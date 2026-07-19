@@ -143,6 +143,9 @@ x
         tags: ['a', 'b'],
         status: 'draft',
         aliases: ['X', 'Y'],
+        date: null,
+        priority: null,
+        props: {},
       }),
     ).toEqual({ tags: 'a b', status: 'draft', aliases: 'X Y' })
     expect(metaToSearchFields(EMPTY_DOC_META)).toEqual({

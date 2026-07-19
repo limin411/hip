@@ -28,7 +28,7 @@ export type WikiCandidate = {
 
 /**
  * Parse the inner body of `[[...]]` into title + optional pipe display.
- * Pipe only (no aliases / namespaces in Phase 1 title-only resolution).
+ * Title may include `#fragment` (heading anchor). Pipe only for display.
  */
 export function parseWikiLinkInner(inner: string): {
   title: string
@@ -43,36 +43,89 @@ export function parseWikiLinkInner(inner: string): {
   return { title, display: displayRaw.length > 0 ? displayRaw : null }
 }
 
-/** Build href for preview rewrite (`./__wiki__/` + URI-encoded title). */
-export function wikiHrefForTitle(title: string): string {
-  return `${WIKI_LINK_HREF_PREFIX}${encodeURIComponent(title)}`
+/**
+ * Split wiki title into doc title + optional heading fragment.
+ * `#Heading` alone → empty docTitle (same-document).
+ */
+export function splitWikiTitleFragment(title: string): {
+  docTitle: string
+  fragment: string | null
+} {
+  const t = title.trim()
+  if (!t) return { docTitle: '', fragment: null }
+  if (t.startsWith('#')) {
+    const frag = t.slice(1).trim()
+    return { docTitle: '', fragment: frag.length > 0 ? frag : null }
+  }
+  const hash = t.indexOf('#')
+  if (hash < 0) return { docTitle: t, fragment: null }
+  const docTitle = t.slice(0, hash).trim()
+  const frag = t.slice(hash + 1).trim()
+  return { docTitle, fragment: frag.length > 0 ? frag : null }
 }
 
-/** Extract title from a rewritten wiki href, or null if not a wiki link. */
-export function titleFromWikiHref(href: string | null | undefined): string | null {
+/** Build href for preview rewrite (`./__wiki__/` + URI-encoded title [+ #frag]). */
+export function wikiHrefForTitle(title: string, fragment?: string | null): string {
+  const base = `${WIKI_LINK_HREF_PREFIX}${encodeURIComponent(title)}`
+  if (fragment != null && fragment.length > 0) {
+    return `${base}#${encodeURIComponent(fragment)}`
+  }
+  return base
+}
+
+export type WikiHrefParts = {
+  /** Raw title segment (may be empty for same-doc `#H`). */
+  title: string
+  fragment: string | null
+}
+
+/** Extract title (+ optional hash fragment) from a rewritten wiki href. */
+export function wikiPartsFromHref(href: string | null | undefined): WikiHrefParts | null {
   if (!href) return null
-  // react-markdown may leave relative as-is or resolve; accept common forms.
   const prefixes = [
     WIKI_LINK_HREF_PREFIX,
     '__wiki__/',
     '/__wiki__/',
   ]
-  let enc: string | null = null
+  let rest: string | null = null
   for (const p of prefixes) {
     const i = href.indexOf(p)
     if (i >= 0) {
-      enc = href.slice(i + p.length)
+      rest = href.slice(i + p.length)
       break
     }
   }
-  if (enc == null) return null
-  // Drop trailing query/hash if any.
-  const clean = enc.split(/[?#]/)[0] ?? enc
-  try {
-    return decodeURIComponent(clean)
-  } catch {
-    return clean
+  if (rest == null) return null
+  const hash = rest.indexOf('#')
+  const q = rest.indexOf('?')
+  let titleEnc: string
+  let fragEnc: string | null = null
+  if (hash >= 0 && (q < 0 || hash < q)) {
+    titleEnc = rest.slice(0, hash)
+    const after = rest.slice(hash + 1)
+    fragEnc = (q >= 0 ? after.slice(0, after.indexOf('?')) : after) || null
+  } else {
+    titleEnc = q >= 0 ? rest.slice(0, q) : rest
   }
+  const decode = (s: string) => {
+    try {
+      return decodeURIComponent(s)
+    } catch {
+      return s
+    }
+  }
+  return {
+    title: decode(titleEnc),
+    fragment: fragEnc != null ? decode(fragEnc) : null,
+  }
+}
+
+/** Extract title from a rewritten wiki href, or null if not a wiki link. */
+export function titleFromWikiHref(href: string | null | undefined): string | null {
+  const parts = wikiPartsFromHref(href)
+  if (!parts) return null
+  // Preserve prior behavior: return title segment only (no fragment).
+  return parts.title
 }
 
 /**
@@ -215,8 +268,9 @@ export function extractWikiLinks(md: string): WikiLinkHit[] {
 /**
  * Rewrite wiki links to standard markdown links for react-markdown preview.
  * `[[Title]]` → `[Title](./__wiki__/Title)`
- * `[[Title|Disp]]` → `[Disp](./__wiki__/Title)`
+ * `[[Title#H|Disp]]` → `[Disp](./__wiki__/Title#H)`
  * Leaves code fences / inline code untouched. Empty titles become broken hrefs still.
+ * Skips `![[embed]]` (leading `!`) — embeds handled separately in a later phase.
  */
 export function rewriteWikiLinksForPreview(md: string): string {
   const hits = extractWikiLinks(md)
@@ -225,10 +279,12 @@ export function rewriteWikiLinksForPreview(md: string): string {
   let out = md
   for (let i = hits.length - 1; i >= 0; i--) {
     const h = hits[i]!
+    if (h.start > 0 && md[h.start - 1] === '!') continue
+    const { docTitle, fragment } = splitWikiTitleFragment(h.title)
     const label = h.display ?? h.title
     // Escape label brackets so nested MD links stay well-formed.
     const safeLabel = label.replace(/[[\]]/g, '')
-    const href = wikiHrefForTitle(h.title)
+    const href = wikiHrefForTitle(docTitle, fragment)
     const replacement = `[${safeLabel || h.title || '?'}](${href})`
     out = out.slice(0, h.start) + replacement + out.slice(h.end)
   }

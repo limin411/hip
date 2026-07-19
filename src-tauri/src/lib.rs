@@ -9,6 +9,7 @@ mod hip_config;
 mod path_tools;
 mod pty;
 mod knowledge;
+mod knowledge_link_index;
 
 // Re-export so command handlers and unit tests can use `super::HipConfig` etc.
 use hip_config::{HipConfig, TomlHipConfig, NetworkPolicyConfig};
@@ -607,6 +608,7 @@ pub fn run() {
             knowledge::knowledge_restore_version,
             write_text_file,
             knowledge::knowledge_export_doc,
+            knowledge::knowledge_export_text,
             knowledge::knowledge_export_space_zip,
             knowledge::knowledge_import_folder,
             knowledge::knowledge_reveal_doc,
@@ -618,6 +620,18 @@ pub fn run() {
             knowledge::knowledge_list_templates,
             knowledge::knowledge_save_template,
             knowledge::knowledge_delete_template,
+            knowledge_link_index::knowledge_link_index_upsert,
+            knowledge_link_index::knowledge_link_index_remove_doc,
+            knowledge_link_index::knowledge_link_index_replace_all,
+            knowledge_link_index::knowledge_link_index_backlinks,
+            knowledge_link_index::knowledge_link_index_outbound,
+            knowledge_link_index::knowledge_link_index_broken,
+            knowledge_link_index::knowledge_link_index_doc_count,
+            knowledge_link_index::knowledge_link_index_graph,
+            knowledge_link_index::knowledge_get_schema,
+            knowledge_link_index::knowledge_set_schema,
+            knowledge_link_index::knowledge_get_views,
+            knowledge_link_index::knowledge_set_views,
         ])
         .build(tauri::generate_context!())
         .expect("error while running tauri application");

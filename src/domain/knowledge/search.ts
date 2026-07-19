@@ -150,6 +150,9 @@ export type KnowledgeDocMetaEntry = {
   tags: string[]
   status: string | null
   aliases: string[]
+  date: string | null
+  priority: string | null
+  props: KnowledgeDocMeta['props']
 }
 
 export type KnowledgeSearchFacets = {
@@ -239,6 +242,9 @@ export function upsertSearchDoc(
       tags: full.tagList,
       status: full.statusValue ? full.statusValue : null,
       aliases: full.aliasList,
+      date: prepared.meta.date,
+      priority: prepared.meta.priority,
+      props: { ...prepared.meta.props },
     })
   }
 }

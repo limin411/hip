@@ -80,6 +80,10 @@ export async function knowledgeExportDoc(
   await invoke('knowledge_export_doc', { args: { spaceId, docId, destPath } })
 }
 
+export async function knowledgeExportText(destPath: string, body: string): Promise<void> {
+  await invoke('knowledge_export_text', { args: { destPath, body } })
+}
+
 export async function knowledgeExportSpaceZip(spaceId: string, destPath: string): Promise<void> {
   await invoke('knowledge_export_space_zip', { args: { spaceId, destPath } })
 }
@@ -209,4 +213,134 @@ export async function knowledgeRestoreVersion(
   return invoke<string>('knowledge_restore_version', {
     args: { spaceId, docId, versionId },
   })
+}
+
+// ── Link index (SQLite under space/.hip/) ─────────────────────────────────
+
+export type KnowledgeLinkOutboundIn = {
+  kind: string
+  raw: string
+  targetTitle: string | null
+  targetDocId: string | null
+  fragment: string | null
+  display: string | null
+}
+
+export type KnowledgeLinkDocPayload = {
+  docId: string
+  title: string
+  aliases: string[]
+  tags: string[]
+  status: string | null
+  props: Record<string, unknown>
+  contentHash: string
+  updatedAt: number
+  outbound: KnowledgeLinkOutboundIn[]
+}
+
+export type KnowledgeLinkBacklink = {
+  fromDocId: string
+  fromTitle: string
+  raw: string
+  kind: string
+  fragment: string | null
+}
+
+export type KnowledgeLinkOutboundRow = {
+  kind: string
+  raw: string
+  targetTitle: string | null
+  targetDocId: string | null
+  fragment: string | null
+  display: string | null
+}
+
+export type KnowledgeLinkBrokenRow = {
+  fromDocId: string
+  fromTitle: string
+  raw: string
+  kind: string
+}
+
+export async function knowledgeLinkIndexUpsert(
+  spaceId: string,
+  doc: KnowledgeLinkDocPayload,
+): Promise<void> {
+  await invoke('knowledge_link_index_upsert', { args: { spaceId, doc } })
+}
+
+export async function knowledgeLinkIndexRemoveDoc(
+  spaceId: string,
+  docId: string,
+): Promise<void> {
+  await invoke('knowledge_link_index_remove_doc', { args: { spaceId, docId } })
+}
+
+export async function knowledgeLinkIndexReplaceAll(
+  spaceId: string,
+  docs: KnowledgeLinkDocPayload[],
+): Promise<void> {
+  await invoke('knowledge_link_index_replace_all', { args: { spaceId, docs } })
+}
+
+export async function knowledgeLinkIndexBacklinks(
+  spaceId: string,
+  docId: string,
+): Promise<KnowledgeLinkBacklink[]> {
+  return invoke<KnowledgeLinkBacklink[]>('knowledge_link_index_backlinks', {
+    args: { spaceId, docId },
+  })
+}
+
+export async function knowledgeLinkIndexOutbound(
+  spaceId: string,
+  docId: string,
+): Promise<KnowledgeLinkOutboundRow[]> {
+  return invoke<KnowledgeLinkOutboundRow[]>('knowledge_link_index_outbound', {
+    args: { spaceId, docId },
+  })
+}
+
+export async function knowledgeLinkIndexBroken(
+  spaceId: string,
+): Promise<KnowledgeLinkBrokenRow[]> {
+  return invoke<KnowledgeLinkBrokenRow[]>('knowledge_link_index_broken', {
+    args: { spaceId },
+  })
+}
+
+export async function knowledgeLinkIndexDocCount(spaceId: string): Promise<number> {
+  return invoke<number>('knowledge_link_index_doc_count', { args: { spaceId } })
+}
+
+export type KnowledgeGraphNode = { id: string; title: string }
+export type KnowledgeGraphEdge = { from: string; to: string; kind: string }
+export type KnowledgeGraphPayload = {
+  nodes: KnowledgeGraphNode[]
+  edges: KnowledgeGraphEdge[]
+}
+
+export async function knowledgeLinkIndexGraph(
+  spaceId: string,
+): Promise<KnowledgeGraphPayload> {
+  return invoke<KnowledgeGraphPayload>('knowledge_link_index_graph', {
+    args: { spaceId },
+  })
+}
+
+/** Raw JSON string or null when file missing. */
+export async function knowledgeGetSchema(spaceId: string): Promise<string | null> {
+  return invoke<string | null>('knowledge_get_schema', { args: { spaceId } })
+}
+
+export async function knowledgeSetSchema(spaceId: string, json: string): Promise<void> {
+  await invoke('knowledge_set_schema', { args: { spaceId, json } })
+}
+
+export async function knowledgeGetViews(spaceId: string): Promise<string | null> {
+  return invoke<string | null>('knowledge_get_views', { args: { spaceId } })
+}
+
+export async function knowledgeSetViews(spaceId: string, json: string): Promise<void> {
+  await invoke('knowledge_set_views', { args: { spaceId, json } })
 }

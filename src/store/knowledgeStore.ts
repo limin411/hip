@@ -62,7 +62,37 @@ import {
   knowledgeSaveVersion,
   knowledgeUpdateSpace,
   knowledgeWriteDoc,
+  knowledgeLinkIndexUpsert,
+  knowledgeLinkIndexRemoveDoc,
+  knowledgeLinkIndexReplaceAll,
+  knowledgeLinkIndexBacklinks,
+  knowledgeLinkIndexOutbound,
+  knowledgeLinkIndexDocCount,
+  knowledgeGetSchema,
+  knowledgeSetSchema,
+  knowledgeGetViews,
+  knowledgeSetViews,
+  type KnowledgeLinkBacklink,
+  type KnowledgeLinkOutboundRow,
 } from '@/ipc/knowledge'
+import { buildDocIndexPayload } from '@/domain/knowledge/linkIndex'
+import {
+  DEFAULT_SPACE_SCHEMA,
+  normalizeSpaceSchema,
+  type SpaceSchemaV1,
+} from '@/domain/knowledge/schema'
+import {
+  DEFAULT_VIEWS,
+  normalizeViewsFile,
+  patchMetaField,
+  type ViewsFileV1,
+} from '@/domain/knowledge/views'
+import { parseFrontmatter, type KnowledgeDocMeta } from '@/domain/knowledge/frontmatter'
+import { applyMetaToDocument } from '@/domain/knowledge/frontmatterWrite'
+import {
+  applyWikiRewrites,
+  planWikiTitleRewrites,
+} from '@/domain/knowledge/rewriteWikiTitles'
 
 export type { EditorMode }
 export { shouldAutosave }
@@ -302,6 +332,16 @@ interface KnowledgeState {
   pendingReveal: KnowledgePendingReveal | null
   /** Outline (TOC) click — consumed by KnowledgeWorkspace for mode-aware scroll. */
   pendingOutlineJump: KnowledgePendingOutlineJump | null
+  /** SQLite link-index panel (active doc). */
+  backlinks: KnowledgeLinkBacklink[]
+  outboundLinks: KnowledgeLinkOutboundRow[]
+  linkPanelStatus: 'idle' | 'loading' | 'ready' | 'error'
+  /** Active space property schema (defaults if missing on disk). */
+  spaceSchema: SpaceSchemaV1
+  /** Active space collection views. */
+  spaceViews: ViewsFileV1
+  /** null = document canvas; else collection view id. */
+  activeViewId: string | null
   /**
    * Doc counts per space. Tree-derived counts land as soon as trees load during
    * index rebuild (before body reads); finalized when indexStatus is ready.
@@ -346,6 +386,29 @@ interface KnowledgeState {
     line: number
   }) => void
   clearPendingOutlineJump: () => void
+  /** Refresh backlinks + outbound for the active doc (or given id). */
+  refreshLinkPanel: (docId?: string) => Promise<void>
+  /** Full rebuild of space link index from disk docs. */
+  rebuildSpaceLinkIndex: (spaceId?: string) => Promise<void>
+  /** Load schema + views for a space (defaults when missing). */
+  loadSpaceConfig: (spaceId: string) => Promise<void>
+  setActiveViewId: (viewId: string | null) => void
+  /** Patch a frontmatter field on a doc (collection board/table or properties row). */
+  patchDocField: (
+    docId: string,
+    key: string,
+    value: string | string[] | null,
+  ) => Promise<boolean>
+  /** Snapshot of meta for active space docs (for collection views). */
+  getDocMetaMap: () => Map<string, KnowledgeDocMeta>
+  /**
+   * After rename: rewrite `[[oldTitle]]` / embeds in all other docs to newTitle.
+   * Returns number of files changed.
+   */
+  rewriteWikiLinksAfterRename: (
+    oldTitle: string,
+    newTitle: string,
+  ) => Promise<number>
   openHome: () => Promise<void>
   createFolder: (parentId: string | null, title: string) => Promise<void>
   /**
@@ -453,6 +516,32 @@ function indexCurrentDoc(
   })
 }
 
+/** Best-effort SQLite link-index upsert (parse in TS). */
+async function upsertLinkIndexDoc(
+  spaceId: string,
+  docId: string,
+  title: string,
+  body: string,
+  nodes: KnowledgeNode[],
+): Promise<void> {
+  try {
+    const payload = buildDocIndexPayload(docId, title, body, nodes)
+    await knowledgeLinkIndexUpsert(spaceId, payload)
+  } catch (e) {
+    console.warn('knowledge link index upsert failed', e)
+  }
+}
+
+async function removeLinkIndexDocs(spaceId: string, docIds: string[]): Promise<void> {
+  for (const docId of docIds) {
+    try {
+      await knowledgeLinkIndexRemoveDoc(spaceId, docId)
+    } catch (e) {
+      console.warn('knowledge link index remove failed', e)
+    }
+  }
+}
+
 /**
  * Refresh facet lists and drop stale filterTag/filterStatus that no longer exist
  * (avoids Home empty-results trap when last tagged doc is deleted).
@@ -516,6 +605,12 @@ export const useKnowledgeStore = create<KnowledgeState>((set, get) => ({
   indexProgress: null,
   pendingReveal: null,
   pendingOutlineJump: null,
+  backlinks: [],
+  outboundLinks: [],
+  linkPanelStatus: 'idle',
+  spaceSchema: structuredClone(DEFAULT_SPACE_SCHEMA),
+  spaceViews: structuredClone(DEFAULT_VIEWS),
+  activeViewId: null,
   spaceDocCounts: {},
   availableTags: [],
   availableStatuses: [],
@@ -781,7 +876,26 @@ export const useKnowledgeStore = create<KnowledgeState>((set, get) => ({
         treeFocusId: opts?.selectDocId ?? null,
         // Drop stale picker: confirm must not write into a different space.
         templatePicker: null,
+        backlinks: [],
+        outboundLinks: [],
+        linkPanelStatus: 'idle',
+        activeViewId: null,
+        spaceSchema: structuredClone(DEFAULT_SPACE_SCHEMA),
+        spaceViews: structuredClone(DEFAULT_VIEWS),
       })
+      void get().loadSpaceConfig(id)
+      // Ensure SQLite link index exists (rebuild when empty / first open).
+      void (async () => {
+        try {
+          const count = await knowledgeLinkIndexDocCount(id)
+          const docCount = nodes.filter((n) => n.kind === 'doc').length
+          if (count === 0 && docCount > 0) {
+            await get().rebuildSpaceLinkIndex(id)
+          }
+        } catch (e) {
+          console.warn('link index ensure failed', e)
+        }
+      })()
       if (opts?.selectDocId) {
         await get().openDoc(opts.selectDocId)
       } else {
@@ -834,6 +948,190 @@ export const useKnowledgeStore = create<KnowledgeState>((set, get) => ({
     })),
   clearPendingOutlineJump: () => set({ pendingOutlineJump: null }),
 
+  refreshLinkPanel: async (docId) => {
+    const spaceId = get().activeSpaceId
+    const id = docId ?? get().activeDocId
+    if (!spaceId || !id) {
+      set({ backlinks: [], outboundLinks: [], linkPanelStatus: 'idle' })
+      return
+    }
+    set({ linkPanelStatus: 'loading' })
+    try {
+      const [backlinks, outboundLinks] = await Promise.all([
+        knowledgeLinkIndexBacklinks(spaceId, id),
+        knowledgeLinkIndexOutbound(spaceId, id),
+      ])
+      // Stale guard
+      if (get().activeSpaceId !== spaceId || get().activeDocId !== id) return
+      set({ backlinks, outboundLinks, linkPanelStatus: 'ready' })
+    } catch (e) {
+      console.warn('refreshLinkPanel failed', e)
+      if (get().activeSpaceId === spaceId && get().activeDocId === id) {
+        set({ backlinks: [], outboundLinks: [], linkPanelStatus: 'error' })
+      }
+    }
+  },
+
+  rebuildSpaceLinkIndex: async (spaceIdArg) => {
+    const spaceId = spaceIdArg ?? get().activeSpaceId
+    if (!spaceId) return
+    const nodes =
+      spaceId === get().activeSpaceId
+        ? get().nodes
+        : ((await knowledgeGetTree(spaceId)).nodes ?? [])
+    const docs = nodes.filter((n) => n.kind === 'doc')
+    const payloads = []
+    for (const d of docs) {
+      let body = ''
+      try {
+        body = await knowledgeReadDoc(spaceId, d.id)
+      } catch {
+        body = ''
+      }
+      payloads.push(buildDocIndexPayload(d.id, d.title, body, nodes))
+    }
+    try {
+      await knowledgeLinkIndexReplaceAll(spaceId, payloads)
+    } catch (e) {
+      console.warn('rebuildSpaceLinkIndex failed', e)
+      return
+    }
+    if (get().activeSpaceId === spaceId && get().activeDocId) {
+      void get().refreshLinkPanel()
+    }
+  },
+
+  loadSpaceConfig: async (spaceId) => {
+    try {
+      const [schemaRaw, viewsRaw] = await Promise.all([
+        knowledgeGetSchema(spaceId),
+        knowledgeGetViews(spaceId),
+      ])
+      let schema = normalizeSpaceSchema(
+        schemaRaw ? JSON.parse(schemaRaw) : null,
+      )
+      let views = normalizeViewsFile(viewsRaw ? JSON.parse(viewsRaw) : null)
+      // Persist defaults once so git-friendly files exist
+      if (!schemaRaw) {
+        try {
+          await knowledgeSetSchema(spaceId, JSON.stringify(schema, null, 2))
+        } catch {
+          /* ignore */
+        }
+      }
+      if (!viewsRaw) {
+        try {
+          await knowledgeSetViews(spaceId, JSON.stringify(views, null, 2))
+        } catch {
+          /* ignore */
+        }
+      }
+      if (get().activeSpaceId === spaceId) {
+        set({ spaceSchema: schema, spaceViews: views })
+      }
+    } catch (e) {
+      console.warn('loadSpaceConfig failed', e)
+      if (get().activeSpaceId === spaceId) {
+        set({
+          spaceSchema: structuredClone(DEFAULT_SPACE_SCHEMA),
+          spaceViews: structuredClone(DEFAULT_VIEWS),
+        })
+      }
+    }
+  },
+
+  setActiveViewId: (viewId) => set({ activeViewId: viewId }),
+
+  getDocMetaMap: () => {
+    const spaceId = get().activeSpaceId
+    const map = new Map<string, KnowledgeDocMeta>()
+    if (!spaceId) return map
+    for (const entry of kbMeta.values()) {
+      if (entry.spaceId !== spaceId) continue
+      map.set(entry.docId, {
+        tags: entry.tags,
+        status: entry.status,
+        aliases: entry.aliases,
+        date: entry.date ?? null,
+        priority: entry.priority ?? null,
+        props: entry.props ? { ...entry.props } : {},
+      })
+    }
+    // Prefer live draft for active doc
+    const activeId = get().activeDocId
+    if (activeId) {
+      const live = parseFrontmatter(get().draftBody || get().docBody).meta
+      map.set(activeId, live)
+    }
+    return map
+  },
+
+  patchDocField: async (docId, key, value) => {
+    const spaceId = get().activeSpaceId
+    if (!spaceId) return false
+    try {
+      let body: string
+      if (get().activeDocId === docId) {
+        const ok = await get().flushSave()
+        if (!ok) return false
+        body = get().docBody
+      } else {
+        body = await knowledgeReadDoc(spaceId, docId)
+      }
+      const meta = parseFrontmatter(body).meta
+      const nextMeta = patchMetaField(meta, key, value)
+      const nextBody = applyMetaToDocument(body, nextMeta)
+      await knowledgeWriteDoc(spaceId, docId, nextBody)
+      const title = get().nodes.find((n) => n.id === docId)?.title ?? ''
+      const spaceName = get().spaces.find((s) => s.id === spaceId)?.name ?? ''
+      indexCurrentDoc(spaceId, docId, title, nextBody, spaceName, get().nodes)
+      void upsertLinkIndexDoc(spaceId, docId, title, nextBody, get().nodes)
+      if (get().activeDocId === docId) {
+        set({ docBody: nextBody, draftBody: nextBody })
+      }
+      syncFacetsToState(set)
+      get().runSearch(get().searchQuery)
+      return true
+    } catch (e) {
+      toast.error(knowledgeErrorMessage(e))
+      return false
+    }
+  },
+
+  rewriteWikiLinksAfterRename: async (oldTitle, newTitle) => {
+    const spaceId = get().activeSpaceId
+    if (!spaceId) return 0
+    const docs = get().nodes.filter((n) => n.kind === 'doc')
+    let changed = 0
+    const spaceName = get().spaces.find((s) => s.id === spaceId)?.name ?? ''
+    for (const d of docs) {
+      try {
+        let body =
+          get().activeDocId === d.id
+            ? get().draftBody || get().docBody
+            : await knowledgeReadDoc(spaceId, d.id)
+        const hits = planWikiTitleRewrites(body, oldTitle, newTitle)
+        if (hits.length === 0) continue
+        const next = applyWikiRewrites(body, hits)
+        await knowledgeWriteDoc(spaceId, d.id, next)
+        indexCurrentDoc(spaceId, d.id, d.title, next, spaceName, get().nodes)
+        void upsertLinkIndexDoc(spaceId, d.id, d.title, next, get().nodes)
+        if (get().activeDocId === d.id) {
+          set({ docBody: next, draftBody: next })
+        }
+        changed += 1
+      } catch (e) {
+        console.warn('rewrite wiki in', d.id, e)
+      }
+    }
+    if (changed > 0) {
+      void get().rebuildSpaceLinkIndex(spaceId)
+      syncFacetsToState(set)
+      get().runSearch(get().searchQuery)
+    }
+    return changed
+  },
+
   openHome: async () => {
     const ok = await get().flushSave()
     if (!ok) return // stay in workspace; saveState error + retry chrome
@@ -853,6 +1151,7 @@ export const useKnowledgeStore = create<KnowledgeState>((set, get) => ({
       filterStatus: null,
       expandedFolderIds: {},
       templatePicker: null,
+      activeViewId: null,
     })
     get().runSearch(get().searchQuery)
   },
@@ -911,6 +1210,7 @@ export const useKnowledgeStore = create<KnowledgeState>((set, get) => ({
       await knowledgeSaveTree(spaceId, { version: 1, nodes })
       const spaceName = get().spaces.find((s) => s.id === spaceId)?.name ?? ''
       indexCurrentDoc(spaceId, id, node.title, body, spaceName, nodes)
+      void upsertLinkIndexDoc(spaceId, id, node.title, body, nodes)
       set((s) => ({
         nodes,
         busy: false,
@@ -1030,6 +1330,9 @@ export const useKnowledgeStore = create<KnowledgeState>((set, get) => ({
           body = get().activeDocId === id ? get().docBody : ''
         }
         indexCurrentDoc(spaceId, id, renamed.title, body, spaceName, nodes)
+        void upsertLinkIndexDoc(spaceId, id, renamed.title, body, nodes)
+        // Title change may re-resolve other docs' wiki targets — rebuild space links.
+        void get().rebuildSpaceLinkIndex(spaceId)
         syncFacetsToState(set)
         get().runSearch(get().searchQuery)
       }
@@ -1095,6 +1398,7 @@ export const useKnowledgeStore = create<KnowledgeState>((set, get) => ({
         await knowledgeDeleteDocFile(spaceId, docId)
         removeSearchDoc(kbIndex, docKey(spaceId, docId), kbMeta)
       }
+      await removeLinkIndexDocs(spaceId, removedDocIds)
       const activeRemoved = get().activeDocId != null && removedDocIds.includes(get().activeDocId!)
       set((s) => {
         const prevCount = s.spaceDocCounts[spaceId]
@@ -1188,9 +1492,15 @@ export const useKnowledgeStore = create<KnowledgeState>((set, get) => ({
         saveState: 'idle',
         treeFocusId: id,
         expandedFolderIds,
+        backlinks: [],
+        outboundLinks: [],
+        linkPanelStatus: 'loading',
         ...(revealMatches ? {} : { pendingReveal: null }),
       })
       schedulePersistExpand(spaceId, get)
+      void upsertLinkIndexDoc(spaceId, id, node.title, body, get().nodes).then(() =>
+        get().refreshLinkPanel(id),
+      )
       const spaceName = get().spaces.find((s) => s.id === spaceId)?.name ?? ''
       const item: KnowledgeRecentItem = {
         spaceId,
@@ -1275,8 +1585,16 @@ export const useKnowledgeStore = create<KnowledgeState>((set, get) => ({
             spaceName,
             get().nodes,
           )
+          await upsertLinkIndexDoc(
+            s.activeSpaceId,
+            s.activeDocId,
+            node.title,
+            s.draftBody,
+            get().nodes,
+          )
           syncFacetsToState(set)
           get().runSearch(get().searchQuery)
+          void get().refreshLinkPanel(s.activeDocId)
         }
         // Daily snapshot on the same chain step so await flushSave drains it
         // (delete/manual must not race an in-flight daily).

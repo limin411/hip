@@ -33,12 +33,21 @@ vi.mock('@/i18n', () => ({
   default: { t: (key: string) => key },
 }))
 
+const requestOutlineJump = vi.fn()
 vi.mock('@/store/knowledgeStore', () => ({
   useKnowledgeStore: Object.assign(
     (selector: (s: {
       setDraftBody: typeof setDraftBody
       activeSpaceId: string | null
-    }) => unknown) => selector({ setDraftBody, activeSpaceId: 'spc_test01' }),
+      activeDocId: string | null
+      requestOutlineJump: typeof requestOutlineJump
+    }) => unknown) =>
+      selector({
+        setDraftBody,
+        activeSpaceId: 'spc_test01',
+        activeDocId: 'doc_cur',
+        requestOutlineJump,
+      }),
     {
       getState: () => getState(),
     },
@@ -58,6 +67,12 @@ vi.mock('@/domain/knowledge/assetUrl', async (importOriginal) => {
 
 vi.mock('@tauri-apps/plugin-shell', () => ({
   open: vi.fn(),
+}))
+
+const knowledgeReadDoc = vi.fn()
+vi.mock('@/ipc/knowledge', () => ({
+  knowledgeReadDoc: (...a: unknown[]) => knowledgeReadDoc(...a),
+  knowledgeErrorMessage: (e: unknown) => (e instanceof Error ? e.message : String(e)),
 }))
 
 // Avoid chat CodeBlock → context-menu → sessionService graph in unit tests.
@@ -258,7 +273,7 @@ describe('DocReader wiki links', () => {
     const link = screen.getByTestId('knowledge-wiki-link')
     expect(link).toHaveTextContent('Alpha')
     fireEvent.click(link)
-    expect(onWikiNavigate).toHaveBeenCalledWith('doc_alpha')
+    expect(onWikiNavigate).toHaveBeenCalledWith('doc_alpha', null)
   })
 
   it('renders broken style and requests create', () => {
@@ -285,5 +300,21 @@ describe('DocReader wiki links', () => {
       />,
     )
     expect(screen.getByTestId('knowledge-wiki-link')).toHaveTextContent('Shown')
+  })
+})
+
+describe('DocReader embeds', () => {
+  beforeEach(() => {
+    knowledgeReadDoc.mockReset()
+    knowledgeReadDoc.mockResolvedValue('# Alpha body\n\nHello embed.\n')
+  })
+
+  it('renders embed card for ![[Title]] when space is active', async () => {
+    render(
+      <DocReader content="Intro\n\n![[Alpha]]\n\nOutro" nodes={nodes} onWikiNavigate={() => {}} />,
+    )
+    expect(await screen.findByTestId('knowledge-embed')).toBeInTheDocument()
+    expect(await screen.findByTestId('knowledge-embed-body')).toHaveTextContent('Hello embed')
+    expect(knowledgeReadDoc).toHaveBeenCalledWith('spc_test01', 'doc_alpha')
   })
 })

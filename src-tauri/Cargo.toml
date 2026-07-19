@@ -42,4 +42,6 @@ portable-pty = "0.9"
 base64 = "0.22"
 # Process-group kill for PTY children (Unix).
 libc = "0.2"
+# Knowledge link index (per-space SQLite under .hip/).
+rusqlite = { version = "0.32", features = ["bundled"] }
 

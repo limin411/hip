@@ -3,7 +3,7 @@ import type { Components, ExtraProps } from 'react-markdown'
 import type { AnchorHTMLAttributes, ClassAttributes } from 'react'
 import { useTranslation } from 'react-i18next'
 import { FileText } from 'lucide-react'
-import { MarkdownBody } from '@/components/chat/MarkdownBody'
+import { KnowledgeMarkdownBody } from './KnowledgeMarkdownBody'
 import { EmptyState } from '@/components/ui/EmptyState'
 import { headingIdsBySourceLine } from '@/domain/knowledge/mdPreview'
 import { toggleTaskAt } from '@/domain/knowledge/mdTasks'
@@ -12,11 +12,14 @@ import {
   listDocsInTreeOrder,
   resolveWikiTitle,
   rewriteWikiLinksForPreview,
-  titleFromWikiHref,
+  wikiPartsFromHref,
 } from '@/domain/knowledge/wikiLink'
+import { extractDocOutline, slugifyHeading } from '@/domain/knowledge/mdPreview'
+import { splitByEmbeds } from '@/domain/knowledge/embedSplit'
 import { cn } from '@/lib/utils'
 import { useKnowledgeStore } from '@/store/knowledgeStore'
 import { knowledgeMarkdownComponents } from './knowledgeMarkdownComponents'
+import { KnowledgeEmbedCard } from './KnowledgeEmbedCard'
 
 interface DocReaderProps {
   /**
@@ -28,10 +31,12 @@ interface DocReaderProps {
   onStartEdit?: () => void
   /** Current space tree — enables `[[title]]` resolution (same space only). */
   nodes?: KnowledgeNode[]
-  /** Navigate to a resolved wiki target. */
-  onWikiNavigate?: (docId: string) => void
+  /** Navigate to a resolved wiki target (optional heading fragment text). */
+  onWikiNavigate?: (docId: string, fragment?: string | null) => void
   /** Broken wiki click → parent shows confirm-create modal. */
   onWikiBroken?: (title: string) => void
+  /** Same-doc heading jump (e.g. `[[#Intro]]`). */
+  onWikiHeadingJump?: (fragment: string) => void
 }
 
 export function DocReader({
@@ -40,15 +45,34 @@ export function DocReader({
   nodes,
   onWikiNavigate,
   onWikiBroken,
+  onWikiHeadingJump,
 }: DocReaderProps) {
   const { t } = useTranslation()
   const setDraftBody = useKnowledgeStore((s) => s.setDraftBody)
   const activeSpaceId = useKnowledgeStore((s) => s.activeSpaceId)
+  const activeDocId = useKnowledgeStore((s) => s.activeDocId)
+  const requestOutlineJump = useKnowledgeStore((s) => s.requestOutlineJump)
   const rootRef = useRef<HTMLDivElement>(null)
+
+  const jumpToFragment = useCallback(
+    (fragment: string) => {
+      if (onWikiHeadingJump) {
+        onWikiHeadingJump(fragment)
+        return
+      }
+      const outline = extractDocOutline(content)
+      const hit =
+        outline.find((o) => o.text === fragment) ||
+        outline.find((o) => o.text.toLowerCase() === fragment.toLowerCase()) ||
+        outline.find((o) => slugifyHeading(o.text) === slugifyHeading(fragment)) ||
+        outline.find((o) => o.id === slugifyHeading(fragment))
+      if (hit) requestOutlineJump(hit)
+    },
+    [content, onWikiHeadingJump, requestOutlineJump],
+  )
 
   const onTaskToggle = useCallback(
     (taskIndex: number) => {
-      // Prefer draftBody so rapid toggles before flush completes stay consistent.
       const { draftBody, docBody } = useKnowledgeStore.getState()
       const source = draftBody || docBody
       const next = toggleTaskAt(source, taskIndex)
@@ -59,7 +83,6 @@ export function DocReader({
     [setDraftBody],
   )
 
-  // Pure precompute from content — stable under StrictMode (no render counters).
   const headingIdsByLine = useMemo(() => headingIdsBySourceLine(content), [content])
 
   const baseComponents = useMemo(
@@ -73,12 +96,9 @@ export function DocReader({
     [onTaskToggle, headingIdsByLine, activeSpaceId],
   )
 
-  const previewMd = useMemo(
-    () => (content.trim() ? rewriteWikiLinksForPreview(content) : content),
-    [content],
-  )
+  const segments = useMemo(() => splitByEmbeds(content), [content])
 
-  const components = useMemo((): Components => {
+  const wikiComponents = useMemo((): Components => {
     if (!nodes && !onWikiNavigate && !onWikiBroken) return baseComponents
     const docs = listDocsInTreeOrder(nodes ?? [])
     const baseA = baseComponents.a
@@ -86,9 +106,8 @@ export function DocReader({
       ...baseComponents,
       a: (props) => {
         const { href, children, className, node: _node, ...rest } = props
-        const wikiTitle = titleFromWikiHref(href)
-        if (wikiTitle == null) {
-          // Fall back to knowledge base link handler (anchors / external / #heading).
+        const parts = wikiPartsFromHref(href)
+        if (parts == null) {
           if (baseA && typeof baseA !== 'string') {
             return createElement(
               baseA as ComponentType<
@@ -110,17 +129,46 @@ export function DocReader({
           )
         }
 
-        const resolved = resolveWikiTitle(wikiTitle, docs)
+        const docTitle = parts.title
+        const fragment = parts.fragment
+
+        if (!docTitle && fragment) {
+          return (
+            <a
+              href={href}
+              data-testid="knowledge-wiki-link"
+              data-wiki-title={`#${fragment}`}
+              data-wiki-doc-id={activeDocId ?? undefined}
+              title={t('knowledge.wiki.openHint', { title: `#${fragment}` })}
+              className={cn(
+                'cursor-pointer underline text-accent-strong hover:opacity-80',
+                className,
+              )}
+              onClick={(e) => {
+                e.preventDefault()
+                e.stopPropagation()
+                jumpToFragment(fragment)
+              }}
+              {...rest}
+            >
+              {children}
+            </a>
+          )
+        }
+
+        const resolved = resolveWikiTitle(docTitle, docs)
         const broken = resolved == null
+        const displayTitle = docTitle || parts.title
         return (
           <a
             href={href}
             data-testid={broken ? 'knowledge-wiki-link-broken' : 'knowledge-wiki-link'}
-            data-wiki-title={wikiTitle}
+            data-wiki-title={displayTitle}
+            data-wiki-fragment={fragment ?? undefined}
             data-wiki-doc-id={resolved?.id}
             title={
               broken
-                ? t('knowledge.wiki.brokenHint', { title: wikiTitle })
+                ? t('knowledge.wiki.brokenHint', { title: displayTitle })
                 : t('knowledge.wiki.openHint', { title: resolved.title })
             }
             className={cn(
@@ -134,9 +182,9 @@ export function DocReader({
               e.preventDefault()
               e.stopPropagation()
               if (resolved) {
-                onWikiNavigate?.(resolved.id)
+                onWikiNavigate?.(resolved.id, fragment)
               } else {
-                onWikiBroken?.(wikiTitle)
+                onWikiBroken?.(displayTitle)
               }
             }}
             {...rest}
@@ -146,7 +194,15 @@ export function DocReader({
         )
       },
     }
-  }, [baseComponents, nodes, onWikiBroken, onWikiNavigate, t])
+  }, [
+    activeDocId,
+    baseComponents,
+    jumpToFragment,
+    nodes,
+    onWikiBroken,
+    onWikiNavigate,
+    t,
+  ])
 
   if (!content.trim()) {
     return (
@@ -167,9 +223,44 @@ export function DocReader({
     )
   }
 
+  const tree = nodes ?? []
+
   return (
     <div ref={rootRef} data-testid="knowledge-doc-reader">
-      <MarkdownBody content={previewMd} components={components} />
+      {segments.map((seg, i) => {
+        if (seg.type === 'md') {
+          const text = seg.text
+          if (!text.trim()) return null
+          const previewMd = rewriteWikiLinksForPreview(text)
+          return (
+            <KnowledgeMarkdownBody
+              key={`md-${i}`}
+              content={previewMd}
+              components={wikiComponents}
+            />
+          )
+        }
+        if (!activeSpaceId) {
+          return (
+            <p key={`emb-${i}`} className="my-2 text-meta text-ink-tertiary font-mono">
+              {seg.raw}
+            </p>
+          )
+        }
+        return (
+          <KnowledgeEmbedCard
+            key={`emb-${i}-${seg.raw}`}
+            spaceId={activeSpaceId}
+            docTitle={seg.docTitle}
+            fragment={seg.fragment}
+            display={seg.display}
+            raw={seg.raw}
+            nodes={tree}
+            depth={1}
+            onOpenDoc={(docId, frag) => onWikiNavigate?.(docId, frag)}
+          />
+        )
+      })}
     </div>
   )
 }

@@ -21,6 +21,9 @@ describe('KnowledgeOutlinePanel', () => {
       activeDocId: null,
       draftBody: '',
       docBody: '',
+      backlinks: [],
+      outboundLinks: [],
+      linkPanelStatus: 'idle',
     })
   })
 
@@ -40,14 +43,42 @@ describe('KnowledgeOutlinePanel', () => {
       activeDocId: 'doc_1',
       draftBody: '# Hello\n\n## Nested\n',
       docBody: '# Hello\n\n## Nested\n',
+      backlinks: [],
+      outboundLinks: [],
+      linkPanelStatus: 'ready',
       requestOutlineJump,
     })
     render(<KnowledgeOutlinePanel />)
     expect(screen.getByTestId('knowledge-doc-outline')).toBeInTheDocument()
+    expect(screen.getByTestId('knowledge-backlinks-section')).toBeInTheDocument()
     fireEvent.click(screen.getByTestId('knowledge-doc-outline-item-nested'))
     expect(requestOutlineJump).toHaveBeenCalledWith(
       expect.objectContaining({ id: 'nested', level: 2, text: 'Nested', line: 3 }),
     )
+  })
+
+  it('lists backlinks and opens source on click', () => {
+    const openDoc = vi.fn().mockResolvedValue(undefined)
+    useKnowledgeStore.setState({
+      activeDocId: 'doc_1',
+      draftBody: '# Hello\n',
+      docBody: '# Hello\n',
+      backlinks: [
+        {
+          fromDocId: 'doc_other',
+          fromTitle: 'Other',
+          raw: '[[Hello]]',
+          kind: 'wiki',
+          fragment: null,
+        },
+      ],
+      outboundLinks: [],
+      linkPanelStatus: 'ready',
+      openDoc,
+    })
+    render(<KnowledgeOutlinePanel />)
+    fireEvent.click(screen.getByTestId('knowledge-backlink-item'))
+    expect(openDoc).toHaveBeenCalledWith('doc_other')
   })
 
   it('close button collapses the knowledge panel', () => {

@@ -20,14 +20,18 @@ describe('normalizeAssetRelPath', () => {
     expect(normalizeAssetRelPath('./assets/ast_x_a.png')).toBe('assets/ast_x_a.png')
   })
 
-  it('rejects remote, data, nested, and traversal', () => {
+  it('rejects remote, data, and traversal', () => {
     expect(normalizeAssetRelPath('https://x/a.png')).toBeNull()
     expect(normalizeAssetRelPath('data:image/png;base64,xx')).toBeNull()
     expect(normalizeAssetRelPath('assets/../evil.png')).toBeNull()
-    expect(normalizeAssetRelPath('assets/sub/x.png')).toBeNull()
     expect(normalizeAssetRelPath('docs/x.png')).toBeNull()
     expect(normalizeAssetRelPath('assets/..')).toBeNull()
     expect(normalizeAssetRelPath('assets/.')).toBeNull()
+  })
+
+  it('allows nested dirs under assets/', () => {
+    expect(normalizeAssetRelPath('assets/sub/x.png')).toBe('assets/sub/x.png')
+    expect(normalizeAssetRelPath('./assets/a/b/c.webp')).toBe('assets/a/b/c.webp')
   })
 
   it('allows filenames containing .. as a substring (not a path component)', () => {

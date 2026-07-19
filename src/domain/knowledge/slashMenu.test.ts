@@ -25,6 +25,10 @@ describe('slashMenu', () => {
       'hr',
       'table',
       'wiki',
+      'embed',
+      'callout',
+      'math',
+      'mermaid',
     ])
   })
 

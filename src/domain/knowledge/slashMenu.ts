@@ -18,6 +18,10 @@ export type KnowledgeSlashId =
   | 'hr'
   | 'table'
   | 'wiki'
+  | 'embed'
+  | 'callout'
+  | 'math'
+  | 'mermaid'
 
 export interface KnowledgeSlashItem {
   id: KnowledgeSlashId
@@ -61,6 +65,9 @@ export const BLOCK_SLASH_IDS: ReadonlySet<KnowledgeSlashId> = new Set([
   'quote',
   'hr',
   'table',
+  'callout',
+  'math',
+  'mermaid',
 ])
 
 /** Live/Source slash insert config — single source of truth. */
@@ -154,6 +161,38 @@ export const KNOWLEDGE_SLASH_ITEMS: KnowledgeSlashItem[] = [
     insert: '[[]]',
     cursorOffset: 2,
   },
+  {
+    id: 'embed',
+    name: 'embed',
+    keywords: ['transclude', 'include', 'ref'],
+    label: 'Embed document',
+    insert: '![[]]',
+    cursorOffset: 3,
+  },
+  {
+    id: 'callout',
+    name: 'callout',
+    keywords: ['note', 'tip', 'warning', 'admonition'],
+    label: 'Callout',
+    insert: '> [!note] Title\n> ',
+    cursorOffset: 10,
+  },
+  {
+    id: 'math',
+    name: 'math',
+    keywords: ['latex', 'formula', 'equation', 'katex'],
+    label: 'Math block',
+    insert: '$$\n\n$$',
+    cursorOffset: 3,
+  },
+  {
+    id: 'mermaid',
+    name: 'mermaid',
+    keywords: ['diagram', 'flowchart', 'chart'],
+    label: 'Mermaid diagram',
+    insert: '```mermaid\nflowchart LR\n  A --> B\n```',
+    cursorOffset: 12,
+  },
 ]
 
 export type SlashQueryMatch = {
@@ -215,7 +254,8 @@ export function filterSlashItems(
     let score = 5
     if (name === q) score = 0
     else if (name.startsWith(q)) score = 1
-    else if (name.includes(q)) score = 2
+    // Substring name match only for multi-char queries (avoid "h" → math).
+    else if (q.length >= 2 && name.includes(q)) score = 2
     else if (kws.some((k) => k.startsWith(q) || k === q)) score = 3
     // Substring keyword/label match only for multi-char queries (avoid "h" → check/task).
     else if (q.length >= 2 && (label.includes(q) || kws.some((k) => k.includes(q))))

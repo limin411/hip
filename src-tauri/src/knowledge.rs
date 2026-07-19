@@ -18,7 +18,7 @@ const KNOWLEDGE_ASSET_MAX_BYTES: u64 = 25 * 1024 * 1024;
 const KNOWLEDGE_ASSET_INLINE_MAX_BYTES: u64 = 1_500_000;
 
 /// Same rule as TS `KNOWLEDGE_ID_RE`.
-fn is_knowledge_id(id: &str) -> bool {
+pub(crate) fn is_knowledge_id(id: &str) -> bool {
     let (prefix, rest) = match id.split_once('_') {
         Some(p) => p,
         None => return false,
@@ -80,11 +80,15 @@ fn doc_path(root: &Path, space_id: &str, doc_id: &str) -> Result<PathBuf, String
 }
 
 /// Resolve a space-root-relative path that must stay under `assets/`.
-/// `rel_path` may be `assets/foo.png` or `foo.png` (normalized to under assets/).
+/// `rel_path` may be `assets/foo.png`, `assets/sub/foo.png`, or bare `foo.png`.
+/// Nested directories are allowed; `..` segments are rejected via `safe_join`.
 fn asset_path(root: &Path, space_id: &str, rel_path: &str) -> Result<PathBuf, String> {
     require_id(space_id, "spaceId")?;
     let space = space_dir(root, space_id)?;
-    let trimmed = rel_path.trim().trim_start_matches("./");
+    let trimmed = rel_path
+        .trim()
+        .trim_start_matches("./")
+        .replace('\\', "/");
     if trimmed.is_empty() {
         return Err("empty asset path".into());
     }
@@ -92,16 +96,23 @@ fn asset_path(root: &Path, space_id: &str, rel_path: &str) -> Result<PathBuf, St
         rest
     } else if trimmed == "assets" {
         return Err("asset path must be a file under assets/".into());
-    } else if !trimmed.contains('/') && !trimmed.contains('\\') {
-        trimmed
+    } else if !trimmed.contains('/') {
+        trimmed.as_str()
     } else {
         return Err("asset path must be under assets/".into());
     };
-    if under_assets.is_empty() || under_assets.contains('/') || under_assets.contains('\\') {
-        // Only single-segment filenames under assets/ (no nested dirs in v1).
-        return Err("asset path must be a single file under assets/".into());
+    if under_assets.is_empty() {
+        return Err("asset path must be a file under assets/".into());
+    }
+    // Reject empty segments and explicit `.` / `..` even before safe_join.
+    for seg in under_assets.split('/') {
+        if seg.is_empty() || seg == "." || seg == ".." {
+            return Err("illegal asset path segment".into());
+        }
     }
     let assets = safe_join(&space, "assets").ok_or_else(|| "illegal assets path".to_string())?;
+    // Nested: join each segment so safe_join never sees `..` as a single string issue
+    // (safe_join already walks components).
     safe_join(&assets, under_assets).ok_or_else(|| "illegal asset path".to_string())
 }
 
@@ -886,6 +897,29 @@ pub fn knowledge_export_doc(app: AppHandle, args: ExportDocArgs) -> Result<(), S
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
+pub struct ExportTextArgs {
+    pub dest_path: String,
+    pub body: String,
+}
+
+/// Write arbitrary text (e.g. HTML export) to an absolute path.
+#[tauri::command]
+pub fn knowledge_export_text(_app: AppHandle, args: ExportTextArgs) -> Result<(), String> {
+    if args.body.len() > 25 * 1024 * 1024 {
+        return Err("export body too large".into());
+    }
+    let dest = PathBuf::from(&args.dest_path);
+    if !dest.is_absolute() {
+        return Err("destPath must be absolute".into());
+    }
+    if let Some(parent) = dest.parent() {
+        fs::create_dir_all(parent).map_err(|e| e.to_string())?;
+    }
+    atomic_write_str(&dest, &args.body)
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct ExportSpaceZipArgs {
     pub space_id: String,
     pub dest_path: String,
@@ -977,36 +1011,54 @@ pub fn knowledge_export_space_zip(app: AppHandle, args: ExportSpaceZipArgs) -> R
         zip.write_all(&body).map_err(|e| e.to_string())?;
     }
 
-    // assets/* (skip symlinks)
+    // assets/** (nested dirs; skip symlinks)
     let assets_dir = dir.join("assets");
     if assets_dir.is_dir() {
-        let entries = fs::read_dir(&assets_dir).map_err(|e| e.to_string())?;
-        for ent in entries.flatten() {
-            let path = ent.path();
-            let meta = match fs::symlink_metadata(&path) {
-                Ok(m) => m,
-                Err(_) => continue,
-            };
-            if meta.file_type().is_symlink() || !meta.is_file() {
-                continue;
-            }
-            let name = ent.file_name();
-            let name_str = name.to_string_lossy();
-            if name_str.starts_with('.') {
-                continue;
-            }
-            let entry_name = format!("assets/{name_str}");
-            if !is_safe_zip_entry(&entry_name) {
-                return Err("illegal asset export path".into());
-            }
-            let bytes = fs::read(&path).map_err(|e| e.to_string())?;
-            zip.start_file(entry_name, opts)
-                .map_err(|e| e.to_string())?;
-            zip.write_all(&bytes).map_err(|e| e.to_string())?;
-        }
+        walk_assets_for_zip(&assets_dir, "assets", &mut zip, opts)?;
     }
 
     zip.finish().map_err(|e| e.to_string())?;
+    Ok(())
+}
+
+fn walk_assets_for_zip(
+    dir: &Path,
+    zip_prefix: &str,
+    zip: &mut zip::ZipWriter<fs::File>,
+    opts: zip::write::SimpleFileOptions,
+) -> Result<(), String> {
+    use std::io::Write as _;
+    let entries = fs::read_dir(dir).map_err(|e| e.to_string())?;
+    for ent in entries.flatten() {
+        let path = ent.path();
+        let meta = match fs::symlink_metadata(&path) {
+            Ok(m) => m,
+            Err(_) => continue,
+        };
+        if meta.file_type().is_symlink() {
+            continue;
+        }
+        let name = ent.file_name();
+        let name_str = name.to_string_lossy();
+        if name_str.starts_with('.') {
+            continue;
+        }
+        let entry_name = format!("{zip_prefix}/{name_str}");
+        if !is_safe_zip_entry(&entry_name) {
+            return Err("illegal asset export path".into());
+        }
+        if meta.is_dir() {
+            walk_assets_for_zip(&path, &entry_name, zip, opts)?;
+            continue;
+        }
+        if !meta.is_file() {
+            continue;
+        }
+        let bytes = fs::read(&path).map_err(|e| e.to_string())?;
+        zip.start_file(entry_name, opts)
+            .map_err(|e| e.to_string())?;
+        zip.write_all(&bytes).map_err(|e| e.to_string())?;
+    }
     Ok(())
 }
 
@@ -2024,13 +2076,16 @@ mod tests {
     }
 
     #[test]
-    fn asset_path_rejects_traversal_and_nested() {
+    fn asset_path_rejects_traversal_allows_nested() {
         let root = Path::new("/tmp/kb-assets");
         assert!(asset_path(root, "spc_oktoken1", "assets/../evil.png").is_err());
         assert!(asset_path(root, "spc_oktoken1", "../evil.png").is_err());
         assert!(asset_path(root, "spc_oktoken1", "docs/doc_x.md").is_err());
-        assert!(asset_path(root, "spc_oktoken1", "assets/sub/x.png").is_err());
         assert!(asset_path(root, "bad", "assets/x.png").is_err());
+        let nested = asset_path(root, "spc_oktoken1", "assets/sub/x.png").unwrap();
+        assert!(
+            nested.ends_with("assets/sub/x.png") || nested.ends_with("assets\\sub\\x.png")
+        );
         let ok = asset_path(root, "spc_oktoken1", "assets/ast_abc123_x.png").unwrap();
         assert!(ok.ends_with("assets/ast_abc123_x.png") || ok.ends_with("assets\\ast_abc123_x.png"));
         let bare = asset_path(root, "spc_oktoken1", "ast_abc123_x.png").unwrap();

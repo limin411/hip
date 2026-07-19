@@ -38,6 +38,17 @@ vi.mock('@/ipc/knowledge', () => ({
   knowledgeListVersions: (...a: unknown[]) => knowledgeListVersions(...a),
   knowledgeReadVersion: (...a: unknown[]) => knowledgeReadVersion(...a),
   knowledgeRestoreVersion: (...a: unknown[]) => knowledgeRestoreVersion(...a),
+  knowledgeLinkIndexUpsert: vi.fn().mockResolvedValue(undefined),
+  knowledgeLinkIndexRemoveDoc: vi.fn().mockResolvedValue(undefined),
+  knowledgeLinkIndexReplaceAll: vi.fn().mockResolvedValue(undefined),
+  knowledgeLinkIndexBacklinks: vi.fn().mockResolvedValue([]),
+  knowledgeLinkIndexOutbound: vi.fn().mockResolvedValue([]),
+  knowledgeLinkIndexBroken: vi.fn().mockResolvedValue([]),
+  knowledgeLinkIndexDocCount: vi.fn().mockResolvedValue(0),
+  knowledgeGetSchema: vi.fn().mockResolvedValue(null),
+  knowledgeSetSchema: vi.fn().mockResolvedValue(undefined),
+  knowledgeGetViews: vi.fn().mockResolvedValue(null),
+  knowledgeSetViews: vi.fn().mockResolvedValue(undefined),
   knowledgeErrorMessage: (e: unknown) => (e instanceof Error ? e.message : String(e)),
 }))
 

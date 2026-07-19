@@ -30,13 +30,16 @@ export function normalizeAssetRelPath(src: string): string | null {
   }
   let path = raw.replace(/\\/g, '/')
   if (path.startsWith('./')) path = path.slice(2)
-  // Only space-root-relative assets/… (design K8 / K16)
+  // Space-root-relative assets/… — nested dirs allowed; reject `.` / `..` segments.
   if (path.startsWith('assets/')) {
     const rest = path.slice('assets/'.length)
-    // Single path component only — reject nested dirs and bare `.` / `..` segments.
-    // Filenames like `notes..v2.png` are allowed (substring `..` is fine).
-    if (!rest || rest.includes('/') || rest === '.' || rest === '..') return null
-    return `assets/${rest}`
+    if (!rest) return null
+    const parts = rest.split('/').filter((p) => p.length > 0)
+    if (parts.length === 0) return null
+    for (const p of parts) {
+      if (p === '.' || p === '..') return null
+    }
+    return `assets/${parts.join('/')}`
   }
   return null
 }

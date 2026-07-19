@@ -39,18 +39,26 @@ export function joinYamlFrontmatter(fmText: string, body: string): string {
 }
 
 /**
- * Knowledge-doc YAML frontmatter: tags / status / aliases only.
+ * Knowledge-doc YAML frontmatter: built-ins + free-form props.
  * Hand-rolled (no gray-matter) — enough for flat scalars + string lists.
  *
  * Frontmatter is accepted only when the opening `---`…`---` block contains at
- * least one known key (`tags` / `status` / `aliases`). Bare thematic breaks
- * (`---` as Markdown hr) are left in the body and stay searchable.
+ * least one known key (built-ins). Bare thematic breaks (`---` as Markdown hr)
+ * are left in the body and stay searchable.
  */
+
+/** Extra property values (custom schema keys). */
+export type PropValue = string | number | boolean | string[]
 
 export type KnowledgeDocMeta = {
   tags: string[]
   status: string | null
   aliases: string[]
+  /** ISO date `YYYY-MM-DD` or free string. */
+  date: string | null
+  priority: string | null
+  /** Custom keys not mapped to built-ins. */
+  props: Record<string, PropValue>
 }
 
 export type ParsedFrontmatter = {
@@ -64,9 +72,19 @@ export const EMPTY_DOC_META: KnowledgeDocMeta = {
   tags: [],
   status: null,
   aliases: [],
+  date: null,
+  priority: null,
+  props: {},
 }
 
-const FM_KEYS = new Set(['tags', 'status', 'aliases'])
+/** Keys that make a fence count as knowledge frontmatter. */
+const KNOWN_FM_KEYS = new Set([
+  'tags',
+  'status',
+  'aliases',
+  'date',
+  'priority',
+])
 
 /** Strip a leading `--- … ---` block and parse known property keys. */
 export function parseFrontmatter(raw: string): ParsedFrontmatter {
@@ -115,6 +133,18 @@ export function metaToSearchFields(meta: KnowledgeDocMeta): {
     tags: meta.tags.join(' '),
     status: meta.status ?? '',
     aliases: meta.aliases.join(' '),
+  }
+}
+
+/** Shallow clone meta (arrays/props copied). */
+export function cloneDocMeta(meta: KnowledgeDocMeta): KnowledgeDocMeta {
+  return {
+    tags: [...meta.tags],
+    status: meta.status,
+    aliases: [...meta.aliases],
+    date: meta.date,
+    priority: meta.priority,
+    props: { ...meta.props },
   }
 }
 
@@ -167,9 +197,13 @@ export function compareWikiDocs(
 
 // ─── internal line parser ───────────────────────────────────────────────────
 
-function normalizeFmKey(raw: string): 'tags' | 'status' | 'aliases' | null {
+function normalizeKnownKey(
+  raw: string,
+): 'tags' | 'status' | 'aliases' | 'date' | 'priority' | null {
   const k = raw.toLowerCase()
-  if (FM_KEYS.has(k)) return k as 'tags' | 'status' | 'aliases'
+  if (KNOWN_FM_KEYS.has(k)) {
+    return k as 'tags' | 'status' | 'aliases' | 'date' | 'priority'
+  }
   return null
 }
 
@@ -177,7 +211,14 @@ function parseMetaLines(lines: string[]): {
   meta: KnowledgeDocMeta
   foundKnownKey: boolean
 } {
-  const meta: KnowledgeDocMeta = { tags: [], status: null, aliases: [] }
+  const meta: KnowledgeDocMeta = {
+    tags: [],
+    status: null,
+    aliases: [],
+    date: null,
+    priority: null,
+    props: {},
+  }
   let foundKnownKey = false
   let i = 0
   while (i < lines.length) {
@@ -191,40 +232,61 @@ function parseMetaLines(lines: string[]): {
     // Block list: `key:` then indented `- item` lines
     const blockKey = trimmed.match(/^([A-Za-z_][\w-]*)\s*:\s*$/)
     if (blockKey) {
-      const key = normalizeFmKey(blockKey[1])
-      if (key) {
-        foundKnownKey = true
-        const items: string[] = []
+      const rawKey = blockKey[1].toLowerCase()
+      const known = normalizeKnownKey(rawKey)
+      const items: string[] = []
+      i += 1
+      while (i < lines.length) {
+        const next = lines[i]
+        const m = next.match(/^\s+-\s*(.*)$/)
+        if (!m) break
+        const v = unquote(m[1].trim())
+        if (v) items.push(v)
         i += 1
-        while (i < lines.length) {
-          const next = lines[i]
-          // Optional space after `-`; bare `-` is empty item and does not break the list.
-          const m = next.match(/^\s+-\s*(.*)$/)
-          if (!m) break
-          const v = unquote(m[1].trim())
-          if (v) items.push(v)
-          i += 1
-        }
-        assignListKey(meta, key, items)
-        continue
       }
+      if (known) {
+        foundKnownKey = true
+        assignListKey(meta, known, items)
+      } else if (items.length > 0) {
+        // Custom multi values only count if we already have a known key
+        // (or will get one later). Store when key is valid-ish.
+        meta.props[rawKey] = uniquePreserve(items)
+      }
+      continue
     }
 
     // Inline: `key: value`
     const inline = trimmed.match(/^([A-Za-z_][\w-]*)\s*:\s*(.*)$/)
     if (inline) {
-      const key = normalizeFmKey(inline[1])
-      if (key) {
+      const rawKey = inline[1].toLowerCase()
+      const known = normalizeKnownKey(rawKey)
+      const rawVal = inline[2].trim()
+      if (known) {
         foundKnownKey = true
-        const rawVal = inline[2].trim()
-        if (key === 'status') {
-          meta.status = unquote(rawVal) || null
+        if (known === 'status' || known === 'date' || known === 'priority') {
+          const scalar = unquote(rawVal) || null
+          if (known === 'status') meta.status = scalar
+          else if (known === 'date') meta.date = scalar
+          else meta.priority = scalar
         } else {
-          assignListKey(meta, key, parseInlineList(rawVal))
+          assignListKey(meta, known, parseInlineList(rawVal))
         }
         i += 1
         continue
       }
+      // Custom scalar / list
+      if (rawVal === 'true' || rawVal === 'false') {
+        meta.props[rawKey] = rawVal === 'true'
+      } else if (rawVal !== '' && !Number.isNaN(Number(rawVal)) && /^-?\d+(\.\d+)?$/.test(rawVal)) {
+        meta.props[rawKey] = Number(rawVal)
+      } else if (rawVal.startsWith('[')) {
+        meta.props[rawKey] = parseInlineList(rawVal)
+      } else {
+        const one = unquote(rawVal)
+        if (one) meta.props[rawKey] = one
+      }
+      i += 1
+      continue
     }
 
     i += 1
@@ -232,16 +294,29 @@ function parseMetaLines(lines: string[]): {
 
   meta.tags = uniquePreserve(meta.tags)
   meta.aliases = uniquePreserve(meta.aliases)
+  // Custom-only FM (no known keys) → reject as frontmatter (thematic break safety).
+  // Drop props when rejecting at caller; here we only set foundKnownKey.
+  if (!foundKnownKey) {
+    meta.props = {}
+  }
   return { meta, foundKnownKey }
 }
 
 function assignListKey(
   meta: KnowledgeDocMeta,
-  key: 'tags' | 'status' | 'aliases',
+  key: 'tags' | 'status' | 'aliases' | 'date' | 'priority',
   items: string[],
 ): void {
   if (key === 'status') {
     meta.status = items[0] ?? null
+    return
+  }
+  if (key === 'date') {
+    meta.date = items[0] ?? null
+    return
+  }
+  if (key === 'priority') {
+    meta.priority = items[0] ?? null
     return
   }
   if (key === 'tags') meta.tags = items

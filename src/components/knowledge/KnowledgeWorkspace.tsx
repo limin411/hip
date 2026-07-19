@@ -10,6 +10,7 @@ import {
   ImagePlus,
   History,
   MoreHorizontal,
+  Network,
   Pencil,
   Search,
 } from 'lucide-react'
@@ -49,9 +50,13 @@ import { pickAttachmentFiles, pickSavePath } from '@/ipc/dialog'
 import {
   knowledgeErrorMessage,
   knowledgeExportDoc,
+  knowledgeExportText,
   knowledgeExportSpaceZip,
+  knowledgeReadVersion,
   knowledgeRevealDoc,
 } from '@/ipc/knowledge'
+import { buildDocHtmlDocument } from '@/domain/knowledge/htmlExport'
+import { diffLines } from '@/domain/knowledge/textDiff'
 import {
   revealHeadingInRoot,
   revealInCodeMirror,
@@ -61,6 +66,7 @@ import {
 import {
   extractDocOutline,
   scrollToKnowledgeHeading,
+  slugifyHeading,
 } from '@/domain/knowledge/mdPreview'
 import { DeclarativeContextMenu } from '@/components/context-menu'
 import { SpaceTree } from './SpaceTree'
@@ -71,6 +77,8 @@ import { DocPropertiesRow } from './DocPropertiesRow'
 import { MarkdownToolbar } from './MarkdownToolbar'
 import { KnowledgeDocCanvas } from './KnowledgeDocCanvas'
 import { WikiCreateModal } from './WikiCreateModal'
+import { KnowledgeGraphModal } from './KnowledgeGraphModal'
+import { KnowledgeCollectionView } from './KnowledgeCollectionView'
 
 /** Lazy so Source-only sessions pay 0 for Milkdown kit. */
 const DocLiveEditor = lazy(() =>
@@ -93,6 +101,7 @@ export function KnowledgeWorkspace() {
   const requestCreateDoc = useKnowledgeStore((s) => s.requestCreateDoc)
   const createFolder = useKnowledgeStore((s) => s.createFolder)
   const renameNode = useKnowledgeStore((s) => s.renameNode)
+  const rewriteWikiLinksAfterRename = useKnowledgeStore((s) => s.rewriteWikiLinksAfterRename)
   const deleteNode = useKnowledgeStore((s) => s.deleteNode)
   const setEditorMode = useKnowledgeStore((s) => s.setEditorMode)
   const setDraftBody = useKnowledgeStore((s) => s.setDraftBody)
@@ -103,8 +112,22 @@ export function KnowledgeWorkspace() {
   const saveVersionManual = useKnowledgeStore((s) => s.saveVersionManual)
   const listVersions = useKnowledgeStore((s) => s.listVersions)
   const restoreVersion = useKnowledgeStore((s) => s.restoreVersion)
+  const spaceViews = useKnowledgeStore((s) => s.spaceViews)
+  const spaceSchema = useKnowledgeStore((s) => s.spaceSchema)
+  const activeViewId = useKnowledgeStore((s) => s.activeViewId)
+  const setActiveViewId = useKnowledgeStore((s) => s.setActiveViewId)
+  const patchDocField = useKnowledgeStore((s) => s.patchDocField)
+  const getDocMetaMap = useKnowledgeStore((s) => s.getDocMetaMap)
 
   const space = spaces.find((s) => s.id === activeSpaceId)
+  const activeView = spaceViews.views.find((v) => v.id === activeViewId) ?? null
+  const docMetaMap = useMemo(() => {
+    // Rebuild when draft/nodes change for collection view freshness
+    void draftBody
+    void nodes
+    void activeDocId
+    return getDocMetaMap()
+  }, [draftBody, nodes, activeDocId, getDocMetaMap, activeViewId])
   const activeNode = nodes.find((n) => n.id === activeDocId)
   const pathNodes = useMemo(
     () => (activeDocId ? getPath(nodes, activeDocId) : []),
@@ -263,9 +286,15 @@ export function KnowledgeWorkspace() {
 
   const [nodeEdit, setNodeEdit] = useState<KnowledgeNode | null>(null)
   const [nodeTitle, setNodeTitle] = useState('')
+  const [renameUpdateLinks, setRenameUpdateLinks] = useState(false)
   const [nodeDelete, setNodeDelete] = useState<KnowledgeNode | null>(null)
+  const [versionDiff, setVersionDiff] = useState<{
+    versionId: string
+    lines: ReturnType<typeof diffLines>
+  } | null>(null)
   /** Broken wiki link → confirm create (K20). Never silent. */
   const [wikiCreateTitle, setWikiCreateTitle] = useState<string | null>(null)
+  const [graphOpen, setGraphOpen] = useState(false)
   const [versionsOpen, setVersionsOpen] = useState(false)
   const [versions, setVersions] = useState<KnowledgeVersionEntry[]>([])
   const [versionsLoading, setVersionsLoading] = useState(false)
@@ -412,14 +441,55 @@ export function KnowledgeWorkspace() {
     const dest = await pickSavePath({
       defaultPath: `${safe}.md`,
       title: t('knowledge.export.doc'),
-      filters: [{ name: 'Markdown', extensions: ['md'] }],
+      filters: [
+        { name: 'Markdown', extensions: ['md'] },
+        { name: 'HTML', extensions: ['html'] },
+      ],
     })
     if (!dest) return
     try {
-      await knowledgeExportDoc(activeSpaceId, activeDocId, dest)
-      toast.success(t('knowledge.export.docDone'))
+      if (dest.toLowerCase().endsWith('.html') || dest.toLowerCase().endsWith('.htm')) {
+        const raw = draftBody || docBody
+        const html = buildDocHtmlDocument({
+          title,
+          rawMd: raw,
+          spaceName: space?.name,
+        })
+        await knowledgeExportText(dest, html)
+        toast.success(t('knowledge.export.htmlDone'))
+      } else {
+        await knowledgeExportDoc(activeSpaceId, activeDocId, dest)
+        toast.success(t('knowledge.export.docDone'))
+      }
     } catch (e) {
       toast.error(knowledgeErrorMessage(e))
+    }
+  }
+
+  const openVersionDiff = async (versionId: string) => {
+    if (!activeSpaceId || !activeDocId) return
+    try {
+      await flushSave()
+      const oldBody = await knowledgeReadVersion(activeSpaceId, activeDocId, versionId)
+      const cur = draftBody || docBody
+      const lines = diffLines(oldBody, cur)
+      setVersionDiff({ versionId, lines })
+    } catch (e) {
+      toast.error(knowledgeErrorMessage(e))
+    }
+  }
+
+  const confirmRenameNode = async () => {
+    if (!nodeEdit || !nodeTitle.trim()) return
+    const oldTitle = nodeEdit.title
+    const next = nodeTitle.trim()
+    const updateLinks = renameUpdateLinks && nodeEdit.kind === 'doc'
+    setNodeEdit(null)
+    setRenameUpdateLinks(false)
+    await renameNode(nodeEdit.id, next)
+    if (updateLinks && oldTitle !== next) {
+      const n = await rewriteWikiLinksAfterRename(oldTitle, next)
+      if (n > 0) toast.success(t('knowledge.tree.renameLinksDone', { count: n }))
     }
   }
 
@@ -566,6 +636,13 @@ export function KnowledgeWorkspace() {
                   >
                     {t('knowledge.export.spaceZip')}
                   </DropdownMenuItem>
+                  <DropdownMenuItem
+                    data-testid="knowledge-space-graph"
+                    onClick={() => setGraphOpen(true)}
+                  >
+                    <Network size={14} />
+                    {t('knowledge.graph.open')}
+                  </DropdownMenuItem>
                   <DropdownMenuSeparator />
                   <DropdownMenuItem
                     data-testid="knowledge-space-delete"
@@ -599,9 +676,40 @@ export function KnowledgeWorkspace() {
           </div>
         </div>
 
-        {/* Tree section */}
+        {/* Views + Tree section */}
         <div className="flex min-h-0 flex-1 flex-col">
-          <div className="flex shrink-0 items-center justify-between px-3.5 pb-1.5 pt-2">
+          <div className="flex shrink-0 flex-wrap items-center gap-1 px-3.5 pb-1 pt-2">
+            <button
+              type="button"
+              data-testid="knowledge-view-docs"
+              className={cn(
+                'rounded-md px-2 py-0.5 text-[11px] font-medium uppercase tracking-[0.06em]',
+                activeViewId == null
+                  ? 'bg-accent/15 text-accent-strong'
+                  : 'text-ink-tertiary hover:bg-state-hover hover:text-ink',
+              )}
+              onClick={() => setActiveViewId(null)}
+            >
+              {t('knowledge.views.docs')}
+            </button>
+            {spaceViews.views.map((v) => (
+              <button
+                key={v.id}
+                type="button"
+                data-testid={`knowledge-view-tab-${v.id}`}
+                className={cn(
+                  'rounded-md px-2 py-0.5 text-[11px] font-medium',
+                  activeViewId === v.id
+                    ? 'bg-accent/15 text-accent-strong'
+                    : 'text-ink-tertiary hover:bg-state-hover hover:text-ink',
+                )}
+                onClick={() => setActiveViewId(v.id)}
+              >
+                {v.name}
+              </button>
+            ))}
+          </div>
+          <div className="flex shrink-0 items-center justify-between px-3.5 pb-1.5 pt-1">
             <span className="text-[11px] font-medium uppercase tracking-[0.08em] text-ink-tertiary">
               {t('knowledge.tree.sectionLabel')}
             </span>
@@ -628,6 +736,7 @@ export function KnowledgeWorkspace() {
                 onRename={(node) => {
                   setNodeEdit(node)
                   setNodeTitle(node.title)
+                  setRenameUpdateLinks(false)
                 }}
                 onDelete={(node) => setNodeDelete(node)}
                 onNewDoc={(parentId) => newDoc(parentId)}
@@ -655,6 +764,32 @@ export function KnowledgeWorkspace() {
       </aside>
 
       <main className="flex min-w-0 flex-1 flex-col bg-surface">
+        {activeView ? (
+          <>
+            <div className="flex h-12 shrink-0 items-center gap-2.5 border-b border-border px-5">
+              <span className="text-body font-medium text-ink">{activeView.name}</span>
+              <span className="text-meta text-ink-tertiary">
+                {activeView.layout === 'board'
+                  ? t('knowledge.views.layoutBoard')
+                  : t('knowledge.views.layoutTable')}
+              </span>
+            </div>
+            <KnowledgeCollectionView
+              view={activeView}
+              nodes={nodes}
+              metaByDocId={docMetaMap}
+              schema={spaceSchema}
+              onOpenDoc={(id) => {
+                setActiveViewId(null)
+                void openDoc(id)
+              }}
+              onPatchField={(docId, key, value) => {
+                void patchDocField(docId, key, value)
+              }}
+            />
+          </>
+        ) : (
+          <>
         <div className="flex h-12 shrink-0 items-center gap-2.5 border-b border-border px-5">
           <div className="flex min-w-0 flex-1 items-center gap-1 truncate text-meta">
             {pathNodes.length === 0 ? (
@@ -807,7 +942,11 @@ export function KnowledgeWorkspace() {
                 title={activeNode?.title ?? t('knowledge.doc.untitled')}
                 onCommit={(title) => void renameNode(activeDocId, title)}
               />
-              <DocPropertiesRow body={draftBody} />
+              <DocPropertiesRow
+                body={draftBody}
+                schema={spaceSchema}
+                onBodyChange={(next) => setDraftBody(next, { persist: 'auto' })}
+              />
               <Suspense
                 fallback={
                   <div
@@ -843,7 +982,11 @@ export function KnowledgeWorkspace() {
                 title={activeNode?.title ?? t('knowledge.doc.untitled')}
                 onCommit={(title) => void renameNode(activeDocId, title)}
               />
-              <DocPropertiesRow body={draftBody} />
+              <DocPropertiesRow
+                body={draftBody}
+                schema={spaceSchema}
+                onBodyChange={(next) => setDraftBody(next, { persist: 'auto' })}
+              />
               <div className="mt-3 mb-2 flex shrink-0 items-center gap-0.5 rounded-lg border border-border/80 bg-surface-muted/60 px-1 py-0.5">
                 <MarkdownToolbar
                   className="mb-0 border-0 bg-transparent p-0 opacity-100"
@@ -890,18 +1033,41 @@ export function KnowledgeWorkspace() {
                 readOnly
                 onCommit={() => {}}
               />
-              <DocPropertiesRow body={docBody} />
+              <DocPropertiesRow
+                body={draftBody || docBody}
+                schema={spaceSchema}
+                onBodyChange={(next) => setDraftBody(next, { persist: 'now' })}
+              />
               <DocReader
                 // Prefer draft so preview task toggles are optimistic before flush.
                 content={draftBody || docBody}
                 onStartEdit={() => void setEditorMode(loadEditorModePref())}
                 nodes={nodes}
-                onWikiNavigate={(docId) => void openDoc(docId)}
+                onWikiNavigate={(docId, fragment) => {
+                  void (async () => {
+                    await openDoc(docId)
+                    if (!fragment) return
+                    const body =
+                      useKnowledgeStore.getState().draftBody ||
+                      useKnowledgeStore.getState().docBody
+                    const outline = extractDocOutline(body)
+                    const slug = slugifyHeading(fragment)
+                    const hit =
+                      outline.find((o) => o.text === fragment) ||
+                      outline.find(
+                        (o) => o.text.toLowerCase() === fragment.toLowerCase(),
+                      ) ||
+                      outline.find((o) => o.id === slug || slugifyHeading(o.text) === slug)
+                    if (hit) useKnowledgeStore.getState().requestOutlineJump(hit)
+                  })()
+                }}
                 onWikiBroken={(title) => setWikiCreateTitle(title)}
               />
             </KnowledgeDocCanvas>
           </div>
         ) : null}
+          </>
+        )}
       </main>
 
       <Modal
@@ -921,12 +1087,7 @@ export function KnowledgeWorkspace() {
             <Button
               data-testid="knowledge-rename-node-confirm"
               disabled={!nodeTitle.trim() || busy}
-              onClick={() => {
-                if (nodeEdit && nodeTitle.trim()) {
-                  void renameNode(nodeEdit.id, nodeTitle.trim())
-                }
-                setNodeEdit(null)
-              }}
+              onClick={() => void confirmRenameNode()}
             >
               {t('common.confirm', { defaultValue: 'OK' })}
             </Button>
@@ -944,11 +1105,22 @@ export function KnowledgeWorkspace() {
               onKeyDown={(e) => {
                 if (e.key !== 'Enter' || !nodeTitle.trim() || !nodeEdit) return
                 e.preventDefault()
-                void renameNode(nodeEdit.id, nodeTitle.trim())
-                setNodeEdit(null)
+                void confirmRenameNode()
               }}
             />
           </label>
+          {nodeEdit?.kind === 'doc' ? (
+            <label className="flex items-start gap-2 text-meta text-ink-secondary">
+              <input
+                type="checkbox"
+                className="mt-0.5"
+                data-testid="knowledge-rename-update-links"
+                checked={renameUpdateLinks}
+                onChange={(e) => setRenameUpdateLinks(e.target.checked)}
+              />
+              <span>{t('knowledge.tree.renameUpdateLinks')}</span>
+            </label>
+          ) : null}
         </div>
       </Modal>
 
@@ -1058,6 +1230,14 @@ export function KnowledgeWorkspace() {
                   </div>
                   <Button
                     size="sm"
+                    variant="ghost"
+                    data-testid="knowledge-version-diff"
+                    onClick={() => void openVersionDiff(v.id)}
+                  >
+                    {t('knowledge.versions.diff')}
+                  </Button>
+                  <Button
+                    size="sm"
                     variant="secondary"
                     data-testid="knowledge-version-restore"
                     onClick={() => setRestoreTarget(v)}
@@ -1068,6 +1248,57 @@ export function KnowledgeWorkspace() {
               )
             })
           )}
+        </div>
+      </Modal>
+
+      <Modal
+        open={versionDiff != null}
+        onOpenChange={(o) => {
+          if (!o) setVersionDiff(null)
+        }}
+        title={t('knowledge.versions.diffTitle')}
+        className="max-w-3xl"
+        resizable
+        defaultSize={{ width: 720, height: 520 }}
+        storageKey="hip-knowledge-version-diff"
+        footer={
+          <div className="flex justify-end">
+            <Button
+              variant="secondary"
+              data-testid="knowledge-version-diff-close"
+              onClick={() => setVersionDiff(null)}
+            >
+              {t('common.close')}
+            </Button>
+          </div>
+        }
+      >
+        <div
+          className="max-h-[60vh] overflow-auto font-mono text-meta"
+          data-testid="knowledge-version-diff-body"
+        >
+          {versionDiff?.lines.map((line, i) => (
+            <div
+              key={i}
+              className={cn(
+                'flex whitespace-pre-wrap px-3 py-0.5',
+                line.type === 'add' && 'bg-success/10 text-success',
+                line.type === 'del' && 'bg-danger/10 text-danger',
+                line.type === 'same' && 'text-ink-secondary',
+              )}
+            >
+              <span className="w-10 shrink-0 select-none text-right opacity-50">
+                {line.oldNo ?? ''}
+              </span>
+              <span className="w-10 shrink-0 select-none text-right opacity-50">
+                {line.newNo ?? ''}
+              </span>
+              <span className="w-4 shrink-0 select-none">
+                {line.type === 'add' ? '+' : line.type === 'del' ? '-' : ' '}
+              </span>
+              <span className="min-w-0 flex-1 break-all">{line.text}</span>
+            </div>
+          ))}
         </div>
       </Modal>
 
@@ -1155,6 +1386,16 @@ export function KnowledgeWorkspace() {
       </Modal>
 
       <TemplatePickerModal />
+
+      {activeSpaceId ? (
+        <KnowledgeGraphModal
+          open={graphOpen}
+          onOpenChange={setGraphOpen}
+          spaceId={activeSpaceId}
+          focusDocId={activeDocId}
+          onOpenDoc={(docId) => void openDoc(docId)}
+        />
+      ) : null}
     </div>
   )
 }

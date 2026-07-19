@@ -830,6 +830,8 @@ export const zhTW = {
       "useMemories": "使用記憶",
       "useMemoriesDesc": "在每輪對話中將相關記憶注入智慧體上下文。",
       "useMemoriesPlain": "每輪對話把已存事實注入智慧體上下文。",
+      "useMemoriesWithExternal": "在外部（ACP）智慧體中使用記憶",
+      "useMemoriesWithExternalHint": "開啟後，ACP 主會話每輪會帶上唯讀記憶前綴。不適用於子智慧體派發。可能增加 token。",
       "generateMemories": "自動學習",
       "generateMemoriesDesc": "在對話結束後抽取並鞏固長期記憶。",
       "generateMemoriesPlain": "你停聊一段時間後，後臺抽取可複用的事實（會用 API）。",

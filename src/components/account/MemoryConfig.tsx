@@ -1120,6 +1120,26 @@ export function MemoryConfig() {
               />
             </div>
 
+            {!!config?.useMemories && (
+              <div className="flex items-center justify-between gap-4 border-t border-border pt-4">
+                <div className="min-w-0 flex-1">
+                  <div className="text-prose font-medium text-ink">
+                    {t('settings.memory.useMemoriesWithExternal')}
+                  </div>
+                  <div className="mt-0.5 text-meta text-ink-tertiary">
+                    {t('settings.memory.useMemoriesWithExternalHint')}
+                  </div>
+                </div>
+                <Switch
+                  checked={!!config?.useMemoriesWithExternal}
+                  disabled={busy || !config}
+                  ariaLabel={t('settings.memory.useMemoriesWithExternal')}
+                  data-testid="memory-switch-use-external"
+                  onCheckedChange={(v) => void applyConfig({ useMemoriesWithExternal: v })}
+                />
+              </div>
+            )}
+
             <div className="flex items-center justify-between gap-4 border-t border-border pt-4">
               <div className="min-w-0 flex-1">
                 <div className="text-prose font-medium text-ink">{t('settings.memory.hybridSearch')}</div>

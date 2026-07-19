@@ -850,6 +850,9 @@ export const en = {
         useMemories: 'Use memories',
         useMemoriesDesc: 'Inject relevant memories into the agent context for each turn.',
         useMemoriesPlain: 'On each turn, inject saved facts into the agent’s context.',
+        useMemoriesWithExternal: 'Use memories with external (ACP) agents',
+        useMemoriesWithExternalHint:
+          'When on, hip prefixes each ACP primary turn with a read-only memory block. Does not apply to sub-agent dispatch. May increase tokens.',
         generateMemories: 'Auto-learn',
         generateMemoriesDesc: 'Extract and consolidate long-term memories after conversations.',
         generateMemoriesPlain:

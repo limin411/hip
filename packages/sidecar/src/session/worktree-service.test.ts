@@ -76,10 +76,17 @@ describe('mapRemoveError', () => {
   it('maps managed / found / dirty / unknown codes', () => {
     expect(mapRemoveError('worktree path outside managed directory').errorCode).toBe('NOT_MANAGED')
     expect(mapRemoveError('worktree not found').errorCode).toBe('NOT_FOUND')
+    expect(mapRemoveError('is not a working tree').errorCode).toBe('NOT_FOUND')
     expect(mapRemoveError('Worktree is dirty (uncommitted changes): /x').errorCode).toBe(
       'WORKTREE_DIRTY',
     )
     expect(mapRemoveError('boom').errorCode).toBe('UNKNOWN')
+  })
+
+  it('maps git binary missing to UNKNOWN, not NOT_FOUND', () => {
+    // workspace-git remove path: literal "git not found" when binary is missing
+    expect(mapRemoveError('git not found').errorCode).toBe('UNKNOWN')
+    expect(mapRemoveError('Git not found').errorCode).toBe('UNKNOWN')
   })
 })
 

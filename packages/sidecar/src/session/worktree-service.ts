@@ -214,7 +214,16 @@ export function mapRemoveError(error?: string): {
   if (lower.includes('outside managed') || lower.includes('not managed')) {
     return { errorCode: 'NOT_MANAGED', error: msg }
   }
-  if (lower.includes('not found') || lower.includes('no such') || lower.includes('not a working tree')) {
+  // Missing git binary is tooling/env failure — not a missing worktree path.
+  // workspace-git returns the literal "git not found"; do not match bare "not found".
+  if (lower.includes('git not found')) {
+    return { errorCode: 'UNKNOWN', error: msg }
+  }
+  if (
+    lower.includes('worktree not found') ||
+    lower.includes('not a working tree') ||
+    lower.includes('no such')
+  ) {
     return { errorCode: 'NOT_FOUND', error: msg }
   }
   if (lower.includes('dirty') || lower.includes('uncommitted')) {

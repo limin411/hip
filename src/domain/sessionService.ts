@@ -31,6 +31,8 @@ import i18n from '@/i18n'
 import { resolveModelConfig, activeModelKey } from '@/lib/modelKey'
 import { clampEffortForKey } from '@/lib/modelEffort'
 import { useProvidersStore } from '@/store/providersStore'
+import { useHipConfigStore } from '@/store/hipConfigStore'
+import { resolveValidAcpAgentId } from '@/lib/sessionAgent'
 import { surfaceOf } from '@/lib/sessions'
 import type { LocalAttachment } from '@/components/chat/attachmentTypes'
 import { applyServerMessageEffects } from './serverMessageEffects'
@@ -1987,32 +1989,32 @@ export class SessionService {
  *  branch never carries a cwd/permissionMode (Chat is picker-less). */
 export function configFromDraft(draft: Draft | null): SessionConfig {
   const surface: 'chat' | 'code' = draft?.mode === 'project' ? 'code' : 'chat'
+  const agents = useHipConfigStore.getState().config.agents ?? []
+  // Only emit agentId when the id still names an enabled ACP-capable agent (stale drafts omit).
+  const externalAgentId = resolveValidAcpAgentId(draft?.agentId, agents)
   const base: SessionConfig =
     surface === 'code' && draft?.cwd
       ? { ...DEFAULT_CONFIG, surface, cwd: draft.cwd }
       : { ...DEFAULT_CONFIG, surface }
   const withMode: SessionConfig =
     surface === 'code' && draft?.permissionMode ? { ...base, permissionMode: draft.permissionMode } : base
+  // forcePlan is hip-graph only — skip when ACP primary.
   const withPlan: SessionConfig =
-    surface === 'code' && draft?.forcePlan
+    surface === 'code' && draft?.forcePlan && !externalAgentId
       ? { ...withMode, forcePlan: true, disablePlan: false }
       : withMode
   const { catalog, config } = useProvidersStore.getState()
   // Clamp effort to the model that will actually run (draft modelKey or global active).
+  // Hip model/effort are unused on ACP primary; omit so SessionConfig stays clean.
+  if (externalAgentId) {
+    return { ...withPlan, agentId: externalAgentId }
+  }
   const modelKey = draft?.modelKey ?? activeModelKey(config)
   const effort = clampEffortForKey(catalog, modelKey, draft?.effort)
   const withEffort: SessionConfig = effort ? { ...withPlan, effort } : withPlan
-  const withModel: SessionConfig = !draft?.modelKey
-    ? withEffort
-    : (() => {
-        const { llmProvider, model, baseURL } = resolveModelConfig(catalog, config, draft.modelKey)
-        return { ...withEffort, llmProvider, model, ...(baseURL ? { baseURL } : {}) }
-      })()
-  // Primary agent: only set when draft picks an external ACP agent (not builtin / empty).
-  if (draft?.agentId && draft.agentId !== 'builtin') {
-    return { ...withModel, agentId: draft.agentId }
-  }
-  return withModel
+  if (!draft?.modelKey) return withEffort
+  const { llmProvider, model, baseURL } = resolveModelConfig(catalog, config, draft.modelKey)
+  return { ...withEffort, llmProvider, model, ...(baseURL ? { baseURL } : {}) }
 }
 
 /** App singleton: connects to the live sidecar over WsTransport. */

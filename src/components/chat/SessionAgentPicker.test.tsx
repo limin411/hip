@@ -54,15 +54,22 @@ vi.mock('./ComposerChip', () => ({
   ComposerChip: ({
     children,
     title,
+    disabled,
     ...rest
   }: {
     children: React.ReactNode
     title?: string
+    disabled?: boolean
     'data-testid'?: string
   }) =>
     React.createElement(
       'button',
-      { 'data-testid': rest['data-testid'] ?? 'composer-chip', title, type: 'button' },
+      {
+        'data-testid': rest['data-testid'] ?? 'composer-chip',
+        title,
+        type: 'button',
+        disabled: !!disabled,
+      },
       children,
     ),
 }))
@@ -86,27 +93,29 @@ vi.mock('@/domain', () => ({
   useActiveSession: () => mockSession,
 }))
 
-const acp = (id: string, name: string, enabled = true): AgentConfig => ({
+const acp = (id: string, name: string, enabled = true, kind: AgentConfig['kind'] = 'acp'): AgentConfig => ({
   id,
   name,
-  kind: 'acp',
+  kind,
   command: 'cmd',
   args: [],
   enabled,
 })
 
 describe('enabledAcpAgents / resolvePrimaryAgentId', () => {
-  it('filters to enabled ACP only', () => {
+  it('filters to enabled acp + legacy opencode', () => {
     const list = [
       acp('a', 'A'),
       acp('b', 'B', false),
-      { ...acp('c', 'C'), kind: 'internal' as const },
+      acp('c', 'C', true, 'internal'),
+      acp('d', 'Legacy', true, 'opencode'),
     ]
-    expect(enabledAcpAgents(list).map((a) => a.id)).toEqual(['a'])
+    expect(enabledAcpAgents(list).map((a) => a.id)).toEqual(['a', 'd'])
   })
   it('resolvePrimaryAgentId defaults empty to builtin', () => {
     expect(resolvePrimaryAgentId(undefined)).toBe('builtin')
     expect(resolvePrimaryAgentId('')).toBe('builtin')
+    expect(resolvePrimaryAgentId('  ')).toBe('builtin')
     expect(resolvePrimaryAgentId('x')).toBe('x')
   })
 })
@@ -116,18 +125,19 @@ describe('SessionAgentPicker', () => {
     cleanup()
     setAgentId.mockClear()
     mockDraft = { tempId: 't1', mode: 'chat', text: '' }
-    mockAgents = [acp('opencode', 'OpenCode'), acp('grok', 'Grok Build')]
+    mockAgents = [acp('opencode', 'OpenCode'), acp('grok', 'Grok Build'), acp('legacy', 'Old OC', true, 'opencode')]
     mockActiveSessionId = null
     mockSession = null
   })
   afterEach(() => cleanup())
 
-  it('lists builtin + enabled ACP agents on draft', () => {
+  it('lists builtin + enabled ACP and legacy opencode agents on draft', () => {
     render(<SessionAgentPicker />)
     expect(screen.getByTestId('session-agent-chip')).toBeInTheDocument()
     expect(screen.getByTestId('session-agent-option-builtin')).toBeInTheDocument()
     expect(screen.getByTestId('session-agent-option-opencode')).toBeInTheDocument()
     expect(screen.getByTestId('session-agent-option-grok')).toBeInTheDocument()
+    expect(screen.getByTestId('session-agent-option-legacy')).toBeInTheDocument()
   })
 
   it('writes draft.agentId when selecting an ACP agent', () => {
@@ -142,11 +152,24 @@ describe('SessionAgentPicker', () => {
     expect(screen.getByTestId('session-agent-empty')).toHaveTextContent(/No external agents/)
   })
 
-  it('locks read-only on active session', () => {
+  it('locks read-only on active session and shows agent name', () => {
     mockActiveSessionId = 's1'
     mockSession = { config: { agentId: 'opencode' } }
     render(<SessionAgentPicker />)
-    expect(screen.getByTestId('session-agent-chip-locked')).toBeInTheDocument()
+    const chip = screen.getByTestId('session-agent-chip-locked')
+    expect(chip).toBeInTheDocument()
+    expect(chip).toBeDisabled()
+    expect(chip).toHaveTextContent('OpenCode')
     expect(screen.queryByTestId('session-agent-chip')).not.toBeInTheDocument()
+    fireEvent.click(chip)
+    expect(setAgentId).not.toHaveBeenCalled()
+  })
+
+  it('locks when activeId is set even if session row is missing', () => {
+    mockActiveSessionId = 'orphan'
+    mockSession = null
+    render(<SessionAgentPicker />)
+    expect(screen.getByTestId('session-agent-chip-locked')).toBeDisabled()
+    expect(screen.queryByTestId('session-agent-menu')).not.toBeInTheDocument()
   })
 })

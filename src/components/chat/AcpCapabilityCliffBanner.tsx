@@ -12,19 +12,11 @@ import { Button } from '@/components/ui/Button'
 interface CliffDismissState {
   dismissed: Record<string, true>
   dismiss: (key: string) => void
-  clearKey: (key: string) => void
 }
 
 export const useCliffDismissStore = create<CliffDismissState>((set) => ({
   dismissed: {},
   dismiss: (key) => set((s) => (s.dismissed[key] ? s : { dismissed: { ...s.dismissed, [key]: true } })),
-  clearKey: (key) =>
-    set((s) => {
-      if (!s.dismissed[key]) return s
-      const next = { ...s.dismissed }
-      delete next[key]
-      return { dismissed: next }
-    }),
 }))
 
 function dismissKey(scopeId: string, agentId: string): string {

@@ -4,7 +4,7 @@
  * Regenerate: yarn product:content
  * Check:      yarn product:content:check
  *
- * contentHash=b1d60ae1f8980a9f skillVersion=2 productVersion=0.1.0
+ * contentHash=ab126f70d1938610 skillVersion=2 productVersion=0.1.0
  */
 
 /** Schema / materialization version for builtin skill files (from docs/product/meta.json). */
@@ -146,8 +146,6 @@ Managed sub-agents may get read-only core injection; external ACP agents default
 - Hybrid search (optional) may send snippets to embedding providers
 - Threat-scan + secret redact on write
 - Soft-delete trash + retention
-
-For architecture detail see the repo docs \`docs/memory.md\` and \`docs/memory-longterm-design.md\` when developing hip itself.
 `
 
 export const CONFIG_REFERENCE_MD = `# hip config & local data (Level 3)

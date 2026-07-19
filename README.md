@@ -11,8 +11,7 @@ Reviewer pipeline on ordinary turns.
 
 Cross-session memory is **off by default**. Enable under **Settings → Memory**.
 SQLite is the source of truth; `~/.hip/memories/` holds markdown export mirrors.
-See [docs/memory.md](./docs/memory.md) and the long-term design
-[docs/memory-longterm-design.md](./docs/memory-longterm-design.md).
+In-app help: **Settings → Help** (or [docs/product/references/memory.md](./docs/product/references/memory.md)).
 
 ## Architecture
 

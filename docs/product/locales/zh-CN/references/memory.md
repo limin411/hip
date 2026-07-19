@@ -33,4 +33,3 @@ SQLite（`memory_items`）中的结构化条目：偏好、约定、教训、工
 - 写入时威胁扫描 + 密钥脱敏
 - 软删除回收站 + 保留期
 
-架构细节见仓库 `docs/memory.md` 与 `docs/memory-longterm-design.md`（开发 hip 时）。

@@ -4,7 +4,7 @@
  * Regenerate: yarn product:content
  * Check:      yarn product:content:check
  *
- * contentHash=b1d60ae1f8980a9f skillVersion=2 productVersion=0.1.0
+ * contentHash=ab126f70d1938610 skillVersion=2 productVersion=0.1.0
  */
 
 export type ProductHelpSectionId = 'overview' | 'memory' | 'config' | 'troubleshooting' | 'agents'
@@ -175,8 +175,6 @@ Managed sub-agents may get read-only core injection; external ACP agents default
 - Hybrid search (optional) may send snippets to embedding providers
 - Threat-scan + secret redact on write
 - Soft-delete trash + retention
-
-For architecture detail see the repo docs \`docs/memory.md\` and \`docs/memory-longterm-design.md\` when developing hip itself.
 `,
   },
   {
@@ -464,8 +462,6 @@ Managed sub-agents may get read-only core injection; external ACP agents default
 - Hybrid search (optional) may send snippets to embedding providers
 - Threat-scan + secret redact on write
 - Soft-delete trash + retention
-
-For architecture detail see the repo docs \`docs/memory.md\` and \`docs/memory-longterm-design.md\` when developing hip itself.
 `,
   },
   {
@@ -751,8 +747,6 @@ SQLite（\`memory_items\`）中的结构化条目：偏好、约定、教训、�
 - 混合检索（可选）可能向嵌入服务发送片段
 - 写入时威胁扫描 + 密钥脱敏
 - 软删除回收站 + 保留期
-
-架构细节见仓库 \`docs/memory.md\` 与 \`docs/memory-longterm-design.md\`（开发 hip 时）。
 `,
   },
   {

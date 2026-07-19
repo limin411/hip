@@ -33,4 +33,3 @@ Managed sub-agents may get read-only core injection; external ACP agents default
 - Threat-scan + secret redact on write
 - Soft-delete trash + retention
 
-For architecture detail see the repo docs `docs/memory.md` and `docs/memory-longterm-design.md` when developing hip itself.

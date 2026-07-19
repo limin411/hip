@@ -51,6 +51,10 @@ yarn product:content:check
 
 `{{HIP_PRODUCT_VERSION}}` is replaced with the root `package.json` `version` at generate time.
 
-## Spec
+## Regenerating
 
-See [product-prompt-progressive-disclosure-spec.md](../product-prompt-progressive-disclosure-spec.md).
+After editing markdown under this tree or `docs/ops/`:
+
+```bash
+yarn product:content
+```

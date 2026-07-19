@@ -1,15 +1,27 @@
 /**
- * Agent-decided parallel slot count (host fan-out + shared clamp).
+ * Local heuristic for parallel slot count (host fan-out + shared clamp).
  * Spec: docs/design/2026-07-18-agent-decided-parallel-count-spec.md
+ * Copy: docs/design/2026-07-19-worktree-composer-control-upgrade.md (reasonCode → i18n)
  */
 
 /** Inclusive bounds for parallel worktree slots. */
 export const PARALLEL_COUNT_MIN = 1
 export const PARALLEL_COUNT_MAX = 4
 
+/** Structured reason for UI i18n (`chat.worktreeControl.reason.*`). English `rationale` kept for tests. */
+export type ParallelSuggestReason =
+  | 'empty'
+  | 'compare'
+  | 'three'
+  | 'four'
+  | 'single'
+  | 'default'
+
 export interface ParallelCountSuggestion {
   n: number
+  /** English diagnostic string for unit tests; UI must use {@link reasonCode}. */
   rationale: string
+  reasonCode: ParallelSuggestReason
 }
 
 /** Clamp fan-out size. Invalid → default 2. */
@@ -21,11 +33,16 @@ export function clampParallelCount(n: number): number {
 /**
  * Local stand-in for “agent picks N” without a paid LLM.
  * Future model output should still pass through {@link clampParallelCount}.
+ * Host UI localizes via `reasonCode` — do not render `rationale` to users.
  */
 export function suggestParallelCount(goal: string): ParallelCountSuggestion {
   const g = goal.trim()
   if (!g) {
-    return { n: 2, rationale: 'Empty goal — default to 2 comparable approaches' }
+    return {
+      n: 2,
+      rationale: 'Empty goal — default to 2 comparable approaches',
+      reasonCode: 'empty',
+    }
   }
 
   const lower = g.toLowerCase()
@@ -37,7 +54,11 @@ export function suggestParallelCount(goal: string): ParallelCountSuggestion {
     /\b4\s*(ways?|options?|approaches?|variants?)\b/.test(lower) ||
     /exhaustive|matrix|全面|穷举/.test(lower)
   ) {
-    return { n: clampParallelCount(4), rationale: 'Multi-way / exhaustive exploration → 4 slots' }
+    return {
+      n: clampParallelCount(4),
+      rationale: 'Multi-way / exhaustive exploration → 4 slots',
+      reasonCode: 'four',
+    }
   }
 
   if (
@@ -45,7 +66,11 @@ export function suggestParallelCount(goal: string): ParallelCountSuggestion {
     /\bthree\b/.test(lower) ||
     /\b3\s*(ways?|options?|approaches?|variants?)\b/.test(lower)
   ) {
-    return { n: clampParallelCount(3), rationale: 'Three distinct approaches → 3 slots' }
+    return {
+      n: clampParallelCount(3),
+      rationale: 'Three distinct approaches → 3 slots',
+      reasonCode: 'three',
+    }
   }
 
   const wantsCompare =
@@ -59,12 +84,24 @@ export function suggestParallelCount(goal: string): ParallelCountSuggestion {
     ) || /只改|仅修|修一个|改一个|重命名/.test(g)
 
   if (wantsCompare) {
-    return { n: clampParallelCount(2), rationale: 'Compare / dual approach language → 2 slots' }
+    return {
+      n: clampParallelCount(2),
+      rationale: 'Compare / dual approach language → 2 slots',
+      reasonCode: 'compare',
+    }
   }
 
   if (wantsSingle && !wantsCompare) {
-    return { n: clampParallelCount(1), rationale: 'Single focused change → 1 isolated worktree' }
+    return {
+      n: clampParallelCount(1),
+      rationale: 'Single focused change → 1 isolated worktree',
+      reasonCode: 'single',
+    }
   }
 
-  return { n: clampParallelCount(2), rationale: 'Default: 2 slots for a light A/B comparison' }
+  return {
+    n: clampParallelCount(2),
+    rationale: 'Default: 2 slots for a light A/B comparison',
+    reasonCode: 'default',
+  }
 }

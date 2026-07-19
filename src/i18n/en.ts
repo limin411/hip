@@ -22,6 +22,37 @@ export const en = {
         starting: 'Creating {{count}} parallel worktree(s)…',
         noneCreated: 'No worktrees created. Is this folder a git repo?',
       },
+      /** Final WorktreeControl namespace (PR1+). Host parallel path is heuristic — not agent. */
+      worktreeControl: {
+        buttonTitle: 'Parallel explore (suggested tracks from prompt)',
+        dialogTitle: 'Parallel explore',
+        dialogHint:
+          'Describe the goal. Suggested track count (1–4) is based on your prompt. Only prepares workspaces — won’t start chat automatically.',
+        promptPlaceholder: 'What should be explored or compared?',
+        suggests: 'Suggested {{count}} track(s)',
+        confirm: 'Create {{count}} isolated workspace(s)',
+        creating: 'Creating…',
+        starting: 'Creating {{count}} isolated workspace(s)…',
+        started: 'Parallel run {{runId}}: {{count}} track(s) ready',
+        noneCreated: 'No isolated workspaces created. Is this folder a git repo?',
+        failed: 'Parallel explore failed',
+        reason: {
+          empty: 'Empty goal — default to 2 comparable approaches',
+          four: 'Multi-way / exhaustive exploration → 4 tracks',
+          three: 'Three distinct approaches → 3 tracks',
+          compare: 'Compare / dual approach language → 2 tracks',
+          single: 'Single focused change → 1 isolated workspace',
+          default: 'Default: 2 tracks for a light A/B comparison',
+        },
+        /** HITL optionId → label stubs for parallel_worktrees (PR8 consumes). */
+        hitlOption: {
+          n1: '1 track',
+          n2: '2 tracks',
+          n3: '3 tracks',
+          n4: '4 tracks',
+          reject: 'Reject',
+        },
+      },
       worktree: {
         created: 'Worktree ready: {{label}}',
       },

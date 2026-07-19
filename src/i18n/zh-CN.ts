@@ -22,6 +22,37 @@ export const zhCN = {
         starting: '正在创建 {{count}} 个并行 worktree…',
         noneCreated: '未创建任何 worktree。当前目录是 git 仓库吗？',
       },
+      /** WorktreeControl 最终命名空间（PR1+）。主机并行路径为启发式 — 非智能体决定。 */
+      worktreeControl: {
+        buttonTitle: '并行探索（根据描述建议路数）',
+        dialogTitle: '并行探索',
+        dialogHint:
+          '描述目标。系统将根据描述建议开启多少路隔离工作区（1–4）。只准备工作区，不会自动发消息。',
+        promptPlaceholder: '要探索或对比什么？',
+        suggests: '建议 {{count}} 路',
+        confirm: '创建 {{count}} 路隔离工作区',
+        creating: '创建中…',
+        starting: '正在创建 {{count}} 路隔离工作区…',
+        started: '并行探索 {{runId}}：已就绪 {{count}} 路',
+        noneCreated: '未创建任何隔离工作区。当前目录是 git 仓库吗？',
+        failed: '并行探索失败',
+        reason: {
+          empty: '未填写目标，默认建议 2 路对比方案',
+          four: '检测到多路/穷举探索意图，建议 4 路',
+          three: '检测到三种方案，建议 3 路',
+          compare: '检测到对比/双方案表述，建议 2 路',
+          single: '检测到单一聚焦改动，建议 1 路隔离工作区',
+          default: '默认建议 2 路，便于轻量 A/B 对比',
+        },
+        /** parallel_worktrees HITL optionId → 文案桩（PR8 消费）。 */
+        hitlOption: {
+          n1: '1 路',
+          n2: '2 路',
+          n3: '3 路',
+          n4: '4 路',
+          reject: '拒绝',
+        },
+      },
       worktree: {
         created: 'Worktree 已就绪：{{label}}',
       },

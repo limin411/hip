@@ -10,8 +10,9 @@ import { Textarea } from '@/components/ui/Textarea'
 import { toast } from 'sonner'
 
 /**
- * Host fan-out entry: user provides goal; agent heuristic decides slot count N.
+ * Host fan-out entry: user provides goal; local heuristic suggests track count N.
  * Never use window.prompt — freezes Tauri/WKWebView.
+ * Copy: chat.worktreeControl.* (honest host path — not agent-decided).
  * Spec: docs/design/2026-07-18-agent-decided-parallel-count-spec.md
  */
 export function ParallelRunButton({ draftPrompt = '' }: { draftPrompt?: string }) {
@@ -34,13 +35,12 @@ export function ParallelRunButton({ draftPrompt = '' }: { draftPrompt?: string }
   const run = async () => {
     const text = prompt.trim()
     if (!text || busy) return
-    const { n, rationale } = suggestParallelCount(text)
+    const { n } = suggestParallelCount(text)
     setBusy(true)
     try {
       toast.message(
-        t('chat.parallel.starting', {
+        t('chat.worktreeControl.starting', {
           count: n,
-          defaultValue: `Creating ${n} parallel worktree(s)…`,
         }),
       )
       const { runId, slotSessionIds } = await sessionService.startParallelRun({
@@ -53,17 +53,13 @@ export function ParallelRunButton({ draftPrompt = '' }: { draftPrompt?: string }
       })
       setOpen(false)
       if (slotSessionIds.length === 0) {
-        toast.error(
-          t('chat.parallel.noneCreated', {
-            defaultValue: 'No worktrees created. Is this folder a git repo?',
-          }),
-        )
+        toast.error(t('chat.worktreeControl.noneCreated'))
         return
       }
       toast.success(
-        t('chat.parallel.started', {
+        t('chat.worktreeControl.started', {
           count: slotSessionIds.length,
-          defaultValue: `Parallel run ${runId.slice(0, 6)}: ${slotSessionIds.length} slot(s) ready — ${rationale}`,
+          runId: runId.slice(0, 6),
         }),
       )
     } catch (err) {
@@ -80,12 +76,8 @@ export function ParallelRunButton({ draftPrompt = '' }: { draftPrompt?: string }
         variant="ghost"
         size="icon"
         disabled={busy}
-        title={t('chat.parallel.buttonTitle', {
-          defaultValue: 'Parallel worktrees (agent chooses how many)',
-        })}
-        aria-label={t('chat.parallel.buttonTitle', {
-          defaultValue: 'Parallel worktrees (agent chooses how many)',
-        })}
+        title={t('chat.worktreeControl.buttonTitle')}
+        aria-label={t('chat.worktreeControl.buttonTitle')}
         data-testid="parallel-run-button"
         onClick={openDialog}
       >
@@ -97,7 +89,7 @@ export function ParallelRunButton({ draftPrompt = '' }: { draftPrompt?: string }
         onOpenChange={(next) => {
           if (!busy) setOpen(next)
         }}
-        title={t('chat.parallel.dialogTitle', { defaultValue: 'Parallel worktrees' })}
+        title={t('chat.worktreeControl.dialogTitle')}
         footer={
           <div className="flex justify-end gap-2">
             <Button type="button" variant="ghost" disabled={busy} onClick={() => setOpen(false)}>
@@ -111,31 +103,23 @@ export function ParallelRunButton({ draftPrompt = '' }: { draftPrompt?: string }
               onClick={() => void run()}
             >
               {busy
-                ? t('chat.parallel.creating', { defaultValue: 'Creating…' })
-                : t('chat.parallel.confirm', {
+                ? t('chat.worktreeControl.creating')
+                : t('chat.worktreeControl.confirm', {
                     count: suggestion.n,
-                    defaultValue: `Create ${suggestion.n} worktree(s)`,
                   })}
             </Button>
           </div>
         }
       >
         <div className="space-y-3 px-5 py-4">
-          <p className="text-meta text-ink-secondary">
-            {t('chat.parallel.dialogHint', {
-              defaultValue:
-                'Describe the goal. The agent chooses how many isolated worktrees to open (1–4). Does not auto-start the model.',
-            })}
-          </p>
+          <p className="text-meta text-ink-secondary">{t('chat.worktreeControl.dialogHint')}</p>
           <Textarea
             data-testid="parallel-run-prompt"
             value={prompt}
             onChange={(e) => setPrompt(e.target.value)}
             rows={4}
             disabled={busy}
-            placeholder={t('chat.parallel.promptPlaceholder', {
-              defaultValue: 'What should be explored or compared?',
-            })}
+            placeholder={t('chat.worktreeControl.promptPlaceholder')}
             autoFocus
           />
           <div
@@ -144,12 +128,13 @@ export function ParallelRunButton({ draftPrompt = '' }: { draftPrompt?: string }
             data-suggest-n={suggestion.n}
           >
             <span className="font-medium text-ink">
-              {t('chat.parallel.agentSuggests', {
+              {t('chat.worktreeControl.suggests', {
                 count: suggestion.n,
-                defaultValue: `Agent suggests ${suggestion.n} slot(s)`,
               })}
             </span>
-            <span className="mt-0.5 block text-ink-tertiary">{suggestion.rationale}</span>
+            <span className="mt-0.5 block text-ink-tertiary">
+              {t(`chat.worktreeControl.reason.${suggestion.reasonCode}`)}
+            </span>
           </div>
         </div>
       </Modal>

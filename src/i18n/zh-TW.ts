@@ -392,6 +392,15 @@ export const zhTW = {
       "label": "智慧體",
       "builtin": "hip（內建）",
       "empty": "尚未啟用外部智慧體。請在設定中新增。"
+    },
+    "agentSwitch": {
+      "title": "切換智慧體？",
+      "body": "切換主智慧體會重啟外部上下文，之前的外部上下文不會保留。",
+      "target": "切換到 {{name}}",
+      "thisSession": "在本工作階段切換",
+      "newSession": "新工作階段",
+      "cancel": "取消",
+      "busy": "回合進行中，無法切換智慧體"
     }
   },
   "artifact": {

@@ -32,7 +32,13 @@ export interface SessionConfig {
    */
   effort?: string
   language?: 'en' | 'zh-CN' | 'zh-TW'
-  agentId?: string             // undefined / 'builtin' => built-in hip agent; else an AgentConfig.id
+  /**
+   * Session primary runtime.
+   * undefined | 'builtin' → hip Supervisor graph.
+   * else → AgentConfig.id (kind acp|opencode) as session primary.
+   * Mutate after create only via session:setAgent (running → BUSY).
+   */
+  agentId?: string
   permissionMode?: PermissionMode  // per-conversation gate; undefined ⇒ treated as 'edit'
   /** When true, HITL approval prompts include "always allow/always reject" sticky options.
    *  Defaults to true for new sessions; undefined ⇒ treated as true. */

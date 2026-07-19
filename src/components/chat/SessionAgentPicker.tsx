@@ -1,11 +1,15 @@
+import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Bot, Check } from 'lucide-react'
-import type { AgentConfig } from '@hip/protocol'
+import type { AgentConfig, SessionConfig } from '@hip/protocol'
+import { normalizeSessionConfig } from '@hip/protocol'
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem } from '@/components/ui/DropdownMenu'
+import { Modal } from '@/components/ui/Modal'
+import { Button } from '@/components/ui/Button'
 import { ComposerChip } from './ComposerChip'
 import { useDraftStore } from '@/store/draftStore'
 import { useAgents } from '@/store/hipConfigStore'
-import { useActiveSession, useActiveSessionId } from '@/domain'
+import { sessionService, useActiveSession, useActiveSessionId } from '@/domain'
 import { isAcpCapableAgent } from '@/lib/sessionAgent'
 import { cn } from '@/lib/utils'
 
@@ -20,9 +24,23 @@ export function resolvePrimaryAgentId(agentId: string | undefined): string {
   return id || 'builtin'
 }
 
+function agentDisplayName(
+  agentId: string,
+  agents: AgentConfig[],
+  enabled: AgentConfig[],
+  builtinLabel: string,
+): string {
+  if (agentId === 'builtin') return builtinLabel
+  return (
+    enabled.find((a) => a.id === agentId)?.name
+    ?? agents.find((a) => a.id === agentId)?.name
+    ?? agentId
+  )
+}
+
 /**
- * Composer chip: pick the primary agent for a **new** (draft) session.
- * Builtin hip graph vs enabled ACP agents. Mid-session switch is PR-6b — locked read-only here.
+ * Composer chip: pick the primary agent for a draft or active session.
+ * Draft: writes draft.agentId. Active: confirm dialog → setAgent mid-switch or new session.
  */
 export function SessionAgentPicker() {
   const { t } = useTranslation()
@@ -31,77 +49,133 @@ export function SessionAgentPicker() {
   const setAgentId = useDraftStore((s) => s.setAgentId)
   const activeId = useActiveSessionId()
   const session = useActiveSession()
+  const [pendingAgentId, setPendingAgentId] = useState<string | null>(null)
 
   const enabled = enabledAcpAgents(agents)
+  const builtinLabel = t('composer.agentPicker.builtin')
+  /** Mid-switch while a turn runs is rejected server-side; hide the action on FE. */
+  const turnRunning = session?.status === 'running'
 
-  // Any active session id: read-only badge (no mid-switch in PR-6a), even if row is briefly missing.
-  if (activeId) {
-    const aid = resolvePrimaryAgentId(session?.config.agentId)
-    const isExternal = aid !== 'builtin'
-    const name = isExternal
-      ? (agents.find((a) => a.id === aid)?.name ?? aid)
-      : t('composer.agentPicker.builtin')
-    return (
-      <ComposerChip
-        disabled
-        active={isExternal}
-        title={t('composer.agentPicker.label')}
-        data-testid="session-agent-chip-locked"
-      >
-        <Bot size={13} className="shrink-0" aria-hidden />
-        <span className="max-w-[120px] truncate">{name}</span>
-      </ComposerChip>
-    )
+  const currentId = activeId
+    ? resolvePrimaryAgentId(session?.config.agentId)
+    : resolvePrimaryAgentId(draft?.agentId)
+
+  const currentName = agentDisplayName(currentId, agents, enabled, builtinLabel)
+
+  const pendingName = pendingAgentId
+    ? agentDisplayName(pendingAgentId, agents, enabled, builtinLabel)
+    : ''
+
+  const selectAgent = (nextId: string) => {
+    const resolved = resolvePrimaryAgentId(nextId)
+    if (resolved === currentId) return
+    if (!activeId) {
+      setAgentId(resolved)
+      return
+    }
+    // Active session: confirm before mid-switch or forking a new session.
+    setPendingAgentId(resolved)
   }
 
-  const currentId = resolvePrimaryAgentId(draft?.agentId)
-  // If the selected ACP agent was removed/disabled, fall back to label from id.
-  const currentName =
-    currentId === 'builtin'
-      ? t('composer.agentPicker.builtin')
-      : (enabled.find((a) => a.id === currentId)?.name
-          ?? agents.find((a) => a.id === currentId)?.name
-          ?? currentId)
+  const closeDialog = () => setPendingAgentId(null)
+
+  const switchThisSession = () => {
+    if (!activeId || !pendingAgentId || turnRunning) return
+    sessionService.setAgent(activeId, pendingAgentId)
+    closeDialog()
+  }
+
+  const openNewSession = () => {
+    if (!pendingAgentId || !session) {
+      closeDialog()
+      return
+    }
+    const base: SessionConfig = { ...session.config }
+    if (pendingAgentId === 'builtin') {
+      delete base.agentId
+    } else {
+      base.agentId = pendingAgentId
+      // Hip-only draft fields are not meaningful under external primary.
+      delete base.forcePlan
+    }
+    sessionService.createSession(normalizeSessionConfig(base))
+    closeDialog()
+  }
 
   return (
-    <DropdownMenu modal={false}>
-      <DropdownMenuTrigger asChild>
-        <ComposerChip
-          active={currentId !== 'builtin'}
-          title={t('composer.agentPicker.label')}
-          data-testid="session-agent-chip"
-        >
-          <Bot size={13} className="shrink-0" aria-hidden />
-          <span className="max-w-[120px] truncate">{currentName}</span>
-        </ComposerChip>
-      </DropdownMenuTrigger>
-      <DropdownMenuContent align="start" data-testid="session-agent-menu">
-        <DropdownMenuItem
-          onSelect={() => setAgentId('builtin')}
-          data-testid="session-agent-option-builtin"
-        >
-          <Check size={14} className={cn('shrink-0', currentId === 'builtin' ? 'opacity-100' : 'opacity-0')} />
-          <span>{t('composer.agentPicker.builtin')}</span>
-        </DropdownMenuItem>
-        {enabled.map((a) => (
+    <>
+      <DropdownMenu modal={false}>
+        <DropdownMenuTrigger asChild>
+          <ComposerChip
+            active={currentId !== 'builtin'}
+            title={t('composer.agentPicker.label')}
+            data-testid={activeId ? 'session-agent-chip-active' : 'session-agent-chip'}
+          >
+            <Bot size={13} className="shrink-0" aria-hidden />
+            <span className="max-w-[120px] truncate">{currentName}</span>
+          </ComposerChip>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="start" data-testid="session-agent-menu">
           <DropdownMenuItem
-            key={a.id}
-            onSelect={() => setAgentId(a.id)}
-            data-testid={`session-agent-option-${a.id}`}
+            onSelect={() => selectAgent('builtin')}
+            data-testid="session-agent-option-builtin"
           >
-            <Check size={14} className={cn('shrink-0', currentId === a.id ? 'opacity-100' : 'opacity-0')} />
-            <span className="truncate">{a.name}</span>
+            <Check size={14} className={cn('shrink-0', currentId === 'builtin' ? 'opacity-100' : 'opacity-0')} />
+            <span>{builtinLabel}</span>
           </DropdownMenuItem>
-        ))}
-        {enabled.length === 0 && (
-          <div
-            className="px-2 py-1.5 text-meta text-ink-tertiary"
-            data-testid="session-agent-empty"
-          >
-            {t('composer.agentPicker.empty')}
+          {enabled.map((a) => (
+            <DropdownMenuItem
+              key={a.id}
+              onSelect={() => selectAgent(a.id)}
+              data-testid={`session-agent-option-${a.id}`}
+            >
+              <Check size={14} className={cn('shrink-0', currentId === a.id ? 'opacity-100' : 'opacity-0')} />
+              <span className="truncate">{a.name}</span>
+            </DropdownMenuItem>
+          ))}
+          {enabled.length === 0 && (
+            <div
+              className="px-2 py-1.5 text-meta text-ink-tertiary"
+              data-testid="session-agent-empty"
+            >
+              {t('composer.agentPicker.empty')}
+            </div>
+          )}
+        </DropdownMenuContent>
+      </DropdownMenu>
+
+      <Modal
+        open={pendingAgentId !== null}
+        onOpenChange={(open) => {
+          if (!open) closeDialog()
+        }}
+        title={t('composer.agentSwitch.title')}
+        footer={
+          <div className="flex flex-wrap items-center justify-end gap-2">
+            <Button variant="ghost" size="sm" onClick={closeDialog} data-testid="session-agent-switch-cancel">
+              {t('composer.agentSwitch.cancel')}
+            </Button>
+            <Button variant="secondary" size="sm" onClick={openNewSession} data-testid="session-agent-switch-new">
+              {t('composer.agentSwitch.newSession')}
+            </Button>
+            <Button
+              variant="primary"
+              size="sm"
+              onClick={switchThisSession}
+              disabled={turnRunning}
+              title={turnRunning ? t('composer.agentSwitch.busy') : undefined}
+              data-testid="session-agent-switch-this"
+            >
+              {t('composer.agentSwitch.thisSession')}
+            </Button>
           </div>
-        )}
-      </DropdownMenuContent>
-    </DropdownMenu>
+        }
+      >
+        <div className="space-y-2 text-body text-ink-secondary" data-testid="session-agent-switch-dialog">
+          <p>{t('composer.agentSwitch.target', { name: pendingName })}</p>
+          <p>{t('composer.agentSwitch.body')}</p>
+        </div>
+      </Modal>
+    </>
   )
 }

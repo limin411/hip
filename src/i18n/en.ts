@@ -404,6 +404,15 @@ export const en = {
         builtin: 'hip (built-in)',
         empty: 'No external agents enabled. Add one in Settings.',
       },
+      agentSwitch: {
+        title: 'Switch agent?',
+        body: 'Switching the primary agent restarts external context. Earlier agent context is not carried over.',
+        target: 'Switch to {{name}}',
+        thisSession: 'Switch this session',
+        newSession: 'New session',
+        cancel: 'Cancel',
+        busy: 'Cannot switch agent while a turn is running',
+      },
     },
     artifact: {
       files: 'Files',

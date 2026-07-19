@@ -94,7 +94,7 @@ export async function resume(host: SessionTurnHost, content: string, send: SendF
 }
 
 export async function regenerate(host: SessionTurnHost, send: SendFn): Promise<void> {
-  if (host.running) {
+  if (host.running || host.switchingAgent) {
     send({ type: 'error', sessionId: host.id, code: 'BUSY', message: 'A turn is already running' })
     return
   }

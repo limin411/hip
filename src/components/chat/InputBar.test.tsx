@@ -440,7 +440,8 @@ describe('InputBar', () => {
     } as any)
 
     render(<InputBar />)
-    expect(screen.getByTestId('session-agent-chip-locked')).toBeInTheDocument()
+    // PR-6b: active session unlocks picker (mid-switch via confirm dialog).
+    expect(screen.getByTestId('session-agent-chip-active')).toBeInTheDocument()
     expect(screen.queryByTestId('model-chip')).not.toBeInTheDocument()
     expect(screen.queryByTestId('effort-chip')).not.toBeInTheDocument()
   })

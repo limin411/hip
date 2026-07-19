@@ -25,6 +25,10 @@ export interface SessionConfigLike {
   /** Reasoning effort level when the model supports it; undefined ⇒ provider default. */
   effort?: string
   language?: 'en' | 'zh-CN' | 'zh-TW'
+  /**
+   * undefined | 'builtin' → hip Supervisor; else AgentConfig.id (acp|opencode).
+   * Mutate after create only via session:setAgent (running → BUSY).
+   */
   agentId?: string
   permissionMode?: PermissionMode
   enableStickyApproval?: boolean

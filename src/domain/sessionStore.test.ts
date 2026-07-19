@@ -91,6 +91,31 @@ describe('applyServerMessage', () => {
     expect(next.sessions[0].error).toBeNull()
   })
 
+  it('BUSY / AGENT_BUSY soft-reject keeps status and plan (no terminal error)', () => {
+    const s0 = {
+      sessions: [
+        baseSession({
+          status: 'running',
+          activeTurnPlan: [{ content: 'step', status: 'pending' }],
+          planApprovalPending: true,
+          planDeltaDraft: { a: 'x' },
+        }),
+      ],
+    }
+    for (const code of ['BUSY', 'AGENT_BUSY'] as const) {
+      const next = applyServerMessage(
+        s0,
+        { type: 'error', sessionId: 's1', code, message: 'soft' },
+        0,
+      )
+      expect(next).toBe(s0)
+      expect(next.sessions[0].status).toBe('running')
+      expect(next.sessions[0].error).toBeNull()
+      expect(next.sessions[0].activeTurnPlan).toEqual([{ content: 'step', status: 'pending' }])
+      expect(next.sessions[0].planApprovalPending).toBe(true)
+    }
+  })
+
   it('error without a sessionId is ignored (cannot attribute to a session)', () => {
     const s0 = { sessions: [baseSession()] }
     const next = applyServerMessage(s0, { type: 'error', code: 'PARSE_ERROR', message: 'bad json' }, 0)
@@ -389,6 +414,29 @@ describe('applyServerMessage', () => {
     const s0 = { sessions: [baseSession()] }
     const next = applyServerMessage(s0, { type: 'session:permissionMode', sessionId: 's1', permissionMode: 'full' }, 0)
     expect(next.sessions[0].config.permissionMode).toBe('full')
+  })
+
+  it('session:agentChanged sets config.agentId, clears configOptions and forcePlan', () => {
+    const s0 = {
+      sessions: [
+        baseSession({
+          config: { llmProvider: 'deepseek', model: 'm', tools: [], agentId: 'old', forcePlan: true },
+          configOptions: [{ id: 'model', name: 'Model', category: 'model', currentValue: 'a', options: [] }],
+        }),
+      ],
+    }
+    const next = applyServerMessage(s0, { type: 'session:agentChanged', sessionId: 's1', agentId: 'opencode' }, 0)
+    expect(next.sessions[0].config.agentId).toBe('opencode')
+    expect(next.sessions[0].config.forcePlan).toBeUndefined()
+    expect(next.sessions[0].configOptions).toBeUndefined()
+  })
+
+  it('session:agentChanged with null clears agentId to builtin', () => {
+    const s0 = {
+      sessions: [baseSession({ config: { llmProvider: 'deepseek', model: 'm', tools: [], agentId: 'opencode' } })],
+    }
+    const next = applyServerMessage(s0, { type: 'session:agentChanged', sessionId: 's1', agentId: null }, 0)
+    expect(next.sessions[0].config.agentId).toBeUndefined()
   })
 
   it('session:forcePlan writes config.forcePlan', () => {

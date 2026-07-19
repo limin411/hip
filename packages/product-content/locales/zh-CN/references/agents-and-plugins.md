@@ -16,6 +16,27 @@
 
 支持的 ACP preset（设置 → 智能体 → 新增 ACP）：**OpenCode**、**Grok Build**（`grok agent stdio`）、**Pi**、**Claude Code**、**Codex**。Grok Build 为原生 ACP（安装见 `https://x.ai/cli`）；认证用 `grok login` 或可选 `XAI_API_KEY`。
 
+ACP 智能体的认证与模型为**自管**：hip **不会**把自身 provider 的 API key 注入 ACP 子进程。请使用智能体自身登录 / 环境变量 / 预设可选的 `authEnvVar`。
+
+## 能力矩阵（内置 vs ACP）
+
+hip 可运行 **内置** LangGraph 智能体、将 **ACP 作为会话主智能体**，或 **派发 ACP 作为子智能体**。能力不同：
+
+| 能力 | 内置主智能体 | ACP 主智能体 | ACP 子智能体（dispatch） |
+|------|--------------|--------------|--------------------------|
+| hip 内置工具（read / write / run_script …） | 有 | 无（智能体自有工具） | 无（智能体自有工具） |
+| hip Skills / 插件钩子 | 有 | 无 | 无 |
+| hip MCP（会话内合并） | 有 | 无（除非开启 MCP 转发） | 无（除非开启 MCP 转发） |
+| 客户端 FS bridge | 不适用 | 有 | 有 |
+| dispatch / task / task_batch | 有 | 无 | 无 |
+| 跨会话 Memory 注入 | 有 | 仅 opt-in 前缀 | 无（v1） |
+| Memory 抽取 | 有 | 无（v1） | 无 |
+| hip 模型选择器 | 有 | 无（用 agent configOptions / 智能体侧模型 UI） | 无 |
+| HITL 权限 | hip 工具门禁 | ACP `requestPermission` | 同 ACP 主智能体 |
+| permissionMode | hip 工具门禁 | FS bridge + 安全 kind 自动放行 | 继承父会话 mode |
+
+**要点：** 选 ACP 作主智能体时，它是对等的编程智能体栈，**不是** hip 内置工具/技能/MCP。派发 ACP 子智能体时是同一工具栈，但没有主会话专用的 memory 前缀。
+
 ## 委派工具（主智能体）
 
 | 工具 | 用途 |

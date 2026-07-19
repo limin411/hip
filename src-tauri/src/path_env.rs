@@ -219,6 +219,41 @@ mod tests {
         }
     }
 
+    /// ACP presets install into global npm / homebrew / cargo-style bins and
+    /// (for Grok Build) `~/.grok/bin`. Lock those baseline dirs so Dock/GUI
+    /// launches still detect opencode / grok / pi / claude / codex (+ adapters).
+    #[test]
+    fn common_dirs_covers_acp_preset_install_locations() {
+        let dirs = common_dirs();
+        if cfg!(windows) {
+            for needle in [
+                r".grok\bin",
+                r".local\bin",
+                r".cargo\bin",
+                r"AppData\Roaming\npm",
+            ] {
+                assert!(
+                    dirs.contains(needle) || dirs.contains(&needle.replace('\\', "\\\\")),
+                    "expected {needle} in common_dirs for ACP CLI discovery, got {dirs}"
+                );
+            }
+        } else {
+            for needle in [
+                ".grok/bin",       // grok (https://x.ai/cli)
+                ".npm-global/bin", // npm -g: opencode, pi, claude, codex, adapters
+                ".local/bin",
+                ".cargo/bin",
+                "/opt/homebrew/bin",
+                "/usr/local/bin",
+            ] {
+                assert!(
+                    dirs.contains(needle),
+                    "expected {needle} in common_dirs for ACP CLI discovery, got {dirs}"
+                );
+            }
+        }
+    }
+
     #[test]
     fn merge_paths_dedups_preserves_order_drops_empty_unix() {
         let got = merge_paths_with_sep(

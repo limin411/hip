@@ -255,11 +255,32 @@ describe('Session idle-timeout watchdog', () => {
   })
 })
 
-describe('Session chat mode ACP auto-allow', () => {
+describe('tryAutoResolvePermission lock table (chat/edit/full × tool kinds)', () => {
+  // Behavior lock only — do NOT change full-mode to yolo. full always returns null (HITL path).
+  // SAFE_KINDS = read | fetch | other → auto-allow in chat/edit when an allow* option exists.
   const opts = [
     { optionId: 'allow_once', name: 'Allow', kind: 'allow_once' },
     { optionId: 'reject_once', name: 'Reject', kind: 'reject_once' },
   ]
+  const allow = { optionId: 'allow_once' }
+  const hitl = null
+
+  const modes = ['chat', 'edit', 'full'] as const
+  const kinds = ['read', 'fetch', 'other', 'write', 'execute', 'edit'] as const
+
+  /** Expected outcome: non-null = auto optionId, null = HITL (tryAutoResolve returns null). */
+  const expected: Record<(typeof modes)[number], Record<(typeof kinds)[number], typeof allow | null>> = {
+    chat: { read: allow, fetch: allow, other: allow, write: hitl, execute: hitl, edit: hitl },
+    edit: { read: allow, fetch: allow, other: allow, write: hitl, execute: hitl, edit: hitl },
+    // full: always null — upstream/HITL owns full-mode decisions; not yolo here.
+    full: { read: hitl, fetch: hitl, other: hitl, write: hitl, execute: hitl, edit: hitl },
+  }
+
+  it.each(
+    modes.flatMap((mode) => kinds.map((kind) => ({ mode, kind, want: expected[mode][kind] }))),
+  )('$mode × $kind → $want', ({ mode, kind, want }) => {
+    expect(tryAutoResolvePermission(mode, kind, opts)).toEqual(want)
+  })
 
   it('auto-resolves read permission in chat and edit modes', () => {
     expect(tryAutoResolvePermission('chat', 'read', opts)).toEqual({ optionId: 'allow_once' })
@@ -281,8 +302,9 @@ describe('Session chat mode ACP auto-allow', () => {
     expect(tryAutoResolvePermission('edit', 'write', opts)).toBeNull()
   })
 
-  it('full mode always returns null (already auto-approved upstream)', () => {
-    expect(tryAutoResolvePermission('full', 'read', opts)).toBeNull()
-    expect(tryAutoResolvePermission('full', 'execute', opts)).toBeNull()
+  it('full mode always returns null (HITL; not yolo)', () => {
+    for (const kind of kinds) {
+      expect(tryAutoResolvePermission('full', kind, opts)).toBeNull()
+    }
   })
 })

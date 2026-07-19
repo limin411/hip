@@ -11,6 +11,22 @@ export const en = {
       parallel: {
         started: 'Started {{count}} parallel worktree slots',
         failed: 'Parallel run failed',
+        buttonTitle: 'Parallel worktrees (agent chooses how many)',
+        dialogTitle: 'Parallel worktrees',
+        dialogHint:
+          'Describe the goal. The agent chooses how many isolated worktrees to open (1–4). Does not auto-start the model.',
+        promptPlaceholder: 'What should be explored or compared?',
+        agentSuggests: 'Agent suggests {{count}} slot(s)',
+        confirm: 'Create {{count}} worktree(s)',
+        creating: 'Creating…',
+        starting: 'Creating {{count}} parallel worktree(s)…',
+        noneCreated: 'No worktrees created. Is this folder a git repo?',
+      },
+      worktree: {
+        created: 'Worktree ready: {{label}}',
+      },
+      goal: {
+        aria: 'Active goal',
       },
       diffAnnotations: {
         chip: '{{count}} diff annotation(s) will be sent',
@@ -1269,6 +1285,7 @@ export const en = {
         collapseWorktrees: 'Hide worktrees',
         worktreeTree: 'Worktrees for {{title}}',
         slotCount: '{{count}} worktrees',
+        catalogGroup: 'Worktrees',
       },
     },
     dropdown: {

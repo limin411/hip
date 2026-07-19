@@ -11,6 +11,22 @@ export const zhCN = {
       parallel: {
         started: '已启动 {{count}} 路并行 worktree',
         failed: '并行运行失败',
+        buttonTitle: '并行 worktree（由智能体决定数量）',
+        dialogTitle: '并行 worktree',
+        dialogHint:
+          '描述目标。智能体将决定开启多少个隔离 worktree（1–4）。不会自动启动模型。',
+        promptPlaceholder: '要探索或对比什么？',
+        agentSuggests: '智能体建议 {{count}} 个槽位',
+        confirm: '创建 {{count}} 个 worktree',
+        creating: '创建中…',
+        starting: '正在创建 {{count}} 个并行 worktree…',
+        noneCreated: '未创建任何 worktree。当前目录是 git 仓库吗？',
+      },
+      worktree: {
+        created: 'Worktree 已就绪：{{label}}',
+      },
+      goal: {
+        aria: '当前目标',
       },
       diffAnnotations: {
         chip: '将发送 {{count}} 条 diff 批注',
@@ -1246,6 +1262,7 @@ export const zhCN = {
         collapseWorktrees: '收起 worktree',
         worktreeTree: '{{title}} 的 worktree',
         slotCount: '{{count}} 个 worktree',
+        catalogGroup: 'Worktree',
       },
     },
     dropdown: {

@@ -18,7 +18,22 @@ export const zhTW = {
     "resizeInput": "拖曳調整輸入框高度",
     "parallel": {
       "started": "已啟動 {{count}} 路並行 worktree",
-      "failed": "並行執行失敗"
+      "failed": "並行執行失敗",
+      "buttonTitle": "並行 worktree（由智能體決定數量）",
+      "dialogTitle": "並行 worktree",
+      "dialogHint": "描述目標。智能體將決定開啟多少個隔離 worktree（1–4）。不會自動啟動模型。",
+      "promptPlaceholder": "要探索或對比什麼？",
+      "agentSuggests": "智能體建議 {{count}} 個槽位",
+      "confirm": "建立 {{count}} 個 worktree",
+      "creating": "建立中…",
+      "starting": "正在建立 {{count}} 個並行 worktree…",
+      "noneCreated": "未建立任何 worktree。目前目錄是 git 倉庫嗎？"
+    },
+    "worktree": {
+      "created": "Worktree 已就緒：{{label}}"
+    },
+    "goal": {
+      "aria": "目前目標"
     },
     "diffAnnotations": {
       "chip": "將傳送 {{count}} 條 diff 批註",
@@ -1220,7 +1235,8 @@ export const zhTW = {
       "expandWorktrees": "展開 worktree",
       "collapseWorktrees": "收起 worktree",
       "worktreeTree": "{{title}} 的 worktree",
-      "slotCount": "{{count}} 個 worktree"
+      "slotCount": "{{count}} 個 worktree",
+      "catalogGroup": "Worktree"
     }
   },
   "dropdown": {

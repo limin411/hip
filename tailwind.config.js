@@ -132,9 +132,11 @@ export default {
           from: { opacity: '0', transform: 'translateY(8px)' },
           to: { opacity: '1', transform: 'translateY(0)' },
         },
+        // Use individual transform properties so Tailwind translate-* on the element
+        // (e.g. -translate-x-1/2 centering) is not wiped for the animation duration.
         'menu-in': {
-          from: { opacity: '0', transform: 'translateY(-4px) scale(0.97)' },
-          to: { opacity: '1', transform: 'translateY(0) scale(1)' },
+          from: { opacity: '0', translate: '0 -4px', scale: '0.97' },
+          to: { opacity: '1', translate: '0 0', scale: '1' },
         },
         'panel-in': {
           from: { opacity: '0', transform: 'translateX(8px)' },

@@ -313,7 +313,9 @@ export function GlobalCommandPalette() {
               }
             }}
             className={cn(
-              'fixed left-1/2 top-[min(20vh,8rem)] z-[210] w-[min(32rem,calc(100vw-2rem))] -translate-x-1/2',
+              // Center with inset + mx-auto (not translateX): animate-menu-in sets `transform`
+              // and would wipe -translate-x-1/2 mid-animation → flash on the right, then snap center.
+              'fixed inset-x-0 top-[min(20vh,8rem)] z-[210] mx-auto w-[min(32rem,calc(100vw-2rem))]',
               'overflow-hidden rounded-xl border border-border bg-surface shadow-overlay outline-none',
               'animate-menu-in motion-reduce:animate-none',
             )}

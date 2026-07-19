@@ -44,6 +44,35 @@ describe('buildSystemPrompt', () => {
     expect(chat).toMatch(/page\.html|artifacts preview|previewable/i)
   })
 
+  it('chat surface never claims edit mode or coding BASE rules', () => {
+    const chat = buildSystemPrompt({ cwd: '/tmp/proj', surface: 'chat', permissionMode: 'edit' })
+    expect(chat).toMatch(/Chat assistant|Chat surface|private sandbox/i)
+    expect(chat).not.toMatch(/Current permission mode:\s*edit/i)
+    expect(chat).not.toMatch(/task_batch/)
+    expect(chat).not.toMatch(/hip-coding/)
+    expect(chat).toMatch(/not.*Code edit mode|not the Code project/i)
+  })
+
+  it('chat surface excludes hip-coding from skills list', () => {
+    const chat = buildSystemPrompt({
+      cwd: '/tmp/proj',
+      surface: 'chat',
+      skills: [
+        { id: 'hip', name: 'hip', description: 'product help', dir: '/s/hip', hasScripts: false, autoInvoke: true },
+        { id: 'hip-coding', name: 'hip-coding', description: 'coding policy', dir: '/s/c', hasScripts: false, autoInvoke: true },
+      ],
+    })
+    expect(chat).toMatch(/hip/)
+    expect(chat).not.toMatch(/hip-coding/)
+  })
+
+  it('code + read-only permission keeps coding body (not BASE_CHAT)', () => {
+    const s = buildSystemPrompt({ cwd: '/tmp/proj', surface: 'code', permissionMode: 'chat' })
+    expect(s).toMatch(/coding assistant|Code workbench/i)
+    expect(s).toMatch(/READ-ONLY mode|read-only/i)
+    expect(s).not.toMatch(/previewable deliverable/i)
+  })
+
   it('gives the agent the hip identity and forbids impersonating other assistants', () => {
     const s = buildSystemPrompt({ cwd: '/tmp/proj' })
     expect(s).toMatch(/you are hip/i)

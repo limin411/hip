@@ -1,5 +1,10 @@
 import type { PermissionMode, SkillMeta } from '@hip/protocol'
 import { buildSystemPrompt, skillsBlock } from './system-prompt.js'
+import {
+  filterSkillsForProfile,
+  renderCapabilityNarrative,
+  resolveAgentRuntimeProfile,
+} from './agent-runtime-profile.js'
 
 // ── State ──────────────────────────────────────────────────────────────────────
 
@@ -8,11 +13,11 @@ export interface InjectorState {
   permissionMode: PermissionMode
   skills: SkillMeta[]
   tokenBudgetPercent: number
-  /** When 'chat', system prompt omits heavy code/git guidance. */
-  surface?: 'chat' | 'code'
+  /** Product surface — owns persona/body; permissionMode owns tool gates. */
+  surface?: 'chat' | 'code' | 'knowledge'
   pendingSubagents?: { id: string; description: string; status: string }[]
   completedSubagents?: { id: string; description: string; status: string }[]
-  /** Session id for memory prefetch scoping. */
+  /** Session id for memory prefetch + surface inference + skill filtering. */
   sessionId?: string
   /** When true, MemoryInjector may inject core snapshot + prefetch. */
   useMemories?: boolean
@@ -79,23 +84,41 @@ export class SystemPromptInjector implements ContextInjector {
   }
 }
 
-/** Wraps `skillsBlock()` to list available skills. */
+/**
+ * Lists available skills.
+ * Prefer SystemPromptInjector (skills already embedded in buildSystemPrompt).
+ * When used alone (tests / custom pipelines), still filters by surface profile.
+ */
 export class SkillsListInjector implements ContextInjector {
   readonly id = 'skills-list'
 
   async inject(state: InjectorState): Promise<InjectResult> {
     if (state.skills.length === 0) return { systemMessages: [] }
-    const block = skillsBlock(state.skills, state.cwd)
+    const profile = resolveAgentRuntimeProfile({
+      surface: state.surface,
+      permissionMode: state.permissionMode,
+      sessionId: state.sessionId,
+      cwd: state.cwd,
+    })
+    const skills = filterSkillsForProfile(state.skills, profile)
+    if (skills.length === 0) return { systemMessages: [] }
+    const block = skillsBlock(skills, state.cwd)
     return { systemMessages: block ? [block] : [] }
   }
 }
 
-/** Adds a permission-mode reminder. */
+/** Adds a surface-aware capability reminder (never bare "permission mode: edit"). */
 export class PermissionModeInjector implements ContextInjector {
   readonly id = 'permission-mode'
 
   async inject(state: InjectorState): Promise<InjectResult> {
-    return { systemMessages: [`Current permission mode: ${state.permissionMode}.`] }
+    const narrative = renderCapabilityNarrative({
+      surface: state.surface,
+      permissionMode: state.permissionMode,
+      sessionId: state.sessionId,
+      cwd: state.cwd,
+    })
+    return { systemMessages: [narrative] }
   }
 }
 

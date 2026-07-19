@@ -17,7 +17,7 @@ export interface SystemSourceInput {
   readonly skills?: SkillMeta[]
   readonly permissionMode?: PermissionMode
   readonly mcpCatalog?: string
-  readonly surface?: 'chat' | 'code'
+  readonly surface?: 'chat' | 'code' | 'knowledge'
 }
 
 // ── Codec ─────────────────────────────────────────────────────────────────────

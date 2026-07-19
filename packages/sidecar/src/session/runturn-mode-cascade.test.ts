@@ -50,10 +50,23 @@ class DispatchThenTextRunner implements ModelRunner {
   }
 }
 
-function makeRunnerSession(id: string, mode: PermissionMode | undefined, runner: ModelRunner, invokerFactory?: (cwd: string) => AgentInvoker): Session {
+function makeRunnerSession(
+  id: string,
+  mode: PermissionMode | undefined,
+  runner: ModelRunner,
+  invokerFactory?: (cwd: string) => AgentInvoker,
+  surface?: 'chat' | 'code',
+): Session {
   return new Session(
     id,
-    { llmProvider: 'deepseek', model: 'm', tools: [], cwd: process.cwd(), ...(mode ? { permissionMode: mode } : {}) },
+    {
+      llmProvider: 'deepseek',
+      model: 'm',
+      tools: [],
+      cwd: process.cwd(),
+      ...(mode ? { permissionMode: mode } : {}),
+      ...(surface ? { surface } : {}),
+    },
     undefined, // model
     undefined, // store
     undefined, // titleGenerator
@@ -101,6 +114,18 @@ describe('runTurn permissionMode cascade — system prompt + buildTools', () => 
     expect(runner.systemPrompt).toContain('sandboxed to it')
     expect(runner.toolNames).toContain('write_file')
     expect(runner.toolNames).toContain('run_script')
+  })
+
+  it("Chat surface + permissionMode edit: Chat body, write tools, never bare 'edit mode' narrative", async () => {
+    const runner = new CapturingRunner()
+    const session = makeRunnerSession('s-chat-surface', 'edit', runner, undefined, 'chat')
+    await drive(session, 'hi')
+    expect(runner.systemPrompt).toMatch(/Chat assistant|private sandbox|Chat surface/i)
+    expect(runner.systemPrompt).not.toMatch(/Current permission mode:\s*edit/i)
+    expect(runner.systemPrompt).toMatch(/not.*Code edit mode|not the Code project/i)
+    expect(runner.systemPrompt).not.toMatch(/task_batch/)
+    expect(runner.toolNames).toContain('write_file')
+    expect(runner.toolNames).not.toContain('git_commit')
   })
 })
 

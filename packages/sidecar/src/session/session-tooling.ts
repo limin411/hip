@@ -29,6 +29,8 @@ export interface BuildSessionToolingInput {
   cwd: string
   sessionId: string
   mode: PermissionMode
+  /** Product surface for tool clamps + skill filtering (Chat vs Code). */
+  surface?: 'chat' | 'code' | 'knowledge'
   skills: SkillMeta[]
   mcpConfigs: McpServerConfig[]
   enabledAgents: AgentConfig[]
@@ -83,6 +85,7 @@ export async function buildSessionTooling(input: BuildSessionToolingInput): Prom
       skills: input.skills,
       requestApproval: input.requestApproval,
       permissionMode: input.mode,
+      surface: input.surface,
       webSearchEnabled: true,
       generateAgentEnabled: true,
       sessionId: input.sessionId,

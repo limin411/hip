@@ -15,6 +15,10 @@ import { EnterPlanModeTool } from './enter-plan-mode.js'
 import { ExitPlanModeTool } from './exit-plan-mode.js'
 import { real, realInSkill, resolveFull } from './helpers.js'
 import type { BuildToolsOpts, DispatchSpec } from './helpers.js'
+import {
+  filterSkillsForProfile,
+  resolveAgentRuntimeProfile,
+} from '../agent-runtime-profile.js'
 
 export type { ApprovalDecision, ApprovalFn, DispatchSpec, BuildToolsOpts } from './helpers.js'
 export { substituteSkillBody, SELF_GATED_TOOLS, isApproved } from './helpers.js'
@@ -36,12 +40,20 @@ export function buildAllTools(
   getBackgroundTaskOutput?: (taskId: string) => string,
   planMode?: PlanMode,
 ): StructuredToolInterface[] {
+  // Surface × permissionMode profile (Chat clamps git/plugin even when writes allowed).
+  const profile = resolveAgentRuntimeProfile({
+    surface: opts.surface,
+    permissionMode: opts.permissionMode,
+    sessionId: opts.sessionId,
+    cwd: cwd ?? root,
+  })
+  const skills = filterSkillsForProfile(opts.skills, profile)
   // Enabled-skill dirs (~/.hip/skills/<id>), DISJOINT from the project root. read_file may ALSO reach
   // bundled reference files under these (read-only); every other path stays jailed to `root` via real().
-  const skillDirs = (opts.skills ?? []).map((s) => s.dir)
+  const skillDirs = skills.map((s) => s.dir)
   // Mode (default + dirty-data → 'edit'). 'full' un-jails file paths; 'chat' is read-only.
-  const mode: PermissionMode = opts.permissionMode === 'chat' || opts.permissionMode === 'full' ? opts.permissionMode : 'edit'
-  const isFull = mode === 'full'
+  const mode: PermissionMode = profile.permissionMode
+  const isFull = profile.toolPolicy.pathJail === 'none'
   const pathRoot = cwd ?? root
   /** Resolve a model path under the active mode: 'full' un-jails (absolute as-is, relative vs cwd);
    *  otherwise the symlink-guarded jail to `root`. */
@@ -53,9 +65,8 @@ export function buildAllTools(
   // ── Planning tool ───────────────────────────────────────────────────────────────
   const planningTools = buildPlanningTools()
 
-  // ── Assemble base (PermissionMode filters write/edit) ──────────────────────────
-  // 'chat' = read-only: drop write_file/edit_file. (read_file/ls/glob/grep + write_todos stay.)
-  const base: StructuredToolInterface[] = mode === 'chat'
+  // ── Assemble base (profile.toolPolicy filters write/edit) ───────────────────────
+  const base: StructuredToolInterface[] = !profile.toolPolicy.allowWrites
     ? [fileTools.readFile, fileTools.ls, fileTools.glob, fileTools.grep, ...planningTools]
     : [
         fileTools.writeFile,
@@ -68,9 +79,8 @@ export function buildAllTools(
         ...planningTools,
       ]
 
-  // ── Git tools (only for a real on-disk cwd; dropped in chat — all mutate) ─────
-  // chat is read-only: omit commit / branch / worktree tools along with write_file.
-  if (mode !== 'chat') {
+  // ── Git tools (only for a real on-disk cwd; dropped on Chat / read-only) ───────
+  if (profile.toolPolicy.allowGit) {
     base.push(
       ...buildGitTools(cwd, {
         sessionId: opts.sessionId,
@@ -88,8 +98,8 @@ export function buildAllTools(
   // ── Skill / script / MCP extras (apply on hip's own loop, every assembly path) ─
   const extras: StructuredToolInterface[] = []
 
-  // use_skill
-  extras.push(...buildSkillTools(opts.skills, opts.sessionId))
+  // use_skill (surface-filtered skill list)
+  extras.push(...buildSkillTools(skills, opts.sessionId))
 
   // web_search + web_fetch
   if (opts.webSearchEnabled) {
@@ -97,15 +107,19 @@ export function buildAllTools(
   }
 
   // generate_agent + run_script
+  // buildScriptTools still keys off protocol mode for run_script; pass chat when disallowed.
+  const scriptMode: PermissionMode = profile.toolPolicy.allowRunScript
+    ? mode === 'full' ? 'full' : 'edit'
+    : 'chat'
   extras.push(...buildScriptTools(
     !!opts.generateAgentEnabled,
     opts.requestApproval,
     cwd ?? root,
-    mode,
+    scriptMode,
   ))
 
-  // plugin_install — dropped in chat mode
-  if (mode !== 'chat') {
+  // plugin_install — dropped on Chat / read-only
+  if (profile.toolPolicy.allowPluginInstall) {
     extras.push(buildPluginInstallTool())
   }
 
@@ -117,7 +131,7 @@ export function buildAllTools(
 
   // parallel_worktrees — agent proposes N isolated worktrees; user confirms count via HITL
   if (
-    mode !== 'chat' &&
+    profile.toolPolicy.allowParallelWorktrees &&
     cwd &&
     opts.sessionId &&
     opts.requestChoice &&

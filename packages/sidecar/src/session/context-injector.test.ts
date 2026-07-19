@@ -30,7 +30,8 @@ describe('ContextInjectorRegistry', () => {
 
     const results = await registry.injectAll(baseState)
     expect(results).toHaveLength(2)
-    expect(results[0].systemMessages).toEqual(['Current permission mode: edit.'])
+    expect(results[0].systemMessages[0]).toMatch(/Code|project sandbox/i)
+    expect(results[0].systemMessages[0]).not.toMatch(/Current permission mode:\s*edit/)
     // tokenBudgetPercent = 100 >= 30 → no messages
     expect(results[1].systemMessages).toEqual([])
   })
@@ -121,22 +122,32 @@ describe('SkillsListInjector', () => {
 })
 
 describe('PermissionModeInjector', () => {
-  it('produces edit mode reminder', async () => {
+  it('produces project-sandbox narrative for Code+edit (never bare edit token)', async () => {
     const injector = new PermissionModeInjector()
-    const result = await injector.inject(baseState)
-    expect(result.systemMessages).toEqual(['Current permission mode: edit.'])
+    const result = await injector.inject({ ...baseState, surface: 'code', permissionMode: 'edit' })
+    expect(result.systemMessages).toHaveLength(1)
+    expect(result.systemMessages[0]).toMatch(/project sandbox/i)
+    expect(result.systemMessages[0]).not.toMatch(/Current permission mode:\s*edit/)
   })
 
-  it('produces chat mode reminder', async () => {
+  it('produces Chat narrative that denies Code edit mode', async () => {
     const injector = new PermissionModeInjector()
-    const result = await injector.inject({ ...baseState, permissionMode: 'chat' })
-    expect(result.systemMessages).toEqual(['Current permission mode: chat.'])
+    const result = await injector.inject({ ...baseState, surface: 'chat', permissionMode: 'edit' })
+    expect(result.systemMessages[0]).toMatch(/Chat/i)
+    expect(result.systemMessages[0]).toMatch(/not.*Code edit mode/i)
+    expect(result.systemMessages[0]).not.toMatch(/Current permission mode/i)
   })
 
-  it('produces full mode reminder', async () => {
+  it('produces read-only narrative for Code+chat permission', async () => {
     const injector = new PermissionModeInjector()
-    const result = await injector.inject({ ...baseState, permissionMode: 'full' })
-    expect(result.systemMessages).toEqual(['Current permission mode: full.'])
+    const result = await injector.inject({ ...baseState, surface: 'code', permissionMode: 'chat' })
+    expect(result.systemMessages[0]).toMatch(/read-only/i)
+  })
+
+  it('produces full filesystem narrative for Code+full', async () => {
+    const injector = new PermissionModeInjector()
+    const result = await injector.inject({ ...baseState, surface: 'code', permissionMode: 'full' })
+    expect(result.systemMessages[0]).toMatch(/full filesystem/i)
   })
 })
 

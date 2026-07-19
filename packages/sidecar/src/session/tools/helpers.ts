@@ -401,6 +401,11 @@ export interface BuildToolsOpts {
    *  Defaults to 'edit'. Unknown values are treated as 'edit'. MCP tools are unaffected by mode;
    *  run_script is dropped in chat mode (it would let a read-only agent mutate the project). */
   permissionMode?: PermissionMode
+  /**
+   * Product surface. Chat further clamps git/plugin/worktree tools even when permissionMode
+   * allows writes (artifact writes stay; project mutation tools do not).
+   */
+  surface?: 'chat' | 'code' | 'knowledge'
   /** Enable web_search and web_fetch tools. web_search uses Exa MCP (free tier, no key required)
    *  with DDG Instant Answer fallback. Set HIP_EXA_API_KEY for higher Exa rate limits. */
   webSearchEnabled?: boolean

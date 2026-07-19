@@ -65,11 +65,11 @@ import { validateAttachments, stageAttachments, buildAttachmentContentParts, spl
 import {
   ContextInjectorRegistry,
   SystemPromptInjector,
-  SkillsListInjector,
   PermissionModeInjector,
   TokenBudgetInjector,
   SubagentStatusInjector,
 } from './context-injector.js'
+import { surfaceOf } from './surface.js'
 import { ProjectAgentsMdInjector } from './project-agents-md.js'
 import { OpenFileContextInjector } from './open-file-context.js'
 import {
@@ -1034,6 +1034,7 @@ export async function runTurn(host: SessionTurnHost, rawSend: SendFn, base?: {
       base?.messages !== undefined ? modelReady(base.messages) : visibleMessages,
     )
 
+    const resolvedSurface = surfaceOf(host._config, host.id)
     const contextState: SessionContextState = {
       cwd,
       customSystemPrompt: host._config.systemPrompt,
@@ -1041,7 +1042,7 @@ export async function runTurn(host: SessionTurnHost, rawSend: SendFn, base?: {
       permissionMode: mode,
       mcpCatalog: mcpManager.toolCatalog() || undefined,
       tokenBudgetPercent,
-      surface: host._config.surface === 'chat' ? 'chat' : 'code',
+      surface: resolvedSurface,
       pendingSubagents: host.backgroundManager.runningCount > 0
         ? host.backgroundManager.runningEntries()
         : undefined,
@@ -1062,7 +1063,7 @@ export async function runTurn(host: SessionTurnHost, rawSend: SendFn, base?: {
     const injectorRegistry = new ContextInjectorRegistry()
     injectorRegistry.register(new SystemPromptInjector())
     injectorRegistry.register(new ProjectAgentsMdInjector())
-    injectorRegistry.register(new SkillsListInjector())
+    // Skills already embedded by SystemPromptInjector / buildSystemPrompt — skip SkillsListInjector.
     injectorRegistry.register(new PermissionModeInjector())
     injectorRegistry.register(new TokenBudgetInjector())
     injectorRegistry.register(new SubagentStatusInjector())
@@ -1081,6 +1082,7 @@ export async function runTurn(host: SessionTurnHost, rawSend: SendFn, base?: {
       cwd,
       sessionId: host.id,
       mode,
+      surface: resolvedSurface,
       skills,
       mcpConfigs: host.configMgr.mcpConfigs,
       enabledAgents,

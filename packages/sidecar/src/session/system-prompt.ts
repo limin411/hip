@@ -1,12 +1,15 @@
 import { globSync } from 'node:fs'
 import type { SkillMeta, PermissionMode } from '@hip/protocol'
-import { HIP_SKILL_ID } from './product/content.js'
-import { CODING_SKILL_ID } from './ops/content.js'
 import {
   isHipProductSkillAvailable,
-  PRODUCT_CAPABILITY_MAP,
   productHelpBlock,
 } from './product/builtin-skills.js'
+import {
+  filterSkillsForProfile,
+  productCapabilityMapForSurface,
+  resolveAgentRuntimeProfile,
+  type ProductSurface,
+} from './agent-runtime-profile.js'
 
 // ── Skill budget & LRU eviction ─────────────────────────────────────────
 
@@ -55,11 +58,32 @@ const GIT_GUIDANCE =
   'work warrants a separate line of history (e.g. an experimental or large refactor). These tools ' +
   'commit on the user\'s behalf, so keep messages clear and the history clean.'
 
-const IDENTITY =
-  'You are hip, a desktop AI workbench agent that works directly in the user\'s project. ' +
-  'When asked who or what you are, identify yourself as hip. ' +
+const IDENTITY_CORE =
+  'You are hip. When asked who or what you are, identify yourself as hip. ' +
   'Never claim or imply that you are Claude, ChatGPT, Gemini, or any other named assistant, ' +
   'and do not name the underlying model or its maker.'
+
+function identityForSurface(surface: ProductSurface): string {
+  if (surface === 'chat') {
+    return (
+      `${IDENTITY_CORE} ` +
+      'You are the Chat assistant in a private sandbox workspace (not the Code project workbench).'
+    )
+  }
+  if (surface === 'knowledge') {
+    return (
+      `${IDENTITY_CORE} ` +
+      'You are the Knowledge assistant for the user\'s notes spaces.'
+    )
+  }
+  return (
+    `${IDENTITY_CORE} ` +
+    'You are the Code workbench agent that works directly in the user\'s project.'
+  )
+}
+
+/** @deprecated Prefer identityForSurface; kept for tests that match /you are hip/i */
+const IDENTITY = identityForSurface('code')
 
 /**
  * Always-on coding core (P3 progressive ops).
@@ -222,8 +246,8 @@ export interface SystemPromptInput {
   skills?: SkillMeta[]
   permissionMode?: PermissionMode
   mcpCatalog?: string
-  /** Chat surface omits long git guidance to save tokens (Sprint B). */
-  surface?: 'chat' | 'code'
+  /** Product surface owns persona/body; permissionMode owns tool gates only. */
+  surface?: 'chat' | 'code' | 'knowledge'
 }
 
 const BASE_CHAT =
@@ -233,29 +257,44 @@ const BASE_CHAT =
   'When the user asks for a previewable deliverable — HTML page, image, PDF, Markdown doc, or similar — ' +
   'write it with write_file to a root-relative path (e.g. `/page.html`, `/notes.md`, `/chart.svg`) so it ' +
   'appears in the artifacts preview. Do not only paste large HTML/source into the chat. ' +
-  'Do not invent shell tool names; use run_script only if it is available.'
+  'Do not invent shell tool names; use run_script only if it is available. ' +
+  'If asked what mode or surface you are in, say Chat (sandbox) — never Code edit mode.'
+
+const BASE_KNOWLEDGE =
+  'You are a knowledge-space assistant. Prefer clear answers grounded in the user\'s notes. ' +
+  'Use file tools only within the knowledge workspace when available. ' +
+  'Do not claim to be a coding agent editing a software project. ' +
+  'For simple questions, answer directly without tools or sub-agents.'
 
 /** Assemble the single-agent system prompt: base + cwd convention + anti-phantom (+ optional skills, user instructions, MCP catalog). */
 export function buildSystemPrompt({ cwd, userInstructions, skills, permissionMode, mcpCatalog, surface }: SystemPromptInput): string {
-  const isChat = surface === 'chat' || permissionMode === 'chat'
-  const body = isChat ? BASE_CHAT : BASE
-  const hipAvailable = isHipProductSkillAvailable(skills)
-  // L0: identity + capability map + conditional product help (Hermes-style pointer when skill is on).
+  // Surface owns persona/body; permissionMode owns tool/cwd jail wording only.
+  // Do NOT treat permissionMode === 'chat' as Chat product body (Code+read-only stays coding body).
+  const profile = resolveAgentRuntimeProfile({ surface, permissionMode })
+  const body =
+    profile.promptBody === 'chat'
+      ? BASE_CHAT
+      : profile.promptBody === 'knowledge'
+        ? BASE_KNOWLEDGE
+        : BASE
+  const skillsForPrompt = filterSkillsForProfile(skills, profile)
+  const hipAvailable = isHipProductSkillAvailable(skillsForPrompt)
+  const capabilityMap = productCapabilityMapForSurface(profile.surface)
+  // L0: identity + surface-filtered capability map + conditional product help.
   const l0 =
-    `${IDENTITY}\n\n${PRODUCT_CAPABILITY_MAP}\n\n${productHelpBlock(hipAvailable)}`
-  let base = isChat
-    ? `${l0}\n\n${body}\n\n${cwdBlock(cwd, permissionMode)}\n\n${ANTI_PHANTOM}`
-    : `${l0}\n\n${body}\n\n${cwdBlock(cwd, permissionMode)}\n\n${GIT_GUIDANCE}\n\n${ANTI_PHANTOM}`
-  if (skills && skills.length > 0) {
-    // Tighter skill budget on chat to save context (Sprint B). Pin product skill against LRU.
-    const block = skillsBlock(skills, cwd, {
-      ...(isChat ? { budget: 1500 } : {}),
-      // Product help + operational depth should survive skills-budget pressure.
-      pinnedIds: [HIP_SKILL_ID, CODING_SKILL_ID],
+    `${identityForSurface(profile.surface)}\n\n${capabilityMap}\n\n${productHelpBlock(hipAvailable)}`
+  let base = profile.includeGitGuidance
+    ? `${l0}\n\n${body}\n\n${cwdBlock(cwd, profile.permissionMode)}\n\n${GIT_GUIDANCE}\n\n${ANTI_PHANTOM}`
+    : `${l0}\n\n${body}\n\n${cwdBlock(cwd, profile.permissionMode)}\n\n${ANTI_PHANTOM}`
+  if (skillsForPrompt.length > 0) {
+    // Tighter skill budget on chat to save context (Sprint B). Pin per profile policy.
+    const block = skillsBlock(skillsForPrompt, cwd, {
+      ...(profile.promptBody === 'chat' ? { budget: 1500 } : {}),
+      pinnedIds: profile.skillPolicy.pinIds,
     })
     if (block) base = `${base}\n\n${block}`
   }
-  if (mcpCatalog && !isChat) {
+  if (mcpCatalog && profile.includeMcpCatalog) {
     base = `${base}\n\n## MCP Tools\n${mcpCatalog}\nUse \`mcp_search\` to find tools by keyword, then call them by their namespaced name (\`mcp__<server>__<tool>\`).`
   }
   const extra = userInstructions?.trim()

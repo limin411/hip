@@ -1,5 +1,6 @@
 import type { PermissionMode } from '@hip/protocol'
 import type { JsonValue, Source, Unavailable } from '../system-context.js'
+import { renderCapabilityNarrative } from '../agent-runtime-profile.js'
 
 // ── Payload ───────────────────────────────────────────────────────────────────
 
@@ -12,6 +13,9 @@ export interface PermissionSourcePayload {
 
 export interface PermissionSourceInput {
   readonly permissionMode?: PermissionMode
+  readonly surface?: 'chat' | 'code' | 'knowledge'
+  readonly sessionId?: string
+  readonly cwd?: string
 }
 
 // ── Codec ─────────────────────────────────────────────────────────────────────
@@ -30,8 +34,13 @@ function permissionMode(j: JsonValue): PermissionMode {
   return 'edit'
 }
 
-function renderPermissionText(mode: PermissionMode): string {
-  return `Current permission mode: ${mode}.`
+function renderPermissionText(
+  mode: PermissionMode,
+  surface?: 'chat' | 'code' | 'knowledge',
+  sessionId?: string,
+  cwd?: string,
+): string {
+  return renderCapabilityNarrative({ permissionMode: mode, surface, sessionId, cwd })
 }
 
 const codec = {
@@ -43,11 +52,11 @@ const codec = {
   },
   decode(j: JsonValue): PermissionSourcePayload {
     if (!isObject(j)) {
-      return { text: renderPermissionText('edit'), mode: 'edit' }
+      return { text: renderPermissionText('edit', 'code'), mode: 'edit' }
     }
     const mode = permissionMode(j.mode)
     return {
-      text: stringField(j, 'text') || renderPermissionText(mode),
+      text: stringField(j, 'text') || renderPermissionText(mode, 'code'),
       mode,
     }
   },
@@ -66,7 +75,10 @@ export function createPermissionSource(
         return { _tag: 'Unavailable', reason: 'permission mode is not set' } as Unavailable
       }
       const mode = input.permissionMode
-      return { text: renderPermissionText(mode), mode }
+      return {
+        text: renderPermissionText(mode, input.surface, input.sessionId, input.cwd),
+        mode,
+      }
     },
     baseline: (payload) => payload.text,
   }

@@ -4,7 +4,7 @@
  * Regenerate: yarn product:content
  * Check:      yarn product:content:check
  *
- * contentHash=ab126f70d1938610 skillVersion=2 productVersion=0.1.0
+ * contentHash=3442d2030519d804 skillVersion=2 productVersion=0.1.0
  */
 
 export type ProductHelpSectionId = 'overview' | 'memory' | 'config' | 'troubleshooting' | 'agents'
@@ -40,7 +40,7 @@ export const PRODUCT_CAPABILITY_MAP = `Product facts (hip):
 - Version: 0.1.0.
 - Desktop workbench agent in the user's project with real file tools and optional sub-agents.
 - Surfaces: Code (full workbench) vs Chat (lighter; previewable files → write_file for artifacts).
-- Permission modes: chat = read-only; edit = project sandbox (default); full = user-granted whole FS.
+- On Code only, tool gates (UI labels): chat = read-only; edit = project sandbox (default); full = user-granted whole FS. Chat surface is not Code "edit mode".
 - API keys: ~/.hip/config/auth.json (0600 plaintext by design).
 - Cross-session memory: off by default (Settings → Memory).
 - Local data: ~/.hip/ (config, db, skills, plugins, logs).`
@@ -329,7 +329,7 @@ export const PRODUCT_HELP_LOCALES: Record<ProductHelpLocale, ProductHelpLocalePa
 - Version: 0.1.0.
 - Desktop workbench agent in the user's project with real file tools and optional sub-agents.
 - Surfaces: Code (full workbench) vs Chat (lighter; previewable files → write_file for artifacts).
-- Permission modes: chat = read-only; edit = project sandbox (default); full = user-granted whole FS.
+- On Code only, tool gates (UI labels): chat = read-only; edit = project sandbox (default); full = user-granted whole FS. Chat surface is not Code "edit mode".
 - API keys: ~/.hip/config/auth.json (0600 plaintext by design).
 - Cross-session memory: off by default (Settings → Memory).
 - Local data: ~/.hip/ (config, db, skills, plugins, logs).`,

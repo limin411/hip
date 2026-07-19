@@ -18,8 +18,8 @@ export interface SessionContextState {
   permissionMode: PermissionMode
   mcpCatalog?: string
   tokenBudgetPercent: number
-  /** Session surface — chat prompts are shorter (Sprint B). */
-  surface?: 'chat' | 'code'
+  /** Product surface — owns persona/body; permissionMode owns tool gates. */
+  surface?: 'chat' | 'code' | 'knowledge'
   pendingSubagents?: Array<{
     id: string
     description: string
@@ -184,6 +184,11 @@ function buildFragmentInput(state: SessionContextState): FragmentSourcesInput {
       completedSubagents: state.completedSubagents,
     },
     checkpoint: { checkpointId: state.checkpointId ?? null },
-    permission: { permissionMode: state.permissionMode },
+    permission: {
+      permissionMode: state.permissionMode,
+      surface: state.surface,
+      sessionId: state.sessionId,
+      cwd: state.cwd,
+    },
   }
 }

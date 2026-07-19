@@ -76,6 +76,28 @@ describe('buildTools permissionMode — registration', () => {
     expect(names).toContain('git_worktree_remove')
   })
 
+  it('Chat surface + edit permission keeps writes but drops git/plugin tools', () => {
+    const names = buildTools(root, undefined, root, undefined, {
+      permissionMode: 'edit',
+      surface: 'chat',
+      requestApproval: async () => ({ kind: 'allow_once' }),
+    }).map((t) => t.name)
+    expect(names).toContain('write_file')
+    expect(names).toContain('edit_file')
+    expect(names).not.toContain('git_commit')
+    expect(names).not.toContain('plugin_install')
+    expect(names).not.toContain('parallel_worktrees')
+  })
+
+  it('Code surface + edit permission keeps git tools', () => {
+    const names = buildTools(root, undefined, root, undefined, {
+      permissionMode: 'edit',
+      surface: 'code',
+    }).map((t) => t.name)
+    expect(names).toContain('git_commit')
+    expect(names).toContain('write_file')
+  })
+
   it("edit mode keeps run_script when an approval fn is wired", () => {
     const names = buildTools(root, undefined, root, undefined, {
       permissionMode: 'edit',

@@ -150,6 +150,27 @@ try {
     }
   })
 
+  runCheck('chat.never.claims.edit.mode', () => {
+    if (/Current permission mode:\s*edit/i.test(chatWithSkills)) {
+      throw new Error('chat prompt still contains bare edit permission injection')
+    }
+    if (!/not.*Code edit mode|not the Code project/i.test(chatWithSkills)) {
+      throw new Error('chat prompt missing anti Code-edit-mode claim')
+    }
+    if (/hip-coding/.test(chatWithSkills)) {
+      throw new Error('chat prompt must not list hip-coding skill')
+    }
+    if (/task_batch/.test(chatWithSkills)) {
+      throw new Error('chat prompt must not include coding task_batch BASE rules')
+    }
+  })
+
+  runCheck('code.keeps.coding.body', () => {
+    if (!/task_batch/.test(codeWithSkills) || !/hip-coding/.test(codeWithSkills)) {
+      throw new Error('code prompt lost coding body / hip-coding pointer')
+    }
+  })
+
   /**
    * Product Q matrix: offline classification of what the prompt *enables*.
    * Score = fraction of cases where the expected always-on cue or skill is available.

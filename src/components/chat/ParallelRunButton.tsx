@@ -1,30 +1,100 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { GitBranch } from 'lucide-react'
-import { sessionService, useActiveSession } from '@/domain'
+import { sessionService, useActiveSession, useSessions } from '@/domain'
 import { surfaceOf } from '@/lib/sessions'
 import { suggestParallelCount } from '@/lib/parallelCount'
 import { Button } from '@/components/ui/Button'
 import { Modal } from '@/components/ui/Modal'
 import { Textarea } from '@/components/ui/Textarea'
 import { toast } from 'sonner'
+import { resolveWorktreeHostContext } from '@/lib/worktreeHostContext'
+import { useParallelStore } from '@/store/parallelStore'
+import { useWorktreeStore } from '@/store/worktreeStore'
+
+export interface ParallelRunButtonProps {
+  draftPrompt?: string
+  /** When set with onOpenChange, modal is controlled (WorktreeControl embeds the form). */
+  open?: boolean
+  onOpenChange?: (open: boolean) => void
+  /** Hide the standalone trigger (default when controlled). */
+  hideTrigger?: boolean
+  /** Override host resolution for fan-out (from WorktreeControl). */
+  hostSessionId?: string
+  baseCwd?: string
+}
 
 /**
  * Host fan-out entry: user provides goal; local heuristic suggests track count N.
  * Never use window.prompt — freezes Tauri/WKWebView.
  * Copy: chat.worktreeControl.* (honest host path — not agent-decided).
- * Spec: docs/design/2026-07-18-agent-decided-parallel-count-spec.md
+ *
+ * Can be embedded by WorktreeControl (controlled open, no trigger) or used standalone.
  */
-export function ParallelRunButton({ draftPrompt = '' }: { draftPrompt?: string }) {
+export function ParallelRunButton({
+  draftPrompt = '',
+  open: controlledOpen,
+  onOpenChange,
+  hideTrigger,
+  hostSessionId: hostOverride,
+  baseCwd: baseCwdOverride,
+}: ParallelRunButtonProps) {
   const { t } = useTranslation()
   const active = useActiveSession()
+  const sessions = useSessions()
+  const runs = useParallelStore((s) => s.runs)
+  const catalogById = useWorktreeStore((s) => s.byId)
   const [busy, setBusy] = useState(false)
-  const [open, setOpen] = useState(false)
+  const [uncontrolledOpen, setUncontrolledOpen] = useState(false)
   const [prompt, setPrompt] = useState('')
+
+  const isControlled = controlledOpen !== undefined
+  const open = isControlled ? controlledOpen : uncontrolledOpen
+  const setOpen = (next: boolean) => {
+    if (isControlled) onOpenChange?.(next)
+    else setUncontrolledOpen(next)
+  }
+  const showTrigger = hideTrigger === true ? false : !isControlled
+
+  // Prefill goal when modal opens (standalone openDialog or controlled embed).
+  useEffect(() => {
+    if (open) setPrompt(draftPrompt.trim())
+    // Only on open transition — don't wipe user edits when draftPrompt changes.
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- intentional: open only
+  }, [open])
 
   const suggestion = useMemo(() => suggestParallelCount(prompt), [prompt])
 
-  if (!active || surfaceOf(active.config) !== 'code' || !active.config.cwd) return null
+  const resolvedHost = useMemo(() => {
+    if (hostOverride && baseCwdOverride) {
+      return { hostSessionId: hostOverride, baseCwd: baseCwdOverride }
+    }
+    const catalog = Object.values(catalogById)
+    const ctx = resolveWorktreeHostContext({
+      activeSession: active
+        ? { id: active.id, config: { cwd: active.config.cwd, surface: active.config.surface } }
+        : null,
+      sessions: sessions.map((s) => ({ id: s.id, title: s.title, config: { cwd: s.config.cwd } })),
+      runs,
+      catalog,
+    })
+    const host = sessions.find((s) => s.id === ctx.hostSessionId)
+    const baseCwd =
+      baseCwdOverride ||
+      ctx.primaryPath ||
+      host?.config.cwd ||
+      active?.config.cwd ||
+      ''
+    return {
+      hostSessionId: hostOverride || ctx.hostSessionId || active?.id || '',
+      baseCwd,
+      unresolved: ctx.unresolved,
+    }
+  }, [active, sessions, runs, catalogById, hostOverride, baseCwdOverride])
+
+  if (!active || surfaceOf(active.config) !== 'code' || !active.config.cwd) {
+    if (!isControlled) return null
+  }
 
   const openDialog = () => {
     if (busy) return
@@ -36,6 +106,12 @@ export function ParallelRunButton({ draftPrompt = '' }: { draftPrompt?: string }
     const text = prompt.trim()
     if (!text || busy) return
     const { n } = suggestParallelCount(text)
+    const hostSessionId = resolvedHost.hostSessionId
+    const baseCwd = resolvedHost.baseCwd
+    if (!hostSessionId || !baseCwd) {
+      toast.error(t('chat.worktreeControl.failed'))
+      return
+    }
     setBusy(true)
     try {
       toast.message(
@@ -45,10 +121,10 @@ export function ParallelRunButton({ draftPrompt = '' }: { draftPrompt?: string }
       )
       const { runId, slotSessionIds } = await sessionService.startParallelRun({
         prompt: text,
-        baseCwd: active.config.cwd!,
+        baseCwd,
         count: n,
-        permissionMode: active.config.permissionMode,
-        hostSessionId: active.id,
+        permissionMode: active?.config.permissionMode,
+        hostSessionId,
         autoSend: false,
       })
       setOpen(false)
@@ -72,18 +148,20 @@ export function ParallelRunButton({ draftPrompt = '' }: { draftPrompt?: string }
 
   return (
     <>
-      <Button
-        type="button"
-        variant="ghost"
-        size="icon"
-        disabled={busy}
-        title={t('chat.worktreeControl.buttonTitle')}
-        aria-label={t('chat.worktreeControl.buttonTitle')}
-        data-testid="parallel-run-button"
-        onClick={openDialog}
-      >
-        <GitBranch size={16} />
-      </Button>
+      {showTrigger ? (
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon"
+          disabled={busy}
+          title={t('chat.worktreeControl.buttonTitle')}
+          aria-label={t('chat.worktreeControl.buttonTitle')}
+          data-testid="parallel-run-button"
+          onClick={openDialog}
+        >
+          <GitBranch size={16} />
+        </Button>
+      ) : null}
 
       <Modal
         open={open}

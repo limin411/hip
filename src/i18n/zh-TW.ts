@@ -56,7 +56,28 @@ export const zhTW = {
         "n3": "3 路",
         "n4": "4 路",
         "reject": "拒絕"
-      }
+      },
+      "chipAria": "隔離工作區",
+      "chipPurpose": "瀏覽、切換或新建隔離工作區",
+      "mainWorkspace": "主工作區",
+      "pathBlocked": "專案路徑不可用",
+      "current": "目前",
+      "listTitle": "隔離工作區",
+      "refresh": "重新整理",
+      "emptyTitle": "還沒有隔離工作區",
+      "createSingle": "新建隔離工作區…",
+      "createSingleSoon": "單路隔離建立即將推出",
+      "parallelExplore": "並行探索…",
+      "footerHint": "在側欄中管理 · 背景臨時隔離不會出現在此列表",
+      "unresolvedBanner": "無法確定主工作區，建立/刪除已停用",
+      "openChat": "開啟對話",
+      "copyPath": "複製路徑",
+      "pathCopied": "路徑已複製",
+      "copyFailed": "無法複製路徑",
+      "rowMenu": "工作區操作",
+      "agentTaskOnly": "該方案由背景任務執行，請從側欄查看進度",
+      "noSessionToast": "此工作區尚未綁定對話",
+      "openHere": "在此工作區開啟對話"
     },
     "worktree": {
       "created": "Worktree 已就緒：{{label}}"

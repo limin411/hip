@@ -75,9 +75,13 @@ describe('smooth P5 parallel + goal @smooth-p5 @harness', () => {
 
   it('P5 agent-suggest UI shows N for compare goal', async () => {
     await createCodeSessionForE2e(dir)
+    // PR3: parallel-run-button is the WorktreeControl chip; open parallel form via CTA.
     const btn = await browser.$('[data-testid="parallel-run-button"]')
     await btn.waitForExist({ timeout: 15000 })
     await browser.execute((el: HTMLElement) => el.click(), btn)
+    const parallelCta = await browser.$('[data-testid="worktree-control-parallel"]')
+    await parallelCta.waitForExist({ timeout: 10000 })
+    await browser.execute((el: HTMLElement) => el.click(), parallelCta)
     const ta = await browser.$('[data-testid="parallel-run-prompt"]')
     await ta.waitForExist({ timeout: 10000 })
     await browser.execute((el: HTMLTextAreaElement, text: string) => {

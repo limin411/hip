@@ -17,7 +17,7 @@ import { PermissionModePicker } from './PermissionModePicker'
 import { PlanModeChip } from './PlanModeChip'
 import { ProjectGuidanceChip } from './ProjectGuidanceChip'
 import { AttachmentButton } from './AttachmentButton'
-import { ParallelRunButton } from './ParallelRunButton'
+import { WorktreeControl } from './WorktreeControl/WorktreeControl'
 import { sessionService, useActiveSession, useActiveSessionId, useActiveSessionStatus, useActivePendingPermission, useConnectionStatus } from '@/domain'
 import { formatDiffAnnotationsForComposer, useDiffAnnotationStore } from '@/store/diffAnnotationStore'
 import { isProjectPathBlocked } from '@/lib/projectPathGate'
@@ -292,7 +292,7 @@ export function InputBar() {
               }
               leftSlot={
                 isCode ? (
-                  <><ModelPicker /><EffortLevelPicker /><PermissionModePicker /><PlanModeChip /><ProjectGuidanceChip /><ParallelRunButton draftPrompt={value} /><AttachmentButton onAttach={setAttachments} /></>
+                  <><ModelPicker /><EffortLevelPicker /><PermissionModePicker /><PlanModeChip /><ProjectGuidanceChip /><WorktreeControl draftPrompt={value} /><AttachmentButton onAttach={setAttachments} /></>
                 ) : (
                   <><ModelPicker /><EffortLevelPicker /><AttachmentButton onAttach={(add) => setAttachments((prev) => [...prev, ...add])} /></>
                 )

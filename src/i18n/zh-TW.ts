@@ -450,7 +450,8 @@ export const zhTW = {
     },
     "subagent": {
       "noSummary": "子任務已完成（無文字總結）",
-      "toolsCount": "{{count}} 步"
+      "toolsCount": "{{count}} 步",
+      "reply": "回覆"
     }
   },
   "composer": {

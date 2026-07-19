@@ -454,6 +454,7 @@ export const zhCN = {
       subagent: {
         noSummary: '子任务已完成（无文字总结）',
         toolsCount: '{{count}} 步',
+        reply: '回复',
       },
     },
     composer: {

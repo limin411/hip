@@ -463,6 +463,7 @@ export const en = {
       subagent: {
         noSummary: 'Sub-task finished (no text summary)',
         toolsCount: '{{count}} steps',
+        reply: 'Reply',
       },
     },
     composer: {

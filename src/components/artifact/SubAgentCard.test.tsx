@@ -37,6 +37,10 @@ const agent: TurnAgent = {
   parentAgentId: 'supervisor',
 }
 
+function expandCard() {
+  fireEvent.click(screen.getByTestId('subagent-card-header'))
+}
+
 describe('SubAgentCard context menu', () => {
   beforeEach(() => {
     cleanup()
@@ -80,16 +84,66 @@ describe('SubAgentCard context menu', () => {
     expect(card).not.toHaveTextContent('artifact.roles.subagent')
   })
 
-  it('always shows content (no collapse) when agent is done', () => {
+  it('collapses body by default when agent is done', () => {
     render(<SubAgentCard agent={agent} showTools />)
-    const card = screen.getByTestId('subagent-card')
-    expect(card).toHaveTextContent('fix bug')
-    // SubAgentCard itself is not a collapsible control (ToolCallRow may still expand details)
-    expect(card).not.toHaveAttribute('aria-expanded')
-    expect(card.tagName).not.toBe('BUTTON')
-    expect(screen.getByTestId('subagent-output')).toBeInTheDocument()
-    expect(screen.getByTestId('subagent-output')).toHaveTextContent('result text')
+    const header = screen.getByTestId('subagent-card-header')
+    expect(header).toHaveAttribute('aria-expanded', 'false')
+    expect(screen.queryByTestId('subagent-card-body')).not.toBeInTheDocument()
+    expect(screen.queryByTestId('subagent-output')).not.toBeInTheDocument()
+    expect(screen.queryByTestId('tool-row')).not.toBeInTheDocument()
+  })
+
+  it('expands body when header is clicked', () => {
+    render(<SubAgentCard agent={agent} showTools />)
+    expandCard()
+    const header = screen.getByTestId('subagent-card-header')
+    expect(header).toHaveAttribute('aria-expanded', 'true')
+    expect(screen.getByTestId('subagent-card-body')).toBeInTheDocument()
     expect(screen.getByTestId('tool-row')).toBeInTheDocument()
+    // Reply is nested-collapsed when done
+    expect(screen.getByTestId('subagent-reply-disclosure')).toHaveAttribute('aria-expanded', 'false')
+    expect(screen.queryByTestId('subagent-output')).not.toBeInTheDocument()
+  })
+
+  it('starts expanded while running', () => {
+    render(<SubAgentCard agent={{ ...agent, status: 'running', elapsedMs: 0 }} showTools />)
+    expect(screen.getByTestId('subagent-card-header')).toHaveAttribute('aria-expanded', 'true')
+    expect(screen.getByTestId('subagent-card-body')).toBeInTheDocument()
+    // Live reply starts open so streaming text is visible
+    expect(screen.getByTestId('subagent-reply-disclosure')).toHaveAttribute('aria-expanded', 'true')
+    expect(screen.getByTestId('subagent-output')).toHaveTextContent('result text')
+  })
+
+  it('collapses reasoning by default and expands on click', () => {
+    render(<SubAgentCard agent={agent} />)
+    expandCard()
+    const disclosure = screen.getByTestId('thinking-disclosure')
+    expect(disclosure).toHaveAttribute('aria-expanded', 'false')
+    expect(screen.queryByText('thinking')).not.toBeInTheDocument()
+
+    fireEvent.click(disclosure)
+    expect(disclosure).toHaveAttribute('aria-expanded', 'true')
+    expect(screen.getByText('thinking')).toBeInTheDocument()
+
+    fireEvent.click(disclosure)
+    expect(disclosure).toHaveAttribute('aria-expanded', 'false')
+    expect(screen.queryByText('thinking')).not.toBeInTheDocument()
+  })
+
+  it('collapses reply by default when done and expands on click', () => {
+    render(<SubAgentCard agent={agent} />)
+    expandCard()
+    const disclosure = screen.getByTestId('subagent-reply-disclosure')
+    expect(disclosure).toHaveAttribute('aria-expanded', 'false')
+    expect(screen.queryByTestId('subagent-output')).not.toBeInTheDocument()
+
+    fireEvent.click(disclosure)
+    expect(disclosure).toHaveAttribute('aria-expanded', 'true')
+    expect(screen.getByTestId('subagent-output')).toHaveTextContent('result text')
+
+    fireEvent.click(disclosure)
+    expect(disclosure).toHaveAttribute('aria-expanded', 'false')
+    expect(screen.queryByTestId('subagent-output')).not.toBeInTheDocument()
   })
 
   it('strips DSML from expanded output', () => {
@@ -103,6 +157,8 @@ describe('SubAgentCard context menu', () => {
         }}
       />,
     )
+    expandCard()
+    fireEvent.click(screen.getByTestId('subagent-reply-disclosure'))
     const out = screen.getByTestId('subagent-output')
     expect(out.textContent).not.toMatch(/DSML/i)
     expect(out.textContent).toContain('Done')
@@ -110,6 +166,7 @@ describe('SubAgentCard context menu', () => {
 
   it('nests toolCall host inside subAgent; right-click tool → tool items only', async () => {
     render(<SubAgentCard agent={agent} showTools />)
+    expandCard()
 
     const toolHost = document.querySelector('[data-context-menu-kind="toolCall"]')
     expect(toolHost).toBeTruthy()

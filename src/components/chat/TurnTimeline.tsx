@@ -28,14 +28,18 @@ export function AgentBadge({ role }: { role: AgentRole }) {
 export const TRAIL_ROW =
   'flex min-h-[var(--trail-min-h)] w-full items-center gap-[var(--meta-gap)] text-left text-meta leading-5'
 
-function ThinkingDisclosure({
+/** Collapsible chain-of-thought row — default closed (same UX for supervisor + sub-agents). */
+export function ThinkingDisclosure({
   role,
   content,
   seconds,
+  /** When false, omit the role color dot (e.g. SubAgentCard already has a left rail). */
+  showBadge = true,
 }: {
   role: AgentRole
   content: string
   seconds?: number
+  showBadge?: boolean
 }) {
   const { t } = useTranslation()
   const [open, setOpen] = useState(false)
@@ -51,7 +55,7 @@ function ThinkingDisclosure({
         className={cn(TRAIL_ROW, 'text-ink-tertiary transition-colors hover:text-ink-secondary')}
         data-testid="thinking-disclosure"
       >
-        <AgentBadge role={role} />
+        {showBadge && <AgentBadge role={role} />}
         <ChevronRight
           size={14}
           className={cn('block shrink-0 transition-transform', open && 'rotate-90')}

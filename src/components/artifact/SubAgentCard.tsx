@@ -1,14 +1,17 @@
+import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Loader2, CheckCircle2, XCircle } from 'lucide-react'
+import { Loader2, CheckCircle2, XCircle, ChevronRight, MessageSquare } from 'lucide-react'
 import type { TurnAgent } from '@/lib/turnAgents'
 import { ToolCallRow } from '@/components/artifact/ToolCallRow'
 import { DeclarativeContextMenu } from '@/components/context-menu'
 import { sanitizeDisplayText } from '@/lib/sanitizeDisplayText'
 import { MarkdownBody } from '@/components/chat/MarkdownBody'
+import { ThinkingDisclosure, TRAIL_ROW } from '@/components/chat/TurnTimeline'
 import { ROLE_COLOR, agentDisplayName } from '@/lib/roleColor'
 import { useFocusStore } from '@/store/focusStore'
 import { useUiStore } from '@/store/uiStore'
 import { useDomainStore } from '@/domain/sessionStore'
+import { cn } from '@/lib/utils'
 
 /** Split grouped agents into flat (supervisor) vs nested (dispatched sub-agents). */
 export function splitAgents(agents: TurnAgent[]): { flat: TurnAgent[]; nested: TurnAgent[] } {
@@ -19,6 +22,42 @@ export function splitAgents(agents: TurnAgent[]): { flat: TurnAgent[]; nested: T
     else flat.push(a)
   }
   return { flat, nested }
+}
+
+/** Collapsible sub-agent reply — intermediate output, not the final user-facing answer. */
+function ReplyDisclosure({
+  content,
+  defaultOpen,
+}: {
+  content: string
+  defaultOpen: boolean
+}) {
+  const { t } = useTranslation()
+  const [open, setOpen] = useState(defaultOpen)
+  const clean = sanitizeDisplayText(content)
+  return (
+    <div className="min-w-0">
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        aria-expanded={open}
+        className={cn(TRAIL_ROW, 'text-ink-tertiary transition-colors hover:text-ink-secondary')}
+        data-testid="subagent-reply-disclosure"
+      >
+        <ChevronRight
+          size={14}
+          className={cn('block shrink-0 transition-transform', open && 'rotate-90')}
+        />
+        <MessageSquare size={14} className="block shrink-0" aria-hidden />
+        <span className="min-w-0 truncate">{t('chat.subagent.reply')}</span>
+      </button>
+      {open && (
+        <div className="mt-1 max-h-48 overflow-auto border-l border-border pl-3" data-testid="subagent-output">
+          <MarkdownBody content={clean} className="text-meta [&_p]:my-1" />
+        </div>
+      )}
+    </div>
+  )
 }
 
 export function SubAgentCard({
@@ -38,6 +77,11 @@ export function SubAgentCard({
   const elapsedSec = agent.elapsedMs > 0 ? Math.round(agent.elapsedMs / 1000) : null
   const runningTool = agent.tools.find((tc) => tc.status === 'running')
   const railColor = ROLE_COLOR[agent.role] ?? ROLE_COLOR.subagent
+  const isRunning = agent.status === 'running'
+
+  // Body: open while live unless the user toggled; closed when done/error by default.
+  const [manualOpen, setManualOpen] = useState<boolean | null>(null)
+  const bodyOpen = manualOpen ?? isRunning
 
   const openInAgents = (e: React.MouseEvent) => {
     e.stopPropagation()
@@ -49,13 +93,22 @@ export function SubAgentCard({
 
   return (
     <DeclarativeContextMenu kind="subAgent" payload={{ agent }}>
-      {/* Always expanded — CLI-style flat trail, single-line baseline for header */}
       <div
         className="mb-2 border-l-2 pl-3"
         style={{ borderLeftColor: railColor }}
         data-testid="subagent-card"
       >
-        <div className="flex min-h-[var(--trail-min-h)] w-full items-center gap-[var(--meta-gap)] text-left text-meta leading-5">
+        <button
+          type="button"
+          onClick={() => setManualOpen(!bodyOpen)}
+          aria-expanded={bodyOpen}
+          className={cn(TRAIL_ROW, 'w-full text-ink transition-colors hover:text-ink')}
+          data-testid="subagent-card-header"
+        >
+          <ChevronRight
+            size={14}
+            className={cn('block shrink-0 text-ink-tertiary transition-transform', bodyOpen && 'rotate-90')}
+          />
           <span className="inline-flex h-3.5 w-3.5 shrink-0 items-center justify-center">
             {agent.status === 'running' ? (
               <Loader2 size={14} className="block animate-spin text-accent-strong" />
@@ -88,7 +141,7 @@ export function SubAgentCard({
             <span className="shrink-0 text-ink-tertiary">{elapsedSec}s</span>
           )}
           <span
-            role="button"
+            role="link"
             tabIndex={0}
             className="shrink-0 text-accent hover:underline"
             data-testid="subagent-open-agents"
@@ -102,25 +155,28 @@ export function SubAgentCard({
           >
             Agents
           </span>
-        </div>
-        <div className="mt-0.5 flex flex-col gap-0.5">
-          {agent.reasoning && (
-            <pre className="whitespace-pre-wrap text-meta leading-5 text-ink-secondary">
-              {sanitizeDisplayText(agent.reasoning)}
-            </pre>
-          )}
-          {showTools && agent.tools.map((tc) => <ToolCallRow key={tc.callId} tool={tc} />)}
-          {!showTools && toolCount > 0 && (
-            <p className="text-meta leading-5 text-ink-tertiary">{t('chat.activity.viewInActivity')}</p>
-          )}
-          {cleanOutput ? (
-            <div className="max-h-48 overflow-auto" data-testid="subagent-output">
-              <MarkdownBody content={cleanOutput} className="text-meta [&_p]:my-1" />
-            </div>
-          ) : (
-            <div className="text-meta leading-5 text-ink-tertiary">{t('chat.subagent.noSummary')}</div>
-          )}
-        </div>
+        </button>
+        {bodyOpen && (
+          <div className="mt-0.5 flex flex-col gap-0.5" data-testid="subagent-card-body">
+            {agent.reasoning && (
+              <ThinkingDisclosure
+                role={agent.role}
+                content={agent.reasoning}
+                seconds={elapsedSec ?? undefined}
+                showBadge={false}
+              />
+            )}
+            {showTools && agent.tools.map((tc) => <ToolCallRow key={tc.callId} tool={tc} />)}
+            {!showTools && toolCount > 0 && (
+              <p className="text-meta leading-5 text-ink-tertiary">{t('chat.activity.viewInActivity')}</p>
+            )}
+            {cleanOutput ? (
+              <ReplyDisclosure content={cleanOutput} defaultOpen={isRunning} />
+            ) : (
+              <div className="text-meta leading-5 text-ink-tertiary">{t('chat.subagent.noSummary')}</div>
+            )}
+          </div>
+        )}
       </div>
     </DeclarativeContextMenu>
   )

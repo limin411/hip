@@ -1,5 +1,6 @@
 import { globSync } from 'node:fs'
 import type { SkillMeta, PermissionMode } from '@hip/protocol'
+import { PRODUCT_HELP_GUIDANCE } from './product/builtin-skills.js'
 
 // ── Skill budget & LRU eviction ─────────────────────────────────────────
 
@@ -48,7 +49,7 @@ const GIT_GUIDANCE =
   'commit on the user\'s behalf, so keep messages clear and the history clean.'
 
 const IDENTITY =
-  'You are hip, a desktop coding assistant that works directly in the user\'s project. ' +
+  'You are hip, a desktop AI workbench agent that works directly in the user\'s project. ' +
   'When asked who or what you are, identify yourself as hip. ' +
   'Never claim or imply that you are Claude, ChatGPT, Gemini, or any other named assistant, ' +
   'and do not name the underlying model or its maker.'
@@ -232,9 +233,10 @@ const BASE_CHAT =
 export function buildSystemPrompt({ cwd, userInstructions, skills, permissionMode, mcpCatalog, surface }: SystemPromptInput): string {
   const isChat = surface === 'chat' || permissionMode === 'chat'
   const body = isChat ? BASE_CHAT : BASE
+  // Identity + compact product pointer (Hermes-style). Full product depth is progressive via use_skill("hip").
   let base = isChat
-    ? `${IDENTITY}\n\n${body}\n\n${cwdBlock(cwd, permissionMode)}\n\n${ANTI_PHANTOM}`
-    : `${IDENTITY}\n\n${body}\n\n${cwdBlock(cwd, permissionMode)}\n\n${GIT_GUIDANCE}\n\n${ANTI_PHANTOM}`
+    ? `${IDENTITY}\n\n${PRODUCT_HELP_GUIDANCE}\n\n${body}\n\n${cwdBlock(cwd, permissionMode)}\n\n${ANTI_PHANTOM}`
+    : `${IDENTITY}\n\n${PRODUCT_HELP_GUIDANCE}\n\n${body}\n\n${cwdBlock(cwd, permissionMode)}\n\n${GIT_GUIDANCE}\n\n${ANTI_PHANTOM}`
   if (skills && skills.length > 0) {
     // Tighter skill budget on chat to save context (Sprint B).
     const block = skillsBlock(skills, cwd, isChat ? { budget: 1500 } : undefined)

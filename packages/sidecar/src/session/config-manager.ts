@@ -8,6 +8,7 @@ import { parseFrontmatter } from './skills/frontmatter.js'
 import { parsePluginManifest, PluginManifestError } from './plugins/parser.js'
 import { synthesizePlugin } from './plugins/synthesizer.js'
 import { HookRegistry } from './hooks/registry.js'
+import { getBuiltinSkills } from './product/builtin-skills.js'
 
 /** Read a plugin skill directory's SKILL.md and build a SkillMeta entry. */
 function skillMetaFromDir(dir: string, id: string): SkillMeta | null {
@@ -57,9 +58,14 @@ export class ConfigManager {
     this.hookRegistry.clear()
     const cwd = this.getConfig().cwd ?? process.cwd()
     const cfg = resolveEffectiveConfig(cwd)
-    try { this.cachedSkills = readEnabledSkills(this.getConfig().cwd, cfg) } catch { this.cachedSkills = [] }
-    this.cachedMcpConfigs = cfg.mcpServers ?? []
     const enabled = readEnabledMap(cwd, cfg)
+    try { this.cachedSkills = readEnabledSkills(this.getConfig().cwd, cfg) } catch { this.cachedSkills = [] }
+    // Built-in product skill (L1) is lowest priority — global/project/plugin same-id wins.
+    // mergeSkills(base, override): later overrides earlier for the same id.
+    // Honor hip.toml skills disable for builtin ids (e.g. skills.hip.enabled = false).
+    const builtin = getBuiltinSkills().filter((s) => enabled[s.id] !== false)
+    this.cachedSkills = mergeSkills(builtin, this.cachedSkills)
+    this.cachedMcpConfigs = cfg.mcpServers ?? []
     const pluginAgents: AgentConfig[] = []
     try {
       const pluginsCfg = readPluginsConfig()

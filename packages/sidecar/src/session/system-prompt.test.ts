@@ -51,6 +51,14 @@ describe('buildSystemPrompt', () => {
     expect(s).toMatch(/Claude/)
   })
 
+  it('includes progressive product help pointer without dumping the product manual', () => {
+    const s = buildSystemPrompt({ cwd: '/tmp/proj' })
+    expect(s).toMatch(/use_skill\(\{ name: "hip" \}\)/)
+    expect(s).toMatch(/do not load the hip skill/i)
+    expect(s).not.toMatch(/## Progressive disclosure/)
+    expect(s).not.toMatch(/~\/\.hip\/db\/hip\.db/)
+  })
+
   it('appends per-conversation user instructions when present', () => {
     const s = buildSystemPrompt({ cwd: '/tmp/proj', userInstructions: 'Always answer in French.' })
     expect(s).toContain('Always answer in French.')

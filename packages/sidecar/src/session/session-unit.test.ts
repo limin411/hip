@@ -255,34 +255,30 @@ describe('Session idle-timeout watchdog', () => {
   })
 })
 
-describe('Session chat mode ACP auto-allow', () => {
+describe('tryAutoResolvePermission lock table (chat/edit/full × tool kinds)', () => {
+  // Behavior lock only — do NOT change full-mode to yolo. full always returns null (HITL path).
+  // SAFE_KINDS = read | fetch | other → auto-allow in chat/edit when an allow* option exists.
   const opts = [
     { optionId: 'allow_once', name: 'Allow', kind: 'allow_once' },
     { optionId: 'reject_once', name: 'Reject', kind: 'reject_once' },
   ]
+  const allow = { optionId: 'allow_once' }
+  const hitl = null
 
-  it('auto-resolves read permission in chat and edit modes', () => {
-    expect(tryAutoResolvePermission('chat', 'read', opts)).toEqual({ optionId: 'allow_once' })
-    expect(tryAutoResolvePermission('edit', 'read', opts)).toEqual({ optionId: 'allow_once' })
-  })
+  const modes = ['chat', 'edit', 'full'] as const
+  const kinds = ['read', 'fetch', 'other', 'write', 'execute', 'edit'] as const
 
-  it('auto-resolves fetch permission in chat and edit modes', () => {
-    expect(tryAutoResolvePermission('chat', 'fetch', opts)).toEqual({ optionId: 'allow_once' })
-    expect(tryAutoResolvePermission('edit', 'fetch', opts)).toEqual({ optionId: 'allow_once' })
-  })
+  /** Expected outcome: non-null = auto optionId, null = HITL (tryAutoResolve returns null). */
+  const expected: Record<(typeof modes)[number], Record<(typeof kinds)[number], typeof allow | null>> = {
+    chat: { read: allow, fetch: allow, other: allow, write: hitl, execute: hitl, edit: hitl },
+    edit: { read: allow, fetch: allow, other: allow, write: hitl, execute: hitl, edit: hitl },
+    // full: always null — upstream/HITL owns full-mode decisions; not yolo here.
+    full: { read: hitl, fetch: hitl, other: hitl, write: hitl, execute: hitl, edit: hitl },
+  }
 
-  it('still prompts for execute permission in chat and edit modes', () => {
-    expect(tryAutoResolvePermission('chat', 'execute', opts)).toBeNull()
-    expect(tryAutoResolvePermission('edit', 'execute', opts)).toBeNull()
-  })
-
-  it('still prompts for write permission in chat and edit modes', () => {
-    expect(tryAutoResolvePermission('chat', 'write', opts)).toBeNull()
-    expect(tryAutoResolvePermission('edit', 'write', opts)).toBeNull()
-  })
-
-  it('full mode always returns null (already auto-approved upstream)', () => {
-    expect(tryAutoResolvePermission('full', 'read', opts)).toBeNull()
-    expect(tryAutoResolvePermission('full', 'execute', opts)).toBeNull()
+  it.each(
+    modes.flatMap((mode) => kinds.map((kind) => ({ mode, kind, want: expected[mode][kind] }))),
+  )('$mode × $kind → $want', ({ mode, kind, want }) => {
+    expect(tryAutoResolvePermission(mode, kind, opts)).toEqual(want)
   })
 })

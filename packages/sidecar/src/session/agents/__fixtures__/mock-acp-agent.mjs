@@ -11,6 +11,8 @@
 //   MOCK_ACP_NO_SET_CONFIG=1-> setSessionConfigOption throws method-not-found (Grok-style fallback)
 //   MOCK_ACP_CLOSE_SLOW_MS=<n> -> delay closeSession so await dispose settles after close RPC
 //   MOCK_ACP_NO_CLOSE=1     -> omit sessionCapabilities.close (no session/close method)
+//   MOCK_ACP_NO_LOAD=1      -> advertise loadSession: false (host must skip load → fresh)
+//   MOCK_ACP_MCP_CAPS=1     -> advertise mcpCapabilities.http + sse
 import { AgentSideConnection, ndJsonStream } from '@agentclientprotocol/sdk'
 import { Readable, Writable, Transform } from 'node:stream'
 
@@ -58,9 +60,11 @@ process.stdin.pipe(stdinFilter)
 const agent = {
   async initialize() {
     const agentCapabilities = {
-      loadSession: true,
+      // loadSession is boolean; false when MOCK_ACP_NO_LOAD so host short-circuits to newSession.
+      loadSession: !env.MOCK_ACP_NO_LOAD,
       // Advertise session/close unless MOCK_ACP_NO_CLOSE (tests host gate).
       ...(env.MOCK_ACP_NO_CLOSE ? {} : { sessionCapabilities: { close: {} } }),
+      ...(env.MOCK_ACP_MCP_CAPS ? { mcpCapabilities: { http: true, sse: true } } : {}),
     }
     return {
       protocolVersion: 1,

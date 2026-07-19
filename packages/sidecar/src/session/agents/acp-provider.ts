@@ -51,13 +51,20 @@ export class AcpAgentProvider implements AgentProvider {
     }
     if (!this.acpSessionId) {
       if (this.resumeAcpSessionId) {
-        try {
-          await this.conn.loadSession(this.resumeAcpSessionId, this.cwd)
-          this.acpSessionId = this.resumeAcpSessionId
-        } catch {
-          // Prior session not loadable on this child (never persisted / agent lacks resume) → start fresh.
+        const caps = await this.conn.ensureInitialized()
+        if (!caps.loadSession) {
+          // Agent did not advertise session/load — skip RPC, open fresh (as if load failed).
           this.resumeAcpSessionId = null
           await this.openFreshSession()
+        } else {
+          try {
+            await this.conn.loadSession(this.resumeAcpSessionId, this.cwd)
+            this.acpSessionId = this.resumeAcpSessionId
+          } catch {
+            // Prior session not loadable on this child (never persisted / agent lacks resume) → start fresh.
+            this.resumeAcpSessionId = null
+            await this.openFreshSession()
+          }
         }
       } else {
         await this.openFreshSession()

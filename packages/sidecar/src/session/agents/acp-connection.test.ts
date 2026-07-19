@@ -3,7 +3,7 @@ import { fileURLToPath } from 'node:url'
 import { dirname, join } from 'node:path'
 import { chmodSync, mkdtempSync, writeFileSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
-import { AcpConnectionManager } from './acp-connection.js'
+import { AcpConnectionManager, parseAgentRuntimeCaps } from './acp-connection.js'
 
 const here = dirname(fileURLToPath(import.meta.url))
 const AGENT = join(here, '__fixtures__', 'mock-acp-agent.mjs')
@@ -141,6 +141,61 @@ describe('AcpConnectionManager', () => {
     await conn.prompt(sessionId, 'hi')
     expect(text).toContain('mock/other')
     conn.detachSink(sessionId)
+  })
+
+  it('caches agentCapabilities from initialize as runtimeCaps', async () => {
+    const conn = await mgr.acquire(agentCfg({ id: 'mock-caps' }), null)
+    expect(conn.runtimeCaps).toBeNull()
+    const caps = await conn.ensureInitialized()
+    expect(caps).toEqual({
+      loadSession: true,
+      closeSession: true,
+      resumeSession: false,
+      mcp: { http: false, sse: false },
+    })
+    expect(conn.runtimeCaps).toEqual(caps)
+  })
+
+  it('parses mcp + close/load/resume from agentCapabilities', () => {
+    expect(parseAgentRuntimeCaps({
+      loadSession: true,
+      mcpCapabilities: { http: true, sse: false },
+      sessionCapabilities: { close: {}, resume: {} },
+    })).toEqual({
+      loadSession: true,
+      closeSession: true,
+      resumeSession: true,
+      mcp: { http: true, sse: false },
+    })
+    expect(parseAgentRuntimeCaps(null)).toEqual({
+      loadSession: false,
+      closeSession: false,
+      resumeSession: false,
+      mcp: { http: false, sse: false },
+    })
+  })
+
+  it('loadSession throws without RPC when agent did not advertise loadSession', async () => {
+    const conn = await mgr.acquire({
+      ...agentCfg(),
+      id: 'mock-no-load',
+      env: { MOCK_ACP_NO_LOAD: '1' },
+    }, null)
+    const caps = await conn.ensureInitialized()
+    expect(caps.loadSession).toBe(false)
+    await expect(conn.loadSession('prior-sess', process.cwd())).rejects.toThrow(/does not support session\/load/)
+    expect(conn.sessionCount).toBe(0)
+  })
+
+  it('caches mcp caps when agent advertises them', async () => {
+    const conn = await mgr.acquire({
+      ...agentCfg(),
+      id: 'mock-mcp-caps',
+      env: { MOCK_ACP_MCP_CAPS: '1' },
+    }, null)
+    const caps = await conn.ensureInitialized()
+    expect(caps.mcp).toEqual({ http: true, sse: true })
+    expect(caps.loadSession).toBe(true)
   })
 
   it('advertises fs capabilities by default', async () => {

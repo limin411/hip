@@ -12,6 +12,8 @@
 **內部**智能體：人設 + 綁定模型 + 工具授權。  
 **外部 / ACP**：獨立行程；產品記憶預設關閉。
 
+支援的 ACP preset（設定 → 智能體 → 新增 ACP）：**OpenCode**、**Grok Build**（`grok agent stdio`）、**Pi**、**Claude Code**、**Codex**。Grok Build 為原生 ACP（安裝見 `https://x.ai/cli`）；認證用 `grok login` 或可選 `XAI_API_KEY`。
+
 ## 委派工具
 
 | 工具 | 用途 |

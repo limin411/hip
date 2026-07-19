@@ -42,9 +42,9 @@ pub fn merge_paths_with_sep(parts: &[String], sep: char) -> String {
 }
 
 /// Common global bin dirs where user-installed CLIs land regardless of installer
-/// (npm -g, Homebrew, cargo, pnpm, …). A safe baseline so a GUI-stripped PATH still
-/// finds globally-installed tools even when the login-shell probe is unavailable.
-fn common_dirs() -> String {
+/// (npm -g, Homebrew, cargo, pnpm, Grok Build, …). A safe baseline so a GUI-stripped
+/// PATH still finds globally-installed tools even when the login-shell probe is unavailable.
+pub(crate) fn common_dirs() -> String {
     #[cfg(windows)]
     {
         let mut dirs: Vec<String> = Vec::new();
@@ -66,6 +66,7 @@ fn common_dirs() -> String {
                 ".local\\bin",
                 ".bun\\bin",
                 ".deno\\bin",
+                ".grok\\bin", // Grok Build CLI (https://x.ai/cli)
                 "AppData\\Roaming\\npm",
                 "AppData\\Local\\pnpm",
                 "AppData\\Local\\Yarn\\bin",
@@ -94,6 +95,7 @@ fn common_dirs() -> String {
                 ".cargo/bin",
                 ".bun/bin",
                 ".deno/bin",
+                ".grok/bin", // Grok Build CLI (https://x.ai/cli)
                 "Library/pnpm",
                 ".volta/bin",
                 ".yarn/bin",
@@ -199,7 +201,23 @@ pub fn ensure_user_path() {
 
 #[cfg(test)]
 mod tests {
-    use super::{merge_paths_with_sep, path_sep};
+    use super::{common_dirs, merge_paths_with_sep, path_sep};
+
+    #[test]
+    fn common_dirs_includes_grok_bin() {
+        let dirs = common_dirs();
+        if cfg!(windows) {
+            assert!(
+                dirs.contains(r".grok\bin") || dirs.contains(".grok\\bin"),
+                "expected .grok\\bin in common_dirs, got {dirs}"
+            );
+        } else {
+            assert!(
+                dirs.contains(".grok/bin"),
+                "expected .grok/bin in common_dirs, got {dirs}"
+            );
+        }
+    }
 
     #[test]
     fn merge_paths_dedups_preserves_order_drops_empty_unix() {

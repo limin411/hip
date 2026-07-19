@@ -14,6 +14,8 @@ Typical fixed profiles (enable/disable in Agents UI):
 Custom **internal** agents: persona prompt + bound model + tool grants.  
 **External / ACP** agents: separate process; product memory defaults off unless configured.
 
+Supported ACP presets (Settings → Agents → Add ACP agent): **OpenCode**, **Grok Build** (`grok agent stdio`), **Pi**, **Claude Code**, **Codex**. Grok Build uses native ACP (install via `https://x.ai/cli`); auth via `grok login` or optional `XAI_API_KEY`.
+
 ## Delegation tools (main agent)
 
 | Tool | Use |

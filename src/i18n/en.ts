@@ -1087,7 +1087,8 @@ export const en = {
         statusAdded: 'Added',
         redetect: 'Re-check',
         apiKey: 'API Key',
-        apiKeyHint: 'Stored in this agent’s {{env}} env var; leave blank to use your system environment.',
+        apiKeyHint:
+          'Stored in this agent’s {{env}} env var; leave blank to use system env or the agent’s own login (e.g. grok login / ~/.grok/auth.json).',
         acpAdapterNote: 'No native ACP — requires the community adapter {{pkg}} on PATH',
         backToProviders: 'Back to providers',
       },

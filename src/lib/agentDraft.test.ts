@@ -111,4 +111,28 @@ describe('buildAgentDraft env / apiKey', () => {
     const d = buildAgentDraft(acpForm({ quirks: 'opencode', authEnvVar: undefined, apiKey: 'ignored' }))
     expect(d.env).toBeUndefined()
   })
+
+  it('Grok Build optional XAI_API_KEY maps into env when provided', () => {
+    const d = buildAgentDraft(acpForm({
+      name: 'Grok Build',
+      command: 'grok',
+      args: 'agent stdio',
+      quirks: 'grok-build',
+      authEnvVar: 'XAI_API_KEY',
+      apiKey: 'xai-secret',
+    }))
+    expect(d.command).toBe('grok')
+    expect(d.args).toEqual(['agent', 'stdio'])
+    expect(d.quirks).toBe('grok-build')
+    expect(d.env).toEqual({ XAI_API_KEY: 'xai-secret' })
+  })
+
+  it('Grok Build blank API key omits env (session auth via ~/.grok/auth.json)', () => {
+    const d = buildAgentDraft(acpForm({
+      quirks: 'grok-build',
+      authEnvVar: 'XAI_API_KEY',
+      apiKey: '',
+    }))
+    expect(d.env).toBeUndefined()
+  })
 })

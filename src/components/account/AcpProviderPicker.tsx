@@ -4,6 +4,7 @@ import {
   Bot,
   Cpu,
   Rocket,
+  Sparkles,
   CircleCheck,
   Check,
   RefreshCw,
@@ -25,7 +26,13 @@ import {
 import { Badge } from '@/components/ui/Badge'
 import { cn } from '@/lib/utils'
 
-const ICONS: Record<AcpPresetIcon, LucideIcon> = { code: Code, bot: Bot, cpu: Cpu, rocket: Rocket }
+const ICONS: Record<AcpPresetIcon, LucideIcon> = {
+  code: Code,
+  bot: Bot,
+  cpu: Cpu,
+  rocket: Rocket,
+  sparkles: Sparkles,
+}
 
 /** Step 1 of adding a new ACP agent: choose one of the supported provider presets.
  *  Only fully-ready (agent + adapter when required) and unadded presets are pickable;

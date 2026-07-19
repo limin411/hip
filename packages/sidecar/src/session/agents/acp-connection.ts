@@ -4,6 +4,11 @@ import { ClientSideConnection, ndJsonStream, PROTOCOL_VERSION } from '@agentclie
 import type { AgentConfig } from '@hip/protocol'
 import type { ResolvedModel } from './registry.js'
 import { buildAcpSpawn } from './acp-config.js'
+import {
+  extractAcpConfigOptions,
+  patchConfigOptionValue,
+  type AcpSelectConfigOption,
+} from './acp-session-options.js'
 
 /** Per-ACP-session handlers, registered by the provider for the duration of a turn. */
 export interface AcpSessionSink {
@@ -23,6 +28,8 @@ export class AcpConnection {
   private refs = 0
   /** auth methods advertised at initialize(), reused for authenticate-on-demand (no re-init). */
   private authMethods: Array<{ id: string }> = []
+  /** Last advertised select options per ACP session (for agents that don't re-return configOptions). */
+  private readonly sessionConfigOptions = new Map<string, AcpSelectConfigOption[]>()
   /** Tail of the child's stderr, kept for diagnostics on death. */
   private stderrTail = ''
 
@@ -89,9 +96,19 @@ export class AcpConnection {
 
   async newSessionWithOptions(cwd: string): Promise<{ sessionId: string; configOptions: any[] }> {
     await this.ensureInit()
-    const r = await this.conn.newSession({ cwd, mcpServers: [] }) as { sessionId: string; configOptions?: any[] }
-    this.openSessions.add(r.sessionId)
-    return { sessionId: r.sessionId, configOptions: r.configOptions ?? [] }
+    let r: unknown
+    try {
+      r = await this.conn.newSession({ cwd, mcpServers: [] })
+    } catch (e: any) {
+      if (!this.isAuthRequired(e)) throw e
+      await this.conn.authenticate({ methodId: this.firstAuthMethod() })
+      r = await this.conn.newSession({ cwd, mcpServers: [] })
+    }
+    const sessionId = (r as { sessionId: string }).sessionId
+    const configOptions = extractAcpConfigOptions(r)
+    this.openSessions.add(sessionId)
+    this.sessionConfigOptions.set(sessionId, configOptions)
+    return { sessionId, configOptions }
   }
 
   registerSink(acpSessionId: string, sink: AcpSessionSink): void {
@@ -101,14 +118,64 @@ export class AcpConnection {
   releaseSession(acpSessionId: string): void {
     if (this.sinks.delete(acpSessionId)) this.refs = Math.max(0, this.refs - 1)
     this.openSessions.delete(acpSessionId)
+    this.sessionConfigOptions.delete(acpSessionId)
   }
 
   prompt(acpSessionId: string, text: string): Promise<{ stopReason: string }> {
     return this.conn.prompt({ sessionId: acpSessionId, prompt: [{ type: 'text', text }] }) as Promise<{ stopReason: string }>
   }
   cancel(acpSessionId: string): Promise<void> { return this.conn.cancel({ sessionId: acpSessionId }) as Promise<void> }
-  setConfigOption(acpSessionId: string, configId: string, value: string): Promise<any> {
-    return this.conn.setSessionConfigOption({ sessionId: acpSessionId, configId, value })
+
+  /**
+   * Set a session config option. Prefers standard `session/set_config_option`.
+   * Falls back for agents (e.g. Grok Build) that use `session/set_model` / `session/set_mode`
+   * and do not implement set_config_option.
+   */
+  async setConfigOption(acpSessionId: string, configId: string, value: string): Promise<{ configOptions?: any[] }> {
+    try {
+      const res = await this.conn.setSessionConfigOption({ sessionId: acpSessionId, configId, value }) as {
+        configOptions?: unknown[]
+      }
+      const next = extractAcpConfigOptions(res)
+      if (next.length > 0) {
+        this.sessionConfigOptions.set(acpSessionId, next)
+        return { configOptions: next }
+      }
+      // Response had no options — patch our last known set.
+      return { configOptions: this.patchLocal(acpSessionId, configId, value) }
+    } catch (e) {
+      // Grok Build rejects set_config_option (often as generic Internal/Method not found).
+      // For model/mode, fall back to session/set_model and session/set_mode.
+      if (configId === 'model' || configId === 'mode') {
+        try {
+          await this.applyConfigOptionFallback(acpSessionId, configId, value)
+          return { configOptions: this.patchLocal(acpSessionId, configId, value) }
+        } catch {
+          throw e
+        }
+      }
+      throw e
+    }
+  }
+
+  private patchLocal(acpSessionId: string, configId: string, value: string): AcpSelectConfigOption[] {
+    const prev = this.sessionConfigOptions.get(acpSessionId) ?? []
+    const next = patchConfigOptionValue(prev, configId, value)
+    this.sessionConfigOptions.set(acpSessionId, next)
+    return next
+  }
+
+  /** Grok Build and similar: model via session/set_model, effort/mode via session/set_mode. */
+  private async applyConfigOptionFallback(acpSessionId: string, configId: string, value: string): Promise<void> {
+    if (configId === 'model') {
+      await this.conn.extMethod('session/set_model', { sessionId: acpSessionId, modelId: value })
+      return
+    }
+    if (configId === 'mode') {
+      await this.conn.setSessionMode({ sessionId: acpSessionId, modeId: value })
+      return
+    }
+    throw new Error(`ACP agent does not support config option "${configId}"`)
   }
 
   get isIdle(): boolean { return this.refs === 0 }

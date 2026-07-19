@@ -6,12 +6,16 @@
 //   MOCK_ACP_PERMISSION=1   -> call session/request_permission before the tool runs
 //   MOCK_ACP_AUTH_REQUIRED=1-> newSession throws auth_required until authenticate() is called
 //   MOCK_ACP_SLOW_MS=<n>    -> delay between answer chunks (so cancel can land mid-stream)
+//   MOCK_ACP_PLAN=1         -> emit a plan sessionUpdate before the answer
+//   MOCK_ACP_MODELS_ONLY=1  -> session/new returns models{} instead of configOptions (Grok-style)
+//   MOCK_ACP_NO_SET_CONFIG=1-> setSessionConfigOption throws method-not-found (Grok-style fallback)
 import { AgentSideConnection, ndJsonStream } from '@agentclientprotocol/sdk'
 import { Readable, Writable, Transform } from 'node:stream'
 
 const env = process.env
 let authed = !env.MOCK_ACP_AUTH_REQUIRED
 let model = 'mock/base'
+let modelEffort = 'high'
 let sessionSeq = 0 // distinct id per newSession (first is 'mock-sess-1')
 let cancelled = new Set()
 let resumed = new Set()
@@ -54,8 +58,24 @@ const agent = {
   async authenticate() { authed = true; return {} },
   async newSession() {
     if (!authed) { const e = new Error('auth_required'); e.code = -32000; e.data = { authRequired: true }; throw e }
+    const sessionId = `mock-sess-${++sessionSeq}`
+    if (env.MOCK_ACP_MODELS_ONLY) {
+      return {
+        sessionId,
+        models: {
+          currentModelId: model,
+          availableModels: [
+            { modelId: 'mock/base', name: 'Base', _meta: { reasoningEffort: 'high', reasoningEfforts: [
+              { id: 'high', value: 'high', label: 'High', default: true },
+              { id: 'low', value: 'low', label: 'Low', default: false },
+            ] } },
+            { modelId: 'mock/other', name: 'Other' },
+          ],
+        },
+      }
+    }
     return {
-      sessionId: `mock-sess-${++sessionSeq}`,
+      sessionId,
       configOptions: [{ type: 'select', id: 'model', name: 'Model', category: 'model', currentValue: model,
         options: [{ value: 'mock/base', name: 'Base' }, { value: 'mock/other', name: 'Other' }] }],
     }
@@ -68,16 +88,48 @@ const agent = {
     return {}
   },
   async setSessionConfigOption(p) {
+    if (env.MOCK_ACP_NO_SET_CONFIG) {
+      const e = new Error('Method not found')
+      e.code = -32601
+      throw e
+    }
     model = p.value
     return { configOptions: [{ type: 'select', id: 'model', name: 'Model', category: 'model', currentValue: model,
       options: [{ value: 'mock/base', name: 'Base' }, { value: 'mock/other', name: 'Other' }] }] }
   },
-  async setSessionMode() { return {} },
+  async setSessionMode(p) {
+    // Grok Build maps effort selector id "mode" → session/set_mode
+    if (p?.modeId) modelEffort = p.modeId
+    return {}
+  },
+  async extMethod(method, params) {
+    // Grok Build: session/set_model is an extension method, not set_config_option
+    if (method === 'session/set_model') {
+      if (!params?.modelId) {
+        const e = new Error('Invalid params'); e.code = -32602; throw e
+      }
+      model = params.modelId
+      return { _meta: { model: { Ok: model } } }
+    }
+    const e = new Error('Method not found'); e.code = -32601; throw e
+  },
   async cancel(p) { cancelled.add(p.sessionId) },
   async prompt(p) {
     const sid = p.sessionId
     cancelled.delete(sid)
     if (env.MOCK_ACP_THINK) await conn.sessionUpdate({ sessionId: sid, update: { sessionUpdate: 'agent_thought_chunk', content: { type: 'text', text: 'thinking… ' } } })
+    if (env.MOCK_ACP_PLAN) {
+      await conn.sessionUpdate({
+        sessionId: sid,
+        update: {
+          sessionUpdate: 'plan',
+          entries: [
+            { content: 'step one', status: 'completed', priority: 'high' },
+            { content: 'step two', status: 'in_progress', priority: 'medium' },
+          ],
+        },
+      })
+    }
     if (env.MOCK_ACP_PERMISSION) {
       const res = await conn.requestPermission({ sessionId: sid, toolCall: { toolCallId: 't1', title: 'edit hello.txt', kind: 'edit', content: [{ type: 'diff', path: 'hello.txt', oldText: '', newText: 'hi' }] },
         options: [{ optionId: 'once', name: 'Allow once', kind: 'allow_once' }, { optionId: 'reject', name: 'Reject', kind: 'reject_once' }] })
@@ -95,5 +147,9 @@ const agent = {
     }
     return { stopReason: 'end_turn' }
   },
+  // Grok-style extension: session/set_model is not part of base Agent interface —
+  // exercised via ClientSideConnection.extMethod from the hip side; mock does not need it
+  // unless we wire a custom JSON-RPC handler. Model switches under MOCK_ACP_NO_SET_CONFIG
+  // still update local optimistic options; prompt continues to echo `model` set by standard path.
 }
 const conn = new AgentSideConnection(() => agent, ndJsonStream(Writable.toWeb(process.stdout), Readable.toWeb(stdinFilter)))

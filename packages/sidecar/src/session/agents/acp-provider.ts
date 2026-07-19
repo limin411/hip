@@ -112,6 +112,18 @@ export class AcpAgentProvider implements AgentProvider {
           emit.toolFinished(u.toolCallId, u.status === 'completed' ? 'finished' : 'error', out, u.status === 'failed' ? (out ?? 'error') : undefined)
         }
         break
+      case 'plan': {
+        // ACP Plan: complete list of entries with status — map to hip PlanItem[] for sticky checklist.
+        const entries = Array.isArray(u.entries) ? u.entries : []
+        const plan = entries
+          .map((e: any) => ({
+            content: String(e?.content ?? ''),
+            status: mapPlanStatus(e?.status),
+          }))
+          .filter((e: { content: string }) => e.content.length > 0)
+        if (plan.length) emit.planUpdated?.(plan)
+        break
+      }
       case 'config_option_update':
         this.currentHooks?.configOptions(normalizeConfigOptions(u.configOptions ?? []))
         break
@@ -158,4 +170,10 @@ function normalizeConfigOptions(opts: any[]): any[] {
     id: o.id, name: o.name, category: o.category, currentValue: o.currentValue,
     options: (Array.isArray(o.options) ? o.options : []).map((x: any) => ({ value: x.value, name: x.name, description: x.description })),
   }))
+}
+
+function mapPlanStatus(status: unknown): 'pending' | 'in_progress' | 'completed' {
+  if (status === 'completed' || status === 'done') return 'completed'
+  if (status === 'in_progress' || status === 'in-progress' || status === 'active') return 'in_progress'
+  return 'pending'
 }

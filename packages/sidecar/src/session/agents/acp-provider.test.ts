@@ -63,6 +63,27 @@ describe('AcpAgentProvider', () => {
     p.dispose()
   })
 
+  it('maps ACP plan sessionUpdate to planUpdated', async () => {
+    const p = new AcpAgentProvider(cfg({ env: { MOCK_ACP_PLAN: '1' } }), process.cwd(), null)
+    const plans: any[] = []
+    const emit: GraphEmit = {
+      token: () => {},
+      reasoning: () => {},
+      toolStarted: () => {},
+      toolFinished: () => {},
+      usage: () => {},
+      planDelta: () => {},
+      planUpdated: (plan) => { plans.push(plan) },
+      compaction: () => {},
+    }
+    await p.runTurn('hi', emit, new AbortController().signal)
+    expect(plans).toEqual([[
+      { content: 'step one', status: 'completed' },
+      { content: 'step two', status: 'in_progress' },
+    ]])
+    p.dispose()
+  })
+
   it('recovers from a warm-child death — the next turn re-acquires a fresh child and succeeds (C1)', async () => {
     const p = new AcpAgentProvider(cfg(), process.cwd(), null)
     const a = cap()

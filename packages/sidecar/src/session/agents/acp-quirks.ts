@@ -7,10 +7,10 @@ export interface AcpQuirks {
 
 const DEFAULTS: AcpQuirks = { cancelReportsEndTurn: false, defaultModelIsBilled: false }
 
-// OpenCode needs non-default quirks. pi/claude-code/codex run on DEFAULTS today
+// OpenCode needs non-default quirks. grok-build/pi/claude-code/codex run on DEFAULTS today
 // (quirksFor returns DEFAULTS for any key without a profile) — add a profile here only when real
 // testing shows one is needed. defaultModelIsBilled is vestigial post model-rollback;
-// cancelReportsEndTurn is the only quirk consumed at runtime.
+// cancelReportsEndTurn is the only quirk consumed at runtime (provider always trusts local abort flag).
 const PROFILES: Record<string, Partial<AcpQuirks>> = {
   opencode: { cancelReportsEndTurn: true, defaultModelIsBilled: true },
 }

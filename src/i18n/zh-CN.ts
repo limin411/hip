@@ -1060,7 +1060,8 @@ export const zhCN = {
         statusAdded: '已添加',
         redetect: '重新检测',
         apiKey: 'API Key',
-        apiKeyHint: '将写入该智能体的 {{env}} 环境变量；留空则使用系统环境变量。',
+        apiKeyHint:
+          '将写入该智能体的 {{env}} 环境变量；留空则使用系统环境变量，或该智能体自身登录态（如 grok login / ~/.grok/auth.json）。',
         acpAdapterNote: '无官方 ACP，需预装社区适配器 {{pkg}}（并加入 PATH）',
         backToProviders: '返回选择提供方',
       },

@@ -1,14 +1,14 @@
 import type { AgentConfig } from '@hip/protocol'
 
-export type AcpPresetIcon = 'code' | 'bot' | 'cpu' | 'rocket'
+export type AcpPresetIcon = 'code' | 'bot' | 'cpu' | 'rocket' | 'sparkles'
 
-/** A supported ACP coding-agent provider. All four are real (detect-and-add).
+/** A supported ACP coding-agent provider. All five are real (detect-and-add).
  *
  *  Detection (`detectBin`) is decoupled from how hip speaks ACP (`command`/`args`):
  *  "agent installed" means the AGENT's own global command is on PATH, regardless of how
  *  it was installed (npm / brew / curl / standalone).
  *
- *  OpenCode speaks ACP natively — launch command IS the detected binary.
+ *  OpenCode and Grok Build speak ACP natively — launch command IS the detected binary.
  *  Pi / Claude Code / Codex need a community ACP adapter binary also on PATH
  *  (`adapterBin`); hip spawns that binary directly (no `npx -y`). Both the agent
  *  and the adapter must be pre-installed before the preset is pickable / switchable. */
@@ -20,7 +20,8 @@ export interface AcpPreset {
   command: string             // baked into AgentConfig.command on add (how hip speaks ACP)
   args: string[]              // baked into AgentConfig.args on add
   quirks: string              // sidecar quirk-profile key (acp-quirks.ts); === id
-  authEnvVar?: string         // adapter agents: env var the API key maps to
+  /** Optional: env var the form API key maps to (Claude/Codex/Grok). Leave blank to use ambient auth. */
+  authEnvVar?: string
   installCmd: string          // shown when agent 未安装 (copyable) — installs the AGENT
   adapterPkg?: string         // set iff the agent has no native ACP: community npm package name
   adapterBin?: string         // global CLI of the adapter on PATH (required when adapterPkg set)
@@ -32,6 +33,16 @@ export const ACP_PRESETS: AcpPreset[] = [
     id: 'opencode', name: 'OpenCode', icon: 'code',
     detectBin: 'opencode', command: 'opencode', args: ['acp', '--pure'],
     quirks: 'opencode', installCmd: 'npm i -g opencode-ai',
+  },
+  {
+    // Detect Grok Build (`grok`); native ACP via `grok agent stdio` (no adapter).
+    // Auth: preferred `grok login` → ~/.grok/auth.json; optional XAI_API_KEY via form/env.
+    id: 'grok-build', name: 'Grok Build', icon: 'sparkles',
+    detectBin: 'grok',
+    command: 'grok', args: ['agent', 'stdio'],
+    quirks: 'grok-build',
+    authEnvVar: 'XAI_API_KEY',
+    installCmd: 'curl -fsSL https://x.ai/cli/install.sh | bash',
   },
   {
     // Detect the Pi agent (`pi`); speak ACP via globally-installed `pi-acp`.

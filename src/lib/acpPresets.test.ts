@@ -13,9 +13,9 @@ import {
 } from './acpPresets'
 
 describe('ACP_PRESETS', () => {
-  it('lists the four supported providers with unique ids', () => {
+  it('lists the five supported providers with unique ids', () => {
     const ids = ACP_PRESETS.map((p) => p.id)
-    expect(new Set(ids)).toEqual(new Set(['opencode', 'pi', 'claude-code', 'codex']))
+    expect(new Set(ids)).toEqual(new Set(['opencode', 'grok-build', 'pi', 'claude-code', 'codex']))
     expect(new Set(ids).size).toBe(ids.length)
   })
 
@@ -28,9 +28,10 @@ describe('ACP_PRESETS', () => {
     }
   })
 
-  it('key-injecting adapter presets declare an authEnvVar; self-managed ones do not', () => {
+  it('key-injecting presets declare an authEnvVar; pure self-managed ones do not', () => {
     expect(acpPresetById('claude-code')?.authEnvVar).toBe('ANTHROPIC_API_KEY')
     expect(acpPresetById('codex')?.authEnvVar).toBe('OPENAI_API_KEY')
+    expect(acpPresetById('grok-build')?.authEnvVar).toBe('XAI_API_KEY')
     expect(acpPresetById('opencode')?.authEnvVar).toBeUndefined()
     expect(acpPresetById('pi')?.authEnvVar).toBeUndefined()
   })
@@ -69,6 +70,17 @@ describe('ACP_PRESETS', () => {
     })
     expect(acpPresetById('opencode')?.adapterPkg).toBeUndefined()
     expect(acpPresetById('opencode')?.adapterBin).toBeUndefined()
+
+    expect(acpPresetById('grok-build')).toMatchObject({
+      detectBin: 'grok',
+      command: 'grok',
+      args: ['agent', 'stdio'],
+      quirks: 'grok-build',
+      icon: 'sparkles',
+    })
+    expect(acpPresetById('grok-build')?.adapterPkg).toBeUndefined()
+    expect(acpPresetById('grok-build')?.adapterBin).toBeUndefined()
+    expect(acpPresetById('grok-build')?.installCmd).toMatch(/x\.ai\/cli/)
   })
 
   it('adapterPkg and adapterBin are paired when either is set', () => {
@@ -84,13 +96,14 @@ describe('ACP_PRESETS', () => {
   it('looks presets up by id', () => {
     expect(acpPresetById('codex')?.name).toBe('Codex')
     expect(acpPresetById('pi')?.name).toBe('Pi')
+    expect(acpPresetById('grok-build')?.name).toBe('Grok Build')
     expect(acpPresetById('nope')).toBeUndefined()
   })
 
   it('acpDetectNames includes agent and adapter binaries', () => {
     const names = acpDetectNames()
     expect(names).toEqual(expect.arrayContaining([
-      'opencode', 'pi', 'pi-acp', 'claude', 'claude-agent-acp', 'codex', 'codex-acp',
+      'opencode', 'grok', 'pi', 'pi-acp', 'claude', 'claude-agent-acp', 'codex', 'codex-acp',
     ]))
     expect(new Set(names).size).toBe(names.length)
   })
@@ -109,6 +122,7 @@ describe('preset install helpers', () => {
 
   it('presetAdapterInstalled is true when no adapterBin; else checks adapterBin', () => {
     expect(presetAdapterInstalled(mk({ detectBin: 'opencode' }), {})).toBe(true)
+    expect(presetAdapterInstalled(mk({ detectBin: 'grok' }), {})).toBe(true)
     const p = mk({ detectBin: 'pi', adapterBin: 'pi-acp' })
     expect(presetAdapterInstalled(p, { 'pi-acp': true })).toBe(true)
     expect(presetAdapterInstalled(p, { 'pi-acp': false })).toBe(false)
@@ -119,6 +133,10 @@ describe('preset install helpers', () => {
     const native = mk({ detectBin: 'opencode' })
     expect(presetInstalled(native, { opencode: true })).toBe(true)
     expect(presetInstalled(native, { opencode: false })).toBe(false)
+
+    const grok = mk({ detectBin: 'grok' })
+    expect(presetInstalled(grok, { grok: true })).toBe(true)
+    expect(presetInstalled(grok, { grok: false })).toBe(false)
 
     const bridged = mk({ detectBin: 'pi', adapterBin: 'pi-acp' })
     expect(presetInstalled(bridged, { pi: true, 'pi-acp': true })).toBe(true)
@@ -133,6 +151,7 @@ describe('presetAdded', () => {
     expect(presetAdded(p, [{ quirks: 'opencode' }, { quirks: 'codex' }])).toBe(true)
     expect(presetAdded(p, [{ quirks: 'opencode' }])).toBe(false)
     expect(presetAdded(p, [{}])).toBe(false)
+    expect(presetAdded(mk({ id: 'grok-build', quirks: 'grok-build' }), [{ quirks: 'grok-build' }])).toBe(true)
   })
 })
 
@@ -160,11 +179,22 @@ describe('agentBinaryStatus', () => {
       adapterInstalled: true,
       installed: true,
     })
+    expect(agentBinaryStatus(agent('grok-build'), { grok: true })).toEqual({
+      preset: acpPresetById('grok-build'),
+      agentInstalled: true,
+      adapterInstalled: true,
+      installed: true,
+    })
   })
 
   it('reports not installed when the preset binary is missing', () => {
     expect(agentBinaryStatus(agent('opencode'), { opencode: false })).toEqual({
       preset: acpPresetById('opencode'),
+      agentInstalled: false,
+      adapterInstalled: true,
+      installed: false,
+    })
+    expect(agentBinaryStatus(agent('grok-build'), { grok: false })).toMatchObject({
       agentInstalled: false,
       adapterInstalled: true,
       installed: false,

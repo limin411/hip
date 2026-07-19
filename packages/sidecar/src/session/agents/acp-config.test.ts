@@ -26,4 +26,21 @@ describe('buildAcpSpawn (model rollback)', () => {
     const { env } = buildAcpSpawn({ ...baseAgent, authMode: 'opencode-self', env: { MOCK_ACP_THINK: '1' } }, null)
     expect(env.MOCK_ACP_THINK).toBe('1')
   })
+
+  it('spawns Grok Build native ACP with agent stdio and optional XAI_API_KEY env', () => {
+    const grok = {
+      id: 'g1',
+      name: 'Grok Build',
+      kind: 'acp',
+      command: 'grok',
+      args: ['agent', 'stdio'],
+      enabled: true,
+      quirks: 'grok-build',
+      env: { XAI_API_KEY: 'xai-test' },
+    }
+    const { command, args, env } = buildAcpSpawn(grok as any, null)
+    expect(command).toBe('grok')
+    expect(args).toEqual(['agent', 'stdio'])
+    expect(env.XAI_API_KEY).toBe('xai-test')
+  })
 })

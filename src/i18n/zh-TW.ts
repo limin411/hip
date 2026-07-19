@@ -1048,7 +1048,7 @@ export const zhTW = {
       "statusAdded": "已新增",
       "redetect": "重新檢測",
       "apiKey": "API Key",
-      "apiKeyHint": "將寫入該智慧體的 {{env}} 環境變數；留空則使用系統環境變數。",
+      "apiKeyHint": "將寫入該智慧體的 {{env}} 環境變數；留空則使用系統環境變數，或該智慧體自身登入態（如 grok login / ~/.grok/auth.json）。",
       "acpAdapterNote": "無官方 ACP，需預裝社群介面卡 {{pkg}}（並加入 PATH）",
       "backToProviders": "返回選擇提供方"
     },

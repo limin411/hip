@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { parseFrontmatter, type KnowledgeDocMeta } from '@/domain/knowledge/frontmatter'
 import { applyMetaToDocument } from '@/domain/knowledge/frontmatterWrite'
+import { KNOWLEDGE_TAGS_MAX } from '@/domain/knowledge/limits'
 import { patchMetaField } from '@/domain/knowledge/views'
 import type { SpaceSchemaV1 } from '@/domain/knowledge/schema'
 import { DEFAULT_SPACE_SCHEMA, propDefByKey } from '@/domain/knowledge/schema'
@@ -163,11 +164,12 @@ export function DocPropertiesRow({
           ) : null}
         </span>
       ))}
-      {editable ? (
+      {editable && meta.tags.length < KNOWLEDGE_TAGS_MAX ? (
         <input
           className="h-7 min-w-[6rem] rounded-full border border-dashed border-border bg-transparent px-2 text-caption text-ink placeholder:text-ink-tertiary"
           data-testid="knowledge-doc-tag-input"
           placeholder={t('knowledge.props.addTag')}
+          title={t('knowledge.props.tagsMax', { count: KNOWLEDGE_TAGS_MAX })}
           value={tagDraft}
           onChange={(e) => setTagDraft(e.target.value)}
           onKeyDown={(e) => {
@@ -175,6 +177,10 @@ export function DocPropertiesRow({
             e.preventDefault()
             const t0 = tagDraft.trim()
             if (!t0) return
+            if (meta.tags.length >= KNOWLEDGE_TAGS_MAX) {
+              setTagDraft('')
+              return
+            }
             if (meta.tags.some((x) => x.toLowerCase() === t0.toLowerCase())) {
               setTagDraft('')
               return

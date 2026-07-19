@@ -3,6 +3,7 @@
  */
 
 import type { KnowledgeDocMeta } from './frontmatter'
+import { KNOWLEDGE_TAGS_MAX } from './limits'
 import type { KnowledgeNode } from './types'
 import { listDocsInTreeOrder } from './wikiLink'
 import { isUnderSubtree } from './tree'
@@ -268,7 +269,8 @@ export function patchMetaField(
   } else if (key === 'priority') {
     next.priority = typeof value === 'string' && value ? value : null
   } else if (key === 'tags') {
-    next.tags = Array.isArray(value) ? value : value ? [value] : []
+    const list = Array.isArray(value) ? value : value ? [value] : []
+    next.tags = list.slice(0, KNOWLEDGE_TAGS_MAX)
   } else if (key === 'aliases') {
     next.aliases = Array.isArray(value) ? value : value ? [value] : []
   } else if (value == null || value === '') {

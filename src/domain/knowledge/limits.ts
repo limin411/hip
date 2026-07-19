@@ -27,6 +27,9 @@ export const KNOWLEDGE_ASSET_INLINE_MAX_BYTES = 1_500_000
 /** Versions retained per doc (Phase 1). */
 export const KNOWLEDGE_VERSION_CAP = 30
 
+/** Max tags per document (UI + meta write path). */
+export const KNOWLEDGE_TAGS_MAX = 5
+
 /** Yield to the event loop every N docs during full index rebuild. */
 export const KNOWLEDGE_INDEX_YIELD_EVERY = 20
 

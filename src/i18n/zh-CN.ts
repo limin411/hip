@@ -1415,6 +1415,7 @@ export const zhCN = {
         date: '日期',
         addTag: '添加标签…',
         removeTag: '移除 {{tag}}',
+        tagsMax: '最多 {{count}} 个标签',
         options: {
           draft: '草稿',
           active: '进行中',

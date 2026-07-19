@@ -757,6 +757,7 @@ export const zhTW = {
         date: '日期',
         addTag: '新增標籤…',
         removeTag: '移除 {{tag}}',
+        tagsMax: '最多 {{count}} 個標籤',
         options: {
           draft: '草稿',
           active: '進行中',

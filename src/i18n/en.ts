@@ -1441,6 +1441,7 @@ export const en = {
         date: 'Date',
         addTag: 'Add tag…',
         removeTag: 'Remove {{tag}}',
+        tagsMax: 'Up to {{count}} tags',
         options: {
           draft: 'Draft',
           active: 'Active',

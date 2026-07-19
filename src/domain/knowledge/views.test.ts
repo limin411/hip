@@ -85,4 +85,13 @@ describe('patchMetaField + applyMetaToDocument', () => {
     expect(doc).toContain('date: 2026-07-19')
     expect(doc).toContain('# Hello')
   })
+
+  it('caps tags at KNOWLEDGE_TAGS_MAX', () => {
+    const meta = patchMetaField(
+      { ...EMPTY_DOC_META },
+      'tags',
+      ['a', 'b', 'c', 'd', 'e', 'f', 'g'],
+    )
+    expect(meta.tags).toEqual(['a', 'b', 'c', 'd', 'e'])
+  })
 })

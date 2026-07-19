@@ -72,4 +72,24 @@ describe('CollaborationStructure', () => {
     expect(screen.getByText('Coder')).toBeInTheDocument()
     expect(screen.getByText('implement feature X')).toBeInTheDocument()
   })
+
+  it('shows concrete agent name for role=subagent when name is set', () => {
+    render(
+      <CollaborationStructure
+        agents={[
+          agent({ agentId: 'supervisor', role: 'supervisor' }),
+          agent({
+            agentId: 'subagent-1',
+            role: 'subagent',
+            name: 'Explore',
+            taskInput: 'find callers',
+            parentAgentId: 'supervisor',
+          }),
+        ]}
+        live={false}
+      />,
+    )
+    expect(screen.getByText('Explore')).toBeInTheDocument()
+    expect(screen.queryByText('Sub-agent')).not.toBeInTheDocument()
+  })
 })

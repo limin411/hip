@@ -728,13 +728,13 @@ export async function runTurn(host: SessionTurnHost, rawSend: SendFn, base?: {
   const closeReasoning = (agentId: string) => {
     const burst = reasoning.close(agentId); if (burst) { const r = trajectory.get(agentId); if (r) r.reasoningBursts.push(burst) }
   }
-  const ensureStarted = (agentId: string, role: AgentRole, parentAgentId?: string, taskInput?: string, agentTaskId?: string) => {
+  const ensureStarted = (agentId: string, role: AgentRole, parentAgentId?: string, taskInput?: string, agentTaskId?: string, name?: string) => {
     if (started.has(agentId)) return; started.add(agentId)
     const stepId = agentId === 'supervisor' ? turnId : agentId
     host.activeSteps.set(agentId, stepId)
-    trajectory.set(agentId, { role, output: '', startedAt: Date.now(), finishedAt: null, seq: agentSeq++, toolCalls: new Map(), reasoningBursts: [], ...(parentAgentId ? { parentAgentId } : {}), ...(taskInput ? { taskInput } : {}) })
+    trajectory.set(agentId, { role, output: '', startedAt: Date.now(), finishedAt: null, seq: agentSeq++, toolCalls: new Map(), reasoningBursts: [], ...(parentAgentId ? { parentAgentId } : {}), ...(taskInput ? { taskInput } : {}), ...(name ? { name } : {}) })
     logInfo('session', 'agent:started', { sessionId: host.id, turnId, agentId, role })
-    send({ type: 'agent:started', sessionId: host.id, turnId, agentId, role, ...(parentAgentId ? { parentAgentId } : {}), ...(taskInput ? { taskInput } : {}), ...(agentTaskId ? { taskId: agentTaskId } : {}) })
+    send({ type: 'agent:started', sessionId: host.id, turnId, agentId, role, ...(parentAgentId ? { parentAgentId } : {}), ...(taskInput ? { taskInput } : {}), ...(agentTaskId ? { taskId: agentTaskId } : {}), ...(name ? { name } : {}) })
     host.emit({ type: 'step_started', sessionId: host.id, turnId: stepId, agentId, timestamp: Date.now() })
     host.emit({ type: 'text_started', sessionId: host.id, messageId: stepId, timestamp: Date.now() })
   }
@@ -917,7 +917,7 @@ export async function runTurn(host: SessionTurnHost, rawSend: SendFn, base?: {
     const cfg = enabledAgents.find((a) => a.id === agentId)
     if (!cfg) return `Error: unknown or disabled agent ${agentId}`
     const childId = `subagent-${++subagentSeq}`
-    ensureStarted(childId, 'subagent', 'supervisor', task)
+    ensureStarted(childId, 'subagent', 'supervisor', task, undefined, cfg.name)
     const hooks: ExternalAgentHooks = {
       requestPermission: (req) => {
         const auto = tryAutoResolvePermission(mode, req.tool.kind, req.options)

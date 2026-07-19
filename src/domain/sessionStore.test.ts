@@ -466,10 +466,10 @@ describe('applyServerMessage', () => {
 
   it('subagent agent:started folds a run with taskInput onto the existing turn message', () => {
     const s0 = { sessions: [baseSession({ messages: [{ id: 'u1', role: 'user', content: 'hi', timestamp: 0 }, { id: 't1', role: 'assistant', content: '', timestamp: 100, agentRuns: [{ agentId: 'supervisor', role: 'supervisor', output: '', startedAt: 100, finishedAt: null, seq: 0, messageId: 't1' }] }] })] }
-    const next = applyServerMessage(s0, { type: 'agent:started', sessionId: 's1', agentId: 'planner-1', role: 'planner', turnId: 't1', parentAgentId: 'supervisor', taskInput: 'make a plan' }, 110)
+    const next = applyServerMessage(s0, { type: 'agent:started', sessionId: 's1', agentId: 'planner-1', role: 'planner', turnId: 't1', parentAgentId: 'supervisor', taskInput: 'make a plan', name: 'Coder' }, 110)
     const runs = next.sessions[0].messages.at(-1)!.agentRuns!
     expect(runs.map((r) => r.agentId)).toEqual(['supervisor', 'planner-1'])
-    expect(runs[1]).toMatchObject({ taskInput: 'make a plan', parentAgentId: 'supervisor', messageId: 't1' })
+    expect(runs[1]).toMatchObject({ taskInput: 'make a plan', parentAgentId: 'supervisor', messageId: 't1', name: 'Coder' })
   })
 
   it('subagent token:stream appends to that run\'s output, not the answer body', () => {

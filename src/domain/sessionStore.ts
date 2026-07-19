@@ -186,6 +186,7 @@ export function applyServerMessage(
         agentId: msg.agentId, role: msg.role, output: '', startedAt: now, finishedAt: null, seq: 0, messageId: msg.turnId,
         ...(msg.taskInput ? { taskInput: msg.taskInput } : {}),
         ...(msg.parentAgentId ? { parentAgentId: msg.parentAgentId } : {}),
+        ...(msg.name ? { name: msg.name } : {}),
       }
       return update(msg.sessionId, (s) => {
         const base = msg.role === 'supervisor' ? ensureAssistantMessage(s.messages, msg.turnId, msg.agentId, now) : s.messages

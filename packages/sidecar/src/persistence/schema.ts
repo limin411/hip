@@ -560,6 +560,18 @@ export function migrate(db: DatabaseSync): void {
       throw e
     }
   }
+  if (version < 22) {
+    db.exec('BEGIN')
+    try {
+      // Human-facing agent name for sub-agent runs (e.g. Coder / Explore).
+      db.exec(`ALTER TABLE agent_runs ADD COLUMN name TEXT`)
+      db.exec('PRAGMA user_version = 22')
+      db.exec('COMMIT')
+    } catch (e) {
+      db.exec('ROLLBACK')
+      throw e
+    }
+  }
 }
 
 /** Try to create the FTS5 objects. Returns true if FTS is available. */

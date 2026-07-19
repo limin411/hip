@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { ChevronRight } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import { ROLE_COLOR, ROLE_NAME_KEY } from '@/lib/roleColor'
+import { ROLE_COLOR, ROLE_NAME_KEY, agentDisplayName } from '@/lib/roleColor'
 import type { TurnAgent } from '@/lib/turnAgents'
 import { Badge } from '@/components/ui/Badge'
 import { ToolTrace } from './ToolTrace'
@@ -47,7 +47,7 @@ export function AgentCard({ agent, live }: { agent: TurnAgent; live: boolean }) 
       >
         <ChevronRight size={14} className={cn('block shrink-0 text-ink-tertiary transition-transform', open && 'rotate-90')} />
         <StatusDot status={agent.status} color={color} />
-        <span className="min-w-0 truncate font-semibold text-ink">{t(ROLE_NAME_KEY[agent.role])}</span>
+        <span className="min-w-0 truncate font-semibold text-ink">{agentDisplayName(agent, t)}</span>
         {agent.tools.length > 0 && <Badge className="shrink-0">{t('artifact.toolsCount', { count: agent.tools.length })}</Badge>}
         {isError && (
           <Badge className="shrink-0 border-danger/30 bg-danger/10 text-danger">{t('artifact.failed')}</Badge>

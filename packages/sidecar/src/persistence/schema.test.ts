@@ -23,8 +23,9 @@ describe('migrate', () => {
     expect(columns(db, 'tool_calls')).toEqual(
       expect.arrayContaining(['agent_run_id', 'call_id', 'agent_id', 'name', 'input', 'output', 'status', 'error', 'seq', 'truncated']),
     )
-    expect((db.prepare('PRAGMA user_version').get() as { user_version: number }).user_version).toBe(21)
+    expect((db.prepare('PRAGMA user_version').get() as { user_version: number }).user_version).toBe(22)
     expect(columns(db, 'messages')).toContain('attachments')
+    expect(columns(db, 'agent_runs')).toContain('name')
   })
 
   it('is idempotent and upgrades an existing v1 database in place', () => {
@@ -49,7 +50,7 @@ describe('migrate', () => {
     const db = new DatabaseSync(':memory:')
     migrate(db)
     expect(columns(db, 'sessions')).toContain('acp_session_id')
-    expect((db.prepare('PRAGMA user_version').get() as { user_version: number }).user_version).toBe(21)
+    expect((db.prepare('PRAGMA user_version').get() as { user_version: number }).user_version).toBe(22)
   })
 
   it('v10 adds event_sequence + event + snapshots tables and reaches user_version 10', () => {
@@ -64,7 +65,7 @@ describe('migrate', () => {
     )
     const indexes = (db.prepare(`SELECT name FROM sqlite_master WHERE type='index' AND tbl_name='event'`).all() as { name: string }[]).map((r) => r.name)
     expect(indexes).toEqual(expect.arrayContaining(['idx_event_aggregate_seq', 'idx_event_aggregate_type_seq']))
-    expect((db.prepare('PRAGMA user_version').get() as { user_version: number }).user_version).toBe(21)
+    expect((db.prepare('PRAGMA user_version').get() as { user_version: number }).user_version).toBe(22)
   })
 
   it('v10 migration preserves all pre-existing tables (no drop / no rename)', () => {
@@ -82,7 +83,7 @@ describe('migrate', () => {
     )
     const indexes = (db.prepare(`SELECT name FROM sqlite_master WHERE type='index' AND tbl_name='session_message'`).all() as { name: string }[]).map((r) => r.name)
     expect(indexes).toEqual(expect.arrayContaining(['idx_session_message_session_seq', 'idx_session_message_session_type_seq']))
-    expect((db.prepare('PRAGMA user_version').get() as { user_version: number }).user_version).toBe(21)
+    expect((db.prepare('PRAGMA user_version').get() as { user_version: number }).user_version).toBe(22)
   })
 
   it('v13 adds session_input queue table and reaches user_version 13', () => {
@@ -93,7 +94,7 @@ describe('migrate', () => {
     )
     const indexes = (db.prepare(`SELECT name FROM sqlite_master WHERE type='index' AND tbl_name='session_input'`).all() as { name: string }[]).map((r) => r.name)
     expect(indexes).toEqual(expect.arrayContaining(['idx_session_input_session', 'idx_session_input_session_promoted']))
-    expect((db.prepare('PRAGMA user_version').get() as { user_version: number }).user_version).toBe(21)
+    expect((db.prepare('PRAGMA user_version').get() as { user_version: number }).user_version).toBe(22)
   })
 
   it('v14 adds cron_tasks table and reaches user_version 14', () => {
@@ -104,7 +105,7 @@ describe('migrate', () => {
     )
     const indexes = (db.prepare(`SELECT name FROM sqlite_master WHERE type='index' AND tbl_name='cron_tasks'`).all() as { name: string }[]).map((r) => r.name)
     expect(indexes).toEqual(expect.arrayContaining(['idx_cron_tasks_session']))
-    expect((db.prepare('PRAGMA user_version').get() as { user_version: number }).user_version).toBe(21)
+    expect((db.prepare('PRAGMA user_version').get() as { user_version: number }).user_version).toBe(22)
   })
 
   it('v15 adds messages.attachments column', () => {
@@ -142,7 +143,7 @@ describe('migrate', () => {
     const db = new DatabaseSync(':memory:')
     migrate(db)
     expect(columns(db, 'messages')).toContain('memory_citations')
-    expect((db.prepare('PRAGMA user_version').get() as { user_version: number }).user_version).toBe(21)
+    expect((db.prepare('PRAGMA user_version').get() as { user_version: number }).user_version).toBe(22)
   })
 
   it('v18 adds memory_embedding_meta / memory_embedding_rows', () => {
@@ -154,7 +155,7 @@ describe('migrate', () => {
     expect(columns(db, 'memory_embedding_rows')).toEqual(
       expect.arrayContaining(['memory_id', 'model_key', 'dim', 'embedding', 'updated_at']),
     )
-    expect((db.prepare('PRAGMA user_version').get() as { user_version: number }).user_version).toBe(21)
+    expect((db.prepare('PRAGMA user_version').get() as { user_version: number }).user_version).toBe(22)
   })
 
   it('v19 adds memory_runtime KV table', () => {
@@ -163,7 +164,7 @@ describe('migrate', () => {
     expect(columns(db, 'memory_runtime')).toEqual(
       expect.arrayContaining(['key', 'value_json', 'updated_at']),
     )
-    expect((db.prepare('PRAGMA user_version').get() as { user_version: number }).user_version).toBe(21)
+    expect((db.prepare('PRAGMA user_version').get() as { user_version: number }).user_version).toBe(22)
   })
 
   it('v21 adds sessions soft-delete columns for recycle bin', () => {
@@ -172,6 +173,6 @@ describe('migrate', () => {
     expect(columns(db, 'sessions')).toEqual(
       expect.arrayContaining(['deleted_at', 'delete_derived_memories']),
     )
-    expect((db.prepare('PRAGMA user_version').get() as { user_version: number }).user_version).toBe(21)
+    expect((db.prepare('PRAGMA user_version').get() as { user_version: number }).user_version).toBe(22)
   })
 })

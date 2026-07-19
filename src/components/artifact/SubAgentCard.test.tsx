@@ -72,6 +72,14 @@ describe('SubAgentCard context menu', () => {
     expect(card).toHaveTextContent('artifact.roles.subagent')
   })
 
+  it('shows concrete agent name instead of generic subagent role when name is set', () => {
+    render(<SubAgentCard agent={{ ...agent, name: 'Coder' }} />)
+    const card = screen.getByTestId('subagent-card')
+    expect(card).toHaveTextContent('fix bug')
+    expect(card).toHaveTextContent('Coder')
+    expect(card).not.toHaveTextContent('artifact.roles.subagent')
+  })
+
   it('always shows content (no collapse) when agent is done', () => {
     render(<SubAgentCard agent={agent} showTools />)
     const card = screen.getByTestId('subagent-card')

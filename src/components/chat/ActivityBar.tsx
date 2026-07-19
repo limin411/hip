@@ -80,7 +80,11 @@ export function ActivityBar({
 
   const ordered = useMemo(() => [...steps].sort((a, b) => a.stepSeq - b.stepSeq), [steps])
   const lastStep = ordered[ordered.length - 1]
-  const activeRole: AgentRole | null = lastStep?.role ?? agentRuns[agentRuns.length - 1]?.role ?? null
+  const activeRun = lastStep
+    ? agentRuns.find((r) => r.agentId === lastStep.agentId) ?? agentRuns[agentRuns.length - 1]
+    : agentRuns[agentRuns.length - 1]
+  const activeRole: AgentRole | null = lastStep?.role ?? activeRun?.role ?? null
+  const activeName = activeRun?.name?.trim()
 
   const { status, parts } = useMemo(
     () =>
@@ -150,7 +154,9 @@ export function ActivityBar({
           <Circle size={14} className="block shrink-0 text-ink-tertiary" />
         ) : null}
         {activeRole && (
-          <span className="shrink-0 font-medium text-ink-secondary">{t(`artifact.roles.${activeRole}`)}</span>
+          <span className="shrink-0 font-medium text-ink-secondary">
+            {activeName || t(`artifact.roles.${activeRole}`)}
+          </span>
         )}
         <span className="min-w-0 truncate text-ink-tertiary" title={summaryText}>
           {summaryText}

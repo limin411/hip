@@ -19,6 +19,8 @@ export interface TurnAgent {
   elapsedMs: number
   taskInput?: string
   parentAgentId?: string
+  /** Human-facing agent name (e.g. "Coder"); prefer over role labels in UI. */
+  name?: string
   /** Total tokens for this agent run when provider reported usage */
   totalTokens?: number
   /** Owning assistant message id (for scroll-to-turn) */
@@ -86,6 +88,7 @@ export function groupByAgent(message: Message | null, live: boolean): TurnAgent[
       messageId: message.id,
       ...(run?.taskInput ? { taskInput: run.taskInput } : {}),
       ...(run?.parentAgentId ? { parentAgentId: run.parentAgentId } : {}),
+      ...(run?.name ? { name: run.name } : {}),
       ...(typeof totalTokens === 'number' ? { totalTokens } : {}),
     }
   })

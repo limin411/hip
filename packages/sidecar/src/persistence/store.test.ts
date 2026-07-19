@@ -269,7 +269,7 @@ describe('SessionStore', () => {
         { agentId: 'supervisor', role: 'supervisor', output: 'done', startedAt: 1, finishedAt: 3, seq: 0, toolCalls: [] },
         {
           agentId: 'coder', role: 'coder', output: 'wrote it', startedAt: 1, finishedAt: 2, seq: 1,
-          parentAgentId: 'supervisor', taskInput: 'implement the plan',
+          parentAgentId: 'supervisor', taskInput: 'implement the plan', name: 'Coder',
           toolCalls: [
             { callId: 'c1', agentId: 'coder', name: 'write_file', input: '{"path":"/a.ts"}', output: 'ok', status: 'finished', seq: 2 },
             { callId: 'c2', agentId: 'coder', name: 'read_file', input: '{"path":"/b.ts"}', status: 'error', error: 'ENOENT', seq: 3, truncated: true },
@@ -279,7 +279,7 @@ describe('SessionStore', () => {
     )
     const runs = store.loadAgentRuns('s1')
     const coder = runs.find((r) => r.agentId === 'coder')!
-    expect(coder).toMatchObject({ taskInput: 'implement the plan', parentAgentId: 'supervisor' })
+    expect(coder).toMatchObject({ taskInput: 'implement the plan', parentAgentId: 'supervisor', name: 'Coder' })
     expect(coder.toolCalls!.map((t) => [t.callId, t.name, t.status])).toEqual([
       ['c1', 'write_file', 'finished'],
       ['c2', 'read_file', 'error'],

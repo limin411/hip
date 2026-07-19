@@ -5,7 +5,7 @@ import { ToolCallRow } from '@/components/artifact/ToolCallRow'
 import { DeclarativeContextMenu } from '@/components/context-menu'
 import { sanitizeDisplayText } from '@/lib/sanitizeDisplayText'
 import { MarkdownBody } from '@/components/chat/MarkdownBody'
-import { ROLE_COLOR, ROLE_NAME_KEY } from '@/lib/roleColor'
+import { ROLE_COLOR, agentDisplayName } from '@/lib/roleColor'
 import { useFocusStore } from '@/store/focusStore'
 import { useUiStore } from '@/store/uiStore'
 import { useDomainStore } from '@/domain/sessionStore'
@@ -31,10 +31,8 @@ export function SubAgentCard({
 }) {
   const { t } = useTranslation()
   const hasTaskTitle = Boolean(agent.taskInput?.trim())
-  const roleLabel = t(ROLE_NAME_KEY[agent.role] ?? 'artifact.roles.subagent', {
-    defaultValue: agent.role,
-  })
-  const title = hasTaskTitle ? agent.taskInput!.trim() : roleLabel
+  const nameLabel = agentDisplayName(agent, t)
+  const title = hasTaskTitle ? agent.taskInput!.trim() : nameLabel
   const cleanOutput = sanitizeDisplayText(agent.output)
   const toolCount = agent.tools.length
   const elapsedSec = agent.elapsedMs > 0 ? Math.round(agent.elapsedMs / 1000) : null
@@ -71,7 +69,7 @@ export function SubAgentCard({
             {title}
           </span>
           {hasTaskTitle && (
-            <span className="shrink-0 text-ink-tertiary">{roleLabel}</span>
+            <span className="shrink-0 text-ink-tertiary">{nameLabel}</span>
           )}
           <span className="hidden min-w-0 shrink-0 truncate font-mono text-ink-tertiary sm:inline" title={agent.agentId}>
             {agent.agentId}

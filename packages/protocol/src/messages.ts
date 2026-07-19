@@ -258,7 +258,7 @@ type AttachmentSendPayload = Attachment & { path: string }
 
 export type ServerMessage =
   | { type: 'session:created'; sessionId: string }
-  | { type: 'agent:started'; sessionId: string; turnId: string; agentId: string; role: AgentRole; parentAgentId?: string; taskInput?: string; taskId?: string }
+  | { type: 'agent:started'; sessionId: string; turnId: string; agentId: string; role: AgentRole; parentAgentId?: string; taskInput?: string; taskId?: string; name?: string }
   | { type: 'token:stream'; sessionId: string; turnId: string; agentId: string; delta: string }
   | { type: 'agent:finished'; sessionId: string; turnId: string; agentId: string }
   | { type: 'reasoning:delta'; sessionId: string; turnId: string; agentId: string; role: AgentRole; stepSeq: number; delta: string }

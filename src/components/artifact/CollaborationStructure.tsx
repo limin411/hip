@@ -1,5 +1,5 @@
 import { useTranslation } from 'react-i18next'
-import { ROLE_COLOR, ROLE_NAME_KEY } from '@/lib/roleColor'
+import { ROLE_COLOR, ROLE_NAME_KEY, agentDisplayName } from '@/lib/roleColor'
 import type { TurnAgent } from '@/lib/turnAgents'
 import { cn } from '@/lib/utils'
 
@@ -55,7 +55,7 @@ export function CollaborationStructure({
               />
               <div className="min-w-0 flex-1">
                 <div className="flex flex-wrap items-center gap-1.5">
-                  <span className="font-semibold text-ink">{t(ROLE_NAME_KEY[child.role])}</span>
+                  <span className="font-semibold text-ink">{agentDisplayName(child, t)}</span>
                   <span
                     className={cn(
                       'text-caption capitalize',

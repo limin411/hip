@@ -76,6 +76,8 @@ export interface AgentRun {
   seq: number
   taskInput?: string        // instruction this sub-agent received
   parentAgentId?: string    // who delegated (always 'supervisor' for our 2-level tree)
+  /** Human-facing agent name (e.g. "Coder", "Explore"); prefer over role labels in UI. */
+  name?: string
   toolCalls?: ToolCall[]     // ordered by seq; hydrated from the tool_calls table
   messageId?: string         // turn this run belongs to (maps agent_runs.message_id; NULL → no assistant message)
   usage?: TurnUsage          // this agent's token counts for the turn (hydrated from agent_runs.*_tokens)

@@ -43,7 +43,7 @@ export function AgentDashboard() {
         >
           <span className="h-2 w-2 animate-pulse rounded-full bg-accent" aria-hidden />
           <span className="min-w-0 flex-1 truncate font-medium text-ink">
-            {liveRunning.taskInput?.trim() || liveRunning.role}
+            {liveRunning.taskInput?.trim() || liveRunning.name?.trim() || liveRunning.role}
             {liveTool ? ` · ${liveTool.name}` : ''}
           </span>
           <span className="shrink-0 text-caption text-ink-tertiary">live</span>

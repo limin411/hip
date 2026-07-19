@@ -13,8 +13,12 @@ describe('dispatch_agent end-to-end (nested sub-agent)', () => {
     const events = await collect(session, 'please delegate')
     const sub = events.find((e): e is Extract<ServerMessage, { type: 'agent:started' }> => e.type === 'agent:started' && e.role === 'subagent')
     expect(sub?.parentAgentId).toBe('supervisor')
+    expect(sub?.name).toBe('Echo')
     expect(events.some((e) => e.type === 'token:stream' && e.agentId === sub?.agentId)).toBe(true)
     expect(events.some((e) => e.type === 'tool:finished')).toBe(true)
+    const complete = events.find((e): e is Extract<ServerMessage, { type: 'message:complete' }> => e.type === 'message:complete')
+    const subRun = complete?.message.agentRuns?.find((r) => r.role === 'subagent')
+    expect(subRun?.name).toBe('Echo')
   })
 
   it('cancelling during a dispatched sub-agent ends the turn as CANCELLED (no supervisor resume)', async () => {

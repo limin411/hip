@@ -112,6 +112,8 @@ export interface TraceRun {
    * agent:started / ensureStarted time so export parent links stay accurate.
    */
   parentAgentId?: string
+  /** Human-facing agent name (e.g. "Coder"); surfaced in UI instead of generic role labels. */
+  name?: string
 }
 
 /** Callbacks the pump uses to mutate the owning session's trajectory. */
@@ -200,6 +202,7 @@ export function trajectoryToRuns(trajectory: Map<string, TraceRun>): AgentRun[] 
     seq: r.seq,
     ...(r.taskInput ? { taskInput: r.taskInput } : {}),
     ...(r.parentAgentId ? { parentAgentId: r.parentAgentId } : {}),
+    ...(r.name ? { name: r.name } : {}),
     toolCalls: [...r.toolCalls.values()]
       .sort((a, b) => a.seq - b.seq)
       .map((tc): ToolCall => (tc.status === 'running' ? { ...tc, status: 'error' as ToolStatus, error: tc.error ?? 'interrupted' } : tc)),

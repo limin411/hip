@@ -9,23 +9,11 @@ export const zhCN = {
       inputPlaceholder: '给 hip 发消息…（Enter 发送，Shift+Enter 换行）',
       resizeInput: '拖拽调整输入框高度',
       /**
-       * 旧版并行文案。主机 UI 已迁至 `chat.worktreeControl.*`（PR1）。
-       * 仍被引用：`started`（serverMessageEffects）。其余含「智能体」的键暂无消费者；
-       * PR5 删除/改写，避免误用带回虚假「智能体决定」文案。
+       * Agent HITL parallel:started 成功 toast（serverMessageEffects）。
+       * 主机 UI 使用 chat.worktreeControl.* — 勿再引入「智能体决定」主机文案。
        */
       parallel: {
-        started: '已启动 {{count}} 路并行 worktree',
-        failed: '并行运行失败',
-        buttonTitle: '并行 worktree（由智能体决定数量）',
-        dialogTitle: '并行 worktree',
-        dialogHint:
-          '描述目标。智能体将决定开启多少个隔离 worktree（1–4）。不会自动启动模型。',
-        promptPlaceholder: '要探索或对比什么？',
-        agentSuggests: '智能体建议 {{count}} 个槽位',
-        confirm: '创建 {{count}} 个 worktree',
-        creating: '创建中…',
-        starting: '正在创建 {{count}} 个并行 worktree…',
-        noneCreated: '未创建任何 worktree。当前目录是 git 仓库吗？',
+        started: '已启动 {{count}} 路并行探索',
       },
       /** WorktreeControl 最终命名空间（PR1+）。主机并行路径为启发式 — 非智能体决定。 */
       worktreeControl: {
@@ -39,6 +27,8 @@ export const zhCN = {
         creating: '创建中…',
         starting: '正在创建 {{count}} 路隔离工作区…',
         started: '并行探索 {{runId}}：已就绪 {{count}} 路',
+        partialStarted: '并行探索 {{runId}}：已就绪 {{count}} 路，失败 {{failed}} 路',
+        partialFooter: '部分路创建失败：',
         noneCreated: '未创建任何隔离工作区。当前目录是 git 仓库吗？',
         failed: '并行探索失败',
         reason: {

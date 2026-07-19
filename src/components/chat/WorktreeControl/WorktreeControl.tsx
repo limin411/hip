@@ -3,7 +3,6 @@ import { useTranslation } from 'react-i18next'
 import { Folders, Copy, RefreshCw, Plus, Layers } from 'lucide-react'
 import { toast } from 'sonner'
 import { ComposerChip } from '../ComposerChip'
-import { ParallelRunButton } from '../ParallelRunButton'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/Popover'
 import {
   sessionService,
@@ -36,6 +35,7 @@ import {
 } from '@/store/worktreeStore'
 import { WorktreeList, type WorktreeListRow } from './WorktreeList'
 import { WorktreeCreateSingleModal } from './WorktreeCreateSingleModal'
+import { WorktreeParallelModal } from './WorktreeParallelModal'
 
 export function WorktreeControl({ draftPrompt = '' }: { draftPrompt?: string }) {
   const { t } = useTranslation()
@@ -486,14 +486,14 @@ export function WorktreeControl({ draftPrompt = '' }: { draftPrompt?: string }) 
         </PopoverContent>
       </Popover>
 
-      <ParallelRunButton
-        draftPrompt={draftPrompt}
+      {/* Close popover before Modal (D17); form owns parallel-run-* testids. */}
+      <WorktreeParallelModal
         open={parallelOpen}
         onOpenChange={setParallelOpen}
-        hideTrigger
-        hostSessionId={opsBaseCwd && hostSessionId ? hostSessionId : undefined}
+        draftPrompt={draftPrompt}
+        hostSessionId={opsBaseCwd && hostSessionId ? hostSessionId : ''}
         // Never fall back to isolated active cwd as fan-out base.
-        baseCwd={opsBaseCwd}
+        baseCwd={opsBaseCwd || ''}
       />
 
       {hostSessionId ? (

@@ -9,23 +9,11 @@ export const en = {
       inputPlaceholder: 'Message hip… (Enter to send, Shift+Enter for newline)',
       resizeInput: 'Drag to resize input',
       /**
-       * Legacy host parallel keys. Host UI uses `chat.worktreeControl.*` (PR1).
-       * Still referenced: `started` by serverMessageEffects. Remaining agent-worded
-       * keys are unused; delete/rewrite in PR5 so false “agent chooses” cannot resurface.
+       * Agent HITL parallel:started toast only (serverMessageEffects).
+       * Host UI uses chat.worktreeControl.* — do not reintroduce agent-worded host keys.
        */
       parallel: {
-        started: 'Started {{count}} parallel worktree slots',
-        failed: 'Parallel run failed',
-        buttonTitle: 'Parallel worktrees (agent chooses how many)',
-        dialogTitle: 'Parallel worktrees',
-        dialogHint:
-          'Describe the goal. The agent chooses how many isolated worktrees to open (1–4). Does not auto-start the model.',
-        promptPlaceholder: 'What should be explored or compared?',
-        agentSuggests: 'Agent suggests {{count}} slot(s)',
-        confirm: 'Create {{count}} worktree(s)',
-        creating: 'Creating…',
-        starting: 'Creating {{count}} parallel worktree(s)…',
-        noneCreated: 'No worktrees created. Is this folder a git repo?',
+        started: 'Started {{count}} parallel explore track(s)',
       },
       /** Final WorktreeControl namespace (PR1+). Host parallel path is heuristic — not agent. */
       worktreeControl: {
@@ -39,6 +27,9 @@ export const en = {
         creating: 'Creating…',
         starting: 'Creating {{count}} isolated workspace(s)…',
         started: 'Parallel run {{runId}}: {{count}} track(s) ready',
+        partialStarted:
+          'Parallel run {{runId}}: {{count}} track(s) ready, {{failed}} failed',
+        partialFooter: 'Some tracks failed to create:',
         noneCreated: 'No isolated workspaces created. Is this folder a git repo?',
         failed: 'Parallel explore failed',
         reason: {

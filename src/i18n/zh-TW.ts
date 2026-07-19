@@ -16,19 +16,9 @@ export const zhTW = {
     "sendMessage": "發送一條消息開始對話",
     "inputPlaceholder": "給 hip 發消息…（Enter 發送，Shift+Enter 換行）",
     "resizeInput": "拖曳調整輸入框高度",
-    // Legacy parallel keys: host UI uses worktreeControl (PR1). `started` still used by serverMessageEffects; PR5 deletes agent-worded leftovers.
+    // Agent HITL parallel:started toast only; host UI uses worktreeControl (PR5 cleaned agent-worded leftovers).
     "parallel": {
-      "started": "已啟動 {{count}} 路並行 worktree",
-      "failed": "並行執行失敗",
-      "buttonTitle": "並行 worktree（由智能體決定數量）",
-      "dialogTitle": "並行 worktree",
-      "dialogHint": "描述目標。智能體將決定開啟多少個隔離 worktree（1–4）。不會自動啟動模型。",
-      "promptPlaceholder": "要探索或對比什麼？",
-      "agentSuggests": "智能體建議 {{count}} 個槽位",
-      "confirm": "建立 {{count}} 個 worktree",
-      "creating": "建立中…",
-      "starting": "正在建立 {{count}} 個並行 worktree…",
-      "noneCreated": "未建立任何 worktree。目前目錄是 git 倉庫嗎？"
+      "started": "已啟動 {{count}} 路並行探索"
     },
     "worktreeControl": {
       "buttonTitle": "並行探索（根據描述建議路數）",
@@ -40,6 +30,8 @@ export const zhTW = {
       "creating": "建立中…",
       "starting": "正在建立 {{count}} 路隔離工作區…",
       "started": "並行探索 {{runId}}：已就緒 {{count}} 路",
+      "partialStarted": "並行探索 {{runId}}：已就緒 {{count}} 路，失敗 {{failed}} 路",
+      "partialFooter": "部分路建立失敗：",
       "noneCreated": "未建立任何隔離工作區。目前目錄是 git 倉庫嗎？",
       "failed": "並行探索失敗",
       "reason": {

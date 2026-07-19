@@ -1,0 +1,1 @@
+Deeper product documentation skill is not available in this session. Answer from the product facts above; if the user needs full guides, suggest enabling the built-in hip skill (or check Settings / hip.toml skills) rather than inventing config keys.

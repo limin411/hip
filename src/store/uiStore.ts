@@ -16,7 +16,16 @@ export type UiDensity = 'comfortable' | 'compact'
 export type SidebarSection = 'knowledge' | 'projects' | 'chats'
 
 /** Settings panel left-nav page ids (see SettingsPanel PAGES). */
-export type SettingsPageId = 'general' | 'model' | 'agents' | 'mcp' | 'skill' | 'plugins' | 'hooks' | 'memory'
+export type SettingsPageId =
+  | 'general'
+  | 'model'
+  | 'agents'
+  | 'mcp'
+  | 'skill'
+  | 'plugins'
+  | 'hooks'
+  | 'memory'
+  | 'help'
 
 const APP_LANGUAGES: readonly AppLanguage[] = ['zh-CN', 'zh-TW', 'en']
 const UI_DENSITIES: readonly UiDensity[] = ['comfortable', 'compact']

@@ -30,7 +30,10 @@
     "cli:dev": "yarn workspace @hip/cli dev",
     "cli:build": "yarn workspace @hip/cli build",
     "cli:test": "yarn workspace @hip/cli test",
-    "cli:type-check": "yarn workspace @hip/cli type-check"
+    "cli:type-check": "yarn workspace @hip/cli type-check",
+    "product:content": "node scripts/generate-product-content.mjs && node scripts/generate-ops-content.mjs",
+    "product:content:check": "node scripts/generate-product-content.mjs --check && node scripts/generate-ops-content.mjs --check",
+    "prompt:dogfood": "node --import tsx scripts/product-prompt-dogfood.mjs"
   },
   "dependencies": {
     "@codemirror/lang-markdown": "^6.5.0",

@@ -291,3 +291,120 @@ describe('ConfigManager — MCP config loading', () => {
     expect(mgr.mcpConfigs[0]).toMatchObject({ id: 'new-srv', name: 'New' })
   })
 })
+
+describe('ConfigManager — builtin product skill', () => {
+  const dirs: string[] = []
+  const prevDataDir = process.env.HIP_DATA_DIR
+  const prevSkillsDir = process.env.HIP_SKILLS_DIR
+  const prevConfigPath = process.env.HIP_CONFIG_PATH
+
+  afterEach(() => {
+    for (const d of dirs.splice(0)) {
+      if (existsSync(d)) rmSync(d, { recursive: true, force: true })
+    }
+    if (prevDataDir === undefined) delete process.env.HIP_DATA_DIR
+    else process.env.HIP_DATA_DIR = prevDataDir
+    if (prevSkillsDir === undefined) delete process.env.HIP_SKILLS_DIR
+    else process.env.HIP_SKILLS_DIR = prevSkillsDir
+    if (prevConfigPath === undefined) delete process.env.HIP_CONFIG_PATH
+    else process.env.HIP_CONFIG_PATH = prevConfigPath
+    delete process.env.HIP_PLUGINS_PATH
+  })
+
+  function makeManager(cwd: string, isExternal = false): ConfigManager {
+    let config: SessionConfig = {
+      llmProvider: 'test',
+      model: 'test-model',
+      tools: [],
+      cwd,
+    }
+    return new ConfigManager(
+      () => config,
+      (next) => { config = next },
+      () => false,
+      false,
+      () => {},
+      () => isExternal,
+      () => false,
+      () => {},
+      new HookRegistry(),
+    )
+  }
+
+  it('loads builtin hip product skill into session skills', () => {
+    const dataDir = tmpDir()
+    dirs.push(dataDir)
+    process.env.HIP_DATA_DIR = dataDir
+    process.env.HIP_SKILLS_DIR = join(dataDir, 'empty-skills')
+    mkdirSync(process.env.HIP_SKILLS_DIR, { recursive: true })
+
+    const cwdDir = tmpDir()
+    dirs.push(cwdDir)
+    const mgr = makeManager(cwdDir)
+    mgr.loadPluginComponents()
+
+    const hip = mgr.skills.find((s) => s.id === 'hip')
+    expect(hip).toBeDefined()
+    expect(hip!.name).toBe('hip')
+    expect(hip!.dir).toContain('builtin-skills')
+    expect(existsSync(join(hip!.dir, 'SKILL.md'))).toBe(true)
+  })
+
+  it('honors hip.toml skills disable for builtin hip', () => {
+    const dataDir = tmpDir()
+    dirs.push(dataDir)
+    process.env.HIP_DATA_DIR = dataDir
+    process.env.HIP_SKILLS_DIR = join(dataDir, 'empty-skills')
+    mkdirSync(process.env.HIP_SKILLS_DIR, { recursive: true })
+
+    const configDir = tmpDir()
+    dirs.push(configDir)
+    const globalToml = join(configDir, 'hip.toml')
+    writeFileSync(globalToml, `version = 1\n\n[[skills]]\nid = "hip"\nenabled = false\n`)
+    process.env.HIP_CONFIG_PATH = globalToml
+
+    const cwdDir = tmpDir()
+    dirs.push(cwdDir)
+    const mgr = makeManager(cwdDir)
+    mgr.loadPluginComponents()
+
+    expect(mgr.skills.find((s) => s.id === 'hip')).toBeUndefined()
+  })
+
+  it('user skill with same id overrides builtin dir', () => {
+    const dataDir = tmpDir()
+    dirs.push(dataDir)
+    process.env.HIP_DATA_DIR = dataDir
+
+    const skillsRoot = join(dataDir, 'skills')
+    const userHip = join(skillsRoot, 'hip')
+    mkdirSync(userHip, { recursive: true })
+    writeFileSync(
+      join(userHip, 'SKILL.md'),
+      '---\nname: hip\ndescription: User hip skill\n---\n# user body\n',
+    )
+    process.env.HIP_SKILLS_DIR = skillsRoot
+
+    const cwdDir = tmpDir()
+    dirs.push(cwdDir)
+    const mgr = makeManager(cwdDir)
+    mgr.loadPluginComponents()
+
+    const hip = mgr.skills.filter((s) => s.id === 'hip')
+    expect(hip).toHaveLength(1)
+    expect(hip[0]!.description).toBe('User hip skill')
+    expect(hip[0]!.dir).toBe(userHip)
+  })
+
+  it('external agent clears skills including builtin hip', () => {
+    const dataDir = tmpDir()
+    dirs.push(dataDir)
+    process.env.HIP_DATA_DIR = dataDir
+
+    const cwdDir = tmpDir()
+    dirs.push(cwdDir)
+    const mgr = makeManager(cwdDir, true)
+    mgr.loadPluginComponents()
+    expect(mgr.skills).toEqual([])
+  })
+})

@@ -715,6 +715,22 @@ export const zhCN = {
       pluginsLabel: '插件市场',
       hooksLabel: '挂钩配置',
       memoryLabel: '记忆',
+      productHelp: {
+        navLabel: '帮助',
+        title: '产品帮助',
+        intro: 'hip 如何工作：界面、设置、记忆、技能与本地数据。与智能体 use_skill("hip") 使用同一套文档。',
+        version: '版本 {{version}}',
+        docsRev: '文档修订 {{rev}}',
+        sectionsLabel: '帮助主题',
+        sourceNote: '来源：仓库 docs/product/（与智能体产品 skill 同源）。',
+        sections: {
+          overview: '概览',
+          memory: '记忆',
+          config: '配置与数据',
+          troubleshooting: '故障排查',
+          agents: '智能体与插件',
+        },
+      },
       memory: {
         title: '记忆',
         intro: '跨会话共享的长期记忆。默认关闭。',
@@ -1662,6 +1678,7 @@ export const zhCN = {
         plugins: '设置：插件市场',
         hooks: '设置：挂钩配置',
         memory: '设置：记忆',
+        help: '设置：产品帮助',
       },
       context: {
         diff: '查看工作区变更',

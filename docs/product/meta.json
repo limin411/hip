@@ -1,0 +1,6 @@
+{
+  "skillId": "hip",
+  "skillName": "hip",
+  "skillVersion": "2",
+  "description": "Product help for the hip desktop agent: Chat/Code surfaces, permission modes, Settings, skills, plugins, MCP, memory, agents, CLI, troubleshooting, and local data. Load when the user asks how hip works or how to configure it."
+}

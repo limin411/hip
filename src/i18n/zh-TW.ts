@@ -964,6 +964,24 @@ export const zhTW = {
         empty: '無可複製內容',
       },
     },
+    settings: {
+      productHelp: {
+        navLabel: '說明',
+        title: '產品說明',
+        intro: 'hip 如何運作：介面、設定、記憶、技能與本機資料。與智能體 use_skill("hip") 使用同一套文件。',
+        version: '版本 {{version}}',
+        docsRev: '文件修訂 {{rev}}',
+        sectionsLabel: '說明主題',
+        sourceNote: '來源：倉庫 docs/product/（與智能體產品 skill 同源）。',
+        sections: {
+          overview: '概覽',
+          memory: '記憶',
+          config: '設定與資料',
+          troubleshooting: '故障排除',
+          agents: '智能體與外掛',
+        },
+      },
+    },
     commandPalette: {
       title: '命令面板',
       searchPlaceholder: '輸入命令…  > 指令  # 對話  @ 技能',
@@ -1004,6 +1022,7 @@ export const zhTW = {
         plugins: '設定：外掛市集',
         hooks: '設定：掛鉤設定',
         memory: '設定：記憶',
+        help: '設定：產品說明',
       },
       context: {
         diff: '檢視工作區變更',

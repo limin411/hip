@@ -53,6 +53,7 @@ export type GlobalCommandLabels = {
     plugins: string
     hooks: string
     memory: string
+    help: string
   }
   context: {
     diff: string
@@ -136,10 +137,11 @@ const ALL_SETTINGS_PAGES: SettingsPageId[] = [
   'plugins',
   'hooks',
   'memory',
+  'help',
 ]
 
 /** Shown on empty query (curated). */
-const CURATED_SETTINGS: SettingsPageId[] = ['model', 'memory', 'skill', 'mcp']
+const CURATED_SETTINGS: SettingsPageId[] = ['model', 'memory', 'skill', 'mcp', 'help']
 
 const SETTINGS_ICON: Record<SettingsPageId, GlobalCommand['icon']> = {
   general: 'settings',
@@ -150,6 +152,7 @@ const SETTINGS_ICON: Record<SettingsPageId, GlobalCommand['icon']> = {
   plugins: 'puzzle',
   hooks: 'link-2',
   memory: 'brain',
+  help: 'book-open',
 }
 
 function surfaceForNewConversation(activeView: ActiveView): 'chat' | 'code' {

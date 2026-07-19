@@ -1,6 +1,12 @@
 import { globSync } from 'node:fs'
 import type { SkillMeta, PermissionMode } from '@hip/protocol'
-import { PRODUCT_HELP_GUIDANCE } from './product/builtin-skills.js'
+import { HIP_SKILL_ID } from './product/content.js'
+import { CODING_SKILL_ID } from './ops/content.js'
+import {
+  isHipProductSkillAvailable,
+  PRODUCT_CAPABILITY_MAP,
+  productHelpBlock,
+} from './product/builtin-skills.js'
 
 // ── Skill budget & LRU eviction ─────────────────────────────────────────
 
@@ -40,6 +46,7 @@ const ANTI_PHANTOM =
   'unless you actually called write_file/edit_file for that exact path this turn and it succeeded. ' +
   'If you did not call a write tool, say plainly that no file was created.'
 
+/** Compact git rules always on for code surface; full policy in hip-coding skill. */
 const GIT_GUIDANCE =
   'When the project is a git repository you also have git tools — git_commit, git_create_branch, ' +
   'git_switch_branch. Commit proactively after a coherent unit of work with a concise one-line ' +
@@ -54,39 +61,27 @@ const IDENTITY =
   'Never claim or imply that you are Claude, ChatGPT, Gemini, or any other named assistant, ' +
   'and do not name the underlying model or its maker.'
 
+/**
+ * Always-on coding core (P3 progressive ops).
+ * Long-form delegation / edit / git policy lives in the built-in `hip-coding` skill (use_skill).
+ * Critical parallel fan-out and simple-task rules stay here so the model does not need to load a skill.
+ */
 const BASE =
   'You are a capable coding assistant working directly in a project. ' +
-  'You have real file tools — read_file, write_file, edit_file, ls, glob, grep — and a planning tool, ' +
-  'write_todos — operating on the ' +
-  'project directory. Use them to do the work yourself: read what you need, write actual files, then ' +
-  'verify by reading the result back. Do not ask the user to do steps you can do with your tools. ' +
-  'When the task is done, finish with a short plain-text summary of what you changed. ' +
-  'Prefer edit_file for localized changes (font sizes, box dimensions, labels, small SVG/HTML/CSS fixes). ' +
-  'Avoid a single write_file that rewrites multi-thousand-line files — large one-shot rewrites can stall; ' +
-  'edit in sections with edit_file, or rewrite only when creating a new file or a true full replacement is required. ' +
-  'When read_file output is truncated, re-read missing ranges with offset/limit before editing — do not invent ' +
-  'the rest of the file from a partial read. ' +
-  'For a multi-step task, call write_todos first to lay out an ordered checklist, then update it as ' +
-  'you go — mark exactly one item in_progress at a time and flip items to completed as you finish them. ' +
-  'For a large, self-contained chunk of work or isolated research, you may call task, dispatch_agent, or ' +
-  'task_batch to delegate to a focused sub-agent that runs its own loop with the file tools and returns a result. ' +
-  'Prefer specialized agents when available: explore for read-only codebase search, plan for design-only ' +
-  'planning, coder for implementation with scripts. ' +
-  'CRITICAL — parallel fan-out: when the user asks for parallel work or you have 2+ independent sub-tasks ' +
-  '(e.g. check several modules at once), you MUST use a single task_batch call with one entry per sub-task. ' +
-  'Set each task\'s optional agent field to a specialized roster id (e.g. explore) when dispatch_agent is available. ' +
-  'task_batch runs those sub-agents concurrently. Do NOT issue multiple sequential dispatch_agent or foreground ' +
-  'task calls for independent work — that is serial and slow. dispatch_agent alone is blocking (one agent at a ' +
-  'time) unless the model emits several dispatch_agent calls in the same tool-call batch (then they may run in ' +
-  'parallel). Never claim work ran "in parallel" if you only used sequential dispatch_agent/task. ' +
-  'For fire-and-forget only, use task with mode background, then task_output/task_stop as needed. ' +
-  'When a task, dispatch_agent, or task_batch result returns, treat it as the research source of truth: do not ' +
-  're-run the same ls/glob/grep/read_file exploration the sub-agent already did unless the result is empty, ' +
-  'errored, clearly incomplete, or you need a specific file section the summary omitted. ' +
-  'For a simple, single-step request (greetings, list a directory, read one file, answer a short question), ' +
-  'do it yourself with tools and answer directly — do not call task, task_batch, write_todos, or spawn sub-agents. ' +
-  'Never thrash on .git/objects or invent shell tool names; use run_script for shell, and stop probing ' +
-  'when a tool fails or returns binary/unreadable content — summarize what you know instead.'
+  'You have real file tools — read_file, write_file, edit_file, ls, glob, grep — and write_todos — ' +
+  'on the project directory. Do the work yourself with tools, verify by re-reading, and finish with a ' +
+  'short plain-text summary. Do not ask the user to do steps your tools can do. ' +
+  'Prefer edit_file for localized changes; avoid one-shot multi-thousand-line write_file rewrites — ' +
+  'edit in sections. When read_file is truncated, re-read with offset/limit before editing — do not invent missing lines. ' +
+  'Multi-step work: call write_todos first (exactly one item in_progress at a time). ' +
+  'Large isolated work: delegate with task, dispatch_agent, or task_batch; prefer explore (search), plan (design), coder (implement) when available. ' +
+  'CRITICAL — parallel fan-out: 2+ independent sub-tasks → one task_batch call (true parallel). ' +
+  'Do NOT chain sequential dispatch_agent/task for independent work. Never claim parallel if you only ran sequential calls. ' +
+  'Simple, single-step requests: do them yourself — do not call task, task_batch, write_todos, or spawn sub-agents. ' +
+  'Trust sub-agent results; re-explore only if empty, errored, or clearly incomplete. ' +
+  'Background only: task mode background, then task_output/task_stop. ' +
+  'Never thrash on .git/objects or invent shell tool names; use run_script for shell; stop probing on binary/failed tools. ' +
+  'For deeper edit/delegation/git policy, call use_skill({ name: "hip-coding" }) when that skill is listed under Skills.'
 
 function cwdBlock(cwd: string, permissionMode?: PermissionMode): string {
   if (permissionMode === 'full') {
@@ -118,6 +113,12 @@ export interface SkillsBlockOptions {
   budget?: number
   /** Tracker to determine which skills are least-used for LRU eviction. */
   tracker?: SkillUsageTracker
+  /**
+   * Skill ids that should not be LRU-evicted while any non-pinned skill remains.
+   * If the block is still over budget with only pinned skills left, pinned skills
+   * may still be evicted (budget is hard). Used to keep product skill `hip` visible.
+   */
+  pinnedIds?: string[]
 }
 
 /** A short "## Skills" block listing auto-invoke-eligible skills with descriptions,
@@ -181,7 +182,8 @@ export function skillsBlock(skills: SkillMeta[], cwd?: string, opts?: SkillsBloc
     currentBlock = header + linesWithMeta.map((l) => l.line).join('\n')
   }
 
-  // Phase 3: LRU-evict least-used skills until block fits
+  // Phase 3: LRU-evict least-used skills until block fits (prefer keeping pinnedIds)
+  const pinned = new Set((opts.pinnedIds ?? []).filter(Boolean))
   const evicted: string[] = []
   if (currentBlock.length > budget) {
     // Sort: least-invoked first (tie-break: alphabetically for determinism)
@@ -193,7 +195,11 @@ export function skillsBlock(skills: SkillMeta[], cwd?: string, opts?: SkillsBloc
     })
 
     while (currentBlock.length > budget && linesWithMeta.length > 0) {
-      const evictedMeta = linesWithMeta.shift()!
+      // Evict non-pinned first; only when all remaining are pinned may we drop a pin.
+      let idx = linesWithMeta.findIndex((l) => !pinned.has(l.skill.id))
+      if (idx < 0) idx = 0
+      const [evictedMeta] = linesWithMeta.splice(idx, 1)
+      if (!evictedMeta) break
       evicted.push(evictedMeta.skill.id)
       currentBlock = header + linesWithMeta.map((l) => l.line).join('\n')
     }
@@ -233,13 +239,20 @@ const BASE_CHAT =
 export function buildSystemPrompt({ cwd, userInstructions, skills, permissionMode, mcpCatalog, surface }: SystemPromptInput): string {
   const isChat = surface === 'chat' || permissionMode === 'chat'
   const body = isChat ? BASE_CHAT : BASE
-  // Identity + compact product pointer (Hermes-style). Full product depth is progressive via use_skill("hip").
+  const hipAvailable = isHipProductSkillAvailable(skills)
+  // L0: identity + capability map + conditional product help (Hermes-style pointer when skill is on).
+  const l0 =
+    `${IDENTITY}\n\n${PRODUCT_CAPABILITY_MAP}\n\n${productHelpBlock(hipAvailable)}`
   let base = isChat
-    ? `${IDENTITY}\n\n${PRODUCT_HELP_GUIDANCE}\n\n${body}\n\n${cwdBlock(cwd, permissionMode)}\n\n${ANTI_PHANTOM}`
-    : `${IDENTITY}\n\n${PRODUCT_HELP_GUIDANCE}\n\n${body}\n\n${cwdBlock(cwd, permissionMode)}\n\n${GIT_GUIDANCE}\n\n${ANTI_PHANTOM}`
+    ? `${l0}\n\n${body}\n\n${cwdBlock(cwd, permissionMode)}\n\n${ANTI_PHANTOM}`
+    : `${l0}\n\n${body}\n\n${cwdBlock(cwd, permissionMode)}\n\n${GIT_GUIDANCE}\n\n${ANTI_PHANTOM}`
   if (skills && skills.length > 0) {
-    // Tighter skill budget on chat to save context (Sprint B).
-    const block = skillsBlock(skills, cwd, isChat ? { budget: 1500 } : undefined)
+    // Tighter skill budget on chat to save context (Sprint B). Pin product skill against LRU.
+    const block = skillsBlock(skills, cwd, {
+      ...(isChat ? { budget: 1500 } : {}),
+      // Product help + operational depth should survive skills-budget pressure.
+      pinnedIds: [HIP_SKILL_ID, CODING_SKILL_ID],
+    })
     if (block) base = `${base}\n\n${block}`
   }
   if (mcpCatalog && !isChat) {

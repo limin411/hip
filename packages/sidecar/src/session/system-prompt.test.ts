@@ -51,10 +51,13 @@ describe('buildSystemPrompt', () => {
     expect(s).toMatch(/Claude/)
   })
 
-  it('includes progressive product help pointer without dumping the product manual', () => {
+  it('includes L0 product capability map without dumping the product manual', () => {
     const s = buildSystemPrompt({ cwd: '/tmp/proj' })
-    expect(s).toMatch(/use_skill\(\{ name: "hip" \}\)/)
-    expect(s).toMatch(/do not load the hip skill/i)
+    expect(s).toMatch(/Product facts \(hip\)/)
+    expect(s).toMatch(/auth\.json/)
+    expect(s).toMatch(/off by default/)
+    // Without hip skill in the list, do not instruct use_skill("hip")
+    expect(s).not.toMatch(/use_skill\(\{ name: "hip" \}\)/)
     expect(s).not.toMatch(/## Progressive disclosure/)
     expect(s).not.toMatch(/~\/\.hip\/db\/hip\.db/)
   })
@@ -85,6 +88,16 @@ describe('buildSystemPrompt', () => {
     expect(cwdIdx).toBeGreaterThanOrEqual(0)
     expect(gitIdx).toBeGreaterThan(cwdIdx)
     expect(antiIdx).toBeGreaterThan(gitIdx)
+  })
+
+  it('keeps critical parallel/simple-task rules always-on and points at hip-coding for depth', () => {
+    const s = buildSystemPrompt({ cwd: '/tmp/proj', surface: 'code' })
+    expect(s).toMatch(/task_batch/)
+    expect(s).toMatch(/parallel fan-out/i)
+    expect(s).toMatch(/use_skill\(\{ name: "hip-coding" \}\)/)
+    // Long-form elaboration lives in the skill, not the always-on BASE
+    expect(s).not.toMatch(/same tool-call batch/)
+    expect(s).not.toMatch(/research source of truth/)
   })
 })
 

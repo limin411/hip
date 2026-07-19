@@ -722,6 +722,22 @@ export const en = {
       pluginsLabel: 'Plugin Market',
       hooksLabel: 'Hooks',
       memoryLabel: 'Memory',
+      productHelp: {
+        navLabel: 'Help',
+        title: 'Product help',
+        intro: 'How hip works — surfaces, settings, memory, skills, and local data. Same guide the agent loads with use_skill("hip").',
+        version: 'Version {{version}}',
+        docsRev: 'Docs rev {{rev}}',
+        sectionsLabel: 'Help topics',
+        sourceNote: 'Source: docs/product/ in the hip repository (shared with the agent product skill).',
+        sections: {
+          overview: 'Overview',
+          memory: 'Memory',
+          config: 'Config & data',
+          troubleshooting: 'Troubleshooting',
+          agents: 'Agents & plugins',
+        },
+      },
       memory: {
         title: 'Memory',
         intro: 'Long-term memories shared across conversations. Disabled by default.',
@@ -1691,6 +1707,7 @@ export const en = {
         plugins: 'Settings: Plugin Market',
         hooks: 'Settings: Hooks',
         memory: 'Settings: Memory',
+        help: 'Settings: Product help',
       },
       context: {
         diff: 'Show workspace changes',

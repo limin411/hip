@@ -189,6 +189,21 @@ describe('skillsBlock (with budget)', () => {
     expect(block).toBe('')
   })
 
+  it('keeps pinned skill ids until only pins remain under budget pressure', () => {
+    const longDesc = 'A very long description that takes a lot of space in the block'
+    const skills = [
+      makeSkill('hip', 'hip', longDesc),
+      makeSkill('a', 'Alpha', longDesc),
+      makeSkill('b', 'Beta', longDesc),
+    ]
+    // Tight budget: without pin, LRU would drop never-used hip first (alphabetically with a,b)
+    const block = skillsBlock(skills, undefined, { budget: 230, pinnedIds: ['hip'] })
+    expect(block.length).toBeLessThanOrEqual(230)
+    expect(block).toContain('hip')
+    expect(block).not.toContain('Alpha')
+    expect(block).not.toContain('Beta')
+  })
+
   it('does not evict when budget is 0 or negative', () => {
     const skills = [
       makeSkill('a', 'Alpha', 'A description'),

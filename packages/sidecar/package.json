@@ -6,6 +6,7 @@
   "main": "dist/index.js",
   "scripts": {
     "dev": "tsx src/main.ts",
+    "prebuild": "node ../../scripts/generate-product-content.mjs && node ../../scripts/generate-ops-content.mjs",
     "build": "ncc build src/main.ts -o dist",
     "type-check": "tsc --noEmit"
   },

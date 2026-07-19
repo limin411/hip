@@ -1,0 +1,6 @@
+{
+  "skillId": "hip-coding",
+  "skillName": "hip-coding",
+  "skillVersion": "1",
+  "description": "Deep coding-agent policy for hip: file edit strategy, write_todos, sub-agent delegation, task_batch parallel fan-out, and git commit/branch etiquette. Load for complex multi-agent or git work."
+}

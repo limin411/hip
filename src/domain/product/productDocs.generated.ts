@@ -7,24 +7,40 @@
  * contentHash=6f7d8fb68b4b3915 skillVersion=2 productVersion=0.1.0
  */
 
-/** Schema / materialization version for builtin skill files (from docs/product/meta.json). */
-export const PRODUCT_SKILL_VERSION = '2'
+export type ProductHelpSectionId = 'overview' | 'memory' | 'config' | 'troubleshooting' | 'agents'
 
-/** App version from root package.json (also used in L0/L2 placeholders). */
+export interface ProductHelpSection {
+  id: ProductHelpSectionId
+  /** i18n key for the tab / nav label */
+  titleKey: string
+  /** Markdown body (English SoT; agent + UI share the same text). */
+  markdown: string
+}
+
+/** App version from root package.json. */
 export const HIP_PRODUCT_VERSION = '0.1.0'
 
-export const HIP_SKILL_ID = 'hip'
-export const HIP_SKILL_NAME = 'hip'
+/** Content schema version from docs/product/meta.json. */
+export const PRODUCT_SKILL_VERSION = '2'
 
 export const HIP_SKILL_DESCRIPTION = 'Product help for the hip desktop agent: Chat/Code surfaces, permission modes, Settings, skills, plugins, MCP, memory, agents, CLI, troubleshooting, and local data. Load when the user asks how hip works or how to configure it.'
 
-/** Level-2 body (frontmatter + markdown). */
-export const HIP_SKILL_MD = `---
-name: hip
-description: "Product help for the hip desktop agent: Chat/Code surfaces, permission modes, Settings, skills, plugins, MCP, memory, agents, CLI, troubleshooting, and local data. Load when the user asks how hip works or how to configure it."
----
+/** L0 capability map (also shown as About summary). */
+export const PRODUCT_CAPABILITY_MAP = `Product facts (hip):
+- Version: 0.1.0.
+- Desktop workbench agent in the user's project with real file tools and optional sub-agents.
+- Surfaces: Code (full workbench) vs Chat (lighter; previewable files → write_file for artifacts).
+- Permission modes: chat = read-only; edit = project sandbox (default); full = user-granted whole FS.
+- API keys: ~/.hip/config/auth.json (0600 plaintext by design).
+- Cross-session memory: off by default (Settings → Memory).
+- Local data: ~/.hip/ (config, db, skills, plugins, logs).`
 
-# hip
+/** Ordered help sections for Settings → Product help. */
+export const PRODUCT_HELP_SECTIONS: readonly ProductHelpSection[] = [
+  {
+    id: 'overview',
+    titleKey: 'settings.productHelp.sections.overview',
+    markdown: `# hip
 
 hip is a **desktop AI workbench** (Tauri shell + React UI + Node sidecar), product version **0.1.0**. Each UI tab is an independent session. The default product loop is a **Supervisor ReAct** agent that uses tools and may delegate with \`task\` / \`dispatch_agent\` / \`task_batch\` — there is no forced Planner → Coder → Reviewer pipeline on ordinary turns.
 
@@ -110,9 +126,12 @@ After loading this skill, \`use_skill\` returns absolute paths. When the user ne
 - Local data layout, config files, env overrides → \`references/config-and-data.md\`
 - Common failures (no key, CLI not running, empty memory) → \`references/troubleshooting.md\`
 - Agents, plugins, MCP wiring → \`references/agents-and-plugins.md\`
-`
-
-export const MEMORY_REFERENCE_MD = `# hip memory (Level 3)
+`,
+  },
+  {
+    id: 'memory',
+    titleKey: 'settings.productHelp.sections.memory',
+    markdown: `# hip memory (Level 3)
 
 Cross-session memory is **disabled by default** (privacy / cost).
 
@@ -148,9 +167,12 @@ Managed sub-agents may get read-only core injection; external ACP agents default
 - Soft-delete trash + retention
 
 For architecture detail see the repo docs \`docs/memory.md\` and \`docs/memory-longterm-design.md\` when developing hip itself.
-`
-
-export const CONFIG_REFERENCE_MD = `# hip config & local data (Level 3)
+`,
+  },
+  {
+    id: 'config',
+    titleKey: 'settings.productHelp.sections.config',
+    markdown: `# hip config & local data (Level 3)
 
 ## Layout (\`~/.hip/\`)
 
@@ -189,9 +211,12 @@ Project overrides often live under \`<project>/.hip/\` (e.g. \`.hip/skills/\`, \
 ## Auth model
 
 Keys are entered in the app Settings panel and stored in \`auth.json\`. Desktop app, standalone sidecar, and tests all read from that store. This is intentional plaintext-on-disk with tight file modes — not a keychain migration target.
-`
-
-export const TROUBLESHOOTING_REFERENCE_MD = `# hip troubleshooting (Level 3)
+`,
+  },
+  {
+    id: 'troubleshooting',
+    titleKey: 'settings.productHelp.sections.troubleshooting',
+    markdown: `# hip troubleshooting (Level 3)
 
 ## No API / model calls work
 
@@ -232,9 +257,12 @@ The product CLI attaches to a **running** hip desktop app. Start the app first (
 ## Stale DMG / build (macOS)
 
 Stale \`rw.*.dmg\` mounts can break \`yarn tauri build\`; remove them and detach \`/Volumes/hip\` if needed.
-`
-
-export const AGENTS_PLUGINS_REFERENCE_MD = `# hip agents, plugins & MCP (Level 3)
+`,
+  },
+  {
+    id: 'agents',
+    titleKey: 'settings.productHelp.sections.agents',
+    markdown: `# hip agents, plugins & MCP (Level 3)
 
 ## Built-in agent profiles
 
@@ -281,29 +309,6 @@ Do not claim work ran "in parallel" if only sequential dispatch was used.
 | project | \`.hip/skills/<id>/\` (wins over global same id) |
 | plugin | plugin-owned skill dirs |
 | builtin product | \`~/.hip/builtin-skills/hip/\` (lowest priority; overridable by same id) |
-`
-
-/** L0 always-on product facts (main agent system prompt). */
-export const PRODUCT_CAPABILITY_MAP = `Product facts (hip):
-- Version: 0.1.0.
-- Desktop workbench agent in the user's project with real file tools and optional sub-agents.
-- Surfaces: Code (full workbench) vs Chat (lighter; previewable files → write_file for artifacts).
-- Permission modes: chat = read-only; edit = project sandbox (default); full = user-granted whole FS.
-- API keys: ~/.hip/config/auth.json (0600 plaintext by design).
-- Cross-session memory: off by default (Settings → Memory).
-- Local data: ~/.hip/ (config, db, skills, plugins, logs).`
-
-/** L0 help when hip skill is on the session skill list. */
-export const PRODUCT_HELP_GUIDANCE = `When the user asks about hip itself — setup, Settings, Chat vs Code, permission modes (chat/edit/full), skills, plugins, MCP, memory, agents, the product CLI, troubleshooting, or local data under ~/.hip — call use_skill({ name: "hip" }) and follow its guide (and references/ for depth). Do not invent product UI labels or config keys; prefer the skill. For ordinary project work, do not load the hip skill.`
-
-/** L0 help when hip skill is unavailable — never instruct use_skill("hip"). */
-export const PRODUCT_HELP_FALLBACK = `Deeper product documentation skill is not available in this session. Answer from the product facts above; if the user needs full guides, suggest enabling the built-in hip skill (or check Settings / hip.toml skills) rather than inventing config keys.`
-
-/** Ordered materialization entries: relative path → body. */
-export const PRODUCT_SKILL_FILES: ReadonlyArray<{ rel: string; body: string }> = [
-  { rel: 'SKILL.md', body: HIP_SKILL_MD },
-  { rel: 'references/memory.md', body: MEMORY_REFERENCE_MD },
-  { rel: 'references/config-and-data.md', body: CONFIG_REFERENCE_MD },
-  { rel: 'references/troubleshooting.md', body: TROUBLESHOOTING_REFERENCE_MD },
-  { rel: 'references/agents-and-plugins.md', body: AGENTS_PLUGINS_REFERENCE_MD },
-]
+`,
+  }
+] as const

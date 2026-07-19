@@ -1,6 +1,6 @@
 import { useTranslation } from 'react-i18next'
 import * as TabsPrimitive from '@radix-ui/react-tabs'
-import { SlidersHorizontal, Cpu, Bot, Plug, Sparkles, Package, Brain, Link2 } from 'lucide-react'
+import { SlidersHorizontal, Cpu, Bot, Plug, Sparkles, Package, Brain, Link2, BookOpen } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useUiStore, type SettingsPageId } from '@/store/uiStore'
 
@@ -12,6 +12,7 @@ import { SkillConfig } from './SkillConfig'
 import { PluginConfig } from './PluginConfig'
 import { HookConfig } from './HookConfig'
 import { MemoryConfig } from './MemoryConfig'
+import { ProductHelpSettings } from './ProductHelpSettings'
 
 const PAGES = [
   { id: 'general' as const, icon: SlidersHorizontal, labelKey: 'settings.general' as const, Component: GeneralSettings },
@@ -22,6 +23,7 @@ const PAGES = [
   { id: 'plugins' as const, icon: Package, labelKey: 'settings.pluginsLabel' as const, Component: PluginConfig },
   { id: 'hooks' as const, icon: Link2, labelKey: 'settings.hooksLabel' as const, Component: HookConfig },
   { id: 'memory' as const, icon: Brain, labelKey: 'settings.memoryLabel' as const, Component: MemoryConfig },
+  { id: 'help' as const, icon: BookOpen, labelKey: 'settings.productHelp.navLabel' as const, Component: ProductHelpSettings },
 ]
 
 /** Fixed width for the settings category nav (not user-resizable). */

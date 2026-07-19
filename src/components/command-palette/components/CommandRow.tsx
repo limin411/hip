@@ -20,6 +20,7 @@ import {
   Puzzle,
   GitBranch,
   Link2,
+  BookOpen,
   Star,
   type LucideIcon,
 } from 'lucide-react'
@@ -47,6 +48,7 @@ const ICONS: Record<PaletteIconName, LucideIcon> = {
   bot: Bot,
   puzzle: Puzzle,
   'link-2': Link2,
+  'book-open': BookOpen,
 }
 
 function HighlightLabel({ label, search }: { label: string; search?: string }) {

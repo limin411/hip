@@ -44,6 +44,7 @@ const labels: GlobalCommandLabels = {
     plugins: 'Settings: Plugins',
     hooks: 'Settings: Hooks',
     memory: 'Settings: Memory',
+    help: 'Settings: Product help',
   },
   context: {
     diff: 'Show workspace changes',

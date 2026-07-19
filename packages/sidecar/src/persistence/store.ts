@@ -16,6 +16,12 @@ export interface PendingInputRow {
   timeCreated: number
 }
 
+/** Active or trashed session list row (protocol SessionSummary + trash fields). */
+export interface TrashedSessionSummary extends SessionSummary {
+  deletedAt: number
+  deleteDerivedMemories: boolean
+}
+
 /** All persisted reads/writes for sessions. Synchronous (node:sqlite). */
 export class SessionStore {
   constructor(private readonly db: DatabaseSync, private readonly ftsEnabled: boolean) {}
@@ -31,9 +37,35 @@ export class SessionStore {
   }
 
   getSession(id: string) {
-    return this.db.prepare(`SELECT id,title,config,created_at,updated_at,diff_base_sha FROM sessions WHERE id=?`).get(id) as
-      | { id: string; title: string; config: string; created_at: number; updated_at: number; diff_base_sha: string | null }
+    return this.db.prepare(
+      `SELECT id,title,config,created_at,updated_at,diff_base_sha,deleted_at,delete_derived_memories FROM sessions WHERE id=?`,
+    ).get(id) as
+      | {
+          id: string
+          title: string
+          config: string
+          created_at: number
+          updated_at: number
+          diff_base_sha: string | null
+          deleted_at: number | null
+          delete_derived_memories: number
+        }
       | undefined
+  }
+
+  /** True when the session row exists and `deleted_at` is set. */
+  isSessionTrashed(id: string): boolean {
+    const row = this.db.prepare(`SELECT deleted_at FROM sessions WHERE id=?`).get(id) as
+      | { deleted_at: number | null }
+      | undefined
+    return row != null && row.deleted_at != null
+  }
+
+  /** Active sessions only: missing or trashed → undefined. */
+  getActiveSession(id: string) {
+    const row = this.getSession(id)
+    if (!row || row.deleted_at != null) return undefined
+    return row
   }
 
   /** Replace the persisted config blob (e.g. when cwd changes). */
@@ -251,36 +283,79 @@ export class SessionStore {
       SELECT s.id, s.title, s.config AS config, s.updated_at AS updatedAt,
         (SELECT content FROM messages m WHERE m.session_id=s.id ORDER BY seq DESC LIMIT 1) AS preview,
         (SELECT COUNT(*) FROM messages m WHERE m.session_id=s.id) AS messageCount
-      FROM sessions s ORDER BY s.updated_at DESC
+      FROM sessions s
+      WHERE s.deleted_at IS NULL
+      ORDER BY s.updated_at DESC
     `).all() as { id: string; title: string; config: string; updatedAt: number; preview: string | null; messageCount: number }[]
-    return rows.map((r) => {
-      let surface: 'chat' | 'code' = 'code'
-      let cwd: string | undefined
-      try {
-        const cfg = JSON.parse(r.config) as SessionConfig
-        surface = surfaceOf(cfg, r.id)
-        const raw = typeof cfg.cwd === 'string' ? cfg.cwd.trim() : ''
-        if (raw) cwd = raw
-      } catch {
-        surface = 'code'
-      }
-      return {
-        id: r.id,
-        title: r.title,
-        surface,
-        updatedAt: r.updatedAt,
-        messageCount: r.messageCount,
-        preview: (r.preview ?? '').slice(0, PREVIEW_LEN),
-        ...(cwd ? { cwd } : {}),
-      }
-    })
+    return rows.map((r) => this.toSessionSummary(r))
+  }
+
+  /**
+   * Soft-deleted sessions newest-trash-first.
+   * Messages remain in place until hard purge.
+   */
+  listTrashedSessions(): TrashedSessionSummary[] {
+    const rows = this.db.prepare(`
+      SELECT s.id, s.title, s.config AS config, s.updated_at AS updatedAt,
+        s.deleted_at AS deletedAt, s.delete_derived_memories AS deleteDerivedMemories,
+        (SELECT content FROM messages m WHERE m.session_id=s.id ORDER BY seq DESC LIMIT 1) AS preview,
+        (SELECT COUNT(*) FROM messages m WHERE m.session_id=s.id) AS messageCount
+      FROM sessions s
+      WHERE s.deleted_at IS NOT NULL
+      ORDER BY s.deleted_at DESC
+    `).all() as {
+      id: string
+      title: string
+      config: string
+      updatedAt: number
+      deletedAt: number
+      deleteDerivedMemories: number
+      preview: string | null
+      messageCount: number
+    }[]
+    return rows.map((r) => ({
+      ...this.toSessionSummary(r),
+      deletedAt: r.deletedAt,
+      deleteDerivedMemories: !!r.deleteDerivedMemories,
+    }))
+  }
+
+  private toSessionSummary(r: {
+    id: string
+    title: string
+    config: string
+    updatedAt: number
+    preview: string | null
+    messageCount: number
+  }): SessionSummary {
+    let surface: 'chat' | 'code' = 'code'
+    let cwd: string | undefined
+    try {
+      const cfg = JSON.parse(r.config) as SessionConfig
+      surface = surfaceOf(cfg, r.id)
+      const raw = typeof cfg.cwd === 'string' ? cfg.cwd.trim() : ''
+      if (raw) cwd = raw
+    } catch {
+      surface = 'code'
+    }
+    return {
+      id: r.id,
+      title: r.title,
+      surface,
+      updatedAt: r.updatedAt,
+      messageCount: r.messageCount,
+      preview: (r.preview ?? '').slice(0, PREVIEW_LEN),
+      ...(cwd ? { cwd } : {}),
+    }
   }
 
   search(query: string): SearchHit[] {
     const q = query.trim()
     if (!q) return []
     const like = `%${q}%`
-    const titleHits = this.db.prepare(`SELECT id AS sessionId, title, updated_at AS timestamp FROM sessions WHERE title LIKE ? ORDER BY updated_at DESC LIMIT 20`)
+    const titleHits = this.db.prepare(
+      `SELECT id AS sessionId, title, updated_at AS timestamp FROM sessions WHERE deleted_at IS NULL AND title LIKE ? ORDER BY updated_at DESC LIMIT 20`,
+    )
       .all(like) as { sessionId: string; title: string; timestamp: number }[]
     const titleOut: SearchHit[] = titleHits.map((t) => ({ sessionId: t.sessionId, messageId: null, title: t.title, snippet: t.title, timestamp: t.timestamp }))
 
@@ -293,7 +368,7 @@ export class SessionStore {
           snippet(messages_fts, 0, char(1), char(2), '…', 12) AS snippet, m.timestamp AS timestamp
         FROM messages_fts JOIN messages m ON m.rowid = messages_fts.rowid
         JOIN sessions s ON s.id = m.session_id
-        WHERE messages_fts MATCH ? ORDER BY rank LIMIT 50
+        WHERE s.deleted_at IS NULL AND messages_fts MATCH ? ORDER BY rank LIMIT 50
       `).all(literal) as SearchHit[]
       return [...titleOut, ...rows]
     }
@@ -301,7 +376,7 @@ export class SessionStore {
       SELECT m.session_id AS sessionId, m.id AS messageId, s.title AS title,
         substr(m.content,1,80) AS snippet, m.timestamp AS timestamp
       FROM messages m JOIN sessions s ON s.id = m.session_id
-      WHERE m.content LIKE ? ORDER BY m.timestamp DESC LIMIT 50
+      WHERE s.deleted_at IS NULL AND m.content LIKE ? ORDER BY m.timestamp DESC LIMIT 50
     `).all(like) as SearchHit[]
     return [...titleOut, ...rows]
   }
@@ -317,15 +392,153 @@ export class SessionStore {
   }
 
   /**
+   * Soft-delete a session into the product recycle bin.
+   * Keeps messages/checkpoints/scratch; tears down are the caller's job (SessionManager).
+   *
+   * Memory (aligned with design K8):
+   * - session-scoped memory_items → soft-delete (status=deleted)
+   * - memory_stage1 → hard-delete (staging only)
+   * - if deleteDerivedMemories: soft-delete project/global items with this source_session_id
+   * - else leave derived items and keep source_session_id
+   *
+   * @returns true if the session was soft-deleted (or already trashed = idempotent true when row exists)
+   */
+  softDeleteSession(
+    id: string,
+    opts?: { deleteDerivedMemories?: boolean; deletedAt?: number },
+  ): boolean {
+    const runIgnoreMissing = (sql: string, ...params: unknown[]) => {
+      try {
+        this.db.prepare(sql).run(...params)
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : String(e)
+        if (msg.includes('no such table')) return
+        throw e
+      }
+    }
+    const existing = this.getSession(id)
+    if (!existing) return false
+    if (existing.deleted_at != null) return true
+
+    const deletedAt = opts?.deletedAt ?? Date.now()
+    const deleteDerived = opts?.deleteDerivedMemories ? 1 : 0
+
+    this.db.exec('BEGIN')
+    try {
+      const changes = this.db.prepare(
+        `UPDATE sessions SET deleted_at=?, delete_derived_memories=?, updated_at=? WHERE id=? AND deleted_at IS NULL`,
+      ).run(deletedAt, deleteDerived, deletedAt, id).changes
+
+      // Staging is never recoverable from trash; drop eagerly.
+      runIgnoreMissing(`DELETE FROM memory_stage1 WHERE session_id=?`, id)
+      // Hide session-scoped memories from active Memory lists until restore/hard-purge.
+      runIgnoreMissing(
+        `UPDATE memory_items SET status='deleted', updated_at=? WHERE scope='session' AND session_id=? AND status!='deleted'`,
+        deletedAt,
+        id,
+      )
+      if (deleteDerived) {
+        runIgnoreMissing(
+          `UPDATE memory_items SET status='deleted', updated_at=? WHERE source_session_id=? AND status!='deleted'`,
+          deletedAt,
+          id,
+        )
+      }
+      this.db.exec('COMMIT')
+      logInfo('session-trash', 'store.softDelete', {
+        sessionId: id,
+        deletedAt,
+        deleteDerivedMemories: !!deleteDerived,
+        changed: changes > 0,
+      })
+      return true
+    } catch (e) {
+      this.db.exec('ROLLBACK')
+      throw e
+    }
+  }
+
+  /**
+   * Restore a soft-deleted session (clears deleted_at / delete_derived_memories).
+   * Restores session-scoped memory_items that were soft-deleted with the session.
+   * Does **not** auto-restore derived (source_session_id) memories — those stay in Memory trash (design).
+   *
+   * @returns true if a trashed session was restored
+   */
+  restoreSession(id: string, opts?: { restoredAt?: number }): boolean {
+    const runIgnoreMissing = (sql: string, ...params: unknown[]) => {
+      try {
+        this.db.prepare(sql).run(...params)
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : String(e)
+        if (msg.includes('no such table')) return
+        throw e
+      }
+    }
+    const existing = this.getSession(id)
+    if (!existing || existing.deleted_at == null) return false
+
+    const restoredAt = opts?.restoredAt ?? Date.now()
+    this.db.exec('BEGIN')
+    try {
+      const changes = this.db.prepare(
+        `UPDATE sessions SET deleted_at=NULL, delete_derived_memories=0, updated_at=? WHERE id=? AND deleted_at IS NOT NULL`,
+      ).run(restoredAt, id).changes
+      runIgnoreMissing(
+        `UPDATE memory_items SET status='active', updated_at=? WHERE scope='session' AND session_id=? AND status='deleted'`,
+        restoredAt,
+        id,
+      )
+      this.db.exec('COMMIT')
+      logInfo('session-trash', 'store.restore', { sessionId: id, restoredAt, changed: changes > 0 })
+      return changes > 0
+    } catch (e) {
+      this.db.exec('ROLLBACK')
+      throw e
+    }
+  }
+
+  /**
+   * Hard-purge soft-deleted sessions with deleted_at &lt; cutoffMs.
+   * Callers compute cutoff from configured retentionDays (store does not hardcode 7).
+   * @returns purged session ids
+   */
+  purgeTrashedOlderThan(cutoffMs: number): string[] {
+    const rows = this.db.prepare(
+      `SELECT id, delete_derived_memories FROM sessions WHERE deleted_at IS NOT NULL AND deleted_at < ?`,
+    ).all(cutoffMs) as { id: string; delete_derived_memories: number }[]
+    const purged: string[] = []
+    for (const r of rows) {
+      this.deleteSession(r.id, { deleteDerivedMemories: !!r.delete_derived_memories })
+      purged.push(r.id)
+    }
+    if (purged.length) {
+      logInfo('session-trash', 'store.purgeOlderThan', { cutoffMs, count: purged.length, ids: purged })
+    }
+    return purged
+  }
+
+  /**
+   * Convenience: purge using retention days (default product policy is 7; Settings may override).
+   * @param retentionDays must be >= 1
+   */
+  purgeTrashedByRetentionDays(retentionDays: number, nowMs = Date.now()): string[] {
+    const days = Math.max(1, Math.floor(retentionDays))
+    const cutoffMs = nowMs - days * 24 * 60 * 60 * 1000
+    return this.purgeTrashedOlderThan(cutoffMs)
+  }
+
+  /**
    * Delete a session and all related rows (Sprint C option P: true delete for privacy).
    * FK cascades cover messages/agent_runs/tool_calls/checkpoints when present.
    * Event log / session_message / snapshots have no FK to sessions — purge explicitly.
    * Tables that only exist after newer migrations are best-effort (ignore missing).
    *
-   * Memory cleanup (v16):
+   * Memory cleanup (v16 / recycle-bin):
    * - always hard-delete session-scoped memory_items and memory_stage1 for this session
    * - by default null `source_session_id` on retained project/global items
    * - if `deleteDerivedMemories`, hard-delete all memory_items with that source session instead
+   * - when opts omitted, honor stored `sessions.delete_derived_memories` (trash forever / retention)
    */
   deleteSession(id: string, opts?: { deleteDerivedMemories?: boolean }): void {
     const runIgnoreMissing = (sql: string, ...params: unknown[]) => {
@@ -339,10 +552,17 @@ export class SessionStore {
     }
     // Best-effort pre-counts for forensics (visible under HIP_DEBUG via callers; always log via console in store would be too noisy).
     let hadRow = false
+    let deleteDerived = opts?.deleteDerivedMemories
     try {
-      hadRow = !!this.db.prepare(`SELECT 1 FROM sessions WHERE id=?`).get(id)
+      const row = this.db.prepare(`SELECT delete_derived_memories FROM sessions WHERE id=?`).get(id) as
+        | { delete_derived_memories: number }
+        | undefined
+      hadRow = !!row
+      if (deleteDerived === undefined) {
+        deleteDerived = !!row?.delete_derived_memories
+      }
     } catch {
-      /* ignore */
+      /* ignore — column may be missing on partial fixtures */
     }
     this.db.exec('BEGIN')
     try {
@@ -361,7 +581,7 @@ export class SessionStore {
       // Memory tables (v16): may be missing on older fixtures / partial schemas.
       runIgnoreMissing(`DELETE FROM memory_items WHERE scope='session' AND session_id=?`, id)
       runIgnoreMissing(`DELETE FROM memory_stage1 WHERE session_id=?`, id)
-      if (opts?.deleteDerivedMemories) {
+      if (deleteDerived) {
         runIgnoreMissing(`DELETE FROM memory_items WHERE source_session_id=?`, id)
       } else {
         runIgnoreMissing(`UPDATE memory_items SET source_session_id=NULL WHERE source_session_id=?`, id)
@@ -373,7 +593,7 @@ export class SessionStore {
         sessionId: id,
         hadRow,
         deletedRows: changes,
-        deleteDerivedMemories: !!opts?.deleteDerivedMemories,
+        deleteDerivedMemories: !!deleteDerived,
       })
     } catch (e) {
       this.db.exec('ROLLBACK')

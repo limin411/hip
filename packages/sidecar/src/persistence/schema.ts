@@ -541,6 +541,25 @@ export function migrate(db: DatabaseSync): void {
       throw e
     }
   }
+  if (version < 21) {
+    db.exec('BEGIN')
+    try {
+      // Product recycle bin: soft-delete sessions; hard purge after retention.
+      // deleted_at NULL = active; epoch-ms when soft-deleted (write-once until restore).
+      // delete_derived_memories persists the user checkbox for deferred hard purge.
+      db.exec(`ALTER TABLE sessions ADD COLUMN deleted_at INTEGER`)
+      db.exec(`ALTER TABLE sessions ADD COLUMN delete_derived_memories INTEGER NOT NULL DEFAULT 0`)
+      db.exec(`
+        CREATE INDEX IF NOT EXISTS idx_sessions_deleted_at
+          ON sessions(deleted_at) WHERE deleted_at IS NOT NULL;
+      `)
+      db.exec('PRAGMA user_version = 21')
+      db.exec('COMMIT')
+    } catch (e) {
+      db.exec('ROLLBACK')
+      throw e
+    }
+  }
 }
 
 /** Try to create the FTS5 objects. Returns true if FTS is available. */

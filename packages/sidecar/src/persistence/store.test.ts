@@ -494,3 +494,154 @@ describe('SessionStore listSessions surface', () => {
     expect(list.find((s) => s.id === 'ld')!.surface).toBe('code')
   })
 })
+
+describe('SessionStore soft-delete / trash', () => {
+  let store: SessionStore
+  beforeEach(() => { store = freshStore() })
+
+  it('softDelete hides from listSessions and search but keeps messages', () => {
+    store.insertSession({ id: 's1', title: '可搜索标题', config: cfg, createdAt: 1, updatedAt: 1 })
+    store.insertMessage({ id: 'm1', sessionId: 's1', role: 'user', agentId: null, content: '可搜索内容', timestamp: 2 })
+
+    expect(store.softDeleteSession('s1', { deletedAt: 1000 })).toBe(true)
+    expect(store.isSessionTrashed('s1')).toBe(true)
+    expect(store.getActiveSession('s1')).toBeUndefined()
+    expect(store.listSessions()).toHaveLength(0)
+    expect(store.search('可搜索内容')).toHaveLength(0)
+    expect(store.search('可搜索标题')).toHaveLength(0)
+    expect(store.loadMessages('s1')).toHaveLength(1)
+    expect(store.getSession('s1')?.deleted_at).toBe(1000)
+  })
+
+  it('listTrashedSessions returns trash rows newest-first', () => {
+    store.insertSession({ id: 'a', title: 'a', config: cfg, createdAt: 1, updatedAt: 1 })
+    store.insertSession({ id: 'b', title: 'b', config: cfg, createdAt: 1, updatedAt: 2 })
+    store.softDeleteSession('a', { deletedAt: 10 })
+    store.softDeleteSession('b', { deletedAt: 20, deleteDerivedMemories: true })
+    const trash = store.listTrashedSessions()
+    expect(trash.map((t) => t.id)).toEqual(['b', 'a'])
+    expect(trash[0]).toMatchObject({ id: 'b', deletedAt: 20, deleteDerivedMemories: true })
+    expect(trash[1]).toMatchObject({ id: 'a', deletedAt: 10, deleteDerivedMemories: false })
+  })
+
+  it('restoreSession clears deleted_at and returns to active list with messages', () => {
+    store.insertSession({ id: 's1', title: 't', config: cfg, createdAt: 1, updatedAt: 1 })
+    store.insertMessage({ id: 'm1', sessionId: 's1', role: 'user', agentId: null, content: 'hi', timestamp: 2 })
+    store.softDeleteSession('s1', { deletedAt: 50 })
+    expect(store.restoreSession('s1', { restoredAt: 60 })).toBe(true)
+    expect(store.isSessionTrashed('s1')).toBe(false)
+    expect(store.listSessions()).toHaveLength(1)
+    expect(store.loadMessages('s1')).toHaveLength(1)
+    expect(store.listTrashedSessions()).toHaveLength(0)
+    expect(store.restoreSession('s1')).toBe(false)
+  })
+
+  it('softDelete soft-deletes session-scoped memory and stage1; optional derived soft', () => {
+    store.insertSession({ id: 's1', title: 't', config: cfg, createdAt: 1, updatedAt: 1 })
+    const db = store.getDb()
+    const now = 1
+    db.prepare(`
+      INSERT INTO memory_items(
+        id, scope, session_id, kind, title, content, confidence, status, source,
+        source_session_id, tags_json, created_at, updated_at, use_count, pinned
+      ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+    `).run('sess-m', 'session', 's1', 'preference', 'session mem', 'c', 0.5, 'active', 'extract', 's1', '[]', now, now, 0, 0)
+    db.prepare(`
+      INSERT INTO memory_items(
+        id, scope, session_id, kind, title, content, confidence, status, source,
+        source_session_id, tags_json, created_at, updated_at, use_count, pinned
+      ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+    `).run('proj-m', 'project', null, 'preference', 'project mem', 'c', 0.5, 'active', 'extract', 's1', '[]', now, now, 0, 0)
+    db.prepare(`
+      INSERT INTO memory_stage1(
+        id, session_id, raw_memory, rollout_summary, status, selected_for_phase2,
+        source_updated_at, created_at
+      ) VALUES (?,?,?,?,?,?,?,?)
+    `).run('st1', 's1', 'raw', 'sum', 'pending', 0, now, now)
+
+    store.softDeleteSession('s1', { deletedAt: 100, deleteDerivedMemories: true })
+
+    expect(db.prepare(`SELECT status FROM memory_items WHERE id='sess-m'`).get() as { status: string }).toEqual({ status: 'deleted' })
+    expect(db.prepare(`SELECT status FROM memory_items WHERE id='proj-m'`).get() as { status: string }).toEqual({ status: 'deleted' })
+    expect(db.prepare(`SELECT source_session_id AS src FROM memory_items WHERE id='proj-m'`).get() as { src: string }).toEqual({ src: 's1' })
+    expect(db.prepare(`SELECT COUNT(*) AS n FROM memory_stage1 WHERE session_id='s1'`).get() as { n: number }).toEqual({ n: 0 })
+  })
+
+  it('restoreSession reactivates session-scoped memory but not derived soft-deleted items', () => {
+    store.insertSession({ id: 's1', title: 't', config: cfg, createdAt: 1, updatedAt: 1 })
+    const db = store.getDb()
+    const now = 1
+    db.prepare(`
+      INSERT INTO memory_items(
+        id, scope, session_id, kind, title, content, confidence, status, source,
+        source_session_id, tags_json, created_at, updated_at, use_count, pinned
+      ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+    `).run('sess-m', 'session', 's1', 'preference', 'session mem', 'c', 0.5, 'active', 'extract', null, '[]', now, now, 0, 0)
+    db.prepare(`
+      INSERT INTO memory_items(
+        id, scope, session_id, kind, title, content, confidence, status, source,
+        source_session_id, tags_json, created_at, updated_at, use_count, pinned
+      ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+    `).run('proj-m', 'project', null, 'preference', 'project mem', 'c', 0.5, 'active', 'extract', 's1', '[]', now, now, 0, 0)
+
+    store.softDeleteSession('s1', { deletedAt: 100, deleteDerivedMemories: true })
+    store.restoreSession('s1', { restoredAt: 200 })
+
+    expect(db.prepare(`SELECT status FROM memory_items WHERE id='sess-m'`).get() as { status: string }).toEqual({ status: 'active' })
+    expect(db.prepare(`SELECT status FROM memory_items WHERE id='proj-m'`).get() as { status: string }).toEqual({ status: 'deleted' })
+  })
+
+  it('hard delete after soft uses stored delete_derived_memories when opts omitted', () => {
+    store.insertSession({ id: 's1', title: 't', config: cfg, createdAt: 1, updatedAt: 1 })
+    const db = store.getDb()
+    const now = 1
+    db.prepare(`
+      INSERT INTO memory_items(
+        id, scope, kind, title, content, confidence, status, source,
+        source_session_id, tags_json, created_at, updated_at, use_count, pinned
+      ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+    `).run('proj-m', 'project', 'preference', 'project mem', 'c', 0.5, 'active', 'extract', 's1', '[]', now, now, 0, 0)
+
+    store.softDeleteSession('s1', { deletedAt: 100, deleteDerivedMemories: true })
+    store.deleteSession('s1') // honor stored flag
+
+    expect(db.prepare(`SELECT COUNT(*) AS n FROM sessions WHERE id='s1'`).get() as { n: number }).toEqual({ n: 0 })
+    expect(db.prepare(`SELECT COUNT(*) AS n FROM memory_items WHERE id='proj-m'`).get() as { n: number }).toEqual({ n: 0 })
+  })
+
+  it('purgeTrashedOlderThan hard-deletes only expired trash rows', () => {
+    store.insertSession({ id: 'old', title: 'old', config: cfg, createdAt: 1, updatedAt: 1 })
+    store.insertSession({ id: 'new', title: 'new', config: cfg, createdAt: 1, updatedAt: 2 })
+    store.insertMessage({ id: 'm-old', sessionId: 'old', role: 'user', agentId: null, content: 'old body', timestamp: 1 })
+    store.insertMessage({ id: 'm-new', sessionId: 'new', role: 'user', agentId: null, content: 'new body', timestamp: 2 })
+    store.softDeleteSession('old', { deletedAt: 1000 })
+    store.softDeleteSession('new', { deletedAt: 5000 })
+
+    const purged = store.purgeTrashedOlderThan(3000)
+    expect(purged).toEqual(['old'])
+    expect(store.getSession('old')).toBeUndefined()
+    expect(store.loadMessages('old')).toHaveLength(0)
+    expect(store.isSessionTrashed('new')).toBe(true)
+    expect(store.loadMessages('new')).toHaveLength(1)
+  })
+
+  it('purgeTrashedByRetentionDays uses parameterized retention (not hardcoded)', () => {
+    store.insertSession({ id: 's1', title: 't', config: cfg, createdAt: 1, updatedAt: 1 })
+    const now = 10 * 24 * 60 * 60 * 1000 // day 10
+    store.softDeleteSession('s1', { deletedAt: now - 8 * 24 * 60 * 60 * 1000 }) // 8 days ago
+    expect(store.purgeTrashedByRetentionDays(7, now)).toEqual(['s1'])
+
+    store.insertSession({ id: 's2', title: 't', config: cfg, createdAt: 1, updatedAt: 1 })
+    store.softDeleteSession('s2', { deletedAt: now - 3 * 24 * 60 * 60 * 1000 }) // 3 days ago
+    expect(store.purgeTrashedByRetentionDays(7, now)).toEqual([])
+    expect(store.isSessionTrashed('s2')).toBe(true)
+  })
+
+  it('softDelete is idempotent and missing id returns false', () => {
+    expect(store.softDeleteSession('missing')).toBe(false)
+    store.insertSession({ id: 's1', title: 't', config: cfg, createdAt: 1, updatedAt: 1 })
+    expect(store.softDeleteSession('s1', { deletedAt: 1 })).toBe(true)
+    expect(store.softDeleteSession('s1', { deletedAt: 2 })).toBe(true)
+    expect(store.getSession('s1')?.deleted_at).toBe(1) // write-once until restore
+  })
+})

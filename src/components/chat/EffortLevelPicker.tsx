@@ -62,7 +62,8 @@ export function EffortLevelPicker() {
     <DropdownMenu modal={false}>
       <DropdownMenuTrigger asChild>
         <ComposerChip
-          active={current !== 'medium' && current !== 'none'}
+          // Never fill the chip — effort is a quiet label, not a toggle state.
+          active={false}
           title={busy ? t('chat.effort.busyTitle') : t('chat.effort.label')}
           aria-label={chipText}
           data-testid="effort-chip"

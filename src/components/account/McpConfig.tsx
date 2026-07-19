@@ -205,8 +205,14 @@ export function McpConfig() {
           <h2 className="text-title font-semibold text-ink">{t('settings.mcp.title')}</h2>
           <p className="mt-1 text-body text-ink-secondary">{t('settings.mcp.intro')}</p>
         </div>
-        <Button size="sm" onClick={() => setEditing({ mode: 'add' })}>
-          <Plus size={15} />
+        <Button
+          type="button"
+          variant="primary"
+          size="md"
+          className="gap-1.5 rounded-lg"
+          onClick={() => setEditing({ mode: 'add' })}
+        >
+          <Plus size={16} />
           {t('settings.mcp.add')}
         </Button>
       </div>

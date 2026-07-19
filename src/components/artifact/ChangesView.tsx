@@ -9,7 +9,7 @@ import { formatRelativeTime } from '@/lib/datetime'
 import { DiffDisplay, Empty } from './DiffDisplay'
 import { DeclarativeContextMenu } from '@/components/context-menu'
 import { Button } from '@/components/ui/Button'
-import { SegmentedControl } from '@/components/ui/SegmentedControl'
+import { cn } from '@/lib/utils'
 
 export function ChangesView() {
   const { t, i18n } = useTranslation()
@@ -52,19 +52,46 @@ export function ChangesView() {
     <div className="flex h-full flex-col" data-testid="changes-view">
       {/* uncommitted (top) */}
       <div className="flex min-h-0 flex-[3] flex-col border-b border-border/80">
-        <div className="flex h-8 shrink-0 items-center justify-between border-b border-border/60 px-3">
-          <span className="text-caption font-medium text-ink-tertiary">{t('artifact.changesView.uncommitted')}</span>
-          <SegmentedControl
-            data-testid="diff-view-toggle"
+        {/* Single toolbar row — no extra hairline under the label (avoids sandwiching the toggle). */}
+        <div className="flex h-8 shrink-0 items-center justify-between gap-2 px-3">
+          <span className="text-caption font-medium text-ink-tertiary">
+            {t('artifact.changesView.uncommitted')}
+          </span>
+          <div
+            role="tablist"
             aria-label={t('artifact.diffView.viewUnified')}
-            size="sm"
-            value={diffViewMode}
-            onChange={setDiffViewMode}
-            options={[
-              { value: 'unified', label: t('artifact.diffView.viewUnified') },
-              { value: 'split', label: t('artifact.diffView.viewSplit') },
-            ]}
-          />
+            data-testid="diff-view-toggle"
+            className="inline-flex items-center gap-0.5"
+          >
+            {(
+              [
+                ['unified', t('artifact.diffView.viewUnified')],
+                ['split', t('artifact.diffView.viewSplit')],
+              ] as const
+            ).map(([mode, label]) => {
+              const selected = diffViewMode === mode
+              return (
+                <button
+                  key={mode}
+                  type="button"
+                  role="tab"
+                  aria-selected={selected}
+                  data-mode={mode}
+                  data-testid={`diff-view-toggle-${mode}`}
+                  onClick={() => setDiffViewMode(mode)}
+                  className={cn(
+                    'rounded-md px-2 py-0.5 text-caption font-medium transition-colors duration-chrome',
+                    'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring/40',
+                    selected
+                      ? 'text-ink'
+                      : 'text-ink-tertiary hover:text-ink-secondary',
+                  )}
+                >
+                  {label}
+                </button>
+              )
+            })}
+          </div>
         </div>
         <div className="min-h-0 flex-1 overflow-y-auto">
           {diff.status !== 'ready' && !diff.state ? (
@@ -89,7 +116,7 @@ export function ChangesView() {
       </div>
       {/* commit log (bottom) — read-only */}
       <div className="flex min-h-0 flex-[2] flex-col">
-        <div className="flex h-8 shrink-0 items-center border-b border-border/60 px-3">
+        <div className="flex h-8 shrink-0 items-center px-3">
           <span className="text-caption font-medium text-ink-tertiary">{t('artifact.changesView.commitLog')}</span>
         </div>
         <div className="min-h-0 flex-1 overflow-y-auto">

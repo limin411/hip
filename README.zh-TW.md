@@ -118,11 +118,22 @@ LangSmith **Thread**。根 run 的 **name** 也是 session id。LLM span 名為
 | `~/.hip/logs/` | Sidecar / Tauri 日誌 |
 | `~/.hip/skills/`、`plugins/`、`scratch/` | 技能、外掛、安裝暫存區 |
 | `~/.hip/memories/` | 開啟記憶後的 Markdown 匯出鏡像 |
+| `~/.hip/trash/` | 產品回收站隔離區（知識庫檔案；工作階段用 SQLite `deleted_at`） |
 
-刪除工作階段會移除該工作階段的 DB 列（含事件日誌）。
+### 回收站（軟刪除）
+
+**桌面 UI** 中刪除 Chat/Code 工作階段或知識庫空間/文件時，會先進入側欄 **回收站**（位於歷史會話上方）。可恢復或永久刪除；超過保留期後自動清除。
+
+| 設定 | 位置 |
+|------|------|
+| 保留天數（預設 **7**，範圍 1–365） | **設定 → 一般**，或 `~/.hip/config/hip.toml` 中 `[trash] retentionDays = 7` |
+
+- **UI 刪除** → 軟刪除（可恢復）。
+- **CLI** `hip session delete <id> --yes` → **永久**硬刪除（不經回收站）。
+- **記憶**回收站仍在 **設定 → 記憶**（預設 30 天，獨立策略）。
 
 ```bash
-# 可選：大量刪除後回收閒置頁（須先關閉應用）
+# 可選：大量永久刪除後回收閒置頁（須先關閉應用）
 sqlite3 ~/.hip/db/hip.db 'VACUUM;'
 ```
 
@@ -182,7 +193,7 @@ yarn cli:dev repl --cwd .
 | `--stream` | 人類可讀 transcript（text \| tools \| all \| none） |
 | `--hitl auto` | 自動批准工具權限（**繞過 GUI**） |
 | `--hitl prompt` | 無 GUI 客戶端時等待 GUI 或 TTY |
-| `session *` | 在共用工作階段上 list/show/delete/send |
+| `session *` | list/show/send；`session delete` 為**永久**刪除（UI 軟刪進回收站） |
 | `repl` | 多輪互動聊天 |
 | `HIP_CLI_DEV_SPAWN=1` | 僅開發：隔離 spawn（絕不使用產品 DB） |
 

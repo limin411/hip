@@ -1264,7 +1264,9 @@ export const zhTW = {
     "emptyConfirmTitle": "清空回收站？",
     "emptyConfirmBody": "將永久刪除回收站中的 {{count}} 個項目，此操作無法復原。",
     "daysLeft": "剩餘 {{days}} 天",
-    "restoredToast": "已從回收站恢復"
+    "restoredToast": "已從回收站恢復",
+    "memoryTrashNote": "長期記憶回收站在 設定 → 記憶（預設 30 天，獨立策略）。",
+    "openMemorySettings": "開啟記憶設定"
   },
   "account": {
     "menu": "賬戶選單",

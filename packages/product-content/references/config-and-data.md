@@ -17,6 +17,16 @@
 | `~/.hip/memories/` | Memory markdown mirrors |
 | `~/.hip/builtin-skills/` | Built-in progressive product skills (e.g. this `hip` skill) |
 | `~/.hip/scratch/`, worktrees | Scratch / parallel worktree helpers |
+| `~/.hip/trash/` | Product recycle bin (knowledge FS quarantine; sessions soft-delete via SQLite) |
+
+### Recycle bin & soft-delete
+
+| Behavior | Notes |
+|----------|--------|
+| UI delete (Chat / Code / Knowledge) | Soft-delete → sidebar **Recycle bin** (above History) |
+| Retention | Default **7** days; **Settings → General** or `hip.toml` `[trash] retentionDays` (1–365) |
+| CLI `hip session delete --yes` | **Permanent** hard-delete (not the recycle bin) |
+| Memory trash | Still **Settings → Memory** (separate retention, default 30 days) |
 
 Project overrides often live under `<project>/.hip/` (e.g. `.hip/skills/`, `.hip/hip.toml`).
 

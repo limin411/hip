@@ -1305,6 +1305,8 @@ export const zhCN = {
       emptyConfirmBody: '将永久删除回收站中的 {{count}} 个条目，此操作无法撤销。',
       daysLeft: '剩余 {{days}} 天',
       restoredToast: '已从回收站恢复',
+      memoryTrashNote: '长期记忆回收站在 设置 → 记忆（默认 30 天，独立策略）。',
+      openMemorySettings: '打开记忆设置',
     },
     account: {
       menu: '账户菜单',

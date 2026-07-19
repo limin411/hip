@@ -5,7 +5,7 @@
 | **Title** | Unified Recycle Bin above History: soft-delete + 7-day retention for Chat, Code, and Knowledge |
 | **Author** | TBD |
 | **Date** | 2026-07-19 |
-| **Status** | Draft (rev 3 — user decisions incorporated) |
+| **Status** | Implemented (rev 3 design; PRs 1–5 on `dev`) |
 | **Primary scope** | Soft-delete data model (sessions + knowledge), unified trash UI in left sidebar, restore / permanent delete / empty / auto-purge |
 | **Workspace** | `/Users/lijiamin/data/my-github/hip` |
 | **Builds on** | Memory soft-delete + `runTrashRetentionJob` (reference pattern only); session hard-delete pipeline; knowledge filesystem CRUD; `SidebarAccountFooter` history entry |

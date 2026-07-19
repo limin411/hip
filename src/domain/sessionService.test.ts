@@ -970,6 +970,15 @@ describe('workspace diff', () => {
     expect(useUiStore.getState().activeView).toBe('history')
   })
 
+  it('openTrashPageForE2e sets activeView trash and requests trash list', () => {
+    useUiStore.setState({ activeView: 'chat' })
+    const t = new FakeTransport()
+    const svc = new SessionService(t)
+    svc.openTrashPageForE2e()
+    expect(useUiStore.getState().activeView).toBe('trash')
+    expect(t.sent.some((m) => (m as { type: string }).type === 'session:trash:list')).toBe(true)
+  })
+
   it('simulatePluginInstallError sets pluginInstall result failure', () => {
     const t = new FakeTransport()
     const svc = new SessionService(t)

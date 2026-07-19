@@ -984,6 +984,12 @@ export class SessionService {
     useUiStore.getState().setActiveView('history')
   }
 
+  /** E2E: open product Recycle Bin via uiStore. */
+  openTrashPageForE2e(): void {
+    useUiStore.getState().setActiveView('trash')
+    this.requestTrashList()
+  }
+
   /** E2E T2: install failure payload (UI must have submitted form to show error). */
   simulatePluginInstallError(error = 'e2e package structure invalid'): void {
     this.receive({ type: 'plugin:install:result', ok: false, error })
@@ -2125,6 +2131,8 @@ export type HipE2EHooks = {
   openSettingsPageForE2e: (page?: string) => void
   /** E2E: open Session History via store. */
   openHistoryPageForE2e: () => void
+  /** E2E: open Recycle Bin via store. */
+  openTrashPageForE2e: () => void
   simulatePluginInstallError: (error?: string) => void
   /** Cross-session memory (WS via SessionService). */
   getMemoryConfig: () => Promise<MemoryFileConfig>
@@ -2254,6 +2262,7 @@ function installE2eHooks(svc: SessionService): void {
     closeCommandPaletteForE2e: () => svc.closeCommandPaletteForE2e(),
     openSettingsPageForE2e: (page) => svc.openSettingsPageForE2e(page),
     openHistoryPageForE2e: () => svc.openHistoryPageForE2e(),
+    openTrashPageForE2e: () => svc.openTrashPageForE2e(),
     simulatePluginInstallError: (error) => svc.simulatePluginInstallError(error),
     getMemoryConfig: () => svc.getMemoryConfig(),
     setMemoryConfig: (partial) => svc.setMemoryConfig(partial),

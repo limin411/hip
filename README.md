@@ -145,11 +145,22 @@ are **not** forwarded — the agent sees the full MCP surface.
 | `~/.hip/logs/` | Sidecar / Tauri logs |
 | `~/.hip/skills/`, `plugins/`, `scratch/` | Skills, plugins, install scratch |
 | `~/.hip/memories/` | Markdown export mirrors when memory is enabled |
+| `~/.hip/trash/` | Product recycle bin quarantine (knowledge FS payloads; sessions use SQLite `deleted_at`) |
 
-Session delete removes DB rows for that session (including event log).
+### Recycle bin (soft-delete)
+
+In the **desktop UI**, deleting Chat/Code sessions or Knowledge spaces/docs moves them to **Recycle bin** (sidebar, above History). Items can be restored or permanently deleted; they auto-purge after a retention period.
+
+| Setting | Location |
+|---------|----------|
+| Retention days (default **7**, range 1–365) | **Settings → General**, or `~/.hip/config/hip.toml` → `[trash] retentionDays = 7` |
+
+- **UI delete** → soft-delete (recoverable).
+- **CLI** `hip session delete <id> --yes` → **permanent** hard-delete (does not use the recycle bin).
+- **Memory** trash remains under **Settings → Memory** (separate 30-day default).
 
 ```bash
-# Optional: reclaim free pages after large deletes (app must be closed)
+# Optional: reclaim free pages after large permanent deletes (app must be closed)
 sqlite3 ~/.hip/db/hip.db 'VACUUM;'
 ```
 
@@ -196,6 +207,7 @@ yarn cli:dev run --stream all "summarize README.md"
 # Sessions (shared with GUI)
 yarn cli:dev session list
 yarn cli:dev session show <id-prefix> --limit 20
+# Permanent hard-delete (not the UI recycle bin)
 yarn cli:dev session delete <id> --yes
 
 # Interactive multi-turn REPL (TTY; HITL prefers GUI when present)
@@ -210,7 +222,7 @@ yarn cli:dev repl --cwd .
 | `--stream` | Human transcript (text \| tools \| all \| none) |
 | `--hitl auto` | Auto-approve tool permissions (**bypasses GUI**) |
 | `--hitl prompt` | Wait for GUI or TTY when no GUI client |
-| `session *` | List/show/delete/send on shared sessions |
+| `session *` | List/show/send; `session delete` is **permanent** (UI soft-deletes to recycle bin) |
 | `repl` | Multi-turn interactive chat |
 | `HIP_CLI_DEV_SPAWN=1` | Dev only: isolated spawn (never product DB) |
 

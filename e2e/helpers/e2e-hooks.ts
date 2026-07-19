@@ -42,6 +42,7 @@ type HipE2E = {
   closeCommandPaletteForE2e: () => void
   openSettingsPageForE2e?: (page?: string) => void
   openHistoryPageForE2e?: () => void
+  openTrashPageForE2e?: () => void
   simulatePluginInstallError: (error?: string) => void
   getMemoryConfig?: () => Promise<Record<string, unknown>>
   setMemoryConfig?: (partial: Record<string, unknown>) => Promise<Record<string, unknown>>
@@ -226,6 +227,15 @@ export async function openHistoryPageForE2e(): Promise<void> {
     const hooks = (window as unknown as { __hipE2E?: HipE2E }).__hipE2E
     if (!hooks?.openHistoryPageForE2e) throw new Error('__hipE2E.openHistoryPageForE2e missing')
     hooks.openHistoryPageForE2e()
+  })
+}
+
+/** Open Recycle Bin via uiStore (DEV bridge). */
+export async function openTrashPageForE2e(): Promise<void> {
+  await browser.execute(() => {
+    const hooks = (window as unknown as { __hipE2E?: HipE2E }).__hipE2E
+    if (!hooks?.openTrashPageForE2e) throw new Error('__hipE2E.openTrashPageForE2e missing')
+    hooks.openTrashPageForE2e()
   })
 }
 

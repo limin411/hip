@@ -278,9 +278,16 @@ export async function sessionSend(
   }
 }
 
+/**
+ * Permanent hard-delete via `session:delete`.
+ * Unlike the desktop UI (soft-delete → recycle bin), CLI always purges immediately.
+ */
 export async function sessionDelete(idArg: string, opts: SessionCmdOpts = {}): Promise<number> {
   if (!opts.yes) {
-    process.stderr.write('Refusing to delete without --yes\n')
+    process.stderr.write(
+      'Refusing to permanently delete without --yes\n' +
+        '(CLI hard-deletes; UI moves sessions to the recycle bin instead.)\n',
+    )
     return 2
   }
   const conn = await connectSidecar({
@@ -313,9 +320,9 @@ export async function sessionDelete(idArg: string, opts: SessionCmdOpts = {}): P
     })
     await deletedP
     if (opts.json) {
-      process.stdout.write(JSON.stringify({ deleted: id }) + '\n')
+      process.stdout.write(JSON.stringify({ deleted: id, permanent: true }) + '\n')
     } else {
-      process.stdout.write(`deleted ${id}\n`)
+      process.stdout.write(`permanently deleted ${id}\n`)
     }
     return 0
   } catch (err) {

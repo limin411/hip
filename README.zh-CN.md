@@ -118,11 +118,22 @@ LangSmith **Thread**。根 run 的 **name** 也是 session id。LLM span 名为
 | `~/.hip/logs/` | Sidecar / Tauri 日志 |
 | `~/.hip/skills/`、`plugins/`、`scratch/` | 技能、插件、安装临时区 |
 | `~/.hip/memories/` | 开启记忆后的 Markdown 导出镜像 |
+| `~/.hip/trash/` | 产品回收站隔离区（知识库文件；会话用 SQLite `deleted_at`） |
 
-删除会话会移除该会话的 DB 行（含事件日志）。
+### 回收站（软删除）
+
+**桌面 UI** 中删除 Chat/Code 会话或知识库空间/文档时，会先进入侧栏 **回收站**（位于历史会话上方）。可恢复或永久删除；超过保留期后自动清除。
+
+| 设置 | 位置 |
+|------|------|
+| 保留天数（默认 **7**，范围 1–365） | **设置 → 通用**，或 `~/.hip/config/hip.toml` 中 `[trash] retentionDays = 7` |
+
+- **UI 删除** → 软删除（可恢复）。
+- **CLI** `hip session delete <id> --yes` → **永久**硬删除（不经过回收站）。
+- **记忆**回收站仍在 **设置 → 记忆**（默认 30 天，独立策略）。
 
 ```bash
-# 可选：大量删除后回收空闲页（须先关闭应用）
+# 可选：大量永久删除后回收空闲页（须先关闭应用）
 sqlite3 ~/.hip/db/hip.db 'VACUUM;'
 ```
 
@@ -165,7 +176,7 @@ yarn cli:dev run --stream none \
 # 人类可读流模式：text | tools | all | none
 yarn cli:dev run --stream all "summarize README.md"
 
-# 会话（与 GUI 共享）
+# 会话（与 GUI 共享；delete 为永久硬删，非 UI 回收站）
 yarn cli:dev session list
 yarn cli:dev session show <id-prefix> --limit 20
 yarn cli:dev session delete <id> --yes
@@ -182,7 +193,7 @@ yarn cli:dev repl --cwd .
 | `--stream` | 人类可读 transcript（text \| tools \| all \| none） |
 | `--hitl auto` | 自动批准工具权限（**绕过 GUI**） |
 | `--hitl prompt` | 无 GUI 客户端时等待 GUI 或 TTY |
-| `session *` | 在共享会话上 list/show/delete/send |
+| `session *` | list/show/send；`session delete` 为**永久**删除（UI 软删进回收站） |
 | `repl` | 多轮交互聊天 |
 | `HIP_CLI_DEV_SPAWN=1` | 仅开发：隔离 spawn（绝不使用产品 DB） |
 

@@ -140,10 +140,12 @@ async function main(): Promise<void> {
     })
   session
     .command('delete')
-    .description('Delete a session (requires --yes)')
+    .description(
+      'Permanently delete a session (hard delete; not the UI recycle bin). Requires --yes',
+    )
     .argument('<id>', 'Session id or unique prefix')
-    .option('--yes', 'Confirm deletion')
-    .option('--delete-derived-memories', 'Also delete memories derived from the session')
+    .option('--yes', 'Confirm permanent deletion')
+    .option('--delete-derived-memories', 'Also permanently delete memories derived from the session')
     .option('--json', 'Emit JSON result')
     .option('--isolate', 'Use temp isolation DB')
     .option('--port <n>', 'Attach port', (v) => Number(v))

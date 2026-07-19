@@ -21,6 +21,7 @@ import {
   type KnowledgeTrashItem,
 } from '@/ipc/knowledge'
 import { useKnowledgeStore } from '@/store/knowledgeStore'
+import { useUiStore } from '@/store/uiStore'
 import { toast } from 'sonner'
 
 const PAGE_SIZE = 20
@@ -158,6 +159,20 @@ export function RecycleBinPage() {
       </div>
       <p className="mb-4 text-meta text-ink-tertiary">
         {t('trash.subtitle', { retentionDays })}
+      </p>
+      <p className="mb-4 text-meta text-ink-tertiary">
+        {t('trash.memoryTrashNote')}{' '}
+        <button
+          type="button"
+          className="text-accent-strong underline-offset-2 hover:underline"
+          data-testid="recycle-bin-memory-settings-link"
+          onClick={() => {
+            useUiStore.getState().setSettingsPage('memory')
+            useUiStore.getState().setActiveView('settings')
+          }}
+        >
+          {t('trash.openMemorySettings')}
+        </button>
       </p>
 
       <div className="relative mb-4 max-w-md">

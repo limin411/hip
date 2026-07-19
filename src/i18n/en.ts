@@ -1336,6 +1336,9 @@ export const en = {
         'Permanently delete all {{count}} item(s) in the recycle bin. This cannot be undone.',
       daysLeft: '{{days}} days left',
       restoredToast: 'Restored from recycle bin',
+      memoryTrashNote:
+        'Long-term memory trash lives under Settings → Memory (default 30 days, separate policy).',
+      openMemorySettings: 'Open Memory settings',
     },
     account: {
       menu: 'Account menu',

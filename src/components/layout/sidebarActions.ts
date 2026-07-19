@@ -6,7 +6,11 @@ import { sessionService } from '@/domain'
 import { useDomainStore } from '@/domain'
 import { surfaceOf } from '@/lib/sessions'
 import { useKnowledgeStore } from '@/store/knowledgeStore'
-import { useUiStore, type SidebarSection } from '@/store/uiStore'
+import {
+  useUiStore,
+  type PlaceholderSidebarSection,
+  type SidebarSection,
+} from '@/store/uiStore'
 
 /** Leave knowledge safely. Flush only — caller sets destination. No-op if not on knowledge. */
 export async function leaveKnowledge(): Promise<void> {
@@ -75,6 +79,15 @@ export async function enterSection(section: 'projects' | 'chats'): Promise<void>
   sessionService.setSurface(section === 'projects' ? 'code' : 'chat')
 }
 
+/** Enter a primary-nav placeholder (workbench / terminals / tasks). */
+export async function enterPlaceholderSection(section: PlaceholderSidebarSection): Promise<void> {
+  if (useUiStore.getState().activeView === 'knowledge') {
+    await leaveKnowledge()
+  }
+  useUiStore.getState().setSidebarSection(section)
+  useUiStore.getState().setActiveView(section)
+}
+
 export async function selectSessionFromSidebar(id: string): Promise<void> {
   if (useUiStore.getState().activeView === 'knowledge') {
     await leaveKnowledge()
@@ -135,12 +148,28 @@ export async function openTrashFromChrome(): Promise<void> {
   })
 }
 
+export async function openAutomationFromChrome(): Promise<void> {
+  const wasKnowledge = useUiStore.getState().activeView === 'knowledge'
+  if (wasKnowledge) {
+    await leaveKnowledge()
+    assignSectionAfterLeavingKnowledge()
+  }
+  useUiStore.getState().setActiveView('automation')
+}
+
 /** MainToolbar / special-view back — keep section in sync with restored view. */
 export function handleMainToolbarBack(): void {
-  const target = useUiStore.getState().previousView ?? 'chat'
+  const target = useUiStore.getState().previousView ?? 'workbench'
   useUiStore.getState().setActiveView(target)
   if (target === 'knowledge') {
     useUiStore.getState().setSidebarSection('knowledge')
+  } else if (
+    target === 'workbench' ||
+    target === 'terminals' ||
+    target === 'tasks' ||
+    target === 'automation'
+  ) {
+    useUiStore.getState().setSidebarSection(target)
   } else if (target === 'chat' || target === 'code') {
     useUiStore.getState().setSidebarSection(target === 'code' ? 'projects' : 'chats')
   }

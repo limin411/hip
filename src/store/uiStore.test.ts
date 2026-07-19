@@ -345,12 +345,12 @@ describe('uiStore persistence partialize', () => {
     expect(persisted).not.toHaveProperty('openSessionIds')
   })
 
-  it('merge strips legacy activeView / tabs / knowledge so cold launch stays on chat', () => {
+  it('merge strips legacy activeView / tabs / knowledge so cold launch stays on workbench', () => {
     expect(isEphemeralActiveView('knowledge')).toBe(true)
 
     const current = {
-      activeView: 'chat' as const,
-      sidebarSection: 'chats' as const,
+      activeView: 'workbench' as const,
+      sidebarSection: 'workbench' as const,
       theme: 'system' as const,
       density: 'comfortable' as const,
     }
@@ -365,8 +365,8 @@ describe('uiStore persistence partialize', () => {
       },
       current,
     )
-    expect(merged.activeView).toBe('chat')
-    expect(merged.sidebarSection).toBe('chats')
+    expect(merged.activeView).toBe('workbench')
+    expect(merged.sidebarSection).toBe('workbench')
     expect(merged).not.toHaveProperty('openSessionIds')
     expect(merged).not.toHaveProperty('knowledgeTabOpen')
     expect(merged.theme).toBe('dark')
@@ -399,13 +399,13 @@ describe('uiStore persistence partialize', () => {
     expect(merged.density).toBe('comfortable')
   })
 
-  it('applyColdLaunchShell forces chat section', () => {
+  it('applyColdLaunchShell forces workbench section', () => {
     useUiStore.setState({
       activeView: 'knowledge',
       sidebarSection: 'knowledge',
     })
     applyColdLaunchShell()
-    expect(useUiStore.getState().activeView).toBe('chat')
-    expect(useUiStore.getState().sidebarSection).toBe('chats')
+    expect(useUiStore.getState().activeView).toBe('workbench')
+    expect(useUiStore.getState().sidebarSection).toBe('workbench')
   })
 })

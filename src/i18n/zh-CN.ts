@@ -1347,7 +1347,15 @@ export const zhCN = {
       code: '编码',
       trash: '回收站',
       history: '历史会话',
+      automation: '自动化',
       settings: '设置',
+    },
+    placeholder: {
+      comingSoon: '功能开发中，敬请期待',
+      workbench: '工作台即将上线，用于总览今日事项与快捷入口。',
+      terminals: '终端管理即将上线，用于集中管理多路终端会话。',
+      tasks: '事项追踪即将上线，用于跟进任务与待办。',
+      automation: '自动化即将上线，用于配置工作流与定时任务。',
     },
     tabs: {
       closeTab: '关闭标签页',
@@ -1365,9 +1373,13 @@ export const zhCN = {
       expand: '显示侧边栏',
       expandAria: '显示左侧边栏',
       nav: {
+        workbench: '工作台',
         knowledge: '知识库',
         projects: '项目',
         chats: '对话',
+        terminals: '终端管理',
+        tasks: '事项追踪',
+        automation: '自动化',
       },
       list: {
         spaces: '知识空间',

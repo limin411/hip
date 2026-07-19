@@ -37,7 +37,8 @@ export type PaletteIconName =
   | 'book-open'
 
 export interface CommandWhen {
-  views?: Array<'chat' | 'code' | 'history' | 'settings' | 'knowledge'>
+  /** Restrict command visibility to these shell views (see ActiveView). */
+  views?: import('@/store/uiStore').ActiveView[]
   requiresSession?: boolean
   surfaces?: Array<'chat' | 'code'>
   enabled?: boolean

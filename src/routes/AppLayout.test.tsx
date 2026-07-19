@@ -71,4 +71,28 @@ describe('AppLayout', () => {
     expect(screen.getByTestId('settings-page')).toBeInTheDocument()
     expect(screen.getByTestId('main-toolbar')).toBeInTheDocument()
   })
+
+  it('renders workbench placeholder as default home view', () => {
+    useUiStore.setState({ activeView: 'workbench', sidebarSection: 'workbench' })
+    render(<AppLayout />, { wrapper: MemoryRouter })
+    expect(screen.getByTestId('placeholder-workbench')).toBeInTheDocument()
+  })
+
+  it('renders terminals placeholder', () => {
+    useUiStore.setState({ activeView: 'terminals' })
+    render(<AppLayout />, { wrapper: MemoryRouter })
+    expect(screen.getByTestId('placeholder-terminals')).toBeInTheDocument()
+  })
+
+  it('renders tasks placeholder', () => {
+    useUiStore.setState({ activeView: 'tasks' })
+    render(<AppLayout />, { wrapper: MemoryRouter })
+    expect(screen.getByTestId('placeholder-tasks')).toBeInTheDocument()
+  })
+
+  it('renders automation placeholder', () => {
+    useUiStore.setState({ activeView: 'automation' })
+    render(<AppLayout />, { wrapper: MemoryRouter })
+    expect(screen.getByTestId('placeholder-automation')).toBeInTheDocument()
+  })
 })

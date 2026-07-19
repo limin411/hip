@@ -1307,7 +1307,15 @@ export const zhTW = {
     "code": "編碼",
     "trash": "回收站",
     "history": "歷史會話",
+    "automation": "自動化",
     "settings": "設定"
+  },
+  "placeholder": {
+    "comingSoon": "功能開發中，敬請期待",
+    "workbench": "工作台即將上線，用於總覽今日事項與快捷入口。",
+    "terminals": "終端管理即將上線，用於集中管理多路終端會話。",
+    "tasks": "事項追蹤即將上線，用於跟進任務與待辦。",
+    "automation": "自動化即將上線，用於設定工作流與定時任務。"
   },
   "tabs": {
     "closeTab": "關閉標籤頁",
@@ -1325,9 +1333,13 @@ export const zhTW = {
     "expand": "顯示側邊欄",
     "expandAria": "顯示左側邊欄",
     "nav": {
+      "workbench": "工作台",
       "knowledge": "知識庫",
       "projects": "專案",
-      "chats": "對話"
+      "chats": "對話",
+      "terminals": "終端管理",
+      "tasks": "事項追蹤",
+      "automation": "自動化"
     },
     "list": {
       "spaces": "知識空間",

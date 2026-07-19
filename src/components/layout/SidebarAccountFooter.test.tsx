@@ -26,6 +26,7 @@ describe('SidebarAccountFooter', () => {
     const settings = screen.getByTestId('account-settings-button')
     expect(trash.compareDocumentPosition(history) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
     expect(history.compareDocumentPosition(settings) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    expect(screen.queryByTestId('account-automation-button')).not.toBeInTheDocument()
     expect(screen.getByText('nav.trash')).toBeInTheDocument()
     expect(screen.getByText('nav.history')).toBeInTheDocument()
     expect(screen.getByText('nav.settings')).toBeInTheDocument()

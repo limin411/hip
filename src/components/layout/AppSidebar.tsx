@@ -3,14 +3,18 @@ import { useTranslation } from 'react-i18next'
 import {
   AlertTriangle,
   BookOpen,
+  CheckSquare,
   ChevronDown,
   ChevronRight,
   Code2,
   Folder,
   GitBranch,
+  LayoutDashboard,
   MessageSquare,
   PanelLeftClose,
   Search,
+  Terminal,
+  Zap,
 } from 'lucide-react'
 import { sessionService, useActiveSessionId, useSessions, type SessionVM } from '@/domain'
 import { HIP_PRODUCT_VERSION } from '@/domain/product'
@@ -40,11 +44,16 @@ import {
   nestableCatalogPaths,
 } from '@/lib/worktreeNesting'
 import { resolveWorktreeSourceLabel } from '@/lib/worktreeHitlLabels'
-import { useUiStore, type SidebarSection } from '@/store/uiStore'
+import {
+  isPlaceholderSidebarSection,
+  useUiStore,
+  type SidebarSection,
+} from '@/store/uiStore'
 import { DeclarativeContextMenu } from '@/components/context-menu'
 import { openCreateKnowledgeSpaceDialog } from '@/components/knowledge/knowledgeSpaceDialogStore'
 import {
   enterKnowledge,
+  enterPlaceholderSection,
   enterSection,
   newConversationFromSidebar,
   openHistoryFromChrome,
@@ -145,6 +154,7 @@ export function AppSidebar() {
 
   const onNav = (section: SidebarSection) => {
     if (section === 'knowledge') void enterKnowledge()
+    else if (isPlaceholderSidebarSection(section)) void enterPlaceholderSection(section)
     else void enterSection(section)
   }
 
@@ -153,7 +163,9 @@ export function AppSidebar() {
       ? t('sidebar.list.spaces')
       : sidebarSection === 'projects'
         ? t('sidebar.list.projects')
-        : t('sidebar.list.chats')
+        : sidebarSection === 'chats'
+          ? t('sidebar.list.chats')
+          : t(`sidebar.nav.${sidebarSection}`)
 
   const toggleWorktree = (sessionId: string) => {
     setWorktreeCollapsed((prev) => ({ ...prev, [sessionId]: !prev[sessionId] }))
@@ -218,6 +230,13 @@ export function AppSidebar() {
 
       <nav className="flex shrink-0 flex-col gap-0.5 px-2 pb-2" aria-label={t('sidebar.navAria')}>
         <NavItem
+          section="workbench"
+          active={sidebarSection === 'workbench' && activeView === 'workbench'}
+          label={t('sidebar.nav.workbench')}
+          icon={<LayoutDashboard size={16} />}
+          onClick={() => onNav('workbench')}
+        />
+        <NavItem
           section="chats"
           active={sidebarSection === 'chats'}
           label={t('sidebar.nav.chats')}
@@ -240,6 +259,27 @@ export function AppSidebar() {
           icon={<BookOpen size={16} />}
           count={spaces.length > 0 ? spaces.length : undefined}
           onClick={() => onNav('knowledge')}
+        />
+        <NavItem
+          section="terminals"
+          active={sidebarSection === 'terminals' && activeView === 'terminals'}
+          label={t('sidebar.nav.terminals')}
+          icon={<Terminal size={16} />}
+          onClick={() => onNav('terminals')}
+        />
+        <NavItem
+          section="tasks"
+          active={sidebarSection === 'tasks' && activeView === 'tasks'}
+          label={t('sidebar.nav.tasks')}
+          icon={<CheckSquare size={16} />}
+          onClick={() => onNav('tasks')}
+        />
+        <NavItem
+          section="automation"
+          active={sidebarSection === 'automation' && activeView === 'automation'}
+          label={t('sidebar.nav.automation')}
+          icon={<Zap size={16} />}
+          onClick={() => onNav('automation')}
         />
       </nav>
 
@@ -277,7 +317,7 @@ export function AppSidebar() {
             >
               {t('sidebar.newTask')}
             </button>
-          ) : (
+          ) : sidebarSection === 'chats' ? (
             <button
               type="button"
               data-testid="sidebar-new-chat-list"
@@ -288,10 +328,14 @@ export function AppSidebar() {
             >
               {t('sidebar.newChat')}
             </button>
-          )}
+          ) : null}
         </div>
 
-        {sidebarSection === 'knowledge' ? (
+        {isPlaceholderSidebarSection(sidebarSection) ? (
+          <p className="px-2 py-4 text-center text-meta text-ink-tertiary" role="status">
+            {t('placeholder.comingSoon')}
+          </p>
+        ) : sidebarSection === 'knowledge' ? (
           filteredSpaces.length === 0 ? (
             <p className="px-2 py-4 text-center text-meta text-ink-tertiary" role="status">
               {t('sidebar.emptySpaces')}

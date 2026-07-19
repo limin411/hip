@@ -14,7 +14,7 @@ interface SidebarAccountFooterProps {
 
 /**
  * Sidebar footer: Recycle Bin + History + Settings (icon + label).
- * Order: trash above history (product recycle bin).
+ * Order: trash → history → settings.
  */
 export function SidebarAccountFooter({
   onOpenTrash,

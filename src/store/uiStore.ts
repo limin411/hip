@@ -6,14 +6,38 @@ import type { CheckpointMode } from '@hip/protocol'
 
 export type ArtifactTab = 'files' | 'agents' | 'outline' | 'timeline' | 'changes' | 'terminal'
 
-export type ActiveView = 'chat' | 'code' | 'settings' | 'history' | 'knowledge' | 'trash'
+export type ActiveView =
+  | 'workbench'
+  | 'chat'
+  | 'code'
+  | 'settings'
+  | 'history'
+  | 'knowledge'
+  | 'trash'
+  | 'terminals'
+  | 'tasks'
+  | 'automation'
 export type Surface = 'chat' | 'code'
 export type ChatTab = 'files' | 'agents' | 'outline'
 export type Theme = 'light' | 'dark' | 'system'
 export type AppLanguage = 'zh-CN' | 'zh-TW' | 'en'
 export type UiDensity = 'comfortable' | 'compact'
-/** Left sidebar primary section (memory-only; cold launch always 'chats'). */
-export type SidebarSection = 'knowledge' | 'projects' | 'chats'
+/** Left sidebar primary section (memory-only; cold launch always 'workbench'). */
+export type SidebarSection =
+  | 'workbench'
+  | 'knowledge'
+  | 'projects'
+  | 'chats'
+  | 'terminals'
+  | 'tasks'
+  | 'automation'
+
+/** Primary nav sections that only show a "coming soon" placeholder page. */
+export type PlaceholderSidebarSection = 'workbench' | 'terminals' | 'tasks' | 'automation'
+
+export function isPlaceholderSidebarSection(s: SidebarSection): s is PlaceholderSidebarSection {
+  return s === 'workbench' || s === 'terminals' || s === 'tasks' || s === 'automation'
+}
 
 /** Settings panel left-nav page ids (see SettingsPanel PAGES). */
 export type SettingsPageId =
@@ -91,7 +115,7 @@ function seedLanguage(): AppLanguage {
 export type UiPersistedState = {
   chatSessionId: string | null
   codeSessionId: string | null
-  // activeView is intentionally NOT persisted — cold launch always New Conversation (chat).
+  // activeView is intentionally NOT persisted — cold launch always Workbench.
   theme: Theme
   language: AppLanguage
   density: UiDensity
@@ -102,9 +126,18 @@ export type UiPersistedState = {
   sidebarOpen: boolean
 }
 
-/** Settings / history / trash / knowledge are session-ephemeral; cold launch always lands on chat. */
+/** Special / placeholder views are session-ephemeral; cold launch always lands on workbench. */
 export function isEphemeralActiveView(v: ActiveView): boolean {
-  return v === 'settings' || v === 'history' || v === 'trash' || v === 'knowledge'
+  return (
+    v === 'settings' ||
+    v === 'history' ||
+    v === 'trash' ||
+    v === 'knowledge' ||
+    v === 'workbench' ||
+    v === 'terminals' ||
+    v === 'tasks' ||
+    v === 'automation'
+  )
 }
 
 /** Merge hip-ui storage into runtime state; strip legacy shell fields. */
@@ -130,9 +163,9 @@ export function mergeUiPersistedState<
   return {
     ...currentState,
     ...rest,
-    // Always cold-start on chat New Conversation (product rule).
-    activeView: 'chat' as const,
-    sidebarSection: 'chats' as const,
+    // Always cold-start on Workbench (product rule).
+    activeView: 'workbench' as const,
+    sidebarSection: 'workbench' as const,
     density: normalizeUiDensity((rest as { density?: unknown }).density),
     // Drop removed pages (e.g. legacy 'help') so tabs stay valid.
     settingsPage: normalizeSettingsPage((rest as { settingsPage?: unknown }).settingsPage),
@@ -168,7 +201,7 @@ interface UiState {
   setActiveView: (v: ActiveView) => void
   previousView: ActiveView | null
 
-  /** Left sidebar section highlight (not persisted; cold launch 'chats'). */
+  /** Left sidebar section highlight (not persisted; cold launch 'workbench'). */
   sidebarSection: SidebarSection
   setSidebarSection: (s: SidebarSection) => void
 
@@ -242,7 +275,7 @@ export const useUiStore = create<UiState>()(
       codeSessionId: null,
       setCodeSessionId: (id) => set((s) => (s.codeSessionId === id ? s : { codeSessionId: id })),
 
-      activeView: 'chat',
+      activeView: 'workbench',
       previousView: null,
       setActiveView: (v) =>
         set((s) => {
@@ -257,7 +290,7 @@ export const useUiStore = create<UiState>()(
           }
         }),
 
-      sidebarSection: 'chats',
+      sidebarSection: 'workbench',
       setSidebarSection: (sec) =>
         set((s) => (s.sidebarSection === sec ? s : { sidebarSection: sec })),
 
@@ -347,9 +380,9 @@ export const useUiStore = create<UiState>()(
 )
 
 /**
- * Cold launch shell: New Conversation on chat surface.
+ * Cold launch shell: Workbench placeholder (default home).
  * Safe to call after rehydrate and once from AppLayout.
  */
 export function applyColdLaunchShell(): void {
-  useUiStore.setState({ activeView: 'chat', sidebarSection: 'chats' })
+  useUiStore.setState({ activeView: 'workbench', sidebarSection: 'workbench' })
 }

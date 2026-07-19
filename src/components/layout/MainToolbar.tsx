@@ -33,7 +33,13 @@ export function MainToolbar() {
   const isMac = isMacPlatform()
 
   const isSpecial =
-    activeView === 'settings' || activeView === 'history' || activeView === 'trash'
+    activeView === 'settings' ||
+    activeView === 'history' ||
+    activeView === 'trash' ||
+    activeView === 'automation' ||
+    activeView === 'workbench' ||
+    activeView === 'terminals' ||
+    activeView === 'tasks'
   const showPanelChrome = !isSpecial
   const showSidebarExpand = !sidebarOpen
 
@@ -42,6 +48,14 @@ export function MainToolbar() {
     title = t('settings.title')
   } else if (activeView === 'history' || activeView === 'trash') {
     title = '' // page keeps h2
+  } else if (activeView === 'automation') {
+    title = t('sidebar.nav.automation')
+  } else if (activeView === 'workbench') {
+    title = t('sidebar.nav.workbench')
+  } else if (activeView === 'terminals') {
+    title = t('sidebar.nav.terminals')
+  } else if (activeView === 'tasks') {
+    title = t('sidebar.nav.tasks')
   } else if (activeView === 'knowledge') {
     if (kbMode === 'workspace' && kbActiveSpaceId) {
       title = kbSpaces.find((s) => s.id === kbActiveSpaceId)?.name ?? t('knowledge.title')

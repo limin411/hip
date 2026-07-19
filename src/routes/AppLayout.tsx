@@ -15,6 +15,7 @@ import { ArtifactPanel } from '@/components/artifact/ArtifactPanel'
 import { PreviewPanel } from '@/components/artifact/PreviewPanel'
 import { AppSidebar } from '@/components/layout/AppSidebar'
 import { MainToolbar } from '@/components/layout/MainToolbar'
+import { PlaceholderPage } from '@/components/layout/PlaceholderPage'
 import { SettingsPage } from '@/components/account/SettingsPage'
 import { SessionHistory } from '@/components/history/SessionHistory'
 import { RecycleBinPage } from '@/components/history/RecycleBinPage'
@@ -129,6 +130,42 @@ export function AppLayout() {
     if (activeView === 'trash') return <RecycleBinPage />
     if (activeView === 'settings') return <SettingsPage />
     if (activeView === 'knowledge') return <KnowledgePage />
+    if (activeView === 'workbench') {
+      return (
+        <PlaceholderPage
+          titleKey="sidebar.nav.workbench"
+          descriptionKey="placeholder.workbench"
+          testId="placeholder-workbench"
+        />
+      )
+    }
+    if (activeView === 'terminals') {
+      return (
+        <PlaceholderPage
+          titleKey="sidebar.nav.terminals"
+          descriptionKey="placeholder.terminals"
+          testId="placeholder-terminals"
+        />
+      )
+    }
+    if (activeView === 'tasks') {
+      return (
+        <PlaceholderPage
+          titleKey="sidebar.nav.tasks"
+          descriptionKey="placeholder.tasks"
+          testId="placeholder-tasks"
+        />
+      )
+    }
+    if (activeView === 'automation') {
+      return (
+        <PlaceholderPage
+          titleKey="sidebar.nav.automation"
+          descriptionKey="placeholder.automation"
+          testId="placeholder-automation"
+        />
+      )
+    }
     return activeSessionId == null ? (
       <NewConversation />
     ) : (

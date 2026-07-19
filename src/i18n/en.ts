@@ -1379,7 +1379,15 @@ export const en = {
       code: 'Coding',
       trash: 'Recycle bin',
       history: 'History',
+      automation: 'Automation',
       settings: 'Settings',
+    },
+    placeholder: {
+      comingSoon: 'Coming soon',
+      workbench: 'Workbench is coming soon — your home for today’s overview and shortcuts.',
+      terminals: 'Terminal management is coming soon — manage multiple terminal sessions in one place.',
+      tasks: 'Task tracking is coming soon — follow up on todos and work items.',
+      automation: 'Automation is coming soon — configure workflows and scheduled jobs.',
     },
     tabs: {
       closeTab: 'Close tab',
@@ -1397,9 +1405,13 @@ export const en = {
       expand: 'Show sidebar',
       expandAria: 'Show left sidebar',
       nav: {
+        workbench: 'Workbench',
         knowledge: 'Knowledge',
         projects: 'Projects',
         chats: 'Chats',
+        terminals: 'Terminals',
+        tasks: 'Tasks',
+        automation: 'Automation',
       },
       list: {
         spaces: 'Spaces',

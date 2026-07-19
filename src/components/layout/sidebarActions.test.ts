@@ -40,9 +40,11 @@ vi.mock('@/domain', async (importOriginal) => {
 import {
   assignSectionAfterLeavingKnowledge,
   enterKnowledge,
+  enterPlaceholderSection,
   enterSection,
   handleMainToolbarBack,
   leaveKnowledge,
+  openAutomationFromChrome,
   openHistoryFromChrome,
   openSettingsFromChrome,
 } from './sidebarActions'
@@ -131,6 +133,35 @@ describe('sidebarActions', () => {
     expect(flushSave).toHaveBeenCalled()
     expect(setSurface).toHaveBeenCalledWith('code')
     expect(useUiStore.getState().sidebarSection).toBe('projects')
+  })
+
+  it('enterPlaceholderSection sets workbench view and section', async () => {
+    useUiStore.setState({ activeView: 'chat', sidebarSection: 'chats' })
+    await enterPlaceholderSection('workbench')
+    expect(useUiStore.getState().activeView).toBe('workbench')
+    expect(useUiStore.getState().sidebarSection).toBe('workbench')
+    expect(setSurface).not.toHaveBeenCalled()
+  })
+
+  it('enterPlaceholderSection flushes knowledge then opens terminals', async () => {
+    useUiStore.setState({ activeView: 'knowledge', sidebarSection: 'knowledge' })
+    await enterPlaceholderSection('terminals')
+    expect(flushSave).toHaveBeenCalled()
+    expect(useUiStore.getState().activeView).toBe('terminals')
+    expect(useUiStore.getState().sidebarSection).toBe('terminals')
+  })
+
+  it('enterPlaceholderSection opens automation under primary nav', async () => {
+    useUiStore.setState({ activeView: 'chat', sidebarSection: 'chats' })
+    await enterPlaceholderSection('automation')
+    expect(useUiStore.getState().activeView).toBe('automation')
+    expect(useUiStore.getState().sidebarSection).toBe('automation')
+  })
+
+  it('openAutomationFromChrome opens automation special view', async () => {
+    useUiStore.setState({ activeView: 'chat', sidebarSection: 'chats' })
+    await openAutomationFromChrome()
+    expect(useUiStore.getState().activeView).toBe('automation')
   })
 
   it('openSettingsFromChrome flushes knowledge and assigns section', async () => {

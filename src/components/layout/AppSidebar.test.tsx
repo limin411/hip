@@ -13,6 +13,9 @@ import { useProjectPathStore } from '@/store/projectPathStore'
 const enterKnowledge = vi.fn(async () => {})
 const openCreateKnowledgeSpaceDialog = vi.fn()
 const enterSection = vi.fn(async (_section: 'projects' | 'chats') => {})
+const enterPlaceholderSection = vi.fn(
+  async (_section: 'workbench' | 'terminals' | 'tasks' | 'automation') => {},
+)
 const openHistoryFromChrome = vi.fn(async () => {})
 const newConversationFromSidebar = vi.fn(async (_surface: 'chat' | 'code') => {})
 const selectSessionFromSidebar = vi.fn(async (_id: string) => {})
@@ -20,8 +23,12 @@ const selectSessionFromSidebar = vi.fn(async (_id: string) => {})
 vi.mock('./sidebarActions', () => ({
   enterKnowledge: () => enterKnowledge(),
   enterSection: (section: 'projects' | 'chats') => enterSection(section),
+  enterPlaceholderSection: (section: 'workbench' | 'terminals' | 'tasks' | 'automation') =>
+    enterPlaceholderSection(section),
   openHistoryFromChrome: () => openHistoryFromChrome(),
   openSettingsFromChrome: vi.fn(),
+  openAutomationFromChrome: vi.fn(),
+  openTrashFromChrome: vi.fn(),
   leaveKnowledge: vi.fn(async () => {}),
   openSpaceFromSidebar: vi.fn(),
   selectSessionFromSidebar: (id: string) => selectSessionFromSidebar(id),
@@ -60,6 +67,7 @@ describe('AppSidebar', () => {
     enterKnowledge.mockClear()
     openCreateKnowledgeSpaceDialog.mockClear()
     enterSection.mockClear()
+    enterPlaceholderSection.mockClear()
     openHistoryFromChrome.mockClear()
     newConversationFromSidebar.mockClear()
     selectSessionFromSidebar.mockClear()
@@ -111,6 +119,10 @@ describe('AppSidebar', () => {
     expect(screen.getByTestId('sidebar-search').tagName).toBe('BUTTON')
     expect(screen.getByTestId('sidebar-toggle')).toBeInTheDocument()
     expect(screen.getByTestId('sidebar-app-version')).toHaveTextContent(/^HIP \d+\.\d+\.\d+/)
+    expect(screen.getByTestId('sidebar-nav-workbench')).toBeInTheDocument()
+    expect(screen.getByTestId('sidebar-nav-terminals')).toBeInTheDocument()
+    expect(screen.getByTestId('sidebar-nav-tasks')).toBeInTheDocument()
+    expect(screen.getByTestId('sidebar-nav-automation')).toBeInTheDocument()
     expect(screen.getByTestId('sidebar-nav-chats')).toHaveAttribute('aria-current', 'page')
     expect(screen.getByTestId('sidebar-session-chat-1')).toBeInTheDocument()
     expect(screen.queryByTestId('sidebar-session-code-1')).not.toBeInTheDocument()
@@ -167,6 +179,33 @@ describe('AppSidebar', () => {
     render(<AppSidebar />)
     fireEvent.click(screen.getByTestId('sidebar-nav-projects'))
     expect(enterSection).toHaveBeenCalledWith('projects')
+  })
+
+  it('nav workbench calls enterPlaceholderSection workbench', () => {
+    render(<AppSidebar />)
+    fireEvent.click(screen.getByTestId('sidebar-nav-workbench'))
+    expect(enterPlaceholderSection).toHaveBeenCalledWith('workbench')
+  })
+
+  it('nav terminals calls enterPlaceholderSection terminals', () => {
+    render(<AppSidebar />)
+    fireEvent.click(screen.getByTestId('sidebar-nav-terminals'))
+    expect(enterPlaceholderSection).toHaveBeenCalledWith('terminals')
+  })
+
+  it('nav tasks calls enterPlaceholderSection tasks', () => {
+    render(<AppSidebar />)
+    fireEvent.click(screen.getByTestId('sidebar-nav-tasks'))
+    expect(enterPlaceholderSection).toHaveBeenCalledWith('tasks')
+  })
+
+  it('nav automation is below tasks and calls enterPlaceholderSection', () => {
+    render(<AppSidebar />)
+    const tasks = screen.getByTestId('sidebar-nav-tasks')
+    const automation = screen.getByTestId('sidebar-nav-automation')
+    expect(tasks.compareDocumentPosition(automation) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    fireEvent.click(automation)
+    expect(enterPlaceholderSection).toHaveBeenCalledWith('automation')
   })
 
   it('chats section new chat starts chat conversation', () => {
@@ -509,7 +548,8 @@ describe('AppSidebar', () => {
     )
     render(<AppSidebar />)
     const row = screen.getByTestId('sidebar-catalog-wt-slot-wt')
-    expect(row).toHaveTextContent('Parallel explore')
+    // Label comes from chat.worktreeControl.source.host_fanout (en: Batch create).
+    expect(row).toHaveTextContent('Batch create')
     expect(row).not.toHaveTextContent('host_fanout')
   })
 

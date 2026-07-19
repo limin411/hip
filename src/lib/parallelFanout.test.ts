@@ -15,7 +15,9 @@ describe('parallelFanout (P5)', () => {
   it('uses agent-aligned hip-p-{runShort}-{1..n} branch convention (D26)', () => {
     const p = planParallelFanout({ n: 2, prompt: 'p', runId: 'ab12cd' })
     expect(p.slots.map((s) => s.branch)).toEqual(['hip-p-ab12cd-1', 'hip-p-ab12cd-2'])
+    // pathKey is branch segment only; full create pathKey is {fullRunId}/{branch}.
     expect(p.slots.map((s) => s.pathKey)).toEqual(['hip-p-ab12cd-1', 'hip-p-ab12cd-2'])
+    expect(p.slots.every((s) => s.pathKey === s.branch && !s.pathKey.includes('/'))).toBe(true)
   })
 
   it('detects primary path collision', () => {

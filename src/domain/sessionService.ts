@@ -2207,10 +2207,11 @@ function installE2eHooks(svc: SessionService): void {
         hostSessionId: opts.hostSessionId,
         source: 'host',
         createdAt: Date.now(),
+        // pathKey on the plan is branch segment only; product layout is {runId}/{branch}.
         slots: plan.slots.map((s) => ({
           index: s.index,
           sessionId: `slot-sess-${s.index}`,
-          worktreePath: `${opts.baseCwd}/.hip-wt/${s.pathKey}`,
+          worktreePath: `${opts.baseCwd}/.hip-wt/${runId}/${s.branch}`,
           branch: s.branch,
           status: 'ready' as const,
         })),

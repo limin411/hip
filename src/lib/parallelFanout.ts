@@ -7,6 +7,11 @@ export type ParallelSlotStatus = 'running' | 'awaiting_user' | 'done' | 'failed'
 export interface ParallelSlotPlan {
   index: number
   branch: string
+  /**
+   * Branch segment only (usually equals `branch`), **not** the full create pathKey.
+   * Product create composes `{fullRunId}/{branch}` in `startParallelRun` (D26).
+   * Do not pass this field alone as `git:worktree:create.pathKey`.
+   */
   pathKey: string
   label: string
 }
@@ -18,7 +23,11 @@ export interface ParallelFanoutPlan {
   prompt: string
 }
 
-/** Build N slot plans without touching git (unit-testable). */
+/**
+ * Build N slot plans without touching git (unit-testable).
+ * @param opts.runId Short id used in branch names (`hip-p-{runId}-{i}`). This is
+ *   typically runShort (6 chars), not the full run id used in on-disk pathKey.
+ */
 export function planParallelFanout(opts: {
   n: number
   prompt: string
@@ -31,7 +40,8 @@ export function planParallelFanout(opts: {
   const runId = opts.runId ?? `prun-${Date.now().toString(36)}`
   const baseBranch = opts.baseBranch ?? 'HEAD'
   const slots: ParallelSlotPlan[] = []
-  // D26: match agent parallel_worktrees — hip-p-{runShort}-{1..n}, pathKey later = runId/branch.
+  // D26: match agent parallel_worktrees — hip-p-{runShort}-{1..n}.
+  // pathKey here is the branch segment only; startParallelRun composes fullRunId/branch.
   for (let i = 0; i < n; i++) {
     const slotNum = i + 1
     const branch = `hip-p-${runId}-${slotNum}`

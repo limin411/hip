@@ -55,6 +55,7 @@ describe('parallel_worktrees tool', () => {
 
   it('creates worktrees and spawns workers after n2 approve', async () => {
     const spawns: Array<{ taskId: string; root: string }> = []
+    const changed: Array<{ kind: string; reveal?: boolean; worktree: { branch?: string; pathKey?: string; path: string } }> = []
     const tools = buildParallelWorktreeTools({
       cwd: repo,
       sessionId: 'sess',
@@ -62,6 +63,18 @@ describe('parallel_worktrees tool', () => {
       spawnInWorktree: async ({ taskId, root }) => {
         spawns.push({ taskId, root })
         return `Background task started: ${taskId}`
+      },
+      // D23: product parallel must suppress per-slot reveal/toast.
+      onWorktreeChanged: (ev) => {
+        changed.push({
+          kind: ev.kind,
+          reveal: ev.reveal,
+          worktree: {
+            branch: ev.worktree.branch,
+            pathKey: ev.worktree.pathKey,
+            path: ev.worktree.path,
+          },
+        })
       },
     })
     const t = tools[0]!
@@ -78,6 +91,28 @@ describe('parallel_worktrees tool', () => {
       expect(s.root.startsWith(getWorktreesDir())).toBe(true)
       const st = await fs.stat(s.root)
       expect(st.isDirectory()).toBe(true)
+    }
+
+    // D23: every slot create notifies with reveal false (via createManagedProductWorktree).
+    expect(changed).toHaveLength(2)
+    expect(changed.every((e) => e.kind === 'created' && e.reveal === false)).toBe(true)
+
+    // D26: hip-p-{runShort}-{1..n} branches; pathKey = {runId}/{branch}; path under managed + runId.
+    const parsed = JSON.parse(out) as {
+      runId: string
+      slots: Array<{ branch: string; path: string; index: number }>
+    }
+    expect(parsed.runId).toMatch(/^[a-f0-9]{10}$/)
+    const runShort = parsed.runId.slice(0, 6)
+    expect(parsed.slots).toHaveLength(2)
+    for (const slot of parsed.slots) {
+      expect(slot.branch).toBe(`hip-p-${runShort}-${slot.index}`)
+      expect(slot.path.startsWith(getWorktreesDir())).toBe(true)
+      expect(slot.path).toContain(parsed.runId)
+    }
+    for (const ev of changed) {
+      expect(ev.worktree.branch).toMatch(new RegExp(`^hip-p-${runShort}-[12]$`))
+      expect(ev.worktree.pathKey).toBe(`${parsed.runId}/${ev.worktree.branch}`)
     }
   })
 })

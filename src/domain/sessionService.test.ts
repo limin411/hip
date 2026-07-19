@@ -1,6 +1,7 @@
 // src/domain/sessionService.test.ts
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 import type { ClientMessage, ServerMessage } from '@hip/protocol'
+import { toast } from 'sonner'
 import { SessionService } from './sessionService'
 import { useDomainStore, DEFAULT_CONFIG } from './sessionStore'
 import { useFsStore } from '@/store/fsStore'
@@ -1311,6 +1312,9 @@ describe('branches + revert', () => {
     it('createManagedWorktree defaults reveal true and does not toast (opens session)', async () => {
       const t = new FakeTransport()
       const svc = new SessionService(t)
+      // D23: success toast is effects-owned when reveal true — method must not toast.
+      const toastSuccess = vi.spyOn(toast, 'success').mockImplementation(() => '')
+      const toastMessage = vi.spyOn(toast, 'message').mockImplementation(() => '')
       // Host session with code cwd so create can open a child session.
       useDomainStore.setState({
         sessions: [
@@ -1354,6 +1358,10 @@ describe('branches + revert', () => {
       expect(result.sessionId).toBeTruthy()
       const child = useDomainStore.getState().sessions.find((s) => s.id === result.sessionId)
       expect(child?.config.cwd).toBe('/tmp/wt/hip-iso-xyz')
+      expect(toastSuccess).not.toHaveBeenCalled()
+      expect(toastMessage).not.toHaveBeenCalled()
+      toastSuccess.mockRestore()
+      toastMessage.mockRestore()
     })
 
     it('startParallelRun uses reveal:false and hip-p-* pathKey convention', async () => {

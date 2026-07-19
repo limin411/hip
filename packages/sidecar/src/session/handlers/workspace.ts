@@ -134,6 +134,7 @@ export async function handleWorkspaceMessage(
         notify: (ev) => send({ type: 'worktree:changed', ...ev }),
       })
       // D23: pass reveal through (omit → service default true). D26: product spine.
+      // source stays 'protocol' until PR7 optional source on create (host_fanout / etc.).
       const r = await createManagedProductWorktree(svc, {
         cwd,
         branch: msg.branch,

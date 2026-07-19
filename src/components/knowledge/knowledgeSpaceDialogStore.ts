@@ -6,7 +6,7 @@ import { useSyncExternalStore } from 'react'
  */
 export type KnowledgeSpaceDialog =
   | { kind: 'create' }
-  | { kind: 'rename'; spaceId: string; name: string }
+  | { kind: 'rename'; spaceId: string; name: string; icon?: string }
   | { kind: 'delete'; spaceId: string; name: string }
 
 let dialog: KnowledgeSpaceDialog | null = null
@@ -32,8 +32,12 @@ export function openCreateKnowledgeSpaceDialog(): void {
   emit()
 }
 
-export function openRenameKnowledgeSpaceDialog(spaceId: string, name: string): void {
-  dialog = { kind: 'rename', spaceId, name }
+export function openRenameKnowledgeSpaceDialog(
+  spaceId: string,
+  name: string,
+  icon?: string,
+): void {
+  dialog = { kind: 'rename', spaceId, name, icon }
   emit()
 }
 

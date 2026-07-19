@@ -319,7 +319,7 @@ export function AppSidebar() {
                   <li key={sp.id}>
                     <DeclarativeContextMenu
                       kind="knowledgeSpace"
-                      payload={{ spaceId: sp.id, name: sp.name }}
+                      payload={{ spaceId: sp.id, name: sp.name, icon: sp.icon }}
                       className="mb-0.5 block w-full"
                     >
                       <button
@@ -342,6 +342,14 @@ export function AppSidebar() {
                           )}
                           aria-hidden
                         />
+                        {sp.icon ? (
+                          <span
+                            className="mt-0.5 shrink-0 text-body leading-none"
+                            aria-hidden
+                          >
+                            {sp.icon}
+                          </span>
+                        ) : null}
                         <span className="min-w-0 flex-1 truncate text-body font-medium text-ink">
                           {sp.name}
                         </span>

@@ -626,6 +626,7 @@ export function KnowledgeWorkspace() {
                       openRenameKnowledgeSpaceDialog(
                         activeSpaceId,
                         space?.name ?? '',
+                        space?.icon,
                       )
                     }}
                   >

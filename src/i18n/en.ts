@@ -1295,6 +1295,9 @@ export const en = {
         deleteTitle: 'Delete “{{name}}”?',
         deleteBody: 'This permanently deletes the space and all of its documents. This cannot be undone.',
         menu: 'Space menu',
+        iconLabel: 'Icon',
+        iconNone: 'No icon',
+        iconCustomPlaceholder: 'Emoji or paste…',
       },
       tree: {
         newDoc: 'Doc',

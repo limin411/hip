@@ -39,7 +39,7 @@ describe('knowledgeSpaceProvider', () => {
     const items = knowledgeSpaceProvider(
       {
         kind: 'knowledgeSpace',
-        payload: { spaceId: 'spc_1', name: 'Notes' },
+        payload: { spaceId: 'spc_1', name: 'Notes', icon: '📚' },
       },
       ctx,
     )
@@ -48,6 +48,7 @@ describe('knowledgeSpaceProvider', () => {
       kind: 'rename',
       spaceId: 'spc_1',
       name: 'Notes',
+      icon: '📚',
     })
   })
 

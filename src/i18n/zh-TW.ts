@@ -614,6 +614,9 @@ export const zhTW = {
         deleteTitle: '刪除「{{name}}」？',
         deleteBody: '將永久刪除此空間及其全部文件，此操作無法復原。',
         menu: '空間選單',
+        iconLabel: '圖示',
+        iconNone: '無圖示',
+        iconCustomPlaceholder: '輸入或貼上 emoji…',
       },
       tree: {
         newDoc: '文件',

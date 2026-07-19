@@ -129,6 +129,7 @@ export type ContextPayloadMap = {
   knowledgeSpace: {
     spaceId: string
     name: string
+    icon?: string
   }
   /**
    * Knowledge tree blank area (root). Hosts supply create callbacks so menus

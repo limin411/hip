@@ -7,7 +7,7 @@ import type { ContextMenuItemDef, ContextProvider } from '../types'
 /** Sidebar knowledge-space row: rename + delete. */
 export const knowledgeSpaceProvider: ContextProvider = (req, ctx) => {
   if (req.kind !== 'knowledgeSpace') return []
-  const { spaceId, name } = req.payload
+  const { spaceId, name, icon } = req.payload
 
   const items: ContextMenuItemDef[] = [
     {
@@ -15,7 +15,7 @@ export const knowledgeSpaceProvider: ContextProvider = (req, ctx) => {
       label: ctx.t('knowledge.tree.rename'),
       group: 'edit',
       run: () => {
-        openRenameKnowledgeSpaceDialog(spaceId, name)
+        openRenameKnowledgeSpaceDialog(spaceId, name, icon)
       },
     },
     {

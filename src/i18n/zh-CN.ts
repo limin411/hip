@@ -1272,6 +1272,9 @@ export const zhCN = {
         deleteTitle: '删除「{{name}}」？',
         deleteBody: '将永久删除该空间及其全部文档，此操作无法撤销。',
         menu: '空间菜单',
+        iconLabel: '图标',
+        iconNone: '无图标',
+        iconCustomPlaceholder: '输入或粘贴 emoji…',
       },
       tree: {
         newDoc: '文档',

@@ -1,11 +1,13 @@
 import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { isSpaceNameTaken, normalizeSpaceName } from '@/domain/knowledge/spaceName'
+import { normalizeSpaceIcon } from '@/domain/knowledge/spaceIcons'
 import { useKnowledgeStore } from '@/store/knowledgeStore'
 import { openSpaceFromSidebar } from '@/components/layout/sidebarActions'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
 import { Modal } from '@/components/ui/Modal'
+import { SpaceIconPicker } from './SpaceIconPicker'
 import {
   closeKnowledgeSpaceDialog,
   useKnowledgeSpaceDialog,
@@ -25,20 +27,28 @@ export function KnowledgeSpaceDialogHost() {
   const busy = useKnowledgeStore((s) => s.busy)
 
   const [name, setName] = useState('')
+  const [icon, setIcon] = useState('')
 
-  // Sync draft name when dialog opens / target changes.
+  // Sync draft name/icon when dialog opens / target changes.
   useEffect(() => {
     if (!dialog) {
       setName('')
+      setIcon('')
       return
     }
-    if (dialog.kind === 'create') setName('')
-    else if (dialog.kind === 'rename') setName(dialog.name)
+    if (dialog.kind === 'create') {
+      setName('')
+      setIcon('')
+    } else if (dialog.kind === 'rename') {
+      setName(dialog.name)
+      setIcon(dialog.icon ?? '')
+    }
   }, [dialog])
 
   if (!dialog) return null
 
   const nameTrimmed = normalizeSpaceName(name)
+  const iconNorm = normalizeSpaceIcon(icon)
   const excludeId = dialog.kind === 'rename' ? dialog.spaceId : undefined
   const nameTaken =
     nameTrimmed.length > 0 && isSpaceNameTaken(spaces, nameTrimmed, excludeId)
@@ -46,7 +56,7 @@ export function KnowledgeSpaceDialogHost() {
   if (dialog.kind === 'create') {
     const submit = async () => {
       if (!nameTrimmed || nameTaken) return
-      const space = await createSpace(nameTrimmed)
+      const space = await createSpace(nameTrimmed, iconNorm)
       if (!space) return
       closeKnowledgeSpaceDialog()
       await openSpaceFromSidebar(space.id)
@@ -73,6 +83,11 @@ export function KnowledgeSpaceDialogHost() {
         }
       >
         <div className="flex flex-col gap-3 px-5 py-4">
+          <SpaceIconPicker
+            value={icon}
+            onChange={setIcon}
+            testIdPrefix="knowledge-create-space-icon"
+          />
           <label className="flex flex-col gap-2">
             <span className="text-body text-ink-secondary">{t('knowledge.space.nameLabel')}</span>
             <Input
@@ -108,7 +123,8 @@ export function KnowledgeSpaceDialogHost() {
     const spaceId = dialog.spaceId
     const submit = async () => {
       if (!nameTrimmed || nameTaken) return
-      const ok = await renameSpace(spaceId, nameTrimmed)
+      // Pass '' to clear icon (Rust treats empty string as None).
+      const ok = await renameSpace(spaceId, nameTrimmed, iconNorm ?? '')
       if (ok) closeKnowledgeSpaceDialog()
     }
     return (
@@ -137,6 +153,11 @@ export function KnowledgeSpaceDialogHost() {
         }
       >
         <div className="flex flex-col gap-3 px-5 py-4">
+          <SpaceIconPicker
+            value={icon}
+            onChange={setIcon}
+            testIdPrefix="knowledge-rename-space-icon"
+          />
           <label className="flex flex-col gap-2">
             <span className="text-body text-ink-secondary">{t('knowledge.space.nameLabel')}</span>
             <Input

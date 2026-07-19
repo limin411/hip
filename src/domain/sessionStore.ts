@@ -330,6 +330,18 @@ export function applyServerMessage(
     case 'session:permissionMode':
       return update(msg.sessionId, (s) => ({ ...s, config: { ...s.config, permissionMode: msg.permissionMode } }))
 
+    case 'session:agentChanged':
+      return update(msg.sessionId, (s) => {
+        const next = msg.agentId && msg.agentId !== 'builtin' ? msg.agentId : undefined
+        if (!next) {
+          const { agentId: _cleared, ...rest } = s.config
+          return { ...s, config: rest, configOptions: undefined }
+        }
+        // Mirror sidecar: external primary drops hip-only forcePlan.
+        const { forcePlan: _fp, ...rest } = s.config
+        return { ...s, config: { ...rest, agentId: next }, configOptions: undefined }
+      })
+
     case 'session:forcePlan':
       return update(msg.sessionId, (s) => ({
         ...s,
@@ -364,6 +376,11 @@ export function applyServerMessage(
       // A cancel is intentional, not a failure: return to idle and surface nothing.
       if (!msg.sessionId) return state
       if (msg.code === 'CANCELLED') return update(msg.sessionId, (s) => ({ ...s, status: 'idle', error: null, activeTurnPlan: null, planDeltaDraft: {}, planApprovalPending: false, messages: finalizeCancelledMessage(s.messages) }))
+      // Soft rejects (concurrent send / agent mid-switch): toast-only via effects.
+      // Do not demote running→error or clear plan UI while the sidecar turn continues.
+      if (msg.code === 'BUSY' || msg.code === 'AGENT_BUSY') {
+        return state
+      }
       return update(msg.sessionId, (s) => ({ ...s, status: 'error', error: { code: msg.code, message: msg.message }, activeTurnPlan: null, planDeltaDraft: {}, planApprovalPending: false }))
 
     case 'session:list:result': {

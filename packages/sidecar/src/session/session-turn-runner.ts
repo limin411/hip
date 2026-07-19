@@ -27,7 +27,7 @@ import { IdleWatchdog, idleTimeoutMessage } from './idle-watchdog.js'
 import { getActiveModel, isOpenAICompatible } from '../config/providers.js'
 import { isMultimodalModel } from '../config/catalog.js'
 import { resolveApiKey } from '../config/auth-file.js'
-import { resolveEffectiveConfig } from '../config/hip-config.js'
+import { resolveEffectiveConfig, resolveAcpHostConfig } from '../config/hip-config.js'
 import { flushLangSmithTraces, tracingInvokeFields } from '../observability/langsmith.js'
 import { buildGraph, type GraphEmit, type GraphCtx, type LoopState } from './graph.js'
 import { selectImageAgent } from './agents/registry.js'
@@ -79,6 +79,7 @@ import {
   loadMemoryConfig,
   resolveSessionMemoryFlags,
   refreshMemoryCoreSnapshot,
+  resolveAcpExternalMemoryPrefix,
   scheduleMemoryExtractAfterTurn,
   parseMemoryCitations,
   bumpMemoryUseCounts,
@@ -161,6 +162,11 @@ export interface SessionTurnHost {
   messages: BaseMessage[]
   abortController: AbortController | null
   running: boolean
+  /**
+   * True while session:setAgent critical section runs (dispose → config → echo).
+   * Blocks concurrent turns so dispose cannot race a new prompt.
+   */
+  switchingAgent: boolean
   awaitingResume: boolean
   /** Multi-client: connection owning the active foreground turn. */
   ownerConnectionId: string | null
@@ -1176,6 +1182,51 @@ export async function runTurn(host: SessionTurnHost, rawSend: SendFn, base?: {
     if (host.agentProv.isExternalAgent()) {
       const userText = lastUserText(base?.messages !== undefined ? modelReady(base.messages) : visibleMessages)
       const cronPrefix = cronMessages.length ? cronMessages.map((m) => m.content as string).join('\n\n') + '\n\n' : ''
+      // ACP primary only: optional fenced memory prefix (not for subagent invoker).
+      // Single gate lives in resolveAcpExternalMemoryPrefix — pass real flag values.
+      let memoryPrefix = ''
+      {
+        const memCfgEarly = host.memoryService?.getConfig() ?? loadMemoryConfig()
+        const flagsEarly = resolveSessionMemoryFlags(memCfgEarly, host._config)
+        const mayInject =
+          flagsEarly.use && !!memCfgEarly.useMemoriesWithExternal && !flagsEarly.incognito
+        if (mayInject && !host.memoryService && host.store) {
+          const db = host.store.getDb()
+          const memoriesFts = tryEnableMemoriesFts(db)
+          const memoriesVec = tryEnableSqliteVec(db)
+          host.memoryService = new MemoryService(new MemoryStore(db, memoriesFts, memoriesVec))
+          host.memoryService.runStartupDecayOnce()
+        }
+        const memCfg = host.memoryService?.getConfig() ?? memCfgEarly
+        const flags = resolveSessionMemoryFlags(memCfg, host._config)
+        let coreBody = ''
+        if (mayInject && host.memoryService) {
+          const snapshotResult = refreshMemoryCoreSnapshot({
+            useMemories: flags.use,
+            cwd,
+            hostSnapshot: host.memoryCoreSnapshot,
+            hostCoreIds: host.memoryCoreIds,
+            hostProjectKey: host.memorySnapshotProjectKey,
+            hostGeneration: host.memoryCoreGeneration,
+            storeGeneration: host.memoryService.getCoreGeneration(),
+            load: (projectKeyHash) => host.memoryService!.loadCoreSnapshot(projectKeyHash),
+            resolveKey: resolveProjectKey,
+          })
+          host.memoryCoreSnapshot = snapshotResult.snapshot
+          host.memoryCoreIds = snapshotResult.coreIds
+          host.memorySnapshotProjectKey = snapshotResult.projectKey
+          host.memoryCoreGeneration = snapshotResult.generation
+          coreBody = snapshotResult.snapshot ?? ''
+        }
+        memoryPrefix = resolveAcpExternalMemoryPrefix({
+          useMemories: flags.use,
+          useMemoriesWithExternal: !!memCfg.useMemoriesWithExternal,
+          incognito: flags.incognito,
+          memoryServiceAvailable: !!host.memoryService,
+          coreSnapshotBody: coreBody,
+          maxCoreSummaryChars: memCfg.maxCoreSummaryChars,
+        })
+      }
       const hooks: ExternalAgentHooks = {
         requestPermission: (req) => {
           const auto = tryAutoResolvePermission(mode, req.tool.kind, req.options)
@@ -1184,7 +1235,17 @@ export async function runTurn(host: SessionTurnHost, rawSend: SendFn, base?: {
         },
         configOptions: (options) => send({ type: 'agent:configOptions', sessionId: host.id, options }),
       }
-      await host.agentProv.ensureExternalProvider().runTurn(cronPrefix + userText, emit, host.abortController.signal, hooks)
+      const provider = host.agentProv.ensureExternalProvider()
+      const setFs = (provider as { setTurnFsContext?: (ctx: { cwd: string; permissionMode: PermissionMode; readMaxBytes: number }) => void }).setTurnFsContext
+      if (typeof setFs === 'function') {
+        const acpHost = resolveAcpHostConfig(cwd)
+        setFs.call(provider, {
+          cwd,
+          permissionMode: mode,
+          readMaxBytes: acpHost.fsReadMaxBytes,
+        })
+      }
+      await provider.runTurn(memoryPrefix + cronPrefix + userText, emit, host.abortController.signal, hooks)
       closeReasoning('supervisor'); finishRemaining()
       const acpId = host.agentProv.acpSessionId; if (acpId && host.store) host.store.setAcpSessionId(host.id, acpId)
     } else {

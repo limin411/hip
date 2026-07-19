@@ -690,3 +690,73 @@ project = "project"
     expect(readHipConfig().langsmith).toBeUndefined()
   })
 })
+
+// ──────────────────────────────────────────────────────────────
+// acp section
+// ──────────────────────────────────────────────────────────────
+
+describe('acp host config', () => {
+  it('parses snake_case [acp]', () => {
+    const dir = tmpDir()
+    const p = writeToml(dir, 'hip.toml', `version = 1
+
+[acp]
+fs_bridge = false
+forward_mcp = true
+fs_read_max_bytes = 1000
+`)
+    process.env.HIP_CONFIG_PATH = p
+    expect(readHipConfig().acp).toEqual({
+      fsBridge: false,
+      forwardMcp: true,
+      fsReadMaxBytes: 1000,
+    })
+  })
+
+  it('parses camelCase [acp]', () => {
+    const dir = tmpDir()
+    const p = writeToml(dir, 'hip.toml', `version = 1
+
+[acp]
+fsBridge = true
+forwardMcp = false
+fsReadMaxBytes = 42
+`)
+    process.env.HIP_CONFIG_PATH = p
+    expect(readHipConfig().acp).toEqual({
+      fsBridge: true,
+      forwardMcp: false,
+      fsReadMaxBytes: 42,
+    })
+  })
+
+  it('project acp replaces global wholesale', () => {
+    const g = tmpDir()
+    const projectRoot = tmpDir()
+    writeToml(g, 'hip.toml', `version = 1
+[acp]
+fs_bridge = true
+forward_mcp = true
+fs_read_max_bytes = 100
+`)
+    process.env.HIP_CONFIG_PATH = join(g, 'hip.toml')
+    mkdirSync(join(projectRoot, '.hip'), { recursive: true })
+    writeFileSync(
+      join(projectRoot, '.hip', 'hip.toml'),
+      `version = 1
+[acp]
+fs_bridge = false
+`,
+    )
+    const cfg = resolveEffectiveConfig(projectRoot)
+    // wholesale replace: project has only fsBridge=false; forwardMcp not inherited
+    expect(cfg.acp).toEqual({ fsBridge: false })
+  })
+
+  it('omits acp when section is absent', () => {
+    const dir = tmpDir()
+    const p = writeToml(dir, 'hip.toml', 'version = 1\n')
+    process.env.HIP_CONFIG_PATH = p
+    expect(readHipConfig().acp).toBeUndefined()
+  })
+})

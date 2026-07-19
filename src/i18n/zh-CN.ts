@@ -301,6 +301,13 @@ export const zhCN = {
       styleDelete: '删除风格',
       styleEmpty: '还没有保存的风格，请在下方新建。',
       agentRestarted: '外部智能体已重启 —— 之前的上下文未保留。',
+      acpCliff: {
+        title: '外部智能体模式',
+        body: '当前会话由 {{name}} 驱动。Hip 工具、技能与委派不可用。',
+        mcpOff: '未转发 Hip MCP 服务器（可在 设置 → ACP 中开启）。',
+        mcpOn: '已将配置的 Hip MCP 服务器转发到该智能体。',
+        dismiss: '知道了',
+      },
       modelHint: '选择模型',
       noModelSelected: '选择模型',
       attach: '添加附件',
@@ -380,6 +387,22 @@ export const zhCN = {
       subagent: {
         noSummary: '子任务已完成（无文字总结）',
         toolsCount: '{{count}} 步',
+      },
+    },
+    composer: {
+      agentPicker: {
+        label: '智能体',
+        builtin: 'hip（内置）',
+        empty: '尚未启用外部智能体。请在设置中添加。',
+      },
+      agentSwitch: {
+        title: '切换智能体？',
+        body: '切换主智能体会重启外部上下文，之前的外部上下文不会保留。',
+        target: '切换到 {{name}}',
+        thisSession: '在本会话切换',
+        newSession: '新会话',
+        cancel: '取消',
+        busy: '回合进行中，无法切换智能体',
       },
     },
     artifact: {
@@ -833,6 +856,9 @@ export const zhCN = {
         useMemories: '使用记忆',
         useMemoriesDesc: '在每轮对话中将相关记忆注入智能体上下文。',
         useMemoriesPlain: '每轮对话把已存事实注入智能体上下文。',
+        useMemoriesWithExternal: '在外部（ACP）智能体中使用记忆',
+        useMemoriesWithExternalHint:
+          '开启后，ACP 主会话每轮会带上只读记忆前缀。不适用于子智能体派发。可能增加 token。',
         generateMemories: '自动学习',
         generateMemoriesDesc: '在对话结束后抽取并巩固长期记忆。',
         generateMemoriesPlain: '你停聊一段时间后，后台抽取可复用的事实（会用 API）。',

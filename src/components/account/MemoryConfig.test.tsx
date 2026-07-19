@@ -156,6 +156,9 @@ describe('MemoryConfig', () => {
     await waitFor(() => {
       expect(screen.getByTestId('memory-switch-hybrid')).toBeInTheDocument()
     })
+    // useMemories on → external ACP memory toggle visible
+    expect(screen.getByTestId('memory-switch-use-external')).toBeInTheDocument()
+    expect(screen.getByTestId('memory-switch-use-external')).toHaveAttribute('aria-checked', 'false')
     // Without embedding: controls stay interactive; enabling hybrid shows a prompt modal
     expect(screen.getByTestId('memory-switch-hybrid')).not.toBeDisabled()
     expect(screen.getByTestId('memory-reindex')).not.toBeDisabled()
@@ -164,6 +167,52 @@ describe('MemoryConfig', () => {
       expect(screen.getByTestId('memory-need-embed-modal')).toBeInTheDocument()
     })
     expect(screen.getByTestId('memory-index-status')).toBeInTheDocument()
+  })
+
+  it('toggles useMemoriesWithExternal when use memories is on', async () => {
+    vi.spyOn(sessionService, 'getMemoryConfig').mockResolvedValue({
+      ...onConfig,
+      useMemoriesWithExternal: false,
+    })
+    vi.spyOn(sessionService, 'listMemories').mockResolvedValue([])
+    const setSpy = vi.spyOn(sessionService, 'setMemoryConfig').mockResolvedValue({
+      ...onConfig,
+      useMemoriesWithExternal: true,
+    })
+
+    render(<MemoryConfig />)
+
+    await waitFor(() => {
+      expect(screen.getByTestId('memory-advanced-toggle')).toBeInTheDocument()
+    })
+    fireEvent.click(screen.getByTestId('memory-advanced-toggle'))
+    await waitFor(() => {
+      expect(screen.getByTestId('memory-switch-use-external')).toBeInTheDocument()
+    })
+    fireEvent.click(screen.getByTestId('memory-switch-use-external'))
+    await waitFor(() => {
+      expect(setSpy).toHaveBeenCalledWith({ useMemoriesWithExternal: true })
+    })
+  })
+
+  it('hides useMemoriesWithExternal toggle when use memories is off', async () => {
+    vi.spyOn(sessionService, 'getMemoryConfig').mockResolvedValue({
+      ...offConfig,
+      useMemories: false,
+      generateMemories: true,
+    })
+    vi.spyOn(sessionService, 'listMemories').mockResolvedValue([])
+
+    render(<MemoryConfig />)
+
+    await waitFor(() => {
+      expect(screen.getByTestId('memory-advanced-toggle')).toBeInTheDocument()
+    })
+    fireEvent.click(screen.getByTestId('memory-advanced-toggle'))
+    await waitFor(() => {
+      expect(screen.getByTestId('memory-switch-hybrid')).toBeInTheDocument()
+    })
+    expect(screen.queryByTestId('memory-switch-use-external')).not.toBeInTheDocument()
   })
 
   it('enables hybrid toggle when embeddingModel is set', async () => {

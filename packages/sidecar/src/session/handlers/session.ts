@@ -33,6 +33,7 @@ export const SESSION_MESSAGE_TYPES = new Set([
   'session:setSystemPrompt',
   'session:setPermissionMode',
   'session:setForcePlan',
+  'session:setAgent',
   'session:setModel',
   'config:setActiveModel',
   'config:testProvider',
@@ -284,6 +285,10 @@ export function handleSessionMessage(
       })
       return
     }
+    case 'session:setAgent': {
+      const s = ctx.ensureSession(msg.sessionId, send)
+      return s.setAgentId(msg.agentId, send).then(() => undefined)
+    }
     case 'session:setModel': {
       ctx.setGlobalActiveModel(msg.llmProvider, msg.model, msg.baseURL ?? '')
       const s = ctx.ensureSession(msg.sessionId, send)
@@ -356,7 +361,7 @@ export function handleSessionMessage(
     }
     case 'workflow:run': {
       const s = ctx.ensureSession(msg.sessionId, send)
-      if (s.running) {
+      if (s.running || s.switchingAgent) {
         send({ type: 'error', sessionId: msg.sessionId, code: 'BUSY', message: 'Session is busy' })
         return
       }

@@ -9,6 +9,10 @@
 //   MOCK_ACP_PLAN=1         -> emit a plan sessionUpdate before the answer
 //   MOCK_ACP_MODELS_ONLY=1  -> session/new returns models{} instead of configOptions (Grok-style)
 //   MOCK_ACP_NO_SET_CONFIG=1-> setSessionConfigOption throws method-not-found (Grok-style fallback)
+//   MOCK_ACP_CLOSE_SLOW_MS=<n> -> delay closeSession so await dispose settles after close RPC
+//   MOCK_ACP_NO_CLOSE=1     -> omit sessionCapabilities.close (no session/close method)
+//   MOCK_ACP_NO_LOAD=1      -> advertise loadSession: false (host must skip load → fresh)
+//   MOCK_ACP_MCP_CAPS=1     -> advertise mcpCapabilities.http + sse
 import { AgentSideConnection, ndJsonStream } from '@agentclientprotocol/sdk'
 import { Readable, Writable, Transform } from 'node:stream'
 
@@ -19,11 +23,17 @@ let modelEffort = 'high'
 let sessionSeq = 0 // distinct id per newSession (first is 'mock-sess-1')
 let cancelled = new Set()
 let resumed = new Set()
+/** Sessions still open (not closed). */
+const open = new Set()
+/** Sessions that received session/close (for dispose settle tests). */
+const closed = new Set()
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
 
 function resetState() {
   cancelled.clear()
   resumed.clear()
+  open.clear()
+  closed.clear()
   sessionSeq = 0
 }
 
@@ -49,9 +59,16 @@ process.stdin.pipe(stdinFilter)
 
 const agent = {
   async initialize() {
+    const agentCapabilities = {
+      // loadSession is boolean; false when MOCK_ACP_NO_LOAD so host short-circuits to newSession.
+      loadSession: !env.MOCK_ACP_NO_LOAD,
+      // Advertise session/close unless MOCK_ACP_NO_CLOSE (tests host gate).
+      ...(env.MOCK_ACP_NO_CLOSE ? {} : { sessionCapabilities: { close: {} } }),
+      ...(env.MOCK_ACP_MCP_CAPS ? { mcpCapabilities: { http: true, sse: true } } : {}),
+    }
     return {
       protocolVersion: 1,
-      agentCapabilities: { loadSession: true },
+      agentCapabilities,
       authMethods: env.MOCK_ACP_AUTH_REQUIRED ? [{ id: 'mock-login', name: 'Mock Login' }] : [],
     }
   },
@@ -59,6 +76,8 @@ const agent = {
   async newSession() {
     if (!authed) { const e = new Error('auth_required'); e.code = -32000; e.data = { authRequired: true }; throw e }
     const sessionId = `mock-sess-${++sessionSeq}`
+    open.add(sessionId)
+    closed.delete(sessionId)
     if (env.MOCK_ACP_MODELS_ONLY) {
       return {
         sessionId,
@@ -82,9 +101,16 @@ const agent = {
   },
   async loadSession(p) {
     resumed.add(p.sessionId) // mark so a later prompt's answer is prefixed 'resumed(...)' — proves load ran
+    open.add(p.sessionId)
     // replay one prior turn
     await conn.sessionUpdate({ sessionId: p.sessionId, update: { sessionUpdate: 'user_message_chunk', content: { type: 'text', text: 'prior question' } } })
     await conn.sessionUpdate({ sessionId: p.sessionId, update: { sessionUpdate: 'agent_message_chunk', content: { type: 'text', text: 'prior answer' } } })
+    return {}
+  },
+  async closeSession(p) {
+    if (env.MOCK_ACP_CLOSE_SLOW_MS) await sleep(Number(env.MOCK_ACP_CLOSE_SLOW_MS))
+    open.delete(p.sessionId)
+    closed.add(p.sessionId)
     return {}
   },
   async setSessionConfigOption(p) {
@@ -116,6 +142,9 @@ const agent = {
   async cancel(p) { cancelled.add(p.sessionId) },
   async prompt(p) {
     const sid = p.sessionId
+    if (closed.has(sid) && !open.has(sid)) {
+      const e = new Error('session closed'); e.code = -32000; throw e
+    }
     cancelled.delete(sid)
     if (env.MOCK_ACP_THINK) await conn.sessionUpdate({ sessionId: sid, update: { sessionUpdate: 'agent_thought_chunk', content: { type: 'text', text: 'thinking… ' } } })
     if (env.MOCK_ACP_PLAN) {

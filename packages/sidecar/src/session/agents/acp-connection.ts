@@ -1,14 +1,53 @@
 import { spawn, type ChildProcessWithoutNullStreams } from 'node:child_process'
 import { Readable, Writable } from 'node:stream'
-import { ClientSideConnection, ndJsonStream, PROTOCOL_VERSION } from '@agentclientprotocol/sdk'
+import { ClientSideConnection, ndJsonStream, PROTOCOL_VERSION, RequestError } from '@agentclientprotocol/sdk'
 import type { AgentConfig } from '@hip/protocol'
+import { logDebug } from '../../debug-logger.js'
 import type { ResolvedModel } from './registry.js'
-import { buildAcpSpawn } from './acp-config.js'
+import { buildAcpSpawn, resolveAcpHostConfig } from './acp-config.js'
+import { buildMcpServersForAcp } from './acp-mcp-list.js'
 import {
   extractAcpConfigOptions,
   patchConfigOptionValue,
   type AcpSelectConfigOption,
 } from './acp-session-options.js'
+import {
+  AcpFsError,
+  acpReadTextFile,
+  acpWriteTextFile,
+  type FsBridgeContext,
+} from './acp-fs-bridge.js'
+import { quirksFor } from './acp-quirks.js'
+
+/**
+ * Runtime agent capabilities from initialize `agentCapabilities`.
+ * Host-path only — do not confuse with workflow `orchestrator/registry.ts` capabilitiesFor.
+ */
+export interface AcpAgentRuntimeCaps {
+  loadSession: boolean
+  closeSession: boolean
+  resumeSession: boolean
+  mcp: { http: boolean; sse: boolean }
+}
+
+/** Parse initialize agentCapabilities into host-facing runtime caps. */
+export function parseAgentRuntimeCaps(agentCapabilities?: {
+  loadSession?: boolean
+  mcpCapabilities?: { http?: boolean; sse?: boolean }
+  sessionCapabilities?: { close?: unknown; resume?: unknown }
+} | null): AcpAgentRuntimeCaps {
+  const ac = agentCapabilities ?? {}
+  return {
+    loadSession: ac.loadSession === true,
+    // sessionCapabilities.close present (including `{}`) means session/close is supported.
+    closeSession: ac.sessionCapabilities?.close != null,
+    resumeSession: ac.sessionCapabilities?.resume != null,
+    mcp: {
+      http: ac.mcpCapabilities?.http === true,
+      sse: ac.mcpCapabilities?.sse === true,
+    },
+  }
+}
 
 /** Per-ACP-session handlers, registered by the provider for the duration of a turn. */
 export interface AcpSessionSink {
@@ -30,10 +69,30 @@ export class AcpConnection {
   private authMethods: Array<{ id: string }> = []
   /** Last advertised select options per ACP session (for agents that don't re-return configOptions). */
   private readonly sessionConfigOptions = new Map<string, AcpSelectConfigOption[]>()
+  /** Per-acpSessionId FS jail/mode context (no cross-session default). */
+  private readonly fsContexts = new Map<string, FsBridgeContext>()
   /** Tail of the child's stderr, kept for diagnostics on death. */
   private stderrTail = ''
+  /**
+   * FS bridge kill-switch captured at construct (global HIP_CONFIG_PATH only — pool is agent-keyed,
+   * not cwd-keyed; project `.hip/hip.toml` [acp] does not re-init an existing warm child).
+   * Same flag gates advertise + handlers so non-compliant agents cannot bypass fs_bridge=false.
+   */
+  private readonly fsEnabled: boolean
+  /**
+   * Agent runtime caps from initialize (host path only).
+   * Null until ensureInit completes.
+   */
+  private _runtimeCaps: AcpAgentRuntimeCaps | null = null
+  /** In-flight closeSession RPCs keyed by acp session id (singleflight / re-entrant safe). */
+  private readonly closing = new Map<string, Promise<void>>()
+  /** Quirks for set_config_option fallback policy (DEFAULT set_model_mode). */
+  private readonly quirks: ReturnType<typeof quirksFor>
 
   constructor(private readonly agent: AgentConfig, private readonly model: ResolvedModel | null) {
+    this.quirks = quirksFor(agent.quirks)
+    // Resolve once so advertise and handlers cannot diverge for this child.
+    this.fsEnabled = resolveAcpHostConfig().fsBridge !== false
     const { command, args, env } = buildAcpSpawn(agent, model)
     this.child = spawn(command, args, { env, stdio: ['pipe', 'pipe', 'pipe'] })
     this.child.stderr.setEncoding('utf8')
@@ -50,8 +109,8 @@ export class AcpConnection {
           if (!sink) return { outcome: { outcome: 'cancelled' } }
           return sink.onPermission(p)
         },
-        readTextFile: async () => ({ content: '' }),
-        writeTextFile: async () => ({}),
+        readTextFile: async (p) => this.handleFsRead(p),
+        writeTextFile: async (p) => this.handleFsWrite(p),
       }),
       ndJsonStream(Writable.toWeb(this.child.stdin), Readable.toWeb(this.child.stdout) as ReadableStream<Uint8Array>),
     )
@@ -61,26 +120,126 @@ export class AcpConnection {
   /** Number of ACP sessions currently held open over this warm child. */
   get sessionCount(): number { return this.openSessions.size }
 
+  /**
+   * Cached agentCapabilities from initialize. Null until first session/init.
+   * Host-path only — workflow registry capabilitiesFor is unrelated.
+   */
+  get runtimeCaps(): AcpAgentRuntimeCaps | null {
+    return this._runtimeCaps
+  }
+
+  /** Ensure initialize has completed; returns cached runtime caps. */
+  async ensureInitialized(): Promise<AcpAgentRuntimeCaps> {
+    await this.ensureInit()
+    return this._runtimeCaps!
+  }
+
   private ensureInit(): Promise<void> {
     if (!this.initPromise) {
+      const clientCapabilities = this.fsEnabled
+        ? { fs: { readTextFile: true, writeTextFile: true } }
+        : {}
       this.initPromise = this.conn
-        .initialize({ protocolVersion: PROTOCOL_VERSION, clientCapabilities: { fs: { readTextFile: true, writeTextFile: true } } })
-        .then((r) => { this.authMethods = (r as { authMethods?: Array<{ id: string }> }).authMethods ?? [] })
+        .initialize({ protocolVersion: PROTOCOL_VERSION, clientCapabilities })
+        .then((r) => {
+          const res = r as {
+            authMethods?: Array<{ id: string }>
+            agentCapabilities?: {
+              loadSession?: boolean
+              mcpCapabilities?: { http?: boolean; sse?: boolean }
+              sessionCapabilities?: { close?: unknown; resume?: unknown }
+            }
+          }
+          this.authMethods = res.authMethods ?? []
+          this._runtimeCaps = parseAgentRuntimeCaps(res.agentCapabilities)
+        })
     }
     return this.initPromise
+  }
+
+  /**
+   * Client FS read with kill-switch + per-session jail gates.
+   * Exposed for unit tests (same path as JSON-RPC handler).
+   */
+  async handleFsRead(p: {
+    sessionId: string
+    path: string
+    line?: number | null
+    limit?: number | null
+  }): Promise<{ content: string }> {
+    try {
+      if (!this.fsEnabled) {
+        throw new AcpFsError('permission_denied', `ACP fs: permission denied: ${p.path}`)
+      }
+      const ctx = this.fsContexts.get(p.sessionId)
+      if (!ctx) {
+        throw new AcpFsError('permission_denied', `ACP fs: permission denied: ${p.path}`)
+      }
+      return await acpReadTextFile(p, ctx)
+    } catch (e) {
+      throw toFsRequestError(e)
+    }
+  }
+
+  /**
+   * Client FS write with kill-switch + per-session jail gates.
+   * Exposed for unit tests (same path as JSON-RPC handler).
+   */
+  async handleFsWrite(p: {
+    sessionId: string
+    path: string
+    content: string
+  }): Promise<Record<string, never>> {
+    try {
+      if (!this.fsEnabled) {
+        throw new AcpFsError('permission_denied', `ACP fs: permission denied: ${p.path}`)
+      }
+      const ctx = this.fsContexts.get(p.sessionId)
+      if (!ctx) {
+        throw new AcpFsError('permission_denied', `ACP fs: permission denied: ${p.path}`)
+      }
+      return await acpWriteTextFile(p, ctx)
+    } catch (e) {
+      throw toFsRequestError(e)
+    }
+  }
+
+  /** Bind FS jail/mode for an ACP session (call before prompt; per-session, no cross-leak). */
+  setFsContext(acpSessionId: string, ctx: FsBridgeContext): void {
+    this.fsContexts.set(acpSessionId, ctx)
+  }
+
+  /** Drop FS context (e.g. on session close). */
+  clearFsContext(acpSessionId: string): void {
+    this.fsContexts.delete(acpSessionId)
+  }
+
+  /** True when this connection advertises + serves fs client capabilities (construct-time flag). */
+  get advertisedFs(): boolean {
+    return this.fsEnabled
+  }
+
+  /**
+   * MCP servers for session/new|loadSession.
+   * Empty unless `[acp].forwardMcp = true`; includes hip.toml + enabled plugin MCP.
+   * Call after ensureInit so runtime caps are available for http/sse filtering.
+   */
+  private mcpServersFor(cwd: string) {
+    return buildMcpServersForAcp(cwd, this._runtimeCaps!)
   }
 
   /** Create a new ACP session (cwd-scoped). Authenticates on demand if the agent demands it. */
   async newSession(cwd: string): Promise<string> {
     await this.ensureInit()
+    const mcpServers = this.mcpServersFor(cwd)
     try {
-      const r = await this.conn.newSession({ cwd, mcpServers: [] })
+      const r = await this.conn.newSession({ cwd, mcpServers })
       this.openSessions.add(r.sessionId)
       return r.sessionId
     } catch (e: any) {
       if (this.isAuthRequired(e)) {
         await this.conn.authenticate({ methodId: this.firstAuthMethod() })
-        const r = await this.conn.newSession({ cwd, mcpServers: [] })
+        const r = await this.conn.newSession({ cwd, mcpServers })
         this.openSessions.add(r.sessionId)
         return r.sessionId
       }
@@ -90,19 +249,25 @@ export class AcpConnection {
 
   async loadSession(acpSessionId: string, cwd: string): Promise<void> {
     await this.ensureInit()
-    await this.conn.loadSession({ sessionId: acpSessionId, cwd, mcpServers: [] })
+    if (!this._runtimeCaps?.loadSession) {
+      // Prefer caller fallthrough to newSession (provider openFreshSession).
+      throw new Error('ACP agent does not support session/load')
+    }
+    const mcpServers = this.mcpServersFor(cwd)
+    await this.conn.loadSession({ sessionId: acpSessionId, cwd, mcpServers })
     this.openSessions.add(acpSessionId)
   }
 
   async newSessionWithOptions(cwd: string): Promise<{ sessionId: string; configOptions: any[] }> {
     await this.ensureInit()
+    const mcpServers = this.mcpServersFor(cwd)
     let r: unknown
     try {
-      r = await this.conn.newSession({ cwd, mcpServers: [] })
+      r = await this.conn.newSession({ cwd, mcpServers })
     } catch (e: any) {
       if (!this.isAuthRequired(e)) throw e
       await this.conn.authenticate({ methodId: this.firstAuthMethod() })
-      r = await this.conn.newSession({ cwd, mcpServers: [] })
+      r = await this.conn.newSession({ cwd, mcpServers })
     }
     const sessionId = (r as { sessionId: string }).sessionId
     const configOptions = extractAcpConfigOptions(r)
@@ -115,10 +280,50 @@ export class AcpConnection {
     if (!this.sinks.has(acpSessionId)) this.refs++
     this.sinks.set(acpSessionId, sink)
   }
-  releaseSession(acpSessionId: string): void {
+
+  /** Turn end: remove streaming sink only. Keeps openSessions + sessionConfigOptions + fs context. */
+  detachSink(acpSessionId: string): void {
     if (this.sinks.delete(acpSessionId)) this.refs = Math.max(0, this.refs - 1)
-    this.openSessions.delete(acpSessionId)
+  }
+
+  /**
+   * Session end (provider.dispose / setAgent / shutdown).
+   * Prefer SDK closeSession when the agent advertised sessionCapabilities.close.
+   * Re-entrant / concurrent closes coalesce on one in-flight RPC per id; skip RPC
+   * when the id was not open or the child is already dead.
+   */
+  async closeSession(acpSessionId: string): Promise<void> {
+    const inflight = this.closing.get(acpSessionId)
+    if (inflight) return inflight
+
+    const work = this.runCloseSession(acpSessionId)
+    this.closing.set(acpSessionId, work)
+    try {
+      await work
+    } finally {
+      this.closing.delete(acpSessionId)
+    }
+  }
+
+  private async runCloseSession(acpSessionId: string): Promise<void> {
+    this.detachSink(acpSessionId)
+    const wasOpen = this.openSessions.delete(acpSessionId)
     this.sessionConfigOptions.delete(acpSessionId)
+    this.clearFsContext(acpSessionId)
+    if (!wasOpen || this.closed || !this._runtimeCaps?.closeSession) return
+    try {
+      await this.conn.closeSession({ sessionId: acpSessionId })
+    } catch (e) {
+      logDebug('acp', 'closeSession failed', { error: e instanceof Error ? e.message : String(e) })
+    }
+  }
+
+  /**
+   * @deprecated Prefer detachSink (turn end) or closeSession (session end). Migration wrapper
+   * that fully closes the session (fire-and-forget async close RPC).
+   */
+  releaseSession(acpSessionId: string): void {
+    void this.closeSession(acpSessionId)
   }
 
   prompt(acpSessionId: string, text: string): Promise<{ stopReason: string }> {
@@ -128,8 +333,8 @@ export class AcpConnection {
 
   /**
    * Set a session config option. Prefers standard `session/set_config_option`.
-   * Falls back for agents (e.g. Grok Build) that use `session/set_model` / `session/set_mode`
-   * and do not implement set_config_option.
+   * On failure, when quirks.setConfigOptionFallback === 'set_model_mode' and configId is
+   * model|mode, tries session/set_model / session/set_mode (DEFAULT preserves today's catch-all).
    */
   async setConfigOption(acpSessionId: string, configId: string, value: string): Promise<{ configOptions?: any[] }> {
     try {
@@ -144,9 +349,11 @@ export class AcpConnection {
       // Response had no options — patch our last known set.
       return { configOptions: this.patchLocal(acpSessionId, configId, value) }
     } catch (e) {
-      // Grok Build rejects set_config_option (often as generic Internal/Method not found).
-      // For model/mode, fall back to session/set_model and session/set_mode.
-      if (configId === 'model' || configId === 'mode') {
+      // Quirks DEFAULT is set_model_mode so agents without set_config_option still work.
+      if (
+        this.quirks.setConfigOptionFallback === 'set_model_mode'
+        && (configId === 'model' || configId === 'mode')
+      ) {
         try {
           await this.applyConfigOptionFallback(acpSessionId, configId, value)
           return { configOptions: this.patchLocal(acpSessionId, configId, value) }
@@ -188,6 +395,10 @@ export class AcpConnection {
     if (this.closed) return
     this.closed = true
     this.sinks.clear()
+    this.refs = 0
+    this.openSessions.clear()
+    this.sessionConfigOptions.clear()
+    this.fsContexts.clear()
     this.onClosed?.()
     // In-flight conn.prompt(...) promises reject on their own when the ndJson stream closes.
   }
@@ -200,6 +411,20 @@ export class AcpConnection {
     // Reuse the methods captured by ensureInit() (always called before newSession) — no re-initialize.
     return this.authMethods[0]?.id ?? 'login'
   }
+}
+
+/** Map AcpFsError → JSON-RPC RequestError with stable message + data.code. */
+function toFsRequestError(e: unknown): RequestError {
+  if (e instanceof RequestError) return e
+  if (e instanceof AcpFsError) {
+    if (e.code === 'not_found') {
+      return new RequestError(-32002, e.message, { code: e.code })
+    }
+    // permission_denied | too_large | io_error → internal with data.code taxonomy
+    return new RequestError(-32603, e.message, { code: e.code })
+  }
+  const msg = e instanceof Error ? e.message : String(e)
+  return RequestError.internalError({ code: 'io_error' }, msg)
 }
 
 /** Module-singleton pool: one AcpConnection per agent-config key, shared across hip Sessions. */

@@ -114,6 +114,41 @@ export interface TerminalConfig {
   shell?: TerminalShellPref
 }
 
+/**
+ * Optional `[acp]` host policy in hip.toml.
+ * Controls ACP client capabilities advertised to external agents and host-side bridges.
+ *
+ * ```toml
+ * [acp]
+ * fs_bridge = true
+ * forward_mcp = false   # secure default — do not hand MCP env/headers to external agents
+ * fs_read_max_bytes = 2000000
+ * ```
+ *
+ * Resolved defaults when fields are omitted: `fsBridge=true`, `forwardMcp=false`,
+ * `fsReadMaxBytes=2_000_000`. Project `[acp]` wholesale-replaces global (same as langsmith).
+ *
+ * When `forwardMcp=true`, hip maps enabled `mcpServers` (toml + enabled plugins) into
+ * ACP session/new|load. Warning: this exposes MCP commands, env, and headers to the
+ * external agent process. Hip `enabledTools`/`disabledTools` are not forwarded.
+ */
+export interface AcpHostConfig {
+  /**
+   * Advertise + implement fs/read_text_file & fs/write_text_file.
+   * Resolved default: true when undefined.
+   * false ⇒ advertise neither (hotfix / rollback).
+   */
+  fsBridge?: boolean
+  /**
+   * Forward enabled hip + plugin MCP configs into session/new|loadSession.
+   * Resolved default: **false** when undefined (secure — no silent key/header leak).
+   * See README “ACP host policy”.
+   */
+  forwardMcp?: boolean
+  /** Max bytes for one fs/read_text_file. Default 2_000_000 when undefined. */
+  fsReadMaxBytes?: number
+}
+
 export interface HipConfig {
   version: number
   providers?: ProviderEntry[]
@@ -132,6 +167,8 @@ export interface HipConfig {
   langsmith?: LangSmithConfig
   /** Optional interactive Terminal defaults. */
   terminal?: TerminalConfig
+  /** Optional ACP host policy (FS bridge, MCP forward). */
+  acp?: AcpHostConfig
 }
 
 /** User-configurable network policy persisted to ~/.hip/config/network.json.

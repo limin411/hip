@@ -134,6 +134,11 @@ export class Session {
   private resumeAbortController: AbortController | null = null
   /** Public so handlers can busy-check without casting (workflow:run). */
   running = false
+  /**
+   * True for the full setAgentId critical section (dispose → config → echo).
+   * Blocks concurrent message:send / regenerate / workflow:run.
+   */
+  switchingAgent = false
   private awaitingResume = false
   /**
    * Connection that owns the active foreground turn / drain / HITL pause.
@@ -505,6 +510,64 @@ export class Session {
   // ── Agent provider delegation ──
   async setAgentConfigOption(configId: string, value: string): Promise<void> { await this.agentProv.setAgentConfigOption(configId, value) }
 
+  /**
+   * Mid-session primary agent switch (session:setAgent).
+   * Idle only; validates enabled acp/opencode; awaits dispose; clears acp_session_id;
+   * reloads plugins; field-echoes session:agentChanged.
+   * Uses `switchingAgent` lock so concurrent send/regenerate cannot race dispose.
+   * Soft rejects use code `AGENT_BUSY` (FE toast; does not demote running status).
+   */
+  async setAgentId(agentId: string, send: (msg: ServerMessage) => void): Promise<boolean> {
+    if (this.running || this.switchingAgent) {
+      send({
+        type: 'error',
+        sessionId: this.id,
+        code: 'AGENT_BUSY',
+        message: 'Cannot change agent while a turn is running',
+      })
+      return false
+    }
+    const trimmed = typeof agentId === 'string' ? agentId.trim() : ''
+    const next = !trimmed || trimmed === 'builtin' ? undefined : trimmed
+    if (next) {
+      const agent = readAgentsConfig(this._config.cwd ?? process.cwd()).find(
+        (a) => a.id === next && a.enabled && (a.kind === 'acp' || a.kind === 'opencode'),
+      )
+      if (!agent) {
+        send({
+          type: 'error',
+          sessionId: this.id,
+          code: 'UNKNOWN_AGENT',
+          message: `Unknown or disabled agent: ${next}`,
+        })
+        return false
+      }
+    }
+    this.switchingAgent = true
+    try {
+      // 1. await dispose → closeSession RPC settles
+      await this.agentProv.dispose()
+      // 2. clear persisted ACP handle (CRITICAL — avoid loadSession on wrong agent)
+      this.store?.setAcpSessionId(this.id, null)
+      // 3. update config (external primary clears hip-only forcePlan — match new-session fork)
+      if (next) {
+        const { forcePlan: _fp, agentId: _prev, ...rest } = this._config
+        this._config = { ...rest, agentId: next }
+      } else {
+        const { agentId: _cleared, ...rest } = this._config
+        this._config = rest
+      }
+      this.store?.updateConfig(this.id, JSON.stringify(this._config))
+      // 4. reload plugins (external clears skills/MCP; builtin reloads)
+      this.configMgr.reloadPlugins()
+      // 5. field-echo (house style — not full SessionConfig)
+      send({ type: 'session:agentChanged', sessionId: this.id, agentId: next ?? null })
+      return true
+    } finally {
+      this.switchingAgent = false
+    }
+  }
+
   // ── Config delegation ──
   setCwd(cwd: string): void { this.configMgr.setCwd(cwd) }
   setThinking(thinking: boolean): boolean { return this.configMgr.setThinking(thinking) }
@@ -754,6 +817,15 @@ export class Session {
     attachments?: AttachmentPayload[],
     connectionId?: string | null,
   ): Promise<void> {
+    if (this.switchingAgent) {
+      _send({
+        type: 'error',
+        sessionId: this.id,
+        code: 'BUSY',
+        message: 'Cannot send while switching agent',
+      })
+      return
+    }
     this.enqueueInput({
       type: 'message',
       content,
@@ -761,7 +833,7 @@ export class Session {
       attachments,
       connectionId: connectionId ?? this.currentConnectionId,
     })
-    if (this.running || this.awaitingResume) return
+    if (this.running || this.awaitingResume || this.switchingAgent) return
     await this.drainInputQueue(_send)
   }
 
@@ -802,7 +874,7 @@ export class Session {
   }
 
   async drainInputQueue(_send: SendFn): Promise<void> {
-    while (!this.running && !this.awaitingResume) {
+    while (!this.running && !this.awaitingResume && !this.switchingAgent) {
       const steer = this.promoteSteerInput()
       const input = steer ?? this.inputQueue.shift()
       if (!input) {
@@ -876,7 +948,7 @@ export class Session {
     send: SendFn,
     opts?: { runInputs?: { text: string; data?: unknown } },
   ): Promise<string> {
-    if (this.running) {
+    if (this.running || this.switchingAgent) {
       // Caller (workflow:run handler) should have checked; still guard.
       send({ type: 'error', sessionId: this.id, code: 'BUSY', message: 'Session is busy' })
       return ''
@@ -968,8 +1040,22 @@ export class Session {
       await Promise.race([Promise.allSettled([...this.backgroundManager.tasks.values()]).then(() => 'settled' as const), timeout])
       this.backgroundManager.clear()
     }
+    // After abort, give a short grace for the foreground turn to leave `running`
+    // so dispose→closeSession does not race the in-flight prompt as hard.
+    if (this.running) {
+      await Promise.race([
+        new Promise<void>((resolve) => {
+          const start = Date.now()
+          const tick = () => {
+            if (!this.running || Date.now() - start > 2_000) resolve()
+            else setTimeout(tick, 20)
+          }
+          tick()
+        }),
+      ])
+    }
     this.spawnedSubagentIds.clear()
-    this.agentProv.dispose()
+    await this.agentProv.dispose()
   }
 }
 

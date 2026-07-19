@@ -78,7 +78,7 @@ describe('InputBar', () => {
     baseMocks()
     vi.spyOn(domain, 'useActiveSession').mockReturnValue({
       id: 's1',
-      config: { llmProvider: 'openai', model: 'gpt-4o', tools: [] },
+      config: { llmProvider: 'openai', model: 'gpt-4o', tools: [], surface: 'chat' as const },
       title: '',
       preview: '',
       messages: [],
@@ -106,7 +106,7 @@ describe('InputBar', () => {
     baseMocks()
     vi.spyOn(domain, 'useActiveSession').mockReturnValue({
       id: 's1',
-      config: { llmProvider: 'openai', model: 'gpt-4o', tools: [] },
+      config: { llmProvider: 'openai', model: 'gpt-4o', tools: [], surface: 'chat' as const },
       title: '',
       preview: '',
       messages: [],
@@ -128,7 +128,7 @@ describe('InputBar', () => {
     baseMocks()
     vi.spyOn(domain, 'useActiveSession').mockReturnValue({
       id: 's1',
-      config: { llmProvider: 'openai', model: 'gpt-4o', tools: [] },
+      config: { llmProvider: 'openai', model: 'gpt-4o', tools: [], surface: 'chat' as const },
       title: '',
       preview: '',
       messages: [],
@@ -158,7 +158,7 @@ describe('InputBar', () => {
     baseMocks()
     vi.spyOn(domain, 'useActiveSession').mockReturnValue({
       id: 's1',
-      config: { llmProvider: 'openai', model: 'gpt-4o', tools: [] },
+      config: { llmProvider: 'openai', model: 'gpt-4o', tools: [], surface: 'chat' as const },
       title: '',
       preview: '',
       messages: [],
@@ -177,7 +177,7 @@ describe('InputBar', () => {
     baseMocks()
     const session = {
       id: 's1',
-      config: { llmProvider: 'openai', model: 'gpt-4o', tools: [] },
+      config: { llmProvider: 'openai', model: 'gpt-4o', tools: [], surface: 'chat' as const },
       title: '',
       preview: '',
       messages: [],
@@ -194,7 +194,7 @@ describe('InputBar', () => {
 
     vi.spyOn(domain, 'useActiveSession').mockReturnValue({
       ...session,
-      config: { llmProvider: 'openai', model: 'gpt-4', tools: [] },
+      config: { llmProvider: 'openai', model: 'gpt-4', tools: [], surface: 'chat' as const },
     } as any)
     rerender(<InputBar />)
 
@@ -207,7 +207,7 @@ describe('InputBar', () => {
     baseMocks()
     vi.spyOn(domain, 'useActiveSession').mockReturnValue({
       id: 's1',
-      config: { llmProvider: 'openai', model: 'gpt-4', tools: [] },
+      config: { llmProvider: 'openai', model: 'gpt-4', tools: [], surface: 'chat' as const },
       title: '',
       preview: '',
       messages: [],
@@ -274,7 +274,7 @@ describe('InputBar', () => {
     baseMocks()
     vi.spyOn(domain, 'useActiveSession').mockReturnValue({
       id: 's1',
-      config: { llmProvider: 'openai', model: 'gpt-4o', tools: [] },
+      config: { llmProvider: 'openai', model: 'gpt-4o', tools: [], surface: 'chat' as const },
       title: '',
       preview: '',
       messages: [],
@@ -301,7 +301,7 @@ describe('InputBar', () => {
     useDomainStore.setState({
       sessions: [{
         id: 's1',
-        config: { llmProvider: 'openai', model: 'gpt-4', tools: [] },
+        config: { llmProvider: 'openai', model: 'gpt-4', tools: [], surface: 'chat' as const },
         title: 'T',
         preview: 'P',
         updatedAtMs: 0,
@@ -315,7 +315,7 @@ describe('InputBar', () => {
     })
     vi.spyOn(domain, 'useActiveSession').mockReturnValue({
       id: 's1',
-      config: { llmProvider: 'openai', model: 'gpt-4', tools: [] },
+      config: { llmProvider: 'openai', model: 'gpt-4', tools: [], surface: 'chat' as const },
       title: '',
       preview: '',
       messages: [],
@@ -351,7 +351,7 @@ describe('InputBar', () => {
     baseMocks()
     vi.spyOn(domain, 'useActiveSession').mockReturnValue({
       id: 's1',
-      config: { llmProvider: 'openai', model: 'gpt-4', tools: [] },
+      config: { llmProvider: 'openai', model: 'gpt-4', tools: [], surface: 'chat' as const },
       title: '',
       preview: '',
       messages: [],
@@ -385,7 +385,7 @@ describe('InputBar', () => {
     baseMocks()
     vi.spyOn(domain, 'useActiveSession').mockReturnValue({
       id: 's1',
-      config: { llmProvider: 'openai', model: 'gpt-4o', tools: [] },
+      config: { llmProvider: 'openai', model: 'gpt-4o', tools: [], surface: 'chat' as const },
       title: '',
       preview: '',
       messages: [],
@@ -406,12 +406,92 @@ describe('InputBar', () => {
     expect(nextH).toBeGreaterThan(startH)
   })
 
+  it('hides hip model/effort when active session is ACP primary', () => {
+    baseMocks()
+    hipConfigStore.useHipConfigStore.setState({
+      config: {
+        version: 1,
+        agents: [
+          {
+            id: 'oc',
+            name: 'OpenCode',
+            kind: 'acp',
+            command: 'opencode',
+            args: [],
+            enabled: true,
+          },
+        ],
+      },
+      loaded: true,
+      error: null,
+    })
+    vi.spyOn(domain, 'useActiveSession').mockReturnValue({
+      id: 's1',
+      config: {
+        llmProvider: 'openai',
+        model: 'gpt-4o',
+        tools: [],
+        surface: 'chat' as const,
+        agentId: 'oc',
+      },
+      title: '',
+      preview: '',
+      messages: [],
+    } as any)
+
+    render(<InputBar />)
+    // PR-6b: active session unlocks picker (mid-switch via confirm dialog).
+    expect(screen.getByTestId('session-agent-chip-active')).toBeInTheDocument()
+    expect(screen.queryByTestId('model-chip')).not.toBeInTheDocument()
+    expect(screen.queryByTestId('effort-chip')).not.toBeInTheDocument()
+  })
+
+  it('code ACP session keeps permission and hides plan/model', () => {
+    baseMocks()
+    hipConfigStore.useHipConfigStore.setState({
+      config: {
+        version: 1,
+        agents: [
+          {
+            id: 'oc',
+            name: 'OpenCode',
+            kind: 'acp',
+            command: 'opencode',
+            args: [],
+            enabled: true,
+          },
+        ],
+      },
+      loaded: true,
+      error: null,
+    })
+    vi.spyOn(domain, 'useActiveSession').mockReturnValue({
+      id: 's1',
+      config: {
+        llmProvider: 'openai',
+        model: 'gpt-4o',
+        tools: [],
+        surface: 'code' as const,
+        cwd: '/tmp/p',
+        agentId: 'oc',
+      },
+      title: '',
+      preview: '',
+      messages: [],
+    } as any)
+
+    render(<InputBar />)
+    expect(screen.getByTestId('permission-chip')).toBeInTheDocument()
+    expect(screen.queryByTestId('plan-mode-chip')).not.toBeInTheDocument()
+    expect(screen.queryByTestId('model-chip')).not.toBeInTheDocument()
+  })
+
   it('blocks this session composer while a permission request is pending', () => {
     baseMocks()
     useDomainStore.setState({
       sessions: [{
         id: 's1',
-        config: { llmProvider: 'openai', model: 'gpt-4o', tools: [] },
+        config: { llmProvider: 'openai', model: 'gpt-4o', tools: [], surface: 'chat' as const },
         title: 'T',
         preview: 'P',
         updatedAtMs: 0,
@@ -430,7 +510,7 @@ describe('InputBar', () => {
     })
     vi.spyOn(domain, 'useActiveSession').mockReturnValue({
       id: 's1',
-      config: { llmProvider: 'openai', model: 'gpt-4o', tools: [] },
+      config: { llmProvider: 'openai', model: 'gpt-4o', tools: [], surface: 'chat' as const },
       title: '',
       preview: '',
       messages: [],

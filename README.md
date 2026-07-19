@@ -111,6 +111,30 @@ grouped into one LangSmith **Thread** via `metadata.thread_id` /
 LLM spans are named `hip.model`. Keep `api_key` out of git; hip.toml lives under
 `~/.hip/config/` (do not sync that directory to public cloud/dotfile repos).
 
+### ACP host policy (optional)
+
+When a session uses an external ACP agent (OpenCode, Claude Code, Grok Build, …),
+hip acts as the ACP **client**. Host-side policy lives in `hip.toml` under `[acp]`:
+
+```toml
+[acp]
+fsBridge = true          # advertise + serve fs/read_text_file & fs/write_text_file (default true)
+forwardMcp = false       # forward enabled hip/plugin MCP servers into session/new (default false)
+fsReadMaxBytes = 2000000 # max bytes per fs/read_text_file (default 2_000_000)
+```
+
+Snake_case aliases (`fs_bridge`, `forward_mcp`, `fs_read_max_bytes`) are accepted.
+Project `.hip/hip.toml` **wholesale-replaces** the global `[acp]` section (same
+rule as `[langsmith]`).
+
+**MCP forward security note:** `forwardMcp` defaults to **false** so hip does not
+silently hand MCP commands, env vars, or HTTP headers (including API keys) to an
+external agent process. When set to `true`, enabled servers from hip.toml
+`mcpServers` **and** enabled plugins are mapped into ACP `session/new` /
+`session/load` (`stdio` always; `http`/`sse` only if the agent advertised those
+MCP capabilities). Hip tool allow/deny lists (`enabledTools` / `disabledTools`)
+are **not** forwarded — the agent sees the full MCP surface.
+
 ### Local data layout (`~/.hip/`)
 
 | Path | Purpose |

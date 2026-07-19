@@ -162,4 +162,31 @@ describe('external ACP agent through SessionManager', () => {
     expect(text).toContain('answer(')
     expect(text).not.toContain('resumed(')
   }, 20000)
+
+  it('session:delete disposes the live Session so ACP closeSession runs (openSessions cleared)', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'hip-acp-'))
+    registerMockAgent(dir)
+    const mgr = new SessionManager(undefined, () => undefined, dir)
+    const out: ServerMessage[] = []
+    const send = (m: ServerMessage) => out.push(m)
+    mgr.handle({ type: 'session:create', id: 's1', config: { agentId: 'mock', cwd: dir } as any }, send)
+    await mgr.handle({ type: 'message:send', sessionId: 's1', id: 'm1', content: 'hi', role: 'user' } as any, send)
+    await waitForTerminal(out, (m) => m.type === 'message:complete')
+
+    const conn = acpConnections.getConnections()[0]
+    expect(conn).toBeDefined()
+    expect(conn!.sessionCount).toBe(1)
+
+    const before = out.length
+    mgr.handle({ type: 'session:delete', sessionId: 's1' }, send)
+    // session:deleted stays synchronous for clients
+    expect(out.slice(before).some((m) => m.type === 'session:deleted')).toBe(true)
+
+    // destroy is fire-and-forget after delete — wait for closeSession to settle
+    const start = Date.now()
+    while (conn!.sessionCount !== 0 && Date.now() - start < 5000) {
+      await new Promise((r) => setTimeout(r, 30))
+    }
+    expect(conn!.sessionCount).toBe(0)
+  }, 20000)
 })

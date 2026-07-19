@@ -56,13 +56,25 @@ describe('draftStore agentId', () => {
     useDraftStore.getState().setAgentId('agent-1')
     expect(useDraftStore.getState().draft?.agentId).toBe('agent-1')
   })
-  it('setAgentId preserves existing draft fields', () => {
+  it('setAgentId preserves project fields and clears hip-only controls for external agent', () => {
     useDraftStore.getState().pickProject('/tmp/x')
+    useDraftStore.getState().setModelKey('openai/gpt-4o')
+    useDraftStore.getState().setForcePlan(true)
+    useDraftStore.getState().setEffort('high')
     useDraftStore.getState().setAgentId('agent-2')
     const d = useDraftStore.getState().draft!
     expect(d.cwd).toBe('/tmp/x')
     expect(d.mode).toBe('project')
     expect(d.agentId).toBe('agent-2')
+    expect(d.modelKey).toBeUndefined()
+    expect(d.forcePlan).toBeUndefined()
+    expect(d.effort).toBeUndefined()
+  })
+  it('setAgentId(builtin) clears agentId field', () => {
+    useDraftStore.getState().setAgentId('agent-3')
+    useDraftStore.getState().setAgentId('builtin')
+    expect(useDraftStore.getState().draft?.agentId).toBeUndefined()
+    expect('agentId' in (useDraftStore.getState().draft ?? {})).toBe(false)
   })
   it('reset clears agentId', () => {
     useDraftStore.getState().setAgentId('agent-3')

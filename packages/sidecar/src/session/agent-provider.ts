@@ -39,9 +39,9 @@ export class AgentProviderManager {
     await this.externalProvider?.setConfigOption?.(configId, value)
   }
 
-  /** Dispose the cached external provider. */
-  dispose(): void {
-    this.externalProvider?.dispose()
+  /** Dispose the cached external provider (awaits ACP session/close when applicable). */
+  async dispose(): Promise<void> {
+    await this.externalProvider?.dispose()
     this.externalProvider = null
   }
 

@@ -1,5 +1,6 @@
 import type { AgentConfig } from '@hip/protocol'
 import type { ResolvedModel } from './registry.js'
+export { resolveAcpHostConfig, type ResolvedAcpHostConfig } from '../../config/hip-config.js'
 
 export interface AcpSpawn { command: string; args: string[]; env: NodeJS.ProcessEnv }
 

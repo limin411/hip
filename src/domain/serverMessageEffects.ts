@@ -89,6 +89,13 @@ export function applyServerMessageEffects(msg: ServerMessage, deps: ServerMessag
       deps.resyncActiveIfRunning()
       return
 
+    case 'error':
+      // Dedicated soft-reject from session:setAgent (running or already switching).
+      if (msg.code === 'AGENT_BUSY') {
+        toast.error(i18n.t('composer.agentSwitch.busy'))
+      }
+      return
+
     case 'fs:ls:result':
       useFsStore.getState().setEntries(msg.sessionId, msg.path, msg.entries)
       return

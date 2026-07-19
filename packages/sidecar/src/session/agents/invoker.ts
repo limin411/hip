@@ -13,6 +13,8 @@ import { createAgentProvider } from './index.js'
 import { readAgentsConfig, resolveAgentModel, type ResolvedModel } from './registry.js'
 import type { AgentProvider, ExternalAgentHooks } from './types.js'
 import type { HookRegistry } from '../hooks/registry.js'
+import { resolveAcpHostConfig } from '../../config/hip-config.js'
+import type { FsBridgeContext } from './acp-fs-bridge.js'
 
 /** Run one configured external agent's turn and return its final text.
  *  Shaped like the orchestrator's AgentRunner (agentId + task → text), but it also
@@ -186,6 +188,17 @@ export function createAgentInvoker(cwd: string, deps: InvokerDeps = {}): AgentIn
       // branch only; resolving here would be dead work that contradicts the UI promise.
       const model = null
       const provider = createProvider(agent, cwd, model)
+      // ACP FS bridge: inherit parent session permissionMode (default edit when unset).
+      const setFs = (provider as { setTurnFsContext?: (ctx: FsBridgeContext) => void }).setTurnFsContext
+      if (typeof setFs === 'function') {
+        const acpHost = resolveAcpHostConfig(cwd)
+        const mode = extras?.permissionMode ?? 'edit'
+        setFs.call(provider, {
+          cwd,
+          permissionMode: mode,
+          readMaxBytes: acpHost.fsReadMaxBytes,
+        })
+      }
       let text = ''
       // Tee token deltas so we can return the final text while still forwarding
       // every event to the caller's sink (the dispatch tool-card).
@@ -202,7 +215,7 @@ export function createAgentInvoker(cwd: string, deps: InvokerDeps = {}): AgentIn
         await provider.runTurn(task, teed, signal, externalHooks)
         return text
       } finally {
-        provider.dispose()
+        await provider.dispose()
       }
     },
   }

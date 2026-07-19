@@ -77,6 +77,22 @@ describe('applyServerMessageEffects', () => {
     expect(deps.resyncActiveIfRunning).toHaveBeenCalled()
   })
 
+  it('AGENT_BUSY toasts agent-switch busy; plain BUSY does not', () => {
+    const deps = makeDeps()
+    toastError.mockClear()
+    applyServerMessageEffects(
+      { type: 'error', sessionId: 's1', code: 'AGENT_BUSY', message: 'Cannot change agent while a turn is running' },
+      deps,
+    )
+    expect(toastError).toHaveBeenCalled()
+    toastError.mockClear()
+    applyServerMessageEffects(
+      { type: 'error', sessionId: 's1', code: 'BUSY', message: 'A turn is already running' },
+      deps,
+    )
+    expect(toastError).not.toHaveBeenCalled()
+  })
+
   it('compact:result applied appends counts and optional summary', () => {
     const deps = makeDeps()
     applyServerMessageEffects({

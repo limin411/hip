@@ -14,7 +14,8 @@ export interface ExternalAgentHooks {
 /** A turn-level agent. The built-in agent stays inline in Session; this is the external seam. */
 export interface AgentProvider {
   runTurn(text: string, emit: GraphEmit, signal: AbortSignal, hooks?: ExternalAgentHooks): Promise<void>
-  dispose(): void
+  /** Settles after ACP session/close (if any) or immediately for non-ACP. */
+  dispose(): Promise<void>
   /** ACP control-plane: switch the live model/mode. Optional (custom CLI agents omit it). */
   setConfigOption?(configId: string, value: string): Promise<void>
 }

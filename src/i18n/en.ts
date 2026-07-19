@@ -310,6 +310,13 @@ export const en = {
       styleDelete: 'Delete style',
       styleEmpty: 'No saved styles yet. Create one below.',
       agentRestarted: 'External agent restarted — earlier context was not carried over.',
+      acpCliff: {
+        title: 'External agent mode',
+        body: 'This session is driven by {{name}}. Hip tools, skills, and delegation are unavailable.',
+        mcpOff: 'Hip MCP servers are not forwarded (enable in Settings → ACP if needed).',
+        mcpOn: 'Configured Hip MCP servers are forwarded into this agent.',
+        dismiss: 'Got it',
+      },
       modelHint: 'Choose the model',
       noModelSelected: 'Select a model',
       attach: 'Attach file',
@@ -389,6 +396,22 @@ export const en = {
       subagent: {
         noSummary: 'Sub-task finished (no text summary)',
         toolsCount: '{{count}} steps',
+      },
+    },
+    composer: {
+      agentPicker: {
+        label: 'Agent',
+        builtin: 'hip (built-in)',
+        empty: 'No external agents enabled. Add one in Settings.',
+      },
+      agentSwitch: {
+        title: 'Switch agent?',
+        body: 'Switching the primary agent restarts external context. Earlier agent context is not carried over.',
+        target: 'Switch to {{name}}',
+        thisSession: 'Switch this session',
+        newSession: 'New session',
+        cancel: 'Cancel',
+        busy: 'Cannot switch agent while a turn is running',
       },
     },
     artifact: {
@@ -850,6 +873,9 @@ export const en = {
         useMemories: 'Use memories',
         useMemoriesDesc: 'Inject relevant memories into the agent context for each turn.',
         useMemoriesPlain: 'On each turn, inject saved facts into the agent’s context.',
+        useMemoriesWithExternal: 'Use memories with external (ACP) agents',
+        useMemoriesWithExternalHint:
+          'When on, hip prefixes each ACP primary turn with a read-only memory block. Does not apply to sub-agent dispatch. May increase tokens.',
         generateMemories: 'Auto-learn',
         generateMemoriesDesc: 'Extract and consolidate long-term memories after conversations.',
         generateMemoriesPlain:

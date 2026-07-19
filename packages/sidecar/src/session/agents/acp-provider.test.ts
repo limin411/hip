@@ -166,4 +166,23 @@ describe('AcpAgentProvider', () => {
     expect(b.out.text).toContain('hello world')
     await p.dispose()
   })
+
+  it('skips loadSession and opens fresh when agent does not advertise loadSession', async () => {
+    // Resume id present, but agent caps.loadSession=false → openFreshSession (not resumed).
+    const p = withFs(new AcpAgentProvider(
+      cfg({ id: 'mock-no-load-prov', env: { MOCK_ACP_NO_LOAD: '1' } }),
+      process.cwd(),
+      null,
+      'prior-mock-sess',
+    ))
+    const a = cap()
+    await p.runTurn('hi', a.emit, new AbortController().signal)
+    // Mock only prefixes 'resumed(...)' when loadSession RPC ran.
+    expect(a.out.text).toContain('answer(')
+    expect(a.out.text).not.toContain('resumed(')
+    // Fresh session id, not the resume target.
+    expect(p.sessionId).toMatch(/^mock-sess-/)
+    expect(p.sessionId).not.toBe('prior-mock-sess')
+    await p.dispose()
+  })
 })

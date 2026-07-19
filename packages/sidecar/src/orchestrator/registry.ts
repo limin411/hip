@@ -1,5 +1,10 @@
 import type { AgentConfig, AgentCapabilities, AgentDescriptor, AgentId } from '@hip/protocol'
 
+/**
+ * Workflow-orchestrator static capabilities by agent kind.
+ * Not ACP host runtime caps (those live on AcpConnection as AcpAgentRuntimeCaps from initialize).
+ * Do not drive session/load, MCP filter, or set_config_option from this table.
+ */
 export function capabilitiesFor(kind: AgentConfig['kind']): AgentCapabilities {
   switch (kind) {
     case 'acp':

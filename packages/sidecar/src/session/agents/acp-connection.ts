@@ -16,10 +16,36 @@ import {
   acpWriteTextFile,
   type FsBridgeContext,
 } from './acp-fs-bridge.js'
+import { quirksFor } from './acp-quirks.js'
 
-/** Minimal runtime caps captured at initialize (PR-4 expands). */
-interface AcpRuntimeCaps {
+/**
+ * Runtime agent capabilities from initialize `agentCapabilities`.
+ * Host-path only — do not confuse with workflow `orchestrator/registry.ts` capabilitiesFor.
+ */
+export interface AcpAgentRuntimeCaps {
+  loadSession: boolean
   closeSession: boolean
+  resumeSession: boolean
+  mcp: { http: boolean; sse: boolean }
+}
+
+/** Parse initialize agentCapabilities into host-facing runtime caps. */
+export function parseAgentRuntimeCaps(agentCapabilities?: {
+  loadSession?: boolean
+  mcpCapabilities?: { http?: boolean; sse?: boolean }
+  sessionCapabilities?: { close?: unknown; resume?: unknown }
+} | null): AcpAgentRuntimeCaps {
+  const ac = agentCapabilities ?? {}
+  return {
+    loadSession: ac.loadSession === true,
+    // sessionCapabilities.close present (including `{}`) means session/close is supported.
+    closeSession: ac.sessionCapabilities?.close != null,
+    resumeSession: ac.sessionCapabilities?.resume != null,
+    mcp: {
+      http: ac.mcpCapabilities?.http === true,
+      sse: ac.mcpCapabilities?.sse === true,
+    },
+  }
 }
 
 /** Per-ACP-session handlers, registered by the provider for the duration of a turn. */
@@ -52,12 +78,18 @@ export class AcpConnection {
    * Same flag gates advertise + handlers so non-compliant agents cannot bypass fs_bridge=false.
    */
   private readonly fsEnabled: boolean
-  /** Agent runtime caps from initialize (closeSession gated on sessionCapabilities.close). */
-  private runtimeCaps: AcpRuntimeCaps | null = null
+  /**
+   * Agent runtime caps from initialize (host path only).
+   * Null until ensureInit completes.
+   */
+  private _runtimeCaps: AcpAgentRuntimeCaps | null = null
   /** In-flight closeSession RPCs keyed by acp session id (singleflight / re-entrant safe). */
   private readonly closing = new Map<string, Promise<void>>()
+  /** Quirks for set_config_option fallback policy (DEFAULT set_model_mode). */
+  private readonly quirks: ReturnType<typeof quirksFor>
 
   constructor(private readonly agent: AgentConfig, private readonly model: ResolvedModel | null) {
+    this.quirks = quirksFor(agent.quirks)
     // Resolve once so advertise and handlers cannot diverge for this child.
     this.fsEnabled = resolveAcpHostConfig().fsBridge !== false
     const { command, args, env } = buildAcpSpawn(agent, model)
@@ -87,6 +119,20 @@ export class AcpConnection {
   /** Number of ACP sessions currently held open over this warm child. */
   get sessionCount(): number { return this.openSessions.size }
 
+  /**
+   * Cached agentCapabilities from initialize. Null until first session/init.
+   * Host-path only — workflow registry capabilitiesFor is unrelated.
+   */
+  get runtimeCaps(): AcpAgentRuntimeCaps | null {
+    return this._runtimeCaps
+  }
+
+  /** Ensure initialize has completed; returns cached runtime caps. */
+  async ensureInitialized(): Promise<AcpAgentRuntimeCaps> {
+    await this.ensureInit()
+    return this._runtimeCaps!
+  }
+
   private ensureInit(): Promise<void> {
     if (!this.initPromise) {
       const clientCapabilities = this.fsEnabled
@@ -98,14 +144,13 @@ export class AcpConnection {
           const res = r as {
             authMethods?: Array<{ id: string }>
             agentCapabilities?: {
-              sessionCapabilities?: { close?: unknown }
+              loadSession?: boolean
+              mcpCapabilities?: { http?: boolean; sse?: boolean }
+              sessionCapabilities?: { close?: unknown; resume?: unknown }
             }
           }
           this.authMethods = res.authMethods ?? []
-          // sessionCapabilities.close present (including `{}`) means session/close is supported.
-          this.runtimeCaps = {
-            closeSession: res.agentCapabilities?.sessionCapabilities?.close != null,
-          }
+          this._runtimeCaps = parseAgentRuntimeCaps(res.agentCapabilities)
         })
     }
     return this.initPromise
@@ -193,6 +238,10 @@ export class AcpConnection {
 
   async loadSession(acpSessionId: string, cwd: string): Promise<void> {
     await this.ensureInit()
+    if (!this._runtimeCaps?.loadSession) {
+      // Prefer caller fallthrough to newSession (provider openFreshSession).
+      throw new Error('ACP agent does not support session/load')
+    }
     await this.conn.loadSession({ sessionId: acpSessionId, cwd, mcpServers: [] })
     this.openSessions.add(acpSessionId)
   }
@@ -248,7 +297,7 @@ export class AcpConnection {
     const wasOpen = this.openSessions.delete(acpSessionId)
     this.sessionConfigOptions.delete(acpSessionId)
     this.clearFsContext(acpSessionId)
-    if (!wasOpen || this.closed || !this.runtimeCaps?.closeSession) return
+    if (!wasOpen || this.closed || !this._runtimeCaps?.closeSession) return
     try {
       await this.conn.closeSession({ sessionId: acpSessionId })
     } catch (e) {
@@ -271,8 +320,8 @@ export class AcpConnection {
 
   /**
    * Set a session config option. Prefers standard `session/set_config_option`.
-   * Falls back for agents (e.g. Grok Build) that use `session/set_model` / `session/set_mode`
-   * and do not implement set_config_option.
+   * On failure, when quirks.setConfigOptionFallback === 'set_model_mode' and configId is
+   * model|mode, tries session/set_model / session/set_mode (DEFAULT preserves today's catch-all).
    */
   async setConfigOption(acpSessionId: string, configId: string, value: string): Promise<{ configOptions?: any[] }> {
     try {
@@ -287,9 +336,11 @@ export class AcpConnection {
       // Response had no options — patch our last known set.
       return { configOptions: this.patchLocal(acpSessionId, configId, value) }
     } catch (e) {
-      // Grok Build rejects set_config_option (often as generic Internal/Method not found).
-      // For model/mode, fall back to session/set_model and session/set_mode.
-      if (configId === 'model' || configId === 'mode') {
+      // Quirks DEFAULT is set_model_mode so agents without set_config_option still work.
+      if (
+        this.quirks.setConfigOptionFallback === 'set_model_mode'
+        && (configId === 'model' || configId === 'mode')
+      ) {
         try {
           await this.applyConfigOptionFallback(acpSessionId, configId, value)
           return { configOptions: this.patchLocal(acpSessionId, configId, value) }

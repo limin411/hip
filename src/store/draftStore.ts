@@ -11,7 +11,7 @@ export interface Draft {
   mode: 'project' | 'chat'
   cwd?: string
   text: string
-  agentId?: string             // legacy; no longer set by the composer
+  agentId?: string             // primary agent for new sessions: undefined|'builtin' = hip; else ACP agent id
   modelKey?: string            // 'providerID/modelID' chosen for this chat
   permissionMode?: PermissionMode   // 'chat'|'edit'|'full' chosen for this chat; undefined ⇒ server default 'edit'
   /** When true, first committed code session forces plan mode (EnterPlanMode path). */

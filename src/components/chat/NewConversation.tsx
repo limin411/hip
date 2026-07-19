@@ -19,8 +19,11 @@ import { EffortLevelPicker } from './EffortLevelPicker'
 import { PermissionModePicker } from './PermissionModePicker'
 import { PlanModeChip } from './PlanModeChip'
 import { AttachmentButton } from './AttachmentButton'
+import { SessionAgentPicker } from './SessionAgentPicker'
+import { AcpCapabilityCliffBanner } from './AcpCapabilityCliffBanner'
 import { isAttachmentSupported } from '@/lib/attachmentEligibility'
 import { activeModelKey } from '@/lib/modelKey'
+import { isExternalPrimary } from '@/lib/sessionAgent'
 import type { LocalAttachment } from './attachmentTypes'
 import { MascotActor } from '@/components/login/MascotActor'
 
@@ -58,6 +61,8 @@ export function NewConversation() {
   const agents = useHipConfigStore(useShallow((s) => s.config.agents ?? []))
   const currentKey = draft?.modelKey ?? activeModelKey(providersConfig)
   const attachmentsSupported = isAttachmentSupported(currentKey, agents, catalog)
+  // External ACP primary: hide hip-model-only controls (model/effort/forcePlan); keep permissionMode.
+  const externalPrimary = isExternalPrimary(draft?.agentId)
 
   useEffect(() => {
     if (!attachmentsSupported) {
@@ -144,6 +149,7 @@ export function NewConversation() {
             {t('chat.greetingSub.default', '')}
           </p>
         </div>
+        <AcpCapabilityCliffBanner />
         <div className="relative">
           {query !== null && (
             <SlashCommandPalette value={text} surface={surface} sessionId={activeId} skills={skills} onSelect={handleCommandSelect} onDismiss={handleDismiss} />
@@ -158,9 +164,21 @@ export function NewConversation() {
             inputRef={inputRef}
             leftSlot={
               surface === 'code' ? (
-                <><ModelPicker /><EffortLevelPicker /><PermissionModePicker /><PlanModeChip /><AttachmentButton onAttach={setAttachments} /></>
+                <>
+                  <SessionAgentPicker />
+                  {!externalPrimary && <ModelPicker />}
+                  {!externalPrimary && <EffortLevelPicker />}
+                  <PermissionModePicker />
+                  {!externalPrimary && <PlanModeChip />}
+                  <AttachmentButton onAttach={setAttachments} />
+                </>
               ) : (
-                <><ModelPicker /><EffortLevelPicker /><AttachmentButton onAttach={(add) => setAttachments((prev) => [...prev, ...add])} /></>
+                <>
+                  <SessionAgentPicker />
+                  {!externalPrimary && <ModelPicker />}
+                  {!externalPrimary && <EffortLevelPicker />}
+                  <AttachmentButton onAttach={(add) => setAttachments((prev) => [...prev, ...add])} />
+                </>
               )
             }
             attachments={attachments}

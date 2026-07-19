@@ -602,9 +602,9 @@ export function KnowledgeWorkspace() {
               type="button"
               data-testid="knowledge-view-docs"
               className={cn(
-                'rounded-md px-2 py-0.5 text-[11px] font-medium uppercase tracking-[0.06em]',
+                'rounded-md px-2 py-0.5 text-caption font-medium transition-colors duration-chrome',
                 activeViewId == null
-                  ? 'bg-accent/15 text-accent-strong'
+                  ? 'bg-state-hover text-ink'
                   : 'text-ink-tertiary hover:bg-state-hover hover:text-ink',
               )}
               onClick={() => setActiveViewId(null)}
@@ -617,9 +617,9 @@ export function KnowledgeWorkspace() {
                 type="button"
                 data-testid={`knowledge-view-tab-${v.id}`}
                 className={cn(
-                  'rounded-md px-2 py-0.5 text-[11px] font-medium',
+                  'rounded-md px-2 py-0.5 text-caption font-medium transition-colors duration-chrome',
                   activeViewId === v.id
-                    ? 'bg-accent/15 text-accent-strong'
+                    ? 'bg-state-hover text-ink'
                     : 'text-ink-tertiary hover:bg-state-hover hover:text-ink',
                 )}
                 onClick={() => setActiveViewId(v.id)}
@@ -629,11 +629,11 @@ export function KnowledgeWorkspace() {
             ))}
           </div>
           <div className="flex shrink-0 items-center justify-between px-3.5 pb-1.5 pt-1">
-            <span className="text-[11px] font-medium uppercase tracking-[0.08em] text-ink-tertiary">
+            <span className="text-caption font-medium text-ink-tertiary">
               {t('knowledge.tree.sectionLabel')}
             </span>
             {docCount > 0 && (
-              <span className="tabular-nums text-[11px] text-ink-tertiary/80">
+              <span className="tabular-nums text-caption text-ink-tertiary">
                 {docCount}
               </span>
             )}

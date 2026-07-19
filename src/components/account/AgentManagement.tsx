@@ -108,7 +108,7 @@ export function AgentManagement() {
           {/* Fixed agents section */}
           <section className="rounded-lg border border-border bg-surface p-4" data-testid="agents-section-builtin">
             <div className="mb-3 flex items-center gap-2">
-              <h3 className="text-caption font-semibold uppercase tracking-wider text-ink-tertiary">
+              <h3 className="text-caption font-medium text-ink-tertiary">
                 {t('settings.agents.sectionBuiltin')}
               </h3>
               <span className="rounded-full bg-surface-muted px-2 py-0.5 text-caption text-ink-tertiary">
@@ -130,7 +130,7 @@ export function AgentManagement() {
           {/* User agents section */}
           <section className="rounded-lg border border-border bg-surface p-4">
             <div className="mb-3 flex items-center gap-2">
-              <h3 className="text-caption font-semibold uppercase tracking-wider text-ink-tertiary">
+              <h3 className="text-caption font-medium text-ink-tertiary">
                 {t('settings.agents.customSection')}
               </h3>
               <span className="rounded-full bg-surface-muted px-2 py-0.5 text-caption text-ink-tertiary">

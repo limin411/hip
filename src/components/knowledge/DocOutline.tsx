@@ -47,7 +47,7 @@ export function DocOutline({ content, onSelect, className }: DocOutlineProps) {
       aria-label={t('knowledge.outline.title')}
     >
       <div className="shrink-0 border-b border-border px-3 py-2">
-        <p className="text-[11px] font-semibold uppercase tracking-wide text-ink-tertiary">
+        <p className="text-caption font-medium text-ink-tertiary">
           {t('knowledge.outline.count', { count: items.length })}
         </p>
       </div>

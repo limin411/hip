@@ -26,10 +26,10 @@ function Field({
 }) {
   return (
     <div>
-      <div className="text-caption uppercase tracking-wide text-ink-tertiary">{label}</div>
+      <div className="text-caption font-medium text-ink-tertiary">{label}</div>
       <pre
         className={cn(
-          'mt-0.5 max-h-40 overflow-auto whitespace-pre-wrap break-all rounded bg-surface px-2 py-1 text-caption',
+          'mt-0.5 max-h-40 overflow-auto whitespace-pre-wrap break-all rounded-md bg-surface-muted/60 px-2 py-1.5 text-caption',
           mono ? 'font-mono' : 'font-sans',
           danger ? 'text-danger' : 'text-ink-secondary',
         )}
@@ -43,7 +43,7 @@ function Field({
 function LineList({ lines }: { lines: string[] }) {
   const shown = lines.slice(0, 80)
   return (
-    <ul className="mt-0.5 max-h-40 list-none space-y-0.5 overflow-auto rounded bg-surface px-2 py-1 font-mono text-caption text-ink-secondary">
+    <ul className="mt-0.5 max-h-40 list-none space-y-0.5 overflow-auto rounded-md bg-surface-muted/60 px-2 py-1.5 font-mono text-caption text-ink-secondary">
       {shown.map((line, i) => (
         <li key={i} className="break-all">
           {line || ' '}
@@ -65,7 +65,7 @@ function StructuredOutput({ tool, cleanOutput }: { tool: ToolCall; cleanOutput: 
       return <p className="text-caption text-ink-tertiary">{t('chat.subagent.noSummary')}</p>
     }
     return (
-      <div className="max-h-48 overflow-auto rounded bg-surface px-2 py-1" data-testid="tool-structured-md">
+      <div className="max-h-48 overflow-auto rounded-md bg-surface-muted/60 px-2 py-1.5" data-testid="tool-structured-md">
         <MarkdownBody content={cleanOutput} className="text-meta [&_p]:my-1" />
       </div>
     )
@@ -75,7 +75,7 @@ function StructuredOutput({ tool, cleanOutput }: { tool: ToolCall; cleanOutput: 
     const lines = cleanOutput.split('\n')
     return (
       <div>
-        <div className="text-caption uppercase tracking-wide text-ink-tertiary">
+        <div className="text-caption font-medium text-ink-tertiary">
           {tool.truncated ? `${t('artifact.output')} · ${t('artifact.truncated')}` : t('artifact.output')}
         </div>
         <LineList lines={lines} />
@@ -135,15 +135,16 @@ export function ToolCallRow({ tool }: { tool: ToolCall }) {
           type="button"
           onClick={() => setOpen((v) => !v)}
           aria-expanded={open}
-          className="flex min-h-[var(--trail-min-h)] w-full items-center gap-[var(--meta-gap)] py-0.5 text-left text-meta leading-5 transition-colors hover:text-ink"
+          className="flex min-h-[var(--trail-min-h)] w-full items-center gap-[var(--meta-gap)] py-0.5 text-left text-meta leading-5 text-ink-secondary transition-colors duration-chrome hover:text-ink"
           data-testid={tool.status === 'running' ? 'tool-card-running' : 'tool-row'}
         >
           <ChevronRight
             size={14}
-            className={cn('block shrink-0 text-ink-tertiary transition-transform', open && 'rotate-90')}
+            strokeWidth={1.75}
+            className={cn('block shrink-0 text-ink-tertiary transition-transform duration-chrome', open && 'rotate-90')}
           />
           <span className="inline-flex h-3.5 w-3.5 shrink-0 items-center justify-center">
-            {tool.status === 'running' && <Loader2 size={14} className="block animate-spin text-accent-strong" />}
+            {tool.status === 'running' && <Loader2 size={14} className="block animate-spin text-accent" />}
             {tool.status === 'finished' && <CheckCircle2 size={14} className="block text-success" />}
             {tool.status === 'error' && <XCircle size={14} className="block text-danger" />}
           </span>
@@ -160,12 +161,12 @@ export function ToolCallRow({ tool }: { tool: ToolCall }) {
           )}
         </button>
         {open && (
-          <div className="mt-0.5 space-y-1.5 border-l border-border py-1 pl-3" data-testid="tool-result-view">
+          <div className="mt-0.5 space-y-1.5 border-l border-border/70 py-1 pl-3" data-testid="tool-result-view">
             {tool.status === 'error' ? (
               <Field label={t('artifact.failed')} value={humanError || tool.error || ''} danger mono={false} />
             ) : model.kind === 'diff' && model.diff ? (
               <pre
-                className="max-h-48 overflow-auto whitespace-pre-wrap break-all rounded bg-surface px-2 py-1 font-mono text-caption text-ink-secondary"
+                className="max-h-48 overflow-auto whitespace-pre-wrap break-all rounded-md bg-surface-muted/60 px-2 py-1.5 font-mono text-caption text-ink-secondary"
                 data-testid="tool-inline-diff"
               >
                 {model.diff}

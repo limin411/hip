@@ -53,7 +53,7 @@ export function AgentDashboard() {
         className="flex flex-col gap-2"
         data-testid="agents-live-turn"
       >
-        <div className="text-caption font-medium uppercase tracking-wide text-ink-tertiary">
+        <div className="text-caption font-medium text-ink-tertiary">
           {t('artifact.timelineView.turn', { n: latest.turnIndex })} · {formatClockTime(latest.timestamp, locale)}
           {children.length > 0
             ? ` · ${t('artifact.subAgentCount', { count: children.length })}`
@@ -73,7 +73,7 @@ export function AgentDashboard() {
         )}
         {children.length > 0 && (
           <>
-            <div className="text-caption font-medium uppercase tracking-wide text-ink-tertiary">
+            <div className="text-caption font-medium text-ink-tertiary">
               {t('artifact.subAgents')}
             </div>
             <div className="flex flex-col gap-2.5">

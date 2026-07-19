@@ -28,7 +28,7 @@ export function CollaborationStructure({
       className="rounded-lg border border-border bg-surface-muted/40 px-3 py-2"
       data-testid="collaboration-structure"
     >
-      <div className="mb-1.5 text-caption font-medium uppercase tracking-wide text-ink-tertiary">
+      <div className="mb-1.5 text-caption font-medium text-ink-tertiary">
         {t('artifact.collaborationStructure')}
       </div>
       <div className="flex flex-col gap-1 font-mono text-meta text-ink-secondary">

@@ -35,7 +35,7 @@ export function ConversationOutline() {
       aria-label={t('artifact.outline')}
     >
       <div className="shrink-0 border-b border-border px-3 py-2">
-        <p className="text-[11px] font-semibold uppercase tracking-wide text-ink-tertiary">
+        <p className="text-caption font-medium text-ink-tertiary">
           {t('artifact.outlineCount', { count: turns.length })}
         </p>
       </div>

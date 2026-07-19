@@ -46,11 +46,11 @@ export function CodeBlock({ children, node, ...props }: ComponentPropsWithoutRef
       data-testid="code-block-context-menu"
     >
       <div
-        className="overflow-hidden rounded-md border border-border bg-surface-muted"
+        className="overflow-hidden rounded-lg border border-border bg-surface-muted/80"
         data-testid="code-block"
       >
-        <div className="flex h-7 items-center justify-between gap-2 border-b border-border px-2.5">
-          <span className="min-w-0 truncate text-caption uppercase tracking-wide text-ink-tertiary">
+        <div className="flex h-7 items-center justify-between gap-2 border-b border-border/80 px-2.5">
+          <span className="min-w-0 truncate text-caption font-medium text-ink-tertiary">
             {language ?? ''}
           </span>
           <button
@@ -59,9 +59,9 @@ export function CodeBlock({ children, node, ...props }: ComponentPropsWithoutRef
             data-testid="code-copy"
             title={t('chat.copyCode')}
             aria-label={t('chat.copyCode')}
-            className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md text-ink-tertiary transition-colors hover:text-ink-secondary"
+            className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md text-ink-tertiary transition-colors duration-chrome hover:bg-state-hover hover:text-ink"
           >
-            {copied ? <Check size={13} /> : <Copy size={13} />}
+            {copied ? <Check size={13} strokeWidth={1.75} /> : <Copy size={13} strokeWidth={1.75} />}
           </button>
         </div>
         <pre

@@ -30,7 +30,7 @@ export function TodoChecklist({
       data-testid="todo-checklist"
     >
       {showHeading && (
-        <div className="mb-1 text-caption uppercase tracking-wide text-ink-tertiary">{t('chat.todos.plan')}</div>
+        <div className="mb-1 text-caption font-medium text-ink-tertiary">{t('chat.todos.plan')}</div>
       )}
       <ul className="flex flex-col gap-0.5">
         {todos.map((todo, i) => {

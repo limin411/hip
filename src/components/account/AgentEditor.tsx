@@ -351,7 +351,7 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
 function Section({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div>
-      <div className="mb-2 text-caption font-medium uppercase tracking-wide text-ink-tertiary">{label}</div>
+      <div className="mb-2 text-caption font-medium text-ink-tertiary">{label}</div>
       <div className="space-y-2">{children}</div>
     </div>
   )

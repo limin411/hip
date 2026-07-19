@@ -58,15 +58,18 @@ export function ArtifactPanel() {
 
   return (
     <div className="flex h-full min-h-0 flex-col border-l border-border bg-surface">
-      <div data-tauri-drag-region className="flex h-10 shrink-0 items-center justify-between border-b border-border px-2">
+      <div
+        data-tauri-drag-region
+        className="flex h-[var(--titlebar-height)] shrink-0 items-center justify-between border-b border-border px-2"
+      >
         <span
-          className="truncate px-1 text-body font-medium text-ink"
+          className="truncate px-1.5 text-body font-medium tracking-tight text-ink"
           data-tauri-drag-region="false"
           data-testid="panel-title"
         >
           {tabLabel(effectiveTab, t)}
         </span>
-        <div className="flex items-center gap-2" data-tauri-drag-region="false">
+        <div className="flex items-center gap-1" data-tauri-drag-region="false">
           {isGitRepo && <BranchSwitcher />}
           <Button
             variant="ghost"
@@ -74,7 +77,7 @@ export function ArtifactPanel() {
             onClick={() => activeSessionId && setSessionCodePanelOpen(activeSessionId, false)}
             title={t('artifact.closePanel')}
           >
-            <X size={16} />
+            <X size={16} strokeWidth={1.75} />
           </Button>
         </div>
       </div>

@@ -79,7 +79,7 @@ export function KnowledgeMarkdownBody({
             data-callout={header.type}
             {...(props as object)}
           >
-            <div className="mb-1 text-meta font-semibold uppercase tracking-wide text-ink">
+            <div className="mb-1 text-meta font-medium text-ink-secondary">
               {header.title ?? typeLabel}
             </div>
             <div className="text-body text-ink [&_p]:my-1">{rest}</div>

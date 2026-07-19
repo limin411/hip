@@ -326,7 +326,7 @@ function ModelPurposeCard({
     >
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0 flex-1">
-          <div className="text-caption font-medium uppercase tracking-wide text-ink-tertiary">
+          <div className="text-caption font-medium text-ink-tertiary">
             {label}
           </div>
           <div className="mt-1 truncate text-prose font-medium text-ink">{title}</div>

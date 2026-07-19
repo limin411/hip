@@ -92,7 +92,7 @@ export function AgentCard({ agent, live }: { agent: TurnAgent; live: boolean }) 
           )}
           {agent.role !== 'supervisor' && agent.output && (
             <div>
-              <div className="mb-1 text-caption font-medium uppercase tracking-wide text-ink-tertiary">{t('artifact.output')}</div>
+              <div className="mb-1 text-caption font-medium text-ink-tertiary">{t('artifact.output')}</div>
               <pre className="whitespace-pre-wrap break-words rounded-md bg-surface-muted px-2.5 py-1.5 font-sans text-meta leading-snug text-ink-secondary">{agent.output}</pre>
             </div>
           )}

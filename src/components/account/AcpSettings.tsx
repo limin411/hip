@@ -34,7 +34,7 @@ export function AcpHostPolicySection() {
       data-testid="acp-settings"
     >
       <div className="mb-3">
-        <h3 className="text-caption font-semibold uppercase tracking-wider text-ink-tertiary">
+        <h3 className="text-caption font-medium text-ink-tertiary">
           {t('settings.acp.sectionTitle')}
         </h3>
         <p className="mt-1 text-meta text-ink-tertiary">{t('settings.acp.intro')}</p>

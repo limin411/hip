@@ -39,10 +39,10 @@ export function SettingsPanel() {
       onValueChange={(v) => setSettingsPage(v as SettingsPageId)}
       className="flex h-full w-full"
     >
-      <div className={cn('flex h-full shrink-0 flex-col bg-surface', NAV_WIDTH_CLASS)}>
+      <div className={cn('flex h-full shrink-0 flex-col bg-surface-subtle/40', NAV_WIDTH_CLASS)}>
         <TabsPrimitive.List
           aria-label={t('settings.title')}
-          className="flex flex-1 flex-col gap-1 overflow-y-auto p-2"
+          className="flex flex-1 flex-col gap-0.5 overflow-y-auto p-2"
         >
           {PAGES.map((page) => {
             const Icon = page.icon
@@ -52,14 +52,15 @@ export function SettingsPanel() {
                 value={page.id}
                 data-testid={`settings-nav-${page.id}`}
                 className={cn(
-                  'flex items-center gap-2 rounded-lg px-2.5 py-2 text-left text-body font-medium transition-colors',
+                  'relative flex h-[var(--row-h-sidebar)] items-center gap-2.5 rounded-lg px-2.5 text-left text-body font-medium transition-colors duration-chrome',
                   'text-ink-secondary hover:bg-state-hover hover:text-ink',
-                  // Match AppSidebar session/nav selection: surface + border ring, ink text (no accent green).
-                  'data-[state=active]:bg-surface data-[state=active]:text-ink data-[state=active]:shadow-[0_0_0_1px_var(--border)]',
+                  // Quiet lift + Sage rail — same signal as AppSidebar (no hairline ring).
+                  'before:absolute before:inset-y-1.5 before:left-0 before:w-[2px] before:rounded-full before:bg-accent before:opacity-0',
+                  'data-[state=active]:bg-state-hover data-[state=active]:text-ink data-[state=active]:before:opacity-100',
                   'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring',
                 )}
               >
-                <Icon size={16} className="shrink-0" />
+                <Icon size={16} strokeWidth={1.75} className="shrink-0 opacity-70" />
                 <span className="truncate">{t(page.labelKey)}</span>
               </TabsPrimitive.Trigger>
             )

@@ -37,7 +37,8 @@ describe('CodeBlock', () => {
       </CodeBlock>,
     )
     const chrome = screen.getByTestId('code-block')
-    expect(chrome).toHaveClass('rounded-md', 'border', 'border-border', 'overflow-hidden', 'bg-surface-muted')
+    expect(chrome).toHaveClass('rounded-lg', 'border', 'border-border', 'overflow-hidden')
+    expect(chrome.className).toMatch(/bg-surface-muted/)
     expect(chrome.className).not.toMatch(/\bmy-/)
   })
 
@@ -113,12 +114,15 @@ describe('markdownProseClassName (KD11 + prose contract)', () => {
     expect(markdownProseClassName).toContain('[&_h3]:text-body')
     expect(markdownProseClassName).toContain('[&_h3]:font-semibold')
     expect(markdownProseClassName).toContain('[&_h4]:text-meta')
-    expect(markdownProseClassName).toContain('[&_h4]:font-semibold')
+    expect(markdownProseClassName).toContain('[&_h4]:font-medium')
     expect(markdownProseClassName).toContain('[&_h5]:text-meta')
-    expect(markdownProseClassName).toContain('[&_h5]:font-semibold')
+    expect(markdownProseClassName).toContain('[&_h5]:font-medium')
     expect(markdownProseClassName).toContain('[&_h6]:text-meta')
-    expect(markdownProseClassName).toContain('[&_h6]:font-semibold')
+    expect(markdownProseClassName).toContain('[&_h6]:font-medium')
     expect(markdownProseClassName).toContain('[&_h6]:text-ink-secondary')
+    // Display/title headings stay semibold + tracking (editorial, not bold-heavy)
+    expect(markdownProseClassName).toContain('[&_h1]:font-semibold')
+    expect(markdownProseClassName).toContain('[&_h2]:font-semibold')
     // List rhythm
     expect(markdownProseClassName).toContain('[&_li]:my-0.5')
     expect(markdownProseClassName).toContain('[&_li>p]:my-0.5')

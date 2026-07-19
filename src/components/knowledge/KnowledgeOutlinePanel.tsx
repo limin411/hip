@@ -84,14 +84,14 @@ export function KnowledgeOutlinePanel() {
         ) : (
           <div className="flex flex-col gap-4 p-2 pb-6">
             <section data-testid="knowledge-outline-section">
-              <h3 className="px-1 pb-1 text-meta font-medium uppercase tracking-wide text-ink-tertiary">
+              <h3 className="px-1 pb-1 text-caption font-medium text-ink-tertiary">
                 {t('knowledge.outline.sectionOutline')}
               </h3>
               <DocOutline content={content} onSelect={(item) => requestOutlineJump(item)} />
             </section>
 
             <section data-testid="knowledge-backlinks-section">
-              <h3 className="px-1 pb-1 text-meta font-medium uppercase tracking-wide text-ink-tertiary">
+              <h3 className="px-1 pb-1 text-caption font-medium text-ink-tertiary">
                 {t('knowledge.outline.sectionBacklinks')}
                 {backlinks.length > 0 ? (
                   <span className="ml-1 font-normal normal-case text-ink-tertiary">
@@ -131,7 +131,7 @@ export function KnowledgeOutlinePanel() {
             </section>
 
             <section data-testid="knowledge-outbound-section">
-              <h3 className="px-1 pb-1 text-meta font-medium uppercase tracking-wide text-ink-tertiary">
+              <h3 className="px-1 pb-1 text-caption font-medium text-ink-tertiary">
                 {t('knowledge.outline.sectionOutbound')}
               </h3>
               {outboundLinks.filter((l) => l.kind === 'wiki' || l.kind === 'embed').length ===

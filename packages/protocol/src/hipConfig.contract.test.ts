@@ -3,6 +3,7 @@ import type {
   HipConfig,
   AgentLoopConfig,
   LangSmithConfig,
+  AcpHostConfig,
   ProviderEntry,
   SkillEntry,
   SkillScope,
@@ -838,5 +839,12 @@ describe('protocol: McpServerConfig extended fields (Todo 1)', () => {
     const cfg: HipConfig = { version: 1, terminal: { shell: 'cmd' } }
     const round = JSON.parse(JSON.stringify(cfg)) as HipConfig
     expect(round.terminal).toEqual({ shell: 'cmd' })
+  })
+
+  it('round-trips acp on HipConfig through JSON', () => {
+    const acp: AcpHostConfig = { fsBridge: true, forwardMcp: false, fsReadMaxBytes: 2_000_000 }
+    const cfg: HipConfig = { version: 1, acp }
+    const round = JSON.parse(JSON.stringify(cfg)) as HipConfig
+    expect(round.acp).toEqual(acp)
   })
 

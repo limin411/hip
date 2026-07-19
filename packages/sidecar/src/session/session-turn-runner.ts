@@ -27,7 +27,7 @@ import { IdleWatchdog, idleTimeoutMessage } from './idle-watchdog.js'
 import { getActiveModel, isOpenAICompatible } from '../config/providers.js'
 import { isMultimodalModel } from '../config/catalog.js'
 import { resolveApiKey } from '../config/auth-file.js'
-import { resolveEffectiveConfig } from '../config/hip-config.js'
+import { resolveEffectiveConfig, resolveAcpHostConfig } from '../config/hip-config.js'
 import { flushLangSmithTraces, tracingInvokeFields } from '../observability/langsmith.js'
 import { buildGraph, type GraphEmit, type GraphCtx, type LoopState } from './graph.js'
 import { selectImageAgent } from './agents/registry.js'
@@ -1184,7 +1184,17 @@ export async function runTurn(host: SessionTurnHost, rawSend: SendFn, base?: {
         },
         configOptions: (options) => send({ type: 'agent:configOptions', sessionId: host.id, options }),
       }
-      await host.agentProv.ensureExternalProvider().runTurn(cronPrefix + userText, emit, host.abortController.signal, hooks)
+      const provider = host.agentProv.ensureExternalProvider()
+      const setFs = (provider as { setTurnFsContext?: (ctx: { cwd: string; permissionMode: PermissionMode; readMaxBytes: number }) => void }).setTurnFsContext
+      if (typeof setFs === 'function') {
+        const acpHost = resolveAcpHostConfig(cwd)
+        setFs.call(provider, {
+          cwd,
+          permissionMode: mode,
+          readMaxBytes: acpHost.fsReadMaxBytes,
+        })
+      }
+      await provider.runTurn(cronPrefix + userText, emit, host.abortController.signal, hooks)
       closeReasoning('supervisor'); finishRemaining()
       const acpId = host.agentProv.acpSessionId; if (acpId && host.store) host.store.setAcpSessionId(host.id, acpId)
     } else {

@@ -1,7 +1,8 @@
 import { describe, it, expect, afterEach } from 'vitest'
 import { fileURLToPath } from 'node:url'
 import { dirname, join } from 'node:path'
-import { chmodSync } from 'node:fs'
+import { chmodSync, mkdtempSync, writeFileSync, rmSync } from 'node:fs'
+import { tmpdir } from 'node:os'
 import { AcpConnectionManager } from './acp-connection.js'
 
 const here = dirname(fileURLToPath(import.meta.url))
@@ -9,10 +10,17 @@ const AGENT = join(here, '__fixtures__', 'mock-acp-agent.mjs')
 chmodSync(AGENT, 0o755)
 
 const mgr = new AcpConnectionManager()
-afterEach(() => mgr.disposeAll())
+const tmpDirs: string[] = []
+afterEach(() => {
+  mgr.disposeAll()
+  delete process.env.HIP_CONFIG_PATH
+  for (const d of tmpDirs.splice(0)) {
+    try { rmSync(d, { recursive: true, force: true }) } catch { /* ok */ }
+  }
+})
 
-function agentCfg(): any {
-  return { id: 'mock', name: 'Mock', kind: 'acp', command: 'node', args: [AGENT], enabled: true }
+function agentCfg(extra: any = {}): any {
+  return { id: 'mock', name: 'Mock', kind: 'acp', command: 'node', args: [AGENT], enabled: true, ...extra }
 }
 
 describe('AcpConnectionManager', () => {
@@ -69,5 +77,22 @@ describe('AcpConnectionManager', () => {
     await conn.prompt(sessionId, 'hi')
     expect(text).toContain('mock/other')
     conn.releaseSession(sessionId)
+  })
+
+  it('advertises fs capabilities by default', async () => {
+    const conn = await mgr.acquire(agentCfg({ id: 'mock-fs-on' }), null)
+    await conn.newSession(process.cwd())
+    expect(conn.advertisedFs).toBe(true)
+  })
+
+  it('does not advertise fs when [acp] fs_bridge = false', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'acp-cfg-'))
+    tmpDirs.push(dir)
+    const cfgPath = join(dir, 'hip.toml')
+    writeFileSync(cfgPath, `version = 1\n\n[acp]\nfs_bridge = false\n`)
+    process.env.HIP_CONFIG_PATH = cfgPath
+    const conn = await mgr.acquire(agentCfg({ id: 'mock-fs-off' }), null)
+    await conn.newSession(process.cwd())
+    expect(conn.advertisedFs).toBe(false)
   })
 })

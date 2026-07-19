@@ -20,17 +20,30 @@ function cfg(extra: any = {}): any {
   return { id: 'mock', name: 'Mock', kind: 'acp', command: 'node', args: [AGENT], enabled: true, ...extra }
 }
 
+function withFs(p: AcpAgentProvider, mode: 'chat' | 'edit' | 'full' = 'edit'): AcpAgentProvider {
+  p.setTurnFsContext({ cwd: process.cwd(), permissionMode: mode, readMaxBytes: 2_000_000 })
+  return p
+}
+
 describe('AcpAgentProvider', () => {
   it('streams an answer through emit.token and resolves on end_turn', async () => {
-    const p = new AcpAgentProvider(cfg(), process.cwd(), null)
+    const p = withFs(new AcpAgentProvider(cfg(), process.cwd(), null))
     const a = cap()
     await p.runTurn('hi', a.emit, new AbortController().signal)
     expect(a.out.text).toContain('hello world')
     p.dispose()
   })
 
-  it('maps thought chunks to reasoning and tool calls to toolStarted/toolFinished', async () => {
+  it('requires setTurnFsContext before runTurn', async () => {
     const p = new AcpAgentProvider(cfg(), process.cwd(), null)
+    const a = cap()
+    await expect(p.runTurn('hi', a.emit, new AbortController().signal))
+      .rejects.toThrow(/setTurnFsContext required/)
+    p.dispose()
+  })
+
+  it('maps thought chunks to reasoning and tool calls to toolStarted/toolFinished', async () => {
+    const p = withFs(new AcpAgentProvider(cfg(), process.cwd(), null))
     const a = cap()
     // drive the mock to emit a thought + a tool by spawning it with env via a dedicated agent cfg
     process.env.MOCK_ACP_THINK = '1'; process.env.MOCK_ACP_TOOL = '1'
@@ -43,7 +56,7 @@ describe('AcpAgentProvider', () => {
   })
 
   it('cancel mid-stream rejects with AbortError even though the agent reports end_turn', async () => {
-    const p = new AcpAgentProvider(cfg({ env: { MOCK_ACP_SLOW_MS: '200' } }), process.cwd(), null)
+    const p = withFs(new AcpAgentProvider(cfg({ env: { MOCK_ACP_SLOW_MS: '200' } }), process.cwd(), null))
     const ac = new AbortController()
     const a = cap()
     const turn = p.runTurn('hi', a.emit, ac.signal)
@@ -53,18 +66,19 @@ describe('AcpAgentProvider', () => {
   })
 
   it('switches the live model via setConfigOption and the backend uses it', async () => {
-    const p = new AcpAgentProvider(cfg(), process.cwd(), null)
+    const p = withFs(new AcpAgentProvider(cfg(), process.cwd(), null))
     const a = cap()
     await p.runTurn('first', a.emit, new AbortController().signal) // answer(mock/base): ...
     await p.setConfigOption('model', 'mock/other')
     const b = cap()
+    withFs(p)
     await p.runTurn('second', b.emit, new AbortController().signal)
     expect(b.out.text).toContain('mock/other')  // backend actually switched (mock echoes model)
     p.dispose()
   })
 
   it('maps ACP plan sessionUpdate to planUpdated', async () => {
-    const p = new AcpAgentProvider(cfg({ env: { MOCK_ACP_PLAN: '1' } }), process.cwd(), null)
+    const p = withFs(new AcpAgentProvider(cfg({ env: { MOCK_ACP_PLAN: '1' } }), process.cwd(), null))
     const plans: any[] = []
     const emit: GraphEmit = {
       token: () => {},
@@ -85,7 +99,7 @@ describe('AcpAgentProvider', () => {
   })
 
   it('recovers from a warm-child death — the next turn re-acquires a fresh child and succeeds (C1)', async () => {
-    const p = new AcpAgentProvider(cfg(), process.cwd(), null)
+    const p = withFs(new AcpAgentProvider(cfg(), process.cwd(), null))
     const a = cap()
     await p.runTurn('first', a.emit, new AbortController().signal)
     expect(a.out.text).toContain('hello world')
@@ -94,6 +108,7 @@ describe('AcpAgentProvider', () => {
     await new Promise((r) => setTimeout(r, 200)) // let the child 'exit' fire → connection marked closed
     // The SAME provider must not be bricked: ensureSession re-acquires and reattaches/recreates.
     const b = cap()
+    withFs(p)
     await p.runTurn('second', b.emit, new AbortController().signal)
     expect(b.out.text).toContain('hello world')
     p.dispose()

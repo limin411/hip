@@ -4,6 +4,7 @@ import type { AgentProvider, ExternalAgentHooks, PermissionChoice } from './type
 import type { ResolvedModel } from './registry.js'
 import { acpConnections, type AcpConnection } from './acp-connection.js'
 import { quirksFor } from './acp-quirks.js'
+import type { FsBridgeContext } from './acp-fs-bridge.js'
 
 function abortError(): Error { const e = new Error('aborted'); e.name = 'AbortError'; return e }
 
@@ -12,6 +13,8 @@ export class AcpAgentProvider implements AgentProvider {
   private acpSessionId: string | null = null
   private readonly quirks: ReturnType<typeof quirksFor>
   private currentHooks: ExternalAgentHooks | null = null
+  /** Required before each runTurn — set by primary runner / invoker. */
+  private turnCtx: FsBridgeContext | null = null
 
   constructor(
     private readonly agent: AgentConfig,
@@ -28,6 +31,11 @@ export class AcpAgentProvider implements AgentProvider {
 
   /** Reopen a prior ACP session on the next turn (loadSession). No-op once a session is live. */
   setResumeSessionId(id: string | null): void { if (!this.acpSessionId) this.resumeAcpSessionId = id }
+
+  /** Call immediately before each runTurn (primary runner + invoker). */
+  setTurnFsContext(ctx: FsBridgeContext): void {
+    this.turnCtx = ctx
+  }
 
   private async ensureSession(): Promise<{ conn: AcpConnection; sid: string }> {
     // Recover from a warm-child death: if our connection died (and was evicted from the pool),
@@ -64,6 +72,9 @@ export class AcpAgentProvider implements AgentProvider {
 
   async runTurn(text: string, emit: GraphEmit, signal: AbortSignal, hooks?: ExternalAgentHooks): Promise<void> {
     if (signal.aborted) throw abortError()
+    if (!this.turnCtx) {
+      throw new Error('AcpAgentProvider: setTurnFsContext required before runTurn')
+    }
     this.currentHooks = hooks ?? null
 
     let aborted = false
@@ -77,6 +88,8 @@ export class AcpAgentProvider implements AgentProvider {
       const session = await this.ensureSession()
       conn = session.conn; sid = session.sid
       if (aborted) throw abortError() // aborted during session setup, before the prompt started
+
+      conn.setFsContext(sid, this.turnCtx)
 
       conn.registerSink(sid, {
         onUpdate: (u) => this.applyUpdate(u, emit),

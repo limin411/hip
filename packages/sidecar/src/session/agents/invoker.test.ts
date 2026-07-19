@@ -37,7 +37,9 @@ function collectingEmit() {
 
 class FakeProvider implements AgentProvider {
   disposed = false
+  turnFs: any = null
   constructor(private readonly script: (emit: GraphEmit) => Promise<void>) {}
+  setTurnFsContext(ctx: any) { this.turnFs = ctx }
   async runTurn(_t: string, emit: GraphEmit, _s: AbortSignal, _h?: ExternalAgentHooks) {
     await this.script(emit)
   }
@@ -105,6 +107,28 @@ describe('createAgentInvoker', () => {
     const hooks: ExternalAgentHooks = { requestPermission: async () => ({ cancelled: true }), configOptions: () => {} }
     await invoker.invoke('echo', 'hi', collectingEmit().emit, new AbortController().signal, hooks)
     expect(seenHooks).toBe(hooks)
+  })
+
+  it('sets turn FS context with parent permissionMode (chat) before runTurn', async () => {
+    const provider = new FakeProvider(async () => {})
+    const invoker = createAgentInvoker('/work/proj', {
+      readAgents: () => [baseAgent],
+      createProvider: () => provider,
+      resolveModel: () => null,
+    })
+    await invoker.invoke(
+      'echo',
+      'hi',
+      collectingEmit().emit,
+      new AbortController().signal,
+      undefined,
+      { permissionMode: 'chat' },
+    )
+    expect(provider.turnFs).toMatchObject({
+      cwd: '/work/proj',
+      permissionMode: 'chat',
+      readMaxBytes: expect.any(Number),
+    })
   })
 
   it('disposes the provider even when runTurn throws', async () => {

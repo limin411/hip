@@ -15,6 +15,7 @@ import type {
   LangSmithConfig,
   TerminalConfig,
   TerminalShellPref,
+  AcpHostConfig,
 } from '@hip/protocol'
 import { parseDoomLoopStrategy } from '../session/doom-loop.js'
 
@@ -237,6 +238,17 @@ function normalizeTerminal(raw: Record<string, unknown>): TerminalConfig {
   return out
 }
 
+/** Normalize `[acp]` host policy (camelCase + snake_case aliases). */
+function normalizeAcpHost(raw: Record<string, unknown>): AcpHostConfig {
+  const out: AcpHostConfig = {}
+  if (typeof raw.fsBridge === 'boolean') out.fsBridge = raw.fsBridge
+  else if (typeof raw.fs_bridge === 'boolean') out.fsBridge = raw.fs_bridge
+  if (typeof raw.forwardMcp === 'boolean') out.forwardMcp = raw.forwardMcp
+  else if (typeof raw.forward_mcp === 'boolean') out.forwardMcp = raw.forward_mcp
+  const max = raw.fsReadMaxBytes ?? raw.fs_read_max_bytes
+  if (typeof max === 'number' && Number.isFinite(max) && max > 0) out.fsReadMaxBytes = max
+  return out
+}
 
 /** Validate a parsed TOML object against the HipConfig schema. Never throws. */
 function validateConfig(parsed: unknown, filePath: string): HipConfig {
@@ -301,6 +313,11 @@ function validateConfig(parsed: unknown, filePath: string): HipConfig {
   const terminal = obj.terminal
   if (terminal && typeof terminal === 'object' && !Array.isArray(terminal)) {
     config.terminal = normalizeTerminal(terminal as Record<string, unknown>)
+  }
+
+  const acp = obj.acp
+  if (acp && typeof acp === 'object' && !Array.isArray(acp)) {
+    config.acp = normalizeAcpHost(acp as Record<string, unknown>)
   }
 
   return config
@@ -372,8 +389,41 @@ function deepMergeConfig(global: HipConfig, project: HipConfig): HipConfig {
   if (project.langsmith !== undefined) {
     merged.langsmith = project.langsmith
   }
+  // Project acp replaces global wholesale (same as langsmith / agentLoop).
+  if (project.acp !== undefined) {
+    merged.acp = project.acp
+  }
 
   return merged
+}
+
+/** Fully-resolved ACP host defaults (no undefined fields). */
+export interface ResolvedAcpHostConfig {
+  fsBridge: boolean
+  forwardMcp: boolean
+  fsReadMaxBytes: number
+}
+
+const DEFAULT_FS_READ_MAX_BYTES = 2_000_000
+
+/**
+ * Resolve `[acp]` host policy with defaults applied.
+ * - `fsBridge`: true when undefined
+ * - `forwardMcp`: false when undefined
+ * - `fsReadMaxBytes`: 2_000_000 when undefined
+ *
+ * When `cwd` is provided, merges global + project `.hip/hip.toml` (project wholesale-replaces).
+ * When omitted, reads only the global `HIP_CONFIG_PATH` config.
+ */
+export function resolveAcpHostConfig(cwd?: string): ResolvedAcpHostConfig {
+  const raw = cwd ? resolveEffectiveConfig(cwd).acp : readHipConfig().acp
+  const max = raw?.fsReadMaxBytes
+  return {
+    fsBridge: raw?.fsBridge !== false,
+    forwardMcp: raw?.forwardMcp === true,
+    fsReadMaxBytes:
+      typeof max === 'number' && Number.isFinite(max) && max > 0 ? max : DEFAULT_FS_READ_MAX_BYTES,
+  }
 }
 
 /**

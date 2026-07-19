@@ -1,5 +1,16 @@
-import { describe, it, expect } from 'vitest'
-import { buildAcpSpawn } from './acp-config.js'
+import { describe, it, expect, afterEach } from 'vitest'
+import { mkdtempSync, writeFileSync, rmSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
+import { buildAcpSpawn, resolveAcpHostConfig } from './acp-config.js'
+
+const tmpDirs: string[] = []
+afterEach(() => {
+  delete process.env.HIP_CONFIG_PATH
+  for (const d of tmpDirs.splice(0)) {
+    try { rmSync(d, { recursive: true, force: true }) } catch { /* ok */ }
+  }
+})
 
 const baseAgent: any = { id: 'opencode', name: 'OpenCode', kind: 'acp', command: 'opencode', args: ['acp', '--pure'], enabled: true, quirks: 'opencode' }
 
@@ -42,5 +53,39 @@ describe('buildAcpSpawn (model rollback)', () => {
     expect(command).toBe('grok')
     expect(args).toEqual(['agent', 'stdio'])
     expect(env.XAI_API_KEY).toBe('xai-test')
+  })
+})
+
+describe('resolveAcpHostConfig', () => {
+  it('defaults fsBridge=true, forwardMcp=false, fsReadMaxBytes=2e6 when [acp] absent', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'acp-host-'))
+    tmpDirs.push(dir)
+    const p = join(dir, 'hip.toml')
+    writeFileSync(p, 'version = 1\n')
+    process.env.HIP_CONFIG_PATH = p
+    expect(resolveAcpHostConfig()).toEqual({
+      fsBridge: true,
+      forwardMcp: false,
+      fsReadMaxBytes: 2_000_000,
+    })
+  })
+
+  it('honors snake_case [acp] fields', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'acp-host-'))
+    tmpDirs.push(dir)
+    const p = join(dir, 'hip.toml')
+    writeFileSync(p, `version = 1
+
+[acp]
+fs_bridge = false
+forward_mcp = true
+fs_read_max_bytes = 5000
+`)
+    process.env.HIP_CONFIG_PATH = p
+    expect(resolveAcpHostConfig()).toEqual({
+      fsBridge: false,
+      forwardMcp: true,
+      fsReadMaxBytes: 5000,
+    })
   })
 })

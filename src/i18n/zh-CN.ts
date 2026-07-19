@@ -478,6 +478,8 @@ export const zhCN = {
     artifact: {
       files: '文件',
       agents: '智能体',
+      agentsEmpty: '暂无智能体活动',
+      agentsEmptyDesc: '当智能体调用工具或委派任务时，最近一轮会显示在这里',
       outline: '对话目录',
       outlineEmpty: '你发出的消息会按目录列在这里，点击可跳转',
       outlineCount: '{{count}} 条',

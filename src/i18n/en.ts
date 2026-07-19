@@ -487,6 +487,8 @@ export const en = {
     artifact: {
       files: 'Files',
       agents: 'Agents',
+      agentsEmpty: 'No agent activity yet',
+      agentsEmptyDesc: 'When the agent runs tools or delegates work, the latest turn will appear here',
       outline: 'Outline',
       outlineEmpty: 'Your sent messages will appear here as a jump list',
       outlineCount: '{{count}} turns',

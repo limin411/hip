@@ -17,11 +17,15 @@ export function ToolTrace({
   }
   const ordered = [...tools].sort((a, b) => a.seq - b.seq)
   return (
-    <div className="flex flex-col gap-1" data-testid="tool-trace">
+    <div className="flex flex-col gap-0.5" data-testid="tool-trace">
       {ordered.map((tc) => (
         <div
           key={tc.callId}
-          className={onToolClick ? 'cursor-pointer rounded-md hover:bg-surface-muted/80' : undefined}
+          className={
+            onToolClick
+              ? 'cursor-pointer rounded-md transition-colors duration-chrome hover:bg-state-hover'
+              : undefined
+          }
           onClick={onToolClick}
           onKeyDown={
             onToolClick

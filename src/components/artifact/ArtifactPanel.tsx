@@ -97,7 +97,7 @@ export function ArtifactPanel() {
           </div>
         )}
         {effectiveTab === 'agents' && (
-          <div className="h-full overflow-auto p-3">
+          <div className="h-full min-h-0 overflow-hidden">
             <AgentDashboard />
           </div>
         )}

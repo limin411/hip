@@ -16,7 +16,6 @@ export const zhTW = {
     "sendMessage": "發送一條消息開始對話",
     "inputPlaceholder": "給 hip 發消息…（Enter 發送，Shift+Enter 換行）",
     "resizeInput": "拖曳調整輸入框高度",
-    // Agent HITL parallel:started toast only (host parallel explore UI removed).
     "parallel": {
       "started": "已啟動 {{count}} 路並行"
     },
@@ -209,13 +208,34 @@ export const zhTW = {
     },
     "emptyGreeting": {
       "timeOfDay": {
-        "earlyMorning": { "title": "起得真早", "sub": "安靜的時間，先做一件小事也很好。" },
-        "morning": { "title": "早上好", "sub": "準備好了，隨時開始。" },
-        "afternoon": { "title": "下午好", "sub": "我們今天解決點什麼？" },
-        "evening": { "title": "晚上好", "sub": "還在打磨些好東西？" },
-        "lateEvening": { "title": "晚上還在忙？", "sub": "再收一個小成果，或先歇會兒。" },
-        "lateNight": { "title": "夜深了", "sub": "我在這兒——不催你，也不評判。" },
-        "deepNight": { "title": "凌晨了還在？", "sub": "做得小一點就好，我陪著。" }
+        "earlyMorning": {
+          "title": "起得真早",
+          "sub": "安靜的時間，先做一件小事也很好。"
+        },
+        "morning": {
+          "title": "早上好",
+          "sub": "準備好了，隨時開始。"
+        },
+        "afternoon": {
+          "title": "下午好",
+          "sub": "我們今天解決點什麼？"
+        },
+        "evening": {
+          "title": "晚上好",
+          "sub": "還在打磨些好東西？"
+        },
+        "lateEvening": {
+          "title": "晚上還在忙？",
+          "sub": "再收一個小成果，或先歇會兒。"
+        },
+        "lateNight": {
+          "title": "夜深了",
+          "sub": "我在這兒——不催你，也不評判。"
+        },
+        "deepNight": {
+          "title": "凌晨了還在？",
+          "sub": "做得小一點就好，我陪著。"
+        }
       },
       "weekend": {
         "title": "週末好",
@@ -236,12 +256,18 @@ export const zhTW = {
         }
       },
       "holiday": {
-        "new-year": { "title": "新年快樂", "sub": "新的一年，新的構建。" },
+        "new-year": {
+          "title": "新年快樂",
+          "sub": "新的一年，新的構建。"
+        },
         "cn-spring-festival": {
           "title": "春節快樂",
           "sub": "祝你開工大吉，程式碼順順。"
         },
-        "cn-labor-day": { "title": "勞動節快樂", "sub": "好好休息，或者隨便搗鼓點什麼。" },
+        "cn-labor-day": {
+          "title": "勞動節快樂",
+          "sub": "好好休息，或者隨便搗鼓點什麼。"
+        },
         "cn-national-day": {
           "title": "國慶快樂",
           "sub": "慶祝一下，也捎帶交付一個小成果。"
@@ -250,8 +276,14 @@ export const zhTW = {
           "title": "國慶快樂",
           "sub": "適合做一件值得做的事。"
         },
-        "cn-mid-autumn": { "title": "中秋快樂", "sub": "月圓人圓，程式碼也圓滿。" },
-        "jp-golden-week": { "title": "黃金週快樂", "sub": "休息或開工，都算數。" },
+        "cn-mid-autumn": {
+          "title": "中秋快樂",
+          "sub": "月圓人圓，程式碼也圓滿。"
+        },
+        "jp-golden-week": {
+          "title": "黃金週快樂",
+          "sub": "休息或開工，都算數。"
+        },
         "us-independence-day": {
           "title": "獨立日快樂",
           "sub": "重構的自由就在眼前。"
@@ -266,11 +298,21 @@ export const zhTW = {
         }
       },
       "tip": {
-        "chat-paste": { "sub": "可以貼上錯誤訊息、路徑或目標。" },
-        "chat-slash": { "sub": "提示：輸入 /help 查看斜線指令。" },
-        "chat-model": { "sub": "隨時可以從下方切換模型。" },
-        "code-folder": { "sub": "選擇專案資料夾以解鎖編碼工具。" },
-        "code-plan": { "sub": "大改動可以先用計畫模式。" }
+        "chat-paste": {
+          "sub": "可以貼上錯誤訊息、路徑或目標。"
+        },
+        "chat-slash": {
+          "sub": "提示：輸入 /help 查看斜線指令。"
+        },
+        "chat-model": {
+          "sub": "隨時可以從下方切換模型。"
+        },
+        "code-folder": {
+          "sub": "選擇專案資料夾以解鎖編碼工具。"
+        },
+        "code-plan": {
+          "sub": "大改動可以先用計畫模式。"
+        }
       }
     },
     "pickFolder": "選擇專案資料夾",
@@ -475,6 +517,8 @@ export const zhTW = {
   "artifact": {
     "files": "檔案",
     "agents": "智慧體",
+    "agentsEmpty": "暫無智慧體活動",
+    "agentsEmptyDesc": "當智慧體呼叫工具或委派任務時，最近一輪會顯示在這裡",
     "outline": "對話目錄",
     "outlineEmpty": "你發出的訊息會按目錄列在這裡，點選可跳轉",
     "outlineCount": "{{count}} 條",

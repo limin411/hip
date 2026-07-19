@@ -54,3 +54,4 @@ Users/
 
 # Stale create-dmg intermediate images break `yarn tauri build`
 **/rw.*.dmg
+tmp/

@@ -6,6 +6,7 @@ import { cn } from '@/lib/utils'
 /**
  * Lightweight parent→children tree for a turn.
  * Only render when there are sub-agents (D2: hide when supervisor-only).
+ * Flat list — no card chrome.
  */
 export function CollaborationStructure({
   agents,
@@ -24,57 +25,64 @@ export function CollaborationStructure({
     : t('artifact.subAgents')
 
   return (
-    <div
-      className="rounded-lg border border-border bg-surface-muted/40 px-3 py-2"
-      data-testid="collaboration-structure"
-    >
-      <div className="mb-1.5 text-caption font-medium text-ink-tertiary">
+    <div className="px-1.5" data-testid="collaboration-structure">
+      <div className="mb-1 text-caption font-medium text-ink-tertiary">
         {t('artifact.collaborationStructure')}
       </div>
-      <div className="flex flex-col gap-1 font-mono text-meta text-ink-secondary">
-        <div className="flex items-center gap-2">
+      <ul className="m-0 flex list-none flex-col p-0">
+        <li className="flex items-center gap-2 py-0.5">
           <span
-            className="h-2 w-2 shrink-0 rounded-full"
-            style={{ background: supervisor ? ROLE_COLOR[supervisor.role] : 'var(--ink-tertiary)' }}
+            className="h-1.5 w-1.5 shrink-0 rounded-full"
+            style={{
+              background: supervisor ? ROLE_COLOR[supervisor.role] : 'var(--ink-tertiary)',
+            }}
+            aria-hidden
           />
-          <span className="font-semibold text-ink">{rootLabel}</span>
+          <span className="text-meta font-medium text-ink">{rootLabel}</span>
           {supervisor && live && supervisor.status === 'running' && (
             <span className="text-caption text-accent">{t('artifact.statusRunning')}</span>
           )}
-        </div>
-        {children.map((child, i) => {
-          const isLast = i === children.length - 1
+        </li>
+        {children.map((child) => {
+          const childRunning = live && child.status === 'running'
           return (
-            <div key={child.agentId} className="flex items-start gap-1 pl-1">
-              <span className="select-none text-ink-tertiary" aria-hidden>
-                {isLast ? '└─' : '├─'}
-              </span>
+            <li key={child.agentId} className="flex items-start gap-2 py-0.5 pl-4">
               <span
-                className="mt-1.5 h-2 w-2 shrink-0 rounded-full"
+                className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full"
                 style={{ background: ROLE_COLOR[child.role] }}
+                aria-hidden
               />
               <div className="min-w-0 flex-1">
-                <div className="flex flex-wrap items-center gap-1.5">
-                  <span className="font-semibold text-ink">{agentDisplayName(child, t)}</span>
+                <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
+                  <span className="text-meta font-medium text-ink">
+                    {agentDisplayName(child, t)}
+                  </span>
                   <span
                     className={cn(
-                      'text-caption capitalize',
-                      live && child.status === 'running' ? 'text-accent' : 'text-ink-tertiary',
+                      'text-caption',
+                      childRunning ? 'text-accent' : 'text-ink-tertiary',
                     )}
                   >
-                    {child.status}
+                    {child.status === 'running'
+                      ? t('artifact.statusRunning')
+                      : child.status === 'error'
+                        ? t('artifact.failed')
+                        : child.status}
                   </span>
                 </div>
                 {child.taskInput && (
-                  <div className="mt-0.5 truncate text-caption text-ink-tertiary" title={child.taskInput}>
+                  <div
+                    className="mt-0.5 truncate text-caption leading-snug text-ink-tertiary"
+                    title={child.taskInput}
+                  >
                     {child.taskInput}
                   </div>
                 )}
               </div>
-            </div>
+            </li>
           )
         })}
-      </div>
+      </ul>
     </div>
   )
 }

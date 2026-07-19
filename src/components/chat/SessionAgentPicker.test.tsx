@@ -11,7 +11,7 @@ vi.mock('react-i18next', () => ({
     t: (key: string, opts?: { name?: string }) => {
       const map: Record<string, string> = {
         'composer.agentPicker.label': 'Agent',
-        'composer.agentPicker.builtin': 'hip (built-in)',
+        'composer.agentPicker.builtin': 'hip',
         'composer.agentPicker.empty': 'No external agents enabled. Add one in Settings.',
         'composer.agentSwitch.title': 'Switch agent',
         'composer.agentSwitch.summary': 'Change the primary agent for this conversation',

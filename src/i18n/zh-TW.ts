@@ -390,7 +390,7 @@ export const zhTW = {
   "composer": {
     "agentPicker": {
       "label": "智慧體",
-      "builtin": "hip（內建）",
+      "builtin": "hip",
       "empty": "尚未啟用外部智慧體。請在設定中新增。"
     },
     "agentSwitch": {

@@ -392,7 +392,7 @@ export const zhCN = {
     composer: {
       agentPicker: {
         label: '智能体',
-        builtin: 'hip（内置）',
+        builtin: 'hip',
         empty: '尚未启用外部智能体。请在设置中添加。',
       },
       agentSwitch: {

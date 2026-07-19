@@ -401,7 +401,7 @@ export const en = {
     composer: {
       agentPicker: {
         label: 'Agent',
-        builtin: 'hip (built-in)',
+        builtin: 'hip',
         empty: 'No external agents enabled. Add one in Settings.',
       },
       agentSwitch: {

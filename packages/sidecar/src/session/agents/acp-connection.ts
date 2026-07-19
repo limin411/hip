@@ -54,6 +54,8 @@ export class AcpConnection {
   private readonly fsEnabled: boolean
   /** Agent runtime caps from initialize (closeSession gated on sessionCapabilities.close). */
   private runtimeCaps: AcpRuntimeCaps | null = null
+  /** In-flight closeSession RPCs keyed by acp session id (singleflight / re-entrant safe). */
+  private readonly closing = new Map<string, Promise<void>>()
 
   constructor(private readonly agent: AgentConfig, private readonly model: ResolvedModel | null) {
     // Resolve once so advertise and handlers cannot diverge for this child.
@@ -225,18 +227,32 @@ export class AcpConnection {
   /**
    * Session end (provider.dispose / setAgent / shutdown).
    * Prefer SDK closeSession when the agent advertised sessionCapabilities.close.
+   * Re-entrant / concurrent closes coalesce on one in-flight RPC per id; skip RPC
+   * when the id was not open or the child is already dead.
    */
   async closeSession(acpSessionId: string): Promise<void> {
+    const inflight = this.closing.get(acpSessionId)
+    if (inflight) return inflight
+
+    const work = this.runCloseSession(acpSessionId)
+    this.closing.set(acpSessionId, work)
+    try {
+      await work
+    } finally {
+      this.closing.delete(acpSessionId)
+    }
+  }
+
+  private async runCloseSession(acpSessionId: string): Promise<void> {
     this.detachSink(acpSessionId)
-    this.openSessions.delete(acpSessionId)
+    const wasOpen = this.openSessions.delete(acpSessionId)
     this.sessionConfigOptions.delete(acpSessionId)
     this.clearFsContext(acpSessionId)
-    if (this.runtimeCaps?.closeSession) {
-      try {
-        await this.conn.closeSession({ sessionId: acpSessionId })
-      } catch (e) {
-        logDebug('acp', 'closeSession failed', { error: e instanceof Error ? e.message : String(e) })
-      }
+    if (!wasOpen || this.closed || !this.runtimeCaps?.closeSession) return
+    try {
+      await this.conn.closeSession({ sessionId: acpSessionId })
+    } catch (e) {
+      logDebug('acp', 'closeSession failed', { error: e instanceof Error ? e.message : String(e) })
     }
   }
 

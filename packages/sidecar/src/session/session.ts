@@ -968,6 +968,20 @@ export class Session {
       await Promise.race([Promise.allSettled([...this.backgroundManager.tasks.values()]).then(() => 'settled' as const), timeout])
       this.backgroundManager.clear()
     }
+    // After abort, give a short grace for the foreground turn to leave `running`
+    // so dispose→closeSession does not race the in-flight prompt as hard.
+    if (this.running) {
+      await Promise.race([
+        new Promise<void>((resolve) => {
+          const start = Date.now()
+          const tick = () => {
+            if (!this.running || Date.now() - start > 2_000) resolve()
+            else setTimeout(tick, 20)
+          }
+          tick()
+        }),
+      ])
+    }
     this.spawnedSubagentIds.clear()
     await this.agentProv.dispose()
   }

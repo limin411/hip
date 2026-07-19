@@ -67,6 +67,38 @@ describe('AcpConnectionManager', () => {
     expect(conn.sessionCount).toBe(0)
   })
 
+  it('closeSession is re-entrant: second call is no-op; concurrent closes coalesce', async () => {
+    const conn = await mgr.acquire({
+      ...agentCfg(),
+      id: 'mock-close-reentry',
+      env: { MOCK_ACP_CLOSE_SLOW_MS: '80' },
+    }, null)
+    const sid = await conn.newSession(process.cwd())
+    const t0 = Date.now()
+    await Promise.all([conn.closeSession(sid), conn.closeSession(sid)])
+    // One RPC only — not 2× slow close
+    expect(Date.now() - t0).toBeLessThan(160)
+    expect(conn.sessionCount).toBe(0)
+    // Already closed — still settles without throwing
+    await conn.closeSession(sid)
+    expect(conn.sessionCount).toBe(0)
+  })
+
+  it('closeSession clears local maps without SDK RPC when close capability omitted (MOCK_ACP_NO_CLOSE)', async () => {
+    const conn = await mgr.acquire({
+      ...agentCfg(),
+      id: 'mock-no-close',
+      // CLOSE_SLOW would delay if RPC ran; with NO_CLOSE host must not call it.
+      env: { MOCK_ACP_NO_CLOSE: '1', MOCK_ACP_CLOSE_SLOW_MS: '200' },
+    }, null)
+    const sid = await conn.newSession(process.cwd())
+    expect(conn.sessionCount).toBe(1)
+    const t0 = Date.now()
+    await conn.closeSession(sid)
+    expect(Date.now() - t0).toBeLessThan(100)
+    expect(conn.sessionCount).toBe(0)
+  })
+
   it('evicts a dead connection so the next acquire spawns a fresh child', async () => {
     const conn = await mgr.acquire(agentCfg(), null)
     const pid1 = conn.childPid

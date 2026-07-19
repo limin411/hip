@@ -112,6 +112,24 @@ describe('AcpAgentProvider', () => {
     await expect(conn.prompt(sid, 'after-close')).rejects.toThrow()
   })
 
+  it('concurrent dispose singleflights on one closeSession', async () => {
+    const p = withFs(new AcpAgentProvider(cfg({
+      id: 'mock-dispose-singleflight',
+      env: { MOCK_ACP_CLOSE_SLOW_MS: '80' },
+    }), process.cwd(), null))
+    const a = cap()
+    await p.runTurn('hi', a.emit, new AbortController().signal)
+    const conn = acpConnections.getConnections()[0]!
+    expect(conn.sessionCount).toBe(1)
+    const t0 = Date.now()
+    await Promise.all([p.dispose(), p.dispose()])
+    // One close only — not 2× slow
+    expect(Date.now() - t0).toBeLessThan(160)
+    expect(conn.sessionCount).toBe(0)
+    // Further dispose is a no-op settle
+    await p.dispose()
+  })
+
   it('maps ACP plan sessionUpdate to planUpdated', async () => {
     const p = withFs(new AcpAgentProvider(cfg({ env: { MOCK_ACP_PLAN: '1' } }), process.cwd(), null))
     const plans: any[] = []

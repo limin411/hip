@@ -310,12 +310,25 @@ export class SessionManager {
       reason,
       cwd: delCwd,
     })
+    // Capture live Session before map/store drop so we can dispose ACP sessions
+    // (closeSession). Delete + session:deleted stay synchronous for clients/tests.
+    const live = this.sessions.get(id)
     this.store?.deleteSession(id, opts)
     this.sessions.delete(id)
     removeScratchDir(id, this.scratchRoot)
     if (delCwd) void workspaceGit.deleteCheckpointRefs(delCwd, id).catch(() => {})
     send({ type: 'session:deleted', sessionId: id })
     logDebug('session-delete', 'deleteSessionSync done', { sessionId: id, reason })
+    // Fire-and-forget: cancel turn + await agentProv.dispose → closeSession.
+    // Must not block session:deleted; errors are best-effort.
+    if (live) {
+      void live.destroy().catch((e) => {
+        logDebug('session-delete', 'destroy after delete failed', {
+          sessionId: id,
+          error: e instanceof Error ? e.message : String(e),
+        })
+      })
+    }
   }
 
   private profileListFor(session: Session): AgentProfileInfo[] {

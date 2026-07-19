@@ -15,6 +15,8 @@ export class AcpAgentProvider implements AgentProvider {
   private currentHooks: ExternalAgentHooks | null = null
   /** Required before each runTurn — set by primary runner / invoker. */
   private turnCtx: FsBridgeContext | null = null
+  /** Singleflight: concurrent dispose() awaits the same close. */
+  private disposePromise: Promise<void> | null = null
 
   constructor(
     private readonly agent: AgentConfig,
@@ -155,6 +157,12 @@ export class AcpAgentProvider implements AgentProvider {
 
   /** Settles after session/close (if advertised); does not kill the warm-pool child. */
   async dispose(): Promise<void> {
+    if (this.disposePromise) return this.disposePromise
+    this.disposePromise = this.runDispose()
+    return this.disposePromise
+  }
+
+  private async runDispose(): Promise<void> {
     if (this.conn && this.acpSessionId) {
       await this.conn.closeSession(this.acpSessionId)
     }

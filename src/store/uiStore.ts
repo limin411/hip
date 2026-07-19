@@ -146,6 +146,13 @@ interface UiState {
   /** Flush knowledge draft then restore chat/code from domain active session. */
   closeKnowledgeView: () => Promise<void>
 
+  /**
+   * Knowledge surface right-rail open (AppLayout drawer). Ephemeral — not persisted.
+   * Default true so the doc outline is visible when entering a space (discoverable).
+   */
+  knowledgePanelOpen: boolean
+  setKnowledgePanelOpen: (open: boolean) => void
+
   diffViewMode: 'unified' | 'split'
   setDiffViewMode: (m: 'unified' | 'split') => void
 
@@ -238,6 +245,10 @@ export const useUiStore = create<UiState>()(
           sidebarSection: surface === 'code' ? 'projects' : 'chats',
         })
       },
+
+      knowledgePanelOpen: true,
+      setKnowledgePanelOpen: (open) =>
+        set((s) => (s.knowledgePanelOpen === open ? s : { knowledgePanelOpen: open })),
 
       diffViewMode: 'unified',
       setDiffViewMode: (m) => set({ diffViewMode: m }),

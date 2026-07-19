@@ -1372,6 +1372,14 @@ export const en = {
         noDocTitle: 'No document selected',
         noDocHint: 'Choose a document in the tree, or create a new one.',
       },
+      outline: {
+        title: 'Outline',
+        empty: 'No headings in this document',
+        untitled: 'Untitled heading',
+        noDoc: 'Select a document to see its outline',
+        count: '{{count}} headings',
+        count_one: '{{count}} heading',
+      },
       doc: {
         edit: 'Edit',
         source: 'Source',

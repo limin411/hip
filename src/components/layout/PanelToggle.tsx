@@ -5,6 +5,7 @@ import type { ArtifactTab, ChatTab } from '@/store/uiStore'
 import { useUiStore } from '@/store/uiStore'
 import { useDomainStore } from '@/domain/sessionStore'
 import { useDiffStore } from '@/store/diffStore'
+import { useKnowledgeStore } from '@/store/knowledgeStore'
 import { Button } from '@/components/ui/Button'
 import {
   DropdownMenu,
@@ -15,7 +16,7 @@ import {
 import { CODE_TERMINAL } from '@/components/artifact/terminalFeature'
 
 type PanelTabOption = {
-  value: ArtifactTab | ChatTab
+  value: ArtifactTab | ChatTab | 'knowledge-outline'
   label: string
   gated?: boolean
 }
@@ -28,10 +29,45 @@ export function PanelToggle() {
   const setTab = useUiStore((s) => s.setTab)
   const chatActiveTab = useUiStore((s) => s.chatActiveTab)
   const setChatActiveTab = useUiStore((s) => s.setChatActiveTab)
+  const knowledgePanelOpen = useUiStore((s) => s.knowledgePanelOpen)
+  const setKnowledgePanelOpen = useUiStore((s) => s.setKnowledgePanelOpen)
   const setSessionCodePanelOpen = useDomainStore((s) => s.setSessionCodePanelOpen)
   const setSessionChatPanelOpen = useDomainStore((s) => s.setSessionChatPanelOpen)
+  const kbMode = useKnowledgeStore((s) => s.mode)
   const isGitRepo =
     useDiffStore((s) => (activeSessionId ? s.bySession[activeSessionId]?.isGitRepo : false)) ?? false
+
+  // Knowledge: no session required; show outline when a space workspace is open.
+  if (activeView === 'knowledge') {
+    if (kbMode !== 'workspace') return null
+    return (
+      <DropdownMenu modal={false}>
+        <DropdownMenuTrigger asChild>
+          <Button
+            variant="ghost"
+            size="icon"
+            title={t('chat.togglePanel')}
+            data-tauri-drag-region="false"
+            data-no-drag
+            data-testid="toggle-panel"
+          >
+            <PanelRight size={17} />
+          </Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end" data-testid="panel-tab-menu">
+          <DropdownMenuItem
+            onSelect={() => setKnowledgePanelOpen(true)}
+            data-testid="panel-tab-knowledge-outline"
+          >
+            <span className="flex w-4 shrink-0 items-center justify-center">
+              {knowledgePanelOpen ? <Check size={14} className="text-accent" /> : null}
+            </span>
+            {t('knowledge.outline.title')}
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
+    )
+  }
 
   if (!activeSessionId) return null
   if (activeView !== 'code' && activeView !== 'chat') return null
@@ -87,7 +123,7 @@ export function PanelToggle() {
           return (
             <DropdownMenuItem
               key={tab.value}
-              onSelect={() => onSelect(tab.value)}
+              onSelect={() => onSelect(tab.value as ArtifactTab | ChatTab)}
               data-testid={`panel-tab-${tab.value}`}
             >
               <span className="flex w-4 shrink-0 items-center justify-center">

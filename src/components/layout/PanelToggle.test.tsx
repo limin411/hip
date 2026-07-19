@@ -35,6 +35,7 @@ const setSessionCodePanelOpen = vi.fn()
 const setSessionChatPanelOpen = vi.fn()
 const setTab = vi.fn()
 const setChatActiveTab = vi.fn()
+const setKnowledgePanelOpen = vi.fn()
 
 vi.mock('@/domain', () => ({
   useActiveSessionId: () => mockActiveSessionId,
@@ -46,8 +47,10 @@ vi.mock('@/store/uiStore', () => ({
       activeView: mockActiveView,
       activeTab: mockActiveTab,
       chatActiveTab: mockChatActiveTab,
+      knowledgePanelOpen: mockKnowledgePanelOpen,
       setTab,
       setChatActiveTab,
+      setKnowledgePanelOpen,
     }),
 }))
 
@@ -68,6 +71,13 @@ vi.mock('@/store/diffStore', () => ({
     }),
 }))
 
+vi.mock('@/store/knowledgeStore', () => ({
+  useKnowledgeStore: (selector: (state: any) => any) =>
+    selector({
+      mode: mockKbMode,
+    }),
+}))
+
 vi.mock('@/components/artifact/terminalFeature', () => ({
   get CODE_TERMINAL() {
     return mockCodeTerminal
@@ -80,6 +90,8 @@ let mockActiveTab = 'agents'
 let mockChatActiveTab = 'files'
 let mockIsGitRepo = false
 let mockCodeTerminal = false
+let mockKnowledgePanelOpen = false
+let mockKbMode: 'home' | 'workspace' = 'home'
 
 describe('PanelToggle', () => {
   beforeEach(() => {
@@ -89,6 +101,8 @@ describe('PanelToggle', () => {
     mockChatActiveTab = 'files'
     mockIsGitRepo = false
     mockCodeTerminal = false
+    mockKnowledgePanelOpen = false
+    mockKbMode = 'home'
   })
 
   afterEach(() => {
@@ -180,4 +194,23 @@ describe('PanelToggle', () => {
   })
 
   // G7 already covered by "is hidden when no session is active"
+
+  it('shows knowledge outline tab in workspace (no session required)', () => {
+    mockActiveSessionId = null
+    mockActiveView = 'knowledge'
+    mockKbMode = 'workspace'
+    render(<PanelToggle />)
+    expect(screen.getByTestId('toggle-panel')).toBeInTheDocument()
+    expect(screen.getByTestId('panel-tab-knowledge-outline')).toBeInTheDocument()
+    fireEvent.click(screen.getByTestId('panel-tab-knowledge-outline'))
+    expect(setKnowledgePanelOpen).toHaveBeenCalledWith(true)
+  })
+
+  it('hides panel toggle on knowledge home (no space open)', () => {
+    mockActiveSessionId = null
+    mockActiveView = 'knowledge'
+    mockKbMode = 'home'
+    render(<PanelToggle />)
+    expect(screen.queryByTestId('toggle-panel')).not.toBeInTheDocument()
+  })
 })

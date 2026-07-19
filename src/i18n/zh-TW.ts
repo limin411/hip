@@ -690,6 +690,14 @@ export const zhTW = {
         noDocTitle: '未選擇文件',
         noDocHint: '在左側樹中選擇文件，或新增一篇。',
       },
+      outline: {
+        title: '目錄',
+        empty: '此文件暫無標題',
+        untitled: '未命名標題',
+        noDoc: '選擇文件以查看目錄',
+        count: '{{count}} 個標題',
+        count_one: '{{count}} 個標題',
+      },
       doc: {
         edit: '編輯',
         source: '原始碼',

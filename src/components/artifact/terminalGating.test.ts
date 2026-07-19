@@ -12,8 +12,11 @@ export function rightPanelKind(input: {
   activeView: string
   codePanelOpen: boolean
   chatPanelOpen: boolean
+  knowledgePanelOpen?: boolean
   hasSession: boolean
-}): 'artifact' | 'preview' | 'none' {
+}): 'artifact' | 'preview' | 'knowledge' | 'none' {
+  // Knowledge does not require a chat/code session.
+  if (input.activeView === 'knowledge' && input.knowledgePanelOpen) return 'knowledge'
   if (!input.hasSession) return 'none'
   if (input.activeView === 'code' && input.codePanelOpen) return 'artifact'
   if (input.activeView === 'chat' && input.chatPanelOpen) return 'preview'
@@ -58,6 +61,7 @@ describe('terminal gating matrix', () => {
         activeView: 'settings',
         codePanelOpen: true,
         chatPanelOpen: true,
+        knowledgePanelOpen: true,
         hasSession: true,
       }),
     ).toBe('none')
@@ -66,10 +70,32 @@ describe('terminal gating matrix', () => {
         activeView: 'history',
         codePanelOpen: true,
         chatPanelOpen: true,
+        knowledgePanelOpen: true,
         hasSession: true,
       }),
     ).toBe('none')
     // PTY keep-alive is backend/lifecycle — panel absence is the UI gate.
+  })
+
+  it('knowledge + panel open → knowledge outline (no session required)', () => {
+    expect(
+      rightPanelKind({
+        activeView: 'knowledge',
+        codePanelOpen: false,
+        chatPanelOpen: false,
+        knowledgePanelOpen: true,
+        hasSession: false,
+      }),
+    ).toBe('knowledge')
+    expect(
+      rightPanelKind({
+        activeView: 'knowledge',
+        codePanelOpen: true,
+        chatPanelOpen: true,
+        knowledgePanelOpen: false,
+        hasSession: true,
+      }),
+    ).toBe('none')
   })
 
   // G7: no session → no panel host

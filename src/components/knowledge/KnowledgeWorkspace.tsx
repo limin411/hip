@@ -52,7 +52,16 @@ import {
   knowledgeExportSpaceZip,
   knowledgeRevealDoc,
 } from '@/ipc/knowledge'
-import { revealInCodeMirror, revealInPreviewRoot } from '@/domain/knowledge/searchReveal'
+import {
+  revealHeadingInRoot,
+  revealInCodeMirror,
+  revealInPreviewRoot,
+  revealLineInCodeMirror,
+} from '@/domain/knowledge/searchReveal'
+import {
+  extractDocOutline,
+  scrollToKnowledgeHeading,
+} from '@/domain/knowledge/mdPreview'
 import { DeclarativeContextMenu } from '@/components/context-menu'
 import { SpaceTree } from './SpaceTree'
 import { DocReader } from './DocReader'
@@ -214,6 +223,43 @@ export function KnowledgeWorkspace() {
   useEffect(() => {
     return () => setExpandPersistSuspended(false)
   }, [])
+
+  // Outline (AppLayout right rail) → scroll Source / Live / Preview.
+  const pendingOutlineJump = useKnowledgeStore((s) => s.pendingOutlineJump)
+  useEffect(() => {
+    if (!pendingOutlineJump || !activeDocId) return
+    const item = pendingOutlineJump
+    const clear = () => useKnowledgeStore.getState().clearPendingOutlineJump()
+
+    if (editorMode === 'preview') {
+      const root = document.querySelector('[data-testid="knowledge-doc-reader"]')
+      scrollToKnowledgeHeading(item.id, root instanceof HTMLElement ? root : null)
+      clear()
+      return
+    }
+    if (editorMode === 'source') {
+      const view = editorRef.current?.getView()
+      if (view) {
+        revealLineInCodeMirror(view, item.line)
+        clear()
+      }
+      // If CM not mounted yet, leave pending — effect re-runs when mode/body settles.
+      return
+    }
+    // Live: Milkdown headings lack stable ids — match by text (nth occurrence).
+    const liveRoot =
+      document.querySelector('[data-testid="knowledge-doc-live-editor"]') ??
+      document.querySelector('.knowledge-live-editor')
+    if (!(liveRoot instanceof HTMLElement)) return
+    const body = useKnowledgeStore.getState().draftBody || useKnowledgeStore.getState().docBody
+    let occurrence = 0
+    for (const it of extractDocOutline(body)) {
+      if (it.line === item.line) break
+      if (it.text === item.text) occurrence += 1
+    }
+    revealHeadingInRoot(liveRoot, item.text, occurrence)
+    clear()
+  }, [pendingOutlineJump, activeDocId, editorMode])
 
   const [nodeEdit, setNodeEdit] = useState<KnowledgeNode | null>(null)
   const [nodeTitle, setNodeTitle] = useState('')

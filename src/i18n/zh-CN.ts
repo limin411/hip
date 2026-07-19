@@ -1348,6 +1348,14 @@ export const zhCN = {
         noDocTitle: '未选择文档',
         noDocHint: '在左侧树中选择文档，或新建一篇。',
       },
+      outline: {
+        title: '目录',
+        empty: '本文档暂无标题',
+        untitled: '未命名标题',
+        noDoc: '选择文档以查看目录',
+        count: '{{count}} 个标题',
+        count_one: '{{count}} 个标题',
+      },
       doc: {
         edit: '编辑',
         source: '源码',

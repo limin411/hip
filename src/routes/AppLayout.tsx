@@ -17,6 +17,8 @@ import { MainToolbar } from '@/components/layout/MainToolbar'
 import { SettingsPage } from '@/components/account/SettingsPage'
 import { SessionHistory } from '@/components/history/SessionHistory'
 import { KnowledgePage } from '@/components/knowledge/KnowledgePage'
+import { KnowledgeOutlinePanel } from '@/components/knowledge/KnowledgeOutlinePanel'
+import { useKnowledgeStore } from '@/store/knowledgeStore'
 import {
   GlobalCommandPalette,
   GlobalHotkeysBinder,
@@ -79,9 +81,14 @@ export function AppLayout() {
     }
   }, [])
 
+  const knowledgePanelOpen = useUiStore((s) => s.knowledgePanelOpen)
+  const knowledgeMode = useKnowledgeStore((s) => s.mode)
   const codeOpen = activeView === 'code' && activeSession?.codePanelOpen === true
   const chatOpen = activeView === 'chat' && activeSession?.chatPanelOpen === true
-  const rightOpen = codeOpen || chatOpen
+  // Only in a space workspace — home has no doc outline.
+  const knowledgeOpen =
+    activeView === 'knowledge' && knowledgeMode === 'workspace' && knowledgePanelOpen
+  const rightOpen = codeOpen || chatOpen || knowledgeOpen
 
   useEffect(() => {
     const p = rightPanelRef.current
@@ -94,12 +101,20 @@ export function AppLayout() {
   }, [rightOpen])
 
   const handleCollapse = () => {
+    if (activeView === 'knowledge') {
+      useUiStore.getState().setKnowledgePanelOpen(false)
+      return
+    }
     if (!activeSessionId) return
     if (activeView === 'code') useDomainStore.getState().setSessionCodePanelOpen(activeSessionId, false)
     else if (activeView === 'chat') useDomainStore.getState().setSessionChatPanelOpen(activeSessionId, false)
   }
 
   const handleExpand = () => {
+    if (activeView === 'knowledge') {
+      useUiStore.getState().setKnowledgePanelOpen(true)
+      return
+    }
     if (!activeSessionId) return
     if (activeView === 'code') useDomainStore.getState().setSessionCodePanelOpen(activeSessionId, true)
     else if (activeView === 'chat') useDomainStore.getState().setSessionChatPanelOpen(activeSessionId, true)
@@ -171,7 +186,13 @@ export function AppLayout() {
               className="flex h-full min-h-0 flex-col bg-surface-subtle"
               data-testid="right-panel-drawer"
             >
-              {codeOpen ? <ArtifactPanel /> : <PreviewPanel />}
+              {codeOpen ? (
+                <ArtifactPanel />
+              ) : knowledgeOpen ? (
+                <KnowledgeOutlinePanel />
+              ) : (
+                <PreviewPanel />
+              )}
             </div>
           ) : null}
         </Panel>

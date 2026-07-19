@@ -50,6 +50,48 @@ export function revealInCodeMirror(view: EditorView, query: string): boolean {
 }
 
 /**
+ * Scroll CodeMirror to a 1-based source line (cursor at line start).
+ * Used by the document outline when jumping from TOC → Source.
+ */
+export function revealLineInCodeMirror(view: EditorView, lineNumber: number): boolean {
+  const doc = view.state.doc
+  if (lineNumber < 1 || lineNumber > doc.lines) return false
+  const line = doc.line(lineNumber)
+  view.dispatch({
+    selection: EditorSelection.cursor(line.from),
+    effects: EditorView.scrollIntoView(line.from, { y: 'start' }),
+  })
+  return true
+}
+
+/**
+ * Best-effort: scroll the nth heading (1-based among h1–h6, document order)
+ * matching exact textContent under `root`. Used by Live editor TOC jumps
+ * (Milkdown headings have no stable ids).
+ */
+export function revealHeadingInRoot(
+  root: HTMLElement,
+  text: string,
+  occurrence = 0,
+): boolean {
+  const headings = root.querySelectorAll('h1, h2, h3, h4, h5, h6')
+  let seen = 0
+  for (const el of headings) {
+    const label = (el.textContent ?? '').trim()
+    if (label !== text.trim()) continue
+    if (seen === occurrence) {
+      if (typeof (el as HTMLElement).scrollIntoView === 'function') {
+        ;(el as HTMLElement).scrollIntoView({ behavior: 'smooth', block: 'start' })
+        return true
+      }
+      return false
+    }
+    seen += 1
+  }
+  return false
+}
+
+/**
  * Best-effort: walk text nodes under `root` and scroll the first match into view.
  * Preview markdown may reflow tokens; full-query match preferred.
  */

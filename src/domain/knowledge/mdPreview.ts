@@ -30,13 +30,22 @@ export function createHeadingIdAssigner(): (text: string) => string {
   }
 }
 
+/** One ATX heading entry for the document outline (TOC). */
+export type DocOutlineItem = {
+  id: string
+  level: 1 | 2 | 3 | 4 | 5 | 6
+  /** Display text (empty ATX → empty string; id still assigned). */
+  text: string
+  /** 1-based source line (mdast `position.start.line`). */
+  line: number
+}
+
 /**
- * Precompute stable ATX heading ids keyed by 1-based source line (mdast `position.start.line`).
- * Pure — no React render counters — so ids stay correct under StrictMode double-invoke.
- * Skips fenced code; setext headings are not assigned (preview anchors are ATX-first).
+ * Extract ATX headings in document order for the right-rail TOC.
+ * Pure — skips fenced code; setext headings are ignored (same as preview anchors).
  */
-export function headingIdsBySourceLine(md: string): Map<number, string> {
-  const map = new Map<number, string>()
+export function extractDocOutline(md: string): DocOutlineItem[] {
+  const items: DocOutlineItem[] = []
   const assignId = createHeadingIdAssigner()
   const lines = md.split('\n')
   let inFence = false
@@ -68,10 +77,24 @@ export function headingIdsBySourceLine(md: string): Map<number, string> {
     // CommonMark ATX: ≤3 spaces, 1–6 #, then space + text (or bare closing).
     const atx = line.match(/^ {0,3}(#{1,6})(?:[ \t]+(.*))?$/)
     if (!atx) continue
+    const level = atx[1].length as 1 | 2 | 3 | 4 | 5 | 6
     const text = (atx[2] ?? '').replace(/[ \t]+#+\s*$/, '').trim()
-    map.set(lineNo, assignId(text))
+    items.push({ id: assignId(text), level, text, line: lineNo })
   }
 
+  return items
+}
+
+/**
+ * Precompute stable ATX heading ids keyed by 1-based source line (mdast `position.start.line`).
+ * Pure — no React render counters — so ids stay correct under StrictMode double-invoke.
+ * Skips fenced code; setext headings are not assigned (preview anchors are ATX-first).
+ */
+export function headingIdsBySourceLine(md: string): Map<number, string> {
+  const map = new Map<number, string>()
+  for (const item of extractDocOutline(md)) {
+    map.set(item.line, item.id)
+  }
   return map
 }
 

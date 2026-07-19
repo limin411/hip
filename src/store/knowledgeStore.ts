@@ -257,6 +257,17 @@ export type KnowledgePendingReveal = {
   docId: string
 }
 
+/** Right-rail outline click → KnowledgeWorkspace scrolls Source / Live / Preview. */
+export type KnowledgePendingOutlineJump = {
+  id: string
+  level: 1 | 2 | 3 | 4 | 5 | 6
+  text: string
+  /** 1-based ATX source line. */
+  line: number
+  /** Bumps so re-clicking the same heading re-triggers the effect. */
+  nonce: number
+}
+
 /** Yield so React can paint index progress (and avoid long freezes). */
 function yieldToUi(): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, 0))
@@ -289,6 +300,8 @@ interface KnowledgeState {
   indexProgress: KnowledgeIndexProgress | null
   /** After opening a search hit, UI scrolls near this query (best-effort). */
   pendingReveal: KnowledgePendingReveal | null
+  /** Outline (TOC) click — consumed by KnowledgeWorkspace for mode-aware scroll. */
+  pendingOutlineJump: KnowledgePendingOutlineJump | null
   /**
    * Doc counts per space. Tree-derived counts land as soon as trees load during
    * index rebuild (before body reads); finalized when indexStatus is ready.
@@ -322,6 +335,17 @@ interface KnowledgeState {
   /** Open a search hit and request scroll-to-match via `pendingReveal`. */
   openSearchHit: (hit: KnowledgeSearchHit) => Promise<void>
   clearPendingReveal: () => void
+  /**
+   * Request scroll to an outline heading. Workspace applies based on editorMode
+   * (preview id / source line / live text match).
+   */
+  requestOutlineJump: (item: {
+    id: string
+    level: 1 | 2 | 3 | 4 | 5 | 6
+    text: string
+    line: number
+  }) => void
+  clearPendingOutlineJump: () => void
   openHome: () => Promise<void>
   createFolder: (parentId: string | null, title: string) => Promise<void>
   /**
@@ -491,6 +515,7 @@ export const useKnowledgeStore = create<KnowledgeState>((set, get) => ({
   indexStatus: 'idle',
   indexProgress: null,
   pendingReveal: null,
+  pendingOutlineJump: null,
   spaceDocCounts: {},
   availableTags: [],
   availableStatuses: [],
@@ -796,6 +821,18 @@ export const useKnowledgeStore = create<KnowledgeState>((set, get) => ({
   },
 
   clearPendingReveal: () => set({ pendingReveal: null }),
+
+  requestOutlineJump: (item) =>
+    set((s) => ({
+      pendingOutlineJump: {
+        id: item.id,
+        level: item.level,
+        text: item.text,
+        line: item.line,
+        nonce: (s.pendingOutlineJump?.nonce ?? 0) + 1,
+      },
+    })),
+  clearPendingOutlineJump: () => set({ pendingOutlineJump: null }),
 
   openHome: async () => {
     const ok = await get().flushSave()

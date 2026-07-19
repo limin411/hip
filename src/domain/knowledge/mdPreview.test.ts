@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   createHeadingIdAssigner,
+  extractDocOutline,
   headingIdsBySourceLine,
   normalizeHeadingHash,
   slugifyHeading,
@@ -42,6 +43,31 @@ describe('normalizeHeadingHash', () => {
     expect(normalizeHeadingHash('#hello-world')).toBe('hello-world')
     expect(normalizeHeadingHash('hello-world')).toBe('hello-world')
     expect(normalizeHeadingHash('#caf%C3%A9')).toBe('café')
+  })
+})
+
+describe('extractDocOutline', () => {
+  it('returns level, text, id, and 1-based line in order', () => {
+    const md = '# Top\n\n## Nested\n\n### Deep\n'
+    expect(extractDocOutline(md)).toEqual([
+      { id: 'top', level: 1, text: 'Top', line: 1 },
+      { id: 'nested', level: 2, text: 'Nested', line: 3 },
+      { id: 'deep', level: 3, text: 'Deep', line: 5 },
+    ])
+  })
+
+  it('uniquifies duplicate titles and skips fenced code', () => {
+    const md = '## Intro\n```\n## Fake\n```\n## Intro\n'
+    expect(extractDocOutline(md)).toEqual([
+      { id: 'intro', level: 2, text: 'Intro', line: 1 },
+      { id: 'intro-1', level: 2, text: 'Intro', line: 5 },
+    ])
+  })
+
+  it('keeps CJK heading text', () => {
+    expect(extractDocOutline('## 中文标题\n')).toEqual([
+      { id: '中文标题', level: 2, text: '中文标题', line: 1 },
+    ])
   })
 })
 

@@ -1,4 +1,5 @@
 import { useCallback, useMemo } from 'react'
+import { useTranslation } from 'react-i18next'
 import {
   ReactFlow,
   Background,
@@ -70,6 +71,7 @@ export function KnowledgeGraphCanvas({
   focusDocId,
   onOpenDoc,
 }: KnowledgeGraphCanvasProps) {
+  const { t } = useTranslation()
   const rfNodes: Node[] = useMemo(
     () =>
       nodes.map((n) => ({
@@ -93,14 +95,14 @@ export function KnowledgeGraphCanvas({
         id: e.id,
         source: e.from,
         target: e.to,
-        label: e.kind === 'embed' ? 'embed' : undefined,
+        label: e.kind === 'embed' ? t('knowledge.graph.edgeEmbed') : undefined,
         markerEnd: { type: MarkerType.ArrowClosed, width: 14, height: 14 },
         style: {
           stroke: e.kind === 'embed' ? 'var(--color-warning, #ca8a04)' : 'var(--color-border, #888)',
         },
         animated: e.kind === 'embed',
       })),
-    [edges],
+    [edges, t],
   )
 
   const onNodeClick = useCallback(

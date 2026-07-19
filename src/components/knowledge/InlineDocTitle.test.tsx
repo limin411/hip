@@ -4,6 +4,18 @@ import { describe, it, expect, vi, afterEach } from 'vitest'
 import { render, screen, cleanup, fireEvent } from '@testing-library/react'
 import { InlineDocTitle } from './InlineDocTitle'
 
+vi.mock('react-i18next', () => ({
+  useTranslation: () => ({
+    t: (key: string) => {
+      const map: Record<string, string> = {
+        'knowledge.doc.titleLabel': 'Document title',
+        'knowledge.doc.untitled': 'Untitled',
+      }
+      return map[key] ?? key
+    },
+  }),
+}))
+
 afterEach(() => cleanup())
 
 describe('InlineDocTitle', () => {

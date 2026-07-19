@@ -56,6 +56,7 @@ import {
   knowledgeRevealDoc,
 } from '@/ipc/knowledge'
 import { buildDocHtmlDocument } from '@/domain/knowledge/htmlExport'
+import { collectionViewDisplayName } from '@/domain/knowledge/propDisplay'
 import { diffLines } from '@/domain/knowledge/textDiff'
 import {
   revealHeadingInRoot,
@@ -705,7 +706,7 @@ export function KnowledgeWorkspace() {
                 )}
                 onClick={() => setActiveViewId(v.id)}
               >
-                {v.name}
+                {collectionViewDisplayName(t, v)}
               </button>
             ))}
           </div>
@@ -767,7 +768,9 @@ export function KnowledgeWorkspace() {
         {activeView ? (
           <>
             <div className="flex h-12 shrink-0 items-center gap-2.5 border-b border-border px-5">
-              <span className="text-body font-medium text-ink">{activeView.name}</span>
+              <span className="text-body font-medium text-ink">
+                {collectionViewDisplayName(t, activeView)}
+              </span>
               <span className="text-meta text-ink-tertiary">
                 {activeView.layout === 'board'
                   ? t('knowledge.views.layoutBoard')

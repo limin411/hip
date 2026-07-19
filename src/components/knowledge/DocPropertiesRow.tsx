@@ -5,6 +5,7 @@ import { applyMetaToDocument } from '@/domain/knowledge/frontmatterWrite'
 import { patchMetaField } from '@/domain/knowledge/views'
 import type { SpaceSchemaV1 } from '@/domain/knowledge/schema'
 import { DEFAULT_SPACE_SCHEMA, propDefByKey } from '@/domain/knowledge/schema'
+import { propOptionLabel } from '@/domain/knowledge/propDisplay'
 import { cn } from '@/lib/utils'
 
 export interface DocPropertiesRowProps {
@@ -69,7 +70,7 @@ export function DocPropertiesRow({
           <option value="">{t('knowledge.props.none')}</option>
           {statusOptions.map((o) => (
             <option key={o} value={o}>
-              {o}
+              {propOptionLabel(t, o)}
             </option>
           ))}
         </select>
@@ -78,7 +79,7 @@ export function DocPropertiesRow({
           className="rounded-full border border-border bg-surface-muted px-2.5 py-0.5 text-caption text-ink-secondary"
           data-testid="knowledge-doc-status"
         >
-          {meta.status}
+          {propOptionLabel(t, meta.status)}
         </span>
       ) : null}
 
@@ -97,7 +98,7 @@ export function DocPropertiesRow({
           <option value="">{t('knowledge.props.priorityNone')}</option>
           {priorityOptions.map((o) => (
             <option key={o} value={o}>
-              {o}
+              {propOptionLabel(t, o)}
             </option>
           ))}
         </select>
@@ -106,7 +107,7 @@ export function DocPropertiesRow({
           className="rounded-full border border-border bg-surface-muted px-2.5 py-0.5 text-caption text-ink-secondary"
           data-testid="knowledge-doc-priority"
         >
-          {meta.priority}
+          {propOptionLabel(t, meta.priority)}
         </span>
       ) : null}
 

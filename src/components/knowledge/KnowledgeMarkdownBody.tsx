@@ -1,4 +1,5 @@
 import { useMemo, type ReactNode } from 'react'
+import { useTranslation } from 'react-i18next'
 import ReactMarkdown from 'react-markdown'
 import type { Components } from 'react-markdown'
 import remarkGfm from 'remark-gfm'
@@ -36,6 +37,7 @@ export function KnowledgeMarkdownBody({
   className,
   components,
 }: KnowledgeMarkdownBodyProps) {
+  const { t } = useTranslation()
   const merged = useMemo((): Components => {
     const base: Components = {
       pre: ({ children, ...props }) => {
@@ -64,6 +66,9 @@ export function KnowledgeMarkdownBody({
         const style = CALLOUT_STYLE[header.type] ?? CALLOUT_STYLE.note
         // Drop the first paragraph if it was only the [!type] header line
         const rest = stripCalloutHeaderChild(children)
+        const typeLabel = t(`knowledge.callout.${header.type}`, {
+          defaultValue: header.type,
+        })
         return (
           <aside
             className={cn(
@@ -75,7 +80,7 @@ export function KnowledgeMarkdownBody({
             {...(props as object)}
           >
             <div className="mb-1 text-meta font-semibold uppercase tracking-wide text-ink">
-              {header.title ?? header.type}
+              {header.title ?? typeLabel}
             </div>
             <div className="text-body text-ink [&_p]:my-1">{rest}</div>
           </aside>
@@ -83,7 +88,7 @@ export function KnowledgeMarkdownBody({
       },
     }
     return { ...base, ...components }
-  }, [components])
+  }, [components, t])
 
   return (
     <div className={cn(markdownProseClassName, className)}>

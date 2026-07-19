@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { cn } from '@/lib/utils'
 
 export interface InlineDocTitleProps {
@@ -20,6 +21,7 @@ export function InlineDocTitle({
   onCommit,
   className,
 }: InlineDocTitleProps) {
+  const { t } = useTranslation()
   const [draft, setDraft] = useState(title)
   const [focused, setFocused] = useState(false)
   const skipBlurCommit = useRef(false)
@@ -63,13 +65,13 @@ export function InlineDocTitle({
       data-testid="knowledge-doc-title"
       type="text"
       value={draft}
-      aria-label="Document title"
+      aria-label={t('knowledge.doc.titleLabel')}
       className={cn(
         'w-full shrink-0 border-0 bg-transparent px-0 pb-2 pt-7 sm:pt-8 text-page font-semibold tracking-tight text-ink',
         'placeholder:text-ink-tertiary focus:outline-none focus-visible:ring-0',
         className,
       )}
-      placeholder="Untitled"
+      placeholder={t('knowledge.doc.untitled')}
       onFocus={() => setFocused(true)}
       onChange={(e) => setDraft(e.target.value)}
       onBlur={() => {

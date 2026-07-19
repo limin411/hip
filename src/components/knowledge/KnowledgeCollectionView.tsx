@@ -12,6 +12,7 @@ import {
   sortDocRows,
   type CollectionView,
 } from '@/domain/knowledge/views'
+import { propFieldLabel, propOptionLabel } from '@/domain/knowledge/propDisplay'
 import { cn } from '@/lib/utils'
 
 export interface KnowledgeCollectionViewProps {
@@ -89,7 +90,7 @@ function TableView({
             </th>
             {columns.map((c) => (
               <th key={c} className="sticky top-0 bg-surface px-2 py-1.5 font-medium">
-                {propDefByKey(schema, c)?.label ?? c}
+                {propFieldLabel(t, c, propDefByKey(schema, c)?.label)}
               </th>
             ))}
           </tr>
@@ -154,6 +155,7 @@ function CellEditor({
   schema: SpaceSchemaV1
   onPatchField: (docId: string, key: string, value: string | null) => void
 }) {
+  const { t } = useTranslation()
   const def = propDefByKey(schema, col)
   const raw = getMetaProp(meta, col)
 
@@ -175,10 +177,12 @@ function CellEditor({
         <option value="">—</option>
         {options.map((o) => (
           <option key={o} value={o}>
-            {o}
+            {propOptionLabel(t, o)}
           </option>
         ))}
-        {val && !options.includes(val) ? <option value={val}>{val}</option> : null}
+        {val && !options.includes(val) ? (
+          <option value={val}>{propOptionLabel(t, val)}</option>
+        ) : null}
       </select>
     )
   }
@@ -248,7 +252,9 @@ function BoardView({
           }}
         >
           <div className="border-b border-border px-2 py-1.5 text-meta font-medium text-ink">
-            {col.key === '' ? t('knowledge.views.emptyCol') : col.label}
+            {col.key === ''
+              ? t('knowledge.views.emptyCol')
+              : propOptionLabel(t, col.key)}
             <span className="ml-1 text-ink-tertiary">({col.rows.length})</span>
           </div>
           <div className="flex flex-1 flex-col gap-1.5 overflow-y-auto p-1.5">

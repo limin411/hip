@@ -1,4 +1,5 @@
 import { useEffect, useId, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { cn } from '@/lib/utils'
 
 export interface KnowledgeMermaidProps {
@@ -11,6 +12,7 @@ export interface KnowledgeMermaidProps {
  * Failures show source + error line.
  */
 export function KnowledgeMermaid({ code, className }: KnowledgeMermaidProps) {
+  const { t } = useTranslation()
   const reactId = useId().replace(/:/g, '')
   const [svg, setSvg] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -60,7 +62,7 @@ export function KnowledgeMermaid({ code, className }: KnowledgeMermaidProps) {
         className={cn('my-2 text-meta text-ink-tertiary', className)}
         data-testid="knowledge-mermaid-loading"
       >
-        …
+        {t('knowledge.mermaid.loading')}
       </div>
     )
   }

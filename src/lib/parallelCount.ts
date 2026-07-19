@@ -8,7 +8,11 @@
 export const PARALLEL_COUNT_MIN = 1
 export const PARALLEL_COUNT_MAX = 4
 
-/** Structured reason for UI i18n (`chat.worktreeControl.reason.*`). English `rationale` kept for tests. */
+/**
+ * Structured reason for UI i18n (`chat.worktreeControl.reason.<code>`).
+ * English `rationale` is a frozen diagnostic for unit tests only — UI must use {@link reasonCode}.
+ * Keep wording aligned with product “track” terminology (not “slot”) for consistency with i18n.
+ */
 export type ParallelSuggestReason =
   | 'empty'
   | 'compare'
@@ -17,9 +21,22 @@ export type ParallelSuggestReason =
   | 'single'
   | 'default'
 
+/** Exhaustive list of reason codes — keep in sync with `chat.worktreeControl.reason.*` keys. */
+export const PARALLEL_SUGGEST_REASONS: readonly ParallelSuggestReason[] = [
+  'empty',
+  'compare',
+  'three',
+  'four',
+  'single',
+  'default',
+] as const
+
 export interface ParallelCountSuggestion {
   n: number
-  /** English diagnostic string for unit tests; UI must use {@link reasonCode}. */
+  /**
+   * English diagnostic for unit tests only (never render in UI).
+   * Intentionally uses “track(s)” to match `chat.worktreeControl.reason.*` product terms.
+   */
   rationale: string
   reasonCode: ParallelSuggestReason
 }
@@ -56,7 +73,7 @@ export function suggestParallelCount(goal: string): ParallelCountSuggestion {
   ) {
     return {
       n: clampParallelCount(4),
-      rationale: 'Multi-way / exhaustive exploration → 4 slots',
+      rationale: 'Multi-way / exhaustive exploration → 4 tracks',
       reasonCode: 'four',
     }
   }
@@ -68,7 +85,7 @@ export function suggestParallelCount(goal: string): ParallelCountSuggestion {
   ) {
     return {
       n: clampParallelCount(3),
-      rationale: 'Three distinct approaches → 3 slots',
+      rationale: 'Three distinct approaches → 3 tracks',
       reasonCode: 'three',
     }
   }
@@ -86,7 +103,7 @@ export function suggestParallelCount(goal: string): ParallelCountSuggestion {
   if (wantsCompare) {
     return {
       n: clampParallelCount(2),
-      rationale: 'Compare / dual approach language → 2 slots',
+      rationale: 'Compare / dual approach language → 2 tracks',
       reasonCode: 'compare',
     }
   }
@@ -94,14 +111,14 @@ export function suggestParallelCount(goal: string): ParallelCountSuggestion {
   if (wantsSingle && !wantsCompare) {
     return {
       n: clampParallelCount(1),
-      rationale: 'Single focused change → 1 isolated worktree',
+      rationale: 'Single focused change → 1 isolated workspace',
       reasonCode: 'single',
     }
   }
 
   return {
     n: clampParallelCount(2),
-    rationale: 'Default: 2 slots for a light A/B comparison',
+    rationale: 'Default: 2 tracks for a light A/B comparison',
     reasonCode: 'default',
   }
 }

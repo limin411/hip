@@ -1,20 +1,14 @@
 import { describe, expect, it } from 'vitest'
+import { en } from '@/i18n/en'
+import { zhCN } from '@/i18n/zh-CN'
+import { zhTW } from '@/i18n/zh-TW'
 import {
   PARALLEL_COUNT_MAX,
   PARALLEL_COUNT_MIN,
+  PARALLEL_SUGGEST_REASONS,
   clampParallelCount,
   suggestParallelCount,
-  type ParallelSuggestReason,
 } from './parallelCount'
-
-const ALL_REASONS: ParallelSuggestReason[] = [
-  'empty',
-  'compare',
-  'three',
-  'four',
-  'single',
-  'default',
-]
 
 describe('clampParallelCount', () => {
   it('clamps to [MIN, MAX]', () => {
@@ -77,7 +71,36 @@ describe('suggestParallelCount', () => {
       expect(s.n).toBeGreaterThanOrEqual(PARALLEL_COUNT_MIN)
       expect(s.n).toBeLessThanOrEqual(PARALLEL_COUNT_MAX)
       expect(s.rationale.length).toBeGreaterThan(0)
-      expect(ALL_REASONS).toContain(s.reasonCode)
+      expect(PARALLEL_SUGGEST_REASONS).toContain(s.reasonCode)
+    }
+  })
+})
+
+describe('ParallelSuggestReason → i18n', () => {
+  const locales = [
+    { name: 'en', reason: en.translation.chat.worktreeControl.reason },
+    { name: 'zh-CN', reason: zhCN.translation.chat.worktreeControl.reason },
+    { name: 'zh-TW', reason: zhTW.translation.chat.worktreeControl.reason },
+  ]
+
+  it('every reasonCode has a non-empty chat.worktreeControl.reason.<code> in all locales', () => {
+    for (const code of PARALLEL_SUGGEST_REASONS) {
+      for (const { name, reason } of locales) {
+        const leaf = reason[code]
+        expect(typeof leaf, `${name} missing reason.${code}`).toBe('string')
+        expect((leaf as string).trim().length, `${name} empty reason.${code}`).toBeGreaterThan(0)
+      }
+    }
+  })
+
+  it('locale reason objects have no extra keys beyond ParallelSuggestReason', () => {
+    const expected = new Set(PARALLEL_SUGGEST_REASONS)
+    for (const { name, reason } of locales) {
+      for (const key of Object.keys(reason)) {
+        expect(expected.has(key as (typeof PARALLEL_SUGGEST_REASONS)[number]), `${name} unknown reason key: ${key}`).toBe(
+          true,
+        )
+      }
     }
   })
 })

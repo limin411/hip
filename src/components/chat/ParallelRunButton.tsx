@@ -63,7 +63,8 @@ export function ParallelRunButton({ draftPrompt = '' }: { draftPrompt?: string }
         }),
       )
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : String(err))
+      const msg = (err instanceof Error ? err.message : String(err)).trim()
+      toast.error(msg || t('chat.worktreeControl.failed'))
     } finally {
       setBusy(false)
     }

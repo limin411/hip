@@ -8,6 +8,11 @@ export const en = {
       sendMessage: 'Send a message to start the conversation',
       inputPlaceholder: 'Message hip… (Enter to send, Shift+Enter for newline)',
       resizeInput: 'Drag to resize input',
+      /**
+       * Legacy host parallel keys. Host UI uses `chat.worktreeControl.*` (PR1).
+       * Still referenced: `started` by serverMessageEffects. Remaining agent-worded
+       * keys are unused; delete/rewrite in PR5 so false “agent chooses” cannot resurface.
+       */
       parallel: {
         started: 'Started {{count}} parallel worktree slots',
         failed: 'Parallel run failed',

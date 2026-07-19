@@ -16,6 +16,7 @@ export const zhTW = {
     "sendMessage": "發送一條消息開始對話",
     "inputPlaceholder": "給 hip 發消息…（Enter 發送，Shift+Enter 換行）",
     "resizeInput": "拖曳調整輸入框高度",
+    // Legacy parallel keys: host UI uses worktreeControl (PR1). `started` still used by serverMessageEffects; PR5 deletes agent-worded leftovers.
     "parallel": {
       "started": "已啟動 {{count}} 路並行 worktree",
       "failed": "並行執行失敗",

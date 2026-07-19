@@ -8,6 +8,11 @@ export const zhCN = {
       sendMessage: '发送一条消息开始对话',
       inputPlaceholder: '给 hip 发消息…（Enter 发送，Shift+Enter 换行）',
       resizeInput: '拖拽调整输入框高度',
+      /**
+       * 旧版并行文案。主机 UI 已迁至 `chat.worktreeControl.*`（PR1）。
+       * 仍被引用：`started`（serverMessageEffects）。其余含「智能体」的键暂无消费者；
+       * PR5 删除/改写，避免误用带回虚假「智能体决定」文案。
+       */
       parallel: {
         started: '已启动 {{count}} 路并行 worktree',
         failed: '并行运行失败',

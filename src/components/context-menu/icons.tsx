@@ -18,6 +18,7 @@ import {
   Puzzle,
   GitBranch,
   Link2,
+  BookOpen,
   type LucideIcon,
 } from 'lucide-react'
 import type { ContextIconName } from './types'
@@ -43,6 +44,7 @@ const ICONS: Record<ContextIconName, LucideIcon> = {
   bot: Bot,
   puzzle: Puzzle,
   'link-2': Link2,
+  'book-open': BookOpen,
 }
 
 export function ContextMenuIcon({

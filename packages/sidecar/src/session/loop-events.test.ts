@@ -33,24 +33,24 @@ describe('LoopEvent union', () => {
   })
 
   it('narrows on type discriminant', () => {
-    const e: LoopEvent = { type: 'loop.nudge', ...base, reason: 'doom' }
-    let reason: string | undefined
-    switch (e.type) {
-      case 'loop.nudge':
-        reason = e.reason
-        break
-      case 'loop.step':
-      case 'loop.replan':
-      case 'loop.pause':
-      case 'loop.budget':
-      case 'loop.end':
-        break
-      default: {
-        const _exhaustive: never = e
-        void _exhaustive
+    // Keep as a parameter so TS does not narrow the union to a single variant.
+    const reasonOf = (e: LoopEvent): string | undefined => {
+      switch (e.type) {
+        case 'loop.nudge':
+          return e.reason
+        case 'loop.step':
+        case 'loop.replan':
+        case 'loop.pause':
+        case 'loop.budget':
+        case 'loop.end':
+          return undefined
+        default: {
+          const _exhaustive: never = e
+          return _exhaustive
+        }
       }
     }
-    expect(reason).toBe('doom')
+    expect(reasonOf({ type: 'loop.nudge', ...base, reason: 'doom' })).toBe('doom')
   })
 })
 

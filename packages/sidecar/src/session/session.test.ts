@@ -344,7 +344,7 @@ describe('Session orchMode', () => {
       id: 'test-wf',
       name: 'Test',
       entry: ['a'],
-      nodes: [{ type: 'agent' as const, id: 'a', agentId: 'worker' }],
+      nodes: [{ type: 'agent' as const, id: 'a', agentId: 'worker', inputTemplate: '{{input}}' }],
       edges: [],
     }
     session.setPendingWorkflowDef(def)

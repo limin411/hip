@@ -43,6 +43,10 @@ export interface SessionContextState {
   memoryIdsInjected?: Set<string>
   /** Last user text used as memory prefetch query. */
   prefetchQuery?: string
+  /** Currently focused/previewed project-relative path (UI → context). */
+  openFilePath?: string
+  /** Optional short excerpt of the open file. */
+  openFileExcerpt?: string
 }
 
 export interface PreparedContext {
@@ -125,6 +129,8 @@ export async function assembleFromInjectors(
     memoryCoreIds: state.memoryCoreIds,
     memoryIdsInjected: state.memoryIdsInjected,
     prefetchQuery: state.prefetchQuery,
+    openFilePath: state.openFilePath,
+    openFileExcerpt: state.openFileExcerpt,
   }
   const results = await injectorRegistry.injectAll(injectorState)
   const messages = results.flatMap((r) => r.systemMessages)

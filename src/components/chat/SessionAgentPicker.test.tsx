@@ -146,14 +146,16 @@ vi.mock('@/store/hipConfigStore', () => ({
   useAgents: () => mockAgents,
 }))
 
-const setAgent = vi.fn()
-const createSession = vi.fn(() => 'new-s')
+const { setAgent, createSession } = vi.hoisted(() => ({
+  setAgent: vi.fn(async (_sessionId: string, _agentId: string) => {}),
+  createSession: vi.fn((_config?: unknown) => 'new-s'),
+}))
 vi.mock('@/domain', () => ({
   useActiveSessionId: () => mockActiveSessionId,
   useActiveSession: () => mockSession,
   sessionService: {
-    setAgent: (...args: unknown[]) => setAgent(...args),
-    createSession: (...args: unknown[]) => createSession(...args),
+    setAgent,
+    createSession,
   },
 }))
 

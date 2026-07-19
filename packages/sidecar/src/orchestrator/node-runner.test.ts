@@ -31,7 +31,7 @@ describe('launchResolvedNode', () => {
     }
     registerGate(gate)
     const result = await launchResolvedNode(
-      { type: 'gate', id: 'g1', gateKind: 'always-pass-test' },
+      { type: 'gate', id: 'g1', gateKind: 'always-pass-test' as import('@hip/protocol').VerificationGateKind },
       { agentRunner: new FakeAgentRunner(), eventSink: new CollectingEventSink() },
       {
         runId: 'r1',
@@ -59,7 +59,7 @@ describe('launchResolvedNode', () => {
     }
     registerGate(gate)
     const result = await launchResolvedNode(
-      { type: 'gate', id: 'g1', gateKind: 'always-fail-test' },
+      { type: 'gate', id: 'g1', gateKind: 'always-fail-test' as import('@hip/protocol').VerificationGateKind },
       { agentRunner: new FakeAgentRunner(), eventSink: new CollectingEventSink() },
       {
         runId: 'r1',

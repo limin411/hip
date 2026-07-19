@@ -10,7 +10,7 @@ const customDef: WorkflowDef = {
   id: 'custom',
   name: 'Custom',
   entry: ['n1'],
-  nodes: [{ type: 'agent', id: 'n1', agentId: 'worker' }],
+  nodes: [{ type: 'agent', id: 'n1', agentId: 'worker', inputTemplate: '{{input}}' }],
   edges: [],
 }
 

@@ -3,8 +3,6 @@ import { applyServerMessageEffects, type ServerMessageEffectDeps } from './serve
 import { useDomainStore } from './sessionStore'
 import { useFsStore } from '@/store/fsStore'
 import { useFocusStore } from '@/store/focusStore'
-import { useUiStore } from '@/store/uiStore'
-
 describe('write-follow effects (P1 C1)', () => {
   beforeEach(() => {
     useDomainStore.setState({
@@ -72,7 +70,7 @@ describe('write-follow effects (P1 C1)', () => {
       deps,
     )
     const prev = useFsStore.getState().bySession['s1']?.preview
-    expect(prev?.path).toBe('/README.md')
+    expect(prev && prev.status !== 'idle' ? prev.path : undefined).toBe('/README.md')
     expect(send).toHaveBeenCalledWith(expect.objectContaining({ type: 'fs:read', path: '/README.md' }))
     expect(useFocusStore.getState().focusedPath).toBe('/README.md')
   })
@@ -98,6 +96,7 @@ describe('write-follow effects (P1 C1)', () => {
         resyncActiveIfRunning: vi.fn(),
       },
     )
-    expect(useFsStore.getState().bySession['s1']?.preview?.path).toBeUndefined()
+    const prev = useFsStore.getState().bySession['s1']?.preview
+    expect(prev && prev.status !== 'idle' ? prev.path : undefined).toBeUndefined()
   })
 })

@@ -572,13 +572,14 @@ describe('applyServerMessage', () => {
         tool: { title: 'x', kind: 'execute' },
         options: [],
       },
+      0,
     )
     const s1 = applyServerMessage(s0, {
       type: 'permission:resolved',
       sessionId: 's',
       requestId: 'r',
       source: 'cli',
-    })
+    }, 0)
     expect(s1.sessions[0].pendingPermission).toBeNull()
   })
 
@@ -593,6 +594,7 @@ describe('applyServerMessage', () => {
         question: 'Approve plan?',
         context: JSON.stringify({ kind: 'plan_approval' }),
       },
+      0,
     )
     expect(s.sessions[0].interrupt?.turnId).toBe('t1')
     expect(s.sessions[0].planApprovalPending).toBe(true)
@@ -601,7 +603,7 @@ describe('applyServerMessage', () => {
       sessionId: 's',
       turnId: 't1',
       source: 'cli',
-    })
+    }, 0)
     expect(s.sessions[0].interrupt).toBeNull()
     expect(s.sessions[0].planApprovalPending).toBe(false)
   })

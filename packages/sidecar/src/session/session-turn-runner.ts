@@ -161,6 +161,8 @@ export interface SessionTurnHost {
   pendingWorkflowDef: WorkflowDef | null
   messages: BaseMessage[]
   abortController: AbortController | null
+  /** AbortController for subagent resume turns (resumeSubagent). */
+  resumeAbortController: AbortController | null
   running: boolean
   /**
    * True while session:setAgent critical section runs (dispose → config → echo).

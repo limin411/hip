@@ -69,7 +69,7 @@ function seedHostSession() {
         hostSessionId: 'host1',
       },
     },
-    pendingRevealPath: null,
+    pendingRevealPath: undefined,
   })
   useParallelStore.setState({ runs: [] })
   useProjectPathStore.getState().markOk('/repo')

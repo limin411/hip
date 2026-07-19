@@ -15,11 +15,11 @@ import type { ToolRunnerDeps } from './tool-runner.js'
 /** Create a mock LangChain tool that returns a known string. */
 function mockTool(
   name: string,
-  fn?: (args: Record<string, unknown>) => string,
+  fn?: (args: Record<string, unknown>) => string | Promise<string>,
 ): StructuredToolInterface {
   return tool(
     async (args: { message?: string }) => {
-      const result = fn ? fn(args as Record<string, unknown>) : `${name}: ok`
+      const result = fn ? await fn(args as Record<string, unknown>) : `${name}: ok`
       return result
     },
     {

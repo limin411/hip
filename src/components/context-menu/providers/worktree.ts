@@ -7,8 +7,9 @@ import type { ContextMenuItemDef, ContextProvider } from '../types'
 export const worktreeProvider: ContextProvider = (req, ctx) => {
   if (req.kind !== 'worktree') return []
   const { hostSessionId, worktreePath, label, branch, slotSessionId } = req.payload
-  const t = (key: string, opts?: Record<string, string>) =>
-    opts ? ctx.t(key, opts) : ctx.t(key)
+  // Context menu t is a typed TFunction; cast for dynamic menu keys.
+  const t = (key: string, opts?: Record<string, string>): string =>
+    String(opts ? ctx.t(key as never, opts as never) : ctx.t(key as never))
 
   const items: ContextMenuItemDef[] = [
     {

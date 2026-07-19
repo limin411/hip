@@ -55,7 +55,11 @@ function downloadText(filename: string, data: string, mime = 'application/x-ndjs
   URL.revokeObjectURL(url)
 }
 
-function formatRelativeTime(ts: number | undefined, t: (k: string, p?: Record<string, unknown>) => string): string {
+/** Compatible with i18next TFunction without requiring the full key union. */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type MemoryTranslate = (k: any, p?: any) => string
+
+function formatRelativeTime(ts: number | undefined, t: MemoryTranslate): string {
   if (!ts) return t('settings.memory.healthNever')
   const mins = Math.max(0, Math.floor((Date.now() - ts) / 60_000))
   if (mins < 1) return t('settings.memory.healthJustNow')
@@ -68,7 +72,7 @@ function formatRelativeTime(ts: number | undefined, t: (k: string, p?: Record<st
 
 function phase1HealthLabel(
   status: MemoryPipelineStatus,
-  t: (k: string, p?: Record<string, unknown>) => string,
+  t: MemoryTranslate,
 ): string {
   const s = status.lastPhase1Status
   const reason = status.lastPhase1Reason
@@ -435,7 +439,7 @@ export function MemoryConfig() {
         }
         setConsolidateMsg({
           tone: 'warn',
-          text: t(key, { reason: phase1Reason ?? primary }),
+          text: t(key as never, { reason: phase1Reason ?? primary }),
         })
         await refreshPipelineStatus()
       } else {

@@ -30,7 +30,7 @@ export function mergeMemoryConfig(partial: Partial<MemoryFileConfig> | Record<st
     // Explicit clear of optional fields (null / empty string) → leave defaults / absent.
     if (v === null || v === '') continue
     if (k in MEMORY_FILE_CONFIG_DEFAULTS || isOptionalMemoryKey(k)) {
-      ;(out as Record<string, unknown>)[k] = v
+      ;(out as unknown as Record<string, unknown>)[k] = v
     }
   }
   out.version = 1

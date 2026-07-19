@@ -155,7 +155,8 @@ export function resolveAgentRuntimeProfile(input: ResolveAgentRuntimeProfileInpu
       toolPolicy: {
         allowWrites: !readOnly,
         allowGit: false,
-        allowRunScript: !readOnly && permissionMode !== 'chat',
+        // Equivalent to !readOnly && permissionMode !== 'chat' (readOnly ⇔ chat).
+        allowRunScript: !readOnly,
         allowPluginInstall: false,
         allowParallelWorktrees: false,
         pathJail: permissionMode === 'full' ? 'none' : 'sandbox',

@@ -46,7 +46,7 @@ describe('runWorkflow — gate node on main path', () => {
       entry: ['a'],
       nodes: [
         { type: 'agent', id: 'a', agentId: 'w', inputTemplate: '{{input}}' },
-        { type: 'gate', id: 'g', gateKind: 'unit-fail-gate' },
+        { type: 'gate', id: 'g', gateKind: 'unit-fail-gate' as import('@hip/protocol').VerificationGateKind },
       ],
       edges: [{ from: 'a', to: 'g' }],
     }
@@ -73,7 +73,7 @@ describe('runWorkflow — gate node on main path', () => {
       entry: ['a'],
       nodes: [
         { type: 'agent', id: 'a', agentId: 'w', inputTemplate: 'x' },
-        { type: 'gate', id: 'g', gateKind: 'unit-pass-gate' },
+        { type: 'gate', id: 'g', gateKind: 'unit-pass-gate' as import('@hip/protocol').VerificationGateKind },
       ],
       edges: [{ from: 'a', to: 'g' }],
     }

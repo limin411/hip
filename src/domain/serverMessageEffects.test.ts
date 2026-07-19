@@ -548,7 +548,7 @@ describe('applyServerMessageEffects', () => {
             repoKey: 'rk',
             isPrimary: true,
             managed: false,
-            source: 'user',
+            source: 'primary',
           },
         },
         makeDeps(),

@@ -315,6 +315,7 @@ describe('uiStore persistence partialize', () => {
       settingsPage: s.settingsPage,
       diffViewMode: s.diffViewMode,
       checkpointMode: s.checkpointMode,
+      sidebarOpen: s.sidebarOpen,
     }
     expect(persisted).toEqual({
       chatSessionId: 'a',
@@ -325,6 +326,7 @@ describe('uiStore persistence partialize', () => {
       settingsPage: 'model',
       diffViewMode: 'split',
       checkpointMode: 'since-start',
+      sidebarOpen: s.sidebarOpen,
     })
     expect(persisted).not.toHaveProperty('activeTab')
     expect(persisted).not.toHaveProperty('scrollTargetMessageId')

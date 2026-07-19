@@ -12,7 +12,7 @@ const baseCtx: GateContext = {
 }
 
 function makeGateNode(kind: string, config?: Record<string, unknown>): GateNode {
-  return { id: 'g1', type: 'gate', gateKind: kind, config }
+  return { id: 'g1', type: 'gate', gateKind: kind as GateNode['gateKind'], config }
 }
 
 describe('runGateNode', () => {

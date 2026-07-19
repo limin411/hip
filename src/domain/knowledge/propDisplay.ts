@@ -5,8 +5,13 @@
 
 import type { CollectionView } from './views'
 
-/** Loose translator — avoids coupling to the full typed key union for dynamic maps. */
-export type PropTranslate = (key: string) => string
+/**
+ * Loose translator — accepts i18next `TFunction` and simple mocks.
+ * Uses `any` for the key so TFunction's narrow key union remains assignable
+ * under strictFunctionTypes (dynamic map keys cannot be the full typed union).
+ */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export type PropTranslate = (key: any, options?: any) => string
 
 /** Builtin property key → i18n label key. */
 export const BUILTIN_PROP_I18N: Record<string, string> = {

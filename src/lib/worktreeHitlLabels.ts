@@ -38,10 +38,14 @@ export function isWorktreeSourceLabelId(source: string): source is WorktreeSourc
  * For parallel_worktrees + known optionId → i18n key via `t`.
  * Otherwise returns server-provided `name` unchanged.
  */
+/** Loose i18n callable (compatible with i18next TFunction under strictFunctionTypes). */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export type WorktreeLabelTranslate = (key: any, opts?: any) => string
+
 export function resolvePermissionOptionLabel(
   option: { optionId: string; name: string },
   toolKind: string,
-  t: (key: string, opts?: { defaultValue?: string }) => string,
+  t: WorktreeLabelTranslate,
 ): string {
   if (toolKind === PARALLEL_WORKTREES_KIND && isParallelHitlOptionId(option.optionId)) {
     return t(`chat.worktreeControl.hitlOption.${option.optionId}`, {
@@ -56,7 +60,7 @@ export function resolvePermissionOptionLabel(
  */
 export function resolveWorktreeSourceLabel(
   source: string | undefined,
-  t: (key: string, opts?: { defaultValue?: string }) => string,
+  t: WorktreeLabelTranslate,
 ): string | null {
   if (!source || !isWorktreeSourceLabelId(source)) return null
   const label = t(`chat.worktreeControl.source.${source}`, { defaultValue: '' })

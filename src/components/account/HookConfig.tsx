@@ -82,7 +82,7 @@ export function HookConfig() {
       <div className="mt-5 space-y-5" data-testid="hook-event-list">
         {HOOK_EVENT_PHASES.map((phase) => (
           <section key={phase.id} data-testid={`hook-phase-${phase.id}`}>
-            <h3 className="mb-2 text-meta font-medium text-ink-secondary">{t(phase.labelKey)}</h3>
+            <h3 className="mb-2 text-meta font-medium text-ink-secondary">{t(phase.labelKey as never)}</h3>
             <ul className="divide-y divide-border overflow-hidden rounded-lg border border-border bg-surface">
               {phase.events.map((event) => {
                 const eventSources = byEvent.get(event) ?? []

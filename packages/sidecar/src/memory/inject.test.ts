@@ -87,7 +87,7 @@ describe('MemoryInjector', () => {
   })
 
   it('includes prefetch block when formatPrefetch returns content', async () => {
-    const formatPrefetch = vi.spyOn(svc, 'formatPrefetch').mockReturnValue({
+    const formatPrefetch = vi.spyOn(svc, 'formatPrefetch').mockResolvedValue({
       text: '## Memory (prefetch)\n- **hit**: body',
       ids: ['hit-id'],
     })

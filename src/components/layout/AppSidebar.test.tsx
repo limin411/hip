@@ -442,7 +442,7 @@ describe('AppSidebar', () => {
           head: 'abc',
           managed: false,
           isPrimary: true,
-          source: 'git',
+          source: 'primary',
           repoKey: 'rk',
         },
         {

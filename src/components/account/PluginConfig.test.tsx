@@ -32,9 +32,9 @@ vi.mock('@/components/chat/MarkdownBody', () => ({
   MarkdownBody: ({ content }: { content: string }) => <div data-testid="md">{content}</div>,
 }))
 
-const shellOpen = vi.fn(async () => {})
+const shellOpen = vi.fn(async (_path?: string) => {})
 vi.mock('@tauri-apps/plugin-shell', () => ({
-  open: (...args: unknown[]) => shellOpen(...args),
+  open: (path?: string) => shellOpen(path),
 }))
 
 function basePlugin(overrides: Partial<PluginMeta> = {}): PluginMeta {

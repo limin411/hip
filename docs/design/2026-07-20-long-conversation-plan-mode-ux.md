@@ -291,10 +291,11 @@ export type TimelineStep =
 
 | 维度 | **Choice A（采用）** |
 |------|----------------------|
-| **text timeline 步** | **仅 supervisor**（`agentId === 'supervisor'` 或 `role === 'supervisor'`） |
-| **`contentFromTimeline`** | 拼接 timeline 中全部 text 步（= 仅 supervisor，因不写入其他） |
-| **`token:stream.stepSeq`** | **仅 supervisor** 带 `stepSeq` 并走 TextBurstTracker |
-| **subagent / managed token** | **无 stepSeq**；`r.output += delta`；wire 仍发 `token:stream`；**不**写 text 步 |
+| **text timeline 步** | **仅 supervisor 面**（hub：`agentId === 'supervisor'`；managed 独立 turn：`surfaceText` 写 textBursts，步 role=`supervisor`，AgentRun.role 仍可为 subagent） |
+| **`contentFromTimeline`** | 拼接 timeline 中全部 text 步（filter `agentId/role === supervisor`） |
+| **`token:stream.stepSeq`** | **hub supervisor** 与 **managed 独立 turn（D1.7 surface supervisor）** 带 `stepSeq` 并走 TextBurstTracker |
+| **subagent / nested managed token** | **无 stepSeq**；`r.output += delta`；wire 仍发 `token:stream`；**不**写 text 步 |
+| **managed 独立 turn** | 有 stepSeq + 持久化 textBursts（`surfaceText`）；complete/reload 与 live 一致；content 仍为 agent 叙述 |
 | **FE live** | `stepSeq != null` → upsert text + content；`stepSeq == null` 且非 supervisor → `appendRunOutput(turnId, agentId)`；supervisor 无 stepSeq（ACP）→ content only |
 | **SubAgentCard** | 继续读 `run.output`；**无**与 TurnBlocks text 双渲染（因无 subagent text 步） |
 | **标题 / search** | 仍基于 `Message.content`（= supervisor 叙述） |

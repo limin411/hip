@@ -153,10 +153,17 @@ export interface TraceRun {
   toolCalls: Map<string, ToolCall>
   reasoningBursts: ReasoningBurst[]
   /**
-   * Closed supervisor text bursts (KD-17). Only the hub supervisor should push here;
-   * trajectoryToTimeline emits kind:'text' solely from supervisor textBursts.
+   * Closed supervisor text bursts (KD-17). Hub writes these for agentId === 'supervisor';
+   * managed independent turns also write them with {@link surfaceText} so complete/reload
+   * keeps kind:'text' steps while AgentRun.role stays 'subagent'.
    */
   textBursts?: TextBurst[]
+  /**
+   * When true, textBursts are surface-supervisor narration for an independent managed turn
+   * (agentId is the managed agent, role stays 'subagent' for SubAgentCard). timeline steps
+   * are emitted with role:'supervisor' for contentFromTimeline.
+   */
+  surfaceText?: boolean
   taskInput?: string
   /**
    * Who delegated this run (observation parent). Used by trajectoryToRuns and
@@ -270,14 +277,20 @@ export function trajectoryToRuns(trajectory: Map<string, TraceRun>): AgentRun[] 
 export function trajectoryToTimeline(trajectory: Map<string, TraceRun>): TimelineStep[] {
   const steps: TimelineStep[] = []
   for (const [agentId, r] of trajectory) {
-    // Text steps: supervisor only (agentId or role). Drop any mistaken non-supervisor textBursts.
-    if (agentId === 'supervisor' || r.role === 'supervisor') {
+    // Text steps (KD-17): hub supervisor (agentId/role) OR managed surfaceText turns.
+    // Drop mistaken non-supervisor textBursts without surfaceText.
+    const emitText =
+      agentId === 'supervisor' || r.role === 'supervisor' || r.surfaceText === true
+    if (emitText) {
+      // Managed surface: AgentRun.role stays subagent; text steps use role supervisor for content join.
+      const textRole: AgentRole =
+        agentId === 'supervisor' || r.role === 'supervisor' ? r.role : 'supervisor'
       for (const b of r.textBursts ?? []) {
         steps.push({
           kind: 'text',
           stepSeq: b.stepSeq,
           agentId,
-          role: r.role,
+          role: textRole,
           content: b.content,
           ...(b.truncated ? { truncated: true } : {}),
         })

@@ -181,7 +181,7 @@ function sanitizeTimeline(steps: TimelineStep[] | undefined): unknown[] | undefi
         ...(s.truncated ? { truncated: true } : {}),
       }
     }
-    // tool (and any future kinds we don't specially format — keep tool shape only for tool)
+    // tool — exhaustive TimelineStep union (reasoning | text | tool)
     if (s.kind === 'tool') {
       return {
         kind: 'tool',
@@ -191,8 +191,9 @@ function sanitizeTimeline(steps: TimelineStep[] | undefined): unknown[] | undefi
         callId: s.callId,
       }
     }
-    // Preserve unknown kinds without assuming callId (loaders must not strip)
-    return { ...s }
+    // Exhaustiveness: if TimelineStep gains a kind, this assignment fails to compile.
+    const _exhaustive: never = s
+    return _exhaustive
   })
 }
 

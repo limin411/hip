@@ -72,6 +72,20 @@ describe('activitySummary', () => {
     expect(parts).toContainEqual({ type: 'partialTools', count: 1 })
   })
 
+  it('streaming last text step does not show runningReasoning when content is present', () => {
+    const steps = [
+      { kind: 'text' as const, stepSeq: 0, agentId: 'supervisor', role: 'supervisor' as const, content: 'Hello' },
+    ]
+    const { parts, status } = buildActivitySummary({
+      streaming: true,
+      hasAssistantContent: true,
+      steps,
+      toolCalls: [],
+    })
+    expect(status).toBe('running')
+    expect(parts.some((p) => p.type === 'runningReasoning')).toBe(false)
+  })
+
   it('streaming tool uses title hint label', () => {
     const tools = [tc({ callId: 'c1', name: 'grep', input: '{"pattern":"zuolin"}', status: 'running' })]
     const steps = [

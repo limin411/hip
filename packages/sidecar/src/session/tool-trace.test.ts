@@ -340,6 +340,27 @@ describe('trajectoryToTimeline', () => {
       { kind: 'text', stepSeq: 1, agentId: 'supervisor', role: 'supervisor', content: 'ok' },
     ])
   })
+  it('emits managed surfaceText bursts with role supervisor (AgentRun role stays subagent)', () => {
+    const trajectory = new Map<string, TraceRun>([
+      ['image-agent', run({
+        role: 'subagent',
+        surfaceText: true,
+        textBursts: [
+          { stepSeq: 0, content: 'drawing' },
+          { stepSeq: 2, content: 'done' },
+        ],
+        toolCalls: new Map<string, ToolCall>([
+          ['c1', { callId: 'c1', agentId: 'image-agent', name: 'generate_image', input: '{}', status: 'finished', output: 'ok', seq: 1 }],
+        ]),
+      })],
+    ])
+    expect(trajectoryToTimeline(trajectory)).toEqual([
+      { kind: 'text', stepSeq: 0, agentId: 'image-agent', role: 'supervisor', content: 'drawing' },
+      { kind: 'tool', stepSeq: 1, agentId: 'image-agent', role: 'subagent', callId: 'c1' },
+      { kind: 'text', stepSeq: 2, agentId: 'image-agent', role: 'supervisor', content: 'done' },
+    ])
+    expect(contentFromTimeline(trajectoryToTimeline(trajectory))).toBe('drawingdone')
+  })
   it('uses each tool call seq as its stepSeq', () => {
     const trajectory = new Map<string, TraceRun>([
       ['coder', run({

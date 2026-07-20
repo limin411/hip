@@ -447,10 +447,10 @@ export async function runManagedAgentTurn(host: SessionTurnHost, input: SessionI
   let stepSeq = 0
   const nextSeq = () => stepSeq++
   const reasoning = new ReasoningTracker(nextSeq)
-  // Managed turn is the surface-level "supervisor" of its own message (agent:started role
-  // supervisor). Emit stepSeq for live interleaving; textBursts use role supervisor on steps
-  // via trajectoryToTimeline (r.role is subagent for SubAgentCard — text steps only if we set
-  // role supervisor; we keep content from agentText and emit stepSeq for FE live only).
+  // Managed turn is surface-supervisor of its own message (agent:started role:'supervisor' for FE).
+  // D1.7: independent managed turns emit stepSeq + persist textBursts (surfaceText) for complete/reload
+  // parity with hub. AgentRun.role stays 'subagent' for SubAgentCard; timeline text steps use role
+  // supervisor via trajectoryToTimeline. Message.content still comes from agentText (equals join of bursts).
   const textTracker = new TextBurstTracker(nextSeq)
   const usageByAgent = new Map<string, TurnUsage>()
   // Mirror runTurn's trajectory so the final message:complete can carry the image agent's
@@ -473,8 +473,13 @@ export async function runManagedAgentTurn(host: SessionTurnHost, input: SessionI
     },
   }
   const closeTextBurst = () => {
-    // Managed: text lives in agentText for content; close tracker so stepSeqs stay ordered vs tools.
-    textTracker.close(agent.id)
+    const burst = textTracker.close(agent.id)
+    if (!burst) return
+    const r = trajectory.get(agent.id)
+    if (r) {
+      if (!r.textBursts) r.textBursts = []
+      r.textBursts.push(burst)
+    }
   }
   const closeReasoningBurst = () => {
     const burst = reasoning.close(agent.id)
@@ -484,7 +489,7 @@ export async function runManagedAgentTurn(host: SessionTurnHost, input: SessionI
   let agentText = ''
   const emit: GraphEmit = {
     // Stream tokens into the assistant body (supervisor role on the wire for FE).
-    // stepSeq for live text timeline; content authority remains agentText on complete.
+    // stepSeq + textBursts for live and complete timeline interleaving.
     token: (delta) => {
       if (!delta) return
       agentText += delta
@@ -521,8 +526,19 @@ export async function runManagedAgentTurn(host: SessionTurnHost, input: SessionI
   // Use role 'supervisor' so the frontend creates the assistant message container that holds
   // streaming tokens for this turn. The final message:complete records the run as a dispatched
   // sub-agent (role='subagent', parentAgentId='supervisor') so the UI renders a SubAgentCard.
+  // surfaceText: persist textBursts into kind:'text' steps with role supervisor (KD-17 / D1.7).
   _send({ type: 'agent:started', sessionId: host.id, turnId, agentId: agent.id, role: 'supervisor' })
-  trajectory.set(agent.id, { role: 'subagent', output: '', startedAt: Date.now(), finishedAt: null, seq: 0, toolCalls: new Map(), reasoningBursts: [] })
+  trajectory.set(agent.id, {
+    role: 'subagent',
+    output: '',
+    startedAt: Date.now(),
+    finishedAt: null,
+    seq: 0,
+    toolCalls: new Map(),
+    reasoningBursts: [],
+    textBursts: [],
+    surfaceText: true,
+  })
   host.emit({ type: 'step_started', sessionId: host.id, turnId, agentId: agent.id, timestamp: Date.now() })
   host.emit({ type: 'text_started', sessionId: host.id, messageId: turnId, timestamp: Date.now() })
   // Keep image_url parts out of the main session history; the agent received them via extras.

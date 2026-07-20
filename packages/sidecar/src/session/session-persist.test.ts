@@ -8,6 +8,7 @@ import { EventStore } from '../persistence/event-store.js'
 import { MemoryStore } from '../memory/store.js'
 import { MemoryService } from '../memory/service.js'
 import { finalizeAndPersistTurn } from './session-persist.js'
+import type { TraceRun } from './tool-trace.js'
 import type { ServerMessage } from '@hip/protocol'
 
 const cfg = { llmProvider: 'deepseek' as const, model: 'deepseek-chat', tools: [] }
@@ -154,5 +155,63 @@ describe('Session persistence', () => {
     expect(complete.message.memoryCitations).toEqual([{ memoryId: 'mem-a' }])
     expect(memStore.getItem('mem-a')!.useCount).toBe(1)
     expect(memStore.getItem('mem-b')!.useCount).toBe(0)
+  })
+
+  it('finalize with text steps preserves cancel suffix when supervisorText extends joined content', () => {
+    const trajectory = new Map<string, TraceRun>([
+      ['supervisor', {
+        role: 'supervisor',
+        output: 'partial',
+        startedAt: 1,
+        finishedAt: 2,
+        seq: 0,
+        toolCalls: new Map(),
+        reasoningBursts: [],
+        textBursts: [{ stepSeq: 0, content: 'partial' }],
+      }],
+    ])
+    const events: ServerMessage[] = []
+    const finalText = finalizeAndPersistTurn(
+      { id: 's1', store: st, eventStore: new EventStore(st.getDb()), config: cfg, messages: [] },
+      (m) => events.push(m),
+      'turn-suffix',
+      'partial\n\n(cancelled)',
+      trajectory,
+      true,
+    )
+    expect(finalText).toBe('partial\n\n(cancelled)')
+    const complete = events.find((e) => e.type === 'message:complete') as Extract<ServerMessage, { type: 'message:complete' }>
+    expect(complete.message.content).toBe('partial\n\n(cancelled)')
+    expect(complete.message.timeline?.some((s) => s.kind === 'text' && s.content === 'partial')).toBe(true)
+  })
+
+  it('finalize with text steps uses contentFromTimeline when supervisorText diverges from joined', () => {
+    const trajectory = new Map<string, TraceRun>([
+      ['supervisor', {
+        role: 'supervisor',
+        output: 'from-bursts',
+        startedAt: 1,
+        finishedAt: 2,
+        seq: 0,
+        toolCalls: new Map(),
+        reasoningBursts: [],
+        textBursts: [
+          { stepSeq: 0, content: 'from-' },
+          { stepSeq: 1, content: 'bursts' },
+        ],
+      }],
+    ])
+    const events: ServerMessage[] = []
+    const finalText = finalizeAndPersistTurn(
+      { id: 's1', store: st, eventStore: new EventStore(st.getDb()), config: cfg, messages: [] },
+      (m) => events.push(m),
+      'turn-joined',
+      'stale-supervisorText',
+      trajectory,
+      false,
+    )
+    expect(finalText).toBe('from-bursts')
+    const complete = events.find((e) => e.type === 'message:complete') as Extract<ServerMessage, { type: 'message:complete' }>
+    expect(complete.message.content).toBe('from-bursts')
   })
 })

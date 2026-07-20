@@ -130,6 +130,11 @@ function buildAgentSections(
   const referencedCallIds = new Set<string>()
 
   for (const step of orderedSteps) {
+    // PR-4: text steps are protocol-visible but not rendered here (legacy content body).
+    // Skip before ensure() so pure-text timelines do not create empty agent sections.
+    // TurnBlocks UI lands in PR-5.
+    if (step.kind === 'text') continue
+
     const b = ensure(step.agentId, step.role, step.stepSeq)
     if (step.kind === 'reasoning') {
       b.items.push({
@@ -142,10 +147,6 @@ function buildAgentSections(
           />
         ),
       })
-    } else if (step.kind === 'text') {
-      // PR-4: text steps are protocol-visible but not rendered here (legacy content body).
-      // TurnBlocks UI lands in PR-5; skip so we never treat text as a tool row.
-      continue
     } else if (step.kind === 'tool') {
       if (!isSuppressedToolStep(step, byCallId)) {
         const tool = byCallId.get(step.callId)

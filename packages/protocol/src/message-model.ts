@@ -15,7 +15,7 @@ export type ContentPart =
 
 export interface Message {
   id: string
-  role: 'user' | 'assistant'
+  role: 'user' | 'assistant' | 'notice'
   content: string
   agentId?: string
   timestamp: number

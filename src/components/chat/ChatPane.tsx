@@ -2,6 +2,7 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { ChevronDown } from 'lucide-react'
 import { sessionService, useActiveSession, useActiveSessionId, useActiveMessages, useActiveSessionError, useActiveSessionStatus, useActiveInterrupt } from '@/domain'
+import { isStreamingAssistant, lastAssistantIndex } from '@/domain/sessionStore'
 import { useUiStore } from '@/store/uiStore'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/Button'
@@ -51,10 +52,14 @@ export function ChatPane() {
     messages.some((m) => m.role === 'assistant')
 
   const last = messages[messages.length - 1]
+  const lastAsstIdx = lastAssistantIndex(messages)
+  const lastAssistant = lastAsstIdx >= 0 ? messages[lastAsstIdx] : null
   const lastActivity =
-    last?.role === 'assistant'
-      ? last.content.length + (last.timeline?.length ?? 0) + (last.toolCalls?.length ?? 0)
-      : 0
+    lastAssistant
+      ? lastAssistant.content.length + (lastAssistant.timeline?.length ?? 0) + (lastAssistant.toolCalls?.length ?? 0)
+      : last?.role === 'notice'
+        ? last.content.length
+        : 0
 
   // On session switch, follow the latest — UNLESS a search jump is pending, in which case the
   // target effect positions the view and we stay unpinned until the user scrolls back down.
@@ -169,8 +174,9 @@ export function ChatPane() {
             </div>
           )}
           {messages.map((m, i) => {
-            const isLastMessage = i === messages.length - 1
             const isNew = i >= animBaselineRef.current
+            const streaming = isStreamingAssistant(messages, i, status)
+            const isLastAsst = m.role === 'assistant' && i === lastAsstIdx
             return (
               <div
                 key={`${activeSessionId ?? 'none'}-${m.id}`}
@@ -183,12 +189,21 @@ export function ChatPane() {
                   highlightedId === m.id && 'bg-accent-subtle ring-1 ring-accent/40',
                 )}
               >
-                <MessageBubble
-                  message={m}
-                  streaming={status === 'running' && m.role === 'assistant' && isLastMessage}
-                  isLastAssistant={m.role === 'assistant' && isLastMessage}
-                  hidePlan={hideBubblePlan && m.role === 'assistant' && isLastMessage}
-                />
+                {m.role === 'notice' ? (
+                  <div
+                    className="my-1 w-fit px-0 py-0.5 text-meta text-ink-tertiary"
+                    data-testid="chat-notice"
+                  >
+                    {m.content}
+                  </div>
+                ) : (
+                  <MessageBubble
+                    message={m}
+                    streaming={streaming}
+                    isLastAssistant={isLastAsst}
+                    hidePlan={hideBubblePlan && isLastAsst}
+                  />
+                )}
               </div>
             )
           })}

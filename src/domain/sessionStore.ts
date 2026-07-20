@@ -46,12 +46,43 @@ function coerceRunningToolCalls(toolCalls: ToolCall[] | undefined): ToolCall[] |
   return toolCalls.map((tc) => (tc.status === 'running' ? { ...tc, status: 'error' as const, error: tc.error ?? 'interrupted' } : tc))
 }
 
-/** On cancel, finalize the in-flight (trailing) assistant message: drop it if it's a fully empty
- *  provisional (no content/timeline/tools), else if it is still in-flight (empty content OR has
- *  running tools) coerce tools to error and mark it stopped. Prior completed turns are left alone. */
+/** Index of the last `role === 'assistant'` message (from the tail); -1 if none.
+ *  Ignores trailing `notice` rows so cancel / streaming / regenerate target the real turn. */
+export function lastAssistantIndex(messages: Message[]): number {
+  for (let i = messages.length - 1; i >= 0; i--) {
+    if (messages[i].role === 'assistant') return i
+  }
+  return -1
+}
+
+/** True when `messages[index]` is the last assistant and the session is still running. */
+export function isStreamingAssistant(
+  messages: Message[],
+  index: number,
+  status: string,
+): boolean {
+  if (status !== 'running') return false
+  if (messages[index]?.role !== 'assistant') return false
+  return index === lastAssistantIndex(messages)
+}
+
+/** Drop trailing assistant + notice messages until a user (or empty). Used by regenerate. */
+export function popForRegenerate(messages: Message[]): Message[] {
+  const next = [...messages]
+  while (next.length > 0) {
+    const r = next[next.length - 1].role
+    if (r === 'assistant' || r === 'notice') next.pop()
+    else break
+  }
+  return next
+}
+
+/** On cancel, finalize the in-flight last assistant message (ignoring trailing notice): drop it if
+ *  it's a fully empty provisional (no content/timeline/tools), else if it is still in-flight
+ *  (empty content OR has running tools) coerce tools to error and mark it stopped.
+ *  Prior completed turns are left alone. */
 function finalizeCancelledMessage(messages: Message[]): Message[] {
-  let idx = -1
-  for (let k = messages.length - 1; k >= 0; k--) { if (messages[k].role === 'assistant') { idx = k; break } }
+  const idx = lastAssistantIndex(messages)
   if (idx === -1) return messages
   const m = messages[idx]
   const empty = m.content === '' && !(m.timeline?.length) && !(m.toolCalls?.length)
@@ -72,10 +103,8 @@ function patchFinishedToolCall(tc: ToolCall, msg: { status: 'finished' | 'error'
 }
 
 /** Ensure the provisional assistant message keyed by turnId exists (idempotent).
- *  Invariant: this provisional message is always the trailing assistant message while the turn
- *  streams — agent:started (which appends it) precedes any token:stream/tool:* /finalize for the
- *  turn, and nothing else appends an assistant message mid-turn. So token/finalize handlers can
- *  safely target the tail. */
+ *  Invariant v2: stream/tool/reasoning/complete only mutate `message.id === turnId` (not the list tail).
+ *  agent:started creates the provisional; notice rows may trail the turn without breaking addressing. */
 function ensureAssistantMessage(messages: Message[], turnId: string, agentId: string, now: number): Message[] {
   if (messages.some((m) => m.id === turnId)) return messages
   return [...messages, { id: turnId, role: 'assistant', content: '', agentId, timestamp: now, timeline: [], toolCalls: [] }]
@@ -95,14 +124,10 @@ function upsertReasoning(messages: Message[], turnId: string, step: { stepSeq: n
   })
 }
 
-function appendAssistantDelta(messages: Message[], delta: string, agentId: string, now: number): Message[] {
-  // Relies on the ensureAssistantMessage invariant: the provisional turnId message is the trailing
-  // assistant message when tokens arrive, so appending to the tail extends the right turn.
-  const last = messages[messages.length - 1]
-  if (last && last.role === 'assistant') {
-    return [...messages.slice(0, -1), { ...last, content: last.content + delta }]
-  }
-  return [...messages, { id: `asst-${agentId}-${now}`, role: 'assistant', content: delta, agentId, timestamp: now }]
+/** Append supervisor token delta to the message with `id === turnId`. No-op if the turn is unknown. */
+function appendAssistantDelta(messages: Message[], turnId: string, delta: string): Message[] {
+  if (!messages.some((m) => m.id === turnId)) return messages
+  return messages.map((m) => (m.id === turnId ? { ...m, content: m.content + delta } : m))
 }
 
 /** Upsert an AgentRun onto the turn's trailing assistant message (keyed by turnId). No-op if the turn is unknown.
@@ -134,9 +159,11 @@ function setRunFinished(messages: Message[], turnId: string, agentId: string, no
   return messages.map((m) => (m.id !== turnId || !m.agentRuns ? m : { ...m, agentRuns: m.agentRuns.map((r) => (r.agentId === agentId ? { ...r, finishedAt: now } : r)) }))
 }
 
+/** Replace the message with matching `message.id`, or append if not found (never relies on list tail). */
 function finalizeAssistant(messages: Message[], message: Message): Message[] {
-  const last = messages[messages.length - 1]
-  return last && last.role === 'assistant' ? [...messages.slice(0, -1), message] : [...messages, message]
+  const idx = messages.findIndex((m) => m.id === message.id)
+  if (idx >= 0) return messages.map((m, i) => (i === idx ? message : m))
+  return [...messages, message]
 }
 
 function summaryToVM(s: SessionSummary): SessionVM {
@@ -201,13 +228,14 @@ export function applyServerMessage(
 
     case 'token:stream':
       return update(msg.sessionId, (s) => {
-        // token:stream carries no role; resolve supervisor (→ body) vs subagent (→ run output)
-        // from the folded run on the trailing assistant message, falling back to the literal agentId.
-        const trailing = s.messages[s.messages.length - 1]
-        const run = trailing?.role === 'assistant' ? trailing.agentRuns?.find((r) => r.agentId === msg.agentId) : undefined
+        // Always address by turnId (not list tail). token:stream carries no role; resolve
+        // supervisor (→ body) vs subagent (→ run output) from the turn's agentRuns, falling
+        // back to the literal agentId.
+        const turn = s.messages.find((m) => m.id === msg.turnId)
+        const run = turn?.role === 'assistant' ? turn.agentRuns?.find((r) => r.agentId === msg.agentId) : undefined
         const isSupervisor = run ? run.role === 'supervisor' : msg.agentId === 'supervisor'
         const messages = isSupervisor
-          ? appendAssistantDelta(s.messages, msg.delta, msg.agentId, now)
+          ? appendAssistantDelta(s.messages, msg.turnId, msg.delta)
           : appendRunOutput(s.messages, msg.turnId, msg.agentId, msg.delta)
         return { ...s, messages }
       })
@@ -464,20 +492,21 @@ export function applyServerMessage(
       })
 
     case 'agent:notification':
+      // KD-13: always role 'notice' — never assistant — so trailing notifications cannot
+      // steal stream/finalize/regenerate targeting from the active turn.
       return update(msg.sessionId, (s) => ({
         ...s,
         messages: [
           ...s.messages,
           {
             id: `notif-${msg.taskId}`,
-            role: 'assistant',
+            role: 'notice' as const,
             content: msg.status === 'completed'
               ? `[Background task "${msg.description}" completed]`
               : msg.status === 'killed'
                 ? `[Background task "${msg.description}" killed: ${msg.error ?? 'stopped'}]`
                 : `[Background task "${msg.description}" failed: ${msg.error ?? 'unknown error'}]`,
             timestamp: now,
-            agentId: msg.taskId,
           },
         ],
       }))
@@ -646,10 +675,7 @@ export const useDomainStore = create<DomainStore>((set) => ({
     set((s) => ({
       sessions: s.sessions.map((sess) => {
         if (sess.id !== sessionId) return sess
-        const messages = [...sess.messages]
-        while (messages.length > 0 && messages[messages.length - 1].role === 'assistant') {
-          messages.pop()
-        }
+        const messages = popForRegenerate(sess.messages)
         return { ...sess, messages, status: 'running' as const, error: null, interrupt: null, pendingPermission: null, activeTurnPlan: null, planDeltaDraft: {}, planApprovalPending: false }
       }),
     })),

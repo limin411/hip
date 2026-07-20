@@ -27,6 +27,15 @@ function formatBytes(bytes?: number): string {
   return `${(bytes / 1024 ** i).toFixed(i === 0 ? 0 : 1)} ${units[i]}`
 }
 
+/** Muted system notice row (background task notifications). Pure — no hooks. */
+export function NoticeRow({ content }: { content: string }) {
+  return (
+    <div className="my-1 w-fit px-0 py-0.5 text-meta text-ink-tertiary" data-testid="chat-notice">
+      {content}
+    </div>
+  )
+}
+
 interface MessageBubbleProps {
   message: Message
   streaming?: boolean
@@ -35,40 +44,38 @@ interface MessageBubbleProps {
   hidePlan?: boolean
 }
 
+/** Chat message bubble for user|assistant. Prefer routing `role:'notice'` via {@link NoticeRow}. */
 export function MessageBubble({ message, streaming, isLastAssistant, hidePlan }: MessageBubbleProps) {
   const { t, i18n } = useTranslation()
   const locale = i18n.resolvedLanguage ?? i18n.language ?? 'en'
   const sessionId = useActiveSessionId()
-  // Callers should route role:'notice' elsewhere (ChatPane); never render as hip/assistant.
-  if (message.role === 'notice') {
-    return (
-      <div className="my-1 w-fit px-0 py-0.5 text-meta text-ink-tertiary" data-testid="chat-notice">
-        {message.content}
-      </div>
-    )
-  }
   const isUser = message.role === 'user'
+  const isNotice = message.role === 'notice'
 
-  // Only assistant turns have a timeline / sub-agent runs; skip the work for user bubbles.
+  // Only assistant turns have a timeline / sub-agent runs; skip the work for user/notice bubbles.
   // Nested subagents still get SubAgentCard summaries; TurnTimeline receives the full timeline
   // so per-agent tool order is preserved (not stripped before ActivityBar).
-  const nested = isUser ? [] : splitAgents(groupByAgent(message, !!streaming)).nested
+  const nested = isUser || isNotice ? [] : splitAgents(groupByAgent(message, !!streaming)).nested
 
   const displayContent = useMemo(
-    () => (isUser ? message.content : normalizeMessageContent(message.content)),
-    [isUser, message.content],
+    () => (isUser || isNotice ? message.content : normalizeMessageContent(message.content)),
+    [isUser, isNotice, message.content],
   )
 
   const hasProcess =
     !isUser &&
+    !isNotice &&
     ((message.timeline?.length ?? 0) > 0 ||
       (message.toolCalls?.length ?? 0) > 0 ||
       (message.agentRuns?.length ?? 0) > 0)
 
   const elapsedMs = useMemo(
-    () => (isUser ? null : activityElapsedMs(message.agentRuns)),
-    [isUser, message.agentRuns],
+    () => (isUser || isNotice ? null : activityElapsedMs(message.agentRuns)),
+    [isUser, isNotice, message.agentRuns],
   )
+
+  // After all hooks — Rules of Hooks safe if role ever flips on the same instance.
+  if (isNotice) return <NoticeRow content={message.content} />
 
   return (
     <DeclarativeContextMenu

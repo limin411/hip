@@ -2,7 +2,7 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { ChevronDown } from 'lucide-react'
 import { sessionService, useActiveSession, useActiveSessionId, useActiveMessages, useActiveSessionError, useActiveSessionStatus, useActiveInterrupt } from '@/domain'
-import { isStreamingAssistant, lastAssistantIndex, lastNonNotice } from '@/domain/sessionStore'
+import { isCurrentTurnAssistant, isStreamingAssistant, lastAssistantIndex, lastNonNotice } from '@/domain/sessionStore'
 import { useUiStore } from '@/store/uiStore'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/Button'
@@ -11,7 +11,7 @@ import { sessionDebugBundleJson } from '@/lib/sessionDebugBundle'
 import { selectLivePlan } from '@/lib/todos'
 import { toast } from 'sonner'
 import { scrollTranscriptToMessage } from '@/lib/transcriptJump'
-import { MessageBubble } from './MessageBubble'
+import { MessageBubble, NoticeRow } from './MessageBubble'
 import { ThinkingBubble } from './ThinkingBubble'
 import { hasPlanApproval } from './planApproval'
 
@@ -177,7 +177,9 @@ export function ChatPane() {
           {messages.map((m, i) => {
             const isNew = i >= animBaselineRef.current
             const streaming = isStreamingAssistant(messages, i, status)
-            const isLastAsst = m.role === 'assistant' && i === lastAsstIdx
+            // Same “no user after” guard as streaming — do not offer regenerate on a prior
+            // completed assistant while a newer user turn is pending provisional.
+            const isLastAsst = isCurrentTurnAssistant(messages, i)
             return (
               <div
                 key={`${activeSessionId ?? 'none'}-${m.id}`}
@@ -191,12 +193,7 @@ export function ChatPane() {
                 )}
               >
                 {m.role === 'notice' ? (
-                  <div
-                    className="my-1 w-fit px-0 py-0.5 text-meta text-ink-tertiary"
-                    data-testid="chat-notice"
-                  >
-                    {m.content}
-                  </div>
+                  <NoticeRow content={m.content} />
                 ) : (
                   <MessageBubble
                     message={m}

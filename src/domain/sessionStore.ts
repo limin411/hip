@@ -63,21 +63,26 @@ export function lastNonNotice(messages: Message[]): Message | undefined {
   return undefined
 }
 
-/** True when `messages[index]` is the in-flight streaming assistant for the current turn.
- *  Requires running status, last assistant index, and no newer user message after it
- *  (notices after the assistant are OK; a subsequent user means a new turn started). */
-export function isStreamingAssistant(
-  messages: Message[],
-  index: number,
-  status: string,
-): boolean {
-  if (status !== 'running') return false
+/** True when `messages[index]` is the last assistant of the open turn: last assistant index
+ *  and no newer user after it (notices after the assistant are OK). Used for regenerate /
+ *  isLastAssistant and as the base for isStreamingAssistant. */
+export function isCurrentTurnAssistant(messages: Message[], index: number): boolean {
   if (messages[index]?.role !== 'assistant') return false
   if (index !== lastAssistantIndex(messages)) return false
   for (let i = index + 1; i < messages.length; i++) {
     if (messages[i].role === 'user') return false
   }
   return true
+}
+
+/** True when `messages[index]` is the in-flight streaming assistant for the current turn. */
+export function isStreamingAssistant(
+  messages: Message[],
+  index: number,
+  status: string,
+): boolean {
+  if (status !== 'running') return false
+  return isCurrentTurnAssistant(messages, index)
 }
 
 /** Drop trailing assistant + notice messages until a user (or empty). Used by regenerate. */

@@ -4,6 +4,7 @@ import {
   applyServerMessage,
   clearPermission,
   emptySession,
+  isCurrentTurnAssistant,
   isStreamingAssistant,
   lastAssistantIndex,
   popForRegenerate,
@@ -1034,7 +1035,7 @@ describe('D2.1 notice helpers', () => {
     expect(1 === messages.length - 1).toBe(false)
   })
 
-  it('isStreamingAssistant is false for previous assistant after a new user send', () => {
+  it('isStreamingAssistant / isCurrentTurnAssistant are false after a new user send', () => {
     // appendUserMessage sets status running before agent:started creates the new provisional.
     const messages = msgs([
       { id: 'u1', role: 'user' },
@@ -1042,7 +1043,17 @@ describe('D2.1 notice helpers', () => {
       { id: 'u2', role: 'user', content: 'again' },
     ])
     expect(lastAssistantIndex(messages)).toBe(1)
+    expect(isCurrentTurnAssistant(messages, 1)).toBe(false)
     expect(isStreamingAssistant(messages, 1, 'running')).toBe(false)
+  })
+
+  it('isCurrentTurnAssistant stays true when only a notice trails the last assistant', () => {
+    const messages = msgs([
+      { id: 'u1', role: 'user' },
+      { id: 'a1', role: 'assistant', content: 'done' },
+      { id: 'n1', role: 'notice', content: 'bg' },
+    ])
+    expect(isCurrentTurnAssistant(messages, 1)).toBe(true)
   })
 
   it('isStreamingAssistant is false for previous assistant when notice trails a new user', () => {
@@ -1052,6 +1063,7 @@ describe('D2.1 notice helpers', () => {
       { id: 'u2', role: 'user', content: 'again' },
       { id: 'n1', role: 'notice', content: 'bg' },
     ])
+    expect(isCurrentTurnAssistant(messages, 1)).toBe(false)
     expect(isStreamingAssistant(messages, 1, 'running')).toBe(false)
   })
 

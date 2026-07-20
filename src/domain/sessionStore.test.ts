@@ -1395,3 +1395,55 @@ describe('mapMessages + stable message refs (PR-7a)', () => {
     expect(next.sessions[0].messages[1]).toBe(t1)
   })
 })
+
+describe('plan approval resync (D4c.1)', () => {
+  it('session:loaded clears pending then interrupt restores awaiting_approval', () => {
+    const s0 = {
+      sessions: [
+        baseSession({
+          planApprovalPending: true,
+          activeTurnPlan: [{ content: 'old', status: 'pending' }],
+          interrupt: { turnId: 't0', question: 'old', context: JSON.stringify({ kind: 'plan_approval' }) },
+        }),
+      ],
+    }
+    const afterLoad = applyServerMessage(
+      s0,
+      {
+        type: 'session:loaded',
+        sessionId: 's1',
+        messages: [{ id: 'a1', role: 'assistant', content: 'planned', timestamp: 1 }],
+        config: { llmProvider: 'deepseek', model: 'deepseek-chat', tools: [], surface: 'code' },
+      },
+      1,
+    )
+    expect(afterLoad.sessions[0].planApprovalPending).toBe(false)
+    expect(afterLoad.sessions[0].activeTurnPlan).toBeNull()
+
+    let s = afterLoad
+    s = applyServerMessage(
+      s,
+      {
+        type: 'plan:published',
+        sessionId: 's1',
+        turnId: 't1',
+        plan: [{ content: 'step one', status: 'pending' }],
+      },
+      2,
+    )
+    s = applyServerMessage(
+      s,
+      {
+        type: 'agent:interrupt',
+        sessionId: 's1',
+        turnId: 't1',
+        agentId: 'supervisor',
+        question: 'Approve this plan?',
+        context: JSON.stringify({ kind: 'plan_approval', plan: [{ content: 'step one', status: 'pending' }] }),
+      },
+      3,
+    )
+    expect(s.sessions[0].planApprovalPending).toBe(true)
+    expect(s.sessions[0].activeTurnPlan?.[0]?.content).toBe('step one')
+  })
+})

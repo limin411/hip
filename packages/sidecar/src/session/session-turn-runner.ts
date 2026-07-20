@@ -115,6 +115,8 @@ export type TurnBase = {
   planningMode?: 'fast' | 'plan'
   planStatus?: 'none' | 'generating' | 'ready' | 'approved' | 'rejected'
   plan?: PlanItem[]
+  /** Original interrupt turn id (for resync / multi-client resolve). */
+  interruptTurnId?: string
 }
 
 /**
@@ -178,6 +180,13 @@ export interface SessionTurnHost {
   inputQueue: SessionInput[]
   steerAbortFlag: boolean
   paused: TurnBase | null
+  /** Persist / clear durable plan-approval pause marker (D4c.1). Optional on hosts without store. */
+  persistPlanApprovalPause?: (marker: {
+    turnId: string
+    plan: PlanItem[]
+    question: string
+  }) => void
+  clearPlanApprovalPause?: () => void
   modelDirty: boolean
   turnSeq: number
   stopContinued: boolean
@@ -1409,6 +1418,7 @@ export async function runTurn(host: SessionTurnHost, rawSend: SendFn, base?: {
           planningMode: finalState.planningMode,
           planStatus: finalState.planStatus,
           plan: finalState.plan,
+          interruptTurnId: turnId,
         }
         host.awaitingResume = true
         const stoppedText = host.finalizeAndPersist(send, turnId, supervisorText, trajectory, true, usageByAgent, host.paused.messages)
@@ -1420,6 +1430,12 @@ export async function runTurn(host: SessionTurnHost, rawSend: SendFn, base?: {
         // Always publish on plan-approval path (D4b) — empty plan still needs UI + FE hydrate.
         if (isPlanApproval) {
           send({ type: 'plan:published', sessionId: host.id, turnId, plan: finalState.plan ?? [] })
+          // Durable pause marker so session:load / process restart can resync the approval UI (D4c.1).
+          host.persistPlanApprovalPause?.({
+            turnId,
+            plan: finalState.plan ?? [],
+            question: finalState.pendingQuestion ?? PAUSE_QUESTION,
+          })
         }
         // forcePlan is one-shot for "plan before execute" — once a plan is submitted
         // for review, do not re-force PlanMode on the next message/resume.

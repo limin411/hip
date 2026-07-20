@@ -5,6 +5,7 @@ import { CodedError, safeErrorMessage } from '../error.js'
 import { logDebug, logInfo } from '../../debug-logger.js'
 import { generateEmptyGreeting } from '../empty-greeting-generate.js'
 import type { SendFn, SessionLifecycleContext } from './types.js'
+import { stripPlanApprovalPause } from '../plan-approval-resync.js'
 
 /** Reject mutations / load against soft-deleted sessions. */
 function assertSessionActive(ctx: SessionLifecycleContext, sessionId: string): void {
@@ -221,8 +222,13 @@ export function handleSessionMessage(
     }
     case 'session:load': {
       assertSessionActive(ctx, msg.sessionId)
+      // Rebuild live Session (hydrate + restore durable plan pause) before echoing history.
+      const live = ctx.ensureSession(msg.sessionId, send)
       const { messages, config } = ctx.loadSession(msg.sessionId)
-      send({ type: 'session:loaded', sessionId: msg.sessionId, messages, config })
+      const clientConfig = config ? stripPlanApprovalPause(config) : config
+      send({ type: 'session:loaded', sessionId: msg.sessionId, messages, config: clientConfig })
+      // After FE clears pending on session:loaded, re-emit plan approval if still paused (D4c.1).
+      live.emitPlanApprovalResyncIfNeeded(send)
       return
     }
     case 'session:search':

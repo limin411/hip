@@ -29,6 +29,14 @@ import { GoalManager } from './goal.js'
 import { addUsage, sumUsage } from './usage.js'
 import { compactMessages, applyCompactResult, estimateTokens, COMPACT_BUDGET_TOKENS, KEEP_RECENT_TURNS, type Summarizer } from './compaction.js'
 import { PAUSE_QUESTION } from './doom-loop.js'
+import {
+  emitPlanApprovalResync,
+  readPlanApprovalPause,
+  stripPlanApprovalPause,
+  withPlanApprovalPause,
+  withoutPlanApprovalPause,
+  type PlanApprovalPauseMarker,
+} from './plan-approval-resync.js'
 import type { ExternalAgentHooks, PermissionChoice } from './agents/types.js'
 import { HookRegistry } from './hooks/registry.js'
 import type { AgentRunner } from '../orchestrator/ports.js'
@@ -155,6 +163,7 @@ export class Session {
     planningMode?: 'fast' | 'plan'
     planStatus?: 'none' | 'generating' | 'ready' | 'approved' | 'rejected'
     plan?: PlanItem[]
+    interruptTurnId?: string
   } | null = null
   private readonly injectedSummarizer?: Summarizer
   private modelDirty = false
@@ -1007,11 +1016,66 @@ export class Session {
     if (this.awaitingResume) {
       this.awaitingResume = false
       this.paused = null
+      this.clearPlanApprovalPause()
       this.ownerConnectionId = null
       return
     }
     this.abortController?.abort()
     this.resumeAbortController?.abort()
+  }
+
+  /** Durable plan-approval pause marker (D4c.1) — survives session:load / process restart. */
+  persistPlanApprovalPause(marker: PlanApprovalPauseMarker): void {
+    this._config = withPlanApprovalPause(this._config, marker)
+    this.store?.updateConfig(this.id, JSON.stringify(this._config))
+  }
+
+  clearPlanApprovalPause(): void {
+    if (!readPlanApprovalPause(this._config)) return
+    this._config = withoutPlanApprovalPause(this._config)
+    this.store?.updateConfig(this.id, JSON.stringify(this._config))
+  }
+
+  /**
+   * After hydrate, restore in-memory awaitingResume from durable marker so plan:respond works.
+   * Messages come from hydrate(); plan items/turnId from the marker.
+   */
+  restorePlanApprovalPauseFromConfig(): void {
+    const marker = readPlanApprovalPause(this._config)
+    if (!marker) return
+    if (this.awaitingResume && this.paused?.planStatus === 'ready') return
+    this.paused = {
+      messages: [...this.messages],
+      steps: 0,
+      planningMode: 'plan',
+      planStatus: 'ready',
+      plan: marker.plan,
+      interruptTurnId: marker.turnId,
+    }
+    this.awaitingResume = true
+  }
+
+  /**
+   * Replay plan:published + agent:interrupt after session:loaded (which clears FE pending).
+   * Prefer live paused state; fall back to durable config marker.
+   */
+  emitPlanApprovalResyncIfNeeded(send: (msg: ServerMessage) => void): void {
+    this.restorePlanApprovalPauseFromConfig()
+    if (!this.awaitingResume || !this.paused) return
+    if (this.paused.planningMode !== 'plan' || this.paused.planStatus !== 'ready') return
+    const marker: PlanApprovalPauseMarker = {
+      turnId: this.paused.interruptTurnId ?? `plan-resync-${this.id}`,
+      plan: this.paused.plan ?? [],
+      question: 'Approve this plan?',
+    }
+    // Refresh durable marker with resolved turn id.
+    this.persistPlanApprovalPause(marker)
+    emitPlanApprovalResync(send, this.id, marker)
+  }
+
+  /** Config as sent to the UI — without internal pause marker. */
+  clientConfig(): SessionConfig {
+    return stripPlanApprovalPause(this._config)
   }
 
   /**

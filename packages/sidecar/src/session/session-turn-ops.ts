@@ -75,6 +75,7 @@ export async function resume(host: SessionTurnHost, content: string, send: SendF
       resumeParts = [{ type: 'text', text: resumeContent }]
     } else {
       host.awaitingResume = false; host.paused = null
+      host.clearPlanApprovalPause?.()
       send({
         type: 'error',
         sessionId: host.id,
@@ -129,6 +130,7 @@ export async function resume(host: SessionTurnHost, content: string, send: SendF
     })
     host.awaitingResume = false
     host.paused = null
+    host.clearPlanApprovalPause?.()
     emitInterruptResolved()
     clearForcePlanFlag(host, send, 'soft_approve_resume')
     const ts = Date.now()
@@ -158,6 +160,7 @@ export async function resume(host: SessionTurnHost, content: string, send: SendF
   }
   host.awaitingResume = false
   host.paused = null
+  host.clearPlanApprovalPause?.()
   emitInterruptResolved()
   const ts = Date.now()
   if (host.store) {
@@ -175,6 +178,7 @@ export async function regenerate(host: SessionTurnHost, send: SendFn): Promise<v
   if (host.awaitingResume) {
     host.awaitingResume = false
     host.paused = null
+    host.clearPlanApprovalPause?.()
   }
   if (!host.requireCompatibleModel(send)) return
   if (!host.requireApiKey(send)) return
@@ -286,6 +290,7 @@ export async function handlePlanResponse(host: SessionTurnHost, action: 'approve
         forcePlanBefore: Boolean(host._config.forcePlan),
       })
       host.awaitingResume = false; host.paused = null
+      host.clearPlanApprovalPause?.()
       emitRespondResult(true)
       emitInterruptResolved()
       // Drop forcePlan before execution so the execute turn is not re-gated into PlanMode.
@@ -302,6 +307,7 @@ export async function handlePlanResponse(host: SessionTurnHost, action: 'approve
         forcePlanBefore: Boolean(host._config.forcePlan),
       })
       host.awaitingResume = false; host.paused = null
+      host.clearPlanApprovalPause?.()
       emitRespondResult(true)
       emitInterruptResolved()
       clearForcePlanFlag(host, send, 'reject')
@@ -326,6 +332,7 @@ export async function handlePlanResponse(host: SessionTurnHost, action: 'approve
         plan: host.paused.plan,
       }
       host.awaitingResume = false; host.paused = null
+      host.clearPlanApprovalPause?.()
       emitRespondResult(true)
       emitInterruptResolved()
       const ts = Date.now()

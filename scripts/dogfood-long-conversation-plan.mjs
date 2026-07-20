@@ -481,6 +481,43 @@ async function main() {
     fail('dogfood.plan_respond_result_rollback', e)
   }
 
+  // ── 15. resync after session:loaded (D4c.1) ──────────────────────────
+  try {
+    const { emitPlanApprovalResync } = await import(href('packages/sidecar/src/session/plan-approval-resync.ts'))
+    reset({
+      planApprovalPending: true,
+      activeTurnPlan: [{ content: 'old', status: 'pending' }],
+      interrupt: { turnId: 't0', question: 'old', context: JSON.stringify({ kind: 'plan_approval' }) },
+    })
+    apply({
+      type: 'session:loaded',
+      sessionId: sid,
+      messages: [{ id: 'a1', role: 'assistant', content: 'planned', timestamp: 1 }],
+      config: { llmProvider: 'deepseek', model: 'deepseek-chat', tools: [], surface: 'code' },
+    })
+    if (session().planApprovalPending) throw new Error('session:loaded should clear pending')
+    const packets = []
+    emitPlanApprovalResync((m) => packets.push(m), sid, {
+      turnId: 't-resync',
+      plan: [{ content: 'resync step', status: 'pending' }],
+      question: 'Approve this plan?',
+    })
+    for (const m of packets) apply(m)
+    if (!hasPlanApproval(session())) throw new Error('resync did not restore pending')
+    const live = selectLivePlan({
+      messages: session().messages,
+      status: session().status,
+      forcePlan: false,
+      planApprovalPending: true,
+      activeTurnPlan: session().activeTurnPlan,
+    })
+    if (live?.phase !== 'awaiting_approval') throw new Error(`phase=${live?.phase}`)
+    if (live.items[0]?.content !== 'resync step') throw new Error(JSON.stringify(live.items))
+    pass('dogfood.resync_after_session_loaded', 'D4c.1')
+  } catch (e) {
+    fail('dogfood.resync_after_session_loaded', e)
+  }
+
   const failed = results.filter((r) => !r.ok)
   const ok = results.filter((r) => r.ok)
   console.log('')

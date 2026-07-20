@@ -289,6 +289,8 @@ export class SessionManager {
     const config = normalizeSessionConfig(raw)
     const session = new Session(id, config, this.modelFactory(config), this.store, undefined, idleTimeoutForConfig(config), undefined, undefined, undefined, this.scratchRoot)
     if (this.store) session.hydrate(this.store.loadMessages(id))
+    // Restore plan-approval pause from durable config marker (D4c.1).
+    session.restorePlanApprovalPauseFromConfig()
     this.sessions.set(id, session)
     // Send immediate MCP status for this session's configured servers.
     // Connections may not be established yet (reconcile runs on first turn),

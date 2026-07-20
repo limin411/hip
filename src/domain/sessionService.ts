@@ -2251,6 +2251,11 @@ export class SessionService {
     this.transport.send({ type: 'message:regenerate', sessionId: activeSessionId })
   }
 
+  /** Reload session messages from sidecar (also triggers plan-approval resync D4c.1). */
+  reloadSession(sessionId: string): void {
+    this.transport.send({ type: 'session:load', sessionId })
+  }
+
   /** On (re)connect, if the active session had an in-flight turn, force a history resync so a
    *  turn that finished/was interrupted during the outage is reconciled (see the session:loaded
    *  reducer). The resync REPLACES optimistic in-memory messages with the persisted truth: the
@@ -2260,7 +2265,7 @@ export class SessionService {
     const { activeSessionId, sessions } = useDomainStore.getState()
     if (!activeSessionId) return
     const s = sessions.find((x) => x.id === activeSessionId)
-    if (s?.status === 'running') this.transport.send({ type: 'session:load', sessionId: activeSessionId })
+    if (s?.status === 'running') this.reloadSession(activeSessionId)
   }
 }
 
@@ -2383,6 +2388,12 @@ export type HipE2EHooks = {
     turnId: string
     planItems: { content: string; status: string }[]
   }
+  /** Switch global active model (DeepSeek dogfood). */
+  setActiveModel: (providerID: string, modelID: string, baseURL?: string) => void
+  /** Reload session history from sidecar (triggers plan-approval resync D4c.1). */
+  reloadSession: (sessionId: string) => void
+  /** Whether FE has planApprovalPending for a session. */
+  getPlanApprovalPending: (sessionId: string) => boolean
   seedBackgroundTaskKilled: (sessionId: string) => {
     turnId: string
     agentId: string
@@ -2496,6 +2507,34 @@ function installE2eHooks(svc: SessionService): void {
     seedAgentInterrupt: (sessionId, question) => svc.seedAgentInterrupt(sessionId, question),
     seedPlanApproval: (sessionId) => svc.seedPlanApproval(sessionId),
     seedPlanProgress: (sessionId, opts) => svc.seedPlanProgress(sessionId, opts),
+    setActiveModel: (providerID, modelID, baseURL = '') => {
+      // Prefer catalog baseURL when empty.
+      let resolved = baseURL
+      if (!resolved) {
+        const { catalog, config } = useProvidersStore.getState()
+        try {
+          resolved = resolveModelConfig(catalog, config, `${providerID}/${modelID}`).baseURL
+        } catch {
+          resolved =
+            providerID === 'deepseek'
+              ? 'https://api.deepseek.com/v1'
+              : ''
+        }
+      }
+      svc.setActiveModel(providerID, modelID, resolved)
+      // Keep FE store in sync for picker UI.
+      useProvidersStore.setState((s) => ({
+        config: {
+          ...s.config,
+          activeModel: { providerID, modelID, baseURL: resolved || s.config.activeModel?.baseURL },
+        },
+      }))
+    },
+    reloadSession: (sessionId) => svc.reloadSession(sessionId),
+    getPlanApprovalPending: (sessionId) => {
+      const sess = useDomainStore.getState().sessions.find((s) => s.id === sessionId)
+      return Boolean(sess?.planApprovalPending)
+    },
     seedBackgroundTaskKilled: (sessionId) => svc.seedBackgroundTaskKilled(sessionId),
     simulateInvalidWorkflowError: (sessionId, reason) => svc.simulateInvalidWorkflowError(sessionId, reason),
     getLastAssistantText: (sessionId) => svc.getLastAssistantText(sessionId),

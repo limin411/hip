@@ -1,5 +1,5 @@
 // src/domain/sessionService.test.ts
-import { describe, it, expect, beforeEach, vi } from 'vitest'
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import type { ClientMessage, ServerMessage } from '@hip/protocol'
 import { toast } from 'sonner'
 import { SessionService } from './sessionService'
@@ -1527,6 +1527,161 @@ describe('branches + revert', () => {
         errorCode: 'WORKTREE_DIRTY',
         dirtySummary: ' M file.ts\n?? new.ts',
       })
+    })
+  })
+
+  describe('token:stream coalescing (PR-3)', () => {
+    let rafCbs: FrameRequestCallback[]
+
+    beforeEach(() => {
+      rafCbs = []
+      vi.stubGlobal('requestAnimationFrame', (cb: FrameRequestCallback) => {
+        rafCbs.push(cb)
+        return rafCbs.length
+      })
+      vi.stubGlobal('cancelAnimationFrame', (id: number) => {
+        rafCbs[id - 1] = () => {}
+      })
+    })
+
+    afterEach(() => {
+      vi.unstubAllGlobals()
+    })
+
+    function flushRaf() {
+      const cbs = rafCbs.splice(0, rafCbs.length)
+      for (const cb of cbs) cb(0)
+    }
+
+    function assistantContent(): string {
+      const msgs = useDomainStore.getState().sessions[0].messages
+      const a = msgs.find((m) => m.role === 'assistant')
+      return a?.content ?? ''
+    }
+
+    it('buffers supervisor token:stream until rAF', () => {
+      const t = new FakeTransport()
+      new SessionService(t)
+      t.push({ type: 'agent:started', sessionId: 's1', turnId: 't1', agentId: 'supervisor', role: 'supervisor' })
+      t.push({ type: 'token:stream', sessionId: 's1', turnId: 't1', agentId: 'supervisor', delta: 'Hel' })
+      t.push({ type: 'token:stream', sessionId: 's1', turnId: 't1', agentId: 'supervisor', delta: 'lo' })
+      expect(assistantContent()).toBe('')
+      flushRaf()
+      expect(assistantContent()).toBe('Hello')
+    })
+
+    it('flushTurn on tool:started applies pending tokens before the tool', () => {
+      const t = new FakeTransport()
+      new SessionService(t)
+      t.push({ type: 'agent:started', sessionId: 's1', turnId: 't1', agentId: 'supervisor', role: 'supervisor' })
+      t.push({ type: 'token:stream', sessionId: 's1', turnId: 't1', agentId: 'supervisor', delta: 'before tool' })
+      expect(assistantContent()).toBe('')
+      t.push({
+        type: 'tool:started',
+        sessionId: 's1',
+        turnId: 't1',
+        agentId: 'supervisor',
+        role: 'supervisor',
+        callId: 'c1',
+        name: 'read_file',
+        input: '{}',
+        seq: 1,
+      })
+      expect(assistantContent()).toBe('before tool')
+      const m = useDomainStore.getState().sessions[0].messages.find((x) => x.id === 't1')
+      expect(m?.toolCalls?.some((tc) => tc.callId === 'c1')).toBe(true)
+    })
+
+    it('reasoning:delta applies immediately without coalescing', () => {
+      const t = new FakeTransport()
+      new SessionService(t)
+      t.push({ type: 'agent:started', sessionId: 's1', turnId: 't1', agentId: 'supervisor', role: 'supervisor' })
+      t.push({
+        type: 'reasoning:delta',
+        sessionId: 's1',
+        turnId: 't1',
+        agentId: 'supervisor',
+        role: 'supervisor',
+        stepSeq: 0,
+        delta: 'think',
+      })
+      const m = useDomainStore.getState().sessions[0].messages.find((x) => x.id === 't1')
+      expect(m?.timeline).toEqual([
+        { kind: 'reasoning', stepSeq: 0, agentId: 'supervisor', role: 'supervisor', content: 'think' },
+      ])
+      // Pending token remains buffered separately (not mixed into reasoning).
+      t.push({ type: 'token:stream', sessionId: 's1', turnId: 't1', agentId: 'supervisor', delta: 'ans' })
+      expect(assistantContent()).toBe('')
+      expect(m?.timeline?.[0]).toMatchObject({ kind: 'reasoning', content: 'think' })
+      flushRaf()
+      expect(assistantContent()).toBe('ans')
+    })
+
+    it('subagent token:stream coalesces into run.output, not content', () => {
+      const t = new FakeTransport()
+      new SessionService(t)
+      t.push({ type: 'agent:started', sessionId: 's1', turnId: 't1', agentId: 'supervisor', role: 'supervisor' })
+      t.push({
+        type: 'agent:started',
+        sessionId: 's1',
+        turnId: 't1',
+        agentId: 'coder-1',
+        role: 'coder',
+        parentAgentId: 'supervisor',
+      })
+      t.push({ type: 'token:stream', sessionId: 's1', turnId: 't1', agentId: 'coder-1', delta: 'plan' })
+      t.push({ type: 'token:stream', sessionId: 's1', turnId: 't1', agentId: 'coder-1', delta: ' A' })
+      expect(assistantContent()).toBe('')
+      flushRaf()
+      expect(assistantContent()).toBe('')
+      const m = useDomainStore.getState().sessions[0].messages.find((x) => x.id === 't1')
+      const run = m?.agentRuns?.find((r) => r.agentId === 'coder-1')
+      expect(run?.output).toBe('plan A')
+    })
+
+    it('message:complete flushes pending tokens before finalize', () => {
+      const t = new FakeTransport()
+      new SessionService(t)
+      t.push({ type: 'agent:started', sessionId: 's1', turnId: 't1', agentId: 'supervisor', role: 'supervisor' })
+      t.push({ type: 'token:stream', sessionId: 's1', turnId: 't1', agentId: 'supervisor', delta: 'partial' })
+      t.push({
+        type: 'message:complete',
+        sessionId: 's1',
+        message: {
+          id: 't1',
+          role: 'assistant',
+          content: 'final from sidecar',
+          timestamp: 1,
+        },
+      })
+      // complete replaces the message; flush runs first so intermediate apply is overwritten by finalize.
+      const m = useDomainStore.getState().sessions[0].messages.find((x) => x.id === 't1')
+      expect(m?.content).toBe('final from sidecar')
+    })
+
+    it('token:stream with stepSeq uses text kind (forward-compat) and still coalesces', () => {
+      const t = new FakeTransport()
+      new SessionService(t)
+      t.push({ type: 'agent:started', sessionId: 's1', turnId: 't1', agentId: 'supervisor', role: 'supervisor' })
+      t.push({
+        type: 'token:stream',
+        sessionId: 's1',
+        turnId: 't1',
+        agentId: 'supervisor',
+        delta: 'a',
+        stepSeq: 3,
+      } as ServerMessage)
+      t.push({
+        type: 'token:stream',
+        sessionId: 's1',
+        turnId: 't1',
+        agentId: 'supervisor',
+        delta: 'b',
+        stepSeq: 3,
+      } as ServerMessage)
+      expect(assistantContent()).toBe('')
+      flushRaf()
+      expect(assistantContent()).toBe('ab')
     })
   })
 })

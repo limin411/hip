@@ -52,6 +52,7 @@ import {
   useDiffAnnotationStore,
 } from '@/store/diffAnnotationStore'
 import { auditSessionDelete, debugSessionDelete } from '@/lib/sessionDelete'
+import { StreamCoalescer, type CoalesceBucket, type StreamKind } from '@/lib/streamCoalesce'
 
 /**
  * Map the current i18next language to a SessionConfig-supported value.
@@ -59,6 +60,11 @@ import { auditSessionDelete, debugSessionDelete } from '@/lib/sessionDelete'
  */
 export function currentLanguage(): AppLanguage {
   return normalizeAppLanguage(i18n.resolvedLanguage ?? i18n.language) ?? 'en'
+}
+
+/** Optional stepSeq on token:stream (PR-4+). Safe to read when absent. */
+function tokenStepSeq(msg: { stepSeq?: number }): number | undefined {
+  return typeof msg.stepSeq === 'number' ? msg.stepSeq : undefined
 }
 
 type ServerMessageWaiter = {
@@ -91,6 +97,7 @@ export class SessionService {
   private readonly transport: Transport
   private readonly unsubscribe: () => void
   private readonly unsubStatus: () => void
+  private readonly streamCoalescer: StreamCoalescer
   private waiters: ServerMessageWaiter[] = []
   /** E2E: when set, checkpoint list requests/results for this session re-apply the seed. */
   private e2eCheckpointSeed: {
@@ -103,11 +110,13 @@ export class SessionService {
 
   constructor(transport: Transport) {
     this.transport = transport
+    this.streamCoalescer = new StreamCoalescer((bucket) => this.applyCoalescedToken(bucket))
     this.unsubscribe = this.transport.onMessage((msg: ServerMessage) => this.receive(msg))
     this.unsubStatus = this.transport.onStatus((s) => useDomainStore.getState().setConnection(s))
   }
 
   dispose(): void {
+    this.streamCoalescer.flushAll()
     this.unsubscribe()
     this.unsubStatus()
     for (const w of this.waiters) {
@@ -115,6 +124,64 @@ export class SessionService {
       w.reject(new Error('SessionService disposed'))
     }
     this.waiters = []
+  }
+
+  /** Flush coalesced token text into the store as a single token:stream apply. */
+  private applyCoalescedToken(bucket: CoalesceBucket): void {
+    // PR-3: map all token kinds through the existing reducer (content vs run.output).
+    // Text timeline steps (kind:'text' + stepSeq>=0) land in PR-4; until then content only.
+    useDomainStore.getState().apply({
+      type: 'token:stream',
+      sessionId: bucket.sessionId,
+      turnId: bucket.turnId,
+      agentId: bucket.agentId,
+      delta: bucket.text,
+    })
+  }
+
+  /** Mirror sessionStore token routing: supervisor → body, else → run.output. */
+  private isSupervisorToken(sessionId: string, turnId: string, agentId: string): boolean {
+    const sess = useDomainStore.getState().sessions.find((s) => s.id === sessionId)
+    const turn = sess?.messages.find((m) => m.id === turnId)
+    const run =
+      turn?.role === 'assistant' ? turn.agentRuns?.find((r) => r.agentId === agentId) : undefined
+    return run ? run.role === 'supervisor' : agentId === 'supervisor'
+  }
+
+  private tokenStreamKind(
+    sessionId: string,
+    turnId: string,
+    agentId: string,
+    stepSeq: number | undefined,
+  ): { kind: StreamKind; stepSeq: number } {
+    if (stepSeq != null) {
+      return { kind: 'text', stepSeq }
+    }
+    if (this.isSupervisorToken(sessionId, turnId, agentId)) {
+      return { kind: 'text-legacy', stepSeq: -1 }
+    }
+    return { kind: 'run-output', stepSeq: -1 }
+  }
+
+  /** Barrier events must drain pending token buckets before the event mutates the turn. */
+  private flushBeforeBarrier(msg: ServerMessage): void {
+    switch (msg.type) {
+      case 'tool:started':
+      case 'tool:finished':
+      case 'agent:interrupt':
+      case 'permission:request':
+        this.streamCoalescer.flushTurn(msg.sessionId, msg.turnId)
+        return
+      case 'message:complete':
+        this.streamCoalescer.flushTurn(msg.sessionId, msg.message.id)
+        return
+      case 'error':
+        if (msg.sessionId) this.streamCoalescer.flushSession(msg.sessionId)
+        else this.streamCoalescer.flushAll()
+        return
+      default:
+        return
+    }
   }
 
   /** One-shot wait for the next inbound ServerMessage of a given type. */
@@ -224,6 +291,30 @@ export class SessionService {
   }
 
   private receive(msg: ServerMessage): void {
+    // PR-3: coalesce token:stream only. reasoning:delta applies immediately (no merge).
+    if (msg.type === 'token:stream') {
+      const stepSeq = tokenStepSeq(msg as { stepSeq?: number })
+      const { kind, stepSeq: seq } = this.tokenStreamKind(
+        msg.sessionId,
+        msg.turnId,
+        msg.agentId,
+        stepSeq,
+      )
+      this.streamCoalescer.push({
+        sessionId: msg.sessionId,
+        turnId: msg.turnId,
+        agentId: msg.agentId,
+        kind,
+        stepSeq: seq,
+        delta: msg.delta,
+      })
+      this.fulfillWaiters(msg)
+      return
+    }
+
+    // Drain pending tokens before turn-mutating barriers so order stays correct.
+    this.flushBeforeBarrier(msg)
+
     useDomainStore.getState().apply(msg)
     applyServerMessageEffects(msg, {
       send: (m) => this.transport.send(m),
@@ -767,6 +858,8 @@ export class SessionService {
       agentId: 'supervisor',
       delta: `${marker} ${question}`,
     })
+    // Seed helpers are synchronous fixtures — drain coalesced tokens so probes/UI see content immediately.
+    this.streamCoalescer.flushTurn(sessionId, turnId)
     return { turnId, callId, marker }
   }
 

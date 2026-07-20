@@ -78,29 +78,26 @@ export function ManagedTerminalSession({ terminalId }: { terminalId: string }) {
       <DeclarativeContextMenu
         kind="managedTerminal"
         payload={{ terminalId, kind: 'local', title: term.title }}
-        className="flex h-8 shrink-0 items-center justify-between gap-2 border-b border-border/80 px-2.5"
+        className="flex min-h-8 shrink-0 items-center justify-between gap-2 border-b border-border/80 px-2.5 py-1"
         data-testid="managed-terminal-chrome"
       >
         <div
           className="flex min-w-0 flex-1 items-center justify-between gap-2"
           data-tauri-drag-region="false"
         >
-          <div className="min-w-0 flex-1">
-            <span
-              className="block truncate text-meta font-medium text-ink"
-              title={term.title}
-              data-testid="managed-terminal-title"
-            >
-              {term.title}
+          {/* Single-line chrome (match code-panel density): title visible, cwd in tooltip. */}
+          <span
+            className="min-w-0 flex-1 truncate font-mono text-meta text-ink-tertiary"
+            title={`${term.title} — ${cwd}`}
+            data-testid="managed-terminal-title"
+            data-cwd={cwd}
+          >
+            <span className="font-sans font-medium text-ink">{term.title}</span>
+            <span className="mx-1.5 text-ink-tertiary/60" aria-hidden>
+              ·
             </span>
-            <span
-              className="block truncate font-mono text-caption text-ink-tertiary"
-              title={cwd}
-              data-testid="managed-terminal-cwd"
-            >
-              {cwd}
-            </span>
-          </div>
+            <span data-testid="managed-terminal-cwd">{cwd}</span>
+          </span>
           <div className="flex shrink-0 items-center gap-0.5">
             <button
               type="button"
@@ -139,11 +136,13 @@ export function ManagedTerminalSession({ terminalId }: { terminalId: string }) {
         cwd={cwd}
         open={async (cols, rows) => {
           const result = await ptyOpen(terminalId, cwd, cols, rows)
-          // K11: only successful open pushes recents (not form submit alone).
-          try {
-            await recordSuccessfulLocalLaunch(cwd, term.title)
-          } catch {
-            /* catalog write failure must not break the shell */
+          // K11: only true new launches push recents — skip keep-alive remounts (reused).
+          if (!result.reused) {
+            try {
+              await recordSuccessfulLocalLaunch(cwd, term.title)
+            } catch {
+              /* catalog write failure must not break the shell */
+            }
           }
           return result
         }}

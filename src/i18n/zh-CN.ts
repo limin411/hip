@@ -1445,7 +1445,6 @@ export const zhCN = {
       quickConnectEmpty: '暂无最近连接',
       close: '关闭',
       connecting: '正在连接…',
-      softCap: '打开的终端过多（最多 8 个，含代码面板终端）。请先关闭一个。',
       cwdMissing: '目录不存在',
       sshComingSoon: 'SSH 即将就绪',
       sessionMissing: '终端不存在',

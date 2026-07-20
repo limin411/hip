@@ -140,10 +140,18 @@ export const useManagedTerminalStore = create<ManagedTerminalStore>((set, get) =
     // SSH close lands in PR5.
 
     useTerminalStore.getState().clearSession(id)
-    set((s) => ({
-      terminals: s.terminals.filter((t) => t.id !== id),
-      focusedId: s.focusedId === id ? null : s.focusedId,
-    }))
+    set((s) => {
+      const terminals = s.terminals.filter((t) => t.id !== id)
+      let focusedId = s.focusedId
+      if (s.focusedId === id) {
+        // Prefer nearest neighbor (previous index), else next, else null.
+        const idx = s.terminals.findIndex((t) => t.id === id)
+        const neighbor =
+          terminals[Math.max(0, idx - 1)] ?? terminals[0] ?? null
+        focusedId = neighbor?.id ?? null
+      }
+      return { terminals, focusedId }
+    })
   },
 
   setTitle: (id, title) => {

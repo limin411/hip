@@ -169,9 +169,16 @@ export function AppSidebar() {
   }
 
   const openLocalTerminal = () => {
-    void useManagedTerminalStore.getState().openLocal().catch((e) => {
-      console.error('[hip] open local terminal failed:', e)
-    })
+    void (async () => {
+      try {
+        await useManagedTerminalStore.getState().openLocal()
+        // Ensure main surface shows the session (section can stay terminals while
+        // activeView is settings/history/trash after chrome navigation).
+        await enterTerminalsSection()
+      } catch (e) {
+        console.error('[hip] open local terminal failed:', e)
+      }
+    })()
   }
 
   const listLabel =

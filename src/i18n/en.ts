@@ -1478,8 +1478,6 @@ export const en = {
       quickConnectEmpty: 'No recent connections yet',
       close: 'Close',
       connecting: 'Connecting…',
-      softCap:
-        'Too many terminals open (max 8, including code-panel terminals). Close one first.',
       cwdMissing: 'Directory does not exist',
       sshComingSoon: 'SSH coming soon',
       sessionMissing: 'Terminal not found',

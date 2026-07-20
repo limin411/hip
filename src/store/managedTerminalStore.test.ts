@@ -100,6 +100,17 @@ describe('managedTerminalStore', () => {
     expect(useManagedTerminalStore.getState().terminals.map((t) => t.id)).toEqual([b])
   })
 
+  it('close of focused focuses a remaining neighbor', async () => {
+    const a = await useManagedTerminalStore.getState().openLocal({ cwd: '/a' })
+    const b = await useManagedTerminalStore.getState().openLocal({ cwd: '/b' })
+    const c = await useManagedTerminalStore.getState().openLocal({ cwd: '/c' })
+    expect(useManagedTerminalStore.getState().focusedId).toBe(c)
+    await useManagedTerminalStore.getState().close(c)
+    // Previous neighbor of c is b.
+    expect(useManagedTerminalStore.getState().focusedId).toBe(b)
+    expect(useManagedTerminalStore.getState().terminals.map((t) => t.id)).toEqual([a, b])
+  })
+
   it('recordSuccessfulLocalLaunch pushes recent', async () => {
     await recordSuccessfulLocalLaunch('/tmp/x', 'X')
     expect(pushRecent).toHaveBeenCalledWith({

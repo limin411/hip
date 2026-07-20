@@ -1446,7 +1446,6 @@ export const zhTW = {
     "quickConnectEmpty": "暫無最近連線",
     "close": "關閉",
     "connecting": "正在連線…",
-    "softCap": "開啟的終端過多（最多 8 個，含程式碼面板終端）。請先關閉一個。",
     "cwdMissing": "目錄不存在",
     "sshComingSoon": "SSH 即將就緒",
     "sessionMissing": "終端不存在",

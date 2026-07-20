@@ -5,6 +5,7 @@ import { isDirectory } from '@/ipc/pathExists'
 import type { RecentLaunch } from '@/ipc/terminalHosts'
 import { useManagedTerminalStore } from '@/store/managedTerminalStore'
 import { useTerminalHostStore } from '@/store/terminalHostStore'
+import { enterTerminalsSection } from '@/components/layout/sidebarActions'
 import {
   Popover,
   PopoverContent,
@@ -57,6 +58,8 @@ export function QuickConnectPopover() {
       setLaunching(true)
       try {
         await useManagedTerminalStore.getState().openLocal({ cwd: r.cwd, label: r.label })
+        // Bring TerminalManagementPage into view when chrome left activeView elsewhere.
+        await enterTerminalsSection()
         setOpen(false)
       } catch (e) {
         console.error('[hip] quick connect local failed:', e)

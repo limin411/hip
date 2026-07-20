@@ -21,7 +21,7 @@ export function TerminalManagementPage() {
   const focusedId = useManagedTerminalStore((s) => s.focusedId)
   const terminals = useManagedTerminalStore((s) => s.terminals)
 
-  // Ensure host catalog (recents) is warm for 快捷连接.
+  // Warm host catalog so Quick connect recents are available immediately.
   useEffect(() => {
     if (!useTerminalHostStore.getState().loaded) {
       void useTerminalHostStore.getState().load()

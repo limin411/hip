@@ -1438,7 +1438,6 @@ export const ja = {
     "quickConnectEmpty": "最近の接続はまだありません",
     "close": "閉じる",
     "connecting": "接続中…",
-    "softCap": "開いているターミナルが多すぎます（最大8個、コードパネル端末を含む）。先に1つ閉じてください。",
     "cwdMissing": "ディレクトリが存在しません",
     "sshComingSoon": "SSH は近日対応",
     "sessionMissing": "端末が見つかりません",

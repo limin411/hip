@@ -1438,7 +1438,6 @@ export const ko = {
     "quickConnectEmpty": "최근 연결이 없습니다",
     "close": "닫기",
     "connecting": "연결 중…",
-    "softCap": "너무 많은 터미널이 열려 있습니다(최대 8개, 코드 패널 터미널 포함). 먼저 하나를 닫으세요.",
     "cwdMissing": "디렉터리가 존재하지 않습니다",
     "sshComingSoon": "SSH 곧 지원",
     "sessionMissing": "터미널을 찾을 수 없음",

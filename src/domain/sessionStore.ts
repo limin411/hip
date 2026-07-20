@@ -511,9 +511,9 @@ export function applyServerMessage(
       // A cancel is intentional, not a failure: return to idle and surface nothing.
       if (!msg.sessionId) return state
       if (msg.code === 'CANCELLED') return update(msg.sessionId, (s) => ({ ...s, status: 'idle', error: null, activeTurnPlan: null, planDeltaDraft: {}, planApprovalPending: false, messages: finalizeCancelledMessage(s.messages) }))
-      // Soft rejects (concurrent send / agent mid-switch): toast-only via effects.
-      // Do not demote running→error or clear plan UI while the sidecar turn continues.
-      if (msg.code === 'BUSY' || msg.code === 'AGENT_BUSY') {
+      // Soft rejects (concurrent send / agent mid-switch / empty resume while plan awaiting):
+      // toast-only or no-op; do not demote status or clear planApprovalPending.
+      if (msg.code === 'BUSY' || msg.code === 'AGENT_BUSY' || msg.code === 'PLAN_AWAITING_RESPONSE') {
         return state
       }
       return update(msg.sessionId, (s) => ({ ...s, status: 'error', error: { code: msg.code, message: msg.message }, activeTurnPlan: null, planDeltaDraft: {}, planApprovalPending: false }))

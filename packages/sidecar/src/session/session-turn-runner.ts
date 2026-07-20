@@ -45,6 +45,7 @@ import { addUsage, sumUsage } from './usage.js'
 import { estimateTokens, COMPACT_BUDGET_TOKENS, type Summarizer } from './compaction.js'
 import { ensureToolCallResults, hasValidToolCallPairing } from '../persistence/event-store.js'
 import { PAUSE_QUESTION, resolveDoomLoopStrategy } from './doom-loop.js'
+import { PLAN_APPROVAL_QUESTION_TOKEN } from './plan-approval-constants.js'
 import type { ExternalAgentHooks, PermissionChoice } from './agents/types.js'
 import type { HookRegistry } from './hooks/registry.js'
 import type { AgentInvoker } from './agents/invoker.js'
@@ -1427,6 +1428,10 @@ export async function runTurn(host: SessionTurnHost, rawSend: SendFn, base?: {
         // Execution-time pauses (doom/error) keep planningMode semantics out of the UI.
         const isPlanApproval =
           finalState.planningMode === 'plan' && finalState.planStatus === 'ready'
+        // Plan approval wire question is always the token (D5 / KD-PA-3); doom uses PAUSE_QUESTION.
+        const interruptQuestion = isPlanApproval
+          ? (finalState.pendingQuestion || PLAN_APPROVAL_QUESTION_TOKEN)
+          : (finalState.pendingQuestion ?? PAUSE_QUESTION)
         // Always publish on plan-approval path (D4b) — empty plan still needs UI + FE hydrate.
         if (isPlanApproval) {
           send({ type: 'plan:published', sessionId: host.id, turnId, plan: finalState.plan ?? [] })
@@ -1434,7 +1439,7 @@ export async function runTurn(host: SessionTurnHost, rawSend: SendFn, base?: {
           host.persistPlanApprovalPause?.({
             turnId,
             plan: finalState.plan ?? [],
-            question: finalState.pendingQuestion ?? PAUSE_QUESTION,
+            question: interruptQuestion,
           })
         }
         // forcePlan is one-shot for "plan before execute" — once a plan is submitted
@@ -1454,14 +1459,14 @@ export async function runTurn(host: SessionTurnHost, rawSend: SendFn, base?: {
           planItemCount: finalState.plan?.length ?? 0,
           forcePlan: Boolean(host._config.forcePlan),
           planModeActive: Boolean(host.planMode?.isActive),
-          question: (finalState.pendingQuestion ?? PAUSE_QUESTION).slice(0, 200),
+          question: interruptQuestion.slice(0, 200),
         })
         send({
           type: 'agent:interrupt',
           sessionId: host.id,
           turnId,
           agentId: 'supervisor',
-          question: finalState.pendingQuestion ?? PAUSE_QUESTION,
+          question: interruptQuestion,
           ...(interruptContext ? { context: interruptContext } : {}),
         })
         return stoppedText

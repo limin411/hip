@@ -916,11 +916,13 @@ describe('loopSignal emissions (Track E1)', () => {
         },
       )
       expect(out.status).toBe('awaiting_user')
+      expect(out.pendingQuestion).toBe('plan_approval')
       const pause = events.find((e) => e.type === 'loop.pause')
       expect(pause).toMatchObject({
         type: 'loop.pause',
         kind: 'plan',
         turnId: 'turn-plan',
+        question: 'plan_approval',
       })
       expect(events.some((e) => e.type === 'loop.end')).toBe(false)
     })

@@ -2110,16 +2110,11 @@ export class SessionService {
     this.lastOutboundUserContent = text
     const st = useDomainStore.getState()
     const active = st.sessions.find((s) => s.id === st.activeSessionId)
-    // KD-8 / D4d composer send decision table:
-    // planApprovalPending → amend by default (not soft-approve resume).
-    // Opt-in soft-approve: hip.toml [plan] softApproveOnComposer = true → message:resume.
+    // KD-8 / KD-PA-1: planApprovalPending → amend only (never soft-approve via resume).
+    // [plan] softApproveOnComposer is deprecated: still parsed for back-compat, FE ignores.
+    // Product CTA is sticky panel plan:respond; composer is blocked in InputBar.
     if (active?.planApprovalPending) {
-      const softApprove = useHipConfigStore.getState().config.plan?.softApproveOnComposer === true
-      if (softApprove) {
-        this.resume(text, attachments)
-        return
-      }
-      // Amend is text-only over plan:respond (attachments not on wire). Soft-approve path keeps them.
+      // Amend is text-only over plan:respond (attachments not on wire).
       this.respondPlan('amend', text || undefined)
       return
     }

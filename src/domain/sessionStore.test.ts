@@ -136,7 +136,7 @@ describe('applyServerMessage', () => {
     expect(next.sessions[0].error).toBeNull()
   })
 
-  it('BUSY / AGENT_BUSY soft-reject keeps status and plan (no terminal error)', () => {
+  it('BUSY / AGENT_BUSY / PLAN_AWAITING_RESPONSE soft-reject keeps status and plan (no terminal error)', () => {
     const s0 = {
       sessions: [
         baseSession({
@@ -147,7 +147,7 @@ describe('applyServerMessage', () => {
         }),
       ],
     }
-    for (const code of ['BUSY', 'AGENT_BUSY'] as const) {
+    for (const code of ['BUSY', 'AGENT_BUSY', 'PLAN_AWAITING_RESPONSE'] as const) {
       const next = applyServerMessage(
         s0,
         { type: 'error', sessionId: 's1', code, message: 'soft' },

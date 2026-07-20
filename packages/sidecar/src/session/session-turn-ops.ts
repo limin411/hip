@@ -100,42 +100,58 @@ export async function resume(host: SessionTurnHost, content: string, send: SendF
     })
   }
 
-  // Composer text during plan approval hits message:resume (not plan:respond).
-  // Treating it as soft-approve: leave plan mode, clear forcePlan, execute with guidance.
-  // (Explicit "Amend" still uses plan:respond amend.)
+  // KD-PA-1: plan:respond approve is the only approve path.
+  // message:resume while planStatus===ready never soft-approves:
+  //   non-empty text → amend (resume_as_amend); empty → structured soft error, pause intact.
   if (paused.planStatus === 'ready') {
-    host.planMode.exit()
-    try {
-      await persistApprovedPlan(host.id, paused.plan ?? [])
-    } catch (err) {
-      console.error('Failed to persist approved plan on resume:', err instanceof Error ? err.message : String(err))
-      send({ type: 'agent:notification', sessionId: host.id, taskId: 'plan-persist', description: 'Plan was approved but could not be saved to disk.', status: 'failed' })
-    }
-    const base = {
-      messages: [...paused.messages, humanMessage],
-      steps: 0,
-      planningMode: 'fast' as const,
-      planStatus: 'approved' as const,
-      plan: paused.plan,
+    const amendText = resumeContent.trim()
+    if (!amendText) {
+      logInfo('session', 'plan:respond', {
+        sessionId: host.id,
+        action: 'resume_empty_rejected',
+        planStatus: 'ready',
+        planItemCount: paused.plan?.length ?? 0,
+        planModeActive: host.planMode.isActive,
+      })
+      // Soft error: FE must not clear planApprovalPending (sessionStore treats this like BUSY).
+      send({
+        type: 'error',
+        sessionId: host.id,
+        code: 'PLAN_AWAITING_RESPONSE',
+        message: 'Plan is awaiting approval. Use plan:respond (approve / amend / reject); empty resume is not allowed.',
+      })
+      return
     }
     logInfo('session', 'plan:respond', {
       sessionId: host.id,
-      action: 'soft_approve_resume',
-      planningMode: 'fast',
-      planStatus: 'approved',
+      action: 'resume_as_amend',
       planItemCount: paused.plan?.length ?? 0,
-      resumeLen: resumeContent.length,
-      forcePlanBefore: Boolean(host._config.forcePlan),
-      planModeActiveBefore: host.planMode.isActive,
+      amendLen: amendText.length,
+      forcePlan: Boolean(host._config.forcePlan),
+      planModeActive: host.planMode.isActive,
     })
+    const base = {
+      messages: [...paused.messages, humanMessage],
+      steps: paused.steps,
+      planningMode: 'plan' as const,
+      planStatus: 'generating' as const,
+      plan: paused.plan,
+    }
     host.awaitingResume = false
     host.paused = null
     host.clearPlanApprovalPause?.()
     emitInterruptResolved()
-    clearForcePlanFlag(host, send, 'soft_approve_resume')
     const ts = Date.now()
     if (host.store) {
-      host.emit({ type: 'user_message', sessionId: host.id, content: resumeContent, messageId: `u-${ts}`, timestamp: ts, ...(staged?.length ? { attachments: staged } : {}), ...(isRichContentParts(resumeParts) ? { contentParts: resumeParts } : {}) })
+      host.emit({
+        type: 'user_message',
+        sessionId: host.id,
+        content: resumeContent,
+        messageId: `u-${ts}`,
+        timestamp: ts,
+        ...(staged?.length ? { attachments: staged } : {}),
+        ...(isRichContentParts(resumeParts) ? { contentParts: resumeParts } : {}),
+      })
     }
     host.messages.push(humanMessage)
     await runTurn(host, send, base)

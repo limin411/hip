@@ -532,7 +532,7 @@ describe('SessionService', () => {
     expect(sess.status).toBe('running')
   })
 
-  it('KD-8: plan.softApproveOnComposer true keeps soft-approve resume path', () => {
+  it('KD-PA-1: softApproveOnComposer is ignored; pending send still amends (never resume)', () => {
     const t = new FakeTransport()
     const svc = new SessionService(t)
     svc.seedPlanApproval('s1')
@@ -543,12 +543,13 @@ describe('SessionService', () => {
       error: null,
     })
     svc.sendMessage('go ahead with proxy 127.0.0.1:7890')
-    expect(t.sent.at(-1)).toMatchObject({
-      type: 'message:resume',
-      sessionId: 's1',
-      content: 'go ahead with proxy 127.0.0.1:7890',
-    })
+    // Deprecated flag must not soft-approve via message:resume.
+    expect(t.sent.some((m) => m.type === 'message:resume')).toBe(false)
+    // FE-only seed completes amend locally (no wire plan:respond).
     expect(t.sent.some((m) => m.type === 'plan:respond')).toBe(false)
+    const sess = useDomainStore.getState().sessions.find((s) => s.id === 's1')!
+    expect(sess.planApprovalPending).toBe(false)
+    expect(sess.status).toBe('running')
   })
 
   it('resume forwards attachments and does not require text', () => {

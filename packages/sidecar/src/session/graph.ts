@@ -34,6 +34,7 @@ import {
   resolveDoomLoopStrategy,
   type DoomLoopStrategy,
 } from './doom-loop.js'
+import { PLAN_APPROVAL_QUESTION_TOKEN } from './plan-approval-constants.js'
 import { estimateTokens, compactMessages, applyCompactResult, COMPACT_BUDGET_TOKENS, KEEP_RECENT_TURNS, isOverflowError, type Summarizer, type CompactResult } from './compaction.js'
 // note: SUBAGENT_COMPACT_BUDGET_TOKENS is applied by callers of buildGraph(maxSteps, budget)
 import { applySlidingWindow } from './context/sliding-window.js'
@@ -754,7 +755,8 @@ export function buildGraph(maxSteps: number = MAX_STEPS, compactBudget: number =
 
   function planPause(_state: State, config: LangGraphRunnableConfig): Partial<State> {
     const ctx = ctxOf(config)
-    const question = 'Review the plan above. Approve, reject, or suggest changes.'
+    // Wire token only — FE sticky panel owns user-visible copy (D5 / KD-PA-3).
+    const question = PLAN_APPROVAL_QUESTION_TOKEN
     emitLoopSignal(ctx.emit.loopSignal, {
       type: 'loop.pause',
       ...loopIds(ctx),

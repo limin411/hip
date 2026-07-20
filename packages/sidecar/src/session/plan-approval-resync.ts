@@ -6,6 +6,7 @@
  * Full LangChain message history is rebuilt via Session.hydrate().
  */
 import type { PlanItem, SessionConfig, ServerMessage } from '@hip/protocol'
+import { PLAN_APPROVAL_QUESTION_TOKEN } from './plan-approval-constants.js'
 
 type SendFn = (msg: ServerMessage) => void
 
@@ -27,7 +28,8 @@ export function readPlanApprovalPause(config: SessionConfig | undefined | null):
   if (!raw || typeof raw !== 'object') return null
   if (typeof raw.turnId !== 'string' || !raw.turnId) return null
   const plan = Array.isArray(raw.plan) ? raw.plan : []
-  const question = typeof raw.question === 'string' && raw.question ? raw.question : 'Approve this plan?'
+  const question =
+    typeof raw.question === 'string' && raw.question ? raw.question : PLAN_APPROVAL_QUESTION_TOKEN
   return { turnId: raw.turnId, plan: plan as PlanItem[], question }
 }
 

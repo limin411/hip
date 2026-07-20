@@ -166,13 +166,13 @@ export interface AcpHostConfig {
 }
 
 /**
- * Optional `[plan]` section in hip.toml (PR-6 / KD-8).
- * Soft-approve on composer is **off** by default — pending submit amends the plan.
+ * Optional `[plan]` section in hip.toml (PR-6 / KD-8 / KD-PA-1).
+ * softApproveOnComposer is **deprecated** (parsed for back-compat; FE ignores).
  */
 export interface PlanConfig {
   /**
-   * When true, composer submit during plan approval soft-approves via message:resume
-   * (legacy path with optional guidance text). Default false → plan:respond amend.
+   * @deprecated KD-PA-1: no product path. Composer is blocked during plan approval;
+   * approve only via plan:respond. Flag may still parse from hip.toml but is ignored.
    */
   softApproveOnComposer?: boolean
 }

@@ -179,9 +179,57 @@ describe('plan lifecycle integration', () => {
   // Test 2: Plan rejection stops execution and writes no plan file
   // ──────────────────────────────────────────────────────────────────────────────
 
-  it('message:resume during plan approval soft-approves and executes (does not re-prompt)', async () => {
+  it('message:resume during plan approval amends (resume_as_amend), does not soft-approve', async () => {
     const store = inMemoryStore()
-    const runner = new PlanRunner()
+    // After first plan ready, amend re-enters plan mode → Exit again → pause again.
+    class AmendPlanRunner implements ModelRunner {
+      callCount = 0
+      executed = false
+      async run(_messages: BaseMessage[], opts: ModelRunOptions): Promise<AIMessage> {
+        this.callCount += 1
+        if (this.callCount === 1) {
+          opts.onText('here is the plan')
+          return new AIMessage({
+            content: 'here is the plan',
+            tool_calls: [
+              { name: 'EnterPlanMode', args: {}, id: 'plan-enter', type: 'tool_call' as const },
+              {
+                name: 'write_todos',
+                args: {
+                  todos: [
+                    { content: 'step 1', status: 'pending' },
+                    { content: 'step 2', status: 'pending' },
+                  ],
+                },
+                id: 'todos-1',
+                type: 'tool_call' as const,
+              },
+              { name: 'ExitPlanMode', args: {}, id: 'plan-exit', type: 'tool_call' as const },
+            ],
+          })
+        }
+        // Amend turn: still planning (not approved execute)
+        opts.onText('revised plan')
+        return new AIMessage({
+          content: 'revised plan',
+          tool_calls: [
+            {
+              name: 'write_todos',
+              args: {
+                todos: [
+                  { content: 'step 1 revised', status: 'pending' },
+                  { content: 'step 2', status: 'pending' },
+                ],
+              },
+              id: 'todos-2',
+              type: 'tool_call' as const,
+            },
+            { name: 'ExitPlanMode', args: {}, id: 'plan-exit-2', type: 'tool_call' as const },
+          ],
+        })
+      }
+    }
+    const runner = new AmendPlanRunner()
     const session = makeSession('s-plan-resume', runner, store)
     session.setForcePlan(true)
 
@@ -193,14 +241,14 @@ describe('plan lifecycle integration', () => {
       | undefined
     expect(interrupt).toBeTruthy()
     expect(JSON.parse(interrupt!.context ?? '{}').kind).toBe('plan_approval')
-    // forcePlan is one-shot: cleared when the plan is submitted for review
     expect(session.config.forcePlan).toBeFalsy()
 
     const resumeEvents: ServerMessage[] = []
     await session.resume('来自 GitHub，用代理 127.0.0.1:7890', (m) => resumeEvents.push(m))
 
-    expect(runner.executed).toBe(true)
-    // Must not re-open plan_approval after soft-approve resume
+    // Must NOT execute as approved — amend stays in plan mode and re-prompts approval.
+    expect(runner.executed).toBe(false)
+    expect(runner.callCount).toBeGreaterThanOrEqual(2)
     const resumePlanApprovals = resumeEvents.filter((e) => {
       if (e.type !== 'agent:interrupt') return false
       try {
@@ -209,9 +257,32 @@ describe('plan lifecycle integration', () => {
         return false
       }
     })
-    expect(resumePlanApprovals).toHaveLength(0)
-    expect(session.config.forcePlan).toBeFalsy()
-    expect(resumeEvents.some((e) => e.type === 'message:complete')).toBe(true)
+    expect(resumePlanApprovals.length).toBeGreaterThanOrEqual(1)
+    expect(resumeEvents.some((e) => e.type === 'error' && (e as { code?: string }).code === 'PLAN_AWAITING_RESPONSE')).toBe(false)
+  })
+
+  it('message:resume with empty content while plan ready returns PLAN_AWAITING_RESPONSE and keeps pause', async () => {
+    const runner = new PlanRunner()
+    const session = makeSession('s-plan-resume-empty', runner)
+    session.setForcePlan(true)
+
+    const planEvents: ServerMessage[] = []
+    await session.sendMessage('plan something', (m) => planEvents.push(m))
+    expect(planEvents.some((e) => e.type === 'agent:interrupt')).toBe(true)
+
+    const resumeEvents: ServerMessage[] = []
+    await session.resume('', (m) => resumeEvents.push(m))
+
+    expect(runner.executed).toBe(false)
+    const err = resumeEvents.find((e) => e.type === 'error') as
+      | Extract<ServerMessage, { type: 'error' }>
+      | undefined
+    expect(err).toMatchObject({ type: 'error', code: 'PLAN_AWAITING_RESPONSE' })
+    // Pause intact: plan:respond approve still works
+    const approveEvents: ServerMessage[] = []
+    await session.handlePlanResponse('approve', (m) => approveEvents.push(m))
+    expect(approveEvents.some((e) => e.type === 'plan:respond:result' && (e as { ok: boolean }).ok)).toBe(true)
+    expect(runner.executed).toBe(true)
   })
 
   it('plan rejection stops execution', async () => {

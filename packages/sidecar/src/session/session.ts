@@ -28,7 +28,6 @@ import { Activity, ActivityTracker } from './activity.js'
 import { GoalManager } from './goal.js'
 import { addUsage, sumUsage } from './usage.js'
 import { compactMessages, applyCompactResult, estimateTokens, COMPACT_BUDGET_TOKENS, KEEP_RECENT_TURNS, type Summarizer } from './compaction.js'
-import { PAUSE_QUESTION } from './doom-loop.js'
 import {
   emitPlanApprovalResync,
   readPlanApprovalPause,
@@ -37,6 +36,7 @@ import {
   withoutPlanApprovalPause,
   type PlanApprovalPauseMarker,
 } from './plan-approval-resync.js'
+import { PLAN_APPROVAL_QUESTION_TOKEN } from './plan-approval-constants.js'
 import type { ExternalAgentHooks, PermissionChoice } from './agents/types.js'
 import { HookRegistry } from './hooks/registry.js'
 import type { AgentRunner } from '../orchestrator/ports.js'
@@ -1066,7 +1066,7 @@ export class Session {
     const marker: PlanApprovalPauseMarker = {
       turnId: this.paused.interruptTurnId ?? `plan-resync-${this.id}`,
       plan: this.paused.plan ?? [],
-      question: 'Approve this plan?',
+      question: PLAN_APPROVAL_QUESTION_TOKEN,
     }
     // Refresh durable marker with resolved turn id.
     this.persistPlanApprovalPause(marker)

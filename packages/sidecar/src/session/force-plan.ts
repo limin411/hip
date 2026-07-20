@@ -12,7 +12,7 @@ type SendFn = (msg: ServerMessage) => void
 
 /**
  * One-shot forcePlan: clear so the next turn is not re-gated into PlanMode.
- * Called on plan ready (submit), approve/reject, and soft-approve resume.
+ * Called on plan ready (submit) and plan:respond approve/reject.
  */
 export function clearForcePlanFlag(host: ForcePlanHost, send: SendFn, reason = 'plan_gate'): void {
   if (!host._config.forcePlan) {

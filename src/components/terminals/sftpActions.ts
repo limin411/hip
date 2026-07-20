@@ -10,11 +10,22 @@ import {
   isSessionClosedError,
 } from '@/ipc/sftp'
 import { useTerminalFsStore } from '@/store/terminalFsStore'
+import { useTerminalStore } from '@/store/terminalStore'
+
+const RETRY_MS = 200
+/** ~3s — enough for open race; TerminalFileTree also gates on status=running. */
+const MAX_RETRIES = 15
 
 function localBasename(localPath: string): string {
   const normalized = localPath.replace(/\\/g, '/')
   const parts = normalized.split('/')
   return parts[parts.length - 1] || localPath
+}
+
+/** True while XtermSurface is still booting / ssh_open has not completed. */
+function isSshStillOpening(terminalId: string): boolean {
+  const status = useTerminalStore.getState().bySession[terminalId]?.status ?? 'idle'
+  return status === 'idle' || status === 'starting'
 }
 
 async function warnIfConfigPath(localPath: string, message: string): Promise<boolean> {
@@ -31,8 +42,16 @@ async function warnIfConfigPath(localPath: string, message: string): Promise<boo
   return true
 }
 
-/** List a remote dir; set rootPath on first success (Issue 1). */
-export async function loadSftpDir(terminalId: string, path: string): Promise<void> {
+/**
+ * List a remote dir; set rootPath on first success (Issue 1).
+ * Retries "SSH session is closed" while the managed SSH tab is still opening
+ * (files rail races XtermSurface ssh_open — Rust returns SESSION_CLOSED for missing).
+ */
+export async function loadSftpDir(
+  terminalId: string,
+  path: string,
+  attempt = 0,
+): Promise<void> {
   const store = useTerminalFsStore.getState()
   store.setLoading(terminalId, path, true)
   store.setDirError(terminalId, path, null)
@@ -47,6 +66,13 @@ export async function loadSftpDir(terminalId: string, path: string): Promise<voi
     }
     store.setError(terminalId, null)
   } catch (e) {
+    // Open race: missing session and dead session both surface as SESSION_CLOSED.
+    // Only retry while the terminal is still connecting — not after exit/error.
+    if (isSessionClosedError(e) && isSshStillOpening(terminalId) && attempt < MAX_RETRIES) {
+      store.setLoading(terminalId, path, false)
+      await new Promise((r) => setTimeout(r, RETRY_MS))
+      return loadSftpDir(terminalId, path, attempt + 1)
+    }
     const msg = e instanceof Error ? e.message : String(e ?? 'SFTP error')
     const closed = isSessionClosedError(e)
     const slice = store.getSlice(terminalId)

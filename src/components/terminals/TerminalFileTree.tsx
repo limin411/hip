@@ -11,6 +11,7 @@ import {
 } from 'lucide-react'
 import type { SftpEntry } from '@/ipc/sftp'
 import { useTerminalFsStore } from '@/store/terminalFsStore'
+import { useTerminalStore } from '@/store/terminalStore'
 import { DeclarativeContextMenu } from '@/components/context-menu'
 import {
   loadSftpDir,
@@ -228,6 +229,13 @@ export function TerminalFileTree({
     const key = slice.rootPath ?? initialPath ?? '.'
     return !!slice.loading[key] || !!slice.loading['.'] || !!slice.loading['']
   })
+  // SSH files rail mounts as soon as the tab is focused; ssh_open happens later in
+  // XtermSurface. Gate listing on status=running so we never treat "not open yet"
+  // as a permanent session_closed (Rust uses the same string for missing sessions).
+  const ptyStatus = useTerminalStore((s) => s.bySession[terminalId]?.status ?? 'idle')
+  const sftpConnecting =
+    backend === 'sftp' && (ptyStatus === 'idle' || ptyStatus === 'starting')
+  const sftpReady = backend !== 'sftp' || ptyStatus === 'running'
 
   // Local: always list with "." (session root). Absolute initialPath is label/rootCwd only.
   // SFTP: empty → "." (server home); else host remotePath.
@@ -247,23 +255,46 @@ export function TerminalFileTree({
   }, [load, rootPath, startPath])
 
   useEffect(() => {
+    if (!sftpReady) return
     if (!rootPath && !rootEntries) {
+      // Drop a stale pre-connect "session_closed" so the tree can recover without
+      // closing/reopening the right panel.
+      if (
+        backend === 'sftp' &&
+        useTerminalFsStore.getState().getSlice(terminalId).error === 'session_closed'
+      ) {
+        useTerminalFsStore.getState().setError(terminalId, null)
+      }
       load(startPath)
     }
-  }, [terminalId, startPath, rootPath, rootEntries, load])
+  }, [terminalId, startPath, rootPath, rootEntries, load, sftpReady, backend])
 
-  if (backend === 'sftp' && error === 'session_closed') {
+  // Only surface permanent closed after connect finished (or session died). While
+  // idle/starting the same error means "not open yet" — show loading instead.
+  if (backend === 'sftp' && error === 'session_closed' && !sftpConnecting) {
     return (
       <div
         className="flex h-full flex-col items-center justify-center gap-2 p-3 text-center text-caption text-ink-tertiary"
         data-testid="sftp-session-closed"
       >
         {t('terminals.sftp.sessionClosed')}
+        {ptyStatus === 'running' ? (
+          <button
+            type="button"
+            className="mt-1 rounded-md px-2 py-1 text-meta text-ink-secondary hover:bg-state-hover"
+            onClick={reload}
+            data-testid="sftp-session-closed-retry"
+          >
+            {t('terminals.sftp.retry')}
+          </button>
+        ) : null}
       </div>
     )
   }
 
-  if (error && !rootEntries) {
+  // While SSH is still opening, suppress generic error chrome for a stale
+  // session_closed so the loading state can show instead.
+  if (error && !rootEntries && !(backend === 'sftp' && error === 'session_closed' && sftpConnecting)) {
     return (
       <div
         className="flex h-full flex-col items-center justify-center gap-2 p-3 text-center"
@@ -374,10 +405,14 @@ export function TerminalFileTree({
             }
             data-testid={refreshTestId}
             onClick={reload}
-            disabled={loadingRoot}
+            disabled={loadingRoot || sftpConnecting}
             className="rounded-md p-1 text-ink-tertiary transition-colors duration-chrome hover:bg-state-hover hover:text-ink disabled:opacity-50"
           >
-            <RefreshCw size={13} strokeWidth={1.75} className={loadingRoot ? 'animate-spin' : ''} />
+            <RefreshCw
+              size={13}
+              strokeWidth={1.75}
+              className={loadingRoot || sftpConnecting ? 'animate-spin' : ''}
+            />
           </button>
         </div>
       </div>
@@ -392,8 +427,11 @@ export function TerminalFileTree({
             rootCwd={labelRootCwd}
           />
         ))}
-        {!rootEntries && loadingRoot ? (
-          <p className="px-2 py-2 text-caption text-ink-tertiary">
+        {!rootEntries && (loadingRoot || sftpConnecting) ? (
+          <p
+            className="px-2 py-2 text-caption text-ink-tertiary"
+            data-testid={backend === 'sftp' ? 'sftp-tree-loading' : 'term-fs-tree-loading'}
+          >
             {backend === 'local' ? t('terminals.localFs.loading') : t('terminals.sftp.loading')}
           </p>
         ) : null}

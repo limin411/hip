@@ -1335,8 +1335,9 @@ export async function runTurn(host: SessionTurnHost, rawSend: SendFn, base?: {
         // Execution-time pauses (doom/error) keep planningMode semantics out of the UI.
         const isPlanApproval =
           finalState.planningMode === 'plan' && finalState.planStatus === 'ready'
-        if (isPlanApproval && finalState.plan) {
-          send({ type: 'plan:published', sessionId: host.id, turnId, plan: finalState.plan })
+        // Always publish on plan-approval path (D4b) — empty plan still needs UI + FE hydrate.
+        if (isPlanApproval) {
+          send({ type: 'plan:published', sessionId: host.id, turnId, plan: finalState.plan ?? [] })
         }
         // forcePlan is one-shot for "plan before execute" — once a plan is submitted
         // for review, do not re-force PlanMode on the next message/resume.

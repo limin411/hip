@@ -47,6 +47,28 @@ describe('PlanProgressPanel', () => {
     expect(screen.queryByTestId('todo-checklist')).not.toBeInTheDocument()
   })
 
+  it('shows empty awaiting state with Approve/Reject/Amend buttons', () => {
+    render(
+      <PlanProgressPanel
+        view={view({
+          items: [],
+          phase: 'awaiting_approval',
+          source: 'empty',
+          progress: { done: 0, total: 0 },
+        })}
+        onApprove={vi.fn()}
+        onReject={vi.fn()}
+        onAmend={vi.fn()}
+      />,
+    )
+    expect(screen.getByTestId('plan-progress-empty-awaiting')).toBeInTheDocument()
+    expect(screen.queryByTestId('todo-checklist')).not.toBeInTheDocument()
+    expect(screen.getByTestId('plan-approval-card')).toBeInTheDocument()
+    expect(screen.getByTestId('plan-approve')).toBeInTheDocument()
+    expect(screen.getByTestId('plan-reject')).toBeInTheDocument()
+    expect(screen.getByTestId('plan-amend')).toBeInTheDocument()
+  })
+
   it('shows approval actions and calls onApprove', () => {
     const onApprove = vi.fn()
     render(

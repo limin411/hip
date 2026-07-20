@@ -423,7 +423,8 @@ export const ko = {
       "executing": "실행 중",
       "done": "완료",
       "progress": "{{done}}/{{total}}",
-      "emptyPlanning": "조사 및 계획 초안 작성 중…"
+      "emptyPlanning": "조사 및 계획 초안 작성 중…",
+      "emptyAwaiting": "계획 단계가 없습니다. 승인·거부·수정은 가능합니다."
     },
     "planApproval": {
       "title": "계획 승인",

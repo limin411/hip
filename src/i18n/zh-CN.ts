@@ -393,6 +393,7 @@ export const zhCN = {
         done: '已完成',
         progress: '{{done}}/{{total}}',
         emptyPlanning: '正在调研并起草计划…',
+        emptyAwaiting: '未生成计划步骤。你仍可批准、拒绝或修改。',
       },
       planApproval: {
         title: '计划审批',

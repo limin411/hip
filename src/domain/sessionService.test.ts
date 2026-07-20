@@ -839,7 +839,8 @@ describe('workspace diff', () => {
     const sess = useDomainStore.getState().sessions.find((s) => s.id === 's1')!
     expect(sess.status).toBe('idle')
     expect(sess.activeTurnPlan).toEqual(planItems)
-    expect(sess.planApprovalPending).toBe(false)
+    // KD-7: complete does not touch planApprovalPending (seed path never set it)
+    expect(sess.planApprovalPending).toBeFalsy()
   })
 
 

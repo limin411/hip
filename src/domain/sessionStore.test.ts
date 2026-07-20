@@ -698,6 +698,79 @@ describe('applyServerMessage', () => {
     const next = applyServerMessage(s, { type: 'message:complete', sessionId: 's1', message: { id: 'm1', role: 'assistant', content: 'done', timestamp: 101 } }, 102)
     expect(next.sessions[0].planDeltaDraft).toEqual({})
     expect(next.sessions[0].activeTurnPlan).toEqual(plan)
+  })
+
+  it('message:complete does not clear planApprovalPending (KD-7 / D4c)', () => {
+    const plan = [{ content: 'approve me', status: 'pending' as const }]
+    const s0 = {
+      sessions: [
+        baseSession({
+          status: 'running',
+          planApprovalPending: true,
+          activeTurnPlan: plan,
+          interrupt: { turnId: 't1', question: 'Approve?', context: '{"kind":"plan_approval"}' },
+        }),
+      ],
+    }
+    const next = applyServerMessage(
+      s0,
+      { type: 'message:complete', sessionId: 's1', message: { id: 'm1', role: 'assistant', content: 'plan ready', timestamp: 101, stopped: true } },
+      102,
+    )
+    expect(next.sessions[0].status).toBe('idle')
+    expect(next.sessions[0].planApprovalPending).toBe(true)
+    expect(next.sessions[0].interrupt?.turnId).toBe('t1')
+    expect(next.sessions[0].activeTurnPlan).toEqual(plan)
+  })
+
+  it('message:complete leaves planApprovalPending false when it was false', () => {
+    const s0 = { sessions: [baseSession({ status: 'running', planApprovalPending: false })] }
+    const next = applyServerMessage(
+      s0,
+      { type: 'message:complete', sessionId: 's1', message: { id: 'm1', role: 'assistant', content: 'done', timestamp: 101 } },
+      102,
+    )
+    expect(next.sessions[0].planApprovalPending).toBe(false)
+  })
+
+  it('agent:interrupt non-plan always clears planApprovalPending (D4c)', () => {
+    const s0 = {
+      sessions: [
+        baseSession({
+          planApprovalPending: true,
+          interrupt: { turnId: 't0', question: 'old', context: '{"kind":"plan_approval"}' },
+        }),
+      ],
+    }
+    const next = applyServerMessage(
+      s0,
+      {
+        type: 'agent:interrupt',
+        sessionId: 's1',
+        turnId: 't2',
+        agentId: 'supervisor',
+        question: 'Need clarification?',
+      },
+      0,
+    )
+    expect(next.sessions[0].planApprovalPending).toBe(false)
+    expect(next.sessions[0].interrupt?.turnId).toBe('t2')
+  })
+
+  it('agent:interrupt non-plan with non-plan context clears planApprovalPending', () => {
+    const s0 = { sessions: [baseSession({ planApprovalPending: true })] }
+    const next = applyServerMessage(
+      s0,
+      {
+        type: 'agent:interrupt',
+        sessionId: 's1',
+        turnId: 't3',
+        agentId: 'supervisor',
+        question: 'Pick one',
+        context: JSON.stringify({ kind: 'choice' }),
+      },
+      0,
+    )
     expect(next.sessions[0].planApprovalPending).toBe(false)
   })
 

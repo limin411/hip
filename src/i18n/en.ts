@@ -402,6 +402,7 @@ export const en = {
         done: 'Done',
         progress: '{{done}}/{{total}}',
         emptyPlanning: 'Investigating and drafting a plan…',
+        emptyAwaiting: 'No plan steps were produced. You can still approve, reject, or amend.',
       },
       planApproval: {
         title: 'Plan approval',

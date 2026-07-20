@@ -431,7 +431,8 @@ export const zhTW = {
       "executing": "執行中",
       "done": "已完成",
       "progress": "{{done}}/{{total}}",
-      "emptyPlanning": "正在調研並起草計劃…"
+      "emptyPlanning": "正在調研並起草計劃…",
+      "emptyAwaiting": "未產生計劃步驟。你仍可批准、拒絕或修改。"
     },
     "planApproval": {
       "title": "計劃審批",

@@ -423,7 +423,8 @@ export const ja = {
       "executing": "実行中",
       "done": "完了",
       "progress": "{{done}}/{{total}}",
-      "emptyPlanning": "調査中、計画を作成中…"
+      "emptyPlanning": "調査中、計画を作成中…",
+      "emptyAwaiting": "計画ステップがありません。承認・却下・修正は可能です。"
     },
     "planApproval": {
       "title": "計画の承認",

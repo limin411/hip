@@ -97,14 +97,18 @@ export function PlanProgressPanel({ view, onApprove, onReject, onAmend }: PlanPr
         </p>
       )}
 
-      {view.phase === 'planning' && view.items.length === 0 ? (
-        <p className="mt-2 text-meta text-ink-secondary" data-testid="plan-progress-empty">
-          {t('chat.planPanel.emptyPlanning')}
-        </p>
-      ) : view.items.length > 0 ? (
+      {view.items.length > 0 ? (
         <div className="mt-2">
           <TodoChecklist todos={view.items} showHeading={false} />
         </div>
+      ) : view.phase === 'planning' ? (
+        <p className="mt-2 text-meta text-ink-secondary" data-testid="plan-progress-empty">
+          {t('chat.planPanel.emptyPlanning')}
+        </p>
+      ) : view.phase === 'awaiting_approval' ? (
+        <p className="mt-2 text-meta text-ink-secondary" data-testid="plan-progress-empty-awaiting">
+          {t('chat.planPanel.emptyAwaiting')}
+        </p>
       ) : null}
 
       {awaiting && (

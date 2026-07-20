@@ -256,7 +256,9 @@ export function applyServerMessage(
     case 'message:complete': {
       const finalized: Message = { ...msg.message, toolCalls: coerceRunningToolCalls(msg.message.toolCalls) }
       // Keep activeTurnPlan for sticky done panel until the next user turn (appendUserMessage clears it).
-      return update(msg.sessionId, (s) => ({ ...s, status: 'idle', planDeltaDraft: {}, planApprovalPending: false, messages: finalizeAssistant(s.messages, finalized) }))
+      // KD-7 / D4c: do NOT clear planApprovalPending — complete arrives before agent:interrupt
+      // on the plan-ready path; clearing would drop the approval UI in a race window.
+      return update(msg.sessionId, (s) => ({ ...s, status: 'idle', planDeltaDraft: {}, messages: finalizeAssistant(s.messages, finalized) }))
     }
 
     case 'agent:interrupt':

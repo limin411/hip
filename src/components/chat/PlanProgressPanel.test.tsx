@@ -99,4 +99,31 @@ describe('PlanProgressPanel', () => {
     fireEvent.click(screen.getByTestId('plan-amend-submit'))
     expect(onAmend).toHaveBeenCalledWith('change step two')
   })
+
+  it('KD-16: re-enables Approve after phase leaves and re-enters awaiting_approval (ok:false rollback)', () => {
+    const onApprove = vi.fn()
+    const awaiting = view({ phase: 'awaiting_approval', source: 'activeTurnPlan' })
+    const executing = view({ phase: 'executing', source: 'activeTurnPlan' })
+    const { rerender } = render(
+      <PlanProgressPanel view={awaiting} onApprove={onApprove} onReject={vi.fn()} onAmend={vi.fn()} />,
+    )
+    fireEvent.click(screen.getByTestId('plan-approve'))
+    expect(onApprove).toHaveBeenCalledTimes(1)
+    expect(screen.getByTestId('plan-approve')).toBeDisabled()
+
+    // Optimistic: store cleared pending → phase executing (panel stays mounted).
+    rerender(
+      <PlanProgressPanel view={executing} onApprove={onApprove} onReject={vi.fn()} onAmend={vi.fn()} />,
+    )
+    expect(screen.queryByTestId('plan-approve')).not.toBeInTheDocument()
+
+    // plan:respond:result ok:false → pending restored → awaiting again.
+    rerender(
+      <PlanProgressPanel view={awaiting} onApprove={onApprove} onReject={vi.fn()} onAmend={vi.fn()} />,
+    )
+    const approve = screen.getByTestId('plan-approve')
+    expect(approve).not.toBeDisabled()
+    fireEvent.click(approve)
+    expect(onApprove).toHaveBeenCalledTimes(2)
+  })
 })

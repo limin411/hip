@@ -2111,7 +2111,7 @@ export class SessionService {
         this.resume(text, attachments)
         return
       }
-      // Empty text with attachments only: still amend with a default revision prompt.
+      // Amend is text-only over plan:respond (attachments not on wire). Soft-approve path keeps them.
       this.respondPlan('amend', text || undefined)
       return
     }

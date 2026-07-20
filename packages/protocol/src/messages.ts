@@ -407,7 +407,8 @@ export type ServerMessage =
   | { type: 'plan:published'; sessionId: string; turnId: string; plan: PlanItem[] }
   /**
    * Ack for every `plan:respond` path (KD-16 / D4e).
-   * ok:false when not awaiting (skip) or handler failure — FE rolls back optimistic UI.
+   * ok:false when not awaiting (`reason: 'not_awaiting'`) — FE rolls back optimistic UI.
+   * Success paths emit ok:true before execute continues (persist/runTurn failures are separate).
    */
   | {
       type: 'plan:respond:result'

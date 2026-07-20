@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { ListChecks, Loader2 } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
@@ -22,6 +22,17 @@ export function PlanProgressPanel({ view, onApprove, onReject, onAmend }: PlanPr
 
   const awaiting = view.phase === 'awaiting_approval'
   const { done, total, current } = view.progress
+
+  // KD-16 / D4e: after plan:respond:result ok:false the store restores planApprovalPending
+  // while this panel stays mounted (activeTurnPlan kept). Re-entry to awaiting_approval
+  // must clear local responded so Approve/Reject/Amend are clickable again.
+  useEffect(() => {
+    if (view.phase === 'awaiting_approval') {
+      setResponded(false)
+      setAmendMode(false)
+      setAmendContent('')
+    }
+  }, [view.phase])
 
   const phaseLabel =
     view.phase === 'planning'

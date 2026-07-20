@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { CheckCircle2, Circle, ListChecks, Loader2 } from 'lucide-react'
 import type { PlanItem } from '@hip/protocol'
@@ -11,6 +11,11 @@ interface PlanApprovalCardProps {
   onApprove: () => void
   onReject: () => void
   onAmend: (content: string) => void
+  /**
+   * When true (plan still awaiting after a failed respond), reset local `responded`
+   * so actions re-enable (KD-16). Parent can pass planApprovalPending.
+   */
+  awaitingApproval?: boolean
 }
 
 function StatusIcon({ status }: { status: PlanItem['status'] }) {
@@ -25,11 +30,26 @@ function StatusIcon({ status }: { status: PlanItem['status'] }) {
   }
 }
 
-export function PlanApprovalCard({ plan, onApprove, onReject, onAmend }: PlanApprovalCardProps) {
+export function PlanApprovalCard({
+  plan,
+  onApprove,
+  onReject,
+  onAmend,
+  awaitingApproval = true,
+}: PlanApprovalCardProps) {
   const { t } = useTranslation()
   const [amendMode, setAmendMode] = useState(false)
   const [amendContent, setAmendContent] = useState('')
   const [responded, setResponded] = useState(false)
+
+  // KD-16: re-enable actions when approval is restored after ok:false.
+  useEffect(() => {
+    if (awaitingApproval) {
+      setResponded(false)
+      setAmendMode(false)
+      setAmendContent('')
+    }
+  }, [awaitingApproval])
 
   const handleApprove = () => {
     setResponded(true)

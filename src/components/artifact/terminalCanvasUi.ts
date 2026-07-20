@@ -4,6 +4,11 @@
  * Bound by XtermSurface while the xterm host is mounted.
  *
  * D6a: keyed by terminalId — no silent global default when id is missing.
+ *
+ * Ownership: at most one binder per terminalId. Focus protocol requires unmounting
+ * the previous XtermSurface (bind(id, null)) before mounting the next for the same
+ * or another id. bind(id, null) deletes by id with no ownership token — overlapping
+ * mounts for one id would let the first unbind clear the second registration.
  */
 
 export type TerminalCanvasApi = {
@@ -15,7 +20,10 @@ export type TerminalCanvasApi = {
 
 const apis = new Map<string, TerminalCanvasApi>()
 
-/** XtermSurface registers while xterm is open for this terminalId. */
+/**
+ * XtermSurface registers while xterm is open for this terminalId.
+ * Pass null only from the surface that previously bound this id (on unmount).
+ */
 export function bindTerminalCanvas(terminalId: string, api: TerminalCanvasApi | null): void {
   if (api) apis.set(terminalId, api)
   else apis.delete(terminalId)

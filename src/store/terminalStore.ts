@@ -176,14 +176,15 @@ export const useTerminalStore = create<TerminalState>((set, get) => ({
   clearSession: (sessionId) => {
     set((st) => {
       const { [sessionId]: _removed, ...rest } = st.bySession
-      const attached =
+      // Dual-read aliases the same way as call sites (attachedTerminalId ?? attachedSessionId).
+      const stillAttached =
         st.attachedSessionId === sessionId || st.attachedTerminalId === sessionId
           ? null
-          : st.attachedSessionId
+          : (st.attachedTerminalId ?? st.attachedSessionId)
       return {
         bySession: rest,
-        attachedSessionId: attached,
-        attachedTerminalId: attached,
+        attachedSessionId: stillAttached,
+        attachedTerminalId: stillAttached,
       }
     })
   },

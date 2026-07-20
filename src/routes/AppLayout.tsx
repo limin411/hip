@@ -30,6 +30,7 @@ import { SessionMenuDialogHost } from '@/components/history/SessionMenuDialogHos
 import { WorktreeDeleteDialogHost } from '@/components/chat/WorktreeControl/WorktreeDeleteDialogHost'
 import { KnowledgeSpaceDialogHost } from '@/components/knowledge/KnowledgeSpaceDialogHost'
 import { CODE_TERMINAL } from '@/components/artifact/terminalFeature'
+import { TERMINAL_MANAGEMENT } from '@/components/terminals/feature'
 import { startTerminalBridge } from '@/ipc/pty'
 import { useProjectPathStore } from '@/store/projectPathStore'
 
@@ -67,10 +68,10 @@ export function AppLayout() {
   }, [])
 
   // App-lifetime terminal event bridge → terminalStore only (D6a). Never writes xterm.
-  // Start when CODE_TERMINAL (or TERMINAL_MANAGEMENT once that flag ships — same single bridge).
+  // Single bridge when either code-panel or terminal-management needs rings.
   // Listens pty:* only until SSH (PR5); normalizeTerminalId accepts sessionId | terminalId.
   useEffect(() => {
-    if (!CODE_TERMINAL /* && !TERMINAL_MANAGEMENT */) return
+    if (!CODE_TERMINAL && !TERMINAL_MANAGEMENT) return
     let stop: (() => void) | undefined
     let cancelled = false
     void startTerminalBridge()

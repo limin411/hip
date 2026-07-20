@@ -73,11 +73,8 @@ export function XtermSurface({
 
   // Context-menu Restart reuses the parent-supplied handler (chrome + canvas).
   useEffect(() => {
-    if (!onRestart) {
-      bindTerminalRestarter(terminalId, null)
-      return
-    }
-    bindTerminalRestarter(terminalId, () => onRestart())
+    if (onRestart) bindTerminalRestarter(terminalId, () => onRestart())
+    else bindTerminalRestarter(terminalId, null)
     return () => bindTerminalRestarter(terminalId, null)
   }, [terminalId, onRestart])
 

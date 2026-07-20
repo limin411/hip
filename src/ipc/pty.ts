@@ -92,6 +92,15 @@ export async function startTerminalBridge(): Promise<() => void> {
     const { data } = e.payload
     const bytes = b64ToBytes(data)
     if (!bytes || bytes.length === 0) return
+    // Dev observability: keep-alive rings still append when not attached (D6a).
+    if (import.meta.env.DEV) {
+      const attached =
+        useTerminalStore.getState().attachedTerminalId ??
+        useTerminalStore.getState().attachedSessionId
+      if (terminalId !== attached) {
+        console.debug('[hip] terminal data while unattached', terminalId)
+      }
+    }
     let dec = decoders.get(terminalId)
     if (!dec) {
       dec = new TextDecoder('utf-8', { fatal: false })

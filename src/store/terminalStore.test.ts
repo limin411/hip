@@ -112,6 +112,17 @@ describe('terminalStore ring', () => {
     expect(useTerminalStore.getState().attachedTerminalId).toBeNull()
   })
 
+  it('clearSession of unrelated id preserves attach via dual-read', () => {
+    useTerminalStore.getState().appendRing('s1', 'a')
+    useTerminalStore.getState().appendRing('s2', 'b')
+    useTerminalStore.getState().setAttached('s2')
+    useTerminalStore.getState().clearSession('s1')
+    expect(useTerminalStore.getState().bySession.s1).toBeUndefined()
+    expect(useTerminalStore.getState().bySession.s2?.ring).toEqual(['b'])
+    expect(useTerminalStore.getState().attachedSessionId).toBe('s2')
+    expect(useTerminalStore.getState().attachedTerminalId).toBe('s2')
+  })
+
   it('trims ring by chunk count', () => {
     for (let i = 0; i < MAX_RING_CHUNKS + 10; i++) {
       useTerminalStore.getState().appendRing('s1', `c${i}`)

@@ -217,4 +217,28 @@ describe('TerminalView', () => {
     expect(menu).toHaveAttribute('data-x', '42')
     expect(menu).toHaveAttribute('data-y', '77')
   })
+
+  it('unmount keep-alive: does not ptyKill and retains ring', async () => {
+    mockSession = { config: { cwd: '/Users/me/hip' } }
+    render(<TerminalView />)
+    await waitFor(() => expect(ptyOpen).toHaveBeenCalled())
+    useTerminalStore.getState().appendRing('s1', 'kept')
+    cleanup()
+    expect(ptyKill).not.toHaveBeenCalled()
+    expect(useTerminalStore.getState().bySession.s1?.ring).toContain('kept')
+    expect(useTerminalStore.getState().attachedTerminalId).toBeNull()
+    expect(useTerminalStore.getState().attachedSessionId).toBeNull()
+  })
+
+  it('unmount exclusive detach: does not clear attach held by another id', async () => {
+    mockSession = { config: { cwd: '/Users/me/hip' } }
+    render(<TerminalView />)
+    await waitFor(() => expect(ptyOpen).toHaveBeenCalled())
+    // Simulate another surface already owning attach (focus steal).
+    useTerminalStore.getState().setAttached('s2')
+    cleanup()
+    expect(ptyKill).not.toHaveBeenCalled()
+    expect(useTerminalStore.getState().attachedTerminalId).toBe('s2')
+    expect(useTerminalStore.getState().attachedSessionId).toBe('s2')
+  })
 })

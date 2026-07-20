@@ -223,8 +223,8 @@ const SNAPSHOT: &str = include_str!("../resources/models-snapshot.json");
 #[tauri::command]
 fn get_plugins_config(app: tauri::AppHandle) -> Result<String, String> {
     match paths::plugins_config_path(&app) {
-        Some(p) => Ok(std::fs::read_to_string(&p).unwrap_or_default()),
-        None => Ok(String::new()),
+        Some(p) => Ok(std::fs::read_to_string(&p).unwrap_or_else(|_| r#"{"plugins":[],"entries":[]}"#.to_string())),
+        None => Ok(r#"{"plugins":[],"entries":[]}"#.to_string()),
     }
 }
 
@@ -611,6 +611,18 @@ pub fn run() {
         .manage(ssh_session::SshManager::new())
         .manage(sftp::SftpTransferState::new())
         .setup(|app| {
+            // Ensure hip-plugins.json exists with a valid default so that the plugin
+            // registry is always a well-known file (even if empty).
+            if let Some(plugins_path) = paths::plugins_config_path(&app.handle()) {
+                if !plugins_path.exists() {
+                    let default = r#"{"plugins":[],"entries":[]}"#;
+                    if let Err(e) = std::fs::write(&plugins_path, default) {
+                        eprintln!("[tauri] could not create {0}: {e}", plugins_path.display());
+                    } else {
+                        println!("[tauri] created default plugin registry at {0}", plugins_path.display());
+                    }
+                }
+            }
             let handle = app.handle().clone();
             tauri::async_runtime::spawn(async move {
                 match sidecar::spawn_sidecar(&handle).await {

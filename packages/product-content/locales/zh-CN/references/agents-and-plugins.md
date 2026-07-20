@@ -53,6 +53,80 @@ hip 可运行 **内置** LangGraph 智能体、将 **ACP 作为会话主智能�
 - 插件可附带技能、智能体、MCP 配置与钩子。
 - 禁用插件会从会话中移除其贡献。
 
+### 插件目录结构
+
+每个插件**必须**包含 `.plugin/plugin.json` 清单文件。缺少此文件 hip 无法发现插件：
+
+```
+~/.hip/plugins/<plugin-id>/
+  .plugin/
+    plugin.json          ← 必需：清单文件（名称、版本、技能等）
+  skills/                ← 可选，由清单中 "skills" 字段引用
+    <skill-id>/
+      SKILL.md
+```
+
+### `.plugin/plugin.json` 清单
+
+**必填字段：**
+
+```json
+{
+  "name": "my-plugin",
+  "version": "1.0.0"
+}
+```
+
+**完整示例**（含所有可选字段）：
+
+```json
+{
+  "name": "my-plugin",
+  "version": "1.0.0",
+  "id": "my-plugin",
+  "description": "一个 hip 插件示例",
+  "author": { "name": "作者名" },
+  "license": "MIT",
+  "keywords": ["ai", "tools"],
+  "skills": ["./skills/tdd", "./skills/debug"],
+  "mcpServers": "./mcp-config.json",
+  "agents": "./agents.json",
+  "hooks": "./hooks.json"
+}
+```
+
+- `skills` — 指向包含 `SKILL.md` 文件的目录的路径（或路径数组）。路径相对于插件根目录，不可使用 `..`。
+- `mcpServers`、`agents`、`hooks` — 可内联指定为 JSON 数组/对象，或指定为插件根目录下外部 JSON 文件的路径。
+
+### `hip-plugins.json` 注册表格式
+
+注册表将插件 ID 映射到绝对路径。支持两种格式：
+
+**字符串数组格式**（新插件推荐使用）：
+```json
+{
+  "plugins": ["/absolute/path/to/plugin"],
+  "entries": [],
+  "enabled": { "my-plugin": true }
+}
+```
+
+**旧版对象格式**（使用 `"dir"` 键）：
+```json
+{
+  "plugins": [
+    { "dir": "/absolute/path/to/plugin", "enabled": true }
+  ]
+}
+```
+
+安装插件的步骤：
+
+1. 将插件克隆/下载到 `~/.hip/plugins/<plugin-id>/`。
+2. 确保 `.plugin/plugin.json` 存在，至少包含 `name` 和 `version`。
+3. 将绝对路径添加到 `hip-plugins.json` → `plugins` 数组（字符串格式）。
+4. 插件将在下次会话启动或执行 `plugin:reload` 后被加载。
+
 ## MCP
 
 - 服务器配置来自 hip.toml / 插件合成。

@@ -591,6 +591,45 @@ async fn models_catalog_refresh(app: tauri::AppHandle) -> Result<String, String>
     download_catalog(&app).await
 }
 
+/// True when either window dimension exceeds the monitor work area (physical pixels).
+/// "Partially too large" → maximize instead of leaving a clipped/off-screen window.
+fn window_size_exceeds_work_area(window: (u32, u32), work_area: (u32, u32)) -> bool {
+    window.0 > work_area.0 || window.1 > work_area.1
+}
+
+/// If the main window's outer size exceeds the current (or primary) monitor work area,
+/// maximize it. Best-effort: failures are logged and ignored so boot continues.
+fn maximize_if_window_exceeds_monitor(window: &tauri::WebviewWindow) {
+    let Ok(outer) = window.outer_size() else {
+        return;
+    };
+    let monitor = match window.current_monitor() {
+        Ok(Some(m)) => m,
+        _ => match window.primary_monitor() {
+            Ok(Some(m)) => m,
+            _ => return,
+        },
+    };
+    let work = monitor.work_area().size;
+    if !window_size_exceeds_work_area(
+        (outer.width, outer.height),
+        (work.width, work.height),
+    ) {
+        return;
+    }
+    match window.maximize() {
+        Ok(()) => {
+            println!(
+                "[tauri] window {}x{} exceeds work area {}x{}; maximized",
+                outer.width, outer.height, work.width, work.height
+            );
+        }
+        Err(e) => {
+            eprintln!("[tauri] maximize after oversized window failed: {e}");
+        }
+    }
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     // A GUI/IDE-launched macOS app inherits a stripped PATH; resolve the user's real
@@ -622,6 +661,10 @@ pub fn run() {
                         println!("[tauri] created default plugin registry at {0}", plugins_path.display());
                     }
                 }
+            }
+            // Configured size (tauri.conf) may exceed this host's display — maximize instead.
+            if let Some(window) = app.get_webview_window("main") {
+                maximize_if_window_exceeds_monitor(&window);
             }
             let handle = app.handle().clone();
             tauri::async_runtime::spawn(async move {
@@ -782,6 +825,19 @@ pub fn run() {
 #[cfg(test)]
 mod tests {
     use std::path::PathBuf;
+
+    #[test]
+    fn window_size_exceeds_work_area_partial_or_full() {
+        // Fits exactly / smaller
+        assert!(!super::window_size_exceeds_work_area((1800, 1100), (1920, 1200)));
+        assert!(!super::window_size_exceeds_work_area((1920, 1080), (1920, 1080)));
+        // Width only
+        assert!(super::window_size_exceeds_work_area((2000, 900), (1920, 1080)));
+        // Height only
+        assert!(super::window_size_exceeds_work_area((1600, 1200), (1920, 1080)));
+        // Both
+        assert!(super::window_size_exceeds_work_area((2560, 1600), (1920, 1080)));
+    }
 
     #[test]
     fn find_on_path_detects_executables() {

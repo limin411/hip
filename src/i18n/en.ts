@@ -1473,6 +1473,8 @@ export const en = {
       filesPanel: 'Files',
       newGroup: 'New group',
       renameGroup: 'Rename group',
+      expandGroup: 'Expand group',
+      collapseGroup: 'Collapse group',
       deleteGroup: 'Delete group',
       emptyTitle: 'No open terminals',
       emptyHint: 'Open a local shell here — independent of Chat and Code sessions.',

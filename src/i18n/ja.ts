@@ -1433,6 +1433,8 @@ export const ja = {
     "filesPanel": "ファイル",
     "newGroup": "新しいグループ",
     "renameGroup": "グループ名を変更",
+    "expandGroup": "グループを展開",
+    "collapseGroup": "グループを折りたたむ",
     "deleteGroup": "グループを削除",
     "emptyTitle": "開いている端末がありません",
     "emptyHint": "チャットやコードセッションに依存しないローカルシェルをここで開けます。",

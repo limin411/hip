@@ -1441,6 +1441,8 @@ export const zhTW = {
     "filesPanel": "檔案",
     "newGroup": "新建分組",
     "renameGroup": "重新命名分組",
+    "expandGroup": "展開分組",
+    "collapseGroup": "收起分組",
     "deleteGroup": "刪除分組",
     "emptyTitle": "還沒有開啟的終端",
     "emptyHint": "在此開啟獨立本機 shell，不綁定對話或編碼會話。",

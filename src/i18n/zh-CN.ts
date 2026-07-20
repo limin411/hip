@@ -1440,6 +1440,8 @@ export const zhCN = {
       filesPanel: '文件',
       newGroup: '新建分组',
       renameGroup: '重命名分组',
+      expandGroup: '展开分组',
+      collapseGroup: '收起分组',
       deleteGroup: '删除分组',
       emptyTitle: '还没有打开的终端',
       emptyHint: '在此打开独立本地 shell，不绑定对话或编码会话。',

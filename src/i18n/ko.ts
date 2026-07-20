@@ -1433,6 +1433,8 @@ export const ko = {
     "filesPanel": "파일",
     "newGroup": "새 그룹",
     "renameGroup": "그룹 이름 변경",
+    "expandGroup": "그룹 펼치기",
+    "collapseGroup": "그룹 접기",
     "deleteGroup": "그룹 삭제",
     "emptyTitle": "열린 터미널 없음",
     "emptyHint": "채팅/코드 세션과 무관한 로컬 셸을 여기서 엽니다.",

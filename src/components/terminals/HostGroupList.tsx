@@ -1,6 +1,6 @@
-import { useMemo } from 'react'
+import { useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Pencil, Server, Trash2, Plug } from 'lucide-react'
+import { ChevronDown, ChevronRight, Pencil, Server, Trash2, Plug } from 'lucide-react'
 import type { HostGroup, TerminalHost } from '@/ipc/terminalHosts'
 import { Button } from '@/components/ui/Button'
 import { cn } from '@/lib/utils'
@@ -16,7 +16,9 @@ export interface HostGroupListProps {
   connectBusy?: boolean
 }
 
-/** Flat group list with hosts under each section (K19 — no nesting). */
+const UNGROUPED_KEY = '__ungrouped__'
+
+/** Flat group list with hosts under each collapsible section (K19 — no nesting). */
 export function HostGroupList({
   groups,
   hosts,
@@ -28,6 +30,8 @@ export function HostGroupList({
   connectBusy,
 }: HostGroupListProps) {
   const { t } = useTranslation()
+  /** Collapsed group keys (missing = expanded). */
+  const [collapsed, setCollapsed] = useState<Record<string, boolean>>({})
 
   const sortedGroups = useMemo(
     () => [...groups].sort((a, b) => a.sort - b.sort || a.name.localeCompare(b.name)),
@@ -52,19 +56,43 @@ export function HostGroupList({
 
   const ungrouped = hostsByGroup.get(null) ?? []
 
+  const isExpanded = (key: string) => collapsed[key] !== true
+  const toggle = (key: string) => {
+    setCollapsed((prev) => ({ ...prev, [key]: !prev[key] }))
+  }
+
   return (
     <div className="flex flex-col gap-5" data-testid="host-group-list">
       {sortedGroups.map((group) => {
         const groupHosts = hostsByGroup.get(group.id) ?? []
+        const open = isExpanded(group.id)
         return (
           <section key={group.id} data-testid={`host-group-${group.id}`}>
-            <div className="mb-2 flex items-center gap-2">
-              <h3 className="min-w-0 flex-1 truncate text-meta font-medium uppercase tracking-wide text-ink-tertiary">
-                {group.name}
-              </h3>
-              <span className="text-caption text-ink-tertiary">
-                {t('terminals.hostsCount', { count: groupHosts.length })}
-              </span>
+            <div className="mb-2 flex items-center gap-1">
+              <button
+                type="button"
+                data-testid={`host-group-toggle-${group.id}`}
+                aria-expanded={open}
+                title={open ? t('terminals.collapseGroup') : t('terminals.expandGroup')}
+                onClick={() => toggle(group.id)}
+                className={cn(
+                  'flex min-w-0 flex-1 items-center gap-1.5 rounded-md px-1 py-0.5 text-left',
+                  'transition-colors hover:bg-state-hover',
+                  'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring',
+                )}
+              >
+                {open ? (
+                  <ChevronDown size={14} className="shrink-0 text-ink-tertiary" aria-hidden />
+                ) : (
+                  <ChevronRight size={14} className="shrink-0 text-ink-tertiary" aria-hidden />
+                )}
+                <h3 className="min-w-0 flex-1 truncate text-meta font-medium uppercase tracking-wide text-ink-tertiary">
+                  {group.name}
+                </h3>
+                <span className="shrink-0 text-caption text-ink-tertiary">
+                  {t('terminals.hostsCount', { count: groupHosts.length })}
+                </span>
+              </button>
               <Button
                 type="button"
                 variant="ghost"
@@ -86,24 +114,26 @@ export function HostGroupList({
                 <Trash2 size={13} aria-hidden />
               </Button>
             </div>
-            {groupHosts.length === 0 ? (
-              <p className="rounded-lg border border-dashed border-border px-3 py-4 text-center text-meta text-ink-tertiary">
-                {t('terminals.groupEmpty')}
-              </p>
-            ) : (
-              <ul className="m-0 flex list-none flex-col gap-1 p-0">
-                {groupHosts.map((h) => (
-                  <HostRow
-                    key={h.id}
-                    host={h}
-                    onEdit={onEditHost}
-                    onDelete={onDeleteHost}
-                    onConnect={onConnectHost}
-                    connectBusy={connectBusy}
-                  />
-                ))}
-              </ul>
-            )}
+            {open ? (
+              groupHosts.length === 0 ? (
+                <p className="rounded-lg border border-dashed border-border px-3 py-4 text-center text-meta text-ink-tertiary">
+                  {t('terminals.groupEmpty')}
+                </p>
+              ) : (
+                <ul className="m-0 flex list-none flex-col gap-1 p-0">
+                  {groupHosts.map((h) => (
+                    <HostRow
+                      key={h.id}
+                      host={h}
+                      onEdit={onEditHost}
+                      onDelete={onDeleteHost}
+                      onConnect={onConnectHost}
+                      connectBusy={connectBusy}
+                    />
+                  ))}
+                </ul>
+              )
+            ) : null}
           </section>
         )
       })}
@@ -111,27 +141,66 @@ export function HostGroupList({
       {(ungrouped.length > 0 || sortedGroups.length === 0) && hosts.length > 0 ? (
         <section data-testid="host-group-ungrouped">
           {sortedGroups.length > 0 ? (
-            <div className="mb-2 flex items-center gap-2">
-              <h3 className="min-w-0 flex-1 truncate text-meta font-medium uppercase tracking-wide text-ink-tertiary">
-                {t('terminals.ungrouped')}
-              </h3>
-              <span className="text-caption text-ink-tertiary">
-                {t('terminals.hostsCount', { count: ungrouped.length })}
-              </span>
-            </div>
-          ) : null}
-          <ul className="m-0 flex list-none flex-col gap-1 p-0">
-            {ungrouped.map((h) => (
-              <HostRow
-                key={h.id}
-                host={h}
-                onEdit={onEditHost}
-                onDelete={onDeleteHost}
-                onConnect={onConnectHost}
-                connectBusy={connectBusy}
-              />
-            ))}
-          </ul>
+            <>
+              <div className="mb-2 flex items-center gap-1">
+                <button
+                  type="button"
+                  data-testid="host-group-toggle-ungrouped"
+                  aria-expanded={isExpanded(UNGROUPED_KEY)}
+                  title={
+                    isExpanded(UNGROUPED_KEY)
+                      ? t('terminals.collapseGroup')
+                      : t('terminals.expandGroup')
+                  }
+                  onClick={() => toggle(UNGROUPED_KEY)}
+                  className={cn(
+                    'flex min-w-0 flex-1 items-center gap-1.5 rounded-md px-1 py-0.5 text-left',
+                    'transition-colors hover:bg-state-hover',
+                    'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring',
+                  )}
+                >
+                  {isExpanded(UNGROUPED_KEY) ? (
+                    <ChevronDown size={14} className="shrink-0 text-ink-tertiary" aria-hidden />
+                  ) : (
+                    <ChevronRight size={14} className="shrink-0 text-ink-tertiary" aria-hidden />
+                  )}
+                  <h3 className="min-w-0 flex-1 truncate text-meta font-medium uppercase tracking-wide text-ink-tertiary">
+                    {t('terminals.ungrouped')}
+                  </h3>
+                  <span className="shrink-0 text-caption text-ink-tertiary">
+                    {t('terminals.hostsCount', { count: ungrouped.length })}
+                  </span>
+                </button>
+              </div>
+              {isExpanded(UNGROUPED_KEY) ? (
+                <ul className="m-0 flex list-none flex-col gap-1 p-0">
+                  {ungrouped.map((h) => (
+                    <HostRow
+                      key={h.id}
+                      host={h}
+                      onEdit={onEditHost}
+                      onDelete={onDeleteHost}
+                      onConnect={onConnectHost}
+                      connectBusy={connectBusy}
+                    />
+                  ))}
+                </ul>
+              ) : null}
+            </>
+          ) : (
+            <ul className="m-0 flex list-none flex-col gap-1 p-0">
+              {ungrouped.map((h) => (
+                <HostRow
+                  key={h.id}
+                  host={h}
+                  onEdit={onEditHost}
+                  onDelete={onDeleteHost}
+                  onConnect={onConnectHost}
+                  connectBusy={connectBusy}
+                />
+              ))}
+            </ul>
+          )}
         </section>
       ) : null}
     </div>

@@ -2,7 +2,7 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { ChevronDown } from 'lucide-react'
 import { sessionService, useActiveSession, useActiveSessionId, useActiveMessages, useActiveSessionError, useActiveSessionStatus, useActiveInterrupt } from '@/domain'
-import { isStreamingAssistant, lastAssistantIndex } from '@/domain/sessionStore'
+import { isStreamingAssistant, lastAssistantIndex, lastNonNotice } from '@/domain/sessionStore'
 import { useUiStore } from '@/store/uiStore'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/Button'
@@ -114,7 +114,8 @@ export function ChatPane() {
     return () => clearTimeout(timer)
   }, [highlightedId])
 
-  const showThinking = status === 'running' && last?.role === 'user'
+  // Notices are transparent for turn boundary: [user, notice] while waiting still shows thinking.
+  const showThinking = status === 'running' && lastNonNotice(messages)?.role === 'user'
 
   const livePlan = useMemo(
     () =>

@@ -905,9 +905,11 @@ describe('workspace diff', () => {
     const { taskId, turnId } = svc.seedBackgroundTaskKilled('s1')
     const sess = useDomainStore.getState().sessions.find((s) => s.id === 's1')!
     const msg = sess.messages.find((m) => m.id === turnId)
+    expect(msg?.role).toBe('notice')
     expect(msg?.content).toContain('killed')
     expect(msg?.content).toContain('e2e background job')
-    expect(msg?.id).toBe(`notif-${taskId}`)
+    expect(msg?.id).toMatch(new RegExp(`^notif-${taskId}-killed-`))
+    expect(turnId).toBe(msg?.id)
   })
 
   it('simulateInvalidWorkflowError sets INVALID_WORKFLOW error', () => {

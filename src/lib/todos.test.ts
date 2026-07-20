@@ -227,6 +227,46 @@ describe('selectLivePlan', () => {
     expect(view).toBeNull()
   })
 
+  it('ignores trailing notice when deciding new-turn plan phase (forcePlan)', () => {
+    // Background notice after user send must not re-surface previous write_todos.
+    const view = selectLivePlan({
+      messages: [
+        user({ id: 'u0' }),
+        assistant({
+          id: 'a0',
+          toolCalls: [tc({ input: todosInput, seq: 1 })],
+        }),
+        user({ id: 'u1', content: 'next' }),
+        { id: 'notif-1', role: 'notice', content: '[Background task "x" completed]', timestamp: 3 },
+      ],
+      status: 'running',
+      forcePlan: true,
+    })
+    expect(view).toEqual({
+      items: [],
+      phase: 'planning',
+      source: 'empty',
+      progress: { done: 0, total: 0 },
+    })
+  })
+
+  it('ignores trailing notice when new turn is running without forcePlan', () => {
+    const view = selectLivePlan({
+      messages: [
+        user({ id: 'u0' }),
+        assistant({
+          id: 'a0',
+          toolCalls: [tc({ input: todosInput, seq: 1 })],
+        }),
+        user({ id: 'u1', content: 'next' }),
+        { id: 'notif-1', role: 'notice', content: '[Background task "x" completed]', timestamp: 3 },
+      ],
+      status: 'running',
+      forcePlan: false,
+    })
+    expect(view).toBeNull()
+  })
+
   it('prefers activeTurnPlan during new-turn execute resume', () => {
     const view = selectLivePlan({
       messages: [user({ content: 'go' })],

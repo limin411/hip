@@ -39,6 +39,14 @@ export function MessageBubble({ message, streaming, isLastAssistant, hidePlan }:
   const { t, i18n } = useTranslation()
   const locale = i18n.resolvedLanguage ?? i18n.language ?? 'en'
   const sessionId = useActiveSessionId()
+  // Callers should route role:'notice' elsewhere (ChatPane); never render as hip/assistant.
+  if (message.role === 'notice') {
+    return (
+      <div className="my-1 w-fit px-0 py-0.5 text-meta text-ink-tertiary" data-testid="chat-notice">
+        {message.content}
+      </div>
+    )
+  }
   const isUser = message.role === 'user'
 
   // Only assistant turns have a timeline / sub-agent runs; skip the work for user bubbles.

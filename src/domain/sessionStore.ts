@@ -55,7 +55,17 @@ export function lastAssistantIndex(messages: Message[]): number {
   return -1
 }
 
-/** True when `messages[index]` is the last assistant and the session is still running. */
+/** Last message that is not a system notice (transparent for turn-boundary checks). */
+export function lastNonNotice(messages: Message[]): Message | undefined {
+  for (let i = messages.length - 1; i >= 0; i--) {
+    if (messages[i].role !== 'notice') return messages[i]
+  }
+  return undefined
+}
+
+/** True when `messages[index]` is the in-flight streaming assistant for the current turn.
+ *  Requires running status, last assistant index, and no newer user message after it
+ *  (notices after the assistant are OK; a subsequent user means a new turn started). */
 export function isStreamingAssistant(
   messages: Message[],
   index: number,
@@ -63,7 +73,11 @@ export function isStreamingAssistant(
 ): boolean {
   if (status !== 'running') return false
   if (messages[index]?.role !== 'assistant') return false
-  return index === lastAssistantIndex(messages)
+  if (index !== lastAssistantIndex(messages)) return false
+  for (let i = index + 1; i < messages.length; i++) {
+    if (messages[i].role === 'user') return false
+  }
+  return true
 }
 
 /** Drop trailing assistant + notice messages until a user (or empty). Used by regenerate. */
@@ -130,7 +144,7 @@ function appendAssistantDelta(messages: Message[], turnId: string, delta: string
   return messages.map((m) => (m.id === turnId ? { ...m, content: m.content + delta } : m))
 }
 
-/** Upsert an AgentRun onto the turn's trailing assistant message (keyed by turnId). No-op if the turn is unknown.
+/** Upsert an AgentRun onto the turn's assistant message (keyed by turnId). No-op if the turn is unknown.
  *  Assigns a provisional insertion-order seq on append; preserves the prior seq on replace.
  *  (message:complete later overwrites runs with the sidecar's authoritative seqs.) */
 function upsertRun(messages: Message[], turnId: string, run: AgentRun): Message[] {
@@ -444,7 +458,8 @@ export function applyServerMessage(
       return update(msg.sessionId, (s) => {
         // A completed conversation always ends with an assistant reply; a trailing user
         // message means the last turn never finished (drop/crash/timeout) → interrupted.
-        const last = msg.messages[msg.messages.length - 1]
+        // Skip notices if they ever appear in persisted transcripts (transparent for turn boundary).
+        const last = lastNonNotice(msg.messages)
         const interrupted = last?.role === 'user'
         return {
           ...s,
@@ -494,12 +509,13 @@ export function applyServerMessage(
     case 'agent:notification':
       // KD-13: always role 'notice' — never assistant — so trailing notifications cannot
       // steal stream/finalize/regenerate targeting from the active turn.
+      // Id includes status+now: same taskId can emit start + terminal notices (no React key clash).
       return update(msg.sessionId, (s) => ({
         ...s,
         messages: [
           ...s.messages,
           {
-            id: `notif-${msg.taskId}`,
+            id: `notif-${msg.taskId}-${msg.status}-${now}`,
             role: 'notice' as const,
             content: msg.status === 'completed'
               ? `[Background task "${msg.description}" completed]`

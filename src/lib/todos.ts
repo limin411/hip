@@ -140,7 +140,8 @@ export function selectLivePlan(input: SelectLivePlanInput): LivePlanView | null 
     return makeView(items, 'awaiting_approval', source)
   }
 
-  const last = messages.length > 0 ? messages[messages.length - 1] : undefined
+  // Notices are transparent for turn-boundary checks (background isolation can trail a user send).
+  const last = lastNonNoticeMessage(messages)
   const lastAssistant = findLastAssistant(messages)
 
   // New turn started: do not stick previous assistant todos.
@@ -185,6 +186,14 @@ export function selectLivePlan(input: SelectLivePlanInput): LivePlanView | null 
   }
 
   return null
+}
+
+/** Last non-notice message (notices do not change turn-boundary phase selection). */
+function lastNonNoticeMessage(messages: Message[]): Message | undefined {
+  for (let i = messages.length - 1; i >= 0; i--) {
+    if (messages[i].role !== 'notice') return messages[i]
+  }
+  return undefined
 }
 
 function findLastAssistant(messages: Message[]): Message | undefined {

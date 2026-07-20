@@ -340,6 +340,18 @@ describe('applyServerMessage', () => {
     expect(next.sessions[0].status).toBe('idle')
   })
 
+  it('error CANCELLED drops empty provisional assistant but retains trailing notice', () => {
+    const s0 = { sessions: [baseSession({ status: 'running', messages: [
+      { id: 'u1', role: 'user', content: 'hi', timestamp: 0 },
+      { id: 't1', role: 'assistant', content: '', agentId: 'supervisor', timestamp: 5, timeline: [], toolCalls: [] },
+      { id: 'notif-bg', role: 'notice', content: '[Background task "x" completed]', timestamp: 6 },
+    ] })] }
+    const next = applyServerMessage(s0, { type: 'error', sessionId: 's1', code: 'CANCELLED', message: 'User cancelled the request' }, 0)
+    expect(next.sessions[0].messages.map((m) => m.id)).toEqual(['u1', 'notif-bg'])
+    expect(next.sessions[0].messages[1].role).toBe('notice')
+    expect(next.sessions[0].status).toBe('idle')
+  })
+
   it('error CANCELLED drops an empty provisional assistant message', () => {
     const s0 = { sessions: [baseSession({ status: 'running', messages: [
       { id: 'u1', role: 'user', content: 'hi', timestamp: 0 },
@@ -680,7 +692,7 @@ describe('applyServerMessage', () => {
     const next = applyServerMessage(s0, { type: 'agent:notification', sessionId: 's1', taskId: 'bg-1', description: 'format code', status: 'completed' }, 1000)
     expect(next.sessions[0].messages).toHaveLength(1)
     expect(next.sessions[0].messages[0]).toMatchObject({
-      id: 'notif-bg-1',
+      id: 'notif-bg-1-completed-1000',
       role: 'notice',
       content: '[Background task "format code" completed]',
     })
@@ -692,6 +704,7 @@ describe('applyServerMessage', () => {
     const next = applyServerMessage(s0, { type: 'agent:notification', sessionId: 's1', taskId: 'bg-2', description: 'build', status: 'failed', error: 'exit 1' }, 1000)
     expect(next.sessions[0].messages).toHaveLength(1)
     expect(next.sessions[0].messages[0]).toMatchObject({
+      id: 'notif-bg-2-failed-1000',
       role: 'notice',
       content: '[Background task "build" failed: exit 1]',
     })
@@ -709,9 +722,20 @@ describe('applyServerMessage', () => {
     }, 1000)
     expect(next.sessions[0].messages).toHaveLength(1)
     expect(next.sessions[0].messages[0]).toMatchObject({
+      id: 'notif-bg-3-killed-1000',
       role: 'notice',
       content: '[Background task "slow job" killed: killed by user: cancel]',
     })
+  })
+
+  it('agent:notification uses unique ids when the same taskId emits multiple statuses', () => {
+    const s0 = { sessions: [baseSession()] }
+    let s = applyServerMessage(s0, { type: 'agent:notification', sessionId: 's1', taskId: 'bg-1', description: 'job', status: 'completed' }, 100)
+    // Second event for same taskId (e.g. isolation path + terminal) must not collide keys.
+    s = applyServerMessage(s, { type: 'agent:notification', sessionId: 's1', taskId: 'bg-1', description: 'job', status: 'failed', error: 'x' }, 200)
+    const ids = s.sessions[0].messages.map((m) => m.id)
+    expect(ids).toEqual(['notif-bg-1-completed-100', 'notif-bg-1-failed-200'])
+    expect(new Set(ids).size).toBe(2)
   })
 
   it('agent:notification for an unknown session is a no-op', () => {
@@ -1008,6 +1032,27 @@ describe('D2.1 notice helpers', () => {
     expect(isStreamingAssistant(messages, 1, 'idle')).toBe(false)
     // length-1 check would wrongly mark streaming false for the assistant
     expect(1 === messages.length - 1).toBe(false)
+  })
+
+  it('isStreamingAssistant is false for previous assistant after a new user send', () => {
+    // appendUserMessage sets status running before agent:started creates the new provisional.
+    const messages = msgs([
+      { id: 'u1', role: 'user' },
+      { id: 'a1', role: 'assistant', content: 'done' },
+      { id: 'u2', role: 'user', content: 'again' },
+    ])
+    expect(lastAssistantIndex(messages)).toBe(1)
+    expect(isStreamingAssistant(messages, 1, 'running')).toBe(false)
+  })
+
+  it('isStreamingAssistant is false for previous assistant when notice trails a new user', () => {
+    const messages = msgs([
+      { id: 'u1', role: 'user' },
+      { id: 'a1', role: 'assistant', content: 'done' },
+      { id: 'u2', role: 'user', content: 'again' },
+      { id: 'n1', role: 'notice', content: 'bg' },
+    ])
+    expect(isStreamingAssistant(messages, 1, 'running')).toBe(false)
   })
 
   it('popForRegenerate drops trailing notice and assistant until user', () => {

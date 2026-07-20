@@ -880,7 +880,7 @@ export class SessionService {
     return { turnId, planItems }
   }
 
-  /** E2E: background task killed notification (synthetic assistant message). */
+  /** E2E: background task killed notification (synthetic notice message). */
   seedBackgroundTaskKilled(sessionId: string): {
     turnId: string
     agentId: string
@@ -895,7 +895,9 @@ export class SessionService {
       status: 'killed',
       error: 'killed by user: cancel',
     })
-    return { turnId: `notif-${taskId}`, agentId: taskId, taskId }
+    const sess = useDomainStore.getState().sessions.find((s) => s.id === sessionId)
+    const notice = [...(sess?.messages ?? [])].reverse().find((m) => m.role === 'notice' && m.id.startsWith(`notif-${taskId}-`))
+    return { turnId: notice?.id ?? `notif-${taskId}`, agentId: taskId, taskId }
   }
 
   /** E2E: sidecar rejected workflow def (INVALID_WORKFLOW) error projection. */

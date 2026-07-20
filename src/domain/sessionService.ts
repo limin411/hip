@@ -118,6 +118,12 @@ export class SessionService {
   } | null = null
   /** E2E: last user content passed to sendMessage (annotation inject assertions). */
   private lastOutboundUserContent: string | null = null
+  /**
+   * FE-only plan approval seeds (seedPlanApproval) never pause the sidecar.
+   * Track them so respondPlan completes locally with plan:respond:result ok:true
+   * instead of plan:respond → not_awaiting → KD-16 rollback (card reappears).
+   */
+  private feOnlyPlanApprovalSessions = new Set<string>()
 
   constructor(transport: Transport) {
     this.transport = transport
@@ -949,6 +955,8 @@ export class SessionService {
       question: 'Approve this plan?',
       context: JSON.stringify({ kind: 'plan_approval' }),
     })
+    // Sidecar is not paused — respondPlan must not wait on plan:respond wire.
+    this.feOnlyPlanApprovalSessions.add(sessionId)
     return { turnId, planItems }
   }
 
@@ -2211,6 +2219,18 @@ export class SessionService {
     if (!sess?.planApprovalPending) return
     // Drop PlanApprovalCard immediately so eval/UI do not keep a disabled shell for the whole execute turn.
     useDomainStore.getState().respondPlanOptimistic(activeSessionId, action)
+    // FE-only seed (seedPlanApproval): no sidecar pause — complete locally so KD-16
+    // does not restore the card via not_awaiting from a real plan:respond.
+    if (this.feOnlyPlanApprovalSessions.has(activeSessionId)) {
+      this.feOnlyPlanApprovalSessions.delete(activeSessionId)
+      this.receive({
+        type: 'plan:respond:result',
+        sessionId: activeSessionId,
+        ok: true,
+        action,
+      })
+      return
+    }
     this.transport.send({ type: 'plan:respond', sessionId: activeSessionId, action, amendContent })
   }
 

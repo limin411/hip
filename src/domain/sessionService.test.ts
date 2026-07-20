@@ -524,13 +524,9 @@ describe('SessionService', () => {
     useDomainStore.setState({ activeSessionId: 's1' })
     useHipConfigStore.setState({ config: { version: 1 }, loaded: true, error: null })
     svc.sendMessage('please revise step 2')
-    expect(t.sent.at(-1)).toMatchObject({
-      type: 'plan:respond',
-      sessionId: 's1',
-      action: 'amend',
-      amendContent: 'please revise step 2',
-    })
+    // FE-only seed completes amend locally (no wire plan:respond); still not resume.
     expect(t.sent.some((m) => m.type === 'message:resume')).toBe(false)
+    expect(t.sent.some((m) => m.type === 'plan:respond')).toBe(false)
     const sess = useDomainStore.getState().sessions.find((s) => s.id === 's1')!
     expect(sess.planApprovalPending).toBe(false)
     expect(sess.status).toBe('running')
@@ -901,17 +897,20 @@ describe('workspace diff', () => {
   })
 
 
-  it('respondPlan optimistically clears planApprovalPending and sends plan:respond', () => {
+  it('respondPlan on seedPlanApproval completes FE-only (no wire plan:respond)', () => {
     const t = new FakeTransport()
     const svc = new SessionService(t)
     svc.seedPlanApproval('s1')
     useDomainStore.setState({ activeSessionId: 's1' })
+    const beforeSent = t.sent.length
     svc.respondPlan('approve')
     const sess = useDomainStore.getState().sessions.find((s) => s.id === 's1')!
     expect(sess.planApprovalPending).toBe(false)
     expect(sess.interrupt).toBeNull()
     expect(sess.status).toBe('running')
-    expect(t.sent.at(-1)).toMatchObject({ type: 'plan:respond', sessionId: 's1', action: 'approve' })
+    expect(sess.planRespondRollback).toBeNull()
+    // FE-only seed must not hit sidecar (would not_awaiting → KD-16 re-show card).
+    expect(t.sent.slice(beforeSent).some((m) => m.type === 'plan:respond')).toBe(false)
   })
 
   it('respondPlan is idempotent after optimistic dismiss', () => {
@@ -925,7 +924,7 @@ describe('workspace diff', () => {
     expect(t.sent.length).toBe(n)
   })
 
-  it('respondPlan reject sets status idle optimistically', () => {
+  it('respondPlan reject on seedPlanApproval sets status idle (FE-only)', () => {
     const t = new FakeTransport()
     const svc = new SessionService(t)
     svc.seedPlanApproval('s1')
@@ -934,23 +933,46 @@ describe('workspace diff', () => {
     const sess = useDomainStore.getState().sessions.find((s) => s.id === 's1')!
     expect(sess.planApprovalPending).toBe(false)
     expect(sess.status).toBe('idle')
-    expect(t.sent.at(-1)).toMatchObject({ type: 'plan:respond', action: 'reject' })
+    expect(t.sent.some((m) => m.type === 'plan:respond')).toBe(false)
   })
 
   it('KD-16: plan:respond:result ok:false restores planApprovalPending and interrupt', () => {
     const t = new FakeTransport()
     const svc = new SessionService(t)
-    const { turnId } = svc.seedPlanApproval('s1')
-    useDomainStore.setState({ activeSessionId: 's1' })
+    // Real wire path (not seedPlanApproval FE-only): seed pending manually then send.
+    useDomainStore.setState({
+      sessions: [
+        {
+          id: 's1',
+          config: { surface: 'chat', llmProvider: 'openai', model: 'gpt-4o', tools: [] },
+          title: '',
+          preview: '',
+          updatedAtMs: 0,
+          loaded: true,
+          messages: [],
+          status: 'idle',
+          error: null,
+          planApprovalPending: true,
+          activeTurnPlan: [{ content: 'step', status: 'pending' }],
+          interrupt: {
+            turnId: 'turn-real',
+            question: 'Approve this plan?',
+            context: JSON.stringify({ kind: 'plan_approval' }),
+          },
+        },
+      ],
+      activeSessionId: 's1',
+    })
     const before = useDomainStore.getState().sessions.find((s) => s.id === 's1')!
     expect(before.planApprovalPending).toBe(true)
-    expect(before.interrupt?.turnId).toBe(turnId)
+    expect(before.interrupt?.turnId).toBe('turn-real')
 
     svc.respondPlan('approve')
     const mid = useDomainStore.getState().sessions.find((s) => s.id === 's1')!
     expect(mid.planApprovalPending).toBe(false)
     expect(mid.interrupt).toBeNull()
-    expect(mid.planRespondRollback?.interrupt?.turnId).toBe(turnId)
+    expect(mid.planRespondRollback?.interrupt?.turnId).toBe('turn-real')
+    expect(t.sent.at(-1)).toMatchObject({ type: 'plan:respond', sessionId: 's1', action: 'approve' })
 
     t.push({
       type: 'plan:respond:result',
@@ -961,17 +983,38 @@ describe('workspace diff', () => {
     })
     const after = useDomainStore.getState().sessions.find((s) => s.id === 's1')!
     expect(after.planApprovalPending).toBe(true)
-    expect(after.interrupt?.turnId).toBe(turnId)
+    expect(after.interrupt?.turnId).toBe('turn-real')
     expect(after.interrupt?.question).toContain('Approve')
     expect(after.status).toBe('idle')
     expect(after.planRespondRollback).toBeNull()
   })
 
-  it('KD-16: plan:respond:result ok:true clears rollback stash', () => {
+  it('KD-16: plan:respond:result ok:true clears rollback stash (wire path)', () => {
     const t = new FakeTransport()
     const svc = new SessionService(t)
-    svc.seedPlanApproval('s1')
-    useDomainStore.setState({ activeSessionId: 's1' })
+    useDomainStore.setState({
+      sessions: [
+        {
+          id: 's1',
+          config: { surface: 'chat', llmProvider: 'openai', model: 'gpt-4o', tools: [] },
+          title: '',
+          preview: '',
+          updatedAtMs: 0,
+          loaded: true,
+          messages: [],
+          status: 'idle',
+          error: null,
+          planApprovalPending: true,
+          activeTurnPlan: [{ content: 'step', status: 'pending' }],
+          interrupt: {
+            turnId: 'turn-real',
+            question: 'Approve this plan?',
+            context: JSON.stringify({ kind: 'plan_approval' }),
+          },
+        },
+      ],
+      activeSessionId: 's1',
+    })
     svc.respondPlan('approve')
     expect(useDomainStore.getState().sessions.find((s) => s.id === 's1')!.planRespondRollback).toBeTruthy()
     t.push({

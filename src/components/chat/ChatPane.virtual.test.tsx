@@ -102,13 +102,18 @@ function mockScrollerGeometry(container: HTMLElement) {
   let scrollTop = 0
   Object.defineProperty(scroll, 'clientHeight', { value: 200, configurable: true })
   Object.defineProperty(scroll, 'scrollHeight', {
-    get: () => 4000,
+    get: () => 8000,
     configurable: true,
   })
   Object.defineProperty(scroll, 'scrollTop', {
     get: () => scrollTop,
     set: (v: number) => {
-      scrollTop = v
+      const next = Math.max(0, Number(v) || 0)
+      if (next === scrollTop) return
+      scrollTop = next
+      // TanStack Virtual updates scrollOffset via the scroll observer — happy-dom does not
+      // always emit 'scroll' on programmatic assignment; dispatch so scrollToIndex remounts rows.
+      scroll.dispatchEvent(new Event('scroll'))
     },
     configurable: true,
   })
@@ -130,11 +135,11 @@ function mockScrollerGeometry(container: HTMLElement) {
     list.getBoundingClientRect = () =>
       ({
         top: 0,
-        bottom: 4000,
+        bottom: 8000,
         left: 0,
         right: 300,
         width: 300,
-        height: 4000,
+        height: 8000,
         x: 0,
         y: 0,
         toJSON: () => ({}),
@@ -224,6 +229,50 @@ describe('ChatPane virtualized transcript (PR-7c)', () => {
     const target = container.querySelector('[data-message-id="m0"]') as HTMLElement | null
     expect(target).toBeTruthy()
     expect(target!.className).toMatch(/bg-accent-subtle/)
+  })
+
+  it('O1: bottom-pinned far jump to m0 highlights after virtual mount (rAF retry)', async () => {
+    // Full window of rows so expand is not needed — only virtual overscan can hide m0.
+    const total = TRANSCRIPT_WINDOW_SIZE
+    seedSession(makeMessages(total))
+    const { container } = render(<ChatPane />)
+    const { scroll } = mockScrollerGeometry(container)
+
+    // Pin to bottom so the virtualizer's visible range is the tail (m0 out of overscan).
+    // Item estimate ~120 + gap 20 → ~140px/row; bottom of 30 rows ≈ 4000+.
+    await act(async () => {
+      scroll.scrollTop = 5000
+    })
+    await act(async () => {})
+
+    // Precondition: far jump from bottom should start with m0 unmounted (overscan of 4).
+    expect(document.querySelector('[data-message-id="m0"]')).toBeNull()
+    expect(document.querySelector(`[data-message-id="m${total - 1}"]`)).toBeTruthy()
+
+    act(() => {
+      jumpToTranscriptMessage('m0')
+    })
+
+    // O1 fix: rAF-driven jumpPaintTick retries until the row mounts and highlight applies.
+    for (let i = 0; i < 24; i++) {
+      await act(async () => {
+        await new Promise<void>((resolve) => {
+          requestAnimationFrame(() => resolve())
+        })
+      })
+      const node = container.querySelector('[data-message-id="m0"]') as HTMLElement | null
+      if (
+        node?.className.includes('bg-accent-subtle') &&
+        useUiStore.getState().scrollTargetMessageId === null
+      ) {
+        break
+      }
+    }
+
+    const target = container.querySelector('[data-message-id="m0"]') as HTMLElement | null
+    expect(target).toBeTruthy()
+    expect(target!.className).toMatch(/bg-accent-subtle/)
+    expect(useUiStore.getState().scrollTargetMessageId).toBeNull()
   })
 
   it('follow-bottom still uses end sentinel when pinned', async () => {

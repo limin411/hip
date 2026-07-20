@@ -68,6 +68,11 @@ export function ChatPane() {
   const [windowSize, setWindowSize] = useState(TRANSCRIPT_WINDOW_SIZE)
   // Offset of the virtual list within the scroll content (header chrome above messages).
   const [scrollMargin, setScrollMargin] = useState(0)
+  // O1: after scrollToIndex the row may not be in DOM yet (virtual overscan lag / no flushSync
+  // from layout). Bump this via rAF so the jump effect re-runs and completes highlight.
+  const [jumpPaintTick, setJumpPaintTick] = useState(0)
+  const jumpRetryCountRef = useRef(0)
+  const jumpRetryTargetRef = useRef<string | null>(null)
 
   // Namespace read so tests can mock a live getter (named import freezes the value).
   const virtualize = chatFeature.TRANSCRIPT_VIRTUALIZE
@@ -184,13 +189,28 @@ export function ChatPane() {
   // Search / outline jump: messageId → index; expand window if needed; scroll + highlight.
   // Virtual path uses scrollToIndex (item may not be in DOM until virtualizer mounts it).
   // Do not rely only on querySelector — unmounted messages are not in the DOM (PR-7b/7c).
+  // O1: when the node is still missing after scrollToIndex, schedule rAF retries via
+  // jumpPaintTick — deps do not change from virtualizer alone, so without this the highlight
+  // and scrollTarget clear never complete (stuck autoscroll gate).
+  const JUMP_RETRY_MAX = 16
   useLayoutEffect(() => {
-    if (!scrollTargetMessageId) return
+    if (!scrollTargetMessageId) {
+      jumpRetryCountRef.current = 0
+      jumpRetryTargetRef.current = null
+      return
+    }
+
+    if (jumpRetryTargetRef.current !== scrollTargetMessageId) {
+      jumpRetryTargetRef.current = scrollTargetMessageId
+      jumpRetryCountRef.current = 0
+    }
 
     const targetIdx = messages.findIndex((m) => m.id === scrollTargetMessageId)
     if (targetIdx < 0) {
       // Messages present but id missing → stale target (deleted/regenerated).
       if (messages.length > 0) setScrollTarget(null)
+      jumpRetryCountRef.current = 0
+      jumpRetryTargetRef.current = null
       return
     }
 
@@ -206,21 +226,53 @@ export function ChatPane() {
     setAtBottom(false)
 
     const localIndex = targetIdx - startIndex
-    if (virtualize && localIndex >= 0 && localIndex < visibleMessages.length) {
-      rowVirtualizer.scrollToIndex(localIndex, { align: 'start' })
+
+    const finishJump = (id: string) => {
+      scrollTranscriptToMessage(id)
+      setHighlightedId(id)
+      setScrollTarget(null)
+      jumpRetryCountRef.current = 0
+      jumpRetryTargetRef.current = null
     }
 
     const el = scrollRef.current?.querySelector(
       `[data-message-id="${CSS.escape(scrollTargetMessageId)}"]`,
     )
     if (el instanceof HTMLElement) {
-      scrollTranscriptToMessage(scrollTargetMessageId)
-      setHighlightedId(scrollTargetMessageId)
-      setScrollTarget(null)
+      finishJump(scrollTargetMessageId)
       return
     }
 
-    // In window range but node not yet in DOM (virtual overscan lag); keep target for a later paint.
+    // In window range but node not yet in DOM (virtual overscan lag).
+    // Do NOT call scrollToIndex inside this layout effect — tanstack may flushSync and React
+    // warns / skips the sync render. Defer scroll + retry via rAF (O1).
+    if (jumpRetryCountRef.current < JUMP_RETRY_MAX) {
+      jumpRetryCountRef.current += 1
+      const targetId = scrollTargetMessageId
+      let cancelled = false
+      const frame = requestAnimationFrame(() => {
+        if (cancelled) return
+        if (virtualize && localIndex >= 0 && localIndex < visibleMessages.length) {
+          rowVirtualizer.scrollToIndex(localIndex, { align: 'start' })
+        }
+        // Second frame: allow virtualizer + React to commit newly mounted rows, then re-enter.
+        requestAnimationFrame(() => {
+          if (cancelled) return
+          // Target may have been cleared or replaced while we waited.
+          if (useUiStore.getState().scrollTargetMessageId !== targetId) return
+          setJumpPaintTick((n) => n + 1)
+        })
+      })
+      return () => {
+        cancelled = true
+        cancelAnimationFrame(frame)
+      }
+    }
+
+    // Give up so follow-bottom is not gated forever on a stuck scrollTarget.
+    setScrollTarget(null)
+    jumpRetryCountRef.current = 0
+    jumpRetryTargetRef.current = null
   }, [
     scrollTargetMessageId,
     messages,
@@ -229,6 +281,7 @@ export function ChatPane() {
     virtualize,
     visibleMessages.length,
     rowVirtualizer,
+    jumpPaintTick,
     setScrollTarget,
   ])
 

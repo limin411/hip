@@ -6,6 +6,7 @@ import type { RecentLaunch } from '@/ipc/terminalHosts'
 import { useManagedTerminalStore } from '@/store/managedTerminalStore'
 import { useTerminalHostStore } from '@/store/terminalHostStore'
 import { enterTerminalsSection } from '@/components/layout/sidebarActions'
+import { useHostLibraryUi } from '@/components/terminals/hostLibraryUi'
 import {
   Popover,
   PopoverContent,
@@ -16,6 +17,7 @@ import { cn } from '@/lib/utils'
 /**
  * 快捷连接 — last 5 successful launches (K11).
  * Local + SSH rows launch immediately.
+ * Command palette can open via `useHostLibraryUi.requestOpenQuickConnect`.
  */
 export function QuickConnectPopover() {
   const { t } = useTranslation()
@@ -23,6 +25,7 @@ export function QuickConnectPopover() {
   const recents = useTerminalHostStore((s) => s.recents)
   const hosts = useTerminalHostStore((s) => s.hosts)
   const loaded = useTerminalHostStore((s) => s.loaded)
+  const quickConnectOpenTick = useHostLibraryUi((s) => s.quickConnectOpenTick)
   const [missingLocal, setMissingLocal] = useState<Record<string, boolean>>({})
   const [launching, setLaunching] = useState(false)
 
@@ -31,6 +34,13 @@ export function QuickConnectPopover() {
       void useTerminalHostStore.getState().load()
     }
   }, [loaded])
+
+  // Palette / external "Quick connect" — open after terminals section mounts.
+  useEffect(() => {
+    if (quickConnectOpenTick > 0) {
+      setOpen(true)
+    }
+  }, [quickConnectOpenTick])
 
   // Probe local cwd existence when popover opens (disabled rows for missing paths).
   useEffect(() => {

@@ -1,4 +1,4 @@
-import { useCallback, useEffect } from 'react'
+import { useCallback, useEffect, type ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
 import {
   ChevronDown,
@@ -28,6 +28,98 @@ function basename(p: string): string {
   if (!p) return ''
   const parts = p.replace(/\/+$/, '').split(/[/\\]/)
   return parts[parts.length - 1] || p
+}
+
+/** Shared row chrome for local + SFTP tree entries. */
+function EntryRow({
+  entry,
+  depth,
+  open,
+  loading,
+  testId,
+  onClick,
+}: {
+  entry: SftpEntry
+  depth: number
+  open: boolean
+  loading: boolean
+  testId: string
+  onClick: () => void
+}) {
+  return (
+    <div
+      data-testid={testId}
+      data-path={entry.path}
+      data-dir={entry.isDir ? '1' : '0'}
+      onClick={onClick}
+      className={cn(
+        'flex cursor-pointer items-center gap-1.5 rounded-md py-1 pr-2 text-body transition-colors duration-chrome',
+        'text-ink hover:bg-state-hover',
+      )}
+      style={{ paddingLeft: depth * 12 + 4 }}
+    >
+      {entry.isDir ? (
+        open ? (
+          <ChevronDown size={13} strokeWidth={1.75} className="shrink-0 text-ink-tertiary" />
+        ) : (
+          <ChevronRight size={13} strokeWidth={1.75} className="shrink-0 text-ink-tertiary" />
+        )
+      ) : (
+        <span className="w-3.5 shrink-0" />
+      )}
+      {entry.isDir ? (
+        open ? (
+          <FolderOpen size={14} strokeWidth={1.75} className="shrink-0 text-ink-tertiary" />
+        ) : (
+          <Folder size={14} strokeWidth={1.75} className="shrink-0 text-ink-tertiary" />
+        )
+      ) : (
+        <File size={14} strokeWidth={1.75} className="shrink-0 text-ink-tertiary" />
+      )}
+      <span className="truncate" title={entry.path}>
+        {entry.name}
+      </span>
+      {loading ? <span className="ml-auto text-caption text-ink-tertiary">…</span> : null}
+    </div>
+  )
+}
+
+function withEntryMenu(
+  backend: TerminalFileTreeBackend,
+  terminalId: string,
+  entry: SftpEntry,
+  rootCwd: string | undefined,
+  children: ReactNode,
+) {
+  if (backend === 'local') {
+    return (
+      <DeclarativeContextMenu
+        kind="termFsEntry"
+        payload={{
+          terminalId,
+          path: entry.path,
+          name: entry.name,
+          isDir: entry.isDir,
+          rootCwd: rootCwd ?? '',
+        }}
+      >
+        {children}
+      </DeclarativeContextMenu>
+    )
+  }
+  return (
+    <DeclarativeContextMenu
+      kind="sftpEntry"
+      payload={{
+        terminalId,
+        path: entry.path,
+        name: entry.name,
+        isDir: entry.isDir,
+      }}
+    >
+      {children}
+    </DeclarativeContextMenu>
+  )
 }
 
 function Node({
@@ -65,107 +157,20 @@ function Node({
     }
   }
 
-  const menu =
-    backend === 'local' ? (
-      <DeclarativeContextMenu
-        kind="termFsEntry"
-        payload={{
-          terminalId,
-          path: entry.path,
-          name: entry.name,
-          isDir: entry.isDir,
-          rootCwd: rootCwd ?? '',
-        }}
-      >
-        <div
-          data-testid="term-fs-tree-entry"
-          data-path={entry.path}
-          data-dir={entry.isDir ? '1' : '0'}
-          onClick={onClick}
-          className={cn(
-            'flex cursor-pointer items-center gap-1.5 rounded-md py-1 pr-2 text-body transition-colors duration-chrome',
-            'text-ink hover:bg-state-hover',
-          )}
-          style={{ paddingLeft: depth * 12 + 4 }}
-        >
-          {entry.isDir ? (
-            open ? (
-              <ChevronDown size={13} strokeWidth={1.75} className="shrink-0 text-ink-tertiary" />
-            ) : (
-              <ChevronRight size={13} strokeWidth={1.75} className="shrink-0 text-ink-tertiary" />
-            )
-          ) : (
-            <span className="w-3.5 shrink-0" />
-          )}
-          {entry.isDir ? (
-            open ? (
-              <FolderOpen size={14} strokeWidth={1.75} className="shrink-0 text-ink-tertiary" />
-            ) : (
-              <Folder size={14} strokeWidth={1.75} className="shrink-0 text-ink-tertiary" />
-            )
-          ) : (
-            <File size={14} strokeWidth={1.75} className="shrink-0 text-ink-tertiary" />
-          )}
-          <span className="truncate" title={entry.path}>
-            {entry.name}
-          </span>
-          {loading ? (
-            <span className="ml-auto text-caption text-ink-tertiary">…</span>
-          ) : null}
-        </div>
-      </DeclarativeContextMenu>
-    ) : (
-      <DeclarativeContextMenu
-        kind="sftpEntry"
-        payload={{
-          terminalId,
-          path: entry.path,
-          name: entry.name,
-          isDir: entry.isDir,
-        }}
-      >
-        <div
-          data-testid="sftp-tree-entry"
-          data-path={entry.path}
-          data-dir={entry.isDir ? '1' : '0'}
-          onClick={onClick}
-          className={cn(
-            'flex cursor-pointer items-center gap-1.5 rounded-md py-1 pr-2 text-body transition-colors duration-chrome',
-            'text-ink hover:bg-state-hover',
-          )}
-          style={{ paddingLeft: depth * 12 + 4 }}
-        >
-          {entry.isDir ? (
-            open ? (
-              <ChevronDown size={13} strokeWidth={1.75} className="shrink-0 text-ink-tertiary" />
-            ) : (
-              <ChevronRight size={13} strokeWidth={1.75} className="shrink-0 text-ink-tertiary" />
-            )
-          ) : (
-            <span className="w-3.5 shrink-0" />
-          )}
-          {entry.isDir ? (
-            open ? (
-              <FolderOpen size={14} strokeWidth={1.75} className="shrink-0 text-ink-tertiary" />
-            ) : (
-              <Folder size={14} strokeWidth={1.75} className="shrink-0 text-ink-tertiary" />
-            )
-          ) : (
-            <File size={14} strokeWidth={1.75} className="shrink-0 text-ink-tertiary" />
-          )}
-          <span className="truncate" title={entry.path}>
-            {entry.name}
-          </span>
-          {loading ? (
-            <span className="ml-auto text-caption text-ink-tertiary">…</span>
-          ) : null}
-        </div>
-      </DeclarativeContextMenu>
-    )
+  const row = (
+    <EntryRow
+      entry={entry}
+      depth={depth}
+      open={open}
+      loading={loading}
+      testId={backend === 'local' ? 'term-fs-tree-entry' : 'sftp-tree-entry'}
+      onClick={onClick}
+    />
+  )
 
   return (
     <div>
-      {menu}
+      {withEntryMenu(backend, terminalId, entry, rootCwd, row)}
       {entry.isDir && open && dirError ? (
         <p
           className="truncate px-2 py-0.5 text-caption text-red-500/90"
@@ -176,16 +181,18 @@ function Node({
           {dirError}
         </p>
       ) : null}
-      {entry.isDir && open && children?.map((c) => (
-        <Node
-          key={c.path}
-          entry={c}
-          terminalId={terminalId}
-          depth={depth + 1}
-          backend={backend}
-          rootCwd={rootCwd}
-        />
-      ))}
+      {entry.isDir &&
+        open &&
+        children?.map((c) => (
+          <Node
+            key={c.path}
+            entry={c}
+            terminalId={terminalId}
+            depth={depth + 1}
+            backend={backend}
+            rootCwd={rootCwd}
+          />
+        ))}
     </div>
   )
 }
@@ -196,7 +203,11 @@ export function TerminalFileTree({
   backend = 'sftp',
 }: {
   terminalId: string
-  /** Host remotePath / local launch cwd, or empty (home / `.`). */
+  /**
+   * SFTP: host remotePath or empty (home / `.`).
+   * Local: launch cwd for labels / open-folder only — listing always uses `.`
+   * so absolute non-canon paths never hit the jail before realpath.
+   */
   initialPath?: string
   /** SFTP remote tree vs local launch-cwd tree. */
   backend?: TerminalFileTreeBackend
@@ -214,15 +225,13 @@ export function TerminalFileTree({
   const loadingRoot = useTerminalFsStore((s) => {
     const slice = s.byTerminal[terminalId]
     if (!slice) return false
-    const key = slice.rootPath ?? initialPath ?? (backend === 'local' ? initialPath : '.')
-    if (!key) return false
+    const key = slice.rootPath ?? initialPath ?? '.'
     return !!slice.loading[key] || !!slice.loading['.'] || !!slice.loading['']
   })
 
-  const startPath =
-    backend === 'local'
-      ? initialPath?.trim() || ''
-      : initialPath?.trim() || '.'
+  // Local: always list with "." (session root). Absolute initialPath is label/rootCwd only.
+  // SFTP: empty → "." (server home); else host remotePath.
+  const startPath = backend === 'local' ? '.' : initialPath?.trim() || '.'
 
   const load = useCallback(
     (path: string) => {
@@ -233,12 +242,13 @@ export function TerminalFileTree({
   )
 
   const reload = useCallback(() => {
-    load(rootPath ?? (startPath || '.'))
+    // Prefer resolved root; local falls back to "." not absolute launch cwd.
+    load(rootPath ?? startPath)
   }, [load, rootPath, startPath])
 
   useEffect(() => {
     if (!rootPath && !rootEntries) {
-      load(startPath || '.')
+      load(startPath)
     }
   }, [terminalId, startPath, rootPath, rootEntries, load])
 
@@ -281,12 +291,31 @@ export function TerminalFileTree({
     : backend === 'local'
       ? t('terminals.localFs.launchDir')
       : t('terminals.sftp.loading')
-  const rootMenuPath = rootPath ?? (startPath || '.')
-  const rootMenuName = rootPath ? basename(rootPath) : startPath || '.'
+  // Menu path: resolved root when known; local still uses "." until first ls (not absolute cwd).
+  const rootMenuPath = rootPath ?? startPath
+  const rootMenuName = rootPath ? basename(rootPath) : startPath
   const treeTestId = backend === 'local' ? 'term-fs-file-tree' : 'sftp-file-tree'
   const rootTestId = backend === 'local' ? 'term-fs-tree-root' : 'sftp-tree-root'
   const emptyTestId = backend === 'local' ? 'term-fs-tree-empty' : 'sftp-tree-empty'
   const refreshTestId = backend === 'local' ? 'term-fs-refresh' : 'sftp-refresh'
+  const labelRootCwd = rootPath ?? initialPath ?? ''
+
+  const rootTitle =
+    backend === 'local'
+      ? rootPath
+        ? `${t('terminals.localFs.launchDir')}: ${rootPath}`
+        : initialPath ?? startPath
+      : (rootPath ?? startPath)
+
+  const rootHeader = (
+    <span
+      className="block min-w-0 flex-1 cursor-default truncate rounded px-1 py-0.5 text-caption font-medium text-ink-tertiary hover:bg-state-hover"
+      title={rootTitle}
+      data-testid={rootTestId}
+    >
+      {rootLabel}
+    </span>
+  )
 
   return (
     <div className="flex h-full min-h-0 flex-col" data-testid={treeTestId}>
@@ -299,21 +328,11 @@ export function TerminalFileTree({
               path: rootMenuPath,
               name: rootMenuName,
               isDir: true,
-              rootCwd: rootPath ?? initialPath ?? '',
+              rootCwd: labelRootCwd,
             }}
             className="min-w-0 flex-1"
           >
-            <span
-              className="block min-w-0 flex-1 cursor-default truncate rounded px-1 py-0.5 text-caption font-medium text-ink-tertiary hover:bg-state-hover"
-              title={
-                rootPath
-                  ? `${t('terminals.localFs.launchDir')}: ${rootPath}`
-                  : initialPath ?? startPath
-              }
-              data-testid={rootTestId}
-            >
-              {rootLabel}
-            </span>
+            {rootHeader}
           </DeclarativeContextMenu>
         ) : (
           <DeclarativeContextMenu
@@ -326,13 +345,7 @@ export function TerminalFileTree({
             }}
             className="min-w-0 flex-1"
           >
-            <span
-              className="block min-w-0 flex-1 cursor-default truncate rounded px-1 py-0.5 text-caption font-medium text-ink-tertiary hover:bg-state-hover"
-              title={rootPath ?? startPath}
-              data-testid={rootTestId}
-            >
-              {rootLabel}
-            </span>
+            {rootHeader}
           </DeclarativeContextMenu>
         )}
         <div className="flex shrink-0 items-center gap-0.5">
@@ -373,7 +386,7 @@ export function TerminalFileTree({
             terminalId={terminalId}
             depth={0}
             backend={backend}
-            rootCwd={rootPath ?? initialPath}
+            rootCwd={labelRootCwd}
           />
         ))}
         {!rootEntries && loadingRoot ? (

@@ -22,6 +22,7 @@ import {
   openTrashFromChrome,
 } from '@/components/layout/sidebarActions'
 import { TERMINAL_MANAGEMENT } from '@/components/terminals/feature'
+import { useHostLibraryUi } from '@/components/terminals/hostLibraryUi'
 import { useManagedTerminalStore } from '@/store/managedTerminalStore'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
@@ -223,7 +224,13 @@ export function GlobalCommandPalette() {
                 }
               }
             },
-            openQuickConnect: () => void enterTerminalsSection(),
+            openQuickConnect: async () => {
+              await enterTerminalsSection()
+              // Defer one frame so sidebar QuickConnectPopover is mounted.
+              requestAnimationFrame(() => {
+                useHostLibraryUi.getState().requestOpenQuickConnect()
+              })
+            },
           }
         : {}),
     }),

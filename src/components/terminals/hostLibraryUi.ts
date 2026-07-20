@@ -6,12 +6,19 @@ import { create } from 'zustand'
  *
  * `pendingCreateHost` is a one-shot flag: request sets true, HostLibrary
  * consumes it when opening the form so remounts do not re-open a stale request.
+ *
+ * `quickConnectOpenTick` bumps when the command palette asks to open 快捷连接;
+ * QuickConnectPopover opens on tick change (after enterTerminalsSection).
  */
 interface HostLibraryUiState {
   pendingCreateHost: boolean
   requestCreateHost: () => void
   /** Clear the one-shot; returns whether a request was pending. */
   consumeCreateHostRequest: () => boolean
+
+  /** Monotonic tick — QuickConnectPopover watches and opens the popover. */
+  quickConnectOpenTick: number
+  requestOpenQuickConnect: () => void
 }
 
 export const useHostLibraryUi = create<HostLibraryUiState>((set, get) => ({
@@ -22,4 +29,8 @@ export const useHostLibraryUi = create<HostLibraryUiState>((set, get) => ({
     set({ pendingCreateHost: false })
     return true
   },
+
+  quickConnectOpenTick: 0,
+  requestOpenQuickConnect: () =>
+    set((s) => ({ quickConnectOpenTick: s.quickConnectOpenTick + 1 })),
 }))

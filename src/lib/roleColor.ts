@@ -26,11 +26,16 @@ export const ROLE_NAME_KEY = {
  */
 export function agentDisplayName(
   agent: { role: AgentRole; name?: string },
-  t: (key: string, opts?: { defaultValue?: string }) => string,
+  // Accept typed i18next TFunction: key must be a known role-name key, not bare `string`
+  // (strictFunctionTypes rejects TFunction → (key: string) => string).
+  t: (
+    key: (typeof ROLE_NAME_KEY)[AgentRole],
+    opts?: { defaultValue?: string },
+  ) => string,
 ): string {
   const named = agent.name?.trim()
   if (named) return named
-  return t(ROLE_NAME_KEY[agent.role] ?? 'artifact.roles.subagent', {
+  return t(ROLE_NAME_KEY[agent.role], {
     defaultValue: agent.role,
   })
 }

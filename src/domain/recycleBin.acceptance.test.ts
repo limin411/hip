@@ -64,8 +64,10 @@ describe('recycle bin acceptance (domain)', () => {
     )
     expect(next.sessions.map((s) => s.id)).toContain('s1')
     expect(next.sessions.find((s) => s.id === 's1')?.loaded).toBe(false)
-    // Restore must not auto-select when activeSessionId was null.
-    expect(next.activeSessionId ?? state.activeSessionId).toBeNull()
+    // Restore must not auto-select: applyServerMessage only returns sessions/pluginInstall
+    // and does not touch store activeSessionId (still null from beforeEach).
+    expect(state.activeSessionId).toBeNull()
+    expect(useDomainStore.getState().activeSessionId).toBeNull()
   })
 
   it('session:deleted hard path also removes from list', () => {

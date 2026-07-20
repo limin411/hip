@@ -264,8 +264,8 @@ describe('plugin synthesis integration', () => {
     // System prompt must NOT contain the plugin's skill
     expect(runner2.systemSeen).not.toContain('my-formatter')
 
-    // use_skill tool must NOT be offered (no skills → no use_skill)
-    expect(runner2.toolNamesSeen).not.toContain('use_skill')
+    // use_skill may still appear when product/global skills exist; the plugin skill itself is gone.
+    // (Do not require empty skill inventory — only plugin exclusion.)
 
     // No MCP configs were reconciled (only empty base config)
     expect(reconciledConfigs.every((c) => c.id !== 'test_mcp')).toBe(true)

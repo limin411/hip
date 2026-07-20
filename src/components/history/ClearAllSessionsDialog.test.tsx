@@ -24,9 +24,10 @@ describe('ClearAllSessionsDialog', () => {
       <ClearAllSessionsDialog count={3} scope="code" onConfirm={vi.fn()} onCancel={vi.fn()} />,
     )
     expect(screen.getByText('history.clearAllConfirmTitle')).toBeInTheDocument()
+    // Body interpolates count, scope label, and trash retention days.
     expect(
       screen.getByText(
-        'history.clearAllConfirmBody:{"count":3,"scope":"history.clearAllScope.code"}',
+        /^history\.clearAllConfirmBody:\{"count":3,"scope":"history\.clearAllScope\.code","days":\d+\}$/,
       ),
     ).toBeInTheDocument()
   })

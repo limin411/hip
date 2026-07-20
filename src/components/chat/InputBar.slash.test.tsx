@@ -89,6 +89,8 @@ function baseMocks() {
 }
 
 function stubSession(surface: 'chat' | 'code', cwd?: string): SessionVM {
+  // Code sessions need a cwd or InputBar gates the composer via projectPathGate.
+  const resolvedCwd = cwd ?? (surface === 'code' ? '/tmp/proj' : undefined)
   return {
     id: 's1',
     config: {
@@ -96,7 +98,7 @@ function stubSession(surface: 'chat' | 'code', cwd?: string): SessionVM {
       llmProvider: 'openai',
       model: 'gpt-4o',
       tools: [],
-      ...(cwd ? { cwd } : {}),
+      ...(resolvedCwd ? { cwd: resolvedCwd } : {}),
     },
     title: '',
     preview: '',

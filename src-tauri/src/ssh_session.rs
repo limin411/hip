@@ -437,6 +437,20 @@ pub async fn ssh_open(
     let result =
         open_ssh_connection(&app, &manager, &budget, &terminal_id, &host, cols, rows).await;
 
+    // On fail: release budget *before* end_open so a second same-id open cannot
+    // observe our reservation then lose it when we release (Issue 4 residual).
+    // Success path: slot stays held; end_open only drops the single-flight guard.
+    if result.is_err() {
+        let published_alive = {
+            let map = manager.sessions.lock().unwrap();
+            map.get(&terminal_id)
+                .map(|s| s.alive.load(Ordering::SeqCst))
+                .unwrap_or(false)
+        };
+        if newly && !published_alive {
+            budget.release(&terminal_id);
+        }
+    }
     manager.end_open(&terminal_id);
 
     match result {
@@ -448,16 +462,6 @@ pub async fn ssh_open(
             Ok(r)
         }
         Err(e) => {
-            // Only release if we reserved and no alive session was published for this id.
-            let published_alive = {
-                let map = manager.sessions.lock().unwrap();
-                map.get(&terminal_id)
-                    .map(|s| s.alive.load(Ordering::SeqCst))
-                    .unwrap_or(false)
-            };
-            if newly && !published_alive {
-                budget.release(&terminal_id);
-            }
             // Avoid logging secrets — e is already redacted.
             eprintln!(
                 "[ssh] open hostId={} terminalId={} err={}",

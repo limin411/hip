@@ -167,4 +167,26 @@ describe('StreamCoalescer v2 (PR-3)', () => {
     expect(flush).toHaveBeenCalledTimes(2)
     expect((flush.mock.calls[1][0] as CoalesceBucket).text).toBe('b')
   })
+
+  it('clearSession discards without applying (persist/delete must win)', () => {
+    const flush = vi.fn()
+    const { coalescer, tick } = createManualCoalescer(flush)
+    pushText(coalescer, { sessionId: 's1', delta: 'stale' })
+    pushText(coalescer, { sessionId: 's2', delta: 'keep' })
+    coalescer.clearSession('s1')
+    expect(flush).not.toHaveBeenCalled()
+    tick()
+    expect(flush).toHaveBeenCalledTimes(1)
+    expect((flush.mock.calls[0][0] as CoalesceBucket).sessionId).toBe('s2')
+    expect((flush.mock.calls[0][0] as CoalesceBucket).text).toBe('keep')
+  })
+
+  it('clearSession of last buckets cancels the scheduled frame', () => {
+    const flush = vi.fn()
+    const { coalescer, tick } = createManualCoalescer(flush)
+    pushText(coalescer, { delta: 'gone' })
+    coalescer.clearSession('s1')
+    tick()
+    expect(flush).not.toHaveBeenCalled()
+  })
 })

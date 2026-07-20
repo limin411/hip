@@ -1639,9 +1639,17 @@ describe('branches + revert', () => {
       expect(run?.output).toBe('plan A')
     })
 
-    it('message:complete flushes pending tokens before finalize', () => {
+    it('message:complete flushes pending tokens before finalize (apply order)', () => {
       const t = new FakeTransport()
       new SessionService(t)
+      const applyOrder: string[] = []
+      const store = useDomainStore.getState()
+      const realApply = store.apply.bind(store)
+      store.apply = ((msg: ServerMessage) => {
+        applyOrder.push(msg.type)
+        return realApply(msg)
+      }) as typeof store.apply
+
       t.push({ type: 'agent:started', sessionId: 's1', turnId: 't1', agentId: 'supervisor', role: 'supervisor' })
       t.push({ type: 'token:stream', sessionId: 's1', turnId: 't1', agentId: 'supervisor', delta: 'partial' })
       t.push({
@@ -1654,14 +1662,71 @@ describe('branches + revert', () => {
           timestamp: 1,
         },
       })
-      // complete replaces the message; flush runs first so intermediate apply is overwritten by finalize.
+      // Barrier must flush token:stream before message:complete so streamed text is not lost
+      // when complete content is incomplete; order proves flushTurn ran.
+      const completeIdx = applyOrder.indexOf('message:complete')
+      const tokenIdx = applyOrder.indexOf('token:stream')
+      expect(tokenIdx).toBeGreaterThanOrEqual(0)
+      expect(completeIdx).toBeGreaterThan(tokenIdx)
       const m = useDomainStore.getState().sessions[0].messages.find((x) => x.id === 't1')
       expect(m?.content).toBe('final from sidecar')
     })
 
-    it('token:stream with stepSeq uses text kind (forward-compat) and still coalesces', () => {
+    it('CANCELLED flushes buffered tokens so content is not deleted as empty provisional', () => {
       const t = new FakeTransport()
       new SessionService(t)
+      t.push({ type: 'agent:started', sessionId: 's1', turnId: 't1', agentId: 'supervisor', role: 'supervisor' })
+      t.push({ type: 'token:stream', sessionId: 's1', turnId: 't1', agentId: 'supervisor', delta: 'partial reply' })
+      expect(assistantContent()).toBe('')
+      t.push({ type: 'error', sessionId: 's1', code: 'CANCELLED', message: 'cancelled' })
+      // Without flushSession, empty provisional would be deleted and later rAF would no-op.
+      expect(useDomainStore.getState().sessions[0].status).toBe('idle')
+      const m = useDomainStore.getState().sessions[0].messages.find((x) => x.id === 't1')
+      expect(m).toBeDefined()
+      expect(m?.content).toBe('partial reply')
+      // Stale rAF must not re-apply after cancel flush.
+      flushRaf()
+      expect(
+        useDomainStore.getState().sessions[0].messages.find((x) => x.id === 't1')?.content,
+      ).toBe('partial reply')
+    })
+
+    it('session:loaded discards pending buckets (no content duplication after reconnect)', () => {
+      const t = new FakeTransport()
+      new SessionService(t)
+      t.push({ type: 'agent:started', sessionId: 's1', turnId: 't1', agentId: 'supervisor', role: 'supervisor' })
+      // Simulate partial flush already in store + more still buffered.
+      t.push({ type: 'token:stream', sessionId: 's1', turnId: 't1', agentId: 'supervisor', delta: 'Hel' })
+      flushRaf()
+      expect(assistantContent()).toBe('Hel')
+      t.push({ type: 'token:stream', sessionId: 's1', turnId: 't1', agentId: 'supervisor', delta: 'lo' })
+      expect(assistantContent()).toBe('Hel') // still buffered
+      // Reconnect load replaces with authoritative full text.
+      t.push({
+        type: 'session:loaded',
+        sessionId: 's1',
+        messages: [
+          { id: 'u1', role: 'user', content: 'hi', timestamp: 0 },
+          { id: 't1', role: 'assistant', content: 'Hello', timestamp: 1 },
+        ],
+      })
+      expect(assistantContent()).toBe('Hello')
+      // Stale rAF must NOT append "lo" → "Hellolo".
+      flushRaf()
+      expect(assistantContent()).toBe('Hello')
+    })
+
+    it('token:stream with stepSeq uses text kind and preserves stepSeq on flush', () => {
+      const t = new FakeTransport()
+      new SessionService(t)
+      const flushed: ServerMessage[] = []
+      const store = useDomainStore.getState()
+      const realApply = store.apply.bind(store)
+      store.apply = ((msg: ServerMessage) => {
+        if (msg.type === 'token:stream') flushed.push(msg)
+        return realApply(msg)
+      }) as typeof store.apply
+
       t.push({ type: 'agent:started', sessionId: 's1', turnId: 't1', agentId: 'supervisor', role: 'supervisor' })
       t.push({
         type: 'token:stream',
@@ -1670,6 +1735,7 @@ describe('branches + revert', () => {
         agentId: 'supervisor',
         delta: 'a',
         stepSeq: 3,
+        role: 'supervisor',
       } as ServerMessage)
       t.push({
         type: 'token:stream',
@@ -1678,10 +1744,18 @@ describe('branches + revert', () => {
         agentId: 'supervisor',
         delta: 'b',
         stepSeq: 3,
+        role: 'supervisor',
       } as ServerMessage)
       expect(assistantContent()).toBe('')
       flushRaf()
       expect(assistantContent()).toBe('ab')
+      expect(flushed).toHaveLength(1)
+      expect(flushed[0]).toMatchObject({
+        type: 'token:stream',
+        delta: 'ab',
+        stepSeq: 3,
+        role: 'supervisor',
+      })
     })
   })
 })

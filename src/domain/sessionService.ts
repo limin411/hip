@@ -62,9 +62,20 @@ export function currentLanguage(): AppLanguage {
   return normalizeAppLanguage(i18n.resolvedLanguage ?? i18n.language) ?? 'en'
 }
 
-/** Optional stepSeq on token:stream (PR-4+). Safe to read when absent. */
-function tokenStepSeq(msg: { stepSeq?: number }): number | undefined {
-  return typeof msg.stepSeq === 'number' ? msg.stepSeq : undefined
+/**
+ * Optional wire fields on token:stream (added in PR-4 protocol).
+ * PR-3 base types omit them; read defensively so stack onto PR-4 preserves identity.
+ * Drop this helper once ServerMessage token:stream includes stepSeq/role in the union.
+ */
+function tokenStreamExtras(msg: ServerMessage & { type: 'token:stream' }): {
+  stepSeq?: number
+  role?: string
+} {
+  const wire = msg as { stepSeq?: number; role?: string }
+  return {
+    ...(typeof wire.stepSeq === 'number' ? { stepSeq: wire.stepSeq } : {}),
+    ...(typeof wire.role === 'string' ? { role: wire.role } : {}),
+  }
 }
 
 type ServerMessageWaiter = {
@@ -128,15 +139,18 @@ export class SessionService {
 
   /** Flush coalesced token text into the store as a single token:stream apply. */
   private applyCoalescedToken(bucket: CoalesceBucket): void {
-    // PR-3: map all token kinds through the existing reducer (content vs run.output).
-    // Text timeline steps (kind:'text' + stepSeq>=0) land in PR-4; until then content only.
-    useDomainStore.getState().apply({
-      type: 'token:stream',
+    // Map all token kinds through the existing reducer (content vs run.output).
+    // Pass stepSeq/role when present so PR-4 store can upsert timeline text steps.
+    const payload = {
+      type: 'token:stream' as const,
       sessionId: bucket.sessionId,
       turnId: bucket.turnId,
       agentId: bucket.agentId,
       delta: bucket.text,
-    })
+      ...(bucket.stepSeq >= 0 ? { stepSeq: bucket.stepSeq } : {}),
+      ...(bucket.role !== undefined ? { role: bucket.role } : {}),
+    }
+    useDomainStore.getState().apply(payload as ServerMessage)
   }
 
   /** Mirror sessionStore token routing: supervisor → body, else → run.output. */
@@ -163,7 +177,11 @@ export class SessionService {
     return { kind: 'run-output', stepSeq: -1 }
   }
 
-  /** Barrier events must drain pending token buckets before the event mutates the turn. */
+  /**
+   * Barrier events must drain or discard pending token buckets before the event mutates state.
+   * - tool/complete/interrupt/permission/error: flush (apply) so content is not lost
+   * - session:loaded/deleted/trashed: discard without apply so persist/delete wins
+   */
   private flushBeforeBarrier(msg: ServerMessage): void {
     switch (msg.type) {
       case 'tool:started':
@@ -178,6 +196,12 @@ export class SessionService {
       case 'error':
         if (msg.sessionId) this.streamCoalescer.flushSession(msg.sessionId)
         else this.streamCoalescer.flushAll()
+        return
+      case 'session:loaded':
+      case 'session:deleted':
+      case 'session:trashed':
+        // Authoritative replace/remove — never re-append client-buffered deltas after.
+        this.streamCoalescer.clearSession(msg.sessionId)
         return
       default:
         return
@@ -293,12 +317,12 @@ export class SessionService {
   private receive(msg: ServerMessage): void {
     // PR-3: coalesce token:stream only. reasoning:delta applies immediately (no merge).
     if (msg.type === 'token:stream') {
-      const stepSeq = tokenStepSeq(msg as { stepSeq?: number })
+      const extras = tokenStreamExtras(msg)
       const { kind, stepSeq: seq } = this.tokenStreamKind(
         msg.sessionId,
         msg.turnId,
         msg.agentId,
-        stepSeq,
+        extras.stepSeq,
       )
       this.streamCoalescer.push({
         sessionId: msg.sessionId,
@@ -306,6 +330,7 @@ export class SessionService {
         agentId: msg.agentId,
         kind,
         stepSeq: seq,
+        ...(extras.role !== undefined ? { role: extras.role } : {}),
         delta: msg.delta,
       })
       this.fulfillWaiters(msg)

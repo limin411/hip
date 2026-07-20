@@ -107,6 +107,18 @@ export class StreamCoalescer {
     if (this.buckets.size === 0) this.cancelSchedule()
   }
 
+  /**
+   * Discard pending buckets for a session without applying them.
+   * Used when authoritative state replaces the turn (session:loaded / delete / trash)
+   * so a later rAF cannot re-append stale deltas.
+   */
+  clearSession(sessionId: string): void {
+    for (const [k, b] of [...this.buckets.entries()]) {
+      if (b.sessionId === sessionId) this.buckets.delete(k)
+    }
+    if (this.buckets.size === 0) this.cancelSchedule()
+  }
+
   private ensureScheduled(): void {
     if (this.scheduled) return
     this.scheduled = true

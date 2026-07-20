@@ -14,17 +14,10 @@ vi.mock('@/ipc/sftp', () => ({
   isAlreadyExistsError: () => false,
 }))
 
-vi.mock('@/components/terminals/TerminalFileTree', () => ({
+vi.mock('@/components/terminals/sftpActions', () => ({
   refreshSftpDir: vi.fn(),
-}))
-
-vi.mock('@/store/terminalFsStore', () => ({
-  useTerminalFsStore: {
-    getState: () => ({
-      upsertTransfer: vi.fn(),
-      removeTransfer: vi.fn(),
-    }),
-  },
+  runSftpDownload: vi.fn(),
+  runSftpUploadIntoDir: vi.fn(),
 }))
 
 function ctx(): ContextMenuBuildContext {

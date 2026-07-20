@@ -1505,7 +1505,9 @@ export const zhTW = {
       "cancel": "取消傳輸",
       "done": "完成",
       "cancelled": "已取消",
-      "failed": "失敗"
+      "failed": "失敗",
+      "uploadHere": "上傳到此資料夾",
+      "emptyDir": "空資料夾"
     },
     "form": {
       "createTitle": "新建連線",

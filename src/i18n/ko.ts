@@ -1497,7 +1497,9 @@ export const ko = {
       "cancel": "전송 취소",
       "done": "완료",
       "cancelled": "취소됨",
-      "failed": "실패"
+      "failed": "실패",
+      "uploadHere": "이 폴더에 업로드",
+      "emptyDir": "빈 폴더"
     },
     "form": {
       "createTitle": "새 연결",

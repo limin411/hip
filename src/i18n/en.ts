@@ -1541,6 +1541,8 @@ export const en = {
         done: 'Done',
         cancelled: 'Cancelled',
         failed: 'Failed',
+        uploadHere: 'Upload into this folder',
+        emptyDir: 'Empty folder',
       },
       form: {
         createTitle: 'New connection',

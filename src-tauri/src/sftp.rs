@@ -21,17 +21,25 @@ use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use russh_sftp::client::SftpSession;
 use russh_sftp::protocol::OpenFlags;
 
-use crate::sftp_path::{join_remote, remote_basename, sanitize_remote_path};
+use crate::sftp_path::{
+    join_remote, remote_basename, remote_temp_path, sanitize_remote_path,
+};
 use crate::ssh_session::{
     ensure_sftp, get_alive_session, SshManager, SshSession, SESSION_CLOSED,
 };
 
 /// Max concurrent transfer ops process-wide (design: global = 2).
 const MAX_GLOBAL_TRANSFERS: usize = 2;
+/// Design v1: one transfer at a time per SSH/SFTP session.
+const MAX_PER_SESSION_TRANSFERS: usize = 1;
 /// Progress emit throttle.
 const PROGRESS_EVERY: Duration = Duration::from_millis(100);
 const PROGRESS_BYTES: u64 = 256 * 1024;
 const IO_BUF: usize = 64 * 1024;
+
+fn transfer_key(terminal_id: &str, op_id: &str) -> String {
+    format!("{terminal_id}\0{op_id}")
+}
 
 // ── Types ───────────────────────────────────────────────────────────────────
 
@@ -70,7 +78,10 @@ struct SftpProgressEvent {
 // ── Transfer cancel registry ────────────────────────────────────────────────
 
 pub struct SftpTransferState {
+    /// Keys: `terminalId\0opId` so cancel is scoped to a session (Issue 9).
     cancels: Mutex<HashMap<String, Arc<AtomicBool>>>,
+    /// Active op count per terminal (Issue 4: max 1 per session).
+    per_session: Mutex<HashMap<String, usize>>,
     active: AtomicUsize,
 }
 
@@ -78,11 +89,20 @@ impl SftpTransferState {
     pub fn new() -> Self {
         Self {
             cancels: Mutex::new(HashMap::new()),
+            per_session: Mutex::new(HashMap::new()),
             active: AtomicUsize::new(0),
         }
     }
 
-    fn begin(&self, op_id: &str) -> Result<Arc<AtomicBool>, String> {
+    fn begin(&self, terminal_id: &str, op_id: &str) -> Result<Arc<AtomicBool>, String> {
+        let mut per = self.per_session.lock().unwrap();
+        let sess_n = *per.get(terminal_id).unwrap_or(&0);
+        if sess_n >= MAX_PER_SESSION_TRANSFERS {
+            return Err(
+                "Only one SFTP transfer per terminal at a time. Wait or cancel the active transfer."
+                    .into(),
+            );
+        }
         let n = self.active.fetch_add(1, Ordering::SeqCst);
         if n >= MAX_GLOBAL_TRANSFERS {
             self.active.fetch_sub(1, Ordering::SeqCst);
@@ -90,25 +110,54 @@ impl SftpTransferState {
                 "Too many concurrent SFTP transfers (max {MAX_GLOBAL_TRANSFERS})"
             ));
         }
+        *per.entry(terminal_id.to_string()).or_insert(0) += 1;
+        drop(per);
+
         let flag = Arc::new(AtomicBool::new(false));
-        self.cancels
-            .lock()
-            .unwrap()
-            .insert(op_id.to_string(), Arc::clone(&flag));
+        self.cancels.lock().unwrap().insert(
+            transfer_key(terminal_id, op_id),
+            Arc::clone(&flag),
+        );
         Ok(flag)
     }
 
-    fn end(&self, op_id: &str) {
-        self.cancels.lock().unwrap().remove(op_id);
+    fn end(&self, terminal_id: &str, op_id: &str) {
+        self.cancels
+            .lock()
+            .unwrap()
+            .remove(&transfer_key(terminal_id, op_id));
+        let mut per = self.per_session.lock().unwrap();
+        if let Some(c) = per.get_mut(terminal_id) {
+            *c = c.saturating_sub(1);
+            if *c == 0 {
+                per.remove(terminal_id);
+            }
+        }
         self.active.fetch_sub(1, Ordering::SeqCst);
     }
 
-    fn cancel(&self, op_id: &str) -> bool {
-        if let Some(f) = self.cancels.lock().unwrap().get(op_id) {
+    fn cancel(&self, terminal_id: &str, op_id: &str) -> bool {
+        if let Some(f) = self
+            .cancels
+            .lock()
+            .unwrap()
+            .get(&transfer_key(terminal_id, op_id))
+        {
             f.store(true, Ordering::SeqCst);
             true
         } else {
             false
+        }
+    }
+
+    /// Cancel every in-flight transfer for a terminal (Issue 8 — session close).
+    pub fn cancel_all_for_terminal(&self, terminal_id: &str) {
+        let prefix = format!("{terminal_id}\0");
+        let map = self.cancels.lock().unwrap();
+        for (k, f) in map.iter() {
+            if k.starts_with(&prefix) {
+                f.store(true, Ordering::SeqCst);
+            }
         }
     }
 }
@@ -281,7 +330,7 @@ pub async fn sftp_download(
     let local = PathBuf::from(&local_path);
     validate_local_transfer_path(&local, true)?;
 
-    let cancel = transfers.begin(&op_id)?;
+    let cancel = transfers.begin(&terminal_id, &op_id)?;
     let result = download_inner(
         &app,
         &manager,
@@ -293,7 +342,7 @@ pub async fn sftp_download(
         &cancel,
     )
     .await;
-    transfers.end(&op_id);
+    transfers.end(&terminal_id, &op_id);
     result
 }
 
@@ -399,13 +448,8 @@ async fn download_inner(
                 );
                 return Err("cancelled".into());
             }
-            // Overwrite dest if force.
-            if local.exists() {
-                let _ = tokio::fs::remove_file(local).await;
-            }
-            tokio::fs::rename(&temp, local)
-                .await
-                .map_err(|e| format!("rename temp → dest failed: {e}"))?;
+            // Safer force replace: move dest → bak, temp → dest, drop bak (Issue 5).
+            promote_local_temp(&temp, local).await?;
             emit_progress(app, terminal_id, op_id, "completed", bytes, total, None);
             Ok(())
         }
@@ -430,6 +474,37 @@ async fn download_inner(
     }
 }
 
+/// Move completed download temp into place without a long window where dest is gone.
+async fn promote_local_temp(temp: &Path, dest: &Path) -> Result<(), String> {
+    if !dest.exists() {
+        return tokio::fs::rename(temp, dest)
+            .await
+            .map_err(|e| format!("rename temp → dest failed: {e}"));
+    }
+    let bak = dest.with_file_name(format!(
+        ".{}.hip-sftp-bak",
+        dest.file_name()
+            .and_then(|s| s.to_str())
+            .unwrap_or("download")
+    ));
+    let _ = tokio::fs::remove_file(&bak).await;
+    tokio::fs::rename(dest, &bak)
+        .await
+        .map_err(|e| format!("rename dest → bak failed: {e}"))?;
+    match tokio::fs::rename(temp, dest).await {
+        Ok(()) => {
+            let _ = tokio::fs::remove_file(&bak).await;
+            Ok(())
+        }
+        Err(e) => {
+            // Restore previous destination.
+            let _ = tokio::fs::rename(&bak, dest).await;
+            let _ = tokio::fs::remove_file(temp).await;
+            Err(format!("rename temp → dest failed: {e}"))
+        }
+    }
+}
+
 #[tauri::command]
 pub async fn sftp_upload(
     app: AppHandle,
@@ -450,7 +525,7 @@ pub async fn sftp_upload(
         return Err(format!("local file not found: {}", local.display()));
     }
 
-    let cancel = transfers.begin(&op_id)?;
+    let cancel = transfers.begin(&terminal_id, &op_id)?;
     let result = upload_inner(
         &app,
         &manager,
@@ -462,7 +537,7 @@ pub async fn sftp_upload(
         &cancel,
     )
     .await;
-    transfers.end(&op_id);
+    transfers.end(&terminal_id, &op_id);
     result
 }
 
@@ -492,23 +567,28 @@ async fn upload_inner(
         .ok()
         .map(|m| m.len());
 
+    // Always write to a sibling temp on the remote; promote via rename (Issue 3).
+    // Destination is never truncated until a successful promote.
+    let remote_temp = remote_temp_path(&remote, op_id);
+    let _ = sftp.remove_file(&remote_temp).await;
+
     emit_progress(app, terminal_id, op_id, "started", 0, total, None);
 
-    let flags = if force {
-        OpenFlags::CREATE | OpenFlags::TRUNCATE | OpenFlags::WRITE
-    } else {
-        OpenFlags::CREATE | OpenFlags::TRUNCATE | OpenFlags::WRITE
+    // Exclusive create of the temp when possible (Issue 6 spirit — no clobber of unexpected peers).
+    let open_flags = OpenFlags::CREATE | OpenFlags::EXCLUDE | OpenFlags::WRITE | OpenFlags::TRUNCATE;
+    let mut remote_file = match sftp.open_with_flags(&remote_temp, open_flags).await {
+        Ok(f) => f,
+        Err(_) => {
+            // Some servers are picky about EXCLUDE+TRUNCATE; fall back after remove.
+            let _ = sftp.remove_file(&remote_temp).await;
+            sftp.open_with_flags(
+                &remote_temp,
+                OpenFlags::CREATE | OpenFlags::TRUNCATE | OpenFlags::WRITE,
+            )
+            .await
+            .map_err(|e| format!("SFTP create remote temp failed: {e}"))?
+        }
     };
-    // When !force and exists we already returned; CREATE|TRUNCATE is fine.
-    let _ = flags;
-
-    let mut remote_file = sftp
-        .open_with_flags(
-            &remote,
-            OpenFlags::CREATE | OpenFlags::TRUNCATE | OpenFlags::WRITE,
-        )
-        .await
-        .map_err(|e| format!("SFTP create remote failed: {e}"))?;
 
     let mut local_file = tokio::fs::File::open(local)
         .await
@@ -555,8 +635,7 @@ async fn upload_inner(
     match transfer {
         Ok(()) => {
             if cancel.load(Ordering::SeqCst) {
-                // Best-effort remove partial remote.
-                let _ = sftp.remove_file(&remote).await;
+                let _ = sftp.remove_file(&remote_temp).await;
                 emit_progress(
                     app,
                     terminal_id,
@@ -568,11 +647,46 @@ async fn upload_inner(
                 );
                 return Err("cancelled".into());
             }
+            // Re-check existence for !force (TOCTOU between check and promote).
+            let now_exists = sftp.try_exists(&remote).await.unwrap_or(false);
+            if now_exists && !force {
+                let _ = sftp.remove_file(&remote_temp).await;
+                return Err("AlreadyExists".into());
+            }
+            // Promote temp → dest. If overwriting, move dest aside first so a failed
+            // rename never leaves the user with neither file nor a truncated dest.
+            let bak = if now_exists {
+                Some(remote_temp_path(
+                    &format!("{remote}.bak"),
+                    &format!("bak-{op_id}"),
+                ))
+            } else {
+                None
+            };
+            if let Some(ref bak_path) = bak {
+                let _ = sftp.remove_file(bak_path).await;
+                if sftp.rename(&remote, bak_path).await.is_err() {
+                    // Fallback when rename-over is unsupported: remove dest only after
+                    // the complete temp is ready (still better than truncate-in-place).
+                    let _ = sftp.remove_file(&remote).await;
+                }
+            }
+            if let Err(e) = sftp.rename(&remote_temp, &remote).await {
+                if let Some(ref bak_path) = bak {
+                    let _ = sftp.rename(bak_path, &remote).await;
+                }
+                let _ = sftp.remove_file(&remote_temp).await;
+                return Err(format!("SFTP rename temp → dest failed: {e}"));
+            }
+            if let Some(ref bak_path) = bak {
+                let _ = sftp.remove_file(bak_path).await;
+            }
             emit_progress(app, terminal_id, op_id, "completed", bytes, total, None);
             Ok(())
         }
         Err(e) => {
-            let _ = sftp.remove_file(&remote).await;
+            // Only delete the partial temp — never the original destination (Issue 3).
+            let _ = sftp.remove_file(&remote_temp).await;
             let phase = if e == "cancelled" || cancel.load(Ordering::SeqCst) {
                 "cancelled"
             } else {
@@ -598,13 +712,13 @@ pub async fn sftp_cancel(
     terminal_id: String,
     op_id: String,
 ) -> Result<(), String> {
-    let _ = terminal_id; // scoped by opId globally; terminalId for API symmetry
-    if transfers.cancel(&op_id) {
-        Ok(())
-    } else {
-        // Idempotent: no-op if already finished.
-        Ok(())
+    // Scoped by (terminalId, opId). Empty op_id cancels all for the terminal (Issue 8).
+    if op_id.trim().is_empty() {
+        transfers.cancel_all_for_terminal(&terminal_id);
+        return Ok(());
     }
+    let _ = transfers.cancel(&terminal_id, &op_id);
+    Ok(())
 }
 
 // ── Local path guards ───────────────────────────────────────────────────────
@@ -660,12 +774,10 @@ fn temp_path_for(dest: &Path, op_id: &str) -> PathBuf {
     }
 }
 
-// Silence unused import if basename only used in future UI helpers.
+// Re-export SESSION_CLOSED for tests/docs.
+#[allow(dead_code)]
+const _SESSION_CLOSED: &str = SESSION_CLOSED;
 #[allow(dead_code)]
 fn _basename_check(p: &str) -> &str {
     remote_basename(p)
 }
-
-// Re-export SESSION_CLOSED for tests/docs.
-#[allow(dead_code)]
-const _SESSION_CLOSED: &str = SESSION_CLOSED;

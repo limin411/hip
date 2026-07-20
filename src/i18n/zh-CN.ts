@@ -1505,6 +1505,8 @@ export const zhCN = {
         done: '完成',
         cancelled: '已取消',
         failed: '失败',
+        uploadHere: '上传到此文件夹',
+        emptyDir: '空文件夹',
       },
       form: {
         createTitle: '新建连接',

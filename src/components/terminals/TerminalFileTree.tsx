@@ -7,12 +7,19 @@ import {
   Folder,
   FolderOpen,
   RefreshCw,
+  Upload,
 } from 'lucide-react'
 import type { SftpEntry } from '@/ipc/sftp'
-import { isSessionClosedError, sftpLs } from '@/ipc/sftp'
 import { useTerminalFsStore } from '@/store/terminalFsStore'
 import { DeclarativeContextMenu } from '@/components/context-menu'
+import {
+  loadSftpDir,
+  refreshSftpDir,
+  runSftpUploadIntoDir,
+} from '@/components/terminals/sftpActions'
 import { cn } from '@/lib/utils'
+
+export { refreshSftpDir }
 
 function basename(p: string): string {
   if (!p) return ''
@@ -36,12 +43,17 @@ function Node({
   const loading = useTerminalFsStore(
     (s) => !!s.byTerminal[terminalId]?.loading[entry.path],
   )
+  const dirError = useTerminalFsStore(
+    (s) => s.byTerminal[terminalId]?.dirErrors?.[entry.path] ?? null,
+  )
 
   const onClick = () => {
     if (!entry.isDir) return
     useTerminalFsStore.getState().toggleExpanded(terminalId, entry.path)
-    if (!children) {
-      void loadDir(terminalId, entry.path)
+    const slice = useTerminalFsStore.getState().byTerminal[terminalId]
+    const hasChildren = !!slice?.entriesByDir[entry.path]
+    if (!hasChildren) {
+      void loadSftpDir(terminalId, entry.path)
     }
   }
 
@@ -93,37 +105,21 @@ function Node({
           ) : null}
         </div>
       </DeclarativeContextMenu>
+      {entry.isDir && open && dirError ? (
+        <p
+          className="truncate px-2 py-0.5 text-caption text-red-500/90"
+          style={{ paddingLeft: (depth + 1) * 12 + 4 }}
+          data-testid="sftp-dir-error"
+          title={dirError}
+        >
+          {dirError}
+        </p>
+      ) : null}
       {entry.isDir && open && children?.map((c) => (
         <Node key={c.path} entry={c} terminalId={terminalId} depth={depth + 1} />
       ))}
     </div>
   )
-}
-
-async function loadDir(terminalId: string, path: string): Promise<void> {
-  const store = useTerminalFsStore.getState()
-  store.setLoading(terminalId, path, true)
-  try {
-    const result = await sftpLs(terminalId, path)
-    // When listing root (empty / "."), persist the resolved absolute path.
-    if (path === '' || path === '.' || path === './') {
-      store.setRootPath(terminalId, result.path)
-    }
-    store.setEntries(terminalId, result.path, result.entries)
-    // Also key under the requested path when it differed (pre-realpath).
-    if (result.path !== path && path) {
-      store.setEntries(terminalId, path, result.entries)
-    }
-  } catch (e) {
-    const msg = e instanceof Error ? e.message : String(e ?? 'SFTP error')
-    store.setError(terminalId, isSessionClosedError(e) ? 'session_closed' : msg)
-  } finally {
-    store.setLoading(terminalId, path, false)
-  }
-}
-
-export async function refreshSftpDir(terminalId: string, path: string): Promise<void> {
-  await loadDir(terminalId, path)
 }
 
 export function TerminalFileTree({
@@ -151,16 +147,15 @@ export function TerminalFileTree({
     return !!slice.loading[key] || !!slice.loading['.'] || !!slice.loading['']
   })
 
-  const startPath = (initialPath?.trim() || '.') 
+  const startPath = initialPath?.trim() || '.'
 
   const reload = useCallback(() => {
-    void loadDir(terminalId, rootPath ?? startPath)
+    void loadSftpDir(terminalId, rootPath ?? startPath)
   }, [terminalId, rootPath, startPath])
 
   useEffect(() => {
-    // Load root once when panel mounts / terminal changes.
     if (!rootPath && !rootEntries) {
-      void loadDir(terminalId, startPath)
+      void loadSftpDir(terminalId, startPath)
     }
   }, [terminalId, startPath, rootPath, rootEntries])
 
@@ -196,25 +191,56 @@ export function TerminalFileTree({
     )
   }
 
+  const rootLabel = rootPath ? basename(rootPath) : t('terminals.sftp.loading')
+  const rootMenuPath = rootPath ?? startPath
+  const rootMenuName = rootPath ? basename(rootPath) : startPath
+
   return (
     <div className="flex h-full min-h-0 flex-col" data-testid="sftp-file-tree">
-      <div className="flex h-7 shrink-0 items-center justify-between gap-1 border-b border-border/80 px-2">
-        <span
-          className="min-w-0 flex-1 truncate text-caption font-medium text-ink-tertiary"
-          title={rootPath ?? startPath}
+      <div className="flex h-7 shrink-0 items-center justify-between gap-1 border-b border-border/80 px-1">
+        <DeclarativeContextMenu
+          kind="sftpEntry"
+          payload={{
+            terminalId,
+            path: rootMenuPath,
+            name: rootMenuName,
+            isDir: true,
+          }}
+          className="min-w-0 flex-1"
         >
-          {rootPath ? basename(rootPath) : t('terminals.sftp.loading')}
-        </span>
-        <button
-          type="button"
-          title={t('terminals.sftp.refresh')}
-          data-testid="sftp-refresh"
-          onClick={reload}
-          disabled={loadingRoot}
-          className="rounded-md p-1 text-ink-tertiary transition-colors hover:bg-state-hover hover:text-ink disabled:opacity-50"
-        >
-          <RefreshCw size={12} strokeWidth={1.75} className={loadingRoot ? 'animate-spin' : ''} />
-        </button>
+          <span
+            className="block min-w-0 flex-1 cursor-default truncate rounded px-1 py-0.5 text-caption font-medium text-ink-tertiary hover:bg-state-hover"
+            title={rootPath ?? startPath}
+            data-testid="sftp-tree-root"
+          >
+            {rootLabel}
+          </span>
+        </DeclarativeContextMenu>
+        <div className="flex shrink-0 items-center gap-0.5">
+          <button
+            type="button"
+            title={t('terminals.sftp.uploadHere')}
+            data-testid="sftp-upload-root"
+            disabled={!rootPath}
+            onClick={() => {
+              if (!rootPath) return
+              void runSftpUploadIntoDir(terminalId, rootPath, t)
+            }}
+            className="rounded-md p-1 text-ink-tertiary transition-colors hover:bg-state-hover hover:text-ink disabled:opacity-40"
+          >
+            <Upload size={12} strokeWidth={1.75} />
+          </button>
+          <button
+            type="button"
+            title={t('terminals.sftp.refresh')}
+            data-testid="sftp-refresh"
+            onClick={reload}
+            disabled={loadingRoot}
+            className="rounded-md p-1 text-ink-tertiary transition-colors hover:bg-state-hover hover:text-ink disabled:opacity-50"
+          >
+            <RefreshCw size={12} strokeWidth={1.75} className={loadingRoot ? 'animate-spin' : ''} />
+          </button>
+        </div>
       </div>
       <div className="min-h-0 flex-1 overflow-auto py-0.5">
         {rootEntries?.map((e) => (
@@ -222,6 +248,11 @@ export function TerminalFileTree({
         ))}
         {!rootEntries && loadingRoot ? (
           <p className="px-2 py-2 text-caption text-ink-tertiary">{t('terminals.sftp.loading')}</p>
+        ) : null}
+        {rootEntries && rootEntries.length === 0 && !loadingRoot ? (
+          <p className="px-2 py-2 text-caption text-ink-tertiary" data-testid="sftp-tree-empty">
+            {t('terminals.sftp.emptyDir')}
+          </p>
         ) : null}
       </div>
     </div>

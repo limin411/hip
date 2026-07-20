@@ -3,10 +3,31 @@ import { nanoid } from 'nanoid'
 import { homeDir } from '@tauri-apps/api/path'
 import { ptyKill } from '@/ipc/pty'
 import { interactiveTerminalList, sshClose } from '@/ipc/ssh'
+import { sftpCancel } from '@/ipc/sftp'
 import type { TerminalHost } from '@/ipc/terminalHosts'
 import { useTerminalStore } from '@/store/terminalStore'
 import { useTerminalHostStore } from '@/store/terminalHostStore'
 import { useTerminalFsStore } from '@/store/terminalFsStore'
+
+/** Cancel in-flight SFTP transfers for a terminal before tearing down SSH (Issue 8). */
+async function cancelSftpTransfers(terminalId: string): Promise<void> {
+  const ops = useTerminalFsStore
+    .getState()
+    .transfers.filter((t) => t.terminalId === terminalId)
+  await Promise.all(
+    ops.map((t) =>
+      sftpCancel(terminalId, t.opId).catch(() => {
+        /* already finished */
+      }),
+    ),
+  )
+  // Also clear any ops Rust still tracks (empty opId = all for terminal).
+  try {
+    await sftpCancel(terminalId, '')
+  } catch {
+    /* ignore */
+  }
+}
 
 /** Stable English substring matched by XtermSurface / HostLibrary soft-cap UX. */
 const SOFT_CAP_ERROR =
@@ -200,6 +221,7 @@ export const useManagedTerminalStore = create<ManagedTerminalStore>((set, get) =
         /* ok if already dead */
       }
     } else if (term.kind === 'ssh') {
+      await cancelSftpTransfers(id)
       try {
         await sshClose(id)
       } catch {

@@ -1497,7 +1497,9 @@ export const ja = {
       "cancel": "転送をキャンセル",
       "done": "完了",
       "cancelled": "キャンセル済み",
-      "failed": "失敗"
+      "failed": "失敗",
+      "uploadHere": "このフォルダにアップロード",
+      "emptyDir": "空のフォルダ"
     },
     "form": {
       "createTitle": "新しい接続",

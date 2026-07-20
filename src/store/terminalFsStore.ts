@@ -20,6 +20,8 @@ interface TerminalFsSlice {
   /** Resolved absolute remote root for this terminal (after first ls). */
   rootPath: string | null
   loading: Record<string, boolean>
+  /** Nested expand failures (Issue 7). */
+  dirErrors: Record<string, string>
   error: string | null
 }
 
@@ -28,6 +30,7 @@ const EMPTY: TerminalFsSlice = {
   expanded: {},
   rootPath: null,
   loading: {},
+  dirErrors: {},
   error: null,
 }
 
@@ -40,6 +43,7 @@ interface TerminalFsStore {
   setRootPath: (terminalId: string, root: string) => void
   setLoading: (terminalId: string, dir: string, loading: boolean) => void
   setError: (terminalId: string, error: string | null) => void
+  setDirError: (terminalId: string, dir: string, error: string | null) => void
   toggleExpanded: (terminalId: string, dir: string) => void
   clearTerminal: (terminalId: string) => void
 
@@ -87,6 +91,16 @@ export const useTerminalFsStore = create<TerminalFsStore>((set, get) => ({
   setError: (id, error) =>
     set((st) => ({
       byTerminal: patch(st.byTerminal, id, (s) => ({ ...s, error })),
+    })),
+
+  setDirError: (id, dir, error) =>
+    set((st) => ({
+      byTerminal: patch(st.byTerminal, id, (s) => {
+        const dirErrors = { ...s.dirErrors }
+        if (error == null) delete dirErrors[dir]
+        else dirErrors[dir] = error
+        return { ...s, dirErrors }
+      }),
     })),
 
   toggleExpanded: (id, dir) =>

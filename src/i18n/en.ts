@@ -1499,6 +1499,7 @@ export const en = {
       deleteHostTitle: 'Delete “{{label}}”?',
       deleteHostBody:
         'Saved credentials for this host will be removed. Any open sessions for this host will be closed.',
+      errorDelete: 'Could not delete this host. Try again.',
       ungrouped: 'Ungrouped',
       groupEmpty: 'No hosts in this group',
       hostsCount: '{{count}} hosts',
@@ -1542,6 +1543,8 @@ export const en = {
         passwordRequired: 'Password is required',
         privateKeyPathRequired: 'Private key path is required',
         errorSave: 'Could not save. Try again.',
+        errorSecretSave:
+          'Host saved, but the password/passphrase could not be stored. Enter it again and save.',
       },
     },
     tabs: {

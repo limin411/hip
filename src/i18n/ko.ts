@@ -1458,6 +1458,7 @@ export const ko = {
     "deleteHost": "삭제",
     "deleteHostTitle": "“{{label}}”을(를) 삭제할까요?",
     "deleteHostBody": "이 호스트의 저장된 자격 증명이 제거됩니다. 관련 열린 세션은 닫힙니다.",
+    "errorDelete": "삭제에 실패했습니다. 다시 시도하세요.",
     "ungrouped": "그룹 없음",
     "groupEmpty": "이 그룹에 호스트가 없습니다",
     "hostsCount": "호스트 {{count}}개",
@@ -1500,7 +1501,8 @@ export const ko = {
       "portInvalid": "포트는 1–65535 사이 정수여야 합니다",
       "passwordRequired": "비밀번호는 필수입니다",
       "privateKeyPathRequired": "개인 키 경로는 필수입니다",
-      "errorSave": "저장에 실패했습니다. 다시 시도하세요."
+      "errorSave": "저장에 실패했습니다. 다시 시도하세요.",
+      "errorSecretSave": "호스트는 저장되었지만 비밀번호/암호 구문을 저장하지 못했습니다. 다시 입력한 뒤 저장하세요."
     }
   },
   "tabs": {

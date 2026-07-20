@@ -1458,6 +1458,7 @@ export const ja = {
     "deleteHost": "削除",
     "deleteHostTitle": "「{{label}}」を削除しますか？",
     "deleteHostBody": "このホストの保存済み認証情報は削除されます。関連する開いているセッションは閉じられます。",
+    "errorDelete": "削除に失敗しました。もう一度お試しください。",
     "ungrouped": "未分類",
     "groupEmpty": "このグループにホストはありません",
     "hostsCount": "{{count}} 台のホスト",
@@ -1500,7 +1501,8 @@ export const ja = {
       "portInvalid": "ポートは 1〜65535 の整数で入力してください",
       "passwordRequired": "パスワードは必須です",
       "privateKeyPathRequired": "秘密鍵のパスは必須です",
-      "errorSave": "保存に失敗しました。もう一度お試しください。"
+      "errorSave": "保存に失敗しました。もう一度お試しください。",
+      "errorSecretSave": "ホストは保存されましたが、パスワード/パスフレーズを保存できませんでした。再入力して保存してください。"
     }
   },
   "tabs": {

@@ -66,23 +66,25 @@ export function HostFormDialog({
   )
 
   // Reset form when dialog opens / mode changes.
+  // Always clear secret-presence flags immediately so a previous host's "Saved"
+  // state cannot make a new open valid before hasSecretKeys resolves (Issue 1).
   useEffect(() => {
     if (!open || !mode) return
     setErrors({})
     setSubmitError(null)
     setBusy(false)
+    setPasswordSaved(false)
+    setPassphraseSaved(false)
     if (mode.mode === 'edit') {
       setHostId(mode.host.id)
       setValues(hostToFormValues(mode.host))
     } else {
       setHostId(mintHostId(nanoid))
       setValues(emptyHostFormValues())
-      setPasswordSaved(false)
-      setPassphraseSaved(false)
     }
   }, [open, mode])
 
-  // Load secret presence for edit mode.
+  // Load secret presence for edit mode (source of truth after reset above).
   useEffect(() => {
     if (!open || !mode || mode.mode !== 'edit') return
     let cancelled = false
@@ -161,11 +163,18 @@ export function HostFormDialog({
 
     setBusy(true)
     setSubmitError(null)
+    const host = formValuesToHost(values, hostId, Date.now())
+    // Persist catalog first, then secrets (same safety order as removeHost).
     try {
-      const host = formValuesToHost(values, hostId, Date.now())
-      // Persist catalog first, then secrets (same safety order as removeHost).
       await upsertHost(host)
+    } catch (e) {
+      console.error('[hip] save host catalog failed:', e)
+      setSubmitError(t('terminals.form.errorSave'))
+      setBusy(false)
+      return
+    }
 
+    try {
       if (values.authMethod === 'password' && values.password.length > 0) {
         await setSecretRaw(sshPasswordKey(hostId), values.password)
         setPasswordSaved(true)
@@ -190,11 +199,11 @@ export function HostFormDialog({
           /* ignore */
         }
       }
-
       onClose()
     } catch (e) {
-      console.error('[hip] save host failed:', e)
-      setSubmitError(t('terminals.form.errorSave'))
+      // Catalog already persisted; keep dialog open so user can retry secret write.
+      console.error('[hip] save host secret failed:', e)
+      setSubmitError(t('terminals.form.errorSecretSave'))
     } finally {
       setBusy(false)
     }

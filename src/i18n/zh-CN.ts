@@ -1465,6 +1465,7 @@ export const zhCN = {
       deleteHost: '删除',
       deleteHostTitle: '删除「{{label}}」？',
       deleteHostBody: '将删除该主机的已保存凭据。与此主机相关的打开会话将被关闭。',
+      errorDelete: '删除失败，请重试。',
       ungrouped: '未分组',
       groupEmpty: '该分组下暂无主机',
       hostsCount: '{{count}} 台主机',
@@ -1508,6 +1509,7 @@ export const zhCN = {
         passwordRequired: '请填写密码',
         privateKeyPathRequired: '请填写私钥路径',
         errorSave: '保存失败，请重试。',
+        errorSecretSave: '主机已保存，但密码/口令未能写入。请重新输入后保存。',
       },
     },
     tabs: {

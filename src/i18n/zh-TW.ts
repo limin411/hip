@@ -1466,6 +1466,7 @@ export const zhTW = {
     "deleteHost": "刪除",
     "deleteHostTitle": "刪除「{{label}}」？",
     "deleteHostBody": "將刪除該主機的已儲存憑證。與此主機相關的開啟工作階段將被關閉。",
+    "errorDelete": "刪除失敗，請重試。",
     "ungrouped": "未分組",
     "groupEmpty": "該分組下暫無主機",
     "hostsCount": "{{count}} 台主機",
@@ -1508,7 +1509,8 @@ export const zhTW = {
       "portInvalid": "連接埠須為 1–65535 的整數",
       "passwordRequired": "請填寫密碼",
       "privateKeyPathRequired": "請填寫私鑰路徑",
-      "errorSave": "儲存失敗，請重試。"
+      "errorSave": "儲存失敗，請重試。",
+      "errorSecretSave": "主機已儲存，但密碼/口令未能寫入。請重新輸入後儲存。"
     }
   },
   "tabs": {

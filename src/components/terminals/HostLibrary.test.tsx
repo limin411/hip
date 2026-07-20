@@ -134,6 +134,9 @@ describe('HostLibrary', () => {
       expect(close).toHaveBeenCalledWith('tm_ssh1')
       expect(removeHost).toHaveBeenCalledWith('hst_1')
     })
+    expect(close.mock.invocationCallOrder[0]!).toBeLessThan(
+      removeHost.mock.invocationCallOrder[0]!,
+    )
   })
 
   it('opens create form from toolbar', async () => {
@@ -142,5 +145,21 @@ describe('HostLibrary', () => {
     await waitFor(() => {
       expect(screen.getByTestId('host-form-dialog')).toBeInTheDocument()
     })
+  })
+
+  it('consumes pendingCreateHost once — remount does not re-open form', async () => {
+    const { useHostLibraryUi } = await import('./hostLibraryUi')
+    useHostLibraryUi.setState({ pendingCreateHost: true })
+
+    const { unmount } = render(<HostLibrary />)
+    await waitFor(() => {
+      expect(screen.getByTestId('host-form-dialog')).toBeInTheDocument()
+    })
+    expect(useHostLibraryUi.getState().pendingCreateHost).toBe(false)
+
+    unmount()
+    render(<HostLibrary />)
+    // Stale request already consumed — form stays closed on remount.
+    expect(screen.queryByTestId('host-form-dialog')).not.toBeInTheDocument()
   })
 })

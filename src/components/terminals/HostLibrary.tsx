@@ -29,7 +29,7 @@ export function HostLibrary() {
   const removeGroup = useTerminalHostStore((s) => s.removeGroup)
   const removeHost = useTerminalHostStore((s) => s.removeHost)
 
-  const createRequestId = useHostLibraryUi((s) => s.createRequestId)
+  const pendingCreateHost = useHostLibraryUi((s) => s.pendingCreateHost)
 
   const [formMode, setFormMode] = useState<HostFormMode | null>(null)
   const [formOpen, setFormOpen] = useState(false)
@@ -51,12 +51,13 @@ export function HostLibrary() {
     }
   }, [])
 
-  // Sidebar / external "new connection" request.
+  // Sidebar / external "new connection" — one-shot consume so remount does not re-open.
   useEffect(() => {
-    if (createRequestId === 0) return
+    if (!pendingCreateHost) return
+    if (!useHostLibraryUi.getState().consumeCreateHostRequest()) return
     setFormMode({ mode: 'create' })
     setFormOpen(true)
-  }, [createRequestId])
+  }, [pendingCreateHost])
 
   const openCreate = useCallback(() => {
     setFormMode({ mode: 'create' })
@@ -111,7 +112,7 @@ export function HostLibrary() {
       setDeletingHost(null)
     } catch (e) {
       console.error('[hip] delete host failed:', e)
-      setDeleteError(t('terminals.form.errorSave'))
+      setDeleteError(t('terminals.errorDelete'))
     } finally {
       setDeleteBusy(false)
     }

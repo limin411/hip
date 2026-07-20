@@ -159,4 +159,56 @@ describe('HostFormDialog', () => {
     )
     expect(screen.getByTestId('host-form-save')).toBeDisabled()
   })
+
+  it('clears passwordSaved on edit open until hasSecretKeys resolves', async () => {
+    // Slow presence check — must not treat a prior host's secret as present.
+    let resolveKeys!: (v: Record<string, boolean>) => void
+    hasSecretKeys.mockImplementation(
+      () =>
+        new Promise<Record<string, boolean>>((resolve) => {
+          resolveKeys = resolve
+        }),
+    )
+
+    render(
+      <HostFormDialog open mode={{ mode: 'edit', host }} groups={[]} onClose={vi.fn()} />,
+    )
+
+    // Before IPC resolves: no Saved badge; Save disabled (password blank + not saved).
+    expect(screen.queryByTestId('host-form-password-saved')).not.toBeInTheDocument()
+    expect(screen.getByTestId('host-form-save')).toBeDisabled()
+
+    resolveKeys({
+      'hip.ssh.hst_existing.password': true,
+      'hip.ssh.hst_existing.passphrase': false,
+    })
+    await waitFor(() => {
+      expect(screen.getByTestId('host-form-password-saved')).toBeInTheDocument()
+    })
+    expect(screen.getByTestId('host-form-save')).not.toBeDisabled()
+  })
+
+  it('keeps dialog open with secret error when setSecretRaw fails after catalog save', async () => {
+    setSecretRaw.mockRejectedValueOnce(new Error('disk full'))
+    const onClose = vi.fn()
+    render(
+      <HostFormDialog open mode={{ mode: 'create' }} groups={[]} onClose={onClose} />,
+    )
+    fireEvent.change(screen.getByTestId('host-form-label'), { target: { value: 'dev' } })
+    fireEvent.change(screen.getByTestId('host-form-hostname'), {
+      target: { value: 'dev.local' },
+    })
+    fireEvent.change(screen.getByTestId('host-form-username'), { target: { value: 'me' } })
+    fireEvent.change(screen.getByTestId('host-form-password'), {
+      target: { value: 'hunter2' },
+    })
+    fireEvent.click(screen.getByTestId('host-form-save'))
+
+    await waitFor(() => {
+      expect(upsertHost).toHaveBeenCalled()
+      expect(setSecretRaw).toHaveBeenCalled()
+    })
+    expect(onClose).not.toHaveBeenCalled()
+    expect(screen.getByRole('alert')).toHaveTextContent('terminals.form.errorSecretSave')
+  })
 })

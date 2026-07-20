@@ -1983,7 +1983,12 @@ export const ja = {
     },
     "managedTerminal": {
       "close": "端末を閉じる",
-      "copyTitle": "タイトルをコピー"
+      "copyTitle": "タイトルをコピー",
+      "rename": "名前を変更",
+      "renameTitle": "端末の名前を変更",
+      "renameDescription": "今回の実行中の表示名のみ変更します。類似の端末を区別しやすくするためのもので、保存済み接続は変更しません。",
+      "renameLabel": "表示名",
+      "renameSave": "保存"
     },
     "sftp": {
       "download": "ダウンロード…",

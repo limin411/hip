@@ -2036,6 +2036,12 @@ export const en = {
       managedTerminal: {
         close: 'Close terminal',
         copyTitle: 'Copy title',
+        rename: 'Rename',
+        renameTitle: 'Rename terminal',
+        renameDescription:
+          'Changes the display name for this run only so you can tell similar terminals apart. Does not edit saved connections.',
+        renameLabel: 'Display name',
+        renameSave: 'Save',
       },
       sftp: {
         download: 'Download…',

@@ -1991,7 +1991,12 @@ export const zhTW = {
     },
     "managedTerminal": {
       "close": "關閉終端",
-      "copyTitle": "複製標題"
+      "copyTitle": "複製標題",
+      "rename": "重新命名",
+      "renameTitle": "重新命名終端",
+      "renameDescription": "僅變更本次執行中的顯示名稱，方便區分多個終端；不會修改連線設定。",
+      "renameLabel": "顯示名稱",
+      "renameSave": "儲存"
     },
     "sftp": {
       "download": "下載…",

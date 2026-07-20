@@ -1993,6 +1993,11 @@ export const zhCN = {
       managedTerminal: {
         close: '关闭终端',
         copyTitle: '复制标题',
+        rename: '重命名',
+        renameTitle: '重命名终端',
+        renameDescription: '仅更改本次运行中的显示名称，方便区分多个终端；不会修改连接配置。',
+        renameLabel: '显示名称',
+        renameSave: '保存',
       },
       sftp: {
         download: '下载…',

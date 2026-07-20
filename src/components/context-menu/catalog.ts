@@ -223,6 +223,12 @@ const STATIC_CATALOG: ContextMenuItemMeta[] = [
     icon: 'code',
   },
   {
+    id: 'managedTerminal.rename',
+    labelKey: 'contextMenu.managedTerminal.rename',
+    kind: 'managedTerminal',
+    group: 'edit',
+  },
+  {
     id: 'managedTerminal.copyTitle',
     labelKey: 'contextMenu.managedTerminal.copyTitle',
     kind: 'managedTerminal',

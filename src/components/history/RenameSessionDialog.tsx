@@ -9,9 +9,26 @@ export interface RenameSessionDialogProps {
   title: string
   onConfirm: (nextTitle: string) => void
   onCancel: () => void
+  /** Override dialog chrome (default: session rename copy). */
+  dialogTitle?: string
+  description?: string
+  label?: string
+  saveLabel?: string
+  inputTestId?: string
+  confirmTestId?: string
 }
 
-export function RenameSessionDialog({ title, onConfirm, onCancel }: RenameSessionDialogProps) {
+export function RenameSessionDialog({
+  title,
+  onConfirm,
+  onCancel,
+  dialogTitle,
+  description,
+  label,
+  saveLabel,
+  inputTestId = 'rename-session-input',
+  confirmTestId = 'rename-session-confirm',
+}: RenameSessionDialogProps) {
   const { t } = useTranslation()
   const [value, setValue] = useState(title)
   const trimmed = value.trim()
@@ -23,19 +40,21 @@ export function RenameSessionDialog({ title, onConfirm, onCancel }: RenameSessio
       onOpenChange={(open) => {
         if (!open) onCancel()
       }}
-      title={t('contextMenu.renameSession.title')}
+      title={dialogTitle ?? t('contextMenu.renameSession.title')}
       className="max-w-sm"
     >
       <div className="p-5">
         <DialogPrimitive.Description className="sr-only">
-          {t('contextMenu.renameSession.description')}
+          {description ?? t('contextMenu.renameSession.description')}
         </DialogPrimitive.Description>
         <label className="flex flex-col gap-2">
-          <span className="text-body text-ink-secondary">{t('contextMenu.renameSession.label')}</span>
+          <span className="text-body text-ink-secondary">
+            {label ?? t('contextMenu.renameSession.label')}
+          </span>
           <Input
             autoFocus
             value={value}
-            data-testid="rename-session-input"
+            data-testid={inputTestId}
             onChange={(e) => setValue(e.target.value)}
             onKeyDown={(e) => {
               if (e.key === 'Enter' && canSave) {
@@ -53,13 +72,13 @@ export function RenameSessionDialog({ title, onConfirm, onCancel }: RenameSessio
             variant="primary"
             size="sm"
             disabled={!canSave}
-            data-testid="rename-session-confirm"
+            data-testid={confirmTestId}
             onClick={() => {
               if (!canSave) return
               onConfirm(trimmed)
             }}
           >
-            {t('contextMenu.renameSession.save')}
+            {saveLabel ?? t('contextMenu.renameSession.save')}
           </Button>
         </div>
       </div>

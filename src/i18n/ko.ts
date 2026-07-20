@@ -1983,7 +1983,12 @@ export const ko = {
     },
     "managedTerminal": {
       "close": "터미널 닫기",
-      "copyTitle": "제목 복사"
+      "copyTitle": "제목 복사",
+      "rename": "이름 바꾸기",
+      "renameTitle": "터미널 이름 바꾸기",
+      "renameDescription": "이번 실행 중의 표시 이름만 바꿉니다. 비슷한 터미널을 구분하기 위한 것이며 저장된 연결은 변경하지 않습니다.",
+      "renameLabel": "표시 이름",
+      "renameSave": "저장"
     },
     "sftp": {
       "download": "다운로드…",

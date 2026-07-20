@@ -27,6 +27,7 @@ import {
   GlobalHotkeysBinder,
 } from '@/components/command-palette'
 import { SessionMenuDialogHost } from '@/components/history/SessionMenuDialogHost'
+import { ManagedTerminalDialogHost } from '@/components/terminals/ManagedTerminalDialogHost'
 import { WorktreeDeleteDialogHost } from '@/components/chat/WorktreeControl/WorktreeDeleteDialogHost'
 import { KnowledgeSpaceDialogHost } from '@/components/knowledge/KnowledgeSpaceDialogHost'
 import { CODE_TERMINAL } from '@/components/artifact/terminalFeature'
@@ -281,6 +282,7 @@ export function AppLayout() {
       <GlobalCommandPalette />
       <GlobalHotkeysBinder />
       <SessionMenuDialogHost />
+      <ManagedTerminalDialogHost />
       <WorktreeDeleteDialogHost />
       <KnowledgeSpaceDialogHost />
     </div>

@@ -22,8 +22,16 @@ export interface SessionPtyUi {
 
 interface TerminalState {
   bySession: Record<string, SessionPtyUi>
-  /** Which session's TerminalView is currently the single xterm writer. */
+  /**
+   * Which terminal id's XtermSurface is currently the single xterm writer (D6a).
+   * Keys any string id (domain sessionId or managed `tm_*`).
+   */
   attachedSessionId: string | null
+  /**
+   * Alias of `attachedSessionId` (K2 / D6a). Always dual-written with the same value.
+   * Prefer this name for multi-terminal call sites.
+   */
+  attachedTerminalId: string | null
 
   ensureSession: (sessionId: string) => void
   appendRing: (sessionId: string, chunk: string) => void
@@ -85,6 +93,7 @@ export function attachDrainWrites(
 export const useTerminalStore = create<TerminalState>((set, get) => ({
   bySession: {},
   attachedSessionId: null,
+  attachedTerminalId: null,
 
   ensureSession: (sessionId) => {
     if (get().bySession[sessionId]) return
@@ -161,14 +170,20 @@ export const useTerminalStore = create<TerminalState>((set, get) => ({
     })
   },
 
-  setAttached: (sessionId) => set({ attachedSessionId: sessionId }),
+  setAttached: (sessionId) =>
+    set({ attachedSessionId: sessionId, attachedTerminalId: sessionId }),
 
   clearSession: (sessionId) => {
     set((st) => {
       const { [sessionId]: _removed, ...rest } = st.bySession
+      const attached =
+        st.attachedSessionId === sessionId || st.attachedTerminalId === sessionId
+          ? null
+          : st.attachedSessionId
       return {
         bySession: rest,
-        attachedSessionId: st.attachedSessionId === sessionId ? null : st.attachedSessionId,
+        attachedSessionId: attached,
+        attachedTerminalId: attached,
       }
     })
   },

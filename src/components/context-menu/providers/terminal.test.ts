@@ -45,8 +45,8 @@ beforeEach(() => {
   setProjectDir.mockClear()
   pickDirectory.mockReset()
   readText.mockReset().mockResolvedValue('pasted')
-  bindTerminalRestarter(null)
-  bindTerminalCanvas(null)
+  bindTerminalRestarter('s1', null)
+  bindTerminalCanvas('s1', null)
   useDomainStore.setState({
     sessions: [
       {
@@ -63,7 +63,7 @@ beforeEach(() => {
 describe('terminalProvider', () => {
   it('includes restart, changeFolder, copyCwd, openFiles for chrome (default)', async () => {
     const restart = vi.fn()
-    bindTerminalRestarter(restart)
+    bindTerminalRestarter('s1', restart)
     const items = terminalProvider(
       { kind: 'terminal', payload: { sessionId: 's1', status: 'running' } },
       makeCtx(),
@@ -76,7 +76,7 @@ describe('terminalProvider', () => {
     ])
 
     await items.find((i) => i.id === 'terminal.restart')!.run()
-    expect(restart).toHaveBeenCalledWith('s1')
+    expect(restart).toHaveBeenCalled()
 
     await items.find((i) => i.id === 'terminal.copyCwd')!.run()
     expect(copyText).toHaveBeenCalledWith('/work/proj')
@@ -104,8 +104,8 @@ describe('terminalProvider', () => {
   it('canvas target: copy selection, paste, restart', async () => {
     const restart = vi.fn()
     const paste = vi.fn()
-    bindTerminalRestarter(restart)
-    bindTerminalCanvas({
+    bindTerminalRestarter('s1', restart)
+    bindTerminalCanvas('s1', {
       getSelection: () => 'hello sel',
       hasSelection: () => true,
       paste,
@@ -131,11 +131,11 @@ describe('terminalProvider', () => {
     expect(paste).toHaveBeenCalledWith('pasted')
 
     await items.find((i) => i.id === 'terminal.restart')!.run()
-    expect(restart).toHaveBeenCalledWith('s1')
+    expect(restart).toHaveBeenCalled()
   })
 
   it('canvas copy is disabled when there is no selection', () => {
-    bindTerminalCanvas({
+    bindTerminalCanvas('s1', {
       getSelection: () => '',
       hasSelection: () => false,
       paste: () => {},
@@ -150,7 +150,7 @@ describe('terminalProvider', () => {
   })
 
   it('buildContextMenuItems preserves canvas order and strips leading separator', () => {
-    bindTerminalCanvas({
+    bindTerminalCanvas('s1', {
       getSelection: () => 'x',
       hasSelection: () => true,
       paste: () => {},
@@ -168,5 +168,19 @@ describe('terminalProvider', () => {
     ])
     expect(items[0]!.separatorBefore).toBeFalsy()
     expect(items.find((i) => i.id === 'terminal.restart')!.separatorBefore).toBe(true)
+  })
+
+  it('does not use another terminalId canvas when sessionId differs', () => {
+    bindTerminalCanvas('other', {
+      getSelection: () => 'wrong',
+      hasSelection: () => true,
+      paste: () => {},
+    })
+    const items = terminalProvider(
+      { kind: 'terminal', payload: { sessionId: 's1', status: 'running', target: 'canvas' } },
+      makeCtx(),
+    )
+    const copy = items.find((i) => i.id === 'terminal.copySelection')!
+    expect(copy.disabled).toBe(true)
   })
 })

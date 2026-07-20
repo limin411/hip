@@ -1055,7 +1055,7 @@ describe('workspace diff', () => {
 
   it('deleteSession clears terminal ring for that session', async () => {
     const { useTerminalStore } = await import('@/store/terminalStore')
-    useTerminalStore.setState({ bySession: {}, attachedSessionId: null })
+    useTerminalStore.setState({ bySession: {}, attachedSessionId: null, attachedTerminalId: null })
     useTerminalStore.getState().appendRing('s1', 'out')
     const t = new FakeTransport()
     new SessionService(t).deleteSession('s1')
@@ -1064,7 +1064,7 @@ describe('workspace diff', () => {
 
   it('setProjectDir clears terminal ring for that session', async () => {
     const { useTerminalStore } = await import('@/store/terminalStore')
-    useTerminalStore.setState({ bySession: {}, attachedSessionId: null })
+    useTerminalStore.setState({ bySession: {}, attachedSessionId: null, attachedTerminalId: null })
     useTerminalStore.getState().appendRing('s1', 'out')
     const t = new FakeTransport()
     new SessionService(t).setProjectDir('s1', '/tmp/other')

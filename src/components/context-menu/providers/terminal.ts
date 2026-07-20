@@ -15,7 +15,7 @@ import type { ContextMenuItemDef, ContextProvider } from '../types'
 /**
  * Terminal chrome (default) and xterm canvas (`target: 'canvas'`).
  * - Chrome: restart, change folder, copy cwd, open Files tab.
- * - Canvas: copy selection, paste, restart (via bridges into TerminalView).
+ * - Canvas: copy selection, paste, restart (via keyed bridges into XtermSurface).
  */
 export const terminalProvider: ContextProvider = (req, ctx) => {
   if (req.kind !== 'terminal') return []
@@ -32,7 +32,7 @@ function canvasItems(
   sessionId: string,
   ctx: Parameters<ContextProvider>[1],
 ): ContextMenuItemDef[] {
-  const hasSel = terminalCanvasHasSelection()
+  const hasSel = terminalCanvasHasSelection(sessionId)
   // Single group so mergeByGroup preserves copy → paste → restart (not primary-first).
   // Manual separatorBefore on restart stays meaningful within the group.
   return [
@@ -43,7 +43,7 @@ function canvasItems(
       disabled: !hasSel,
       disabledReason: hasSel ? undefined : ctx.t('contextMenu.terminal.copySelectionDisabled'),
       run: () => {
-        const text = getTerminalCanvasSelection()
+        const text = getTerminalCanvasSelection(sessionId)
         if (!text) return
         void ctx.copyText(text)
       },
@@ -55,7 +55,7 @@ function canvasItems(
       disabled: !hasSel,
       disabledReason: hasSel ? undefined : ctx.t('contextMenu.terminal.copySelectionDisabled'),
       run: () => {
-        const text = getTerminalCanvasSelection()
+        const text = getTerminalCanvasSelection(sessionId)
         if (!text) return
         setComposerQuote(text)
       },
@@ -67,7 +67,7 @@ function canvasItems(
       run: async () => {
         const text = await readText()
         if (text == null || text === '') return
-        pasteToTerminalCanvas(text)
+        pasteToTerminalCanvas(sessionId, text)
       },
     },
     {

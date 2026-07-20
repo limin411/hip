@@ -7,7 +7,7 @@ import {
 } from './terminalStore'
 
 beforeEach(() => {
-  useTerminalStore.setState({ bySession: {}, attachedSessionId: null })
+  useTerminalStore.setState({ bySession: {}, attachedSessionId: null, attachedTerminalId: null })
 })
 
 describe('attachDrainWrites (D6a)', () => {
@@ -99,6 +99,17 @@ describe('terminalStore ring', () => {
     useTerminalStore.getState().clearSession('s1')
     expect(useTerminalStore.getState().bySession.s1).toBeUndefined()
     expect(useTerminalStore.getState().attachedSessionId).toBeNull()
+    expect(useTerminalStore.getState().attachedTerminalId).toBeNull()
+  })
+
+  it('setAttached dual-writes attachedTerminalId alias', () => {
+    useTerminalStore.getState().setAttached('s1')
+    const st = useTerminalStore.getState()
+    expect(st.attachedSessionId).toBe('s1')
+    expect(st.attachedTerminalId).toBe('s1')
+    useTerminalStore.getState().setAttached(null)
+    expect(useTerminalStore.getState().attachedSessionId).toBeNull()
+    expect(useTerminalStore.getState().attachedTerminalId).toBeNull()
   })
 
   it('trims ring by chunk count', () => {

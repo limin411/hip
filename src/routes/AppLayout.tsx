@@ -30,7 +30,7 @@ import { SessionMenuDialogHost } from '@/components/history/SessionMenuDialogHos
 import { WorktreeDeleteDialogHost } from '@/components/chat/WorktreeControl/WorktreeDeleteDialogHost'
 import { KnowledgeSpaceDialogHost } from '@/components/knowledge/KnowledgeSpaceDialogHost'
 import { CODE_TERMINAL } from '@/components/artifact/terminalFeature'
-import { startPtyBridge } from '@/ipc/pty'
+import { startTerminalBridge } from '@/ipc/pty'
 import { useProjectPathStore } from '@/store/projectPathStore'
 
 export function AppLayout() {
@@ -66,18 +66,20 @@ export function AppLayout() {
     return () => window.removeEventListener('focus', onFocus)
   }, [])
 
-  // App-lifetime PTY event bridge → terminalStore only (D6a). Never writes xterm.
+  // App-lifetime terminal event bridge → terminalStore only (D6a). Never writes xterm.
+  // Start when CODE_TERMINAL (or TERMINAL_MANAGEMENT once that flag ships — same single bridge).
+  // Listens pty:* only until SSH (PR5); normalizeTerminalId accepts sessionId | terminalId.
   useEffect(() => {
-    if (!CODE_TERMINAL) return
+    if (!CODE_TERMINAL /* && !TERMINAL_MANAGEMENT */) return
     let stop: (() => void) | undefined
     let cancelled = false
-    void startPtyBridge()
+    void startTerminalBridge()
       .then((unlisten) => {
         if (cancelled) unlisten()
         else stop = unlisten
       })
       .catch((err) => {
-        console.error('[hip] pty bridge failed:', err)
+        console.error('[hip] terminal bridge failed:', err)
       })
     return () => {
       cancelled = true

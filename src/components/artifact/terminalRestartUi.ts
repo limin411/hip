@@ -1,18 +1,21 @@
 /**
- * UI bridge so terminal context-menu "Restart" reuses TerminalView's existing restart handler
- * (ptyKill + clearSession + bootKey). No domain logic here.
+ * UI bridge so terminal context-menu "Restart" reuses the surface's restart handler
+ * (ptyKill + clearSession + remount). No domain logic here.
+ *
+ * D6a: keyed by terminalId — no silent global default when id is missing.
  */
 
-type Restarter = (sessionId: string) => void | Promise<void>
+type Restarter = () => void | Promise<void>
 
-let restarter: Restarter | null = null
+const restarters = new Map<string, Restarter>()
 
-/** TerminalView registers its restart while mounted. */
-export function bindTerminalRestarter(fn: Restarter | null): void {
-  restarter = fn
+/** XtermSurface / TerminalView registers restart while mounted for this terminalId. */
+export function bindTerminalRestarter(terminalId: string, fn: Restarter | null): void {
+  if (fn) restarters.set(terminalId, fn)
+  else restarters.delete(terminalId)
 }
 
-/** Provider run() entry — no-ops if Terminal is not mounted. */
-export async function requestTerminalRestart(sessionId: string): Promise<void> {
-  await restarter?.(sessionId)
+/** Provider run() entry — no-ops if that terminal is not mounted. */
+export async function requestTerminalRestart(terminalId: string): Promise<void> {
+  await restarters.get(terminalId)?.()
 }

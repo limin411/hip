@@ -124,7 +124,7 @@ describe('TerminalView', () => {
     ptyWrite.mockReset().mockResolvedValue(undefined)
     ptyResize.mockReset().mockResolvedValue(undefined)
     ptyKill.mockReset().mockResolvedValue(undefined)
-    useTerminalStore.setState({ bySession: {}, attachedSessionId: null })
+    useTerminalStore.setState({ bySession: {}, attachedSessionId: null, attachedTerminalId: null })
   })
 
   afterEach(() => {

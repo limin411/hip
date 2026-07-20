@@ -25,11 +25,13 @@ const mockStore = { appendRing, setExit }
 
 import {
   decodePtyDataB64,
+  normalizeTerminalId,
   ptyKill,
   ptyOpen,
   ptyResize,
   ptyWrite,
   startPtyBridge,
+  startTerminalBridge,
 } from './pty'
 
 beforeEach(() => {
@@ -47,6 +49,20 @@ describe('decodePtyDataB64', () => {
 
   it('returns empty on invalid base64', () => {
     expect(decodePtyDataB64('%%%')).toBe('')
+  })
+})
+
+describe('normalizeTerminalId', () => {
+  it('prefers terminalId over sessionId', () => {
+    expect(normalizeTerminalId({ terminalId: 'tm_a', sessionId: 's1' })).toBe('tm_a')
+  })
+
+  it('falls back to sessionId', () => {
+    expect(normalizeTerminalId({ sessionId: 's1' })).toBe('s1')
+  })
+
+  it('returns null when neither field present', () => {
+    expect(normalizeTerminalId({})).toBeNull()
   })
 })
 
@@ -73,12 +89,12 @@ describe('pty IPC wrappers', () => {
   })
 })
 
-describe('startPtyBridge', () => {
+describe('startTerminalBridge', () => {
   it('registers listeners and only mutates store (no Terminal)', async () => {
     const un1 = vi.fn()
     const un2 = vi.fn()
-    let dataHandler: ((e: { payload: { sessionId: string; data: string } }) => void) | undefined
-    let exitHandler: ((e: { payload: { sessionId: string; code: number | null; generation?: number } }) => void) | undefined
+    let dataHandler: ((e: { payload: { sessionId?: string; terminalId?: string; data: string } }) => void) | undefined
+    let exitHandler: ((e: { payload: { sessionId?: string; terminalId?: string; code: number | null; generation?: number } }) => void) | undefined
 
     listen.mockImplementation(async (event: string, cb: (e: unknown) => void) => {
       if (event === 'pty:data') dataHandler = cb as typeof dataHandler
@@ -86,7 +102,7 @@ describe('startPtyBridge', () => {
       return event === 'pty:data' ? un1 : un2
     })
 
-    const stop = await startPtyBridge()
+    const stop = await startTerminalBridge()
     expect(listen).toHaveBeenCalledWith('pty:data', expect.any(Function))
     expect(listen).toHaveBeenCalledWith('pty:exit', expect.any(Function))
 
@@ -99,5 +115,28 @@ describe('startPtyBridge', () => {
     stop()
     expect(un1).toHaveBeenCalled()
     expect(un2).toHaveBeenCalled()
+  })
+
+  it('accepts terminalId field shape on data/exit', async () => {
+    let dataHandler: ((e: { payload: { sessionId?: string; terminalId?: string; data: string } }) => void) | undefined
+    let exitHandler: ((e: { payload: { sessionId?: string; terminalId?: string; code: number | null; generation?: number } }) => void) | undefined
+
+    listen.mockImplementation(async (event: string, cb: (e: unknown) => void) => {
+      if (event === 'pty:data') dataHandler = cb as typeof dataHandler
+      if (event === 'pty:exit') exitHandler = cb as typeof exitHandler
+      return vi.fn()
+    })
+
+    await startTerminalBridge()
+
+    dataHandler?.({ payload: { terminalId: 'tm_x', data: btoa('hi') } })
+    expect(appendRing).toHaveBeenCalledWith('tm_x', 'hi')
+
+    exitHandler?.({ payload: { terminalId: 'tm_x', code: 1, generation: 2 } })
+    expect(setExit).toHaveBeenCalledWith('tm_x', 1, 2)
+  })
+
+  it('startPtyBridge is an alias of startTerminalBridge', () => {
+    expect(startPtyBridge).toBe(startTerminalBridge)
   })
 })

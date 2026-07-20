@@ -2,6 +2,6 @@
  * Terminal Management surface flag.
  * When false, `activeView: 'terminals'` stays on PlaceholderPage.
  * AppLayout starts the PTY/terminal bridge when CODE_TERMINAL || TERMINAL_MANAGEMENT.
- * Flipped true for dogfood of local managed terminals (PR3).
+ * Default true for release (PR7); kill-switch restores PlaceholderPage without auto-killing sessions.
  */
 export const TERMINAL_MANAGEMENT = true

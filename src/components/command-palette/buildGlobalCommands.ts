@@ -41,6 +41,10 @@ export type GlobalCommandLabels = {
   actionNewConversation: string
   actionKeyboardShortcuts: string
   actionChangeTheme: string
+  /** Terminal management (K17) — optional when flag off / labels omitted. */
+  openTerminals?: string
+  newLocalTerminal?: string
+  quickConnect?: string
   themeLight: string
   themeDark: string
   themeSystem: string
@@ -122,6 +126,11 @@ export type GlobalCommandContext = {
   knowledgeCreateDoc?: () => void
   searchKnowledgeDocs?: (q: string) => KnowledgeDocHit[]
   knowledgeIndexReady?: boolean
+  /** Terminal management (K17). */
+  enterTerminals?: () => void | Promise<void>
+  openLocalTerminal?: () => void | Promise<void>
+  /** Open terminals section for quick-connect (popover lives in sidebar). */
+  openQuickConnect?: () => void | Promise<void>
 }
 
 /** Source cap for search-time session list. */
@@ -374,6 +383,30 @@ export function buildGlobalCommandGroups(
     },
   ]
 
+  // Terminal management (K17) — only when labels + handlers are provided (flag on).
+  if (labels.openTerminals && ctx.enterTerminals) {
+    navigation.push({
+      id: 'nav-terminals',
+      label: labels.openTerminals,
+      icon: 'terminal',
+      keywords: [
+        'terminal',
+        'terminals',
+        'ssh',
+        'shell',
+        '终端',
+        '終端',
+        '端末',
+        '터미널',
+        labels.openTerminals,
+      ],
+      group: 'navigation',
+      run: () => {
+        void ctx.enterTerminals?.()
+      },
+    })
+  }
+
   const actions: GlobalCommand[] = [
     {
       id: 'action-new-conversation',
@@ -393,6 +426,53 @@ export function buildGlobalCommandGroups(
       run: () => ctx.openShortcutsHelp(),
     },
   ]
+
+  if (labels.newLocalTerminal && ctx.openLocalTerminal) {
+    actions.push({
+      id: 'action-new-local-terminal',
+      label: labels.newLocalTerminal,
+      icon: 'terminal',
+      keywords: [
+        'terminal',
+        'local',
+        'shell',
+        'pty',
+        '本地终端',
+        '本機終端',
+        'ローカル',
+        '로컬',
+        labels.newLocalTerminal,
+      ],
+      group: 'actions',
+      run: () => {
+        void ctx.openLocalTerminal?.()
+      },
+    })
+  }
+
+  if (labels.quickConnect && (ctx.openQuickConnect || ctx.enterTerminals)) {
+    actions.push({
+      id: 'action-quick-connect',
+      label: labels.quickConnect,
+      icon: 'terminal',
+      keywords: [
+        'quick',
+        'connect',
+        'recent',
+        'ssh',
+        '快捷连接',
+        '快捷連線',
+        'クイック',
+        '빠른 연결',
+        labels.quickConnect,
+      ],
+      group: 'actions',
+      run: () => {
+        if (ctx.openQuickConnect) void ctx.openQuickConnect()
+        else void ctx.enterTerminals?.()
+      },
+    })
+  }
 
   const appearance: GlobalCommand[] = [
     {

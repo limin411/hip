@@ -1501,6 +1501,15 @@ export const ja = {
       "uploadHere": "このフォルダにアップロード",
       "emptyDir": "空のフォルダ"
     },
+    "localFs": {
+      "panelTitle": "ファイル",
+      "launchDir": "起動ディレクトリ",
+      "loading": "読み込み中…",
+      "loadError": "ローカルファイルを一覧表示できません",
+      "retry": "再試行",
+      "refresh": "更新",
+      "emptyDir": "空のフォルダ"
+    },
     "form": {
       "createTitle": "新しい接続",
       "editTitle": "接続を編集",
@@ -1979,6 +1988,12 @@ export const ja = {
       "copyName": "名前をコピー",
       "refresh": "更新"
     },
+    "termFs": {
+      "copyPath": "パスをコピー",
+      "copyName": "名前をコピー",
+      "refresh": "更新",
+      "openContainingFolder": "親フォルダを開く"
+    },
     "filePreview": {
       "copyPath": "パスをコピー",
       "copyContent": "内容をコピー",
@@ -2030,6 +2045,9 @@ export const ja = {
       "keyboardShortcuts": "キーボードショートカット",
       "changeTheme": "テーマを変更…"
     },
+    "openTerminals": "端末管理を開く",
+    "newLocalTerminal": "新しいローカル端末",
+    "quickConnect": "クイック接続",
     "settings": {
       "general": "設定：一般",
       "model": "設定：モデル",

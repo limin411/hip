@@ -21,6 +21,8 @@ export type ContextKind =
   | 'managedTerminal'
   /** Remote SFTP tree entry in managed SSH files panel. */
   | 'sftpEntry'
+  /** Local managed-terminal tree entry (term_fs_ls, launch cwd root). */
+  | 'termFsEntry'
   | 'agentConfig'
   | 'skillConfig'
   | 'mcpServer'
@@ -96,6 +98,15 @@ export type ContextPayloadMap = {
     path: string
     name: string
     isDir: boolean
+  }
+  /** Local managed-terminal tree entry (launch cwd root). */
+  termFsEntry: {
+    terminalId: string
+    path: string
+    name: string
+    isDir: boolean
+    /** Launch cwd for open-containing-folder trust boundary. */
+    rootCwd: string
   }
   /**
    * Settings agent row. Hosts supply onEdit/onDelete so menus reuse existing

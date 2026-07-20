@@ -22,6 +22,7 @@ import {
   Link2,
   BookOpen,
   Star,
+  Terminal,
   type LucideIcon,
 } from 'lucide-react'
 import type { GlobalCommand, PaletteIconName } from '../types'
@@ -49,6 +50,7 @@ const ICONS: Record<PaletteIconName, LucideIcon> = {
   puzzle: Puzzle,
   'link-2': Link2,
   'book-open': BookOpen,
+  terminal: Terminal,
 }
 
 function HighlightLabel({ label, search }: { label: string; search?: string }) {

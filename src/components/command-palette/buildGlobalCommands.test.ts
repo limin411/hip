@@ -124,6 +124,45 @@ describe('buildGlobalCommandGroups', () => {
     expect(ids).toContain('nav-settings')
   })
 
+  it('includes terminal management commands when handlers + labels present (K17)', () => {
+    const enterTerminals = vi.fn()
+    const openLocalTerminal = vi.fn()
+    const openQuickConnect = vi.fn()
+    const groups = buildGlobalCommandGroups(
+      makeCtx({
+        labels: {
+          ...labels,
+          openTerminals: 'Open terminal management',
+          newLocalTerminal: 'New local terminal',
+          quickConnect: 'Quick connect',
+        },
+        enterTerminals,
+        openLocalTerminal,
+        openQuickConnect,
+      }),
+    )
+    const items = groups.flatMap((g) => g.items)
+    const ids = items.map((i) => i.id)
+    expect(ids).toContain('nav-terminals')
+    expect(ids).toContain('action-new-local-terminal')
+    expect(ids).toContain('action-quick-connect')
+
+    items.find((i) => i.id === 'nav-terminals')!.run?.()
+    expect(enterTerminals).toHaveBeenCalled()
+    items.find((i) => i.id === 'action-new-local-terminal')!.run?.()
+    expect(openLocalTerminal).toHaveBeenCalled()
+    items.find((i) => i.id === 'action-quick-connect')!.run?.()
+    expect(openQuickConnect).toHaveBeenCalled()
+  })
+
+  it('omits terminal management commands without handlers', () => {
+    const groups = buildGlobalCommandGroups(makeCtx())
+    const ids = groups.flatMap((g) => g.items.map((i) => i.id))
+    expect(ids).not.toContain('nav-terminals')
+    expect(ids).not.toContain('action-new-local-terminal')
+    expect(ids).not.toContain('action-quick-connect')
+  })
+
   it('shows need-session hint when sessionId is null', () => {
     const ctx = makeCtx({ sessionId: null })
     const groups = buildGlobalCommandGroups(ctx)

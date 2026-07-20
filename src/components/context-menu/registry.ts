@@ -30,6 +30,7 @@ import { subAgentProvider } from './providers/subAgent'
 import { terminalProvider } from './providers/terminal'
 import { managedTerminalProvider } from './providers/managedTerminal'
 import { sftpEntryProvider } from './providers/sftpEntry'
+import { termFsEntryProvider } from './providers/termFsEntry'
 import { toolCallProvider } from './providers/toolCall'
 
 /**
@@ -57,6 +58,7 @@ const BUILTIN_PROVIDERS: ContextProvider[] = [
   terminalProvider,
   managedTerminalProvider,
   sftpEntryProvider,
+  termFsEntryProvider,
   toolCallProvider,
 ]
 

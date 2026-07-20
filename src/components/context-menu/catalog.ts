@@ -272,6 +272,36 @@ const STATIC_CATALOG: ContextMenuItemMeta[] = [
     group: 'workspace',
   },
   {
+    id: 'termFs.copyPath',
+    labelKey: 'contextMenu.termFs.copyPath',
+    kind: 'termFsEntry',
+    group: 'clipboard',
+  },
+  {
+    id: 'termFs.copyName',
+    labelKey: 'contextMenu.termFs.copyName',
+    kind: 'termFsEntry',
+    group: 'clipboard',
+  },
+  {
+    id: 'termFs.refresh',
+    labelKey: 'contextMenu.termFs.refresh',
+    kind: 'termFsEntry',
+    group: 'workspace',
+  },
+  {
+    id: 'termFs.refreshParent',
+    labelKey: 'contextMenu.termFs.refresh',
+    kind: 'termFsEntry',
+    group: 'workspace',
+  },
+  {
+    id: 'termFs.openContainingFolder',
+    labelKey: 'contextMenu.termFs.openContainingFolder',
+    kind: 'termFsEntry',
+    group: 'navigation',
+  },
+  {
     id: 'filePreview.copyPath',
     labelKey: 'contextMenu.filePreview.copyPath',
     kind: 'filePreview',

@@ -211,7 +211,13 @@ export function ManagedTerminalSession({ terminalId }: { terminalId: string }) {
         </div>
 
         {kind === 'ssh' ? (
-          <TerminalFilesPanel terminalId={terminalId} remotePath={term.remotePath} />
+          <TerminalFilesPanel
+            terminalId={terminalId}
+            backend="sftp"
+            remotePath={term.remotePath}
+          />
+        ) : kind === 'local' && cwd ? (
+          <TerminalFilesPanel terminalId={terminalId} backend="local" localRoot={cwd} />
         ) : null}
       </div>
 

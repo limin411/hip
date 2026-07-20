@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next'
 import { X } from 'lucide-react'
 import { listenSftpProgress, sftpCancel } from '@/ipc/sftp'
 import { useTerminalFsStore } from '@/store/terminalFsStore'
-import { TerminalFileTree } from './TerminalFileTree'
+import { TerminalFileTree, type TerminalFileTreeBackend } from './TerminalFileTree'
 import { cn } from '@/lib/utils'
 
 function formatBytes(n: number): string {
@@ -14,22 +14,30 @@ function formatBytes(n: number): string {
 }
 
 /**
- * In-page files panel for managed SSH sessions: remote SFTP tree + transfer progress.
+ * In-page files panel for managed terminals.
+ * - SSH: remote SFTP tree + transfer progress
+ * - Local: launch-cwd tree via term_fs_ls (no transfers)
  */
 export function TerminalFilesPanel({
   terminalId,
   remotePath,
+  backend = 'sftp',
+  localRoot,
 }: {
   terminalId: string
   remotePath?: string
+  backend?: TerminalFileTreeBackend
+  /** Launch cwd for local tree root label / open-folder. */
+  localRoot?: string
 }) {
   const { t } = useTranslation()
   const transfers = useTerminalFsStore((s) =>
     s.transfers.filter((x) => x.terminalId === terminalId),
   )
 
-  // Bridge sftp:progress → store (one listener per mount is fine; filter by terminalId).
+  // Bridge sftp:progress → store (SSH only).
   useEffect(() => {
+    if (backend !== 'sftp') return
     let unlisten: (() => void) | undefined
     let cancelled = false
     void listenSftpProgress((ev) => {
@@ -48,7 +56,6 @@ export function TerminalFilesPanel({
         message: ev.message,
       })
       if (ev.phase === 'completed' || ev.phase === 'cancelled' || ev.phase === 'error') {
-        // Keep terminal status briefly then drop.
         window.setTimeout(() => {
           useTerminalFsStore.getState().removeTransfer(ev.opId)
         }, 2500)
@@ -61,20 +68,29 @@ export function TerminalFilesPanel({
       cancelled = true
       unlisten?.()
     }
-  }, [terminalId])
+  }, [terminalId, backend])
+
+  const panelTitle =
+    backend === 'local' ? t('terminals.localFs.panelTitle') : t('terminals.sftp.panelTitle')
+  const initialPath = backend === 'local' ? localRoot : remotePath
 
   return (
     <aside
       className="hidden w-60 shrink-0 flex-col border-l border-border bg-surface-muted/30 sm:flex"
       data-testid="managed-terminal-files"
+      data-backend={backend}
     >
       <div className="flex h-8 shrink-0 items-center border-b border-border/80 px-2.5">
-        <p className="text-meta font-medium text-ink">{t('terminals.sftp.panelTitle')}</p>
+        <p className="text-meta font-medium text-ink">{panelTitle}</p>
       </div>
       <div className="min-h-0 flex-1">
-        <TerminalFileTree terminalId={terminalId} initialPath={remotePath} />
+        <TerminalFileTree
+          terminalId={terminalId}
+          initialPath={initialPath}
+          backend={backend}
+        />
       </div>
-      {transfers.length > 0 ? (
+      {backend === 'sftp' && transfers.length > 0 ? (
         <div
           className="shrink-0 border-t border-border/80 px-2 py-1.5"
           data-testid="sftp-transfers"

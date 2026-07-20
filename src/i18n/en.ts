@@ -1544,6 +1544,15 @@ export const en = {
         uploadHere: 'Upload into this folder',
         emptyDir: 'Empty folder',
       },
+      localFs: {
+        panelTitle: 'Files',
+        launchDir: 'Launch directory',
+        loading: 'Loading…',
+        loadError: 'Could not list local files',
+        retry: 'Retry',
+        refresh: 'Refresh',
+        emptyDir: 'Empty folder',
+      },
       form: {
         createTitle: 'New connection',
         editTitle: 'Edit connection',
@@ -2031,6 +2040,12 @@ export const en = {
         copyName: 'Copy name',
         refresh: 'Refresh',
       },
+      termFs: {
+        copyPath: 'Copy path',
+        copyName: 'Copy name',
+        refresh: 'Refresh',
+        openContainingFolder: 'Open containing folder',
+      },
       filePreview: {
         copyPath: 'Copy path',
         copyContent: 'Copy content',
@@ -2082,6 +2097,9 @@ export const en = {
         keyboardShortcuts: 'Keyboard shortcuts',
         changeTheme: 'Change theme…',
       },
+      openTerminals: 'Open terminal management',
+      newLocalTerminal: 'New local terminal',
+      quickConnect: 'Quick connect',
       settings: {
         general: 'Settings: General',
         model: 'Settings: Model',

@@ -1501,6 +1501,15 @@ export const ko = {
       "uploadHere": "이 폴더에 업로드",
       "emptyDir": "빈 폴더"
     },
+    "localFs": {
+      "panelTitle": "파일",
+      "launchDir": "시작 디렉터리",
+      "loading": "로딩 중…",
+      "loadError": "로컬 파일을 나열할 수 없습니다",
+      "retry": "다시 시도",
+      "refresh": "새로 고침",
+      "emptyDir": "빈 폴더"
+    },
     "form": {
       "createTitle": "새 연결",
       "editTitle": "연결 편집",
@@ -1979,6 +1988,12 @@ export const ko = {
       "copyName": "이름 복사",
       "refresh": "새로 고침"
     },
+    "termFs": {
+      "copyPath": "경로 복사",
+      "copyName": "이름 복사",
+      "refresh": "새로 고침",
+      "openContainingFolder": "포함 폴더 열기"
+    },
     "filePreview": {
       "copyPath": "경로 복사",
       "copyContent": "내용 복사",
@@ -2030,6 +2045,9 @@ export const ko = {
       "keyboardShortcuts": "키보드 단축키",
       "changeTheme": "테마 변경…"
     },
+    "openTerminals": "터미널 관리 열기",
+    "newLocalTerminal": "새 로컬 터미널",
+    "quickConnect": "빠른 연결",
     "settings": {
       "general": "설정: 일반",
       "model": "설정: 모델",

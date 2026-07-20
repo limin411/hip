@@ -1508,6 +1508,15 @@ export const zhCN = {
         uploadHere: '上传到此文件夹',
         emptyDir: '空文件夹',
       },
+      localFs: {
+        panelTitle: '文件',
+        launchDir: '启动目录',
+        loading: '加载中…',
+        loadError: '无法列出本地文件',
+        retry: '重试',
+        refresh: '刷新',
+        emptyDir: '空文件夹',
+      },
       form: {
         createTitle: '新建连接',
         editTitle: '编辑连接',
@@ -1988,6 +1997,12 @@ export const zhCN = {
         copyName: '复制名称',
         refresh: '刷新',
       },
+      termFs: {
+        copyPath: '复制路径',
+        copyName: '复制名称',
+        refresh: '刷新',
+        openContainingFolder: '打开所在文件夹',
+      },
       filePreview: {
         copyPath: '复制路径',
         copyContent: '复制内容',
@@ -2039,6 +2054,9 @@ export const zhCN = {
         keyboardShortcuts: '键盘快捷键',
         changeTheme: '更改主题…',
       },
+      openTerminals: '打开终端管理',
+      newLocalTerminal: '新建本地终端',
+      quickConnect: '快捷连接',
       settings: {
         general: '设置：通用',
         model: '设置：模型',

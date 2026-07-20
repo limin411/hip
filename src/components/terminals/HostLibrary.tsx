@@ -277,11 +277,12 @@ export function HostLibrary() {
           <div className="flex flex-col items-center py-8" data-testid="host-library-empty">
             <EmptyState
               icon={Server}
+              tier="friendly"
               title={t('terminals.emptyLibrary')}
               description={t('terminals.emptyLibraryHint')}
-              className="py-8"
+              className="py-6"
             />
-            <div className="mt-1 flex flex-wrap items-center justify-center gap-2">
+            <div className="-mt-2 flex flex-wrap items-center justify-center gap-2">
               <Button
                 type="button"
                 variant="primary"

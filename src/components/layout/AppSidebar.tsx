@@ -390,13 +390,16 @@ export function AppSidebar() {
 
         {sidebarSection === 'terminals' && TERMINAL_MANAGEMENT ? (
           managedTerminals.length === 0 ? (
-            <p
-              className="px-2 py-4 text-center text-meta text-ink-tertiary"
+            <div
+              className="flex flex-col items-center gap-1 px-3 py-6 text-center"
               role="status"
               data-testid="sidebar-terminals-empty"
             >
-              {t('terminals.sidebarEmpty')}
-            </p>
+              <p className="text-meta text-ink-tertiary">{t('terminals.sidebarEmpty')}</p>
+              <p className="text-caption leading-relaxed text-ink-tertiary/80">
+                {t('terminals.emptyHint')}
+              </p>
+            </div>
           ) : (
             <ul
               className="m-0 list-none p-0"

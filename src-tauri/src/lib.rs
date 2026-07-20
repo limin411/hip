@@ -9,6 +9,7 @@ mod logging;
 mod hip_config;
 mod path_tools;
 mod pty;
+mod term_fs;
 mod terminal_hosts;
 mod terminal_budget;
 mod ssh_path;
@@ -667,6 +668,7 @@ pub fn run() {
             pty::pty_resize,
             pty::pty_kill,
             pty::pty_list,
+            term_fs::term_fs_ls,
             ssh_known_hosts::ssh_known_hosts_get,
             ssh_known_hosts::ssh_trust_host,
             ssh_known_hosts::ssh_remove_host_key,

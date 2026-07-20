@@ -1509,6 +1509,15 @@ export const zhTW = {
       "uploadHere": "上傳到此資料夾",
       "emptyDir": "空資料夾"
     },
+    "localFs": {
+      "panelTitle": "檔案",
+      "launchDir": "啟動目錄",
+      "loading": "載入中…",
+      "loadError": "無法列出本機檔案",
+      "retry": "重試",
+      "refresh": "重新整理",
+      "emptyDir": "空資料夾"
+    },
     "form": {
       "createTitle": "新建連線",
       "editTitle": "編輯連線",
@@ -1987,6 +1996,12 @@ export const zhTW = {
       "copyName": "複製名稱",
       "refresh": "重新整理"
     },
+    "termFs": {
+      "copyPath": "複製路徑",
+      "copyName": "複製名稱",
+      "refresh": "重新整理",
+      "openContainingFolder": "開啟所在資料夾"
+    },
     "filePreview": {
       "copyPath": "複製路徑",
       "copyContent": "複製內容",
@@ -2038,6 +2053,9 @@ export const zhTW = {
       "keyboardShortcuts": "鍵盤快捷鍵",
       "changeTheme": "變更主題…"
     },
+    "openTerminals": "開啟終端管理",
+    "newLocalTerminal": "新建本機終端",
+    "quickConnect": "快捷連線",
     "settings": {
       "general": "設定：一般",
       "model": "設定：模型",

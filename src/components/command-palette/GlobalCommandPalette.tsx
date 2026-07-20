@@ -16,10 +16,13 @@ import { resolveParentForNew } from '@/domain/knowledge/parentForNew'
 import {
   enterKnowledge,
   enterSection,
+  enterTerminalsSection,
   openHistoryFromChrome,
   openSettingsFromChrome,
   openTrashFromChrome,
 } from '@/components/layout/sidebarActions'
+import { TERMINAL_MANAGEMENT } from '@/components/terminals/feature'
+import { useManagedTerminalStore } from '@/store/managedTerminalStore'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
 import {
@@ -103,6 +106,13 @@ export function GlobalCommandPalette() {
       actionNewConversation: t('commandPalette.actions.newConversation'),
       actionKeyboardShortcuts: t('commandPalette.actions.keyboardShortcuts'),
       actionChangeTheme: t('commandPalette.actions.changeTheme'),
+      ...(TERMINAL_MANAGEMENT
+        ? {
+            openTerminals: t('commandPalette.openTerminals'),
+            newLocalTerminal: t('commandPalette.newLocalTerminal'),
+            quickConnect: t('commandPalette.quickConnect'),
+          }
+        : {}),
       themeLight: t('settings.themes.light'),
       themeDark: t('settings.themes.dark'),
       themeSystem: t('settings.themes.system'),
@@ -197,6 +207,25 @@ export function GlobalCommandPalette() {
       },
       searchKnowledgeDocs: (q: string) => searchKnowledgeDocs(q),
       knowledgeIndexReady: knowledgeIndexStatus === 'ready' || isKnowledgeIndexReady(),
+      ...(TERMINAL_MANAGEMENT
+        ? {
+            enterTerminals: () => void enterTerminalsSection(),
+            openLocalTerminal: async () => {
+              await enterTerminalsSection()
+              try {
+                await useManagedTerminalStore.getState().openLocal()
+              } catch (e) {
+                const msg = e instanceof Error ? e.message : String(e ?? '')
+                if (msg.includes('Too many terminals')) {
+                  toast.error(t('terminals.softCap'))
+                } else {
+                  toast.error(msg || t('terminals.errorConnect'))
+                }
+              }
+            },
+            openQuickConnect: () => void enterTerminalsSection(),
+          }
+        : {}),
     }),
     [
       sessions,

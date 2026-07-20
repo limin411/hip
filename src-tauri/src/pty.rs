@@ -425,6 +425,16 @@ impl PtyManager {
             .map(|(k, _)| k.clone())
             .collect()
     }
+
+    /// Launch cwd for a session still present in the map (alive or exited).
+    /// Used by `term_fs_ls` as the fixed tree root for managed local terminals.
+    pub fn launch_cwd(&self, session_id: &str) -> Option<PathBuf> {
+        self.sessions
+            .lock()
+            .unwrap()
+            .get(session_id)
+            .map(|s| s.cwd.clone())
+    }
 }
 
 fn kill_session_handles(sess: &PtySession) {

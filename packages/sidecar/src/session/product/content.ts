@@ -4,7 +4,7 @@
  * Regenerate: yarn product:content
  * Check:      yarn product:content:check
  *
- * contentHash=4fcb1fa84dac5618 skillVersion=2 productVersion=0.1.0
+ * contentHash=2d7c649da492b988 skillVersion=2 productVersion=0.1.0
  */
 
 /** Schema / materialization version for builtin skill files (from packages/product-content/meta.json). */
@@ -296,6 +296,80 @@ Do not claim work ran "in parallel" if only sequential dispatch was used.
 - Installed under \`~/.hip/plugins/\`; registry in \`~/.hip/config/hip-plugins.json\`.
 - A plugin may ship skills, agents, MCP server configs, and hooks.
 - Disable a plugin to drop its contributions from the session.
+
+### Plugin directory structure
+
+Every plugin **must** contain a \`.plugin/plugin.json\` manifest file. Without it, hip will not discover the plugin:
+
+\`\`\`
+~/.hip/plugins/<plugin-id>/
+  .plugin/
+    plugin.json          ← REQUIRED manifest (name, version, skills, etc.)
+  skills/                ← optional, referenced by manifest "skills" field
+    <skill-id>/
+      SKILL.md
+\`\`\`
+
+### \`.plugin/plugin.json\` manifest
+
+**Required fields:**
+
+\`\`\`json
+{
+  "name": "my-plugin",
+  "version": "1.0.0"
+}
+\`\`\`
+
+**Full example** (all optional fields):
+
+\`\`\`json
+{
+  "name": "my-plugin",
+  "version": "1.0.0",
+  "id": "my-plugin",
+  "description": "A sample hip plugin",
+  "author": { "name": "Author Name" },
+  "license": "MIT",
+  "keywords": ["ai", "tools"],
+  "skills": ["./skills/tdd", "./skills/debug"],
+  "mcpServers": "./mcp-config.json",
+  "agents": "./agents.json",
+  "hooks": "./hooks.json"
+}
+\`\`\`
+
+- \`skills\` — a path (or array of paths) to directories containing \`SKILL.md\` files. Paths are relative to the plugin root and must not use \`..\`.
+- \`mcpServers\`, \`agents\`, \`hooks\` — can be specified inline as JSON arrays/objects, or as a path to an external JSON file under the plugin root.
+
+### \`hip-plugins.json\` registry format
+
+The registry maps plugin IDs to absolute paths. Two formats are supported:
+
+**String array format** (recommended for new plugins):
+\`\`\`json
+{
+  "plugins": ["/absolute/path/to/plugin"],
+  "entries": [],
+  "enabled": { "my-plugin": true }
+}
+\`\`\`
+
+**Legacy object format** (uses \`"dir"\` key):
+\`\`\`json
+{
+  "plugins": [
+    { "dir": "/absolute/path/to/plugin", "enabled": true }
+  ]
+}
+\`\`\`
+
+To install a plugin:
+
+1. Clone/download the plugin under \`~/.hip/plugins/<plugin-id>/\`.
+2. Ensure \`.plugin/plugin.json\` exists with at least \`name\` and \`version\`.
+3. Add the absolute path to \`hip-plugins.json\` → \`plugins\` array (string format).
+4. The plugin will be discovered on next session start or after \`plugin:reload\`.
 
 ## MCP
 

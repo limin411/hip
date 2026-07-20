@@ -4,7 +4,7 @@
  * Regenerate: yarn product:content
  * Check:      yarn product:content:check
  *
- * contentHash=4fcb1fa84dac5618 skillVersion=2 productVersion=0.1.0
+ * contentHash=2d7c649da492b988 skillVersion=2 productVersion=0.1.0
  */
 
 export type ProductHelpSectionId = 'overview' | 'memory' | 'config' | 'troubleshooting' | 'agents'
@@ -335,6 +335,80 @@ Do not claim work ran "in parallel" if only sequential dispatch was used.
 - A plugin may ship skills, agents, MCP server configs, and hooks.
 - Disable a plugin to drop its contributions from the session.
 
+### Plugin directory structure
+
+Every plugin **must** contain a \`.plugin/plugin.json\` manifest file. Without it, hip will not discover the plugin:
+
+\`\`\`
+~/.hip/plugins/<plugin-id>/
+  .plugin/
+    plugin.json          ← REQUIRED manifest (name, version, skills, etc.)
+  skills/                ← optional, referenced by manifest "skills" field
+    <skill-id>/
+      SKILL.md
+\`\`\`
+
+### \`.plugin/plugin.json\` manifest
+
+**Required fields:**
+
+\`\`\`json
+{
+  "name": "my-plugin",
+  "version": "1.0.0"
+}
+\`\`\`
+
+**Full example** (all optional fields):
+
+\`\`\`json
+{
+  "name": "my-plugin",
+  "version": "1.0.0",
+  "id": "my-plugin",
+  "description": "A sample hip plugin",
+  "author": { "name": "Author Name" },
+  "license": "MIT",
+  "keywords": ["ai", "tools"],
+  "skills": ["./skills/tdd", "./skills/debug"],
+  "mcpServers": "./mcp-config.json",
+  "agents": "./agents.json",
+  "hooks": "./hooks.json"
+}
+\`\`\`
+
+- \`skills\` — a path (or array of paths) to directories containing \`SKILL.md\` files. Paths are relative to the plugin root and must not use \`..\`.
+- \`mcpServers\`, \`agents\`, \`hooks\` — can be specified inline as JSON arrays/objects, or as a path to an external JSON file under the plugin root.
+
+### \`hip-plugins.json\` registry format
+
+The registry maps plugin IDs to absolute paths. Two formats are supported:
+
+**String array format** (recommended for new plugins):
+\`\`\`json
+{
+  "plugins": ["/absolute/path/to/plugin"],
+  "entries": [],
+  "enabled": { "my-plugin": true }
+}
+\`\`\`
+
+**Legacy object format** (uses \`"dir"\` key):
+\`\`\`json
+{
+  "plugins": [
+    { "dir": "/absolute/path/to/plugin", "enabled": true }
+  ]
+}
+\`\`\`
+
+To install a plugin:
+
+1. Clone/download the plugin under \`~/.hip/plugins/<plugin-id>/\`.
+2. Ensure \`.plugin/plugin.json\` exists with at least \`name\` and \`version\`.
+3. Add the absolute path to \`hip-plugins.json\` → \`plugins\` array (string format).
+4. The plugin will be discovered on next session start or after \`plugin:reload\`.
+
 ## MCP
 
 - Server configs come from hip.toml / plugin synthesis.
@@ -655,6 +729,80 @@ Do not claim work ran "in parallel" if only sequential dispatch was used.
 - A plugin may ship skills, agents, MCP server configs, and hooks.
 - Disable a plugin to drop its contributions from the session.
 
+### Plugin directory structure
+
+Every plugin **must** contain a \`.plugin/plugin.json\` manifest file. Without it, hip will not discover the plugin:
+
+\`\`\`
+~/.hip/plugins/<plugin-id>/
+  .plugin/
+    plugin.json          ← REQUIRED manifest (name, version, skills, etc.)
+  skills/                ← optional, referenced by manifest "skills" field
+    <skill-id>/
+      SKILL.md
+\`\`\`
+
+### \`.plugin/plugin.json\` manifest
+
+**Required fields:**
+
+\`\`\`json
+{
+  "name": "my-plugin",
+  "version": "1.0.0"
+}
+\`\`\`
+
+**Full example** (all optional fields):
+
+\`\`\`json
+{
+  "name": "my-plugin",
+  "version": "1.0.0",
+  "id": "my-plugin",
+  "description": "A sample hip plugin",
+  "author": { "name": "Author Name" },
+  "license": "MIT",
+  "keywords": ["ai", "tools"],
+  "skills": ["./skills/tdd", "./skills/debug"],
+  "mcpServers": "./mcp-config.json",
+  "agents": "./agents.json",
+  "hooks": "./hooks.json"
+}
+\`\`\`
+
+- \`skills\` — a path (or array of paths) to directories containing \`SKILL.md\` files. Paths are relative to the plugin root and must not use \`..\`.
+- \`mcpServers\`, \`agents\`, \`hooks\` — can be specified inline as JSON arrays/objects, or as a path to an external JSON file under the plugin root.
+
+### \`hip-plugins.json\` registry format
+
+The registry maps plugin IDs to absolute paths. Two formats are supported:
+
+**String array format** (recommended for new plugins):
+\`\`\`json
+{
+  "plugins": ["/absolute/path/to/plugin"],
+  "entries": [],
+  "enabled": { "my-plugin": true }
+}
+\`\`\`
+
+**Legacy object format** (uses \`"dir"\` key):
+\`\`\`json
+{
+  "plugins": [
+    { "dir": "/absolute/path/to/plugin", "enabled": true }
+  ]
+}
+\`\`\`
+
+To install a plugin:
+
+1. Clone/download the plugin under \`~/.hip/plugins/<plugin-id>/\`.
+2. Ensure \`.plugin/plugin.json\` exists with at least \`name\` and \`version\`.
+3. Add the absolute path to \`hip-plugins.json\` → \`plugins\` array (string format).
+4. The plugin will be discovered on next session start or after \`plugin:reload\`.
+
 ## MCP
 
 - Server configs come from hip.toml / plugin synthesis.
@@ -962,6 +1110,80 @@ hip 可运行 **内置** LangGraph 智能体、将 **ACP 作为会话主智能�
 - 安装于 \`~/.hip/plugins/\`；注册表在 \`~/.hip/config/hip-plugins.json\`。
 - 插件可附带技能、智能体、MCP 配置与钩子。
 - 禁用插件会从会话中移除其贡献。
+
+### 插件目录结构
+
+每个插件**必须**包含 \`.plugin/plugin.json\` 清单文件。缺少此文件 hip 无法发现插件：
+
+\`\`\`
+~/.hip/plugins/<plugin-id>/
+  .plugin/
+    plugin.json          ← 必需：清单文件（名称、版本、技能等）
+  skills/                ← 可选，由清单中 "skills" 字段引用
+    <skill-id>/
+      SKILL.md
+\`\`\`
+
+### \`.plugin/plugin.json\` 清单
+
+**必填字段：**
+
+\`\`\`json
+{
+  "name": "my-plugin",
+  "version": "1.0.0"
+}
+\`\`\`
+
+**完整示例**（含所有可选字段）：
+
+\`\`\`json
+{
+  "name": "my-plugin",
+  "version": "1.0.0",
+  "id": "my-plugin",
+  "description": "一个 hip 插件示例",
+  "author": { "name": "作者名" },
+  "license": "MIT",
+  "keywords": ["ai", "tools"],
+  "skills": ["./skills/tdd", "./skills/debug"],
+  "mcpServers": "./mcp-config.json",
+  "agents": "./agents.json",
+  "hooks": "./hooks.json"
+}
+\`\`\`
+
+- \`skills\` — 指向包含 \`SKILL.md\` 文件的目录的路径（或路径数组）。路径相对于插件根目录，不可使用 \`..\`。
+- \`mcpServers\`、\`agents\`、\`hooks\` — 可内联指定为 JSON 数组/对象，或指定为插件根目录下外部 JSON 文件的路径。
+
+### \`hip-plugins.json\` 注册表格式
+
+注册表将插件 ID 映射到绝对路径。支持两种格式：
+
+**字符串数组格式**（新插件推荐使用）：
+\`\`\`json
+{
+  "plugins": ["/absolute/path/to/plugin"],
+  "entries": [],
+  "enabled": { "my-plugin": true }
+}
+\`\`\`
+
+**旧版对象格式**（使用 \`"dir"\` 键）：
+\`\`\`json
+{
+  "plugins": [
+    { "dir": "/absolute/path/to/plugin", "enabled": true }
+  ]
+}
+\`\`\`
+
+安装插件的步骤：
+
+1. 将插件克隆/下载到 \`~/.hip/plugins/<plugin-id>/\`。
+2. 确保 \`.plugin/plugin.json\` 存在，至少包含 \`name\` 和 \`version\`。
+3. 将绝对路径添加到 \`hip-plugins.json\` → \`plugins\` 数组（字符串格式）。
+4. 插件将在下次会话启动或执行 \`plugin:reload\` 后被加载。
 
 ## MCP
 

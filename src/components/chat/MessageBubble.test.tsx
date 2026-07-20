@@ -8,6 +8,54 @@ import { MessageBubble } from './MessageBubble'
 vi.mock('@tauri-apps/plugin-shell', () => ({ open: vi.fn() }))
 vi.mock('@/ipc/clipboard', () => ({ copyText: vi.fn() }))
 
+// Mutable flag so tests can toggle PR-5 TurnBlocks without reloading modules.
+const featureState = { interleaved: false }
+vi.mock('./feature', () => ({
+  get TRANSCRIPT_INTERLEAVED_BLOCKS() {
+    return featureState.interleaved
+  },
+}))
+
+const textTimelineMessage = {
+  id: 'm-text',
+  role: 'assistant' as const,
+  content: 'First I will search\n\nHere is the answer',
+  timestamp: Date.now(),
+  timeline: [
+    {
+      kind: 'text' as const,
+      stepSeq: 0,
+      agentId: 'supervisor',
+      role: 'supervisor' as const,
+      content: 'First I will search',
+    },
+    {
+      kind: 'tool' as const,
+      stepSeq: 1,
+      agentId: 'supervisor',
+      role: 'supervisor' as const,
+      callId: 'c1',
+    },
+    {
+      kind: 'text' as const,
+      stepSeq: 2,
+      agentId: 'supervisor',
+      role: 'supervisor' as const,
+      content: 'Here is the answer',
+    },
+  ],
+  toolCalls: [
+    {
+      callId: 'c1',
+      agentId: 'supervisor',
+      name: 'grep',
+      input: '{"pattern":"x"}',
+      status: 'finished' as const,
+      seq: 1,
+    },
+  ],
+}
+
 describe('MessageBubble', () => {
   beforeAll(async () => {
     await i18n.changeLanguage('zh-CN')
@@ -15,6 +63,7 @@ describe('MessageBubble', () => {
 
   beforeEach(() => {
     cleanup()
+    featureState.interleaved = false
   })
   it('renders a user message with content', () => {
     render(
@@ -131,5 +180,66 @@ describe('MessageBubble', () => {
       />,
     )
     expect(screen.queryByTestId('memory-citations-chip')).not.toBeInTheDocument()
+  })
+
+  it('flag off + text steps: content body only, no timeline text blocks (no dual render)', () => {
+    featureState.interleaved = false
+    render(<MessageBubble message={textTimelineMessage as any} />)
+    // Legacy answer body shows joined content
+    expect(screen.getByTestId('message-answer')).toHaveTextContent('First I will search')
+    expect(screen.getByTestId('message-answer')).toHaveTextContent('Here is the answer')
+    // Text steps are not rendered in the process trail
+    expect(screen.queryByTestId('turn-text-block')).not.toBeInTheDocument()
+    // Tools still appear in ActivityBar / TurnTimeline
+    expect(screen.getByTestId('message-process')).toBeInTheDocument()
+    expect(screen.getByTestId('tool-row')).toBeInTheDocument()
+  })
+
+  it('flag on + text steps: interleaved text blocks, no bottom answer body', () => {
+    featureState.interleaved = true
+    render(<MessageBubble message={textTimelineMessage as any} />)
+    // Answer body suppressed to avoid dual render
+    expect(screen.queryByTestId('message-answer')).not.toBeInTheDocument()
+    // Text segments live in the process trail
+    const blocks = screen.getAllByTestId('turn-text-block')
+    expect(blocks).toHaveLength(2)
+    expect(blocks[0]).toHaveTextContent('First I will search')
+    expect(blocks[1]).toHaveTextContent('Here is the answer')
+    expect(screen.getByTestId('turn-timeline').getAttribute('data-interleaved')).toBe('true')
+  })
+
+  it('flag on without text steps still shows content body (legacy fallback)', () => {
+    featureState.interleaved = true
+    render(
+      <MessageBubble
+        message={{
+          id: 'm-legacy',
+          role: 'assistant',
+          content: 'ACP style answer',
+          timestamp: Date.now(),
+          timeline: [
+            {
+              kind: 'tool',
+              stepSeq: 1,
+              agentId: 'supervisor',
+              role: 'supervisor',
+              callId: 'c1',
+            },
+          ],
+          toolCalls: [
+            {
+              callId: 'c1',
+              agentId: 'supervisor',
+              name: 'read_file',
+              input: '{"path":"a.ts"}',
+              status: 'finished',
+              seq: 1,
+            },
+          ],
+        } as any}
+      />,
+    )
+    expect(screen.getByTestId('message-answer')).toHaveTextContent('ACP style answer')
+    expect(screen.queryByTestId('turn-text-block')).not.toBeInTheDocument()
   })
 })

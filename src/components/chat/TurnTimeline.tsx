@@ -87,6 +87,138 @@ function renderToolList(tools: ToolCall[]) {
 /** Parent-shell delegation tools when child agentRuns already represent the work. */
 const PARENT_DELEGATE_SHELL = new Set(['task', 'task_batch', 'dispatch_agent'])
 
+function toolContext(toolCalls: ToolCall[] | undefined, agentRuns: AgentRun[] | undefined) {
+  const byCallId = new Map((toolCalls ?? []).map((tc) => [tc.callId, tc]))
+  const runByAgent = new Map((agentRuns ?? []).map((r) => [r.agentId, r]))
+  const hasNestedChildren = (agentRuns ?? []).some(
+    (r) => r.role !== 'supervisor' && (r.parentAgentId || r.taskInput),
+  )
+  return { byCallId, runByAgent, hasNestedChildren }
+}
+
+/**
+ * Global stepSeq TurnBlocks (KD-2 / KD-9): reasoning + supervisor text + tool in wall-clock
+ * order. Agent identity is an inline badge — no supervisor-first section re-sort.
+ * Subagent narration stays on SubAgentCard / run.output (KD-17); text steps are supervisor only.
+ */
+function buildInterleavedNodes(
+  steps: TimelineStep[] | undefined,
+  toolCalls: ToolCall[] | undefined,
+  agentRuns: AgentRun[] | undefined,
+): JSX.Element[] {
+  const { byCallId, runByAgent, hasNestedChildren } = toolContext(toolCalls, agentRuns)
+  const orderedSteps = [...(steps ?? [])].sort((a, b) => a.stepSeq - b.stepSeq)
+  const items: Array<{ seq: number; node: JSX.Element }> = []
+  const referencedCallIds = new Set<string>()
+
+  for (const step of orderedSteps) {
+    if (step.kind === 'text') {
+      const clean = sanitizeDisplayText(step.content)
+      if (!clean.trim()) continue
+      items.push({
+        seq: step.stepSeq,
+        node: (
+          <div
+            key={`t-${step.agentId}-${step.stepSeq}`}
+            className="min-w-0"
+            data-testid="turn-text-block"
+            data-step-seq={step.stepSeq}
+          >
+            <MarkdownBody content={clean} />
+          </div>
+        ),
+      })
+    } else if (step.kind === 'reasoning') {
+      items.push({
+        seq: step.stepSeq,
+        node: (
+          <ThinkingDisclosure
+            key={`r-${step.agentId}-${step.stepSeq}`}
+            role={step.role}
+            content={step.content}
+          />
+        ),
+      })
+    } else if (step.kind === 'tool') {
+      if (!isSuppressedToolStep(step, byCallId)) {
+        const tool = byCallId.get(step.callId)
+        if (!tool || tool.name === 'write_todos') continue
+        if (
+          hasNestedChildren &&
+          step.role === 'supervisor' &&
+          PARENT_DELEGATE_SHELL.has(tool.name)
+        ) {
+          referencedCallIds.add(tool.callId)
+          continue
+        }
+        referencedCallIds.add(tool.callId)
+        items.push({
+          seq: step.stepSeq,
+          node: (
+            <div
+              key={tool.callId}
+              className="flex gap-2"
+              data-testid="turn-tool-block"
+              data-step-seq={step.stepSeq}
+            >
+              {step.role !== 'supervisor' && (
+                <div className="pt-1">
+                  <AgentBadge role={step.role} />
+                </div>
+              )}
+              <div className="min-w-0 flex-1">
+                <ToolCallRow tool={tool} />
+              </div>
+            </div>
+          ),
+        })
+      } else {
+        const tool = byCallId.get(step.callId)
+        if (tool) referencedCallIds.add(tool.callId)
+      }
+    }
+  }
+
+  const orphans = (toolCalls ?? [])
+    .filter((tc) => {
+      if (tc.name === 'write_todos') return false
+      if (referencedCallIds.has(tc.callId)) return false
+      if (tc.name === 'task') return false
+      if (hasNestedChildren && PARENT_DELEGATE_SHELL.has(tc.name) && tc.agentId === 'supervisor') {
+        return false
+      }
+      return true
+    })
+    .sort((a, b) => a.seq - b.seq)
+
+  for (const tc of orphans) {
+    const run = runByAgent.get(tc.agentId)
+    const role = (run?.role ?? (tc.agentId === 'supervisor' ? 'supervisor' : 'subagent')) as AgentRole
+    items.push({
+      seq: tc.seq,
+      node: (
+        <div
+          key={tc.callId}
+          className="flex gap-2"
+          data-testid="turn-tool-block"
+          data-step-seq={tc.seq}
+        >
+          {role !== 'supervisor' && (
+            <div className="pt-1">
+              <AgentBadge role={role} />
+            </div>
+          )}
+          <div className="min-w-0 flex-1">
+            <ToolCallRow tool={tc} />
+          </div>
+        </div>
+      ),
+    })
+  }
+
+  return items.sort((a, b) => a.seq - b.seq).map((i) => i.node)
+}
+
 interface AgentSection {
   agentId: string
   role: AgentRole
@@ -102,11 +234,7 @@ function buildAgentSections(
   agentRuns: AgentRun[] | undefined,
   t: (key: string, opts?: Record<string, unknown>) => string,
 ): AgentSection[] {
-  const byCallId = new Map((toolCalls ?? []).map((tc) => [tc.callId, tc]))
-  const runByAgent = new Map((agentRuns ?? []).map((r) => [r.agentId, r]))
-  const hasNestedChildren = (agentRuns ?? []).some(
-    (r) => r.role !== 'supervisor' && (r.parentAgentId || r.taskInput),
-  )
+  const { byCallId, runByAgent, hasNestedChildren } = toolContext(toolCalls, agentRuns)
 
   type Bucket = {
     agentId: string
@@ -297,10 +425,21 @@ interface TurnTimelineProps {
   agentRuns?: AgentRun[]
   /** When true, omit TodoChecklist (sticky PlanProgressPanel already shows the live plan). */
   hidePlan?: boolean
+  /**
+   * PR-5 TurnBlocks: global stepSeq list including supervisor text segments.
+   * No agent-section supervisor-first re-sort (KD-9). Flag-off path keeps legacy sections.
+   */
+  interleaved?: boolean
 }
 
 /** Inline per-turn activity, ordered by agent then stepSeq within each agent. */
-export function TurnTimeline({ steps, toolCalls, agentRuns, hidePlan }: TurnTimelineProps) {
+export function TurnTimeline({
+  steps,
+  toolCalls,
+  agentRuns,
+  hidePlan,
+  interleaved,
+}: TurnTimelineProps) {
   const { t } = useTranslation()
   const plan = hidePlan ? null : latestTodos(toolCalls)
 
@@ -308,6 +447,26 @@ export function TurnTimeline({ steps, toolCalls, agentRuns, hidePlan }: TurnTime
   const hasTools = (toolCalls?.length ?? 0) > 0
   const hasRuns = (agentRuns?.length ?? 0) > 0
   if (!hasSteps && !hasTools && !hasRuns) return null
+
+  // TurnBlocks: single global stepSeq stream (reasoning / text / tool).
+  if (interleaved && (hasSteps || hasTools)) {
+    const nodes = buildInterleavedNodes(steps, toolCalls, agentRuns)
+    if (nodes.length === 0 && !(plan && plan.todos.length > 0)) {
+      // Only suppressed shells / empty text — fall through to agentRuns summary if needed.
+      if (!hasRuns) return null
+    } else {
+      return (
+        <div
+          className="mb-0 flex flex-col gap-1"
+          data-testid="turn-timeline"
+          data-interleaved="true"
+        >
+          {plan && plan.todos.length > 0 && <TodoChecklist todos={plan.todos} />}
+          {nodes}
+        </div>
+      )
+    }
+  }
 
   // Multi-agent path: steps and/or tools and/or runs → per-agent sections.
   if (hasSteps || (hasTools && hasRuns) || (hasRuns && (agentRuns?.length ?? 0) > 1)) {

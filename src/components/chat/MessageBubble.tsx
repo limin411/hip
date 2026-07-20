@@ -18,6 +18,7 @@ import { groupByAgent } from '@/lib/turnAgents'
 import { normalizeMessageContent } from '@/lib/normalizeMessageContent'
 import { activityElapsedMs, formatElapsed } from '@/lib/activitySummary'
 import { MarkdownBody } from './MarkdownBody'
+import { TRANSCRIPT_INTERLEAVED_BLOCKS } from './feature'
 
 function formatBytes(bytes?: number): string {
   if (bytes === undefined || bytes === null) return ''
@@ -69,6 +70,14 @@ export function MessageBubble({ message, streaming, isLastAssistant, hidePlan }:
       (message.toolCalls?.length ?? 0) > 0 ||
       (message.agentRuns?.length ?? 0) > 0)
 
+  // PR-5 / KD-2: when interleaved TurnBlocks are on and timeline has supervisor text steps,
+  // render text inside the timeline and skip the bottom answer body (no dual render).
+  // Flag off always uses legacy content body; text steps are skipped in TurnTimeline.
+  const hasTextSteps =
+    !isUser && (message.timeline?.some((s) => s.kind === 'text') ?? false)
+  const interleavedBlocks = TRANSCRIPT_INTERLEAVED_BLOCKS && !isUser
+  const hideAnswerBody = interleavedBlocks && hasTextSteps
+
   const elapsedMs = useMemo(
     () => (isUser || isNotice ? null : activityElapsedMs(message.agentRuns)),
     [isUser, isNotice, message.agentRuns],
@@ -110,6 +119,7 @@ export function MessageBubble({ message, streaming, isLastAssistant, hidePlan }:
               stopped={!!message.stopped}
               hasAssistantContent={!!displayContent.trim()}
               hidePlan={hidePlan}
+              interleaved={interleavedBlocks}
             />
             {nested.map((a) => (
               <SubAgentCard
@@ -120,9 +130,11 @@ export function MessageBubble({ message, streaming, isLastAssistant, hidePlan }:
             ))}
           </div>
         )}
-        <div data-testid="message-answer">
-          <MarkdownBody content={displayContent} />
-        </div>
+        {!hideAnswerBody && (
+          <div data-testid="message-answer">
+            <MarkdownBody content={displayContent} />
+          </div>
+        )}
         {isUser && message.attachments && message.attachments.length > 0 && (
           <div className="mt-2 flex flex-wrap gap-2">
             {message.attachments.map((a) => (

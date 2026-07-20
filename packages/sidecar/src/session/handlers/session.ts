@@ -227,9 +227,8 @@ export function handleSessionMessage(
       const { messages, config } = ctx.loadSession(msg.sessionId)
       const clientConfig = config ? stripPlanApprovalPause(config) : config
       send({ type: 'session:loaded', sessionId: msg.sessionId, messages, config: clientConfig })
-      // After FE clears pending on session:loaded, re-emit plan approval if still paused (D4c.1).
-      live.emitPlanApprovalResyncIfNeeded(send)
-      return
+      // After FE clears pending on session:loaded, re-emit plan approval if still paused (D4c.1 / PR-PA1).
+      return live.emitPlanApprovalResyncIfNeeded(send)
     }
     case 'session:search':
       send({ type: 'session:search:result', query: msg.query, hits: ctx.searchSessions(msg.query) })

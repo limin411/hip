@@ -59,6 +59,7 @@ import { clearForcePlanFlag } from './force-plan.js'
 import type { AgentProfile } from './agent-profile.js'
 import type { PlanMode } from './plan-mode.js'
 import type { ToolOutputStore } from './tool-output-store.js'
+import { clipPlanMarkdown } from './plan-markdown-wire.js'
 import { NetworkPolicy, loadNetworkPolicyConfig } from './network-policy.js'
 import { GuardianReviewer } from './guardian.js'
 import type { SessionInput } from './session-input.js'
@@ -181,11 +182,14 @@ export interface SessionTurnHost {
   inputQueue: SessionInput[]
   steerAbortFlag: boolean
   paused: TurnBase | null
-  /** Persist / clear durable plan-approval pause marker (D4c.1). Optional on hosts without store. */
+  /** Persist / clear durable plan-approval pause marker (D4c.1 / PR-PA1). Optional on hosts without store. */
   persistPlanApprovalPause?: (marker: {
     turnId: string
     plan: PlanItem[]
     question: string
+    markdown?: string
+    planPath?: string
+    markdownTruncated?: boolean
   }) => void
   clearPlanApprovalPause?: () => void
   modelDirty: boolean
@@ -1433,13 +1437,39 @@ export async function runTurn(host: SessionTurnHost, rawSend: SendFn, base?: {
           ? (finalState.pendingQuestion || PLAN_APPROVAL_QUESTION_TOKEN)
           : (finalState.pendingQuestion ?? PAUSE_QUESTION)
         // Always publish on plan-approval path (D4b) — empty plan still needs UI + FE hydrate.
+        // Always readPlan() so ExitPlanMode and planAutoReady both carry markdown when present (PR-PA1).
         if (isPlanApproval) {
-          send({ type: 'plan:published', sessionId: host.id, turnId, plan: finalState.plan ?? [] })
-          // Durable pause marker so session:load / process restart can resync the approval UI (D4c.1).
+          const plan = finalState.plan ?? []
+          const markdownRaw = await host.planMode.readPlan().catch(() => '')
+          const clipped = clipPlanMarkdown(markdownRaw)
+          const planPath = host.planMode.planFilePath ?? undefined
+          const markdownFields = clipped.text.trim()
+            ? { markdown: clipped.text, markdownTruncated: clipped.truncated }
+            : {}
+          const pathFields = planPath ? { planPath } : {}
+          send({
+            type: 'plan:published',
+            sessionId: host.id,
+            turnId,
+            plan,
+            ...markdownFields,
+            ...pathFields,
+          })
+          // Durable pause marker so session:load / process restart can resync the approval UI (D4c.1 / PR-PA1).
           host.persistPlanApprovalPause?.({
             turnId,
-            plan: finalState.plan ?? [],
+            plan,
             question: interruptQuestion,
+            ...markdownFields,
+            ...pathFields,
+          })
+          logInfo('session', 'plan:published', {
+            sessionId: host.id,
+            turnId,
+            planItemCount: plan.length,
+            markdownLen: clipped.text.length,
+            truncated: clipped.truncated,
+            hasPlanPath: Boolean(planPath),
           })
         }
         // forcePlan is one-shot for "plan before execute" — once a plan is submitted
@@ -1447,6 +1477,7 @@ export async function runTurn(host: SessionTurnHost, rawSend: SendFn, base?: {
         if (isPlanApproval) {
           clearForcePlanFlag(host, send, 'plan_ready')
         }
+        // Lean interrupt context — no markdown (KD-PA-5); FE processes plan:published first.
         const interruptContext = isPlanApproval
           ? JSON.stringify({ kind: 'plan_approval', plan: finalState.plan ?? [] })
           : undefined

@@ -30,6 +30,7 @@ import { addUsage, sumUsage } from './usage.js'
 import { compactMessages, applyCompactResult, estimateTokens, COMPACT_BUDGET_TOKENS, KEEP_RECENT_TURNS, type Summarizer } from './compaction.js'
 import {
   emitPlanApprovalResync,
+  mergePlanApprovalPauseMarker,
   readPlanApprovalPause,
   stripPlanApprovalPause,
   withPlanApprovalPause,
@@ -37,6 +38,7 @@ import {
   type PlanApprovalPauseMarker,
 } from './plan-approval-resync.js'
 import { PLAN_APPROVAL_QUESTION_TOKEN } from './plan-approval-constants.js'
+import { clipPlanMarkdown } from './plan-markdown-wire.js'
 import type { ExternalAgentHooks, PermissionChoice } from './agents/types.js'
 import { HookRegistry } from './hooks/registry.js'
 import type { AgentRunner } from '../orchestrator/ports.js'
@@ -1058,17 +1060,44 @@ export class Session {
   /**
    * Replay plan:published + agent:interrupt after session:loaded (which clears FE pending).
    * Prefer live paused state; fall back to durable config marker.
+   *
+   * KD-PA-12 / PR-PA1: never rebuild a plan-only marker over a rich one. Preserve
+   * durable markdown/path/truncated; re-read plan.md when planMode still has a path
+   * and durable body is missing. Never re-persist a stripped marker.
    */
-  emitPlanApprovalResyncIfNeeded(send: (msg: ServerMessage) => void): void {
+  async emitPlanApprovalResyncIfNeeded(send: (msg: ServerMessage) => void): Promise<void> {
     this.restorePlanApprovalPauseFromConfig()
     if (!this.awaitingResume || !this.paused) return
     if (this.paused.planningMode !== 'plan' || this.paused.planStatus !== 'ready') return
-    const marker: PlanApprovalPauseMarker = {
-      turnId: this.paused.interruptTurnId ?? `plan-resync-${this.id}`,
-      plan: this.paused.plan ?? [],
-      question: PLAN_APPROVAL_QUESTION_TOKEN,
+
+    const durable = readPlanApprovalPause(this._config)
+    const planPath = durable?.planPath ?? this.planMode.planFilePath ?? undefined
+
+    let markdown = durable?.markdown
+    let markdownTruncated = durable?.markdownTruncated
+
+    // Re-read plan.md when durable lacks body but planMode still holds a path (live pause).
+    if (!markdown?.trim() && this.planMode.planFilePath) {
+      const raw = await this.planMode.readPlan().catch(() => '')
+      if (raw.trim()) {
+        const clipped = clipPlanMarkdown(raw)
+        markdown = clipped.text
+        markdownTruncated = clipped.truncated
+      }
     }
-    // Refresh durable marker with resolved turn id.
+
+    const next: PlanApprovalPauseMarker = {
+      turnId: this.paused.interruptTurnId ?? durable?.turnId ?? `plan-resync-${this.id}`,
+      plan: this.paused.plan ?? durable?.plan ?? [],
+      question: durable?.question || PLAN_APPROVAL_QUESTION_TOKEN,
+      ...(markdown?.trim()
+        ? { markdown, markdownTruncated: Boolean(markdownTruncated) }
+        : {}),
+      ...(planPath ? { planPath } : {}),
+    }
+
+    // Never strip rich durable fields when rebuilding (KD-PA-12).
+    const marker = mergePlanApprovalPauseMarker(durable, next)
     this.persistPlanApprovalPause(marker)
     emitPlanApprovalResync(send, this.id, marker)
   }

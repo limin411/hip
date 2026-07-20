@@ -404,7 +404,16 @@ export type ServerMessage =
   /** Incremental plan checklist update (e.g. after write_todos); may fire many times per turn. */
   | { type: 'plan:updated'; sessionId: string; turnId: string; plan: PlanItem[] }
   /** Authoritative plan snapshot at plan-approval boundary (ExitPlanMode / pause). */
-  | { type: 'plan:published'; sessionId: string; turnId: string; plan: PlanItem[] }
+  | {
+      type: 'plan:published'
+      sessionId: string
+      turnId: string
+      plan: PlanItem[]
+      /** plan.md body at publish time; JS string.length units; clipped by sidecar. */
+      markdown?: string
+      planPath?: string
+      markdownTruncated?: boolean
+    }
   /**
    * Ack for every `plan:respond` path (KD-16 / D4e).
    * ok:false when not awaiting (`reason: 'not_awaiting'`) — FE rolls back optimistic UI.

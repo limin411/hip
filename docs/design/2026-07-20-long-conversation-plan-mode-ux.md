@@ -331,15 +331,16 @@ Message.content === contentFromTimeline(timeline) === join(supervisor text burst
 
 | 发射方 | stepSeq |
 |--------|---------|
-| Builtin supervisor | **必填**（TextBurstTracker） |
-| Builtin subagent / managed / background | **省略**（legacy run.output 路径） |
+| Builtin hub supervisor | **必填**（TextBurstTracker，`agentId === 'supervisor'`） |
+| Managed **独立 turn**（image agent 等，D1.7 surface supervisor） | **必填**（TextBurstTracker + `surfaceText` 持久化 text 步；wire `role:'supervisor'`） |
+| Builtin subagent / nested managed / background | **省略**（legacy `run.output` 路径；不写 text 步） |
 | ACP / 旧客户端 | 可省略 → FE content-only（若 agentId 当 supervisor）或 run.output |
 
 #### D1.3 `TextBurstTracker` 算法（sidecar，对称 `ReasoningTracker`）
 
 位置：`packages/sidecar/src/session/tool-trace.ts`（或并列新文件）。
 
-**范围（KD-17）**：tracker **仅对 supervisor** 调用 `push`/`close`。Subagent 的 `emit.token` **不**进入 TextBurstTracker。
+**范围（KD-17）**：tracker 对 **hub supervisor** 与 **managed 独立 turn（surfaceText）** 调用 `push`/`close`。嵌套 subagent 的 `emit.token` **不**进入 TextBurstTracker。
 
 ```ts
 /** Supervisor-only open text burst（实现可用 Map，但 v1 仅 supervisor 一键）。 */

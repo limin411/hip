@@ -573,7 +573,7 @@ fn open_session(
     #[cfg(unix)]
     let pgid = pair.master.process_group_leader();
     #[cfg(not(unix))]
-    let pgid = None;
+    let pgid: Option<i32> = None;
 
     let reader = match pair.master.try_clone_reader() {
         Ok(r) => r,

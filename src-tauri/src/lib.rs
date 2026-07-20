@@ -11,6 +11,9 @@ mod pty;
 mod knowledge;
 mod knowledge_trash;
 mod knowledge_link_index;
+// PR0: compile-path only when `ssh-spike` is enabled (see docs/design/2026-07-20-terminal-ssh-spike.md).
+#[cfg(feature = "ssh-spike")]
+mod ssh_spike;
 
 // Re-export so command handlers and unit tests can use `super::HipConfig` etc.
 use hip_config::{HipConfig, TomlHipConfig, NetworkPolicyConfig};
@@ -531,6 +534,14 @@ pub fn run() {
     // global PATH first so detection (path_tools::which_binaries), the sidecar, and every spawned
     // ACP/CLI agent can find globally-installed tools.
     path_env::ensure_user_path();
+
+    // PR0: when `ssh-spike` is enabled, touch the russh surface so release LTO cannot
+    // fully dead-strip it — needed for honest binary-size measurement. Feature is off
+    // by default; removed/replaced when PR5 lands real ssh_open.
+    #[cfg(feature = "ssh-spike")]
+    {
+        std::hint::black_box(ssh_spike::size_probe_link_anchor());
+    }
 
     let app = tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())

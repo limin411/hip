@@ -14,6 +14,21 @@ edition = "2021"
 name = "hip_lib"
 crate-type = ["staticlib", "cdylib", "rlib"]
 
+[features]
+default = []
+# PR0 spike: optional russh compile path. Not on by default — default `cargo check` stays clean.
+# PR5 will promote to a product `ssh` feature (default-on for release). See docs/design/2026-07-20-terminal-ssh-spike.md.
+ssh-spike = [
+    "dep:russh",
+    "tokio/rt",
+    "tokio/rt-multi-thread",
+    "tokio/net",
+    "tokio/time",
+    "tokio/io-util",
+    "tokio/macros",
+    "tokio/sync",
+]
+
 [build-dependencies]
 tauri-build = { version = "2", features = [] }
 
@@ -44,4 +59,7 @@ base64 = "0.22"
 libc = "0.2"
 # Knowledge link index (per-space SQLite under .hip/).
 rusqlite = { version = "0.32", features = ["bundled"] }
+# PR0 SSH spike only (`ssh-spike` feature). Default crypto backend = aws-lc-rs + flate2 + rsa.
+# See docs/design/2026-07-20-terminal-ssh-spike.md for ring alternative and size notes.
+russh = { version = "0.54", optional = true }
 

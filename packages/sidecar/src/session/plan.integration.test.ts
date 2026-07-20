@@ -237,4 +237,58 @@ describe('plan lifecycle integration', () => {
     const planFile = join(cwd, '.hip', 'plans', 's-plan-reject.json')
     expect(existsSync(planFile)).toBe(false)
   })
+
+  // ──────────────────────────────────────────────────────────────────────────────
+  // D4b: ExitPlanMode without write_todos still publishes empty plan for approval
+  // ──────────────────────────────────────────────────────────────────────────────
+
+  it('empty plan (ExitPlanMode only) still emits plan:published with plan: [] before interrupt', async () => {
+    class EmptyPlanRunner implements ModelRunner {
+      callCount = 0
+      async run(_messages: BaseMessage[], opts: ModelRunOptions): Promise<AIMessage> {
+        this.callCount += 1
+        if (this.callCount === 1) {
+          opts.onText('empty plan')
+          return new AIMessage({
+            content: 'empty plan',
+            tool_calls: [
+              {
+                name: 'EnterPlanMode',
+                args: {},
+                id: 'plan-enter',
+                type: 'tool_call' as const,
+              },
+              {
+                name: 'ExitPlanMode',
+                args: {},
+                id: 'plan-exit',
+                type: 'tool_call' as const,
+              },
+            ],
+          })
+        }
+        opts.onText('done')
+        return new AIMessage('done')
+      }
+    }
+
+    const runner = new EmptyPlanRunner()
+    const session = makeSession('s-plan-empty', runner)
+
+    const events: ServerMessage[] = []
+    await session.sendMessage('plan something', (m) => events.push(m))
+
+    const publishedIdx = events.findIndex((e) => e.type === 'plan:published')
+    const interruptIdx = events.findIndex((e) => e.type === 'agent:interrupt')
+    expect(publishedIdx).toBeGreaterThanOrEqual(0)
+    expect(interruptIdx).toBeGreaterThan(publishedIdx)
+
+    const published = events[publishedIdx] as Extract<ServerMessage, { type: 'plan:published' }>
+    expect(published.plan).toEqual([])
+
+    const interrupt = events[interruptIdx] as Extract<ServerMessage, { type: 'agent:interrupt' }>
+    const ctx = JSON.parse(interrupt.context ?? '{}') as { kind?: string; plan?: unknown }
+    expect(ctx.kind).toBe('plan_approval')
+    expect(ctx.plan).toEqual([])
+  })
 })

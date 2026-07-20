@@ -50,7 +50,11 @@ export function latestTodos(toolCalls?: ToolCall[]): LivePlan | null {
 
 export type PlanPhase = 'planning' | 'awaiting_approval' | 'executing' | 'done'
 export type LivePlanSource = 'activeTurnPlan' | 'write_todos' | 'empty'
-/** Pure UI phase for chip/panel gating (D4a). Includes `off` when nothing to show. */
+/**
+ * Pure UI phase for chip/panel gating (D4a). Includes `off` when nothing to show.
+ * `'pending'` is reserved for design parity and is unused in v1 — forcePlan+idle maps to `off`
+ * (chip alone; no sticky empty bar).
+ */
 export type PlanUiPhase = 'off' | 'pending' | 'planning' | 'awaiting_approval' | 'executing' | 'done'
 
 export interface LivePlanView {
@@ -98,6 +102,8 @@ export interface DerivePlanUiPhaseInput {
 
 /**
  * Pure plan UI phase (D4a gold table). Independent of message list / write_todos.
+ * Not yet wired into chip/panel production paths — `selectLivePlan` remains authoritative
+ * for sticky panel items/source/phase until a follow-up binds this helper for phase-only gates.
  * `selectLivePlan` may still surface write_todos when activeTurnPlan is empty.
  */
 export function derivePlanUiPhase(input: DerivePlanUiPhaseInput): PlanUiPhase {

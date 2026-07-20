@@ -267,6 +267,10 @@ describe('derivePlanUiPhase (D4a gold table)', () => {
     { forcePlan: false, planApprovalPending: false, status: 'error' as const, activeTurnPlan: null, phase: 'off' },
     // pending always wins even if forcePlan still true
     { forcePlan: true, planApprovalPending: true, status: 'idle' as const, activeTurnPlan: null, phase: 'awaiting_approval' },
+    // pending while still running (complete/interrupt race window)
+    { forcePlan: false, planApprovalPending: true, status: 'running' as const, activeTurnPlan: items, phase: 'awaiting_approval' },
+    // forcePlan cleared + sticky items idle → done
+    { forcePlan: true, planApprovalPending: false, status: 'idle' as const, activeTurnPlan: items, phase: 'done' },
   ])(
     'forcePlan=$forcePlan pending=$planApprovalPending status=$status plan=$activeTurnPlan → $phase',
     ({ forcePlan, planApprovalPending, status, activeTurnPlan, phase }) => {

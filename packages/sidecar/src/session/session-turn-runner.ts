@@ -1345,7 +1345,7 @@ export async function runTurn(host: SessionTurnHost, rawSend: SendFn, base?: {
           clearForcePlanFlag(host, send, 'plan_ready')
         }
         const interruptContext = isPlanApproval
-          ? JSON.stringify({ kind: 'plan_approval', plan: finalState.plan })
+          ? JSON.stringify({ kind: 'plan_approval', plan: finalState.plan ?? [] })
           : undefined
         logInfo('session', 'agent:interrupt', {
           sessionId: host.id,

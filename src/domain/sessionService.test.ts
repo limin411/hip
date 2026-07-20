@@ -839,8 +839,27 @@ describe('workspace diff', () => {
     const sess = useDomainStore.getState().sessions.find((s) => s.id === 's1')!
     expect(sess.status).toBe('idle')
     expect(sess.activeTurnPlan).toEqual(planItems)
-    // KD-7: complete does not touch planApprovalPending (seed path never set it)
+    // Seed path never sets pending; KD-7 (complete preserves prior true) is covered in sessionStore.test.ts.
     expect(sess.planApprovalPending).toBeFalsy()
+  })
+
+  it('message:complete preserves prior planApprovalPending true (KD-7 harness)', () => {
+    const t = new FakeTransport()
+    const svc = new SessionService(t)
+    svc.seedPlanApproval('s1')
+    useDomainStore.setState({ activeSessionId: 's1' })
+    const before = useDomainStore.getState().sessions.find((s) => s.id === 's1')!
+    expect(before.planApprovalPending).toBe(true)
+    const plan = before.activeTurnPlan
+    useDomainStore.getState().apply({
+      type: 'message:complete',
+      sessionId: 's1',
+      message: { id: 'm-complete', role: 'assistant', content: 'ready', timestamp: Date.now(), stopped: true },
+    })
+    const after = useDomainStore.getState().sessions.find((s) => s.id === 's1')!
+    expect(after.planApprovalPending).toBe(true)
+    expect(after.activeTurnPlan).toEqual(plan)
+    expect(after.status).toBe('idle')
   })
 
 

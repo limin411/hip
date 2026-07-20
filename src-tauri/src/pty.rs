@@ -17,13 +17,16 @@ use std::sync::mpsc;
 use std::sync::{Arc, Mutex};
 use std::thread;
 use std::time::{Duration, Instant};
-use tauri::{AppHandle, Emitter, State};
+use tauri::{AppHandle, Emitter, Manager, State};
 
 use crate::hip_config::TomlHipConfig;
 use crate::paths;
+use crate::terminal_budget::{self, TerminalBudget, MAX_INTERACTIVE_TERMINALS};
 
-/// Max concurrent PTY sessions (D16).
-pub const MAX_PTY_SESSIONS: usize = 8;
+/// Max concurrent interactive terminals (shared with SSH via TerminalBudget).
+/// Kept as a stable alias for external references / tests.
+#[allow(dead_code)]
+pub const MAX_PTY_SESSIONS: usize = MAX_INTERACTIVE_TERMINALS;
 
 /// Master read size (design: 8–64 KiB; pick 16 KiB).
 const READ_BUF: usize = 16 * 1024;
@@ -59,8 +62,9 @@ pub fn validate_cwd(cwd: &str) -> Result<PathBuf, String> {
 }
 
 /// Soft-cap: allow open if session already has a slot, or **alive** count has room.
+/// Delegates to the shared TerminalBudget helper (K5).
 pub fn soft_cap_allows(alive_count: usize, session_exists: bool, max: usize) -> bool {
-    session_exists || alive_count < max
+    terminal_budget::soft_cap_allows(alive_count, session_exists, max)
 }
 
 /// Whether coalesce buffer should flush (size or time).
@@ -396,12 +400,13 @@ impl PtyManager {
         self.next_generation.fetch_add(1, Ordering::SeqCst)
     }
 
-    pub fn kill_all(&self) {
+    pub fn kill_all(&self, budget: &TerminalBudget) {
         let mut map = self.sessions.lock().unwrap();
         let ids: Vec<String> = map.keys().cloned().collect();
         for id in ids {
             if let Some(sess) = map.remove(&id) {
                 kill_session_handles(&sess);
+                budget.release(&id);
             }
         }
     }
@@ -409,14 +414,17 @@ impl PtyManager {
     fn list_ids(&self) -> Vec<String> {
         self.sessions.lock().unwrap().keys().cloned().collect()
     }
-}
 
-/// Count sessions whose `alive` flag is still true.
-fn count_alive(sessions: &HashMap<String, PtySession>) -> usize {
-    sessions
-        .values()
-        .filter(|s| s.alive.load(Ordering::SeqCst))
-        .count()
+    /// Alive session ids only (for interactive_terminal_list).
+    pub fn list_alive_ids(&self) -> Vec<String> {
+        self.sessions
+            .lock()
+            .unwrap()
+            .iter()
+            .filter(|(_, s)| s.alive.load(Ordering::SeqCst))
+            .map(|(k, _)| k.clone())
+            .collect()
+    }
 }
 
 fn kill_session_handles(sess: &PtySession) {
@@ -448,17 +456,19 @@ fn kill_session_handles(sess: &PtySession) {
 pub fn pty_open(
     app: AppHandle,
     state: State<'_, PtyManager>,
+    budget: State<'_, TerminalBudget>,
     session_id: String,
     cwd: String,
     cols: u16,
     rows: u16,
 ) -> Result<PtyOpenResult, String> {
-    open_session(app, &state, session_id, cwd, cols, rows)
+    open_session(app, &state, &budget, session_id, cwd, cols, rows)
 }
 
 fn open_session(
     app: AppHandle,
     state: &PtyManager,
+    budget: &TerminalBudget,
     session_id: String,
     cwd: String,
     cols: u16,
@@ -472,19 +482,15 @@ fn open_session(
     let rows = rows.max(1);
 
     // Reuse / replace under lock, then spawn outside if needed.
-    {
+    // Lock order: Budget checks use TerminalBudget mutex; then PtyManager map.
+    let newly_acquired: bool = {
         let mut map = state.sessions.lock().unwrap();
         let exists = map.contains_key(&session_id);
-        let alive_n = count_alive(&map);
-        if !soft_cap_allows(alive_n, exists, MAX_PTY_SESSIONS) {
-            return Err(format!(
-                "Too many terminals open (max {MAX_PTY_SESSIONS}). Close a session first."
-            ));
-        }
 
         if let Some(sess) = map.get(&session_id) {
             if sess.alive.load(Ordering::SeqCst) && sess.cwd == cwd_path {
-                // Reuse: resize only.
+                // Reuse: resize only. Ensure budget still tracks this id.
+                let _ = budget.try_acquire(&session_id, true);
                 let gen = sess.generation;
                 if let Ok(guard) = sess.master.lock() {
                     if let Some(master) = guard.as_ref() {
@@ -504,46 +510,79 @@ fn open_session(
             // Different cwd or dead: tear down before recreate.
             if let Some(old) = map.remove(&session_id) {
                 kill_session_handles(&old);
+                budget.release(&session_id);
             }
         }
-    }
+
+        // Unified soft cap across PTY + SSH (K5).
+        budget.try_acquire(&session_id, exists)?
+    };
 
     let generation = state.next_gen();
     let shell_pref = load_shell_pref(&app);
-    let shell = resolve_shell(&shell_pref)?;
+    let shell = match resolve_shell(&shell_pref) {
+        Ok(s) => s,
+        Err(e) => {
+            if newly_acquired {
+                budget.release(&session_id);
+            }
+            return Err(e);
+        }
+    };
     let pty_system = portable_pty::native_pty_system();
-    let pair = pty_system
-        .openpty(portable_pty::PtySize {
-            rows,
-            cols,
-            pixel_width: 0,
-            pixel_height: 0,
-        })
-        .map_err(|e| format!("openpty failed: {e}"))?;
+    let pair = match pty_system.openpty(portable_pty::PtySize {
+        rows,
+        cols,
+        pixel_width: 0,
+        pixel_height: 0,
+    }) {
+        Ok(p) => p,
+        Err(e) => {
+            if newly_acquired {
+                budget.release(&session_id);
+            }
+            return Err(format!("openpty failed: {e}"));
+        }
+    };
 
     let mut cmd = portable_pty::CommandBuilder::new(&shell);
     configure_shell_command(&mut cmd, &shell);
     cmd.cwd(&cwd_path);
     // Inherit process env (PATH already fixed by path_env::ensure_user_path).
 
-    let mut child = pair
-        .slave
-        .spawn_command(cmd)
-        .map_err(|e| format!("spawn shell failed: {e}"))?;
+    let mut child = match pair.slave.spawn_command(cmd) {
+        Ok(c) => c,
+        Err(e) => {
+            if newly_acquired {
+                budget.release(&session_id);
+            }
+            return Err(format!("spawn shell failed: {e}"));
+        }
+    };
 
     #[cfg(unix)]
     let pgid = pair.master.process_group_leader();
     #[cfg(not(unix))]
     let pgid = None;
 
-    let reader = pair
-        .master
-        .try_clone_reader()
-        .map_err(|e| format!("clone reader failed: {e}"))?;
-    let writer = pair
-        .master
-        .take_writer()
-        .map_err(|e| format!("take writer failed: {e}"))?;
+    let reader = match pair.master.try_clone_reader() {
+        Ok(r) => r,
+        Err(e) => {
+            if newly_acquired {
+                budget.release(&session_id);
+            }
+            return Err(format!("clone reader failed: {e}"));
+        }
+    };
+    let writer = match pair.master.take_writer() {
+        Ok(w) => w,
+        Err(e) => {
+            if newly_acquired {
+                budget.release(&session_id);
+            }
+            return Err(format!("take writer failed: {e}"));
+        }
+    };
 
     let killer = child.clone_killer();
 
@@ -564,18 +603,10 @@ fn open_session(
 
     {
         let mut map = state.sessions.lock().unwrap();
-        // Re-check soft cap after spawn (race with other opens).
-        let exists = map.contains_key(&session_id);
-        let alive_n = count_alive(&map);
-        if !soft_cap_allows(alive_n, exists, MAX_PTY_SESSIONS) {
-            kill_session_handles(&sess);
-            return Err(format!(
-                "Too many terminals open (max {MAX_PTY_SESSIONS}). Close a session first."
-            ));
-        }
         // Always kill displaced entry if concurrent open won the race.
         if let Some(displaced) = map.insert(session_id.clone(), sess) {
             kill_session_handles(&displaced);
+            // Displaced id is the same session_id — budget stays with us.
         }
     }
 
@@ -592,6 +623,10 @@ fn open_session(
         .spawn(move || {
             let status = child.wait();
             wait_alive.store(false, Ordering::SeqCst);
+            // Free unified budget slot so SSH/other PTYs can open.
+            if let Some(budget) = wait_app.try_state::<TerminalBudget>() {
+                budget.release(&wait_id);
+            }
             let code = status.ok().map(|s| s.exit_code() as i32);
             let _ = wait_app.emit(
                 "pty:exit",
@@ -604,7 +639,12 @@ fn open_session(
             // Leave entry until pty_kill / open replace — frontend may Restart.
             // Mark dead only via alive flag; map entry cleared on kill/open.
         })
-        .map_err(|e| format!("spawn wait thread: {e}"))?;
+        .map_err(|e| {
+            if newly_acquired {
+                budget.release(&session_id);
+            }
+            format!("spawn wait thread: {e}")
+        })?;
 
     Ok(PtyOpenResult {
         reused: false,
@@ -773,11 +813,18 @@ pub fn pty_resize(
 }
 
 #[tauri::command]
-pub fn pty_kill(state: State<'_, PtyManager>, session_id: String) -> Result<(), String> {
+pub fn pty_kill(
+    state: State<'_, PtyManager>,
+    budget: State<'_, TerminalBudget>,
+    session_id: String,
+) -> Result<(), String> {
     // Idempotent on all platforms.
     let mut map = state.sessions.lock().unwrap();
     if let Some(sess) = map.remove(&session_id) {
         kill_session_handles(&sess);
+        budget.release(&session_id);
+    } else {
+        budget.release(&session_id);
     }
     Ok(())
 }
@@ -873,7 +920,8 @@ mod tests {
             let mut map = mgr.sessions.lock().unwrap();
             assert!(map.remove("missing").is_none());
         }
-        mgr.kill_all(); // no panic
+        let budget = TerminalBudget::new();
+        mgr.kill_all(&budget); // no panic
         assert!(mgr.list_ids().is_empty());
     }
 

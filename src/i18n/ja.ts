@@ -1442,6 +1442,7 @@ export const ja = {
     "close": "閉じる",
     "connecting": "接続中…",
     "cwdMissing": "ディレクトリが存在しません",
+    "hostMissing": "ホストはもう保存されていません",
     "sshComingSoon": "SSH は近日対応",
     "sessionMissing": "端末が見つかりません",
     "noCwd": "作業ディレクトリがありません",
@@ -1449,6 +1450,7 @@ export const ja = {
     "kindSsh": "SSH",
     "statusExited": "終了",
     "statusError": "エラー",
+    "softCap": "開いているターミナルが多すぎます（最大8個、コードパネル端末を含む）。先に1つ閉じてください。",
     "libraryTitle": "接続一覧",
     "librarySubtitle": "保存済みの SSH ホストとグループ",
     "emptyLibrary": "保存済みの接続はまだありません",
@@ -1459,6 +1461,7 @@ export const ja = {
     "deleteHostTitle": "「{{label}}」を削除しますか？",
     "deleteHostBody": "このホストの保存済み認証情報は削除されます。関連する開いているセッションは閉じられます。",
     "errorDelete": "削除に失敗しました。もう一度お試しください。",
+    "errorConnect": "接続に失敗しました。ホスト設定と認証情報を確認してください。",
     "ungrouped": "未分類",
     "groupEmpty": "このグループにホストはありません",
     "hostsCount": "{{count}} 台のホスト",
@@ -1467,6 +1470,20 @@ export const ja = {
     "groupRenameTitle": "グループ名を変更",
     "deleteGroupTitle": "グループ「{{name}}」を削除しますか？",
     "deleteGroupBody": "このグループのホストは未分類になります。ホスト自体は残ります。",
+    "hostKey": {
+      "title": "ホスト鍵が変更されました",
+      "body": "{{host}} の SSH ホスト鍵が以前に信頼した鍵と一致しません。中間者攻撃の可能性があります。",
+      "fingerprint": "新しい指紋",
+      "previousFingerprint": "以前に信頼した指紋",
+      "copyFingerprint": "指紋をコピー",
+      "copied": "コピーしました",
+      "trustAndConnect": "信頼して接続",
+      "trustFailed": "ホスト鍵を保存できませんでした。もう一度お試しください。"
+    },
+    "sftp": {
+      "panelTitle": "ファイル",
+      "comingSoon": "SFTP は近日対応"
+    },
     "form": {
       "createTitle": "新しい接続",
       "editTitle": "接続を編集",

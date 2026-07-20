@@ -1442,6 +1442,7 @@ export const ko = {
     "close": "닫기",
     "connecting": "연결 중…",
     "cwdMissing": "디렉터리가 존재하지 않습니다",
+    "hostMissing": "호스트가 더 이상 저장되어 있지 않습니다",
     "sshComingSoon": "SSH 곧 지원",
     "sessionMissing": "터미널을 찾을 수 없음",
     "noCwd": "작업 디렉터리 없음",
@@ -1449,6 +1450,7 @@ export const ko = {
     "kindSsh": "SSH",
     "statusExited": "종료됨",
     "statusError": "오류",
+    "softCap": "너무 많은 터미널이 열려 있습니다(최대 8개, 코드 패널 터미널 포함). 먼저 하나를 닫으세요.",
     "libraryTitle": "연결 목록",
     "librarySubtitle": "저장된 SSH 호스트 및 그룹",
     "emptyLibrary": "저장된 연결이 없습니다",
@@ -1459,6 +1461,7 @@ export const ko = {
     "deleteHostTitle": "“{{label}}”을(를) 삭제할까요?",
     "deleteHostBody": "이 호스트의 저장된 자격 증명이 제거됩니다. 관련 열린 세션은 닫힙니다.",
     "errorDelete": "삭제에 실패했습니다. 다시 시도하세요.",
+    "errorConnect": "연결에 실패했습니다. 호스트 설정과 자격 증명을 확인하세요.",
     "ungrouped": "그룹 없음",
     "groupEmpty": "이 그룹에 호스트가 없습니다",
     "hostsCount": "호스트 {{count}}개",
@@ -1467,6 +1470,20 @@ export const ko = {
     "groupRenameTitle": "그룹 이름 변경",
     "deleteGroupTitle": "그룹 “{{name}}”을(를) 삭제할까요?",
     "deleteGroupBody": "이 그룹의 호스트는 그룹 없음으로 이동합니다. 호스트 자체는 유지됩니다.",
+    "hostKey": {
+      "title": "호스트 키가 변경됨",
+      "body": "{{host}}의 SSH 호스트 키가 이전에 신뢰한 키와 일치하지 않습니다. 중간자 공격일 수 있습니다.",
+      "fingerprint": "새 지문",
+      "previousFingerprint": "이전에 신뢰한 지문",
+      "copyFingerprint": "지문 복사",
+      "copied": "복사됨",
+      "trustAndConnect": "신뢰하고 연결",
+      "trustFailed": "호스트 키를 저장할 수 없습니다. 다시 시도하세요."
+    },
+    "sftp": {
+      "panelTitle": "파일",
+      "comingSoon": "SFTP 곧 지원"
+    },
     "form": {
       "createTitle": "새 연결",
       "editTitle": "연결 편집",

@@ -2,6 +2,8 @@ import { create } from 'zustand'
 import { nanoid } from 'nanoid'
 import { homeDir } from '@tauri-apps/api/path'
 import { ptyKill } from '@/ipc/pty'
+import { sshClose } from '@/ipc/ssh'
+import type { TerminalHost } from '@/ipc/terminalHosts'
 import { useTerminalStore } from '@/store/terminalStore'
 import { useTerminalHostStore } from '@/store/terminalHostStore'
 
@@ -53,7 +55,13 @@ interface ManagedTerminalStore {
   openLocal: (opts?: { cwd?: string; label?: string }) => Promise<string>
 
   /**
-   * Kill backend (local pty), clear ring, remove from list.
+   * Register an SSH managed terminal and focus it.
+   * Actual `ssh_open` happens in ManagedTerminalSession / XtermSurface; pushRecent after success.
+   */
+  openSsh: (host: TerminalHost) => Promise<string>
+
+  /**
+   * Kill backend (local pty / SSH), clear ring, remove from list.
    * Does not clear host catalog recents.
    */
   close: (id: string) => Promise<void>
@@ -70,6 +78,16 @@ export async function recordSuccessfulLocalLaunch(cwd: string, label?: string): 
   await useTerminalHostStore.getState().pushRecent({
     type: 'local',
     cwd,
+    label,
+    at: Date.now(),
+  })
+}
+
+/** After a successful `ssh_open`, record a recent SSH launch (K11). */
+export async function recordSuccessfulSshLaunch(hostId: string, label: string): Promise<void> {
+  await useTerminalHostStore.getState().pushRecent({
+    type: 'ssh',
+    hostId,
     label,
     at: Date.now(),
   })
@@ -114,12 +132,35 @@ export const useManagedTerminalStore = create<ManagedTerminalStore>((set, get) =
     return id
   },
 
+  openSsh: async (host) => {
+    const id = mintManagedTerminalId()
+    const entry: ManagedTerminal = {
+      id,
+      kind: 'ssh',
+      title: host.label?.trim() || `${host.username}@${host.hostname}`,
+      hostId: host.id,
+      remotePath: host.remotePath,
+      createdAt: Date.now(),
+    }
+    useTerminalStore.getState().ensureSession(id)
+    set((s) => ({
+      terminals: [...s.terminals, entry],
+      focusedId: id,
+    }))
+    return id
+  },
+
   close: async (id) => {
     const term = get().getTerminal(id)
     if (!term) {
       // Still try to free native resources if id is known to rings only.
       try {
         await ptyKill(id)
+      } catch {
+        /* already dead */
+      }
+      try {
+        await sshClose(id)
       } catch {
         /* already dead */
       }
@@ -136,8 +177,13 @@ export const useManagedTerminalStore = create<ManagedTerminalStore>((set, get) =
       } catch {
         /* ok if already dead */
       }
+    } else if (term.kind === 'ssh') {
+      try {
+        await sshClose(id)
+      } catch {
+        /* ok if already dead */
+      }
     }
-    // SSH close lands in PR5.
 
     useTerminalStore.getState().clearSession(id)
     set((s) => {

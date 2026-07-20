@@ -77,11 +77,51 @@ export function ptyKill(sessionId: string): Promise<void> {
   return invoke('pty_kill', { sessionId })
 }
 
+function appendDecodedData(
+  decoders: Map<string, TextDecoder>,
+  terminalId: string,
+  b64: string,
+): void {
+  const bytes = b64ToBytes(b64)
+  if (!bytes || bytes.length === 0) return
+  // Dev observability: keep-alive rings still append when not attached (D6a).
+  if (import.meta.env.DEV) {
+    const attached =
+      useTerminalStore.getState().attachedTerminalId ??
+      useTerminalStore.getState().attachedSessionId
+    if (terminalId !== attached) {
+      console.debug('[hip] terminal data while unattached', terminalId)
+    }
+  }
+  let dec = decoders.get(terminalId)
+  if (!dec) {
+    dec = new TextDecoder('utf-8', { fatal: false })
+    decoders.set(terminalId, dec)
+  }
+  const text = dec.decode(bytes, { stream: true })
+  if (text) useTerminalStore.getState().appendRing(terminalId, text)
+}
+
+function handleExit(
+  decoders: Map<string, TextDecoder>,
+  terminalId: string,
+  code: number | null,
+  generation?: number,
+): void {
+  const dec = decoders.get(terminalId)
+  if (dec) {
+    const tail = dec.decode()
+    if (tail) useTerminalStore.getState().appendRing(terminalId, tail)
+    decoders.delete(terminalId)
+  }
+  useTerminalStore.getState().setExit(terminalId, code, generation)
+}
+
 /**
  * App-lifetime bridge. Call once when CODE_TERMINAL || TERMINAL_MANAGEMENT is enabled.
  * ONLY mutates terminalStore (appendRing / setExit). Never receives a Terminal.
  * Uses per-id streaming TextDecoder so multi-byte UTF-8 split across events is intact.
- * Listens `pty:*` only until SSH events land (PR5); normalizeTerminalId accepts both field shapes.
+ * Listens `pty:*` and `ssh:*`; normalizeTerminalId accepts sessionId | terminalId.
  */
 export async function startTerminalBridge(): Promise<() => void> {
   const decoders = new Map<string, TextDecoder>()
@@ -89,42 +129,28 @@ export async function startTerminalBridge(): Promise<() => void> {
   const u1: UnlistenFn = await listen<PtyDataPayload>('pty:data', (e) => {
     const terminalId = normalizeTerminalId(e.payload)
     if (!terminalId) return
-    const { data } = e.payload
-    const bytes = b64ToBytes(data)
-    if (!bytes || bytes.length === 0) return
-    // Dev observability: keep-alive rings still append when not attached (D6a).
-    if (import.meta.env.DEV) {
-      const attached =
-        useTerminalStore.getState().attachedTerminalId ??
-        useTerminalStore.getState().attachedSessionId
-      if (terminalId !== attached) {
-        console.debug('[hip] terminal data while unattached', terminalId)
-      }
-    }
-    let dec = decoders.get(terminalId)
-    if (!dec) {
-      dec = new TextDecoder('utf-8', { fatal: false })
-      decoders.set(terminalId, dec)
-    }
-    const text = dec.decode(bytes, { stream: true })
-    if (text) useTerminalStore.getState().appendRing(terminalId, text)
+    appendDecodedData(decoders, terminalId, e.payload.data)
   })
   const u2: UnlistenFn = await listen<PtyExitPayload>('pty:exit', (e) => {
     const terminalId = normalizeTerminalId(e.payload)
     if (!terminalId) return
-    const { code, generation } = e.payload
-    // Flush any pending multi-byte sequence for this session.
-    const dec = decoders.get(terminalId)
-    if (dec) {
-      const tail = dec.decode()
-      if (tail) useTerminalStore.getState().appendRing(terminalId, tail)
-      decoders.delete(terminalId)
-    }
-    useTerminalStore.getState().setExit(terminalId, code, generation)
+    handleExit(decoders, terminalId, e.payload.code, e.payload.generation)
+  })
+  const u3: UnlistenFn = await listen<PtyDataPayload>('ssh:data', (e) => {
+    const terminalId = normalizeTerminalId(e.payload)
+    if (!terminalId) return
+    appendDecodedData(decoders, terminalId, e.payload.data)
+  })
+  const u4: UnlistenFn = await listen<PtyExitPayload>('ssh:exit', (e) => {
+    const terminalId = normalizeTerminalId(e.payload)
+    if (!terminalId) return
+    handleExit(decoders, terminalId, e.payload.code ?? null, e.payload.generation)
   })
   return () => {
     u1()
     u2()
+    u3()
+    u4()
     decoders.clear()
   }
 }

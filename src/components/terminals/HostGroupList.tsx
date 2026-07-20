@@ -12,6 +12,8 @@ export interface HostGroupListProps {
   onDeleteHost: (host: TerminalHost) => void
   onRenameGroup: (group: HostGroup) => void
   onDeleteGroup: (group: HostGroup) => void
+  onConnectHost?: (host: TerminalHost) => void
+  connectBusy?: boolean
 }
 
 /** Flat group list with hosts under each section (K19 — no nesting). */
@@ -22,6 +24,8 @@ export function HostGroupList({
   onDeleteHost,
   onRenameGroup,
   onDeleteGroup,
+  onConnectHost,
+  connectBusy,
 }: HostGroupListProps) {
   const { t } = useTranslation()
 
@@ -94,6 +98,8 @@ export function HostGroupList({
                     host={h}
                     onEdit={onEditHost}
                     onDelete={onDeleteHost}
+                    onConnect={onConnectHost}
+                    connectBusy={connectBusy}
                   />
                 ))}
               </ul>
@@ -116,7 +122,14 @@ export function HostGroupList({
           ) : null}
           <ul className="m-0 flex list-none flex-col gap-1 p-0">
             {ungrouped.map((h) => (
-              <HostRow key={h.id} host={h} onEdit={onEditHost} onDelete={onDeleteHost} />
+              <HostRow
+                key={h.id}
+                host={h}
+                onEdit={onEditHost}
+                onDelete={onDeleteHost}
+                onConnect={onConnectHost}
+                connectBusy={connectBusy}
+              />
             ))}
           </ul>
         </section>
@@ -129,10 +142,14 @@ function HostRow({
   host,
   onEdit,
   onDelete,
+  onConnect,
+  connectBusy,
 }: {
   host: TerminalHost
   onEdit: (h: TerminalHost) => void
   onDelete: (h: TerminalHost) => void
+  onConnect?: (h: TerminalHost) => void
+  connectBusy?: boolean
 }) {
   const { t } = useTranslation()
   const subtitle = `${host.username}@${host.hostname}:${host.port}`
@@ -155,9 +172,10 @@ function HostRow({
           type="button"
           variant="secondary"
           size="sm"
-          disabled
-          title={t('terminals.sshComingSoon')}
+          disabled={!onConnect || connectBusy}
+          title={t('terminals.connect')}
           data-testid={`host-connect-${host.id}`}
+          onClick={() => onConnect?.(host)}
         >
           <Plug size={13} aria-hidden />
           {t('terminals.connect')}

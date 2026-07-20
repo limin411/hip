@@ -10,12 +10,15 @@ mod hip_config;
 mod path_tools;
 mod pty;
 mod terminal_hosts;
+mod terminal_budget;
+mod ssh_path;
+mod ssh_known_hosts;
 mod knowledge;
 mod knowledge_trash;
 mod knowledge_link_index;
-// PR0: compile-path only when `ssh-spike` is enabled (see docs/design/2026-07-20-terminal-ssh-spike.md).
-#[cfg(feature = "ssh-spike")]
-mod ssh_spike;
+// Production SSH (default feature `ssh`).
+#[cfg(feature = "ssh")]
+mod ssh_session;
 
 // Re-export so command handlers and unit tests can use `super::HipConfig` etc.
 use hip_config::{HipConfig, TomlHipConfig, NetworkPolicyConfig};
@@ -530,6 +533,38 @@ fn write_text_file(path: String, contents: String) -> Result<(), String> {
     std::fs::write(&dest, contents).map_err(|e| e.to_string())
 }
 
+/// Union of alive PTY + SSH ids for UI badges / soft-cap pre-check.
+#[derive(Clone, serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+struct InteractiveTerminalEntry {
+    id: String,
+    kind: String, // "pty" | "ssh"
+}
+
+#[tauri::command]
+fn interactive_terminal_list(
+    pty: tauri::State<'_, pty::PtyManager>,
+    #[cfg(feature = "ssh")] manager: tauri::State<'_, ssh_session::SshManager>,
+) -> Result<Vec<InteractiveTerminalEntry>, String> {
+    let mut out = Vec::new();
+    for id in pty.list_alive_ids() {
+        out.push(InteractiveTerminalEntry {
+            id,
+            kind: "pty".into(),
+        });
+    }
+    #[cfg(feature = "ssh")]
+    {
+        for id in manager.list_alive_ids() {
+            out.push(InteractiveTerminalEntry {
+                id,
+                kind: "ssh".into(),
+            });
+        }
+    }
+    Ok(out)
+}
+
 /// Instant catalog for UI boot: cache or bundled snapshot only (no network).
 #[tauri::command]
 fn models_catalog(app: tauri::AppHandle) -> Result<String, String> {
@@ -550,21 +585,19 @@ pub fn run() {
     // ACP/CLI agent can find globally-installed tools.
     path_env::ensure_user_path();
 
-    // PR0: when `ssh-spike` is enabled, touch the russh surface so release LTO cannot
-    // fully dead-strip it — needed for honest binary-size measurement. Feature is off
-    // by default; removed/replaced when PR5 lands real ssh_open.
-    #[cfg(feature = "ssh-spike")]
-    {
-        std::hint::black_box(ssh_spike::size_probe_link_anchor());
-    }
-
     let app = tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_wdio_webdriver::init())
         .manage(SidecarState::new())
-        .manage(pty::PtyManager::new())
+        .manage(terminal_budget::TerminalBudget::new())
+        .manage(pty::PtyManager::new());
+
+    #[cfg(feature = "ssh")]
+    let app = app.manage(ssh_session::SshManager::new());
+
+    let app = app
         .setup(|app| {
             let handle = app.handle().clone();
             tauri::async_runtime::spawn(async move {
@@ -623,6 +656,15 @@ pub fn run() {
             pty::pty_resize,
             pty::pty_kill,
             pty::pty_list,
+            ssh_known_hosts::ssh_known_hosts_get,
+            ssh_known_hosts::ssh_trust_host,
+            ssh_known_hosts::ssh_remove_host_key,
+            interactive_terminal_list,
+            ssh_session::ssh_open,
+            ssh_session::ssh_write,
+            ssh_session::ssh_resize,
+            ssh_session::ssh_close,
+            ssh_session::ssh_list,
             knowledge::knowledge_ensure_root,
             knowledge::knowledge_list_spaces,
             knowledge::knowledge_create_space,
@@ -687,7 +729,14 @@ pub fn run() {
             }
             // Product CLI discovery file must not outlive the host.
             crate::sidecar::remove_discovery_file(app_handle);
-            app_handle.state::<pty::PtyManager>().kill_all();
+            let budget = app_handle.state::<terminal_budget::TerminalBudget>();
+            app_handle.state::<pty::PtyManager>().kill_all(&budget);
+            #[cfg(feature = "ssh")]
+            {
+                app_handle
+                    .state::<ssh_session::SshManager>()
+                    .kill_all(&budget);
+            }
         }
         // On macOS, closing the (single) window does not quit the app by default,
         // which would leave the sidecar running. For this single-window app, treat

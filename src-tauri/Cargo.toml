@@ -15,10 +15,10 @@ name = "hip_lib"
 crate-type = ["staticlib", "cdylib", "rlib"]
 
 [features]
-default = []
-# PR0 spike: optional russh compile path. Not on by default — default `cargo check` stays clean.
-# PR5 will promote to a product `ssh` feature (default-on for release). See docs/design/2026-07-20-terminal-ssh-spike.md.
-ssh-spike = [
+# Product SSH (russh) is default-on after PR5. Emergency: `--no-default-features` strips SSH.
+default = ["ssh"]
+# Production SSH interactive shell + TOFU. See docs/design/2026-07-20-terminal-management.md.
+ssh = [
     "dep:russh",
     "tokio/rt",
     "tokio/rt-multi-thread",
@@ -28,6 +28,8 @@ ssh-spike = [
     "tokio/macros",
     "tokio/sync",
 ]
+# PR0 spike alias — kept so older docs/commands still work.
+ssh-spike = ["ssh"]
 
 [build-dependencies]
 tauri-build = { version = "2", features = [] }
@@ -41,6 +43,7 @@ serde_json = "1"
 tauri-plugin-dialog = "2"
 tauri-plugin-shell = "2"
 tauri-plugin-wdio-webdriver = "1"
+# `sync` always; SSH feature expands rt/net/time/io-util/macros (see [features].ssh).
 tokio = { version = "1", features = ["sync"] }
 # Pinned to 0.12 (rustls-tls): bumping to 0.13 to dedupe the transitive 0.13.4 fails
 # here — 0.13's `rustls` feature requires aws-lc-rs ^1.14, unavailable in this index.

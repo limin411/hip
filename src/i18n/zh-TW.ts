@@ -1450,6 +1450,7 @@ export const zhTW = {
     "close": "關閉",
     "connecting": "正在連線…",
     "cwdMissing": "目錄不存在",
+    "hostMissing": "主機已不存在",
     "sshComingSoon": "SSH 即將就緒",
     "sessionMissing": "終端不存在",
     "noCwd": "無工作目錄",
@@ -1457,6 +1458,7 @@ export const zhTW = {
     "kindSsh": "SSH",
     "statusExited": "已退出",
     "statusError": "錯誤",
+    "softCap": "開啟的終端過多（最多 8 個，含程式碼面板終端）。請先關閉一個。",
     "libraryTitle": "連線庫",
     "librarySubtitle": "已儲存的 SSH 主機與分組",
     "emptyLibrary": "還沒有儲存的連線",
@@ -1467,6 +1469,7 @@ export const zhTW = {
     "deleteHostTitle": "刪除「{{label}}」？",
     "deleteHostBody": "將刪除該主機的已儲存憑證。與此主機相關的開啟工作階段將被關閉。",
     "errorDelete": "刪除失敗，請重試。",
+    "errorConnect": "連線失敗。請檢查主機設定與憑證。",
     "ungrouped": "未分組",
     "groupEmpty": "該分組下暫無主機",
     "hostsCount": "{{count}} 台主機",
@@ -1475,6 +1478,20 @@ export const zhTW = {
     "groupRenameTitle": "重新命名分組",
     "deleteGroupTitle": "刪除分組「{{name}}」？",
     "deleteGroupBody": "該分組下的主機會變為未分組，主機本身不會被刪除。",
+    "hostKey": {
+      "title": "主機金鑰已變更",
+      "body": "主機 {{host}} 的 SSH 金鑰與先前信任的金鑰不一致。這可能表示存在中間人攻擊。",
+      "fingerprint": "新指紋",
+      "previousFingerprint": "先前信任的指紋",
+      "copyFingerprint": "複製指紋",
+      "copied": "已複製",
+      "trustAndConnect": "信任並連線",
+      "trustFailed": "無法儲存主機金鑰，請重試。"
+    },
+    "sftp": {
+      "panelTitle": "檔案",
+      "comingSoon": "SFTP 即將就緒"
+    },
     "form": {
       "createTitle": "新建連線",
       "editTitle": "編輯連線",

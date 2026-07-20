@@ -70,7 +70,7 @@ export function AppLayout() {
 
   // App-lifetime terminal event bridge → terminalStore only (D6a). Never writes xterm.
   // Single bridge when either code-panel or terminal-management needs rings.
-  // Listens pty:* only until SSH (PR5); normalizeTerminalId accepts sessionId | terminalId.
+  // Listens pty:* + ssh:*; normalizeTerminalId accepts sessionId | terminalId.
   useEffect(() => {
     if (!CODE_TERMINAL && !TERMINAL_MANAGEMENT) return
     let stop: (() => void) | undefined

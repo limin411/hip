@@ -7,6 +7,7 @@ import type { TerminalHost } from '@/ipc/terminalHosts'
 const removeHost = vi.fn().mockResolvedValue(undefined)
 const load = vi.fn().mockResolvedValue(undefined)
 const openLocal = vi.fn().mockResolvedValue('tm_x')
+const openSsh = vi.fn().mockResolvedValue('tm_ssh')
 const close = vi.fn().mockResolvedValue(undefined)
 
 let hosts: TerminalHost[] = []
@@ -38,6 +39,7 @@ vi.mock('@/store/managedTerminalStore', () => {
   const store = {
     getState: () => ({
       openLocal,
+      openSsh,
       close,
       terminals: [{ id: 'tm_ssh1', kind: 'ssh', hostId: 'hst_1', title: 'ops', createdAt: 1 }],
       focus: vi.fn(),
@@ -81,6 +83,7 @@ describe('HostLibrary', () => {
     removeHost.mockClear().mockResolvedValue(undefined)
     close.mockClear().mockResolvedValue(undefined)
     openLocal.mockClear().mockResolvedValue('tm_x')
+    openSsh.mockClear().mockResolvedValue('tm_ssh')
   })
 
   afterEach(() => {
@@ -94,7 +97,7 @@ describe('HostLibrary', () => {
     expect(screen.getByTestId('host-library-empty-new-local')).toBeInTheDocument()
   })
 
-  it('lists hosts and disables Connect (SSH not ready)', () => {
+  it('lists hosts and enables Connect (calls openSsh)', async () => {
     hosts = [
       {
         id: 'hst_1',
@@ -109,8 +112,13 @@ describe('HostLibrary', () => {
     render(<HostLibrary />)
     expect(screen.getByTestId('host-row-hst_1')).toBeInTheDocument()
     const connect = screen.getByTestId('host-connect-hst_1')
-    expect(connect).toBeDisabled()
-    expect(connect).toHaveAttribute('title', 'terminals.sshComingSoon')
+    expect(connect).not.toBeDisabled()
+    fireEvent.click(connect)
+    await waitFor(() => {
+      expect(openSsh).toHaveBeenCalledWith(
+        expect.objectContaining({ id: 'hst_1', hostname: '10.0.0.1' }),
+      )
+    })
   })
 
   it('delete confirm force-closes sessions then removeHost', async () => {

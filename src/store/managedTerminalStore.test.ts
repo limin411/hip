@@ -1,11 +1,16 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 const ptyKill = vi.fn(async (_id: string) => {})
+const sshClose = vi.fn(async (_id: string) => {})
 const homeDir = vi.fn(async () => '/Users/test')
 const pushRecent = vi.fn(async (_entry: unknown) => {})
 
 vi.mock('@/ipc/pty', () => ({
   ptyKill: (id: string) => ptyKill(id),
+}))
+
+vi.mock('@/ipc/ssh', () => ({
+  sshClose: (id: string) => sshClose(id),
 }))
 
 vi.mock('@tauri-apps/api/path', () => ({
@@ -26,6 +31,7 @@ import {
   localTerminalTitle,
   mintManagedTerminalId,
   recordSuccessfulLocalLaunch,
+  recordSuccessfulSshLaunch,
   useManagedTerminalStore,
 } from './managedTerminalStore'
 
@@ -47,6 +53,7 @@ describe('managedTerminal helpers', () => {
 describe('managedTerminalStore', () => {
   beforeEach(() => {
     ptyKill.mockReset().mockResolvedValue(undefined)
+    sshClose.mockReset().mockResolvedValue(undefined)
     homeDir.mockReset().mockResolvedValue('/Users/test')
     pushRecent.mockReset()
     useManagedTerminalStore.setState({ terminals: [], focusedId: null })
@@ -117,6 +124,51 @@ describe('managedTerminalStore', () => {
       type: 'local',
       cwd: '/tmp/x',
       label: 'X',
+      at: expect.any(Number),
+    })
+  })
+
+  it('openSsh mints tm_ id, stores hostId, focuses', async () => {
+    const id = await useManagedTerminalStore.getState().openSsh({
+      id: 'hst_1',
+      label: 'ops',
+      hostname: '10.0.0.1',
+      port: 22,
+      username: 'root',
+      authMethod: 'password',
+      updatedAt: 1,
+    })
+    expect(id.startsWith('tm_')).toBe(true)
+    const t = useManagedTerminalStore.getState().getTerminal(id)
+    expect(t).toMatchObject({
+      kind: 'ssh',
+      hostId: 'hst_1',
+      title: 'ops',
+    })
+    expect(useManagedTerminalStore.getState().focusedId).toBe(id)
+  })
+
+  it('close of ssh calls sshClose', async () => {
+    const id = await useManagedTerminalStore.getState().openSsh({
+      id: 'hst_1',
+      label: 'ops',
+      hostname: '10.0.0.1',
+      port: 22,
+      username: 'root',
+      authMethod: 'password',
+      updatedAt: 1,
+    })
+    await useManagedTerminalStore.getState().close(id)
+    expect(sshClose).toHaveBeenCalledWith(id)
+    expect(ptyKill).not.toHaveBeenCalled()
+  })
+
+  it('recordSuccessfulSshLaunch pushes recent', async () => {
+    await recordSuccessfulSshLaunch('hst_1', 'ops')
+    expect(pushRecent).toHaveBeenCalledWith({
+      type: 'ssh',
+      hostId: 'hst_1',
+      label: 'ops',
       at: expect.any(Number),
     })
   })

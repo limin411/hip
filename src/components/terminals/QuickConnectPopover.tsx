@@ -15,12 +15,13 @@ import { cn } from '@/lib/utils'
 
 /**
  * 快捷连接 — last 5 successful launches (K11).
- * Local rows launch immediately; SSH is stubbed until PR5.
+ * Local + SSH rows launch immediately.
  */
 export function QuickConnectPopover() {
   const { t } = useTranslation()
   const [open, setOpen] = useState(false)
   const recents = useTerminalHostStore((s) => s.recents)
+  const hosts = useTerminalHostStore((s) => s.hosts)
   const loaded = useTerminalHostStore((s) => s.loaded)
   const [missingLocal, setMissingLocal] = useState<Record<string, boolean>>({})
   const [launching, setLaunching] = useState(false)
@@ -68,6 +69,24 @@ export function QuickConnectPopover() {
       }
     },
     [missingLocal],
+  )
+
+  const onPickSsh = useCallback(
+    async (r: Extract<RecentLaunch, { type: 'ssh' }>) => {
+      const host = hosts.find((h) => h.id === r.hostId)
+      if (!host) return
+      setLaunching(true)
+      try {
+        await useManagedTerminalStore.getState().openSsh(host)
+        await enterTerminalsSection()
+        setOpen(false)
+      } catch (e) {
+        console.error('[hip] quick connect ssh failed:', e)
+      } finally {
+        setLaunching(false)
+      }
+    },
+    [hosts],
   )
 
   return (
@@ -141,21 +160,31 @@ export function QuickConnectPopover() {
                   </li>
                 )
               }
-              // SSH stub until PR5 — show disabled.
+              const host = hosts.find((h) => h.id === r.hostId)
+              const missing = !host
+              const subtitle = host
+                ? `${host.username}@${host.hostname}:${host.port}`
+                : t('terminals.hostMissing')
               return (
                 <li key={`ssh:${r.hostId}`}>
                   <button
                     type="button"
-                    disabled
-                    title={t('terminals.sshComingSoon')}
+                    disabled={missing || launching}
+                    title={missing ? t('terminals.hostMissing') : subtitle}
                     data-testid={`quick-connect-ssh-${r.hostId}`}
-                    className="flex w-full cursor-not-allowed items-start gap-2 rounded-md px-2 py-1.5 text-left opacity-50"
+                    onClick={() => void onPickSsh(r)}
+                    className={cn(
+                      'flex w-full items-start gap-2 rounded-md px-2 py-1.5 text-left transition-colors',
+                      missing || launching
+                        ? 'cursor-not-allowed opacity-50'
+                        : 'hover:bg-state-hover',
+                    )}
                   >
                     <Terminal size={14} className="mt-0.5 shrink-0 text-ink-tertiary" aria-hidden />
                     <span className="min-w-0 flex-1">
                       <span className="block truncate text-body font-medium text-ink">{r.label}</span>
-                      <span className="block truncate text-caption text-ink-tertiary">
-                        {t('terminals.sshComingSoon')}
+                      <span className="block truncate font-mono text-caption text-ink-tertiary">
+                        {subtitle}
                       </span>
                     </span>
                   </button>

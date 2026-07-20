@@ -1482,6 +1482,7 @@ export const en = {
       close: 'Close',
       connecting: 'Connecting…',
       cwdMissing: 'Directory does not exist',
+      hostMissing: 'Host no longer saved',
       sshComingSoon: 'SSH coming soon',
       sessionMissing: 'Terminal not found',
       noCwd: 'No working directory',
@@ -1489,6 +1490,8 @@ export const en = {
       kindSsh: 'SSH',
       statusExited: 'Exited',
       statusError: 'Error',
+      softCap:
+        'Too many terminals open (max 8, including code-panel terminals). Close one first.',
       libraryTitle: 'Connections',
       librarySubtitle: 'Saved SSH hosts and groups',
       emptyLibrary: 'No saved connections yet',
@@ -1500,6 +1503,7 @@ export const en = {
       deleteHostBody:
         'Saved credentials for this host will be removed. Any open sessions for this host will be closed.',
       errorDelete: 'Could not delete this host. Try again.',
+      errorConnect: 'Could not connect. Check host settings and credentials.',
       ungrouped: 'Ungrouped',
       groupEmpty: 'No hosts in this group',
       hostsCount: '{{count}} hosts',
@@ -1508,6 +1512,20 @@ export const en = {
       groupRenameTitle: 'Rename group',
       deleteGroupTitle: 'Delete group “{{name}}”?',
       deleteGroupBody: 'Hosts in this group will become ungrouped. Hosts themselves are kept.',
+      hostKey: {
+        title: 'Host key changed',
+        body: 'The SSH host key for {{host}} does not match the key previously trusted. This could indicate a man-in-the-middle attack.',
+        fingerprint: 'New fingerprint',
+        previousFingerprint: 'Previously trusted fingerprint',
+        copyFingerprint: 'Copy fingerprint',
+        copied: 'Copied',
+        trustAndConnect: 'Trust and connect',
+        trustFailed: 'Could not save the host key. Try again.',
+      },
+      sftp: {
+        panelTitle: 'Files',
+        comingSoon: 'SFTP coming soon',
+      },
       form: {
         createTitle: 'New connection',
         editTitle: 'Edit connection',

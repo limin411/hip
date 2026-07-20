@@ -3,36 +3,54 @@ import { RotateCcw, X } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { ptyKill, ptyOpen, ptyResize, ptyWrite } from '@/ipc/pty'
 import {
+  parseSshInvokeError,
+  sshClose,
+  sshOpen,
+  sshResize,
+  sshWrite,
+  type HostKeyMismatchError,
+} from '@/ipc/ssh'
+import {
   recordSuccessfulLocalLaunch,
+  recordSuccessfulSshLaunch,
   useManagedTerminalStore,
 } from '@/store/managedTerminalStore'
+import { useTerminalHostStore } from '@/store/terminalHostStore'
 import { useTerminalStore } from '@/store/terminalStore'
 import { DeclarativeContextMenu } from '@/components/context-menu'
 import { XtermSurface } from '@/components/artifact/XtermSurface'
 import { cn } from '@/lib/utils'
+import { HostKeyMismatchModal } from './HostKeyMismatchModal'
 
 /**
- * Focused managed terminal workspace: chrome + shared XtermSurface (PTY backend).
- * Unmount detaches xterm but does not kill PTY (D6a keep-alive).
+ * Focused managed terminal workspace: chrome + shared XtermSurface (PTY or SSH).
+ * Unmount detaches xterm but does not kill backend (D6a keep-alive).
  */
 export function ManagedTerminalSession({ terminalId }: { terminalId: string }) {
   const { t } = useTranslation()
   const term = useManagedTerminalStore((s) => s.terminals.find((x) => x.id === terminalId))
   const [bootKey, setBootKey] = useState(0)
+  const [hostKeyError, setHostKeyError] = useState<HostKeyMismatchError | null>(null)
 
   const cwd = term?.cwd
   const kind = term?.kind ?? 'local'
+  const hostId = term?.hostId
+  const host = useTerminalHostStore((s) =>
+    hostId ? s.hosts.find((h) => h.id === hostId) : undefined,
+  )
 
   const restart = useCallback(async () => {
     try {
-      await ptyKill(terminalId)
+      if (kind === 'ssh') await sshClose(terminalId)
+      else await ptyKill(terminalId)
     } catch {
       /* already dead */
     }
     useTerminalStore.getState().clearSession(terminalId)
     useTerminalStore.getState().ensureSession(terminalId)
+    setHostKeyError(null)
     setBootKey((k) => k + 1)
-  }, [terminalId])
+  }, [terminalId, kind])
 
   const close = useCallback(() => {
     void useManagedTerminalStore.getState().close(terminalId)
@@ -49,20 +67,7 @@ export function ManagedTerminalSession({ terminalId }: { terminalId: string }) {
     )
   }
 
-  if (kind === 'ssh') {
-    // SSH lands in PR5 — keep a stub so list can hold ssh rows later.
-    return (
-      <div
-        className="flex h-full flex-col items-center justify-center gap-2 p-6 text-center text-ink-secondary"
-        data-testid="managed-terminal-ssh-stub"
-      >
-        <p className="text-body font-medium text-ink">{term.title}</p>
-        <p className="text-meta">{t('terminals.sshComingSoon')}</p>
-      </div>
-    )
-  }
-
-  if (!cwd) {
+  if (kind === 'local' && !cwd) {
     return (
       <div
         className="flex h-full items-center justify-center text-meta text-ink-tertiary"
@@ -73,11 +78,29 @@ export function ManagedTerminalSession({ terminalId }: { terminalId: string }) {
     )
   }
 
+  if (kind === 'ssh' && !hostId) {
+    return (
+      <div
+        className="flex h-full items-center justify-center text-meta text-ink-tertiary"
+        data-testid="managed-terminal-no-host"
+      >
+        {t('terminals.sessionMissing')}
+      </div>
+    )
+  }
+
+  const subtitle =
+    kind === 'ssh'
+      ? host
+        ? `${host.username}@${host.hostname}:${host.port}`
+        : hostId
+      : cwd
+
   return (
     <div className="flex h-full min-h-0 flex-col bg-surface" data-testid="managed-terminal-session">
       <DeclarativeContextMenu
         kind="managedTerminal"
-        payload={{ terminalId, kind: 'local', title: term.title }}
+        payload={{ terminalId, kind, title: term.title }}
         className="flex min-h-8 shrink-0 items-center justify-between gap-2 border-b border-border/80 px-2.5 py-1"
         data-testid="managed-terminal-chrome"
       >
@@ -85,18 +108,21 @@ export function ManagedTerminalSession({ terminalId }: { terminalId: string }) {
           className="flex min-w-0 flex-1 items-center justify-between gap-2"
           data-tauri-drag-region="false"
         >
-          {/* Single-line chrome (match code-panel density): title visible, cwd in tooltip. */}
           <span
             className="min-w-0 flex-1 truncate font-mono text-meta text-ink-tertiary"
-            title={`${term.title} — ${cwd}`}
+            title={`${term.title} — ${subtitle ?? ''}`}
             data-testid="managed-terminal-title"
             data-cwd={cwd}
           >
             <span className="font-sans font-medium text-ink">{term.title}</span>
-            <span className="mx-1.5 text-ink-tertiary/60" aria-hidden>
-              ·
-            </span>
-            <span data-testid="managed-terminal-cwd">{cwd}</span>
+            {subtitle ? (
+              <>
+                <span className="mx-1.5 text-ink-tertiary/60" aria-hidden>
+                  ·
+                </span>
+                <span data-testid="managed-terminal-cwd">{subtitle}</span>
+              </>
+            ) : null}
           </span>
           <div className="flex shrink-0 items-center gap-0.5">
             <button
@@ -129,26 +155,82 @@ export function ManagedTerminalSession({ terminalId }: { terminalId: string }) {
         </div>
       </DeclarativeContextMenu>
 
-      <XtermSurface
-        key={bootKey}
-        terminalId={terminalId}
-        backend="pty"
-        cwd={cwd}
-        open={async (cols, rows) => {
-          const result = await ptyOpen(terminalId, cwd, cols, rows)
-          // K11: only true new launches push recents — skip keep-alive remounts (reused).
-          if (!result.reused) {
-            try {
-              await recordSuccessfulLocalLaunch(cwd, term.title)
-            } catch {
-              /* catalog write failure must not break the shell */
-            }
-          }
-          return result
+      <div className="flex min-h-0 flex-1">
+        <div className="min-h-0 min-w-0 flex-1">
+          {kind === 'local' && cwd ? (
+            <XtermSurface
+              key={bootKey}
+              terminalId={terminalId}
+              backend="pty"
+              cwd={cwd}
+              open={async (cols, rows) => {
+                const result = await ptyOpen(terminalId, cwd, cols, rows)
+                if (!result.reused) {
+                  try {
+                    await recordSuccessfulLocalLaunch(cwd, term.title)
+                  } catch {
+                    /* catalog write failure must not break the shell */
+                  }
+                }
+                return result
+              }}
+              write={(data) => ptyWrite(terminalId, data)}
+              resize={(cols, rows) => ptyResize(terminalId, cols, rows)}
+              onRestart={restart}
+            />
+          ) : kind === 'ssh' && hostId ? (
+            <XtermSurface
+              key={bootKey}
+              terminalId={terminalId}
+              backend="ssh"
+              open={async (cols, rows) => {
+                try {
+                  const result = await sshOpen(terminalId, hostId, cols, rows)
+                  if (!result.reused) {
+                    try {
+                      await recordSuccessfulSshLaunch(hostId, term.title)
+                    } catch {
+                      /* ignore catalog errors */
+                    }
+                  }
+                  return result
+                } catch (e) {
+                  const parsed = parseSshInvokeError(e)
+                  if (parsed.hostKeyMismatch) {
+                    setHostKeyError(parsed.hostKeyMismatch)
+                  }
+                  throw e
+                }
+              }}
+              write={(data) => sshWrite(terminalId, data)}
+              resize={(cols, rows) => sshResize(terminalId, cols, rows)}
+              onRestart={restart}
+            />
+          ) : null}
+        </div>
+
+        {kind === 'ssh' ? (
+          <aside
+            className="hidden w-56 shrink-0 flex-col border-l border-border bg-surface-muted/30 p-3 sm:flex"
+            data-testid="managed-terminal-files-placeholder"
+          >
+            <p className="text-meta font-medium text-ink">{t('terminals.sftp.panelTitle')}</p>
+            <p className="mt-1 text-caption text-ink-tertiary">
+              {t('terminals.sftp.comingSoon')}
+            </p>
+          </aside>
+        ) : null}
+      </div>
+
+      <HostKeyMismatchModal
+        open={hostKeyError != null}
+        error={hostKeyError}
+        onCancel={() => setHostKeyError(null)}
+        onTrusted={() => {
+          setHostKeyError(null)
+          // Retry open after pin update.
+          void restart()
         }}
-        write={(data) => ptyWrite(terminalId, data)}
-        resize={(cols, rows) => ptyResize(terminalId, cols, rows)}
-        onRestart={restart}
       />
     </div>
   )

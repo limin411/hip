@@ -17,7 +17,7 @@ import { useHostLibraryUi } from './hostLibraryUi'
 
 /**
  * Host library — default landing when no managed terminal is focused.
- * CRUD for hosts/groups; Connect stays disabled until PR5 (SSH).
+ * CRUD for hosts/groups; Connect opens an SSH managed terminal.
  */
 export function HostLibrary() {
   const { t } = useTranslation()
@@ -36,6 +36,8 @@ export function HostLibrary() {
   const [deletingHost, setDeletingHost] = useState<TerminalHost | null>(null)
   const [deleteBusy, setDeleteBusy] = useState(false)
   const [deleteError, setDeleteError] = useState<string | null>(null)
+  const [connectBusy, setConnectBusy] = useState(false)
+  const [connectError, setConnectError] = useState<string | null>(null)
 
   const [groupDialog, setGroupDialog] = useState<
     null | { mode: 'create' } | { mode: 'rename'; group: HostGroup }
@@ -92,12 +94,30 @@ export function HostLibrary() {
     }
   }, [])
 
+  const connectHost = useCallback(async (host: TerminalHost) => {
+    setConnectBusy(true)
+    setConnectError(null)
+    try {
+      await useManagedTerminalStore.getState().openSsh(host)
+    } catch (e) {
+      console.error('[hip] open ssh terminal failed:', e)
+      const msg = e instanceof Error ? e.message : String(e)
+      if (msg.includes('Too many terminals')) {
+        setConnectError(t('terminals.softCap'))
+      } else {
+        setConnectError(t('terminals.errorConnect'))
+      }
+    } finally {
+      setConnectBusy(false)
+    }
+  }, [t])
+
   const confirmDeleteHost = useCallback(async () => {
     if (!deletingHost) return
     setDeleteBusy(true)
     setDeleteError(null)
     try {
-      // K21: force-close any open managed sessions for this host (SSH lands in PR5).
+      // K21: force-close any open managed sessions for this host.
       const open = useManagedTerminalStore
         .getState()
         .terminals.filter((mt) => mt.hostId === deletingHost.id)
@@ -243,6 +263,15 @@ export function HostLibrary() {
             {error}
           </p>
         ) : null}
+        {connectError ? (
+          <p
+            className="mb-3 rounded-md border border-danger/30 bg-danger/5 px-3 py-2 text-meta text-danger"
+            role="alert"
+            data-testid="host-library-connect-error"
+          >
+            {connectError}
+          </p>
+        ) : null}
 
         {isEmpty ? (
           <div className="flex flex-col items-center py-8" data-testid="host-library-empty">
@@ -283,6 +312,8 @@ export function HostLibrary() {
             onDeleteHost={setDeletingHost}
             onRenameGroup={openRenameGroup}
             onDeleteGroup={setDeletingGroup}
+            onConnectHost={(h) => void connectHost(h)}
+            connectBusy={connectBusy}
           />
         )}
       </div>

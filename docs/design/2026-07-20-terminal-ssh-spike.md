@@ -5,7 +5,7 @@
 | **Title** | `spike(tauri): russh password/ed25519/passphrase + TOFU + binary size` |
 | **Date** | 2026-07-20 |
 | **Status** | Complete (compile-path + findings; gate for PR5) |
-| **Parent design** | [`2026-07-20-terminal-management.md`](./2026-07-20-terminal-management.md) § PR0 / § SSH runtime model |
+| **Parent design** | [`2026-07-20-terminal-management.md`](./2026-07-20-terminal-management.md) § PR0 / § SSH runtime model (in-tree; K4/K7/K16/K22 cited below are defined there) |
 | **Code** | `src-tauri` feature `ssh-spike` → `src-tauri/src/ssh_spike.rs` |
 
 ---
@@ -14,10 +14,10 @@
 
 Prove the **russh** stack is viable for hip terminal management **before** PR5 production SSH work:
 
-1. Password auth API compiles and is callable.
-2. Publickey auth (ed25519 + RSA hash negotiation) compiles.
-3. Encrypted private key + passphrase decrypts.
-4. Host-key TOFU decision model (first-use / match / mismatch + SHA256 fingerprint).
+1. Password auth API compiles and is callable (compile-path / API shape).
+2. Publickey auth (ed25519 + RSA hash negotiation) compiles (compile-path / API shape).
+3. Encrypted private key + passphrase decrypts (**unit-tested**).
+4. Host-key TOFU decision model (first-use / match / mismatch + SHA256 fingerprint) (**unit-tested**).
 5. Tokio features required by russh + Tauri async runtime.
 6. Binary size impact methodology + initial measurement notes.
 7. **Pass/fail gate for PR5.**
@@ -28,20 +28,26 @@ Non-goals for this PR: live network dogfood against a real SSH server, product `
 
 ## Verdict — **PASS** (gate open for PR5)
 
-| Criterion | Result | Notes |
-|-----------|--------|-------|
-| Default `cargo check` (no feature) | **PASS** | `ssh-spike` off by default; zero russh in default graph |
-| `cargo check --features ssh-spike` | **PASS** | See compile proof module |
-| Password auth | **PASS** | `Handle::authenticate_password` |
-| ed25519 publickey | **PASS** | `load_secret_key` / OpenSSH PEM + `authenticate_publickey` |
-| Encrypted key + passphrase | **PASS** | PKCS8 sample + OpenSSH `aes256-ctr` fixture decrypt in unit tests |
-| TOFU + SHA256 fingerprint | **PASS** | `PublicKey::fingerprint(HashAlg::Sha256)` → `SHA256:…`; mismatch path unit-tested |
-| Tokio feature set locked | **PASS** | Documented below |
-| Binary size | **PASS (~+7.0% on macOS aarch64)** | Well under 15% gate with link anchor; re-measure after PR5 wires live `ssh_open` |
-| Windows dogfood (live SSH) | **DEFERRED** | Compile path is cross-platform (`russh` supports Windows; pageant optional). Live password/key dogfood still required on macOS + Windows before PR5 merge to main product path |
-| Fallback needed? | **No** | Do **not** take Alt 7 (system `ssh` in PTY) or ssh2 unless a later live-dogfood failure |
+Proof levels used below:
 
-**PR5 may proceed** on the russh path (K4 / K22). If a later live dogfood fails hard on Windows OpenSSH auth edge cases, escalate to product with ssh2 / Alt 7 as emergency valves only.
+- **compile-path** — API symbols type-check / monomorphize under `--features ssh-spike`; not executed against a live session.
+- **unit-tested** — covered by `cargo test --features ssh-spike ssh_spike` (no network).
+- **live dogfood** — requires a real SSH server (deferred to PR5 shipping checklist).
+
+| Criterion | Result | Proof level | Notes |
+|-----------|--------|-------------|-------|
+| Default `cargo check` (no feature) | **PASS** | default CI | `ssh-spike` off by default; zero russh in default graph |
+| `cargo check --features ssh-spike` | **PASS** | manual (feature off in CI) | See compile proof module |
+| Password auth | **PASS** | **compile-path** | `Handle::authenticate_password` wrapper type-checks; **not** executed vs a session |
+| ed25519 publickey | **PASS** | **compile-path** (+ key load unit-tested) | OpenSSH PEM load unit-tested; `authenticate_publickey` is compile-path only |
+| Encrypted key + passphrase | **PASS** | **unit-tested** | PKCS8 sample + OpenSSH `aes256-ctr` fixture decrypt |
+| TOFU + SHA256 fingerprint | **PASS** | **unit-tested** | `PublicKey::fingerprint(HashAlg::Sha256)` → `SHA256:…`; mismatch path unit-tested |
+| Tokio feature set locked | **PASS** | doc | Documented below |
+| Binary size | **PASS (~+7.0% on macOS aarch64)** | measured | Well under 15% gate with link anchor; re-measure after PR5 wires live `ssh_open` |
+| Windows / macOS live SSH | **DEFERRED** | live dogfood | Compile path is cross-platform. Live password/key dogfood is **required before shipping SSH / merging the PR5 product path to main**; **not** a blocker to start PR5 implementation on a feature branch |
+| Fallback needed? | **No** | decision | Do **not** take Alt 7 (system `ssh` in PTY) or ssh2 unless a later live-dogfood failure |
+
+**PR5 may proceed** on the russh path (parent design K4 primary stack / K22 reject hybrid). If a later live dogfood fails hard on Windows OpenSSH auth edge cases, escalate to product with ssh2 / Alt 7 as emergency valves only.
 
 ---
 
@@ -65,26 +71,29 @@ ssh-spike = [
 ]
 
 [dependencies]
-russh = { version = "0.54", optional = true }
+russh = { version = "0.54", optional = true }  # resolves to 0.54.5 today
 ```
 
 - **Default build:** no `russh`, no extra tokio features beyond existing `sync`.
-- **Spike build:** `cargo check --features ssh-spike` / `cargo test --features ssh-spike ssh_spike`.
-- **PR5 plan:** rename/promote to product feature `ssh` (default-on for release; emergency `default-features` off strips SSH). Keep the same russh version pin unless a security release forces a bump.
+- **Spike build (manual — not in default CI):**  
+  `cargo check --features ssh-spike`  
+  `cargo test --features ssh-spike ssh_spike`  
+  CI `cargo test` / `yarn tauri build` do **not** enable `ssh-spike`, so the 7 spike unit tests are **not** regression-guarded in default CI. Re-run the commands above after any russh / tokio bump.
+- **PR5 plan:** rename/promote to product feature `ssh` (default-on for release; emergency `default-features` off strips SSH). Keep the same russh version pin unless a security release forces a bump (see residual bump policy).
 
 ### Module
 
 `src-tauri/src/ssh_spike.rs` (cfg `feature = "ssh-spike"`):
 
-| Symbol | Proves |
-|--------|--------|
-| `SpikeHandler::check_server_key` | Host-key gate required by `client::Handler` |
-| `authenticate_password` | Password auth |
-| `authenticate_publickey` + `PrivateKeyWithHashAlg` | Publickey + RSA hash alg negotiation |
-| `load_private_key` / `decode_private_key` | Disk + PEM; passphrase `Option<&str>` |
-| `tofu_check` / `sha256_fingerprint` | TOFU decisions + OpenSSH-like fingerprint string |
-| `connect_spike` / `open_shell_channel` | TCP connect + PTY/shell channel shape for PR5 |
-| unit tests | Encrypted PKCS8, OpenSSH ed25519±passphrase, TOFU mismatch |
+| Symbol | Proves | Proof level |
+|--------|--------|-------------|
+| `SpikeHandler::check_server_key` | Host-key gate required by `client::Handler` | compile-path |
+| `authenticate_password` | Password auth API shape | **compile-path only** |
+| `authenticate_publickey` + `PrivateKeyWithHashAlg` | Publickey + RSA hash alg negotiation API shape | **compile-path only** |
+| `load_private_key` / `decode_private_key` | Disk + PEM; passphrase `Option<&str>` | unit-tested (decrypt fixtures; missing-path) |
+| `tofu_check` / `sha256_fingerprint` | TOFU decisions + OpenSSH-like fingerprint string | unit-tested |
+| `connect_spike` / `open_shell_channel` | TCP connect + PTY/shell channel shape for PR5 | compile-path |
+| unit tests | Encrypted PKCS8, OpenSSH ed25519±passphrase, TOFU mismatch | unit-tested |
 
 No Tauri commands are registered — this PR does not change the IPC surface.
 
@@ -92,7 +101,11 @@ No Tauri commands are registered — this PR does not change the IPC surface.
 
 ```bash
 cd src-tauri
+# Default product path (also what CI runs — no ssh-spike)
 cargo check
+cargo test --lib
+
+# Spike path — MANUAL (feature not enabled in CI)
 cargo check --features ssh-spike
 cargo test --features ssh-spike ssh_spike
 ```
@@ -101,19 +114,21 @@ cargo test --features ssh-spike ssh_spike
 
 ## Auth matrix (v1 lock)
 
-| Method | Supported in v1 | russh API | Product UX |
-|--------|-----------------|-----------|------------|
-| Password | **Yes** | `authenticate_password(user, password)` | Host form → raw secret `hip.ssh.<hostId>.password` via existing `set_secret` |
-| Publickey ed25519 | **Yes** | `load_secret_key(path, passphrase?)` + `authenticate_publickey` | `privateKeyPath` in catalog; optional passphrase secret |
-| Publickey RSA | **Yes** | Same; use `best_supported_rsa_hash()` + `PrivateKeyWithHashAlg` | Same path |
-| Encrypted key + passphrase | **Yes** | `load_secret_key(path, Some(passphrase))` | Secret key `hip.ssh.<hostId>.passphrase` |
-| Keyboard-interactive | **No** | Exists on russh (`authenticate_keyboard_interactive_*`) | Clear error “暂不支持” |
-| OpenSSH certificate | **No** (v1) | `authenticate_openssh_cert` exists | Defer |
-| Agent / PKCS11 | **No** | Agent helpers exist; out of scope | Defer |
+| Method | Supported in v1 | russh API | Proof in PR0 | Product UX |
+|--------|-----------------|-----------|--------------|------------|
+| Password | **Yes** | `authenticate_password(user, password)` | **compile-path** | Host form → raw secret `hip.ssh.<hostId>.password` via existing `set_secret` |
+| Publickey ed25519 | **Yes** | `load_secret_key(path, passphrase?)` + `authenticate_publickey` | key load **unit-tested**; auth call **compile-path** | `privateKeyPath` in catalog; optional passphrase secret |
+| Publickey RSA | **Yes** | Same; use `best_supported_rsa_hash()` + `PrivateKeyWithHashAlg` | **compile-path only** — no RSA PEM fixture in PR0 | Same path |
+| Encrypted key + passphrase | **Yes** | `load_secret_key(path, Some(passphrase))` | **unit-tested** (PKCS8 + OpenSSH ed25519 enc) | Secret key `hip.ssh.<hostId>.passphrase` |
+| Keyboard-interactive | **No** | Exists on russh (`authenticate_keyboard_interactive_*`) | n/a | Clear error “暂不支持” |
+| OpenSSH certificate | **No** (v1) | `authenticate_openssh_cert` exists | n/a | Defer |
+| Agent / PKCS11 | **No** | Agent helpers exist; out of scope | n/a | Defer |
+
+**RSA residual:** RSA fixture is **not** unit-tested in PR0; covered by compile-path (`authenticate_publickey` + `best_supported_rsa_hash`) + live dogfood / optional PR5 fixture.
 
 **Key path expand (PR5):** if `privateKeyPath` starts with `~/`, expand via `dirs::home_dir()` (already a hip dependency).
 
-**Passwords never logged** (K16): spike and PR5 must not format credentials into log/error strings.
+**Passwords never logged** (parent design K16): spike and PR5 must not format credentials into log/error strings.
 
 ---
 
@@ -225,7 +240,7 @@ Measured with a **link anchor** (`ssh_spike::size_probe_link_anchor` called from
 | Build | Platform | `target/release/hip` bytes | Δ vs baseline | Δ % |
 |-------|----------|----------------------------|---------------|-----|
 | baseline (no feature) | aarch64-apple-darwin | 20,820,528 | 0 | 0% |
-| `--features ssh-spike` (russh 0.54 defaults / aws-lc) | aarch64-apple-darwin | 22,281,904 | +1,461,376 (~1.39 MiB) | **+7.02%** |
+| `--features ssh-spike` (russh 0.54.5 defaults / aws-lc) | aarch64-apple-darwin | 22,281,904 | +1,461,376 (~1.39 MiB) | **+7.02%** |
 | `--features ssh-spike` + ring backend (optional) | — | not measured this PR | | |
 
 **Gate:** 7.02% **≪ 15%** → size gate **PASS** for the spike surface.
@@ -283,9 +298,11 @@ ssh_open(terminalId, hostId, cols, rows):
 
 | Risk | Severity | Mitigation |
 |------|----------|------------|
-| Live Windows OpenSSH password/keyboard-interactive quirks | Med | Dogfood before PR5 merge; keyboard-interactive still non-goal |
+| Live Windows OpenSSH password/keyboard-interactive quirks | Med | Dogfood before **shipping SSH / merging PR5 product path to main** (not a blocker to *start* PR5); keyboard-interactive still non-goal |
 | Binary size >15% with aws-lc | Med | Measure; switch to `ring` feature set or product OK |
-| russh version drift (0.54 → 0.62+) | Low | Pin 0.54 for PR5 unless need bugfix; re-run this checklist on bump |
+| russh **future-incompat** (`cargo` warns `russh v0.54.5` will be rejected by a future Rust) | Med | Recorded residual. **Bump policy:** try next **0.54.x** patch first (re-run this checklist). Note: `0.54.6` was **not** adoptable in this PR — resolves `libcrux-ml-kem = ^0.0.3` which is **yanked** on crates.io. Next try later 0.54.x or a fixed patch; only then consider 0.55+/0.62 with a full re-checklist. |
+| RSA publickey not unit-tested (no RSA PEM fixture) | Low | Compile-path via `authenticate_publickey` + `best_supported_rsa_hash`; add fixture in PR5 tests or cover in live dogfood |
+| Spike unit tests not in default CI | Low | Manual: `cargo test --features ssh-spike ssh_spike` after russh/tokio bumps; optional non-blocking CI job later |
 | Dual crypto (ring via rustls + aws-lc via russh) | Med | Prefer one backend after size measurement |
 | TOFU UX race (two connects first-use) | Low | Serialize trust write; last-write wins on same host key |
 
@@ -297,8 +314,8 @@ ssh_open(terminalId, hostId, cols, rows):
 
 1. [x] `cargo check` clean without features  
 2. [x] `cargo check --features ssh-spike` clean  
-3. [x] Auth matrix APIs proven (password, ed25519, passphrase)  
-4. [x] TOFU fingerprint + mismatch model proven  
+3. [x] Auth matrix APIs proven at compile-path (password, ed25519 publickey) + unit-tested decrypt (passphrase)  
+4. [x] TOFU fingerprint + mismatch model proven (unit-tested)  
 5. [x] Tokio features documented and feature-gated  
 6. [x] Binary size methodology + backend recommendation recorded  
 7. [x] Release size delta filled and ≤15% on macOS aarch64 (**+7.02%**)  
@@ -306,7 +323,7 @@ ssh_open(terminalId, hostId, cols, rows):
 9. [ ] Live Windows dogfood (PR5 / dogfood checklist)  
 10. [ ] Re-measure release size after PR5 live `ssh_open` linkage  
 
-Items 1–7 are **satisfied by this PR**. Items 8–10 are **PR5 entry criteria** (not blockers for starting PR5 implementation on a feature branch; blockers for shipping SSH to users).
+Items 1–7 are **satisfied by this PR**. Items 8–10 are **required before shipping SSH / merging the PR5 product path to main** — they are **not** blockers for starting PR5 implementation on a feature branch.
 
 ---
 
@@ -314,9 +331,11 @@ Items 1–7 are **satisfied by this PR**. Items 8–10 are **PR5 entry criteria*
 
 | Decision | Choice |
 |----------|--------|
-| SSH crate | **russh 0.54** (primary; no ssh2) |
-| Hybrid system-ssh in PTY | **Rejected** (K22) unless emergency |
+| SSH crate | **russh 0.54** (locked at **0.54.5**; no ssh2). 0.54.6 blocked by yanked `libcrux-ml-kem` |
+| Hybrid system-ssh in PTY | **Rejected** (parent design K22) unless emergency |
 | Default feature in PR0 | `ssh-spike` **off** |
 | Crypto backend for spike | russh defaults (`aws-lc-rs`) |
 | Known hosts | Product JSON TOFU (not only OpenSSH file) |
-| PR5 unblocked? | **Yes** |
+| Password/publickey proof level | **compile-path** in PR0; live dogfood before ship |
+| Spike tests in CI | **Manual** until optional CI job added |
+| PR5 unblocked? | **Yes** (start implementation); ship gated on dogfood + size re-measure |

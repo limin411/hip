@@ -4,7 +4,10 @@
 //! ships to the UI. See `docs/design/2026-07-20-terminal-ssh-spike.md`.
 //!
 //! This module is intentionally **not** the production `ssh_session.rs`. It only
-//! proves the APIs PR5 will call compile and type-check against russh 0.54.
+//! proves the APIs PR5 will call compile and type-check against russh 0.54.x
+//! (locked at 0.54.5). Password / publickey **session** auth is compile-path only;
+//! passphrase decrypt + TOFU are unit-tested. Spike tests are manual:
+//! `cargo test --features ssh-spike ssh_spike` (not in default CI).
 
 #![cfg(feature = "ssh-spike")]
 // Intentionally not wired into Tauri commands — compile-path + unit tests only.

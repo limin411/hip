@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useState } from 'react'
-import { History, Loader2, Terminal } from 'lucide-react'
+import { FolderOpen, History, Loader2, Plus, Terminal } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { isDirectory } from '@/ipc/pathExists'
+import { pickDirectory } from '@/ipc/dialog'
 import type { RecentLaunch } from '@/ipc/terminalHosts'
 import { useManagedTerminalStore } from '@/store/managedTerminalStore'
 import { useTerminalHostStore } from '@/store/terminalHostStore'
@@ -15,8 +16,8 @@ import {
 import { cn } from '@/lib/utils'
 
 /**
- * 快捷连接 — last 5 successful launches (K11).
- * Local + SSH rows launch immediately.
+ * Single trailing action under 终端管理 (matches chat / code / knowledge):
+ * one "新建终端" button → popover with create actions + 快捷连接 recents (K11).
  * Command palette can open via `useHostLibraryUi.requestOpenQuickConnect`.
  */
 export function QuickConnectPopover() {
@@ -63,22 +64,61 @@ export function QuickConnectPopover() {
     }
   }, [open, recents])
 
+  const finishLaunch = useCallback(async () => {
+    await enterTerminalsSection()
+    setOpen(false)
+  }, [])
+
+  const onNewLocal = useCallback(async () => {
+    setLaunching(true)
+    try {
+      await useManagedTerminalStore.getState().openLocal()
+      await finishLaunch()
+    } catch (e) {
+      console.error('[hip] open local terminal failed:', e)
+    } finally {
+      setLaunching(false)
+    }
+  }, [finishLaunch])
+
+  const onNewLocalFolder = useCallback(async () => {
+    const dir = await pickDirectory()
+    if (!dir) return
+    setLaunching(true)
+    try {
+      await useManagedTerminalStore.getState().openLocal({ cwd: dir })
+      await finishLaunch()
+    } catch (e) {
+      console.error('[hip] open local terminal failed:', e)
+    } finally {
+      setLaunching(false)
+    }
+  }, [finishLaunch])
+
+  const onNewRemote = useCallback(() => {
+    void (async () => {
+      // Unfocus any session so HostLibrary mounts and can open the form.
+      useManagedTerminalStore.getState().focus(null)
+      await enterTerminalsSection()
+      useHostLibraryUi.getState().requestCreateHost()
+      setOpen(false)
+    })()
+  }, [])
+
   const onPickLocal = useCallback(
     async (r: Extract<RecentLaunch, { type: 'local' }>) => {
       if (missingLocal[r.cwd]) return
       setLaunching(true)
       try {
         await useManagedTerminalStore.getState().openLocal({ cwd: r.cwd, label: r.label })
-        // Bring TerminalManagementPage into view when chrome left activeView elsewhere.
-        await enterTerminalsSection()
-        setOpen(false)
+        await finishLaunch()
       } catch (e) {
         console.error('[hip] quick connect local failed:', e)
       } finally {
         setLaunching(false)
       }
     },
-    [missingLocal],
+    [missingLocal, finishLaunch],
   )
 
   const onPickSsh = useCallback(
@@ -88,15 +128,14 @@ export function QuickConnectPopover() {
       setLaunching(true)
       try {
         await useManagedTerminalStore.getState().openSsh(host)
-        await enterTerminalsSection()
-        setOpen(false)
+        await finishLaunch()
       } catch (e) {
         console.error('[hip] quick connect ssh failed:', e)
       } finally {
         setLaunching(false)
       }
     },
-    [hosts],
+    [hosts, finishLaunch],
   )
 
   return (
@@ -104,9 +143,9 @@ export function QuickConnectPopover() {
       <PopoverTrigger asChild>
         <button
           type="button"
-          data-testid="terminals-quick-connect"
+          data-testid="sidebar-new-terminal"
           data-no-drag
-          title={t('sidebar.quickConnect')}
+          title={t('sidebar.newTerminal')}
           className={cn(
             'rounded-md px-1.5 py-0.5 text-caption text-ink-tertiary transition-colors duration-chrome',
             'hover:bg-state-hover hover:text-ink',
@@ -114,44 +153,124 @@ export function QuickConnectPopover() {
             open && 'bg-state-hover text-ink',
           )}
         >
-          {t('sidebar.quickConnect')}
+          {t('sidebar.newTerminal')}
         </button>
       </PopoverTrigger>
       <PopoverContent
         side="bottom"
         align="end"
         className="w-[min(280px,calc(100vw-2rem))] p-0"
-        data-testid="terminals-quick-connect-popover"
+        data-testid="terminals-new-popover"
         onOpenAutoFocus={(e) => e.preventDefault()}
       >
-        <div className="border-b border-border px-3 py-2">
-          <div className="flex items-center gap-1.5 text-meta font-medium text-ink">
-            <History size={13} className="shrink-0 text-ink-tertiary" aria-hidden />
+        {/* Create actions */}
+        <ul className="m-0 list-none p-1" role="list">
+          <li>
+            <button
+              type="button"
+              disabled={launching}
+              data-testid="sidebar-new-local-terminal"
+              onClick={() => void onNewLocal()}
+              className={cn(
+                'flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left transition-colors',
+                launching ? 'cursor-not-allowed opacity-50' : 'hover:bg-state-hover',
+              )}
+            >
+              <Terminal size={14} className="shrink-0 text-ink-tertiary" aria-hidden />
+              <span className="text-body font-medium text-ink">{t('terminals.newLocal')}</span>
+            </button>
+          </li>
+          <li>
+            <button
+              type="button"
+              disabled={launching}
+              data-testid="sidebar-new-local-folder"
+              onClick={() => void onNewLocalFolder()}
+              className={cn(
+                'flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left transition-colors',
+                launching ? 'cursor-not-allowed opacity-50' : 'hover:bg-state-hover',
+              )}
+            >
+              <FolderOpen size={14} className="shrink-0 text-ink-tertiary" aria-hidden />
+              <span className="text-body font-medium text-ink">{t('terminals.newLocalFolder')}</span>
+            </button>
+          </li>
+          <li>
+            <button
+              type="button"
+              disabled={launching}
+              data-testid="sidebar-new-remote-host"
+              onClick={onNewRemote}
+              className={cn(
+                'flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left transition-colors',
+                launching ? 'cursor-not-allowed opacity-50' : 'hover:bg-state-hover',
+              )}
+            >
+              <Plus size={14} className="shrink-0 text-ink-tertiary" aria-hidden />
+              <span className="text-body font-medium text-ink">{t('terminals.newRemote')}</span>
+            </button>
+          </li>
+        </ul>
+
+        {/* Quick connect recents */}
+        <div className="border-t border-border">
+          <div className="flex items-center gap-1.5 px-3 py-2 text-meta font-medium text-ink-tertiary">
+            <History size={13} className="shrink-0" aria-hidden />
             {t('sidebar.quickConnect')}
           </div>
-        </div>
-        {recents.length === 0 ? (
-          <p
-            className="px-3 py-4 text-center text-meta text-ink-tertiary"
-            role="status"
-            data-testid="terminals-quick-connect-empty"
-          >
-            {t('terminals.quickConnectEmpty')}
-          </p>
-        ) : (
-          <ul className="m-0 max-h-64 list-none overflow-y-auto p-1" role="list">
-            {recents.map((r) => {
-              if (r.type === 'local') {
-                const missing = missingLocal[r.cwd] === true
-                const label = r.label?.trim() || r.cwd
+          {recents.length === 0 ? (
+            <p
+              className="px-3 pb-3 text-center text-meta text-ink-tertiary"
+              role="status"
+              data-testid="terminals-quick-connect-empty"
+            >
+              {t('terminals.quickConnectEmpty')}
+            </p>
+          ) : (
+            <ul className="m-0 max-h-48 list-none overflow-y-auto p-1 pt-0" role="list">
+              {recents.map((r) => {
+                if (r.type === 'local') {
+                  const missing = missingLocal[r.cwd] === true
+                  const label = r.label?.trim() || r.cwd
+                  return (
+                    <li key={`local:${r.cwd}`}>
+                      <button
+                        type="button"
+                        disabled={missing || launching}
+                        title={missing ? t('terminals.cwdMissing') : r.cwd}
+                        data-testid={`quick-connect-local-${r.cwd}`}
+                        onClick={() => void onPickLocal(r)}
+                        className={cn(
+                          'flex w-full items-start gap-2 rounded-md px-2 py-1.5 text-left transition-colors',
+                          missing || launching
+                            ? 'cursor-not-allowed opacity-50'
+                            : 'hover:bg-state-hover',
+                        )}
+                      >
+                        <Terminal size={14} className="mt-0.5 shrink-0 text-ink-tertiary" aria-hidden />
+                        <span className="min-w-0 flex-1">
+                          <span className="block truncate text-body font-medium text-ink">{label}</span>
+                          <span className="block truncate font-mono text-caption text-ink-tertiary">
+                            {r.cwd}
+                          </span>
+                        </span>
+                      </button>
+                    </li>
+                  )
+                }
+                const host = hosts.find((h) => h.id === r.hostId)
+                const missing = !host
+                const subtitle = host
+                  ? `${host.username}@${host.hostname}:${host.port}`
+                  : t('terminals.hostMissing')
                 return (
-                  <li key={`local:${r.cwd}`}>
+                  <li key={`ssh:${r.hostId}`}>
                     <button
                       type="button"
                       disabled={missing || launching}
-                      title={missing ? t('terminals.cwdMissing') : r.cwd}
-                      data-testid={`quick-connect-local-${r.cwd}`}
-                      onClick={() => void onPickLocal(r)}
+                      title={missing ? t('terminals.hostMissing') : subtitle}
+                      data-testid={`quick-connect-ssh-${r.hostId}`}
+                      onClick={() => void onPickSsh(r)}
                       className={cn(
                         'flex w-full items-start gap-2 rounded-md px-2 py-1.5 text-left transition-colors',
                         missing || launching
@@ -161,48 +280,19 @@ export function QuickConnectPopover() {
                     >
                       <Terminal size={14} className="mt-0.5 shrink-0 text-ink-tertiary" aria-hidden />
                       <span className="min-w-0 flex-1">
-                        <span className="block truncate text-body font-medium text-ink">{label}</span>
+                        <span className="block truncate text-body font-medium text-ink">{r.label}</span>
                         <span className="block truncate font-mono text-caption text-ink-tertiary">
-                          {r.cwd}
+                          {subtitle}
                         </span>
                       </span>
                     </button>
                   </li>
                 )
-              }
-              const host = hosts.find((h) => h.id === r.hostId)
-              const missing = !host
-              const subtitle = host
-                ? `${host.username}@${host.hostname}:${host.port}`
-                : t('terminals.hostMissing')
-              return (
-                <li key={`ssh:${r.hostId}`}>
-                  <button
-                    type="button"
-                    disabled={missing || launching}
-                    title={missing ? t('terminals.hostMissing') : subtitle}
-                    data-testid={`quick-connect-ssh-${r.hostId}`}
-                    onClick={() => void onPickSsh(r)}
-                    className={cn(
-                      'flex w-full items-start gap-2 rounded-md px-2 py-1.5 text-left transition-colors',
-                      missing || launching
-                        ? 'cursor-not-allowed opacity-50'
-                        : 'hover:bg-state-hover',
-                    )}
-                  >
-                    <Terminal size={14} className="mt-0.5 shrink-0 text-ink-tertiary" aria-hidden />
-                    <span className="min-w-0 flex-1">
-                      <span className="block truncate text-body font-medium text-ink">{r.label}</span>
-                      <span className="block truncate font-mono text-caption text-ink-tertiary">
-                        {subtitle}
-                      </span>
-                    </span>
-                  </button>
-                </li>
-              )
-            })}
-          </ul>
-        )}
+              })}
+            </ul>
+          )}
+        </div>
+
         {launching ? (
           <div className="flex items-center justify-center gap-1.5 border-t border-border px-3 py-2 text-meta text-ink-tertiary">
             <Loader2 size={12} className="animate-spin" aria-hidden />

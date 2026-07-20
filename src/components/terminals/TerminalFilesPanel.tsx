@@ -1,8 +1,10 @@
-import { useEffect } from 'react'
+import { useEffect, useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
 import { X } from 'lucide-react'
 import { listenSftpProgress, sftpCancel } from '@/ipc/sftp'
 import { useTerminalFsStore } from '@/store/terminalFsStore'
+import { useUiStore } from '@/store/uiStore'
+import { Button } from '@/components/ui/Button'
 import { TerminalFileTree, type TerminalFileTreeBackend } from './TerminalFileTree'
 import { cn } from '@/lib/utils'
 
@@ -14,9 +16,8 @@ function formatBytes(n: number): string {
 }
 
 /**
- * In-page files panel for managed terminals.
- * - SSH: remote SFTP tree + transfer progress
- * - Local: launch-cwd tree via term_fs_ls (no transfers)
+ * Managed-terminal files rail (local term_fs or remote SFTP).
+ * Shell right drawer chrome matches ArtifactPanel / PreviewPanel / KnowledgeOutlinePanel.
  */
 export function TerminalFilesPanel({
   terminalId,
@@ -31,8 +32,14 @@ export function TerminalFilesPanel({
   localRoot?: string
 }) {
   const { t } = useTranslation()
-  const transfers = useTerminalFsStore((s) =>
-    s.transfers.filter((x) => x.terminalId === terminalId),
+  const setTerminalPanelOpen = useUiStore((s) => s.setTerminalPanelOpen)
+  // Select the stable store array, then filter in useMemo. Returning a fresh
+  // `.filter()` array from a zustand selector breaks useSyncExternalStore
+  // equality (new ref every snapshot) and triggers "Maximum update depth exceeded".
+  const allTransfers = useTerminalFsStore((s) => s.transfers)
+  const transfers = useMemo(
+    () => allTransfers.filter((x) => x.terminalId === terminalId),
+    [allTransfers, terminalId],
   )
 
   // Bridge sftp:progress → store (SSH only).
@@ -75,15 +82,36 @@ export function TerminalFilesPanel({
   const initialPath = backend === 'local' ? localRoot : remotePath
 
   return (
-    <aside
-      className="hidden w-60 shrink-0 flex-col border-l border-border bg-surface-muted/30 sm:flex"
+    <div
+      className="flex h-full min-h-0 flex-col border-l border-border bg-surface"
       data-testid="managed-terminal-files"
       data-backend={backend}
     >
-      <div className="flex h-8 shrink-0 items-center border-b border-border/80 px-2.5">
-        <p className="text-meta font-medium text-ink">{panelTitle}</p>
+      {/* Same titlebar chrome as ArtifactPanel / KnowledgeOutlinePanel / PreviewPanel */}
+      <div
+        data-tauri-drag-region
+        className="flex h-[var(--titlebar-height)] shrink-0 items-center justify-between border-b border-border px-2"
+      >
+        <span
+          className="truncate px-1.5 text-body font-medium tracking-tight text-ink"
+          data-tauri-drag-region="false"
+          data-testid="panel-title"
+        >
+          {panelTitle}
+        </span>
+        <Button
+          variant="ghost"
+          size="icon"
+          onClick={() => setTerminalPanelOpen(false)}
+          title={t('artifact.closePanel')}
+          data-tauri-drag-region="false"
+          data-testid="terminal-files-panel-close"
+        >
+          <X size={16} strokeWidth={1.75} />
+        </Button>
       </div>
-      <div className="min-h-0 flex-1">
+
+      <div className="min-h-0 flex-1 overflow-hidden">
         <TerminalFileTree
           terminalId={terminalId}
           initialPath={initialPath}
@@ -92,7 +120,7 @@ export function TerminalFilesPanel({
       </div>
       {backend === 'sftp' && transfers.length > 0 ? (
         <div
-          className="shrink-0 border-t border-border/80 px-2 py-1.5"
+          className="shrink-0 border-t border-border px-2 py-1.5"
           data-testid="sftp-transfers"
         >
           {transfers.map((tr) => {
@@ -109,7 +137,10 @@ export function TerminalFilesPanel({
                 data-phase={tr.phase}
               >
                 <div className="flex items-center justify-between gap-1">
-                  <span className="min-w-0 flex-1 truncate text-caption text-ink-secondary" title={tr.label}>
+                  <span
+                    className="min-w-0 flex-1 truncate text-caption text-ink-secondary"
+                    title={tr.label}
+                  >
                     {tr.kind === 'upload'
                       ? t('terminals.sftp.uploading')
                       : t('terminals.sftp.downloading')}
@@ -158,6 +189,6 @@ export function TerminalFilesPanel({
           })}
         </div>
       ) : null}
-    </aside>
+    </div>
   )
 }

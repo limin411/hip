@@ -36,6 +36,7 @@ const setSessionChatPanelOpen = vi.fn()
 const setTab = vi.fn()
 const setChatActiveTab = vi.fn()
 const setKnowledgePanelOpen = vi.fn()
+const setTerminalPanelOpen = vi.fn()
 
 vi.mock('@/domain', () => ({
   useActiveSessionId: () => mockActiveSessionId,
@@ -48,10 +49,28 @@ vi.mock('@/store/uiStore', () => ({
       activeTab: mockActiveTab,
       chatActiveTab: mockChatActiveTab,
       knowledgePanelOpen: mockKnowledgePanelOpen,
+      terminalPanelOpen: mockTerminalPanelOpen,
       setTab,
       setChatActiveTab,
       setKnowledgePanelOpen,
+      setTerminalPanelOpen,
     }),
+}))
+
+vi.mock('@/store/managedTerminalStore', () => ({
+  useManagedTerminalStore: (selector: (state: any) => any) =>
+    selector({
+      focusedId: mockFocusedManagedId,
+      terminals: mockFocusedManagedId
+        ? [{ id: mockFocusedManagedId, kind: 'local', title: 't', cwd: '/tmp' }]
+        : [],
+    }),
+}))
+
+vi.mock('@/components/terminals/feature', () => ({
+  get TERMINAL_MANAGEMENT() {
+    return mockTerminalManagement
+  },
 }))
 
 vi.mock('@/domain/sessionStore', () => ({
@@ -91,6 +110,9 @@ let mockChatActiveTab = 'files'
 let mockIsGitRepo = false
 let mockCodeTerminal = false
 let mockKnowledgePanelOpen = false
+let mockTerminalPanelOpen = false
+let mockFocusedManagedId: string | null = null
+let mockTerminalManagement = true
 let mockKbMode: 'home' | 'workspace' = 'home'
 
 describe('PanelToggle', () => {
@@ -102,6 +124,9 @@ describe('PanelToggle', () => {
     mockIsGitRepo = false
     mockCodeTerminal = false
     mockKnowledgePanelOpen = false
+    mockTerminalPanelOpen = false
+    mockFocusedManagedId = null
+    mockTerminalManagement = true
     mockKbMode = 'home'
   })
 
@@ -210,6 +235,26 @@ describe('PanelToggle', () => {
     mockActiveSessionId = null
     mockActiveView = 'knowledge'
     mockKbMode = 'home'
+    render(<PanelToggle />)
+    expect(screen.queryByTestId('toggle-panel')).not.toBeInTheDocument()
+  })
+
+  it('shows terminal files tab when a managed terminal is focused', () => {
+    mockActiveSessionId = null
+    mockActiveView = 'terminals'
+    mockFocusedManagedId = 'tm_1'
+    mockTerminalPanelOpen = true
+    render(<PanelToggle />)
+    expect(screen.getByTestId('toggle-panel')).toBeInTheDocument()
+    expect(screen.getByTestId('panel-tab-terminal-files')).toBeInTheDocument()
+    fireEvent.click(screen.getByTestId('panel-tab-terminal-files'))
+    expect(setTerminalPanelOpen).toHaveBeenCalledWith(true)
+  })
+
+  it('hides panel toggle on terminals host library (no focused session)', () => {
+    mockActiveSessionId = null
+    mockActiveView = 'terminals'
+    mockFocusedManagedId = null
     render(<PanelToggle />)
     expect(screen.queryByTestId('toggle-panel')).not.toBeInTheDocument()
   })

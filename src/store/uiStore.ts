@@ -232,6 +232,14 @@ interface UiState {
   knowledgePanelOpen: boolean
   setKnowledgePanelOpen: (open: boolean) => void
 
+  /**
+   * Terminal-management right-rail (files tree) open (AppLayout drawer).
+   * Ephemeral — not persisted. Default true when a managed session is focused.
+   * Hidden automatically when no terminal is focused (HostLibrary landing).
+   */
+  terminalPanelOpen: boolean
+  setTerminalPanelOpen: (open: boolean) => void
+
   diffViewMode: 'unified' | 'split'
   setDiffViewMode: (m: 'unified' | 'split') => void
 
@@ -334,6 +342,10 @@ export const useUiStore = create<UiState>()(
       knowledgePanelOpen: true,
       setKnowledgePanelOpen: (open) =>
         set((s) => (s.knowledgePanelOpen === open ? s : { knowledgePanelOpen: open })),
+
+      terminalPanelOpen: true,
+      setTerminalPanelOpen: (open) =>
+        set((s) => (s.terminalPanelOpen === open ? s : { terminalPanelOpen: open })),
 
       diffViewMode: 'unified',
       setDiffViewMode: (m) => set({ diffViewMode: m }),

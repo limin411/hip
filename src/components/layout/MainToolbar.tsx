@@ -32,13 +32,14 @@ export function MainToolbar() {
   const kbActiveSpaceId = useKnowledgeStore((s) => s.activeSpaceId)
   const isMac = isMacPlatform()
 
+  // Terminals keeps MainToolbar panel chrome (right-rail toggle) like chat/code/knowledge.
+  // workbench / tasks / automation / settings / history / trash stay chrome-light.
   const isSpecial =
     activeView === 'settings' ||
     activeView === 'history' ||
     activeView === 'trash' ||
     activeView === 'automation' ||
     activeView === 'workbench' ||
-    activeView === 'terminals' ||
     activeView === 'tasks'
   const showPanelChrome = !isSpecial
   const showSidebarExpand = !sidebarOpen

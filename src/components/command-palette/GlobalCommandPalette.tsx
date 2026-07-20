@@ -210,8 +210,9 @@ export function GlobalCommandPalette() {
       knowledgeIndexReady: knowledgeIndexStatus === 'ready' || isKnowledgeIndexReady(),
       ...(TERMINAL_MANAGEMENT
         ? {
-            enterTerminals: () => void enterTerminalsSection(),
+            enterTerminals: () => void enterTerminalsSection({ library: true }),
             openLocalTerminal: async () => {
+              // openLocal focuses the new session; do not force library landing.
               await enterTerminalsSection()
               try {
                 await useManagedTerminalStore.getState().openLocal()
@@ -225,7 +226,7 @@ export function GlobalCommandPalette() {
               }
             },
             openQuickConnect: async () => {
-              await enterTerminalsSection()
+              await enterTerminalsSection({ library: true })
               // Defer one frame so sidebar QuickConnectPopover is mounted.
               requestAnimationFrame(() => {
                 useHostLibraryUi.getState().requestOpenQuickConnect()

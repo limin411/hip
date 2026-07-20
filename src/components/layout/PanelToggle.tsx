@@ -6,6 +6,7 @@ import { useUiStore } from '@/store/uiStore'
 import { useDomainStore } from '@/domain/sessionStore'
 import { useDiffStore } from '@/store/diffStore'
 import { useKnowledgeStore } from '@/store/knowledgeStore'
+import { useManagedTerminalStore } from '@/store/managedTerminalStore'
 import { Button } from '@/components/ui/Button'
 import {
   DropdownMenu,
@@ -14,9 +15,10 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/DropdownMenu'
 import { CODE_TERMINAL } from '@/components/artifact/terminalFeature'
+import { TERMINAL_MANAGEMENT } from '@/components/terminals/feature'
 
 type PanelTabOption = {
-  value: ArtifactTab | ChatTab | 'knowledge-outline'
+  value: ArtifactTab | ChatTab | 'knowledge-outline' | 'terminal-files'
   label: string
   gated?: boolean
 }
@@ -31,9 +33,12 @@ export function PanelToggle() {
   const setChatActiveTab = useUiStore((s) => s.setChatActiveTab)
   const knowledgePanelOpen = useUiStore((s) => s.knowledgePanelOpen)
   const setKnowledgePanelOpen = useUiStore((s) => s.setKnowledgePanelOpen)
+  const terminalPanelOpen = useUiStore((s) => s.terminalPanelOpen)
+  const setTerminalPanelOpen = useUiStore((s) => s.setTerminalPanelOpen)
   const setSessionCodePanelOpen = useDomainStore((s) => s.setSessionCodePanelOpen)
   const setSessionChatPanelOpen = useDomainStore((s) => s.setSessionChatPanelOpen)
   const kbMode = useKnowledgeStore((s) => s.mode)
+  const focusedManagedId = useManagedTerminalStore((s) => s.focusedId)
   const isGitRepo =
     useDiffStore((s) => (activeSessionId ? s.bySession[activeSessionId]?.isGitRepo : false)) ?? false
 
@@ -63,6 +68,39 @@ export function PanelToggle() {
               {knowledgePanelOpen ? <Check size={14} className="text-accent" /> : null}
             </span>
             {t('knowledge.outline.title')}
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
+    )
+  }
+
+  // Terminal management: files tree in the shell right rail (same chrome as chat/code/KB).
+  // Only when a managed session is focused — HostLibrary landing has no files panel.
+  if (activeView === 'terminals') {
+    if (!TERMINAL_MANAGEMENT || !focusedManagedId) return null
+    return (
+      <DropdownMenu modal={false}>
+        <DropdownMenuTrigger asChild>
+          <Button
+            variant="ghost"
+            size="icon"
+            title={t('chat.togglePanel')}
+            data-tauri-drag-region="false"
+            data-no-drag
+            data-testid="toggle-panel"
+          >
+            <PanelRight size={17} />
+          </Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end" data-testid="panel-tab-menu">
+          <DropdownMenuItem
+            onSelect={() => setTerminalPanelOpen(true)}
+            data-testid="panel-tab-terminal-files"
+          >
+            <span className="flex w-4 shrink-0 items-center justify-center">
+              {terminalPanelOpen ? <Check size={14} className="text-accent" /> : null}
+            </span>
+            {t('terminals.filesPanel')}
           </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>

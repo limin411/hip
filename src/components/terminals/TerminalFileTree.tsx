@@ -307,19 +307,22 @@ export function TerminalFileTree({
         : initialPath ?? startPath
       : (rootPath ?? startPath)
 
+  // Match FileTree root row + ManagedTerminalSession chrome (h-8, px-2) so the
+  // path / “username” strip lines up with the left terminal toolbar across the split.
   const rootHeader = (
     <span
-      className="block min-w-0 flex-1 cursor-default truncate rounded px-1 py-0.5 text-caption font-medium text-ink-tertiary hover:bg-state-hover"
+      className="flex min-w-0 flex-1 cursor-default items-center gap-1.5 truncate rounded px-0.5 text-caption font-medium text-ink-tertiary hover:bg-state-hover"
       title={rootTitle}
       data-testid={rootTestId}
     >
-      {rootLabel}
+      <Folder size={13} strokeWidth={1.75} className="shrink-0" aria-hidden />
+      <span className="truncate text-ink-secondary">{rootLabel}</span>
     </span>
   )
 
   return (
     <div className="flex h-full min-h-0 flex-col" data-testid={treeTestId}>
-      <div className="flex h-7 shrink-0 items-center justify-between gap-1 border-b border-border/80 px-1">
+      <div className="flex h-8 shrink-0 items-center justify-between gap-1 border-b border-border/80 px-2">
         {backend === 'local' ? (
           <DeclarativeContextMenu
             kind="termFsEntry"
@@ -359,9 +362,9 @@ export function TerminalFileTree({
                 if (!rootPath) return
                 void runSftpUploadIntoDir(terminalId, rootPath, t)
               }}
-              className="rounded-md p-1 text-ink-tertiary transition-colors hover:bg-state-hover hover:text-ink disabled:opacity-40"
+              className="rounded-md p-1 text-ink-tertiary transition-colors duration-chrome hover:bg-state-hover hover:text-ink disabled:opacity-40"
             >
-              <Upload size={12} strokeWidth={1.75} />
+              <Upload size={13} strokeWidth={1.75} />
             </button>
           ) : null}
           <button
@@ -372,9 +375,9 @@ export function TerminalFileTree({
             data-testid={refreshTestId}
             onClick={reload}
             disabled={loadingRoot}
-            className="rounded-md p-1 text-ink-tertiary transition-colors hover:bg-state-hover hover:text-ink disabled:opacity-50"
+            className="rounded-md p-1 text-ink-tertiary transition-colors duration-chrome hover:bg-state-hover hover:text-ink disabled:opacity-50"
           >
-            <RefreshCw size={12} strokeWidth={1.75} className={loadingRoot ? 'animate-spin' : ''} />
+            <RefreshCw size={13} strokeWidth={1.75} className={loadingRoot ? 'animate-spin' : ''} />
           </button>
         </div>
       </div>

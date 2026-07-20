@@ -28,22 +28,6 @@ vi.mock('@/components/artifact/XtermSurface', () => ({
   XtermSurface: () => <div data-testid="xterm-surface-stub" />,
 }))
 
-vi.mock('@/components/terminals/TerminalFilesPanel', () => ({
-  TerminalFilesPanel: (props: {
-    terminalId: string
-    backend?: string
-    localRoot?: string
-    remotePath?: string
-  }) => (
-    <div
-      data-testid="managed-terminal-files"
-      data-backend={props.backend}
-      data-local-root={props.localRoot}
-      data-remote-path={props.remotePath}
-    />
-  ),
-}))
-
 vi.mock('@/components/context-menu', () => ({
   DeclarativeContextMenu: ({ children }: { children: unknown }) => children,
 }))
@@ -51,7 +35,7 @@ vi.mock('@/components/context-menu', () => ({
 import { ManagedTerminalSession } from './ManagedTerminalSession'
 import { useManagedTerminalStore } from '@/store/managedTerminalStore'
 
-describe('ManagedTerminalSession local files panel', () => {
+describe('ManagedTerminalSession layout', () => {
   beforeEach(() => {
     useManagedTerminalStore.setState({
       terminals: [
@@ -79,17 +63,16 @@ describe('ManagedTerminalSession local files panel', () => {
     cleanup()
   })
 
-  it('renders local files panel with launch cwd for local terminals', () => {
+  it('does not embed files panel — shell right rail owns files (PanelToggle)', () => {
     render(<ManagedTerminalSession terminalId="tm_local1" />)
-    const panel = screen.getByTestId('managed-terminal-files')
-    expect(panel).toHaveAttribute('data-backend', 'local')
-    expect(panel).toHaveAttribute('data-local-root', '/tmp/proj')
+    expect(screen.getByTestId('managed-terminal-session')).toBeInTheDocument()
+    expect(screen.getByTestId('xterm-surface-stub')).toBeInTheDocument()
+    expect(screen.queryByTestId('managed-terminal-files')).not.toBeInTheDocument()
   })
 
-  it('renders sftp files panel for ssh terminals', () => {
+  it('ssh session also leaves files to the shell drawer', () => {
     render(<ManagedTerminalSession terminalId="tm_ssh1" />)
-    const panel = screen.getByTestId('managed-terminal-files')
-    expect(panel).toHaveAttribute('data-backend', 'sftp')
-    expect(panel).toHaveAttribute('data-remote-path', '/var/www')
+    expect(screen.getByTestId('managed-terminal-session')).toBeInTheDocument()
+    expect(screen.queryByTestId('managed-terminal-files')).not.toBeInTheDocument()
   })
 })

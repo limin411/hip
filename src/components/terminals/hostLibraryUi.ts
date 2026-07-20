@@ -8,7 +8,7 @@ import { create } from 'zustand'
  * consumes it when opening the form so remounts do not re-open a stale request.
  *
  * `quickConnectOpenTick` bumps when the command palette asks to open 快捷连接;
- * QuickConnectPopover opens on tick change (after enterTerminalsSection).
+ * the sidebar 新建终端 popover opens on tick change (after enterTerminalsSection).
  */
 interface HostLibraryUiState {
   pendingCreateHost: boolean
@@ -16,7 +16,7 @@ interface HostLibraryUiState {
   /** Clear the one-shot; returns whether a request was pending. */
   consumeCreateHostRequest: () => boolean
 
-  /** Monotonic tick — QuickConnectPopover watches and opens the popover. */
+  /** Monotonic tick — sidebar 新建终端 popover watches and opens. */
   quickConnectOpenTick: number
   requestOpenQuickConnect: () => void
 }

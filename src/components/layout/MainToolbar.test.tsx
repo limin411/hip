@@ -110,4 +110,16 @@ describe('MainToolbar', () => {
     expect(screen.queryByTestId('connection-status')).not.toBeInTheDocument()
     expect(screen.queryByTestId('toggle-panel')).not.toBeInTheDocument()
   })
+
+  it('terminals: shows title and panel chrome (files rail via PanelToggle)', () => {
+    useUiStore.setState({
+      activeView: 'terminals',
+      sidebarSection: 'terminals',
+    })
+    render(<MainToolbar />)
+    expect(screen.getByTestId('main-toolbar-title')).toBeInTheDocument()
+    // PanelToggle is mocked always-present; connection + toggle chrome should show.
+    expect(screen.getByTestId('connection-status')).toBeInTheDocument()
+    expect(screen.getByTestId('toggle-panel')).toBeInTheDocument()
+  })
 })

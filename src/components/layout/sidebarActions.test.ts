@@ -152,6 +152,46 @@ describe('sidebarActions', () => {
     expect(useUiStore.getState().sidebarSection).toBe('terminals')
   })
 
+  it('enterTerminalsSection({ library: true }) clears focused managed terminal', async () => {
+    const { enterTerminalsSection } = await import('./sidebarActions')
+    const { useManagedTerminalStore } = await import('@/store/managedTerminalStore')
+    useManagedTerminalStore.setState({
+      terminals: [
+        {
+          id: 'tm_1',
+          kind: 'local',
+          title: 'home',
+          cwd: '/tmp',
+          createdAt: 1,
+        },
+      ],
+      focusedId: 'tm_1',
+    })
+    useUiStore.setState({ activeView: 'chat', sidebarSection: 'chats' })
+    await enterTerminalsSection({ library: true })
+    expect(useManagedTerminalStore.getState().focusedId).toBeNull()
+    expect(useUiStore.getState().activeView).toBe('terminals')
+  })
+
+  it('enterTerminalsSection without library keeps focused terminal', async () => {
+    const { enterTerminalsSection } = await import('./sidebarActions')
+    const { useManagedTerminalStore } = await import('@/store/managedTerminalStore')
+    useManagedTerminalStore.setState({
+      terminals: [
+        {
+          id: 'tm_keep',
+          kind: 'local',
+          title: 'home',
+          cwd: '/tmp',
+          createdAt: 1,
+        },
+      ],
+      focusedId: 'tm_keep',
+    })
+    await enterTerminalsSection()
+    expect(useManagedTerminalStore.getState().focusedId).toBe('tm_keep')
+  })
+
   it('enterPlaceholderSection opens automation under primary nav', async () => {
     useUiStore.setState({ activeView: 'chat', sidebarSection: 'chats' })
     await enterPlaceholderSection('automation')

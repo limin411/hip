@@ -32,8 +32,10 @@ import { KnowledgeSpaceDialogHost } from '@/components/knowledge/KnowledgeSpaceD
 import { CODE_TERMINAL } from '@/components/artifact/terminalFeature'
 import { TERMINAL_MANAGEMENT } from '@/components/terminals/feature'
 import { TerminalManagementPage } from '@/components/terminals/TerminalManagementPage'
+import { TerminalFilesPanel } from '@/components/terminals/TerminalFilesPanel'
 import { startTerminalBridge } from '@/ipc/pty'
 import { useProjectPathStore } from '@/store/projectPathStore'
+import { useManagedTerminalStore } from '@/store/managedTerminalStore'
 
 export function AppLayout() {
   const rightPanelRef = useRef<ImperativePanelHandle>(null)
@@ -90,14 +92,26 @@ export function AppLayout() {
   }, [])
 
   const knowledgePanelOpen = useUiStore((s) => s.knowledgePanelOpen)
+  const terminalPanelOpen = useUiStore((s) => s.terminalPanelOpen)
   const sidebarOpen = useUiStore((s) => s.sidebarOpen)
   const knowledgeMode = useKnowledgeStore((s) => s.mode)
+  const focusedManagedId = useManagedTerminalStore((s) => s.focusedId)
+  const focusedManaged = useManagedTerminalStore((s) =>
+    s.focusedId ? s.terminals.find((t) => t.id === s.focusedId) : undefined,
+  )
   const codeOpen = activeView === 'code' && activeSession?.codePanelOpen === true
   const chatOpen = activeView === 'chat' && activeSession?.chatPanelOpen === true
   // Only in a space workspace — home has no doc outline.
   const knowledgeOpen =
     activeView === 'knowledge' && knowledgeMode === 'workspace' && knowledgePanelOpen
-  const rightOpen = codeOpen || chatOpen || knowledgeOpen
+  // Terminal files rail: focused managed session + toolbar toggle (like KB outline).
+  const terminalsOpen =
+    TERMINAL_MANAGEMENT &&
+    activeView === 'terminals' &&
+    !!focusedManagedId &&
+    !!focusedManaged &&
+    terminalPanelOpen
+  const rightOpen = codeOpen || chatOpen || knowledgeOpen || terminalsOpen
 
   useEffect(() => {
     const p = rightPanelRef.current
@@ -114,6 +128,10 @@ export function AppLayout() {
       useUiStore.getState().setKnowledgePanelOpen(false)
       return
     }
+    if (activeView === 'terminals') {
+      useUiStore.getState().setTerminalPanelOpen(false)
+      return
+    }
     if (!activeSessionId) return
     if (activeView === 'code') useDomainStore.getState().setSessionCodePanelOpen(activeSessionId, false)
     else if (activeView === 'chat') useDomainStore.getState().setSessionChatPanelOpen(activeSessionId, false)
@@ -122,6 +140,10 @@ export function AppLayout() {
   const handleExpand = () => {
     if (activeView === 'knowledge') {
       useUiStore.getState().setKnowledgePanelOpen(true)
+      return
+    }
+    if (activeView === 'terminals') {
+      useUiStore.getState().setTerminalPanelOpen(true)
       return
     }
     if (!activeSessionId) return
@@ -241,6 +263,13 @@ export function AppLayout() {
                 <ArtifactPanel />
               ) : knowledgeOpen ? (
                 <KnowledgeOutlinePanel />
+              ) : terminalsOpen && focusedManaged ? (
+                <TerminalFilesPanel
+                  terminalId={focusedManaged.id}
+                  backend={focusedManaged.kind === 'local' ? 'local' : 'sftp'}
+                  localRoot={focusedManaged.cwd}
+                  remotePath={focusedManaged.remotePath}
+                />
               ) : (
                 <PreviewPanel />
               )}

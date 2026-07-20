@@ -55,7 +55,6 @@ import { DeclarativeContextMenu } from '@/components/context-menu'
 import { openCreateKnowledgeSpaceDialog } from '@/components/knowledge/knowledgeSpaceDialogStore'
 import { TERMINAL_MANAGEMENT } from '@/components/terminals/feature'
 import { QuickConnectPopover } from '@/components/terminals/QuickConnectPopover'
-import { useHostLibraryUi } from '@/components/terminals/hostLibraryUi'
 import {
   enterKnowledge,
   enterPlaceholderSection,
@@ -164,31 +163,10 @@ export function AppSidebar() {
 
   const onNav = (section: SidebarSection) => {
     if (section === 'knowledge') void enterKnowledge()
-    else if (section === 'terminals' && TERMINAL_MANAGEMENT) void enterTerminalsSection()
+    else if (section === 'terminals' && TERMINAL_MANAGEMENT)
+      void enterTerminalsSection({ library: true })
     else if (isPlaceholderSidebarSection(section)) void enterPlaceholderSection(section)
     else if (section === 'projects' || section === 'chats') void enterSection(section)
-  }
-
-  const openCreateHost = () => {
-    void (async () => {
-      // Unfocus any session so HostLibrary mounts and can open the form.
-      useManagedTerminalStore.getState().focus(null)
-      await enterTerminalsSection()
-      useHostLibraryUi.getState().requestCreateHost()
-    })()
-  }
-
-  const openLocalTerminal = () => {
-    void (async () => {
-      try {
-        await useManagedTerminalStore.getState().openLocal()
-        // Ensure main surface shows the session (section can stay terminals while
-        // activeView is settings/history/trash after chrome navigation).
-        await enterTerminalsSection()
-      } catch (e) {
-        console.error('[hip] open local terminal failed:', e)
-      }
-    })()
   }
 
   const listLabel =
@@ -364,27 +342,7 @@ export function AppSidebar() {
               {t('sidebar.newChat')}
             </button>
           ) : sidebarSection === 'terminals' && TERMINAL_MANAGEMENT ? (
-            <div className="flex items-center gap-1">
-              <QuickConnectPopover />
-              <button
-                type="button"
-                data-testid="sidebar-new-local-terminal"
-                data-no-drag
-                onClick={openLocalTerminal}
-                className="rounded-md px-1.5 py-0.5 text-caption text-ink-tertiary transition-colors duration-chrome hover:bg-state-hover hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring"
-              >
-                {t('terminals.newLocal')}
-              </button>
-              <button
-                type="button"
-                data-testid="sidebar-new-remote-host"
-                data-no-drag
-                onClick={openCreateHost}
-                className="rounded-md px-1.5 py-0.5 text-caption text-ink-tertiary transition-colors duration-chrome hover:bg-state-hover hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring"
-              >
-                {t('terminals.newRemote')}
-              </button>
-            </div>
+            <QuickConnectPopover />
           ) : null}
         </div>
 

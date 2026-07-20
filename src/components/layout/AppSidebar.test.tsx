@@ -16,7 +16,7 @@ const enterSection = vi.fn(async (_section: 'projects' | 'chats') => {})
 const enterPlaceholderSection = vi.fn(
   async (_section: 'workbench' | 'tasks' | 'automation') => {},
 )
-const enterTerminalsSection = vi.fn(async () => {})
+const enterTerminalsSection = vi.fn(async (_opts?: { library?: boolean }) => {})
 const openHistoryFromChrome = vi.fn(async () => {})
 const newConversationFromSidebar = vi.fn(async (_surface: 'chat' | 'code') => {})
 const selectSessionFromSidebar = vi.fn(async (_id: string) => {})
@@ -26,7 +26,7 @@ vi.mock('./sidebarActions', () => ({
   enterSection: (section: 'projects' | 'chats') => enterSection(section),
   enterPlaceholderSection: (section: 'workbench' | 'tasks' | 'automation') =>
     enterPlaceholderSection(section),
-  enterTerminalsSection: () => enterTerminalsSection(),
+  enterTerminalsSection: (opts?: { library?: boolean }) => enterTerminalsSection(opts),
   openHistoryFromChrome: () => openHistoryFromChrome(),
   openSettingsFromChrome: vi.fn(),
   openAutomationFromChrome: vi.fn(),
@@ -190,10 +190,10 @@ describe('AppSidebar', () => {
     expect(enterPlaceholderSection).toHaveBeenCalledWith('workbench')
   })
 
-  it('nav terminals calls enterTerminalsSection when management is on', () => {
+  it('nav terminals opens library landing (not last focused session)', () => {
     render(<AppSidebar />)
     fireEvent.click(screen.getByTestId('sidebar-nav-terminals'))
-    expect(enterTerminalsSection).toHaveBeenCalled()
+    expect(enterTerminalsSection).toHaveBeenCalledWith({ library: true })
     expect(enterPlaceholderSection).not.toHaveBeenCalledWith('terminals')
   })
 
@@ -230,6 +230,19 @@ describe('AppSidebar', () => {
     render(<AppSidebar />)
     fireEvent.click(screen.getByTestId('sidebar-new-space'))
     expect(openCreateKnowledgeSpaceDialog).toHaveBeenCalled()
+  })
+
+  it('terminals section shows a single new button that opens a popover', () => {
+    useUiStore.setState({ sidebarSection: 'terminals', activeView: 'terminals' })
+    render(<AppSidebar />)
+    // One trailing action (like chat / code / knowledge) — not multiple inline buttons.
+    expect(screen.getByTestId('sidebar-new-terminal')).toBeInTheDocument()
+    expect(screen.queryByTestId('sidebar-new-local-terminal')).not.toBeInTheDocument()
+    expect(screen.queryByTestId('sidebar-new-remote-host')).not.toBeInTheDocument()
+    fireEvent.click(screen.getByTestId('sidebar-new-terminal'))
+    expect(screen.getByTestId('terminals-new-popover')).toBeInTheDocument()
+    expect(screen.getByTestId('sidebar-new-local-terminal')).toBeInTheDocument()
+    expect(screen.getByTestId('sidebar-new-remote-host')).toBeInTheDocument()
   })
 
   it('active knowledge space uses sage rail without hairline ring', () => {

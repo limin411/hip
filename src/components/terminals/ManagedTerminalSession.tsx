@@ -21,7 +21,6 @@ import { DeclarativeContextMenu } from '@/components/context-menu'
 import { XtermSurface } from '@/components/artifact/XtermSurface'
 import { cn } from '@/lib/utils'
 import { HostKeyMismatchModal } from './HostKeyMismatchModal'
-import { TerminalFilesPanel } from './TerminalFilesPanel'
 
 /**
  * Focused managed terminal workspace: chrome + shared XtermSurface (PTY or SSH).
@@ -102,7 +101,7 @@ export function ManagedTerminalSession({ terminalId }: { terminalId: string }) {
       <DeclarativeContextMenu
         kind="managedTerminal"
         payload={{ terminalId, kind, title: term.title }}
-        className="flex min-h-8 shrink-0 items-center justify-between gap-2 border-b border-border/80 px-2.5 py-1"
+        className="flex h-8 shrink-0 items-center justify-between gap-2 border-b border-border/80 px-2"
         data-testid="managed-terminal-chrome"
       >
         <div
@@ -156,68 +155,57 @@ export function ManagedTerminalSession({ terminalId }: { terminalId: string }) {
         </div>
       </DeclarativeContextMenu>
 
-      <div className="flex min-h-0 flex-1">
-        <div className="min-h-0 min-w-0 flex-1">
-          {kind === 'local' && cwd ? (
-            <XtermSurface
-              key={bootKey}
-              terminalId={terminalId}
-              backend="pty"
-              cwd={cwd}
-              open={async (cols, rows) => {
-                const result = await ptyOpen(terminalId, cwd, cols, rows)
+      {/* Files tree lives in the shell right rail (MainToolbar PanelToggle), like chat/code/KB. */}
+      <div className="min-h-0 min-w-0 flex-1">
+        {kind === 'local' && cwd ? (
+          <XtermSurface
+            key={bootKey}
+            terminalId={terminalId}
+            backend="pty"
+            cwd={cwd}
+            open={async (cols, rows) => {
+              const result = await ptyOpen(terminalId, cwd, cols, rows)
+              if (!result.reused) {
+                try {
+                  await recordSuccessfulLocalLaunch(cwd, term.title)
+                } catch {
+                  /* catalog write failure must not break the shell */
+                }
+              }
+              return result
+            }}
+            write={(data) => ptyWrite(terminalId, data)}
+            resize={(cols, rows) => ptyResize(terminalId, cols, rows)}
+            onRestart={restart}
+          />
+        ) : kind === 'ssh' && hostId ? (
+          <XtermSurface
+            key={bootKey}
+            terminalId={terminalId}
+            backend="ssh"
+            open={async (cols, rows) => {
+              try {
+                const result = await sshOpen(terminalId, hostId, cols, rows)
                 if (!result.reused) {
                   try {
-                    await recordSuccessfulLocalLaunch(cwd, term.title)
+                    await recordSuccessfulSshLaunch(hostId, term.title)
                   } catch {
-                    /* catalog write failure must not break the shell */
+                    /* ignore catalog errors */
                   }
                 }
                 return result
-              }}
-              write={(data) => ptyWrite(terminalId, data)}
-              resize={(cols, rows) => ptyResize(terminalId, cols, rows)}
-              onRestart={restart}
-            />
-          ) : kind === 'ssh' && hostId ? (
-            <XtermSurface
-              key={bootKey}
-              terminalId={terminalId}
-              backend="ssh"
-              open={async (cols, rows) => {
-                try {
-                  const result = await sshOpen(terminalId, hostId, cols, rows)
-                  if (!result.reused) {
-                    try {
-                      await recordSuccessfulSshLaunch(hostId, term.title)
-                    } catch {
-                      /* ignore catalog errors */
-                    }
-                  }
-                  return result
-                } catch (e) {
-                  const parsed = parseSshInvokeError(e)
-                  if (parsed.hostKeyMismatch) {
-                    setHostKeyError(parsed.hostKeyMismatch)
-                  }
-                  throw e
+              } catch (e) {
+                const parsed = parseSshInvokeError(e)
+                if (parsed.hostKeyMismatch) {
+                  setHostKeyError(parsed.hostKeyMismatch)
                 }
-              }}
-              write={(data) => sshWrite(terminalId, data)}
-              resize={(cols, rows) => sshResize(terminalId, cols, rows)}
-              onRestart={restart}
-            />
-          ) : null}
-        </div>
-
-        {kind === 'ssh' ? (
-          <TerminalFilesPanel
-            terminalId={terminalId}
-            backend="sftp"
-            remotePath={term.remotePath}
+                throw e
+              }
+            }}
+            write={(data) => sshWrite(terminalId, data)}
+            resize={(cols, rows) => sshResize(terminalId, cols, rows)}
+            onRestart={restart}
           />
-        ) : kind === 'local' && cwd ? (
-          <TerminalFilesPanel terminalId={terminalId} backend="local" localRoot={cwd} />
         ) : null}
       </div>
 

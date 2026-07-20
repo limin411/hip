@@ -6,6 +6,7 @@ import { sessionService } from '@/domain'
 import { useDomainStore } from '@/domain'
 import { surfaceOf } from '@/lib/sessions'
 import { useKnowledgeStore } from '@/store/knowledgeStore'
+import { useManagedTerminalStore } from '@/store/managedTerminalStore'
 import {
   useUiStore,
   type PlaceholderSidebarSection,
@@ -91,10 +92,19 @@ export async function enterPlaceholderSection(section: PlaceholderSidebarSection
 /**
  * Enter terminal management (K14): leave knowledge if needed, set section + view.
  * Used when TERMINAL_MANAGEMENT is on; flag-off path still uses enterPlaceholderSection.
+ *
+ * @param opts.library When true (primary nav / “open terminal management”), clear
+ *   focused managed terminal so the HostLibrary landing shows — not the last session.
+ *   Omit when opening/focusing a specific terminal (openLocal, session row click).
  */
-export async function enterTerminalsSection(): Promise<void> {
+export async function enterTerminalsSection(opts?: {
+  library?: boolean
+}): Promise<void> {
   if (useUiStore.getState().activeView === 'knowledge') {
     await leaveKnowledge()
+  }
+  if (opts?.library) {
+    useManagedTerminalStore.getState().focus(null)
   }
   useUiStore.getState().setSidebarSection('terminals')
   useUiStore.getState().setActiveView('terminals')

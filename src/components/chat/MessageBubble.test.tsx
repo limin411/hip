@@ -241,5 +241,107 @@ describe('MessageBubble', () => {
     )
     expect(screen.getByTestId('message-answer')).toHaveTextContent('ACP style answer')
     expect(screen.queryByTestId('turn-text-block')).not.toBeInTheDocument()
+    // O4: no text → do not force interleaved flatten
+    expect(screen.getByTestId('message-process').getAttribute('data-interleaved')).toBeNull()
+    expect(screen.getByTestId('turn-timeline').getAttribute('data-interleaved')).toBeNull()
+  })
+
+  it('flag on + whitespace-only text steps keeps content body (O5)', () => {
+    featureState.interleaved = true
+    render(
+      <MessageBubble
+        message={{
+          id: 'm-ws',
+          role: 'assistant',
+          content: 'Fallback answer body',
+          timestamp: Date.now(),
+          timeline: [
+            {
+              kind: 'text',
+              stepSeq: 0,
+              agentId: 'supervisor',
+              role: 'supervisor',
+              content: '   \n\t  ',
+            },
+            {
+              kind: 'tool',
+              stepSeq: 1,
+              agentId: 'supervisor',
+              role: 'supervisor',
+              callId: 'c1',
+            },
+          ],
+          toolCalls: [
+            {
+              callId: 'c1',
+              agentId: 'supervisor',
+              name: 'read_file',
+              input: '{"path":"a.ts"}',
+              status: 'finished',
+              seq: 1,
+            },
+          ],
+        } as any}
+      />,
+    )
+    expect(screen.getByTestId('message-answer')).toHaveTextContent('Fallback answer body')
+    expect(screen.queryByTestId('turn-text-block')).not.toBeInTheDocument()
+    expect(screen.getByTestId('message-process').getAttribute('data-interleaved')).toBeNull()
+  })
+
+  it('flag on + multi-agent without text keeps agent sections (O4)', () => {
+    featureState.interleaved = true
+    render(
+      <MessageBubble
+        message={{
+          id: 'm-multi',
+          role: 'assistant',
+          content: 'done',
+          timestamp: Date.now(),
+          agentRuns: [
+            {
+              agentId: 'supervisor',
+              role: 'supervisor',
+              output: '',
+              startedAt: 1000,
+              finishedAt: 5000,
+              seq: 0,
+            },
+            {
+              agentId: 'subagent-1',
+              role: 'subagent',
+              output: 'child',
+              startedAt: 1100,
+              finishedAt: 2000,
+              seq: 1,
+              taskInput: 'check A',
+              parentAgentId: 'supervisor',
+            },
+          ],
+          toolCalls: [
+            {
+              callId: 'c1',
+              agentId: 'subagent-1',
+              name: 'grep',
+              input: '{"pattern":"A"}',
+              status: 'finished',
+              seq: 2,
+            },
+          ],
+          timeline: [
+            {
+              kind: 'tool',
+              stepSeq: 2,
+              agentId: 'subagent-1',
+              role: 'subagent',
+              callId: 'c1',
+            },
+          ],
+        } as any}
+      />,
+    )
+    expect(screen.getByTestId('message-answer')).toHaveTextContent('done')
+    expect(screen.getAllByTestId('agent-timeline-section').length).toBeGreaterThanOrEqual(1)
+    expect(screen.getByTestId('turn-timeline').getAttribute('data-interleaved')).toBeNull()
   })
 })

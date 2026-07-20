@@ -165,7 +165,15 @@ export function ActivityBar({
           {summaryText}
         </span>
       </div>
-      <div className="mt-1 flex flex-col gap-0.5 border-l border-border pl-3">
+      {/* O3: interleaved TurnBlocks (incl. answer text) sit outside the process rail so
+          supervisor prose is not demoted under border-l + meta chrome. */}
+      <div
+        className={
+          interleaved
+            ? 'mt-1 flex flex-col gap-1'
+            : 'mt-1 flex flex-col gap-0.5 border-l border-border pl-3'
+        }
+      >
         <TurnTimeline
           steps={steps}
           toolCalls={toolCalls}

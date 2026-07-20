@@ -286,6 +286,52 @@ describe('TurnTimeline', () => {
     expect(precedes(thinking, textBlocks[1])).toBe(true)
   })
 
+  it('interleaved path skips non-supervisor text steps (O1)', () => {
+    render(
+      <TurnTimeline
+        interleaved
+        steps={[
+          {
+            kind: 'text',
+            stepSeq: 0,
+            agentId: 'worker-1',
+            role: 'worker',
+            content: 'should not leak',
+          },
+          {
+            kind: 'text',
+            stepSeq: 1,
+            agentId: 'supervisor',
+            role: 'supervisor',
+            content: 'ok',
+          },
+        ]}
+      />,
+    )
+    const blocks = screen.getAllByTestId('turn-text-block')
+    expect(blocks).toHaveLength(1)
+    expect(blocks[0]).toHaveTextContent('ok')
+    expect(screen.queryByText('should not leak')).not.toBeInTheDocument()
+  })
+
+  it('interleaved path normalizes broken CJK text emission (O2)', () => {
+    render(
+      <TurnTimeline
+        interleaved
+        steps={[
+          {
+            kind: 'text',
+            stepSeq: 0,
+            agentId: 'supervisor',
+            role: 'supervisor',
+            content: '让\n我\n先',
+          },
+        ]}
+      />,
+    )
+    expect(screen.getByTestId('turn-text-block')).toHaveTextContent('让我先')
+  })
+
   it('interleaved path does not supervisor-first re-sort multi-agent tools', () => {
     render(
       <TurnTimeline

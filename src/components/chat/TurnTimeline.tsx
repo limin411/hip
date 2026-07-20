@@ -6,7 +6,11 @@ import { cn } from '@/lib/utils'
 import { ToolCallRow } from '@/components/artifact/ToolCallRow'
 import { ToolCallGroup } from '@/components/artifact/ToolCallGroup'
 import { ROLE_COLOR, ROLE_NAME_KEY } from '@/lib/roleColor'
-import { isSuppressedToolStep } from '@/lib/timelineFilter'
+import {
+  isSuppressedToolStep,
+  isSupervisorTextStep,
+  prepareTimelineTextContent,
+} from '@/lib/timelineFilter'
 import { latestTodos } from '@/lib/todos'
 import { groupToolCalls } from '@/lib/toolGroups'
 import { sanitizeDisplayText } from '@/lib/sanitizeDisplayText'
@@ -113,14 +117,17 @@ function buildInterleavedNodes(
 
   for (const step of orderedSteps) {
     if (step.kind === 'text') {
-      const clean = sanitizeDisplayText(step.content)
+      // O1: same surface as contentFromTimeline — ignore non-supervisor leaks.
+      if (!isSupervisorTextStep(step)) continue
+      // O2: sanitize + normalizeMessageContent (parity with answer body).
+      const clean = prepareTimelineTextContent(step.content)
       if (!clean.trim()) continue
       items.push({
         seq: step.stepSeq,
         node: (
           <div
             key={`t-${step.agentId}-${step.stepSeq}`}
-            className="min-w-0"
+            className="min-w-0 text-body text-ink"
             data-testid="turn-text-block"
             data-step-seq={step.stepSeq}
           >

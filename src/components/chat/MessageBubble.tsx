@@ -19,6 +19,8 @@ import { normalizeMessageContent } from '@/lib/normalizeMessageContent'
 import { activityElapsedMs, formatElapsed } from '@/lib/activitySummary'
 import { MarkdownBody } from './MarkdownBody'
 import { TRANSCRIPT_INTERLEAVED_BLOCKS } from './feature'
+import { hasRenderableSupervisorText } from '@/lib/timelineFilter'
+import { cn } from '@/lib/utils'
 
 function formatBytes(bytes?: number): string {
   if (bytes === undefined || bytes === null) return ''
@@ -70,13 +72,15 @@ export function MessageBubble({ message, streaming, isLastAssistant, hidePlan }:
       (message.toolCalls?.length ?? 0) > 0 ||
       (message.agentRuns?.length ?? 0) > 0)
 
-  // PR-5 / KD-2: when interleaved TurnBlocks are on and timeline has supervisor text steps,
-  // render text inside the timeline and skip the bottom answer body (no dual render).
+  // PR-5 / KD-2 / O4–O5: enable TurnBlocks only when flag is on AND there is at least
+  // one non-empty supervisor text step (after sanitize+normalize). Avoids flattening
+  // multi-agent chrome for ACP/old turns, and blank answers when all text is whitespace.
   // Flag off always uses legacy content body; text steps are skipped in TurnTimeline.
-  const hasTextSteps =
-    !isUser && (message.timeline?.some((s) => s.kind === 'text') ?? false)
-  const interleavedBlocks = TRANSCRIPT_INTERLEAVED_BLOCKS && !isUser
-  const hideAnswerBody = interleavedBlocks && hasTextSteps
+  const interleavedBlocks =
+    TRANSCRIPT_INTERLEAVED_BLOCKS &&
+    !isUser &&
+    hasRenderableSupervisorText(message.timeline)
+  const hideAnswerBody = interleavedBlocks
 
   const elapsedMs = useMemo(
     () => (isUser || isNotice ? null : activityElapsedMs(message.agentRuns)),
@@ -110,7 +114,13 @@ export function MessageBubble({ message, streaming, isLastAssistant, hidePlan }:
       </div>
       <div className="min-w-0">
         {message.role === 'assistant' && (hasProcess || streaming) && (
-          <div className="mb-1 text-meta text-ink-tertiary" data-testid="message-process">
+          // O3: when interleaved, do not force text-meta/tertiary on the whole process
+          // region so supervisor text blocks keep primary answer weight (MarkdownBody ink).
+          <div
+            className={cn('mb-1', !interleavedBlocks && 'text-meta text-ink-tertiary')}
+            data-testid="message-process"
+            data-interleaved={interleavedBlocks ? 'true' : undefined}
+          >
             <ActivityBar
               steps={message.timeline}
               toolCalls={message.toolCalls}

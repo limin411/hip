@@ -155,6 +155,20 @@ describe('HostLibrary', () => {
     })
   })
 
+  it('rejects duplicate group names (case-insensitive)', async () => {
+    groups = [{ id: 'g1', name: 'Prod', sort: 0 }]
+    render(<HostLibrary />)
+    fireEvent.click(screen.getByTestId('host-library-new-group'))
+    await waitFor(() => {
+      expect(screen.getByTestId('host-group-dialog')).toBeInTheDocument()
+    })
+    fireEvent.change(screen.getByTestId('host-group-name'), { target: { value: 'prod' } })
+    fireEvent.click(screen.getByTestId('host-group-save'))
+    await waitFor(() => {
+      expect(screen.getByText('terminals.form.groupNameDuplicate')).toBeInTheDocument()
+    })
+  })
+
   it('consumes pendingCreateHost once — remount does not re-open form', async () => {
     const { useHostLibraryUi } = await import('./hostLibraryUi')
     useHostLibraryUi.setState({ pendingCreateHost: true })

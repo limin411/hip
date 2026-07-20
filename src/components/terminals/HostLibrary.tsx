@@ -7,6 +7,7 @@ import { pickDirectory } from '@/ipc/dialog'
 import { useManagedTerminalStore } from '@/store/managedTerminalStore'
 import { useTerminalHostStore } from '@/store/terminalHostStore'
 import { mintGroupId } from '@/lib/hostFormDraft'
+import { isDuplicateGroupName } from '@/lib/hostGroupUi'
 import { EmptyState } from '@/components/ui/EmptyState'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
@@ -156,10 +157,16 @@ export function HostLibrary() {
       setGroupError(t('terminals.form.groupNameRequired'))
       return
     }
+    const excludeId = groupDialog.mode === 'rename' ? groupDialog.group.id : undefined
+    if (isDuplicateGroupName(name, groups, excludeId)) {
+      setGroupError(t('terminals.form.groupNameDuplicate'))
+      return
+    }
     setGroupBusy(true)
     setGroupError(null)
     try {
       if (groupDialog.mode === 'create') {
+        // `sort` kept for schema compatibility; UI orders by name.
         const sort =
           groups.length === 0 ? 0 : Math.max(...groups.map((g) => g.sort)) + 1
         await upsertGroup({ id: mintGroupId(nanoid), name, sort })

@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { ChevronDown, ChevronRight, Pencil, Server, Trash2, Plug } from 'lucide-react'
 import type { HostGroup, TerminalHost } from '@/ipc/terminalHosts'
+import { sortGroupsByName } from '@/lib/hostGroupUi'
 import { Button } from '@/components/ui/Button'
 import { cn } from '@/lib/utils'
 
@@ -33,10 +34,8 @@ export function HostGroupList({
   /** Collapsed group keys (missing = expanded). */
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({})
 
-  const sortedGroups = useMemo(
-    () => [...groups].sort((a, b) => a.sort - b.sort || a.name.localeCompare(b.name)),
-    [groups],
-  )
+  // Product rule: always name ascending (ignore stored `sort`).
+  const sortedGroups = useMemo(() => sortGroupsByName(groups), [groups])
 
   const hostsByGroup = useMemo(() => {
     const map = new Map<string | null, TerminalHost[]>()

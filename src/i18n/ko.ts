@@ -1539,6 +1539,7 @@ export const ko = {
       "groupNone": "그룹 없음",
       "groupName": "그룹 이름",
       "groupNameRequired": "그룹 이름을 입력하세요",
+      "groupNameDuplicate": "같은 이름의 그룹이 이미 있습니다",
       "remotePath": "원격 경로(선택)",
       "save": "저장",
       "labelRequired": "이름은 필수입니다",

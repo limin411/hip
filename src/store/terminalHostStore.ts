@@ -8,6 +8,7 @@ import {
   type TerminalHostsCatalog,
 } from '@/ipc/terminalHosts'
 import { deleteSecretRaw, sshPassphraseKey, sshPasswordKey } from '@/ipc/secrets'
+import { isDuplicateGroupName } from '@/lib/hostGroupUi'
 
 /** Product cap for 快捷连接 (K11). */
 export const MAX_RECENTS = 5
@@ -155,6 +156,12 @@ export const useTerminalHostStore = create<TerminalHostStore>((set, get) => ({
   },
 
   upsertGroup: async (group) => {
+    // Enforce unique names (case-insensitive); exclude self when renaming.
+    if (isDuplicateGroupName(group.name, get().groups, group.id)) {
+      const msg = 'Duplicate group name'
+      set({ error: msg })
+      throw new Error(msg)
+    }
     set((s) => {
       const idx = s.groups.findIndex((g) => g.id === group.id)
       const groups =

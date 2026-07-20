@@ -1547,6 +1547,7 @@ export const zhTW = {
       "groupNone": "無分組",
       "groupName": "分組名稱",
       "groupNameRequired": "請輸入分組名稱",
+      "groupNameDuplicate": "分組名稱已存在",
       "remotePath": "遠端路徑（可選）",
       "save": "儲存",
       "labelRequired": "請填寫名稱",

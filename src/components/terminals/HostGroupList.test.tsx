@@ -54,6 +54,24 @@ const noop = vi.fn()
 describe('HostGroupList collapse', () => {
   afterEach(() => cleanup())
 
+  it('orders groups by name ascending (Dev before Prod)', () => {
+    render(
+      <HostGroupList
+        groups={groups}
+        hosts={hosts}
+        onEditHost={noop}
+        onDeleteHost={noop}
+        onRenameGroup={noop}
+        onDeleteGroup={noop}
+      />,
+    )
+    const sections = screen.getAllByTestId(/^host-group-g/)
+    expect(sections.map((el) => el.getAttribute('data-testid'))).toEqual([
+      'host-group-g2', // Dev
+      'host-group-g1', // Prod
+    ])
+  })
+
   it('starts expanded and can collapse / expand a group', () => {
     render(
       <HostGroupList

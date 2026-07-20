@@ -1539,6 +1539,7 @@ export const ja = {
       "groupNone": "グループなし",
       "groupName": "グループ名",
       "groupNameRequired": "グループ名を入力してください",
+      "groupNameDuplicate": "同じ名前のグループが既にあります",
       "remotePath": "リモートパス（任意）",
       "save": "保存",
       "labelRequired": "名前は必須です",

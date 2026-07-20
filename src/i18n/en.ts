@@ -1582,6 +1582,7 @@ export const en = {
         groupNone: 'No group',
         groupName: 'Group name',
         groupNameRequired: 'Enter a group name',
+        groupNameDuplicate: 'A group with this name already exists',
         remotePath: 'Remote path (optional)',
         save: 'Save',
         labelRequired: 'Name is required',

@@ -1546,6 +1546,7 @@ export const zhCN = {
         groupNone: '无分组',
         groupName: '分组名称',
         groupNameRequired: '请输入分组名称',
+        groupNameDuplicate: '分组名称已存在',
         remotePath: '远程路径（可选）',
         save: '保存',
         labelRequired: '请填写名称',

@@ -952,7 +952,7 @@ export class SessionService {
       sessionId,
       turnId,
       agentId: 'supervisor',
-      question: 'Approve this plan?',
+      question: 'plan_approval',
       context: JSON.stringify({ kind: 'plan_approval' }),
     })
     // Sidecar is not paused — respondPlan must not wait on plan:respond wire.

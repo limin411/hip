@@ -1,8 +1,12 @@
 import { describe, it, expect } from 'vitest'
 import type { SessionVM } from '@/domain/sessionStore'
-import { hasPlanApproval } from './planApproval'
+import {
+  hasPlanApproval,
+  isPlanApprovalInterrupt,
+  shouldHideInterruptForPlanApproval,
+} from './planApproval'
 
-function sess(over: Partial<SessionVM> = {}): SessionVM {
+function sess(partial: Partial<SessionVM>): SessionVM {
   return {
     id: 's1',
     config: { llmProvider: 'deepseek', model: 'm', tools: [] },
@@ -19,8 +23,8 @@ function sess(over: Partial<SessionVM> = {}): SessionVM {
     planApprovalPending: false,
     codePanelOpen: false,
     chatPanelOpen: false,
-    ...over,
-  }
+    ...partial,
+  } as SessionVM
 }
 
 describe('hasPlanApproval', () => {
@@ -49,5 +53,40 @@ describe('hasPlanApproval', () => {
     expect(hasPlanApproval(sess({ planApprovalPending: undefined }))).toBe(false)
     expect(hasPlanApproval(null)).toBe(false)
     expect(hasPlanApproval(undefined)).toBe(false)
+  })
+})
+
+describe('shouldHideInterruptForPlanApproval (KD-PA-3 / D5.2)', () => {
+  const planIntr = {
+    turnId: 't1',
+    question: 'plan_approval',
+    context: JSON.stringify({ kind: 'plan_approval', plan: [] }),
+  }
+
+  it('hides when planApprovalPending even with empty checklist', () => {
+    expect(shouldHideInterruptForPlanApproval(true, planIntr)).toBe(true)
+    expect(shouldHideInterruptForPlanApproval(true, null)).toBe(true)
+  })
+
+  it('hides when interrupt context kind is plan_approval even if pending false', () => {
+    expect(shouldHideInterruptForPlanApproval(false, planIntr)).toBe(true)
+    expect(isPlanApprovalInterrupt(planIntr)).toBe(true)
+  })
+
+  it('hides when question is the wire token plan_approval', () => {
+    expect(
+      shouldHideInterruptForPlanApproval(false, { question: 'plan_approval', context: undefined }),
+    ).toBe(true)
+  })
+
+  it('does not hide generic interrupts', () => {
+    expect(
+      shouldHideInterruptForPlanApproval(false, {
+        turnId: 't1',
+        question: 'Need more info?',
+        context: JSON.stringify({ kind: 'doom' }),
+      } as { question: string; context: string }),
+    ).toBe(false)
+    expect(shouldHideInterruptForPlanApproval(false, null)).toBe(false)
   })
 })

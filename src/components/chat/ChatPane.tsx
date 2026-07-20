@@ -35,6 +35,7 @@ import {
   windowSizeToInclude,
 } from '@/lib/transcriptWindow'
 import * as chatFeature from './feature'
+import { shouldHideInterruptForPlanApproval } from './planApproval'
 import { MessageBubble, NoticeRow } from './MessageBubble'
 import { ThinkingBubble } from './ThinkingBubble'
 import type { Message } from '@hip/protocol'
@@ -49,8 +50,12 @@ export function ChatPane() {
   const status = useActiveSessionStatus()
   const interrupt = useActiveInterrupt()
   const planSlice = useActiveChatPlanSlice()
-  const showPlanApproval =
-    planSlice.planApprovalPending && (planSlice.activeTurnPlan?.length ?? 0) > 0
+  // D5.2 / KD-PA-3: hide interrupt banner for any planApprovalPending (empty checklist too).
+  // Defensive: also hide when context kind / question is plan_approval (never paint token).
+  const showPlanApproval = shouldHideInterruptForPlanApproval(
+    planSlice.planApprovalPending,
+    interrupt,
+  )
   const setActiveView = useUiStore((s) => s.setActiveView)
   const scrollTargetMessageId = useUiStore((s) => s.scrollTargetMessageId)
   const setScrollTarget = useUiStore((s) => s.setScrollTarget)

@@ -853,7 +853,7 @@ describe('workspace diff', () => {
     const sess = useDomainStore.getState().sessions.find((s) => s.id === 's1')!
     expect(sess.planApprovalPending).toBe(true)
     expect(sess.activeTurnPlan).toEqual(planItems)
-    expect(sess.interrupt?.question).toContain('Approve')
+    expect(sess.interrupt?.question).toBe('plan_approval')
   })
 
   it('seedPlanProgress sets activeTurnPlan without approval', () => {

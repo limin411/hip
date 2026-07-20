@@ -6,6 +6,7 @@ import { AIMessage, type BaseMessage } from '@langchain/core/messages'
 import type { ServerMessage, SessionConfig } from '@hip/protocol'
 import type { ModelRunner, ModelRunOptions } from './model-runner.js'
 import { Session } from './session.js'
+import { PLAN_APPROVAL_QUESTION_TOKEN } from './plan-approval-constants.js'
 import { SessionStore } from '../persistence/store.js'
 import { openDatabase } from '../persistence/open.js'
 
@@ -128,7 +129,7 @@ describe('plan lifecycle integration', () => {
     const interruptEvent = events.find((e) => e.type === 'agent:interrupt')
     expect(interruptEvent).toBeTruthy()
     const question = (interruptEvent as { question: string }).question
-    expect(question.toLowerCase()).toContain('plan')
+    expect(question).toBe(PLAN_APPROVAL_QUESTION_TOKEN)
     // Only planStatus=ready should carry plan_approval (not later doom/error pauses).
     const interruptCtx = (interruptEvent as { context?: string }).context
     expect(interruptCtx).toBeTruthy()

@@ -1,5 +1,13 @@
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import {
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+  type CSSProperties,
+} from 'react'
 import { useTranslation } from 'react-i18next'
+import { useVirtualizer } from '@tanstack/react-virtual'
 import { ChevronDown } from 'lucide-react'
 import {
   sessionService,
@@ -26,8 +34,10 @@ import {
   transcriptWindowStart,
   windowSizeToInclude,
 } from '@/lib/transcriptWindow'
+import * as chatFeature from './feature'
 import { MessageBubble, NoticeRow } from './MessageBubble'
 import { ThinkingBubble } from './ThinkingBubble'
+import type { Message } from '@hip/protocol'
 
 export function ChatPane() {
   const { t } = useTranslation()
@@ -46,6 +56,7 @@ export function ChatPane() {
   const setScrollTarget = useUiStore((s) => s.setScrollTarget)
   const bottomRef = useRef<HTMLDivElement>(null)
   const scrollRef = useRef<HTMLDivElement>(null)
+  const virtualListRef = useRef<HTMLDivElement>(null)
   // Sync pin flag so autoscroll cannot re-stick to bottom in the same frame a jump clears
   // scrollTarget (React state for atBottom is one paint behind).
   const followBottomRef = useRef(true)
@@ -55,6 +66,11 @@ export function ChatPane() {
   const [highlightedId, setHighlightedId] = useState<string | null>(null)
   // PR-7b / KD-15: mount last N messages; grow via "Load earlier" or jump ensure-mount.
   const [windowSize, setWindowSize] = useState(TRANSCRIPT_WINDOW_SIZE)
+  // Offset of the virtual list within the scroll content (header chrome above messages).
+  const [scrollMargin, setScrollMargin] = useState(0)
+
+  // Namespace read so tests can mock a live getter (named import freezes the value).
+  const virtualize = chatFeature.TRANSCRIPT_VIRTUALIZE
 
   // Only animate genuinely NEW messages (appended after the session loaded) — not the whole
   // transcript on every session switch. Capture a per-session baseline count at switch time;
@@ -96,6 +112,29 @@ export function ChatPane() {
         ? last.content.length
         : 0
 
+  // Virtualizer over the *mounted window* only (PR-7c on top of 7b). Hooks must be unconditional.
+  const rowVirtualizer = useVirtualizer({
+    count: virtualize ? visibleMessages.length : 0,
+    getScrollElement: () => scrollRef.current,
+    estimateSize: () => chatFeature.TRANSCRIPT_ROW_ESTIMATE_PX,
+    overscan: 4,
+    gap: chatFeature.TRANSCRIPT_ROW_GAP_PX,
+    scrollMargin,
+    getItemKey: (index) => visibleMessages[index]?.id ?? index,
+    enabled: virtualize,
+  })
+
+  // Measure list offset inside the scroller so absolute item positions account for chrome above.
+  useLayoutEffect(() => {
+    if (!virtualize) return
+    const scrollEl = scrollRef.current
+    const listEl = virtualListRef.current
+    if (!scrollEl || !listEl) return
+    const next =
+      listEl.getBoundingClientRect().top - scrollEl.getBoundingClientRect().top + scrollEl.scrollTop
+    setScrollMargin((prev) => (Math.abs(prev - next) < 0.5 ? prev : next))
+  }, [virtualize, hasEarlier, showAgentRestart, windowSize, activeSessionId, visibleMessages.length])
+
   // On session switch, follow the latest — UNLESS a search jump is pending, in which case the
   // target effect positions the view and we stay unpinned until the user scrolls back down.
   // Read the target via getState (not a subscription) so clearing it later does not re-arm autoscroll.
@@ -116,7 +155,7 @@ export function ChatPane() {
   useEffect(() => {
     if (!followBottomRef.current || !atBottom || scrollTargetMessageId) return
     // Spec A4: pinned-to-bottom uses instant scroll — smooth + high-frequency tokens fights.
-    // End sentinel (bottomRef) stays mounted outside the window slice.
+    // End sentinel (bottomRef) stays mounted outside the window slice and virtual range.
     bottomRef.current?.scrollIntoView({ behavior: 'auto' })
   }, [messages.length, error, lastActivity, atBottom, scrollTargetMessageId])
 
@@ -130,8 +169,21 @@ export function ChatPane() {
     el.scrollTop += el.scrollHeight - prevHeight
   }, [windowSize, startIndex])
 
-  // Search / outline jump: ensure target is mounted (expand window if needed), then pin + highlight.
-  // Do not rely only on querySelector — unmounted messages are not in the DOM (PR-7b).
+  // Streaming / last-item growth: remeasure last row (ResizeObserver also runs via measureElement).
+  useLayoutEffect(() => {
+    if (!virtualize || visibleMessages.length === 0) return
+    const lastLocal = visibleMessages.length - 1
+    const el = scrollRef.current?.querySelector(
+      `[data-index="${lastLocal}"]`,
+    )
+    if (el instanceof HTMLElement) {
+      rowVirtualizer.measureElement(el)
+    }
+  }, [virtualize, lastActivity, visibleMessages.length, rowVirtualizer])
+
+  // Search / outline jump: messageId → index; expand window if needed; scroll + highlight.
+  // Virtual path uses scrollToIndex (item may not be in DOM until virtualizer mounts it).
+  // Do not rely only on querySelector — unmounted messages are not in the DOM (PR-7b/7c).
   useLayoutEffect(() => {
     if (!scrollTargetMessageId) return
 
@@ -149,21 +201,36 @@ export function ChatPane() {
       return
     }
 
+    // Unpin first so any concurrent autoscroll effect skips on the next paint.
+    followBottomRef.current = false
+    setAtBottom(false)
+
+    const localIndex = targetIdx - startIndex
+    if (virtualize && localIndex >= 0 && localIndex < visibleMessages.length) {
+      rowVirtualizer.scrollToIndex(localIndex, { align: 'start' })
+    }
+
     const el = scrollRef.current?.querySelector(
       `[data-message-id="${CSS.escape(scrollTargetMessageId)}"]`,
     )
     if (el instanceof HTMLElement) {
-      // Unpin first so any concurrent autoscroll effect skips on the next paint.
-      followBottomRef.current = false
-      setAtBottom(false)
       scrollTranscriptToMessage(scrollTargetMessageId)
       setHighlightedId(scrollTargetMessageId)
       setScrollTarget(null)
       return
     }
 
-    // In window range but node not yet in DOM (rare); keep target for a later paint.
-  }, [scrollTargetMessageId, messages, windowSize, setScrollTarget])
+    // In window range but node not yet in DOM (virtual overscan lag); keep target for a later paint.
+  }, [
+    scrollTargetMessageId,
+    messages,
+    windowSize,
+    startIndex,
+    virtualize,
+    visibleMessages.length,
+    rowVirtualizer,
+    setScrollTarget,
+  ])
 
   // Fade the landing highlight ~2s after it is set. Kept in its own effect (keyed on highlightedId)
   // so that clearing the scroll target above — which re-runs the jump effect — cannot cancel this
@@ -234,6 +301,47 @@ export function ChatPane() {
     }
   }
 
+  const renderMessageShell = (m: Message, globalIndex: number, extra?: {
+    ref?: (el: HTMLElement | null) => void
+    dataIndex?: number
+    style?: CSSProperties
+  }) => {
+    const isNew = globalIndex >= animBaselineRef.current
+    const streaming = isStreamingAssistant(messages, globalIndex, status)
+    // Same “no user after” guard as streaming — do not offer regenerate on a prior
+    // completed assistant while a newer user turn is pending provisional.
+    const isLastAsst = isCurrentTurnAssistant(messages, globalIndex)
+    return (
+      <div
+        key={`${activeSessionId ?? 'none'}-${m.id}`}
+        ref={extra?.ref}
+        data-index={extra?.dataIndex}
+        data-message-id={m.id}
+        style={extra?.style}
+        // Transition lives on the always-present base classes so the highlight fades on the
+        // way OUT too (when the color/ring classes are removed), not just on the way in.
+        className={cn(
+          'transition-[background-color,box-shadow] duration-700',
+          isNew && 'animate-msg-enter-left',
+          highlightedId === m.id && 'bg-accent-subtle ring-1 ring-accent/40',
+        )}
+      >
+        {m.role === 'notice' ? (
+          <NoticeRow content={m.content} />
+        ) : (
+          <MessageBubble
+            message={m}
+            streaming={streaming}
+            isLastAssistant={isLastAsst}
+            hidePlan={hideBubblePlan && isLastAsst}
+          />
+        )}
+      </div>
+    )
+  }
+
+  const virtualItems = virtualize ? rowVirtualizer.getVirtualItems() : null
+
   return (
     <div className="relative min-h-0 flex-1 overflow-hidden">
       <div
@@ -242,6 +350,7 @@ export function ChatPane() {
         className="h-full min-h-0 overflow-y-auto"
         data-transcript-scroll=""
         data-testid="chat-transcript-scroll"
+        data-transcript-virtual={virtualize ? 'true' : undefined}
       >
         {/* CLI-style transcript: full-width left-aligned, no centered chat column */}
         <div className="flex w-full flex-col gap-5 px-4 py-4">
@@ -263,38 +372,36 @@ export function ChatPane() {
               {t('chat.agentRestarted')}
             </div>
           )}
-          {visibleMessages.map((m, localI) => {
-            const i = startIndex + localI
-            const isNew = i >= animBaselineRef.current
-            const streaming = isStreamingAssistant(messages, i, status)
-            // Same “no user after” guard as streaming — do not offer regenerate on a prior
-            // completed assistant while a newer user turn is pending provisional.
-            const isLastAsst = isCurrentTurnAssistant(messages, i)
-            return (
-              <div
-                key={`${activeSessionId ?? 'none'}-${m.id}`}
-                data-message-id={m.id}
-                // Transition lives on the always-present base classes so the highlight fades on the
-                // way OUT too (when the color/ring classes are removed), not just on the way in.
-                className={cn(
-                  'transition-[background-color,box-shadow] duration-700',
-                  isNew && 'animate-msg-enter-left',
-                  highlightedId === m.id && 'bg-accent-subtle ring-1 ring-accent/40',
-                )}
-              >
-                {m.role === 'notice' ? (
-                  <NoticeRow content={m.content} />
-                ) : (
-                  <MessageBubble
-                    message={m}
-                    streaming={streaming}
-                    isLastAssistant={isLastAsst}
-                    hidePlan={hideBubblePlan && isLastAsst}
-                  />
-                )}
-              </div>
-            )
-          })}
+          {virtualize ? (
+            <div
+              ref={virtualListRef}
+              data-testid="transcript-virtual-list"
+              style={{
+                height: `${rowVirtualizer.getTotalSize()}px`,
+                width: '100%',
+                position: 'relative',
+              }}
+            >
+              {virtualItems!.map((virtualRow) => {
+                const m = visibleMessages[virtualRow.index]
+                if (!m) return null
+                const globalIndex = startIndex + virtualRow.index
+                return renderMessageShell(m, globalIndex, {
+                  dataIndex: virtualRow.index,
+                  ref: rowVirtualizer.measureElement,
+                  style: {
+                    position: 'absolute',
+                    top: 0,
+                    left: 0,
+                    width: '100%',
+                    transform: `translateY(${virtualRow.start - scrollMargin}px)`,
+                  },
+                })
+              })}
+            </div>
+          ) : (
+            visibleMessages.map((m, localI) => renderMessageShell(m, startIndex + localI))
+          )}
           {showThinking && <ThinkingBubble />}
           {interrupt && !showPlanApproval && (
             <div className="border border-accent/30 bg-accent-subtle px-3 py-2.5 text-body text-ink" data-testid="chat-interrupt">
@@ -362,6 +469,7 @@ export function ChatPane() {
               </div>
             </div>
           )}
+          {/* End sentinel always outside virtual range — follow-bottom anchor (D3b). */}
           <div ref={bottomRef} data-testid="transcript-end-sentinel" />
         </div>
       </div>

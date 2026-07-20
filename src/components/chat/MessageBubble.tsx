@@ -1,4 +1,4 @@
-import { useMemo } from 'react'
+import { memo, useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
 import type { Message } from '@hip/protocol'
 import { formatClockTime, formatAbsolute } from '@/lib/datetime'
@@ -31,13 +31,17 @@ function formatBytes(bytes?: number): string {
 }
 
 /** Muted system notice row (background task notifications). Pure — no hooks. */
-export function NoticeRow({ content }: { content: string }) {
+function NoticeRowImpl({ content }: { content: string }) {
   return (
     <div className="my-1 w-fit px-0 py-0.5 text-meta text-ink-tertiary" data-testid="chat-notice">
       {content}
     </div>
   )
 }
+
+/** Memoized notice row — only re-renders when `content` changes. */
+export const NoticeRow = memo(NoticeRowImpl)
+NoticeRow.displayName = 'NoticeRow'
 
 interface MessageBubbleProps {
   message: Message
@@ -47,8 +51,44 @@ interface MessageBubbleProps {
   hidePlan?: boolean
 }
 
+/**
+ * Render-relevant equality for a Message. Prefers reference equality (store keeps
+ * unchanged message objects stable); falls back to field identity for nested arrays
+ * that the store also replaces only when they change.
+ */
+export function messageRenderEqual(a: Message, b: Message): boolean {
+  if (a === b) return true
+  return (
+    a.id === b.id &&
+    a.role === b.role &&
+    a.content === b.content &&
+    a.timestamp === b.timestamp &&
+    a.stopped === b.stopped &&
+    a.agentId === b.agentId &&
+    a.timeline === b.timeline &&
+    a.toolCalls === b.toolCalls &&
+    a.agentRuns === b.agentRuns &&
+    a.attachments === b.attachments &&
+    a.memoryCitations === b.memoryCitations &&
+    a.usage === b.usage
+  )
+}
+
+/** Custom memo compare: id + content + timeline + toolCalls + status-relevant flags. */
+export function areMessageBubblePropsEqual(
+  prev: MessageBubbleProps,
+  next: MessageBubbleProps,
+): boolean {
+  return (
+    prev.streaming === next.streaming &&
+    prev.isLastAssistant === next.isLastAssistant &&
+    prev.hidePlan === next.hidePlan &&
+    messageRenderEqual(prev.message, next.message)
+  )
+}
+
 /** Chat message bubble for user|assistant. Prefer routing `role:'notice'` via {@link NoticeRow}. */
-export function MessageBubble({ message, streaming, isLastAssistant, hidePlan }: MessageBubbleProps) {
+function MessageBubbleImpl({ message, streaming, isLastAssistant, hidePlan }: MessageBubbleProps) {
   const { t, i18n } = useTranslation()
   const locale = i18n.resolvedLanguage ?? i18n.language ?? 'en'
   const sessionId = useActiveSessionId()
@@ -218,3 +258,9 @@ export function MessageBubble({ message, streaming, isLastAssistant, hidePlan }:
     </DeclarativeContextMenu>
   )
 }
+
+/** Memoized bubble — skips re-render when message + streaming/last/hidePlan flags are equal. */
+export const MessageBubble = memo(MessageBubbleImpl, areMessageBubblePropsEqual)
+MessageBubble.displayName = 'MessageBubble'
+
+export type { MessageBubbleProps }

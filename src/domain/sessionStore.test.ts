@@ -7,6 +7,7 @@ import {
   isCurrentTurnAssistant,
   isStreamingAssistant,
   lastAssistantIndex,
+  mapMessages,
   popForRegenerate,
   useDomainStore,
   type SessionVM,
@@ -1331,5 +1332,66 @@ describe('session-scoped panel state', () => {
     }, 0)
     expect(next.sessions[0].codePanelOpen).toBe(true)
     expect(next.sessions[0].chatPanelOpen).toBe(true)
+  })
+})
+
+describe('mapMessages + stable message refs (PR-7a)', () => {
+  it('mapMessages keeps array identity when no element changes', () => {
+    const msgs: Message[] = [
+      { id: 'u1', role: 'user', content: 'hi', timestamp: 0 },
+      { id: 'a1', role: 'assistant', content: 'yo', timestamp: 1 },
+    ]
+    const next = mapMessages(msgs, (m) => m)
+    expect(next).toBe(msgs)
+  })
+
+  it('mapMessages replaces only the mutated message object', () => {
+    const u1: Message = { id: 'u1', role: 'user', content: 'hi', timestamp: 0 }
+    const a1: Message = { id: 'a1', role: 'assistant', content: 'yo', timestamp: 1 }
+    const msgs = [u1, a1]
+    const next = mapMessages(msgs, (m) => (m.id === 'a1' ? { ...m, content: 'yo!' } : m))
+    expect(next).not.toBe(msgs)
+    expect(next[0]).toBe(u1)
+    expect(next[1]).not.toBe(a1)
+    expect(next[1].content).toBe('yo!')
+  })
+
+  it('token:stream keeps prior message object references', () => {
+    const u1: Message = { id: 'u1', role: 'user', content: 'hi', timestamp: 0 }
+    const t1: Message = {
+      id: 't1',
+      role: 'assistant',
+      content: 'Hel',
+      timestamp: 5,
+      agentRuns: [{ agentId: 'supervisor', role: 'supervisor', output: '', startedAt: 5, finishedAt: null, seq: 0, messageId: 't1' }],
+    }
+    const s0 = { sessions: [baseSession({ messages: [u1, t1] })] }
+    const next = applyServerMessage(s0, { type: 'token:stream', sessionId: 's1', agentId: 'supervisor', delta: 'lo', turnId: 't1' }, 6)
+    expect(next.sessions[0].messages[0]).toBe(u1)
+    expect(next.sessions[0].messages[1]).not.toBe(t1)
+    expect(next.sessions[0].messages[1].content).toBe('Hello')
+  })
+
+  it('tool:finished with unknown callId keeps messages array identity', () => {
+    const u1: Message = { id: 'u1', role: 'user', content: 'hi', timestamp: 0 }
+    const t1: Message = { id: 't1', role: 'assistant', content: 'x', timestamp: 5, toolCalls: [] }
+    const msgs = [u1, t1]
+    const s0 = { sessions: [baseSession({ messages: msgs })] }
+    const next = applyServerMessage(
+      s0,
+      {
+        type: 'tool:finished',
+        sessionId: 's1',
+        turnId: 't1',
+        agentId: 'supervisor',
+        callId: 'missing',
+        status: 'finished',
+        output: 'ok',
+      },
+      6,
+    )
+    expect(next.sessions[0].messages).toBe(msgs)
+    expect(next.sessions[0].messages[0]).toBe(u1)
+    expect(next.sessions[0].messages[1]).toBe(t1)
   })
 })

@@ -1,5 +1,5 @@
 // src/domain/hooks.ts
-import type { AcpConfigOption, Message, SearchHit, TurnUsage } from '@hip/protocol'
+import type { AcpConfigOption, Message, PlanItem, SearchHit, TurnUsage } from '@hip/protocol'
 import { useShallow } from 'zustand/react/shallow'
 import { useDomainStore, type PendingPermission, type SessionError, type SessionVM, type McpServerStatusVM } from './sessionStore'
 import { computePercentage, zoneForPercent } from '@/lib/tokenPercentage'
@@ -21,8 +21,35 @@ export function useActiveSession(): SessionVM | null {
   return useDomainStore((s) => s.sessions.find((x) => x.id === s.activeSessionId) ?? null)
 }
 
+/**
+ * Active session messages only. Zustand compares the selected value with Object.is, so
+ * subscribers re-render only when the messages **array reference** changes — not when
+ * unrelated session fields (title, planDeltaDraft, permission, …) update.
+ * Pair with React.memo(MessageBubble) + stable per-message refs from mapMessages.
+ */
 export function useActiveMessages(): Message[] {
   return useDomainStore((s) => s.sessions.find((x) => x.id === s.activeSessionId)?.messages ?? EMPTY_MESSAGES)
+}
+
+/** Plan/agent slice for ChatPane hidePlan + plan-approval gate. Shallow so plan:delta
+ *  (planDeltaDraft-only) and permission noise do not re-render the transcript. */
+export function useActiveChatPlanSlice(): {
+  forcePlan: boolean
+  planApprovalPending: boolean
+  activeTurnPlan: PlanItem[] | null | undefined
+  agentId: string | undefined
+} {
+  return useDomainStore(
+    useShallow((s) => {
+      const sess = s.sessions.find((x) => x.id === s.activeSessionId)
+      return {
+        forcePlan: Boolean(sess?.config.forcePlan),
+        planApprovalPending: Boolean(sess?.planApprovalPending),
+        activeTurnPlan: sess?.activeTurnPlan,
+        agentId: sess?.config.agentId,
+      }
+    }),
+  )
 }
 
 export function useActiveSessionError(): SessionError | null {

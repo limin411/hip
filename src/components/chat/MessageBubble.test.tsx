@@ -3,7 +3,13 @@ import '@testing-library/jest-dom/vitest'
 import { describe, it, expect, vi, beforeEach, beforeAll } from 'vitest'
 import { render, screen, cleanup, fireEvent } from '@testing-library/react'
 import i18n from '@/i18n'
-import { MessageBubble } from './MessageBubble'
+import {
+  MessageBubble,
+  NoticeRow,
+  areMessageBubblePropsEqual,
+  messageRenderEqual,
+} from './MessageBubble'
+import type { Message } from '@hip/protocol'
 
 vi.mock('@tauri-apps/plugin-shell', () => ({ open: vi.fn() }))
 vi.mock('@/ipc/clipboard', () => ({ copyText: vi.fn() }))
@@ -343,5 +349,64 @@ describe('MessageBubble', () => {
     expect(screen.getByTestId('message-answer')).toHaveTextContent('done')
     expect(screen.getAllByTestId('agent-timeline-section').length).toBeGreaterThanOrEqual(1)
     expect(screen.getByTestId('turn-timeline').getAttribute('data-interleaved')).toBeNull()
+
+it('renders NoticeRow content', () => {
+    render(<NoticeRow content="task done" />)
+    expect(screen.getByTestId('chat-notice')).toHaveTextContent('task done')
+  })
+})
+
+describe('messageRenderEqual / areMessageBubblePropsEqual', () => {
+  const base: Message = {
+    id: 'a1',
+    role: 'assistant',
+    content: 'hello',
+    timestamp: 1,
+    timeline: [{ kind: 'reasoning', stepSeq: 0, agentId: 'supervisor', role: 'supervisor', content: 'think' }],
+    toolCalls: [{ callId: 'c1', agentId: 'supervisor', name: 'read', input: '{}', status: 'finished', seq: 1 }],
+  }
+
+  it('messageRenderEqual is true for same reference', () => {
+    expect(messageRenderEqual(base, base)).toBe(true)
+  })
+
+  it('messageRenderEqual is true when render fields match by identity', () => {
+    const twin: Message = { ...base }
+    expect(messageRenderEqual(base, twin)).toBe(true)
+  })
+
+  it('messageRenderEqual is false when content changes', () => {
+    expect(messageRenderEqual(base, { ...base, content: 'bye' })).toBe(false)
+  })
+
+  it('messageRenderEqual is false when timeline reference changes', () => {
+    expect(messageRenderEqual(base, { ...base, timeline: [...(base.timeline ?? [])] })).toBe(false)
+  })
+
+  it('areMessageBubblePropsEqual ignores nothing for streaming flag', () => {
+    expect(
+      areMessageBubblePropsEqual(
+        { message: base, streaming: true, isLastAssistant: true, hidePlan: false },
+        { message: base, streaming: false, isLastAssistant: true, hidePlan: false },
+      ),
+    ).toBe(false)
+  })
+
+  it('areMessageBubblePropsEqual is true when only message object identity differs but fields match', () => {
+    expect(
+      areMessageBubblePropsEqual(
+        { message: base, streaming: false, isLastAssistant: true, hidePlan: false },
+        { message: { ...base }, streaming: false, isLastAssistant: true, hidePlan: false },
+      ),
+    ).toBe(true)
+  })
+
+  it('areMessageBubblePropsEqual is false when hidePlan differs', () => {
+    expect(
+      areMessageBubblePropsEqual(
+        { message: base, hidePlan: true },
+        { message: base, hidePlan: false },
+      ),
+    ).toBe(false)
   })
 })

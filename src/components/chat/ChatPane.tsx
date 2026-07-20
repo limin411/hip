@@ -1,7 +1,16 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { ChevronDown } from 'lucide-react'
-import { sessionService, useActiveSession, useActiveSessionId, useActiveMessages, useActiveSessionError, useActiveSessionStatus, useActiveInterrupt } from '@/domain'
+import {
+  sessionService,
+  useActiveSessionId,
+  useActiveMessages,
+  useActiveChatPlanSlice,
+  useActiveSessionError,
+  useActiveSessionStatus,
+  useActiveInterrupt,
+  useDomainStore,
+} from '@/domain'
 import { isCurrentTurnAssistant, isStreamingAssistant, lastAssistantIndex, lastNonNotice } from '@/domain/sessionStore'
 import { useUiStore } from '@/store/uiStore'
 import { cn } from '@/lib/utils'
@@ -13,17 +22,19 @@ import { toast } from 'sonner'
 import { scrollTranscriptToMessage } from '@/lib/transcriptJump'
 import { MessageBubble, NoticeRow } from './MessageBubble'
 import { ThinkingBubble } from './ThinkingBubble'
-import { hasPlanApproval } from './planApproval'
 
 export function ChatPane() {
   const { t } = useTranslation()
-  const session = useActiveSession()
-  const showPlanApproval = hasPlanApproval(session)
+  // Isolated slices: messages / status / plan — not the whole SessionVM — so title,
+  // planDeltaDraft, permission, and other session noise do not re-render the transcript list.
   const activeSessionId = useActiveSessionId()
   const messages = useActiveMessages()
   const error = useActiveSessionError()
   const status = useActiveSessionStatus()
   const interrupt = useActiveInterrupt()
+  const planSlice = useActiveChatPlanSlice()
+  const showPlanApproval =
+    planSlice.planApprovalPending && (planSlice.activeTurnPlan?.length ?? 0) > 0
   const setActiveView = useUiStore((s) => s.setActiveView)
   const scrollTargetMessageId = useUiStore((s) => s.scrollTargetMessageId)
   const setScrollTarget = useUiStore((s) => s.setScrollTarget)
@@ -46,9 +57,8 @@ export function ChatPane() {
   }
 
   const showAgentRestart =
-    !!session &&
-    !!session.config.agentId &&
-    session.config.agentId !== 'builtin' &&
+    !!planSlice.agentId &&
+    planSlice.agentId !== 'builtin' &&
     messages.some((m) => m.role === 'assistant')
 
   const last = messages[messages.length - 1]
@@ -119,21 +129,31 @@ export function ChatPane() {
 
   const livePlan = useMemo(
     () =>
-      session
+      activeSessionId
         ? selectLivePlan({
             messages,
             status,
-            forcePlan: Boolean(session.config.forcePlan),
-            planApprovalPending: session.planApprovalPending,
-            activeTurnPlan: session.activeTurnPlan,
+            forcePlan: planSlice.forcePlan,
+            planApprovalPending: planSlice.planApprovalPending,
+            activeTurnPlan: planSlice.activeTurnPlan,
           })
         : null,
-    [session, messages, status],
+    [
+      activeSessionId,
+      messages,
+      status,
+      planSlice.forcePlan,
+      planSlice.planApprovalPending,
+      planSlice.activeTurnPlan,
+    ],
   )
   const hideBubblePlan = livePlan !== null
 
   const exportDebugInfo = async () => {
-    if (!session || !activeSessionId) return
+    if (!activeSessionId) return
+    // Read full session snapshot only when exporting (avoid subscribing ChatPane to whole VM).
+    const session = useDomainStore.getState().sessions.find((x) => x.id === activeSessionId)
+    if (!session) return
     const text = sessionDebugBundleJson({
       sessionId: activeSessionId,
       title: session.title,

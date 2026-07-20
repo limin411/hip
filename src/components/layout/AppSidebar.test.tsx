@@ -14,8 +14,9 @@ const enterKnowledge = vi.fn(async () => {})
 const openCreateKnowledgeSpaceDialog = vi.fn()
 const enterSection = vi.fn(async (_section: 'projects' | 'chats') => {})
 const enterPlaceholderSection = vi.fn(
-  async (_section: 'workbench' | 'terminals' | 'tasks' | 'automation') => {},
+  async (_section: 'workbench' | 'tasks' | 'automation') => {},
 )
+const enterTerminalsSection = vi.fn(async () => {})
 const openHistoryFromChrome = vi.fn(async () => {})
 const newConversationFromSidebar = vi.fn(async (_surface: 'chat' | 'code') => {})
 const selectSessionFromSidebar = vi.fn(async (_id: string) => {})
@@ -23,8 +24,9 @@ const selectSessionFromSidebar = vi.fn(async (_id: string) => {})
 vi.mock('./sidebarActions', () => ({
   enterKnowledge: () => enterKnowledge(),
   enterSection: (section: 'projects' | 'chats') => enterSection(section),
-  enterPlaceholderSection: (section: 'workbench' | 'terminals' | 'tasks' | 'automation') =>
+  enterPlaceholderSection: (section: 'workbench' | 'tasks' | 'automation') =>
     enterPlaceholderSection(section),
+  enterTerminalsSection: () => enterTerminalsSection(),
   openHistoryFromChrome: () => openHistoryFromChrome(),
   openSettingsFromChrome: vi.fn(),
   openAutomationFromChrome: vi.fn(),
@@ -68,6 +70,7 @@ describe('AppSidebar', () => {
     openCreateKnowledgeSpaceDialog.mockClear()
     enterSection.mockClear()
     enterPlaceholderSection.mockClear()
+    enterTerminalsSection.mockClear()
     openHistoryFromChrome.mockClear()
     newConversationFromSidebar.mockClear()
     selectSessionFromSidebar.mockClear()
@@ -187,10 +190,11 @@ describe('AppSidebar', () => {
     expect(enterPlaceholderSection).toHaveBeenCalledWith('workbench')
   })
 
-  it('nav terminals calls enterPlaceholderSection terminals', () => {
+  it('nav terminals calls enterTerminalsSection when management is on', () => {
     render(<AppSidebar />)
     fireEvent.click(screen.getByTestId('sidebar-nav-terminals'))
-    expect(enterPlaceholderSection).toHaveBeenCalledWith('terminals')
+    expect(enterTerminalsSection).toHaveBeenCalled()
+    expect(enterPlaceholderSection).not.toHaveBeenCalledWith('terminals')
   })
 
   it('nav tasks calls enterPlaceholderSection tasks', () => {

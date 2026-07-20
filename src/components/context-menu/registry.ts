@@ -28,6 +28,7 @@ import { knowledgeSpaceProvider } from './providers/knowledgeSpace'
 import { knowledgeTreeProvider } from './providers/knowledgeTree'
 import { subAgentProvider } from './providers/subAgent'
 import { terminalProvider } from './providers/terminal'
+import { managedTerminalProvider } from './providers/managedTerminal'
 import { toolCallProvider } from './providers/toolCall'
 
 /**
@@ -53,6 +54,7 @@ const BUILTIN_PROVIDERS: ContextProvider[] = [
   knowledgeTreeProvider,
   subAgentProvider,
   terminalProvider,
+  managedTerminalProvider,
   toolCallProvider,
 ]
 

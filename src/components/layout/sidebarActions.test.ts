@@ -143,9 +143,10 @@ describe('sidebarActions', () => {
     expect(setSurface).not.toHaveBeenCalled()
   })
 
-  it('enterPlaceholderSection flushes knowledge then opens terminals', async () => {
+  it('enterTerminalsSection flushes knowledge then opens terminals', async () => {
+    const { enterTerminalsSection } = await import('./sidebarActions')
     useUiStore.setState({ activeView: 'knowledge', sidebarSection: 'knowledge' })
-    await enterPlaceholderSection('terminals')
+    await enterTerminalsSection()
     expect(flushSave).toHaveBeenCalled()
     expect(useUiStore.getState().activeView).toBe('terminals')
     expect(useUiStore.getState().sidebarSection).toBe('terminals')

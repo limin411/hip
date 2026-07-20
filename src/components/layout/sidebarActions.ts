@@ -79,13 +79,25 @@ export async function enterSection(section: 'projects' | 'chats'): Promise<void>
   sessionService.setSurface(section === 'projects' ? 'code' : 'chat')
 }
 
-/** Enter a primary-nav placeholder (workbench / terminals / tasks). */
+/** Enter a primary-nav placeholder (workbench / tasks / automation; terminals when flag off). */
 export async function enterPlaceholderSection(section: PlaceholderSidebarSection): Promise<void> {
   if (useUiStore.getState().activeView === 'knowledge') {
     await leaveKnowledge()
   }
   useUiStore.getState().setSidebarSection(section)
   useUiStore.getState().setActiveView(section)
+}
+
+/**
+ * Enter terminal management (K14): leave knowledge if needed, set section + view.
+ * Used when TERMINAL_MANAGEMENT is on; flag-off path still uses enterPlaceholderSection.
+ */
+export async function enterTerminalsSection(): Promise<void> {
+  if (useUiStore.getState().activeView === 'knowledge') {
+    await leaveKnowledge()
+  }
+  useUiStore.getState().setSidebarSection('terminals')
+  useUiStore.getState().setActiveView('terminals')
 }
 
 export async function selectSessionFromSidebar(id: string): Promise<void> {

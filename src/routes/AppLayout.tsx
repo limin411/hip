@@ -31,6 +31,7 @@ import { WorktreeDeleteDialogHost } from '@/components/chat/WorktreeControl/Work
 import { KnowledgeSpaceDialogHost } from '@/components/knowledge/KnowledgeSpaceDialogHost'
 import { CODE_TERMINAL } from '@/components/artifact/terminalFeature'
 import { TERMINAL_MANAGEMENT } from '@/components/terminals/feature'
+import { TerminalManagementPage } from '@/components/terminals/TerminalManagementPage'
 import { startTerminalBridge } from '@/ipc/pty'
 import { useProjectPathStore } from '@/store/projectPathStore'
 
@@ -143,6 +144,9 @@ export function AppLayout() {
       )
     }
     if (activeView === 'terminals') {
+      if (TERMINAL_MANAGEMENT) {
+        return <TerminalManagementPage />
+      }
       return (
         <PlaceholderPage
           titleKey="sidebar.nav.terminals"

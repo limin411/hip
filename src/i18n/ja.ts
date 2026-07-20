@@ -637,7 +637,7 @@ export const ja = {
       "error": "ターミナルを起動できませんでした",
       "unsupportedPlatform": "このプラットフォームではターミナルはまだサポートされていません",
       "noShell": "使用可能なシェルが見つかりません。一般設定でデフォルトのターミナルを変更してください。",
-      "softCap": "開いているターミナルが多すぎます（最大8個）。先にセッションを閉じてください。"
+      "softCap": "開いているターミナルが多すぎます（最大8個、コードパネル端末を含む）。先に1つ閉じてください。"
     },
     "changeFolder": "フォルダを変更",
     "refresh": "更新",
@@ -1425,6 +1425,29 @@ export const ja = {
     "tasks": "タスク管理は近日公開 — TODO や作業項目をフォローアップできます。",
     "automation": "自動化は近日公開 — ワークフローやスケジュールジョブを設定できます。"
   },
+  "terminals": {
+    "title": "ターミナル管理",
+    "newLocal": "ローカル端末",
+    "newLocalFolder": "フォルダで開く…",
+    "newRemote": "新しい接続",
+    "emptyTitle": "開いている端末がありません",
+    "emptyHint": "チャットやコードセッションに依存しないローカルシェルをここで開けます。",
+    "selectOrNew": "端末を選択",
+    "selectOrNewHint": "サイドバーで端末を選ぶか、新しいローカルシェルを開いてください。",
+    "sidebarEmpty": "アクティブな端末はありません",
+    "quickConnectEmpty": "最近の接続はまだありません",
+    "close": "閉じる",
+    "connecting": "接続中…",
+    "softCap": "開いているターミナルが多すぎます（最大8個、コードパネル端末を含む）。先に1つ閉じてください。",
+    "cwdMissing": "ディレクトリが存在しません",
+    "sshComingSoon": "SSH は近日対応",
+    "sessionMissing": "端末が見つかりません",
+    "noCwd": "作業ディレクトリがありません",
+    "kindLocal": "ローカル",
+    "kindSsh": "SSH",
+    "statusExited": "終了",
+    "statusError": "エラー"
+  },
   "tabs": {
     "closeTab": "タブを閉じる",
     "newSession": "新しいセッション",
@@ -1452,8 +1475,10 @@ export const ja = {
     "list": {
       "spaces": "スペース",
       "projects": "プロジェクトセッション",
-      "chats": "チャット履歴"
+      "chats": "チャット履歴",
+      "terminals": "ターミナル管理"
     },
+    "quickConnect": "クイック接続",
     "badge": {
       "chat": "チャット",
       "code": "コード"
@@ -1851,6 +1876,10 @@ export const ja = {
       "copySelectionDisabled": "コピーする選択範囲がありません",
       "sendSelectionToChat": "選択範囲をチャットに送信",
       "paste": "貼り付け"
+    },
+    "managedTerminal": {
+      "close": "端末を閉じる",
+      "copyTitle": "タイトルをコピー"
     },
     "filePreview": {
       "copyPath": "パスをコピー",

@@ -34,6 +34,12 @@ vi.mock('@/components/chat/ChatPane', () => ({ ChatPane: () => <div data-testid=
 vi.mock('@/components/chat/InputBar', () => ({ InputBar: () => <div data-testid="input-bar" /> }))
 vi.mock('@/components/account/SettingsPage', () => ({ SettingsPage: () => <div data-testid="settings-page" /> }))
 vi.mock('@/components/knowledge/KnowledgePage', () => ({ KnowledgePage: () => <div data-testid="knowledge-page" /> }))
+vi.mock('@/components/terminals/TerminalManagementPage', () => ({
+  TerminalManagementPage: () => <div data-testid="terminal-management-page" />,
+}))
+vi.mock('@/components/terminals/feature', () => ({
+  TERMINAL_MANAGEMENT: true,
+}))
 
 describe('AppLayout', () => {
   it('renders final shell: sidebar + main toolbar, no title bar / floating avatar', () => {
@@ -78,10 +84,11 @@ describe('AppLayout', () => {
     expect(screen.getByTestId('placeholder-workbench')).toBeInTheDocument()
   })
 
-  it('renders terminals placeholder', () => {
-    useUiStore.setState({ activeView: 'terminals' })
+  it('renders TerminalManagementPage when terminals view and flag on', () => {
+    useUiStore.setState({ activeView: 'terminals', sidebarSection: 'terminals' })
     render(<AppLayout />, { wrapper: MemoryRouter })
-    expect(screen.getByTestId('placeholder-terminals')).toBeInTheDocument()
+    expect(screen.getByTestId('terminal-management-page')).toBeInTheDocument()
+    expect(screen.queryByTestId('placeholder-terminals')).not.toBeInTheDocument()
   })
 
   it('renders tasks placeholder', () => {

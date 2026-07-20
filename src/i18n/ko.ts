@@ -637,7 +637,7 @@ export const ko = {
       "error": "터미널을 시작할 수 없음",
       "unsupportedPlatform": "이 플랫폼에서는 아직 터미널을 지원하지 않습니다",
       "noShell": "사용 가능한 셸을 찾을 수 없습니다. 일반 설정에서 기본 터미널을 변경하세요.",
-      "softCap": "너무 많은 터미널이 열려 있습니다(최대 8개). 먼저 세션을 닫으세요."
+      "softCap": "너무 많은 터미널이 열려 있습니다(최대 8개, 코드 패널 터미널 포함). 먼저 하나를 닫으세요."
     },
     "changeFolder": "폴더 변경",
     "refresh": "새로고침",
@@ -1425,6 +1425,29 @@ export const ko = {
     "tasks": "작업 추적이 곧 출시됩니다 — 할 일과 작업 항목을 추적하세요.",
     "automation": "자동화가 곧 출시됩니다 — 워크플로우와 예약 작업을 구성하세요."
   },
+  "terminals": {
+    "title": "터미널 관리",
+    "newLocal": "로컬 터미널",
+    "newLocalFolder": "폴더에서 열기…",
+    "newRemote": "새 연결",
+    "emptyTitle": "열린 터미널 없음",
+    "emptyHint": "채팅/코드 세션과 무관한 로컬 셸을 여기서 엽니다.",
+    "selectOrNew": "터미널 선택",
+    "selectOrNewHint": "사이드바에서 활성 터미널을 선택하거나 새 로컬 셸을 여세요.",
+    "sidebarEmpty": "활성 터미널 없음",
+    "quickConnectEmpty": "최근 연결이 없습니다",
+    "close": "닫기",
+    "connecting": "연결 중…",
+    "softCap": "너무 많은 터미널이 열려 있습니다(최대 8개, 코드 패널 터미널 포함). 먼저 하나를 닫으세요.",
+    "cwdMissing": "디렉터리가 존재하지 않습니다",
+    "sshComingSoon": "SSH 곧 지원",
+    "sessionMissing": "터미널을 찾을 수 없음",
+    "noCwd": "작업 디렉터리 없음",
+    "kindLocal": "로컬",
+    "kindSsh": "SSH",
+    "statusExited": "종료됨",
+    "statusError": "오류"
+  },
   "tabs": {
     "closeTab": "탭 닫기",
     "newSession": "새 세션",
@@ -1452,8 +1475,10 @@ export const ko = {
     "list": {
       "spaces": "공간",
       "projects": "프로젝트 세션",
-      "chats": "채팅 기록"
+      "chats": "채팅 기록",
+      "terminals": "터미널 관리"
     },
+    "quickConnect": "빠른 연결",
     "badge": {
       "chat": "채팅",
       "code": "코드"
@@ -1851,6 +1876,10 @@ export const ko = {
       "copySelectionDisabled": "복사할 선택 항목 없음",
       "sendSelectionToChat": "선택 항목을 채팅으로 보내기",
       "paste": "붙여넣기"
+    },
+    "managedTerminal": {
+      "close": "터미널 닫기",
+      "copyTitle": "제목 복사"
     },
     "filePreview": {
       "copyPath": "경로 복사",

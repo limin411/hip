@@ -645,7 +645,7 @@ export const zhTW = {
       "error": "無法啟動終端",
       "unsupportedPlatform": "當前平臺暫不支援終端",
       "noShell": "找不到可用的 shell。請在「通用設定」中更換預設終端。",
-      "softCap": "開啟的終端過多（最多 8 個）。請先關閉一個會話。"
+      "softCap": "開啟的終端過多（最多 8 個，含程式碼面板終端）。請先關閉一個。"
     },
     "changeFolder": "更換資料夾",
     "refresh": "重新整理",
@@ -1433,6 +1433,29 @@ export const zhTW = {
     "tasks": "事項追蹤即將上線，用於跟進任務與待辦。",
     "automation": "自動化即將上線，用於設定工作流與定時任務。"
   },
+  "terminals": {
+    "title": "終端管理",
+    "newLocal": "本機終端",
+    "newLocalFolder": "開啟資料夾…",
+    "newRemote": "新建連線",
+    "emptyTitle": "還沒有開啟的終端",
+    "emptyHint": "在此開啟獨立本機 shell，不綁定對話或編碼會話。",
+    "selectOrNew": "選擇終端",
+    "selectOrNewHint": "在側邊欄選擇一個活動終端，或新建本機終端。",
+    "sidebarEmpty": "暫無活動終端",
+    "quickConnectEmpty": "暫無最近連線",
+    "close": "關閉",
+    "connecting": "正在連線…",
+    "softCap": "開啟的終端過多（最多 8 個，含程式碼面板終端）。請先關閉一個。",
+    "cwdMissing": "目錄不存在",
+    "sshComingSoon": "SSH 即將就緒",
+    "sessionMissing": "終端不存在",
+    "noCwd": "無工作目錄",
+    "kindLocal": "本機",
+    "kindSsh": "SSH",
+    "statusExited": "已退出",
+    "statusError": "錯誤"
+  },
   "tabs": {
     "closeTab": "關閉標籤頁",
     "newSession": "新增工作階段",
@@ -1460,8 +1483,10 @@ export const zhTW = {
     "list": {
       "spaces": "知識空間",
       "projects": "專案會話",
-      "chats": "對話歷史"
+      "chats": "對話歷史",
+      "terminals": "終端管理"
     },
+    "quickConnect": "快捷連線",
     "badge": {
       "chat": "對話",
       "code": "編碼"
@@ -1859,6 +1884,10 @@ export const zhTW = {
       "copySelectionDisabled": "沒有可複製的選區",
       "sendSelectionToChat": "傳送選區到對話",
       "paste": "貼上"
+    },
+    "managedTerminal": {
+      "close": "關閉終端",
+      "copyTitle": "複製標題"
     },
     "filePreview": {
       "copyPath": "複製路徑",

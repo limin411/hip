@@ -49,12 +49,17 @@ import {
   useUiStore,
   type SidebarSection,
 } from '@/store/uiStore'
+import { useManagedTerminalStore } from '@/store/managedTerminalStore'
+import { useTerminalStore } from '@/store/terminalStore'
 import { DeclarativeContextMenu } from '@/components/context-menu'
 import { openCreateKnowledgeSpaceDialog } from '@/components/knowledge/knowledgeSpaceDialogStore'
+import { TERMINAL_MANAGEMENT } from '@/components/terminals/feature'
+import { QuickConnectPopover } from '@/components/terminals/QuickConnectPopover'
 import {
   enterKnowledge,
   enterPlaceholderSection,
   enterSection,
+  enterTerminalsSection,
   newConversationFromSidebar,
   openHistoryFromChrome,
   openSettingsFromChrome,
@@ -79,6 +84,10 @@ export function AppSidebar() {
   const activeSpaceId = useKnowledgeStore((s) => s.activeSpaceId)
   const parallelRuns = useParallelStore((s) => s.runs)
   const catalogById = useWorktreeStore((s) => s.byId)
+  const managedTerminals = useManagedTerminalStore((s) => s.terminals)
+  const focusedManagedId = useManagedTerminalStore((s) => s.focusedId)
+  /** Ring status map — re-renders sidebar rows when PTY status changes. */
+  const terminalBySession = useTerminalStore((s) => s.bySession)
   const isMac = isMacPlatform()
 
   const hydrateWorktrees = (sessionId: string) => {
@@ -154,8 +163,15 @@ export function AppSidebar() {
 
   const onNav = (section: SidebarSection) => {
     if (section === 'knowledge') void enterKnowledge()
+    else if (section === 'terminals' && TERMINAL_MANAGEMENT) void enterTerminalsSection()
     else if (isPlaceholderSidebarSection(section)) void enterPlaceholderSection(section)
-    else void enterSection(section)
+    else if (section === 'projects' || section === 'chats') void enterSection(section)
+  }
+
+  const openLocalTerminal = () => {
+    void useManagedTerminalStore.getState().openLocal().catch((e) => {
+      console.error('[hip] open local terminal failed:', e)
+    })
   }
 
   const listLabel =
@@ -165,7 +181,9 @@ export function AppSidebar() {
         ? t('sidebar.list.projects')
         : sidebarSection === 'chats'
           ? t('sidebar.list.chats')
-          : t(`sidebar.nav.${sidebarSection}`)
+          : sidebarSection === 'terminals' && TERMINAL_MANAGEMENT
+            ? t('sidebar.list.terminals')
+            : t(`sidebar.nav.${sidebarSection}`)
 
   const toggleWorktree = (sessionId: string) => {
     setWorktreeCollapsed((prev) => ({ ...prev, [sessionId]: !prev[sessionId] }))
@@ -328,10 +346,105 @@ export function AppSidebar() {
             >
               {t('sidebar.newChat')}
             </button>
+          ) : sidebarSection === 'terminals' && TERMINAL_MANAGEMENT ? (
+            <div className="flex items-center gap-1">
+              <QuickConnectPopover />
+              <button
+                type="button"
+                data-testid="sidebar-new-local-terminal"
+                data-no-drag
+                onClick={openLocalTerminal}
+                className="rounded-md px-1.5 py-0.5 text-caption text-ink-tertiary transition-colors duration-chrome hover:bg-state-hover hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring"
+              >
+                {t('terminals.newLocal')}
+              </button>
+            </div>
           ) : null}
         </div>
 
-        {isPlaceholderSidebarSection(sidebarSection) ? (
+        {sidebarSection === 'terminals' && TERMINAL_MANAGEMENT ? (
+          managedTerminals.length === 0 ? (
+            <p
+              className="px-2 py-4 text-center text-meta text-ink-tertiary"
+              role="status"
+              data-testid="sidebar-terminals-empty"
+            >
+              {t('terminals.sidebarEmpty')}
+            </p>
+          ) : (
+            <ul
+              className="m-0 list-none p-0"
+              aria-labelledby="sidebar-list-heading"
+              data-testid="sidebar-managed-terminals"
+            >
+              {managedTerminals.map((mt) => {
+                const active = focusedManagedId === mt.id && activeView === 'terminals'
+                const ptyStatus = terminalBySession[mt.id]?.status ?? 'idle'
+                return (
+                  <li key={mt.id}>
+                    <DeclarativeContextMenu
+                      kind="managedTerminal"
+                      payload={{
+                        terminalId: mt.id,
+                        kind: mt.kind,
+                        title: mt.title,
+                      }}
+                      className="mb-0.5 block w-full"
+                    >
+                      <button
+                        type="button"
+                        data-testid={`sidebar-managed-terminal-${mt.id}`}
+                        data-no-drag
+                        aria-current={active ? 'true' : undefined}
+                        onClick={() => {
+                          useManagedTerminalStore.getState().focus(mt.id)
+                          if (activeView !== 'terminals') {
+                            void enterTerminalsSection()
+                          }
+                        }}
+                        className={cn(
+                          'flex w-full items-start gap-2 rounded-lg px-2.5 py-[var(--row-pad-y-session)] text-left transition-colors',
+                          'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring',
+                          active ? SIDEBAR_ACTIVE_RAIL : 'hover:bg-state-hover',
+                        )}
+                      >
+                        <span
+                          className={cn(
+                            'mt-1.5 size-1.5 shrink-0 rounded-full',
+                            active ? 'bg-accent' : 'bg-transparent',
+                          )}
+                          aria-hidden
+                        />
+                        <Terminal
+                          size={14}
+                          className="mt-0.5 shrink-0 text-ink-tertiary"
+                          aria-hidden
+                        />
+                        <span className="min-w-0 flex-1">
+                          <span className="block truncate text-body font-medium text-ink">
+                            {mt.title}
+                          </span>
+                          <span className="block truncate text-caption text-ink-tertiary">
+                            {mt.kind === 'local'
+                              ? mt.cwd || t('terminals.kindLocal')
+                              : t('terminals.kindSsh')}
+                            {ptyStatus === 'running'
+                              ? ` · ${t('sidebar.status.running')}`
+                              : ptyStatus === 'exited'
+                                ? ` · ${t('terminals.statusExited')}`
+                                : ptyStatus === 'error'
+                                  ? ` · ${t('terminals.statusError')}`
+                                  : ''}
+                          </span>
+                        </span>
+                      </button>
+                    </DeclarativeContextMenu>
+                  </li>
+                )
+              })}
+            </ul>
+          )
+        ) : isPlaceholderSidebarSection(sidebarSection) ? (
           <p className="px-2 py-4 text-center text-meta text-ink-tertiary" role="status">
             {t('placeholder.comingSoon')}
           </p>

@@ -17,6 +17,8 @@ export type ContextKind =
   | 'checkpoint'
   | 'commit'
   | 'terminal'
+  /** Sidebar / chrome managed terminal (tm_* local or SSH). */
+  | 'managedTerminal'
   | 'agentConfig'
   | 'skillConfig'
   | 'mcpServer'
@@ -80,6 +82,12 @@ export type ContextPayloadMap = {
   commit: { sha: string; shortSha: string; message: string; sessionId: string }
   /** `target` distinguishes chrome vs xterm canvas (ControlledContextMenu). */
   terminal: { sessionId: string; status: string; target?: 'chrome' | 'canvas' }
+  /** Active managed terminal row (sidebar list / session chrome). */
+  managedTerminal: {
+    terminalId: string
+    kind: 'local' | 'ssh'
+    title: string
+  }
   /**
    * Settings agent row. Hosts supply onEdit/onDelete so menus reuse existing
    * editor / delete-dialog state (same as kebab actions).

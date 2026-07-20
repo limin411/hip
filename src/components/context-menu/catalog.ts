@@ -223,6 +223,19 @@ const STATIC_CATALOG: ContextMenuItemMeta[] = [
     icon: 'code',
   },
   {
+    id: 'managedTerminal.copyTitle',
+    labelKey: 'contextMenu.managedTerminal.copyTitle',
+    kind: 'managedTerminal',
+    group: 'clipboard',
+  },
+  {
+    id: 'managedTerminal.close',
+    labelKey: 'contextMenu.managedTerminal.close',
+    kind: 'managedTerminal',
+    group: 'danger',
+    danger: true,
+  },
+  {
     id: 'filePreview.copyPath',
     labelKey: 'contextMenu.filePreview.copyPath',
     kind: 'filePreview',

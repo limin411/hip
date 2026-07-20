@@ -13,6 +13,7 @@ mod terminal_hosts;
 mod terminal_budget;
 mod ssh_path;
 mod ssh_known_hosts;
+mod sftp_path;
 mod knowledge;
 mod knowledge_trash;
 mod knowledge_link_index;
@@ -22,6 +23,12 @@ mod ssh_session;
 #[cfg(not(feature = "ssh"))]
 #[path = "ssh_session_stub.rs"]
 mod ssh_session;
+// SFTP (PR6) — same feature gate as SSH; stubs keep IPC when stripped.
+#[cfg(feature = "ssh")]
+mod sftp;
+#[cfg(not(feature = "ssh"))]
+#[path = "sftp_stub.rs"]
+mod sftp;
 
 // Re-export so command handlers and unit tests can use `super::HipConfig` etc.
 use hip_config::{HipConfig, TomlHipConfig, NetworkPolicyConfig};
@@ -601,6 +608,7 @@ pub fn run() {
 
     let app = app
         .manage(ssh_session::SshManager::new())
+        .manage(sftp::SftpTransferState::new())
         .setup(|app| {
             let handle = app.handle().clone();
             tauri::async_runtime::spawn(async move {
@@ -668,6 +676,12 @@ pub fn run() {
             ssh_session::ssh_resize,
             ssh_session::ssh_close,
             ssh_session::ssh_list,
+            sftp::sftp_ls,
+            sftp::sftp_mkdir,
+            sftp::sftp_remove,
+            sftp::sftp_download,
+            sftp::sftp_upload,
+            sftp::sftp_cancel,
             knowledge::knowledge_ensure_root,
             knowledge::knowledge_list_spaces,
             knowledge::knowledge_create_space,

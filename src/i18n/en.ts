@@ -1525,6 +1525,22 @@ export const en = {
       sftp: {
         panelTitle: 'Files',
         comingSoon: 'SFTP coming soon',
+        loading: 'Loading…',
+        loadError: 'Could not list remote files',
+        sessionClosed: 'SSH session is closed. Reconnect to browse files.',
+        retry: 'Retry',
+        refresh: 'Refresh',
+        saveAs: 'Save remote file',
+        pickFiles: 'Upload files',
+        overwriteConfirm: '“{{name}}” already exists. Overwrite?',
+        warnConfigPath:
+          'This file is under ~/.hip/config (may include secrets). Upload anyway?',
+        uploading: 'Upload',
+        downloading: 'Download',
+        cancel: 'Cancel transfer',
+        done: 'Done',
+        cancelled: 'Cancelled',
+        failed: 'Failed',
       },
       form: {
         createTitle: 'New connection',
@@ -2005,6 +2021,13 @@ export const en = {
       managedTerminal: {
         close: 'Close terminal',
         copyTitle: 'Copy title',
+      },
+      sftp: {
+        download: 'Download…',
+        upload: 'Upload files…',
+        copyPath: 'Copy remote path',
+        copyName: 'Copy name',
+        refresh: 'Refresh',
       },
       filePreview: {
         copyPath: 'Copy path',

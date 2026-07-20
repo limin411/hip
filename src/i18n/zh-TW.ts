@@ -1490,7 +1490,22 @@ export const zhTW = {
     },
     "sftp": {
       "panelTitle": "檔案",
-      "comingSoon": "SFTP 即將就緒"
+      "comingSoon": "SFTP 即將就緒",
+      "loading": "載入中…",
+      "loadError": "無法列出遠端檔案",
+      "sessionClosed": "SSH 工作階段已關閉。請重新連線後再瀏覽檔案。",
+      "retry": "重試",
+      "refresh": "重新整理",
+      "saveAs": "儲存遠端檔案",
+      "pickFiles": "上傳檔案",
+      "overwriteConfirm": "「{{name}}」已存在，是否覆寫？",
+      "warnConfigPath": "此檔案位於 ~/.hip/config 下（可能包含密鑰）。仍要上傳嗎？",
+      "uploading": "上傳",
+      "downloading": "下載",
+      "cancel": "取消傳輸",
+      "done": "完成",
+      "cancelled": "已取消",
+      "failed": "失敗"
     },
     "form": {
       "createTitle": "新建連線",
@@ -1962,6 +1977,13 @@ export const zhTW = {
     "managedTerminal": {
       "close": "關閉終端",
       "copyTitle": "複製標題"
+    },
+    "sftp": {
+      "download": "下載…",
+      "upload": "上傳檔案…",
+      "copyPath": "複製遠端路徑",
+      "copyName": "複製名稱",
+      "refresh": "重新整理"
     },
     "filePreview": {
       "copyPath": "複製路徑",

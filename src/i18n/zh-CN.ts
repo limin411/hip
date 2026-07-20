@@ -1490,6 +1490,21 @@ export const zhCN = {
       sftp: {
         panelTitle: '文件',
         comingSoon: 'SFTP 即将就绪',
+        loading: '加载中…',
+        loadError: '无法列出远程文件',
+        sessionClosed: 'SSH 会话已关闭。请重新连接后再浏览文件。',
+        retry: '重试',
+        refresh: '刷新',
+        saveAs: '保存远程文件',
+        pickFiles: '上传文件',
+        overwriteConfirm: '“{{name}}” 已存在，是否覆盖？',
+        warnConfigPath: '该文件位于 ~/.hip/config 下（可能包含密钥）。仍要上传吗？',
+        uploading: '上传',
+        downloading: '下载',
+        cancel: '取消传输',
+        done: '完成',
+        cancelled: '已取消',
+        failed: '失败',
       },
       form: {
         createTitle: '新建连接',
@@ -1963,6 +1978,13 @@ export const zhCN = {
       managedTerminal: {
         close: '关闭终端',
         copyTitle: '复制标题',
+      },
+      sftp: {
+        download: '下载…',
+        upload: '上传文件…',
+        copyPath: '复制远程路径',
+        copyName: '复制名称',
+        refresh: '刷新',
       },
       filePreview: {
         copyPath: '复制路径',

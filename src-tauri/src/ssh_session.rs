@@ -156,7 +156,7 @@ impl client::Handler for SshHandler {
 
 // ── Session state ───────────────────────────────────────────────────────────
 
-struct SshSession {
+pub(crate) struct SshSession {
     host_id: String,
     /// Retained for SFTP / reconnect diagnostics (PR6+).
     #[allow(dead_code)]
@@ -167,8 +167,10 @@ struct SshSession {
     generation: u64,
     /// Channel write half for stdin + window_change.
     writer: AsyncMutex<Option<ChannelWriteHalf<client::Msg>>>,
-    /// Keep the client handle so disconnect works.
+    /// Keep the client handle so disconnect works + lazy SFTP channel open.
     handle: AsyncMutex<Option<Handle<SshHandler>>>,
+    /// Long-lived SFTP subsystem co-owned with the shell (PR6); opened lazily.
+    sftp: AsyncMutex<Option<Arc<russh_sftp::client::SftpSession>>>,
 }
 
 pub struct SshManager {
@@ -244,6 +246,10 @@ impl Default for SshManager {
 
 async fn close_session_handles(sess: &SshSession) {
     sess.alive.store(false, Ordering::SeqCst);
+    // Drop SFTP before shell/TCP so in-flight transfers fail cleanly.
+    if let Some(sftp) = sess.sftp.lock().await.take() {
+        let _ = sftp.close().await;
+    }
     if let Some(w) = sess.writer.lock().await.take() {
         let _ = w.close().await;
     }
@@ -252,6 +258,69 @@ async fn close_session_handles(sess: &SshSession) {
             .disconnect(Disconnect::ByApplication, "", "en")
             .await;
     }
+}
+
+/// Session closed / missing error string (SFTP + write/resize).
+pub const SESSION_CLOSED: &str = "SSH session is closed";
+
+/// Return an alive session for SFTP / diagnostics. Err if missing or dead.
+pub fn get_alive_session(
+    manager: &SshManager,
+    terminal_id: &str,
+) -> Result<Arc<SshSession>, String> {
+    let map = manager.sessions.lock().unwrap();
+    let sess = map
+        .get(terminal_id)
+        .cloned()
+        .ok_or_else(|| SESSION_CLOSED.to_string())?;
+    if !sess.alive.load(Ordering::SeqCst) {
+        return Err(SESSION_CLOSED.to_string());
+    }
+    Ok(sess)
+}
+
+/// Lazily open (or reuse) the SFTP subsystem channel on an alive SSH session.
+pub async fn ensure_sftp(sess: &SshSession) -> Result<Arc<russh_sftp::client::SftpSession>, String> {
+    if !sess.alive.load(Ordering::SeqCst) {
+        return Err(SESSION_CLOSED.to_string());
+    }
+    // Double-checked under sftp mutex so concurrent first ops open once.
+    {
+        let guard = sess.sftp.lock().await;
+        if let Some(ref s) = *guard {
+            return Ok(Arc::clone(s));
+        }
+    }
+    let mut guard = sess.sftp.lock().await;
+    if let Some(ref s) = *guard {
+        return Ok(Arc::clone(s));
+    }
+    if !sess.alive.load(Ordering::SeqCst) {
+        return Err(SESSION_CLOSED.to_string());
+    }
+
+    let channel = {
+        let handle_guard = sess.handle.lock().await;
+        let handle = handle_guard
+            .as_ref()
+            .ok_or_else(|| SESSION_CLOSED.to_string())?;
+        handle
+            .channel_open_session()
+            .await
+            .map_err(|e| format!("SFTP channel open failed: {e}"))?
+    };
+
+    channel
+        .request_subsystem(true, "sftp")
+        .await
+        .map_err(|e| format!("SFTP subsystem request failed: {e}"))?;
+
+    let sftp = russh_sftp::client::SftpSession::new(channel.into_stream())
+        .await
+        .map_err(|e| format!("SFTP init failed: {e}"))?;
+    let arc = Arc::new(sftp);
+    *guard = Some(Arc::clone(&arc));
+    Ok(arc)
 }
 
 // ── Drop-oldest emit queue (same spirit as pty) ─────────────────────────────
@@ -665,6 +734,7 @@ async fn open_ssh_connection(
         generation,
         writer: AsyncMutex::new(Some(write_half)),
         handle: AsyncMutex::new(Some(handle)),
+        sftp: AsyncMutex::new(None),
     });
 
     {

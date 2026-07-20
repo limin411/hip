@@ -11,6 +11,7 @@ declare global {
       filters?: { name: string; extensions: string[] }[]
     }) => Promise<string | null>
     __hipPickPrivateKey?: () => Promise<string | null>
+    __hipPickFiles?: (opts?: { multiple?: boolean; title?: string }) => Promise<string[] | null>
   }
 }
 
@@ -79,6 +80,26 @@ export async function pickPrivateKeyFile(): Promise<string | null> {
     title: 'Select private key',
   })
   return typeof result === 'string' ? result : null
+}
+
+/**
+ * Pick one or more local files for SFTP upload (any type).
+ * E2E via `window.__hipPickFiles`.
+ */
+export async function pickFiles(opts?: {
+  multiple?: boolean
+  title?: string
+}): Promise<string[] | null> {
+  if (typeof window !== 'undefined' && window.__hipPickFiles) {
+    return window.__hipPickFiles(opts)
+  }
+  const { open } = await import('@tauri-apps/plugin-dialog')
+  const result = await open({
+    multiple: opts?.multiple ?? true,
+    title: opts?.title ?? 'Select files',
+  })
+  if (result === null) return null
+  return Array.isArray(result) ? result : [result]
 }
 
 export {}

@@ -1482,7 +1482,22 @@ export const ja = {
     },
     "sftp": {
       "panelTitle": "ファイル",
-      "comingSoon": "SFTP は近日対応"
+      "comingSoon": "SFTP は近日対応",
+      "loading": "読み込み中…",
+      "loadError": "リモートファイルを一覧できませんでした",
+      "sessionClosed": "SSH セッションは閉じられています。ファイルを閲覧するには再接続してください。",
+      "retry": "再試行",
+      "refresh": "更新",
+      "saveAs": "リモートファイルを保存",
+      "pickFiles": "ファイルをアップロード",
+      "overwriteConfirm": "「{{name}}」は既に存在します。上書きしますか？",
+      "warnConfigPath": "このファイルは ~/.hip/config 配下にあります（秘密情報が含まれる場合があります）。アップロードしますか？",
+      "uploading": "アップロード",
+      "downloading": "ダウンロード",
+      "cancel": "転送をキャンセル",
+      "done": "完了",
+      "cancelled": "キャンセル済み",
+      "failed": "失敗"
     },
     "form": {
       "createTitle": "新しい接続",
@@ -1954,6 +1969,13 @@ export const ja = {
     "managedTerminal": {
       "close": "端末を閉じる",
       "copyTitle": "タイトルをコピー"
+    },
+    "sftp": {
+      "download": "ダウンロード…",
+      "upload": "ファイルをアップロード…",
+      "copyPath": "リモートパスをコピー",
+      "copyName": "名前をコピー",
+      "refresh": "更新"
     },
     "filePreview": {
       "copyPath": "パスをコピー",

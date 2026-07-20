@@ -20,6 +20,7 @@ default = ["ssh"]
 # Production SSH interactive shell + TOFU. See docs/design/2026-07-20-terminal-management.md.
 ssh = [
     "dep:russh",
+    "dep:russh-sftp",
     "tokio/rt",
     "tokio/rt-multi-thread",
     "tokio/net",
@@ -27,6 +28,7 @@ ssh = [
     "tokio/io-util",
     "tokio/macros",
     "tokio/sync",
+    "tokio/fs",
 ]
 # PR0 spike alias — kept so older docs/commands still work.
 ssh-spike = ["ssh"]
@@ -66,4 +68,6 @@ rusqlite = { version = "0.32", features = ["bundled"] }
 # Resolves to 0.54.5 (0.54.6 blocked: yanked libcrux-ml-kem). cargo may warn future-incompat —
 # bump policy in docs/design/2026-07-20-terminal-ssh-spike.md.
 russh = { version = "0.54", optional = true }
+# SFTP subsystem on the same russh client (PR6). Matches russh 0.54 example stack.
+russh-sftp = { version = "2.1", optional = true }
 

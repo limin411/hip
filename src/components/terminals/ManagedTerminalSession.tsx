@@ -21,6 +21,7 @@ import { DeclarativeContextMenu } from '@/components/context-menu'
 import { XtermSurface } from '@/components/artifact/XtermSurface'
 import { cn } from '@/lib/utils'
 import { HostKeyMismatchModal } from './HostKeyMismatchModal'
+import { TerminalFilesPanel } from './TerminalFilesPanel'
 
 /**
  * Focused managed terminal workspace: chrome + shared XtermSurface (PTY or SSH).
@@ -210,15 +211,7 @@ export function ManagedTerminalSession({ terminalId }: { terminalId: string }) {
         </div>
 
         {kind === 'ssh' ? (
-          <aside
-            className="hidden w-56 shrink-0 flex-col border-l border-border bg-surface-muted/30 p-3 sm:flex"
-            data-testid="managed-terminal-files-placeholder"
-          >
-            <p className="text-meta font-medium text-ink">{t('terminals.sftp.panelTitle')}</p>
-            <p className="mt-1 text-caption text-ink-tertiary">
-              {t('terminals.sftp.comingSoon')}
-            </p>
-          </aside>
+          <TerminalFilesPanel terminalId={terminalId} remotePath={term.remotePath} />
         ) : null}
       </div>
 

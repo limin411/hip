@@ -1482,7 +1482,22 @@ export const ko = {
     },
     "sftp": {
       "panelTitle": "파일",
-      "comingSoon": "SFTP 곧 지원"
+      "comingSoon": "SFTP 곧 지원",
+      "loading": "불러오는 중…",
+      "loadError": "원격 파일을 나열할 수 없습니다",
+      "sessionClosed": "SSH 세션이 닫혔습니다. 파일을 보려면 다시 연결하세요.",
+      "retry": "다시 시도",
+      "refresh": "새로 고침",
+      "saveAs": "원격 파일 저장",
+      "pickFiles": "파일 업로드",
+      "overwriteConfirm": "“{{name}}”이(가) 이미 있습니다. 덮어쓸까요?",
+      "warnConfigPath": "이 파일은 ~/.hip/config 아래에 있습니다(비밀 정보가 포함될 수 있음). 그래도 업로드할까요?",
+      "uploading": "업로드",
+      "downloading": "다운로드",
+      "cancel": "전송 취소",
+      "done": "완료",
+      "cancelled": "취소됨",
+      "failed": "실패"
     },
     "form": {
       "createTitle": "새 연결",
@@ -1954,6 +1969,13 @@ export const ko = {
     "managedTerminal": {
       "close": "터미널 닫기",
       "copyTitle": "제목 복사"
+    },
+    "sftp": {
+      "download": "다운로드…",
+      "upload": "파일 업로드…",
+      "copyPath": "원격 경로 복사",
+      "copyName": "이름 복사",
+      "refresh": "새로 고침"
     },
     "filePreview": {
       "copyPath": "경로 복사",

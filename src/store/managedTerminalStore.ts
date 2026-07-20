@@ -6,6 +6,7 @@ import { interactiveTerminalList, sshClose } from '@/ipc/ssh'
 import type { TerminalHost } from '@/ipc/terminalHosts'
 import { useTerminalStore } from '@/store/terminalStore'
 import { useTerminalHostStore } from '@/store/terminalHostStore'
+import { useTerminalFsStore } from '@/store/terminalFsStore'
 
 /** Stable English substring matched by XtermSurface / HostLibrary soft-cap UX. */
 const SOFT_CAP_ERROR =
@@ -185,6 +186,7 @@ export const useManagedTerminalStore = create<ManagedTerminalStore>((set, get) =
         /* already dead */
       }
       useTerminalStore.getState().clearSession(id)
+      useTerminalFsStore.getState().clearTerminal(id)
       set((s) => ({
         focusedId: s.focusedId === id ? null : s.focusedId,
       }))
@@ -206,6 +208,7 @@ export const useManagedTerminalStore = create<ManagedTerminalStore>((set, get) =
     }
 
     useTerminalStore.getState().clearSession(id)
+    useTerminalFsStore.getState().clearTerminal(id)
     set((s) => {
       const terminals = s.terminals.filter((t) => t.id !== id)
       let focusedId = s.focusedId

@@ -236,6 +236,42 @@ const STATIC_CATALOG: ContextMenuItemMeta[] = [
     danger: true,
   },
   {
+    id: 'sftp.download',
+    labelKey: 'contextMenu.sftp.download',
+    kind: 'sftpEntry',
+    group: 'primary',
+  },
+  {
+    id: 'sftp.upload',
+    labelKey: 'contextMenu.sftp.upload',
+    kind: 'sftpEntry',
+    group: 'primary',
+  },
+  {
+    id: 'sftp.copyPath',
+    labelKey: 'contextMenu.sftp.copyPath',
+    kind: 'sftpEntry',
+    group: 'clipboard',
+  },
+  {
+    id: 'sftp.copyName',
+    labelKey: 'contextMenu.sftp.copyName',
+    kind: 'sftpEntry',
+    group: 'clipboard',
+  },
+  {
+    id: 'sftp.refresh',
+    labelKey: 'contextMenu.sftp.refresh',
+    kind: 'sftpEntry',
+    group: 'workspace',
+  },
+  {
+    id: 'sftp.refreshParent',
+    labelKey: 'contextMenu.sftp.refresh',
+    kind: 'sftpEntry',
+    group: 'workspace',
+  },
+  {
     id: 'filePreview.copyPath',
     labelKey: 'contextMenu.filePreview.copyPath',
     kind: 'filePreview',

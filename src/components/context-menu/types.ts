@@ -19,6 +19,8 @@ export type ContextKind =
   | 'terminal'
   /** Sidebar / chrome managed terminal (tm_* local or SSH). */
   | 'managedTerminal'
+  /** Remote SFTP tree entry in managed SSH files panel. */
+  | 'sftpEntry'
   | 'agentConfig'
   | 'skillConfig'
   | 'mcpServer'
@@ -87,6 +89,13 @@ export type ContextPayloadMap = {
     terminalId: string
     kind: 'local' | 'ssh'
     title: string
+  }
+  /** Remote SFTP tree entry (managed SSH files panel). */
+  sftpEntry: {
+    terminalId: string
+    path: string
+    name: string
+    isDir: boolean
   }
   /**
    * Settings agent row. Hosts supply onEdit/onDelete so menus reuse existing

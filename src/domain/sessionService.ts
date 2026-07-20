@@ -1982,6 +1982,8 @@ export class SessionService {
     this.lastOutboundUserContent = text
     const st = useDomainStore.getState()
     const active = st.sessions.find((s) => s.id === st.activeSessionId)
+    // Any interrupt (including plan approval) continues via message:resume.
+    // Sidecar treats planStatus=ready resume as soft-approve + execute with the text as guidance.
     if (active?.interrupt) { this.resume(text, attachments); return }
     let { activeSessionId } = st
     if (!activeSessionId) {

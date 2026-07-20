@@ -146,9 +146,13 @@ export class ConfigManager {
     return true
   }
 
-  /** Force plan/execute/verify loop for subsequent turns. NO-OP while a turn is running. */
+  /**
+   * Force plan mode for subsequent turns.
+   * Enabling (true) is NO-OP while a turn is running.
+   * Clearing (false) is always allowed — plan-ready / approve must drop the gate mid-turn.
+   */
   setForcePlan(forcePlan: boolean): boolean {
-    if (this.isRunning()) return false
+    if (forcePlan && this.isRunning()) return false
     this.updateConfig({
       ...this.getConfig(),
       forcePlan,

@@ -54,6 +54,7 @@ import type { SkillMeta } from '@hip/protocol'
 import { deriveTitle } from './title-generator.js'
 import { runWorkflowTurn as runWorkflowTurnFn, type WorkflowRunDeps } from './workflow-runner.js'
 import { shouldPlan } from './plan.js'
+import { clearForcePlanFlag } from './force-plan.js'
 import type { AgentProfile } from './agent-profile.js'
 import type { PlanMode } from './plan-mode.js'
 import type { ToolOutputStore } from './tool-output-store.js'
@@ -1337,6 +1338,11 @@ export async function runTurn(host: SessionTurnHost, rawSend: SendFn, base?: {
         if (isPlanApproval && finalState.plan) {
           send({ type: 'plan:published', sessionId: host.id, turnId, plan: finalState.plan })
         }
+        // forcePlan is one-shot for "plan before execute" — once a plan is submitted
+        // for review, do not re-force PlanMode on the next message/resume.
+        if (isPlanApproval) {
+          clearForcePlanFlag(host, send, 'plan_ready')
+        }
         const interruptContext = isPlanApproval
           ? JSON.stringify({ kind: 'plan_approval', plan: finalState.plan })
           : undefined
@@ -1347,6 +1353,8 @@ export async function runTurn(host: SessionTurnHost, rawSend: SendFn, base?: {
           planStatus: finalState.planStatus,
           isPlanApproval,
           planItemCount: finalState.plan?.length ?? 0,
+          forcePlan: Boolean(host._config.forcePlan),
+          planModeActive: Boolean(host.planMode?.isActive),
           question: (finalState.pendingQuestion ?? PAUSE_QUESTION).slice(0, 200),
         })
         send({

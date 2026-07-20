@@ -16,6 +16,7 @@ import { safeErrorMessage } from './error.js'
 import { loadSubagentMessages } from './session-background.js'
 import { clipForTool, stringify } from './tool-trace.js'
 import { logInfo } from '../debug-logger.js'
+import { clearForcePlanFlag } from './force-plan.js'
 import {
   type SessionTurnHost,
   type SendFn,
@@ -24,7 +25,17 @@ import {
 } from './session-turn-runner.js'
 
 export async function resume(host: SessionTurnHost, content: string, send: SendFn, attachments?: AttachmentPayload[]): Promise<void> {
-  if (!host.awaitingResume || !host.paused || host.running) return
+  if (!host.awaitingResume || !host.paused || host.running) {
+    logInfo('session', 'resume:skip', {
+      sessionId: host.id,
+      awaitingResume: host.awaitingResume,
+      hasPaused: Boolean(host.paused),
+      running: host.running,
+      planStatus: host.paused?.planStatus,
+      contentLen: content.length,
+    })
+    return
+  }
   const parts: ContentPart[] = []
   if (content) parts.push({ type: 'text', text: content })
   let staged: Attachment[] | undefined
@@ -78,14 +89,76 @@ export async function resume(host: SessionTurnHost, content: string, send: SendF
     ? new HumanMessage(resumeContent)
     : new HumanMessage({ content: resumeParts })
 
-  const base = {
-    messages: [...host.paused.messages, humanMessage],
-    steps: host.paused.steps,
-    planningMode: host.paused.planningMode,
-    planStatus: host.paused.planStatus,
-    plan: host.paused.plan,
+  const paused = host.paused
+  const interruptTurnId = `turn-${host.turnSeq}`
+  const emitInterruptResolved = () => {
+    send({
+      type: 'agent:interrupt:resolved',
+      sessionId: host.id,
+      turnId: interruptTurnId,
+    })
   }
-  host.awaitingResume = false; host.paused = null
+
+  // Composer text during plan approval hits message:resume (not plan:respond).
+  // Treating it as soft-approve: leave plan mode, clear forcePlan, execute with guidance.
+  // (Explicit "Amend" still uses plan:respond amend.)
+  if (paused.planStatus === 'ready') {
+    host.planMode.exit()
+    try {
+      await persistApprovedPlan(host.id, paused.plan ?? [])
+    } catch (err) {
+      console.error('Failed to persist approved plan on resume:', err instanceof Error ? err.message : String(err))
+      send({ type: 'agent:notification', sessionId: host.id, taskId: 'plan-persist', description: 'Plan was approved but could not be saved to disk.', status: 'failed' })
+    }
+    const base = {
+      messages: [...paused.messages, humanMessage],
+      steps: 0,
+      planningMode: 'fast' as const,
+      planStatus: 'approved' as const,
+      plan: paused.plan,
+    }
+    logInfo('session', 'plan:respond', {
+      sessionId: host.id,
+      action: 'soft_approve_resume',
+      planningMode: 'fast',
+      planStatus: 'approved',
+      planItemCount: paused.plan?.length ?? 0,
+      resumeLen: resumeContent.length,
+      forcePlanBefore: Boolean(host._config.forcePlan),
+      planModeActiveBefore: host.planMode.isActive,
+    })
+    host.awaitingResume = false
+    host.paused = null
+    emitInterruptResolved()
+    clearForcePlanFlag(host, send, 'soft_approve_resume')
+    const ts = Date.now()
+    if (host.store) {
+      host.emit({ type: 'user_message', sessionId: host.id, content: resumeContent, messageId: `u-${ts}`, timestamp: ts, ...(staged?.length ? { attachments: staged } : {}), ...(isRichContentParts(resumeParts) ? { contentParts: resumeParts } : {}) })
+    }
+    host.messages.push(humanMessage)
+    await runTurn(host, send, base)
+    return
+  }
+
+  logInfo('session', 'resume:continue', {
+    sessionId: host.id,
+    planningMode: paused.planningMode,
+    planStatus: paused.planStatus,
+    planItemCount: paused.plan?.length ?? 0,
+    contentLen: resumeContent.length,
+    forcePlan: Boolean(host._config.forcePlan),
+    planModeActive: host.planMode.isActive,
+  })
+  const base = {
+    messages: [...paused.messages, humanMessage],
+    steps: paused.steps,
+    planningMode: paused.planningMode,
+    planStatus: paused.planStatus,
+    plan: paused.plan,
+  }
+  host.awaitingResume = false
+  host.paused = null
+  emitInterruptResolved()
   const ts = Date.now()
   if (host.store) {
     host.emit({ type: 'user_message', sessionId: host.id, content: resumeContent, messageId: `u-${ts}`, timestamp: ts, ...(staged?.length ? { attachments: staged } : {}), ...(isRichContentParts(resumeParts) ? { contentParts: resumeParts } : {}) })
@@ -148,22 +221,19 @@ export async function regenerate(host: SessionTurnHost, send: SendFn): Promise<v
   await runTurn(host, send)
 }
 
-/** One-shot forcePlan: clear after approve/reject so execution/next turns are not re-forced. */
-function clearForcePlanFlag(host: SessionTurnHost, send: SendFn): void {
-  if (!host._config.forcePlan) return
-  const applied = host.configMgr.setForcePlan(false)
-  if (applied && host.store) {
-    try {
-      host.store.updateConfig(host.id, JSON.stringify(host._config))
-    } catch {
-      // best-effort persist
-    }
-  }
-  send({ type: 'session:forcePlan', sessionId: host.id, forcePlan: false })
-}
-
 export async function handlePlanResponse(host: SessionTurnHost, action: 'approve' | 'reject' | 'amend', send: SendFn, amendContent?: string): Promise<void> {
-  if (!host.awaitingResume || !host.paused) return
+  if (!host.awaitingResume || !host.paused) {
+    logInfo('session', 'plan:respond:skip', {
+      sessionId: host.id,
+      action,
+      awaitingResume: host.awaitingResume,
+      hasPaused: Boolean(host.paused),
+      planStatus: host.paused?.planStatus,
+      planModeActive: host.planMode.isActive,
+      forcePlan: Boolean(host._config.forcePlan),
+    })
+    return
+  }
   // Capture turn id for multi-client UI clear (message:complete alone does not clear interrupt).
   const interruptTurnId = `turn-${host.turnSeq}`
   const emitInterruptResolved = () => {
@@ -201,11 +271,12 @@ export async function handlePlanResponse(host: SessionTurnHost, action: 'approve
         planStatus: 'approved',
         planItemCount: planItems.length,
         planCompleted: planItems.filter((p) => p.status === 'completed').length,
+        forcePlanBefore: Boolean(host._config.forcePlan),
       })
       host.awaitingResume = false; host.paused = null
       emitInterruptResolved()
       // Drop forcePlan before execution so the execute turn is not re-gated into PlanMode.
-      clearForcePlanFlag(host, send)
+      clearForcePlanFlag(host, send, 'approve')
       await runTurn(host, send, base)
       break
     }
@@ -215,10 +286,11 @@ export async function handlePlanResponse(host: SessionTurnHost, action: 'approve
         sessionId: host.id,
         action: 'reject',
         planItemCount: host.paused?.plan?.length ?? 0,
+        forcePlanBefore: Boolean(host._config.forcePlan),
       })
       host.awaitingResume = false; host.paused = null
       emitInterruptResolved()
-      clearForcePlanFlag(host, send)
+      clearForcePlanFlag(host, send, 'reject')
       send({ type: 'error', sessionId: host.id, code: 'PLAN_REJECTED', message: 'Plan was rejected by the user.' })
       break
     }
@@ -229,6 +301,8 @@ export async function handlePlanResponse(host: SessionTurnHost, action: 'approve
         action: 'amend',
         planItemCount: host.paused?.plan?.length ?? 0,
         amendLen: content.length,
+        forcePlan: Boolean(host._config.forcePlan),
+        planModeActive: host.planMode.isActive,
       })
       const base = {
         messages: [...host.paused.messages, new HumanMessage(content)],

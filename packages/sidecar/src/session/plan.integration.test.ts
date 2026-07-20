@@ -173,6 +173,41 @@ describe('plan lifecycle integration', () => {
   // Test 2: Plan rejection stops execution and writes no plan file
   // ──────────────────────────────────────────────────────────────────────────────
 
+  it('message:resume during plan approval soft-approves and executes (does not re-prompt)', async () => {
+    const store = inMemoryStore()
+    const runner = new PlanRunner()
+    const session = makeSession('s-plan-resume', runner, store)
+    session.setForcePlan(true)
+
+    const planEvents: ServerMessage[] = []
+    await session.sendMessage('plan something', (m) => planEvents.push(m))
+
+    const interrupt = planEvents.find((e) => e.type === 'agent:interrupt') as
+      | Extract<ServerMessage, { type: 'agent:interrupt' }>
+      | undefined
+    expect(interrupt).toBeTruthy()
+    expect(JSON.parse(interrupt!.context ?? '{}').kind).toBe('plan_approval')
+    // forcePlan is one-shot: cleared when the plan is submitted for review
+    expect(session.config.forcePlan).toBeFalsy()
+
+    const resumeEvents: ServerMessage[] = []
+    await session.resume('来自 GitHub，用代理 127.0.0.1:7890', (m) => resumeEvents.push(m))
+
+    expect(runner.executed).toBe(true)
+    // Must not re-open plan_approval after soft-approve resume
+    const resumePlanApprovals = resumeEvents.filter((e) => {
+      if (e.type !== 'agent:interrupt') return false
+      try {
+        return JSON.parse((e as { context?: string }).context ?? '{}').kind === 'plan_approval'
+      } catch {
+        return false
+      }
+    })
+    expect(resumePlanApprovals).toHaveLength(0)
+    expect(session.config.forcePlan).toBeFalsy()
+    expect(resumeEvents.some((e) => e.type === 'message:complete')).toBe(true)
+  })
+
   it('plan rejection stops execution', async () => {
     const runner = new PlanRunner()
     const session = makeSession('s-plan-reject', runner)

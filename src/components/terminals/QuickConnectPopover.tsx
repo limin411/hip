@@ -157,8 +157,9 @@ export function QuickConnectPopover() {
         </button>
       </PopoverTrigger>
       <PopoverContent
-        side="bottom"
-        align="end"
+        side="right"
+        align="start"
+        sideOffset={8}
         className="w-[min(280px,calc(100vw-2rem))] p-0"
         data-testid="terminals-new-popover"
         onOpenAutoFocus={(e) => e.preventDefault()}

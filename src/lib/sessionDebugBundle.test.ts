@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import {
+  buildDebugAnalysis,
   buildSessionDebugBundle,
   clipForExport,
   MAX_CONTENT,
@@ -43,7 +44,7 @@ describe('sessionDebugBundle', () => {
       ],
       now: () => '2026-07-10T00:00:00.000Z',
     })
-    expect(bundle.version).toBe(2)
+    expect(bundle.version).toBe(3)
     expect(bundle.exportedAt).toBe('2026-07-10T00:00:00.000Z')
     expect(bundle.session.config.apiKey).toBeUndefined()
     expect(bundle.session.surface).toBe('code')
@@ -52,12 +53,110 @@ describe('sessionDebugBundle', () => {
     expect(bundle.messages[1]!.content).toContain('export clipped')
     expect(bundle.messages[1]!.content).toContain('not a runtime tool cap')
     expect(bundle.messages[1]!.stopped).toBe(true)
+    expect(bundle.analysis?.assistantTurns).toBe(1)
+    expect(bundle.analysis?.stoppedTurns).toBe(1)
     expect(sessionDebugBundleJson({
       sessionId: 's1',
       title: 'T',
       messages: [],
       now: () => 't',
-    })).toContain('"version": 2')
+    })).toContain('"version": 3')
+  })
+
+  it('includes ui state and tool-error analysis for plan/HITL postmortems', () => {
+    const bundle = buildSessionDebugBundle({
+      sessionId: 's1',
+      title: 'T',
+      config: { llmProvider: 'deepseek', model: 'm', forcePlan: true } as never,
+      messages: [
+        {
+          id: 'm1',
+          role: 'assistant',
+          content: 'plan',
+          timestamp: 10,
+          toolCalls: [
+            {
+              callId: 'c1',
+              agentId: 'supervisor',
+              name: 'web_fetch',
+              input: '{}',
+              output: 'Error: DNS resolution failed',
+              status: 'finished',
+              seq: 1,
+            },
+            {
+              callId: 'c2',
+              agentId: 'supervisor',
+              name: 'ExitPlanMode',
+              input: '{}',
+              output: 'Exited plan mode. Plan ready for review.',
+              status: 'finished',
+              seq: 2,
+            },
+          ],
+          agentRuns: [
+            {
+              agentId: 'supervisor',
+              role: 'supervisor',
+              output: 'plan',
+              startedAt: 10,
+              finishedAt: 50,
+              seq: 0,
+            },
+          ],
+        },
+      ],
+      ui: {
+        status: 'idle',
+        planApprovalPending: true,
+        interrupt: {
+          turnId: 't1',
+          question: 'Review the plan',
+          context: JSON.stringify({ kind: 'plan_approval' }),
+        },
+        activeTurnPlan: [{ content: 'step', status: 'pending' }],
+        forcePlan: true,
+      },
+      now: () => 't',
+    })
+    expect(bundle.session.ui?.planApprovalPending).toBe(true)
+    expect(bundle.session.ui?.interrupt?.turnId).toBe('t1')
+    expect(bundle.session.ui?.activeTurnPlan?.[0]?.content).toBe('step')
+    expect(bundle.analysis?.toolErrorCount).toBe(1)
+    expect(bundle.analysis?.planToolCounts.ExitPlanMode).toBe(1)
+    expect(bundle.analysis?.toolErrors[0]?.preview).toContain('DNS')
+    expect(bundle.messages[0]!.meta?.hasExitPlanMode).toBe(true)
+    expect(bundle.messages[0]!.meta?.toolErrorCount).toBe(1)
+    expect(bundle.messages[0]!.meta?.durationMs).toBe(40)
+  })
+
+  it('buildDebugAnalysis counts tools and gaps', () => {
+    const analysis = buildDebugAnalysis([
+      { id: 'u', role: 'user', content: 'hi', timestamp: 100 },
+      {
+        id: 'a',
+        role: 'assistant',
+        content: 'ok',
+        timestamp: 250,
+        stopped: true,
+        toolCalls: [
+          {
+            callId: 'c',
+            agentId: 'supervisor',
+            name: 'write_todos',
+            input: '{}',
+            output: 'ok',
+            status: 'finished',
+            seq: 1,
+          },
+        ],
+      },
+    ])
+    expect(analysis.userTurns).toBe(1)
+    expect(analysis.assistantTurns).toBe(1)
+    expect(analysis.stoppedTurns).toBe(1)
+    expect(analysis.planToolCounts.write_todos).toBe(1)
+    expect(analysis.messageGapsMs).toEqual([150])
   })
 
   it('preserves agentRun taskInput/parentAgentId/seq and timeline', () => {

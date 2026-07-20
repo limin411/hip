@@ -136,6 +136,13 @@ export function ChatPane() {
       recentErrors: error
         ? [{ code: error.code, message: error.message, at: Date.now() }]
         : undefined,
+      ui: {
+        status,
+        planApprovalPending: Boolean(session.planApprovalPending),
+        interrupt: interrupt ?? null,
+        activeTurnPlan: session.activeTurnPlan ?? null,
+        forcePlan: Boolean(session.config.forcePlan),
+      },
     })
     const result = await exportSessionDebugBundle(text, activeSessionId)
     if (result === 'saved') {

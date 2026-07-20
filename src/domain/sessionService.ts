@@ -667,6 +667,13 @@ export class SessionService {
       recentErrors: session.error
         ? [{ code: session.error.code, message: session.error.message, at: Date.now() }]
         : undefined,
+      ui: {
+        status: session.status,
+        planApprovalPending: Boolean(session.planApprovalPending),
+        interrupt: session.interrupt ?? null,
+        activeTurnPlan: session.activeTurnPlan ?? null,
+        forcePlan: Boolean(session.config.forcePlan),
+      },
     })
   }
 

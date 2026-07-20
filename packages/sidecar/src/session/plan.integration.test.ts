@@ -129,6 +129,10 @@ describe('plan lifecycle integration', () => {
     expect(interruptEvent).toBeTruthy()
     const question = (interruptEvent as { question: string }).question
     expect(question.toLowerCase()).toContain('plan')
+    // Only planStatus=ready should carry plan_approval (not later doom/error pauses).
+    const interruptCtx = (interruptEvent as { context?: string }).context
+    expect(interruptCtx).toBeTruthy()
+    expect(JSON.parse(interruptCtx!).kind).toBe('plan_approval')
 
     // Approve the plan
     const approveEvents: ServerMessage[] = []
@@ -137,6 +141,14 @@ describe('plan lifecycle integration', () => {
     // Verify execution runner was invoked
     expect(runner.executed).toBe(true)
     expect(runner.callCount).toBeGreaterThanOrEqual(2)
+    // Execution pauses (if any) must not re-tag as plan_approval.
+    const execInterrupts = approveEvents.filter((e) => e.type === 'agent:interrupt')
+    for (const ev of execInterrupts) {
+      const ctx = (ev as { context?: string }).context
+      if (ctx) {
+        expect(JSON.parse(ctx).kind).not.toBe('plan_approval')
+      }
+    }
 
     // Approved plan JSON lives under ~/.hip/plans/ (not project cwd)
     const { approvedPlanJsonPath } = await import('./plan-persistence.js')

@@ -832,12 +832,13 @@ export function buildGraph(maxSteps: number = MAX_STEPS, compactBudget: number =
     config: LangGraphRunnableConfig,
   ): 'replan' | 'nudge' | 'pause' | 'compact' | 'planPause' | typeof END {
     if (state.planStatus === 'ready') return 'planPause'
+
+    // Only the most recent tool batch (after the last AIMessage). Historical
+    // planning-phase Error:* results must not re-pause execution after approve.
+    const recentToolContents = collectRecentToolContents(state)
+
     if (state.planningMode === 'plan' && state.planStatus === 'approved') {
-      const hasToolFailure = state.messages.some((m) => {
-        if (!(m instanceof ToolMessage)) return false
-        const c = m.content.toString()
-        return isLoopToolError(c)
-      })
+      const hasToolFailure = recentToolContents.some((c) => isLoopToolError(c))
       if (hasToolFailure) {
         return 'pause'
       }
@@ -854,7 +855,6 @@ export function buildGraph(maxSteps: number = MAX_STEPS, compactBudget: number =
       }
     }
 
-    const recentToolContents = collectRecentToolContents(state)
     const trailingErrors = harvestTrailingToolErrors(recentToolContents)
     const lastSig = state.recentSigs[state.recentSigs.length - 1]
     const isDoom =

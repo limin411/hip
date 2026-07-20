@@ -1,7 +1,46 @@
-import type { Message, SessionConfig, TimelineStep } from '@hip/protocol'
+import type { Message, PlanItem, SessionConfig, TimelineStep } from '@hip/protocol'
+
+/** Tool-error preview length in analysis (not a runtime cap). */
+const ERROR_PREVIEW = 240
+/** Max tool-error rows retained in analysis.summary. */
+const MAX_ERROR_ROWS = 40
+
+export type SessionDebugUiState = {
+  status?: string
+  planApprovalPending?: boolean
+  interrupt?: { turnId: string; question: string; context?: string } | null
+  activeTurnPlan?: PlanItem[] | null
+  forcePlan?: boolean
+}
+
+export type SessionDebugAnalysis = {
+  messageCount: number
+  userTurns: number
+  assistantTurns: number
+  stoppedTurns: number
+  toolCallCount: number
+  toolErrorCount: number
+  toolsByName: Record<string, number>
+  planToolCounts: {
+    EnterPlanMode: number
+    ExitPlanMode: number
+    write_todos: number
+  }
+  /** Compact list of tool failures for plan/HITL postmortems. */
+  toolErrors: Array<{
+    messageId: string
+    name: string
+    callId?: string
+    status?: string
+    preview: string
+  }>
+  /** Wall-clock deltas between consecutive messages (ms), when timestamps exist. */
+  messageGapsMs: number[]
+}
 
 export type SessionDebugBundle = {
-  version: 2
+  /** v3 adds session.ui + analysis for plan/HITL postmortems. */
+  version: 3
   exportedAt: string
   appVersion?: string
   session: {
@@ -15,6 +54,8 @@ export type SessionDebugBundle = {
       subagentMaxConcurrency: number
       toolParallelismDefault: number
     }
+    /** Live UI/session flags at export time (plan approval, interrupt, etc.). */
+    ui?: SessionDebugUiState
   }
   messages: Array<{
     id: string
@@ -26,7 +67,17 @@ export type SessionDebugBundle = {
     toolCalls?: unknown[]
     agentRuns?: unknown[]
     timeline?: unknown[]
+    /** Per-message derived flags for faster offline scans. */
+    meta?: {
+      toolCount: number
+      toolErrorCount: number
+      toolNames: string[]
+      hasExitPlanMode?: boolean
+      hasEnterPlanMode?: boolean
+      durationMs?: number
+    }
   }>
+  analysis?: SessionDebugAnalysis
   recentErrors?: Array<{ code?: string; message: string; at?: number }>
 }
 
@@ -128,6 +179,115 @@ function sanitizeTimeline(steps: TimelineStep[] | undefined): unknown[] | undefi
   })
 }
 
+function isToolErrorOutput(output: unknown, status: unknown, error: unknown): boolean {
+  if (status === 'error') return true
+  if (typeof error === 'string' && error.length > 0) return true
+  if (typeof output === 'string' && (output.startsWith('Error') || output.startsWith('error:'))) return true
+  return false
+}
+
+function toolPreview(output: unknown, error: unknown): string {
+  const raw = typeof error === 'string' && error.length > 0
+    ? error
+    : typeof output === 'string'
+      ? output
+      : ''
+  return raw.length <= ERROR_PREVIEW ? raw : `${raw.slice(0, ERROR_PREVIEW)}…`
+}
+
+/** Derive offline-friendly stats from messages (pure; safe for tests). */
+export function buildDebugAnalysis(messages: Message[]): SessionDebugAnalysis {
+  let userTurns = 0
+  let assistantTurns = 0
+  let stoppedTurns = 0
+  let toolCallCount = 0
+  let toolErrorCount = 0
+  const toolsByName: Record<string, number> = {}
+  const planToolCounts = { EnterPlanMode: 0, ExitPlanMode: 0, write_todos: 0 }
+  const toolErrors: SessionDebugAnalysis['toolErrors'] = []
+  const messageGapsMs: number[] = []
+
+  let prevTs: number | undefined
+  for (const m of messages) {
+    if (typeof m.timestamp === 'number' && typeof prevTs === 'number') {
+      messageGapsMs.push(m.timestamp - prevTs)
+    }
+    if (typeof m.timestamp === 'number') prevTs = m.timestamp
+
+    if (m.role === 'user') userTurns += 1
+    if (m.role === 'assistant') {
+      assistantTurns += 1
+      if (m.stopped) stoppedTurns += 1
+    }
+
+    for (const tc of m.toolCalls ?? []) {
+      toolCallCount += 1
+      const name = typeof tc.name === 'string' ? tc.name : 'unknown'
+      toolsByName[name] = (toolsByName[name] ?? 0) + 1
+      if (name === 'EnterPlanMode' || name === 'ExitPlanMode' || name === 'write_todos') {
+        planToolCounts[name] += 1
+      }
+      if (isToolErrorOutput(tc.output, tc.status, tc.error)) {
+        toolErrorCount += 1
+        if (toolErrors.length < MAX_ERROR_ROWS) {
+          toolErrors.push({
+            messageId: m.id,
+            name,
+            ...(typeof tc.callId === 'string' ? { callId: tc.callId } : {}),
+            ...(typeof tc.status === 'string' ? { status: tc.status } : {}),
+            preview: toolPreview(tc.output, tc.error),
+          })
+        }
+      }
+    }
+  }
+
+  return {
+    messageCount: messages.length,
+    userTurns,
+    assistantTurns,
+    stoppedTurns,
+    toolCallCount,
+    toolErrorCount,
+    toolsByName,
+    planToolCounts,
+    toolErrors,
+    messageGapsMs,
+  }
+}
+
+function messageMeta(m: Message): SessionDebugBundle['messages'][number]['meta'] {
+  const toolCalls = m.toolCalls ?? []
+  if (toolCalls.length === 0 && !m.agentRuns?.length) return undefined
+  const toolNames: string[] = []
+  let toolErrorCount = 0
+  let hasExitPlanMode = false
+  let hasEnterPlanMode = false
+  for (const tc of toolCalls) {
+    const name = typeof tc.name === 'string' ? tc.name : 'unknown'
+    toolNames.push(name)
+    if (name === 'ExitPlanMode') hasExitPlanMode = true
+    if (name === 'EnterPlanMode') hasEnterPlanMode = true
+    if (isToolErrorOutput(tc.output, tc.status, tc.error)) toolErrorCount += 1
+  }
+  let durationMs: number | undefined
+  if (m.agentRuns?.length) {
+    const starts = m.agentRuns.map((r) => r.startedAt).filter((n): n is number => typeof n === 'number')
+    const ends = m.agentRuns.map((r) => r.finishedAt).filter((n): n is number => typeof n === 'number')
+    if (starts.length && ends.length) {
+      durationMs = Math.max(...ends) - Math.min(...starts)
+    }
+  }
+  return {
+    toolCount: toolCalls.length,
+    toolErrorCount,
+    toolNames,
+    ...(hasExitPlanMode ? { hasExitPlanMode: true } : {}),
+    ...(hasEnterPlanMode ? { hasEnterPlanMode: true } : {}),
+    ...(durationMs !== undefined ? { durationMs } : {}),
+  }
+}
+
 export type BuildDebugBundleInput = {
   sessionId: string
   title: string
@@ -136,6 +296,8 @@ export type BuildDebugBundleInput = {
   recentErrors?: Array<{ code?: string; message: string; at?: number }>
   appVersion?: string
   now?: () => string
+  /** Optional live session UI flags (plan approval, interrupt, status). */
+  ui?: SessionDebugUiState
 }
 
 /** Pure builder for the redacted session debug export payload. */
@@ -143,8 +305,25 @@ export function buildSessionDebugBundle(input: BuildDebugBundleInput): SessionDe
   const cfg = sanitizeConfig(input.config)
   const surface = typeof cfg.surface === 'string' ? cfg.surface : undefined
   const cwd = typeof cfg.cwd === 'string' ? cfg.cwd : undefined
+  const forcePlan = Boolean(cfg.forcePlan)
+  const analysis = buildDebugAnalysis(input.messages)
+
+  const ui: SessionDebugUiState | undefined = input.ui
+    ? {
+        ...(input.ui.status !== undefined ? { status: input.ui.status } : {}),
+        ...(input.ui.planApprovalPending !== undefined
+          ? { planApprovalPending: input.ui.planApprovalPending }
+          : {}),
+        ...(input.ui.interrupt !== undefined ? { interrupt: input.ui.interrupt } : {}),
+        ...(input.ui.activeTurnPlan !== undefined ? { activeTurnPlan: input.ui.activeTurnPlan } : {}),
+        forcePlan: input.ui.forcePlan ?? forcePlan,
+      }
+    : forcePlan
+      ? { forcePlan }
+      : undefined
+
   return {
-    version: 2,
+    version: 3,
     exportedAt: (input.now ?? (() => new Date().toISOString()))(),
     ...(input.appVersion ? { appVersion: input.appVersion } : {}),
     session: {
@@ -157,33 +336,39 @@ export function buildSessionDebugBundle(input: BuildDebugBundleInput): SessionDe
         subagentMaxConcurrency: DEFAULT_SUBAGENT_MAX_CONCURRENCY,
         toolParallelismDefault: DEFAULT_TOOL_PARALLELISM,
       },
+      ...(ui ? { ui } : {}),
     },
-    messages: input.messages.map((m) => ({
-      id: m.id,
-      role: m.role,
-      content: clipForExport(m.content ?? '', MAX_CONTENT).text,
-      ...(m.agentId ? { agentId: m.agentId } : {}),
-      ...(m.stopped ? { stopped: true } : {}),
-      ...(typeof m.timestamp === 'number' ? { timestamp: m.timestamp } : {}),
-      ...(m.toolCalls?.length ? { toolCalls: sanitizeToolCalls(m.toolCalls) } : {}),
-      ...(m.agentRuns?.length
-        ? {
-            agentRuns: m.agentRuns.map((r) => ({
-              agentId: r.agentId,
-              role: r.role,
-              output: clipForExport(r.output ?? '', MAX_CONTENT).text,
-              startedAt: r.startedAt,
-              finishedAt: r.finishedAt,
-              seq: r.seq,
-              ...(r.taskInput ? { taskInput: clipForExport(r.taskInput, MAX_CONTENT).text } : {}),
-              ...(r.parentAgentId ? { parentAgentId: r.parentAgentId } : {}),
-              ...(r.messageId ? { messageId: r.messageId } : {}),
-              ...(r.usage ? { usage: r.usage } : {}),
-            })),
-          }
-        : {}),
-      ...(m.timeline?.length ? { timeline: sanitizeTimeline(m.timeline) } : {}),
-    })),
+    messages: input.messages.map((m) => {
+      const meta = messageMeta(m)
+      return {
+        id: m.id,
+        role: m.role,
+        content: clipForExport(m.content ?? '', MAX_CONTENT).text,
+        ...(m.agentId ? { agentId: m.agentId } : {}),
+        ...(m.stopped ? { stopped: true } : {}),
+        ...(typeof m.timestamp === 'number' ? { timestamp: m.timestamp } : {}),
+        ...(m.toolCalls?.length ? { toolCalls: sanitizeToolCalls(m.toolCalls) } : {}),
+        ...(m.agentRuns?.length
+          ? {
+              agentRuns: m.agentRuns.map((r) => ({
+                agentId: r.agentId,
+                role: r.role,
+                output: clipForExport(r.output ?? '', MAX_CONTENT).text,
+                startedAt: r.startedAt,
+                finishedAt: r.finishedAt,
+                seq: r.seq,
+                ...(r.taskInput ? { taskInput: clipForExport(r.taskInput, MAX_CONTENT).text } : {}),
+                ...(r.parentAgentId ? { parentAgentId: r.parentAgentId } : {}),
+                ...(r.messageId ? { messageId: r.messageId } : {}),
+                ...(r.usage ? { usage: r.usage } : {}),
+              })),
+            }
+          : {}),
+        ...(m.timeline?.length ? { timeline: sanitizeTimeline(m.timeline) } : {}),
+        ...(meta ? { meta } : {}),
+      }
+    }),
+    analysis,
     ...(input.recentErrors?.length ? { recentErrors: input.recentErrors } : {}),
   }
 }

@@ -1330,12 +1330,25 @@ export async function runTurn(host: SessionTurnHost, rawSend: SendFn, base?: {
         host.awaitingResume = true
         const stoppedText = host.finalizeAndPersist(send, turnId, supervisorText, trajectory, true, usageByAgent, host.paused.messages)
         void host.hooks.fire('TurnComplete', { sessionId: host.id, turnId }).catch((err) => logNonCritical('TurnComplete', err))
-        if (finalState.planningMode === 'plan' && finalState.plan) {
+        // Only publish/ask for plan approval when the plan is ready for review.
+        // Execution-time pauses (doom/error) keep planningMode semantics out of the UI.
+        const isPlanApproval =
+          finalState.planningMode === 'plan' && finalState.planStatus === 'ready'
+        if (isPlanApproval && finalState.plan) {
           send({ type: 'plan:published', sessionId: host.id, turnId, plan: finalState.plan })
         }
-        const interruptContext = finalState.planningMode === 'plan'
+        const interruptContext = isPlanApproval
           ? JSON.stringify({ kind: 'plan_approval', plan: finalState.plan })
           : undefined
+        logInfo('session', 'agent:interrupt', {
+          sessionId: host.id,
+          turnId,
+          planningMode: finalState.planningMode,
+          planStatus: finalState.planStatus,
+          isPlanApproval,
+          planItemCount: finalState.plan?.length ?? 0,
+          question: (finalState.pendingQuestion ?? PAUSE_QUESTION).slice(0, 200),
+        })
         send({
           type: 'agent:interrupt',
           sessionId: host.id,

@@ -2,7 +2,7 @@ import { describe, it, expect, beforeAll } from 'vitest'
 import { mkdtempSync, rmSync, readFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { AIMessage, HumanMessage, SystemMessage, type AIMessage as AIMsg, type BaseMessage } from '@langchain/core/messages'
+import { AIMessage, HumanMessage, SystemMessage, ToolMessage, type AIMessage as AIMsg, type BaseMessage } from '@langchain/core/messages'
 import { tool } from '@langchain/core/tools'
 import { z } from 'zod'
 import { buildTools } from './tools.js'
@@ -680,6 +680,36 @@ describe('replan × error-streak decision table (Track A)', () => {
       )
       expect(out.status).toBe('awaiting_user')
       expect(out.pendingQuestion).toBeTruthy()
+    })
+  })
+
+  it('plan-mode hasToolFailure ignores historical planning-phase tool errors', async () => {
+    await withTmp(async (root) => {
+      const app = buildGraph()
+      const runner = fakeRunner([
+        new AIMessage({ content: '', tool_calls: [{ name: 'ls', args: { path: '/' }, id: 'ok1' }] }),
+        new AIMessage('continued after approve'),
+      ])
+      // Stale planning failures (DNS / missing files) remain in the transcript after approve.
+      // Only the most recent tool batch must drive hasToolFailure.
+      const out = await app.invoke(
+        {
+          messages: [
+            new HumanMessage('install plugin'),
+            new AIMessage({ content: '', tool_calls: [{ name: 'web_fetch', args: { url: 'https://x' }, id: 'old1' }] }),
+            new ToolMessage({ content: 'Error: DNS resolution failed for "github.com"', tool_call_id: 'old1', name: 'web_fetch' }),
+            new ToolMessage({ content: 'Error: file not found: hip-plugins.json', tool_call_id: 'old2', name: 'read_file' }),
+            new HumanMessage('approved — execute'),
+          ],
+          steps: 0,
+          planningMode: 'plan',
+          planStatus: 'approved',
+          plan: [{ content: 'step one', status: 'pending' }],
+        },
+        { configurable: { ctx: baseCtx(root, runner) }, recursionLimit: 30 },
+      )
+      expect(out.status).toBe('running')
+      expect((out.messages[out.messages.length - 1] as AIMessage).content).toBe('continued after approve')
     })
   })
 

@@ -15,6 +15,7 @@ import { isImageAttachment, logNonCritical } from './session-helpers.js'
 import { safeErrorMessage } from './error.js'
 import { loadSubagentMessages } from './session-background.js'
 import { clipForTool, stringify } from './tool-trace.js'
+import { logInfo } from '../debug-logger.js'
 import {
   type SessionTurnHost,
   type SendFn,
@@ -182,14 +183,25 @@ export async function handlePlanResponse(host: SessionTurnHost, action: 'approve
         console.error('Failed to persist approved plan:', err instanceof Error ? err.message : String(err))
         send({ type: 'agent:notification', sessionId: host.id, taskId: 'plan-persist', description: 'Plan was approved but could not be saved to disk.', status: 'failed' })
       }
+      const planItems = host.paused?.plan ?? []
+      // Leave plan drafting mode: execution uses normal routing so historical
+      // planning-phase tool errors and plan_approval interrupt context do not re-fire.
       const base = {
         messages: host.paused.messages,
         // Fresh execute budget: planning steps must not starve the fix turn.
         steps: 0,
-        planningMode: 'plan' as const,
+        planningMode: 'fast' as const,
         planStatus: 'approved' as const,
         plan: host.paused.plan,
       }
+      logInfo('session', 'plan:respond', {
+        sessionId: host.id,
+        action: 'approve',
+        planningMode: 'fast',
+        planStatus: 'approved',
+        planItemCount: planItems.length,
+        planCompleted: planItems.filter((p) => p.status === 'completed').length,
+      })
       host.awaitingResume = false; host.paused = null
       emitInterruptResolved()
       // Drop forcePlan before execution so the execute turn is not re-gated into PlanMode.
@@ -199,6 +211,11 @@ export async function handlePlanResponse(host: SessionTurnHost, action: 'approve
     }
     case 'reject': {
       host.planMode.cancel()
+      logInfo('session', 'plan:respond', {
+        sessionId: host.id,
+        action: 'reject',
+        planItemCount: host.paused?.plan?.length ?? 0,
+      })
       host.awaitingResume = false; host.paused = null
       emitInterruptResolved()
       clearForcePlanFlag(host, send)
@@ -207,6 +224,12 @@ export async function handlePlanResponse(host: SessionTurnHost, action: 'approve
     }
     case 'amend': {
       const content = amendContent ?? 'Please revise the plan.'
+      logInfo('session', 'plan:respond', {
+        sessionId: host.id,
+        action: 'amend',
+        planItemCount: host.paused?.plan?.length ?? 0,
+        amendLen: content.length,
+      })
       const base = {
         messages: [...host.paused.messages, new HumanMessage(content)],
         steps: host.paused.steps,

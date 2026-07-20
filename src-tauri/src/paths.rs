@@ -87,6 +87,11 @@ pub fn network_policy_path(app: &AppHandle) -> Option<PathBuf> {
     Some(config_dir(app)?.join("network.json"))
 }
 
+/// Canonical path of the terminal host catalog inside `config/`.
+pub fn terminal_hosts_path(app: &AppHandle) -> Option<PathBuf> {
+    Some(config_dir(app)?.join("terminal-hosts.json"))
+}
+
 /// Directory holding installed plugins (`<dir>/<plugin-id>/.plugin/plugin.json`).
 pub fn plugins_dir(app: &AppHandle) -> Option<PathBuf> {
     hip_subdir(app, "plugins")
@@ -160,6 +165,16 @@ mod tests {
         assert_eq!(
             base.join("config").join("network.json"),
             PathBuf::from("/Users/x/.hip/config/network.json"),
+        );
+    }
+
+    #[test]
+    #[cfg(not(windows))]
+    fn terminal_hosts_path_lives_under_config() {
+        let base = hip_base_from(Some(PathBuf::from("/Users/x")), None).unwrap();
+        assert_eq!(
+            base.join("config").join("terminal-hosts.json"),
+            PathBuf::from("/Users/x/.hip/config/terminal-hosts.json"),
         );
     }
 

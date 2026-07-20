@@ -28,3 +28,40 @@ export function clearProviderKey(providerID: string): Promise<void> {
 export function restartSidecar(): Promise<number> {
   return invoke<number>('restart_sidecar')
 }
+
+// ── Raw secret key helpers (SSH / non-provider) ──────────────────
+// set_secret / delete_secret already accept raw key strings.
+// has_secret_keys is the only new Tauri command (no provider_key_env mapping).
+
+/** auth.json key for an SSH host password. */
+export function sshPasswordKey(hostId: string): string {
+  return `hip.ssh.${hostId}.password`
+}
+
+/** auth.json key for an SSH private-key passphrase. */
+export function sshPassphraseKey(hostId: string): string {
+  return `hip.ssh.${hostId}.passphrase`
+}
+
+/**
+ * Raw key presence check. Keys are looked up **as-is** in auth.json
+ * (no `provider_key_env` mapping). Order of returned flags matches `keys`.
+ */
+export async function hasSecretKeys(keys: string[]): Promise<Record<string, boolean>> {
+  const flags = await invoke<boolean[]>('has_secret_keys', { keys })
+  const out: Record<string, boolean> = {}
+  for (let i = 0; i < keys.length; i++) {
+    out[keys[i]!] = flags[i] === true
+  }
+  return out
+}
+
+/** Alias → existing `set_secret` (already raw). Do NOT invent set_secret_raw in Rust. */
+export function setSecretRaw(key: string, value: string): Promise<void> {
+  return invoke<void>('set_secret', { key, value })
+}
+
+/** Alias → existing `delete_secret` (already raw). */
+export function deleteSecretRaw(key: string): Promise<void> {
+  return invoke<void>('delete_secret', { key })
+}

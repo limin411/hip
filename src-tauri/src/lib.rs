@@ -8,6 +8,7 @@ mod logging;
 mod hip_config;
 mod path_tools;
 mod pty;
+mod terminal_hosts;
 mod knowledge;
 mod knowledge_trash;
 mod knowledge_link_index;
@@ -174,6 +175,14 @@ fn has_secrets(app: tauri::AppHandle, keys: Vec<String>) -> Result<HashMap<Strin
         result.insert(key.clone(), auth_map.contains_key(&env_key));
     }
     Ok(result)
+}
+
+/// Raw key presence (no `provider_key_env` mapping). Order matches input `keys`.
+/// Used for SSH secrets (`hip.ssh.<hostId>.*`) and other non-provider auth.json keys.
+#[tauri::command]
+fn has_secret_keys(app: tauri::AppHandle, keys: Vec<String>) -> Result<Vec<bool>, String> {
+    let auth_map = auth::auth_get_all(&auth_path(&app)?);
+    Ok(keys.iter().map(|k| auth_map.contains_key(k)).collect())
 }
 
 #[tauri::command]
@@ -579,7 +588,10 @@ pub fn run() {
             set_secret,
             get_secret,
             has_secrets,
+            has_secret_keys,
             delete_secret,
+            terminal_hosts::terminal_hosts_list,
+            terminal_hosts::terminal_hosts_save,
             models_catalog,
             models_catalog_refresh,
             get_hip_config,

@@ -69,6 +69,62 @@ describe('PlanProgressPanel', () => {
     expect(screen.getByTestId('plan-amend')).toBeInTheDocument()
   })
 
+  it('renders markdown preview above checklist when markdown present', () => {
+    render(
+      <PlanProgressPanel
+        view={view({
+          phase: 'awaiting_approval',
+          source: 'activeTurnPlan',
+          markdown: '## Context\n\nDo the work carefully.',
+          planPath: '/Users/me/.hip/plans/s1.md',
+        })}
+        onApprove={vi.fn()}
+        onReject={vi.fn()}
+        onAmend={vi.fn()}
+      />,
+    )
+    expect(screen.getByTestId('plan-markdown-preview')).toBeInTheDocument()
+    expect(screen.getByTestId('plan-markdown-body')).toHaveTextContent('Context')
+    expect(screen.getByTestId('plan-markdown-body')).toHaveTextContent('Do the work carefully')
+    expect(screen.getByTestId('todo-checklist')).toBeInTheDocument()
+    expect(screen.queryByTestId('plan-progress-empty-markdown')).not.toBeInTheDocument()
+    expect(screen.queryByTestId('plan-progress-empty-checklist')).not.toBeInTheDocument()
+  })
+
+  it('shows emptyChecklist when markdown-only awaiting', () => {
+    render(
+      <PlanProgressPanel
+        view={view({
+          items: [],
+          phase: 'awaiting_approval',
+          source: 'empty',
+          progress: { done: 0, total: 0 },
+          markdown: '## Narrative only',
+        })}
+        onApprove={vi.fn()}
+        onReject={vi.fn()}
+        onAmend={vi.fn()}
+      />,
+    )
+    expect(screen.getByTestId('plan-markdown-preview')).toBeInTheDocument()
+    expect(screen.getByTestId('plan-progress-empty-checklist')).toBeInTheDocument()
+    expect(screen.queryByTestId('plan-progress-empty-awaiting')).not.toBeInTheDocument()
+  })
+
+  it('shows emptyMarkdown when todos-only awaiting', () => {
+    render(
+      <PlanProgressPanel
+        view={view({ phase: 'awaiting_approval', source: 'activeTurnPlan' })}
+        onApprove={vi.fn()}
+        onReject={vi.fn()}
+        onAmend={vi.fn()}
+      />,
+    )
+    expect(screen.queryByTestId('plan-markdown-preview')).not.toBeInTheDocument()
+    expect(screen.getByTestId('plan-progress-empty-markdown')).toBeInTheDocument()
+    expect(screen.getByTestId('todo-checklist')).toBeInTheDocument()
+  })
+
   it('shows approval actions and calls onApprove', () => {
     const onApprove = vi.fn()
     render(

@@ -429,7 +429,12 @@ export const ko = {
       "done": "완료",
       "progress": "{{done}}/{{total}}",
       "emptyPlanning": "조사 및 계획 초안 작성 중…",
-      "emptyAwaiting": "계획 단계가 없습니다. 승인·거부·수정은 가능합니다."
+      "emptyAwaiting": "아직 계획이 없습니다. 승인·거부·수정은 가능합니다.",
+      "emptyMarkdown": "계획 문서가 없습니다. 아래 체크리스트를 검토하세요.",
+      "emptyChecklist": "실행 단계가 아직 없습니다. 위 계획 문서가 승인 대상입니다.",
+      "markdownTruncated": "표시를 위해 계획 문서가 잘렸습니다.",
+      "expandMarkdown": "계획 본문 보기",
+      "collapseMarkdown": "계획 본문 숨기기"
     },
     "planApproval": {
       "title": "계획 승인",

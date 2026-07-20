@@ -50,8 +50,8 @@ export function ChatPane() {
   const status = useActiveSessionStatus()
   const interrupt = useActiveInterrupt()
   const planSlice = useActiveChatPlanSlice()
-  // D5.2 / KD-PA-3: hide interrupt banner for any planApprovalPending (empty checklist too).
-  // Defensive: also hide when context kind / question is plan_approval (never paint token).
+  // D5.2 / KD-PA-3 / KD-PA-6: hide interrupt for any planApprovalPending (empty checklist too)
+  // or defensive plan_approval context/token — sticky panel owns CTA.
   const showPlanApproval = shouldHideInterruptForPlanApproval(
     planSlice.planApprovalPending,
     interrupt,

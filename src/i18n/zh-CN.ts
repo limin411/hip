@@ -398,7 +398,12 @@ export const zhCN = {
         done: '已完成',
         progress: '{{done}}/{{total}}',
         emptyPlanning: '正在调研并起草计划…',
-        emptyAwaiting: '未生成计划步骤。你仍可批准、拒绝或修改。',
+        emptyAwaiting: '尚未生成计划内容。你仍可批准、拒绝或修改。',
+        emptyMarkdown: '未写入计划文档。请审阅下方检查清单。',
+        emptyChecklist: '尚未生成执行步骤。上方计划文档即为审批内容。',
+        markdownTruncated: '计划文档已截断显示。',
+        expandMarkdown: '查看计划正文',
+        collapseMarkdown: '收起计划正文',
       },
       planApproval: {
         title: '计划审批',

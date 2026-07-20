@@ -38,6 +38,14 @@ describe('harness plan approval @harness @core', () => {
     expect(panelText).toContain('e2e plan step one')
     expect(panelText).toContain('e2e plan step two')
 
+    // PA2: markdown preview from plan:published
+    const mdPreview = await browser.$('[data-testid="plan-markdown-preview"]')
+    await mdPreview.waitForExist({ timeout: 5000 })
+    const mdBody = await browser.$('[data-testid="plan-markdown-body"]')
+    expect(await mdBody.isExisting()).toBe(true)
+    const mdText = await mdBody.getText()
+    expect(mdText).toContain('E2E plan')
+
     const card = await chat.planApprovalCard
     await card.waitForExist({ timeout: 15000 })
 

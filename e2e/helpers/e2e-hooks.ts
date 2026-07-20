@@ -70,9 +70,13 @@ type HipE2E = {
     marker: '[hip:subagent_paused]'
   }
   seedAgentInterrupt?: (sessionId: string, question?: string) => { turnId: string; question: string }
-  seedPlanApproval?: (sessionId: string) => {
+  seedPlanApproval?: (
+    sessionId: string,
+    opts?: { markdown?: string; planPath?: string },
+  ) => {
     turnId: string
     planItems: { content: string; status: string }[]
+    markdown?: string
   }
   seedPlanProgress?: (
     sessionId: string,
@@ -291,12 +295,17 @@ export async function seedAgentInterrupt(
 
 export async function seedPlanApproval(
   sessionId: string,
-): Promise<{ turnId: string; planItems: { content: string; status: string }[] }> {
-  return browser.execute((id: string) => {
-    const hooks = (window as unknown as { __hipE2E?: HipE2E }).__hipE2E
-    if (!hooks?.seedPlanApproval) throw new Error('__hipE2E.seedPlanApproval missing')
-    return hooks.seedPlanApproval(id)
-  }, sessionId)
+  opts?: { markdown?: string; planPath?: string },
+): Promise<{ turnId: string; planItems: { content: string; status: string }[]; markdown?: string }> {
+  return browser.execute(
+    (id: string, o: { markdown?: string; planPath?: string } | undefined) => {
+      const hooks = (window as unknown as { __hipE2E?: HipE2E }).__hipE2E
+      if (!hooks?.seedPlanApproval) throw new Error('__hipE2E.seedPlanApproval missing')
+      return hooks.seedPlanApproval(id, o)
+    },
+    sessionId,
+    opts,
+  )
 }
 
 export async function seedPlanProgress(

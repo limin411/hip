@@ -2,8 +2,10 @@ import { describe, it, expect } from 'vitest'
 import type { Message, PlanItem, ToolCall } from '@hip/protocol'
 import {
   derivePlanUiPhase,
+  hasPlanMarkdown,
   latestTodos,
   parseTodos,
+  planHalfEmptyKind,
   planProgress,
   selectLivePlan,
   type Todo,
@@ -105,6 +107,21 @@ describe('planProgress', () => {
   })
 })
 
+describe('planHalfEmptyKind / hasPlanMarkdown', () => {
+  it('classifies dual-representation halves', () => {
+    expect(planHalfEmptyKind({ items: [{ content: 'a', status: 'pending' }], markdown: '# m' })).toBe(
+      'none',
+    )
+    expect(planHalfEmptyKind({ items: [], markdown: '# m' })).toBe('emptyChecklist')
+    expect(planHalfEmptyKind({ items: [{ content: 'a', status: 'pending' }], markdown: null })).toBe(
+      'emptyMarkdown',
+    )
+    expect(planHalfEmptyKind({ items: [], markdown: '  ' })).toBe('emptyBoth')
+    expect(hasPlanMarkdown({ markdown: '# x' })).toBe(true)
+    expect(hasPlanMarkdown({ markdown: '  ' })).toBe(false)
+  })
+})
+
 describe('selectLivePlan', () => {
   const todosInput = JSON.stringify({
     todos: [
@@ -123,6 +140,21 @@ describe('selectLivePlan', () => {
     expect(view?.phase).toBe('awaiting_approval')
     expect(view?.items).toEqual([{ content: 'approve me', status: 'pending' }])
     expect(view?.source).toBe('activeTurnPlan')
+  })
+
+  it('attaches markdown fields from session on awaiting_approval', () => {
+    const view = selectLivePlan({
+      messages: [],
+      status: 'idle',
+      planApprovalPending: true,
+      activeTurnPlan: [{ content: 'step', status: 'pending' }],
+      activeTurnPlanMarkdown: '## Plan body',
+      activeTurnPlanPath: '/tmp/.hip/plans/s1.md',
+      activeTurnPlanMarkdownTruncated: true,
+    })
+    expect(view?.markdown).toBe('## Plan body')
+    expect(view?.planPath).toBe('/tmp/.hip/plans/s1.md')
+    expect(view?.markdownTruncated).toBe(true)
   })
 
   it('returns awaiting_approval with empty items when pending and no plan (D4b)', () => {

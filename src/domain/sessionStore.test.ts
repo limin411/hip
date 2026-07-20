@@ -885,15 +885,52 @@ describe('applyServerMessage', () => {
     const next = applyServerMessage(s, { type: 'plan:published', sessionId: 's1', turnId: 't1', plan }, 101)
     expect(next.sessions[0].activeTurnPlan).toEqual(plan)
     expect(next.sessions[0].planDeltaDraft).toEqual({})
+    expect(next.sessions[0].activeTurnPlanMarkdown).toBeNull()
   })
 
-  it('plan:updated sets activeTurnPlan and clears delta draft', () => {
-    const plan = [{ content: 'step a', status: 'in_progress' as const }]
+  it('plan:published stores markdown fields and clears them when omitted on re-publish (D2.5)', () => {
+    const plan = [{ content: 'step', status: 'pending' as const }]
     let s = { sessions: [baseSession()] }
+    s = applyServerMessage(
+      s,
+      {
+        type: 'plan:published',
+        sessionId: 's1',
+        turnId: 't1',
+        plan,
+        markdown: '# Hello plan\n\nBody',
+        planPath: '/tmp/.hip/plans/s1.md',
+        markdownTruncated: true,
+      },
+      100,
+    )
+    expect(s.sessions[0].activeTurnPlanMarkdown).toBe('# Hello plan\n\nBody')
+    expect(s.sessions[0].activeTurnPlanPath).toBe('/tmp/.hip/plans/s1.md')
+    expect(s.sessions[0].activeTurnPlanMarkdownTruncated).toBe(true)
+
+    s = applyServerMessage(s, { type: 'plan:published', sessionId: 's1', turnId: 't2', plan: [] }, 101)
+    expect(s.sessions[0].activeTurnPlanMarkdown).toBeNull()
+    expect(s.sessions[0].activeTurnPlanPath).toBeNull()
+    expect(s.sessions[0].activeTurnPlanMarkdownTruncated).toBe(false)
+  })
+
+  it('plan:updated sets activeTurnPlan and keeps prior markdown (D2.5)', () => {
+    const plan = [{ content: 'step a', status: 'in_progress' as const }]
+    let s = {
+      sessions: [
+        baseSession({
+          activeTurnPlanMarkdown: '## keep me',
+          activeTurnPlanPath: '/p.md',
+          activeTurnPlanMarkdownTruncated: false,
+        }),
+      ],
+    }
     s = applyServerMessage(s, { type: 'plan:delta', sessionId: 's1', turnId: 't1', itemId: 'p1', delta: 'draft' }, 100)
     const next = applyServerMessage(s, { type: 'plan:updated', sessionId: 's1', turnId: 't1', plan }, 101)
     expect(next.sessions[0].activeTurnPlan).toEqual(plan)
     expect(next.sessions[0].planDeltaDraft).toEqual({})
+    expect(next.sessions[0].activeTurnPlanMarkdown).toBe('## keep me')
+    expect(next.sessions[0].activeTurnPlanPath).toBe('/p.md')
   })
 
   it('message:complete clears the plan delta draft but retains activeTurnPlan', () => {
@@ -1055,6 +1092,8 @@ describe('useDomainStore actions', () => {
               planApprovalPending: true,
               interrupt: { turnId: 't1', question: 'Approve?', context: '{"kind":"plan_approval"}' },
               activeTurnPlan: [{ content: 'step', status: 'pending' as const }],
+              activeTurnPlanMarkdown: '## plan body',
+              activeTurnPlanPath: '/plans/s1.md',
             }
           : sess,
       ),
@@ -1065,9 +1104,12 @@ describe('useDomainStore actions', () => {
     expect(sess.interrupt).toBeNull()
     expect(sess.status).toBe('running')
     expect(sess.activeTurnPlan?.[0]?.content).toBe('step')
+    // D2.5: approve keeps markdown until next user turn
+    expect(sess.activeTurnPlanMarkdown).toBe('## plan body')
+    expect(sess.activeTurnPlanPath).toBe('/plans/s1.md')
   })
 
-  it('respondPlanOptimistic reject sets idle', () => {
+  it('respondPlanOptimistic reject sets idle and clears plan + markdown (D2.5)', () => {
     reset()
     useDomainStore.getState().createSession('s1', { llmProvider: 'deepseek', model: 'm', tools: [] })
     useDomainStore.setState((s) => ({
@@ -1077,13 +1119,44 @@ describe('useDomainStore actions', () => {
               ...sess,
               planApprovalPending: true,
               interrupt: { turnId: 't1', question: 'Approve?' },
+              activeTurnPlan: [{ content: 'step', status: 'pending' as const }],
+              activeTurnPlanMarkdown: '## gone',
+              activeTurnPlanPath: '/p.md',
             }
           : sess,
       ),
     }))
     useDomainStore.getState().respondPlanOptimistic('s1', 'reject')
-    expect(useDomainStore.getState().sessions[0].status).toBe('idle')
-    expect(useDomainStore.getState().sessions[0].planApprovalPending).toBe(false)
+    const sess = useDomainStore.getState().sessions[0]
+    expect(sess.status).toBe('idle')
+    expect(sess.planApprovalPending).toBe(false)
+    expect(sess.activeTurnPlan).toBeNull()
+    expect(sess.activeTurnPlanMarkdown).toBeNull()
+    expect(sess.activeTurnPlanPath).toBeNull()
+  })
+
+  it('appendUserMessage clears plan markdown fields (D2.5)', () => {
+    reset()
+    useDomainStore.getState().createSession('s1', { llmProvider: 'deepseek', model: 'm', tools: [] })
+    useDomainStore.setState((s) => ({
+      sessions: s.sessions.map((sess) =>
+        sess.id === 's1'
+          ? {
+              ...sess,
+              activeTurnPlan: [{ content: 'step', status: 'completed' as const }],
+              activeTurnPlanMarkdown: '## body',
+              activeTurnPlanPath: '/p.md',
+              activeTurnPlanMarkdownTruncated: true,
+            }
+          : sess,
+      ),
+    }))
+    useDomainStore.getState().appendUserMessage('s1', 'u1', 'next turn')
+    const sess = useDomainStore.getState().sessions[0]
+    expect(sess.activeTurnPlan).toBeNull()
+    expect(sess.activeTurnPlanMarkdown).toBeNull()
+    expect(sess.activeTurnPlanPath).toBeNull()
+    expect(sess.activeTurnPlanMarkdownTruncated).toBe(false)
   })
 
   it("apply('ready') updates hasApiKey from the sidecar", () => {

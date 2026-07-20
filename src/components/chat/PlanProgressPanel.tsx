@@ -5,6 +5,8 @@ import { Button } from '@/components/ui/Button'
 import { Textarea } from '@/components/ui/Textarea'
 import { cn } from '@/lib/utils'
 import type { LivePlanView } from '@/lib/todos'
+import { hasPlanMarkdown, planHalfEmptyKind } from '@/lib/todos'
+import { PlanMarkdownPreview } from './PlanMarkdownPreview'
 import { TodoChecklist } from './TodoChecklist'
 
 interface PlanProgressPanelProps {
@@ -22,6 +24,8 @@ export function PlanProgressPanel({ view, onApprove, onReject, onAmend }: PlanPr
 
   const awaiting = view.phase === 'awaiting_approval'
   const { done, total, current } = view.progress
+  const showMarkdown = hasPlanMarkdown(view)
+  const halfEmpty = planHalfEmptyKind(view)
 
   // KD-16 / D4e: after plan:respond:result ok:false the store restores planApprovalPending
   // while this panel stays mounted (activeTurnPlan kept). Re-entry to awaiting_approval
@@ -108,6 +112,28 @@ export function PlanProgressPanel({ view, onApprove, onReject, onAmend }: PlanPr
         </p>
       )}
 
+      {/* Narrative plan.md above checklist (D2.6 / D3). Expand by default only while awaiting. */}
+      {showMarkdown && view.markdown && (
+        <PlanMarkdownPreview
+          markdown={view.markdown}
+          planPath={view.planPath}
+          truncated={view.markdownTruncated}
+          defaultExpanded={awaiting}
+        />
+      )}
+
+      {/* Half-empty meta labels (D3.3 / D4.2) — only relevant while reviewing. */}
+      {awaiting && halfEmpty === 'emptyMarkdown' && (
+        <p className="mt-2 text-meta text-ink-secondary" data-testid="plan-progress-empty-markdown">
+          {t('chat.planPanel.emptyMarkdown')}
+        </p>
+      )}
+      {awaiting && halfEmpty === 'emptyChecklist' && (
+        <p className="mt-2 text-meta text-ink-secondary" data-testid="plan-progress-empty-checklist">
+          {t('chat.planPanel.emptyChecklist')}
+        </p>
+      )}
+
       {view.items.length > 0 ? (
         <div className="mt-2">
           <TodoChecklist todos={view.items} showHeading={false} />
@@ -116,7 +142,7 @@ export function PlanProgressPanel({ view, onApprove, onReject, onAmend }: PlanPr
         <p className="mt-2 text-meta text-ink-secondary" data-testid="plan-progress-empty">
           {t('chat.planPanel.emptyPlanning')}
         </p>
-      ) : view.phase === 'awaiting_approval' ? (
+      ) : view.phase === 'awaiting_approval' && halfEmpty === 'emptyBoth' ? (
         <p className="mt-2 text-meta text-ink-secondary" data-testid="plan-progress-empty-awaiting">
           {t('chat.planPanel.emptyAwaiting')}
         </p>

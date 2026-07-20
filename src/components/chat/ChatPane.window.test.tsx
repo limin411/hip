@@ -25,7 +25,11 @@ vi.mock('@/components/chat/MessageBubble', () => ({
   NoticeRow: ({ content }: { content: string }) => <div data-testid="notice">{content}</div>,
 }))
 vi.mock('@/components/chat/ThinkingBubble', () => ({ ThinkingBubble: () => null }))
-vi.mock('@/components/chat/planApproval', () => ({ hasPlanApproval: () => false }))
+vi.mock('@/components/chat/planApproval', () => ({
+  hasPlanApproval: () => false,
+  shouldHideInterruptForPlanApproval: () => false,
+  isPlanApprovalInterrupt: () => false,
+}))
 vi.mock('sonner', () => ({ toast: { success: vi.fn(), error: vi.fn() } }))
 
 function makeMessages(n: number): Message[] {

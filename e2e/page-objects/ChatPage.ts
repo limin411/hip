@@ -29,6 +29,7 @@ export class ChatPage {
   get planProgressPanel() { return browser.$('[data-testid="plan-progress-panel"]') }
   get planProgressCount() { return browser.$('[data-testid="plan-progress-count"]') }
   get planProgressCurrent() { return browser.$('[data-testid="plan-progress-current"]') }
+  get planMarkdownPreview() { return browser.$('[data-testid="plan-markdown-preview"]') }
   get todoChecklist() { return browser.$('[data-testid="todo-checklist"]') }
   get planApprove() { return browser.$('[data-testid="plan-approve"]') }
   get planAmend() { return browser.$('[data-testid="plan-amend"]') }

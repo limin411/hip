@@ -407,7 +407,12 @@ export const en = {
         done: 'Done',
         progress: '{{done}}/{{total}}',
         emptyPlanning: 'Investigating and drafting a plan…',
-        emptyAwaiting: 'No plan steps were produced. You can still approve, reject, or amend.',
+        emptyAwaiting: 'No plan was written yet. You can still approve, reject, or amend.',
+        emptyMarkdown: 'No plan document was written. Review the checklist below.',
+        emptyChecklist: 'No execution steps yet. The plan document above is what you approve.',
+        markdownTruncated: 'Plan document truncated for display.',
+        expandMarkdown: 'Show plan document',
+        collapseMarkdown: 'Hide plan document',
       },
       planApproval: {
         title: 'Plan approval',

@@ -429,7 +429,12 @@ export const ja = {
       "done": "完了",
       "progress": "{{done}}/{{total}}",
       "emptyPlanning": "調査中、計画を作成中…",
-      "emptyAwaiting": "計画ステップがありません。承認・却下・修正は可能です。"
+      "emptyAwaiting": "まだ計画がありません。承認・却下・修正は可能です。",
+      "emptyMarkdown": "計画ドキュメントがありません。下のチェックリストを確認してください。",
+      "emptyChecklist": "実行ステップはまだありません。上の計画ドキュメントが承認対象です。",
+      "markdownTruncated": "表示のため計画ドキュメントを切り詰めました。",
+      "expandMarkdown": "計画本文を表示",
+      "collapseMarkdown": "計画本文を隠す"
     },
     "planApproval": {
       "title": "計画の承認",

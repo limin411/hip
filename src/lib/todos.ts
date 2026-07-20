@@ -62,6 +62,31 @@ export interface LivePlanView {
   phase: PlanPhase
   source: LivePlanSource
   progress: { done: number; total: number; current?: string }
+  /** plan.md narrative from plan:published (D2 / KD-PA-7) */
+  markdown?: string | null
+  planPath?: string | null
+  markdownTruncated?: boolean
+}
+
+/** Half-empty labels for dual representation (D3.3 / D4.2). */
+export type PlanHalfEmptyKind = 'none' | 'emptyMarkdown' | 'emptyChecklist' | 'emptyBoth'
+
+export function hasPlanMarkdown(
+  view: Pick<LivePlanView, 'markdown'> | { markdown?: string | null },
+): boolean {
+  return Boolean(view.markdown?.trim())
+}
+
+/** Classify which half of narrative/checklist is missing (awaiting_approval UI). */
+export function planHalfEmptyKind(
+  view: Pick<LivePlanView, 'markdown' | 'items'>,
+): PlanHalfEmptyKind {
+  const hasMd = hasPlanMarkdown(view)
+  const hasItems = view.items.length > 0
+  if (hasMd && hasItems) return 'none'
+  if (hasMd && !hasItems) return 'emptyChecklist'
+  if (!hasMd && hasItems) return 'emptyMarkdown'
+  return 'emptyBoth'
 }
 
 export function planProgress(items: PlanItem[]): LivePlanView['progress'] {
@@ -79,8 +104,24 @@ function todosToPlanItems(todos: Todo[]): PlanItem[] {
   return todos.map((t) => ({ content: t.content, status: t.status }))
 }
 
-function makeView(items: PlanItem[], phase: PlanPhase, source: LivePlanSource): LivePlanView {
-  return { items, phase, source, progress: planProgress(items) }
+function makeView(
+  items: PlanItem[],
+  phase: PlanPhase,
+  source: LivePlanSource,
+  markdown?: {
+    markdown?: string | null
+    planPath?: string | null
+    markdownTruncated?: boolean
+  },
+): LivePlanView {
+  const base: LivePlanView = { items, phase, source, progress: planProgress(items) }
+  const md = markdown?.markdown
+  if (typeof md === 'string' && md.trim()) {
+    base.markdown = md
+    base.markdownTruncated = Boolean(markdown?.markdownTruncated)
+  }
+  if (markdown?.planPath) base.planPath = markdown.planPath
+  return base
 }
 
 export interface SelectLivePlanInput {
@@ -89,6 +130,9 @@ export interface SelectLivePlanInput {
   forcePlan?: boolean
   planApprovalPending?: boolean
   activeTurnPlan?: PlanItem[] | null
+  activeTurnPlanMarkdown?: string | null
+  activeTurnPlanPath?: string | null
+  activeTurnPlanMarkdownTruncated?: boolean
 }
 
 export interface DerivePlanUiPhaseInput {
@@ -132,12 +176,17 @@ export function derivePlanUiPhase(input: DerivePlanUiPhaseInput): PlanUiPhase {
 export function selectLivePlan(input: SelectLivePlanInput): LivePlanView | null {
   const { messages, status, forcePlan, planApprovalPending, activeTurnPlan } = input
   const planItems = activeTurnPlan?.length ? activeTurnPlan : null
+  const md = {
+    markdown: input.activeTurnPlanMarkdown,
+    planPath: input.activeTurnPlanPath,
+    markdownTruncated: input.activeTurnPlanMarkdownTruncated,
+  }
 
   // Pending approval always shows the panel — even with an empty plan (RC-7 / D4b).
   if (planApprovalPending) {
     const items = activeTurnPlan ?? []
     const source: LivePlanSource = items.length > 0 ? 'activeTurnPlan' : 'empty'
-    return makeView(items, 'awaiting_approval', source)
+    return makeView(items, 'awaiting_approval', source, md)
   }
 
   // Notices are transparent for turn-boundary checks (background isolation can trail a user send).
@@ -149,10 +198,10 @@ export function selectLivePlan(input: SelectLivePlanInput): LivePlanView | null 
     if (planItems) {
       // forcePlan still on → drafting/resume-plan; cleared after approve → execute.
       const phase: PlanPhase = forcePlan ? 'planning' : 'executing'
-      return makeView(planItems, phase, 'activeTurnPlan')
+      return makeView(planItems, phase, 'activeTurnPlan', md)
     }
     if (forcePlan) {
-      return makeView([], 'planning', 'empty')
+      return makeView([], 'planning', 'empty', md)
     }
     return null
   }
@@ -160,7 +209,7 @@ export function selectLivePlan(input: SelectLivePlanInput): LivePlanView | null 
   // Idle after user message with no pending plan — hide.
   if (last?.role === 'user' && status !== 'running') {
     if (planItems) {
-      return makeView(planItems, 'done', 'activeTurnPlan')
+      return makeView(planItems, 'done', 'activeTurnPlan', md)
     }
     return null
   }
@@ -172,17 +221,18 @@ export function selectLivePlan(input: SelectLivePlanInput): LivePlanView | null 
     // forcePlan + running + no approval yet → still drafting (not execute phase).
     const phase: PlanPhase =
       status !== 'running' ? 'done' : forcePlan ? 'planning' : 'executing'
-    return makeView(toolItems, phase, 'write_todos')
+    // Prefer live write_todos checklist; still attach stored plan.md for execute expand (D3.4).
+    return makeView(toolItems, phase, 'write_todos', md)
   }
 
   if (planItems) {
     const phase: PlanPhase =
       status !== 'running' ? 'done' : forcePlan ? 'planning' : 'executing'
-    return makeView(planItems, phase, 'activeTurnPlan')
+    return makeView(planItems, phase, 'activeTurnPlan', md)
   }
 
   if (forcePlan && status === 'running') {
-    return makeView([], 'planning', 'empty')
+    return makeView([], 'planning', 'empty', md)
   }
 
   return null

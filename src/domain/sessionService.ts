@@ -925,15 +925,23 @@ export class SessionService {
   }
 
   /** E2E: plan:published + plan_approval interrupt → PlanApprovalCard / PlanProgressPanel. */
-  seedPlanApproval(sessionId: string): {
+  seedPlanApproval(
+    sessionId: string,
+    opts?: { markdown?: string; planPath?: string },
+  ): {
     turnId: string
     planItems: { content: string; status: string }[]
+    markdown: string
   } {
     const turnId = `e2e-turn-${nanoid(8)}`
     const planItems = [
       { content: 'e2e plan step one', status: 'pending' as const },
       { content: 'e2e plan step two', status: 'pending' as const },
     ]
+    const markdown =
+      opts?.markdown ??
+      '## E2E plan\n\nSeeded plan body for sticky markdown preview.\n\n- step one\n- step two\n'
+    const planPath = opts?.planPath ?? `/tmp/hip-e2e/plans/${sessionId}.md`
     this.receive({
       type: 'agent:started',
       sessionId,
@@ -946,6 +954,9 @@ export class SessionService {
       sessionId,
       turnId,
       plan: planItems,
+      markdown,
+      planPath,
+      markdownTruncated: false,
     })
     this.receive({
       type: 'agent:interrupt',
@@ -957,7 +968,7 @@ export class SessionService {
     })
     // Sidecar is not paused — respondPlan must not wait on plan:respond wire.
     this.feOnlyPlanApprovalSessions.add(sessionId)
-    return { turnId, planItems }
+    return { turnId, planItems, markdown }
   }
 
   /**

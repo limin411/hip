@@ -33,6 +33,10 @@ export interface SessionVM {
   configOptions?: AcpConfigOption[]  // agent-advertised model/mode selectors (ACP agents only); absent = none
   pendingPermission?: PendingPermission | null  // pending HITL tool-permission request (ACP agents only); null/absent = none
   activeTurnPlan?: PlanItem[] | null  // live plan from plan:updated / plan:published; cleared on next user turn
+  /** plan.md body from plan:published (D2.5); cleared on next user turn / reject */
+  activeTurnPlanMarkdown?: string | null
+  activeTurnPlanPath?: string | null
+  activeTurnPlanMarkdownTruncated?: boolean
   planDeltaDraft?: Record<string, string>  // incremental plan text keyed by itemId, accumulated from plan:delta
   planApprovalPending?: boolean  // true when agent:interrupt carries a plan_approval context
   /**
@@ -42,6 +46,10 @@ export interface SessionVM {
   planRespondRollback?: {
     interrupt: { turnId: string; question: string; context?: string } | null
     status: 'idle' | 'running' | 'error'
+    activeTurnPlan?: PlanItem[] | null
+    activeTurnPlanMarkdown?: string | null
+    activeTurnPlanPath?: string | null
+    activeTurnPlanMarkdownTruncated?: boolean
   } | null
   agentProfiles?: AgentProfileInfo[]  // list of available agent profiles from agent:profiles message
   codePanelOpen?: boolean
@@ -395,10 +403,21 @@ export function applyServerMessage(
       }))
 
     case 'plan:updated':
+      // Keep prior markdown (D2.5) — plan:updated only refreshes checklist items.
       return update(msg.sessionId, (s) => ({ ...s, activeTurnPlan: msg.plan, planDeltaDraft: {} }))
 
-    case 'plan:published':
-      return update(msg.sessionId, (s) => ({ ...s, activeTurnPlan: msg.plan, planDeltaDraft: {} }))
+    case 'plan:published': {
+      // Set markdown if present; clear if omitted (new publish without body) — D2.5.
+      const hasMarkdown = Boolean(msg.markdown?.trim())
+      return update(msg.sessionId, (s) => ({
+        ...s,
+        activeTurnPlan: msg.plan,
+        planDeltaDraft: {},
+        activeTurnPlanMarkdown: hasMarkdown ? msg.markdown! : null,
+        activeTurnPlanPath: msg.planPath ?? null,
+        activeTurnPlanMarkdownTruncated: hasMarkdown ? Boolean(msg.markdownTruncated) : false,
+      }))
+    }
 
     case 'plan:respond:result':
       // KD-16: ok:false restores approval chrome after optimistic dismiss; ok:true drops rollback stash.
@@ -413,6 +432,21 @@ export function applyServerMessage(
           planApprovalPending: true,
           interrupt: snap?.interrupt ?? s.interrupt ?? null,
           status: snap?.status ?? (s.status === 'running' ? 'idle' : s.status),
+          ...(snap
+            ? {
+                activeTurnPlan: snap.activeTurnPlan !== undefined ? snap.activeTurnPlan : s.activeTurnPlan,
+                activeTurnPlanMarkdown:
+                  snap.activeTurnPlanMarkdown !== undefined
+                    ? snap.activeTurnPlanMarkdown
+                    : s.activeTurnPlanMarkdown,
+                activeTurnPlanPath:
+                  snap.activeTurnPlanPath !== undefined ? snap.activeTurnPlanPath : s.activeTurnPlanPath,
+                activeTurnPlanMarkdownTruncated:
+                  snap.activeTurnPlanMarkdownTruncated !== undefined
+                    ? snap.activeTurnPlanMarkdownTruncated
+                    : s.activeTurnPlanMarkdownTruncated,
+              }
+            : {}),
           planRespondRollback: null,
         }
       })
@@ -510,13 +544,36 @@ export function applyServerMessage(
     case 'error':
       // A cancel is intentional, not a failure: return to idle and surface nothing.
       if (!msg.sessionId) return state
-      if (msg.code === 'CANCELLED') return update(msg.sessionId, (s) => ({ ...s, status: 'idle', error: null, activeTurnPlan: null, planDeltaDraft: {}, planApprovalPending: false, messages: finalizeCancelledMessage(s.messages) }))
+      if (msg.code === 'CANCELLED') {
+        return update(msg.sessionId, (s) => ({
+          ...s,
+          status: 'idle',
+          error: null,
+          activeTurnPlan: null,
+          activeTurnPlanMarkdown: null,
+          activeTurnPlanPath: null,
+          activeTurnPlanMarkdownTruncated: false,
+          planDeltaDraft: {},
+          planApprovalPending: false,
+          messages: finalizeCancelledMessage(s.messages),
+        }))
+      }
       // Soft rejects (concurrent send / agent mid-switch / empty resume while plan awaiting):
       // toast-only or no-op; do not demote status or clear planApprovalPending.
       if (msg.code === 'BUSY' || msg.code === 'AGENT_BUSY' || msg.code === 'PLAN_AWAITING_RESPONSE') {
         return state
       }
-      return update(msg.sessionId, (s) => ({ ...s, status: 'error', error: { code: msg.code, message: msg.message }, activeTurnPlan: null, planDeltaDraft: {}, planApprovalPending: false }))
+      return update(msg.sessionId, (s) => ({
+        ...s,
+        status: 'error',
+        error: { code: msg.code, message: msg.message },
+        activeTurnPlan: null,
+        activeTurnPlanMarkdown: null,
+        activeTurnPlanPath: null,
+        activeTurnPlanMarkdownTruncated: false,
+        planDeltaDraft: {},
+        planApprovalPending: false,
+      }))
 
     case 'session:list:result': {
       const incoming = msg.sessions.map(summaryToVM)
@@ -566,6 +623,9 @@ export function applyServerMessage(
           configOptions: undefined,
           agentProfiles: undefined,
           activeTurnPlan: null,
+          activeTurnPlanMarkdown: null,
+          activeTurnPlanPath: null,
+          activeTurnPlanMarkdownTruncated: false,
           planDeltaDraft: {},
           planApprovalPending: false,
         }
@@ -654,7 +714,26 @@ export const DEFAULT_CONFIG: SessionConfig = normalizeSessionConfig({
 })
 
 export function emptySession(id: string): SessionVM {
-  return { id, config: DEFAULT_CONFIG, title: '新对话', preview: '开始一段新的对话…', updatedAtMs: Date.now(), loaded: true, messages: [], status: 'idle', error: null, interrupt: null, activeTurnPlan: null, planDeltaDraft: {}, planApprovalPending: false, codePanelOpen: false, chatPanelOpen: false }
+  return {
+    id,
+    config: DEFAULT_CONFIG,
+    title: '新对话',
+    preview: '开始一段新的对话…',
+    updatedAtMs: Date.now(),
+    loaded: true,
+    messages: [],
+    status: 'idle',
+    error: null,
+    interrupt: null,
+    activeTurnPlan: null,
+    activeTurnPlanMarkdown: null,
+    activeTurnPlanPath: null,
+    activeTurnPlanMarkdownTruncated: false,
+    planDeltaDraft: {},
+    planApprovalPending: false,
+    codePanelOpen: false,
+    chatPanelOpen: false,
+  }
 }
 
 export type Connection = 'connecting' | 'connected' | 'error' | 'disconnected'
@@ -749,7 +828,24 @@ export const useDomainStore = create<DomainStore>((set) => ({
         sess.id !== sessionId
           ? sess
           : // Clear any prior error: appending a user message means a retry is underway.
-            { ...sess, status: 'running' as const, error: null, interrupt: null, activeTurnPlan: null, planDeltaDraft: {}, planApprovalPending: false, updatedAtMs: Date.now(), messages: [...sess.messages, { id, role: 'user' as const, content, timestamp: Date.now(), attachments }] },
+            // D2.5: clear plan checklist + markdown on next user turn.
+            {
+              ...sess,
+              status: 'running' as const,
+              error: null,
+              interrupt: null,
+              activeTurnPlan: null,
+              activeTurnPlanMarkdown: null,
+              activeTurnPlanPath: null,
+              activeTurnPlanMarkdownTruncated: false,
+              planDeltaDraft: {},
+              planApprovalPending: false,
+              updatedAtMs: Date.now(),
+              messages: [
+                ...sess.messages,
+                { id, role: 'user' as const, content, timestamp: Date.now(), attachments },
+              ],
+            },
       ),
     })),
 
@@ -764,19 +860,33 @@ export const useDomainStore = create<DomainStore>((set) => ({
     set((s) => ({
       sessions: s.sessions.map((sess) => {
         if (sess.id !== sessionId) return sess
-        const nextStatus = action === 'reject' ? ('idle' as const) : ('running' as const)
+        const isReject = action === 'reject'
+        const nextStatus = isReject ? ('idle' as const) : ('running' as const)
         return {
           ...sess,
           status: nextStatus,
-          error: action === 'reject' ? sess.error : null,
-          // Stash for plan:respond:result ok:false rollback (KD-16).
+          error: isReject ? sess.error : null,
+          // Stash for plan:respond:result ok:false rollback (KD-16 / D2.5 markdown).
           planRespondRollback: {
             interrupt: sess.interrupt ?? null,
             status: sess.status,
+            activeTurnPlan: sess.activeTurnPlan ?? null,
+            activeTurnPlanMarkdown: sess.activeTurnPlanMarkdown ?? null,
+            activeTurnPlanPath: sess.activeTurnPlanPath ?? null,
+            activeTurnPlanMarkdownTruncated: sess.activeTurnPlanMarkdownTruncated,
           },
           interrupt: null,
           planApprovalPending: false,
-          // Keep activeTurnPlan through execute / done; cleared on next user turn. Card gates on planApprovalPending.
+          // D2.5: approve/amend keep checklist + markdown until next user turn;
+          // reject clears both (PLAN_REJECTED may follow).
+          ...(isReject
+            ? {
+                activeTurnPlan: null as PlanItem[] | null,
+                activeTurnPlanMarkdown: null as string | null,
+                activeTurnPlanPath: null as string | null,
+                activeTurnPlanMarkdownTruncated: false,
+              }
+            : {}),
           updatedAtMs: Date.now(),
         }
       }),
@@ -787,7 +897,20 @@ export const useDomainStore = create<DomainStore>((set) => ({
       sessions: s.sessions.map((sess) => {
         if (sess.id !== sessionId) return sess
         const messages = popForRegenerate(sess.messages)
-        return { ...sess, messages, status: 'running' as const, error: null, interrupt: null, pendingPermission: null, activeTurnPlan: null, planDeltaDraft: {}, planApprovalPending: false }
+        return {
+          ...sess,
+          messages,
+          status: 'running' as const,
+          error: null,
+          interrupt: null,
+          pendingPermission: null,
+          activeTurnPlan: null,
+          activeTurnPlanMarkdown: null,
+          activeTurnPlanPath: null,
+          activeTurnPlanMarkdownTruncated: false,
+          planDeltaDraft: {},
+          planApprovalPending: false,
+        }
       }),
     })),
 

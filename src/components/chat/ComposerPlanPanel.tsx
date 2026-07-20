@@ -21,6 +21,9 @@ export function ComposerPlanPanel() {
             forcePlan: Boolean(session.config.forcePlan),
             planApprovalPending: session.planApprovalPending,
             activeTurnPlan: session.activeTurnPlan,
+            activeTurnPlanMarkdown: session.activeTurnPlanMarkdown,
+            activeTurnPlanPath: session.activeTurnPlanPath,
+            activeTurnPlanMarkdownTruncated: session.activeTurnPlanMarkdownTruncated,
           })
         : null,
     [session, messages, status],

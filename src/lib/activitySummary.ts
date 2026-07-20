@@ -116,6 +116,10 @@ export function buildActivitySummary(input: ActivitySummaryInput): {
     if (last?.kind === 'reasoning') {
       return { status: 'running', parts: withPlanProgress([{ type: 'runningReasoning' }], tools) }
     }
+    // kind:'text' while streaming: assistant is writing the answer body (hasAssistantContent path)
+    if (last?.kind === 'text') {
+      return { status: 'running', parts: withPlanProgress([{ type: 'runningReasoning' }], tools) }
+    }
     // Fallback: last running tool or any tool
     const running = [...tools].reverse().find((t) => t.status === 'running')
     if (running) {

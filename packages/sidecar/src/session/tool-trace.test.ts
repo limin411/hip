@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import type { ServerMessage, ToolCall } from '@hip/protocol'
-import { clip, clipForTool, DELEGATE_BLOB_CAP, TOOL_BLOB_CAP, stringify, consumeToolCalls, trajectoryToRuns, trajectoryToTimeline, REASONING_CAP, clipReasoning, ReasoningTracker, type ToolCallStreamLike, type TraceRun, type TraceRecorder, type ReasoningBurst } from './tool-trace.js'
+import { clip, clipForTool, DELEGATE_BLOB_CAP, TOOL_BLOB_CAP, stringify, consumeToolCalls, trajectoryToRuns, trajectoryToTimeline, contentFromTimeline, REASONING_CAP, clipReasoning, ReasoningTracker, TextBurstTracker, type ToolCallStreamLike, type TraceRun, type TraceRecorder, type ReasoningBurst } from './tool-trace.js'
 
 // A fake ToolCallStream whose Promises are already resolved.
 function fakeTool(over: Partial<ToolCallStreamLike> & { name: string; callId: string }): ToolCallStreamLike {
@@ -249,6 +249,39 @@ describe('ReasoningTracker', () => {
   })
 })
 
+describe('TextBurstTracker', () => {
+  const counter = () => { let s = 0; return () => s++ }
+
+  it('opens a burst on first delta; second push appends at the SAME stepSeq', () => {
+    const t = new TextBurstTracker(counter())
+    expect(t.push('supervisor', 'Hel')).toBe(0)
+    expect(t.push('supervisor', 'lo')).toBe(0)
+    expect(t.close('supervisor')).toEqual({ stepSeq: 0, content: 'Hello' })
+  })
+
+  it('close after tool-simulated gap opens a new higher stepSeq (text→tool→text)', () => {
+    let s = 0
+    const next = () => s++
+    const t = new TextBurstTracker(next)
+    expect(t.push('supervisor', 'before')).toBe(0)
+    t.close('supervisor')
+    next() // tool claims seq 1
+    expect(t.push('supervisor', 'after')).toBe(2)
+    expect(t.close('supervisor')).toEqual({ stepSeq: 2, content: 'after' })
+  })
+
+  it('close on no open burst returns undefined', () => {
+    expect(new TextBurstTracker(counter()).close('supervisor')).toBeUndefined()
+  })
+
+  it('closeAll drains every open agent', () => {
+    const t = new TextBurstTracker(counter())
+    t.push('supervisor', 'x')
+    expect(t.closeAll()).toEqual([{ agentId: 'supervisor', stepSeq: 0, content: 'x' }])
+    expect(t.close('supervisor')).toBeUndefined()
+  })
+})
+
 describe('trajectoryToTimeline', () => {
   function run(over: Partial<TraceRun> & { role: TraceRun['role'] }): TraceRun {
     return { output: '', startedAt: 0, finishedAt: null, seq: 0, toolCalls: new Map(), reasoningBursts: [], ...over }
@@ -269,6 +302,42 @@ describe('trajectoryToTimeline', () => {
       { kind: 'reasoning', stepSeq: 0, agentId: 'supervisor', role: 'supervisor', content: 'plan the work' },
       { kind: 'tool', stepSeq: 1, agentId: 'coder', role: 'coder', callId: 'c1' },
       { kind: 'reasoning', stepSeq: 2, agentId: 'coder', role: 'coder', content: 'now I write the file' },
+    ])
+  })
+  it('orders supervisor text before tool by stepSeq (text₁ → tool → text₂)', () => {
+    const trajectory = new Map<string, TraceRun>([
+      ['supervisor', run({
+        role: 'supervisor',
+        textBursts: [
+          { stepSeq: 0, content: 'I will search' },
+          { stepSeq: 2, content: 'Found it' },
+        ],
+        toolCalls: new Map<string, ToolCall>([
+          ['c1', { callId: 'c1', agentId: 'supervisor', name: 'web_search', input: '{}', status: 'finished', output: 'ok', seq: 1 }],
+        ]),
+      })],
+    ])
+    expect(trajectoryToTimeline(trajectory)).toEqual([
+      { kind: 'text', stepSeq: 0, agentId: 'supervisor', role: 'supervisor', content: 'I will search' },
+      { kind: 'tool', stepSeq: 1, agentId: 'supervisor', role: 'supervisor', callId: 'c1' },
+      { kind: 'text', stepSeq: 2, agentId: 'supervisor', role: 'supervisor', content: 'Found it' },
+    ])
+  })
+  it('does not emit text steps from non-supervisor agents even if textBursts is set', () => {
+    const trajectory = new Map<string, TraceRun>([
+      ['worker-1', run({
+        role: 'worker',
+        textBursts: [{ stepSeq: 0, content: 'subagent leak' }],
+        toolCalls: new Map(),
+      })],
+      ['supervisor', run({
+        role: 'supervisor',
+        textBursts: [{ stepSeq: 1, content: 'ok' }],
+      })],
+    ])
+    const steps = trajectoryToTimeline(trajectory)
+    expect(steps.filter((s) => s.kind === 'text')).toEqual([
+      { kind: 'text', stepSeq: 1, agentId: 'supervisor', role: 'supervisor', content: 'ok' },
     ])
   })
   it('uses each tool call seq as its stepSeq', () => {
@@ -293,5 +362,31 @@ describe('trajectoryToTimeline', () => {
   it('omits the truncated key when a reasoning burst was not clipped', () => {
     const trajectory = new Map<string, TraceRun>([['supervisor', run({ role: 'supervisor', reasoningBursts: [{ stepSeq: 0, content: 'short' }] })]])
     expect(trajectoryToTimeline(trajectory)[0]).not.toHaveProperty('truncated')
+  })
+})
+
+describe('contentFromTimeline', () => {
+  it('joins supervisor text steps by stepSeq only', () => {
+    const steps = [
+      { kind: 'tool' as const, stepSeq: 1, agentId: 'supervisor', role: 'supervisor' as const, callId: 'c1' },
+      { kind: 'text' as const, stepSeq: 2, agentId: 'supervisor', role: 'supervisor' as const, content: 'B' },
+      { kind: 'text' as const, stepSeq: 0, agentId: 'supervisor', role: 'supervisor' as const, content: 'A' },
+      { kind: 'reasoning' as const, stepSeq: 3, agentId: 'supervisor', role: 'supervisor' as const, content: 'think' },
+    ]
+    expect(contentFromTimeline(steps)).toBe('AB')
+  })
+
+  it('filters non-supervisor text steps (defense in depth)', () => {
+    const steps = [
+      { kind: 'text' as const, stepSeq: 0, agentId: 'worker-1', role: 'worker' as const, content: 'leak' },
+      { kind: 'text' as const, stepSeq: 1, agentId: 'supervisor', role: 'supervisor' as const, content: 'ok' },
+    ]
+    expect(contentFromTimeline(steps)).toBe('ok')
+  })
+
+  it('returns empty string when no text steps', () => {
+    expect(contentFromTimeline([
+      { kind: 'reasoning', stepSeq: 0, agentId: 'supervisor', role: 'supervisor', content: 'x' },
+    ])).toBe('')
   })
 })

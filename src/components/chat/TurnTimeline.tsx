@@ -142,32 +142,38 @@ function buildAgentSections(
           />
         ),
       })
-    } else if (!isSuppressedToolStep(step, byCallId)) {
-      const tool = byCallId.get(step.callId)
-      if (!tool || tool.name === 'write_todos') continue
-      // When children are present, hide parent shell delegate rows (shown as child sections).
-      if (
-        hasNestedChildren &&
-        step.role === 'supervisor' &&
-        PARENT_DELEGATE_SHELL.has(tool.name)
-      ) {
+    } else if (step.kind === 'text') {
+      // PR-4: text steps are protocol-visible but not rendered here (legacy content body).
+      // TurnBlocks UI lands in PR-5; skip so we never treat text as a tool row.
+      continue
+    } else if (step.kind === 'tool') {
+      if (!isSuppressedToolStep(step, byCallId)) {
+        const tool = byCallId.get(step.callId)
+        if (!tool || tool.name === 'write_todos') continue
+        // When children are present, hide parent shell delegate rows (shown as child sections).
+        if (
+          hasNestedChildren &&
+          step.role === 'supervisor' &&
+          PARENT_DELEGATE_SHELL.has(tool.name)
+        ) {
+          referencedCallIds.add(tool.callId)
+          continue
+        }
         referencedCallIds.add(tool.callId)
-        continue
-      }
-      referencedCallIds.add(tool.callId)
-      b.items.push({
-        seq: step.stepSeq,
-        node: (
-          <div key={tool.callId} className="flex gap-2">
-            <div className="min-w-0 flex-1">
-              <ToolCallRow tool={tool} />
+        b.items.push({
+          seq: step.stepSeq,
+          node: (
+            <div key={tool.callId} className="flex gap-2">
+              <div className="min-w-0 flex-1">
+                <ToolCallRow tool={tool} />
+              </div>
             </div>
-          </div>
-        ),
-      })
-    } else {
-      const tool = byCallId.get(step.callId)
-      if (tool) referencedCallIds.add(tool.callId)
+          ),
+        })
+      } else {
+        const tool = byCallId.get(step.callId)
+        if (tool) referencedCallIds.add(tool.callId)
+      }
     }
   }
 

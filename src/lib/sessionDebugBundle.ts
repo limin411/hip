@@ -169,13 +169,30 @@ function sanitizeTimeline(steps: TimelineStep[] | undefined): unknown[] | undefi
         ...(clipped.exportClipped ? { exportClipped: true } : {}),
       }
     }
-    return {
-      kind: 'tool',
-      stepSeq: s.stepSeq,
-      agentId: s.agentId,
-      role: s.role,
-      callId: s.callId,
+    if (s.kind === 'text') {
+      const clipped = clipForExport(s.content ?? '', MAX_CONTENT)
+      return {
+        kind: 'text',
+        stepSeq: s.stepSeq,
+        agentId: s.agentId,
+        role: s.role,
+        content: clipped.text,
+        ...(clipped.exportClipped ? { exportClipped: true } : {}),
+        ...(s.truncated ? { truncated: true } : {}),
+      }
     }
+    // tool (and any future kinds we don't specially format — keep tool shape only for tool)
+    if (s.kind === 'tool') {
+      return {
+        kind: 'tool',
+        stepSeq: s.stepSeq,
+        agentId: s.agentId,
+        role: s.role,
+        callId: s.callId,
+      }
+    }
+    // Preserve unknown kinds without assuming callId (loaders must not strip)
+    return { ...s }
   })
 }
 

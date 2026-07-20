@@ -550,6 +550,65 @@ describe('applyServerMessage', () => {
     expect(m.agentRuns![0].output).toBe('a plan')
   })
 
+  it('subagent token:stream never creates text timeline steps (even if stepSeq is wrongly present)', () => {
+    const s0 = { sessions: [baseSession({ messages: [{ id: 't1', role: 'assistant', content: '', timestamp: 100, timeline: [], agentRuns: [
+      { agentId: 'supervisor', role: 'supervisor', output: '', startedAt: 100, finishedAt: null, seq: 0, messageId: 't1' },
+      { agentId: 'worker-1', role: 'worker', output: '', startedAt: 100, finishedAt: null, seq: 1, messageId: 't1' },
+    ] }] })] }
+    const next = applyServerMessage(s0, {
+      type: 'token:stream', sessionId: 's1', turnId: 't1', agentId: 'worker-1', delta: 'sub', stepSeq: 99, role: 'worker',
+    }, 120)
+    const m = next.sessions[0].messages.at(-1)!
+    expect(m.content).toBe('')
+    expect(m.timeline ?? []).toEqual([])
+    expect(m.agentRuns!.find((r) => r.agentId === 'worker-1')!.output).toBe('sub')
+  })
+
+  it('supervisor token:stream with stepSeq upserts text step and appends content', () => {
+    const s0 = { sessions: [baseSession({ messages: [{ id: 't1', role: 'assistant', content: '', timestamp: 100, timeline: [], agentRuns: [
+      { agentId: 'supervisor', role: 'supervisor', output: '', startedAt: 100, finishedAt: null, seq: 0, messageId: 't1' },
+    ] }] })] }
+    const a = applyServerMessage(s0, {
+      type: 'token:stream', sessionId: 's1', turnId: 't1', agentId: 'supervisor', delta: 'Hel', stepSeq: 0, role: 'supervisor',
+    }, 101)
+    const b = applyServerMessage(a, {
+      type: 'token:stream', sessionId: 's1', turnId: 't1', agentId: 'supervisor', delta: 'lo', stepSeq: 0, role: 'supervisor',
+    }, 102)
+    const m = b.sessions[0].messages.at(-1)!
+    expect(m.content).toBe('Hello')
+    expect(m.timeline).toEqual([
+      { kind: 'text', stepSeq: 0, agentId: 'supervisor', role: 'supervisor', content: 'Hello' },
+    ])
+  })
+
+  it('supervisor token:stream without stepSeq is ACP legacy (content only, no text step)', () => {
+    const s0 = { sessions: [baseSession({ messages: [{ id: 't1', role: 'assistant', content: '', timestamp: 100, timeline: [], agentRuns: [
+      { agentId: 'supervisor', role: 'supervisor', output: '', startedAt: 100, finishedAt: null, seq: 0, messageId: 't1' },
+    ] }] })] }
+    const next = applyServerMessage(s0, {
+      type: 'token:stream', sessionId: 's1', turnId: 't1', agentId: 'supervisor', delta: 'hi',
+    }, 101)
+    const m = next.sessions[0].messages.at(-1)!
+    expect(m.content).toBe('hi')
+    expect(m.timeline ?? []).toEqual([])
+  })
+
+  it('supervisor text then tool then text keeps distinct stepSeq bursts on the timeline', () => {
+    let s = { sessions: [baseSession({ messages: [{ id: 't1', role: 'assistant', content: '', timestamp: 100, timeline: [], toolCalls: [], agentRuns: [
+      { agentId: 'supervisor', role: 'supervisor', output: '', startedAt: 100, finishedAt: null, seq: 0, messageId: 't1' },
+    ] }] })] }
+    s = applyServerMessage(s, { type: 'token:stream', sessionId: 's1', turnId: 't1', agentId: 'supervisor', delta: 'A', stepSeq: 0, role: 'supervisor' }, 101)
+    s = applyServerMessage(s, { type: 'tool:started', sessionId: 's1', turnId: 't1', agentId: 'supervisor', role: 'supervisor', callId: 'c1', name: 'read_file', input: '{}', seq: 1 }, 102)
+    s = applyServerMessage(s, { type: 'token:stream', sessionId: 's1', turnId: 't1', agentId: 'supervisor', delta: 'B', stepSeq: 2, role: 'supervisor' }, 103)
+    const m = s.sessions[0].messages.at(-1)!
+    expect(m.content).toBe('AB')
+    expect(m.timeline).toEqual([
+      { kind: 'text', stepSeq: 0, agentId: 'supervisor', role: 'supervisor', content: 'A' },
+      { kind: 'tool', stepSeq: 1, agentId: 'supervisor', role: 'supervisor', callId: 'c1' },
+      { kind: 'text', stepSeq: 2, agentId: 'supervisor', role: 'supervisor', content: 'B' },
+    ])
+  })
+
   it('agent:finished sets finishedAt on the run', () => {
     const s0 = { sessions: [baseSession({ messages: [{ id: 't1', role: 'assistant', content: '', timestamp: 100, agentRuns: [{ agentId: 'planner-1', role: 'planner', output: '', startedAt: 100, finishedAt: null, seq: 1, messageId: 't1' }] }] })] }
     const next = applyServerMessage(s0, { type: 'agent:finished', sessionId: 's1', agentId: 'planner-1', turnId: 't1' }, 2600)

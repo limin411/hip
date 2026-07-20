@@ -1,7 +1,7 @@
 /** Dual-write session event persistence + turn finalize helpers. */
 import type { ServerMessage, SessionConfig, AgentRun, SessionEvent, TimelineStep, TurnUsage, MemoryCitation } from '@hip/protocol'
 import { AIMessage, AIMessageChunk, type BaseMessage } from '@langchain/core/messages'
-import { trajectoryToRuns, trajectoryToTimeline, type TraceRun } from './tool-trace.js'
+import { contentFromTimeline, trajectoryToRuns, trajectoryToTimeline, type TraceRun } from './tool-trace.js'
 import { verifyWrites } from './verify.js'
 import { sumUsage } from './usage.js'
 import type { SessionStore } from '../persistence/store.js'
@@ -91,8 +91,21 @@ export function finalizeAndPersistTurn(
   usageByAgent?: Map<string, TurnUsage>,
   targetMessages: BaseMessage[] = deps.messages,
 ): string {
+  // Authoritative body: join supervisor text steps when present (KD-17); else legacy supervisorText
+  // (ACP / turns without TextBurstTracker). Preserve stop/error suffixes the caller appended.
+  const timeline = trajectoryToTimeline(trajectory)
+  const joined = contentFromTimeline(timeline)
+  const hasTextSteps = timeline.some((s) => s.kind === 'text')
+  let bodySource = supervisorText
+  if (hasTextSteps) {
+    if (supervisorText.startsWith(joined) && supervisorText.length >= joined.length) {
+      bodySource = supervisorText // includes optional cancelled/timeout/error suffix
+    } else {
+      bodySource = joined
+    }
+  }
   const { citations, strippedContent } = parseMemoryCitations(
-    supervisorText,
+    bodySource,
     deps.memoryIdsInjectedThisTurn,
   )
   const memoryCitations = citations.length ? citations : undefined
@@ -106,7 +119,7 @@ export function finalizeAndPersistTurn(
   if (
     (last instanceof AIMessage || last instanceof AIMessageChunk) &&
     typeof last.content === 'string' &&
-    (last.content === supervisorText || last.content === strippedContent) &&
+    (last.content === supervisorText || last.content === bodySource || last.content === strippedContent) &&
     finalText
   ) {
     targetMessages[targetMessages.length - 1] = new AIMessage(finalText)
@@ -119,7 +132,6 @@ export function finalizeAndPersistTurn(
     return { ...r, messageId: turnId, ...(u ? { usage: u } : {}) }
   })
   const turnUsage = sumUsage(runs.map((r) => r.usage))
-  const timeline = trajectoryToTimeline(trajectory)
   const toolCalls = runs.flatMap((r) => r.toolCalls ?? []).sort((a, b) => a.seq - b.seq)
   if (deps.store) {
     emitSessionEvent(deps, { type: 'text_ended', sessionId: deps.id, messageId: turnId, content: finalText, timestamp: ts })

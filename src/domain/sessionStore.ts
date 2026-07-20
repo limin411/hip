@@ -143,11 +143,35 @@ function upsertReasoning(messages: Message[], turnId: string, step: { stepSeq: n
   })
 }
 
+/**
+ * Upsert a supervisor text step (KD-17): same stepSeq concatenates the delta.
+ * Non-supervisor agentId/role is a defensive no-op (subagent tokens must never become text steps).
+ */
+function upsertTimelineText(
+  messages: Message[],
+  turnId: string,
+  step: { stepSeq: number; agentId: string; role: AgentRole; delta: string },
+): Message[] {
+  const isSupervisor = step.agentId === 'supervisor' || step.role === 'supervisor'
+  if (!isSupervisor) return messages
+  if (!messages.some((m) => m.id === turnId)) return messages
+  return messages.map((m) => {
+    if (m.id !== turnId) return m
+    const timeline = m.timeline ?? []
+    const exists = timeline.some((t) => t.kind === 'text' && t.stepSeq === step.stepSeq)
+    const nextTimeline = exists
+      ? timeline.map((t) => (t.kind === 'text' && t.stepSeq === step.stepSeq ? { ...t, content: t.content + step.delta } : t))
+      : [...timeline, { kind: 'text' as const, stepSeq: step.stepSeq, agentId: step.agentId, role: step.role, content: step.delta } satisfies TimelineStep]
+    return { ...m, timeline: nextTimeline }
+  })
+}
+
 /** Append supervisor token delta to the message with `id === turnId`. No-op if the turn is unknown. */
 function appendAssistantDelta(messages: Message[], turnId: string, delta: string): Message[] {
   if (!messages.some((m) => m.id === turnId)) return messages
   return messages.map((m) => (m.id === turnId ? { ...m, content: m.content + delta } : m))
 }
+
 
 /** Upsert an AgentRun onto the turn's assistant message (keyed by turnId). No-op if the turn is unknown.
  *  Assigns a provisional insertion-order seq on append; preserves the prior seq on replace.
@@ -247,12 +271,25 @@ export function applyServerMessage(
 
     case 'token:stream':
       return update(msg.sessionId, (s) => {
-        // Always address by turnId (not list tail). token:stream carries no role; resolve
-        // supervisor (→ body) vs subagent (→ run output) from the turn's agentRuns, falling
-        // back to the literal agentId.
+// Always address by turnId (PR-2). KD-17: supervisor+stepSeq → text step + content;
+        // supervisor without stepSeq → content only; subagent → run.output only.
         const turn = s.messages.find((m) => m.id === msg.turnId)
         const run = turn?.role === 'assistant' ? turn.agentRuns?.find((r) => r.agentId === msg.agentId) : undefined
-        const isSupervisor = run ? run.role === 'supervisor' : msg.agentId === 'supervisor'
+        const isSupervisor =
+          (msg as { role?: string }).role === 'supervisor' ||
+          (run ? run.role === 'supervisor' : msg.agentId === 'supervisor')
+        const stepSeq = (msg as { stepSeq?: number }).stepSeq
+        if (stepSeq != null && isSupervisor) {
+          const role: AgentRole = ((msg as { role?: AgentRole }).role ?? run?.role ?? 'supervisor') as AgentRole
+          let messages = upsertTimelineText(s.messages, msg.turnId, {
+            stepSeq,
+            agentId: msg.agentId,
+            role,
+            delta: msg.delta,
+          })
+          messages = appendAssistantDelta(messages, msg.turnId, msg.delta)
+          return { ...s, messages }
+        }
         const messages = isSupervisor
           ? appendAssistantDelta(s.messages, msg.turnId, msg.delta)
           : appendRunOutput(s.messages, msg.turnId, msg.agentId, msg.delta)

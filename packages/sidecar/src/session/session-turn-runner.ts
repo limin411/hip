@@ -22,7 +22,7 @@ import type {
 import { FIXED_AGENTS } from '@hip/protocol'
 import { HumanMessage, AIMessage, SystemMessage, type BaseMessage } from '@langchain/core/messages'
 import type { BaseLanguageModel } from '@langchain/core/language_models/base'
-import { clipForTool, stringify, trajectoryToRuns, trajectoryToTimeline, ReasoningTracker, type TraceRun, type TraceRecorder } from './tool-trace.js'
+import { clipForTool, stringify, trajectoryToRuns, trajectoryToTimeline, ReasoningTracker, TextBurstTracker, type TraceRun, type TraceRecorder } from './tool-trace.js'
 import { IdleWatchdog, idleTimeoutMessage } from './idle-watchdog.js'
 import { getActiveModel, isOpenAICompatible } from '../config/providers.js'
 import { isMultimodalModel } from '../config/catalog.js'
@@ -445,7 +445,13 @@ export async function runManagedAgentTurn(host: SessionTurnHost, input: SessionI
   const requestApproval = host.permissions.buildRequestApproval(_send, host.id, turnId, () => 0, mode, host.hooks)
 
   let stepSeq = 0
-  const reasoning = new ReasoningTracker(() => stepSeq++)
+  const nextSeq = () => stepSeq++
+  const reasoning = new ReasoningTracker(nextSeq)
+  // Managed turn is the surface-level "supervisor" of its own message (agent:started role
+  // supervisor). Emit stepSeq for live interleaving; textBursts use role supervisor on steps
+  // via trajectoryToTimeline (r.role is subagent for SubAgentCard — text steps only if we set
+  // role supervisor; we keep content from agentText and emit stepSeq for FE live only).
+  const textTracker = new TextBurstTracker(nextSeq)
   const usageByAgent = new Map<string, TurnUsage>()
   // Mirror runTurn's trajectory so the final message:complete can carry the image agent's
   // reasoning bursts, tool calls and per-agent runs. Without this, the frontend's provisional
@@ -466,6 +472,10 @@ export async function runManagedAgentTurn(host: SessionTurnHost, input: SessionI
       if (truncated || tc.truncated) tc.truncated = true
     },
   }
+  const closeTextBurst = () => {
+    // Managed: text lives in agentText for content; close tracker so stepSeqs stay ordered vs tools.
+    textTracker.close(agent.id)
+  }
   const closeReasoningBurst = () => {
     const burst = reasoning.close(agent.id)
     const r = trajectory.get(agent.id)
@@ -473,20 +483,24 @@ export async function runManagedAgentTurn(host: SessionTurnHost, input: SessionI
   }
   let agentText = ''
   const emit: GraphEmit = {
-    // Stream tokens directly into the assistant body (supervisor role). Don't duplicate them
-    // into the trajectory run's output; the image agent's reply is the message content.
-    // Also tee them locally so that if the invoker returns an empty string (e.g. the graph's
-    // final AIMessage has no text), we still have the streamed reply for message:complete.
-    token: (delta) => { agentText += delta; _send({ type: 'token:stream', sessionId: host.id, turnId, agentId: agent.id, delta }) },
+    // Stream tokens into the assistant body (supervisor role on the wire for FE).
+    // stepSeq for live text timeline; content authority remains agentText on complete.
+    token: (delta) => {
+      if (!delta) return
+      agentText += delta
+      const stepSeq = textTracker.push(agent.id, delta)
+      _send({ type: 'token:stream', sessionId: host.id, turnId, agentId: agent.id, delta, stepSeq, role: 'supervisor' })
+    },
     reasoning: (delta) => {
       if (!delta) return
+      closeTextBurst()
       _send({ type: 'reasoning:delta', sessionId: host.id, turnId, agentId: agent.id, role: 'subagent', stepSeq: reasoning.push(agent.id, delta), delta })
     },
     toolStarted: (name, callId, input) => {
-      // Close any open reasoning burst BEFORE the tool claims the next stepSeq, so reasoning and
-      // tool steps share a single turn-global ordering (mirrors runTurn).
+      // Close text then reasoning BEFORE the tool claims the next stepSeq (mirrors runTurn).
+      closeTextBurst()
       closeReasoningBurst()
-      const seq = stepSeq++
+      const seq = nextSeq()
       const inClip = clipForTool(name, typeof input === 'string' ? input : JSON.stringify(input))
       recorder.start(agent.id, callId, name, inClip.text, seq, inClip.truncated)
       _send({ type: 'tool:started', sessionId: host.id, turnId, agentId: agent.id, role: 'subagent', callId, name, input: inClip.text, seq, ...(inClip.truncated ? { truncated: true } : {}) })
@@ -541,6 +555,7 @@ export async function runManagedAgentTurn(host: SessionTurnHost, input: SessionI
     agentText = agentText || returnedText
   } catch (err) {
     logInfo('session', 'turn:error', { sessionId: host.id, turnId, agentId: agent.id, error: err instanceof Error ? err.message : String(err) })
+    closeTextBurst()
     closeReasoningBurst()
     host.emit({ type: 'step_failed', sessionId: host.id, turnId, agentId: agent.id, error: err instanceof Error ? err.message : String(err), timestamp: Date.now() })
     const isAbort = err instanceof Error && err.name === 'AbortError'
@@ -555,6 +570,7 @@ export async function runManagedAgentTurn(host: SessionTurnHost, input: SessionI
   host.running = false
   host.abortController = null
   host.endActivity()
+  closeTextBurst()
   closeReasoningBurst()
   const run = trajectory.get(agent.id); if (run) run.finishedAt = Date.now()
   _send({ type: 'agent:finished', sessionId: host.id, turnId, agentId: agent.id })
@@ -722,25 +738,47 @@ export async function runTurn(host: SessionTurnHost, rawSend: SendFn, base?: {
     },
   }
   const reasoning = new ReasoningTracker(nextSeq)
+  /** Supervisor-only text bursts (KD-17). Shares the turn-global stepSeq with reasoning/tools. */
+  const textTracker = new TextBurstTracker(nextSeq)
+  const closeText = (agentId: string) => {
+    if (agentId !== 'supervisor') return
+    const burst = textTracker.close(agentId)
+    if (burst) {
+      const r = trajectory.get(agentId)
+      if (r) {
+        if (!r.textBursts) r.textBursts = []
+        r.textBursts.push(burst)
+      }
+    }
+  }
   const reasoningDelta = (agentId: string, role: AgentRole, delta: string) => {
     if (!delta) return
+    // Close open supervisor text before a new reasoning burst so stepSeq stays ordered.
+    if (agentId === 'supervisor') closeText(agentId)
     send({ type: 'reasoning:delta', sessionId: host.id, turnId, agentId, role, stepSeq: reasoning.push(agentId, delta), delta })
   }
   const closeReasoning = (agentId: string) => {
     const burst = reasoning.close(agentId); if (burst) { const r = trajectory.get(agentId); if (r) r.reasoningBursts.push(burst) }
   }
+  /** Tool start: close text then reasoning so both stepSeqs are strictly below the tool's seq. */
+  const onToolStart = (agentId: string) => {
+    if (agentId === 'supervisor') closeText(agentId)
+    closeReasoning(agentId)
+  }
   const ensureStarted = (agentId: string, role: AgentRole, parentAgentId?: string, taskInput?: string, agentTaskId?: string, name?: string) => {
     if (started.has(agentId)) return; started.add(agentId)
     const stepId = agentId === 'supervisor' ? turnId : agentId
     host.activeSteps.set(agentId, stepId)
-    trajectory.set(agentId, { role, output: '', startedAt: Date.now(), finishedAt: null, seq: agentSeq++, toolCalls: new Map(), reasoningBursts: [], ...(parentAgentId ? { parentAgentId } : {}), ...(taskInput ? { taskInput } : {}), ...(name ? { name } : {}) })
+    trajectory.set(agentId, { role, output: '', startedAt: Date.now(), finishedAt: null, seq: agentSeq++, toolCalls: new Map(), reasoningBursts: [], ...(agentId === 'supervisor' ? { textBursts: [] } : {}), ...(parentAgentId ? { parentAgentId } : {}), ...(taskInput ? { taskInput } : {}), ...(name ? { name } : {}) })
     logInfo('session', 'agent:started', { sessionId: host.id, turnId, agentId, role })
     send({ type: 'agent:started', sessionId: host.id, turnId, agentId, role, ...(parentAgentId ? { parentAgentId } : {}), ...(taskInput ? { taskInput } : {}), ...(agentTaskId ? { taskId: agentTaskId } : {}), ...(name ? { name } : {}) })
     host.emit({ type: 'step_started', sessionId: host.id, turnId: stepId, agentId, timestamp: Date.now() })
     host.emit({ type: 'text_started', sessionId: host.id, messageId: stepId, timestamp: Date.now() })
   }
   const ensureFinished = (agentId: string, output: string) => {
-    if (!started.has(agentId)) return; closeReasoning(agentId)
+    if (!started.has(agentId)) return
+    if (agentId === 'supervisor') closeText(agentId)
+    closeReasoning(agentId)
     const r = trajectory.get(agentId)
     // Prefer the explicit final output, but fall back to the tee'd streamed output when the
     // invoker/runSubagent happens to return an empty string (e.g. tool-call-only final step).
@@ -754,7 +792,12 @@ export async function runTurn(host: SessionTurnHost, rawSend: SendFn, base?: {
     }
   }
   const finishRemaining = () => {
-    for (const id of started) { closeReasoning(id); const r = trajectory.get(id); if (r) r.finishedAt = Date.now(); send({ type: 'agent:finished', sessionId: host.id, turnId, agentId: id }) }
+    for (const id of started) {
+      if (id === 'supervisor') closeText(id)
+      closeReasoning(id)
+      const r = trajectory.get(id); if (r) r.finishedAt = Date.now()
+      send({ type: 'agent:finished', sessionId: host.id, turnId, agentId: id })
+    }
     started.clear()
   }
 
@@ -783,9 +826,32 @@ export async function runTurn(host: SessionTurnHost, rawSend: SendFn, base?: {
 
   const logToken = logDebugEveryN('session', 10, 'token:stream', { sessionId: host.id, turnId, agentId: 'supervisor' })
   const makeEmit = (agentId: string, role: AgentRole): GraphEmit => ({
-    token: (delta) => { if (!delta) return; logToken(); if (agentId === 'supervisor') supervisorText += delta; const r = trajectory.get(agentId); if (r) r.output += delta; send({ type: 'token:stream', sessionId: host.id, turnId, agentId, delta }) },
+    token: (delta) => {
+      if (!delta) return
+      logToken()
+      const r = trajectory.get(agentId)
+      if (r) r.output += delta
+      if (agentId === 'supervisor') {
+        // Supervisor: stream buffer + TextBurstTracker stepSeq (KD-17 Choice A)
+        supervisorText += delta
+        const stepSeq = textTracker.push(agentId, delta)
+        send({ type: 'token:stream', sessionId: host.id, turnId, agentId, delta, stepSeq, role })
+      } else {
+        // Subagent: run.output only — never claim stepSeq / text steps
+        send({ type: 'token:stream', sessionId: host.id, turnId, agentId, delta, role })
+      }
+    },
     reasoning: (delta) => reasoningDelta(agentId, role, delta),
-    toolStarted: (name, callId, input) => { closeReasoning(agentId); const seq = nextSeq(); const inClip = clipForTool(name, stringify(input)); recorder.start(agentId, callId, name, inClip.text, seq, inClip.truncated); send({ type: 'tool:started', sessionId: host.id, turnId, agentId, role, callId, name, input: inClip.text, seq, ...(inClip.truncated ? { truncated: true } : {}) }); const stepId = host.activeSteps.get(agentId) ?? (agentId === 'supervisor' ? turnId : agentId); host.emit({ type: 'tool_called', sessionId: host.id, callId, name, input: inClip.text, timestamp: Date.now() }, { stepId }); host.checkSteerPromotion() },
+    toolStarted: (name, callId, input) => {
+      onToolStart(agentId)
+      const seq = nextSeq()
+      const inClip = clipForTool(name, stringify(input))
+      recorder.start(agentId, callId, name, inClip.text, seq, inClip.truncated)
+      send({ type: 'tool:started', sessionId: host.id, turnId, agentId, role, callId, name, input: inClip.text, seq, ...(inClip.truncated ? { truncated: true } : {}) })
+      const stepId = host.activeSteps.get(agentId) ?? (agentId === 'supervisor' ? turnId : agentId)
+      host.emit({ type: 'tool_called', sessionId: host.id, callId, name, input: inClip.text, timestamp: Date.now() }, { stepId })
+      host.checkSteerPromotion()
+    },
     toolFinished: (callId, status, output, error) => { const toolName = trajectory.get(agentId)?.toolCalls.get(callId)?.name ?? ''; const outClip = output !== undefined ? clipForTool(toolName, stringify(output)) : undefined; recorder.finish(agentId, callId, status, outClip?.text, error, outClip?.truncated ?? false); send({ type: 'tool:finished', sessionId: host.id, turnId, agentId, callId, status, ...(outClip ? { output: outClip.text } : {}), ...(error ? { error } : {}), ...(outClip?.truncated ? { truncated: true } : {}) }); const stepId = host.activeSteps.get(agentId) ?? (agentId === 'supervisor' ? turnId : agentId); if (status === 'finished') { host.emit({ type: 'tool_success', sessionId: host.id, callId, output: outClip?.text ?? '', timestamp: Date.now() }, { stepId }) } else { host.emit({ type: 'tool_failed', sessionId: host.id, callId, error: error ?? '', timestamp: Date.now() }, { stepId }) }; host.checkSteerPromotion() },
     usage: (u) => { usageByAgent.set(agentId, addUsage(usageByAgent.get(agentId), u)) },
     planDelta: (itemId, delta) => { send({ type: 'plan:delta', sessionId: host.id, turnId, itemId, delta }) },

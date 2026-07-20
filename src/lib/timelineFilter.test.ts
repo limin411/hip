@@ -25,6 +25,11 @@ describe('isSuppressedToolStep', () => {
     expect(isSuppressedToolStep(step, byCallId)).toBe(false)
   })
 
+  it('does not suppress text steps', () => {
+    const step: TimelineStep = { kind: 'text', stepSeq: 5, agentId: 'supervisor', role: 'supervisor', content: 'hello' }
+    expect(isSuppressedToolStep(step, byCallId)).toBe(false)
+  })
+
   it('keeps a tool step whose call is missing from the map', () => {
     const step: TimelineStep = { kind: 'tool', stepSeq: 4, agentId: 'supervisor', role: 'supervisor', callId: 'absent' }
     expect(isSuppressedToolStep(step, byCallId)).toBe(false)

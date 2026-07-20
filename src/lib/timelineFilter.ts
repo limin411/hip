@@ -11,6 +11,7 @@ import type { TimelineStep, ToolCall } from '@hip/protocol'
  * in TurnTimeline (needs agentRuns context).
  */
 export function isSuppressedToolStep(step: TimelineStep, byCallId: Map<string, ToolCall>): boolean {
+  // text / reasoning steps are never "tool" rows — only suppress parent `task` tool shells
   if (step.kind !== 'tool') return false
   return byCallId.get(step.callId)?.name === 'task'
 }

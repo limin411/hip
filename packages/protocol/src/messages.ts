@@ -259,7 +259,13 @@ type AttachmentSendPayload = Attachment & { path: string }
 export type ServerMessage =
   | { type: 'session:created'; sessionId: string }
   | { type: 'agent:started'; sessionId: string; turnId: string; agentId: string; role: AgentRole; parentAgentId?: string; taskInput?: string; taskId?: string; name?: string }
-  | { type: 'token:stream'; sessionId: string; turnId: string; agentId: string; delta: string }
+  /**
+   * Streaming assistant / subagent token. Builtin hub supervisor includes
+   * `stepSeq` (TextBurstTracker) for interleaved text timeline steps; subagents
+   * and ACP omit it (legacy content / run.output paths). Optional `role` helps
+   * clients without agentRuns context.
+   */
+  | { type: 'token:stream'; sessionId: string; turnId: string; agentId: string; delta: string; stepSeq?: number; role?: AgentRole }
   | { type: 'agent:finished'; sessionId: string; turnId: string; agentId: string }
   | { type: 'reasoning:delta'; sessionId: string; turnId: string; agentId: string; role: AgentRole; stepSeq: number; delta: string }
   | { type: 'tool:started'; sessionId: string; turnId: string; agentId: string; role: AgentRole; callId: string; name: string; input: string; seq: number; truncated?: boolean }

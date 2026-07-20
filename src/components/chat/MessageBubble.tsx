@@ -18,7 +18,7 @@ import { groupByAgent } from '@/lib/turnAgents'
 import { normalizeMessageContent } from '@/lib/normalizeMessageContent'
 import { activityElapsedMs, formatElapsed } from '@/lib/activitySummary'
 import { MarkdownBody } from './MarkdownBody'
-import { TRANSCRIPT_INTERLEAVED_BLOCKS } from './feature'
+import * as chatFeature from './feature'
 import { hasRenderableSupervisorText } from '@/lib/timelineFilter'
 import { cn } from '@/lib/utils'
 
@@ -116,8 +116,9 @@ function MessageBubbleImpl({ message, streaming, isLastAssistant, hidePlan }: Me
   // one non-empty supervisor text step (after sanitize+normalize). Avoids flattening
   // multi-agent chrome for ACP/old turns, and blank answers when all text is whitespace.
   // Flag off always uses legacy content body; text steps are skipped in TurnTimeline.
+  // Read via namespace so tests can mock a live getter (named import freezes the value).
   const interleavedBlocks =
-    TRANSCRIPT_INTERLEAVED_BLOCKS &&
+    chatFeature.TRANSCRIPT_INTERLEAVED_BLOCKS &&
     !isUser &&
     hasRenderableSupervisorText(message.timeline)
   const hideAnswerBody = interleavedBlocks

@@ -335,6 +335,7 @@ export const ja = {
     "interruptContinueMessage": "現在のタスクを続けて完了してください。追加の質問は不要です。",
     "errorTimeout": "応答がタイムアウトしたため停止しました。",
     "jumpToLatest": "最新へジャンプ",
+    "loadEarlier": "以前のメッセージを読み込む",
     "plan": {
       "chipLabel": "プラン",
       "chipTitle": "プランモードを強制 — コーディング前に調査と承認を得ます",

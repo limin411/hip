@@ -311,6 +311,7 @@ export const en = {
       interruptContinueMessage: 'Please continue and finish the current task without asking more questions.',
       errorTimeout: 'Response timed out and was stopped.',
       jumpToLatest: 'Jump to latest',
+      loadEarlier: 'Load earlier',
       plan: {
         chipLabel: 'Plan',
         chipTitle: 'Force plan mode — investigate and get approval before coding',

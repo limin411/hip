@@ -20,6 +20,12 @@ import { sessionDebugBundleJson } from '@/lib/sessionDebugBundle'
 import { selectLivePlan } from '@/lib/todos'
 import { toast } from 'sonner'
 import { scrollTranscriptToMessage } from '@/lib/transcriptJump'
+import {
+  TRANSCRIPT_WINDOW_SIZE,
+  growWindowSize,
+  transcriptWindowStart,
+  windowSizeToInclude,
+} from '@/lib/transcriptWindow'
 import { MessageBubble, NoticeRow } from './MessageBubble'
 import { ThinkingBubble } from './ThinkingBubble'
 
@@ -43,8 +49,12 @@ export function ChatPane() {
   // Sync pin flag so autoscroll cannot re-stick to bottom in the same frame a jump clears
   // scrollTarget (React state for atBottom is one paint behind).
   const followBottomRef = useRef(true)
+  // Preserve scroll position when prepending via "Load earlier" (not used for jump expand).
+  const pendingScrollAdjustRef = useRef<number | null>(null)
   const [atBottom, setAtBottom] = useState(true)
   const [highlightedId, setHighlightedId] = useState<string | null>(null)
+  // PR-7b / KD-15: mount last N messages; grow via "Load earlier" or jump ensure-mount.
+  const [windowSize, setWindowSize] = useState(TRANSCRIPT_WINDOW_SIZE)
 
   // Only animate genuinely NEW messages (appended after the session loaded) — not the whole
   // transcript on every session switch. Capture a per-session baseline count at switch time;
@@ -55,6 +65,21 @@ export function ChatPane() {
     animSessionRef.current = activeSessionId ?? null
     animBaselineRef.current = messages.length
   }
+
+  // Reset window when switching sessions (render-time adjust so jump layout effect sees N=30,
+  // not a stale expanded size from the previous session).
+  const windowSessionRef = useRef<string | null>(activeSessionId ?? null)
+  if (windowSessionRef.current !== (activeSessionId ?? null)) {
+    windowSessionRef.current = activeSessionId ?? null
+    setWindowSize(TRANSCRIPT_WINDOW_SIZE)
+  }
+
+  const startIndex = transcriptWindowStart(messages.length, windowSize)
+  const visibleMessages = useMemo(
+    () => (startIndex === 0 ? messages : messages.slice(startIndex)),
+    [messages, startIndex],
+  )
+  const hasEarlier = startIndex > 0
 
   const showAgentRestart =
     !!planSlice.agentId &&
@@ -91,16 +116,39 @@ export function ChatPane() {
   useEffect(() => {
     if (!followBottomRef.current || !atBottom || scrollTargetMessageId) return
     // Spec A4: pinned-to-bottom uses instant scroll — smooth + high-frequency tokens fights.
+    // End sentinel (bottomRef) stays mounted outside the window slice.
     bottomRef.current?.scrollIntoView({ behavior: 'auto' })
   }, [messages.length, error, lastActivity, atBottom, scrollTargetMessageId])
 
-  // Search / outline jump: pin the message (layout phase so stick-to-bottom can't paint first),
-  // flash a highlight, unpin follow, then clear the target.
-  // If the session is still loading, `messages` is empty and the effect no-ops until they
-  // arrive (it re-runs on `messages`). If messages are present but the anchor is gone (deleted/
-  // regenerated since indexing), clear the stale target so it doesn't linger.
+  // After "Load earlier" prepends DOM, restore viewport so content does not jump.
+  useLayoutEffect(() => {
+    const prevHeight = pendingScrollAdjustRef.current
+    if (prevHeight == null) return
+    pendingScrollAdjustRef.current = null
+    const el = scrollRef.current
+    if (!el) return
+    el.scrollTop += el.scrollHeight - prevHeight
+  }, [windowSize, startIndex])
+
+  // Search / outline jump: ensure target is mounted (expand window if needed), then pin + highlight.
+  // Do not rely only on querySelector — unmounted messages are not in the DOM (PR-7b).
   useLayoutEffect(() => {
     if (!scrollTargetMessageId) return
+
+    const targetIdx = messages.findIndex((m) => m.id === scrollTargetMessageId)
+    if (targetIdx < 0) {
+      // Messages present but id missing → stale target (deleted/regenerated).
+      if (messages.length > 0) setScrollTarget(null)
+      return
+    }
+
+    const needSize = windowSizeToInclude(messages.length, targetIdx)
+    if (needSize > windowSize) {
+      // Expand first; keep target so this effect re-runs after mount.
+      setWindowSize(needSize)
+      return
+    }
+
     const el = scrollRef.current?.querySelector(
       `[data-message-id="${CSS.escape(scrollTargetMessageId)}"]`,
     )
@@ -110,10 +158,12 @@ export function ChatPane() {
       setAtBottom(false)
       scrollTranscriptToMessage(scrollTargetMessageId)
       setHighlightedId(scrollTargetMessageId)
+      setScrollTarget(null)
+      return
     }
-    // Either way the target is consumed: found → highlighted; absent (and messages present) → stale, drop it.
-    if (el || messages.length > 0) setScrollTarget(null)
-  }, [scrollTargetMessageId, messages, setScrollTarget])
+
+    // In window range but node not yet in DOM (rare); keep target for a later paint.
+  }, [scrollTargetMessageId, messages, windowSize, setScrollTarget])
 
   // Fade the landing highlight ~2s after it is set. Kept in its own effect (keyed on highlightedId)
   // so that clearing the scroll target above — which re-runs the jump effect — cannot cancel this
@@ -148,6 +198,12 @@ export function ChatPane() {
     ],
   )
   const hideBubblePlan = livePlan !== null
+
+  const loadEarlier = () => {
+    const el = scrollRef.current
+    if (el) pendingScrollAdjustRef.current = el.scrollHeight
+    setWindowSize((w) => growWindowSize(messages.length, w))
+  }
 
   const exportDebugInfo = async () => {
     if (!activeSessionId) return
@@ -189,12 +245,26 @@ export function ChatPane() {
       >
         {/* CLI-style transcript: full-width left-aligned, no centered chat column */}
         <div className="flex w-full flex-col gap-5 px-4 py-4">
+          {hasEarlier && (
+            <div className="flex justify-center">
+              <Button
+                type="button"
+                variant="secondary"
+                size="sm"
+                data-testid="load-earlier"
+                onClick={loadEarlier}
+              >
+                {t('chat.loadEarlier')}
+              </Button>
+            </div>
+          )}
           {showAgentRestart && (
             <div className="my-1 w-fit bg-surface-muted px-2 py-0.5 text-meta text-ink-tertiary">
               {t('chat.agentRestarted')}
             </div>
           )}
-          {messages.map((m, i) => {
+          {visibleMessages.map((m, localI) => {
+            const i = startIndex + localI
             const isNew = i >= animBaselineRef.current
             const streaming = isStreamingAssistant(messages, i, status)
             // Same “no user after” guard as streaming — do not offer regenerate on a prior
@@ -292,7 +362,7 @@ export function ChatPane() {
               </div>
             </div>
           )}
-          <div ref={bottomRef} />
+          <div ref={bottomRef} data-testid="transcript-end-sentinel" />
         </div>
       </div>
       {!atBottom && (

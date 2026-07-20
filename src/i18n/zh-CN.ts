@@ -303,6 +303,7 @@ export const zhCN = {
       interruptContinueMessage: '请继续完成当前任务，不要再追问。',
       errorTimeout: '响应超时，已停止。',
       jumpToLatest: '回到最新',
+      loadEarlier: '加载更早消息',
       plan: {
         chipLabel: '规划',
         chipTitle: '强制规划模式 — 先调研并获批后再改代码',

@@ -21,6 +21,7 @@ vi.mock('@/components/chat/MessageBubble', () => ({
   MessageBubble: ({ message }: { message: { id: string; content: string } }) => (
     <div data-testid={`bubble-${message.id}`}>{message.content}</div>
   ),
+  NoticeRow: ({ content }: { content: string }) => <div data-testid="notice">{content}</div>,
 }))
 vi.mock('@/components/chat/ThinkingBubble', () => ({ ThinkingBubble: () => null }))
 vi.mock('@/components/chat/planApproval', () => ({ hasPlanApproval: () => false }))

@@ -335,6 +335,7 @@ export const ko = {
     "interruptContinueMessage": "계속해서 현재 작업을 추가 질문 없이 완료해 주세요.",
     "errorTimeout": "응답 시간이 초과되어 중지되었습니다.",
     "jumpToLatest": "최신으로 이동",
+    "loadEarlier": "이전 메시지 불러오기",
     "plan": {
       "chipLabel": "계획",
       "chipTitle": "계획 모드 강제 — 코딩 전에 조사하고 승인 받기",

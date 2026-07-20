@@ -343,6 +343,7 @@ export const zhTW = {
     "interruptContinueMessage": "請繼續完成當前任務，不要再追問。",
     "errorTimeout": "響應超時，已停止。",
     "jumpToLatest": "回到最新",
+    "loadEarlier": "載入更早訊息",
     "plan": {
       "chipLabel": "規劃",
       "chipTitle": "強制規劃模式 — 先調研並獲批後再改程式碼",

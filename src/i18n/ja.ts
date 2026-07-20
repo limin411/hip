@@ -335,6 +335,7 @@ export const ja = {
     "interruptContinueMessage": "現在のタスクを続けて完了してください。追加の質問は不要です。",
     "errorTimeout": "応答がタイムアウトしたため停止しました。",
     "jumpToLatest": "最新へジャンプ",
+    "loadEarlier": "以前のメッセージを読み込む",
     "plan": {
       "chipLabel": "プラン",
       "chipTitle": "プランモードを強制 — コーディング前に調査と承認を得ます",
@@ -342,7 +343,9 @@ export const ja = {
       "forceOnTitle": "プランモード オン",
       "forceOnBody": "次のターンは最初にプランを立てます。タスクを送信するか、/plan あなたのタスク を使用してください。",
       "forceOffTitle": "プランモード オフ",
-      "forceOffBody": "ターンにプランは不要になりました。"
+      "forceOffBody": "ターンにプランは不要になりました。",
+      "respondFailedTitle": "プラン応答に失敗しました",
+      "respondFailedBody": "プラン応答を適用できませんでした（{{reason}}）。承認状態を復元しました。"
     },
     "permission": {
       "title": "権限が必要です",
@@ -423,7 +426,8 @@ export const ja = {
       "executing": "実行中",
       "done": "完了",
       "progress": "{{done}}/{{total}}",
-      "emptyPlanning": "調査中、計画を作成中…"
+      "emptyPlanning": "調査中、計画を作成中…",
+      "emptyAwaiting": "計画ステップがありません。承認・却下・修正は可能です。"
     },
     "planApproval": {
       "title": "計画の承認",

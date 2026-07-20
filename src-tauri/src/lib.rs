@@ -115,6 +115,7 @@ fn get_hip_config(app: tauri::AppHandle) -> Result<String, String> {
                 langsmith: None,
                 terminal: None,
                 acp: None,
+                plan: None,
             };
             serde_json::to_string(&cfg).map_err(|e| e.to_string())
         }
@@ -923,6 +924,7 @@ mod tests {
             langsmith: None,
             terminal: None,
             acp: None,
+            plan: None,
         }
     }
 
@@ -1106,6 +1108,7 @@ mod tests {
             langsmith: None,
             terminal: None,
             acp: None,
+            plan: None,
         };
 
         let toml_str = toml::to_string_pretty(&cfg).unwrap();
@@ -1279,6 +1282,7 @@ mod tests {
             langsmith: None,
             terminal: None,
             acp: None,
+            plan: None,
         };
 
         let toml_str = toml::to_string_pretty(&cfg).unwrap();
@@ -1395,6 +1399,7 @@ mod tests {
             langsmith: None,
             terminal: None,
             acp: None,
+            plan: None,
         };
 
         let json = serde_json::to_string(&cfg).unwrap();
@@ -1433,6 +1438,7 @@ mod tests {
             langsmith: None,
             terminal: None,
             acp: None,
+            plan: None,
         };
 
         // UI path: JSON (camelCase) → HipConfig → TomlHipConfig → TOML → back
@@ -1506,6 +1512,7 @@ doomLoopStrategy = "auto_continue"
                 shell: Some("cmd".into()),
             }),
             acp: None,
+            plan: None,
         };
 
         let json = serde_json::to_string(&cfg).unwrap();
@@ -1550,6 +1557,7 @@ doomLoopStrategy = "auto_continue"
                 forward_mcp: Some(true),
                 fs_read_max_bytes: Some(1_000_000),
             }),
+            plan: None,
         };
 
         let json = serde_json::to_string(&cfg).unwrap();
@@ -1603,6 +1611,79 @@ fsReadMaxBytes = 2000000
     }
 
     #[test]
+    fn plan_survives_json_toml_roundtrip() {
+        // set_hip_config rewrites hip.toml from typed HipConfig; [plan] must not be stripped (KD-8).
+        let cfg = super::HipConfig {
+            version: 1,
+            providers: vec![],
+            active_model: None,
+            mcp_servers: vec![],
+            skills: vec![],
+            agents: vec![],
+            fixed_agents: None,
+            permissions: None,
+            agent_loop: None,
+            langsmith: None,
+            terminal: None,
+            acp: None,
+            plan: Some(super::hip_config::PlanConfig {
+                soft_approve_on_composer: Some(true),
+            }),
+        };
+
+        let json = serde_json::to_string(&cfg).unwrap();
+        assert!(json.contains("\"plan\""), "JSON must emit plan: {json}");
+        assert!(
+            json.contains("\"softApproveOnComposer\""),
+            "JSON must emit softApproveOnComposer: {json}"
+        );
+        let from_json: super::HipConfig = serde_json::from_str(&json).unwrap();
+        let toml_cfg: super::TomlHipConfig = from_json.into();
+        let toml_str = toml::to_string_pretty(&toml_cfg).unwrap();
+        assert!(
+            toml_str.contains("[plan]") || toml_str.contains("plan"),
+            "TOML should contain plan: {toml_str}"
+        );
+        assert!(
+            toml_str.contains("soft_approve_on_composer") || toml_str.contains("true"),
+            "TOML should preserve soft_approve_on_composer: {toml_str}"
+        );
+        let from_toml: super::TomlHipConfig = toml::from_str(&toml_str).unwrap();
+        let back: super::HipConfig = from_toml.into();
+        let plan = back.plan.as_ref().expect("plan preserved");
+        assert_eq!(plan.soft_approve_on_composer, Some(true));
+
+        // snake_case + camelCase aliases in hand-edited TOML
+        let snake = r#"
+version = 1
+[plan]
+soft_approve_on_composer = true
+"#;
+        let from_snake: super::TomlHipConfig = toml::from_str(snake).unwrap();
+        assert_eq!(
+            from_snake
+                .plan
+                .as_ref()
+                .and_then(|p| p.soft_approve_on_composer),
+            Some(true)
+        );
+
+        let camel = r#"
+version = 1
+[plan]
+softApproveOnComposer = false
+"#;
+        let from_camel: super::TomlHipConfig = toml::from_str(camel).unwrap();
+        assert_eq!(
+            from_camel
+                .plan
+                .as_ref()
+                .and_then(|p| p.soft_approve_on_composer),
+            Some(false)
+        );
+    }
+
+    #[test]
     fn langsmith_survives_json_toml_roundtrip() {
         // set_hip_config rewrites hip.toml from typed HipConfig; langsmith must not be stripped.
         let cfg = super::HipConfig {
@@ -1623,6 +1704,7 @@ fsReadMaxBytes = 2000000
             }),
             terminal: None,
             acp: None,
+            plan: None,
         };
 
         let json = serde_json::to_string(&cfg).unwrap();

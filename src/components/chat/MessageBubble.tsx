@@ -1,4 +1,4 @@
-import { useMemo } from 'react'
+import { memo, useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
 import type { Message } from '@hip/protocol'
 import { formatClockTime, formatAbsolute } from '@/lib/datetime'
@@ -18,6 +18,9 @@ import { groupByAgent } from '@/lib/turnAgents'
 import { normalizeMessageContent } from '@/lib/normalizeMessageContent'
 import { activityElapsedMs, formatElapsed } from '@/lib/activitySummary'
 import { MarkdownBody } from './MarkdownBody'
+import * as chatFeature from './feature'
+import { hasRenderableSupervisorText } from '@/lib/timelineFilter'
+import { cn } from '@/lib/utils'
 
 function formatBytes(bytes?: number): string {
   if (bytes === undefined || bytes === null) return ''
@@ -27,6 +30,19 @@ function formatBytes(bytes?: number): string {
   return `${(bytes / 1024 ** i).toFixed(i === 0 ? 0 : 1)} ${units[i]}`
 }
 
+/** Muted system notice row (background task notifications). Pure — no hooks. */
+function NoticeRowImpl({ content }: { content: string }) {
+  return (
+    <div className="my-1 w-fit px-0 py-0.5 text-meta text-ink-tertiary" data-testid="chat-notice">
+      {content}
+    </div>
+  )
+}
+
+/** Memoized notice row — only re-renders when `content` changes. */
+export const NoticeRow = memo(NoticeRowImpl)
+NoticeRow.displayName = 'NoticeRow'
+
 interface MessageBubbleProps {
   message: Message
   streaming?: boolean
@@ -35,32 +51,85 @@ interface MessageBubbleProps {
   hidePlan?: boolean
 }
 
-export function MessageBubble({ message, streaming, isLastAssistant, hidePlan }: MessageBubbleProps) {
+/**
+ * Render-relevant equality for a Message. Prefers reference equality (store keeps
+ * unchanged message objects stable); falls back to field identity for nested arrays
+ * that the store also replaces only when they change.
+ */
+export function messageRenderEqual(a: Message, b: Message): boolean {
+  if (a === b) return true
+  return (
+    a.id === b.id &&
+    a.role === b.role &&
+    a.content === b.content &&
+    a.timestamp === b.timestamp &&
+    a.stopped === b.stopped &&
+    a.agentId === b.agentId &&
+    a.timeline === b.timeline &&
+    a.toolCalls === b.toolCalls &&
+    a.agentRuns === b.agentRuns &&
+    a.attachments === b.attachments &&
+    a.memoryCitations === b.memoryCitations &&
+    a.usage === b.usage
+  )
+}
+
+/** Custom memo compare: id + content + timeline + toolCalls + status-relevant flags. */
+export function areMessageBubblePropsEqual(
+  prev: MessageBubbleProps,
+  next: MessageBubbleProps,
+): boolean {
+  return (
+    prev.streaming === next.streaming &&
+    prev.isLastAssistant === next.isLastAssistant &&
+    prev.hidePlan === next.hidePlan &&
+    messageRenderEqual(prev.message, next.message)
+  )
+}
+
+/** Chat message bubble for user|assistant. Prefer routing `role:'notice'` via {@link NoticeRow}. */
+function MessageBubbleImpl({ message, streaming, isLastAssistant, hidePlan }: MessageBubbleProps) {
   const { t, i18n } = useTranslation()
   const locale = i18n.resolvedLanguage ?? i18n.language ?? 'en'
   const sessionId = useActiveSessionId()
   const isUser = message.role === 'user'
+  const isNotice = message.role === 'notice'
 
-  // Only assistant turns have a timeline / sub-agent runs; skip the work for user bubbles.
+  // Only assistant turns have a timeline / sub-agent runs; skip the work for user/notice bubbles.
   // Nested subagents still get SubAgentCard summaries; TurnTimeline receives the full timeline
   // so per-agent tool order is preserved (not stripped before ActivityBar).
-  const nested = isUser ? [] : splitAgents(groupByAgent(message, !!streaming)).nested
+  const nested = isUser || isNotice ? [] : splitAgents(groupByAgent(message, !!streaming)).nested
 
   const displayContent = useMemo(
-    () => (isUser ? message.content : normalizeMessageContent(message.content)),
-    [isUser, message.content],
+    () => (isUser || isNotice ? message.content : normalizeMessageContent(message.content)),
+    [isUser, isNotice, message.content],
   )
 
   const hasProcess =
     !isUser &&
+    !isNotice &&
     ((message.timeline?.length ?? 0) > 0 ||
       (message.toolCalls?.length ?? 0) > 0 ||
       (message.agentRuns?.length ?? 0) > 0)
 
+  // PR-5 / KD-2 / O4–O5: enable TurnBlocks only when flag is on AND there is at least
+  // one non-empty supervisor text step (after sanitize+normalize). Avoids flattening
+  // multi-agent chrome for ACP/old turns, and blank answers when all text is whitespace.
+  // Flag off always uses legacy content body; text steps are skipped in TurnTimeline.
+  // Read via namespace so tests can mock a live getter (named import freezes the value).
+  const interleavedBlocks =
+    chatFeature.TRANSCRIPT_INTERLEAVED_BLOCKS &&
+    !isUser &&
+    hasRenderableSupervisorText(message.timeline)
+  const hideAnswerBody = interleavedBlocks
+
   const elapsedMs = useMemo(
-    () => (isUser ? null : activityElapsedMs(message.agentRuns)),
-    [isUser, message.agentRuns],
+    () => (isUser || isNotice ? null : activityElapsedMs(message.agentRuns)),
+    [isUser, isNotice, message.agentRuns],
   )
+
+  // After all hooks — Rules of Hooks safe if role ever flips on the same instance.
+  if (isNotice) return <NoticeRow content={message.content} />
 
   return (
     <DeclarativeContextMenu
@@ -86,7 +155,13 @@ export function MessageBubble({ message, streaming, isLastAssistant, hidePlan }:
       </div>
       <div className="min-w-0">
         {message.role === 'assistant' && (hasProcess || streaming) && (
-          <div className="mb-1 text-meta text-ink-tertiary" data-testid="message-process">
+          // O3: when interleaved, do not force text-meta/tertiary on the whole process
+          // region so supervisor text blocks keep primary answer weight (MarkdownBody ink).
+          <div
+            className={cn('mb-1', !interleavedBlocks && 'text-meta text-ink-tertiary')}
+            data-testid="message-process"
+            data-interleaved={interleavedBlocks ? 'true' : undefined}
+          >
             <ActivityBar
               steps={message.timeline}
               toolCalls={message.toolCalls}
@@ -95,6 +170,7 @@ export function MessageBubble({ message, streaming, isLastAssistant, hidePlan }:
               stopped={!!message.stopped}
               hasAssistantContent={!!displayContent.trim()}
               hidePlan={hidePlan}
+              interleaved={interleavedBlocks}
             />
             {nested.map((a) => (
               <SubAgentCard
@@ -105,9 +181,11 @@ export function MessageBubble({ message, streaming, isLastAssistant, hidePlan }:
             ))}
           </div>
         )}
-        <div data-testid="message-answer">
-          <MarkdownBody content={displayContent} />
-        </div>
+        {!hideAnswerBody && (
+          <div data-testid="message-answer">
+            <MarkdownBody content={displayContent} />
+          </div>
+        )}
         {isUser && message.attachments && message.attachments.length > 0 && (
           <div className="mt-2 flex flex-wrap gap-2">
             {message.attachments.map((a) => (
@@ -181,3 +259,9 @@ export function MessageBubble({ message, streaming, isLastAssistant, hidePlan }:
     </DeclarativeContextMenu>
   )
 }
+
+/** Memoized bubble — skips re-render when message + streaming/last/hidePlan flags are equal. */
+export const MessageBubble = memo(MessageBubbleImpl, areMessageBubblePropsEqual)
+MessageBubble.displayName = 'MessageBubble'
+
+export type { MessageBubbleProps }

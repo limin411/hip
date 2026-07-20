@@ -399,6 +399,32 @@ enabled = true
 // agentLoop section
 // ──────────────────────────────────────────────────────────────
 
+describe('plan config', () => {
+  it('parses [plan] softApproveOnComposer', () => {
+    const dir = tmpDir()
+    const p = writeToml(dir, 'hip.toml', `version = 1
+
+[plan]
+softApproveOnComposer = true
+`)
+    process.env.HIP_CONFIG_PATH = p
+    const cfg = readHipConfig()
+    expect(cfg.plan).toEqual({ softApproveOnComposer: true })
+  })
+
+  it('normalizes snake_case soft_approve_on_composer', () => {
+    const dir = tmpDir()
+    const p = writeToml(dir, 'hip.toml', `version = 1
+
+[plan]
+soft_approve_on_composer = true
+`)
+    process.env.HIP_CONFIG_PATH = p
+    const cfg = readHipConfig()
+    expect(cfg.plan).toEqual({ softApproveOnComposer: true })
+  })
+})
+
 describe('agentLoop config', () => {
   it('parses camelCase [agentLoop] with step budgets and hitl placeholder', () => {
     const dir = tmpDir()

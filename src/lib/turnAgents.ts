@@ -68,7 +68,11 @@ export function groupByAgent(message: Message | null, live: boolean): TurnAgent[
   for (const step of [...steps].sort((a, b) => a.stepSeq - b.stepSeq)) {
     const b = ensure(step.agentId, step.role)
     if (step.kind === 'reasoning') b.reasoning.push(step.content)
-    else { const tc = toolByCallId.get(step.callId); if (tc) b.tools.push(tc) }
+    else if (step.kind === 'tool') {
+      const tc = toolByCallId.get(step.callId)
+      if (tc) b.tools.push(tc)
+    }
+    // kind:'text' — ignore for agent tool/reasoning buckets (narration is Message.content / run.output)
   }
   for (const r of runs) ensure(r.agentId, r.role) // output-only agents
   return order.map((agentId) => {

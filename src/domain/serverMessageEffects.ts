@@ -336,6 +336,17 @@ export function applyServerMessageEffects(msg: ServerMessage, deps: ServerMessag
       return
     }
 
+    case 'plan:respond:result':
+      // KD-16: toast on failure so optimistic dismiss + silent skip is never invisible.
+      if (!msg.ok) {
+        toast.error(i18n.t('chat.plan.respondFailedTitle'), {
+          description: i18n.t('chat.plan.respondFailedBody', {
+            reason: msg.reason ?? 'unknown',
+          }),
+        })
+      }
+      return
+
     case 'compact:result': {
       const content = formatCompactResultMessage(msg)
       if (msg.ok && msg.applied) {

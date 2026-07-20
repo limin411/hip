@@ -1,6 +1,6 @@
 import type { ServerMessage, SessionConfig, AgentRole, WorkflowDef, OrchestratorEvent } from '@hip/protocol'
 import type { TraceRun } from './tool-trace.js'
-import { ReasoningTracker, stringify } from './tool-trace.js'
+import { ReasoningTracker, TextBurstTracker, stringify } from './tool-trace.js'
 import { IdleWatchdog, idleTimeoutMessage } from './idle-watchdog.js'
 import type { ModelRunner } from './model-runner.js'
 import type { Summarizer } from './compaction.js'
@@ -89,16 +89,47 @@ export async function runWorkflowTurn(
   const nextSeq = () => stepSeq++
   const started = new Set<string>()
   const reasoning = new ReasoningTracker(nextSeq)
+  /** Only agentId === 'supervisor' claims text stepSeq (KD-17); node/aggregator tokens → run.output. */
+  const textTracker = new TextBurstTracker(nextSeq)
+
+  const closeText = (agentId: string) => {
+    if (agentId !== 'supervisor') return
+    const burst = textTracker.close(agentId)
+    if (burst) {
+      const r = trajectory.get(agentId)
+      if (r) {
+        if (!r.textBursts) r.textBursts = []
+        r.textBursts.push(burst)
+      }
+    }
+  }
 
   const ensureStarted = (agentId: string, role: AgentRole, parentAgentId?: string, taskInput?: string) => {
     if (started.has(agentId)) return
     started.add(agentId)
-    trajectory.set(agentId, { role, output: '', startedAt: Date.now(), finishedAt: null, seq: agentSeq++, toolCalls: new Map(), reasoningBursts: [], ...(parentAgentId ? { parentAgentId } : {}), ...(taskInput ? { taskInput } : {}) })
+    trajectory.set(agentId, {
+      role,
+      output: '',
+      startedAt: Date.now(),
+      finishedAt: null,
+      seq: agentSeq++,
+      toolCalls: new Map(),
+      reasoningBursts: [],
+      ...(agentId === 'supervisor' ? { textBursts: [] } : {}),
+      ...(parentAgentId ? { parentAgentId } : {}),
+      ...(taskInput ? { taskInput } : {}),
+    })
     send({ type: 'agent:started', sessionId: deps.id, turnId, agentId, role, ...(parentAgentId ? { parentAgentId } : {}), ...(taskInput ? { taskInput } : {}) })
   }
 
   const ensureFinished = (agentId: string, output: string) => {
     if (!started.has(agentId)) return
+    closeText(agentId)
+    const burst = reasoning.close(agentId)
+    if (burst) {
+      const r = trajectory.get(agentId)
+      if (r) r.reasoningBursts.push(burst)
+    }
     const r = trajectory.get(agentId)
     if (r) { r.output = output; r.finishedAt = Date.now() }
     started.delete(agentId)
@@ -107,6 +138,12 @@ export async function runWorkflowTurn(
 
   const finishRemaining = () => {
     for (const id of started) {
+      closeText(id)
+      const burst = reasoning.close(id)
+      if (burst) {
+        const r = trajectory.get(id)
+        if (r) r.reasoningBursts.push(burst)
+      }
       const r = trajectory.get(id); if (r) r.finishedAt = Date.now()
       send({ type: 'agent:finished', sessionId: deps.id, turnId, agentId: id })
     }
@@ -126,13 +163,20 @@ export async function runWorkflowTurn(
         if (!delta) return
         const r = trajectory.get(agentId)
         if (r) r.output += delta
-        send({ type: 'token:stream', sessionId: deps.id, turnId, agentId, delta })
+        if (agentId === 'supervisor') {
+          const stepSeq = textTracker.push(agentId, delta)
+          send({ type: 'token:stream', sessionId: deps.id, turnId, agentId, delta, stepSeq, role })
+        } else {
+          send({ type: 'token:stream', sessionId: deps.id, turnId, agentId, delta, role })
+        }
       },
       reasoning: (delta) => {
         if (!delta) return
+        if (agentId === 'supervisor') closeText(agentId)
         send({ type: 'reasoning:delta', sessionId: deps.id, turnId, agentId, role, stepSeq: reasoning.push(agentId, delta), delta })
       },
       toolStarted: (name, callId, input) => {
+        if (agentId === 'supervisor') closeText(agentId)
         closeReasoning()
         const seq = nextSeq()
         const r = trajectory.get(agentId)

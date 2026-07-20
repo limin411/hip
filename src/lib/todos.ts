@@ -50,6 +50,12 @@ export function latestTodos(toolCalls?: ToolCall[]): LivePlan | null {
 
 export type PlanPhase = 'planning' | 'awaiting_approval' | 'executing' | 'done'
 export type LivePlanSource = 'activeTurnPlan' | 'write_todos' | 'empty'
+/**
+ * Pure UI phase for chip/panel gating (D4a). Includes `off` when nothing to show.
+ * `'pending'` is reserved for design parity and is unused in v1 — forcePlan+idle maps to `off`
+ * (chip alone; no sticky empty bar).
+ */
+export type PlanUiPhase = 'off' | 'pending' | 'planning' | 'awaiting_approval' | 'executing' | 'done'
 
 export interface LivePlanView {
   items: PlanItem[]
@@ -85,6 +91,39 @@ export interface SelectLivePlanInput {
   activeTurnPlan?: PlanItem[] | null
 }
 
+export interface DerivePlanUiPhaseInput {
+  forcePlan: boolean
+  planApprovalPending: boolean
+  status: 'idle' | 'running' | 'error'
+  activeTurnPlan: PlanItem[] | null | undefined
+  interruptContextKind?: 'plan_approval' | string
+  lastMessageRole?: 'user' | 'assistant' | 'notice'
+}
+
+/**
+ * Pure plan UI phase (D4a gold table). Independent of message list / write_todos.
+ * Not yet wired into chip/panel production paths — `selectLivePlan` remains authoritative
+ * for sticky panel items/source/phase until a follow-up binds this helper for phase-only gates.
+ * `selectLivePlan` may still surface write_todos when activeTurnPlan is empty.
+ */
+export function derivePlanUiPhase(input: DerivePlanUiPhaseInput): PlanUiPhase {
+  const { forcePlan, planApprovalPending, status, activeTurnPlan } = input
+  if (planApprovalPending) return 'awaiting_approval'
+
+  const hasItems = Array.isArray(activeTurnPlan) && activeTurnPlan.length > 0
+
+  if (forcePlan && status === 'running') return 'planning'
+  // forcePlan + idle + no sticky items → off (chip alone; no empty planning bar)
+  if (forcePlan && !hasItems) return 'off'
+
+  if (hasItems) {
+    if (status === 'running') return 'executing'
+    return 'done'
+  }
+
+  return 'off'
+}
+
 /**
  * Session-level live plan for the sticky PlanProgressPanel.
  * Returns null when the panel should be hidden.
@@ -94,18 +133,22 @@ export function selectLivePlan(input: SelectLivePlanInput): LivePlanView | null 
   const { messages, status, forcePlan, planApprovalPending, activeTurnPlan } = input
   const planItems = activeTurnPlan?.length ? activeTurnPlan : null
 
-  if (planApprovalPending && planItems) {
-    return makeView(planItems, 'awaiting_approval', 'activeTurnPlan')
+  // Pending approval always shows the panel — even with an empty plan (RC-7 / D4b).
+  if (planApprovalPending) {
+    const items = activeTurnPlan ?? []
+    const source: LivePlanSource = items.length > 0 ? 'activeTurnPlan' : 'empty'
+    return makeView(items, 'awaiting_approval', source)
   }
 
-  const last = messages.length > 0 ? messages[messages.length - 1] : undefined
+  // Notices are transparent for turn-boundary checks (background isolation can trail a user send).
+  const last = lastNonNoticeMessage(messages)
   const lastAssistant = findLastAssistant(messages)
 
   // New turn started: do not stick previous assistant todos.
   if (last?.role === 'user' && status === 'running') {
     if (planItems) {
       // forcePlan still on → drafting/resume-plan; cleared after approve → execute.
-      const phase: PlanPhase = forcePlan && !planApprovalPending ? 'planning' : 'executing'
+      const phase: PlanPhase = forcePlan ? 'planning' : 'executing'
       return makeView(planItems, phase, 'activeTurnPlan')
     }
     if (forcePlan) {
@@ -128,13 +171,13 @@ export function selectLivePlan(input: SelectLivePlanInput): LivePlanView | null 
   if (toolItems) {
     // forcePlan + running + no approval yet → still drafting (not execute phase).
     const phase: PlanPhase =
-      status !== 'running' ? 'done' : forcePlan && !planApprovalPending ? 'planning' : 'executing'
+      status !== 'running' ? 'done' : forcePlan ? 'planning' : 'executing'
     return makeView(toolItems, phase, 'write_todos')
   }
 
   if (planItems) {
     const phase: PlanPhase =
-      status !== 'running' ? 'done' : forcePlan && !planApprovalPending ? 'planning' : 'executing'
+      status !== 'running' ? 'done' : forcePlan ? 'planning' : 'executing'
     return makeView(planItems, phase, 'activeTurnPlan')
   }
 
@@ -143,6 +186,14 @@ export function selectLivePlan(input: SelectLivePlanInput): LivePlanView | null 
   }
 
   return null
+}
+
+/** Last non-notice message (notices do not change turn-boundary phase selection). */
+function lastNonNoticeMessage(messages: Message[]): Message | undefined {
+  for (let i = messages.length - 1; i >= 0; i--) {
+    if (messages[i].role !== 'notice') return messages[i]
+  }
+  return undefined
 }
 
 function findLastAssistant(messages: Message[]): Message | undefined {

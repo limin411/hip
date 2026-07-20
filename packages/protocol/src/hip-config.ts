@@ -165,6 +165,18 @@ export interface AcpHostConfig {
   fsReadMaxBytes?: number
 }
 
+/**
+ * Optional `[plan]` section in hip.toml (PR-6 / KD-8).
+ * Soft-approve on composer is **off** by default — pending submit amends the plan.
+ */
+export interface PlanConfig {
+  /**
+   * When true, composer submit during plan approval soft-approves via message:resume
+   * (legacy path with optional guidance text). Default false → plan:respond amend.
+   */
+  softApproveOnComposer?: boolean
+}
+
 export interface HipConfig {
   version: number
   providers?: ProviderEntry[]
@@ -187,6 +199,8 @@ export interface HipConfig {
   trash?: TrashConfig
   /** Optional ACP host policy (FS bridge, MCP forward). */
   acp?: AcpHostConfig
+  /** Optional plan-mode product knobs (composer soft-approve, etc.). */
+  plan?: PlanConfig
 }
 
 /** User-configurable network policy persisted to ~/.hip/config/network.json.

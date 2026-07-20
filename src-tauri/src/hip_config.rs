@@ -169,6 +169,17 @@ pub(crate) struct AcpHostConfig {
     pub(crate) fs_read_max_bytes: Option<u64>,
 }
 
+/// Optional `[plan]` product knobs (PR-6 / KD-8). JSON uses camelCase for the UI.
+/// Must be preserved on set_hip_config rewrites so soft-approve flag is not stripped.
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct PlanConfig {
+    /// When true, composer submit during plan approval soft-approves via message:resume.
+    /// Default false (composer / service path amends via plan:respond).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub(crate) soft_approve_on_composer: Option<bool>,
+}
+
 #[derive(Serialize, Deserialize, Clone, Debug)]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct HipConfig {
@@ -199,6 +210,9 @@ pub(crate) struct HipConfig {
     /// Optional ACP host policy. Preserved on set_hip_config rewrites.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub(crate) acp: Option<AcpHostConfig>,
+    /// Optional plan-mode product knobs. Preserved on set_hip_config rewrites.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub(crate) plan: Option<PlanConfig>,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
@@ -388,6 +402,15 @@ pub(crate) struct TomlAcpHostConfig {
     pub(crate) fs_read_max_bytes: Option<u64>,
 }
 
+/// TOML mirror for `[plan]` (snake_case keys; camelCase aliases for hand-edited files).
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+#[allow(dead_code)]
+pub(crate) struct TomlPlanConfig {
+    #[serde(default, skip_serializing_if = "Option::is_none", alias = "softApproveOnComposer")]
+    pub(crate) soft_approve_on_composer: Option<bool>,
+}
+
 #[derive(Serialize, Deserialize, Clone, Debug)]
 #[serde(rename_all = "snake_case")]
 #[allow(dead_code)]
@@ -415,6 +438,8 @@ pub(crate) struct TomlHipConfig {
     pub(crate) terminal: Option<TomlTerminalConfig>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub(crate) acp: Option<TomlAcpHostConfig>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub(crate) plan: Option<TomlPlanConfig>,
 }
 
 // ── From impls: HipConfig ↔ TomlHipConfig (recursive field mapping) ──
@@ -693,6 +718,22 @@ impl From<TomlAcpHostConfig> for AcpHostConfig {
     }
 }
 
+impl From<PlanConfig> for TomlPlanConfig {
+    fn from(p: PlanConfig) -> Self {
+        TomlPlanConfig {
+            soft_approve_on_composer: p.soft_approve_on_composer,
+        }
+    }
+}
+
+impl From<TomlPlanConfig> for PlanConfig {
+    fn from(p: TomlPlanConfig) -> Self {
+        PlanConfig {
+            soft_approve_on_composer: p.soft_approve_on_composer,
+        }
+    }
+}
+
 impl From<HipConfig> for TomlHipConfig {
     fn from(cfg: HipConfig) -> Self {
         TomlHipConfig {
@@ -708,6 +749,7 @@ impl From<HipConfig> for TomlHipConfig {
             langsmith: cfg.langsmith.map(|x| x.into()),
             terminal: cfg.terminal.map(|x| x.into()),
             acp: cfg.acp.map(|x| x.into()),
+            plan: cfg.plan.map(|x| x.into()),
         }
     }
 }
@@ -727,6 +769,7 @@ impl From<TomlHipConfig> for HipConfig {
             langsmith: cfg.langsmith.map(|x| x.into()),
             terminal: cfg.terminal.map(|x| x.into()),
             acp: cfg.acp.map(|x| x.into()),
+            plan: cfg.plan.map(|x| x.into()),
         }
     }
 }

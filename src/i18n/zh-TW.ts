@@ -343,6 +343,7 @@ export const zhTW = {
     "interruptContinueMessage": "請繼續完成當前任務，不要再追問。",
     "errorTimeout": "響應超時，已停止。",
     "jumpToLatest": "回到最新",
+    "loadEarlier": "載入更早訊息",
     "plan": {
       "chipLabel": "規劃",
       "chipTitle": "強制規劃模式 — 先調研並獲批後再改程式碼",
@@ -350,7 +351,9 @@ export const zhTW = {
       "forceOnTitle": "已開啟規劃模式",
       "forceOnBody": "後續回合會先規劃。直接傳送任務，或使用 /plan 你的任務。",
       "forceOffTitle": "已關閉規劃模式",
-      "forceOffBody": "回合不再強制先規劃。"
+      "forceOffBody": "回合不再強制先規劃。",
+      "respondFailedTitle": "計劃響應失敗",
+      "respondFailedBody": "無法套用計劃響應（{{reason}}）。已恢復審批狀態。"
     },
     "permission": {
       "title": "需要授權",
@@ -431,7 +434,8 @@ export const zhTW = {
       "executing": "執行中",
       "done": "已完成",
       "progress": "{{done}}/{{total}}",
-      "emptyPlanning": "正在調研並起草計劃…"
+      "emptyPlanning": "正在調研並起草計劃…",
+      "emptyAwaiting": "未產生計劃步驟。你仍可批准、拒絕或修改。"
     },
     "planApproval": {
       "title": "計劃審批",

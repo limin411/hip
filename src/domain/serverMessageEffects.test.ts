@@ -93,6 +93,28 @@ describe('applyServerMessageEffects', () => {
     expect(toastError).not.toHaveBeenCalled()
   })
 
+  it('KD-16: plan:respond:result ok:false toasts respondFailed', () => {
+    const deps = makeDeps()
+    toastError.mockClear()
+    applyServerMessageEffects(
+      {
+        type: 'plan:respond:result',
+        sessionId: 's1',
+        ok: false,
+        action: 'approve',
+        reason: 'not_awaiting',
+      },
+      deps,
+    )
+    expect(toastError).toHaveBeenCalled()
+    toastError.mockClear()
+    applyServerMessageEffects(
+      { type: 'plan:respond:result', sessionId: 's1', ok: true, action: 'approve' },
+      deps,
+    )
+    expect(toastError).not.toHaveBeenCalled()
+  })
+
   it('compact:result applied appends counts and optional summary', () => {
     const deps = makeDeps()
     applyServerMessageEffects({

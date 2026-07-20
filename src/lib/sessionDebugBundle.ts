@@ -169,13 +169,31 @@ function sanitizeTimeline(steps: TimelineStep[] | undefined): unknown[] | undefi
         ...(clipped.exportClipped ? { exportClipped: true } : {}),
       }
     }
-    return {
-      kind: 'tool',
-      stepSeq: s.stepSeq,
-      agentId: s.agentId,
-      role: s.role,
-      callId: s.callId,
+    if (s.kind === 'text') {
+      const clipped = clipForExport(s.content ?? '', MAX_CONTENT)
+      return {
+        kind: 'text',
+        stepSeq: s.stepSeq,
+        agentId: s.agentId,
+        role: s.role,
+        content: clipped.text,
+        ...(clipped.exportClipped ? { exportClipped: true } : {}),
+        ...(s.truncated ? { truncated: true } : {}),
+      }
     }
+    // tool — exhaustive TimelineStep union (reasoning | text | tool)
+    if (s.kind === 'tool') {
+      return {
+        kind: 'tool',
+        stepSeq: s.stepSeq,
+        agentId: s.agentId,
+        role: s.role,
+        callId: s.callId,
+      }
+    }
+    // Exhaustiveness: if TimelineStep gains a kind, this assignment fails to compile.
+    const _exhaustive: never = s
+    return _exhaustive
   })
 }
 

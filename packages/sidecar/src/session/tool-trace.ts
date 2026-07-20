@@ -48,6 +48,13 @@ export interface ReasoningBurst {
   truncated?: boolean
 }
 
+/** One contiguous burst of supervisor assistant text (mirrors ReasoningBurst; no clip — content is authoritative). */
+export interface TextBurst {
+  stepSeq: number
+  content: string
+  truncated?: boolean
+}
+
 /**
  * Tracks one open reasoning burst per agent during a turn. A burst opens on the agent's
  * first delta (claiming the next turn-global stepSeq), accumulates subsequent deltas, and
@@ -73,6 +80,46 @@ export class ReasoningTracker {
     this.open.delete(agentId)
     const { text, truncated } = clipReasoning(b.content)
     return { stepSeq: b.stepSeq, content: text, ...(truncated ? { truncated: true } : {}) }
+  }
+}
+
+/**
+ * Tracks open supervisor text bursts during a turn (KD-17 Choice A).
+ * Callers must only push/close for the turn supervisor (`agentId === 'supervisor'` on the hub).
+ * Subagent tokens never enter this tracker. Mirrors {@link ReasoningTracker} for stepSeq ordering.
+ * Text is not clipped: closed bursts become authoritative Message.content via contentFromTimeline.
+ */
+export class TextBurstTracker {
+  private open = new Map<string, { stepSeq: number; content: string }>()
+  constructor(private readonly nextSeq: () => number) {}
+
+  /** Append a delta, opening a burst (drawing a stepSeq) if none is open. Returns the burst's stepSeq. */
+  push(agentId: string, delta: string): number {
+    let b = this.open.get(agentId)
+    if (!b) {
+      b = { stepSeq: this.nextSeq(), content: '' }
+      this.open.set(agentId, b)
+    }
+    b.content += delta
+    return b.stepSeq
+  }
+
+  /** Close the agent's open burst into a TextBurst, or undefined if none is open. */
+  close(agentId: string): TextBurst | undefined {
+    const b = this.open.get(agentId)
+    if (!b) return undefined
+    this.open.delete(agentId)
+    return { stepSeq: b.stepSeq, content: b.content }
+  }
+
+  /** Close every open burst (turn finalize). */
+  closeAll(): Array<{ agentId: string } & TextBurst> {
+    const out: Array<{ agentId: string } & TextBurst> = []
+    for (const agentId of [...this.open.keys()]) {
+      const burst = this.close(agentId)
+      if (burst) out.push({ agentId, ...burst })
+    }
+    return out
   }
 }
 
@@ -105,6 +152,18 @@ export interface TraceRun {
   seq: number
   toolCalls: Map<string, ToolCall>
   reasoningBursts: ReasoningBurst[]
+  /**
+   * Closed supervisor text bursts (KD-17). Hub writes these for agentId === 'supervisor';
+   * managed independent turns also write them with {@link surfaceText} so complete/reload
+   * keeps kind:'text' steps while AgentRun.role stays 'subagent'.
+   */
+  textBursts?: TextBurst[]
+  /**
+   * When true, textBursts are surface-supervisor narration for an independent managed turn
+   * (agentId is the managed agent, role stays 'subagent' for SubAgentCard). timeline steps
+   * are emitted with role:'supervisor' for contentFromTimeline.
+   */
+  surfaceText?: boolean
   taskInput?: string
   /**
    * Who delegated this run (observation parent). Used by trajectoryToRuns and
@@ -211,12 +270,32 @@ export function trajectoryToRuns(trajectory: Map<string, TraceRun>): AgentRun[] 
 
 /**
  * Flatten the live trajectory into a single turn-ordered timeline. Emit each run's reasoning
- * bursts (kind:'reasoning', carrying the burst's stepSeq) and tool calls (kind:'tool',
- * stepSeq = toolCall.seq), then sort by the shared turn-global stepSeq ascending.
+ * bursts (kind:'reasoning'), tool calls (kind:'tool', stepSeq = toolCall.seq), and
+ * supervisor-only text bursts (kind:'text', KD-17), then sort by the shared turn-global
+ * stepSeq ascending.
  */
 export function trajectoryToTimeline(trajectory: Map<string, TraceRun>): TimelineStep[] {
   const steps: TimelineStep[] = []
   for (const [agentId, r] of trajectory) {
+    // Text steps (KD-17): hub supervisor (agentId/role) OR managed surfaceText turns.
+    // Drop mistaken non-supervisor textBursts without surfaceText.
+    const emitText =
+      agentId === 'supervisor' || r.role === 'supervisor' || r.surfaceText === true
+    if (emitText) {
+      // Managed surface: AgentRun.role stays subagent; text steps use role supervisor for content join.
+      const textRole: AgentRole =
+        agentId === 'supervisor' || r.role === 'supervisor' ? r.role : 'supervisor'
+      for (const b of r.textBursts ?? []) {
+        steps.push({
+          kind: 'text',
+          stepSeq: b.stepSeq,
+          agentId,
+          role: textRole,
+          content: b.content,
+          ...(b.truncated ? { truncated: true } : {}),
+        })
+      }
+    }
     for (const b of r.reasoningBursts) {
       steps.push({ kind: 'reasoning', stepSeq: b.stepSeq, agentId, role: r.role, content: b.content, ...(b.truncated ? { truncated: true } : {}) })
     }
@@ -225,4 +304,17 @@ export function trajectoryToTimeline(trajectory: Map<string, TraceRun>): Timelin
     }
   }
   return steps.sort((a, b) => a.stepSeq - b.stepSeq)
+}
+
+/**
+ * Authoritative assistant body from timeline text steps (KD-17).
+ * Joins supervisor `kind:'text'` steps by stepSeq. Non-supervisor text is ignored as a belt-and-suspenders guard.
+ */
+export function contentFromTimeline(steps: TimelineStep[]): string {
+  return steps
+    .filter((s): s is Extract<TimelineStep, { kind: 'text' }> => s.kind === 'text')
+    .filter((s) => s.agentId === 'supervisor' || s.role === 'supervisor')
+    .sort((a, b) => a.stepSeq - b.stepSeq)
+    .map((s) => s.content)
+    .join('')
 }

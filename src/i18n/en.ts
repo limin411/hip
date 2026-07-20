@@ -311,6 +311,7 @@ export const en = {
       interruptContinueMessage: 'Please continue and finish the current task without asking more questions.',
       errorTimeout: 'Response timed out and was stopped.',
       jumpToLatest: 'Jump to latest',
+      loadEarlier: 'Load earlier',
       plan: {
         chipLabel: 'Plan',
         chipTitle: 'Force plan mode — investigate and get approval before coding',
@@ -319,6 +320,8 @@ export const en = {
         forceOnBody: 'Next turns will plan first. Send a task, or use /plan your task.',
         forceOffTitle: 'Plan mode off',
         forceOffBody: 'Turns no longer require a plan first.',
+        respondFailedTitle: 'Plan response failed',
+        respondFailedBody: 'Could not apply plan response ({{reason}}). Approval restored.',
       },
       permission: {
         title: 'Permission required',
@@ -402,6 +405,7 @@ export const en = {
         done: 'Done',
         progress: '{{done}}/{{total}}',
         emptyPlanning: 'Investigating and drafting a plan…',
+        emptyAwaiting: 'No plan steps were produced. You can still approve, reject, or amend.',
       },
       planApproval: {
         title: 'Plan approval',

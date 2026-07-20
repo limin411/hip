@@ -335,6 +335,7 @@ export const ko = {
     "interruptContinueMessage": "계속해서 현재 작업을 추가 질문 없이 완료해 주세요.",
     "errorTimeout": "응답 시간이 초과되어 중지되었습니다.",
     "jumpToLatest": "최신으로 이동",
+    "loadEarlier": "이전 메시지 불러오기",
     "plan": {
       "chipLabel": "계획",
       "chipTitle": "계획 모드 강제 — 코딩 전에 조사하고 승인 받기",
@@ -342,7 +343,9 @@ export const ko = {
       "forceOnTitle": "계획 모드 켜짐",
       "forceOnBody": "다음 턴은 먼저 계획을 세웁니다. 작업을 보내거나 /plan your task를 사용하세요.",
       "forceOffTitle": "계획 모드 꺼짐",
-      "forceOffBody": "더 이상 턴에 먼저 계획이 필요하지 않습니다."
+      "forceOffBody": "더 이상 턴에 먼저 계획이 필요하지 않습니다.",
+      "respondFailedTitle": "계획 응답 실패",
+      "respondFailedBody": "계획 응답을 적용할 수 없습니다({{reason}}). 승인 상태를 복원했습니다."
     },
     "permission": {
       "title": "권한 필요",
@@ -423,7 +426,8 @@ export const ko = {
       "executing": "실행 중",
       "done": "완료",
       "progress": "{{done}}/{{total}}",
-      "emptyPlanning": "조사 및 계획 초안 작성 중…"
+      "emptyPlanning": "조사 및 계획 초안 작성 중…",
+      "emptyAwaiting": "계획 단계가 없습니다. 승인·거부·수정은 가능합니다."
     },
     "planApproval": {
       "title": "계획 승인",

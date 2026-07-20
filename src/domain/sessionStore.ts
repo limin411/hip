@@ -35,6 +35,14 @@ export interface SessionVM {
   activeTurnPlan?: PlanItem[] | null  // live plan from plan:updated / plan:published; cleared on next user turn
   planDeltaDraft?: Record<string, string>  // incremental plan text keyed by itemId, accumulated from plan:delta
   planApprovalPending?: boolean  // true when agent:interrupt carries a plan_approval context
+  /**
+   * Snapshot for rolling back optimistic plan:respond UI when plan:respond:result ok:false (KD-16).
+   * Cleared on ok:true or after restore.
+   */
+  planRespondRollback?: {
+    interrupt: { turnId: string; question: string; context?: string } | null
+    status: 'idle' | 'running' | 'error'
+  } | null
   agentProfiles?: AgentProfileInfo[]  // list of available agent profiles from agent:profiles message
   codePanelOpen?: boolean
   chatPanelOpen?: boolean
@@ -46,19 +54,71 @@ function coerceRunningToolCalls(toolCalls: ToolCall[] | undefined): ToolCall[] |
   return toolCalls.map((tc) => (tc.status === 'running' ? { ...tc, status: 'error' as const, error: tc.error ?? 'interrupted' } : tc))
 }
 
-/** On cancel, finalize the in-flight (trailing) assistant message: drop it if it's a fully empty
- *  provisional (no content/timeline/tools), else if it is still in-flight (empty content OR has
- *  running tools) coerce tools to error and mark it stopped. Prior completed turns are left alone. */
+/** Index of the last `role === 'assistant'` message (from the tail); -1 if none.
+ *  Ignores trailing `notice` rows so cancel / streaming / regenerate target the real turn. */
+export function lastAssistantIndex(messages: Message[]): number {
+  for (let i = messages.length - 1; i >= 0; i--) {
+    if (messages[i].role === 'assistant') return i
+  }
+  return -1
+}
+
+/** Last message that is not a system notice (transparent for turn-boundary checks). */
+export function lastNonNotice(messages: Message[]): Message | undefined {
+  for (let i = messages.length - 1; i >= 0; i--) {
+    if (messages[i].role !== 'notice') return messages[i]
+  }
+  return undefined
+}
+
+/** True when `messages[index]` is the last assistant of the open turn: last assistant index
+ *  and no newer user after it (notices after the assistant are OK). Used for regenerate /
+ *  isLastAssistant and as the base for isStreamingAssistant. */
+export function isCurrentTurnAssistant(messages: Message[], index: number): boolean {
+  if (messages[index]?.role !== 'assistant') return false
+  if (index !== lastAssistantIndex(messages)) return false
+  for (let i = index + 1; i < messages.length; i++) {
+    if (messages[i].role === 'user') return false
+  }
+  return true
+}
+
+/** True when `messages[index]` is the in-flight streaming assistant for the current turn. */
+export function isStreamingAssistant(
+  messages: Message[],
+  index: number,
+  status: string,
+): boolean {
+  if (status !== 'running') return false
+  return isCurrentTurnAssistant(messages, index)
+}
+
+/** Drop trailing assistant + notice messages until a user (or empty). Used by regenerate. */
+export function popForRegenerate(messages: Message[]): Message[] {
+  const next = [...messages]
+  while (next.length > 0) {
+    const r = next[next.length - 1].role
+    if (r === 'assistant' || r === 'notice') next.pop()
+    else break
+  }
+  return next
+}
+
+/** On cancel, finalize the in-flight last assistant message (ignoring trailing notice): drop it if
+ *  it's a fully empty provisional (no content/timeline/tools), else if it is still in-flight
+ *  (empty content OR has running tools) coerce tools to error and mark it stopped.
+ *  Prior completed turns are left alone. */
 function finalizeCancelledMessage(messages: Message[]): Message[] {
-  let idx = -1
-  for (let k = messages.length - 1; k >= 0; k--) { if (messages[k].role === 'assistant') { idx = k; break } }
+  const idx = lastAssistantIndex(messages)
   if (idx === -1) return messages
   const m = messages[idx]
   const empty = m.content === '' && !(m.timeline?.length) && !(m.toolCalls?.length)
   if (empty) return messages.filter((_, k) => k !== idx)
   const inFlight = m.content === '' || !!m.toolCalls?.some((tc) => tc.status === 'running')
   if (!inFlight) return messages // prior completed turn — leave alone
-  return messages.map((x, k) => (k === idx ? { ...x, toolCalls: coerceRunningToolCalls(x.toolCalls), stopped: true } : x))
+  return mapMessages(messages, (x) =>
+    x.id === m.id ? { ...x, toolCalls: coerceRunningToolCalls(x.toolCalls), stopped: true } : x,
+  )
 }
 
 /** Build a freshly-started ToolCall from a tool:started message. */
@@ -71,11 +131,25 @@ function patchFinishedToolCall(tc: ToolCall, msg: { status: 'finished' | 'error'
   return { ...tc, status: msg.status, ...(msg.output !== undefined ? { output: msg.output } : {}), ...(msg.error !== undefined ? { error: msg.error } : {}), ...(tc.truncated || msg.truncated ? { truncated: true } : {}) }
 }
 
+/**
+ * Map over messages while preserving **array identity** when every element is
+ * referentially unchanged. Unchanged message objects are always kept as-is
+ * (`fn` should return the same ref when nothing mutates). This lets React.memo
+ * on MessageBubble skip re-renders for prior turns during stream/tool updates.
+ */
+export function mapMessages(messages: Message[], fn: (m: Message) => Message): Message[] {
+  let changed = false
+  const next = messages.map((m) => {
+    const m2 = fn(m)
+    if (m2 !== m) changed = true
+    return m2
+  })
+  return changed ? next : messages
+}
+
 /** Ensure the provisional assistant message keyed by turnId exists (idempotent).
- *  Invariant: this provisional message is always the trailing assistant message while the turn
- *  streams — agent:started (which appends it) precedes any token:stream/tool:* /finalize for the
- *  turn, and nothing else appends an assistant message mid-turn. So token/finalize handlers can
- *  safely target the tail. */
+ *  Invariant v2: stream/tool/reasoning/complete only mutate `message.id === turnId` (not the list tail).
+ *  agent:started creates the provisional; notice rows may trail the turn without breaking addressing. */
 function ensureAssistantMessage(messages: Message[], turnId: string, agentId: string, now: number): Message[] {
   if (messages.some((m) => m.id === turnId)) return messages
   return [...messages, { id: turnId, role: 'assistant', content: '', agentId, timestamp: now, timeline: [], toolCalls: [] }]
@@ -84,7 +158,7 @@ function ensureAssistantMessage(messages: Message[], turnId: string, agentId: st
 /** Upsert a reasoning step on the turn's message: same stepSeq concatenates the delta. No-op if the turn is unknown. */
 function upsertReasoning(messages: Message[], turnId: string, step: { stepSeq: number; agentId: string; role: AgentRole; delta: string }): Message[] {
   if (!messages.some((m) => m.id === turnId)) return messages
-  return messages.map((m) => {
+  return mapMessages(messages, (m) => {
     if (m.id !== turnId) return m
     const timeline = m.timeline ?? []
     const exists = timeline.some((t) => t.kind === 'reasoning' && t.stepSeq === step.stepSeq)
@@ -95,22 +169,42 @@ function upsertReasoning(messages: Message[], turnId: string, step: { stepSeq: n
   })
 }
 
-function appendAssistantDelta(messages: Message[], delta: string, agentId: string, now: number): Message[] {
-  // Relies on the ensureAssistantMessage invariant: the provisional turnId message is the trailing
-  // assistant message when tokens arrive, so appending to the tail extends the right turn.
-  const last = messages[messages.length - 1]
-  if (last && last.role === 'assistant') {
-    return [...messages.slice(0, -1), { ...last, content: last.content + delta }]
-  }
-  return [...messages, { id: `asst-${agentId}-${now}`, role: 'assistant', content: delta, agentId, timestamp: now }]
+/**
+ * Upsert a supervisor text step (KD-17): same stepSeq concatenates the delta.
+ * Non-supervisor agentId/role is a defensive no-op (subagent tokens must never become text steps).
+ */
+function upsertTimelineText(
+  messages: Message[],
+  turnId: string,
+  step: { stepSeq: number; agentId: string; role: AgentRole; delta: string },
+): Message[] {
+  const isSupervisor = step.agentId === 'supervisor' || step.role === 'supervisor'
+  if (!isSupervisor) return messages
+  if (!messages.some((m) => m.id === turnId)) return messages
+  return messages.map((m) => {
+    if (m.id !== turnId) return m
+    const timeline = m.timeline ?? []
+    const exists = timeline.some((t) => t.kind === 'text' && t.stepSeq === step.stepSeq)
+    const nextTimeline = exists
+      ? timeline.map((t) => (t.kind === 'text' && t.stepSeq === step.stepSeq ? { ...t, content: t.content + step.delta } : t))
+      : [...timeline, { kind: 'text' as const, stepSeq: step.stepSeq, agentId: step.agentId, role: step.role, content: step.delta } satisfies TimelineStep]
+    return { ...m, timeline: nextTimeline }
+  })
 }
 
-/** Upsert an AgentRun onto the turn's trailing assistant message (keyed by turnId). No-op if the turn is unknown.
+/** Append supervisor token delta to the message with `id === turnId`. No-op if the turn is unknown. */
+function appendAssistantDelta(messages: Message[], turnId: string, delta: string): Message[] {
+  if (!messages.some((m) => m.id === turnId)) return messages
+  return mapMessages(messages, (m) => (m.id === turnId ? { ...m, content: m.content + delta } : m))
+}
+
+
+/** Upsert an AgentRun onto the turn's assistant message (keyed by turnId). No-op if the turn is unknown.
  *  Assigns a provisional insertion-order seq on append; preserves the prior seq on replace.
  *  (message:complete later overwrites runs with the sidecar's authoritative seqs.) */
 function upsertRun(messages: Message[], turnId: string, run: AgentRun): Message[] {
   if (!messages.some((m) => m.id === turnId)) return messages
-  return messages.map((m) => {
+  return mapMessages(messages, (m) => {
     if (m.id !== turnId) return m
     const runs = m.agentRuns ?? []
     const i = runs.findIndex((r) => r.agentId === run.agentId)
@@ -122,7 +216,7 @@ function upsertRun(messages: Message[], turnId: string, run: AgentRun): Message[
 
 /** Append a delta to a subagent run's output on the turn's message (keyed by turnId). No-op if unknown. */
 function appendRunOutput(messages: Message[], turnId: string, agentId: string, delta: string): Message[] {
-  return messages.map((m) =>
+  return mapMessages(messages, (m) =>
     m.id !== turnId || !m.agentRuns
       ? m
       : { ...m, agentRuns: m.agentRuns.map((r) => (r.agentId === agentId ? { ...r, output: r.output + delta } : r)) },
@@ -131,12 +225,18 @@ function appendRunOutput(messages: Message[], turnId: string, agentId: string, d
 
 /** Set finishedAt on the run for the given turn + agent. */
 function setRunFinished(messages: Message[], turnId: string, agentId: string, now: number): Message[] {
-  return messages.map((m) => (m.id !== turnId || !m.agentRuns ? m : { ...m, agentRuns: m.agentRuns.map((r) => (r.agentId === agentId ? { ...r, finishedAt: now } : r)) }))
+  return mapMessages(messages, (m) =>
+    m.id !== turnId || !m.agentRuns
+      ? m
+      : { ...m, agentRuns: m.agentRuns.map((r) => (r.agentId === agentId ? { ...r, finishedAt: now } : r)) },
+  )
 }
 
+/** Replace the message with matching `message.id`, or append if not found (never relies on list tail). */
 function finalizeAssistant(messages: Message[], message: Message): Message[] {
-  const last = messages[messages.length - 1]
-  return last && last.role === 'assistant' ? [...messages.slice(0, -1), message] : [...messages, message]
+  const idx = messages.findIndex((m) => m.id === message.id)
+  if (idx >= 0) return mapMessages(messages, (m) => (m.id === message.id ? message : m))
+  return [...messages, message]
 }
 
 function summaryToVM(s: SessionSummary): SessionVM {
@@ -201,13 +301,27 @@ export function applyServerMessage(
 
     case 'token:stream':
       return update(msg.sessionId, (s) => {
-        // token:stream carries no role; resolve supervisor (→ body) vs subagent (→ run output)
-        // from the folded run on the trailing assistant message, falling back to the literal agentId.
-        const trailing = s.messages[s.messages.length - 1]
-        const run = trailing?.role === 'assistant' ? trailing.agentRuns?.find((r) => r.agentId === msg.agentId) : undefined
-        const isSupervisor = run ? run.role === 'supervisor' : msg.agentId === 'supervisor'
+// Always address by turnId (PR-2). KD-17: supervisor+stepSeq → text step + content;
+        // supervisor without stepSeq → content only; subagent → run.output only.
+        const turn = s.messages.find((m) => m.id === msg.turnId)
+        const run = turn?.role === 'assistant' ? turn.agentRuns?.find((r) => r.agentId === msg.agentId) : undefined
+        const isSupervisor =
+          (msg as { role?: string }).role === 'supervisor' ||
+          (run ? run.role === 'supervisor' : msg.agentId === 'supervisor')
+        const stepSeq = (msg as { stepSeq?: number }).stepSeq
+        if (stepSeq != null && isSupervisor) {
+          const role: AgentRole = ((msg as { role?: AgentRole }).role ?? run?.role ?? 'supervisor') as AgentRole
+          let messages = upsertTimelineText(s.messages, msg.turnId, {
+            stepSeq,
+            agentId: msg.agentId,
+            role,
+            delta: msg.delta,
+          })
+          messages = appendAssistantDelta(messages, msg.turnId, msg.delta)
+          return { ...s, messages }
+        }
         const messages = isSupervisor
-          ? appendAssistantDelta(s.messages, msg.delta, msg.agentId, now)
+          ? appendAssistantDelta(s.messages, msg.turnId, msg.delta)
           : appendRunOutput(s.messages, msg.turnId, msg.agentId, msg.delta)
         return { ...s, messages }
       })
@@ -227,7 +341,7 @@ export function applyServerMessage(
     case 'tool:started':
       return update(msg.sessionId, (s) => ({
         ...s,
-        messages: s.messages.map((m) =>
+        messages: mapMessages(s.messages, (m) =>
           m.id === msg.turnId
             ? {
                 ...m,
@@ -243,7 +357,7 @@ export function applyServerMessage(
     case 'tool:finished':
       return update(msg.sessionId, (s) => ({
         ...s,
-        messages: s.messages.map((m) =>
+        messages: mapMessages(s.messages, (m) =>
           m.toolCalls?.some((tc) => tc.callId === msg.callId)
             ? {
                 ...m,
@@ -256,7 +370,9 @@ export function applyServerMessage(
     case 'message:complete': {
       const finalized: Message = { ...msg.message, toolCalls: coerceRunningToolCalls(msg.message.toolCalls) }
       // Keep activeTurnPlan for sticky done panel until the next user turn (appendUserMessage clears it).
-      return update(msg.sessionId, (s) => ({ ...s, status: 'idle', planDeltaDraft: {}, planApprovalPending: false, messages: finalizeAssistant(s.messages, finalized) }))
+      // KD-7 / D4c: do NOT clear planApprovalPending — complete arrives before agent:interrupt
+      // on the plan-ready path; clearing would drop the approval UI in a race window.
+      return update(msg.sessionId, (s) => ({ ...s, status: 'idle', planDeltaDraft: {}, messages: finalizeAssistant(s.messages, finalized) }))
     }
 
     case 'agent:interrupt':
@@ -284,6 +400,23 @@ export function applyServerMessage(
     case 'plan:published':
       return update(msg.sessionId, (s) => ({ ...s, activeTurnPlan: msg.plan, planDeltaDraft: {} }))
 
+    case 'plan:respond:result':
+      // KD-16: ok:false restores approval chrome after optimistic dismiss; ok:true drops rollback stash.
+      return update(msg.sessionId, (s) => {
+        if (msg.ok) {
+          if (!s.planRespondRollback) return s
+          return { ...s, planRespondRollback: null }
+        }
+        const snap = s.planRespondRollback
+        return {
+          ...s,
+          planApprovalPending: true,
+          interrupt: snap?.interrupt ?? s.interrupt ?? null,
+          status: snap?.status ?? (s.status === 'running' ? 'idle' : s.status),
+          planRespondRollback: null,
+        }
+      })
+
     case 'agent:configOptions':
       return update(msg.sessionId, (s) => ({ ...s, configOptions: msg.options }))
 
@@ -307,12 +440,13 @@ export function applyServerMessage(
         // Clear sticky plan/interrupt chrome when any client resolves the pause.
         if (s.interrupt && msg.turnId && s.interrupt.turnId !== msg.turnId) {
           // Different turn — still clear planApprovalPending if set (foreign resolve).
-          if (!s.planApprovalPending) return s
+          if (!s.planApprovalPending && !s.planRespondRollback) return s
         }
         return {
           ...s,
           interrupt: null,
           planApprovalPending: false,
+          planRespondRollback: null,
         }
       })
 
@@ -414,7 +548,8 @@ export function applyServerMessage(
       return update(msg.sessionId, (s) => {
         // A completed conversation always ends with an assistant reply; a trailing user
         // message means the last turn never finished (drop/crash/timeout) → interrupted.
-        const last = msg.messages[msg.messages.length - 1]
+        // Skip notices if they ever appear in persisted transcripts (transparent for turn boundary).
+        const last = lastNonNotice(msg.messages)
         const interrupted = last?.role === 'user'
         return {
           ...s,
@@ -462,20 +597,22 @@ export function applyServerMessage(
       })
 
     case 'agent:notification':
+      // KD-13: always role 'notice' — never assistant — so trailing notifications cannot
+      // steal stream/finalize/regenerate targeting from the active turn.
+      // Id includes status+now: same taskId can emit start + terminal notices (no React key clash).
       return update(msg.sessionId, (s) => ({
         ...s,
         messages: [
           ...s.messages,
           {
-            id: `notif-${msg.taskId}`,
-            role: 'assistant',
+            id: `notif-${msg.taskId}-${msg.status}-${now}`,
+            role: 'notice' as const,
             content: msg.status === 'completed'
               ? `[Background task "${msg.description}" completed]`
               : msg.status === 'killed'
                 ? `[Background task "${msg.description}" killed: ${msg.error ?? 'stopped'}]`
                 : `[Background task "${msg.description}" failed: ${msg.error ?? 'unknown error'}]`,
             timestamp: now,
-            agentId: msg.taskId,
           },
         ],
       }))
@@ -632,6 +769,11 @@ export const useDomainStore = create<DomainStore>((set) => ({
           ...sess,
           status: nextStatus,
           error: action === 'reject' ? sess.error : null,
+          // Stash for plan:respond:result ok:false rollback (KD-16).
+          planRespondRollback: {
+            interrupt: sess.interrupt ?? null,
+            status: sess.status,
+          },
           interrupt: null,
           planApprovalPending: false,
           // Keep activeTurnPlan through execute / done; cleared on next user turn. Card gates on planApprovalPending.
@@ -644,10 +786,7 @@ export const useDomainStore = create<DomainStore>((set) => ({
     set((s) => ({
       sessions: s.sessions.map((sess) => {
         if (sess.id !== sessionId) return sess
-        const messages = [...sess.messages]
-        while (messages.length > 0 && messages[messages.length - 1].role === 'assistant') {
-          messages.pop()
-        }
+        const messages = popForRegenerate(sess.messages)
         return { ...sess, messages, status: 'running' as const, error: null, interrupt: null, pendingPermission: null, activeTurnPlan: null, planDeltaDraft: {}, planApprovalPending: false }
       }),
     })),

@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { ListChecks, Loader2 } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
@@ -22,6 +22,17 @@ export function PlanProgressPanel({ view, onApprove, onReject, onAmend }: PlanPr
 
   const awaiting = view.phase === 'awaiting_approval'
   const { done, total, current } = view.progress
+
+  // KD-16 / D4e: after plan:respond:result ok:false the store restores planApprovalPending
+  // while this panel stays mounted (activeTurnPlan kept). Re-entry to awaiting_approval
+  // must clear local responded so Approve/Reject/Amend are clickable again.
+  useEffect(() => {
+    if (view.phase === 'awaiting_approval') {
+      setResponded(false)
+      setAmendMode(false)
+      setAmendContent('')
+    }
+  }, [view.phase])
 
   const phaseLabel =
     view.phase === 'planning'
@@ -97,14 +108,18 @@ export function PlanProgressPanel({ view, onApprove, onReject, onAmend }: PlanPr
         </p>
       )}
 
-      {view.phase === 'planning' && view.items.length === 0 ? (
-        <p className="mt-2 text-meta text-ink-secondary" data-testid="plan-progress-empty">
-          {t('chat.planPanel.emptyPlanning')}
-        </p>
-      ) : view.items.length > 0 ? (
+      {view.items.length > 0 ? (
         <div className="mt-2">
           <TodoChecklist todos={view.items} showHeading={false} />
         </div>
+      ) : view.phase === 'planning' ? (
+        <p className="mt-2 text-meta text-ink-secondary" data-testid="plan-progress-empty">
+          {t('chat.planPanel.emptyPlanning')}
+        </p>
+      ) : view.phase === 'awaiting_approval' ? (
+        <p className="mt-2 text-meta text-ink-secondary" data-testid="plan-progress-empty-awaiting">
+          {t('chat.planPanel.emptyAwaiting')}
+        </p>
       ) : null}
 
       {awaiting && (

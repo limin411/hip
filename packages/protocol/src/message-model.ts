@@ -15,12 +15,12 @@ export type ContentPart =
 
 export interface Message {
   id: string
-  role: 'user' | 'assistant'
+  role: 'user' | 'assistant' | 'notice'
   content: string
   agentId?: string
   timestamp: number
   stopped?: boolean // assistant turn was cancelled mid-stream; partial content kept
-  timeline?: TimelineStep[]  // ordered reasoning+tool steps for this turn (assistant only)
+  timeline?: TimelineStep[]  // ordered reasoning+tool+text steps for this turn (assistant only)
   toolCalls?: ToolCall[]     // flat tool calls for this turn, referenced by timeline tool steps via callId
   agentRuns?: AgentRun[]     // per-agent run metadata for THIS turn (taskInput/output/timing/parent)
   usage?: TurnUsage          // turn total = sum of agentRuns' usage; present once usage was reported
@@ -126,13 +126,16 @@ export interface ReplayResult {
 
 /**
  * One step in an assistant turn's execution trace. `stepSeq` is a single
- * turn-global monotonic counter shared across reasoning and tool steps, so a
+ * turn-global monotonic counter shared across reasoning, tool, and text steps, so a
  * timeline interleaves them in true wall-clock order. A 'tool' step carries no
  * payload — it references a ToolCall (on Message.toolCalls) by callId.
+ * 'text' steps are supervisor narration only (KD-17 Choice A); subagent tokens
+ * stay on AgentRun.output and never become text steps.
  */
 export type TimelineStep =
   | { kind: 'reasoning'; stepSeq: number; agentId: string; role: AgentRole; content: string; truncated?: boolean }
   | { kind: 'tool'; stepSeq: number; agentId: string; role: AgentRole; callId: string }
+  | { kind: 'text'; stepSeq: number; agentId: string; role: AgentRole; content: string; truncated?: boolean }
 
 export interface SessionSummary {
   id: string

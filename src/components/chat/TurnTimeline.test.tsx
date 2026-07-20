@@ -170,4 +170,231 @@ describe('TurnTimeline', () => {
     expect(child.className).toContain('mt-1')
     expect(supervisor.className.split(/\s+/)).not.toContain('mt-1')
   })
+
+  it('legacy path skips text steps (no dual render with content body)', () => {
+    render(
+      <TurnTimeline
+        steps={[
+          {
+            kind: 'text',
+            stepSeq: 0,
+            agentId: 'supervisor',
+            role: 'supervisor',
+            content: 'Should not appear in timeline',
+          },
+          {
+            kind: 'tool',
+            stepSeq: 1,
+            agentId: 'supervisor',
+            role: 'supervisor',
+            callId: 'c1',
+          },
+          {
+            kind: 'text',
+            stepSeq: 2,
+            agentId: 'supervisor',
+            role: 'supervisor',
+            content: 'Also hidden',
+          },
+        ]}
+        toolCalls={[
+          {
+            callId: 'c1',
+            agentId: 'supervisor',
+            name: 'read_file',
+            input: '{"path":"a.ts"}',
+            status: 'finished',
+            seq: 1,
+          },
+        ]}
+      />,
+    )
+    expect(screen.queryByTestId('turn-text-block')).not.toBeInTheDocument()
+    expect(screen.queryByText('Should not appear in timeline')).not.toBeInTheDocument()
+    expect(screen.queryByText('Also hidden')).not.toBeInTheDocument()
+    expect(screen.getByTestId('tool-row')).toBeInTheDocument()
+  })
+
+  it('interleaved path renders text + tool + reasoning in global stepSeq order', () => {
+    render(
+      <TurnTimeline
+        interleaved
+        steps={[
+          {
+            kind: 'text',
+            stepSeq: 0,
+            agentId: 'supervisor',
+            role: 'supervisor',
+            content: 'First I will search',
+          },
+          {
+            kind: 'tool',
+            stepSeq: 1,
+            agentId: 'supervisor',
+            role: 'supervisor',
+            callId: 'c1',
+          },
+          {
+            kind: 'reasoning',
+            stepSeq: 2,
+            agentId: 'supervisor',
+            role: 'supervisor',
+            content: 'considering results',
+          },
+          {
+            kind: 'text',
+            stepSeq: 3,
+            agentId: 'supervisor',
+            role: 'supervisor',
+            content: 'Here is the answer',
+          },
+        ]}
+        toolCalls={[
+          {
+            callId: 'c1',
+            agentId: 'supervisor',
+            name: 'grep',
+            input: '{"pattern":"foo"}',
+            status: 'finished',
+            seq: 1,
+            output: 'hit',
+          },
+        ]}
+      />,
+    )
+    const timeline = screen.getByTestId('turn-timeline')
+    expect(timeline.getAttribute('data-interleaved')).toBe('true')
+    // No agent-section chrome (KD-9 global list)
+    expect(screen.queryByTestId('agent-timeline-section')).not.toBeInTheDocument()
+
+    const textBlocks = screen.getAllByTestId('turn-text-block')
+    expect(textBlocks).toHaveLength(2)
+    expect(textBlocks[0]).toHaveTextContent('First I will search')
+    expect(textBlocks[1]).toHaveTextContent('Here is the answer')
+    expect(textBlocks[0].getAttribute('data-step-seq')).toBe('0')
+    expect(textBlocks[1].getAttribute('data-step-seq')).toBe('3')
+
+    const tool = screen.getByTestId('turn-tool-block')
+    expect(tool.getAttribute('data-step-seq')).toBe('1')
+    const thinking = screen.getByTestId('thinking-disclosure')
+
+    // DOM order follows stepSeq: text0 → tool1 → reasoning2 → text3
+    const precedes = (a: Element, b: Element) =>
+      !!(a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING)
+    expect(precedes(textBlocks[0], tool)).toBe(true)
+    expect(precedes(tool, thinking)).toBe(true)
+    expect(precedes(thinking, textBlocks[1])).toBe(true)
+  })
+
+  it('interleaved path skips non-supervisor text steps (O1)', () => {
+    render(
+      <TurnTimeline
+        interleaved
+        steps={[
+          {
+            kind: 'text',
+            stepSeq: 0,
+            agentId: 'worker-1',
+            role: 'worker',
+            content: 'should not leak',
+          },
+          {
+            kind: 'text',
+            stepSeq: 1,
+            agentId: 'supervisor',
+            role: 'supervisor',
+            content: 'ok',
+          },
+        ]}
+      />,
+    )
+    const blocks = screen.getAllByTestId('turn-text-block')
+    expect(blocks).toHaveLength(1)
+    expect(blocks[0]).toHaveTextContent('ok')
+    expect(screen.queryByText('should not leak')).not.toBeInTheDocument()
+  })
+
+  it('interleaved path normalizes broken CJK text emission (O2)', () => {
+    render(
+      <TurnTimeline
+        interleaved
+        steps={[
+          {
+            kind: 'text',
+            stepSeq: 0,
+            agentId: 'supervisor',
+            role: 'supervisor',
+            content: '让\n我\n先',
+          },
+        ]}
+      />,
+    )
+    expect(screen.getByTestId('turn-text-block')).toHaveTextContent('让我先')
+  })
+
+  it('interleaved path does not supervisor-first re-sort multi-agent tools', () => {
+    render(
+      <TurnTimeline
+        interleaved
+        steps={[
+          {
+            kind: 'tool',
+            stepSeq: 1,
+            agentId: 'subagent-1',
+            role: 'subagent',
+            callId: 'c-sub',
+          },
+          {
+            kind: 'tool',
+            stepSeq: 2,
+            agentId: 'supervisor',
+            role: 'supervisor',
+            callId: 'c-sup',
+          },
+        ]}
+        toolCalls={[
+          {
+            callId: 'c-sub',
+            agentId: 'subagent-1',
+            name: 'grep',
+            input: '{"pattern":"A"}',
+            status: 'finished',
+            seq: 1,
+          },
+          {
+            callId: 'c-sup',
+            agentId: 'supervisor',
+            name: 'read_file',
+            input: '{"path":"b.ts"}',
+            status: 'finished',
+            seq: 2,
+          },
+        ]}
+        agentRuns={[
+          {
+            agentId: 'supervisor',
+            role: 'supervisor',
+            output: '',
+            startedAt: 1000,
+            finishedAt: 5000,
+            seq: 0,
+          },
+          {
+            agentId: 'subagent-1',
+            role: 'subagent',
+            output: 'a',
+            startedAt: 1100,
+            finishedAt: 2000,
+            seq: 1,
+            taskInput: 'search A',
+            parentAgentId: 'supervisor',
+          },
+        ]}
+      />,
+    )
+    expect(screen.queryByTestId('agent-timeline-section')).not.toBeInTheDocument()
+    const tools = screen.getAllByTestId('turn-tool-block')
+    expect(tools[0].getAttribute('data-step-seq')).toBe('1')
+    expect(tools[1].getAttribute('data-step-seq')).toBe('2')
+  })
 })

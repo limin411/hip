@@ -1,5 +1,5 @@
 // src/domain/sessionService.test.ts
-import { describe, it, expect, beforeEach, vi } from 'vitest'
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import type { ClientMessage, ServerMessage } from '@hip/protocol'
 import { toast } from 'sonner'
 import { SessionService } from './sessionService'
@@ -517,6 +517,44 @@ describe('SessionService', () => {
     expect(useDomainStore.getState().sessions[0].interrupt ?? null).toBeNull()
   })
 
+  it('KD-8: planApprovalPending send defaults to plan:respond amend (not resume)', () => {
+    const t = new FakeTransport()
+    const svc = new SessionService(t)
+    svc.seedPlanApproval('s1')
+    useDomainStore.setState({ activeSessionId: 's1' })
+    useHipConfigStore.setState({ config: { version: 1 }, loaded: true, error: null })
+    svc.sendMessage('please revise step 2')
+    expect(t.sent.at(-1)).toMatchObject({
+      type: 'plan:respond',
+      sessionId: 's1',
+      action: 'amend',
+      amendContent: 'please revise step 2',
+    })
+    expect(t.sent.some((m) => m.type === 'message:resume')).toBe(false)
+    const sess = useDomainStore.getState().sessions.find((s) => s.id === 's1')!
+    expect(sess.planApprovalPending).toBe(false)
+    expect(sess.status).toBe('running')
+  })
+
+  it('KD-8: plan.softApproveOnComposer true keeps soft-approve resume path', () => {
+    const t = new FakeTransport()
+    const svc = new SessionService(t)
+    svc.seedPlanApproval('s1')
+    useDomainStore.setState({ activeSessionId: 's1' })
+    useHipConfigStore.setState({
+      config: { version: 1, plan: { softApproveOnComposer: true } },
+      loaded: true,
+      error: null,
+    })
+    svc.sendMessage('go ahead with proxy 127.0.0.1:7890')
+    expect(t.sent.at(-1)).toMatchObject({
+      type: 'message:resume',
+      sessionId: 's1',
+      content: 'go ahead with proxy 127.0.0.1:7890',
+    })
+    expect(t.sent.some((m) => m.type === 'plan:respond')).toBe(false)
+  })
+
   it('resume forwards attachments and does not require text', () => {
     const t = new FakeTransport()
     const svc = new SessionService(t)
@@ -839,7 +877,27 @@ describe('workspace diff', () => {
     const sess = useDomainStore.getState().sessions.find((s) => s.id === 's1')!
     expect(sess.status).toBe('idle')
     expect(sess.activeTurnPlan).toEqual(planItems)
-    expect(sess.planApprovalPending).toBe(false)
+    // Seed path never sets pending; KD-7 (complete preserves prior true) is covered in sessionStore.test.ts.
+    expect(sess.planApprovalPending).toBeFalsy()
+  })
+
+  it('message:complete preserves prior planApprovalPending true (KD-7 harness)', () => {
+    const t = new FakeTransport()
+    const svc = new SessionService(t)
+    svc.seedPlanApproval('s1')
+    useDomainStore.setState({ activeSessionId: 's1' })
+    const before = useDomainStore.getState().sessions.find((s) => s.id === 's1')!
+    expect(before.planApprovalPending).toBe(true)
+    const plan = before.activeTurnPlan
+    useDomainStore.getState().apply({
+      type: 'message:complete',
+      sessionId: 's1',
+      message: { id: 'm-complete', role: 'assistant', content: 'ready', timestamp: Date.now(), stopped: true },
+    })
+    const after = useDomainStore.getState().sessions.find((s) => s.id === 's1')!
+    expect(after.planApprovalPending).toBe(true)
+    expect(after.activeTurnPlan).toEqual(plan)
+    expect(after.status).toBe('idle')
   })
 
 
@@ -879,15 +937,65 @@ describe('workspace diff', () => {
     expect(t.sent.at(-1)).toMatchObject({ type: 'plan:respond', action: 'reject' })
   })
 
+  it('KD-16: plan:respond:result ok:false restores planApprovalPending and interrupt', () => {
+    const t = new FakeTransport()
+    const svc = new SessionService(t)
+    const { turnId } = svc.seedPlanApproval('s1')
+    useDomainStore.setState({ activeSessionId: 's1' })
+    const before = useDomainStore.getState().sessions.find((s) => s.id === 's1')!
+    expect(before.planApprovalPending).toBe(true)
+    expect(before.interrupt?.turnId).toBe(turnId)
+
+    svc.respondPlan('approve')
+    const mid = useDomainStore.getState().sessions.find((s) => s.id === 's1')!
+    expect(mid.planApprovalPending).toBe(false)
+    expect(mid.interrupt).toBeNull()
+    expect(mid.planRespondRollback?.interrupt?.turnId).toBe(turnId)
+
+    t.push({
+      type: 'plan:respond:result',
+      sessionId: 's1',
+      ok: false,
+      action: 'approve',
+      reason: 'not_awaiting',
+    })
+    const after = useDomainStore.getState().sessions.find((s) => s.id === 's1')!
+    expect(after.planApprovalPending).toBe(true)
+    expect(after.interrupt?.turnId).toBe(turnId)
+    expect(after.interrupt?.question).toContain('Approve')
+    expect(after.status).toBe('idle')
+    expect(after.planRespondRollback).toBeNull()
+  })
+
+  it('KD-16: plan:respond:result ok:true clears rollback stash', () => {
+    const t = new FakeTransport()
+    const svc = new SessionService(t)
+    svc.seedPlanApproval('s1')
+    useDomainStore.setState({ activeSessionId: 's1' })
+    svc.respondPlan('approve')
+    expect(useDomainStore.getState().sessions.find((s) => s.id === 's1')!.planRespondRollback).toBeTruthy()
+    t.push({
+      type: 'plan:respond:result',
+      sessionId: 's1',
+      ok: true,
+      action: 'approve',
+    })
+    const sess = useDomainStore.getState().sessions.find((s) => s.id === 's1')!
+    expect(sess.planRespondRollback).toBeNull()
+    expect(sess.planApprovalPending).toBe(false)
+  })
+
   it('seedBackgroundTaskKilled appends synthetic killed notification', () => {
     const t = new FakeTransport()
     const svc = new SessionService(t)
     const { taskId, turnId } = svc.seedBackgroundTaskKilled('s1')
     const sess = useDomainStore.getState().sessions.find((s) => s.id === 's1')!
     const msg = sess.messages.find((m) => m.id === turnId)
+    expect(msg?.role).toBe('notice')
     expect(msg?.content).toContain('killed')
     expect(msg?.content).toContain('e2e background job')
-    expect(msg?.id).toBe(`notif-${taskId}`)
+    expect(msg?.id).toMatch(new RegExp(`^notif-${taskId}-killed-`))
+    expect(turnId).toBe(msg?.id)
   })
 
   it('simulateInvalidWorkflowError sets INVALID_WORKFLOW error', () => {
@@ -1504,6 +1612,235 @@ describe('branches + revert', () => {
         error: 'Worktree is dirty (uncommitted changes): /tmp/wt/a',
         errorCode: 'WORKTREE_DIRTY',
         dirtySummary: ' M file.ts\n?? new.ts',
+      })
+    })
+  })
+
+  describe('token:stream coalescing (PR-3)', () => {
+    let rafCbs: FrameRequestCallback[]
+
+    beforeEach(() => {
+      rafCbs = []
+      vi.stubGlobal('requestAnimationFrame', (cb: FrameRequestCallback) => {
+        rafCbs.push(cb)
+        return rafCbs.length
+      })
+      vi.stubGlobal('cancelAnimationFrame', (id: number) => {
+        rafCbs[id - 1] = () => {}
+      })
+    })
+
+    afterEach(() => {
+      vi.unstubAllGlobals()
+    })
+
+    function flushRaf() {
+      const cbs = rafCbs.splice(0, rafCbs.length)
+      for (const cb of cbs) cb(0)
+    }
+
+    function assistantContent(): string {
+      const msgs = useDomainStore.getState().sessions[0].messages
+      const a = msgs.find((m) => m.role === 'assistant')
+      return a?.content ?? ''
+    }
+
+    it('buffers supervisor token:stream until rAF', () => {
+      const t = new FakeTransport()
+      new SessionService(t)
+      t.push({ type: 'agent:started', sessionId: 's1', turnId: 't1', agentId: 'supervisor', role: 'supervisor' })
+      t.push({ type: 'token:stream', sessionId: 's1', turnId: 't1', agentId: 'supervisor', delta: 'Hel' })
+      t.push({ type: 'token:stream', sessionId: 's1', turnId: 't1', agentId: 'supervisor', delta: 'lo' })
+      expect(assistantContent()).toBe('')
+      flushRaf()
+      expect(assistantContent()).toBe('Hello')
+    })
+
+    it('flushTurn on tool:started applies pending tokens before the tool', () => {
+      const t = new FakeTransport()
+      new SessionService(t)
+      t.push({ type: 'agent:started', sessionId: 's1', turnId: 't1', agentId: 'supervisor', role: 'supervisor' })
+      t.push({ type: 'token:stream', sessionId: 's1', turnId: 't1', agentId: 'supervisor', delta: 'before tool' })
+      expect(assistantContent()).toBe('')
+      t.push({
+        type: 'tool:started',
+        sessionId: 's1',
+        turnId: 't1',
+        agentId: 'supervisor',
+        role: 'supervisor',
+        callId: 'c1',
+        name: 'read_file',
+        input: '{}',
+        seq: 1,
+      })
+      expect(assistantContent()).toBe('before tool')
+      const m = useDomainStore.getState().sessions[0].messages.find((x) => x.id === 't1')
+      expect(m?.toolCalls?.some((tc) => tc.callId === 'c1')).toBe(true)
+    })
+
+    it('reasoning:delta applies immediately without coalescing', () => {
+      const t = new FakeTransport()
+      new SessionService(t)
+      t.push({ type: 'agent:started', sessionId: 's1', turnId: 't1', agentId: 'supervisor', role: 'supervisor' })
+      t.push({
+        type: 'reasoning:delta',
+        sessionId: 's1',
+        turnId: 't1',
+        agentId: 'supervisor',
+        role: 'supervisor',
+        stepSeq: 0,
+        delta: 'think',
+      })
+      const m = useDomainStore.getState().sessions[0].messages.find((x) => x.id === 't1')
+      expect(m?.timeline).toEqual([
+        { kind: 'reasoning', stepSeq: 0, agentId: 'supervisor', role: 'supervisor', content: 'think' },
+      ])
+      // Pending token remains buffered separately (not mixed into reasoning).
+      t.push({ type: 'token:stream', sessionId: 's1', turnId: 't1', agentId: 'supervisor', delta: 'ans' })
+      expect(assistantContent()).toBe('')
+      expect(m?.timeline?.[0]).toMatchObject({ kind: 'reasoning', content: 'think' })
+      flushRaf()
+      expect(assistantContent()).toBe('ans')
+    })
+
+    it('subagent token:stream coalesces into run.output, not content', () => {
+      const t = new FakeTransport()
+      new SessionService(t)
+      t.push({ type: 'agent:started', sessionId: 's1', turnId: 't1', agentId: 'supervisor', role: 'supervisor' })
+      t.push({
+        type: 'agent:started',
+        sessionId: 's1',
+        turnId: 't1',
+        agentId: 'coder-1',
+        role: 'coder',
+        parentAgentId: 'supervisor',
+      })
+      t.push({ type: 'token:stream', sessionId: 's1', turnId: 't1', agentId: 'coder-1', delta: 'plan' })
+      t.push({ type: 'token:stream', sessionId: 's1', turnId: 't1', agentId: 'coder-1', delta: ' A' })
+      expect(assistantContent()).toBe('')
+      flushRaf()
+      expect(assistantContent()).toBe('')
+      const m = useDomainStore.getState().sessions[0].messages.find((x) => x.id === 't1')
+      const run = m?.agentRuns?.find((r) => r.agentId === 'coder-1')
+      expect(run?.output).toBe('plan A')
+    })
+
+    it('message:complete flushes pending tokens before finalize (apply order)', () => {
+      const t = new FakeTransport()
+      new SessionService(t)
+      const applyOrder: string[] = []
+      const store = useDomainStore.getState()
+      const realApply = store.apply.bind(store)
+      store.apply = ((msg: ServerMessage) => {
+        applyOrder.push(msg.type)
+        return realApply(msg)
+      }) as typeof store.apply
+
+      t.push({ type: 'agent:started', sessionId: 's1', turnId: 't1', agentId: 'supervisor', role: 'supervisor' })
+      t.push({ type: 'token:stream', sessionId: 's1', turnId: 't1', agentId: 'supervisor', delta: 'partial' })
+      t.push({
+        type: 'message:complete',
+        sessionId: 's1',
+        message: {
+          id: 't1',
+          role: 'assistant',
+          content: 'final from sidecar',
+          timestamp: 1,
+        },
+      })
+      // Barrier must flush token:stream before message:complete so streamed text is not lost
+      // when complete content is incomplete; order proves flushTurn ran.
+      const completeIdx = applyOrder.indexOf('message:complete')
+      const tokenIdx = applyOrder.indexOf('token:stream')
+      expect(tokenIdx).toBeGreaterThanOrEqual(0)
+      expect(completeIdx).toBeGreaterThan(tokenIdx)
+      const m = useDomainStore.getState().sessions[0].messages.find((x) => x.id === 't1')
+      expect(m?.content).toBe('final from sidecar')
+    })
+
+    it('CANCELLED flushes buffered tokens so content is not deleted as empty provisional', () => {
+      const t = new FakeTransport()
+      new SessionService(t)
+      t.push({ type: 'agent:started', sessionId: 's1', turnId: 't1', agentId: 'supervisor', role: 'supervisor' })
+      t.push({ type: 'token:stream', sessionId: 's1', turnId: 't1', agentId: 'supervisor', delta: 'partial reply' })
+      expect(assistantContent()).toBe('')
+      t.push({ type: 'error', sessionId: 's1', code: 'CANCELLED', message: 'cancelled' })
+      // Without flushSession, empty provisional would be deleted and later rAF would no-op.
+      expect(useDomainStore.getState().sessions[0].status).toBe('idle')
+      const m = useDomainStore.getState().sessions[0].messages.find((x) => x.id === 't1')
+      expect(m).toBeDefined()
+      expect(m?.content).toBe('partial reply')
+      // Stale rAF must not re-apply after cancel flush.
+      flushRaf()
+      expect(
+        useDomainStore.getState().sessions[0].messages.find((x) => x.id === 't1')?.content,
+      ).toBe('partial reply')
+    })
+
+    it('session:loaded discards pending buckets (no content duplication after reconnect)', () => {
+      const t = new FakeTransport()
+      new SessionService(t)
+      t.push({ type: 'agent:started', sessionId: 's1', turnId: 't1', agentId: 'supervisor', role: 'supervisor' })
+      // Simulate partial flush already in store + more still buffered.
+      t.push({ type: 'token:stream', sessionId: 's1', turnId: 't1', agentId: 'supervisor', delta: 'Hel' })
+      flushRaf()
+      expect(assistantContent()).toBe('Hel')
+      t.push({ type: 'token:stream', sessionId: 's1', turnId: 't1', agentId: 'supervisor', delta: 'lo' })
+      expect(assistantContent()).toBe('Hel') // still buffered
+      // Reconnect load replaces with authoritative full text.
+      t.push({
+        type: 'session:loaded',
+        sessionId: 's1',
+        messages: [
+          { id: 'u1', role: 'user', content: 'hi', timestamp: 0 },
+          { id: 't1', role: 'assistant', content: 'Hello', timestamp: 1 },
+        ],
+      })
+      expect(assistantContent()).toBe('Hello')
+      // Stale rAF must NOT append "lo" → "Hellolo".
+      flushRaf()
+      expect(assistantContent()).toBe('Hello')
+    })
+
+    it('token:stream with stepSeq uses text kind and preserves stepSeq on flush', () => {
+      const t = new FakeTransport()
+      new SessionService(t)
+      const flushed: ServerMessage[] = []
+      const store = useDomainStore.getState()
+      const realApply = store.apply.bind(store)
+      store.apply = ((msg: ServerMessage) => {
+        if (msg.type === 'token:stream') flushed.push(msg)
+        return realApply(msg)
+      }) as typeof store.apply
+
+      t.push({ type: 'agent:started', sessionId: 's1', turnId: 't1', agentId: 'supervisor', role: 'supervisor' })
+      t.push({
+        type: 'token:stream',
+        sessionId: 's1',
+        turnId: 't1',
+        agentId: 'supervisor',
+        delta: 'a',
+        stepSeq: 3,
+        role: 'supervisor',
+      } as ServerMessage)
+      t.push({
+        type: 'token:stream',
+        sessionId: 's1',
+        turnId: 't1',
+        agentId: 'supervisor',
+        delta: 'b',
+        stepSeq: 3,
+        role: 'supervisor',
+      } as ServerMessage)
+      expect(assistantContent()).toBe('')
+      flushRaf()
+      expect(assistantContent()).toBe('ab')
+      expect(flushed).toHaveLength(1)
+      expect(flushed[0]).toMatchObject({
+        type: 'token:stream',
+        delta: 'ab',
+        stepSeq: 3,
+        role: 'supervisor',
       })
     })
   })

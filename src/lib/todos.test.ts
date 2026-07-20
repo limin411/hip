@@ -1,6 +1,13 @@
 import { describe, it, expect } from 'vitest'
-import type { Message, ToolCall } from '@hip/protocol'
-import { latestTodos, parseTodos, planProgress, selectLivePlan, type Todo } from './todos'
+import type { Message, PlanItem, ToolCall } from '@hip/protocol'
+import {
+  derivePlanUiPhase,
+  latestTodos,
+  parseTodos,
+  planProgress,
+  selectLivePlan,
+  type Todo,
+} from './todos'
 
 function tc(over: Partial<ToolCall>): ToolCall {
   return { callId: 'c', agentId: 'supervisor', name: 'write_todos', input: '{}', status: 'finished', seq: 0, ...over }
@@ -118,6 +125,33 @@ describe('selectLivePlan', () => {
     expect(view?.source).toBe('activeTurnPlan')
   })
 
+  it('returns awaiting_approval with empty items when pending and no plan (D4b)', () => {
+    const view = selectLivePlan({
+      messages: [],
+      status: 'idle',
+      planApprovalPending: true,
+      activeTurnPlan: null,
+    })
+    expect(view).toEqual({
+      items: [],
+      phase: 'awaiting_approval',
+      source: 'empty',
+      progress: { done: 0, total: 0 },
+    })
+  })
+
+  it('returns awaiting_approval with empty array activeTurnPlan when pending', () => {
+    const view = selectLivePlan({
+      messages: [user(), assistant({ content: 'done' })],
+      status: 'idle',
+      planApprovalPending: true,
+      activeTurnPlan: [],
+    })
+    expect(view?.phase).toBe('awaiting_approval')
+    expect(view?.items).toEqual([])
+    expect(view?.source).toBe('empty')
+  })
+
   it('returns planning empty shell when forcePlan and running without todos', () => {
     const view = selectLivePlan({
       messages: [user()],
@@ -193,6 +227,46 @@ describe('selectLivePlan', () => {
     expect(view).toBeNull()
   })
 
+  it('ignores trailing notice when deciding new-turn plan phase (forcePlan)', () => {
+    // Background notice after user send must not re-surface previous write_todos.
+    const view = selectLivePlan({
+      messages: [
+        user({ id: 'u0' }),
+        assistant({
+          id: 'a0',
+          toolCalls: [tc({ input: todosInput, seq: 1 })],
+        }),
+        user({ id: 'u1', content: 'next' }),
+        { id: 'notif-1', role: 'notice', content: '[Background task "x" completed]', timestamp: 3 },
+      ],
+      status: 'running',
+      forcePlan: true,
+    })
+    expect(view).toEqual({
+      items: [],
+      phase: 'planning',
+      source: 'empty',
+      progress: { done: 0, total: 0 },
+    })
+  })
+
+  it('ignores trailing notice when new turn is running without forcePlan', () => {
+    const view = selectLivePlan({
+      messages: [
+        user({ id: 'u0' }),
+        assistant({
+          id: 'a0',
+          toolCalls: [tc({ input: todosInput, seq: 1 })],
+        }),
+        user({ id: 'u1', content: 'next' }),
+        { id: 'notif-1', role: 'notice', content: '[Background task "x" completed]', timestamp: 3 },
+      ],
+      status: 'running',
+      forcePlan: false,
+    })
+    expect(view).toBeNull()
+  })
+
   it('prefers activeTurnPlan during new-turn execute resume', () => {
     const view = selectLivePlan({
       messages: [user({ content: 'go' })],
@@ -212,4 +286,37 @@ describe('selectLivePlan', () => {
       }),
     ).toBeNull()
   })
+})
+
+describe('derivePlanUiPhase (D4a gold table)', () => {
+  const items: PlanItem[] = [{ content: 'a', status: 'pending' }]
+
+  it.each([
+    // forcePlan | pending | status | plan | → phase
+    { forcePlan: true, planApprovalPending: false, status: 'running' as const, activeTurnPlan: null, phase: 'planning' },
+    { forcePlan: true, planApprovalPending: false, status: 'running' as const, activeTurnPlan: [], phase: 'planning' },
+    { forcePlan: true, planApprovalPending: false, status: 'idle' as const, activeTurnPlan: null, phase: 'off' },
+    { forcePlan: true, planApprovalPending: false, status: 'idle' as const, activeTurnPlan: [], phase: 'off' },
+    { forcePlan: true, planApprovalPending: false, status: 'running' as const, activeTurnPlan: items, phase: 'planning' },
+    { forcePlan: false, planApprovalPending: true, status: 'idle' as const, activeTurnPlan: [], phase: 'awaiting_approval' },
+    { forcePlan: false, planApprovalPending: true, status: 'idle' as const, activeTurnPlan: items, phase: 'awaiting_approval' },
+    { forcePlan: false, planApprovalPending: false, status: 'running' as const, activeTurnPlan: items, phase: 'executing' },
+    { forcePlan: false, planApprovalPending: false, status: 'idle' as const, activeTurnPlan: items, phase: 'done' },
+    { forcePlan: false, planApprovalPending: false, status: 'idle' as const, activeTurnPlan: null, phase: 'off' },
+    { forcePlan: false, planApprovalPending: false, status: 'running' as const, activeTurnPlan: null, phase: 'off' },
+    { forcePlan: false, planApprovalPending: false, status: 'error' as const, activeTurnPlan: null, phase: 'off' },
+    // pending always wins even if forcePlan still true
+    { forcePlan: true, planApprovalPending: true, status: 'idle' as const, activeTurnPlan: null, phase: 'awaiting_approval' },
+    // pending while still running (complete/interrupt race window)
+    { forcePlan: false, planApprovalPending: true, status: 'running' as const, activeTurnPlan: items, phase: 'awaiting_approval' },
+    // forcePlan cleared + sticky items idle → done
+    { forcePlan: true, planApprovalPending: false, status: 'idle' as const, activeTurnPlan: items, phase: 'done' },
+  ])(
+    'forcePlan=$forcePlan pending=$planApprovalPending status=$status plan=$activeTurnPlan → $phase',
+    ({ forcePlan, planApprovalPending, status, activeTurnPlan, phase }) => {
+      expect(
+        derivePlanUiPhase({ forcePlan, planApprovalPending, status, activeTurnPlan }),
+      ).toBe(phase)
+    },
+  )
 })

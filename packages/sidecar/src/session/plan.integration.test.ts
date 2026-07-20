@@ -138,6 +138,12 @@ describe('plan lifecycle integration', () => {
     const approveEvents: ServerMessage[] = []
     await session.handlePlanResponse('approve', (m) => approveEvents.push(m))
 
+    // KD-16: every plan:respond path emits plan:respond:result
+    const respondResult = approveEvents.find((e) => e.type === 'plan:respond:result') as
+      | Extract<ServerMessage, { type: 'plan:respond:result' }>
+      | undefined
+    expect(respondResult).toMatchObject({ ok: true, action: 'approve', sessionId: 's-plan-lifecycle' })
+
     // Verify execution runner was invoked
     expect(runner.executed).toBe(true)
     expect(runner.callCount).toBeGreaterThanOrEqual(2)
@@ -224,6 +230,8 @@ describe('plan lifecycle integration', () => {
     const rejectEvents: ServerMessage[] = []
     await session.handlePlanResponse('reject', (m) => rejectEvents.push(m))
 
+    expect(rejectEvents.some((e) => e.type === 'plan:respond:result' && (e as { ok: boolean }).ok === true)).toBe(true)
+
     // Verify execution runner was NOT called (only 1 call = planner)
     expect(runner.callCount).toBe(1)
     expect(runner.executed).toBe(false)
@@ -236,5 +244,77 @@ describe('plan lifecycle integration', () => {
     // Verify no plan file was written
     const planFile = join(cwd, '.hip', 'plans', 's-plan-reject.json')
     expect(existsSync(planFile)).toBe(false)
+  })
+
+  it('KD-16: plan:respond when not awaiting emits result ok:false not_awaiting', async () => {
+    const runner = new PlanRunner()
+    const session = makeSession('s-plan-skip', runner)
+    const events: ServerMessage[] = []
+    await session.handlePlanResponse('approve', (m) => events.push(m))
+    const result = events.find((e) => e.type === 'plan:respond:result') as
+      | Extract<ServerMessage, { type: 'plan:respond:result' }>
+      | undefined
+    expect(result).toMatchObject({
+      type: 'plan:respond:result',
+      sessionId: 's-plan-skip',
+      ok: false,
+      action: 'approve',
+      reason: 'not_awaiting',
+    })
+    expect(runner.executed).toBe(false)
+  })
+
+  // ──────────────────────────────────────────────────────────────────────────────
+  // D4b: ExitPlanMode without write_todos still publishes empty plan for approval
+  // ──────────────────────────────────────────────────────────────────────────────
+
+  it('empty plan (ExitPlanMode only) still emits plan:published with plan: [] before interrupt', async () => {
+    class EmptyPlanRunner implements ModelRunner {
+      callCount = 0
+      async run(_messages: BaseMessage[], opts: ModelRunOptions): Promise<AIMessage> {
+        this.callCount += 1
+        if (this.callCount === 1) {
+          opts.onText('empty plan')
+          return new AIMessage({
+            content: 'empty plan',
+            tool_calls: [
+              {
+                name: 'EnterPlanMode',
+                args: {},
+                id: 'plan-enter',
+                type: 'tool_call' as const,
+              },
+              {
+                name: 'ExitPlanMode',
+                args: {},
+                id: 'plan-exit',
+                type: 'tool_call' as const,
+              },
+            ],
+          })
+        }
+        opts.onText('done')
+        return new AIMessage('done')
+      }
+    }
+
+    const runner = new EmptyPlanRunner()
+    const session = makeSession('s-plan-empty', runner)
+
+    const events: ServerMessage[] = []
+    await session.sendMessage('plan something', (m) => events.push(m))
+
+    const publishedIdx = events.findIndex((e) => e.type === 'plan:published')
+    const interruptIdx = events.findIndex((e) => e.type === 'agent:interrupt')
+    expect(publishedIdx).toBeGreaterThanOrEqual(0)
+    expect(interruptIdx).toBeGreaterThan(publishedIdx)
+
+    const published = events[publishedIdx] as Extract<ServerMessage, { type: 'plan:published' }>
+    expect(published.plan).toEqual([])
+
+    const interrupt = events[interruptIdx] as Extract<ServerMessage, { type: 'agent:interrupt' }>
+    const ctx = JSON.parse(interrupt.context ?? '{}') as { kind?: string; plan?: unknown }
+    expect(ctx.kind).toBe('plan_approval')
+    expect(ctx.plan).toEqual([])
   })
 })

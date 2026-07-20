@@ -1,7 +1,18 @@
 // src/domain/sessionStore.test.ts
 import { describe, it, expect, beforeEach } from 'vitest'
-import { applyServerMessage, clearPermission, emptySession, useDomainStore, type SessionVM } from './sessionStore'
-import type { SessionSummary } from '@hip/protocol'
+import {
+  applyServerMessage,
+  clearPermission,
+  emptySession,
+  isCurrentTurnAssistant,
+  isStreamingAssistant,
+  lastAssistantIndex,
+  mapMessages,
+  popForRegenerate,
+  useDomainStore,
+  type SessionVM,
+} from './sessionStore'
+import type { Message, SessionSummary } from '@hip/protocol'
 
 function baseSession(over: Partial<SessionVM> = {}): SessionVM {
   return {
@@ -38,13 +49,47 @@ describe('applyServerMessage', () => {
     expect(next.sessions[0].messages.at(-1)!.content).toBe('Hello')
   })
 
-  it('message:complete replaces the streaming assistant message', () => {
-    const s0 = { sessions: [baseSession({ messages: [{ id: 'u1', role: 'user', content: 'hi', timestamp: 0 }, { id: 'asst', role: 'assistant', content: 'partial', timestamp: 5 }] })] }
-    const final = { id: 'final', role: 'assistant' as const, content: 'full reply', timestamp: 9 }
+  it('message:complete replaces the streaming assistant message by id', () => {
+    const s0 = { sessions: [baseSession({ messages: [{ id: 'u1', role: 'user', content: 'hi', timestamp: 0 }, { id: 't1', role: 'assistant', content: 'partial', timestamp: 5 }] })] }
+    const final = { id: 't1', role: 'assistant' as const, content: 'full reply', timestamp: 9 }
     const next = applyServerMessage(s0, { type: 'message:complete', sessionId: 's1', message: final }, 9)
     expect(next.sessions[0].messages).toHaveLength(2)
     expect(next.sessions[0].messages[1]).toEqual(final)
     expect(next.sessions[0].status).toBe('idle')
+  })
+
+  it('message:complete appends when turn id is not found', () => {
+    const s0 = { sessions: [baseSession({ messages: [{ id: 'u1', role: 'user', content: 'hi', timestamp: 0 }] })] }
+    const final = { id: 't1', role: 'assistant' as const, content: 'full reply', timestamp: 9 }
+    const next = applyServerMessage(s0, { type: 'message:complete', sessionId: 's1', message: final }, 9)
+    expect(next.sessions[0].messages).toHaveLength(2)
+    expect(next.sessions[0].messages[1]).toEqual(final)
+  })
+
+  it('message:complete replaces by turnId even when a notice trails the assistant', () => {
+    const s0 = { sessions: [baseSession({ messages: [
+      { id: 'u1', role: 'user', content: 'hi', timestamp: 0 },
+      { id: 't1', role: 'assistant', content: 'partial', timestamp: 5 },
+      { id: 'notif-bg', role: 'notice', content: '[Background task "x" completed]', timestamp: 6 },
+    ] })] }
+    const final = { id: 't1', role: 'assistant' as const, content: 'full reply', timestamp: 9 }
+    const next = applyServerMessage(s0, { type: 'message:complete', sessionId: 's1', message: final }, 9)
+    expect(next.sessions[0].messages).toHaveLength(3)
+    expect(next.sessions[0].messages[1]).toEqual(final)
+    expect(next.sessions[0].messages[2].role).toBe('notice')
+    expect(next.sessions[0].status).toBe('idle')
+  })
+
+  it('token:stream updates the correct turn by turnId when a notice is trailing', () => {
+    const s0 = { sessions: [baseSession({ messages: [
+      { id: 'u1', role: 'user', content: 'hi', timestamp: 0 },
+      { id: 't1', role: 'assistant', content: 'Hel', timestamp: 5, agentRuns: [{ agentId: 'supervisor', role: 'supervisor', output: '', startedAt: 5, finishedAt: null, seq: 0, messageId: 't1' }] },
+      { id: 'notif-bg', role: 'notice', content: '[Background task "x" completed]', timestamp: 6 },
+    ] })] }
+    const next = applyServerMessage(s0, { type: 'token:stream', sessionId: 's1', agentId: 'supervisor', delta: 'lo', turnId: 't1' }, 7)
+    expect(next.sessions[0].messages[1].content).toBe('Hello')
+    expect(next.sessions[0].messages[2].role).toBe('notice')
+    expect(next.sessions[0].messages).toHaveLength(3)
   })
 
   it('message:complete carries the stopped flag through finalize', () => {
@@ -271,7 +316,7 @@ describe('applyServerMessage', () => {
   })
 
   it('error CANCELLED coerces the in-flight provisional message tools and marks it stopped', () => {
-    // No message:complete arrives on cancel; the CANCELLED branch must finalize the trailing message.
+    // No message:complete arrives on cancel; the CANCELLED branch must finalize the last assistant.
     const s0 = { sessions: [baseSession({ status: 'running', messages: [
       { id: 'u1', role: 'user', content: 'hi', timestamp: 0 },
       { id: 't1', role: 'assistant', content: 'partial', agentId: 'supervisor', timestamp: 5, timeline: [{ kind: 'tool', stepSeq: 0, agentId: 'coder', role: 'coder', callId: 'c1' }], toolCalls: [{ callId: 'c1', agentId: 'coder', name: 'write_file', input: '{}', status: 'running', seq: 0 }] },
@@ -280,6 +325,32 @@ describe('applyServerMessage', () => {
     const m = next.sessions[0].messages.at(-1)!
     expect(m.toolCalls![0]).toMatchObject({ status: 'error', error: 'interrupted' })
     expect(m.stopped).toBe(true)
+    expect(next.sessions[0].status).toBe('idle')
+  })
+
+  it('error CANCELLED finalizes last assistant when a notice is trailing', () => {
+    const s0 = { sessions: [baseSession({ status: 'running', messages: [
+      { id: 'u1', role: 'user', content: 'hi', timestamp: 0 },
+      { id: 't1', role: 'assistant', content: 'partial', agentId: 'supervisor', timestamp: 5, timeline: [{ kind: 'tool', stepSeq: 0, agentId: 'coder', role: 'coder', callId: 'c1' }], toolCalls: [{ callId: 'c1', agentId: 'coder', name: 'write_file', input: '{}', status: 'running', seq: 0 }] },
+      { id: 'notif-bg', role: 'notice', content: '[Background task "x" completed]', timestamp: 6 },
+    ] })] }
+    const next = applyServerMessage(s0, { type: 'error', sessionId: 's1', code: 'CANCELLED', message: 'User cancelled the request' }, 0)
+    expect(next.sessions[0].messages).toHaveLength(3)
+    expect(next.sessions[0].messages[1]).toMatchObject({ id: 't1', stopped: true })
+    expect(next.sessions[0].messages[1].toolCalls![0]).toMatchObject({ status: 'error', error: 'interrupted' })
+    expect(next.sessions[0].messages[2].role).toBe('notice')
+    expect(next.sessions[0].status).toBe('idle')
+  })
+
+  it('error CANCELLED drops empty provisional assistant but retains trailing notice', () => {
+    const s0 = { sessions: [baseSession({ status: 'running', messages: [
+      { id: 'u1', role: 'user', content: 'hi', timestamp: 0 },
+      { id: 't1', role: 'assistant', content: '', agentId: 'supervisor', timestamp: 5, timeline: [], toolCalls: [] },
+      { id: 'notif-bg', role: 'notice', content: '[Background task "x" completed]', timestamp: 6 },
+    ] })] }
+    const next = applyServerMessage(s0, { type: 'error', sessionId: 's1', code: 'CANCELLED', message: 'User cancelled the request' }, 0)
+    expect(next.sessions[0].messages.map((m) => m.id)).toEqual(['u1', 'notif-bg'])
+    expect(next.sessions[0].messages[1].role).toBe('notice')
     expect(next.sessions[0].status).toBe('idle')
   })
 
@@ -480,6 +551,65 @@ describe('applyServerMessage', () => {
     expect(m.agentRuns![0].output).toBe('a plan')
   })
 
+  it('subagent token:stream never creates text timeline steps (even if stepSeq is wrongly present)', () => {
+    const s0 = { sessions: [baseSession({ messages: [{ id: 't1', role: 'assistant', content: '', timestamp: 100, timeline: [], agentRuns: [
+      { agentId: 'supervisor', role: 'supervisor', output: '', startedAt: 100, finishedAt: null, seq: 0, messageId: 't1' },
+      { agentId: 'worker-1', role: 'worker', output: '', startedAt: 100, finishedAt: null, seq: 1, messageId: 't1' },
+    ] }] })] }
+    const next = applyServerMessage(s0, {
+      type: 'token:stream', sessionId: 's1', turnId: 't1', agentId: 'worker-1', delta: 'sub', stepSeq: 99, role: 'worker',
+    }, 120)
+    const m = next.sessions[0].messages.at(-1)!
+    expect(m.content).toBe('')
+    expect(m.timeline ?? []).toEqual([])
+    expect(m.agentRuns!.find((r) => r.agentId === 'worker-1')!.output).toBe('sub')
+  })
+
+  it('supervisor token:stream with stepSeq upserts text step and appends content', () => {
+    const s0 = { sessions: [baseSession({ messages: [{ id: 't1', role: 'assistant', content: '', timestamp: 100, timeline: [], agentRuns: [
+      { agentId: 'supervisor', role: 'supervisor', output: '', startedAt: 100, finishedAt: null, seq: 0, messageId: 't1' },
+    ] }] })] }
+    const a = applyServerMessage(s0, {
+      type: 'token:stream', sessionId: 's1', turnId: 't1', agentId: 'supervisor', delta: 'Hel', stepSeq: 0, role: 'supervisor',
+    }, 101)
+    const b = applyServerMessage(a, {
+      type: 'token:stream', sessionId: 's1', turnId: 't1', agentId: 'supervisor', delta: 'lo', stepSeq: 0, role: 'supervisor',
+    }, 102)
+    const m = b.sessions[0].messages.at(-1)!
+    expect(m.content).toBe('Hello')
+    expect(m.timeline).toEqual([
+      { kind: 'text', stepSeq: 0, agentId: 'supervisor', role: 'supervisor', content: 'Hello' },
+    ])
+  })
+
+  it('supervisor token:stream without stepSeq is ACP legacy (content only, no text step)', () => {
+    const s0 = { sessions: [baseSession({ messages: [{ id: 't1', role: 'assistant', content: '', timestamp: 100, timeline: [], agentRuns: [
+      { agentId: 'supervisor', role: 'supervisor', output: '', startedAt: 100, finishedAt: null, seq: 0, messageId: 't1' },
+    ] }] })] }
+    const next = applyServerMessage(s0, {
+      type: 'token:stream', sessionId: 's1', turnId: 't1', agentId: 'supervisor', delta: 'hi',
+    }, 101)
+    const m = next.sessions[0].messages.at(-1)!
+    expect(m.content).toBe('hi')
+    expect(m.timeline ?? []).toEqual([])
+  })
+
+  it('supervisor text then tool then text keeps distinct stepSeq bursts on the timeline', () => {
+    let s = { sessions: [baseSession({ messages: [{ id: 't1', role: 'assistant', content: '', timestamp: 100, timeline: [], toolCalls: [], agentRuns: [
+      { agentId: 'supervisor', role: 'supervisor', output: '', startedAt: 100, finishedAt: null, seq: 0, messageId: 't1' },
+    ] }] })] }
+    s = applyServerMessage(s, { type: 'token:stream', sessionId: 's1', turnId: 't1', agentId: 'supervisor', delta: 'A', stepSeq: 0, role: 'supervisor' }, 101)
+    s = applyServerMessage(s, { type: 'tool:started', sessionId: 's1', turnId: 't1', agentId: 'supervisor', role: 'supervisor', callId: 'c1', name: 'read_file', input: '{}', seq: 1 }, 102)
+    s = applyServerMessage(s, { type: 'token:stream', sessionId: 's1', turnId: 't1', agentId: 'supervisor', delta: 'B', stepSeq: 2, role: 'supervisor' }, 103)
+    const m = s.sessions[0].messages.at(-1)!
+    expect(m.content).toBe('AB')
+    expect(m.timeline).toEqual([
+      { kind: 'text', stepSeq: 0, agentId: 'supervisor', role: 'supervisor', content: 'A' },
+      { kind: 'tool', stepSeq: 1, agentId: 'supervisor', role: 'supervisor', callId: 'c1' },
+      { kind: 'text', stepSeq: 2, agentId: 'supervisor', role: 'supervisor', content: 'B' },
+    ])
+  })
+
   it('agent:finished sets finishedAt on the run', () => {
     const s0 = { sessions: [baseSession({ messages: [{ id: 't1', role: 'assistant', content: '', timestamp: 100, agentRuns: [{ agentId: 'planner-1', role: 'planner', output: '', startedAt: 100, finishedAt: null, seq: 1, messageId: 't1' }] }] })] }
     const next = applyServerMessage(s0, { type: 'agent:finished', sessionId: 's1', agentId: 'planner-1', turnId: 't1' }, 2600)
@@ -608,6 +738,65 @@ describe('applyServerMessage', () => {
     expect(s.sessions[0].planApprovalPending).toBe(false)
   })
 
+  it('KD-16: plan:respond:result ok:false restores pending + interrupt from rollback stash', () => {
+    const interrupt = {
+      turnId: 't1',
+      question: 'Approve plan?',
+      context: JSON.stringify({ kind: 'plan_approval' }),
+    }
+    const s0 = {
+      sessions: [
+        baseSession({
+          id: 's',
+          planApprovalPending: false,
+          interrupt: null,
+          status: 'running',
+          planRespondRollback: { interrupt, status: 'idle' },
+        }),
+      ],
+    }
+    const next = applyServerMessage(
+      s0,
+      {
+        type: 'plan:respond:result',
+        sessionId: 's',
+        ok: false,
+        action: 'approve',
+        reason: 'not_awaiting',
+      },
+      0,
+    )
+    expect(next.sessions[0].planApprovalPending).toBe(true)
+    expect(next.sessions[0].interrupt).toEqual(interrupt)
+    expect(next.sessions[0].status).toBe('idle')
+    expect(next.sessions[0].planRespondRollback).toBeNull()
+  })
+
+  it('KD-16: plan:respond:result ok:true clears rollback only', () => {
+    const s0 = {
+      sessions: [
+        baseSession({
+          id: 's',
+          planApprovalPending: false,
+          interrupt: null,
+          status: 'running',
+          planRespondRollback: {
+            interrupt: { turnId: 't1', question: 'q' },
+            status: 'idle',
+          },
+        }),
+      ],
+    }
+    const next = applyServerMessage(
+      s0,
+      { type: 'plan:respond:result', sessionId: 's', ok: true, action: 'amend' },
+      0,
+    )
+    expect(next.sessions[0].planApprovalPending).toBe(false)
+    expect(next.sessions[0].planRespondRollback).toBeNull()
+    expect(next.sessions[0].status).toBe('running')
+  })
+
   it('stores agentFrame on pendingPermission for a nested sub-agent request', () => {
     const base = { sessions: [{ id: 's1', config: { llmProvider: 'd', model: 'm', tools: [] }, title: '', preview: '', updatedAtMs: 0, loaded: true, messages: [], status: 'idle', error: null }] } as any
     const next = applyServerMessage(base, {
@@ -618,26 +807,30 @@ describe('applyServerMessage', () => {
     expect(next.sessions[0].pendingPermission?.agentFrame?.name).toBe('OpenCode')
   })
 
-  it('agent:notification appends a synthetic assistant message for completed background tasks', () => {
+  it('agent:notification appends a notice message for completed background tasks', () => {
     const s0 = { sessions: [baseSession()] }
     const next = applyServerMessage(s0, { type: 'agent:notification', sessionId: 's1', taskId: 'bg-1', description: 'format code', status: 'completed' }, 1000)
     expect(next.sessions[0].messages).toHaveLength(1)
     expect(next.sessions[0].messages[0]).toMatchObject({
-      id: 'notif-bg-1',
-      role: 'assistant',
+      id: 'notif-bg-1-completed-1000',
+      role: 'notice',
       content: '[Background task "format code" completed]',
-      agentId: 'bg-1',
     })
+    expect(next.sessions[0].messages[0].agentId).toBeUndefined()
   })
 
-  it('agent:notification appends a synthetic assistant message for failed background tasks', () => {
+  it('agent:notification appends a notice message for failed background tasks', () => {
     const s0 = { sessions: [baseSession()] }
     const next = applyServerMessage(s0, { type: 'agent:notification', sessionId: 's1', taskId: 'bg-2', description: 'build', status: 'failed', error: 'exit 1' }, 1000)
     expect(next.sessions[0].messages).toHaveLength(1)
-    expect(next.sessions[0].messages[0].content).toBe('[Background task "build" failed: exit 1]')
+    expect(next.sessions[0].messages[0]).toMatchObject({
+      id: 'notif-bg-2-failed-1000',
+      role: 'notice',
+      content: '[Background task "build" failed: exit 1]',
+    })
   })
 
-  it('agent:notification appends a synthetic assistant message for killed background tasks', () => {
+  it('agent:notification appends a notice message for killed background tasks', () => {
     const s0 = { sessions: [baseSession()] }
     const next = applyServerMessage(s0, {
       type: 'agent:notification',
@@ -648,9 +841,21 @@ describe('applyServerMessage', () => {
       error: 'killed by user: cancel',
     }, 1000)
     expect(next.sessions[0].messages).toHaveLength(1)
-    expect(next.sessions[0].messages[0].content).toBe(
-      '[Background task "slow job" killed: killed by user: cancel]',
-    )
+    expect(next.sessions[0].messages[0]).toMatchObject({
+      id: 'notif-bg-3-killed-1000',
+      role: 'notice',
+      content: '[Background task "slow job" killed: killed by user: cancel]',
+    })
+  })
+
+  it('agent:notification uses unique ids when the same taskId emits multiple statuses', () => {
+    const s0 = { sessions: [baseSession()] }
+    let s = applyServerMessage(s0, { type: 'agent:notification', sessionId: 's1', taskId: 'bg-1', description: 'job', status: 'completed' }, 100)
+    // Second event for same taskId (e.g. isolation path + terminal) must not collide keys.
+    s = applyServerMessage(s, { type: 'agent:notification', sessionId: 's1', taskId: 'bg-1', description: 'job', status: 'failed', error: 'x' }, 200)
+    const ids = s.sessions[0].messages.map((m) => m.id)
+    expect(ids).toEqual(['notif-bg-1-completed-100', 'notif-bg-1-failed-200'])
+    expect(new Set(ids).size).toBe(2)
   })
 
   it('agent:notification for an unknown session is a no-op', () => {
@@ -698,6 +903,79 @@ describe('applyServerMessage', () => {
     const next = applyServerMessage(s, { type: 'message:complete', sessionId: 's1', message: { id: 'm1', role: 'assistant', content: 'done', timestamp: 101 } }, 102)
     expect(next.sessions[0].planDeltaDraft).toEqual({})
     expect(next.sessions[0].activeTurnPlan).toEqual(plan)
+  })
+
+  it('message:complete does not clear planApprovalPending (KD-7 / D4c)', () => {
+    const plan = [{ content: 'approve me', status: 'pending' as const }]
+    const s0 = {
+      sessions: [
+        baseSession({
+          status: 'running',
+          planApprovalPending: true,
+          activeTurnPlan: plan,
+          interrupt: { turnId: 't1', question: 'Approve?', context: '{"kind":"plan_approval"}' },
+        }),
+      ],
+    }
+    const next = applyServerMessage(
+      s0,
+      { type: 'message:complete', sessionId: 's1', message: { id: 'm1', role: 'assistant', content: 'plan ready', timestamp: 101, stopped: true } },
+      102,
+    )
+    expect(next.sessions[0].status).toBe('idle')
+    expect(next.sessions[0].planApprovalPending).toBe(true)
+    expect(next.sessions[0].interrupt?.turnId).toBe('t1')
+    expect(next.sessions[0].activeTurnPlan).toEqual(plan)
+  })
+
+  it('message:complete leaves planApprovalPending false when it was false', () => {
+    const s0 = { sessions: [baseSession({ status: 'running', planApprovalPending: false })] }
+    const next = applyServerMessage(
+      s0,
+      { type: 'message:complete', sessionId: 's1', message: { id: 'm1', role: 'assistant', content: 'done', timestamp: 101 } },
+      102,
+    )
+    expect(next.sessions[0].planApprovalPending).toBe(false)
+  })
+
+  it('agent:interrupt non-plan always clears planApprovalPending (D4c)', () => {
+    const s0 = {
+      sessions: [
+        baseSession({
+          planApprovalPending: true,
+          interrupt: { turnId: 't0', question: 'old', context: '{"kind":"plan_approval"}' },
+        }),
+      ],
+    }
+    const next = applyServerMessage(
+      s0,
+      {
+        type: 'agent:interrupt',
+        sessionId: 's1',
+        turnId: 't2',
+        agentId: 'supervisor',
+        question: 'Need clarification?',
+      },
+      0,
+    )
+    expect(next.sessions[0].planApprovalPending).toBe(false)
+    expect(next.sessions[0].interrupt?.turnId).toBe('t2')
+  })
+
+  it('agent:interrupt non-plan with non-plan context clears planApprovalPending', () => {
+    const s0 = { sessions: [baseSession({ planApprovalPending: true })] }
+    const next = applyServerMessage(
+      s0,
+      {
+        type: 'agent:interrupt',
+        sessionId: 's1',
+        turnId: 't3',
+        agentId: 'supervisor',
+        question: 'Pick one',
+        context: JSON.stringify({ kind: 'choice' }),
+      },
+      0,
+    )
     expect(next.sessions[0].planApprovalPending).toBe(false)
   })
 
@@ -849,6 +1127,75 @@ describe('applyServerMessage session:cwd', () => {
   })
 })
 
+describe('D2.1 notice helpers', () => {
+  const msgs = (rows: Array<Partial<Message> & Pick<Message, 'id' | 'role'>>): Message[] =>
+    rows.map((r) => ({ content: '', timestamp: 0, ...r }))
+
+  it('lastAssistantIndex skips trailing notice', () => {
+    const messages = msgs([
+      { id: 'u1', role: 'user' },
+      { id: 't1', role: 'assistant' },
+      { id: 'n1', role: 'notice' },
+    ])
+    expect(lastAssistantIndex(messages)).toBe(1)
+    expect(lastAssistantIndex(msgs([{ id: 'u1', role: 'user' }]))).toBe(-1)
+  })
+
+  it('isStreamingAssistant stays true for assistant when notice trails', () => {
+    const messages = msgs([
+      { id: 'u1', role: 'user' },
+      { id: 't1', role: 'assistant', content: 'partial' },
+      { id: 'n1', role: 'notice', content: 'done' },
+    ])
+    expect(isStreamingAssistant(messages, 1, 'running')).toBe(true)
+    expect(isStreamingAssistant(messages, 2, 'running')).toBe(false)
+    expect(isStreamingAssistant(messages, 1, 'idle')).toBe(false)
+    // length-1 check would wrongly mark streaming false for the assistant
+    expect(1 === messages.length - 1).toBe(false)
+  })
+
+  it('isStreamingAssistant / isCurrentTurnAssistant are false after a new user send', () => {
+    // appendUserMessage sets status running before agent:started creates the new provisional.
+    const messages = msgs([
+      { id: 'u1', role: 'user' },
+      { id: 'a1', role: 'assistant', content: 'done' },
+      { id: 'u2', role: 'user', content: 'again' },
+    ])
+    expect(lastAssistantIndex(messages)).toBe(1)
+    expect(isCurrentTurnAssistant(messages, 1)).toBe(false)
+    expect(isStreamingAssistant(messages, 1, 'running')).toBe(false)
+  })
+
+  it('isCurrentTurnAssistant stays true when only a notice trails the last assistant', () => {
+    const messages = msgs([
+      { id: 'u1', role: 'user' },
+      { id: 'a1', role: 'assistant', content: 'done' },
+      { id: 'n1', role: 'notice', content: 'bg' },
+    ])
+    expect(isCurrentTurnAssistant(messages, 1)).toBe(true)
+  })
+
+  it('isStreamingAssistant is false for previous assistant when notice trails a new user', () => {
+    const messages = msgs([
+      { id: 'u1', role: 'user' },
+      { id: 'a1', role: 'assistant', content: 'done' },
+      { id: 'u2', role: 'user', content: 'again' },
+      { id: 'n1', role: 'notice', content: 'bg' },
+    ])
+    expect(isCurrentTurnAssistant(messages, 1)).toBe(false)
+    expect(isStreamingAssistant(messages, 1, 'running')).toBe(false)
+  })
+
+  it('popForRegenerate drops trailing notice and assistant until user', () => {
+    const messages = msgs([
+      { id: 'u1', role: 'user' },
+      { id: 't1', role: 'assistant', content: 'ans' },
+      { id: 'n1', role: 'notice', content: 'bg done' },
+    ])
+    expect(popForRegenerate(messages).map((m) => m.id)).toEqual(['u1'])
+  })
+})
+
 describe('regenerateLastTurn', () => {
   it('drops all trailing assistant messages and resets to running', () => {
     useDomainStore.setState({
@@ -869,6 +1216,24 @@ describe('regenerateLastTurn', () => {
     expect(s.error).toBeNull()
     expect(s.interrupt).toBeNull()
     expect(s.pendingPermission).toBeNull()
+  })
+
+  it('drops trailing notice then assistant on regenerate', () => {
+    useDomainStore.setState({
+      sessions: [baseSession({
+        messages: [
+          { id: 'u1', role: 'user', content: 'hi', timestamp: 0 },
+          { id: 't1', role: 'assistant', content: 'ans', timestamp: 1 },
+          { id: 'notif-bg', role: 'notice', content: '[Background task "x" completed]', timestamp: 2 },
+        ],
+        status: 'idle',
+      })],
+      activeSessionId: 's1',
+    })
+    useDomainStore.getState().regenerateLastTurn('s1')
+    const s = useDomainStore.getState().sessions[0]
+    expect(s.messages.map((m) => m.id)).toEqual(['u1'])
+    expect(s.status).toBe('running')
   })
 
   it('keeps a trailing user message (retry-after-error path)', () => {
@@ -967,5 +1332,66 @@ describe('session-scoped panel state', () => {
     }, 0)
     expect(next.sessions[0].codePanelOpen).toBe(true)
     expect(next.sessions[0].chatPanelOpen).toBe(true)
+  })
+})
+
+describe('mapMessages + stable message refs (PR-7a)', () => {
+  it('mapMessages keeps array identity when no element changes', () => {
+    const msgs: Message[] = [
+      { id: 'u1', role: 'user', content: 'hi', timestamp: 0 },
+      { id: 'a1', role: 'assistant', content: 'yo', timestamp: 1 },
+    ]
+    const next = mapMessages(msgs, (m) => m)
+    expect(next).toBe(msgs)
+  })
+
+  it('mapMessages replaces only the mutated message object', () => {
+    const u1: Message = { id: 'u1', role: 'user', content: 'hi', timestamp: 0 }
+    const a1: Message = { id: 'a1', role: 'assistant', content: 'yo', timestamp: 1 }
+    const msgs = [u1, a1]
+    const next = mapMessages(msgs, (m) => (m.id === 'a1' ? { ...m, content: 'yo!' } : m))
+    expect(next).not.toBe(msgs)
+    expect(next[0]).toBe(u1)
+    expect(next[1]).not.toBe(a1)
+    expect(next[1].content).toBe('yo!')
+  })
+
+  it('token:stream keeps prior message object references', () => {
+    const u1: Message = { id: 'u1', role: 'user', content: 'hi', timestamp: 0 }
+    const t1: Message = {
+      id: 't1',
+      role: 'assistant',
+      content: 'Hel',
+      timestamp: 5,
+      agentRuns: [{ agentId: 'supervisor', role: 'supervisor', output: '', startedAt: 5, finishedAt: null, seq: 0, messageId: 't1' }],
+    }
+    const s0 = { sessions: [baseSession({ messages: [u1, t1] })] }
+    const next = applyServerMessage(s0, { type: 'token:stream', sessionId: 's1', agentId: 'supervisor', delta: 'lo', turnId: 't1' }, 6)
+    expect(next.sessions[0].messages[0]).toBe(u1)
+    expect(next.sessions[0].messages[1]).not.toBe(t1)
+    expect(next.sessions[0].messages[1].content).toBe('Hello')
+  })
+
+  it('tool:finished with unknown callId keeps messages array identity', () => {
+    const u1: Message = { id: 'u1', role: 'user', content: 'hi', timestamp: 0 }
+    const t1: Message = { id: 't1', role: 'assistant', content: 'x', timestamp: 5, toolCalls: [] }
+    const msgs = [u1, t1]
+    const s0 = { sessions: [baseSession({ messages: msgs })] }
+    const next = applyServerMessage(
+      s0,
+      {
+        type: 'tool:finished',
+        sessionId: 's1',
+        turnId: 't1',
+        agentId: 'supervisor',
+        callId: 'missing',
+        status: 'finished',
+        output: 'ok',
+      },
+      6,
+    )
+    expect(next.sessions[0].messages).toBe(msgs)
+    expect(next.sessions[0].messages[0]).toBe(u1)
+    expect(next.sessions[0].messages[1]).toBe(t1)
   })
 })

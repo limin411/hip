@@ -259,7 +259,13 @@ type AttachmentSendPayload = Attachment & { path: string }
 export type ServerMessage =
   | { type: 'session:created'; sessionId: string }
   | { type: 'agent:started'; sessionId: string; turnId: string; agentId: string; role: AgentRole; parentAgentId?: string; taskInput?: string; taskId?: string; name?: string }
-  | { type: 'token:stream'; sessionId: string; turnId: string; agentId: string; delta: string }
+  /**
+   * Streaming assistant / subagent token. Builtin hub supervisor includes
+   * `stepSeq` (TextBurstTracker) for interleaved text timeline steps; subagents
+   * and ACP omit it (legacy content / run.output paths). Optional `role` helps
+   * clients without agentRuns context.
+   */
+  | { type: 'token:stream'; sessionId: string; turnId: string; agentId: string; delta: string; stepSeq?: number; role?: AgentRole }
   | { type: 'agent:finished'; sessionId: string; turnId: string; agentId: string }
   | { type: 'reasoning:delta'; sessionId: string; turnId: string; agentId: string; role: AgentRole; stepSeq: number; delta: string }
   | { type: 'tool:started'; sessionId: string; turnId: string; agentId: string; role: AgentRole; callId: string; name: string; input: string; seq: number; truncated?: boolean }
@@ -399,6 +405,18 @@ export type ServerMessage =
   | { type: 'plan:updated'; sessionId: string; turnId: string; plan: PlanItem[] }
   /** Authoritative plan snapshot at plan-approval boundary (ExitPlanMode / pause). */
   | { type: 'plan:published'; sessionId: string; turnId: string; plan: PlanItem[] }
+  /**
+   * Ack for every `plan:respond` path (KD-16 / D4e).
+   * ok:false when not awaiting (`reason: 'not_awaiting'`) — FE rolls back optimistic UI.
+   * Success paths emit ok:true before execute continues (persist/runTurn failures are separate).
+   */
+  | {
+      type: 'plan:respond:result'
+      sessionId: string
+      ok: boolean
+      action: 'approve' | 'reject' | 'amend'
+      reason?: string
+    }
   /**
    * Goal mode chrome (smoothness I1). Emitted when goal_create / goal_update changes state.
    * goal=null means cleared (completed or cancelled).

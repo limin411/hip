@@ -2714,6 +2714,18 @@
   resolved "https://registry.npmmirror.com/@standard-schema/spec/-/spec-1.1.0.tgz#a79b55dbaf8604812f52d140b2c9ab41bc150bb8"
   integrity sha512-l2aFy5jALhniG5HgqrD6jXLi/rUWrKvqN/qJx6yoJsgKhblVd+iqqU4RCXavm/jPityDo5TCvKMnpjKnOriy0w==
 
+"@tanstack/react-virtual@^3":
+  version "3.14.7"
+  resolved "https://registry.npmmirror.com/@tanstack/react-virtual/-/react-virtual-3.14.7.tgz#0e64a7702f65a9dd9e8458fee4af33d413b7ff9a"
+  integrity sha512-11uSrj77IDijNBqizD4lY4y1laMyRrqMLSxjnWy5CvWkCjyRDW+gGmxYq0lwQKVas/sq7zyzYWXbL/BvBzR32g==
+  dependencies:
+    "@tanstack/virtual-core" "3.17.5"
+
+"@tanstack/virtual-core@3.17.5":
+  version "3.17.5"
+  resolved "https://registry.npmmirror.com/@tanstack/virtual-core/-/virtual-core-3.17.5.tgz#ad729d7bbc8bad270f603115fa86588a5b50386a"
+  integrity sha512-AXfBC3sq6PuYSwyxYORqqgHCNjPGAvKJvZuBBJ1klhztWBB5cgqgwsq8+fNfaQJG7/K4xYBja9S90QFn2zmQAg==
+
 "@tauri-apps/api@2.10.1":
   version "2.10.1"
   resolved "https://registry.npmmirror.com/@tauri-apps/api/-/api-2.10.1.tgz#57c1bae6114ec33d977eb2b50dfefc25fa84fc93"

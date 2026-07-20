@@ -222,6 +222,16 @@ export async function regenerate(host: SessionTurnHost, send: SendFn): Promise<v
 }
 
 export async function handlePlanResponse(host: SessionTurnHost, action: 'approve' | 'reject' | 'amend', send: SendFn, amendContent?: string): Promise<void> {
+  const emitRespondResult = (ok: boolean, reason?: string) => {
+    send({
+      type: 'plan:respond:result',
+      sessionId: host.id,
+      ok,
+      action,
+      ...(reason ? { reason } : {}),
+    })
+  }
+
   if (!host.awaitingResume || !host.paused) {
     logInfo('session', 'plan:respond:skip', {
       sessionId: host.id,
@@ -232,6 +242,8 @@ export async function handlePlanResponse(host: SessionTurnHost, action: 'approve
       planModeActive: host.planMode.isActive,
       forcePlan: Boolean(host._config.forcePlan),
     })
+    // KD-16: every plan:respond path must emit a result (silent skip forbidden).
+    emitRespondResult(false, 'not_awaiting')
     return
   }
   // Capture turn id for multi-client UI clear (message:complete alone does not clear interrupt).
@@ -274,6 +286,7 @@ export async function handlePlanResponse(host: SessionTurnHost, action: 'approve
         forcePlanBefore: Boolean(host._config.forcePlan),
       })
       host.awaitingResume = false; host.paused = null
+      emitRespondResult(true)
       emitInterruptResolved()
       // Drop forcePlan before execution so the execute turn is not re-gated into PlanMode.
       clearForcePlanFlag(host, send, 'approve')
@@ -289,6 +302,7 @@ export async function handlePlanResponse(host: SessionTurnHost, action: 'approve
         forcePlanBefore: Boolean(host._config.forcePlan),
       })
       host.awaitingResume = false; host.paused = null
+      emitRespondResult(true)
       emitInterruptResolved()
       clearForcePlanFlag(host, send, 'reject')
       send({ type: 'error', sessionId: host.id, code: 'PLAN_REJECTED', message: 'Plan was rejected by the user.' })
@@ -312,6 +326,7 @@ export async function handlePlanResponse(host: SessionTurnHost, action: 'approve
         plan: host.paused.plan,
       }
       host.awaitingResume = false; host.paused = null
+      emitRespondResult(true)
       emitInterruptResolved()
       const ts = Date.now()
       if (host.store) {

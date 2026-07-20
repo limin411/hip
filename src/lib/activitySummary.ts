@@ -116,6 +116,28 @@ export function buildActivitySummary(input: ActivitySummaryInput): {
     if (last?.kind === 'reasoning') {
       return { status: 'running', parts: withPlanProgress([{ type: 'runningReasoning' }], tools) }
     }
+    // kind:'text' while streaming: assistant is writing the answer body — not "thinking".
+    // Prefer tool chrome when tools exist; otherwise plan-only or bare running (no runningReasoning).
+    if (last?.kind === 'text') {
+      const running = [...tools].reverse().find((t) => t.status === 'running')
+      if (running) {
+        return {
+          status: 'running',
+          parts: withPlanProgress([{ type: 'runningTool', label: toolTitleHint(running) }], tools),
+        }
+      }
+      if (tools.length > 0) {
+        const lastTool = tools.reduce((a, b) => (a.seq >= b.seq ? a : b))
+        return {
+          status: 'running',
+          parts: withPlanProgress([{ type: 'runningTool', label: toolTitleHint(lastTool) }], tools),
+        }
+      }
+      const planOnly = withPlanProgress([], tools)
+      if (planOnly.length > 0) return { status: 'running', parts: planOnly }
+      // Neutral running while content streams (avoid misleading thinking chip).
+      return { status: 'running', parts: input.hasAssistantContent ? [] : [{ type: 'initializing' }] }
+    }
     // Fallback: last running tool or any tool
     const running = [...tools].reverse().find((t) => t.status === 'running')
     if (running) {

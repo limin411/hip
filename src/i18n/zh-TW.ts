@@ -347,6 +347,8 @@ export const zhTW = {
     "plan": {
       "chipLabel": "規劃",
       "chipTitle": "強制規劃模式 — 先調研並獲批後再改程式碼",
+      "whenToUse":
+        "適合有實作歧義的任務（架構選型、多檔案重構）。不適合純分析、錯別字或路徑明確的小改動。",
       "busyTitle": "回合進行中，暫不能切換規劃模式",
       "forceOnTitle": "已開啟規劃模式",
       "forceOnBody": "後續回合會先規劃。直接傳送任務，或使用 /plan 你的任務。",

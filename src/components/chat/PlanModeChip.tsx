@@ -38,7 +38,7 @@ export function PlanModeChip() {
     <ComposerChip
       type="button"
       active={current}
-      title={busy ? t('chat.plan.busyTitle') : t('chat.plan.chipTitle')}
+      title={busy ? t('chat.plan.busyTitle') : t('chat.plan.whenToUse')}
       data-testid="plan-mode-chip"
       aria-pressed={current}
       aria-disabled={busy || undefined}

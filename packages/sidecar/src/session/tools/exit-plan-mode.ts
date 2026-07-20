@@ -10,7 +10,10 @@ export class ExitPlanModeTool extends StructuredTool {
   }
 
   name = 'ExitPlanMode'
-  description = 'Exit plan mode. Save and submit the plan for review.'
+  description =
+    'Exit plan mode and submit the plan for user approval. Prefer a narrative plan file plus ' +
+    'write_todos before calling. Do not use for pure research/analysis that only needs a written ' +
+    'answer, and do not rush ExitPlanMode without plan content.'
   schema = ExitPlanModeSchema
 
   constructor(private planMode: PlanMode) {

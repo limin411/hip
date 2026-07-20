@@ -69,6 +69,13 @@ describe('EnterPlanModeTool', () => {
       expect(tool.description).toContain('plan mode')
       expect(tool.description).toContain('ExitPlanMode')
     })
+
+    it('describes good vs not-appropriate triggers (when-to-use guidance)', () => {
+      const tool = makeTool()
+      expect(tool.description).toMatch(/ambiguity|ambiguous|multi-file|unclear/i)
+      expect(tool.description).toMatch(/research|analysis/i)
+      expect(tool.description).toMatch(/typo|obvious|single/i)
+    })
   })
 
   describe('schema validation', () => {

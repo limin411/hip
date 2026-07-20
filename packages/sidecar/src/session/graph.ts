@@ -55,9 +55,11 @@ function fullPlanReminder(planFilePath: string): string {
 Workflow:
 1. Understand — explore the codebase with Glob, Grep, Read.
 2. Design — converge on the best approach.
-3. Write Plan — modify the plan file with Write or Edit.
-4. Call write_todos — with structured plan items.
+3. Write Plan — modify the plan file with Write or Edit (narrative Markdown: context, approach, key files).
+4. Call write_todos — with structured plan items for execution tracking.
 5. Exit — call ExitPlanMode for user approval.
+
+For implementation plans, prefer BOTH the narrative plan file AND write_todos before ExitPlanMode. Do not rush ExitPlanMode without plan content. Pure research/analysis that only needs a written answer should not use plan mode / ExitPlanMode.
 
 Your turn must end with either AskUserQuestion (to clarify requirements) or ExitPlanMode (to request plan approval).
 Plan file: ${planFilePath}`
@@ -82,7 +84,7 @@ Plan file: ${planFilePath}`
 const PLAN_EXIT_NUDGE = `Plan mode is still active — you must NOT deliver a final answer yet.
 
 Required next steps:
-1. Write the plan to the plan file (Write/Edit) and/or call write_todos with structured steps.
+1. Prefer BOTH: write a narrative plan to the plan file (Write/Edit) AND call write_todos with structured steps. Do not rush ExitPlanMode without plan content.
 2. Call ExitPlanMode so the user can approve before any non-plan work.
 
 Do this now. Do not answer the user request until ExitPlanMode has been called.`

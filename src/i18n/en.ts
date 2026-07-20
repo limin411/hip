@@ -315,6 +315,8 @@ export const en = {
       plan: {
         chipLabel: 'Plan',
         chipTitle: 'Force plan mode — investigate and get approval before coding',
+        whenToUse:
+          'Best for ambiguous implementation (architecture, multi-file redesign). Not for pure analysis, typos, or obvious one-shot fixes.',
         busyTitle: 'Cannot change plan mode while a turn is running',
         forceOnTitle: 'Plan mode on',
         forceOnBody: 'Next turns will plan first. Send a task, or use /plan your task.',

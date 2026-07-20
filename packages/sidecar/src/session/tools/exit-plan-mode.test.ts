@@ -30,6 +30,13 @@ describe('ExitPlanModeTool', () => {
       expect(tool.description).toBeDefined()
       expect(tool.description.length).toBeGreaterThan(0)
     })
+
+    it('mentions plan content and research exclusion (when-to-use guidance)', () => {
+      const tool = makeTool()
+      expect(tool.description).toMatch(/write_todos|narrative|plan file/i)
+      expect(tool.description).toMatch(/research|analysis/i)
+      expect(tool.description).toMatch(/without plan content|rush/i)
+    })
   })
 
   describe('schema validation', () => {

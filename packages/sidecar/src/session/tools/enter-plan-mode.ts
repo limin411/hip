@@ -11,11 +11,14 @@ export class EnterPlanModeTool extends StructuredTool {
 
   name = 'EnterPlanMode'
   description =
-    'Enter plan mode. Use this when the task requires investigation and design before coding. ' +
-    'Plan mode restricts the agent to read-only tools (Read, Grep, Glob) and the plan file. ' +
-    'After entering plan mode, investigate the codebase, design a step-by-step plan, write it ' +
-    'to the plan file, call write_todos for execution tracking, then call ExitPlanMode for ' +
-    'user approval. Do NOT edit files other than the plan file while plan mode is active.'
+    'Enter plan mode for implementation tasks with genuine ambiguity about the right approach ' +
+    '(e.g. auth/caching/real-time design, multi-file redesign, unclear requirements that need ' +
+    'exploration before code). Plan mode restricts the agent to read-only tools (Read, Grep, Glob) ' +
+    'and the plan file. After entering, investigate, design a step-by-step plan, write narrative ' +
+    'Markdown to the plan file, call write_todos for execution tracking, then ExitPlanMode for ' +
+    'user approval. Do NOT use for pure research/analysis that only needs a written answer, ' +
+    'single obvious edits (typos, renames, small UI tweaks), or when the user wants execution ' +
+    'not a planning ceremony. Do NOT edit files other than the plan file while plan mode is active.'
   schema = enterPlanModeSchema
 
   constructor(

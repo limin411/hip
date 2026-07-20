@@ -307,6 +307,8 @@ export const zhCN = {
       plan: {
         chipLabel: '规划',
         chipTitle: '强制规划模式 — 先调研并获批后再改代码',
+        whenToUse:
+          '适合有实现歧义的任务（架构选型、多文件重构）。不适合纯分析、错别字或路径明确的小改动。',
         busyTitle: '回合进行中，暂不能切换规划模式',
         forceOnTitle: '已开启规划模式',
         forceOnBody: '后续回合会先规划。直接发送任务，或使用 /plan 你的任务。',

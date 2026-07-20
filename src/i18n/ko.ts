@@ -339,6 +339,8 @@ export const ko = {
     "plan": {
       "chipLabel": "계획",
       "chipTitle": "계획 모드 강제 — 코딩 전에 조사하고 승인 받기",
+      "whenToUse":
+        "구현 경로가 모호한 작업에 적합(아키텍처, 다중 파일 재설계). 순수 분석, 오타, 명확한 소규모 수정에는 비권장.",
       "busyTitle": "턴이 실행 중일 때는 계획 모드를 변경할 수 없습니다",
       "forceOnTitle": "계획 모드 켜짐",
       "forceOnBody": "다음 턴은 먼저 계획을 세웁니다. 작업을 보내거나 /plan your task를 사용하세요.",

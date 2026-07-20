@@ -10,6 +10,7 @@ declare global {
       title?: string
       filters?: { name: string; extensions: string[] }[]
     }) => Promise<string | null>
+    __hipPickPrivateKey?: () => Promise<string | null>
   }
 }
 
@@ -61,6 +62,21 @@ export async function pickSavePath(opts?: {
     title: opts?.title,
     defaultPath: opts?.defaultPath,
     filters: opts?.filters,
+  })
+  return typeof result === 'string' ? result : null
+}
+
+/**
+ * Pick an SSH private key file (any path). E2E via `window.__hipPickPrivateKey`.
+ */
+export async function pickPrivateKeyFile(): Promise<string | null> {
+  if (typeof window !== 'undefined' && window.__hipPickPrivateKey) {
+    return window.__hipPickPrivateKey()
+  }
+  const { open } = await import('@tauri-apps/plugin-dialog')
+  const result = await open({
+    multiple: false,
+    title: 'Select private key',
   })
   return typeof result === 'string' ? result : null
 }

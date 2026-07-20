@@ -1,0 +1,146 @@
+// @vitest-environment happy-dom
+import '@testing-library/jest-dom/vitest'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+import { render, screen, fireEvent, waitFor, cleanup } from '@testing-library/react'
+import type { TerminalHost } from '@/ipc/terminalHosts'
+
+const removeHost = vi.fn().mockResolvedValue(undefined)
+const load = vi.fn().mockResolvedValue(undefined)
+const openLocal = vi.fn().mockResolvedValue('tm_x')
+const close = vi.fn().mockResolvedValue(undefined)
+
+let hosts: TerminalHost[] = []
+let groups: { id: string; name: string; sort: number }[] = []
+
+vi.mock('@/store/terminalHostStore', () => {
+  const store = (sel: (s: Record<string, unknown>) => unknown) =>
+    sel({
+      groups,
+      hosts,
+      loaded: true,
+      error: null,
+      load,
+      upsertGroup: vi.fn(),
+      removeGroup: vi.fn(),
+      removeHost,
+    })
+  store.getState = () => ({
+    loaded: true,
+    load,
+    groups,
+    hosts,
+    removeHost,
+  })
+  return { useTerminalHostStore: store }
+})
+
+vi.mock('@/store/managedTerminalStore', () => {
+  const store = {
+    getState: () => ({
+      openLocal,
+      close,
+      terminals: [{ id: 'tm_ssh1', kind: 'ssh', hostId: 'hst_1', title: 'ops', createdAt: 1 }],
+      focus: vi.fn(),
+    }),
+  }
+  return { useManagedTerminalStore: store }
+})
+
+vi.mock('@/ipc/dialog', () => ({
+  pickDirectory: vi.fn().mockResolvedValue(null),
+  pickPrivateKeyFile: vi.fn().mockResolvedValue(null),
+}))
+
+vi.mock('@/ipc/secrets', () => ({
+  hasSecretKeys: vi.fn().mockResolvedValue({}),
+  setSecretRaw: vi.fn(),
+  deleteSecretRaw: vi.fn(),
+  sshPasswordKey: (id: string) => `hip.ssh.${id}.password`,
+  sshPassphraseKey: (id: string) => `hip.ssh.${id}.passphrase`,
+}))
+
+vi.mock('react-i18next', () => ({
+  useTranslation: () => ({
+    t: (key: string, opts?: { label?: string; name?: string; count?: number }) => {
+      if (opts?.label) return `${key}:${opts.label}`
+      if (opts?.name) return `${key}:${opts.name}`
+      if (opts?.count != null) return `${key}:${opts.count}`
+      return key
+    },
+  }),
+}))
+
+vi.mock('nanoid', () => ({ nanoid: () => 'g1' }))
+
+import { HostLibrary } from './HostLibrary'
+
+describe('HostLibrary', () => {
+  beforeEach(() => {
+    hosts = []
+    groups = []
+    removeHost.mockClear().mockResolvedValue(undefined)
+    close.mockClear().mockResolvedValue(undefined)
+    openLocal.mockClear().mockResolvedValue('tm_x')
+  })
+
+  afterEach(() => {
+    cleanup()
+  })
+
+  it('shows empty library state with CTAs', () => {
+    render(<HostLibrary />)
+    expect(screen.getByTestId('host-library-empty')).toBeInTheDocument()
+    expect(screen.getByTestId('host-library-empty-new-remote')).toBeInTheDocument()
+    expect(screen.getByTestId('host-library-empty-new-local')).toBeInTheDocument()
+  })
+
+  it('lists hosts and disables Connect (SSH not ready)', () => {
+    hosts = [
+      {
+        id: 'hst_1',
+        label: 'ops-1',
+        hostname: '10.0.0.1',
+        port: 22,
+        username: 'root',
+        authMethod: 'password',
+        updatedAt: 1,
+      },
+    ]
+    render(<HostLibrary />)
+    expect(screen.getByTestId('host-row-hst_1')).toBeInTheDocument()
+    const connect = screen.getByTestId('host-connect-hst_1')
+    expect(connect).toBeDisabled()
+    expect(connect).toHaveAttribute('title', 'terminals.sshComingSoon')
+  })
+
+  it('delete confirm force-closes sessions then removeHost', async () => {
+    hosts = [
+      {
+        id: 'hst_1',
+        label: 'ops-1',
+        hostname: '10.0.0.1',
+        port: 22,
+        username: 'root',
+        authMethod: 'password',
+        updatedAt: 1,
+      },
+    ]
+    render(<HostLibrary />)
+    fireEvent.click(screen.getByTestId('host-delete-hst_1'))
+    expect(screen.getByTestId('host-delete-dialog')).toBeInTheDocument()
+    fireEvent.click(screen.getByTestId('host-delete-confirm'))
+
+    await waitFor(() => {
+      expect(close).toHaveBeenCalledWith('tm_ssh1')
+      expect(removeHost).toHaveBeenCalledWith('hst_1')
+    })
+  })
+
+  it('opens create form from toolbar', async () => {
+    render(<HostLibrary />)
+    fireEvent.click(screen.getByTestId('host-library-new-remote'))
+    await waitFor(() => {
+      expect(screen.getByTestId('host-form-dialog')).toBeInTheDocument()
+    })
+  })
+})

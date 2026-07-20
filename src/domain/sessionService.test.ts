@@ -849,11 +849,14 @@ describe('workspace diff', () => {
   it('seedPlanApproval sets planApprovalPending and activeTurnPlan', () => {
     const t = new FakeTransport()
     const svc = new SessionService(t)
-    const { planItems } = svc.seedPlanApproval('s1')
+    const { planItems, markdown } = svc.seedPlanApproval('s1')
     const sess = useDomainStore.getState().sessions.find((s) => s.id === 's1')!
     expect(sess.planApprovalPending).toBe(true)
     expect(sess.activeTurnPlan).toEqual(planItems)
     expect(sess.interrupt?.question).toBe('plan_approval')
+    expect(sess.activeTurnPlanMarkdown).toBe(markdown)
+    expect(sess.activeTurnPlanMarkdown).toContain('E2E plan')
+    expect(sess.activeTurnPlanPath).toContain('s1.md')
   })
 
   it('seedPlanProgress sets activeTurnPlan without approval', () => {

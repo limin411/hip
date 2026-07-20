@@ -908,7 +908,18 @@ describe('applyServerMessage', () => {
     expect(s.sessions[0].activeTurnPlanPath).toBe('/tmp/.hip/plans/s1.md')
     expect(s.sessions[0].activeTurnPlanMarkdownTruncated).toBe(true)
 
-    s = applyServerMessage(s, { type: 'plan:published', sessionId: 's1', turnId: 't2', plan: [] }, 101)
+    // Empty body publish clears path even if wire still sends planPath.
+    s = applyServerMessage(
+      s,
+      {
+        type: 'plan:published',
+        sessionId: 's1',
+        turnId: 't2',
+        plan: [],
+        planPath: '/tmp/.hip/plans/s1.md',
+      },
+      101,
+    )
     expect(s.sessions[0].activeTurnPlanMarkdown).toBeNull()
     expect(s.sessions[0].activeTurnPlanPath).toBeNull()
     expect(s.sessions[0].activeTurnPlanMarkdownTruncated).toBe(false)
@@ -1133,6 +1144,54 @@ describe('useDomainStore actions', () => {
     expect(sess.activeTurnPlan).toBeNull()
     expect(sess.activeTurnPlanMarkdown).toBeNull()
     expect(sess.activeTurnPlanPath).toBeNull()
+  })
+
+  it('plan:respond:result ok:false after reject restores plan + markdown from rollback (D2.5)', () => {
+    reset()
+    useDomainStore.getState().createSession('s1', { llmProvider: 'deepseek', model: 'm', tools: [] })
+    const plan = [{ content: 'step', status: 'pending' as const }]
+    const interrupt = {
+      turnId: 't1',
+      question: 'plan_approval',
+      context: '{"kind":"plan_approval"}',
+    }
+    useDomainStore.setState((s) => ({
+      sessions: s.sessions.map((sess) =>
+        sess.id === 's1'
+          ? {
+              ...sess,
+              status: 'idle' as const,
+              planApprovalPending: true,
+              interrupt,
+              activeTurnPlan: plan,
+              activeTurnPlanMarkdown: '## restore me',
+              activeTurnPlanPath: '/plans/s1.md',
+              activeTurnPlanMarkdownTruncated: true,
+            }
+          : sess,
+      ),
+    }))
+    useDomainStore.getState().respondPlanOptimistic('s1', 'reject')
+    const mid = useDomainStore.getState().sessions[0]
+    expect(mid.activeTurnPlan).toBeNull()
+    expect(mid.activeTurnPlanMarkdown).toBeNull()
+    expect(mid.planRespondRollback?.activeTurnPlanMarkdown).toBe('## restore me')
+
+    useDomainStore.getState().apply({
+      type: 'plan:respond:result',
+      sessionId: 's1',
+      ok: false,
+      action: 'reject',
+      reason: 'rejected by server',
+    })
+    const after = useDomainStore.getState().sessions[0]
+    expect(after.planApprovalPending).toBe(true)
+    expect(after.interrupt?.turnId).toBe('t1')
+    expect(after.activeTurnPlan).toEqual(plan)
+    expect(after.activeTurnPlanMarkdown).toBe('## restore me')
+    expect(after.activeTurnPlanPath).toBe('/plans/s1.md')
+    expect(after.activeTurnPlanMarkdownTruncated).toBe(true)
+    expect(after.planRespondRollback).toBeNull()
   })
 
   it('appendUserMessage clears plan markdown fields (D2.5)', () => {

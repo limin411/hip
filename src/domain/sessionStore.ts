@@ -407,14 +407,15 @@ export function applyServerMessage(
       return update(msg.sessionId, (s) => ({ ...s, activeTurnPlan: msg.plan, planDeltaDraft: {} }))
 
     case 'plan:published': {
-      // Set markdown if present; clear if omitted (new publish without body) — D2.5.
+      // Set markdown fields if body present; clear all (incl. path) if omitted — D2.5.
       const hasMarkdown = Boolean(msg.markdown?.trim())
       return update(msg.sessionId, (s) => ({
         ...s,
         activeTurnPlan: msg.plan,
         planDeltaDraft: {},
         activeTurnPlanMarkdown: hasMarkdown ? msg.markdown! : null,
-        activeTurnPlanPath: msg.planPath ?? null,
+        // Path only meaningful with a body (avoid orphan path on empty publish).
+        activeTurnPlanPath: hasMarkdown ? (msg.planPath ?? null) : null,
         activeTurnPlanMarkdownTruncated: hasMarkdown ? Boolean(msg.markdownTruncated) : false,
       }))
     }

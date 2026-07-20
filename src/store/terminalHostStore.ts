@@ -50,7 +50,7 @@ interface TerminalHostStore {
   error: string | null
 
   load: () => Promise<void>
-  /** Persist current catalog state. */
+  /** Persist current catalog state (serialized with other saves). */
   save: () => Promise<void>
   /** Replace catalog (e.g. after form compose) and optionally persist. */
   setCatalog: (catalog: TerminalHostsCatalog, opts?: { persist?: boolean }) => Promise<void>
@@ -59,8 +59,9 @@ interface TerminalHostStore {
   removeGroup: (id: string) => Promise<void>
   upsertHost: (host: TerminalHost) => Promise<void>
   /**
-   * Remove host row, filter recents, delete both SSH secret keys, persist.
-   * Session force-close is handled by callers once managed terminals exist (K21).
+   * Remove host row, filter recents, persist catalog, then best-effort delete
+   * both SSH secret keys. Session force-close is handled by callers once
+   * managed terminals exist (K21).
    */
   removeHost: (id: string) => Promise<void>
   /** Push a successful launch into recents and persist (K11). */
@@ -80,6 +81,24 @@ function toCatalog(s: {
   }
 }
 
+/**
+ * Serialize catalog IPC writes so concurrent mutations cannot clobber each other.
+ * Each `save` snapshots Zustand state when its turn runs (latest wins), not when
+ * it was enqueued mid-flight.
+ */
+let saveChain: Promise<void> = Promise.resolve()
+
+function enqueueSave(run: () => Promise<void>): Promise<void> {
+  // Run even if the previous save failed so one disk error does not stall the queue.
+  const next = saveChain.then(run, run)
+  // Keep the chain alive after rejections.
+  saveChain = next.then(
+    () => undefined,
+    () => undefined,
+  )
+  return next
+}
+
 export const useTerminalHostStore = create<TerminalHostStore>((set, get) => ({
   groups: [],
   hosts: [],
@@ -89,6 +108,7 @@ export const useTerminalHostStore = create<TerminalHostStore>((set, get) => ({
 
   load: async () => {
     try {
+      // listTerminalHosts propagates IPC failures (missing/corrupt file is empty in Rust).
       const catalog = await listTerminalHosts()
       const hostIds = hostIdSet(catalog.hosts)
       const recents = filterRecentsForHosts(catalog.recents, hostIds)
@@ -107,16 +127,18 @@ export const useTerminalHostStore = create<TerminalHostStore>((set, get) => ({
     }
   },
 
-  save: async () => {
-    try {
-      await saveTerminalHosts(toCatalog(get()))
-      set({ error: null })
-    } catch (e) {
-      const msg = e instanceof Error ? e.message : 'Failed to save terminal hosts'
-      set({ error: msg })
-      throw e
-    }
-  },
+  save: () =>
+    enqueueSave(async () => {
+      try {
+        // Snapshot at write time so chained saves always persist latest state.
+        await saveTerminalHosts(toCatalog(get()))
+        set({ error: null })
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : 'Failed to save terminal hosts'
+        set({ error: msg })
+        throw e
+      }
+    }),
 
   setCatalog: async (catalog, opts) => {
     const hostIds = hostIdSet(catalog.hosts)
@@ -169,12 +191,22 @@ export const useTerminalHostStore = create<TerminalHostStore>((set, get) => ({
   },
 
   removeHost: async (id) => {
+    const prevHosts = get().hosts
+    const prevRecents = get().recents
     set((s) => {
       const hosts = s.hosts.filter((h) => h.id !== id)
       const recents = filterRecentsForHosts(s.recents, hostIdSet(hosts))
       return { hosts, recents, error: null }
     })
-    // Best-effort secret cleanup (ignore missing keys / IPC failures).
+    // Persist catalog first. Only delete secrets after the host row is gone on disk
+    // so a failed save does not leave a credential-less restored host (K21 order:
+    // catalog then secrets is safer than secrets-then-catalog for this failure mode).
+    try {
+      await get().save()
+    } catch (e) {
+      set({ hosts: prevHosts, recents: prevRecents })
+      throw e
+    }
     try {
       await deleteSecretRaw(sshPasswordKey(id))
     } catch {
@@ -185,7 +217,6 @@ export const useTerminalHostStore = create<TerminalHostStore>((set, get) => ({
     } catch {
       /* ignore */
     }
-    await get().save()
   },
 
   pushRecent: async (entry) => {

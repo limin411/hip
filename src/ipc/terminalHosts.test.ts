@@ -9,6 +9,7 @@ import {
   listTerminalHosts,
   saveTerminalHosts,
   normalizeCatalog,
+  emptyTerminalHostsCatalog,
   EMPTY_TERMINAL_HOSTS_CATALOG,
 } from './terminalHosts'
 
@@ -39,21 +40,26 @@ describe('terminalHosts IPC', () => {
     expect(cat.recents[0]).toEqual({ type: 'ssh', hostId: 'h1', label: 'ops', at: 200 })
   })
 
-  it('listTerminalHosts returns empty catalog on IPC error', async () => {
+  it('listTerminalHosts propagates IPC errors', async () => {
     invoke.mockRejectedValueOnce(new Error('no config dir'))
-    await expect(listTerminalHosts()).resolves.toEqual(EMPTY_TERMINAL_HOSTS_CATALOG)
+    await expect(listTerminalHosts()).rejects.toThrow('no config dir')
   })
 
   it('saveTerminalHosts invokes terminal_hosts_save', async () => {
     invoke.mockResolvedValueOnce(undefined)
-    const catalog = {
-      version: 1,
-      groups: [],
-      hosts: [],
-      recents: [] as const,
-    }
+    const catalog = emptyTerminalHostsCatalog()
     await saveTerminalHosts(catalog)
     expect(invoke).toHaveBeenCalledWith('terminal_hosts_save', { catalog })
+  })
+
+  it('emptyTerminalHostsCatalog returns fresh mutable arrays', () => {
+    const a = emptyTerminalHostsCatalog()
+    const b = emptyTerminalHostsCatalog()
+    expect(a).toEqual(EMPTY_TERMINAL_HOSTS_CATALOG)
+    expect(a.groups).not.toBe(b.groups)
+    a.groups.push({ id: 'g', name: 'x', sort: 0 })
+    expect(b.groups).toHaveLength(0)
+    expect(EMPTY_TERMINAL_HOSTS_CATALOG.groups).toHaveLength(0)
   })
 
   it('normalizeCatalog drops malformed hosts / recents', () => {
@@ -86,5 +92,20 @@ describe('terminalHosts IPC', () => {
       { type: 'local', cwd: '/tmp', at: 1 },
       { type: 'ssh', hostId: 'h1', label: 'ok', at: 2 },
     ])
+  })
+
+  it('normalizeCatalog returns a fresh empty catalog for bad input', () => {
+    const cat = normalizeCatalog(null)
+    expect(cat).toEqual(EMPTY_TERMINAL_HOSTS_CATALOG)
+    cat.hosts.push({
+      id: 'x',
+      label: 'x',
+      hostname: 'h',
+      port: 22,
+      username: 'u',
+      authMethod: 'password',
+      updatedAt: 1,
+    })
+    expect(EMPTY_TERMINAL_HOSTS_CATALOG.hosts).toHaveLength(0)
   })
 })

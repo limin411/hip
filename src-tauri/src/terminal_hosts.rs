@@ -100,44 +100,14 @@ pub fn sanitize_recents(catalog: &mut TerminalHostsCatalog) {
     });
 }
 
-/// Atomic write (temp + rename). On Unix the temp file is created at `0o600`
-/// so host inventory + usernames are never briefly world-readable — mirrors `auth.rs`.
+/// Persist catalog via shared atomic 0o600 helper (see `atomic_write`).
 pub fn save_catalog(path: &Path, catalog: &TerminalHostsCatalog) -> io::Result<()> {
     if let Some(parent) = path.parent() {
         std::fs::create_dir_all(parent)?;
     }
     let body = serde_json::to_string_pretty(catalog)
         .map_err(|e| io::Error::new(io::ErrorKind::Other, e))?;
-    let tmp = path.with_extension("tmp");
-
-    let write_and_rename = || -> io::Result<()> {
-        #[cfg(unix)]
-        {
-            use std::io::Write;
-            use std::os::unix::fs::{OpenOptionsExt, PermissionsExt};
-            let mut f = std::fs::OpenOptions::new()
-                .write(true)
-                .create(true)
-                .truncate(true)
-                .mode(0o600)
-                .open(&tmp)?;
-            f.write_all(body.as_bytes())?;
-            // `mode(0o600)` only applies when the file is created; re-assert in case
-            // `tmp` pre-existed (stale from a crash) with wider perms.
-            std::fs::set_permissions(&tmp, std::fs::Permissions::from_mode(0o600))?;
-        }
-        #[cfg(not(unix))]
-        {
-            std::fs::write(&tmp, body.as_bytes())?;
-        }
-        std::fs::rename(&tmp, path)
-    };
-
-    let result = write_and_rename();
-    if result.is_err() {
-        let _ = std::fs::remove_file(&tmp);
-    }
-    result
+    crate::atomic_write::atomic_write_private(path, body.as_bytes())
 }
 
 #[tauri::command]

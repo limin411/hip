@@ -11,44 +11,19 @@ fn read_auth_map(path: &Path) -> Map<String, Value> {
     }
 }
 
-/// Write the auth map atomically (temp file + rename). On Unix the temp file is
-/// created at `0o600` so a file containing secrets is never briefly world-readable;
-/// the perms are re-asserted in case a stale temp pre-existed, and a failed write
-/// cleans up the temp rather than leaking secrets to disk. Windows relies on the
-/// user-profile ACL of the app-data root.
+/// Write the auth map via shared atomic 0o600 helper (see `atomic_write`).
 fn write_auth_map(path: &Path, map: &Map<String, Value>) -> io::Result<()> {
     let body = serde_json::to_string_pretty(map)
         .map_err(|e| io::Error::new(io::ErrorKind::Other, e))?;
-    let tmp = path.with_extension("tmp");
+    crate::atomic_write::atomic_write_private(path, body.as_bytes())
+}
 
-    let write_and_rename = || -> io::Result<()> {
-        #[cfg(unix)]
-        {
-            use std::io::Write;
-            use std::os::unix::fs::{OpenOptionsExt, PermissionsExt};
-            let mut f = std::fs::OpenOptions::new()
-                .write(true)
-                .create(true)
-                .truncate(true)
-                .mode(0o600)
-                .open(&tmp)?;
-            f.write_all(body.as_bytes())?;
-            // `mode(0o600)` only applies when the file is created; re-assert in case
-            // `tmp` pre-existed (stale from a crash) with wider perms.
-            std::fs::set_permissions(&tmp, std::fs::Permissions::from_mode(0o600))?;
-        }
-        #[cfg(not(unix))]
-        {
-            std::fs::write(&tmp, body.as_bytes())?;
-        }
-        std::fs::rename(&tmp, path)
-    };
-
-    let result = write_and_rename();
-    if result.is_err() {
-        let _ = std::fs::remove_file(&tmp);
-    }
-    result
+/// True when `key` maps to a non-empty JSON string in the auth map.
+/// Used by `has_secrets` / `has_secret_keys` so empty-string values do not count as configured.
+pub fn auth_has_nonempty(map: &Map<String, Value>, key: &str) -> bool {
+    map.get(key)
+        .and_then(|v| v.as_str())
+        .is_some_and(|s| !s.is_empty())
 }
 
 /// Read the entire auth map (single file read). Used by batch lookups like
@@ -121,6 +96,18 @@ mod tests {
         let p = tmp_path("corrupt");
         std::fs::write(&p, b"not-json{{{{").unwrap();
         assert_eq!(auth_get(&p, "anything"), None);
+    }
+
+    #[test]
+    fn auth_has_nonempty_rejects_empty_and_missing() {
+        let mut map = Map::new();
+        map.insert("K".into(), Value::String("v".into()));
+        map.insert("EMPTY".into(), Value::String("".into()));
+        map.insert("NUM".into(), Value::Number(1.into()));
+        assert!(auth_has_nonempty(&map, "K"));
+        assert!(!auth_has_nonempty(&map, "EMPTY"));
+        assert!(!auth_has_nonempty(&map, "MISSING"));
+        assert!(!auth_has_nonempty(&map, "NUM"));
     }
 
     #[test]

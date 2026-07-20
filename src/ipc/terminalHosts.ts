@@ -36,12 +36,21 @@ export interface TerminalHostsCatalog {
   recents: RecentLaunch[]
 }
 
-export const EMPTY_TERMINAL_HOSTS_CATALOG: TerminalHostsCatalog = {
-  version: 1,
-  groups: [],
-  hosts: [],
-  recents: [],
+/** Fresh empty catalog (new arrays every call — safe to mutate). */
+export function emptyTerminalHostsCatalog(): TerminalHostsCatalog {
+  return { version: 1, groups: [], hosts: [], recents: [] }
 }
+
+/**
+ * Frozen empty catalog for value comparisons / defaults.
+ * Nested arrays are frozen so accidental in-place mutation throws in dev.
+ */
+export const EMPTY_TERMINAL_HOSTS_CATALOG: TerminalHostsCatalog = Object.freeze({
+  version: 1,
+  groups: Object.freeze([]) as unknown as HostGroup[],
+  hosts: Object.freeze([]) as unknown as TerminalHost[],
+  recents: Object.freeze([]) as unknown as RecentLaunch[],
+})
 
 function isAuthMethod(v: unknown): v is HostAuthMethod {
   return v === 'password' || v === 'privateKey'
@@ -108,7 +117,7 @@ function normalizeGroup(raw: unknown): HostGroup | null {
 
 /** Coerce IPC payload into a safe catalog (drops malformed rows). */
 export function normalizeCatalog(raw: unknown): TerminalHostsCatalog {
-  if (!raw || typeof raw !== 'object') return { ...EMPTY_TERMINAL_HOSTS_CATALOG }
+  if (!raw || typeof raw !== 'object') return emptyTerminalHostsCatalog()
   const c = raw as Record<string, unknown>
   const groups = Array.isArray(c.groups)
     ? c.groups.map(normalizeGroup).filter((g): g is HostGroup => g != null)
@@ -129,15 +138,12 @@ export function normalizeCatalog(raw: unknown): TerminalHostsCatalog {
 
 /**
  * Load the terminal host catalog from `~/.hip/config/terminal-hosts.json`.
- * Missing / corrupt / IPC error → empty catalog.
+ * Missing/corrupt file is handled in Rust as an empty catalog (does not reject).
+ * IPC failures **propagate** so the store can surface `error`.
  */
 export async function listTerminalHosts(): Promise<TerminalHostsCatalog> {
-  try {
-    const raw = await invoke<unknown>('terminal_hosts_list')
-    return normalizeCatalog(raw)
-  } catch {
-    return { ...EMPTY_TERMINAL_HOSTS_CATALOG }
-  }
+  const raw = await invoke<unknown>('terminal_hosts_list')
+  return normalizeCatalog(raw)
 }
 
 /** Persist the full catalog (atomic 0o600 write on the Rust side). */

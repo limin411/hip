@@ -1,6 +1,7 @@
 mod sidecar;
 mod paths;
 mod auth;
+mod atomic_write;
 mod skills;
 mod plugins;
 mod path_env;
@@ -172,17 +173,22 @@ fn has_secrets(app: tauri::AppHandle, keys: Vec<String>) -> Result<HashMap<Strin
     let mut result = HashMap::new();
     for key in &keys {
         let env_key = sidecar::provider_key_env(key);
-        result.insert(key.clone(), auth_map.contains_key(&env_key));
+        // Non-empty string only — parity with has_secret_keys / auth_has_nonempty.
+        result.insert(key.clone(), auth::auth_has_nonempty(&auth_map, &env_key));
     }
     Ok(result)
 }
 
 /// Raw key presence (no `provider_key_env` mapping). Order matches input `keys`.
-/// Used for SSH secrets (`hip.ssh.<hostId>.*`) and other non-provider auth.json keys.
+/// Non-empty string values only (empty string → false). Used for SSH secrets
+/// (`hip.ssh.<hostId>.*`) and other non-provider auth.json keys.
 #[tauri::command]
 fn has_secret_keys(app: tauri::AppHandle, keys: Vec<String>) -> Result<Vec<bool>, String> {
     let auth_map = auth::auth_get_all(&auth_path(&app)?);
-    Ok(keys.iter().map(|k| auth_map.contains_key(k)).collect())
+    Ok(keys
+        .iter()
+        .map(|k| auth::auth_has_nonempty(&auth_map, k))
+        .collect())
 }
 
 #[tauri::command]

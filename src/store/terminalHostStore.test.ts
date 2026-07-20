@@ -158,7 +158,14 @@ describe('terminalHostStore', () => {
     expect(saved.recents[0].label).toBe('new')
   })
 
-  it('removeHost filters recents, deletes secrets, and persists', async () => {
+  it('removeHost saves catalog before deleting secrets', async () => {
+    const order: string[] = []
+    saveTerminalHosts.mockImplementation(async () => {
+      order.push('save')
+    })
+    deleteSecretRaw.mockImplementation(async (key: string) => {
+      order.push(`del:${key}`)
+    })
     useTerminalHostStore.setState({
       hosts: [host('h1'), host('h2')],
       recents: [
@@ -175,9 +182,66 @@ describe('terminalHostStore', () => {
       { type: 'ssh', hostId: 'h2', label: 'B', at: 2 },
       { type: 'local', cwd: '/tmp', at: 3 },
     ])
-    expect(deleteSecretRaw).toHaveBeenCalledWith('hip.ssh.h1.password')
-    expect(deleteSecretRaw).toHaveBeenCalledWith('hip.ssh.h1.passphrase')
-    expect(saveTerminalHosts).toHaveBeenCalled()
+    expect(order).toEqual([
+      'save',
+      'del:hip.ssh.h1.password',
+      'del:hip.ssh.h1.passphrase',
+    ])
+  })
+
+  it('removeHost rolls back and skips secret delete when save fails', async () => {
+    saveTerminalHosts.mockRejectedValueOnce(new Error('disk full'))
+    const beforeHosts = [host('h1'), host('h2')]
+    const beforeRecents: RecentLaunch[] = [
+      { type: 'ssh', hostId: 'h1', label: 'A', at: 1 },
+      { type: 'local', cwd: '/tmp', at: 3 },
+    ]
+    useTerminalHostStore.setState({
+      hosts: beforeHosts,
+      recents: beforeRecents,
+      loaded: true,
+    })
+    await expect(useTerminalHostStore.getState().removeHost('h1')).rejects.toThrow('disk full')
+    const s = useTerminalHostStore.getState()
+    expect(s.hosts).toEqual(beforeHosts)
+    expect(s.recents).toEqual(beforeRecents)
+    expect(deleteSecretRaw).not.toHaveBeenCalled()
+    expect(s.error).toBe('disk full')
+  })
+
+  it('load surfaces IPC errors', async () => {
+    listTerminalHosts.mockRejectedValueOnce(new Error('no config dir'))
+    await useTerminalHostStore.getState().load()
+    const s = useTerminalHostStore.getState()
+    expect(s.loaded).toBe(true)
+    expect(s.error).toBe('no config dir')
+  })
+
+  it('serializes concurrent saves so the last state wins', async () => {
+    let releaseFirst!: () => void
+    const firstGate = new Promise<void>((r) => {
+      releaseFirst = r
+    })
+    let call = 0
+    const snapshots: string[][] = []
+    saveTerminalHosts.mockImplementation(async (cat: { hosts: TerminalHost[] }) => {
+      call += 1
+      snapshots.push(cat.hosts.map((h) => h.id))
+      if (call === 1) await firstGate
+    })
+
+    useTerminalHostStore.setState({ hosts: [], recents: [], loaded: true })
+    const p1 = useTerminalHostStore.getState().upsertHost(host('a'))
+    // Second mutation while first save is in flight
+    const p2 = useTerminalHostStore.getState().upsertHost(host('b'))
+    // Allow first save to finish after both state updates applied
+    releaseFirst()
+    await Promise.all([p1, p2])
+
+    expect(saveTerminalHosts).toHaveBeenCalledTimes(2)
+    // Final disk write must include both hosts (second save sees latest state).
+    expect(snapshots[snapshots.length - 1]!.sort()).toEqual(['a', 'b'])
+    expect(useTerminalHostStore.getState().hosts.map((h) => h.id).sort()).toEqual(['a', 'b'])
   })
 
   it('upsertHost insert and update', async () => {

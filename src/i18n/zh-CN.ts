@@ -311,6 +311,8 @@ export const zhCN = {
         forceOnBody: '后续回合会先规划。直接发送任务，或使用 /plan 你的任务。',
         forceOffTitle: '已关闭规划模式',
         forceOffBody: '回合不再强制先规划。',
+        respondFailedTitle: '计划响应失败',
+        respondFailedBody: '无法应用计划响应（{{reason}}）。已恢复审批状态。',
       },
       permission: {
         title: '需要授权',

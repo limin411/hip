@@ -2102,8 +2102,20 @@ export class SessionService {
     this.lastOutboundUserContent = text
     const st = useDomainStore.getState()
     const active = st.sessions.find((s) => s.id === st.activeSessionId)
-    // Any interrupt (including plan approval) continues via message:resume.
-    // Sidecar treats planStatus=ready resume as soft-approve + execute with the text as guidance.
+    // KD-8 / D4d composer send decision table:
+    // planApprovalPending → amend by default (not soft-approve resume).
+    // Opt-in soft-approve: hip.toml [plan] softApproveOnComposer = true → message:resume.
+    if (active?.planApprovalPending) {
+      const softApprove = useHipConfigStore.getState().config.plan?.softApproveOnComposer === true
+      if (softApprove) {
+        this.resume(text, attachments)
+        return
+      }
+      // Empty text with attachments only: still amend with a default revision prompt.
+      this.respondPlan('amend', text || undefined)
+      return
+    }
+    // Non-plan interrupt continues via message:resume.
     if (active?.interrupt) { this.resume(text, attachments); return }
     let { activeSessionId } = st
     if (!activeSessionId) {

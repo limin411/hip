@@ -35,6 +35,14 @@ export interface SessionVM {
   activeTurnPlan?: PlanItem[] | null  // live plan from plan:updated / plan:published; cleared on next user turn
   planDeltaDraft?: Record<string, string>  // incremental plan text keyed by itemId, accumulated from plan:delta
   planApprovalPending?: boolean  // true when agent:interrupt carries a plan_approval context
+  /**
+   * Snapshot for rolling back optimistic plan:respond UI when plan:respond:result ok:false (KD-16).
+   * Cleared on ok:true or after restore.
+   */
+  planRespondRollback?: {
+    interrupt: { turnId: string; question: string; context?: string } | null
+    status: 'idle' | 'running' | 'error'
+  } | null
   agentProfiles?: AgentProfileInfo[]  // list of available agent profiles from agent:profiles message
   codePanelOpen?: boolean
   chatPanelOpen?: boolean
@@ -370,6 +378,23 @@ export function applyServerMessage(
     case 'plan:published':
       return update(msg.sessionId, (s) => ({ ...s, activeTurnPlan: msg.plan, planDeltaDraft: {} }))
 
+    case 'plan:respond:result':
+      // KD-16: ok:false restores approval chrome after optimistic dismiss; ok:true drops rollback stash.
+      return update(msg.sessionId, (s) => {
+        if (msg.ok) {
+          if (!s.planRespondRollback) return s
+          return { ...s, planRespondRollback: null }
+        }
+        const snap = s.planRespondRollback
+        return {
+          ...s,
+          planApprovalPending: true,
+          interrupt: snap?.interrupt ?? s.interrupt ?? null,
+          status: snap?.status ?? (s.status === 'running' ? 'idle' : s.status),
+          planRespondRollback: null,
+        }
+      })
+
     case 'agent:configOptions':
       return update(msg.sessionId, (s) => ({ ...s, configOptions: msg.options }))
 
@@ -393,12 +418,13 @@ export function applyServerMessage(
         // Clear sticky plan/interrupt chrome when any client resolves the pause.
         if (s.interrupt && msg.turnId && s.interrupt.turnId !== msg.turnId) {
           // Different turn — still clear planApprovalPending if set (foreign resolve).
-          if (!s.planApprovalPending) return s
+          if (!s.planApprovalPending && !s.planRespondRollback) return s
         }
         return {
           ...s,
           interrupt: null,
           planApprovalPending: false,
+          planRespondRollback: null,
         }
       })
 
@@ -721,6 +747,11 @@ export const useDomainStore = create<DomainStore>((set) => ({
           ...sess,
           status: nextStatus,
           error: action === 'reject' ? sess.error : null,
+          // Stash for plan:respond:result ok:false rollback (KD-16).
+          planRespondRollback: {
+            interrupt: sess.interrupt ?? null,
+            status: sess.status,
+          },
           interrupt: null,
           planApprovalPending: false,
           // Keep activeTurnPlan through execute / done; cleared on next user turn. Card gates on planApprovalPending.

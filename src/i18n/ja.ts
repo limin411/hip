@@ -342,7 +342,9 @@ export const ja = {
       "forceOnTitle": "プランモード オン",
       "forceOnBody": "次のターンは最初にプランを立てます。タスクを送信するか、/plan あなたのタスク を使用してください。",
       "forceOffTitle": "プランモード オフ",
-      "forceOffBody": "ターンにプランは不要になりました。"
+      "forceOffBody": "ターンにプランは不要になりました。",
+      "respondFailedTitle": "プラン応答に失敗しました",
+      "respondFailedBody": "プラン応答を適用できませんでした（{{reason}}）。承認状態を復元しました。"
     },
     "permission": {
       "title": "権限が必要です",

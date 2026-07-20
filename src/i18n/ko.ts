@@ -342,7 +342,9 @@ export const ko = {
       "forceOnTitle": "계획 모드 켜짐",
       "forceOnBody": "다음 턴은 먼저 계획을 세웁니다. 작업을 보내거나 /plan your task를 사용하세요.",
       "forceOffTitle": "계획 모드 꺼짐",
-      "forceOffBody": "더 이상 턴에 먼저 계획이 필요하지 않습니다."
+      "forceOffBody": "더 이상 턴에 먼저 계획이 필요하지 않습니다.",
+      "respondFailedTitle": "계획 응답 실패",
+      "respondFailedBody": "계획 응답을 적용할 수 없습니다({{reason}}). 승인 상태를 복원했습니다."
     },
     "permission": {
       "title": "권한 필요",

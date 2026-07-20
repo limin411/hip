@@ -17,6 +17,7 @@ import type {
   TerminalShellPref,
   TrashConfig,
   AcpHostConfig,
+  PlanConfig,
 } from '@hip/protocol'
 import { parseDoomLoopStrategy } from '../session/doom-loop.js'
 
@@ -248,6 +249,19 @@ function normalizeTrash(raw: Record<string, unknown>): TrashConfig {
   return out
 }
 
+/** Normalize `[plan]` product knobs (camelCase + snake_case aliases). */
+function normalizePlan(raw: Record<string, unknown>): PlanConfig {
+  const out: PlanConfig = {}
+  const soft =
+    raw.softApproveOnComposer !== undefined
+      ? raw.softApproveOnComposer
+      : raw.soft_approve_on_composer
+  if (typeof soft === 'boolean') {
+    out.softApproveOnComposer = soft
+  }
+  return out
+}
+
 /** Normalize `[acp]` host policy (camelCase + snake_case aliases). */
 function normalizeAcpHost(raw: Record<string, unknown>): AcpHostConfig {
   const out: AcpHostConfig = {}
@@ -333,6 +347,11 @@ function validateConfig(parsed: unknown, filePath: string): HipConfig {
   const acp = obj.acp
   if (acp && typeof acp === 'object' && !Array.isArray(acp)) {
     config.acp = normalizeAcpHost(acp as Record<string, unknown>)
+  }
+
+  const plan = obj.plan
+  if (plan && typeof plan === 'object' && !Array.isArray(plan)) {
+    config.plan = normalizePlan(plan as Record<string, unknown>)
   }
 
   return config

@@ -319,6 +319,8 @@ export const en = {
         forceOnBody: 'Next turns will plan first. Send a task, or use /plan your task.',
         forceOffTitle: 'Plan mode off',
         forceOffBody: 'Turns no longer require a plan first.',
+        respondFailedTitle: 'Plan response failed',
+        respondFailedBody: 'Could not apply plan response ({{reason}}). Approval restored.',
       },
       permission: {
         title: 'Permission required',

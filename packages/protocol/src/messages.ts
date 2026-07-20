@@ -406,6 +406,17 @@ export type ServerMessage =
   /** Authoritative plan snapshot at plan-approval boundary (ExitPlanMode / pause). */
   | { type: 'plan:published'; sessionId: string; turnId: string; plan: PlanItem[] }
   /**
+   * Ack for every `plan:respond` path (KD-16 / D4e).
+   * ok:false when not awaiting (skip) or handler failure — FE rolls back optimistic UI.
+   */
+  | {
+      type: 'plan:respond:result'
+      sessionId: string
+      ok: boolean
+      action: 'approve' | 'reject' | 'amend'
+      reason?: string
+    }
+  /**
    * Goal mode chrome (smoothness I1). Emitted when goal_create / goal_update changes state.
    * goal=null means cleared (completed or cancelled).
    */

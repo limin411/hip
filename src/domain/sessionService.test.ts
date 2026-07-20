@@ -517,6 +517,44 @@ describe('SessionService', () => {
     expect(useDomainStore.getState().sessions[0].interrupt ?? null).toBeNull()
   })
 
+  it('KD-8: planApprovalPending send defaults to plan:respond amend (not resume)', () => {
+    const t = new FakeTransport()
+    const svc = new SessionService(t)
+    svc.seedPlanApproval('s1')
+    useDomainStore.setState({ activeSessionId: 's1' })
+    useHipConfigStore.setState({ config: { version: 1 }, loaded: true, error: null })
+    svc.sendMessage('please revise step 2')
+    expect(t.sent.at(-1)).toMatchObject({
+      type: 'plan:respond',
+      sessionId: 's1',
+      action: 'amend',
+      amendContent: 'please revise step 2',
+    })
+    expect(t.sent.some((m) => m.type === 'message:resume')).toBe(false)
+    const sess = useDomainStore.getState().sessions.find((s) => s.id === 's1')!
+    expect(sess.planApprovalPending).toBe(false)
+    expect(sess.status).toBe('running')
+  })
+
+  it('KD-8: plan.softApproveOnComposer true keeps soft-approve resume path', () => {
+    const t = new FakeTransport()
+    const svc = new SessionService(t)
+    svc.seedPlanApproval('s1')
+    useDomainStore.setState({ activeSessionId: 's1' })
+    useHipConfigStore.setState({
+      config: { version: 1, plan: { softApproveOnComposer: true } },
+      loaded: true,
+      error: null,
+    })
+    svc.sendMessage('go ahead with proxy 127.0.0.1:7890')
+    expect(t.sent.at(-1)).toMatchObject({
+      type: 'message:resume',
+      sessionId: 's1',
+      content: 'go ahead with proxy 127.0.0.1:7890',
+    })
+    expect(t.sent.some((m) => m.type === 'plan:respond')).toBe(false)
+  })
+
   it('resume forwards attachments and does not require text', () => {
     const t = new FakeTransport()
     const svc = new SessionService(t)
@@ -897,6 +935,54 @@ describe('workspace diff', () => {
     expect(sess.planApprovalPending).toBe(false)
     expect(sess.status).toBe('idle')
     expect(t.sent.at(-1)).toMatchObject({ type: 'plan:respond', action: 'reject' })
+  })
+
+  it('KD-16: plan:respond:result ok:false restores planApprovalPending and interrupt', () => {
+    const t = new FakeTransport()
+    const svc = new SessionService(t)
+    const { turnId } = svc.seedPlanApproval('s1')
+    useDomainStore.setState({ activeSessionId: 's1' })
+    const before = useDomainStore.getState().sessions.find((s) => s.id === 's1')!
+    expect(before.planApprovalPending).toBe(true)
+    expect(before.interrupt?.turnId).toBe(turnId)
+
+    svc.respondPlan('approve')
+    const mid = useDomainStore.getState().sessions.find((s) => s.id === 's1')!
+    expect(mid.planApprovalPending).toBe(false)
+    expect(mid.interrupt).toBeNull()
+    expect(mid.planRespondRollback?.interrupt?.turnId).toBe(turnId)
+
+    t.push({
+      type: 'plan:respond:result',
+      sessionId: 's1',
+      ok: false,
+      action: 'approve',
+      reason: 'not_awaiting',
+    })
+    const after = useDomainStore.getState().sessions.find((s) => s.id === 's1')!
+    expect(after.planApprovalPending).toBe(true)
+    expect(after.interrupt?.turnId).toBe(turnId)
+    expect(after.interrupt?.question).toContain('Approve')
+    expect(after.status).toBe('idle')
+    expect(after.planRespondRollback).toBeNull()
+  })
+
+  it('KD-16: plan:respond:result ok:true clears rollback stash', () => {
+    const t = new FakeTransport()
+    const svc = new SessionService(t)
+    svc.seedPlanApproval('s1')
+    useDomainStore.setState({ activeSessionId: 's1' })
+    svc.respondPlan('approve')
+    expect(useDomainStore.getState().sessions.find((s) => s.id === 's1')!.planRespondRollback).toBeTruthy()
+    t.push({
+      type: 'plan:respond:result',
+      sessionId: 's1',
+      ok: true,
+      action: 'approve',
+    })
+    const sess = useDomainStore.getState().sessions.find((s) => s.id === 's1')!
+    expect(sess.planRespondRollback).toBeNull()
+    expect(sess.planApprovalPending).toBe(false)
   })
 
   it('seedBackgroundTaskKilled appends synthetic killed notification', () => {

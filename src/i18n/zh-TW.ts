@@ -350,7 +350,9 @@ export const zhTW = {
       "forceOnTitle": "已開啟規劃模式",
       "forceOnBody": "後續回合會先規劃。直接傳送任務，或使用 /plan 你的任務。",
       "forceOffTitle": "已關閉規劃模式",
-      "forceOffBody": "回合不再強制先規劃。"
+      "forceOffBody": "回合不再強制先規劃。",
+      "respondFailedTitle": "計劃響應失敗",
+      "respondFailedBody": "無法套用計劃響應（{{reason}}）。已恢復審批狀態。"
     },
     "permission": {
       "title": "需要授權",

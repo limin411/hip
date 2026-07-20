@@ -737,6 +737,65 @@ describe('applyServerMessage', () => {
     expect(s.sessions[0].planApprovalPending).toBe(false)
   })
 
+  it('KD-16: plan:respond:result ok:false restores pending + interrupt from rollback stash', () => {
+    const interrupt = {
+      turnId: 't1',
+      question: 'Approve plan?',
+      context: JSON.stringify({ kind: 'plan_approval' }),
+    }
+    const s0 = {
+      sessions: [
+        baseSession({
+          id: 's',
+          planApprovalPending: false,
+          interrupt: null,
+          status: 'running',
+          planRespondRollback: { interrupt, status: 'idle' },
+        }),
+      ],
+    }
+    const next = applyServerMessage(
+      s0,
+      {
+        type: 'plan:respond:result',
+        sessionId: 's',
+        ok: false,
+        action: 'approve',
+        reason: 'not_awaiting',
+      },
+      0,
+    )
+    expect(next.sessions[0].planApprovalPending).toBe(true)
+    expect(next.sessions[0].interrupt).toEqual(interrupt)
+    expect(next.sessions[0].status).toBe('idle')
+    expect(next.sessions[0].planRespondRollback).toBeNull()
+  })
+
+  it('KD-16: plan:respond:result ok:true clears rollback only', () => {
+    const s0 = {
+      sessions: [
+        baseSession({
+          id: 's',
+          planApprovalPending: false,
+          interrupt: null,
+          status: 'running',
+          planRespondRollback: {
+            interrupt: { turnId: 't1', question: 'q' },
+            status: 'idle',
+          },
+        }),
+      ],
+    }
+    const next = applyServerMessage(
+      s0,
+      { type: 'plan:respond:result', sessionId: 's', ok: true, action: 'amend' },
+      0,
+    )
+    expect(next.sessions[0].planApprovalPending).toBe(false)
+    expect(next.sessions[0].planRespondRollback).toBeNull()
+    expect(next.sessions[0].status).toBe('running')
+  })
+
   it('stores agentFrame on pendingPermission for a nested sub-agent request', () => {
     const base = { sessions: [{ id: 's1', config: { llmProvider: 'd', model: 'm', tools: [] }, title: '', preview: '', updatedAtMs: 0, loaded: true, messages: [], status: 'idle', error: null }] } as any
     const next = applyServerMessage(base, {

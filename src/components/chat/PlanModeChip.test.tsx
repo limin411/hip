@@ -2,6 +2,7 @@
 import '@testing-library/jest-dom/vitest'
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, fireEvent, cleanup } from '@testing-library/react'
+import { toast } from 'sonner'
 import { PlanModeChip } from './PlanModeChip'
 import { useDraftStore } from '@/store/draftStore'
 import { useDomainStore } from '@/domain'
@@ -10,6 +11,10 @@ import i18n from '@/i18n'
 const setForcePlan = vi.fn()
 const runPlanOn = vi.fn()
 const runPlanOff = vi.fn()
+
+vi.mock('sonner', () => ({
+  toast: { message: vi.fn(), error: vi.fn(), success: vi.fn() },
+}))
 
 vi.mock('@/domain', async () => {
   const actual = await vi.importActual<typeof import('@/domain')>('@/domain')
@@ -105,7 +110,7 @@ describe('PlanModeChip', () => {
     expect(runPlanOn).toHaveBeenCalledWith('s1')
   })
 
-  it('is disabled while a turn is running', () => {
+  it('KD-12: while running, chip is aria-disabled and click only toasts', () => {
     useDomainStore.setState({
       sessions: [
         {
@@ -132,9 +137,12 @@ describe('PlanModeChip', () => {
 
     render(<PlanModeChip />)
     const chip = screen.getByTestId('plan-mode-chip')
-    expect(chip).toBeDisabled()
+    // Not HTML-disabled so click can surface toast (KD-12 toast-only).
+    expect(chip).not.toBeDisabled()
+    expect(chip).toHaveAttribute('aria-disabled', 'true')
     fireEvent.click(chip)
     expect(runPlanOn).not.toHaveBeenCalled()
     expect(runPlanOff).not.toHaveBeenCalled()
+    expect(toast.message).toHaveBeenCalledWith(i18n.t('chat.plan.busyTitle'))
   })
 })

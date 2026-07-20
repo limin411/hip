@@ -1,7 +1,16 @@
 //! Shared interactive-terminal soft cap (local PTY + SSH).
 //!
-//! Authoritative alive-slot counter. Lock order: **Budget → PtyManager / SshManager**
-//! (never reverse). See design K5 / soft-cap section.
+//! Authoritative alive-slot counter (K5). Max = [`MAX_INTERACTIVE_TERMINALS`].
+//!
+//! **Locking policy (actual):** the budget mutex is **never held across I/O** and
+//! never nested under another long-lived lock. Callers may hold a manager map
+//! briefly and call `try_acquire` / `release` (budget lock is taken and released
+//! inside those methods). Do **not** hold the budget mutex while awaiting network
+//! or portable-pty I/O, and do not take a manager lock while already holding budget.
+//!
+//! Design phrasing “Budget → managers” means: decide the slot first (or under a
+//! brief manager peek), then do long work; never reverse into “hold manager wait
+//! while holding budget.”
 
 use std::collections::HashSet;
 use std::sync::Mutex;

@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 const ptyKill = vi.fn(async (_id: string) => {})
 const sshClose = vi.fn(async (_id: string) => {})
+const interactiveTerminalList = vi.fn(async () => [] as { id: string; kind: string }[])
 const homeDir = vi.fn(async () => '/Users/test')
 const pushRecent = vi.fn(async (_entry: unknown) => {})
 
@@ -11,6 +12,7 @@ vi.mock('@/ipc/pty', () => ({
 
 vi.mock('@/ipc/ssh', () => ({
   sshClose: (id: string) => sshClose(id),
+  interactiveTerminalList: () => interactiveTerminalList(),
 }))
 
 vi.mock('@tauri-apps/api/path', () => ({
@@ -54,6 +56,7 @@ describe('managedTerminalStore', () => {
   beforeEach(() => {
     ptyKill.mockReset().mockResolvedValue(undefined)
     sshClose.mockReset().mockResolvedValue(undefined)
+    interactiveTerminalList.mockReset().mockResolvedValue([])
     homeDir.mockReset().mockResolvedValue('/Users/test')
     pushRecent.mockReset()
     useManagedTerminalStore.setState({ terminals: [], focusedId: null })
@@ -146,6 +149,24 @@ describe('managedTerminalStore', () => {
       title: 'ops',
     })
     expect(useManagedTerminalStore.getState().focusedId).toBe(id)
+  })
+
+  it('openSsh throws soft-cap when interactive list is full', async () => {
+    interactiveTerminalList.mockResolvedValue(
+      Array.from({ length: 8 }, (_, i) => ({ id: `t${i}`, kind: 'pty' })),
+    )
+    await expect(
+      useManagedTerminalStore.getState().openSsh({
+        id: 'hst_1',
+        label: 'ops',
+        hostname: '10.0.0.1',
+        port: 22,
+        username: 'root',
+        authMethod: 'password',
+        updatedAt: 1,
+      }),
+    ).rejects.toThrow(/Too many terminals/)
+    expect(useManagedTerminalStore.getState().terminals).toHaveLength(0)
   })
 
   it('close of ssh calls sshClose', async () => {

@@ -62,8 +62,8 @@ base64 = "0.22"
 libc = "0.2"
 # Knowledge link index (per-space SQLite under .hip/).
 rusqlite = { version = "0.32", features = ["bundled"] }
-# PR0 SSH spike only (`ssh-spike` feature). Default crypto backend = aws-lc-rs + flate2 + rsa.
+# Product SSH client (feature `ssh`, default-on). Default crypto = aws-lc-rs + flate2 + rsa.
 # Resolves to 0.54.5 (0.54.6 blocked: yanked libcrux-ml-kem). cargo may warn future-incompat —
-# bump policy + residual notes in docs/design/2026-07-20-terminal-ssh-spike.md.
+# bump policy in docs/design/2026-07-20-terminal-ssh-spike.md.
 russh = { version = "0.54", optional = true }
 

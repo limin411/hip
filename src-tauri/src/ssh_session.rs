@@ -8,7 +8,7 @@
 
 use base64::{engine::general_purpose::STANDARD as B64, Engine};
 use serde::Serialize;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::Arc;
 use std::time::{Duration, Instant};
@@ -20,7 +20,7 @@ use russh::keys::{self, HashAlg, PrivateKeyWithHashAlg, PublicKey};
 use russh::{ChannelMsg, ChannelWriteHalf, Disconnect};
 
 use crate::ssh_known_hosts::{
-    get_pin, host_key_id, load_known_hosts, save_known_hosts, tofu_check_strings, trust_host,
+    get_pin, host_key_id, tofu_check_strings, trust_host, with_known_hosts, with_known_hosts_mut,
     HostKeyDecision, KnownHostEntry,
 };
 use crate::ssh_path::expand_tilde_path;
@@ -89,10 +89,10 @@ fn mismatch_err(
         previous_fingerprint: previous,
         public_key: public_key.to_string(),
     };
+    // Always JSON via serde (no hand-interpolated fallback — Issue 13).
     serde_json::to_string(&payload).unwrap_or_else(|_| {
-        format!(
-            r#"{{"code":"host_key_mismatch","hostname":"{hostname}","port":{port},"fingerprint":"{fingerprint}"}}"#
-        )
+        r#"{"code":"host_key_mismatch","hostname":"","port":0,"fingerprint":"","publicKey":""}"#
+            .to_string()
     })
 }
 
@@ -173,6 +173,9 @@ struct SshSession {
 
 pub struct SshManager {
     sessions: std::sync::Mutex<HashMap<String, Arc<SshSession>>>,
+    /// In-flight `ssh_open` ids — single-flight so concurrent same-id opens
+    /// cannot free each other's budget reservation (Issue 4).
+    opening: std::sync::Mutex<HashSet<String>>,
     next_generation: AtomicU64,
 }
 
@@ -180,12 +183,26 @@ impl SshManager {
     pub fn new() -> Self {
         Self {
             sessions: std::sync::Mutex::new(HashMap::new()),
+            opening: std::sync::Mutex::new(HashSet::new()),
             next_generation: AtomicU64::new(1),
         }
     }
 
     fn next_gen(&self) -> u64 {
         self.next_generation.fetch_add(1, Ordering::SeqCst)
+    }
+
+    /// Begin single-flight open for `id`. Err if another open is already in progress.
+    fn begin_open(&self, id: &str) -> Result<(), String> {
+        let mut set = self.opening.lock().unwrap();
+        if !set.insert(id.to_string()) {
+            return Err("SSH open already in progress for this terminal".into());
+        }
+        Ok(())
+    }
+
+    fn end_open(&self, id: &str) {
+        self.opening.lock().unwrap().remove(id);
     }
 
     pub fn list_ids(&self) -> Vec<String> {
@@ -298,7 +315,7 @@ fn secret_passphrase_key(host_id: &str) -> String {
     format!("hip.ssh.{host_id}.passphrase")
 }
 
-/// Pin TOFU key after successful first-use connect.
+/// Pin TOFU key after successful first-use connect (serialized RMW).
 fn pin_tofu_if_needed(
     app: &AppHandle,
     hostname: &str,
@@ -313,20 +330,21 @@ fn pin_tofu_if_needed(
     }
     let path = crate::ssh_known_hosts::known_hosts_path(app)
         .ok_or_else(|| "no config dir".to_string())?;
-    let mut file = load_known_hosts(&path);
     let now = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
         .map(|d| d.as_millis() as i64)
         .unwrap_or(0);
-    trust_host(
-        &mut file,
-        hostname,
-        port,
-        outcome.server_public_key.clone(),
-        outcome.fingerprint.clone(),
-        now,
-    );
-    save_known_hosts(&path, &file).map_err(|e| e.to_string())?;
+    with_known_hosts_mut(&path, |file| {
+        trust_host(
+            file,
+            hostname,
+            port,
+            outcome.server_public_key.clone(),
+            outcome.fingerprint.clone(),
+            now,
+        );
+        Ok(())
+    })?;
     eprintln!(
         "[ssh] tofu_trust host={} pin={}",
         host_key_id(hostname, port),
@@ -377,9 +395,14 @@ pub async fn ssh_open(
         });
     }
 
+    // Single-flight: concurrent same-id opens must not race budget release (Issue 4).
+    manager.begin_open(&terminal_id)?;
+
     // Tear down any existing entry for this id (different host / dead).
-    {
+    // Remember membership so soft_cap_allows can reopen existing ids at cap (Issue 11).
+    let session_existed = {
         let mut map = manager.sessions.lock().unwrap();
+        let existed = map.contains_key(&terminal_id);
         if let Some(old) = map.remove(&terminal_id) {
             old.alive.store(false, Ordering::SeqCst);
             budget.release(&terminal_id);
@@ -388,12 +411,17 @@ pub async fn ssh_open(
                 close_session_handles(&old).await;
             });
         }
-    }
+        existed
+    };
 
-    // Budget acquire — lock order Budget only (session_exists if id was known).
-    // We already removed any prior entry; session_exists is false for fresh open.
-    // Reopen of a previously known dead id: not in map → false is fine (slot free).
-    let newly = budget.try_acquire(&terminal_id, false)?;
+    // Budget acquire after manager teardown; budget mutex is not held across I/O.
+    let newly = match budget.try_acquire(&terminal_id, session_existed) {
+        Ok(n) => n,
+        Err(e) => {
+            manager.end_open(&terminal_id);
+            return Err(e);
+        }
+    };
 
     let host = match load_host_meta(&app, &host_id) {
         Ok(h) => h,
@@ -401,24 +429,33 @@ pub async fn ssh_open(
             if newly {
                 budget.release(&terminal_id);
             }
+            manager.end_open(&terminal_id);
             return Err(e);
         }
     };
 
-    let result = open_ssh_connection(&app, &manager, &budget, &terminal_id, &host, cols, rows).await;
+    let result =
+        open_ssh_connection(&app, &manager, &budget, &terminal_id, &host, cols, rows).await;
+
+    manager.end_open(&terminal_id);
 
     match result {
         Ok(r) => {
             eprintln!(
                 "[ssh] open hostId={} terminalId={} auth={} ok",
-                host_id,
-                terminal_id,
-                host.auth_method
+                host_id, terminal_id, host.auth_method
             );
             Ok(r)
         }
         Err(e) => {
-            if newly {
+            // Only release if we reserved and no alive session was published for this id.
+            let published_alive = {
+                let map = manager.sessions.lock().unwrap();
+                map.get(&terminal_id)
+                    .map(|s| s.alive.load(Ordering::SeqCst))
+                    .unwrap_or(false)
+            };
+            if newly && !published_alive {
                 budget.release(&terminal_id);
             }
             // Avoid logging secrets — e is already redacted.
@@ -458,11 +495,10 @@ async fn open_ssh_connection(
         return Err("username is empty".into());
     }
 
-    // Load known pin for TOFU.
+    // Load known pin for TOFU (under known_hosts lock).
     let kh_path = crate::ssh_known_hosts::known_hosts_path(app)
         .ok_or_else(|| "no config dir".to_string())?;
-    let kh = load_known_hosts(&kh_path);
-    let trusted = get_pin(&kh, &hostname, port).cloned();
+    let trusted = with_known_hosts(&kh_path, |kh| get_pin(kh, &hostname, port).cloned())?;
 
     let gate = Arc::new(HostKeyGate {
         trusted,
@@ -587,10 +623,15 @@ async fn open_ssh_connection(
         }
     }
 
-    // Pin on first use after successful auth.
+    // Pin on first use after successful auth (log pin failures — Issue 9).
     if let Ok(g) = gate.outcome.lock() {
         if let Some(ref o) = *g {
-            let _ = pin_tofu_if_needed(app, &hostname, port, o);
+            if let Err(e) = pin_tofu_if_needed(app, &hostname, port, o) {
+                eprintln!(
+                    "[ssh] tofu pin failed host={}: {e}",
+                    host_key_id(&hostname, port)
+                );
+            }
         }
     }
 
@@ -640,12 +681,13 @@ async fn open_ssh_connection(
         }
     }
 
-    // Reader + coalesce loop.
+    // Reader + coalesce loop. On exit: drop network handles (Issue 3) then budget + event.
     let emit_app = app.clone();
     let emit_id = terminal_id.to_string();
     let emit_alive = Arc::clone(&alive);
     let emit_gen = generation;
     let emit_budget_app = app.clone();
+    let emit_sess = Arc::clone(&sess);
     tauri::async_runtime::spawn(async move {
         let mut pending: Vec<u8> = Vec::new();
         let mut queue = EmitQueue::new();
@@ -698,6 +740,8 @@ async fn open_ssh_connection(
         }
 
         flush_ssh_pending(&emit_app, &emit_id, &mut pending, &mut queue);
+        // Drop channel writer + disconnect TCP (keep map entry for Restart, like PTY).
+        close_session_handles(&emit_sess).await;
         emit_alive.store(false, Ordering::SeqCst);
 
         // Release budget slot.

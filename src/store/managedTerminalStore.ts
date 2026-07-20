@@ -2,10 +2,27 @@ import { create } from 'zustand'
 import { nanoid } from 'nanoid'
 import { homeDir } from '@tauri-apps/api/path'
 import { ptyKill } from '@/ipc/pty'
-import { sshClose } from '@/ipc/ssh'
+import { interactiveTerminalList, sshClose } from '@/ipc/ssh'
 import type { TerminalHost } from '@/ipc/terminalHosts'
 import { useTerminalStore } from '@/store/terminalStore'
 import { useTerminalHostStore } from '@/store/terminalHostStore'
+
+/** Stable English substring matched by XtermSurface / HostLibrary soft-cap UX. */
+const SOFT_CAP_ERROR =
+  'Too many terminals open (max 8). Close a session first.'
+
+/** Pre-check via Rust interactive list (UX only; Rust remains authoritative on open). */
+async function assertSoftCapRoom(): Promise<void> {
+  try {
+    const list = await interactiveTerminalList()
+    if (list.length >= 8) {
+      throw new Error(SOFT_CAP_ERROR)
+    }
+  } catch (e) {
+    // Re-throw soft-cap; ignore non-Tauri / list failures so open can still try Rust path.
+    if (e instanceof Error && e.message.includes('Too many terminals')) throw e
+  }
+}
 
 export type ManagedTerminalKind = 'local' | 'ssh'
 
@@ -102,6 +119,7 @@ export const useManagedTerminalStore = create<ManagedTerminalStore>((set, get) =
   getTerminal: (id) => get().terminals.find((t) => t.id === id),
 
   openLocal: async (opts) => {
+    await assertSoftCapRoom()
     let cwd = opts?.cwd?.trim()
     if (!cwd) {
       try {
@@ -133,6 +151,8 @@ export const useManagedTerminalStore = create<ManagedTerminalStore>((set, get) =
   },
 
   openSsh: async (host) => {
+    // Soft-cap surfaces at Connect (before minting a tab); Rust still enforces on ssh_open.
+    await assertSoftCapRoom()
     const id = mintManagedTerminalId()
     const entry: ManagedTerminal = {
       id,

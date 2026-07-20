@@ -1,12 +1,18 @@
 //! TOFU host-key store (`~/.hip/config/ssh_known_hosts.json`).
 //!
 //! Atomic write + Unix 0o600. Product source of truth (not OpenSSH known_hosts).
+//! All load→mutate→save paths serialize under a process-wide mutex so concurrent
+//! first-use / trust updates cannot drop each other's pins.
 
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 use std::io;
 use std::path::Path;
+use std::sync::Mutex;
 use tauri::AppHandle;
+
+/// Serializes known_hosts RMW (not just rename atomicity).
+static KNOWN_HOSTS_LOCK: Mutex<()> = Mutex::new(());
 
 /// Host-key decision returned by TOFU checks (maps to modal outcomes).
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -39,7 +45,7 @@ pub struct KnownHostEntry {
 pub struct KnownHostsFile {
     #[serde(default = "default_version")]
     pub version: u32,
-    /// Keyed by `hostname:port` (hostname lowercased).
+    /// Keyed by `host_key_id` (`hostname|port`, hostname lowercased).
     #[serde(default)]
     pub hosts: BTreeMap<String, KnownHostEntry>,
 }
@@ -49,7 +55,15 @@ fn default_version() -> u32 {
 }
 
 /// Canonical map key for a host:port pin.
+///
+/// Uses `|` as delimiter so raw IPv6 addresses (`2001:db8::1`) are unambiguous.
+/// Legacy keys used `hostname:port` (ambiguous for IPv6); lookup still falls back.
 pub fn host_key_id(hostname: &str, port: u16) -> String {
+    format!("{}|{}", hostname.trim().to_ascii_lowercase(), port)
+}
+
+/// Pre-PR5 key form `hostname:port` (kept only for read migration).
+fn host_key_id_legacy(hostname: &str, port: u16) -> String {
     format!("{}:{}", hostname.trim().to_ascii_lowercase(), port)
 }
 
@@ -104,16 +118,19 @@ pub fn known_hosts_path(app: &AppHandle) -> Option<std::path::PathBuf> {
     Some(crate::paths::config_dir(app)?.join("ssh_known_hosts.json"))
 }
 
-/// Lookup pin for hostname:port.
+/// Lookup pin for hostname:port (new key, then legacy `:` form).
 pub fn get_pin<'a>(
     file: &'a KnownHostsFile,
     hostname: &str,
     port: u16,
 ) -> Option<&'a KnownHostEntry> {
-    file.hosts.get(&host_key_id(hostname, port))
+    let key = host_key_id(hostname, port);
+    file.hosts
+        .get(&key)
+        .or_else(|| file.hosts.get(&host_key_id_legacy(hostname, port)))
 }
 
-/// Insert or replace pin.
+/// Insert or replace pin under the canonical key; drop any legacy key for the same host.
 pub fn trust_host(
     file: &mut KnownHostsFile,
     hostname: &str,
@@ -125,8 +142,10 @@ pub fn trust_host(
     if file.version == 0 {
         file.version = 1;
     }
+    let key = host_key_id(hostname, port);
+    file.hosts.remove(&host_key_id_legacy(hostname, port));
     file.hosts.insert(
-        host_key_id(hostname, port),
+        key,
         KnownHostEntry {
             public_key,
             fingerprint_sha256,
@@ -135,9 +154,40 @@ pub fn trust_host(
     );
 }
 
-/// Remove pin if present. Returns whether something was removed.
+/// Remove pin if present (both canonical and legacy keys). Returns whether something was removed.
 pub fn remove_host_key(file: &mut KnownHostsFile, hostname: &str, port: u16) -> bool {
-    file.hosts.remove(&host_key_id(hostname, port)).is_some()
+    let a = file.hosts.remove(&host_key_id(hostname, port)).is_some();
+    let b = file
+        .hosts
+        .remove(&host_key_id_legacy(hostname, port))
+        .is_some();
+    a || b
+}
+
+/// Load → mutate → save under the process-wide known_hosts lock (Issue 2).
+pub fn with_known_hosts_mut<F, R>(path: &Path, f: F) -> Result<R, String>
+where
+    F: FnOnce(&mut KnownHostsFile) -> Result<R, String>,
+{
+    let _guard = KNOWN_HOSTS_LOCK
+        .lock()
+        .map_err(|_| "known_hosts lock poisoned".to_string())?;
+    let mut file = load_known_hosts(path);
+    let out = f(&mut file)?;
+    save_known_hosts(path, &file).map_err(|e| e.to_string())?;
+    Ok(out)
+}
+
+/// Read-only load under the same lock (consistent with writers).
+pub fn with_known_hosts<F, R>(path: &Path, f: F) -> Result<R, String>
+where
+    F: FnOnce(&KnownHostsFile) -> R,
+{
+    let _guard = KNOWN_HOSTS_LOCK
+        .lock()
+        .map_err(|_| "known_hosts lock poisoned".to_string())?;
+    let file = load_known_hosts(path);
+    Ok(f(&file))
 }
 
 #[tauri::command]
@@ -147,8 +197,7 @@ pub fn ssh_known_hosts_get(
     port: u16,
 ) -> Result<Option<KnownHostEntry>, String> {
     let path = known_hosts_path(&app).ok_or_else(|| "no config dir".to_string())?;
-    let file = load_known_hosts(&path);
-    Ok(get_pin(&file, &hostname, port).cloned())
+    with_known_hosts(&path, |file| get_pin(file, &hostname, port).cloned())
 }
 
 #[tauri::command]
@@ -160,28 +209,30 @@ pub fn ssh_trust_host(
     fingerprint_sha256: String,
 ) -> Result<(), String> {
     let path = known_hosts_path(&app).ok_or_else(|| "no config dir".to_string())?;
-    let mut file = load_known_hosts(&path);
     let now = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
         .map(|d| d.as_millis() as i64)
         .unwrap_or(0);
-    trust_host(
-        &mut file,
-        &hostname,
-        port,
-        public_key,
-        fingerprint_sha256,
-        now,
-    );
-    save_known_hosts(&path, &file).map_err(|e| e.to_string())
+    with_known_hosts_mut(&path, |file| {
+        trust_host(
+            file,
+            &hostname,
+            port,
+            public_key,
+            fingerprint_sha256,
+            now,
+        );
+        Ok(())
+    })
 }
 
 #[tauri::command]
 pub fn ssh_remove_host_key(app: AppHandle, hostname: String, port: u16) -> Result<(), String> {
     let path = known_hosts_path(&app).ok_or_else(|| "no config dir".to_string())?;
-    let mut file = load_known_hosts(&path);
-    remove_host_key(&mut file, &hostname, port);
-    save_known_hosts(&path, &file).map_err(|e| e.to_string())
+    with_known_hosts_mut(&path, |file| {
+        remove_host_key(file, &hostname, port);
+        Ok(())
+    })
 }
 
 #[cfg(test)]
@@ -200,8 +251,24 @@ mod tests {
     }
 
     #[test]
-    fn host_key_id_normalizes_case() {
-        assert_eq!(host_key_id("Host.Example", 22), "host.example:22");
+    fn host_key_id_uses_pipe_and_normalizes_case() {
+        assert_eq!(host_key_id("Host.Example", 22), "host.example|22");
+        assert_eq!(host_key_id("2001:db8::1", 22), "2001:db8::1|22");
+    }
+
+    #[test]
+    fn get_pin_falls_back_to_legacy_colon_key() {
+        let mut file = KnownHostsFile::default();
+        file.hosts.insert(
+            host_key_id_legacy("example.com", 22),
+            KnownHostEntry {
+                public_key: "ssh-ed25519 AAAA".into(),
+                fingerprint_sha256: "SHA256:old".into(),
+                updated_at: 1,
+            },
+        );
+        let pin = get_pin(&file, "example.com", 22).unwrap();
+        assert_eq!(pin.fingerprint_sha256, "SHA256:old");
     }
 
     #[test]
@@ -260,6 +327,39 @@ mod tests {
         assert_eq!(pin.fingerprint_sha256, "SHA256:xyz");
         assert!(remove_host_key(&mut file, "example.com", 22));
         assert!(get_pin(&file, "example.com", 22).is_none());
+    }
+
+    #[test]
+    fn with_known_hosts_mut_serializes_writes() {
+        let p = tmp_path("rmw");
+        let _ = std::fs::remove_file(&p);
+        with_known_hosts_mut(&p, |file| {
+            trust_host(
+                file,
+                "a.example",
+                22,
+                "ssh-ed25519 A".into(),
+                "SHA256:a".into(),
+                1,
+            );
+            Ok(())
+        })
+        .unwrap();
+        with_known_hosts_mut(&p, |file| {
+            trust_host(
+                file,
+                "b.example",
+                22,
+                "ssh-ed25519 B".into(),
+                "SHA256:b".into(),
+                2,
+            );
+            Ok(())
+        })
+        .unwrap();
+        let loaded = load_known_hosts(&p);
+        assert!(get_pin(&loaded, "a.example", 22).is_some());
+        assert!(get_pin(&loaded, "b.example", 22).is_some());
     }
 
     #[test]

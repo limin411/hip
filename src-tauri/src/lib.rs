@@ -16,8 +16,11 @@ mod ssh_known_hosts;
 mod knowledge;
 mod knowledge_trash;
 mod knowledge_link_index;
-// Production SSH (default feature `ssh`).
+// Production SSH (default feature `ssh`); stubs keep IPC registered when stripped.
 #[cfg(feature = "ssh")]
+mod ssh_session;
+#[cfg(not(feature = "ssh"))]
+#[path = "ssh_session_stub.rs"]
 mod ssh_session;
 
 // Re-export so command handlers and unit tests can use `super::HipConfig` etc.
@@ -167,6 +170,11 @@ fn set_secret(app: tauri::AppHandle, key: String, value: String) -> Result<(), S
 
 #[tauri::command]
 fn get_secret(app: tauri::AppHandle, key: String) -> Result<Option<String>, String> {
+    // Defense in depth (K6b): never expose SSH passwords/passphrases to the renderer.
+    // Internal `get_secret_value` still loads them for `ssh_open` only.
+    if key.starts_with("hip.ssh.") {
+        return Err("SSH secrets cannot be read from the renderer".into());
+    }
     Ok(auth::auth_get(&auth_path(&app)?, &key))
 }
 
@@ -544,7 +552,7 @@ struct InteractiveTerminalEntry {
 #[tauri::command]
 fn interactive_terminal_list(
     pty: tauri::State<'_, pty::PtyManager>,
-    #[cfg(feature = "ssh")] manager: tauri::State<'_, ssh_session::SshManager>,
+    manager: tauri::State<'_, ssh_session::SshManager>,
 ) -> Result<Vec<InteractiveTerminalEntry>, String> {
     let mut out = Vec::new();
     for id in pty.list_alive_ids() {
@@ -553,14 +561,11 @@ fn interactive_terminal_list(
             kind: "pty".into(),
         });
     }
-    #[cfg(feature = "ssh")]
-    {
-        for id in manager.list_alive_ids() {
-            out.push(InteractiveTerminalEntry {
-                id,
-                kind: "ssh".into(),
-            });
-        }
+    for id in manager.list_alive_ids() {
+        out.push(InteractiveTerminalEntry {
+            id,
+            kind: "ssh".into(),
+        });
     }
     Ok(out)
 }
@@ -594,10 +599,8 @@ pub fn run() {
         .manage(terminal_budget::TerminalBudget::new())
         .manage(pty::PtyManager::new());
 
-    #[cfg(feature = "ssh")]
-    let app = app.manage(ssh_session::SshManager::new());
-
     let app = app
+        .manage(ssh_session::SshManager::new())
         .setup(|app| {
             let handle = app.handle().clone();
             tauri::async_runtime::spawn(async move {
@@ -731,12 +734,9 @@ pub fn run() {
             crate::sidecar::remove_discovery_file(app_handle);
             let budget = app_handle.state::<terminal_budget::TerminalBudget>();
             app_handle.state::<pty::PtyManager>().kill_all(&budget);
-            #[cfg(feature = "ssh")]
-            {
-                app_handle
-                    .state::<ssh_session::SshManager>()
-                    .kill_all(&budget);
-            }
+            app_handle
+                .state::<ssh_session::SshManager>()
+                .kill_all(&budget);
         }
         // On macOS, closing the (single) window does not quit the app by default,
         // which would leave the sidecar running. For this single-window app, treat

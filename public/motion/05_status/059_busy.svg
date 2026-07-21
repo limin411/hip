@@ -1,0 +1,46 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 400" width="512" height="512" role="img" aria-labelledby="busy-title busy-desc" style="overflow:hidden">
+  <title id="busy-title">忙碌</title>
+  <desc id="busy-desc">Busy</desc>
+  <style>
+
+    .root { transform-origin: 200px 280px; animation: shake 0.55s cubic-bezier(0.22, 0.9, 0.3, 1) infinite; }
+    .arm-l { transform-origin: 70px 220px; animation: punchL 0.55s cubic-bezier(0.22, 0.9, 0.3, 1) infinite; }
+    .arm-r { transform-origin: 330px 220px; animation: punchR 0.55s cubic-bezier(0.22, 0.9, 0.3, 1) infinite; }
+    @keyframes shake {
+      0%,100% { transform: translateX(0); }
+      20% { transform: translateX(-5px); } 40% { transform: translateX(5px); }
+      60% { transform: translateX(-3px); } 80% { transform: translateX(3px); }
+    }
+    @keyframes punchL { 0%,100% { transform: rotate(0); } 50% { transform: rotate(-12deg); } }
+    @keyframes punchR { 0%,100% { transform: rotate(0); } 50% { transform: rotate(12deg); } }
+
+.pe{animation:be .7s cubic-bezier(0.34, 1.35, 0.64, 1) infinite}@keyframes be{0%,100%{transform:scale(1)}50%{transform:scale(1.12)}}
+  </style>
+  <g class="root">
+
+    <ellipse cx="152" cy="208" rx="90" ry="102" fill="#FF9800"/>
+    <ellipse cx="248" cy="208" rx="90" ry="102" fill="#FF9800"/>
+    <path d="M200 128 Q192 208 200 278" fill="none" stroke="#E87E00" stroke-width="10" stroke-linecap="round"/>
+
+    <g class="arm-l">
+      <path d="M95 245 Q120 258 145 270" fill="none" stroke="#000000" stroke-width="14" stroke-linecap="round"/>
+      
+      <circle cx="145" cy="270" r="16" fill="#FFFFFF" stroke="#000000" stroke-width="6"/>
+      <path d="M135 264 Q145 258 155 264" fill="none" stroke="#000000" stroke-width="3.5" stroke-linecap="round"/></g>
+    <g class="arm-r">
+      <path d="M305 245 Q280 258 255 270" fill="none" stroke="#000000" stroke-width="14" stroke-linecap="round"/>
+      
+      <circle cx="255" cy="270" r="16" fill="#FFFFFF" stroke="#000000" stroke-width="6"/>
+      <path d="M245 264 Q255 258 265 264" fill="none" stroke="#000000" stroke-width="3.5" stroke-linecap="round"/></g>
+
+    <path d="M148 140 L184 150" fill="none" stroke="#000000" stroke-width="6" stroke-linecap="round"/>
+    <path d="M252 150 L216 140" fill="none" stroke="#000000" stroke-width="6" stroke-linecap="round"/>
+    <ellipse cx="166" cy="164" rx="16" ry="18" fill="#FFFFFF" stroke="#000000" stroke-width="4"/>
+    <circle cx="168" cy="166" r="9" fill="#000000"/>
+    <ellipse cx="234" cy="164" rx="16" ry="18" fill="#FFFFFF" stroke="#000000" stroke-width="4"/>
+    <circle cx="236" cy="166" r="9" fill="#000000"/>
+<path d="M176 278 L224 278" fill="none" stroke="#000000" stroke-width="7" stroke-linecap="round"/>
+  </g>
+
+  <g transform="translate(312 90)"><g class="pe"><circle r="18" fill="#FFD23A" stroke="#000" stroke-width="4"/><text x="0" y="8" text-anchor="middle" font-size="24" font-family="Arial" font-weight="700">!</text></g></g>
+</svg>

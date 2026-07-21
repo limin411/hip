@@ -1,0 +1,65 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 400" width="512" height="512" role="img" aria-labelledby="party-title party-desc" style="overflow:hidden">
+  <title id="party-title">派对</title>
+  <desc id="party-desc">Party</desc>
+  <style>
+
+    .root { transform-origin: 200px 280px; animation: wiggle 0.7s cubic-bezier(0.22, 0.9, 0.3, 1) infinite; }
+    @keyframes wiggle {
+      0%,100% { transform: rotate(-3deg); } 25% { transform: rotate(3.5deg); }
+      50% { transform: rotate(-2.5deg); } 75% { transform: rotate(2.5deg); }
+    }
+
+
+    .c1 { animation: cf1 1.3s cubic-bezier(0.33, 0, 0.2, 1) infinite; }
+    .c2 { animation: cf2 1.3s cubic-bezier(0.33, 0, 0.2, 1) 0.2s infinite; }
+    .c3 { animation: cf3 1.3s cubic-bezier(0.33, 0, 0.2, 1) 0.4s infinite; }
+    .c4 { animation: cf4 1.3s cubic-bezier(0.33, 0, 0.2, 1) 0.6s infinite; }
+    @keyframes cf1 {
+      0% { opacity: 0; transform: translate(0,0) rotate(0deg); }
+      15% { opacity: 1; }
+      100% { opacity: 0; transform: translate(-20px,70px) rotate(160deg); }
+    }
+    @keyframes cf2 {
+      0% { opacity: 0; transform: translate(0,0) rotate(0deg); }
+      15% { opacity: 1; }
+      100% { opacity: 0; transform: translate(8px,70px) rotate(140deg); }
+    }
+    @keyframes cf3 {
+      0% { opacity: 0; transform: translate(0,0) rotate(0deg); }
+      15% { opacity: 1; }
+      100% { opacity: 0; transform: translate(22px,70px) rotate(180deg); }
+    }
+    @keyframes cf4 {
+      0% { opacity: 0; transform: translate(0,0) rotate(0deg); }
+      15% { opacity: 1; }
+      100% { opacity: 0; transform: translate(30px,70px) rotate(120deg); }
+    }
+
+  </style>
+  <g class="root">
+
+    <ellipse cx="152" cy="208" rx="90" ry="102" fill="#FF9800"/>
+    <ellipse cx="248" cy="208" rx="90" ry="102" fill="#FF9800"/>
+    <path d="M200 128 Q192 208 200 278" fill="none" stroke="#E87E00" stroke-width="10" stroke-linecap="round"/>
+
+    <g class="arm-l">
+      <path d="M75 220 Q58 160 40 100" fill="none" stroke="#000000" stroke-width="14" stroke-linecap="round"/>
+      
+      <circle cx="40" cy="100" r="24" fill="#FFFFFF" stroke="#000000" stroke-width="6"/>
+      <path d="M30 94 Q40 88 50 94" fill="none" stroke="#000000" stroke-width="3.5" stroke-linecap="round"/></g>
+    <g class="arm-r">
+      <path d="M325 220 Q342 160 360 100" fill="none" stroke="#000000" stroke-width="14" stroke-linecap="round"/>
+      
+      <circle cx="360" cy="100" r="24" fill="#FFFFFF" stroke="#000000" stroke-width="6"/>
+      <path d="M350 94 Q360 88 370 94" fill="none" stroke="#000000" stroke-width="3.5" stroke-linecap="round"/></g>
+
+    <path fill="#FFD23A" stroke="#000000" stroke-width="2" d="M166 140 L170 154 L184 154 L173 162 L177 176 L166 168 L155 176 L159 162 L148 154 L162 154Z"/>
+    <path fill="#FFD23A" stroke="#000000" stroke-width="2" d="M234 140 L238 154 L252 154 L241 162 L245 176 L234 168 L223 176 L227 162 L216 154 L230 154Z"/>
+<path d="M168 255 Q200 300 232 255" fill="none" stroke="#000000" stroke-width="8" stroke-linecap="round"/>
+  </g>
+
+  <g transform="translate(120 85)"><g class="c1"><circle r="5" fill="#FF5A6E"/></g></g>
+  <g transform="translate(180 65)"><g class="c2"><circle r="4.5" fill="#FFD23A"/></g></g>
+  <g transform="translate(250 70)"><g class="c3"><circle r="5" fill="#78BEFF"/></g></g>
+  <g transform="translate(300 90)"><g class="c4"><circle r="4.5" fill="#78DC78"/></g></g>
+</svg>

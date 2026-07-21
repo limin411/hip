@@ -1,0 +1,45 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 400" width="512" height="512" role="img" aria-labelledby="coffee-title coffee-desc" style="overflow:hidden">
+  <title id="coffee-title">喝咖啡</title>
+  <desc id="coffee-desc">Coffee</desc>
+  <style>
+
+    .root { transform-origin: 200px 300px; animation: sway 2s cubic-bezier(0.45, 0, 0.55, 1) infinite; }
+    @keyframes sway {
+      0%,100% { transform: translateX(0) rotate(0); }
+      25% { transform: translateX(3px) rotate(1.8deg); }
+      75% { transform: translateX(-3px) rotate(-1.8deg); }
+    }
+
+.pcs{animation:cs 1s cubic-bezier(0.45, 0, 0.55, 1) infinite}@keyframes cs{0%,100%{opacity:.4;transform:translateY(0)}50%{opacity:1;transform:translateY(-8px)}}
+  </style>
+  <g class="root">
+
+    <ellipse cx="152" cy="208" rx="90" ry="102" fill="#FF9800"/>
+    <ellipse cx="248" cy="208" rx="90" ry="102" fill="#FF9800"/>
+    <path d="M200 128 Q192 208 200 278" fill="none" stroke="#E87E00" stroke-width="10" stroke-linecap="round"/>
+
+    <g class="arm-l">
+      <path d="M85 230 Q70 240 55 250" fill="none" stroke="#000000" stroke-width="14" stroke-linecap="round"/>
+      
+      <circle cx="55" cy="250" r="16" fill="#FFFFFF" stroke="#000000" stroke-width="6"/>
+      <path d="M45 244 Q55 238 65 244" fill="none" stroke="#000000" stroke-width="3.5" stroke-linecap="round"/></g>
+    <g class="arm-r">
+      <path d="M315 230 Q340 200 350 155" fill="none" stroke="#000000" stroke-width="14" stroke-linecap="round"/>
+      <rect x="340" y="120" width="22" height="36" rx="3" fill="#FFF8E7" stroke="#000000" stroke-width="3"/>
+      <ellipse cx="351" cy="120" rx="11" ry="5" fill="#FFD23A" stroke="#000000" stroke-width="2"/>
+      <path d="M362 130 H372 Q378 130 378 140 Q378 150 372 150 H362" fill="none" stroke="#000000" stroke-width="3"/>
+    </g>
+
+    <ellipse cx="166" cy="165" rx="18" ry="11" fill="#FFFFFF" stroke="#000000" stroke-width="4"/>
+    <ellipse cx="168" cy="168" rx="8" ry="4" fill="#000000"/>
+    <ellipse cx="234" cy="165" rx="18" ry="11" fill="#FFFFFF" stroke="#000000" stroke-width="4"/>
+    <ellipse cx="236" cy="168" rx="8" ry="4" fill="#000000"/>
+<path d="M188 282 Q200 292 212 282" fill="none" stroke="#000000" stroke-width="6" stroke-linecap="round"/>
+  </g>
+
+  <g transform="translate(200 68)">
+    <rect x="-18" y="12" width="36" height="28" rx="4" fill="#FFF8E7" stroke="#000" stroke-width="3"/>
+    <path d="M18 18H28Q34 18 34 26Q34 34 28 34H18" fill="none" stroke="#000" stroke-width="3"/>
+    <g class="pcs"><path d="M-8 8Q-10-2-6-8M2 8Q0-4 4-10M12 8Q14 0 10-6" fill="none" stroke="#AAA" stroke-width="2.5" stroke-linecap="round"/></g>
+  </g>
+</svg>

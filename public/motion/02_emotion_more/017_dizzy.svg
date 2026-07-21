@@ -1,0 +1,33 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 400" width="512" height="512" role="img" aria-labelledby="dizzy-title dizzy-desc" style="overflow:hidden">
+  <title id="dizzy-title">晕</title>
+  <desc id="dizzy-desc">Dizzy spin</desc>
+  <style>
+
+    .root { transform-origin: 200px 210px; animation: spin 2.8s linear infinite; }
+    @keyframes spin { from { transform: rotate(0); } to { transform: rotate(360deg); } }
+
+.ps1{animation:tw 1.2s cubic-bezier(0.45, 0, 0.55, 1) infinite}.ps2{animation:tw 1.2s cubic-bezier(0.45, 0, 0.55, 1) .4s infinite}@keyframes tw{0%,100%{opacity:.35;transform:scale(.75)}50%{opacity:1;transform:scale(1)}}
+  </style>
+  <g class="root">
+
+    <ellipse cx="152" cy="208" rx="90" ry="102" fill="#FF9800"/>
+    <ellipse cx="248" cy="208" rx="90" ry="102" fill="#FF9800"/>
+    <path d="M200 128 Q192 208 200 278" fill="none" stroke="#E87E00" stroke-width="10" stroke-linecap="round"/>
+<g class="arm-l">
+      <path d="M75 235 Q52 252 28 268" fill="none" stroke="#000000" stroke-width="14" stroke-linecap="round"/>
+      
+      <circle cx="28" cy="268" r="22" fill="#FFFFFF" stroke="#000000" stroke-width="6"/>
+      <path d="M18 262 Q28 256 38 262" fill="none" stroke="#000000" stroke-width="3.5" stroke-linecap="round"/></g><g class="arm-r">
+      <path d="M325 235 Q348 252 372 268" fill="none" stroke="#000000" stroke-width="14" stroke-linecap="round"/>
+      
+      <circle cx="372" cy="268" r="22" fill="#FFFFFF" stroke="#000000" stroke-width="6"/>
+      <path d="M362 262 Q372 256 382 262" fill="none" stroke="#000000" stroke-width="3.5" stroke-linecap="round"/></g>
+
+    <path d="M152 150 L180 170 M180 150 L152 170" stroke="#000000" stroke-width="5" stroke-linecap="round"/>
+    <path d="M220 150 L248 170 M248 150 L220 170" stroke="#000000" stroke-width="5" stroke-linecap="round"/>
+<ellipse cx="200" cy="278" rx="12" ry="14" fill="none" stroke="#000000" stroke-width="6"/>
+  </g>
+
+  <g transform="translate(80 90)"><g class="ps1"><path fill="#FFD23A" d="M0-10L3-3L10-3L4 2L6 10L0 5L-6 10L-4 2L-10-3L-3-3Z"/></g></g>
+  <g transform="translate(320 85)"><g class="ps2"><path fill="#FFD23A" d="M0-10L3-3L10-3L4 2L6 10L0 5L-6 10L-4 2L-10-3L-3-3Z"/></g></g>
+</svg>

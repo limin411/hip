@@ -1,0 +1,63 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 400" width="512" height="512" role="img" aria-labelledby="yummy-title yummy-desc" style="overflow:hidden">
+  <title id="yummy-title">好吃</title>
+  <desc id="yummy-desc">Yummy</desc>
+  <style>
+
+    .root { transform-origin: 200px 290px; animation: bounce 1.25s cubic-bezier(0.34, 1.35, 0.64, 1) infinite; }
+    .arm-l { transform-origin: 60px 220px; animation: waveL 1.25s cubic-bezier(0.45, 0, 0.55, 1) infinite; }
+    .arm-r { transform-origin: 340px 220px; animation: waveR 1.25s cubic-bezier(0.45, 0, 0.55, 1) infinite; }
+    @keyframes bounce {
+      0%,100% { transform: translateY(0) scale(1,1); }
+      30% { transform: translateY(-9px) scale(0.98,1.03); }
+      55% { transform: translateY(0) scale(1.03,0.97); }
+      75% { transform: translateY(-3px) scale(0.995,1.01); }
+    }
+    @keyframes waveL { 0%,100% { transform: rotate(0); } 50% { transform: rotate(-12deg); } }
+    @keyframes waveR { 0%,100% { transform: rotate(0); } 50% { transform: rotate(12deg); } }
+
+
+    .ph1 { animation: pfloat 1.8s cubic-bezier(0.33, 0, 0.2, 1) 0s infinite; }
+    @keyframes pfloat {
+      0% { opacity: 0; transform: translateY(6px) scale(0.8); }
+      20% { opacity: 1; }
+      100% { opacity: 0; transform: translateY(-36px) scale(1.1); }
+    }
+    .ph2 { animation: pfloat 1.8s cubic-bezier(0.33, 0, 0.2, 1) 0.4s infinite; }
+    @keyframes pfloat {
+      0% { opacity: 0; transform: translateY(6px) scale(0.8); }
+      20% { opacity: 1; }
+      100% { opacity: 0; transform: translateY(-36px) scale(1.1); }
+    }
+    .ph3 { animation: pfloat 1.8s cubic-bezier(0.33, 0, 0.2, 1) 0.85s infinite; }
+    @keyframes pfloat {
+      0% { opacity: 0; transform: translateY(6px) scale(0.8); }
+      20% { opacity: 1; }
+      100% { opacity: 0; transform: translateY(-36px) scale(1.1); }
+    }
+  </style>
+  <g class="root">
+
+    <ellipse cx="152" cy="208" rx="90" ry="102" fill="#FF9800"/>
+    <ellipse cx="248" cy="208" rx="90" ry="102" fill="#FF9800"/>
+    <path d="M200 128 Q192 208 200 278" fill="none" stroke="#E87E00" stroke-width="10" stroke-linecap="round"/>
+<g class="arm-l">
+      <path d="M78 230 Q60 200 42 170" fill="none" stroke="#000000" stroke-width="14" stroke-linecap="round"/>
+      
+      <circle cx="42" cy="170" r="22" fill="#FFFFFF" stroke="#000000" stroke-width="6"/>
+      <path d="M32 164 Q42 158 52 164" fill="none" stroke="#000000" stroke-width="3.5" stroke-linecap="round"/></g><g class="arm-r">
+      <path d="M322 230 Q340 200 358 170" fill="none" stroke="#000000" stroke-width="14" stroke-linecap="round"/>
+      
+      <circle cx="358" cy="170" r="22" fill="#FFFFFF" stroke="#000000" stroke-width="6"/>
+      <path d="M348 164 Q358 158 368 164" fill="none" stroke="#000000" stroke-width="3.5" stroke-linecap="round"/></g>
+
+    <path d="M148 160 Q166 148 184 160" fill="none" stroke="#000000" stroke-width="6" stroke-linecap="round"/>
+    <path d="M216 160 Q234 148 252 160" fill="none" stroke="#000000" stroke-width="6" stroke-linecap="round"/>
+
+    <path d="M176 268 Q200 292 224 268" fill="none" stroke="#000000" stroke-width="6" stroke-linecap="round"/>
+    <ellipse cx="200" cy="292" rx="10" ry="12" fill="#FF6B8A" stroke="#000000" stroke-width="3"/>
+  </g>
+
+  <g transform="translate(88 100)"><g class="ph1"><path fill="#FF5A6E" d="M0-8C-6-16-16-12-16-2C-16 8 0 18 0 18C0 18 16 8 16-2C16-12 6-16 0-8Z"/></g></g>
+  <g transform="translate(312 88)"><g class="ph2"><path fill="#FF5A6E" d="M0-8C-6-16-16-12-16-2C-16 8 0 18 0 18C0 18 16 8 16-2C16-12 6-16 0-8Z" transform="scale(.85)"/></g></g>
+  <g transform="translate(200 62)"><g class="ph3"><path fill="#FF7A8C" d="M0-8C-6-16-16-12-16-2C-16 8 0 18 0 18C0 18 16 8 16-2C16-12 6-16 0-8Z" transform="scale(.7)"/></g></g>
+</svg>

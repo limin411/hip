@@ -1,0 +1,40 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 400" width="512" height="512" role="img" aria-labelledby="hot-title hot-desc" style="overflow:hidden">
+  <title id="hot-title">好热</title>
+  <desc id="hot-desc">Hot</desc>
+  <style>
+
+    .root { transform-origin: 200px 280px; animation: shake 0.55s cubic-bezier(0.22, 0.9, 0.3, 1) infinite; }
+    .arm-l { transform-origin: 70px 220px; animation: punchL 0.55s cubic-bezier(0.22, 0.9, 0.3, 1) infinite; }
+    .arm-r { transform-origin: 330px 220px; animation: punchR 0.55s cubic-bezier(0.22, 0.9, 0.3, 1) infinite; }
+    @keyframes shake {
+      0%,100% { transform: translateX(0); }
+      20% { transform: translateX(-5px); } 40% { transform: translateX(5px); }
+      60% { transform: translateX(-3px); } 80% { transform: translateX(3px); }
+    }
+    @keyframes punchL { 0%,100% { transform: rotate(0); } 50% { transform: rotate(-12deg); } }
+    @keyframes punchR { 0%,100% { transform: rotate(0); } 50% { transform: rotate(12deg); } }
+
+.psw{animation:sw 1.4s cubic-bezier(0.33, 0, 0.2, 1) infinite}@keyframes sw{0%{opacity:1;transform:translate(0,0)}70%{opacity:.9;transform:translate(3px,12px)}100%{opacity:0;transform:translate(5px,20px)}}
+  </style>
+  <g class="root">
+
+    <ellipse cx="152" cy="208" rx="90" ry="102" fill="#FF9800"/>
+    <ellipse cx="248" cy="208" rx="90" ry="102" fill="#FF9800"/>
+    <path d="M200 128 Q192 208 200 278" fill="none" stroke="#E87E00" stroke-width="10" stroke-linecap="round"/>
+<g class="arm-l">
+      <path d="M75 235 Q52 252 28 268" fill="none" stroke="#000000" stroke-width="14" stroke-linecap="round"/>
+      
+      <circle cx="28" cy="268" r="22" fill="#FFFFFF" stroke="#000000" stroke-width="6"/>
+      <path d="M18 262 Q28 256 38 262" fill="none" stroke="#000000" stroke-width="3.5" stroke-linecap="round"/></g><g class="arm-r">
+      <path d="M325 235 Q348 252 372 268" fill="none" stroke="#000000" stroke-width="14" stroke-linecap="round"/>
+      
+      <circle cx="372" cy="268" r="22" fill="#FFFFFF" stroke="#000000" stroke-width="6"/>
+      <path d="M362 262 Q372 256 382 262" fill="none" stroke="#000000" stroke-width="3.5" stroke-linecap="round"/></g>
+
+    <path d="M152 150 L180 170 M180 150 L152 170" stroke="#000000" stroke-width="5" stroke-linecap="round"/>
+    <path d="M220 150 L248 170 M248 150 L220 170" stroke="#000000" stroke-width="5" stroke-linecap="round"/>
+<ellipse cx="200" cy="278" rx="16" ry="20" fill="#000000"/><ellipse cx="200" cy="275" rx="9" ry="7" fill="#5A2A2A"/>
+  </g>
+
+  <g transform="translate(292 115)"><g class="psw"><ellipse rx="8" ry="12" fill="#78BEFF" stroke="#000" stroke-width="2.5"/></g></g>
+</svg>

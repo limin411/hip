@@ -1,0 +1,42 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 400" width="512" height="512" role="img" aria-labelledby="diet-title diet-desc" style="overflow:hidden">
+  <title id="diet-title">减肥</title>
+  <desc id="diet-desc">Dieting</desc>
+  <style>
+
+    .root { transform-origin: 200px 300px; animation: sway 2s cubic-bezier(0.45, 0, 0.55, 1) infinite; }
+    @keyframes sway {
+      0%,100% { transform: translateX(0) rotate(0); }
+      25% { transform: translateX(3px) rotate(1.8deg); }
+      75% { transform: translateX(-3px) rotate(-1.8deg); }
+    }
+
+
+  </style>
+  <g class="root">
+
+    <ellipse cx="152" cy="208" rx="90" ry="102" fill="#FF9800"/>
+    <ellipse cx="248" cy="208" rx="90" ry="102" fill="#FF9800"/>
+    <path d="M200 128 Q192 208 200 278" fill="none" stroke="#E87E00" stroke-width="10" stroke-linecap="round"/>
+<g class="arm-l">
+      <path d="M85 238 Q68 280 52 322" fill="none" stroke="#000000" stroke-width="14" stroke-linecap="round"/>
+      
+      <circle cx="52" cy="322" r="20" fill="#FFFFFF" stroke="#000000" stroke-width="6"/>
+      <path d="M42 316 Q52 310 62 316" fill="none" stroke="#000000" stroke-width="3.5" stroke-linecap="round"/></g><g class="arm-r">
+      <path d="M315 238 Q332 280 348 322" fill="none" stroke="#000000" stroke-width="14" stroke-linecap="round"/>
+      
+      <circle cx="348" cy="322" r="20" fill="#FFFFFF" stroke="#000000" stroke-width="6"/>
+      <path d="M338 316 Q348 310 358 316" fill="none" stroke="#000000" stroke-width="3.5" stroke-linecap="round"/></g>
+
+    <ellipse cx="166" cy="160" rx="18" ry="23" fill="#FFFFFF" stroke="#000000" stroke-width="4"/>
+    <circle cx="170" cy="168" r="10" fill="#000000"/>
+    <ellipse cx="234" cy="160" rx="18" ry="23" fill="#FFFFFF" stroke="#000000" stroke-width="4"/>
+    <circle cx="238" cy="168" r="10" fill="#000000"/>
+<path d="M188 282 Q200 292 212 282" fill="none" stroke="#000000" stroke-width="6" stroke-linecap="round"/>
+  </g>
+
+  <g transform="translate(200 75)">
+    <ellipse rx="36" ry="12" fill="#DDD" stroke="#000" stroke-width="3"/>
+    <rect x="-14" y="-28" width="28" height="22" rx="4" fill="#FFF" stroke="#000" stroke-width="3"/>
+    <text x="0" y="-10" text-anchor="middle" font-size="12" font-family="Arial" font-weight="700">?</text>
+  </g>
+</svg>

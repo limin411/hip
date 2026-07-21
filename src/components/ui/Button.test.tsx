@@ -9,7 +9,7 @@ afterEach(() => {
 })
 
 describe('Button variants', () => {
-  // Non-goal (KD2): primary stays soft monochrome inverse — never sage accent fill.
+  // Non-goal (KD2): primary stays soft monochrome inverse — never brand accent fill.
   it('primary is soft solid inverse monochrome, not sage or elevated outline', () => {
     const { getByRole } = render(<Button variant="primary">Save</Button>)
     const cls = getByRole('button', { name: 'Save' }).className

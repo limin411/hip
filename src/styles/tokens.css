@@ -23,10 +23,10 @@
   --text-primary: #111111;
   --text-secondary: #5e5e5e;
   --text-tertiary: #757575; /* AA ~4.4:1 on bg-app —— 时间戳/占位符/元数据可读 */
-  /* 品牌强调色：Sage Gray —— 仅作焦点 / 当前 / 极少量点缀 */
-  --accent: #6b7c5c; /* 品牌填充色（按钮底、激活条、focus ring）—— 鼠尾草灰，正文/图标可用 */
-  --accent-hover: #5d6d50;
-  --accent-strong: #556647; /* Sage Gray 作正文/图标时用 */
+  /* 品牌强调色：暖橙（Flat Butt）—— 仅作焦点 / 当前 / 极少量点缀 */
+  --accent: #c2410c; /* 品牌填充色（按钮底、激活条、focus ring）—— 深橙 AA on white */
+  --accent-hover: #9a3412;
+  --accent-strong: #7c2d12; /* 更深橙，正文/图标强调 */
   --accent-subtle: #f0f0f0; /* 中性浅底 —— hover/头像/chip 底（刻意保持中性灰，不带品牌色调） */
   --accent-active: #e6e6e6; /* 中性选中底 —— 比 hover 更深以区分（刻意保持中性灰，不带品牌色调） */
   --on-accent: #ffffff; /* 填充按钮/强调底上的文字与图标 */
@@ -122,10 +122,10 @@ html[data-platform="linux"] {
   --text-primary: #f0f0f0;
   --text-secondary: #a3a3a3;
   --text-tertiary: #7a7a7a;
-  /* 品牌强调色：更亮的 Sage Gray，保证在暗底上可识别 */
-  --accent: #a8b89a;
-  --accent-hover: #b7c7a9;
-  --accent-strong: #c6d4b8;
+  /* 品牌强调色：更亮的暖橙（贴 logo #FF9800），保证在暗底上可识别 */
+  --accent: #ff9800;
+  --accent-hover: #ffb300; /* ≠ dark --warning #ffb74d */
+  --accent-strong: #ffcc80;
   --accent-subtle: #222222; /* 暗色中性 hover/头像/chip 底 */
   --accent-active: #2e2e2e; /* 暗色选中底 */
   --on-accent: #111111; /* 浅 accent 填充上的近黑字，保证暗色对比 */

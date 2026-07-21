@@ -1,0 +1,36 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 400" width="512" height="512" role="img" aria-labelledby="jog-title jog-desc" style="overflow:hidden">
+  <title id="jog-title">慢跑</title>
+  <desc id="jog-desc">Jogging</desc>
+  <style>
+
+    .root { transform-origin: 200px 290px; animation: bob 1.5s cubic-bezier(0.45, 0, 0.55, 1) infinite; }
+    .arm-r { transform-origin: 330px 220px; animation: thumbs 1.5s cubic-bezier(0.34, 1.35, 0.64, 1) infinite; }
+    @keyframes bob { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-5px); } }
+    @keyframes thumbs { 0%,100% { transform: rotate(0); } 50% { transform: rotate(10deg) translateY(-4px); } }
+
+.psw{animation:sw 1.4s cubic-bezier(0.33, 0, 0.2, 1) infinite}@keyframes sw{0%{opacity:1;transform:translate(0,0)}70%{opacity:.9;transform:translate(3px,12px)}100%{opacity:0;transform:translate(5px,20px)}}
+  </style>
+  <g class="root">
+
+    <ellipse cx="152" cy="208" rx="90" ry="102" fill="#FF9800"/>
+    <ellipse cx="248" cy="208" rx="90" ry="102" fill="#FF9800"/>
+    <path d="M200 128 Q192 208 200 278" fill="none" stroke="#E87E00" stroke-width="10" stroke-linecap="round"/>
+<g class="arm-l">
+      <path d="M78 230 Q60 200 42 170" fill="none" stroke="#000000" stroke-width="14" stroke-linecap="round"/>
+      
+      <circle cx="42" cy="170" r="22" fill="#FFFFFF" stroke="#000000" stroke-width="6"/>
+      <path d="M32 164 Q42 158 52 164" fill="none" stroke="#000000" stroke-width="3.5" stroke-linecap="round"/></g><g class="arm-r">
+      <path d="M322 230 Q340 200 358 170" fill="none" stroke="#000000" stroke-width="14" stroke-linecap="round"/>
+      
+      <circle cx="358" cy="170" r="22" fill="#FFFFFF" stroke="#000000" stroke-width="6"/>
+      <path d="M348 164 Q358 158 368 164" fill="none" stroke="#000000" stroke-width="3.5" stroke-linecap="round"/></g>
+
+    <ellipse cx="166" cy="160" rx="18" ry="23" fill="#FFFFFF" stroke="#000000" stroke-width="4"/>
+    <circle cx="170" cy="157" r="10" fill="#000000"/><circle cx="174" cy="152" r="3.5" fill="#FFFFFF"/>
+    <ellipse cx="234" cy="160" rx="18" ry="23" fill="#FFFFFF" stroke="#000000" stroke-width="4"/>
+    <circle cx="238" cy="157" r="10" fill="#000000"/><circle cx="242" cy="152" r="3.5" fill="#FFFFFF"/>
+<path d="M176 268 Q200 292 224 268" fill="none" stroke="#000000" stroke-width="7" stroke-linecap="round"/>
+  </g>
+
+  <g transform="translate(292 115)"><g class="psw"><ellipse rx="8" ry="12" fill="#78BEFF" stroke="#000" stroke-width="2.5"/></g></g>
+</svg>

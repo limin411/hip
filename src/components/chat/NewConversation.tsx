@@ -233,7 +233,7 @@ export function NewConversation() {
   const greeting = llmGreeting?.title ?? baseGreeting
   const greetingSub = llmGreeting?.sub ?? baseGreetingSub
   const mascotInitial =
-    pick.tier === 'holiday' ? 'gift' : surface === 'code' ? 'code' : 'wave'
+    pick.tier === 'holiday' ? 'party' : surface === 'code' ? 'coding' : 'wave'
   // J1 empty-state CTA identity for e2e (@smooth-p4)
 
   const setText = useCallback((value: string) => useDraftStore.getState().setText(value), [])

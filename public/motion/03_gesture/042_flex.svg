@@ -1,0 +1,38 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 400" width="512" height="512" role="img" aria-labelledby="flex-title flex-desc" style="overflow:hidden">
+  <title id="flex-title">秀肌肉</title>
+  <desc id="flex-desc">Flex</desc>
+  <style>
+
+    .root { transform-origin: 200px 220px; animation: pulse 1.35s cubic-bezier(0.45, 0, 0.55, 1) infinite; }
+    @keyframes pulse { 0%,100% { transform: scale(1); } 50% { transform: scale(1.05); } }
+
+.ps { animation: sp 1.4s cubic-bezier(0.34, 1.35, 0.64, 1) infinite; transform-origin:0 0; }@keyframes sp { 0%,40%,100%{opacity:0;transform:scale(.6)} 55%,70%{opacity:1;transform:scale(1)} }
+  </style>
+  <g class="root">
+
+    <ellipse cx="152" cy="208" rx="90" ry="102" fill="#FF9800"/>
+    <ellipse cx="248" cy="208" rx="90" ry="102" fill="#FF9800"/>
+    <path d="M200 128 Q192 208 200 278" fill="none" stroke="#E87E00" stroke-width="10" stroke-linecap="round"/>
+
+    <g class="arm-l">
+      <path d="M85 240 Q65 208 45 175" fill="none" stroke="#000000" stroke-width="14" stroke-linecap="round"/>
+      
+      <circle cx="45" cy="175" r="24" fill="#FFFFFF" stroke="#000000" stroke-width="6"/>
+      <path d="M35 169 Q45 163 55 169" fill="none" stroke="#000000" stroke-width="3.5" stroke-linecap="round"/></g>
+    <g class="arm-r">
+      <path d="M315 240 Q335 208 355 175" fill="none" stroke="#000000" stroke-width="14" stroke-linecap="round"/>
+      
+      <circle cx="355" cy="175" r="24" fill="#FFFFFF" stroke="#000000" stroke-width="6"/>
+      <path d="M345 169 Q355 163 365 169" fill="none" stroke="#000000" stroke-width="3.5" stroke-linecap="round"/></g>
+
+    <path d="M148 140 L184 150" fill="none" stroke="#000000" stroke-width="6" stroke-linecap="round"/>
+    <path d="M252 150 L216 140" fill="none" stroke="#000000" stroke-width="6" stroke-linecap="round"/>
+    <ellipse cx="166" cy="164" rx="16" ry="18" fill="#FFFFFF" stroke="#000000" stroke-width="4"/>
+    <circle cx="168" cy="166" r="9" fill="#000000"/>
+    <ellipse cx="234" cy="164" rx="16" ry="18" fill="#FFFFFF" stroke="#000000" stroke-width="4"/>
+    <circle cx="236" cy="166" r="9" fill="#000000"/>
+<path d="M188 272 Q210 290 232 268" fill="none" stroke="#000000" stroke-width="7" stroke-linecap="round"/>
+  </g>
+
+  <g transform="translate(305 110)"><g class="ps"><path d="M0-12L0 12M-12 0L12 0M-8-8L8 8M-8 8L8-8" stroke="#000" stroke-width="3.5" stroke-linecap="round"/></g></g>
+</svg>

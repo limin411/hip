@@ -1,0 +1,57 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 400" width="512" height="512" role="img" aria-labelledby="sleepy-title sleepy-desc" style="overflow:hidden">
+  <title id="sleepy-title">犯困</title>
+  <desc id="sleepy-desc">Sleepy</desc>
+  <style>
+
+    .root { transform-origin: 200px 300px; animation: sleepy 2.4s cubic-bezier(0.33, 0, 0.2, 1) infinite; }
+    @keyframes sleepy {
+      0%,100% { transform: rotate(-2deg) translateY(2px); }
+      50% { transform: rotate(2.2deg) translateY(6px); }
+    }
+
+
+    .pz1 { animation: pfloat 1.8s cubic-bezier(0.33, 0, 0.2, 1) 0s infinite; }
+    @keyframes pfloat {
+      0% { opacity: 0; transform: translateY(6px) scale(0.8); }
+      20% { opacity: 1; }
+      100% { opacity: 0; transform: translateY(-36px) scale(1.1); }
+    }
+    .pz2 { animation: pfloat 1.8s cubic-bezier(0.33, 0, 0.2, 1) 0.5s infinite; }
+    @keyframes pfloat {
+      0% { opacity: 0; transform: translateY(6px) scale(0.8); }
+      20% { opacity: 1; }
+      100% { opacity: 0; transform: translateY(-36px) scale(1.1); }
+    }
+    .pz3 { animation: pfloat 1.8s cubic-bezier(0.33, 0, 0.2, 1) 1s infinite; }
+    @keyframes pfloat {
+      0% { opacity: 0; transform: translateY(6px) scale(0.8); }
+      20% { opacity: 1; }
+      100% { opacity: 0; transform: translateY(-36px) scale(1.1); }
+    }
+  </style>
+  <g class="root">
+
+    <ellipse cx="152" cy="208" rx="90" ry="102" fill="#FF9800"/>
+    <ellipse cx="248" cy="208" rx="90" ry="102" fill="#FF9800"/>
+    <path d="M200 128 Q192 208 200 278" fill="none" stroke="#E87E00" stroke-width="10" stroke-linecap="round"/>
+<g class="arm-l">
+      <path d="M85 238 Q68 280 52 322" fill="none" stroke="#000000" stroke-width="14" stroke-linecap="round"/>
+      
+      <circle cx="52" cy="322" r="20" fill="#FFFFFF" stroke="#000000" stroke-width="6"/>
+      <path d="M42 316 Q52 310 62 316" fill="none" stroke="#000000" stroke-width="3.5" stroke-linecap="round"/></g><g class="arm-r">
+      <path d="M315 238 Q332 280 348 322" fill="none" stroke="#000000" stroke-width="14" stroke-linecap="round"/>
+      
+      <circle cx="348" cy="322" r="20" fill="#FFFFFF" stroke="#000000" stroke-width="6"/>
+      <path d="M338 316 Q348 310 358 316" fill="none" stroke="#000000" stroke-width="3.5" stroke-linecap="round"/></g>
+
+    <ellipse cx="166" cy="165" rx="18" ry="11" fill="#FFFFFF" stroke="#000000" stroke-width="4"/>
+    <ellipse cx="168" cy="168" rx="8" ry="4" fill="#000000"/>
+    <ellipse cx="234" cy="165" rx="18" ry="11" fill="#FFFFFF" stroke="#000000" stroke-width="4"/>
+    <ellipse cx="236" cy="168" rx="8" ry="4" fill="#000000"/>
+<path d="M188 282 Q200 292 212 282" fill="none" stroke="#000000" stroke-width="6" stroke-linecap="round"/>
+  </g>
+
+  <g transform="translate(295 100)" fill="none" stroke="#4A4A55" stroke-width="3.5" stroke-linecap="round"><g class="pz1"><path d="M0 0H14L0 14H14"/></g></g>
+  <g transform="translate(318 78)" fill="none" stroke="#4A4A55" stroke-width="4" stroke-linecap="round"><g class="pz2"><path d="M0 0H16L0 16H16"/></g></g>
+  <g transform="translate(345 55)" fill="none" stroke="#4A4A55" stroke-width="4.5" stroke-linecap="round"><g class="pz3"><path d="M0 0H18L0 18H18"/></g></g>
+</svg>

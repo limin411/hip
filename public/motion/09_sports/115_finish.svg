@@ -1,0 +1,46 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 400" width="512" height="512" role="img" aria-labelledby="finish-title finish-desc" style="overflow:hidden">
+  <title id="finish-title">完赛</title>
+  <desc id="finish-desc">Finish line</desc>
+  <style>
+
+    .root { transform-origin: 200px 290px; animation: bounce 1.25s cubic-bezier(0.34, 1.35, 0.64, 1) infinite; }
+    .arm-l { transform-origin: 60px 220px; animation: waveL 1.25s cubic-bezier(0.45, 0, 0.55, 1) infinite; }
+    .arm-r { transform-origin: 340px 220px; animation: waveR 1.25s cubic-bezier(0.45, 0, 0.55, 1) infinite; }
+    @keyframes bounce {
+      0%,100% { transform: translateY(0) scale(1,1); }
+      30% { transform: translateY(-9px) scale(0.98,1.03); }
+      55% { transform: translateY(0) scale(1.03,0.97); }
+      75% { transform: translateY(-3px) scale(0.995,1.01); }
+    }
+    @keyframes waveL { 0%,100% { transform: rotate(0); } 50% { transform: rotate(-12deg); } }
+    @keyframes waveR { 0%,100% { transform: rotate(0); } 50% { transform: rotate(12deg); } }
+
+.pri{animation:ri 1s cubic-bezier(0.34, 1.35, 0.64, 1) infinite}@keyframes ri{0%,100%{transform:scaleX(1)}50%{transform:scaleX(1.08)}}
+  </style>
+  <g class="root">
+
+    <ellipse cx="152" cy="208" rx="90" ry="102" fill="#FF9800"/>
+    <ellipse cx="248" cy="208" rx="90" ry="102" fill="#FF9800"/>
+    <path d="M200 128 Q192 208 200 278" fill="none" stroke="#E87E00" stroke-width="10" stroke-linecap="round"/>
+
+    <g class="arm-l">
+      <path d="M75 220 Q58 160 40 100" fill="none" stroke="#000000" stroke-width="14" stroke-linecap="round"/>
+      
+      <circle cx="40" cy="100" r="24" fill="#FFFFFF" stroke="#000000" stroke-width="6"/>
+      <path d="M30 94 Q40 88 50 94" fill="none" stroke="#000000" stroke-width="3.5" stroke-linecap="round"/></g>
+    <g class="arm-r">
+      <path d="M325 220 Q342 160 360 100" fill="none" stroke="#000000" stroke-width="14" stroke-linecap="round"/>
+      
+      <circle cx="360" cy="100" r="24" fill="#FFFFFF" stroke="#000000" stroke-width="6"/>
+      <path d="M350 94 Q360 88 370 94" fill="none" stroke="#000000" stroke-width="3.5" stroke-linecap="round"/></g>
+
+    <path d="M148 160 Q166 148 184 160" fill="none" stroke="#000000" stroke-width="6" stroke-linecap="round"/>
+    <path d="M216 160 Q234 148 252 160" fill="none" stroke="#000000" stroke-width="6" stroke-linecap="round"/>
+<path d="M168 255 Q200 300 232 255" fill="none" stroke="#000000" stroke-width="8" stroke-linecap="round"/>
+  </g>
+
+  <g transform="translate(200 55)"><g class="pri">
+    <rect x="-55" y="-8" width="110" height="22" rx="4" fill="#FF5A6E" stroke="#000" stroke-width="3"/>
+    <text x="0" y="8" text-anchor="middle" font-size="12" font-family="Arial" font-weight="700" fill="#FFF">FINISH</text>
+  </g></g>
+</svg>

@@ -1,0 +1,46 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 400" width="512" height="512" role="img" aria-labelledby="cold-title cold-desc" style="overflow:hidden">
+  <title id="cold-title">好冷</title>
+  <desc id="cold-desc">Cold</desc>
+  <style>
+
+    .root { transform-origin: 200px 280px; animation: shake 0.55s cubic-bezier(0.22, 0.9, 0.3, 1) infinite; }
+    .arm-l { transform-origin: 70px 220px; animation: punchL 0.55s cubic-bezier(0.22, 0.9, 0.3, 1) infinite; }
+    .arm-r { transform-origin: 330px 220px; animation: punchR 0.55s cubic-bezier(0.22, 0.9, 0.3, 1) infinite; }
+    @keyframes shake {
+      0%,100% { transform: translateX(0); }
+      20% { transform: translateX(-5px); } 40% { transform: translateX(5px); }
+      60% { transform: translateX(-3px); } 80% { transform: translateX(3px); }
+    }
+    @keyframes punchL { 0%,100% { transform: rotate(0); } 50% { transform: rotate(-12deg); } }
+    @keyframes punchR { 0%,100% { transform: rotate(0); } 50% { transform: rotate(12deg); } }
+
+.sn1{animation:sn 2s linear infinite}.sn2{animation:sn 2s linear .6s infinite}.sn3{animation:sn 2s linear 1.2s infinite}@keyframes sn{0%{opacity:0;transform:translate(0,0)}20%{opacity:1}100%{opacity:0;transform:translate(8px,55px)}}
+  </style>
+  <g class="root">
+
+    <ellipse cx="152" cy="208" rx="90" ry="102" fill="#FF9800"/>
+    <ellipse cx="248" cy="208" rx="90" ry="102" fill="#FF9800"/>
+    <path d="M200 128 Q192 208 200 278" fill="none" stroke="#E87E00" stroke-width="10" stroke-linecap="round"/>
+
+    <ellipse cx="166" cy="158" rx="22" ry="28" fill="#FFFFFF" stroke="#000000" stroke-width="4"/>
+    <circle cx="168" cy="158" r="10" fill="#000000"/><circle cx="172" cy="151" r="3.5" fill="#FFFFFF"/>
+    <ellipse cx="234" cy="158" rx="22" ry="28" fill="#FFFFFF" stroke="#000000" stroke-width="4"/>
+    <circle cx="236" cy="158" r="10" fill="#000000"/><circle cx="240" cy="151" r="3.5" fill="#FFFFFF"/>
+<ellipse cx="200" cy="278" rx="12" ry="14" fill="none" stroke="#000000" stroke-width="6"/>
+
+    <g class="arm-l">
+      <path d="M90 230 Q122 199 155 168" fill="none" stroke="#000000" stroke-width="14" stroke-linecap="round"/>
+      
+      <circle cx="155" cy="168" r="18" fill="#FFFFFF" stroke="#000000" stroke-width="6"/>
+      <path d="M145 162 Q155 156 165 162" fill="none" stroke="#000000" stroke-width="3.5" stroke-linecap="round"/></g>
+    <g class="arm-r">
+      <path d="M310 230 Q278 199 245 168" fill="none" stroke="#000000" stroke-width="14" stroke-linecap="round"/>
+      
+      <circle cx="245" cy="168" r="18" fill="#FFFFFF" stroke="#000000" stroke-width="6"/>
+      <path d="M235 162 Q245 156 255 162" fill="none" stroke="#000000" stroke-width="3.5" stroke-linecap="round"/></g>
+  </g>
+
+  <g transform="translate(130 70)"><g class="sn1"><circle r="4" fill="#A8D4FF" stroke="#000" stroke-width="1.5"/></g></g>
+  <g transform="translate(210 50)"><g class="sn2"><circle r="5" fill="#A8D4FF" stroke="#000" stroke-width="1.5"/></g></g>
+  <g transform="translate(290 75)"><g class="sn3"><circle r="4" fill="#A8D4FF" stroke="#000" stroke-width="1.5"/></g></g>
+</svg>

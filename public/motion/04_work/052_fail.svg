@@ -1,0 +1,36 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 400" width="512" height="512" role="img" aria-labelledby="fail-title fail-desc" style="overflow:hidden">
+  <title id="fail-title">失败</title>
+  <desc id="fail-desc">Failed</desc>
+  <style>
+
+    .root { transform-origin: 200px 300px; animation: sway 2s cubic-bezier(0.45, 0, 0.55, 1) infinite; }
+    @keyframes sway {
+      0%,100% { transform: translateX(0) rotate(0); }
+      25% { transform: translateX(3px) rotate(1.8deg); }
+      75% { transform: translateX(-3px) rotate(-1.8deg); }
+    }
+
+.png{animation:ng .8s cubic-bezier(0.34, 1.35, 0.64, 1) infinite}@keyframes ng{0%,100%{transform:scale(1)}50%{transform:scale(1.1)}}
+  </style>
+  <g class="root">
+
+    <ellipse cx="152" cy="208" rx="90" ry="102" fill="#FF9800"/>
+    <ellipse cx="248" cy="208" rx="90" ry="102" fill="#FF9800"/>
+    <path d="M200 128 Q192 208 200 278" fill="none" stroke="#E87E00" stroke-width="10" stroke-linecap="round"/>
+<g class="arm-l">
+      <path d="M85 238 Q68 280 52 322" fill="none" stroke="#000000" stroke-width="14" stroke-linecap="round"/>
+      
+      <circle cx="52" cy="322" r="20" fill="#FFFFFF" stroke="#000000" stroke-width="6"/>
+      <path d="M42 316 Q52 310 62 316" fill="none" stroke="#000000" stroke-width="3.5" stroke-linecap="round"/></g><g class="arm-r">
+      <path d="M315 238 Q332 280 348 322" fill="none" stroke="#000000" stroke-width="14" stroke-linecap="round"/>
+      
+      <circle cx="348" cy="322" r="20" fill="#FFFFFF" stroke="#000000" stroke-width="6"/>
+      <path d="M338 316 Q348 310 358 316" fill="none" stroke="#000000" stroke-width="3.5" stroke-linecap="round"/></g>
+
+    <path d="M152 150 L180 170 M180 150 L152 170" stroke="#000000" stroke-width="5" stroke-linecap="round"/>
+    <path d="M220 150 L248 170 M248 150 L220 170" stroke="#000000" stroke-width="5" stroke-linecap="round"/>
+<path d="M176 285 Q200 270 224 285" fill="none" stroke="#000000" stroke-width="7" stroke-linecap="round"/>
+  </g>
+
+  <g transform="translate(310 95)"><g class="png"><circle r="20" fill="#FF6B6B" stroke="#000" stroke-width="4"/><path d="M-8-8L8 8M8-8L-8 8" stroke="#000" stroke-width="4" stroke-linecap="round"/></g></g>
+</svg>

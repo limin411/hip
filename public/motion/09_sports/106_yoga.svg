@@ -1,0 +1,35 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 400" width="512" height="512" role="img" aria-labelledby="yoga-title yoga-desc" style="overflow:hidden">
+  <title id="yoga-title">瑜伽</title>
+  <desc id="yoga-desc">Yoga</desc>
+  <style>
+
+    .root { transform-origin: 200px 240px; animation: floaty 2.2s cubic-bezier(0.45, 0, 0.55, 1) infinite; }
+    @keyframes floaty { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-9px); } }
+
+
+  </style>
+  <g class="root">
+
+    <ellipse cx="152" cy="208" rx="90" ry="102" fill="#FF9800"/>
+    <ellipse cx="248" cy="208" rx="90" ry="102" fill="#FF9800"/>
+    <path d="M200 128 Q192 208 200 278" fill="none" stroke="#E87E00" stroke-width="10" stroke-linecap="round"/>
+
+    <g class="arm-l">
+      <path d="M90 230 Q72 215 55 200" fill="none" stroke="#000000" stroke-width="14" stroke-linecap="round"/>
+      
+      <circle cx="55" cy="200" r="18" fill="#FFFFFF" stroke="#000000" stroke-width="6"/>
+      <path d="M45 194 Q55 188 65 194" fill="none" stroke="#000000" stroke-width="3.5" stroke-linecap="round"/></g>
+    <g class="arm-r">
+      <path d="M310 230 Q328 215 345 200" fill="none" stroke="#000000" stroke-width="14" stroke-linecap="round"/>
+      
+      <circle cx="345" cy="200" r="18" fill="#FFFFFF" stroke="#000000" stroke-width="6"/>
+      <path d="M335 194 Q345 188 355 194" fill="none" stroke="#000000" stroke-width="3.5" stroke-linecap="round"/></g>
+
+    <ellipse cx="166" cy="160" rx="18" ry="23" fill="#FFFFFF" stroke="#000000" stroke-width="4"/>
+    <circle cx="170" cy="150" r="10" fill="#000000"/><circle cx="174" cy="145" r="3.5" fill="#FFFFFF"/>
+    <ellipse cx="234" cy="160" rx="18" ry="23" fill="#FFFFFF" stroke="#000000" stroke-width="4"/>
+    <circle cx="238" cy="150" r="10" fill="#000000"/><circle cx="242" cy="145" r="3.5" fill="#FFFFFF"/>
+<path d="M188 282 Q200 292 212 282" fill="none" stroke="#000000" stroke-width="6" stroke-linecap="round"/>
+  </g>
+
+</svg>

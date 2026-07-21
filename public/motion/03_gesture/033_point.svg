@@ -1,0 +1,37 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 400" width="512" height="512" role="img" aria-labelledby="point-title point-desc" style="overflow:hidden">
+  <title id="point-title">指你</title>
+  <desc id="point-desc">Pointing at you</desc>
+  <style>
+
+    .root { transform-origin: 200px 290px; animation: bob 1.5s cubic-bezier(0.45, 0, 0.55, 1) infinite; }
+    .arm-r { transform-origin: 330px 220px; animation: thumbs 1.5s cubic-bezier(0.34, 1.35, 0.64, 1) infinite; }
+    @keyframes bob { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-5px); } }
+    @keyframes thumbs { 0%,100% { transform: rotate(0); } 50% { transform: rotate(10deg) translateY(-4px); } }
+
+
+  </style>
+  <g class="root">
+
+    <ellipse cx="152" cy="208" rx="90" ry="102" fill="#FF9800"/>
+    <ellipse cx="248" cy="208" rx="90" ry="102" fill="#FF9800"/>
+    <path d="M200 128 Q192 208 200 278" fill="none" stroke="#E87E00" stroke-width="10" stroke-linecap="round"/>
+
+    <g class="arm-l">
+      <path d="M85 230 Q68 209 52 188" fill="none" stroke="#000000" stroke-width="14" stroke-linecap="round"/>
+      
+      <circle cx="52" cy="188" r="20" fill="#FFFFFF" stroke="#000000" stroke-width="6"/>
+      <path d="M42 182 Q52 176 62 182" fill="none" stroke="#000000" stroke-width="3.5" stroke-linecap="round"/></g>
+    <g class="arm-r">
+      <path d="M320 230 Q355 210 378 185" fill="none" stroke="#000000" stroke-width="14" stroke-linecap="round"/>
+      <circle cx="382" cy="178" r="16" fill="#FFFFFF" stroke="#000000" stroke-width="5"/>
+      <path d="M382 162 L382 148" fill="none" stroke="#000000" stroke-width="6" stroke-linecap="round"/>
+    </g>
+
+    <ellipse cx="166" cy="160" rx="18" ry="23" fill="#FFFFFF" stroke="#000000" stroke-width="4"/>
+    <circle cx="176" cy="157" r="10" fill="#000000"/><circle cx="180" cy="152" r="3" fill="#FFFFFF"/>
+    <ellipse cx="234" cy="160" rx="18" ry="23" fill="#FFFFFF" stroke="#000000" stroke-width="4"/>
+    <circle cx="244" cy="157" r="10" fill="#000000"/><circle cx="248" cy="152" r="3" fill="#FFFFFF"/>
+<path d="M188 272 Q210 290 232 268" fill="none" stroke="#000000" stroke-width="7" stroke-linecap="round"/>
+  </g>
+
+</svg>

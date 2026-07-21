@@ -1,0 +1,49 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 400" width="512" height="512" role="img" aria-labelledby="rage-title rage-desc" style="overflow:hidden">
+  <title id="rage-title">暴怒</title>
+  <desc id="rage-desc">Rage</desc>
+  <style>
+
+    .root { transform-origin: 200px 280px; animation: shake 0.55s cubic-bezier(0.22, 0.9, 0.3, 1) infinite; }
+    .arm-l { transform-origin: 70px 220px; animation: punchL 0.55s cubic-bezier(0.22, 0.9, 0.3, 1) infinite; }
+    .arm-r { transform-origin: 330px 220px; animation: punchR 0.55s cubic-bezier(0.22, 0.9, 0.3, 1) infinite; }
+    @keyframes shake {
+      0%,100% { transform: translateX(0); }
+      20% { transform: translateX(-5px); } 40% { transform: translateX(5px); }
+      60% { transform: translateX(-3px); } 80% { transform: translateX(3px); }
+    }
+    @keyframes punchL { 0%,100% { transform: rotate(0); } 50% { transform: rotate(-12deg); } }
+    @keyframes punchR { 0%,100% { transform: rotate(0); } 50% { transform: rotate(12deg); } }
+
+.pst{animation:st 1.1s cubic-bezier(0.45, 0, 0.55, 1) infinite}@keyframes st{0%,100%{opacity:.45;transform:translateY(0)}50%{opacity:1;transform:translateY(-7px)}}
+  </style>
+  <g class="root">
+
+    <ellipse cx="152" cy="208" rx="90" ry="102" fill="#FF9800"/>
+    <ellipse cx="248" cy="208" rx="90" ry="102" fill="#FF9800"/>
+    <path d="M200 128 Q192 208 200 278" fill="none" stroke="#E87E00" stroke-width="10" stroke-linecap="round"/>
+<g class="arm-l">
+      <path d="M78 240 Q56 214 34 188" fill="none" stroke="#000000" stroke-width="14" stroke-linecap="round"/>
+      
+      <circle cx="34" cy="188" r="24" fill="#FFFFFF" stroke="#000000" stroke-width="6"/>
+      <path d="M24 182 Q34 176 44 182" fill="none" stroke="#000000" stroke-width="3.5" stroke-linecap="round"/></g><g class="arm-r">
+      <path d="M322 240 Q344 214 366 188" fill="none" stroke="#000000" stroke-width="14" stroke-linecap="round"/>
+      
+      <circle cx="366" cy="188" r="24" fill="#FFFFFF" stroke="#000000" stroke-width="6"/>
+      <path d="M356 182 Q366 176 376 182" fill="none" stroke="#000000" stroke-width="3.5" stroke-linecap="round"/></g>
+
+    <path d="M148 140 L184 150" fill="none" stroke="#000000" stroke-width="6" stroke-linecap="round"/>
+    <path d="M252 150 L216 140" fill="none" stroke="#000000" stroke-width="6" stroke-linecap="round"/>
+    <ellipse cx="166" cy="164" rx="16" ry="18" fill="#FFFFFF" stroke="#000000" stroke-width="4"/>
+    <circle cx="168" cy="166" r="9" fill="#000000"/>
+    <ellipse cx="234" cy="164" rx="16" ry="18" fill="#FFFFFF" stroke="#000000" stroke-width="4"/>
+    <circle cx="236" cy="166" r="9" fill="#000000"/>
+<ellipse cx="200" cy="278" rx="16" ry="20" fill="#000000"/><ellipse cx="200" cy="275" rx="9" ry="7" fill="#5A2A2A"/>
+  </g>
+
+  <g class="pst">
+    <path d="M118 115 Q112 100 120 90" fill="none" stroke="#666" stroke-width="3.5" stroke-linecap="round"/>
+    <path d="M132 118 Q128 102 136 92" fill="none" stroke="#666" stroke-width="3.5" stroke-linecap="round"/>
+    <path d="M268 118 Q272 102 264 92" fill="none" stroke="#666" stroke-width="3.5" stroke-linecap="round"/>
+    <path d="M282 115 Q288 100 280 90" fill="none" stroke="#666" stroke-width="3.5" stroke-linecap="round"/>
+  </g>
+</svg>

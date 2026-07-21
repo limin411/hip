@@ -1,0 +1,40 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 400" width="512" height="512" role="img" aria-labelledby="brb-title brb-desc" style="overflow:hidden">
+  <title id="brb-title">马上回来</title>
+  <desc id="brb-desc">BRB</desc>
+  <style>
+
+    .root { transform-origin: 200px 290px; animation: bob 1.4s cubic-bezier(0.45, 0, 0.55, 1) infinite; }
+    .arm-r { transform-origin: 315px 230px; animation: waveHi 0.7s cubic-bezier(0.22, 0.9, 0.3, 1) infinite; }
+    .arm-l { transform-origin: 85px 240px; }
+    @keyframes bob { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-4px); } }
+    @keyframes waveHi {
+      0%,100% { transform: rotate(-8deg); }
+      50% { transform: rotate(22deg); }
+    }
+
+
+  </style>
+  <g class="root">
+
+    <ellipse cx="152" cy="208" rx="90" ry="102" fill="#FF9800"/>
+    <ellipse cx="248" cy="208" rx="90" ry="102" fill="#FF9800"/>
+    <path d="M200 128 Q192 208 200 278" fill="none" stroke="#E87E00" stroke-width="10" stroke-linecap="round"/>
+
+    <g class="arm-l">
+      <path d="M85 238 Q70 269 55 300" fill="none" stroke="#000000" stroke-width="14" stroke-linecap="round"/>
+      
+      <circle cx="55" cy="300" r="20" fill="#FFFFFF" stroke="#000000" stroke-width="6"/>
+      <path d="M45 294 Q55 288 65 294" fill="none" stroke="#000000" stroke-width="3.5" stroke-linecap="round"/></g>
+    <g class="arm-r">
+      <path d="M315 230 Q338 175 360 120" fill="none" stroke="#000000" stroke-width="14" stroke-linecap="round"/>
+      
+      <circle cx="360" cy="120" r="24" fill="#FFFFFF" stroke="#000000" stroke-width="6"/>
+      <path d="M350 114 Q360 108 370 114" fill="none" stroke="#000000" stroke-width="3.5" stroke-linecap="round"/></g>
+
+    <ellipse cx="166" cy="160" rx="18" ry="23" fill="#FFFFFF" stroke="#000000" stroke-width="4"/>
+    <circle cx="170" cy="157" r="10" fill="#000000"/><circle cx="174" cy="152" r="3.5" fill="#FFFFFF"/>
+    <path d="M216 160 Q234 148 252 160" fill="none" stroke="#000000" stroke-width="6" stroke-linecap="round"/>
+<path d="M176 268 Q200 292 224 268" fill="none" stroke="#000000" stroke-width="7" stroke-linecap="round"/>
+  </g>
+
+</svg>

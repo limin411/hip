@@ -2,7 +2,9 @@
 import '@testing-library/jest-dom/vitest'
 import { describe, it, expect, afterEach, vi, beforeEach } from 'vitest'
 import { render, cleanup } from '@testing-library/react'
-import { MascotActor } from './MascotActor'
+import { existsSync } from 'node:fs'
+import { resolve } from 'node:path'
+import { ACTION_PATH, MascotActor, type MascotAction } from './MascotActor'
 
 afterEach(() => {
   cleanup()
@@ -26,6 +28,17 @@ describe('MascotActor', () => {
     })
   })
 
+  it('ACTION_PATH covers 116 stickers and every file exists under public/motion', () => {
+    const keys = Object.keys(ACTION_PATH) as MascotAction[]
+    expect(keys).toHaveLength(116)
+    const paths = Object.values(ACTION_PATH)
+    expect(new Set(paths).size).toBe(116)
+    const motionRoot = resolve(process.cwd(), 'public/motion')
+    for (const rel of paths) {
+      expect(existsSync(resolve(motionRoot, rel)), `missing public/motion/${rel}`).toBe(true)
+    }
+  })
+
   it('renders a motion svg img with data-mascot-action when motion is allowed', () => {
     const { container } = render(<MascotActor size={200} />)
     const wrap = container.querySelector('[data-mascot-action]')
@@ -34,7 +47,7 @@ describe('MascotActor', () => {
 
     const img = container.querySelector('img')
     expect(img).toBeInTheDocument()
-    expect(img?.getAttribute('src')).toMatch(/motion\/lifestyle\/logo-wave\.svg$/)
+    expect(img?.getAttribute('src')).toMatch(/motion\/03_gesture\/029_wave\.svg$/)
   })
 
   it('falls back to HipLogo when prefers-reduced-motion', () => {
@@ -55,13 +68,13 @@ describe('MascotActor', () => {
   })
 
   it('honors initialAction for the first clip', () => {
-    const { container } = render(<MascotActor initialAction="code" />)
+    const { container } = render(<MascotActor initialAction="coding" />)
     expect(container.querySelector('[data-mascot-action]')).toHaveAttribute(
       'data-mascot-action',
-      'code',
+      'coding',
     )
     const img = container.querySelector('img')
-    expect(img?.getAttribute('src')).toMatch(/motion\/work\/logo-code\.svg$/)
+    expect(img?.getAttribute('src')).toMatch(/motion\/04_work\/043_coding\.svg$/)
   })
 
   it('dual-buffers motion imgs when crossfade is enabled', () => {
@@ -70,8 +83,8 @@ describe('MascotActor', () => {
     expect(wrap).toBeInTheDocument()
     const imgs = container.querySelectorAll('img')
     expect(imgs.length).toBe(2)
-    expect(imgs[0]?.getAttribute('src')).toMatch(/motion\/lifestyle\/logo-wave\.svg$/)
-    expect(imgs[1]?.getAttribute('src')).toMatch(/motion\/lifestyle\/logo-wave\.svg$/)
+    expect(imgs[0]?.getAttribute('src')).toMatch(/motion\/03_gesture\/029_wave\.svg$/)
+    expect(imgs[1]?.getAttribute('src')).toMatch(/motion\/03_gesture\/029_wave\.svg$/)
   })
 
   it('keeps front buffer A on mount when crossfade starts on the same clip', () => {
@@ -102,4 +115,3 @@ describe('MascotActor', () => {
     expect(imgs[1]).toHaveStyle({ opacity: '0' })
   })
 })
-

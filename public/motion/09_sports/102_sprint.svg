@@ -1,0 +1,43 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 400" width="512" height="512" role="img" aria-labelledby="sprint-title sprint-desc" style="overflow:hidden">
+  <title id="sprint-title">冲刺</title>
+  <desc id="sprint-desc">Sprint</desc>
+  <style>
+
+    .root { transform-origin: 200px 300px; animation: run 0.42s cubic-bezier(0.22, 0.9, 0.3, 1) infinite; }
+    .arm-l { transform-origin: 90px 230px; animation: runArmL 0.42s cubic-bezier(0.22, 0.9, 0.3, 1) infinite; }
+    .arm-r { transform-origin: 310px 235px; animation: runArmR 0.42s cubic-bezier(0.22, 0.9, 0.3, 1) infinite; }
+    @keyframes run {
+      0%,100% { transform: translateY(0) translateX(-3px) rotate(-2deg) scale(1,1); }
+      50% { transform: translateY(-8px) translateX(3px) rotate(2deg) scale(0.98,1.03); }
+    }
+    @keyframes runArmL { 0%,100% { transform: rotate(10deg); } 50% { transform: rotate(-18deg); } }
+    @keyframes runArmR { 0%,100% { transform: rotate(-10deg); } 50% { transform: rotate(18deg); } }
+
+.psw{animation:sw 1.4s cubic-bezier(0.33, 0, 0.2, 1) infinite}@keyframes sw{0%{opacity:1;transform:translate(0,0)}70%{opacity:.9;transform:translate(3px,12px)}100%{opacity:0;transform:translate(5px,20px)}}
+  </style>
+  <g class="root">
+
+    <ellipse cx="152" cy="208" rx="90" ry="102" fill="#FF9800"/>
+    <ellipse cx="248" cy="208" rx="90" ry="102" fill="#FF9800"/>
+    <path d="M200 128 Q192 208 200 278" fill="none" stroke="#E87E00" stroke-width="10" stroke-linecap="round"/>
+
+    <g class="arm-l">
+      <path d="M90 230 Q72 202 55 175" fill="none" stroke="#000000" stroke-width="14" stroke-linecap="round"/>
+      
+      <circle cx="55" cy="175" r="22" fill="#FFFFFF" stroke="#000000" stroke-width="6"/>
+      <path d="M45 169 Q55 163 65 169" fill="none" stroke="#000000" stroke-width="3.5" stroke-linecap="round"/></g>
+    <g class="arm-r">
+      <path d="M310 235 Q330 260 350 285" fill="none" stroke="#000000" stroke-width="14" stroke-linecap="round"/>
+      
+      <circle cx="350" cy="285" r="18" fill="#FFFFFF" stroke="#000000" stroke-width="6"/>
+      <path d="M340 279 Q350 273 360 279" fill="none" stroke="#000000" stroke-width="3.5" stroke-linecap="round"/></g>
+
+    <ellipse cx="166" cy="158" rx="22" ry="28" fill="#FFFFFF" stroke="#000000" stroke-width="4"/>
+    <circle cx="168" cy="158" r="10" fill="#000000"/><circle cx="172" cy="151" r="3.5" fill="#FFFFFF"/>
+    <ellipse cx="234" cy="158" rx="22" ry="28" fill="#FFFFFF" stroke="#000000" stroke-width="4"/>
+    <circle cx="236" cy="158" r="10" fill="#000000"/><circle cx="240" cy="151" r="3.5" fill="#FFFFFF"/>
+<ellipse cx="200" cy="278" rx="16" ry="20" fill="#000000"/><ellipse cx="200" cy="275" rx="9" ry="7" fill="#5A2A2A"/>
+  </g>
+
+  <g transform="translate(292 115)"><g class="psw"><ellipse rx="8" ry="12" fill="#78BEFF" stroke="#000" stroke-width="2.5"/></g></g>
+</svg>

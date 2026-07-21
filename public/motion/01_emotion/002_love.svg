@@ -1,0 +1,56 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 400" width="512" height="512" role="img" aria-labelledby="love-title love-desc" style="overflow:hidden">
+  <title id="love-title">爱心眼</title>
+  <desc id="love-desc">Heart eyes</desc>
+  <style>
+
+    .root { transform-origin: 200px 300px; animation: sway 2s cubic-bezier(0.45, 0, 0.55, 1) infinite; }
+    @keyframes sway {
+      0%,100% { transform: translateX(0) rotate(0); }
+      25% { transform: translateX(3px) rotate(1.8deg); }
+      75% { transform: translateX(-3px) rotate(-1.8deg); }
+    }
+
+
+    .ph1 { animation: pfloat 1.8s cubic-bezier(0.33, 0, 0.2, 1) 0s infinite; }
+    @keyframes pfloat {
+      0% { opacity: 0; transform: translateY(6px) scale(0.8); }
+      20% { opacity: 1; }
+      100% { opacity: 0; transform: translateY(-36px) scale(1.1); }
+    }
+    .ph2 { animation: pfloat 1.8s cubic-bezier(0.33, 0, 0.2, 1) 0.4s infinite; }
+    @keyframes pfloat {
+      0% { opacity: 0; transform: translateY(6px) scale(0.8); }
+      20% { opacity: 1; }
+      100% { opacity: 0; transform: translateY(-36px) scale(1.1); }
+    }
+    .ph3 { animation: pfloat 1.8s cubic-bezier(0.33, 0, 0.2, 1) 0.85s infinite; }
+    @keyframes pfloat {
+      0% { opacity: 0; transform: translateY(6px) scale(0.8); }
+      20% { opacity: 1; }
+      100% { opacity: 0; transform: translateY(-36px) scale(1.1); }
+    }
+  </style>
+  <g class="root">
+
+    <ellipse cx="152" cy="208" rx="90" ry="102" fill="#FF9800"/>
+    <ellipse cx="248" cy="208" rx="90" ry="102" fill="#FF9800"/>
+    <path d="M200 128 Q192 208 200 278" fill="none" stroke="#E87E00" stroke-width="10" stroke-linecap="round"/>
+<g class="arm-l">
+      <path d="M78 230 Q60 200 42 170" fill="none" stroke="#000000" stroke-width="14" stroke-linecap="round"/>
+      
+      <circle cx="42" cy="170" r="22" fill="#FFFFFF" stroke="#000000" stroke-width="6"/>
+      <path d="M32 164 Q42 158 52 164" fill="none" stroke="#000000" stroke-width="3.5" stroke-linecap="round"/></g><g class="arm-r">
+      <path d="M322 230 Q340 200 358 170" fill="none" stroke="#000000" stroke-width="14" stroke-linecap="round"/>
+      
+      <circle cx="358" cy="170" r="22" fill="#FFFFFF" stroke="#000000" stroke-width="6"/>
+      <path d="M348 164 Q358 158 368 164" fill="none" stroke="#000000" stroke-width="3.5" stroke-linecap="round"/></g>
+
+    <path fill="#FF5A6E" d="M166 150 C158 140 144 146 144 158 C144 170 166 186 166 186 C166 186 188 170 188 158 C188 146 174 140 166 150Z"/>
+    <path fill="#FF5A6E" d="M234 150 C226 140 212 146 212 158 C212 170 234 186 234 186 C234 186 256 170 256 158 C256 146 242 140 234 150Z"/>
+<path d="M176 268 Q200 292 224 268" fill="none" stroke="#000000" stroke-width="7" stroke-linecap="round"/>
+  </g>
+
+  <g transform="translate(88 100)"><g class="ph1"><path fill="#FF5A6E" d="M0-8C-6-16-16-12-16-2C-16 8 0 18 0 18C0 18 16 8 16-2C16-12 6-16 0-8Z"/></g></g>
+  <g transform="translate(312 88)"><g class="ph2"><path fill="#FF5A6E" d="M0-8C-6-16-16-12-16-2C-16 8 0 18 0 18C0 18 16 8 16-2C16-12 6-16 0-8Z" transform="scale(.85)"/></g></g>
+  <g transform="translate(200 62)"><g class="ph3"><path fill="#FF7A8C" d="M0-8C-6-16-16-12-16-2C-16 8 0 18 0 18C0 18 16 8 16-2C16-12 6-16 0-8Z" transform="scale(.7)"/></g></g>
+</svg>

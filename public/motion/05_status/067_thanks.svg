@@ -1,0 +1,58 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 400" width="512" height="512" role="img" aria-labelledby="thanks-title thanks-desc" style="overflow:hidden">
+  <title id="thanks-title">谢谢</title>
+  <desc id="thanks-desc">Thanks</desc>
+  <style>
+
+    .root { transform-origin: 200px 300px; animation: sway 2s cubic-bezier(0.45, 0, 0.55, 1) infinite; }
+    @keyframes sway {
+      0%,100% { transform: translateX(0) rotate(0); }
+      25% { transform: translateX(3px) rotate(1.8deg); }
+      75% { transform: translateX(-3px) rotate(-1.8deg); }
+    }
+
+
+    .ph1 { animation: pfloat 1.8s cubic-bezier(0.33, 0, 0.2, 1) 0s infinite; }
+    @keyframes pfloat {
+      0% { opacity: 0; transform: translateY(6px) scale(0.8); }
+      20% { opacity: 1; }
+      100% { opacity: 0; transform: translateY(-36px) scale(1.1); }
+    }
+    .ph2 { animation: pfloat 1.8s cubic-bezier(0.33, 0, 0.2, 1) 0.4s infinite; }
+    @keyframes pfloat {
+      0% { opacity: 0; transform: translateY(6px) scale(0.8); }
+      20% { opacity: 1; }
+      100% { opacity: 0; transform: translateY(-36px) scale(1.1); }
+    }
+    .ph3 { animation: pfloat 1.8s cubic-bezier(0.33, 0, 0.2, 1) 0.85s infinite; }
+    @keyframes pfloat {
+      0% { opacity: 0; transform: translateY(6px) scale(0.8); }
+      20% { opacity: 1; }
+      100% { opacity: 0; transform: translateY(-36px) scale(1.1); }
+    }
+  </style>
+  <g class="root">
+
+    <ellipse cx="152" cy="208" rx="90" ry="102" fill="#FF9800"/>
+    <ellipse cx="248" cy="208" rx="90" ry="102" fill="#FF9800"/>
+    <path d="M200 128 Q192 208 200 278" fill="none" stroke="#E87E00" stroke-width="10" stroke-linecap="round"/>
+
+    <path d="M148 160 Q166 148 184 160" fill="none" stroke="#000000" stroke-width="6" stroke-linecap="round"/>
+    <path d="M216 160 Q234 148 252 160" fill="none" stroke="#000000" stroke-width="6" stroke-linecap="round"/>
+<path d="M176 268 Q200 292 224 268" fill="none" stroke="#000000" stroke-width="7" stroke-linecap="round"/>
+
+    <g class="arm-l">
+      <path d="M100 240 Q138 235 175 230" fill="none" stroke="#000000" stroke-width="14" stroke-linecap="round"/>
+      
+      <circle cx="175" cy="230" r="16" fill="#FFFFFF" stroke="#000000" stroke-width="6"/>
+      <path d="M165 224 Q175 218 185 224" fill="none" stroke="#000000" stroke-width="3.5" stroke-linecap="round"/></g>
+    <g class="arm-r">
+      <path d="M300 240 Q262 235 225 230" fill="none" stroke="#000000" stroke-width="14" stroke-linecap="round"/>
+      
+      <circle cx="225" cy="230" r="16" fill="#FFFFFF" stroke="#000000" stroke-width="6"/>
+      <path d="M215 224 Q225 218 235 224" fill="none" stroke="#000000" stroke-width="3.5" stroke-linecap="round"/></g>
+  </g>
+
+  <g transform="translate(88 100)"><g class="ph1"><path fill="#FF5A6E" d="M0-8C-6-16-16-12-16-2C-16 8 0 18 0 18C0 18 16 8 16-2C16-12 6-16 0-8Z"/></g></g>
+  <g transform="translate(312 88)"><g class="ph2"><path fill="#FF5A6E" d="M0-8C-6-16-16-12-16-2C-16 8 0 18 0 18C0 18 16 8 16-2C16-12 6-16 0-8Z" transform="scale(.85)"/></g></g>
+  <g transform="translate(200 62)"><g class="ph3"><path fill="#FF7A8C" d="M0-8C-6-16-16-12-16-2C-16 8 0 18 0 18C0 18 16 8 16-2C16-12 6-16 0-8Z" transform="scale(.7)"/></g></g>
+</svg>

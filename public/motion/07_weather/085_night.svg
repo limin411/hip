@@ -1,0 +1,39 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 400" width="512" height="512" role="img" aria-labelledby="night-title night-desc" style="overflow:hidden">
+  <title id="night-title">晚安</title>
+  <desc id="night-desc">Good night</desc>
+  <style>
+
+    .root { transform-origin: 200px 300px; animation: sleepy 2.4s cubic-bezier(0.33, 0, 0.2, 1) infinite; }
+    @keyframes sleepy {
+      0%,100% { transform: rotate(-2deg) translateY(2px); }
+      50% { transform: rotate(2.2deg) translateY(6px); }
+    }
+
+
+  </style>
+  <g class="root">
+
+    <ellipse cx="152" cy="208" rx="90" ry="102" fill="#FF9800"/>
+    <ellipse cx="248" cy="208" rx="90" ry="102" fill="#FF9800"/>
+    <path d="M200 128 Q192 208 200 278" fill="none" stroke="#E87E00" stroke-width="10" stroke-linecap="round"/>
+<g class="arm-l">
+      <path d="M85 238 Q68 280 52 322" fill="none" stroke="#000000" stroke-width="14" stroke-linecap="round"/>
+      
+      <circle cx="52" cy="322" r="20" fill="#FFFFFF" stroke="#000000" stroke-width="6"/>
+      <path d="M42 316 Q52 310 62 316" fill="none" stroke="#000000" stroke-width="3.5" stroke-linecap="round"/></g><g class="arm-r">
+      <path d="M315 238 Q332 280 348 322" fill="none" stroke="#000000" stroke-width="14" stroke-linecap="round"/>
+      
+      <circle cx="348" cy="322" r="20" fill="#FFFFFF" stroke="#000000" stroke-width="6"/>
+      <path d="M338 316 Q348 310 358 316" fill="none" stroke="#000000" stroke-width="3.5" stroke-linecap="round"/></g>
+
+    <ellipse cx="166" cy="165" rx="18" ry="11" fill="#FFFFFF" stroke="#000000" stroke-width="4"/>
+    <ellipse cx="168" cy="168" rx="8" ry="4" fill="#000000"/>
+    <ellipse cx="234" cy="165" rx="18" ry="11" fill="#FFFFFF" stroke="#000000" stroke-width="4"/>
+    <ellipse cx="236" cy="168" rx="8" ry="4" fill="#000000"/>
+<path d="M188 282 Q200 292 212 282" fill="none" stroke="#000000" stroke-width="6" stroke-linecap="round"/>
+  </g>
+
+  <g transform="translate(310 82)">
+    <path d="M8-16A18 18 0 1 0 8 16A12 12 0 1 1 8-16Z" fill="#F5E6A8" stroke="#000" stroke-width="3"/>
+  </g>
+</svg>

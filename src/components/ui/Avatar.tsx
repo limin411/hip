@@ -5,7 +5,7 @@ interface AvatarProps {
   src?: string
   size?: number
   shape?: 'circle' | 'square'
-  /** Apply Sage Gray gradient background to initials fallback (no effect when src is set). */
+  /** Apply brand accent gradient background to initials fallback (no effect when src is set). */
   gradient?: boolean
   /** Apply hover ring border for clickable affordance. */
   ring?: boolean

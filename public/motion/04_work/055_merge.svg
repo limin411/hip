@@ -1,0 +1,43 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 400" width="512" height="512" role="img" aria-labelledby="merge-title merge-desc" style="overflow:hidden">
+  <title id="merge-title">合并</title>
+  <desc id="merge-desc">Merge done</desc>
+  <style>
+
+    .root { transform-origin: 200px 290px; animation: bounce 1.25s cubic-bezier(0.34, 1.35, 0.64, 1) infinite; }
+    .arm-l { transform-origin: 60px 220px; animation: waveL 1.25s cubic-bezier(0.45, 0, 0.55, 1) infinite; }
+    .arm-r { transform-origin: 340px 220px; animation: waveR 1.25s cubic-bezier(0.45, 0, 0.55, 1) infinite; }
+    @keyframes bounce {
+      0%,100% { transform: translateY(0) scale(1,1); }
+      30% { transform: translateY(-9px) scale(0.98,1.03); }
+      55% { transform: translateY(0) scale(1.03,0.97); }
+      75% { transform: translateY(-3px) scale(0.995,1.01); }
+    }
+    @keyframes waveL { 0%,100% { transform: rotate(0); } 50% { transform: rotate(-12deg); } }
+    @keyframes waveR { 0%,100% { transform: rotate(0); } 50% { transform: rotate(12deg); } }
+
+.pok{animation:ok 1s cubic-bezier(0.34, 1.35, 0.64, 1) infinite}@keyframes ok{0%,100%{transform:scale(1)}50%{transform:scale(1.1)}}
+  </style>
+  <g class="root">
+
+    <ellipse cx="152" cy="208" rx="90" ry="102" fill="#FF9800"/>
+    <ellipse cx="248" cy="208" rx="90" ry="102" fill="#FF9800"/>
+    <path d="M200 128 Q192 208 200 278" fill="none" stroke="#E87E00" stroke-width="10" stroke-linecap="round"/>
+<g class="arm-l">
+      <path d="M78 230 Q60 200 42 170" fill="none" stroke="#000000" stroke-width="14" stroke-linecap="round"/>
+      
+      <circle cx="42" cy="170" r="22" fill="#FFFFFF" stroke="#000000" stroke-width="6"/>
+      <path d="M32 164 Q42 158 52 164" fill="none" stroke="#000000" stroke-width="3.5" stroke-linecap="round"/></g><g class="arm-r">
+      <path d="M322 230 Q340 200 358 170" fill="none" stroke="#000000" stroke-width="14" stroke-linecap="round"/>
+      
+      <circle cx="358" cy="170" r="22" fill="#FFFFFF" stroke="#000000" stroke-width="6"/>
+      <path d="M348 164 Q358 158 368 164" fill="none" stroke="#000000" stroke-width="3.5" stroke-linecap="round"/></g>
+
+    <ellipse cx="166" cy="160" rx="18" ry="23" fill="#FFFFFF" stroke="#000000" stroke-width="4"/>
+    <circle cx="170" cy="157" r="10" fill="#000000"/><circle cx="174" cy="152" r="3.5" fill="#FFFFFF"/>
+    <ellipse cx="234" cy="160" rx="18" ry="23" fill="#FFFFFF" stroke="#000000" stroke-width="4"/>
+    <circle cx="238" cy="157" r="10" fill="#000000"/><circle cx="242" cy="152" r="3.5" fill="#FFFFFF"/>
+<path d="M176 268 Q200 292 224 268" fill="none" stroke="#000000" stroke-width="7" stroke-linecap="round"/>
+  </g>
+
+  <g transform="translate(310 95)"><g class="pok"><circle r="20" fill="#78DC78" stroke="#000" stroke-width="4"/><path d="M-8 0L-2 8L10-8" fill="none" stroke="#000" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/></g></g>
+</svg>

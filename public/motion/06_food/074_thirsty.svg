@@ -1,0 +1,45 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 400" width="512" height="512" role="img" aria-labelledby="thirsty-title thirsty-desc" style="overflow:hidden">
+  <title id="thirsty-title">渴了</title>
+  <desc id="thirsty-desc">Thirsty</desc>
+  <style>
+
+    .root { transform-origin: 200px 220px; animation: pop 1.15s cubic-bezier(0.34, 1.35, 0.64, 1) infinite; }
+    @keyframes pop {
+      0%,100% { transform: scale(1); } 25% { transform: scale(0.96); }
+      55% { transform: scale(1.06); } 75% { transform: scale(0.99); }
+    }
+
+.pw1{animation:dr 1.2s cubic-bezier(0.33, 0, 0.2, 1) infinite}.pw2{animation:dr 1.2s cubic-bezier(0.33, 0, 0.2, 1) .4s infinite}@keyframes dr{0%{opacity:0;transform:translateY(0)}20%{opacity:1}100%{opacity:0;transform:translateY(22px)}}
+  </style>
+  <g class="root">
+
+    <ellipse cx="152" cy="208" rx="90" ry="102" fill="#FF9800"/>
+    <ellipse cx="248" cy="208" rx="90" ry="102" fill="#FF9800"/>
+    <path d="M200 128 Q192 208 200 278" fill="none" stroke="#E87E00" stroke-width="10" stroke-linecap="round"/>
+
+    <g class="arm-l">
+      <path d="M85 230 Q70 240 55 250" fill="none" stroke="#000000" stroke-width="14" stroke-linecap="round"/>
+      
+      <circle cx="55" cy="250" r="16" fill="#FFFFFF" stroke="#000000" stroke-width="6"/>
+      <path d="M45 244 Q55 238 65 244" fill="none" stroke="#000000" stroke-width="3.5" stroke-linecap="round"/></g>
+    <g class="arm-r">
+      <path d="M315 230 Q340 200 350 155" fill="none" stroke="#000000" stroke-width="14" stroke-linecap="round"/>
+      <rect x="340" y="120" width="22" height="36" rx="3" fill="#FFF8E7" stroke="#000000" stroke-width="3"/>
+      <ellipse cx="351" cy="120" rx="11" ry="5" fill="#FFD23A" stroke="#000000" stroke-width="2"/>
+      <path d="M362 130 H372 Q378 130 378 140 Q378 150 372 150 H362" fill="none" stroke="#000000" stroke-width="3"/>
+    </g>
+
+    <ellipse cx="166" cy="158" rx="22" ry="28" fill="#FFFFFF" stroke="#000000" stroke-width="4"/>
+    <circle cx="168" cy="158" r="10" fill="#000000"/><circle cx="172" cy="151" r="3.5" fill="#FFFFFF"/>
+    <ellipse cx="234" cy="158" rx="22" ry="28" fill="#FFFFFF" stroke="#000000" stroke-width="4"/>
+    <circle cx="236" cy="158" r="10" fill="#000000"/><circle cx="240" cy="151" r="3.5" fill="#FFFFFF"/>
+<ellipse cx="200" cy="278" rx="12" ry="14" fill="none" stroke="#000000" stroke-width="6"/>
+  </g>
+
+  <g transform="translate(100 90)"><g class="pw1"><ellipse rx="5" ry="8" fill="#78BEFF" stroke="#000" stroke-width="2"/></g></g>
+  <g transform="translate(300 80)"><g class="pw2"><ellipse rx="5" ry="8" fill="#78BEFF" stroke="#000" stroke-width="2"/></g></g>
+  <g transform="translate(200 58)">
+    <rect x="-8" y="0" width="16" height="28" rx="4" fill="#78BEFF" stroke="#000" stroke-width="2.5"/>
+    <rect x="-10" y="-6" width="20" height="8" rx="2" fill="#5B9BD5" stroke="#000" stroke-width="2"/>
+  </g>
+</svg>

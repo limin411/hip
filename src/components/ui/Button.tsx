@@ -7,7 +7,7 @@ export const buttonVariants = cva(
   {
     variants: {
       variant: {
-        // Solid inverse CTA — soft monochrome (not pure ink-black), never sage paint
+        // Solid inverse CTA — soft monochrome (not pure ink-black), never brand accent paint
         primary:
           'bg-btn-primary text-on-btn-primary hover:bg-btn-primary-hover focus-visible:ring-ink/25',
         secondary:

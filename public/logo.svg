@@ -1,34 +1,36 @@
-<svg viewBox="0 0 1320 1320" xmlns="http://www.w3.org/2000/svg">
-  <!-- Green body/head -->
-  <g fill="#9faf8b">
-    <!-- Main head circle -->
-    <circle cx="636" cy="724" r="500"/>
-    <!-- Side bumps -->
-    <circle cx="162" cy="1020" r="68"/>
-    <circle cx="1110" cy="1020" r="68"/>
-    <!-- Antennae stems -->
-    <line x1="428" y1="240" x2="362" y2="165" stroke="#9faf8b" stroke-width="40" stroke-linecap="round"/>
-    <line x1="844" y1="240" x2="910" y2="165" stroke="#9faf8b" stroke-width="40" stroke-linecap="round"/>
-  </g>
+<svg width="400" height="400" viewBox="0 0 400 400" xmlns="http://www.w3.org/2000/svg" aria-labelledby="title desc" role="img">
+  <title id="title">Flat Butt Mascot Logo</title>
+  <desc id="desc">A cute flat mascot of a smiling peach/butt character with eyes, noodle-line arms, and white glove fists.</desc>
 
-  <!-- Eyes -->
-  <g fill="#ffffff">
-    <ellipse cx="454" cy="632" rx="109" ry="72"/>
-    <ellipse cx="818" cy="632" rx="109" ry="72"/>
-  </g>
+  <!-- Body: two cheeks -->
+  <ellipse cx="152" cy="208" rx="90" ry="102" fill="#FF9800"/>
+  <ellipse cx="248" cy="208" rx="90" ry="102" fill="#FF9800"/>
 
-  <!-- Pupils -->
-  <g fill="#1a1a1a">
-    <circle cx="454" cy="632" r="35"/>
-    <circle cx="819" cy="632" r="35"/>
-  </g>
+  <!-- Center crease -->
+  <path d="M200 128 Q192 208 200 278" fill="none" stroke="#E87E00" stroke-width="10" stroke-linecap="round"/>
 
-  <!-- Eyebrows -->
-  <g fill="none" stroke="#1a1a1a" stroke-width="55" stroke-linecap="round" stroke-linejoin="round">
-    <path d="M332,470 Q454,430 576,470"/>
-    <path d="M697,470 Q818,430 940,470"/>
-  </g>
+  <!-- Eyes: white sclera + black pupils (lively, looking slightly up) -->
+  <!-- Left eye -->
+  <ellipse cx="166" cy="160" rx="18" ry="23" fill="#FFFFFF" stroke="#000000" stroke-width="4"/>
+  <circle cx="170" cy="157" r="10" fill="#000000"/>
+  <circle cx="174" cy="152" r="3.5" fill="#FFFFFF"/>
+  <!-- Right eye -->
+  <ellipse cx="234" cy="160" rx="18" ry="23" fill="#FFFFFF" stroke="#000000" stroke-width="4"/>
+  <circle cx="238" cy="157" r="10" fill="#000000"/>
+  <circle cx="242" cy="152" r="3.5" fill="#FFFFFF"/>
 
-  <!-- Mouth -->
-  <path d="M555,855 Q636,890 717,855" fill="none" stroke="#1a1a1a" stroke-width="40" stroke-linecap="round" stroke-linejoin="round"/>
+  <!-- Smile — near bottom of body -->
+  <path d="M176 268 Q200 292 224 268" fill="none" stroke="#000000" stroke-width="7" stroke-linecap="round"/>
+
+  <!-- Left arm: thick black noodle line + white glove fist -->
+  <path d="M78 230 Q48 210 42 178" fill="none" stroke="#000000" stroke-width="14" stroke-linecap="round"/>
+  <circle cx="40" cy="162" r="22" fill="#FFFFFF" stroke="#000000" stroke-width="6"/>
+  <!-- fist knuckle hint -->
+  <path d="M30 156 Q40 150 50 156" fill="none" stroke="#000000" stroke-width="3.5" stroke-linecap="round"/>
+
+  <!-- Right arm: thick black noodle line + white glove fist -->
+  <path d="M322 230 Q352 210 358 178" fill="none" stroke="#000000" stroke-width="14" stroke-linecap="round"/>
+  <circle cx="360" cy="162" r="22" fill="#FFFFFF" stroke="#000000" stroke-width="6"/>
+  <path d="M350 156 Q360 150 370 156" fill="none" stroke="#000000" stroke-width="3.5" stroke-linecap="round"/>
+
 </svg>

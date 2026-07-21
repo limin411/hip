@@ -2,173 +2,177 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { HipLogo } from '@/components/login/HipLogo'
 
 /**
- * Animated mascot clips under `public/motion/<category>/logo-<id>.svg`.
- * ids are unique across categories.
+ * Animated mascot clips under `public/motion/<category>/NNN_name.svg`.
+ * Action ids are sticker semantic names (snake_case), unique across categories.
  */
 export type MascotAction =
-  // arts
-  | 'dance'
-  | 'guitar'
-  | 'paint'
-  | 'photo'
-  | 'piano'
-  // celebration
-  | 'birthday'
-  | 'gift'
-  // fitness
-  | 'bike'
-  | 'jump-rope'
-  | 'jumping-jack'
-  | 'lift'
-  | 'plank'
-  | 'run'
-  | 'stretch'
-  | 'yoga'
-  // lifestyle
-  | 'brush-teeth'
-  | 'clap'
-  | 'coffee'
-  | 'cook'
-  | 'phone'
-  | 'read'
-  | 'shower'
-  | 'sleep'
-  | 'wave'
-  // outdoor
-  | 'camp'
-  | 'fish'
-  | 'hike'
-  | 'skate'
-  | 'ski'
-  | 'surf'
-  // pets
-  | 'cat'
-  | 'dog'
-  // sports
-  | 'archery'
-  | 'badminton'
-  | 'baseball'
-  | 'basketball'
-  | 'bowling'
-  | 'box'
-  | 'golf'
-  | 'pingpong'
-  | 'soccer'
-  | 'swim'
-  | 'tennis'
-  | 'volleyball'
-  // travel
-  | 'drive'
-  | 'plane'
-  // work
-  | 'code'
-  | 'meeting'
-  | 'write'
+  | 'happy' | 'love' | 'cry' | 'angry' | 'shock' | 'wink'
+  | 'sleepy' | 'cheer' | 'laugh' | 'shy' | 'cool' | 'sad'
+  | 'confused' | 'excited' | 'proud' | 'nervous' | 'dizzy' | 'dead'
+  | 'drool' | 'tongue' | 'blank' | 'rage' | 'melt' | 'sparkle'
+  | 'smug' | 'pout' | 'awe' | 'relief' | 'wave' | 'thumbs_up'
+  | 'thumbs_down' | 'clap' | 'point' | 'shrug' | 'peace' | 'hug'
+  | 'highfive' | 'come' | 'stop' | 'ok_hand' | 'pray' | 'flex'
+  | 'coding' | 'bug' | 'fixed' | 'deploy' | 'review' | 'thinking'
+  | 'idea' | 'loading' | 'success' | 'fail' | 'deadline' | 'meeting'
+  | 'merge' | 'coffee_work' | 'online' | 'offline' | 'busy' | 'away'
+  | 'brb' | 'done' | 'wait' | 'yes' | 'no' | 'maybe'
+  | 'thanks' | 'sorry' | 'hungry' | 'eat' | 'coffee' | 'full'
+  | 'yummy' | 'thirsty' | 'snack' | 'chef' | 'diet' | 'cheers_drink'
+  | 'sunny' | 'rainy' | 'snowy' | 'hot' | 'cold' | 'windy'
+  | 'night' | 'morning' | 'rainbow' | 'storm' | 'party' | 'birthday'
+  | 'new_year' | 'valentine' | 'halloween' | 'champion' | 'rich' | 'music'
+  | 'dance' | 'game' | 'travel' | 'fire' | 'run' | 'sprint'
+  | 'jog' | 'jump_rope' | 'gym' | 'yoga' | 'stretch' | 'basketball'
+  | 'soccer' | 'tennis' | 'swim' | 'boxing' | 'victory_lap' | 'tired_run'
+  | 'finish' | 'coach'
 
-const ACTION_PATH: Record<MascotAction, string> = {
-  dance: 'arts/logo-dance.svg',
-  guitar: 'arts/logo-guitar.svg',
-  paint: 'arts/logo-paint.svg',
-  photo: 'arts/logo-photo.svg',
-  piano: 'arts/logo-piano.svg',
-  birthday: 'celebration/logo-birthday.svg',
-  gift: 'celebration/logo-gift.svg',
-  bike: 'fitness/logo-bike.svg',
-  'jump-rope': 'fitness/logo-jump-rope.svg',
-  'jumping-jack': 'fitness/logo-jumping-jack.svg',
-  lift: 'fitness/logo-lift.svg',
-  plank: 'fitness/logo-plank.svg',
-  run: 'fitness/logo-run.svg',
-  stretch: 'fitness/logo-stretch.svg',
-  yoga: 'fitness/logo-yoga.svg',
-  'brush-teeth': 'lifestyle/logo-brush-teeth.svg',
-  clap: 'lifestyle/logo-clap.svg',
-  coffee: 'lifestyle/logo-coffee.svg',
-  cook: 'lifestyle/logo-cook.svg',
-  phone: 'lifestyle/logo-phone.svg',
-  read: 'lifestyle/logo-read.svg',
-  shower: 'lifestyle/logo-shower.svg',
-  sleep: 'lifestyle/logo-sleep.svg',
-  wave: 'lifestyle/logo-wave.svg',
-  camp: 'outdoor/logo-camp.svg',
-  fish: 'outdoor/logo-fish.svg',
-  hike: 'outdoor/logo-hike.svg',
-  skate: 'outdoor/logo-skate.svg',
-  ski: 'outdoor/logo-ski.svg',
-  surf: 'outdoor/logo-surf.svg',
-  cat: 'pets/logo-cat.svg',
-  dog: 'pets/logo-dog.svg',
-  archery: 'sports/logo-archery.svg',
-  badminton: 'sports/logo-badminton.svg',
-  baseball: 'sports/logo-baseball.svg',
-  basketball: 'sports/logo-basketball.svg',
-  bowling: 'sports/logo-bowling.svg',
-  box: 'sports/logo-box.svg',
-  golf: 'sports/logo-golf.svg',
-  pingpong: 'sports/logo-pingpong.svg',
-  soccer: 'sports/logo-soccer.svg',
-  swim: 'sports/logo-swim.svg',
-  tennis: 'sports/logo-tennis.svg',
-  volleyball: 'sports/logo-volleyball.svg',
-  drive: 'travel/logo-drive.svg',
-  plane: 'travel/logo-plane.svg',
-  code: 'work/logo-code.svg',
-  meeting: 'work/logo-meeting.svg',
-  write: 'work/logo-write.svg',
+/** Paths under public/motion. Exported for completeness tests. */
+export const ACTION_PATH: Record<MascotAction, string> = {
+  happy: '01_emotion/001_happy.svg',
+  love: '01_emotion/002_love.svg',
+  cry: '01_emotion/003_cry.svg',
+  angry: '01_emotion/004_angry.svg',
+  shock: '01_emotion/005_shock.svg',
+  wink: '01_emotion/006_wink.svg',
+  sleepy: '01_emotion/007_sleepy.svg',
+  cheer: '01_emotion/008_cheer.svg',
+  laugh: '01_emotion/009_laugh.svg',
+  shy: '01_emotion/010_shy.svg',
+  cool: '01_emotion/011_cool.svg',
+  sad: '01_emotion/012_sad.svg',
+  confused: '01_emotion/013_confused.svg',
+  excited: '01_emotion/014_excited.svg',
+  proud: '01_emotion/015_proud.svg',
+  nervous: '01_emotion/016_nervous.svg',
+  dizzy: '02_emotion_more/017_dizzy.svg',
+  dead: '02_emotion_more/018_dead.svg',
+  drool: '02_emotion_more/019_drool.svg',
+  tongue: '02_emotion_more/020_tongue.svg',
+  blank: '02_emotion_more/021_blank.svg',
+  rage: '02_emotion_more/022_rage.svg',
+  melt: '02_emotion_more/023_melt.svg',
+  sparkle: '02_emotion_more/024_sparkle.svg',
+  smug: '02_emotion_more/025_smug.svg',
+  pout: '02_emotion_more/026_pout.svg',
+  awe: '02_emotion_more/027_awe.svg',
+  relief: '02_emotion_more/028_relief.svg',
+  wave: '03_gesture/029_wave.svg',
+  thumbs_up: '03_gesture/030_thumbs_up.svg',
+  thumbs_down: '03_gesture/031_thumbs_down.svg',
+  clap: '03_gesture/032_clap.svg',
+  point: '03_gesture/033_point.svg',
+  shrug: '03_gesture/034_shrug.svg',
+  peace: '03_gesture/035_peace.svg',
+  hug: '03_gesture/036_hug.svg',
+  highfive: '03_gesture/037_highfive.svg',
+  come: '03_gesture/038_come.svg',
+  stop: '03_gesture/039_stop.svg',
+  ok_hand: '03_gesture/040_ok_hand.svg',
+  pray: '03_gesture/041_pray.svg',
+  flex: '03_gesture/042_flex.svg',
+  coding: '04_work/043_coding.svg',
+  bug: '04_work/044_bug.svg',
+  fixed: '04_work/045_fixed.svg',
+  deploy: '04_work/046_deploy.svg',
+  review: '04_work/047_review.svg',
+  thinking: '04_work/048_thinking.svg',
+  idea: '04_work/049_idea.svg',
+  loading: '04_work/050_loading.svg',
+  success: '04_work/051_success.svg',
+  fail: '04_work/052_fail.svg',
+  deadline: '04_work/053_deadline.svg',
+  meeting: '04_work/054_meeting.svg',
+  merge: '04_work/055_merge.svg',
+  coffee_work: '04_work/056_coffee_work.svg',
+  online: '05_status/057_online.svg',
+  offline: '05_status/058_offline.svg',
+  busy: '05_status/059_busy.svg',
+  away: '05_status/060_away.svg',
+  brb: '05_status/061_brb.svg',
+  done: '05_status/062_done.svg',
+  wait: '05_status/063_wait.svg',
+  yes: '05_status/064_yes.svg',
+  no: '05_status/065_no.svg',
+  maybe: '05_status/066_maybe.svg',
+  thanks: '05_status/067_thanks.svg',
+  sorry: '05_status/068_sorry.svg',
+  hungry: '06_food/069_hungry.svg',
+  eat: '06_food/070_eat.svg',
+  coffee: '06_food/071_coffee.svg',
+  full: '06_food/072_full.svg',
+  yummy: '06_food/073_yummy.svg',
+  thirsty: '06_food/074_thirsty.svg',
+  snack: '06_food/075_snack.svg',
+  chef: '06_food/076_chef.svg',
+  diet: '06_food/077_diet.svg',
+  cheers_drink: '06_food/078_cheers_drink.svg',
+  sunny: '07_weather/079_sunny.svg',
+  rainy: '07_weather/080_rainy.svg',
+  snowy: '07_weather/081_snowy.svg',
+  hot: '07_weather/082_hot.svg',
+  cold: '07_weather/083_cold.svg',
+  windy: '07_weather/084_windy.svg',
+  night: '07_weather/085_night.svg',
+  morning: '07_weather/086_morning.svg',
+  rainbow: '07_weather/087_rainbow.svg',
+  storm: '07_weather/088_storm.svg',
+  party: '08_fun/089_party.svg',
+  birthday: '08_fun/090_birthday.svg',
+  new_year: '08_fun/091_new_year.svg',
+  valentine: '08_fun/092_valentine.svg',
+  halloween: '08_fun/093_halloween.svg',
+  champion: '08_fun/094_champion.svg',
+  rich: '08_fun/095_rich.svg',
+  music: '08_fun/096_music.svg',
+  dance: '08_fun/097_dance.svg',
+  game: '08_fun/098_game.svg',
+  travel: '08_fun/099_travel.svg',
+  fire: '08_fun/100_fire.svg',
+  run: '09_sports/101_run.svg',
+  sprint: '09_sports/102_sprint.svg',
+  jog: '09_sports/103_jog.svg',
+  jump_rope: '09_sports/104_jump_rope.svg',
+  gym: '09_sports/105_gym.svg',
+  yoga: '09_sports/106_yoga.svg',
+  stretch: '09_sports/107_stretch.svg',
+  basketball: '09_sports/108_basketball.svg',
+  soccer: '09_sports/109_soccer.svg',
+  tennis: '09_sports/110_tennis.svg',
+  swim: '09_sports/111_swim.svg',
+  boxing: '09_sports/112_boxing.svg',
+  victory_lap: '09_sports/113_victory_lap.svg',
+  tired_run: '09_sports/114_tired_run.svg',
+  finish: '09_sports/115_finish.svg',
+  coach: '09_sports/116_coach.svg',
 }
 
-/** Calm / common clips appear more often in the idle pool. */
+/** Calm / common clips appear more often in the idle pool (~23 unique / ~24 weighted). */
 const IDLE_POOL: MascotAction[] = [
   'wave',
   'wave',
-  'coffee',
-  'read',
+  'happy',
+  'thumbs_up',
   'clap',
-  'phone',
-  'sleep',
+  'ok_hand',
+  'coding',
+  'thinking',
+  'coffee_work',
+  'idea',
+  'review',
+  'wink',
+  'cool',
+  'proud',
+  'relief',
+  'sparkle',
+  'online',
+  'done',
+  'coffee',
   'stretch',
   'yoga',
-  'code',
-  'write',
-  'meeting',
-  'paint',
-  'guitar',
+  'music',
   'dance',
-  'piano',
-  'photo',
-  'cook',
-  'fish',
-  'hike',
-  'camp',
-  'bike',
   'run',
-  'lift',
-  'plank',
-  'jump-rope',
-  'jumping-jack',
-  'soccer',
-  'basketball',
-  'tennis',
-  'pingpong',
-  'badminton',
-  'swim',
-  'surf',
-  'skate',
-  'ski',
-  'cat',
-  'dog',
-  'plane',
-  'drive',
-  'birthday',
-  'gift',
-  'archery',
-  'baseball',
-  'bowling',
-  'box',
-  'golf',
-  'volleyball',
-  'brush-teeth',
-  'shower',
 ]
 
 /** How long each infinite SVG clip stays on screen before rotating (ms). */
@@ -262,7 +266,7 @@ interface MascotActorProps {
 const BOTTOM_PAD_RATIO = 0.12
 
 /**
- * Cycles animated mascot SVGs from `public/motion`.
+ * Cycles animated Flat Butt mascot SVGs from `public/motion`.
  * Falls back to static HipLogo when the user prefers reduced motion.
  */
 export function MascotActor({

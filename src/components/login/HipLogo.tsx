@@ -1,4 +1,4 @@
-// hip 品牌标识 —— 使用 public/logo.svg 的全身吉祥物。
+// hip 品牌标识 —— 使用 public/logo.svg 的 Flat Butt 暖橙吉祥物。
 
 const LOGO_SCALE = 0.75
 

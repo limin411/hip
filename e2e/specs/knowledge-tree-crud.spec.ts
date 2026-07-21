@@ -25,6 +25,7 @@ import {
   expectTreeNotContains,
   deleteSpaceFromWorkspace,
   ensureKnowledgeHome,
+  waitForKnowledgeWritableSurface,
 } from '../helpers/knowledge.js'
 
 describe('knowledge tree node crud @knowledge @core', () => {
@@ -96,9 +97,8 @@ describe('knowledge tree node crud @knowledge @core', () => {
     })
     await clickContextMenuItem('knowledgeNode.newDoc')
 
-    await (await browser.$('[data-testid="knowledge-doc-editor"]')).waitForExist({
-      timeout: 15000,
-    })
+    // Live or Source (R3 product default is Live — do not hard-wait Source only)
+    await waitForKnowledgeWritableSurface(15000)
     await expandAllKnowledgeFolders()
     await browser.waitUntil(
       async () => (await listKnowledgeDocTestIds()).length > 0,

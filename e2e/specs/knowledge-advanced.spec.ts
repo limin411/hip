@@ -33,6 +33,7 @@ import {
   expandAllKnowledgeFolders,
   createDocAndExpectEditor as createDoc,
   createFolderFromToolbar,
+  waitForKnowledgeWritableSurface,
 } from '../helpers/knowledge.js'
 
 describe('knowledge advanced surfaces @knowledge @core', () => {
@@ -95,10 +96,8 @@ describe('knowledge advanced surfaces @knowledge @core', () => {
     })
     await clickContextMenuItem('knowledgeNode.newDoc')
 
-    // Success: editor opens (createDoc → openDoc)
-    await (await browser.$('[data-testid="knowledge-doc-editor"]')).waitForExist({
-      timeout: 15000,
-    })
+    // Success: Live or Source writing surface opens (R3 product default is Live)
+    await waitForKnowledgeWritableSurface(15000)
     await expandAllKnowledgeFolders()
     await browser.waitUntil(
       async () => (await listKnowledgeDocTestIds()).length > 0,

@@ -19,6 +19,7 @@ import type {
 import { codeBlockSchema } from '@milkdown/kit/preset/commonmark'
 import { $prose, $view } from '@milkdown/kit/utils'
 import { normalizeHighlightLang } from '@/domain/knowledge/codeHighlight'
+import { isDocDark, subscribeDocTheme } from '@/lib/docTheme'
 import { highlightCode } from '@/lib/shikiLazy'
 import { copyText } from '@/ipc/clipboard'
 import {
@@ -31,38 +32,6 @@ import {
 const PASSTHROUGH_LANGS = new Set(['svg'])
 
 const liveViews = new Set<LiveCodeBlockNodeView>()
-
-function isDocDark(): boolean {
-  return (
-    typeof document !== 'undefined' &&
-    document.documentElement.classList.contains('dark')
-  )
-}
-
-/** Shared theme observer — one MutationObserver for all live code blocks. */
-type ThemeListener = () => void
-const themeListeners = new Set<ThemeListener>()
-let themeObserver: MutationObserver | null = null
-
-function subscribeDocTheme(listener: ThemeListener): () => void {
-  themeListeners.add(listener)
-  if (!themeObserver && typeof document !== 'undefined') {
-    themeObserver = new MutationObserver(() => {
-      for (const l of themeListeners) l()
-    })
-    themeObserver.observe(document.documentElement, {
-      attributes: true,
-      attributeFilter: ['class'],
-    })
-  }
-  return () => {
-    themeListeners.delete(listener)
-    if (themeListeners.size === 0 && themeObserver) {
-      themeObserver.disconnect()
-      themeObserver = null
-    }
-  }
-}
 
 class LiveCodeBlockNodeView implements NodeView {
   dom: HTMLElement

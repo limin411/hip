@@ -5,7 +5,8 @@
  * - Default / blur: render via KnowledgeMermaid (lazy mermaid, securityLevel strict)
  * - Focus / click: editable source (contentDOM)
  *
- * contentDOM stays in-flow (never display:none) so PM coords/IME stay stable.
+ * contentDOM stays in the document (never `display:none`); collapsed out of
+ * flow while previewing so a tall diagram can size the block.
  */
 
 import { createElement } from 'react'
@@ -80,9 +81,10 @@ export class LiveMermaidNodeView implements NodeView {
 
     liveMermaidViews.add(this)
 
-    // Diagram-first when source exists (open doc → see figure). Empty fence
-    // (e.g. after /mermaid) stays in edit so the user can type immediately.
-    // Selection plugin still flips edit/preview as the caret moves.
+    // Diagram-first when source exists (open doc → see figure). Empty/cleared
+    // fences stay in edit so the user can type immediately. (Note: /mermaid
+    // slash inserts a starter flowchart body, so it takes the preview path
+    // until the caret lands inside.) Selection plugin still flips modes.
     if (node.textContent.trim()) {
       this.showPreview()
     } else {
@@ -104,6 +106,7 @@ export class LiveMermaidNodeView implements NodeView {
     // contentDOM back in normal flow for editing.
     this.editShell.style.position = ''
     this.editShell.style.height = ''
+    this.editShell.style.minHeight = ''
     this.editShell.style.overflow = ''
     this.editShell.style.opacity = ''
     this.editShell.style.pointerEvents = ''
@@ -130,9 +133,11 @@ export class LiveMermaidNodeView implements NodeView {
     this.dom.dataset.editing = 'false'
     this.editShell.removeAttribute('data-testid')
     // Keep contentDOM in the document for PM mapping, but collapse so the
-    // diagram (often taller than source) sizes the block.
+    // diagram (often taller than source) sizes the block. Clear minHeight so
+    // it does not fight height:0 (Tailwind min-h-[3rem] on editShell).
     this.editShell.style.position = 'absolute'
     this.editShell.style.height = '0'
+    this.editShell.style.minHeight = '0'
     this.editShell.style.overflow = 'hidden'
     this.editShell.style.opacity = '0'
     this.editShell.style.pointerEvents = 'none'

@@ -1,5 +1,6 @@
 import { useEffect, useId, useState } from 'react'
 import { useTranslation } from 'react-i18next'
+import { isDocDark, subscribeDocTheme } from '@/lib/docTheme'
 import { cn } from '@/lib/utils'
 
 export interface KnowledgeMermaidProps {
@@ -13,13 +14,6 @@ type MermaidTheme = 'dark' | 'neutral'
 let mermaidLoad: Promise<MermaidApi> | null = null
 /** Theme last applied via mermaid.initialize (module-level; not every render). */
 let appliedTheme: MermaidTheme | null = null
-
-function isDocDark(): boolean {
-  return (
-    typeof document !== 'undefined' &&
-    document.documentElement.classList.contains('dark')
-  )
-}
 
 async function loadMermaid(): Promise<MermaidApi> {
   if (!mermaidLoad) {
@@ -45,18 +39,14 @@ async function ensureMermaid(theme: MermaidTheme): Promise<MermaidApi> {
   return mermaid
 }
 
-/** Subscribe to `documentElement` class changes for `dark`. */
+/** Shared `subscribeDocTheme` observer (one MutationObserver for mermaid + Shiki). */
 function useDocDark(): boolean {
   const [dark, setDark] = useState(isDocDark)
 
   useEffect(() => {
-    if (typeof document === 'undefined') return
-    const root = document.documentElement
-    const sync = () => setDark(root.classList.contains('dark'))
+    const sync = () => setDark(isDocDark())
     sync()
-    const obs = new MutationObserver(sync)
-    obs.observe(root, { attributes: true, attributeFilter: ['class'] })
-    return () => obs.disconnect()
+    return subscribeDocTheme(sync)
   }, [])
 
   return dark

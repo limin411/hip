@@ -288,32 +288,89 @@ export interface StagingResult {
   stagingDir: string
   /** True when the staging dir was created by this call (needs cleanup on error). */
   owned: boolean
+  /** Full clone root when subpath isolates plugin root; cleanup should remove this. */
+  cloneRoot?: string
+}
+
+export interface PrepareStagingOptions {
+  sha?: string
+  ref?: string
+  /** Subdirectory inside the repo that is the plugin root. */
+  subpath?: string
 }
 
 /**
  * Create a staging directory and optionally clone a git repo into it.
  * When `providedStagingDir` is given (test seam), skips mkdir + git clone.
+ * With `subpath`, the returned stagingDir is the plugin root (nested path).
  */
 export function prepareStaging(
   url: string,
   pluginsDir: string,
   providedStagingDir?: string,
+  opts?: PrepareStagingOptions,
 ): StagingResult {
   if (providedStagingDir) {
-    return { stagingDir: providedStagingDir, owned: false }
+    let dir = providedStagingDir
+    if (opts?.subpath) {
+      const nested = join(dir, opts.subpath.replace(/^\.\//, ''))
+      if (!existsSync(nested)) {
+        throw new Error(`plugin subpath not found: ${opts.subpath}`)
+      }
+      dir = nested
+    }
+    return { stagingDir: dir, owned: false }
   }
-  const stagingDir = join(pluginsDir, `.staging-${randomUUID()}`)
-  mkdirSync(stagingDir, { recursive: true })
+  const cloneRoot = join(pluginsDir, `.staging-${randomUUID()}`)
+  mkdirSync(cloneRoot, { recursive: true })
   try {
-    execFileSync('git', ['clone', '--depth', '1', url, stagingDir], {
+    const cloneArgs = ['clone', '--depth', '1']
+    if (opts?.ref && !opts?.sha) {
+      cloneArgs.push('--branch', opts.ref)
+    }
+    cloneArgs.push(url, cloneRoot)
+    execFileSync('git', cloneArgs, {
       timeout: 60_000,
       stdio: 'pipe',
     })
-    return { stagingDir, owned: true }
+    if (opts?.sha) {
+      try {
+        execFileSync('git', ['fetch', '--depth', '1', 'origin', opts.sha], {
+          cwd: cloneRoot,
+          timeout: 60_000,
+          stdio: 'pipe',
+        })
+      } catch {
+        /* shallow fetch of sha may fail; try checkout anyway */
+      }
+      execFileSync('git', ['checkout', opts.sha], {
+        cwd: cloneRoot,
+        timeout: 30_000,
+        stdio: 'pipe',
+      })
+      const head = execFileSync('git', ['rev-parse', 'HEAD'], {
+        cwd: cloneRoot,
+        timeout: 5_000,
+        stdio: 'pipe',
+      })
+        .toString('utf8')
+        .trim()
+      if (head.toLowerCase() !== opts.sha.toLowerCase()) {
+        throw new Error(`git checkout sha mismatch: expected ${opts.sha}, got ${head}`)
+      }
+    }
+    let stagingDir = cloneRoot
+    if (opts?.subpath) {
+      const nested = join(cloneRoot, opts.subpath.replace(/^\.\//, ''))
+      if (!existsSync(nested)) {
+        throw new Error(`plugin subpath not found: ${opts.subpath}`)
+      }
+      stagingDir = nested
+    }
+    return { stagingDir, owned: true, cloneRoot }
   } catch (err) {
-    // Clean up the staging dir on clone failure
     try {
-      rmSync(stagingDir, { recursive: true, force: true })
+      rmSync(cloneRoot, { recursive: true, force: true })
     } catch {
       /* ignore */
     }
@@ -417,6 +474,7 @@ export interface PluginInstallSuccess {
     agents: number
     hooks: number
   }
+  modelReview?: import('@hip/protocol').PluginModelReviewSummary
 }
 
 /** The shape returned by the plugin_install tool on failure. */

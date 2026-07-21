@@ -133,7 +133,19 @@ export type ClientMessage =
   | { type: 'git:revert'; sessionId: string; checkpointId: string }
   | { type: 'permission:respond'; sessionId: string; requestId: string; optionId?: string; cancelled?: boolean }
   | { type: 'agent:setConfigOption'; sessionId: string; configId: string; value: string }
-  | { type: 'plugin:install:url'; url: string }
+  | {
+      type: 'plugin:install:url'
+      url: string
+      sha?: string
+      ref?: string
+      subpath?: string
+      marketSourceId?: string
+      marketPluginName?: string
+      /** Default true for marketplace downloads. */
+      runModelReview?: boolean
+      /** When true (marketplace default), register with enabled=false. */
+      startDisabled?: boolean
+    }
   | { type: 'plugin:install:github'; url: string }
   | { type: 'plugin:delete'; pluginId: string }
   /** Reload plugin components in all sessions (after enable/disable or disk change). */
@@ -445,8 +457,27 @@ export type ServerMessage =
     }
   | { type: 'agent:profiles'; sessionId: string; profiles: AgentProfileInfo[] }
   | { type: 'agent:notification'; sessionId: string; taskId: string; description: string; status: 'completed' | 'failed' | 'killed'; result?: string; error?: string }
-  | { type: 'plugin:install:progress'; status: 'cloning' | 'scanning' | 'generating_manifest' | 'registering' | 'done' | 'error'; message: string; pluginId?: string; components?: { skills: number; mcpServers: number; agents: number; hooks: number } }
-  | { type: 'plugin:install:result'; ok: boolean; pluginId?: string; error?: string }
+  | {
+      type: 'plugin:install:progress'
+      status:
+        | 'cloning'
+        | 'scanning'
+        | 'generating_manifest'
+        | 'reviewing_models'
+        | 'registering'
+        | 'done'
+        | 'error'
+      message: string
+      pluginId?: string
+      components?: { skills: number; mcpServers: number; agents: number; hooks: number }
+    }
+  | {
+      type: 'plugin:install:result'
+      ok: boolean
+      pluginId?: string
+      error?: string
+      modelReview?: import('./marketplace.js').PluginModelReviewSummary
+    }
   | { type: 'plugin:delete:result'; pluginId: string; ok: boolean; error?: string }
   | { type: 'replay:result'; sessionId: string; result: ReplayResult }
   | {

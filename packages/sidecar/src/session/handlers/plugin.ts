@@ -13,8 +13,18 @@ export function isPluginMessage(msg: ClientMessage): boolean {
   return PLUGIN_MESSAGE_TYPES.has(msg.type)
 }
 
+export type PluginInstallOptions = {
+  sha?: string
+  ref?: string
+  subpath?: string
+  marketSourceId?: string
+  marketPluginName?: string
+  runModelReview?: boolean
+  startDisabled?: boolean
+}
+
 export type PluginHandlerContext = SessionLifecycleContext & {
-  installPluginFromUrl(url: string, send: SendFn): Promise<void>
+  installPluginFromUrl(url: string, send: SendFn, opts?: PluginInstallOptions): Promise<void>
   replayTurn(sessionId: string, turnIndex: number, send: SendFn): Promise<void>
 }
 
@@ -42,7 +52,15 @@ export function handlePluginMessage(
 ): void | Promise<void> {
   switch (msg.type) {
     case 'plugin:install:url':
-      return ctx.installPluginFromUrl(msg.url, send)
+      return ctx.installPluginFromUrl(msg.url, send, {
+        sha: msg.sha,
+        ref: msg.ref,
+        subpath: msg.subpath,
+        marketSourceId: msg.marketSourceId,
+        marketPluginName: msg.marketPluginName,
+        runModelReview: msg.runModelReview,
+        startDisabled: msg.startDisabled,
+      })
     case 'plugin:install:github':
       // Same pipeline as URL install (github URLs are validated inside installPluginFromUrl).
       return ctx.installPluginFromUrl(msg.url, send)

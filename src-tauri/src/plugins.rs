@@ -53,6 +53,12 @@ pub struct PluginMeta {
     pub has_plugin_md: Option<bool>,
     /// Whether the plugin is registered and not explicitly disabled.
     pub enabled: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub market_source_id: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub market_plugin_name: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub model_review: Option<serde_json::Value>,
 }
 
 /// Scan `<root>/*/.plugin/plugin.json`, parse each to build a `PluginMeta`.
@@ -117,6 +123,9 @@ pub fn scan_one_plugin(dir: &Path) -> Option<PluginMeta> {
         has_plugin_md: None,
         // Filled by list_installed_plugins from the registry.
         enabled: false,
+        market_source_id: None,
+        market_plugin_name: None,
+        model_review: None,
     };
 
     merge_plugin_md(dir, &mut plugin);
@@ -135,7 +144,7 @@ pub fn list_installed_plugins(plugins_root: &Path, config_path: Option<&Path>) -
     // Also key by id so we don't double-list.
     let mut seen_ids: std::collections::HashSet<String> = out.iter().map(|m| m.id.clone()).collect();
 
-    let (reg_paths, _entries, enabled_map) = match config_path {
+    let (reg_paths, entries, enabled_map) = match config_path {
         Some(cfg) => {
             let (p, e) = read_plugins_config(cfg);
             let en = read_enabled_map(cfg);
@@ -143,6 +152,7 @@ pub fn list_installed_plugins(plugins_root: &Path, config_path: Option<&Path>) -
         }
         None => (Vec::new(), Vec::new(), std::collections::HashMap::new()),
     };
+    let entry_by_id = index_registry_entries(&entries);
 
     let mut registered_canons: std::collections::HashSet<String> = std::collections::HashSet::new();
     let mut registered_ids: std::collections::HashSet<String> = std::collections::HashSet::new();
@@ -177,10 +187,50 @@ pub fn list_installed_plugins(plugins_root: &Path, config_path: Option<&Path>) -
         let registered = registered_canons.contains(&canon) || registered_ids.contains(&meta.id);
         let not_disabled = enabled_map.get(&meta.id).copied() != Some(false);
         meta.enabled = registered && not_disabled;
+        if let Some(e) = entry_by_id.get(&meta.id) {
+            meta.market_source_id = e.market_source_id.clone();
+            meta.market_plugin_name = e.market_plugin_name.clone();
+            meta.model_review = e.model_review.clone();
+        }
     }
 
     out.sort_by(|a, b| a.name.to_lowercase().cmp(&b.name.to_lowercase()));
     out
+}
+
+struct RegistryEntryMeta {
+    market_source_id: Option<String>,
+    market_plugin_name: Option<String>,
+    model_review: Option<serde_json::Value>,
+}
+
+fn index_registry_entries(
+    entries: &[serde_json::Value],
+) -> std::collections::HashMap<String, RegistryEntryMeta> {
+    let mut map = std::collections::HashMap::new();
+    for e in entries {
+        let Some(id) = e.get("id").and_then(|v| v.as_str()) else {
+            continue;
+        };
+        if id.is_empty() {
+            continue;
+        }
+        map.insert(
+            id.to_string(),
+            RegistryEntryMeta {
+                market_source_id: e
+                    .get("marketSourceId")
+                    .and_then(|v| v.as_str())
+                    .map(|s| s.to_string()),
+                market_plugin_name: e
+                    .get("marketPluginName")
+                    .and_then(|v| v.as_str())
+                    .map(|s| s.to_string()),
+                model_review: e.get("modelReview").cloned(),
+            },
+        );
+    }
+    map
 }
 
 fn read_enabled_map(config_path: &Path) -> std::collections::HashMap<String, bool> {

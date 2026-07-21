@@ -267,10 +267,18 @@ function summaryToVM(s: SessionSummary): SessionVM {
 
 /** Surface state for a plugin installation driven by WebSocket messages. */
 export interface PluginInstallState {
-  status: 'cloning' | 'scanning' | 'generating_manifest' | 'registering' | 'done' | 'error'
+  status:
+    | 'cloning'
+    | 'scanning'
+    | 'generating_manifest'
+    | 'reviewing_models'
+    | 'registering'
+    | 'done'
+    | 'error'
   message: string
   pluginId?: string
   result?: { ok: boolean; error?: string }
+  modelReview?: import('@hip/protocol').PluginModelReviewSummary
 }
 
 /** 把一条 ServerMessage 归并进状态。纯函数：now 由调用方注入。 */
@@ -689,6 +697,7 @@ export function applyServerMessage(
           message: msg.ok ? '' : (msg.error ?? ''),
           pluginId: msg.pluginId,
           result: { ok: msg.ok, error: msg.error },
+          modelReview: msg.modelReview,
         },
       }
 

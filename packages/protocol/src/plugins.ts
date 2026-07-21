@@ -2,6 +2,7 @@
 import type { AgentConfig } from './providers-agents.js'
 import type { McpServerConfig } from './mcp-config.js'
 import type { Hook } from './hooks.js'
+import type { MarketSourceId, PluginModelReviewSummary } from './marketplace.js'
 
 export interface PluginManifest {
   id: string
@@ -23,6 +24,18 @@ export interface PluginComponentRef {
   componentId: string
 }
 
+/** Rich registry entry for marketplace provenance and model review. */
+export interface PluginRegistryEntry {
+  id: string
+  dir?: string
+  marketSourceId?: MarketSourceId | string
+  marketPluginName?: string
+  installUrl?: string
+  installSha?: string
+  installedAt?: string
+  modelReview?: PluginModelReviewSummary
+}
+
 /**
  * Plugin registry (`~/.hip/config/hip-plugins.json`).
  * `plugins` = absolute directory paths the sidecar loads.
@@ -32,6 +45,8 @@ export interface PluginsConfig {
   plugins: string[]
   /** Keyed by plugin folder id/slug. Explicit `false` disables session load. */
   enabled?: Record<string, boolean>
+  /** Optional provenance / review metadata per plugin id. */
+  entries?: PluginRegistryEntry[]
 }
 
 /** One installed plugin, scanned from ~/.hip/plugins/<id>/.plugin/plugin.json
@@ -63,4 +78,10 @@ export interface PluginMeta {
   sourceType?: string
   /** True when PLUGIN.md exists at the plugin root. */
   hasPluginMd?: boolean
+  /** Marketplace source this plugin was downloaded from (if any). */
+  marketSourceId?: MarketSourceId | string
+  /** Catalog plugin name at install time. */
+  marketPluginName?: string
+  /** Last model-review summary from marketplace install. */
+  modelReview?: PluginModelReviewSummary
 }

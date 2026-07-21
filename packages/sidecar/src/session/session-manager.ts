@@ -246,7 +246,7 @@ export class SessionManager {
   private pluginCtx(): PluginHandlerContext {
     return {
       ...this.lifecycleCtx(null),
-      installPluginFromUrl: (url, send) => this.handlePluginInstallUrl(url, send),
+      installPluginFromUrl: (url, send, opts) => this.handlePluginInstallUrl(url, send, opts),
       replayTurn: async (sessionId, turnIndex, send) => {
         if (!this.store) {
           send({ type: 'error', sessionId, code: 'NO_STORE', message: 'No persistence store available for replay' })
@@ -596,7 +596,19 @@ export class SessionManager {
    * with an isolated scratch cwd, invokes the plugin_install tool directly, and
    * streams progress + result back.
    */
-  private async handlePluginInstallUrl(url: string, send: SendFn): Promise<void> {
+  private async handlePluginInstallUrl(
+    url: string,
+    send: SendFn,
+    opts?: {
+      sha?: string
+      ref?: string
+      subpath?: string
+      marketSourceId?: string
+      marketPluginName?: string
+      runModelReview?: boolean
+      startDisabled?: boolean
+    },
+  ): Promise<void> {
     if (!url || typeof url !== 'string' || url.trim().length === 0) {
       send({ type: 'plugin:install:result', ok: false, error: 'URL is required' })
       return
@@ -633,8 +645,26 @@ export class SessionManager {
 
       send({ type: 'plugin:install:progress', status: 'cloning', message: 'Cloning plugin repository...' })
       send({ type: 'plugin:install:progress', status: 'scanning', message: 'Scanning plugin manifest...' })
+      if (opts?.runModelReview) {
+        send({
+          type: 'plugin:install:progress',
+          status: 'reviewing_models',
+          message: 'Reviewing plugin model configuration...',
+        })
+      }
 
-      const raw = String(await pluginInstallTool.invoke({ url }))
+      const raw = String(
+        await pluginInstallTool.invoke({
+          url,
+          sha: opts?.sha,
+          ref: opts?.ref,
+          subpath: opts?.subpath,
+          marketSourceId: opts?.marketSourceId,
+          marketPluginName: opts?.marketPluginName,
+          runModelReview: opts?.runModelReview === true,
+          startDisabled: opts?.startDisabled === true,
+        }),
+      )
       const result: PluginInstallResult = JSON.parse(raw) as PluginInstallResult
 
       if (result.ok) {
@@ -651,7 +681,12 @@ export class SessionManager {
           pluginId: result.pluginId,
           components: result.components,
         })
-        send({ type: 'plugin:install:result', ok: true, pluginId: result.pluginId })
+        send({
+          type: 'plugin:install:result',
+          ok: true,
+          pluginId: result.pluginId,
+          modelReview: result.modelReview,
+        })
       } else {
         send({ type: 'plugin:install:progress', status: 'error', message: result.error })
         send({ type: 'plugin:install:result', ok: false, error: result.error })

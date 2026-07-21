@@ -4,6 +4,7 @@ mod auth;
 mod atomic_write;
 mod skills;
 mod plugins;
+mod marketplace;
 mod path_env;
 mod logging;
 mod hip_config;
@@ -257,6 +258,35 @@ fn list_plugins(app: tauri::AppHandle) -> Result<String, String> {
     let config = paths::plugins_config_path(&app);
     let metas = plugins::list_installed_plugins(&dir, config.as_deref());
     serde_json::to_string(&metas).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+fn list_marketplace_sources(app: tauri::AppHandle) -> Result<String, String> {
+    let sources = marketplace::list_sources(&app)?;
+    serde_json::to_string(&sources).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+fn set_marketplace_source_enabled(
+    app: tauri::AppHandle,
+    source_id: String,
+    enabled: bool,
+) -> Result<(), String> {
+    marketplace::set_source_enabled(&app, &source_id, enabled)
+}
+
+#[tauri::command]
+async fn refresh_marketplace_catalog(
+    app: tauri::AppHandle,
+    source_id: Option<String>,
+) -> Result<(), String> {
+    marketplace::refresh_catalog(&app, source_id.as_deref()).await
+}
+
+#[tauri::command]
+fn list_marketplace_plugins(app: tauri::AppHandle) -> Result<String, String> {
+    let snap = marketplace::list_marketplace_snapshot(&app)?;
+    serde_json::to_string(&snap).map_err(|e| e.to_string())
 }
 
 #[tauri::command]
@@ -719,6 +749,10 @@ pub fn run() {
             delete_plugin,
             set_plugin_enabled,
             read_plugin_file,
+            list_marketplace_sources,
+            set_marketplace_source_enabled,
+            refresh_marketplace_catalog,
+            list_marketplace_plugins,
             list_worktrees,
             path_tools::which_binaries,
             path_tools::path_is_dir,

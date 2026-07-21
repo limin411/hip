@@ -53,6 +53,23 @@ Do not claim work ran "in parallel" if only sequential dispatch was used.
 - A plugin may ship skills, agents, MCP server configs, and hooks.
 - Disable a plugin to drop its contributions from the session.
 
+### Plugin Market (Settings)
+
+hip’s Plugin Market page integrates **only** the official catalogs:
+
+| Source id | Catalog |
+|-----------|---------|
+| `grok-official` | [xai-org/plugin-marketplace](https://github.com/xai-org/plugin-marketplace) |
+| `claude-official` | [anthropics/claude-plugins-official](https://github.com/anthropics/claude-plugins-official) |
+
+UI tabs: **Grok market** · **Claude market** · **Custom plugins** (local installs without official provenance).
+
+- Catalog cache: `~/.hip/cache/marketplaces/<sourceId>/`
+- Source toggles: `~/.hip/config/marketplace-sources.json`
+- Marketplace **download** registers the plugin with `enabled: false` by default (downloaded but not on).
+- On download, sidecar **reviews** agent `boundModel` fields; unavailable models are rewritten to the product default (`activeModel` in hip.toml).
+- Enable the plugin switch to inject skills/MCP/agents into sessions (`plugin:reload`).
+
 ### Plugin directory structure
 
 Every plugin **must** contain a `.plugin/plugin.json` manifest file. Without it, hip will not discover the plugin:

@@ -1266,6 +1266,9 @@ export const zhCN = {
         stateReviewFailed: '审核失败',
         localBadge: '本地',
         modelRewritten: '模型已适配为当前默认（{{model}}）',
+        pageSummary: '共 {{total}} 个 · 第 {{page}} / {{pages}} 页',
+        previousPage: '上一页',
+        nextPage: '下一页',
       },
       hooks: {
         title: '挂钩配置',

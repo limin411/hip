@@ -1277,7 +1277,10 @@ export const ja = {
         "stateDownloadedEnabled": "Downloaded · On",
         "stateReviewFailed": "Review failed",
         "localBadge": "Local",
-        "modelRewritten": "Models adapted to default ({{model}})"
+        "modelRewritten": "Models adapted to default ({{model}})",
+        "pageSummary": "{{total}} plugins · page {{page}} / {{pages}}",
+        "previousPage": "Previous page",
+        "nextPage": "Next page"
 
     },
     "hooks": {

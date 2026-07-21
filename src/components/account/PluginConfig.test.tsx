@@ -7,6 +7,8 @@ import {
   PluginConfigView,
   formatComponentCounts,
   filterLocalPlugins,
+  paginateItems,
+  PLUGIN_MARKET_PAGE_SIZE,
 } from './PluginConfigView'
 
 vi.mock('react-i18next', () => ({
@@ -221,5 +223,37 @@ describe('PluginConfigView', () => {
     )
     expect(screen.getByText('settings.plugins.stateDownloadedDisabled')).toBeInTheDocument()
     expect(screen.getByTestId('market-plugin-uninstall')).toBeInTheDocument()
+  })
+
+  it('renders left sidebar market nav instead of top segmented control', () => {
+    render(<PluginConfigView {...baseViewProps} />)
+    expect(screen.getByTestId('plugin-market-sidebar')).toBeInTheDocument()
+    expect(screen.getByTestId('plugin-market-tab-grok')).toBeInTheDocument()
+    expect(screen.getByTestId('plugin-market-tab-claude')).toBeInTheDocument()
+    expect(screen.getByTestId('plugin-market-tab-custom')).toBeInTheDocument()
+  })
+
+  it('paginates market cards when count exceeds page size', () => {
+    const entries = Array.from({ length: PLUGIN_MARKET_PAGE_SIZE + 3 }, (_, i) =>
+      marketEntry({
+        key: `grok-official::p${i}`,
+        name: `plugin-${i}`,
+      }),
+    )
+    render(
+      <PluginConfigView {...baseViewProps} tab="grok" marketEntries={entries} />,
+    )
+    expect(screen.getAllByTestId('market-plugin-card')).toHaveLength(PLUGIN_MARKET_PAGE_SIZE)
+    expect(screen.getByTestId('plugin-market-pagination')).toBeInTheDocument()
+    expect(screen.getByTestId('plugin-market-pagination-footer')).toBeInTheDocument()
+  })
+})
+
+describe('paginateItems', () => {
+  it('slices by page', () => {
+    const items = [1, 2, 3, 4, 5]
+    expect(paginateItems(items, 1, 2)).toEqual([1, 2])
+    expect(paginateItems(items, 2, 2)).toEqual([3, 4])
+    expect(paginateItems(items, 3, 2)).toEqual([5])
   })
 })

@@ -1298,6 +1298,9 @@ export const en = {
         stateReviewFailed: 'Review failed',
         localBadge: 'Local',
         modelRewritten: 'Models adapted to default ({{model}})',
+        pageSummary: '{{total}} plugins · page {{page}} / {{pages}}',
+        previousPage: 'Previous page',
+        nextPage: 'Next page',
       },
       hooks: {
         title: 'Hooks',

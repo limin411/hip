@@ -5,11 +5,18 @@ import { render, screen, fireEvent, waitFor, cleanup } from '@testing-library/re
 import { CodeBlock } from './CodeBlock'
 import { markdownProseClassName } from './MarkdownBody'
 import { copyText } from '@/ipc/clipboard'
+import { highlightCode } from '@/lib/shikiLazy'
 
 vi.mock('@/ipc/clipboard', () => ({ copyText: vi.fn() }))
+vi.mock('@/lib/shikiLazy', () => ({
+  highlightCode: vi.fn(async () => '<span class="tok">highlighted</span>'),
+}))
 
 describe('CodeBlock', () => {
-  beforeEach(() => cleanup())
+  beforeEach(() => {
+    cleanup()
+    vi.mocked(highlightCode).mockClear()
+  })
 
   it('renders code and copy button', () => {
     render(
@@ -101,6 +108,49 @@ describe('CodeBlock', () => {
     await waitFor(() => expect(copyText).toHaveBeenCalled())
     expect(btn.querySelector('.lucide-copy')).toBeTruthy()
     expect(btn.querySelector('.lucide-check')).toBeNull()
+  })
+
+  it('defaults syntaxHighlight=false and does not call shiki', () => {
+    render(
+      <CodeBlock>
+        <code className="language-ts">const x = 1</code>
+      </CodeBlock>,
+    )
+    expect(highlightCode).not.toHaveBeenCalled()
+    expect(screen.getByText('const x = 1')).toBeInTheDocument()
+  })
+
+  it('syntaxHighlight=true lazy-highlights known langs (single-layer code)', async () => {
+    render(
+      <CodeBlock syntaxHighlight>
+        <code className="language-ts">const x = 1</code>
+      </CodeBlock>,
+    )
+    await waitFor(() => expect(highlightCode).toHaveBeenCalled())
+    expect(highlightCode).toHaveBeenCalledWith(
+      'const x = 1',
+      'typescript',
+      expect.any(Boolean),
+    )
+    await waitFor(() => {
+      expect(screen.getByText('highlighted')).toBeInTheDocument()
+    })
+    // Single chrome pre — no nested shiki pre
+    const chrome = screen.getByTestId('code-block')
+    expect(chrome.querySelectorAll('pre').length).toBe(1)
+  })
+
+  it('syntaxHighlight=true with unknown lang stays plain (no toast)', async () => {
+    render(
+      <CodeBlock syntaxHighlight>
+        <code className="language-mermaid">graph TD</code>
+      </CodeBlock>,
+    )
+    // allow effect to run
+    await waitFor(() => {
+      expect(screen.getByText('graph TD')).toBeInTheDocument()
+    })
+    expect(highlightCode).not.toHaveBeenCalled()
   })
 })
 

@@ -32,6 +32,7 @@ import {
 } from '@/domain/knowledge/slashMenu'
 import { WikiLinkPicker } from './WikiLinkPicker'
 import { KnowledgeSlashMenu } from './KnowledgeSlashMenu'
+import { liveCodeBlockPlugins } from './blocks/liveCodeBlockView'
 
 import '@milkdown/kit/prose/view/style/prosemirror.css'
 import '@milkdown/kit/prose/tables/style/tables.css'
@@ -390,6 +391,7 @@ export const DocLiveEditor = forwardRef<DocLiveEditorHandle, DocLiveEditorProps>
             .use(commonmark)
             .use(gfm)
             .use(history)
+            .use(liveCodeBlockPlugins)
             .create()
 
           if (cancelled) {

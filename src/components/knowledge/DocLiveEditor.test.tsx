@@ -193,6 +193,44 @@ describe('DocLiveEditor', () => {
     })
   }, 25_000)
 
+  it('renders live code_block node view chrome (knowledge-live-code-block)', async () => {
+    render(
+      <DocLiveEditor
+        docId="d-code"
+        initialMarkdown={'```ts\nconst x = 1\n```\n'}
+        onDraftChange={() => {}}
+      />,
+    )
+    await waitForProseMirror()
+    await waitFor(() => {
+      expect(screen.getByTestId('knowledge-live-code-block')).toBeInTheDocument()
+    })
+    const block = screen.getByTestId('knowledge-live-code-block')
+    expect(block.dataset.language).toBe('ts')
+    expect(block.textContent ?? '').toContain('const x = 1')
+    // mermaid stays a code_block node view (passthrough; PR-4 specializes)
+    await waitFor(() => {
+      expect(screen.getByTestId('knowledge-live-code-copy')).toBeInTheDocument()
+    })
+  }, 25_000)
+
+  it('mermaid fence is passthrough live code_block (no crash)', async () => {
+    render(
+      <DocLiveEditor
+        docId="d-mmd"
+        initialMarkdown={'```mermaid\ngraph TD\n  A-->B\n```\n'}
+        onDraftChange={() => {}}
+      />,
+    )
+    await waitForProseMirror()
+    await waitFor(() => {
+      expect(screen.getByTestId('knowledge-live-code-block')).toBeInTheDocument()
+    })
+    expect(screen.getByTestId('knowledge-live-code-block').dataset.language).toBe(
+      'mermaid',
+    )
+  }, 25_000)
+
   it('selecting table produces a table node', async () => {
     await openSlashMenu('/')
     await act(async () => {

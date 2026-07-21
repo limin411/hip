@@ -1,9 +1,16 @@
-import { useState, type ComponentPropsWithoutRef, type ReactElement } from 'react'
+import {
+  useEffect,
+  useState,
+  type ComponentPropsWithoutRef,
+  type ReactElement,
+} from 'react'
 import { useTranslation } from 'react-i18next'
 import { Copy, Check } from 'lucide-react'
 import { DeclarativeContextMenu } from '@/components/context-menu'
 import { copyText } from '@/ipc/clipboard'
 import { cn } from '@/lib/utils'
+import { highlightCode } from '@/lib/shikiLazy'
+import { normalizeHighlightLang } from '@/domain/knowledge/codeHighlight'
 
 /** Extract the raw code text from react-markdown's <pre> children (a <code> element). */
 function codeTextOf(children: unknown): string {
@@ -20,16 +27,71 @@ function languageOf(children: unknown): string | undefined {
   return m?.[1]
 }
 
+function useIsDark(): boolean {
+  const [dark, setDark] = useState(() =>
+    typeof document !== 'undefined'
+      ? document.documentElement.classList.contains('dark')
+      : false,
+  )
+
+  useEffect(() => {
+    if (typeof document === 'undefined') return
+    const root = document.documentElement
+    const sync = () => setDark(root.classList.contains('dark'))
+    sync()
+    const obs = new MutationObserver(sync)
+    obs.observe(root, { attributes: true, attributeFilter: ['class'] })
+    return () => obs.disconnect()
+  }, [])
+
+  return dark
+}
+
+export type CodeBlockProps = ComponentPropsWithoutRef<'pre'> & {
+  node?: unknown
+  /**
+   * Lazy Shiki highlight (knowledge Reader / embed). Default false so chat
+   * pays zero cost and never imports the highlighter.
+   */
+  syntaxHighlight?: boolean
+}
+
 /**
  * Replacement for the markdown `pre` element: owns fenced-code chrome and
  * external vertical spacing (KD11). `node` (react-markdown's hast node) is
  * destructured out so it is never spread onto the DOM.
  */
-export function CodeBlock({ children, node, ...props }: ComponentPropsWithoutRef<'pre'> & { node?: unknown }) {
+export function CodeBlock({
+  children,
+  node,
+  syntaxHighlight = false,
+  ...props
+}: CodeBlockProps) {
   const { t } = useTranslation()
   const [copied, setCopied] = useState(false)
   const code = codeTextOf(children)
   const language = languageOf(children)
+  const isDark = useIsDark()
+  const [highlightedHtml, setHighlightedHtml] = useState<string | null>(null)
+
+  useEffect(() => {
+    if (!syntaxHighlight) {
+      setHighlightedHtml(null)
+      return
+    }
+    const canonical = normalizeHighlightLang(language)
+    if (!canonical || !code) {
+      setHighlightedHtml(null)
+      return
+    }
+    let cancelled = false
+    void highlightCode(code, canonical, isDark).then((html) => {
+      if (!cancelled) setHighlightedHtml(html)
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [syntaxHighlight, code, language, isDark])
 
   const onCopy = async () => {
     if (code && (await copyText(code))) {
@@ -64,6 +126,7 @@ export function CodeBlock({ children, node, ...props }: ComponentPropsWithoutRef
             {copied ? <Check size={13} strokeWidth={1.75} /> : <Copy size={13} strokeWidth={1.75} />}
           </button>
         </div>
+        {/* Single-layer chrome: our pre/code only — never nest a shiki <pre>. */}
         <pre
           {...props}
           className={cn(
@@ -71,7 +134,15 @@ export function CodeBlock({ children, node, ...props }: ComponentPropsWithoutRef
             props.className,
           )}
         >
-          {children}
+          {highlightedHtml ? (
+            <code
+              className={language ? `language-${language}` : undefined}
+              // Token spans from structure:'inline' — plain fence text only in.
+              dangerouslySetInnerHTML={{ __html: highlightedHtml }}
+            />
+          ) : (
+            children
+          )}
         </pre>
       </div>
     </DeclarativeContextMenu>

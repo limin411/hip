@@ -56,7 +56,12 @@ export function KnowledgeMarkdownBody({
             return <KnowledgeMermaid code={code} />
           }
         }
-        return <CodeBlock {...props}>{children}</CodeBlock>
+        // Knowledge Reader/embed: enable lazy CSP-safe Shiki (chat stays default off).
+        return (
+          <CodeBlock syntaxHighlight {...props}>
+            {children}
+          </CodeBlock>
+        )
       },
       blockquote: ({ children, ...props }) => {
         const header = parseCalloutHeader(firstTextLine(children))

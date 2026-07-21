@@ -2532,7 +2532,7 @@ function installE2eHooks(svc: SessionService): void {
       useProvidersStore.setState((s) => ({
         config: {
           ...s.config,
-          activeModel: { providerID, modelID, baseURL: resolved || s.config.activeModel?.baseURL },
+          activeModel: { providerID, modelID },
         },
       }))
     },

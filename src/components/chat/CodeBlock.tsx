@@ -9,7 +9,6 @@ import { Copy, Check } from 'lucide-react'
 import { DeclarativeContextMenu } from '@/components/context-menu'
 import { copyText } from '@/ipc/clipboard'
 import { cn } from '@/lib/utils'
-import { highlightCode } from '@/lib/shikiLazy'
 import { normalizeHighlightLang } from '@/domain/knowledge/codeHighlight'
 
 /** Extract the raw code text from react-markdown's <pre> children (a <code> element). */
@@ -19,15 +18,20 @@ function codeTextOf(children: unknown): string {
   return (typeof inner === 'string' ? inner : '').replace(/\n$/, '')
 }
 
-/** Optional language class from the inner <code class="language-…">. */
+/**
+ * Optional language class from the inner <code class="language-…">.
+ * Allows `#` / `+` so `language-c#` / `language-c++` survive for aliases.
+ */
 function languageOf(children: unknown): string | undefined {
   const el = children as ReactElement<{ className?: string }> | undefined
   const cls = el?.props?.className ?? ''
-  const m = /language-([\w+-]+)/.exec(cls)
+  // Capture until whitespace; fence tags are a single token (c#, c++, objective-c).
+  const m = /language-(\S+)/.exec(cls)
   return m?.[1]
 }
 
-function useIsDark(): boolean {
+/** Theme observer only when highlighting is enabled (chat path pays zero). */
+function useIsDark(enabled: boolean): boolean {
   const [dark, setDark] = useState(() =>
     typeof document !== 'undefined'
       ? document.documentElement.classList.contains('dark')
@@ -35,14 +39,14 @@ function useIsDark(): boolean {
   )
 
   useEffect(() => {
-    if (typeof document === 'undefined') return
+    if (!enabled || typeof document === 'undefined') return
     const root = document.documentElement
     const sync = () => setDark(root.classList.contains('dark'))
     sync()
     const obs = new MutationObserver(sync)
     obs.observe(root, { attributes: true, attributeFilter: ['class'] })
     return () => obs.disconnect()
-  }, [])
+  }, [enabled])
 
   return dark
 }
@@ -51,7 +55,7 @@ export type CodeBlockProps = ComponentPropsWithoutRef<'pre'> & {
   node?: unknown
   /**
    * Lazy Shiki highlight (knowledge Reader / embed). Default false so chat
-   * pays zero cost and never imports the highlighter.
+   * pays zero cost and never statically imports the highlighter.
    */
   syntaxHighlight?: boolean
 }
@@ -60,6 +64,9 @@ export type CodeBlockProps = ComponentPropsWithoutRef<'pre'> & {
  * Replacement for the markdown `pre` element: owns fenced-code chrome and
  * external vertical spacing (KD11). `node` (react-markdown's hast node) is
  * destructured out so it is never spread onto the DOM.
+ *
+ * Shiki is loaded only via dynamic `import('@/lib/shikiLazy')` when
+ * `syntaxHighlight` is true — chat MarkdownBody must stay off the shiki graph.
  */
 export function CodeBlock({
   children,
@@ -71,7 +78,7 @@ export function CodeBlock({
   const [copied, setCopied] = useState(false)
   const code = codeTextOf(children)
   const language = languageOf(children)
-  const isDark = useIsDark()
+  const isDark = useIsDark(syntaxHighlight)
   const [highlightedHtml, setHighlightedHtml] = useState<string | null>(null)
 
   useEffect(() => {
@@ -85,9 +92,15 @@ export function CodeBlock({
       return
     }
     let cancelled = false
-    void highlightCode(code, canonical, isDark).then((html) => {
-      if (!cancelled) setHighlightedHtml(html)
-    })
+    // Dynamic import: chat (syntaxHighlight=false) never pulls shiki into the bundle graph.
+    void import('@/lib/shikiLazy')
+      .then(({ highlightCode }) => highlightCode(code, canonical, isDark))
+      .then((html) => {
+        if (!cancelled) setHighlightedHtml(html)
+      })
+      .catch(() => {
+        if (!cancelled) setHighlightedHtml(null)
+      })
     return () => {
       cancelled = true
     }

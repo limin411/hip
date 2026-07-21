@@ -152,6 +152,42 @@ describe('CodeBlock', () => {
     })
     expect(highlightCode).not.toHaveBeenCalled()
   })
+
+  it('parses language-c# and language-c++ class tokens for aliases', async () => {
+    render(
+      <CodeBlock syntaxHighlight>
+        <code className="language-c#">var x = 1;</code>
+      </CodeBlock>,
+    )
+    await waitFor(() => expect(highlightCode).toHaveBeenCalled())
+    expect(highlightCode).toHaveBeenCalledWith(
+      'var x = 1;',
+      'csharp',
+      expect.any(Boolean),
+    )
+    cleanup()
+    vi.mocked(highlightCode).mockClear()
+    render(
+      <CodeBlock syntaxHighlight>
+        <code className="language-c++">int x = 1;</code>
+      </CodeBlock>,
+    )
+    await waitFor(() => expect(highlightCode).toHaveBeenCalled())
+    expect(highlightCode).toHaveBeenCalledWith(
+      'int x = 1;',
+      'cpp',
+      expect.any(Boolean),
+    )
+  })
+
+  it('shows language badge for c# class names', () => {
+    render(
+      <CodeBlock>
+        <code className="language-c#">x</code>
+      </CodeBlock>,
+    )
+    expect(screen.getByText('c#')).toBeInTheDocument()
+  })
 })
 
 describe('markdownProseClassName (KD11 + prose contract)', () => {

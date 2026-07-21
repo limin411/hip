@@ -78,7 +78,7 @@ export const HIGHLIGHT_LANG_ALIASES: Readonly<Record<string, string>> = {
   docker: 'dockerfile',
   rb: 'ruby',
   kt: 'kotlin',
-  text: 'markdown',
+  // intentionally no `text` → markdown (plain ```text fences stay unhighlighted)
 }
 
 /**

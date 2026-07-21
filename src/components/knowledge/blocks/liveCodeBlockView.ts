@@ -2,8 +2,9 @@
  * Live Milkdown NodeView for `code_block`.
  *
  * - mermaid / svg: plain editable passthrough (PR-4/5 specialize)
- * - other langs: chrome (lang badge + copy) + Shiki preview when selection
- *   is outside the node; plain editable contentDOM when selection is inside
+ * - other langs: chrome (lang badge + copy) + Shiki preview overlay when
+ *   selection is outside the node; plain editable contentDOM when inside
+ * - contentDOM stays in-flow (never display:none) so PM coords/IME stay stable
  * - CSP-safe Shiki via shikiLazy (JS engine only)
  */
 
@@ -32,6 +33,31 @@ function isDocDark(): boolean {
   )
 }
 
+/** Shared theme observer — one MutationObserver for all live code blocks. */
+type ThemeListener = () => void
+const themeListeners = new Set<ThemeListener>()
+let themeObserver: MutationObserver | null = null
+
+function subscribeDocTheme(listener: ThemeListener): () => void {
+  themeListeners.add(listener)
+  if (!themeObserver && typeof document !== 'undefined') {
+    themeObserver = new MutationObserver(() => {
+      for (const l of themeListeners) l()
+    })
+    themeObserver.observe(document.documentElement, {
+      attributes: true,
+      attributeFilter: ['class'],
+    })
+  }
+  return () => {
+    themeListeners.delete(listener)
+    if (themeListeners.size === 0 && themeObserver) {
+      themeObserver.disconnect()
+      themeObserver = null
+    }
+  }
+}
+
 class LiveCodeBlockNodeView implements NodeView {
   dom: HTMLElement
   contentDOM: HTMLElement
@@ -45,6 +71,7 @@ class LiveCodeBlockNodeView implements NodeView {
   private editing = true
   private highlightGen = 0
   private destroyed = false
+  private unsubTheme: (() => void) | null = null
 
   constructor(
     node: Node,
@@ -91,6 +118,7 @@ class LiveCodeBlockNodeView implements NodeView {
 
     header.append(this.langEl, copyBtn)
 
+    // Body: contentDOM always in-flow; preview overlays when not editing.
     const body = document.createElement('div')
     body.className = 'relative'
 
@@ -105,8 +133,12 @@ class LiveCodeBlockNodeView implements NodeView {
 
     this.previewEl = document.createElement('pre')
     this.previewEl.className =
-      'm-0 cursor-text overflow-auto bg-transparent p-3 font-mono text-meta text-ink'
+      'm-0 cursor-text overflow-auto bg-surface-muted/80 p-3 font-mono text-meta text-ink'
     this.previewEl.setAttribute('data-testid', 'knowledge-live-code-preview')
+    // Overlay on top of contentDOM (never take contentDOM out of flow).
+    this.previewEl.style.position = 'absolute'
+    this.previewEl.style.inset = '0'
+    this.previewEl.style.zIndex = '1'
     this.previewEl.style.display = 'none'
     this.previewEl.addEventListener('mousedown', (e) => {
       e.preventDefault()
@@ -120,7 +152,13 @@ class LiveCodeBlockNodeView implements NodeView {
     // plugin may switch to preview once the cursor leaves.
     this.editing = true
     liveViews.add(this)
-    // Kick off preview paint for when we leave the block.
+
+    // Re-highlight preview when app dark class toggles.
+    this.unsubTheme = subscribeDocTheme(() => {
+      if (this.destroyed || this.editing || !this.canPreview()) return
+      void this.refreshPreview()
+    })
+
     void this.refreshPreview()
   }
 
@@ -140,7 +178,9 @@ class LiveCodeBlockNodeView implements NodeView {
 
   private enterEdit(focus = false) {
     this.editing = true
-    this.editPre.style.display = ''
+    // contentDOM stays in flow; only drop the overlay.
+    this.editPre.style.opacity = ''
+    this.editPre.style.pointerEvents = ''
     this.previewEl.style.display = 'none'
     if (focus) {
       const pos = this.getPos()
@@ -165,7 +205,9 @@ class LiveCodeBlockNodeView implements NodeView {
       return
     }
     this.editing = false
-    this.editPre.style.display = 'none'
+    // Keep contentDOM measurable for PM; hide visually under overlay.
+    this.editPre.style.opacity = '0'
+    this.editPre.style.pointerEvents = 'none'
     this.previewEl.style.display = ''
     void this.refreshPreview()
   }
@@ -204,9 +246,11 @@ class LiveCodeBlockNodeView implements NodeView {
   /**
    * Called by the selection plugin whenever the editor selection changes.
    * Preview when the caret/selection is entirely outside this node.
+   * Ignores updates from a different EditorView (multi-editor safety).
    */
   syncSelection(view: EditorView) {
     if (this.destroyed) return
+    if (view !== this.view) return
     if (!this.canPreview()) {
       if (!this.editing) this.enterEdit(false)
       return
@@ -274,6 +318,8 @@ class LiveCodeBlockNodeView implements NodeView {
   destroy() {
     this.destroyed = true
     liveViews.delete(this)
+    this.unsubTheme?.()
+    this.unsubTheme = null
   }
 }
 

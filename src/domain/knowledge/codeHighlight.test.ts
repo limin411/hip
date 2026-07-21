@@ -24,7 +24,13 @@ describe('normalizeHighlightLang', () => {
     expect(normalizeHighlightLang('yml')).toBe('yaml')
     expect(normalizeHighlightLang('md')).toBe('markdown')
     expect(normalizeHighlightLang('cs')).toBe('csharp')
+    expect(normalizeHighlightLang('c#')).toBe('csharp')
     expect(normalizeHighlightLang('c++')).toBe('cpp')
+  })
+
+  it('does not map plain text fences to markdown', () => {
+    expect(normalizeHighlightLang('text')).toBeNull()
+    expect(HIGHLIGHT_LANG_ALIASES.text).toBeUndefined()
   })
 
   it('accepts canonical allowlist ids', () => {

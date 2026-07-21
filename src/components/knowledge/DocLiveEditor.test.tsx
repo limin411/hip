@@ -208,17 +208,48 @@ describe('DocLiveEditor', () => {
     const block = screen.getByTestId('knowledge-live-code-block')
     expect(block.dataset.language).toBe('ts')
     expect(block.textContent ?? '').toContain('const x = 1')
-    // mermaid stays a code_block node view (passthrough; PR-4 specializes)
     await waitFor(() => {
       expect(screen.getByTestId('knowledge-live-code-copy')).toBeInTheDocument()
     })
   }, 25_000)
 
-  it('mermaid fence is passthrough live code_block (no crash)', async () => {
+  it('mermaid fence uses LiveMermaidView and previews when selection is outside', async () => {
+    // Leading paragraph so default caret is outside the mermaid fence → preview.
     render(
       <DocLiveEditor
         docId="d-mmd"
-        initialMarkdown={'```mermaid\ngraph TD\n  A-->B\n```\n'}
+        initialMarkdown={
+          'Intro paragraph\n\n```mermaid\ngraph TD\n  A-->B\n```\n'
+        }
+        onDraftChange={() => {}}
+      />,
+    )
+    await waitForProseMirror()
+    await waitFor(() => {
+      expect(screen.getByTestId('knowledge-live-mermaid')).toBeInTheDocument()
+    })
+    const block = screen.getByTestId('knowledge-live-mermaid')
+    expect(block.dataset.language).toBe('mermaid')
+    // Not the Shiki code chrome.
+    expect(screen.queryByTestId('knowledge-live-code-block')).not.toBeInTheDocument()
+
+    // Selection plugin should put mermaid into preview when caret is in the intro.
+    await waitFor(
+      () => {
+        const loading = screen.queryByTestId('knowledge-mermaid-loading')
+        const diagram = screen.queryByTestId('knowledge-mermaid')
+        const err = screen.queryByTestId('knowledge-mermaid-error')
+        expect(loading != null || diagram != null || err != null).toBe(true)
+      },
+      { timeout: 15_000 },
+    )
+  }, 30_000)
+
+  it('svg fence stays live code_block passthrough (PR-5)', async () => {
+    render(
+      <DocLiveEditor
+        docId="d-svg"
+        initialMarkdown={'```svg\n<svg></svg>\n```\n'}
         onDraftChange={() => {}}
       />,
     )
@@ -227,8 +258,9 @@ describe('DocLiveEditor', () => {
       expect(screen.getByTestId('knowledge-live-code-block')).toBeInTheDocument()
     })
     expect(screen.getByTestId('knowledge-live-code-block').dataset.language).toBe(
-      'mermaid',
+      'svg',
     )
+    expect(screen.queryByTestId('knowledge-live-mermaid')).not.toBeInTheDocument()
   }, 25_000)
 
   it('selecting table produces a table node', async () => {

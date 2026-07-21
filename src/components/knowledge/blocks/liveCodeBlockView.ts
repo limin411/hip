@@ -1,7 +1,8 @@
 /**
  * Live Milkdown NodeView for `code_block`.
  *
- * - mermaid / svg: plain editable passthrough (PR-4/5 specialize)
+ * - mermaid → LiveMermaidNodeView (in-place diagram render; this file dispatches)
+ * - svg: plain editable passthrough (PR-5 specializes)
  * - other langs: chrome (lang badge + copy) + Shiki preview overlay when
  *   selection is outside the node; plain editable contentDOM when inside
  * - contentDOM stays in-flow (never display:none) so PM coords/IME stay stable
@@ -20,9 +21,14 @@ import { $prose, $view } from '@milkdown/kit/utils'
 import { normalizeHighlightLang } from '@/domain/knowledge/codeHighlight'
 import { highlightCode } from '@/lib/shikiLazy'
 import { copyText } from '@/ipc/clipboard'
+import {
+  isMermaidLang,
+  LiveMermaidNodeView,
+  liveMermaidViews,
+} from './liveMermaidView'
 
-/** Languages deferred to later PRs (mermaid diagram / SVG fence). */
-const PASSTHROUGH_LANGS = new Set(['mermaid', 'svg'])
+/** Languages deferred to later PRs (SVG fence). mermaid is handled by LiveMermaidNodeView. */
+const PASSTHROUGH_LANGS = new Set(['svg'])
 
 const liveViews = new Set<LiveCodeBlockNodeView>()
 
@@ -270,6 +276,8 @@ class LiveCodeBlockNodeView implements NodeView {
 
   update(node: Node): boolean {
     if (node.type.name !== 'code_block') return false
+    // Switched to mermaid → force recreate as LiveMermaidNodeView.
+    if (isMermaidLang(node.attrs.language as string)) return false
     const langChanged =
       (node.attrs.language as string) !== (this.node.attrs.language as string)
     this.node = node
@@ -323,15 +331,19 @@ class LiveCodeBlockNodeView implements NodeView {
   }
 }
 
-/** NodeView plugin — registers for all `code_block` nodes. */
+/** NodeView plugin — registers for all `code_block` nodes; language dispatch. */
 export const liveCodeBlockView = $view(
   codeBlockSchema.node,
   (): NodeViewConstructor =>
-    (node, view, getPos) =>
-      new LiveCodeBlockNodeView(node, view, getPos),
+    (node, view, getPos) => {
+      if (isMermaidLang(node.attrs.language as string)) {
+        return new LiveMermaidNodeView(node, view, getPos)
+      }
+      return new LiveCodeBlockNodeView(node, view, getPos)
+    },
 )
 
-/** Keeps preview/edit mode in sync when the selection moves. */
+/** Keeps preview/edit mode in sync when the selection moves (code + mermaid). */
 export const liveCodeBlockSelectionPlugin = $prose(
   () =>
     new Plugin({
@@ -339,6 +351,7 @@ export const liveCodeBlockSelectionPlugin = $prose(
         return {
           update(view) {
             for (const v of liveViews) v.syncSelection(view)
+            for (const v of liveMermaidViews) v.syncSelection(view)
           },
         }
       },

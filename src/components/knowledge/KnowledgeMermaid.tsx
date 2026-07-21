@@ -7,13 +7,69 @@ export interface KnowledgeMermaidProps {
   className?: string
 }
 
+type MermaidApi = typeof import('mermaid').default
+type MermaidTheme = 'dark' | 'neutral'
+
+let mermaidLoad: Promise<MermaidApi> | null = null
+/** Theme last applied via mermaid.initialize (module-level; not every render). */
+let appliedTheme: MermaidTheme | null = null
+
+function isDocDark(): boolean {
+  return (
+    typeof document !== 'undefined' &&
+    document.documentElement.classList.contains('dark')
+  )
+}
+
+async function loadMermaid(): Promise<MermaidApi> {
+  if (!mermaidLoad) {
+    mermaidLoad = import('mermaid').then((m) => m.default)
+  }
+  return mermaidLoad
+}
+
 /**
- * Lazy mermaid renderer for knowledge Preview (not chat).
+ * Ensure mermaid is initialized for the given theme.
+ * Calls `initialize` only on first use and when the theme actually changes.
+ */
+async function ensureMermaid(theme: MermaidTheme): Promise<MermaidApi> {
+  const mermaid = await loadMermaid()
+  if (appliedTheme !== theme) {
+    mermaid.initialize({
+      startOnLoad: false,
+      securityLevel: 'strict',
+      theme,
+    })
+    appliedTheme = theme
+  }
+  return mermaid
+}
+
+/** Subscribe to `documentElement` class changes for `dark`. */
+function useDocDark(): boolean {
+  const [dark, setDark] = useState(isDocDark)
+
+  useEffect(() => {
+    if (typeof document === 'undefined') return
+    const root = document.documentElement
+    const sync = () => setDark(root.classList.contains('dark'))
+    sync()
+    const obs = new MutationObserver(sync)
+    obs.observe(root, { attributes: true, attributeFilter: ['class'] })
+    return () => obs.disconnect()
+  }, [])
+
+  return dark
+}
+
+/**
+ * Lazy mermaid renderer for knowledge Live / Reader (not chat).
  * Failures show source + error line.
  */
 export function KnowledgeMermaid({ code, className }: KnowledgeMermaidProps) {
   const { t } = useTranslation()
   const reactId = useId().replace(/:/g, '')
+  const dark = useDocDark()
   const [svg, setSvg] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
 
@@ -23,12 +79,8 @@ export function KnowledgeMermaid({ code, className }: KnowledgeMermaidProps) {
       setError(null)
       setSvg(null)
       try {
-        const mermaid = (await import('mermaid')).default
-        mermaid.initialize({
-          startOnLoad: false,
-          securityLevel: 'strict',
-          theme: 'neutral',
-        })
+        const theme = dark ? 'dark' : 'neutral'
+        const mermaid = await ensureMermaid(theme)
         const id = `hip-mmd-${reactId}-${Math.random().toString(36).slice(2, 8)}`
         const { svg: out } = await mermaid.render(id, code.trim())
         if (!cancelled) setSvg(out)
@@ -42,7 +94,7 @@ export function KnowledgeMermaid({ code, className }: KnowledgeMermaidProps) {
     return () => {
       cancelled = true
     }
-  }, [code, reactId])
+  }, [code, reactId, dark])
 
   if (error) {
     return (
@@ -75,4 +127,15 @@ export function KnowledgeMermaid({ code, className }: KnowledgeMermaidProps) {
       dangerouslySetInnerHTML={{ __html: svg }}
     />
   )
+}
+
+/** Test helper: which theme mermaid was last initialized with (null if never). */
+export function __mermaidAppliedThemeForTests(): MermaidTheme | null {
+  return appliedTheme
+}
+
+/** Test helper: reset module-level mermaid load/init state. */
+export function __resetMermaidModuleForTests(): void {
+  mermaidLoad = null
+  appliedTheme = null
 }

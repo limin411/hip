@@ -75,6 +75,12 @@ describe('smooth P2 tool result UI @smooth-p2 @harness', () => {
       const expanded = await activityBtn.getAttribute('aria-expanded')
       if (expanded !== 'true') await activityBtn.click()
     }
+    // Tool bodies default collapsed — open the row to reveal inline diff
+    const toolRow = await browser.$('[data-testid="tool-row"], [data-testid="tool-card-running"]')
+    if (await toolRow.isExisting()) {
+      const expanded = await toolRow.getAttribute('aria-expanded')
+      if (expanded !== 'true') await toolRow.click()
+    }
     await browser.waitUntil(
       async () => (await browser.$('[data-testid="tool-inline-diff"]')).isExisting(),
       { timeout: 10000, interval: 200, timeoutMsg: 'expected tool-inline-diff for edit_file output' },

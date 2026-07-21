@@ -106,9 +106,9 @@ export function AgentCard({ agent, live }: { agent: TurnAgent; live: boolean }) 
   const color = ROLE_COLOR[agent.role]
   const running = live && agent.status === 'running'
   const isError = agent.status === 'error'
-  // Body: open while live unless user toggled; closed when done/error by default.
+  // Body: collapsed by default; user toggles to inspect tools / output.
   const [manual, setManual] = useState<boolean | null>(null)
-  const open = manual ?? running
+  const open = manual ?? false
   const setScrollTarget = useUiStore((s) => s.setScrollTarget)
 
   const jumpToTurn = () => {
@@ -195,7 +195,7 @@ export function AgentCard({ agent, live }: { agent: TurnAgent; live: boolean }) 
             <ToolTrace tools={agent.tools} onToolClick={agent.messageId ? jumpToTurn : undefined} />
           )}
           {isSubAgent && cleanOutput && (
-            <OutputDisclosure content={cleanOutput} defaultOpen={running} />
+            <OutputDisclosure content={cleanOutput} defaultOpen={false} />
           )}
         </div>
       )}

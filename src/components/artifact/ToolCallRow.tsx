@@ -103,10 +103,8 @@ function StructuredOutput({ tool, cleanOutput }: { tool: ToolCall; cleanOutput: 
 export function ToolCallRow({ tool }: { tool: ToolCall }) {
   const { t } = useTranslation()
   const model = useMemo(() => buildToolResultModel(tool), [tool])
-  // U2 / P2: running tools and edit diffs start expanded for visibility.
-  const [open, setOpen] = useState(
-    () => tool.status === 'running' || model.kind === 'diff',
-  )
+  // Default collapsed — tool bodies (output/diff) are noisy when every row is open.
+  const [open, setOpen] = useState(false)
   const [showRaw, setShowRaw] = useState(false)
   const title = useMemo(() => toolTitleHint(tool), [tool])
   const cleanOutput = useMemo(

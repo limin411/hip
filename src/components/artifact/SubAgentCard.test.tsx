@@ -105,13 +105,17 @@ describe('SubAgentCard context menu', () => {
     expect(screen.queryByTestId('subagent-output')).not.toBeInTheDocument()
   })
 
-  it('starts expanded while running', () => {
+  it('stays collapsed while running until user expands', () => {
     render(<SubAgentCard agent={{ ...agent, status: 'running', elapsedMs: 0 }} showTools />)
+    expect(screen.getByTestId('subagent-card-header')).toHaveAttribute('aria-expanded', 'false')
+    expect(screen.queryByTestId('subagent-card-body')).not.toBeInTheDocument()
+
+    expandCard()
     expect(screen.getByTestId('subagent-card-header')).toHaveAttribute('aria-expanded', 'true')
     expect(screen.getByTestId('subagent-card-body')).toBeInTheDocument()
-    // Live reply starts open so streaming text is visible
-    expect(screen.getByTestId('subagent-reply-disclosure')).toHaveAttribute('aria-expanded', 'true')
-    expect(screen.getByTestId('subagent-output')).toHaveTextContent('result text')
+    // Nested reply also defaults collapsed
+    expect(screen.getByTestId('subagent-reply-disclosure')).toHaveAttribute('aria-expanded', 'false')
+    expect(screen.queryByTestId('subagent-output')).not.toBeInTheDocument()
   })
 
   it('collapses reasoning by default and expands on click', () => {

@@ -1,6 +1,6 @@
-import { useMemo } from 'react'
+import { useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Loader2, CheckCircle2, XCircle, Circle, AlertTriangle } from 'lucide-react'
+import { Loader2, CheckCircle2, XCircle, Circle, AlertTriangle, ChevronRight } from 'lucide-react'
 import type { AgentRole, AgentRun, TimelineStep, ToolCall } from '@hip/protocol'
 import { cn } from '@/lib/utils'
 import { AgentBadge, TRAIL_ROW, TurnTimeline } from './TurnTimeline'
@@ -105,6 +105,9 @@ export function ActivityBar({
   const summaryText = formatParts(parts, t as (key: string, params?: Record<string, unknown>) => string)
 
   const hasActivity = steps.length > 0 || toolCalls.length > 0 || agentRuns.length > 0
+  // Process trail defaults collapsed. Interleaved TurnBlocks embed answer text, so stay open.
+  const [open, setOpen] = useState(!!interleaved)
+  const trailOpen = interleaved || open
 
   if (!hasActivity) {
     if (!streaming) return null
@@ -140,48 +143,80 @@ export function ActivityBar({
         <CheckCircle2 size={14} className="block shrink-0 text-success" data-testid="activity-status-success" />
       )
 
-  // Always expanded (CLI-style process trail) — one min-h-5 row for icon/dot/text alignment.
   return (
     <div className="mb-2" data-testid="activity-bar" aria-live="polite">
-      <div
-        className={TRAIL_ROW}
-        role="status"
-        data-testid="activity-bar-summary"
-      >
-        {statusIcon}
-        {activeRole ? (
-          <span className={cn('inline-flex items-center', isRunning && 'animate-pulse')}>
-            <AgentBadge role={activeRole} />
+      {interleaved ? (
+        <div
+          className={TRAIL_ROW}
+          role="status"
+          data-testid="activity-bar-summary"
+        >
+          {statusIcon}
+          {activeRole ? (
+            <span className={cn('inline-flex items-center', isRunning && 'animate-pulse')}>
+              <AgentBadge role={activeRole} />
+            </span>
+          ) : !isRunning ? (
+            <Circle size={14} className="block shrink-0 text-ink-tertiary" />
+          ) : null}
+          {activeRole && (
+            <span className="shrink-0 font-medium text-ink-secondary">
+              {activeName || t(`artifact.roles.${activeRole}`)}
+            </span>
+          )}
+          <span className="min-w-0 truncate text-ink-tertiary" title={summaryText}>
+            {summaryText}
           </span>
-        ) : !isRunning ? (
-          <Circle size={14} className="block shrink-0 text-ink-tertiary" />
-        ) : null}
-        {activeRole && (
-          <span className="shrink-0 font-medium text-ink-secondary">
-            {activeName || t(`artifact.roles.${activeRole}`)}
+        </div>
+      ) : (
+        <button
+          type="button"
+          onClick={() => setOpen((v) => !v)}
+          aria-expanded={open}
+          className={cn(TRAIL_ROW, 'w-full text-ink-tertiary transition-colors hover:text-ink-secondary')}
+          data-testid="activity-bar-summary"
+        >
+          <ChevronRight
+            size={14}
+            className={cn('block shrink-0 transition-transform', open && 'rotate-90')}
+          />
+          {statusIcon}
+          {activeRole ? (
+            <span className={cn('inline-flex items-center', isRunning && 'animate-pulse')}>
+              <AgentBadge role={activeRole} />
+            </span>
+          ) : !isRunning ? (
+            <Circle size={14} className="block shrink-0 text-ink-tertiary" />
+          ) : null}
+          {activeRole && (
+            <span className="shrink-0 font-medium text-ink-secondary">
+              {activeName || t(`artifact.roles.${activeRole}`)}
+            </span>
+          )}
+          <span className="min-w-0 truncate" title={summaryText}>
+            {summaryText}
           </span>
-        )}
-        <span className="min-w-0 truncate text-ink-tertiary" title={summaryText}>
-          {summaryText}
-        </span>
-      </div>
+        </button>
+      )}
       {/* O3: interleaved TurnBlocks (incl. answer text) sit outside the process rail so
           supervisor prose is not demoted under border-l + meta chrome. */}
-      <div
-        className={
-          interleaved
-            ? 'mt-1 flex flex-col gap-1'
-            : 'mt-1 flex flex-col gap-0.5 border-l border-border pl-3'
-        }
-      >
-        <TurnTimeline
-          steps={steps}
-          toolCalls={toolCalls}
-          agentRuns={agentRuns}
-          hidePlan={hidePlan}
-          interleaved={interleaved}
-        />
-      </div>
+      {trailOpen && (
+        <div
+          className={
+            interleaved
+              ? 'mt-1 flex flex-col gap-1'
+              : 'mt-1 flex flex-col gap-0.5 border-l border-border pl-3'
+          }
+        >
+          <TurnTimeline
+            steps={steps}
+            toolCalls={toolCalls}
+            agentRuns={agentRuns}
+            hidePlan={hidePlan}
+            interleaved={interleaved}
+          />
+        </div>
+      )}
     </div>
   )
 }

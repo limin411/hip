@@ -2,7 +2,7 @@
 import '@testing-library/jest-dom/vitest'
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { renderToStaticMarkup } from 'react-dom/server'
-import { render, cleanup, within } from '@testing-library/react'
+import { render, cleanup, within, fireEvent } from '@testing-library/react'
 import { ActivityBar } from './ActivityBar'
 import { TurnTimeline } from './TurnTimeline'
 
@@ -60,7 +60,7 @@ describe('ActivityBar', () => {
     vi.mocked(TurnTimeline).mockClear()
   })
 
-  it('renders always-expanded summary and timeline for completed activity', () => {
+  it('renders collapsed summary by default for completed activity', () => {
     const html = renderToStaticMarkup(
       <ActivityBar steps={baseSteps} toolCalls={baseTools} agentRuns={baseRuns} hasAssistantContent />,
     )
@@ -69,9 +69,9 @@ describe('ActivityBar', () => {
     expect(html).toContain('1/1 个工具')
     expect(html).toContain('1 个子 Agent')
     expect(html).toContain('data-testid="activity-status-success"')
-    expect(html).toContain('data-testid="turn-timeline"')
-    // No collapse control
-    expect(html).not.toContain('aria-expanded')
+    // Timeline hidden until expanded
+    expect(html).not.toContain('data-testid="turn-timeline"')
+    expect(html).toContain('aria-expanded="false"')
   })
 
   it('includes category summary when tools span categories', () => {
@@ -93,7 +93,8 @@ describe('ActivityBar', () => {
     expect(html).toContain('正在')
     expect(html).toContain('a.ts')
     expect(html).toContain('animate-pulse')
-    expect(html).toContain('data-testid="turn-timeline"')
+    // Process trail stays collapsed while streaming; summary still shows live hint
+    expect(html).not.toContain('data-testid="turn-timeline"')
   })
 
   it('running with activeRole: pulse on badge only — no Loader2 on summary', () => {
@@ -221,25 +222,50 @@ describe('ActivityBar', () => {
     expect(html).toContain('a.ts')
   })
 
-  it('always shows the timeline (no collapse toggle)', () => {
+  it('expands timeline when summary is clicked', () => {
     const { container } = render(
       <ActivityBar steps={baseSteps} toolCalls={baseTools} agentRuns={baseRuns} hasAssistantContent />,
     )
     const bar = within(container).getByTestId('activity-bar')
+    const summary = within(bar).getByTestId('activity-bar-summary')
 
-    expect(within(bar).getByTestId('activity-bar-summary')).toBeInTheDocument()
+    expect(summary).toHaveAttribute('aria-expanded', 'false')
+    expect(within(bar).queryByTestId('turn-timeline')).not.toBeInTheDocument()
+
+    fireEvent.click(summary)
+    expect(summary).toHaveAttribute('aria-expanded', 'true')
     expect(within(bar).getByTestId('turn-timeline')).toBeInTheDocument()
-    expect(bar.querySelector('button')).toBeNull()
+
+    fireEvent.click(summary)
+    expect(summary).toHaveAttribute('aria-expanded', 'false')
+    expect(within(bar).queryByTestId('turn-timeline')).not.toBeInTheDocument()
   })
 
-  it('always shows the timeline while streaming', () => {
+  it('keeps timeline collapsed while streaming until expanded', () => {
     const { container } = render(
       <ActivityBar steps={baseSteps} toolCalls={baseTools} agentRuns={baseRuns} streaming />,
     )
     const bar = within(container).getByTestId('activity-bar')
+    const summary = within(bar).getByTestId('activity-bar-summary')
 
+    expect(within(bar).queryByTestId('turn-timeline')).not.toBeInTheDocument()
+    fireEvent.click(summary)
     expect(within(bar).getByTestId('turn-timeline')).toBeInTheDocument()
-    expect(bar.querySelector('button')).toBeNull()
+  })
+
+  it('keeps interleaved timeline open (answer text lives inside TurnBlocks)', () => {
+    const html = renderToStaticMarkup(
+      <ActivityBar
+        steps={baseSteps}
+        toolCalls={baseTools}
+        agentRuns={baseRuns}
+        hasAssistantContent
+        interleaved
+      />,
+    )
+    expect(html).toContain('data-testid="turn-timeline"')
+    // No collapse control when interleaved
+    expect(html).not.toContain('aria-expanded')
   })
 
   it('does not break React hook rules when activity appears after initial render', () => {
@@ -251,6 +277,7 @@ describe('ActivityBar', () => {
     ).not.toThrow()
 
     expect(container.querySelector('[data-testid="activity-bar"]')).toBeInTheDocument()
-    expect(container.querySelector('[data-testid="turn-timeline"]')).toBeInTheDocument()
+    // Still collapsed by default after activity appears
+    expect(container.querySelector('[data-testid="turn-timeline"]')).not.toBeInTheDocument()
   })
 })

@@ -58,6 +58,39 @@ describe('ToolCallRow', () => {
     expect(screen.getByTestId('tool-row')).toHaveTextContent('zuolin')
   })
 
+  it('starts collapsed for running tools and edit diffs', () => {
+    const { rerender } = render(
+      <ToolCallRow
+        tool={{
+          callId: '1',
+          agentId: 'a',
+          name: 'read_file',
+          input: JSON.stringify({ path: 'a.ts' }),
+          status: 'running',
+          seq: 1,
+        }}
+      />,
+    )
+    expect(screen.getByTestId('tool-card-running')).toHaveAttribute('aria-expanded', 'false')
+    expect(screen.queryByTestId('tool-result-view')).not.toBeInTheDocument()
+
+    rerender(
+      <ToolCallRow
+        tool={{
+          callId: '2',
+          agentId: 'a',
+          name: 'edit_file',
+          input: JSON.stringify({ path: 'a.ts' }),
+          status: 'finished',
+          seq: 1,
+          output: '<<<<<<< SEARCH\nold\n=======\nnew\n>>>>>>> REPLACE',
+        }}
+      />,
+    )
+    expect(screen.getByTestId('tool-row')).toHaveAttribute('aria-expanded', 'false')
+    expect(screen.queryByTestId('tool-inline-diff')).not.toBeInTheDocument()
+  })
+
   it('sanitizes DSML from expanded output', () => {
     const dirty =
       'Hello<｜｜DSML｜｜tool_calls>\n<｜｜DSML｜｜invoke name="x">\n</｜｜DSML｜｜invoke>\n</｜｜DSML｜｜tool_calls>'

@@ -263,8 +263,9 @@ describe('interleaved TurnBlocks (flag)', () => {
     expect(screen.getByTestId('message-answer')).toHaveTextContent('Here is the answer')
     // Text steps are not rendered in the process trail
     expect(screen.queryByTestId('turn-text-block')).not.toBeInTheDocument()
-    // Tools still appear in ActivityBar / TurnTimeline
+    // Process trail is collapsed by default; expand to see tools
     expect(screen.getByTestId('message-process')).toBeInTheDocument()
+    fireEvent.click(screen.getByTestId('activity-bar-summary'))
     expect(screen.getByTestId('tool-row')).toBeInTheDocument()
   })
 
@@ -316,6 +317,7 @@ describe('interleaved TurnBlocks (flag)', () => {
     expect(screen.queryByTestId('turn-text-block')).not.toBeInTheDocument()
     // O4: no text → do not force interleaved flatten
     expect(screen.getByTestId('message-process').getAttribute('data-interleaved')).toBeNull()
+    fireEvent.click(screen.getByTestId('activity-bar-summary'))
     expect(screen.getByTestId('turn-timeline').getAttribute('data-interleaved')).toBeNull()
   })
 
@@ -414,6 +416,7 @@ describe('interleaved TurnBlocks (flag)', () => {
       />,
     )
     expect(screen.getByTestId('message-answer')).toHaveTextContent('done')
+    fireEvent.click(screen.getByTestId('activity-bar-summary'))
     expect(screen.getAllByTestId('agent-timeline-section').length).toBeGreaterThanOrEqual(1)
     expect(screen.getByTestId('turn-timeline').getAttribute('data-interleaved')).toBeNull()
   })

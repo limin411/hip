@@ -94,26 +94,32 @@ describe('artifact AgentCard', () => {
     expect(screen.queryByTestId('agent-output')).not.toBeInTheDocument()
   })
 
-  it('starts expanded while running; output disclosure open for live stream', () => {
+  it('stays collapsed while running until user expands', () => {
     render(
       <AgentCard
         agent={{ ...baseAgent, status: 'running', elapsedMs: 0 }}
         live
       />,
     )
+    expect(screen.getByTestId('agent-card-header')).toHaveAttribute('aria-expanded', 'false')
+    expect(screen.queryByTestId('agent-card-body')).not.toBeInTheDocument()
+
+    expandCard()
     expect(screen.getByTestId('agent-card-header')).toHaveAttribute('aria-expanded', 'true')
     expect(screen.getByTestId('agent-card-body')).toBeInTheDocument()
-    expect(screen.getByTestId('agent-output-disclosure')).toHaveAttribute('aria-expanded', 'true')
-    expect(screen.getByTestId('agent-output')).toHaveTextContent('result text')
+    // Nested output also defaults collapsed
+    expect(screen.getByTestId('agent-output-disclosure')).toHaveAttribute('aria-expanded', 'false')
+    expect(screen.queryByTestId('agent-output')).not.toBeInTheDocument()
   })
 
-  it('lets user collapse a running sub-agent body like supervisor', () => {
+  it('lets user collapse a running sub-agent body after expanding', () => {
     render(
       <AgentCard
         agent={{ ...baseAgent, status: 'running', elapsedMs: 0 }}
         live
       />,
     )
+    expandCard()
     expect(screen.getByTestId('agent-card-body')).toBeInTheDocument()
     fireEvent.click(screen.getByTestId('agent-card-header'))
     expect(screen.getByTestId('agent-card-header')).toHaveAttribute('aria-expanded', 'false')

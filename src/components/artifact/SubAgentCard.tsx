@@ -79,9 +79,9 @@ export function SubAgentCard({
   const railColor = ROLE_COLOR[agent.role] ?? ROLE_COLOR.subagent
   const isRunning = agent.status === 'running'
 
-  // Body: open while live unless the user toggled; closed when done/error by default.
+  // Body: collapsed by default; user toggles to inspect tools / reply.
   const [manualOpen, setManualOpen] = useState<boolean | null>(null)
-  const bodyOpen = manualOpen ?? isRunning
+  const bodyOpen = manualOpen ?? false
 
   const openInAgents = (e: React.MouseEvent) => {
     e.stopPropagation()
@@ -171,7 +171,7 @@ export function SubAgentCard({
               <p className="text-meta leading-5 text-ink-tertiary">{t('chat.activity.viewInActivity')}</p>
             )}
             {cleanOutput ? (
-              <ReplyDisclosure content={cleanOutput} defaultOpen={isRunning} />
+              <ReplyDisclosure content={cleanOutput} defaultOpen={false} />
             ) : (
               <div className="text-meta leading-5 text-ink-tertiary">{t('chat.subagent.noSummary')}</div>
             )}

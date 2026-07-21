@@ -456,9 +456,24 @@ export function KnowledgeWorkspace() {
   }
 
   const attachFiles = async () => {
-    if (!activeSpaceId || !activeDocId || showLiveEditor) return
+    if (!activeSpaceId || !activeDocId) return
     const paths = await pickAttachmentFiles()
     if (!paths?.length) return
+
+    // Live: structured insert via Milkdown (never multi-line tr.insertText).
+    if (showLiveEditor) {
+      for (const sourcePath of paths) {
+        const result = await importAssetFromPath(activeSpaceId, sourcePath)
+        if (!result.ok) {
+          toastAssetError(result.reason)
+          continue
+        }
+        liveEditorRef.current?.insertMarkdown(result.markdown)
+      }
+      return
+    }
+
+    // Source: CodeMirror string insert at caret.
     const view = editorRef.current?.getView()
     if (!view) return
     for (const sourcePath of paths) {
@@ -883,10 +898,12 @@ export function KnowledgeWorkspace() {
                   key={`${activeDocId}-live`}
                   docId={activeDocId}
                   initialMarkdown={draftBody}
+                  spaceId={activeSpaceId}
                   onDraftChange={setDraftBody}
                   onBlur={() => void flushSave()}
                   onSave={() => void flushSave()}
                   onParseError={onLiveParseError}
+                  onAssetImportError={toastAssetError}
                   placeholder={t('knowledge.doc.placeholder')}
                   wikiNodes={nodes}
                 />

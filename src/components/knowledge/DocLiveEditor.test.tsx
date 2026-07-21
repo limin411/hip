@@ -18,6 +18,10 @@ import {
   splitYamlFrontmatter,
 } from '@/domain/knowledge/frontmatter'
 import {
+  importAssetFromClipboardItems,
+  importAssetFromFile,
+} from '@/domain/knowledge/importAsset'
+import {
   KNOWLEDGE_SLASH_ITEMS,
   filterSlashItemsForLive,
   liveAllowsBlockSlash,
@@ -31,7 +35,16 @@ vi.mock('react-i18next', () => ({
   }),
 }))
 
-afterEach(() => cleanup())
+vi.mock('@/domain/knowledge/importAsset', () => ({
+  importAssetFromClipboardItems: vi.fn(),
+  importAssetFromFile: vi.fn(),
+}))
+
+afterEach(() => {
+  cleanup()
+  vi.mocked(importAssetFromClipboardItems).mockReset()
+  vi.mocked(importAssetFromFile).mockReset()
+})
 
 async function waitForProseMirror(timeout = 15_000) {
   await waitFor(
@@ -259,6 +272,204 @@ describe('DocLiveEditor', () => {
     expect(screen.queryByTestId('knowledge-slash-h1')).not.toBeInTheDocument()
     expect(screen.queryByTestId('knowledge-slash-fence')).not.toBeInTheDocument()
   }, 25_000)
+
+  it('paste image imports asset and inserts markdown via structured insert', async () => {
+    const onDraftChange = vi.fn()
+    const onAssetImported = vi.fn()
+    const md = '![paste.png](assets/paste.png)'
+    vi.mocked(importAssetFromClipboardItems).mockResolvedValue({
+      ok: true,
+      meta: {
+        relPath: 'assets/paste.png',
+        mime: 'image/png',
+        byteLength: 12,
+      },
+      markdown: md,
+    })
+
+    render(
+      <DocLiveEditor
+        docId="d-paste"
+        initialMarkdown="hello"
+        spaceId="spc_1"
+        onDraftChange={onDraftChange}
+        onAssetImported={onAssetImported}
+      />,
+    )
+    await waitForProseMirror()
+
+    const root = screen.getByTestId('knowledge-doc-live-editor')
+    const item = {
+      kind: 'file' as const,
+      type: 'image/png',
+      getAsFile: () =>
+        new File([new Uint8Array([1, 2, 3])], 'paste.png', {
+          type: 'image/png',
+        }),
+    }
+    // Array-like list with length (matches clipboard DataTransferItemList usage).
+    const items = Object.assign([item], { length: 1 }) as unknown as DataTransferItemList
+    const clipboardData = {
+      items,
+      files: [] as unknown as FileList,
+      types: ['Files'],
+      getData: () => '',
+    }
+
+    await act(async () => {
+      fireEvent.paste(root, { clipboardData })
+    })
+
+    await waitFor(() => {
+      expect(importAssetFromClipboardItems).toHaveBeenCalledWith(
+        'spc_1',
+        items,
+      )
+    })
+    await waitFor(() => {
+      expect(onAssetImported).toHaveBeenCalled()
+      const last = onDraftChange.mock.calls.at(-1)?.[0] as string
+      expect(last).toMatch(/assets\/paste\.png/)
+    })
+  }, 20_000)
+
+  it('paste skips image/svg+xml (same as Source)', async () => {
+    const onAssetImported = vi.fn()
+    render(
+      <DocLiveEditor
+        docId="d-paste-svg"
+        initialMarkdown="hello"
+        spaceId="spc_1"
+        onDraftChange={() => {}}
+        onAssetImported={onAssetImported}
+      />,
+    )
+    await waitForProseMirror()
+
+    const root = screen.getByTestId('knowledge-doc-live-editor')
+    const item = {
+      kind: 'file' as const,
+      type: 'image/svg+xml',
+      getAsFile: () =>
+        new File(['<svg/>'], 'x.svg', { type: 'image/svg+xml' }),
+    }
+    const items = Object.assign([item], { length: 1 }) as unknown as DataTransferItemList
+
+    await act(async () => {
+      fireEvent.paste(root, {
+        clipboardData: {
+          items,
+          files: [],
+          types: ['Files'],
+          getData: () => '',
+        },
+      })
+    })
+
+    expect(importAssetFromClipboardItems).not.toHaveBeenCalled()
+    expect(onAssetImported).not.toHaveBeenCalled()
+  }, 20_000)
+
+  it('drop image imports via importAssetFromFile and inserts markdown', async () => {
+    const onDraftChange = vi.fn()
+    const onAssetImportError = vi.fn()
+    const file = new File([new Uint8Array([1])], 'drop.png', {
+      type: 'image/png',
+    })
+    vi.mocked(importAssetFromFile).mockResolvedValue({
+      ok: true,
+      meta: {
+        relPath: 'assets/drop.png',
+        mime: 'image/png',
+        byteLength: 1,
+      },
+      markdown: '![drop.png](assets/drop.png)',
+    })
+
+    render(
+      <DocLiveEditor
+        docId="d-drop"
+        initialMarkdown="x"
+        spaceId="spc_1"
+        onDraftChange={onDraftChange}
+        onAssetImportError={onAssetImportError}
+      />,
+    )
+    await waitForProseMirror()
+
+    const root = screen.getByTestId('knowledge-doc-live-editor')
+    // FileList-like: length + numeric index (Array.from uses these).
+    const files = {
+      0: file,
+      length: 1,
+      item: (i: number) => (i === 0 ? file : null),
+      *[Symbol.iterator]() {
+        yield file
+      },
+    } as unknown as FileList
+
+    await act(async () => {
+      fireEvent.drop(root, {
+        dataTransfer: {
+          files,
+          types: ['Files'],
+          dropEffect: 'none',
+        },
+      })
+    })
+
+    await waitFor(() => {
+      expect(importAssetFromFile).toHaveBeenCalledWith('spc_1', file)
+    })
+    await waitFor(() => {
+      const last = onDraftChange.mock.calls.at(-1)?.[0] as string
+      expect(last).toMatch(/assets\/drop\.png/)
+    })
+    expect(onAssetImportError).not.toHaveBeenCalled()
+  }, 20_000)
+
+  it('paste import failure surfaces onAssetImportError', async () => {
+    const onAssetImportError = vi.fn()
+    vi.mocked(importAssetFromClipboardItems).mockResolvedValue({
+      ok: false,
+      reason: 'too_large_paste',
+    })
+
+    render(
+      <DocLiveEditor
+        docId="d-paste-err"
+        initialMarkdown="hello"
+        spaceId="spc_1"
+        onDraftChange={() => {}}
+        onAssetImportError={onAssetImportError}
+      />,
+    )
+    await waitForProseMirror()
+
+    const root = screen.getByTestId('knowledge-doc-live-editor')
+    const item = {
+      kind: 'file' as const,
+      type: 'image/png',
+      getAsFile: () =>
+        new File([new Uint8Array([1])], 'big.png', { type: 'image/png' }),
+    }
+    const items = Object.assign([item], { length: 1 }) as unknown as DataTransferItemList
+
+    await act(async () => {
+      fireEvent.paste(root, {
+        clipboardData: {
+          items,
+          files: [],
+          types: ['Files'],
+          getData: () => '',
+        },
+      })
+    })
+
+    await waitFor(() => {
+      expect(onAssetImportError).toHaveBeenCalledWith('too_large_paste')
+    })
+  }, 20_000)
 })
 
 describe('DocLiveEditor slash catalog gating (domain + menu)', () => {

@@ -197,16 +197,20 @@ export function RecycleBinPage() {
           }}
         >
           <TabsList className="h-9 gap-2">
-            <TabsTrigger className="px-4" value="all">
+            <TabsTrigger className="px-4" value="all" data-testid="recycle-bin-filter-all">
               {t('trash.filterAll')}
             </TabsTrigger>
-            <TabsTrigger className="px-4" value="chat">
+            <TabsTrigger className="px-4" value="chat" data-testid="recycle-bin-filter-chat">
               {t('trash.filterChat')}
             </TabsTrigger>
-            <TabsTrigger className="px-4" value="code">
+            <TabsTrigger className="px-4" value="code" data-testid="recycle-bin-filter-code">
               {t('trash.filterCode')}
             </TabsTrigger>
-            <TabsTrigger className="px-4" value="knowledge">
+            <TabsTrigger
+              className="px-4"
+              value="knowledge"
+              data-testid="recycle-bin-filter-knowledge"
+            >
               {t('trash.filterKnowledge')}
             </TabsTrigger>
           </TabsList>
@@ -261,6 +265,7 @@ export function RecycleBinPage() {
                     <Button
                       variant="ghost"
                       size="sm"
+                      data-testid="recycle-bin-restore"
                       onClick={() => {
                         if (row.source === 'session') {
                           sessionService.restoreSession(row.id)

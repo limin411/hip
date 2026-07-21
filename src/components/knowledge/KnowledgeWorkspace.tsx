@@ -74,6 +74,22 @@ const DocLiveEditor = lazy(() =>
   import('./DocLiveEditor').then((m) => ({ default: m.DocLiveEditor })),
 )
 import { TemplatePickerModal } from './TemplatePickerModal'
+import type { SpaceSchemaV1 } from '@/domain/knowledge/schema'
+
+/**
+ * Isolated draftBody subscriber so Live typing does not re-render the whole workspace.
+ */
+function DocPropertiesConnected({ schema }: { schema: SpaceSchemaV1 }) {
+  const draftBody = useKnowledgeStore((s) => s.draftBody)
+  const setDraftBody = useKnowledgeStore((s) => s.setDraftBody)
+  return (
+    <DocPropertiesRow
+      body={draftBody}
+      schema={schema}
+      onBodyChange={(next) => setDraftBody(next, { persist: 'auto' })}
+    />
+  )
+}
 
 export function KnowledgeWorkspace() {
   const { t, i18n } = useTranslation()
@@ -83,7 +99,9 @@ export function KnowledgeWorkspace() {
   const activeDocId = useKnowledgeStore((s) => s.activeDocId)
   const treeFocusId = useKnowledgeStore((s) => s.treeFocusId)
   const docBody = useKnowledgeStore((s) => s.docBody)
-  const draftBody = useKnowledgeStore((s) => s.draftBody)
+  // Intentionally do NOT subscribe to draftBody here — Live typing would re-render
+  // the whole workspace (tree, chrome, toolbars). Editors keep local state; store
+  // draft is read via getState() on mount / export / mode switch.
   const editorMode = useKnowledgeStore((s) => s.editorMode)
   const busy = useKnowledgeStore((s) => s.busy)
   const saveState = useKnowledgeStore((s) => s.saveState)
@@ -111,12 +129,12 @@ export function KnowledgeWorkspace() {
   const space = spaces.find((s) => s.id === activeSpaceId)
   const activeView = spaceViews.views.find((v) => v.id === activeViewId) ?? null
   const docMetaMap = useMemo(() => {
-    // Rebuild when draft/nodes change for collection view freshness
-    void draftBody
+    // Collection views: prefer saved body ticks, not per-keystroke draft.
+    void docBody
     void nodes
     void activeDocId
     return getDocMetaMap()
-  }, [draftBody, nodes, activeDocId, getDocMetaMap, activeViewId])
+  }, [docBody, nodes, activeDocId, getDocMetaMap, activeViewId])
   const activeNode = nodes.find((n) => n.id === activeDocId)
   const pathNodes = useMemo(
     () => (activeDocId ? getPath(nodes, activeDocId) : []),
@@ -345,7 +363,8 @@ export function KnowledgeWorkspace() {
     if (editorMode !== 'preview') return
     useKnowledgeStore.setState({ editorMode: 'live' })
   }, [editorMode])
-  const bodyLen = Math.max(docBody.length, draftBody.length)
+  const draftLen = useKnowledgeStore.getState().draftBody.length
+  const bodyLen = Math.max(docBody.length, draftLen)
   const liveBlocked = Boolean(activeDocId && liveBlockedDocIds[activeDocId])
   const liveSuppressed =
     liveBlocked || bodyLen > KNOWLEDGE_LARGE_DOC_CHARS
@@ -353,6 +372,8 @@ export function KnowledgeWorkspace() {
   const showLiveEditor =
     canvasMode === 'live' && liveEnabled && !liveSuppressed
   const showSourceEditor = !showLiveEditor
+  /** Body for editor mount (mode/doc switch); not a per-keystroke subscription. */
+  const mountMarkdown = useKnowledgeStore.getState().draftBody || docBody
 
   const onLiveParseError = () => {
     toast.error(t('knowledge.doc.liveParseFailed'))
@@ -378,7 +399,9 @@ export function KnowledgeWorkspace() {
     if (!dest) return
     try {
       if (dest.toLowerCase().endsWith('.html') || dest.toLowerCase().endsWith('.htm')) {
-        const raw = draftBody || docBody
+        const raw =
+          useKnowledgeStore.getState().draftBody ||
+          useKnowledgeStore.getState().docBody
         const html = buildDocHtmlDocument({
           title,
           rawMd: raw,
@@ -400,7 +423,8 @@ export function KnowledgeWorkspace() {
     try {
       await flushSave()
       const oldBody = await knowledgeReadVersion(activeSpaceId, activeDocId, versionId)
-      const cur = draftBody || docBody
+      const st = useKnowledgeStore.getState()
+      const cur = st.draftBody || st.docBody
       const lines = diffLines(oldBody, cur)
       setVersionDiff({ versionId, lines })
     } catch (e) {
@@ -891,11 +915,7 @@ export function KnowledgeWorkspace() {
                 title={activeNode?.title ?? t('knowledge.doc.untitled')}
                 onCommit={(title) => void renameNode(activeDocId, title)}
               />
-              <DocPropertiesRow
-                body={draftBody}
-                schema={spaceSchema}
-                onBodyChange={(next) => setDraftBody(next, { persist: 'auto' })}
-              />
+              <DocPropertiesConnected schema={spaceSchema} />
               <Suspense
                 fallback={
                   <div
@@ -910,7 +930,7 @@ export function KnowledgeWorkspace() {
                   ref={liveEditorRef}
                   key={`${activeDocId}-live`}
                   docId={activeDocId}
-                  initialMarkdown={draftBody}
+                  initialMarkdown={mountMarkdown}
                   spaceId={activeSpaceId}
                   onDraftChange={setDraftBody}
                   onBlur={() => void flushSave()}
@@ -935,11 +955,7 @@ export function KnowledgeWorkspace() {
                 title={activeNode?.title ?? t('knowledge.doc.untitled')}
                 onCommit={(title) => void renameNode(activeDocId, title)}
               />
-              <DocPropertiesRow
-                body={draftBody}
-                schema={spaceSchema}
-                onBodyChange={(next) => setDraftBody(next, { persist: 'auto' })}
-              />
+              <DocPropertiesConnected schema={spaceSchema} />
               <div className="mt-3 mb-2 flex shrink-0 items-center gap-0.5 rounded-lg border border-border/80 bg-surface-muted/60 px-1 py-0.5">
                 <MarkdownToolbar
                   className="mb-0 border-0 bg-transparent p-0 opacity-100"
@@ -966,7 +982,7 @@ export function KnowledgeWorkspace() {
                 ref={editorRef}
                 key={`${activeDocId}-source`}
                 docId={activeDocId}
-                initialValue={draftBody}
+                initialValue={mountMarkdown}
                 spaceId={activeSpaceId}
                 onDraftChange={setDraftBody}
                 onBlur={() => void flushSave()}

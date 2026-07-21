@@ -5,6 +5,7 @@
 
 import fs from 'node:fs'
 import path from 'node:path'
+import { fileURLToPath } from 'node:url'
 import { execSync } from 'node:child_process'
 import {
   openContextMenu,
@@ -1503,9 +1504,438 @@ export async function applySlashMenuItem(name: string): Promise<void> {
   await browser.pause(200)
 }
 
+/**
+ * Open Live slash menu at end of doc (line-start `/` after newline) and pick item.
+ * Product R3 path — hard-assert menu + click.
+ */
+export async function applySlashMenuItemLive(name: string): Promise<void> {
+  await ensureKnowledgeLive()
+  const host = await browser.$(
+    '[data-testid="knowledge-doc-live-editor"] .ProseMirror, [data-testid="knowledge-doc-live-editor"] [contenteditable="true"]',
+  )
+  await host.waitForExist({ timeout: 15000 })
+
+  await browser.execute((el: HTMLElement) => {
+    el.focus()
+    const sel = window.getSelection()
+    const range = document.createRange()
+    range.selectNodeContents(el)
+    range.collapse(false)
+    sel?.removeAllRanges()
+    sel?.addRange(range)
+    // New paragraph then `/` so block slash is allowed (line-start).
+    document.execCommand('insertText', false, '\n/')
+  }, host)
+  await browser.pause(250)
+
+  let menu = await browser.$('[data-testid="knowledge-slash-menu"]')
+  if (!(await menu.isExisting())) {
+    await browser.execute((el: HTMLElement) => el.focus(), host)
+    await browser.keys('/')
+    await browser.pause(300)
+    menu = await browser.$('[data-testid="knowledge-slash-menu"]')
+  }
+  await menu.waitForExist({
+    timeout: 12000,
+    timeoutMsg: 'Live slash menu did not open',
+  })
+
+  let item = await browser.$(`[data-testid="knowledge-slash-${name}"]`)
+  if (!(await item.isExisting())) {
+    await browser.keys(name)
+    await browser.pause(200)
+    item = await browser.$(`[data-testid="knowledge-slash-${name}"]`)
+  }
+  await item.waitForExist({
+    timeout: 10000,
+    timeoutMsg: `Live slash item not found: ${name}`,
+  })
+  await browser.execute((el: HTMLElement) => el.click(), item)
+  await browser.pause(300)
+}
+
 /** Count tree docs currently visible. */
 export async function countTreeDocs(): Promise<number> {
   return browser.execute(
     () => document.querySelectorAll('[data-testid^="knowledge-tree-doc-"]').length,
   )
+}
+
+// ---------------------------------------------------------------------------
+// Perf harness + fixture seeding (knowledge-perf / diagnosis)
+// ---------------------------------------------------------------------------
+
+/** Matches src/domain/knowledge/limits.ts KNOWLEDGE_LARGE_DOC_CHARS. */
+export const E2E_KNOWLEDGE_LARGE_DOC_CHARS = 512_000
+
+export type KnowledgePerfSnapshot = {
+  enabled: boolean
+  open: {
+    openStartMs: number | null
+    ipcMs: number | null
+    storeSetAt: number | null
+    liveCreateMs: number | null
+    firstEditableMs: number | null
+    bodyChars: number | null
+    editorMode: string | null
+  }
+  typing: {
+    lastSerializeMs: number | null
+    serializeSamples: number[]
+    serializeCount: number
+    draftSetCount: number
+  }
+  shiki: { calls: number; lastMs: number | null }
+  mermaid: { renders: number; lastMs: number | null }
+  nodeViews: { code: number; mermaid: number; svg: number }
+}
+
+/** Absolute path to `e2e/fixtures/knowledge/<name>`. */
+export function knowledgeFixturePath(name: string): string {
+  // helpers live at e2e/helpers → fixtures at e2e/fixtures/knowledge
+  const helpersDir = path.dirname(fileURLToPath(import.meta.url))
+  return path.join(helpersDir, '..', 'fixtures', 'knowledge', name)
+}
+
+export function readKnowledgeFixture(name: string): string {
+  const p = knowledgeFixturePath(name)
+  if (!fs.existsSync(p)) throw new Error(`knowledge fixture missing: ${p}`)
+  return fs.readFileSync(p, 'utf8')
+}
+
+/** Build a body larger than the Live→Source force threshold. */
+export function buildLargeSourceBody(
+  minChars = E2E_KNOWLEDGE_LARGE_DOC_CHARS + 2_048,
+): string {
+  const header = '# Large source fixture\n\nMarker: LARGE_SOURCE_MARKER_V1\n\n'
+  const line = 'Padding line for large-doc Source fallback path. '.repeat(8) + '\n'
+  let body = header
+  while (body.length < minChars) body += line
+  return body
+}
+
+/** Active tree doc id (`doc_…`) or null. */
+export async function getActiveDocId(): Promise<string | null> {
+  return browser.execute(() => {
+    const row = document.querySelector(
+      '[data-testid^="knowledge-tree-doc-"][aria-selected="true"]',
+    ) as HTMLElement | null
+    const tid = row?.getAttribute('data-testid')
+    if (!tid?.startsWith('knowledge-tree-doc-')) return null
+    return tid.slice('knowledge-tree-doc-'.length)
+  })
+}
+
+/** Resolve on-disk path for a doc id under HIP_DATA_DIR/knowledge. */
+export function findDocPathOnDisk(docId: string): string | null {
+  const root = knowledgeRootOnDisk()
+  if (!fs.existsSync(root)) return null
+  for (const ent of fs.readdirSync(root, { withFileTypes: true })) {
+    if (!ent.isDirectory() || !ent.name.startsWith('spc_')) continue
+    const candidate = path.join(root, ent.name, 'docs', `${docId}.md`)
+    if (fs.existsSync(candidate)) return candidate
+  }
+  return null
+}
+
+/**
+ * Write body into the currently active doc file on disk.
+ * Call only when draft is clean (e.g. right after create, before typing),
+ * then reopen so openDoc re-reads disk without flushSave overwriting.
+ */
+export function writeActiveDocBodyOnDisk(docId: string, body: string): string {
+  const p = findDocPathOnDisk(docId)
+  if (!p) throw new Error(`doc file not found on disk for ${docId}`)
+  fs.writeFileSync(p, body, 'utf8')
+  return p
+}
+
+/**
+ * Create a fresh doc, write body to disk, reopen so openDoc re-reads disk.
+ * Always creates a new tree node (does not reuse a dirty active doc).
+ * Prefers Live flag on so medium-rich exercises the product path.
+ */
+export async function seedActiveDocBodyAndReopen(
+  body: string,
+  opts?: { title?: string; preferLive?: boolean },
+): Promise<{ docId: string; path: string; chars: number }> {
+  // Prefer a clean empty doc so flushSave before reopen cannot clobber the seed.
+  if (await hasKnowledgeWritableSurface()) {
+    await createNewDocFromMenu()
+  } else {
+    await createDocAndExpectEditor()
+  }
+  await waitForKnowledgeWritableSurface(20_000)
+  if (opts?.title) await setKnowledgeDocTitle(opts.title)
+
+  const docId = await getActiveDocId()
+  if (!docId) throw new Error('no active knowledge doc to seed')
+
+  // Ensure draft is clean (empty body) so flushSave is a no-op, then plant fixture.
+  const diskPath = writeActiveDocBodyOnDisk(docId, body)
+
+  if (opts?.preferLive === false) {
+    await setKnowledgeLiveFlag(false)
+  } else {
+    await setKnowledgeLiveFlag(true)
+  }
+
+  await enableKnowledgePerf()
+  await resetKnowledgePerf()
+
+  await reopenActiveKnowledgeDoc()
+  await waitForKnowledgeWritableSurface(30_000)
+
+  return { docId, path: diskPath, chars: body.length }
+}
+
+export async function seedActiveDocFromFixture(
+  fixtureName: string,
+  opts?: { title?: string; preferLive?: boolean },
+): Promise<{ docId: string; path: string; chars: number; body: string }> {
+  const body = readKnowledgeFixture(fixtureName)
+  const seeded = await seedActiveDocBodyAndReopen(body, opts)
+  return { ...seeded, body }
+}
+
+/** Enable in-app knowledge perf collection (window.__hipKnowledgePerf). */
+export async function enableKnowledgePerf(): Promise<void> {
+  await browser.execute(() => {
+    const api = (
+      window as Window & {
+        __hipKnowledgePerf?: { enable: () => void }
+      }
+    ).__hipKnowledgePerf
+    if (api?.enable) {
+      api.enable()
+      return
+    }
+    try {
+      localStorage.setItem('hip-knowledge-perf', '1')
+    } catch {
+      // ignore
+    }
+  })
+}
+
+export async function resetKnowledgePerf(): Promise<void> {
+  await browser.execute(() => {
+    const api = (
+      window as Window & {
+        __hipKnowledgePerf?: { reset: () => void; enable: () => void }
+      }
+    ).__hipKnowledgePerf
+    api?.enable?.()
+    api?.reset?.()
+  })
+}
+
+export async function readKnowledgePerfSnapshot(): Promise<KnowledgePerfSnapshot | null> {
+  return browser.execute(() => {
+    const api = (
+      window as Window & {
+        __hipKnowledgePerf?: { snapshot: () => KnowledgePerfSnapshot }
+      }
+    ).__hipKnowledgePerf
+    return api?.snapshot?.() ?? null
+  })
+}
+
+/** p95 of a numeric sample list (empty → null). */
+export function p95(samples: number[]): number | null {
+  if (samples.length === 0) return null
+  const sorted = [...samples].sort((a, b) => a - b)
+  const idx = Math.min(sorted.length - 1, Math.ceil(sorted.length * 0.95) - 1)
+  return sorted[Math.max(0, idx)]
+}
+
+/**
+ * Count Live block NodeViews currently in the DOM
+ * (does not wait for mermaid SVG finish — host presence only).
+ */
+export async function countLiveBlockNodeViews(): Promise<{
+  code: number
+  mermaid: number
+  svg: number
+}> {
+  return browser.execute(() => ({
+    code: document.querySelectorAll('[data-testid="knowledge-live-code-block"]').length,
+    mermaid: document.querySelectorAll('[data-testid="knowledge-live-mermaid"]').length,
+    svg: document.querySelectorAll('[data-testid="knowledge-live-svg"]').length,
+  }))
+}
+
+/**
+ * Wall-clock open: reset perf → click tree title → wait writable.
+ * Returns elapsed ms + optional perf snapshot.
+ */
+export async function openDocByTitleWithTiming(
+  title: string,
+  timeoutMs = 30_000,
+): Promise<{ elapsedMs: number; snap: KnowledgePerfSnapshot | null }> {
+  await enableKnowledgePerf()
+  await resetKnowledgePerf()
+  const t0 = Date.now()
+  await openTreeDocByTitle(title)
+  await waitForKnowledgeWritableSurface(timeoutMs)
+  const elapsedMs = Date.now() - t0
+  const snap = await readKnowledgePerfSnapshot()
+  return { elapsedMs, snap }
+}
+
+// ---------------------------------------------------------------------------
+// P2 product surfaces: graph, collection views, outline, trash
+// ---------------------------------------------------------------------------
+
+/** Open knowledge graph modal from workspace space menu. */
+export async function openKnowledgeGraphModal(): Promise<void> {
+  await clickMenuItem('knowledge-space-menu', 'knowledge-space-graph')
+  // Loading or canvas/empty/error all prove the modal path.
+  await browser.waitUntil(
+    async () => {
+      for (const id of [
+        'knowledge-graph-loading',
+        'knowledge-graph-canvas-host',
+        'knowledge-graph-empty',
+        'knowledge-graph-error',
+      ]) {
+        if (await (await browser.$(`[data-testid="${id}"]`)).isExisting()) return true
+      }
+      return false
+    },
+    { timeout: 15000, interval: 200, timeoutMsg: 'knowledge graph modal not shown' },
+  )
+}
+
+/** Close graph modal via Escape (Modal). */
+export async function closeKnowledgeGraphModal(): Promise<void> {
+  await browser.keys('Escape')
+  await browser.pause(200)
+  await browser.waitUntil(
+    async () =>
+      !(await (await browser.$('[data-testid="knowledge-graph-canvas-host"]')).isExisting()) &&
+      !(await (await browser.$('[data-testid="knowledge-graph-loading"]')).isExisting()) &&
+      !(await (await browser.$('[data-testid="knowledge-graph-empty"]')).isExisting()),
+    { timeout: 8000, interval: 150, timeoutMsg: 'graph modal still open' },
+  ).catch(() => {
+    // Some modal chrome may keep host; Escape again
+    return browser.keys('Escape')
+  })
+}
+
+/** Switch collection view tab by view id (default: view_all_table / view_status_board). */
+export async function selectKnowledgeViewTab(viewId: string): Promise<void> {
+  const tab = await browser.$(`[data-testid="knowledge-view-tab-${viewId}"]`)
+  await tab.waitForExist({ timeout: 10000 })
+  await browser.execute((el: HTMLElement) => el.click(), tab)
+  await browser.pause(200)
+}
+
+/** Back to docs/tree tab. */
+export async function selectKnowledgeDocsTab(): Promise<void> {
+  const tab = await browser.$('[data-testid="knowledge-view-docs"]')
+  await tab.waitForExist({ timeout: 10000 })
+  await browser.execute((el: HTMLElement) => el.click(), tab)
+  await browser.pause(150)
+}
+
+/** Open right-rail outline panel (knowledge workspace). */
+export async function openKnowledgeOutlinePanel(): Promise<void> {
+  const panel = await browser.$('[data-testid="knowledge-outline-panel"]')
+  if (await panel.isExisting()) return
+
+  const toggle = await browser.$('[data-testid="toggle-panel"]')
+  await toggle.waitForExist({ timeout: 10000 })
+  await browser.execute((el: HTMLElement) => el.click(), toggle)
+  await browser.pause(150)
+  const item = await browser.$('[data-testid="panel-tab-knowledge-outline"]')
+  if (await item.isExisting()) {
+    await browser.execute((el: HTMLElement) => el.click(), item)
+  }
+  await (await browser.$('[data-testid="knowledge-outline-panel"]')).waitForExist({
+    timeout: 10000,
+  })
+}
+
+/** Click first outline heading item (if any). */
+export async function clickFirstOutlineItem(): Promise<boolean> {
+  const item = await browser.$('[data-testid^="knowledge-doc-outline-item-"]')
+  if (!(await item.isExisting())) return false
+  await browser.execute((el: HTMLElement) => el.click(), item)
+  await browser.pause(150)
+  return true
+}
+
+/**
+ * Soft-delete active (or given) tree doc and confirm.
+ * Returns the title used for later restore asserts.
+ */
+export async function softDeleteTreeDocByTitle(title: string): Promise<void> {
+  const tid = await browser.execute((t: string) => {
+    const rows = Array.from(
+      document.querySelectorAll('[data-testid^="knowledge-tree-doc-"]'),
+    ) as HTMLElement[]
+    const row = rows.find((r) => (r.textContent ?? '').includes(t))
+    return row?.getAttribute('data-testid') ?? null
+  }, title)
+  if (!tid) throw new Error(`tree doc not found for soft-delete: ${title}`)
+  await deleteTreeNodeByTestId(tid)
+}
+
+/** Filter recycle bin to knowledge and restore first row (or row containing title). */
+export async function restoreKnowledgeFromTrash(titleHint?: string): Promise<void> {
+  const filter = await browser.$('[data-testid="recycle-bin-filter-knowledge"]')
+  await filter.waitForExist({ timeout: 10000 })
+  await browser.execute((el: HTMLElement) => el.click(), filter)
+  await browser.pause(200)
+
+  await browser.waitUntil(
+    async () => {
+      const empty = await browser.$('[data-testid="recycle-bin-empty"]')
+      const row = await browser.$('[data-testid="recycle-bin-row"]')
+      return (await empty.isExisting()) || (await row.isExisting())
+    },
+    { timeout: 15000, interval: 300, timeoutMsg: 'trash knowledge filter never settled' },
+  )
+
+  if (titleHint) {
+    const clicked = await browser.execute((hint: string) => {
+      const rows = Array.from(
+        document.querySelectorAll('[data-testid="recycle-bin-row"]'),
+      ) as HTMLElement[]
+      const row = rows.find((r) => (r.textContent ?? '').includes(hint))
+      if (!row) return false
+      const btn = row.querySelector(
+        '[data-testid="recycle-bin-restore"]',
+      ) as HTMLElement | null
+      if (!btn) return false
+      btn.click()
+      return true
+    }, titleHint)
+    if (!clicked) throw new Error(`trash row not found for restore: ${titleHint}`)
+  } else {
+    const btn = await browser.$('[data-testid="recycle-bin-restore"]')
+    await btn.waitForExist({ timeout: 10000 })
+    await browser.execute((el: HTMLElement) => el.click(), btn)
+  }
+  await browser.pause(500)
+}
+
+/**
+ * Seed a second doc with wiki links to `targetTitle` (for backlinks e2e).
+ * Leaves the **target** doc active after linking.
+ */
+export async function seedWikiLinkSource(
+  sourceTitle: string,
+  targetTitle: string,
+  marker: string,
+): Promise<void> {
+  await createNewDocFromMenu()
+  await setKnowledgeDocTitle(sourceTitle)
+  await ensureKnowledgeSource()
+  await typeInKnowledgeEditor(`${marker} See [[${targetTitle}]].\n`)
+  await waitForSaveStatusSaved(15000)
+  await waitForDocBodyOnDisk(`[[${targetTitle}]]`, 15000)
+  await openTreeDocByTitle(targetTitle)
+  await waitForKnowledgeWritableSurface(15000)
 }

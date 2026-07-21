@@ -2,6 +2,10 @@ import { useEffect, useId, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { isDocDark, subscribeDocTheme } from '@/lib/docTheme'
 import { cn } from '@/lib/utils'
+import {
+  isKnowledgePerfEnabled,
+  kbPerfMermaid,
+} from '@/domain/knowledge/knowledgePerf'
 
 export interface KnowledgeMermaidProps {
   code: string
@@ -68,11 +72,13 @@ export function KnowledgeMermaid({ code, className }: KnowledgeMermaidProps) {
     const run = async () => {
       setError(null)
       setSvg(null)
+      const t0 = isKnowledgePerfEnabled() ? performance.now() : 0
       try {
         const theme = dark ? 'dark' : 'neutral'
         const mermaid = await ensureMermaid(theme)
         const id = `hip-mmd-${reactId}-${Math.random().toString(36).slice(2, 8)}`
         const { svg: out } = await mermaid.render(id, code.trim())
+        if (isKnowledgePerfEnabled()) kbPerfMermaid(performance.now() - t0)
         if (!cancelled) setSvg(out)
       } catch (e) {
         if (!cancelled) {

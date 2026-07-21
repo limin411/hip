@@ -10,10 +10,9 @@ import {
 import { Editor, rootCtx, defaultValueCtx, editorViewCtx } from '@milkdown/kit/core'
 import { commonmark } from '@milkdown/kit/preset/commonmark'
 import { gfm } from '@milkdown/kit/preset/gfm'
-import { listener, listenerCtx } from '@milkdown/kit/plugin/listener'
 import { history } from '@milkdown/kit/plugin/history'
-import { getMarkdown, insert } from '@milkdown/kit/utils'
-import { TextSelection } from '@milkdown/kit/prose/state'
+import { $prose, getMarkdown, insert } from '@milkdown/kit/utils'
+import { Plugin, TextSelection } from '@milkdown/kit/prose/state'
 import {
   joinYamlFrontmatter,
   splitYamlFrontmatter,
@@ -37,6 +36,12 @@ import {
 import { WikiLinkPicker } from './WikiLinkPicker'
 import { KnowledgeSlashMenu } from './KnowledgeSlashMenu'
 import { liveCodeBlockPlugins } from './blocks/liveCodeBlockView'
+import {
+  isKnowledgePerfEnabled,
+  kbPerfLiveCreateEnd,
+  kbPerfLiveCreateStart,
+  kbPerfSerialize,
+} from '@/domain/knowledge/knowledgePerf'
 
 import '@milkdown/kit/prose/view/style/prosemirror.css'
 import '@milkdown/kit/prose/tables/style/tables.css'
@@ -94,6 +99,13 @@ type SlashPickerState = {
 
 const SLASH_MENU_WIDTH = 320
 const SLASH_MENU_MAX_H = 224
+
+/**
+ * Throttle Live → store draft sync. Milkdown `markdownUpdated` serializes the
+ * full document on every transaction; we instead call `getMarkdown()` only on
+ * this interval (and flush on blur / Mod-s / unmount).
+ */
+const LIVE_DRAFT_THROTTLE_MS = 100
 
 function computeSlashMenuPos(
   root: HTMLElement,
@@ -211,6 +223,8 @@ export const DocLiveEditor = forwardRef<DocLiveEditorHandle, DocLiveEditorProps>
     const rootRef = useRef<HTMLDivElement>(null)
     const editorRef = useRef<Editor | null>(null)
     const fmTextRef = useRef('')
+    /** Flush pending Live draft to store (blur / save / unmount). */
+    const flushDraftRef = useRef<() => void>(() => {})
     const onDraftChangeRef = useRef(onDraftChange)
     onDraftChangeRef.current = onDraftChange
     const onBlurRef = useRef(onBlur)
@@ -411,6 +425,9 @@ export const DocLiveEditor = forwardRef<DocLiveEditorHandle, DocLiveEditorProps>
       if (!root) return
 
       let cancelled = false
+      let draftTimer: ReturnType<typeof setTimeout> | null = null
+      /** Set after `.create()` so the draft-sync plugin can schedule. */
+      let liveEditor: Editor | null = null
       const { fmText, body } = splitYamlFrontmatter(initialRef.current)
       fmTextRef.current = fmText
 
@@ -418,30 +435,68 @@ export const DocLiveEditor = forwardRef<DocLiveEditorHandle, DocLiveEditorProps>
         onDraftChangeRef.current(joinYamlFrontmatter(fmTextRef.current, bodyMd))
       }
 
+      const flushDraftFromEditor = () => {
+        if (draftTimer) {
+          clearTimeout(draftTimer)
+          draftTimer = null
+        }
+        const ed = liveEditor ?? editorRef.current
+        if (!ed) return
+        try {
+          const t0 = isKnowledgePerfEnabled() ? performance.now() : 0
+          const bodyMd = ed.action(getMarkdown())
+          if (isKnowledgePerfEnabled()) kbPerfSerialize(performance.now() - t0)
+          emitDraft(bodyMd)
+        } catch {
+          // ignore serialize failures; keep last committed draft
+        }
+      }
+
+      const scheduleDraftFromEditor = () => {
+        if (cancelled || draftTimer) return
+        draftTimer = setTimeout(() => {
+          draftTimer = null
+          if (!cancelled) flushDraftFromEditor()
+        }, LIVE_DRAFT_THROTTLE_MS)
+      }
+
+      flushDraftRef.current = flushDraftFromEditor
+
+      // Doc changes only — not milkdown markdownUpdated (full serialize every tx).
+      const draftSyncPlugin = $prose(
+        () =>
+          new Plugin({
+            view: () => ({
+              update(view, prevState) {
+                if (view.state.doc.eq(prevState.doc)) return
+                scheduleDraftFromEditor()
+              },
+            }),
+          }),
+      )
+
       ;(async () => {
         try {
+          kbPerfLiveCreateStart()
           const editor = await Editor.make()
             .config((ctx) => {
               ctx.set(rootCtx, root)
               ctx.set(defaultValueCtx, body)
-              const l = ctx.get(listenerCtx)
-              l.markdownUpdated((_ctx, markdown, prevMarkdown) => {
-                if (markdown === prevMarkdown) return
-                emitDraft(markdown)
-              })
             })
-            .use(listener)
             .use(commonmark)
             .use(gfm)
             .use(history)
             .use(liveCodeBlockPlugins)
+            .use(draftSyncPlugin)
             .create()
 
           if (cancelled) {
             await editor.destroy()
             return
           }
+          liveEditor = editor
           editorRef.current = editor
+          kbPerfLiveCreateEnd()
         } catch (err) {
           if (!cancelled) onParseErrorRef.current?.(err)
         }
@@ -449,8 +504,12 @@ export const DocLiveEditor = forwardRef<DocLiveEditorHandle, DocLiveEditorProps>
 
       return () => {
         cancelled = true
+        // Commit in-flight edits before tear-down (doc switch / mode change).
+        flushDraftFromEditor()
+        flushDraftRef.current = () => {}
         const ed = editorRef.current
         editorRef.current = null
+        liveEditor = null
         if (ed) void ed.destroy()
         // Clear host so remount starts clean (Milkdown leaves DOM under root).
         root.replaceChildren()
@@ -472,6 +531,8 @@ export const DocLiveEditor = forwardRef<DocLiveEditorHandle, DocLiveEditorProps>
           if (!host.contains(document.activeElement)) {
             setPicker(null)
             updateSlash(null)
+            // Flush draft before autosave so we do not write a stale body.
+            flushDraftRef.current()
             onBlurRef.current?.()
           }
         }, 0)
@@ -480,18 +541,7 @@ export const DocLiveEditor = forwardRef<DocLiveEditorHandle, DocLiveEditorProps>
       const onKeyDown = (e: KeyboardEvent) => {
         if ((e.metaKey || e.ctrlKey) && e.key === 's') {
           e.preventDefault()
-          // Flush latest markdown before save in case listener is lagging.
-          const ed = editorRef.current
-          if (ed) {
-            try {
-              const bodyMd = ed.action(getMarkdown())
-              onDraftChangeRef.current(
-                joinYamlFrontmatter(fmTextRef.current, bodyMd),
-              )
-            } catch {
-              // ignore; still invoke save with last draft
-            }
-          }
+          flushDraftRef.current()
           onSaveRef.current?.()
         }
       }

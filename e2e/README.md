@@ -91,6 +91,7 @@ E2E_GREP=@live E2E_INVERT=1 yarn test:e2e
 | `@adv` | L4 noisy / safety (`bytebase-adv`) | **no** |
 | `@context-menu` | Right-click menus (see plan) | smoke/core cases also tagged `@smoke`/`@core` → in gate |
 | `@knowledge` | Knowledge base full business flows | main path also `@core` → in gate |
+| `@knowledge-perf` | Knowledge open/type usability budgets + unusable hard lines | **no** (nightly / local) |
 
 Context-menu helpers: `e2e/helpers/context-menu.ts`. Specs: `context-menu-smoke.spec.ts`, `context-menu-core.spec.ts`, `context-menu-panel.spec.ts`.
 
@@ -98,19 +99,34 @@ Knowledge helpers: `e2e/helpers/knowledge.ts`. Specs (all unpaid, isolated `HIP_
 
 | Spec | Cases |
 |------|--------|
-| `knowledge-editor.spec.ts` | KE: open → space → edit/preview → title → bold → export md → tree filter |
-| `knowledge-advanced.spec.ts` | KA: palette nav/search, context newDoc, DnD, import folder |
-| `knowledge-lifecycle.spec.ts` | KL: create → disk save → search → export md/zip → **delete space** → chip reopen |
-| `knowledge-home.spec.ts` | KH: multi-space, rename, recent, search empty, delete/cancel |
+| `knowledge-editor.spec.ts` | KE: open → space → default Live/Source → title → bold → export md → tree filter |
+| `knowledge-advanced.spec.ts` | KA: palette nav/search, context newDoc, DnD, import folder (KA5 may skip) |
+| `knowledge-lifecycle.spec.ts` | KL: create → disk save → export md/zip → **delete space** → shell reopen |
+| `knowledge-home.spec.ts` | KH: multi-space, rename, delete/cancel |
 | `knowledge-tree-crud.spec.ts` | KT: folder/doc rename, delete, context newDoc |
-| `knowledge-preview.spec.ts` | KP1: Preview GFM task checkbox write-back (no edit mode) |
-| `knowledge-nav.spec.ts` | KN1: flush-fail aborts doc switch; KN2: search groups by space |
-| `knowledge-wiki.spec.ts` | KW1–KW3: `[[title]]` navigate, confirm create, cancel create |
-| `knowledge-phase1.spec.ts` | K1C–G: templates, versions, frontmatter filter, assets, portable zip (`@knowledge`, not `@core`) |
-| `knowledge-live.spec.ts` | KF1 slash `/h1`; KF2 Live flag + type + disk (`@knowledge`, not `@core`) |
+| `knowledge-preview.spec.ts` | KP1: GFM task checkbox write-back (Live/Source; no Preview writing mode) |
+| `knowledge-nav.spec.ts` | KN1: flush-fail + durability; KN2: multi-space sidebar reopen |
+| `knowledge-wiki.spec.ts` | KW1–KW4: `[[title]]` navigate, create/cancel (some soft) |
+| `knowledge-phase1.spec.ts` | K1C–G: templates, versions, frontmatter, assets, portable zip (`@knowledge`, not `@core`) |
+| `knowledge-live.spec.ts` | KF1 Source slash `/h1`; KF2 Live type + disk; KF3 live blocks hard (`@knowledge`) |
+| `knowledge-live-r3.spec.ts` | KR1–4: default Live, Live slash, fixture blocks hard, large→Source (`@knowledge @core`) |
+| `knowledge-p2.spec.ts` | KP2: graph modal, table/board views, outline, backlinks, soft-delete restore (`@knowledge`) |
+| `knowledge-perf.spec.ts` | KP-O/T: fixture open/type budgets; large-doc → Source (`@knowledge-perf`) |
 
+Perf budgets: `e2e/helpers/knowledge-perf-budgets.ts` (hard unusable lines always; targets soft unless `KNOWLEDGE_PERF_STRICT=1`).
+
+Fixtures: `e2e/fixtures/knowledge/` (`small-prose.md`, `medium-rich.md`, …).  
+Perf seam: `window.__hipKnowledgePerf` (`enable` / `reset` / `snapshot`) — see `src/domain/knowledge/knowledgePerf.ts`.  
 Write-fail seam: `window.__hipKnowledgeWriteFail` (see `installWriteFailSeam` / `src/ipc/knowledge.ts`).  
 Attachment seam: `window.__hipPickAttachmentFiles`. Live flag: `localStorage.hip-knowledge-live=true`.
+
+```bash
+# All knowledge functional specs
+yarn test:e2e:knowledge
+# Usability / perf (not in gate)
+yarn test:e2e:knowledge-perf
+```
+
 
 ```bash
 E2E_GREP=@context-menu yarn test:e2e

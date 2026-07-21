@@ -10,6 +10,10 @@
 import { createHighlighterCore, type HighlighterCore } from 'shiki/core'
 import { createJavaScriptRegexEngine } from 'shiki/engine/javascript'
 import { normalizeHighlightLang } from '@/domain/knowledge/codeHighlight'
+import {
+  isKnowledgePerfEnabled,
+  kbPerfShiki,
+} from '@/domain/knowledge/knowledgePerf'
 
 type LangLoader = () => Promise<{ default: Parameters<HighlighterCore['loadLanguage']>[0] }>
 
@@ -53,6 +57,37 @@ const THEME_DARK = 'github-dark'
 
 let highlighterPromise: Promise<HighlighterCore> | null = null
 const loadedLangs = new Set<string>()
+
+/** Bounded highlight cache (lang|theme|code → HTML). Cap avoids unbounded growth. */
+const HIGHLIGHT_CACHE_MAX = 48
+const highlightCache = new Map<string, string>()
+
+function cacheKey(lang: string, theme: string, code: string): string {
+  // Avoid huge keys for multi-MB fences — hash-ish length prefix + length.
+  if (code.length > 4000) {
+    return `${lang}|${theme}|L${code.length}|${code.slice(0, 200)}|${code.slice(-200)}`
+  }
+  return `${lang}|${theme}|${code}`
+}
+
+function cacheGet(key: string): string | undefined {
+  const hit = highlightCache.get(key)
+  if (hit === undefined) return undefined
+  // LRU: re-insert at end
+  highlightCache.delete(key)
+  highlightCache.set(key, hit)
+  return hit
+}
+
+function cacheSet(key: string, html: string): void {
+  if (highlightCache.has(key)) highlightCache.delete(key)
+  highlightCache.set(key, html)
+  while (highlightCache.size > HIGHLIGHT_CACHE_MAX) {
+    const oldest = highlightCache.keys().next().value
+    if (oldest === undefined) break
+    highlightCache.delete(oldest)
+  }
+}
 
 async function getHighlighter(): Promise<HighlighterCore> {
   if (!highlighterPromise) {
@@ -100,18 +135,29 @@ export async function highlightCode(
   const canonical = normalizeHighlightLang(lang)
   if (!canonical) return null
 
+  const theme = isDark ? THEME_DARK : THEME_LIGHT
+  const key = cacheKey(canonical, theme, code)
+  const cached = cacheGet(key)
+  if (cached !== undefined) {
+    if (isKnowledgePerfEnabled()) kbPerfShiki(0)
+    return cached
+  }
+
+  const t0 = isKnowledgePerfEnabled() ? performance.now() : 0
   try {
     const hl = await getHighlighter()
     const ok = await ensureLang(hl, canonical)
     if (!ok) return null
 
-    const theme = isDark ? THEME_DARK : THEME_LIGHT
     // structure: 'inline' → token spans only (no nested shiki <pre>/<code>)
-    return hl.codeToHtml(code, {
+    const html = hl.codeToHtml(code, {
       lang: canonical,
       theme,
       structure: 'inline',
     })
+    cacheSet(key, html)
+    if (isKnowledgePerfEnabled()) kbPerfShiki(performance.now() - t0)
+    return html
   } catch {
     return null
   }
@@ -121,4 +167,5 @@ export async function highlightCode(
 export function __resetShikiLazyForTests(): void {
   highlighterPromise = null
   loadedLangs.clear()
+  highlightCache.clear()
 }

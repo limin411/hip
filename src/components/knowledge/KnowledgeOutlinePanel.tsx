@@ -1,3 +1,4 @@
+import { useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { X } from 'lucide-react'
 import { useKnowledgeStore } from '@/store/knowledgeStore'
@@ -6,6 +7,9 @@ import { Button } from '@/components/ui/Button'
 import { DocOutline } from './DocOutline'
 import { cn } from '@/lib/utils'
 import { extractDocOutline, slugifyHeading } from '@/domain/knowledge/mdPreview'
+
+/** Idle debounce so outline does not re-parse on every Live draft tick. */
+const OUTLINE_BODY_DEBOUNCE_MS = 200
 
 /**
  * Knowledge right-rail: Outline + Backlinks + Outbound.
@@ -24,7 +28,24 @@ export function KnowledgeOutlinePanel() {
   const openDoc = useKnowledgeStore((s) => s.openDoc)
   const setKnowledgePanelOpen = useUiStore((s) => s.setKnowledgePanelOpen)
 
-  const content = draftBody || docBody
+  const liveContent = draftBody || docBody
+  const [content, setContent] = useState(liveContent)
+  const prevDocIdRef = useRef(activeDocId)
+  useEffect(() => {
+    if (!activeDocId) {
+      setContent('')
+      prevDocIdRef.current = null
+      return
+    }
+    // Doc switch: paint outline immediately.
+    if (prevDocIdRef.current !== activeDocId) {
+      prevDocIdRef.current = activeDocId
+      setContent(liveContent)
+      return
+    }
+    const id = window.setTimeout(() => setContent(liveContent), OUTLINE_BODY_DEBOUNCE_MS)
+    return () => window.clearTimeout(id)
+  }, [liveContent, activeDocId])
 
   const openBacklink = async (fromDocId: string, fragment: string | null) => {
     await openDoc(fromDocId)

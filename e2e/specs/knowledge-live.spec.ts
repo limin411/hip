@@ -102,7 +102,7 @@ describe('knowledge live editor and slash menu @knowledge', () => {
     await waitForKnowledgeMarker(liveMarker, 15000)
   })
 
-  it('KF3: Live renders code / mermaid / svg blocks from Source fences', async () => {
+  it('KF3: Live renders code / mermaid / svg blocks from Source fences (hard)', async () => {
     await ensureKnowledgeSource()
     const body = [
       '```js',
@@ -124,19 +124,8 @@ describe('knowledge live editor and slash menu @knowledge', () => {
     await waitForDocBodyOnDisk('```mermaid', 15000)
 
     await ensureKnowledgeLive()
-    // Block NodeViews are best-effort in e2e (Milkdown async); assert any that mount.
-    const codeOk = await waitForKnowledgeLiveCodeBlock(12000).then(() => true).catch(() => false)
-    const mermaidOk = await waitForKnowledgeLiveMermaid(12000).then(() => true).catch(() => false)
-    const svgOk = await waitForKnowledgeLiveSvg(12000).then(() => true).catch(() => false)
-    // At least one live block chrome should appear when Live parses fences.
-    // If Milkdown e2e is flaky, disk + Live host still prove product path.
-    const liveHost = await browser.$('[data-testid="knowledge-doc-live-editor"]')
-    expect(await liveHost.isExisting()).toBe(true)
-    if (!(codeOk || mermaidOk || svgOk)) {
-      console.warn(
-        '[e2e] KF3 soft: no live block NodeView mounted (code/mermaid/svg); Live host ok',
-      )
-    }
-    expect(codeOk || mermaidOk || svgOk || (await liveHost.isExisting())).toBe(true)
+    await waitForKnowledgeLiveCodeBlock(20000)
+    await waitForKnowledgeLiveMermaid(20000)
+    await waitForKnowledgeLiveSvg(20000)
   })
 })

@@ -15,6 +15,7 @@ import type { Node } from '@milkdown/kit/prose/model'
 import { TextSelection } from '@milkdown/kit/prose/state'
 import type { EditorView, NodeView } from '@milkdown/kit/prose/view'
 import { KnowledgeSvg } from '../KnowledgeSvg'
+import { kbPerfNodeViewMount } from '@/domain/knowledge/knowledgePerf'
 
 export const liveSvgViews = new Set<LiveSvgNodeView>()
 
@@ -37,6 +38,10 @@ export class LiveSvgNodeView implements NodeView {
   private destroyed = false
   private lastPreviewCode: string | null = null
 
+  get isEditing(): boolean {
+    return this.editing
+  }
+
   constructor(
     node: Node,
     view: EditorView,
@@ -51,6 +56,7 @@ export class LiveSvgNodeView implements NodeView {
       'knowledge-live-svg my-2 overflow-hidden rounded-lg border border-border bg-surface-muted/40'
     this.dom.setAttribute('data-testid', 'knowledge-live-svg')
     this.dom.dataset.language = 'svg'
+    kbPerfNodeViewMount('svg')
 
     const body = document.createElement('div')
     body.className = 'relative min-h-[3rem]'

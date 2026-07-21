@@ -35,6 +35,7 @@ import {
 } from '@/domain/knowledge/importAsset'
 import { wikiLinkAutocomplete } from '@/domain/knowledge/wikiCmCompletion'
 import type { KnowledgeNode } from '@/domain/knowledge/types'
+import { kbPerfSourceReady } from '@/domain/knowledge/knowledgePerf'
 
 export interface DocEditorProps {
   /** Remount key source — parent should also pass key={docId} */
@@ -544,6 +545,7 @@ export const DocEditor = forwardRef<DocEditorHandle, DocEditorProps>(function Do
             effects: themeCompartment.reconfigure(buildProseTheme(isDark)),
           })
           updateSlashMatch(readSlashMatch(view))
+          kbPerfSourceReady()
         }}
         onChange={(v) => {
           setText(v)

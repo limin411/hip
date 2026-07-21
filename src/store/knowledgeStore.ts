@@ -16,6 +16,14 @@ import {
   localDayKey,
 } from '@/domain/knowledge/limits'
 import {
+  installKnowledgePerfWindowApi,
+  isKnowledgePerfEnabled,
+  kbPerfDraftSet,
+  kbPerfOpenIpc,
+  kbPerfOpenStart,
+  kbPerfOpenStore,
+} from '@/domain/knowledge/knowledgePerf'
+import {
   collectDocIdsInSubtree,
   getPathTitles,
   insertNode,
@@ -1499,7 +1507,12 @@ export const useKnowledgeStore = create<KnowledgeState>((set, get) => ({
       return
     }
     try {
+      kbPerfOpenStart()
+      const ipcT0 = isKnowledgePerfEnabled() ? performance.now() : 0
       const body = await knowledgeReadDoc(spaceId, id)
+      if (isKnowledgePerfEnabled()) {
+        kbPerfOpenIpc(performance.now() - ipcT0)
+      }
       // Always real-time (Live). Source only when Live is off or doc is too large.
       // Do not restore a prior Source preference — product is Notion/Feishu-style.
       let editorMode = resolveEditorMode('live')
@@ -1527,6 +1540,7 @@ export const useKnowledgeStore = create<KnowledgeState>((set, get) => ({
         linkPanelStatus: 'loading',
         ...(revealMatches ? {} : { pendingReveal: null }),
       })
+      kbPerfOpenStore(body.length, editorMode)
       schedulePersistExpand(spaceId, get)
       void upsertLinkIndexDoc(spaceId, id, node.title, body, get().nodes).then(() =>
         get().refreshLinkPanel(id),
@@ -1583,6 +1597,7 @@ export const useKnowledgeStore = create<KnowledgeState>((set, get) => ({
   },
 
   setDraftBody: (v, opts) => {
+    kbPerfDraftSet()
     set({ draftBody: v })
     const persist =
       opts?.persist ?? (shouldAutosave(get().editorMode) ? 'auto' : 'none')
@@ -1782,4 +1797,7 @@ export function scheduleActiveExpandPersist() {
   const spaceId = useKnowledgeStore.getState().activeSpaceId
   if (spaceId) schedulePersistExpand(spaceId, () => useKnowledgeStore.getState())
 }
+
+// E2E / diagnosis: window.__hipKnowledgePerf (collection off until enable()).
+installKnowledgePerfWindowApi()
 

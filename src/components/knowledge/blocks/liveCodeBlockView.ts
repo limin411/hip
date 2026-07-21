@@ -22,6 +22,7 @@ import { normalizeHighlightLang } from '@/domain/knowledge/codeHighlight'
 import { isDocDark, subscribeDocTheme } from '@/lib/docTheme'
 import { highlightCode } from '@/lib/shikiLazy'
 import { copyText } from '@/ipc/clipboard'
+import { kbPerfNodeViewMount } from '@/domain/knowledge/knowledgePerf'
 import {
   isMermaidLang,
   LiveMermaidNodeView,
@@ -50,6 +51,11 @@ class LiveCodeBlockNodeView implements NodeView {
   private destroyed = false
   private unsubTheme: (() => void) | null = null
 
+  /** Selection plugin fast-path: skip full walk when no block is in edit mode. */
+  get isEditing(): boolean {
+    return this.editing
+  }
+
   constructor(
     node: Node,
     view: EditorView,
@@ -64,6 +70,7 @@ class LiveCodeBlockNodeView implements NodeView {
       'knowledge-live-code-block my-2 overflow-hidden rounded-lg border border-border bg-surface-muted/80'
     this.dom.setAttribute('data-testid', 'knowledge-live-code-block')
     this.dom.dataset.language = (node.attrs.language as string) ?? ''
+    kbPerfNodeViewMount('code')
 
     const header = document.createElement('div')
     header.className =
@@ -313,13 +320,37 @@ export const liveCodeBlockView = $view(
     },
 )
 
+function selectionInCodeBlock(view: EditorView): boolean {
+  const $from = view.state.selection.$from
+  for (let d = $from.depth; d > 0; d--) {
+    if ($from.node(d).type.name === 'code_block') return true
+  }
+  return false
+}
+
+function anyLiveBlockEditing(): boolean {
+  for (const v of liveViews) if (v.isEditing) return true
+  for (const v of liveMermaidViews) if (v.isEditing) return true
+  for (const v of liveSvgViews) if (v.isEditing) return true
+  return false
+}
+
 /** Keeps preview/edit mode in sync when the selection moves (code + mermaid + svg). */
 export const liveCodeBlockSelectionPlugin = $prose(
   () =>
     new Plugin({
       view() {
         return {
-          update(view) {
+          update(view, prevState) {
+            if (prevState && view.state.selection.eq(prevState.selection)) {
+              // Doc-only updates: NodeView.update handles preview content.
+              return
+            }
+            const total =
+              liveViews.size + liveMermaidViews.size + liveSvgViews.size
+            if (total === 0) return
+            // Prose typing: caret outside fences and no block in edit → skip O(n) walk.
+            if (!selectionInCodeBlock(view) && !anyLiveBlockEditing()) return
             for (const v of liveViews) v.syncSelection(view)
             for (const v of liveMermaidViews) v.syncSelection(view)
             for (const v of liveSvgViews) v.syncSelection(view)

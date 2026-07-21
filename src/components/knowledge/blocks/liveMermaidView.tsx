@@ -15,6 +15,7 @@ import type { Node } from '@milkdown/kit/prose/model'
 import { TextSelection } from '@milkdown/kit/prose/state'
 import type { EditorView, NodeView } from '@milkdown/kit/prose/view'
 import { KnowledgeMermaid } from '../KnowledgeMermaid'
+import { kbPerfNodeViewMount } from '@/domain/knowledge/knowledgePerf'
 
 export const liveMermaidViews = new Set<LiveMermaidNodeView>()
 
@@ -36,6 +37,12 @@ export class LiveMermaidNodeView implements NodeView {
   private editing = true
   private destroyed = false
   private lastPreviewCode: string | null = null
+  private io: IntersectionObserver | null = null
+  private previewPending = false
+
+  get isEditing(): boolean {
+    return this.editing
+  }
 
   constructor(
     node: Node,
@@ -50,6 +57,7 @@ export class LiveMermaidNodeView implements NodeView {
     this.dom.className =
       'knowledge-live-mermaid my-2 overflow-hidden rounded-lg border border-border bg-surface-muted/40'
     this.dom.setAttribute('data-testid', 'knowledge-live-mermaid')
+    kbPerfNodeViewMount('mermaid')
     this.dom.dataset.language = 'mermaid'
 
     // Body: contentDOM stays in the tree; collapsed when previewing so diagram sizes the block.
@@ -142,11 +150,45 @@ export class LiveMermaidNodeView implements NodeView {
     this.editShell.style.opacity = '0'
     this.editShell.style.pointerEvents = 'none'
     this.previewHost.style.display = ''
-    this.mountPreview()
+    // Defer mermaid.render until the block is near the viewport (open cost).
+    this.scheduleMountPreview()
+  }
+
+  private scheduleMountPreview() {
+    if (this.destroyed) return
+    if (typeof IntersectionObserver === 'undefined') {
+      this.mountPreview()
+      return
+    }
+    this.previewPending = true
+    if (this.io) return
+    let settled = false
+    const finish = () => {
+      if (settled || this.destroyed) return
+      settled = true
+      this.io?.disconnect()
+      this.io = null
+      if (this.previewPending && !this.editing) this.mountPreview()
+    }
+    this.io = new IntersectionObserver(
+      (entries) => {
+        if (entries.some((e) => e.isIntersecting)) finish()
+      },
+      { root: null, rootMargin: '200px 0px', threshold: 0 },
+    )
+    this.io.observe(this.dom)
+    // jsdom / zero-layout: IntersectionObserver never fires. Real off-screen
+    // nodes have non-zero box and stay lazy until scrolled near.
+    requestAnimationFrame(() => {
+      if (settled || this.destroyed) return
+      const rect = this.dom.getBoundingClientRect()
+      if (rect.width === 0 && rect.height === 0) finish()
+    })
   }
 
   private mountPreview() {
     if (this.destroyed) return
+    this.previewPending = false
     const code = this.node.textContent
     if (!this.reactRoot) {
       this.reactRoot = createRoot(this.previewHost)
@@ -223,6 +265,9 @@ export class LiveMermaidNodeView implements NodeView {
 
   destroy() {
     this.destroyed = true
+    this.previewPending = false
+    this.io?.disconnect()
+    this.io = null
     liveMermaidViews.delete(this)
     if (this.reactRoot) {
       // Defer unmount — PM may still be tearing down the DOM.

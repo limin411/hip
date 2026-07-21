@@ -205,16 +205,16 @@ describe('knowledge advanced surfaces @knowledge @core', () => {
     }, docs[0]!)
 
     // Import success = workspace + at least one doc in tree. Opening body is best-effort
-    // (preview vs editor defaults vary).
+    // (Live vs Source defaults; Preview writing path retired).
     expect(docs.length).toBeGreaterThan(0)
     const editor = await browser.$('[data-testid="knowledge-doc-editor"]')
-    const reader = await browser.$('[data-testid="knowledge-doc-reader"]')
+    const live = await browser.$('[data-testid="knowledge-doc-live-editor"]')
     if (await editor.isExisting()) {
       const content = await browser.$('[data-testid="knowledge-doc-editor"] .cm-content')
       const t = await content.getText()
       expect(t.includes('Imported') || t.includes('e2e-import-marker') || t.length >= 0).toBe(true)
-    } else if (await reader.isExisting()) {
-      const t = await reader.getText()
+    } else if (await live.isExisting()) {
+      const t = await live.getText()
       expect(t.includes('Imported') || t.includes('e2e-import-marker') || t.length >= 0).toBe(true)
     } else {
       // Tree listing after expand proves import produced content.

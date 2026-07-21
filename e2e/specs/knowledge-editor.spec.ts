@@ -9,7 +9,6 @@ import {
   toggleKnowledgePreviewOrEdit,
   expectKnowledgeEditor,
   expectKnowledgeReader,
-  expectNoKnowledgeEditor,
   closeKnowledgeChipIfOpen,
   setKnowledgeDocTitle,
   clickKnowledgeBold,
@@ -75,25 +74,29 @@ describe('knowledge editor ux @knowledge @core', () => {
     expect(await ws.isExisting()).toBe(true)
   })
 
-  it('KE3: document opens in edit mode by default', async () => {
-    // Editor was shown without clicking edit toggle in before()
-    expect(await (await browser.$('[data-testid="knowledge-doc-editor"]')).isExisting()).toBe(
-      true,
-    )
+  it('KE3: document opens on a writable surface by default', async () => {
+    // R3: Live is product default; Source after typeInKnowledgeEditor (raw MD path).
+    const live = await (await browser.$('[data-testid="knowledge-doc-live-editor"]')).isExisting()
+    const source = await (await browser.$('[data-testid="knowledge-doc-editor"]')).isExisting()
+    expect(live || source).toBe(true)
+    // No document-level Preview writing control.
+    expect(
+      await (await browser.$('[data-testid="knowledge-edit-toggle-preview"]')).isExisting(),
+    ).toBe(false)
   })
 
   it('KE4: editor contains typed marker', async () => {
+    await expectKnowledgeEditor()
     const content = await browser.$('[data-testid="knowledge-doc-editor"] .cm-content')
     expect(await content.getText()).toContain(marker)
   })
 
-  it('KE5: preview shows the typed marker', async () => {
+  it('KE5: Live canvas shows the typed marker (no Preview mode)', async () => {
     await toggleKnowledgePreviewOrEdit()
-    await expectNoKnowledgeEditor()
     await expectKnowledgeReader(marker)
   })
 
-  it('KE6: edit again keeps the marker', async () => {
+  it('KE6: Source again keeps the marker', async () => {
     await toggleKnowledgePreviewOrEdit()
     await expectKnowledgeEditor()
     const content = await browser.$('[data-testid="knowledge-doc-editor"] .cm-content')
@@ -104,7 +107,7 @@ describe('knowledge editor ux @knowledge @core', () => {
     expect(await content.getText()).toContain(marker)
   })
 
-  it('KE7: content survives debounce + preview round-trip', async () => {
+  it('KE7: content survives debounce + Live/Source round-trip', async () => {
     if (!(await (await browser.$('[data-testid="knowledge-doc-editor"]')).isExisting())) {
       await toggleKnowledgePreviewOrEdit()
       await expectKnowledgeEditor()

@@ -16,7 +16,6 @@ import {
   toggleKnowledgePreviewOrEdit,
   expectKnowledgeEditor,
   expectKnowledgeReader,
-  expectNoKnowledgeEditor,
   closeKnowledgeChipIfOpen,
   setKnowledgeDocTitle,
   goKnowledgeHome,
@@ -93,9 +92,9 @@ describe('knowledge lifecycle business flow @knowledge @core', () => {
     expect(fs.readFileSync(file, 'utf8')).toContain(marker)
   })
 
-  it('KL5: preview and edit round-trip keeps marker', async () => {
+  it('KL5: Live and Source round-trip keeps marker', async () => {
+    // R3: no Preview writing mode — toggle Live ↔ Source fallback.
     await toggleKnowledgePreviewOrEdit()
-    await expectNoKnowledgeEditor()
     await expectKnowledgeReader(marker)
     await toggleKnowledgePreviewOrEdit()
     await expectKnowledgeEditor()
@@ -132,7 +131,9 @@ describe('knowledge lifecycle business flow @knowledge @core', () => {
       await openSpaceCardByName(spaceName)
     }
     if (!(await (await browser.$('[data-testid="knowledge-doc-editor"]')).isExisting())) {
-      if (await (await browser.$('[data-testid="knowledge-edit-toggle"]')).isExisting()) {
+      // Source fallback via flag (document-level mode toggle retired).
+      await toggleKnowledgePreviewOrEdit()
+      if (!(await (await browser.$('[data-testid="knowledge-doc-editor"]')).isExisting())) {
         await toggleKnowledgePreviewOrEdit()
       }
       await expectKnowledgeEditor()

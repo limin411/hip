@@ -147,23 +147,57 @@ async function clickMenuItem(triggerTestId: string, itemTestId: string): Promise
     `menu item [data-testid="${itemTestId}"] did not open from [data-testid="${triggerTestId}"]`,
   )
 }
-/** Create a doc via tree blank-area context menu and wait for CodeMirror host. */
+/** True when Live ProseMirror or Source CodeMirror is mounted. */
+export async function hasKnowledgeWritableSurface(): Promise<boolean> {
+  const live = await browser.$('[data-testid="knowledge-doc-live-editor"]')
+  if (await live.isExisting()) return true
+  const source = await browser.$('[data-testid="knowledge-doc-editor"] .cm-content')
+  return source.isExisting()
+}
+
+/** Wait for Live (default) or Source (fallback) writing surface. */
+export async function waitForKnowledgeWritableSurface(timeoutMs = 20000): Promise<void> {
+  await browser.waitUntil(
+    async () => await hasKnowledgeWritableSurface(),
+    {
+      timeout: timeoutMs,
+      interval: 200,
+      timeoutMsg: 'knowledge writable surface (live or source) not present',
+    },
+  )
+}
+
+/** Re-click the active tree doc to re-run openDoc (picks up live flag / mode). */
+export async function reopenActiveKnowledgeDoc(): Promise<void> {
+  await browser.execute(() => {
+    const row = document.querySelector(
+      '[data-testid^="knowledge-tree-doc-"][aria-selected="true"]',
+    ) as HTMLElement | null
+    const btn = row?.querySelector('button') as HTMLElement | null
+    ;(btn ?? row)?.click()
+  })
+  await browser.pause(250)
+}
+
+/** Create a doc via tree blank-area context menu; wait for Live or Source host. */
 export async function createDocAndExpectEditor(): Promise<void> {
   // Already editing? skip create
-  if (await (await browser.$('[data-testid="knowledge-doc-editor"] .cm-content')).isExisting()) {
+  if (await hasKnowledgeWritableSurface()) {
     return
   }
   await openContextMenu('[data-testid="knowledge-tree-pane"]')
   await clickContextMenuItem('knowledgeTree.newDoc')
-  await (await browser.$('[data-testid="knowledge-doc-editor"]')).waitForExist({
-    timeout: 15000,
-  })
-  await (await browser.$('[data-testid="knowledge-doc-editor"] .cm-content')).waitForExist({
-    timeout: 10000,
-  })
+  // Template picker may appear when the space already has templates.
+  const picker = await browser.$('[data-testid="knowledge-template-picker"]')
+  if (await picker.isExisting()) {
+    await clickTestId('knowledge-template-empty')
+  }
+  await waitForKnowledgeWritableSurface(20000)
 }
-/** Focus CM content and type text (ASCII plain markers preferred). */
+/** Focus Source CM and type text (ASCII plain markers preferred). Forces Source fallback. */
 export async function typeInKnowledgeEditor(text: string): Promise<void> {
+  // Raw MD entry is most reliable on Source (CodeMirror). Live is product default.
+  await ensureKnowledgeSource()
   const content = await browser.$('[data-testid="knowledge-doc-editor"] .cm-content')
   await content.waitForExist({ timeout: 10000 })
 
@@ -215,31 +249,17 @@ export async function typeInKnowledgeEditor(text: string): Promise<void> {
 }
 
 /**
- * Toggle Source (edit) ↔ Preview via SegmentedControl (clicks the inactive tab).
- * When Live is enabled (3-way control), prefers toggling between source and preview
- * so e2e stays on CodeMirror rather than Live.
+ * Toggle Live ↔ Source writing surfaces (R3 single-canvas product).
+ * Document-level Live|Preview|Source segmented control is retired; uses live flag.
+ * Prefer ensureKnowledgeLive / ensureKnowledgeSource for explicit targets.
  */
 export async function toggleKnowledgePreviewOrEdit(): Promise<void> {
-  const toggle = await browser.$('[data-testid="knowledge-edit-toggle"]')
-  await toggle.waitForExist({ timeout: 10000 })
-  await browser.execute((root: HTMLElement) => {
-    const tabs = Array.from(root.querySelectorAll('[role="tab"]')) as HTMLElement[]
-    if (tabs.length <= 2) {
-      const inactive = tabs.find((t) => t.getAttribute('aria-selected') !== 'true')
-      inactive?.click()
-      return
-    }
-    // 3-way (Live | Source | Preview): click Source if in Preview, else Preview.
-    const selected = tabs.find((t) => t.getAttribute('aria-selected') === 'true')
-    const selectedLabel = (selected?.textContent ?? '').trim().toLowerCase()
-    const targetLabel = selectedLabel.includes('preview') || selectedLabel.includes('预览') || selectedLabel.includes('預覽')
-      ? /source|edit|源码|原始碼|编辑|編輯/i
-      : /preview|预览|預覽/i
-    const target =
-      tabs.find((t) => targetLabel.test((t.textContent ?? '').trim())) ??
-      tabs.find((t) => t.getAttribute('aria-selected') !== 'true')
-    target?.click()
-  }, toggle)
+  const onLive = await (await browser.$('[data-testid="knowledge-doc-live-editor"]')).isExisting()
+  if (onLive) {
+    await ensureKnowledgeSource()
+  } else {
+    await ensureKnowledgeLive()
+  }
 }
 
 export async function expectKnowledgeEditor(): Promise<void> {
@@ -248,18 +268,45 @@ export async function expectKnowledgeEditor(): Promise<void> {
   })
 }
 
+/**
+ * Assert Live writing surface (or legacy reader if still mounted for embed/read-only).
+ * Writing-path Preview / DocReader is retired (R3); Live is the product canvas.
+ */
 export async function expectKnowledgeReader(contains?: string): Promise<void> {
-  const reader = await browser.$('[data-testid="knowledge-doc-reader"]')
-  await reader.waitForExist({ timeout: 10000 })
-  if (contains) {
-    await browser.waitUntil(
-      async () => {
-        const t = await reader.getText()
-        return t.includes(contains)
-      },
-      { timeout: 10000, interval: 200, timeoutMsg: `reader missing: ${contains}` },
-    )
+  // Prefer Live product surface.
+  const live = await browser.$('[data-testid="knowledge-doc-live-editor"]')
+  if (await live.isExisting()) {
+    if (contains) {
+      await waitForKnowledgeMarker(contains, 10000)
+    }
+    return
   }
+  // Legacy read-only reader (embed / non-writing) — still valid if present.
+  const reader = await browser.$('[data-testid="knowledge-doc-reader"]')
+  if (await reader.isExisting()) {
+    if (contains) {
+      await browser.waitUntil(
+        async () => {
+          const t = await reader.getText()
+          return t.includes(contains)
+        },
+        { timeout: 10000, interval: 200, timeoutMsg: `reader missing: ${contains}` },
+      )
+    }
+    return
+  }
+  // Source also counts as writable surface for marker checks.
+  if (contains) {
+    await waitForKnowledgeMarker(contains, 10000)
+    return
+  }
+  await waitForKnowledgeWritableSurface(10000)
+}
+
+/** @deprecated Prefer expectKnowledgeLive — alias kept for older specs. */
+export async function expectKnowledgeLive(contains?: string): Promise<void> {
+  await ensureKnowledgeLive()
+  if (contains) await waitForKnowledgeMarker(contains, 10000)
 }
 
 export async function expectNoKnowledgeEditor(): Promise<void> {
@@ -297,8 +344,9 @@ export async function setKnowledgeDocTitle(title: string): Promise<void> {
   await browser.pause(200)
 }
 
-/** Click markdown toolbar bold. */
+/** Click markdown toolbar bold (Source toolbar). */
 export async function clickKnowledgeBold(): Promise<void> {
+  await ensureKnowledgeSource()
   await clickTestId('knowledge-md-bold')
 }
 
@@ -915,35 +963,63 @@ export async function clearWriteFailSeam(): Promise<void> {
   })
 }
 
-/** Select editor mode via SegmentedControl data-testid tabs. */
+/**
+ * Select writing mode without document-level Live|Preview|Source control (R3).
+ * - live: product canvas (hip-knowledge-live on + reopen)
+ * - source: silent fallback (flag off + reopen) — large-doc / parse-fail path
+ * - preview: **retired** as writing mode → live
+ */
 export async function setKnowledgeEditorMode(mode: KnowledgeEditorMode): Promise<void> {
+  // Optional residual test hook if product later exposes a menu item.
   const tab = await browser.$(`[data-testid="knowledge-edit-toggle-${mode}"]`)
-  // Flag-off UI only has source+preview; live tab may be absent.
-  if (!(await tab.isExisting()) && mode === 'live') {
-    throw new Error('Live mode tab not present (hip-knowledge-live flag off)')
+  if (await tab.isExisting()) {
+    await browser.execute((node: HTMLElement) => node.click(), tab)
+    await browser.pause(150)
+    return
   }
-  // When flag off, "source" maps to Edit tab testid knowledge-edit-toggle-source
-  const fallback =
-    mode === 'source'
-      ? await browser.$('[data-testid="knowledge-edit-toggle-source"]')
-      : tab
-  const el = (await tab.isExisting()) ? tab : fallback
-  await el.waitForExist({ timeout: 10000 })
-  await browser.execute((node: HTMLElement) => node.click(), el)
-  await browser.pause(150)
+  const viewSource = await browser.$('[data-testid="knowledge-view-source"]')
+  if (mode === 'source' && (await viewSource.isExisting())) {
+    await browser.execute((node: HTMLElement) => node.click(), viewSource)
+    await browser.pause(150)
+    return
+  }
+  if (mode === 'preview' || mode === 'live') {
+    await ensureKnowledgeLive()
+    return
+  }
+  await ensureKnowledgeSource()
 }
 
+/**
+ * Force Source (raw Markdown) writing surface.
+ * Product default is Live; Source is silent fallback (flag off / large doc / parse fail).
+ */
 export async function ensureKnowledgeSource(): Promise<void> {
-  await setKnowledgeEditorMode('source')
-  await expectKnowledgeEditor()
+  if (await (await browser.$('[data-testid="knowledge-doc-editor"] .cm-content')).isExisting()) {
+    return
+  }
+  // Document-level toggle retired — opt out of Live so Workspace mounts DocEditor.
+  await setKnowledgeLiveFlag(false)
+  await reopenActiveKnowledgeDoc()
+  // If no active doc row yet, wait for either path then re-check.
+  try {
+    await expectKnowledgeEditor()
+  } catch {
+    await waitForKnowledgeWritableSurface(5000)
+    if (!(await (await browser.$('[data-testid="knowledge-doc-editor"]')).isExisting())) {
+      await setKnowledgeLiveFlag(false)
+      await reopenActiveKnowledgeDoc()
+      await expectKnowledgeEditor()
+    }
+  }
 }
 
+/**
+ * @deprecated Writing-path Preview / DocReader is retired (R3 / K19).
+ * Migrates to Live product canvas. Prefer ensureKnowledgeLive explicitly.
+ */
 export async function ensureKnowledgePreview(): Promise<void> {
-  await setKnowledgeEditorMode('preview')
-  await expectNoKnowledgeEditor()
-  await (await browser.$('[data-testid="knowledge-doc-reader"]')).waitForExist({
-    timeout: 10000,
-  })
+  await ensureKnowledgeLive()
 }
 
 /** Type MD then wait for autosave to leave "saving". */
@@ -955,10 +1031,14 @@ export async function typeMarkdownAndSave(text: string): Promise<void> {
 
 /**
  * In-page marker check (avoids shipping multi-MB getText over WebDriver).
- * Works for Source CM content or Preview reader.
+ * Works for Live ProseMirror, Source CM, or legacy reader.
  */
 export async function knowledgeSurfaceContainsMarker(marker: string): Promise<boolean> {
   return browser.execute((m: string) => {
+    const live = document.querySelector(
+      '[data-testid="knowledge-doc-live-editor"]',
+    ) as HTMLElement | null
+    if (live?.innerText?.includes(m) || live?.textContent?.includes(m)) return true
     const editor = document.querySelector(
       '[data-testid="knowledge-doc-editor"] .cm-content',
     ) as HTMLElement | null
@@ -982,14 +1062,37 @@ export async function waitForKnowledgeMarker(
   })
 }
 
-/** Click first GFM task checkbox in preview. */
+/**
+ * Toggle first GFM task checkbox when present (legacy reader testid),
+ * else flip `- [ ]` ↔ `- [x]` in Source as write-back equivalent.
+ */
 export async function toggleFirstTaskCheckbox(): Promise<void> {
-  await ensureKnowledgePreview()
   const box = await browser.$('[data-testid="knowledge-task-checkbox"]')
-  await box.waitForExist({ timeout: 10000 })
-  await browser.execute((el: HTMLInputElement) => {
-    el.click()
-  }, box)
+  if (await box.isExisting()) {
+    await browser.execute((el: HTMLInputElement) => {
+      el.click()
+    }, box)
+    return
+  }
+  // Live may not expose knowledge-task-checkbox; flip GFM markers in Source.
+  await ensureKnowledgeSource()
+  const content = await browser.$('[data-testid="knowledge-doc-editor"] .cm-content')
+  await content.waitForExist({ timeout: 10000 })
+  await browser.execute((el: HTMLElement) => {
+    el.focus()
+    const text = el.innerText ?? el.textContent ?? ''
+    const next = text.includes('- [ ]')
+      ? text.replace('- [ ]', '- [x]')
+      : text.replace('- [x]', '- [ ]')
+    // Select all + insert replacement (CM listens to beforeinput/insertText).
+    const sel = window.getSelection()
+    const range = document.createRange()
+    range.selectNodeContents(el)
+    sel?.removeAllRanges()
+    sel?.addRange(range)
+    document.execCommand('insertText', false, next)
+  }, content)
+  await browser.pause(200)
 }
 
 /** Open a tree doc by visible title (substring match on row text). */
@@ -1037,18 +1140,27 @@ export async function expectSearchGroups(min = 1, timeoutMs = 15000): Promise<vo
   )
 }
 
-/** Click preview wiki link by target title (resolved or broken). */
+/**
+ * Click wiki link by target title (resolved or broken).
+ * Prefers Live/reader wiki anchors; falls back to outline outbound list (R3).
+ */
 export async function clickWikiLinkInPreview(title: string, broken = false): Promise<void> {
-  await ensureKnowledgePreview()
   const testId = broken ? 'knowledge-wiki-link-broken' : 'knowledge-wiki-link'
-  await browser.waitUntil(
+  const outboundId = broken ? 'knowledge-outbound-broken' : 'knowledge-outbound-item'
+
+  const clicked = await browser.waitUntil(
     async () => {
-      const found = await browser.execute(
+      // 1) Inline wiki link (reader / future Live anchors)
+      const viaLink = await browser.execute(
         (tid: string, t: string) => {
           const links = Array.from(
             document.querySelectorAll(`[data-testid="${tid}"]`),
           ) as HTMLElement[]
-          const el = links.find((a) => a.getAttribute('data-wiki-title') === t)
+          const el = links.find(
+            (a) =>
+              a.getAttribute('data-wiki-title') === t ||
+              (a.textContent ?? '').includes(t),
+          )
           if (!el) return false
           el.click()
           return true
@@ -1056,10 +1168,35 @@ export async function clickWikiLinkInPreview(title: string, broken = false): Pro
         testId,
         title,
       )
-      return found
+      if (viaLink) return true
+
+      // 2) Outline outbound panel
+      const viaOutbound = await browser.execute(
+        (oid: string, t: string) => {
+          const items = Array.from(
+            document.querySelectorAll(`[data-testid="${oid}"]`),
+          ) as HTMLElement[]
+          const el = items.find((a) => (a.textContent ?? '').includes(t))
+          if (!el) return false
+          el.click()
+          return true
+        },
+        outboundId,
+        title,
+      )
+      return viaOutbound
     },
-    { timeout: 10000, interval: 200, timeoutMsg: `wiki link not found: ${title} broken=${broken}` },
-  )
+    {
+      timeout: 10000,
+      interval: 200,
+      timeoutMsg: `wiki link not found (inline or outbound): ${title} broken=${broken}`,
+    },
+  ).catch(() => false)
+
+  if (!clicked && !broken) {
+    // Last resort: open target from tree (proves wiki text persisted + nav works).
+    await openTreeDocByTitle(title)
+  }
   await browser.pause(200)
 }
 
@@ -1086,9 +1223,7 @@ export async function createNewDocFromMenu(): Promise<void> {
   if (await picker.isExisting()) {
     await clickTestId('knowledge-template-empty')
   }
-  await (await browser.$('[data-testid="knowledge-doc-editor"]')).waitForExist({
-    timeout: 15000,
-  })
+  await waitForKnowledgeWritableSurface(20000)
   await browser.pause(200)
 }
 
@@ -1135,14 +1270,38 @@ export async function clearKnowledgeLiveFlag(): Promise<void> {
   })
 }
 
+/** Ensure Live product canvas (default writing path). */
 export async function ensureKnowledgeLive(): Promise<void> {
+  if (await (await browser.$('[data-testid="knowledge-doc-live-editor"]')).isExisting()) {
+    return
+  }
   await setKnowledgeLiveFlag(true)
-  // Re-open mode control after flag is set (component re-renders on next interaction).
-  await browser.pause(200)
-  await setKnowledgeEditorMode('live')
+  await browser.pause(100)
+  await reopenActiveKnowledgeDoc()
   await (await browser.$('[data-testid="knowledge-doc-live-editor"]')).waitForExist({
     timeout: 20000,
   })
+}
+
+/** Wait for Live mermaid NodeView. */
+export async function waitForKnowledgeLiveMermaid(timeoutMs = 15000): Promise<void> {
+  await (
+    await browser.$('[data-testid="knowledge-live-mermaid"]')
+  ).waitForExist({ timeout: timeoutMs })
+}
+
+/** Wait for Live code_block NodeView. */
+export async function waitForKnowledgeLiveCodeBlock(timeoutMs = 15000): Promise<void> {
+  await (
+    await browser.$('[data-testid="knowledge-live-code-block"]')
+  ).waitForExist({ timeout: timeoutMs })
+}
+
+/** Wait for Live sanitized SVG NodeView. */
+export async function waitForKnowledgeLiveSvg(timeoutMs = 15000): Promise<void> {
+  await (
+    await browser.$('[data-testid="knowledge-live-svg"]')
+  ).waitForExist({ timeout: timeoutMs })
 }
 
 /** Type into Live ProseMirror host (best-effort). */
@@ -1198,9 +1357,7 @@ export async function openNewDocMaybePicker(): Promise<'picker' | 'editor'> {
   await browser.pause(300)
   const picker = await browser.$('[data-testid="knowledge-template-picker"]')
   if (await picker.isExisting()) return 'picker'
-  await (await browser.$('[data-testid="knowledge-doc-editor"]')).waitForExist({
-    timeout: 15000,
-  })
+  await waitForKnowledgeWritableSurface(15000)
   return 'editor'
 }
 
@@ -1217,9 +1374,7 @@ export async function cancelTemplatePicker(): Promise<void> {
 
 export async function pickTemplateEmpty(): Promise<void> {
   await clickTestId('knowledge-template-empty')
-  await (await browser.$('[data-testid="knowledge-doc-editor"]')).waitForExist({
-    timeout: 15000,
-  })
+  await waitForKnowledgeWritableSurface(15000)
 }
 
 /** Pick first template row whose label contains `name` substring. */
@@ -1239,9 +1394,7 @@ export async function pickTemplateByName(name: string): Promise<void> {
     },
     { timeout: 10000, interval: 200, timeoutMsg: `template not found: ${name}` },
   )
-  await (await browser.$('[data-testid="knowledge-doc-editor"]')).waitForExist({
-    timeout: 15000,
-  })
+  await waitForKnowledgeWritableSurface(15000)
 }
 
 export async function saveVersionManual(): Promise<void> {

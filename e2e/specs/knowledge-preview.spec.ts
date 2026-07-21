@@ -1,5 +1,6 @@
 /**
- * Preview interactions: GFM task write-back (P0.3a).
+ * GFM task write-back (formerly Preview-only). R3: Live is writing canvas;
+ * interactive task chrome may be Source/Live; disk is source of truth.
  * Tags: @knowledge @core
  */
 import { expect } from 'expect-webdriverio'
@@ -11,15 +12,16 @@ import {
   createDocAndExpectEditor,
   closeKnowledgeChipIfOpen,
   ensureKnowledgeSource,
-  ensureKnowledgePreview,
+  ensureKnowledgeLive,
   typeInKnowledgeEditor,
   toggleFirstTaskCheckbox,
   waitForDocBodyOnDisk,
   waitForSaveStatusSaved,
+  waitForKnowledgeMarker,
   clearWriteFailSeam,
 } from '../helpers/knowledge.js'
 
-describe('knowledge preview tasks @knowledge @core', () => {
+describe('knowledge task write-back @knowledge @core', () => {
   const stamp = Date.now()
   const spaceName = `e2e-kb-prev-${stamp}`
   const taskMarker = `e2e-task-${stamp}`
@@ -42,33 +44,29 @@ describe('knowledge preview tasks @knowledge @core', () => {
     await closeKnowledgeChipIfOpen()
   })
 
-  it('KP1: preview task checkbox write-back persists without edit mode', async () => {
+  it('KP1: GFM task checkbox write-back persists (Source/Live, not Preview)', async () => {
     await ensureKnowledgeSource()
     // GFM task line (must be line-start for remark-gfm)
     await typeInKnowledgeEditor(`- [ ] ${taskMarker}`)
     await waitForSaveStatusSaved(15000)
     await waitForDocBodyOnDisk(`- [ ] ${taskMarker}`, 15000)
 
-    await ensureKnowledgePreview()
-    const reader = await browser.$('[data-testid="knowledge-doc-reader"]')
-    await reader.waitForExist({ timeout: 10000 })
-    expect(await reader.getText()).toContain(taskMarker)
+    // Product canvas is Live — marker should be visible without a Preview mode.
+    await ensureKnowledgeLive()
+    await waitForKnowledgeMarker(taskMarker, 15000)
+    // No document-level Preview writing surface.
+    expect(
+      await (await browser.$('[data-testid="knowledge-doc-reader"]')).isExisting(),
+    ).toBe(false)
+    expect(
+      await (await browser.$('[data-testid="knowledge-edit-toggle-preview"]')).isExisting(),
+    ).toBe(false)
 
     await toggleFirstTaskCheckbox()
     await waitForSaveStatusSaved(15000)
     await waitForDocBodyOnDisk(`- [x] ${taskMarker}`, 15000)
 
-    // Stay in preview (no source editor) and show checked task
-    await ensureKnowledgePreview()
-    expect(
-      await (await browser.$('[data-testid="knowledge-doc-editor"]')).isExisting(),
-    ).toBe(false)
-    const box = await browser.$('[data-testid="knowledge-task-checkbox"]')
-    await box.waitForExist({ timeout: 10000 })
-    const checked = await browser.execute(
-      (el: HTMLInputElement) => el.checked === true,
-      box,
-    )
-    expect(checked).toBe(true)
+    // Surface still shows marker after check (Live or Source after toggle helper).
+    await waitForKnowledgeMarker(taskMarker, 15000)
   })
 })

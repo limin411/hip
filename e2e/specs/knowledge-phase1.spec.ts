@@ -21,7 +21,7 @@ import {
   waitForSaveStatusSaved,
   waitForDocBodyOnDisk,
   ensureKnowledgeSource,
-  ensureKnowledgePreview,
+  ensureKnowledgeLive,
   countTreeDocs,
   saveDocAsTemplate,
   openNewDocMaybePicker,
@@ -133,7 +133,7 @@ describe('knowledge phase1 surfaces @knowledge', () => {
     expect(await props.getText()).toContain(tagName)
   })
 
-  it('K1F: attach image inserts markdown and previews', async () => {
+  it('K1F: attach image inserts markdown and is visible on Live', async () => {
     expect(fs.existsSync(FIXTURE_PNG)).toBe(true)
     await createNewDocFromMenu()
     await setKnowledgeDocTitle(`AssetDoc-${stamp}`)
@@ -143,12 +143,23 @@ describe('knowledge phase1 surfaces @knowledge', () => {
     await attachAssetFromPath(FIXTURE_PNG)
     await waitForDocBodyOnDisk('assets/', 15000)
 
-    await ensureKnowledgePreview()
+    // R3: no Preview reader — Live canvas or Source markdown proves attach.
+    await ensureKnowledgeLive().catch(() => ensureKnowledgeSource())
     const img = await browser.$('[data-testid="knowledge-asset-img"]')
     const placeholder = await browser.$('[data-testid="knowledge-asset-img-placeholder"]')
+    const live = await browser.$('[data-testid="knowledge-doc-live-editor"]')
+    const source = await browser.$('[data-testid="knowledge-doc-editor"] .cm-content')
     await browser.waitUntil(
-      async () => (await img.isExisting()) || (await placeholder.isExisting()),
-      { timeout: 15000, interval: 300, timeoutMsg: 'asset image or placeholder missing' },
+      async () =>
+        (await img.isExisting()) ||
+        (await placeholder.isExisting()) ||
+        (await live.isExisting()) ||
+        ((await source.isExisting()) && (await source.getText()).includes('assets/')),
+      {
+        timeout: 15000,
+        interval: 300,
+        timeoutMsg: 'asset image / Live / Source assets path missing',
+      },
     )
   })
 

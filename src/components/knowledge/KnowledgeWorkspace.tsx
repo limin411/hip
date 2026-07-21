@@ -340,6 +340,11 @@ export function KnowledgeWorkspace() {
   const [liveBlockedDocIds, setLiveBlockedDocIds] = useState<Record<string, true>>(
     {},
   )
+  // Residual in-memory `preview` → `live` without reseed (preview is no longer read-only).
+  useEffect(() => {
+    if (editorMode !== 'preview') return
+    useKnowledgeStore.setState({ editorMode: 'live' })
+  }, [editorMode])
   const bodyLen = Math.max(docBody.length, draftBody.length)
   const liveBlocked = Boolean(activeDocId && liveBlockedDocIds[activeDocId])
   const liveSuppressed =

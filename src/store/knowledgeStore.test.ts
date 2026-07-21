@@ -513,12 +513,12 @@ describe('knowledgeStore setDraftBody persist modes', () => {
     vi.useRealTimers()
   })
 
-  it('defaults to none in preview (no autosave schedule)', async () => {
+  it('defaults to auto for legacy preview (writable Live surface)', async () => {
     useKnowledgeStore.getState().setDraftBody('preview-dirty')
     expect(useKnowledgeStore.getState().draftBody).toBe('preview-dirty')
-    await vi.advanceTimersByTimeAsync(600)
-    expect(knowledgeWriteDoc).not.toHaveBeenCalled()
-    expect(useKnowledgeStore.getState().docBody).toBe('saved')
+    await vi.advanceTimersByTimeAsync(500)
+    expect(knowledgeWriteDoc).toHaveBeenCalledWith('spc_1', 'doc_1', 'preview-dirty')
+    expect(useKnowledgeStore.getState().docBody).toBe('preview-dirty')
   })
 
   it('defaults to auto in source mode (schedules flush)', async () => {

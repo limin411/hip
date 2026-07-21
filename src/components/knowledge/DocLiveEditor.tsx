@@ -12,7 +12,8 @@ import { commonmark } from '@milkdown/kit/preset/commonmark'
 import { gfm } from '@milkdown/kit/preset/gfm'
 import { listener, listenerCtx } from '@milkdown/kit/plugin/listener'
 import { history } from '@milkdown/kit/plugin/history'
-import { getMarkdown, insert, replaceRange } from '@milkdown/kit/utils'
+import { getMarkdown, insert } from '@milkdown/kit/utils'
+import { TextSelection } from '@milkdown/kit/prose/state'
 import {
   joinYamlFrontmatter,
   splitYamlFrontmatter,
@@ -20,6 +21,7 @@ import {
 import type { KnowledgeNode } from '@/domain/knowledge/types'
 import { wikiLinkQueryAt } from '@/domain/knowledge/wikiLink'
 import {
+  BLOCK_SLASH_IDS,
   KNOWLEDGE_SLASH_ITEMS,
   extractSlashQueryAt,
   filterSlashItemsForLive,
@@ -98,11 +100,77 @@ function computeSlashMenuPos(
 }
 
 /**
+ * Apply a slash catalog item into the Live editor.
+ *
+ * Milkdown `replaceRange` → `markdownToSlice`/`parseSlice` fits the slice into the
+ * surrounding paragraph and collapses most block MD (headings, lists, fences).
+ * Block items: delete the parent textblock (when line-start/whitespace prefix),
+ * then `insert(md)` so the parser yields real PM block nodes. Inline items
+ * (`wiki`/`embed`): delete the `/query` token only, then `insert`.
+ *
+ * Returns false if composing or the editor action throws.
+ */
+function applyLiveSlashInsert(
+  editor: Editor,
+  match: SlashQueryMatch,
+  item: KnowledgeSlashItem,
+  allowBlocks: boolean,
+): boolean {
+  const view = editor.ctx.get(editorViewCtx)
+  if (view.composing) return false
+
+  const isBlock = BLOCK_SLASH_IDS.has(item.id)
+  let delFrom = match.from
+  let delTo = match.to
+
+  // Expand delete to the whole textblock so the slash paragraph does not remain empty.
+  if (isBlock && allowBlocks) {
+    const $pos = view.state.doc.resolve(match.from)
+    if ($pos.depth >= 1) {
+      delFrom = $pos.before()
+      delTo = $pos.after()
+    }
+  }
+
+  const tr = view.state.tr.delete(delFrom, delTo)
+  const selPos = Math.min(delFrom, tr.doc.content.size)
+  const $sel = tr.doc.resolve(selPos)
+  tr.setSelection(TextSelection.near($sel)).scrollIntoView()
+  view.dispatch(tr)
+
+  // Structured parse → PM nodes (never multi-line tr.insertText).
+  editor.action(insert(item.insert))
+
+  // Best-effort caret from catalog cursorOffset (string offset ≠ PM pos).
+  if (item.cursorOffset > 0) {
+    try {
+      const v = editor.ctx.get(editorViewCtx)
+      const target = Math.min(
+        delFrom + item.cursorOffset,
+        v.state.doc.content.size,
+      )
+      if (target >= 0 && target <= v.state.doc.content.size) {
+        v.dispatch(
+          v.state.tr
+            .setSelection(TextSelection.near(v.state.doc.resolve(target)))
+            .scrollIntoView(),
+        )
+      }
+    } catch {
+      // leave default selection after insert
+    }
+  }
+
+  view.focus()
+  return true
+}
+
+/**
  * Milkdown kit Live host (not Crepe / @milkdown/react).
  *
  * Frontmatter is stripped before the editor and re-prefixed on serialize.
  * Live is a canonicalizing writer — serializer style may rewrite lists/tables.
- * `/` slash uses structured `replaceRange`; Escape uses `tr.delete` on the token.
+ * `/` slash: delete token (or parent block) then structured `insert`; Escape uses `tr.delete`.
  */
 export const DocLiveEditor = forwardRef<DocLiveEditorHandle, DocLiveEditorProps>(
   function DocLiveEditor(
@@ -260,20 +328,16 @@ export const DocLiveEditor = forwardRef<DocLiveEditorHandle, DocLiveEditorProps>
         const s = slashRef.current
         if (!ed || !s) return
         try {
-          const view = ed.ctx.get(editorViewCtx)
-          if (view.composing) return
-          // Structured MD → PM nodes (block fences/tables must not use insertText).
-          ed.action(
-            replaceRange(item.insert, {
-              from: s.match.from,
-              to: s.match.to,
-            }),
-          )
-          view.focus()
-        } catch {
-          // ignore
+          const ok = applyLiveSlashInsert(ed, s.match, item, s.allowBlocks)
+          if (!ok) {
+            // Composing or no-op — keep menu/token so failure is visible.
+            return
+          }
+          updateSlash(null)
+        } catch (err) {
+          // Keep menu open; do not silently clear the `/` token.
+          console.warn('[DocLiveEditor] slash insert failed', err)
         }
-        updateSlash(null)
       },
       [updateSlash],
     )
@@ -453,5 +517,7 @@ export const DocLiveEditor = forwardRef<DocLiveEditorHandle, DocLiveEditorProps>
     )
   },
 )
+
+DocLiveEditor.displayName = 'DocLiveEditor'
 
 export default DocLiveEditor

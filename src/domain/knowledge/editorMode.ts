@@ -21,9 +21,12 @@ export const KNOWLEDGE_LIVE_FLAG_KEY = 'hip-knowledge-live'
 /** localStorage: last writable mode preference (`live` | `source`). */
 export const KNOWLEDGE_EDITOR_MODE_PREF_KEY = 'hip-knowledge-editor-mode'
 
-/** Autosave default when user types in Live or Source. */
+/**
+ * Autosave default when user types in a writable surface.
+ * Legacy `preview` is treated as Live (writable) if still present in store.
+ */
 export function shouldAutosave(mode: EditorMode): boolean {
-  return mode === 'live' || mode === 'source'
+  return mode === 'live' || mode === 'source' || mode === 'preview'
 }
 
 /**

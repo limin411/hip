@@ -16,8 +16,8 @@ describe('shouldAutosave', () => {
     expect(shouldAutosave('source')).toBe(true)
   })
 
-  it('is false for preview', () => {
-    expect(shouldAutosave('preview')).toBe(false)
+  it('is true for legacy preview (maps to Live writing surface)', () => {
+    expect(shouldAutosave('preview')).toBe(true)
   })
 })
 

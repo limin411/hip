@@ -43,11 +43,15 @@ async function waitForProseMirror(timeout = 15_000) {
   )
 }
 
-/** Best-effort: put caret at end of ProseMirror and fire keyup so Live syncs slash. */
-async function syncSlashFromCaret() {
-  const pm = screen
+function proseMirror(): HTMLElement {
+  return screen
     .getByTestId('knowledge-doc-live-editor')
     .querySelector('.ProseMirror') as HTMLElement
+}
+
+/** Best-effort: put caret at end of ProseMirror and fire keyup so Live syncs slash. */
+async function syncSlashFromCaret() {
+  const pm = proseMirror()
   pm.focus()
   const sel = window.getSelection()
   if (sel) {
@@ -63,6 +67,26 @@ async function syncSlashFromCaret() {
     await new Promise((r) => requestAnimationFrame(() => r(null)))
     await new Promise((r) => requestAnimationFrame(() => r(null)))
   })
+}
+
+async function openSlashMenu(initialMarkdown = '/') {
+  const onDraftChange = vi.fn()
+  render(
+    <DocLiveEditor
+      docId={`d-slash-${initialMarkdown}`}
+      initialMarkdown={initialMarkdown}
+      onDraftChange={onDraftChange}
+    />,
+  )
+  await waitForProseMirror()
+  await syncSlashFromCaret()
+  await waitFor(
+    () => {
+      expect(screen.getByTestId('knowledge-slash-menu')).toBeInTheDocument()
+    },
+    { timeout: 8_000 },
+  )
+  return { onDraftChange }
 }
 
 describe('DocLiveEditor', () => {
@@ -89,9 +113,7 @@ describe('DocLiveEditor', () => {
       />,
     )
     await waitForProseMirror()
-    const pm = screen
-      .getByTestId('knowledge-doc-live-editor')
-      .querySelector('.ProseMirror')
+    const pm = proseMirror()
     expect(pm?.textContent ?? '').toContain('Body')
     expect(pm?.textContent ?? '').not.toContain('tags: [a]')
   }, 20_000)
@@ -121,79 +143,121 @@ describe('DocLiveEditor', () => {
     await waitFor(() => {
       expect(onDraftChange).toHaveBeenCalled()
       const last = onDraftChange.mock.calls.at(-1)?.[0] as string
-      // Structured insert parses emphasis — serializer may use * or **.
       expect(last).toMatch(/bold/)
     })
-    // Fence insert proves multi-line MD is not a bare insertText of raw backticks only.
     await act(async () => {
       expect(ref.current?.insertMarkdown('```\ncode\n```')).toBe(true)
     })
     await waitFor(() => {
-      const pm = screen
-        .getByTestId('knowledge-doc-live-editor')
-        .querySelector('.ProseMirror')
+      const pm = proseMirror()
       expect(pm?.querySelector('pre') || pm?.textContent?.includes('code')).toBeTruthy()
     })
   }, 20_000)
 
   it('opens slash menu for line-start / with block catalog items', async () => {
+    await openSlashMenu('/')
+    expect(screen.getByTestId('knowledge-slash-h1')).toBeInTheDocument()
+    expect(screen.getByTestId('knowledge-slash-table')).toBeInTheDocument()
+    expect(screen.getByTestId('knowledge-slash-wiki')).toBeInTheDocument()
+  }, 25_000)
+
+  it('selecting h1 produces a real heading node (not plain paragraph)', async () => {
+    const { onDraftChange } = await openSlashMenu('/')
+    await act(async () => {
+      fireEvent.click(screen.getByTestId('knowledge-slash-h1'))
+    })
+    await waitFor(() => {
+      expect(screen.queryByTestId('knowledge-slash-menu')).not.toBeInTheDocument()
+    })
+    await waitFor(() => {
+      const pm = proseMirror()
+      expect(pm.querySelector('h1')).toBeTruthy()
+    })
+    await waitFor(() => {
+      const drafts = onDraftChange.mock.calls.map((c) => c[0] as string)
+      expect(drafts.some((d) => /^#\s/m.test(d) || d.includes('# '))).toBe(true)
+    })
+  }, 25_000)
+
+  it('selecting fence produces a pre/code block', async () => {
+    await openSlashMenu('/')
+    await act(async () => {
+      fireEvent.click(screen.getByTestId('knowledge-slash-fence'))
+    })
+    await waitFor(() => {
+      expect(screen.queryByTestId('knowledge-slash-menu')).not.toBeInTheDocument()
+    })
+    await waitFor(() => {
+      const pm = proseMirror()
+      expect(pm.querySelector('pre')).toBeTruthy()
+    })
+  }, 25_000)
+
+  it('selecting table produces a table node', async () => {
+    await openSlashMenu('/')
+    await act(async () => {
+      fireEvent.click(screen.getByTestId('knowledge-slash-table'))
+    })
+    await waitFor(() => {
+      expect(screen.queryByTestId('knowledge-slash-menu')).not.toBeInTheDocument()
+    })
+    await waitFor(() => {
+      const pm = proseMirror()
+      expect(pm.querySelector('table')).toBeTruthy()
+    })
+  }, 25_000)
+
+  it('selecting wiki replaces / token with wiki skeleton', async () => {
+    await openSlashMenu('/')
+    await act(async () => {
+      fireEvent.click(screen.getByTestId('knowledge-slash-wiki'))
+    })
+    await waitFor(() => {
+      expect(screen.queryByTestId('knowledge-slash-menu')).not.toBeInTheDocument()
+    })
+    await waitFor(() => {
+      const text = proseMirror().textContent ?? ''
+      expect(text.includes('[[') || text.includes(']]')).toBe(true)
+      expect(text.trim()).not.toBe('/')
+    })
+  }, 25_000)
+
+  it('Escape dismiss deletes the / token via tr.delete', async () => {
+    await openSlashMenu('/')
+    expect(proseMirror().textContent ?? '').toContain('/')
+    await act(async () => {
+      fireEvent.keyDown(document, { key: 'Escape' })
+    })
+    await waitFor(() => {
+      expect(screen.queryByTestId('knowledge-slash-menu')).not.toBeInTheDocument()
+    })
+    await waitFor(() => {
+      const text = (proseMirror().textContent ?? '').trim()
+      expect(text).not.toContain('/')
+    })
+  }, 25_000)
+
+  it('mid-line host slash menu excludes block items', async () => {
     render(
       <DocLiveEditor
-        docId="d-slash"
-        initialMarkdown="/"
+        docId="d-mid"
+        initialMarkdown="hello /"
         onDraftChange={() => {}}
       />,
     )
     await waitForProseMirror()
     await syncSlashFromCaret()
-
     await waitFor(
       () => {
         expect(screen.getByTestId('knowledge-slash-menu')).toBeInTheDocument()
       },
       { timeout: 8_000 },
     )
-    expect(screen.getByTestId('knowledge-slash-h1')).toBeInTheDocument()
-    expect(screen.getByTestId('knowledge-slash-table')).toBeInTheDocument()
     expect(screen.getByTestId('knowledge-slash-wiki')).toBeInTheDocument()
-  }, 25_000)
-
-  it('selecting slash item replaces / token via structured insert path', async () => {
-    const onDraftChange = vi.fn()
-    render(
-      <DocLiveEditor
-        docId="d-sel"
-        initialMarkdown="/"
-        onDraftChange={onDraftChange}
-      />,
-    )
-    await waitForProseMirror()
-    await syncSlashFromCaret()
-
-    await waitFor(
-      () => {
-        expect(screen.getByTestId('knowledge-slash-wiki')).toBeInTheDocument()
-      },
-      { timeout: 8_000 },
-    )
-
-    await act(async () => {
-      fireEvent.click(screen.getByTestId('knowledge-slash-wiki'))
-    })
-
-    // Menu closes after select.
-    await waitFor(() => {
-      expect(screen.queryByTestId('knowledge-slash-menu')).not.toBeInTheDocument()
-    })
-    // `/` token replaced with wiki skeleton (structured replaceRange path).
-    await waitFor(() => {
-      const pm = screen
-        .getByTestId('knowledge-doc-live-editor')
-        .querySelector('.ProseMirror')
-      const text = pm?.textContent ?? ''
-      expect(text.includes('[[') || text.includes(']]')).toBe(true)
-      expect(text.trim()).not.toBe('/')
-    })
+    expect(screen.getByTestId('knowledge-slash-embed')).toBeInTheDocument()
+    expect(screen.queryByTestId('knowledge-slash-table')).not.toBeInTheDocument()
+    expect(screen.queryByTestId('knowledge-slash-h1')).not.toBeInTheDocument()
+    expect(screen.queryByTestId('knowledge-slash-fence')).not.toBeInTheDocument()
   }, 25_000)
 })
 

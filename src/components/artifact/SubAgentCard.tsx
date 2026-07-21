@@ -77,7 +77,6 @@ export function SubAgentCard({
   const elapsedSec = agent.elapsedMs > 0 ? Math.round(agent.elapsedMs / 1000) : null
   const runningTool = agent.tools.find((tc) => tc.status === 'running')
   const railColor = ROLE_COLOR[agent.role] ?? ROLE_COLOR.subagent
-  const isRunning = agent.status === 'running'
 
   // Body: collapsed by default; user toggles to inspect tools / reply.
   const [manualOpen, setManualOpen] = useState<boolean | null>(null)

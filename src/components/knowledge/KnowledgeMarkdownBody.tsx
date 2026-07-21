@@ -52,11 +52,12 @@ export function KnowledgeMarkdownBody({
         ) {
           const cp = (child as { props: { className?: string; children?: ReactNode } }).props
           const cls = cp.className ?? ''
-          if (/\blanguage-mermaid\b/.test(cls)) {
+          // Case-insensitive: Live lowercases fence lang; Reader className may be SVG/Mermaid.
+          if (/\blanguage-mermaid\b/i.test(cls)) {
             const code = textOf(cp.children)
             return <KnowledgeMermaid code={code} />
           }
-          if (/\blanguage-svg\b/.test(cls)) {
+          if (/\blanguage-svg\b/i.test(cls)) {
             const code = textOf(cp.children)
             return <KnowledgeSvg code={code} />
           }

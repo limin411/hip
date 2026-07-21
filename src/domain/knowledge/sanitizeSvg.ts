@@ -260,16 +260,34 @@ function hrefKindFor(tag: string): HrefKind {
 }
 
 /**
+ * Normalize an href candidate the way URL parsers effectively do for scheme
+ * detection: strip ASCII whitespace + C0 controls (WHATWG removes these when
+ * parsing, so `java\tscript:` becomes `javascript:`).
+ */
+export function normalizeHrefCandidate(value: string): string {
+  return value.trim().replace(/[\u0000-\u001F\u007F\s]+/g, '')
+}
+
+/**
  * Safe URL policy for href / xlink:href:
  * - use: only #fragment (no external resource load)
- * - image: #fragment, data:image/*, or relative path (no scheme / //)
+ * - image: #fragment, data:image/*, or relative path (no scheme / // / \)
  * - a / other: #fragment or relative (strip absolute / javascript: / data:text/html)
+ *
+ * Always normalize controls before scheme checks so tab/NL-split `javascript:`
+ * and backslash host tricks (`\\evil.com`) cannot bypass the policy.
  */
 export function isSafeSvgHref(value: string, kind: HrefKind): boolean {
-  const v = value.trim()
+  const v = normalizeHrefCandidate(value)
   if (!v) return false
+  // URL parsers map `\` → `/`; `\\evil.com` and `/\evil.com` become external.
+  if (v.includes('\\')) return false
+
   const lower = v.toLowerCase()
   if (lower.startsWith('javascript:') || lower.startsWith('vbscript:')) {
+    return false
+  }
+  if (lower.includes('javascript:') || lower.includes('vbscript:')) {
     return false
   }
   if (lower.startsWith('data:text/html') || lower.startsWith('data:text/javascript')) {
@@ -292,9 +310,102 @@ export function isSafeSvgHref(value: string, kind: HrefKind): boolean {
   return true
 }
 
+/**
+ * Whether a url() target is safe inside style / paint servers.
+ * Fragments only for paint; style also allows relative / data:image (no schemes).
+ */
+function isSafeCssUrlTarget(rawInner: string, mode: 'paint' | 'style'): boolean {
+  const stripped = rawInner.trim().replace(/^['"]|['"]$/g, '')
+  const v = normalizeHrefCandidate(stripped)
+  if (!v) return false
+  if (v.includes('\\')) return false
+  const lower = v.toLowerCase()
+  if (lower.includes('javascript:') || lower.includes('vbscript:')) return false
+  if (v.startsWith('#')) return true
+  if (mode === 'paint') {
+    // Paint servers: only local fragment refs (gradients, patterns, filters).
+    return false
+  }
+  if (lower.startsWith('data:image/')) return true
+  if (v.startsWith('//')) return false
+  if (/^[a-z][a-z0-9+.-]*:/i.test(v)) return false
+  return true
+}
+
+/**
+ * Replace css `url(...)` with balanced-paren scan (handles `url(javascript:alert(1))`).
+ */
+function mapCssUrls(value: string, replace: (inner: string) => string): string {
+  let out = ''
+  let i = 0
+  while (i < value.length) {
+    const rest = value.slice(i)
+    const m = rest.match(/^url\s*\(/i)
+    if (!m) {
+      out += value[i]
+      i += 1
+      continue
+    }
+    i += m[0].length
+    let depth = 1
+    const start = i
+    while (i < value.length && depth > 0) {
+      const ch = value[i]
+      if (ch === '(') depth += 1
+      else if (ch === ')') depth -= 1
+      if (depth > 0) i += 1
+    }
+    const inner = value.slice(start, i)
+    if (depth === 0) i += 1 // consume closing )
+    out += replace(inner)
+  }
+  return out
+}
+
+/** Presentation attrs that accept paint servers (`url(...)`). */
+const PAINT_SERVER_ATTRS: ReadonlySet<string> = new Set([
+  'fill',
+  'stroke',
+  'filter',
+  'clip-path',
+  'clippath',
+  'mask',
+  'marker-start',
+  'marker-mid',
+  'marker-end',
+])
+
+/**
+ * Harden fill/stroke/filter/etc.: drop javascript: and non-fragment url().
+ * Solid colors / keywords / url(#id) kept; bad url() → `none`.
+ */
+export function sanitizePaintValue(value: string): string | null {
+  // Neutralize url() first so `url(javascript:…)` becomes `none`.
+  let cleaned = mapCssUrls(value, (inner) => {
+    if (isSafeCssUrlTarget(inner, 'paint')) {
+      const frag = normalizeHrefCandidate(inner.trim().replace(/^['"]|['"]$/g, ''))
+      return `url(${frag})`
+    }
+    return 'none'
+  })
+  cleaned = cleaned.replace(/[\u0000-\u001F\u007F]/g, '')
+  const lower = cleaned.toLowerCase()
+  if (
+    lower.includes('javascript:') ||
+    lower.includes('vbscript:') ||
+    lower.includes('expression(')
+  ) {
+    return null
+  }
+  // Solid color / keyword path — reject backslash tricks.
+  if (cleaned.includes('\\')) return null
+  return cleaned.trim() || null
+}
+
 /** Strip dangerous url() / expression from inline style. */
 function sanitizeStyleValue(value: string): string | null {
-  const lower = value.toLowerCase()
+  const decontrolled = value.replace(/[\u0000-\u001F\u007F]/g, '')
+  const lower = decontrolled.toLowerCase()
   if (
     lower.includes('javascript:') ||
     lower.includes('vbscript:') ||
@@ -304,19 +415,14 @@ function sanitizeStyleValue(value: string): string | null {
   ) {
     return null
   }
-  // Drop url(...) that is not a fragment or data:image
-  const cleaned = value.replace(/url\s*\(\s*([^)]*)\s*\)/gi, (full, inner: string) => {
-    const raw = inner.trim().replace(/^['"]|['"]$/g, '')
-    const l = raw.toLowerCase()
-    if (raw.startsWith('#')) return full
-    if (l.startsWith('data:image/')) return full
-    // relative without scheme
-    if (!/^[a-z][a-z0-9+.-]*:/i.test(raw) && !raw.startsWith('//')) {
-      return full
+  // Drop url(...) that is not a fragment, data:image, or safe relative
+  return mapCssUrls(decontrolled, (inner) => {
+    if (isSafeCssUrlTarget(inner, 'style')) {
+      const v = normalizeHrefCandidate(inner.trim().replace(/^['"]|['"]$/g, ''))
+      return `url(${v})`
     }
     return 'url()'
   })
-  return cleaned
 }
 
 function attrLocalName(attr: Attr): string {
@@ -395,17 +501,18 @@ function rebuildElement(src: Element, state: WalkState): Element | null {
       continue
     }
 
-    // href / xlink:href
+    // href / xlink:href — emit normalized value (controls stripped) only if safe
     const isHref =
       local === 'href' ||
       rawName.toLowerCase() === 'xlink:href' ||
       (attr.namespaceURI === XLINK_NS && local === 'href')
     if (isHref) {
       if (!isSafeSvgHref(value, kind)) continue
+      const safeHref = normalizeHrefCandidate(value)
       if (attr.namespaceURI === XLINK_NS || rawName.toLowerCase().startsWith('xlink:')) {
-        out.setAttributeNS(XLINK_NS, 'xlink:href', value.trim())
+        out.setAttributeNS(XLINK_NS, 'xlink:href', safeHref)
       } else {
-        out.setAttribute('href', value.trim())
+        out.setAttribute('href', safeHref)
       }
       continue
     }
@@ -413,6 +520,18 @@ function rebuildElement(src: Element, state: WalkState): Element | null {
     if (local === 'style') {
       const safe = sanitizeStyleValue(value)
       if (safe != null && safe.trim()) out.setAttribute('style', safe)
+      continue
+    }
+
+    // Paint servers: fill/stroke/filter/mask/clip-path/marker-*
+    if (PAINT_SERVER_ATTRS.has(local)) {
+      const safe = sanitizePaintValue(value)
+      if (safe == null) continue
+      try {
+        out.setAttribute(local === 'clippath' ? 'clip-path' : local, safe)
+      } catch {
+        // ignore
+      }
       continue
     }
 

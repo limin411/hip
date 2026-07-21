@@ -456,13 +456,41 @@ export function KnowledgeWorkspace() {
   }
 
   const attachFiles = async () => {
-    if (!activeSpaceId || !activeDocId || showLiveEditor) return
+    if (!activeSpaceId || !activeDocId) return
     const paths = await pickAttachmentFiles()
     if (!paths?.length) return
+
+    // Re-read mode after OS dialog (Live↔Source may flip while the picker is open).
+    const st = useKnowledgeStore.getState()
+    const spaceId = st.activeSpaceId
+    const docId = st.activeDocId
+    if (!spaceId || !docId) return
+    const canvasMode = st.editorMode === 'preview' ? 'live' : st.editorMode
+    const bodyLenNow = Math.max(st.docBody.length, st.draftBody.length)
+    const liveBlockedNow = Boolean(docId && liveBlockedDocIds[docId])
+    const useLive =
+      canvasMode === 'live' && liveEnabled && !liveBlockedNow &&
+      bodyLenNow <= KNOWLEDGE_LARGE_DOC_CHARS
+
+    // Live: structured insert via Milkdown (never multi-line tr.insertText).
+    if (useLive) {
+      for (const sourcePath of paths) {
+        const result = await importAssetFromPath(spaceId, sourcePath)
+        if (!result.ok) {
+          toastAssetError(result.reason)
+          continue
+        }
+        const ok = liveEditorRef.current?.insertMarkdown(result.markdown)
+        if (!ok) toastAssetError('error')
+      }
+      return
+    }
+
+    // Source: CodeMirror string insert at caret.
     const view = editorRef.current?.getView()
     if (!view) return
     for (const sourcePath of paths) {
-      const result = await importAssetFromPath(activeSpaceId, sourcePath)
+      const result = await importAssetFromPath(spaceId, sourcePath)
       if (!result.ok) {
         toastAssetError(result.reason)
         continue
@@ -883,10 +911,12 @@ export function KnowledgeWorkspace() {
                   key={`${activeDocId}-live`}
                   docId={activeDocId}
                   initialMarkdown={draftBody}
+                  spaceId={activeSpaceId}
                   onDraftChange={setDraftBody}
                   onBlur={() => void flushSave()}
                   onSave={() => void flushSave()}
                   onParseError={onLiveParseError}
+                  onAssetImportError={toastAssetError}
                   placeholder={t('knowledge.doc.placeholder')}
                   wikiNodes={nodes}
                 />

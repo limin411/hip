@@ -18,6 +18,10 @@ import {
   joinYamlFrontmatter,
   splitYamlFrontmatter,
 } from '@/domain/knowledge/frontmatter'
+import {
+  importAssetFromClipboardItems,
+  importAssetFromFile,
+} from '@/domain/knowledge/importAsset'
 import type { KnowledgeNode } from '@/domain/knowledge/types'
 import { wikiLinkQueryAt } from '@/domain/knowledge/wikiLink'
 import {
@@ -60,6 +64,13 @@ export interface DocLiveEditorProps {
   placeholder?: string
   /** Current space nodes for Live `[[` wiki fuzzy picker. */
   wikiNodes?: KnowledgeNode[]
+  /** Active space for asset paste/drop (mirrors DocEditor). */
+  spaceId?: string | null
+  /** Toast/surface import failures (too large, unsupported). */
+  onAssetImportError?: (
+    reason: 'too_large_paste' | 'too_large_disk' | 'unsupported' | 'error',
+  ) => void
+  onAssetImported?: () => void
 }
 
 type WikiPickerState = {
@@ -184,6 +195,9 @@ export const DocLiveEditor = forwardRef<DocLiveEditorHandle, DocLiveEditorProps>
       onParseError,
       placeholder,
       wikiNodes,
+      spaceId,
+      onAssetImportError,
+      onAssetImported,
     },
     ref,
   ) {
@@ -201,6 +215,12 @@ export const DocLiveEditor = forwardRef<DocLiveEditorHandle, DocLiveEditorProps>
     onParseErrorRef.current = onParseError
     const wikiNodesRef = useRef(wikiNodes ?? [])
     wikiNodesRef.current = wikiNodes ?? []
+    const spaceIdRef = useRef(spaceId)
+    spaceIdRef.current = spaceId
+    const onAssetImportErrorRef = useRef(onAssetImportError)
+    onAssetImportErrorRef.current = onAssetImportError
+    const onAssetImportedRef = useRef(onAssetImported)
+    onAssetImportedRef.current = onAssetImported
     // Capture mount-time markdown only (parent remounts via key on doc switch).
     const initialRef = useRef(initialMarkdown)
 
@@ -209,22 +229,24 @@ export const DocLiveEditor = forwardRef<DocLiveEditorHandle, DocLiveEditorProps>
     const slashRef = useRef<SlashPickerState | null>(null)
     slashRef.current = slash
 
+    const insertMarkdown = useCallback((md: string): boolean => {
+      const ed = editorRef.current
+      if (!ed || !md) return false
+      try {
+        // Structured parse → PM nodes (never multi-line tr.insertText).
+        ed.action(insert(md))
+        return true
+      } catch {
+        return false
+      }
+    }, [])
+
     useImperativeHandle(
       ref,
       () => ({
-        insertMarkdown: (md: string) => {
-          const ed = editorRef.current
-          if (!ed || !md) return false
-          try {
-            // Structured parse → PM nodes (never multi-line tr.insertText).
-            ed.action(insert(md))
-            return true
-          } catch {
-            return false
-          }
-        },
+        insertMarkdown,
       }),
-      [],
+      [insertMarkdown],
     )
 
     const updateSlash = useCallback((next: SlashPickerState | null) => {
@@ -418,15 +440,15 @@ export const DocLiveEditor = forwardRef<DocLiveEditorHandle, DocLiveEditorProps>
 
     // Blur + Mod-s + wiki/slash picker sync on the contenteditable host.
     useEffect(() => {
-      const root = hostRef.current
-      if (!root) return
+      const host = hostRef.current
+      if (!host) return
 
       const onFocusOut = (e: FocusEvent) => {
         const next = e.relatedTarget as Node | null
-        if (next && root.contains(next)) return
+        if (next && host.contains(next)) return
         // Delay so picker mousedown can fire first.
         window.setTimeout(() => {
-          if (!root.contains(document.activeElement)) {
+          if (!host.contains(document.activeElement)) {
             setPicker(null)
             updateSlash(null)
             onBlurRef.current?.()
@@ -458,17 +480,107 @@ export const DocLiveEditor = forwardRef<DocLiveEditorHandle, DocLiveEditorProps>
         requestAnimationFrame(() => syncPickers())
       }
 
-      root.addEventListener('focusout', onFocusOut)
-      root.addEventListener('keydown', onKeyDown)
-      root.addEventListener('keyup', onInputOrKey)
-      root.addEventListener('click', onInputOrKey)
+      host.addEventListener('focusout', onFocusOut)
+      host.addEventListener('keydown', onKeyDown)
+      host.addEventListener('keyup', onInputOrKey)
+      host.addEventListener('click', onInputOrKey)
       return () => {
-        root.removeEventListener('focusout', onFocusOut)
-        root.removeEventListener('keydown', onKeyDown)
-        root.removeEventListener('keyup', onInputOrKey)
-        root.removeEventListener('click', onInputOrKey)
+        host.removeEventListener('focusout', onFocusOut)
+        host.removeEventListener('keydown', onKeyDown)
+        host.removeEventListener('keyup', onInputOrKey)
+        host.removeEventListener('click', onInputOrKey)
       }
     }, [syncPickers, updateSlash])
+
+    // Asset paste/drop on the outer Live root (capture, mirror DocEditor).
+    useEffect(() => {
+      const root = rootRef.current
+      if (!root) return
+
+      const handleImportResult = (
+        result: Awaited<ReturnType<typeof importAssetFromFile>>,
+      ) => {
+        if (result.ok) {
+          // Import may have written to disk; surface insert failure so user is not silent.
+          if (insertMarkdown(result.markdown)) {
+            onAssetImportedRef.current?.()
+          } else {
+            onAssetImportErrorRef.current?.('error')
+          }
+          return
+        }
+        onAssetImportErrorRef.current?.(result.reason)
+      }
+
+      const onPaste = (event: ClipboardEvent) => {
+        const space = spaceIdRef.current
+        if (!space || !event.clipboardData) return
+        // Fall through until Milkdown is ready so we do not swallow paste with no host.
+        if (!editorRef.current) return
+        const items = event.clipboardData.items
+        if (!items?.length) return
+        let hasImage = false
+        for (let i = 0; i < items.length; i++) {
+          const it = items[i]
+          if (
+            it.kind === 'file' &&
+            it.type.startsWith('image/') &&
+            it.type !== 'image/svg+xml'
+          ) {
+            hasImage = true
+            break
+          }
+        }
+        if (!hasImage) return
+        event.preventDefault()
+        event.stopPropagation()
+        void importAssetFromClipboardItems(space, items).then((result) => {
+          if (!result) return
+          handleImportResult(result)
+        })
+      }
+
+      const onDrop = (event: DragEvent) => {
+        const space = spaceIdRef.current
+        if (!space || !event.dataTransfer?.files?.length) return
+        if (!editorRef.current) return
+        const files = Array.from(event.dataTransfer.files)
+        const assets = files.filter((f) => {
+          const mime = f.type
+          return (
+            (mime.startsWith('image/') && mime !== 'image/svg+xml') ||
+            mime === 'application/pdf' ||
+            /\.(png|jpe?g|gif|webp|pdf)$/i.test(f.name)
+          )
+        })
+        if (!assets.length) return
+        event.preventDefault()
+        event.stopPropagation()
+        void (async () => {
+          for (const file of assets) {
+            const result = await importAssetFromFile(space, file)
+            handleImportResult(result)
+          }
+        })()
+      }
+
+      const onDragOver = (event: DragEvent) => {
+        if (!spaceIdRef.current) return
+        if (!event.dataTransfer?.types?.includes('Files')) return
+        // Allow drop into the Live surface (otherwise browser may navigate).
+        event.preventDefault()
+        event.dataTransfer.dropEffect = 'copy'
+      }
+
+      root.addEventListener('paste', onPaste, true)
+      root.addEventListener('drop', onDrop, true)
+      root.addEventListener('dragover', onDragOver, true)
+      return () => {
+        root.removeEventListener('paste', onPaste, true)
+        root.removeEventListener('drop', onDrop, true)
+        root.removeEventListener('dragover', onDragOver, true)
+      }
+    }, [insertMarkdown])
 
     const slashItems = useMemo(
       () =>

@@ -60,6 +60,7 @@ import { extractDocOutline } from '@/domain/knowledge/mdPreview'
 import { DeclarativeContextMenu } from '@/components/context-menu'
 import { SpaceTree } from './SpaceTree'
 import { DocEditor, type DocEditorHandle } from './DocEditor'
+import type { DocLiveEditorHandle } from './DocLiveEditor'
 import { InlineDocTitle } from './InlineDocTitle'
 import { DocPropertiesRow } from './DocPropertiesRow'
 import { MarkdownToolbar } from './MarkdownToolbar'
@@ -123,6 +124,8 @@ export function KnowledgeWorkspace() {
   )
 
   const editorRef = useRef<DocEditorHandle>(null)
+  /** Live host handle for attach/paste (PR-2); wired now for insertMarkdown. */
+  const liveEditorRef = useRef<DocLiveEditorHandle>(null)
   const [treeFilter, setTreeFilter] = useState('')
   const [filterExpandSnapshot, setFilterExpandSnapshot] = useState<Record<
     string,
@@ -329,7 +332,9 @@ export function KnowledgeWorkspace() {
     void requestCreateDoc(parentId, t('knowledge.doc.untitled'))
   }
 
-  // Always real-time (Live). Source only as silent fallback: flag off, large doc, parse fail.
+  // Single-canvas Live (Notion/Feishu). Source only as silent fallback:
+  // flag off, large doc, parse fail, or explicit source. Never mount DocReader
+  // as a writing mode; legacy `preview` normalizes to live for canvas selection.
   const liveEnabled = isKnowledgeLiveEnabled()
   /** Doc ids that failed Live parse this session — stay on Source. */
   const [liveBlockedDocIds, setLiveBlockedDocIds] = useState<Record<string, true>>(
@@ -339,8 +344,9 @@ export function KnowledgeWorkspace() {
   const liveBlocked = Boolean(activeDocId && liveBlockedDocIds[activeDocId])
   const liveSuppressed =
     liveBlocked || bodyLen > KNOWLEDGE_LARGE_DOC_CHARS
+  const canvasMode = editorMode === 'preview' ? 'live' : editorMode
   const showLiveEditor =
-    editorMode === 'live' && liveEnabled && !liveSuppressed
+    canvasMode === 'live' && liveEnabled && !liveSuppressed
   const showSourceEditor = !showLiveEditor
 
   const onLiveParseError = () => {
@@ -868,6 +874,7 @@ export function KnowledgeWorkspace() {
                 }
               >
                 <DocLiveEditor
+                  ref={liveEditorRef}
                   key={`${activeDocId}-live`}
                   docId={activeDocId}
                   initialMarkdown={draftBody}

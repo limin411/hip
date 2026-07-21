@@ -69,10 +69,15 @@ describe('live flag + editor mode pref (product-on Live / 所见即所得)', () 
     localStorage.setItem(KNOWLEDGE_LIVE_FLAG_KEY, 'false')
     expect(resolveEditorMode('live')).toBe('source')
     expect(resolveEditorMode('source')).toBe('source')
-    expect(resolveEditorMode('preview')).toBe('preview')
+    // preview → live → source when flag off
+    expect(resolveEditorMode('preview')).toBe('source')
   })
 
   it('resolveEditorMode keeps live when flag on (default)', () => {
     expect(resolveEditorMode('live')).toBe('live')
+  })
+
+  it('resolveEditorMode maps deprecated preview writing mode → live', () => {
+    expect(resolveEditorMode('preview')).toBe('live')
   })
 })

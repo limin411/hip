@@ -270,6 +270,34 @@ export function filterSlashItems(
 }
 
 /**
+ * Live (ProseMirror) block slash is only safe at textblock start (or after
+ * whitespace-only prefix). Mid-line block insert would nest block nodes in a
+ * paragraph; Source still allows mid-line via string `\n` prepend.
+ *
+ * `slashFromInBlock` is the offset of `/` within `blockText`.
+ */
+export function liveAllowsBlockSlash(
+  blockText: string,
+  slashFromInBlock: number,
+): boolean {
+  if (slashFromInBlock < 0 || slashFromInBlock > blockText.length) return false
+  const prefix = blockText.slice(0, slashFromInBlock)
+  return prefix.trim().length === 0
+}
+
+/**
+ * Drop BLOCK_SLASH_IDS when Live does not allow block inserts at the caret.
+ * Call after `filterSlashItems` (or on the full catalog before query filter).
+ */
+export function filterSlashItemsForLive(
+  items: KnowledgeSlashItem[],
+  opts: { allowBlocks: boolean },
+): KnowledgeSlashItem[] {
+  if (opts.allowBlocks) return items
+  return items.filter((item) => !BLOCK_SLASH_IDS.has(item.id))
+}
+
+/**
  * Normalize insert for block items: if `/` is mid-line after non-whitespace,
  * prepend `\n` so the snippet starts a new block line.
  */

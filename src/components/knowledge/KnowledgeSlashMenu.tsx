@@ -13,6 +13,11 @@ export interface KnowledgeSlashMenuProps {
   query: string
   onSelect: (item: KnowledgeSlashItem) => void
   onDismiss: () => void
+  /**
+   * Optional catalog override (e.g. Live mid-line without block items).
+   * Defaults to the shared `KNOWLEDGE_SLASH_ITEMS`.
+   */
+  items?: KnowledgeSlashItem[]
   /** Optional class for positioning (caller places absolute/fixed). */
   className?: string
   /** Optional inline style (caret-relative top/left from host). */
@@ -28,13 +33,15 @@ export function KnowledgeSlashMenu({
   query,
   onSelect,
   onDismiss,
+  items,
   className,
   style,
 }: KnowledgeSlashMenuProps) {
   const { t } = useTranslation()
+  const catalog = items ?? KNOWLEDGE_SLASH_ITEMS
   const filtered = useMemo(
-    () => filterSlashItems(KNOWLEDGE_SLASH_ITEMS, query),
-    [query],
+    () => filterSlashItems(catalog, query),
+    [catalog, query],
   )
   const [activeIndex, setActiveIndex] = useState(0)
   const activeRef = useRef<HTMLButtonElement | null>(null)

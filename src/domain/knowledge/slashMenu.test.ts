@@ -1,10 +1,13 @@
 import { describe, expect, it } from 'vitest'
 import {
+  BLOCK_SLASH_IDS,
   KNOWLEDGE_SLASH_ITEMS,
   TABLE_SKELETON_3X2,
   applySlashInsertText,
   extractSlashQueryAt,
   filterSlashItems,
+  filterSlashItemsForLive,
+  liveAllowsBlockSlash,
   prepareSlashInsert,
   sameSlashMatch,
   slashItemLabelKey,
@@ -124,6 +127,49 @@ describe('slashMenu', () => {
           { query: 'b', from: 0, to: 2 },
         ),
       ).toBe(false)
+    })
+  })
+
+  describe('liveAllowsBlockSlash / filterSlashItemsForLive', () => {
+    it('allows block slash at textblock start', () => {
+      expect(liveAllowsBlockSlash('/table', 0)).toBe(true)
+      expect(liveAllowsBlockSlash('/', 0)).toBe(true)
+    })
+
+    it('allows block slash when only whitespace precedes /', () => {
+      expect(liveAllowsBlockSlash('  /h1', 2)).toBe(true)
+      expect(liveAllowsBlockSlash('\t/mer', 1)).toBe(true)
+    })
+
+    it('rejects block slash mid-line after non-whitespace', () => {
+      expect(liveAllowsBlockSlash('para /table', 5)).toBe(false)
+      expect(liveAllowsBlockSlash('x /', 2)).toBe(false)
+    })
+
+    it('rejects out-of-range slash offsets', () => {
+      expect(liveAllowsBlockSlash('a', -1)).toBe(false)
+      expect(liveAllowsBlockSlash('a', 2)).toBe(false)
+    })
+
+    it('filterSlashItemsForLive keeps all items when allowBlocks', () => {
+      const out = filterSlashItemsForLive(KNOWLEDGE_SLASH_ITEMS, {
+        allowBlocks: true,
+      })
+      expect(out).toEqual(KNOWLEDGE_SLASH_ITEMS)
+    })
+
+    it('filterSlashItemsForLive drops BLOCK_SLASH_IDS when !allowBlocks', () => {
+      const out = filterSlashItemsForLive(KNOWLEDGE_SLASH_ITEMS, {
+        allowBlocks: false,
+      })
+      expect(out.every((i) => !BLOCK_SLASH_IDS.has(i.id))).toBe(true)
+      expect(out.map((i) => i.id)).toEqual(['wiki', 'embed'])
+    })
+
+    it('chains after filterSlashItems for mid-line Live', () => {
+      const q = filterSlashItems(KNOWLEDGE_SLASH_ITEMS, 'w')
+      const mid = filterSlashItemsForLive(q, { allowBlocks: false })
+      expect(mid.map((i) => i.id)).toEqual(['wiki'])
     })
   })
 

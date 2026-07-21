@@ -32,9 +32,14 @@ vi.mock('./DocEditor', async () => {
   }
 })
 
-vi.mock('./DocLiveEditor', () => ({
-  DocLiveEditor: () => <div data-testid="knowledge-doc-live-editor" />,
-}))
+vi.mock('./DocLiveEditor', async () => {
+  const { forwardRef } = await import('react')
+  return {
+    DocLiveEditor: forwardRef(function MockDocLiveEditor() {
+      return <div data-testid="knowledge-doc-live-editor" />
+    }),
+  }
+})
 
 vi.mock('./MarkdownToolbar', () => ({
   MarkdownToolbar: () => <div data-testid="knowledge-md-toolbar" />,
@@ -111,6 +116,17 @@ describe('KnowledgeWorkspace paper overflow contract', () => {
     const paper = screen.getByTestId('knowledge-doc-paper')
     expect(paper.className).toContain('overflow-hidden')
     expect(paper.className).not.toContain('overflow-visible')
+    // No document-level Live|Preview|Source segmented control (R3 single canvas).
+    expect(screen.queryByTestId('knowledge-edit-toggle')).toBeNull()
+    expect(screen.queryByTestId('knowledge-edit-toggle-preview')).toBeNull()
+    expect(screen.queryByTestId('knowledge-doc-reader')).toBeNull()
+  })
+
+  it('legacy preview mode does not mount DocReader as writing surface', () => {
+    seedWorkspace('preview')
+    render(<KnowledgeWorkspace />)
+    expect(screen.getByTestId('knowledge-doc-live-editor')).toBeInTheDocument()
+    expect(screen.queryByTestId('knowledge-doc-reader')).toBeNull()
     expect(screen.queryByTestId('knowledge-edit-toggle')).toBeNull()
   })
 })

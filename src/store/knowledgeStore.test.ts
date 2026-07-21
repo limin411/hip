@@ -606,14 +606,14 @@ describe('knowledgeStore setEditorMode', () => {
     })
   })
 
-  it('entering preview flushes dirty draft', async () => {
+  it('setEditorMode preview normalizes to live (deprecated writing mode)', async () => {
     await useKnowledgeStore.getState().setEditorMode('preview')
-    expect(knowledgeWriteDoc).toHaveBeenCalledWith('spc_1', 'doc_1', 'dirty')
-    expect(useKnowledgeStore.getState().editorMode).toBe('preview')
-    expect(useKnowledgeStore.getState().docBody).toBe('dirty')
+    // No flush-to-enter-preview path; preview is not a writing surface.
+    expect(useKnowledgeStore.getState().editorMode).toBe('live')
+    expect(localStorage.getItem('hip-knowledge-editor-mode')).toBe('live')
   })
 
-  it('leaving preview reseeds draft from docBody', async () => {
+  it('leaving legacy preview state reseeds draft from docBody', async () => {
     useKnowledgeStore.setState({
       editorMode: 'preview',
       docBody: 'on-disk',

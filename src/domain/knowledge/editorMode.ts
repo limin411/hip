@@ -2,7 +2,7 @@
  * Document pane mode.
  * Product path is always real-time Live (Notion/Feishu-style).
  * `source` is a silent fallback (large doc / parse fail / live flag off).
- * `preview` is legacy and unused by the workspace UI.
+ * `preview` is **deprecated** as a writing mode — normalize to `live` on read.
  */
 export type EditorMode = 'live' | 'source' | 'preview'
 
@@ -73,10 +73,13 @@ export function persistEditorModePref(mode: WritableEditorMode): void {
 }
 
 /**
- * Clamp requested mode: Live without flag becomes Source.
- * Call sites can still store `live` only when flag is on.
+ * Clamp requested mode:
+ * - Deprecated `preview` writing mode → `live` (single-canvas product)
+ * - Live without flag → Source
  */
 export function resolveEditorMode(mode: EditorMode): EditorMode {
-  if (mode === 'live' && !isKnowledgeLiveEnabled()) return 'source'
-  return mode
+  // Writing Preview is not a product surface (R3 / Notion-Feishu single canvas).
+  const base: EditorMode = mode === 'preview' ? 'live' : mode
+  if (base === 'live' && !isKnowledgeLiveEnabled()) return 'source'
+  return base
 }

@@ -172,6 +172,54 @@ describe('DocLiveEditor', () => {
     expect(screen.getByTestId('knowledge-slash-h1')).toBeInTheDocument()
     expect(screen.getByTestId('knowledge-slash-table')).toBeInTheDocument()
     expect(screen.getByTestId('knowledge-slash-wiki')).toBeInTheDocument()
+    expect(screen.getByTestId('knowledge-slash-svg')).toBeInTheDocument()
+    expect(screen.getByTestId('knowledge-slash-image')).toBeInTheDocument()
+  }, 25_000)
+
+  it('image slash with spaceId deletes token and calls onRequestAttach (K10)', async () => {
+    const onRequestAttach = vi.fn()
+    const onDraftChange = vi.fn()
+    render(
+      <DocLiveEditor
+        docId="d-image-attach"
+        initialMarkdown="/"
+        spaceId="spc_1"
+        onDraftChange={onDraftChange}
+        onRequestAttach={onRequestAttach}
+      />,
+    )
+    await waitForProseMirror()
+    await syncSlashFromCaret()
+    await waitFor(() => {
+      expect(screen.getByTestId('knowledge-slash-menu')).toBeInTheDocument()
+    })
+    await act(async () => {
+      fireEvent.click(screen.getByTestId('knowledge-slash-image'))
+    })
+    await waitFor(() => {
+      expect(screen.queryByTestId('knowledge-slash-menu')).not.toBeInTheDocument()
+    })
+    expect(onRequestAttach).toHaveBeenCalledTimes(1)
+    // Must not insert the skeleton when attach host is used.
+    const last = onDraftChange.mock.calls.at(-1)?.[0] as string | undefined
+    if (last != null) {
+      expect(last).not.toContain('![](assets/)')
+    }
+  }, 25_000)
+
+  it('image slash without spaceId inserts skeleton', async () => {
+    const { onDraftChange } = await openSlashMenu('/')
+    await act(async () => {
+      fireEvent.click(screen.getByTestId('knowledge-slash-image'))
+    })
+    await waitFor(() => {
+      expect(screen.queryByTestId('knowledge-slash-menu')).not.toBeInTheDocument()
+    })
+    await waitFor(() => {
+      expect(onDraftChange).toHaveBeenCalled()
+      const last = onDraftChange.mock.calls.at(-1)?.[0] as string
+      expect(last).toContain('![](assets/)')
+    })
   }, 25_000)
 
   it('selecting h1 produces a real heading node (not plain paragraph)', async () => {
@@ -258,23 +306,34 @@ describe('DocLiveEditor', () => {
     )
   }, 30_000)
 
-  it('svg fence stays live code_block passthrough (PR-5)', async () => {
+  it('svg fence uses LiveSvgView and previews when selection is outside', async () => {
     render(
       <DocLiveEditor
         docId="d-svg"
-        initialMarkdown={'```svg\n<svg></svg>\n```\n'}
+        initialMarkdown={
+          'Intro paragraph\n\n```svg\n<svg xmlns="http://www.w3.org/2000/svg"><circle r="1"/></svg>\n```\n'
+        }
         onDraftChange={() => {}}
       />,
     )
     await waitForProseMirror()
     await waitFor(() => {
-      expect(screen.getByTestId('knowledge-live-code-block')).toBeInTheDocument()
+      expect(screen.getByTestId('knowledge-live-svg')).toBeInTheDocument()
     })
-    expect(screen.getByTestId('knowledge-live-code-block').dataset.language).toBe(
-      'svg',
-    )
+    const block = screen.getByTestId('knowledge-live-svg')
+    expect(block.dataset.language).toBe('svg')
+    expect(screen.queryByTestId('knowledge-live-code-block')).not.toBeInTheDocument()
     expect(screen.queryByTestId('knowledge-live-mermaid')).not.toBeInTheDocument()
-  }, 25_000)
+
+    await waitFor(
+      () => {
+        const diagram = screen.queryByTestId('knowledge-svg')
+        const err = screen.queryByTestId('knowledge-svg-error')
+        expect(diagram != null || err != null).toBe(true)
+      },
+      { timeout: 15_000 },
+    )
+  }, 30_000)
 
   it('selecting table produces a table node', async () => {
     await openSlashMenu('/')
@@ -639,6 +698,8 @@ describe('DocLiveEditor slash catalog gating (domain + menu)', () => {
     expect(screen.queryByTestId('knowledge-slash-table')).not.toBeInTheDocument()
     expect(screen.queryByTestId('knowledge-slash-h1')).not.toBeInTheDocument()
     expect(screen.queryByTestId('knowledge-slash-mermaid')).not.toBeInTheDocument()
+    expect(screen.queryByTestId('knowledge-slash-svg')).not.toBeInTheDocument()
+    expect(screen.queryByTestId('knowledge-slash-image')).not.toBeInTheDocument()
   })
 
   it('line-start allows block slash and menu shows table/h1', () => {

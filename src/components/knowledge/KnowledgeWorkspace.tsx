@@ -917,6 +917,7 @@ export function KnowledgeWorkspace() {
                   onSave={() => void flushSave()}
                   onParseError={onLiveParseError}
                   onAssetImportError={toastAssetError}
+                  onRequestAttach={() => void attachFiles()}
                   placeholder={t('knowledge.doc.placeholder')}
                   wikiNodes={nodes}
                 />

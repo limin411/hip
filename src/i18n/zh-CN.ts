@@ -1787,6 +1787,8 @@ export const zhCN = {
         callout: '高亮块',
         math: '公式块',
         mermaid: 'Mermaid 图',
+        svg: 'SVG',
+        image: '图片',
       },
       workspace: {
         new: '新建',
@@ -1830,6 +1832,14 @@ export const zhCN = {
       },
       mermaid: {
         loading: '正在渲染图表…',
+      },
+      svg: {
+        empty: '空 SVG',
+        tooLarge: 'SVG 过大，无法渲染',
+        tooManyNodes: 'SVG 节点过多，无法渲染',
+        parseError: '无法解析 SVG',
+        rejected: 'SVG 无法安全渲染',
+        showSource: '显示源码',
       },
       callout: {
         note: '备注',

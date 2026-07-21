@@ -2,7 +2,7 @@
  * Live Milkdown NodeView for `code_block`.
  *
  * - mermaid → LiveMermaidNodeView (in-place diagram render; this file dispatches)
- * - svg: plain editable passthrough (PR-5 specializes)
+ * - svg → LiveSvgNodeView (sanitizeSvg rebuild render; this file dispatches)
  * - other langs: chrome (lang badge + copy) + Shiki preview overlay when
  *   selection is outside the node; plain editable contentDOM when inside
  * - contentDOM stays in-flow (never display:none) so PM coords/IME stay stable
@@ -27,9 +27,11 @@ import {
   LiveMermaidNodeView,
   liveMermaidViews,
 } from './liveMermaidView'
-
-/** Languages deferred to later PRs (SVG fence). mermaid is handled by LiveMermaidNodeView. */
-const PASSTHROUGH_LANGS = new Set(['svg'])
+import {
+  isSvgLang,
+  LiveSvgNodeView,
+  liveSvgViews,
+} from './liveSvgView'
 
 const liveViews = new Set<LiveCodeBlockNodeView>()
 
@@ -141,13 +143,8 @@ class LiveCodeBlockNodeView implements NodeView {
     return ((this.node.attrs.language as string) ?? '').trim()
   }
 
-  private isPassthrough(): boolean {
-    return PASSTHROUGH_LANGS.has(this.langRaw().toLowerCase())
-  }
-
   /** Whether this block can show a Shiki preview overlay. */
   private canPreview(): boolean {
-    if (this.isPassthrough()) return false
     return normalizeHighlightLang(this.langRaw()) != null
   }
 
@@ -245,8 +242,9 @@ class LiveCodeBlockNodeView implements NodeView {
 
   update(node: Node): boolean {
     if (node.type.name !== 'code_block') return false
-    // Switched to mermaid → force recreate as LiveMermaidNodeView.
+    // Switched to mermaid/svg → force recreate as specialized NodeView.
     if (isMermaidLang(node.attrs.language as string)) return false
+    if (isSvgLang(node.attrs.language as string)) return false
     const langChanged =
       (node.attrs.language as string) !== (this.node.attrs.language as string)
     this.node = node
@@ -308,11 +306,14 @@ export const liveCodeBlockView = $view(
       if (isMermaidLang(node.attrs.language as string)) {
         return new LiveMermaidNodeView(node, view, getPos)
       }
+      if (isSvgLang(node.attrs.language as string)) {
+        return new LiveSvgNodeView(node, view, getPos)
+      }
       return new LiveCodeBlockNodeView(node, view, getPos)
     },
 )
 
-/** Keeps preview/edit mode in sync when the selection moves (code + mermaid). */
+/** Keeps preview/edit mode in sync when the selection moves (code + mermaid + svg). */
 export const liveCodeBlockSelectionPlugin = $prose(
   () =>
     new Plugin({
@@ -321,6 +322,7 @@ export const liveCodeBlockSelectionPlugin = $prose(
           update(view) {
             for (const v of liveViews) v.syncSelection(view)
             for (const v of liveMermaidViews) v.syncSelection(view)
+            for (const v of liveSvgViews) v.syncSelection(view)
           },
         }
       },

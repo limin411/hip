@@ -32,7 +32,21 @@ describe('slashMenu', () => {
       'callout',
       'math',
       'mermaid',
+      'svg',
+      'image',
     ])
+  })
+
+  it('svg and image are block slash items with expected inserts', () => {
+    const svg = KNOWLEDGE_SLASH_ITEMS.find((i) => i.id === 'svg')!
+    expect(BLOCK_SLASH_IDS.has('svg')).toBe(true)
+    expect(svg.insert).toBe('```svg\n\n```')
+    expect(svg.cursorOffset).toBe(7)
+
+    const image = KNOWLEDGE_SLASH_ITEMS.find((i) => i.id === 'image')!
+    expect(BLOCK_SLASH_IDS.has('image')).toBe(true)
+    expect(image.insert).toBe('![](assets/)')
+    expect(image.cursorOffset).toBe(11)
   })
 
   it('table skeleton is 3 columns × header + 2 body rows', () => {

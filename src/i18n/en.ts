@@ -1826,6 +1826,8 @@ export const en = {
         callout: 'Callout',
         math: 'Math block',
         mermaid: 'Mermaid diagram',
+        svg: 'SVG',
+        image: 'Image',
       },
       workspace: {
         new: 'New',
@@ -1871,6 +1873,14 @@ export const en = {
       },
       mermaid: {
         loading: 'Rendering diagram…',
+      },
+      svg: {
+        empty: 'Empty SVG',
+        tooLarge: 'SVG is too large to render',
+        tooManyNodes: 'SVG has too many nodes to render',
+        parseError: 'Could not parse SVG',
+        rejected: 'SVG could not be rendered safely',
+        showSource: 'Show source',
       },
       callout: {
         note: 'Note',

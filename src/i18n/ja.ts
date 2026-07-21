@@ -1778,7 +1778,9 @@ export const ja = {
       "embed": "ドキュメント埋め込み",
       "callout": "コールアウト",
       "math": "数式ブロック",
-      "mermaid": "Mermaid図"
+      "mermaid": "Mermaid図",
+      "svg": "SVG",
+      "image": "画像"
     },
     "workspace": {
       "new": "新規",
@@ -1822,6 +1824,14 @@ export const ja = {
     },
     "mermaid": {
       "loading": "図をレンダリング中…"
+    },
+    "svg": {
+      "empty": "空の SVG",
+      "tooLarge": "SVG が大きすぎて描画できません",
+      "tooManyNodes": "SVG のノードが多すぎて描画できません",
+      "parseError": "SVG を解析できません",
+      "rejected": "SVG を安全に描画できません",
+      "showSource": "ソースを表示"
     },
     "callout": {
       "note": "注記",

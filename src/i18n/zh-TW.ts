@@ -1786,7 +1786,9 @@ export const zhTW = {
       "embed": "嵌入文件",
       "callout": "醒目提示",
       "math": "公式區塊",
-      "mermaid": "Mermaid 圖"
+      "mermaid": "Mermaid 圖",
+      "svg": "SVG",
+      "image": "圖片"
     },
     "workspace": {
       "new": "新增",
@@ -1830,6 +1832,14 @@ export const zhTW = {
     },
     "mermaid": {
       "loading": "正在渲染圖表…"
+    },
+    "svg": {
+      "empty": "空 SVG",
+      "tooLarge": "SVG 過大，無法渲染",
+      "tooManyNodes": "SVG 節點過多，無法渲染",
+      "parseError": "無法解析 SVG",
+      "rejected": "SVG 無法安全渲染",
+      "showSource": "顯示原始碼"
     },
     "callout": {
       "note": "備註",

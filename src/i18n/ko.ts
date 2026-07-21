@@ -1778,7 +1778,9 @@ export const ko = {
       "embed": "문서 포함",
       "callout": "강조 상자",
       "math": "수학 블록",
-      "mermaid": "Mermaid 다이어그램"
+      "mermaid": "Mermaid 다이어그램",
+      "svg": "SVG",
+      "image": "이미지"
     },
     "workspace": {
       "new": "새로 만들기",
@@ -1822,6 +1824,14 @@ export const ko = {
     },
     "mermaid": {
       "loading": "다이어그램 렌더링 중…"
+    },
+    "svg": {
+      "empty": "빈 SVG",
+      "tooLarge": "SVG가 너무 커서 렌더링할 수 없습니다",
+      "tooManyNodes": "SVG 노드가 너무 많아 렌더링할 수 없습니다",
+      "parseError": "SVG를 파싱할 수 없습니다",
+      "rejected": "SVG를 안전하게 렌더링할 수 없습니다",
+      "showSource": "소스 보기"
     },
     "callout": {
       "note": "참고",

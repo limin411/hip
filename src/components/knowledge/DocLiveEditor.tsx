@@ -71,6 +71,11 @@ export interface DocLiveEditorProps {
     reason: 'too_large_paste' | 'too_large_disk' | 'unsupported' | 'error',
   ) => void
   onAssetImported?: () => void
+  /**
+   * K10: `/image` with spaceId → delete slash token and open host file picker
+   * (same attach path as the toolbar). Without spaceId, slash inserts skeleton.
+   */
+  onRequestAttach?: () => void
 }
 
 type WikiPickerState = {
@@ -198,6 +203,7 @@ export const DocLiveEditor = forwardRef<DocLiveEditorHandle, DocLiveEditorProps>
       spaceId,
       onAssetImportError,
       onAssetImported,
+      onRequestAttach,
     },
     ref,
   ) {
@@ -221,6 +227,8 @@ export const DocLiveEditor = forwardRef<DocLiveEditorHandle, DocLiveEditorProps>
     onAssetImportErrorRef.current = onAssetImportError
     const onAssetImportedRef = useRef(onAssetImported)
     onAssetImportedRef.current = onAssetImported
+    const onRequestAttachRef = useRef(onRequestAttach)
+    onRequestAttachRef.current = onRequestAttach
     // Capture mount-time markdown only (parent remounts via key on doc switch).
     const initialRef = useRef(initialMarkdown)
 
@@ -351,6 +359,19 @@ export const DocLiveEditor = forwardRef<DocLiveEditorHandle, DocLiveEditorProps>
         const s = slashRef.current
         if (!ed || !s) return
         try {
+          // K10: /image with spaceId → delete token + host attach (toolbar path).
+          if (item.id === 'image' && spaceIdRef.current) {
+            const view = ed.ctx.get(editorViewCtx)
+            if (view.composing) return
+            view.dispatch(
+              view.state.tr.delete(s.match.from, s.match.to).scrollIntoView(),
+            )
+            view.focus()
+            updateSlash(null)
+            onRequestAttachRef.current?.()
+            return
+          }
+
           const ok = applyLiveSlashInsert(ed, s.match, item, s.allowBlocks)
           if (!ok) {
             // Composing or no-op — keep menu/token so failure is visible.

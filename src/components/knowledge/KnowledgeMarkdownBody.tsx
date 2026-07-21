@@ -10,6 +10,7 @@ import { cn } from '@/lib/utils'
 import { markdownProseClassName } from '@/components/chat/MarkdownBody'
 import { CodeBlock } from '@/components/chat/CodeBlock'
 import { KnowledgeMermaid } from './KnowledgeMermaid'
+import { KnowledgeSvg } from './KnowledgeSvg'
 import { firstTextLine, parseCalloutHeader } from '@/domain/knowledge/callout'
 
 export interface KnowledgeMarkdownBodyProps {
@@ -29,7 +30,7 @@ const CALLOUT_STYLE: Record<string, string> = {
 }
 
 /**
- * Knowledge-only markdown pipeline: GFM + math + mermaid fences + callout blockquotes.
+ * Knowledge-only markdown pipeline: GFM + math + mermaid/svg fences + callout blockquotes.
  * Chat continues to use plain MarkdownBody (no katex/mermaid cost).
  */
 export function KnowledgeMarkdownBody({
@@ -41,7 +42,7 @@ export function KnowledgeMarkdownBody({
   const merged = useMemo((): Components => {
     const base: Components = {
       pre: ({ children, ...props }) => {
-        // Detect ```mermaid via code child className
+        // Detect ```mermaid / ```svg via code child className
         const child = Array.isArray(children) ? children[0] : children
         if (
           child &&
@@ -54,6 +55,10 @@ export function KnowledgeMarkdownBody({
           if (/\blanguage-mermaid\b/.test(cls)) {
             const code = textOf(cp.children)
             return <KnowledgeMermaid code={code} />
+          }
+          if (/\blanguage-svg\b/.test(cls)) {
+            const code = textOf(cp.children)
+            return <KnowledgeSvg code={code} />
           }
         }
         // Knowledge Reader/embed: enable lazy CSP-safe Shiki (chat stays default off).

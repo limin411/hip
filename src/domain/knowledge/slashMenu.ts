@@ -22,6 +22,8 @@ export type KnowledgeSlashId =
   | 'callout'
   | 'math'
   | 'mermaid'
+  | 'svg'
+  | 'image'
 
 export interface KnowledgeSlashItem {
   id: KnowledgeSlashId
@@ -68,6 +70,8 @@ export const BLOCK_SLASH_IDS: ReadonlySet<KnowledgeSlashId> = new Set([
   'callout',
   'math',
   'mermaid',
+  'svg',
+  'image',
 ])
 
 /** Live/Source slash insert config — single source of truth. */
@@ -192,6 +196,23 @@ export const KNOWLEDGE_SLASH_ITEMS: KnowledgeSlashItem[] = [
     label: 'Mermaid diagram',
     insert: '```mermaid\nflowchart LR\n  A --> B\n```',
     cursorOffset: 12,
+  },
+  {
+    id: 'svg',
+    name: 'svg',
+    keywords: ['vector', 'drawing', 'illustration'],
+    label: 'SVG',
+    insert: '```svg\n\n```',
+    cursorOffset: 7,
+  },
+  {
+    id: 'image',
+    name: 'image',
+    keywords: ['img', 'picture', 'photo', 'asset', 'attach'],
+    label: 'Image',
+    /** Skeleton when no spaceId; with spaceId Live host opens attach (K10). */
+    insert: '![](assets/)',
+    cursorOffset: 11,
   },
 ]
 

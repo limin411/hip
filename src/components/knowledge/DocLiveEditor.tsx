@@ -499,8 +499,11 @@ export const DocLiveEditor = forwardRef<DocLiveEditorHandle, DocLiveEditorProps>
         result: Awaited<ReturnType<typeof importAssetFromFile>>,
       ) => {
         if (result.ok) {
+          // Import may have written to disk; surface insert failure so user is not silent.
           if (insertMarkdown(result.markdown)) {
             onAssetImportedRef.current?.()
+          } else {
+            onAssetImportErrorRef.current?.('error')
           }
           return
         }
@@ -510,6 +513,8 @@ export const DocLiveEditor = forwardRef<DocLiveEditorHandle, DocLiveEditorProps>
       const onPaste = (event: ClipboardEvent) => {
         const space = spaceIdRef.current
         if (!space || !event.clipboardData) return
+        // Fall through until Milkdown is ready so we do not swallow paste with no host.
+        if (!editorRef.current) return
         const items = event.clipboardData.items
         if (!items?.length) return
         let hasImage = false
@@ -536,6 +541,7 @@ export const DocLiveEditor = forwardRef<DocLiveEditorHandle, DocLiveEditorProps>
       const onDrop = (event: DragEvent) => {
         const space = spaceIdRef.current
         if (!space || !event.dataTransfer?.files?.length) return
+        if (!editorRef.current) return
         const files = Array.from(event.dataTransfer.files)
         const assets = files.filter((f) => {
           const mime = f.type

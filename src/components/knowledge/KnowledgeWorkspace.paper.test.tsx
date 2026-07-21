@@ -32,10 +32,19 @@ vi.mock('./DocEditor', async () => {
   }
 })
 
+const liveEditorProps = vi.fn()
+
 vi.mock('./DocLiveEditor', async () => {
-  const { forwardRef } = await import('react')
+  const { forwardRef, useImperativeHandle } = await import('react')
   return {
-    DocLiveEditor: forwardRef(function MockDocLiveEditor() {
+    DocLiveEditor: forwardRef(function MockDocLiveEditor(
+      props: Record<string, unknown>,
+      ref: React.ForwardedRef<{ insertMarkdown: (md: string) => boolean }>,
+    ) {
+      liveEditorProps(props)
+      useImperativeHandle(ref, () => ({
+        insertMarkdown: () => true,
+      }))
       return <div data-testid="knowledge-doc-live-editor" />
     }),
   }
@@ -94,6 +103,7 @@ function seedWorkspace(editorMode: EditorMode) {
 describe('KnowledgeWorkspace paper overflow contract', () => {
   beforeEach(() => {
     localStorage.setItem(KNOWLEDGE_LIVE_FLAG_KEY, 'true')
+    liveEditorProps.mockClear()
   })
 
   afterEach(() => {
@@ -128,5 +138,18 @@ describe('KnowledgeWorkspace paper overflow contract', () => {
     expect(screen.getByTestId('knowledge-doc-live-editor')).toBeInTheDocument()
     expect(screen.queryByTestId('knowledge-doc-reader')).toBeNull()
     expect(screen.queryByTestId('knowledge-edit-toggle')).toBeNull()
+  })
+
+  it('Live editor receives spaceId and asset error toast callback', () => {
+    seedWorkspace('live')
+    render(<KnowledgeWorkspace />)
+    expect(screen.getByTestId('knowledge-doc-live-editor')).toBeInTheDocument()
+    expect(liveEditorProps).toHaveBeenCalled()
+    const props = liveEditorProps.mock.calls.at(-1)?.[0] as {
+      spaceId?: string
+      onAssetImportError?: (r: string) => void
+    }
+    expect(props.spaceId).toBe('spc_1')
+    expect(typeof props.onAssetImportError).toBe('function')
   })
 })

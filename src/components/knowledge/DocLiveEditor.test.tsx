@@ -316,10 +316,14 @@ describe('DocLiveEditor', () => {
       getData: () => '',
     }
 
+    let pasteEv: Event | null = null
     await act(async () => {
-      fireEvent.paste(root, { clipboardData })
+      pasteEv = new Event('paste', { bubbles: true, cancelable: true })
+      Object.defineProperty(pasteEv, 'clipboardData', { value: clipboardData })
+      root.dispatchEvent(pasteEv)
     })
 
+    expect(pasteEv!.defaultPrevented).toBe(true)
     await waitFor(() => {
       expect(importAssetFromClipboardItems).toHaveBeenCalledWith(
         'spc_1',
@@ -330,6 +334,8 @@ describe('DocLiveEditor', () => {
       expect(onAssetImported).toHaveBeenCalled()
       const last = onDraftChange.mock.calls.at(-1)?.[0] as string
       expect(last).toMatch(/assets\/paste\.png/)
+      // Structured insert yields a real image node (not only draft string).
+      expect(proseMirror().querySelector('img')).toBeTruthy()
     })
   }, 20_000)
 
@@ -408,22 +414,27 @@ describe('DocLiveEditor', () => {
       },
     } as unknown as FileList
 
+    let dropEv: Event | null = null
     await act(async () => {
-      fireEvent.drop(root, {
-        dataTransfer: {
+      dropEv = new Event('drop', { bubbles: true, cancelable: true })
+      Object.defineProperty(dropEv, 'dataTransfer', {
+        value: {
           files,
           types: ['Files'],
           dropEffect: 'none',
         },
       })
+      root.dispatchEvent(dropEv)
     })
 
+    expect(dropEv!.defaultPrevented).toBe(true)
     await waitFor(() => {
       expect(importAssetFromFile).toHaveBeenCalledWith('spc_1', file)
     })
     await waitFor(() => {
       const last = onDraftChange.mock.calls.at(-1)?.[0] as string
       expect(last).toMatch(/assets\/drop\.png/)
+      expect(proseMirror().querySelector('img')).toBeTruthy()
     })
     expect(onAssetImportError).not.toHaveBeenCalled()
   }, 20_000)
@@ -469,6 +480,71 @@ describe('DocLiveEditor', () => {
     await waitFor(() => {
       expect(onAssetImportError).toHaveBeenCalledWith('too_large_paste')
     })
+  }, 20_000)
+
+  it('import ok but insert fails after unmount surfaces onAssetImportError error', async () => {
+    const onAssetImportError = vi.fn()
+    const onAssetImported = vi.fn()
+    let resolveImport!: (v: Awaited<ReturnType<typeof importAssetFromClipboardItems>>) => void
+    vi.mocked(importAssetFromClipboardItems).mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          resolveImport = resolve
+        }),
+    )
+
+    render(
+      <DocLiveEditor
+        docId="d-paste-insert-fail"
+        initialMarkdown="hello"
+        spaceId="spc_1"
+        onDraftChange={() => {}}
+        onAssetImportError={onAssetImportError}
+        onAssetImported={onAssetImported}
+      />,
+    )
+    await waitForProseMirror()
+
+    const root = screen.getByTestId('knowledge-doc-live-editor')
+    const item = {
+      kind: 'file' as const,
+      type: 'image/png',
+      getAsFile: () =>
+        new File([new Uint8Array([1])], 'x.png', { type: 'image/png' }),
+    }
+    const items = Object.assign([item], { length: 1 }) as unknown as DataTransferItemList
+    const clipboardData = {
+      items,
+      files: [] as unknown as FileList,
+      types: ['Files'],
+      getData: () => '',
+    }
+
+    await act(async () => {
+      const pasteEv = new Event('paste', { bubbles: true, cancelable: true })
+      Object.defineProperty(pasteEv, 'clipboardData', { value: clipboardData })
+      root.dispatchEvent(pasteEv)
+    })
+
+    // Tear down editor while import is in flight (doc switch / mode flip).
+    cleanup()
+
+    await act(async () => {
+      resolveImport({
+        ok: true,
+        meta: {
+          relPath: 'assets/x.png',
+          mime: 'image/png',
+          byteLength: 1,
+        },
+        markdown: '![x.png](assets/x.png)',
+      })
+    })
+
+    await waitFor(() => {
+      expect(onAssetImportError).toHaveBeenCalledWith('error')
+    })
+    expect(onAssetImported).not.toHaveBeenCalled()
   }, 20_000)
 })
 

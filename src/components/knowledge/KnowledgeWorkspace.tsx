@@ -460,15 +460,28 @@ export function KnowledgeWorkspace() {
     const paths = await pickAttachmentFiles()
     if (!paths?.length) return
 
+    // Re-read mode after OS dialog (Live↔Source may flip while the picker is open).
+    const st = useKnowledgeStore.getState()
+    const spaceId = st.activeSpaceId
+    const docId = st.activeDocId
+    if (!spaceId || !docId) return
+    const canvasMode = st.editorMode === 'preview' ? 'live' : st.editorMode
+    const bodyLenNow = Math.max(st.docBody.length, st.draftBody.length)
+    const liveBlockedNow = Boolean(docId && liveBlockedDocIds[docId])
+    const useLive =
+      canvasMode === 'live' && liveEnabled && !liveBlockedNow &&
+      bodyLenNow <= KNOWLEDGE_LARGE_DOC_CHARS
+
     // Live: structured insert via Milkdown (never multi-line tr.insertText).
-    if (showLiveEditor) {
+    if (useLive) {
       for (const sourcePath of paths) {
-        const result = await importAssetFromPath(activeSpaceId, sourcePath)
+        const result = await importAssetFromPath(spaceId, sourcePath)
         if (!result.ok) {
           toastAssetError(result.reason)
           continue
         }
-        liveEditorRef.current?.insertMarkdown(result.markdown)
+        const ok = liveEditorRef.current?.insertMarkdown(result.markdown)
+        if (!ok) toastAssetError('error')
       }
       return
     }
@@ -477,7 +490,7 @@ export function KnowledgeWorkspace() {
     const view = editorRef.current?.getView()
     if (!view) return
     for (const sourcePath of paths) {
-      const result = await importAssetFromPath(activeSpaceId, sourcePath)
+      const result = await importAssetFromPath(spaceId, sourcePath)
       if (!result.ok) {
         toastAssetError(result.reason)
         continue

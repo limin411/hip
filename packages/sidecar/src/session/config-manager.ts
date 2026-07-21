@@ -5,7 +5,11 @@ import { resolveEffectiveConfig } from '../config/hip-config.js'
 import { isPluginEnabled, readPluginsConfig } from '../config/plugins.js'
 import { readEnabledSkills, mergeSkills, extractSkillMetaFromData, readEnabledMap } from './skills/registry.js'
 import { parseFrontmatter } from './skills/frontmatter.js'
-import { parsePluginManifest, PluginManifestError } from './plugins/parser.js'
+import {
+  parsePluginManifest,
+  PluginManifestError,
+  type PluginManifestDiagnostic,
+} from './plugins/parser.js'
 import { synthesizePlugin } from './plugins/synthesizer.js'
 import { HookRegistry } from './hooks/registry.js'
 import { getBuiltinSkills } from './product/builtin-skills.js'
@@ -72,7 +76,14 @@ export class ConfigManager {
       for (const pluginDir of pluginsCfg.plugins) {
         if (!isPluginEnabled(pluginDir, pluginsCfg)) continue
         try {
-          const manifest = parsePluginManifest(pluginDir)
+          const diagnostics: PluginManifestDiagnostic[] = []
+          const manifest = parsePluginManifest(pluginDir, { diagnostics })
+          // parsePluginManifest already console.warns each diagnostic; re-log with id for load pipeline.
+          for (const d of diagnostics) {
+            console.warn(
+              `[plugin:load] id=${manifest.id} code=${d.code} dir=${pluginDir}: ${d.message}`,
+            )
+          }
           const synth = synthesizePlugin(manifest)
           const pluginSkills: SkillMeta[] = []
           for (const se of synth.skills) {
@@ -90,7 +101,14 @@ export class ConfigManager {
           }
         } catch (e) {
           if (e instanceof PluginManifestError) {
-            console.warn(`Skipping invalid plugin: ${e.message}`)
+            console.warn(
+              `[plugin:load] Skipping invalid plugin dir=${pluginDir}: ${e.message}`,
+            )
+          } else {
+            console.warn(
+              `[plugin:load] Unexpected error loading plugin dir=${pluginDir}:`,
+              e instanceof Error ? e.message : e,
+            )
           }
         }
       }

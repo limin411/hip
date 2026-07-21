@@ -41,18 +41,33 @@ describe('readPluginsConfig', () => {
     expect(readPluginsConfig()).toEqual({ plugins: [] })
   })
 
-  it('filters out non-string entries and warns', () => {
+  it('filters out unrecoverable entries and warns', () => {
     const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
     process.env.HIP_PLUGINS_PATH = writeConfig('plugins.json', { plugins: ['/valid', 42, null, '/also-valid'] })
     const result = readPluginsConfig()
     expect(result).toEqual({ plugins: ['/valid', '/also-valid'] })
     expect(warnSpy).toHaveBeenCalledTimes(2)
-    expect(warnSpy).toHaveBeenCalledWith('Skipping non-string plugin entry (number):', 42)
-    expect(warnSpy).toHaveBeenCalledWith('Skipping non-string plugin entry (object):', null)
     warnSpy.mockRestore()
   })
 
-  it('returns { plugins: [] } when all entries are non-string', () => {
+  it('coerces object entries with path/dir/root', () => {
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    process.env.HIP_PLUGINS_PATH = writeConfig('plugins.json', {
+      plugins: [
+        { name: 'superpowers', path: '/x/superpowers' },
+        { dir: '/y/other' },
+        { root: '/z/root' },
+        { name: 'no-path' },
+      ],
+    })
+    expect(readPluginsConfig()).toEqual({
+      plugins: ['/x/superpowers', '/y/other', '/z/root'],
+    })
+    expect(warnSpy).toHaveBeenCalledTimes(1)
+    warnSpy.mockRestore()
+  })
+
+  it('returns { plugins: [] } when all entries are unrecoverable', () => {
     const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
     process.env.HIP_PLUGINS_PATH = writeConfig('plugins.json', { plugins: [42, true, null] })
     const result = readPluginsConfig()
@@ -70,6 +85,22 @@ describe('readPluginsConfig', () => {
       plugins: ['/path/superpowers'],
       enabled: { superpowers: false },
     })
+  })
+
+  it('normalizePluginsConfigFile rewrites object entries to strings', async () => {
+    const { normalizePluginsConfigFile } = await import('./plugins.js')
+    const { readFileSync } = await import('node:fs')
+    const p = writeConfig('plugins.json', {
+      plugins: [{ name: 'a', path: '/p/a' }, '/p/b'],
+      enabled: { a: true },
+      entries: [{ slug: 'a' }],
+    })
+    expect(normalizePluginsConfigFile(p)).toBe(true)
+    expect(normalizePluginsConfigFile(p)).toBe(false) // already clean
+    const raw = JSON.parse(readFileSync(p, 'utf8'))
+    expect(raw.plugins).toEqual(['/p/a', '/p/b'])
+    expect(raw.enabled).toEqual({ a: true })
+    expect(raw.entries).toEqual([{ slug: 'a' }])
   })
 })
 

@@ -145,16 +145,35 @@ export function inferPluginName(stagingDir: string, sourceUrl?: string): string 
 }
 
 /**
+ * Read optional Claude Code marketplace metadata from `.claude-plugin/plugin.json`.
+ */
+function readClaudePluginMeta(stagingDir: string): Record<string, unknown> | null {
+  const p = join(stagingDir, '.claude-plugin', 'plugin.json')
+  if (!existsSync(p)) return null
+  try {
+    const raw = JSON.parse(readFileSync(p, 'utf8')) as unknown
+    if (typeof raw !== 'object' || raw === null || Array.isArray(raw)) return null
+    return raw as Record<string, unknown>
+  } catch {
+    return null
+  }
+}
+
+/**
  * Auto-generate a minimal plugin.json manifest by scanning common plugin layouts
  * inside `stagingDir`. This is used when the cloned repo has no `.plugin/plugin.json`.
  *
  * Scanning rules:
- * - `skills/** /SKILL.md` → `skills: ["./skills/<dirname>", ...]`
- * - `.mcp.json` at root → `mcpServers: "./.mcp.json"`
- * - `hooks/**` (any files) → `hooks: "./hooks/hooks.cjs"`
- * - `agents/**` (any files) → `agents: "./agents.json"`
+ * - skills/<name>/SKILL.md → skills: ["./skills/<name>", ...]
+ * - .mcp.json at root → mcpServers: "./.mcp.json"
+ * - hip CJS hooks (hooks/hooks.cjs or hooks/index.cjs) only — Claude
+ *   hooks/hooks.json is intentionally omitted (Phase A)
+ * - agents/ (any files) → agents: "./agents.json"
+ * - .claude-plugin/plugin.json supplies name/version/description when present
  */
 export function generatePluginManifest(stagingDir: string, sourceUrl?: string): Record<string, unknown> {
+  const claude = readClaudePluginMeta(stagingDir)
+
   const skills: string[] = []
   const skillsDir = join(stagingDir, 'skills')
   if (existsSync(skillsDir)) {
@@ -174,16 +193,20 @@ export function generatePluginManifest(stagingDir: string, sourceUrl?: string): 
     mcpServers = './.mcp.json'
   }
 
+  // Only reference hooks modules that actually exist and are hip-compatible CJS.
   let hooks: string | undefined
-  const hooksDir = join(stagingDir, 'hooks')
-  if (existsSync(hooksDir)) {
-    try {
-      if (readdirSync(hooksDir).length > 0) {
-        hooks = './hooks/hooks.cjs'
-      }
-    } catch {
-      /* ignore */
-    }
+  const hooksCjs = join(stagingDir, 'hooks', 'hooks.cjs')
+  const hooksIndexCjs = join(stagingDir, 'hooks', 'index.cjs')
+  if (existsSync(hooksCjs)) {
+    hooks = './hooks/hooks.cjs'
+  } else if (existsSync(hooksIndexCjs)) {
+    hooks = './hooks/index.cjs'
+  } else if (existsSync(join(stagingDir, 'hooks', 'hooks.json'))) {
+    console.warn(
+      '[plugin-install] hooks/hooks.json looks like Claude Code format; ' +
+        'omitting hooks from generated manifest (skills still install). ' +
+        'code=hooks_deferred_claude_format',
+    )
   }
 
   let agents: string | undefined
@@ -198,9 +221,27 @@ export function generatePluginManifest(stagingDir: string, sourceUrl?: string): 
     }
   }
 
+  const nameFromClaude =
+    typeof claude?.name === 'string' && claude.name.length > 0
+      ? slugifyPlugin(claude.name)
+      : undefined
+  const versionFromClaude =
+    typeof claude?.version === 'string' && claude.version.length > 0
+      ? claude.version
+      : undefined
+
   const generated: Record<string, unknown> = {
-    name: inferPluginName(stagingDir, sourceUrl),
-    version: inferPluginVersion(stagingDir),
+    name: nameFromClaude ?? inferPluginName(stagingDir, sourceUrl),
+    version: versionFromClaude ?? inferPluginVersion(stagingDir),
+  }
+  if (typeof claude?.description === 'string') generated.description = claude.description
+  if (typeof claude?.license === 'string') generated.license = claude.license
+  if (Array.isArray(claude?.keywords)) {
+    const kw = claude.keywords.filter((k): k is string => typeof k === 'string')
+    if (kw.length > 0) generated.keywords = kw
+  }
+  if (claude?.author && typeof claude.author === 'object' && !Array.isArray(claude.author)) {
+    generated.author = claude.author
   }
   if (skills.length > 0) generated.skills = skills
   if (mcpServers !== undefined) generated.mcpServers = mcpServers

@@ -167,10 +167,28 @@ describe('parsePluginManifest — skills resolution', () => {
     expect(m.skills).toEqual([join(dir, 'skills', 'a'), join(dir, 'skills', 'b')])
   })
 
-  it('leaves skills undefined when not provided', () => {
+  it('leaves skills undefined when not provided and no skills/ dir', () => {
     const dir = makePlugin({ name: 'p', version: '1' })
     const m = parsePluginManifest(dir)
     expect(m.skills).toBeUndefined()
+  })
+
+  it('rewrites bare skill id to skills/<id> when present', () => {
+    const dir = makePlugin({ name: 'p', version: '1', skills: ['brainstorming'] })
+    mkdirSync(join(dir, 'skills', 'brainstorming'), { recursive: true })
+    writeFileSync(join(dir, 'skills', 'brainstorming', 'SKILL.md'), '# brainstorming')
+    const m = parsePluginManifest(dir)
+    expect(m.skills).toEqual([join(dir, 'skills', 'brainstorming')])
+  })
+
+  it('scans skills/*/SKILL.md when skills field omitted', () => {
+    const dir = makePlugin({ name: 'p', version: '1' })
+    mkdirSync(join(dir, 'skills', 'a'), { recursive: true })
+    mkdirSync(join(dir, 'skills', 'b'), { recursive: true })
+    writeFileSync(join(dir, 'skills', 'a', 'SKILL.md'), '# a')
+    writeFileSync(join(dir, 'skills', 'b', 'SKILL.md'), '# b')
+    const m = parsePluginManifest(dir)
+    expect(m.skills).toEqual([join(dir, 'skills', 'a'), join(dir, 'skills', 'b')])
   })
 })
 
@@ -242,6 +260,24 @@ describe('parsePluginManifest — hooks resolution', () => {
     const dir = makePlugin({ name: 'p', version: '1' })
     const m = parsePluginManifest(dir)
     expect(m.hooks).toBeUndefined()
+  })
+
+  it('soft-skips Claude-style hooks object without throwing', () => {
+    const dir = makePlugin({
+      name: 'p',
+      version: '1',
+      skills: ['skills/brainstorming'],
+      hooks: {
+        SessionStart: [{ matcher: 'startup', hooks: [{ type: 'command', command: 'echo' }] }],
+      },
+    })
+    mkdirSync(join(dir, 'skills', 'brainstorming'), { recursive: true })
+    writeFileSync(join(dir, 'skills', 'brainstorming', 'SKILL.md'), '# b')
+    const diagnostics: { code: string }[] = []
+    const m = parsePluginManifest(dir, { diagnostics })
+    expect(m.hooks).toBeUndefined()
+    expect(m.skills).toEqual([join(dir, 'skills', 'brainstorming')])
+    expect(diagnostics.some((d) => d.code === 'hooks_unsupported_format')).toBe(true)
   })
 })
 

@@ -799,6 +799,26 @@ pub fn slugify_plugin(name: &str) -> String {
     }
 }
 
+/// Coerce one plugins[] entry to a directory path string.
+/// Accepts string, or object with `dir` / `path` / `root`.
+fn coerce_plugin_entry(v: &serde_json::Value) -> Option<String> {
+    if let Some(path) = v.as_str() {
+        let t = path.trim();
+        return if t.is_empty() { None } else { Some(t.to_string()) };
+    }
+    if let Some(obj) = v.as_object() {
+        for key in ["dir", "path", "root"] {
+            if let Some(p) = obj.get(key).and_then(|d| d.as_str()) {
+                let t = p.trim();
+                if !t.is_empty() {
+                    return Some(t.to_string());
+                }
+            }
+        }
+    }
+    None
+}
+
 fn read_plugins_config(config_path: &Path) -> (Vec<String>, Vec<serde_json::Value>) {
     let raw: serde_json::Value = match std::fs::read_to_string(config_path) {
         Ok(body) if !body.trim().is_empty() => serde_json::from_str(&body).unwrap_or_default(),
@@ -808,12 +828,8 @@ fn read_plugins_config(config_path: &Path) -> (Vec<String>, Vec<serde_json::Valu
     let mut plugins: Vec<String> = Vec::new();
     if let Some(arr) = raw.get("plugins").and_then(|v| v.as_array()) {
         for v in arr {
-            if let Some(path) = v.as_str() {
-                plugins.push(path.to_string());
-            } else if let Some(obj) = v.as_object() {
-                if let Some(dir) = obj.get("dir").and_then(|d| d.as_str()) {
-                    plugins.push(dir.to_string());
-                }
+            if let Some(path) = coerce_plugin_entry(v) {
+                plugins.push(path);
             }
         }
     }
@@ -825,6 +841,62 @@ fn read_plugins_config(config_path: &Path) -> (Vec<String>, Vec<serde_json::Valu
         .unwrap_or_default();
 
     (plugins, entries)
+}
+
+/// Rewrite hip-plugins.json so `plugins` is a string[] (coerces dir/path/root objects).
+/// Preserves `enabled` and `entries`. No-op when already clean or unreadable.
+pub fn normalize_plugins_config_file(config_path: &Path) -> bool {
+    let body = match std::fs::read_to_string(config_path) {
+        Ok(b) if !b.trim().is_empty() => b,
+        _ => return false,
+    };
+    let raw: serde_json::Value = match serde_json::from_str(&body) {
+        Ok(v) => v,
+        Err(_) => return false,
+    };
+    let arr = match raw.get("plugins").and_then(|v| v.as_array()) {
+        Some(a) => a,
+        None => return false,
+    };
+
+    let mut needs_rewrite = false;
+    let mut plugins: Vec<String> = Vec::new();
+    for v in arr {
+        if !v.is_string() {
+            needs_rewrite = true;
+        }
+        match coerce_plugin_entry(v) {
+            Some(p) => plugins.push(p),
+            None => needs_rewrite = true,
+        }
+    }
+    if !needs_rewrite {
+        return false;
+    }
+
+    let entries = raw
+        .get("entries")
+        .and_then(|v| v.as_array())
+        .cloned()
+        .unwrap_or_default();
+    let mut enabled = std::collections::HashMap::new();
+    if let Some(obj) = raw.get("enabled").and_then(|v| v.as_object()) {
+        for (k, v) in obj {
+            if let Some(b) = v.as_bool() {
+                enabled.insert(k.clone(), b);
+            }
+        }
+    }
+    if write_plugins_config_full(config_path, &plugins, &entries, &enabled).is_ok() {
+        eprintln!(
+            "[tauri] normalized plugin registry at {} ({} path(s))",
+            config_path.display(),
+            plugins.len()
+        );
+        true
+    } else {
+        false
+    }
 }
 
 /// Register an installed plugin directory so the sidecar can discover it.
@@ -1534,6 +1606,48 @@ module.exports = [
         let plugins = cfg.get("plugins").unwrap().as_array().unwrap();
         assert_eq!(plugins.len(), 1);
         assert_eq!(plugins[0].as_str().unwrap(), plugin_dir.to_string_lossy());
+    }
+
+    #[test]
+    fn read_plugins_config_coerces_path_field() {
+        let tmp = TempDir::new();
+        let config_path = tmp.child("hip-plugins.json");
+        let plugin_dir = tmp.child("superpowers");
+        let legacy = serde_json::json!({
+            "plugins": [
+                { "name": "superpowers", "path": plugin_dir.to_string_lossy() }
+            ],
+        });
+        fs::write(&config_path, serde_json::to_string(&legacy).unwrap()).unwrap();
+        let (plugins, _) = read_plugins_config(&config_path);
+        assert_eq!(plugins, vec![plugin_dir.to_string_lossy().to_string()]);
+    }
+
+    #[test]
+    fn normalize_plugins_config_file_rewrites_objects() {
+        let tmp = TempDir::new();
+        let config_path = tmp.child("hip-plugins.json");
+        let plugin_dir = tmp.child("superpowers");
+        let legacy = serde_json::json!({
+            "plugins": [
+                { "name": "superpowers", "path": plugin_dir.to_string_lossy() }
+            ],
+            "enabled": { "superpowers": true },
+        });
+        fs::write(&config_path, serde_json::to_string(&legacy).unwrap()).unwrap();
+        assert!(normalize_plugins_config_file(&config_path));
+        assert!(!normalize_plugins_config_file(&config_path));
+        let raw = fs::read_to_string(&config_path).unwrap();
+        let cfg: serde_json::Value = serde_json::from_str(&raw).unwrap();
+        let plugins = cfg.get("plugins").unwrap().as_array().unwrap();
+        assert_eq!(plugins.len(), 1);
+        assert_eq!(plugins[0].as_str().unwrap(), plugin_dir.to_string_lossy());
+        assert_eq!(
+            cfg.get("enabled")
+                .and_then(|e| e.get("superpowers"))
+                .and_then(|v| v.as_bool()),
+            Some(true)
+        );
     }
 
     #[test]

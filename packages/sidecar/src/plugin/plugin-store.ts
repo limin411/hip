@@ -28,11 +28,25 @@ function configPath(): string {
     || join(homedir(), '.hip', 'config', 'hip-plugins.json')
 }
 
+function coerceEntry(entry: unknown): string | null {
+  if (typeof entry === 'string' && entry.trim()) return entry.trim()
+  if (entry && typeof entry === 'object' && !Array.isArray(entry)) {
+    const o = entry as Record<string, unknown>
+    for (const k of ['dir', 'path', 'root'] as const) {
+      const v = o[k]
+      if (typeof v === 'string' && v.trim()) return v.trim()
+    }
+  }
+  return null
+}
+
 function readConfig(): PluginsFile {
   const file = configPath()
   try {
     const raw = JSON.parse(readFileSync(file, 'utf8'))
-    const plugins = Array.isArray(raw?.plugins) ? raw.plugins.filter((e: unknown) => typeof e === 'string') : []
+    const plugins = Array.isArray(raw?.plugins)
+      ? (raw.plugins.map(coerceEntry).filter(Boolean) as string[])
+      : []
     const entries = Array.isArray(raw?.entries) ? raw.entries : []
     return { plugins, entries }
   } catch {
@@ -62,7 +76,9 @@ export class PluginStore {
   private read(): PluginsFile {
     try {
       const raw = JSON.parse(readFileSync(this.configPath, 'utf8'))
-      const plugins = Array.isArray(raw?.plugins) ? raw.plugins.filter((e: unknown) => typeof e === 'string') : []
+      const plugins = Array.isArray(raw?.plugins)
+        ? (raw.plugins.map(coerceEntry).filter(Boolean) as string[])
+        : []
       const entries = Array.isArray(raw?.entries) ? raw.entries : []
       return { plugins, entries }
     } catch {

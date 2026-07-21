@@ -1,28 +1,28 @@
 use std::path::PathBuf;
-use tauri::{AppHandle, Manager};
+use tauri::AppHandle;
 
-/// Pure core: pick the storage root. Unix → `$HOME/.hip`; Windows → app-data dir.
+/// Pure core: pick the storage root. All platforms → `$HOME/.hip`
+/// (Windows: `%USERPROFILE%\.hip`). `app_data` is ignored (kept for call-site
+/// compatibility during the transition away from Tauri app_data_dir).
 /// Split out from `hip_base_dir` so it is unit-testable without a Tauri AppHandle.
-pub fn hip_base_from(home: Option<PathBuf>, app_data: Option<PathBuf>) -> Option<PathBuf> {
-    if cfg!(windows) {
-        app_data
-    } else {
-        home.map(|h| h.join(".hip"))
-    }
+pub fn hip_base_from(home: Option<PathBuf>, _app_data: Option<PathBuf>) -> Option<PathBuf> {
+    home.map(|h| h.join(".hip"))
 }
 
 /// The storage root for the running app.
 ///
 /// Honors `HIP_DATA_DIR` when present so E2E harnesses can isolate sessions and
-/// config from the user's real data directory. Falls back to the platform default
-/// (`$HOME/.hip` on Unix, the Tauri app-data dir on Windows) otherwise.
+/// config from the user's real data directory. Falls back to `$HOME/.hip` on
+/// all platforms (Windows: `%USERPROFILE%\.hip` via `HOME` / `USERPROFILE`).
 pub fn hip_base_dir(app: &AppHandle) -> Option<PathBuf> {
+    let _ = app; // keep signature; base no longer needs Tauri path API
     if let Some(dir) = std::env::var_os("HIP_DATA_DIR") {
         return Some(PathBuf::from(dir));
     }
-    let home = std::env::var_os("HOME").map(PathBuf::from);
-    let app_data = app.path().app_data_dir().ok();
-    hip_base_from(home, app_data)
+    let home = std::env::var_os("HOME")
+        .or_else(|| std::env::var_os("USERPROFILE"))
+        .map(PathBuf::from);
+    hip_base_from(home, None)
 }
 
 /// `<root>/<sub>`, created on demand. The `config` subdir is locked to `0o700` on Unix.
@@ -123,32 +123,23 @@ mod tests {
     use std::path::PathBuf;
 
     #[test]
-    #[cfg(not(windows))]
-    fn unix_uses_home_dot_hip() {
+    fn uses_home_dot_hip() {
         let base = hip_base_from(Some(PathBuf::from("/Users/x")), Some(PathBuf::from("/ignored")));
         assert_eq!(base, Some(PathBuf::from("/Users/x/.hip")));
     }
 
     #[test]
-    #[cfg(not(windows))]
-    fn unix_none_home_is_none() {
+    fn none_home_is_none() {
         assert_eq!(hip_base_from(None, Some(PathBuf::from("/x"))), None);
     }
 
-    // The skill layout: `skills_dir` resolves to `<base>/skills` (via `hip_subdir`).
-    // It wraps `hip_base_dir` = `hip_base_from(HOME, app_data)`, so composing the
-    // real pure core with the exact subpath the wrapper appends pins the actual
-    // on-disk layout this function produces.
     #[test]
-    #[cfg(not(windows))]
     fn skills_layout_lives_under_base() {
         let base = hip_base_from(Some(PathBuf::from("/Users/x")), None).unwrap();
-        // `skills_dir(app)` → `hip_subdir(app, "skills")` → `<base>/skills`.
         assert_eq!(base.join("skills"), PathBuf::from("/Users/x/.hip/skills"));
     }
 
     #[test]
-    #[cfg(not(windows))]
     fn trash_knowledge_layout_lives_under_base() {
         let base = hip_base_from(Some(PathBuf::from("/Users/x")), None).unwrap();
         assert_eq!(base.join("trash"), PathBuf::from("/Users/x/.hip/trash"));
@@ -159,7 +150,6 @@ mod tests {
     }
 
     #[test]
-    #[cfg(not(windows))]
     fn network_policy_path_lives_under_config() {
         let base = hip_base_from(Some(PathBuf::from("/Users/x")), None).unwrap();
         assert_eq!(
@@ -169,7 +159,6 @@ mod tests {
     }
 
     #[test]
-    #[cfg(not(windows))]
     fn terminal_hosts_path_lives_under_config() {
         let base = hip_base_from(Some(PathBuf::from("/Users/x")), None).unwrap();
         assert_eq!(
@@ -179,12 +168,17 @@ mod tests {
     }
 
     #[test]
-    #[cfg(windows)]
-    fn windows_uses_app_data() {
+    fn windows_style_home_uses_dot_hip_not_app_data() {
+        let home = PathBuf::from(r"C:\Users\x");
         let base = hip_base_from(
-            Some(PathBuf::from(r"C:\Users\x")),
+            Some(home.clone()),
             Some(PathBuf::from(r"C:\AppData\com.ljm.hip")),
         );
-        assert_eq!(base, Some(PathBuf::from(r"C:\AppData\com.ljm.hip")));
+        // Join uses host separator; assert suffix and that app_data was ignored.
+        assert_eq!(base, Some(home.join(".hip")));
+        let s = base.unwrap().to_string_lossy().replace('\\', "/");
+        assert!(s.ends_with("/.hip") || s.ends_with(".hip"));
+        assert!(!s.contains("AppData"));
+        assert!(!s.contains("com.ljm.hip"));
     }
 }

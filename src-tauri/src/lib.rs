@@ -652,7 +652,8 @@ pub fn run() {
         .manage(sftp::SftpTransferState::new())
         .setup(|app| {
             // Ensure hip-plugins.json exists with a valid default so that the plugin
-            // registry is always a well-known file (even if empty).
+            // registry is always a well-known file (even if empty). Normalize legacy
+            // object entries (dir/path) to string paths on every startup.
             if let Some(plugins_path) = paths::plugins_config_path(&app.handle()) {
                 if !plugins_path.exists() {
                     let default = r#"{"plugins":[],"entries":[]}"#;
@@ -661,6 +662,8 @@ pub fn run() {
                     } else {
                         println!("[tauri] created default plugin registry at {0}", plugins_path.display());
                     }
+                } else {
+                    let _ = plugins::normalize_plugins_config_file(&plugins_path);
                 }
             }
             // Configured size (tauri.conf) may exceed this host's display — maximize instead.

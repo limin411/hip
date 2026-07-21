@@ -266,13 +266,41 @@ describe('generatePluginManifest', () => {
     }
   })
 
-  it('detects hooks/** directory', () => {
+  it('detects hooks/hooks.cjs when present', () => {
     const dir = mkdtempSync(join(tmpdir(), 'hip-gen-hooks-'))
     try {
       mkdirSync(join(dir, 'hooks'), { recursive: true })
-      writeFileSync(join(dir, 'hooks', 'index.cjs'), 'module.exports = {}', 'utf8')
+      writeFileSync(join(dir, 'hooks', 'hooks.cjs'), 'module.exports = []', 'utf8')
       const result = generatePluginManifest(dir)
       expect(result.hooks).toBe('./hooks/hooks.cjs')
+    } finally {
+      rmSync(dir, { recursive: true, force: true })
+    }
+  })
+
+  it('detects hooks/index.cjs when hooks.cjs is absent', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'hip-gen-hooks-idx-'))
+    try {
+      mkdirSync(join(dir, 'hooks'), { recursive: true })
+      writeFileSync(join(dir, 'hooks', 'index.cjs'), 'module.exports = []', 'utf8')
+      const result = generatePluginManifest(dir)
+      expect(result.hooks).toBe('./hooks/index.cjs')
+    } finally {
+      rmSync(dir, { recursive: true, force: true })
+    }
+  })
+
+  it('does not set hooks for Claude hooks/hooks.json only', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'hip-gen-hooks-claude-'))
+    try {
+      mkdirSync(join(dir, 'hooks'), { recursive: true })
+      writeFileSync(
+        join(dir, 'hooks', 'hooks.json'),
+        JSON.stringify({ hooks: { SessionStart: [] } }),
+        'utf8',
+      )
+      const result = generatePluginManifest(dir)
+      expect(result.hooks).toBeUndefined()
     } finally {
       rmSync(dir, { recursive: true, force: true })
     }
@@ -284,6 +312,31 @@ describe('generatePluginManifest', () => {
       mkdirSync(join(dir, 'hooks'), { recursive: true })
       const result = generatePluginManifest(dir)
       expect(result.hooks).toBeUndefined()
+    } finally {
+      rmSync(dir, { recursive: true, force: true })
+    }
+  })
+
+  it('uses .claude-plugin/plugin.json name and version', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'hip-gen-claude-meta-'))
+    try {
+      mkdirSync(join(dir, '.claude-plugin'), { recursive: true })
+      writeFileSync(
+        join(dir, '.claude-plugin', 'plugin.json'),
+        JSON.stringify({
+          name: 'superpowers',
+          version: '6.1.1',
+          description: 'Core skills',
+        }),
+        'utf8',
+      )
+      mkdirSync(join(dir, 'skills', 'tdd'), { recursive: true })
+      writeFileSync(join(dir, 'skills', 'tdd', 'SKILL.md'), '# tdd')
+      const result = generatePluginManifest(dir)
+      expect(result.name).toBe('superpowers')
+      expect(result.version).toBe('6.1.1')
+      expect(result.description).toBe('Core skills')
+      expect(result.skills).toEqual(['./skills/tdd'])
     } finally {
       rmSync(dir, { recursive: true, force: true })
     }

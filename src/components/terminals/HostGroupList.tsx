@@ -77,7 +77,7 @@ export function HostGroupList({
                 className={cn(
                   'flex min-w-0 flex-1 items-center gap-1.5 rounded-md px-1 py-0.5 text-left',
                   'transition-colors hover:bg-state-hover',
-                  'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring',
+                  'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink/20',
                 )}
               >
                 {open ? (
@@ -155,7 +155,7 @@ export function HostGroupList({
                   className={cn(
                     'flex min-w-0 flex-1 items-center gap-1.5 rounded-md px-1 py-0.5 text-left',
                     'transition-colors hover:bg-state-hover',
-                    'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring',
+                    'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink/20',
                   )}
                 >
                   {isExpanded(UNGROUPED_KEY) ? (

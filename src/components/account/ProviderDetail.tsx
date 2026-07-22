@@ -40,7 +40,7 @@ const CAP_I18N = {
 } as const satisfies Record<ModelCapKey, string>
 
 const inputCls =
-  'h-9 flex-1 rounded-md border border-border bg-surface px-2.5 text-body text-ink focus:outline-none focus:ring-2 focus:ring-accent/60'
+  'h-9 flex-1 rounded-md border border-border bg-surface px-2.5 text-body text-ink focus-visible:outline-none focus-visible:border-accent focus-visible:ring-[3px] focus-visible:ring-accent/10'
 
 /** Right detail pane: provider connection settings and model selection. */
 export function ProviderDetail({
@@ -299,7 +299,7 @@ export function ProviderDetail({
                 <button
                   type="button"
                   onClick={() => setShowKey((v) => !v)}
-                  className="absolute right-2 rounded p-0.5 text-ink-tertiary hover:bg-surface-muted hover:text-ink-secondary"
+                  className="absolute right-2 rounded p-0.5 text-ink-tertiary hover:bg-state-hover hover:text-ink-secondary"
                   aria-label={showKey ? t('settings.modelConfig.hide') : t('settings.modelConfig.show')}
                 >
                   {showKey ? <EyeOff size={14} /> : <Eye size={14} />}
@@ -480,7 +480,7 @@ function ModelCard({
       onClick={onClick}
       className={cn(
         'flex items-center gap-2.5 rounded-md border px-3 py-2.5 text-left transition-colors disabled:opacity-60',
-        isCurrent ? 'border-accent bg-accent-active' : 'border-border hover:bg-surface-muted',
+        isCurrent ? 'border-accent bg-accent-active' : 'border-border hover:bg-state-hover',
       )}
     >
       <div className="min-w-0 flex-1">

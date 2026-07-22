@@ -28,7 +28,7 @@ function KbGraphNode({ data }: NodeProps) {
   return (
     <div
       className={cn(
-        'min-w-[100px] max-w-[160px] rounded-md border px-2 py-1.5 text-center text-meta shadow-sm',
+        'min-w-[100px] max-w-[160px] rounded-md border px-2 py-1.5 text-center text-meta',
         d.focused
           ? 'border-accent bg-accent/15 font-medium text-ink'
           : 'border-border bg-surface text-ink hover:border-accent/60',

@@ -32,10 +32,10 @@ import { Switch } from '@/components/ui/Switch'
 import { cn } from '@/lib/utils'
 
 const inputCls =
-  'h-9 w-full rounded-md border border-border bg-surface px-2.5 text-body text-ink focus:outline-none focus:ring-2 focus:ring-accent/60'
+  'h-9 w-full rounded-md border border-border bg-surface px-2.5 text-body text-ink focus-visible:outline-none focus-visible:border-accent focus-visible:ring-[3px] focus-visible:ring-accent/10'
 
 const textareaCls =
-  'w-full min-h-[120px] resize-y rounded-md border border-border bg-surface px-2.5 py-2 text-body text-ink focus:outline-none focus:ring-2 focus:ring-accent/60'
+  'w-full min-h-[120px] resize-y rounded-md border border-border bg-surface px-2.5 py-2 text-body text-ink focus-visible:outline-none focus-visible:border-accent focus-visible:ring-[3px] focus-visible:ring-accent/10'
 
 const KIND_OPTIONS: MemoryKind[] = [
   'preference',
@@ -530,7 +530,7 @@ export function MemoryConfig() {
         </div>
 
         <div
-          className="rounded-xl border border-border bg-surface-muted/40 px-4 py-4"
+          className="rounded-xl bg-surface-muted/40 px-4 py-4"
           data-testid="memory-howto-empty"
         >
           <div className="mb-2 flex items-center gap-2 text-prose font-medium text-ink">
@@ -590,7 +590,7 @@ export function MemoryConfig() {
 
       {/* How to use (collapsible) */}
       <section
-        className="rounded-xl border border-border bg-surface-muted/30"
+        className="rounded-xl bg-surface-muted/30"
         data-testid="memory-howto"
       >
         <button
@@ -611,11 +611,11 @@ export function MemoryConfig() {
               <li>{t('settings.memory.howtoStep3On')}</li>
             </ol>
             <div className="grid gap-2 sm:grid-cols-2">
-              <div className="rounded-lg border border-border bg-surface px-3 py-2">
+              <div className="rounded-lg bg-surface px-3 py-2">
                 <div className="text-meta font-medium text-ink">{t('settings.memory.useMemories')}</div>
                 <p className="mt-0.5 text-caption text-ink-tertiary">{t('settings.memory.useMemoriesPlain')}</p>
               </div>
-              <div className="rounded-lg border border-border bg-surface px-3 py-2">
+              <div className="rounded-lg bg-surface px-3 py-2">
                 <div className="text-meta font-medium text-ink">{t('settings.memory.generateMemories')}</div>
                 <p className="mt-0.5 text-caption text-ink-tertiary">{t('settings.memory.generateMemoriesPlain')}</p>
               </div>
@@ -754,7 +754,7 @@ export function MemoryConfig() {
                   'rounded-full border px-2.5 py-0.5 text-caption font-medium transition-colors',
                   listStatus === 'active'
                     ? 'border-accent/40 bg-accent/10 text-accent'
-                    : 'border-border bg-surface text-ink-secondary hover:bg-surface-muted',
+                    : 'border-border bg-surface text-ink-secondary hover:bg-state-hover',
                 )}
                 aria-pressed={listStatus === 'active'}
                 disabled={busy}
@@ -772,7 +772,7 @@ export function MemoryConfig() {
                   'rounded-full border px-2.5 py-0.5 text-caption font-medium transition-colors',
                   isTrash
                     ? 'border-accent/40 bg-accent/10 text-accent'
-                    : 'border-border bg-surface text-ink-secondary hover:bg-surface-muted',
+                    : 'border-border bg-surface text-ink-secondary hover:bg-state-hover',
                 )}
                 aria-pressed={isTrash}
                 disabled={busy}

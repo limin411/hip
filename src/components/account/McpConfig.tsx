@@ -25,7 +25,7 @@ import {
 } from '@/lib/mcpServerDraft'
 
 const inputCls =
-  'h-9 w-full rounded-md border border-border bg-surface px-2.5 text-body text-ink focus:outline-none focus:ring-2 focus:ring-accent/60'
+  'h-9 w-full rounded-md border border-border bg-surface px-2.5 text-body text-ink focus-visible:outline-none focus-visible:border-accent focus-visible:ring-[3px] focus-visible:ring-accent/10'
 
 type Editing = { mode: 'add' } | { mode: 'edit'; server: McpServerConfig } | null
 
@@ -250,7 +250,7 @@ export function McpConfig() {
           {servers.length === 0 ? (
             <button
               onClick={() => setEditing({ mode: 'add' })}
-              className="col-span-full flex w-full flex-col items-center justify-center gap-2 rounded-xl border border-dashed border-border py-8 text-body font-medium text-accent-strong transition-colors hover:bg-accent-subtle focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60"
+              className="col-span-full flex w-full flex-col items-center justify-center gap-2 rounded-xl border border-dashed border-border py-8 text-body font-medium text-accent-strong transition-colors hover:bg-state-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink/20"
             >
               <Plug size={24} />
               <span>{t('settings.mcp.empty')}</span>
@@ -464,7 +464,7 @@ function McpServerCard({
             </div>
           )}
           {toolsOpen && hasTools && (
-            <div className="mt-3 rounded-lg border border-border bg-surface-subtle p-3">
+            <div className="mt-3 rounded-md bg-surface-subtle p-3">
               <div className="mb-2 flex items-center justify-between">
                 <span className="text-caption font-medium text-ink-tertiary">
                   {t('settings.mcp.sectionTools')}
@@ -496,7 +496,7 @@ function McpServerCard({
                   return (
                     <label
                       key={toolName}
-                      className="flex items-center gap-2 rounded-md p-1.5 hover:bg-surface-muted cursor-pointer"
+                      className="flex items-center gap-2 rounded-md p-1.5 hover:bg-state-hover cursor-pointer"
                     >
                       <Switch
                         checked={enabled}
@@ -662,10 +662,10 @@ function ActionButton({
       disabled={disabled}
       title={label}
       className={cn(
-        'flex h-7 w-7 items-center justify-center rounded-md transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60',
+        'flex h-7 w-7 items-center justify-center rounded-md transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink/20',
         danger
           ? 'text-ink-secondary hover:bg-danger/10 hover:text-danger'
-          : 'text-ink-secondary hover:bg-surface-muted hover:text-ink',
+          : 'text-ink-secondary hover:bg-state-hover hover:text-ink',
         disabled && 'opacity-50 cursor-not-allowed',
       )}
       aria-label={label}
@@ -794,7 +794,7 @@ function McpServerEditor({
                     return (
                       <label
                         key={toolName}
-                        className="flex items-center gap-2 rounded px-1 py-1 hover:bg-surface-muted cursor-pointer"
+                        className="flex items-center gap-2 rounded px-1 py-1 hover:bg-state-hover cursor-pointer"
                       >
                         <Switch
                           checked={enabled}
@@ -885,7 +885,7 @@ function KvEditor({ pairs, onChange }: { pairs: KvPair[]; onChange: (pairs: KvPa
             type="button"
             onClick={() => removeAt(i)}
             aria-label={t('settings.mcp.removePair')}
-            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md text-ink-secondary transition-colors hover:bg-surface-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60"
+            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md text-ink-secondary transition-colors hover:bg-state-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink/20"
           >
             <X size={15} />
           </button>
@@ -894,7 +894,7 @@ function KvEditor({ pairs, onChange }: { pairs: KvPair[]; onChange: (pairs: KvPa
       <button
         type="button"
         onClick={add}
-        className="flex items-center gap-1.5 rounded-md border border-border px-2.5 py-1.5 text-meta font-medium text-accent-strong transition-colors hover:bg-accent-subtle"
+        className="flex items-center gap-1.5 rounded-md border border-border px-2.5 py-1.5 text-meta font-medium text-accent-strong transition-colors hover:bg-state-hover"
       >
         <Plus size={13} /> {t('settings.mcp.addPair')}
       </button>
@@ -939,7 +939,7 @@ function ChoiceCard({
       onClick={onClick}
       className={cn(
         'flex items-center gap-3 rounded-lg border px-3 py-2.5 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink/20',
-        selected ? 'border-ink bg-surface-subtle' : 'border-border hover:bg-surface-muted',
+        selected ? 'border-ink bg-surface-subtle' : 'border-border hover:bg-state-hover',
       )}
     >
       <span

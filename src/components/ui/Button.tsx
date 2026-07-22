@@ -1,21 +1,21 @@
 import { forwardRef } from 'react'
 import { cva, type VariantProps } from 'class-variance-authority'
 import { cn } from '@/lib/utils'
+import { focusChrome } from './focusClasses'
 
 export const buttonVariants = cva(
-  'inline-flex items-center justify-center gap-1.5 border border-transparent font-medium transition-[background-color,color,border-color,transform,opacity] duration-chrome active:scale-[0.985] focus-visible:outline-none focus-visible:ring-2 disabled:opacity-40 disabled:pointer-events-none',
+  cn(
+    'inline-flex items-center justify-center gap-1.5 border border-transparent font-medium transition-[background-color,color,border-color,transform,opacity] duration-chrome active:scale-[0.985] disabled:opacity-40 disabled:pointer-events-none',
+    focusChrome,
+  ),
   {
     variants: {
       variant: {
         // Solid inverse CTA — soft monochrome (not pure ink-black), never brand accent paint
-        primary:
-          'bg-btn-primary text-on-btn-primary hover:bg-btn-primary-hover focus-visible:ring-ink/25',
-        secondary:
-          'bg-surface-subtle text-ink hover:bg-surface-muted focus-visible:ring-ink/20',
-        ghost:
-          'text-ink-secondary hover:bg-state-hover hover:text-ink focus-visible:ring-ink/20',
-        outline:
-          'border-border bg-transparent text-ink hover:bg-state-hover focus-visible:ring-ink/20',
+        primary: 'bg-btn-primary text-on-btn-primary hover:bg-btn-primary-hover',
+        secondary: 'bg-surface-subtle text-ink hover:bg-state-hover',
+        ghost: 'text-ink-secondary hover:bg-state-hover hover:text-ink',
+        outline: 'border-border bg-transparent text-ink hover:bg-state-hover',
         danger:
           'bg-danger text-on-accent hover:bg-danger/90 focus-visible:ring-danger/40',
         dangerSoft:

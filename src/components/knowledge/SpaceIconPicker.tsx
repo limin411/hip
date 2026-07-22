@@ -61,7 +61,7 @@ export function SpaceIconPicker({
           onClick={() => onChange('')}
           className={cn(
             'flex h-8 w-full items-center justify-center rounded-md text-meta text-ink-tertiary transition-colors',
-            'hover:bg-state-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring',
+            'hover:bg-state-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink/20',
             !selected && 'bg-accent/10 text-accent-strong ring-1 ring-accent/30',
           )}
         >
@@ -80,7 +80,7 @@ export function SpaceIconPicker({
               onClick={() => onChange(emoji)}
               className={cn(
                 'flex h-8 w-full items-center justify-center rounded-md text-base leading-none transition-colors',
-                'hover:bg-state-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring',
+                'hover:bg-state-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink/20',
                 active && 'bg-accent/10 ring-1 ring-accent/30',
               )}
             >

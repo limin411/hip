@@ -89,7 +89,7 @@ export function TerminalView() {
             data-testid="terminal-restart"
             onClick={() => void restart()}
             title={t('artifact.terminalView.restart')}
-            className="inline-flex shrink-0 items-center gap-1 rounded-md px-2 py-1 text-meta font-medium text-ink-secondary transition-colors hover:bg-surface-muted hover:text-ink"
+            className="inline-flex shrink-0 items-center gap-1 rounded-md px-2 py-1 text-meta font-medium text-ink-secondary transition-colors hover:bg-state-hover hover:text-ink"
           >
             <RotateCcw size={13} />
             {t('artifact.terminalView.restart')}

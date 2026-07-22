@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react'
 import { cn } from '@/lib/utils'
+import { focusChrome } from './focusClasses'
 
 export type SegmentedOption<T extends string> = {
   value: T
@@ -50,8 +51,8 @@ export function SegmentedControl<T extends string>({
             data-testid={dataTestId ? `${dataTestId}-${opt.value}` : undefined}
             onClick={() => onChange(opt.value)}
             className={cn(
-              'inline-flex items-center justify-center gap-1 rounded-[5px] font-medium transition-colors duration-chrome',
-              'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink/20',
+              'inline-flex items-center justify-center gap-1 rounded font-medium transition-colors duration-chrome',
+              focusChrome,
               size === 'sm' ? 'h-7 px-2.5 text-meta' : 'h-8 px-3 text-body',
               selected
                 ? // Elevated chip on muted track — surface only, no shadow (flat chrome rule).

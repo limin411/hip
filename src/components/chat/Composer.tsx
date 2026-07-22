@@ -82,8 +82,7 @@ export function Composer({
       {hasAnns && (
         <div
           className={cn(
-            'mb-2 flex items-center gap-2 border border-border bg-surface-muted px-2.5 py-1.5',
-            isCard && 'rounded-md',
+            'mb-2 flex items-center gap-2 rounded-md border border-border bg-surface-muted px-2.5 py-1.5',
           )}
           data-testid="composer-diff-annotations"
         >
@@ -104,8 +103,7 @@ export function Composer({
       {hasQuote && (
         <div
           className={cn(
-            'mb-2 flex items-start gap-2 border-l-2 border-accent bg-surface-muted px-2.5 py-1.5',
-            isCard && 'rounded-md',
+            'mb-2 flex items-start gap-2 rounded-md border-l-2 border-accent bg-surface-muted px-2.5 py-1.5',
           )}
           data-testid="composer-quote"
         >
@@ -132,8 +130,7 @@ export function Composer({
             <div
               key={a.id}
               className={cn(
-                'flex items-center gap-1 bg-surface-muted px-2 py-1 text-meta',
-                isCard && 'rounded-md',
+                'flex items-center gap-1 rounded-md bg-surface-muted px-2 py-1 text-meta',
               )}
               data-testid="attachment-chip"
             >
@@ -198,7 +195,7 @@ export function Composer({
               data-testid="composer-stop"
               title={t('chat.stop')}
             >
-              <Square size={12} strokeWidth={2} />
+              <Square size={12} strokeWidth={1.75} />
             </Button>
           </div>
         ) : (
@@ -211,7 +208,7 @@ export function Composer({
             data-testid="composer-send"
             title={t('chat.send')}
           >
-            <ArrowUp size={15} strokeWidth={2} />
+            <ArrowUp size={15} strokeWidth={1.75} />
           </Button>
         )}
       </div>

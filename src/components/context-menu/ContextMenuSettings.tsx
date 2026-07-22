@@ -237,7 +237,7 @@ export function ContextMenuSettings() {
                         <input
                           id={inputId}
                           type="checkbox"
-                          className="h-3.5 w-3.5 shrink-0 rounded border-border text-accent focus:ring-accent/60"
+                          className="h-3.5 w-3.5 shrink-0 rounded border-border accent-accent text-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink/20"
                           checked={visible}
                           onChange={(e) => setVisible(item.id, e.target.checked)}
                           aria-label={t('settings.contextMenu.showItem', { label })}
@@ -257,8 +257,8 @@ export function ContextMenuSettings() {
                             type="button"
                             className={cn(
                               'inline-flex h-7 w-7 items-center justify-center rounded-md text-ink-tertiary',
-                              'hover:bg-surface-muted hover:text-ink',
-                              'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60',
+                              'hover:bg-state-hover hover:text-ink',
+                              'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink/20',
                               'disabled:pointer-events-none disabled:opacity-30',
                             )}
                             disabled={index === 0}
@@ -272,8 +272,8 @@ export function ContextMenuSettings() {
                             type="button"
                             className={cn(
                               'inline-flex h-7 w-7 items-center justify-center rounded-md text-ink-tertiary',
-                              'hover:bg-surface-muted hover:text-ink',
-                              'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60',
+                              'hover:bg-state-hover hover:text-ink',
+                              'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink/20',
                               'disabled:pointer-events-none disabled:opacity-30',
                             )}
                             disabled={index === items.length - 1}

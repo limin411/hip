@@ -144,7 +144,7 @@ export function MarketplaceSourceModal({
               return (
                 <div
                   key={src.id}
-                  className="rounded-xl border border-border bg-surface p-4 shadow-sm"
+                  className="rounded-xl border border-border bg-surface p-4"
                   data-testid={`marketplace-source-${src.id}`}
                 >
                   <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">

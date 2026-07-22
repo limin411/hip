@@ -216,7 +216,7 @@ function MessageBubbleImpl({ message, streaming, isLastAssistant, hidePlan }: Me
                 <button
                   type="button"
                   data-testid="memory-citations-chip"
-                  className="bg-accent/10 px-1.5 py-0.5 text-meta leading-5 text-accent outline-none transition-colors hover:bg-accent/15 focus-visible:ring-1 focus-visible:ring-accent"
+                  className="rounded-md bg-accent/10 px-1.5 py-0.5 text-meta leading-5 text-accent outline-none transition-colors hover:bg-accent/15 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink/20"
                 >
                   {t('settings.memory.citationsChip', { count: message.memoryCitations.length })}
                 </button>

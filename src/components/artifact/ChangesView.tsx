@@ -81,7 +81,7 @@ export function ChangesView() {
                   onClick={() => setDiffViewMode(mode)}
                   className={cn(
                     'rounded-md px-2 py-0.5 text-caption font-medium transition-colors duration-chrome',
-                    'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring/40',
+                    'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink/20',
                     selected
                       ? 'text-ink'
                       : 'text-ink-tertiary hover:text-ink-secondary',

@@ -148,7 +148,7 @@ export function KnowledgeSlashMenu({
               onClick={() => onSelect(item)}
               onMouseEnter={() => setActiveIndex(i)}
               className={cn(
-                'flex w-full items-center gap-2 px-3 py-2 text-left text-body text-ink transition-colors hover:bg-accent-subtle first:rounded-t-lg last:rounded-b-lg',
+                'flex w-full items-center gap-2 px-3 py-2 text-left text-body text-ink transition-colors hover:bg-state-hover first:rounded-t-lg last:rounded-b-lg',
                 i === safeIndex && 'bg-accent-subtle',
               )}
             >

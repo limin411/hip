@@ -153,7 +153,7 @@ export function AgentCard({
             ) : (
               <>
                 <div className="mt-1 flex items-center gap-1 overflow-hidden font-mono text-caption text-ink-tertiary">
-                  <Terminal size={12} className="shrink-0 text-ink-tertiary/70" />
+                  <Terminal size={12} className="shrink-0 text-ink-tertiary" />
                   <span className="min-w-0 truncate">{cmdline}</span>
                 </div>
                 {agent.description && <div className="mt-1 truncate text-caption text-ink-tertiary">{agent.description}</div>}
@@ -177,7 +177,7 @@ export function AgentCard({
           <DropdownMenu modal={false}>
             <DropdownMenuTrigger asChild>
               <button
-                className="flex h-7 w-7 items-center justify-center rounded-md text-ink-secondary transition-colors hover:bg-surface-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60"
+                className="flex h-7 w-7 items-center justify-center rounded-md text-ink-secondary transition-colors hover:bg-state-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink/20"
                 aria-label={t('settings.agents.menuMore')}
               >
                 <MoreVertical size={16} />
@@ -257,10 +257,10 @@ function ActionButton({
       onClick={onClick}
       title={label}
       className={cn(
-        'flex h-7 w-7 items-center justify-center rounded-md transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60',
+        'flex h-7 w-7 items-center justify-center rounded-md transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink/20',
         danger
           ? 'text-ink-secondary hover:bg-danger/10 hover:text-danger'
-          : 'text-ink-secondary hover:bg-surface-muted hover:text-ink',
+          : 'text-ink-secondary hover:bg-state-hover hover:text-ink',
       )}
       aria-label={label}
     >

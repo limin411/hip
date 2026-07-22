@@ -82,7 +82,7 @@ function FooterNavButton({
       aria-current={active ? 'page' : undefined}
       className={cn(
         'flex h-[var(--row-h-sidebar)] w-full items-center gap-2.5 rounded-lg px-2.5 text-left text-body font-medium transition-colors duration-chrome',
-        'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring',
+        'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink/20',
         active ? SIDEBAR_ACTIVE_RAIL : 'text-ink-secondary hover:bg-state-hover hover:text-ink',
       )}
     >

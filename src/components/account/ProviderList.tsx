@@ -42,7 +42,7 @@ export function ProviderList({
         onClick={() => onSelect(p.id)}
         className={cn(
           'flex w-full items-center gap-2.5 rounded-md px-2.5 py-2 text-left text-body transition-colors',
-          compat ? 'hover:bg-surface-muted' : 'cursor-not-allowed opacity-55',
+          compat ? 'hover:bg-state-hover' : 'cursor-not-allowed opacity-55',
           isActive && 'bg-accent-active',
         )}
       >
@@ -83,7 +83,7 @@ export function ProviderList({
         {filter && (
           <button
             onClick={() => onFilter('')}
-            className="rounded p-0.5 text-ink-tertiary hover:bg-surface-muted hover:text-ink-secondary"
+            className="rounded p-0.5 text-ink-tertiary hover:bg-state-hover hover:text-ink-secondary"
             aria-label={t('settings.modelConfig.clear')}
           >
             <X size={13} />
@@ -127,7 +127,7 @@ export function ProviderList({
       </div>
       <button
         onClick={onAddCustom}
-        className="flex w-full items-center gap-1.5 border-t border-border bg-surface px-2.5 py-2.5 text-body text-accent-strong transition-colors hover:bg-surface-muted"
+        className="flex w-full items-center gap-1.5 border-t border-border bg-surface px-2.5 py-2.5 text-body text-accent-strong transition-colors hover:bg-state-hover"
       >
         <Plus size={14} /> {t('settings.modelConfig.addCustom')}
       </button>

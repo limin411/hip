@@ -69,7 +69,7 @@ export function ArtifactCard({ toolCalls }: { toolCalls?: ToolCall[] }) {
                 title={canPreview ? a.path : t('artifact.needsSessionScope')}
                 className={cn(
                   'flex w-full items-center gap-2 px-3 py-1.5 text-left text-body text-ink transition-colors',
-                  canPreview ? 'cursor-pointer hover:bg-surface-muted' : 'cursor-default opacity-70',
+                  canPreview ? 'cursor-pointer hover:bg-state-hover' : 'cursor-default opacity-70',
                 )}
               >
                 <Icon size={15} className="shrink-0 text-ink-tertiary" />

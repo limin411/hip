@@ -132,7 +132,7 @@ export function ManagedTerminalSession({ terminalId }: { terminalId: string }) {
               title={t('artifact.terminalView.restart')}
               className={cn(
                 'inline-flex items-center gap-1 rounded-md px-2 py-1 text-meta font-medium',
-                'text-ink-secondary transition-colors hover:bg-surface-muted hover:text-ink',
+                'text-ink-secondary transition-colors hover:bg-state-hover hover:text-ink',
               )}
             >
               <RotateCcw size={13} />
@@ -145,7 +145,7 @@ export function ManagedTerminalSession({ terminalId }: { terminalId: string }) {
               title={t('terminals.close')}
               className={cn(
                 'inline-flex items-center gap-1 rounded-md px-2 py-1 text-meta font-medium',
-                'text-ink-secondary transition-colors hover:bg-surface-muted hover:text-ink',
+                'text-ink-secondary transition-colors hover:bg-state-hover hover:text-ink',
               )}
             >
               <X size={13} />

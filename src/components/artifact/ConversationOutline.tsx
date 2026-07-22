@@ -51,7 +51,7 @@ export function ConversationOutline() {
               className={cn(
                 'mb-0.5 flex h-8 w-full items-center gap-2 rounded-md px-2 text-left transition-colors',
                 'hover:bg-state-hover',
-                'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring',
+                'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink/20',
               )}
             >
               <span

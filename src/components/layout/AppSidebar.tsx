@@ -235,7 +235,7 @@ export function AppSidebar() {
       </div>
 
       <div
-        className="px-3 pb-1.5 pt-0 text-caption tabular-nums tracking-wide text-ink-tertiary/70"
+        className="px-3 pb-1.5 pt-0 text-caption tabular-nums tracking-wide text-ink-tertiary"
         data-testid="sidebar-app-version"
       >
         HIP {HIP_PRODUCT_VERSION}
@@ -246,14 +246,14 @@ export function AppSidebar() {
           section="workbench"
           active={sidebarSection === 'workbench' && activeView === 'workbench'}
           label={t('sidebar.nav.workbench')}
-          icon={<LayoutDashboard size={16} />}
+          icon={<LayoutDashboard size={16} strokeWidth={1.75} />}
           onClick={() => onNav('workbench')}
         />
         <NavItem
           section="chats"
           active={sidebarSection === 'chats'}
           label={t('sidebar.nav.chats')}
-          icon={<MessageSquare size={16} />}
+          icon={<MessageSquare size={16} strokeWidth={1.75} />}
           count={chatCount > 0 ? chatCount : undefined}
           onClick={() => onNav('chats')}
         />
@@ -261,7 +261,7 @@ export function AppSidebar() {
           section="projects"
           active={sidebarSection === 'projects'}
           label={t('sidebar.nav.projects')}
-          icon={<Code2 size={16} />}
+          icon={<Code2 size={16} strokeWidth={1.75} />}
           count={projectCount > 0 ? projectCount : undefined}
           onClick={() => onNav('projects')}
         />
@@ -269,7 +269,7 @@ export function AppSidebar() {
           section="knowledge"
           active={sidebarSection === 'knowledge'}
           label={t('sidebar.nav.knowledge')}
-          icon={<BookOpen size={16} />}
+          icon={<BookOpen size={16} strokeWidth={1.75} />}
           count={spaces.length > 0 ? spaces.length : undefined}
           onClick={() => onNav('knowledge')}
         />
@@ -277,21 +277,21 @@ export function AppSidebar() {
           section="terminals"
           active={sidebarSection === 'terminals' && activeView === 'terminals'}
           label={t('sidebar.nav.terminals')}
-          icon={<Terminal size={16} />}
+          icon={<Terminal size={16} strokeWidth={1.75} />}
           onClick={() => onNav('terminals')}
         />
         <NavItem
           section="tasks"
           active={sidebarSection === 'tasks' && activeView === 'tasks'}
           label={t('sidebar.nav.tasks')}
-          icon={<CheckSquare size={16} />}
+          icon={<CheckSquare size={16} strokeWidth={1.75} />}
           onClick={() => onNav('tasks')}
         />
         <NavItem
           section="automation"
           active={sidebarSection === 'automation' && activeView === 'automation'}
           label={t('sidebar.nav.automation')}
-          icon={<Zap size={16} />}
+          icon={<Zap size={16} strokeWidth={1.75} />}
           onClick={() => onNav('automation')}
         />
       </nav>
@@ -315,7 +315,7 @@ export function AppSidebar() {
               data-testid="sidebar-new-space"
               data-no-drag
               onClick={() => openCreateKnowledgeSpaceDialog()}
-              className="rounded-md px-1.5 py-0.5 text-caption text-ink-tertiary transition-colors duration-chrome hover:bg-state-hover hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring"
+              className="rounded-md px-1.5 py-0.5 text-caption text-ink-tertiary transition-colors duration-chrome hover:bg-state-hover hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink/20"
             >
               {t('sidebar.newSpace')}
             </button>
@@ -326,7 +326,7 @@ export function AppSidebar() {
               data-new-session="code"
               data-no-drag
               onClick={() => void newConversationFromSidebar('code')}
-              className="rounded-md px-1.5 py-0.5 text-caption text-ink-tertiary transition-colors duration-chrome hover:bg-state-hover hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring"
+              className="rounded-md px-1.5 py-0.5 text-caption text-ink-tertiary transition-colors duration-chrome hover:bg-state-hover hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink/20"
             >
               {t('sidebar.newTask')}
             </button>
@@ -337,7 +337,7 @@ export function AppSidebar() {
               data-new-session="chat"
               data-no-drag
               onClick={() => void newConversationFromSidebar('chat')}
-              className="rounded-md px-1.5 py-0.5 text-caption text-ink-tertiary transition-colors duration-chrome hover:bg-state-hover hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring"
+              className="rounded-md px-1.5 py-0.5 text-caption text-ink-tertiary transition-colors duration-chrome hover:bg-state-hover hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink/20"
             >
               {t('sidebar.newChat')}
             </button>
@@ -391,7 +391,7 @@ export function AppSidebar() {
                         }}
                         className={cn(
                           'flex w-full items-start gap-2 rounded-lg px-2.5 py-[var(--row-pad-y-session)] text-left transition-colors',
-                          'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring',
+                          'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink/20',
                           active ? SIDEBAR_ACTIVE_RAIL : 'hover:bg-state-hover',
                         )}
                       >
@@ -460,7 +460,7 @@ export function AppSidebar() {
                         onClick={() => void openSpaceFromSidebar(sp.id)}
                         className={cn(
                           'flex w-full items-start gap-2 rounded-lg px-2.5 py-[var(--row-pad-y-session)] text-left transition-colors',
-                          'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring',
+                          'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink/20',
                           active ? SIDEBAR_ACTIVE_RAIL : 'hover:bg-state-hover',
                         )}
                       >
@@ -689,7 +689,7 @@ function SidebarSessionRow({
               className={cn(
                 'ml-1 flex size-5 shrink-0 items-center justify-center rounded text-ink-tertiary',
                 'hover:bg-state-hover hover:text-ink',
-                'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring',
+                'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink/20',
               )}
             >
               {expanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
@@ -712,7 +712,7 @@ function SidebarSessionRow({
             onClick={() => void selectSessionFromSidebar(session.id)}
             className={cn(
               'flex min-w-0 flex-1 items-center gap-2 py-[var(--row-pad-y-session)] pr-2.5 text-left',
-              'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring rounded-r-lg',
+              'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink/20 rounded-r-lg',
             )}
           >
             {running ? (
@@ -849,7 +849,7 @@ function CatalogWorktreeRow({
           title={row.path}
           className={cn(
             'flex w-full items-start gap-2 rounded-lg py-1.5 pl-3 pr-2 text-left transition-colors',
-            'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring',
+            'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink/20',
             'hover:bg-state-hover',
           )}
         >
@@ -912,7 +912,7 @@ function WorktreeSlotRow({
       }
       className={cn(
         'flex w-full items-start gap-2 rounded-lg py-1.5 pl-3 pr-2 text-left transition-colors',
-        'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring',
+        'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink/20',
         active ? SIDEBAR_ACTIVE_RAIL : 'hover:bg-state-hover',
       )}
     >
@@ -994,7 +994,7 @@ function NavItem({
       onClick={onClick}
       className={cn(
         'flex h-[var(--row-h-sidebar)] w-full items-center gap-2.5 rounded-lg px-2.5 text-left text-body font-medium transition-colors duration-chrome',
-        'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring',
+        'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink/20',
         active ? SIDEBAR_ACTIVE_RAIL : 'text-ink-secondary hover:bg-state-hover hover:text-ink',
       )}
     >

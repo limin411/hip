@@ -6,7 +6,7 @@ import App from "./App";
 import "./styles/tokens.css";
 import { ThemeProvider } from "./components/theme/ThemeProvider";
 import { LanguageProvider } from "./components/theme/LanguageProvider";
-import { Toaster } from 'sonner'
+import { ToasterHost } from './components/ui/ToasterHost'
 import { applyPlatformDataset } from './lib/platform'
 import { applyPlatformWindowChrome } from './lib/windowChrome'
 import { enableNativeVibrancy } from './lib/windowVibrancy'
@@ -24,7 +24,7 @@ ReactDOM.createRoot(document.getElementById("root") as HTMLElement).render(
   <React.StrictMode>
     <ThemeProvider>
       <LanguageProvider>
-        <Toaster richColors position="bottom-right" />
+        <ToasterHost />
         <App />
       </LanguageProvider>
     </ThemeProvider>

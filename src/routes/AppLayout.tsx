@@ -235,7 +235,7 @@ export function AppLayout() {
         <PanelResizeHandle
           className={
             rightOpen
-              ? 'group relative z-10 w-2 -mx-1 bg-transparent outline-none focus-visible:ring-1 focus-visible:ring-accent/40'
+              ? 'group relative z-10 w-2 -mx-1 bg-transparent outline-none focus-visible:ring-1 focus-visible:ring-ink/20'
               : 'w-0'
           }
           disabled={!rightOpen}

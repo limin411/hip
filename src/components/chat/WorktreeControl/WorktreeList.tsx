@@ -123,7 +123,7 @@ export function WorktreeList({
                 onClick={() => onOpenRow(row)}
                 className={cn(
                   'flex min-w-0 flex-1 items-start gap-2 rounded-md px-1 py-0.5 text-left',
-                  'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring',
+                  'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink/20',
                 )}
               >
                 <GitBranch
@@ -149,7 +149,7 @@ export function WorktreeList({
                     className={cn(
                       'mt-0.5 flex size-6 shrink-0 items-center justify-center rounded text-ink-tertiary',
                       'hover:bg-state-hover hover:text-ink',
-                      'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring',
+                      'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink/20',
                     )}
                     aria-label={t('chat.worktreeControl.rowMenu')}
                   >

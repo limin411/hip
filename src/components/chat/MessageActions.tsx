@@ -6,7 +6,7 @@ import { copyText } from '@/ipc/clipboard'
 import { sessionService } from '@/domain'
 
 const BTN =
-  'inline-flex h-5 w-5 shrink-0 items-center justify-center text-ink-tertiary transition-colors hover:bg-surface-muted hover:text-ink-secondary focus-visible:ring-2 focus-visible:ring-accent/60'
+  'inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-sm text-ink-tertiary transition-colors hover:bg-state-hover hover:text-ink-secondary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink/20'
 
 export function MessageActions({ message, isLastAssistant }: { message: Message; isLastAssistant: boolean }) {
   const { t } = useTranslation()

@@ -429,7 +429,8 @@ export function SpaceTree({
         className={cn(
           'group relative flex w-full min-h-[32px] items-center gap-0.5 rounded-lg py-1 pr-1.5 text-body transition-[background-color,color,box-shadow,opacity] duration-100 outline-none select-none',
           isActiveDoc ? TREE_ACTIVE_DOC : 'text-ink hover:bg-state-hover',
-          isFocused && !isActiveDoc && 'bg-state-hover ring-1 ring-accent/25',
+          // Keyboard focus: fill only (Chrome ring omitted — row uses roving tabindex)
+          isFocused && !isActiveDoc && 'bg-state-hover',
           draggingId === node.id && 'opacity-45',
           dropHint?.targetId === node.id &&
             dropHint.mode === 'into' &&
@@ -475,7 +476,7 @@ export function SpaceTree({
               : 'pointer-events-none opacity-0 group-hover:pointer-events-auto group-hover:opacity-100 group-focus-within:pointer-events-auto group-focus-within:opacity-100',
           )}
         >
-          <GripVertical size={12} strokeWidth={2} />
+          <GripVertical size={12} strokeWidth={1.75} />
         </button>
 
         {isFolder ? (
@@ -493,9 +494,9 @@ export function SpaceTree({
           >
             <span className="flex h-5 w-4 shrink-0 items-center justify-center text-ink-tertiary">
               {isOpen ? (
-                <ChevronDown size={14} strokeWidth={2} />
+                <ChevronDown size={14} strokeWidth={1.75} />
               ) : (
-                <ChevronRight size={14} strokeWidth={2} />
+                <ChevronRight size={14} strokeWidth={1.75} />
               )}
             </span>
             <span

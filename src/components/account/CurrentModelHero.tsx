@@ -80,7 +80,7 @@ export function CurrentModelHero({
 
   const className = cn(
     'flex w-full items-center gap-3.5 rounded-lg border border-border bg-surface px-4 py-3 text-left transition-colors',
-    onLocate && 'hover:bg-surface-muted',
+    onLocate && 'hover:bg-state-hover',
   )
 
   return onLocate ? (

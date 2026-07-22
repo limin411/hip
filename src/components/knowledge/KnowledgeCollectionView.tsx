@@ -109,7 +109,7 @@ function TableView({
             rows.map((r) => (
               <tr
                 key={r.id}
-                className="border-b border-border/60 hover:bg-surface-muted/50"
+                className="border-b border-border/60 hover:bg-state-hover"
                 data-testid="knowledge-view-table-row"
                 data-doc-id={r.id}
               >
@@ -267,7 +267,7 @@ function BoardView({
                 onDragEnd={() => setDragId(null)}
                 onClick={() => onOpenDoc(r.id)}
                 className={cn(
-                  'rounded-md border border-border bg-surface px-2 py-2 text-left text-meta shadow-sm',
+                  'rounded-md border border-border bg-surface px-2 py-2 text-left text-meta',
                   'hover:border-accent/50',
                   dragId === r.id && 'opacity-60',
                 )}

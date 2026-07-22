@@ -35,7 +35,17 @@ describe('Button variants', () => {
     const { getByRole } = render(<Button variant="secondary">Cancel</Button>)
     const cls = getByRole('button', { name: 'Cancel' }).className
     expect(cls).toMatch(/bg-surface-subtle/)
+    expect(cls).toMatch(/hover:bg-state-hover/)
+    expect(cls).not.toMatch(/hover:bg-surface-muted/)
     expect(cls).not.toMatch(/\bbg-accent\b/)
+  })
+
+  it('non-danger variants use Chrome focus ring', () => {
+    const { getByRole } = render(<Button variant="primary">Save</Button>)
+    const cls = getByRole('button', { name: 'Save' }).className
+    expect(cls).toMatch(/focus-visible:ring-ink\/20/)
+    expect(cls).not.toMatch(/ring-focus-ring/)
+    expect(cls).not.toMatch(/ring-accent/)
   })
 
   it('ghost is quiet chrome', () => {

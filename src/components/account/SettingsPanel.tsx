@@ -57,7 +57,7 @@ export function SettingsPanel() {
                   // Quiet lift + Sage rail — same signal as AppSidebar (no hairline ring).
                   'before:absolute before:inset-y-1.5 before:left-0 before:w-[2px] before:rounded-full before:bg-accent before:opacity-0',
                   'data-[state=active]:bg-state-hover data-[state=active]:text-ink data-[state=active]:before:opacity-100',
-                  'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring',
+                  'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink/20',
                 )}
               >
                 <Icon size={16} strokeWidth={1.75} className="shrink-0 opacity-70" />

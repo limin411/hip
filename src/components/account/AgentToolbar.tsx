@@ -25,13 +25,13 @@ export function AgentToolbar({
           value={search}
           onChange={(e) => onSearchChange(e.target.value)}
           placeholder={t('settings.agents.searchPlaceholder')}
-          className="h-9 w-full rounded-lg border border-border bg-surface py-2 pl-9 pr-8 text-body text-ink placeholder:text-ink-tertiary focus:outline-none focus:ring-2 focus:ring-accent/60"
+          className="h-9 w-full rounded-lg border border-border bg-surface py-2 pl-9 pr-8 text-body text-ink placeholder:text-ink-tertiary focus-visible:outline-none focus-visible:border-accent focus-visible:ring-[3px] focus-visible:ring-accent/10"
         />
         {search && (
           <button
             type="button"
             onClick={() => onSearchChange('')}
-            className="absolute right-2 top-1/2 flex h-5 w-5 -translate-y-1/2 items-center justify-center rounded text-ink-tertiary transition-colors hover:bg-surface-muted hover:text-ink"
+            className="absolute right-2 top-1/2 flex h-5 w-5 -translate-y-1/2 items-center justify-center rounded text-ink-tertiary transition-colors hover:bg-state-hover hover:text-ink"
             aria-label={t('common.close')}
           >
             <X size={14} />

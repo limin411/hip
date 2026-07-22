@@ -64,7 +64,7 @@ export function AcpProviderPicker({
             'inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-border bg-surface px-2.5 py-1.5',
             'text-meta text-ink-secondary transition-colors',
             'hover:border-accent/40 hover:bg-state-hover hover:text-ink',
-            'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60',
+            'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink/20',
           )}
         >
           <RefreshCw size={13} className={cn(!checked && 'animate-spin')} />
@@ -107,8 +107,8 @@ export function AcpProviderPicker({
                   'group px-3 py-2.5 transition-colors duration-150',
                   pickable && [
                     'cursor-pointer',
-                    'hover:bg-accent-subtle/60',
-                    'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-accent/60',
+                    'hover:bg-state-hover',
+                    'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink/20',
                   ],
                   !pickable && 'bg-surface-subtle/30',
                   added && 'opacity-90',
@@ -227,7 +227,7 @@ function StatusPill({
         tone === 'muted' && 'bg-surface-muted text-ink-secondary',
       )}
     >
-      <Icon size={12} className="shrink-0" strokeWidth={2.25} />
+      <Icon size={12} className="shrink-0" strokeWidth={1.75} />
       <span className="truncate">{label}</span>
     </span>
   )

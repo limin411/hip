@@ -14,7 +14,7 @@ import { sessionService } from '@/domain/sessionService'
 import { useDomainStore } from '@/domain/sessionStore'
 
 const inputCls =
-  'h-9 w-full rounded-md border border-border bg-surface px-2.5 text-body text-ink focus:outline-none focus:ring-2 focus:ring-accent/60'
+  'h-9 w-full rounded-md border border-border bg-surface px-2.5 text-body text-ink focus-visible:outline-none focus-visible:border-accent focus-visible:ring-[3px] focus-visible:ring-accent/10'
 
 export type EndpointDraft = {
   baseURL: string

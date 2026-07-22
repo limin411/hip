@@ -595,7 +595,7 @@ export function KnowledgeWorkspace() {
                     className="flex h-8 w-8 items-center justify-center rounded-lg text-ink-tertiary transition-colors hover:bg-state-hover hover:text-ink"
                     aria-label={t('knowledge.space.menu')}
                   >
-                    <MoreHorizontal size={16} strokeWidth={2} />
+                    <MoreHorizontal size={16} strokeWidth={1.75} />
                   </button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end">
@@ -645,7 +645,7 @@ export function KnowledgeWorkspace() {
           <div className="relative">
             <Search
               size={14}
-              strokeWidth={2}
+              strokeWidth={1.75}
               className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-ink-tertiary"
             />
             <Input
@@ -653,7 +653,7 @@ export function KnowledgeWorkspace() {
               value={treeFilter}
               onChange={(e) => setTreeFilter(e.target.value)}
               placeholder={t('knowledge.tree.filterPlaceholder')}
-              className="h-8 rounded-lg border border-border bg-surface pl-8 text-meta shadow-none placeholder:text-ink-tertiary focus-visible:border-accent/50 focus-visible:bg-surface focus-visible:ring-2 focus-visible:ring-accent/25"
+              className="h-8 rounded-lg border border-border bg-surface pl-8 text-meta shadow-none placeholder:text-ink-tertiary focus-visible:outline-none focus-visible:border-accent focus-visible:bg-surface focus-visible:ring-[3px] focus-visible:ring-accent/10"
             />
           </div>
         </div>
@@ -786,7 +786,7 @@ export function KnowledgeWorkspace() {
                       {i > 0 && (
                         <ChevronRight
                           size={12}
-                          className="shrink-0 text-ink-tertiary/70"
+                          className="shrink-0 text-ink-tertiary"
                           aria-hidden
                         />
                       )}
@@ -803,7 +803,7 @@ export function KnowledgeWorkspace() {
                     {i > 0 && (
                       <ChevronRight
                         size={12}
-                        className="shrink-0 text-ink-tertiary/70"
+                        className="shrink-0 text-ink-tertiary"
                         aria-hidden
                       />
                     )}

@@ -134,7 +134,7 @@ function HookEventRow({
         type="button"
         className={cn(
           'flex w-full items-start gap-3 px-3.5 py-3 text-left transition-colors',
-          'hover:bg-surface-muted/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-accent/50',
+          'hover:bg-state-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink/20',
           expanded && 'bg-surface-muted/40',
         )}
         onClick={onToggle}

@@ -50,7 +50,7 @@ export function FolderPill() {
             data-testid="quick-pick-folder"
             title={t('chat.quickPickFolderHint')}
             aria-label={t('chat.quickPickFolderAria')}
-            className="flex items-center gap-1 rounded-md border border-border px-2 py-1 text-meta text-ink-secondary transition-colors hover:bg-surface-muted"
+            className="flex items-center gap-1 rounded-md border border-border px-2 py-1 text-meta text-ink-secondary transition-colors hover:bg-state-hover"
           >
             <History size={13} className="text-ink-tertiary" aria-hidden />
             <ChevronDown size={12} className="text-ink-tertiary" aria-hidden />
@@ -124,7 +124,7 @@ export function FolderPill() {
         type="button"
         onClick={pick}
         data-testid="pick-folder"
-        className="flex items-center gap-1.5 rounded-md border border-border px-2.5 py-1 text-meta text-ink-secondary transition-colors hover:bg-surface-muted"
+        className="flex items-center gap-1.5 rounded-md border border-border px-2.5 py-1 text-meta text-ink-secondary transition-colors hover:bg-state-hover"
       >
         <Folder size={13} className="text-ink-tertiary" />
         {t('chat.pickFolder')}

@@ -480,7 +480,7 @@ export function ChatPane() {
           )}
           {error && (
             <div
-              className={`border px-3 py-2.5 text-body ${
+              className={`rounded-lg border px-3 py-2.5 text-body ${
                 error.code === 'NO_API_KEY'
                   ? 'border-warning/30 bg-warning/10 text-warning'
                   : 'border-danger/30 bg-danger/10 text-danger'
@@ -540,9 +540,9 @@ export function ChatPane() {
           }}
           data-testid="jump-to-latest"
           title={t('chat.jumpToLatest')}
-          className="absolute bottom-4 left-1/2 flex -translate-x-1/2 items-center gap-1 rounded-full border border-border bg-surface px-3 py-1.5 text-meta text-ink-secondary transition-colors hover:bg-surface-muted"
+          className="absolute bottom-4 left-1/2 flex -translate-x-1/2 items-center gap-1 rounded-full border border-border bg-surface px-3 py-1.5 text-meta text-ink-secondary transition-colors hover:bg-state-hover"
         >
-          <ChevronDown size={14} />
+          <ChevronDown size={14} strokeWidth={1.75} />
           {t('chat.jumpToLatest')}
         </button>
       )}

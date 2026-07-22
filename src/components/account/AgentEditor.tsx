@@ -21,7 +21,7 @@ import { AcpProviderPicker } from './AcpProviderPicker'
 import type { AcpPreset } from '@/lib/acpPresets'
 
 const inputCls =
-  'h-9 w-full rounded-md border border-border bg-surface px-2.5 text-body text-ink focus:outline-none focus:ring-2 focus:ring-accent/60'
+  'h-9 w-full rounded-md border border-border bg-surface px-2.5 text-body text-ink focus-visible:outline-none focus-visible:border-accent focus-visible:ring-[3px] focus-visible:ring-accent/10'
 
 export function AgentEditor({
   initial,
@@ -137,7 +137,7 @@ export function AgentEditor({
           className={cn(
             'inline-flex items-center gap-1.5 rounded-lg px-1.5 py-1 -ml-1.5',
             'text-meta font-medium text-accent-strong transition-colors',
-            'hover:bg-accent-subtle focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60',
+            'hover:bg-state-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink/20',
           )}
         >
           <ArrowLeft size={14} />
@@ -433,7 +433,7 @@ function GrantPanel({
                   placeholder={t('settings.agents.toolGrantSearch')}
                   className={cn(
                     'h-7 w-full rounded-md border border-border bg-surface pl-7 pr-2 text-caption text-ink',
-                    'placeholder:text-ink-tertiary focus:outline-none focus:ring-2 focus:ring-accent/50',
+                    'placeholder:text-ink-tertiary focus-visible:outline-none focus-visible:border-accent focus-visible:ring-[3px] focus-visible:ring-accent/10',
                   )}
                 />
               </div>
@@ -445,8 +445,8 @@ function GrantPanel({
                 onClick={selectFiltered}
                 className={cn(
                   'rounded-md px-1.5 py-1 text-caption font-medium text-accent-strong transition-colors',
-                  'hover:bg-accent-subtle disabled:pointer-events-none disabled:opacity-40',
-                  'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60',
+                  'hover:bg-state-hover disabled:pointer-events-none disabled:opacity-40',
+                  'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink/20',
                 )}
               >
                 {t('settings.agents.toolGrantSelectAll')}
@@ -459,7 +459,7 @@ function GrantPanel({
                 className={cn(
                   'rounded-md px-1.5 py-1 text-caption font-medium text-ink-secondary transition-colors',
                   'hover:bg-state-hover hover:text-ink disabled:pointer-events-none disabled:opacity-40',
-                  'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60',
+                  'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink/20',
                 )}
               >
                 {t('settings.agents.toolGrantClear')}

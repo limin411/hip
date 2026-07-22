@@ -118,7 +118,7 @@ export function TimelineView() {
               key={c.id}
               kind="checkpoint"
               payload={{ checkpointId: c.id, sessionId }}
-              className={cn('flex w-full items-center gap-1 px-3 py-1.5 hover:bg-surface-muted', c.id === activeId && 'bg-accent/10')}
+              className={cn('flex w-full items-center gap-1 px-3 py-1.5 hover:bg-state-hover', c.id === activeId && 'bg-accent/10')}
               data-testid="timeline-row"
             >
               <button

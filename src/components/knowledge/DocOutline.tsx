@@ -33,7 +33,7 @@ export function DocOutline({ content, onSelect, className }: DocOutlineProps) {
         data-testid="knowledge-doc-outline-empty"
         role="status"
       >
-        <ListTree size={18} className="text-ink-tertiary/70" aria-hidden />
+        <ListTree size={18} className="text-ink-tertiary" aria-hidden />
         <p className="text-meta text-ink-tertiary">{t('knowledge.outline.empty')}</p>
       </div>
     )
@@ -68,7 +68,7 @@ export function DocOutline({ content, onSelect, className }: DocOutlineProps) {
                 className={cn(
                   'mb-0.5 flex min-h-[28px] w-full items-center rounded-md py-1 pr-2 text-left transition-colors',
                   'hover:bg-state-hover',
-                  'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring',
+                  'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink/20',
                   item.level === 1
                     ? 'text-meta font-medium text-ink'
                     : 'text-meta text-ink-secondary',

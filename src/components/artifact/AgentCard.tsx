@@ -138,7 +138,7 @@ export function AgentCard({ agent, live }: { agent: TurnAgent; live: boolean }) 
           TRAIL_ROW,
           'w-full rounded-md px-1.5 py-1.5 text-ink transition-colors duration-chrome',
           'hover:bg-state-hover',
-          'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring',
+          'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink/20',
         )}
         data-testid="agent-card-header"
       >

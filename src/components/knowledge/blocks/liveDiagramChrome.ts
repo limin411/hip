@@ -22,7 +22,7 @@ const COPY_ICON =
 const SEGMENT_IDLE =
   'rounded px-1.5 py-0.5 text-caption font-medium text-ink-tertiary hover:bg-state-hover hover:text-ink'
 const SEGMENT_ACTIVE =
-  'rounded px-1.5 py-0.5 text-caption font-medium bg-surface text-ink shadow-sm'
+  'rounded px-1.5 py-0.5 text-caption font-medium bg-surface text-ink'
 
 export function createDiagramChrome(opts: {
   kind: 'mermaid' | 'svg'

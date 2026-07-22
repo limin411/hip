@@ -478,6 +478,7 @@ export const zhTW = {
       "aria": "工作階段 token 用量：上下文 {{percent}}%（{{used}} / {{total}}）",
       "ariaTokens": "工作階段 token 用量：{{used}} tokens",
       "contextTitle": "上下文佔用",
+      "estimated": "估算",
       "lastInput": "最近一輪輸入 · {{tokens}} tokens",
       "segPercent": "{{percent}}%",
       "breakdownNote": "分項由可見對話紀錄估算（約每 4 字元 1 token）。「其他」含系統提示、記憶與無法直接看到的注入內容。",

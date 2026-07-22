@@ -142,6 +142,20 @@ describe('TokenUsageChip', () => {
     expect(screen.getByTestId('session-usage-seg-other')).toBeInTheDocument()
   })
 
+  it('keeps breakdown note on estimated tooltip, not in panel body', () => {
+    seedSessionWithUsage()
+    render(<TokenUsageChip />)
+    fireEvent.mouseEnter(screen.getByTestId('session-usage'))
+    act(() => {
+      vi.advanceTimersByTime(250)
+    })
+    const est = screen.getByTestId('session-usage-estimated')
+    const note = est.getAttribute('title') ?? ''
+    expect(note.length).toBeGreaterThan(20)
+    // Full methodology must not appear as visible body text.
+    expect(screen.queryByText(note)).not.toBeInTheDocument()
+  })
+
   it('falls back to compact tokens when context window unknown', () => {
     useDomainStore.setState({
       activeSessionId: 's1',

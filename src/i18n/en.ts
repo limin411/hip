@@ -448,6 +448,7 @@ export const en = {
         aria: 'Session token usage: {{percent}}% of context ({{used}} of {{total}})',
         ariaTokens: 'Session token usage: {{used}} tokens',
         contextTitle: 'Context occupancy',
+        estimated: 'est.',
         lastInput: 'Last turn input · {{tokens}} tokens',
         segPercent: '{{percent}}%',
         breakdownNote:

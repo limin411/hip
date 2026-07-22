@@ -470,6 +470,7 @@ export const ja = {
       "aria": "セッショントークン使用量: コンテキスト {{percent}}%（{{used}} / {{total}}）",
       "ariaTokens": "セッショントークン使用量: {{used}} トークン",
       "contextTitle": "コンテキスト使用量",
+      "estimated": "推定",
       "lastInput": "直近ターン入力 · {{tokens}} トークン",
       "segPercent": "{{percent}}%",
       "breakdownNote": "内訳は表示中の会話から推定（約 4 文字 = 1 トークン）。「その他」はシステムプロンプト・メモリなど不可視の注入分です。",

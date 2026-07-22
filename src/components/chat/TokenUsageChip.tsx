@@ -140,7 +140,18 @@ export function TokenUsageChip() {
       >
         <div className="space-y-3">
           <div>
-            <div className="text-caption font-medium text-ink">{t('chat.usage.contextTitle')}</div>
+            <div className="flex items-baseline gap-1.5">
+              <div className="text-caption font-medium text-ink">{t('chat.usage.contextTitle')}</div>
+              {segments.length > 0 && (
+                <span
+                  className="cursor-help text-meta text-ink-tertiary"
+                  title={t('chat.usage.breakdownNote')}
+                  data-testid="session-usage-estimated"
+                >
+                  {t('chat.usage.estimated')}
+                </span>
+              )}
+            </div>
             <div className="mt-0.5 text-meta text-ink-secondary tabular-nums">
               {percent !== null && contextWindow
                 ? t('chat.usage.percentageTooltip', {
@@ -195,7 +206,6 @@ export function TokenUsageChip() {
                   </li>
                 ))}
               </ul>
-              <p className="text-meta leading-snug text-ink-tertiary">{t('chat.usage.breakdownNote')}</p>
             </div>
           )}
 

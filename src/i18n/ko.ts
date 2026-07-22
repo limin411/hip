@@ -470,6 +470,7 @@ export const ko = {
       "aria": "세션 토큰 사용량: 컨텍스트 {{percent}}% ({{used}} / {{total}})",
       "ariaTokens": "세션 토큰 사용량: {{used}} 토큰",
       "contextTitle": "컨텍스트 점유",
+      "estimated": "추정",
       "lastInput": "최근 턴 입력 · {{tokens}} 토큰",
       "segPercent": "{{percent}}%",
       "breakdownNote": "항목은 보이는 대화 기록으로 추정합니다(약 문자 4개 = 1토큰). 「기타」는 시스템 프롬프트·메모리 등 보이지 않는 주입분입니다.",

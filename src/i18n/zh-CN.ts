@@ -439,6 +439,7 @@ export const zhCN = {
         aria: '会话 token 用量：上下文 {{percent}}%（{{used}} / {{total}}）',
         ariaTokens: '会话 token 用量：{{used}} tokens',
         contextTitle: '上下文占用',
+        estimated: '估算',
         lastInput: '最近一轮输入 · {{tokens}} tokens',
         segPercent: '{{percent}}%',
         breakdownNote:

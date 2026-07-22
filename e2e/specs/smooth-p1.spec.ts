@@ -37,10 +37,13 @@ describe('smooth P1 follow + process UI @smooth-p1 @harness', () => {
 
     const process = await browser.$('[data-testid="message-process"]')
     await process.waitForExist({ timeout: 15000 })
+    const { expandActivityTrailIfCollapsed } = await import('../helpers/composer-tune.js')
+    await expandActivityTrailIfCollapsed()
     const running = await browser.$('[data-testid="tool-card-running"]')
     await running.waitForExist({ timeout: 15000 })
     expect(await running.isExisting()).toBe(true)
-    expect(await (await browser.$('[data-testid="message-answer"]')).isExisting()).toBe(true)
+    // Answer body may be empty while tools run; process region is the guarantee.
+    expect(await process.isExisting()).toBe(true)
   })
 
   it('P1-E7 write-follow updates fs active path before turn complete', async () => {

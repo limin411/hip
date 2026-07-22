@@ -11,6 +11,7 @@ import {
   waitForHipE2E,
 } from '../helpers/e2e-hooks.js'
 import { enablePlanModeUi } from '../helpers/eval-plan.js'
+import { ensureComposerSecondary } from '../helpers/composer-tune.js'
 import { switchToCodeSurface } from '../helpers/surface.js'
 import { CodePage } from '../page-objects/CodePage.js'
 
@@ -45,15 +46,19 @@ describe('harness plan entry @harness @core', () => {
     const sessionId = await createCodeSessionForE2e(tmpCwd)
     expect(sessionId).toBeTruthy()
 
-    const chip = await browser.$('[data-testid="plan-mode-chip"]')
-    await chip.waitForExist({ timeout: 15000 })
+    const chip = await ensureComposerSecondary('plan-mode-chip')
     expect(await chip.getAttribute('aria-pressed')).not.toBe('true')
 
     await enablePlanModeUi()
 
     await browser.waitUntil(
       async () => {
-        const pressed = await chip.getAttribute('aria-pressed')
+        // Chip may re-pin outside Tune after becoming active.
+        let el = await browser.$('[data-testid="plan-mode-chip"]')
+        if (!(await el.isExisting())) {
+          el = await ensureComposerSecondary('plan-mode-chip')
+        }
+        const pressed = await el.getAttribute('aria-pressed')
         if (pressed === 'true') return true
         const flag = await browser.execute(() => {
           const hooks = (window as unknown as {

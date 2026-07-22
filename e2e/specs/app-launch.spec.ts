@@ -3,9 +3,6 @@ import { waitForAppReady, waitForMainApp } from '../helpers/app.js'
 import { skipLoginIfPresent } from '../helpers/auth.js'
 import { switchToChatSurface } from '../helpers/surface.js'
 
-// NewConversation greeting (chat surface). Code surface uses a different string + folder picker.
-const CHAT_GREETING = '我们来做点什么？'
-
 describe('hip desktop app @smoke', () => {
   it('should launch directly into the main app', async () => {
     await waitForAppReady()
@@ -28,15 +25,17 @@ describe('hip desktop app @smoke', () => {
     const landing = await browser.$('[data-testid="new-conversation"]')
     await landing.waitForExist({ timeout: 30000 })
 
+    // Greeting is time/locale/LLM-dynamic (emptyGreeting); only require a non-empty H1.
     const greeting = await landing.$('h1')
+    await greeting.waitForExist({ timeout: 15000 })
     await browser.waitUntil(
       async () => {
-        const text = await greeting.getText()
-        return text.includes(CHAT_GREETING)
+        const text = (await greeting.getText()).trim()
+        return text.length > 0
       },
-      { timeout: 15000, interval: 200 },
+      { timeout: 15000, interval: 200, timeoutMsg: 'new-conversation h1 greeting empty' },
     )
-    expect(await greeting.getText()).toContain(CHAT_GREETING)
+    expect((await greeting.getText()).trim().length).toBeGreaterThan(0)
 
     // Product chrome: sidebar "new chat" (legacy new-session-button dropdown removed).
     const newSessionBtn = await browser.$('[data-testid="sidebar-new-chat-list"]')

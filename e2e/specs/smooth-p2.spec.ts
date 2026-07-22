@@ -68,13 +68,17 @@ describe('smooth P2 tool result UI @smooth-p2 @harness', () => {
       hooks.simulateEditWithDiff(id, { path: '/README.md' })
     }, sessionId)
 
+    const { expandActivityTrailIfCollapsed } = await import('../helpers/composer-tune.js')
+    // Process trail is collapsed by default when not interleaved — expand before looking for tools.
+    await expandActivityTrailIfCollapsed()
+    // Category chapters may also start collapsed for finished tools.
+    const chapter = await browser.$('[data-testid="tool-call-group-header"]')
+    if (await chapter.isExisting()) {
+      const open = await (await browser.$('[data-testid="tool-call-group"]')).getAttribute('data-open')
+      if (open !== 'true') await browser.execute((el: HTMLElement) => el.click(), chapter)
+    }
     const card = await browser.$('[data-testid="tool-card"]')
     await card.waitForExist({ timeout: 15000 })
-    const activityBtn = await browser.$('[data-testid="activity-bar"] button')
-    if (await activityBtn.isExisting()) {
-      const expanded = await activityBtn.getAttribute('aria-expanded')
-      if (expanded !== 'true') await activityBtn.click()
-    }
     // Tool bodies default collapsed — open the row to reveal inline diff
     const toolRow = await browser.$('[data-testid="tool-row"], [data-testid="tool-card-running"]')
     if (await toolRow.isExisting()) {
@@ -97,6 +101,13 @@ describe('smooth P2 tool result UI @smooth-p2 @harness', () => {
       { command: 'false' },
       'failed\nexit_code=1',
     )
+    const { expandActivityTrailIfCollapsed } = await import('../helpers/composer-tune.js')
+    await expandActivityTrailIfCollapsed()
+    const chapter = await browser.$('[data-testid="tool-call-group-header"]')
+    if (await chapter.isExisting()) {
+      const open = await (await browser.$('[data-testid="tool-call-group"]')).getAttribute('data-open')
+      if (open !== 'true') await browser.execute((el: HTMLElement) => el.click(), chapter)
+    }
     const card = await browser.$('[data-testid="tool-card"]')
     await card.waitForExist({ timeout: 15000 })
     const html = await card.getHTML()

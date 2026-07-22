@@ -98,10 +98,19 @@ export async function pumpPermissionsUntil(
  * Open permission chip menu with pointer synthesis (Radix often ignores bare el.click()).
  */
 async function openPermissionMenu(): Promise<void> {
-  const chip = await browser.$('[data-testid="permission-chip"]')
+  const { ensureComposerSecondary } = await import('./composer-tune.js')
+  let chip = await browser.$('[data-testid="permission-chip"]')
+  if (!(await chip.isExisting())) {
+    chip = await ensureComposerSecondary('permission-chip')
+  }
   await chip.waitForExist({ timeout: 15000 })
 
   for (let attempt = 0; attempt < 4; attempt++) {
+    // Re-resolve chip each attempt (may pin outside Tune after mode change).
+    chip = await browser.$('[data-testid="permission-chip"]')
+    if (!(await chip.isExisting())) {
+      chip = await ensureComposerSecondary('permission-chip')
+    }
     await browser.execute((el: HTMLElement) => {
       el.focus()
       el.scrollIntoView({ block: 'nearest', inline: 'nearest' })

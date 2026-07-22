@@ -13,7 +13,13 @@ import { surfaceOf } from '@/lib/sessions'
 import { consumeUserDiffRequest } from '@/domain/commands/diffFeedback'
 import { useParallelStore } from '@/store/parallelStore'
 import { useWorktreeStore } from '@/store/worktreeStore'
-import { pathFromToolInput, shouldAutoFollowWrite } from '@/lib/writeFollow'
+import {
+  commandFromRunScriptInput,
+  pathFromToolInput,
+  runScriptReferencesPath,
+  shouldAutoFollowWrite,
+  writeFollowPanelPolicy,
+} from '@/lib/writeFollow'
 import { useFocusStore } from '@/store/focusStore'
 import { useGoalStore } from '@/store/goalStore'
 import { collectWorktreeCascadeDeleteIds } from '@/lib/worktreeNesting'
@@ -56,6 +62,42 @@ export interface ServerMessageEffectDeps {
   requestCheckpoints(sessionId: string): void
   requestCommitLog(sessionId: string): void
   resyncActiveIfRunning(): void
+}
+
+/** Load path into FS preview + focus (shared by immediate / deferred write-follow). */
+function applyWriteFollowPreview(
+  sessionId: string,
+  path: string,
+  callId: string | null,
+  deps: ServerMessageEffectDeps,
+): void {
+  useFsStore.getState().setActive(sessionId, path)
+  useFsStore.getState().setPreview(sessionId, { status: 'loading', path })
+  deps.send({ type: 'fs:read', sessionId, path })
+  const focus = useFocusStore.getState()
+  focus.setFocusedPath(path)
+  if (callId) focus.setFocusedCallId(callId)
+}
+
+/**
+ * Open the right panel for a write-follow hit.
+ * Code: keep Changes/Terminal tab if already there; otherwise switch to Files.
+ * Chat: always Files + selected artifact path.
+ */
+function openWriteFollowPanel(sessionId: string, path: string, isCode: boolean): void {
+  const domain = useDomainStore.getState()
+  const ui = useUiStore.getState()
+  if (isCode) {
+    const tab = ui.activeTab
+    if (tab !== 'changes' && tab !== 'terminal') {
+      ui.setTab('files')
+    }
+    domain.setSessionCodePanelOpen(sessionId, true)
+  } else {
+    ui.setChatActiveTab('files')
+    ui.setSelectedArtifactPath(path)
+    domain.setSessionChatPanelOpen(sessionId, true)
+  }
 }
 
 /** Per-session debounced full diff refresh after write tools (Sprint B). */
@@ -258,39 +300,63 @@ export function applyServerMessageEffects(msg: ServerMessage, deps: ServerMessag
       if (shouldRefreshDiffOnToolFinish(name, msg.status)) {
         debouncedRequestDiff(msg.sessionId)
       }
+
+      // run_script that executes a deferred script write → cancel deferred panel open
+      // (stdout in the transcript is the primary surface).
+      if (tool && name === 'run_script' && msg.status === 'finished') {
+        const focus = useFocusStore.getState()
+        const deferred = focus.deferredWriteFollow
+        if (deferred && deferred.sessionId === msg.sessionId) {
+          const cmd = commandFromRunScriptInput(tool.input)
+          if (runScriptReferencesPath(cmd, deferred.path)) {
+            focus.clearDeferredWriteFollow()
+          }
+        }
+      }
+
       // P1 C1: auto-follow write-like tools to preview before turn ends.
+      // Panel policy: durable files open immediately; script-like paths defer until
+      // turn end (cancelled if run_script consumes them); ephemeral paths never open.
       const focus = useFocusStore.getState()
+      const path = tool ? pathFromToolInput(name, tool.input) : null
       if (
         tool &&
         shouldAutoFollowWrite({
           autoFollow: focus.autoFollowEdits,
           followPaused: focus.followPaused,
+          panelDismissedThisTurn: focus.panelDismissedThisTurn,
           isActiveSession: domain.activeSessionId === msg.sessionId,
           toolName: name,
           status: msg.status,
-        })
+          path,
+        }) &&
+        path
       ) {
-        const path = pathFromToolInput(name, tool.input)
-        if (path) {
-          useFsStore.getState().setActive(msg.sessionId, path)
-          useFsStore.getState().setPreview(msg.sessionId, { status: 'loading', path })
-          deps.send({ type: 'fs:read', sessionId: msg.sessionId, path })
-          focus.setFocusedPath(path)
-          focus.setFocusedCallId(msg.callId)
-          const ui = useUiStore.getState()
-          if (sess && surfaceOf(sess.config) === 'code') {
-            // Keep Changes/Terminal if already there — only auto-open Files when not reviewing diffs.
-            const tab = ui.activeTab
-            if (tab !== 'changes' && tab !== 'terminal') {
-              ui.setTab('files')
-            }
-            domain.setSessionCodePanelOpen(msg.sessionId, true)
-          } else if (sess) {
-            ui.setChatActiveTab('files')
-            ui.setSelectedArtifactPath(path)
-            domain.setSessionChatPanelOpen(msg.sessionId, true)
-          }
+        const policy = writeFollowPanelPolicy(path)
+        if (policy === 'skip') {
+          // shouldAutoFollowWrite already filters ephemeral; keep defensive.
+          return
         }
+
+        const isCode = sess ? surfaceOf(sess.config) === 'code' : false
+        const panelAlreadyOpen = isCode
+          ? sess?.codePanelOpen === true
+          : sess?.chatPanelOpen === true
+
+        if (policy === 'defer' && !panelAlreadyOpen) {
+          // Stash for message:complete; do not steal chat width for write-then-run.
+          focus.setDeferredWriteFollow({
+            sessionId: msg.sessionId,
+            path,
+            callId: msg.callId,
+          })
+          return
+        }
+
+        // Immediate, or deferred while panel is already open → follow into the file.
+        focus.clearDeferredWriteFollow()
+        applyWriteFollowPreview(msg.sessionId, path, msg.callId, deps)
+        if (sess) openWriteFollowPanel(msg.sessionId, path, isCode)
       }
       return
     }
@@ -316,17 +382,43 @@ export function applyServerMessageEffects(msg: ServerMessage, deps: ServerMessag
         deps.requestDiff(msg.sessionId)
         if (tab === 'changes') deps.requestCommitLog(msg.sessionId)
       }
-      // Chat surface: auto-open PreviewPanel on the latest renderable write so HTML/images/docs
-      // actually appear without requiring a manual card click (Claude Artifacts-style).
+
       const domain = useDomainStore.getState()
       const sess = domain.sessions.find((s) => s.id === msg.sessionId)
-      if (sess && surfaceOf(sess.config) === 'chat' && domain.activeSessionId === msg.sessionId) {
+      const focus = useFocusStore.getState()
+
+      // Flush deferred script write-follow when the turn ends without a consuming run_script.
+      const deferred = focus.deferredWriteFollow
+      if (
+        deferred &&
+        deferred.sessionId === msg.sessionId &&
+        domain.activeSessionId === msg.sessionId &&
+        sess &&
+        !focus.panelDismissedThisTurn &&
+        focus.autoFollowEdits &&
+        !focus.followPaused
+      ) {
+        const isCode = surfaceOf(sess.config) === 'code'
+        applyWriteFollowPreview(msg.sessionId, deferred.path, deferred.callId, deps)
+        openWriteFollowPanel(msg.sessionId, deferred.path, isCode)
+        focus.clearDeferredWriteFollow()
+      } else if (deferred && deferred.sessionId === msg.sessionId) {
+        focus.clearDeferredWriteFollow()
+      }
+
+      // Chat surface: auto-open PreviewPanel on the latest renderable write so HTML/images/docs
+      // actually appear without requiring a manual card click (Claude Artifacts-style).
+      if (
+        sess &&
+        surfaceOf(sess.config) === 'chat' &&
+        domain.activeSessionId === msg.sessionId &&
+        !focus.panelDismissedThisTurn &&
+        focus.autoFollowEdits
+      ) {
         const arts = extractRenderedArtifacts(msg.message.toolCalls)
         if (arts.length > 0) {
           const last = arts[arts.length - 1]
-          useFsStore.getState().setActive(msg.sessionId, last.path)
-          useFsStore.getState().setPreview(msg.sessionId, { status: 'loading', path: last.path })
-          deps.send({ type: 'fs:read', sessionId: msg.sessionId, path: last.path })
+          applyWriteFollowPreview(msg.sessionId, last.path, null, deps)
           const ui = useUiStore.getState()
           ui.setChatActiveTab('files')
           ui.setSelectedArtifactPath(last.path)

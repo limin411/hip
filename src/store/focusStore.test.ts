@@ -8,7 +8,9 @@ describe('focusStore (P3 U10)', () => {
       focusedAgentId: null,
       focusedPath: null,
       followPaused: false,
+      panelDismissedThisTurn: false,
       autoFollowEdits: true,
+      deferredWriteFollow: null,
     })
   })
 
@@ -23,9 +25,36 @@ describe('focusStore (P3 U10)', () => {
     expect(useFocusStore.getState().followPaused).toBe(false)
   })
 
-  it('resetFollowForTurn clears pause', () => {
+  it('resetFollowForTurn clears pause, dismiss, and deferred follow', () => {
     useFocusStore.getState().setFocusedPath('/a.ts', { userInitiated: true })
+    useFocusStore.getState().dismissPanelThisTurn()
+    useFocusStore.getState().setDeferredWriteFollow({
+      sessionId: 's1',
+      path: '/scripts/x.py',
+      callId: 'c1',
+    })
     useFocusStore.getState().resetFollowForTurn()
     expect(useFocusStore.getState().followPaused).toBe(false)
+    expect(useFocusStore.getState().panelDismissedThisTurn).toBe(false)
+    expect(useFocusStore.getState().deferredWriteFollow).toBeNull()
+  })
+
+  it('dismissPanelThisTurn sets flag and clears deferred follow', () => {
+    useFocusStore.getState().setDeferredWriteFollow({
+      sessionId: 's1',
+      path: '/a.py',
+      callId: 'c1',
+    })
+    useFocusStore.getState().dismissPanelThisTurn()
+    expect(useFocusStore.getState().panelDismissedThisTurn).toBe(true)
+    expect(useFocusStore.getState().deferredWriteFollow).toBeNull()
+  })
+
+  it('setDeferredWriteFollow / clearDeferredWriteFollow', () => {
+    const d = { sessionId: 's1', path: '/a.py', callId: 'c1' }
+    useFocusStore.getState().setDeferredWriteFollow(d)
+    expect(useFocusStore.getState().deferredWriteFollow).toEqual(d)
+    useFocusStore.getState().clearDeferredWriteFollow()
+    expect(useFocusStore.getState().deferredWriteFollow).toBeNull()
   })
 })

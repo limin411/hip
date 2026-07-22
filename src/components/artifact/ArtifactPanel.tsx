@@ -17,6 +17,7 @@ import { TerminalView } from './TerminalView'
 import { CODE_TERMINAL } from './terminalFeature'
 import { useDomainStore } from '@/domain/sessionStore'
 import { useDiffStore } from '@/store/diffStore'
+import { useFocusStore } from '@/store/focusStore'
 const GIT_GATED: ReadonlySet<ArtifactTab> = new Set(['timeline', 'changes'])
 
 function tabLabel(
@@ -74,7 +75,11 @@ export function ArtifactPanel() {
           <Button
             variant="ghost"
             size="icon"
-            onClick={() => activeSessionId && setSessionCodePanelOpen(activeSessionId, false)}
+            onClick={() => {
+              if (!activeSessionId) return
+              useFocusStore.getState().dismissPanelThisTurn()
+              setSessionCodePanelOpen(activeSessionId, false)
+            }}
             title={t('artifact.closePanel')}
           >
             <X size={16} strokeWidth={1.75} />

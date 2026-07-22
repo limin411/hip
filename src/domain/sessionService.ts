@@ -2153,6 +2153,8 @@ export class SessionService {
       }
     }
     const id = nanoid()
+    // New user turn: re-enable write-follow / panel auto-open for this turn.
+    useFocusStore.getState().resetFollowForTurn()
     useDomainStore.getState().appendUserMessage(activeSessionId, id, text, attachments)
     this.transport.send({
       type: 'message:send',
@@ -2207,6 +2209,7 @@ export class SessionService {
     const { activeSessionId } = useDomainStore.getState()
     if (!activeSessionId) return
     const id = nanoid()
+    useFocusStore.getState().resetFollowForTurn()
     useDomainStore.getState().appendUserMessage(activeSessionId, id, text, attachments)
     this.transport.send({
       type: 'message:resume',

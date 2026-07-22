@@ -37,6 +37,7 @@ import { TerminalFilesPanel } from '@/components/terminals/TerminalFilesPanel'
 import { startTerminalBridge } from '@/ipc/pty'
 import { useProjectPathStore } from '@/store/projectPathStore'
 import { useManagedTerminalStore } from '@/store/managedTerminalStore'
+import { useFocusStore } from '@/store/focusStore'
 
 export function AppLayout() {
   const rightPanelRef = useRef<ImperativePanelHandle>(null)
@@ -134,6 +135,10 @@ export function AppLayout() {
       return
     }
     if (!activeSessionId) return
+    // User-dismissed: suppress write-follow auto-open for the rest of this turn.
+    if (activeView === 'code' || activeView === 'chat') {
+      useFocusStore.getState().dismissPanelThisTurn()
+    }
     if (activeView === 'code') useDomainStore.getState().setSessionCodePanelOpen(activeSessionId, false)
     else if (activeView === 'chat') useDomainStore.getState().setSessionChatPanelOpen(activeSessionId, false)
   }

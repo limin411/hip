@@ -6,6 +6,7 @@ import { useFsScope } from '@/store/useFsScope'
 import { useFsStore } from '@/store/fsStore'
 import { useActiveMessages, sessionService, useActiveSessionId } from '@/domain'
 import { useDomainStore } from '@/domain/sessionStore'
+import { useFocusStore } from '@/store/focusStore'
 import { collectConversationArtifacts } from '@/lib/renderedArtifacts'
 import { iconFor } from './ArtifactCard'
 import { FilePreview } from './FilePreview'
@@ -68,7 +69,10 @@ export function PreviewPanel() {
 
   const close = () => {
     resetChatActiveTab()
-    if (activeSessionId) setSessionChatPanelOpen(activeSessionId, false)
+    if (activeSessionId) {
+      useFocusStore.getState().dismissPanelThisTurn()
+      setSessionChatPanelOpen(activeSessionId, false)
+    }
   }
 
   return (

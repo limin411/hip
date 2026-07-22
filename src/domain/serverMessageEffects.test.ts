@@ -6,6 +6,7 @@ import { useWorkflowStore } from '@/store/workflowStore'
 import { useUiStore } from '@/store/uiStore'
 import { useParallelStore } from '@/store/parallelStore'
 import { useWorktreeStore } from '@/store/worktreeStore'
+import { useFocusStore } from '@/store/focusStore'
 import type { WorkflowDef } from '@hip/protocol'
 import '@/i18n'
 
@@ -68,6 +69,15 @@ describe('applyServerMessageEffects', () => {
     useUiStore.setState({ activeTab: 'files' })
     useParallelStore.setState({ runs: [] })
     useWorktreeStore.getState().clear()
+    useFocusStore.setState({
+      autoFollowEdits: true,
+      followPaused: false,
+      panelDismissedThisTurn: false,
+      deferredWriteFollow: null,
+      focusedPath: null,
+      focusedCallId: null,
+      focusedAgentId: null,
+    })
   })
 
   it('ready resets diff transient and requests session:list', () => {
@@ -402,6 +412,42 @@ describe('applyServerMessageEffects', () => {
             content: 'hello',
             timestamp: 1,
             toolCalls: [],
+          },
+        },
+        deps,
+      )
+      expect(useDomainStore.getState().sessions.find((s) => s.id === 's1')!.chatPanelOpen).toBe(false)
+    })
+
+    it('message:complete on chat surface does not open panel when user dismissed this turn', () => {
+      seedSession('chat')
+      useFocusStore.setState({ panelDismissedThisTurn: true })
+      useUiStore.setState({
+        activeView: 'chat',
+        chatActiveTab: 'agents',
+        selectedArtifactPath: null,
+      })
+      const deps = makeDeps()
+      applyServerMessageEffects(
+        {
+          type: 'message:complete',
+          sessionId: 's1',
+          message: {
+            id: 't1',
+            role: 'assistant',
+            content: 'done',
+            timestamp: 1,
+            toolCalls: [
+              {
+                callId: 'c1',
+                agentId: 'supervisor',
+                name: 'write_file',
+                input: JSON.stringify({ path: '/page.html', content: '<h1>hi</h1>' }),
+                status: 'finished',
+                seq: 0,
+                output: 'wrote /page.html (11 bytes)',
+              },
+            ],
           },
         },
         deps,

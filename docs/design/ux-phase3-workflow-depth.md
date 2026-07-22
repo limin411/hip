@@ -12,7 +12,7 @@
 | --- | --- |
 | **3a** | Tune popover: sectioned layout, full-width interactive rows |
 | **3b** | Tool timeline chapters: lower group threshold; collapsible `ToolCallGroup` |
-| **3c** | First-run: with key but Code missing folder → folder-focused card |
+| **3c** | First-run: no-key three-step only; Code folder stays on `FolderPill` (no second bordered card when key exists) |
 | **3d** | Unit tests + e2e composer-widgets open Tune for secondary chips |
 
 ## Constraints

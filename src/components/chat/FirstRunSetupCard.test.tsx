@@ -49,23 +49,19 @@ describe('FirstRunSetupCard', () => {
     expect(container.querySelector('[data-testid="first-run-setup"]')).toBeNull()
   })
 
-  it('shows code-folder card when key present but no folder', () => {
+  it('hides when code has a key even without folder (FolderPill owns folder UX)', () => {
     providersStore.useProvidersStore.setState({
       keyConfigured: { openai: true },
       loaded: true,
     })
-    render(<FirstRunSetupCard surface="code" hasFolder={false} />)
-    expect(screen.getByTestId('first-run-setup')).toHaveAttribute('data-variant', 'code-folder')
-    expect(screen.getByTestId('first-run-pick-folder')).toBeInTheDocument()
+    const { container } = render(<FirstRunSetupCard surface="code" />)
+    expect(container.querySelector('[data-testid="first-run-setup"]')).toBeNull()
   })
 
-  it('hides code card when folder bound', () => {
-    providersStore.useProvidersStore.setState({
-      keyConfigured: { openai: true },
-      loaded: true,
-    })
-    const { container } = render(<FirstRunSetupCard surface="code" hasFolder />)
-    expect(container.querySelector('[data-testid="first-run-setup"]')).toBeNull()
+  it('shows no-key card on code surface without key (includes folder step)', () => {
+    render(<FirstRunSetupCard surface="code" />)
+    expect(screen.getByTestId('first-run-setup')).toHaveAttribute('data-variant', 'no-key')
+    expect(screen.getByTestId('first-run-pick-folder')).toBeInTheDocument()
   })
 
   it('open models CTA switches settings page', () => {

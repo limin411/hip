@@ -8,28 +8,17 @@ import { useDraftStore } from '@/store/draftStore'
 import { cn } from '@/lib/utils'
 
 /**
- * Empty-conversation onboarding:
- * - No API key → full three-step setup
- * - Code surface + has key but no folder → folder-focused card
- * Hidden once the user can actually send.
+ * Empty-conversation onboarding when no API key is configured.
+ * Code folder binding is handled by FolderPill under the composer — do not
+ * stack a second bordered "choose folder" card once a key exists.
  */
-export function FirstRunSetupCard({
-  surface,
-  hasFolder = false,
-}: {
-  surface: 'chat' | 'code'
-  /** Code: project folder already bound on draft. */
-  hasFolder?: boolean
-}) {
+export function FirstRunSetupCard({ surface }: { surface: 'chat' | 'code' }) {
   const { t } = useTranslation()
   const loaded = useProvidersStore((s) => s.loaded)
   const keyConfigured = useProvidersStore((s) => s.keyConfigured)
   const hasKey = Object.values(keyConfigured).some(Boolean)
 
-  if (!loaded) return null
-
-  // Ready to work: chat with key, or code with key + folder.
-  if (hasKey && (surface === 'chat' || hasFolder)) return null
+  if (!loaded || hasKey) return null
 
   const openModels = () => {
     useUiStore.getState().setSettingsPage('model')
@@ -42,29 +31,6 @@ export function FirstRunSetupCard({
     useDraftStore.getState().pickProject(dir)
   }
 
-  // Path B: key ok, Code needs folder.
-  if (hasKey && surface === 'code' && !hasFolder) {
-    return (
-      <div
-        className="mb-6 rounded-xl border border-border bg-surface-muted/40 px-4 py-4"
-        data-testid="first-run-setup"
-        data-variant="code-folder"
-        role="region"
-        aria-label={t('chat.firstRun.folderTitle')}
-      >
-        <div className="text-body font-medium text-ink">{t('chat.firstRun.folderTitle')}</div>
-        <p className="mt-1 text-meta text-ink-secondary">{t('chat.firstRun.folderSubtitle')}</p>
-        <div className="mt-4 flex flex-wrap items-center gap-2">
-          <Button size="sm" data-testid="first-run-pick-folder" onClick={() => void pickFolder()}>
-            <FolderOpen size={14} strokeWidth={1.75} className="mr-1.5" aria-hidden />
-            {t('chat.firstRun.folderCta')}
-          </Button>
-        </div>
-      </div>
-    )
-  }
-
-  // Path A: no key — three steps.
   const steps = [
     {
       icon: KeyRound,

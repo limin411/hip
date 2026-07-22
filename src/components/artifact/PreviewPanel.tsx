@@ -12,6 +12,7 @@ import { iconFor } from './ArtifactCard'
 import { FilePreview } from './FilePreview'
 import { AgentDashboard } from './AgentDashboard'
 import { ConversationOutline } from './ConversationOutline'
+import { TasksPanel } from './TasksPanel'
 import { Button } from '@/components/ui/Button'
 import { cn } from '@/lib/utils'
 
@@ -25,9 +26,10 @@ function base64ToBytes(b64: string): Uint8Array {
 
 function tabLabel(
   tab: ChatTab,
-  t: (key: 'artifact.files' | 'artifact.agents' | 'artifact.outline') => string,
+  t: (key: 'artifact.files' | 'artifact.agents' | 'artifact.runtime' | 'artifact.outline') => string,
 ): string {
   if (tab === 'agents') return t('artifact.agents')
+  if (tab === 'tasks') return t('artifact.runtime')
   if (tab === 'outline') return t('artifact.outline')
   return t('artifact.files')
 }
@@ -151,6 +153,11 @@ export function PreviewPanel() {
         {chatActiveTab === 'agents' && (
           <div className="h-full overflow-auto p-3">
             <AgentDashboard />
+          </div>
+        )}
+        {chatActiveTab === 'tasks' && (
+          <div className="h-full min-h-0 overflow-hidden">
+            <TasksPanel />
           </div>
         )}
       </div>

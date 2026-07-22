@@ -79,6 +79,18 @@ describe('message-guard', () => {
     expect(msg!.deleteDerivedMemories).toBe(true)
   })
 
+  it('accepts task:list / task:stop / task:getOutput', () => {
+    expect(parseClientMessage({ type: 'task:list', sessionId: 's1' })?.type).toBe('task:list')
+    expect(
+      parseClientMessage({ type: 'task:stop', sessionId: 's1', taskId: 'shell-1', reason: 'user' })
+        ?.type,
+    ).toBe('task:stop')
+    expect(
+      parseClientMessage({ type: 'task:getOutput', sessionId: 's1', taskId: 'shell-1', offsetBytes: 0 })
+        ?.type,
+    ).toBe('task:getOutput')
+  })
+
   it('accepts session:delete with reason audit tag', () => {
     const msg = parseClientMessage({
       type: 'session:delete',

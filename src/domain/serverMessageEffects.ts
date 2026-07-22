@@ -24,6 +24,7 @@ import { useFocusStore } from '@/store/focusStore'
 import { useGoalStore } from '@/store/goalStore'
 import { collectWorktreeCascadeDeleteIds } from '@/lib/worktreeNesting'
 import { auditSessionDelete, debugSessionDelete } from '@/lib/sessionDelete'
+import { useTaskRuntimeStore } from '@/store/taskRuntimeStore'
 
 /** Must match sidecar KEEP_RECENT_TURNS — used only in no-op copy. */
 const COMPACT_KEEP_RECENT_TURNS = 3
@@ -127,6 +128,7 @@ let lastDiffDeps: ServerMessageEffectDeps | null = null
  */
 export function applyServerMessageEffects(msg: ServerMessage, deps: ServerMessageEffectDeps): void {
   lastDiffDeps = deps
+  useTaskRuntimeStore.getState().applyMessage(msg)
   switch (msg.type) {
     case 'ready':
       useDiffStore.getState().resetTransient()

@@ -1195,7 +1195,24 @@ export async function runTurn(host: SessionTurnHost, rawSend: SendFn, base?: {
       spawnSubagent,
       retrySubagent: retrySubagentWrapper,
       stopBackgroundTask: (taskId, reason) => host.backgroundManager.stop(taskId, reason),
-      getBackgroundTaskOutput: (taskId) => host.backgroundManager.getOutput(taskId),
+      getBackgroundTaskOutput: async (taskId, timeoutMs?: number) => {
+        if (typeof timeoutMs === 'number' && timeoutMs > 0) {
+          await host.backgroundManager.wait(taskId, timeoutMs)
+        }
+        const structured = host.backgroundManager.getOutputStructured(taskId)
+        // Prefer structured JSON for multi-kind; fall back to plain text for agents.
+        if (structured.kind === 'agent' && structured.output && !structured.error) {
+          return structured.output
+        }
+        return JSON.stringify(structured)
+      },
+      taskRuntime: host.backgroundManager,
+      onActivity: () => emit.activity?.(),
+      signal: host.abortController?.signal,
+      originTurnId: turnId,
+      shellBackgroundEnabled: true,
+      monitorEnabled: true,
+      schedulerWakeEnabled: true,
       hooks: host.hooks,
       approvalCache: host.approvalCache,
       requestApproval,

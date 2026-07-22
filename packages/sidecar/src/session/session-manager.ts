@@ -270,11 +270,35 @@ export class SessionManager {
     const now = Date.now()
     this.store?.insertSession({ id, title: '新对话', config: JSON.stringify(cfg), createdAt: now, updatedAt: now })
     const idleMs = idleTimeoutForConfig(cfg)
-    this.sessions.set(id, new Session(id, cfg, this.modelFactory(cfg), this.store, undefined, idleMs, undefined, undefined, undefined, this.scratchRoot))
-    void this.sessions.get(id)!.captureSnapshot().catch((err) => console.warn('[session-manager] captureSnapshot failed:', err instanceof Error ? err.message : String(err)))
+    const session = new Session(id, cfg, this.modelFactory(cfg), this.store, undefined, idleMs, undefined, undefined, undefined, this.scratchRoot)
+    this.wireTaskRuntime(session, send)
+    this.sessions.set(id, session)
+    void session.captureSnapshot().catch((err) => console.warn('[session-manager] captureSnapshot failed:', err instanceof Error ? err.message : String(err)))
     send({ type: 'session:created', sessionId: id })
     // A no-cwd (pure-chat) session got a server-derived scratch cwd — tell the client.
     if (!config.cwd) send({ type: 'session:cwd', sessionId: id, cwd: cfg.cwd! })
+    session.backgroundManager.pushSnapshot()
+  }
+
+  private wireTaskRuntime(session: Session, send: SendFn): void {
+    session.bindSend(send)
+    session.setTaskRuntimeBroadcast((msg) => {
+      // Fan-out via the connection that last bound send; multi-client may rebind per request.
+      try {
+        send(msg)
+      } catch {
+        /* connection gone */
+      }
+    })
+    // Mirror existing cron rows into Runtime
+    for (const t of session.cronManager.list()) {
+      session.backgroundManager.upsertSchedule({
+        id: t.id,
+        prompt: t.prompt,
+        nextFireAt: t.nextFireAt,
+      })
+    }
+    session.startScheduleTimer()
   }
 
   /** Get the in-memory session, or rebuild it from the DB (lazy resume). */
@@ -283,7 +307,10 @@ export class SessionManager {
       throw new CodedError('SESSION_TRASHED', 'Session is in the recycle bin; restore it first')
     }
     const existing = this.sessions.get(id)
-    if (existing) return existing
+    if (existing) {
+      existing.bindSend(send)
+      return existing
+    }
     const row = this.store?.getSession(id)
     const raw: SessionConfig = row ? JSON.parse(row.config) : { llmProvider: 'deepseek', model: '', tools: [] }
     const config = normalizeSessionConfig(raw)
@@ -291,6 +318,7 @@ export class SessionManager {
     if (this.store) session.hydrate(this.store.loadMessages(id))
     // Restore plan-approval pause from durable config marker (D4c.1).
     session.restorePlanApprovalPauseFromConfig()
+    this.wireTaskRuntime(session, send)
     this.sessions.set(id, session)
     // Send immediate MCP status for this session's configured servers.
     // Connections may not be established yet (reconcile runs on first turn),

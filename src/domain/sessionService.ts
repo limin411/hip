@@ -1829,6 +1829,19 @@ export class SessionService {
     return { imported: msg.imported, skipped: msg.skipped }
   }
 
+  /** Send a raw client message (TaskRuntime control plane). */
+  sendClient(msg: import('@hip/protocol').ClientMessage): void {
+    this.transport.send(msg)
+  }
+
+  listRuntimeTasks(sessionId: string): void {
+    this.transport.send({ type: 'task:list', sessionId })
+  }
+
+  stopRuntimeTask(sessionId: string, taskId: string, reason?: string): void {
+    this.transport.send({ type: 'task:stop', sessionId, taskId, ...(reason ? { reason } : {}) })
+  }
+
   setMemoryFlags(
     sessionId: string,
     flags: { useMemories?: boolean; generateMemories?: boolean; incognito?: boolean },

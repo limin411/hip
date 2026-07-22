@@ -87,6 +87,7 @@ import { buildSessionTooling, type SessionTooling } from './session-tooling.js'
 import { safeErrorMessage } from './error.js'
 import { BackgroundManager, BackgroundTaskPersistence, type BackgroundTaskMeta } from './background-manager.js'
 import { CronManager } from './cron.js'
+import { TurnEnqueuer, type WakeMode } from './turn-enqueuer.js'
 import { logInfo, logDebug, logDebugEveryN } from '../debug-logger.js'
 import {
   resolveModel,
@@ -178,6 +179,13 @@ export class Session {
   private readonly invokerFactory: (cwd: string) => AgentInvoker
   readonly backgroundManager: BackgroundManager
   readonly cronManager: CronManager
+  readonly turnEnqueuer: TurnEnqueuer
+  private scheduleTimer: ReturnType<typeof setInterval> | null = null
+  private lastSend: SendFn | null = null
+  /** Product default per KD-25: auto wake on shell/agent complete. */
+  wakeMode: WakeMode = 'auto'
+  /** When true, schedule fires are frozen (chat mode). */
+  scheduleFiresPaused = false
   /** @deprecated Use backgroundManager.tasks instead. Kept for test backward-compat. */
   get backgroundTasks(): Map<string, Promise<void>> { return this.backgroundManager.tasks }
   /** @deprecated Use backgroundManager.meta instead. Kept for internal backward-compat. */
@@ -331,9 +339,14 @@ export class Session {
     this.backgroundManager = new BackgroundManager(id, {
       maxTasks: Session.MAX_BACKGROUND_TASKS,
       maxRetainedMeta: Session.MAX_RETAINED_BACKGROUND_META,
+      caps: { agent: Session.MAX_BACKGROUND_TASKS, shell: 20, monitor: 10, schedule: 50, globalRunning: 40 },
     })
 
     this.cronManager = new CronManager(id, store)
+    this.turnEnqueuer = new TurnEnqueuer(
+      this as unknown as import('./turn-enqueuer.js').TurnEnqueuerHost,
+      () => this.lastSend,
+    )
 
     this.eventStore = store ? new EventStore(store.getDb()) : undefined
     this.snapshotStore = store ? new SnapshotStore(store.getDb()) : undefined
@@ -345,7 +358,13 @@ export class Session {
     this.git = new GitOperations(id, store)
     this.permissions = new PermissionManager(
       () => this._config.permissionMode ?? 'edit',
-      (mode) => { if (this.running) return false; this._config = { ...this._config, permissionMode: mode }; return true },
+      (mode) => {
+        if (this.running) return false
+        this._config = { ...this._config, permissionMode: mode }
+        // KD-21: freeze schedule fires in chat; keep running shells
+        this.scheduleFiresPaused = mode === 'chat'
+        return true
+      },
       { enableStickyApproval: this._config.enableStickyApproval ?? true },
     )
     this.permissions.setApprovalCache(this.approvalCache)
@@ -885,25 +904,33 @@ export class Session {
   }
 
   async drainInputQueue(_send: SendFn): Promise<void> {
-    while (!this.running && !this.awaitingResume && !this.switchingAgent) {
-      const steer = this.promoteSteerInput()
-      const input = steer ?? this.inputQueue.shift()
-      if (!input) {
-        if (!this.running && !this.awaitingResume) this.ownerConnectionId = null
-        return
-      }
-      if (input.type === 'message' && input.messageId) {
-        this.inputQueueStore?.promoteById(input.messageId)
-      }
-      // Ownership for the turn that is about to start.
-      this.ownerConnectionId = input.connectionId ?? this.currentConnectionId ?? null
-      this.currentConnectionId = this.ownerConnectionId
-      try {
-        await this.processInput(input, _send)
-      } finally {
-        if (!this.running && !this.awaitingResume && this.inputQueue.length === 0) {
-          this.ownerConnectionId = null
+    this.lastSend = _send
+    try {
+      while (!this.running && !this.awaitingResume && !this.switchingAgent) {
+        const steer = this.promoteSteerInput()
+        const input = steer ?? this.inputQueue.shift()
+        if (!input) {
+          if (!this.running && !this.awaitingResume) this.ownerConnectionId = null
+          break
         }
+        if (input.type === 'message' && input.messageId) {
+          this.inputQueueStore?.promoteById(input.messageId)
+        }
+        // Ownership for the turn that is about to start.
+        this.ownerConnectionId = input.connectionId ?? this.currentConnectionId ?? null
+        this.currentConnectionId = this.ownerConnectionId
+        try {
+          await this.processInput(input, _send)
+        } finally {
+          if (!this.running && !this.awaitingResume && this.inputQueue.length === 0) {
+            this.ownerConnectionId = null
+          }
+        }
+      }
+    } finally {
+      // KD-23: always attempt wake buffer flush when idle
+      if (!this.running && !this.awaitingResume) {
+        await this.turnEnqueuer.flushWakeBuffer()
       }
     }
   }
@@ -1126,11 +1153,96 @@ export class Session {
   }
 
 
+  /** Wire session-level broadcast for TaskRuntime (out-of-turn events). */
+  setTaskRuntimeBroadcast(fn: (msg: import('@hip/protocol').ServerMessage) => void): void {
+    this.backgroundManager.setBroadcast((msg) => {
+      fn(msg)
+      // Auto-wake on shell/agent terminal notifications (KD-25)
+      if (msg.type === 'task:notification' && this.wakeMode === 'auto') {
+        if (
+          (msg.kind === 'shell' || msg.kind === 'agent') &&
+          (msg.status === 'completed' || msg.status === 'failed')
+        ) {
+          const clip = (msg.result ?? msg.error ?? '').slice(0, 2000)
+          this.turnEnqueuer.enqueueWake(
+            `[background ${msg.kind} "${msg.description}" ${msg.status}]\n${clip}`,
+            `wake-task-${msg.taskId}-${Date.now()}`,
+          )
+        }
+      }
+    })
+  }
+
+  /** Remember last send for schedule/wake drains. */
+  bindSend(send: SendFn): void {
+    this.lastSend = send
+  }
+
+  startScheduleTimer(): void {
+    if (this.scheduleTimer) return
+    this.scheduleTimer = setInterval(() => {
+      void this.tickSchedules()
+    }, 1000)
+    this.scheduleTimer.unref?.()
+  }
+
+  stopScheduleTimer(): void {
+    if (this.scheduleTimer) {
+      clearInterval(this.scheduleTimer)
+      this.scheduleTimer = null
+    }
+  }
+
+  private async tickSchedules(): Promise<void> {
+    if (this.scheduleFiresPaused) return
+    const due = this.cronManager.tickDue()
+    for (const fire of due) {
+      // Mirror nextFire for recurring
+      const row = this.cronManager.get(fire.id)
+      if (row) {
+        this.backgroundManager.upsertSchedule({
+          id: fire.id,
+          prompt: fire.prompt,
+          nextFireAt: row.nextFireAt,
+        })
+      }
+
+      if (fire.foreground) {
+        this.cronManager.commitFire(fire.id)
+        this.turnEnqueuer.enqueueWake(
+          `[scheduled task ${fire.id}] ${fire.prompt}`,
+          `sched-fire-${fire.id}-${Date.now()}`,
+        )
+        continue
+      }
+
+      // Background fire as agent
+      const taskId = `worker-sched-${fire.id}-${Date.now().toString(36)}`
+      const result = this.backgroundManager.spawn(
+        taskId,
+        `schedule:${fire.prompt.slice(0, 60)}`,
+        async (signal) => {
+          if (!this.lastSend) return
+          await this.runBackgroundSubagent(taskId, fire.prompt, signal, this.lastSend)
+        },
+      )
+      if (result.startsWith('Error:')) {
+        this.cronManager.skipFire(fire.id)
+        const m = this.backgroundManager.meta.get(fire.id)
+        if (m) {
+          m.metrics = { ...m.metrics, skipCount: (m.metrics?.skipCount ?? 0) + 1 }
+        }
+        continue
+      }
+      this.cronManager.commitFire(fire.id)
+    }
+  }
+
   async destroy(): Promise<void> {
     this.cancel()
-    if (this.backgroundManager.totalCount > 0) {
-      const timeout = new Promise<'timed_out'>((resolve) => setTimeout(() => resolve('timed_out'), 5_000))
-      await Promise.race([Promise.allSettled([...this.backgroundManager.tasks.values()]).then(() => 'settled' as const), timeout])
+    this.stopScheduleTimer()
+    if (this.backgroundManager.meta.size > 0 || this.backgroundManager.totalCount > 0) {
+      await this.backgroundManager.destroyAll({ killSchedules: true })
       this.backgroundManager.clear()
     }
     // After abort, give a short grace for the foreground turn to leave `running`

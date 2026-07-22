@@ -103,7 +103,10 @@ const BASE =
   'Do NOT chain sequential dispatch_agent/task for independent work. Never claim parallel if you only ran sequential calls. ' +
   'Simple, single-step requests: do them yourself — do not call task, task_batch, write_todos, or spawn sub-agents. ' +
   'Trust sub-agent results; re-explore only if empty, errored, or clearly incomplete. ' +
-  'Background only: task mode background, then task_output/task_stop. ' +
+  'Long shell work: run_script with background:true (returns task_id); use task_output / wait_tasks / task_stop — do not sleep-poll. ' +
+  'Log/CI streams: monitor with tight filters (lines are UI events, not auto-injected — use task_output). ' +
+  'Periodic checks: scheduler_create (not FG sleep loops). ' +
+  'Sub-agent fire-and-forget: task mode background, then task_output/task_stop. ' +
   'Never thrash on .git/objects or invent shell tool names; use run_script for shell; stop probing on binary/failed tools. ' +
   'For deeper edit/delegation/git policy, call use_skill({ name: "hip-coding" }) when that skill is listed under Skills.'
 

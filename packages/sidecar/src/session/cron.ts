@@ -15,6 +15,23 @@ export interface CronTask {
   schedule: CronSchedule
   nextFireAt: number
   createdAt: number
+  /** When true, fire enqueues a main-turn wake; default false = bg agent. */
+  foreground?: boolean
+  durable?: boolean
+  expiresAt?: number
+}
+
+export interface CronDueFire {
+  id: string
+  prompt: string
+  foreground: boolean
+  scheduleType: 'once' | 'recurring'
+}
+
+export interface CronCreateOpts {
+  foreground?: boolean
+  durable?: boolean
+  expiresAt?: number
 }
 
 function jitter(intervalMs: number): number {
@@ -50,15 +67,25 @@ export class CronManager {
     this.loaded = true
   }
 
-  create(prompt: string, schedule: CronSchedule): string {
+  create(prompt: string, schedule: CronSchedule, opts?: CronCreateOpts): string {
     this.ensureLoaded()
     const id = `cron-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
     const now = Date.now()
-    const nextFireAt = schedule.type === 'once'
-      ? (schedule.at ?? now)
-      : (schedule.at ?? now + (schedule.intervalMs ?? 60000))
+    const nextFireAt =
+      schedule.type === 'once'
+        ? (schedule.at ?? now)
+        : (schedule.at ?? now + (schedule.intervalMs ?? 60000))
 
-    const task: CronTask = { id, prompt, schedule, nextFireAt, createdAt: now }
+    const task: CronTask = {
+      id,
+      prompt,
+      schedule,
+      nextFireAt,
+      createdAt: now,
+      foreground: opts?.foreground ?? false,
+      durable: opts?.durable ?? false,
+      expiresAt: opts?.expiresAt ?? now + 7 * 86_400_000,
+    }
     this.tasks.set(id, task)
 
     if (this.store) {
@@ -90,15 +117,33 @@ export class CronManager {
     return existed
   }
 
-  tick(): string[] {
+  get(id: string): CronTask | undefined {
     this.ensureLoaded()
-    const now = Date.now()
-    const due: string[] = []
+    return this.tasks.get(id)
+  }
 
-    for (const task of this.tasks.values()) {
+  /**
+   * Return due fires with ids. Does NOT delete one-shots until commitFire.
+   * Advances recurring nextFireAt immediately so skips still wait for next interval.
+   */
+  tickDue(now = Date.now()): CronDueFire[] {
+    this.ensureLoaded()
+    const due: CronDueFire[] = []
+
+    for (const task of [...this.tasks.values()]) {
+      if (task.expiresAt != null && now > task.expiresAt) {
+        this.tasks.delete(task.id)
+        if (this.store) this.store.deleteCronTask(task.id)
+        continue
+      }
       if (now < task.nextFireAt) continue
 
-      due.push(task.prompt)
+      due.push({
+        id: task.id,
+        prompt: task.prompt,
+        foreground: task.foreground ?? false,
+        scheduleType: task.schedule.type,
+      })
 
       if (task.schedule.type === 'recurring' && task.schedule.intervalMs) {
         const nextInterval = jitter(task.schedule.intervalMs)
@@ -106,25 +151,54 @@ export class CronManager {
         if (this.store) {
           this.store.updateCronTaskNextFire(task.id, task.nextFireAt)
         }
-      } else {
-        this.tasks.delete(task.id)
-        if (this.store) {
-          this.store.deleteCronTask(task.id)
-        }
       }
+      // one-shot: leave in map until commitFire/skipFire
     }
 
     return due
   }
+
+  /** Successful handoff — delete one-shots. */
+  commitFire(id: string): void {
+    this.ensureLoaded()
+    const task = this.tasks.get(id)
+    if (!task) return
+    if (task.schedule.type === 'once') {
+      this.tasks.delete(id)
+      if (this.store) this.store.deleteCronTask(id)
+    }
+  }
+
+  /**
+   * Skip fire (cap full). One-shot: re-arm nextFireAt = now + min(interval, 60s) backoff.
+   * Recurring: already advanced in tickDue.
+   */
+  skipFire(id: string, now = Date.now()): void {
+    this.ensureLoaded()
+    const task = this.tasks.get(id)
+    if (!task) return
+    if (task.schedule.type === 'once') {
+      const backoff = Math.min(task.schedule.intervalMs ?? 60_000, 60_000)
+      task.nextFireAt = now + backoff
+      if (this.store) this.store.updateCronTaskNextFire(id, task.nextFireAt)
+    }
+  }
+
+  /** Legacy: prompts only (session-turn inject path). */
+  tick(): string[] {
+    return this.tickDue().map((f) => {
+      this.commitFire(f.id)
+      return f.prompt
+    })
+  }
 }
 
+/** @deprecated Prefer buildSchedulerTools in task-runtime-tools. Kept for direct imports. */
 export function buildCronTools(cronManager: CronManager): StructuredToolInterface[] {
   const createTool = tool(
     async ({ prompt, type, at, interval_ms }) => {
       const schedule: CronSchedule = { type }
-      if (type === 'once' && at !== undefined) {
-        schedule.at = at
-      }
+      if (type === 'once' && at !== undefined) schedule.at = at
       if (type === 'recurring') {
         if (interval_ms !== undefined) schedule.intervalMs = interval_ms
         if (at !== undefined) schedule.at = at
@@ -152,30 +226,31 @@ export function buildCronTools(cronManager: CronManager): StructuredToolInterfac
       const tasks = cronManager.list()
       if (tasks.length === 0) return 'No scheduled cron tasks.'
       return tasks
-        .map(
-          (t) =>
-            `${t.id}: type=${t.schedule.type}, prompt="${t.prompt.slice(0, 80)}${t.prompt.length > 80 ? '...' : ''}", nextFire=${new Date(t.nextFireAt).toISOString()}${t.schedule.type === 'recurring' && t.schedule.intervalMs ? `, every=${t.schedule.intervalMs}ms` : ''}`,
-        )
+        .map((t) => {
+          const interval =
+            t.schedule.type === 'recurring' && t.schedule.intervalMs
+              ? ` ${t.schedule.intervalMs}ms`
+              : ''
+          return `${t.id}: ${t.schedule.type}${interval} next=${new Date(t.nextFireAt).toISOString()} — ${t.prompt.slice(0, 80)}`
+        })
         .join('\n')
     },
     {
       name: 'cron_list',
-      description: 'List all scheduled cron tasks (self-reminders) for this session.',
+      description: 'List scheduled cron tasks.',
       schema: z.object({}),
     },
   )
 
   const deleteTool = tool(
     async ({ id }) => {
-      const removed = cronManager.delete(id)
-      return removed ? `Deleted cron task ${id}.` : `Cron task ${id} not found.`
+      const ok = cronManager.delete(id)
+      return ok ? `Deleted cron task ${id}` : `Error: cron task ${id} not found`
     },
     {
       name: 'cron_delete',
-      description: 'Delete a scheduled cron task by ID. Returns whether the task was found and removed.',
-      schema: z.object({
-        id: z.string().describe('The cron task ID to delete'),
-      }),
+      description: 'Delete a cron task by id.',
+      schema: z.object({ id: z.string() }),
     },
   )
 

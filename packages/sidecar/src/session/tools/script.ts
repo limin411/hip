@@ -1,10 +1,11 @@
-import { spawn } from 'node:child_process'
 import { tool } from '@langchain/core/tools'
 import type { StructuredToolInterface } from '@langchain/core/tools'
 import { z } from 'zod'
 import { generateAgentConfig } from '../agents/generate.js'
 import { isApproved, SCRIPT_TIMEOUT_MS, SCRIPT_OUTPUT_CAP } from './helpers.js'
 import type { ApprovalFn } from './helpers.js'
+import type { BackgroundManager } from '../background-manager.js'
+import { runShellForeground } from '../shell-backend.js'
 
 export function buildGenerateAgentTool(): StructuredToolInterface {
   return tool(
@@ -30,66 +31,112 @@ export function buildGenerateAgentTool(): StructuredToolInterface {
   )
 }
 
-export function buildRunScriptTool(
-  requestApproval: ApprovalFn,
-  cwd: string,
-): StructuredToolInterface {
-  const scriptCwd = cwd
+export interface RunScriptToolOpts {
+  requestApproval: ApprovalFn
+  cwd: string
+  /** When set, enables background: true path. */
+  runtime?: BackgroundManager
+  /** Idle activity pulse during FG execution. */
+  onActivity?: () => void
+  /** AbortSignal for FG cancel. */
+  signal?: AbortSignal
+  originTurnId?: string | null
+  shellBackgroundEnabled?: boolean
+}
+
+export function buildRunScriptTool(opts: RunScriptToolOpts): StructuredToolInterface {
+  const {
+    requestApproval,
+    cwd,
+    runtime,
+    onActivity,
+    signal,
+    originTurnId,
+    shellBackgroundEnabled = true,
+  } = opts
+
   return tool(
-    async ({ command, reason }) => {
+    async ({ command, reason, background, timeout_ms }) => {
       const decision = await requestApproval({
         title: 'Run script',
         toolName: 'run_script',
         kind: 'execute',
         content: reason ? `${command}\n\n# ${reason}` : command,
       })
-      if (!isApproved(decision)) return '用户拒绝执行该脚本（command was rejected by the user; nothing ran）。'
-      const isWin = process.platform === 'win32'
-      const shell = isWin ? 'cmd' : 'sh'
-      const shellArgs = isWin ? ['/c', command] : ['-c', command]
-      return await new Promise<string>((resolve) => {
-        // Detached on non-Windows so the shell gets its own process group; killing -pid on timeout
-        // reaps any grandchildren the script spawned (a bare child.kill leaves orphans).
-        const child = spawn(shell, shellArgs, { cwd: scriptCwd, env: process.env, detached: !isWin })
-        let out = ''
-        let capped = false
-        const onChunk = (b: Buffer) => {
-          if (capped) return
-          out += b.toString('utf8')
-          if (out.length > SCRIPT_OUTPUT_CAP) { out = out.slice(0, SCRIPT_OUTPUT_CAP); capped = true }
-        }
-        child.stdout.on('data', onChunk)
-        child.stderr.on('data', onChunk)
-        let timedOut = false
-        const timer = setTimeout(() => {
-          timedOut = true
-          if (!isWin && child.pid) {
-            try { process.kill(-child.pid, 'SIGKILL') } catch { try { child.kill('SIGKILL') } catch { /* already gone */ } }
-          } else {
-            try { child.kill('SIGKILL') } catch { /* already gone */ }
-          }
-        }, SCRIPT_TIMEOUT_MS)
-        timer.unref?.()
-        child.on('error', (err) => {
-          clearTimeout(timer)
-          resolve(`Error: failed to spawn shell: ${err.message}`)
+      if (!isApproved(decision)) {
+        return '用户拒绝执行该脚本（command was rejected by the user; nothing ran）。'
+      }
+
+      // Background path
+      if (background && shellBackgroundEnabled && runtime) {
+        const started = runtime.spawnShell({
+          command,
+          cwd,
+          description: reason ?? command.slice(0, 80),
+          originTurnId: originTurnId ?? null,
         })
-        child.on('close', (code) => {
-          clearTimeout(timer)
-          const tail = capped ? '\n…(output truncated to 64KB)' : ''
-          const note = timedOut ? '\n(timed out after 120s; process killed)' : ''
-          resolve(`exitCode: ${code ?? 'null'}${note}\n${out}${tail}`)
+        if ('error' in started) return started.error
+        return JSON.stringify({
+          task_id: started.taskId,
+          kind: 'shell',
+          status: 'running',
+          message:
+            'Background shell started. Use task_output / wait_tasks; stop with task_stop.',
         })
-      })
+      }
+      if (background && !runtime) {
+        return 'Error: background shells are not available in this session'
+      }
+
+      const timeoutMs =
+        typeof timeout_ms === 'number' && timeout_ms > 0 ? timeout_ms : SCRIPT_TIMEOUT_MS
+
+      // FG activity pulse for IdleWatchdog
+      let pulse: ReturnType<typeof setInterval> | undefined
+      if (onActivity) {
+        onActivity()
+        pulse = setInterval(() => onActivity(), 5_000)
+        pulse.unref?.()
+      }
+
+      try {
+        const result = await runShellForeground({
+          command,
+          cwd,
+          timeoutMs,
+          outputCap: SCRIPT_OUTPUT_CAP,
+          signal,
+        })
+        const tail = result.truncated ? '\n…(output truncated to 64KB)' : ''
+        const note = result.timedOut
+          ? `\n(timed out after ${Math.round(timeoutMs / 1000)}s; process killed)`
+          : ''
+        return `exitCode: ${result.exitCode ?? 'null'}${note}\n${result.output}${tail}`
+      } finally {
+        if (pulse) clearInterval(pulse)
+      }
     },
     {
       name: 'run_script',
       description:
         'Run a shell command in the project directory. EVERY call is gated by an explicit user ' +
         'approval prompt — explain WHY in `reason`. Use for skill-bundled scripts and build/test ' +
-        'commands. Returns the exit code and combined stdout/stderr (truncated to 64KB, 120s timeout). ' +
+        'commands. Returns the exit code and combined stdout/stderr (truncated to 64KB). ' +
+        'Set `background: true` for long-running work (dev servers, stress tests) — returns task_id immediately; ' +
+        'use task_output / wait_tasks / task_stop. Optional `timeout_ms` for foreground only (default 120000). ' +
         'If the user rejects, the command does not run.',
-      schema: z.object({ command: z.string(), reason: z.string().optional() }),
+      schema: z.object({
+        command: z.string(),
+        reason: z.string().optional(),
+        background: z
+          .boolean()
+          .optional()
+          .describe('Run in background and return task_id immediately (for long-running commands)'),
+        timeout_ms: z
+          .number()
+          .optional()
+          .describe('Foreground timeout in ms (default 120000). Ignored when background is true.'),
+      }),
     },
   )
 }
@@ -99,6 +146,13 @@ export function buildScriptTools(
   requestApproval: ApprovalFn | undefined,
   cwd: string,
   mode: string,
+  runtime?: BackgroundManager,
+  extras?: {
+    onActivity?: () => void
+    signal?: AbortSignal
+    originTurnId?: string | null
+    shellBackgroundEnabled?: boolean
+  },
 ): StructuredToolInterface[] {
   const tools: StructuredToolInterface[] = []
 
@@ -106,11 +160,18 @@ export function buildScriptTools(
     tools.push(buildGenerateAgentTool())
   }
 
-  // run_script is dropped in chat (read-only) mode: a shell command would let a "read-only" agent
-  // mutate the project, defeating the mode. Outside chat it is registered whenever an approval fn
-  // is wired (every call is still HITL-gated).
   if (requestApproval && mode !== 'chat') {
-    tools.push(buildRunScriptTool(requestApproval, cwd))
+    tools.push(
+      buildRunScriptTool({
+        requestApproval,
+        cwd,
+        runtime,
+        onActivity: extras?.onActivity,
+        signal: extras?.signal,
+        originTurnId: extras?.originTurnId,
+        shellBackgroundEnabled: extras?.shellBackgroundEnabled,
+      }),
+    )
   }
 
   return tools

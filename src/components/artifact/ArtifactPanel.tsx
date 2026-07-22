@@ -14,6 +14,7 @@ import { ChangesView } from './ChangesView'
 import { GitInitBanner } from './GitInitBanner'
 import { BranchSwitcher } from './BranchSwitcher'
 import { TerminalView } from './TerminalView'
+import { TasksPanel } from './TasksPanel'
 import { CODE_TERMINAL } from './terminalFeature'
 import { useDomainStore } from '@/domain/sessionStore'
 import { useDiffStore } from '@/store/diffStore'
@@ -26,6 +27,7 @@ function tabLabel(
     key:
       | 'artifact.files'
       | 'artifact.agents'
+      | 'artifact.runtime'
       | 'artifact.outline'
       | 'artifact.timeline'
       | 'artifact.changes'
@@ -34,6 +36,7 @@ function tabLabel(
 ): string {
   if (tab === 'files') return t('artifact.files')
   if (tab === 'agents') return t('artifact.agents')
+  if (tab === 'tasks') return t('artifact.runtime')
   if (tab === 'outline') return t('artifact.outline')
   if (tab === 'timeline') return t('artifact.timeline')
   if (tab === 'changes') return t('artifact.changes')
@@ -104,6 +107,11 @@ export function ArtifactPanel() {
         {effectiveTab === 'agents' && (
           <div className="h-full min-h-0 overflow-hidden">
             <AgentDashboard />
+          </div>
+        )}
+        {effectiveTab === 'tasks' && (
+          <div className="h-full min-h-0 overflow-hidden">
+            <TasksPanel />
           </div>
         )}
         {effectiveTab === 'timeline' && isGitRepo && <TimelineView />}

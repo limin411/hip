@@ -450,7 +450,7 @@ describe('BackgroundManager with persistence', () => {
     })
 
     const meta = persistence.readMeta('s1', 'task-1')
-    expect(meta).toEqual({ status: 'running', description: 'research X' })
+    expect(meta).toEqual({ status: 'running', description: 'research X', kind: 'agent' })
   })
 
   it('stop then completeTask does not overwrite persisted killed meta', () => {

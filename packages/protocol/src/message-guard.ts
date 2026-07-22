@@ -87,6 +87,9 @@ export const CLIENT_MESSAGE_TYPES = [
   'memory:importMirror',
   'session:setMemoryFlags',
   'ui:emptyGreeting:generate',
+  'task:list',
+  'task:stop',
+  'task:getOutput',
 ] as const
 
 export type ClientMessageType = (typeof CLIENT_MESSAGE_TYPES)[number]

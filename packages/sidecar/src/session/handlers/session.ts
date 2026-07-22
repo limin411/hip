@@ -54,6 +54,9 @@ export const SESSION_MESSAGE_TYPES = new Set([
   'ui:emptyGreeting:generate',
   'workflow:run',
   'workflow:getActive',
+  'task:list',
+  'task:stop',
+  'task:getOutput',
 ])
 
 export function isSessionMessage(msg: ClientMessage): boolean {
@@ -159,6 +162,51 @@ export function handleSessionMessage(
     }
     case 'subagent:resume':
       return ctx.ensureSession(msg.sessionId, send).resumeSubagent(msg.taskId, msg.message, send)
+    case 'task:list': {
+      const s = ctx.getSession(msg.sessionId)
+      if (!s) {
+        send({
+          type: 'task:snapshot',
+          sessionId: msg.sessionId,
+          tasks: [],
+          runningCounts: { shell: 0, agent: 0, monitor: 0, schedule: 0 },
+        })
+        return
+      }
+      s.bindSend(send)
+      s.backgroundManager.pushSnapshot()
+      return
+    }
+    case 'task:stop': {
+      const s = ctx.ensureSession(msg.sessionId, send)
+      s.bindSend(send)
+      const result = s.backgroundManager.stop(msg.taskId, msg.reason)
+      const ok = result === 'killed'
+      send({
+        type: 'task:stop:result',
+        sessionId: msg.sessionId,
+        taskId: msg.taskId,
+        ok,
+        message: ok ? result : undefined,
+        error: ok ? undefined : result,
+      })
+      return
+    }
+    case 'task:getOutput': {
+      const s = ctx.ensureSession(msg.sessionId, send)
+      s.bindSend(send)
+      const payload = s.backgroundManager.getOutputStructured(msg.taskId)
+      const notFound = payload.error === 'not found'
+      send({
+        type: 'task:getOutput:result',
+        sessionId: msg.sessionId,
+        taskId: msg.taskId,
+        ok: !notFound,
+        payload: notFound ? undefined : payload,
+        error: notFound ? payload.error : undefined,
+      })
+      return
+    }
     case 'plan:respond':
       return ctx.ensureSession(msg.sessionId, send).handlePlanResponse(msg.action, send, msg.amendContent)
     case 'agent:setConfigOption':

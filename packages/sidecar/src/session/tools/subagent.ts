@@ -15,7 +15,7 @@ export function buildSubagentTools(
   dispatch?: DispatchSpec,
   retrySubagent?: (agentId: string) => Promise<string>,
   stopBackgroundTask?: (taskId: string, reason?: string) => string,
-  getBackgroundTaskOutput?: (taskId: string) => string,
+  getBackgroundTaskOutput?: (taskId: string, timeoutMs?: number) => string | Promise<string>,
 ): { subagentTools: StructuredToolInterface[]; hasTask: boolean } {
   if (!spawnSubagent) {
     return { subagentTools: [], hasTask: false }
@@ -83,16 +83,33 @@ export function buildSubagentTools(
 
   if (getBackgroundTaskOutput) {
     tools.push(
-      tool(async ({ task_id }) => getBackgroundTaskOutput(task_id), {
-        name: 'task_output',
-        description:
-          'Read the output produced so far by a background task. Use this to check on ' +
-          'the progress or result of a background sub-agent. Works on both running and ' +
-          'completed tasks. Returns the accumulated output text.',
-        schema: z.object({
-          task_id: z.string().describe('the ID of the background task to read output from'),
-        }),
-      }),
+      tool(
+        async ({ task_id, timeout_ms }) => {
+          // When timeout_ms is set, wait for completion first (via wait_tasks semantics in host).
+          if (typeof timeout_ms === 'number' && timeout_ms > 0) {
+            const waited = await (getBackgroundTaskOutput as (
+              id: string,
+              timeoutMs?: number,
+            ) => string | Promise<string>)(task_id, timeout_ms)
+            return waited
+          }
+          return getBackgroundTaskOutput(task_id)
+        },
+        {
+          name: 'task_output',
+          description:
+            'Read the output produced so far by a background task (shell, agent, monitor). ' +
+            'Works on running and completed tasks. Optional timeout_ms waits for completion ' +
+            '(task keeps running on timeout). Prefer wait_tasks for multiple ids.',
+          schema: z.object({
+            task_id: z.string().describe('the ID of the background task to read output from'),
+            timeout_ms: z
+              .number()
+              .optional()
+              .describe('wait up to this many ms for the task to finish before returning output'),
+          }),
+        },
+      ),
     )
   }
 

@@ -67,6 +67,30 @@ export interface AgentLoopConfig {
 }
 
 /**
+ * Optional `[task_runtime]` / `[taskRuntime]` section in hip.toml.
+ * Controls shell background, monitor, scheduler wake, and completion auto-wake.
+ */
+export interface TaskRuntimeConfig {
+  /** Master switch (default true when section present). */
+  enabled?: boolean
+  /** Allow run_script background:true (default true). */
+  shellBackground?: boolean
+  /** Register monitor tool (default true). */
+  monitor?: boolean
+  /** Fire schedules via TurnEnqueuer (default true). */
+  schedulerWake?: boolean
+  /** notice | auto — shell/agent completion wake (default auto, KD-25). */
+  wakeMode?: 'notice' | 'auto'
+  caps?: {
+    agent?: number
+    shell?: number
+    monitor?: number
+    schedule?: number
+    globalRunning?: number
+  }
+}
+
+/**
  * Optional `[langsmith]` section in hip.toml.
  * When `enabled = true`, the sidecar exports traces to LangSmith (LangChain auto-tracing).
  * All fields optional; env vars (`LANGSMITH_*`) still override when already set.
@@ -191,6 +215,8 @@ export interface HipConfig {
   teams?: import('./team-types.js').TeamConfig[]
   /** Optional agent-loop controls (budgets, HITL placeholder, doom strategy). */
   agentLoop?: AgentLoopConfig
+  /** Optional TaskRuntime (shell bg / monitor / scheduler / wake). */
+  taskRuntime?: TaskRuntimeConfig
   /** Optional LangSmith tracing (observability). */
   langsmith?: LangSmithConfig
   /** Optional interactive Terminal defaults. */

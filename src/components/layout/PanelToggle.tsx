@@ -116,6 +116,7 @@ export function PanelToggle() {
     { value: 'outline', label: t('artifact.outline') },
     { value: 'files', label: t('artifact.files') },
     { value: 'agents', label: t('artifact.agents') },
+    { value: 'tasks', label: t('artifact.runtime') },
     { value: 'timeline', label: t('artifact.timeline'), gated: true },
     { value: 'changes', label: t('artifact.changes'), gated: true },
     ...(CODE_TERMINAL
@@ -126,6 +127,7 @@ export function PanelToggle() {
     { value: 'outline', label: t('artifact.outline') },
     { value: 'files', label: t('artifact.files') },
     { value: 'agents', label: t('artifact.agents') },
+    { value: 'tasks', label: t('artifact.runtime') },
   ]
 
   const tabs = (isCode ? codeTabs : chatTabs).filter((tab) => !tab.gated || isGitRepo)

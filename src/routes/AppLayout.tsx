@@ -9,6 +9,7 @@ import { ComposerPlanPanel } from '@/components/chat/ComposerPlanPanel'
 import { PermissionModal } from '@/components/chat/PermissionModal'
 import { GoalStatusChip } from '@/components/chat/GoalStatusChip'
 import { InputBar } from '@/components/chat/InputBar'
+import { StillRunningChip } from '@/components/chat/StillRunningChip'
 import { MissingProjectBanner } from '@/components/chat/MissingProjectBanner'
 import { AcpCapabilityCliffBanner } from '@/components/chat/AcpCapabilityCliffBanner'
 import { ArtifactPanel } from '@/components/artifact/ArtifactPanel'
@@ -214,6 +215,7 @@ export function AppLayout() {
         <PermissionModal />
         {/* ACP primary capability cliff — sticky above InputBar (not in timeline). */}
         <AcpCapabilityCliffBanner />
+        <StillRunningChip />
         <InputBar />
       </>
     )

@@ -78,6 +78,20 @@ const _notificationGuard: Extract<ServerMessage, { type: 'agent:notification' }>
 }
 void _notificationGuard
 
+const _taskListGuard: Extract<ClientMessage, { type: 'task:list' }> = {
+  type: 'task:list',
+  sessionId: 's',
+}
+void _taskListGuard
+
+const _taskSnapshotGuard: Extract<ServerMessage, { type: 'task:snapshot' }> = {
+  type: 'task:snapshot',
+  sessionId: 's',
+  tasks: [],
+  runningCounts: { shell: 0, agent: 0, monitor: 0, schedule: 0 },
+}
+void _taskSnapshotGuard
+
 const _workflowGetActive: Extract<ClientMessage, { type: 'workflow:getActive' }> = {
   type: 'workflow:getActive',
   sessionId: 's',

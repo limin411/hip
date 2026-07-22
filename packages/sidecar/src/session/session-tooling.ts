@@ -15,7 +15,7 @@ import type { ModelRunner } from './model-runner.js'
 import type { GoalManager } from './goal.js'
 import { buildGoalTools } from './tools/goal.js'
 import type { CronManager } from './cron.js'
-import { buildCronTools } from './cron.js'
+import type { BackgroundManager } from './background-manager.js'
 import type { PlanMode } from './plan-mode.js'
 import type { MemoryService } from '../memory/service.js'
 import { buildMemoryTools } from '../memory/tools.js'
@@ -38,7 +38,7 @@ export interface BuildSessionToolingInput {
   spawnSubagent: (description: string, mode?: 'foreground' | 'background', taskId?: string, signal?: AbortSignal) => Promise<string>
   retrySubagent?: (agentId: string) => Promise<string>
   stopBackgroundTask?: (taskId: string, reason?: string) => string
-  getBackgroundTaskOutput?: (taskId: string) => string
+  getBackgroundTaskOutput?: (taskId: string, timeoutMs?: number) => string | Promise<string>
   hooks: HookRegistry
   approvalCache: SessionApprovalCache
   requestApproval?: ApprovalFn
@@ -62,6 +62,14 @@ export interface BuildSessionToolingInput {
   /** Emit goal:updated to the UI when goal tools change state. */
   onGoalUpdated?: (goal: import('./goal.js').Goal | null) => void
   cronManager?: CronManager
+  /** TaskRuntime (shell bg / monitor / wait). */
+  taskRuntime?: BackgroundManager
+  onActivity?: () => void
+  signal?: AbortSignal
+  originTurnId?: string | null
+  shellBackgroundEnabled?: boolean
+  monitorEnabled?: boolean
+  schedulerWakeEnabled?: boolean
   planMode?: PlanMode
   memoryService?: MemoryService
   useMemories?: boolean
@@ -96,6 +104,14 @@ export async function buildSessionTooling(input: BuildSessionToolingInput): Prom
       spawnInWorktree: input.spawnInWorktree,
       onParallelRunStarted: input.onParallelRunStarted,
       onWorktreeChanged: input.onWorktreeChanged,
+      taskRuntime: input.taskRuntime,
+      cronManager: input.cronManager,
+      onActivity: input.onActivity,
+      signal: input.signal,
+      originTurnId: input.originTurnId,
+      shellBackgroundEnabled: input.shellBackgroundEnabled,
+      monitorEnabled: input.monitorEnabled,
+      schedulerWakeEnabled: input.schedulerWakeEnabled,
     },
     input.retrySubagent,
     input.stopBackgroundTask,
@@ -108,12 +124,6 @@ export async function buildSessionTooling(input: BuildSessionToolingInput): Prom
   if (input.goalManager) {
     const goalTools = buildGoalTools(input.goalManager, input.onGoalUpdated)
     for (const t of goalTools) {
-      registry.register(t)
-    }
-  }
-  if (input.cronManager) {
-    const cronTools = buildCronTools(input.cronManager)
-    for (const t of cronTools) {
       registry.register(t)
     }
   }

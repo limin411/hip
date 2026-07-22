@@ -446,6 +446,19 @@ export interface BuildToolsOpts {
    * Wire from session-turn-runner like onParallelRunStarted → send.
    */
   onWorktreeChanged?: import('../worktree-service.js').WorktreeChangedNotify
+  /** TaskRuntime for background shells / monitor / wait_tasks. */
+  taskRuntime?: import('../background-manager.js').BackgroundManager
+  /** Cron manager for scheduler tools (when not registered separately). */
+  cronManager?: import('../cron.js').CronManager
+  /** Idle activity pulse during FG run_script. */
+  onActivity?: () => void
+  /** Abort signal for FG tools. */
+  signal?: AbortSignal
+  originTurnId?: string | null
+  /** Feature gates (default on when runtime present). */
+  shellBackgroundEnabled?: boolean
+  monitorEnabled?: boolean
+  schedulerWakeEnabled?: boolean
 }
 
 /** True for an allow decision (run_script may execute). Keys off the decision's SEMANTIC `kind`
@@ -459,4 +472,9 @@ export function isApproved(d: ApprovalDecision): boolean {
  *  (via requestApproval), rather than being gated by a pre-execution policy
  *  check. Currently only run_script — the tool fires, asks the user, and
  *  respects the answer. */
-export const SELF_GATED_TOOLS: Set<string> = new Set(['run_script', 'EnterPlanMode', 'parallel_worktrees'])
+export const SELF_GATED_TOOLS: Set<string> = new Set([
+  'run_script',
+  'monitor',
+  'EnterPlanMode',
+  'parallel_worktrees',
+])

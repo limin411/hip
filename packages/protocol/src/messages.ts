@@ -46,6 +46,13 @@ import type {
   MemoryFileConfig,
   MemoryPipelineStatus,
 } from './memory-types.js'
+import type {
+  TaskKind,
+  TaskSnapshot,
+  TaskRunningCounts,
+  TaskOutputPayload,
+  TaskNotificationStatus,
+} from './task-runtime.js'
 
 export type ClientMessage =
   | { type: 'session:create'; id: string; config: SessionConfig }
@@ -228,6 +235,12 @@ export type ClientMessage =
       modelID?: string
       context: EmptyGreetingGenerateContext
     }
+  /** Force-refresh Runtime task snapshot for a session (TaskRuntime). */
+  | { type: 'task:list'; sessionId: string }
+  /** Stop a runtime task (shell / agent / monitor / schedule). */
+  | { type: 'task:stop'; sessionId: string; taskId: string; reason?: string }
+  /** Fetch output for a runtime task (optional byte offset for tail/resume). */
+  | { type: 'task:getOutput'; sessionId: string; taskId: string; offsetBytes?: number }
 
 /** Context for LLM empty-state title/sub generation (UI chrome only). */
 export interface EmptyGreetingGenerateContext {
@@ -537,6 +550,59 @@ export type ServerMessage =
       ok: boolean
       title?: string
       sub?: string
+      error?: string
+    }
+  /** Full Runtime task list + running counts (session open / task:list). */
+  | {
+      type: 'task:snapshot'
+      sessionId: string
+      tasks: TaskSnapshot[]
+      runningCounts: TaskRunningCounts
+    }
+  /** Incremental Runtime task upsert (status / metrics / logTail). */
+  | { type: 'task:delta'; sessionId: string; task: TaskSnapshot }
+  /** Monitor line event (UI/WS only; not auto-injected into the model). */
+  | {
+      type: 'task:event'
+      sessionId: string
+      taskId: string
+      description: string
+      line: string
+      seq: number
+    }
+  /**
+   * Terminal Runtime notification (all kinds).
+   * Do not use for schedule "fired" — that is task:delta metrics + optional notice.
+   * Agent kind may still also emit agent:notification for backward compat.
+   */
+  | {
+      type: 'task:notification'
+      sessionId: string
+      taskId: string
+      kind: TaskKind
+      description: string
+      status: TaskNotificationStatus
+      result?: string
+      error?: string
+      originTurnId?: string | null
+      originToolCallId?: string | null
+    }
+  /** RPC result for task:stop. */
+  | {
+      type: 'task:stop:result'
+      sessionId: string
+      taskId: string
+      ok: boolean
+      message?: string
+      error?: string
+    }
+  /** RPC result for task:getOutput. */
+  | {
+      type: 'task:getOutput:result'
+      sessionId: string
+      taskId: string
+      ok: boolean
+      payload?: TaskOutputPayload
       error?: string
     }
 

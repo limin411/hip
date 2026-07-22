@@ -11,6 +11,7 @@ import { buildScriptTools } from './script.js'
 import { buildPluginInstallTool } from './plugin.js'
 import { buildMediaTools } from './media.js'
 import { buildParallelWorktreeTools } from './parallel-worktree.js'
+import { buildTaskRuntimeExtraTools } from './task-runtime-tools.js'
 import { EnterPlanModeTool } from './enter-plan-mode.js'
 import { ExitPlanModeTool } from './exit-plan-mode.js'
 import { real, realInSkill, resolveFull } from './helpers.js'
@@ -37,7 +38,7 @@ export function buildAllTools(
   opts: BuildToolsOpts = {},
   retrySubagent?: (agentId: string) => Promise<string>,
   stopBackgroundTask?: (taskId: string, reason?: string) => string,
-  getBackgroundTaskOutput?: (taskId: string) => string,
+  getBackgroundTaskOutput?: (taskId: string, timeoutMs?: number) => string | Promise<string>,
   planMode?: PlanMode,
 ): StructuredToolInterface[] {
   // Surface × permissionMode profile (Chat clamps git/plugin even when writes allowed).
@@ -116,7 +117,33 @@ export function buildAllTools(
     opts.requestApproval,
     cwd ?? root,
     scriptMode,
+    opts.taskRuntime,
+    {
+      onActivity: opts.onActivity,
+      signal: opts.signal,
+      originTurnId: opts.originTurnId,
+      shellBackgroundEnabled: opts.shellBackgroundEnabled,
+    },
   ))
+
+  // wait_tasks / monitor / scheduler (TaskRuntime)
+  if (opts.taskRuntime) {
+    extras.push(
+      ...buildTaskRuntimeExtraTools({
+        runtime: opts.taskRuntime,
+        cron: opts.cronManager ?? ({
+          create: () => 'cron-noop',
+          list: () => [],
+          delete: () => false,
+        } as import('../cron.js').CronManager),
+        requestApproval: opts.requestApproval,
+        cwd: cwd ?? root,
+        mode: scriptMode,
+        monitorEnabled: opts.monitorEnabled,
+        schedulerEnabled: opts.schedulerWakeEnabled !== false && !!opts.cronManager,
+      }),
+    )
+  }
 
   // plugin_install — dropped on Chat / read-only
   if (profile.toolPolicy.allowPluginInstall) {

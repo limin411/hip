@@ -686,6 +686,29 @@ export function applyServerMessage(
         ],
       }))
 
+    case 'task:notification':
+      return update(msg.sessionId, (s) => ({
+        ...s,
+        messages: [
+          ...s.messages,
+          {
+            id: `task-notif-${msg.taskId}-${msg.status}-${now}`,
+            role: 'notice' as const,
+            content:
+              msg.status === 'completed'
+                ? `[${msg.kind} "${msg.description}" completed]`
+                : msg.status === 'killed'
+                  ? `[${msg.kind} "${msg.description}" killed: ${msg.error ?? 'stopped'}]`
+                  : msg.status === 'suppressed'
+                    ? `[${msg.kind} "${msg.description}" suppressed: ${msg.error ?? 'volume limit'}]`
+                    : msg.status === 'lost'
+                      ? `[${msg.kind} "${msg.description}" lost]`
+                      : `[${msg.kind} "${msg.description}" failed: ${msg.error ?? 'unknown error'}]`,
+            timestamp: now,
+          },
+        ],
+      }))
+
     case 'plugin:install:progress':
       return { ...state, pluginInstall: { status: msg.status, message: msg.message, pluginId: msg.pluginId } }
 

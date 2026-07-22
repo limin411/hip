@@ -20,7 +20,9 @@ export function StillRunningChip() {
       className="mx-3 mb-1 flex w-fit max-w-full items-center gap-1.5 truncate rounded-md border border-border bg-surface-subtle px-2 py-1 text-caption text-ink-secondary hover:border-accent hover:text-ink"
       onClick={() => {
         const view = useUiStore.getState().activeView
-        useUiStore.getState().setTab('tasks')
+        // Agents tab hosts Agents (top) + Runtime (bottom).
+        useUiStore.getState().setTab('agents')
+        useUiStore.getState().setChatActiveTab('agents')
         if (view === 'code') {
           useDomainStore.getState().setSessionCodePanelOpen(sessionId, true)
         } else if (view === 'chat') {

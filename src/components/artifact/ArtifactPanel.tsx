@@ -7,14 +7,13 @@ import { useActiveSessionId } from '@/domain'
 import { Button } from '@/components/ui/Button'
 import { FileTree } from './FileTree'
 import { FilePreview } from './FilePreview'
-import { AgentDashboard } from './AgentDashboard'
 import { ConversationOutline } from './ConversationOutline'
 import { TimelineView } from './TimelineView'
 import { ChangesView } from './ChangesView'
 import { GitInitBanner } from './GitInitBanner'
 import { BranchSwitcher } from './BranchSwitcher'
 import { TerminalView } from './TerminalView'
-import { TasksPanel } from './TasksPanel'
+import { AgentsRuntimeSplit } from './AgentsRuntimeSplit'
 import { CODE_TERMINAL } from './terminalFeature'
 import { useDomainStore } from '@/domain/sessionStore'
 import { useDiffStore } from '@/store/diffStore'
@@ -27,7 +26,6 @@ function tabLabel(
     key:
       | 'artifact.files'
       | 'artifact.agents'
-      | 'artifact.runtime'
       | 'artifact.outline'
       | 'artifact.timeline'
       | 'artifact.changes'
@@ -35,8 +33,8 @@ function tabLabel(
   ) => string,
 ): string {
   if (tab === 'files') return t('artifact.files')
-  if (tab === 'agents') return t('artifact.agents')
-  if (tab === 'tasks') return t('artifact.runtime')
+  // agents + tasks share the combined Agents/Runtime page
+  if (tab === 'agents' || tab === 'tasks') return t('artifact.agents')
   if (tab === 'outline') return t('artifact.outline')
   if (tab === 'timeline') return t('artifact.timeline')
   if (tab === 'changes') return t('artifact.changes')
@@ -47,6 +45,8 @@ function resolveEffectiveTab(activeTab: ArtifactTab, isGitRepo: boolean): Artifa
   if (GIT_GATED.has(activeTab) && !isGitRepo) return 'files'
   // Flag-off leftover: treat like gated tab fallback.
   if (activeTab === 'terminal' && !CODE_TERMINAL) return 'files'
+  // Legacy 'tasks' tab id opens the combined agents+runtime page.
+  if (activeTab === 'tasks') return 'agents'
   return activeTab
 }
 
@@ -106,12 +106,7 @@ export function ArtifactPanel() {
         )}
         {effectiveTab === 'agents' && (
           <div className="h-full min-h-0 overflow-hidden">
-            <AgentDashboard />
-          </div>
-        )}
-        {effectiveTab === 'tasks' && (
-          <div className="h-full min-h-0 overflow-hidden">
-            <TasksPanel />
+            <AgentsRuntimeSplit />
           </div>
         )}
         {effectiveTab === 'timeline' && isGitRepo && <TimelineView />}

@@ -10,9 +10,8 @@ import { useFocusStore } from '@/store/focusStore'
 import { collectConversationArtifacts } from '@/lib/renderedArtifacts'
 import { iconFor } from './ArtifactCard'
 import { FilePreview } from './FilePreview'
-import { AgentDashboard } from './AgentDashboard'
 import { ConversationOutline } from './ConversationOutline'
-import { TasksPanel } from './TasksPanel'
+import { AgentsRuntimeSplit } from './AgentsRuntimeSplit'
 import { Button } from '@/components/ui/Button'
 import { cn } from '@/lib/utils'
 
@@ -26,12 +25,16 @@ function base64ToBytes(b64: string): Uint8Array {
 
 function tabLabel(
   tab: ChatTab,
-  t: (key: 'artifact.files' | 'artifact.agents' | 'artifact.runtime' | 'artifact.outline') => string,
+  t: (key: 'artifact.files' | 'artifact.agents' | 'artifact.outline') => string,
 ): string {
-  if (tab === 'agents') return t('artifact.agents')
-  if (tab === 'tasks') return t('artifact.runtime')
+  // agents + tasks share the combined Agents/Runtime page
+  if (tab === 'agents' || tab === 'tasks') return t('artifact.agents')
   if (tab === 'outline') return t('artifact.outline')
   return t('artifact.files')
+}
+
+function effectiveChatTab(tab: ChatTab): ChatTab {
+  return tab === 'tasks' ? 'agents' : tab
 }
 
 export function PreviewPanel() {
@@ -42,7 +45,8 @@ export function PreviewPanel() {
   const selected = useUiStore((s) => s.selectedArtifactPath)
   const activeSessionId = useActiveSessionId()
   const setSessionChatPanelOpen = useDomainStore((s) => s.setSessionChatPanelOpen)
-  const chatActiveTab = useUiStore((s) => s.chatActiveTab)
+  const chatActiveTabRaw = useUiStore((s) => s.chatActiveTab)
+  const chatActiveTab = effectiveChatTab(chatActiveTabRaw)
   const resetChatActiveTab = useUiStore((s) => s.resetChatActiveTab)
   const preview = useFsStore((s) => (scopeId ? s.bySession[scopeId]?.preview : undefined))
 
@@ -151,13 +155,8 @@ export function PreviewPanel() {
           )
         )}
         {chatActiveTab === 'agents' && (
-          <div className="h-full overflow-auto p-3">
-            <AgentDashboard />
-          </div>
-        )}
-        {chatActiveTab === 'tasks' && (
           <div className="h-full min-h-0 overflow-hidden">
-            <TasksPanel />
+            <AgentsRuntimeSplit />
           </div>
         )}
       </div>

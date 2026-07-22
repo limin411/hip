@@ -315,7 +315,7 @@ export class LiveMermaidNodeView implements NodeView {
     mutation: MutationRecord | { type: string; target: globalThis.Node },
   ): boolean {
     const target = mutation.target
-    if (!(target instanceof Node)) return false
+    if (!(target instanceof globalThis.Node)) return false
     // Text edits inside contentDOM must sync to the document.
     if (target === this.contentDOM || this.contentDOM.contains(target)) {
       return false

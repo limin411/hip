@@ -481,9 +481,7 @@ describe('InputBar', () => {
     } as any)
 
     render(<InputBar />)
-    // Secondary controls live under Tune (Phase 2 density); open panel to assert.
-    fireEvent.click(screen.getByTestId('composer-tune'))
-    expect(await screen.findByTestId('permission-chip')).toBeInTheDocument()
+    expect(screen.getByTestId('permission-chip')).toBeInTheDocument()
     expect(screen.queryByTestId('plan-mode-chip')).not.toBeInTheDocument()
     expect(screen.queryByTestId('model-chip')).not.toBeInTheDocument()
   })

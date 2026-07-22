@@ -41,8 +41,8 @@ describe('smooth P5 worktree + goal @smooth-p5 @harness', () => {
 
   it('P5 worktree control chip opens popover with single create (no parallel explore)', async () => {
     await createCodeSessionForE2e(dir)
-    const { ensureComposerSecondary } = await import('../helpers/composer-tune.js')
-    const btn = await ensureComposerSecondary('worktree-control-chip')
+    const btn = await browser.$('[data-testid="worktree-control-chip"]')
+    await btn.waitForExist({ timeout: 15000 })
     await browser.execute((el: HTMLElement) => el.click(), btn)
     const createCta = await browser.$('[data-testid="worktree-control-create-single"]')
     await createCta.waitForExist({ timeout: 10000 })

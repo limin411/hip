@@ -25,22 +25,12 @@ export async function planProgressPanelVisible(): Promise<boolean> {
 
 /** Click product Plan mode chip until active (draft or session forcePlan). */
 export async function enablePlanModeUi(): Promise<void> {
-  const { ensureComposerSecondary } = await import('./composer-tune.js')
-  // Prefer pinned chip when forcePlan already on; else open Tune.
-  let chip = await browser.$('[data-testid="plan-mode-chip"]')
-  if (!(await chip.isExisting())) {
-    chip = await ensureComposerSecondary('plan-mode-chip')
-  }
+  const chip = await browser.$('[data-testid="plan-mode-chip"]')
   await chip.waitForExist({ timeout: 15000 })
   const pressed = await chip.getAttribute('aria-pressed')
   if (pressed === 'true') return
   await browser.execute((el: HTMLElement) => el.click(), chip)
   await browser.pause(200)
-  // After toggle on, chip may pin outside Tune — re-query.
-  chip = await browser.$('[data-testid="plan-mode-chip"]')
-  if (!(await chip.isExisting())) {
-    chip = await ensureComposerSecondary('plan-mode-chip')
-  }
   // If still off (missed click), try once more
   const again = await chip.getAttribute('aria-pressed')
   if (again !== 'true') {

@@ -86,9 +86,9 @@ describe('eval UI smoke @eval @smoke', () => {
     const chip = await codePage.folderChip.getText()
     expect(chip).toContain(path.basename(ws.cwd))
 
-    // permission chip present on code surface (under Tune when default edit mode)
-    const { ensureComposerSecondary } = await import('../helpers/composer-tune.js')
-    const perm = await ensureComposerSecondary('permission-chip')
+    // permission chip present on code surface
+    const perm = await browser.$('[data-testid="permission-chip"]')
+    await perm.waitForExist({ timeout: 15000 })
     expect(await perm.isExisting()).toBe(true)
 
     cleanupWorkspace({ ...ws, keep: false })

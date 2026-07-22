@@ -21,14 +21,12 @@ import { readSkillFile } from '@/ipc/skills'
 import { FolderPill } from './FolderPill'
 import { ModelPicker } from './ModelPicker'
 import { EffortLevelPicker } from './EffortLevelPicker'
-import { PermissionModePicker, resolvePermissionMode } from './PermissionModePicker'
+import { PermissionModePicker } from './PermissionModePicker'
 import { PlanModeChip } from './PlanModeChip'
 import { AttachmentButton } from './AttachmentButton'
 import { SessionAgentPicker } from './SessionAgentPicker'
-import { ComposerControlRow } from './ComposerControlRow'
 import { FirstRunSetupCard } from './FirstRunSetupCard'
 import { AcpCapabilityCliffBanner } from './AcpCapabilityCliffBanner'
-import { defaultEffort, effortLevelsForKey, resolveEffort } from '@/lib/modelEffort'
 import { isAttachmentSupported } from '@/lib/attachmentEligibility'
 import { activeModelKey, parseModelKey } from '@/lib/modelKey'
 import { isExternalPrimary } from '@/lib/sessionAgent'
@@ -92,18 +90,6 @@ export function NewConversation() {
   const attachmentsSupported = isAttachmentSupported(currentKey, agents, catalog)
   // External ACP primary: hide hip-model-only controls (model/effort/forcePlan); keep permissionMode.
   const externalPrimary = isExternalPrimary(draft?.agentId)
-
-  const permissionMode = resolvePermissionMode(draft?.permissionMode)
-  const forcePlan = Boolean(draft?.forcePlan)
-  const effortLevels = effortLevelsForKey(catalog, currentKey)
-  const resolvedEffort = resolveEffort(draft?.effort, effortLevels)
-  const pinEffort =
-    !externalPrimary &&
-    !!effortLevels &&
-    !!resolvedEffort &&
-    resolvedEffort !== defaultEffort(effortLevels)
-  const pinPermission = surface === 'code' && permissionMode !== 'edit'
-  const pinPlan = surface === 'code' && !externalPrimary && forcePlan
 
   // K10: drop only multimodal chips when model lacks attachment support.
   useEffect(() => {
@@ -385,45 +371,23 @@ export function NewConversation() {
             inputRef={inputRef}
             leftSlot={
               surface === 'code' ? (
-                <ComposerControlRow
-                  primary={
-                    <>
-                      <SessionAgentPicker />
-                      {!externalPrimary && <ModelPicker />}
-                      <AttachmentButton onAttach={setAttachments} />
-                    </>
-                  }
-                  pinnedSecondary={
-                    pinPermission || pinPlan || pinEffort ? (
-                      <>
-                        {pinPermission && <PermissionModePicker />}
-                        {pinPlan && <PlanModeChip />}
-                        {pinEffort && <EffortLevelPicker />}
-                      </>
-                    ) : undefined
-                  }
-                  secondary={
-                    <>
-                      {!externalPrimary && <EffortLevelPicker />}
-                      <PermissionModePicker />
-                      {!externalPrimary && <PlanModeChip />}
-                    </>
-                  }
-                />
+                <>
+                  <SessionAgentPicker />
+                  {!externalPrimary && <ModelPicker />}
+                  {!externalPrimary && <EffortLevelPicker />}
+                  <PermissionModePicker />
+                  {!externalPrimary && <PlanModeChip />}
+                  <AttachmentButton onAttach={setAttachments} />
+                </>
               ) : (
-                <ComposerControlRow
-                  primary={
-                    <>
-                      <SessionAgentPicker />
-                      {!externalPrimary && <ModelPicker />}
-                      <AttachmentButton
-                        onAttach={(add) => setAttachments((prev) => [...prev, ...add])}
-                      />
-                    </>
-                  }
-                  pinnedSecondary={pinEffort ? <EffortLevelPicker /> : undefined}
-                  secondary={!externalPrimary ? <EffortLevelPicker /> : undefined}
-                />
+                <>
+                  <SessionAgentPicker />
+                  {!externalPrimary && <ModelPicker />}
+                  {!externalPrimary && <EffortLevelPicker />}
+                  <AttachmentButton
+                    onAttach={(add) => setAttachments((prev) => [...prev, ...add])}
+                  />
+                </>
               )
             }
             attachments={attachments}

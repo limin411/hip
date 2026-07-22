@@ -82,8 +82,8 @@ describe('eval UI visual capture @eval @smoke @visual', () => {
     await bindFolderViaUi(ws.cwd)
     await shot('03-folder-chip-bound')
 
-    const { ensureComposerSecondary } = await import('../helpers/composer-tune.js')
-    const perm = await ensureComposerSecondary('permission-chip')
+    const perm = await browser.$('[data-testid="permission-chip"]')
+    await perm.waitForExist({ timeout: 15000 })
     expect(await perm.isExisting()).toBe(true)
     // Chip label should stay short (zh "编辑文件" / en "Edit files")
     const chipText = (await perm.getText()).replace(/\s+/g, '')
@@ -109,8 +109,9 @@ describe('eval UI visual capture @eval @smoke @visual', () => {
     await browser.pause(800)
     await shot('07-session-active')
 
-    // Session chrome: permission (under Tune if default) + send still present
-    const permSession = await ensureComposerSecondary('permission-chip')
+    // Session chrome: permission + send still present
+    const permSession = await browser.$('[data-testid="permission-chip"]')
+    await permSession.waitForExist({ timeout: 15000 })
     expect(await permSession.isExisting()).toBe(true)
     const send = await browser.$('[data-testid="composer-send"]')
     const stop = await browser.$('[data-testid="composer-stop"]')

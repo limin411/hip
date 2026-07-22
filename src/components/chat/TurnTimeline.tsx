@@ -101,6 +101,35 @@ function toolContext(toolCalls: ToolCall[] | undefined, agentRuns: AgentRun[] | 
 }
 
 /**
+ * Interleaved answer-only stream: supervisor text segments so the user can fold
+ * process chrome without losing the final response body.
+ */
+function buildInterleavedAnswerNodes(steps: TimelineStep[] | undefined): JSX.Element[] {
+  const orderedSteps = [...(steps ?? [])].sort((a, b) => a.stepSeq - b.stepSeq)
+  const items: Array<{ seq: number; node: JSX.Element }> = []
+  for (const step of orderedSteps) {
+    if (step.kind !== 'text') continue
+    if (!isSupervisorTextStep(step)) continue
+    const clean = prepareTimelineTextContent(step.content)
+    if (!clean.trim()) continue
+    items.push({
+      seq: step.stepSeq,
+      node: (
+        <div
+          key={`t-${step.agentId}-${step.stepSeq}`}
+          className="min-w-0 text-body text-ink"
+          data-testid="turn-text-block"
+          data-step-seq={step.stepSeq}
+        >
+          <MarkdownBody content={clean} />
+        </div>
+      ),
+    })
+  }
+  return items.sort((a, b) => a.seq - b.seq).map((i) => i.node)
+}
+
+/**
  * Global stepSeq TurnBlocks (KD-2 / KD-9): reasoning + supervisor text + tool in wall-clock
  * order. Agent identity is an inline badge — no supervisor-first section re-sort.
  * Subagent narration stays on SubAgentCard / run.output (KD-17); text steps are supervisor only.
@@ -437,6 +466,11 @@ interface TurnTimelineProps {
    * No agent-section supervisor-first re-sort (KD-9). Flag-off path keeps legacy sections.
    */
   interleaved?: boolean
+  /**
+   * When true with interleaved, only render supervisor answer text blocks
+   * (process tools / reasoning stay folded in ActivityBar).
+   */
+  answerOnly?: boolean
 }
 
 /** Inline per-turn activity, ordered by agent then stepSeq within each agent. */
@@ -446,9 +480,10 @@ export function TurnTimeline({
   agentRuns,
   hidePlan,
   interleaved,
+  answerOnly,
 }: TurnTimelineProps) {
   const { t } = useTranslation()
-  const plan = hidePlan ? null : latestTodos(toolCalls)
+  const plan = hidePlan || answerOnly ? null : latestTodos(toolCalls)
 
   const hasSteps = (steps?.length ?? 0) > 0
   const hasTools = (toolCalls?.length ?? 0) > 0
@@ -457,16 +492,20 @@ export function TurnTimeline({
 
   // TurnBlocks: single global stepSeq stream (reasoning / text / tool).
   if (interleaved && (hasSteps || hasTools)) {
-    const nodes = buildInterleavedNodes(steps, toolCalls, agentRuns)
+    const nodes = answerOnly
+      ? buildInterleavedAnswerNodes(steps)
+      : buildInterleavedNodes(steps, toolCalls, agentRuns)
     if (nodes.length === 0 && !(plan && plan.todos.length > 0)) {
       // Only suppressed shells / empty text — fall through to agentRuns summary if needed.
-      if (!hasRuns) return null
+      // answerOnly with no text: render nothing (process is folded).
+      if (answerOnly || !hasRuns) return null
     } else {
       return (
         <div
           className="mb-0 flex flex-col gap-1"
           data-testid="turn-timeline"
           data-interleaved="true"
+          data-answer-only={answerOnly ? 'true' : undefined}
         >
           {plan && plan.todos.length > 0 && <TodoChecklist todos={plan.todos} />}
           {nodes}

@@ -18,7 +18,8 @@ export function splitAgents(agents: TurnAgent[]): { flat: TurnAgent[]; nested: T
   const flat: TurnAgent[] = []
   const nested: TurnAgent[] = []
   for (const a of agents) {
-    if (a.role === 'subagent' && a.parentAgentId) nested.push(a)
+    // Any child run with a parent (role may be subagent/coder/planner/…) is nested chrome.
+    if (a.role !== 'supervisor' && a.parentAgentId) nested.push(a)
     else flat.push(a)
   }
   return { flat, nested }

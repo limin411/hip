@@ -31,10 +31,9 @@ export function ToolCallGroup({
 }) {
   const { t } = useTranslation()
   const anyRunning = tools.some((tool) => tool.status === 'running')
-  const [open, setOpen] = useState(anyRunning)
-
-  // Re-open when a tool starts running mid-mount (status flip).
-  const showBody = open || anyRunning
+  // Default open while live; user toggle wins so collapse works mid-run.
+  const [manual, setManual] = useState<boolean | null>(null)
+  const showBody = manual ?? anyRunning
 
   return (
     <div
@@ -45,7 +44,7 @@ export function ToolCallGroup({
     >
       <button
         type="button"
-        onClick={() => setOpen((v) => !v)}
+        onClick={() => setManual(!showBody)}
         aria-expanded={showBody}
         className={cn(
           'flex min-h-[var(--trail-min-h)] w-full items-center gap-[var(--meta-gap)] text-left text-meta leading-5',

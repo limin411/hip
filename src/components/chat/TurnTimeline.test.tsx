@@ -215,6 +215,52 @@ describe('TurnTimeline', () => {
     expect(screen.getByTestId('tool-row')).toBeInTheDocument()
   })
 
+  it('interleaved answerOnly keeps text and drops tools/reasoning', () => {
+    render(
+      <TurnTimeline
+        interleaved
+        answerOnly
+        steps={[
+          {
+            kind: 'text',
+            stepSeq: 0,
+            agentId: 'supervisor',
+            role: 'supervisor',
+            content: 'Answer only',
+          },
+          {
+            kind: 'tool',
+            stepSeq: 1,
+            agentId: 'supervisor',
+            role: 'supervisor',
+            callId: 'c1',
+          },
+          {
+            kind: 'reasoning',
+            stepSeq: 2,
+            agentId: 'supervisor',
+            role: 'supervisor',
+            content: 'hidden thought',
+          },
+        ]}
+        toolCalls={[
+          {
+            callId: 'c1',
+            agentId: 'supervisor',
+            name: 'grep',
+            input: '{"pattern":"foo"}',
+            status: 'finished',
+            seq: 1,
+          },
+        ]}
+      />,
+    )
+    expect(screen.getByTestId('turn-timeline').getAttribute('data-answer-only')).toBe('true')
+    expect(screen.getByTestId('turn-text-block')).toHaveTextContent('Answer only')
+    expect(screen.queryByTestId('tool-row')).not.toBeInTheDocument()
+    expect(screen.queryByTestId('thinking-disclosure')).not.toBeInTheDocument()
+  })
+
   it('interleaved path renders text + tool + reasoning in global stepSeq order', () => {
     render(
       <TurnTimeline

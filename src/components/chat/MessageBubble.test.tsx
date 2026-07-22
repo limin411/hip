@@ -274,12 +274,81 @@ describe('interleaved TurnBlocks (flag)', () => {
     render(<MessageBubble message={textTimelineMessage as any} />)
     // Answer body suppressed to avoid dual render
     expect(screen.queryByTestId('message-answer')).not.toBeInTheDocument()
-    // Text segments live in the process trail
+    // Process starts collapsed: answer text still visible, tools folded
+    expect(screen.getByTestId('activity-bar-summary')).toHaveAttribute('aria-expanded', 'false')
     const blocks = screen.getAllByTestId('turn-text-block')
     expect(blocks).toHaveLength(2)
     expect(blocks[0]).toHaveTextContent('First I will search')
     expect(blocks[1]).toHaveTextContent('Here is the answer')
     expect(screen.getByTestId('turn-timeline').getAttribute('data-interleaved')).toBe('true')
+    expect(screen.getByTestId('turn-timeline').getAttribute('data-answer-only')).toBe('true')
+    expect(screen.queryByTestId('tool-row')).not.toBeInTheDocument()
+
+    // Expand process trail to inspect tools without losing answer text
+    fireEvent.click(screen.getByTestId('activity-bar-summary'))
+    expect(screen.getByTestId('activity-bar-summary')).toHaveAttribute('aria-expanded', 'true')
+    expect(screen.getByTestId('turn-timeline').getAttribute('data-answer-only')).toBeNull()
+    expect(screen.getByTestId('tool-row')).toBeInTheDocument()
+    expect(screen.getAllByTestId('turn-text-block')).toHaveLength(2)
+  })
+
+  it('folds SubAgentCards with the process trail', () => {
+    featureState.interleaved = false
+    render(
+      <MessageBubble
+        message={{
+          id: 'm-sub',
+          role: 'assistant',
+          content: 'done',
+          timestamp: Date.now(),
+          agentRuns: [
+            {
+              agentId: 'supervisor',
+              role: 'supervisor',
+              output: '',
+              startedAt: 1000,
+              finishedAt: 5000,
+              seq: 0,
+            },
+            {
+              agentId: 'subagent-1',
+              role: 'subagent',
+              output: 'child result',
+              startedAt: 1100,
+              finishedAt: 2000,
+              seq: 1,
+              taskInput: 'check A',
+              parentAgentId: 'supervisor',
+            },
+          ],
+          toolCalls: [
+            {
+              callId: 'c1',
+              agentId: 'subagent-1',
+              name: 'grep',
+              input: '{"pattern":"A"}',
+              status: 'finished',
+              seq: 2,
+            },
+          ],
+          timeline: [
+            {
+              kind: 'tool',
+              stepSeq: 2,
+              agentId: 'subagent-1',
+              role: 'subagent',
+              callId: 'c1',
+            },
+          ],
+        } as any}
+      />,
+    )
+    // Collapsed: sub-agent chrome must not leak outside the fold
+    expect(screen.queryByTestId('subagent-card')).not.toBeInTheDocument()
+    fireEvent.click(screen.getByTestId('activity-bar-summary'))
+    expect(screen.getByTestId('subagent-card')).toBeInTheDocument()
+    fireEvent.click(screen.getByTestId('activity-bar-summary'))
+    expect(screen.queryByTestId('subagent-card')).not.toBeInTheDocument()
   })
 
   it('flag on without text steps still shows content body (legacy fallback)', () => {

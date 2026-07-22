@@ -52,7 +52,7 @@ describe('ToolCallGroup', () => {
     expect(screen.getAllByTestId('tool-row')).toHaveLength(2)
   })
 
-  it('stays open while a tool is running', () => {
+  it('stays open while a tool is running until user collapses', () => {
     const tools: ToolCall[] = [
       finished(1),
       { ...finished(2), status: 'running' },
@@ -61,5 +61,12 @@ describe('ToolCallGroup', () => {
     expect(screen.getByTestId('tool-call-group')).toHaveAttribute('data-open', 'true')
     expect(screen.getByTestId('tool-call-group-running')).toBeInTheDocument()
     expect(screen.getAllByTestId('tool-row')).toHaveLength(2)
+
+    // Collapse must work mid-run (was forced open via anyRunning before).
+    fireEvent.click(screen.getByTestId('tool-call-group-header'))
+    expect(screen.getByTestId('tool-call-group')).toHaveAttribute('data-open', 'false')
+    expect(screen.queryByTestId('tool-row')).not.toBeInTheDocument()
+    // Running badge still visible on the header
+    expect(screen.getByTestId('tool-call-group-running')).toBeInTheDocument()
   })
 })

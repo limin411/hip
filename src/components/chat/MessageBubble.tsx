@@ -171,25 +171,26 @@ function MessageBubbleImpl({ message, streaming, isLastAssistant, hidePlan }: Me
               hasAssistantContent={!!displayContent.trim()}
               hidePlan={hidePlan}
               interleaved={interleavedBlocks}
-            />
-            {nested.length >= 2 && (
-              <div
-                className="mb-1.5 text-meta text-ink-tertiary"
-                data-testid="parallel-agents-summary"
-              >
-                {t('chat.subagent.parallelSummary', {
-                  count: nested.length,
-                  running: nested.filter((a) => a.status === 'running').length,
-                })}
-              </div>
-            )}
-            {nested.map((a) => (
-              <SubAgentCard
-                key={a.agentId}
-                agent={a}
-                showTools={!!streaming || a.status === 'running'}
-              />
-            ))}
+            >
+              {nested.length >= 2 && (
+                <div
+                  className="mb-1.5 text-meta text-ink-tertiary"
+                  data-testid="parallel-agents-summary"
+                >
+                  {t('chat.subagent.parallelSummary', {
+                    count: nested.length,
+                    running: nested.filter((a) => a.status === 'running').length,
+                  })}
+                </div>
+              )}
+              {nested.map((a) => (
+                <SubAgentCard
+                  key={a.agentId}
+                  agent={a}
+                  showTools={!!streaming || a.status === 'running'}
+                />
+              ))}
+            </ActivityBar>
           </div>
         )}
         {!hideAnswerBody && (

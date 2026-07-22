@@ -253,8 +253,8 @@ describe('ActivityBar', () => {
     expect(within(bar).getByTestId('turn-timeline')).toBeInTheDocument()
   })
 
-  it('keeps interleaved timeline open (answer text lives inside TurnBlocks)', () => {
-    const html = renderToStaticMarkup(
+  it('interleaved: keeps answer timeline mounted while process starts collapsed', () => {
+    const { container } = render(
       <ActivityBar
         steps={baseSteps}
         toolCalls={baseTools}
@@ -263,9 +263,40 @@ describe('ActivityBar', () => {
         interleaved
       />,
     )
-    expect(html).toContain('data-testid="turn-timeline"')
-    // No collapse control when interleaved
-    expect(html).not.toContain('aria-expanded')
+    const bar = within(container).getByTestId('activity-bar')
+    const summary = within(bar).getByTestId('activity-bar-summary')
+    // Fold control always present so tools/sub-agents can be hidden
+    expect(summary.tagName.toLowerCase()).toBe('button')
+    expect(summary).toHaveAttribute('aria-expanded', 'false')
+    // Answer shell still mounts (answerOnly) so supervisor text is not lost
+    expect(within(bar).getByTestId('turn-timeline')).toBeInTheDocument()
+    expect(vi.mocked(TurnTimeline)).toHaveBeenLastCalledWith(
+      expect.objectContaining({ interleaved: true, answerOnly: true }),
+      expect.anything(),
+    )
+
+    fireEvent.click(summary)
+    expect(summary).toHaveAttribute('aria-expanded', 'true')
+    expect(vi.mocked(TurnTimeline)).toHaveBeenLastCalledWith(
+      expect.objectContaining({ interleaved: true, answerOnly: false }),
+      expect.anything(),
+    )
+  })
+
+  it('hides process children (e.g. SubAgentCards) until trail is expanded', () => {
+    const { container } = render(
+      <ActivityBar steps={baseSteps} toolCalls={baseTools} agentRuns={baseRuns} hasAssistantContent>
+        <div data-testid="subagent-slot">child</div>
+      </ActivityBar>,
+    )
+    const bar = within(container).getByTestId('activity-bar')
+    expect(within(bar).queryByTestId('subagent-slot')).not.toBeInTheDocument()
+
+    fireEvent.click(within(bar).getByTestId('activity-bar-summary'))
+    expect(within(bar).getByTestId('subagent-slot')).toBeInTheDocument()
+
+    fireEvent.click(within(bar).getByTestId('activity-bar-summary'))
+    expect(within(bar).queryByTestId('subagent-slot')).not.toBeInTheDocument()
   })
 
   it('does not break React hook rules when activity appears after initial render', () => {

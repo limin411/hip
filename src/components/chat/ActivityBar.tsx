@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useMemo, useState, type ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Loader2, CheckCircle2, XCircle, Circle, AlertTriangle, ChevronRight } from 'lucide-react'
 import type { AgentRole, AgentRun, TimelineStep, ToolCall } from '@hip/protocol'
@@ -17,6 +17,11 @@ interface ActivityBarProps {
   hidePlan?: boolean
   /** PR-5: pass through to TurnTimeline for global stepSeq TurnBlocks. */
   interleaved?: boolean
+  /**
+   * Process chrome rendered only when the trail is expanded (e.g. SubAgentCards).
+   * Kept outside TurnTimeline so nested agent cards share the same fold as tools.
+   */
+  children?: ReactNode
 }
 
 function formatParts(
@@ -88,6 +93,7 @@ export function ActivityBar({
   hasAssistantContent,
   hidePlan,
   interleaved,
+  children,
 }: ActivityBarProps) {
   const { t } = useTranslation()
 
@@ -115,9 +121,9 @@ export function ActivityBar({
   const summaryText = formatParts(parts, t as (key: string, params?: Record<string, unknown>) => string)
 
   const hasActivity = steps.length > 0 || toolCalls.length > 0 || agentRuns.length > 0
-  // Process trail defaults collapsed. Interleaved TurnBlocks embed answer text, so stay open.
-  const [open, setOpen] = useState(!!interleaved)
-  const trailOpen = interleaved || open
+  // Process chrome (tools / reasoning / SubAgentCards) defaults collapsed.
+  // Interleaved turns still keep a fold control: when collapsed we only leave answer text visible.
+  const [open, setOpen] = useState(false)
 
   if (!hasActivity) {
     if (!streaming) return null
@@ -165,6 +171,11 @@ export function ActivityBar({
           : 'border-l-2 border-l-success pl-2'
     : undefined
 
+  // Interleaved: always mount a timeline shell so answer text stays available when process is folded.
+  // Legacy: only mount the full process trail when expanded.
+  const showTimeline = open || !!interleaved
+  const answerOnly = !!interleaved && !open
+
   return (
     <div
       className={cn('mb-2', settleRail && 'animate-message-enter')}
@@ -173,66 +184,43 @@ export function ActivityBar({
       data-phase={isRunning ? 'running' : 'settled'}
       aria-live="polite"
     >
-      {interleaved ? (
-        <div
-          className={cn(TRAIL_ROW, settleRail)}
-          role="status"
-          data-testid="activity-bar-summary"
-        >
-          {statusIcon}
-          {activeRole ? (
-            <span className={cn('inline-flex items-center', isRunning && 'animate-pulse')}>
-              <AgentBadge role={activeRole} />
-            </span>
-          ) : !isRunning ? (
-            <Circle size={14} className="block shrink-0 text-ink-tertiary" />
-          ) : null}
-          {activeRole && (
-            <span className="shrink-0 font-medium text-ink-secondary">
-              {activeName || t(`artifact.roles.${activeRole}`)}
-            </span>
-          )}
-          <span className="min-w-0 truncate text-ink-tertiary" title={summaryText}>
-            {summaryText}
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        aria-expanded={open}
+        className={cn(
+          TRAIL_ROW,
+          'w-full text-ink-tertiary transition-colors hover:text-ink-secondary',
+          settleRail,
+        )}
+        data-testid="activity-bar-summary"
+      >
+        <ChevronRight
+          size={14}
+          className={cn('block shrink-0 transition-transform', open && 'rotate-90')}
+        />
+        {statusIcon}
+        {activeRole ? (
+          <span className={cn('inline-flex items-center', isRunning && 'animate-pulse')}>
+            <AgentBadge role={activeRole} />
           </span>
-        </div>
-      ) : (
-        <button
-          type="button"
-          onClick={() => setOpen((v) => !v)}
-          aria-expanded={open}
-          className={cn(
-            TRAIL_ROW,
-            'w-full text-ink-tertiary transition-colors hover:text-ink-secondary',
-            settleRail,
-          )}
-          data-testid="activity-bar-summary"
-        >
-          <ChevronRight
-            size={14}
-            className={cn('block shrink-0 transition-transform', open && 'rotate-90')}
-          />
-          {statusIcon}
-          {activeRole ? (
-            <span className={cn('inline-flex items-center', isRunning && 'animate-pulse')}>
-              <AgentBadge role={activeRole} />
-            </span>
-          ) : !isRunning ? (
-            <Circle size={14} className="block shrink-0 text-ink-tertiary" />
-          ) : null}
-          {activeRole && (
-            <span className="shrink-0 font-medium text-ink-secondary">
-              {activeName || t(`artifact.roles.${activeRole}`)}
-            </span>
-          )}
-          <span className="min-w-0 truncate" title={summaryText}>
-            {summaryText}
+        ) : !isRunning ? (
+          <Circle size={14} className="block shrink-0 text-ink-tertiary" />
+        ) : null}
+        {activeRole && (
+          <span className="shrink-0 font-medium text-ink-secondary">
+            {activeName || t(`artifact.roles.${activeRole}`)}
           </span>
-        </button>
-      )}
+        )}
+        <span className="min-w-0 truncate" title={summaryText}>
+          {summaryText}
+        </span>
+      </button>
       {/* O3: interleaved TurnBlocks (incl. answer text) sit outside the process rail so
-          supervisor prose is not demoted under border-l + meta chrome. */}
-      {trailOpen && (
+          supervisor prose is not demoted under border-l + meta chrome.
+          Process fold: tools / reasoning / SubAgentCards hide when collapsed; interleaved
+          answer text remains via answerOnly. */}
+      {showTimeline && (
         <div
           className={
             interleaved
@@ -244,11 +232,14 @@ export function ActivityBar({
             steps={steps}
             toolCalls={toolCalls}
             agentRuns={agentRuns}
-            hidePlan={hidePlan}
+            hidePlan={hidePlan || answerOnly}
             interleaved={interleaved}
+            answerOnly={answerOnly}
           />
         </div>
       )}
+      {/* SubAgentCards share the trail fold but keep their own left rail (not nested in the process border). */}
+      {open && children ? <div className="mt-1">{children}</div> : null}
     </div>
   )
 }

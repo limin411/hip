@@ -37,6 +37,7 @@ import {
   windowSizeToInclude,
 } from '@/lib/transcriptWindow'
 import * as chatFeature from './feature'
+import { TRANSCRIPT_ROW_GAP_PX } from './feature'
 import { shouldHideInterruptForPlanApproval } from './planApproval'
 import { MessageBubble, NoticeRow } from './MessageBubble'
 import { ThinkingBubble } from './ThinkingBubble'
@@ -416,11 +417,11 @@ export function ChatPane() {
       >
         {/* CLI-style transcript: full-width left-aligned, no centered chat column */}
         <div
-          className={cn(
-            'flex w-full flex-col px-4 py-4',
-            // Chat surface: slightly looser vertical rhythm (reading room vs code bench).
-            isChatSurface ? 'gap-6' : 'gap-5',
-          )}
+          className="flex w-full flex-col px-4 py-4"
+          style={{
+            // Code: design ladder gap-5 (20px). Chat: slightly looser reading room.
+            gap: isChatSurface ? TRANSCRIPT_ROW_GAP_PX + 4 : TRANSCRIPT_ROW_GAP_PX,
+          }}
           data-surface={isChatSurface ? 'chat' : 'code'}
         >
           {hasEarlier && (

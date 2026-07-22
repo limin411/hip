@@ -1,5 +1,6 @@
 import { useTranslation } from 'react-i18next'
 import { Construction } from 'lucide-react'
+import { EmptyState } from '@/components/ui/EmptyState'
 
 /** i18n keys used by placeholder pages (typed for strict TFunction). */
 export type PlaceholderI18nKey =
@@ -29,21 +30,14 @@ export function PlaceholderPage({
   const { t } = useTranslation()
 
   return (
-    <div
-      className="flex min-h-0 flex-1 flex-col items-center justify-center gap-4 px-8 py-12 text-center"
-      data-testid={testId}
-      role="status"
-    >
-      <div
-        className="flex size-12 items-center justify-center rounded-2xl bg-surface-muted text-ink-tertiary"
-        aria-hidden
-      >
-        <Construction size={24} strokeWidth={1.75} />
-      </div>
-      <div className="flex max-w-md flex-col gap-2">
-        <h1 className="text-lg font-semibold tracking-tight text-ink">{t(titleKey)}</h1>
-        <p className="text-body text-ink-secondary">{t(descriptionKey)}</p>
-      </div>
+    <div className="flex min-h-0 flex-1 flex-col" data-testid={testId} role="status">
+      <EmptyState
+        icon={Construction}
+        tier="professional"
+        title={t(titleKey)}
+        description={t(descriptionKey)}
+        className="flex-1"
+      />
     </div>
   )
 }

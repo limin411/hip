@@ -21,6 +21,7 @@ import { Modal } from '@/components/ui/Modal'
 import { Input } from '@/components/ui/Input'
 import { Pagination } from '@/components/ui/Pagination'
 import { EmptyState as UiEmptyState } from '@/components/ui/EmptyState'
+import { Skeleton } from '@/components/ui/Skeleton'
 import { MarkdownBody } from '@/components/chat/MarkdownBody'
 import { readPluginFile } from '@/ipc/plugins'
 import { cn } from '@/lib/utils'
@@ -345,7 +346,14 @@ export function PluginConfigView({
 
           <div className="min-h-0 flex-1 overflow-y-auto px-5 py-4">
             {loading ? (
-              <div className="text-body text-ink-tertiary">{t('settings.plugins.loading')}</div>
+              <div className="space-y-3" data-testid="plugin-market-loading">
+                <p className="text-body text-ink-tertiary">{t('settings.plugins.loading')}</p>
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
+                  <Skeleton className="h-28 rounded-xl" />
+                  <Skeleton className="h-28 rounded-xl" />
+                  <Skeleton className="h-28 rounded-xl" />
+                </div>
+              </div>
             ) : tab === 'custom' ? (
               localFiltered.length === 0 ? (
                 <UiEmptyState

@@ -12,6 +12,7 @@ import { Badge } from '@/components/ui/Badge'
 import { Button } from '@/components/ui/Button'
 import { Switch } from '@/components/ui/Switch'
 import { Modal } from '@/components/ui/Modal'
+import { EmptyState } from '@/components/ui/EmptyState'
 import {
   DropdownMenu,
   DropdownMenuTrigger,
@@ -168,11 +169,14 @@ export function SkillConfig() {
 
       <div className="mt-5">
         {standalone.length === 0 && pluginEntries.length === 0 ? (
-          <div className="rounded-lg border border-dashed border-border bg-surface-subtle px-4 py-8 text-center">
-            <Sparkles size={22} className="mx-auto text-ink-tertiary" />
-            <div className="mt-2 text-body text-ink-secondary">{t('settings.skill.empty')}</div>
-            <div className="mt-1 text-meta text-ink-tertiary">{t('settings.skill.emptyHint')}</div>
-          </div>
+          <EmptyState
+            icon={Sparkles}
+            tier="professional"
+            title={t('settings.skill.empty')}
+            description={t('settings.skill.emptyHint')}
+            className="border border-dashed border-border bg-surface-subtle"
+            data-testid="skill-config-empty"
+          />
         ) : (
           <>
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">

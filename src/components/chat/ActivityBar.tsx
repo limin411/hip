@@ -126,6 +126,7 @@ export function ActivityBar({
       <div
         className={cn('mb-2', TRAIL_ROW, 'text-ink-tertiary')}
         data-testid="activity-bar"
+        data-phase="initializing"
         role="status"
         aria-live="polite"
       >
@@ -169,6 +170,7 @@ export function ActivityBar({
       className={cn('mb-2', settleRail && 'animate-message-enter')}
       data-testid="activity-bar"
       data-status={status}
+      data-phase={isRunning ? 'running' : 'settled'}
       aria-live="polite"
     >
       {interleaved ? (

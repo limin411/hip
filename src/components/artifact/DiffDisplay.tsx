@@ -6,6 +6,7 @@ import { cn } from '@/lib/utils'
 import { computeHunkWordDiffs } from '@/lib/wordDiff'
 import { buildSplitRows } from '@/lib/diffSplit'
 import { DeclarativeContextMenu } from '@/components/context-menu'
+import { EmptyState } from '@/components/ui/EmptyState'
 
 export const STATUS_CHIP = {
   added: { cls: 'bg-success/10 text-success', key: 'artifact.diffView.statusAdded' },
@@ -206,13 +207,37 @@ function FileDiff({
   )
 }
 
-export function Empty({ icon, title, desc, children }: { icon?: ReactNode; title: string; desc?: string; children?: ReactNode }) {
+/** Panel empty — shared visual with ui/EmptyState (artifact panels stay full-height). */
+export function Empty({
+  icon,
+  title,
+  desc,
+  children,
+}: {
+  icon?: ReactNode
+  title: string
+  desc?: string
+  children?: ReactNode
+}) {
   return (
-    <div className="flex h-full flex-col items-center justify-center gap-2 py-14 text-ink-tertiary">
-      <span className="text-stat opacity-35">{icon ?? '±'}</span>
-      <div className="text-body font-medium tracking-tight text-ink-secondary">{title}</div>
-      {desc && <div className="max-w-[240px] text-center text-meta leading-relaxed text-ink-tertiary">{desc}</div>}
-      {children}
+    <div className="flex h-full flex-col items-center justify-center" data-testid="artifact-empty">
+      <EmptyState
+        tier="professional"
+        title={title}
+        description={desc}
+        className="py-10"
+      >
+        {icon != null ? (
+          <span className="text-stat text-ink-tertiary opacity-40" aria-hidden>
+            {icon}
+          </span>
+        ) : (
+          <span className="text-stat text-ink-tertiary opacity-35" aria-hidden>
+            ±
+          </span>
+        )}
+      </EmptyState>
+      {children ? <div className="mt-1 flex justify-center">{children}</div> : null}
     </div>
   )
 }

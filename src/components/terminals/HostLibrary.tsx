@@ -9,6 +9,7 @@ import { useTerminalHostStore } from '@/store/terminalHostStore'
 import { mintGroupId } from '@/lib/hostFormDraft'
 import { isDuplicateGroupName } from '@/lib/hostGroupUi'
 import { EmptyState } from '@/components/ui/EmptyState'
+import { Skeleton } from '@/components/ui/Skeleton'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
 import { Modal } from '@/components/ui/Modal'
@@ -198,10 +199,16 @@ export function HostLibrary() {
   if (!loaded) {
     return (
       <div
-        className="flex h-full min-h-0 flex-1 items-center justify-center"
+        className="flex h-full min-h-0 flex-1 flex-col gap-3 p-5"
         data-testid="host-library-loading"
       >
-        <Loader2 size={18} className="animate-spin text-ink-tertiary" aria-hidden />
+        <Skeleton className="h-8 w-48 rounded-md" />
+        <Skeleton className="h-4 w-72 max-w-full rounded-md" />
+        <div className="mt-2 space-y-2">
+          <Skeleton className="h-12 w-full rounded-lg" />
+          <Skeleton className="h-12 w-full rounded-lg" />
+          <Skeleton className="h-12 w-4/5 rounded-lg" />
+        </div>
       </div>
     )
   }

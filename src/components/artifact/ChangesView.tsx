@@ -9,6 +9,7 @@ import { formatRelativeTime } from '@/lib/datetime'
 import { DiffDisplay, Empty } from './DiffDisplay'
 import { DeclarativeContextMenu } from '@/components/context-menu'
 import { Button } from '@/components/ui/Button'
+import { Skeleton } from '@/components/ui/Skeleton'
 import { cn } from '@/lib/utils'
 
 export function ChangesView() {
@@ -95,7 +96,11 @@ export function ChangesView() {
         </div>
         <div className="min-h-0 flex-1 overflow-y-auto">
           {diff.status !== 'ready' && !diff.state ? (
-            <div className="flex h-full items-center justify-center text-ink-tertiary"><Loader2 size={16} className="animate-spin" /></div>
+            <div className="space-y-2 p-3" data-testid="changes-diff-loading">
+              <Skeleton className="h-8 w-full rounded-md" />
+              <Skeleton className="h-8 w-full rounded-md" />
+              <Skeleton className="h-8 w-3/4 rounded-md" />
+            </div>
           ) : diff.files.length === 0 ? (
             <Empty title={t('artifact.diffView.clean')} desc={t('artifact.diffView.cleanDesc')} />
           ) : (
@@ -121,7 +126,11 @@ export function ChangesView() {
         </div>
         <div className="min-h-0 flex-1 overflow-y-auto">
           {log.status === 'loading' ? (
-            <div className="flex h-full items-center justify-center text-ink-tertiary"><Loader2 size={16} className="animate-spin" /></div>
+            <div className="space-y-2 p-3" data-testid="changes-log-loading">
+              <Skeleton className="h-7 w-full rounded-md" />
+              <Skeleton className="h-7 w-full rounded-md" />
+              <Skeleton className="h-7 w-2/3 rounded-md" />
+            </div>
           ) : log.state && log.state !== 'ok' ? (
             <Empty title={t('artifact.changesView.commitLogError')} desc={log.error} />
           ) : log.commits.length === 0 ? (

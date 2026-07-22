@@ -1,7 +1,7 @@
 <svg viewBox="0 0 400 400" xmlns="http://www.w3.org/2000/svg">
-  <!-- hip favicon — Flat Butt body; ~9% tile inset to match common app-icon scale -->
-  <rect x="36" y="36" width="328" height="328" rx="72" fill="#FFF6EB"/>
-  <g transform="translate(200 200) scale(1.1) translate(-200 -200)">
+  <!-- hip favicon — Flat Butt body; full-bleed tile, max mascot scale -->
+  <rect x="0" y="0" width="400" height="400" rx="88" fill="#FFF6EB"/>
+  <g transform="translate(200 200) scale(1.4) translate(-200 -200)">
     <ellipse cx="152" cy="208" rx="90" ry="102" fill="#FF9800"/>
     <ellipse cx="248" cy="208" rx="90" ry="102" fill="#FF9800"/>
     <path d="M200 128 Q192 208 200 278" fill="none" stroke="#E87E00" stroke-width="10" stroke-linecap="round"/>

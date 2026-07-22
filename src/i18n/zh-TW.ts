@@ -477,7 +477,8 @@ export const zhTW = {
     },
     "composer": {
       "tune": "調節",
-      "tuneTitle": "工作階段選項"
+      "tuneTitle": "工作階段選項",
+      "tuneHint": "努力程度、權限、計劃模式等"
     },
     "firstRun": {
       "title": "三步開始使用",
@@ -490,7 +491,10 @@ export const zhTW = {
       "step2CodeTitle": "選擇專案資料夾",
       "step2CodeBody": "Code 工作階段需要專案目錄，以便工具讀寫檔案。",
       "step3Title": "傳送第一則訊息",
-      "step3Body": "按 Enter 開始。可隨時切換模型與權限。"
+      "step3Body": "按 Enter 開始。可隨時切換模型與權限。",
+      "folderTitle": "選擇專案資料夾",
+      "folderSubtitle": "Code 工作階段需要專案目錄，以便工具讀寫檔案。",
+      "folderCta": "選擇資料夾"
     },
     "activity": {
       "completed": "已完成",
@@ -508,6 +512,7 @@ export const zhTW = {
       "writing": "正在撰寫回覆…",
       "parallelAgents": "{{total}} 個子智慧體",
       "parallelAgentsRunning": "{{running}}/{{total}} 個子智慧體執行中",
+      "chapterRunning": "進行中",
       "planProgress": "計劃 {{done}}/{{total}}",
       "viewInActivity": "工具明細見上方活動",
       "elapsed": "{{time}}",

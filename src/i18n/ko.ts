@@ -469,7 +469,8 @@ export const ko = {
     },
     "composer": {
       "tune": "조절",
-      "tuneTitle": "세션 옵션"
+      "tuneTitle": "세션 옵션",
+      "tuneHint": "노력 수준, 권한, 계획 모드 등"
     },
     "firstRun": {
       "title": "3단계로 시작하기",
@@ -482,7 +483,10 @@ export const ko = {
       "step2CodeTitle": "프로젝트 폴더 선택",
       "step2CodeBody": "Code 세션은 도구가 파일을 읽고 쓸 수 있도록 폴더가 필요합니다.",
       "step3Title": "첫 메시지 보내기",
-      "step3Body": "Enter로 시작하세요. 모델과 권한은 언제든 바꿀 수 있습니다."
+      "step3Body": "Enter로 시작하세요. 모델과 권한은 언제든 바꿀 수 있습니다.",
+      "folderTitle": "프로젝트 폴더 선택",
+      "folderSubtitle": "Code 세션은 도구가 파일을 읽고 쓸 수 있도록 폴더가 필요합니다.",
+      "folderCta": "폴더 선택"
     },
     "activity": {
       "completed": "완료됨",
@@ -500,6 +504,7 @@ export const ko = {
       "writing": "답변 작성 중…",
       "parallelAgents": "하위 에이전트 {{total}}",
       "parallelAgentsRunning": "하위 에이전트 {{running}}/{{total}} 실행 중",
+      "chapterRunning": "실행 중",
       "planProgress": "계획 {{done}}/{{total}}",
       "viewInActivity": "도구 세부 정보는 위 활동에 나열됩니다",
       "elapsed": "{{time}}",

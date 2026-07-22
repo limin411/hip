@@ -448,6 +448,7 @@ export const en = {
       composer: {
         tune: 'Tune',
         tuneTitle: 'Session options',
+        tuneHint: 'Effort, permissions, plan mode, and more',
       },
       firstRun: {
         title: 'Get started in three steps',
@@ -461,6 +462,9 @@ export const en = {
         step2CodeBody: 'Code sessions need a folder so tools can read and edit files.',
         step3Title: 'Send your first message',
         step3Body: 'Press Enter to start. You can change model and permissions anytime.',
+        folderTitle: 'Choose a project folder',
+        folderSubtitle: 'Code sessions need a folder so tools can read and edit files.',
+        folderCta: 'Choose folder',
       },
       activity: {
         completed: 'Completed',
@@ -478,6 +482,7 @@ export const en = {
         writing: 'Writing reply…',
         parallelAgents: '{{total}} sub-agents',
         parallelAgentsRunning: '{{running}}/{{total}} sub-agents running',
+        chapterRunning: 'running',
         planProgress: 'Plan {{done}}/{{total}}',
         viewInActivity: 'Tool details are listed in activity above',
         elapsed: '{{time}}',

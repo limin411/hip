@@ -361,7 +361,7 @@ export function NewConversation() {
             {greetingSub}
           </p>
         </div>
-        <FirstRunSetupCard surface={surface} />
+        <FirstRunSetupCard surface={surface} hasFolder={hasFolder} />
         <AcpCapabilityCliffBanner />
         <div className="relative">
           {query !== null && (

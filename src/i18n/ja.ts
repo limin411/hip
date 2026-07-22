@@ -469,7 +469,8 @@ export const ja = {
     },
     "composer": {
       "tune": "調整",
-      "tuneTitle": "セッション設定"
+      "tuneTitle": "セッション設定",
+      "tuneHint": "努力度、権限、プランモードなど"
     },
     "firstRun": {
       "title": "3ステップで始める",
@@ -482,7 +483,10 @@ export const ja = {
       "step2CodeTitle": "プロジェクトフォルダを選ぶ",
       "step2CodeBody": "Code セッションでは、ツールがファイルを読み書きできるフォルダが必要です。",
       "step3Title": "最初のメッセージを送る",
-      "step3Body": "Enter で開始。モデルと権限はいつでも変更できます。"
+      "step3Body": "Enter で開始。モデルと権限はいつでも変更できます。",
+      "folderTitle": "プロジェクトフォルダを選ぶ",
+      "folderSubtitle": "Code セッションでは、ツールがファイルを読み書きできるフォルダが必要です。",
+      "folderCta": "フォルダを選択"
     },
     "activity": {
       "completed": "完了",
@@ -500,6 +504,7 @@ export const ja = {
       "writing": "返信を作成中…",
       "parallelAgents": "サブエージェント {{total}}",
       "parallelAgentsRunning": "サブエージェント {{running}}/{{total}} 実行中",
+      "chapterRunning": "実行中",
       "planProgress": "計画 {{done}}/{{total}}",
       "viewInActivity": "ツールの詳細はアクティビティ内に表示されます",
       "elapsed": "{{time}}",

@@ -439,6 +439,7 @@ export const zhCN = {
       composer: {
         tune: '调节',
         tuneTitle: '会话选项',
+        tuneHint: '努力程度、权限、计划模式等',
       },
       firstRun: {
         title: '三步开始使用',
@@ -452,6 +453,9 @@ export const zhCN = {
         step2CodeBody: 'Code 会话需要项目目录，以便工具读写文件。',
         step3Title: '发送第一条消息',
         step3Body: '按 Enter 开始。可随时切换模型与权限。',
+        folderTitle: '选择项目文件夹',
+        folderSubtitle: 'Code 会话需要项目目录，以便工具读写文件。',
+        folderCta: '选择文件夹',
       },
       activity: {
         completed: '已完成',
@@ -469,6 +473,7 @@ export const zhCN = {
         writing: '正在撰写回复…',
         parallelAgents: '{{total}} 个子智能体',
         parallelAgentsRunning: '{{running}}/{{total}} 个子智能体运行中',
+        chapterRunning: '进行中',
         planProgress: '计划 {{done}}/{{total}}',
         viewInActivity: '工具明细见上方活动',
         elapsed: '{{time}}',

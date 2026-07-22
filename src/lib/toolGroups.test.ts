@@ -21,8 +21,8 @@ describe('groupToolCalls', () => {
 
   it('returns grouped when at or above threshold', () => {
     const tools = [
-      ...Array.from({ length: 5 }, (_, i) => tc(i, 'grep')),
-      ...Array.from({ length: 5 }, (_, i) => tc(i + 10, 'read_file')),
+      ...Array.from({ length: 3 }, (_, i) => tc(i, 'grep')),
+      ...Array.from({ length: 2 }, (_, i) => tc(i + 10, 'read_file')),
     ]
     const r = groupToolCalls(tools)
     expect(r.mode).toBe('grouped')
@@ -34,7 +34,7 @@ describe('groupToolCalls', () => {
 
   it('excludes write_todos from groups', () => {
     const tools = [
-      ...Array.from({ length: 8 }, (_, i) => tc(i, 'grep')),
+      ...Array.from({ length: TOOL_GROUP_THRESHOLD }, (_, i) => tc(i, 'grep')),
       tc(99, 'write_todos'),
     ]
     const r = groupToolCalls(tools)

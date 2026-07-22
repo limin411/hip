@@ -1,7 +1,8 @@
 import type { ToolCall } from '@hip/protocol'
 import { toolCategory, type ToolCategory } from './toolPresentation'
 
-export const TOOL_GROUP_THRESHOLD = 8
+/** Group into category chapters sooner so multi-tool turns scan as narrative sections. */
+export const TOOL_GROUP_THRESHOLD = 5
 
 /** Display order for grouped tools (plan handled separately as todos). */
 export const GROUP_ORDER: ToolCategory[] = [

@@ -29,6 +29,8 @@ export class ChatPage {
   get attachmentButton() { return browser.$('[data-testid="attachment-button"]') }
   get attachmentChips() { return browser.$$('[data-testid="attachment-chip"]') }
   get modelChip() { return browser.$('[data-testid="model-chip"]') }
+  get composerTune() { return browser.$('[data-testid="composer-tune"]') }
+  get composerTunePanel() { return browser.$('[data-testid="composer-tune-panel"]') }
   get permissionChip() { return browser.$('[data-testid="permission-chip"]') }
   get planApprovalCard() { return browser.$('[data-testid="plan-approval-card"]') }
   get planProgressPanel() { return browser.$('[data-testid="plan-progress-panel"]') }

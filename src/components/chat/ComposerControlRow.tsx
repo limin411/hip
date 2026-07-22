@@ -8,7 +8,7 @@ import { cn } from '@/lib/utils'
  * Composer toolbar:
  * - Primary: always visible (agent / model / attach)
  * - Pinned secondary: non-default chips kept outside (permission / plan / effort)
- * - Tune popover: full secondary control list (density without losing e2e pickers)
+ * - Tune popover: full secondary control list as sectioned, full-width rows
  */
 export function ComposerControlRow({
   primary,
@@ -60,14 +60,20 @@ export function ComposerControlRow({
           <PopoverContent
             align="start"
             side="top"
-            className="w-auto min-w-[200px] max-w-[min(360px,calc(100vw-2rem))] p-2"
+            className="w-[min(280px,calc(100vw-2rem))] p-0"
             data-testid="composer-tune-panel"
           >
-            <div className="mb-1.5 px-1 text-caption font-medium text-ink-tertiary">
-              {t('chat.composer.tuneTitle')}
+            <div className="border-b border-border px-3 py-2">
+              <div className="text-meta font-medium text-ink">{t('chat.composer.tuneTitle')}</div>
+              <p className="mt-0.5 text-caption text-ink-tertiary">{t('chat.composer.tuneHint')}</p>
             </div>
             <div
-              className="flex flex-col gap-0.5"
+              className={cn(
+                'flex flex-col gap-0.5 p-1.5',
+                // Each chip/control stretches as a full-width row inside Tune.
+                '[&_button]:w-full [&_button]:justify-start',
+                '[&_[data-testid]]:w-full',
+              )}
               data-testid="composer-controls-secondary"
             >
               {secondary}

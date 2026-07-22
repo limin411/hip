@@ -23,6 +23,19 @@ async function openChipMenu(chip: ChainablePromiseElement): Promise<ChainablePro
   return menu
 }
 
+/** Secondary controls (permission / plan / effort) live under Tune popover. */
+async function openTunePanel(): Promise<ChainablePromiseElement> {
+  const tune = await chat.composerTune
+  await tune.waitForExist({ timeout: 10000 })
+  await browser.execute((el: HTMLElement) => {
+    el.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, cancelable: true, pointerType: 'mouse' }))
+    el.click()
+  }, tune)
+  const panel = await chat.composerTunePanel
+  await panel.waitForExist({ timeout: 10000 })
+  return panel
+}
+
 describe('composer widgets @core', () => {
   before(async () => {
     await waitForAppReady()
@@ -59,8 +72,11 @@ describe('composer widgets @core', () => {
     await browser.keys('Escape')
   })
 
-  it('shows the permission mode picker and lists all three modes', async () => {
-    const menu = await openChipMenu(await chat.permissionChip)
+  it('shows Tune and permission mode picker with all three modes', async () => {
+    await openTunePanel()
+    const chip = await chat.permissionChip
+    await chip.waitForExist({ timeout: 10000 })
+    const menu = await openChipMenu(chip)
     const text = await menu.getText()
     // zh-CN or en labels
     const hasChat = text.includes('仅对话') || /chat/i.test(text)
@@ -73,7 +89,9 @@ describe('composer widgets @core', () => {
   })
 
   it('updates the permission chip label after selecting a different mode', async () => {
+    await openTunePanel()
     const chip = await chat.permissionChip
+    await chip.waitForExist({ timeout: 10000 })
     const before = await chip.getText()
     await openChipMenu(chip)
 
@@ -83,14 +101,27 @@ describe('composer widgets @core', () => {
     expect(items.length).toBeGreaterThanOrEqual(1)
     await browser.execute((el: HTMLElement) => el.click(), items[0])
 
-    // Chip label should change after selecting a mode (locale-agnostic).
+    // Non-default permission pins outside Tune; re-open Tune if chip left the panel.
     await browser.waitUntil(async () => {
-      const after = await chip.getText()
+      const pinned = await browser.$('[data-testid="composer-controls-pinned"] [data-testid="permission-chip"]')
+      if (await pinned.isExisting()) {
+        return (await pinned.getText()).length > 0 && (await pinned.getText()) !== before
+      }
+      const inTune = await chat.permissionChip
+      if (!(await inTune.isExisting())) {
+        await openTunePanel()
+      }
+      const after = await (await chat.permissionChip).getText()
       return after.length > 0 && after !== before
     }, { timeout: 10000 })
 
-    // Restore another mode so later specs are not stuck on chat-only.
-    await openChipMenu(chip)
+    // Restore via pinned chip or Tune.
+    let restoreChip = await browser.$('[data-testid="permission-chip"]')
+    if (!(await restoreChip.isExisting())) {
+      await openTunePanel()
+      restoreChip = await chat.permissionChip
+    }
+    await openChipMenu(restoreChip)
     const restoreItems = await browser.$$('[role="menuitem"]')
     expect(restoreItems.length).toBeGreaterThanOrEqual(2)
     await browser.execute((el: HTMLElement) => el.click(), restoreItems[1])

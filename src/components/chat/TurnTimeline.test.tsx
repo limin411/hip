@@ -46,7 +46,7 @@ describe('TurnTimeline', () => {
     expect(rows.some((r) => r.textContent?.includes('zuolin'))).toBe(true)
   })
 
-  it('groups when tool count ≥ 8', () => {
+  it('groups tools into category chapters at/above threshold', () => {
     render(<TurnTimeline toolCalls={sampleToolCalls} />)
     expect(screen.getByTestId('turn-timeline')).toBeInTheDocument()
     const groups = screen.getAllByTestId('tool-call-group')

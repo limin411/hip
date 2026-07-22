@@ -4,7 +4,8 @@ const WRITE_TOOLS = new Set(['write_file', 'edit_file', 'apply_patch'])
 
 /**
  * Shell / interpreter scripts commonly written only to execute once.
- * Product source (.ts/.tsx/.js/…) still auto-opens for review.
+ * Product source (.ts/.tsx/.js/…) still auto-follows preview/focus (panel
+ * open is a separate code/chat policy).
  */
 const DEFER_PANEL_SCRIPT_EXT = /\.(py|sh|bash|zsh|rb|pl|ps1|cmd|bat)$/i
 
@@ -71,7 +72,10 @@ export function isDeferredPanelOpenPath(path: string): boolean {
   return DEFER_PANEL_SCRIPT_EXT.test(basename(path))
 }
 
-/** How write-follow should treat the right panel for this path. */
+/**
+ * How write-follow should treat preview timing for this path.
+ * Code never force-opens the panel; chat still may auto-open on follow.
+ */
 export type WriteFollowPanelPolicy = 'immediate' | 'defer' | 'skip'
 
 export function writeFollowPanelPolicy(path: string): WriteFollowPanelPolicy {

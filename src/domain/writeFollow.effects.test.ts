@@ -126,14 +126,29 @@ describe('write-follow effects (P1 C1)', () => {
     })
   })
 
-  it('sets preview path on durable write tool:finished and opens code panel', () => {
+  it('sets preview path on durable write tool:finished without force-opening code panel', () => {
     const deps = makeDeps()
     finishTool('c1', deps)
     const prev = useFsStore.getState().bySession['s1']?.preview
     expect(prev && prev.status !== 'idle' ? prev.path : undefined).toBe('/README.md')
     expect(deps.send).toHaveBeenCalledWith(expect.objectContaining({ type: 'fs:read', path: '/README.md' }))
     expect(useFocusStore.getState().focusedPath).toBe('/README.md')
+    // Code surface: keep conversation full-width; user opens panel explicitly.
+    expect(useDomainStore.getState().sessions[0].codePanelOpen).toBe(false)
+  })
+
+  it('follows into Files tab when code panel is already open on durable write', () => {
+    useDomainStore.setState((s) => ({
+      sessions: s.sessions.map((sess) =>
+        sess.id === 's1' ? { ...sess, codePanelOpen: true } : sess,
+      ),
+    }))
+    useUiStore.setState({ activeTab: 'agents' })
+    const deps = makeDeps()
+    finishTool('c1', deps)
     expect(useDomainStore.getState().sessions[0].codePanelOpen).toBe(true)
+    expect(useUiStore.getState().activeTab).toBe('files')
+    expect(useFocusStore.getState().focusedPath).toBe('/README.md')
   })
 
   it('skips follow when paused', () => {
@@ -169,7 +184,7 @@ describe('write-follow effects (P1 C1)', () => {
     expect(prev && prev.status !== 'idle' ? prev.path : undefined).toBeUndefined()
   })
 
-  it('defers panel open for script-like paths until turn end', () => {
+  it('defers preview follow for script-like paths until turn end without force-opening panel', () => {
     seedCodeSession([
       {
         callId: 'c-py',
@@ -194,7 +209,8 @@ describe('write-follow effects (P1 C1)', () => {
         status: 'finished',
       },
     ])
-    expect(useDomainStore.getState().sessions[0].codePanelOpen).toBe(true)
+    // Still never force-open on code; preview/focus update for when user opens panel.
+    expect(useDomainStore.getState().sessions[0].codePanelOpen).toBe(false)
     expect(useFocusStore.getState().focusedPath).toBe('/scripts/check.py')
     expect(useFocusStore.getState().deferredWriteFollow).toBeNull()
   })
@@ -279,6 +295,11 @@ describe('write-follow effects (P1 C1)', () => {
   })
 
   it('keeps Changes tab when already reviewing diffs on durable write', () => {
+    useDomainStore.setState((s) => ({
+      sessions: s.sessions.map((sess) =>
+        sess.id === 's1' ? { ...sess, codePanelOpen: true } : sess,
+      ),
+    }))
     useUiStore.setState({ activeTab: 'changes' })
     const deps = makeDeps()
     finishTool('c1', deps)
@@ -286,7 +307,7 @@ describe('write-follow effects (P1 C1)', () => {
     expect(useDomainStore.getState().sessions[0].codePanelOpen).toBe(true)
   })
 
-  it('immediate durable write clears any deferred script follow', () => {
+  it('immediate durable write clears any deferred script follow without force-opening panel', () => {
     seedCodeSession([
       {
         callId: 'c-py',
@@ -304,7 +325,7 @@ describe('write-follow effects (P1 C1)', () => {
     expect(useFocusStore.getState().deferredWriteFollow?.path).toBe('/scripts/check.py')
     finishTool('c-ts', deps)
     expect(useFocusStore.getState().deferredWriteFollow).toBeNull()
-    expect(useDomainStore.getState().sessions[0].codePanelOpen).toBe(true)
+    expect(useDomainStore.getState().sessions[0].codePanelOpen).toBe(false)
     expect(useFocusStore.getState().focusedPath).toBe('/src/a.ts')
   })
 })

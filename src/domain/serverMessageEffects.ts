@@ -80,19 +80,21 @@ function applyWriteFollowPreview(
 }
 
 /**
- * Open the right panel for a write-follow hit.
- * Code: keep Changes/Terminal tab if already there; otherwise switch to Files.
- * Chat: always Files + selected artifact path.
+ * Right-panel policy for a write-follow hit.
+ * Code: never force-open (keeps the conversation full-width). If the panel is
+ * already open, keep Changes/Terminal; otherwise switch to Files.
+ * Chat: Artifacts-style auto-open on Files + selected path.
  */
 function openWriteFollowPanel(sessionId: string, path: string, isCode: boolean): void {
   const domain = useDomainStore.getState()
   const ui = useUiStore.getState()
   if (isCode) {
+    const sess = domain.sessions.find((s) => s.id === sessionId)
+    if (!sess?.codePanelOpen) return
     const tab = ui.activeTab
     if (tab !== 'changes' && tab !== 'terminal') {
       ui.setTab('files')
     }
-    domain.setSessionCodePanelOpen(sessionId, true)
   } else {
     ui.setChatActiveTab('files')
     ui.setSelectedArtifactPath(path)
@@ -315,8 +317,9 @@ export function applyServerMessageEffects(msg: ServerMessage, deps: ServerMessag
       }
 
       // P1 C1: auto-follow write-like tools to preview before turn ends.
-      // Panel policy: durable files open immediately; script-like paths defer until
-      // turn end (cancelled if run_script consumes them); ephemeral paths never open.
+      // Code never force-opens the right panel (preview/focus still update).
+      // Chat still auto-opens. Script-like paths defer until turn end (cancelled
+      // if run_script consumes them); ephemeral paths never follow.
       const focus = useFocusStore.getState()
       const path = tool ? pathFromToolInput(name, tool.input) : null
       if (

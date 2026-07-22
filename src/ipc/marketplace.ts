@@ -23,3 +23,12 @@ export async function listMarketplacePlugins(): Promise<MarketplaceSnapshot> {
   const raw = await invoke<string>('list_marketplace_plugins')
   return JSON.parse(raw) as MarketplaceSnapshot
 }
+
+export async function addMarketplaceSource(gitUrl: string): Promise<MarketSourceState> {
+  const raw = await invoke<string>('add_marketplace_source', { gitUrl })
+  return JSON.parse(raw) as MarketSourceState
+}
+
+export async function removeMarketplaceSource(sourceId: string): Promise<void> {
+  await invoke('remove_marketplace_source', { sourceId })
+}

@@ -151,6 +151,22 @@ describe('filterLocalPlugins', () => {
     expect(filterLocalPlugins(list, 'local').map((p) => p.id)).toEqual(['local'])
     expect(filterLocalPlugins(list, 'missing')).toEqual([])
   })
+
+  it('excludes plugins from user-added marketplace sources', () => {
+    const list = [
+      basePlugin({ id: 'local', name: 'Local One' }),
+      basePlugin({
+        id: 'from-custom-mkt',
+        name: 'Custom Mkt P',
+        marketSourceId: 'custom-acme-plugins',
+      }),
+    ]
+    expect(
+      filterLocalPlugins(list, '', ['grok-official', 'claude-official', 'custom-acme-plugins']).map(
+        (p) => p.id,
+      ),
+    ).toEqual(['local'])
+  })
 })
 
 describe('PluginConfigView', () => {
@@ -232,6 +248,31 @@ describe('PluginConfigView', () => {
     expect(screen.getByTestId('plugin-market-tab-claude')).toBeInTheDocument()
     expect(screen.getByTestId('plugin-market-tab-custom')).toBeInTheDocument()
   })
+
+  it('renders custom marketplace source in sidebar nav', () => {
+    render(
+      <PluginConfigView
+        {...baseViewProps}
+        sources={[
+          ...baseViewProps.sources,
+          {
+            id: 'custom-acme-plugins',
+            kind: 'claude',
+            name: 'Acme Plugins',
+            description: 'Test',
+            catalogRepo: 'https://github.com/acme/plugins',
+            catalogUrl: 'https://raw.githubusercontent.com/acme/plugins/main/.claude-plugin/marketplace.json',
+            enabled: true,
+            builtin: false,
+            pluginCount: 3,
+          },
+        ]}
+      />,
+    )
+    expect(screen.getByTestId('plugin-market-tab-custom-acme-plugins')).toBeInTheDocument()
+    expect(screen.getByText('Acme Plugins')).toBeInTheDocument()
+  })
+
 
   it('paginates market cards when count exceeds page size', () => {
     const entries = Array.from({ length: PLUGIN_MARKET_PAGE_SIZE + 3 }, (_, i) =>

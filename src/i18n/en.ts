@@ -1227,7 +1227,7 @@ export const en = {
       plugins: {
         title: 'Plugin Market',
         intro:
-          'Browse the official Grok and Claude marketplaces, or manage local custom plugins. Marketplace downloads start disabled. On download, model bindings are reviewed and unavailable models are rewritten to your product default.',
+          'Browse marketplace sources (Grok, Claude, or GitHub repos you add), or manage local custom plugins. Marketplace downloads start disabled. On download, model bindings are reviewed and unavailable models are rewritten to your product default.',
         install: 'Install Plugin',
         urlLabel: 'Git Repository URL',
         urlPlaceholder: 'https://github.com/owner/repo.git',
@@ -1277,7 +1277,20 @@ export const en = {
         refreshCatalog: 'Refresh catalog',
         sourcesTitle: 'Marketplace sources',
         sourcesIntro:
-          'Only the official Grok and Claude sources are integrated. You can enable, disable, or refresh them — custom marketplace URLs are not supported.',
+          'Grok and Claude are seeded on first install. Add more sources with a public GitHub repo that ships a Grok or Claude marketplace.json. A source cannot be removed while it still has downloaded plugins.',
+        sourcesEmpty: 'No marketplace sources yet. Add a GitHub repository above.',
+        addSourceTitle: 'Add marketplace source',
+        addSourceHint:
+          'Paste a GitHub HTTPS URL. The catalog must be at .grok-plugin/marketplace.json or .claude-plugin/marketplace.json (same layout as the official markets).',
+        addSourcePlaceholder: 'https://github.com/owner/repo.git',
+        addSource: 'Add source',
+        addingSource: 'Adding…',
+        addSourceRequired: 'Enter a Git repository URL.',
+        removeSource: 'Remove',
+        removeSourceConfirm: 'Remove this marketplace source from the list?',
+        removeSourceBlocked:
+          'This source has downloaded plugins. Uninstall them first, then remove the source.',
+        sourceBuiltin: 'Official',
         enableSource: 'Enable this source',
         refreshSource: 'Refresh now',
         lastFetched: 'Last fetched',

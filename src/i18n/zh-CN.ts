@@ -1198,7 +1198,7 @@ export const zhCN = {
       plugins: {
         title: '插件市场',
         intro:
-          '浏览 Grok / Claude 官方市场，或管理本地自定义插件。从官方市场下载后默认为未开启；下载时会审核插件内的模型配置，不可用模型将改写为当前默认模型。',
+          '浏览市场源（Grok、Claude 或你添加的 GitHub 仓库），或管理本地自定义插件。从市场下载后默认为未开启；下载时会审核插件内的模型配置，不可用模型将改写为当前默认模型。',
         install: '安装插件',
         urlLabel: 'Git 仓库地址',
         urlPlaceholder: 'https://github.com/owner/repo.git',
@@ -1246,7 +1246,20 @@ export const zhCN = {
         manageSources: '管理市场源',
         refreshCatalog: '刷新目录',
         sourcesTitle: '市场源',
-        sourcesIntro: '仅集成 Grok 与 Claude 官方源，可开关与刷新；不支持添加第三方源。',
+        sourcesIntro:
+          '首次安装会初始化 Grok 与 Claude 官方源。可添加公开 GitHub 仓库（需含 Grok/Claude 格式的 marketplace.json）。若该源下仍有已下载插件，则不可删除。',
+        sourcesEmpty: '暂无市场源。请在上方添加 GitHub 仓库。',
+        addSourceTitle: '新建市场源',
+        addSourceHint:
+          '填写 GitHub HTTPS 地址。目录需位于 .grok-plugin/marketplace.json 或 .claude-plugin/marketplace.json（与官方市场相同）。',
+        addSourcePlaceholder: 'https://github.com/owner/repo.git',
+        addSource: '添加',
+        addingSource: '添加中…',
+        addSourceRequired: '请填写 Git 仓库地址。',
+        removeSource: '删除',
+        removeSourceConfirm: '确定从列表中移除此市场源？',
+        removeSourceBlocked: '该源下仍有已下载插件，请先卸载插件后再删除市场源。',
+        sourceBuiltin: '官方',
         enableSource: '启用此市场源',
         refreshSource: '立即刷新',
         lastFetched: '最近刷新',

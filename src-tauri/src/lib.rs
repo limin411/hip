@@ -290,6 +290,20 @@ fn list_marketplace_plugins(app: tauri::AppHandle) -> Result<String, String> {
 }
 
 #[tauri::command]
+async fn add_marketplace_source(
+    app: tauri::AppHandle,
+    git_url: String,
+) -> Result<String, String> {
+    let src = marketplace::add_source(&app, &git_url).await?;
+    serde_json::to_string(&src).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+fn remove_marketplace_source(app: tauri::AppHandle, source_id: String) -> Result<(), String> {
+    marketplace::remove_source(&app, &source_id)
+}
+
+#[tauri::command]
 fn set_plugin_enabled(
     app: tauri::AppHandle,
     id: String,
@@ -753,6 +767,8 @@ pub fn run() {
             set_marketplace_source_enabled,
             refresh_marketplace_catalog,
             list_marketplace_plugins,
+            add_marketplace_source,
+            remove_marketplace_source,
             list_worktrees,
             path_tools::which_binaries,
             path_tools::path_is_dir,

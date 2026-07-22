@@ -1,6 +1,7 @@
 /** Plugin marketplace sources, catalog entries, and model-review types. */
 
-export type MarketSourceId = 'grok-official' | 'claude-official'
+/** Stable source id (seeded official or user-added). */
+export type MarketSourceId = string
 
 export type MarketKind = 'grok' | 'claude' | 'custom'
 
@@ -10,7 +11,8 @@ export type MarketDownloadState =
   | 'downloaded'
   | 'review_failed'
 
-export type MarketTab = 'grok' | 'claude' | 'custom'
+/** Sidebar tab: official shortcuts, custom local plugins, or a source id. */
+export type MarketTab = 'grok' | 'claude' | 'custom' | string
 
 export interface MarketInstallSpec {
   kind: 'git'
@@ -66,6 +68,10 @@ export interface MarketSourceState {
   lastFetchedAt?: string
   lastError?: string
   pluginCount?: number
+  /** Seeded official Grok / Claude source (still deletable when no downloads). */
+  builtin?: boolean
+  /** True when ≥1 installed plugin has this marketSourceId. */
+  hasDownloadedPlugins?: boolean
 }
 
 export interface MarketplaceSnapshot {
@@ -73,11 +79,11 @@ export interface MarketplaceSnapshot {
   entries: MarketPluginEntry[]
 }
 
-/** Built-in official marketplace definitions (URLs are fixed; not user-editable). */
+/** Official marketplace seed definitions (written on first install). */
 export const BUILTIN_MARKET_SOURCES: Record<
-  MarketSourceId,
+  string,
   {
-    id: MarketSourceId
+    id: string
     kind: 'grok' | 'claude'
     name: string
     description: string
@@ -105,4 +111,4 @@ export const BUILTIN_MARKET_SOURCES: Record<
   },
 }
 
-export const MARKET_SOURCE_IDS: MarketSourceId[] = ['grok-official', 'claude-official']
+export const MARKET_SOURCE_IDS: string[] = ['grok-official', 'claude-official']

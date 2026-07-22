@@ -7,9 +7,11 @@ import type {
   PluginModelReviewSummary,
 } from '@hip/protocol'
 import {
+  addMarketplaceSource,
   listMarketplacePlugins,
   listMarketplaceSources,
   refreshMarketplaceCatalog,
+  removeMarketplaceSource,
   setMarketplaceSourceEnabled,
 } from '@/ipc/marketplace'
 import { wsClient } from '@/ipc/ws-client'
@@ -21,6 +23,7 @@ interface MarketplaceStore {
   loaded: boolean
   loading: boolean
   refreshing: boolean
+  adding: boolean
   error: string | null
   tab: MarketTab
   query: string
@@ -33,20 +36,32 @@ interface MarketplaceStore {
   load: () => Promise<void>
   refresh: (sourceId?: string) => Promise<void>
   setSourceEnabled: (sourceId: string, enabled: boolean) => Promise<void>
+  addSource: (gitUrl: string) => Promise<void>
+  removeSource: (sourceId: string) => Promise<void>
   download: (entry: MarketPluginEntry) => Promise<void>
   filteredEntries: () => MarketPluginEntry[]
 }
 
-function filterEntries(entries: MarketPluginEntry[], tab: MarketTab, query: string): MarketPluginEntry[] {
+/** Map UI tab → marketSourceId filter (null = custom local, no market entries). */
+export function tabToSourceId(tab: MarketTab): string | null {
+  if (tab === 'custom') return null
+  if (tab === 'grok') return 'grok-official'
+  if (tab === 'claude') return 'claude-official'
+  return tab
+}
+
+export function filterEntries(
+  entries: MarketPluginEntry[],
+  tab: MarketTab,
+  query: string,
+): MarketPluginEntry[] {
   const q = query.trim().toLowerCase()
+  const sourceId = tabToSourceId(tab)
   let list = entries
-  if (tab === 'grok') {
-    list = entries.filter((e) => e.marketKind === 'grok')
-  } else if (tab === 'claude') {
-    list = entries.filter((e) => e.marketKind === 'claude')
-  } else {
-    // custom tab uses local plugins store — remote entries not used
+  if (sourceId === null) {
     list = []
+  } else {
+    list = entries.filter((e) => e.marketSourceId === sourceId)
   }
   if (!q) return list
   return list.filter((e) => {
@@ -90,6 +105,7 @@ export const useMarketplaceStore = create<MarketplaceStore>((set, get) => ({
   loaded: false,
   loading: false,
   refreshing: false,
+  adding: false,
   error: null,
   tab: 'custom',
   query: '',
@@ -129,7 +145,6 @@ export const useMarketplaceStore = create<MarketplaceStore>((set, get) => ({
         refreshing: false,
       })
     } catch (err) {
-      // Still reload snapshot (may have partial cache)
       try {
         const snap = await listMarketplacePlugins()
         set({ sources: snap.sources, entries: snap.entries })
@@ -150,6 +165,48 @@ export const useMarketplaceStore = create<MarketplaceStore>((set, get) => ({
     set({ sources, entries: snap.entries })
   },
 
+  addSource: async (gitUrl) => {
+    set({ adding: true, error: null })
+    try {
+      await addMarketplaceSource(gitUrl)
+      const snap = await listMarketplacePlugins()
+      set({
+        sources: snap.sources,
+        entries: snap.entries,
+        adding: false,
+      })
+    } catch (err) {
+      set({
+        adding: false,
+        error: err instanceof Error ? err.message : String(err),
+      })
+      throw err
+    }
+  },
+
+  removeSource: async (sourceId) => {
+    set({ error: null })
+    try {
+      await removeMarketplaceSource(sourceId)
+      const snap = await listMarketplacePlugins()
+      const tab = get().tab
+      const removedTab =
+        tab === sourceId ||
+        (tab === 'grok' && sourceId === 'grok-official') ||
+        (tab === 'claude' && sourceId === 'claude-official')
+      set({
+        sources: snap.sources,
+        entries: snap.entries,
+        tab: removedTab ? 'custom' : tab,
+      })
+    } catch (err) {
+      set({
+        error: err instanceof Error ? err.message : String(err),
+      })
+      throw err
+    }
+  },
+
   download: async (entry) => {
     const install = entry.install
     if (!install) {
@@ -158,7 +215,6 @@ export const useMarketplaceStore = create<MarketplaceStore>((set, get) => ({
     set({ downloadingKey: entry.key, error: null, lastModelReview: null })
     useDomainStore.getState().clearPluginInstall()
 
-    // Mark UI downloading
     set({
       entries: get().entries.map((e) =>
         e.key === entry.key ? { ...e, downloadState: 'downloading' as const } : e,
@@ -222,5 +278,3 @@ export function matchInstallSpecSearch(
   if (!install || !query) return true
   return install.url.toLowerCase().includes(query.toLowerCase())
 }
-
-export { filterEntries }

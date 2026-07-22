@@ -53,11 +53,18 @@ export function formatComponentCounts(plugin: PluginMeta, t: Translate): string 
   })
 }
 
-export function filterLocalPlugins(plugins: PluginMeta[], query: string): PluginMeta[] {
+/** Local/custom tab: plugins not attributed to any configured marketplace source. */
+export function filterLocalPlugins(
+  plugins: PluginMeta[],
+  query: string,
+  knownSourceIds?: Iterable<string>,
+): PluginMeta[] {
+  const known = new Set(
+    knownSourceIds ?? ['grok-official', 'claude-official'],
+  )
   const q = query.trim().toLowerCase()
-  // Custom = not from official markets
   const custom = plugins.filter(
-    (p) => p.marketSourceId !== 'grok-official' && p.marketSourceId !== 'claude-official',
+    (p) => !p.marketSourceId || !known.has(p.marketSourceId),
   )
   if (!q) return custom
   return custom.filter((p) => {
@@ -67,6 +74,14 @@ export function filterLocalPlugins(plugins: PluginMeta[], query: string): Plugin
       .toLowerCase()
     return hay.includes(q)
   })
+}
+
+/** Map UI tab to marketplace source id (null for custom local plugins). */
+export function tabToMarketSourceId(tab: MarketTab): string | null {
+  if (tab === 'custom') return null
+  if (tab === 'grok') return 'grok-official'
+  if (tab === 'claude') return 'claude-official'
+  return tab
 }
 
 export interface PluginConfigViewProps {
@@ -119,10 +134,16 @@ export function PluginConfigView({
 }: PluginConfigViewProps) {
   const [page, setPage] = useState(1)
 
-  const localFiltered = useMemo(() => filterLocalPlugins(plugins, query), [plugins, query])
-  const sourceDisabled =
-    (tab === 'grok' && sources.find((s) => s.id === 'grok-official')?.enabled === false) ||
-    (tab === 'claude' && sources.find((s) => s.id === 'claude-official')?.enabled === false)
+  const knownSourceIds = useMemo(() => sources.map((s) => s.id), [sources])
+  const localFiltered = useMemo(
+    () => filterLocalPlugins(plugins, query, knownSourceIds),
+    [plugins, query, knownSourceIds],
+  )
+  const activeSourceId = tabToMarketSourceId(tab)
+  const activeSource = activeSourceId
+    ? sources.find((s) => s.id === activeSourceId)
+    : undefined
+  const sourceDisabled = Boolean(activeSource && activeSource.enabled === false)
 
   const listLength = tab === 'custom' ? localFiltered.length : marketEntries.length
   const totalPages = Math.max(1, Math.ceil(listLength / PLUGIN_MARKET_PAGE_SIZE))
@@ -147,41 +168,50 @@ export function PluginConfigView({
     [marketEntries, safePage],
   )
 
-  const grokCount = sources.find((s) => s.id === 'grok-official')?.pluginCount
-  const claudeCount = sources.find((s) => s.id === 'claude-official')?.pluginCount
   const customCount = useMemo(
-    () =>
-      plugins.filter(
-        (p) => p.marketSourceId !== 'grok-official' && p.marketSourceId !== 'claude-official',
-      ).length,
-    [plugins],
+    () => filterLocalPlugins(plugins, '', knownSourceIds).length,
+    [plugins, knownSourceIds],
   )
 
-  const navItems: {
-    id: MarketTab
-    label: string
-    icon: typeof Package
-    count?: number
-  }[] = [
-    {
-      id: 'grok',
-      label: t('settings.plugins.tabGrok'),
-      icon: Sparkles,
-      count: grokCount,
-    },
-    {
-      id: 'claude',
-      label: t('settings.plugins.tabClaude'),
-      icon: Box,
-      count: claudeCount,
-    },
-    {
+  const navItems = useMemo(() => {
+    const items: {
+      id: MarketTab
+      label: string
+      icon: typeof Package
+      count?: number
+    }[] = []
+    for (const src of sources) {
+      if (src.id === 'grok-official') {
+        items.push({
+          id: 'grok',
+          label: t('settings.plugins.tabGrok'),
+          icon: Sparkles,
+          count: src.pluginCount,
+        })
+      } else if (src.id === 'claude-official') {
+        items.push({
+          id: 'claude',
+          label: t('settings.plugins.tabClaude'),
+          icon: Box,
+          count: src.pluginCount,
+        })
+      } else {
+        items.push({
+          id: src.id,
+          label: src.name,
+          icon: Box,
+          count: src.pluginCount,
+        })
+      }
+    }
+    items.push({
       id: 'custom',
       label: t('settings.plugins.tabCustom'),
       icon: Package,
       count: customCount,
-    },
-  ]
+    })
+    return items
+  }, [sources, customCount, t])
 
   return (
     <div className="flex min-h-0 flex-col" data-testid="plugin-market">

@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import type { MarketPluginEntry, PluginMeta } from '@hip/protocol'
 import { usePluginsStore } from '@/store/pluginsStore'
-import { useMarketplaceStore } from '@/store/marketplaceStore'
+import { useMarketplaceStore, tabToSourceId } from '@/store/marketplaceStore'
 import { Button } from '@/components/ui/Button'
 import { Modal } from '@/components/ui/Modal'
 import { PluginConfigView, PluginViewModal, type Translate } from './PluginConfigView'
@@ -10,7 +10,7 @@ import { MarketplaceSourceModal } from './MarketplaceSourceModal'
 
 /**
  * Settings → Plugin Market.
- * Grok / Claude official catalogs + custom local plugins; search + source management.
+ * Seeded Grok / Claude catalogs + user-added GitHub market sources + local custom plugins.
  */
 export function PluginConfig() {
   const { t } = useTranslation()
@@ -31,6 +31,7 @@ export function PluginConfig() {
   const marketTab = useMarketplaceStore((s) => s.tab)
   const marketSources = useMarketplaceStore((s) => s.sources)
   const marketRefreshing = useMarketplaceStore((s) => s.refreshing)
+  const marketAdding = useMarketplaceStore((s) => s.adding)
   const marketEntriesRaw = useMarketplaceStore((s) => s.entries)
   const marketQuery = useMarketplaceStore((s) => s.query)
 
@@ -45,13 +46,11 @@ export function PluginConfig() {
     })
   }, [plugins])
 
-  // Auto-refresh each official source at most once per mount when no catalog yet.
-  // Do not key off marketRefreshing/sources identity — that caused a tight retry loop when
-  // lastFetchedAt failed to persist or refresh failed.
+  // Auto-refresh each source at most once per mount when no catalog yet.
   const autoRefreshAttempted = useRef<Set<string>>(new Set())
   useEffect(() => {
-    if (marketTab === 'custom') return
-    const sourceId = marketTab === 'grok' ? 'grok-official' : 'claude-official'
+    const sourceId = tabToSourceId(marketTab)
+    if (!sourceId) return
     const src = marketSources.find((s) => s.id === sourceId)
     if (!src?.enabled || src.lastFetchedAt || marketRefreshing) return
     if (autoRefreshAttempted.current.has(sourceId)) return
@@ -132,12 +131,7 @@ export function PluginConfig() {
         }}
         onOpenSources={() => setSourcesOpen(true)}
         onRefreshCatalog={() => {
-          const sourceId =
-            market.tab === 'grok'
-              ? 'grok-official'
-              : market.tab === 'claude'
-                ? 'claude-official'
-                : undefined
+          const sourceId = tabToSourceId(market.tab) ?? undefined
           void market.refresh(sourceId)
         }}
         t={t as Translate}
@@ -155,6 +149,7 @@ export function PluginConfig() {
         open={sourcesOpen}
         sources={market.sources}
         refreshing={market.refreshing}
+        adding={marketAdding}
         onClose={() => setSourcesOpen(false)}
         onToggle={(id, enabled) => {
           void market.setSourceEnabled(id, enabled).catch((err: Error) => {
@@ -163,6 +158,14 @@ export function PluginConfig() {
         }}
         onRefresh={(id) => {
           void market.refresh(id)
+        }}
+        onAdd={async (gitUrl) => {
+          setError(null)
+          await market.addSource(gitUrl)
+        }}
+        onRemove={async (id) => {
+          setError(null)
+          await market.removeSource(id)
         }}
         t={t as Translate}
       />

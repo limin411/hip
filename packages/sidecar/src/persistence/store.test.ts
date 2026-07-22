@@ -289,22 +289,56 @@ describe('SessionStore', () => {
     expect(runs.find((r) => r.agentId === 'supervisor')!.toolCalls).toEqual([])
   })
 
-  it('round-trips per-agent usage and reconstructs Message.usage = sum', () => {
+  it('round-trips per-agent usage and reconstructs Message.usage = sum with max contextTokens', () => {
     store.insertSession({ id: 's1', title: 't', config: cfg, createdAt: 1, updatedAt: 1 })
     store.insertMessage({ id: 'u1', sessionId: 's1', role: 'user', agentId: null, content: 'hi', timestamp: 1 })
     store.insertTurn(
       { id: 'a1', sessionId: 's1', agentId: 'supervisor', content: 'done', timestamp: 3 },
       's1',
       [
-        { agentId: 'supervisor', role: 'supervisor', output: 'done', startedAt: 1, finishedAt: 3, seq: 0, usage: { inputTokens: 100, outputTokens: 20, totalTokens: 120 } },
-        { agentId: 'worker-1', role: 'worker', output: 'sub', startedAt: 1, finishedAt: 2, seq: 1, parentAgentId: 'supervisor', taskInput: 'do', usage: { inputTokens: 30, outputTokens: 5, totalTokens: 35 } },
+        {
+          agentId: 'supervisor',
+          role: 'supervisor',
+          output: 'done',
+          startedAt: 1,
+          finishedAt: 3,
+          seq: 0,
+          // multi-step sum 100 in, last-step context 70
+          usage: { inputTokens: 100, outputTokens: 20, totalTokens: 120, contextTokens: 70 },
+        },
+        {
+          agentId: 'worker-1',
+          role: 'worker',
+          output: 'sub',
+          startedAt: 1,
+          finishedAt: 2,
+          seq: 1,
+          parentAgentId: 'supervisor',
+          taskInput: 'do',
+          usage: { inputTokens: 30, outputTokens: 5, totalTokens: 35, contextTokens: 30 },
+        },
       ],
     )
     const runs = store.loadAgentRuns('s1')
-    expect(runs.find((r) => r.agentId === 'supervisor')!.usage).toEqual({ inputTokens: 100, outputTokens: 20, totalTokens: 120 })
-    expect(runs.find((r) => r.agentId === 'worker-1')!.usage).toEqual({ inputTokens: 30, outputTokens: 5, totalTokens: 35 })
+    expect(runs.find((r) => r.agentId === 'supervisor')!.usage).toEqual({
+      inputTokens: 100,
+      outputTokens: 20,
+      totalTokens: 120,
+      contextTokens: 70,
+    })
+    expect(runs.find((r) => r.agentId === 'worker-1')!.usage).toEqual({
+      inputTokens: 30,
+      outputTokens: 5,
+      totalTokens: 35,
+      contextTokens: 30,
+    })
     const msg = store.loadMessagesWithRuns('s1').find((m) => m.id === 'a1')!
-    expect(msg.usage).toEqual({ inputTokens: 130, outputTokens: 25, totalTokens: 155 })
+    expect(msg.usage).toEqual({
+      inputTokens: 130,
+      outputTokens: 25,
+      totalTokens: 155,
+      contextTokens: 70, // max of agent peaks, not sum
+    })
   })
 
   it('omits usage for a run inserted without it (legacy/no-usage rows stay NULL)', () => {

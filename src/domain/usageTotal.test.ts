@@ -3,7 +3,10 @@ import { selectUsageTotal, selectContextTokens, tokensFromUsage } from './hooks'
 import type { SessionVM } from './sessionStore'
 import type { Message } from '@hip/protocol'
 
-function msg(id: string, usage?: { inputTokens: number; outputTokens: number; totalTokens: number }): Message {
+function msg(
+  id: string,
+  usage?: { inputTokens: number; outputTokens: number; totalTokens: number; contextTokens?: number },
+): Message {
   return { id, role: 'assistant', content: 'x', timestamp: 1, ...(usage ? { usage } : {}) }
 }
 
@@ -12,7 +15,18 @@ function session(id: string, messages: Message[]): SessionVM {
 }
 
 describe('tokensFromUsage', () => {
-  it('prefers totalTokens when positive', () => {
+  it('prefers contextTokens when present (multi-step last/max request size)', () => {
+    expect(
+      tokensFromUsage({
+        inputTokens: 300_000,
+        outputTokens: 600,
+        totalTokens: 300_600,
+        contextTokens: 200_000,
+      }),
+    ).toBe(200_000)
+  })
+
+  it('prefers totalTokens when contextTokens absent', () => {
     expect(tokensFromUsage({ inputTokens: 1, outputTokens: 2, totalTokens: 99 })).toBe(99)
   })
 
@@ -34,6 +48,23 @@ describe('selectContextTokens', () => {
     }
     expect(selectContextTokens(state)).toBe(64_000)
     expect(selectUsageTotal(state)?.totalTokens).toBe(164_000)
+  })
+
+  it('uses contextTokens for fill when multi-step sum exceeds last request', () => {
+    const state = {
+      activeSessionId: 's1',
+      sessions: [
+        session('s1', [
+          msg('b', {
+            inputTokens: 2_700_000,
+            outputTokens: 6_000,
+            totalTokens: 2_706_000,
+            contextTokens: 800_000,
+          }),
+        ]),
+      ],
+    }
+    expect(selectContextTokens(state)).toBe(800_000)
   })
 
   it('skips trailing messages without usage', () => {

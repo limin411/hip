@@ -143,9 +143,13 @@ export function selectLastUsage(messages: Message[]): TurnUsage | null {
   return null
 }
 
-/** Prefer inputTokens for context composition; fall back to total / in+out. */
+/**
+ * Prefer single-request context size for composition budget; fall back to
+ * summed input / total / in+out (legacy multi-step rows may overstate).
+ */
 export function inputBudgetFromUsage(u: TurnUsage | null | undefined): number | null {
   if (!u) return null
+  if (u.contextTokens != null && u.contextTokens > 0) return u.contextTokens
   const input = u.inputTokens ?? 0
   if (input > 0) return input
   const total = u.totalTokens ?? 0

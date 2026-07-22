@@ -91,8 +91,14 @@ export function useActivePendingPermission(): PendingPermission | null {
   return useDomainStore((s) => s.sessions.find((x) => x.id === s.activeSessionId)?.pendingPermission ?? null)
 }
 
-/** Prefer reported totalTokens; fall back to in+out when total is missing/zero. */
+/**
+ * Context-fill numerator from a usage report.
+ * Prefers `contextTokens` (last/max single-request size) so multi-step tool loops
+ * do not sum every LLM call into a false 100% against the context window.
+ * Legacy fallback: totalTokens, then in+out.
+ */
 export function tokensFromUsage(u: TurnUsage): number {
+  if (u.contextTokens != null && u.contextTokens > 0) return u.contextTokens
   const total = u.totalTokens ?? 0
   if (total > 0) return total
   return (u.inputTokens ?? 0) + (u.outputTokens ?? 0)

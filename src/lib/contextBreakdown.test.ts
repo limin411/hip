@@ -113,4 +113,15 @@ describe('selectLastUsage / inputBudgetFromUsage', () => {
       inputBudgetFromUsage({ inputTokens: 0, outputTokens: 3, totalTokens: 10 }),
     ).toBe(10)
   })
+
+  it('prefers contextTokens over summed inputTokens', () => {
+    expect(
+      inputBudgetFromUsage({
+        inputTokens: 2_700_000,
+        outputTokens: 6000,
+        totalTokens: 2_706_000,
+        contextTokens: 800_000,
+      }),
+    ).toBe(800_000)
+  })
 })

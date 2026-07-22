@@ -572,6 +572,19 @@ export function migrate(db: DatabaseSync): void {
       throw e
     }
   }
+  if (version < 23) {
+    db.exec('BEGIN')
+    try {
+      // Peak/last single-request input for context-window fill % (billing totals stay in
+      // prompt/completion/total_tokens which sum multi-step tool loops).
+      db.exec(`ALTER TABLE agent_runs ADD COLUMN context_tokens INTEGER`)
+      db.exec('PRAGMA user_version = 23')
+      db.exec('COMMIT')
+    } catch (e) {
+      db.exec('ROLLBACK')
+      throw e
+    }
+  }
 }
 
 /** Try to create the FTS5 objects. Returns true if FTS is available. */

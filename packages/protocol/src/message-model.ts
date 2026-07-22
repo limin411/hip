@@ -29,11 +29,18 @@ export interface Message {
 }
 
 /** Provider-reported token counts for a turn or a single agent's slice of it.
- *  Counts only — $ cost is computed in the renderer from the models.dev catalog price. */
+ *  Counts only — $ cost is computed in the renderer from the models.dev catalog price.
+ *
+ *  `inputTokens` / `outputTokens` / `totalTokens` are **sums** across multi-step LLM
+ *  calls (billing). `contextTokens` is the best estimate of single-request context
+ *  size for context-window fill % (last step input within an agent; max across agents).
+ */
 export interface TurnUsage {
   inputTokens: number
   outputTokens: number
   totalTokens: number
+  /** Single-request context size for fill %; omit on legacy rows. */
+  contextTokens?: number
 }
 
 /** One agent-advertised session config selector (model/mode/reasoning level). */

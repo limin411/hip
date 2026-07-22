@@ -33,11 +33,21 @@ vi.mock('react-i18next', () => ({
     t: (key: string, opts?: { defaultValue?: string }) =>
       opts?.defaultValue ?? key,
   }),
+  // liveDiagramChrome → @/i18n pulls initReactI18next at module load.
+  initReactI18next: {
+    type: '3rdParty',
+    init: () => {},
+  },
 }))
 
 vi.mock('@/domain/knowledge/importAsset', () => ({
   importAssetFromClipboardItems: vi.fn(),
   importAssetFromFile: vi.fn(),
+}))
+
+vi.mock('@/ipc/clipboard', () => ({
+  copyText: vi.fn(async () => true),
+  readText: vi.fn(async () => null),
 }))
 
 afterEach(() => {
@@ -274,6 +284,62 @@ describe('DocLiveEditor', () => {
     })
   }, 25_000)
 
+  it('code block copy keeps edit mode (does not bounce to preview)', async () => {
+    const { copyText } = await import('@/ipc/clipboard')
+    vi.mocked(copyText).mockImplementation(async (text: string) => {
+      // Simulate clipboard fallback stealing focus from ProseMirror.
+      const ta = document.createElement('textarea')
+      ta.value = text
+      document.body.appendChild(ta)
+      ta.focus()
+      ta.select()
+      document.body.removeChild(ta)
+      return true
+    })
+
+    render(
+      <DocLiveEditor
+        docId="d-code-copy"
+        initialMarkdown={'```ts\nconst x = 1\n```\n'}
+        onDraftChange={() => {}}
+      />,
+    )
+    await waitForProseMirror()
+    await waitFor(() => {
+      expect(screen.getByTestId('knowledge-live-code-block')).toBeInTheDocument()
+      expect(screen.getByTestId('knowledge-live-code-copy')).toBeInTheDocument()
+    })
+
+    // Ensure edit surface is active (hide preview overlay if selection left).
+    const preview = screen.getByTestId('knowledge-live-code-preview')
+    if (preview.style.display !== 'none') {
+      await act(async () => {
+        fireEvent.mouseDown(preview)
+      })
+    }
+    await waitFor(() => {
+      expect(
+        screen.getByTestId('knowledge-live-code-preview').style.display,
+      ).toBe('none')
+    })
+
+    await act(async () => {
+      fireEvent.click(screen.getByTestId('knowledge-live-code-copy'))
+      // flush copyText().finally(() => enterEdit(true))
+      await Promise.resolve()
+      await Promise.resolve()
+    })
+
+    expect(copyText).toHaveBeenCalled()
+    // Must remain in edit — not bounce to Shiki preview after focus steal.
+    await waitFor(() => {
+      expect(
+        screen.getByTestId('knowledge-live-code-preview').style.display,
+      ).toBe('none')
+      expect(screen.getByTestId('knowledge-live-code-edit')).toBeInTheDocument()
+    })
+  }, 25_000)
+
   it('mermaid fence uses LiveMermaidView and previews when selection is outside', async () => {
     // Leading paragraph so default caret is outside the mermaid fence → preview.
     render(
@@ -293,6 +359,10 @@ describe('DocLiveEditor', () => {
     expect(block.dataset.language).toBe('mermaid')
     // Not the Shiki code chrome.
     expect(screen.queryByTestId('knowledge-live-code-block')).not.toBeInTheDocument()
+    // Feishu-style block chrome.
+    expect(screen.getByTestId('knowledge-live-mermaid-chrome')).toBeInTheDocument()
+    expect(screen.getByTestId('knowledge-live-mermaid-mode')).toBeInTheDocument()
+    expect(screen.getByTestId('knowledge-live-mermaid-copy')).toBeInTheDocument()
 
     // Selection plugin should put mermaid into preview when caret is in the intro.
     await waitFor(
@@ -301,9 +371,153 @@ describe('DocLiveEditor', () => {
         const diagram = screen.queryByTestId('knowledge-mermaid')
         const err = screen.queryByTestId('knowledge-mermaid-error')
         expect(loading != null || diagram != null || err != null).toBe(true)
+        expect(block.dataset.editing).toBe('false')
+        expect(
+          screen.getByTestId('knowledge-live-mermaid-chrome').dataset.mode,
+        ).toBe('preview')
       },
       { timeout: 15_000 },
     )
+  }, 30_000)
+
+  it('mermaid Source | Preview chrome toggles edit and preview modes', async () => {
+    render(
+      <DocLiveEditor
+        docId="d-mmd-chrome"
+        initialMarkdown={
+          'Intro paragraph\n\n```mermaid\ngraph TD\n  A-->B\n```\n'
+        }
+        onDraftChange={() => {}}
+      />,
+    )
+    await waitForProseMirror()
+    await waitFor(() => {
+      expect(screen.getByTestId('knowledge-live-mermaid')).toBeInTheDocument()
+    })
+    const block = screen.getByTestId('knowledge-live-mermaid')
+
+    await waitFor(
+      () => {
+        expect(block.dataset.editing).toBe('false')
+      },
+      { timeout: 15_000 },
+    )
+
+    await act(async () => {
+      // Mode toggles on mousedown (click may be suppressed after preventDefault).
+      fireEvent.mouseDown(screen.getByTestId('knowledge-live-mermaid-mode-source'))
+    })
+    await waitFor(() => {
+      expect(block.dataset.editing).toBe('true')
+      expect(screen.getByTestId('knowledge-live-mermaid-editing')).toBeInTheDocument()
+      expect(
+        screen.getByTestId('knowledge-live-mermaid-chrome').dataset.mode,
+      ).toBe('edit')
+      expect(
+        screen.getByTestId('knowledge-live-mermaid-mode-source').getAttribute(
+          'aria-pressed',
+        ),
+      ).toBe('true')
+    })
+
+    await act(async () => {
+      fireEvent.mouseDown(screen.getByTestId('knowledge-live-mermaid-mode-preview'))
+    })
+    await waitFor(
+      () => {
+        expect(block.dataset.editing).toBe('false')
+        expect(
+          screen.queryByTestId('knowledge-live-mermaid-editing'),
+        ).not.toBeInTheDocument()
+        expect(
+          screen.getByTestId('knowledge-live-mermaid-chrome').dataset.mode,
+        ).toBe('preview')
+        const loading = screen.queryByTestId('knowledge-mermaid-loading')
+        const diagram = screen.queryByTestId('knowledge-mermaid')
+        const err = screen.queryByTestId('knowledge-mermaid-error')
+        expect(loading != null || diagram != null || err != null).toBe(true)
+      },
+      { timeout: 15_000 },
+    )
+  }, 30_000)
+
+  it('mermaid Preview → Copy → Source stays in edit (no bounce to preview)', async () => {
+    const { copyText } = await import('@/ipc/clipboard')
+    vi.mocked(copyText).mockImplementation(async (text: string) => {
+      const ta = document.createElement('textarea')
+      ta.value = text
+      document.body.appendChild(ta)
+      ta.focus()
+      ta.select()
+      document.body.removeChild(ta)
+      return true
+    })
+
+    render(
+      <DocLiveEditor
+        docId="d-mmd-copy-bounce"
+        initialMarkdown={
+          'Intro paragraph\n\n```mermaid\ngraph TD\n  A-->B\n```\n'
+        }
+        onDraftChange={() => {}}
+      />,
+    )
+    await waitForProseMirror()
+    const block = await screen.findByTestId('knowledge-live-mermaid')
+
+    await waitFor(() => {
+      expect(block.dataset.editing).toBe('false')
+    })
+
+    // Source
+    await act(async () => {
+      fireEvent.mouseDown(screen.getByTestId('knowledge-live-mermaid-mode-source'))
+    })
+    await waitFor(() => {
+      expect(block.dataset.editing).toBe('true')
+      expect(block.dataset.modePin).toBe('edit')
+    })
+
+    // Preview (pins preview — caret may sit outside the fence)
+    await act(async () => {
+      fireEvent.mouseDown(screen.getByTestId('knowledge-live-mermaid-mode-preview'))
+    })
+    await waitFor(() => {
+      expect(block.dataset.editing).toBe('false')
+      expect(block.dataset.modePin).toBe('preview')
+    })
+
+    // Copy while preview (focus steal) — must remain preview, not sticky-break
+    await act(async () => {
+      fireEvent.click(screen.getByTestId('knowledge-live-mermaid-copy'))
+      await Promise.resolve()
+      await Promise.resolve()
+    })
+    expect(copyText).toHaveBeenCalled()
+    expect(block.dataset.editing).toBe('false')
+    expect(block.dataset.modePin).toBe('preview')
+
+    // Source again — must stick in edit even if caret is still outside
+    await act(async () => {
+      fireEvent.mouseDown(screen.getByTestId('knowledge-live-mermaid-mode-source'))
+      await new Promise((r) => requestAnimationFrame(() => r(null)))
+      await Promise.resolve()
+    })
+    await waitFor(() => {
+      expect(block.dataset.editing).toBe('true')
+      expect(block.dataset.modePin).toBe('edit')
+      expect(
+        screen.getByTestId('knowledge-live-mermaid-chrome').dataset.mode,
+      ).toBe('edit')
+      expect(screen.getByTestId('knowledge-live-mermaid-editing')).toBeInTheDocument()
+    })
+
+    // Stay edit after another tick (no delayed bounce to preview)
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 50))
+    })
+    expect(block.dataset.editing).toBe('true')
+    expect(block.dataset.modePin).toBe('edit')
   }, 30_000)
 
   it('svg fence uses LiveSvgView and previews when selection is outside', async () => {
@@ -324,15 +538,73 @@ describe('DocLiveEditor', () => {
     expect(block.dataset.language).toBe('svg')
     expect(screen.queryByTestId('knowledge-live-code-block')).not.toBeInTheDocument()
     expect(screen.queryByTestId('knowledge-live-mermaid')).not.toBeInTheDocument()
+    expect(screen.getByTestId('knowledge-live-svg-chrome')).toBeInTheDocument()
+    expect(screen.getByTestId('knowledge-live-svg-mode')).toBeInTheDocument()
+    expect(screen.getByTestId('knowledge-live-svg-copy')).toBeInTheDocument()
 
     await waitFor(
       () => {
         const diagram = screen.queryByTestId('knowledge-svg')
         const err = screen.queryByTestId('knowledge-svg-error')
         expect(diagram != null || err != null).toBe(true)
+        expect(block.dataset.editing).toBe('false')
+        expect(
+          screen.getByTestId('knowledge-live-svg-chrome').dataset.mode,
+        ).toBe('preview')
       },
       { timeout: 15_000 },
     )
+  }, 30_000)
+
+  it('svg Source | Preview chrome toggles edit and preview modes', async () => {
+    render(
+      <DocLiveEditor
+        docId="d-svg-chrome"
+        initialMarkdown={
+          'Intro paragraph\n\n```svg\n<svg xmlns="http://www.w3.org/2000/svg"><circle r="1"/></svg>\n```\n'
+        }
+        onDraftChange={() => {}}
+      />,
+    )
+    await waitForProseMirror()
+    await waitFor(() => {
+      expect(screen.getByTestId('knowledge-live-svg')).toBeInTheDocument()
+    })
+    const block = screen.getByTestId('knowledge-live-svg')
+
+    await waitFor(
+      () => {
+        expect(block.dataset.editing).toBe('false')
+      },
+      { timeout: 10_000 },
+    )
+
+    await act(async () => {
+      fireEvent.mouseDown(screen.getByTestId('knowledge-live-svg-mode-source'))
+    })
+    await waitFor(() => {
+      expect(block.dataset.editing).toBe('true')
+      expect(screen.getByTestId('knowledge-live-svg-editing')).toBeInTheDocument()
+      expect(screen.getByTestId('knowledge-live-svg-chrome').dataset.mode).toBe(
+        'edit',
+      )
+    })
+
+    await act(async () => {
+      fireEvent.mouseDown(screen.getByTestId('knowledge-live-svg-mode-preview'))
+    })
+    await waitFor(() => {
+      expect(block.dataset.editing).toBe('false')
+      expect(
+        screen.queryByTestId('knowledge-live-svg-editing'),
+      ).not.toBeInTheDocument()
+      expect(screen.getByTestId('knowledge-live-svg-chrome').dataset.mode).toBe(
+        'preview',
+      )
+      const diagram = screen.queryByTestId('knowledge-svg')
+      const err = screen.queryByTestId('knowledge-svg-error')
+      expect(diagram != null || err != null).toBe(true)
+    })
   }, 30_000)
 
   it('selecting table produces a table node', async () => {

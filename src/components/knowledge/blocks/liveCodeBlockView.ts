@@ -70,11 +70,15 @@ class LiveCodeBlockNodeView implements NodeView {
       'knowledge-live-code-block my-2 overflow-hidden rounded-lg border border-border bg-surface-muted/80'
     this.dom.setAttribute('data-testid', 'knowledge-live-code-block')
     this.dom.dataset.language = (node.attrs.language as string) ?? ''
+    // Chrome (copy) must not live inside contenteditable or clicks/focus steal
+    // collapse the PM selection and bounce the block into preview.
+    this.dom.contentEditable = 'false'
     kbPerfNodeViewMount('code')
 
     const header = document.createElement('div')
     header.className =
       'flex h-7 items-center justify-between gap-2 border-b border-border/80 px-2.5'
+    header.contentEditable = 'false'
 
     this.langEl = document.createElement('span')
     this.langEl.className =
@@ -93,11 +97,19 @@ class LiveCodeBlockNodeView implements NodeView {
     copyBtn.addEventListener('mousedown', (e) => {
       // Keep PM selection; do not steal focus into the button.
       e.preventDefault()
+      e.stopPropagation()
     })
     copyBtn.addEventListener('click', (e) => {
       e.preventDefault()
       e.stopPropagation()
-      void copyText(this.node.textContent)
+      const stayEditing = this.editing || this.selectionInside(this.view)
+      void copyText(this.node.textContent).finally(() => {
+        if (this.destroyed) return
+        // copyText fallback focuses a temporary textarea and can drop the
+        // caret outside the fence → selection plugin would flip to preview.
+        // Restore edit (and caret) when the user was already editing.
+        if (stayEditing) this.enterEdit(true)
+      })
     })
 
     header.append(this.langEl, copyBtn)
@@ -113,6 +125,7 @@ class LiveCodeBlockNodeView implements NodeView {
 
     this.contentDOM = document.createElement('code')
     this.contentDOM.spellcheck = false
+    this.contentDOM.contentEditable = 'true'
     this.editPre.appendChild(this.contentDOM)
 
     this.previewEl = document.createElement('pre')
@@ -222,6 +235,15 @@ class LiveCodeBlockNodeView implements NodeView {
     }
   }
 
+  private selectionInside(view: EditorView): boolean {
+    const pos = this.getPos()
+    if (pos == null) return false
+    const end = pos + this.node.nodeSize
+    const { from, to } = view.state.selection
+    // Inside if any part of the selection intersects the node (including edges).
+    return from < end && to > pos
+  }
+
   /**
    * Called by the selection plugin whenever the editor selection changes.
    * Preview when the caret/selection is entirely outside this node.
@@ -234,12 +256,7 @@ class LiveCodeBlockNodeView implements NodeView {
       if (!this.editing) this.enterEdit(false)
       return
     }
-    const pos = this.getPos()
-    if (pos == null) return
-    const end = pos + this.node.nodeSize
-    const { from, to } = view.state.selection
-    // Inside if any part of the selection intersects the node (including edges).
-    const inside = from < end && to > pos
+    const inside = this.selectionInside(view)
     if (inside) {
       if (!this.editing) this.enterEdit(false)
     } else {
@@ -291,9 +308,14 @@ class LiveCodeBlockNodeView implements NodeView {
     mutation: MutationRecord | { type: string; target: globalThis.Node },
   ): boolean {
     const target = mutation.target
-    if (target === this.previewEl || this.previewEl.contains(target)) return true
-    if (target === this.langEl || this.langEl.contains(target)) return true
-    if (target === this.dom) return true
+    if (!(target instanceof Node)) return false
+    // Text edits inside contentDOM must sync to the document.
+    if (target === this.contentDOM || this.contentDOM.contains(target)) {
+      return false
+    }
+    // Header / Shiki preview overlay / opacity toggles are view-only.
+    // Ignoring prevents NodeView destroy+recreate (edit↔preview bounce).
+    if (target === this.dom || this.dom.contains(target)) return true
     return false
   }
 

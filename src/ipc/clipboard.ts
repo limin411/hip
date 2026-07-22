@@ -15,18 +15,40 @@ export async function copyText(text: string): Promise<boolean> {
   } catch {
     // fall through to the legacy path
   }
+  const prev =
+    document.activeElement instanceof HTMLElement
+      ? document.activeElement
+      : null
   try {
     const ta = document.createElement('textarea')
     ta.value = text
     ta.style.position = 'fixed'
     ta.style.opacity = '0'
+    // Avoid scrolling / focus rings in embedded editors (ProseMirror).
+    ta.setAttribute('readonly', '')
     document.body.appendChild(ta)
     ta.focus()
     ta.select()
     const ok = document.execCommand('copy')
     document.body.removeChild(ta)
+    // Restore focus so Live code/diagram blocks do not lose the caret and
+    // bounce from edit → preview after copy.
+    if (prev && document.contains(prev)) {
+      try {
+        prev.focus()
+      } catch {
+        // ignore
+      }
+    }
     return ok
   } catch {
+    if (prev && document.contains(prev)) {
+      try {
+        prev.focus()
+      } catch {
+        // ignore
+      }
+    }
     return false
   }
 }

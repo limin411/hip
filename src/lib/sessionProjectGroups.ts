@@ -2,6 +2,8 @@
  * Group project (code-surface) sessions by workspace path for the sidebar.
  */
 
+import { surfaceOf } from './sessions'
+
 export function projectPathKey(cwd: string | undefined | null): string {
   if (!cwd?.trim()) return ''
   return cwd.replace(/\\/g, '/').replace(/\/+$/, '')
@@ -23,6 +25,19 @@ export interface SessionProjectGroup<T> {
   /** Basename label; empty when unbound. */
   label: string
   sessions: T[]
+}
+
+/** Unique project folders from open code sessions (newest group first). Unbound excluded. */
+export function listOpenProjectFolders(
+  sessions: Array<{
+    updatedAtMs: number
+    config: Parameters<typeof surfaceOf>[0]
+  }>,
+): Array<{ pathKey: string; cwd: string; label: string }> {
+  const code = sessions.filter((s) => surfaceOf(s.config) === 'code')
+  return groupSessionsByProjectPath(code)
+    .filter((g) => Boolean(g.pathKey && g.cwd))
+    .map((g) => ({ pathKey: g.pathKey, cwd: g.cwd as string, label: g.label }))
 }
 
 /**

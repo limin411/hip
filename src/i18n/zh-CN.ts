@@ -276,6 +276,9 @@ export const zhCN = {
         },
       },
       pickFolder: '选择项目文件夹',
+      quickPickFolder: '已打开的项目',
+      quickPickFolderHint: '从当前已打开的项目会话中快速选择目录',
+      quickPickFolderAria: '从已打开的项目会话中选择目录',
       clearFolder: '纯对话',
       missingProject: {
         title: '项目文件夹不可用',

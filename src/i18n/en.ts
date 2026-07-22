@@ -284,6 +284,9 @@ export const en = {
         },
       },
       pickFolder: 'Choose project folder',
+      quickPickFolder: 'Open project folders',
+      quickPickFolderHint: 'Reuse a folder from open project sessions',
+      quickPickFolderAria: 'Choose from open project folders',
       clearFolder: 'Pure chat',
       missingProject: {
         title: 'Project folder unavailable',

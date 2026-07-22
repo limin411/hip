@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   groupSessionsByProjectPath,
+  listOpenProjectFolders,
   projectPathBasename,
   projectPathKey,
 } from './sessionProjectGroups'
@@ -67,5 +68,26 @@ describe('groupSessionsByProjectPath', () => {
     ])
     expect(groups).toHaveLength(1)
     expect(groups[0].sessions).toHaveLength(2)
+  })
+})
+
+describe('listOpenProjectFolders', () => {
+  it('returns unique code session folders newest-first and skips chat/unbound', () => {
+    const folders = listOpenProjectFolders([
+      { updatedAtMs: 10, config: { surface: 'code', cwd: '/p/old' } },
+      { updatedAtMs: 50, config: { surface: 'code', cwd: '/p/new' } },
+      { updatedAtMs: 99, config: { surface: 'chat', cwd: '/p/sandbox' } },
+      { updatedAtMs: 80, config: { surface: 'code' } },
+      { updatedAtMs: 40, config: { surface: 'code', cwd: '/p/new/' } },
+    ])
+    expect(folders.map((f) => f.pathKey)).toEqual(['/p/new', '/p/old'])
+    expect(folders[0]).toMatchObject({ label: 'new', cwd: '/p/new' })
+  })
+
+  it('treats workspaceMode project as code even without surface', () => {
+    const folders = listOpenProjectFolders([
+      { updatedAtMs: 1, config: { workspaceMode: 'project', cwd: '/work/a' } },
+    ])
+    expect(folders).toEqual([{ pathKey: '/work/a', cwd: '/work/a', label: 'a' }])
   })
 })

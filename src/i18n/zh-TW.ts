@@ -316,6 +316,9 @@ export const zhTW = {
       }
     },
     "pickFolder": "選擇專案資料夾",
+    "quickPickFolder": "已開啟的專案",
+    "quickPickFolderHint": "從目前已開啟的專案工作階段中快速選擇目錄",
+    "quickPickFolderAria": "從已開啟的專案工作階段中選擇目錄",
     "clearFolder": "純對話",
     "missingProject": {
       "title": "專案資料夾不可用",

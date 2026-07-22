@@ -308,6 +308,9 @@ export const ja = {
       }
     },
     "pickFolder": "プロジェクトフォルダを選択",
+    "quickPickFolder": "開いているプロジェクト",
+    "quickPickFolderHint": "開いているプロジェクトセッションのフォルダから素早く選択",
+    "quickPickFolderAria": "開いているプロジェクトフォルダから選択",
     "clearFolder": "チャットのみ",
     "missingProject": {
       "title": "プロジェクトフォルダが見つかりません",

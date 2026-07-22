@@ -308,6 +308,9 @@ export const ko = {
       }
     },
     "pickFolder": "프로젝트 폴더 선택",
+    "quickPickFolder": "열린 프로젝트",
+    "quickPickFolderHint": "현재 열린 프로젝트 세션의 폴더에서 빠르게 선택",
+    "quickPickFolderAria": "열린 프로젝트 폴더에서 선택",
     "clearFolder": "일반 채팅",
     "missingProject": {
       "title": "프로젝트 폴더를 찾을 수 없음",

@@ -3,6 +3,7 @@ import type { AcpConfigOption, Message, PlanItem, SearchHit, TurnUsage } from '@
 import { useShallow } from 'zustand/react/shallow'
 import { useDomainStore, type PendingPermission, type SessionError, type SessionVM, type McpServerStatusVM } from './sessionStore'
 import { computePercentage, zoneForPercent } from '@/lib/tokenPercentage'
+import { computeCost } from '@/lib/usageCost'
 import { activeModelKey, parseModelKey } from '@/lib/modelKey'
 import { useProvidersStore } from '@/store/providersStore'
 
@@ -90,6 +91,13 @@ export function useActivePendingPermission(): PendingPermission | null {
   return useDomainStore((s) => s.sessions.find((x) => x.id === s.activeSessionId)?.pendingPermission ?? null)
 }
 
+/** Prefer reported totalTokens; fall back to in+out when total is missing/zero. */
+export function tokensFromUsage(u: TurnUsage): number {
+  const total = u.totalTokens ?? 0
+  if (total > 0) return total
+  return (u.inputTokens ?? 0) + (u.outputTokens ?? 0)
+}
+
 /** Pure: sum `usage` across the active session's messages. Returns null when the active
  *  session is absent or no message carries usage. Exported for unit testing; the hook below
  *  is the thin reactive wrapper. */
@@ -108,6 +116,24 @@ export function selectUsageTotal(state: { sessions: SessionVM[]; activeSessionId
   return any ? total : null
 }
 
+/**
+ * Pure: context-fill numerator — last message with usage (OpenCode/Codex style).
+ * Not session cumulative (which overstates % vs context window across turns).
+ */
+export function selectContextTokens(state: {
+  sessions: SessionVM[]
+  activeSessionId: string | null
+}): number | null {
+  const active = state.sessions.find((x) => x.id === state.activeSessionId)
+  if (!active) return null
+  for (let i = active.messages.length - 1; i >= 0; i--) {
+    const m = active.messages[i]
+    if (!m.usage) continue
+    return tokensFromUsage(m.usage)
+  }
+  return null
+}
+
 /** Session-total token usage for the active session (derived, never stored). `useShallow` is
  *  REQUIRED, not cosmetic: selectUsageTotal builds a FRESH object whenever usage exists, and a
  *  Zustand v5 selector that returns a new reference every call makes useSyncExternalStore re-render
@@ -117,24 +143,58 @@ export function useActiveUsageTotal(): TurnUsage | null {
   return useDomainStore(useShallow(selectUsageTotal))
 }
 
-/** Token usage relative to the active model's context window. Returns null when
- *  there is no active session, no usage, or the model catalog hasn't loaded. */
-export function useTokenUsage(): { usedTokens: number | null; contextWindow: number | undefined; percent: number | null; zone: 'success' | 'warning' | 'danger' | null } | null {
-  const usageTotal = useActiveUsageTotal()
+/** Session token meter for the composer chip (and any other session-level usage UI). */
+export type SessionTokenMeter = {
+  /** Last-turn tokens used for context-window %. */
+  contextTokens: number
+  contextWindow: number | undefined
+  percent: number | null
+  zone: 'success' | 'warning' | 'danger' | null
+  /** Sum of all message usage in the session. */
+  cumulative: TurnUsage
+  /** Estimated USD from cumulative × catalog cost, or null when unpriced. */
+  costUsd: number | null
+}
+
+/** Token meter for the active session. Null when no session or no usage yet.
+ *  Percent/zone use last-turn context fill, not cumulative totals. */
+export function useSessionTokenMeter(): SessionTokenMeter | null {
+  const cumulative = useActiveUsageTotal()
+  const contextTokens = useDomainStore(selectContextTokens)
   const catalog = useProvidersStore((s) => s.catalog)
   const config = useProvidersStore((s) => s.config)
   const active = useActiveSession()
-  if (!usageTotal) return null
+  if (!cumulative || contextTokens == null) return null
   const currentKey = active?.config.model
     ? `${active.config.llmProvider}/${active.config.model}`
     : activeModelKey(config)
   const { providerID, modelID } = parseModelKey(currentKey)
-  const limit = catalog[providerID]?.models[modelID]?.limit
-  const contextWindow = limit?.context
-  const usedTokens = usageTotal.totalTokens
-  const percent = computePercentage(usedTokens, contextWindow)
+  const model = catalog[providerID]?.models[modelID]
+  const contextWindow = model?.limit?.context
+  const percent = computePercentage(contextTokens, contextWindow)
   const zone = zoneForPercent(percent)
-  return { usedTokens, contextWindow, percent, zone }
+  const costUsd = computeCost(cumulative, model?.cost)
+  return { contextTokens, contextWindow, percent, zone, cumulative, costUsd }
+}
+
+/**
+ * @deprecated Prefer `useSessionTokenMeter`. Kept for callers that only need
+ * context-fill percent fields. `usedTokens` is last-turn context fill (not cumulative).
+ */
+export function useTokenUsage(): {
+  usedTokens: number | null
+  contextWindow: number | undefined
+  percent: number | null
+  zone: 'success' | 'warning' | 'danger' | null
+} | null {
+  const meter = useSessionTokenMeter()
+  if (!meter) return null
+  return {
+    usedTokens: meter.contextTokens,
+    contextWindow: meter.contextWindow,
+    percent: meter.percent,
+    zone: meter.zone,
+  }
 }
 
 export function useMcpStatuses(): McpServerStatusVM[] {

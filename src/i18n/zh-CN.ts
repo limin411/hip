@@ -435,6 +435,8 @@ export const zhCN = {
         cost: '约 {{cost}}',
         percentage: '{{percent}}%',
         percentageTooltip: '{{used}} / {{total}} tokens（{{percent}}%）',
+        aria: '会话 token 用量：上下文 {{percent}}%（{{used}} / {{total}}）',
+        ariaTokens: '会话 token 用量：{{used}} tokens',
       },
       composer: {
         tune: '调节',

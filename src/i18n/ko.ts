@@ -465,7 +465,9 @@ export const ko = {
       "sessionTotal": "세션 합계",
       "cost": "~{{cost}}",
       "percentage": "{{percent}}%",
-      "percentageTooltip": "{{used}} / {{total}} 토큰 ({{percent}}%)"
+      "percentageTooltip": "{{used}} / {{total}} 토큰 ({{percent}}%)",
+      "aria": "세션 토큰 사용량: 컨텍스트 {{percent}}% ({{used}} / {{total}})",
+      "ariaTokens": "세션 토큰 사용량: {{used}} 토큰"
     },
     "composer": {
       "tune": "조절",

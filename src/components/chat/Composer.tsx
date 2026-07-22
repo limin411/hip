@@ -5,6 +5,7 @@ import { Textarea } from '@/components/ui/Textarea'
 import { focusFieldWithin } from '@/components/ui/focusClasses'
 import { cn } from '@/lib/utils'
 import type { LocalAttachment } from './attachmentTypes'
+import { TokenUsageChip } from './TokenUsageChip'
 
 /** Collapse whitespace for the one-line quote chip; CSS truncate handles overflow. */
 function quotePreviewLine(text: string): string {
@@ -186,35 +187,40 @@ export function Composer({
         <div className={cn('flex items-center gap-0.5', locked && 'pointer-events-none opacity-50')}>
           {leftSlot}
         </div>
-        {running && onStop ? (
-          <div className="flex items-center gap-2">
-            {reconnecting && <span className="text-meta text-ink-tertiary">{t('chat.reconnecting')}</span>}
+        <div className="flex items-center gap-1.5">
+          <TokenUsageChip />
+          {running && onStop ? (
+            <>
+              {reconnecting && (
+                <span className="text-meta text-ink-tertiary">{t('chat.reconnecting')}</span>
+              )}
+              <Button
+                type="button"
+                variant="primary"
+                size="icon"
+                className={cn('h-7 w-7 shrink-0 rounded-full')}
+                onClick={onStop}
+                disabled={reconnecting}
+                data-testid="composer-stop"
+                title={t('chat.stop')}
+              >
+                <Square size={12} strokeWidth={1.75} />
+              </Button>
+            </>
+          ) : (
             <Button
-              type="button"
               variant="primary"
               size="icon"
               className={cn('h-7 w-7 shrink-0 rounded-full')}
-              onClick={onStop}
-              disabled={reconnecting}
-              data-testid="composer-stop"
-              title={t('chat.stop')}
+              onClick={onSubmit}
+              disabled={locked || (!value.trim() && attachments.length === 0) || submitDisabled}
+              data-testid="composer-send"
+              title={t('chat.send')}
             >
-              <Square size={12} strokeWidth={1.75} />
+              <ArrowUp size={15} strokeWidth={1.75} />
             </Button>
-          </div>
-        ) : (
-          <Button
-            variant="primary"
-            size="icon"
-            className={cn('h-7 w-7 shrink-0 rounded-full')}
-            onClick={onSubmit}
-            disabled={locked || (!value.trim() && attachments.length === 0) || submitDisabled}
-            data-testid="composer-send"
-            title={t('chat.send')}
-          >
-            <ArrowUp size={15} strokeWidth={1.75} />
-          </Button>
-        )}
+          )}
+        </div>
       </div>
     </div>
   )

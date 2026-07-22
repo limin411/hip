@@ -444,6 +444,8 @@ export const en = {
         cost: '~{{cost}}',
         percentage: '{{percent}}%',
         percentageTooltip: '{{used}} / {{total}} tokens ({{percent}}%)',
+        aria: 'Session token usage: {{percent}}% of context ({{used}} of {{total}})',
+        ariaTokens: 'Session token usage: {{used}} tokens',
       },
       composer: {
         tune: 'Tune',

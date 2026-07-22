@@ -67,6 +67,14 @@ describe('Composer', () => {
     expect(onStop).toHaveBeenCalled()
   })
 
+  it('keeps send control after session-usage slot (chip may be absent without usage)', () => {
+    render(<Composer value="hello" onChange={vi.fn()} onSubmit={vi.fn()} />)
+    const send = screen.getByTestId('composer-send')
+    expect(send).toBeInTheDocument()
+    // TokenUsageChip returns null without session usage — no session-usage node.
+    expect(screen.queryByTestId('session-usage')).toBeNull()
+  })
+
   it('renders quote chip with one-line preview and clears it', () => {
     const onQuoteClear = vi.fn()
     render(

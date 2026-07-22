@@ -473,7 +473,9 @@ export const zhTW = {
       "sessionTotal": "本對話累計",
       "cost": "約 {{cost}}",
       "percentage": "{{percent}}%",
-      "percentageTooltip": "{{used}} / {{total}} tokens（{{percent}}%）"
+      "percentageTooltip": "{{used}} / {{total}} tokens（{{percent}}%）",
+      "aria": "工作階段 token 用量：上下文 {{percent}}%（{{used}} / {{total}}）",
+      "ariaTokens": "工作階段 token 用量：{{used}} tokens"
     },
     "composer": {
       "tune": "調節",

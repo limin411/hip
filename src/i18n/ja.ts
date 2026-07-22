@@ -465,7 +465,9 @@ export const ja = {
       "sessionTotal": "セッション合計",
       "cost": "~{{cost}}",
       "percentage": "{{percent}}%",
-      "percentageTooltip": "{{used}} / {{total}} トークン ({{percent}}%)"
+      "percentageTooltip": "{{used}} / {{total}} トークン ({{percent}}%)",
+      "aria": "セッショントークン使用量: コンテキスト {{percent}}%（{{used}} / {{total}}）",
+      "ariaTokens": "セッショントークン使用量: {{used}} トークン"
     },
     "composer": {
       "tune": "調整",

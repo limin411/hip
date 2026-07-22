@@ -8,8 +8,12 @@ import {
   saveComposerHeight,
 } from './composerHeight'
 import { SlashCommandPalette, extractSlashQuery, type ComposerSurface } from './SlashCommandPalette'
+import { FileMentionPalette } from './FileMentionPalette'
+import { useFileMentionHandler } from './useFileMentionHandler'
 import { SkillArgInput, extractSkillInvocation } from './SkillArgInput'
 import { useSlashCommandHandler } from './useSlashCommandHandler'
+import { resolveSearchRoot } from '@/lib/resolveSearchRoot'
+import { isMultimodalAttachmentMime } from '@/lib/attachmentAllowlist'
 import { readSkillFile } from '@/ipc/skills'
 import { ModelPicker } from './ModelPicker'
 import { EffortLevelPicker } from './EffortLevelPicker'
@@ -192,14 +196,6 @@ export function InputBar() {
     inputRef,
   })
 
-  // D18: when global ⌘K opens, dismiss active slash query so two palettes never stack.
-  const globalPaletteOpen = useCommandPaletteStore((s) => s.open)
-  useEffect(() => {
-    if (globalPaletteOpen && extractSlashQuery(value) !== null) {
-      handleDismiss()
-    }
-  }, [globalPaletteOpen, value, handleDismiss])
-
   const draft = useDraftStore((s) => s.draft)
   const catalog = useProvidersStore((s) => s.catalog)
   const config = useProvidersStore((s) => s.config)
@@ -213,11 +209,51 @@ export function InputBar() {
     activeId && active ? active.config.agentId : draft?.agentId,
   )
 
+  // K10: when multimodal unsupported, drop only image/PDF chips — keep text @ attachments.
   useEffect(() => {
-    if (!attachmentsSupported && attachments.length > 0) {
-      setAttachments([])
+    if (!attachmentsSupported) {
+      setAttachments((prev) => {
+        const next = prev.filter((a) => !isMultimodalAttachmentMime(a.mimeType))
+        return next.length === prev.length ? prev : next
+      })
     }
-  }, [attachmentsSupported, attachments.length])
+  }, [attachmentsSupported])
+
+  const searchRoot = useMemo(
+    () =>
+      active
+        ? resolveSearchRoot({
+            sessionConfig: active.config,
+            pathStatus: pathStatus,
+          })
+        : null,
+    [active, pathStatus],
+  )
+
+  const {
+    atQuery,
+    handleSelect: handleFileMentionSelect,
+    handleDismiss: handleFileMentionDismiss,
+  } = useFileMentionHandler({
+    value,
+    setValue,
+    searchRoot,
+    attachments,
+    setAttachments,
+    attachmentsSupported,
+    inputRef,
+  })
+
+  // D18: when global ⌘K opens, dismiss active slash / @ query so palettes never stack.
+  const globalPaletteOpen = useCommandPaletteStore((s) => s.open)
+  useEffect(() => {
+    if (!globalPaletteOpen) return
+    if (extractSlashQuery(value) !== null) {
+      handleDismiss()
+    } else if (atQuery !== null) {
+      handleFileMentionDismiss()
+    }
+  }, [globalPaletteOpen, value, handleDismiss, atQuery, handleFileMentionDismiss])
 
   const submit = () => {
     if (projectPathBlocked) return
@@ -277,6 +313,14 @@ export function InputBar() {
                 skillsEnabled={skillsEnabled}
                 onSelect={handleCommandSelect}
                 onDismiss={handleDismiss}
+              />
+            )}
+            {query === null && atQuery !== null && searchRoot && (
+              <FileMentionPalette
+                query={atQuery}
+                searchRoot={searchRoot}
+                onSelect={handleFileMentionSelect}
+                onDismiss={handleFileMentionDismiss}
               />
             )}
             <Composer

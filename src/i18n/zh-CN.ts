@@ -118,6 +118,16 @@ export const zhCN = {
           'memory-status': '显示本会话的记忆标志',
         },
       },
+      fileMention: {
+        listLabel: '文件引用',
+        hint: '输入以搜索项目中的文件',
+        noMatch: '没有匹配的文件',
+        noRoot: '请先打开项目文件夹，才能用 @ 引用文件',
+        loading: '搜索中…',
+        dirSuffix: '文件夹',
+        typeNotAttachable: '“{{name}}” 无法作为附件；路径已保留为文本',
+        multimodalUnsupported: '当前模型无法附加图片/PDF；路径已保留为文本',
+      },
       compact: {
         applied: '上下文已压缩：{{before}} → {{after}} 条消息（约 {{tokensBefore}} → {{tokensAfter}} tokens）',
         noop: '无需压缩。需要超过 {{n}} 个用户轮次的历史（近期轮次会原样保留）。',

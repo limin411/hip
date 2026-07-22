@@ -108,6 +108,16 @@ export const ko = {
         "memory-status": "이 세션의 메모리 플래그 보기"
       }
     },
+    "fileMention": {
+      "listLabel": "파일 참조",
+      "hint": "입력하여 프로젝트 파일 검색",
+      "noMatch": "일치하는 파일이 없습니다",
+      "noRoot": "프로젝트 폴더를 열면 @로 파일을 참조할 수 있습니다",
+      "loading": "검색 중…",
+      "dirSuffix": "폴더",
+      "typeNotAttachable": "“{{name}}”은(는) 첨부할 수 없습니다. 경로는 텍스트로 유지됩니다",
+      "multimodalUnsupported": "이 모델은 이미지/PDF를 첨부할 수 없습니다. 경로는 텍스트로 유지됩니다"
+    },
     "compact": {
       "applied": "컨텍스트 압축 완료: {{before}} → {{after}} 메시지 (~{{tokensBefore}} → ~{{tokensAfter}} 토큰)",
       "noop": "압축할 내용이 없습니다. 목표 외에 {{n}}개 이상의 사용자 턴 기록이 필요합니다 (최근 턴은 그대로 유지됨).",

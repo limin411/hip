@@ -11,6 +11,7 @@ mod hip_config;
 mod path_tools;
 mod pty;
 mod term_fs;
+mod workspace_file_search;
 mod terminal_hosts;
 mod terminal_budget;
 mod ssh_path;
@@ -772,6 +773,7 @@ pub fn run() {
             list_worktrees,
             path_tools::which_binaries,
             path_tools::path_is_dir,
+            workspace_file_search::workspace_file_search,
             pty::pty_open,
             pty::pty_write,
             pty::pty_resize,

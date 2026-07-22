@@ -108,6 +108,16 @@ export const ja = {
         "memory-status": "このセッションのメモリフラグを表示"
       }
     },
+    "fileMention": {
+      "listLabel": "ファイル参照",
+      "hint": "入力してプロジェクト内のファイルを検索",
+      "noMatch": "一致するファイルがありません",
+      "noRoot": "プロジェクトフォルダを開くと @ でファイルを参照できます",
+      "loading": "検索中…",
+      "dirSuffix": "フォルダ",
+      "typeNotAttachable": "「{{name}}」は添付できません。パスはテキストのまま残します",
+      "multimodalUnsupported": "このモデルは画像/PDFを添付できません。パスはテキストのまま残します"
+    },
     "compact": {
       "applied": "コンテキストを圧縮: {{before}} → {{after}} メッセージ（~{{tokensBefore}} → ~{{tokensAfter}} トークン）",
       "noop": "圧縮するものがありません。目標を超えるには{{n}}ターン以上のユーザー履歴が必要です（最近のターンはそのまま保持されます）。",

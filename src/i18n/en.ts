@@ -124,6 +124,16 @@ export const en = {
           'memory-status': 'Show memory flags for this session',
         },
       },
+      fileMention: {
+        listLabel: 'File references',
+        hint: 'Type to search files in the project',
+        noMatch: 'No matching files',
+        noRoot: 'Open a project folder to reference files with @',
+        loading: 'Searching…',
+        dirSuffix: 'folder',
+        typeNotAttachable: '“{{name}}” cannot be attached; path kept as text',
+        multimodalUnsupported: 'This model cannot attach images/PDFs; path kept as text',
+      },
       compact: {
         applied:
           'Context compacted: {{before}} → {{after}} messages (~{{tokensBefore}} → ~{{tokensAfter}} tokens)',

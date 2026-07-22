@@ -10,8 +10,13 @@ import { useCommandPaletteStore } from '@/store/commandPaletteStore'
 import { sessionService, useActiveSessionId, useDomainStore } from '@/domain'
 import { Composer } from './Composer'
 import { SlashCommandPalette, extractSlashQuery } from './SlashCommandPalette'
+import { FileMentionPalette } from './FileMentionPalette'
+import { useFileMentionHandler } from './useFileMentionHandler'
 import { SkillArgInput, extractSkillInvocation } from './SkillArgInput'
 import { useSlashCommandHandler } from './useSlashCommandHandler'
+import { resolveSearchRoot } from '@/lib/resolveSearchRoot'
+import { isMultimodalAttachmentMime } from '@/lib/attachmentAllowlist'
+import { useProjectPathStore } from '@/store/projectPathStore'
 import { readSkillFile } from '@/ipc/skills'
 import { FolderPill } from './FolderPill'
 import { ModelPicker } from './ModelPicker'
@@ -84,9 +89,13 @@ export function NewConversation() {
   // External ACP primary: hide hip-model-only controls (model/effort/forcePlan); keep permissionMode.
   const externalPrimary = isExternalPrimary(draft?.agentId)
 
+  // K10: drop only multimodal chips when model lacks attachment support.
   useEffect(() => {
     if (!attachmentsSupported) {
-      setAttachments((prev) => (prev.length > 0 ? [] : prev))
+      setAttachments((prev) => {
+        const next = prev.filter((a) => !isMultimodalAttachmentMime(a.mimeType))
+        return next.length === prev.length ? prev : next
+      })
     }
   }, [attachmentsSupported])
 
@@ -273,13 +282,42 @@ export function NewConversation() {
     inputRef,
   })
 
-  // D18: when global ⌘K opens, dismiss active slash query so two palettes never stack.
+  const pathStatus = useProjectPathStore((s) => s.statusOf(draft?.cwd))
+  const searchRoot = useMemo(
+    () =>
+      resolveSearchRoot({
+        draft: draft
+          ? { mode: draft.mode === 'project' ? 'project' : 'chat', cwd: draft.cwd }
+          : null,
+        pathStatus,
+      }),
+    [draft, pathStatus],
+  )
+
+  const {
+    atQuery,
+    handleSelect: handleFileMentionSelect,
+    handleDismiss: handleFileMentionDismiss,
+  } = useFileMentionHandler({
+    value: text,
+    setValue: setText,
+    searchRoot,
+    attachments,
+    setAttachments,
+    attachmentsSupported,
+    inputRef,
+  })
+
+  // D18: when global ⌘K opens, dismiss active slash / @ query so palettes never stack.
   const globalPaletteOpen = useCommandPaletteStore((s) => s.open)
   useEffect(() => {
-    if (globalPaletteOpen && extractSlashQuery(text) !== null) {
+    if (!globalPaletteOpen) return
+    if (extractSlashQuery(text) !== null) {
       handleDismiss()
+    } else if (atQuery !== null) {
+      handleFileMentionDismiss()
     }
-  }, [globalPaletteOpen, text, handleDismiss])
+  }, [globalPaletteOpen, text, handleDismiss, atQuery, handleFileMentionDismiss])
 
   return (
     <div className="flex flex-1 flex-col items-center justify-center overflow-y-auto px-6 pb-32" data-testid="new-conversation">
@@ -304,6 +342,14 @@ export function NewConversation() {
         <div className="relative">
           {query !== null && (
             <SlashCommandPalette value={text} surface={surface} sessionId={activeId} skills={skills} onSelect={handleCommandSelect} onDismiss={handleDismiss} />
+          )}
+          {query === null && atQuery !== null && searchRoot && (
+            <FileMentionPalette
+              query={atQuery}
+              searchRoot={searchRoot}
+              onSelect={handleFileMentionSelect}
+              onDismiss={handleFileMentionDismiss}
+            />
           )}
           <Composer
             variant="card"

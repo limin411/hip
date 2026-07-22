@@ -8,6 +8,11 @@ export class ChatPage {
   get slashPalette() { return browser.$('[data-testid="slash-palette"]') }
   slashCmd(name: string) { return browser.$(`[data-testid="slash-cmd-${name}"]`) }
 
+  // ── @ file mention palette ──
+  get fileMentionPalette() { return browser.$('[data-testid="file-mention-palette"]') }
+  get fileMentionHint() { return browser.$('[data-testid="file-mention-hint"]') }
+  fileMentionHit(index: number) { return browser.$(`[data-testid="file-mention-hit-${index}"]`) }
+
   /** Active textarea in the chat view — works for both new-conversation and existing sessions. */
   get activeTextarea() { return browser.$('textarea') }
 

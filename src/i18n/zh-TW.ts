@@ -116,6 +116,16 @@ export const zhTW = {
         "memory-status": "顯示此對話的記憶標誌"
       }
     },
+    "fileMention": {
+      "listLabel": "檔案引用",
+      "hint": "輸入以搜尋專案中的檔案",
+      "noMatch": "沒有相符的檔案",
+      "noRoot": "請先開啟專案資料夾，才能用 @ 引用檔案",
+      "loading": "搜尋中…",
+      "dirSuffix": "資料夾",
+      "typeNotAttachable": "「{{name}}」無法作為附件；路徑已保留為文字",
+      "multimodalUnsupported": "目前模型無法附加圖片/PDF；路徑已保留為文字"
+    },
     "compact": {
       "applied": "上下文已壓縮：{{before}} → {{after}} 則訊息（約 {{tokensBefore}} → {{tokensAfter}} tokens）",
       "noop": "無需壓縮。需要超過 {{n}} 個使用者輪次的歷史（近期輪次會原樣保留）。",

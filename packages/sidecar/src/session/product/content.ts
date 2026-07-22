@@ -4,11 +4,11 @@
  * Regenerate: yarn product:content
  * Check:      yarn product:content:check
  *
- * contentHash=47b3ee0ee782433f skillVersion=2 productVersion=1.0.1
+ * contentHash=3b30e7d8ce8c0f3a skillVersion=3 productVersion=1.0.1
  */
 
 /** Schema / materialization version for builtin skill files (from packages/product-content/meta.json). */
-export const PRODUCT_SKILL_VERSION = '2'
+export const PRODUCT_SKILL_VERSION = '3'
 
 /** App version from root package.json (also used in L0/L2 placeholders). */
 export const HIP_PRODUCT_VERSION = '1.0.1'
@@ -16,12 +16,12 @@ export const HIP_PRODUCT_VERSION = '1.0.1'
 export const HIP_SKILL_ID = 'hip'
 export const HIP_SKILL_NAME = 'hip'
 
-export const HIP_SKILL_DESCRIPTION = 'Product help for the hip desktop agent: Chat/Code surfaces, permission modes, Settings, skills, plugins, MCP, memory, agents, CLI, troubleshooting, and local data. Load when the user asks how hip works or how to configure it.'
+export const HIP_SKILL_DESCRIPTION = 'Product help for the hip desktop agent: Chat/Code/Knowledge surfaces, permission modes, Agents+Runtime panel, Settings, skills, plugins, MCP, memory, agents, CLI, troubleshooting, and local data. Load when the user asks how hip works or how to configure it.'
 
 /** Level-2 body (frontmatter + markdown). */
 export const HIP_SKILL_MD = `---
 name: hip
-description: "Product help for the hip desktop agent: Chat/Code surfaces, permission modes, Settings, skills, plugins, MCP, memory, agents, CLI, troubleshooting, and local data. Load when the user asks how hip works or how to configure it."
+description: "Product help for the hip desktop agent: Chat/Code/Knowledge surfaces, permission modes, Agents+Runtime panel, Settings, skills, plugins, MCP, memory, agents, CLI, troubleshooting, and local data. Load when the user asks how hip works or how to configure it."
 ---
 
 # hip
@@ -44,8 +44,9 @@ If a product detail is not documented here, say so rather than inventing UI labe
 
 | Surface | Intent |
 |---------|--------|
-| **Code** | Project workbench: file tools, git guidance, MCP catalog, full agent tools |
+| **Code** | Project workbench: file tools, git guidance, MCP catalog, full agent tools, async TaskRuntime |
 | **Chat** | Lighter conversation surface: shorter prompt, no git-commit guidance, prefer writing previewable deliverables (\`page.html\`, \`notes.md\`, SVG, etc.) into the workspace for the artifacts panel |
+| **Knowledge** | Notes / knowledge-space assistant: grounded answers in the user's notes workspace; not a coding agent for a software project |
 
 Surface is chosen in the UI; the system prompt already reflects the active surface.
 
@@ -66,9 +67,18 @@ Typical destinations (wording may vary slightly in the UI):
 - **Providers / API keys** — stored as plaintext under \`~/.hip/config/auth.json\` (mode 0600 by design)
 - **Memory** — cross-session memory is **off by default**; enable under Settings → Memory (see \`references/memory.md\`)
 - **Skills** — enable/disable installed skills (\`hip.toml\` + skill folders)
-- **Plugins** — install/enable plugins (skills, agents, MCP, hooks)
+- **Plugins** — install/enable plugins (skills, agents, MCP, hooks); Plugin Market under Settings
 - **Agents** — fixed profiles (supervisor / plan / explore / coder) and custom internal or external agents
 - **Network policy** — optional allow/deny for outbound tools
+
+## Right panel: Agents + Runtime
+
+Each session’s right panel combines:
+
+- **Agents** — roster, active sub-agents, delegation status
+- **Runtime** — background shell jobs, monitors, and schedules (TaskRuntime). Still-running work shows a chip; open the panel to inspect output and stop tasks.
+
+Long shell, log watches, and recurring checks should use TaskRuntime tools (see \`references/agents-and-plugins.md\` and the \`hip-coding\` skill for policy). Do not sleep-poll in the main turn.
 
 ## Skills, plugins, MCP
 
@@ -81,6 +91,7 @@ Typical destinations (wording may vary slightly in the UI):
 - Default session agent decides when to use tools or delegate.
 - Prefer specialized roster agents when available: **explore** (read-only search), **plan** (design-only), **coder** (implementation).
 - Parallel independent sub-tasks → one \`task_batch\` (not sequential \`dispatch_agent\`).
+- Long-running shell / CI / periodic work → TaskRuntime (\`run_script\` background, \`monitor\`, \`scheduler_*\`) rather than blocking the main turn.
 - Explicit workflows / multi-agent handoff exist but are **not** the ordinary product path.
 - Depth: \`references/agents-and-plugins.md\`.
 
@@ -109,7 +120,7 @@ After loading this skill, \`use_skill\` returns absolute paths. When the user ne
 - Memory enablement, inject, extract, privacy → \`references/memory.md\`
 - Local data layout, config files, env overrides → \`references/config-and-data.md\`
 - Common failures (no key, CLI not running, empty memory) → \`references/troubleshooting.md\`
-- Agents, plugins, MCP wiring → \`references/agents-and-plugins.md\`
+- Agents, plugins, MCP, TaskRuntime tools → \`references/agents-and-plugins.md\`
 `
 
 export const MEMORY_REFERENCE_MD = `# hip memory (Level 3)
@@ -273,6 +284,7 @@ hip can run a **built-in** LangGraph agent, an **ACP agent as the session primar
 | hip MCP (merged into session) | yes | no (planned: opt-in forward) | no (planned: opt-in forward) |
 | Client FS bridge | n/a | no (stub only; real bridge planned) | no (stub only; real bridge planned) |
 | dispatch / task / task_batch | yes | no | no |
+| TaskRuntime (bg shell / monitor / scheduler) | yes | no | no |
 | Memory inject (cross-session) | yes | no (config flag reserved; prefix planned) | no |
 | Memory extract | yes | no | no |
 | hip model picker | yes | no (agent configOptions / agent model UI) | no |
@@ -281,15 +293,26 @@ hip can run a **built-in** LangGraph agent, an **ACP agent as the session primar
 
 **Takeaway:** choosing ACP as primary is a peer coding agent with its own stack—not hip’s built-in tools/skills/MCP. Subagent dispatch uses the same agent stack; neither primary nor subagent currently gets hip memory inject or hip MCP.
 
-## Delegation tools (main agent)
+## Delegation & TaskRuntime tools (main agent)
 
 | Tool | Use |
 |------|-----|
 | \`task\` | One sub-task (foreground or background) |
 | \`dispatch_agent\` | Named roster agent; blocking unless parallel tool-calls |
 | \`task_batch\` | **Preferred** for 2+ independent sub-tasks (true parallel) |
+| \`run_script\` (+ \`background:true\`) | Shell; long work returns \`task_id\` |
+| \`wait_tasks\` | Wait for one or more background task ids |
+| \`task_output\` | Read output so far (shell / agent / monitor) |
+| \`task_stop\` | Stop a running background task |
+| \`monitor\` | Stream stdout as UI events (not auto-injected into the model) |
+| \`scheduler_create\` / \`scheduler_list\` / \`scheduler_delete\` | Recurring prompt wakes (min interval 60s) |
 
-Do not claim work ran "in parallel" if only sequential dispatch was used.
+Do not claim work ran "in parallel" if only sequential dispatch was used.  
+Do not sleep-poll the main turn for long shell or CI — use TaskRuntime tools above.
+
+### Runtime panel (UI)
+
+Session right panel combines **Agents** (roster / sub-agents) and **Runtime** (background shell, monitors, schedules). Still-running work shows a chip; open Runtime to inspect or stop tasks.
 
 ## Plugins
 
@@ -409,14 +432,15 @@ To install a plugin:
 export const PRODUCT_CAPABILITY_MAP = `Product facts (hip):
 - Version: 1.0.1.
 - Desktop workbench agent in the user's project with real file tools and optional sub-agents.
-- Surfaces: Code (full workbench) vs Chat (lighter; previewable files → write_file for artifacts).
+- Surfaces: Code (full workbench) vs Chat (lighter; previewable files → write_file for artifacts) vs Knowledge (notes spaces).
 - On Code only, tool gates (UI labels): chat = read-only; edit = project sandbox (default); full = user-granted whole FS. Chat surface is not Code "edit mode".
+- Right panel (session): Agents (roster / sub-agents) + Runtime (background shell, monitors, schedules) combined view.
 - API keys: ~/.hip/config/auth.json (0600 plaintext by design).
 - Cross-session memory: off by default (Settings → Memory).
 - Local data: ~/.hip/ (config, db, skills, plugins, logs).`
 
 /** L0 help when hip skill is on the session skill list. */
-export const PRODUCT_HELP_GUIDANCE = `When the user asks about hip itself — setup, Settings, Chat vs Code, permission modes (chat/edit/full), skills, plugins, MCP, memory, agents, the product CLI, troubleshooting, or local data under ~/.hip — call use_skill({ name: "hip" }) and follow its guide (and references/ for depth). Do not invent product UI labels or config keys; prefer the skill. For ordinary project work, do not load the hip skill.`
+export const PRODUCT_HELP_GUIDANCE = `When the user asks about hip itself — setup, Settings, Chat vs Code vs Knowledge, permission modes (chat/edit/full), Agents+Runtime panel, background tasks / TaskRuntime, skills, plugins, Plugin Market, MCP, memory, agents, the product CLI, troubleshooting, or local data under ~/.hip — call use_skill({ name: "hip" }) and follow its guide (and references/ for depth). Do not invent product UI labels or config keys; prefer the skill. For ordinary project work, do not load the hip skill.`
 
 /** L0 help when hip skill is unavailable — never instruct use_skill("hip"). */
 export const PRODUCT_HELP_FALLBACK = `Deeper product documentation skill is not available in this session. Answer from the product facts above; if the user needs full guides, suggest enabling the built-in hip skill (or check Settings / hip.toml skills) rather than inventing config keys.`

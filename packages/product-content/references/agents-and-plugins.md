@@ -29,6 +29,7 @@ hip can run a **built-in** LangGraph agent, an **ACP agent as the session primar
 | hip MCP (merged into session) | yes | no (planned: opt-in forward) | no (planned: opt-in forward) |
 | Client FS bridge | n/a | no (stub only; real bridge planned) | no (stub only; real bridge planned) |
 | dispatch / task / task_batch | yes | no | no |
+| TaskRuntime (bg shell / monitor / scheduler) | yes | no | no |
 | Memory inject (cross-session) | yes | no (config flag reserved; prefix planned) | no |
 | Memory extract | yes | no | no |
 | hip model picker | yes | no (agent configOptions / agent model UI) | no |
@@ -37,15 +38,26 @@ hip can run a **built-in** LangGraph agent, an **ACP agent as the session primar
 
 **Takeaway:** choosing ACP as primary is a peer coding agent with its own stack—not hip’s built-in tools/skills/MCP. Subagent dispatch uses the same agent stack; neither primary nor subagent currently gets hip memory inject or hip MCP.
 
-## Delegation tools (main agent)
+## Delegation & TaskRuntime tools (main agent)
 
 | Tool | Use |
 |------|-----|
 | `task` | One sub-task (foreground or background) |
 | `dispatch_agent` | Named roster agent; blocking unless parallel tool-calls |
 | `task_batch` | **Preferred** for 2+ independent sub-tasks (true parallel) |
+| `run_script` (+ `background:true`) | Shell; long work returns `task_id` |
+| `wait_tasks` | Wait for one or more background task ids |
+| `task_output` | Read output so far (shell / agent / monitor) |
+| `task_stop` | Stop a running background task |
+| `monitor` | Stream stdout as UI events (not auto-injected into the model) |
+| `scheduler_create` / `scheduler_list` / `scheduler_delete` | Recurring prompt wakes (min interval 60s) |
 
-Do not claim work ran "in parallel" if only sequential dispatch was used.
+Do not claim work ran "in parallel" if only sequential dispatch was used.  
+Do not sleep-poll the main turn for long shell or CI — use TaskRuntime tools above.
+
+### Runtime panel (UI)
+
+Session right panel combines **Agents** (roster / sub-agents) and **Runtime** (background shell, monitors, schedules). Still-running work shows a chip; open Runtime to inspect or stop tasks.
 
 ## Plugins
 

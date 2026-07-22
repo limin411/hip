@@ -25,8 +25,10 @@ Markdown here generates embeds via `yarn product:content`:
 | Memory | [references/memory.md](./references/memory.md) | [zh-CN](./locales/zh-CN/references/memory.md) | [zh-TW](./locales/zh-TW/references/memory.md) |
 | Config & data | [references/config-and-data.md](./references/config-and-data.md) | [zh-CN](./locales/zh-CN/references/config-and-data.md) | [zh-TW](./locales/zh-TW/references/config-and-data.md) |
 | Troubleshooting | [references/troubleshooting.md](./references/troubleshooting.md) | [zh-CN](./locales/zh-CN/references/troubleshooting.md) | [zh-TW](./locales/zh-TW/references/troubleshooting.md) |
-| Agents & plugins | [references/agents-and-plugins.md](./references/agents-and-plugins.md) | [zh-CN](./locales/zh-CN/references/agents-and-plugins.md) | [zh-TW](./locales/zh-TW/references/agents-and-plugins.md) |
-| Coding ops skill | [ops/](./ops/) | — | — |
+| Agents, plugins, TaskRuntime | [references/agents-and-plugins.md](./references/agents-and-plugins.md) | [zh-CN](./locales/zh-CN/references/agents-and-plugins.md) | [zh-TW](./locales/zh-TW/references/agents-and-plugins.md) |
+| Coding ops skill (incl. TaskRuntime policy) | [ops/](./ops/) | — | — |
+
+Also: `locales/ja/`, `locales/ko/` for the same topics (Help UI).
 
 ## Edit workflow
 

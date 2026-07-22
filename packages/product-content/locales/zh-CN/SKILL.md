@@ -18,8 +18,9 @@ hip 是一款**桌面 AI 工作台**（Tauri 壳 + React UI + Node sidecar），
 
 | 界面 | 用途 |
 |------|------|
-| **Code** | 项目工作台：文件工具、git 指导、MCP 目录、完整智能体工具 |
+| **Code** | 项目工作台：文件工具、git 指导、MCP 目录、完整智能体工具、异步 TaskRuntime |
 | **Chat** | 更轻的会话面：更短提示、无 git 提交指导；可预览交付物（`page.html`、`notes.md`、SVG 等）请 `write_file` 到工作区以便工件面板展示 |
+| **Knowledge** | 笔记 / 知识空间助手：基于用户笔记作答；不是软件项目的编码智能体 |
 
 界面在 UI 中选择；系统提示会反映当前界面。
 
@@ -40,9 +41,18 @@ edit/chat 下的路径约定：以 `/` 开头的项目根相对形式（如 `/sr
 - **提供商 / API 密钥** — 明文保存在 `~/.hip/config/auth.json`（按设计为 0600）
 - **记忆** — 跨会话记忆**默认关闭**；在 设置 → 记忆 开启（见 `references/memory.md`）
 - **技能** — 启用/禁用已安装技能（`hip.toml` + 技能目录）
-- **插件** — 安装/启用插件（技能、智能体、MCP、钩子）
+- **插件** — 安装/启用插件（技能、智能体、MCP、钩子）；设置中有插件市场
 - **智能体** — 固定配置（supervisor / plan / explore / coder）与自定义内部或外部智能体
 - **网络策略** — 可选的出站工具允许/拒绝
+
+## 右侧面板：Agents + Runtime
+
+每个会话的右侧面板合并：
+
+- **Agents** — 花名册、活跃子智能体、委派状态
+- **Runtime** — 后台 shell、monitor、定时任务（TaskRuntime）。仍在运行的工作显示 chip；打开面板可查看输出或停止任务
+
+长时间 shell、日志监视与周期检查应使用 TaskRuntime 工具（见 `references/agents-and-plugins.md` 与 `hip-coding` 技能）。不要在主回合里 sleep 轮询。
 
 ## 技能、插件、MCP
 
@@ -55,6 +65,7 @@ edit/chat 下的路径约定：以 `/` 开头的项目根相对形式（如 `/sr
 - 默认会话智能体决定何时用工具或委派。
 - 有专用花名册时优先：**explore**（只读搜索）、**plan**（仅设计）、**coder**（带脚本实现）。
 - 多个独立子任务 → 一次 `task_batch`（不要顺序多个 `dispatch_agent`）。
+- 长时间 shell / CI / 周期工作 → TaskRuntime（`run_script` background、`monitor`、`scheduler_*`），避免阻塞主回合。
 - 显式工作流 / 多智能体 handoff **不是**普通产品路径。
 - 深入：`references/agents-and-plugins.md`。
 
@@ -83,4 +94,4 @@ yarn cli:dev repl --cwd .
 - 记忆启用、注入、抽取、隐私 → `references/memory.md`
 - 本地数据布局、配置、环境变量 → `references/config-and-data.md`
 - 常见故障（无密钥、CLI 未运行、记忆为空） → `references/troubleshooting.md`
-- 智能体、插件、MCP → `references/agents-and-plugins.md`
+- 智能体、插件、MCP、TaskRuntime 工具 → `references/agents-and-plugins.md`

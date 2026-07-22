@@ -18,8 +18,9 @@ hip 是一款**桌面 AI 工作台**（Tauri 殼 + React UI + Node sidecar），
 
 | 介面 | 用途 |
 |------|------|
-| **Code** | 專案工作台：檔案工具、git 指導、MCP 目錄、完整智能體工具 |
+| **Code** | 專案工作台：檔案工具、git 指導、MCP 目錄、完整智能體工具、非同步 TaskRuntime |
 | **Chat** | 較輕的對話面：更短提示、無 git 提交指導；可預覽交付物請 `write_file` 到工作區以便工件面板展示 |
+| **Knowledge** | 筆記 / 知識空間助手：依使用者筆記作答；不是軟體專案的編碼智能體 |
 
 介面在 UI 中選擇；系統提示會反映目前介面。
 
@@ -40,26 +41,36 @@ edit/chat 下的路徑約定：以 `/` 開頭的專案根相對形式。不要�
 - **提供者 / API 金鑰** — 明文保存在 `~/.hip/config/auth.json`（依設計為 0600）
 - **記憶** — 跨工作階段記憶**預設關閉**；在 設定 → 記憶 開啟（見 `references/memory.md`）
 - **技能** — 啟用/停用已安裝技能
-- **外掛** — 安裝/啟用外掛（技能、智能體、MCP、掛鉤）
+- **外掛** — 安裝/啟用外掛（技能、智能體、MCP、掛鉤）；設定中有外掛市集
 - **智能體** — 固定設定（supervisor / plan / explore / coder）與自訂內部或外部智能體
 - **網路原則** — 可選的出站工具允許/拒絕
 
+## 右側面板：Agents + Runtime
+
+每個工作階段的右側面板合併：
+
+- **Agents** — 名冊、活躍子智能體、委派狀態
+- **Runtime** — 後台 shell、monitor、排程（TaskRuntime）。仍在執行的工作顯示 chip；開啟面板可檢視輸出或停止任務
+
+長時間 shell、日誌監視與週期檢查應使用 TaskRuntime 工具。不要在主回合 sleep 輪詢。
+
 ## 技能、外掛、MCP
 
-- **技能**：Claude 格式 `SKILL.md`。全域：`~/.hip/skills/<id>/`。專案：`.hip/skills/<id>/`。
-- **外掛**：位於 `~/.hip/plugins/`。見 `references/agents-and-plugins.md`。
-- **MCP**：用 `mcp_search` 尋找，再呼叫 `mcp__<server>__<tool>`。
+- **技能**：Claude 格式 `SKILL.md` 資料夾。全域：`~/.hip/skills/<id>/`。專案：`.hip/skills/<id>/`。
+- **外掛**：位於 `~/.hip/plugins/`；可貢獻技能、智能體、MCP 與掛鉤。見 `references/agents-and-plugins.md`。
+- **MCP**：用 `mcp_search` 後呼叫 `mcp__<server>__<tool>`。
 
 ## 智能體與委派
 
 - 預設工作階段智能體決定何時用工具或委派。
 - 有專用名冊時優先：**explore**、**plan**、**coder**。
 - 多個獨立子任務 → 一次 `task_batch`。
+- 長時間 shell / CI / 週期工作 → TaskRuntime（`run_script` background、`monitor`、`scheduler_*`）。
 - 深入：`references/agents-and-plugins.md`。
 
 ## CLI（`@hip/cli`）
 
-僅附著到**已執行**的 hip 應用。應用未執行時 CLI 失敗並回傳 `APP_NOT_RUNNING`。
+僅附著到**已執行**的 hip 應用（共享 sidecar 與 `~/.hip` 資料）。不會啟動產品 sidecar。
 
 ```bash
 yarn cli:dev doctor
@@ -69,13 +80,15 @@ yarn cli:dev run --stream none --json "Reply with exactly: pong"
 yarn cli:dev repl --cwd .
 ```
 
+應用未執行時 CLI 失敗並回傳 `APP_NOT_RUNNING`。
+
 ## 專案指導檔
 
-專案中的 `AGENTS.md` / `Claude.md` / `.hip` 等描述**專案**約定；本技能描述**產品**行為。
+專案中若存在 `AGENTS.md` / `Claude.md` / `.hip` 等，hip 可能注入。**專案**約定優先；本技能描述**產品**行為。
 
 ## Level 3 參考
 
 - 記憶 → `references/memory.md`
 - 本機資料與設定 → `references/config-and-data.md`
-- 故障排除 → `references/troubleshooting.md`
-- 智能體與外掛 → `references/agents-and-plugins.md`
+- 疑難排解 → `references/troubleshooting.md`
+- 智能體、外掛、MCP、TaskRuntime → `references/agents-and-plugins.md`

@@ -4,26 +4,26 @@
  * Regenerate: yarn product:content  (or node scripts/generate-ops-content.mjs)
  * Check:      yarn product:content:check
  *
- * contentHash=5a39ed607b630009 skillVersion=1
+ * contentHash=c2196260fa9ccad9 skillVersion=2
  */
 
 /** Materialization schema version (from packages/product-content/ops/meta.json). */
-export const OPS_SKILL_VERSION = '1'
+export const OPS_SKILL_VERSION = '2'
 
 export const CODING_SKILL_ID = 'hip-coding'
 export const CODING_SKILL_NAME = 'hip-coding'
 
-export const CODING_SKILL_DESCRIPTION = 'Deep coding-agent policy for hip: file edit strategy, write_todos, sub-agent delegation, task_batch parallel fan-out, and git commit/branch etiquette. Load for complex multi-agent or git work.'
+export const CODING_SKILL_DESCRIPTION = 'Deep coding-agent policy for hip: file edit strategy, write_todos, sub-agent delegation, task_batch parallel fan-out, async TaskRuntime (run_script background, wait_tasks, monitor, scheduler), and git commit/branch etiquette. Load for complex multi-agent, long-running, or git work.'
 
 /** Level-2 body (frontmatter + markdown). */
 export const CODING_SKILL_MD = `---
 name: hip-coding
-description: "Deep coding-agent policy for hip: file edit strategy, write_todos, sub-agent delegation, task_batch parallel fan-out, and git commit/branch etiquette. Load for complex multi-agent or git work."
+description: "Deep coding-agent policy for hip: file edit strategy, write_todos, sub-agent delegation, task_batch parallel fan-out, async TaskRuntime (run_script background, wait_tasks, monitor, scheduler), and git commit/branch etiquette. Load for complex multi-agent, long-running, or git work."
 ---
 
 # hip-coding (operational policy)
 
-This skill expands the **compact** always-on coding rules in the system prompt. Follow it for multi-step, multi-agent, large-edit, or git-heavy work.
+This skill expands the **compact** always-on coding rules in the system prompt. Follow it for multi-step, multi-agent, large-edit, git-heavy, or long-running background work.
 
 ## File edits
 
@@ -47,9 +47,30 @@ This skill expands the **compact** always-on coding rules in the system prompt. 
 - \`task_batch\` runs sub-agents concurrently. Do NOT issue multiple sequential \`dispatch_agent\` or foreground \`task\` calls for independent work — that is serial and slow.
 - \`dispatch_agent\` alone is blocking (one at a time) unless the model emits several \`dispatch_agent\` calls in the same tool-call batch (then they may run in parallel).
 - Never claim work ran "in parallel" if you only used sequential \`dispatch_agent\`/\`task\`.
-- Fire-and-forget: \`task\` with mode \`background\`, then \`task_output\` / \`task_stop\` as needed.
+- Fire-and-forget sub-agent: \`task\` with mode \`background\`, then \`task_output\` / \`task_stop\` as needed.
 - When a sub-agent result returns, treat it as the research source of truth: do not re-run the same ls/glob/grep/read_file exploration unless the result is empty, errored, clearly incomplete, or you need a specific file section the summary omitted.
 - Simple single-step requests (greetings, list a directory, read one file, short Q&A): do it yourself — do not call task, task_batch, write_todos, or spawn sub-agents.
+
+## Async TaskRuntime (shell / monitor / schedule)
+
+Long work must not block the supervisor turn. Use TaskRuntime tools; the session **right panel → Runtime** (combined with Agents) shows running/completed jobs.
+
+| Tool | When |
+|------|------|
+| \`run_script\` with \`background:true\` | Long shell builds, tests, installs — returns \`task_id\` |
+| \`wait_tasks\` | Wait for one or more background task ids (\`wait_all\` / \`wait_any\`; optional \`timeout_ms\`) |
+| \`task_output\` | Read accumulated output (shell, agent, monitor) without busy-waiting |
+| \`task_stop\` | Kill a running background task |
+| \`monitor\` | Stream a command’s stdout as UI events (CI/log tails). Lines are **not** auto-injected into the model — use \`task_output\`. Prefer tight filters (\`grep --line-buffered\`). |
+| \`scheduler_create\` / \`scheduler_list\` / \`scheduler_delete\` | Recurring checks (interval strings like \`5m\`, \`2h\`; min 60s). Prefer over foreground sleep loops. |
+
+Rules:
+
+- Do **not** sleep-poll the main turn waiting for long shell or CI.
+- Never invent shell tool names — only \`run_script\` for shell.
+- Prefer \`wait_tasks\` when you need completion of known ids; use \`task_output\` for partial logs.
+- Monitor streams surface in the Runtime panel / notifications; still call \`task_output\` when you need the text in-context.
+- Sub-agent background and shell background share the same task id / output / stop APIs.
 
 ## Git
 
@@ -62,6 +83,7 @@ This skill expands the **compact** always-on coding rules in the system prompt. 
 ## Shell & failures
 
 - Use \`run_script\` for shell; never invent shell tool names.
+- Short, quick commands may run in the foreground; anything that can take minutes should use \`background:true\`.
 - Never thrash on \`.git/objects\`.
 - When a tool fails or returns binary/unreadable content, stop probing and summarize what you know.
 `

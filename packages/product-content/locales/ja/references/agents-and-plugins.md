@@ -1,70 +1,106 @@
-# hip エージェント、プラグイン & MCP (レベル 3)
+# hip エージェント、プラグイン & MCP（Level 3）
 
 ## 組み込みエージェントプロファイル
 
-典型的な固定プロファイル（エージェントUIで有効化/無効化）：
-
 | プロファイル | 役割 |
-|---------|------|
-| **supervisor** | デフォルトオーケストレーター：ツール、コミット、スクリプト、委任 |
-| **plan** | 設計/計画指向（設定によって書き込み姿勢が狭まる） |
-| **explore** | 読み取り専用のコードベース検索 |
-| **coder** | スクリプトを使用した実装重視 |
+|--------------|------|
+| **supervisor** | 既定オーケストレータ：ツール、コミット、スクリプト、委任 |
+| **plan** | 設計 / 計画向き |
+| **explore** | 読み取り専用コード検索 |
+| **coder** | 実装寄り（スクリプト可） |
 
-カスタム **内部** エージェント：ペルソナプロンプト + バインドモデル + ツール権限。  
-**外部 / ACP** エージェント：別プロセス；設定されていない限り、製品メモリはデフォルトでオフ。
+**内部**エージェント：ペルソナ + モデル + ツール権限。  
+**外部 / ACP**：別プロセス；製品メモリは既定オフ。
 
-サポートされているACPプリセット（設定 → エージェント → ACPエージェント追加）：**OpenCode**、**Grok Build**（`grok agent stdio`）、**Pi**、**Claude Code**、**Codex**。Grok BuildはネイティブACPを使用（`https://x.ai/cli`からインストール）；認証は`grok login`またはオプションの`XAI_API_KEY`を介して行います。
+対応 ACP プリセット（設定 → エージェント → ACP 追加）：**OpenCode**、**Grok Build**（`grok agent stdio`）、**Pi**、**Claude Code**、**Codex**。Grok Build はネイティブ ACP（`https://x.ai/cli`）；認証は `grok login` または任意の `XAI_API_KEY`。
 
-ACPエージェントは認証とモデルを**自己管理**します：hipはACP子プロセスに自身のプロバイダAPIキーを注入しません。エージェント設定で、エージェント自身のログイン/環境変数/オプションのプリセット`authEnvVar`を使用します。
+ACP の認証とモデルは**自己管理**：hip は provider API キーを ACP 子プロセスに注入しません。
 
 ## 機能マトリックス（組み込み vs ACP）
 
-hipは**組み込み**のLangGraphエージェント、セッションのプライマリとしての**ACPエージェント**、またはサブエージェントとしての**ACPエージェントのディスパッチ**を実行できます。機能は異なります（現在の製品；関連する計画中のホスト作業は注記）：
+| 機能 | 組み込み primary | ACP primary | ACP サブ（dispatch） |
+|------|------------------|-------------|----------------------|
+| hip ツール（read / write / run_script …） | あり | なし | なし |
+| hip Skills / プラグインフック | あり | なし | なし |
+| hip MCP | あり | なし（計画: opt-in 転送） | なし |
+| クライアント FS bridge | n/a | なし（stub） | なし |
+| dispatch / task / task_batch | あり | なし | なし |
+| TaskRuntime（bg shell / monitor / scheduler） | あり | なし | なし |
+| クロスセッション Memory 注入 | あり | なし | なし |
+| Memory 抽出 | あり | なし | なし |
+| hip モデル選択 | あり | なし | なし |
+| HITL | hip ツール | ACP `requestPermission` | 同 ACP primary |
+| permissionMode | hip ゲート | chat/edit で安全 kind 自動；他は HITL | 親セッション継承 |
 
-| 機能 | 組み込みプライマリ | ACPプライマリ | ACPサブエージェント（ディスパッチ） |
-|------------|------------------|-------------|-------------------------|
-| hipツール（read / write / run_script / …） | はい | いいえ（エージェント自身のツール） | いいえ（エージェント自身のツール） |
-| hipスキル / プラグインフック | はい | いいえ | いいえ |
-| hip MCP（セッションにマージ） | はい | いいえ（計画中：オプトイン転送） | いいえ（計画中：オプトイン転送） |
-| クライアントFSブリッジ | 該当なし | いいえ（スタブのみ；実際のブリッジは計画中） | いいえ（スタブのみ；実際のブリッジは計画中） |
-| dispatch / task / task_batch | はい | いいえ | いいえ |
-| メモリ注入（セッション間） | はい | いいえ（設定フラグは予約済み；プレフィックスは計画中） | いいえ |
-| メモリ抽出 | はい | いいえ | いいえ |
-| hipモデルピッカー | はい | いいえ（エージェントconfigOptions / エージェントモデルUI） | いいえ |
-| HITL許可 | hipツール | ACP `requestPermission` | ACPプライマリと同じ |
-| permissionMode | hipツールゲート | チャット/編集で安全な種類（read/fetch/other）を自動解決；それ以外はHITL（`full`はACPパスでもHITL） | 親セッションモード |
+**要点:** ACP を primary にすると hip 組み込みツール/スキル/MCP ではなく、対等な別スタックになる。
 
-**要点：** ACPをプライマリとして選択することは、独自のスタックを持つピアコーディングエージェントであり、hipの組み込みツール/スキル/MCPではありません。サブエージェントディスパッチは同じエージェントスタックを使用します；プライマリもサブエージェントも現在、hipメモリ注入またはhip MCPを取得しません。
+## 委任 & TaskRuntime ツール（メインエージェント）
 
-## 委任ツール（メインエージェント）
+| ツール | 用途 |
+|--------|------|
+| `task` | 単一サブタスク（fg / background） |
+| `dispatch_agent` | 名簿エージェント |
+| `task_batch` | **2+ 独立サブタスク推奨**（真並列） |
+| `run_script`（+ `background:true`） | シェル；長時間は `task_id` |
+| `wait_tasks` | バックグラウンド id 待ち |
+| `task_output` | これまでの出力を読む |
+| `task_stop` | 実行中タスク停止 |
+| `monitor` | stdout を UI イベントとして配信（モデルへ自動注入しない） |
+| `scheduler_create` / `list` / `delete` | 定期起動（最短 60s） |
 
-| ツール | 使用法 |
-|------|-----|
-| `task` | 1つのサブタスク（フォアグラウンドまたはバックグラウンド） |
-| `dispatch_agent` | 名前付きロスターエージェント；並列ツール呼び出しがない限りブロッキング |
-| `task_batch` | **推奨** 2つ以上の独立したサブタスク（真の並列処理） |
+メインターンで長時間 shell/CI を sleep ポールしない。
 
-逐次ディスパッチのみを使用した場合、作業が「並列に」実行されたと主張しないでください。
+### Runtime パネル（UI）
+
+セッション右パネルは **Agents** と **Runtime** を統合。実行中は chip 表示。
 
 ## プラグイン
 
-- `~/.hip/plugins/` の下にインストール；レジストリは `~/.hip/config/hip-plugins.json`。
-- プラグインはスキル、エージェント、MCPサーバー設定、フックを提供できます。
-- プラグインを無効にすると、その貢献がセッションから削除されます。
+- 配置: `~/.hip/plugins/`；レジストリ `~/.hip/config/hip-plugins.json`。
+- スキル、エージェント、MCP、フックを同梱可。
+
+### Plugin Market（設定）
+
+公式カタログのみ:
+
+| Source id | Catalog |
+|-----------|---------|
+| `grok-official` | [xai-org/plugin-marketplace](https://github.com/xai-org/plugin-marketplace) |
+| `claude-official` | [anthropics/claude-plugins-official](https://github.com/anthropics/claude-plugins-official) |
+
+UI: **Grok market** · **Claude market** · **Custom plugins**。
+
+- キャッシュ: `~/.hip/cache/marketplaces/<sourceId>/`
+- ソース切替: `~/.hip/config/marketplace-sources.json`
+- ダウンロード既定 `enabled: false`；`boundModel` をレビュー。
+
+### プラグインディレクトリ
+
+必須: `.plugin/plugin.json`（少なくとも `name` / `version`）。
+
+### `hip-plugins.json`
+
+推奨（文字列配列）:
+
+```json
+{
+  "plugins": ["/absolute/path/to/plugin"],
+  "entries": [],
+  "enabled": { "my-plugin": true }
+}
+```
 
 ## MCP
 
-- サーバー設定は hip.toml / プラグイン合成から取得されます。
-- コードサーフェスは短いカタログを注入する場合があります；`mcp_search` で発見します。
-- ツールは `mcp__<server>__<tool>` として呼び出します。
-- ネットワークポリシー（設定されている場合）は、アウトバウンドMCP/Webツールをブロックする場合があります。
+- hip.toml / プラグイン合成。
+- `mcp_search` 後 `mcp__<server>__<tool>`。
+- ネットワークポリシーが出方向を遮断する場合あり。
 
 ## スキルスコープ
 
 | スコープ | 場所 |
-|-------|------|
-| グローバル | `~/.hip/skills/<id>/` |
-| プロジェクト | `.hip/skills/<id>/`（同じIDのグローバルより優先） |
-| プラグイン | プラグイン所有のスキルディレクトリ |
-| 組み込み製品 | `~/.hip/builtin-skills/hip/`（最低優先度；同じIDで上書き可能） |
+|----------|------|
+| global | `~/.hip/skills/<id>/` |
+| project | `.hip/skills/<id>/` |
+| plugin | プラグイン内 |
+| builtin | `~/.hip/builtin-skills/hip/`（最低優先） |

@@ -4,7 +4,7 @@
  * Regenerate: yarn product:content
  * Check:      yarn product:content:check
  *
- * contentHash=47b3ee0ee782433f skillVersion=2 productVersion=1.0.1
+ * contentHash=3b30e7d8ce8c0f3a skillVersion=3 productVersion=1.0.1
  */
 
 export type ProductHelpSectionId = 'overview' | 'memory' | 'config' | 'troubleshooting' | 'agents'
@@ -30,17 +30,18 @@ export interface ProductHelpLocalePack {
 export const HIP_PRODUCT_VERSION = '1.0.1'
 
 /** Content schema version from packages/product-content/meta.json. */
-export const PRODUCT_SKILL_VERSION = '2'
+export const PRODUCT_SKILL_VERSION = '3'
 
 /** English defaults (agent-aligned). Prefer getProductHelpPack(lang) in UI. */
-export const HIP_SKILL_DESCRIPTION = 'Product help for the hip desktop agent: Chat/Code surfaces, permission modes, Settings, skills, plugins, MCP, memory, agents, CLI, troubleshooting, and local data. Load when the user asks how hip works or how to configure it.'
+export const HIP_SKILL_DESCRIPTION = 'Product help for the hip desktop agent: Chat/Code/Knowledge surfaces, permission modes, Agents+Runtime panel, Settings, skills, plugins, MCP, memory, agents, CLI, troubleshooting, and local data. Load when the user asks how hip works or how to configure it.'
 
 /** L0 capability map English (agent + default UI). */
 export const PRODUCT_CAPABILITY_MAP = `Product facts (hip):
 - Version: 1.0.1.
 - Desktop workbench agent in the user's project with real file tools and optional sub-agents.
-- Surfaces: Code (full workbench) vs Chat (lighter; previewable files → write_file for artifacts).
+- Surfaces: Code (full workbench) vs Chat (lighter; previewable files → write_file for artifacts) vs Knowledge (notes spaces).
 - On Code only, tool gates (UI labels): chat = read-only; edit = project sandbox (default); full = user-granted whole FS. Chat surface is not Code "edit mode".
+- Right panel (session): Agents (roster / sub-agents) + Runtime (background shell, monitors, schedules) combined view.
 - API keys: ~/.hip/config/auth.json (0600 plaintext by design).
 - Cross-session memory: off by default (Settings → Memory).
 - Local data: ~/.hip/ (config, db, skills, plugins, logs).`
@@ -70,8 +71,9 @@ If a product detail is not documented here, say so rather than inventing UI labe
 
 | Surface | Intent |
 |---------|--------|
-| **Code** | Project workbench: file tools, git guidance, MCP catalog, full agent tools |
+| **Code** | Project workbench: file tools, git guidance, MCP catalog, full agent tools, async TaskRuntime |
 | **Chat** | Lighter conversation surface: shorter prompt, no git-commit guidance, prefer writing previewable deliverables (\`page.html\`, \`notes.md\`, SVG, etc.) into the workspace for the artifacts panel |
+| **Knowledge** | Notes / knowledge-space assistant: grounded answers in the user's notes workspace; not a coding agent for a software project |
 
 Surface is chosen in the UI; the system prompt already reflects the active surface.
 
@@ -92,9 +94,18 @@ Typical destinations (wording may vary slightly in the UI):
 - **Providers / API keys** — stored as plaintext under \`~/.hip/config/auth.json\` (mode 0600 by design)
 - **Memory** — cross-session memory is **off by default**; enable under Settings → Memory (see \`references/memory.md\`)
 - **Skills** — enable/disable installed skills (\`hip.toml\` + skill folders)
-- **Plugins** — install/enable plugins (skills, agents, MCP, hooks)
+- **Plugins** — install/enable plugins (skills, agents, MCP, hooks); Plugin Market under Settings
 - **Agents** — fixed profiles (supervisor / plan / explore / coder) and custom internal or external agents
 - **Network policy** — optional allow/deny for outbound tools
+
+## Right panel: Agents + Runtime
+
+Each session’s right panel combines:
+
+- **Agents** — roster, active sub-agents, delegation status
+- **Runtime** — background shell jobs, monitors, and schedules (TaskRuntime). Still-running work shows a chip; open the panel to inspect output and stop tasks.
+
+Long shell, log watches, and recurring checks should use TaskRuntime tools (see \`references/agents-and-plugins.md\` and the \`hip-coding\` skill for policy). Do not sleep-poll in the main turn.
 
 ## Skills, plugins, MCP
 
@@ -107,6 +118,7 @@ Typical destinations (wording may vary slightly in the UI):
 - Default session agent decides when to use tools or delegate.
 - Prefer specialized roster agents when available: **explore** (read-only search), **plan** (design-only), **coder** (implementation).
 - Parallel independent sub-tasks → one \`task_batch\` (not sequential \`dispatch_agent\`).
+- Long-running shell / CI / periodic work → TaskRuntime (\`run_script\` background, \`monitor\`, \`scheduler_*\`) rather than blocking the main turn.
 - Explicit workflows / multi-agent handoff exist but are **not** the ordinary product path.
 - Depth: \`references/agents-and-plugins.md\`.
 
@@ -135,7 +147,7 @@ After loading this skill, \`use_skill\` returns absolute paths. When the user ne
 - Memory enablement, inject, extract, privacy → \`references/memory.md\`
 - Local data layout, config files, env overrides → \`references/config-and-data.md\`
 - Common failures (no key, CLI not running, empty memory) → \`references/troubleshooting.md\`
-- Agents, plugins, MCP wiring → \`references/agents-and-plugins.md\`
+- Agents, plugins, MCP, TaskRuntime tools → \`references/agents-and-plugins.md\`
 `,
   },
   {
@@ -311,6 +323,7 @@ hip can run a **built-in** LangGraph agent, an **ACP agent as the session primar
 | hip MCP (merged into session) | yes | no (planned: opt-in forward) | no (planned: opt-in forward) |
 | Client FS bridge | n/a | no (stub only; real bridge planned) | no (stub only; real bridge planned) |
 | dispatch / task / task_batch | yes | no | no |
+| TaskRuntime (bg shell / monitor / scheduler) | yes | no | no |
 | Memory inject (cross-session) | yes | no (config flag reserved; prefix planned) | no |
 | Memory extract | yes | no | no |
 | hip model picker | yes | no (agent configOptions / agent model UI) | no |
@@ -319,15 +332,26 @@ hip can run a **built-in** LangGraph agent, an **ACP agent as the session primar
 
 **Takeaway:** choosing ACP as primary is a peer coding agent with its own stack—not hip’s built-in tools/skills/MCP. Subagent dispatch uses the same agent stack; neither primary nor subagent currently gets hip memory inject or hip MCP.
 
-## Delegation tools (main agent)
+## Delegation & TaskRuntime tools (main agent)
 
 | Tool | Use |
 |------|-----|
 | \`task\` | One sub-task (foreground or background) |
 | \`dispatch_agent\` | Named roster agent; blocking unless parallel tool-calls |
 | \`task_batch\` | **Preferred** for 2+ independent sub-tasks (true parallel) |
+| \`run_script\` (+ \`background:true\`) | Shell; long work returns \`task_id\` |
+| \`wait_tasks\` | Wait for one or more background task ids |
+| \`task_output\` | Read output so far (shell / agent / monitor) |
+| \`task_stop\` | Stop a running background task |
+| \`monitor\` | Stream stdout as UI events (not auto-injected into the model) |
+| \`scheduler_create\` / \`scheduler_list\` / \`scheduler_delete\` | Recurring prompt wakes (min interval 60s) |
 
-Do not claim work ran "in parallel" if only sequential dispatch was used.
+Do not claim work ran "in parallel" if only sequential dispatch was used.  
+Do not sleep-poll the main turn for long shell or CI — use TaskRuntime tools above.
+
+### Runtime panel (UI)
+
+Session right panel combines **Agents** (roster / sub-agents) and **Runtime** (background shell, monitors, schedules). Still-running work shows a chip; open Runtime to inspect or stop tasks.
 
 ## Plugins
 
@@ -448,12 +472,13 @@ To install a plugin:
 /** All UI locales for Settings → Product help. Agent embeds stay English. */
 export const PRODUCT_HELP_LOCALES: Record<ProductHelpLocale, ProductHelpLocalePack> = {
   en: {
-  description: 'Product help for the hip desktop agent: Chat/Code surfaces, permission modes, Settings, skills, plugins, MCP, memory, agents, CLI, troubleshooting, and local data. Load when the user asks how hip works or how to configure it.',
+  description: 'Product help for the hip desktop agent: Chat/Code/Knowledge surfaces, permission modes, Agents+Runtime panel, Settings, skills, plugins, MCP, memory, agents, CLI, troubleshooting, and local data. Load when the user asks how hip works or how to configure it.',
   capabilityMap: `Product facts (hip):
 - Version: 1.0.1.
 - Desktop workbench agent in the user's project with real file tools and optional sub-agents.
-- Surfaces: Code (full workbench) vs Chat (lighter; previewable files → write_file for artifacts).
+- Surfaces: Code (full workbench) vs Chat (lighter; previewable files → write_file for artifacts) vs Knowledge (notes spaces).
 - On Code only, tool gates (UI labels): chat = read-only; edit = project sandbox (default); full = user-granted whole FS. Chat surface is not Code "edit mode".
+- Right panel (session): Agents (roster / sub-agents) + Runtime (background shell, monitors, schedules) combined view.
 - API keys: ~/.hip/config/auth.json (0600 plaintext by design).
 - Cross-session memory: off by default (Settings → Memory).
 - Local data: ~/.hip/ (config, db, skills, plugins, logs).`,
@@ -481,8 +506,9 @@ If a product detail is not documented here, say so rather than inventing UI labe
 
 | Surface | Intent |
 |---------|--------|
-| **Code** | Project workbench: file tools, git guidance, MCP catalog, full agent tools |
+| **Code** | Project workbench: file tools, git guidance, MCP catalog, full agent tools, async TaskRuntime |
 | **Chat** | Lighter conversation surface: shorter prompt, no git-commit guidance, prefer writing previewable deliverables (\`page.html\`, \`notes.md\`, SVG, etc.) into the workspace for the artifacts panel |
+| **Knowledge** | Notes / knowledge-space assistant: grounded answers in the user's notes workspace; not a coding agent for a software project |
 
 Surface is chosen in the UI; the system prompt already reflects the active surface.
 
@@ -503,9 +529,18 @@ Typical destinations (wording may vary slightly in the UI):
 - **Providers / API keys** — stored as plaintext under \`~/.hip/config/auth.json\` (mode 0600 by design)
 - **Memory** — cross-session memory is **off by default**; enable under Settings → Memory (see \`references/memory.md\`)
 - **Skills** — enable/disable installed skills (\`hip.toml\` + skill folders)
-- **Plugins** — install/enable plugins (skills, agents, MCP, hooks)
+- **Plugins** — install/enable plugins (skills, agents, MCP, hooks); Plugin Market under Settings
 - **Agents** — fixed profiles (supervisor / plan / explore / coder) and custom internal or external agents
 - **Network policy** — optional allow/deny for outbound tools
+
+## Right panel: Agents + Runtime
+
+Each session’s right panel combines:
+
+- **Agents** — roster, active sub-agents, delegation status
+- **Runtime** — background shell jobs, monitors, and schedules (TaskRuntime). Still-running work shows a chip; open the panel to inspect output and stop tasks.
+
+Long shell, log watches, and recurring checks should use TaskRuntime tools (see \`references/agents-and-plugins.md\` and the \`hip-coding\` skill for policy). Do not sleep-poll in the main turn.
 
 ## Skills, plugins, MCP
 
@@ -518,6 +553,7 @@ Typical destinations (wording may vary slightly in the UI):
 - Default session agent decides when to use tools or delegate.
 - Prefer specialized roster agents when available: **explore** (read-only search), **plan** (design-only), **coder** (implementation).
 - Parallel independent sub-tasks → one \`task_batch\` (not sequential \`dispatch_agent\`).
+- Long-running shell / CI / periodic work → TaskRuntime (\`run_script\` background, \`monitor\`, \`scheduler_*\`) rather than blocking the main turn.
 - Explicit workflows / multi-agent handoff exist but are **not** the ordinary product path.
 - Depth: \`references/agents-and-plugins.md\`.
 
@@ -546,7 +582,7 @@ After loading this skill, \`use_skill\` returns absolute paths. When the user ne
 - Memory enablement, inject, extract, privacy → \`references/memory.md\`
 - Local data layout, config files, env overrides → \`references/config-and-data.md\`
 - Common failures (no key, CLI not running, empty memory) → \`references/troubleshooting.md\`
-- Agents, plugins, MCP wiring → \`references/agents-and-plugins.md\`
+- Agents, plugins, MCP, TaskRuntime tools → \`references/agents-and-plugins.md\`
 `,
   },
   {
@@ -722,6 +758,7 @@ hip can run a **built-in** LangGraph agent, an **ACP agent as the session primar
 | hip MCP (merged into session) | yes | no (planned: opt-in forward) | no (planned: opt-in forward) |
 | Client FS bridge | n/a | no (stub only; real bridge planned) | no (stub only; real bridge planned) |
 | dispatch / task / task_batch | yes | no | no |
+| TaskRuntime (bg shell / monitor / scheduler) | yes | no | no |
 | Memory inject (cross-session) | yes | no (config flag reserved; prefix planned) | no |
 | Memory extract | yes | no | no |
 | hip model picker | yes | no (agent configOptions / agent model UI) | no |
@@ -730,15 +767,26 @@ hip can run a **built-in** LangGraph agent, an **ACP agent as the session primar
 
 **Takeaway:** choosing ACP as primary is a peer coding agent with its own stack—not hip’s built-in tools/skills/MCP. Subagent dispatch uses the same agent stack; neither primary nor subagent currently gets hip memory inject or hip MCP.
 
-## Delegation tools (main agent)
+## Delegation & TaskRuntime tools (main agent)
 
 | Tool | Use |
 |------|-----|
 | \`task\` | One sub-task (foreground or background) |
 | \`dispatch_agent\` | Named roster agent; blocking unless parallel tool-calls |
 | \`task_batch\` | **Preferred** for 2+ independent sub-tasks (true parallel) |
+| \`run_script\` (+ \`background:true\`) | Shell; long work returns \`task_id\` |
+| \`wait_tasks\` | Wait for one or more background task ids |
+| \`task_output\` | Read output so far (shell / agent / monitor) |
+| \`task_stop\` | Stop a running background task |
+| \`monitor\` | Stream stdout as UI events (not auto-injected into the model) |
+| \`scheduler_create\` / \`scheduler_list\` / \`scheduler_delete\` | Recurring prompt wakes (min interval 60s) |
 
-Do not claim work ran "in parallel" if only sequential dispatch was used.
+Do not claim work ran "in parallel" if only sequential dispatch was used.  
+Do not sleep-poll the main turn for long shell or CI — use TaskRuntime tools above.
+
+### Runtime panel (UI)
+
+Session right panel combines **Agents** (roster / sub-agents) and **Runtime** (background shell, monitors, schedules). Still-running work shows a chip; open Runtime to inspect or stop tasks.
 
 ## Plugins
 
@@ -857,12 +905,13 @@ To install a plugin:
   ],
 },
   'zh-CN': {
-  description: 'hip 桌面智能体产品帮助：Chat/Code 界面、权限模式、设置、技能、插件、MCP、记忆、智能体、CLI、故障排查与本地数据布局。当用户询问 hip 如何工作或如何配置时加载。',
+  description: 'hip 桌面智能体产品帮助：Chat/Code/Knowledge 界面、权限模式、Agents+Runtime 面板、设置、技能、插件、MCP、记忆、智能体、CLI、故障排查与本地数据布局。当用户询问 hip 如何工作或如何配置时加载。',
   capabilityMap: `产品要点（hip）：
 - 版本：1.0.1。
 - 桌面 AI 工作台智能体，在用户项目中使用真实文件工具，并可委派子智能体。
-- 界面：Code（完整工作台）与 Chat（更轻；可预览交付物请 write_file 到工件面板）。
-- 权限：chat = 只读；edit = 项目沙箱（默认）；full = 用户授权的整机文件系统。
+- 界面：Code（完整工作台）与 Chat（更轻；可预览交付物请 write_file 到工件面板）与 Knowledge（笔记空间）。
+- 仅在 Code 上，工具门禁（UI 标签）：chat = 只读；edit = 项目沙箱（默认）；full = 用户授权的整机文件系统。Chat 界面不是 Code 的「edit 模式」。
+- 会话右侧面板：Agents（花名册 / 子智能体）与 Runtime（后台 shell、monitor、定时任务）合并视图。
 - API 密钥：~/.hip/config/auth.json（按设计为 0600 明文）。
 - 跨会话记忆：默认关闭（设置 → 记忆）。
 - 本地数据：~/.hip/（配置、数据库、技能、插件、日志）。`,
@@ -890,8 +939,9 @@ hip 是一款**桌面 AI 工作台**（Tauri 壳 + React UI + Node sidecar），
 
 | 界面 | 用途 |
 |------|------|
-| **Code** | 项目工作台：文件工具、git 指导、MCP 目录、完整智能体工具 |
+| **Code** | 项目工作台：文件工具、git 指导、MCP 目录、完整智能体工具、异步 TaskRuntime |
 | **Chat** | 更轻的会话面：更短提示、无 git 提交指导；可预览交付物（\`page.html\`、\`notes.md\`、SVG 等）请 \`write_file\` 到工作区以便工件面板展示 |
+| **Knowledge** | 笔记 / 知识空间助手：基于用户笔记作答；不是软件项目的编码智能体 |
 
 界面在 UI 中选择；系统提示会反映当前界面。
 
@@ -912,9 +962,18 @@ edit/chat 下的路径约定：以 \`/\` 开头的项目根相对形式（如 \`
 - **提供商 / API 密钥** — 明文保存在 \`~/.hip/config/auth.json\`（按设计为 0600）
 - **记忆** — 跨会话记忆**默认关闭**；在 设置 → 记忆 开启（见 \`references/memory.md\`）
 - **技能** — 启用/禁用已安装技能（\`hip.toml\` + 技能目录）
-- **插件** — 安装/启用插件（技能、智能体、MCP、钩子）
+- **插件** — 安装/启用插件（技能、智能体、MCP、钩子）；设置中有插件市场
 - **智能体** — 固定配置（supervisor / plan / explore / coder）与自定义内部或外部智能体
 - **网络策略** — 可选的出站工具允许/拒绝
+
+## 右侧面板：Agents + Runtime
+
+每个会话的右侧面板合并：
+
+- **Agents** — 花名册、活跃子智能体、委派状态
+- **Runtime** — 后台 shell、monitor、定时任务（TaskRuntime）。仍在运行的工作显示 chip；打开面板可查看输出或停止任务
+
+长时间 shell、日志监视与周期检查应使用 TaskRuntime 工具（见 \`references/agents-and-plugins.md\` 与 \`hip-coding\` 技能）。不要在主回合里 sleep 轮询。
 
 ## 技能、插件、MCP
 
@@ -927,6 +986,7 @@ edit/chat 下的路径约定：以 \`/\` 开头的项目根相对形式（如 \`
 - 默认会话智能体决定何时用工具或委派。
 - 有专用花名册时优先：**explore**（只读搜索）、**plan**（仅设计）、**coder**（带脚本实现）。
 - 多个独立子任务 → 一次 \`task_batch\`（不要顺序多个 \`dispatch_agent\`）。
+- 长时间 shell / CI / 周期工作 → TaskRuntime（\`run_script\` background、\`monitor\`、\`scheduler_*\`），避免阻塞主回合。
 - 显式工作流 / 多智能体 handoff **不是**普通产品路径。
 - 深入：\`references/agents-and-plugins.md\`。
 
@@ -955,7 +1015,7 @@ yarn cli:dev repl --cwd .
 - 记忆启用、注入、抽取、隐私 → \`references/memory.md\`
 - 本地数据布局、配置、环境变量 → \`references/config-and-data.md\`
 - 常见故障（无密钥、CLI 未运行、记忆为空） → \`references/troubleshooting.md\`
-- 智能体、插件、MCP → \`references/agents-and-plugins.md\`
+- 智能体、插件、MCP、TaskRuntime 工具 → \`references/agents-and-plugins.md\`
 `,
   },
   {
@@ -1121,6 +1181,7 @@ hip 可运行 **内置** LangGraph 智能体、将 **ACP 作为会话主智能�
 | hip MCP（会话内合并） | 有 | 无（规划：opt-in 转发） | 无（规划：opt-in 转发） |
 | 客户端 FS bridge | 不适用 | 无（仅 stub；真实 bridge 规划中） | 无（仅 stub；真实 bridge 规划中） |
 | dispatch / task / task_batch | 有 | 无 | 无 |
+| TaskRuntime（后台 shell / monitor / scheduler） | 有 | 无 | 无 |
 | 跨会话 Memory 注入 | 有 | 无（配置项预留；前缀规划中） | 无 |
 | Memory 抽取 | 有 | 无 | 无 |
 | hip 模型选择器 | 有 | 无（用 agent configOptions / 智能体侧模型 UI） | 无 |
@@ -1129,21 +1190,49 @@ hip 可运行 **内置** LangGraph 智能体、将 **ACP 作为会话主智能�
 
 **要点：** 选 ACP 作主智能体时，它是对等的编程智能体栈，**不是** hip 内置工具/技能/MCP。子智能体派发使用同一工具栈；主智能体与子智能体目前均无 hip memory 注入或 hip MCP。
 
-## 委派工具（主智能体）
+## 委派与 TaskRuntime 工具（主智能体）
 
 | 工具 | 用途 |
 |------|------|
 | \`task\` | 单个子任务（前台或后台） |
 | \`dispatch_agent\` | 命名花名册智能体；阻塞，除非同批多个调用 |
 | \`task_batch\` | **2+ 独立子任务的首选**（真并行） |
+| \`run_script\`（+ \`background:true\`） | Shell；长任务返回 \`task_id\` |
+| \`wait_tasks\` | 等待一个或多个后台 task id |
+| \`task_output\` | 读取目前输出（shell / agent / monitor） |
+| \`task_stop\` | 停止运行中的后台任务 |
+| \`monitor\` | 将 stdout 流式到 UI 事件（**不会**自动注入模型上下文） |
+| \`scheduler_create\` / \`scheduler_list\` / \`scheduler_delete\` | 周期唤醒（最短间隔 60s） |
 
-若只用顺序 dispatch，不要声称「并行」完成。
+若只用顺序 dispatch，不要声称「并行」完成。  
+长 shell / CI 不要在主回合 sleep 轮询——使用上表 TaskRuntime 工具。
+
+### Runtime 面板（UI）
+
+会话右侧面板合并 **Agents**（花名册 / 子智能体）与 **Runtime**（后台 shell、monitor、定时任务）。仍在运行的工作显示 chip；打开 Runtime 可查看或停止任务。
 
 ## 插件
 
 - 安装于 \`~/.hip/plugins/\`；注册表在 \`~/.hip/config/hip-plugins.json\`。
 - 插件可附带技能、智能体、MCP 配置与钩子。
 - 禁用插件会从会话中移除其贡献。
+
+### 插件市场（设置）
+
+hip 的插件市场页**仅**集成官方目录：
+
+| Source id | 目录 |
+|-----------|------|
+| \`grok-official\` | [xai-org/plugin-marketplace](https://github.com/xai-org/plugin-marketplace) |
+| \`claude-official\` | [anthropics/claude-plugins-official](https://github.com/anthropics/claude-plugins-official) |
+
+UI 标签：**Grok market** · **Claude market** · **Custom plugins**（无官方来源的本地安装）。
+
+- 目录缓存：\`~/.hip/cache/marketplaces/<sourceId>/\`
+- 源开关：\`~/.hip/config/marketplace-sources.json\`
+- 市场**下载**默认 \`enabled: false\`（已下载未启用）。
+- 下载时 sidecar **审查** agent \`boundModel\`；不可用模型会改写为产品默认（hip.toml 的 \`activeModel\`）。
+- 打开插件开关后注入技能/MCP/智能体（\`plugin:reload\`）。
 
 ### 插件目录结构
 
@@ -1239,12 +1328,13 @@ hip 可运行 **内置** LangGraph 智能体、将 **ACP 作为会话主智能�
   ],
 },
   'zh-TW': {
-  description: 'hip 桌面智能體產品說明：Chat/Code 介面、權限模式、設定、技能、外掛、MCP、記憶、智能體、CLI、故障排除與本機資料配置。當使用者詢問 hip 如何運作或如何設定時載入。',
+  description: 'hip 桌面智能體產品說明：Chat/Code/Knowledge 介面、權限模式、Agents+Runtime 面板、設定、技能、外掛、MCP、記憶、智能體、CLI、故障排除與本機資料配置。當使用者詢問 hip 如何運作或如何設定時載入。',
   capabilityMap: `產品要點（hip）：
 - 版本：1.0.1。
 - 桌面 AI 工作台智能體，在使用者專案中使用真實檔案工具，並可委派子智能體。
-- 介面：Code（完整工作台）與 Chat（較輕；可預覽交付物請 write_file 到工件面板）。
-- 權限：chat = 唯讀；edit = 專案沙箱（預設）；full = 使用者授權的整機檔案系統。
+- 介面：Code（完整工作台）與 Chat（較輕；可預覽交付物請 write_file 到工件面板）與 Knowledge（筆記空間）。
+- 僅在 Code 上，工具門禁（UI 標籤）：chat = 唯讀；edit = 專案沙箱（預設）；full = 使用者授權的整機檔案系統。Chat 介面不是 Code 的「edit 模式」。
+- 工作階段右側面板：Agents（名冊 / 子智能體）與 Runtime（後台 shell、monitor、排程）合併檢視。
 - API 金鑰：~/.hip/config/auth.json（依設計為 0600 明文）。
 - 跨工作階段記憶：預設關閉（設定 → 記憶）。
 - 本機資料：~/.hip/（設定、資料庫、技能、外掛、日誌）。`,
@@ -1272,8 +1362,9 @@ hip 是一款**桌面 AI 工作台**（Tauri 殼 + React UI + Node sidecar），
 
 | 介面 | 用途 |
 |------|------|
-| **Code** | 專案工作台：檔案工具、git 指導、MCP 目錄、完整智能體工具 |
+| **Code** | 專案工作台：檔案工具、git 指導、MCP 目錄、完整智能體工具、非同步 TaskRuntime |
 | **Chat** | 較輕的對話面：更短提示、無 git 提交指導；可預覽交付物請 \`write_file\` 到工作區以便工件面板展示 |
+| **Knowledge** | 筆記 / 知識空間助手：依使用者筆記作答；不是軟體專案的編碼智能體 |
 
 介面在 UI 中選擇；系統提示會反映目前介面。
 
@@ -1294,26 +1385,36 @@ edit/chat 下的路徑約定：以 \`/\` 開頭的專案根相對形式。不要
 - **提供者 / API 金鑰** — 明文保存在 \`~/.hip/config/auth.json\`（依設計為 0600）
 - **記憶** — 跨工作階段記憶**預設關閉**；在 設定 → 記憶 開啟（見 \`references/memory.md\`）
 - **技能** — 啟用/停用已安裝技能
-- **外掛** — 安裝/啟用外掛（技能、智能體、MCP、掛鉤）
+- **外掛** — 安裝/啟用外掛（技能、智能體、MCP、掛鉤）；設定中有外掛市集
 - **智能體** — 固定設定（supervisor / plan / explore / coder）與自訂內部或外部智能體
 - **網路原則** — 可選的出站工具允許/拒絕
 
+## 右側面板：Agents + Runtime
+
+每個工作階段的右側面板合併：
+
+- **Agents** — 名冊、活躍子智能體、委派狀態
+- **Runtime** — 後台 shell、monitor、排程（TaskRuntime）。仍在執行的工作顯示 chip；開啟面板可檢視輸出或停止任務
+
+長時間 shell、日誌監視與週期檢查應使用 TaskRuntime 工具。不要在主回合 sleep 輪詢。
+
 ## 技能、外掛、MCP
 
-- **技能**：Claude 格式 \`SKILL.md\`。全域：\`~/.hip/skills/<id>/\`。專案：\`.hip/skills/<id>/\`。
-- **外掛**：位於 \`~/.hip/plugins/\`。見 \`references/agents-and-plugins.md\`。
-- **MCP**：用 \`mcp_search\` 尋找，再呼叫 \`mcp__<server>__<tool>\`。
+- **技能**：Claude 格式 \`SKILL.md\` 資料夾。全域：\`~/.hip/skills/<id>/\`。專案：\`.hip/skills/<id>/\`。
+- **外掛**：位於 \`~/.hip/plugins/\`；可貢獻技能、智能體、MCP 與掛鉤。見 \`references/agents-and-plugins.md\`。
+- **MCP**：用 \`mcp_search\` 後呼叫 \`mcp__<server>__<tool>\`。
 
 ## 智能體與委派
 
 - 預設工作階段智能體決定何時用工具或委派。
 - 有專用名冊時優先：**explore**、**plan**、**coder**。
 - 多個獨立子任務 → 一次 \`task_batch\`。
+- 長時間 shell / CI / 週期工作 → TaskRuntime（\`run_script\` background、\`monitor\`、\`scheduler_*\`）。
 - 深入：\`references/agents-and-plugins.md\`。
 
 ## CLI（\`@hip/cli\`）
 
-僅附著到**已執行**的 hip 應用。應用未執行時 CLI 失敗並回傳 \`APP_NOT_RUNNING\`。
+僅附著到**已執行**的 hip 應用（共享 sidecar 與 \`~/.hip\` 資料）。不會啟動產品 sidecar。
 
 \`\`\`bash
 yarn cli:dev doctor
@@ -1323,16 +1424,18 @@ yarn cli:dev run --stream none --json "Reply with exactly: pong"
 yarn cli:dev repl --cwd .
 \`\`\`
 
+應用未執行時 CLI 失敗並回傳 \`APP_NOT_RUNNING\`。
+
 ## 專案指導檔
 
-專案中的 \`AGENTS.md\` / \`Claude.md\` / \`.hip\` 等描述**專案**約定；本技能描述**產品**行為。
+專案中若存在 \`AGENTS.md\` / \`Claude.md\` / \`.hip\` 等，hip 可能注入。**專案**約定優先；本技能描述**產品**行為。
 
 ## Level 3 參考
 
 - 記憶 → \`references/memory.md\`
 - 本機資料與設定 → \`references/config-and-data.md\`
-- 故障排除 → \`references/troubleshooting.md\`
-- 智能體與外掛 → \`references/agents-and-plugins.md\`
+- 疑難排解 → \`references/troubleshooting.md\`
+- 智能體、外掛、MCP、TaskRuntime → \`references/agents-and-plugins.md\`
 `,
   },
   {
@@ -1440,6 +1543,8 @@ SQLite（\`memory_items\`）結構化條目：偏好、約定、教訓、工作�
 
 ## 內建智能體設定
 
+常見固定設定（在智能體 UI 中啟用/停用）：
+
 | 設定 | 角色 |
 |------|------|
 | **supervisor** | 預設編排：工具、提交、腳本、委派 |
@@ -1452,56 +1557,124 @@ SQLite（\`memory_items\`）結構化條目：偏好、約定、教訓、工作�
 
 支援的 ACP preset（設定 → 智能體 → 新增 ACP）：**OpenCode**、**Grok Build**（\`grok agent stdio\`）、**Pi**、**Claude Code**、**Codex**。Grok Build 為原生 ACP（安裝見 \`https://x.ai/cli\`）；認證用 \`grok login\` 或可選 \`XAI_API_KEY\`。
 
-ACP 智能體的認證與模型為**自管**：hip **不會**將自身 provider 的 API key 注入 ACP 子行程。請使用智能體自身登入 / 環境變數 / 預設可選的 \`authEnvVar\`。
+ACP 智能體的認證與模型為**自管**：hip **不會**將自身 provider 的 API key 注入 ACP 子行程。
 
 ## 能力矩陣（內建 vs ACP）
 
-hip 可執行 **內建** LangGraph 智能體、將 **ACP 作為工作階段主智能體**，或 **派發 ACP 作為子智能體**。能力不同（目前產品；規劃中的 host 能力另行標註）：
-
 | 能力 | 內建主智能體 | ACP 主智能體 | ACP 子智能體（dispatch） |
 |------|--------------|--------------|--------------------------|
-| hip 內建工具（read / write / run_script …） | 有 | 無（智能體自有工具） | 無（智能體自有工具） |
+| hip 內建工具（read / write / run_script …） | 有 | 無（智能體自有工具） | 無 |
 | hip Skills / 外掛鉤子 | 有 | 無 | 無 |
-| hip MCP（工作階段內合併） | 有 | 無（規劃：opt-in 轉發） | 無（規劃：opt-in 轉發） |
-| 用戶端 FS bridge | 不適用 | 無（僅 stub；真實 bridge 規劃中） | 無（僅 stub；真實 bridge 規劃中） |
+| hip MCP | 有 | 無（規劃：opt-in 轉發） | 無 |
+| 用戶端 FS bridge | 不適用 | 無（僅 stub） | 無 |
 | dispatch / task / task_batch | 有 | 無 | 無 |
-| 跨工作階段 Memory 注入 | 有 | 無（設定項預留；前綴規劃中） | 無 |
+| TaskRuntime（後台 shell / monitor / scheduler） | 有 | 無 | 無 |
+| 跨工作階段 Memory 注入 | 有 | 無 | 無 |
 | Memory 擷取 | 有 | 無 | 無 |
-| hip 模型選擇器 | 有 | 無（用 agent configOptions / 智能體側模型 UI） | 無 |
+| hip 模型選擇器 | 有 | 無 | 無 |
 | HITL 權限 | hip 工具門禁 | ACP \`requestPermission\` | 同 ACP 主智能體 |
-| permissionMode | hip 工具門禁 | chat/edit 下安全 kind（read/fetch/other）自動放行；其餘 HITL（ACP 路徑上 \`full\` 亦為 HITL） | 繼承父工作階段 mode |
+| permissionMode | hip 工具門禁 | chat/edit 安全 kind 自動放行；其餘 HITL | 繼承父工作階段 |
 
-**重點：** 選 ACP 作主智能體時，它是對等的程式智能體堆疊，**不是** hip 內建工具／技能／MCP。子智能體派發使用同一工具堆疊；主智能體與子智能體目前均無 hip memory 注入或 hip MCP。
+**重點：** 選 ACP 作主智能體時，它是對等程式智能體堆疊，**不是** hip 內建工具／技能／MCP。
 
-## 委派工具
+## 委派與 TaskRuntime 工具（主智能體）
 
 | 工具 | 用途 |
 |------|------|
-| \`task\` | 單個子任務 |
+| \`task\` | 單個子任務（前台或後台） |
 | \`dispatch_agent\` | 名冊智能體（通常阻塞） |
 | \`task_batch\` | **2+ 獨立子任務首選**（真平行） |
+| \`run_script\`（+ \`background:true\`） | Shell；長任務回傳 \`task_id\` |
+| \`wait_tasks\` | 等待一個或多個後台 task id |
+| \`task_output\` | 讀取目前輸出 |
+| \`task_stop\` | 停止後台任務 |
+| \`monitor\` | stdout 串流為 UI 事件（**不**自動注入模型） |
+| \`scheduler_create\` / \`scheduler_list\` / \`scheduler_delete\` | 週期喚醒（最短 60s） |
 
-## 外掛與 MCP
+不要在主回合 sleep 輪詢長 shell / CI。
 
-- 外掛：\`~/.hip/plugins/\`；登錄 \`~/.hip/config/hip-plugins.json\`。
-- MCP：\`mcp_search\` 後呼叫 \`mcp__<server>__<tool>\`。
+### Runtime 面板（UI）
+
+工作階段右側面板合併 **Agents** 與 **Runtime**。仍在執行的工作顯示 chip。
+
+## 外掛
+
+- 安裝於 \`~/.hip/plugins/\`；登錄 \`~/.hip/config/hip-plugins.json\`。
+- 外掛可附帶技能、智能體、MCP、掛鉤。
+
+### 外掛市集（設定）
+
+僅整合官方目錄：
+
+| Source id | 目錄 |
+|-----------|------|
+| \`grok-official\` | [xai-org/plugin-marketplace](https://github.com/xai-org/plugin-marketplace) |
+| \`claude-official\` | [anthropics/claude-plugins-official](https://github.com/anthropics/claude-plugins-official) |
+
+UI：**Grok market** · **Claude market** · **Custom plugins**。
+
+- 快取：\`~/.hip/cache/marketplaces/<sourceId>/\`
+- 源開關：\`~/.hip/config/marketplace-sources.json\`
+- 下載預設 \`enabled: false\`；下載時會審查 \`boundModel\`。
+- 開啟開關後注入貢獻（\`plugin:reload\`）。
+
+### 外掛目錄結構
+
+每個外掛**必須**有 \`.plugin/plugin.json\`：
+
+\`\`\`
+~/.hip/plugins/<plugin-id>/
+  .plugin/
+    plugin.json
+  skills/
+    <skill-id>/
+      SKILL.md
+\`\`\`
+
+### \`.plugin/plugin.json\`
+
+至少需要 \`name\`、\`version\`。可選：\`skills\`、\`mcpServers\`、\`agents\`、\`hooks\` 等。
+
+### \`hip-plugins.json\`
+
+建議字串陣列格式：
+
+\`\`\`json
+{
+  "plugins": ["/absolute/path/to/plugin"],
+  "entries": [],
+  "enabled": { "my-plugin": true }
+}
+\`\`\`
+
+## MCP
+
+- 設定來自 hip.toml / 外掛合成。
+- 用 \`mcp_search\`，再呼叫 \`mcp__<server>__<tool>\`。
+- 網路原則可能封鎖出站 MCP/web。
 
 ## 技能作用域
 
-全域 \`~/.hip/skills/\`、專案 \`.hip/skills/\`、外掛目錄、內建 \`~/.hip/builtin-skills/hip/\`（優先權最低）。
+| 作用域 | 位置 |
+|--------|------|
+| global | \`~/.hip/skills/<id>/\` |
+| project | \`.hip/skills/<id>/\`（同 id 覆蓋 global） |
+| plugin | 外掛自有技能目錄 |
+| 內建產品 | \`~/.hip/builtin-skills/hip/\`（優先權最低） |
 `,
   }
   ],
 },
   ja: {
-  description: 'hip デスクトップエージェントの製品ヘルプ：Chat/Code サーフェス、権限モード、設定、スキル、プラグイン、MCP、メモリ、エージェント、CLI、トラブルシューティング、ローカルデータ。ユーザーが hip の仕組みや設定方法を尋ねたときに読み込みます。',
-  capabilityMap: `製品要点（hip）：
+  description: 'hip デスクトップエージェントの製品ヘルプ：Chat/Code/Knowledge サーフェス、権限モード、Agents+Runtime パネル、設定、スキル、プラグイン、MCP、メモリ、エージェント、CLI、トラブルシューティング、ローカルデータ。ユーザーが hip の仕組みや設定方法を尋ねたときに読み込みます。',
+  capabilityMap: `製品の要点（hip）：
 - バージョン：1.0.1。
-- ユーザーのプロジェクト内で実ファイルツールと任意のサブエージェントを使うデスクトップ AI ワークベンチエージェント。
-- サーフェス：Code（フルワークベンチ）と Chat（軽量；プレビュー可能な成果物は write_file でアーティファクトへ）。
-- Code のみのツールゲート（UI ラベル）：chat = 読み取り専用；edit = プロジェクトサンドボックス（既定）；full = ユーザー許可のファイルシステム全体。Chat サーフェスは Code の「編集モード」ではない。
+- ユーザーのプロジェクトで実ファイルツールと任意のサブエージェントを使うデスクトップ作業台エージェント。
+- サーフェス：Code（フル作業台）vs Chat（軽量；プレビュー可能な成果物は write_file でアーティファクト）vs Knowledge（ノート空間）。
+- Code のみのツールゲート（UI ラベル）：chat = 読み取り専用；edit = プロジェクトサンドボックス（既定）；full = ユーザー許可の全 FS。Chat は Code の「edit モード」ではない。
+- セッション右パネル：Agents（名簿 / サブエージェント）+ Runtime（バックグラウンド shell、monitor、スケジュール）の統合ビュー。
 - API キー：~/.hip/config/auth.json（設計上 0600 平文）。
-- セッション横断メモリ：既定オフ（設定 → メモリ）。
+- クロスセッション記憶：既定オフ（設定 → メモリ）。
 - ローカルデータ：~/.hip/（設定、DB、スキル、プラグイン、ログ）。`,
   sections: [
   {
@@ -1509,67 +1682,74 @@ hip 可執行 **內建** LangGraph 智能體、將 **ACP 作為工作階段主�
     titleKey: 'settings.productHelp.sections.overview',
     markdown: `# hip
 
-hipは**デスクトップAIワークベンチ**（Tauriシェル + React UI + Nodeサイドカー）であり、製品バージョンは**1.0.1**です。各UIタブは独立したセッションです。デフォルトの製品ループは、ツールを使用し、\`task\` / \`dispatch_agent\` / \`task_batch\` で委譲を行う可能性のある**Supervisor ReAct**エージェントです。通常のターンで強制的なPlanner → Coder → Reviewerパイプラインはありません。
+hip は**デスクトップ AI 作業台**（Tauri シェル + React UI + Node sidecar）、製品バージョン **1.0.1** です。各 UI タブは独立セッションです。既定の製品ループは **Supervisor ReAct** エージェントで、ツールを使い \`task\` / \`dispatch_agent\` / \`task_batch\` で委任できます。通常ターンに Planner → Coder → Reviewer 強制パイプラインはありません。
 
-このスキルは、*hip自体*のための信頼できる製品ガイドです。ユーザーのプロジェクトでの通常のコーディング作業には、このスキルを**ロードしないでください**。
+このスキルは *hip 製品そのもの* の公式ガイドです。ユーザープロジェクトの通常コーディングでは **読み込まない** でください。
 
-製品に関する質問には**ユーザーの言語**（例：ユーザーが中国語で書いた場合は中国語）で回答しますが、設定パスと識別子は正確に保ちます。
+製品の質問には**ユーザーの言語**で答え、設定パスと識別子は原文のまま正確に。
 
-## 段階的な開示
+## 段階的開示
 
-- **レベル1**（システムプロンプトのスキル一覧）：名前と説明のみ
-- **レベル2**（このファイル）：以下の概要。\`use_skill({ name: "hip" })\` でロード
-- **レベル3**：\`references/\` 内のより深いトピック。必要に応じて \`read_file\` でこれらの絶対パスを読み取ります
+- **Level 1**（システムプロンプト Skills 一覧）：名前 + 説明のみ
+- **Level 2**（本ファイル）：\`use_skill({ name: "hip" })\` で読み込む概要
+- **Level 3**：\`references/\` — 必要時 \`read_file\` で絶対パスを読む
 
-製品の詳細がここに文書化されていない場合は、UIラベルや設定キーをでっち上げるのではなく、その旨を伝えてください。
+ここに無い製品詳細は創作せず「不明」と述べる。
 
 ## サーフェス
 
-| サーフェス | 意図 |
-|---------|--------|
-| **コード** | プロジェクトワークベンチ：ファイルツール、gitガイダンス、MCPカタログ、完全なエージェントツール |
-| **チャット** | より軽量な会話サーフェス：短いプロンプト、git-commitガイダンスなし、プレビュー可能な成果物（\`page.html\`、\`notes.md\`、SVGなど）を作業スペースに書き込んでアーティファクトパネルに表示することを推奨 |
+| サーフェス | 用途 |
+|------------|------|
+| **Code** | プロジェクト作業台：ファイルツール、git 指針、MCP カタログ、フルツール、非同期 TaskRuntime |
+| **Chat** | 軽量会話：短いプロンプト、git コミット指針なし；プレビュー可能な成果物は \`write_file\` |
+| **Knowledge** | ノート空間アシスタント；ソフトウェアプロジェクトのコーディングエージェントではない |
 
-サーフェスはUIで選択されます。システムプロンプトは既にアクティブなサーフェスを反映しています。
+サーフェスは UI で選択；システムプロンプトが反映済み。
 
 ## 権限モード
 
 | モード | 効果 |
-|------|--------|
-| **編集**（デフォルト） | ファイルシステムツールはプロジェクトルートにサンドボックス化されます |
-| **チャット** | 読み取り専用：書き込み/編集/スクリプト/gitの変更は不可 |
-| **フル** | サンドボックス化されていないファイルシステム（ユーザー許可済み）。絶対パスを推奨 |
+|--------|------|
+| **edit**（既定） | プロジェクトルートにサンドボックス |
+| **chat** | 読み取り専用（書き込み/スクリプト不可） |
+| **full** | サンドボックスなし（ユーザー許可）；絶対パス推奨 |
 
-編集/チャットでのパス規則：\`/\` で始まるプロジェクトルート形式（例：\`/src/index.ts\` は \`<cwd>/src/index.ts\` にマッピングされます）。シェルツール名をでっち上げないでください。利用可能な場合は \`run_script\` を使用してください。
+edit/chat のパスは \`/\` 始まりのプロジェクト相対。シェルツール名を発明せず \`run_script\` を使う。
 
-## 設定（デスクトップUI）
+## 設定（デスクトップ UI）
 
-一般的な設定項目（UIでの表記は若干異なる場合があります）：
+- **プロバイダ / API キー** — \`~/.hip/config/auth.json\`（0600 平文）
+- **メモリ** — クロスセッションは**既定オフ**（設定 → メモリ）
+- **スキル** — インストール済みスキルの有効/無効
+- **プラグイン** — インストール/有効化；設定に Plugin Market
+- **エージェント** — supervisor / plan / explore / coder とカスタム
+- **ネットワークポリシー** — 出方向ツールの許可/拒否
 
-- **プロバイダー / APIキー** — \`~/.hip/config/auth.json\` に平文で保存（設計上、モード0600）
-- **メモリ** — セッション間メモリは**デフォルトでオフ**。設定 → メモリで有効化（\`references/memory.md\` を参照）
-- **スキル** — インストール済みスキルの有効/無効化（\`hip.toml\` + スキルフォルダ）
-- **プラグイン** — プラグインのインストール/有効化（スキル、エージェント、MCP、フック）
-- **エージェント** — 固定プロファイル（supervisor / plan / explore / coder）とカスタムの内部または外部エージェント
-- **ネットワークポリシー** — アウトバウンドツールのオプションの許可/拒否
+## 右パネル：Agents + Runtime
 
-## スキル、プラグイン、MCP
+セッション右パネルは次を統合：
 
-- **スキル**：\`SKILL.md\` を含むClaude形式のフォルダ。グローバル：\`~/.hip/skills/<id>/\`。プロジェクト：\`.hip/skills/<id>/\`。段階的な開示：L1メタデータ → \`use_skill\` 本文 → \`references/\` + \`assets/\`。
-- **プラグイン**：\`~/.hip/plugins/\` 以下。スキル、エージェント、MCPサーバー、フックを提供できます。\`references/agents-and-plugins.md\` を参照。
-- **MCP**：設定されたサーバーがツールを公開します。コードサーフェスでは、システムプロンプトがカタログを一覧表示する場合があります。\`mcp_search\` を使用してから、名前空間付きツール \`mcp__<server>__<tool>\` を呼び出します。
+- **Agents** — 名簿、サブエージェント、委任状態
+- **Runtime** — バックグラウンド shell、monitor、スケジュール。実行中は chip 表示
 
-## エージェントと委譲
+長時間 shell / CI / 定期チェックは TaskRuntime ツールを使う。メインターンで sleep ポールしない。
 
-- デフォルトのセッションエージェントは、ツールを使用するか委譲するかを決定します。
-- 利用可能な場合は、専門化されたロスターエージェントを優先します：**explore**（読み取り専用検索）、**plan**（設計のみ）、**coder**（実装）。
-- 並列の独立したサブタスク → 1つの \`task_batch\`（順次 \`dispatch_agent\` ではありません）。
-- 明示的なワークフロー/マルチエージェントハンドオフは存在しますが、通常の製品パスでは**ありません**。
+## スキル・プラグイン・MCP
+
+- **スキル**：\`SKILL.md\` フォルダ。グローバル \`~/.hip/skills/\`、プロジェクト \`.hip/skills/\`。
+- **プラグイン**：\`~/.hip/plugins/\`。詳細は \`references/agents-and-plugins.md\`。
+- **MCP**：\`mcp_search\` 後 \`mcp__<server>__<tool>\`。
+
+## エージェントと委任
+
+- 専用名簿を優先：explore / plan / coder。
+- 独立サブタスク 2+ → 一度の \`task_batch\`。
+- 長時間作業 → TaskRuntime（\`run_script\` background、\`monitor\`、\`scheduler_*\`）。
 - 詳細：\`references/agents-and-plugins.md\`。
 
 ## CLI（\`@hip/cli\`）
 
-**実行中の** hipアプリにアタッチするだけのコンパニオン（共有サイドカー + \`~/.hip\` データ）。製品サイドカーを起動しません。
+**起動済み** hip アプリへのアタッチ専用（共有 sidecar + \`~/.hip\`）。製品 sidecar は起動しない。
 
 \`\`\`bash
 yarn cli:dev doctor
@@ -1579,20 +1759,18 @@ yarn cli:dev run --stream none --json "Reply with exactly: pong"
 yarn cli:dev repl --cwd .
 \`\`\`
 
-アプリが実行されていない場合、CLIは \`APP_NOT_RUNNING\` で失敗します。
+アプリ未起動時は \`APP_NOT_RUNNING\`。
 
-## プロジェクトガイダンスファイル
+## プロジェクト指導ファイル
 
-プロジェクトに存在する場合、hipは \`AGENTS.md\` / \`Claude.md\` / \`.hip\` 設定などのガイダンスを注入することがあります。**プロジェクト**の規約についてはこれらに従うことを優先します。このスキルは**製品**の動作に関するものです。
+\`AGENTS.md\` / \`Claude.md\` / \`.hip\` があれば製品より**プロジェクト**規約を優先。
 
-## レベル3のリファレンス
+## Level 3 参照
 
-このスキルをロードした後、\`use_skill\` は絶対パスを返します。ユーザーが詳細を必要とする場合：
-
-- メモリの有効化、注入、抽出、プライバシー → \`references/memory.md\`
-- ローカルデータレイアウト、設定ファイル、環境変数の上書き → \`references/config-and-data.md\`
-- 一般的な障害（キーがない、CLIが実行されていない、メモリが空） → \`references/troubleshooting.md\`
-- エージェント、プラグイン、MCPの配線 → \`references/agents-and-plugins.md\`
+- メモリ → \`references/memory.md\`
+- 設定とデータ → \`references/config-and-data.md\`
+- トラブルシュート → \`references/troubleshooting.md\`
+- エージェント・プラグイン・MCP・TaskRuntime → \`references/agents-and-plugins.md\`
 `,
   },
   {
@@ -1737,89 +1915,126 @@ SQLite（\`memory_items\`）内の構造化アイテム：設定、慣習、教�
   {
     id: 'agents',
     titleKey: 'settings.productHelp.sections.agents',
-    markdown: `# hip エージェント、プラグイン & MCP (レベル 3)
+    markdown: `# hip エージェント、プラグイン & MCP（Level 3）
 
 ## 組み込みエージェントプロファイル
 
-典型的な固定プロファイル（エージェントUIで有効化/無効化）：
-
 | プロファイル | 役割 |
-|---------|------|
-| **supervisor** | デフォルトオーケストレーター：ツール、コミット、スクリプト、委任 |
-| **plan** | 設計/計画指向（設定によって書き込み姿勢が狭まる） |
-| **explore** | 読み取り専用のコードベース検索 |
-| **coder** | スクリプトを使用した実装重視 |
+|--------------|------|
+| **supervisor** | 既定オーケストレータ：ツール、コミット、スクリプト、委任 |
+| **plan** | 設計 / 計画向き |
+| **explore** | 読み取り専用コード検索 |
+| **coder** | 実装寄り（スクリプト可） |
 
-カスタム **内部** エージェント：ペルソナプロンプト + バインドモデル + ツール権限。  
-**外部 / ACP** エージェント：別プロセス；設定されていない限り、製品メモリはデフォルトでオフ。
+**内部**エージェント：ペルソナ + モデル + ツール権限。  
+**外部 / ACP**：別プロセス；製品メモリは既定オフ。
 
-サポートされているACPプリセット（設定 → エージェント → ACPエージェント追加）：**OpenCode**、**Grok Build**（\`grok agent stdio\`）、**Pi**、**Claude Code**、**Codex**。Grok BuildはネイティブACPを使用（\`https://x.ai/cli\`からインストール）；認証は\`grok login\`またはオプションの\`XAI_API_KEY\`を介して行います。
+対応 ACP プリセット（設定 → エージェント → ACP 追加）：**OpenCode**、**Grok Build**（\`grok agent stdio\`）、**Pi**、**Claude Code**、**Codex**。Grok Build はネイティブ ACP（\`https://x.ai/cli\`）；認証は \`grok login\` または任意の \`XAI_API_KEY\`。
 
-ACPエージェントは認証とモデルを**自己管理**します：hipはACP子プロセスに自身のプロバイダAPIキーを注入しません。エージェント設定で、エージェント自身のログイン/環境変数/オプションのプリセット\`authEnvVar\`を使用します。
+ACP の認証とモデルは**自己管理**：hip は provider API キーを ACP 子プロセスに注入しません。
 
 ## 機能マトリックス（組み込み vs ACP）
 
-hipは**組み込み**のLangGraphエージェント、セッションのプライマリとしての**ACPエージェント**、またはサブエージェントとしての**ACPエージェントのディスパッチ**を実行できます。機能は異なります（現在の製品；関連する計画中のホスト作業は注記）：
+| 機能 | 組み込み primary | ACP primary | ACP サブ（dispatch） |
+|------|------------------|-------------|----------------------|
+| hip ツール（read / write / run_script …） | あり | なし | なし |
+| hip Skills / プラグインフック | あり | なし | なし |
+| hip MCP | あり | なし（計画: opt-in 転送） | なし |
+| クライアント FS bridge | n/a | なし（stub） | なし |
+| dispatch / task / task_batch | あり | なし | なし |
+| TaskRuntime（bg shell / monitor / scheduler） | あり | なし | なし |
+| クロスセッション Memory 注入 | あり | なし | なし |
+| Memory 抽出 | あり | なし | なし |
+| hip モデル選択 | あり | なし | なし |
+| HITL | hip ツール | ACP \`requestPermission\` | 同 ACP primary |
+| permissionMode | hip ゲート | chat/edit で安全 kind 自動；他は HITL | 親セッション継承 |
 
-| 機能 | 組み込みプライマリ | ACPプライマリ | ACPサブエージェント（ディスパッチ） |
-|------------|------------------|-------------|-------------------------|
-| hipツール（read / write / run_script / …） | はい | いいえ（エージェント自身のツール） | いいえ（エージェント自身のツール） |
-| hipスキル / プラグインフック | はい | いいえ | いいえ |
-| hip MCP（セッションにマージ） | はい | いいえ（計画中：オプトイン転送） | いいえ（計画中：オプトイン転送） |
-| クライアントFSブリッジ | 該当なし | いいえ（スタブのみ；実際のブリッジは計画中） | いいえ（スタブのみ；実際のブリッジは計画中） |
-| dispatch / task / task_batch | はい | いいえ | いいえ |
-| メモリ注入（セッション間） | はい | いいえ（設定フラグは予約済み；プレフィックスは計画中） | いいえ |
-| メモリ抽出 | はい | いいえ | いいえ |
-| hipモデルピッカー | はい | いいえ（エージェントconfigOptions / エージェントモデルUI） | いいえ |
-| HITL許可 | hipツール | ACP \`requestPermission\` | ACPプライマリと同じ |
-| permissionMode | hipツールゲート | チャット/編集で安全な種類（read/fetch/other）を自動解決；それ以外はHITL（\`full\`はACPパスでもHITL） | 親セッションモード |
+**要点:** ACP を primary にすると hip 組み込みツール/スキル/MCP ではなく、対等な別スタックになる。
 
-**要点：** ACPをプライマリとして選択することは、独自のスタックを持つピアコーディングエージェントであり、hipの組み込みツール/スキル/MCPではありません。サブエージェントディスパッチは同じエージェントスタックを使用します；プライマリもサブエージェントも現在、hipメモリ注入またはhip MCPを取得しません。
+## 委任 & TaskRuntime ツール（メインエージェント）
 
-## 委任ツール（メインエージェント）
+| ツール | 用途 |
+|--------|------|
+| \`task\` | 単一サブタスク（fg / background） |
+| \`dispatch_agent\` | 名簿エージェント |
+| \`task_batch\` | **2+ 独立サブタスク推奨**（真並列） |
+| \`run_script\`（+ \`background:true\`） | シェル；長時間は \`task_id\` |
+| \`wait_tasks\` | バックグラウンド id 待ち |
+| \`task_output\` | これまでの出力を読む |
+| \`task_stop\` | 実行中タスク停止 |
+| \`monitor\` | stdout を UI イベントとして配信（モデルへ自動注入しない） |
+| \`scheduler_create\` / \`list\` / \`delete\` | 定期起動（最短 60s） |
 
-| ツール | 使用法 |
-|------|-----|
-| \`task\` | 1つのサブタスク（フォアグラウンドまたはバックグラウンド） |
-| \`dispatch_agent\` | 名前付きロスターエージェント；並列ツール呼び出しがない限りブロッキング |
-| \`task_batch\` | **推奨** 2つ以上の独立したサブタスク（真の並列処理） |
+メインターンで長時間 shell/CI を sleep ポールしない。
 
-逐次ディスパッチのみを使用した場合、作業が「並列に」実行されたと主張しないでください。
+### Runtime パネル（UI）
+
+セッション右パネルは **Agents** と **Runtime** を統合。実行中は chip 表示。
 
 ## プラグイン
 
-- \`~/.hip/plugins/\` の下にインストール；レジストリは \`~/.hip/config/hip-plugins.json\`。
-- プラグインはスキル、エージェント、MCPサーバー設定、フックを提供できます。
-- プラグインを無効にすると、その貢献がセッションから削除されます。
+- 配置: \`~/.hip/plugins/\`；レジストリ \`~/.hip/config/hip-plugins.json\`。
+- スキル、エージェント、MCP、フックを同梱可。
+
+### Plugin Market（設定）
+
+公式カタログのみ:
+
+| Source id | Catalog |
+|-----------|---------|
+| \`grok-official\` | [xai-org/plugin-marketplace](https://github.com/xai-org/plugin-marketplace) |
+| \`claude-official\` | [anthropics/claude-plugins-official](https://github.com/anthropics/claude-plugins-official) |
+
+UI: **Grok market** · **Claude market** · **Custom plugins**。
+
+- キャッシュ: \`~/.hip/cache/marketplaces/<sourceId>/\`
+- ソース切替: \`~/.hip/config/marketplace-sources.json\`
+- ダウンロード既定 \`enabled: false\`；\`boundModel\` をレビュー。
+
+### プラグインディレクトリ
+
+必須: \`.plugin/plugin.json\`（少なくとも \`name\` / \`version\`）。
+
+### \`hip-plugins.json\`
+
+推奨（文字列配列）:
+
+\`\`\`json
+{
+  "plugins": ["/absolute/path/to/plugin"],
+  "entries": [],
+  "enabled": { "my-plugin": true }
+}
+\`\`\`
 
 ## MCP
 
-- サーバー設定は hip.toml / プラグイン合成から取得されます。
-- コードサーフェスは短いカタログを注入する場合があります；\`mcp_search\` で発見します。
-- ツールは \`mcp__<server>__<tool>\` として呼び出します。
-- ネットワークポリシー（設定されている場合）は、アウトバウンドMCP/Webツールをブロックする場合があります。
+- hip.toml / プラグイン合成。
+- \`mcp_search\` 後 \`mcp__<server>__<tool>\`。
+- ネットワークポリシーが出方向を遮断する場合あり。
 
 ## スキルスコープ
 
 | スコープ | 場所 |
-|-------|------|
-| グローバル | \`~/.hip/skills/<id>/\` |
-| プロジェクト | \`.hip/skills/<id>/\`（同じIDのグローバルより優先） |
-| プラグイン | プラグイン所有のスキルディレクトリ |
-| 組み込み製品 | \`~/.hip/builtin-skills/hip/\`（最低優先度；同じIDで上書き可能） |
+|----------|------|
+| global | \`~/.hip/skills/<id>/\` |
+| project | \`.hip/skills/<id>/\` |
+| plugin | プラグイン内 |
+| builtin | \`~/.hip/builtin-skills/hip/\`（最低優先） |
 `,
   }
   ],
 },
   ko: {
-  description: 'hip 데스크톱 에이전트 제품 도움말: Chat/Code 서피스, 권한 모드, 설정, 스킬, 플러그인, MCP, 메모리, 에이전트, CLI, 문제 해결, 로컬 데이터. 사용자가 hip 작동 방식이나 설정 방법을 물을 때 로드합니다.',
-  capabilityMap: `제품 요점(hip):
+  description: 'hip 데스크톱 에이전트 제품 도움말: Chat/Code/Knowledge 서피스, 권한 모드, Agents+Runtime 패널, 설정, 스킬, 플러그인, MCP, 메모리, 에이전트, CLI, 문제 해결, 로컬 데이터. 사용자가 hip 작동 방식이나 설정 방법을 물을 때 로드합니다.',
+  capabilityMap: `제품 요약（hip）：
 - 버전: 1.0.1.
-- 사용자 프로젝트에서 실제 파일 도구와 선택적 서브 에이전트를 쓰는 데스크톱 AI 워크벤치 에이전트.
-- 서피스: Code(전체 워크벤치) vs Chat(가벼움; 미리보기 가능한 결과물은 write_file로 아티팩트).
-- Code 전용 도구 게이트(UI 라벨): chat = 읽기 전용; edit = 프로젝트 샌드박스(기본); full = 사용자가 허용한 전체 파일시스템. Chat 서피스는 Code의 "편집 모드"가 아님.
+- 사용자 프로젝트에서 실제 파일 도구와 선택적 서브에이전트를 쓰는 데스크톱 작업대 에이전트.
+- 서피스: Code(전체 작업대) vs Chat(가벼움; 미리보기 산출물은 write_file로 아티팩트) vs Knowledge(노트 공간).
+- Code에서만 도구 게이트(UI 라벨): chat = 읽기 전용; edit = 프로젝트 샌드박스(기본); full = 사용자 허용 전체 FS. Chat 서피스는 Code "edit 모드"가 아님.
+- 세션 오른쪽 패널: Agents(명단/서브에이전트) + Runtime(백그라운드 shell, monitor, 스케줄) 통합 뷰.
 - API 키: ~/.hip/config/auth.json (설계상 0600 평문).
-- 세션 간 메모리: 기본 꺼짐(설정 → 메모리).
+- 교차 세션 메모리: 기본 꺼짐(설정 → 메모리).
 - 로컬 데이터: ~/.hip/(설정, DB, 스킬, 플러그인, 로그).`,
   sections: [
   {
@@ -1827,67 +2042,74 @@ hipは**組み込み**のLangGraphエージェント、セッションのプラ�
     titleKey: 'settings.productHelp.sections.overview',
     markdown: `# hip
 
-hip은 **데스크톱 AI 작업대**(Tauri 셸 + React UI + Node 사이드카)이며, 제품 버전은 **1.0.1**입니다. 각 UI 탭은 독립적인 세션입니다. 기본 제품 루프는 도구를 사용하고 \`task\` / \`dispatch_agent\` / \`task_batch\`로 위임할 수 있는 **Supervisor ReAct** 에이전트입니다. 일반적인 턴에서 Planner → Coder → Reviewer 파이프라인이 강제되지 않습니다.
+hip은 **데스크톱 AI 작업대**(Tauri 셸 + React UI + Node sidecar)이며 제품 버전 **1.0.1**입니다. 각 UI 탭은 독립 세션입니다. 기본 제품 루프는 **Supervisor ReAct** 에이전트로 도구를 쓰고 \`task\` / \`dispatch_agent\` / \`task_batch\`로 위임할 수 있습니다. 일반 턴에 Planner → Coder → Reviewer 강제 파이프라인은 없습니다.
 
-이 스킬은 *hip 자체*에 대한 권위 있는 제품 가이드입니다. 사용자 프로젝트의 일반 코딩 작업에는 이 스킬을 **로드하지 마십시오**.
+이 스킬은 *hip 제품 자체*의 공식 가이드입니다. 사용자 프로젝트의 일반 코딩 작업에는 **로드하지 마세요**.
 
-제품 질문은 **사용자의 언어**(예: 사용자가 중국어로 작성한 경우 중국어)로 답변하되, 설정 경로와 식별자는 정확하게 유지하십시오.
+제품 질문은 **사용자 언어**로 답하고, 설정 경로·식별자는 원문 그대로 유지하세요.
 
 ## 점진적 공개
 
-- **레벨 1**(시스템 프롬프트 Skills 목록): 이름 + 설명만
-- **레벨 2**(이 파일): 아래 개요, \`use_skill({ name: "hip" })\`를 통해 로드됨
-- **레벨 3**: \`references/\`의 심화 주제 — 필요 시 \`read_file\`로 해당 절대 경로를 읽으십시오
+- **Level 1**(시스템 프롬프트 Skills 목록): 이름 + 설명만
+- **Level 2**(이 파일): \`use_skill({ name: "hip" })\`로 로드
+- **Level 3**: \`references/\` — 필요 시 \`read_file\`로 절대 경로 읽기
 
-제품 세부 사항이 여기에 문서화되지 않은 경우, UI 레이블이나 설정 키를 임의로 만들지 말고 그렇게 명시하십시오.
+여기 없는 제품 세부사항은 지어내지 말고 모른다고 말하세요.
 
-## 표면
+## 서피스
 
-| 표면 | 의도 |
-|---------|--------|
-| **Code** | 프로젝트 작업대: 파일 도구, git 안내, MCP 카탈로그, 전체 에이전트 도구 |
-| **Chat** | 가벼운 대화 표면: 짧은 프롬프트, git-커밋 안내 없음, 아티팩트 패널을 위해 미리보기 가능한 결과물(\`page.html\`, \`notes.md\`, SVG 등)을 작업 공간에 작성 선호 |
+| 서피스 | 용도 |
+|--------|------|
+| **Code** | 프로젝트 작업대: 파일 도구, git 가이드, MCP 카탈로그, 전체 도구, 비동기 TaskRuntime |
+| **Chat** | 가벼운 대화: 짧은 프롬프트, git 커밋 가이드 없음; 미리보기 산출물은 \`write_file\` |
+| **Knowledge** | 노트 공간 어시스턴트; 소프트웨어 프로젝트 코딩 에이전트가 아님 |
 
-표면은 UI에서 선택되며, 시스템 프롬프트는 이미 활성 표면을 반영합니다.
+서피스는 UI에서 선택되며 시스템 프롬프트에 반영됩니다.
 
 ## 권한 모드
 
 | 모드 | 효과 |
-|------|--------|
-| **edit** (기본값) | 파일시스템 도구가 프로젝트 루트로 샌드박싱됨 |
-| **chat** | 읽기 전용: 쓰기/편집/스크립트/git 변형 없음 |
-| **full** | 샌드박스 해제된 파일시스템(사용자 승인); 절대 경로 선호 |
+|------|------|
+| **edit**(기본) | 프로젝트 루트 샌드박스 |
+| **chat** | 읽기 전용(쓰기/스크립트 불가) |
+| **full** | 샌드박스 없음(사용자 허용); 절대 경로 권장 |
 
-edit/chat의 경로 규칙: \`/\`로 시작하는 프로젝트 루트 형식(예: \`/src/index.ts\`는 \`<cwd>/src/index.ts\`에 매핑). 셸 도구 이름을 임의로 만들지 마십시오 — 사용 가능한 경우 \`run_script\`를 사용하십시오.
+edit/chat 경로는 \`/\`로 시작하는 프로젝트 상대 형식. 셸 도구 이름을 만들지 말고 \`run_script\`를 사용.
 
-## 설정 (데스크톱 UI)
+## 설정(데스크톱 UI)
 
-일반적인 위치(UI에서 표현이 약간 다를 수 있음):
+- **프로바이더 / API 키** — \`~/.hip/config/auth.json\`(0600 평문)
+- **메모리** — 교차 세션 **기본 꺼짐**(설정 → 메모리)
+- **스킬** — 설치된 스킬 활성/비활성
+- **플러그인** — 설치/활성; 설정에 Plugin Market
+- **에이전트** — supervisor / plan / explore / coder 및 커스텀
+- **네트워크 정책** — 아웃바운드 도구 허용/거부
 
-- **Providers / API keys** — \`~/.hip/config/auth.json\`에 일반 텍스트로 저장됨(설계상 모드 0600)
-- **Memory** — 교차 세션 메모리는 **기본적으로 꺼져 있음**; Settings → Memory에서 활성화(\`references/memory.md\` 참조)
-- **Skills** — 설치된 스킬 활성화/비활성화(\`hip.toml\` + 스킬 폴더)
-- **Plugins** — 플러그인 설치/활성화(스킬, 에이전트, MCP, 훅)
-- **Agents** — 고정 프로필(supervisor / plan / explore / coder) 및 사용자 정의 내부 또는 외부 에이전트
-- **Network policy** — 아웃바운드 도구에 대한 선택적 허용/거부
+## 오른쪽 패널: Agents + Runtime
 
-## 스킬, 플러그인, MCP
+세션 오른쪽 패널은 다음을 합칩니다:
 
-- **스킬**: \`SKILL.md\`가 포함된 Claude 형식 폴더. 전역: \`~/.hip/skills/<id>/\`. 프로젝트: \`.hip/skills/<id>/\`. 점진적 공개: L1 메타데이터 → \`use_skill\` 본문 → \`references/\` + \`assets/\`.
-- **플러그인**: \`~/.hip/plugins/\` 아래; 스킬, 에이전트, MCP 서버 및 훅을 제공할 수 있음. \`references/agents-and-plugins.md\` 참조.
-- **MCP**: 구성된 서버가 도구를 노출함. Code 표면에서 시스템 프롬프트가 카탈로그를 나열할 수 있음; \`mcp_search\`를 사용한 후 네임스페이스된 도구 \`mcp__<server>__<tool>\`을 호출하십시오.
+- **Agents** — 명단, 서브에이전트, 위임 상태
+- **Runtime** — 백그라운드 shell, monitor, 스케줄. 실행 중 작업은 chip 표시
 
-## 에이전트 및 위임
+긴 shell / CI / 주기 작업은 TaskRuntime 도구를 쓰세요. 메인 턴에서 sleep 폴링하지 마세요.
 
-- 기본 세션 에이전트는 도구 사용 또는 위임 시기를 결정합니다.
-- 사용 가능한 경우 전문 로스터 에이전트를 선호하십시오: **explore**(읽기 전용 검색), **plan**(설계 전용), **coder**(구현).
-- 병렬 독립 하위 작업 → 하나의 \`task_batch\`(순차적 \`dispatch_agent\` 아님).
-- 명시적 워크플로우 / 다중 에이전트 핸드오프가 존재하지만 **일반적인 제품 경로는 아닙니다**.
+## 스킬·플러그인·MCP
+
+- **스킬**: \`SKILL.md\` 폴더. 전역 \`~/.hip/skills/\`, 프로젝트 \`.hip/skills/\`.
+- **플러그인**: \`~/.hip/plugins/\`. 자세한 내용 \`references/agents-and-plugins.md\`.
+- **MCP**: \`mcp_search\` 후 \`mcp__<server>__<tool>\`.
+
+## 에이전트와 위임
+
+- 전용 명단 우선: explore / plan / coder.
+- 독립 서브태스크 2+ → 한 번의 \`task_batch\`.
+- 장시간 작업 → TaskRuntime(\`run_script\` background, \`monitor\`, \`scheduler_*\`).
 - 심화: \`references/agents-and-plugins.md\`.
 
-## CLI (\`@hip/cli\`)
+## CLI（\`@hip/cli\`）
 
-**실행 중인** hip 앱에 연결 전용 동반자(공유 사이드카 + \`~/.hip\` 데이터). 제품 사이드카를 시작하지 않습니다.
+**실행 중인** hip 앱에만 연결(공유 sidecar + \`~/.hip\`). 제품 sidecar를 시작하지 않습니다.
 
 \`\`\`bash
 yarn cli:dev doctor
@@ -1897,20 +2119,18 @@ yarn cli:dev run --stream none --json "Reply with exactly: pong"
 yarn cli:dev repl --cwd .
 \`\`\`
 
-앱이 실행 중이지 않으면 CLI는 \`APP_NOT_RUNNING\`으로 실패합니다.
+앱이 없으면 \`APP_NOT_RUNNING\`.
 
-## 프로젝트 안내 파일
+## 프로젝트 가이드 파일
 
-프로젝트 아래에 있을 때, hip은 \`AGENTS.md\` / \`Claude.md\` / \`.hip\` 설정과 같은 안내를 주입할 수 있습니다. **프로젝트** 규칙에 대해서는 이를 따르는 것을 선호하십시오; 이 스킬은 **제품** 동작을 위한 것입니다.
+\`AGENTS.md\` / \`Claude.md\` / \`.hip\`가 있으면 **프로젝트** 규칙을 우선.
 
-## 레벨 3 참조
+## Level 3 참고
 
-이 스킬을 로드한 후, \`use_skill\`은 절대 경로를 반환합니다. 사용자가 심화가 필요할 때:
-
-- 메모리 활성화, 주입, 추출, 개인정보 → \`references/memory.md\`
-- 로컬 데이터 레이아웃, 설정 파일, 환경 변수 재정의 → \`references/config-and-data.md\`
-- 일반적인 실패(키 없음, CLI 실행 중 아님, 빈 메모리) → \`references/troubleshooting.md\`
-- 에이전트, 플러그인, MCP 연결 → \`references/agents-and-plugins.md\`
+- 메모리 → \`references/memory.md\`
+- 설정과 데이터 → \`references/config-and-data.md\`
+- 문제 해결 → \`references/troubleshooting.md\`
+- 에이전트·플러그인·MCP·TaskRuntime → \`references/agents-and-plugins.md\`
 `,
   },
   {
@@ -2055,76 +2275,112 @@ SQLite의 구조화된 항목(\`memory_items\`): 선호도, 규칙, 학습 내�
   {
     id: 'agents',
     titleKey: 'settings.productHelp.sections.agents',
-    markdown: `# hip 에이전트, 플러그인 및 MCP (레벨 3)
+    markdown: `# hip 에이전트, 플러그인 & MCP（Level 3）
 
 ## 내장 에이전트 프로필
 
-일반적인 고정 프로필 (에이전트 UI에서 활성화/비활성화):
-
 | 프로필 | 역할 |
-|---------|------|
+|--------|------|
 | **supervisor** | 기본 오케스트레이터: 도구, 커밋, 스크립트, 위임 |
-| **plan** | 설계/계획 중심 (구성에 따라 더 좁은 쓰기 자세) |
-| **explore** | 읽기 전용 코드베이스 검색 |
-| **coder** | 스크립트를 사용한 구현 중심 |
+| **plan** | 설계 / 계획 중심 |
+| **explore** | 읽기 전용 코드 검색 |
+| **coder** | 구현 중심(스크립트 가능) |
 
-사용자 정의 **내부** 에이전트: 페르소나 프롬프트 + 바인딩된 모델 + 도구 권한.  
-**외부 / ACP** 에이전트: 별도 프로세스; 구성되지 않으면 제품 메모리는 기본적으로 꺼짐.
+**내부** 에이전트: 페르소나 + 모델 + 도구 권한.  
+**외부 / ACP**: 별도 프로세스; 제품 메모리는 기본 꺼짐.
 
-지원되는 ACP 프리셋 (설정 → 에이전트 → ACP 에이전트 추가): **OpenCode**, **Grok Build** (\`grok agent stdio\`), **Pi**, **Claude Code**, **Codex**. Grok Build는 네이티브 ACP 사용 (\`https://x.ai/cli\` 통해 설치); \`grok login\` 또는 선택적 \`XAI_API_KEY\`를 통해 인증.
+지원 ACP 프리셋(설정 → 에이전트 → ACP 추가): **OpenCode**, **Grok Build**(\`grok agent stdio\`), **Pi**, **Claude Code**, **Codex**. Grok Build는 네이티브 ACP(\`https://x.ai/cli\`); 인증은 \`grok login\` 또는 선택적 \`XAI_API_KEY\`.
 
-ACP 에이전트는 인증 및 모델에 대해 **자체 관리**됩니다: hip은 ACP 하위 프로세스에 자체 제공자 API 키를 주입하지 않습니다. 에이전트 구성에서 에이전트 자체 로그인 / 환경 변수 / 선택적 프리셋 \`authEnvVar\`를 사용하세요.
+ACP 인증·모델은 **자체 관리**: hip은 provider API 키를 ACP 자식 프로세스에 주입하지 않습니다.
 
-## 기능 매트릭스 (내장 vs ACP)
+## 기능 매트릭스(내장 vs ACP)
 
-hip은 **내장** LangGraph 에이전트, **세션 기본 ACP 에이전트**를 실행하거나 **ACP 에이전트를 하위 에이전트로 디스패치**할 수 있습니다. 기능이 다릅니다 (현재 제품; 계획된 호스트 작업은 해당 위치에 명시):
+| 기능 | 내장 primary | ACP primary | ACP 서브(dispatch) |
+|------|--------------|-------------|---------------------|
+| hip 도구(read / write / run_script …) | 있음 | 없음 | 없음 |
+| hip Skills / 플러그인 훅 | 있음 | 없음 | 없음 |
+| hip MCP | 있음 | 없음(계획: opt-in 전달) | 없음 |
+| 클라이언트 FS bridge | n/a | 없음(stub) | 없음 |
+| dispatch / task / task_batch | 있음 | 없음 | 없음 |
+| TaskRuntime(bg shell / monitor / scheduler) | 있음 | 없음 | 없음 |
+| 교차 세션 Memory 주입 | 있음 | 없음 | 없음 |
+| Memory 추출 | 있음 | 없음 | 없음 |
+| hip 모델 선택 | 있음 | 없음 | 없음 |
+| HITL | hip 도구 | ACP \`requestPermission\` | ACP primary와 동일 |
+| permissionMode | hip 게이트 | chat/edit 안전 kind 자동; 그 외 HITL | 부모 세션 상속 |
 
-| 기능 | 내장 기본 | ACP 기본 | ACP 하위 에이전트 (디스패치) |
-|------------|------------------|-------------|-------------------------|
-| hip 도구 (읽기/쓰기/run_script/…) | 예 | 아니요 (에이전트 자체 도구) | 아니요 (에이전트 자체 도구) |
-| hip 스킬 / 플러그인 훅 | 예 | 아니요 | 아니요 |
-| hip MCP (세션에 병합) | 예 | 아니요 (계획: 옵트인 전달) | 아니요 (계획: 옵트인 전달) |
-| 클라이언트 FS 브리지 | 해당 없음 | 아니요 (스텁만; 실제 브리지 계획됨) | 아니요 (스텁만; 실제 브리지 계획됨) |
-| 디스패치 / task / task_batch | 예 | 아니요 | 아니요 |
-| 메모리 주입 (세션 간) | 예 | 아니요 (구성 플래그 예약됨; 접두사 계획됨) | 아니요 |
-| 메모리 추출 | 예 | 아니요 | 아니요 |
-| hip 모델 선택기 | 예 | 아니요 (에이전트 configOptions / 에이전트 모델 UI) | 아니요 |
-| HITL 권한 | hip 도구 | ACP \`requestPermission\` | ACP 기본과 동일 |
-| permissionMode | hip 도구 게이트 | 채팅/편집에서 안전한 종류(읽기/가져오기/기타) 자동 해결; 그 외 HITL (\`full\`은 ACP 경로에서도 HITL) | 상위 세션 모드 |
+**요약:** ACP를 primary로 쓰면 hip 내장 도구/스킬/MCP가 아닌 대등한 별도 스택입니다.
 
-**결론:** ACP를 기본으로 선택하는 것은 자체 스택을 가진 피어 코딩 에이전트입니다—hip의 내장 도구/스킬/MCP가 아닙니다. 하위 에이전트 디스패치는 동일한 에이전트 스택을 사용합니다; 기본 및 하위 에이전트 모두 현재 hip 메모리 주입 또는 hip MCP를 받지 않습니다.
+## 위임 & TaskRuntime 도구(메인 에이전트)
 
-## 위임 도구 (주 에이전트)
+| 도구 | 용도 |
+|------|------|
+| \`task\` | 단일 서브태스크(fg / background) |
+| \`dispatch_agent\` | 명단 에이전트 |
+| \`task_batch\` | **독립 서브태스크 2+ 권장**(진짜 병렬) |
+| \`run_script\`(+ \`background:true\`) | 셸; 장시간 → \`task_id\` |
+| \`wait_tasks\` | 백그라운드 id 대기 |
+| \`task_output\` | 지금까지 출력 읽기 |
+| \`task_stop\` | 실행 중 태스크 중지 |
+| \`monitor\` | stdout를 UI 이벤트로 스트리밍(모델에 자동 주입 안 함) |
+| \`scheduler_create\` / \`list\` / \`delete\` | 주기 깨우기(최소 60s) |
 
-| 도구 | 사용 |
-|------|-----|
-| \`task\` | 하나의 하위 작업 (포그라운드 또는 백그라운드) |
-| \`dispatch_agent\` | 명명된 로스터 에이전트; 병렬 도구 호출이 아니면 차단 |
-| \`task_batch\` | **권장** 2개 이상의 독립적인 하위 작업 (진정한 병렬) |
+메인 턴에서 긴 shell/CI를 sleep 폴링하지 마세요.
 
-순차적 디스패치만 사용된 경우 작업이 "병렬로" 실행되었다고 주장하지 마십시오.
+### Runtime 패널(UI)
+
+세션 오른쪽 패널은 **Agents**와 **Runtime**을 합칩니다. 실행 중 작업은 chip으로 표시됩니다.
 
 ## 플러그인
 
-- \`~/.hip/plugins/\` 아래에 설치됨; 레지스트리는 \`~/.hip/config/hip-plugins.json\`에 있음.
-- 플러그인은 스킬, 에이전트, MCP 서버 구성 및 훅을 제공할 수 있음.
-- 플러그인을 비활성화하면 세션에서 해당 기여가 제거됨.
+- 위치: \`~/.hip/plugins/\`; 레지스트리 \`~/.hip/config/hip-plugins.json\`.
+- 스킬, 에이전트, MCP, 훅 포함 가능.
+
+### Plugin Market(설정)
+
+공식 카탈로그만:
+
+| Source id | Catalog |
+|-----------|---------|
+| \`grok-official\` | [xai-org/plugin-marketplace](https://github.com/xai-org/plugin-marketplace) |
+| \`claude-official\` | [anthropics/claude-plugins-official](https://github.com/anthropics/claude-plugins-official) |
+
+UI: **Grok market** · **Claude market** · **Custom plugins**.
+
+- 캐시: \`~/.hip/cache/marketplaces/<sourceId>/\`
+- 소스 토글: \`~/.hip/config/marketplace-sources.json\`
+- 다운로드 기본 \`enabled: false\`; \`boundModel\` 검토.
+
+### 플러그인 디렉터리
+
+필수: \`.plugin/plugin.json\`(\`name\` / \`version\` 최소).
+
+### \`hip-plugins.json\`
+
+권장(문자열 배열):
+
+\`\`\`json
+{
+  "plugins": ["/absolute/path/to/plugin"],
+  "entries": [],
+  "enabled": { "my-plugin": true }
+}
+\`\`\`
 
 ## MCP
 
-- 서버 구성은 hip.toml / 플러그인 합성에서 가져옴.
-- 코드 표면은 짧은 카탈로그를 주입할 수 있음; \`mcp_search\`로 검색.
-- 도구를 \`mcp__<server>__<tool>\`로 호출.
-- 네트워크 정책 (구성된 경우)은 아웃바운드 MCP/웹 도구를 차단할 수 있음.
+- hip.toml / 플러그인 합성.
+- \`mcp_search\` 후 \`mcp__<server>__<tool>\`.
+- 네트워크 정책이 아웃바운드를 막을 수 있음.
 
 ## 스킬 범위
 
 | 범위 | 위치 |
-|-------|------|
-| 전역 | \`~/.hip/skills/<id>/\` |
-| 프로젝트 | \`.hip/skills/<id>/\` (동일한 id의 전역보다 우선) |
-| 플러그인 | 플러그인 소유 스킬 디렉토리 |
-| 내장 제품 | \`~/.hip/builtin-skills/hip/\` (최하위 우선순위; 동일한 id로 재정의 가능) |
+|------|------|
+| global | \`~/.hip/skills/<id>/\` |
+| project | \`.hip/skills/<id>/\` |
+| plugin | 플러그인 소유 |
+| builtin | \`~/.hip/builtin-skills/hip/\`(최저 우선) |
 `,
   }
   ],

@@ -128,6 +128,16 @@ describe('buildSystemPrompt', () => {
     expect(s).not.toMatch(/same tool-call batch/)
     expect(s).not.toMatch(/research source of truth/)
   })
+
+  it('keeps TaskRuntime compact rules always-on for code surface', () => {
+    const s = buildSystemPrompt({ cwd: '/tmp/proj', surface: 'code' })
+    expect(s).toMatch(/background:true/)
+    expect(s).toMatch(/wait_tasks/)
+    expect(s).toMatch(/task_output/)
+    expect(s).toMatch(/task_stop/)
+    expect(s).toMatch(/\bmonitor\b/)
+    expect(s).toMatch(/scheduler_create/)
+  })
 })
 
 describe('childSystemPrompt', () => {

@@ -108,6 +108,9 @@ try {
     { id: 'always.git', re: /git_commit/i, in: codeBare },
     { id: 'always.product.facts', re: /Product facts \(hip\)|auth\.json/i, in: codeBare },
     { id: 'always.pointer.coding', re: /hip-coding/i, in: codeBare },
+    { id: 'always.runtime.bg_shell', re: /background:true|wait_tasks/i, in: codeBare },
+    { id: 'always.runtime.monitor', re: /\bmonitor\b/i, in: codeBare },
+    { id: 'always.runtime.scheduler', re: /scheduler_create/i, in: codeBare },
   ]
 
   for (const c of ALWAYS_ON) {
@@ -141,6 +144,17 @@ try {
   runCheck('skills.coding.body.has.parallel.depth', () => {
     if (!/task_batch/.test(CODING_SKILL_MD) || !/research source of truth/.test(CODING_SKILL_MD)) {
       throw new Error('hip-coding skill body missing deep parallel policy')
+    }
+  })
+
+  runCheck('skills.coding.body.has.taskruntime.depth', () => {
+    if (
+      !/wait_tasks/.test(CODING_SKILL_MD) ||
+      !/scheduler_create/.test(CODING_SKILL_MD) ||
+      !/\bmonitor\b/.test(CODING_SKILL_MD) ||
+      !/background:true/.test(CODING_SKILL_MD)
+    ) {
+      throw new Error('hip-coding skill body missing TaskRuntime depth (wait_tasks/monitor/scheduler)')
     }
   })
 
@@ -199,6 +213,16 @@ try {
     {
       q: 'How should I commit?',
       expectAlways: [/git_commit/],
+      expectSkill: 'hip-coding',
+    },
+    {
+      q: 'Run a long build in the background and wait for it',
+      expectAlways: [/wait_tasks/i, /background:true|run_script/i],
+      expectSkill: 'hip-coding',
+    },
+    {
+      q: 'Watch CI logs without blocking the turn',
+      expectAlways: [/\bmonitor\b/i],
       expectSkill: 'hip-coding',
     },
   ]

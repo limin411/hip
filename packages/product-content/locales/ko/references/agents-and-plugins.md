@@ -1,70 +1,106 @@
-# hip 에이전트, 플러그인 및 MCP (레벨 3)
+# hip 에이전트, 플러그인 & MCP（Level 3）
 
 ## 내장 에이전트 프로필
 
-일반적인 고정 프로필 (에이전트 UI에서 활성화/비활성화):
-
 | 프로필 | 역할 |
-|---------|------|
+|--------|------|
 | **supervisor** | 기본 오케스트레이터: 도구, 커밋, 스크립트, 위임 |
-| **plan** | 설계/계획 중심 (구성에 따라 더 좁은 쓰기 자세) |
-| **explore** | 읽기 전용 코드베이스 검색 |
-| **coder** | 스크립트를 사용한 구현 중심 |
+| **plan** | 설계 / 계획 중심 |
+| **explore** | 읽기 전용 코드 검색 |
+| **coder** | 구현 중심(스크립트 가능) |
 
-사용자 정의 **내부** 에이전트: 페르소나 프롬프트 + 바인딩된 모델 + 도구 권한.  
-**외부 / ACP** 에이전트: 별도 프로세스; 구성되지 않으면 제품 메모리는 기본적으로 꺼짐.
+**내부** 에이전트: 페르소나 + 모델 + 도구 권한.  
+**외부 / ACP**: 별도 프로세스; 제품 메모리는 기본 꺼짐.
 
-지원되는 ACP 프리셋 (설정 → 에이전트 → ACP 에이전트 추가): **OpenCode**, **Grok Build** (`grok agent stdio`), **Pi**, **Claude Code**, **Codex**. Grok Build는 네이티브 ACP 사용 (`https://x.ai/cli` 통해 설치); `grok login` 또는 선택적 `XAI_API_KEY`를 통해 인증.
+지원 ACP 프리셋(설정 → 에이전트 → ACP 추가): **OpenCode**, **Grok Build**(`grok agent stdio`), **Pi**, **Claude Code**, **Codex**. Grok Build는 네이티브 ACP(`https://x.ai/cli`); 인증은 `grok login` 또는 선택적 `XAI_API_KEY`.
 
-ACP 에이전트는 인증 및 모델에 대해 **자체 관리**됩니다: hip은 ACP 하위 프로세스에 자체 제공자 API 키를 주입하지 않습니다. 에이전트 구성에서 에이전트 자체 로그인 / 환경 변수 / 선택적 프리셋 `authEnvVar`를 사용하세요.
+ACP 인증·모델은 **자체 관리**: hip은 provider API 키를 ACP 자식 프로세스에 주입하지 않습니다.
 
-## 기능 매트릭스 (내장 vs ACP)
+## 기능 매트릭스(내장 vs ACP)
 
-hip은 **내장** LangGraph 에이전트, **세션 기본 ACP 에이전트**를 실행하거나 **ACP 에이전트를 하위 에이전트로 디스패치**할 수 있습니다. 기능이 다릅니다 (현재 제품; 계획된 호스트 작업은 해당 위치에 명시):
+| 기능 | 내장 primary | ACP primary | ACP 서브(dispatch) |
+|------|--------------|-------------|---------------------|
+| hip 도구(read / write / run_script …) | 있음 | 없음 | 없음 |
+| hip Skills / 플러그인 훅 | 있음 | 없음 | 없음 |
+| hip MCP | 있음 | 없음(계획: opt-in 전달) | 없음 |
+| 클라이언트 FS bridge | n/a | 없음(stub) | 없음 |
+| dispatch / task / task_batch | 있음 | 없음 | 없음 |
+| TaskRuntime(bg shell / monitor / scheduler) | 있음 | 없음 | 없음 |
+| 교차 세션 Memory 주입 | 있음 | 없음 | 없음 |
+| Memory 추출 | 있음 | 없음 | 없음 |
+| hip 모델 선택 | 있음 | 없음 | 없음 |
+| HITL | hip 도구 | ACP `requestPermission` | ACP primary와 동일 |
+| permissionMode | hip 게이트 | chat/edit 안전 kind 자동; 그 외 HITL | 부모 세션 상속 |
 
-| 기능 | 내장 기본 | ACP 기본 | ACP 하위 에이전트 (디스패치) |
-|------------|------------------|-------------|-------------------------|
-| hip 도구 (읽기/쓰기/run_script/…) | 예 | 아니요 (에이전트 자체 도구) | 아니요 (에이전트 자체 도구) |
-| hip 스킬 / 플러그인 훅 | 예 | 아니요 | 아니요 |
-| hip MCP (세션에 병합) | 예 | 아니요 (계획: 옵트인 전달) | 아니요 (계획: 옵트인 전달) |
-| 클라이언트 FS 브리지 | 해당 없음 | 아니요 (스텁만; 실제 브리지 계획됨) | 아니요 (스텁만; 실제 브리지 계획됨) |
-| 디스패치 / task / task_batch | 예 | 아니요 | 아니요 |
-| 메모리 주입 (세션 간) | 예 | 아니요 (구성 플래그 예약됨; 접두사 계획됨) | 아니요 |
-| 메모리 추출 | 예 | 아니요 | 아니요 |
-| hip 모델 선택기 | 예 | 아니요 (에이전트 configOptions / 에이전트 모델 UI) | 아니요 |
-| HITL 권한 | hip 도구 | ACP `requestPermission` | ACP 기본과 동일 |
-| permissionMode | hip 도구 게이트 | 채팅/편집에서 안전한 종류(읽기/가져오기/기타) 자동 해결; 그 외 HITL (`full`은 ACP 경로에서도 HITL) | 상위 세션 모드 |
+**요약:** ACP를 primary로 쓰면 hip 내장 도구/스킬/MCP가 아닌 대등한 별도 스택입니다.
 
-**결론:** ACP를 기본으로 선택하는 것은 자체 스택을 가진 피어 코딩 에이전트입니다—hip의 내장 도구/스킬/MCP가 아닙니다. 하위 에이전트 디스패치는 동일한 에이전트 스택을 사용합니다; 기본 및 하위 에이전트 모두 현재 hip 메모리 주입 또는 hip MCP를 받지 않습니다.
+## 위임 & TaskRuntime 도구(메인 에이전트)
 
-## 위임 도구 (주 에이전트)
+| 도구 | 용도 |
+|------|------|
+| `task` | 단일 서브태스크(fg / background) |
+| `dispatch_agent` | 명단 에이전트 |
+| `task_batch` | **독립 서브태스크 2+ 권장**(진짜 병렬) |
+| `run_script`(+ `background:true`) | 셸; 장시간 → `task_id` |
+| `wait_tasks` | 백그라운드 id 대기 |
+| `task_output` | 지금까지 출력 읽기 |
+| `task_stop` | 실행 중 태스크 중지 |
+| `monitor` | stdout를 UI 이벤트로 스트리밍(모델에 자동 주입 안 함) |
+| `scheduler_create` / `list` / `delete` | 주기 깨우기(최소 60s) |
 
-| 도구 | 사용 |
-|------|-----|
-| `task` | 하나의 하위 작업 (포그라운드 또는 백그라운드) |
-| `dispatch_agent` | 명명된 로스터 에이전트; 병렬 도구 호출이 아니면 차단 |
-| `task_batch` | **권장** 2개 이상의 독립적인 하위 작업 (진정한 병렬) |
+메인 턴에서 긴 shell/CI를 sleep 폴링하지 마세요.
 
-순차적 디스패치만 사용된 경우 작업이 "병렬로" 실행되었다고 주장하지 마십시오.
+### Runtime 패널(UI)
+
+세션 오른쪽 패널은 **Agents**와 **Runtime**을 합칩니다. 실행 중 작업은 chip으로 표시됩니다.
 
 ## 플러그인
 
-- `~/.hip/plugins/` 아래에 설치됨; 레지스트리는 `~/.hip/config/hip-plugins.json`에 있음.
-- 플러그인은 스킬, 에이전트, MCP 서버 구성 및 훅을 제공할 수 있음.
-- 플러그인을 비활성화하면 세션에서 해당 기여가 제거됨.
+- 위치: `~/.hip/plugins/`; 레지스트리 `~/.hip/config/hip-plugins.json`.
+- 스킬, 에이전트, MCP, 훅 포함 가능.
+
+### Plugin Market(설정)
+
+공식 카탈로그만:
+
+| Source id | Catalog |
+|-----------|---------|
+| `grok-official` | [xai-org/plugin-marketplace](https://github.com/xai-org/plugin-marketplace) |
+| `claude-official` | [anthropics/claude-plugins-official](https://github.com/anthropics/claude-plugins-official) |
+
+UI: **Grok market** · **Claude market** · **Custom plugins**.
+
+- 캐시: `~/.hip/cache/marketplaces/<sourceId>/`
+- 소스 토글: `~/.hip/config/marketplace-sources.json`
+- 다운로드 기본 `enabled: false`; `boundModel` 검토.
+
+### 플러그인 디렉터리
+
+필수: `.plugin/plugin.json`(`name` / `version` 최소).
+
+### `hip-plugins.json`
+
+권장(문자열 배열):
+
+```json
+{
+  "plugins": ["/absolute/path/to/plugin"],
+  "entries": [],
+  "enabled": { "my-plugin": true }
+}
+```
 
 ## MCP
 
-- 서버 구성은 hip.toml / 플러그인 합성에서 가져옴.
-- 코드 표면은 짧은 카탈로그를 주입할 수 있음; `mcp_search`로 검색.
-- 도구를 `mcp__<server>__<tool>`로 호출.
-- 네트워크 정책 (구성된 경우)은 아웃바운드 MCP/웹 도구를 차단할 수 있음.
+- hip.toml / 플러그인 합성.
+- `mcp_search` 후 `mcp__<server>__<tool>`.
+- 네트워크 정책이 아웃바운드를 막을 수 있음.
 
 ## 스킬 범위
 
 | 범위 | 위치 |
-|-------|------|
-| 전역 | `~/.hip/skills/<id>/` |
-| 프로젝트 | `.hip/skills/<id>/` (동일한 id의 전역보다 우선) |
-| 플러그인 | 플러그인 소유 스킬 디렉토리 |
-| 내장 제품 | `~/.hip/builtin-skills/hip/` (최하위 우선순위; 동일한 id로 재정의 가능) |
+|------|------|
+| global | `~/.hip/skills/<id>/` |
+| project | `.hip/skills/<id>/` |
+| plugin | 플러그인 소유 |
+| builtin | `~/.hip/builtin-skills/hip/`(최저 우선) |

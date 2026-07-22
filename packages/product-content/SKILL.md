@@ -18,8 +18,9 @@ If a product detail is not documented here, say so rather than inventing UI labe
 
 | Surface | Intent |
 |---------|--------|
-| **Code** | Project workbench: file tools, git guidance, MCP catalog, full agent tools |
+| **Code** | Project workbench: file tools, git guidance, MCP catalog, full agent tools, async TaskRuntime |
 | **Chat** | Lighter conversation surface: shorter prompt, no git-commit guidance, prefer writing previewable deliverables (`page.html`, `notes.md`, SVG, etc.) into the workspace for the artifacts panel |
+| **Knowledge** | Notes / knowledge-space assistant: grounded answers in the user's notes workspace; not a coding agent for a software project |
 
 Surface is chosen in the UI; the system prompt already reflects the active surface.
 
@@ -40,9 +41,18 @@ Typical destinations (wording may vary slightly in the UI):
 - **Providers / API keys** — stored as plaintext under `~/.hip/config/auth.json` (mode 0600 by design)
 - **Memory** — cross-session memory is **off by default**; enable under Settings → Memory (see `references/memory.md`)
 - **Skills** — enable/disable installed skills (`hip.toml` + skill folders)
-- **Plugins** — install/enable plugins (skills, agents, MCP, hooks)
+- **Plugins** — install/enable plugins (skills, agents, MCP, hooks); Plugin Market under Settings
 - **Agents** — fixed profiles (supervisor / plan / explore / coder) and custom internal or external agents
 - **Network policy** — optional allow/deny for outbound tools
+
+## Right panel: Agents + Runtime
+
+Each session’s right panel combines:
+
+- **Agents** — roster, active sub-agents, delegation status
+- **Runtime** — background shell jobs, monitors, and schedules (TaskRuntime). Still-running work shows a chip; open the panel to inspect output and stop tasks.
+
+Long shell, log watches, and recurring checks should use TaskRuntime tools (see `references/agents-and-plugins.md` and the `hip-coding` skill for policy). Do not sleep-poll in the main turn.
 
 ## Skills, plugins, MCP
 
@@ -55,6 +65,7 @@ Typical destinations (wording may vary slightly in the UI):
 - Default session agent decides when to use tools or delegate.
 - Prefer specialized roster agents when available: **explore** (read-only search), **plan** (design-only), **coder** (implementation).
 - Parallel independent sub-tasks → one `task_batch` (not sequential `dispatch_agent`).
+- Long-running shell / CI / periodic work → TaskRuntime (`run_script` background, `monitor`, `scheduler_*`) rather than blocking the main turn.
 - Explicit workflows / multi-agent handoff exist but are **not** the ordinary product path.
 - Depth: `references/agents-and-plugins.md`.
 
@@ -83,4 +94,4 @@ After loading this skill, `use_skill` returns absolute paths. When the user need
 - Memory enablement, inject, extract, privacy → `references/memory.md`
 - Local data layout, config files, env overrides → `references/config-and-data.md`
 - Common failures (no key, CLI not running, empty memory) → `references/troubleshooting.md`
-- Agents, plugins, MCP wiring → `references/agents-and-plugins.md`
+- Agents, plugins, MCP, TaskRuntime tools → `references/agents-and-plugins.md`

@@ -6,7 +6,7 @@ import { promises as dns } from 'node:dns'
 import { buildTools } from './tools.js'
 import { NetworkPolicy } from './network-policy.js'
 import { HIP_PRODUCT_VERSION } from './product/content.js'
-import { _resetExaSession } from './tools/web.js'
+import { _resetExaSession, _resetWebHttpProxy, parseMcpHttpBody } from './tools/web.js'
 
 vi.mock('node:dns', async (importOriginal) => {
   const actual = await importOriginal<typeof import('node:dns')>()
@@ -25,11 +25,13 @@ let root: string
 beforeEach(() => {
   root = mkdtempSync(join(tmpdir(), 'hip-ws-'))
   _resetExaSession()
+  _resetWebHttpProxy()
 })
 afterEach(() => {
   rmSync(root, { recursive: true, force: true })
   vi.unstubAllGlobals()
   _resetExaSession()
+  _resetWebHttpProxy()
 })
 
 function byName(tools: ReturnType<typeof buildTools>, name: string) {
@@ -52,24 +54,45 @@ function mockResponse(body: string, opts?: { status?: number; headers?: Record<s
   }
 }
 
-function mockExaCall(initResponseBody: unknown, searchResultText: string) {
+function assertMcpAccept(init?: RequestInit) {
+  const headers = (init?.headers ?? {}) as Record<string, string>
+  // Headers may be a plain object or Headers; normalize
+  const accept =
+    typeof (headers as Headers).get === 'function'
+      ? (headers as unknown as Headers).get('Accept') ?? (headers as unknown as Headers).get('accept')
+      : headers['Accept'] ?? headers['accept']
+  expect(accept).toMatch(/application\/json/)
+  expect(accept).toMatch(/text\/event-stream/)
+}
+
+function mockExaCall(
+  initResponseBody: unknown,
+  searchResultText: string,
+  opts?: { sse?: boolean },
+) {
   return vi.fn((url: string, init?: RequestInit) => {
     if (url === 'https://mcp.exa.ai/mcp') {
+      assertMcpAccept(init)
       const body = JSON.parse((init?.body as string) || '{}')
       if (body.method === 'initialize') {
-        return Promise.resolve(mockResponse(JSON.stringify(initResponseBody), {
-          headers: { 'mcp-session-id': 'test-session' },
-        }))
+        const payload = JSON.stringify(initResponseBody)
+        return Promise.resolve(mockResponse(
+          opts?.sse ? `event: message\ndata: ${payload}\n\n` : payload,
+          { headers: { 'mcp-session-id': 'test-session' } },
+        ))
       }
       if (body.method === 'notifications/initialized') {
         return Promise.resolve(mockResponse('', { status: 202 }))
       }
       if (body.method === 'tools/call') {
-        return Promise.resolve(mockResponse(JSON.stringify({
+        const payload = JSON.stringify({
           jsonrpc: '2.0',
           id: body.id,
           result: { content: [{ type: 'text', text: searchResultText }] },
-        })))
+        })
+        return Promise.resolve(mockResponse(
+          opts?.sse ? `event: message\ndata: ${payload}\n\n` : payload,
+        ))
       }
     }
     return Promise.resolve(mockResponse('unexpected url', { status: 500 }))
@@ -93,6 +116,7 @@ function mockExaDown() {
 function mockExaToolError(errorMessage: string) {
   return vi.fn((url: string, init?: RequestInit) => {
     if (url === 'https://mcp.exa.ai/mcp') {
+      assertMcpAccept(init)
       const body = JSON.parse((init?.body as string) || '{}')
       if (body.method === 'initialize') {
         return Promise.resolve(mockResponse(JSON.stringify({
@@ -118,6 +142,30 @@ function mockExaToolError(errorMessage: string) {
 }
 
 // ── Tests ───────────────────────────────────────────────────────────────────
+
+describe('parseMcpHttpBody', () => {
+  it('parses pure JSON', () => {
+    const msg = parseMcpHttpBody(JSON.stringify({
+      jsonrpc: '2.0', id: 1,
+      result: { content: [{ type: 'text', text: 'hi' }] },
+    }))
+    expect(msg.result?.content?.[0]?.text).toBe('hi')
+  })
+
+  it('parses SSE event:message data frames', () => {
+    const msg = parseMcpHttpBody(
+      'event: message\ndata: {"jsonrpc":"2.0","id":1,"result":{"content":[{"type":"text","text":"from-sse"}]}}\n\n',
+    )
+    expect(msg.result?.content?.[0]?.text).toBe('from-sse')
+  })
+
+  it('surfaces JSON-RPC errors from SSE', () => {
+    const msg = parseMcpHttpBody(
+      'event: message\ndata: {"jsonrpc":"2.0","id":1,"error":{"code":-32000,"message":"rate limited"}}\n\n',
+    )
+    expect(msg.error?.message).toBe('rate limited')
+  })
+})
 
 describe('web_search tool', () => {
   it('is registered when webSearchEnabled=true', () => {
@@ -149,6 +197,18 @@ describe('web_search tool', () => {
     expect(out).toBe('exa search results')
   })
 
+  it('parses SSE Streamable HTTP responses from Exa (production shape)', async () => {
+    vi.stubGlobal('fetch', mockExaCall(
+      { jsonrpc: '2.0', id: 1, result: { protocolVersion: '2024-11-05', capabilities: {}, serverInfo: { name: 'exa-mcp', version: '1.0.0' } } },
+      'sse search results',
+      { sse: true },
+    ))
+
+    const tools = buildTools(root, undefined, undefined, undefined, { webSearchEnabled: true })
+    const out = String(await byName(tools, 'web_search').invoke({ query: 'hello world' }))
+    expect(out).toBe('sse search results')
+  })
+
   it('falls back to DDG Instant Answer when Exa is unavailable', async () => {
     vi.stubGlobal('fetch', mockExaDown())
 
@@ -169,6 +229,7 @@ describe('web_search tool', () => {
     process.env.HIP_EXA_API_KEY = 'my-exa-key'
     const mockFetch = vi.fn((url: string, init?: RequestInit) => {
       if (url === 'https://mcp.exa.ai/mcp') {
+        assertMcpAccept(init)
         const body = JSON.parse((init?.body as string) || '{}')
         if (body.method === 'initialize') {
           return Promise.resolve(mockResponse(JSON.stringify({
@@ -204,6 +265,8 @@ describe('web_search tool', () => {
     const tools = buildTools(root, undefined, undefined, undefined, { webSearchEnabled: true })
     const out = String(await byName(tools, 'web_search').invoke({ query: 'test' }))
     expect(out).toMatch(/Error: web search failed/)
+    expect(out).toMatch(/primary \(Exa\)/)
+    expect(out).toMatch(/fallback \(DDG\)/)
   })
 
   it('rate-limits when policy maxRequestsPerMinute is exceeded (N+1th call)', async () => {

@@ -4,7 +4,7 @@
 | --- | --- |
 | **Title** | Composer 发送键左侧：当前会话 Token 计量 |
 | **Date** | 2026-07-22 |
-| **Status** | Implemented (2026-07-22) |
+| **Status** | Implemented (2026-07-22); hover breakdown panel added |
 | **Product** | hip — Tauri desktop AI workbench |
 | **Surfaces** | `code` / `chat` 已有会话（`InputBar` 路径）；不含 `NewConversation` 草稿 |
 | **Depends on** | 已有：`useTokenUsage` / `useActiveUsageTotal` / `tokenPercentage` / `usageCost` / i18n `chat.usage.*` / 消息级 usage |

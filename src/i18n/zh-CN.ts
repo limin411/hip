@@ -433,10 +433,23 @@ export const zhCN = {
         io: '{{input}} 输入 · {{output}} 输出',
         sessionTotal: '本对话累计',
         cost: '约 {{cost}}',
+        costLabel: '估算费用',
         percentage: '{{percent}}%',
         percentageTooltip: '{{used}} / {{total}} tokens（{{percent}}%）',
         aria: '会话 token 用量：上下文 {{percent}}%（{{used}} / {{total}}）',
         ariaTokens: '会话 token 用量：{{used}} tokens',
+        contextTitle: '上下文占用',
+        lastInput: '最近一轮输入 · {{tokens}} tokens',
+        segPercent: '{{percent}}%',
+        breakdownNote:
+          '分项由可见对话记录估算（约每 4 字符 1 token）。「其他」含系统提示、记忆与无法直接看到的注入内容。',
+        breakdown: {
+          user: '会话（你）',
+          assistant: '助手与推理',
+          skills: '技能',
+          tools: '工具',
+          other: '其他（系统 / 记忆）',
+        },
       },
       composer: {
         tune: '调节',

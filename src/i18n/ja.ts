@@ -464,10 +464,22 @@ export const ja = {
       "io": "入力 {{input}} · 出力 {{output}}",
       "sessionTotal": "セッション合計",
       "cost": "~{{cost}}",
+      "costLabel": "概算コスト",
       "percentage": "{{percent}}%",
       "percentageTooltip": "{{used}} / {{total}} トークン ({{percent}}%)",
       "aria": "セッショントークン使用量: コンテキスト {{percent}}%（{{used}} / {{total}}）",
-      "ariaTokens": "セッショントークン使用量: {{used}} トークン"
+      "ariaTokens": "セッショントークン使用量: {{used}} トークン",
+      "contextTitle": "コンテキスト使用量",
+      "lastInput": "直近ターン入力 · {{tokens}} トークン",
+      "segPercent": "{{percent}}%",
+      "breakdownNote": "内訳は表示中の会話から推定（約 4 文字 = 1 トークン）。「その他」はシステムプロンプト・メモリなど不可視の注入分です。",
+      "breakdown": {
+        "user": "会話（あなた）",
+        "assistant": "アシスタントと推論",
+        "skills": "スキル",
+        "tools": "ツール",
+        "other": "その他（システム / メモリ）"
+      }
     },
     "composer": {
       "tune": "調整",

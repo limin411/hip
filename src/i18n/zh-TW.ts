@@ -472,10 +472,22 @@ export const zhTW = {
       "io": "{{input}} 輸入 · {{output}} 輸出",
       "sessionTotal": "本對話累計",
       "cost": "約 {{cost}}",
+      "costLabel": "估算費用",
       "percentage": "{{percent}}%",
       "percentageTooltip": "{{used}} / {{total}} tokens（{{percent}}%）",
       "aria": "工作階段 token 用量：上下文 {{percent}}%（{{used}} / {{total}}）",
-      "ariaTokens": "工作階段 token 用量：{{used}} tokens"
+      "ariaTokens": "工作階段 token 用量：{{used}} tokens",
+      "contextTitle": "上下文佔用",
+      "lastInput": "最近一輪輸入 · {{tokens}} tokens",
+      "segPercent": "{{percent}}%",
+      "breakdownNote": "分項由可見對話紀錄估算（約每 4 字元 1 token）。「其他」含系統提示、記憶與無法直接看到的注入內容。",
+      "breakdown": {
+        "user": "會話（你）",
+        "assistant": "助手與推理",
+        "skills": "技能",
+        "tools": "工具",
+        "other": "其他（系統 / 記憶）"
+      }
     },
     "composer": {
       "tune": "調節",

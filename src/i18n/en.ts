@@ -442,10 +442,23 @@ export const en = {
         io: '{{input}} in · {{output}} out',
         sessionTotal: 'Session total',
         cost: '~{{cost}}',
+        costLabel: 'Est. cost',
         percentage: '{{percent}}%',
         percentageTooltip: '{{used}} / {{total}} tokens ({{percent}}%)',
         aria: 'Session token usage: {{percent}}% of context ({{used}} of {{total}})',
         ariaTokens: 'Session token usage: {{used}} tokens',
+        contextTitle: 'Context occupancy',
+        lastInput: 'Last turn input · {{tokens}} tokens',
+        segPercent: '{{percent}}%',
+        breakdownNote:
+          'Breakdown is estimated from the visible transcript (≈ chars/4). “Other” covers system prompt, memory, and injects we cannot see.',
+        breakdown: {
+          user: 'Conversation (you)',
+          assistant: 'Assistant & reasoning',
+          skills: 'Skills',
+          tools: 'Tools',
+          other: 'Other (system / memory)',
+        },
       },
       composer: {
         tune: 'Tune',

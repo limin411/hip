@@ -464,10 +464,22 @@ export const ko = {
       "io": "{{input}} 입력 · {{output}} 출력",
       "sessionTotal": "세션 합계",
       "cost": "~{{cost}}",
+      "costLabel": "추정 비용",
       "percentage": "{{percent}}%",
       "percentageTooltip": "{{used}} / {{total}} 토큰 ({{percent}}%)",
       "aria": "세션 토큰 사용량: 컨텍스트 {{percent}}% ({{used}} / {{total}})",
-      "ariaTokens": "세션 토큰 사용량: {{used}} 토큰"
+      "ariaTokens": "세션 토큰 사용량: {{used}} 토큰",
+      "contextTitle": "컨텍스트 점유",
+      "lastInput": "최근 턴 입력 · {{tokens}} 토큰",
+      "segPercent": "{{percent}}%",
+      "breakdownNote": "항목은 보이는 대화 기록으로 추정합니다(약 문자 4개 = 1토큰). 「기타」는 시스템 프롬프트·메모리 등 보이지 않는 주입분입니다.",
+      "breakdown": {
+        "user": "대화(나)",
+        "assistant": "어시스턴트·추론",
+        "skills": "스킬",
+        "tools": "도구",
+        "other": "기타(시스템 / 메모리)"
+      }
     },
     "composer": {
       "tune": "조절",

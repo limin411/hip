@@ -3,6 +3,7 @@ import {
   commandFromRunScriptInput,
   isDeferredPanelOpenPath,
   isEphemeralRunScriptPath,
+  isProcessIntermediatePath,
   isWriteLikeTool,
   pathFromToolInput,
   runScriptReferencesPath,
@@ -139,6 +140,18 @@ describe('writeFollow path policy', () => {
     expect(writeFollowPanelPolicy('/scripts/check.py')).toBe('defer')
     expect(writeFollowPanelPolicy('/src/a.ts')).toBe('immediate')
     expect(writeFollowPanelPolicy('/docs/guide.md')).toBe('immediate')
+  })
+
+  it('isProcessIntermediatePath covers ephemeral and draft/wip/partial basenames', () => {
+    expect(isProcessIntermediatePath('/tmp/a.md')).toBe(true)
+    expect(isProcessIntermediatePath('/proj/scratch/note.md')).toBe(true)
+    expect(isProcessIntermediatePath('/docs/notes_draft.md')).toBe(true)
+    expect(isProcessIntermediatePath('/docs/draft-outline.md')).toBe(true)
+    expect(isProcessIntermediatePath('/docs/wip-plan.md')).toBe(true)
+    expect(isProcessIntermediatePath('/docs/partial_summary.md')).toBe(true)
+    expect(isProcessIntermediatePath('/docs/report.md')).toBe(false)
+    expect(isProcessIntermediatePath('/page.html')).toBe(false)
+    expect(isProcessIntermediatePath('/chart.png')).toBe(false)
   })
 
   it('runScriptReferencesPath matches full path and basename tokens', () => {

@@ -8,7 +8,7 @@ import { useUiStore } from '@/store/uiStore'
 import { useDiffStore } from '@/store/diffStore'
 import { useWorkflowStore } from '@/store/workflowStore'
 import { createDebouncedFn, shouldRefreshDiffOnToolFinish } from '@/lib/diffRefreshOnWrite'
-import { extractRenderedArtifacts } from '@/lib/renderedArtifacts'
+import { extractAutoOpenArtifacts } from '@/lib/renderedArtifacts'
 import { surfaceOf } from '@/lib/sessions'
 import { consumeUserDiffRequest } from '@/domain/commands/diffFeedback'
 import { useParallelStore } from '@/store/parallelStore'
@@ -80,25 +80,26 @@ function applyWriteFollowPreview(
 }
 
 /**
- * Right-panel policy for a write-follow hit.
- * Code: never force-open (keeps the conversation full-width). If the panel is
- * already open, keep Changes/Terminal; otherwise switch to Files.
- * Chat: Artifacts-style auto-open on Files + selected path.
+ * Right-panel policy for a write-follow hit (mid-turn / deferred script flush).
+ * Never force-opens a closed panel on either surface — Chat auto-open for
+ * deliverables is solely on message:complete via extractAutoOpenArtifacts.
+ * Code: if already open, keep Changes/Terminal; else switch to Files.
+ * Chat: if already open, select Files + path for preview.
  */
 function openWriteFollowPanel(sessionId: string, path: string, isCode: boolean): void {
   const domain = useDomainStore.getState()
   const ui = useUiStore.getState()
+  const sess = domain.sessions.find((s) => s.id === sessionId)
   if (isCode) {
-    const sess = domain.sessions.find((s) => s.id === sessionId)
     if (!sess?.codePanelOpen) return
     const tab = ui.activeTab
     if (tab !== 'changes' && tab !== 'terminal') {
       ui.setTab('files')
     }
   } else {
+    if (!sess?.chatPanelOpen) return
     ui.setChatActiveTab('files')
     ui.setSelectedArtifactPath(path)
-    domain.setSessionChatPanelOpen(sessionId, true)
   }
 }
 
@@ -317,8 +318,8 @@ export function applyServerMessageEffects(msg: ServerMessage, deps: ServerMessag
       }
 
       // P1 C1: auto-follow write-like tools to preview before turn ends.
-      // Code never force-opens the right panel (preview/focus still update).
-      // Chat still auto-opens. Script-like paths defer until turn end (cancelled
+      // Neither surface force-opens a closed panel here (Chat deliverable open is
+      // message:complete only). Script-like paths defer until turn end (cancelled
       // if run_script consumes them); ephemeral paths never follow.
       const focus = useFocusStore.getState()
       const path = tool ? pathFromToolInput(name, tool.input) : null
@@ -391,6 +392,7 @@ export function applyServerMessageEffects(msg: ServerMessage, deps: ServerMessag
       const focus = useFocusStore.getState()
 
       // Flush deferred script write-follow when the turn ends without a consuming run_script.
+      // Preview/focus only — openWriteFollowPanel never force-opens a closed panel.
       const deferred = focus.deferredWriteFollow
       if (
         deferred &&
@@ -409,8 +411,8 @@ export function applyServerMessageEffects(msg: ServerMessage, deps: ServerMessag
         focus.clearDeferredWriteFollow()
       }
 
-      // Chat surface: auto-open PreviewPanel on the latest renderable write so HTML/images/docs
-      // actually appear without requiring a manual card click (Claude Artifacts-style).
+      // Chat surface: force-open PreviewPanel only for durable final deliverables
+      // (image/md/html/pdf, excluding draft/wip/ephemeral process paths).
       if (
         sess &&
         surfaceOf(sess.config) === 'chat' &&
@@ -418,7 +420,7 @@ export function applyServerMessageEffects(msg: ServerMessage, deps: ServerMessag
         !focus.panelDismissedThisTurn &&
         focus.autoFollowEdits
       ) {
-        const arts = extractRenderedArtifacts(msg.message.toolCalls)
+        const arts = extractAutoOpenArtifacts(msg.message.toolCalls)
         if (arts.length > 0) {
           const last = arts[arts.length - 1]
           applyWriteFollowPreview(msg.sessionId, last.path, null, deps)

@@ -359,7 +359,66 @@ describe('applyServerMessageEffects', () => {
   })
 
   describe('chat artifact auto-open', () => {
-    it('message:complete on chat surface opens PreviewPanel and loads the latest renderable write', () => {
+    function finishWrite(path: string, callId = 'c1') {
+      useDomainStore.setState((st) => ({
+        sessions: st.sessions.map((s) =>
+          s.id === 's1'
+            ? {
+                ...s,
+                messages: [
+                  {
+                    id: 't1',
+                    role: 'assistant' as const,
+                    content: '',
+                    timestamp: 1,
+                    toolCalls: [
+                      {
+                        callId,
+                        agentId: 'supervisor',
+                        name: 'write_file',
+                        input: JSON.stringify({ path, content: 'x' }),
+                        status: 'running' as const,
+                        seq: 0,
+                      },
+                    ],
+                  },
+                ],
+              }
+            : s,
+        ),
+      }))
+      applyServerMessageEffects(
+        {
+          type: 'tool:finished',
+          sessionId: 's1',
+          turnId: 't1',
+          agentId: 'supervisor',
+          callId,
+          status: 'finished',
+          output: `wrote ${path} (1 bytes)`,
+        },
+        makeDeps(),
+      )
+    }
+
+    it('tool:finished mid-turn does not force-open chat panel for durable products', () => {
+      seedSession('chat')
+      useUiStore.setState({ activeView: 'chat', selectedArtifactPath: null })
+      finishWrite('/page.html')
+      expect(useDomainStore.getState().sessions.find((s) => s.id === 's1')!.chatPanelOpen).toBe(false)
+    })
+
+    it('tool:finished mid-turn does not force-open for source or scripts', () => {
+      seedSession('chat')
+      finishWrite('/src/a.ts')
+      expect(useDomainStore.getState().sessions.find((s) => s.id === 's1')!.chatPanelOpen).toBe(false)
+      seedSession('chat')
+      finishWrite('/scripts/check.py')
+      expect(useDomainStore.getState().sessions.find((s) => s.id === 's1')!.chatPanelOpen).toBe(false)
+      expect(useFocusStore.getState().deferredWriteFollow?.path).toBe('/scripts/check.py')
+    })
+
+    it('message:complete on chat surface opens PreviewPanel for the latest durable deliverable', () => {
       seedSession('chat')
       useUiStore.setState({
         activeView: 'chat',
@@ -396,6 +455,80 @@ describe('applyServerMessageEffects', () => {
       expect(useUiStore.getState().chatActiveTab).toBe('files')
       expect(useUiStore.getState().selectedArtifactPath).toBe('/page.html')
       expect(deps.sent.some((m) => m.type === 'fs:read' && (m as { path?: string }).path === '/page.html')).toBe(true)
+    })
+
+    it('message:complete does not open for draft/wip/ephemeral renderables or source-only turns', () => {
+      seedSession('chat')
+      useUiStore.setState({ activeView: 'chat', selectedArtifactPath: null })
+      const deps = makeDeps()
+      applyServerMessageEffects(
+        {
+          type: 'message:complete',
+          sessionId: 's1',
+          message: {
+            id: 't1',
+            role: 'assistant',
+            content: 'done',
+            timestamp: 1,
+            toolCalls: [
+              {
+                callId: 'c1',
+                agentId: 'supervisor',
+                name: 'write_file',
+                input: JSON.stringify({ path: '/notes_draft.md', content: 'wip' }),
+                status: 'finished',
+                seq: 0,
+                output: 'wrote /notes_draft.md (3 bytes)',
+              },
+              {
+                callId: 'c2',
+                agentId: 'supervisor',
+                name: 'write_file',
+                input: JSON.stringify({ path: '/src/a.ts', content: 'export {}' }),
+                status: 'finished',
+                seq: 1,
+                output: 'wrote /src/a.ts (10 bytes)',
+              },
+            ],
+          },
+        },
+        deps,
+      )
+      expect(useDomainStore.getState().sessions.find((s) => s.id === 's1')!.chatPanelOpen).toBe(false)
+    })
+
+    it('message:complete does not open when only a script was written', () => {
+      seedSession('chat')
+      useFocusStore.setState({
+        deferredWriteFollow: { sessionId: 's1', path: '/scripts/check.py', callId: 'c-py' },
+      })
+      const deps = makeDeps()
+      applyServerMessageEffects(
+        {
+          type: 'message:complete',
+          sessionId: 's1',
+          message: {
+            id: 't1',
+            role: 'assistant',
+            content: 'ran check',
+            timestamp: 1,
+            toolCalls: [
+              {
+                callId: 'c-py',
+                agentId: 'supervisor',
+                name: 'write_file',
+                input: JSON.stringify({ path: '/scripts/check.py', content: 'print(1)' }),
+                status: 'finished',
+                seq: 0,
+                output: 'wrote /scripts/check.py (8 bytes)',
+              },
+            ],
+          },
+        },
+        deps,
+      )
+      expect(useDomainStore.getState().sessions.find((s) => s.id === 's1')!.chatPanelOpen).toBe(false)
+      expect(useFocusStore.getState().deferredWriteFollow).toBeNull()
     })
 
     it('message:complete on chat surface does not open panel when no renderable writes', () => {

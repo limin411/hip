@@ -1,6 +1,12 @@
 import { describe, it, expect } from 'vitest'
 import type { ToolCall, Message } from '@hip/protocol'
-import { extractRenderedArtifacts, collectConversationArtifacts, type RenderedArtifact } from './renderedArtifacts'
+import {
+  extractRenderedArtifacts,
+  extractAutoOpenArtifacts,
+  collectConversationArtifacts,
+  isAutoOpenPanelArtifactPath,
+  type RenderedArtifact,
+} from './renderedArtifacts'
 
 function tc(over: Partial<ToolCall>): ToolCall {
   return { callId: 'c', agentId: 'coder', name: 'write_file', input: '{}', status: 'finished', seq: 0, ...over }
@@ -119,6 +125,40 @@ describe('extractRenderedArtifacts', () => {
   it('returns [] for undefined or empty input', () => {
     expect(extractRenderedArtifacts(undefined)).toEqual([])
     expect(extractRenderedArtifacts([])).toEqual([])
+  })
+})
+
+describe('extractAutoOpenArtifacts / isAutoOpenPanelArtifactPath', () => {
+  it('keeps durable renderable deliverables', () => {
+    expect(isAutoOpenPanelArtifactPath('/p/page.html')).toBe(true)
+    expect(isAutoOpenPanelArtifactPath('/p/report.md')).toBe(true)
+    expect(isAutoOpenPanelArtifactPath('/p/logo.png')).toBe(true)
+    expect(isAutoOpenPanelArtifactPath('/p/out.pdf')).toBe(true)
+  })
+
+  it('drops source, process intermediates, and ephemeral paths', () => {
+    expect(isAutoOpenPanelArtifactPath('/p/main.ts')).toBe(false)
+    expect(isAutoOpenPanelArtifactPath('/p/notes_draft.md')).toBe(false)
+    expect(isAutoOpenPanelArtifactPath('/p/wip-outline.md')).toBe(false)
+    expect(isAutoOpenPanelArtifactPath('/tmp/a.md')).toBe(false)
+    expect(isAutoOpenPanelArtifactPath('/proj/scratch/note.md')).toBe(false)
+  })
+
+  it('filters turn writes to durable products only (cards still use extractRenderedArtifacts)', () => {
+    const calls: ToolCall[] = [
+      tc({ callId: 'c1', seq: 1, input: JSON.stringify({ path: '/p/notes_draft.md' }) }),
+      tc({ callId: 'c2', seq: 2, input: JSON.stringify({ path: '/p/page.html' }) }),
+      tc({ callId: 'c3', seq: 3, input: JSON.stringify({ path: '/tmp/x.md' }) }),
+      tc({ callId: 'c4', seq: 4, input: JSON.stringify({ path: '/p/main.ts' }) }),
+    ]
+    expect(extractRenderedArtifacts(calls).map((a) => a.path)).toEqual([
+      '/p/notes_draft.md',
+      '/p/page.html',
+      '/tmp/x.md',
+    ])
+    expect(extractAutoOpenArtifacts(calls)).toEqual<RenderedArtifact[]>([
+      { path: '/p/page.html', name: 'page.html', kind: 'html' },
+    ])
   })
 })
 

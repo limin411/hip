@@ -64,8 +64,23 @@ export function isEphemeralRunScriptPath(path: string): boolean {
 }
 
 /**
- * Script-like paths that may be "write then run" — defer panel open until turn
- * end; cancel if a run_script references the same file.
+ * Process / intermediate material that must not force-open the Chat panel
+ * (draft notes, WIP outlines). Includes ephemeral paths.
+ * Does not block durable deliverables like `report.md` or `page.html`.
+ */
+export function isProcessIntermediatePath(path: string): boolean {
+  if (!path) return false
+  if (isEphemeralRunScriptPath(path)) return true
+  const base = basename(path.replace(/\\/g, '/'))
+  // draft / wip / partial as path token in the basename
+  if (/(^|[-_.])(draft|wip|partial)([-_.]|$)/i.test(base)) return true
+  return false
+}
+
+/**
+ * Script-like paths that may be "write then run" — defer preview follow until
+ * turn end; cancel if a run_script references the same file. Never force-opens
+ * a closed panel (Code and Chat both require the panel already open).
  */
 export function isDeferredPanelOpenPath(path: string): boolean {
   if (!path || isEphemeralRunScriptPath(path)) return false
@@ -74,7 +89,8 @@ export function isDeferredPanelOpenPath(path: string): boolean {
 
 /**
  * How write-follow should treat preview timing for this path.
- * Code never force-opens the panel; chat still may auto-open on follow.
+ * Neither Code nor Chat force-opens a closed panel from write-follow; Chat
+ * auto-open is turn-end deliverables only (see extractAutoOpenArtifacts).
  */
 export type WriteFollowPanelPolicy = 'immediate' | 'defer' | 'skip'
 

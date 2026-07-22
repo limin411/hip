@@ -1,5 +1,6 @@
 import type { ToolCall, Message } from '@hip/protocol'
 import { previewKind, type PreviewKind } from '@/components/artifact/previewKind'
+import { isProcessIntermediatePath } from '@/lib/writeFollow'
 
 /** A renderable file the agent wrote this turn — surfaced as an artifact-card row. */
 export interface RenderedArtifact {
@@ -9,6 +10,12 @@ export interface RenderedArtifact {
 }
 
 const RENDERABLE: ReadonlySet<PreviewKind> = new Set(['image', 'markdown', 'html', 'pdf'])
+
+/** True when path is a durable Chat panel auto-open candidate (kind + not process noise). */
+export function isAutoOpenPanelArtifactPath(path: string): boolean {
+  if (!path || isProcessIntermediatePath(path)) return false
+  return RENDERABLE.has(previewKind(path))
+}
 
 /**
  * Recover a `"path"` value from possibly-truncated JSON via regex. The sidecar clips ToolCall.input
@@ -86,6 +93,15 @@ export function extractRenderedArtifacts(toolCalls?: ToolCall[]): RenderedArtifa
     byPath.set(path, { path, name: basename(path), kind: kind as RenderedArtifact['kind'] })
   }
   return order.map((p) => byPath.get(p)!)
+}
+
+/**
+ * Subset of extractRenderedArtifacts that may force-open the Chat right panel at
+ * turn end: durable deliverables only (drops draft/wip/partial and ephemeral paths).
+ * Artifact cards still use extractRenderedArtifacts so intermediate files remain clickable.
+ */
+export function extractAutoOpenArtifacts(toolCalls?: ToolCall[]): RenderedArtifact[] {
+  return extractRenderedArtifacts(toolCalls).filter((a) => isAutoOpenPanelArtifactPath(a.path))
 }
 
 /** Conversation-level rollup of renderable artifacts: the union of every assistant turn's

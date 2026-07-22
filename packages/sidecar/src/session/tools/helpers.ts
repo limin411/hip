@@ -116,25 +116,49 @@ export async function validateFetchUrl(rawUrl: string): Promise<string | null> {
   return null
 }
 
+/** True when `abs` is lexically under `root` (exact match or prefix + sep). */
+function isUnderRoot(abs: string, root: string): boolean {
+  return abs === root || abs.startsWith(root + path.sep)
+}
+
 /** Map "/abs-relative-to-root" → real fs path inside `root`. Lexical jail PLUS a symlink check on the
  *  deepest existing ancestor (so writing through a symlinked parent that escapes the root is rejected). */
 export async function real(root: string, p: string): Promise<string> {
   const realRoot = await fs.realpath(root)
+  const resolvedRoot = path.resolve(root)
   const normalizedP = path.normalize(p)
   // The model can pass either the documented root-relative form ("/index.html")
   // or an absolute path that is already under the project root. On macOS the
   // temporary directory is a symlink (/var/folders/... -> /private/var/folders/...),
   // so compare against the *real* root after realpath, not the lexical root.
+  //
+  // Critical: new writes target non-existent paths. fs.realpath(leaf) fails then,
+  // so we also accept absolute paths that are *lexically* under root/realRoot —
+  // otherwise "/Users/.../scratch/session/out.html" is mis-handled as root-relative
+  // and lands at root/Users/.../out.html, while write confirmation + preview still
+  // cite the original path → "cannot preview this file".
   let realInput: string | undefined
   try { realInput = await fs.realpath(normalizedP) } catch { realInput = undefined }
-  const isRootRelative = normalizedP.startsWith('/')
-  const isAbsoluteUnderRoot = path.isAbsolute(p) && realInput !== undefined &&
-    (realInput === realRoot || realInput.startsWith(realRoot + path.sep))
-  const candidate = isAbsoluteUnderRoot
-    ? normalizedP
-    : isRootRelative
-      ? path.join(root, normalizedP.replace(/^[\/]+/, ''))
-      : path.join(root, normalizedP)
+
+  let candidate: string
+  if (path.isAbsolute(normalizedP) || path.isAbsolute(p)) {
+    const abs = path.resolve(normalizedP)
+    const underExisting =
+      realInput !== undefined && isUnderRoot(realInput, realRoot)
+    const underLexical =
+      isUnderRoot(abs, realRoot) || isUnderRoot(abs, resolvedRoot)
+    if (underExisting || underLexical) {
+      candidate = underExisting ? normalizedP : abs
+    } else if (normalizedP.startsWith('/') || normalizedP.startsWith('\\')) {
+      // Documented project-root form ("/index.html") or absolute outside root → jail under root.
+      candidate = path.join(root, normalizedP.replace(/^[\/\\]+/, ''))
+    } else {
+      candidate = path.join(root, normalizedP)
+    }
+  } else {
+    candidate = path.join(root, normalizedP)
+  }
+
   const lexical = resolveWithin(root, candidate)
   let probe = lexical
   // find the deepest existing ancestor (the leaf may not exist yet for writes)

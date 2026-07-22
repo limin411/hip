@@ -124,6 +124,15 @@ describe('writeFollow path policy', () => {
     expect(isEphemeralRunScriptPath('/README.md')).toBe(false)
   })
 
+  it('does not mark chat sandbox deliverables under ~/.hip/scratch/<session>/ as ephemeral', () => {
+    expect(isEphemeralRunScriptPath('/Users/x/.hip/scratch/s1/page.html')).toBe(false)
+    expect(isEphemeralRunScriptPath('/Users/x/.hip/scratch/s1/report.md')).toBe(false)
+    expect(isEphemeralRunScriptPath('C:/Users/Admin/.hip/scratch/abc123/out.pdf')).toBe(false)
+    // Nested throwaways inside the session sandbox still count
+    expect(isEphemeralRunScriptPath('/Users/x/.hip/scratch/s1/tmp/x.py')).toBe(true)
+    expect(isEphemeralRunScriptPath('/Users/x/.hip/scratch/s1/scratch/note.md')).toBe(true)
+  })
+
   it('defers shell/script extensions but not product source', () => {
     expect(isDeferredPanelOpenPath('/scripts/analyze.py')).toBe(true)
     expect(isDeferredPanelOpenPath('/bin/setup.sh')).toBe(true)

@@ -354,18 +354,31 @@ export function KnowledgeWorkspace() {
   // flag off, large doc, parse fail, or explicit source. Never mount DocReader
   // as a writing mode; legacy `preview` normalizes to live for canvas selection.
   const liveEnabled = isKnowledgeLiveEnabled()
-  /** Doc ids that failed Live parse this session — stay on Source. */
-  const [liveBlockedDocIds, setLiveBlockedDocIds] = useState<Record<string, true>>(
-    {},
+  /**
+   * Live parse-fail suppress: only blocks the *current* Live attempt token.
+   * A later openDoc / setEditorMode('live') bumps the token so e2e and users
+   * can retry Milkdown instead of being stuck on Source for the session.
+   */
+  const liveAttemptTokenRef = useRef(0)
+  const [liveBlock, setLiveBlock] = useState<{ docId: string; token: number } | null>(
+    null,
   )
   // Residual in-memory `preview` → `live` without reseed (preview is no longer read-only).
   useEffect(() => {
     if (editorMode !== 'preview') return
     useKnowledgeStore.setState({ editorMode: 'live' })
   }, [editorMode])
+  // Entering Live (or switching docs) opens a new attempt — prior parse-fail no longer applies.
+  useEffect(() => {
+    if (editorMode !== 'live' || !activeDocId) return
+    liveAttemptTokenRef.current += 1
+  }, [editorMode, activeDocId])
   const draftLen = useKnowledgeStore.getState().draftBody.length
   const bodyLen = Math.max(docBody.length, draftLen)
-  const liveBlocked = Boolean(activeDocId && liveBlockedDocIds[activeDocId])
+  const liveBlocked =
+    liveBlock != null &&
+    liveBlock.docId === activeDocId &&
+    liveBlock.token === liveAttemptTokenRef.current
   const liveSuppressed =
     liveBlocked || bodyLen > KNOWLEDGE_LARGE_DOC_CHARS
   const canvasMode = editorMode === 'preview' ? 'live' : editorMode
@@ -378,7 +391,7 @@ export function KnowledgeWorkspace() {
   const onLiveParseError = () => {
     toast.error(t('knowledge.doc.liveParseFailed'))
     if (activeDocId) {
-      setLiveBlockedDocIds((prev) => ({ ...prev, [activeDocId]: true }))
+      setLiveBlock({ docId: activeDocId, token: liveAttemptTokenRef.current })
     }
     void setEditorMode('source')
   }
@@ -491,7 +504,10 @@ export function KnowledgeWorkspace() {
     if (!spaceId || !docId) return
     const canvasMode = st.editorMode === 'preview' ? 'live' : st.editorMode
     const bodyLenNow = Math.max(st.docBody.length, st.draftBody.length)
-    const liveBlockedNow = Boolean(docId && liveBlockedDocIds[docId])
+    const liveBlockedNow =
+      liveBlock != null &&
+      liveBlock.docId === docId &&
+      liveBlock.token === liveAttemptTokenRef.current
     const useLive =
       canvasMode === 'live' && liveEnabled && !liveBlockedNow &&
       bodyLenNow <= KNOWLEDGE_LARGE_DOC_CHARS

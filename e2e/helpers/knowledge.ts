@@ -932,10 +932,10 @@ export async function countSpaceCards(): Promise<number> {
   return rows.length
 }
 
-/** Export active doc via doc menu + save seam. */
+/** Export active doc via doc menu + save seam. Live or Source both export. */
 export async function exportActiveDocTo(destPath: string): Promise<void> {
   await installSavePathSeam(destPath)
-  await expectKnowledgeEditor()
+  await waitForKnowledgeWritableSurface(20000)
   await browser.pause(500)
   await clickMenuItem('knowledge-doc-menu', 'knowledge-export-doc')
   await browser.waitUntil(
@@ -994,14 +994,28 @@ export async function setKnowledgeEditorMode(mode: KnowledgeEditorMode): Promise
 /**
  * Force Source (raw Markdown) writing surface.
  * Product default is Live; Source is silent fallback (flag off / large doc / parse fail).
+ * Prefer __hipE2E.knowledgeSetEditorMode (store + flag) over reopen-only — reopen can
+ * no-op on flushSave failure and leave Live blocked/stuck.
  */
 export async function ensureKnowledgeSource(): Promise<void> {
   if (await (await browser.$('[data-testid="knowledge-doc-editor"] .cm-content')).isExisting()) {
     return
   }
-  // Document-level toggle retired — opt out of Live so Workspace mounts DocEditor.
-  await setKnowledgeLiveFlag(false)
-  await reopenActiveKnowledgeDoc()
+  const viaHook = await browser.execute(async () => {
+    const hooks = (
+      window as unknown as {
+        __hipE2E?: { knowledgeSetEditorMode?: (m: 'live' | 'source') => Promise<void> }
+      }
+    ).__hipE2E
+    if (!hooks?.knowledgeSetEditorMode) return false
+    await hooks.knowledgeSetEditorMode('source')
+    return true
+  })
+  if (!viaHook) {
+    // Document-level toggle retired — opt out of Live so Workspace mounts DocEditor.
+    await setKnowledgeLiveFlag(false)
+    await reopenActiveKnowledgeDoc()
+  }
   // If no active doc row yet, wait for either path then re-check.
   try {
     await expectKnowledgeEditor()
@@ -1098,27 +1112,48 @@ export async function toggleFirstTaskCheckbox(): Promise<void> {
 
 /** Open a tree doc by visible title (substring match on row text). */
 export async function openTreeDocByTitle(title: string): Promise<void> {
-  await browser.waitUntil(
+  const docId = await browser.waitUntil(
     async () => {
-      const tid = await browser.execute((t: string) => {
+      return browser.execute((t: string) => {
         const rows = Array.from(
           document.querySelectorAll('[data-testid^="knowledge-tree-doc-"]'),
         ) as HTMLElement[]
         const row = rows.find((r) => (r.textContent ?? '').includes(t))
-        return row?.getAttribute('data-testid') ?? null
+        const tid = row?.getAttribute('data-testid')
+        if (!tid?.startsWith('knowledge-tree-doc-')) return null
+        return tid.slice('knowledge-tree-doc-'.length)
       }, title)
-      if (!tid) return false
-      await browser.execute((id: string) => {
-        const row = document.querySelector(`[data-testid="${id}"]`) as HTMLElement | null
-        // Open handler is on the inner button, not the row shell.
-        const btn = row?.querySelector('button') as HTMLElement | null
-        ;(btn ?? row)?.click()
-      }, tid)
-      return true
     },
-    { timeout: 15000, interval: 300, timeoutMsg: `tree doc not found: ${title}` },
+    {
+      timeout: 15000,
+      interval: 300,
+      timeoutMsg: `tree doc not found: ${title}`,
+    },
   )
-  await browser.pause(200)
+  if (!docId || typeof docId !== 'string') {
+    throw new Error(`tree doc id missing for title: ${title}`)
+  }
+  // Prefer store openDoc via e2e hook (awaits flush+read). Tree click can race.
+  const viaHook = await browser.execute(async (id: string) => {
+    const hooks = (
+      window as unknown as {
+        __hipE2E?: { knowledgeOpenDoc?: (docId: string) => Promise<void> }
+      }
+    ).__hipE2E
+    if (!hooks?.knowledgeOpenDoc) return false
+    await hooks.knowledgeOpenDoc(id)
+    return true
+  }, docId)
+  if (!viaHook) {
+    await browser.execute((id: string) => {
+      const row = document.querySelector(
+        `[data-testid="knowledge-tree-doc-${id}"]`,
+      ) as HTMLElement | null
+      const btn = row?.querySelector('button') as HTMLElement | null
+      ;(btn ?? row)?.click()
+    }, docId)
+  }
+  await waitForKnowledgeWritableSurface(20000)
 }
 
 /** Title of the active (aria-selected) tree doc, or null. */
@@ -1276,11 +1311,24 @@ export async function ensureKnowledgeLive(): Promise<void> {
   if (await (await browser.$('[data-testid="knowledge-doc-live-editor"]')).isExisting()) {
     return
   }
-  await setKnowledgeLiveFlag(true)
-  await browser.pause(100)
-  await reopenActiveKnowledgeDoc()
+  const viaHook = await browser.execute(async () => {
+    const hooks = (
+      window as unknown as {
+        __hipE2E?: { knowledgeSetEditorMode?: (m: 'live' | 'source') => Promise<void> }
+      }
+    ).__hipE2E
+    if (!hooks?.knowledgeSetEditorMode) return false
+    await hooks.knowledgeSetEditorMode('live')
+    return true
+  })
+  if (!viaHook) {
+    await setKnowledgeLiveFlag(true)
+    await browser.pause(100)
+    await reopenActiveKnowledgeDoc()
+  }
   await (await browser.$('[data-testid="knowledge-doc-live-editor"]')).waitForExist({
     timeout: 20000,
+    timeoutMsg: 'knowledge-doc-live-editor not mounted after knowledgeSetEditorMode(live)',
   })
 }
 

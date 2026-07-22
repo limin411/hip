@@ -41,11 +41,26 @@ function escapeRegExp(s: string): string {
 /**
  * Paths that look like throwaway / one-shot run material — never auto-open the
  * right panel (stdout in the transcript is the primary surface).
+ *
+ * Chat sandboxes live at `~/.hip/scratch/<sessionId>/…`. Absolute paths there
+ * are durable session deliverables (HTML/MD/PDF), not project throwaways — only
+ * nested tmp/scratch under that session root stays ephemeral.
  */
 export function isEphemeralRunScriptPath(path: string): boolean {
   if (!path) return false
   const norm = path.replace(/\\/g, '/')
   const base = basename(norm)
+
+  // Filename prefixes / suffixes that mark one-shots (always)
+  if (/^(tmp|temp|scratch|oneoff|one-off|run)[-_.]/i.test(base)) return true
+  if (/[-_](tmp|temp|scratch|oneoff)(\.|$)/i.test(base)) return true
+
+  // Chat session sandbox: <hip>/scratch/<sessionId>/rest — only nested throwaways
+  const hipScratch = /(?:^|\/)\.hip\/scratch\/[^/]+\/(.+)$/i.exec(norm)
+  if (hipScratch) {
+    const rest = hipScratch[1]
+    return /(^|\/)(\.hip\/(tmp|cache|run|scratch)|tmp|temp|scratch|oneoffs?|one-offs?)(\/|$)/i.test(rest)
+  }
 
   // Absolute system temp
   if (/^\/(var\/)?tmp\//i.test(norm)) return true
@@ -55,10 +70,6 @@ export function isEphemeralRunScriptPath(path: string): boolean {
   if (/(^|\/)(\.hip\/(tmp|cache|run|scratch)|tmp|temp|scratch|oneoffs?|one-offs?)(\/|$)/i.test(norm)) {
     return true
   }
-
-  // Filename prefixes / suffixes that mark one-shots
-  if (/^(tmp|temp|scratch|oneoff|one-off|run)[-_.]/i.test(base)) return true
-  if (/[-_](tmp|temp|scratch|oneoff)(\.|$)/i.test(base)) return true
 
   return false
 }

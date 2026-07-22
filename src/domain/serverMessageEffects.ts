@@ -148,8 +148,7 @@ export function applyServerMessageEffects(msg: ServerMessage, deps: ServerMessag
       return
 
     case 'fs:read:result':
-      useFsStore.getState().setPreview(msg.sessionId, {
-        status: 'ready',
+      useFsStore.getState().applyPreviewResult(msg.sessionId, {
         path: msg.path,
         content: msg.content,
         encoding: msg.encoding,
@@ -164,8 +163,7 @@ export function applyServerMessageEffects(msg: ServerMessage, deps: ServerMessag
       return
 
     case 'fs:readCwd:result':
-      useFsStore.getState().setPreview(msg.cwd, {
-        status: 'ready',
+      useFsStore.getState().applyPreviewResult(msg.cwd, {
         path: msg.path,
         content: msg.content,
         encoding: msg.encoding,
@@ -368,34 +366,15 @@ export function applyServerMessageEffects(msg: ServerMessage, deps: ServerMessag
     }
 
     case 'message:complete': {
-      const fsState = useFsStore.getState().bySession[msg.sessionId]
-      if (fsState) {
-        for (const dir of Object.keys(fsState.entriesByDir)) {
-          deps.send({ type: 'fs:ls', sessionId: msg.sessionId, path: dir })
-        }
-        if (fsState.activePath) {
-          deps.send({ type: 'fs:read', sessionId: msg.sessionId, path: fsState.activePath })
-        }
-      }
-      useDiffStore.getState().clearCheckpointDiffCache(msg.sessionId)
-      const base = useDiffStore.getState().bySession[msg.sessionId]?.base ?? 'session-start'
-      deps.send({ type: 'fs:diffSummary', sessionId: msg.sessionId, base })
-      deps.send({ type: 'git:checkpoint:list', sessionId: msg.sessionId })
-      const tab = useUiStore.getState().activeTab
-      const view = useUiStore.getState().activeView
-      // Code surface: always refresh full diff after a turn so Changes stays honest after cancel/complete.
-      if (tab === 'changes' || view === 'code') {
-        deps.requestDiff(msg.sessionId)
-        if (tab === 'changes') deps.requestCommitLog(msg.sessionId)
-      }
-
       const domain = useDomainStore.getState()
       const sess = domain.sessions.find((s) => s.id === msg.sessionId)
       const focus = useFocusStore.getState()
 
       // Flush deferred script write-follow when the turn ends without a consuming run_script.
       // Preview/focus only — openWriteFollowPanel never force-opens a closed panel.
+      // Run before the generic activePath refresh so the deliverable path wins.
       const deferred = focus.deferredWriteFollow
+      let followedPath: string | null = null
       if (
         deferred &&
         deferred.sessionId === msg.sessionId &&
@@ -408,6 +387,7 @@ export function applyServerMessageEffects(msg: ServerMessage, deps: ServerMessag
         const isCode = surfaceOf(sess.config) === 'code'
         applyWriteFollowPreview(msg.sessionId, deferred.path, deferred.callId, deps)
         openWriteFollowPanel(msg.sessionId, deferred.path, isCode)
+        followedPath = deferred.path
         focus.clearDeferredWriteFollow()
       } else if (deferred && deferred.sessionId === msg.sessionId) {
         focus.clearDeferredWriteFollow()
@@ -426,11 +406,34 @@ export function applyServerMessageEffects(msg: ServerMessage, deps: ServerMessag
         if (arts.length > 0) {
           const last = arts[arts.length - 1]
           applyWriteFollowPreview(msg.sessionId, last.path, null, deps)
+          followedPath = last.path
           const ui = useUiStore.getState()
           ui.setChatActiveTab('files')
           ui.setSelectedArtifactPath(last.path)
           domain.setSessionChatPanelOpen(msg.sessionId, true)
         }
+      }
+
+      const fsState = useFsStore.getState().bySession[msg.sessionId]
+      if (fsState) {
+        for (const dir of Object.keys(fsState.entriesByDir)) {
+          deps.send({ type: 'fs:ls', sessionId: msg.sessionId, path: dir })
+        }
+        // Skip redundant re-read when write-follow/auto-open already requested this path.
+        if (fsState.activePath && fsState.activePath !== followedPath) {
+          deps.send({ type: 'fs:read', sessionId: msg.sessionId, path: fsState.activePath })
+        }
+      }
+      useDiffStore.getState().clearCheckpointDiffCache(msg.sessionId)
+      const base = useDiffStore.getState().bySession[msg.sessionId]?.base ?? 'session-start'
+      deps.send({ type: 'fs:diffSummary', sessionId: msg.sessionId, base })
+      deps.send({ type: 'git:checkpoint:list', sessionId: msg.sessionId })
+      const tab = useUiStore.getState().activeTab
+      const view = useUiStore.getState().activeView
+      // Code surface: always refresh full diff after a turn so Changes stays honest after cancel/complete.
+      if (tab === 'changes' || view === 'code') {
+        deps.requestDiff(msg.sessionId)
+        if (tab === 'changes') deps.requestCommitLog(msg.sessionId)
       }
       return
     }

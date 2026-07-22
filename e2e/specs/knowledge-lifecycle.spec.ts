@@ -31,6 +31,8 @@ import {
   clearSavePathSeam,
   ensureKnowledgeHome,
   expectTreeContains,
+  openTreeDocByTitle,
+  waitForKnowledgeWritableSurface,
 } from '../helpers/knowledge.js'
 
 describe('knowledge lifecycle business flow @knowledge @core', () => {
@@ -125,19 +127,13 @@ describe('knowledge lifecycle business flow @knowledge @core', () => {
   })
 
   it('KL9: export active doc includes marker', async () => {
-    // Ensure workspace + editor mode with content
+    // KL7/KL8 only prove tree presence — reopen may leave no active doc selected.
     if (!(await (await browser.$('[data-testid="knowledge-workspace"]')).isExisting())) {
       await ensureKnowledgeHome()
       await openSpaceCardByName(spaceName)
     }
-    if (!(await (await browser.$('[data-testid="knowledge-doc-editor"]')).isExisting())) {
-      // Source fallback via flag (document-level mode toggle retired).
-      await toggleKnowledgePreviewOrEdit()
-      if (!(await (await browser.$('[data-testid="knowledge-doc-editor"]')).isExisting())) {
-        await toggleKnowledgePreviewOrEdit()
-      }
-      await expectKnowledgeEditor()
-    }
+    await openTreeDocByTitle(docTitle)
+    await waitForKnowledgeWritableSurface(20000)
     exportMd = path.join(os.tmpdir(), `hip-e2e-life-export-${Date.now()}.md`)
     await exportActiveDocTo(exportMd)
     expect(fs.readFileSync(exportMd, 'utf8')).toContain(marker)

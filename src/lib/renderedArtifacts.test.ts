@@ -144,6 +144,11 @@ describe('extractAutoOpenArtifacts / isAutoOpenPanelArtifactPath', () => {
     expect(isAutoOpenPanelArtifactPath('/proj/scratch/note.md')).toBe(false)
   })
 
+  it('keeps chat sandbox deliverables under ~/.hip/scratch/<session>/', () => {
+    expect(isAutoOpenPanelArtifactPath('/Users/x/.hip/scratch/s1/page.html')).toBe(true)
+    expect(isAutoOpenPanelArtifactPath('/Users/x/.hip/scratch/s1/report.md')).toBe(true)
+  })
+
   it('filters turn writes to durable products only (cards still use extractRenderedArtifacts)', () => {
     const calls: ToolCall[] = [
       tc({ callId: 'c1', seq: 1, input: JSON.stringify({ path: '/p/notes_draft.md' }) }),

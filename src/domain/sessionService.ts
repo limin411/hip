@@ -53,6 +53,8 @@ import {
 } from '@/store/diffAnnotationStore'
 import { auditSessionDelete, debugSessionDelete } from '@/lib/sessionDelete'
 import { StreamCoalescer, type CoalesceBucket, type StreamKind } from '@/lib/streamCoalesce'
+import { useKnowledgeStore } from '@/store/knowledgeStore'
+import { KNOWLEDGE_LIVE_FLAG_KEY } from '@/domain/knowledge/editorMode'
 
 /**
  * Map the current i18next language to a SessionConfig-supported value.
@@ -2465,6 +2467,15 @@ export type HipE2EHooks = {
   ) => string
   /** Mirror InputBar submit: format pending annotations + sendMessage. */
   sendWithPendingAnnotations: (sessionId: string, text: string) => void
+  /**
+   * Knowledge Live ↔ Source switch for e2e (R3 has no document-level mode chrome).
+   * Sets hip-knowledge-live flag then store.setEditorMode so Workspace remounts.
+   */
+  knowledgeSetEditorMode: (mode: 'live' | 'source') => Promise<void>
+  /** Current knowledge editorMode (live | source | preview). */
+  knowledgeGetEditorMode: () => string | null
+  /** Open a knowledge doc by id (awaits openDoc). */
+  knowledgeOpenDoc: (docId: string) => Promise<void>
 }
 
 declare global {
@@ -2618,6 +2629,24 @@ function installE2eHooks(svc: SessionService): void {
       if (annBlock) content = `${annBlock}${content}`
       useDomainStore.getState().selectSession(sessionId)
       svc.sendMessage(content, [])
+    },
+    knowledgeSetEditorMode: async (mode) => {
+      try {
+        localStorage.setItem(KNOWLEDGE_LIVE_FLAG_KEY, mode === 'live' ? 'true' : 'false')
+      } catch {
+        // private mode / quota
+      }
+      const st = useKnowledgeStore.getState()
+      // Already Live but surface may still be Source (parse-block). Bounce through
+      // source so Workspace bumps the Live attempt token and remounts Milkdown.
+      if (mode === 'live' && st.editorMode === 'live') {
+        await st.setEditorMode('source')
+      }
+      await useKnowledgeStore.getState().setEditorMode(mode)
+    },
+    knowledgeGetEditorMode: () => useKnowledgeStore.getState().editorMode ?? null,
+    knowledgeOpenDoc: async (docId) => {
+      await useKnowledgeStore.getState().openDoc(docId)
     },
   }
 }

@@ -21,6 +21,7 @@ export interface EmptyStateProps {
    */
   children?: React.ReactNode
   className?: string
+  'data-testid'?: string
 }
 
 export function EmptyState({
@@ -31,10 +32,12 @@ export function EmptyState({
   action,
   children,
   className,
+  'data-testid': testId,
 }: EmptyStateProps) {
   return (
     <div
       data-tier={tier}
+      data-testid={testId}
       className={cn(
         'flex flex-col items-center justify-center rounded-lg py-14 text-center',
         className,

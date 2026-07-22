@@ -20,6 +20,7 @@ import { Switch } from '@/components/ui/Switch'
 import { Modal } from '@/components/ui/Modal'
 import { Input } from '@/components/ui/Input'
 import { Pagination } from '@/components/ui/Pagination'
+import { EmptyState as UiEmptyState } from '@/components/ui/EmptyState'
 import { MarkdownBody } from '@/components/chat/MarkdownBody'
 import { readPluginFile } from '@/ipc/plugins'
 import { cn } from '@/lib/utils'
@@ -347,18 +348,21 @@ export function PluginConfigView({
               <div className="text-body text-ink-tertiary">{t('settings.plugins.loading')}</div>
             ) : tab === 'custom' ? (
               localFiltered.length === 0 ? (
-                <EmptyState
+                <UiEmptyState
+                  icon={Package}
+                  tier="professional"
                   title={
                     query.trim()
                       ? t('settings.plugins.noSearchResults')
                       : t('settings.plugins.empty')
                   }
-                  hint={
+                  description={
                     query.trim()
                       ? t('settings.plugins.noSearchResultsHint')
                       : t('settings.plugins.emptyHint')
                   }
-                  testId={query.trim() ? 'plugin-market-no-results' : 'plugin-market-empty'}
+                  className="border border-dashed border-border bg-surface-subtle"
+                  data-testid={query.trim() ? 'plugin-market-no-results' : 'plugin-market-empty'}
                 />
               ) : (
                 <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
@@ -375,18 +379,21 @@ export function PluginConfigView({
                 </div>
               )
             ) : marketEntries.length === 0 ? (
-              <EmptyState
+              <UiEmptyState
+                icon={Package}
+                tier="professional"
                 title={
                   query.trim()
                     ? t('settings.plugins.noSearchResults')
                     : t('settings.plugins.marketEmpty')
                 }
-                hint={
+                description={
                   query.trim()
                     ? t('settings.plugins.noSearchResultsHint')
                     : t('settings.plugins.marketEmptyHint')
                 }
-                testId={query.trim() ? 'plugin-market-no-results' : 'plugin-market-empty'}
+                className="border border-dashed border-border bg-surface-subtle"
+                data-testid={query.trim() ? 'plugin-market-no-results' : 'plugin-market-empty'}
               />
             ) : (
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
@@ -429,27 +436,6 @@ export function PluginConfigView({
           )}
         </div>
       </div>
-    </div>
-  )
-}
-
-function EmptyState({
-  title,
-  hint,
-  testId,
-}: {
-  title: string
-  hint: string
-  testId: string
-}) {
-  return (
-    <div
-      className="rounded-lg border border-dashed border-border bg-surface-subtle px-4 py-8 text-center"
-      data-testid={testId}
-    >
-      <Package size={22} className="mx-auto text-ink-tertiary" />
-      <div className="mt-2 text-body text-ink-secondary">{title}</div>
-      <div className="mt-1 text-meta text-ink-tertiary">{hint}</div>
     </div>
   )
 }

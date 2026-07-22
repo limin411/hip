@@ -2,6 +2,7 @@ import { useTranslation } from 'react-i18next'
 import { ArrowUp, Square } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
 import { Textarea } from '@/components/ui/Textarea'
+import { focusFieldWithin } from '@/components/ui/focusClasses'
 import { cn } from '@/lib/utils'
 import type { LocalAttachment } from './attachmentTypes'
 
@@ -72,7 +73,10 @@ export function Composer({
     <div
       className={cn(
         isCard
-          ? 'rounded-xl border border-border bg-surface p-2.5 transition-[border-color,box-shadow] duration-chrome focus-within:border-accent focus-within:ring-[3px] focus-within:ring-accent/10'
+          ? cn(
+              'rounded-xl border border-border bg-surface p-2.5 transition-[border-color,box-shadow] duration-chrome',
+              focusFieldWithin,
+            )
           // Flat dock: no focus chrome — InputBar already draws the top rule.
           : 'bg-surface',
       )}

@@ -93,15 +93,23 @@ export function SubAgentCard({
   return (
     <DeclarativeContextMenu kind="subAgent" payload={{ agent }}>
       <div
-        className="mb-2 border-l-2 pl-3"
+        className={cn(
+          'mb-2 border-l-2 pl-3 transition-opacity duration-content',
+          agent.status === 'running' ? 'opacity-100' : 'opacity-95',
+        )}
         style={{ borderLeftColor: railColor }}
         data-testid="subagent-card"
+        data-status={agent.status}
       >
         <button
           type="button"
           onClick={() => setManualOpen(!bodyOpen)}
           aria-expanded={bodyOpen}
-          className={cn(TRAIL_ROW, 'w-full text-ink transition-colors hover:text-ink')}
+          className={cn(
+            TRAIL_ROW,
+            'w-full text-ink transition-colors duration-chrome hover:text-ink',
+            agent.status !== 'running' && 'text-ink-secondary',
+          )}
           data-testid="subagent-card-header"
         >
           <ChevronRight

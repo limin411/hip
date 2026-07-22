@@ -13,6 +13,7 @@ import { Button } from '@/components/ui/Button'
 import { Switch } from '@/components/ui/Switch'
 import { Badge } from '@/components/ui/Badge'
 import { Modal } from '@/components/ui/Modal'
+import { inputClassName } from '@/components/ui/Input'
 import { DeclarativeContextMenu } from '@/components/context-menu'
 
 import {
@@ -24,8 +25,7 @@ import {
   type KvPair,
 } from '@/lib/mcpServerDraft'
 
-const inputCls =
-  'h-9 w-full rounded-md border border-border bg-surface px-2.5 text-body text-ink focus-visible:outline-none focus-visible:border-accent focus-visible:ring-[3px] focus-visible:ring-accent/10'
+const inputCls = inputClassName
 
 type Editing = { mode: 'add' } | { mode: 'edit'; server: McpServerConfig } | null
 

@@ -143,11 +143,27 @@ export function ActivityBar({
         <CheckCircle2 size={14} className="block shrink-0 text-success" data-testid="activity-status-success" />
       )
 
+  // Terminal settle rail — quiet while running; semantic edge when the turn settles.
+  const settleRail = !isRunning
+    ? status === 'error'
+      ? 'border-l-2 border-l-danger pl-2'
+      : status === 'success_partial'
+        ? 'border-l-2 border-l-warning pl-2'
+        : status === 'stopped'
+          ? 'border-l-2 border-l-border-strong pl-2'
+          : 'border-l-2 border-l-success pl-2'
+    : undefined
+
   return (
-    <div className="mb-2" data-testid="activity-bar" aria-live="polite">
+    <div
+      className={cn('mb-2', settleRail && 'animate-message-enter')}
+      data-testid="activity-bar"
+      data-status={status}
+      aria-live="polite"
+    >
       {interleaved ? (
         <div
-          className={TRAIL_ROW}
+          className={cn(TRAIL_ROW, settleRail)}
           role="status"
           data-testid="activity-bar-summary"
         >
@@ -173,7 +189,11 @@ export function ActivityBar({
           type="button"
           onClick={() => setOpen((v) => !v)}
           aria-expanded={open}
-          className={cn(TRAIL_ROW, 'w-full text-ink-tertiary transition-colors hover:text-ink-secondary')}
+          className={cn(
+            TRAIL_ROW,
+            'w-full text-ink-tertiary transition-colors hover:text-ink-secondary',
+            settleRail,
+          )}
           data-testid="activity-bar-summary"
         >
           <ChevronRight

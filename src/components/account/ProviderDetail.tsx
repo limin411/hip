@@ -8,6 +8,7 @@ import { modelBadges, type ModelCapKey } from '@/lib/modelBadges'
 import { Button } from '@/components/ui/Button'
 import { Badge } from '@/components/ui/Badge'
 import { Switch } from '@/components/ui/Switch'
+import { inputClassName } from '@/components/ui/Input'
 import { cn } from '@/lib/utils'
 import { sessionService } from '@/domain/sessionService'
 import { useDomainStore } from '@/domain/sessionStore'
@@ -39,8 +40,7 @@ const CAP_I18N = {
   attachment: 'settings.modelConfig.vision',
 } as const satisfies Record<ModelCapKey, string>
 
-const inputCls =
-  'h-9 flex-1 rounded-md border border-border bg-surface px-2.5 text-body text-ink focus-visible:outline-none focus-visible:border-accent focus-visible:ring-[3px] focus-visible:ring-accent/10'
+const inputCls = cn(inputClassName, 'flex-1')
 
 /** Right detail pane: provider connection settings and model selection. */
 export function ProviderDetail({

@@ -25,15 +25,14 @@ import {
 } from '@/lib/hostFormDraft'
 import { Modal } from '@/components/ui/Modal'
 import { Button } from '@/components/ui/Button'
-import { Input } from '@/components/ui/Input'
+import { Input, inputClassName } from '@/components/ui/Input'
 import { SegmentedControl } from '@/components/ui/SegmentedControl'
 import { Badge } from '@/components/ui/Badge'
 import { cn } from '@/lib/utils'
 
 export type HostFormMode = { mode: 'create' } | { mode: 'edit'; host: TerminalHost }
 
-const inputCls =
-  'h-9 w-full rounded-md border border-border bg-surface px-2.5 text-body text-ink focus-visible:outline-none focus-visible:border-accent focus-visible:ring-[3px] focus-visible:ring-accent/10'
+const inputCls = inputClassName
 
 export function HostFormDialog({
   open,

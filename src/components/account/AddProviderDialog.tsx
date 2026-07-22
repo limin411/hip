@@ -3,10 +3,10 @@ import { useTranslation } from 'react-i18next'
 import { useProvidersStore } from '@/store/providersStore'
 import { Modal } from '@/components/ui/Modal'
 import { Button } from '@/components/ui/Button'
+import { inputClassName } from '@/components/ui/Input'
 import { cn } from '@/lib/utils'
 
-const inputCls =
-  'h-9 w-full rounded-md border border-border bg-surface px-2.5 text-body text-ink focus-visible:outline-none focus-visible:border-accent focus-visible:ring-[3px] focus-visible:ring-accent/10'
+const inputCls = inputClassName
 
 /** Modal form to register a custom OpenAI-compatible provider. */
 export function AddProviderDialog({ onDone, onCancel }: { onDone: (id: string) => void; onCancel: () => void }) {

@@ -46,5 +46,20 @@ export function ThemeProvider({ children }: ThemeProviderProps) {
     document.documentElement.dataset.density = density
   }, [density])
 
+  // Quiet chrome when the OS window is unfocused (native desktop feel).
+  useEffect(() => {
+    const root = document.documentElement
+    const sync = () => {
+      root.dataset.windowFocus = document.hasFocus() ? 'true' : 'false'
+    }
+    sync()
+    window.addEventListener('focus', sync)
+    window.addEventListener('blur', sync)
+    return () => {
+      window.removeEventListener('focus', sync)
+      window.removeEventListener('blur', sync)
+    }
+  }, [])
+
   return <>{children}</>
 }

@@ -23,6 +23,7 @@ import { ProjectGuidanceChip } from './ProjectGuidanceChip'
 import { AttachmentButton } from './AttachmentButton'
 import { SessionAgentPicker } from './SessionAgentPicker'
 import { WorktreeControl } from './WorktreeControl/WorktreeControl'
+import { ComposerControlRow } from './ComposerControlRow'
 import { isExternalPrimary } from '@/lib/sessionAgent'
 import { sessionService, useActiveSession, useActiveSessionId, useActiveSessionStatus, useActivePendingPermission, useConnectionStatus } from '@/domain'
 import { formatDiffAnnotationsForComposer, useDiffAnnotationStore } from '@/store/diffAnnotationStore'
@@ -297,7 +298,11 @@ export function InputBar() {
       )}
       <div className="w-full px-4 py-2.5">
         {sessionActionBlocked ? (
-          <div className="border-y border-border bg-surface px-1 py-3 text-left text-meta text-ink-secondary">
+          <div
+            className="rounded-md bg-surface-muted/50 px-3 py-3 text-left text-meta text-ink-secondary"
+            data-testid="input-bar-blocked"
+            role="status"
+          >
             {pendingPermission
               ? t('chat.permission.reviewAbove')
               : t('chat.planApproval.reviewAbove')}
@@ -342,23 +347,37 @@ export function InputBar() {
               }
               leftSlot={
                 isCode ? (
-                  <>
-                    <SessionAgentPicker />
-                    {!externalPrimary && <ModelPicker />}
-                    {!externalPrimary && <EffortLevelPicker />}
-                    <PermissionModePicker />
-                    {!externalPrimary && <PlanModeChip />}
-                    <ProjectGuidanceChip />
-                    <WorktreeControl />
-                    <AttachmentButton onAttach={setAttachments} />
-                  </>
+                  <ComposerControlRow
+                    primary={
+                      <>
+                        <SessionAgentPicker />
+                        {!externalPrimary && <ModelPicker />}
+                        <AttachmentButton onAttach={setAttachments} />
+                      </>
+                    }
+                    secondary={
+                      <>
+                        {!externalPrimary && <EffortLevelPicker />}
+                        <PermissionModePicker />
+                        {!externalPrimary && <PlanModeChip />}
+                        <ProjectGuidanceChip />
+                        <WorktreeControl />
+                      </>
+                    }
+                  />
                 ) : (
-                  <>
-                    <SessionAgentPicker />
-                    {!externalPrimary && <ModelPicker />}
-                    {!externalPrimary && <EffortLevelPicker />}
-                    <AttachmentButton onAttach={(add) => setAttachments((prev) => [...prev, ...add])} />
-                  </>
+                  <ComposerControlRow
+                    primary={
+                      <>
+                        <SessionAgentPicker />
+                        {!externalPrimary && <ModelPicker />}
+                        <AttachmentButton
+                          onAttach={(add) => setAttachments((prev) => [...prev, ...add])}
+                        />
+                      </>
+                    }
+                    secondary={!externalPrimary ? <EffortLevelPicker /> : undefined}
+                  />
                 )
               }
               attachments={attachments}

@@ -83,13 +83,18 @@ export function PlanProgressPanel({ view, onApprove, onReject, onAmend }: PlanPr
     }
   }
 
+  const progressPct = total > 0 ? Math.min(100, Math.round((done / total) * 100)) : 0
+
   return (
     <div
       className={cn(
         'rounded-lg border px-4 py-3',
-        awaiting ? 'border-accent/30 bg-accent-subtle' : 'border-border bg-surface-muted/40',
+        awaiting
+          ? 'border-accent/30 border-l-2 border-l-accent bg-accent-subtle'
+          : 'border-border bg-surface-muted/40',
       )}
       data-testid="plan-progress-panel"
+      data-phase={view.phase}
       aria-live="polite"
     >
       <div className="flex flex-wrap items-center gap-2 text-body font-medium text-ink">
@@ -105,6 +110,25 @@ export function PlanProgressPanel({ view, onApprove, onReject, onAmend }: PlanPr
           <Loader2 size={14} className="shrink-0 animate-spin text-accent-strong" aria-hidden />
         )}
       </div>
+
+      {total > 0 && view.phase !== 'planning' && (
+        <div
+          className="mt-2 h-1 w-full overflow-hidden rounded-full bg-border"
+          data-testid="plan-progress-track"
+          role="progressbar"
+          aria-valuenow={done}
+          aria-valuemin={0}
+          aria-valuemax={total}
+        >
+          <div
+            className={cn(
+              'h-full rounded-full transition-[width] duration-content',
+              awaiting ? 'bg-accent' : view.phase === 'done' ? 'bg-success' : 'bg-accent-strong',
+            )}
+            style={{ width: `${progressPct}%` }}
+          />
+        </div>
+      )}
 
       {current && view.phase !== 'planning' && (
         <p className="mt-1 truncate text-meta text-ink-tertiary" data-testid="plan-progress-current">

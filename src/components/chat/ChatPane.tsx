@@ -11,6 +11,7 @@ import { useVirtualizer } from '@tanstack/react-virtual'
 import { ChevronDown } from 'lucide-react'
 import {
   sessionService,
+  useActiveSession,
   useActiveSessionId,
   useActiveMessages,
   useActiveChatPlanSlice,
@@ -19,6 +20,7 @@ import {
   useActiveInterrupt,
   useDomainStore,
 } from '@/domain'
+import { surfaceOf } from '@/lib/sessions'
 import { isCurrentTurnAssistant, isStreamingAssistant, lastAssistantIndex, lastNonNotice } from '@/domain/sessionStore'
 import { useUiStore } from '@/store/uiStore'
 import { cn } from '@/lib/utils'
@@ -45,6 +47,8 @@ export function ChatPane() {
   // Isolated slices: messages / status / plan — not the whole SessionVM — so title,
   // planDeltaDraft, permission, and other session noise do not re-render the transcript list.
   const activeSessionId = useActiveSessionId()
+  const activeSession = useActiveSession()
+  const isChatSurface = activeSession ? surfaceOf(activeSession.config) === 'chat' : false
   const messages = useActiveMessages()
   const error = useActiveSessionError()
   const status = useActiveSessionStatus()
@@ -411,7 +415,14 @@ export function ChatPane() {
         data-transcript-virtual={virtualize ? 'true' : undefined}
       >
         {/* CLI-style transcript: full-width left-aligned, no centered chat column */}
-        <div className="flex w-full flex-col gap-5 px-4 py-4">
+        <div
+          className={cn(
+            'flex w-full flex-col px-4 py-4',
+            // Chat surface: slightly looser vertical rhythm (reading room vs code bench).
+            isChatSurface ? 'gap-6' : 'gap-5',
+          )}
+          data-surface={isChatSurface ? 'chat' : 'code'}
+        >
           {hasEarlier && (
             <div className="flex justify-center">
               <Button

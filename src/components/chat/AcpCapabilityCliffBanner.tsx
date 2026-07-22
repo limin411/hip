@@ -1,12 +1,12 @@
 import { useMemo } from 'react'
 import { create } from 'zustand'
-import { AlertTriangle } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { useActiveSession, useActiveSessionId } from '@/domain'
 import { useDraftStore } from '@/store/draftStore'
 import { useAgents, useHipConfigStore } from '@/store/hipConfigStore'
 import { isExternalPrimary } from '@/lib/sessionAgent'
 import { Button } from '@/components/ui/Button'
+import { ActionBanner } from '@/components/ui/ActionBanner'
 
 /** Session-local dismiss keys: `${scopeId}:${agentId}` — agent change re-shows the banner. */
 interface CliffDismissState {
@@ -57,22 +57,14 @@ export function AcpCapabilityCliffBanner() {
   if (dismissed[key]) return null
 
   return (
-    <div
-      className="flex shrink-0 items-start gap-3 border-b border-warning/30 bg-warning/10 px-4 py-2.5"
-      data-testid="acp-capability-cliff-banner"
+    <ActionBanner
+      tone="warning"
       role="status"
-    >
-      <AlertTriangle size={16} className="mt-0.5 shrink-0 text-warning" aria-hidden />
-      <div className="min-w-0 flex-1">
-        <div className="text-meta font-medium text-ink">{t('chat.acpCliff.title')}</div>
-        <div className="mt-0.5 text-caption text-ink-secondary">
-          {t('chat.acpCliff.body', { name: resolved.agentName })}
-        </div>
-        <div className="mt-0.5 text-caption text-ink-tertiary">
-          {forwardMcp ? t('chat.acpCliff.mcpOn') : t('chat.acpCliff.mcpOff')}
-        </div>
-      </div>
-      <div className="flex shrink-0 items-center gap-2">
+      data-testid="acp-capability-cliff-banner"
+      title={t('chat.acpCliff.title')}
+      description={t('chat.acpCliff.body', { name: resolved.agentName })}
+      meta={forwardMcp ? t('chat.acpCliff.mcpOn') : t('chat.acpCliff.mcpOff')}
+      actions={
         <Button
           size="sm"
           variant="ghost"
@@ -81,7 +73,7 @@ export function AcpCapabilityCliffBanner() {
         >
           {t('chat.acpCliff.dismiss')}
         </Button>
-      </div>
-    </div>
+      }
+    />
   )
 }

@@ -7,6 +7,7 @@ import { Modal } from '@/components/ui/Modal'
 import { Button } from '@/components/ui/Button'
 import { Switch } from '@/components/ui/Switch'
 import { Badge } from '@/components/ui/Badge'
+import { inputClassName } from '@/components/ui/Input'
 import { cn } from '@/lib/utils'
 import { groupModelOptions } from '@/lib/agentModelOptions'
 import { buildAgentDraft, isAgentDraftValid, type AgentForm } from '@/lib/agentDraft'
@@ -20,8 +21,7 @@ import { acpPresetById } from '@/lib/acpPresets'
 import { AcpProviderPicker } from './AcpProviderPicker'
 import type { AcpPreset } from '@/lib/acpPresets'
 
-const inputCls =
-  'h-9 w-full rounded-md border border-border bg-surface px-2.5 text-body text-ink focus-visible:outline-none focus-visible:border-accent focus-visible:ring-[3px] focus-visible:ring-accent/10'
+const inputCls = inputClassName
 
 export function AgentEditor({
   initial,

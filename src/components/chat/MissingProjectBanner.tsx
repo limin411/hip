@@ -1,4 +1,3 @@
-import { AlertTriangle } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { sessionService, useActiveSession } from '@/domain'
 import { pickDirectory } from '@/ipc/dialog'
@@ -6,6 +5,7 @@ import { projectPathBlockReason } from '@/lib/projectPathGate'
 import { projectPathKey } from '@/lib/sessionProjectGroups'
 import { useProjectPathStore } from '@/store/projectPathStore'
 import { Button } from '@/components/ui/Button'
+import { ActionBanner } from '@/components/ui/ActionBanner'
 
 /**
  * Code sessions must have a live project folder. Shown when unbound or when
@@ -40,27 +40,22 @@ export function MissingProjectBanner() {
       : t('chat.missingProject.desc', { path: pathLabel })
 
   return (
-    <div
-      className="flex shrink-0 items-start gap-3 border-b border-warning/30 bg-warning/10 px-4 py-2.5"
+    <ActionBanner
+      tone="warning"
+      role="alert"
       data-testid="missing-project-banner"
       data-reason={reason}
-      role="alert"
-    >
-      <AlertTriangle size={16} className="mt-0.5 shrink-0 text-warning" aria-hidden />
-      <div className="min-w-0 flex-1">
-        <div className="text-meta font-medium text-ink">{title}</div>
-        <div
-          className="mt-0.5 truncate text-caption text-ink-secondary"
-          title={reason === 'missing' ? pathLabel : undefined}
-        >
+      title={title}
+      description={
+        <span className="block truncate" title={reason === 'missing' ? pathLabel : undefined}>
           {desc}
-        </div>
-      </div>
-      <div className="flex shrink-0 flex-wrap items-center gap-2">
+        </span>
+      }
+      actions={
         <Button size="sm" data-testid="missing-project-rebind" onClick={() => void rebind()}>
           {t('chat.missingProject.rebind')}
         </Button>
-      </div>
-    </div>
+      }
+    />
   )
 }

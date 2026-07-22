@@ -23,6 +23,8 @@ vi.mock('react-i18next', () => ({
 
 vi.mock('lucide-react', () => ({
   AlertTriangle: () => React.createElement('span', { 'data-testid': 'icon-warn' }),
+  XCircle: () => React.createElement('span', { 'data-testid': 'icon-danger' }),
+  Info: () => React.createElement('span', { 'data-testid': 'icon-info' }),
 }))
 
 vi.mock('@/components/ui/Button', () => ({

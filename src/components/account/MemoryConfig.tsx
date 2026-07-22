@@ -29,13 +29,14 @@ import { memoryModelKey, memoryModelRefFromKey } from '@/lib/memoryModelRef'
 import { Button } from '@/components/ui/Button'
 import { Modal } from '@/components/ui/Modal'
 import { Switch } from '@/components/ui/Switch'
+import { inputClassName } from '@/components/ui/Input'
+import { textareaClassName } from '@/components/ui/Textarea'
+import { Skeleton, SkeletonText } from '@/components/ui/Skeleton'
 import { cn } from '@/lib/utils'
 
-const inputCls =
-  'h-9 w-full rounded-md border border-border bg-surface px-2.5 text-body text-ink focus-visible:outline-none focus-visible:border-accent focus-visible:ring-[3px] focus-visible:ring-accent/10'
+const inputCls = inputClassName
 
-const textareaCls =
-  'w-full min-h-[120px] resize-y rounded-md border border-border bg-surface px-2.5 py-2 text-body text-ink focus-visible:outline-none focus-visible:border-accent focus-visible:ring-[3px] focus-visible:ring-accent/10'
+const textareaCls = cn(textareaClassName, 'min-h-[120px] resize-y')
 
 const KIND_OPTIONS: MemoryKind[] = [
   'preference',
@@ -507,9 +508,18 @@ export function MemoryConfig() {
 
   if (loading && !config) {
     return (
-      <div className="px-8 pt-7 pb-20">
-        <h2 className="text-title font-semibold text-ink">{t('settings.memory.title')}</h2>
-        <p className="mt-2 text-body text-ink-secondary">{t('settings.memory.loading')}</p>
+      <div className="space-y-6 px-8 pt-7 pb-20" data-testid="memory-config-loading">
+        <div>
+          <h2 className="text-title font-semibold text-ink">{t('settings.memory.title')}</h2>
+          <p className="mt-2 text-body text-ink-secondary">{t('settings.memory.loading')}</p>
+        </div>
+        <Skeleton className="h-24 w-full rounded-xl" />
+        <SkeletonText lines={4} />
+        <div className="space-y-2">
+          <Skeleton className="h-12 w-full rounded-lg" />
+          <Skeleton className="h-12 w-full rounded-lg" />
+          <Skeleton className="h-12 w-4/5 rounded-lg" />
+        </div>
       </div>
     )
   }

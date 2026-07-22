@@ -25,6 +25,7 @@ import { PermissionModePicker } from './PermissionModePicker'
 import { PlanModeChip } from './PlanModeChip'
 import { AttachmentButton } from './AttachmentButton'
 import { SessionAgentPicker } from './SessionAgentPicker'
+import { ComposerControlRow } from './ComposerControlRow'
 import { AcpCapabilityCliffBanner } from './AcpCapabilityCliffBanner'
 import { isAttachmentSupported } from '@/lib/attachmentEligibility'
 import { activeModelKey, parseModelKey } from '@/lib/modelKey'
@@ -361,21 +362,35 @@ export function NewConversation() {
             inputRef={inputRef}
             leftSlot={
               surface === 'code' ? (
-                <>
-                  <SessionAgentPicker />
-                  {!externalPrimary && <ModelPicker />}
-                  {!externalPrimary && <EffortLevelPicker />}
-                  <PermissionModePicker />
-                  {!externalPrimary && <PlanModeChip />}
-                  <AttachmentButton onAttach={setAttachments} />
-                </>
+                <ComposerControlRow
+                  primary={
+                    <>
+                      <SessionAgentPicker />
+                      {!externalPrimary && <ModelPicker />}
+                      <AttachmentButton onAttach={setAttachments} />
+                    </>
+                  }
+                  secondary={
+                    <>
+                      {!externalPrimary && <EffortLevelPicker />}
+                      <PermissionModePicker />
+                      {!externalPrimary && <PlanModeChip />}
+                    </>
+                  }
+                />
               ) : (
-                <>
-                  <SessionAgentPicker />
-                  {!externalPrimary && <ModelPicker />}
-                  {!externalPrimary && <EffortLevelPicker />}
-                  <AttachmentButton onAttach={(add) => setAttachments((prev) => [...prev, ...add])} />
-                </>
+                <ComposerControlRow
+                  primary={
+                    <>
+                      <SessionAgentPicker />
+                      {!externalPrimary && <ModelPicker />}
+                      <AttachmentButton
+                        onAttach={(add) => setAttachments((prev) => [...prev, ...add])}
+                      />
+                    </>
+                  }
+                  secondary={!externalPrimary ? <EffortLevelPicker /> : undefined}
+                />
               )
             }
             attachments={attachments}

@@ -191,7 +191,7 @@ function MessageBubbleImpl({ message, streaming, isLastAssistant, hidePlan }: Me
             {message.attachments.map((a) => (
               <div
                 key={a.id}
-                className="flex items-center gap-1 border border-border bg-surface-muted px-2 py-1 text-meta"
+                className="flex items-center gap-1 rounded-md border border-border bg-surface-muted px-2 py-1 text-meta"
                 data-testid="message-attachment"
               >
                 <span className="max-w-[160px] truncate">{a.name}</span>

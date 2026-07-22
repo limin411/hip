@@ -32,7 +32,7 @@ export function ComposerPlanPanel() {
   if (!livePlan) return null
 
   return (
-    <div className="shrink-0 border-t border-border bg-surface px-4 py-2" data-testid="composer-plan-slot">
+    <div className="shrink-0 bg-surface px-4 py-2" data-testid="composer-plan-slot">
       <div className="w-full">
         <PlanProgressPanel
           view={livePlan}

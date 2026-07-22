@@ -39,7 +39,7 @@ export function PermissionModal() {
 
   return (
     <div
-      className="shrink-0 border-t border-border bg-surface px-4 py-3"
+      className="shrink-0 bg-surface px-4 py-3"
       data-testid="permission-prompt-slot"
     >
       <div

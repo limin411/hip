@@ -2,6 +2,7 @@ import { tool } from '@langchain/core/tools'
 import type { StructuredToolInterface } from '@langchain/core/tools'
 import { z } from 'zod'
 import type { NetworkPolicy } from '../network-policy.js'
+import { HIP_PRODUCT_VERSION } from '../product/content.js'
 import { clipText, validateFetchUrl, WEB_OUTPUT_CAP } from './helpers.js'
 
 // ── Exa MCP client (free tier, no API key required) ─────────────────────────
@@ -36,7 +37,7 @@ async function ensureExaSession(): Promise<ExaSession> {
           params: {
             protocolVersion: '2024-11-05',
             capabilities: {},
-            clientInfo: { name: 'hip', version: '0.1.0' },
+            clientInfo: { name: 'hip', version: HIP_PRODUCT_VERSION },
           },
         }),
       })
@@ -182,7 +183,7 @@ export function buildWebTools(
         const err = await validateFetchUrl(url)
         if (err) return err
         const res = await globalThis.fetch(url, {
-          headers: { 'User-Agent': 'hip/0.1.0' },
+          headers: { 'User-Agent': `hip/${HIP_PRODUCT_VERSION}` },
           signal: AbortSignal.timeout(30_000),
         })
         if (!res.ok) return `Error: fetch failed with status ${res.status}`

@@ -7,7 +7,7 @@
  */
 import type { PermissionMode, SkillMeta } from '@hip/protocol'
 import { CODING_SKILL_ID } from './ops/content.js'
-import { HIP_SKILL_ID, PRODUCT_CAPABILITY_MAP } from './product/content.js'
+import { HIP_PRODUCT_VERSION, HIP_SKILL_ID, PRODUCT_CAPABILITY_MAP } from './product/content.js'
 import { surfaceOf } from './surface.js'
 
 export type ProductSurface = 'chat' | 'code' | 'knowledge'
@@ -71,7 +71,7 @@ export function productCapabilityMapForSurface(surface: ProductSurface): string 
   if (surface === 'chat') {
     return (
       'Product facts (hip):\n' +
-      '- Version: 0.1.0.\n' +
+      `- Version: ${HIP_PRODUCT_VERSION}.\n` +
       '- You are on the **Chat** surface: a lighter assistant with a private sandbox workspace.\n' +
       '- Previewable deliverables (HTML, images, PDF, Markdown) → write with write_file for artifacts preview.\n' +
       '- You are **not** on the Code workbench and must not claim to be in Code "edit mode".\n' +
@@ -84,7 +84,7 @@ export function productCapabilityMapForSurface(surface: ProductSurface): string 
   if (surface === 'knowledge') {
     return (
       'Product facts (hip):\n' +
-      '- Version: 0.1.0.\n' +
+      `- Version: ${HIP_PRODUCT_VERSION}.\n` +
       '- You are on the **Knowledge** surface: help with the user\'s notes spaces.\n' +
       '- Do not claim to be a coding agent editing a software project unless the user opens Code.\n' +
       '- API keys: ~/.hip/config/auth.json (0600 plaintext by design).\n' +

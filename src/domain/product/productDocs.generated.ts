@@ -4,7 +4,7 @@
  * Regenerate: yarn product:content
  * Check:      yarn product:content:check
  *
- * contentHash=2d7c649da492b988 skillVersion=2 productVersion=0.1.0
+ * contentHash=47b3ee0ee782433f skillVersion=2 productVersion=1.0.1
  */
 
 export type ProductHelpSectionId = 'overview' | 'memory' | 'config' | 'troubleshooting' | 'agents'
@@ -27,7 +27,7 @@ export interface ProductHelpLocalePack {
 }
 
 /** App version from root package.json. */
-export const HIP_PRODUCT_VERSION = '0.1.0'
+export const HIP_PRODUCT_VERSION = '1.0.1'
 
 /** Content schema version from packages/product-content/meta.json. */
 export const PRODUCT_SKILL_VERSION = '2'
@@ -37,7 +37,7 @@ export const HIP_SKILL_DESCRIPTION = 'Product help for the hip desktop agent: Ch
 
 /** L0 capability map English (agent + default UI). */
 export const PRODUCT_CAPABILITY_MAP = `Product facts (hip):
-- Version: 0.1.0.
+- Version: 1.0.1.
 - Desktop workbench agent in the user's project with real file tools and optional sub-agents.
 - Surfaces: Code (full workbench) vs Chat (lighter; previewable files → write_file for artifacts).
 - On Code only, tool gates (UI labels): chat = read-only; edit = project sandbox (default); full = user-granted whole FS. Chat surface is not Code "edit mode".
@@ -52,7 +52,7 @@ export const PRODUCT_HELP_SECTIONS: readonly ProductHelpSection[] = [
     titleKey: 'settings.productHelp.sections.overview',
     markdown: `# hip
 
-hip is a **desktop AI workbench** (Tauri shell + React UI + Node sidecar), product version **0.1.0**. Each UI tab is an independent session. The default product loop is a **Supervisor ReAct** agent that uses tools and may delegate with \`task\` / \`dispatch_agent\` / \`task_batch\` — there is no forced Planner → Coder → Reviewer pipeline on ordinary turns.
+hip is a **desktop AI workbench** (Tauri shell + React UI + Node sidecar), product version **1.0.1**. Each UI tab is an independent session. The default product loop is a **Supervisor ReAct** agent that uses tools and may delegate with \`task\` / \`dispatch_agent\` / \`task_batch\` — there is no forced Planner → Coder → Reviewer pipeline on ordinary turns.
 
 This skill is the authoritative product guide for *hip itself*. For ordinary coding work in the user's project, do **not** load this skill.
 
@@ -334,6 +334,23 @@ Do not claim work ran "in parallel" if only sequential dispatch was used.
 - Installed under \`~/.hip/plugins/\`; registry in \`~/.hip/config/hip-plugins.json\`.
 - A plugin may ship skills, agents, MCP server configs, and hooks.
 - Disable a plugin to drop its contributions from the session.
+
+### Plugin Market (Settings)
+
+hip’s Plugin Market page integrates **only** the official catalogs:
+
+| Source id | Catalog |
+|-----------|---------|
+| \`grok-official\` | [xai-org/plugin-marketplace](https://github.com/xai-org/plugin-marketplace) |
+| \`claude-official\` | [anthropics/claude-plugins-official](https://github.com/anthropics/claude-plugins-official) |
+
+UI tabs: **Grok market** · **Claude market** · **Custom plugins** (local installs without official provenance).
+
+- Catalog cache: \`~/.hip/cache/marketplaces/<sourceId>/\`
+- Source toggles: \`~/.hip/config/marketplace-sources.json\`
+- Marketplace **download** registers the plugin with \`enabled: false\` by default (downloaded but not on).
+- On download, sidecar **reviews** agent \`boundModel\` fields; unavailable models are rewritten to the product default (\`activeModel\` in hip.toml).
+- Enable the plugin switch to inject skills/MCP/agents into sessions (\`plugin:reload\`).
 
 ### Plugin directory structure
 
@@ -433,7 +450,7 @@ export const PRODUCT_HELP_LOCALES: Record<ProductHelpLocale, ProductHelpLocalePa
   en: {
   description: 'Product help for the hip desktop agent: Chat/Code surfaces, permission modes, Settings, skills, plugins, MCP, memory, agents, CLI, troubleshooting, and local data. Load when the user asks how hip works or how to configure it.',
   capabilityMap: `Product facts (hip):
-- Version: 0.1.0.
+- Version: 1.0.1.
 - Desktop workbench agent in the user's project with real file tools and optional sub-agents.
 - Surfaces: Code (full workbench) vs Chat (lighter; previewable files → write_file for artifacts).
 - On Code only, tool gates (UI labels): chat = read-only; edit = project sandbox (default); full = user-granted whole FS. Chat surface is not Code "edit mode".
@@ -446,7 +463,7 @@ export const PRODUCT_HELP_LOCALES: Record<ProductHelpLocale, ProductHelpLocalePa
     titleKey: 'settings.productHelp.sections.overview',
     markdown: `# hip
 
-hip is a **desktop AI workbench** (Tauri shell + React UI + Node sidecar), product version **0.1.0**. Each UI tab is an independent session. The default product loop is a **Supervisor ReAct** agent that uses tools and may delegate with \`task\` / \`dispatch_agent\` / \`task_batch\` — there is no forced Planner → Coder → Reviewer pipeline on ordinary turns.
+hip is a **desktop AI workbench** (Tauri shell + React UI + Node sidecar), product version **1.0.1**. Each UI tab is an independent session. The default product loop is a **Supervisor ReAct** agent that uses tools and may delegate with \`task\` / \`dispatch_agent\` / \`task_batch\` — there is no forced Planner → Coder → Reviewer pipeline on ordinary turns.
 
 This skill is the authoritative product guide for *hip itself*. For ordinary coding work in the user's project, do **not** load this skill.
 
@@ -729,6 +746,23 @@ Do not claim work ran "in parallel" if only sequential dispatch was used.
 - A plugin may ship skills, agents, MCP server configs, and hooks.
 - Disable a plugin to drop its contributions from the session.
 
+### Plugin Market (Settings)
+
+hip’s Plugin Market page integrates **only** the official catalogs:
+
+| Source id | Catalog |
+|-----------|---------|
+| \`grok-official\` | [xai-org/plugin-marketplace](https://github.com/xai-org/plugin-marketplace) |
+| \`claude-official\` | [anthropics/claude-plugins-official](https://github.com/anthropics/claude-plugins-official) |
+
+UI tabs: **Grok market** · **Claude market** · **Custom plugins** (local installs without official provenance).
+
+- Catalog cache: \`~/.hip/cache/marketplaces/<sourceId>/\`
+- Source toggles: \`~/.hip/config/marketplace-sources.json\`
+- Marketplace **download** registers the plugin with \`enabled: false\` by default (downloaded but not on).
+- On download, sidecar **reviews** agent \`boundModel\` fields; unavailable models are rewritten to the product default (\`activeModel\` in hip.toml).
+- Enable the plugin switch to inject skills/MCP/agents into sessions (\`plugin:reload\`).
+
 ### Plugin directory structure
 
 Every plugin **must** contain a \`.plugin/plugin.json\` manifest file. Without it, hip will not discover the plugin:
@@ -825,7 +859,7 @@ To install a plugin:
   'zh-CN': {
   description: 'hip 桌面智能体产品帮助：Chat/Code 界面、权限模式、设置、技能、插件、MCP、记忆、智能体、CLI、故障排查与本地数据布局。当用户询问 hip 如何工作或如何配置时加载。',
   capabilityMap: `产品要点（hip）：
-- 版本：0.1.0。
+- 版本：1.0.1。
 - 桌面 AI 工作台智能体，在用户项目中使用真实文件工具，并可委派子智能体。
 - 界面：Code（完整工作台）与 Chat（更轻；可预览交付物请 write_file 到工件面板）。
 - 权限：chat = 只读；edit = 项目沙箱（默认）；full = 用户授权的整机文件系统。
@@ -838,7 +872,7 @@ To install a plugin:
     titleKey: 'settings.productHelp.sections.overview',
     markdown: `# hip
 
-hip 是一款**桌面 AI 工作台**（Tauri 壳 + React UI + Node sidecar），产品版本 **0.1.0**。每个 UI 标签页是独立会话。默认产品回路是 **Supervisor ReAct** 智能体：用工具完成工作，并可通过 \`task\` / \`dispatch_agent\` / \`task_batch\` 委派——普通轮次**不会**强制 Planner → Coder → Reviewer 流水线。
+hip 是一款**桌面 AI 工作台**（Tauri 壳 + React UI + Node sidecar），产品版本 **1.0.1**。每个 UI 标签页是独立会话。默认产品回路是 **Supervisor ReAct** 智能体：用工具完成工作，并可通过 \`task\` / \`dispatch_agent\` / \`task_batch\` 委派——普通轮次**不会**强制 Planner → Coder → Reviewer 流水线。
 
 本技能是 *hip 产品本身* 的权威指南。用户项目中的普通编码任务**不要**加载本技能。
 
@@ -1207,7 +1241,7 @@ hip 可运行 **内置** LangGraph 智能体、将 **ACP 作为会话主智能�
   'zh-TW': {
   description: 'hip 桌面智能體產品說明：Chat/Code 介面、權限模式、設定、技能、外掛、MCP、記憶、智能體、CLI、故障排除與本機資料配置。當使用者詢問 hip 如何運作或如何設定時載入。',
   capabilityMap: `產品要點（hip）：
-- 版本：0.1.0。
+- 版本：1.0.1。
 - 桌面 AI 工作台智能體，在使用者專案中使用真實檔案工具，並可委派子智能體。
 - 介面：Code（完整工作台）與 Chat（較輕；可預覽交付物請 write_file 到工件面板）。
 - 權限：chat = 唯讀；edit = 專案沙箱（預設）；full = 使用者授權的整機檔案系統。
@@ -1220,7 +1254,7 @@ hip 可运行 **内置** LangGraph 智能体、将 **ACP 作为会话主智能�
     titleKey: 'settings.productHelp.sections.overview',
     markdown: `# hip
 
-hip 是一款**桌面 AI 工作台**（Tauri 殼 + React UI + Node sidecar），產品版本 **0.1.0**。每個 UI 分頁是獨立工作階段。預設產品迴路是 **Supervisor ReAct** 智能體：用工具完成工作，並可透過 \`task\` / \`dispatch_agent\` / \`task_batch\` 委派——一般回合**不會**強制 Planner → Coder → Reviewer 流水線。
+hip 是一款**桌面 AI 工作台**（Tauri 殼 + React UI + Node sidecar），產品版本 **1.0.1**。每個 UI 分頁是獨立工作階段。預設產品迴路是 **Supervisor ReAct** 智能體：用工具完成工作，並可透過 \`task\` / \`dispatch_agent\` / \`task_batch\` 委派——一般回合**不會**強制 Planner → Coder → Reviewer 流水線。
 
 本技能是 *hip 產品本身* 的權威指南。使用者專案中的一般編碼任務**不要**載入本技能。
 
@@ -1462,7 +1496,7 @@ hip 可執行 **內建** LangGraph 智能體、將 **ACP 作為工作階段主�
   ja: {
   description: 'hip デスクトップエージェントの製品ヘルプ：Chat/Code サーフェス、権限モード、設定、スキル、プラグイン、MCP、メモリ、エージェント、CLI、トラブルシューティング、ローカルデータ。ユーザーが hip の仕組みや設定方法を尋ねたときに読み込みます。',
   capabilityMap: `製品要点（hip）：
-- バージョン：0.1.0。
+- バージョン：1.0.1。
 - ユーザーのプロジェクト内で実ファイルツールと任意のサブエージェントを使うデスクトップ AI ワークベンチエージェント。
 - サーフェス：Code（フルワークベンチ）と Chat（軽量；プレビュー可能な成果物は write_file でアーティファクトへ）。
 - Code のみのツールゲート（UI ラベル）：chat = 読み取り専用；edit = プロジェクトサンドボックス（既定）；full = ユーザー許可のファイルシステム全体。Chat サーフェスは Code の「編集モード」ではない。
@@ -1475,7 +1509,7 @@ hip 可執行 **內建** LangGraph 智能體、將 **ACP 作為工作階段主�
     titleKey: 'settings.productHelp.sections.overview',
     markdown: `# hip
 
-hipは**デスクトップAIワークベンチ**（Tauriシェル + React UI + Nodeサイドカー）であり、製品バージョンは**0.1.0**です。各UIタブは独立したセッションです。デフォルトの製品ループは、ツールを使用し、\`task\` / \`dispatch_agent\` / \`task_batch\` で委譲を行う可能性のある**Supervisor ReAct**エージェントです。通常のターンで強制的なPlanner → Coder → Reviewerパイプラインはありません。
+hipは**デスクトップAIワークベンチ**（Tauriシェル + React UI + Nodeサイドカー）であり、製品バージョンは**1.0.1**です。各UIタブは独立したセッションです。デフォルトの製品ループは、ツールを使用し、\`task\` / \`dispatch_agent\` / \`task_batch\` で委譲を行う可能性のある**Supervisor ReAct**エージェントです。通常のターンで強制的なPlanner → Coder → Reviewerパイプラインはありません。
 
 このスキルは、*hip自体*のための信頼できる製品ガイドです。ユーザーのプロジェクトでの通常のコーディング作業には、このスキルを**ロードしないでください**。
 
@@ -1780,7 +1814,7 @@ hipは**組み込み**のLangGraphエージェント、セッションのプラ�
   ko: {
   description: 'hip 데스크톱 에이전트 제품 도움말: Chat/Code 서피스, 권한 모드, 설정, 스킬, 플러그인, MCP, 메모리, 에이전트, CLI, 문제 해결, 로컬 데이터. 사용자가 hip 작동 방식이나 설정 방법을 물을 때 로드합니다.',
   capabilityMap: `제품 요점(hip):
-- 버전: 0.1.0.
+- 버전: 1.0.1.
 - 사용자 프로젝트에서 실제 파일 도구와 선택적 서브 에이전트를 쓰는 데스크톱 AI 워크벤치 에이전트.
 - 서피스: Code(전체 워크벤치) vs Chat(가벼움; 미리보기 가능한 결과물은 write_file로 아티팩트).
 - Code 전용 도구 게이트(UI 라벨): chat = 읽기 전용; edit = 프로젝트 샌드박스(기본); full = 사용자가 허용한 전체 파일시스템. Chat 서피스는 Code의 "편집 모드"가 아님.
@@ -1793,7 +1827,7 @@ hipは**組み込み**のLangGraphエージェント、セッションのプラ�
     titleKey: 'settings.productHelp.sections.overview',
     markdown: `# hip
 
-hip은 **데스크톱 AI 작업대**(Tauri 셸 + React UI + Node 사이드카)이며, 제품 버전은 **0.1.0**입니다. 각 UI 탭은 독립적인 세션입니다. 기본 제품 루프는 도구를 사용하고 \`task\` / \`dispatch_agent\` / \`task_batch\`로 위임할 수 있는 **Supervisor ReAct** 에이전트입니다. 일반적인 턴에서 Planner → Coder → Reviewer 파이프라인이 강제되지 않습니다.
+hip은 **데스크톱 AI 작업대**(Tauri 셸 + React UI + Node 사이드카)이며, 제품 버전은 **1.0.1**입니다. 각 UI 탭은 독립적인 세션입니다. 기본 제품 루프는 도구를 사용하고 \`task\` / \`dispatch_agent\` / \`task_batch\`로 위임할 수 있는 **Supervisor ReAct** 에이전트입니다. 일반적인 턴에서 Planner → Coder → Reviewer 파이프라인이 강제되지 않습니다.
 
 이 스킬은 *hip 자체*에 대한 권위 있는 제품 가이드입니다. 사용자 프로젝트의 일반 코딩 작업에는 이 스킬을 **로드하지 마십시오**.
 

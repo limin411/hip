@@ -4,14 +4,14 @@
  * Regenerate: yarn product:content
  * Check:      yarn product:content:check
  *
- * contentHash=2d7c649da492b988 skillVersion=2 productVersion=0.1.0
+ * contentHash=47b3ee0ee782433f skillVersion=2 productVersion=1.0.1
  */
 
 /** Schema / materialization version for builtin skill files (from packages/product-content/meta.json). */
 export const PRODUCT_SKILL_VERSION = '2'
 
 /** App version from root package.json (also used in L0/L2 placeholders). */
-export const HIP_PRODUCT_VERSION = '0.1.0'
+export const HIP_PRODUCT_VERSION = '1.0.1'
 
 export const HIP_SKILL_ID = 'hip'
 export const HIP_SKILL_NAME = 'hip'
@@ -26,7 +26,7 @@ description: "Product help for the hip desktop agent: Chat/Code surfaces, permis
 
 # hip
 
-hip is a **desktop AI workbench** (Tauri shell + React UI + Node sidecar), product version **0.1.0**. Each UI tab is an independent session. The default product loop is a **Supervisor ReAct** agent that uses tools and may delegate with \`task\` / \`dispatch_agent\` / \`task_batch\` — there is no forced Planner → Coder → Reviewer pipeline on ordinary turns.
+hip is a **desktop AI workbench** (Tauri shell + React UI + Node sidecar), product version **1.0.1**. Each UI tab is an independent session. The default product loop is a **Supervisor ReAct** agent that uses tools and may delegate with \`task\` / \`dispatch_agent\` / \`task_batch\` — there is no forced Planner → Coder → Reviewer pipeline on ordinary turns.
 
 This skill is the authoritative product guide for *hip itself*. For ordinary coding work in the user's project, do **not** load this skill.
 
@@ -297,6 +297,23 @@ Do not claim work ran "in parallel" if only sequential dispatch was used.
 - A plugin may ship skills, agents, MCP server configs, and hooks.
 - Disable a plugin to drop its contributions from the session.
 
+### Plugin Market (Settings)
+
+hip’s Plugin Market page integrates **only** the official catalogs:
+
+| Source id | Catalog |
+|-----------|---------|
+| \`grok-official\` | [xai-org/plugin-marketplace](https://github.com/xai-org/plugin-marketplace) |
+| \`claude-official\` | [anthropics/claude-plugins-official](https://github.com/anthropics/claude-plugins-official) |
+
+UI tabs: **Grok market** · **Claude market** · **Custom plugins** (local installs without official provenance).
+
+- Catalog cache: \`~/.hip/cache/marketplaces/<sourceId>/\`
+- Source toggles: \`~/.hip/config/marketplace-sources.json\`
+- Marketplace **download** registers the plugin with \`enabled: false\` by default (downloaded but not on).
+- On download, sidecar **reviews** agent \`boundModel\` fields; unavailable models are rewritten to the product default (\`activeModel\` in hip.toml).
+- Enable the plugin switch to inject skills/MCP/agents into sessions (\`plugin:reload\`).
+
 ### Plugin directory structure
 
 Every plugin **must** contain a \`.plugin/plugin.json\` manifest file. Without it, hip will not discover the plugin:
@@ -390,7 +407,7 @@ To install a plugin:
 
 /** L0 always-on product facts (main agent system prompt). */
 export const PRODUCT_CAPABILITY_MAP = `Product facts (hip):
-- Version: 0.1.0.
+- Version: 1.0.1.
 - Desktop workbench agent in the user's project with real file tools and optional sub-agents.
 - Surfaces: Code (full workbench) vs Chat (lighter; previewable files → write_file for artifacts).
 - On Code only, tool gates (UI labels): chat = read-only; edit = project sandbox (default); full = user-granted whole FS. Chat surface is not Code "edit mode".

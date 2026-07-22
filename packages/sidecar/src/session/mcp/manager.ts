@@ -11,6 +11,7 @@ import { SSEClientTransport } from '@modelcontextprotocol/sdk/client/sse.js'
 import { jsonSchemaToZod, type JsonSchema } from './json-schema-to-zod.js'
 import { ToolRegistry, type Scope } from '../tool-registry.js'
 import { safeErrorMessage } from '../error.js'
+import { HIP_PRODUCT_VERSION } from '../product/content.js'
 
 /** Connection status for UI display. */
 export type McpConnectionStatus = 'connected' | 'connecting' | 'disconnected' | 'error'
@@ -161,7 +162,7 @@ export class McpManager {
       const error = await this.validateStdioCommand(server.command)
       if (error) throw new Error(error)
     }
-    const client = new Client({ name: 'hip', version: '0.1.0' })
+    const client = new Client({ name: 'hip', version: HIP_PRODUCT_VERSION })
     await client.connect(this.buildTransport(server))
     return client as unknown as ClientLike
   }

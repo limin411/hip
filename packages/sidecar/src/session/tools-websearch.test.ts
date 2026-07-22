@@ -5,6 +5,7 @@ import { join } from 'node:path'
 import { promises as dns } from 'node:dns'
 import { buildTools } from './tools.js'
 import { NetworkPolicy } from './network-policy.js'
+import { HIP_PRODUCT_VERSION } from './product/content.js'
 import { _resetExaSession } from './tools/web.js'
 
 vi.mock('node:dns', async (importOriginal) => {
@@ -291,7 +292,7 @@ describe('web_fetch tool', () => {
     const out = String(await byName(tools, 'web_fetch').invoke({ url: 'https://example.com' }))
     expect(out).toBe('<html>hello</html>')
     expect(mockFetch).toHaveBeenCalledWith('https://example.com', expect.objectContaining({
-      headers: { 'User-Agent': 'hip/0.1.0' },
+      headers: { 'User-Agent': `hip/${HIP_PRODUCT_VERSION}` },
     }))
   })
 

@@ -1,6 +1,6 @@
 import { createRequire } from 'node:module'
 
-export const CLI_VERSION = '0.1.0'
+export const CLI_VERSION = '1.0.1'
 
 export function resolveSidecarPackageVersion(): string | undefined {
   try {

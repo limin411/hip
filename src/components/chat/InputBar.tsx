@@ -17,7 +17,7 @@ import { isMultimodalAttachmentMime } from '@/lib/attachmentAllowlist'
 import { readSkillFile } from '@/ipc/skills'
 import { ModelPicker } from './ModelPicker'
 import { EffortLevelPicker } from './EffortLevelPicker'
-import { PermissionModePicker } from './PermissionModePicker'
+import { PermissionModePicker, resolvePermissionMode } from './PermissionModePicker'
 import { PlanModeChip } from './PlanModeChip'
 import { ProjectGuidanceChip } from './ProjectGuidanceChip'
 import { AttachmentButton } from './AttachmentButton'
@@ -25,6 +25,7 @@ import { SessionAgentPicker } from './SessionAgentPicker'
 import { WorktreeControl } from './WorktreeControl/WorktreeControl'
 import { ComposerControlRow } from './ComposerControlRow'
 import { isExternalPrimary } from '@/lib/sessionAgent'
+import { defaultEffort, effortLevelsForKey, resolveEffort } from '@/lib/modelEffort'
 import { sessionService, useActiveSession, useActiveSessionId, useActiveSessionStatus, useActivePendingPermission, useConnectionStatus } from '@/domain'
 import { formatDiffAnnotationsForComposer, useDiffAnnotationStore } from '@/store/diffAnnotationStore'
 import { isProjectPathBlocked } from '@/lib/projectPathGate'
@@ -210,6 +211,22 @@ export function InputBar() {
     activeId && active ? active.config.agentId : draft?.agentId,
   )
 
+  // Pin non-default secondary chips outside Tune (permission / plan / effort).
+  const permissionMode = activeId && active
+    ? resolvePermissionMode(active.config.permissionMode)
+    : resolvePermissionMode(draft?.permissionMode)
+  const forcePlan = activeId && active ? Boolean(active.config.forcePlan) : Boolean(draft?.forcePlan)
+  const effortLevels = effortLevelsForKey(catalog, currentKey)
+  const storedEffort = activeId && active ? active.config.effort : draft?.effort
+  const resolvedEffort = resolveEffort(storedEffort, effortLevels)
+  const pinEffort =
+    !externalPrimary &&
+    !!effortLevels &&
+    !!resolvedEffort &&
+    resolvedEffort !== defaultEffort(effortLevels)
+  const pinPermission = isCode && permissionMode !== 'edit'
+  const pinPlan = isCode && !externalPrimary && forcePlan
+
   // K10: when multimodal unsupported, drop only image/PDF chips — keep text @ attachments.
   useEffect(() => {
     if (!attachmentsSupported) {
@@ -355,6 +372,15 @@ export function InputBar() {
                         <AttachmentButton onAttach={setAttachments} />
                       </>
                     }
+                    pinnedSecondary={
+                      pinPermission || pinPlan || pinEffort ? (
+                        <>
+                          {pinPermission && <PermissionModePicker />}
+                          {pinPlan && <PlanModeChip />}
+                          {pinEffort && <EffortLevelPicker />}
+                        </>
+                      ) : undefined
+                    }
                     secondary={
                       <>
                         {!externalPrimary && <EffortLevelPicker />}
@@ -376,6 +402,7 @@ export function InputBar() {
                         />
                       </>
                     }
+                    pinnedSecondary={pinEffort ? <EffortLevelPicker /> : undefined}
                     secondary={!externalPrimary ? <EffortLevelPicker /> : undefined}
                   />
                 )

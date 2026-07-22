@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Search, MessageSquare, Code2, Trash2 } from 'lucide-react'
+import { Search, MessageSquare, Code2, Trash2, Inbox } from 'lucide-react'
 import { useSessions, sessionService } from '@/domain'
 import { surfaceOf } from '@/lib/sessions'
 import {
@@ -14,6 +14,7 @@ import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/Button'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/Tabs'
 import { Pagination } from '@/components/ui/Pagination'
+import { EmptyState } from '@/components/ui/EmptyState'
 import { DeclarativeContextMenu } from '@/components/context-menu'
 import { DeleteSessionDialog } from './DeleteSessionDialog'
 import { ClearAllSessionsDialog } from './ClearAllSessionsDialog'
@@ -148,9 +149,13 @@ export function SessionHistory() {
       </div>
 
       {filtered.length === 0 ? (
-        <div className="flex flex-1 flex-col items-center justify-center text-ink-secondary">
-          <span className="text-body">{t('history.empty')}</span>
-        </div>
+        <EmptyState
+          icon={Inbox}
+          tier="professional"
+          title={t('history.empty')}
+          className="flex-1"
+          data-testid="session-history-empty"
+        />
       ) : (
         <>
           <div className="flex flex-col gap-1.5">

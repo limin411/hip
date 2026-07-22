@@ -6,6 +6,8 @@ import { Button } from '@/components/ui/Button'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/Tabs'
 import { Pagination } from '@/components/ui/Pagination'
 import { Modal } from '@/components/ui/Modal'
+import { EmptyState } from '@/components/ui/EmptyState'
+import { Skeleton } from '@/components/ui/Skeleton'
 import * as DialogPrimitive from '@radix-ui/react-dialog'
 import { useTrashListStore } from '@/store/trashListStore'
 import { useHipConfigStore } from '@/store/hipConfigStore'
@@ -218,11 +220,18 @@ export function RecycleBinPage() {
       </div>
 
       {!loaded ? (
-        <p className="text-body text-ink-tertiary">{t('common.loading', { defaultValue: 'Loading…' })}</p>
+        <div className="space-y-3 py-4" data-testid="recycle-bin-loading">
+          <Skeleton className="h-10 w-full rounded-lg" />
+          <Skeleton className="h-10 w-full rounded-lg" />
+          <Skeleton className="h-10 w-4/5 rounded-lg" />
+        </div>
       ) : filtered.length === 0 ? (
-        <p className="py-12 text-center text-body text-ink-tertiary" data-testid="recycle-bin-empty">
-          {t('trash.emptyState')}
-        </p>
+        <EmptyState
+          icon={Trash2}
+          tier="professional"
+          title={t('trash.emptyState')}
+          data-testid="recycle-bin-empty"
+        />
       ) : (
         <>
           <div className="divide-y divide-border/80 overflow-hidden rounded-lg border border-border/80 bg-surface">

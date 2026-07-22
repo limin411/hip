@@ -467,6 +467,23 @@ export const ko = {
       "percentage": "{{percent}}%",
       "percentageTooltip": "{{used}} / {{total}} 토큰 ({{percent}}%)"
     },
+    "composer": {
+      "tune": "조절",
+      "tuneTitle": "세션 옵션"
+    },
+    "firstRun": {
+      "title": "3단계로 시작하기",
+      "subtitle": "프로바이더 API 키를 한 번만 추가하세요. 이 기기에만 저장됩니다.",
+      "step1Title": "API 키 추가",
+      "step1Body": "설정 → 모델에서 프로바이더 키를 저장하세요.",
+      "step1Cta": "모델 설정 열기",
+      "step2ChatTitle": "필요한 내용 말하기",
+      "step2ChatBody": "아래 상자에 오류, 경로 또는 목표를 붙여넣으세요.",
+      "step2CodeTitle": "프로젝트 폴더 선택",
+      "step2CodeBody": "Code 세션은 도구가 파일을 읽고 쓸 수 있도록 폴더가 필요합니다.",
+      "step3Title": "첫 메시지 보내기",
+      "step3Body": "Enter로 시작하세요. 모델과 권한은 언제든 바꿀 수 있습니다."
+    },
     "activity": {
       "completed": "완료됨",
       "stopped": "중단됨",
@@ -479,7 +496,10 @@ export const ko = {
       "catBrowse": "목록 {{count}}개",
       "runningTool": "{{name}} 진행 중",
       "runningReasoning": "생각 중",
-      "initializing": "초기화 중…",
+      "initializing": "연결 중…",
+      "writing": "답변 작성 중…",
+      "parallelAgents": "하위 에이전트 {{total}}",
+      "parallelAgentsRunning": "하위 에이전트 {{running}}/{{total}} 실행 중",
       "planProgress": "계획 {{done}}/{{total}}",
       "viewInActivity": "도구 세부 정보는 위 활동에 나열됩니다",
       "elapsed": "{{time}}",
@@ -509,7 +529,8 @@ export const ko = {
     "subagent": {
       "noSummary": "하위 작업 완료 (텍스트 요약 없음)",
       "toolsCount": "{{count}}단계",
-      "reply": "답장"
+      "reply": "답장",
+      "parallelSummary": "하위 에이전트 {{count}} · 실행 중 {{running}}"
     }
   },
   "composer": {

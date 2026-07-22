@@ -446,7 +446,7 @@ describe('InputBar', () => {
     expect(screen.queryByTestId('effort-chip')).not.toBeInTheDocument()
   })
 
-  it('code ACP session keeps permission and hides plan/model', () => {
+  it('code ACP session keeps permission and hides plan/model', async () => {
     baseMocks()
     hipConfigStore.useHipConfigStore.setState({
       config: {
@@ -481,7 +481,9 @@ describe('InputBar', () => {
     } as any)
 
     render(<InputBar />)
-    expect(screen.getByTestId('permission-chip')).toBeInTheDocument()
+    // Secondary controls live under Tune (Phase 2 density); open panel to assert.
+    fireEvent.click(screen.getByTestId('composer-tune'))
+    expect(await screen.findByTestId('permission-chip')).toBeInTheDocument()
     expect(screen.queryByTestId('plan-mode-chip')).not.toBeInTheDocument()
     expect(screen.queryByTestId('model-chip')).not.toBeInTheDocument()
   })

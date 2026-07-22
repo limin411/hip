@@ -467,6 +467,23 @@ export const ja = {
       "percentage": "{{percent}}%",
       "percentageTooltip": "{{used}} / {{total}} トークン ({{percent}}%)"
     },
+    "composer": {
+      "tune": "調整",
+      "tuneTitle": "セッション設定"
+    },
+    "firstRun": {
+      "title": "3ステップで始める",
+      "subtitle": "プロバイダーの API キーを一度追加するだけです。この端末にのみ保存されます。",
+      "step1Title": "API キーを追加",
+      "step1Body": "設定 → モデル を開き、プロバイダーのキーを保存します。",
+      "step1Cta": "モデル設定を開く",
+      "step2ChatTitle": "やりたいことを書く",
+      "step2ChatBody": "下の欄にエラー、パス、または目標を貼り付けてください。",
+      "step2CodeTitle": "プロジェクトフォルダを選ぶ",
+      "step2CodeBody": "Code セッションでは、ツールがファイルを読み書きできるフォルダが必要です。",
+      "step3Title": "最初のメッセージを送る",
+      "step3Body": "Enter で開始。モデルと権限はいつでも変更できます。"
+    },
     "activity": {
       "completed": "完了",
       "stopped": "停止",
@@ -479,7 +496,10 @@ export const ja = {
       "catBrowse": "{{count}} 件の一覧",
       "runningTool": "{{name}} 実行中",
       "runningReasoning": "思考中",
-      "initializing": "初期化中…",
+      "initializing": "接続中…",
+      "writing": "返信を作成中…",
+      "parallelAgents": "サブエージェント {{total}}",
+      "parallelAgentsRunning": "サブエージェント {{running}}/{{total}} 実行中",
       "planProgress": "計画 {{done}}/{{total}}",
       "viewInActivity": "ツールの詳細はアクティビティ内に表示されます",
       "elapsed": "{{time}}",
@@ -509,7 +529,8 @@ export const ja = {
     "subagent": {
       "noSummary": "サブタスク完了（テキスト要約なし）",
       "toolsCount": "{{count}} ステップ",
-      "reply": "返信"
+      "reply": "返信",
+      "parallelSummary": "サブエージェント {{count}} · 実行中 {{running}}"
     }
   },
   "composer": {

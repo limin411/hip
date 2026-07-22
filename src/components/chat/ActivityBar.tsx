@@ -61,6 +61,16 @@ function formatParts(
       case 'initializing':
         bits.push(t('chat.activity.initializing'))
         break
+      case 'writing':
+        bits.push(t('chat.activity.writing'))
+        break
+      case 'parallelAgents':
+        bits.push(
+          p.running > 0
+            ? t('chat.activity.parallelAgentsRunning', { total: p.total, running: p.running })
+            : t('chat.activity.parallelAgents', { total: p.total }),
+        )
+        break
       case 'planProgress':
         bits.push(t('chat.activity.planProgress', { done: p.done, total: p.total }))
         break

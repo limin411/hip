@@ -475,6 +475,23 @@ export const zhTW = {
       "percentage": "{{percent}}%",
       "percentageTooltip": "{{used}} / {{total}} tokens（{{percent}}%）"
     },
+    "composer": {
+      "tune": "調節",
+      "tuneTitle": "工作階段選項"
+    },
+    "firstRun": {
+      "title": "三步開始使用",
+      "subtitle": "新增一次 API 金鑰即可，金鑰僅保存在本機。",
+      "step1Title": "新增 API 金鑰",
+      "step1Body": "開啟 設定 → 模型，為你的提供商儲存金鑰。",
+      "step1Cta": "開啟模型設定",
+      "step2ChatTitle": "說明你的需求",
+      "step2ChatBody": "在下方貼上錯誤、路徑或目標即可。",
+      "step2CodeTitle": "選擇專案資料夾",
+      "step2CodeBody": "Code 工作階段需要專案目錄，以便工具讀寫檔案。",
+      "step3Title": "傳送第一則訊息",
+      "step3Body": "按 Enter 開始。可隨時切換模型與權限。"
+    },
     "activity": {
       "completed": "已完成",
       "stopped": "已停止",
@@ -487,7 +504,10 @@ export const zhTW = {
       "catBrowse": "{{count}} 次瀏覽",
       "runningTool": "正在 {{name}}",
       "runningReasoning": "正在思考",
-      "initializing": "準備中…",
+      "initializing": "連線中…",
+      "writing": "正在撰寫回覆…",
+      "parallelAgents": "{{total}} 個子智慧體",
+      "parallelAgentsRunning": "{{running}}/{{total}} 個子智慧體執行中",
       "planProgress": "計劃 {{done}}/{{total}}",
       "viewInActivity": "工具明細見上方活動",
       "elapsed": "{{time}}",
@@ -517,7 +537,8 @@ export const zhTW = {
     "subagent": {
       "noSummary": "子任務已完成（無文字總結）",
       "toolsCount": "{{count}} 步",
-      "reply": "回覆"
+      "reply": "回覆",
+      "parallelSummary": "{{count}} 個子智慧體 · {{running}} 執行中"
     }
   },
   "composer": {

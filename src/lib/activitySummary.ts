@@ -15,6 +15,10 @@ export type SummaryPart =
   | { type: 'runningTool'; label: string }
   | { type: 'runningReasoning' }
   | { type: 'initializing' }
+  /** Streaming answer body without an active tool. */
+  | { type: 'writing' }
+  /** Sub-agents running in parallel (runtime narrative). */
+  | { type: 'parallelAgents'; total: number; running: number }
   | { type: 'planProgress'; done: number; total: number }
 
 export interface ActivitySummaryInput {
@@ -83,6 +87,14 @@ function planProgressPart(tools: ToolCall[]): SummaryPart | null {
   return { type: 'planProgress', done: p.done, total: p.total }
 }
 
+/** Parallel sub-agent strip when 2+ non-supervisor runs exist. */
+function parallelAgentsPart(runs: AgentRun[]): SummaryPart | null {
+  const nested = runs.filter((r) => r.role !== 'supervisor')
+  if (nested.length < 2) return null
+  const running = nested.filter((r) => !r.finishedAt).length
+  return { type: 'parallelAgents', total: nested.length, running }
+}
+
 function withPlanProgress(parts: SummaryPart[], tools: ToolCall[]): SummaryPart[] {
   const plan = planProgressPart(tools)
   return plan ? [plan, ...parts] : parts
@@ -104,17 +116,27 @@ export function buildActivitySummary(input: ActivitySummaryInput): {
   if (input.streaming) {
     const ordered = [...steps].sort((a, b) => a.stepSeq - b.stepSeq)
     const last = ordered[ordered.length - 1]
+    const parallelPart = parallelAgentsPart(runs)
+    const withParallel = (parts: SummaryPart[]) =>
+      parallelPart ? [...parts, parallelPart] : parts
+
     if (last?.kind === 'tool') {
       const tool = tools.find((t) => t.callId === last.callId)
       if (tool) {
         return {
           status: 'running',
-          parts: withPlanProgress([{ type: 'runningTool', label: toolTitleHint(tool) }], tools),
+          parts: withPlanProgress(
+            withParallel([{ type: 'runningTool', label: toolTitleHint(tool) }]),
+            tools,
+          ),
         }
       }
     }
     if (last?.kind === 'reasoning') {
-      return { status: 'running', parts: withPlanProgress([{ type: 'runningReasoning' }], tools) }
+      return {
+        status: 'running',
+        parts: withPlanProgress(withParallel([{ type: 'runningReasoning' }]), tools),
+      }
     }
     // kind:'text' while streaming: assistant is writing the answer body — not "thinking".
     // Prefer tool chrome when tools exist; otherwise plan-only or bare running (no runningReasoning).
@@ -123,40 +145,60 @@ export function buildActivitySummary(input: ActivitySummaryInput): {
       if (running) {
         return {
           status: 'running',
-          parts: withPlanProgress([{ type: 'runningTool', label: toolTitleHint(running) }], tools),
+          parts: withPlanProgress(
+            withParallel([{ type: 'runningTool', label: toolTitleHint(running) }]),
+            tools,
+          ),
         }
       }
       if (tools.length > 0) {
         const lastTool = tools.reduce((a, b) => (a.seq >= b.seq ? a : b))
         return {
           status: 'running',
-          parts: withPlanProgress([{ type: 'runningTool', label: toolTitleHint(lastTool) }], tools),
+          parts: withPlanProgress(
+            withParallel([{ type: 'runningTool', label: toolTitleHint(lastTool) }]),
+            tools,
+          ),
         }
       }
-      const planOnly = withPlanProgress([], tools)
+      const planOnly = withPlanProgress(withParallel([]), tools)
       if (planOnly.length > 0) return { status: 'running', parts: planOnly }
-      // Neutral running while content streams (avoid misleading thinking chip).
-      return { status: 'running', parts: input.hasAssistantContent ? [] : [{ type: 'initializing' }] }
+      // Writing answer vs still spinning up.
+      return {
+        status: 'running',
+        parts: withParallel(
+          input.hasAssistantContent ? [{ type: 'writing' }] : [{ type: 'initializing' }],
+        ),
+      }
     }
     // Fallback: last running tool or any tool
     const running = [...tools].reverse().find((t) => t.status === 'running')
     if (running) {
       return {
         status: 'running',
-        parts: withPlanProgress([{ type: 'runningTool', label: toolTitleHint(running) }], tools),
+        parts: withPlanProgress(
+          withParallel([{ type: 'runningTool', label: toolTitleHint(running) }]),
+          tools,
+        ),
       }
     }
     if (tools.length > 0) {
       const lastTool = tools.reduce((a, b) => (a.seq >= b.seq ? a : b))
       return {
         status: 'running',
-        parts: withPlanProgress([{ type: 'runningTool', label: toolTitleHint(lastTool) }], tools),
+        parts: withPlanProgress(
+          withParallel([{ type: 'runningTool', label: toolTitleHint(lastTool) }]),
+          tools,
+        ),
       }
     }
     if (steps.length === 0 && tools.length === 0 && runs.length === 0) {
       return { status: 'running', parts: [{ type: 'initializing' }] }
     }
-    return { status: 'running', parts: withPlanProgress([{ type: 'runningReasoning' }], tools) }
+    return {
+      status: 'running',
+      parts: withPlanProgress(withParallel([{ type: 'runningReasoning' }]), tools),
+    }
   }
 
   const parts: SummaryPart[] = []

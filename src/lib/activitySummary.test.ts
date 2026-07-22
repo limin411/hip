@@ -40,6 +40,32 @@ describe('activitySummary', () => {
     expect(resolveActivityStatus({ streaming: true, toolCalls: [] })).toBe('running')
   })
 
+  it('streaming with content and no tools → writing phase', () => {
+    const { parts } = buildActivitySummary({
+      streaming: true,
+      hasAssistantContent: true,
+      steps: [{ kind: 'text', stepSeq: 1, agentId: 's', role: 'supervisor', content: 'hi' }],
+      toolCalls: [],
+      agentRuns: [],
+    })
+    expect(parts.some((p) => p.type === 'writing')).toBe(true)
+  })
+
+  it('streaming with 2+ sub-agents adds parallelAgents part', () => {
+    const runs: AgentRun[] = [
+      { agentId: 'a', role: 'coder', output: '', startedAt: 1, finishedAt: 0, seq: 1 },
+      { agentId: 'b', role: 'worker', output: '', startedAt: 1, finishedAt: 0, seq: 2 },
+    ]
+    const { parts } = buildActivitySummary({
+      streaming: true,
+      steps: [{ kind: 'reasoning', stepSeq: 1, agentId: 'a', role: 'coder', content: '…' }],
+      toolCalls: [],
+      agentRuns: runs,
+    })
+    const par = parts.find((p) => p.type === 'parallelAgents')
+    expect(par).toEqual({ type: 'parallelAgents', total: 2, running: 2 })
+  })
+
   it('resolveActivityStatus: stopped', () => {
     expect(resolveActivityStatus({ stopped: true, hasAssistantContent: true })).toBe('stopped')
   })

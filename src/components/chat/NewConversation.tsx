@@ -21,15 +21,18 @@ import { readSkillFile } from '@/ipc/skills'
 import { FolderPill } from './FolderPill'
 import { ModelPicker } from './ModelPicker'
 import { EffortLevelPicker } from './EffortLevelPicker'
-import { PermissionModePicker } from './PermissionModePicker'
+import { PermissionModePicker, resolvePermissionMode } from './PermissionModePicker'
 import { PlanModeChip } from './PlanModeChip'
 import { AttachmentButton } from './AttachmentButton'
 import { SessionAgentPicker } from './SessionAgentPicker'
 import { ComposerControlRow } from './ComposerControlRow'
+import { FirstRunSetupCard } from './FirstRunSetupCard'
 import { AcpCapabilityCliffBanner } from './AcpCapabilityCliffBanner'
+import { defaultEffort, effortLevelsForKey, resolveEffort } from '@/lib/modelEffort'
 import { isAttachmentSupported } from '@/lib/attachmentEligibility'
 import { activeModelKey, parseModelKey } from '@/lib/modelKey'
 import { isExternalPrimary } from '@/lib/sessionAgent'
+import { cn } from '@/lib/utils'
 import type { LocalAttachment } from './attachmentTypes'
 import { MascotActor } from '@/components/login/MascotActor'
 import {
@@ -89,6 +92,18 @@ export function NewConversation() {
   const attachmentsSupported = isAttachmentSupported(currentKey, agents, catalog)
   // External ACP primary: hide hip-model-only controls (model/effort/forcePlan); keep permissionMode.
   const externalPrimary = isExternalPrimary(draft?.agentId)
+
+  const permissionMode = resolvePermissionMode(draft?.permissionMode)
+  const forcePlan = Boolean(draft?.forcePlan)
+  const effortLevels = effortLevelsForKey(catalog, currentKey)
+  const resolvedEffort = resolveEffort(draft?.effort, effortLevels)
+  const pinEffort =
+    !externalPrimary &&
+    !!effortLevels &&
+    !!resolvedEffort &&
+    resolvedEffort !== defaultEffort(effortLevels)
+  const pinPermission = surface === 'code' && permissionMode !== 'edit'
+  const pinPlan = surface === 'code' && !externalPrimary && forcePlan
 
   // K10: drop only multimodal chips when model lacks attachment support.
   useEffect(() => {
@@ -321,7 +336,14 @@ export function NewConversation() {
   }, [globalPaletteOpen, text, handleDismiss, atQuery, handleFileMentionDismiss])
 
   return (
-    <div className="flex flex-1 flex-col items-center justify-center overflow-y-auto px-6 pb-32" data-testid="new-conversation">
+    <div
+      className={cn(
+        'flex flex-1 flex-col items-center justify-center overflow-y-auto px-6 pb-32',
+        surface === 'chat' && 'px-8',
+      )}
+      data-testid="new-conversation"
+      data-surface={surface}
+    >
       <div className="w-full max-w-2xl">
         <div className="mb-3 flex justify-center">
           <MascotActor
@@ -335,10 +357,11 @@ export function NewConversation() {
           <h1 className="mb-2 text-center text-display font-semibold tracking-tight text-ink">
             {greeting}
           </h1>
-          <p className="mb-8 text-center text-body text-ink-secondary">
+          <p className="mb-6 text-center text-body text-ink-secondary">
             {greetingSub}
           </p>
         </div>
+        <FirstRunSetupCard surface={surface} />
         <AcpCapabilityCliffBanner />
         <div className="relative">
           {query !== null && (
@@ -370,6 +393,15 @@ export function NewConversation() {
                       <AttachmentButton onAttach={setAttachments} />
                     </>
                   }
+                  pinnedSecondary={
+                    pinPermission || pinPlan || pinEffort ? (
+                      <>
+                        {pinPermission && <PermissionModePicker />}
+                        {pinPlan && <PlanModeChip />}
+                        {pinEffort && <EffortLevelPicker />}
+                      </>
+                    ) : undefined
+                  }
                   secondary={
                     <>
                       {!externalPrimary && <EffortLevelPicker />}
@@ -389,6 +421,7 @@ export function NewConversation() {
                       />
                     </>
                   }
+                  pinnedSecondary={pinEffort ? <EffortLevelPicker /> : undefined}
                   secondary={!externalPrimary ? <EffortLevelPicker /> : undefined}
                 />
               )

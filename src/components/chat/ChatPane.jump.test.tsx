@@ -9,6 +9,17 @@ import { ChatPane } from '@/components/chat/ChatPane'
 import { ConversationOutline } from '@/components/artifact/ConversationOutline'
 import { jumpToTranscriptMessage } from '@/lib/transcriptJump'
 
+// Outline jump smoke: non-virtual path (product default virtualizes; covered in virtual tests).
+vi.mock('@/components/chat/feature', async () => {
+  const actual = await vi.importActual<typeof import('@/components/chat/feature')>(
+    '@/components/chat/feature',
+  )
+  return {
+    ...actual,
+    TRANSCRIPT_VIRTUALIZE: false,
+  }
+})
+
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({
     t: (key: string) => key,

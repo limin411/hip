@@ -5,12 +5,13 @@
  * global stepSeq stream (reasoning / supervisor text / tool) instead of the
  * legacy "process trail above answer body" layout.
  *
- * Default **false** for dogfood rollout. Flag off + text steps in DB: skip text
- * in the timeline (legacy content body only) — no dual render.
+ * Default **true** (Phase 5 product default). Flag off + text steps in DB: skip
+ * text in the timeline (legacy content body only) — no dual render.
  *
- * Flip to true once dogfood is green; eventual default-on is a follow-up.
+ * ACP / turns without renderable supervisor text steps keep the legacy body
+ * via `hasRenderableSupervisorText` (see MessageBubble).
  */
-export const TRANSCRIPT_INTERLEAVED_BLOCKS = false
+export const TRANSCRIPT_INTERLEAVED_BLOCKS = true
 
 /**
  * Virtualize the mounted transcript window (PR-7c / D3b).
@@ -18,10 +19,10 @@ export const TRANSCRIPT_INTERLEAVED_BLOCKS = false
  * Layers on PR-7b windowing (N=30 + load earlier + jump ensure-mount).
  * Uses @tanstack/react-virtual with measureElement (variable height) when true.
  *
- * Default **false** until dogfood proves stable — windowing remains the primary
- * long-list strategy. Flip on once jump / pin-bottom / streaming remeasure are green.
+ * Default **true** (Phase 5 product default). Windowing remains the primary
+ * long-list strategy; virtualization only mounts the visible overscan slice.
  */
-export const TRANSCRIPT_VIRTUALIZE = false
+export const TRANSCRIPT_VIRTUALIZE = true
 
 /** Tailwind `gap-5` = 1.25rem = 20px between message rows. */
 export const TRANSCRIPT_ROW_GAP_PX = 20

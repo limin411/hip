@@ -10,6 +10,17 @@ import { jumpToTranscriptMessage } from '@/lib/transcriptJump'
 import { TRANSCRIPT_WINDOW_SIZE } from '@/lib/transcriptWindow'
 import type { Message } from '@hip/protocol'
 
+// PR-7b windowing suite: exercise non-virtual path (virtual defaults on in product).
+vi.mock('@/components/chat/feature', async () => {
+  const actual = await vi.importActual<typeof import('@/components/chat/feature')>(
+    '@/components/chat/feature',
+  )
+  return {
+    ...actual,
+    TRANSCRIPT_VIRTUALIZE: false,
+  }
+})
+
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({
     t: (key: string) => key,

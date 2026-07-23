@@ -41,6 +41,9 @@ Hip already has a layered compaction stack (micro-prune → sliding window → L
 |----|------|--------|
 | G9 | `TARGET_THRESHOLD_PERCENT` (50%) drives keep-tail via `selectKeepUnitsByTokenBudget` | done |
 | G10 | Memory Phase1 flush before LLM compact (`flushMemoryBeforeCompact`, 15s timeout) | done |
+| G11 | Two-pass prefire compact (NOTE₁ at threshold−10%, pass-2 merge at compact) | done |
+
+Kill switch: `HIP_TWO_PASS_COMPACT=0|false|off`.
 
 ## Design
 

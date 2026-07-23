@@ -17,6 +17,7 @@ import {
   type PromptEstimateInput,
 } from './context-budget.js'
 
+
 /** @deprecated Prefer `compactTriggerTokens(contextWindow)`. Absolute default for 128k × 85%. */
 export const COMPACT_BUDGET_TOKENS = DEFAULT_COMPACT_TRIGGER_TOKENS
 
@@ -82,6 +83,21 @@ export interface CompactOptions {
    * counts are chosen so the tail fits this budget (grok-build style).
    */
   targetKeepTokens?: number
+  /**
+   * Optional two-pass prefire cache. When NOTE₁ matches the current middle,
+   * pass-2 reuses or merges it instead of summarizing the full middle again.
+   */
+  prefire?: {
+    match(middle: BaseMessage[]): { note1: string; delta: BaseMessage[] } | null
+    awaitInflight?(timeoutMs?: number): Promise<void>
+  }
+}
+
+/** Planned compact split (middle span only — no LLM yet). */
+export interface CompactMiddlePlan {
+  middle: BaseMessage[]
+  mode: 'user-turn' | 'tool-round'
+  headId: string
 }
 
 /** Detect provider context-length / maximum-token errors so the graph can compact and retry. */
@@ -169,6 +185,24 @@ export function formatCompactSummaryMessage(headId: string, body: string): Syste
     ? body.trim()
     : `${COMPACT_SUMMARY_PREFIX} ${body.trim()}`
   return new SystemMessage({ id: headId, content: text })
+}
+
+/**
+ * Build pass-2 summarizer input: NOTE₁ + optional delta messages (two-pass prefire).
+ * When delta is empty, the caller can use note1 directly without another LLM call.
+ */
+export function buildPass2SeedMessages(note1: string, delta: BaseMessage[]): BaseMessage[] {
+  const seed = new SystemMessage(
+    `Previous conversation summary (NOTE₁ — already compressed; preserve all critical facts):\n\n${note1}`,
+  )
+  if (delta.length === 0) return [seed]
+  return [
+    seed,
+    new HumanMessage(
+      'Additional conversation after NOTE₁ (compress together with NOTE₁ into one structured summary):',
+    ),
+    ...delta,
+  ]
 }
 
 /**
@@ -297,6 +331,48 @@ export function resolveKeepRecentToolRounds(
 }
 
 /**
+ * Pure: select the middle span that would be summarized (no LLM).
+ * Shared by compactMessages, prefire pass-1, and two-pass pass-2.
+ */
+export function selectCompactMiddle(
+  messages: BaseMessage[],
+  opts: Pick<CompactOptions, 'keepRecentTurns' | 'keepRecentToolRounds' | 'overflowRecovery' | 'targetKeepTokens'>,
+): CompactMiddlePlan | null {
+  const firstHumanIdx = messages.findIndex((m) => m instanceof HumanMessage)
+  if (firstHumanIdx === -1) return null
+
+  const humanIdxs: number[] = []
+  messages.forEach((m, i) => { if (m instanceof HumanMessage) humanIdxs.push(i) })
+  const keepRecentTurns = resolveKeepRecentTurns(messages, humanIdxs, {
+    ...opts,
+    summarizer: { async summarize() { return '' } },
+  })
+
+  // User-turn path when enough human turns for a non-empty middle.
+  if (humanIdxs.length > keepRecentTurns) {
+    const recentStart = humanIdxs[humanIdxs.length - keepRecentTurns]
+    const middle = messages.slice(firstHumanIdx + 1, recentStart)
+    if (middle.length > 0 && middle[0].id) {
+      return { middle, mode: 'user-turn', headId: middle[0].id }
+    }
+  }
+
+  // Tool-round fallback
+  const afterHuman = firstHumanIdx + 1
+  if (afterHuman >= messages.length) return null
+  const rounds = splitToolRounds(messages, afterHuman)
+  const keepRounds = resolveKeepRecentToolRounds(rounds, {
+    ...opts,
+    summarizer: { async summarize() { return '' } },
+  })
+  if (rounds.length <= keepRounds) return null
+  const middleRounds = rounds.slice(0, rounds.length - keepRounds)
+  const middle = middleRounds.flat()
+  if (middle.length === 0 || !middle[0].id) return null
+  return { middle, mode: 'tool-round', headId: middle[0].id }
+}
+
+/**
  * Tool-round compaction for single-Human ReAct loops (explore / task / dispatch).
  * Pins system + first human; summarizes middle tool-rounds; keeps recent rounds intact.
  */
@@ -304,27 +380,64 @@ export async function compactToolRounds(
   messages: BaseMessage[],
   opts: CompactOptions,
 ): Promise<CompactResult | null> {
-  const firstHumanIdx = messages.findIndex((m) => m instanceof HumanMessage)
-  if (firstHumanIdx === -1) return null
+  const plan = selectCompactMiddle(messages, opts)
+  if (!plan || plan.mode !== 'tool-round') {
+    // selectCompactMiddle may return user-turn; for explicit tool-round API keep old path
+    const firstHumanIdx = messages.findIndex((m) => m instanceof HumanMessage)
+    if (firstHumanIdx === -1) return null
+    const afterHuman = firstHumanIdx + 1
+    if (afterHuman >= messages.length) return null
+    const rounds = splitToolRounds(messages, afterHuman)
+    const keepRounds = resolveKeepRecentToolRounds(rounds, opts)
+    if (rounds.length <= keepRounds) return null
+    const middle = rounds.slice(0, rounds.length - keepRounds).flat()
+    if (middle.length === 0) return null
+    return summarizeMiddle(middle, opts, 'tool-round')
+  }
+  return summarizeMiddle(plan.middle, opts, 'tool-round')
+}
 
-  const afterHuman = firstHumanIdx + 1
-  if (afterHuman >= messages.length) return null
-
-  const rounds = splitToolRounds(messages, afterHuman)
-  const keepRounds = resolveKeepRecentToolRounds(rounds, opts)
-  if (rounds.length <= keepRounds) return null
-
-  const middleRounds = rounds.slice(0, rounds.length - keepRounds)
-  const middle = middleRounds.flat()
-  if (middle.length === 0) return null
-
-  return summarizeMiddle(middle, opts, 'tool-round')
+/**
+ * Summarize a planned middle, optionally using two-pass prefire NOTE₁.
+ */
+async function summarizeMiddleWithPrefire(
+  plan: CompactMiddlePlan,
+  opts: CompactOptions,
+): Promise<CompactResult | null> {
+  const { middle, mode, headId } = plan
+  if (opts.prefire) {
+    try {
+      await opts.prefire.awaitInflight?.(2_000)
+    } catch {
+      // ignore
+    }
+    const hit = opts.prefire.match(middle)
+    if (hit) {
+      let text = hit.note1
+      if (hit.delta.length > 0) {
+        // Pass-2: merge NOTE₁ + delta into one summary.
+        text = await summarizeWithQualityGate(buildPass2SeedMessages(hit.note1, hit.delta), opts)
+      }
+      // Reuse quality gate only when we had delta; pure NOTE₁ already gated in pass-1.
+      if (hit.delta.length === 0 || text.trim()) {
+        const removeIds = middle.slice(1).map((m) => m.id).filter((id): id is string => !!id)
+        return {
+          summary: formatCompactSummaryMessage(headId, text.trim() || hit.note1),
+          removeIds,
+          replacedIds: [headId, ...removeIds],
+          mode,
+        }
+      }
+    }
+  }
+  return summarizeMiddle(middle, opts, mode)
 }
 
 /**
  * Plan a compaction:
  * 1. Prefer user-turn boundaries when there are enough HumanMessages (multi-turn chat).
  * 2. Else fall back to tool-round boundaries so explore/subagent loops can shrink.
+ * 3. When `opts.prefire` has a valid NOTE₁, reuse or merge it (two-pass).
  *
  * Keep-tail size uses `targetKeepTokens` when provided (≈50% of context window);
  * otherwise falls back to KEEP_RECENT_TURNS / KEEP_RECENT_TOOL_ROUNDS.
@@ -336,25 +449,9 @@ export async function compactMessages(
   messages: BaseMessage[],
   opts: CompactOptions,
 ): Promise<CompactResult | null> {
-  const firstHumanIdx = messages.findIndex((m) => m instanceof HumanMessage)
-  if (firstHumanIdx === -1) return null
-
-  const humanIdxs: number[] = []
-  messages.forEach((m, i) => { if (m instanceof HumanMessage) humanIdxs.push(i) })
-  const keepRecentTurns = resolveKeepRecentTurns(messages, humanIdxs, opts)
-
-  // User-turn path when enough human turns for a non-empty middle.
-  if (humanIdxs.length > keepRecentTurns) {
-    const recentStart = humanIdxs[humanIdxs.length - keepRecentTurns]
-    const middle = messages.slice(firstHumanIdx + 1, recentStart)
-    if (middle.length > 0) {
-      const result = await summarizeMiddle(middle, opts, 'user-turn')
-      if (result) return result
-    }
-  }
-
-  // Tool-round fallback: single-Human (or too few humans) ReAct / explore.
-  return compactToolRounds(messages, opts)
+  const plan = selectCompactMiddle(messages, opts)
+  if (!plan) return null
+  return summarizeMiddleWithPrefire(plan, opts)
 }
 
 // Re-export for callers that previously imported CHARS_PER_TOKEN indirectly.

@@ -1319,6 +1319,7 @@ export async function runTurn(host: SessionTurnHost, rawSend: SendFn, base?: {
     contextWindowTokens,
     compactThresholdPercent: AUTO_COMPACT_THRESHOLD_PERCENT,
     lastPromptTokens: host.lastPromptTokens,
+    // Prefire cache is created lazily inside the graph when two-pass is enabled.
     beforeLlmCompact: async () => {
       if (!host.memoryService || !host.store) return
       const memCfg = host.memoryService.getConfig()

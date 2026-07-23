@@ -38,6 +38,7 @@ import { PLAN_APPROVAL_QUESTION_TOKEN } from './plan-approval-constants.js'
 import {
   compactMessages,
   applyCompactResult,
+  selectCompactMiddle,
   COMPACT_BUDGET_TOKENS,
   KEEP_RECENT_TURNS,
   MIN_STEPS_BETWEEN_LLM_COMPACT,
@@ -55,6 +56,11 @@ import {
   estimateToolsTokens,
   messageKeepTokenBudget,
 } from './context-budget.js'
+import {
+  PrefireCache,
+  isTwoPassPrefireEnabled,
+  shouldStartPrefire,
+} from './prefire.js'
 // note: SUBAGENT compact budget is applied by callers via GraphCtx or buildGraph(maxSteps, budget)
 import { applySlidingWindow } from './context/sliding-window.js'
 import { isMicroCompactionEnabled, MicroCompaction } from './micro-compaction.js'
@@ -188,6 +194,11 @@ export interface GraphCtx {
    * Must not throw; errors are swallowed by the compact node.
    */
   beforeLlmCompact?: () => Promise<void>
+  /**
+   * Two-pass prefire cache (NOTE₁). Shared across compactNode visits in one
+   * invoke. Created lazily when two-pass is enabled.
+   */
+  prefire?: PrefireCache
   planMode?: PlanMode
   /**
    * @experimental Test / harness only. Product session-turn paths never inject.
@@ -355,6 +366,75 @@ function resolveTargetKeepTokens(ctx: GraphCtx): number | undefined {
   return messageKeepTokenBudget(ctx.contextWindowTokens, overhead, TARGET_THRESHOLD_PERCENT)
 }
 
+function ensurePrefire(ctx: GraphCtx): PrefireCache | null {
+  if (!isTwoPassPrefireEnabled()) return null
+  if (!ctx.prefire) ctx.prefire = new PrefireCache()
+  return ctx.prefire
+}
+
+/** Used-token estimate for prefire / compact gates (same inputs as isOverCompactBudget). */
+function estimateUsedForGate(
+  working: BaseMessage[],
+  ctx: GraphCtx,
+): number {
+  const tools = (ctx.tools ?? []).map((t) => ({
+    name: t.name,
+    description: typeof t.description === 'string' ? t.description : undefined,
+  }))
+  return effectiveUsedTokens(
+    estimatePromptTokens({
+      messages: working,
+      systemPrompt: ctx.systemPrompt,
+      tools,
+    }),
+    ctx.lastPromptTokens,
+  )
+}
+
+/** Kick off background pass-1 when approaching the compact threshold. */
+function maybeStartPrefire(
+  working: BaseMessage[],
+  ctx: GraphCtx,
+  compactBudget: number,
+): void {
+  const cache = ensurePrefire(ctx)
+  if (!cache) return
+
+  const used = estimateUsedForGate(working, ctx)
+  let window = ctx.contextWindowTokens ?? 0
+  let thresholdPct = ctx.compactThresholdPercent ?? AUTO_COMPACT_THRESHOLD_PERCENT
+
+  // Absolute-budget tests: treat compactBudget as 100% of a synthetic window.
+  if ((!window || window <= 0) && compactBudget > 0 && ctx.compactBudgetTokens == null) {
+    // only when product didn't set absolute override on ctx
+  }
+  if (ctx.compactBudgetTokens != null && ctx.compactBudgetTokens > 0) {
+    window = Math.max(ctx.compactBudgetTokens, 1)
+    thresholdPct = 100
+  } else if (window <= 0) {
+    // Fallback absolute path from buildGraph second arg
+    window = Math.max(compactBudget, 1)
+    thresholdPct = 100
+  }
+
+  if (!shouldStartPrefire(used, window, thresholdPct)) return
+
+  const targetKeep = resolveTargetKeepTokens(ctx)
+  const plan = selectCompactMiddle(working, {
+    keepRecentTurns: KEEP_RECENT_TURNS,
+    ...(targetKeep != null ? { targetKeepTokens: targetKeep } : {}),
+  })
+  if (!plan) return
+  const outcome = cache.startPass1(plan.middle, ctx.summarizer, { sessionId: ctx.sessionId })
+  if (outcome === 'started') {
+    try {
+      ctx.emit.compaction('[prefire] pass-1 started')
+    } catch {
+      // best-effort
+    }
+  }
+}
+
 /** Build the agent-loop graph. `maxSteps` and `compactBudget` are injectable for tests. */
 export function buildGraph(maxSteps: number = MAX_STEPS, compactBudget: number = COMPACT_BUDGET_TOKENS) {
   /**
@@ -409,6 +489,12 @@ export function buildGraph(maxSteps: number = MAX_STEPS, compactBudget: number =
     // 3) Token-budget LLM compact (user-turn or tool-round). Throttled between LLM passes.
     const overBudget = isOverCompactBudget(working, ctx, compactBudget)
     const canLlmCompact = stepsSince >= MIN_STEPS_BETWEEN_LLM_COMPACT
+
+    // Approaching threshold: start background pass-1 (NOTE₁) without blocking.
+    if (!overBudget) {
+      maybeStartPrefire(working, ctx, compactBudget)
+    }
+
     if (!overBudget || !canLlmCompact) {
       // Always tick the counter so we eventually re-enable LLM compact after a prior one.
       const nextSteps = stepsSince + 1
@@ -435,12 +521,16 @@ export function buildGraph(maxSteps: number = MAX_STEPS, compactBudget: number =
     }
 
     const targetKeep = resolveTargetKeepTokens(ctx)
+    const prefire = ensurePrefire(ctx)
     const result = await compactMessages(working, {
       keepRecentTurns: KEEP_RECENT_TURNS,
       summarizer: ctx.summarizer,
       sessionId: ctx.sessionId,
       ...(targetKeep != null ? { targetKeepTokens: targetKeep } : {}),
+      ...(prefire ? { prefire } : {}),
     })
+    // Consumed NOTE₁ — clear so the next cycle does not reuse a stale note.
+    prefire?.clear()
     if (!result) {
       if (out.length === 0) {
         return { ...deferredResolved, stepsSinceLastLlmCompact: stepsSince + 1 }
@@ -591,6 +681,7 @@ export function buildGraph(maxSteps: number = MAX_STEPS, compactBudget: number =
         }
       }
       const targetKeep = resolveTargetKeepTokens(ctx)
+      const prefire = ensurePrefire(ctx)
       const result = await compactMessages(messages, {
         keepRecentTurns: KEEP_RECENT_TURNS,
         summarizer: ctx.summarizer,
@@ -598,7 +689,9 @@ export function buildGraph(maxSteps: number = MAX_STEPS, compactBudget: number =
         sessionId: ctx.sessionId,
         // Overflow: keep half the target budget so the retry prompt is smaller.
         ...(targetKeep != null ? { targetKeepTokens: Math.max(500, Math.floor(targetKeep / 2)) } : {}),
+        ...(prefire ? { prefire } : {}),
       })
+      prefire?.clear()
       if (!result) throw err
       const summaryText = typeof result.summary.content === 'string' ? result.summary.content : ''
       emit.compaction(summaryText, { replacedMessageIds: result.replacedIds })

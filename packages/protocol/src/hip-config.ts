@@ -198,6 +198,13 @@ export interface AcpHostConfig {
    * See README “ACP host policy”.
    */
   forwardMcp?: boolean
+  /**
+   * Opt-in: inject resolved hip provider API keys into ACP spawn env under
+   * standard names (ANTHROPIC_API_KEY, OPENAI_API_KEY, …). Default **false**
+   * (ACP agents remain self-managed). See docs/design/byok-spec.md Phase E.
+   * TOML: `forward_hip_keys` / `forwardHipKeys`.
+   */
+  forwardHipKeys?: boolean
   /** Max bytes for one fs/read_text_file. Default 2_000_000 when undefined. */
   fsReadMaxBytes?: number
 }

@@ -331,6 +331,8 @@ function normalizeAcpHost(raw: Record<string, unknown>): AcpHostConfig {
   else if (typeof raw.fs_bridge === 'boolean') out.fsBridge = raw.fs_bridge
   if (typeof raw.forwardMcp === 'boolean') out.forwardMcp = raw.forwardMcp
   else if (typeof raw.forward_mcp === 'boolean') out.forwardMcp = raw.forward_mcp
+  if (typeof raw.forwardHipKeys === 'boolean') out.forwardHipKeys = raw.forwardHipKeys
+  else if (typeof raw.forward_hip_keys === 'boolean') out.forwardHipKeys = raw.forward_hip_keys
   const max = raw.fsReadMaxBytes ?? raw.fs_read_max_bytes
   if (typeof max === 'number' && Number.isFinite(max) && max > 0) out.fsReadMaxBytes = max
   return out
@@ -506,6 +508,8 @@ function deepMergeConfig(global: HipConfig, project: HipConfig): HipConfig {
 export interface ResolvedAcpHostConfig {
   fsBridge: boolean
   forwardMcp: boolean
+  /** Opt-in hip→ACP API key injection. Default false. */
+  forwardHipKeys: boolean
   fsReadMaxBytes: number
 }
 
@@ -515,6 +519,7 @@ const DEFAULT_FS_READ_MAX_BYTES = 2_000_000
  * Resolve `[acp]` host policy with defaults applied.
  * - `fsBridge`: true when undefined
  * - `forwardMcp`: false when undefined
+ * - `forwardHipKeys`: false when undefined
  * - `fsReadMaxBytes`: 2_000_000 when undefined
  *
  * When `cwd` is provided, merges global + project `.hip/hip.toml` (project wholesale-replaces).
@@ -532,6 +537,7 @@ export function resolveAcpHostConfig(cwd?: string): ResolvedAcpHostConfig {
   return {
     fsBridge: raw?.fsBridge !== false,
     forwardMcp: raw?.forwardMcp === true,
+    forwardHipKeys: raw?.forwardHipKeys === true,
     fsReadMaxBytes:
       typeof max === 'number' && Number.isFinite(max) && max > 0 ? max : DEFAULT_FS_READ_MAX_BYTES,
   }

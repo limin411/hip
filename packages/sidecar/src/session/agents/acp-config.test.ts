@@ -112,7 +112,7 @@ describe('buildAcpSpawn (model rollback)', () => {
 })
 
 describe('resolveAcpHostConfig', () => {
-  it('defaults fsBridge=true, forwardMcp=false, fsReadMaxBytes=2e6 when [acp] absent', () => {
+  it('defaults fsBridge=true, forwardMcp=false, forwardHipKeys=false, fsReadMaxBytes=2e6 when [acp] absent', () => {
     const dir = mkdtempSync(join(tmpdir(), 'acp-host-'))
     tmpDirs.push(dir)
     const p = join(dir, 'hip.toml')
@@ -121,11 +121,12 @@ describe('resolveAcpHostConfig', () => {
     expect(resolveAcpHostConfig()).toEqual({
       fsBridge: true,
       forwardMcp: false,
+      forwardHipKeys: false,
       fsReadMaxBytes: 2_000_000,
     })
   })
 
-  it('honors snake_case [acp] fields', () => {
+  it('honors snake_case [acp] fields including forward_hip_keys', () => {
     const dir = mkdtempSync(join(tmpdir(), 'acp-host-'))
     tmpDirs.push(dir)
     const p = join(dir, 'hip.toml')
@@ -134,13 +135,60 @@ describe('resolveAcpHostConfig', () => {
 [acp]
 fs_bridge = false
 forward_mcp = true
+forward_hip_keys = true
 fs_read_max_bytes = 5000
 `)
     process.env.HIP_CONFIG_PATH = p
     expect(resolveAcpHostConfig()).toEqual({
       fsBridge: false,
       forwardMcp: true,
+      forwardHipKeys: true,
       fsReadMaxBytes: 5000,
     })
+  })
+})
+
+describe('buildAcpSpawn forwardHipKeys', () => {
+  it('injects resolved hip keys under standard env names when forward_hip_keys=true', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'acp-fwd-'))
+    tmpDirs.push(dir)
+    writeFileSync(join(dir, 'hip.toml'), `version = 1\n\n[acp]\nforward_hip_keys = true\n`)
+    process.env.HIP_CONFIG_PATH = join(dir, 'hip.toml')
+    process.env.HIP_AUTH_PATH = join(dir, 'auth.json')
+    writeFileSync(
+      join(dir, 'auth.json'),
+      JSON.stringify({ HIP_MODEL_DEEPSEEK_API_KEY: 'sk-hip-forward-test' }),
+    )
+    // Clear ambient so we can assert injection (not inheritance).
+    const prev = process.env.DEEPSEEK_API_KEY
+    delete process.env.DEEPSEEK_API_KEY
+    try {
+      const { env } = buildAcpSpawn({ ...baseAgent }, null)
+      expect(env.DEEPSEEK_API_KEY).toBe('sk-hip-forward-test')
+    } finally {
+      if (prev === undefined) delete process.env.DEEPSEEK_API_KEY
+      else process.env.DEEPSEEK_API_KEY = prev
+    }
+  })
+
+  it('does not inject hip keys when forward_hip_keys is off (default)', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'acp-nofwd-'))
+    tmpDirs.push(dir)
+    writeFileSync(join(dir, 'hip.toml'), 'version = 1\n')
+    process.env.HIP_CONFIG_PATH = join(dir, 'hip.toml')
+    process.env.HIP_AUTH_PATH = join(dir, 'auth.json')
+    writeFileSync(
+      join(dir, 'auth.json'),
+      JSON.stringify({ HIP_MODEL_DEEPSEEK_API_KEY: 'sk-must-not-appear' }),
+    )
+    const prev = process.env.DEEPSEEK_API_KEY
+    delete process.env.DEEPSEEK_API_KEY
+    try {
+      const { env } = buildAcpSpawn({ ...baseAgent }, null)
+      expect(env.DEEPSEEK_API_KEY).toBeUndefined()
+    } finally {
+      if (prev === undefined) delete process.env.DEEPSEEK_API_KEY
+      else process.env.DEEPSEEK_API_KEY = prev
+    }
   })
 })

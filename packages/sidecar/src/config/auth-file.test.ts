@@ -9,6 +9,8 @@ import {
   resolveProviderAuth,
   resolveStandardEnvApiKey,
   expandKeyExpression,
+  buildHipKeyForwardEnv,
+  resetAuthCommandCacheForTests,
   defaultAuthPath,
 } from './auth-file.js'
 
@@ -156,6 +158,125 @@ describe('expandKeyExpression', () => {
     } finally {
       delete process.env.MY_FILE_KEY_XYZ
     }
+  })
+
+  it('runs !command and caches stdout for the process lifetime', () => {
+    resetAuthCommandCacheForTests()
+    delete process.env.HIP_AUTH_ALLOW_CMD
+    // Portable: echo is available on macOS/Linux CI.
+    expect(expandKeyExpression('!echo sk-from-cmd')).toBe('sk-from-cmd')
+    expect(expandKeyExpression('!echo sk-from-cmd')).toBe('sk-from-cmd')
+    writeFileSync(authPath, JSON.stringify({ HIP_MODEL_DEEPSEEK_API_KEY: '!echo sk-cmd-file' }))
+    expect(resolveApiKey('deepseek', authPath)).toBe('sk-cmd-file')
+    expect(resolveProviderAuth('deepseek', undefined, authPath)?.source).toBe('command')
+  })
+
+  it('disables !command when HIP_AUTH_ALLOW_CMD=0', () => {
+    resetAuthCommandCacheForTests()
+    process.env.HIP_AUTH_ALLOW_CMD = '0'
+    try {
+      expect(expandKeyExpression('!echo should-not-run')).toBeUndefined()
+    } finally {
+      delete process.env.HIP_AUTH_ALLOW_CMD
+    }
+  })
+
+  it('treats $! as a literal bang prefix without executing', () => {
+    expect(expandKeyExpression('$!not-a-command')).toBe('!not-a-command')
+  })
+})
+
+describe('credentials map (v2)', () => {
+  it('resolves api_key credential with env bag', () => {
+    writeFileSync(
+      authPath,
+      JSON.stringify({
+        credentials: {
+          deepseek: {
+            type: 'api_key',
+            key: 'sk-cred',
+            env: { CLOUDFLARE_ACCOUNT_ID: 'acct-1' },
+          },
+        },
+      }),
+    )
+    expect(resolveProviderAuth('deepseek', undefined, authPath)).toEqual({
+      apiKey: 'sk-cred',
+      source: 'auth.json',
+      env: { CLOUDFLARE_ACCOUNT_ID: 'acct-1' },
+    })
+  })
+
+  it('resolves oauth credential when not expired', () => {
+    writeFileSync(
+      authPath,
+      JSON.stringify({
+        credentials: {
+          anthropic: {
+            type: 'oauth',
+            access: 'oauth-access-token',
+            refresh: 'oauth-refresh',
+            expires: Date.now() + 60_000,
+          },
+        },
+      }),
+    )
+    expect(resolveProviderAuth('anthropic', undefined, authPath)).toEqual({
+      apiKey: 'oauth-access-token',
+      source: 'oauth',
+    })
+  })
+
+  it('does not fall through to env when oauth is expired', () => {
+    process.env.ANTHROPIC_API_KEY = 'sk-should-not-use'
+    try {
+      writeFileSync(
+        authPath,
+        JSON.stringify({
+          credentials: {
+            anthropic: {
+              type: 'oauth',
+              access: 'stale-access',
+              expires: Date.now() - 1000,
+            },
+          },
+        }),
+      )
+      expect(resolveProviderAuth('anthropic', undefined, authPath)).toBeUndefined()
+    } finally {
+      delete process.env.ANTHROPIC_API_KEY
+    }
+  })
+
+  it('credentials map wins over flat HIP_MODEL key', () => {
+    writeFileSync(
+      authPath,
+      JSON.stringify({
+        HIP_MODEL_DEEPSEEK_API_KEY: 'sk-flat',
+        credentials: { deepseek: { type: 'api_key', key: 'sk-map' } },
+      }),
+    )
+    expect(resolveApiKey('deepseek', authPath)).toBe('sk-map')
+  })
+})
+
+describe('buildHipKeyForwardEnv', () => {
+  it('maps resolved keys onto standard env names without overwriting base', () => {
+    writeFileSync(authPath, JSON.stringify({ HIP_MODEL_DEEPSEEK_API_KEY: 'sk-forward-me' }))
+    const base = { DEEPSEEK_API_KEY: 'keep-me', PATH: '/bin' } as NodeJS.ProcessEnv
+    const fwd = buildHipKeyForwardEnv(base, authPath)
+    expect(fwd.DEEPSEEK_API_KEY).toBeUndefined() // already set on base
+    // OpenAI may be unset on base and absent in auth — only assert deepseek path
+    writeFileSync(
+      authPath,
+      JSON.stringify({
+        HIP_MODEL_DEEPSEEK_API_KEY: 'sk-forward-me',
+        HIP_MODEL_OPENAI_API_KEY: 'sk-oai',
+      }),
+    )
+    const fwd2 = buildHipKeyForwardEnv({ PATH: '/bin' } as NodeJS.ProcessEnv, authPath)
+    expect(fwd2.DEEPSEEK_API_KEY).toBe('sk-forward-me')
+    expect(fwd2.OPENAI_API_KEY).toBe('sk-oai')
   })
 })
 

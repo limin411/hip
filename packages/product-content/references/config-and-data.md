@@ -86,8 +86,45 @@ Set in **Settings → Add custom provider**, or edit the provider detail pane. K
 
 ```json
 {
-  "HIP_MODEL_ANTHROPIC_API_KEY": "$ANTHROPIC_API_KEY"
+  "HIP_MODEL_ANTHROPIC_API_KEY": "$ANTHROPIC_API_KEY",
+  "HIP_MODEL_OPENAI_API_KEY": "!op read 'op://vault/openai/credential'"
 }
 ```
 
-`$VAR` / `${VAR}` expands from the process environment. Literal keys still work. Shell command keys (`!cmd`) are not supported yet.
+| Form | Meaning |
+|------|---------|
+| literal | Used as-is |
+| `$VAR` / `${VAR}` | Process environment |
+| `!command` | Shell stdout (cached for process life). Disable with `HIP_AUTH_ALLOW_CMD=0` |
+| `$!…` | Literal string starting with `!` (no shell) |
+
+### Typed credentials (optional)
+
+```json
+{
+  "credentials": {
+    "anthropic": {
+      "type": "oauth",
+      "access": "…",
+      "refresh": "…",
+      "expires": 1893456000000
+    },
+    "cloudflare-ai-gateway": {
+      "type": "api_key",
+      "key": "cf-token",
+      "env": { "CLOUDFLARE_ACCOUNT_ID": "…", "CLOUDFLARE_GATEWAY_ID": "…" }
+    }
+  }
+}
+```
+
+Flat `HIP_MODEL_*` keys remain fully supported. When both exist, `credentials[provider]` wins. Expired OAuth does **not** fall back to env.
+
+### ACP: optional hip key forward
+
+```toml
+[acp]
+forward_hip_keys = true   # default false — inject hip keys as ANTHROPIC_API_KEY / OPENAI_API_KEY / …
+```
+
+Default remains self-managed ACP (no hip key injection).

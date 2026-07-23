@@ -16,7 +16,9 @@ Custom **internal** agents: persona prompt + bound model + tool grants.
 
 Supported ACP presets (Settings → Agents → Add ACP agent): **OpenCode**, **Grok Build** (`grok agent stdio`), **Pi**, **Claude Code**, **Codex**. Grok Build uses native ACP (install via `https://x.ai/cli`); auth via `grok login` or optional `XAI_API_KEY`.
 
-ACP agents are **self-managed** for auth and models: hip does not inject its provider API keys into the ACP child process. Use the agent’s own login / ambient env / optional preset `authEnvVar` on the agent config.
+ACP agents are **self-managed** for auth and models by default: hip does not inject its provider API keys into the ACP child process. Use the agent’s own login / ambient env / optional preset `authEnvVar` on the agent config.
+
+Opt-in bridge (BYOK Phase E): set `[acp] forward_hip_keys = true` in `hip.toml` to inject resolved hip keys under standard env names (`ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, …) for ACP spawns. Agent `env` and ambient process env still take precedence when already set.
 
 ## Capability matrix (Built-in vs ACP)
 

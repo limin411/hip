@@ -1,6 +1,6 @@
 # hip BYOK 强化 Spec
 
-Status: **implemented** (Phase A + B core + Phase C apiKind + light D `$ENV`; OAuth / `!cmd` / native SDK backlog)  
+Status: **implemented** (Phases A–E core; interactive OAuth login UI and full native Google/Bedrock/Azure SDKs remain product backlog)  
 Related: OpenCode / Pi credential models, `~/.hip/config/auth.json`
 
 ## 0. 现状（已有能力）
@@ -132,17 +132,21 @@ UI / Tauri set_secret
 | C3 | Add custom provider：API type 选择 + 保存 key 无需 restart |
 | C4 | Provider detail：自定义 provider 可改 apiKind |
 
-### Phase D light — key 表达式（部分）
+### Phase D — key 表达式 + credentials
 
-| ID | 项 |
-|----|----|
-| D1a | auth.json 支持 `$VAR` / `${VAR}` 展开 |
-| D1b | `!command` shell 取 secret — **未做** |
-| D2+ | 云厂商 native / OAuth — **未做** |
+| ID | 项 | 状态 |
+|----|----|------|
+| D1a | `$VAR` / `${VAR}` | done |
+| D1b | `!command` + cache + `HIP_AUTH_ALLOW_CMD=0` | done |
+| D2 | `credentials[id].env` bag | done |
+| D3 | OAuth credential storage + resolve (expired = hard fail) | done (no interactive login UI) |
+| D4 | Native Google/Bedrock/Azure SDKs | backlog (still blocklisted) |
 
-### Phase E（后续）
+### Phase E — ACP bridge
 
-- ACP bridge 策略
+| ID | 项 | 状态 |
+|----|----|------|
+| E1 | `[acp] forward_hip_keys` opt-in inject | done |
 
 ## 5. 非目标
 

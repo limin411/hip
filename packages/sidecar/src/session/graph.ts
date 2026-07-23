@@ -35,8 +35,27 @@ import {
   type DoomLoopStrategy,
 } from './doom-loop.js'
 import { PLAN_APPROVAL_QUESTION_TOKEN } from './plan-approval-constants.js'
-import { estimateTokens, compactMessages, applyCompactResult, COMPACT_BUDGET_TOKENS, KEEP_RECENT_TURNS, isOverflowError, type Summarizer, type CompactResult } from './compaction.js'
-// note: SUBAGENT_COMPACT_BUDGET_TOKENS is applied by callers of buildGraph(maxSteps, budget)
+import {
+  compactMessages,
+  applyCompactResult,
+  COMPACT_BUDGET_TOKENS,
+  KEEP_RECENT_TURNS,
+  MIN_STEPS_BETWEEN_LLM_COMPACT,
+  isOverflowError,
+  estimatePromptTokens,
+  type Summarizer,
+  type CompactResult,
+} from './compaction.js'
+import {
+  AUTO_COMPACT_THRESHOLD_PERCENT,
+  TARGET_THRESHOLD_PERCENT,
+  effectiveUsedTokens,
+  exceedsThreshold,
+  estimateTextTokens,
+  estimateToolsTokens,
+  messageKeepTokenBudget,
+} from './context-budget.js'
+// note: SUBAGENT compact budget is applied by callers via GraphCtx or buildGraph(maxSteps, budget)
 import { applySlidingWindow } from './context/sliding-window.js'
 import { isMicroCompactionEnabled, MicroCompaction } from './micro-compaction.js'
 import type { HookRegistry } from './hooks/registry.js'
@@ -141,6 +160,34 @@ export interface GraphCtx {
   toolParallelism?: number
   /** Per-activity step cap. When provided, overrides the `maxSteps` passed to `buildGraph`. */
   maxSteps?: number
+  /**
+   * Model context window in tokens. Used with `compactThresholdPercent` when
+   * `compactBudgetTokens` is not set. Defaults to 128k.
+   */
+  contextWindowTokens?: number
+  /**
+   * Absolute token trigger for auto-compact. When set, overrides the percentage
+   * gate (tests and forced budgets). When omitted, uses
+   * `contextWindowTokens * compactThresholdPercent / 100`.
+   */
+  compactBudgetTokens?: number
+  /** Auto-compact threshold as % of context window (default 85). */
+  compactThresholdPercent?: number
+  /**
+   * Last model call's prompt / input token count (from provider usage).
+   * When set, gates use max(estimate, lastPromptTokens).
+   */
+  lastPromptTokens?: number
+  /**
+   * Optional keep-tail token budget (message body). When omitted, derived from
+   * contextWindowTokens × TARGET_THRESHOLD_PERCENT minus system/tools overhead.
+   */
+  targetKeepTokens?: number
+  /**
+   * Best-effort hook before LLM history compaction (e.g. memory flush).
+   * Must not throw; errors are swallowed by the compact node.
+   */
+  beforeLlmCompact?: () => Promise<void>
   planMode?: PlanMode
   /**
    * @experimental Test / harness only. Product session-turn paths never inject.
@@ -183,6 +230,15 @@ const LoopState = Annotation.Root({
   planStepsSinceInjection: Annotation<number>({ reducer: (_prev, next) => next, default: () => 0 }),
   /** How many times we nudged the model to ExitPlanMode while planStatus=generating. */
   planExitNudgeCount: Annotation<number>({ reducer: (_prev, next) => next, default: () => 0 }),
+  /**
+   * Steps since the last LLM summary compaction. Defaults to MIN so the first
+   * over-budget compact is allowed immediately; reset to 0 after each LLM compact.
+   * Micro-prune is not gated on this counter.
+   */
+  stepsSinceLastLlmCompact: Annotation<number>({
+    reducer: (_prev, next) => next,
+    default: () => MIN_STEPS_BETWEEN_LLM_COMPACT,
+  }),
 })
 
 type State = typeof LoopState.State
@@ -253,19 +309,67 @@ function applyCompaction(stateMessages: BaseMessage[], result: CompactResult): B
   return applyCompactResult(stateMessages, result)
 }
 
+/** Resolve whether the prompt is over the compact budget for this invoke. */
+function isOverCompactBudget(
+  working: BaseMessage[],
+  ctx: GraphCtx,
+  fallbackAbsoluteBudget: number,
+): boolean {
+  const tools = (ctx.tools ?? []).map((t) => ({
+    name: t.name,
+    description: typeof t.description === 'string' ? t.description : undefined,
+  }))
+  const estimated = estimatePromptTokens({
+    messages: working,
+    systemPrompt: ctx.systemPrompt,
+    tools,
+  })
+  const used = effectiveUsedTokens(estimated, ctx.lastPromptTokens)
+
+  // Explicit absolute budget (tests, buildGraph second arg, forced overrides).
+  if (ctx.compactBudgetTokens != null && ctx.compactBudgetTokens > 0) {
+    return used > ctx.compactBudgetTokens
+  }
+  // Percentage of model context window (product path).
+  if (ctx.contextWindowTokens != null && ctx.contextWindowTokens > 0) {
+    const pct = ctx.compactThresholdPercent ?? AUTO_COMPACT_THRESHOLD_PERCENT
+    return exceedsThreshold(used, ctx.contextWindowTokens, pct)
+  }
+  // Fallback: absolute budget from buildGraph(maxSteps, compactBudget).
+  return used > fallbackAbsoluteBudget
+}
+
+/** Derive message-tail keep budget for compactMessages (product path only). */
+function resolveTargetKeepTokens(ctx: GraphCtx): number | undefined {
+  if (ctx.targetKeepTokens != null && ctx.targetKeepTokens > 0) return ctx.targetKeepTokens
+  // Absolute forced budgets (tests / harness) keep classic turn counts.
+  if (ctx.compactBudgetTokens != null && ctx.compactBudgetTokens > 0) return undefined
+  // Only size the keep-tail from a real model window on the product path.
+  if (ctx.contextWindowTokens == null || ctx.contextWindowTokens <= 0) return undefined
+  const tools = (ctx.tools ?? []).map((t) => ({
+    name: t.name,
+    description: typeof t.description === 'string' ? t.description : undefined,
+  }))
+  const overhead =
+    estimateTextTokens(ctx.systemPrompt ?? '') + estimateToolsTokens(tools)
+  return messageKeepTokenBudget(ctx.contextWindowTokens, overhead, TARGET_THRESHOLD_PERCENT)
+}
+
 /** Build the agent-loop graph. `maxSteps` and `compactBudget` are injectable for tests. */
 export function buildGraph(maxSteps: number = MAX_STEPS, compactBudget: number = COMPACT_BUDGET_TOKENS) {
   /**
    * Pre-model compaction each graph cycle:
    * 1) Prune old tool bodies (default on) — cheap, runs every step even after LLM compact
    * 2) Sliding window when message count is high (multi-turn)
-   * 3) LLM summary when over token budget (user-turn or tool-round fallback)
+   * 3) LLM summary when over token budget (user-turn or tool-round fallback),
+   *    throttled by MIN_STEPS_BETWEEN_LLM_COMPACT
    */
   async function compactNode(state: State, config: LangGraphRunnableConfig): Promise<Partial<State>> {
     const deferredResolved = resolveDeferred(state)
     const ctx = ctxOf(config)
     const out: BaseMessage[] = [...(deferredResolved.messages ?? [])]
     let working = state.messages
+    let stepsSince = state.stepsSinceLastLlmCompact ?? MIN_STEPS_BETWEEN_LLM_COMPACT
 
     // 1) Cheap prune of stale tool results (default on; not gated on state.compacted).
     if (isMicroCompactionEnabled()) {
@@ -297,25 +401,55 @@ export function buildGraph(maxSteps: number = MAX_STEPS, compactBudget: number =
       return {
         messages: [...out, summaryMsg, ...windowResult.kept],
         compacted: true,
+        stepsSinceLastLlmCompact: 0,
         deferredMessages: deferredResolved.deferredMessages,
       }
     }
 
-    // 3) Token-budget LLM compact (user-turn or tool-round). Re-runs after more tools accumulate.
-    const overBudget = estimateTokens(working) > compactBudget
-    if (!overBudget) {
-      if (out.length === 0) return deferredResolved
-      return { messages: out, deferredMessages: deferredResolved.deferredMessages }
+    // 3) Token-budget LLM compact (user-turn or tool-round). Throttled between LLM passes.
+    const overBudget = isOverCompactBudget(working, ctx, compactBudget)
+    const canLlmCompact = stepsSince >= MIN_STEPS_BETWEEN_LLM_COMPACT
+    if (!overBudget || !canLlmCompact) {
+      // Always tick the counter so we eventually re-enable LLM compact after a prior one.
+      const nextSteps = stepsSince + 1
+      if (out.length === 0) {
+        return {
+          ...deferredResolved,
+          stepsSinceLastLlmCompact: nextSteps,
+        }
+      }
+      return {
+        messages: out,
+        deferredMessages: deferredResolved.deferredMessages,
+        stepsSinceLastLlmCompact: nextSteps,
+      }
     }
 
+    // Memory flush (best-effort) before we destroy the middle span.
+    if (ctx.beforeLlmCompact) {
+      try {
+        await ctx.beforeLlmCompact()
+      } catch {
+        // never block compact
+      }
+    }
+
+    const targetKeep = resolveTargetKeepTokens(ctx)
     const result = await compactMessages(working, {
       keepRecentTurns: KEEP_RECENT_TURNS,
       summarizer: ctx.summarizer,
       sessionId: ctx.sessionId,
+      ...(targetKeep != null ? { targetKeepTokens: targetKeep } : {}),
     })
     if (!result) {
-      if (out.length === 0) return deferredResolved
-      return { messages: out, deferredMessages: deferredResolved.deferredMessages }
+      if (out.length === 0) {
+        return { ...deferredResolved, stepsSinceLastLlmCompact: stepsSince + 1 }
+      }
+      return {
+        messages: out,
+        deferredMessages: deferredResolved.deferredMessages,
+        stepsSinceLastLlmCompact: stepsSince + 1,
+      }
     }
     const summaryText = typeof result.summary.content === 'string' ? result.summary.content : ''
     const mode = result.mode ?? 'user-turn'
@@ -327,6 +461,7 @@ export function buildGraph(maxSteps: number = MAX_STEPS, compactBudget: number =
         ...result.removeIds.map((id) => new RemoveMessage({ id })),
       ],
       compacted: true,
+      stepsSinceLastLlmCompact: 0,
       deferredMessages: deferredResolved.deferredMessages,
     }
   }
@@ -396,7 +531,13 @@ export function buildGraph(maxSteps: number = MAX_STEPS, compactBudget: number =
     async function execute(input: BaseMessage[]): Promise<Partial<State>> {
       const msg = await runModel(input)
       const u = msg.usage_metadata
-      if (u) emit.usage({ inputTokens: u.input_tokens, outputTokens: u.output_tokens, totalTokens: u.total_tokens })
+      if (u) {
+        emit.usage({ inputTokens: u.input_tokens, outputTokens: u.output_tokens, totalTokens: u.total_tokens })
+        // Keep gate honest for subsequent compactNode cycles in this invoke.
+        if (typeof u.input_tokens === 'number' && u.input_tokens > 0) {
+          ctx.lastPromptTokens = u.input_tokens
+        }
+      }
       return { messages: [msg], steps: state.steps + 1 }
     }
 
@@ -442,11 +583,21 @@ export function buildGraph(maxSteps: number = MAX_STEPS, compactBudget: number =
       }
     } catch (err) {
       if (state.compacted || !isOverflowError(err)) throw err
+      if (ctx.beforeLlmCompact) {
+        try {
+          await ctx.beforeLlmCompact()
+        } catch {
+          // best-effort
+        }
+      }
+      const targetKeep = resolveTargetKeepTokens(ctx)
       const result = await compactMessages(messages, {
         keepRecentTurns: KEEP_RECENT_TURNS,
         summarizer: ctx.summarizer,
         overflowRecovery: true,
         sessionId: ctx.sessionId,
+        // Overflow: keep half the target budget so the retry prompt is smaller.
+        ...(targetKeep != null ? { targetKeepTokens: Math.max(500, Math.floor(targetKeep / 2)) } : {}),
       })
       if (!result) throw err
       const summaryText = typeof result.summary.content === 'string' ? result.summary.content : ''
@@ -455,7 +606,14 @@ export function buildGraph(maxSteps: number = MAX_STEPS, compactBudget: number =
       const compactedState = applyCompaction(state.messages, result)
       const retryMessages = prepareMessages(compactedState)
       const msgResult = await execute(retryMessages)
-      return { ...msgResult, messages: [...(deferredResolved.messages ?? []), ...compactedMessages, ...(msgResult.messages ?? [])], compacted: true, deferredMessages: deferredResolved.deferredMessages, planStepsSinceInjection }
+      return {
+        ...msgResult,
+        messages: [...(deferredResolved.messages ?? []), ...compactedMessages, ...(msgResult.messages ?? [])],
+        compacted: true,
+        stepsSinceLastLlmCompact: 0,
+        deferredMessages: deferredResolved.deferredMessages,
+        planStepsSinceInjection,
+      }
     }
   }
 

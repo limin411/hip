@@ -78,7 +78,8 @@ describe('compaction overflow behavior', () => {
   it('produces a summary and removes middle messages while keeping system + first user + recent K', async () => {
     await withTmp(async (root) => {
       const app = buildGraph(25, 1)
-      const summarizer: Summarizer = { async summarize() { return '早期摘要' } }
+      // Must clear MIN_SUMMARY_SEED_CHARS quality gate (not treated as degenerate).
+      const summarizer: Summarizer = { async summarize() { return '早期摘要：' + '细节'.repeat(40) } }
       const out = await app.invoke(
         { messages: build(), steps: 0 },
         { configurable: { ctx: { sessionId: 'test-session', runner: fakeRunner([new AIMessage('最终答复')]), tools: buildTools(root), emit: noopEmit, summarizer } } },
@@ -99,7 +100,8 @@ describe('compaction overflow behavior', () => {
   it('emits compaction_ended with the summary text when compacting', async () => {
     await withTmp(async (root) => {
       const app = buildGraph(25, 1)
-      const summarizer: Summarizer = { async summarize() { return 'emit-test-summary' } }
+      const body = 'emit-test-summary ' + 'x'.repeat(80)
+      const summarizer: Summarizer = { async summarize() { return body } }
       const summaries: string[] = []
       const emit: GraphEmit = { ...noopEmit, compaction: (s) => summaries.push(s) }
       await app.invoke(
@@ -107,7 +109,7 @@ describe('compaction overflow behavior', () => {
         { configurable: { ctx: { sessionId: 'test-session', runner: fakeRunner([new AIMessage('最终答复')]), tools: buildTools(root), emit, summarizer } } },
       )
       // graph emits `[${mode}] ${summaryText}`; mode is user-turn when multi-user messages exist.
-      expect(summaries).toEqual(['[user-turn] [对话摘要] emit-test-summary'])
+      expect(summaries).toEqual([`[user-turn] [对话摘要] ${body}`])
     })
   })
 
@@ -122,7 +124,7 @@ describe('compaction overflow behavior', () => {
             // First call is from overflow recovery; it should see more messages because keepRecentTurns is reduced.
             expect(m.length).toBeGreaterThan(0)
           }
-          return 'overflow-summary'
+          return 'overflow-summary: ' + 'kept critical context. '.repeat(6)
         },
       }
       const overflow = new Error('context length exceeded')
@@ -141,7 +143,12 @@ describe('compaction overflow behavior', () => {
     await withTmp(async (root) => {
       const app = buildGraph(25, 1)
       let summarizeCalls = 0
-      const summarizer: Summarizer = { async summarize() { summarizeCalls++; return 'single-summary' } }
+      const summarizer: Summarizer = {
+        async summarize() {
+          summarizeCalls++
+          return 'single-summary: ' + 'kept critical context. '.repeat(6)
+        },
+      }
       const loop = () => new AIMessage({ content: '', tool_calls: [{ name: 'ls', args: { path: root }, id: 'x' }] })
       await app.invoke(
         { messages: build(), steps: 0 },
@@ -152,8 +159,9 @@ describe('compaction overflow behavior', () => {
       )
       // Tool-loop may compact once for tool-rounds and again if budget still high;
       // assert we do not thrash (bounded), not a single call forever.
+      // MIN_STEPS throttle + quality gate keep this small.
       expect(summarizeCalls).toBeGreaterThanOrEqual(1)
-      expect(summarizeCalls).toBeLessThanOrEqual(2)
+      expect(summarizeCalls).toBeLessThanOrEqual(4)
     })
   })
 })

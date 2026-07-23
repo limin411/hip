@@ -3,7 +3,10 @@ import type { StructuredToolInterface } from '@langchain/core/tools'
 import { resolveEffectiveConfig } from '../config/hip-config.js'
 import type { GraphEmit, GraphCtx } from './graph.js'
 import { buildGraph } from './graph.js'
-import { SUBAGENT_COMPACT_BUDGET_TOKENS } from './compaction.js'
+import {
+  SUBAGENT_COMPACT_THRESHOLD_PERCENT,
+  resolveModelContextWindow,
+} from './context-budget.js'
 import { buildTools } from './tools.js'
 import { recursionLimit } from './loop-control.js'
 import { resolveDoomLoopStrategy } from './doom-loop.js'
@@ -104,6 +107,8 @@ export async function runManagedAgent(args: RunManagedAgentArgs): Promise<string
   const doomLoopStrategy = resolveDoomLoopStrategy(
     resolveEffectiveConfig(cwd).agentLoop?.doomLoopStrategy,
   )
+  const active = getActiveModel()
+  const contextWindowTokens = resolveModelContextWindow(active.providerID, active.modelID)
   const ctx: GraphCtx = {
     runner,
     tools,
@@ -121,6 +126,8 @@ export async function runManagedAgent(args: RunManagedAgentArgs): Promise<string
     requestApproval,
     permissionMode,
     doomLoopStrategy,
+    contextWindowTokens,
+    compactThresholdPercent: SUBAGENT_COMPACT_THRESHOLD_PERCENT,
   }
   let humanParts: ContentPart[]
   if (attachmentParts?.length) {
@@ -157,7 +164,8 @@ export async function runManagedAgent(args: RunManagedAgentArgs): Promise<string
   if (systemPromptExtra?.trim()) {
     systemText = `${systemText}\n\n${systemPromptExtra.trim()}`
   }
-  const app = buildGraph(childMaxSteps, SUBAGENT_COMPACT_BUDGET_TOKENS)
+  ctx.systemPrompt = systemText
+  const app = buildGraph(childMaxSteps)
   const final = await app.invoke(
     {
       messages: [new SystemMessage(systemText), humanMessage],

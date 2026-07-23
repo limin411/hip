@@ -128,7 +128,12 @@ describe('agent loop graph', () => {
     await withTmp(async (root) => {
       const app = buildGraph(25, 1)
       let summarizeCalled = 0
-      const summarizer: Summarizer = { async summarize() { summarizeCalled++; return '早期摘要' } }
+      const summarizer: Summarizer = {
+        async summarize() {
+          summarizeCalled++
+          return '早期摘要：' + 'kept critical context. '.repeat(6)
+        },
+      }
       const msgs: BaseMessage[] = [
         new HumanMessage({ id: 'u1', content: '原始目标' }),
         new AIMessage({ id: 'a1', content: '老回复一' }),

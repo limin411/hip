@@ -7,8 +7,10 @@ import { Session } from './session.js'
 import type { Summarizer } from './compaction.js'
 import { KEEP_RECENT_TURNS } from './compaction.js'
 
+/** Long enough to pass MIN_SUMMARY_SEED_CHARS quality gate. */
+const FAKE_SUMMARY = '早期对话摘要：' + '已完成关键步骤与决策。'.repeat(10)
 const fakeSummarizer: Summarizer = {
-  async summarize() { return '早期对话摘要' },
+  async summarize() { return FAKE_SUMMARY },
 }
 
 function getMessages(session: Session): BaseMessage[] {

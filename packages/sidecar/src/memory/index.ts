@@ -128,6 +128,12 @@ export {
   type RunLearnNowOpts,
 } from './pipeline/learn-now.js'
 export {
+  flushMemoryBeforeCompact,
+  MEMORY_FLUSH_TIMEOUT_MS,
+  type FlushBeforeCompactOpts,
+  type FlushBeforeCompactResult,
+} from './pipeline/flush-before-compact.js'
+export {
   runDecayJob,
   applyDecayStep,
   isDecayCandidate,

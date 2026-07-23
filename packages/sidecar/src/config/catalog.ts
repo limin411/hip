@@ -8,6 +8,8 @@ export interface CatalogModel {
   attachment?: boolean
   reasoning?: boolean
   reasoning_options?: Array<{ type?: string; values?: string[] }>
+  /** Provider-advertised token limits (models.dev / cache). */
+  limit?: { context?: number; output?: number }
 }
 
 export interface CatalogProvider {

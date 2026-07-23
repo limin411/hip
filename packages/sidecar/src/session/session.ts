@@ -27,7 +27,7 @@ import { maxStepsForSession } from './loop-control.js'
 import { Activity, ActivityTracker } from './activity.js'
 import { GoalManager } from './goal.js'
 import { addUsage, sumUsage } from './usage.js'
-import { compactMessages, applyCompactResult, estimateTokens, COMPACT_BUDGET_TOKENS, KEEP_RECENT_TURNS, type Summarizer } from './compaction.js'
+import { compactMessages, applyCompactResult, estimateTokens, KEEP_RECENT_TURNS, type Summarizer } from './compaction.js'
 import {
   emitPlanApprovalResync,
   mergePlanApprovalPauseMarker,
@@ -454,6 +454,8 @@ export class Session {
     const tokensBefore = estimateTokens(this.messages)
     let result
     try {
+      // Manual /compact uses classic turn counts so short histories still shrink.
+      // Auto-compact in the graph applies targetKeepTokens (50% of context window).
       result = await compactMessages(this.messages, {
         keepRecentTurns: KEEP_RECENT_TURNS,
         summarizer: this.summarizer(),

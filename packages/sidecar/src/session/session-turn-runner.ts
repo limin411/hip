@@ -42,7 +42,13 @@ import { recursionLimit, childMaxStepsForAgent, maxStepsForSession } from './loo
 import type { Activity, ActivityTracker } from './activity.js'
 import type { GoalManager } from './goal.js'
 import { addUsage, sumUsage } from './usage.js'
-import { estimateTokens, COMPACT_BUDGET_TOKENS, type Summarizer } from './compaction.js'
+import { estimatePromptTokens, type Summarizer } from './compaction.js'
+import {
+  AUTO_COMPACT_THRESHOLD_PERCENT,
+  effectiveUsedTokens,
+  remainingBudgetPercent,
+  resolveModelContextWindow,
+} from './context-budget.js'
 import { ensureToolCallResults, hasValidToolCallPairing } from '../persistence/event-store.js'
 import { PAUSE_QUESTION, resolveDoomLoopStrategy } from './doom-loop.js'
 import { PLAN_APPROVAL_QUESTION_TOKEN } from './plan-approval-constants.js'
@@ -88,6 +94,7 @@ import {
   bumpMemoryUseCounts,
   buildMemorySearchToolOnly,
   buildMemoryTools,
+  flushMemoryBeforeCompact,
 } from '../memory/index.js'
 import { MemoryInjector } from '../memory/inject.js'
 import { tryEnableMemoriesFts, tryEnableSqliteVec } from '../persistence/schema.js'
@@ -220,6 +227,11 @@ export interface SessionTurnHost {
   scratchRoot: string
   idleTimeoutMs: number
   workflowDeps: WorkflowRunDeps
+  /**
+   * Last observed model prompt/input token count for this session (from usage).
+   * Used for remaining-budget % and auto-compact gates.
+   */
+  lastPromptTokens?: number
 
   buildAgent(): void
   modelRunner(): ModelRunner
@@ -851,8 +863,15 @@ export async function runTurn(host: SessionTurnHost, rawSend: SendFn, base?: {
   const skills = host.configMgr.skills; const pluginAgents = host.configMgr.pluginAgents
   const rawMode = host._config.permissionMode
   const mode: PermissionMode = rawMode === 'chat' || rawMode === 'full' ? rawMode : 'edit'
-  const usedTokens = estimateTokens(visibleMessages)
-  const tokenBudgetPercent = Math.max(0, Math.min(100, Math.round(100 - (usedTokens / COMPACT_BUDGET_TOKENS) * 100)))
+  const activeModel = getActiveModel()
+  const contextWindowTokens = resolveModelContextWindow(activeModel.providerID, activeModel.modelID)
+  // Remaining % for injectors: prefer last real prompt usage, else message estimate.
+  // System/tools are added after prepare; gate in graph uses full estimate + usage.
+  const usedTokens = effectiveUsedTokens(
+    estimatePromptTokens({ messages: visibleMessages }),
+    host.lastPromptTokens,
+  )
+  const tokenBudgetPercent = remainingBudgetPercent(usedTokens, contextWindowTokens)
 
   const logToken = logDebugEveryN('session', 10, 'token:stream', { sessionId: host.id, turnId, agentId: 'supervisor' })
   const makeEmit = (agentId: string, role: AgentRole): GraphEmit => ({
@@ -883,7 +902,13 @@ export async function runTurn(host: SessionTurnHost, rawSend: SendFn, base?: {
       host.checkSteerPromotion()
     },
     toolFinished: (callId, status, output, error) => { const toolName = trajectory.get(agentId)?.toolCalls.get(callId)?.name ?? ''; const outClip = output !== undefined ? clipForTool(toolName, stringify(output)) : undefined; recorder.finish(agentId, callId, status, outClip?.text, error, outClip?.truncated ?? false); send({ type: 'tool:finished', sessionId: host.id, turnId, agentId, callId, status, ...(outClip ? { output: outClip.text } : {}), ...(error ? { error } : {}), ...(outClip?.truncated ? { truncated: true } : {}) }); const stepId = host.activeSteps.get(agentId) ?? (agentId === 'supervisor' ? turnId : agentId); if (status === 'finished') { host.emit({ type: 'tool_success', sessionId: host.id, callId, output: outClip?.text ?? '', timestamp: Date.now() }, { stepId }) } else { host.emit({ type: 'tool_failed', sessionId: host.id, callId, error: error ?? '', timestamp: Date.now() }, { stepId }) }; host.checkSteerPromotion() },
-    usage: (u) => { usageByAgent.set(agentId, addUsage(usageByAgent.get(agentId), u)) },
+    usage: (u) => {
+      usageByAgent.set(agentId, addUsage(usageByAgent.get(agentId), u))
+      const prompt = u.contextTokens ?? u.inputTokens
+      if (typeof prompt === 'number' && prompt > 0) {
+        host.lastPromptTokens = prompt
+      }
+    },
     planDelta: (itemId, delta) => { send({ type: 'plan:delta', sessionId: host.id, turnId, itemId, delta }) },
     planUpdated: (plan) => { send({ type: 'plan:updated', sessionId: host.id, turnId, plan }) },
     compaction: (summary: string, meta?: { replacedMessageIds?: string[] }) => {
@@ -1291,6 +1316,34 @@ export async function runTurn(host: SessionTurnHost, rawSend: SendFn, base?: {
     requestApproval, permissionMode: mode, allowedTools: activeProfile.allowedTools,
     blockedTools: activeProfile.blockedTools, systemPrompt: system, activeProfileId: activeProfile.id,
     maxSteps, planMode, doomLoopStrategy,
+    contextWindowTokens,
+    compactThresholdPercent: AUTO_COMPACT_THRESHOLD_PERCENT,
+    lastPromptTokens: host.lastPromptTokens,
+    beforeLlmCompact: async () => {
+      if (!host.memoryService || !host.store) return
+      const memCfg = host.memoryService.getConfig()
+      const flags = resolveSessionMemoryFlags(memCfg, host._config)
+      if (!flags.generate || flags.incognito) return
+      const result = await flushMemoryBeforeCompact({
+        sessionId: host.id,
+        store: host.memoryService.store,
+        sessionStore: host.store,
+        memoryService: host.memoryService,
+        config: memCfg,
+        sessionConfig: {
+          generateMemories: host._config.generateMemories,
+          incognito: host._config.incognito,
+          cwd: host._config.cwd,
+        },
+      })
+      if (result.status === 'flushed') {
+        try {
+          emit.compaction(`[memory-flush] ${result.phase1?.status ?? 'ok'}`)
+        } catch {
+          // best-effort UI signal
+        }
+      }
+    },
   }
 
   let finalState: LoopState | undefined

@@ -175,7 +175,7 @@ describe('ToolOutputStore', () => {
 
     expect(r.truncated).toBe(true)
     expect(r.outputPaths).toHaveLength(1)
-    expect(Buffer.byteLength(r.output, 'utf-8')).toBeLessThanOrEqual(100 * 1024)
+    expect(Buffer.byteLength(r.output, 'utf-8')).toBeLessThanOrEqual(40 * 1024)
 
     // The managed file MUST contain the full 10MB (not just a path promise).
     const fileContent = await fs.readFile(r.outputPaths[0], 'utf-8')

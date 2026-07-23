@@ -20,8 +20,10 @@ function fakeRunner(script: AIMessage[]): ModelRunner {
   }
 }
 
+/** Long enough to pass MIN_SUMMARY_SEED_CHARS quality gate. */
+const FAKE_SUMMARY = '早期对话摘要：' + '已完成关键步骤与决策。'.repeat(10)
 const fakeSummarizer: Summarizer = {
-  async summarize() { return '早期对话摘要' },
+  async summarize() { return FAKE_SUMMARY },
 }
 
 let root: string
@@ -50,8 +52,22 @@ describe('Session compaction restores compacted message history', () => {
       runner,
       fakeSummarizer,
     )
-    // Force a tiny compaction budget so the sixth turn compacts the middle.
+    // Force a tiny absolute compaction budget so the sixth turn compacts the middle.
+    // compactBudgetTokens on GraphCtx is set by patching runTurn path via app only —
+    // also patch buildAgent's graph; absolute second-arg is used when ctx has no window.
     ;(session as any).app = buildGraph(25, 1)
+    // Ensure product path does not attach a large context window that would ignore budget=1.
+    const orig = (session as any).app
+    ;(session as any).app = {
+      invoke: (state: unknown, config: { configurable?: { ctx?: Record<string, unknown> } }) => {
+        if (config?.configurable?.ctx) {
+          // Absolute test budget wins over percent-of-window.
+          config.configurable.ctx.compactBudgetTokens = 1
+          delete config.configurable.ctx.contextWindowTokens
+        }
+        return orig.invoke(state, config)
+      },
+    }
 
     const sent: ServerMessage[] = []
     const send = (m: ServerMessage) => sent.push(m)

@@ -5,8 +5,12 @@ import * as path from 'node:path'
 // ── Defaults ─────────────────────────────────────────────────────────────────
 
 const DEFAULT_MAX_LINES = 2000
-/** Raised from 50KB so dense single-file assets (SVG/HTML) fit more often before head+tail. */
-const DEFAULT_MAX_BYTES = 100 * 1024 // 100 KB
+/**
+ * Default max tool-result bytes kept inline for the model.
+ * 40 KB ≈ 10k tokens (aligned with grok-build DEFAULT_TOOL_OUTPUT_BYTES).
+ * Full content still spills to ~/.hip/data/tool-output/ when over limit.
+ */
+const DEFAULT_MAX_BYTES = 40 * 1024 // 40 KB
 const CLEANUP_INTERVAL_MS = 60 * 60 * 1000 // 1 hour
 const CLEANUP_RETENTION_MS = 7 * 24 * 60 * 60 * 1000 // 7 days
 const FILE_PREFIX = 'tool_'

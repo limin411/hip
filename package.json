@@ -14,6 +14,8 @@
     "sidecar:dev": "yarn workspace @hip/sidecar dev",
     "sidecar:dev-bin": "node scripts/make-sidecar-dev-bin.js",
     "sidecar:build": "yarn workspace @hip/sidecar build",
+    "sidecar:prod-bin": "bash scripts/make-sidecar-prod-bin.sh",
+    "release:macos": "bash scripts/release-macos.sh",
     "type-check": "tsc --noEmit",
     "check:visual-dialects": "node scripts/check-visual-dialects.mjs",
     "test": "vitest run",

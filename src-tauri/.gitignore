@@ -6,6 +6,12 @@
 # will have schema files for capabilities auto-completion
 /gen/schemas
 
-# Sidecar binaries (dev wrapper + bundled native binary) — build artifacts.
+# Sidecar binaries (dev wrapper + production launcher) — build artifacts.
 # Regenerate the dev wrapper with `yarn sidecar:dev-bin`.
+# Production: `yarn sidecar:prod-bin` / `yarn release:macos`.
 /binaries/
+
+# Production Node runtime + JS bundle staged for app Resources (large; local only).
+# Directory itself is kept via resources/hip-sidecar/README.txt so resource globs resolve.
+/resources/hip-sidecar/*
+!/resources/hip-sidecar/README.txt

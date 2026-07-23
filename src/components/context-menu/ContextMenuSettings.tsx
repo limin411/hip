@@ -169,12 +169,12 @@ export function ContextMenuSettings() {
   return (
     <>
       <div
-        className="flex items-center justify-between px-6 py-5"
+        className="flex items-center justify-between gap-6 px-8 py-4"
         data-testid="context-menu-settings"
       >
         <div className="min-w-0 flex-1">
-          <div className="text-prose font-medium text-ink">{t('settings.contextMenu.title')}</div>
-          <div className="mt-0.5 text-meta text-ink-tertiary">
+          <div className="text-body font-medium text-ink">{t('settings.contextMenu.title')}</div>
+          <div className="mt-0.5 text-meta leading-relaxed text-ink-tertiary">
             {t('settings.contextMenu.description')}
           </div>
         </div>
@@ -182,7 +182,7 @@ export function ContextMenuSettings() {
           type="button"
           variant="outline"
           size="sm"
-          className="ml-4 shrink-0"
+          className="shrink-0"
           onClick={() => setOpen(true)}
           data-testid="context-menu-settings-open"
         >

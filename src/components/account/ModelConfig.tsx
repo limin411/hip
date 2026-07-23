@@ -17,7 +17,6 @@ import {
   isProviderKeyConfigured,
   saveProviderKey,
   clearProviderKey,
-  restartSidecar,
 } from '@/ipc/secrets'
 import { sessionService } from '@/domain'
 import { Button } from '@/components/ui/Button'
@@ -42,6 +41,7 @@ export function ModelConfig() {
     clearKey,
     setBaseURL,
     setEnabled,
+    setApiKind,
     setActiveModel,
   } = useProvidersStore()
   const [selected, setSelected] = useState<string | null>(null)
@@ -123,8 +123,8 @@ export function ModelConfig() {
     const ref = buildMemoryEndpointRef(purpose, draft.baseURL, draft.modelID, draft.apiFormat)
     if (!ref) throw new Error(t('settings.modelConfig.error'))
     if (draft.apiKey) {
+      // auth.json is read live by the sidecar — no restart required (BYOK hot path).
       await saveProviderKey(slot, draft.apiKey)
-      await restartSidecar()
     } else {
       const ok = await isProviderKeyConfigured(slot)
       if (!ok) throw new Error(t('settings.modelConfig.testNoKey'))
@@ -143,7 +143,6 @@ export function ModelConfig() {
     const slot = memoryEndpointProviderId(purpose)
     try {
       await clearProviderKey(slot)
-      await restartSidecar()
     } catch {
       // ignore missing key
     }
@@ -241,11 +240,13 @@ export function ModelConfig() {
                   configured={!!keyConfigured[active.id]}
                   enabled={config.providers[active.id]?.enabled ?? false}
                   baseURL={config.providers[active.id]?.baseURL ?? active.api ?? ''}
+                  apiKind={config.providers[active.id]?.apiKind}
                   isActive={(modelID) => am?.providerID === active.id && am?.modelID === modelID}
                   onSaveKey={(v) => saveKey(active.id, v)}
                   onClearKey={() => clearKey(active.id)}
                   onSaveBaseURL={(v) => setBaseURL(active.id, v)}
                   onSetEnabled={(v) => setEnabled(active.id, v)}
+                  onSetApiKind={(v) => setApiKind(active.id, v)}
                   onSetCurrent={(modelID) => setActiveModel(active.id, modelID)}
                   setCurrentLabel={t('settings.modelConfig.purpose.base.setCurrent')}
                   currentLabel={t('settings.modelConfig.purpose.base.current')}

@@ -1,4 +1,5 @@
 import type { ActiveModel } from '@hip/protocol'
+import { readCatalog } from './catalog.js'
 import { readHipConfig } from './hip-config.js'
 
 export const DEEPSEEK_DEFAULT: ActiveModel = {
@@ -8,6 +9,14 @@ export const DEEPSEEK_DEFAULT: ActiveModel = {
 }
 
 export const ANTHROPIC_DEFAULT_BASE_URL = 'https://api.anthropic.com/v1'
+export const OPENAI_DEFAULT_BASE_URL = 'https://api.openai.com/v1'
+
+/** Built-in official bases when catalog cache is cold (docs/design/byok-spec.md §3.2). */
+const BUILTIN_BASE_URL: Record<string, string> = {
+  deepseek: DEEPSEEK_DEFAULT.baseURL,
+  anthropic: ANTHROPIC_DEFAULT_BASE_URL,
+  openai: OPENAI_DEFAULT_BASE_URL,
+}
 
 /** Provider ids that require a native (non-OpenAI) SDK and so cannot be reached through ChatOpenAI.
  *  We BLOCKLIST rather than allowlist on purpose: the renderer (src/ipc/catalog.ts) admits any
@@ -41,7 +50,8 @@ export function setActiveModel(m: ActiveModel): void {
 
 function providerBaseUrlFromToml(providerID: string): string | undefined {
   const cfg = readHipConfig()
-  return cfg.providers?.find((p) => p.id === providerID)?.baseUrl
+  const u = cfg.providers?.find((p) => p.id === providerID)?.baseUrl?.trim()
+  return u || undefined
 }
 
 /** Initialise the process-global active model from hip.toml. */
@@ -50,20 +60,25 @@ export function loadActiveModelFromEnv(): void {
   const sel = cfg.activeModel
   if (sel) {
     // Treat an empty/missing stored baseURL as unset and re-resolve it (provider override
-    // → deepseek/anthropic default) so we never hand the SDK '' (which defaults to OpenAI).
-    const baseURL = sel.baseURL || resolveProviderBaseURL(sel.providerID)
+    // → catalog / builtin) so we never hand the SDK '' (which defaults to OpenAI).
+    const baseURL = sel.baseURL?.trim() || resolveProviderBaseURL(sel.providerID)
     active = { providerID: sel.providerID, modelID: sel.modelID, baseURL }
     return
   }
   active = DEEPSEEK_DEFAULT
 }
 
-/** Resolve a provider's OpenAI-compatible base URL from hip.toml; fall back to the
- *  deepseek/anthropic defaults. */
+/**
+ * Resolve a provider's API base URL (BYOK spec §3.2):
+ * hip.toml override → models.dev catalog `api` → builtin official defaults → ''.
+ * Never invent a DeepSeek URL for unrelated providers.
+ */
 export function resolveProviderBaseURL(providerID: string): string {
   const fromToml = providerBaseUrlFromToml(providerID)
   if (fromToml) return fromToml
-  return providerID === 'anthropic' ? ANTHROPIC_DEFAULT_BASE_URL : DEEPSEEK_DEFAULT.baseURL
+  const fromCatalog = readCatalog()[providerID]?.api?.trim()
+  if (fromCatalog) return fromCatalog
+  return BUILTIN_BASE_URL[providerID] ?? ''
 }
 
 /** Cheap model for a provider's auxiliary calls (titles, compaction summaries). Falls back to the

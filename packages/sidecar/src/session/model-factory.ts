@@ -8,9 +8,22 @@ import {
   normalizeAnthropicApiUrl,
   resolveChatApiKind,
 } from '../config/chat-api-kind.js'
-import { resolveApiKey } from '../config/auth-file.js'
+import { resolveApiKey, resolveProviderAuth } from '../config/auth-file.js'
 import { langSmithModelCallConfig } from '../observability/langsmith.js'
 import { SUMMARY_OUTPUT_TOKENS, type Summarizer } from './compaction.js'
+
+/** Thrown when buildChatModel is called without a configured API key (no sk-missing). */
+export class MissingApiKeyError extends Error {
+  readonly code = 'MISSING_KEY' as const
+  readonly providerID: string
+  constructor(providerID: string) {
+    super(
+      `Missing API key for provider "${providerID}". Add a key in Settings → Providers, or set a standard env var / HIP_MODEL_* key.`,
+    )
+    this.name = 'MissingApiKeyError'
+    this.providerID = providerID
+  }
+}
 
 /** Stable content-block index for the re-projected reasoning block — distinct from text (0)
  *  and tool-call chunk indices so it accumulates as its own block in convertChunksToEvents. */
@@ -107,8 +120,19 @@ export class ReasoningChatOpenAI extends ChatOpenAI {
   }
 }
 
+/**
+ * Require a configured API key for chat. Never returns a dummy key.
+ * @throws {MissingApiKeyError} when no key is resolvable
+ */
 export function activeKey(providerID: string): string {
-  return resolveApiKey(providerID) || 'sk-missing'
+  const auth = resolveProviderAuth(providerID)
+  if (!auth?.apiKey) throw new MissingApiKeyError(providerID)
+  return auth.apiKey
+}
+
+/** @deprecated Use activeKey; kept for call sites that only need a boolean check. */
+export function hasActiveKey(providerID: string): boolean {
+  return !!resolveApiKey(providerID)
 }
 
 export type BuildChatModelChoice = {

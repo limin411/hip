@@ -1,9 +1,9 @@
 // src/store/providersStore.ts
 import { create } from 'zustand'
-import type { ActiveModel, ProviderEntry, ProvidersConfig } from '@hip/protocol'
+import type { ActiveModel, ProviderApiKind, ProviderEntry, ProvidersConfig } from '@hip/protocol'
 import { fetchCatalog, refreshCatalog, isCompatible, type Catalog, type CatalogProvider } from '@/ipc/catalog'
 import { useHipConfigStore } from '@/store/hipConfigStore'
-import { areProviderKeysConfigured, saveProviderKey, clearProviderKey, restartSidecar } from '@/ipc/secrets'
+import { areProviderKeysConfigured, saveProviderKey, clearProviderKey } from '@/ipc/secrets'
 import { sessionService } from '@/domain/sessionService'
 
 /** Coordinates the models.dev catalog, the hip.toml provider config, and per-provider API
@@ -25,7 +25,14 @@ interface ProvidersStore {
   clearKey: (providerID: string) => Promise<void>
   setBaseURL: (providerID: string, baseURL: string) => Promise<void>
   setEnabled: (providerID: string, enabled: boolean) => Promise<void>
-  addCustom: (providerID: string, name: string, baseURL: string, modelIDs: string[]) => Promise<void>
+  setApiKind: (providerID: string, apiKind: ProviderApiKind) => Promise<void>
+  addCustom: (
+    providerID: string,
+    name: string,
+    baseURL: string,
+    modelIDs: string[],
+    apiKind?: ProviderApiKind,
+  ) => Promise<void>
   setActiveModel: (providerID: string, modelID: string) => Promise<void>
 }
 
@@ -40,12 +47,25 @@ function withDefaults(cfg: ProvidersConfig | null): ProvidersConfig {
   }
 }
 
+/** Catalog npm tag that matches sidecar Anthropic routing for custom providers. */
+function catalogNpmForApiKind(apiKind: ProviderApiKind | undefined): string | undefined {
+  return apiKind === 'anthropic' ? '@ai-sdk/anthropic' : undefined
+}
+
 /** Merge user `custom` providers into the catalog so the list renders them too. */
 function mergeCustom(catalog: Catalog, config: ProvidersConfig): Catalog {
   const out: Catalog = { ...catalog }
   for (const [id, entry] of Object.entries(config.providers)) {
     if (entry.custom && !out[id]) {
-      out[id] = { id, name: entry.custom.name, env: [], models: {}, custom: true, api: entry.baseURL }
+      out[id] = {
+        id,
+        name: entry.custom.name,
+        env: [],
+        models: {},
+        custom: true,
+        api: entry.baseURL,
+        ...(catalogNpmForApiKind(entry.apiKind) ? { npm: catalogNpmForApiKind(entry.apiKind) } : {}),
+      }
     }
   }
   return out
@@ -66,6 +86,7 @@ export function providerEntriesToConfig(entries: ProviderEntry[] | undefined, ca
     const entry: ProvidersConfig['providers'][string] = {
       enabled: e.enabled,
       baseURL: e.baseUrl || undefined,
+      ...(e.apiKind ? { apiKind: e.apiKind } : {}),
     }
     if (isCustomProvider(e.id, catalog)) {
       entry.custom = { name: e.name }
@@ -82,6 +103,7 @@ export function configToProviderEntries(config: ProvidersConfig, catalog: Catalo
     name: entry.custom?.name ?? catalog[id]?.name ?? id,
     baseUrl: entry.baseURL ?? '',
     enabled: entry.enabled,
+    ...(entry.apiKind ? { apiKind: entry.apiKind } : {}),
   }))
 }
 
@@ -150,8 +172,10 @@ export const useProvidersStore = create<ProvidersStore>((set, get) => ({
 
   saveKey: async (providerID, value) => {
     await saveProviderKey(providerID, value)
-    // Enable + persist so spawn injects this key, then restart to pick it up.
+    // Enable + persist baseURL. Sidecar resolves keys from auth.json on each
+    // request (BYOK hot path) — no sidecar restart required.
     const config = get().config
+    const baseURL = resolveBaseURL(get().catalog[providerID], config, providerID)
     const next: ProvidersConfig = {
       ...config,
       providers: {
@@ -159,19 +183,29 @@ export const useProvidersStore = create<ProvidersStore>((set, get) => ({
         [providerID]: {
           ...config.providers[providerID],
           enabled: true,
-          baseURL: resolveBaseURL(get().catalog[providerID], config, providerID),
+          baseURL,
         },
       },
     }
     await persistProvidersConfig(next, get().catalog)
-    await restartSidecar()
     set((s) => ({ config: next, keyConfigured: { ...s.keyConfigured, [providerID]: true } }))
+    // Refresh hasApiKey banner when the active provider's key changes.
+    if (config.activeModel?.providerID === providerID && baseURL) {
+      sessionService.setActiveModel(providerID, config.activeModel.modelID, baseURL)
+    }
   },
 
   clearKey: async (providerID) => {
+    // Tombstone "" in auth.json so env fallback cannot revive a cleared key.
     await clearProviderKey(providerID)
-    await restartSidecar()
     set((s) => ({ keyConfigured: { ...s.keyConfigured, [providerID]: false } }))
+    const { config, catalog } = get()
+    if (config.activeModel?.providerID === providerID) {
+      const baseURL = resolveBaseURL(catalog[providerID], config, providerID)
+      if (baseURL) {
+        sessionService.setActiveModel(providerID, config.activeModel.modelID, baseURL)
+      }
+    }
   },
 
   setBaseURL: async (providerID, baseURL) => {
@@ -207,24 +241,64 @@ export const useProvidersStore = create<ProvidersStore>((set, get) => ({
     set({ config: next })
   },
 
-  // Note: addCustom persists config but does NOT restart the sidecar, so the new provider's
-  // HIP_MODEL_<ID>_API_KEY env is injected on the next saveKey() restart. The intended flow is
-  // addCustom → saveKey (restart) before that provider is made active.
-  addCustom: async (providerID, name, baseURL, modelIDs) => {
+  setApiKind: async (providerID, apiKind) => {
+    const config = get().config
+    const prev = config.providers[providerID]
+    const next: ProvidersConfig = {
+      ...config,
+      providers: {
+        ...config.providers,
+        [providerID]: {
+          ...prev,
+          enabled: prev?.enabled ?? true,
+          apiKind,
+        },
+      },
+    }
+    await persistProvidersConfig(next, get().catalog)
+    set((s) => {
+      const cat = s.catalog[providerID]
+      if (!cat?.custom) return { config: next }
+      const npm = catalogNpmForApiKind(apiKind)
+      return {
+        config: next,
+        catalog: {
+          ...s.catalog,
+          [providerID]: npm ? { ...cat, npm } : { ...cat, npm: undefined },
+        },
+      }
+    })
+  },
+
+  // Note: addCustom persists config only. Call saveKey before making the provider active
+  // so auth.json has a key (sidecar reads auth.json / env without restart).
+  addCustom: async (providerID, name, baseURL, modelIDs, apiKind = 'openai') => {
     // Don't let a custom provider clobber a built-in catalog entry (e.g. name "OpenAI" → id "openai").
     const existing = get().catalog[providerID]
     if (existing && !existing.custom) throw new Error(`Provider id "${providerID}" already exists`)
     const config = get().config
     const next: ProvidersConfig = {
       ...config,
-      providers: { ...config.providers, [providerID]: { enabled: true, baseURL, custom: { name } } },
+      providers: {
+        ...config.providers,
+        [providerID]: { enabled: true, baseURL, apiKind, custom: { name } },
+      },
     }
     await persistProvidersConfig(next, get().catalog)
+    const npm = catalogNpmForApiKind(apiKind)
     set((s) => ({
       config: next,
       catalog: {
         ...s.catalog,
-        [providerID]: { id: providerID, name, env: [], custom: true, api: baseURL, models: Object.fromEntries(modelIDs.map((m) => [m, { id: m, name: m }])) },
+        [providerID]: {
+          id: providerID,
+          name,
+          env: [],
+          custom: true,
+          api: baseURL,
+          ...(npm ? { npm } : {}),
+          models: Object.fromEntries(modelIDs.map((m) => [m, { id: m, name: m }])),
+        },
       },
     }))
   },

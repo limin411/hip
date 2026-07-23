@@ -1,12 +1,25 @@
 /** Unified TOML config types and network policy. */
-import type { ActiveModel, AgentConfig } from './providers-agents.js'
+import type { ActiveModel, AgentConfig, ProviderApiKind } from './providers-agents.js'
 import type { McpServerConfig } from './mcp-config.js'
+
+export type { ProviderApiKind }
 
 export interface ProviderEntry {
   id: string
   name: string
   baseUrl: string
+  /**
+   * @deprecated Never used for chat BYOK. LLM keys live only in
+   * `~/.hip/config/auth.json` (see docs/design/byok-spec.md). If present in
+   * hip.toml it is ignored by the runtime; do not store secrets here.
+   */
   apiKey?: string
+  /**
+   * Chat wire protocol. Optional for catalog providers (inferred from models.dev npm /
+   * URL). Recommended for custom OpenAI-compatible vs Anthropic Messages hosts.
+   * TOML: `apiKind` or `api_kind`.
+   */
+  apiKind?: ProviderApiKind
   enabled: boolean
 }
 

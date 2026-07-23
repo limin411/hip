@@ -1,4 +1,6 @@
-import { afterEach, describe, it, expect, vi } from 'vitest'
+import { afterEach, beforeEach, describe, it, expect, vi } from 'vitest'
+import { join } from 'node:path'
+import { tmpdir } from 'node:os'
 import { ChatOpenAI } from '@langchain/openai'
 import { ChatAnthropic } from '@langchain/anthropic'
 import { resolveModelChoice } from './session.js' // pure helper extracted from buildModel
@@ -7,6 +9,8 @@ import {
   ReasoningChatOpenAI,
   openAiReasoningEffort,
   anthropicOutputEffort,
+  MissingApiKeyError,
+  activeKey,
 } from './model-factory.js'
 
 vi.mock('../config/catalog.js', async (importOriginal) => {
@@ -22,8 +26,32 @@ import { readCatalog } from '../config/catalog.js'
 
 const mockReadCatalog = vi.mocked(readCatalog)
 
+/** Seed HIP keys so buildChatModel tests do not hit MissingApiKeyError. */
+const TEST_KEYS = [
+  'HIP_MODEL_DEEPSEEK_API_KEY',
+  'HIP_MODEL_ANTHROPIC_API_KEY',
+  'HIP_MODEL_OPENAI_API_KEY',
+  'HIP_MODEL_MINIMAX_CN_CODING_PLAN_API_KEY',
+  'HIP_MODEL_MY_GATEWAY_API_KEY',
+  'HIP_MODEL_MY_PROXY_API_KEY',
+] as const
+
+const savedKeys: Record<string, string | undefined> = {}
+
+beforeEach(() => {
+  for (const k of TEST_KEYS) {
+    savedKeys[k] = process.env[k]
+    process.env[k] = 'sk-test-build-model'
+  }
+  // Ensure auth.json tombstone path does not block test env (HIP_AUTH_PATH from vitest.setup).
+})
+
 afterEach(() => {
   mockReadCatalog.mockReturnValue({})
+  for (const k of TEST_KEYS) {
+    if (savedKeys[k] === undefined) delete process.env[k]
+    else process.env[k] = savedKeys[k]
+  }
 })
 
 describe('resolveModelChoice', () => {
@@ -187,5 +215,26 @@ describe('buildChatModel routing', () => {
     })
     expect(model).toBeInstanceOf(ReasoningChatOpenAI)
     expect(model).not.toBeInstanceOf(ChatAnthropic)
+  })
+
+  it('throws MissingApiKeyError instead of using sk-missing', () => {
+    delete process.env.HIP_MODEL_DEEPSEEK_API_KEY
+    delete process.env.DEEPSEEK_API_KEY
+    // Point at an empty auth file so no file / standard / hip key remains.
+    const prevAuth = process.env.HIP_AUTH_PATH
+    process.env.HIP_AUTH_PATH = join(tmpdir(), '__hip_no_auth_missing_key__', 'auth.json')
+    try {
+      expect(() => activeKey('deepseek')).toThrow(MissingApiKeyError)
+      expect(() =>
+        buildChatModel({
+          providerID: 'deepseek',
+          modelID: 'deepseek-chat',
+          baseURL: 'https://api.deepseek.com/v1',
+        }),
+      ).toThrow(MissingApiKeyError)
+    } finally {
+      if (prevAuth === undefined) delete process.env.HIP_AUTH_PATH
+      else process.env.HIP_AUTH_PATH = prevAuth
+    }
   })
 })

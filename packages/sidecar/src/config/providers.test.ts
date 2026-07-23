@@ -1,9 +1,20 @@
-import { describe, it, expect, beforeEach, afterEach } from 'vitest'
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import { writeFileSync, mkdtempSync, rmSync } from 'node:fs'
 import { join } from 'node:path'
 import { tmpdir } from 'node:os'
 import { getActiveModel, setActiveModel, loadActiveModelFromEnv, isOpenAICompatible, DEEPSEEK_DEFAULT, cheapModelFor, resolveProviderBaseURL } from './providers.js'
 import { providerKeyEnv } from '@hip/protocol'
+
+vi.mock('./catalog.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('./catalog.js')>()
+  return {
+    ...actual,
+    readCatalog: vi.fn(() => ({})),
+  }
+})
+
+import { readCatalog } from './catalog.js'
+const mockReadCatalog = vi.mocked(readCatalog)
 
 const tmps: string[] = []
 function writeToml(enabled: Record<string, boolean> = { deepseek: true }, active?: { providerID: string; modelID: string; baseURL: string }): string {
@@ -77,6 +88,7 @@ describe('sidecar provider config', () => {
 describe('resolveProviderBaseURL', () => {
   afterEach(() => {
     delete process.env.HIP_CONFIG_PATH
+    mockReadCatalog.mockReturnValue({})
     for (const d of tmps.splice(0)) rmSync(d, { recursive: true, force: true })
   })
 
@@ -84,8 +96,28 @@ describe('resolveProviderBaseURL', () => {
     process.env.HIP_CONFIG_PATH = writeToml({ acme: true })
     expect(resolveProviderBaseURL('acme')).toBe('https://acme.test/v1')
   })
-  it('falls back to the deepseek default when the provider/file is missing', () => {
+  it('uses catalog api when present', () => {
     delete process.env.HIP_CONFIG_PATH
-    expect(resolveProviderBaseURL('whatever')).toBe('https://api.deepseek.com/v1')
+    mockReadCatalog.mockReturnValue({
+      openai: {
+        id: 'openai',
+        name: 'OpenAI',
+        api: 'https://api.openai.com/v1',
+        models: {},
+      },
+    })
+    expect(resolveProviderBaseURL('openai')).toBe('https://api.openai.com/v1')
+  })
+  it('uses builtin defaults for known providers when toml/catalog are empty', () => {
+    delete process.env.HIP_CONFIG_PATH
+    mockReadCatalog.mockReturnValue({})
+    expect(resolveProviderBaseURL('deepseek')).toBe('https://api.deepseek.com/v1')
+    expect(resolveProviderBaseURL('anthropic')).toBe('https://api.anthropic.com/v1')
+    expect(resolveProviderBaseURL('openai')).toBe('https://api.openai.com/v1')
+  })
+  it('returns empty string for unknown providers (never invents DeepSeek URL)', () => {
+    delete process.env.HIP_CONFIG_PATH
+    mockReadCatalog.mockReturnValue({})
+    expect(resolveProviderBaseURL('whatever-unknown-xyz')).toBe('')
   })
 })

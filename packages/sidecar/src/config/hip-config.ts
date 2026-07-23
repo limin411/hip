@@ -38,11 +38,19 @@ function normalizeProviderEntry(raw: Record<string, unknown>): ProviderEntry {
   if (raw.api_key !== undefined && raw.apiKey === undefined) {
     raw.apiKey = raw.api_key
   }
+  if (raw.api_kind !== undefined && raw.apiKind === undefined) {
+    raw.apiKind = raw.api_kind
+  }
+  // Normalize/validate apiKind; drop unknown values so bad toml does not poison routing.
+  if (raw.apiKind !== undefined && raw.apiKind !== 'openai' && raw.apiKind !== 'anthropic') {
+    delete raw.apiKind
+  }
   if (raw.enabled === undefined) {
     raw.enabled = true
   }
   delete raw.base_url
   delete raw.api_key
+  delete raw.api_kind
   return raw as unknown as ProviderEntry
 }
 

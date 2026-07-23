@@ -52,11 +52,12 @@ describe('secrets IPC', () => {
     })
   })
 
-  it('clearProviderKey maps provider id through providerKeyEnv', async () => {
+  it('clearProviderKey writes empty tombstone via set_secret (BYOK hot-clear)', async () => {
     invoke.mockResolvedValueOnce(undefined)
     await clearProviderKey('openai')
-    expect(invoke).toHaveBeenCalledWith('delete_secret', {
+    expect(invoke).toHaveBeenCalledWith('set_secret', {
       key: 'HIP_MODEL_OPENAI_API_KEY',
+      value: '',
     })
   })
 

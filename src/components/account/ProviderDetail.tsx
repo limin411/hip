@@ -1,7 +1,7 @@
 import { useState, type ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Search, Check, Eye, EyeOff } from 'lucide-react'
-import type { KeyProbeCode } from '@hip/protocol'
+import type { KeyProbeCode, ProviderApiKind } from '@hip/protocol'
 import type { CatalogProvider, CatalogModel } from '@/ipc/catalog'
 import { filterModels, NO_CAPS, type ModelCaps } from '@/lib/modelFilter'
 import { modelBadges, type ModelCapKey } from '@/lib/modelBadges'
@@ -48,11 +48,13 @@ export function ProviderDetail({
   configured,
   enabled,
   baseURL,
+  apiKind,
   isActive,
   onSaveKey,
   onClearKey,
   onSaveBaseURL,
   onSetEnabled,
+  onSetApiKind,
   onSetCurrent,
   setCurrentLabel,
   currentLabel,
@@ -62,11 +64,14 @@ export function ProviderDetail({
   configured: boolean
   enabled: boolean
   baseURL: string
+  /** User/config wire protocol; shown for custom providers. */
+  apiKind?: ProviderApiKind
   isActive: (modelID: string) => boolean
   onSaveKey: (value: string) => Promise<void>
   onClearKey: () => Promise<void>
   onSaveBaseURL: (value: string) => Promise<void>
   onSetEnabled: (value: boolean) => Promise<void>
+  onSetApiKind?: (value: ProviderApiKind) => Promise<void>
   onSetCurrent: (modelID: string) => Promise<void>
   /** Button label when a model is not current (e.g. "Set as embedding"). */
   setCurrentLabel?: string
@@ -332,6 +337,26 @@ export function ProviderDetail({
               </Button>
             </div>
           </div>
+
+          {provider.custom && onSetApiKind && (
+            <div>
+              <div className="mb-1.5 text-body font-medium text-ink">{t('settings.modelConfig.apiKind')}</div>
+              <select
+                className={cn(inputCls, 'cursor-pointer')}
+                value={apiKind ?? 'openai'}
+                disabled={busy}
+                data-testid="provider-api-kind"
+                onChange={(e) => {
+                  const v = e.target.value as ProviderApiKind
+                  void run(() => onSetApiKind(v))
+                }}
+              >
+                <option value="openai">{t('settings.modelConfig.apiKindOpenAI')}</option>
+                <option value="anthropic">{t('settings.modelConfig.apiKindAnthropic')}</option>
+              </select>
+              <p className="mt-1 text-caption text-ink-tertiary">{t('settings.modelConfig.apiKindHint')}</p>
+            </div>
+          )}
 
           <div className="flex flex-col gap-1.5 pt-1">
             <div className="flex items-center gap-2">

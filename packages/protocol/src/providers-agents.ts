@@ -6,12 +6,17 @@ export interface ActiveModel {
   baseURL: string              // always resolved; sidecar falls back to DEEPSEEK_DEFAULT when unknown
 }
 
+/** Wire protocol for a provider (custom or override). See docs/design/byok-spec.md Phase C. */
+export type ProviderApiKind = 'openai' | 'anthropic'
+
 /** One provider's non-secret config (the key lives only in ~/.hip/config/auth.json).
  *  This is the UI/runtime shape keyed by provider id; the durable source of truth is
  *  HipConfig.providers (ProviderEntry[]) in ~/.hip/config/hip.toml. */
 export interface ProviderConfigEntry {
   enabled: boolean
   baseURL?: string             // catalog default or user override; required for custom
+  /** Wire protocol override (custom providers / Anthropic-compatible gateways). */
+  apiKind?: ProviderApiKind
   custom?: { name: string }    // present iff user-defined (not in the models.dev catalog)
 }
 

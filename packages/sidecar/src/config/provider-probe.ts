@@ -4,7 +4,7 @@
  */
 import { createHash } from 'node:crypto'
 import type { KeyProbeCode } from '@hip/protocol'
-import { resolveApiKey } from './auth-file.js'
+import { resolveProviderAuth } from './auth-file.js'
 import {
   ANTHROPIC_DEFAULT_BASE_URL,
   cheapModelFor,
@@ -327,8 +327,7 @@ export async function runProviderProbe(req: ProviderProbeRequest): Promise<Provi
     const model = req.modelID?.trim() ?? ''
     if (!base) return fail('MISSING_BASE_URL', 'Base URL is required')
     if (!model) return fail('MISSING_MODEL', 'Model id is required')
-    const draft = req.draftApiKey?.trim()
-    const key = draft || resolveApiKey(providerID)
+    const key = resolveProviderAuth(providerID, req.draftApiKey)?.apiKey
     if (!key) return fail('MISSING_KEY', 'API key is missing')
     return fail('PROBE_UNSUPPORTED', 'Rerank key probe is not supported yet')
   }
@@ -358,9 +357,8 @@ export async function runProviderProbe(req: ProviderProbeRequest): Promise<Provi
     return fail('MISSING_BASE_URL', 'Base URL is required')
   }
 
-  // 3. Resolve key
-  const draft = req.draftApiKey?.trim()
-  const key = draft || resolveApiKey(providerID)
+  // 3. Resolve key (draft override → auth.json → standard env → HIP env)
+  const key = resolveProviderAuth(providerID, req.draftApiKey)?.apiKey
   if (!key) return fail('MISSING_KEY', 'API key is missing')
 
   const modelForCache = req.modelID?.trim() ?? ''

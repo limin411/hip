@@ -28,7 +28,6 @@ vi.mock('@/ipc/secrets', () => ({
   areProviderKeysConfigured: vi.fn().mockResolvedValue({}),
   saveProviderKey: vi.fn().mockResolvedValue(undefined),
   clearProviderKey: vi.fn().mockResolvedValue(undefined),
-  restartSidecar: vi.fn().mockResolvedValue(undefined),
 }))
 
 vi.mock('@/domain/sessionService', () => ({
@@ -179,10 +178,16 @@ describe('providersStore ProviderEntry[] ⇄ ProvidersConfig conversion', () => 
     deepseek: { id: 'deepseek', name: 'DeepSeek', env: [], models: {}, api: 'https://api.deepseek.com/v1' },
   }
 
-  it('round-trips built-in and custom providers preserving enabled, name and baseURL', () => {
+  it('round-trips built-in and custom providers preserving enabled, name, baseURL and apiKind', () => {
     const entries = [
       { id: 'deepseek', name: 'DeepSeek', baseUrl: 'https://api.deepseek.com/v1', enabled: true },
-      { id: 'mycustom', name: 'My Custom', baseUrl: 'https://custom.test/v1', enabled: false },
+      {
+        id: 'mycustom',
+        name: 'My Custom',
+        baseUrl: 'https://custom.test/v1',
+        enabled: false,
+        apiKind: 'anthropic' as const,
+      },
     ]
     const config = providerEntriesToConfig(entries, catalog)
 
@@ -191,6 +196,7 @@ describe('providersStore ProviderEntry[] ⇄ ProvidersConfig conversion', () => 
     expect(config.providers.mycustom).toEqual({
       enabled: false,
       baseURL: 'https://custom.test/v1',
+      apiKind: 'anthropic',
       custom: { name: 'My Custom' },
     })
 

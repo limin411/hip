@@ -9,15 +9,55 @@ vi.mock('./catalog.js', () => ({
   readCatalog: vi.fn(() => ({})),
 }))
 
+vi.mock('./hip-config.js', () => ({
+  readHipConfig: vi.fn(() => ({ version: 1 })),
+}))
+
 import { readCatalog } from './catalog.js'
+import { readHipConfig } from './hip-config.js'
 
 const mockReadCatalog = vi.mocked(readCatalog)
+const mockReadHipConfig = vi.mocked(readHipConfig)
 
 afterEach(() => {
   mockReadCatalog.mockReturnValue({})
+  mockReadHipConfig.mockReturnValue({ version: 1 })
 })
 
 describe('resolveChatApiKind', () => {
+  it('prefers hip.toml apiKind over URL heuristics', () => {
+    mockReadHipConfig.mockReturnValue({
+      version: 1,
+      providers: [
+        {
+          id: 'my-gw',
+          name: 'GW',
+          baseUrl: 'https://example.com/v1',
+          enabled: true,
+          apiKind: 'anthropic',
+        },
+      ],
+    })
+    // No /anthropic in URL — still anthropic because toml says so.
+    expect(resolveChatApiKind('my-gw', 'https://example.com/v1')).toBe('anthropic')
+  })
+
+  it('honors explicit openai apiKind even when URL contains /anthropic', () => {
+    mockReadHipConfig.mockReturnValue({
+      version: 1,
+      providers: [
+        {
+          id: 'odd',
+          name: 'Odd',
+          baseUrl: 'https://example.com/anthropic/v1',
+          enabled: true,
+          apiKind: 'openai',
+        },
+      ],
+    })
+    expect(resolveChatApiKind('odd', 'https://example.com/anthropic/v1')).toBe('openai')
+  })
+
   it('returns anthropic for the official anthropic provider id', () => {
     expect(resolveChatApiKind('anthropic')).toBe('anthropic')
     expect(resolveChatApiKind('anthropic', 'https://api.anthropic.com/v1')).toBe('anthropic')

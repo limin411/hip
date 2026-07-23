@@ -133,7 +133,7 @@ enabled = true
 // ──────────────────────────────────────────────────────────────
 
 describe('snake_case TOML normalization', () => {
-  it('normalizes provider base_url and api_key to camelCase', () => {
+  it('normalizes provider base_url, api_key, and api_kind to camelCase', () => {
     const dir = tmpDir()
     const p = writeToml(dir, 'hip.toml', `version = 1
 [[providers]]
@@ -141,6 +141,7 @@ id = "deepseek"
 name = "DeepSeek"
 base_url = "https://api.deepseek.com/v1"
 api_key = "sk-test"
+api_kind = "anthropic"
 `)
     process.env.HIP_CONFIG_PATH = p
     const cfg = readHipConfig()
@@ -150,6 +151,7 @@ api_key = "sk-test"
       name: 'DeepSeek',
       baseUrl: 'https://api.deepseek.com/v1',
       apiKey: 'sk-test',
+      apiKind: 'anthropic',
     })
   })
 

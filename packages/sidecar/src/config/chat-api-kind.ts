@@ -1,11 +1,15 @@
 /**
  * Resolve which wire protocol a chat provider should use.
  *
- * models.dev tags Anthropic Messages providers with npm `@ai-sdk/anthropic`
- * (MiniMax, Kimi-for-coding, freemodel, …). The UI already admits those ids;
- * runtime must honor the same signal instead of only `providerID === 'anthropic'`.
+ * Priority (docs/design/byok-spec.md Phase C):
+ * 1. hip.toml `apiKind` / `api_kind` for this provider
+ * 2. official anthropic id
+ * 3. models.dev catalog npm `@ai-sdk/anthropic`
+ * 4. URL path heuristic (`…/anthropic`)
+ * 5. openai-compatible default
  */
 import { readCatalog } from './catalog.js'
+import { readHipConfig } from './hip-config.js'
 import { ANTHROPIC_DEFAULT_BASE_URL } from './providers.js'
 
 export type ChatApiKind = 'openai' | 'anthropic'
@@ -17,9 +21,11 @@ const ANTHROPIC_PATH_RE = /\/anthropic(?:\/|$)/i
 
 /**
  * Decide openai-compatible vs Anthropic Messages for a provider + optional base URL.
- * Order: official id → catalog npm → URL path heuristic → openai.
  */
 export function resolveChatApiKind(providerID: string, baseURL?: string): ChatApiKind {
+  const fromToml = readHipConfig().providers?.find((p) => p.id === providerID)?.apiKind
+  if (fromToml === 'anthropic' || fromToml === 'openai') return fromToml
+
   if (providerID === 'anthropic') return 'anthropic'
   const npm = readCatalog()[providerID]?.npm
   if (npm === ANTHROPIC_NPM) return 'anthropic'

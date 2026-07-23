@@ -21,8 +21,14 @@ export function saveProviderKey(providerID: string, value: string): Promise<void
   return invoke<void>('set_secret', { key: providerKeyEnv(providerID), value })
 }
 
+/**
+ * Clear a provider key using an empty-string tombstone (BYOK hot-reload).
+ * Present-but-empty in auth.json means "explicitly unconfigured" so the sidecar
+ * will not fall back to a stale HIP_MODEL_* env from a previous spawn.
+ * Prefer this over delete_secret for provider keys.
+ */
 export function clearProviderKey(providerID: string): Promise<void> {
-  return invoke<void>('delete_secret', { key: providerKeyEnv(providerID) })
+  return invoke<void>('set_secret', { key: providerKeyEnv(providerID), value: '' })
 }
 
 export function restartSidecar(): Promise<number> {

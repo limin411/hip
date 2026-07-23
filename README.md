@@ -54,10 +54,11 @@ src-tauri/           Rust shell
 ## Development setup
 
 > API keys (e.g. DeepSeek) are entered in the app's **Settings** panel and stored in
-> `~/.hip/config/auth.json` (file mode `0600`) — the single source of truth. The
-> desktop app, the standalone sidecar (`scripts/dev.sh start sidecar`), and the
-> test suite all read the key from there. **`~/.hip/config/` holds plaintext API
-> keys; do not sync it to cloud drives or dotfile repos.**
+> `~/.hip/config/auth.json` (file mode `0600`) — primary store for LLM API keys.
+> The desktop app, standalone sidecar, and tests resolve keys from there (then
+> standard env vars such as `ANTHROPIC_API_KEY`, then `HIP_MODEL_*`). See
+> `docs/design/byok-spec.md`. **`~/.hip/config/` holds plaintext secrets; do not
+> sync it to cloud drives or public dotfile repos.**
 
 ### Prerequisites
 

@@ -37,7 +37,6 @@ vi.mock('@/components/ui/Popover', async () => {
       R.createElement(
         'div',
         { 'data-testid': 'popover', 'data-open': open ? 'true' : 'false' },
-        // Always render children so content (slider) is present for unit tests.
         children,
       ),
     PopoverTrigger: ({ children }: { children: React.ReactNode }) =>
@@ -125,7 +124,7 @@ vi.mock('@/domain', () => ({
   },
 }))
 
-import { EffortLevelPicker, isMaxBudgetEffort } from './EffortLevelPicker'
+import { EffortLevelPicker, isMaxBudgetEffort, nearestEffortIndex } from './EffortLevelPicker'
 
 describe('isMaxBudgetEffort', () => {
   it('marks max always, and xhigh only when it is the top of the scale', () => {
@@ -133,6 +132,16 @@ describe('isMaxBudgetEffort', () => {
     expect(isMaxBudgetEffort('xhigh', ['low', 'medium', 'high', 'xhigh', 'max'])).toBe(false)
     expect(isMaxBudgetEffort('xhigh', ['none', 'low', 'medium', 'high', 'xhigh'])).toBe(true)
     expect(isMaxBudgetEffort('high', ['low', 'medium', 'high'])).toBe(false)
+  })
+})
+
+describe('nearestEffortIndex', () => {
+  it('maps continuous ratio to discrete stops', () => {
+    expect(nearestEffortIndex(0, 5)).toBe(0)
+    expect(nearestEffortIndex(0.5, 5)).toBe(2)
+    expect(nearestEffortIndex(1, 5)).toBe(4)
+    expect(nearestEffortIndex(0.49, 2)).toBe(0)
+    expect(nearestEffortIndex(0.5, 2)).toBe(1)
   })
 })
 
@@ -149,13 +158,17 @@ describe('EffortLevelPicker', () => {
 
   afterEach(() => cleanup())
 
-  it('renders chip with effort prefix + level text, slider, and dynamic levels', () => {
+  it('renders chip, slider, and snap nodes', () => {
     render(<EffortLevelPicker />)
     expect(screen.getByTestId('effort-chip')).toBeInTheDocument()
     expect(screen.getByTestId('effort-chip-label')).toHaveTextContent(/Effort/)
     expect(screen.getByTestId('effort-chip-label')).toHaveTextContent(/medium/i)
     expect(screen.getByTestId('effort-chip')).toHaveAttribute('aria-label', expect.stringContaining('Effort'))
-    expect(screen.getByTestId('effort-slider')).toBeInTheDocument()
+
+    const slider = screen.getByTestId('effort-slider')
+    expect(slider).toHaveAttribute('role', 'slider')
+    expect(slider).toHaveAttribute('aria-valuenow', '2')
+
     expect(screen.getByTestId('effort-level-none')).toBeInTheDocument()
     expect(screen.getByTestId('effort-level-high')).toBeInTheDocument()
     expect(screen.getByTestId('effort-level-xhigh')).toBeInTheDocument()
@@ -168,18 +181,16 @@ describe('EffortLevelPicker', () => {
     expect(container).toBeEmptyDOMElement()
   })
 
-  it('writes draft effort when no active session (tick)', () => {
+  it('writes draft effort when clicking a snap node', () => {
     render(<EffortLevelPicker />)
     fireEvent.click(screen.getByTestId('effort-level-high'))
     expect(mockSetEffort).toHaveBeenCalledWith('high')
     expect(mockSetSessionEffort).not.toHaveBeenCalled()
   })
 
-  it('writes draft effort via slider change', () => {
+  it('writes draft effort via keyboard on the slider', () => {
     render(<EffortLevelPicker />)
-    const slider = screen.getByTestId('effort-slider')
-    // levels: none, low, medium, high, xhigh → high is index 3
-    fireEvent.change(slider, { target: { value: '3' } })
+    fireEvent.keyDown(screen.getByTestId('effort-slider'), { key: 'ArrowRight' })
     expect(mockSetEffort).toHaveBeenCalledWith('high')
   })
 
@@ -199,7 +210,7 @@ describe('EffortLevelPicker', () => {
     mockDraftStore.draft = { tempId: 't', mode: 'chat', text: '' }
     render(<EffortLevelPicker />)
     fireEvent.click(screen.getByTestId('effort-level-high'))
-    fireEvent.change(screen.getByTestId('effort-slider'), { target: { value: '4' } })
+    fireEvent.keyDown(screen.getByTestId('effort-slider'), { key: 'ArrowRight' })
     expect(mockSetEffort).not.toHaveBeenCalled()
     expect(mockSetSessionEffort).not.toHaveBeenCalled()
   })

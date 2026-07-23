@@ -382,6 +382,14 @@ html[data-window-focus='false'] [data-tauri-drag-region] {
 .border-effort-max {
   border-color: var(--effort-max-bright);
 }
+.bg-effort-max-node {
+  background-color: var(--effort-max-bright);
+}
+.effort-max-node-selected {
+  box-shadow:
+    0 0 0 2px color-mix(in srgb, var(--effort-max-bright) 35%, transparent),
+    0 0 8px rgba(168, 85, 247, 0.45);
+}
 
 @keyframes effort-max-shimmer {
   0% { background-position: 0% 50%; }

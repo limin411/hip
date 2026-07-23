@@ -10,6 +10,7 @@ import {
   cheapModelFor,
   isOpenAICompatible,
 } from './providers.js'
+import { anthropicMessagesBase, resolveChatApiKind } from './chat-api-kind.js'
 import { readHipConfig } from './hip-config.js'
 import { safeErrorMessage } from '../session/error.js'
 
@@ -220,7 +221,7 @@ async function probeAnthropicChat(
   modelID: string | undefined,
 ): Promise<ProviderProbeResult> {
   const started = Date.now()
-  const base = (baseURL?.trim() || ANTHROPIC_DEFAULT_BASE_URL).replace(/\/+$/, '')
+  const base = anthropicMessagesBase(baseURL)
   const resolvedModel = resolveChatModelId(providerID, modelID)
   if (!resolvedModel) {
     return fail('MISSING_MODEL', 'No model id available for Anthropic probe')
@@ -332,21 +333,28 @@ export async function runProviderProbe(req: ProviderProbeRequest): Promise<Provi
     return fail('PROBE_UNSUPPORTED', 'Rerank key probe is not supported yet')
   }
 
+  const baseURL = req.baseURL?.trim() ?? ''
+  const chatKind = purpose === 'chat' ? resolveChatApiKind(providerID, baseURL || undefined) : 'openai'
+
   if (purpose === 'chat') {
     if (isChatProviderDisabled(providerID)) {
       return fail('PROVIDER_DISABLED', 'Provider is disabled')
     }
-    if (!isOpenAICompatible(providerID) && providerID !== 'anthropic') {
+    if (!isOpenAICompatible(providerID) && chatKind !== 'anthropic') {
       return fail('INCOMPATIBLE_PROVIDER', `Provider ${providerID} is not probeable`)
     }
   }
 
-  const baseURL = req.baseURL?.trim() ?? ''
   if (purpose === 'embedding') {
     if (!baseURL) return fail('MISSING_BASE_URL', 'Base URL is required')
     if (!req.modelID?.trim()) return fail('MISSING_MODEL', 'Model id is required')
   }
-  if (purpose === 'chat' && providerID !== 'anthropic' && !baseURL) {
+  // Official Anthropic may omit baseURL (SDK default). Other Anthropic-compatible
+  // hosts always need an explicit base (catalog api or user override).
+  if (purpose === 'chat' && chatKind === 'openai' && !baseURL) {
+    return fail('MISSING_BASE_URL', 'Base URL is required')
+  }
+  if (purpose === 'chat' && chatKind === 'anthropic' && providerID !== 'anthropic' && !baseURL) {
     return fail('MISSING_BASE_URL', 'Base URL is required')
   }
 
@@ -357,7 +365,7 @@ export async function runProviderProbe(req: ProviderProbeRequest): Promise<Provi
 
   const modelForCache = req.modelID?.trim() ?? ''
   const baseForCache =
-    purpose === 'chat' && providerID === 'anthropic'
+    purpose === 'chat' && chatKind === 'anthropic'
       ? baseURL || ANTHROPIC_DEFAULT_BASE_URL
       : baseURL
   const ck = cacheKey(purpose, providerID, baseForCache, modelForCache, keyFingerprint(key))
@@ -385,7 +393,7 @@ export async function runProviderProbe(req: ProviderProbeRequest): Promise<Provi
     let result: ProviderProbeResult
     if (purpose === 'embedding') {
       result = await probeEmbedding(baseURL, key, req.modelID!.trim())
-    } else if (providerID === 'anthropic') {
+    } else if (chatKind === 'anthropic') {
       result = await probeAnthropicChat(baseURL || undefined, key, providerID, req.modelID)
     } else {
       result = await probeOpenAICompatibleChat(baseURL, key, providerID, req.modelID)

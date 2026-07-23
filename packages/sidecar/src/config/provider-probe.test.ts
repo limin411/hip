@@ -143,6 +143,40 @@ describe('runProviderProbe', () => {
     expect(headers['anthropic-version']).toBe('2023-06-01')
   })
 
+  it('probes Anthropic-compatible catalog hosts via Messages (not chat/completions)', async () => {
+    process.env.HIP_MODEL_MINIMAX_CN_CODING_PLAN_API_KEY = 'sk-minimax-test-key-1234567890'
+    fetchMock.mockResolvedValueOnce(jsonResponse(200, { content: [] }))
+    const r = await runProviderProbe({
+      purpose: 'chat',
+      providerID: 'minimax-cn-coding-plan',
+      baseURL: 'https://api.minimaxi.com/anthropic/v1',
+      modelID: 'MiniMax-M3',
+    })
+    expect(r.ok).toBe(true)
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+    const url = String(fetchMock.mock.calls[0][0])
+    expect(url).toBe('https://api.minimaxi.com/anthropic/v1/messages')
+    expect(url).not.toContain('chat/completions')
+    const headers = fetchMock.mock.calls[0][1]?.headers as Record<string, string>
+    expect(headers['x-api-key']).toBe('sk-minimax-test-key-1234567890')
+    const body = JSON.parse(String(fetchMock.mock.calls[0][1]?.body)) as { model: string }
+    expect(body.model).toBe('MiniMax-M3')
+    delete process.env.HIP_MODEL_MINIMAX_CN_CODING_PLAN_API_KEY
+  })
+
+  it('probes custom /anthropic baseURL via Messages without catalog npm', async () => {
+    fetchMock.mockResolvedValueOnce(jsonResponse(200, { content: [] }))
+    const r = await runProviderProbe({
+      purpose: 'chat',
+      providerID: 'my-gateway',
+      baseURL: 'https://api.minimaxi.com/anthropic/v1',
+      modelID: 'MiniMax-M3',
+      draftApiKey: 'sk-custom-anthropic-key-1234567890',
+    })
+    expect(r.ok).toBe(true)
+    expect(String(fetchMock.mock.calls[0][0])).toBe('https://api.minimaxi.com/anthropic/v1/messages')
+  })
+
   it('returns INCOMPATIBLE_PROVIDER for azure', async () => {
     const r = await runProviderProbe({
       purpose: 'chat',

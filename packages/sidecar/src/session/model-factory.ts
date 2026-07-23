@@ -4,6 +4,10 @@ import type { BaseChatModel } from '@langchain/core/language_models/chat_models'
 import { SystemMessage, HumanMessage, type BaseMessage } from '@langchain/core/messages'
 import { getActiveModel, cheapModelFor } from '../config/providers.js'
 import { clampEffortForModel } from '../config/catalog.js'
+import {
+  normalizeAnthropicApiUrl,
+  resolveChatApiKind,
+} from '../config/chat-api-kind.js'
 import { resolveApiKey } from '../config/auth-file.js'
 import { langSmithModelCallConfig } from '../observability/langsmith.js'
 import { SUMMARY_OUTPUT_TOKENS, type Summarizer } from './compaction.js'
@@ -139,20 +143,26 @@ export function anthropicOutputEffort(effort: string | undefined): string | unde
 export function buildChatModel(choice: BuildChatModelChoice): BaseChatModel {
   // Drop effort that is invalid for this exact model (catalog-aware) before provider mapping.
   const catalogEffort = clampEffortForModel(choice.providerID, choice.modelID, choice.effort)
-  if (choice.providerID === 'anthropic') {
+  if (resolveChatApiKind(choice.providerID, choice.baseURL) === 'anthropic') {
     const effort = anthropicOutputEffort(catalogEffort)
+    const anthropicApiUrl = normalizeAnthropicApiUrl(choice.baseURL)
+    // Claude-only adaptive thinking + outputConfig.effort. Other Anthropic-compatible
+    // hosts (MiniMax, Kimi, …) accept Messages API but not always Claude effort knobs;
+    // only attach those when the official Anthropic provider is selected and effort is set.
+    const claudeEffort =
+      choice.providerID === 'anthropic' && effort
+        ? {
+            thinking: { type: 'adaptive' as const },
+            outputConfig: { effort: effort as 'low' | 'medium' | 'high' | 'xhigh' | 'max' },
+          }
+        : {}
     return new ChatAnthropic({
       model: choice.modelID,
       apiKey: activeKey(choice.providerID),
       streaming: true,
       streamUsage: true,
-      ...(effort
-        ? {
-            // Adaptive thinking pairs with output effort on modern Claude models.
-            thinking: { type: 'adaptive' as const },
-            outputConfig: { effort: effort as 'low' | 'medium' | 'high' | 'xhigh' | 'max' },
-          }
-        : {}),
+      ...(anthropicApiUrl ? { anthropicApiUrl } : {}),
+      ...claudeEffort,
     })
   }
   const oe = openAiReasoningEffort(catalogEffort)

@@ -16,6 +16,10 @@ export interface CatalogProvider {
   id: string
   name: string
   models: Record<string, CatalogModel>
+  /** models.dev npm package tag (e.g. @ai-sdk/anthropic, @ai-sdk/openai-compatible). */
+  npm?: string
+  /** Default OpenAI-/Anthropic-style API base URL from models.dev. */
+  api?: string
 }
 
 export type Catalog = Record<string, CatalogProvider>

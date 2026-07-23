@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { AIMessage, AIMessageChunk } from '@langchain/core/messages'
+import { AIMessage, AIMessageChunk, HumanMessage, SystemMessage } from '@langchain/core/messages'
 import { concat } from '@langchain/core/utils/stream'
 import {
   textDelta,
@@ -122,6 +122,132 @@ describe('RealModelRunner retry', () => {
     ).rejects.toThrow()
     expect(activity).toBeGreaterThanOrEqual(1)
     expect(calls).toBe(1)
+  })
+
+  it('coalesces multiple SystemMessages for ChatAnthropic before stream', async () => {
+    const seen: unknown[] = []
+    // Stand-in named ChatAnthropic — isAnthropicChatModel matches constructor.name.
+    class ChatAnthropic {
+      bindTools() { return this }
+      async stream(msgs: unknown[]) {
+        seen.push(msgs)
+        return (async function* () {
+          yield new AIMessageChunk({ content: 'ok' })
+        })()
+      }
+    }
+    const model = new ChatAnthropic() as any
+    await new RealModelRunner(model).run(
+      [new SystemMessage('main'), new SystemMessage('ctx'), new HumanMessage('hi')],
+      { tools: [], bindTools: true, onText: () => {}, onReasoning: () => {} } as any,
+    )
+    const msgs = seen[0] as Array<{ getType: () => string; content: unknown }>
+    expect(msgs).toHaveLength(2)
+    expect(msgs[0].getType()).toBe('system')
+    expect(String(msgs[0].content)).toContain('main')
+    expect(String(msgs[0].content)).toContain('ctx')
+    expect(msgs[1].getType()).toBe('human')
+  })
+
+  it('splits MiniMax-style <think> tags into onReasoning vs onText (UI sinks)', async () => {
+    const texts: string[] = []
+    const reasons: string[] = []
+    const model: any = {
+      bindTools() { return model },
+      async stream() {
+        return (async function* () {
+          // Mimic MiniMax OpenAI stream: CoT inside content with think tags.
+          yield new AIMessageChunk({ content: '<think>The user asks 12*13' })
+          yield new AIMessageChunk({ content: '.</think>\n\n156' })
+        })()
+      },
+    }
+    const msg = await new RealModelRunner(model).run([], {
+      tools: [],
+      bindTools: true,
+      onText: (d) => texts.push(d),
+      onReasoning: (d) => reasons.push(d),
+    } as any)
+    expect(reasons.join('')).toBe('The user asks 12*13.')
+    expect(texts.join('')).toBe('\n\n156')
+    // Gathered message keeps raw tags for multi-turn CoT continuity.
+    expect(typeof msg.content === 'string' ? msg.content : '').toContain('<think>')
+  })
+
+  it('does not rewrite plain OpenAI/DeepSeek text that has no think tags', async () => {
+    const texts: string[] = []
+    const reasons: string[] = []
+    const model: any = {
+      bindTools() { return model },
+      async stream() {
+        return (async function* () {
+          yield new AIMessageChunk({ content: 'Hello ' })
+          yield new AIMessageChunk({ content: 'world. a < b is fine.' })
+        })()
+      },
+    }
+    await new RealModelRunner(model).run([], {
+      tools: [],
+      bindTools: true,
+      onText: (d) => texts.push(d),
+      onReasoning: (d) => reasons.push(d),
+    } as any)
+    expect(reasons.join('')).toBe('')
+    expect(texts.join('')).toBe('Hello world. a < b is fine.')
+  })
+
+  it('still emits native reasoning_content (DeepSeek-style) without think-tag interference', async () => {
+    const texts: string[] = []
+    const reasons: string[] = []
+    const model: any = {
+      bindTools() { return model },
+      async stream() {
+        return (async function* () {
+          // Projected the same way ReasoningChatOpenAI does for DeepSeek.
+          yield new AIMessageChunk({
+            content: [
+              { type: 'reasoning', reasoning: 'step 1', index: 7 },
+              { type: 'text', text: 'ans', index: 0 },
+            ] as any,
+          })
+          yield new AIMessageChunk({ content: 'wer' })
+        })()
+      },
+    }
+    await new RealModelRunner(model).run([], {
+      tools: [],
+      bindTools: true,
+      onText: (d) => texts.push(d),
+      onReasoning: (d) => reasons.push(d),
+    } as any)
+    expect(reasons.join('')).toBe('step 1')
+    expect(texts.join('')).toBe('answer')
+  })
+
+  it('emits Anthropic thinking blocks as reasoning and text blocks as text', async () => {
+    const texts: string[] = []
+    const reasons: string[] = []
+    const model: any = {
+      bindTools() { return model },
+      async stream() {
+        return (async function* () {
+          yield new AIMessageChunk({
+            content: [
+              { type: 'thinking', thinking: 'ponder', index: 0 },
+              { type: 'text', text: '42', index: 1 },
+            ] as any,
+          })
+        })()
+      },
+    }
+    await new RealModelRunner(model).run([], {
+      tools: [],
+      bindTools: true,
+      onText: (d) => texts.push(d),
+      onReasoning: (d) => reasons.push(d),
+    } as any)
+    expect(reasons.join('')).toBe('ponder')
+    expect(texts.join('')).toBe('42')
   })
 
   it('completes a tool-call-only stream and gathers tool_calls', async () => {

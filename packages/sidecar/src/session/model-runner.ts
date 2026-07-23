@@ -3,10 +3,25 @@ import { concat } from '@langchain/core/utils/stream'
 import type { StructuredToolInterface } from '@langchain/core/tools'
 import type { BaseChatModel } from '@langchain/core/language_models/chat_models'
 import type { Callbacks } from '@langchain/core/callbacks/manager'
+import { ChatAnthropic } from '@langchain/anthropic'
 import { MAX_STEPS_NOTE } from './loop-control.js'
 import { withRetry, isRetryable, MAX_RETRIES } from './retry.js'
 import { logInfo, logDebug } from '../debug-logger.js'
 import { parseDsmlToolCalls, hasDsmlToolCalls } from './dsml.js'
+import { createThinkTagStreamSplitter } from './think-tags.js'
+import { coalesceSystemMessages } from './anthropic-messages.js'
+
+/** True when the chat client is (or wraps) ChatAnthropic — MiniMax-compatible Messages API. */
+export function isAnthropicChatModel(model: unknown): boolean {
+  if (model instanceof ChatAnthropic) return true
+  if (model && typeof model === 'object') {
+    const bound = (model as { bound?: unknown }).bound
+    if (bound instanceof ChatAnthropic) return true
+    const name = (model as { constructor?: { name?: string } }).constructor?.name
+    if (name === 'ChatAnthropic' || name === 'ChatAnthropicMessages') return true
+  }
+  return false
+}
 
 /** Per-step run options: the streaming sinks + whether tools are bound (off on the final, capped step). */
 export interface ModelRunOptions {
@@ -191,7 +206,11 @@ export class RealModelRunner implements ModelRunner {
 
   async run(messages: BaseMessage[], opts: ModelRunOptions): Promise<AIMessage> {
     const bound = opts.bindTools ? this.model.bindTools!(opts.tools) : this.model
-    const input: BaseMessage[] = opts.bindTools ? messages : [...messages, new SystemMessage(MAX_STEPS_NOTE)]
+    let input: BaseMessage[] = opts.bindTools ? messages : [...messages, new SystemMessage(MAX_STEPS_NOTE)]
+    // MiniMax (and strict Anthropic-compatible hosts): only one system message, and only first.
+    if (isAnthropicChatModel(this.model) || isAnthropicChatModel(bound)) {
+      input = coalesceSystemMessages(input)
+    }
     let emitted = false
     const attempt = async (): Promise<AIMessage> => {
       const t0 = Date.now()
@@ -205,15 +224,34 @@ export class RealModelRunner implements ModelRunner {
       })
       let gathered: AIMessageChunk | undefined
       let firstToken = true
+      // MiniMax (and similar) embed CoT as <think>…</think> inside text deltas.
+      // Split for UI sinks only; gathered message keeps raw content for multi-turn CoT.
+      const thinkSplit = createThinkTagStreamSplitter()
+      const emitText = (raw: string) => {
+        if (!raw) return
+        const { text, reasoning } = thinkSplit.push(raw)
+        if (text) {
+          if (firstToken) { firstToken = false; logDebug('model', 'first-token', { latencyMs: Date.now() - t0 }) }
+          emitted = true
+          opts.onText(text)
+        }
+        if (reasoning) {
+          if (firstToken) { firstToken = false; logDebug('model', 'first-token', { latencyMs: Date.now() - t0, kind: 'reasoning' }) }
+          emitted = true
+          opts.onReasoning(reasoning)
+        }
+      }
       for await (const chunk of stream) {
         gathered = gathered ? (concat(gathered, chunk) as AIMessageChunk) : chunk
-        const t = textDelta(chunk)
-        if (t) {
-          if (firstToken) { firstToken = false; logDebug('model', 'first-token', { latencyMs: Date.now() - t0 }) }
-          emitted = true; opts.onText(t)
-        }
+        // Native reasoning blocks / reasoning_content first (DeepSeek, Anthropic thinking, MiniMax reasoning_split).
         const r = reasoningDelta(chunk)
-        if (r) { emitted = true; opts.onReasoning(r) }
+        if (r) {
+          if (firstToken) { firstToken = false; logDebug('model', 'first-token', { latencyMs: Date.now() - t0, kind: 'reasoning' }) }
+          emitted = true
+          opts.onReasoning(r)
+        }
+        const t = textDelta(chunk)
+        if (t) emitText(t)
         // Tool-call arg streams often have empty content; still count as progress so
         // the turn idle watchdog does not fire mid write_file / large edit generation.
         if (hasToolCallStreamActivity(chunk)) {
@@ -222,6 +260,9 @@ export class RealModelRunner implements ModelRunner {
           opts.onActivity?.()
         }
       }
+      const tail = thinkSplit.flush()
+      if (tail.text) { emitted = true; opts.onText(tail.text) }
+      if (tail.reasoning) { emitted = true; opts.onReasoning(tail.reasoning) }
       logInfo('model', 'stream:end', { totalMs: Date.now() - t0, contentLen: typeof gathered?.content === 'string' ? gathered.content.length : 0, hadText: emitted })
       if (!gathered) throw new Error('model produced no output')
       // Collapse micro text/reasoning blocks from stream concat before DSML recovery

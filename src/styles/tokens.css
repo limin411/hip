@@ -358,3 +358,94 @@ html[data-window-focus='false'] [data-tauri-drag-region] {
 .animate-greeting-enter {
   animation: greeting-enter var(--duration-celebrate, 450ms) ease-out both;
 }
+
+/*
+ * Effort Max budget — Claude Desktop–style purple holographic track.
+ * Applied when reasoning effort is at max (or top-of-scale xhigh).
+ */
+:root {
+  --effort-max: #7c3aed;
+  --effort-max-bright: #a855f7;
+  --effort-max-pink: #e879f9;
+  --effort-max-indigo: #6366f1;
+}
+.dark {
+  --effort-max: #c4b5fd;
+  --effort-max-bright: #d8b4fe;
+  --effort-max-pink: #f0abfc;
+  --effort-max-indigo: #a5b4fc;
+}
+
+.text-effort-max {
+  color: var(--effort-max);
+}
+.border-effort-max {
+  border-color: var(--effort-max-bright);
+}
+
+@keyframes effort-max-shimmer {
+  0% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+@keyframes effort-max-glow-pulse {
+  0%, 100% {
+    box-shadow:
+      0 0 6px rgba(168, 85, 247, 0.55),
+      0 0 14px rgba(139, 92, 246, 0.35),
+      inset 0 0 4px rgba(255, 255, 255, 0.28);
+  }
+  50% {
+    box-shadow:
+      0 0 10px rgba(232, 121, 249, 0.65),
+      0 0 22px rgba(168, 85, 247, 0.45),
+      inset 0 0 6px rgba(255, 255, 255, 0.38);
+  }
+}
+
+.effort-max-track {
+  position: relative;
+  /* Multi-stop purple → magenta → indigo; oversize for animated pan */
+  background-image:
+    /* Fine diagonal “花纹” hatching */
+    repeating-linear-gradient(
+      118deg,
+      transparent 0 2px,
+      rgba(255, 255, 255, 0.14) 2px 3px,
+      transparent 3px 6px
+    ),
+    /* Soft iridescent sheen */
+    linear-gradient(
+      110deg,
+      var(--effort-max) 0%,
+      var(--effort-max-bright) 18%,
+      var(--effort-max-pink) 38%,
+      var(--effort-max-bright) 55%,
+      var(--effort-max-indigo) 72%,
+      var(--effort-max) 100%
+    );
+  background-size: auto, 220% 100%;
+  background-position: 0 0, 0% 50%;
+  animation:
+    effort-max-shimmer 2.8s ease-in-out infinite,
+    effort-max-glow-pulse 2.2s ease-in-out infinite;
+}
+
+.effort-max-thumb {
+  box-shadow:
+    0 0 0 1px rgba(168, 85, 247, 0.35),
+    0 0 10px rgba(168, 85, 247, 0.55),
+    0 0 18px rgba(232, 121, 249, 0.3);
+}
+
+.effort-max-icon {
+  color: var(--effort-max);
+  filter: drop-shadow(0 0 4px rgba(168, 85, 247, 0.55));
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .effort-max-track {
+    animation: none;
+    background-position: 0 0, 40% 50%;
+  }
+}

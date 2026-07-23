@@ -9,8 +9,10 @@ vi.mock('react-i18next', () => ({
     t: (key: string, opts?: { defaultValue?: string; level?: string }) => {
       if (key === 'chat.effort.chipPrefix') return 'Effort'
       if (key === 'chat.effort.chip') return `Effort · ${opts?.level ?? ''}`
+      if (key === 'chat.effort.label') return 'Reasoning effort'
+      if (key === 'chat.effort.busyTitle') return 'busy'
       if (key.startsWith('chat.effort.levels.')) return key.slice('chat.effort.levels.'.length)
-      if (key.startsWith('chat.effort.desc.')) return opts?.defaultValue ?? ''
+      if (key.startsWith('chat.effort.desc.')) return opts?.defaultValue ?? `desc-${key.split('.').pop()}`
       return key
     },
   }),
@@ -18,36 +20,41 @@ vi.mock('react-i18next', () => ({
 
 vi.mock('lucide-react', () => ({
   Gauge: () => React.createElement('span', { 'data-testid': 'icon-gauge' }),
-  Check: () => React.createElement('span', { 'data-testid': 'icon-check' }),
 }))
 
-vi.mock('@/components/ui/DropdownMenu', async () => {
+vi.mock('@/components/ui/Popover', async () => {
   const R = await import('react')
   return {
-    DropdownMenu: ({ children }: { children: React.ReactNode }) =>
-      R.createElement('div', { 'data-testid': 'dropdown-menu' }, children),
-    DropdownMenuTrigger: ({ children }: { children: React.ReactNode }) =>
-      R.createElement('div', { 'data-testid': 'dropdown-trigger' }, children),
-    DropdownMenuContent: ({ children }: { children: React.ReactNode }) =>
-      R.createElement('div', { 'data-testid': 'dropdown-content' }, children),
-    DropdownMenuItem: ({
+    Popover: ({
       children,
-      onSelect,
+      open,
+    }: {
+      children: React.ReactNode
+      open?: boolean
+      onOpenChange?: (o: boolean) => void
+      modal?: boolean
+    }) =>
+      R.createElement(
+        'div',
+        { 'data-testid': 'popover', 'data-open': open ? 'true' : 'false' },
+        // Always render children so content (slider) is present for unit tests.
+        children,
+      ),
+    PopoverTrigger: ({ children }: { children: React.ReactNode }) =>
+      R.createElement('div', { 'data-testid': 'popover-trigger' }, children),
+    PopoverContent: ({
+      children,
       ...rest
     }: {
       children: React.ReactNode
-      onSelect?: () => void
       'data-testid'?: string
-      disabled?: boolean
+      className?: string
+      align?: string
+      onOpenAutoFocus?: (e: Event) => void
     }) =>
       R.createElement(
-        'button',
-        {
-          type: 'button',
-          'data-testid': rest['data-testid'],
-          disabled: rest.disabled,
-          onClick: () => onSelect?.(),
-        },
+        'div',
+        { 'data-testid': rest['data-testid'] ?? 'popover-content' },
         children,
       ),
   }
@@ -78,6 +85,19 @@ const mockProvidersStore = {
         'gpt-4o': { id: 'gpt-4o', name: 'GPT-4o' },
       },
     },
+    anthropic: {
+      id: 'anthropic',
+      name: 'Anthropic',
+      env: [],
+      models: {
+        'claude-opus-4-8': {
+          id: 'claude-opus-4-8',
+          name: 'Claude Opus 4.8',
+          reasoning: true,
+          reasoning_options: [{ type: 'effort', values: ['low', 'medium', 'high', 'xhigh', 'max'] }],
+        },
+      },
+    },
   },
   config: {
     providers: {},
@@ -105,7 +125,16 @@ vi.mock('@/domain', () => ({
   },
 }))
 
-import { EffortLevelPicker } from './EffortLevelPicker'
+import { EffortLevelPicker, isMaxBudgetEffort } from './EffortLevelPicker'
+
+describe('isMaxBudgetEffort', () => {
+  it('marks max always, and xhigh only when it is the top of the scale', () => {
+    expect(isMaxBudgetEffort('max', ['low', 'medium', 'high', 'max'])).toBe(true)
+    expect(isMaxBudgetEffort('xhigh', ['low', 'medium', 'high', 'xhigh', 'max'])).toBe(false)
+    expect(isMaxBudgetEffort('xhigh', ['none', 'low', 'medium', 'high', 'xhigh'])).toBe(true)
+    expect(isMaxBudgetEffort('high', ['low', 'medium', 'high'])).toBe(false)
+  })
+})
 
 describe('EffortLevelPicker', () => {
   beforeEach(() => {
@@ -120,13 +149,13 @@ describe('EffortLevelPicker', () => {
 
   afterEach(() => cleanup())
 
-  it('renders chip with effort prefix + level text, and dynamic levels', () => {
+  it('renders chip with effort prefix + level text, slider, and dynamic levels', () => {
     render(<EffortLevelPicker />)
     expect(screen.getByTestId('effort-chip')).toBeInTheDocument()
-    // Not icon-only: category + current level are visible on the chip.
     expect(screen.getByTestId('effort-chip-label')).toHaveTextContent(/Effort/)
     expect(screen.getByTestId('effort-chip-label')).toHaveTextContent(/medium/i)
     expect(screen.getByTestId('effort-chip')).toHaveAttribute('aria-label', expect.stringContaining('Effort'))
+    expect(screen.getByTestId('effort-slider')).toBeInTheDocument()
     expect(screen.getByTestId('effort-level-none')).toBeInTheDocument()
     expect(screen.getByTestId('effort-level-high')).toBeInTheDocument()
     expect(screen.getByTestId('effort-level-xhigh')).toBeInTheDocument()
@@ -139,11 +168,19 @@ describe('EffortLevelPicker', () => {
     expect(container).toBeEmptyDOMElement()
   })
 
-  it('writes draft effort when no active session', () => {
+  it('writes draft effort when no active session (tick)', () => {
     render(<EffortLevelPicker />)
     fireEvent.click(screen.getByTestId('effort-level-high'))
     expect(mockSetEffort).toHaveBeenCalledWith('high')
     expect(mockSetSessionEffort).not.toHaveBeenCalled()
+  })
+
+  it('writes draft effort via slider change', () => {
+    render(<EffortLevelPicker />)
+    const slider = screen.getByTestId('effort-slider')
+    // levels: none, low, medium, high, xhigh → high is index 3
+    fireEvent.change(slider, { target: { value: '3' } })
+    expect(mockSetEffort).toHaveBeenCalledWith('high')
   })
 
   it('calls sessionService.setEffort for an active session', () => {
@@ -162,7 +199,25 @@ describe('EffortLevelPicker', () => {
     mockDraftStore.draft = { tempId: 't', mode: 'chat', text: '' }
     render(<EffortLevelPicker />)
     fireEvent.click(screen.getByTestId('effort-level-high'))
+    fireEvent.change(screen.getByTestId('effort-slider'), { target: { value: '4' } })
     expect(mockSetEffort).not.toHaveBeenCalled()
     expect(mockSetSessionEffort).not.toHaveBeenCalled()
+  })
+
+  it('applies max-budget fill when at xhigh (top of openai scale)', () => {
+    mockDraftStore.draft = { tempId: 't', mode: 'chat', text: '', effort: 'xhigh' }
+    render(<EffortLevelPicker />)
+    expect(screen.getByTestId('effort-slider-fill')).toHaveAttribute('data-max-budget', 'true')
+  })
+
+  it('applies max-budget fill for anthropic max, not for xhigh when max exists', () => {
+    mockProvidersStore.config.activeModel = { providerID: 'anthropic', modelID: 'claude-opus-4-8' }
+    mockDraftStore.draft = { tempId: 't', mode: 'chat', text: '', effort: 'xhigh' }
+    const { rerender } = render(<EffortLevelPicker />)
+    expect(screen.getByTestId('effort-slider-fill')).toHaveAttribute('data-max-budget', 'false')
+
+    mockDraftStore.draft = { tempId: 't', mode: 'chat', text: '', effort: 'max' }
+    rerender(<EffortLevelPicker />)
+    expect(screen.getByTestId('effort-slider-fill')).toHaveAttribute('data-max-budget', 'true')
   })
 })

@@ -44,11 +44,12 @@ import type { GoalManager } from './goal.js'
 import { addUsage, sumUsage } from './usage.js'
 import { estimatePromptTokens, type Summarizer } from './compaction.js'
 import {
-  AUTO_COMPACT_THRESHOLD_PERCENT,
   effectiveUsedTokens,
   remainingBudgetPercent,
   resolveModelContextWindow,
 } from './context-budget.js'
+import { resolveContextPolicy } from './context-policy.js'
+import { emitLoopSignal } from './loop-events.js'
 import { ensureToolCallResults, hasValidToolCallPairing } from '../persistence/event-store.js'
 import { PAUSE_QUESTION, resolveDoomLoopStrategy } from './doom-loop.js'
 import { PLAN_APPROVAL_QUESTION_TOKEN } from './plan-approval-constants.js'
@@ -865,6 +866,7 @@ export async function runTurn(host: SessionTurnHost, rawSend: SendFn, base?: {
   const mode: PermissionMode = rawMode === 'chat' || rawMode === 'full' ? rawMode : 'edit'
   const activeModel = getActiveModel()
   const contextWindowTokens = resolveModelContextWindow(activeModel.providerID, activeModel.modelID)
+  const contextPolicy = resolveContextPolicy(resolveEffectiveConfig(cwd).context)
   // Remaining % for injectors: prefer last real prompt usage, else message estimate.
   // System/tools are added after prepare; gate in graph uses full estimate + usage.
   const usedTokens = effectiveUsedTokens(
@@ -1317,10 +1319,12 @@ export async function runTurn(host: SessionTurnHost, rawSend: SendFn, base?: {
     blockedTools: activeProfile.blockedTools, systemPrompt: system, activeProfileId: activeProfile.id,
     maxSteps, planMode, doomLoopStrategy,
     contextWindowTokens,
-    compactThresholdPercent: AUTO_COMPACT_THRESHOLD_PERCENT,
+    compactThresholdPercent: contextPolicy.autoCompactPercent,
+    contextPolicy,
     lastPromptTokens: host.lastPromptTokens,
     // Prefire cache is created lazily inside the graph when two-pass is enabled.
     beforeLlmCompact: async () => {
+      if (!contextPolicy.memoryFlushBeforeCompact) return
       if (!host.memoryService || !host.store) return
       const memCfg = host.memoryService.getConfig()
       const flags = resolveSessionMemoryFlags(memCfg, host._config)
@@ -1345,7 +1349,17 @@ export async function runTurn(host: SessionTurnHost, rawSend: SendFn, base?: {
         }
       }
     },
+    // Structured context observability for debug sinks / future WS loop:event.
+    // Product path uses emit.loopSignal when wired; also log a fill snapshot each turn.
   }
+  // Turn-start context-fill snapshot (best-effort; remaining = free %).
+  emitLoopSignal(ctx.emit.loopSignal, {
+    type: 'loop.budget',
+    sessionId: host.id,
+    turnId,
+    remaining: Math.max(0, contextWindowTokens - usedTokens),
+    total: contextWindowTokens,
+  })
 
   let finalState: LoopState | undefined
   try {

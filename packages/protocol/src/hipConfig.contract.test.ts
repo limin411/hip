@@ -121,6 +121,23 @@ describe('protocol: AgentLoopConfig', () => {
       idleTimeoutMs: 120_000,
     })
   })
+
+  it('round-trips context on HipConfig through JSON', () => {
+    const cfg: HipConfig = {
+      version: 1,
+      context: {
+        autoCompactPercent: 90,
+        subagentCompactPercent: 65,
+        targetKeepPercent: 40,
+        prefireLeadPercent: 12,
+        twoPass: false,
+        memoryFlushBeforeCompact: true,
+        toolOutputMaxBytes: 20_000,
+      },
+    }
+    const round = JSON.parse(JSON.stringify(cfg)) as HipConfig
+    expect(round.context).toEqual(cfg.context)
+  })
 })
 
 describe('protocol: ProviderEntry (Todo 1)', () => {

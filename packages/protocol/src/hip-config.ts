@@ -190,6 +190,31 @@ export interface AcpHostConfig {
 }
 
 /**
+ * Optional `[context]` section in hip.toml — compaction / token-budget policy.
+ * All fields optional; omitted values keep sidecar defaults
+ * (85% auto-compact, 70% subagent, 50% keep-tail, prefire lead 10, two-pass on).
+ */
+export interface ContextConfig {
+  /** Auto-compact trigger as % of model context window. Default 85. */
+  autoCompactPercent?: number
+  /** Subagent auto-compact trigger %. Default 70. */
+  subagentCompactPercent?: number
+  /** Verbatim keep-tail target as % of window. Default 50. */
+  targetKeepPercent?: number
+  /**
+   * Points below autoCompactPercent where background prefire (NOTE₁) starts.
+   * Default 10 → prefire at 75% when auto is 85%.
+   */
+  prefireLeadPercent?: number
+  /** Two-pass prefire compact. Default true (also killable via HIP_TWO_PASS_COMPACT=0). */
+  twoPass?: boolean
+  /** Phase1 memory extract before LLM compact. Default true. */
+  memoryFlushBeforeCompact?: boolean
+  /** Max tool-result bytes kept inline for the model. Default 40960 (40KB). */
+  toolOutputMaxBytes?: number
+}
+
+/**
  * Optional `[plan]` section in hip.toml (PR-6 / KD-8 / KD-PA-1).
  * softApproveOnComposer is **deprecated** (parsed for back-compat; FE ignores).
  */
@@ -215,6 +240,8 @@ export interface HipConfig {
   teams?: import('./team-types.js').TeamConfig[]
   /** Optional agent-loop controls (budgets, HITL placeholder, doom strategy). */
   agentLoop?: AgentLoopConfig
+  /** Optional context-window / compaction policy. */
+  context?: ContextConfig
   /** Optional TaskRuntime (shell bg / monitor / scheduler / wake). */
   taskRuntime?: TaskRuntimeConfig
   /** Optional LangSmith tracing (observability). */

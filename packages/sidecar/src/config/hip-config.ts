@@ -12,6 +12,7 @@ import type {
   TeamMember,
   TeamPipelineStep,
   AgentLoopConfig,
+  ContextConfig,
   LangSmithConfig,
   TerminalConfig,
   TerminalShellPref,
@@ -141,6 +142,59 @@ function normalizeTeamEntry(raw: Record<string, unknown>): TeamConfig {
   return raw as unknown as TeamConfig
 }
 
+
+function normalizeContext(raw: Record<string, unknown>): ContextConfig {
+  if (raw.auto_compact_percent !== undefined && raw.autoCompactPercent === undefined) {
+    raw.autoCompactPercent = raw.auto_compact_percent
+  }
+  if (raw.subagent_compact_percent !== undefined && raw.subagentCompactPercent === undefined) {
+    raw.subagentCompactPercent = raw.subagent_compact_percent
+  }
+  if (raw.target_keep_percent !== undefined && raw.targetKeepPercent === undefined) {
+    raw.targetKeepPercent = raw.target_keep_percent
+  }
+  if (raw.prefire_lead_percent !== undefined && raw.prefireLeadPercent === undefined) {
+    raw.prefireLeadPercent = raw.prefire_lead_percent
+  }
+  if (raw.two_pass !== undefined && raw.twoPass === undefined) {
+    raw.twoPass = raw.two_pass
+  }
+  if (raw.memory_flush_before_compact !== undefined && raw.memoryFlushBeforeCompact === undefined) {
+    raw.memoryFlushBeforeCompact = raw.memory_flush_before_compact
+  }
+  if (raw.tool_output_max_bytes !== undefined && raw.toolOutputMaxBytes === undefined) {
+    raw.toolOutputMaxBytes = raw.tool_output_max_bytes
+  }
+  delete raw.auto_compact_percent
+  delete raw.subagent_compact_percent
+  delete raw.target_keep_percent
+  delete raw.prefire_lead_percent
+  delete raw.two_pass
+  delete raw.memory_flush_before_compact
+  delete raw.tool_output_max_bytes
+
+  const out: ContextConfig = {}
+  if (typeof raw.autoCompactPercent === 'number' && Number.isFinite(raw.autoCompactPercent)) {
+    out.autoCompactPercent = raw.autoCompactPercent
+  }
+  if (typeof raw.subagentCompactPercent === 'number' && Number.isFinite(raw.subagentCompactPercent)) {
+    out.subagentCompactPercent = raw.subagentCompactPercent
+  }
+  if (typeof raw.targetKeepPercent === 'number' && Number.isFinite(raw.targetKeepPercent)) {
+    out.targetKeepPercent = raw.targetKeepPercent
+  }
+  if (typeof raw.prefireLeadPercent === 'number' && Number.isFinite(raw.prefireLeadPercent)) {
+    out.prefireLeadPercent = raw.prefireLeadPercent
+  }
+  if (typeof raw.twoPass === 'boolean') out.twoPass = raw.twoPass
+  if (typeof raw.memoryFlushBeforeCompact === 'boolean') {
+    out.memoryFlushBeforeCompact = raw.memoryFlushBeforeCompact
+  }
+  if (typeof raw.toolOutputMaxBytes === 'number' && Number.isFinite(raw.toolOutputMaxBytes)) {
+    out.toolOutputMaxBytes = raw.toolOutputMaxBytes
+  }
+  return out
+}
 
 function normalizeAgentLoop(raw: Record<string, unknown>): AgentLoopConfig {
   if (raw.max_steps !== undefined && raw.maxSteps === undefined) {
@@ -329,6 +383,11 @@ function validateConfig(parsed: unknown, filePath: string): HipConfig {
     config.agentLoop = normalizeAgentLoop(agentLoop as Record<string, unknown>)
   }
 
+  const context = obj.context
+  if (context && typeof context === 'object' && !Array.isArray(context)) {
+    config.context = normalizeContext(context as Record<string, unknown>)
+  }
+
   const langsmith = obj.langsmith
   if (langsmith && typeof langsmith === 'object' && !Array.isArray(langsmith)) {
     config.langsmith = normalizeLangSmith(langsmith as Record<string, unknown>)
@@ -418,6 +477,10 @@ function deepMergeConfig(global: HipConfig, project: HipConfig): HipConfig {
   // Project agentLoop replaces global wholesale (same as activeModel / fixedAgents).
   if (project.agentLoop !== undefined) {
     merged.agentLoop = project.agentLoop
+  }
+  // Project context replaces global wholesale.
+  if (project.context !== undefined) {
+    merged.context = project.context
   }
   // Project langsmith replaces global wholesale (same as agentLoop).
   if (project.langsmith !== undefined) {

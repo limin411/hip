@@ -61,6 +61,12 @@ import {
   isTwoPassPrefireEnabled,
   shouldStartPrefire,
 } from './prefire.js'
+import {
+  DEFAULT_CONTEXT_POLICY,
+  type ResolvedContextPolicy,
+} from './context-policy.js'
+import { estimateMessagesTokens, usageFillPercent } from './context-budget.js'
+import type { LoopCompactReason, LoopPrefireOutcome } from './loop-events.js'
 // note: SUBAGENT compact budget is applied by callers via GraphCtx or buildGraph(maxSteps, budget)
 import { applySlidingWindow } from './context/sliding-window.js'
 import { isMicroCompactionEnabled, MicroCompaction } from './micro-compaction.js'
@@ -127,7 +133,18 @@ export interface GraphEmit {
   planDelta(itemId: string, delta: string): void
   /** Optional: emit when write_todos replaces the structured plan (UI sticky checklist). */
   planUpdated?(plan: PlanItem[]): void
-  compaction(summary: string, meta?: { replacedMessageIds?: string[] }): void
+  compaction(
+    summary: string,
+    meta?: {
+      replacedMessageIds?: string[]
+      reason?: import('./loop-events.js').LoopCompactReason
+      used?: number
+      window?: number
+      fillPercent?: number
+      mode?: string
+      prefire?: import('./loop-events.js').LoopPrefireOutcome
+    },
+  ): void
   /** Optional: signal that work is still progressing (keeps idle watchdog alive during long tools). */
   activity?(): void
   /**
@@ -199,6 +216,8 @@ export interface GraphCtx {
    * invoke. Created lazily when two-pass is enabled.
    */
   prefire?: PrefireCache
+  /** Resolved [context] policy from hip.toml + env. */
+  contextPolicy?: ResolvedContextPolicy
   planMode?: PlanMode
   /**
    * @experimental Test / harness only. Product session-turn paths never inject.
@@ -343,11 +362,18 @@ function isOverCompactBudget(
   }
   // Percentage of model context window (product path).
   if (ctx.contextWindowTokens != null && ctx.contextWindowTokens > 0) {
-    const pct = ctx.compactThresholdPercent ?? AUTO_COMPACT_THRESHOLD_PERCENT
+    const pct =
+      ctx.compactThresholdPercent ??
+      policyOf(ctx).autoCompactPercent ??
+      AUTO_COMPACT_THRESHOLD_PERCENT
     return exceedsThreshold(used, ctx.contextWindowTokens, pct)
   }
   // Fallback: absolute budget from buildGraph(maxSteps, compactBudget).
   return used > fallbackAbsoluteBudget
+}
+
+function policyOf(ctx: GraphCtx): ResolvedContextPolicy {
+  return ctx.contextPolicy ?? DEFAULT_CONTEXT_POLICY
 }
 
 /** Derive message-tail keep budget for compactMessages (product path only). */
@@ -363,13 +389,45 @@ function resolveTargetKeepTokens(ctx: GraphCtx): number | undefined {
   }))
   const overhead =
     estimateTextTokens(ctx.systemPrompt ?? '') + estimateToolsTokens(tools)
-  return messageKeepTokenBudget(ctx.contextWindowTokens, overhead, TARGET_THRESHOLD_PERCENT)
+  const keepPct = policyOf(ctx).targetKeepPercent ?? TARGET_THRESHOLD_PERCENT
+  return messageKeepTokenBudget(ctx.contextWindowTokens, overhead, keepPct)
 }
 
 function ensurePrefire(ctx: GraphCtx): PrefireCache | null {
-  if (!isTwoPassPrefireEnabled()) return null
+  const pol = policyOf(ctx)
+  if (!pol.twoPass || !isTwoPassPrefireEnabled()) return null
   if (!ctx.prefire) ctx.prefire = new PrefireCache()
   return ctx.prefire
+}
+
+function emitCompactObs(
+  ctx: GraphCtx,
+  payload: {
+    reason: LoopCompactReason
+    used?: number
+    window?: number
+    mode?: 'user-turn' | 'tool-round' | 'sliding_window' | 'prune'
+    prefire?: LoopPrefireOutcome
+    tokensBefore?: number
+    tokensAfter?: number
+  },
+): void {
+  const window = payload.window ?? ctx.contextWindowTokens
+  const used = payload.used
+  const fillPercent =
+    used != null && window != null && window > 0 ? usageFillPercent(used, window) : undefined
+  emitLoopSignal(ctx.emit.loopSignal, {
+    type: 'loop.compact',
+    ...loopIds(ctx),
+    reason: payload.reason,
+    ...(used != null ? { used } : {}),
+    ...(window != null ? { window } : {}),
+    ...(fillPercent != null ? { fillPercent } : {}),
+    ...(payload.mode ? { mode: payload.mode } : {}),
+    ...(payload.prefire ? { prefire: payload.prefire } : {}),
+    ...(payload.tokensBefore != null ? { tokensBefore: payload.tokensBefore } : {}),
+    ...(payload.tokensAfter != null ? { tokensAfter: payload.tokensAfter } : {}),
+  })
 }
 
 /** Used-token estimate for prefire / compact gates (same inputs as isOverCompactBudget). */
@@ -402,12 +460,11 @@ function maybeStartPrefire(
 
   const used = estimateUsedForGate(working, ctx)
   let window = ctx.contextWindowTokens ?? 0
-  let thresholdPct = ctx.compactThresholdPercent ?? AUTO_COMPACT_THRESHOLD_PERCENT
+  const pol = policyOf(ctx)
+  let thresholdPct =
+    ctx.compactThresholdPercent ?? pol.autoCompactPercent ?? AUTO_COMPACT_THRESHOLD_PERCENT
+  const lead = pol.prefireLeadPercent
 
-  // Absolute-budget tests: treat compactBudget as 100% of a synthetic window.
-  if ((!window || window <= 0) && compactBudget > 0 && ctx.compactBudgetTokens == null) {
-    // only when product didn't set absolute override on ctx
-  }
   if (ctx.compactBudgetTokens != null && ctx.compactBudgetTokens > 0) {
     window = Math.max(ctx.compactBudgetTokens, 1)
     thresholdPct = 100
@@ -417,7 +474,7 @@ function maybeStartPrefire(
     thresholdPct = 100
   }
 
-  if (!shouldStartPrefire(used, window, thresholdPct)) return
+  if (!shouldStartPrefire(used, window, thresholdPct, lead)) return
 
   const targetKeep = resolveTargetKeepTokens(ctx)
   const plan = selectCompactMiddle(working, {
@@ -426,6 +483,14 @@ function maybeStartPrefire(
   })
   if (!plan) return
   const outcome = cache.startPass1(plan.middle, ctx.summarizer, { sessionId: ctx.sessionId })
+  emitLoopSignal(ctx.emit.loopSignal, {
+    type: 'loop.prefire',
+    ...loopIds(ctx),
+    outcome: outcome as LoopPrefireOutcome,
+    used,
+    window,
+    fillPercent: usageFillPercent(used, window),
+  })
   if (outcome === 'started') {
     try {
       ctx.emit.compaction('[prefire] pass-1 started')
@@ -465,19 +530,31 @@ export function buildGraph(maxSteps: number = MAX_STEPS, compactBudget: number =
         }
         working = mcMessages
         try {
-          ctx.emit.compaction(`Pruned ${truncated} stale tool result(s)`)
+          ctx.emit.compaction(`Pruned ${truncated} stale tool result(s)`, { reason: 'prune' })
         } catch {
           // best-effort
         }
+        emitCompactObs(ctx, { reason: 'prune', mode: 'prune' })
       }
     }
 
     // 2) Sliding window — multi-Human-turn conversations primarily.
     const windowResult = applySlidingWindow(working)
     if (windowResult.removed.length > 0) {
+      const beforeTok = estimateMessagesTokens(windowResult.removed) + estimateMessagesTokens(windowResult.kept)
       const summary = await ctx.summarizer.summarize(windowResult.removed, { sessionId: ctx.sessionId })
       const summaryMsg = new SystemMessage(`[Earlier conversation summary]\n${summary}`)
-      ctx.emit.compaction(`Sliding window: ${windowResult.removed.length} messages summarized`)
+      ctx.emit.compaction(`Sliding window: ${windowResult.removed.length} messages summarized`, {
+        reason: 'sliding_window',
+        mode: 'sliding_window',
+      })
+      const afterTok = estimateMessagesTokens([summaryMsg, ...windowResult.kept])
+      emitCompactObs(ctx, {
+        reason: 'sliding_window',
+        mode: 'sliding_window',
+        tokensBefore: beforeTok,
+        tokensAfter: afterTok,
+      })
       return {
         messages: [...out, summaryMsg, ...windowResult.kept],
         compacted: true,
@@ -522,6 +599,25 @@ export function buildGraph(maxSteps: number = MAX_STEPS, compactBudget: number =
 
     const targetKeep = resolveTargetKeepTokens(ctx)
     const prefire = ensurePrefire(ctx)
+    const usedBefore = estimateUsedForGate(working, ctx)
+    const tokensBefore = estimateMessagesTokens(working)
+    // Peek prefire validity without consuming (match only peeks when middle is non-empty).
+    const plannedMiddle = selectCompactMiddle(working, {
+      keepRecentTurns: KEEP_RECENT_TURNS,
+      ...(targetKeep != null ? { targetKeepTokens: targetKeep } : {}),
+    })?.middle
+    let prefireOutcome: LoopPrefireOutcome = 'miss'
+    if (prefire && plannedMiddle && plannedMiddle.length > 0) {
+      // Snapshot fingerprint path: if note exists and prefix matches, classify hit/pass2.
+      // compactMessages will call match again (idempotent when valid).
+      const peek = prefire.match(plannedMiddle)
+      if (peek) {
+        prefireOutcome = peek.delta.length > 0 ? 'pass2' : 'hit'
+        // Re-seed note after peek match? match does not clear on success.
+      } else if (prefire.note1) {
+        prefireOutcome = 'miss'
+      }
+    }
     const result = await compactMessages(working, {
       keepRecentTurns: KEEP_RECENT_TURNS,
       summarizer: ctx.summarizer,
@@ -543,7 +639,31 @@ export function buildGraph(maxSteps: number = MAX_STEPS, compactBudget: number =
     }
     const summaryText = typeof result.summary.content === 'string' ? result.summary.content : ''
     const mode = result.mode ?? 'user-turn'
-    ctx.emit.compaction(`[${mode}] ${summaryText}`, { replacedMessageIds: result.replacedIds })
+    const tokensAfter = estimateMessagesTokens([
+      result.summary,
+      ...working.filter((m) => !result.replacedIds.includes(m.id ?? '')),
+    ])
+    ctx.emit.compaction(`[${mode}] ${summaryText}`, {
+      replacedMessageIds: result.replacedIds,
+      reason: 'budget',
+      used: usedBefore,
+      window: ctx.contextWindowTokens,
+      fillPercent:
+        ctx.contextWindowTokens && ctx.contextWindowTokens > 0
+          ? usageFillPercent(usedBefore, ctx.contextWindowTokens)
+          : undefined,
+      mode,
+      prefire: prefireOutcome,
+    })
+    emitCompactObs(ctx, {
+      reason: 'budget',
+      used: usedBefore,
+      window: ctx.contextWindowTokens,
+      mode,
+      prefire: prefireOutcome,
+      tokensBefore,
+      tokensAfter,
+    })
     return {
       messages: [
         ...out,
@@ -680,32 +800,136 @@ export function buildGraph(maxSteps: number = MAX_STEPS, compactBudget: number =
           // best-effort
         }
       }
+
+      const runOverflowCompact = async (
+        workingMsgs: BaseMessage[],
+        reason: LoopCompactReason,
+        keepTurns: number,
+        keepRounds: number,
+        targetKeep?: number,
+      ) => {
+        const prefire = ensurePrefire(ctx)
+        const result = await compactMessages(workingMsgs, {
+          keepRecentTurns: keepTurns,
+          keepRecentToolRounds: keepRounds,
+          summarizer: ctx.summarizer,
+          overflowRecovery: true,
+          sessionId: ctx.sessionId,
+          ...(targetKeep != null ? { targetKeepTokens: targetKeep } : {}),
+          ...(prefire ? { prefire } : {}),
+        })
+        prefire?.clear()
+        if (!result) return null
+        const summaryText = typeof result.summary.content === 'string' ? result.summary.content : ''
+        const mode = result.mode ?? 'user-turn'
+        emit.compaction(summaryText, {
+          replacedMessageIds: result.replacedIds,
+          reason,
+          mode,
+        })
+        emitCompactObs(ctx, {
+          reason,
+          mode,
+          used: estimateUsedForGate(workingMsgs, ctx),
+          window: ctx.contextWindowTokens,
+          tokensBefore: estimateMessagesTokens(workingMsgs),
+        })
+        return result
+      }
+
       const targetKeep = resolveTargetKeepTokens(ctx)
-      const prefire = ensurePrefire(ctx)
-      const result = await compactMessages(messages, {
-        keepRecentTurns: KEEP_RECENT_TURNS,
-        summarizer: ctx.summarizer,
-        overflowRecovery: true,
-        sessionId: ctx.sessionId,
-        // Overflow: keep half the target budget so the retry prompt is smaller.
-        ...(targetKeep != null ? { targetKeepTokens: Math.max(500, Math.floor(targetKeep / 2)) } : {}),
-        ...(prefire ? { prefire } : {}),
-      })
-      prefire?.clear()
-      if (!result) throw err
-      const summaryText = typeof result.summary.content === 'string' ? result.summary.content : ''
-      emit.compaction(summaryText, { replacedMessageIds: result.replacedIds })
+      const halfKeep =
+        targetKeep != null ? Math.max(500, Math.floor(targetKeep / 2)) : undefined
+
+      // Pass 1: standard overflow recovery compact.
+      let result = await runOverflowCompact(
+        messages,
+        'overflow',
+        KEEP_RECENT_TURNS,
+        3,
+        halfKeep,
+      )
+
+      // Pass 2 (secondary): aggressive prune + tighter keep if first compact failed
+      // or if we need an even smaller prompt for the retry.
+      if (!result) {
+        let secondary = [...state.messages]
+        if (isMicroCompactionEnabled()) {
+          const mc = new MicroCompaction({ keepRecent: 8 })
+          secondary = mc.compact(secondary).messages
+        }
+        result = await runOverflowCompact(secondary, 'overflow_secondary', 1, 2, halfKeep != null ? Math.floor(halfKeep / 2) : undefined)
+        if (result) {
+          // Apply micro-prune removals are already in secondary content stubs;
+          // compact plan is relative to secondary.
+          const compactedState = applyCompaction(secondary, result)
+          const retryMessages = prepareMessages(compactedState)
+          try {
+            const msgResult = await execute(retryMessages)
+            const compactedMessages = [
+              result.summary,
+              ...result.removeIds.map((id) => new RemoveMessage({ id })),
+            ]
+            return {
+              ...msgResult,
+              messages: [
+                ...(deferredResolved.messages ?? []),
+                ...compactedMessages,
+                ...(msgResult.messages ?? []),
+              ],
+              compacted: true,
+              stepsSinceLastLlmCompact: 0,
+              deferredMessages: deferredResolved.deferredMessages,
+              planStepsSinceInjection,
+            }
+          } catch (err2) {
+            if (!isOverflowError(err2)) throw err2
+            throw err
+          }
+        }
+        throw err
+      }
+
       const compactedMessages = [result.summary, ...result.removeIds.map((id) => new RemoveMessage({ id }))]
       const compactedState = applyCompaction(state.messages, result)
       const retryMessages = prepareMessages(compactedState)
-      const msgResult = await execute(retryMessages)
-      return {
-        ...msgResult,
-        messages: [...(deferredResolved.messages ?? []), ...compactedMessages, ...(msgResult.messages ?? [])],
-        compacted: true,
-        stepsSinceLastLlmCompact: 0,
-        deferredMessages: deferredResolved.deferredMessages,
-        planStepsSinceInjection,
+      try {
+        const msgResult = await execute(retryMessages)
+        return {
+          ...msgResult,
+          messages: [...(deferredResolved.messages ?? []), ...compactedMessages, ...(msgResult.messages ?? [])],
+          compacted: true,
+          stepsSinceLastLlmCompact: 0,
+          deferredMessages: deferredResolved.deferredMessages,
+          planStepsSinceInjection,
+        }
+      } catch (err2) {
+        if (!isOverflowError(err2)) throw err2
+        // Retry still overflowed — secondary pass on already-compacted state.
+        let secondary = compactedState
+        if (isMicroCompactionEnabled()) {
+          secondary = new MicroCompaction({ keepRecent: 8 }).compact(secondary).messages
+        }
+        const result2 = await runOverflowCompact(secondary, 'overflow_secondary', 1, 2, halfKeep != null ? Math.floor(halfKeep / 2) : undefined)
+        if (!result2) throw err
+        const compacted2 = applyCompaction(secondary, result2)
+        const retry2 = prepareMessages(compacted2)
+        const msgResult = await execute(retry2)
+        return {
+          ...msgResult,
+          messages: [
+            ...(deferredResolved.messages ?? []),
+            result.summary,
+            ...result.removeIds.map((id) => new RemoveMessage({ id })),
+            result2.summary,
+            ...result2.removeIds.map((id) => new RemoveMessage({ id })),
+            ...(msgResult.messages ?? []),
+          ],
+          compacted: true,
+          stepsSinceLastLlmCompact: 0,
+          deferredMessages: deferredResolved.deferredMessages,
+          planStepsSinceInjection,
+        }
       }
     }
   }

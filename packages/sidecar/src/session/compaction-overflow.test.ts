@@ -113,6 +113,32 @@ describe('compaction overflow behavior', () => {
     })
   })
 
+  it('emits loop.compact with overflow reason when recovering', async () => {
+    await withTmp(async (root) => {
+      const app = buildGraph(25, 100_000)
+      const loopEvents: Array<{ type: string; reason?: string }> = []
+      const summarizer: Summarizer = {
+        async summarize() {
+          return 'overflow-summary: ' + 'kept critical context. '.repeat(6)
+        },
+      }
+      const overflow = new Error('context length exceeded')
+      const runner = overflowRunner(overflow, new AIMessage('recovered'))
+      const emit: GraphEmit = {
+        ...noopEmit,
+        loopSignal: (e) => {
+          loopEvents.push(e as { type: string; reason?: string })
+        },
+      }
+      const out = await app.invoke(
+        { messages: build(), steps: 0 },
+        { configurable: { ctx: { sessionId: 'test-session', runner, tools: buildTools(root), emit, summarizer } } },
+      )
+      expect(out.compacted).toBe(true)
+      expect(loopEvents.some((e) => e.type === 'loop.compact' && e.reason === 'overflow')).toBe(true)
+    })
+  })
+
   it('recovers from a provider overflow error by compacting aggressively and retrying once', async () => {
     await withTmp(async (root) => {
       const app = buildGraph(25, 100_000)

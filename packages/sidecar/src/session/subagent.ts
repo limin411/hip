@@ -2,10 +2,8 @@ import { SystemMessage, HumanMessage, AIMessage, type BaseMessage } from '@langc
 import type { PermissionMode } from '@hip/protocol'
 import type { ModelRunner } from './model-runner.js'
 import { type Summarizer } from './compaction.js'
-import {
-  SUBAGENT_COMPACT_THRESHOLD_PERCENT,
-  resolveModelContextWindow,
-} from './context-budget.js'
+import { resolveModelContextWindow } from './context-budget.js'
+import { resolveContextPolicy } from './context-policy.js'
 import { getActiveModel } from '../config/providers.js'
 import { resolveEffectiveConfig } from '../config/hip-config.js'
 import { buildGraph, type GraphEmit, type GraphCtx } from './graph.js'
@@ -174,6 +172,7 @@ export async function runSubagent(args: RunSubagentArgs): Promise<string> {
   )
   const active = getActiveModel()
   const contextWindowTokens = resolveModelContextWindow(active.providerID, active.modelID)
+  const contextPolicy = resolveContextPolicy(resolveEffectiveConfig(root).context)
   const ctx: GraphCtx = {
     runner,
     tools,
@@ -192,7 +191,12 @@ export async function runSubagent(args: RunSubagentArgs): Promise<string> {
     permissionMode,
     doomLoopStrategy,
     contextWindowTokens,
-    compactThresholdPercent: SUBAGENT_COMPACT_THRESHOLD_PERCENT,
+    compactThresholdPercent: contextPolicy.subagentCompactPercent,
+    contextPolicy: {
+      ...contextPolicy,
+      // Subagent path always uses the subagent trigger as autoCompact.
+      autoCompactPercent: contextPolicy.subagentCompactPercent,
+    },
   }
   // Absolute second-arg is fallback only; product path uses ctx percentage gate.
   const app = buildGraph(childMaxSteps)

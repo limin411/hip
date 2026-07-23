@@ -42,6 +42,27 @@ Hip already has a layered compaction stack (micro-prune → sliding window → L
 | G9 | `TARGET_THRESHOLD_PERCENT` (50%) drives keep-tail via `selectKeepUnitsByTokenBudget` | done |
 | G10 | Memory Phase1 flush before LLM compact (`flushMemoryBeforeCompact`, 15s timeout) | done |
 | G11 | Two-pass prefire compact (NOTE₁ at threshold−10%, pass-2 merge at compact) | done |
+| G12 | hip.toml `[context]` + env overrides (`resolveContextPolicy`) | done |
+| G13 | Loop observability: `loop.compact` / `loop.prefire` + fill snapshot | done |
+| G14 | Overflow secondary recovery (prune + tighter keep + second retry) | done |
+
+### hip.toml `[context]`
+
+```toml
+[context]
+autoCompactPercent = 85
+subagentCompactPercent = 70
+targetKeepPercent = 50
+prefireLeadPercent = 10
+twoPass = true
+memoryFlushBeforeCompact = true
+toolOutputMaxBytes = 40960
+```
+
+Env overrides: `HIP_TWO_PASS_COMPACT`, `HIP_CONTEXT_AUTO_COMPACT_PERCENT`,
+`HIP_CONTEXT_SUBAGENT_COMPACT_PERCENT`, `HIP_CONTEXT_TARGET_KEEP_PERCENT`,
+`HIP_CONTEXT_PREFIRE_LEAD_PERCENT`, `HIP_CONTEXT_MEMORY_FLUSH`,
+`HIP_TOOL_OUTPUT_MAX_BYTES`.
 
 Kill switch: `HIP_TWO_PASS_COMPACT=0|false|off`.
 

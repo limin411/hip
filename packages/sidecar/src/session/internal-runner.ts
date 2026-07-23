@@ -3,10 +3,8 @@ import type { StructuredToolInterface } from '@langchain/core/tools'
 import { resolveEffectiveConfig } from '../config/hip-config.js'
 import type { GraphEmit, GraphCtx } from './graph.js'
 import { buildGraph } from './graph.js'
-import {
-  SUBAGENT_COMPACT_THRESHOLD_PERCENT,
-  resolveModelContextWindow,
-} from './context-budget.js'
+import { resolveModelContextWindow } from './context-budget.js'
+import { resolveContextPolicy } from './context-policy.js'
 import { buildTools } from './tools.js'
 import { recursionLimit } from './loop-control.js'
 import { resolveDoomLoopStrategy } from './doom-loop.js'
@@ -109,6 +107,7 @@ export async function runManagedAgent(args: RunManagedAgentArgs): Promise<string
   )
   const active = getActiveModel()
   const contextWindowTokens = resolveModelContextWindow(active.providerID, active.modelID)
+  const contextPolicy = resolveContextPolicy(resolveEffectiveConfig(cwd).context)
   const ctx: GraphCtx = {
     runner,
     tools,
@@ -127,7 +126,11 @@ export async function runManagedAgent(args: RunManagedAgentArgs): Promise<string
     permissionMode,
     doomLoopStrategy,
     contextWindowTokens,
-    compactThresholdPercent: SUBAGENT_COMPACT_THRESHOLD_PERCENT,
+    compactThresholdPercent: contextPolicy.subagentCompactPercent,
+    contextPolicy: {
+      ...contextPolicy,
+      autoCompactPercent: contextPolicy.subagentCompactPercent,
+    },
   }
   let humanParts: ContentPart[]
   if (attachmentParts?.length) {

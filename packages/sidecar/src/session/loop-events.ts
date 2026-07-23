@@ -12,6 +12,28 @@ export type LoopNudgeReason = 'doom' | 'error_streak' | 'path_hit' | 'replan' | 
 export type LoopPauseKind = 'doom' | 'plan' | 'subagent_pause'
 export type LoopEndReason = 'completed' | 'max_steps' | 'interrupt' | 'abort' | 'circuit_breaker'
 
+/** Why a compact / context-management action ran. */
+export type LoopCompactReason =
+  | 'budget'
+  | 'overflow'
+  | 'overflow_secondary'
+  | 'prefire'
+  | 'sliding_window'
+  | 'prune'
+  | 'manual'
+
+export type LoopPrefireOutcome =
+  | 'started'
+  | 'cached'
+  | 'hit'
+  | 'pass2'
+  | 'miss'
+  | 'skipped_disabled'
+  | 'skipped_small'
+  | 'skipped_inflight'
+  | 'skipped_same_fp'
+  | 'failed'
+
 export type LoopEvent =
   | { type: 'loop.step'; sessionId: string; turnId: string; agentId: string; step: number; maxSteps: number }
   | { type: 'loop.nudge'; sessionId: string; turnId: string; reason: LoopNudgeReason }
@@ -19,6 +41,29 @@ export type LoopEvent =
   | { type: 'loop.pause'; sessionId: string; turnId: string; question: string; kind?: LoopPauseKind }
   | { type: 'loop.budget'; sessionId: string; turnId: string; remaining: number; total: number }
   | { type: 'loop.end'; sessionId: string; turnId: string; reason: LoopEndReason }
+  /** Context fill snapshot and/or compaction lifecycle (Track context-budget). */
+  | {
+      type: 'loop.compact'
+      sessionId: string
+      turnId: string
+      reason: LoopCompactReason
+      used?: number
+      window?: number
+      fillPercent?: number
+      mode?: 'user-turn' | 'tool-round' | 'sliding_window' | 'prune'
+      prefire?: LoopPrefireOutcome
+      tokensBefore?: number
+      tokensAfter?: number
+    }
+  | {
+      type: 'loop.prefire'
+      sessionId: string
+      turnId: string
+      outcome: LoopPrefireOutcome
+      used?: number
+      window?: number
+      fillPercent?: number
+    }
 
 /** Sync, best-effort sink. Implementations must not throw into the agent loop. */
 export type LoopEventSink = (e: LoopEvent) => void

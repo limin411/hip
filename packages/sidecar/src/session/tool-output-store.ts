@@ -9,8 +9,11 @@ const DEFAULT_MAX_LINES = 2000
  * Default max tool-result bytes kept inline for the model.
  * 40 KB ≈ 10k tokens (aligned with grok-build DEFAULT_TOOL_OUTPUT_BYTES).
  * Full content still spills to ~/.hip/data/tool-output/ when over limit.
+ * Overridable via hip.toml `[context].toolOutputMaxBytes` / HIP_TOOL_OUTPUT_MAX_BYTES
+ * when constructing the store (session wiring).
  */
-const DEFAULT_MAX_BYTES = 40 * 1024 // 40 KB
+export const DEFAULT_TOOL_OUTPUT_MAX_BYTES = 40 * 1024 // 40 KB
+const DEFAULT_MAX_BYTES = DEFAULT_TOOL_OUTPUT_MAX_BYTES
 const CLEANUP_INTERVAL_MS = 60 * 60 * 1000 // 1 hour
 const CLEANUP_RETENTION_MS = 7 * 24 * 60 * 60 * 1000 // 7 days
 const FILE_PREFIX = 'tool_'

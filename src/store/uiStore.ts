@@ -52,24 +52,25 @@ export function isPlaceholderSidebarSection(s: SidebarSection): s is Placeholder
 export type SettingsPageId =
   | 'general'
   | 'model'
+  | 'connectors'
+  | 'memory'
   | 'agents'
   | 'mcp'
-  | 'connectors'
   | 'skill'
   | 'plugins'
   | 'hooks'
-  | 'memory'
 
+/** Order matches SettingsPanel NAV_GROUPS (basics → agents). */
 const SETTINGS_PAGE_IDS: readonly SettingsPageId[] = [
   'general',
   'model',
+  'connectors',
+  'memory',
   'agents',
   'mcp',
-  'connectors',
   'skill',
   'plugins',
   'hooks',
-  'memory',
 ]
 
 function normalizeSettingsPage(v: unknown): SettingsPageId {

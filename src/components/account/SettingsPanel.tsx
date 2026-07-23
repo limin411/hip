@@ -14,17 +14,54 @@ import { PluginConfig } from './PluginConfig'
 import { HookConfig } from './HookConfig'
 import { MemoryConfig } from './MemoryConfig'
 
-const PAGES = [
-  { id: 'general' as const, icon: SlidersHorizontal, labelKey: 'settings.general' as const, Component: GeneralSettings },
-  { id: 'model' as const, icon: Cpu, labelKey: 'settings.model' as const, Component: ModelConfig },
-  { id: 'agents' as const, icon: Bot, labelKey: 'settings.agentsLabel' as const, Component: AgentManagement },
-  { id: 'mcp' as const, icon: Plug, labelKey: 'settings.mcpLabel' as const, Component: McpConfig },
-  { id: 'connectors' as const, icon: Cable, labelKey: 'settings.connectorsLabel' as const, Component: ConnectorsSettings },
-  { id: 'skill' as const, icon: Sparkles, labelKey: 'settings.skillLabel' as const, Component: SkillConfig },
-  { id: 'plugins' as const, icon: Package, labelKey: 'settings.pluginsLabel' as const, Component: PluginConfig },
-  { id: 'hooks' as const, icon: Link2, labelKey: 'settings.hooksLabel' as const, Component: HookConfig },
-  { id: 'memory' as const, icon: Brain, labelKey: 'settings.memoryLabel' as const, Component: MemoryConfig },
+type SettingsPageDef = {
+  id: SettingsPageId
+  icon: typeof SlidersHorizontal
+  labelKey:
+    | 'settings.general'
+    | 'settings.model'
+    | 'settings.agentsLabel'
+    | 'settings.mcpLabel'
+    | 'settings.connectorsLabel'
+    | 'settings.skillLabel'
+    | 'settings.pluginsLabel'
+    | 'settings.hooksLabel'
+    | 'settings.memoryLabel'
+  Component: () => React.JSX.Element
+}
+
+type SettingsNavGroup = {
+  id: 'basics' | 'agents'
+  labelKey: 'settings.groups.basics' | 'settings.groups.agents'
+  pages: SettingsPageDef[]
+}
+
+/** Grouped settings nav (order is the product IA). */
+const NAV_GROUPS: SettingsNavGroup[] = [
+  {
+    id: 'basics',
+    labelKey: 'settings.groups.basics',
+    pages: [
+      { id: 'general', icon: SlidersHorizontal, labelKey: 'settings.general', Component: GeneralSettings },
+      { id: 'model', icon: Cpu, labelKey: 'settings.model', Component: ModelConfig },
+      { id: 'connectors', icon: Cable, labelKey: 'settings.connectorsLabel', Component: ConnectorsSettings },
+      { id: 'memory', icon: Brain, labelKey: 'settings.memoryLabel', Component: MemoryConfig },
+    ],
+  },
+  {
+    id: 'agents',
+    labelKey: 'settings.groups.agents',
+    pages: [
+      { id: 'agents', icon: Bot, labelKey: 'settings.agentsLabel', Component: AgentManagement },
+      { id: 'mcp', icon: Plug, labelKey: 'settings.mcpLabel', Component: McpConfig },
+      { id: 'skill', icon: Sparkles, labelKey: 'settings.skillLabel', Component: SkillConfig },
+      { id: 'plugins', icon: Package, labelKey: 'settings.pluginsLabel', Component: PluginConfig },
+      { id: 'hooks', icon: Link2, labelKey: 'settings.hooksLabel', Component: HookConfig },
+    ],
+  },
 ]
+
+const PAGES = NAV_GROUPS.flatMap((g) => g.pages)
 
 /** Fixed width for the settings category nav (not user-resizable). */
 const NAV_WIDTH_CLASS = 'w-48'
@@ -46,27 +83,43 @@ export function SettingsPanel() {
           aria-label={t('settings.title')}
           className="flex flex-1 flex-col gap-0.5 overflow-y-auto p-2"
         >
-          {PAGES.map((page) => {
-            const Icon = page.icon
-            return (
-              <TabsPrimitive.Trigger
-                key={page.id}
-                value={page.id}
-                data-testid={`settings-nav-${page.id}`}
+          {NAV_GROUPS.map((group, groupIndex) => (
+            <div key={group.id} role="group" aria-labelledby={`settings-nav-group-${group.id}`}>
+              <div
+                id={`settings-nav-group-${group.id}`}
+                data-testid={`settings-nav-group-${group.id}`}
                 className={cn(
-                  'relative flex h-[var(--row-h-sidebar)] items-center gap-2.5 rounded-lg px-2.5 text-left text-body font-medium transition-colors duration-chrome',
-                  'text-ink-secondary hover:bg-state-hover hover:text-ink',
-                  // Quiet lift + Sage rail — same signal as AppSidebar (no hairline ring).
-                  'before:absolute before:inset-y-1.5 before:left-0 before:w-[2px] before:rounded-full before:bg-accent before:opacity-0',
-                  'data-[state=active]:bg-state-hover data-[state=active]:text-ink data-[state=active]:before:opacity-100',
-                  'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink/20',
+                  'px-2.5 pb-1 text-caption font-medium tracking-wide text-ink-tertiary',
+                  groupIndex === 0 ? 'pt-1' : 'pt-3',
                 )}
               >
-                <Icon size={16} strokeWidth={1.75} className="shrink-0 opacity-70" />
-                <span className="truncate">{t(page.labelKey)}</span>
-              </TabsPrimitive.Trigger>
-            )
-          })}
+                {t(group.labelKey)}
+              </div>
+              <div className="flex flex-col gap-0.5">
+                {group.pages.map((page) => {
+                  const Icon = page.icon
+                  return (
+                    <TabsPrimitive.Trigger
+                      key={page.id}
+                      value={page.id}
+                      data-testid={`settings-nav-${page.id}`}
+                      className={cn(
+                        'relative flex h-[var(--row-h-sidebar)] w-full items-center gap-2.5 rounded-lg px-2.5 text-left text-body font-medium transition-colors duration-chrome',
+                        'text-ink-secondary hover:bg-state-hover hover:text-ink',
+                        // Quiet lift + Sage rail — same signal as AppSidebar (no hairline ring).
+                        'before:absolute before:inset-y-1.5 before:left-0 before:w-[2px] before:rounded-full before:bg-accent before:opacity-0',
+                        'data-[state=active]:bg-state-hover data-[state=active]:text-ink data-[state=active]:before:opacity-100',
+                        'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink/20',
+                      )}
+                    >
+                      <Icon size={16} strokeWidth={1.75} className="shrink-0 opacity-70" />
+                      <span className="truncate">{t(page.labelKey)}</span>
+                    </TabsPrimitive.Trigger>
+                  )
+                })}
+              </div>
+            </div>
+          ))}
         </TabsPrimitive.List>
       </div>
       <div className="w-px shrink-0 bg-border" aria-hidden data-testid="settings-nav-divider" />

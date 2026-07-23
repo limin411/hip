@@ -724,6 +724,10 @@ export const ja = {
   },
   "settings": {
     "title": "設定",
+    "groups": {
+      "basics": "基本設定",
+      "agents": "エージェント設定"
+    },
     "general": "一般設定",
     "language": "インターフェース言語",
     "languageDesc": "アプリケーションの表示言語",

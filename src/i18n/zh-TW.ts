@@ -732,6 +732,10 @@ export const zhTW = {
   },
   "settings": {
     "title": "設定",
+    "groups": {
+      "basics": "基礎設定",
+      "agents": "智慧體設定"
+    },
     "general": "通用設定",
     "language": "介面語言",
     "languageDesc": "應用介面的顯示語言",

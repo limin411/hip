@@ -697,6 +697,10 @@ export const en = {
     },
     settings: {
       title: 'Settings',
+      groups: {
+        basics: 'Basic Settings',
+        agents: 'Agent Settings',
+      },
       general: 'General Settings',
       language: 'Interface Language',
       languageDesc: 'The display language of the application',

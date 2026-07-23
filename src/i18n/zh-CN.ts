@@ -687,6 +687,10 @@ export const zhCN = {
     },
     settings: {
       title: '设置',
+      groups: {
+        basics: '基础设置',
+        agents: '智能体设置',
+      },
       general: '通用设置',
       language: '界面语言',
       languageDesc: '应用界面的显示语言',

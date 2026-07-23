@@ -724,6 +724,10 @@ export const ko = {
   },
   "settings": {
     "title": "설정",
+    "groups": {
+      "basics": "기본 설정",
+      "agents": "에이전트 설정"
+    },
     "general": "일반 설정",
     "language": "인터페이스 언어",
     "languageDesc": "애플리케이션의 표시 언어",

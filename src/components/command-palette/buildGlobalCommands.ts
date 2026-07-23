@@ -139,16 +139,17 @@ export const RECENT_SESSION_LIMIT = 50
 /** Max session rows shown after rank (P2-9). */
 export const SESSION_DISPLAY_CAP = 15
 
+/** Order matches SettingsPanel NAV_GROUPS (basics → agents). */
 const ALL_SETTINGS_PAGES: SettingsPageId[] = [
   'general',
   'model',
+  'connectors',
+  'memory',
   'agents',
   'mcp',
-  'connectors',
   'skill',
   'plugins',
   'hooks',
-  'memory',
 ]
 
 /** Shown on empty query (curated). */

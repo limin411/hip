@@ -136,4 +136,67 @@ describe('HostGroupList collapse', () => {
     // Still expanded after rename/delete clicks
     expect(screen.getByTestId('host-row-h1')).toBeInTheDocument()
   })
+
+  it('renders add cards per group and ungrouped; add calls onAddHost with group id', () => {
+    const onAddHost = vi.fn()
+    render(
+      <HostGroupList
+        groups={groups}
+        hosts={hosts}
+        onEditHost={noop}
+        onDeleteHost={noop}
+        onRenameGroup={noop}
+        onDeleteGroup={noop}
+        onAddHost={onAddHost}
+      />,
+    )
+    expect(screen.getByTestId('host-add-g1')).toBeInTheDocument()
+    expect(screen.getByTestId('host-add-g2')).toBeInTheDocument()
+    expect(screen.getByTestId('host-add-ungrouped')).toBeInTheDocument()
+
+    fireEvent.click(screen.getByTestId('host-add-g1'))
+    expect(onAddHost).toHaveBeenCalledWith('g1')
+    fireEvent.click(screen.getByTestId('host-add-ungrouped'))
+    expect(onAddHost).toHaveBeenCalledWith(null)
+  })
+
+  it('card body click connects host; edit does not', () => {
+    const onConnect = vi.fn()
+    const onEdit = vi.fn()
+    render(
+      <HostGroupList
+        groups={groups}
+        hosts={hosts}
+        onEditHost={onEdit}
+        onDeleteHost={noop}
+        onRenameGroup={noop}
+        onDeleteGroup={noop}
+        onConnectHost={onConnect}
+      />,
+    )
+    fireEvent.click(screen.getByTestId('host-row-h1'))
+    expect(onConnect).toHaveBeenCalledWith(expect.objectContaining({ id: 'h1' }))
+
+    onConnect.mockClear()
+    fireEvent.click(screen.getByTestId('host-edit-h1'))
+    expect(onEdit).toHaveBeenCalledWith(expect.objectContaining({ id: 'h1' }))
+    expect(onConnect).not.toHaveBeenCalled()
+  })
+
+  it('empty group still shows add card (no empty placeholder)', () => {
+    const onAddHost = vi.fn()
+    render(
+      <HostGroupList
+        groups={[{ id: 'g-empty', name: 'Empty', sort: 0 }]}
+        hosts={[]}
+        onEditHost={noop}
+        onDeleteHost={noop}
+        onRenameGroup={noop}
+        onDeleteGroup={noop}
+        onAddHost={onAddHost}
+      />,
+    )
+    expect(screen.getByTestId('host-add-g-empty')).toBeInTheDocument()
+    expect(screen.queryByText('terminals.groupEmpty')).not.toBeInTheDocument()
+  })
 })

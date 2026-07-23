@@ -1548,6 +1548,7 @@ export const ko = {
     "newLocal": "로컬 터미널",
     "newLocalFolder": "폴더에서 열기…",
     "newRemote": "새 연결",
+    "addHost": "추가",
     "filesPanel": "파일",
     "newGroup": "새 그룹",
     "renameGroup": "그룹 이름 변경",

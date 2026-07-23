@@ -1558,6 +1558,7 @@ export const zhCN = {
       newLocal: '本地终端',
       newLocalFolder: '打开文件夹…',
       newRemote: '新建连接',
+      addHost: '添加',
       filesPanel: '文件',
       newGroup: '新建分组',
       renameGroup: '重命名分组',

@@ -59,12 +59,12 @@ export function HostLibrary() {
   useEffect(() => {
     if (!pendingCreateHost) return
     if (!useHostLibraryUi.getState().consumeCreateHostRequest()) return
-    setFormMode({ mode: 'create' })
+    setFormMode({ mode: 'create', groupId: null })
     setFormOpen(true)
   }, [pendingCreateHost])
 
-  const openCreate = useCallback(() => {
-    setFormMode({ mode: 'create' })
+  const openCreate = useCallback((groupId?: string | null) => {
+    setFormMode({ mode: 'create', groupId: groupId ?? null })
     setFormOpen(true)
   }, [])
 
@@ -263,7 +263,7 @@ export function HostLibrary() {
             variant="primary"
             size="sm"
             data-testid="host-library-new-remote"
-            onClick={openCreate}
+            onClick={() => openCreate()}
           >
             <Plus size={14} aria-hidden />
             {t('terminals.newRemote')}
@@ -302,7 +302,7 @@ export function HostLibrary() {
                 variant="primary"
                 size="sm"
                 data-testid="host-library-empty-new-remote"
-                onClick={openCreate}
+                onClick={() => openCreate()}
               >
                 <Plus size={14} aria-hidden />
                 {t('terminals.newRemote')}
@@ -328,6 +328,7 @@ export function HostLibrary() {
             onRenameGroup={openRenameGroup}
             onDeleteGroup={setDeletingGroup}
             onConnectHost={(h) => void connectHost(h)}
+            onAddHost={(groupId) => openCreate(groupId)}
             connectBusy={connectBusy}
           />
         )}

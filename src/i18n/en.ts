@@ -1592,6 +1592,7 @@ export const en = {
       newLocal: 'Local terminal',
       newLocalFolder: 'Open in folder…',
       newRemote: 'New connection',
+      addHost: 'Add',
       filesPanel: 'Files',
       newGroup: 'New group',
       renameGroup: 'Rename group',

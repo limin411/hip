@@ -1556,6 +1556,7 @@ export const zhTW = {
     "newLocal": "本機終端",
     "newLocalFolder": "開啟資料夾…",
     "newRemote": "新建連線",
+    "addHost": "新增",
     "filesPanel": "檔案",
     "newGroup": "新建分組",
     "renameGroup": "重新命名分組",

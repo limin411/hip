@@ -1548,6 +1548,7 @@ export const ja = {
     "newLocal": "ローカル端末",
     "newLocalFolder": "フォルダで開く…",
     "newRemote": "新しい接続",
+    "addHost": "追加",
     "filesPanel": "ファイル",
     "newGroup": "新しいグループ",
     "renameGroup": "グループ名を変更",

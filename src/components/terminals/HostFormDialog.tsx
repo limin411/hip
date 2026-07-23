@@ -30,7 +30,9 @@ import { SegmentedControl } from '@/components/ui/SegmentedControl'
 import { Badge } from '@/components/ui/Badge'
 import { cn } from '@/lib/utils'
 
-export type HostFormMode = { mode: 'create' } | { mode: 'edit'; host: TerminalHost }
+export type HostFormMode =
+  | { mode: 'create'; groupId?: string | null }
+  | { mode: 'edit'; host: TerminalHost }
 
 const inputCls = inputClassName
 
@@ -79,7 +81,9 @@ export function HostFormDialog({
       setValues(hostToFormValues(mode.host))
     } else {
       setHostId(mintHostId(nanoid))
-      setValues(emptyHostFormValues())
+      const draft = emptyHostFormValues()
+      if (mode.groupId) draft.groupId = mode.groupId
+      setValues(draft)
     }
   }, [open, mode])
 

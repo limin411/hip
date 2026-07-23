@@ -1,6 +1,6 @@
 import { useTranslation } from 'react-i18next'
 import * as TabsPrimitive from '@radix-ui/react-tabs'
-import { SlidersHorizontal, Cpu, Bot, Plug, Sparkles, Package, Brain, Link2 } from 'lucide-react'
+import { SlidersHorizontal, Cpu, Bot, Plug, Cable, Sparkles, Package, Brain, Link2 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useUiStore, type SettingsPageId } from '@/store/uiStore'
 
@@ -8,6 +8,7 @@ import { GeneralSettings } from './GeneralSettings'
 import { ModelConfig } from './ModelConfig'
 import { AgentManagement } from './AgentManagement'
 import { McpConfig } from './McpConfig'
+import { ConnectorsSettings } from './ConnectorsSettings'
 import { SkillConfig } from './SkillConfig'
 import { PluginConfig } from './PluginConfig'
 import { HookConfig } from './HookConfig'
@@ -18,6 +19,7 @@ const PAGES = [
   { id: 'model' as const, icon: Cpu, labelKey: 'settings.model' as const, Component: ModelConfig },
   { id: 'agents' as const, icon: Bot, labelKey: 'settings.agentsLabel' as const, Component: AgentManagement },
   { id: 'mcp' as const, icon: Plug, labelKey: 'settings.mcpLabel' as const, Component: McpConfig },
+  { id: 'connectors' as const, icon: Cable, labelKey: 'settings.connectorsLabel' as const, Component: ConnectorsSettings },
   { id: 'skill' as const, icon: Sparkles, labelKey: 'settings.skillLabel' as const, Component: SkillConfig },
   { id: 'plugins' as const, icon: Package, labelKey: 'settings.pluginsLabel' as const, Component: PluginConfig },
   { id: 'hooks' as const, icon: Link2, labelKey: 'settings.hooksLabel' as const, Component: HookConfig },

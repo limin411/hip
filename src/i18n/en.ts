@@ -906,6 +906,7 @@ export const en = {
         },
       },
       mcpLabel: 'External Tool Services',
+      connectorsLabel: 'Connectors',
       mcp: {
         title: 'External Tool Services',
         intro: 'Connect external tool services. Their tools are merged into the hip agent (and internal agents you allow). External (ACP/CLI) agents do not use them.',
@@ -2243,6 +2244,7 @@ export const en = {
         model: 'Settings: Model',
         agents: 'Settings: Agents',
         mcp: 'Settings: MCP',
+        connectors: 'Settings: Connectors',
         skill: 'Settings: Skills',
         plugins: 'Settings: Plugin Market',
         hooks: 'Settings: Hooks',

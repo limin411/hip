@@ -923,6 +923,7 @@ export const ja = {
       }
     },
     "mcpLabel": "外部ツールサービス",
+    "connectorsLabel": "コネクター",
     "mcp": {
       "title": "外部ツールサービス",
       "intro": "外部ツールサービスを接続します。そのツールはhipエージェント（および許可した内部エージェント）に統合されます。外部（ACP/CLI）エージェントはこれらを使用しません。",
@@ -2186,6 +2187,7 @@ export const ja = {
       "model": "設定：モデル",
       "agents": "設定：エージェント",
       "mcp": "設定：MCP",
+      "connectors": "設定：コネクター",
       "skill": "設定：スキル",
       "plugins": "設定：プラグインマーケット",
       "hooks": "設定：フック",

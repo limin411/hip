@@ -41,6 +41,7 @@ const labels: GlobalCommandLabels = {
     model: 'Settings: Model',
     agents: 'Settings: Agents',
     mcp: 'Settings: MCP',
+    connectors: 'Settings: Connectors',
     skill: 'Settings: Skills',
     plugins: 'Settings: Plugins',
     hooks: 'Settings: Hooks',

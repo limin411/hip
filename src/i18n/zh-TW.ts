@@ -931,6 +931,7 @@ export const zhTW = {
       }
     },
     "mcpLabel": "外部工具服務",
+    "connectorsLabel": "連接器",
     "mcp": {
       "title": "外部工具服務",
       "intro": "接入外部工具服務，其工具會合並進 hip 主智慧體（以及你授權的內部智慧體）。外部（ACP/CLI）智慧體不使用它們。",
@@ -2194,6 +2195,7 @@ export const zhTW = {
       "model": "設定：模型",
       "agents": "設定：智慧體",
       "mcp": "設定：MCP",
+      "connectors": "設定：連接器",
       "skill": "設定：技能",
       "plugins": "設定：外掛市集",
       "hooks": "設定：掛鉤設定",

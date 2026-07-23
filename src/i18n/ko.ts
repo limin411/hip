@@ -923,6 +923,7 @@ export const ko = {
       }
     },
     "mcpLabel": "외부 도구 서비스",
+    "connectorsLabel": "커넥터",
     "mcp": {
       "title": "외부 도구 서비스",
       "intro": "외부 도구 서비스를 연결하세요. 해당 도구는 hip 에이전트(및 허용한 내부 에이전트)에 병합됩니다. 외부(ACP/CLI) 에이전트는 이를 사용하지 않습니다.",
@@ -2186,6 +2187,7 @@ export const ko = {
       "model": "설정: 모델",
       "agents": "설정: 에이전트",
       "mcp": "설정: MCP",
+      "connectors": "설정: 커넥터",
       "skill": "설정: 스킬",
       "plugins": "설정: 플러그인 마켓",
       "hooks": "설정: 훅",

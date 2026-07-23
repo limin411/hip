@@ -891,6 +891,7 @@ export const zhCN = {
         },
       },
       mcpLabel: '外部工具服务',
+      connectorsLabel: '连接器',
       mcp: {
         title: '外部工具服务',
         intro: '接入外部工具服务，其工具会合并进 hip 主智能体（以及你授权的内部智能体）。外部（ACP/CLI）智能体不使用它们。',
@@ -2198,6 +2199,7 @@ export const zhCN = {
         model: '设置：模型',
         agents: '设置：智能体',
         mcp: '设置：MCP',
+        connectors: '设置：连接器',
         skill: '设置：技能',
         plugins: '设置：插件市场',
         hooks: '设置：挂钩配置',

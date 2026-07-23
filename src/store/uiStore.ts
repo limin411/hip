@@ -54,6 +54,7 @@ export type SettingsPageId =
   | 'model'
   | 'agents'
   | 'mcp'
+  | 'connectors'
   | 'skill'
   | 'plugins'
   | 'hooks'
@@ -64,6 +65,7 @@ const SETTINGS_PAGE_IDS: readonly SettingsPageId[] = [
   'model',
   'agents',
   'mcp',
+  'connectors',
   'skill',
   'plugins',
   'hooks',

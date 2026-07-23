@@ -2160,9 +2160,9 @@ export const ko = {
   },
   "commandPalette": {
     "title": "명령 팔레트",
-    "searchPlaceholder": "명령 입력…  > cmds  # 세션  @ 스킬",
+    "searchPlaceholder": "명령 입력…  > cmds  # 세션  @ 스킬  / 슬래시",
     "noResults": "결과 없음",
-    "noResultsHint": "“theme”, “memory”, 세션 이름 또는 접두사 > # @ 시도",
+    "noResultsHint": "“theme”, “memory”, 세션 이름 또는 접두사 > # @ / 시도",
     "back": "뒤로",
     "current": "현재",
     "openTrigger": "명령 팔레트",
@@ -2177,6 +2177,7 @@ export const ko = {
       "appearance": "모양",
       "skills": "스킬",
       "favorites": "즐겨찾기",
+      "recent": "최근",
       "knowledge": "지식"
     },
     "navKnowledge": "지식 베이스",
@@ -2187,7 +2188,9 @@ export const ko = {
     "actions": {
       "newConversation": "새 대화",
       "keyboardShortcuts": "키보드 단축키",
-      "changeTheme": "테마 변경…"
+      "changeTheme": "테마 변경…",
+      "switchModel": "모델 전환…",
+      "resumeSession": "세션 재개…"
     },
     "openTerminals": "터미널 관리 열기",
     "newLocalTerminal": "새 로컬 터미널",
@@ -2208,6 +2211,8 @@ export const ko = {
       "diff": "작업공간 변경사항 보기",
       "compact": "대화 압축",
       "init": "AGENTS.md 생성 또는 업데이트",
+      "plan": "계획 모드 강제",
+      "planOff": "계획 모드 종료",
       "memoryOn": "이 세션에 메모리 주입 활성화",
       "memoryOff": "이 세션에 메모리 주입 비활성화",
       "memoryIncognito": "이 세션의 시크릿 메모리",
@@ -2228,6 +2233,7 @@ export const ko = {
       "prefixCmd": "명령만 필터링",
       "prefixSess": "세션만 필터링",
       "prefixSkill": "스킬만 필터링",
+      "prefixSlash": "슬래시 명령만",
       "favorite": "즐겨찾기에 고정하려면 행에 별표 표시",
       "nestEsc": "중첩 페이지에서 뒤로 가기 (또는 닫기)"
     },

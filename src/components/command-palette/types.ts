@@ -12,7 +12,20 @@ export type CommandGroupId =
   | 'commands-extra'
   | 'theme'
   | 'favorites'
+  | 'recent'
   | string
+
+/** Nested palette pages (theme / model / sessions pickers). */
+export type PalettePageId = 'theme' | 'model' | 'sessions'
+
+export type CommandSource =
+  | 'builtin-slash'
+  | 'action'
+  | 'skill'
+  | 'session'
+  | 'knowledge'
+  | 'nav'
+  | 'settings'
 
 export type PaletteIconName =
   | 'message-square'
@@ -50,10 +63,14 @@ export type GlobalCommand = RankableItem & {
   description?: string
   icon?: PaletteIconName
   shortcut?: string
-  to?: string
+  /** Nested page id (theme | model | sessions). */
+  to?: PalettePageId
   keepOpen?: boolean
   when?: CommandWhen
   contextBoost?: number
+  /** Slash token without leading slash, when this row mirrors a /command. */
+  slashName?: string
+  source?: CommandSource
   /** true when this is the active theme/view — UI shows check */
   active?: boolean
   run?: () => void

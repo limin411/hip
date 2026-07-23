@@ -34,6 +34,14 @@ describe('parsePaletteQuery', () => {
       prefix: null,
     })
   })
+
+  it('parses / slash prefix', () => {
+    expect(parsePaletteQuery('/comp')).toMatchObject({
+      mode: 'slash',
+      needle: 'comp',
+      prefix: '/',
+    })
+  })
 })
 
 describe('filterGroupsByMode', () => {
@@ -57,5 +65,22 @@ describe('filterGroupsByMode', () => {
 
   it('commands mode drops sessions and skills', () => {
     expect(filterGroupsByMode(groups, 'commands').map((g) => g.id)).toEqual(['navigation'])
+  })
+
+  it('slash mode keeps skills and slash-named context items', () => {
+    const mixed = [
+      {
+        id: 'context',
+        items: [
+          { slashName: 'compact', source: 'builtin-slash' },
+          { id: 'ctx-need-session' },
+        ],
+      },
+      { id: 'skills', items: [{ slashName: 'pdf' }] },
+      { id: 'navigation', items: [{}] },
+    ]
+    const filtered = filterGroupsByMode(mixed, 'slash')
+    expect(filtered.map((g) => g.id)).toEqual(['context', 'skills'])
+    expect(filtered[0].items).toHaveLength(1)
   })
 })

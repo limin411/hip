@@ -2,17 +2,23 @@
 
 Keyboard-first launcher (`⌘K` / `Ctrl+K`) for hip desktop.
 
+**Design (gap analysis + target behavior):** [`docs/design/command-palette-spec.md`](../../../docs/design/command-palette-spec.md)  
+**Execution plan (phased PRs):** [`docs/design/command-palette-execution-plan.md`](../../../docs/design/command-palette-execution-plan.md)
+
 ## Architecture
 
 | Module | Role |
 |--------|------|
 | `GlobalCommandPalette.tsx` | Dialog shell, nested pages, selection |
-| `buildGlobalCommands.ts` | Core command groups (nav, workspace, context, sessions…) |
+| `buildGlobalCommands.ts` | Core command groups (nav, workspace, sessions…) |
+| `catalog.ts` | Slash builtins → Suggested/context rows (shared with `/`) |
+| `matchesWhen.ts` | views / surfaces / requiresSession gating |
 | `registry.ts` | `buildAllGroups` + `registerCommandProvider` |
-| `rankGlobalCommands.ts` | Scoring (substring + fuzzy + usage boost) |
-| `queryPrefix.ts` | `>` / `#` / `@` mode filters |
+| `rankGlobalCommands.ts` | Scoring (substring + fuzzy + usage + contextBoost) |
+| `queryPrefix.ts` | `>` / `#` / `@` / `/` mode filters |
+| `recent.ts` | MRU group from usage store |
 | `favoritesStore.ts` | Pinned command ids (`localStorage`) |
-| `composerBridge.ts` | Insert text into the active composer (skills handoff) |
+| `composerBridge.ts` | Insert/replace into the active composer |
 | `domain/commands/*` | Shared run handlers with slash |
 
 ## Query prefixes
@@ -23,6 +29,7 @@ Keyboard-first launcher (`⌘K` / `Ctrl+K`) for hip desktop.
 | `>` | Commands only (no sessions/skills) |
 | `#` | Sessions only |
 | `@` | Skills only |
+| `/` | Slash catalog (builtin slash + skills) |
 
 ## Extending: `registerCommandProvider`
 
@@ -69,15 +76,17 @@ unregister()
 
 ### Skills handoff
 
-Selecting a skill tries `replaceComposerText('/{name} ')` — it **replaces** the entire composer draft with the slash token (not a caret insert). Register handlers from the composer (`InputBar` already does via `registerComposerHandlers`).
+Selecting a skill tries `insertComposerText('/{name} ')` — **draft-preserving** caret insert/append (does not wipe the composer). Register handlers from the composer (`InputBar` already does via `registerComposerHandlers`).
 
-1. If replace handler is live → replace and done.  
-2. Else if a palette session id is known → `selectSession` then retry replace briefly (`replaceComposerTextWhenReady`).  
+1. If insert handler is live → insert and done.  
+2. Else if a palette session id is known → `selectSession` then retry insert briefly (`insertComposerTextWhenReady`).  
 3. Else toast `commandPalette.skills.needComposer` — **never** silently open Skills settings.
 
-**Related:** context-menu quote / other “add text” flows use `insertComposerText` (caret insert or append) so an in-progress draft is preserved. Skill handoff deliberately uses replace so the slash token is the full draft.
-
 Disabled skills (`skillsEnabled[id] === false`) are omitted.
+
+### Nested pages
+
+`to: 'theme' | 'model' | 'sessions'` opens a subpage. Esc / Back restores the previous root search (`previousSearch` on the palette store).
 
 ### ⌘1–⌘9
 

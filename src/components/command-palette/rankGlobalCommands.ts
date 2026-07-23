@@ -8,6 +8,8 @@ export type RankableItem = {
   label: string
   keywords?: string[]
   description?: string
+  /** Additive boost after a match (capped in rankGroups). */
+  contextBoost?: number
 }
 
 export type RankableGroup<T extends RankableItem = RankableItem> = {
@@ -82,8 +84,9 @@ export function rankGroups<T extends RankableItem>(
         .map((item) => {
           const base = scoreItem(item, needle)
           if (base <= 0) return { item, score: 0 }
-          const boost = usage ? usageBoost(usage[item.id], now) : 0
-          return { item, score: base + boost }
+          const usagePart = usage ? usageBoost(usage[item.id], now) : 0
+          const ctxPart = Math.min(0.15, Math.max(0, item.contextBoost ?? 0))
+          return { item, score: base + usagePart + ctxPart }
         })
         .filter((e) => e.score > 0)
         .sort((a, b) => b.score - a.score)

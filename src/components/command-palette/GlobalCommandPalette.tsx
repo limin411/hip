@@ -3,10 +3,12 @@ import * as Dialog from '@radix-ui/react-dialog'
 import { Command } from 'cmdk'
 import { ChevronLeft } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
-import { sessionService, useSessions } from '@/domain'
+import { sessionService, useActiveSession, useSessions } from '@/domain'
 import { useCommandPaletteStore } from '@/store/commandPaletteStore'
 import { useSkillsStore } from '@/store/skillsStore'
 import { useUiStore } from '@/store/uiStore'
+import { useDraftStore } from '@/store/draftStore'
+import { useProvidersStore } from '@/store/providersStore'
 import {
   isKnowledgeIndexReady,
   searchKnowledgeDocs,
@@ -24,9 +26,13 @@ import {
 import { TERMINAL_MANAGEMENT } from '@/components/terminals/feature'
 import { useHostLibraryUi } from '@/components/terminals/hostLibraryUi'
 import { useManagedTerminalStore } from '@/store/managedTerminalStore'
+import { groupModelOptions } from '@/lib/agentModelOptions'
+import { activeModelKey } from '@/lib/modelKey'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
 import {
+  buildModelPageGroups,
+  buildSessionsPageGroups,
   buildThemePageGroups,
   type GlobalCommandLabels,
 } from './buildGlobalCommands'
@@ -38,22 +44,22 @@ import { flattenHotkeyItems, hotkeyIndexForId } from './hotkeyItems'
 import { detectIsMac } from './keys'
 import { filterGroupsByMode, parsePaletteQuery } from './queryPrefix'
 import { rankGroups } from './rankGlobalCommands'
+import { buildRecentGroup } from './recent'
 import { buildAllGroups } from './registry'
 import { resolvePaletteSessionId } from './sessionResolve'
 import { ShortcutsHelpDialog } from './ShortcutsHelpDialog'
-import type { GlobalCommand } from './types'
+import type { GlobalCommand, PalettePageId } from './types'
 import { loadCommandUsage, recordCommandUsage } from './usageStore'
 
 /**
  * Global ⌘K command palette.
- * Navigation, workspace, theme subpage, context actions, prefixes, favorites, skills.
+ * Navigation, workspace, nested pages (theme/model/sessions), prefixes, favorites, skills.
  */
 export function GlobalCommandPalette() {
   const { t, i18n } = useTranslation()
   const open = useCommandPaletteStore((s) => s.open)
   const setOpen = useCommandPaletteStore((s) => s.setOpen)
   const page = useCommandPaletteStore((s) => s.page)
-  const setPage = useCommandPaletteStore((s) => s.setPage)
   const sessions = useSessions()
   const skills = useSkillsStore((s) => s.skills)
   const skillsEnabled = useSkillsStore((s) => s.enabled)
@@ -66,6 +72,12 @@ export function GlobalCommandPalette() {
   const setTheme = useUiStore((s) => s.setTheme)
   const setSettingsPage = useUiStore((s) => s.setSettingsPage)
   const knowledgeIndexStatus = useKnowledgeStore((s) => s.indexStatus)
+  const draft = useDraftStore((s) => s.draft)
+  const setDraftModelKey = useDraftStore((s) => s.setModelKey)
+  const catalog = useProvidersStore((s) => s.catalog)
+  const providersConfig = useProvidersStore((s) => s.config)
+  const keyConfigured = useProvidersStore((s) => s.keyConfigured)
+  const activeSession = useActiveSession()
   const [search, setSearch] = useState('')
   const [shortcutsOpen, setShortcutsOpen] = useState(false)
   const [usageTick, setUsageTick] = useState(0)
@@ -73,6 +85,20 @@ export function GlobalCommandPalette() {
   const isMac = useMemo(() => detectIsMac(), [])
 
   const sessionId = resolvePaletteSessionId(activeView, chatSessionId, codeSessionId)
+
+  const modelOptions = useMemo(
+    () => groupModelOptions(catalog, providersConfig, keyConfigured),
+    [catalog, providersConfig, keyConfigured],
+  )
+
+  const currentModelKey = useMemo(() => {
+    if (sessionId && activeSession && activeSession.id === sessionId) {
+      return activeSession.config.model
+        ? `${activeSession.config.llmProvider}/${activeSession.config.model}`
+        : activeModelKey(providersConfig)
+    }
+    return draft?.modelKey ?? activeModelKey(providersConfig)
+  }, [sessionId, activeSession, draft?.modelKey, providersConfig])
 
   const parsed = useMemo(() => parsePaletteQuery(search), [search])
 
@@ -93,6 +119,7 @@ export function GlobalCommandPalette() {
       groupAppearance: t('commandPalette.groups.appearance'),
       groupSkills: t('commandPalette.groups.skills'),
       groupFavorites: t('commandPalette.groups.favorites'),
+      groupRecent: t('commandPalette.groups.recent'),
       groupKnowledge: t('commandPalette.groups.knowledge'),
       navChat: t('nav.chat'),
       navCode: t('nav.code'),
@@ -107,6 +134,8 @@ export function GlobalCommandPalette() {
       actionNewConversation: t('commandPalette.actions.newConversation'),
       actionKeyboardShortcuts: t('commandPalette.actions.keyboardShortcuts'),
       actionChangeTheme: t('commandPalette.actions.changeTheme'),
+      actionSwitchModel: t('commandPalette.actions.switchModel'),
+      actionResumeSession: t('commandPalette.actions.resumeSession'),
       ...(TERMINAL_MANAGEMENT
         ? {
             openTerminals: t('commandPalette.openTerminals'),
@@ -133,6 +162,8 @@ export function GlobalCommandPalette() {
         diff: t('commandPalette.context.diff'),
         compact: t('commandPalette.context.compact'),
         init: t('commandPalette.context.init'),
+        plan: t('commandPalette.context.plan'),
+        planOff: t('commandPalette.context.planOff'),
         memoryOn: t('commandPalette.context.memoryOn'),
         memoryOff: t('commandPalette.context.memoryOff'),
         memoryIncognito: t('commandPalette.context.memoryIncognito'),
@@ -144,6 +175,11 @@ export function GlobalCommandPalette() {
     }),
     [t, i18n.language],
   )
+
+  const openPalettePage = (next: PalettePageId) => {
+    useCommandPaletteStore.getState().openPage(next, search)
+    setSearch('')
+  }
 
   const ctx = useMemo(
     () => ({
@@ -169,6 +205,17 @@ export function GlobalCommandPalette() {
       search: parsed.needle,
       skills,
       skillsEnabled,
+      openPalettePage,
+      modelOptions,
+      currentModelKey,
+      setModelKey: (modelKey: string) => {
+        if (sessionId) {
+          sessionService.selectSession(sessionId)
+          sessionService.setSessionModel(modelKey)
+        } else {
+          setDraftModelKey(modelKey)
+        }
+      },
       enterSection: (section: 'projects' | 'chats') => void enterSection(section),
       openHistoryFromChrome: () => void openHistoryFromChrome(),
       openTrashFromChrome: () => void openTrashFromChrome(),
@@ -213,7 +260,6 @@ export function GlobalCommandPalette() {
         ? {
             enterTerminals: () => void enterTerminalsSection({ library: true }),
             openLocalTerminal: async () => {
-              // openLocal focuses the new session; do not force library landing.
               await enterTerminalsSection()
               try {
                 await useManagedTerminalStore.getState().openLocal()
@@ -228,7 +274,6 @@ export function GlobalCommandPalette() {
             },
             openQuickConnect: async () => {
               await enterTerminalsSection({ library: true })
-              // Defer one frame so sidebar QuickConnectPopover is mounted.
               requestAnimationFrame(() => {
                 useHostLibraryUi.getState().requestOpenQuickConnect()
               })
@@ -252,6 +297,10 @@ export function GlobalCommandPalette() {
       skills,
       skillsEnabled,
       knowledgeIndexStatus,
+      modelOptions,
+      currentModelKey,
+      setDraftModelKey,
+      search,
     ],
   )
 
@@ -260,21 +309,41 @@ export function GlobalCommandPalette() {
     return loadFavorites()
   }, [favTick, open])
 
-  const groups = useMemo(() => {
-    if (page === 'theme') return buildThemePageGroups(ctx)
-    const built = buildAllGroups(ctx, { search, mode: parsed.mode })
-    const fav = buildFavoritesGroup(built, labels.groupFavorites, favoriteIds)
-    // Favorites only on root empty-all mode (not when filtering with prefix)
-    if (fav && parsed.mode === 'all' && !parsed.needle && !page) {
-      return [fav, ...built]
-    }
-    return built
-  }, [ctx, page, search, parsed.mode, parsed.needle, labels.groupFavorites, favoriteIds])
-
   const usage = useMemo(() => {
     void usageTick
     return loadCommandUsage()
   }, [usageTick, open])
+
+  const groups = useMemo(() => {
+    if (page === 'theme') return buildThemePageGroups(ctx)
+    if (page === 'model') return buildModelPageGroups(ctx)
+    if (page === 'sessions') return buildSessionsPageGroups(ctx)
+
+    const built = buildAllGroups(ctx, { search, mode: parsed.mode })
+    const fav = buildFavoritesGroup(built, labels.groupFavorites, favoriteIds)
+    const recent =
+      labels.groupRecent != null
+        ? buildRecentGroup(built, labels.groupRecent, usage)
+        : null
+
+    if (parsed.mode === 'all' && !parsed.needle && !page) {
+      const head: typeof built = []
+      if (fav) head.push(fav)
+      if (recent) head.push(recent)
+      return head.length > 0 ? [...head, ...built] : built
+    }
+    return built
+  }, [
+    ctx,
+    page,
+    search,
+    parsed.mode,
+    parsed.needle,
+    labels.groupFavorites,
+    labels.groupRecent,
+    favoriteIds,
+    usage,
+  ])
 
   const ranked = useMemo(
     () => rankGroups(groups, parsed.needle, { usage }),
@@ -282,24 +351,22 @@ export function GlobalCommandPalette() {
   )
 
   const visible = useMemo(
-    () => filterGroupsByMode(ranked, parsed.mode),
-    [ranked, parsed.mode],
+    () => (page ? ranked : filterGroupsByMode(ranked, parsed.mode)),
+    [ranked, parsed.mode, page],
   )
 
   const flatItems = useMemo(() => flattenVisibleItems(visible), [visible])
-  /** Runnable rows for ⌘1–9 (excludes nested `to`) — same list for display and keydown. */
   const hotkeyItems = useMemo(() => flattenHotkeyItems(visible), [visible])
   const hasItems = flatItems.length > 0
 
   const goBack = () => {
-    setSearch('')
-    setPage(null)
+    const restored = useCommandPaletteStore.getState().goBack()
+    setSearch(restored)
   }
 
   const handleSelect = (item: GlobalCommand) => {
     if (item.to) {
-      setPage(item.to)
-      setSearch('')
+      openPalettePage(item.to)
       return
     }
     item.run?.()
@@ -310,7 +377,6 @@ export function GlobalCommandPalette() {
     }
   }
 
-  // ⌘1–⌘9 run first nine hotkey-eligible rows (same order as displayed ⌘n badges).
   useEffect(() => {
     if (!open || page) return
     const onKey = (e: KeyboardEvent) => {
@@ -327,12 +393,17 @@ export function GlobalCommandPalette() {
     }
     window.addEventListener('keydown', onKey, true)
     return () => window.removeEventListener('keydown', onKey, true)
-    // handleSelect closes over latest hotkeyItems via effect deps
     // eslint-disable-next-line react-hooks/exhaustive-deps -- intentional: rebind when list changes
   }, [open, page, hotkeyItems])
 
   const pageTitle =
-    page === 'theme' ? t('commandPalette.groups.theme') : page ?? ''
+    page === 'theme'
+      ? t('commandPalette.groups.theme')
+      : page === 'model'
+        ? t('commandPalette.actions.switchModel')
+        : page === 'sessions'
+          ? t('commandPalette.groups.sessions')
+          : page ?? ''
 
   const highlightNeedle = parsed.needle
   const favSet = useMemo(() => new Set(favoriteIds), [favoriteIds])
@@ -351,8 +422,6 @@ export function GlobalCommandPalette() {
               }
             }}
             className={cn(
-              // Center with inset + mx-auto (not translateX): animate-menu-in sets `transform`
-              // and would wipe -translate-x-1/2 mid-animation → flash on the right, then snap center.
               'fixed inset-x-0 top-[min(20vh,8rem)] z-[210] mx-auto w-[min(32rem,calc(100vw-2rem))]',
               'overflow-hidden rounded-xl border border-border bg-surface shadow-overlay outline-none',
               'animate-menu-in motion-reduce:animate-none',

@@ -51,6 +51,8 @@ const labels: GlobalCommandLabels = {
     diff: 'Show workspace changes',
     compact: 'Compact conversation',
     init: 'Create or update AGENTS.md',
+    plan: 'Force plan mode',
+    planOff: 'Exit plan mode',
     memoryOn: 'Enable memories',
     memoryOff: 'Disable memories',
     memoryIncognito: 'Incognito memory',
@@ -59,6 +61,9 @@ const labels: GlobalCommandLabels = {
     needSession: 'Open a conversation…',
     needSessionHint: 'Session actions need an active session',
   },
+  actionSwitchModel: 'Switch model…',
+  actionResumeSession: 'Resume session…',
+  groupRecent: 'Recent',
 }
 
 function stubSession(partial: Partial<SessionVM> & { id: string }): SessionVM {
@@ -258,6 +263,30 @@ describe('buildGlobalCommandGroups', () => {
 
     const yes = buildGlobalCommandGroups(makeCtx({ activeView: 'code', sessionId: 's1' }))
     expect(yes.flatMap((g) => g.items).some((i) => i.id === 'ctx-diff')).toBe(true)
+  })
+
+  it('hides code-only commands on chat surface even with session', () => {
+    const groups = buildGlobalCommandGroups(makeCtx({ activeView: 'chat', sessionId: 's1' }))
+    const ids = groups.flatMap((g) => g.items).map((i) => i.id)
+    expect(ids).not.toContain('ctx-diff')
+    expect(ids).not.toContain('ctx-init')
+    expect(ids).not.toContain('ctx-plan')
+    expect(ids).toContain('ctx-compact')
+  })
+
+  it('includes plan on code surface without session (draft force-plan)', () => {
+    const groups = buildGlobalCommandGroups(makeCtx({ activeView: 'code', sessionId: null }))
+    const ids = groups.flatMap((g) => g.items).map((i) => i.id)
+    expect(ids).toContain('ctx-plan')
+    expect(ids).toContain('ctx-plan-off')
+  })
+
+  it('includes switch model and resume session actions', () => {
+    const ids = buildGlobalCommandGroups(makeCtx())
+      .flatMap((g) => g.items)
+      .map((i) => i.id)
+    expect(ids).toContain('action-switch-model')
+    expect(ids).toContain('action-resume-session')
   })
 
   it('includes memory-on when sessionId set', () => {

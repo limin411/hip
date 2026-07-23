@@ -77,6 +77,17 @@ describe('global command palette @smoke @core', () => {
     expect(await (await browser.$('[data-testid="global-command-palette"]')).isExisting()).toBe(true)
   })
 
+  it('lists switch-model and resume-session actions', async () => {
+    await openCommandPaletteForE2e()
+    await (await browser.$('[data-testid="global-command-palette"]')).waitForExist({ timeout: 10000 })
+    expect(await (await browser.$('[data-testid="global-cmd-action-switch-model"]')).isExisting()).toBe(
+      true,
+    )
+    expect(
+      await (await browser.$('[data-testid="global-cmd-action-resume-session"]')).isExisting(),
+    ).toBe(true)
+  })
+
   it('titlebar button opens palette when present', async () => {
     const btn = await browser.$('[data-testid="titlebar-command-palette"]')
     if (await btn.isExisting()) {

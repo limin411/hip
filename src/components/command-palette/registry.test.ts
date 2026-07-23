@@ -6,7 +6,7 @@ import {
   skillsCommandProvider,
 } from './registry'
 import type { GlobalCommandContext, GlobalCommandLabels } from './buildGlobalCommands'
-import { registerComposerInserter } from './composerBridge'
+import { registerComposerHandlers, registerComposerInserter } from './composerBridge'
 
 const labels: GlobalCommandLabels = {
   groupNavigation: 'Navigation',
@@ -51,6 +51,8 @@ const labels: GlobalCommandLabels = {
     diff: 'Show workspace changes',
     compact: 'Compact conversation',
     init: 'Create or update AGENTS.md',
+    plan: 'Force plan mode',
+    planOff: 'Exit plan mode',
     memoryOn: 'Enable memories',
     memoryOff: 'Disable memories',
     memoryIncognito: 'Incognito memory',
@@ -124,7 +126,8 @@ describe('registry', () => {
 
   it('skills provider lists skills when searching', () => {
     const insert = vi.fn()
-    registerComposerInserter(insert)
+    const replace = vi.fn()
+    registerComposerHandlers({ insert, replace })
     const groups = skillsCommandProvider(
       makeCtx({
         search: 'pdf',
@@ -134,6 +137,7 @@ describe('registry', () => {
     expect(groups[0]?.items[0]?.id).toBe('skill-pdf')
     groups[0]?.items[0]?.run?.()
     expect(insert).toHaveBeenCalledWith('/pdf ')
+    expect(replace).not.toHaveBeenCalled()
   })
 
   it('skills provider excludes disabled skills', () => {

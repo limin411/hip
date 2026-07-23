@@ -4,7 +4,7 @@ import { useCommandPaletteStore } from './commandPaletteStore'
 
 describe('commandPaletteStore', () => {
   beforeEach(() => {
-    useCommandPaletteStore.setState({ open: false, page: null })
+    useCommandPaletteStore.setState({ open: false, page: null, previousSearch: '' })
   })
 
   it('starts closed with no page', () => {
@@ -28,16 +28,25 @@ describe('commandPaletteStore', () => {
   it('toggle opens then closes and clears page', () => {
     useCommandPaletteStore.getState().toggle()
     expect(useCommandPaletteStore.getState().open).toBe(true)
-    useCommandPaletteStore.getState().openPage('pets')
+    useCommandPaletteStore.getState().openPage('model')
     useCommandPaletteStore.getState().toggle()
     expect(useCommandPaletteStore.getState().open).toBe(false)
     expect(useCommandPaletteStore.getState().page).toBeNull()
   })
 
-  it('openPage opens and sets nested page', () => {
-    useCommandPaletteStore.getState().openPage('theme')
+  it('openPage opens and sets nested page with previousSearch', () => {
+    useCommandPaletteStore.getState().openPage('theme', 'mod')
     expect(useCommandPaletteStore.getState().open).toBe(true)
     expect(useCommandPaletteStore.getState().page).toBe('theme')
+    expect(useCommandPaletteStore.getState().previousSearch).toBe('mod')
+  })
+
+  it('goBack restores previousSearch and clears page', () => {
+    useCommandPaletteStore.getState().openPage('model', 'switch')
+    const restored = useCommandPaletteStore.getState().goBack()
+    expect(restored).toBe('switch')
+    expect(useCommandPaletteStore.getState().page).toBeNull()
+    expect(useCommandPaletteStore.getState().previousSearch).toBe('')
   })
 
   it('close clears open and page', () => {

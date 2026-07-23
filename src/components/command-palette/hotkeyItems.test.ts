@@ -9,7 +9,7 @@ const run = (id: string): GlobalCommand => ({
   run: () => {},
 })
 
-const nest = (id: string, to: string): GlobalCommand => ({
+const nest = (id: string, to: 'theme' | 'model' | 'sessions'): GlobalCommand => ({
   id,
   label: id,
   group: 'appearance',

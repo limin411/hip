@@ -19,7 +19,7 @@ describe('feature flag', () => {
 describe('GlobalCommandPalette actions and sessions', () => {
   beforeEach(() => {
     cleanup()
-    useCommandPaletteStore.setState({ open: false, page: null })
+    useCommandPaletteStore.setState({ open: false, page: null, previousSearch: '' })
     useUiStore.setState({
       activeView: 'chat',
       theme: 'system',

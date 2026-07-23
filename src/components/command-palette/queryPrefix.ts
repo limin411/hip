@@ -3,17 +3,18 @@
  *   >  commands only (nav, actions, workspace, context, theme, appearance)
  *   #  sessions only
  *   @  skills only
+ *   /  slash-catalog only (builtin slash + skills)
  * (no prefix = all groups)
  */
 
-export type PaletteQueryMode = 'all' | 'commands' | 'sessions' | 'skills'
+export type PaletteQueryMode = 'all' | 'commands' | 'sessions' | 'skills' | 'slash'
 
 export type ParsedPaletteQuery = {
   mode: PaletteQueryMode
   /** Text used for ranking (prefix character stripped). */
   needle: string
   /** Leading prefix if any. */
-  prefix: '>' | '#' | '@' | null
+  prefix: '>' | '#' | '@' | '/' | null
   /** Raw input (for display). */
   raw: string
 }
@@ -26,6 +27,7 @@ const COMMAND_GROUP_IDS = new Set([
   'appearance',
   'theme',
   'favorites',
+  'recent',
   'commands-extra',
 ])
 
@@ -55,10 +57,23 @@ export function parsePaletteQuery(raw: string): ParsedPaletteQuery {
       raw,
     }
   }
+  if (trimmedStart.startsWith('/')) {
+    return {
+      mode: 'slash',
+      needle: trimmedStart.slice(1).trim(),
+      prefix: '/',
+      raw,
+    }
+  }
   return { mode: 'all', needle: raw.trim(), prefix: null, raw }
 }
 
-export type GroupLike = { id?: string; heading?: string; items: unknown[] }
+export type GroupLike = {
+  id?: string
+  heading?: string
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  items: any[]
+}
 
 /** Filter groups by query mode. */
 export function filterGroupsByMode<T extends GroupLike>(
@@ -72,19 +87,34 @@ export function filterGroupsByMode<T extends GroupLike>(
   if (mode === 'skills') {
     return groups.filter((g) => g.id === 'skills')
   }
+  if (mode === 'slash') {
+    return groups
+      .map((g) => {
+        if (g.id === 'skills') return g
+        if (g.id === 'context') {
+          const items = g.items.filter(
+            (i: { slashName?: string; source?: string }) =>
+              Boolean(i?.slashName) || i?.source === 'builtin-slash',
+          )
+          if (items.length === 0) return null
+          return { ...g, items }
+        }
+        return null
+      })
+      .filter(Boolean) as T[]
+  }
   // commands: drop sessions + skills
   return groups.filter((g) => {
     if (g.id === 'sessions' || g.id === 'skills') return false
     if (g.id && COMMAND_GROUP_IDS.has(g.id)) return true
-    // Groups without id that aren't sessions/skills: keep if not named Sessions/Skills via id only
     return g.id !== 'sessions' && g.id !== 'skills'
   })
 }
 
 /**
  * Whether long-tail providers should run even with empty needle.
- * `@` alone should still list skills; `#` alone lists sessions.
+ * `@` alone should still list skills; `#` alone lists sessions; `/` lists slash catalog.
  */
 export function forceLongTail(mode: PaletteQueryMode): boolean {
-  return mode === 'skills' || mode === 'sessions'
+  return mode === 'skills' || mode === 'sessions' || mode === 'slash'
 }

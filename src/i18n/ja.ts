@@ -2160,9 +2160,9 @@ export const ja = {
   },
   "commandPalette": {
     "title": "コマンドパレット",
-    "searchPlaceholder": "コマンドを入力…  > cmds  # sessions  @ skills",
+    "searchPlaceholder": "コマンドを入力…  > cmds  # sessions  @ skills  / slash",
     "noResults": "結果がありません",
-    "noResultsHint": "「theme」「memory」、セッション名、またはプレフィックス > # @ を試してください",
+    "noResultsHint": "「theme」「memory」、セッション名、またはプレフィックス > # @ / を試してください",
     "back": "戻る",
     "current": "現在",
     "openTrigger": "コマンドパレット",
@@ -2177,6 +2177,7 @@ export const ja = {
       "appearance": "外観",
       "skills": "スキル",
       "favorites": "お気に入り",
+      "recent": "最近",
       "knowledge": "ナレッジ"
     },
     "navKnowledge": "ナレッジベース",
@@ -2187,7 +2188,9 @@ export const ja = {
     "actions": {
       "newConversation": "新しい会話",
       "keyboardShortcuts": "キーボードショートカット",
-      "changeTheme": "テーマを変更…"
+      "changeTheme": "テーマを変更…",
+      "switchModel": "モデルを切り替え…",
+      "resumeSession": "セッションを再開…"
     },
     "openTerminals": "端末管理を開く",
     "newLocalTerminal": "新しいローカル端末",
@@ -2208,6 +2211,8 @@ export const ja = {
       "diff": "ワークスペースの変更を表示",
       "compact": "会話をコンパクトに",
       "init": "AGENTS.mdを作成または更新",
+      "plan": "プランモードを強制",
+      "planOff": "プランモードを終了",
       "memoryOn": "このセッションでメモリー注入を有効にする",
       "memoryOff": "このセッションでメモリー注入を無効にする",
       "memoryIncognito": "このセッションでシークレットメモリー",
@@ -2228,6 +2233,7 @@ export const ja = {
       "prefixCmd": "コマンドのみにフィルター",
       "prefixSess": "セッションのみにフィルター",
       "prefixSkill": "スキルのみにフィルター",
+      "prefixSlash": "スラッシュコマンドのみ",
       "favorite": "行をスター付けてお気に入りに固定",
       "nestEsc": "ネストされたページから戻る（または閉じる）"
     },

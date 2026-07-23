@@ -2,7 +2,7 @@ import type { GlobalCommandContext, PaletteGroup } from './buildGlobalCommands'
 import { buildGlobalCommandGroups } from './buildGlobalCommands'
 import type { GlobalCommand } from './types'
 import type { SkillMeta } from '@hip/protocol'
-import { replaceComposerText, replaceComposerTextWhenReady } from './composerBridge'
+import { insertComposerText, insertComposerTextWhenReady } from './composerBridge'
 import { parsePaletteQuery, type PaletteQueryMode } from './queryPrefix'
 import i18n from '@/i18n'
 import { toast } from 'sonner'
@@ -67,11 +67,11 @@ export async function runSkillHandoff(
   ctx: Pick<GlobalCommandContext, 'sessionId' | 'selectSession'>,
 ): Promise<void> {
   const text = `/${skillName} `
-  // Skill handoff intentionally *replaces* the composer so the slash token is the full draft.
-  if (replaceComposerText(text)) return
+  // Draft-preserving: insert slash token at caret (or append) — do not wipe the composer.
+  if (insertComposerText(text)) return
   if (ctx.sessionId) {
     ctx.selectSession(ctx.sessionId)
-    const ok = await replaceComposerTextWhenReady(text)
+    const ok = await insertComposerTextWhenReady(text)
     if (ok) return
   }
   toast.message(i18n.t('commandPalette.skills.needComposer'))
@@ -97,6 +97,8 @@ export function skillsCommandProvider(
     icon: 'sparkles' as const,
     keywords: [s.name, s.description ?? '', 'skill', '技能', s.id].filter(Boolean),
     group: 'skills' as const,
+    slashName: s.name,
+    source: 'skill' as const,
     run: () => {
       void runSkillHandoff(s.name, ctx)
     },
@@ -192,7 +194,9 @@ export function buildAllGroups(
     forceSessions: mode === 'sessions',
   })
   const extras = [
-    skillsCommandProvider(ctxWithSearch, { force: mode === 'skills' }),
+    skillsCommandProvider(ctxWithSearch, {
+      force: mode === 'skills' || mode === 'slash',
+    }),
     knowledgeCommandProvider(ctxWithSearch),
     ...extraProviders.map((p) => p(ctxWithSearch)),
   ].flat()

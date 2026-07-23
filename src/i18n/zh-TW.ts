@@ -2168,9 +2168,9 @@ export const zhTW = {
   },
   "commandPalette": {
     "title": "命令面板",
-    "searchPlaceholder": "輸入命令…  > 指令  # 對話  @ 技能",
+    "searchPlaceholder": "輸入命令…  > 指令  # 對話  @ 技能  / 斜線",
     "noResults": "無結果",
-    "noResultsHint": "試試「主題」、「記憶」、對話名，或前綴 > # @",
+    "noResultsHint": "試試「主題」、「記憶」、對話名，或前綴 > # @ /",
     "back": "返回",
     "current": "目前",
     "openTrigger": "命令面板",
@@ -2185,6 +2185,7 @@ export const zhTW = {
       "appearance": "外觀",
       "skills": "技能",
       "favorites": "收藏",
+      "recent": "最近使用",
       "knowledge": "知識庫"
     },
     "navKnowledge": "知識庫",
@@ -2195,7 +2196,9 @@ export const zhTW = {
     "actions": {
       "newConversation": "新增對話",
       "keyboardShortcuts": "鍵盤快捷鍵",
-      "changeTheme": "變更主題…"
+      "changeTheme": "變更主題…",
+      "switchModel": "切換模型…",
+      "resumeSession": "恢復對話…"
     },
     "openTerminals": "開啟終端管理",
     "newLocalTerminal": "新建本機終端",
@@ -2216,6 +2219,8 @@ export const zhTW = {
       "diff": "檢視工作區變更",
       "compact": "壓縮對話上下文",
       "init": "產生或更新 AGENTS.md",
+      "plan": "強制計畫模式",
+      "planOff": "退出計畫模式",
       "memoryOn": "為此對話啟用記憶注入",
       "memoryOff": "為此對話關閉記憶注入",
       "memoryIncognito": "此對話隱身（不注入／抽取記憶）",
@@ -2236,6 +2241,7 @@ export const zhTW = {
       "prefixCmd": "僅顯示命令",
       "prefixSess": "僅顯示對話",
       "prefixSkill": "僅顯示技能",
+      "prefixSlash": "僅顯示斜線指令",
       "favorite": "點星號將命令固定到收藏",
       "nestEsc": "從子頁返回（或關閉）"
     },

@@ -62,6 +62,21 @@ describe('rankGroups with usage', () => {
   })
 })
 
+describe('rankGroups with contextBoost', () => {
+  it('boosts matching items that declare contextBoost', () => {
+    const groups = [
+      {
+        items: [
+          { id: 'plain', label: 'Workspace tools panel' },
+          { id: 'boosted', label: 'Workspace tools panel', contextBoost: 0.1 },
+        ],
+      },
+    ]
+    const ranked = rankGroups(groups, 'tools')
+    expect(ranked[0]?.items[0]?.id).toBe('boosted')
+  })
+})
+
 describe('rankGroups', () => {
   it('returns original groups when search is empty', () => {
     const groups = [{ heading: 'Nav', items }]

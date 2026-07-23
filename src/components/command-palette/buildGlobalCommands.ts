@@ -1,21 +1,13 @@
 import type { SessionVM } from '@/domain'
 import type { SkillMeta } from '@hip/protocol'
 import type { ActiveView, SettingsPageId, Theme } from '@/store/uiStore'
-import {
-  goSettingsPage,
-  formatMemoryStatusBody,
-  openMemorySettings,
-  runCompact,
-  runDiff,
-  runInit,
-  setIncognito,
-  setUseMemories,
-  showMemoryStatus,
-  toastMemoryFlagChange,
-} from '@/domain/commands'
-import type { CommandWhen, GlobalCommand, PaletteGroup } from './types'
+import { goSettingsPage } from '@/domain/commands'
+import { buildContextFromSlashCatalog } from './catalog'
+import { matchesWhen } from './matchesWhen'
+import type { GlobalCommand, PaletteGroup, PalettePageId } from './types'
 
-export type { GlobalCommand, PaletteGroup } from './types'
+export type { GlobalCommand, PaletteGroup, PalettePageId } from './types'
+export { matchesWhen, resolvePaletteSurface } from './matchesWhen'
 
 export type GlobalCommandLabels = {
   groupNavigation: string
@@ -28,6 +20,7 @@ export type GlobalCommandLabels = {
   groupSkills: string
   groupFavorites: string
   groupKnowledge: string
+  groupRecent?: string
   navChat: string
   navCode: string
   navHistory: string
@@ -41,6 +34,8 @@ export type GlobalCommandLabels = {
   actionNewConversation: string
   actionKeyboardShortcuts: string
   actionChangeTheme: string
+  actionSwitchModel?: string
+  actionResumeSession?: string
   /** Terminal management (K17) — optional when flag off / labels omitted. */
   openTerminals?: string
   newLocalTerminal?: string
@@ -64,6 +59,8 @@ export type GlobalCommandLabels = {
     diff: string
     compact: string
     init: string
+    plan: string
+    planOff: string
     memoryOn: string
     memoryOff: string
     memoryIncognito: string
@@ -132,6 +129,18 @@ export type GlobalCommandContext = {
   openLocalTerminal?: () => void | Promise<void>
   /** Open terminals section for quick-connect (popover lives in sidebar). */
   openQuickConnect?: () => void | Promise<void>
+  /** Open a nested palette page (theme / model / sessions). */
+  openPalettePage?: (page: PalettePageId) => void
+  /** Switch model for active session or draft (`provider/model` key). */
+  setModelKey?: (modelKey: string) => void
+  /** Currently selected model key (for active check on model page). */
+  currentModelKey?: string | null
+  /** Grouped models for the model subpage (same shape as ModelPicker). */
+  modelOptions?: Array<{
+    providerID: string
+    providerName: string
+    models: Array<{ key: string; modelID: string }>
+  }>
 }
 
 /** Source cap for search-time session list. */
@@ -171,14 +180,6 @@ function surfaceForNewConversation(activeView: ActiveView): 'chat' | 'code' {
   return activeView === 'code' ? 'code' : 'chat'
 }
 
-function matchesWhen(when: CommandWhen | undefined, ctx: GlobalCommandContext): boolean {
-  if (!when) return true
-  if (when.enabled === false) return false
-  if (when.views && !when.views.includes(ctx.activeView)) return false
-  if (when.requiresSession && !ctx.sessionId) return false
-  return true
-}
-
 /** Pure: most recently updated sessions, capped. */
 export function pickRecentSessions(
   sessions: SessionVM[],
@@ -189,12 +190,32 @@ export function pickRecentSessions(
     .slice(0, limit)
 }
 
-function sessionLabel(s: SessionVM): string {
+export function sessionLabel(s: SessionVM): string {
   const title = s.title.trim()
   if (title) return title
   const preview = s.preview.trim()
   if (preview) return preview.length > 48 ? `${preview.slice(0, 48)}…` : preview
   return s.id
+}
+
+/** Session rows for long-tail search or sessions subpage. */
+export function buildSessionCommands(
+  ctx: GlobalCommandContext,
+  opts?: { limit?: number },
+): GlobalCommand[] {
+  const limit = opts?.limit ?? SESSION_DISPLAY_CAP
+  return pickRecentSessions(ctx.sessions).slice(0, limit).map((s) => {
+    const label = sessionLabel(s)
+    return {
+      id: `session-${s.id}`,
+      label,
+      icon: 'message-square' as const,
+      keywords: [s.id, s.preview, s.title, 'session', '会话', '對話'].filter(Boolean),
+      group: 'sessions' as const,
+      source: 'session' as const,
+      run: () => ctx.selectSession(s.id),
+    }
+  })
 }
 
 function settingsLabel(labels: GlobalCommandLabels, page: SettingsPageId): string {
@@ -418,6 +439,7 @@ export function buildGlobalCommandGroups(
       icon: 'plus',
       keywords: ['new', 'chat', 'clear', 'start', '新建', '新增'],
       group: 'actions',
+      source: 'action',
       run: () => ctx.newConversation(surfaceForNewConversation(ctx.activeView)),
     },
     {
@@ -427,9 +449,36 @@ export function buildGlobalCommandGroups(
       shortcut: `${mod}/`,
       keywords: ['keyboard', 'shortcuts', 'hotkeys', '快捷键', '快捷鍵'],
       group: 'actions',
+      source: 'action',
       run: () => ctx.openShortcutsHelp(),
     },
   ]
+
+  if (labels.actionSwitchModel) {
+    actions.push({
+      id: 'action-switch-model',
+      label: labels.actionSwitchModel,
+      icon: 'cpu',
+      keywords: ['model', 'llm', 'switch', '模型', '切换'],
+      group: 'actions',
+      source: 'action',
+      to: 'model',
+      run: ctx.openPalettePage ? () => ctx.openPalettePage!('model') : undefined,
+    })
+  }
+
+  if (labels.actionResumeSession) {
+    actions.push({
+      id: 'action-resume-session',
+      label: labels.actionResumeSession,
+      icon: 'history',
+      keywords: ['resume', 'session', 'recent', '恢复', '会话', '對話'],
+      group: 'actions',
+      source: 'action',
+      to: 'sessions',
+      run: ctx.openPalettePage ? () => ctx.openPalettePage!('sessions') : undefined,
+    })
+  }
 
   if (labels.newLocalTerminal && ctx.openLocalTerminal) {
     actions.push({
@@ -485,132 +534,14 @@ export function buildGlobalCommandGroups(
       icon: 'palette',
       keywords: ['theme', 'appearance', 'color', 'dark', 'light', '主题', '主題', '外观', '外觀'],
       group: 'appearance',
+      source: 'action',
       to: 'theme',
+      run: ctx.openPalettePage ? () => ctx.openPalettePage!('theme') : undefined,
     },
   ]
 
-  const contextCandidates: GlobalCommand[] = [
-    {
-      id: 'ctx-diff',
-      label: labels.context.diff,
-      icon: 'git-branch',
-      keywords: ['diff', 'changes', '变更', '變更'],
-      group: 'context',
-      when: { requiresSession: true },
-      contextBoost: 0.1,
-      run: () => {
-        if (ctx.sessionId) runDiff(ctx.sessionId)
-      },
-    },
-    {
-      id: 'ctx-compact',
-      label: labels.context.compact,
-      icon: 'package',
-      keywords: ['compact', 'summarize', '压缩', '壓縮'],
-      group: 'context',
-      when: { requiresSession: true },
-      contextBoost: 0.1,
-      run: () => {
-        if (ctx.sessionId) runCompact(ctx.sessionId)
-      },
-    },
-    {
-      id: 'ctx-init',
-      label: labels.context.init,
-      icon: 'sparkles',
-      keywords: [
-        'init',
-        'initialize',
-        'agents',
-        'AGENTS.md',
-        'project',
-        'rules',
-        '初始化',
-        '项目指引',
-      ],
-      group: 'context',
-      when: { requiresSession: true },
-      contextBoost: 0.1,
-      run: () => {
-        if (ctx.sessionId) runInit(ctx.sessionId)
-      },
-    },
-    {
-      id: 'ctx-memory-settings',
-      label: labels.settings.memory,
-      icon: 'brain',
-      keywords: ['memory', 'memories', '记忆', '記憶'],
-      group: 'context',
-      run: () => openMemorySettings(),
-    },
-    {
-      id: 'ctx-memory-on',
-      label: labels.context.memoryOn,
-      icon: 'brain',
-      keywords: ['memory', 'enable', 'on', 'inject', '记忆', '記憶'],
-      group: 'context',
-      when: { requiresSession: true },
-      run: () => {
-        if (!ctx.sessionId) return
-        setUseMemories(ctx.sessionId, true)
-        toastMemoryFlagChange('useOn')
-      },
-    },
-    {
-      id: 'ctx-memory-off',
-      label: labels.context.memoryOff,
-      icon: 'brain',
-      keywords: ['memory', 'disable', 'off', '记忆', '記憶'],
-      group: 'context',
-      when: { requiresSession: true },
-      run: () => {
-        if (!ctx.sessionId) return
-        setUseMemories(ctx.sessionId, false)
-        toastMemoryFlagChange('useOff')
-      },
-    },
-    {
-      id: 'ctx-memory-incognito',
-      label: labels.context.memoryIncognito,
-      icon: 'brain',
-      keywords: ['memory', 'incognito', 'private', '隐身', '隱身'],
-      group: 'context',
-      when: { requiresSession: true },
-      run: () => {
-        if (!ctx.sessionId) return
-        setIncognito(ctx.sessionId, true)
-        toastMemoryFlagChange('incognitoOn')
-      },
-    },
-    {
-      id: 'ctx-memory-incognito-off',
-      label: labels.context.memoryIncognitoOff,
-      icon: 'brain',
-      keywords: ['memory', 'incognito', 'exit', '退出隐身', '退出隱身'],
-      group: 'context',
-      when: { requiresSession: true },
-      run: () => {
-        if (!ctx.sessionId) return
-        setIncognito(ctx.sessionId, false)
-        toastMemoryFlagChange('incognitoOff')
-      },
-    },
-    {
-      id: 'ctx-memory-status',
-      label: labels.context.memoryStatus,
-      icon: 'brain',
-      keywords: ['memory', 'status', 'flags', '状态', '狀態'],
-      group: 'context',
-      when: { requiresSession: true },
-      run: () => {
-        if (!ctx.sessionId) return
-        const flags = formatMemoryStatusBody(ctx.sessionId)
-        if (flags) showMemoryStatus(ctx.sessionId, ctx.memoryStatusCopy(flags))
-      },
-    },
-  ]
-
-  const context = contextCandidates.filter((c) => matchesWhen(c.when, ctx))
+  // Context / Suggested rows from slash builtins (surfaces + requiresSession via matchesWhen).
+  const context = buildContextFromSlashCatalog(ctx).filter((c) => matchesWhen(c.when, ctx))
 
   // When no session is bound, still surface a hint so Suggested is not only "Settings: Memory".
   if (!ctx.sessionId) {
@@ -620,9 +551,9 @@ export function buildGlobalCommandGroups(
       icon: 'message-square',
       keywords: ['session', 'conversation', '会话', '對話', 'open'],
       group: 'context',
+      source: 'action',
       description: labels.context.needSessionHint,
       run: () => {
-        // Prefer starting a conversation on the current surface.
         ctx.newConversation(ctx.activeView === 'code' ? 'code' : 'chat')
       },
     })
@@ -645,8 +576,16 @@ export function buildGlobalCommandGroups(
     groups.push({ id: 'context', heading: labels.groupContext, items: context })
   }
   groups.push(
-    { id: 'navigation', heading: labels.groupNavigation, items: navigation },
-    { id: 'actions', heading: labels.groupActions, items: actions },
+    {
+      id: 'navigation',
+      heading: labels.groupNavigation,
+      items: navigation.filter((c) => matchesWhen(c.when, ctx)),
+    },
+    {
+      id: 'actions',
+      heading: labels.groupActions,
+      items: actions.filter((c) => matchesWhen(c.when, ctx)),
+    },
     { id: 'workspace', heading: labels.groupWorkspace, items: workspaceFiltered },
     { id: 'appearance', heading: labels.groupAppearance, items: appearance },
   )
@@ -660,28 +599,59 @@ export function buildGlobalCommandGroups(
   }
 
   if (includeLongTail) {
-    const recent = pickRecentSessions(ctx.sessions)
-    if (recent.length > 0) {
-      const sessions: GlobalCommand[] = recent.map((s) => {
-        const label = sessionLabel(s)
-        return {
-          id: `session-${s.id}`,
-          label,
-          icon: 'message-square' as const,
-          keywords: [s.id, s.preview, s.title, 'session', '会话', '對話'].filter(Boolean),
-          group: 'sessions' as const,
-          run: () => ctx.selectSession(s.id),
-        }
-      })
+    const sessions = buildSessionCommands(ctx)
+    if (sessions.length > 0) {
       groups.push({
         id: 'sessions',
         heading: labels.groupSessions,
-        items: sessions.slice(0, SESSION_DISPLAY_CAP),
+        items: sessions,
       })
     }
   }
 
   return groups
+}
+
+/** Model subpage groups (page === 'model'). */
+export function buildModelPageGroups(ctx: GlobalCommandContext): PaletteGroup[] {
+  const models = ctx.modelOptions ?? []
+  const items: GlobalCommand[] = []
+  for (const g of models) {
+    for (const m of g.models) {
+      const active = ctx.currentModelKey === m.key
+      items.push({
+        id: `model-${m.key}`,
+        label: m.modelID,
+        description: active ? ctx.labels.current : g.providerName,
+        icon: 'cpu',
+        keywords: [m.key, m.modelID, g.providerName, g.providerID, 'model', '模型'],
+        group: 'theme',
+        source: 'action',
+        active,
+        keepOpen: false,
+        run: () => ctx.setModelKey?.(m.key),
+      })
+    }
+  }
+  return [
+    {
+      id: 'model',
+      heading: ctx.labels.actionSwitchModel ?? ctx.labels.settings.model,
+      items,
+    },
+  ]
+}
+
+/** Sessions subpage (page === 'sessions'). */
+export function buildSessionsPageGroups(ctx: GlobalCommandContext): PaletteGroup[] {
+  const items = buildSessionCommands(ctx, { limit: SESSION_DISPLAY_CAP })
+  return [
+    {
+      id: 'sessions',
+      heading: ctx.labels.groupSessions,
+      items,
+    },
+  ]
 }
 
 /** Re-export for callers that deep-link into settings without palette. */

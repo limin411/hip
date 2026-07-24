@@ -1552,6 +1552,7 @@ doomLoopStrategy = "auto_continue"
 
     #[test]
     fn terminal_survives_json_toml_roundtrip() {
+        // set_hip_config rewrites hip.toml from typed HipConfig; terminal shell + colorTheme must not be stripped.
         let cfg = super::HipConfig {
             version: 1,
             providers: vec![],
@@ -1565,6 +1566,7 @@ doomLoopStrategy = "auto_continue"
             langsmith: None,
             terminal: Some(super::hip_config::TerminalConfig {
                 shell: Some("cmd".into()),
+                color_theme: Some("dracula".into()),
             }),
             acp: None,
             plan: None,
@@ -1573,6 +1575,10 @@ doomLoopStrategy = "auto_continue"
         let json = serde_json::to_string(&cfg).unwrap();
         assert!(json.contains("\"terminal\""), "JSON must emit terminal: {json}");
         assert!(json.contains("\"shell\""), "JSON must emit shell: {json}");
+        assert!(
+            json.contains("\"colorTheme\""),
+            "JSON must emit colorTheme: {json}"
+        );
         let from_json: super::HipConfig = serde_json::from_str(&json).unwrap();
         let toml_cfg: super::TomlHipConfig = from_json.into();
         let toml_str = toml::to_string_pretty(&toml_cfg).unwrap();
@@ -1584,11 +1590,61 @@ doomLoopStrategy = "auto_continue"
             toml_str.contains("shell") || toml_str.contains("cmd"),
             "TOML should preserve shell: {toml_str}"
         );
+        assert!(
+            toml_str.contains("color_theme") || toml_str.contains("dracula"),
+            "TOML should emit color_theme: {toml_str}"
+        );
         let from_toml: super::TomlHipConfig = toml::from_str(&toml_str).unwrap();
         let back: super::HipConfig = from_toml.into();
         assert_eq!(
             back.terminal.as_ref().and_then(|t| t.shell.as_deref()),
             Some("cmd")
+        );
+        assert_eq!(
+            back.terminal.as_ref().and_then(|t| t.color_theme.as_deref()),
+            Some("dracula")
+        );
+
+        // Raw TOML snake_case fixture
+        let snake = r#"
+version = 1
+[terminal]
+shell = "zsh"
+color_theme = "dracula"
+"#;
+        let snake_cfg: super::TomlHipConfig = toml::from_str(snake).unwrap();
+        let snake_hip: super::HipConfig = snake_cfg.into();
+        assert_eq!(
+            snake_hip.terminal.as_ref().and_then(|t| t.shell.as_deref()),
+            Some("zsh")
+        );
+        assert_eq!(
+            snake_hip
+                .terminal
+                .as_ref()
+                .and_then(|t| t.color_theme.as_deref()),
+            Some("dracula")
+        );
+
+        // Raw TOML camelCase alias fixture
+        let camel = r#"
+version = 1
+[terminal]
+shell = "bash"
+colorTheme = "one-dark"
+"#;
+        let camel_cfg: super::TomlHipConfig = toml::from_str(camel).unwrap();
+        let camel_hip: super::HipConfig = camel_cfg.into();
+        assert_eq!(
+            camel_hip.terminal.as_ref().and_then(|t| t.shell.as_deref()),
+            Some("bash")
+        );
+        assert_eq!(
+            camel_hip
+                .terminal
+                .as_ref()
+                .and_then(|t| t.color_theme.as_deref()),
+            Some("one-dark")
         );
     }
 

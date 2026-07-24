@@ -685,6 +685,9 @@ export const en = {
         exited: 'Shell exited ({{code}})',
         exitedNull: 'Shell exited',
         restart: 'Restart',
+        close: 'Close',
+        closed: 'Terminal closed',
+        closedDesc: 'Shell stopped. Restart to open a new terminal in this folder.',
         starting: 'Starting shell…',
         error: 'Could not start terminal',
         unsupportedPlatform: 'Terminal is not supported on this platform yet',
@@ -744,6 +747,18 @@ export const en = {
         pwsh: 'PowerShell 7+',
         bash: 'Bash',
         zsh: 'Zsh',
+      },
+      terminalColor: 'Terminal color',
+      terminalColorDesc:
+        'Color palette for integrated terminals. Independent of app theme. Applies immediately.',
+      terminalColors: {
+        follow: 'Match app theme',
+        light: 'Light',
+        dark: 'Dark',
+        'solarized-dark': 'Solarized Dark',
+        'solarized-light': 'Solarized Light',
+        dracula: 'Dracula',
+        'one-dark': 'One Dark',
       },
       trashRetention: 'Recycle bin retention',
       trashRetentionDesc:

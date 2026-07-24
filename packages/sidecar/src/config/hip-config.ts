@@ -20,6 +20,7 @@ import type {
   AcpHostConfig,
   PlanConfig,
 } from '@hip/protocol'
+import { isTerminalColorThemeId } from '@hip/protocol'
 import { parseDoomLoopStrategy } from '../session/doom-loop.js'
 
 const DEFAULT_CONFIG: HipConfig = { version: 1 }
@@ -297,6 +298,13 @@ function normalizeTerminal(raw: Record<string, unknown>): TerminalConfig {
     const shell = raw.shell.trim().toLowerCase() as TerminalShellPref
     if (TERMINAL_SHELL_PREFS.has(shell)) {
       out.shell = shell
+    }
+  }
+  const ct = raw.colorTheme ?? raw.color_theme
+  if (typeof ct === 'string') {
+    const id = ct.trim().toLowerCase()
+    if (isTerminalColorThemeId(id)) {
+      out.colorTheme = id
     }
   }
   return out

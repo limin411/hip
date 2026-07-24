@@ -139,16 +139,46 @@ export interface LangSmithConfig {
 export type TerminalShellPref = 'default' | 'cmd' | 'powershell' | 'pwsh' | 'bash' | 'zsh'
 
 /**
+ * Integrated terminal (xterm) color preference.
+ * Independent of app chrome theme (`uiStore.theme`).
+ * - `follow`: match document dark class (current default behavior)
+ * - `light` / `dark`: fixed hip token-derived palettes
+ * - named presets: static catalog entries (Solarized, Dracula, One Dark)
+ */
+export const TERMINAL_COLOR_THEME_IDS = [
+  'follow',
+  'light',
+  'dark',
+  'solarized-dark',
+  'solarized-light',
+  'dracula',
+  'one-dark',
+] as const
+
+export type TerminalColorThemeId = (typeof TERMINAL_COLOR_THEME_IDS)[number]
+
+/** Runtime membership (sidecar normalize + FE normalize). */
+export function isTerminalColorThemeId(v: string): v is TerminalColorThemeId {
+  return (TERMINAL_COLOR_THEME_IDS as readonly string[]).includes(v)
+}
+
+/**
  * Optional `[terminal]` section in hip.toml.
  *
  * ```toml
  * [terminal]
  * shell = "cmd"
+ * color_theme = "dracula"   # or colorTheme
  * ```
  */
 export interface TerminalConfig {
   /** Default shell for new / restarted PTY sessions. */
   shell?: TerminalShellPref
+  /**
+   * xterm color palette id. Omitted / unknown → `follow`.
+   * JSON/TS: `colorTheme`. TOML: `color_theme` (camelCase alias accepted).
+   */
+  colorTheme?: TerminalColorThemeId
 }
 
 /**

@@ -19,6 +19,7 @@ vi.mock('react-i18next', () => ({
 vi.mock('lucide-react', () => ({
   Folder: () => React.createElement('span', { 'data-testid': 'icon-folder' }),
   RotateCcw: () => React.createElement('span', { 'data-testid': 'icon-restart' }),
+  X: () => React.createElement('span', { 'data-testid': 'icon-close' }),
   Loader2: () => React.createElement('span', { 'data-testid': 'icon-loader' }),
   AlertCircle: () => React.createElement('span', { 'data-testid': 'icon-alert' }),
 }))
@@ -106,6 +107,8 @@ vi.mock('@xterm/xterm/css/xterm.css', () => ({}))
 vi.mock('./terminalTheme', () => ({
   isDarkDom: () => false,
   buildXtermTheme: () => ({ background: '#fff', foreground: '#111', cursor: '#111' }),
+  resolveXtermTheme: () => ({ background: '#fff', foreground: '#111', cursor: '#111' }),
+  normalizeTerminalColorThemeId: (raw?: string | null) => raw || 'follow',
 }))
 
 import { TerminalView } from './TerminalView'
@@ -203,6 +206,28 @@ describe('TerminalView', () => {
       expect(ring).not.toContain('old')
       expect(ptyOpen).toHaveBeenCalled()
     })
+  })
+
+  it('close kills PTY, clears ring, and does not re-open until restart', async () => {
+    mockSession = { config: { cwd: '/Users/me/hip' } }
+    useTerminalStore.getState().appendRing('s1', 'old')
+    render(<TerminalView />)
+    await waitFor(() => expect(ptyOpen).toHaveBeenCalled())
+    ptyOpen.mockClear()
+    fireEvent.click(screen.getByTestId('terminal-close'))
+    await waitFor(() => {
+      expect(ptyKill).toHaveBeenCalledWith('s1')
+      expect(useTerminalStore.getState().bySession.s1).toBeUndefined()
+    })
+    expect(screen.getByTestId('terminal-view-closed')).toBeInTheDocument()
+    expect(ptyOpen).not.toHaveBeenCalled()
+    expect(screen.getByTestId('terminal-close')).toBeDisabled()
+
+    fireEvent.click(screen.getByTestId('terminal-closed-restart'))
+    await waitFor(() => {
+      expect(ptyOpen).toHaveBeenCalled()
+    })
+    expect(screen.queryByTestId('terminal-view-closed')).toBeNull()
   })
 
   it('right-click on xterm canvas opens controlled menu at pointer', async () => {

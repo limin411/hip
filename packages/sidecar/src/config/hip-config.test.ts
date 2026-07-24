@@ -314,6 +314,54 @@ shell = "powershell"
     expect(cfg.terminal).toEqual({ shell: 'powershell' })
   })
 
+  it('parses [terminal] color_theme (snake_case)', () => {
+    const dir = tmpDir()
+    const p = writeToml(
+      dir,
+      'terminal-color.toml',
+      `version = 1
+[terminal]
+shell = "zsh"
+color_theme = "dracula"
+`,
+    )
+    process.env.HIP_CONFIG_PATH = p
+    const cfg = readHipConfig()
+    expect(cfg.terminal).toEqual({ shell: 'zsh', colorTheme: 'dracula' })
+  })
+
+  it('parses [terminal] colorTheme (camelCase alias)', () => {
+    const dir = tmpDir()
+    const p = writeToml(
+      dir,
+      'terminal-color-camel.toml',
+      `version = 1
+[terminal]
+shell = "bash"
+colorTheme = "one-dark"
+`,
+    )
+    process.env.HIP_CONFIG_PATH = p
+    const cfg = readHipConfig()
+    expect(cfg.terminal).toEqual({ shell: 'bash', colorTheme: 'one-dark' })
+  })
+
+  it('ignores unknown terminal.color_theme values', () => {
+    const dir = tmpDir()
+    const p = writeToml(
+      dir,
+      'terminal-color-bad.toml',
+      `version = 1
+[terminal]
+shell = "zsh"
+color_theme = "not-a-theme"
+`,
+    )
+    process.env.HIP_CONFIG_PATH = p
+    const cfg = readHipConfig()
+    expect(cfg.terminal).toEqual({ shell: 'zsh' })
+  })
+
   it('ignores unknown terminal.shell values', () => {
     const dir = tmpDir()
     const p = writeToml(

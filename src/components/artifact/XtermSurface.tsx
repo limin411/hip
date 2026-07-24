@@ -5,7 +5,12 @@ import type { Terminal as XTerm } from '@xterm/xterm'
 import type { FitAddon as FitAddonType } from '@xterm/addon-fit'
 import { attachDrainWrites, ringIndexForCursor, useTerminalStore } from '@/store/terminalStore'
 import { useUiStore } from '@/store/uiStore'
-import { buildXtermTheme, isDarkDom } from './terminalTheme'
+import { useHipConfigStore } from '@/store/hipConfigStore'
+import {
+  isDarkDom,
+  normalizeTerminalColorThemeId,
+  resolveXtermTheme,
+} from './terminalTheme'
 import { bindTerminalRestarter } from './terminalRestartUi'
 import { bindTerminalCanvas } from './terminalCanvasUi'
 import {
@@ -46,7 +51,10 @@ export function XtermSurface({
   cwd,
 }: XtermSurfaceProps) {
   const { t } = useTranslation()
-  const theme = useUiStore((s) => s.theme)
+  const uiTheme = useUiStore((s) => s.theme)
+  const colorTheme = useHipConfigStore((s) =>
+    normalizeTerminalColorThemeId(s.config.terminal?.colorTheme),
+  )
   const status = useTerminalStore((s) => s.bySession[terminalId]?.status ?? 'idle')
   const exitCode = useTerminalStore((s) => s.bySession[terminalId]?.exitCode)
   const lastError = useTerminalStore((s) => s.bySession[terminalId]?.lastError)
@@ -120,7 +128,9 @@ export function XtermSurface({
         fontSize: 13,
         lineHeight: 1.25,
         fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace',
-        theme: buildXtermTheme(),
+        theme: resolveXtermTheme(
+          useHipConfigStore.getState().config.terminal?.colorTheme,
+        ),
         allowProposedApi: true,
       })
       const fit = new FitAddon()
@@ -144,8 +154,11 @@ export function XtermSurface({
         },
       })
 
+      // INVARIANT: MO / non-React paths must use getState() — boot effect deps are [terminalId, cwd].
       const applyTheme = () => {
-        if (term) term.options.theme = buildXtermTheme(isDarkDom())
+        if (!term) return
+        const pref = useHipConfigStore.getState().config.terminal?.colorTheme
+        term.options.theme = resolveXtermTheme(pref, isDarkDom())
       }
       applyTheme()
 
@@ -282,8 +295,9 @@ export function XtermSurface({
   useEffect(() => {
     const term = termRef.current
     if (!term) return
-    term.options.theme = buildXtermTheme(isDarkDom())
-  }, [theme])
+    const pref = useHipConfigStore.getState().config.terminal?.colorTheme
+    term.options.theme = resolveXtermTheme(pref, isDarkDom())
+  }, [uiTheme, colorTheme])
 
   const exited = status === 'exited'
   const errored = status === 'error'

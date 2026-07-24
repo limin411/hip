@@ -721,6 +721,9 @@ export const zhTW = {
       "exited": "Shell 已退出（{{code}}）",
       "exitedNull": "Shell 已退出",
       "restart": "重新啟動",
+      "close": "關閉",
+      "closed": "終端已關閉",
+      "closedDesc": "Shell 已停止。重新啟動可在此資料夾中開啟新終端。",
       "starting": "正在啟動 shell…",
       "error": "無法啟動終端",
       "unsupportedPlatform": "當前平臺暫不支援終端",
@@ -778,6 +781,17 @@ export const zhTW = {
       "pwsh": "PowerShell 7+",
       "bash": "Bash",
       "zsh": "Zsh"
+    },
+    "terminalColor": "終端顏色",
+    "terminalColorDesc": "整合終端的配色方案，與應用主題獨立。修改後立即生效。",
+    "terminalColors": {
+      "follow": "跟隨應用主題",
+      "light": "亮色",
+      "dark": "暗色",
+      "solarized-dark": "Solarized Dark",
+      "solarized-light": "Solarized Light",
+      "dracula": "Dracula",
+      "one-dark": "One Dark"
     },
     "trashRetention": "回收站保留天數",
     "trashRetentionDesc": "移入回收站的會話將在此天數後自動永久刪除（1–365）。",

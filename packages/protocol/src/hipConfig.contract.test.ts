@@ -19,6 +19,7 @@ import type {
   ServerMessage,
   ActiveModel,
 } from './index.js'
+import { TERMINAL_COLOR_THEME_IDS, isTerminalColorThemeId } from './hip-config.js'
 
 // ──────────────────────────────────────────────────────────────────
 // TYPE GUARDS (checked only by tsc, NOT by vitest)
@@ -862,6 +863,22 @@ describe('protocol: McpServerConfig extended fields (Todo 1)', () => {
     const cfg: HipConfig = { version: 1, terminal: { shell: 'cmd' } }
     const round = JSON.parse(JSON.stringify(cfg)) as HipConfig
     expect(round.terminal).toEqual({ shell: 'cmd' })
+  })
+
+  it('round-trips terminal.colorTheme on HipConfig through JSON', () => {
+    const cfg: HipConfig = {
+      version: 1,
+      terminal: { shell: 'cmd', colorTheme: 'dracula' },
+    }
+    const round = JSON.parse(JSON.stringify(cfg)) as HipConfig
+    expect(round.terminal).toEqual({ shell: 'cmd', colorTheme: 'dracula' })
+  })
+
+  it('TERMINAL_COLOR_THEME_IDS includes follow and is non-empty', () => {
+    expect(TERMINAL_COLOR_THEME_IDS.length).toBeGreaterThan(0)
+    expect(TERMINAL_COLOR_THEME_IDS).toContain('follow')
+    expect(isTerminalColorThemeId('dracula')).toBe(true)
+    expect(isTerminalColorThemeId('not-a-theme')).toBe(false)
   })
 
   it('round-trips acp on HipConfig through JSON', () => {

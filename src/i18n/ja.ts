@@ -713,6 +713,9 @@ export const ja = {
       "exited": "シェルが終了しました ({{code}})",
       "exitedNull": "シェルが終了しました",
       "restart": "再起動",
+      "close": "閉じる",
+      "closed": "ターミナルを閉じました",
+      "closedDesc": "シェルを停止しました。再起動するとこのフォルダで新しいターミナルが開きます。",
       "starting": "シェルを起動中…",
       "error": "ターミナルを起動できませんでした",
       "unsupportedPlatform": "このプラットフォームではターミナルはまだサポートされていません",
@@ -770,6 +773,17 @@ export const ja = {
       "pwsh": "PowerShell 7+",
       "bash": "Bash",
       "zsh": "Zsh"
+    },
+    "terminalColor": "ターミナルの色",
+    "terminalColorDesc": "統合ターミナルの配色です。アプリのテーマとは独立しており、すぐに適用されます。",
+    "terminalColors": {
+      "follow": "アプリのテーマに合わせる",
+      "light": "ライト",
+      "dark": "ダーク",
+      "solarized-dark": "Solarized Dark",
+      "solarized-light": "Solarized Light",
+      "dracula": "Dracula",
+      "one-dark": "One Dark"
     },
     "trashRetention": "ゴミ箱の保持期間",
     "trashRetentionDesc": "論理削除されたセッションは、この日数（1～365日）経過後に完全に削除されます。",

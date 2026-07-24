@@ -8,14 +8,18 @@ import { GeneralSettings } from './GeneralSettings'
 const updateSection = vi.fn().mockResolvedValue(undefined)
 const load = vi.fn().mockResolvedValue(undefined)
 
+const hipConfigState = {
+  config: {
+    version: 1 as const,
+    terminal: { shell: 'default' as const, colorTheme: 'follow' as const },
+  },
+  loaded: true,
+  load,
+  updateSection,
+}
+
 vi.mock('@/store/hipConfigStore', () => ({
-  useHipConfigStore: (sel: (s: Record<string, unknown>) => unknown) =>
-    sel({
-      config: { version: 1, terminal: { shell: 'default' } },
-      loaded: true,
-      load,
-      updateSection,
-    }),
+  useHipConfigStore: (sel: (s: typeof hipConfigState) => unknown) => sel(hipConfigState),
 }))
 
 vi.mock('@/store/uiStore', () => ({
@@ -73,6 +77,7 @@ describe('GeneralSettings terminal shell', () => {
   beforeEach(() => {
     updateSection.mockClear()
     load.mockClear()
+    hipConfigState.config.terminal = { shell: 'default', colorTheme: 'follow' }
   })
   afterEach(() => {
     cleanup()
@@ -87,12 +92,55 @@ describe('GeneralSettings terminal shell', () => {
     )
   })
 
-  it('persists shell preference via hipConfig terminal section', async () => {
+  it('persists shell preference via functional merge', async () => {
     render(<GeneralSettings />)
     fireEvent.click(screen.getByTestId('settings-terminal-shell-powershell'))
     await waitFor(() => {
-      expect(updateSection).toHaveBeenCalledWith('terminal', { shell: 'powershell' })
+      expect(updateSection).toHaveBeenCalledWith('terminal', expect.any(Function))
+    })
+    const updater = updateSection.mock.calls[0][1] as (prev: {
+      shell?: string
+      colorTheme?: string
+    }) => { shell?: string; colorTheme?: string }
+    expect(updater({ shell: 'default', colorTheme: 'dracula' })).toEqual({
+      shell: 'powershell',
+      colorTheme: 'dracula',
     })
   })
+})
 
+describe('GeneralSettings terminal color', () => {
+  beforeEach(() => {
+    updateSection.mockClear()
+    load.mockClear()
+    hipConfigState.config.terminal = { shell: 'default', colorTheme: 'follow' }
+  })
+  afterEach(() => {
+    cleanup()
+  })
+
+  it('renders terminal color control', () => {
+    render(<GeneralSettings />)
+    const row = screen.getByTestId('settings-terminal-color')
+    expect(row).toBeInTheDocument()
+    expect(within(row).getByTestId('settings-terminal-color-trigger')).toHaveTextContent(
+      'settings.terminalColors.follow',
+    )
+  })
+
+  it('persists colorTheme via functional merge and preserves shell', async () => {
+    render(<GeneralSettings />)
+    fireEvent.click(screen.getByTestId('settings-terminal-color-dracula'))
+    await waitFor(() => {
+      expect(updateSection).toHaveBeenCalledWith('terminal', expect.any(Function))
+    })
+    const updater = updateSection.mock.calls[0][1] as (prev: {
+      shell?: string
+      colorTheme?: string
+    }) => { shell?: string; colorTheme?: string }
+    expect(updater({ shell: 'zsh', colorTheme: 'follow' })).toEqual({
+      shell: 'zsh',
+      colorTheme: 'dracula',
+    })
+  })
 })

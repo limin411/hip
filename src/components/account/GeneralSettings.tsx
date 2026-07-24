@@ -1,7 +1,11 @@
 import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Check, ChevronDown } from 'lucide-react'
-import type { TerminalShellPref } from '@hip/protocol'
+import {
+  type TerminalShellPref,
+  type TerminalColorThemeId,
+  TERMINAL_COLOR_THEME_IDS,
+} from '@hip/protocol'
 import { cn } from '@/lib/utils'
 import { detectHipPlatform } from '@/lib/platform'
 import { useUiStore, type AppLanguage, type Theme, type UiDensity } from '@/store/uiStore'
@@ -20,6 +24,8 @@ import {
 import { ContextMenuSettings } from '@/components/context-menu/ContextMenuSettings'
 import { CONTEXT_MENUS } from '@/components/context-menu/feature'
 import { CODE_TERMINAL } from '@/components/artifact/terminalFeature'
+import { TERMINAL_MANAGEMENT } from '@/components/terminals/feature'
+import { normalizeTerminalColorThemeId } from '@/components/artifact/terminalTheme'
 
 const LANGUAGE_KEYS: AppLanguage[] = ['zh-CN', 'zh-TW', 'en', 'ja', 'ko']
 
@@ -48,6 +54,9 @@ export function GeneralSettings() {
   const setDensity = useUiStore((s) => s.setDensity)
 
   const terminalShell = useHipConfigStore((s) => s.config.terminal?.shell ?? 'default')
+  const terminalColor = useHipConfigStore((s) =>
+    normalizeTerminalColorThemeId(s.config.terminal?.colorTheme),
+  )
   const trashRetention = resolveTrashRetentionDays(
     useHipConfigStore((s) => s.config.trash?.retentionDays),
   )
@@ -65,8 +74,12 @@ export function GeneralSettings() {
   }, [trashRetention])
 
   const shellKeys = shellOptionsForPlatform()
+  const showTerminalColor = CODE_TERMINAL || TERMINAL_MANAGEMENT
   const setTerminalShell = (shell: TerminalShellPref) => {
-    void updateSection('terminal', { shell })
+    void updateSection('terminal', (prev) => ({ ...(prev ?? {}), shell }))
+  }
+  const setTerminalColor = (colorTheme: TerminalColorThemeId) => {
+    void updateSection('terminal', (prev) => ({ ...(prev ?? {}), colorTheme }))
   }
 
   const commitTrashRetention = () => {
@@ -178,6 +191,51 @@ export function GeneralSettings() {
                       className={cn('shrink-0', terminalShell === shellKey ? 'opacity-100' : 'opacity-0')}
                     />
                     <span>{t(`settings.terminalShells.${shellKey}`)}</span>
+                  </DropdownMenuItem>
+                ))}
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
+        </div>
+      ) : null}
+      {showTerminalColor ? (
+        <div
+          className="flex items-center justify-between gap-6 px-8 py-4"
+          data-testid="settings-terminal-color"
+        >
+          <div className="min-w-0 flex-1">
+            <div className="text-body font-medium text-ink">{t('settings.terminalColor')}</div>
+            <div className="mt-0.5 text-meta leading-relaxed text-ink-tertiary">
+              {t('settings.terminalColorDesc')}
+            </div>
+          </div>
+          <div className="relative shrink-0">
+            <DropdownMenu modal={false}>
+              <DropdownMenuTrigger asChild>
+                <button
+                  type="button"
+                  className={selectTriggerCls}
+                  data-testid="settings-terminal-color-trigger"
+                >
+                  <span>{t(`settings.terminalColors.${terminalColor}`)}</span>
+                  <ChevronDown size={14} strokeWidth={1.75} className="shrink-0 text-ink-tertiary" />
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                {TERMINAL_COLOR_THEME_IDS.map((themeId) => (
+                  <DropdownMenuItem
+                    key={themeId}
+                    data-testid={`settings-terminal-color-${themeId}`}
+                    onSelect={() => setTerminalColor(themeId)}
+                  >
+                    <Check
+                      size={14}
+                      className={cn(
+                        'shrink-0',
+                        terminalColor === themeId ? 'opacity-100' : 'opacity-0',
+                      )}
+                    />
+                    <span>{t(`settings.terminalColors.${themeId}`)}</span>
                   </DropdownMenuItem>
                 ))}
               </DropdownMenuContent>

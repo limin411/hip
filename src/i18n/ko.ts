@@ -713,6 +713,9 @@ export const ko = {
       "exited": "셸 종료됨 ({{code}})",
       "exitedNull": "셸 종료됨",
       "restart": "다시 시작",
+      "close": "닫기",
+      "closed": "터미널이 닫혔습니다",
+      "closedDesc": "셸이 중지되었습니다. 다시 시작하면 이 폴더에서 새 터미널이 열립니다.",
       "starting": "셸 시작 중…",
       "error": "터미널을 시작할 수 없음",
       "unsupportedPlatform": "이 플랫폼에서는 아직 터미널을 지원하지 않습니다",
@@ -770,6 +773,17 @@ export const ko = {
       "pwsh": "PowerShell 7+",
       "bash": "Bash",
       "zsh": "Zsh"
+    },
+    "terminalColor": "터미널 색상",
+    "terminalColorDesc": "통합 터미널 색상 팔레트입니다. 앱 테마와 독립적이며 즉시 적용됩니다.",
+    "terminalColors": {
+      "follow": "앱 테마 따르기",
+      "light": "라이트",
+      "dark": "다크",
+      "solarized-dark": "Solarized Dark",
+      "solarized-light": "Solarized Light",
+      "dracula": "Dracula",
+      "one-dark": "One Dark"
     },
     "trashRetention": "휴지통 보관 기간",
     "trashRetentionDesc": "소프트 삭제된 세션은 이 일수(1~365일) 후에 영구적으로 제거됩니다.",

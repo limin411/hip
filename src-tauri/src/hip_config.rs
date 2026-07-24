@@ -144,13 +144,16 @@ pub(crate) struct LangSmithConfig {
 }
 
 /// Optional `[terminal]` section. JSON uses camelCase for the UI.
-/// Must be preserved on set_hip_config rewrites so shell preference is not stripped.
+/// Must be preserved on set_hip_config rewrites so shell / colorTheme are not stripped.
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct TerminalConfig {
     /// Preferred interactive shell: default | cmd | powershell | pwsh | bash | zsh
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub(crate) shell: Option<String>,
+    /// xterm color palette id (follow | light | dark | named presets). JSON key: colorTheme.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub(crate) color_theme: Option<String>,
 }
 
 /// Optional `[acp]` host policy. JSON uses camelCase for the UI.
@@ -380,13 +383,15 @@ pub(crate) struct TomlLangSmithConfig {
     pub(crate) endpoint: Option<String>,
 }
 
-/// TOML mirror for `[terminal]`.
+/// TOML mirror for `[terminal]` (snake_case keys; camelCase aliases for hand-edited files).
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
 #[allow(dead_code)]
 pub(crate) struct TomlTerminalConfig {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub(crate) shell: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none", alias = "colorTheme")]
+    pub(crate) color_theme: Option<String>,
 }
 
 /// TOML mirror for `[acp]` (snake_case keys; camelCase aliases for hand-edited files).
@@ -688,13 +693,19 @@ impl From<TomlLangSmithConfig> for LangSmithConfig {
 
 impl From<TerminalConfig> for TomlTerminalConfig {
     fn from(t: TerminalConfig) -> Self {
-        TomlTerminalConfig { shell: t.shell }
+        TomlTerminalConfig {
+            shell: t.shell,
+            color_theme: t.color_theme,
+        }
     }
 }
 
 impl From<TomlTerminalConfig> for TerminalConfig {
     fn from(t: TomlTerminalConfig) -> Self {
-        TerminalConfig { shell: t.shell }
+        TerminalConfig {
+            shell: t.shell,
+            color_theme: t.color_theme,
+        }
     }
 }
 

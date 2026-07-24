@@ -1786,6 +1786,8 @@ export const en = {
         unbound: 'No project folder',
         missingBadge: 'Unavailable',
         missingTitle: 'Folder unavailable: {{path}}',
+        expand: 'Expand conversations under {{name}}',
+        collapse: 'Collapse conversations under {{name}}',
       },
       parallel: {
         group: 'Parallel · {{id}}',

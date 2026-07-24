@@ -1747,6 +1747,8 @@ export const zhCN = {
         unbound: '未绑定项目路径',
         missingBadge: '不可用',
         missingTitle: '文件夹不可用：{{path}}',
+        expand: '展开 {{name}} 下的对话',
+        collapse: '收起 {{name}} 下的对话',
       },
       parallel: {
         group: '并行 · {{id}}',

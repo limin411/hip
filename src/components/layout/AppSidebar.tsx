@@ -76,6 +76,8 @@ export function AppSidebar() {
   const handlePointerDown = useWindowDrag()
   /** Session ids whose worktree subtree is collapsed (default = expanded when slots exist). */
   const [worktreeCollapsed, setWorktreeCollapsed] = useState<Record<string, boolean>>({})
+  /** Project path keys whose session list is collapsed (default = expanded). */
+  const [projectGroupCollapsed, setProjectGroupCollapsed] = useState<Record<string, boolean>>({})
   const sidebarSection = useUiStore((s) => s.sidebarSection)
   const activeView = useUiStore((s) => s.activeView)
   const sessions = useSessions()
@@ -185,6 +187,12 @@ export function AppSidebar() {
   }
 
   const isWorktreeExpanded = (sessionId: string) => worktreeCollapsed[sessionId] !== true
+
+  const toggleProjectGroup = (groupId: string) => {
+    setProjectGroupCollapsed((prev) => ({ ...prev, [groupId]: !prev[groupId] }))
+  }
+
+  const isProjectGroupExpanded = (groupId: string) => projectGroupCollapsed[groupId] !== true
 
   return (
     <aside
@@ -506,6 +514,7 @@ export function AppSidebar() {
               const headerTitle = pathMissing
                 ? t('sidebar.projectGroup.missingTitle', { path: groupTitle })
                 : groupTitle
+              const groupExpanded = isProjectGroupExpanded(groupId)
               return (
                 <li
                   key={groupId}
@@ -513,11 +522,29 @@ export function AppSidebar() {
                   data-testid={`sidebar-project-group-${groupId}`}
                   data-path-missing={pathMissing ? 'true' : undefined}
                 >
-                  <div
-                    className="mb-0.5 flex items-center gap-1.5 px-2 py-1"
+                  <button
+                    type="button"
+                    className={cn(
+                      'mb-0.5 flex w-full items-center gap-1.5 rounded-md px-2 py-1 text-left',
+                      'transition-colors hover:bg-state-hover',
+                      'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink/20',
+                    )}
                     title={headerTitle}
                     data-testid={`sidebar-project-group-header-${groupId}`}
+                    data-no-drag
+                    aria-expanded={groupExpanded}
+                    aria-label={
+                      groupExpanded
+                        ? t('sidebar.projectGroup.collapse', { name: groupLabel })
+                        : t('sidebar.projectGroup.expand', { name: groupLabel })
+                    }
+                    onClick={() => toggleProjectGroup(groupId)}
                   >
+                    {groupExpanded ? (
+                      <ChevronDown size={12} className="shrink-0 text-ink-tertiary" aria-hidden />
+                    ) : (
+                      <ChevronRight size={12} className="shrink-0 text-ink-tertiary" aria-hidden />
+                    )}
                     {pathMissing ? (
                       <AlertTriangle
                         size={12}
@@ -542,30 +569,32 @@ export function AppSidebar() {
                       >
                         {t('sidebar.projectGroup.missingBadge')}
                       </span>
-                    ) : group.sessions.length > 1 ? (
+                    ) : !groupExpanded || group.sessions.length > 1 ? (
                       <span className="shrink-0 tabular-nums text-caption text-ink-tertiary">
                         {group.sessions.length}
                       </span>
                     ) : null}
-                  </div>
-                  <ul className="m-0 list-none p-0" aria-label={groupTitle}>
-                    {group.sessions.map((session) => (
-                      <SidebarSessionRow
-                        key={session.id}
-                        session={session}
-                        activeSessionId={activeSessionId}
-                        activeView={activeView}
-                        parallelRuns={parallelRuns}
-                        runsByHost={runsByHost}
-                        worktreeExpanded={isWorktreeExpanded(session.id)}
-                        onToggleWorktree={() => {
-                          const next = !isWorktreeExpanded(session.id)
-                          toggleWorktree(session.id)
-                          if (next) hydrateWorktrees(session.id)
-                        }}
-                      />
-                    ))}
-                  </ul>
+                  </button>
+                  {groupExpanded ? (
+                    <ul className="m-0 list-none p-0" aria-label={groupTitle}>
+                      {group.sessions.map((session) => (
+                        <SidebarSessionRow
+                          key={session.id}
+                          session={session}
+                          activeSessionId={activeSessionId}
+                          activeView={activeView}
+                          parallelRuns={parallelRuns}
+                          runsByHost={runsByHost}
+                          worktreeExpanded={isWorktreeExpanded(session.id)}
+                          onToggleWorktree={() => {
+                            const next = !isWorktreeExpanded(session.id)
+                            toggleWorktree(session.id)
+                            if (next) hydrateWorktrees(session.id)
+                          }}
+                        />
+                      ))}
+                    </ul>
+                  ) : null}
                 </li>
               )
             })}

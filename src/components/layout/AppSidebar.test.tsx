@@ -683,4 +683,65 @@ describe('AppSidebar', () => {
     expect(screen.queryByTestId(/^sidebar-project-group-/)).not.toBeInTheDocument()
     expect(screen.getByTestId('sidebar-session-chat-1')).toBeInTheDocument()
   })
+
+  it('collapses and expands conversations under a project group', () => {
+    useUiStore.setState({ sidebarSection: 'projects', activeView: 'code' })
+    useDomainStore.setState({
+      sessions: [
+        {
+          id: 'code-hip-1',
+          title: 'Hip task A',
+          preview: 'a',
+          updatedAtMs: Date.now(),
+          config: { ...DEFAULT_CONFIG, surface: 'code', cwd: '/Users/x/data/hip' },
+          messages: [],
+          status: 'idle',
+          loaded: true,
+        },
+        {
+          id: 'code-hip-2',
+          title: 'Hip task B',
+          preview: 'b',
+          updatedAtMs: Date.now() - 1000,
+          config: { ...DEFAULT_CONFIG, surface: 'code', cwd: '/Users/x/data/hip' },
+          messages: [],
+          status: 'idle',
+          loaded: true,
+        },
+        {
+          id: 'code-other',
+          title: 'Other repo',
+          preview: 'c',
+          updatedAtMs: Date.now() - 500,
+          config: { ...DEFAULT_CONFIG, surface: 'code', cwd: '/Users/x/data/other' },
+          messages: [],
+          status: 'idle',
+          loaded: true,
+        },
+      ],
+      activeSessionId: 'code-hip-1',
+    } as never)
+
+    render(<AppSidebar />)
+
+    const hipHeader = screen.getByTestId('sidebar-project-group-header-/Users/x/data/hip')
+    expect(hipHeader).toHaveAttribute('aria-expanded', 'true')
+    expect(screen.getByTestId('sidebar-session-code-hip-1')).toBeInTheDocument()
+    expect(screen.getByTestId('sidebar-session-code-hip-2')).toBeInTheDocument()
+    expect(screen.getByTestId('sidebar-session-code-other')).toBeInTheDocument()
+
+    fireEvent.click(hipHeader)
+    expect(hipHeader).toHaveAttribute('aria-expanded', 'false')
+    expect(screen.queryByTestId('sidebar-session-code-hip-1')).not.toBeInTheDocument()
+    expect(screen.queryByTestId('sidebar-session-code-hip-2')).not.toBeInTheDocument()
+    // Other project stays expanded.
+    expect(screen.getByTestId('sidebar-session-code-other')).toBeInTheDocument()
+    // Collapsed group still shows session count.
+    expect(screen.getByTestId('sidebar-project-group-/Users/x/data/hip')).toHaveTextContent('2')
+
+    fireEvent.click(hipHeader)
+    expect(hipHeader).toHaveAttribute('aria-expanded', 'true')
+    expect(screen.getByTestId('sidebar-session-code-hip-1')).toBeInTheDocument()
+    expect(screen.getByTestId('sidebar-session-code-hip-2')).toBeInTheDocument()
+  })
 })

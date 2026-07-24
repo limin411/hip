@@ -1736,7 +1736,9 @@ export const ko = {
     "projectGroup": {
       "unbound": "프로젝트 폴더 없음",
       "missingBadge": "사용 불가",
-      "missingTitle": "폴더를 사용할 수 없음: {{path}}"
+      "missingTitle": "폴더를 사용할 수 없음: {{path}}",
+      "expand": "{{name}} 아래 대화 펼치기",
+      "collapse": "{{name}} 아래 대화 접기"
     },
     "parallel": {
       "group": "병렬 · {{id}}",

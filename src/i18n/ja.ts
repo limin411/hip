@@ -1736,7 +1736,9 @@ export const ja = {
     "projectGroup": {
       "unbound": "プロジェクトフォルダなし",
       "missingBadge": "利用不可",
-      "missingTitle": "フォルダが利用できません: {{path}}"
+      "missingTitle": "フォルダが利用できません: {{path}}",
+      "expand": "{{name}} の会話を展開",
+      "collapse": "{{name}} の会話を折りたたむ"
     },
     "parallel": {
       "group": "並列 · {{id}}",

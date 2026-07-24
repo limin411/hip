@@ -1744,7 +1744,9 @@ export const zhTW = {
     "projectGroup": {
       "unbound": "未綁定專案路徑",
       "missingBadge": "不可用",
-      "missingTitle": "資料夾不可用：{{path}}"
+      "missingTitle": "資料夾不可用：{{path}}",
+      "expand": "展開 {{name}} 下的對話",
+      "collapse": "收起 {{name}} 下的對話"
     },
     "parallel": {
       "group": "並行 · {{id}}",

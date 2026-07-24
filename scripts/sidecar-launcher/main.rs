@@ -4,30 +4,39 @@
 //! The real Node runtime + esbuild-bundled JS live next to the app as
 //! `hip-sidecar/` (NSIS / portable) or `Contents/Resources/hip-sidecar/` (macOS .app).
 //!
-//! This tiny binary spawns that Node with the bundled script, forwarding args and
-//! stdio so Tauri can still observe stdout for the ready `{port,token}` line.
+//! ## Unix
+//! `exec` replaces this process with Node so Tauri's pipes attach directly.
 //!
-//! On Windows, Node is placed under a Job Object with KILL_ON_JOB_CLOSE so that
-//! Tauri's `child.kill()` on this launcher PID also tears down the Node tree
-//! (plain `Command::status()` would otherwise orphan Node and keep the port/DB).
-//! If AssignProcessToJobObject fails (process already in a job — common under
-//! some shells), we continue without a job rather than killing Node.
+//! ## Windows
+//! We cannot reliably `exec`, and **Stdio::inherit() does not forward Tauri's
+//! redirected pipes to a grandchild** (CreateProcess handle inheritance). That
+//! made Node's `stdout.write(ready)` fail with exit 1 while a manual
+//! `node.exe index.js` worked. Fix: pipe Node's stdio and relay bytes
+//! (flushing after every read) between Tauri ↔ this launcher ↔ Node.
+//!
+//! Node is also placed under a Job Object with KILL_ON_JOB_CLOSE so Tauri's
+//! `child.kill()` on this PID tears down Node. If Assign fails, we continue
+//! without a job rather than killing Node.
 
 use std::env;
 use std::path::{Path, PathBuf};
-use std::process::{Command, Stdio};
+use std::process::Command;
 
 #[cfg(unix)]
 use std::os::unix::process::CommandExt;
 
 #[cfg(windows)]
+use std::io::{Read, Write};
+#[cfg(windows)]
 use std::os::windows::io::AsRawHandle;
 #[cfg(windows)]
 use std::os::windows::process::CommandExt;
 #[cfg(windows)]
-use std::process::exit;
+use std::process::{exit, Stdio};
 #[cfg(windows)]
 use std::ptr;
+#[cfg(windows)]
+use std::thread;
 
 fn runtime_dir(exe: &Path) -> PathBuf {
     if let Some(p) = env::var_os("HIP_SIDECAR_RUNTIME") {
@@ -156,10 +165,6 @@ fn main() {
     cmd.args(env::args().skip(1));
     // Run with runtime as cwd so relative native addon loads stay sane.
     cmd.current_dir(&runtime);
-    // Critical: inherit Tauri's pipes so ready JSON on stdout reaches the shell plugin.
-    cmd.stdin(Stdio::inherit())
-        .stdout(Stdio::inherit())
-        .stderr(Stdio::inherit());
     // Optional native addons next to the script.
     if let Ok(prev) = env::var("PATH") {
         cmd.env(
@@ -170,6 +175,7 @@ fn main() {
 
     #[cfg(unix)]
     {
+        // Replace this process so Tauri's pipes attach directly to Node.
         let err = cmd.exec();
         eprintln!("[sidecar-launcher] exec failed: {err}");
         boot_log(&exe, &format!("exec failed: {err}"));
@@ -179,6 +185,25 @@ fn main() {
     #[cfg(windows)]
     {
         run_windows(cmd, &exe);
+    }
+}
+
+/// Copy all bytes from `from` to `to`, flushing after every successful read so
+/// the ready JSON line is not stuck in an 8KiB `io::copy` buffer.
+#[cfg(windows)]
+fn relay_flush(mut from: impl Read, mut to: impl Write) {
+    let mut buf = [0u8; 4096];
+    loop {
+        match from.read(&mut buf) {
+            Ok(0) => break,
+            Ok(n) => {
+                if to.write_all(&buf[..n]).is_err() {
+                    break;
+                }
+                let _ = to.flush();
+            }
+            Err(_) => break,
+        }
     }
 }
 
@@ -236,6 +261,12 @@ fn run_windows(mut cmd: Command, exe: &Path) {
         fn AssignProcessToJobObject(job: HANDLE, process: HANDLE) -> i32;
     }
 
+    // Explicit pipes + relay (do NOT inherit — Tauri's pipes are not reliable
+    // as inherited handles for the Node grandchild on Windows).
+    cmd.stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped());
+
     // Intentionally never CloseHandle(job): handle lives until this process
     // exits (or is TerminateProcess'd by Tauri). Closing the last handle then
     // kills every process still assigned to the job.
@@ -267,7 +298,6 @@ fn run_windows(mut cmd: Command, exe: &Path) {
     let mut child = match cmd.spawn() {
         Ok(c) => c,
         Err(e) => {
-            // Breakaway may be denied by the parent job; retry without the flag.
             boot_log(exe, &format!("spawn with BREAKAWAY failed: {e}; retry plain"));
             cmd.creation_flags(0);
             cmd.spawn().unwrap_or_else(|e2| {
@@ -282,15 +312,39 @@ fn run_windows(mut cmd: Command, exe: &Path) {
     let process_handle = child.as_raw_handle() as HANDLE;
     let assign_ok = unsafe { AssignProcessToJobObject(job, process_handle) };
     if assign_ok == 0 {
-        // Do NOT kill Node — Tauri may already own a job; Node must keep running
-        // so it can print ready JSON. Worst case: orphaned Node if launcher dies
-        // without TerminateProcess cascade.
         let msg = "AssignProcessToJobObject failed; continuing without kill-on-close job";
         eprintln!("[sidecar-launcher] {msg}");
         boot_log(exe, msg);
     } else {
-        boot_log(exe, "Node assigned to kill-on-close job");
+        boot_log(exe, "Node assigned to kill-on-close job; stdio relay active");
     }
+
+    let child_stdin = child.stdin.take();
+    let child_stdout = child.stdout.take();
+    let child_stderr = child.stderr.take();
+
+    // stdout: Node → Tauri (must flush so ready JSON is not buffered)
+    let out_thr = child_stdout.map(|mut r| {
+        thread::spawn(move || {
+            let mut w = std::io::stdout();
+            relay_flush(&mut r, &mut w);
+        })
+    });
+    // stderr: Node → Tauri / console
+    let err_thr = child_stderr.map(|mut r| {
+        thread::spawn(move || {
+            let mut w = std::io::stderr();
+            relay_flush(&mut r, &mut w);
+        })
+    });
+    // stdin: Tauri → Node (HIP_PARENT_WATCH sees EOF when Tauri closes our stdin)
+    let in_thr = child_stdin.map(|mut w| {
+        thread::spawn(move || {
+            let mut r = std::io::stdin();
+            relay_flush(&mut r, &mut w);
+            // drop w → closes Node stdin
+        })
+    });
 
     let status = child.wait().unwrap_or_else(|e| {
         let msg = format!("wait failed: {e}");
@@ -298,6 +352,17 @@ fn run_windows(mut cmd: Command, exe: &Path) {
         boot_log(exe, &msg);
         exit(1);
     });
+
+    if let Some(t) = out_thr {
+        let _ = t.join();
+    }
+    if let Some(t) = err_thr {
+        let _ = t.join();
+    }
+    if let Some(t) = in_thr {
+        let _ = t.join();
+    }
+
     boot_log(exe, &format!("Node exited code={:?}", status.code()));
     exit(status.code().unwrap_or(1));
 }

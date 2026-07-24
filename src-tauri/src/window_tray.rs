@@ -237,28 +237,37 @@ pub fn sync_tray(app: &AppHandle) {
     }
 }
 
-/// Resolve tray image.
+/// Monochrome "HIP" wordmark for the system tray (not the orange mascot).
 ///
-/// Important: hip's app icon is a **color** glyph (orange face). macOS
-/// `icon_as_template(true)` turns every opaque pixel into a flat mono silhouette —
-/// with our light rounded background that becomes an unreadable white blob.
-/// Do **not** enable template mode unless we ship a true black-on-transparent
-/// menu-bar template asset.
+/// - macOS: black-on-transparent + `icon_as_template(true)` so the menu bar
+///   tints it for light/dark appearance (Apple template convention).
+/// - Windows/Linux: white-on-transparent (typical dark taskbar / panel).
 fn tray_icon_image() -> Result<tauri::image::Image<'static>, String> {
-    // Mid-size PNG keeps face details readable at tray size.
-    tauri::image::Image::from_bytes(include_bytes!("../icons/128x128.png"))
-        .or_else(|_| tauri::image::Image::from_bytes(include_bytes!("../icons/32x32.png")))
-        .map_err(|e| format!("load tray icon: {e}"))
+    #[cfg(target_os = "macos")]
+    {
+        // 32pt logical; template scales for retina.
+        tauri::image::Image::from_bytes(include_bytes!("../icons/tray-hip-32.png"))
+            .or_else(|_| {
+                tauri::image::Image::from_bytes(include_bytes!("../icons/tray-hip-64.png"))
+            })
+            .map_err(|e| format!("load tray HIP icon: {e}"))
+    }
+    #[cfg(not(target_os = "macos"))]
+    {
+        tauri::image::Image::from_bytes(include_bytes!("../icons/tray-hip-white-32.png"))
+            .or_else(|_| {
+                tauri::image::Image::from_bytes(include_bytes!("../icons/tray-hip-white-64.png"))
+            })
+            .map_err(|e| format!("load tray HIP icon: {e}"))
+    }
 }
 
 fn try_create_tray_inner(app: &AppHandle) -> Result<TrayIcon, String> {
     let menu = build_tray_menu(app).map_err(|e| e.to_string())?;
     let icon = tray_icon_image()?;
 
-    let builder = TrayIconBuilder::with_id(TRAY_ID)
+    let mut builder = TrayIconBuilder::with_id(TRAY_ID)
         .icon(icon)
-        // Color app icon — not a macOS menu-bar template (see tray_icon_image).
-        .icon_as_template(false)
         .menu(&menu)
         .show_menu_on_left_click(false)
         .tooltip("hip")
@@ -285,6 +294,12 @@ fn try_create_tray_inner(app: &AppHandle) -> Result<TrayIcon, String> {
                 show_main_window(tray.app_handle());
             }
         });
+
+    // Black HIP glyph is a proper template silhouette (unlike the color mascot).
+    #[cfg(target_os = "macos")]
+    {
+        builder = builder.icon_as_template(true);
+    }
 
     builder.build(app).map_err(|e| e.to_string())
 }

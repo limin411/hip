@@ -4,7 +4,7 @@ import { Loader2, CheckCircle2, XCircle, Circle, AlertTriangle, ChevronRight } f
 import type { AgentRole, AgentRun, TimelineStep, ToolCall } from '@hip/protocol'
 import { cn } from '@/lib/utils'
 import { AgentBadge, TRAIL_ROW, TurnTimeline } from './TurnTimeline'
-import { buildActivitySummary, formatElapsed, type SummaryPart } from '@/lib/activitySummary'
+import { buildActivitySummary, formatActivityParts } from '@/lib/activitySummary'
 
 interface ActivityBarProps {
   steps?: TimelineStep[]
@@ -22,73 +22,6 @@ interface ActivityBarProps {
    * Kept outside TurnTimeline so nested agent cards share the same fold as tools.
    */
   children?: ReactNode
-}
-
-function formatParts(
-  parts: SummaryPart[],
-  t: (key: string, params?: Record<string, unknown>) => string,
-): string {
-  const bits: string[] = []
-  for (const p of parts) {
-    switch (p.type) {
-      case 'completed':
-        bits.push(t('chat.activity.completed'))
-        break
-      case 'stopped':
-        bits.push(t('chat.activity.stopped'))
-        break
-      case 'toolCount':
-        bits.push(t('chat.activity.toolCount', { finished: p.finished, total: p.total }))
-        break
-      case 'agentCount':
-        bits.push(t('chat.activity.agentCount', { agents: p.agents }))
-        break
-      case 'partialTools':
-        bits.push(t('chat.activity.partialTools', { count: p.count }))
-        break
-      case 'categorySummary': {
-        const segs: string[] = []
-        // Prefer edit + shell first (craft upgrade PR-3), then read/search/browse.
-        if (p.edit > 0) segs.push(t('chat.activity.catEdit', { count: p.edit }))
-        if (p.shell > 0) segs.push(t('chat.activity.catShell', { count: p.shell }))
-        if (p.read > 0) segs.push(t('chat.activity.catRead', { count: p.read }))
-        if (p.search > 0) segs.push(t('chat.activity.catSearch', { count: p.search }))
-        if (p.browse > 0) segs.push(t('chat.activity.catBrowse', { count: p.browse }))
-        if (segs.length) bits.push(segs.join(' · '))
-        break
-      }
-      case 'elapsed': {
-        bits.push(formatElapsed(p.ms))
-        break
-      }
-      case 'taskHint':
-        bits.push(p.text)
-        break
-      case 'runningTool':
-        bits.push(t('chat.activity.runningTool', { name: p.label }))
-        break
-      case 'runningReasoning':
-        bits.push(t('chat.activity.runningReasoning'))
-        break
-      case 'initializing':
-        bits.push(t('chat.activity.initializing'))
-        break
-      case 'writing':
-        bits.push(t('chat.activity.writing'))
-        break
-      case 'parallelAgents':
-        bits.push(
-          p.running > 0
-            ? t('chat.activity.parallelAgentsRunning', { total: p.total, running: p.running })
-            : t('chat.activity.parallelAgents', { total: p.total }),
-        )
-        break
-      case 'planProgress':
-        bits.push(t('chat.activity.planProgress', { done: p.done, total: p.total }))
-        break
-    }
-  }
-  return bits.join(' · ')
 }
 
 export function ActivityBar({
@@ -125,7 +58,10 @@ export function ActivityBar({
     [streaming, stopped, hasAssistantContent, steps, toolCalls, agentRuns],
   )
 
-  const summaryText = formatParts(parts, t as (key: string, params?: Record<string, unknown>) => string)
+  const summaryText = formatActivityParts(
+    parts,
+    t as (key: string, params?: Record<string, unknown>) => string,
+  )
 
   const hasActivity = steps.length > 0 || toolCalls.length > 0 || agentRuns.length > 0
   // Process chrome (tools / reasoning / SubAgentCards) defaults collapsed.

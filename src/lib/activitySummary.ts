@@ -260,18 +260,67 @@ export function buildActivitySummary(input: ActivitySummaryInput): {
   return { status, parts }
 }
 
-/** Wall-clock ms from agentRuns when available. */
-export function activityElapsedMs(agentRuns: AgentRun[] | undefined): number | null {
+/**
+ * Earliest agent run start, or `fallback` (e.g. message.timestamp) when runs are missing.
+ */
+export function activityStartedAt(
+  agentRuns: AgentRun[] | undefined,
+  fallback?: number | null,
+): number | null {
+  if (agentRuns?.length) {
+    let min = Infinity
+    for (const r of agentRuns) {
+      if (typeof r.startedAt === 'number') min = Math.min(min, r.startedAt)
+    }
+    if (Number.isFinite(min)) return min
+  }
+  return typeof fallback === 'number' && Number.isFinite(fallback) ? fallback : null
+}
+
+/**
+ * Wall-clock ms from agentRuns when available.
+ * Pass `now` while the turn is still running so unfinished runs use wall time as end.
+ */
+export function activityElapsedMs(
+  agentRuns: AgentRun[] | undefined,
+  opts?: { now?: number },
+): number | null {
   if (!agentRuns?.length) return null
   let min = Infinity
   let max = -Infinity
+  const liveEnd = opts?.now
   for (const r of agentRuns) {
     if (typeof r.startedAt === 'number') min = Math.min(min, r.startedAt)
-    const end = r.finishedAt ?? r.startedAt
+    const end =
+      typeof r.finishedAt === 'number'
+        ? r.finishedAt
+        : liveEnd != null
+          ? liveEnd
+          : r.startedAt
     if (typeof end === 'number') max = Math.max(max, end)
   }
   if (!Number.isFinite(min) || !Number.isFinite(max) || max < min) return null
   return max - min
+}
+
+/**
+ * Elapsed ms for a turn: prefer agentRuns; while live, fall back to wall clock from start.
+ */
+export function turnElapsedMs(input: {
+  agentRuns?: AgentRun[]
+  startedAt?: number | null
+  streaming?: boolean
+  now?: number
+}): number | null {
+  const now = input.now ?? Date.now()
+  if (input.streaming) {
+    const fromRuns = activityElapsedMs(input.agentRuns, { now })
+    if (fromRuns != null && fromRuns >= 0) return fromRuns
+    const start = activityStartedAt(input.agentRuns, input.startedAt)
+    if (start == null) return null
+    return Math.max(0, now - start)
+  }
+  return activityElapsedMs(input.agentRuns)
 }
 
 export function formatElapsed(ms: number): string {
@@ -280,4 +329,71 @@ export function formatElapsed(ms: number): string {
   const m = Math.floor(sec / 60)
   const s = sec % 60
   return s > 0 ? `${m}m ${s}s` : `${m}m`
+}
+
+/** i18n-aware join of summary parts for ActivityBar / TurnStatusLine. */
+export function formatActivityParts(
+  parts: SummaryPart[],
+  t: (key: string, params?: Record<string, unknown>) => string,
+): string {
+  const bits: string[] = []
+  for (const p of parts) {
+    switch (p.type) {
+      case 'completed':
+        bits.push(t('chat.activity.completed'))
+        break
+      case 'stopped':
+        bits.push(t('chat.activity.stopped'))
+        break
+      case 'toolCount':
+        bits.push(t('chat.activity.toolCount', { finished: p.finished, total: p.total }))
+        break
+      case 'agentCount':
+        bits.push(t('chat.activity.agentCount', { agents: p.agents }))
+        break
+      case 'partialTools':
+        bits.push(t('chat.activity.partialTools', { count: p.count }))
+        break
+      case 'categorySummary': {
+        const segs: string[] = []
+        // Prefer edit + shell first (craft upgrade PR-3), then read/search/browse.
+        if (p.edit > 0) segs.push(t('chat.activity.catEdit', { count: p.edit }))
+        if (p.shell > 0) segs.push(t('chat.activity.catShell', { count: p.shell }))
+        if (p.read > 0) segs.push(t('chat.activity.catRead', { count: p.read }))
+        if (p.search > 0) segs.push(t('chat.activity.catSearch', { count: p.search }))
+        if (p.browse > 0) segs.push(t('chat.activity.catBrowse', { count: p.browse }))
+        if (segs.length) bits.push(segs.join(' · '))
+        break
+      }
+      case 'elapsed':
+        bits.push(formatElapsed(p.ms))
+        break
+      case 'taskHint':
+        bits.push(p.text)
+        break
+      case 'runningTool':
+        bits.push(t('chat.activity.runningTool', { name: p.label }))
+        break
+      case 'runningReasoning':
+        bits.push(t('chat.activity.runningReasoning'))
+        break
+      case 'initializing':
+        bits.push(t('chat.activity.initializing'))
+        break
+      case 'writing':
+        bits.push(t('chat.activity.writing'))
+        break
+      case 'parallelAgents':
+        bits.push(
+          p.running > 0
+            ? t('chat.activity.parallelAgentsRunning', { total: p.total, running: p.running })
+            : t('chat.activity.parallelAgents', { total: p.total }),
+        )
+        break
+      case 'planProgress':
+        bits.push(t('chat.activity.planProgress', { done: p.done, total: p.total }))
+        break
+    }
+  }
+  return bits.join(' · ')
 }

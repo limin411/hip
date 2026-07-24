@@ -134,6 +134,50 @@ describe('MessageBubble', () => {
     expect(screen.getByTestId('message-usage')).toHaveTextContent('15')
   })
 
+  it('shows bottom turn status after completion with duration', () => {
+    render(
+      <MessageBubble
+        message={{
+          id: 'm4b',
+          role: 'assistant',
+          content: 'done',
+          timestamp: 1000,
+          agentRuns: [
+            {
+              agentId: 'supervisor',
+              role: 'supervisor',
+              output: '',
+              startedAt: 1000,
+              finishedAt: 4500,
+              seq: 0,
+            },
+          ],
+        } as any}
+      />,
+    )
+    const status = screen.getByTestId('turn-status-line')
+    expect(status).toHaveAttribute('data-phase', 'settled')
+    expect(status).toHaveTextContent('已完成')
+    expect(status).toHaveTextContent('4s')
+  })
+
+  it('shows bottom turn status while streaming', () => {
+    render(
+      <MessageBubble
+        message={{
+          id: 'm4c',
+          role: 'assistant',
+          content: 'partial',
+          timestamp: Date.now() - 2000,
+        } as any}
+        streaming
+      />,
+    )
+    const status = screen.getByTestId('turn-status-line')
+    expect(status).toHaveAttribute('data-phase', 'running')
+    expect(screen.getByTestId('turn-status-spinner')).toBeInTheDocument()
+  })
+
   it('shows message timestamp when available', () => {
     const now = Date.now()
     render(

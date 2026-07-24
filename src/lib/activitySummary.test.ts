@@ -7,6 +7,9 @@ import {
   extractTaskHint,
   formatElapsed,
   activityElapsedMs,
+  activityStartedAt,
+  turnElapsedMs,
+  formatActivityParts,
 } from './activitySummary'
 
 const tc = (over: Partial<ToolCall> & Pick<ToolCall, 'callId' | 'name'>): ToolCall => ({
@@ -191,5 +194,55 @@ describe('activitySummary', () => {
     expect(activityElapsedMs(runs)).toBe(3000)
     expect(formatElapsed(3000)).toBe('3s')
     expect(formatElapsed(125000)).toBe('2m 5s')
+  })
+
+  it('activityElapsedMs uses now for unfinished runs', () => {
+    const runs: AgentRun[] = [
+      {
+        agentId: 'supervisor',
+        role: 'supervisor',
+        output: '',
+        startedAt: 1000,
+        finishedAt: null,
+        seq: 1,
+      },
+    ]
+    expect(activityElapsedMs(runs, { now: 4500 })).toBe(3500)
+  })
+
+  it('activityStartedAt and turnElapsedMs cover live + settled', () => {
+    const runs: AgentRun[] = [
+      {
+        agentId: 'supervisor',
+        role: 'supervisor',
+        output: '',
+        startedAt: 2000,
+        finishedAt: null,
+        seq: 1,
+      },
+    ]
+    expect(activityStartedAt(runs)).toBe(2000)
+    expect(activityStartedAt(undefined, 900)).toBe(900)
+    expect(turnElapsedMs({ agentRuns: runs, streaming: true, now: 5000 })).toBe(3000)
+    expect(turnElapsedMs({ startedAt: 1000, streaming: true, now: 2500 })).toBe(1500)
+    expect(
+      turnElapsedMs({
+        agentRuns: [{ ...runs[0], finishedAt: 8000 }],
+        streaming: false,
+      }),
+    ).toBe(6000)
+  })
+
+  it('formatActivityParts joins completed + elapsed', () => {
+    const text = formatActivityParts(
+      [{ type: 'completed' }, { type: 'elapsed', ms: 3000 }],
+      (key, params) => {
+        if (key === 'chat.activity.completed') return '已完成'
+        if (key === 'chat.activity.elapsed') return String(params?.time ?? '')
+        return key
+      },
+    )
+    // elapsed part formats via formatElapsed inside formatActivityParts
+    expect(text).toBe('已完成 · 3s')
   })
 })

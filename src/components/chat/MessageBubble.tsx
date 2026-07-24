@@ -18,8 +18,8 @@ import { SubAgentLanes } from '@/components/artifact/SubAgentLanes'
 import { ACTIVITY_LANES } from './craftFeature'
 import { groupByAgent } from '@/lib/turnAgents'
 import { normalizeMessageContent } from '@/lib/normalizeMessageContent'
-import { activityElapsedMs, formatElapsed } from '@/lib/activitySummary'
 import { MarkdownBody } from './MarkdownBody'
+import { TurnStatusLine } from './TurnStatusLine'
 import * as chatFeature from './feature'
 import { hasRenderableSupervisorText } from '@/lib/timelineFilter'
 import { cn } from '@/lib/utils'
@@ -125,11 +125,6 @@ function MessageBubbleImpl({ message, streaming, isLastAssistant, hidePlan }: Me
     hasRenderableSupervisorText(message.timeline)
   const hideAnswerBody = interleavedBlocks
 
-  const elapsedMs = useMemo(
-    () => (isUser || isNotice ? null : activityElapsedMs(message.agentRuns)),
-    [isUser, isNotice, message.agentRuns],
-  )
-
   // After all hooks — Rules of Hooks safe if role ever flips on the same instance.
   if (isNotice) return <NoticeRow content={message.content} />
 
@@ -156,7 +151,8 @@ function MessageBubbleImpl({ message, streaming, isLastAssistant, hidePlan }: Me
         )}
       </div>
       <div className="min-w-0">
-        {message.role === 'assistant' && (hasProcess || streaming) && (
+        {/* Process trail (tools / timeline) stays above the answer; live stage is TurnStatusLine below. */}
+        {message.role === 'assistant' && hasProcess && (
           // O3: when interleaved, do not force text-meta/tertiary on the whole process
           // region so supervisor text blocks keep primary answer weight (MarkdownBody ink).
           <div
@@ -225,6 +221,18 @@ function MessageBubbleImpl({ message, streaming, isLastAssistant, hidePlan }: Me
           </div>
         )}
         {streaming && <StreamingCursor />}
+        {/* Bottom turn status: live phase while streaming; settle status + duration when done. */}
+        {!isUser && (
+          <TurnStatusLine
+            streaming={!!streaming}
+            stopped={!!message.stopped}
+            hasAssistantContent={!!displayContent.trim()}
+            steps={message.timeline}
+            toolCalls={message.toolCalls}
+            agentRuns={message.agentRuns}
+            startedAt={message.timestamp}
+          />
+        )}
       </div>
       {!streaming && message.role === 'assistant' && (
         <ArtifactCard toolCalls={message.toolCalls} />
@@ -258,22 +266,17 @@ function MessageBubbleImpl({ message, streaming, isLastAssistant, hidePlan }: Me
               </DropdownMenuContent>
             </DropdownMenu>
           )}
-          {message.role === 'assistant' && (elapsedMs != null || message.usage) && (
+          {/* Tokens only here — status + duration live on TurnStatusLine. */}
+          {message.role === 'assistant' && message.usage && (
             <span
               data-testid="message-usage"
-              title={
-                message.usage
-                  ? t('chat.usage.io', { input: message.usage.inputTokens, output: message.usage.outputTokens })
-                  : undefined
-              }
+              title={t('chat.usage.io', {
+                input: message.usage.inputTokens,
+                output: message.usage.outputTokens,
+              })}
               className="text-ink-tertiary"
             >
-              {[
-                elapsedMs != null ? t('chat.activity.elapsed', { time: formatElapsed(elapsedMs) }) : null,
-                message.usage ? t('chat.usage.tokens', { total: message.usage.totalTokens }) : null,
-              ]
-                .filter(Boolean)
-                .join(' · ')}
+              {t('chat.usage.tokens', { total: message.usage.totalTokens })}
             </span>
           )}
         </div>

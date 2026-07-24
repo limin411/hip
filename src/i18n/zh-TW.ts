@@ -796,6 +796,16 @@ export const zhTW = {
     "trashRetention": "回收站保留天數",
     "trashRetentionDesc": "移入回收站的會話將在此天數後自動永久刪除（1–365）。",
     "trashRetentionUnit": "天",
+    "windowSection": "視窗與背景",
+    "closeAction": "關閉視窗時",
+    "closeActionDesc": "隱藏到系統匣後 agent、終端與 sidecar 會繼續執行。真正退出請使用系統匣選單或「結束 hip」。",
+    "closeActions": {
+      "hide": "隱藏到系統匣",
+      "quit": "結束 hip",
+      "ask": "每次詢問"
+    },
+    "trayEnabled": "系統匣圖示",
+    "trayEnabledDesc": "透過系統匣圖示還原視窗或結束。選擇「隱藏到系統匣」時會自動開啟。",
     "contextMenu": {
       "title": "右鍵選單",
       "description": "選擇要顯示的右鍵操作及其順序。",

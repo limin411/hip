@@ -764,6 +764,18 @@ export const en = {
       trashRetentionDesc:
         'Soft-deleted sessions are permanently removed after this many days (1–365).',
       trashRetentionUnit: 'days',
+      windowSection: 'Window & background',
+      closeAction: 'When closing the window',
+      closeActionDesc:
+        'Hide keeps agents, terminals, and the sidecar running in the tray. Quit fully exits hip. Use the tray menu or Quit to exit while hidden.',
+      closeActions: {
+        hide: 'Hide to system tray',
+        quit: 'Quit hip',
+        ask: 'Ask every time',
+      },
+      trayEnabled: 'System tray icon',
+      trayEnabledDesc:
+        'Show a tray icon to restore the window or quit. Required for “Hide to system tray”.',
       contextMenu: {
         title: 'Context menus',
         description: 'Choose which right-click actions appear and in what order.',

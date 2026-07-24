@@ -874,6 +874,15 @@ describe('protocol: McpServerConfig extended fields (Todo 1)', () => {
     expect(round.terminal).toEqual({ shell: 'cmd', colorTheme: 'dracula' })
   })
 
+  it('round-trips window on HipConfig through JSON', () => {
+    const cfg: HipConfig = {
+      version: 1,
+      window: { closeAction: 'hide', trayEnabled: true },
+    }
+    const round = JSON.parse(JSON.stringify(cfg)) as HipConfig
+    expect(round.window).toEqual({ closeAction: 'hide', trayEnabled: true })
+  })
+
   it('TERMINAL_COLOR_THEME_IDS includes follow and is non-empty', () => {
     expect(TERMINAL_COLOR_THEME_IDS.length).toBeGreaterThan(0)
     expect(TERMINAL_COLOR_THEME_IDS).toContain('follow')

@@ -137,6 +137,28 @@ LangSmith **Thread**。根 run 的 **name** 也是 session id。LLM span 名为
 sqlite3 ~/.hip/db/hip.db 'VACUUM;'
 ```
 
+### 关闭窗口与系统托盘
+
+默认关闭主窗口会 **退出** hip（sidecar、agent 与 CLI attach 一并结束）。可在 **设置 → 通用 → 窗口与后台** 中配置：
+
+| 选项 | 效果 |
+|------|------|
+| **隐藏到系统托盘** | 关窗仅隐藏；agent / 终端 / sidecar 继续运行。托盘左键或「显示主界面」恢复；「退出」干净退出。 |
+| **退出 hip** | 关窗即退出（历史默认）。 |
+| **系统托盘图标** | 显示托盘图标（选隐藏时会自动开启）。 |
+
+```toml
+# ~/.hip/config/hip.toml
+[window]
+closeAction = "hide"   # hide | quit | ask（ask 的 UI 为 Phase 2）
+trayEnabled = true
+```
+
+- **Cmd+Q** / 应用菜单退出始终真正退出（不会只隐藏）。
+- 隐藏模式下产品 CLI 仍可 attach 到运行中的桌面进程。
+- 逃生开关：`HIP_TRAY=0` 强制关窗退出并禁用托盘。
+- Release 构建为单实例（二次启动聚焦已有窗口）；开发模式允许多实例。
+
 ### 常用脚本
 
 | 命令 | 说明 |

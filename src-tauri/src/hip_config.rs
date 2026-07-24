@@ -156,6 +156,26 @@ pub(crate) struct TerminalConfig {
     pub(crate) color_theme: Option<String>,
 }
 
+/// Optional `[window]` section. JSON uses camelCase for the UI.
+/// Must be preserved on set_hip_config rewrites so close/tray policy is not stripped.
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct WindowConfig {
+    /// hide | quit | ask
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub(crate) close_action: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub(crate) tray_enabled: Option<bool>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub(crate) tray_always_visible: Option<bool>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub(crate) close_prompt_seen: Option<bool>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub(crate) launch_at_login: Option<bool>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub(crate) notify_on_agent_complete: Option<bool>,
+}
+
 /// Optional `[acp]` host policy. JSON uses camelCase for the UI.
 /// Must be preserved on set_hip_config rewrites so MCP forward / FS bridge flags are not stripped.
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
@@ -210,6 +230,9 @@ pub(crate) struct HipConfig {
     /// Optional Terminal defaults. Preserved on set_hip_config rewrites.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub(crate) terminal: Option<TerminalConfig>,
+    /// Optional window close / tray policy. Preserved on set_hip_config rewrites.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub(crate) window: Option<WindowConfig>,
     /// Optional ACP host policy. Preserved on set_hip_config rewrites.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub(crate) acp: Option<AcpHostConfig>,
@@ -394,6 +417,29 @@ pub(crate) struct TomlTerminalConfig {
     pub(crate) color_theme: Option<String>,
 }
 
+/// TOML mirror for `[window]` (snake_case keys; camelCase aliases for hand-edited files).
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+#[allow(dead_code)]
+pub(crate) struct TomlWindowConfig {
+    #[serde(default, skip_serializing_if = "Option::is_none", alias = "closeAction")]
+    pub(crate) close_action: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none", alias = "trayEnabled")]
+    pub(crate) tray_enabled: Option<bool>,
+    #[serde(default, skip_serializing_if = "Option::is_none", alias = "trayAlwaysVisible")]
+    pub(crate) tray_always_visible: Option<bool>,
+    #[serde(default, skip_serializing_if = "Option::is_none", alias = "closePromptSeen")]
+    pub(crate) close_prompt_seen: Option<bool>,
+    #[serde(default, skip_serializing_if = "Option::is_none", alias = "launchAtLogin")]
+    pub(crate) launch_at_login: Option<bool>,
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        alias = "notifyOnAgentComplete"
+    )]
+    pub(crate) notify_on_agent_complete: Option<bool>,
+}
+
 /// TOML mirror for `[acp]` (snake_case keys; camelCase aliases for hand-edited files).
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
@@ -441,6 +487,8 @@ pub(crate) struct TomlHipConfig {
     pub(crate) langsmith: Option<TomlLangSmithConfig>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub(crate) terminal: Option<TomlTerminalConfig>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub(crate) window: Option<TomlWindowConfig>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub(crate) acp: Option<TomlAcpHostConfig>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -709,6 +757,32 @@ impl From<TomlTerminalConfig> for TerminalConfig {
     }
 }
 
+impl From<WindowConfig> for TomlWindowConfig {
+    fn from(w: WindowConfig) -> Self {
+        TomlWindowConfig {
+            close_action: w.close_action,
+            tray_enabled: w.tray_enabled,
+            tray_always_visible: w.tray_always_visible,
+            close_prompt_seen: w.close_prompt_seen,
+            launch_at_login: w.launch_at_login,
+            notify_on_agent_complete: w.notify_on_agent_complete,
+        }
+    }
+}
+
+impl From<TomlWindowConfig> for WindowConfig {
+    fn from(w: TomlWindowConfig) -> Self {
+        WindowConfig {
+            close_action: w.close_action,
+            tray_enabled: w.tray_enabled,
+            tray_always_visible: w.tray_always_visible,
+            close_prompt_seen: w.close_prompt_seen,
+            launch_at_login: w.launch_at_login,
+            notify_on_agent_complete: w.notify_on_agent_complete,
+        }
+    }
+}
+
 impl From<AcpHostConfig> for TomlAcpHostConfig {
     fn from(a: AcpHostConfig) -> Self {
         TomlAcpHostConfig {
@@ -759,6 +833,7 @@ impl From<HipConfig> for TomlHipConfig {
             agent_loop: cfg.agent_loop.map(|x| x.into()),
             langsmith: cfg.langsmith.map(|x| x.into()),
             terminal: cfg.terminal.map(|x| x.into()),
+            window: cfg.window.map(|x| x.into()),
             acp: cfg.acp.map(|x| x.into()),
             plan: cfg.plan.map(|x| x.into()),
         }
@@ -779,6 +854,7 @@ impl From<TomlHipConfig> for HipConfig {
             agent_loop: cfg.agent_loop.map(|x| x.into()),
             langsmith: cfg.langsmith.map(|x| x.into()),
             terminal: cfg.terminal.map(|x| x.into()),
+            window: cfg.window.map(|x| x.into()),
             acp: cfg.acp.map(|x| x.into()),
             plan: cfg.plan.map(|x| x.into()),
         }

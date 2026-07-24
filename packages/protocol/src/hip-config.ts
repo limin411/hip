@@ -198,6 +198,50 @@ export interface TrashConfig {
 }
 
 /**
+ * Close-window behavior for the main desktop shell.
+ * - `hide` — hide to system tray (sidecar / agents keep running)
+ * - `quit` — exit the app (historical default when unset)
+ * - `ask` — prompt each time (Phase 2 UI; accepted in config for forward-compat)
+ */
+export type WindowCloseAction = 'hide' | 'quit' | 'ask'
+
+export const WINDOW_CLOSE_ACTIONS: readonly WindowCloseAction[] = ['hide', 'quit', 'ask'] as const
+
+export function isWindowCloseAction(v: string): v is WindowCloseAction {
+  return (WINDOW_CLOSE_ACTIONS as readonly string[]).includes(v)
+}
+
+/**
+ * Optional `[window]` section in hip.toml — close behavior & system tray.
+ *
+ * ```toml
+ * [window]
+ * closeAction = "hide"   # hide | quit | ask
+ * trayEnabled = true
+ * ```
+ *
+ * Resolved defaults when omitted (Phase 1 zero-surprise for existing installs):
+ * `closeAction=quit`, `trayEnabled=false`.
+ */
+export interface WindowConfig {
+  /** Behavior when the user closes the main window chrome. */
+  closeAction?: WindowCloseAction
+  /** Create a system tray icon. When false, close always quits. */
+  trayEnabled?: boolean
+  /**
+   * If true, tray exists whenever trayEnabled.
+   * Phase 1: always treated as true when tray is enabled (field reserved).
+   */
+  trayAlwaysVisible?: boolean
+  /** User completed first-close dialog (Phase 2). */
+  closePromptSeen?: boolean
+  /** Launch hip at OS login (Phase 3). */
+  launchAtLogin?: boolean
+  /** OS notification when an agent turn finishes while hidden (Phase 3). */
+  notifyOnAgentComplete?: boolean
+}
+
+/**
  * Optional `[acp]` host policy in hip.toml.
  * Controls ACP client capabilities advertised to external agents and host-side bridges.
  *
@@ -300,6 +344,8 @@ export interface HipConfig {
   terminal?: TerminalConfig
   /** Optional product recycle-bin retention. */
   trash?: TrashConfig
+  /** Optional main-window close behavior & system tray. */
+  window?: WindowConfig
   /** Optional ACP host policy (FS bridge, MCP forward). */
   acp?: AcpHostConfig
   /** Optional plan-mode product knobs (composer soft-approve, etc.). */

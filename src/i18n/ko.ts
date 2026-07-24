@@ -788,6 +788,16 @@ export const ko = {
     "trashRetention": "휴지통 보관 기간",
     "trashRetentionDesc": "소프트 삭제된 세션은 이 일수(1~365일) 후에 영구적으로 제거됩니다.",
     "trashRetentionUnit": "일",
+    "windowSection": "창 및 백그라운드",
+    "closeAction": "창을 닫을 때",
+    "closeActionDesc": "트레이로 숨기면 agent, 터미널, sidecar가 계속 실행됩니다. 완전히 종료하려면 트레이 메뉴 또는 「hip 종료」를 사용하세요.",
+    "closeActions": {
+      "hide": "시스템 트레이로 숨기기",
+      "quit": "hip 종료",
+      "ask": "매번 묻기"
+    },
+    "trayEnabled": "시스템 트레이 아이콘",
+    "trayEnabledDesc": "트레이에서 창을 복원하거나 종료할 수 있습니다. 「시스템 트레이로 숨기기」 선택 시 자동으로 켜집니다.",
     "contextMenu": {
       "title": "컨텍스트 메뉴",
       "description": "표시할 오른쪽 클릭 동작과 순서를 선택하세요.",

@@ -11,6 +11,13 @@ import { detectHipPlatform } from '@/lib/platform'
 import { useUiStore, type AppLanguage, type Theme, type UiDensity } from '@/store/uiStore'
 import { useHipConfigStore } from '@/store/hipConfigStore'
 import {
+  CLOSE_ACTION_OPTIONS,
+  resolveCloseAction,
+  resolveTrayEnabled,
+  setWindowPolicy,
+} from '@/ipc/windowPolicy'
+import { Switch } from '@/components/ui/Switch'
+import {
   resolveTrashRetentionDays,
   TRASH_RETENTION_MAX_DAYS,
   TRASH_RETENTION_MIN_DAYS,
@@ -60,6 +67,8 @@ export function GeneralSettings() {
   const trashRetention = resolveTrashRetentionDays(
     useHipConfigStore((s) => s.config.trash?.retentionDays),
   )
+  const closeAction = resolveCloseAction(useHipConfigStore((s) => s.config.window?.closeAction))
+  const trayEnabled = resolveTrayEnabled(useHipConfigStore((s) => s.config.window?.trayEnabled))
   const updateSection = useHipConfigStore((s) => s.updateSection)
   const loadHipConfig = useHipConfigStore((s) => s.load)
   const hipLoaded = useHipConfigStore((s) => s.loaded)
@@ -80,6 +89,32 @@ export function GeneralSettings() {
   }
   const setTerminalColor = (colorTheme: TerminalColorThemeId) => {
     void updateSection('terminal', (prev) => ({ ...(prev ?? {}), colorTheme }))
+  }
+
+  const pushWindowPolicy = (nextClose: 'hide' | 'quit', nextTray: boolean) => {
+    void setWindowPolicy(nextClose, nextTray)
+  }
+
+  const setCloseAction = (action: 'hide' | 'quit') => {
+    // Choosing hide without tray would be a no-op at runtime — auto-enable tray.
+    const nextTray = action === 'hide' ? true : trayEnabled
+    void updateSection('window', (prev) => ({
+      ...(prev ?? {}),
+      closeAction: action,
+      trayEnabled: nextTray,
+    }))
+    pushWindowPolicy(action, nextTray)
+  }
+
+  const setTrayEnabled = (enabled: boolean) => {
+    // Turning tray off while closeAction is hide → fall back to quit.
+    const nextClose: 'hide' | 'quit' = !enabled && closeAction === 'hide' ? 'quit' : closeAction
+    void updateSection('window', (prev) => ({
+      ...(prev ?? {}),
+      closeAction: nextClose,
+      trayEnabled: enabled,
+    }))
+    pushWindowPolicy(nextClose, enabled)
   }
 
   const commitTrashRetention = () => {
@@ -271,6 +306,68 @@ export function GeneralSettings() {
             {t('settings.trashRetentionUnit', { defaultValue: 'days' })}
           </span>
         </div>
+      </div>
+      <div className="px-8 pb-1 pt-5">
+        <h3 className="text-meta font-semibold uppercase tracking-wide text-ink-tertiary">
+          {t('settings.windowSection')}
+        </h3>
+      </div>
+      <div
+        className="flex items-center justify-between gap-6 px-8 py-4"
+        data-testid="settings-close-action"
+      >
+        <div className="min-w-0 flex-1">
+          <div className="text-body font-medium text-ink">{t('settings.closeAction')}</div>
+          <div className="mt-0.5 text-meta leading-relaxed text-ink-tertiary">
+            {t('settings.closeActionDesc')}
+          </div>
+        </div>
+        <div className="relative shrink-0">
+          <DropdownMenu modal={false}>
+            <DropdownMenuTrigger asChild>
+              <button
+                type="button"
+                className={selectTriggerCls}
+                data-testid="settings-close-action-trigger"
+              >
+                <span>{t(`settings.closeActions.${closeAction}`)}</span>
+                <ChevronDown size={14} strokeWidth={1.75} className="shrink-0 text-ink-tertiary" />
+              </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              {CLOSE_ACTION_OPTIONS.map((action) => (
+                <DropdownMenuItem
+                  key={action}
+                  data-testid={`settings-close-action-${action}`}
+                  onSelect={() => setCloseAction(action)}
+                >
+                  <Check
+                    size={14}
+                    className={cn('shrink-0', closeAction === action ? 'opacity-100' : 'opacity-0')}
+                  />
+                  <span>{t(`settings.closeActions.${action}`)}</span>
+                </DropdownMenuItem>
+              ))}
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
+      </div>
+      <div
+        className="flex items-center justify-between gap-6 px-8 py-4"
+        data-testid="settings-tray-enabled"
+      >
+        <div className="min-w-0 flex-1">
+          <div className="text-body font-medium text-ink">{t('settings.trayEnabled')}</div>
+          <div className="mt-0.5 text-meta leading-relaxed text-ink-tertiary">
+            {t('settings.trayEnabledDesc')}
+          </div>
+        </div>
+        <Switch
+          checked={trayEnabled}
+          onCheckedChange={setTrayEnabled}
+          ariaLabel={t('settings.trayEnabled')}
+          data-testid="settings-tray-enabled-switch"
+        />
       </div>
       {CONTEXT_MENUS ? <ContextMenuSettings /> : null}
     </div>

@@ -17,10 +17,12 @@ import type {
   TerminalConfig,
   TerminalShellPref,
   TrashConfig,
+  WindowConfig,
+  WindowCloseAction,
   AcpHostConfig,
   PlanConfig,
 } from '@hip/protocol'
-import { isTerminalColorThemeId } from '@hip/protocol'
+import { isTerminalColorThemeId, isWindowCloseAction } from '@hip/protocol'
 import { parseDoomLoopStrategy } from '../session/doom-loop.js'
 
 const DEFAULT_CONFIG: HipConfig = { version: 1 }
@@ -319,6 +321,29 @@ function normalizeTrash(raw: Record<string, unknown>): TrashConfig {
   return out
 }
 
+/** Normalize `[window]` close / tray policy (camelCase + snake_case aliases). */
+function normalizeWindow(raw: Record<string, unknown>): WindowConfig {
+  const out: WindowConfig = {}
+  const actionRaw = raw.closeAction ?? raw.close_action
+  if (typeof actionRaw === 'string') {
+    const action = actionRaw.trim().toLowerCase()
+    if (isWindowCloseAction(action)) {
+      out.closeAction = action as WindowCloseAction
+    }
+  }
+  const tray = raw.trayEnabled ?? raw.tray_enabled
+  if (typeof tray === 'boolean') out.trayEnabled = tray
+  const always = raw.trayAlwaysVisible ?? raw.tray_always_visible
+  if (typeof always === 'boolean') out.trayAlwaysVisible = always
+  const seen = raw.closePromptSeen ?? raw.close_prompt_seen
+  if (typeof seen === 'boolean') out.closePromptSeen = seen
+  const login = raw.launchAtLogin ?? raw.launch_at_login
+  if (typeof login === 'boolean') out.launchAtLogin = login
+  const notify = raw.notifyOnAgentComplete ?? raw.notify_on_agent_complete
+  if (typeof notify === 'boolean') out.notifyOnAgentComplete = notify
+  return out
+}
+
 /** Normalize `[plan]` product knobs (camelCase + snake_case aliases). */
 function normalizePlan(raw: Record<string, unknown>): PlanConfig {
   const out: PlanConfig = {}
@@ -419,6 +444,11 @@ function validateConfig(parsed: unknown, filePath: string): HipConfig {
   const trash = obj.trash
   if (trash && typeof trash === 'object' && !Array.isArray(trash)) {
     config.trash = normalizeTrash(trash as Record<string, unknown>)
+  }
+
+  const windowSec = obj.window
+  if (windowSec && typeof windowSec === 'object' && !Array.isArray(windowSec)) {
+    config.window = normalizeWindow(windowSec as Record<string, unknown>)
   }
 
   const acp = obj.acp

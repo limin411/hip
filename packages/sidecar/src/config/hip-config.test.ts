@@ -377,6 +377,48 @@ shell = "fish"
     expect(cfg.terminal).toEqual({})
   })
 
+  it('reads [window] closeAction / trayEnabled (snake + camel)', () => {
+    const dir = tmpDir()
+    const snake = writeToml(
+      dir,
+      'window-snake.toml',
+      `version = 1
+[window]
+close_action = "hide"
+tray_enabled = true
+`,
+    )
+    process.env.HIP_CONFIG_PATH = snake
+    expect(readHipConfig().window).toEqual({ closeAction: 'hide', trayEnabled: true })
+
+    const camel = writeToml(
+      dir,
+      'window-camel.toml',
+      `version = 1
+[window]
+closeAction = "quit"
+trayEnabled = false
+`,
+    )
+    process.env.HIP_CONFIG_PATH = camel
+    expect(readHipConfig().window).toEqual({ closeAction: 'quit', trayEnabled: false })
+  })
+
+  it('ignores unknown window.closeAction values', () => {
+    const dir = tmpDir()
+    const p = writeToml(
+      dir,
+      'window-bad.toml',
+      `version = 1
+[window]
+close_action = "minimize"
+tray_enabled = true
+`,
+    )
+    process.env.HIP_CONFIG_PATH = p
+    expect(readHipConfig().window).toEqual({ trayEnabled: true })
+  })
+
   it('snake_case and camelCase TOML produce identical HipConfig objects', () => {
     const dir = tmpDir()
     const snakeFile = writeToml(dir, 'snake.toml', `version = 1

@@ -751,6 +751,17 @@ export const zhCN = {
       trashRetention: '回收站保留天数',
       trashRetentionDesc: '移入回收站的会话将在此天数后自动永久删除（1–365）。',
       trashRetentionUnit: '天',
+      windowSection: '窗口与后台',
+      closeAction: '关闭窗口时',
+      closeActionDesc:
+        '隐藏到托盘后 agent、终端与 sidecar 继续运行。真正退出请使用托盘菜单或「退出 hip」。',
+      closeActions: {
+        hide: '隐藏到系统托盘',
+        quit: '退出 hip',
+        ask: '每次询问',
+      },
+      trayEnabled: '系统托盘图标',
+      trayEnabledDesc: '通过托盘图标恢复窗口或退出。选择「隐藏到系统托盘」时会自动开启。',
       contextMenu: {
         title: '右键菜单',
         description: '选择要显示的右键操作及其顺序。',

@@ -8,6 +8,7 @@ mod marketplace;
 mod path_env;
 mod logging;
 mod hip_config;
+mod window_tray;
 mod path_tools;
 mod pty;
 mod term_fs;
@@ -116,6 +117,7 @@ fn get_hip_config(app: tauri::AppHandle) -> Result<String, String> {
                 agent_loop: None,
                 langsmith: None,
                 terminal: None,
+                window: None,
                 acp: None,
                 plan: None,
             };
@@ -683,16 +685,32 @@ pub fn run() {
     // ACP/CLI agent can find globally-installed tools.
     path_env::ensure_user_path();
 
-    let app = tauri::Builder::default()
+    // Release builds: second launch focuses the existing window. Dev keeps multi-instance
+    // (and HIP_ALLOW_MULTI_INSTANCE=1 always allows multi-instance).
+    #[cfg_attr(debug_assertions, allow(unused_mut))]
+    let mut builder = tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_wdio_webdriver::init())
         .manage(SidecarState::new())
         .manage(terminal_budget::TerminalBudget::new())
-        .manage(pty::PtyManager::new());
+        .manage(pty::PtyManager::new())
+        .manage(window_tray::WindowPolicyState(std::sync::Mutex::new(
+            window_tray::WindowPolicy::default(),
+        )))
+        .manage(window_tray::TrayState(std::sync::Mutex::new(None)));
 
-    let app = app
+    #[cfg(not(debug_assertions))]
+    {
+        if std::env::var_os("HIP_ALLOW_MULTI_INSTANCE").is_none() {
+            builder = builder.plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
+                window_tray::show_main_window(app);
+            }));
+        }
+    }
+
+    let app = builder
         .manage(ssh_session::SshManager::new())
         .manage(sftp::SftpTransferState::new())
         .setup(|app| {
@@ -710,6 +728,14 @@ pub fn run() {
                 } else {
                     let _ = plugins::normalize_plugins_config_file(&plugins_path);
                 }
+            }
+            // Load [window] close/tray policy and install tray when enabled.
+            {
+                let policy = window_tray::load_policy_from_disk(app.handle());
+                if let Ok(mut slot) = app.state::<window_tray::WindowPolicyState>().0.lock() {
+                    *slot = policy;
+                }
+                window_tray::sync_tray(app.handle());
             }
             // Configured size (tauri.conf) may exceed this host's display — maximize instead.
             if let Some(window) = app.get_webview_window("main") {
@@ -745,6 +771,10 @@ pub fn run() {
             has_secrets,
             has_secret_keys,
             delete_secret,
+            window_tray::window_get_policy,
+            window_tray::window_set_policy,
+            window_tray::window_show_main,
+            window_tray::window_quit,
             terminal_hosts::terminal_hosts_list,
             terminal_hosts::terminal_hosts_save,
             models_catalog,
@@ -865,14 +895,23 @@ pub fn run() {
                 .state::<ssh_session::SshManager>()
                 .kill_all(&budget);
         }
-        // On macOS, closing the (single) window does not quit the app by default,
-        // which would leave the sidecar running. For this single-window app, treat
-        // window close as quit: exit() routes through ExitRequested above.
+        // Close chrome: hide to tray when policy says so; otherwise quit (historical default).
+        // exit() routes through ExitRequested above for sidecar / PTY / SSH cleanup.
         tauri::RunEvent::WindowEvent {
-            event: tauri::WindowEvent::CloseRequested { .. },
+            event: tauri::WindowEvent::CloseRequested { api, .. },
             ..
         } => {
-            app_handle.exit(0);
+            window_tray::handle_close_requested(app_handle, api);
+        }
+        // macOS Dock click when all windows are hidden → restore main window.
+        #[cfg(target_os = "macos")]
+        tauri::RunEvent::Reopen {
+            has_visible_windows,
+            ..
+        } => {
+            if !has_visible_windows {
+                window_tray::show_main_window(app_handle);
+            }
         }
         _ => {}
     });
@@ -978,6 +1017,7 @@ mod tests {
             agent_loop: None,
             langsmith: None,
             terminal: None,
+            window: None,
             acp: None,
             plan: None,
         }
@@ -1162,6 +1202,7 @@ mod tests {
             agent_loop: None,
             langsmith: None,
             terminal: None,
+            window: None,
             acp: None,
             plan: None,
         };
@@ -1336,6 +1377,7 @@ mod tests {
             agent_loop: None,
             langsmith: None,
             terminal: None,
+            window: None,
             acp: None,
             plan: None,
         };
@@ -1453,6 +1495,7 @@ mod tests {
             agent_loop: None,
             langsmith: None,
             terminal: None,
+            window: None,
             acp: None,
             plan: None,
         };
@@ -1492,6 +1535,7 @@ mod tests {
             }),
             langsmith: None,
             terminal: None,
+            window: None,
             acp: None,
             plan: None,
         };
@@ -1568,6 +1612,7 @@ doomLoopStrategy = "auto_continue"
                 shell: Some("cmd".into()),
                 color_theme: Some("dracula".into()),
             }),
+            window: None,
             acp: None,
             plan: None,
         };
@@ -1649,6 +1694,106 @@ colorTheme = "one-dark"
     }
 
     #[test]
+    fn window_survives_json_toml_roundtrip() {
+        // set_hip_config rewrites hip.toml from typed HipConfig; [window] must not be stripped.
+        let cfg = super::HipConfig {
+            version: 1,
+            providers: vec![],
+            active_model: None,
+            mcp_servers: vec![],
+            skills: vec![],
+            agents: vec![],
+            fixed_agents: None,
+            permissions: None,
+            agent_loop: None,
+            langsmith: None,
+            terminal: None,
+            window: Some(super::hip_config::WindowConfig {
+                close_action: Some("hide".into()),
+                tray_enabled: Some(true),
+                tray_always_visible: None,
+                close_prompt_seen: None,
+                launch_at_login: None,
+                notify_on_agent_complete: None,
+            }),
+            acp: None,
+            plan: None,
+        };
+
+        let json = serde_json::to_string(&cfg).unwrap();
+        assert!(json.contains("\"window\""), "JSON must emit window: {json}");
+        assert!(
+            json.contains("\"closeAction\""),
+            "JSON must emit closeAction: {json}"
+        );
+        assert!(
+            json.contains("\"trayEnabled\""),
+            "JSON must emit trayEnabled: {json}"
+        );
+        let from_json: super::HipConfig = serde_json::from_str(&json).unwrap();
+        let toml_cfg: super::TomlHipConfig = from_json.into();
+        let toml_str = toml::to_string_pretty(&toml_cfg).unwrap();
+        assert!(
+            toml_str.contains("[window]") || toml_str.contains("window"),
+            "TOML should contain window: {toml_str}"
+        );
+        assert!(
+            toml_str.contains("close_action") || toml_str.contains("hide"),
+            "TOML should preserve close_action: {toml_str}"
+        );
+        let from_toml: super::TomlHipConfig = toml::from_str(&toml_str).unwrap();
+        let back: super::HipConfig = from_toml.into();
+        assert_eq!(
+            back.window.as_ref().and_then(|w| w.close_action.as_deref()),
+            Some("hide")
+        );
+        assert_eq!(
+            back.window.as_ref().and_then(|w| w.tray_enabled),
+            Some(true)
+        );
+
+        let snake = r#"
+version = 1
+[window]
+close_action = "quit"
+tray_enabled = false
+"#;
+        let snake_cfg: super::TomlHipConfig = toml::from_str(snake).unwrap();
+        let snake_hip: super::HipConfig = snake_cfg.into();
+        assert_eq!(
+            snake_hip
+                .window
+                .as_ref()
+                .and_then(|w| w.close_action.as_deref()),
+            Some("quit")
+        );
+        assert_eq!(
+            snake_hip.window.as_ref().and_then(|w| w.tray_enabled),
+            Some(false)
+        );
+
+        let camel = r#"
+version = 1
+[window]
+closeAction = "hide"
+trayEnabled = true
+"#;
+        let camel_cfg: super::TomlHipConfig = toml::from_str(camel).unwrap();
+        let camel_hip: super::HipConfig = camel_cfg.into();
+        assert_eq!(
+            camel_hip
+                .window
+                .as_ref()
+                .and_then(|w| w.close_action.as_deref()),
+            Some("hide")
+        );
+        assert_eq!(
+            camel_hip.window.as_ref().and_then(|w| w.tray_enabled),
+            Some(true)
+        );
+    }
+
+    #[test]
     fn acp_survives_json_toml_roundtrip() {
         // set_hip_config rewrites hip.toml from typed HipConfig; acp host policy must not be stripped.
         let cfg = super::HipConfig {
@@ -1663,6 +1808,7 @@ colorTheme = "one-dark"
             agent_loop: None,
             langsmith: None,
             terminal: None,
+            window: None,
             acp: Some(super::hip_config::AcpHostConfig {
                 fs_bridge: Some(true),
                 forward_mcp: Some(true),
@@ -1736,6 +1882,7 @@ fsReadMaxBytes = 2000000
             agent_loop: None,
             langsmith: None,
             terminal: None,
+            window: None,
             acp: None,
             plan: Some(super::hip_config::PlanConfig {
                 soft_approve_on_composer: Some(true),
@@ -1814,6 +1961,7 @@ softApproveOnComposer = false
                 endpoint: Some("https://eu.api.smith.langchain.com".into()),
             }),
             terminal: None,
+            window: None,
             acp: None,
             plan: None,
         };

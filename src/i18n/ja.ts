@@ -788,6 +788,16 @@ export const ja = {
     "trashRetention": "ゴミ箱の保持期間",
     "trashRetentionDesc": "論理削除されたセッションは、この日数（1～365日）経過後に完全に削除されます。",
     "trashRetentionUnit": "日",
+    "windowSection": "ウィンドウとバックグラウンド",
+    "closeAction": "ウィンドウを閉じるとき",
+    "closeActionDesc": "トレイに隠すと agent・ターミナル・sidecar は動作を続けます。完全に終了するにはトレイメニューまたは「hip を終了」を使います。",
+    "closeActions": {
+      "hide": "システムトレイに隠す",
+      "quit": "hip を終了",
+      "ask": "毎回確認"
+    },
+    "trayEnabled": "システムトレイアイコン",
+    "trayEnabledDesc": "トレイからウィンドウを再表示したり終了したりできます。「システムトレイに隠す」選択時は自動で有効になります。",
     "contextMenu": {
       "title": "コンテキストメニュー",
       "description": "右クリックで表示するアクションとその順序を選択します。",

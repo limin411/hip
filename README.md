@@ -160,6 +160,28 @@ In the **desktop UI**, deleting Chat/Code sessions or Knowledge spaces/docs move
 - **CLI** `hip session delete <id> --yes` → **permanent** hard-delete (does not use the recycle bin).
 - **Memory** trash remains under **Settings → Memory** (separate 30-day default).
 
+### Window close & system tray
+
+By default, closing the main window **quits** hip (sidecar, agents, and CLI attach stop). Under **Settings → General → Window & background** you can:
+
+| Option | Effect |
+|--------|--------|
+| **Hide to system tray** | Close hides the window; agents / terminals / sidecar keep running. Tray left-click or **Show hip** restores; **Quit** exits cleanly. |
+| **Quit hip** | Close exits (historical default). |
+| **System tray icon** | Show a tray icon (auto-enabled when choosing hide). |
+
+```toml
+# ~/.hip/config/hip.toml
+[window]
+closeAction = "hide"   # hide | quit | ask (ask UI is Phase 2)
+trayEnabled = true
+```
+
+- **Cmd+Q** / application Quit always exits (never hide-only).
+- Hide mode: product CLI (`hip doctor` / `session` / `run`) still attaches to the running desktop app.
+- Escape hatch: `HIP_TRAY=0` forces quit-on-close and disables tray.
+- Release builds are single-instance (second launch focuses the existing window). Dev allows multiple instances; set `HIP_ALLOW_MULTI_INSTANCE=1` in release to override.
+
 ```bash
 # Optional: reclaim free pages after large permanent deletes (app must be closed)
 sqlite3 ~/.hip/db/hip.db 'VACUUM;'

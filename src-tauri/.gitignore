@@ -8,7 +8,8 @@
 
 # Sidecar binaries (dev wrapper + production launcher) — build artifacts.
 # Regenerate the dev wrapper with `yarn sidecar:dev-bin`.
-# Production: `yarn sidecar:prod-bin` / `yarn release:macos`.
+# Production: `yarn sidecar:prod-bin` then `yarn release:macos` / `yarn release:windows`.
+# Never ship a Windows NSIS build without prod-bin — empty hip-sidecar → 连接错误.
 /binaries/
 
 # Production Node runtime + JS bundle staged for app Resources (large; local only).

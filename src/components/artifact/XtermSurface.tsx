@@ -126,8 +126,6 @@ export function XtermSurface({
       const fit = new FitAddon()
       term.loadAddon(fit)
       term.open(el)
-      // Slight padding so glyphs don't hug the rounded panel edge.
-      el.style.padding = '4px 6px'
       termRef.current = term
       fitRef.current = fit
 
@@ -366,15 +364,18 @@ export function XtermSurface({
         </div>
       )}
 
-      <div
-        ref={containerRef}
-        className="min-h-0 flex-1 overflow-hidden bg-surface"
-        data-testid="terminal-xterm"
-        data-no-drag
-        data-tauri-drag-region="false"
-        data-context-menu-kind="terminal"
-        onContextMenu={onCanvasContextMenu}
-      />
+      {/* Outer shell reserves bottom margin; host fills the remaining box so fit() is correct. */}
+      <div className="flex min-h-0 flex-1 flex-col bg-surface px-1.5 pt-1 pb-4">
+        <div
+          ref={containerRef}
+          className="min-h-0 flex-1 overflow-hidden"
+          data-testid="terminal-xterm"
+          data-no-drag
+          data-tauri-drag-region="false"
+          data-context-menu-kind="terminal"
+          onContextMenu={onCanvasContextMenu}
+        />
+      </div>
 
       {CONTEXT_MENUS ? (
         <ControlledContextMenu

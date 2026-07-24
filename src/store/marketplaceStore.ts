@@ -63,13 +63,19 @@ export function filterEntries(
   } else {
     list = entries.filter((e) => e.marketSourceId === sourceId)
   }
-  if (!q) return list
-  return list.filter((e) => {
-    const hay = [e.name, e.description, e.author, e.category, ...(e.keywords ?? [])]
-      .filter(Boolean)
-      .join(' ')
-      .toLowerCase()
-    return hay.includes(q)
+  if (q) {
+    list = list.filter((e) => {
+      const hay = [e.name, e.description, e.author, e.category, ...(e.keywords ?? [])]
+        .filter(Boolean)
+        .join(' ')
+        .toLowerCase()
+      return hay.includes(q)
+    })
+  }
+  // Installed plugins first; preserve relative order within each group.
+  return [...list].sort((a, b) => {
+    const rank = (e: MarketPluginEntry) => (e.downloadState === 'downloaded' ? 0 : 1)
+    return rank(a) - rank(b)
   })
 }
 

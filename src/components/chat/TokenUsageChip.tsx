@@ -76,7 +76,7 @@ export function TokenUsageChip() {
   }, [clearTimers])
 
   const lastUsage = useMemo(() => selectLastUsage(messages), [messages])
-  const inputBudget = useMemo(() => inputBudgetFromUsage(lastUsage), [lastUsage])
+  const inputBudget = useMemo(() => inputBudgetFromUsage(lastUsage, messages), [lastUsage, messages])
   const segments = useMemo(
     () => (inputBudget != null ? estimateContextBreakdown(messages, inputBudget) : []),
     [messages, inputBudget],

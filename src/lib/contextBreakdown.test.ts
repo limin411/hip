@@ -108,10 +108,20 @@ describe('selectLastUsage / inputBudgetFromUsage', () => {
     expect(inputBudgetFromUsage(selectLastUsage(messages))).toBe(80)
   })
 
-  it('falls back when input is 0', () => {
+  it('does not treat billing total as budget when input is 0', () => {
     expect(
       inputBudgetFromUsage({ inputTokens: 0, outputTokens: 3, totalTokens: 10 }),
-    ).toBe(10)
+    ).toBeNull()
+  })
+
+  it('falls back to visible estimate when input is 0 and messages provided', () => {
+    const body = 'word '.repeat(400)
+    const messages: Message[] = [
+      user('u1', body),
+      assistant('a1', body, { usage: { inputTokens: 0, outputTokens: 3, totalTokens: 10 } }),
+    ]
+    const budget = inputBudgetFromUsage(selectLastUsage(messages), messages)
+    expect(budget).toBeGreaterThan(100)
   })
 
   it('prefers contextTokens over summed inputTokens', () => {

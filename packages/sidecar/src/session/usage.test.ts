@@ -1,12 +1,38 @@
 import { describe, it, expect } from 'vitest'
-import { addUsage, sumUsage, stepContextTokens } from './usage.js'
+import { addUsage, sumUsage, stepContextTokens, usageFromModelMetadata } from './usage.js'
 import type { TurnUsage } from '@hip/protocol'
 
 describe('usage helpers', () => {
-  it('stepContextTokens prefers contextTokens then input then total', () => {
+  it('stepContextTokens prefers contextTokens then input; never billing total', () => {
     expect(stepContextTokens({ inputTokens: 10, outputTokens: 2, totalTokens: 12, contextTokens: 9 })).toBe(9)
     expect(stepContextTokens({ inputTokens: 10, outputTokens: 2, totalTokens: 12 })).toBe(10)
-    expect(stepContextTokens({ inputTokens: 0, outputTokens: 2, totalTokens: 12 })).toBe(12)
+    // MiniMax-style output-only report: total is not context fill
+    expect(stepContextTokens({ inputTokens: 0, outputTokens: 2, totalTokens: 12 })).toBe(0)
+  })
+
+  it('usageFromModelMetadata uses input as contextTokens', () => {
+    expect(usageFromModelMetadata({ input_tokens: 12, output_tokens: 5, total_tokens: 17 })).toEqual({
+      inputTokens: 12,
+      outputTokens: 5,
+      totalTokens: 17,
+      contextTokens: 12,
+    })
+  })
+
+  it('usageFromModelMetadata falls back to estimate when input is 0 (MiniMax)', () => {
+    expect(
+      usageFromModelMetadata({ input_tokens: 0, output_tokens: 65, total_tokens: 65 }, 48_000),
+    ).toEqual({
+      inputTokens: 0,
+      outputTokens: 65,
+      totalTokens: 65,
+      contextTokens: 48_000,
+    })
+  })
+
+  it('usageFromModelMetadata returns undefined when all zeros and no estimate', () => {
+    expect(usageFromModelMetadata({ input_tokens: 0, output_tokens: 0, total_tokens: 0 })).toBeUndefined()
+    expect(usageFromModelMetadata(undefined)).toBeUndefined()
   })
 
   it('addUsage seeds from undefined accumulator with contextTokens', () => {

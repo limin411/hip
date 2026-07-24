@@ -169,6 +169,68 @@ describe('TokenUsageChip', () => {
     })
 
     render(<TokenUsageChip />)
-    expect(screen.getByTestId('session-usage')).toHaveTextContent('1.5k')
+    // Context fill uses input/contextTokens, not billing total
+    expect(screen.getByTestId('session-usage')).toHaveTextContent('1.2k')
+  })
+
+  it('does not stick at 0% when provider reports output-only usage (MiniMax)', () => {
+    const long = 'context blob '.repeat(2000) // ~26k chars → ~6.5k tokens
+    useDomainStore.setState({
+      activeSessionId: 's1',
+      sessions: [
+        session('s1', [
+          msg('u1', undefined, 'user', { content: long }),
+          msg('a1', { inputTokens: 0, outputTokens: 65, totalTokens: 65 }, 'assistant', {
+            content: long,
+            usage: { inputTokens: 0, outputTokens: 65, totalTokens: 65, contextTokens: 65 },
+          }),
+        ]),
+      ],
+    } as never)
+    providersStore.useProvidersStore.setState({
+      catalog: {
+        'minimax-cn-coding-plan': {
+          id: 'minimax-cn-coding-plan',
+          name: 'MiniMax',
+          env: [],
+          models: {
+            'MiniMax-M3': {
+              id: 'MiniMax-M3',
+              name: 'MiniMax-M3',
+              limit: { context: 1_000_000, output: 128_000 },
+            },
+          },
+        },
+      },
+      config: {
+        providers: {},
+        activeModel: { providerID: 'minimax-cn-coding-plan', modelID: 'MiniMax-M3' },
+      },
+      keyConfigured: {},
+      loaded: true,
+    })
+    // Session model must match catalog for window lookup
+    useDomainStore.setState((s) => ({
+      ...s,
+      sessions: s.sessions.map((sess) =>
+        sess.id === 's1'
+          ? {
+              ...sess,
+              config: {
+                ...sess.config,
+                llmProvider: 'minimax-cn-coding-plan',
+                model: 'MiniMax-M3',
+              },
+            }
+          : sess,
+      ),
+    }))
+
+    render(<TokenUsageChip />)
+    const el = screen.getByTestId('session-usage')
+    // Must not show 0% (65 / 1M rounds to 0); estimate of long transcript is >> 0
+    expect(el.textContent).not.toBe('0%')
+    const pct = Number(el.textContent?.replace('%', ''))
+    expect(pct).toBeGreaterThan(0)
   })
 })

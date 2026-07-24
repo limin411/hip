@@ -38,6 +38,8 @@ import type { ModelRunner } from './model-runner.js'
 import type { GraphEmit } from './graph.js'
 import { buildGraph } from './graph.js'
 import { MAX_STEPS } from './loop-control.js'
+import { estimatePromptTokens } from './compaction.js'
+import { usageFromModelMetadata } from './usage.js'
 import {
   HANDOFF_TOOL_PREFIX,
   ctxOf,
@@ -132,10 +134,12 @@ function makeAgentNode(profile: AgentProfile) {
       onActivity: () => ctx.emit.activity?.(),
     })
 
-    const u = msg.usage_metadata
-    if (u) {
-      ctx.emit.usage({ inputTokens: u.input_tokens, outputTokens: u.output_tokens, totalTokens: u.total_tokens })
-    }
+    const estimated = estimatePromptTokens({
+      messages,
+      tools: toolsForAgent.map((t) => ({ name: t.name, description: t.description })),
+    })
+    const turnUsage = usageFromModelMetadata(msg.usage_metadata, estimated)
+    if (turnUsage) ctx.emit.usage(turnUsage)
 
     // Re-assert this profile as the active agent so the post-tool router
     // recovers even when the initial state had activeAgent = ''.

@@ -63,7 +63,7 @@ describe('agent loop graph', () => {
         { messages: [new HumanMessage('hi')], steps: 0 },
         { configurable: { ctx: { sessionId: 'test-session', runner, tools: buildTools(root), emit: { ...noopEmit, usage: (u: TurnUsage) => seen.push(u) }, summarizer: noopSummarizer } } },
       )
-      expect(seen).toEqual([{ inputTokens: 12, outputTokens: 5, totalTokens: 17 }])
+      expect(seen).toEqual([{ inputTokens: 12, outputTokens: 5, totalTokens: 17, contextTokens: 12 }])
     })
   })
 

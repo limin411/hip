@@ -1,11 +1,49 @@
 import type { TurnUsage } from '@hip/protocol'
 
-/** Best single-request context size from a usage report (prefers input). */
+/** Best single-request context size from a usage report.
+ *  Only input / explicit contextTokens count — never billing `totalTokens`.
+ *  Some providers (MiniMax stream usage) report output-only totals with input=0;
+ *  treating that total as context fill makes the composer meter stick at 0%. */
 export function stepContextTokens(u: TurnUsage): number {
   if (u.contextTokens != null && u.contextTokens > 0) return u.contextTokens
   if ((u.inputTokens ?? 0) > 0) return u.inputTokens
-  if ((u.totalTokens ?? 0) > 0) return u.totalTokens
-  return (u.inputTokens ?? 0) + (u.outputTokens ?? 0)
+  return 0
+}
+
+/**
+ * Build TurnUsage from LangChain `usage_metadata` (+ optional chars/4 estimate when
+ * the provider omits prompt tokens). Returns undefined when nothing usable.
+ */
+export function usageFromModelMetadata(
+  u: {
+    input_tokens?: number | null
+    output_tokens?: number | null
+    total_tokens?: number | null
+  } | null | undefined,
+  estimatedContextTokens?: number,
+): TurnUsage | undefined {
+  if (!u) return undefined
+  const inputTokens = finiteOrZero(u.input_tokens)
+  const outputTokens = finiteOrZero(u.output_tokens)
+  const totalRaw = finiteOrZero(u.total_tokens)
+  const totalTokens = totalRaw > 0 ? totalRaw : inputTokens + outputTokens
+  // No token fields at all → skip (same as "no usage_metadata").
+  if (inputTokens <= 0 && outputTokens <= 0 && totalTokens <= 0) return undefined
+
+  let contextTokens = inputTokens > 0 ? inputTokens : 0
+  if (contextTokens <= 0 && estimatedContextTokens != null && estimatedContextTokens > 0) {
+    contextTokens = estimatedContextTokens
+  }
+  return {
+    inputTokens,
+    outputTokens,
+    totalTokens,
+    ...(contextTokens > 0 ? { contextTokens } : {}),
+  }
+}
+
+function finiteOrZero(n: unknown): number {
+  return typeof n === 'number' && Number.isFinite(n) && n > 0 ? Math.floor(n) : 0
 }
 
 /** Fold one step's usage into an accumulator (immutable; undefined acc → seed).

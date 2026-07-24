@@ -143,17 +143,56 @@ export function selectLastUsage(messages: Message[]): TurnUsage | null {
   return null
 }
 
+/** Visible transcript ≈ chars/4 (system prompt / tool schemas not included). */
+export function estimateVisibleContextTokens(messages: Message[]): number {
+  const chars = countVisibleContextChars(messages)
+  return estimateTokensFromChars(chars.user + chars.assistant + chars.skills + chars.tools)
+}
+
 /**
- * Prefer single-request context size for composition budget; fall back to
- * summed input / total / in+out (legacy multi-step rows may overstate).
+ * Provider-reported single-request context size for fill %.
+ * Never uses billing `totalTokens` alone — multi-step sums and MiniMax-style
+ * output-only stream usage both misrepresent context occupancy.
  */
-export function inputBudgetFromUsage(u: TurnUsage | null | undefined): number | null {
-  if (!u) return null
+export function reportedContextTokens(u: TurnUsage | null | undefined): number {
+  if (!u) return 0
   if (u.contextTokens != null && u.contextTokens > 0) return u.contextTokens
-  const input = u.inputTokens ?? 0
-  if (input > 0) return input
-  const total = u.totalTokens ?? 0
-  if (total > 0) return total
-  const sum = (u.inputTokens ?? 0) + (u.outputTokens ?? 0)
-  return sum > 0 ? sum : null
+  if ((u.inputTokens ?? 0) > 0) return u.inputTokens
+  return 0
+}
+
+/**
+ * Context-fill numerator for the session meter.
+ * - Honest provider input/contextTokens → trust it (includes system/tools).
+ * - input_tokens=0 (MiniMax stream usage, etc.) → chars/4 over visible transcript.
+ * Returns null when neither source has tokens.
+ */
+export function contextFillTokens(
+  messages: Message[],
+  usage: TurnUsage | null | undefined = selectLastUsage(messages),
+): number | null {
+  const reported = reportedContextTokens(usage)
+  const estimated = estimateVisibleContextTokens(messages)
+  // Real prompt tokens from the provider beat a visible-only estimate.
+  if (reported > 0 && (usage?.inputTokens ?? 0) > 0) return reported
+  if (estimated > 0) return estimated
+  if (reported > 0) return reported
+  return null
+}
+
+/**
+ * Prefer single-request context size for composition budget.
+ * Falls back to visible estimate when provider omits input tokens.
+ */
+export function inputBudgetFromUsage(
+  u: TurnUsage | null | undefined,
+  messages?: Message[],
+): number | null {
+  const reported = reportedContextTokens(u)
+  if (reported > 0) return reported
+  if (messages) {
+    const estimated = estimateVisibleContextTokens(messages)
+    if (estimated > 0) return estimated
+  }
+  return null
 }

@@ -47,6 +47,7 @@ import {
   type Summarizer,
   type CompactResult,
 } from './compaction.js'
+import { usageFromModelMetadata } from './usage.js'
 import {
   AUTO_COMPACT_THRESHOLD_PERCENT,
   TARGET_THRESHOLD_PERCENT,
@@ -740,13 +741,18 @@ export function buildGraph(maxSteps: number = MAX_STEPS, compactBudget: number =
 
     async function execute(input: BaseMessage[]): Promise<Partial<State>> {
       const msg = await runModel(input)
-      const u = msg.usage_metadata
-      if (u) {
-        emit.usage({ inputTokens: u.input_tokens, outputTokens: u.output_tokens, totalTokens: u.total_tokens })
+      // MiniMax (and some OpenAI-compat hosts) stream usage with input_tokens=0.
+      // Fall back to chars/4 over the prepared prompt so context fill % stays honest.
+      const estimated = estimatePromptTokens({
+        messages: input,
+        tools: tools.map((t) => ({ name: t.name, description: t.description })),
+      })
+      const turnUsage = usageFromModelMetadata(msg.usage_metadata, estimated)
+      if (turnUsage) {
+        emit.usage(turnUsage)
         // Keep gate honest for subsequent compactNode cycles in this invoke.
-        if (typeof u.input_tokens === 'number' && u.input_tokens > 0) {
-          ctx.lastPromptTokens = u.input_tokens
-        }
+        const prompt = turnUsage.contextTokens ?? turnUsage.inputTokens
+        if (prompt > 0) ctx.lastPromptTokens = prompt
       }
       return { messages: [msg], steps: state.steps + 1 }
     }

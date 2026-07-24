@@ -6,8 +6,9 @@ import type { Message } from '@hip/protocol'
 function msg(
   id: string,
   usage?: { inputTokens: number; outputTokens: number; totalTokens: number; contextTokens?: number },
+  content = 'x',
 ): Message {
-  return { id, role: 'assistant', content: 'x', timestamp: 1, ...(usage ? { usage } : {}) }
+  return { id, role: 'assistant', content, timestamp: 1, ...(usage ? { usage } : {}) }
 }
 
 function session(id: string, messages: Message[]): SessionVM {
@@ -26,12 +27,12 @@ describe('tokensFromUsage', () => {
     ).toBe(200_000)
   })
 
-  it('prefers totalTokens when contextTokens absent', () => {
-    expect(tokensFromUsage({ inputTokens: 1, outputTokens: 2, totalTokens: 99 })).toBe(99)
+  it('prefers inputTokens when contextTokens absent', () => {
+    expect(tokensFromUsage({ inputTokens: 99, outputTokens: 2, totalTokens: 101 })).toBe(99)
   })
 
-  it('falls back to in+out when total is 0', () => {
-    expect(tokensFromUsage({ inputTokens: 10, outputTokens: 5, totalTokens: 0 })).toBe(15)
+  it('does not treat billing total as context when input is 0 (MiniMax stream usage)', () => {
+    expect(tokensFromUsage({ inputTokens: 0, outputTokens: 65, totalTokens: 65 })).toBe(0)
   })
 })
 
@@ -77,10 +78,28 @@ describe('selectContextTokens', () => {
         ]),
       ],
     }
-    expect(selectContextTokens(state)).toBe(15)
+    // max(reported 10, visible estimate) — content is tiny so reported wins
+    expect(selectContextTokens(state)).toBe(10)
   })
 
-  it('returns null when no usage', () => {
+  it('falls back to visible estimate when provider reports input_tokens=0', () => {
+    const long = 'hello world '.repeat(500) // ~6000 chars → ~1500 tokens
+    const state = {
+      activeSessionId: 's1',
+      sessions: [
+        session('s1', [
+          { id: 'u1', role: 'user' as const, content: long, timestamp: 1 },
+          msg('a', { inputTokens: 0, outputTokens: 65, totalTokens: 65, contextTokens: 65 }, long),
+        ]),
+      ],
+    }
+    const fill = selectContextTokens(state)
+    expect(fill).toBeGreaterThan(1000)
+    // Must not stick at the bogus output-only contextTokens
+    expect(fill).toBeGreaterThan(65)
+  })
+
+  it('returns null when no usage and empty transcript', () => {
     expect(
       selectContextTokens({ activeSessionId: 's1', sessions: [session('s1', [msg('a')])] }),
     ).toBeNull()

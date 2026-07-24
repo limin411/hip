@@ -3,6 +3,7 @@ import type { AcpConfigOption, Message, PlanItem, SearchHit, TurnUsage } from '@
 import { useShallow } from 'zustand/react/shallow'
 import { useDomainStore, type PendingPermission, type SessionError, type SessionVM, type McpServerStatusVM } from './sessionStore'
 import { computePercentage, zoneForPercent } from '@/lib/tokenPercentage'
+import { contextFillTokens, reportedContextTokens } from '@/lib/contextBreakdown'
 import { computeCost } from '@/lib/usageCost'
 import { activeModelKey, parseModelKey } from '@/lib/modelKey'
 import { useProvidersStore } from '@/store/providersStore'
@@ -93,15 +94,13 @@ export function useActivePendingPermission(): PendingPermission | null {
 
 /**
  * Context-fill numerator from a usage report.
- * Prefers `contextTokens` (last/max single-request size) so multi-step tool loops
- * do not sum every LLM call into a false 100% against the context window.
- * Legacy fallback: totalTokens, then in+out.
+ * Prefers `contextTokens` / inputTokens (single-request size) so multi-step tool
+ * loops do not sum every LLM call into a false 100% against the context window.
+ * Does **not** fall back to billing `totalTokens` (output-only stream reports from
+ * MiniMax etc. would otherwise show ~0% of a 1M window).
  */
 export function tokensFromUsage(u: TurnUsage): number {
-  if (u.contextTokens != null && u.contextTokens > 0) return u.contextTokens
-  const total = u.totalTokens ?? 0
-  if (total > 0) return total
-  return (u.inputTokens ?? 0) + (u.outputTokens ?? 0)
+  return reportedContextTokens(u)
 }
 
 /** Pure: sum `usage` across the active session's messages. Returns null when the active
@@ -123,8 +122,10 @@ export function selectUsageTotal(state: { sessions: SessionVM[]; activeSessionId
 }
 
 /**
- * Pure: context-fill numerator — last message with usage (OpenCode/Codex style).
- * Not session cumulative (which overstates % vs context window across turns).
+ * Pure: context-fill numerator for the active session.
+ * Requires at least one provider usage report (so the chip still only appears after
+ * a turn reports usage). Uses max(provider context, visible chars/4 estimate) so
+ * MiniMax-style input_tokens=0 stream reports do not stick at 0%.
  */
 export function selectContextTokens(state: {
   sessions: SessionVM[]
@@ -132,12 +133,9 @@ export function selectContextTokens(state: {
 }): number | null {
   const active = state.sessions.find((x) => x.id === state.activeSessionId)
   if (!active) return null
-  for (let i = active.messages.length - 1; i >= 0; i--) {
-    const m = active.messages[i]
-    if (!m.usage) continue
-    return tokensFromUsage(m.usage)
-  }
-  return null
+  if (!active.messages.some((m) => m.usage)) return null
+  const fill = contextFillTokens(active.messages)
+  return fill != null && fill > 0 ? fill : 0
 }
 
 /** Session-total token usage for the active session (derived, never stored). `useShallow` is

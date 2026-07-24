@@ -12,6 +12,7 @@ import {
   type PlaceholderSidebarSection,
   type SidebarSection,
 } from '@/store/uiStore'
+import { recordNavEntry } from './navHistory'
 
 /** Leave knowledge safely. Flush only — caller sets destination. No-op if not on knowledge. */
 export async function leaveKnowledge(): Promise<void> {
@@ -63,12 +64,14 @@ export async function enterKnowledge(): Promise<void> {
     state.activeSpaceId &&
     state.spaces.some((s) => s.id === state.activeSpaceId)
   ) {
+    recordNavEntry()
     return
   }
   const firstId = firstSpaceIdByName(state.spaces)
   if (firstId) {
     await useKnowledgeStore.getState().openSpace(firstId)
   }
+  recordNavEntry()
 }
 
 export async function enterSection(section: 'projects' | 'chats'): Promise<void> {
@@ -78,6 +81,7 @@ export async function enterSection(section: 'projects' | 'chats'): Promise<void>
   }
   useUiStore.getState().setSidebarSection(section)
   sessionService.setSurface(section === 'projects' ? 'code' : 'chat')
+  recordNavEntry()
 }
 
 /** Enter a primary-nav placeholder (workbench / tasks / automation; terminals when flag off). */
@@ -87,6 +91,7 @@ export async function enterPlaceholderSection(section: PlaceholderSidebarSection
   }
   useUiStore.getState().setSidebarSection(section)
   useUiStore.getState().setActiveView(section)
+  recordNavEntry()
 }
 
 /**
@@ -108,6 +113,7 @@ export async function enterTerminalsSection(opts?: {
   }
   useUiStore.getState().setSidebarSection('terminals')
   useUiStore.getState().setActiveView('terminals')
+  recordNavEntry()
 }
 
 export async function selectSessionFromSidebar(id: string): Promise<void> {
@@ -115,6 +121,7 @@ export async function selectSessionFromSidebar(id: string): Promise<void> {
     await leaveKnowledge()
   }
   sessionService.selectSession(id)
+  recordNavEntry()
 }
 
 export async function newConversationFromSidebar(surface: 'chat' | 'code'): Promise<void> {
@@ -123,6 +130,7 @@ export async function newConversationFromSidebar(surface: 'chat' | 'code'): Prom
   }
   sessionService.newConversation(surface)
   useUiStore.getState().setSidebarSection(surface === 'code' ? 'projects' : 'chats')
+  recordNavEntry()
 }
 
 export async function openSpaceFromSidebar(spaceId: string): Promise<void> {
@@ -135,6 +143,7 @@ export async function openSpaceFromSidebar(spaceId: string): Promise<void> {
     await kb.loadSpaces()
   }
   await useKnowledgeStore.getState().openSpace(spaceId)
+  recordNavEntry()
 }
 
 export async function openSettingsFromChrome(): Promise<void> {
@@ -146,6 +155,7 @@ export async function openSettingsFromChrome(): Promise<void> {
   // Always land on General when opening Settings from chrome (not last-visited page).
   useUiStore.getState().setSettingsPage('general')
   useUiStore.getState().setActiveView('settings')
+  recordNavEntry()
 }
 
 export async function openHistoryFromChrome(): Promise<void> {
@@ -155,6 +165,7 @@ export async function openHistoryFromChrome(): Promise<void> {
     assignSectionAfterLeavingKnowledge()
   }
   useUiStore.getState().setActiveView('history')
+  recordNavEntry()
 }
 
 export async function openTrashFromChrome(): Promise<void> {
@@ -168,6 +179,7 @@ export async function openTrashFromChrome(): Promise<void> {
   void import('@/domain').then(({ sessionService }) => {
     sessionService.requestTrashList()
   })
+  recordNavEntry()
 }
 
 export async function openAutomationFromChrome(): Promise<void> {
@@ -177,6 +189,7 @@ export async function openAutomationFromChrome(): Promise<void> {
     assignSectionAfterLeavingKnowledge()
   }
   useUiStore.getState().setActiveView('automation')
+  recordNavEntry()
 }
 
 /** MainToolbar / special-view back — keep section in sync with restored view. */
@@ -195,6 +208,7 @@ export function handleMainToolbarBack(): void {
   } else if (target === 'chat' || target === 'code') {
     useUiStore.getState().setSidebarSection(target === 'code' ? 'projects' : 'chats')
   }
+  recordNavEntry()
 }
 
 export function sectionForSurface(surface: 'chat' | 'code'): SidebarSection {

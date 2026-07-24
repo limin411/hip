@@ -25,6 +25,7 @@ import { useFsStore } from '@/store/fsStore'
 import { useDraftStore } from '@/store/draftStore'
 import type { Draft } from '@/store/draftStore'
 import { useUiStore, normalizeAppLanguage, type AppLanguage, type Surface } from '@/store/uiStore'
+import { useNavHistoryStore } from '@/store/navHistoryStore'
 import { useDiffStore } from '@/store/diffStore'
 import { useTerminalStore } from '@/store/terminalStore'
 import { ptyKill } from '@/ipc/pty'
@@ -1436,6 +1437,13 @@ export class SessionService {
     this.requestWorktreeList(id)
     // Carry a clicked search hit's message into the scroll target; a plain select clears any stale one.
     useUiStore.getState().setScrollTarget(messageId ?? null)
+    // Shell back/forward stack (ChatGPT-style). Skip while applying history.
+    // Dynamic import of record helper avoids sessionService ↔ layout init cycles.
+    if (!useNavHistoryStore.getState().applying) {
+      void import('@/components/layout/navHistory').then(({ recordNavEntry }) => {
+        recordNavEntry()
+      })
+    }
   }
 
   /** Request porcelain+meta worktree list for Studio catalog (git:worktree:list → store). */
@@ -2109,6 +2117,11 @@ export class SessionService {
     if (surface) {
       useUiStore.getState().setActiveView(surface)
       useUiStore.getState().setSidebarSection(surface === 'code' ? 'projects' : 'chats')
+    }
+    if (!useNavHistoryStore.getState().applying) {
+      void import('@/components/layout/navHistory').then(({ recordNavEntry }) => {
+        recordNavEntry()
+      })
     }
   }
 

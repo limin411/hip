@@ -39,6 +39,7 @@ import { startTerminalBridge } from '@/ipc/pty'
 import { useProjectPathStore } from '@/store/projectPathStore'
 import { useManagedTerminalStore } from '@/store/managedTerminalStore'
 import { useFocusStore } from '@/store/focusStore'
+import { seedNavHistoryIfEmpty } from '@/components/layout/navHistory'
 
 export function AppLayout() {
   const rightPanelRef = useRef<ImperativePanelHandle>(null)
@@ -54,6 +55,8 @@ export function AppLayout() {
       })
     }
     sessionService.connect()
+    // Seed shell back/forward with the cold-launch location (workbench).
+    seedNavHistoryIfEmpty()
     return () => sessionService.disconnect()
   }, [])
 

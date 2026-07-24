@@ -408,6 +408,7 @@ export const useUiStore = create<UiState>()(
 /**
  * Cold launch shell: Workbench placeholder (default home).
  * Safe to call after rehydrate and once from AppLayout.
+ * Nav history is seeded separately from AppLayout (see seedNavHistoryIfEmpty).
  */
 export function applyColdLaunchShell(): void {
   useUiStore.setState({ activeView: 'workbench', sidebarSection: 'workbench' })

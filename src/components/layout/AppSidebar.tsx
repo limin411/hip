@@ -5,6 +5,7 @@ import {
   BookOpen,
   CheckSquare,
   ChevronDown,
+  ChevronLeft,
   ChevronRight,
   Code2,
   Folder,
@@ -69,7 +70,14 @@ import {
 } from './sidebarActions'
 import { SIDEBAR_ACTIVE_RAIL } from './sidebarActiveRail'
 import { SidebarAccountFooter } from './SidebarAccountFooter'
+import { goNavBack, goNavForward } from './navHistory'
+import { useNavHistoryStore } from '@/store/navHistoryStore'
 import { titlebarIconBtnClass, titlebarIconProps, titlebarRowClass } from './titlebarChrome'
+
+const titlebarNavBtnClass = cn(
+  titlebarIconBtnClass,
+  'disabled:pointer-events-none disabled:opacity-30 disabled:hover:bg-transparent disabled:hover:text-ink-secondary',
+)
 
 export function AppSidebar() {
   const { t } = useTranslation()
@@ -91,6 +99,10 @@ export function AppSidebar() {
   /** Ring status map — re-renders sidebar rows when PTY status changes. */
   const terminalBySession = useTerminalStore((s) => s.bySession)
   const isMac = isMacPlatform()
+  const navIndex = useNavHistoryStore((s) => s.index)
+  const navStackLen = useNavHistoryStore((s) => s.stack.length)
+  const canGoBack = navIndex > 0
+  const canGoForward = navIndex >= 0 && navIndex < navStackLen - 1
 
   const hydrateWorktrees = (sessionId: string) => {
     sessionService.requestWorktreeList(sessionId)
@@ -216,6 +228,30 @@ export function AppSidebar() {
           <div className="h-full w-2 shrink-0" aria-hidden />
         )}
         <div className="flex h-full shrink-0 items-center gap-0.5 pr-2">
+          <button
+            type="button"
+            data-testid="sidebar-nav-back"
+            data-no-drag
+            title={t('sidebar.navBack')}
+            aria-label={t('sidebar.navBackAria')}
+            disabled={!canGoBack}
+            onClick={() => void goNavBack()}
+            className={titlebarNavBtnClass}
+          >
+            <ChevronLeft {...titlebarIconProps} />
+          </button>
+          <button
+            type="button"
+            data-testid="sidebar-nav-forward"
+            data-no-drag
+            title={t('sidebar.navForward')}
+            aria-label={t('sidebar.navForwardAria')}
+            disabled={!canGoForward}
+            onClick={() => void goNavForward()}
+            className={titlebarNavBtnClass}
+          >
+            <ChevronRight {...titlebarIconProps} />
+          </button>
           <button
             type="button"
             data-testid="sidebar-search"

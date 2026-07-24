@@ -9,6 +9,7 @@ import { DEFAULT_CONFIG } from '@/domain/sessionStore'
 import { useParallelStore } from '@/store/parallelStore'
 import { useWorktreeStore } from '@/store/worktreeStore'
 import { useProjectPathStore } from '@/store/projectPathStore'
+import { useNavHistoryStore } from '@/store/navHistoryStore'
 
 const enterKnowledge = vi.fn(async () => {})
 const openCreateKnowledgeSpaceDialog = vi.fn()
@@ -58,9 +59,11 @@ const knowledgeState = {
   activeSpaceId: null as string | null,
 }
 
-vi.mock('@/store/knowledgeStore', () => ({
-  useKnowledgeStore: (sel: (s: typeof knowledgeState) => unknown) => sel(knowledgeState),
-}))
+vi.mock('@/store/knowledgeStore', () => {
+  const useKnowledgeStore = (sel: (s: typeof knowledgeState) => unknown) => sel(knowledgeState)
+  useKnowledgeStore.getState = () => knowledgeState
+  return { useKnowledgeStore }
+})
 
 import { AppSidebar } from './AppSidebar'
 
@@ -76,6 +79,7 @@ describe('AppSidebar', () => {
     selectSessionFromSidebar.mockClear()
     knowledgeState.spaces = []
     knowledgeState.activeSpaceId = null
+    useNavHistoryStore.setState({ stack: [], index: -1, applying: false })
     useUiStore.setState({
       activeView: 'chat',
       sidebarSection: 'chats',
@@ -118,6 +122,8 @@ describe('AppSidebar', () => {
   it('renders search icon, nav, and chat sessions for chats section', () => {
     render(<AppSidebar />)
     expect(screen.getByTestId('app-sidebar')).toBeInTheDocument()
+    expect(screen.getByTestId('sidebar-nav-back')).toBeInTheDocument()
+    expect(screen.getByTestId('sidebar-nav-forward')).toBeInTheDocument()
     expect(screen.getByTestId('sidebar-search')).toBeInTheDocument()
     expect(screen.getByTestId('sidebar-search').tagName).toBe('BUTTON')
     expect(screen.getByTestId('sidebar-toggle')).toBeInTheDocument()
@@ -129,6 +135,22 @@ describe('AppSidebar', () => {
     expect(screen.getByTestId('sidebar-nav-chats')).toHaveAttribute('aria-current', 'page')
     expect(screen.getByTestId('sidebar-session-chat-1')).toBeInTheDocument()
     expect(screen.queryByTestId('sidebar-session-code-1')).not.toBeInTheDocument()
+  })
+
+  it('back/forward sit left of search and start disabled after seed', () => {
+    render(<AppSidebar />)
+    const back = screen.getByTestId('sidebar-nav-back')
+    const forward = screen.getByTestId('sidebar-nav-forward')
+    const search = screen.getByTestId('sidebar-search')
+    expect(back).toBeDisabled()
+    expect(forward).toBeDisabled()
+    // DOM order: back, forward, search
+    const parent = search.parentElement
+    expect(parent).toBeTruthy()
+    const buttons = within(parent!).getAllByRole('button')
+    expect(buttons[0]).toBe(back)
+    expect(buttons[1]).toBe(forward)
+    expect(buttons[2]).toBe(search)
   })
 
   it('active nav uses sage rail without hairline ring', () => {

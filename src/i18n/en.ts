@@ -1750,6 +1750,10 @@ export const en = {
       collapseAria: 'Hide left sidebar',
       expand: 'Show sidebar',
       expandAria: 'Show left sidebar',
+      navBack: 'Back',
+      navBackAria: 'Go back',
+      navForward: 'Forward',
+      navForwardAria: 'Go forward',
       nav: {
         workbench: 'Workbench',
         knowledge: 'Knowledge',

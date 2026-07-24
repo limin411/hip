@@ -1709,6 +1709,10 @@ export const zhTW = {
     "collapseAria": "隱藏左側邊欄",
     "expand": "顯示側邊欄",
     "expandAria": "顯示左側邊欄",
+    "navBack": "後退",
+    "navBackAria": "後退到上一位置",
+    "navForward": "前進",
+    "navForwardAria": "前進到下一位置",
     "nav": {
       "workbench": "工作台",
       "knowledge": "知識庫",

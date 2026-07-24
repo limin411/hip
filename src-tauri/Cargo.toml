@@ -39,7 +39,8 @@ tauri-build = { version = "2", features = [] }
 [dependencies]
 # macos-private-api: required for transparent window + NSVisualEffect vibrancy (App Store ineligible).
 # tray-icon: system tray for close-to-hide (docs/design/2026-07-25-window-close-tray.md).
-tauri = { version = "2", features = ["macos-private-api", "tray-icon"] }
+# image-png: load dedicated tray PNG (32/128) instead of only default_window_icon.
+tauri = { version = "2", features = ["macos-private-api", "tray-icon", "image-png"] }
 tauri-plugin-opener = "2"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"

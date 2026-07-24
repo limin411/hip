@@ -52,9 +52,19 @@ describe('composer widgets @core', () => {
   })
 
   it('shows the model picker chip and lists providers and models', async () => {
-    const menu = await openChipMenu(await chat.modelChip)
-    const text = await menu.getText()
-    // The dropdown is grouped by provider and contains at least one model entry.
+    const chip = await chat.modelChip
+    await chip.waitForExist({ timeout: 10000 })
+    await chip.waitForClickable({ timeout: 10000 })
+    // WebKit/Tauri WebDriver: Radix Popover opens more reliably via pointerdown.
+    await browser.execute((el: HTMLElement) => {
+      el.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, cancelable: true, pointerType: 'mouse' }))
+    }, chip)
+    const popover = await browser.$('[data-testid="model-picker-popover"]')
+    await popover.waitForExist({ timeout: 10000 })
+    const list = await browser.$('[data-testid="model-picker-list"]')
+    await list.waitForExist({ timeout: 5000 })
+    const text = await list.getText()
+    // Grouped by provider with at least one model entry.
     expect(text.length).toBeGreaterThan(0)
     await browser.keys('Escape')
   })

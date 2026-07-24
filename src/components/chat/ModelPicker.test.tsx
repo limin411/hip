@@ -1,7 +1,7 @@
 // @vitest-environment happy-dom
 import '@testing-library/jest-dom/vitest'
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { render, screen, cleanup } from '@testing-library/react'
+import { render, screen, cleanup, fireEvent } from '@testing-library/react'
 import React from 'react'
 
 // ── Mocks ──
@@ -12,6 +12,9 @@ vi.mock('react-i18next', () => ({
       const map: Record<string, string> = {
         'chat.modelHint': 'Choose a model',
         'chat.noModelSelected': 'No model',
+        'chat.searchModels': 'Search models…',
+        'chat.noModelsMatch': 'No models match',
+        'chat.noModelsAvailable': 'No models available',
       }
       return map[key] ?? key
     },
@@ -21,24 +24,46 @@ vi.mock('react-i18next', () => ({
 vi.mock('lucide-react', () => ({
   Cpu: () => React.createElement('span', { 'data-testid': 'icon-cpu' }),
   Check: () => React.createElement('span', { 'data-testid': 'icon-check' }),
+  Search: () => React.createElement('span', { 'data-testid': 'icon-search' }),
 }))
 
-// Mock UI components to render their children directly
-vi.mock('@/components/ui/DropdownMenu', async () => {
+vi.mock('@/components/ui/Popover', async () => {
   const React = await import('react')
   return {
-    DropdownMenu: ({ children }: { children: React.ReactNode }) =>
-      React.createElement('div', { 'data-testid': 'dropdown-menu' }, children),
-    DropdownMenuTrigger: ({ children }: { children: React.ReactNode }) =>
-      React.createElement('div', { 'data-testid': 'dropdown-trigger' }, children),
-    DropdownMenuContent: ({ children }: { children: React.ReactNode }) =>
-      React.createElement('div', { 'data-testid': 'dropdown-content' }, children),
-    DropdownMenuItem: ({ children, onSelect }: { children: React.ReactNode; onSelect?: () => void }) =>
-      React.createElement('div', { 'data-testid': 'dropdown-item', onClick: onSelect }, children),
-    DropdownMenuLabel: ({ children }: { children: React.ReactNode }) =>
-      React.createElement('div', { 'data-testid': 'dropdown-label' }, children),
-    DropdownMenuGroup: ({ children }: { children: React.ReactNode }) =>
-      React.createElement('div', { 'data-testid': 'dropdown-group' }, children),
+    Popover: ({
+      children,
+      open,
+      onOpenChange,
+    }: {
+      children: React.ReactNode
+      open?: boolean
+      onOpenChange?: (open: boolean) => void
+    }) =>
+      React.createElement(
+        'div',
+        {
+          'data-testid': 'popover',
+          'data-open': open ? 'true' : 'false',
+          onClick: () => onOpenChange?.(true),
+        },
+        children,
+      ),
+    PopoverTrigger: ({ children }: { children: React.ReactNode }) =>
+      React.createElement('div', { 'data-testid': 'popover-trigger' }, children),
+    PopoverContent: ({
+      children,
+      ...rest
+    }: {
+      children: React.ReactNode
+      [key: string]: unknown
+    }) => {
+      const { onOpenAutoFocus: _a, onKeyDown, className: _c, align: _align, ...dom } = rest
+      return React.createElement(
+        'div',
+        { 'data-testid': 'popover-content', onKeyDown: onKeyDown as React.KeyboardEventHandler, ...dom },
+        children,
+      )
+    },
   }
 })
 
@@ -48,7 +73,7 @@ vi.mock('./ComposerChip', () => ({
 }))
 
 // Mock stores
-const mockDraftStore = { draft: null, setModelKey: vi.fn() }
+const mockDraftStore = { draft: null as null | { modelKey?: string }, setModelKey: vi.fn() }
 vi.mock('@/store/draftStore', () => ({
   useDraftStore: (sel: (s: typeof mockDraftStore) => unknown) => sel(mockDraftStore),
 }))
@@ -59,6 +84,7 @@ const mockProvidersStore = {
     providers: { openai: { enabled: true } },
     activeModel: { providerID: 'openai', modelID: 'gpt-4o' },
   },
+  keyConfigured: { openai: true },
 }
 vi.mock('@/store/providersStore', () => ({
   useProvidersStore: (sel: (s: typeof mockProvidersStore) => unknown) => sel(mockProvidersStore),
@@ -67,13 +93,12 @@ vi.mock('@/store/providersStore', () => ({
 // Mock domain hooks
 let mockActiveSessionId: string | null = 'sess-1'
 let mockSession: { config: { model?: string; llmProvider?: string } } | null = null
-let mockActiveSessionStatus: 'idle' | 'running' = 'idle'
+const setSessionModel = vi.fn()
 vi.mock('@/domain', () => ({
   useActiveSessionId: () => mockActiveSessionId,
   useActiveSession: () => mockSession,
-  useActiveSessionStatus: () => mockActiveSessionStatus,
   sessionService: {
-    setSessionModel: vi.fn(),
+    setSessionModel: (...args: unknown[]) => setSessionModel(...args),
   },
 }))
 
@@ -86,14 +111,18 @@ vi.mock('@/lib/modelKey', () => ({
   activeModelKey: () => 'openai/gpt-4o',
 }))
 
+const mockGroups = [
+  {
+    providerID: 'openai',
+    providerName: 'OpenAI',
+    models: [
+      { key: 'openai/gpt-4o', modelID: 'gpt-4o' },
+      { key: 'openai/gpt-4o-mini', modelID: 'gpt-4o-mini' },
+    ],
+  },
+]
 vi.mock('@/lib/agentModelOptions', () => ({
-  groupModelOptions: () => [
-    {
-      providerID: 'openai',
-      providerName: 'OpenAI',
-      models: [{ key: 'openai/gpt-4o', modelID: 'gpt-4o' }],
-    },
-  ],
+  groupModelOptions: () => mockGroups,
 }))
 
 vi.mock('@/lib/utils', () => ({
@@ -107,8 +136,18 @@ describe('ModelPicker', () => {
     cleanup()
     mockActiveSessionId = 'sess-1'
     mockSession = { config: { model: 'deepseek-chat', llmProvider: 'deepseek' } }
-    mockActiveSessionStatus = 'idle'
     mockDraftStore.draft = null
+    mockDraftStore.setModelKey.mockReset()
+    setSessionModel.mockReset()
+    mockGroups.length = 0
+    mockGroups.push({
+      providerID: 'openai',
+      providerName: 'OpenAI',
+      models: [
+        { key: 'openai/gpt-4o', modelID: 'gpt-4o' },
+        { key: 'openai/gpt-4o-mini', modelID: 'gpt-4o-mini' },
+      ],
+    })
   })
 
   afterEach(() => {
@@ -125,20 +164,60 @@ describe('ModelPicker', () => {
     mockSession = { config: { model: 'gpt-4o', llmProvider: 'openai' } }
     mockActiveSessionId = 'sess-1'
     render(<ModelPicker />)
-    // Both the chip label and dropdown item contain 'gpt-4o'
     expect(screen.getAllByText('gpt-4o').length).toBeGreaterThanOrEqual(1)
   })
 
-  it('renders dropdown with model groups and items', () => {
+  it('renders popover list with model groups and items', () => {
     render(<ModelPicker />)
-    expect(screen.getByTestId('dropdown-content')).toBeInTheDocument()
-    expect(screen.getByTestId('dropdown-group')).toBeInTheDocument()
-    expect(screen.getByTestId('dropdown-item')).toBeInTheDocument()
+    expect(screen.getByTestId('model-picker-popover')).toBeInTheDocument()
+    expect(screen.getByTestId('model-picker-group')).toBeInTheDocument()
+    expect(screen.getAllByTestId('model-picker-item').length).toBe(2)
+  })
+
+  it('hides search when the catalog is small', () => {
+    render(<ModelPicker />)
+    expect(screen.queryByTestId('model-picker-search')).toBeNull()
+  })
+
+  it('shows search and filters models when the catalog is large', () => {
+    mockGroups[0]!.models = Array.from({ length: 10 }, (_, i) => ({
+      key: `openai/model-${i}`,
+      modelID: i === 3 ? 'special-alpha' : `model-${i}`,
+    }))
+    render(<ModelPicker />)
+    const search = screen.getByTestId('model-picker-search')
+    expect(search).toBeInTheDocument()
+    fireEvent.change(search, { target: { value: 'alpha' } })
+    expect(screen.getAllByTestId('model-picker-item')).toHaveLength(1)
+    expect(screen.getByText('special-alpha')).toBeInTheDocument()
+  })
+
+  it('shows empty state when search matches nothing', () => {
+    mockGroups[0]!.models = Array.from({ length: 10 }, (_, i) => ({
+      key: `openai/model-${i}`,
+      modelID: `model-${i}`,
+    }))
+    render(<ModelPicker />)
+    fireEvent.change(screen.getByTestId('model-picker-search'), { target: { value: 'zzz' } })
+    expect(screen.getByTestId('model-picker-empty')).toHaveTextContent('No models match')
+  })
+
+  it('selects a model for the active session', () => {
+    render(<ModelPicker />)
+    fireEvent.click(screen.getByText('gpt-4o-mini'))
+    expect(setSessionModel).toHaveBeenCalledWith('openai/gpt-4o-mini')
+  })
+
+  it('selects a model on the draft when no session', () => {
+    mockActiveSessionId = null
+    mockSession = null
+    render(<ModelPicker />)
+    fireEvent.click(screen.getByText('gpt-4o-mini'))
+    expect(mockDraftStore.setModelKey).toHaveBeenCalledWith('openai/gpt-4o-mini')
   })
 
   it('does not show orchMode toggle (agent-driven orchestration)', () => {
     render(<ModelPicker />)
-    // Product path has no fast/dag switch; only model picker remains.
     expect(screen.queryByText(/Orchestration|Single Instance|Cluster Mode/i)).toBeNull()
     expect(screen.queryByTestId('orch-mode-toggle')).toBeNull()
   })

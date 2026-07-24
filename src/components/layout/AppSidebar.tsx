@@ -230,6 +230,29 @@ export function AppSidebar() {
         <div className="flex h-full shrink-0 items-center gap-0.5 pr-2">
           <button
             type="button"
+            data-testid="sidebar-search"
+            data-no-drag
+            title={t('commandPalette.openTrigger')}
+            aria-label={t('commandPalette.openTriggerAria')}
+            onClick={() => useCommandPaletteStore.getState().setOpen(true)}
+            className={titlebarIconBtnClass}
+          >
+            <Search {...titlebarIconProps} />
+          </button>
+          <button
+            type="button"
+            data-testid="sidebar-toggle"
+            data-no-drag
+            title={t('sidebar.collapse')}
+            aria-label={t('sidebar.collapseAria')}
+            aria-expanded={true}
+            onClick={() => useUiStore.getState().setSidebarOpen(false)}
+            className={titlebarIconBtnClass}
+          >
+            <PanelLeftClose {...titlebarIconProps} />
+          </button>
+          <button
+            type="button"
             data-testid="sidebar-nav-back"
             data-no-drag
             title={t('sidebar.navBack')}
@@ -251,29 +274,6 @@ export function AppSidebar() {
             className={titlebarNavBtnClass}
           >
             <ChevronRight {...titlebarIconProps} />
-          </button>
-          <button
-            type="button"
-            data-testid="sidebar-search"
-            data-no-drag
-            title={t('commandPalette.openTrigger')}
-            aria-label={t('commandPalette.openTriggerAria')}
-            onClick={() => useCommandPaletteStore.getState().setOpen(true)}
-            className={titlebarIconBtnClass}
-          >
-            <Search {...titlebarIconProps} />
-          </button>
-          <button
-            type="button"
-            data-testid="sidebar-toggle"
-            data-no-drag
-            title={t('sidebar.collapse')}
-            aria-label={t('sidebar.collapseAria')}
-            aria-expanded={true}
-            onClick={() => useUiStore.getState().setSidebarOpen(false)}
-            className={titlebarIconBtnClass}
-          >
-            <PanelLeftClose {...titlebarIconProps} />
           </button>
         </div>
       </div>

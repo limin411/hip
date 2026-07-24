@@ -137,20 +137,22 @@ describe('AppSidebar', () => {
     expect(screen.queryByTestId('sidebar-session-code-1')).not.toBeInTheDocument()
   })
 
-  it('back/forward sit left of search and start disabled after seed', () => {
+  it('back/forward sit right of collapse and start disabled after seed', () => {
     render(<AppSidebar />)
     const back = screen.getByTestId('sidebar-nav-back')
     const forward = screen.getByTestId('sidebar-nav-forward')
     const search = screen.getByTestId('sidebar-search')
+    const toggle = screen.getByTestId('sidebar-toggle')
     expect(back).toBeDisabled()
     expect(forward).toBeDisabled()
-    // DOM order: back, forward, search
+    // DOM order: search, toggle, back, forward
     const parent = search.parentElement
     expect(parent).toBeTruthy()
     const buttons = within(parent!).getAllByRole('button')
-    expect(buttons[0]).toBe(back)
-    expect(buttons[1]).toBe(forward)
-    expect(buttons[2]).toBe(search)
+    expect(buttons[0]).toBe(search)
+    expect(buttons[1]).toBe(toggle)
+    expect(buttons[2]).toBe(back)
+    expect(buttons[3]).toBe(forward)
   })
 
   it('active nav uses sage rail without hairline ring', () => {

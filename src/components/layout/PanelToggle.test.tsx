@@ -13,7 +13,9 @@ vi.mock('react-i18next', () => ({
 
 vi.mock('lucide-react', () => ({
   Check: () => React.createElement('span', { 'data-testid': 'icon-check' }),
+  ChevronDown: () => React.createElement('span', { 'data-testid': 'icon-chevron-down' }),
   PanelRight: () => React.createElement('span', { 'data-testid': 'icon-panel-right' }),
+  PanelRightClose: () => React.createElement('span', { 'data-testid': 'icon-panel-right-close' }),
 }))
 
 vi.mock('@/components/ui/DropdownMenu', () => ({
@@ -37,6 +39,8 @@ const setTab = vi.fn()
 const setChatActiveTab = vi.fn()
 const setKnowledgePanelOpen = vi.fn()
 const setTerminalPanelOpen = vi.fn()
+const resetChatActiveTab = vi.fn()
+const dismissPanelThisTurn = vi.fn()
 
 vi.mock('@/domain', () => ({
   useActiveSessionId: () => mockActiveSessionId,
@@ -54,6 +58,7 @@ vi.mock('@/store/uiStore', () => ({
       setChatActiveTab,
       setKnowledgePanelOpen,
       setTerminalPanelOpen,
+      resetChatActiveTab,
     }),
 }))
 
@@ -78,7 +83,23 @@ vi.mock('@/domain/sessionStore', () => ({
     selector({
       setSessionCodePanelOpen,
       setSessionChatPanelOpen,
+      sessions: mockActiveSessionId
+        ? [
+            {
+              id: mockActiveSessionId,
+              codePanelOpen: mockCodePanelOpen,
+              chatPanelOpen: mockChatPanelOpen,
+            },
+          ]
+        : [],
     }),
+}))
+
+vi.mock('@/store/focusStore', () => ({
+  useFocusStore: Object.assign(
+    (selector: (state: any) => any) => selector({ dismissPanelThisTurn }),
+    { getState: () => ({ dismissPanelThisTurn }) },
+  ),
 }))
 
 vi.mock('@/store/diffStore', () => ({
@@ -111,6 +132,8 @@ let mockIsGitRepo = false
 let mockCodeTerminal = false
 let mockKnowledgePanelOpen = false
 let mockTerminalPanelOpen = false
+let mockCodePanelOpen = false
+let mockChatPanelOpen = false
 let mockFocusedManagedId: string | null = null
 let mockTerminalManagement = true
 let mockKbMode: 'home' | 'workspace' = 'home'
@@ -125,6 +148,8 @@ describe('PanelToggle', () => {
     mockCodeTerminal = false
     mockKnowledgePanelOpen = false
     mockTerminalPanelOpen = false
+    mockCodePanelOpen = false
+    mockChatPanelOpen = false
     mockFocusedManagedId = null
     mockTerminalManagement = true
     mockKbMode = 'home'
@@ -134,9 +159,26 @@ describe('PanelToggle', () => {
     vi.clearAllMocks()
   })
 
-  it('renders toggle button', () => {
-    render(<PanelToggle />)
+  it('renders toggle button in toolbar when rail is collapsed', () => {
+    render(<PanelToggle slot="toolbar" />)
     expect(screen.getByTestId('toggle-panel')).toBeInTheDocument()
+  })
+
+  it('hides toolbar toggle when rail is open', () => {
+    mockChatPanelOpen = true
+    render(<PanelToggle slot="toolbar" />)
+    expect(screen.queryByTestId('toggle-panel')).not.toBeInTheDocument()
+  })
+
+  it('shows panel-slot collapse control when rail is open', () => {
+    mockChatPanelOpen = true
+    render(<PanelToggle slot="panel" />)
+    expect(screen.getByTestId('panel-collapse')).toBeInTheDocument()
+    expect(screen.getByTestId('toggle-panel')).toBeInTheDocument()
+    fireEvent.click(screen.getByTestId('panel-collapse'))
+    expect(dismissPanelThisTurn).toHaveBeenCalled()
+    expect(setSessionChatPanelOpen).toHaveBeenCalledWith('s1', false)
+    expect(resetChatActiveTab).toHaveBeenCalled()
   })
 
   it('is hidden when no session is active', () => {
@@ -231,6 +273,16 @@ describe('PanelToggle', () => {
     expect(setKnowledgePanelOpen).toHaveBeenCalledWith(true)
   })
 
+  it('collapses knowledge panel from panel slot when open', () => {
+    mockActiveSessionId = null
+    mockActiveView = 'knowledge'
+    mockKbMode = 'workspace'
+    mockKnowledgePanelOpen = true
+    render(<PanelToggle slot="panel" />)
+    fireEvent.click(screen.getByTestId('knowledge-outline-panel-close'))
+    expect(setKnowledgePanelOpen).toHaveBeenCalledWith(false)
+  })
+
   it('hides panel toggle on knowledge home (no space open)', () => {
     mockActiveSessionId = null
     mockActiveView = 'knowledge'
@@ -239,16 +291,26 @@ describe('PanelToggle', () => {
     expect(screen.queryByTestId('toggle-panel')).not.toBeInTheDocument()
   })
 
-  it('shows terminal files tab when a managed terminal is focused', () => {
+  it('shows terminal files tab when a managed terminal is focused (collapsed)', () => {
     mockActiveSessionId = null
     mockActiveView = 'terminals'
     mockFocusedManagedId = 'tm_1'
-    mockTerminalPanelOpen = true
+    mockTerminalPanelOpen = false
     render(<PanelToggle />)
     expect(screen.getByTestId('toggle-panel')).toBeInTheDocument()
     expect(screen.getByTestId('panel-tab-terminal-files')).toBeInTheDocument()
     fireEvent.click(screen.getByTestId('panel-tab-terminal-files'))
     expect(setTerminalPanelOpen).toHaveBeenCalledWith(true)
+  })
+
+  it('collapses terminal files panel from panel slot when open', () => {
+    mockActiveSessionId = null
+    mockActiveView = 'terminals'
+    mockFocusedManagedId = 'tm_1'
+    mockTerminalPanelOpen = true
+    render(<PanelToggle slot="panel" />)
+    fireEvent.click(screen.getByTestId('terminal-files-panel-close'))
+    expect(setTerminalPanelOpen).toHaveBeenCalledWith(false)
   })
 
   it('hides panel toggle on terminals host library (no focused session)', () => {

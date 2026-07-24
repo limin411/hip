@@ -1,18 +1,17 @@
 import { useTranslation } from 'react-i18next'
-import { X, Copy, Download } from 'lucide-react'
+import { Copy, Download } from 'lucide-react'
 import type { ChatTab } from '@/store/uiStore'
 import { useUiStore } from '@/store/uiStore'
 import { useFsScope } from '@/store/useFsScope'
 import { useFsStore } from '@/store/fsStore'
-import { useActiveMessages, sessionService, useActiveSessionId } from '@/domain'
-import { useDomainStore } from '@/domain/sessionStore'
-import { useFocusStore } from '@/store/focusStore'
+import { useActiveMessages, sessionService } from '@/domain'
 import { collectConversationArtifacts } from '@/lib/renderedArtifacts'
 import { iconFor } from './ArtifactCard'
 import { FilePreview } from './FilePreview'
 import { ConversationOutline } from './ConversationOutline'
 import { AgentsRuntimeSplit } from './AgentsRuntimeSplit'
 import { Button } from '@/components/ui/Button'
+import { PanelToggle } from '@/components/layout/PanelToggle'
 import { cn } from '@/lib/utils'
 
 /** Decode a base64 string to bytes (for downloading image/pdf artifacts). */
@@ -43,11 +42,8 @@ export function PreviewPanel() {
   const messages = useActiveMessages()
   const artifacts = collectConversationArtifacts(messages)
   const selected = useUiStore((s) => s.selectedArtifactPath)
-  const activeSessionId = useActiveSessionId()
-  const setSessionChatPanelOpen = useDomainStore((s) => s.setSessionChatPanelOpen)
   const chatActiveTabRaw = useUiStore((s) => s.chatActiveTab)
   const chatActiveTab = effectiveChatTab(chatActiveTabRaw)
-  const resetChatActiveTab = useUiStore((s) => s.resetChatActiveTab)
   const preview = useFsStore((s) => (scopeId ? s.bySession[scopeId]?.preview : undefined))
 
   const select = (path: string) => {
@@ -73,14 +69,6 @@ export function PreviewPanel() {
     URL.revokeObjectURL(url)
   }
 
-  const close = () => {
-    resetChatActiveTab()
-    if (activeSessionId) {
-      useFocusStore.getState().dismissPanelThisTurn()
-      setSessionChatPanelOpen(activeSessionId, false)
-    }
-  }
-
   return (
     <div className="flex h-full min-h-0 flex-col border-l border-border bg-surface">
       <div
@@ -94,15 +82,8 @@ export function PreviewPanel() {
         >
           {tabLabel(chatActiveTab, t)}
         </span>
-        <Button
-          variant="ghost"
-          size="icon"
-          onClick={close}
-          title={t('artifact.closePanel')}
-          data-tauri-drag-region="false"
-        >
-          <X size={16} strokeWidth={1.75} />
-        </Button>
+        {/* Relocated from main toolbar when open — same toggle collapses the rail. */}
+        <PanelToggle slot="panel" />
       </div>
 
       <div className="min-h-0 flex-1 overflow-hidden" data-testid={`panel-view-${chatActiveTab}`}>

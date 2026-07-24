@@ -22,13 +22,8 @@ vi.mock('react-i18next', () => ({
   }),
 }))
 
-vi.mock('lucide-react', () => ({
-  X: () => React.createElement('span', { 'data-testid': 'icon-x' }),
-}))
-
-vi.mock('@/components/ui/Button', () => ({
-  Button: ({ children, onClick }: { children: React.ReactNode; onClick?: () => void }) =>
-    React.createElement('button', { 'data-testid': 'close-btn', onClick }, children),
+vi.mock('@/components/layout/PanelToggle', () => ({
+  PanelToggle: () => React.createElement('button', { 'data-testid': 'close-btn', type: 'button' }, 'collapse'),
 }))
 
 vi.mock('react-resizable-panels', () => ({

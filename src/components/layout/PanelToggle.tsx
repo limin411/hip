@@ -1,5 +1,5 @@
 import { useTranslation } from 'react-i18next'
-import { Check, PanelRight } from 'lucide-react'
+import { Check, ChevronDown, PanelRight, PanelRightClose } from 'lucide-react'
 import { useActiveSessionId } from '@/domain'
 import type { ArtifactTab, ChatTab } from '@/store/uiStore'
 import { useUiStore } from '@/store/uiStore'
@@ -7,6 +7,7 @@ import { useDomainStore } from '@/domain/sessionStore'
 import { useDiffStore } from '@/store/diffStore'
 import { useKnowledgeStore } from '@/store/knowledgeStore'
 import { useManagedTerminalStore } from '@/store/managedTerminalStore'
+import { useFocusStore } from '@/store/focusStore'
 import { Button } from '@/components/ui/Button'
 import {
   DropdownMenu,
@@ -23,7 +24,43 @@ type PanelTabOption = {
   gated?: boolean
 }
 
-export function PanelToggle() {
+export type PanelToggleSlot = 'toolbar' | 'panel'
+
+/** Whether the shell right rail is open for the current view. */
+export function useRightPanelOpen(): boolean {
+  const activeView = useUiStore((s) => s.activeView)
+  const knowledgePanelOpen = useUiStore((s) => s.knowledgePanelOpen)
+  const terminalPanelOpen = useUiStore((s) => s.terminalPanelOpen)
+  const kbMode = useKnowledgeStore((s) => s.mode)
+  const focusedManagedId = useManagedTerminalStore((s) => s.focusedId)
+  const activeSessionId = useActiveSessionId()
+  const codePanelOpen = useDomainStore((s) =>
+    activeSessionId ? s.sessions.find((x) => x.id === activeSessionId)?.codePanelOpen === true : false,
+  )
+  const chatPanelOpen = useDomainStore((s) =>
+    activeSessionId ? s.sessions.find((x) => x.id === activeSessionId)?.chatPanelOpen === true : false,
+  )
+
+  if (activeView === 'knowledge') {
+    return kbMode === 'workspace' && knowledgePanelOpen
+  }
+  if (activeView === 'terminals') {
+    return TERMINAL_MANAGEMENT && !!focusedManagedId && terminalPanelOpen
+  }
+  if (activeView === 'code') return codePanelOpen
+  if (activeView === 'chat') return chatPanelOpen
+  return false
+}
+
+/**
+ * Right-rail open/close + tab picker.
+ *
+ * Mirrors left sidebar chrome: when the rail is closed the control lives in the
+ * main toolbar; when open it relocates to the panel header (former X slot) and
+ * collapses on click. Multi-tab surfaces keep a dropdown for switching tabs;
+ * re-selecting the active tab also collapses.
+ */
+export function PanelToggle({ slot = 'toolbar' }: { slot?: PanelToggleSlot }) {
   const { t } = useTranslation()
   const activeSessionId = useActiveSessionId()
   const activeView = useUiStore((s) => s.activeView)
@@ -37,26 +74,78 @@ export function PanelToggle() {
   const setTerminalPanelOpen = useUiStore((s) => s.setTerminalPanelOpen)
   const setSessionCodePanelOpen = useDomainStore((s) => s.setSessionCodePanelOpen)
   const setSessionChatPanelOpen = useDomainStore((s) => s.setSessionChatPanelOpen)
+  const resetChatActiveTab = useUiStore((s) => s.resetChatActiveTab)
   const kbMode = useKnowledgeStore((s) => s.mode)
   const focusedManagedId = useManagedTerminalStore((s) => s.focusedId)
   const isGitRepo =
     useDiffStore((s) => (activeSessionId ? s.bySession[activeSessionId]?.isGitRepo : false)) ?? false
+  const panelOpen = useRightPanelOpen()
+
+  // Placement: toolbar only when collapsed; panel header only when expanded.
+  if (slot === 'toolbar' && panelOpen) return null
+  if (slot === 'panel' && !panelOpen) return null
+
+  const collapse = () => {
+    if (activeView === 'knowledge') {
+      setKnowledgePanelOpen(false)
+      return
+    }
+    if (activeView === 'terminals') {
+      setTerminalPanelOpen(false)
+      return
+    }
+    if (!activeSessionId) return
+    if (activeView === 'code' || activeView === 'chat') {
+      useFocusStore.getState().dismissPanelThisTurn()
+    }
+    if (activeView === 'code') {
+      setSessionCodePanelOpen(activeSessionId, false)
+    } else if (activeView === 'chat') {
+      resetChatActiveTab()
+      setSessionChatPanelOpen(activeSessionId, false)
+    }
+  }
+
+  const triggerIcon = panelOpen ? (
+    <PanelRightClose size={17} strokeWidth={1.75} />
+  ) : (
+    <PanelRight size={17} />
+  )
+  const triggerTitle = panelOpen ? t('artifact.closePanel') : t('chat.togglePanel')
 
   // Knowledge: no session required; show outline when a space workspace is open.
   if (activeView === 'knowledge') {
     if (kbMode !== 'workspace') return null
+    // Expanded: one-click collapse at the former X slot (single option surface).
+    if (panelOpen) {
+      return (
+        <Button
+          variant="ghost"
+          size="icon"
+          title={triggerTitle}
+          data-tauri-drag-region="false"
+          data-no-drag
+          data-testid="knowledge-outline-panel-close"
+          onClick={collapse}
+          aria-expanded={true}
+        >
+          {triggerIcon}
+        </Button>
+      )
+    }
     return (
       <DropdownMenu modal={false}>
         <DropdownMenuTrigger asChild>
           <Button
             variant="ghost"
             size="icon"
-            title={t('chat.togglePanel')}
+            title={triggerTitle}
             data-tauri-drag-region="false"
             data-no-drag
             data-testid="toggle-panel"
+            aria-expanded={false}
           >
-            <PanelRight size={17} />
+            {triggerIcon}
           </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end" data-testid="panel-tab-menu">
@@ -78,18 +167,35 @@ export function PanelToggle() {
   // Only when a managed session is focused — HostLibrary landing has no files panel.
   if (activeView === 'terminals') {
     if (!TERMINAL_MANAGEMENT || !focusedManagedId) return null
+    if (panelOpen) {
+      return (
+        <Button
+          variant="ghost"
+          size="icon"
+          title={triggerTitle}
+          data-tauri-drag-region="false"
+          data-no-drag
+          data-testid="terminal-files-panel-close"
+          onClick={collapse}
+          aria-expanded={true}
+        >
+          {triggerIcon}
+        </Button>
+      )
+    }
     return (
       <DropdownMenu modal={false}>
         <DropdownMenuTrigger asChild>
           <Button
             variant="ghost"
             size="icon"
-            title={t('chat.togglePanel')}
+            title={triggerTitle}
             data-tauri-drag-region="false"
             data-no-drag
             data-testid="toggle-panel"
+            aria-expanded={false}
           >
-            <PanelRight size={17} />
+            {triggerIcon}
           </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end" data-testid="panel-tab-menu">
@@ -132,6 +238,11 @@ export function PanelToggle() {
   const currentTab = isCode ? activeTab : chatActiveTab
 
   const onSelect = (value: ArtifactTab | ChatTab) => {
+    // Re-selecting the active tab while open collapses (same control toggles off).
+    if (panelOpen && currentTab === value) {
+      collapse()
+      return
+    }
     if (isCode) {
       setTab(value as ArtifactTab)
       setSessionCodePanelOpen(activeSessionId, true)
@@ -141,18 +252,69 @@ export function PanelToggle() {
     }
   }
 
+  // Expanded multi-tab: the fold control relocates to the former X slot (one-click
+  // collapse). Tab switching stays available via a compact chevron menu so e2e and
+  // in-panel view changes keep working without a toolbar control.
+  if (panelOpen) {
+    return (
+      <div className="flex items-center gap-0.5" data-tauri-drag-region="false" data-no-drag>
+        <DropdownMenu modal={false}>
+          <DropdownMenuTrigger asChild>
+            <Button
+              variant="ghost"
+              size="icon"
+              title={t('chat.togglePanel')}
+              data-testid="toggle-panel"
+              aria-expanded={true}
+            >
+              <ChevronDown size={16} strokeWidth={1.75} />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" data-testid="panel-tab-menu">
+            {tabs.map((tab) => {
+              const selected = currentTab === tab.value
+              return (
+                <DropdownMenuItem
+                  key={tab.value}
+                  onSelect={() => onSelect(tab.value as ArtifactTab | ChatTab)}
+                  data-testid={`panel-tab-${tab.value}`}
+                >
+                  <span className="flex w-4 shrink-0 items-center justify-center">
+                    {selected ? <Check size={14} className="text-accent" /> : null}
+                  </span>
+                  {tab.label}
+                </DropdownMenuItem>
+              )
+            })}
+          </DropdownMenuContent>
+        </DropdownMenu>
+        <Button
+          variant="ghost"
+          size="icon"
+          title={triggerTitle}
+          onClick={collapse}
+          data-testid="panel-collapse"
+          aria-expanded={true}
+        >
+          <PanelRightClose size={17} strokeWidth={1.75} />
+        </Button>
+      </div>
+    )
+  }
+
   return (
     <DropdownMenu modal={false}>
       <DropdownMenuTrigger asChild>
         <Button
           variant="ghost"
           size="icon"
-          title={t('chat.togglePanel')}
+          title={triggerTitle}
           data-tauri-drag-region="false"
           data-no-drag
           data-testid="toggle-panel"
+          aria-expanded={false}
         >
-          <PanelRight size={17} />
+          {triggerIcon}
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" data-testid="panel-tab-menu">

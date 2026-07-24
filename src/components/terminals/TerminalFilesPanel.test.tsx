@@ -5,6 +5,7 @@ import { render, screen, fireEvent, cleanup } from '@testing-library/react'
 
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({ t: (key: string) => key }),
+  initReactI18next: { type: '3rdParty', init: () => {} },
 }))
 
 vi.mock('@/ipc/sftp', () => ({
@@ -16,13 +17,28 @@ vi.mock('./TerminalFileTree', () => ({
   TerminalFileTree: () => <div data-testid="term-fs-file-tree-stub" />,
 }))
 
+vi.mock('@/components/layout/PanelToggle', async () => {
+  const { useUiStore } = await import('@/store/uiStore')
+  return {
+    PanelToggle: () => (
+      <button
+        type="button"
+        data-testid="terminal-files-panel-close"
+        onClick={() => useUiStore.getState().setTerminalPanelOpen(false)}
+      >
+        collapse
+      </button>
+    ),
+  }
+})
+
 import { TerminalFilesPanel } from './TerminalFilesPanel'
 import { useUiStore } from '@/store/uiStore'
 import { useTerminalFsStore } from '@/store/terminalFsStore'
 
 describe('TerminalFilesPanel chrome', () => {
   beforeEach(() => {
-    useUiStore.setState({ terminalPanelOpen: true })
+    useUiStore.setState({ activeView: 'terminals', terminalPanelOpen: true })
     useTerminalFsStore.setState({ byTerminal: {}, transfers: [] })
   })
   afterEach(() => cleanup())

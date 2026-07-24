@@ -16,8 +16,12 @@ vi.mock('react-i18next', () => ({
 
 describe('KnowledgeOutlinePanel', () => {
   beforeEach(() => {
-    useUiStore.setState({ knowledgePanelOpen: true })
+    useUiStore.setState({
+      activeView: 'knowledge',
+      knowledgePanelOpen: true,
+    })
     useKnowledgeStore.setState({
+      mode: 'workspace',
       activeDocId: null,
       draftBody: '',
       docBody: '',

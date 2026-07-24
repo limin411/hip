@@ -1,10 +1,7 @@
-import { X } from 'lucide-react'
 import { Panel, PanelGroup, PanelResizeHandle } from 'react-resizable-panels'
 import { useTranslation } from 'react-i18next'
 import type { ArtifactTab } from '@/store/uiStore'
 import { useUiStore } from '@/store/uiStore'
-import { useActiveSessionId } from '@/domain'
-import { Button } from '@/components/ui/Button'
 import { FileTree } from './FileTree'
 import { FilePreview } from './FilePreview'
 import { ConversationOutline } from './ConversationOutline'
@@ -17,7 +14,7 @@ import { AgentsRuntimeSplit } from './AgentsRuntimeSplit'
 import { CODE_TERMINAL } from './terminalFeature'
 import { useDomainStore } from '@/domain/sessionStore'
 import { useDiffStore } from '@/store/diffStore'
-import { useFocusStore } from '@/store/focusStore'
+import { PanelToggle } from '@/components/layout/PanelToggle'
 const GIT_GATED: ReadonlySet<ArtifactTab> = new Set(['timeline', 'changes'])
 
 function tabLabel(
@@ -53,8 +50,6 @@ function resolveEffectiveTab(activeTab: ArtifactTab, isGitRepo: boolean): Artifa
 export function ArtifactPanel() {
   const { t } = useTranslation()
   const activeTab = useUiStore((s) => s.activeTab)
-  const activeSessionId = useActiveSessionId()
-  const setSessionCodePanelOpen = useDomainStore((s) => s.setSessionCodePanelOpen)
   const sid = useDomainStore((s) => s.activeSessionId)
   const isGitRepo = useDiffStore((s) => (sid ? s.bySession[sid]?.isGitRepo : false)) ?? false
 
@@ -75,18 +70,8 @@ export function ArtifactPanel() {
         </span>
         <div className="flex items-center gap-1" data-tauri-drag-region="false">
           {isGitRepo && <BranchSwitcher />}
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={() => {
-              if (!activeSessionId) return
-              useFocusStore.getState().dismissPanelThisTurn()
-              setSessionCodePanelOpen(activeSessionId, false)
-            }}
-            title={t('artifact.closePanel')}
-          >
-            <X size={16} strokeWidth={1.75} />
-          </Button>
+          {/* Relocated from main toolbar when open — same toggle collapses the rail. */}
+          <PanelToggle slot="panel" />
         </div>
       </div>
 

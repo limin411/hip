@@ -1,9 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { X } from 'lucide-react'
 import { useKnowledgeStore } from '@/store/knowledgeStore'
-import { useUiStore } from '@/store/uiStore'
-import { Button } from '@/components/ui/Button'
+import { PanelToggle } from '@/components/layout/PanelToggle'
 import { DocOutline } from './DocOutline'
 import { cn } from '@/lib/utils'
 import { extractDocOutline, slugifyHeading } from '@/domain/knowledge/mdPreview'
@@ -26,7 +24,6 @@ export function KnowledgeOutlinePanel() {
   const linkPanelStatus = useKnowledgeStore((s) => s.linkPanelStatus)
   const requestOutlineJump = useKnowledgeStore((s) => s.requestOutlineJump)
   const openDoc = useKnowledgeStore((s) => s.openDoc)
-  const setKnowledgePanelOpen = useUiStore((s) => s.setKnowledgePanelOpen)
 
   const liveContent = draftBody || docBody
   const [content, setContent] = useState(liveContent)
@@ -81,15 +78,8 @@ export function KnowledgeOutlinePanel() {
           {t('knowledge.outline.title')}
         </span>
         <div className="flex items-center gap-2" data-tauri-drag-region="false">
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={() => setKnowledgePanelOpen(false)}
-            title={t('artifact.closePanel')}
-            data-testid="knowledge-outline-panel-close"
-          >
-            <X size={16} />
-          </Button>
+          {/* Relocated from main toolbar when open — same toggle collapses the rail. */}
+          <PanelToggle slot="panel" />
         </div>
       </div>
 

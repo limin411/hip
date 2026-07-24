@@ -3,8 +3,7 @@ import { useTranslation } from 'react-i18next'
 import { X } from 'lucide-react'
 import { listenSftpProgress, sftpCancel } from '@/ipc/sftp'
 import { useTerminalFsStore } from '@/store/terminalFsStore'
-import { useUiStore } from '@/store/uiStore'
-import { Button } from '@/components/ui/Button'
+import { PanelToggle } from '@/components/layout/PanelToggle'
 import { TerminalFileTree, type TerminalFileTreeBackend } from './TerminalFileTree'
 import { cn } from '@/lib/utils'
 
@@ -32,7 +31,6 @@ export function TerminalFilesPanel({
   localRoot?: string
 }) {
   const { t } = useTranslation()
-  const setTerminalPanelOpen = useUiStore((s) => s.setTerminalPanelOpen)
   // Select the stable store array, then filter in useMemo. Returning a fresh
   // `.filter()` array from a zustand selector breaks useSyncExternalStore
   // equality (new ref every snapshot) and triggers "Maximum update depth exceeded".
@@ -99,16 +97,8 @@ export function TerminalFilesPanel({
         >
           {panelTitle}
         </span>
-        <Button
-          variant="ghost"
-          size="icon"
-          onClick={() => setTerminalPanelOpen(false)}
-          title={t('artifact.closePanel')}
-          data-tauri-drag-region="false"
-          data-testid="terminal-files-panel-close"
-        >
-          <X size={16} strokeWidth={1.75} />
-        </Button>
+        {/* Relocated from main toolbar when open — same toggle collapses the rail. */}
+        <PanelToggle slot="panel" />
       </div>
 
       <div className="min-h-0 flex-1 overflow-hidden">

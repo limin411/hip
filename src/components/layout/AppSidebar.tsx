@@ -17,6 +17,7 @@ import {
   Zap,
 } from 'lucide-react'
 import { sessionService, useActiveSessionId, useSessions, type SessionVM } from '@/domain'
+import { HIP_PRODUCT_VERSION } from '@/domain/product'
 import { isMacPlatform } from '@/lib/platform'
 import { surfaceOf } from '@/lib/sessions'
 import { groupSessionsByProjectPath, projectPathKey } from '@/lib/sessionProjectGroups'
@@ -231,6 +232,13 @@ export function AppSidebar() {
             <PanelLeftClose {...titlebarIconProps} />
           </button>
         </div>
+      </div>
+
+      <div
+        className="px-3 pb-1.5 pt-0 text-caption tabular-nums tracking-wide text-ink-tertiary"
+        data-testid="sidebar-app-version"
+      >
+        HIP {HIP_PRODUCT_VERSION}
       </div>
 
       <nav className="flex shrink-0 flex-col gap-0.5 px-2 pb-3" aria-label={t('sidebar.navAria')}>

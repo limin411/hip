@@ -5,8 +5,11 @@
  * **Feature Flag Registry** is the sole source of defaults: first_merge = false
  * for every flag (zero UI change until bake-in flips).
  */
-/** Progressive composer disclosure (bake-in after PR-2 e2e helper). */
-export const COMPOSER_OVERFLOW = true
+/**
+ * Progressive composer disclosure (overflow "More" menu).
+ * Product 2026-07-24: keep flat primary controls — always false.
+ */
+export const COMPOSER_OVERFLOW = false
 /** Parallel sub-agents as lanes. */
 export const ACTIVITY_LANES = true
 /** Fold long fences + lang badge polish. */

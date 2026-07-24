@@ -18,8 +18,6 @@ import { CODE_TERMINAL } from './terminalFeature'
 import { useDomainStore } from '@/domain/sessionStore'
 import { useDiffStore } from '@/store/diffStore'
 import { useFocusStore } from '@/store/focusStore'
-import { visibleArtifactTabs } from './visibleArtifactTabs'
-import { cn } from '@/lib/utils'
 const GIT_GATED: ReadonlySet<ArtifactTab> = new Set(['timeline', 'changes'])
 
 function tabLabel(
@@ -55,20 +53,12 @@ function resolveEffectiveTab(activeTab: ArtifactTab, isGitRepo: boolean): Artifa
 export function ArtifactPanel() {
   const { t } = useTranslation()
   const activeTab = useUiStore((s) => s.activeTab)
-  const setTab = useUiStore((s) => s.setTab)
   const activeSessionId = useActiveSessionId()
   const setSessionCodePanelOpen = useDomainStore((s) => s.setSessionCodePanelOpen)
   const sid = useDomainStore((s) => s.activeSessionId)
   const isGitRepo = useDiffStore((s) => (sid ? s.bySession[sid]?.isGitRepo : false)) ?? false
-  const changeFileCount =
-    useDiffStore((s) => (sid ? s.bySession[sid]?.files?.length : undefined)) ?? 0
 
   const effectiveTab = resolveEffectiveTab(activeTab, isGitRepo)
-  const tabs = visibleArtifactTabs({
-    surface: 'code',
-    isGitRepo,
-    codeTerminal: CODE_TERMINAL,
-  }).filter((tab) => !tab.gated)
 
   return (
     <div className="flex h-full min-h-0 flex-col border-l border-border bg-surface">
@@ -98,46 +88,6 @@ export function ArtifactPanel() {
             <X size={16} strokeWidth={1.75} />
           </Button>
         </div>
-      </div>
-
-      {/* Second-row tab chrome (craft PR-8) — does not squeeze titlebar drag row. */}
-      <div
-        className="flex h-8 shrink-0 items-center gap-0.5 overflow-x-auto border-b border-border px-1.5"
-        role="tablist"
-        aria-label={t('artifact.panelTabsAria', { defaultValue: 'Panel tabs' })}
-        data-testid="artifact-panel-tabs"
-      >
-        {tabs.map((tab) => {
-          const selected = effectiveTab === tab.value || (tab.value === 'agents' && effectiveTab === 'tasks')
-          const badge =
-            tab.value === 'changes' && changeFileCount > 0 ? changeFileCount : null
-          return (
-            <button
-              key={tab.value}
-              type="button"
-              role="tab"
-              aria-selected={selected}
-              data-testid={`artifact-panel-tab-${tab.value}`}
-              onClick={() => setTab(tab.value as ArtifactTab)}
-              className={cn(
-                'inline-flex h-7 shrink-0 items-center gap-1 rounded-md px-2 text-meta transition-colors duration-chrome',
-                selected
-                  ? 'bg-state-hover font-medium text-ink'
-                  : 'text-ink-tertiary hover:bg-state-hover hover:text-ink-secondary',
-              )}
-            >
-              {t(tab.labelKey)}
-              {badge != null && (
-                <span
-                  className="rounded bg-surface-muted px-1 text-caption tabular-nums text-ink-tertiary"
-                  data-testid="artifact-changes-badge"
-                >
-                  {badge}
-                </span>
-              )}
-            </button>
-          )
-        })}
       </div>
 
       <div className="min-h-0 flex-1 overflow-hidden" data-testid={`panel-view-${effectiveTab}`}>

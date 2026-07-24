@@ -6,9 +6,9 @@ import {
   CODEBLOCK_LAZY_HIGHLIGHT,
 } from './craftFeature'
 
-describe('craftFeature flags (product bake-in defaults)', () => {
-  it('enables craft upgrade flags after full plan implementation', () => {
-    expect(COMPOSER_OVERFLOW).toBe(true)
+describe('craftFeature flags', () => {
+  it('keeps composer flat; other craft flags remain on', () => {
+    expect(COMPOSER_OVERFLOW).toBe(false)
     expect(ACTIVITY_LANES).toBe(true)
     expect(CODEBLOCK_STRUCTURE_CRAFT).toBe(true)
     expect(CODEBLOCK_LAZY_HIGHLIGHT).toBe(true)

@@ -118,6 +118,24 @@ fn boot_log(exe: &Path, msg: &str) {
         });
 }
 
+/// Strip Windows `\\?\` extended-length prefix.
+///
+/// `current_exe().canonicalize()` returns `\\?\D:\...`. Passing that as Node's
+/// entry script makes Node's `realpathSync` mis-resolve the path and die with:
+///   EISDIR: illegal operation on a directory, lstat 'D:'
+/// Prefer ordinary `D:\...` paths (and on Windows, prefer relative `index.js`).
+fn strip_extended_prefix(p: &Path) -> PathBuf {
+    let s = p.to_string_lossy();
+    // `\\?\UNC\server\share\...` → `\\server\share\...`
+    if let Some(rest) = s.strip_prefix(r"\\?\UNC\") {
+        return PathBuf::from(format!(r"\\{rest}"));
+    }
+    if let Some(rest) = s.strip_prefix(r"\\?\") {
+        return PathBuf::from(rest);
+    }
+    p.to_path_buf()
+}
+
 fn main() {
     let exe = match env::current_exe() {
         Ok(p) => p.canonicalize().unwrap_or(p),
@@ -126,12 +144,13 @@ fn main() {
             std::process::exit(127);
         }
     };
+    let exe = strip_extended_prefix(&exe);
 
-    let runtime = runtime_dir(&exe);
+    let runtime = strip_extended_prefix(&runtime_dir(&exe));
     let script = runtime.join("index.js");
 
     let node = match resolve_node(&runtime) {
-        Some(p) => p,
+        Some(p) => strip_extended_prefix(&p),
         None => {
             let msg = format!(
                 "node runtime missing under {} (expected node{} + index.js; set HIP_SIDECAR_RUNTIME to override)",
@@ -151,19 +170,27 @@ fn main() {
         std::process::exit(127);
     }
 
+    // Windows: pass relative entry + cwd. Absolute `\\?\D:\...` / even some
+    // absolute forms make Node 24 `resolveMainPath` lstat the drive root `D:`.
+    #[cfg(windows)]
+    let script_arg = PathBuf::from("index.js");
+    #[cfg(not(windows))]
+    let script_arg = script.clone();
+
     boot_log(
         &exe,
         &format!(
-            "starting node={} script={}",
+            "starting node={} cwd={} script_arg={}",
             node.display(),
-            script.display()
+            runtime.display(),
+            script_arg.display()
         ),
     );
 
     let mut cmd = Command::new(&node);
-    cmd.arg(&script);
+    cmd.arg(&script_arg);
     cmd.args(env::args().skip(1));
-    // Run with runtime as cwd so relative native addon loads stay sane.
+    // cwd = runtime so relative index.js and native addons resolve correctly.
     cmd.current_dir(&runtime);
     // Optional native addons next to the script.
     if let Ok(prev) = env::var("PATH") {

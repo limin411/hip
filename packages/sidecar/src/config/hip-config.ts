@@ -337,6 +337,8 @@ function normalizeWindow(raw: Record<string, unknown>): WindowConfig {
   if (typeof always === 'boolean') out.trayAlwaysVisible = always
   const seen = raw.closePromptSeen ?? raw.close_prompt_seen
   if (typeof seen === 'boolean') out.closePromptSeen = seen
+  const hideHint = raw.hideHintShown ?? raw.hide_hint_shown
+  if (typeof hideHint === 'boolean') out.hideHintShown = hideHint
   const login = raw.launchAtLogin ?? raw.launch_at_login
   if (typeof login === 'boolean') out.launchAtLogin = login
   const notify = raw.notifyOnAgentComplete ?? raw.notify_on_agent_complete

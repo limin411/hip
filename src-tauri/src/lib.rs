@@ -699,7 +699,8 @@ pub fn run() {
         .manage(window_tray::WindowPolicyState(std::sync::Mutex::new(
             window_tray::WindowPolicy::default(),
         )))
-        .manage(window_tray::TrayState(std::sync::Mutex::new(None)));
+        .manage(window_tray::TrayState(std::sync::Mutex::new(None)))
+        .manage(window_tray::QuitGuard::default());
 
     #[cfg(not(debug_assertions))]
     {
@@ -773,8 +774,14 @@ pub fn run() {
             delete_secret,
             window_tray::window_get_policy,
             window_tray::window_set_policy,
+            window_tray::window_close_decision,
             window_tray::window_show_main,
+            window_tray::window_hide_main,
             window_tray::window_quit,
+            window_tray::window_force_quit,
+            window_tray::window_cancel_exit,
+            window_tray::window_exit_hide_instead,
+            window_tray::tray_set_status,
             terminal_hosts::terminal_hosts_list,
             terminal_hosts::terminal_hosts_save,
             models_catalog,
@@ -883,7 +890,11 @@ pub fn run() {
         // this process (e.g. E2E teardown) runs no handler, so the sidecar also
         // self-terminates when our stdin pipe closes (HIP_PARENT_WATCH; sidecar.rs).
         // Interactive shells have no parent-death watchdog (accepted; design D orphan policy).
-        tauri::RunEvent::ExitRequested { .. } => {
+        tauri::RunEvent::ExitRequested { api, .. } => {
+            // Phase 2: unless force_quit, let FE confirm when agents/tasks may be running.
+            if !window_tray::handle_exit_requested(app_handle, &api) {
+                return;
+            }
             if let Some(child) = app_handle.state::<SidecarState>().child.lock().unwrap().take() {
                 let _ = child.kill();
             }
@@ -1713,6 +1724,7 @@ colorTheme = "one-dark"
                 tray_enabled: Some(true),
                 tray_always_visible: None,
                 close_prompt_seen: None,
+                hide_hint_shown: None,
                 launch_at_login: None,
                 notify_on_agent_complete: None,
             }),

@@ -762,6 +762,7 @@ export const zhCN = {
       },
       trayEnabled: '系统托盘图标',
       trayEnabledDesc: '通过托盘图标恢复窗口或退出。选择「隐藏到系统托盘」时会自动开启。',
+      closeActionsAskNote: '每次关闭窗口时询问。',
       contextMenu: {
         title: '右键菜单',
         description: '选择要显示的右键操作及其顺序。',
@@ -2078,6 +2079,22 @@ export const zhCN = {
       logout: '退出登录',
       logoutConfirmTitle: '退出登录？',
       logoutConfirmDesc: '退出后需要重新登录才能继续。',
+    },
+    dialog: {
+      closeWindowTitle: '关闭窗口时',
+      closeWindowBody: '选择关闭主窗口时的行为。',
+      closeWindowHideHint: '推荐 — agent 与终端会在后台继续运行。',
+      closeWindowRemember: '记住我的选择',
+      exitConfirmTitle: '仍有工作在进行',
+      exitConfirmBody: '退出将中止进行中的工作：',
+      exitConfirmSessions: '{{count}} 个会话中的 agent',
+      exitConfirmTasks: '{{count}} 个后台任务',
+      exitConfirmHide: '隐藏到托盘',
+      exitConfirmQuit: '退出并中止',
+    },
+    tray: {
+      hideHintTitle: 'hip 仍在后台运行',
+      hideHintBody: '单击托盘图标可恢复窗口，或从托盘菜单选择退出。',
     },
     contextMenu: {
       message: {

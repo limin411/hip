@@ -1,0 +1,256 @@
+import { useCallback, useEffect, useState } from 'react'
+import { useTranslation } from 'react-i18next'
+import { useHipConfigStore } from '@/store/hipConfigStore'
+import { useDomainStore } from '@/domain'
+import { useTaskRuntimeStore } from '@/store/taskRuntimeStore'
+import { countActiveWork } from '@/lib/activeWork'
+import {
+  listenClosePrompt,
+  listenExitConfirm,
+  listenWindowHidden,
+  setWindowPolicy,
+  traySetStatus,
+  windowCancelExit,
+  windowCloseDecision,
+  windowExitHideInstead,
+  windowForceQuit,
+} from '@/ipc/windowPolicy'
+import { Modal } from '@/components/ui/Modal'
+import { Button } from '@/components/ui/Button'
+import { Switch } from '@/components/ui/Switch'
+
+/**
+ * Phase 2 host: first-close / ask dialog, exit confirm when work is running,
+ * first-hide notification, and throttled tray tooltip updates.
+ */
+export function WindowLifecycleHost() {
+  const { t } = useTranslation()
+  const [closeOpen, setCloseOpen] = useState(false)
+  const [exitOpen, setExitOpen] = useState(false)
+  const [remember, setRemember] = useState(true)
+  const [pick, setPick] = useState<'hide' | 'quit'>('hide')
+  const [work, setWork] = useState(() => countActiveWork())
+
+  const updateSection = useHipConfigStore((s) => s.updateSection)
+
+  // ── Shell events ──────────────────────────────────────────────
+  useEffect(() => {
+    let unsubs: Array<() => void> = []
+    let cancelled = false
+    void (async () => {
+      try {
+        const u1 = await listenClosePrompt(() => {
+          if (!cancelled) {
+            setPick('hide')
+            setRemember(true)
+            setCloseOpen(true)
+          }
+        })
+        const u2 = await listenExitConfirm(() => {
+          if (cancelled) return
+          const w = countActiveWork()
+          if (w.total === 0) {
+            void windowForceQuit()
+            return
+          }
+          setWork(w)
+          setExitOpen(true)
+        })
+        const u3 = await listenWindowHidden(() => {
+          if (cancelled) return
+          void handleFirstHideHint()
+        })
+        if (cancelled) {
+          u1()
+          u2()
+          u3()
+        } else {
+          unsubs = [u1, u2, u3]
+        }
+      } catch {
+        /* non-tauri */
+      }
+    })()
+    return () => {
+      cancelled = true
+      for (const u of unsubs) u()
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- mount once
+  }, [])
+
+  const handleFirstHideHint = useCallback(async () => {
+    const cfg = useHipConfigStore.getState().config
+    if (cfg.window?.hideHintShown) return
+    try {
+      if (typeof Notification !== 'undefined') {
+        if (Notification.permission === 'granted') {
+          new Notification(t('tray.hideHintTitle'), { body: t('tray.hideHintBody') })
+        } else if (Notification.permission !== 'denied') {
+          const perm = await Notification.requestPermission()
+          if (perm === 'granted') {
+            new Notification(t('tray.hideHintTitle'), { body: t('tray.hideHintBody') })
+          }
+        }
+      }
+    } catch {
+      /* ignore */
+    }
+    void updateSection('window', (prev) => ({ ...(prev ?? {}), hideHintShown: true }))
+  }, [t, updateSection])
+
+  // ── Tray tooltip (throttled) ──────────────────────────────────
+  useEffect(() => {
+    let timer: ReturnType<typeof setTimeout> | null = null
+    const push = () => {
+      if (timer) return
+      timer = setTimeout(() => {
+        timer = null
+        const w = countActiveWork()
+        void traySetStatus({
+          runningAgents: w.runningSessions,
+          runningTasks: w.runningTasks,
+        })
+      }, 500)
+    }
+    push()
+    const unsubDomain = useDomainStore.subscribe(push)
+    const unsubTasks = useTaskRuntimeStore.subscribe(push)
+    return () => {
+      unsubDomain()
+      unsubTasks()
+      if (timer) clearTimeout(timer)
+    }
+  }, [])
+
+  // ── Close prompt actions ──────────────────────────────────────
+  const onCloseConfirm = async () => {
+    setCloseOpen(false)
+    if (remember) {
+      const trayEnabled = pick === 'hide' ? true : useHipConfigStore.getState().config.window?.trayEnabled === true
+      await updateSection('window', (prev) => ({
+        ...(prev ?? {}),
+        closeAction: pick,
+        trayEnabled,
+        closePromptSeen: true,
+      }))
+      void setWindowPolicy(pick, trayEnabled, true)
+    }
+    // Shell applies hide/quit (and may still exit-confirm on quit).
+    void windowCloseDecision(pick, remember)
+  }
+
+  const onCloseCancel = () => {
+    setCloseOpen(false)
+  }
+
+  // ── Exit confirm actions ──────────────────────────────────────
+  const onExitQuit = () => {
+    setExitOpen(false)
+    void windowForceQuit()
+  }
+
+  const onExitHide = () => {
+    setExitOpen(false)
+    void windowExitHideInstead()
+  }
+
+  const onExitCancel = () => {
+    setExitOpen(false)
+    void windowCancelExit()
+  }
+
+  return (
+    <>
+      <Modal
+        open={closeOpen}
+        onOpenChange={(o) => {
+          if (!o) onCloseCancel()
+        }}
+        title={t('dialog.closeWindowTitle')}
+        footer={
+          <div className="flex justify-end gap-2">
+            <Button variant="ghost" size="sm" onClick={onCloseCancel} data-testid="close-prompt-cancel">
+              {t('common.cancel')}
+            </Button>
+            <Button size="sm" onClick={() => void onCloseConfirm()} data-testid="close-prompt-confirm">
+              {t('common.confirm')}
+            </Button>
+          </div>
+        }
+      >
+        <div className="space-y-4 px-5 py-4" data-testid="close-prompt-dialog">
+          <p className="text-meta text-ink-secondary">{t('dialog.closeWindowBody')}</p>
+          <div className="flex flex-col gap-2">
+            <label className="flex cursor-pointer items-start gap-2 rounded-md border border-border px-3 py-2 hover:bg-state-hover">
+              <input
+                type="radio"
+                name="close-action"
+                checked={pick === 'hide'}
+                onChange={() => setPick('hide')}
+                className="mt-1"
+                data-testid="close-prompt-hide"
+              />
+              <span>
+                <span className="block text-body font-medium text-ink">{t('settings.closeActions.hide')}</span>
+                <span className="block text-meta text-ink-tertiary">{t('dialog.closeWindowHideHint')}</span>
+              </span>
+            </label>
+            <label className="flex cursor-pointer items-start gap-2 rounded-md border border-border px-3 py-2 hover:bg-state-hover">
+              <input
+                type="radio"
+                name="close-action"
+                checked={pick === 'quit'}
+                onChange={() => setPick('quit')}
+                className="mt-1"
+                data-testid="close-prompt-quit"
+              />
+              <span className="block text-body font-medium text-ink">{t('settings.closeActions.quit')}</span>
+            </label>
+          </div>
+          <label className="flex items-center justify-between gap-3">
+            <span className="text-body text-ink">{t('dialog.closeWindowRemember')}</span>
+            <Switch
+              checked={remember}
+              onCheckedChange={setRemember}
+              data-testid="close-prompt-remember"
+              ariaLabel={t('dialog.closeWindowRemember')}
+            />
+          </label>
+        </div>
+      </Modal>
+
+      <Modal
+        open={exitOpen}
+        onOpenChange={(o) => {
+          if (!o) onExitCancel()
+        }}
+        title={t('dialog.exitConfirmTitle')}
+        footer={
+          <div className="flex flex-wrap justify-end gap-2">
+            <Button variant="ghost" size="sm" onClick={onExitCancel} data-testid="exit-confirm-cancel">
+              {t('common.cancel')}
+            </Button>
+            <Button variant="ghost" size="sm" onClick={onExitHide} data-testid="exit-confirm-hide">
+              {t('dialog.exitConfirmHide')}
+            </Button>
+            <Button size="sm" onClick={onExitQuit} data-testid="exit-confirm-quit">
+              {t('dialog.exitConfirmQuit')}
+            </Button>
+          </div>
+        }
+      >
+        <div className="space-y-2 px-5 py-4" data-testid="exit-confirm-dialog">
+          <p className="text-body text-ink">{t('dialog.exitConfirmBody')}</p>
+          <ul className="list-inside list-disc text-meta text-ink-secondary">
+            {work.runningSessions > 0 ? (
+              <li>{t('dialog.exitConfirmSessions', { count: work.runningSessions })}</li>
+            ) : null}
+            {work.runningTasks > 0 ? (
+              <li>{t('dialog.exitConfirmTasks', { count: work.runningTasks })}</li>
+            ) : null}
+          </ul>
+        </div>
+      </Modal>
+    </>
+  )
+}

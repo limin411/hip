@@ -806,6 +806,7 @@ export const zhTW = {
     },
     "trayEnabled": "系統匣圖示",
     "trayEnabledDesc": "透過系統匣圖示還原視窗或結束。選擇「隱藏到系統匣」時會自動開啟。",
+    "closeActionsAskNote": "每次關閉視窗時詢問。",
     "contextMenu": {
       "title": "右鍵選單",
       "description": "選擇要顯示的右鍵操作及其順序。",
@@ -2074,6 +2075,22 @@ export const zhTW = {
     "logout": "登出",
     "logoutConfirmTitle": "登出？",
     "logoutConfirmDesc": "登出後需要重新登入才能繼續。"
+  },
+  "dialog": {
+    "closeWindowTitle": "關閉視窗時",
+    "closeWindowBody": "選擇關閉主視窗時的行為。",
+    "closeWindowHideHint": "推薦 — agent 與終端會在背景繼續執行。",
+    "closeWindowRemember": "記住我的選擇",
+    "exitConfirmTitle": "仍有工作在進行",
+    "exitConfirmBody": "結束將中止進行中的工作：",
+    "exitConfirmSessions": "{{count}} 個工作階段中的 agent",
+    "exitConfirmTasks": "{{count}} 個背景工作",
+    "exitConfirmHide": "隱藏到系統匣",
+    "exitConfirmQuit": "結束並中止"
+  },
+  "tray": {
+    "hideHintTitle": "hip 仍在背景執行",
+    "hideHintBody": "按一下系統匣圖示可還原視窗，或從系統匣選單選擇結束。"
   },
   "contextMenu": {
     "message": {

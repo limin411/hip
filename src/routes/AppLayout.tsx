@@ -40,6 +40,7 @@ import { useProjectPathStore } from '@/store/projectPathStore'
 import { useManagedTerminalStore } from '@/store/managedTerminalStore'
 import { useFocusStore } from '@/store/focusStore'
 import { seedNavHistoryIfEmpty } from '@/components/layout/navHistory'
+import { WindowLifecycleHost } from '@/components/window/WindowLifecycleHost'
 
 export function AppLayout() {
   const rightPanelRef = useRef<ImperativePanelHandle>(null)
@@ -229,6 +230,7 @@ export function AppLayout() {
     // Shell is transparent so native vibrancy (macOS Sidebar / Win Mica) shows through
     // the left sidebar; main column stays opaque for readable content.
     <div className="flex h-dvh w-screen flex-row overflow-hidden bg-transparent">
+      <WindowLifecycleHost />
       {sidebarOpen ? <AppSidebar /> : null}
       <PanelGroup direction="horizontal" className="min-w-0 flex-1 bg-surface">
         <Panel minSize={34} className="flex min-w-0 flex-col bg-surface">

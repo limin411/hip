@@ -776,6 +776,7 @@ export const en = {
       trayEnabled: 'System tray icon',
       trayEnabledDesc:
         'Show a tray icon to restore the window or quit. Required for “Hide to system tray”.',
+      closeActionsAskNote: 'Ask each time you close the window.',
       contextMenu: {
         title: 'Context menus',
         description: 'Choose which right-click actions appear and in what order.',
@@ -2124,6 +2125,22 @@ export const en = {
       logout: 'Log Out',
       logoutConfirmTitle: 'Log out?',
       logoutConfirmDesc: 'You will need to log in again to continue.',
+    },
+    dialog: {
+      closeWindowTitle: 'When closing the window',
+      closeWindowBody: 'Choose what happens when you close the main window.',
+      closeWindowHideHint: 'Recommended — agents and terminals keep running in the background.',
+      closeWindowRemember: 'Remember my choice',
+      exitConfirmTitle: 'Work still running',
+      exitConfirmBody: 'Quitting will stop in-progress work:',
+      exitConfirmSessions: '{{count}} session agent(s)',
+      exitConfirmTasks: '{{count}} background task(s)',
+      exitConfirmHide: 'Hide to tray',
+      exitConfirmQuit: 'Quit and stop',
+    },
+    tray: {
+      hideHintTitle: 'hip is still running',
+      hideHintBody: 'Click the tray icon to restore the window, or Quit from the tray menu to exit.',
     },
     contextMenu: {
       message: {

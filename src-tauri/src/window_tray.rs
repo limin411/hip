@@ -1,18 +1,22 @@
-//! Main-window close policy + system tray (Phase 1).
+//! Main-window close policy + system tray (Phase 1–2).
+//!
+//! Phase 1: hide vs quit, tray show/quit, single-instance (see lib.rs).
+//! Phase 2: first-close / ask dialog, exit confirm via FE, tray tooltip status.
 //!
 //! - Missing `[window]` ⇒ close quits, no tray (historical behavior).
-//! - `closeAction=hide` + `trayEnabled=true` + tray available ⇒ hide on close.
-//! - Tray left-click / menu "Show hip" ⇒ show main window.
-//! - Tray menu "Quit" / `window_quit` / Cmd+Q ⇒ full exit (ExitRequested cleanup).
-//! - `HIP_TRAY=0` forces legacy always-quit (no tray).
+//! - `closeAction=hide` + tray ⇒ hide on close (after first-close prompt when unseen).
+//! - `closeAction=ask` or `closePromptSeen=false` ⇒ FE close dialog.
+//! - Quit paths (close/quit menu/Cmd+Q) go through ExitRequested; unless
+//!   `force_quit`, FE gets `window://exit-confirm` and decides.
 
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Mutex;
 
 use serde::{Deserialize, Serialize};
 use tauri::{
     menu::{Menu, MenuItem},
     tray::{MouseButton, MouseButtonState, TrayIcon, TrayIconBuilder, TrayIconEvent},
-    AppHandle, Manager, Runtime, State,
+    AppHandle, Emitter, Manager, Runtime, State,
 };
 
 use crate::hip_config::{TomlHipConfig, WindowConfig};
@@ -28,8 +32,9 @@ pub struct WindowPolicyDto {
     pub tray_enabled: bool,
     /// True when a tray icon is currently installed.
     pub tray_available: bool,
-    /// Effective: hide on chrome close.
+    /// Effective: hide on chrome close (no ask / first-prompt).
     pub should_hide_on_close: bool,
+    pub close_prompt_seen: bool,
 }
 
 #[derive(Debug, Clone)]
@@ -37,6 +42,7 @@ pub struct WindowPolicy {
     pub close_action: String,
     pub tray_enabled: bool,
     pub tray_available: bool,
+    pub close_prompt_seen: bool,
 }
 
 impl Default for WindowPolicy {
@@ -45,6 +51,7 @@ impl Default for WindowPolicy {
             close_action: "quit".into(),
             tray_enabled: false,
             tray_available: false,
+            close_prompt_seen: false,
         }
     }
 }
@@ -54,7 +61,17 @@ impl WindowPolicy {
         if env_tray_disabled() {
             return false;
         }
-        self.tray_enabled && self.tray_available && self.close_action == "hide"
+        self.tray_enabled
+            && self.tray_available
+            && close_action_hides(&self.close_action)
+            && self.close_prompt_seen
+    }
+
+    pub fn needs_close_prompt(&self) -> bool {
+        if env_tray_disabled() {
+            return false;
+        }
+        !self.close_prompt_seen || self.close_action == "ask"
     }
 
     pub fn to_dto(&self) -> WindowPolicyDto {
@@ -63,6 +80,7 @@ impl WindowPolicy {
             tray_enabled: self.tray_enabled,
             tray_available: self.tray_available,
             should_hide_on_close: self.should_hide_on_close(),
+            close_prompt_seen: self.close_prompt_seen,
         }
     }
 }
@@ -70,6 +88,22 @@ impl WindowPolicy {
 pub struct WindowPolicyState(pub Mutex<WindowPolicy>);
 
 pub struct TrayState(pub Mutex<Option<TrayIcon>>);
+
+/// When true, ExitRequested performs cleanup and does not ask FE.
+pub struct QuitGuard {
+    pub force: AtomicBool,
+    /// Avoid re-emitting exit-confirm while FE dialog is open.
+    pub exit_confirm_pending: AtomicBool,
+}
+
+impl Default for QuitGuard {
+    fn default() -> Self {
+        Self {
+            force: AtomicBool::new(false),
+            exit_confirm_pending: AtomicBool::new(false),
+        }
+    }
+}
 
 fn env_tray_disabled() -> bool {
     matches!(
@@ -81,29 +115,30 @@ fn env_tray_disabled() -> bool {
 fn normalize_close_action(raw: Option<&str>) -> String {
     match raw.map(|s| s.trim().to_ascii_lowercase()).as_deref() {
         Some("hide") => "hide".into(),
-        Some("ask") => "ask".into(), // Phase 2; P1 treats as quit for close path
+        Some("ask") => "ask".into(),
         Some("quit") | None => "quit".into(),
         Some(_) => "quit".into(),
     }
 }
 
-/// Phase 1: `ask` does not hide (no dialog yet) — behaves like quit on close.
 fn close_action_hides(action: &str) -> bool {
     action == "hide"
 }
 
 pub fn policy_from_window_config(cfg: Option<&WindowConfig>) -> WindowPolicy {
-    let (close_action, tray_enabled) = match cfg {
+    let (close_action, tray_enabled, close_prompt_seen) = match cfg {
         Some(w) => (
             normalize_close_action(w.close_action.as_deref()),
             w.tray_enabled.unwrap_or(false),
+            w.close_prompt_seen.unwrap_or(false),
         ),
-        None => ("quit".into(), false),
+        None => ("quit".into(), false, false),
     };
     WindowPolicy {
         close_action,
         tray_enabled: tray_enabled && !env_tray_disabled(),
         tray_available: false,
+        close_prompt_seen,
     }
 }
 
@@ -167,7 +202,6 @@ pub fn sync_tray(app: &AppHandle) {
         return;
     }
 
-    // Already have a tray?
     {
         let has = app
             .state::<TrayState>()
@@ -216,7 +250,11 @@ fn try_create_tray_inner(app: &AppHandle) -> Result<TrayIcon, String> {
         .tooltip("hip")
         .on_menu_event(|app, event| match event.id.as_ref() {
             "show" => show_main_window(app),
-            "quit" => app.exit(0),
+            "quit" => {
+                // Ensure UI can show exit-confirm when work is running.
+                show_main_window(app);
+                app.exit(0);
+            }
             _ => {}
         })
         .on_tray_icon_event(|tray, event| {
@@ -246,62 +284,117 @@ fn remove_tray(app: &AppHandle) {
     if let Ok(mut slot) = app.state::<TrayState>().0.lock() {
         if let Some(tray) = slot.take() {
             let _ = tray.set_visible(false);
-            // Drop removes the tray icon.
             drop(tray);
         }
     }
-    // Also remove by id if present
     if let Some(existing) = app.tray_by_id(TRAY_ID) {
         let _ = existing.set_visible(false);
     }
 }
 
 /// Apply policy from FE (hot update). Recreates tray if needed.
-pub fn apply_policy(app: &AppHandle, close_action: String, tray_enabled: bool) {
+pub fn apply_policy(
+    app: &AppHandle,
+    close_action: String,
+    tray_enabled: bool,
+    close_prompt_seen: Option<bool>,
+) {
     let action = normalize_close_action(Some(&close_action));
     let enabled = tray_enabled && !env_tray_disabled();
     if let Ok(mut p) = app.state::<WindowPolicyState>().0.lock() {
         p.close_action = action;
         p.tray_enabled = enabled;
         p.tray_available = false;
+        if let Some(seen) = close_prompt_seen {
+            p.close_prompt_seen = seen;
+        }
     }
-    // Rebuild tray when enabling; remove when disabling.
     remove_tray(app);
     sync_tray(app);
 }
 
+fn perform_hide(app: &AppHandle) {
+    sync_tray(app);
+    let still_ok = app
+        .state::<WindowPolicyState>()
+        .0
+        .lock()
+        .map(|p| p.tray_available)
+        .unwrap_or(false);
+    if still_ok {
+        hide_main_window(app);
+        let _ = app.emit("window://hidden", ());
+    } else {
+        // No tray → quit path so the user is not stuck.
+        app.exit(0);
+    }
+}
+
 pub fn handle_close_requested(app: &AppHandle, api: tauri::CloseRequestApi) {
+    if env_tray_disabled() {
+        app.exit(0);
+        return;
+    }
+
+    let needs_prompt = app
+        .state::<WindowPolicyState>()
+        .0
+        .lock()
+        .map(|p| p.needs_close_prompt())
+        .unwrap_or(false);
+
+    if needs_prompt {
+        api.prevent_close();
+        show_main_window(app);
+        let _ = app.emit("window://close-prompt", ());
+        return;
+    }
+
     let should_hide = app
         .state::<WindowPolicyState>()
         .0
         .lock()
-        .map(|p| {
-            p.tray_enabled
-                && p.tray_available
-                && close_action_hides(&p.close_action)
-                && !env_tray_disabled()
-        })
+        .map(|p| p.should_hide_on_close())
         .unwrap_or(false);
 
     if should_hide {
         api.prevent_close();
-        // Ensure tray exists (e.g. user enabled hide without tray race).
-        sync_tray(app);
-        let still_ok = app
-            .state::<WindowPolicyState>()
-            .0
-            .lock()
-            .map(|p| p.tray_available)
-            .unwrap_or(false);
-        if still_ok {
-            hide_main_window(app);
-        } else {
-            // No tray → fall back to quit so the user is not stuck.
-            app.exit(0);
-        }
-    } else {
-        app.exit(0);
+        perform_hide(app);
+        return;
     }
+
+    app.exit(0);
+}
+
+/// ExitRequested handler: unless force_quit, ask FE to confirm (active work).
+/// Returns true if exit should proceed with cleanup.
+pub fn handle_exit_requested(app: &AppHandle, api: &tauri::ExitRequestApi) -> bool {
+    let guard = app.state::<QuitGuard>();
+    if guard.force.load(Ordering::SeqCst) {
+        return true;
+    }
+    api.prevent_exit();
+    if guard
+        .exit_confirm_pending
+        .compare_exchange(false, true, Ordering::SeqCst, Ordering::SeqCst)
+        .is_ok()
+    {
+        show_main_window(app);
+        let _ = app.emit("window://exit-confirm", ());
+        // Safety: if FE never responds (not mounted / hung), force quit after a few seconds.
+        let app2 = app.clone();
+        std::thread::spawn(move || {
+            std::thread::sleep(std::time::Duration::from_secs(8));
+            let g = app2.state::<QuitGuard>();
+            if g.exit_confirm_pending.load(Ordering::SeqCst) && !g.force.load(Ordering::SeqCst) {
+                eprintln!("[tauri] exit-confirm timed out; forcing quit");
+                g.force.store(true, Ordering::SeqCst);
+                g.exit_confirm_pending.store(false, Ordering::SeqCst);
+                app2.exit(0);
+            }
+        });
+    }
+    false
 }
 
 // ── Tauri commands ───────────────────────────────────────────────
@@ -321,6 +414,8 @@ pub fn window_get_policy(state: State<'_, WindowPolicyState>) -> Result<WindowPo
 pub struct WindowSetPolicyArgs {
     pub close_action: String,
     pub tray_enabled: bool,
+    #[serde(default)]
+    pub close_prompt_seen: Option<bool>,
 }
 
 #[tauri::command]
@@ -328,7 +423,12 @@ pub fn window_set_policy(
     app: AppHandle,
     args: WindowSetPolicyArgs,
 ) -> Result<WindowPolicyDto, String> {
-    apply_policy(&app, args.close_action, args.tray_enabled);
+    apply_policy(
+        &app,
+        args.close_action,
+        args.tray_enabled,
+        args.close_prompt_seen,
+    );
     let p = app
         .state::<WindowPolicyState>()
         .0
@@ -338,6 +438,64 @@ pub fn window_set_policy(
     Ok(p.to_dto())
 }
 
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct WindowCloseDecisionArgs {
+    /// "hide" | "quit"
+    pub action: String,
+    pub remember: bool,
+}
+
+/// FE response to `window://close-prompt`.
+#[tauri::command]
+pub fn window_close_decision(
+    app: AppHandle,
+    args: WindowCloseDecisionArgs,
+) -> Result<(), String> {
+    let action = normalize_close_action(Some(&args.action));
+    // "ask" from dialog is not valid; treat as quit.
+    let action = if action == "ask" {
+        "quit".to_string()
+    } else {
+        action
+    };
+
+    if args.remember {
+        let tray_enabled = action == "hide"
+            || app
+                .state::<WindowPolicyState>()
+                .0
+                .lock()
+                .map(|p| p.tray_enabled)
+                .unwrap_or(false)
+            || action == "hide";
+        let tray_on = if action == "hide" { true } else { tray_enabled };
+        apply_policy(&app, action.clone(), tray_on, Some(true));
+    }
+
+    if action == "hide" {
+        // One-shot hide: ensure tray for this session even if not remembered.
+        if let Ok(mut p) = app.state::<WindowPolicyState>().0.lock() {
+            p.tray_enabled = true;
+            if args.remember {
+                p.close_prompt_seen = true;
+                p.close_action = "hide".into();
+            }
+        }
+        perform_hide(&app);
+    } else {
+        // Quit path — ExitRequested may still prompt for active work.
+        if args.remember {
+            if let Ok(mut p) = app.state::<WindowPolicyState>().0.lock() {
+                p.close_prompt_seen = true;
+                p.close_action = "quit".into();
+            }
+        }
+        app.exit(0);
+    }
+    Ok(())
+}
+
 #[tauri::command]
 pub fn window_show_main(app: AppHandle) -> Result<(), String> {
     show_main_window(&app);
@@ -345,8 +503,85 @@ pub fn window_show_main(app: AppHandle) -> Result<(), String> {
 }
 
 #[tauri::command]
+pub fn window_hide_main(app: AppHandle) -> Result<(), String> {
+    perform_hide(&app);
+    Ok(())
+}
+
+/// Request quit (same as chrome quit / tray quit). May prompt FE via ExitRequested.
+#[tauri::command]
 pub fn window_quit(app: AppHandle) -> Result<(), String> {
+    show_main_window(&app);
     app.exit(0);
+    Ok(())
+}
+
+/// User confirmed quit (or no active work). Performs real exit + cleanup.
+#[tauri::command]
+pub fn window_force_quit(app: AppHandle) -> Result<(), String> {
+    app.state::<QuitGuard>()
+        .force
+        .store(true, Ordering::SeqCst);
+    app.state::<QuitGuard>()
+        .exit_confirm_pending
+        .store(false, Ordering::SeqCst);
+    app.exit(0);
+    Ok(())
+}
+
+/// User cancelled exit-confirm (or chose hide instead).
+#[tauri::command]
+pub fn window_cancel_exit(app: AppHandle) -> Result<(), String> {
+    app.state::<QuitGuard>()
+        .exit_confirm_pending
+        .store(false, Ordering::SeqCst);
+    Ok(())
+}
+
+/// Hide instead of quitting from exit-confirm.
+#[tauri::command]
+pub fn window_exit_hide_instead(app: AppHandle) -> Result<(), String> {
+    app.state::<QuitGuard>()
+        .exit_confirm_pending
+        .store(false, Ordering::SeqCst);
+    if let Ok(mut p) = app.state::<WindowPolicyState>().0.lock() {
+        p.tray_enabled = true;
+    }
+    perform_hide(&app);
+    Ok(())
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TraySetStatusArgs {
+    #[serde(default)]
+    pub running_agents: u32,
+    #[serde(default)]
+    pub running_tasks: u32,
+    #[serde(default)]
+    pub label: Option<String>,
+}
+
+#[tauri::command]
+pub fn tray_set_status(app: AppHandle, args: TraySetStatusArgs) -> Result<(), String> {
+    let tooltip = if let Some(label) = args.label.filter(|s| !s.is_empty()) {
+        label
+    } else if args.running_agents > 0 || args.running_tasks > 0 {
+        format!(
+            "hip · {} agents · {} tasks",
+            args.running_agents, args.running_tasks
+        )
+    } else {
+        "hip".into()
+    };
+
+    if let Ok(slot) = app.state::<TrayState>().0.lock() {
+        if let Some(tray) = slot.as_ref() {
+            let _ = tray.set_tooltip(Some(&tooltip));
+        }
+    } else if let Some(tray) = app.tray_by_id(TRAY_ID) {
+        let _ = tray.set_tooltip(Some(&tooltip));
+    }
     Ok(())
 }
 
@@ -360,36 +595,57 @@ mod tests {
         let p = policy_from_window_config(None);
         assert_eq!(p.close_action, "quit");
         assert!(!p.tray_enabled);
+        assert!(!p.close_prompt_seen);
         assert!(!p.should_hide_on_close());
+        assert!(p.needs_close_prompt()); // first close educates
     }
 
     #[test]
-    fn hide_requires_tray_available() {
+    fn hide_requires_tray_and_prompt_seen() {
         let mut p = policy_from_window_config(Some(&WindowConfig {
             close_action: Some("hide".into()),
             tray_enabled: Some(true),
             tray_always_visible: None,
-            close_prompt_seen: None,
+            close_prompt_seen: Some(true),
             launch_at_login: None,
             notify_on_agent_complete: None,
+            hide_hint_shown: None,
         }));
-        assert!(!p.should_hide_on_close()); // tray not available yet
+        assert!(!p.should_hide_on_close());
         p.tray_available = true;
         assert!(p.should_hide_on_close());
+        assert!(!p.needs_close_prompt());
     }
 
     #[test]
-    fn ask_does_not_hide_in_phase1() {
+    fn ask_always_needs_prompt() {
         let mut p = policy_from_window_config(Some(&WindowConfig {
             close_action: Some("ask".into()),
             tray_enabled: Some(true),
             tray_always_visible: None,
-            close_prompt_seen: None,
+            close_prompt_seen: Some(true),
             launch_at_login: None,
             notify_on_agent_complete: None,
+            hide_hint_shown: None,
         }));
         p.tray_available = true;
-        assert!(!close_action_hides(&p.close_action));
+        assert!(p.needs_close_prompt());
+        assert!(!p.should_hide_on_close());
+    }
+
+    #[test]
+    fn unseen_prompt_blocks_hide() {
+        let mut p = policy_from_window_config(Some(&WindowConfig {
+            close_action: Some("hide".into()),
+            tray_enabled: Some(true),
+            tray_always_visible: None,
+            close_prompt_seen: Some(false),
+            launch_at_login: None,
+            notify_on_agent_complete: None,
+            hide_hint_shown: None,
+        }));
+        p.tray_available = true;
+        assert!(p.needs_close_prompt());
         assert!(!p.should_hide_on_close());
     }
 

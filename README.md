@@ -168,7 +168,10 @@ By default, closing the main window **quits** hip (sidecar, agents, and CLI atta
 |--------|--------|
 | **Hide to system tray** | Close hides the window; agents / terminals / sidecar keep running. Tray left-click or **Show hip** restores; **Quit** exits cleanly. |
 | **Quit hip** | Close exits (historical default). |
+| **Ask every time** | Prompt on each window close (optional). |
 | **System tray icon** | Show a tray icon (auto-enabled when choosing hide). |
+
+First close (until you save a preference) shows a one-time chooser. Quitting while agents/tasks are running asks for confirmation; you can hide to tray instead.
 
 ```toml
 # ~/.hip/config/hip.toml

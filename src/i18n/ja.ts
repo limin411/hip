@@ -798,6 +798,7 @@ export const ja = {
     },
     "trayEnabled": "システムトレイアイコン",
     "trayEnabledDesc": "トレイからウィンドウを再表示したり終了したりできます。「システムトレイに隠す」選択時は自動で有効になります。",
+    "closeActionsAskNote": "ウィンドウを閉じるたびに確認します。",
     "contextMenu": {
       "title": "コンテキストメニュー",
       "description": "右クリックで表示するアクションとその順序を選択します。",
@@ -2066,6 +2067,22 @@ export const ja = {
     "logout": "ログアウト",
     "logoutConfirmTitle": "ログアウトしますか？",
     "logoutConfirmDesc": "続行するには再度ログインする必要があります。"
+  },
+  "dialog": {
+    "closeWindowTitle": "ウィンドウを閉じるとき",
+    "closeWindowBody": "メインウィンドウを閉じたときの動作を選んでください。",
+    "closeWindowHideHint": "推奨 — agent とターミナルはバックグラウンドで動作を続けます。",
+    "closeWindowRemember": "選択を記憶する",
+    "exitConfirmTitle": "作業が進行中です",
+    "exitConfirmBody": "終了すると進行中の作業が停止します：",
+    "exitConfirmSessions": "セッション agent {{count}} 件",
+    "exitConfirmTasks": "バックグラウンドタスク {{count}} 件",
+    "exitConfirmHide": "トレイに隠す",
+    "exitConfirmQuit": "終了して停止"
+  },
+  "tray": {
+    "hideHintTitle": "hip はバックグラウンドで実行中です",
+    "hideHintBody": "トレイアイコンをクリックしてウィンドウを復元するか、トレイメニューから終了してください。"
   },
   "contextMenu": {
     "message": {

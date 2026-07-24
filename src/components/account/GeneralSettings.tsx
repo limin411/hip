@@ -10,6 +10,7 @@ import { cn } from '@/lib/utils'
 import { detectHipPlatform } from '@/lib/platform'
 import { useUiStore, type AppLanguage, type Theme, type UiDensity } from '@/store/uiStore'
 import { useHipConfigStore } from '@/store/hipConfigStore'
+import type { WindowCloseAction } from '@hip/protocol'
 import {
   CLOSE_ACTION_OPTIONS,
   resolveCloseAction,
@@ -91,30 +92,38 @@ export function GeneralSettings() {
     void updateSection('terminal', (prev) => ({ ...(prev ?? {}), colorTheme }))
   }
 
-  const pushWindowPolicy = (nextClose: 'hide' | 'quit', nextTray: boolean) => {
-    void setWindowPolicy(nextClose, nextTray)
+  const pushWindowPolicy = (
+    nextClose: WindowCloseAction,
+    nextTray: boolean,
+    closePromptSeen = true,
+  ) => {
+    void setWindowPolicy(nextClose, nextTray, closePromptSeen)
   }
 
-  const setCloseAction = (action: 'hide' | 'quit') => {
+  const setCloseAction = (action: WindowCloseAction) => {
     // Choosing hide without tray would be a no-op at runtime — auto-enable tray.
-    const nextTray = action === 'hide' ? true : trayEnabled
+    const nextTray = action === 'hide' || action === 'ask' ? true : trayEnabled
+    // Explicit settings choice counts as “prompt seen” so chrome close uses the preference.
     void updateSection('window', (prev) => ({
       ...(prev ?? {}),
       closeAction: action,
       trayEnabled: nextTray,
+      closePromptSeen: true,
     }))
-    pushWindowPolicy(action, nextTray)
+    pushWindowPolicy(action, nextTray, true)
   }
 
   const setTrayEnabled = (enabled: boolean) => {
-    // Turning tray off while closeAction is hide → fall back to quit.
-    const nextClose: 'hide' | 'quit' = !enabled && closeAction === 'hide' ? 'quit' : closeAction
+    // Turning tray off while closeAction is hide/ask → fall back to quit.
+    const nextClose: WindowCloseAction =
+      !enabled && (closeAction === 'hide' || closeAction === 'ask') ? 'quit' : closeAction
     void updateSection('window', (prev) => ({
       ...(prev ?? {}),
       closeAction: nextClose,
       trayEnabled: enabled,
+      closePromptSeen: true,
     }))
-    pushWindowPolicy(nextClose, enabled)
+    pushWindowPolicy(nextClose, enabled, true)
   }
 
   const commitTrashRetention = () => {

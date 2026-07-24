@@ -798,6 +798,7 @@ export const ko = {
     },
     "trayEnabled": "시스템 트레이 아이콘",
     "trayEnabledDesc": "트레이에서 창을 복원하거나 종료할 수 있습니다. 「시스템 트레이로 숨기기」 선택 시 자동으로 켜집니다.",
+    "closeActionsAskNote": "창을 닫을 때마다 묻습니다.",
     "contextMenu": {
       "title": "컨텍스트 메뉴",
       "description": "표시할 오른쪽 클릭 동작과 순서를 선택하세요.",
@@ -2066,6 +2067,22 @@ export const ko = {
     "logout": "로그아웃",
     "logoutConfirmTitle": "로그아웃할까요?",
     "logoutConfirmDesc": "계속하려면 다시 로그인해야 합니다."
+  },
+  "dialog": {
+    "closeWindowTitle": "창을 닫을 때",
+    "closeWindowBody": "메인 창을 닫을 때의 동작을 선택하세요.",
+    "closeWindowHideHint": "권장 — agent와 터미널이 백그라운드에서 계속 실행됩니다.",
+    "closeWindowRemember": "선택 기억하기",
+    "exitConfirmTitle": "작업이 진행 중입니다",
+    "exitConfirmBody": "종료하면 진행 중인 작업이 중지됩니다:",
+    "exitConfirmSessions": "세션 agent {{count}}개",
+    "exitConfirmTasks": "백그라운드 작업 {{count}}개",
+    "exitConfirmHide": "트레이로 숨기기",
+    "exitConfirmQuit": "종료하고 중지"
+  },
+  "tray": {
+    "hideHintTitle": "hip이 백그라운드에서 실행 중입니다",
+    "hideHintBody": "트레이 아이콘을 클릭해 창을 복원하거나, 트레이 메뉴에서 종료하세요."
   },
   "contextMenu": {
     "message": {

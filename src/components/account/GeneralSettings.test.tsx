@@ -184,14 +184,25 @@ describe('GeneralSettings window close / tray', () => {
     const updater = updateSection.mock.calls[0][1] as (prev: {
       closeAction?: string
       trayEnabled?: boolean
-    }) => { closeAction?: string; trayEnabled?: boolean }
+      closePromptSeen?: boolean
+    }) => {
+      closeAction?: string
+      trayEnabled?: boolean
+      closePromptSeen?: boolean
+    }
     expect(updater({ closeAction: 'quit', trayEnabled: false })).toEqual({
       closeAction: 'hide',
       trayEnabled: true,
+      closePromptSeen: true,
     })
     await waitFor(() => {
-      expect(setWindowPolicy).toHaveBeenCalledWith('hide', true)
+      expect(setWindowPolicy).toHaveBeenCalledWith('hide', true, true)
     })
+  })
+
+  it('exposes ask close action', () => {
+    render(<GeneralSettings />)
+    expect(screen.getByTestId('settings-close-action-ask')).toBeInTheDocument()
   })
 
   it('enabling tray switch persists trayEnabled', async () => {
@@ -203,10 +214,16 @@ describe('GeneralSettings window close / tray', () => {
     const updater = updateSection.mock.calls[0][1] as (prev: {
       closeAction?: string
       trayEnabled?: boolean
-    }) => { closeAction?: string; trayEnabled?: boolean }
+      closePromptSeen?: boolean
+    }) => {
+      closeAction?: string
+      trayEnabled?: boolean
+      closePromptSeen?: boolean
+    }
     expect(updater({ closeAction: 'quit', trayEnabled: false })).toEqual({
       closeAction: 'quit',
       trayEnabled: true,
+      closePromptSeen: true,
     })
   })
 })

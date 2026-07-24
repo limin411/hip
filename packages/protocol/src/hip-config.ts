@@ -235,6 +235,8 @@ export interface WindowConfig {
   trayAlwaysVisible?: boolean
   /** User completed first-close dialog (Phase 2). */
   closePromptSeen?: boolean
+  /** First hide-to-tray system hint already shown (Phase 2). */
+  hideHintShown?: boolean
   /** Launch hip at OS login (Phase 3). */
   launchAtLogin?: boolean
   /** OS notification when an agent turn finishes while hidden (Phase 3). */

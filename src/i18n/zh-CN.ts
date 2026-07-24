@@ -2097,6 +2097,11 @@ export const zhCN = {
       exitConfirmQuit: '退出并中止',
     },
     tray: {
+      showMain: '显示 hip',
+      openSettings: '打开设置',
+      quit: '退出',
+      tooltipIdle: 'hip',
+      tooltipRunning: 'hip · {{agents}} 个 Agent · {{tasks}} 个任务',
       hideHintTitle: 'hip 仍在后台运行',
       hideHintBody: '单击托盘图标可恢复窗口，或从托盘菜单选择退出。',
       agentCompleteTitle: 'Agent 已完成',

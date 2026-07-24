@@ -11,6 +11,7 @@ import {
   listenOpenSettings,
   listenWindowHidden,
   setWindowPolicy,
+  traySetLabels,
   traySetStatus,
   windowCancelExit,
   windowCloseDecision,
@@ -150,7 +151,17 @@ export function WindowLifecycleHost() {
     void updateSection('window', (prev) => ({ ...(prev ?? {}), hideHintShown: true }))
   }, [t, updateSection])
 
-  // ── Tray tooltip (throttled) ──────────────────────────────────
+  // ── Tray menu + tooltip i18n ──────────────────────────────────
+  useEffect(() => {
+    void traySetLabels({
+      showMain: t('tray.showMain'),
+      openSettings: t('tray.openSettings'),
+      quit: t('tray.quit'),
+      tooltipIdle: t('tray.tooltipIdle'),
+    })
+  }, [t])
+
+  // ── Tray tooltip (throttled, localized) ───────────────────────
   useEffect(() => {
     let timer: ReturnType<typeof setTimeout> | null = null
     const push = () => {
@@ -158,9 +169,17 @@ export function WindowLifecycleHost() {
       timer = setTimeout(() => {
         timer = null
         const w = countActiveWork()
+        const label =
+          w.runningSessions > 0 || w.runningTasks > 0
+            ? t('tray.tooltipRunning', {
+                agents: w.runningSessions,
+                tasks: w.runningTasks,
+              })
+            : t('tray.tooltipIdle')
         void traySetStatus({
           runningAgents: w.runningSessions,
           runningTasks: w.runningTasks,
+          label,
         })
       }, 500)
     }
@@ -172,7 +191,7 @@ export function WindowLifecycleHost() {
       unsubTasks()
       if (timer) clearTimeout(timer)
     }
-  }, [])
+  }, [t])
 
   // ── Close prompt actions ──────────────────────────────────────
   const onCloseConfirm = async () => {

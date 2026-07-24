@@ -16,7 +16,7 @@ use serde::{Deserialize, Serialize};
 use tauri::{
     menu::{Menu, MenuItem},
     tray::{MouseButton, MouseButtonState, TrayIcon, TrayIconBuilder, TrayIconEvent},
-    AppHandle, Emitter, Manager, Runtime, State,
+    AppHandle, Emitter, Manager, State,
 };
 
 use crate::hip_config::{TomlHipConfig, WindowConfig};
@@ -88,6 +88,28 @@ impl WindowPolicy {
 pub struct WindowPolicyState(pub Mutex<WindowPolicy>);
 
 pub struct TrayState(pub Mutex<Option<TrayIcon>>);
+
+/// Localized tray menu / idle tooltip strings (pushed from FE i18n).
+#[derive(Debug, Clone)]
+pub struct TrayLabels {
+    pub show_main: String,
+    pub open_settings: String,
+    pub quit: String,
+    pub tooltip_idle: String,
+}
+
+impl Default for TrayLabels {
+    fn default() -> Self {
+        Self {
+            show_main: "Show hip".into(),
+            open_settings: "Open Settings".into(),
+            quit: "Quit".into(),
+            tooltip_idle: "hip".into(),
+        }
+    }
+}
+
+pub struct TrayLabelsState(pub Mutex<TrayLabels>);
 
 /// When true, ExitRequested performs cleanup and does not ask FE.
 pub struct QuitGuard {
@@ -170,11 +192,41 @@ pub fn hide_main_window(app: &AppHandle) {
     }
 }
 
-fn build_tray_menu<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<Menu<R>> {
-    let show_i = MenuItem::with_id(app, "show", "Show hip", true, None::<&str>)?;
-    let settings_i = MenuItem::with_id(app, "settings", "Open Settings", true, None::<&str>)?;
-    let quit_i = MenuItem::with_id(app, "quit", "Quit", true, None::<&str>)?;
+fn tray_labels_snapshot(app: &AppHandle) -> TrayLabels {
+    app.try_state::<TrayLabelsState>()
+        .and_then(|s| s.0.lock().ok().map(|g| g.clone()))
+        .unwrap_or_default()
+}
+
+fn build_tray_menu(app: &AppHandle) -> tauri::Result<Menu<tauri::Wry>> {
+    let labels = tray_labels_snapshot(app);
+    let show_i = MenuItem::with_id(app, "show", &labels.show_main, true, None::<&str>)?;
+    let settings_i =
+        MenuItem::with_id(app, "settings", &labels.open_settings, true, None::<&str>)?;
+    let quit_i = MenuItem::with_id(app, "quit", &labels.quit, true, None::<&str>)?;
     Menu::with_items(app, &[&show_i, &settings_i, &quit_i])
+}
+
+/// Rebuild tray menu text from current labels (no icon recreate).
+fn refresh_tray_menu(app: &AppHandle) {
+    let Ok(menu) = build_tray_menu(app) else {
+        return;
+    };
+    let idle = tray_labels_snapshot(app).tooltip_idle;
+    if let Ok(slot) = app.state::<TrayState>().0.lock() {
+        if let Some(tray) = slot.as_ref() {
+            let _ = tray.set_menu(Some(menu));
+            // FE re-pushes a localized status tooltip shortly after language change.
+            let _ = tray.set_tooltip(Some(&idle));
+            return;
+        }
+    }
+    if let Some(tray) = app.tray_by_id(TRAY_ID) {
+        if let Ok(menu2) = build_tray_menu(app) {
+            let _ = tray.set_menu(Some(menu2));
+        }
+        let _ = tray.set_tooltip(Some(&idle));
+    }
 }
 
 /// Create or rebuild the tray icon from current policy. Updates `tray_available`.
@@ -265,12 +317,13 @@ fn tray_icon_image() -> Result<tauri::image::Image<'static>, String> {
 fn try_create_tray_inner(app: &AppHandle) -> Result<TrayIcon, String> {
     let menu = build_tray_menu(app).map_err(|e| e.to_string())?;
     let icon = tray_icon_image()?;
+    let tooltip = tray_labels_snapshot(app).tooltip_idle;
 
     let mut builder = TrayIconBuilder::with_id(TRAY_ID)
         .icon(icon)
         .menu(&menu)
         .show_menu_on_left_click(false)
-        .tooltip("hip")
+        .tooltip(tooltip)
         .on_menu_event(|app, event| match event.id.as_ref() {
             "show" => show_main_window(app),
             "settings" => {
@@ -659,17 +712,57 @@ pub fn maybe_start_hidden(app: &AppHandle) {
     println!("[tauri] started hidden (--autostart)");
 }
 
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TraySetLabelsArgs {
+    pub show_main: String,
+    pub open_settings: String,
+    pub quit: String,
+    #[serde(default)]
+    pub tooltip_idle: Option<String>,
+}
+
+/// FE pushes localized tray menu labels (and idle tooltip) when language changes.
+#[tauri::command]
+pub fn tray_set_labels(app: AppHandle, args: TraySetLabelsArgs) -> Result<(), String> {
+    let show = args.show_main.trim();
+    let settings = args.open_settings.trim();
+    let quit = args.quit.trim();
+    if show.is_empty() || settings.is_empty() || quit.is_empty() {
+        return Err("tray labels must be non-empty".into());
+    }
+    let idle = args
+        .tooltip_idle
+        .as_deref()
+        .map(str::trim)
+        .filter(|s| !s.is_empty())
+        .unwrap_or("hip")
+        .to_string();
+
+    if let Ok(mut slot) = app.state::<TrayLabelsState>().0.lock() {
+        *slot = TrayLabels {
+            show_main: show.to_string(),
+            open_settings: settings.to_string(),
+            quit: quit.to_string(),
+            tooltip_idle: idle,
+        };
+    }
+    refresh_tray_menu(&app);
+    Ok(())
+}
+
 #[tauri::command]
 pub fn tray_set_status(app: AppHandle, args: TraySetStatusArgs) -> Result<(), String> {
     let tooltip = if let Some(label) = args.label.filter(|s| !s.is_empty()) {
         label
     } else if args.running_agents > 0 || args.running_tasks > 0 {
+        // Fallback if FE has not yet pushed a localized label.
         format!(
             "hip · {} agents · {} tasks",
             args.running_agents, args.running_tasks
         )
     } else {
-        "hip".into()
+        tray_labels_snapshot(&app).tooltip_idle
     };
 
     if let Ok(slot) = app.state::<TrayState>().0.lock() {

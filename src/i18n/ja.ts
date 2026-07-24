@@ -2085,6 +2085,11 @@ export const ja = {
     "exitConfirmQuit": "終了して停止"
   },
   "tray": {
+    "showMain": "hip を表示",
+    "openSettings": "設定を開く",
+    "quit": "終了",
+    "tooltipIdle": "hip",
+    "tooltipRunning": "hip · Agent {{agents}} · タスク {{tasks}}",
     "hideHintTitle": "hip はバックグラウンドで実行中です",
     "hideHintBody": "トレイアイコンをクリックしてウィンドウを復元するか、トレイメニューから終了してください。",
     "agentCompleteTitle": "Agent 完了",

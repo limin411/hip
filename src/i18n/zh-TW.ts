@@ -2093,6 +2093,11 @@ export const zhTW = {
     "exitConfirmQuit": "結束並中止"
   },
   "tray": {
+    "showMain": "顯示 hip",
+    "openSettings": "開啟設定",
+    "quit": "結束",
+    "tooltipIdle": "hip",
+    "tooltipRunning": "hip · {{agents}} 個 Agent · {{tasks}} 個任務",
     "hideHintTitle": "hip 仍在背景執行",
     "hideHintBody": "按一下系統匣圖示可還原視窗，或從系統匣選單選擇結束。",
     "agentCompleteTitle": "Agent 已完成",

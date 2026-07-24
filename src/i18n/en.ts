@@ -2145,6 +2145,11 @@ export const en = {
       exitConfirmQuit: 'Quit and stop',
     },
     tray: {
+      showMain: 'Show hip',
+      openSettings: 'Open Settings',
+      quit: 'Quit',
+      tooltipIdle: 'hip',
+      tooltipRunning: 'hip · {{agents}} agents · {{tasks}} tasks',
       hideHintTitle: 'hip is still running',
       hideHintBody: 'Click the tray icon to restore the window, or Quit from the tray menu to exit.',
       agentCompleteTitle: 'Agent finished',

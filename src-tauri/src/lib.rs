@@ -706,6 +706,9 @@ pub fn run() {
             window_tray::WindowPolicy::default(),
         )))
         .manage(window_tray::TrayState(std::sync::Mutex::new(None)))
+        .manage(window_tray::TrayLabelsState(std::sync::Mutex::new(
+            window_tray::TrayLabels::default(),
+        )))
         .manage(window_tray::QuitGuard::default());
 
     #[cfg(not(debug_assertions))]
@@ -796,6 +799,7 @@ pub fn run() {
             window_tray::window_set_launch_at_login,
             window_tray::window_get_launch_at_login,
             window_tray::tray_set_status,
+            window_tray::tray_set_labels,
             terminal_hosts::terminal_hosts_list,
             terminal_hosts::terminal_hosts_save,
             models_catalog,

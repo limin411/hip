@@ -2085,6 +2085,11 @@ export const ko = {
     "exitConfirmQuit": "종료하고 중지"
   },
   "tray": {
+    "showMain": "hip 표시",
+    "openSettings": "설정 열기",
+    "quit": "종료",
+    "tooltipIdle": "hip",
+    "tooltipRunning": "hip · Agent {{agents}} · 작업 {{tasks}}",
     "hideHintTitle": "hip이 백그라운드에서 실행 중입니다",
     "hideHintBody": "트레이 아이콘을 클릭해 창을 복원하거나, 트레이 메뉴에서 종료하세요.",
     "agentCompleteTitle": "Agent 완료",

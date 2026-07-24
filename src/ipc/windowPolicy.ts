@@ -111,6 +111,27 @@ export async function traySetStatus(args: {
   }
 }
 
+/** Push localized tray menu + idle tooltip labels (call on language change). */
+export async function traySetLabels(args: {
+  showMain: string
+  openSettings: string
+  quit: string
+  tooltipIdle?: string
+}): Promise<void> {
+  try {
+    await invoke('tray_set_labels', {
+      args: {
+        showMain: args.showMain,
+        openSettings: args.openSettings,
+        quit: args.quit,
+        tooltipIdle: args.tooltipIdle,
+      },
+    })
+  } catch {
+    /* ignore in web / tests */
+  }
+}
+
 export function listenClosePrompt(handler: () => void): Promise<UnlistenFn> {
   return listen('window://close-prompt', () => handler())
 }

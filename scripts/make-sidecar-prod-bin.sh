@@ -36,6 +36,16 @@ if [ -z "${NODE_BIN}" ] || [ ! -x "${NODE_BIN}" ]; then
   exit 1
 fi
 
+# node:sqlite (hip persistence) needs Node >= 22.5
+NODE_VER="$(node -p 'process.versions.node' 2>/dev/null || true)"
+NODE_MAJOR="${NODE_VER%%.*}"
+NODE_REST="${NODE_VER#*.}"
+NODE_MINOR="${NODE_REST%%.*}"
+if [ -z "${NODE_MAJOR}" ] || [ "${NODE_MAJOR}" -lt 22 ] || { [ "${NODE_MAJOR}" -eq 22 ] && [ "${NODE_MINOR:-0}" -lt 5 ]; }; then
+  echo "error: Node ${NODE_VER} is too old (need >= 22.5 for node:sqlite). Install a newer Node and re-run." >&2
+  exit 1
+fi
+
 IS_WINDOWS=0
 case "$(uname -s 2>/dev/null || echo unknown)" in
   MINGW*|MSYS*|CYGWIN*) IS_WINDOWS=1 ;;

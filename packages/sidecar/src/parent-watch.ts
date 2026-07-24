@@ -21,6 +21,17 @@ export function watchParentViaStdin(
   onParentExit: () => void = () => process.exit(0),
   stdin: NodeJS.ReadStream = process.stdin,
 ): void {
+  // If the launcher failed to inherit Tauri's stdin pipe (seen on some Windows
+  // spawn paths), stdin is already ended/destroyed. Exiting here would kill the
+  // sidecar right after ready — or before Tauri reads ready — and show 连接错误.
+  // Standalone /dev/null launches intentionally omit HIP_PARENT_WATCH.
+  if (stdin.readableEnded || stdin.destroyed) {
+    console.error(
+      '[sidecar] HIP_PARENT_WATCH set but stdin already closed; not watching (stdio inherit broken?)',
+    )
+    return
+  }
+
   let fired = false
   const exit = () => {
     if (fired) return
@@ -30,7 +41,13 @@ export function watchParentViaStdin(
   stdin.on('end', exit)
   stdin.on('close', exit)
   // A broken read pipe surfaces as an error on some platforms; the parent is gone.
-  stdin.on('error', exit)
+  // Do not treat generic errors as parent death before we have seen data/flow —
+  // Windows sometimes emits transient EPIPE-like noise on inherited pipes.
+  stdin.on('error', (err) => {
+    const code = (err as NodeJS.ErrnoException)?.code
+    if (code === 'EPIPE' || code === 'EOF' || code === 'ECONNRESET') exit()
+    else console.error('[sidecar] parent-watch stdin error:', err)
+  })
   // Paused streams never emit 'end'. Flowing mode reads and discards bytes (we
   // have no stdin protocol) and emits 'end' when the parent closes the pipe.
   stdin.resume()

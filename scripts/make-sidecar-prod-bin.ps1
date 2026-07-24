@@ -60,8 +60,18 @@ if (-not $NodeBin -or -not (Test-Path $NodeBin)) {
     exit 1
 }
 
+# node:sqlite (hip persistence) needs Node >= 22.5
+$NodeVer = node -p 'process.versions.node' 2>$null
+$NodeParts = @($NodeVer -split '\.')
+$NodeMajor = [int]($NodeParts[0])
+$NodeMinor = [int]($NodeParts[1])
+if ($NodeMajor -lt 22 -or ($NodeMajor -eq 22 -and $NodeMinor -lt 5)) {
+    Write-Error ("error: Node $NodeVer is too old (need >= 22.5 for node:sqlite). Install a newer Node and re-run.")
+    exit 1
+}
+
 Write-Prod ('target:  ' + $TargetTriple)
-Write-Prod ('node:    ' + $NodeBin)
+Write-Prod ('node:    ' + $NodeBin + ' (v' + $NodeVer + ')')
 Write-Prod 'bundling sidecar with esbuild...'
 
 if (-not (Test-Path $Esbuild)) {

@@ -10,16 +10,20 @@
 //! On Windows, Node is placed under a Job Object with KILL_ON_JOB_CLOSE so that
 //! Tauri's `child.kill()` on this launcher PID also tears down the Node tree
 //! (plain `Command::status()` would otherwise orphan Node and keep the port/DB).
+//! If AssignProcessToJobObject fails (process already in a job — common under
+//! some shells), we continue without a job rather than killing Node.
 
 use std::env;
 use std::path::{Path, PathBuf};
-use std::process::Command;
+use std::process::{Command, Stdio};
 
 #[cfg(unix)]
 use std::os::unix::process::CommandExt;
 
 #[cfg(windows)]
 use std::os::windows::io::AsRawHandle;
+#[cfg(windows)]
+use std::os::windows::process::CommandExt;
 #[cfg(windows)]
 use std::process::exit;
 #[cfg(windows)]
@@ -76,7 +80,33 @@ fn resolve_node(runtime: &Path) -> Option<PathBuf> {
 }
 
 fn path_sep() -> &'static str {
-    if cfg!(windows) { ";" } else { ":" }
+    if cfg!(windows) {
+        ";"
+    } else {
+        ":"
+    }
+}
+
+/// Append a line to a small boot log next to the launcher (Windows diagnostics).
+fn boot_log(exe: &Path, msg: &str) {
+    let parent = exe.parent().unwrap_or_else(|| Path::new("."));
+    let path = parent.join("sidecar-launcher.log");
+    let line = format!(
+        "[{}] {}\n",
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map(|d| d.as_millis())
+            .unwrap_or(0),
+        msg
+    );
+    let _ = std::fs::OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open(&path)
+        .and_then(|mut f| {
+            use std::io::Write;
+            f.write_all(line.as_bytes())
+        });
 }
 
 fn main() {
@@ -94,52 +124,72 @@ fn main() {
     let node = match resolve_node(&runtime) {
         Some(p) => p,
         None => {
-            eprintln!(
-                "[sidecar-launcher] node runtime missing under {} (expected node{} + index.js; set HIP_SIDECAR_RUNTIME to override)",
+            let msg = format!(
+                "node runtime missing under {} (expected node{} + index.js; set HIP_SIDECAR_RUNTIME to override)",
                 runtime.display(),
                 if cfg!(windows) { ".exe" } else { "" },
             );
+            eprintln!("[sidecar-launcher] {msg}");
+            boot_log(&exe, &msg);
             std::process::exit(127);
         }
     };
 
     if !script.is_file() {
-        eprintln!(
-            "[sidecar-launcher] index.js missing at {}",
-            script.display()
-        );
+        let msg = format!("index.js missing at {}", script.display());
+        eprintln!("[sidecar-launcher] {msg}");
+        boot_log(&exe, &msg);
         std::process::exit(127);
     }
+
+    boot_log(
+        &exe,
+        &format!(
+            "starting node={} script={}",
+            node.display(),
+            script.display()
+        ),
+    );
 
     let mut cmd = Command::new(&node);
     cmd.arg(&script);
     cmd.args(env::args().skip(1));
+    // Run with runtime as cwd so relative native addon loads stay sane.
+    cmd.current_dir(&runtime);
+    // Critical: inherit Tauri's pipes so ready JSON on stdout reaches the shell plugin.
+    cmd.stdin(Stdio::inherit())
+        .stdout(Stdio::inherit())
+        .stderr(Stdio::inherit());
     // Optional native addons next to the script.
     if let Ok(prev) = env::var("PATH") {
-        if let Some(dir) = script.parent() {
-            cmd.env("PATH", format!("{}{}{}", dir.display(), path_sep(), prev));
-        }
+        cmd.env(
+            "PATH",
+            format!("{}{}{}", runtime.display(), path_sep(), prev),
+        );
     }
 
     #[cfg(unix)]
     {
         let err = cmd.exec();
         eprintln!("[sidecar-launcher] exec failed: {err}");
+        boot_log(&exe, &format!("exec failed: {err}"));
         std::process::exit(1);
     }
 
     #[cfg(windows)]
     {
-        run_windows(cmd);
+        run_windows(cmd, &exe);
     }
 }
 
 #[cfg(windows)]
-fn run_windows(mut cmd: Command) {
+fn run_windows(mut cmd: Command, exe: &Path) {
     type HANDLE = *mut core::ffi::c_void;
 
     const JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE: u32 = 0x2000;
     const JOB_OBJECT_EXTENDED_LIMIT_INFORMATION: i32 = 9;
+    // Allow child to leave the parent's job so we can put it in our own.
+    const CREATE_BREAKAWAY_FROM_JOB: u32 = 0x0100_0000;
 
     #[repr(C)]
     struct JOBOBJECT_BASIC_LIMIT_INFORMATION {
@@ -192,6 +242,7 @@ fn run_windows(mut cmd: Command) {
     let job = unsafe { CreateJobObjectW(ptr::null_mut(), ptr::null()) };
     if job.is_null() {
         eprintln!("[sidecar-launcher] CreateJobObjectW failed");
+        boot_log(exe, "CreateJobObjectW failed");
         exit(1);
     }
 
@@ -207,25 +258,46 @@ fn run_windows(mut cmd: Command) {
     };
     if set_ok == 0 {
         eprintln!("[sidecar-launcher] SetInformationJobObject failed");
+        boot_log(exe, "SetInformationJobObject failed");
         exit(1);
     }
 
-    let mut child = cmd.spawn().unwrap_or_else(|e| {
-        eprintln!("[sidecar-launcher] spawn failed: {e}");
-        exit(1);
-    });
+    // Prefer breakaway so Node is not stuck in Tauri's job (Assign would fail).
+    cmd.creation_flags(CREATE_BREAKAWAY_FROM_JOB);
+    let mut child = match cmd.spawn() {
+        Ok(c) => c,
+        Err(e) => {
+            // Breakaway may be denied by the parent job; retry without the flag.
+            boot_log(exe, &format!("spawn with BREAKAWAY failed: {e}; retry plain"));
+            cmd.creation_flags(0);
+            cmd.spawn().unwrap_or_else(|e2| {
+                let msg = format!("spawn failed: {e2}");
+                eprintln!("[sidecar-launcher] {msg}");
+                boot_log(exe, &msg);
+                exit(1);
+            })
+        }
+    };
 
     let process_handle = child.as_raw_handle() as HANDLE;
     let assign_ok = unsafe { AssignProcessToJobObject(job, process_handle) };
     if assign_ok == 0 {
-        eprintln!("[sidecar-launcher] AssignProcessToJobObject failed");
-        let _ = child.kill();
-        exit(1);
+        // Do NOT kill Node — Tauri may already own a job; Node must keep running
+        // so it can print ready JSON. Worst case: orphaned Node if launcher dies
+        // without TerminateProcess cascade.
+        let msg = "AssignProcessToJobObject failed; continuing without kill-on-close job";
+        eprintln!("[sidecar-launcher] {msg}");
+        boot_log(exe, msg);
+    } else {
+        boot_log(exe, "Node assigned to kill-on-close job");
     }
 
     let status = child.wait().unwrap_or_else(|e| {
-        eprintln!("[sidecar-launcher] wait failed: {e}");
+        let msg = format!("wait failed: {e}");
+        eprintln!("[sidecar-launcher] {msg}");
+        boot_log(exe, &msg);
         exit(1);
     });
+    boot_log(exe, &format!("Node exited code={:?}", status.code()));
     exit(status.code().unwrap_or(1));
 }

@@ -1,13 +1,14 @@
 Production sidecar runtime is staged here by `yarn sidecar:prod-bin`
-(or `yarn release:macos` / `yarn release:windows`):
+(or the full packagers `yarn package:macos` / `yarn package:windows`):
 
-  node / node.exe  — copy of the Node.js runtime (platform-native)
-  index.js         — esbuild bundle of packages/sidecar
+  node / node.exe  - copy of the Node.js runtime (platform-native)
+  index.js         - esbuild bundle of packages/sidecar
   package.json
 
-These files are gitignored (large). For a distributable installer ALWAYS run
-`yarn sidecar:prod-bin` on the *target OS* before `yarn tauri build`.
+These files are gitignored (large). NEVER ship with only this README.
 
-Windows: if this folder only contains README.txt after install, the build
-skipped prod-bin (or used the dev sidecar launcher). Result: UI shows
-「连接错误」and tauri.log only has sidecar:spawn → sidecar:exit.
+  macOS:   yarn package:macos
+  Windows: yarn package:windows
+
+Bare `yarn tauri build` without prod-bin ships an empty hip-sidecar and
+shows connection error on first launch.

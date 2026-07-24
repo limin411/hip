@@ -1,38 +1,24 @@
 #!/usr/bin/env bash
 #
-# Build a macOS DMG that other Macs can open (Developer ID signed + notarized).
+# hip — macOS 分发包（.app + .dmg）
 #
-# Why plain `yarn tauri build` fails on other machines:
-#   - No Developer ID signature → Gatekeeper shows「文件已损坏」when quarantine is set
-#   - (e.g. download / WeChat / browser). Apps from other sites work because they are
-#     signed with "Developer ID Application" and notarized by Apple.
+# 必须在 macOS 上运行。会：
+#   1. yarn sidecar:prod-bin  （node + index.js + 原生 launcher，禁止用 dev wrapper）
+#   2. 校验 runtime / launcher
+#   3. yarn tauri build --bundles app,dmg
+#   4. codesign + notarization 校验（需 Developer ID）
 #
-# One-time Apple setup (required — cannot be automated without your account):
-#   1. Enroll in Apple Developer Program (paid): https://developer.apple.com/programs/
-#   2. Create a CSR in Keychain Access → Certificate Assistant
-#   3. Create certificate type **Developer ID Application** at:
-#        https://developer.apple.com/account/resources/certificates/list
-#   4. Download .cer and double-click to install into login keychain
-#   5. Verify:
-#        security find-identity -v -p codesigning
-#      Expect a line like: "Developer ID Application: Your Name (TEAMID)"
-#   6. Notarization credentials (pick one):
-#        A) App Store Connect API key (recommended for CI / scripting):
-#             export APPLE_API_ISSUER=...
-#             export APPLE_API_KEY=...          # Key ID
-#             export APPLE_API_KEY_PATH=/path/to/AuthKey_XXX.p8
-#        B) Apple ID + app-specific password:
-#             export APPLE_ID=you@example.com
-#             export APPLE_PASSWORD=xxxx-xxxx-xxxx-xxxx   # appleid.apple.com → App-Specific
-#             export APPLE_TEAM_ID=XXXXXXXXXX
+# 前置：
+#   - Node.js >= 22.5、Yarn、Rust
+#   - Apple Developer ID Application 证书在钥匙串
+#   - 公证凭据（二选一）：
+#       export APPLE_API_ISSUER=... APPLE_API_KEY=... APPLE_API_KEY_PATH=/path/to/AuthKey_XXX.p8
+#       或 export APPLE_ID=... APPLE_PASSWORD=... APPLE_TEAM_ID=...
+#   - 可选：export APPLE_SIGNING_IDENTITY='Developer ID Application: Name (TEAMID)'
 #
-# Optional overrides:
-#   export APPLE_SIGNING_IDENTITY='Developer ID Application: Your Name (TEAMID)'
-#   (otherwise the first Developer ID Application identity is used)
-#
-# Usage:
-#   scripts/release-macos.sh
-#   # or: yarn release:macos
+# 用法（仓库根目录）：
+#   yarn package:macos
+#   # 或：bash scripts/package-macos.sh
 #
 set -euo pipefail
 
@@ -40,7 +26,15 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT_DIR="$(cd "${SCRIPT_DIR}/.." && pwd)"
 cd "${ROOT_DIR}"
 
-echo "==> hip macOS release (signed + notarized)"
+echo "==> hip package:macos"
+
+case "$(uname -s)" in
+  Darwin) ;;
+  *)
+    echo "error: package-macos.sh must run on macOS (got $(uname -s))" >&2
+    exit 1
+    ;;
+esac
 
 # ── 1. Signing identity ─────────────────────────────────────────────────────
 if [ -z "${APPLE_SIGNING_IDENTITY:-}" ]; then
@@ -55,20 +49,13 @@ if [ -z "${APPLE_SIGNING_IDENTITY}" ]; then
   cat >&2 <<'EOF'
 error: no "Developer ID Application" certificate in the keychain.
 
-Other websites' apps open fine because they ship with Apple Developer ID
-signing + notarization. An ad-hoc `yarn tauri build` DMG will always show
-「文件已损坏」on other Macs once Gatekeeper quarantine is applied.
-
+Ad-hoc `yarn tauri build` DMGs show "damaged" on other Macs under Gatekeeper.
 One-time setup:
-  1. Apple Developer Program: https://developer.apple.com/programs/
-  2. Create CSR (Keychain Access → Certificate Assistant → Request…)
-  3. Create "Developer ID Application" cert:
-     https://developer.apple.com/account/resources/certificates/list
-  4. Install the .cer, then re-run:
-     security find-identity -v -p codesigning
-  5. Export notarization credentials (see scripts/release-macos.sh header)
-
-Then re-run: yarn release:macos
+  1. Apple Developer Program
+  2. Create "Developer ID Application" cert and install .cer
+  3. security find-identity -v -p codesigning
+  4. Set notarization env (see header of scripts/package-macos.sh)
+Then: yarn package:macos
 EOF
   exit 1
 fi
@@ -90,15 +77,13 @@ if [ "${has_api}" -eq 0 ] && [ "${has_apple_id}" -eq 0 ]; then
   cat >&2 <<'EOF'
 error: notarization credentials missing.
 
-Signing alone is not enough — Apple requires notarization for Developer ID
-apps. Set either:
+Set either:
 
-  # App Store Connect API key (recommended)
   export APPLE_API_ISSUER=...
   export APPLE_API_KEY=...
   export APPLE_API_KEY_PATH=/path/to/AuthKey_XXX.p8
 
-  # or Apple ID + app-specific password
+  # or
   export APPLE_ID=you@example.com
   export APPLE_PASSWORD=xxxx-xxxx-xxxx-xxxx
   export APPLE_TEAM_ID=XXXXXXXXXX
@@ -119,20 +104,36 @@ else
 fi
 
 # ── 3. Production sidecar (never ship the dev shell wrapper) ────────────────
-echo "==> production sidecar"
+echo "==> production sidecar (yarn sidecar:prod-bin)"
 bash "${SCRIPT_DIR}/make-sidecar-prod-bin.sh"
 
-# Guard: refuse shell-script sidecars
-TRIPLE="$(rustc -vV | sed -n 's/^host: //p')"
-SIDECAR_BIN="${ROOT_DIR}/src-tauri/binaries/sidecar-${TRIPLE}"
-if file "${SIDECAR_BIN}" | grep -qi 'shell script\|ASCII text\|UTF-8 text'; then
-  echo "error: ${SIDECAR_BIN} is still a script — prod packaging failed" >&2
+RUNTIME_DIR="${ROOT_DIR}/src-tauri/resources/hip-sidecar"
+if [ ! -f "${RUNTIME_DIR}/node" ] || [ ! -f "${RUNTIME_DIR}/index.js" ]; then
+  echo "error: hip-sidecar incomplete (need node + index.js under ${RUNTIME_DIR})" >&2
   exit 1
 fi
+NODE_SIZE="$(wc -c < "${RUNTIME_DIR}/node" | tr -d ' ')"
+INDEX_SIZE="$(wc -c < "${RUNTIME_DIR}/index.js" | tr -d ' ')"
+if [ "${NODE_SIZE}" -lt 1000000 ] || [ "${INDEX_SIZE}" -lt 10000 ]; then
+  echo "error: hip-sidecar looks truncated (node=${NODE_SIZE}B index=${INDEX_SIZE}B)" >&2
+  exit 1
+fi
+echo "    hip-sidecar: node (${NODE_SIZE} bytes), index.js (${INDEX_SIZE} bytes)"
 
-# ── 4. Build (Tauri codesigns + notarizes when env is set) ──────────────────
-echo "==> yarn tauri build"
-# Prefer dmg for distribution; "all" also fine.
+TRIPLE="$(rustc -vV | sed -n 's/^host: //p')"
+SIDECAR_BIN="${ROOT_DIR}/src-tauri/binaries/sidecar-${TRIPLE}"
+if [ ! -f "${SIDECAR_BIN}" ]; then
+  echo "error: missing launcher ${SIDECAR_BIN}" >&2
+  exit 1
+fi
+if file "${SIDECAR_BIN}" | grep -qi 'shell script\|ASCII text\|UTF-8 text'; then
+  echo "error: ${SIDECAR_BIN} is still a script — ran sidecar:dev-bin by mistake?" >&2
+  exit 1
+fi
+echo "    launcher: ${SIDECAR_BIN}"
+
+# ── 4. Build ────────────────────────────────────────────────────────────────
+echo "==> yarn tauri build --bundles app,dmg"
 yarn tauri build --bundles app,dmg
 
 APP="${ROOT_DIR}/src-tauri/target/release/bundle/macos/hip.app"
@@ -140,6 +141,14 @@ DMG="$(ls -1 "${ROOT_DIR}"/src-tauri/target/release/bundle/dmg/hip_*_*.dmg 2>/de
 
 if [ ! -d "${APP}" ]; then
   echo "error: expected app bundle missing: ${APP}" >&2
+  exit 1
+fi
+
+# Bundled runtime must exist inside the .app
+APP_RUNTIME="${APP}/Contents/Resources/hip-sidecar"
+if [ ! -f "${APP_RUNTIME}/node" ] || [ ! -f "${APP_RUNTIME}/index.js" ]; then
+  echo "error: app bundle missing hip-sidecar runtime at ${APP_RUNTIME}" >&2
+  ls -la "${APP}/Contents/Resources/" 2>/dev/null || true
   exit 1
 fi
 
@@ -154,11 +163,10 @@ spctl -a -vv -t install "${APP}" || {
 }
 
 echo
-echo "OK — distributable build ready:"
+echo "OK — macOS package ready:"
 echo "  app: ${APP}"
 if [ -n "${DMG}" ]; then
   echo "  dmg: ${DMG}"
 fi
 echo
-echo "Ship the DMG. Recipients should open it like any other Mac app."
-echo "Do NOT transfer via tools that strip signatures; prefer HTTPS download."
+echo "Ship the DMG over HTTPS. Do not transfer via tools that strip signatures."

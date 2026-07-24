@@ -9,7 +9,7 @@
 #   yarn sidecar:prod-bin
 #   # or: powershell -File scripts/make-sidecar-prod-bin.ps1
 #
-# Then: yarn tauri build  (or scripts/release-windows.ps1)
+# Prefer full packager: yarn package:windows
 #
 # Written for Windows PowerShell 5.1:
 # - no em-dash / fancy unicode in parse-sensitive strings

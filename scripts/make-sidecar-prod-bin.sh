@@ -162,4 +162,4 @@ fi
 
 echo "[sidecar:prod] wrote launcher: ${OUT}"
 echo "[sidecar:prod] runtime:        ${RUNTIME_DIR}/ ($(basename "${NODE_STAGED}") + index.js)"
-echo "[sidecar:prod] next:           yarn tauri build   # Windows: NSIS; macOS: yarn release:macos"
+echo "[sidecar:prod] next:           yarn package:macos   # or yarn package:windows"

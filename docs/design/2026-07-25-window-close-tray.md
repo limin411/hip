@@ -5,7 +5,7 @@
 | **Title** | Window Close Behavior & System Tray |
 | **Author** | TBD |
 | **Date** | 2026-07-25 |
-| **Status** | Phase 1–2 **implemented** (2026-07-25); Phase 3 still planned |
+| **Status** | Phase 1–3 **implemented** (2026-07-25) |
 | **Audience** | hip core (React UI / Tauri shell / protocol config / CLI attach) |
 | **Related** | `src-tauri/src/lib.rs` (`CloseRequested` → `exit(0)`); `GeneralSettings`; CLI attach-only; `HipConfig` / `hip.toml` |
 | **Platforms** | macOS · Windows · Linux (best-effort tray) |

@@ -763,6 +763,10 @@ export const zhCN = {
       trayEnabled: '系统托盘图标',
       trayEnabledDesc: '通过托盘图标恢复窗口或退出。选择「隐藏到系统托盘」时会自动开启。',
       closeActionsAskNote: '每次关闭窗口时询问。',
+      launchAtLogin: '开机时启动 hip',
+      launchAtLoginDesc: '登录系统时启动 hip。从登录项启动时默认隐藏到托盘。',
+      notifyOnAgentComplete: '任务完成时通知',
+      notifyOnAgentCompleteDesc: '窗口隐藏时，agent 回合结束会弹出系统通知。',
       contextMenu: {
         title: '右键菜单',
         description: '选择要显示的右键操作及其顺序。',
@@ -2095,6 +2099,10 @@ export const zhCN = {
     tray: {
       hideHintTitle: 'hip 仍在后台运行',
       hideHintBody: '单击托盘图标可恢复窗口，或从托盘菜单选择退出。',
+      agentCompleteTitle: 'Agent 已完成',
+      agentCompleteBody: '「{{title}}」已就绪。',
+      agentFailedTitle: 'Agent 出错',
+      agentFailedBody: '「{{title}}」以错误结束。',
     },
     contextMenu: {
       message: {

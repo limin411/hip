@@ -5,8 +5,10 @@ import { useDomainStore } from '@/domain'
 import { useTaskRuntimeStore } from '@/store/taskRuntimeStore'
 import { countActiveWork } from '@/lib/activeWork'
 import {
+  isMainWindowVisible,
   listenClosePrompt,
   listenExitConfirm,
+  listenOpenSettings,
   listenWindowHidden,
   setWindowPolicy,
   traySetStatus,
@@ -15,6 +17,7 @@ import {
   windowExitHideInstead,
   windowForceQuit,
 } from '@/ipc/windowPolicy'
+import { useUiStore } from '@/store/uiStore'
 import { Modal } from '@/components/ui/Modal'
 import { Button } from '@/components/ui/Button'
 import { Switch } from '@/components/ui/Switch'
@@ -60,12 +63,17 @@ export function WindowLifecycleHost() {
           if (cancelled) return
           void handleFirstHideHint()
         })
+        const u4 = await listenOpenSettings(() => {
+          if (cancelled) return
+          useUiStore.getState().setActiveView('settings')
+        })
         if (cancelled) {
           u1()
           u2()
           u3()
+          u4()
         } else {
-          unsubs = [u1, u2, u3]
+          unsubs = [u1, u2, u3, u4]
         }
       } catch {
         /* non-tauri */
@@ -77,6 +85,50 @@ export function WindowLifecycleHost() {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps -- mount once
   }, [])
+
+  // ── Agent complete notification while hidden (Phase 3) ────────
+  useEffect(() => {
+    const prev = new Map<string, string>()
+    for (const s of useDomainStore.getState().sessions) {
+      prev.set(s.id, s.status)
+    }
+    return useDomainStore.subscribe((state) => {
+      const cfg = useHipConfigStore.getState().config.window
+      if (cfg?.notifyOnAgentComplete === false) return
+      for (const s of state.sessions) {
+        const was = prev.get(s.id)
+        prev.set(s.id, s.status)
+        if (was !== 'running') continue
+        if (s.status !== 'idle' && s.status !== 'error') continue
+        void (async () => {
+          const visible = await isMainWindowVisible()
+          if (visible) return
+          try {
+            if (typeof Notification === 'undefined') return
+            if (Notification.permission === 'denied') return
+            if (Notification.permission !== 'granted') {
+              const p = await Notification.requestPermission()
+              if (p !== 'granted') return
+            }
+            const title =
+              s.status === 'error'
+                ? t('tray.agentFailedTitle')
+                : t('tray.agentCompleteTitle')
+            const body =
+              s.status === 'error'
+                ? t('tray.agentFailedBody', { title: s.title || s.id })
+                : t('tray.agentCompleteBody', { title: s.title || s.id })
+            const n = new Notification(title, { body })
+            n.onclick = () => {
+              void import('@/ipc/windowPolicy').then((m) => m.showMainWindow())
+            }
+          } catch {
+            /* ignore */
+          }
+        })()
+      }
+    })
+  }, [t])
 
   const handleFirstHideHint = useCallback(async () => {
     const cfg = useHipConfigStore.getState().config

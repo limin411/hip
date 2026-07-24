@@ -48,6 +48,8 @@ tauri-plugin-shell = "2"
 tauri-plugin-wdio-webdriver = "1"
 # Second launch focuses the existing main window (release builds only; see lib.rs).
 tauri-plugin-single-instance = "2"
+# Launch at login (Phase 3 window / tray).
+tauri-plugin-autostart = "2"
 # `sync` always; SSH feature expands rt/net/time/io-util/macros (see [features].ssh).
 tokio = { version = "1", features = ["sync"] }
 # Pinned to 0.12 (rustls-tls): bumping to 0.13 to dedupe the transitive 0.13.4 fails

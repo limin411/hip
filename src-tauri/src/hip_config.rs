@@ -175,6 +175,8 @@ pub(crate) struct WindowConfig {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub(crate) launch_at_login: Option<bool>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub(crate) start_hidden_on_login: Option<bool>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub(crate) notify_on_agent_complete: Option<bool>,
 }
 
@@ -436,6 +438,8 @@ pub(crate) struct TomlWindowConfig {
     pub(crate) hide_hint_shown: Option<bool>,
     #[serde(default, skip_serializing_if = "Option::is_none", alias = "launchAtLogin")]
     pub(crate) launch_at_login: Option<bool>,
+    #[serde(default, skip_serializing_if = "Option::is_none", alias = "startHiddenOnLogin")]
+    pub(crate) start_hidden_on_login: Option<bool>,
     #[serde(
         default,
         skip_serializing_if = "Option::is_none",
@@ -770,6 +774,7 @@ impl From<WindowConfig> for TomlWindowConfig {
             close_prompt_seen: w.close_prompt_seen,
             hide_hint_shown: w.hide_hint_shown,
             launch_at_login: w.launch_at_login,
+            start_hidden_on_login: w.start_hidden_on_login,
             notify_on_agent_complete: w.notify_on_agent_complete,
         }
     }
@@ -784,6 +789,7 @@ impl From<TomlWindowConfig> for WindowConfig {
             close_prompt_seen: w.close_prompt_seen,
             hide_hint_shown: w.hide_hint_shown,
             launch_at_login: w.launch_at_login,
+            start_hidden_on_login: w.start_hidden_on_login,
             notify_on_agent_complete: w.notify_on_agent_complete,
         }
     }

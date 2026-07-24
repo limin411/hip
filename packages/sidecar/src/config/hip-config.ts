@@ -341,6 +341,8 @@ function normalizeWindow(raw: Record<string, unknown>): WindowConfig {
   if (typeof hideHint === 'boolean') out.hideHintShown = hideHint
   const login = raw.launchAtLogin ?? raw.launch_at_login
   if (typeof login === 'boolean') out.launchAtLogin = login
+  const startHidden = raw.startHiddenOnLogin ?? raw.start_hidden_on_login
+  if (typeof startHidden === 'boolean') out.startHiddenOnLogin = startHidden
   const notify = raw.notifyOnAgentComplete ?? raw.notify_on_agent_complete
   if (typeof notify === 'boolean') out.notifyOnAgentComplete = notify
   return out

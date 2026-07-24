@@ -807,6 +807,10 @@ export const zhTW = {
     "trayEnabled": "系統匣圖示",
     "trayEnabledDesc": "透過系統匣圖示還原視窗或結束。選擇「隱藏到系統匣」時會自動開啟。",
     "closeActionsAskNote": "每次關閉視窗時詢問。",
+    "launchAtLogin": "開機時啟動 hip",
+    "launchAtLoginDesc": "登入系統時啟動 hip。從登入項目啟動時預設隱藏到系統匣。",
+    "notifyOnAgentComplete": "任務完成時通知",
+    "notifyOnAgentCompleteDesc": "視窗隱藏時，agent 回合結束會顯示系統通知。",
     "contextMenu": {
       "title": "右鍵選單",
       "description": "選擇要顯示的右鍵操作及其順序。",
@@ -2090,7 +2094,11 @@ export const zhTW = {
   },
   "tray": {
     "hideHintTitle": "hip 仍在背景執行",
-    "hideHintBody": "按一下系統匣圖示可還原視窗，或從系統匣選單選擇結束。"
+    "hideHintBody": "按一下系統匣圖示可還原視窗，或從系統匣選單選擇結束。",
+    "agentCompleteTitle": "Agent 已完成",
+    "agentCompleteBody": "「{{title}}」已就緒。",
+    "agentFailedTitle": "Agent 出錯",
+    "agentFailedBody": "「{{title}}」以錯誤結束。"
   },
   "contextMenu": {
     "message": {

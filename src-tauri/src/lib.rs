@@ -688,11 +688,17 @@ pub fn run() {
     // Release builds: second launch focuses the existing window. Dev keeps multi-instance
     // (and HIP_ALLOW_MULTI_INSTANCE=1 always allows multi-instance).
     #[cfg_attr(debug_assertions, allow(unused_mut))]
+    use tauri_plugin_autostart::MacosLauncher;
+
     let mut builder = tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_wdio_webdriver::init())
+        .plugin(tauri_plugin_autostart::init(
+            MacosLauncher::LaunchAgent,
+            Some(vec!["--autostart"]),
+        ))
         .manage(SidecarState::new())
         .manage(terminal_budget::TerminalBudget::new())
         .manage(pty::PtyManager::new())
@@ -737,10 +743,15 @@ pub fn run() {
                     *slot = policy;
                 }
                 window_tray::sync_tray(app.handle());
+                window_tray::maybe_start_hidden(app.handle());
             }
             // Configured size (tauri.conf) may exceed this host's display — maximize instead.
             if let Some(window) = app.get_webview_window("main") {
-                maximize_if_window_exceeds_monitor(&window);
+                // Skip maximize when intentionally starting hidden (login item).
+                let visible = window.is_visible().unwrap_or(true);
+                if visible {
+                    maximize_if_window_exceeds_monitor(&window);
+                }
             }
             let handle = app.handle().clone();
             tauri::async_runtime::spawn(async move {
@@ -781,6 +792,9 @@ pub fn run() {
             window_tray::window_force_quit,
             window_tray::window_cancel_exit,
             window_tray::window_exit_hide_instead,
+            window_tray::window_is_main_visible,
+            window_tray::window_set_launch_at_login,
+            window_tray::window_get_launch_at_login,
             window_tray::tray_set_status,
             terminal_hosts::terminal_hosts_list,
             terminal_hosts::terminal_hosts_save,
@@ -1726,6 +1740,7 @@ colorTheme = "one-dark"
                 close_prompt_seen: None,
                 hide_hint_shown: None,
                 launch_at_login: None,
+                start_hidden_on_login: None,
                 notify_on_agent_complete: None,
             }),
             acp: None,

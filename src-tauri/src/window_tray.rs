@@ -172,8 +172,9 @@ pub fn hide_main_window(app: &AppHandle) {
 
 fn build_tray_menu<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<Menu<R>> {
     let show_i = MenuItem::with_id(app, "show", "Show hip", true, None::<&str>)?;
+    let settings_i = MenuItem::with_id(app, "settings", "Open Settings", true, None::<&str>)?;
     let quit_i = MenuItem::with_id(app, "quit", "Quit", true, None::<&str>)?;
-    Menu::with_items(app, &[&show_i, &quit_i])
+    Menu::with_items(app, &[&show_i, &settings_i, &quit_i])
 }
 
 /// Create or rebuild the tray icon from current policy. Updates `tray_available`.
@@ -250,6 +251,10 @@ fn try_create_tray_inner(app: &AppHandle) -> Result<TrayIcon, String> {
         .tooltip("hip")
         .on_menu_event(|app, event| match event.id.as_ref() {
             "show" => show_main_window(app),
+            "settings" => {
+                show_main_window(app);
+                let _ = app.emit("window://open-settings", ());
+            }
             "quit" => {
                 // Ensure UI can show exit-confirm when work is running.
                 show_main_window(app);
@@ -563,6 +568,75 @@ pub struct TraySetStatusArgs {
 }
 
 #[tauri::command]
+pub fn window_is_main_visible(app: AppHandle) -> Result<bool, String> {
+    Ok(app
+        .get_webview_window("main")
+        .and_then(|w| w.is_visible().ok())
+        .unwrap_or(false))
+}
+
+/// Sync OS login item with `launchAtLogin` preference.
+#[tauri::command]
+pub fn window_set_launch_at_login(app: AppHandle, enabled: bool) -> Result<(), String> {
+    use tauri_plugin_autostart::ManagerExt;
+    let launcher = app.autolaunch();
+    if enabled {
+        launcher.enable().map_err(|e| e.to_string())?;
+    } else {
+        launcher.disable().map_err(|e| e.to_string())?;
+    }
+    Ok(())
+}
+
+#[tauri::command]
+pub fn window_get_launch_at_login(app: AppHandle) -> Result<bool, String> {
+    use tauri_plugin_autostart::ManagerExt;
+    app.autolaunch().is_enabled().map_err(|e| e.to_string())
+}
+
+/// Hide main window at startup when launched with `--autostart` and policy allows.
+pub fn maybe_start_hidden(app: &AppHandle) {
+    let autostart_arg = std::env::args().any(|a| a == "--autostart");
+    if !autostart_arg {
+        return;
+    }
+    let policy = load_policy_from_disk(app);
+    // Prefer explicit startHiddenOnLogin from disk; default true when autostart.
+    let start_hidden = {
+        let Some(path) = paths::hip_config_path(app) else {
+            return;
+        };
+        let Ok(raw) = std::fs::read_to_string(&path) else {
+            return;
+        };
+        let Ok(toml_cfg) = toml::from_str::<TomlHipConfig>(&raw) else {
+            return;
+        };
+        let hip: crate::hip_config::HipConfig = toml_cfg.into();
+        hip.window
+            .as_ref()
+            .and_then(|w| w.start_hidden_on_login)
+            .unwrap_or(true)
+    };
+    if !start_hidden {
+        return;
+    }
+    // Ensure tray so the user can restore.
+    if let Ok(mut p) = app.state::<WindowPolicyState>().0.lock() {
+        p.tray_enabled = true;
+        *p = WindowPolicy {
+            close_action: policy.close_action,
+            tray_enabled: true,
+            tray_available: false,
+            close_prompt_seen: policy.close_prompt_seen,
+        };
+    }
+    sync_tray(app);
+    hide_main_window(app);
+    println!("[tauri] started hidden (--autostart)");
+}
+
+#[tauri::command]
 pub fn tray_set_status(app: AppHandle, args: TraySetStatusArgs) -> Result<(), String> {
     let tooltip = if let Some(label) = args.label.filter(|s| !s.is_empty()) {
         label
@@ -608,6 +682,7 @@ mod tests {
             tray_always_visible: None,
             close_prompt_seen: Some(true),
             launch_at_login: None,
+            start_hidden_on_login: None,
             notify_on_agent_complete: None,
             hide_hint_shown: None,
         }));
@@ -625,6 +700,7 @@ mod tests {
             tray_always_visible: None,
             close_prompt_seen: Some(true),
             launch_at_login: None,
+            start_hidden_on_login: None,
             notify_on_agent_complete: None,
             hide_hint_shown: None,
         }));
@@ -641,6 +717,7 @@ mod tests {
             tray_always_visible: None,
             close_prompt_seen: Some(false),
             launch_at_login: None,
+            start_hidden_on_login: None,
             notify_on_agent_complete: None,
             hide_hint_shown: None,
         }));

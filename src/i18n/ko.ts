@@ -799,6 +799,10 @@ export const ko = {
     "trayEnabled": "시스템 트레이 아이콘",
     "trayEnabledDesc": "트레이에서 창을 복원하거나 종료할 수 있습니다. 「시스템 트레이로 숨기기」 선택 시 자동으로 켜집니다.",
     "closeActionsAskNote": "창을 닫을 때마다 묻습니다.",
+    "launchAtLogin": "로그인 시 시작",
+    "launchAtLoginDesc": "컴퓨터에 로그인할 때 hip을 시작합니다. 로그인 항목에서 실행되면 기본적으로 트레이로 숨깁니다.",
+    "notifyOnAgentComplete": "에이전트 완료 시 알림",
+    "notifyOnAgentCompleteDesc": "창이 숨겨져 있을 때 agent 턴이 끝나면 시스템 알림을 표시합니다.",
     "contextMenu": {
       "title": "컨텍스트 메뉴",
       "description": "표시할 오른쪽 클릭 동작과 순서를 선택하세요.",
@@ -2082,7 +2086,11 @@ export const ko = {
   },
   "tray": {
     "hideHintTitle": "hip이 백그라운드에서 실행 중입니다",
-    "hideHintBody": "트레이 아이콘을 클릭해 창을 복원하거나, 트레이 메뉴에서 종료하세요."
+    "hideHintBody": "트레이 아이콘을 클릭해 창을 복원하거나, 트레이 메뉴에서 종료하세요.",
+    "agentCompleteTitle": "Agent 완료",
+    "agentCompleteBody": "「{{title}}」이(가) 준비되었습니다.",
+    "agentFailedTitle": "Agent 오류",
+    "agentFailedBody": "「{{title}}」이(가) 오류로 종료되었습니다."
   },
   "contextMenu": {
     "message": {

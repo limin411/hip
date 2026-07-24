@@ -777,6 +777,12 @@ export const en = {
       trayEnabledDesc:
         'Show a tray icon to restore the window or quit. Required for “Hide to system tray”.',
       closeActionsAskNote: 'Ask each time you close the window.',
+      launchAtLogin: 'Launch at login',
+      launchAtLoginDesc:
+        'Start hip when you sign in to the computer. Opens to the tray by default when launched from login.',
+      notifyOnAgentComplete: 'Notify when agents finish',
+      notifyOnAgentCompleteDesc:
+        'Show a system notification when an agent turn completes while the window is hidden.',
       contextMenu: {
         title: 'Context menus',
         description: 'Choose which right-click actions appear and in what order.',
@@ -2141,6 +2147,10 @@ export const en = {
     tray: {
       hideHintTitle: 'hip is still running',
       hideHintBody: 'Click the tray icon to restore the window, or Quit from the tray menu to exit.',
+      agentCompleteTitle: 'Agent finished',
+      agentCompleteBody: '“{{title}}” is ready.',
+      agentFailedTitle: 'Agent error',
+      agentFailedBody: '“{{title}}” ended with an error.',
     },
     contextMenu: {
       message: {

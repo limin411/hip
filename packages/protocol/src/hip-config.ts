@@ -239,6 +239,11 @@ export interface WindowConfig {
   hideHintShown?: boolean
   /** Launch hip at OS login (Phase 3). */
   launchAtLogin?: boolean
+  /**
+   * When launched via login item / `--autostart`, start with the main window hidden
+   * (tray only). Default true when omitted and launchAtLogin is on.
+   */
+  startHiddenOnLogin?: boolean
   /** OS notification when an agent turn finishes while hidden (Phase 3). */
   notifyOnAgentComplete?: boolean
 }

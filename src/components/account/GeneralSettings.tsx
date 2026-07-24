@@ -15,6 +15,7 @@ import {
   CLOSE_ACTION_OPTIONS,
   resolveCloseAction,
   resolveTrayEnabled,
+  setLaunchAtLogin,
   setWindowPolicy,
 } from '@/ipc/windowPolicy'
 import { Switch } from '@/components/ui/Switch'
@@ -70,6 +71,10 @@ export function GeneralSettings() {
   )
   const closeAction = resolveCloseAction(useHipConfigStore((s) => s.config.window?.closeAction))
   const trayEnabled = resolveTrayEnabled(useHipConfigStore((s) => s.config.window?.trayEnabled))
+  const launchAtLogin = useHipConfigStore((s) => s.config.window?.launchAtLogin === true)
+  const notifyOnAgentComplete = useHipConfigStore(
+    (s) => s.config.window?.notifyOnAgentComplete !== false,
+  )
   const updateSection = useHipConfigStore((s) => s.updateSection)
   const loadHipConfig = useHipConfigStore((s) => s.load)
   const hipLoaded = useHipConfigStore((s) => s.loaded)
@@ -124,6 +129,23 @@ export function GeneralSettings() {
       closePromptSeen: true,
     }))
     pushWindowPolicy(nextClose, enabled, true)
+  }
+
+  const setLaunchAtLoginPref = (enabled: boolean) => {
+    void updateSection('window', (prev) => ({
+      ...(prev ?? {}),
+      launchAtLogin: enabled,
+      // Default start-hidden when enabling login item.
+      startHiddenOnLogin: enabled ? (prev?.startHiddenOnLogin ?? true) : prev?.startHiddenOnLogin,
+    }))
+    void setLaunchAtLogin(enabled)
+  }
+
+  const setNotifyOnAgentComplete = (enabled: boolean) => {
+    void updateSection('window', (prev) => ({
+      ...(prev ?? {}),
+      notifyOnAgentComplete: enabled,
+    }))
   }
 
   const commitTrashRetention = () => {
@@ -376,6 +398,40 @@ export function GeneralSettings() {
           onCheckedChange={setTrayEnabled}
           ariaLabel={t('settings.trayEnabled')}
           data-testid="settings-tray-enabled-switch"
+        />
+      </div>
+      <div
+        className="flex items-center justify-between gap-6 px-8 py-4"
+        data-testid="settings-launch-at-login"
+      >
+        <div className="min-w-0 flex-1">
+          <div className="text-body font-medium text-ink">{t('settings.launchAtLogin')}</div>
+          <div className="mt-0.5 text-meta leading-relaxed text-ink-tertiary">
+            {t('settings.launchAtLoginDesc')}
+          </div>
+        </div>
+        <Switch
+          checked={launchAtLogin}
+          onCheckedChange={setLaunchAtLoginPref}
+          ariaLabel={t('settings.launchAtLogin')}
+          data-testid="settings-launch-at-login-switch"
+        />
+      </div>
+      <div
+        className="flex items-center justify-between gap-6 px-8 py-4"
+        data-testid="settings-notify-agent-complete"
+      >
+        <div className="min-w-0 flex-1">
+          <div className="text-body font-medium text-ink">{t('settings.notifyOnAgentComplete')}</div>
+          <div className="mt-0.5 text-meta leading-relaxed text-ink-tertiary">
+            {t('settings.notifyOnAgentCompleteDesc')}
+          </div>
+        </div>
+        <Switch
+          checked={notifyOnAgentComplete}
+          onCheckedChange={setNotifyOnAgentComplete}
+          ariaLabel={t('settings.notifyOnAgentComplete')}
+          data-testid="settings-notify-agent-complete-switch"
         />
       </div>
       {CONTEXT_MENUS ? <ContextMenuSettings /> : null}

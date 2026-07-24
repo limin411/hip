@@ -799,6 +799,10 @@ export const ja = {
     "trayEnabled": "システムトレイアイコン",
     "trayEnabledDesc": "トレイからウィンドウを再表示したり終了したりできます。「システムトレイに隠す」選択時は自動で有効になります。",
     "closeActionsAskNote": "ウィンドウを閉じるたびに確認します。",
+    "launchAtLogin": "ログイン時に起動",
+    "launchAtLoginDesc": "サインイン時に hip を起動します。ログイン項目からの起動時はトレイに隠れた状態で開始します。",
+    "notifyOnAgentComplete": "エージェント完了時に通知",
+    "notifyOnAgentCompleteDesc": "ウィンドウが隠れているとき、agent のターン完了でシステム通知を表示します。",
     "contextMenu": {
       "title": "コンテキストメニュー",
       "description": "右クリックで表示するアクションとその順序を選択します。",
@@ -2082,7 +2086,11 @@ export const ja = {
   },
   "tray": {
     "hideHintTitle": "hip はバックグラウンドで実行中です",
-    "hideHintBody": "トレイアイコンをクリックしてウィンドウを復元するか、トレイメニューから終了してください。"
+    "hideHintBody": "トレイアイコンをクリックしてウィンドウを復元するか、トレイメニューから終了してください。",
+    "agentCompleteTitle": "Agent 完了",
+    "agentCompleteBody": "「{{title}}」の準備ができました。",
+    "agentFailedTitle": "Agent エラー",
+    "agentFailedBody": "「{{title}}」がエラーで終了しました。"
   },
   "contextMenu": {
     "message": {

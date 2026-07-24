@@ -122,3 +122,31 @@ export function listenExitConfirm(handler: () => void): Promise<UnlistenFn> {
 export function listenWindowHidden(handler: () => void): Promise<UnlistenFn> {
   return listen('window://hidden', () => handler())
 }
+
+export function listenOpenSettings(handler: () => void): Promise<UnlistenFn> {
+  return listen('window://open-settings', () => handler())
+}
+
+export async function isMainWindowVisible(): Promise<boolean> {
+  try {
+    return await invoke<boolean>('window_is_main_visible')
+  } catch {
+    return true
+  }
+}
+
+export async function setLaunchAtLogin(enabled: boolean): Promise<void> {
+  try {
+    await invoke('window_set_launch_at_login', { enabled })
+  } catch {
+    /* ignore in web / tests */
+  }
+}
+
+export async function getLaunchAtLogin(): Promise<boolean> {
+  try {
+    return await invoke<boolean>('window_get_launch_at_login')
+  } catch {
+    return false
+  }
+}

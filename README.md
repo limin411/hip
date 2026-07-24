@@ -184,6 +184,7 @@ trayEnabled = true
 - Hide mode: product CLI (`hip doctor` / `session` / `run`) still attaches to the running desktop app.
 - Escape hatch: `HIP_TRAY=0` forces quit-on-close and disables tray.
 - Release builds are single-instance (second launch focuses the existing window). Dev allows multiple instances; set `HIP_ALLOW_MULTI_INSTANCE=1` in release to override.
+- **Launch at login** and **notify when agents finish** (while hidden) are optional under the same settings section. Login-item launches pass `--autostart` and default to starting hidden in the tray.
 
 ```bash
 # Optional: reclaim free pages after large permanent deletes (app must be closed)

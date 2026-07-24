@@ -42,7 +42,11 @@ vi.mock('@/components/knowledge/knowledgeSpaceDialogStore', () => ({
 }))
 
 vi.mock('./SidebarAccountFooter', () => ({
-  SidebarAccountFooter: () => <div data-testid="sidebar-account-footer" />,
+  SidebarAccountFooter: () => (
+    <div data-testid="sidebar-account-footer">
+      <div data-testid="sidebar-app-version">HIP 0.0.0</div>
+    </div>
+  ),
 }))
 
 vi.mock('@/ipc/pathExists', () => ({

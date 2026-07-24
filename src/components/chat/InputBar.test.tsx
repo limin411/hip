@@ -481,6 +481,7 @@ describe('InputBar', () => {
     } as any)
 
     render(<InputBar />)
+    fireEvent.click(screen.getByTestId('composer-overflow'))
     expect(screen.getByTestId('permission-chip')).toBeInTheDocument()
     expect(screen.queryByTestId('plan-mode-chip')).not.toBeInTheDocument()
     expect(screen.queryByTestId('model-chip')).not.toBeInTheDocument()

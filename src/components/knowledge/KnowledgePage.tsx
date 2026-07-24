@@ -4,6 +4,7 @@ import { BookOpen } from 'lucide-react'
 import { useKnowledgeStore } from '@/store/knowledgeStore'
 import { openCreateKnowledgeSpaceDialog } from './knowledgeSpaceDialogStore'
 import { EmptyState } from '@/components/ui/EmptyState'
+import { Skeleton, SkeletonText } from '@/components/ui/Skeleton'
 import { KnowledgeWorkspace } from './KnowledgeWorkspace'
 
 export function KnowledgePage() {
@@ -37,6 +38,16 @@ export function KnowledgePage() {
       )}
       {mode === 'workspace' ? (
         <KnowledgeWorkspace />
+      ) : !loaded ? (
+        <div
+          className="flex min-h-0 flex-1 flex-col items-center justify-center bg-surface px-8"
+          data-testid="knowledge-loading"
+        >
+          <div className="w-full max-w-sm space-y-3">
+            <Skeleton className="mx-auto h-8 w-8 rounded-lg" />
+            <SkeletonText lines={3} className="items-center" />
+          </div>
+        </div>
       ) : (
         <div
           className="flex min-h-0 flex-1 flex-col items-center justify-center bg-surface px-8"
@@ -54,10 +65,14 @@ export function KnowledgePage() {
                 ? t('knowledge.home.emptyHint')
                 : t('knowledge.empty.selectHint')
             }
-            action={{
-              label: t('sidebar.newSpace'),
-              onClick: () => openCreateKnowledgeSpaceDialog(),
-            }}
+            action={
+              spaces.length === 0
+                ? {
+                    label: t('sidebar.newSpace'),
+                    onClick: () => openCreateKnowledgeSpaceDialog(),
+                  }
+                : undefined
+            }
             className="border-0 py-16"
           >
             <BookOpen size={32} className="text-accent-strong" strokeWidth={1.5} />

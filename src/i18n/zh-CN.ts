@@ -453,9 +453,9 @@ export const zhCN = {
         },
       },
       composer: {
-        tune: '调节',
-        tuneTitle: '会话选项',
-        tuneHint: '努力程度、权限、计划模式等',
+        more: '更多',
+        moreTitle: '更多控件',
+        moreHint: '权限、计划、努力程度与工作区控件',
       },
       firstRun: {
         title: '三步开始使用',
@@ -483,6 +483,8 @@ export const zhCN = {
         catSearch: '{{count}} 次搜索',
         catRead: '{{count}} 次读取',
         catBrowse: '{{count}} 次浏览',
+        catEdit: '{{count}} 次编辑',
+        catShell: '{{count}} 条命令',
         runningTool: '正在 {{name}}',
         runningReasoning: '正在思考',
         initializing: '连接中…',
@@ -521,6 +523,11 @@ export const zhCN = {
         toolsCount: '{{count}} 步',
         reply: '回复',
         parallelSummary: '{{count}} 个子智能体 · {{running}} 运行中',
+        lanesAria: '并行子智能体',
+      },
+      codeBlock: {
+        expand: '再显示 {{count}} 行',
+        collapse: '收起',
       },
     },
     composer: {

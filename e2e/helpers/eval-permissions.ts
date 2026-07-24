@@ -96,10 +96,11 @@ export async function pumpPermissionsUntil(
 
 /**
  * Open permission chip menu with pointer synthesis (Radix often ignores bare el.click()).
+ * Uses ensureComposerControlVisible so overflow-hosted chips work when COMPOSER_OVERFLOW is on.
  */
 async function openPermissionMenu(): Promise<void> {
-  const chip = await browser.$('[data-testid="permission-chip"]')
-  await chip.waitForExist({ timeout: 15000 })
+  const { ensureComposerControlVisible } = await import('./composer-overflow')
+  const chip = await ensureComposerControlVisible('permission-chip')
 
   for (let attempt = 0; attempt < 4; attempt++) {
     await browser.execute((el: HTMLElement) => {

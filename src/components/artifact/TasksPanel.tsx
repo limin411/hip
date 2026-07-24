@@ -89,7 +89,7 @@ export function TasksPanel() {
                 <button
                   type="button"
                   className={cn(
-                    'flex w-full items-start gap-2 px-2.5 py-2 text-left hover:bg-surface-muted',
+                    'flex w-full items-start gap-2 px-2.5 py-2 text-left hover:bg-state-hover',
                     selectedId === task.id && 'bg-surface-muted',
                   )}
                   onClick={() => selectTask(sessionId, task.id)}

@@ -10,7 +10,15 @@ export type SummaryPart =
   | { type: 'toolCount'; finished: number; total: number }
   | { type: 'agentCount'; agents: number }
   | { type: 'partialTools'; count: number }
-  | { type: 'categorySummary'; search: number; read: number; browse: number }
+  | {
+      type: 'categorySummary'
+      search: number
+      read: number
+      browse: number
+      edit: number
+      shell: number
+    }
+  | { type: 'elapsed'; ms: number }
   | { type: 'taskHint'; text: string }
   | { type: 'runningTool'; label: string }
   | { type: 'runningReasoning' }
@@ -212,15 +220,25 @@ export function buildActivitySummary(input: ActivitySummaryInput): {
   if (taskHint) parts.push({ type: 'taskHint', text: taskHint })
 
   const cats = countToolsByCategory(tools)
-  const hasCat = cats.search > 0 || cats.read > 0 || cats.browse > 0
+  const hasCat =
+    cats.search > 0 ||
+    cats.read > 0 ||
+    cats.browse > 0 ||
+    cats.edit > 0 ||
+    cats.shell > 0
   if (hasCat) {
     parts.push({
       type: 'categorySummary',
       search: cats.search,
       read: cats.read,
       browse: cats.browse,
+      edit: cats.edit,
+      shell: cats.shell,
     })
   }
+
+  const parallelPart = parallelAgentsPart(runs)
+  if (parallelPart) parts.push(parallelPart)
 
   if (tools.length > 0) {
     const finished = tools.filter((t) => t.status === 'finished').length
@@ -232,6 +250,11 @@ export function buildActivitySummary(input: ActivitySummaryInput): {
 
   const errorCount = tools.filter((t) => t.status === 'error').length
   if (errorCount > 0) parts.push({ type: 'partialTools', count: errorCount })
+
+  const elapsed = activityElapsedMs(runs)
+  if (elapsed != null && elapsed >= 0) {
+    parts.push({ type: 'elapsed', ms: elapsed })
+  }
 
   // Spec: must not be toolCount-only when we could add signal — if only toolCount after completed, OK for single-tool; if no cat/task, toolCount alone is acceptable for tiny turns.
   return { status, parts }

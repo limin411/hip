@@ -19,17 +19,11 @@ import { isMultimodalAttachmentMime } from '@/lib/attachmentAllowlist'
 import { useProjectPathStore } from '@/store/projectPathStore'
 import { readSkillFile } from '@/ipc/skills'
 import { FolderPill } from './FolderPill'
-import { ModelPicker } from './ModelPicker'
-import { EffortLevelPicker } from './EffortLevelPicker'
-import { PermissionModePicker } from './PermissionModePicker'
-import { PlanModeChip } from './PlanModeChip'
-import { AttachmentButton } from './AttachmentButton'
-import { SessionAgentPicker } from './SessionAgentPicker'
+import { ComposerLeftSlot } from './ComposerLeftSlot'
 import { FirstRunSetupCard } from './FirstRunSetupCard'
 import { AcpCapabilityCliffBanner } from './AcpCapabilityCliffBanner'
 import { isAttachmentSupported } from '@/lib/attachmentEligibility'
 import { activeModelKey, parseModelKey } from '@/lib/modelKey'
-import { isExternalPrimary } from '@/lib/sessionAgent'
 import { cn } from '@/lib/utils'
 import type { LocalAttachment } from './attachmentTypes'
 import { MascotActor } from '@/components/login/MascotActor'
@@ -88,8 +82,6 @@ export function NewConversation() {
   const agents = useHipConfigStore(useShallow((s) => s.config.agents ?? []))
   const currentKey = draft?.modelKey ?? activeModelKey(providersConfig)
   const attachmentsSupported = isAttachmentSupported(currentKey, agents, catalog)
-  // External ACP primary: hide hip-model-only controls (model/effort/forcePlan); keep permissionMode.
-  const externalPrimary = isExternalPrimary(draft?.agentId)
 
   // K10: drop only multimodal chips when model lacks attachment support.
   useEffect(() => {
@@ -370,25 +362,15 @@ export function NewConversation() {
             submitDisabled={!canSend}
             inputRef={inputRef}
             leftSlot={
-              surface === 'code' ? (
-                <>
-                  <SessionAgentPicker />
-                  {!externalPrimary && <ModelPicker />}
-                  {!externalPrimary && <EffortLevelPicker />}
-                  <PermissionModePicker />
-                  {!externalPrimary && <PlanModeChip />}
-                  <AttachmentButton onAttach={setAttachments} />
-                </>
-              ) : (
-                <>
-                  <SessionAgentPicker />
-                  {!externalPrimary && <ModelPicker />}
-                  {!externalPrimary && <EffortLevelPicker />}
-                  <AttachmentButton
-                    onAttach={(add) => setAttachments((prev) => [...prev, ...add])}
-                  />
-                </>
-              )
+              <ComposerLeftSlot
+                surface={surface}
+                sessionBound={false}
+                onAttach={
+                  surface === 'code'
+                    ? setAttachments
+                    : (add) => setAttachments((prev) => [...prev, ...add])
+                }
+              />
             }
             attachments={attachments}
             onAttachmentsChange={setAttachments}

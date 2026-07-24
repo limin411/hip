@@ -3,6 +3,7 @@ import { History, Settings, Trash2 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { SIDEBAR_ACTIVE_RAIL } from './sidebarActiveRail'
 import { formatTrashBadge, trashBadgeTotal, useTrashBadgeStore } from '@/store/trashBadgeStore'
+import { HIP_PRODUCT_VERSION } from '@/domain/product'
 
 interface SidebarAccountFooterProps {
   onOpenTrash: () => void
@@ -54,6 +55,13 @@ export function SidebarAccountFooter({
         icon={Settings}
         onClick={onOpenSettings}
       />
+      {/* Version demoted from titlebar strip (craft PR-7) — quiet footer meta. */}
+      <div
+        className="px-2.5 pt-1 text-caption tabular-nums tracking-wide text-ink-tertiary/70"
+        data-testid="sidebar-app-version"
+      >
+        HIP {HIP_PRODUCT_VERSION}
+      </div>
     </div>
   )
 }

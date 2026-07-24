@@ -4,7 +4,7 @@ import { Loader2, CheckCircle2, XCircle, Circle, AlertTriangle, ChevronRight } f
 import type { AgentRole, AgentRun, TimelineStep, ToolCall } from '@hip/protocol'
 import { cn } from '@/lib/utils'
 import { AgentBadge, TRAIL_ROW, TurnTimeline } from './TurnTimeline'
-import { buildActivitySummary, type SummaryPart } from '@/lib/activitySummary'
+import { buildActivitySummary, formatElapsed, type SummaryPart } from '@/lib/activitySummary'
 
 interface ActivityBarProps {
   steps?: TimelineStep[]
@@ -48,10 +48,17 @@ function formatParts(
         break
       case 'categorySummary': {
         const segs: string[] = []
-        if (p.search > 0) segs.push(t('chat.activity.catSearch', { count: p.search }))
+        // Prefer edit + shell first (craft upgrade PR-3), then read/search/browse.
+        if (p.edit > 0) segs.push(t('chat.activity.catEdit', { count: p.edit }))
+        if (p.shell > 0) segs.push(t('chat.activity.catShell', { count: p.shell }))
         if (p.read > 0) segs.push(t('chat.activity.catRead', { count: p.read }))
+        if (p.search > 0) segs.push(t('chat.activity.catSearch', { count: p.search }))
         if (p.browse > 0) segs.push(t('chat.activity.catBrowse', { count: p.browse }))
         if (segs.length) bits.push(segs.join(' · '))
+        break
+      }
+      case 'elapsed': {
+        bits.push(formatElapsed(p.ms))
         break
       }
       case 'taskHint':

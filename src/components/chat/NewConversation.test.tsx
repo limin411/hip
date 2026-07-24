@@ -119,12 +119,16 @@ describe('NewConversation', () => {
   it('shows effort picker when the draft model advertises effort levels', () => {
     setDraftModel('openai/gpt-5.4')
     render(<NewConversation />)
+    // Default effort lives in overflow when COMPOSER_OVERFLOW is on.
+    fireEvent.click(screen.getByTestId('composer-overflow'))
     expect(screen.getByTestId('effort-chip')).toBeInTheDocument()
   })
 
   it('hides effort picker when the draft model has no effort options', () => {
     setDraftModel('openai/gpt-4o')
     render(<NewConversation />)
+    const overflow = screen.queryByTestId('composer-overflow')
+    if (overflow) fireEvent.click(overflow)
     expect(screen.queryByTestId('effort-chip')).not.toBeInTheDocument()
   })
 
@@ -191,6 +195,7 @@ describe('NewConversation', () => {
       },
     })
     render(<NewConversation />)
+    fireEvent.click(screen.getByTestId('composer-overflow'))
     expect(screen.getByTestId('permission-chip')).toBeInTheDocument()
     expect(screen.queryByTestId('plan-mode-chip')).not.toBeInTheDocument()
     expect(screen.queryByTestId('model-chip')).not.toBeInTheDocument()

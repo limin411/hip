@@ -58,9 +58,31 @@ const THEME_DARK = 'github-dark'
 let highlighterPromise: Promise<HighlighterCore> | null = null
 const loadedLangs = new Set<string>()
 
-/** Bounded highlight cache (lang|theme|code → HTML). Cap avoids unbounded growth. */
-const HIGHLIGHT_CACHE_MAX = 48
+/** Bounded highlight cache (lang|theme|code → HTML). Cap avoids unbounded growth.
+ * Craft upgrade PR-6: LRU max 32 retained highlights. */
+const HIGHLIGHT_CACHE_MAX = 32
 const highlightCache = new Map<string, string>()
+
+/** Concurrent highlight cap (craft PR-6). */
+const HIGHLIGHT_CONCURRENCY = 3
+let highlightInFlight = 0
+const highlightWaitQueue: Array<() => void> = []
+
+async function withHighlightSlot<T>(fn: () => Promise<T>): Promise<T> {
+  if (highlightInFlight >= HIGHLIGHT_CONCURRENCY) {
+    await new Promise<void>((resolve) => {
+      highlightWaitQueue.push(resolve)
+    })
+  }
+  highlightInFlight += 1
+  try {
+    return await fn()
+  } finally {
+    highlightInFlight -= 1
+    const next = highlightWaitQueue.shift()
+    next?.()
+  }
+}
 
 function cacheKey(lang: string, theme: string, code: string): string {
   // Avoid huge keys for multi-MB fences — hash-ish length prefix + length.
@@ -132,6 +154,8 @@ export async function highlightCode(
   isDark: boolean,
 ): Promise<string | null> {
   if (!code) return null
+  // Skip very large fences (UTF-16 code units) — craft PR-6.
+  if (code.length > 50_000) return null
   const canonical = normalizeHighlightLang(lang)
   if (!canonical) return null
 
@@ -143,24 +167,26 @@ export async function highlightCode(
     return cached
   }
 
-  const t0 = isKnowledgePerfEnabled() ? performance.now() : 0
-  try {
-    const hl = await getHighlighter()
-    const ok = await ensureLang(hl, canonical)
-    if (!ok) return null
+  return withHighlightSlot(async () => {
+    const t0 = isKnowledgePerfEnabled() ? performance.now() : 0
+    try {
+      const hl = await getHighlighter()
+      const ok = await ensureLang(hl, canonical)
+      if (!ok) return null
 
-    // structure: 'inline' → token spans only (no nested shiki <pre>/<code>)
-    const html = hl.codeToHtml(code, {
-      lang: canonical,
-      theme,
-      structure: 'inline',
-    })
-    cacheSet(key, html)
-    if (isKnowledgePerfEnabled()) kbPerfShiki(performance.now() - t0)
-    return html
-  } catch {
-    return null
-  }
+      // structure: 'inline' → token spans only (no nested shiki <pre>/<code>)
+      const html = hl.codeToHtml(code, {
+        lang: canonical,
+        theme,
+        structure: 'inline',
+      })
+      cacheSet(key, html)
+      if (isKnowledgePerfEnabled()) kbPerfShiki(performance.now() - t0)
+      return html
+    } catch {
+      return null
+    }
+  })
 }
 
 /** Test helper — reset singleton between tests. */

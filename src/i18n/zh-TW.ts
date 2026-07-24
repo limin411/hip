@@ -491,9 +491,9 @@ export const zhTW = {
       }
     },
     "composer": {
-      "tune": "調節",
-      "tuneTitle": "工作階段選項",
-      "tuneHint": "努力程度、權限、計劃模式等"
+      "more": "更多",
+      "moreTitle": "更多控制項",
+      "moreHint": "權限、計劃、努力程度與工作區控制項"
     },
     "firstRun": {
       "title": "三步開始使用",
@@ -521,6 +521,8 @@ export const zhTW = {
       "catSearch": "{{count}} 次搜尋",
       "catRead": "{{count}} 次讀取",
       "catBrowse": "{{count}} 次瀏覽",
+      "catEdit": "{{count}} 次編輯",
+      "catShell": "{{count}} 條命令",
       "runningTool": "正在 {{name}}",
       "runningReasoning": "正在思考",
       "initializing": "連線中…",
@@ -558,7 +560,12 @@ export const zhTW = {
       "noSummary": "子任務已完成（無文字總結）",
       "toolsCount": "{{count}} 步",
       "reply": "回覆",
-      "parallelSummary": "{{count}} 個子智慧體 · {{running}} 執行中"
+      "parallelSummary": "{{count}} 個子智慧體 · {{running}} 執行中",
+      "lanesAria": "並行子智慧體"
+    },
+    "codeBlock": {
+      "expand": "再顯示 {{count}} 行",
+      "collapse": "收起"
     }
   },
   "composer": {

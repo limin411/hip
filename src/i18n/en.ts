@@ -462,9 +462,9 @@ export const en = {
         },
       },
       composer: {
-        tune: 'Tune',
-        tuneTitle: 'Session options',
-        tuneHint: 'Effort, permissions, plan mode, and more',
+        more: 'More',
+        moreTitle: 'More controls',
+        moreHint: 'Permission, plan, effort, and workspace controls',
       },
       firstRun: {
         title: 'Get started in three steps',
@@ -492,6 +492,8 @@ export const en = {
         catSearch: '{{count}} searches',
         catRead: '{{count}} reads',
         catBrowse: '{{count}} listings',
+        catEdit: '{{count}} edits',
+        catShell: '{{count}} commands',
         runningTool: '{{name}} in progress',
         runningReasoning: 'Thinking',
         initializing: 'Connecting…',
@@ -530,6 +532,11 @@ export const en = {
         toolsCount: '{{count}} steps',
         reply: 'Reply',
         parallelSummary: '{{count}} sub-agents · {{running}} running',
+        lanesAria: 'Parallel sub-agents',
+      },
+      codeBlock: {
+        expand: 'Show {{count}} more lines',
+        collapse: 'Show less',
       },
     },
     composer: {

@@ -98,7 +98,7 @@ export function KnowledgeGraphCanvas({
         label: e.kind === 'embed' ? t('knowledge.graph.edgeEmbed') : undefined,
         markerEnd: { type: MarkerType.ArrowClosed, width: 14, height: 14 },
         style: {
-          stroke: e.kind === 'embed' ? 'var(--color-warning, #ca8a04)' : 'var(--color-border, #888)',
+          stroke: e.kind === 'embed' ? 'var(--warning)' : 'var(--border)',
         },
         animated: e.kind === 'embed',
       })),

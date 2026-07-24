@@ -25,8 +25,8 @@ export async function planProgressPanelVisible(): Promise<boolean> {
 
 /** Click product Plan mode chip until active (draft or session forcePlan). */
 export async function enablePlanModeUi(): Promise<void> {
-  const chip = await browser.$('[data-testid="plan-mode-chip"]')
-  await chip.waitForExist({ timeout: 15000 })
+  const { ensureComposerControlVisible } = await import('./composer-overflow')
+  const chip = await ensureComposerControlVisible('plan-mode-chip')
   const pressed = await chip.getAttribute('aria-pressed')
   if (pressed === 'true') return
   await browser.execute((el: HTMLElement) => el.click(), chip)

@@ -28,7 +28,13 @@ export function AgentDashboard() {
         <EmptyState
           icon={Bot}
           title={t('artifact.agentsEmpty')}
-          description={t('artifact.agentsEmptyDesc')}
+          description={
+            live
+              ? t('artifact.agentsEmptyLive', {
+                  defaultValue: 'Agents will appear here as the turn starts…',
+                })
+              : t('artifact.agentsEmptyDesc')
+          }
         />
       </div>
     )
@@ -44,6 +50,12 @@ export function AgentDashboard() {
     t('artifact.timelineView.turn', { n: latest.turnIndex }),
     formatClockTime(latest.timestamp, locale),
     children.length > 0 ? t('artifact.subAgentCount', { count: children.length }) : null,
+    liveRunning
+      ? t('artifact.agentsLiveRunning', {
+          defaultValue: 'Running: {{name}}',
+          name: liveRunning.name || liveRunning.role,
+        })
+      : null,
   ]
     .filter(Boolean)
     .join(' · ')

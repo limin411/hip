@@ -483,9 +483,9 @@ export const ko = {
       }
     },
     "composer": {
-      "tune": "조절",
-      "tuneTitle": "세션 옵션",
-      "tuneHint": "노력 수준, 권한, 계획 모드 등"
+      "more": "더 보기",
+      "moreTitle": "추가 컨트롤",
+      "moreHint": "권한, 계획, 노력 수준 및 워크스페이스 컨트롤"
     },
     "firstRun": {
       "title": "3단계로 시작하기",
@@ -513,6 +513,8 @@ export const ko = {
       "catSearch": "검색 {{count}}회",
       "catRead": "읽기 {{count}}회",
       "catBrowse": "목록 {{count}}개",
+      "catEdit": "편집 {{count}}회",
+      "catShell": "명령 {{count}}개",
       "runningTool": "{{name}} 진행 중",
       "runningReasoning": "생각 중",
       "initializing": "연결 중…",
@@ -550,7 +552,12 @@ export const ko = {
       "noSummary": "하위 작업 완료 (텍스트 요약 없음)",
       "toolsCount": "{{count}}단계",
       "reply": "답장",
-      "parallelSummary": "하위 에이전트 {{count}} · 실행 중 {{running}}"
+      "parallelSummary": "하위 에이전트 {{count}} · 실행 중 {{running}}",
+      "lanesAria": "병렬 하위 에이전트"
+    },
+    "codeBlock": {
+      "expand": "{{count}}줄 더 보기",
+      "collapse": "접기"
     }
   },
   "composer": {

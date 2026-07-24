@@ -483,9 +483,9 @@ export const ja = {
       }
     },
     "composer": {
-      "tune": "調整",
-      "tuneTitle": "セッション設定",
-      "tuneHint": "努力度、権限、プランモードなど"
+      "more": "その他",
+      "moreTitle": "その他のコントロール",
+      "moreHint": "権限、プラン、努力度、ワークスペースのコントロール"
     },
     "firstRun": {
       "title": "3ステップで始める",
@@ -513,6 +513,8 @@ export const ja = {
       "catSearch": "{{count}} 件の検索",
       "catRead": "{{count}} 件の読み取り",
       "catBrowse": "{{count}} 件の一覧",
+      "catEdit": "{{count}} 件の編集",
+      "catShell": "{{count}} 件のコマンド",
       "runningTool": "{{name}} 実行中",
       "runningReasoning": "思考中",
       "initializing": "接続中…",
@@ -550,7 +552,12 @@ export const ja = {
       "noSummary": "サブタスク完了（テキスト要約なし）",
       "toolsCount": "{{count}} ステップ",
       "reply": "返信",
-      "parallelSummary": "サブエージェント {{count}} · 実行中 {{running}}"
+      "parallelSummary": "サブエージェント {{count}} · 実行中 {{running}}",
+      "lanesAria": "並列サブエージェント"
+    },
+    "codeBlock": {
+      "expand": "あと {{count}} 行を表示",
+      "collapse": "折りたたむ"
     }
   },
   "composer": {

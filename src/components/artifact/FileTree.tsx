@@ -8,6 +8,7 @@ import { useFsScope } from '@/store/useFsScope'
 import { useDraftStore } from '@/store/draftStore'
 import { pickDirectory } from '@/ipc/dialog'
 import { Button } from '@/components/ui/Button'
+import { Skeleton } from '@/components/ui/Skeleton'
 import { DeclarativeContextMenu } from '@/components/context-menu'
 import { cn } from '@/lib/utils'
 
@@ -114,6 +115,18 @@ export function FileTree() {
     if (!dir) return
     if (!isDraft && scopeId) sessionService.setProjectDir(scopeId, dir)
     else useDraftStore.getState().pickProject(dir)
+  }
+
+  // Craft PR-9: root hydrate — not preview.loading (that's file content).
+  if (rootPath && rootEntries === undefined && scopeId) {
+    return (
+      <div className="space-y-1.5 p-2" data-testid="file-tree-loading">
+        <Skeleton className="h-7 w-full rounded-md" />
+        <Skeleton className="h-7 w-full rounded-md" />
+        <Skeleton className="h-7 w-4/5 rounded-md" />
+        <Skeleton className="h-7 w-3/4 rounded-md" />
+      </div>
+    )
   }
 
   if (!rootPath) {

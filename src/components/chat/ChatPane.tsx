@@ -41,6 +41,7 @@ import { TRANSCRIPT_ROW_GAP_PX } from './feature'
 import { shouldHideInterruptForPlanApproval } from './planApproval'
 import { MessageBubble, NoticeRow } from './MessageBubble'
 import { ThinkingBubble } from './ThinkingBubble'
+import { SkeletonText } from '@/components/ui/Skeleton'
 import type { Message } from '@hip/protocol'
 
 export function ChatPane() {
@@ -92,10 +93,28 @@ export function ChatPane() {
   // messages at index >= baseline are the ones that arrived live and get the enter animation.
   const animSessionRef = useRef<string | null>(null)
   const animBaselineRef = useRef(0)
+  // Craft PR-9: short soft transition on session switch (rAF / ≤80ms); empty session ≠ skeleton.
+  const [sessionSwitching, setSessionSwitching] = useState(false)
   if (animSessionRef.current !== (activeSessionId ?? null)) {
     animSessionRef.current = activeSessionId ?? null
     animBaselineRef.current = messages.length
   }
+
+  useEffect(() => {
+    if (!activeSessionId) {
+      setSessionSwitching(false)
+      return
+    }
+    setSessionSwitching(true)
+    let cancelled = false
+    const t = window.setTimeout(() => {
+      if (!cancelled) setSessionSwitching(false)
+    }, 80)
+    return () => {
+      cancelled = true
+      window.clearTimeout(t)
+    }
+  }, [activeSessionId])
 
   // Reset window when switching sessions (render-time adjust so jump layout effect sees N=30,
   // not a stale expanded size from the previous session).
@@ -404,6 +423,18 @@ export function ChatPane() {
   }
 
   const virtualItems = virtualize ? rowVirtualizer.getVirtualItems() : null
+
+  // Soft session-switch skeleton: only when transcript is still empty (never infinite).
+  if (sessionSwitching && messages.length === 0 && activeSessionId) {
+    return (
+      <div
+        className="relative min-h-0 flex-1 overflow-hidden px-4 py-6"
+        data-testid="chat-session-switch-skeleton"
+      >
+        <SkeletonText lines={4} />
+      </div>
+    )
+  }
 
   return (
     <div className="relative min-h-0 flex-1 overflow-hidden">

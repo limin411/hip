@@ -14,6 +14,8 @@ import { MessageActions } from './MessageActions'
 import { ArtifactCard } from '@/components/artifact/ArtifactCard'
 import { ActivityBar } from './ActivityBar'
 import { SubAgentCard, splitAgents } from '@/components/artifact/SubAgentCard'
+import { SubAgentLanes } from '@/components/artifact/SubAgentLanes'
+import { ACTIVITY_LANES } from './craftFeature'
 import { groupByAgent } from '@/lib/turnAgents'
 import { normalizeMessageContent } from '@/lib/normalizeMessageContent'
 import { activityElapsedMs, formatElapsed } from '@/lib/activitySummary'
@@ -172,7 +174,7 @@ function MessageBubbleImpl({ message, streaming, isLastAssistant, hidePlan }: Me
               hidePlan={hidePlan}
               interleaved={interleavedBlocks}
             >
-              {nested.length >= 2 && (
+              {nested.length >= 2 && !ACTIVITY_LANES && (
                 <div
                   className="mb-1.5 text-meta text-ink-tertiary"
                   data-testid="parallel-agents-summary"
@@ -183,13 +185,21 @@ function MessageBubbleImpl({ message, streaming, isLastAssistant, hidePlan }: Me
                   })}
                 </div>
               )}
-              {nested.map((a) => (
-                <SubAgentCard
-                  key={a.agentId}
-                  agent={a}
-                  showTools={!!streaming || a.status === 'running'}
+              {ACTIVITY_LANES && nested.length >= 2 ? (
+                <SubAgentLanes
+                  agents={nested}
+                  showTools={!!streaming}
+                  expanded
                 />
-              ))}
+              ) : (
+                nested.map((a) => (
+                  <SubAgentCard
+                    key={a.agentId}
+                    agent={a}
+                    showTools={!!streaming || a.status === 'running'}
+                  />
+                ))
+              )}
             </ActivityBar>
           </div>
         )}

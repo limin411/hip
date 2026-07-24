@@ -15,15 +15,7 @@ import { useSlashCommandHandler } from './useSlashCommandHandler'
 import { resolveSearchRoot } from '@/lib/resolveSearchRoot'
 import { isMultimodalAttachmentMime } from '@/lib/attachmentAllowlist'
 import { readSkillFile } from '@/ipc/skills'
-import { ModelPicker } from './ModelPicker'
-import { EffortLevelPicker } from './EffortLevelPicker'
-import { PermissionModePicker } from './PermissionModePicker'
-import { PlanModeChip } from './PlanModeChip'
-import { ProjectGuidanceChip } from './ProjectGuidanceChip'
-import { AttachmentButton } from './AttachmentButton'
-import { SessionAgentPicker } from './SessionAgentPicker'
-import { WorktreeControl } from './WorktreeControl/WorktreeControl'
-import { isExternalPrimary } from '@/lib/sessionAgent'
+import { ComposerLeftSlot } from './ComposerLeftSlot'
 import { sessionService, useActiveSession, useActiveSessionId, useActiveSessionStatus, useActivePendingPermission, useConnectionStatus } from '@/domain'
 import { formatDiffAnnotationsForComposer, useDiffAnnotationStore } from '@/store/diffAnnotationStore'
 import { isProjectPathBlocked } from '@/lib/projectPathGate'
@@ -204,10 +196,6 @@ export function InputBar() {
     ? (active.config.model ? `${active.config.llmProvider}/${active.config.model}` : activeModelKey(config))
     : (draft?.modelKey ?? activeModelKey(config))
   const attachmentsSupported = isAttachmentSupported(currentKey, agents, catalog)
-  // External ACP primary: hide hip-model-only controls; keep permissionMode.
-  const externalPrimary = isExternalPrimary(
-    activeId && active ? active.config.agentId : draft?.agentId,
-  )
 
   // K10: when multimodal unsupported, drop only image/PDF chips — keep text @ attachments.
   useEffect(() => {
@@ -345,27 +333,15 @@ export function InputBar() {
                   : undefined
               }
               leftSlot={
-                isCode ? (
-                  <>
-                    <SessionAgentPicker />
-                    {!externalPrimary && <ModelPicker />}
-                    {!externalPrimary && <EffortLevelPicker />}
-                    <PermissionModePicker />
-                    {!externalPrimary && <PlanModeChip />}
-                    <ProjectGuidanceChip />
-                    <WorktreeControl />
-                    <AttachmentButton onAttach={setAttachments} />
-                  </>
-                ) : (
-                  <>
-                    <SessionAgentPicker />
-                    {!externalPrimary && <ModelPicker />}
-                    {!externalPrimary && <EffortLevelPicker />}
-                    <AttachmentButton
-                      onAttach={(add) => setAttachments((prev) => [...prev, ...add])}
-                    />
-                  </>
-                )
+                <ComposerLeftSlot
+                  surface={isCode ? 'code' : 'chat'}
+                  sessionBound
+                  onAttach={
+                    isCode
+                      ? setAttachments
+                      : (add) => setAttachments((prev) => [...prev, ...add])
+                  }
+                />
               }
               attachments={attachments}
               onAttachmentsChange={setAttachments}

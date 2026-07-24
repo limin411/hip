@@ -17,7 +17,6 @@ import {
   Zap,
 } from 'lucide-react'
 import { sessionService, useActiveSessionId, useSessions, type SessionVM } from '@/domain'
-import { HIP_PRODUCT_VERSION } from '@/domain/product'
 import { isMacPlatform } from '@/lib/platform'
 import { surfaceOf } from '@/lib/sessions'
 import { groupSessionsByProjectPath, projectPathKey } from '@/lib/sessionProjectGroups'
@@ -232,13 +231,6 @@ export function AppSidebar() {
             <PanelLeftClose {...titlebarIconProps} />
           </button>
         </div>
-      </div>
-
-      <div
-        className="px-3 pb-1.5 pt-0 text-caption tabular-nums tracking-wide text-ink-tertiary"
-        data-testid="sidebar-app-version"
-      >
-        HIP {HIP_PRODUCT_VERSION}
       </div>
 
       <nav className="flex shrink-0 flex-col gap-0.5 px-2 pb-3" aria-label={t('sidebar.navAria')}>
@@ -911,7 +903,8 @@ function WorktreeSlotRow({
         isAgentSlot ? t('sidebar.parallel.agentSlotHint') : t('sidebar.parallel.slotHint')
       }
       className={cn(
-        'flex w-full items-start gap-2 rounded-lg py-1.5 pl-3 pr-2 text-left transition-colors',
+        // Craft PR-7: stronger indent for nested worktree slots vs primary session rows.
+        'flex w-full items-start gap-2 rounded-lg border-l-2 border-transparent py-1 pl-4 pr-2 text-left transition-colors',
         'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink/20',
         active ? SIDEBAR_ACTIVE_RAIL : 'hover:bg-state-hover',
       )}
@@ -934,7 +927,7 @@ function WorktreeSlotRow({
               aria-hidden
             />
           ) : null}
-          <span className="block min-w-0 truncate text-meta font-medium text-ink">{label}</span>
+          <span className="block min-w-0 truncate text-meta font-medium text-ink-secondary">{label}</span>
         </span>
         <span className="mt-0.5 block truncate text-caption text-ink-tertiary" title={slot.worktreePath}>
           {pathLabel}

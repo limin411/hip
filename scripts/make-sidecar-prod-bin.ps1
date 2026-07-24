@@ -64,19 +64,25 @@ $DistDir = Join-Path $SidecarPkg "dist"
 New-Item -ItemType Directory -Force -Path $DistDir | Out-Null
 $BundleJs = Join-Path $DistDir "index.cjs"
 
+# Banner must be single-quoted: PowerShell parses () inside double-quoted --banner:js="…".
+$BannerJs = 'const __import_meta_url = require(''url'').pathToFileURL(__filename).href;'
+$EsbuildArgs = @(
+    'src\main.ts'
+    '--bundle'
+    '--platform=node'
+    '--format=cjs'
+    '--target=node20'
+    "--outfile=$BundleJs"
+    '--external:sqlite-vec'
+    "--banner:js=$BannerJs"
+    '--define:import.meta.url=__import_meta_url'
+)
+
 Push-Location $SidecarPkg
 try {
-    & $Esbuild "src\main.ts" `
-        --bundle `
-        --platform=node `
-        --format=cjs `
-        --target=node20 `
-        --outfile="$BundleJs" `
-        --external:sqlite-vec `
-        --banner:js="const __import_meta_url = require('url').pathToFileURL(__filename).href;" `
-        --define:import.meta.url=__import_meta_url
+    & $Esbuild @EsbuildArgs
     if ($LASTEXITCODE -ne 0) {
-        Write-Error "error: esbuild failed"
+        Write-Error 'error: esbuild failed'
         exit 1
     }
 } finally {

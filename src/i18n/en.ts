@@ -1643,9 +1643,9 @@ export const en = {
     },
     placeholder: {
       comingSoon: 'Coming soon',
-      workbench: 'Workbench is coming soon — your home for today’s overview and shortcuts.',
+      workbench: 'Workbench is coming soon — overview and quick entry points.',
       terminals: 'Terminal management is coming soon — manage multiple terminal sessions in one place.',
-      tasks: 'Task tracking is coming soon — follow up on todos and work items.',
+      tasks: 'Work item tracking is coming soon — follow up on work items.',
       automation: 'Automation is coming soon — configure workflows and scheduled jobs.',
     },
     terminals: {
@@ -1780,6 +1780,7 @@ export const en = {
           'Host saved, but the password/passphrase could not be stored. Enter it again and save.',
       },
     },
+    /** Product work-item tracking (sidebar section `tasks`) — not TaskRuntime. */
     workItems: {
       title: 'Work items',
       inbox: 'Inbox',
@@ -1796,6 +1797,7 @@ export const en = {
       backToList: 'Back to list',
       listFilter: 'List',
       loading: 'Loading…',
+      filtersAria: 'Smart filters',
       filters: {
         open: 'Open',
         today: 'Due today',
@@ -1844,7 +1846,13 @@ export const en = {
       },
       deleteConfirm: 'Delete this work item permanently? This cannot be undone.',
       listsSection: 'Lists',
+      listsHeading: 'Lists',
       smartFilters: 'Smart filters',
+      newList: 'New list',
+      newListPrompt: 'List name',
+      renameListPrompt: 'Rename list',
+      deleteListConfirm: 'Delete list “{{name}}”? Items move to Inbox.',
+      listRowHint: '{{name}} · double-click to rename · right-click to delete',
     },
     tabs: {
       closeTab: 'Close tab',
@@ -1896,7 +1904,6 @@ export const en = {
       newProject: 'New project session',
       newChat: 'New chat',
       newTerminal: 'New terminal',
-      newWorkItem: 'New work item',
       emptySearch: 'No matches',
       emptySessions: 'No sessions yet',
       emptySpaces: 'No spaces yet',
@@ -1923,26 +1930,6 @@ export const en = {
       newChat: 'New Work Chat',
       newCode: 'New Coding Task',
       newKnowledge: 'Knowledge base',
-    },
-    /** Product work-item tracking (sidebar section `tasks`) — not TaskRuntime. */
-    workItems: {
-      inbox: 'Inbox',
-      filtersAria: 'Smart filters',
-      filters: {
-        open: 'Open',
-        today: 'Due today',
-        overdue: 'Overdue',
-        in_progress: 'In progress',
-        done: 'Done',
-        cancelled: 'Cancelled',
-        archived: 'Archived',
-      },
-      listsHeading: 'Lists',
-      newList: 'New list',
-      newListPrompt: 'List name',
-      renameListPrompt: 'Rename list',
-      deleteListConfirm: 'Delete list “{{name}}”? Items move to Inbox.',
-      listRowHint: '{{name}} · double-click to rename · right-click to delete',
     },
     knowledge: {
       title: 'Knowledge base',

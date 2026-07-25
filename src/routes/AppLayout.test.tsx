@@ -40,6 +40,9 @@ vi.mock('@/components/terminals/TerminalManagementPage', () => ({
 vi.mock('@/components/terminals/feature', () => ({
   TERMINAL_MANAGEMENT: true,
 }))
+vi.mock('@/components/work-items/WorkItemsPage', () => ({
+  WorkItemsPage: () => <div data-testid="work-items-page" />,
+}))
 
 describe('AppLayout', () => {
   it('renders final shell: sidebar + main toolbar, no title bar / floating avatar', () => {
@@ -91,10 +94,11 @@ describe('AppLayout', () => {
     expect(screen.queryByTestId('placeholder-terminals')).not.toBeInTheDocument()
   })
 
-  it('renders tasks placeholder', () => {
-    useUiStore.setState({ activeView: 'tasks' })
+  it('renders WorkItemsPage when tasks view and WORK_ITEM_TRACKING on', () => {
+    useUiStore.setState({ activeView: 'tasks', sidebarSection: 'tasks' })
     render(<AppLayout />, { wrapper: MemoryRouter })
-    expect(screen.getByTestId('placeholder-tasks')).toBeInTheDocument()
+    expect(screen.getByTestId('work-items-page')).toBeInTheDocument()
+    expect(screen.queryByTestId('placeholder-tasks')).not.toBeInTheDocument()
   })
 
   it('renders automation placeholder', () => {

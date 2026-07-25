@@ -423,10 +423,9 @@ describe('uiStore persistence partialize', () => {
 })
 
 describe('uiStore - isPlaceholderSidebarSection (work items flag)', () => {
-  it('keeps tasks as placeholder while WORK_ITEM_TRACKING is false', () => {
-    // PR3..PR6 invariant: flag must stay false so AppSidebar still uses placeholder path.
-    expect(WORK_ITEM_TRACKING).toBe(false)
-    expect(isPlaceholderSidebarSection('tasks')).toBe(true)
+  it('excludes tasks from placeholder when WORK_ITEM_TRACKING is true', () => {
+    expect(WORK_ITEM_TRACKING).toBe(true)
+    expect(isPlaceholderSidebarSection('tasks')).toBe(false)
     expect(isPlaceholderSidebarSection('workbench')).toBe(true)
     expect(isPlaceholderSidebarSection('automation')).toBe(true)
     // Real sections

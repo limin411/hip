@@ -225,19 +225,11 @@ describe('AppSidebar', () => {
     expect(enterPlaceholderSection).not.toHaveBeenCalledWith('terminals')
   })
 
-  it('nav tasks calls enterPlaceholderSection while WORK_ITEM_TRACKING is false', () => {
+  it('nav tasks calls enterWorkItemsSection when WORK_ITEM_TRACKING is on', () => {
     render(<AppSidebar />)
     fireEvent.click(screen.getByTestId('sidebar-nav-tasks'))
-    expect(enterPlaceholderSection).toHaveBeenCalledWith('tasks')
-    expect(enterWorkItemsSection).not.toHaveBeenCalled()
-  })
-
-  it('tasks section shows coming soon placeholder while WORK_ITEM_TRACKING is false', () => {
-    useUiStore.setState({ sidebarSection: 'tasks', activeView: 'tasks' })
-    render(<AppSidebar />)
-    expect(screen.getByText(i18n.t('placeholder.comingSoon'))).toBeInTheDocument()
-    expect(screen.queryByTestId('sidebar-work-items')).not.toBeInTheDocument()
-    expect(screen.queryByTestId('sidebar-new-work-item')).not.toBeInTheDocument()
+    expect(enterWorkItemsSection).toHaveBeenCalled()
+    expect(enterPlaceholderSection).not.toHaveBeenCalledWith('tasks')
   })
 
   it('nav automation is below tasks and calls enterPlaceholderSection', () => {

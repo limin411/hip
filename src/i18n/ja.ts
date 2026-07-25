@@ -1592,9 +1592,9 @@ export const ja = {
   },
   "placeholder": {
     "comingSoon": "近日公開",
-    "workbench": "ワークベンチは近日公開 — 今日の概要とショートカットのホームになります。",
+    "workbench": "ワークベンチは近日公開 — 総覧とクイック入口として使えます。",
     "terminals": "ターミナル管理は近日公開 — 複数のターミナルセッションを一箇所で管理できます。",
-    "tasks": "タスク管理は近日公開 — TODO や作業項目をフォローアップできます。",
+    "tasks": "事項トラッキングは近日公開 — 作業項目をフォローアップできます。",
     "automation": "自動化は近日公開 — ワークフローやスケジュールジョブを設定できます。"
   },
   "terminals": {
@@ -1788,7 +1788,14 @@ export const ja = {
     },
     "deleteConfirm": "このワークアイテムを完全に削除しますか？元に戻せません。",
     "listsSection": "リスト",
-    "smartFilters": "スマートフィルター"
+    "listsHeading": "リスト",
+    "smartFilters": "スマートフィルター",
+    "filtersAria": "スマートフィルタ",
+    "newList": "新しいリスト",
+    "newListPrompt": "リスト名",
+    "renameListPrompt": "リスト名を変更",
+    "deleteListConfirm": "リスト「{{name}}」を削除しますか？項目は受信箱に移動します。",
+    "listRowHint": "{{name}} · ダブルクリックで名前変更 · 右クリックで削除"
   },
   "tabs": {
     "closeTab": "タブを閉じる",
@@ -1840,7 +1847,6 @@ export const ja = {
     "newProject": "新しいプロジェクトセッション",
     "newChat": "新しいチャット",
     "newTerminal": "新しい端末",
-    "newWorkItem": "新しいワークアイテム",
     "emptySearch": "一致するものがありません",
     "emptySessions": "セッションはまだありません",
     "emptySpaces": "スペースはまだありません",
@@ -1867,25 +1873,6 @@ export const ja = {
     "newChat": "新しいワークチャット",
     "newCode": "新しいコーディングタスク",
     "newKnowledge": "ナレッジベース"
-  },
-  "workItems": {
-    "inbox": "受信箱",
-    "filtersAria": "スマートフィルタ",
-    "filters": {
-      "open": "未完了",
-      "today": "今日期限",
-      "overdue": "期限超過",
-      "in_progress": "進行中",
-      "done": "完了",
-      "cancelled": "キャンセル済み",
-      "archived": "アーカイブ"
-    },
-    "listsHeading": "リスト",
-    "newList": "新しいリスト",
-    "newListPrompt": "リスト名",
-    "renameListPrompt": "リスト名を変更",
-    "deleteListConfirm": "リスト「{{name}}」を削除しますか？項目は受信箱に移動します。",
-    "listRowHint": "{{name}} · ダブルクリックで名前変更 · 右クリックで削除"
   },
   "knowledge": {
     "title": "ナレッジベース",

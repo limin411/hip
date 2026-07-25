@@ -17,7 +17,7 @@ vi.mock('@/components/work-items/feature', () => ({
 }))
 
 const enterWorkItemsSection = vi.fn(async () => {})
-const enterPlaceholderSection = vi.fn(async () => {})
+const enterPlaceholderSection = vi.fn(async (_section?: string) => {})
 const createItem = vi.fn(async () => 'wi_1')
 
 vi.mock('./sidebarActions', () => ({

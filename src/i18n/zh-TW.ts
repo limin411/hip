@@ -1600,9 +1600,9 @@ export const zhTW = {
   },
   "placeholder": {
     "comingSoon": "功能開發中，敬請期待",
-    "workbench": "工作台即將上線，用於總覽今日事項與快捷入口。",
+    "workbench": "工作台即將上線，用於總覽與快捷入口。",
     "terminals": "終端管理即將上線，用於集中管理多路終端會話。",
-    "tasks": "事項追蹤即將上線，用於跟進任務與待辦。",
+    "tasks": "事項追蹤即將上線，用於跟進事項。",
     "automation": "自動化即將上線，用於設定工作流與定時任務。"
   },
   "terminals": {
@@ -1796,7 +1796,14 @@ export const zhTW = {
     },
     "deleteConfirm": "永久刪除此事項？此操作無法復原。",
     "listsSection": "清單",
-    "smartFilters": "智慧篩選"
+    "listsHeading": "清單",
+    "smartFilters": "智慧篩選",
+    "filtersAria": "智慧篩選",
+    "newList": "新建清單",
+    "newListPrompt": "清單名稱",
+    "renameListPrompt": "重新命名清單",
+    "deleteListConfirm": "刪除清單「{{name}}」？其中事項將移至收集箱。",
+    "listRowHint": "{{name}} · 雙擊重新命名 · 右鍵刪除"
   },
   "tabs": {
     "closeTab": "關閉標籤頁",
@@ -1844,11 +1851,10 @@ export const zhTW = {
     "viewAll": "檢視全部",
     "newSpace": "新建知識庫",
     "newTask": "新增任務",
-    "newWorkItem": "新增事項",
+    "newWorkItem": "新建事項",
     "newProject": "新增專案會話",
     "newChat": "新增對話",
     "newTerminal": "新建終端",
-    "newWorkItem": "新建事項",
     "emptySearch": "無符合項目",
     "emptySessions": "尚無會話",
     "emptySpaces": "尚無知識空間",
@@ -1875,25 +1881,6 @@ export const zhTW = {
     "newChat": "新增辦公對話",
     "newCode": "新增編碼任務",
     "newKnowledge": "知識庫"
-  },
-  "workItems": {
-    "inbox": "收集箱",
-    "filtersAria": "智慧篩選",
-    "filters": {
-      "open": "全部未完成",
-      "today": "今日到期",
-      "overdue": "已逾期",
-      "in_progress": "進行中",
-      "done": "已完成",
-      "cancelled": "已取消",
-      "archived": "已封存"
-    },
-    "listsHeading": "清單",
-    "newList": "新建清單",
-    "newListPrompt": "清單名稱",
-    "renameListPrompt": "重新命名清單",
-    "deleteListConfirm": "刪除清單「{{name}}」？其中事項將移至收集箱。",
-    "listRowHint": "{{name}} · 雙擊重新命名 · 右鍵刪除"
   },
   "knowledge": {
     "title": "知識庫",

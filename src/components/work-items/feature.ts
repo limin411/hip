@@ -1,7 +1,7 @@
 /**
  * Work Item Tracking surface flag.
- * When false, `activeView: 'tasks'` stays on PlaceholderPage and
- * `isPlaceholderSidebarSection('tasks')` remains true.
- * MUST stay false until PR7 (shell + UI fully wired).
+ * When true, `activeView: 'tasks'` renders WorkItemsPage and
+ * `isPlaceholderSidebarSection('tasks')` is false (`tasks` leaves PlaceholderSidebarSection).
+ * Rollback: set to `false as const`.
  */
-export const WORK_ITEM_TRACKING = false as const
+export const WORK_ITEM_TRACKING = true as const

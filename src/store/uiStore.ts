@@ -37,7 +37,7 @@ export type SidebarSection =
 /**
  * Primary nav sections that only show a "coming soon" placeholder page.
  * When TERMINAL_MANAGEMENT is on, `terminals` is a real section (not placeholder) — K14.
- * When WORK_ITEM_TRACKING is on, `tasks` is a real section (not placeholder) — PR7 only.
+ * When WORK_ITEM_TRACKING is on, `tasks` is a real section (not placeholder).
  */
 export type PlaceholderSidebarSection =
   | 'workbench'

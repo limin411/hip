@@ -5,7 +5,7 @@ import type { WorkItem } from './types'
 /** Pure workbench selectors — no zustand. Sorted with default item order. */
 
 export function selectOpenItems(items: readonly WorkItem[]): WorkItem[] {
-  return sortWorkItems(items.filter((i) => matchesFilter(i, 'open', '')))
+  return sortWorkItems(items.filter((i) => matchesFilter(i, 'open')))
 }
 
 export function selectTodayDue(
@@ -23,10 +23,10 @@ export function selectOverdue(
 }
 
 export function selectInProgress(items: readonly WorkItem[]): WorkItem[] {
-  return sortWorkItems(items.filter((i) => matchesFilter(i, 'in_progress', '')))
+  return sortWorkItems(items.filter((i) => matchesFilter(i, 'in_progress')))
 }
 
 /** Non-archived cancelled items (K17). */
 export function selectCancelled(items: readonly WorkItem[]): WorkItem[] {
-  return sortWorkItems(items.filter((i) => matchesFilter(i, 'cancelled', '')))
+  return sortWorkItems(items.filter((i) => matchesFilter(i, 'cancelled')))
 }

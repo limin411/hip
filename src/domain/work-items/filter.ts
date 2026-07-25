@@ -26,11 +26,14 @@ function isOpen(item: WorkItem): boolean {
   return item.archivedAt == null && OPEN_STATUSES.has(item.status)
 }
 
-/** Predicate for a single filterId (no search). */
+/**
+ * Predicate for a single filterId (no search).
+ * `todayYmd` is only required for `today` / `overdue`; omitted → `localTodayYmd()`.
+ */
 export function matchesFilter(
   item: WorkItem,
   filterId: string,
-  todayYmd: string,
+  todayYmd?: string,
 ): boolean {
   if (filterId.startsWith('list:')) {
     const listId = filterId.slice('list:'.length)
@@ -40,10 +43,14 @@ export function matchesFilter(
   switch (filterId as SmartFilterId) {
     case 'open':
       return isOpen(item)
-    case 'today':
-      return isOpen(item) && item.dueOn === todayYmd
-    case 'overdue':
-      return isOpen(item) && item.dueOn != null && item.dueOn < todayYmd
+    case 'today': {
+      const day = todayYmd ?? localTodayYmd()
+      return isOpen(item) && item.dueOn === day
+    }
+    case 'overdue': {
+      const day = todayYmd ?? localTodayYmd()
+      return isOpen(item) && item.dueOn != null && item.dueOn < day
+    }
     case 'in_progress':
       return isOpen(item) && item.status === 'in_progress'
     case 'done':

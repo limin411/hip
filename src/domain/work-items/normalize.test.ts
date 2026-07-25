@@ -3,6 +3,7 @@ import { INBOX_LIST_ID, mintWorkItemId, mintWorkListId } from './ids'
 import {
   DUE_ON_RE,
   emptyDefaultCatalog,
+  isValidDueOn,
   normalizeCatalog,
   WORK_ITEM_NOTES_MAX,
   WORK_ITEM_TAG_MAX_LEN,
@@ -69,6 +70,26 @@ describe('normalizeCatalog', () => {
     expect(inbox.system).toBe('inbox')
     expect(inbox.name).toBe('收集箱')
     expect(cat.lists.map((l) => l.id)).toContain('wl_custom')
+  })
+
+  it('strips forged system:inbox from non-inbox lists', () => {
+    const cat = normalizeCatalog({
+      version: 1,
+      lists: [
+        {
+          id: 'wl_forged',
+          name: 'Fake Inbox',
+          sortOrder: 1,
+          createdAt: 1,
+          updatedAt: 1,
+          system: 'inbox',
+        },
+      ],
+      items: [],
+    })
+    const forged = cat.lists.find((l) => l.id === 'wl_forged')!
+    expect(forged.system).toBeUndefined()
+    expect(cat.lists.find((l) => l.id === INBOX_LIST_ID)!.system).toBe('inbox')
   })
 
   it('drops invalid item ids and list ids', () => {
@@ -142,9 +163,12 @@ describe('normalizeCatalog', () => {
     expect(cat.items[0]!.listId).toBe(INBOX_LIST_ID)
   })
 
-  it('validates dueOn: null or YYYY-MM-DD only', () => {
+  it('validates dueOn: null or real calendar YYYY-MM-DD only', () => {
     expect(DUE_ON_RE.test('2026-07-25')).toBe(true)
     expect(DUE_ON_RE.test('2026-7-5')).toBe(false)
+    expect(isValidDueOn('2026-07-25')).toBe(true)
+    expect(isValidDueOn('2026-02-31')).toBe(false)
+    expect(isValidDueOn('2026-13-01')).toBe(false)
 
     const cat = normalizeCatalog({
       version: 1,
@@ -180,10 +204,67 @@ describe('normalizeCatalog', () => {
           archivedAt: null,
           links: {},
         },
+        {
+          id: 'wi_3',
+          title: 'c',
+          status: 'todo',
+          priority: 'none',
+          listId: INBOX_LIST_ID,
+          tags: [],
+          notes: '',
+          dueOn: '2026-02-31',
+          createdAt: 1,
+          updatedAt: 1,
+          completedAt: null,
+          archivedAt: null,
+          links: {},
+        },
       ],
     })
     expect(cat.items.find((i) => i.id === 'wi_1')!.dueOn).toBeNull()
     expect(cat.items.find((i) => i.id === 'wi_2')!.dueOn).toBe('2026-07-25')
+    expect(cat.items.find((i) => i.id === 'wi_3')!.dueOn).toBeNull()
+  })
+
+  it('trims item titles (whitespace-only becomes empty)', () => {
+    const cat = normalizeCatalog({
+      version: 1,
+      lists: [],
+      items: [
+        {
+          id: 'wi_ws',
+          title: '  hello  ',
+          status: 'todo',
+          priority: 'none',
+          listId: INBOX_LIST_ID,
+          tags: [],
+          notes: '',
+          dueOn: null,
+          createdAt: 1,
+          updatedAt: 1,
+          completedAt: null,
+          archivedAt: null,
+          links: {},
+        },
+        {
+          id: 'wi_blank',
+          title: '   ',
+          status: 'todo',
+          priority: 'none',
+          listId: INBOX_LIST_ID,
+          tags: [],
+          notes: '',
+          dueOn: null,
+          createdAt: 1,
+          updatedAt: 1,
+          completedAt: null,
+          archivedAt: null,
+          links: {},
+        },
+      ],
+    })
+    expect(cat.items.find((i) => i.id === 'wi_ws')!.title).toBe('hello')
+    expect(cat.items.find((i) => i.id === 'wi_blank')!.title).toBe('')
   })
 
   it('clamps title and notes', () => {

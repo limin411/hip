@@ -20,8 +20,23 @@ export const WORK_ITEM_TAGS_MAX = 20
 /** Max chars per tag. */
 export const WORK_ITEM_TAG_MAX_LEN = 32
 
-/** dueOn: null or local calendar YYYY-MM-DD. */
+/** dueOn shape: YYYY-MM-DD. */
 export const DUE_ON_RE = /^\d{4}-\d{2}-\d{2}$/
+
+/**
+ * True when `s` is YYYY-MM-DD and a real local calendar day
+ * (rejects `2026-02-31`, `2026-13-01`, etc.).
+ */
+export function isValidDueOn(s: string): boolean {
+  if (!DUE_ON_RE.test(s)) return false
+  const y = Number(s.slice(0, 4))
+  const m = Number(s.slice(5, 7))
+  const d = Number(s.slice(8, 10))
+  const dt = new Date(y, m - 1, d)
+  return (
+    dt.getFullYear() === y && dt.getMonth() === m - 1 && dt.getDate() === d
+  )
+}
 
 const STATUSES: ReadonlySet<string> = new Set([
   'todo',
@@ -112,7 +127,7 @@ function normalizeDueOn(raw: unknown): string | null {
   if (raw == null || raw === '') return null
   if (typeof raw !== 'string') return null
   const s = raw.trim()
-  if (!DUE_ON_RE.test(s)) return null
+  if (!isValidDueOn(s)) return null
   return s
 }
 
@@ -148,7 +163,8 @@ function normalizeList(
     createdAt,
     updatedAt,
   }
-  if (id === INBOX_LIST_ID || o.system === 'inbox') {
+  // Only the real Inbox id may carry system:'inbox' (strip forged flags).
+  if (id === INBOX_LIST_ID) {
     list.system = 'inbox'
   }
   return list
@@ -171,7 +187,9 @@ function normalizeItem(
   if (!listIds.has(listId)) listId = INBOX_LIST_ID
 
   const title =
-    typeof o.title === 'string' ? clampStr(o.title, WORK_ITEM_TITLE_MAX) : ''
+    typeof o.title === 'string'
+      ? clampStr(o.title.trim(), WORK_ITEM_TITLE_MAX)
+      : ''
   const notes =
     typeof o.notes === 'string' ? clampStr(o.notes, WORK_ITEM_NOTES_MAX) : ''
   const tags = normalizeTags(o.tags)

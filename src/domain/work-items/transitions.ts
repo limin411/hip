@@ -16,25 +16,18 @@ export function canTransition(from: WorkItemStatus, to: WorkItemStatus): boolean
 }
 
 /**
- * Apply a status change with completedAt side effects.
+ * Apply a status change with completedAt side effects (destination-based).
  * - enter done|cancelled → completedAt = now
- * - enter todo|in_progress from terminal → completedAt = null
+ * - enter todo|in_progress → completedAt = null (always; upholds open invariant)
  * Returns `item` unchanged when transition is not allowed.
  */
 export function applyStatus(item: WorkItem, to: WorkItemStatus, now: number): WorkItem {
   if (!canTransition(item.status, to)) return item
 
-  let completedAt = item.completedAt
-  if (TERMINAL.has(to)) {
-    completedAt = now
-  } else if (TERMINAL.has(item.status)) {
-    completedAt = null
-  }
-
   return {
     ...item,
     status: to,
-    completedAt,
+    completedAt: TERMINAL.has(to) ? now : null,
     updatedAt: now,
   }
 }

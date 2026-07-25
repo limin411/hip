@@ -112,6 +112,16 @@ describe('applyStatus', () => {
     expect(next.completedAt).toBeNull()
   })
 
+  it('clears corrupt completedAt on open→open (destination invariant)', () => {
+    const next = applyStatus(
+      item({ status: 'todo', completedAt: 99 }),
+      'in_progress',
+      now,
+    )
+    expect(next.status).toBe('in_progress')
+    expect(next.completedAt).toBeNull()
+  })
+
   it('returns same item when transition disallowed', () => {
     const src = item({ status: 'todo', completedAt: null, updatedAt: 1 })
     const next = applyStatus(src, 'todo', now)

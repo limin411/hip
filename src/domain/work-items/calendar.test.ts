@@ -11,8 +11,8 @@ function wi(partial: Partial<WorkItem> & { id: string }): WorkItem {
     listId: partial.listId ?? 'wl_inbox',
     tags: partial.tags ?? [],
     notes: partial.notes ?? '',
-    startOn: partial.startOn ?? null,
-    endOn: partial.endOn ?? null,
+    startOn: partial.startOn ?? '2026-07-25',
+    endOn: partial.endOn ?? '2026-07-25',
     createdAt: partial.createdAt ?? 1,
     updatedAt: partial.updatedAt ?? 1,
     completedAt: partial.completedAt ?? null,
@@ -56,8 +56,8 @@ describe('placeBarsForMonth', () => {
     expect(map.get('2026-07-24')?.[0]).toMatchObject({ kind: 'end' })
   })
 
-  it('fills missing dates with today for single day', () => {
-    const items = [wi({ id: 'wi_b', title: 'No dates', startOn: null, endOn: null })]
+  it('places single-day items on their start', () => {
+    const items = [wi({ id: 'wi_b', title: 'Day', startOn: '2026-07-25', endOn: '2026-07-25' })]
     const map = placeBarsForMonth(items, 2026, 6, '2026-07-25')
     expect(map.get('2026-07-25')?.[0]?.kind).toBe('single')
   })

@@ -132,11 +132,7 @@ describe('work items lifecycle @work-items @core', () => {
     await waitForListTitle(titleA)
     await selectWorkItemByTitle(titleA)
     await unarchiveSelected()
-    // Save modal if still open after unarchive
-    const saveBtn = await browser.$('[data-testid="work-item-modal-save"]')
-    if (await saveBtn.isExisting()) {
-      await saveWorkItemModal()
-    }
+    // Unarchive flushes draft + closes modal
     await clickSmartFilter('archived')
     await waitForListTitleGone(titleA)
     await clickSmartFilter('todo')

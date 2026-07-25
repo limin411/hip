@@ -168,12 +168,21 @@ describe('normalizeCatalog', () => {
     expect(cat.items[0]!.listId).toBe(INBOX_LIST_ID)
   })
 
-  it('validates startOn: null, endOn: null or real calendar YYYY-MM-DD only', () => {
+  it('fills missing/invalid dates with today; keeps valid calendar YYYY-MM-DD', () => {
     expect(DUE_ON_RE.test('2026-07-25')).toBe(true)
     expect(DUE_ON_RE.test('2026-7-5')).toBe(false)
     expect(isValidDueOn('2026-07-25')).toBe(true)
     expect(isValidDueOn('2026-02-31')).toBe(false)
     expect(isValidDueOn('2026-13-01')).toBe(false)
+
+    // localTodayYmd imported at top via filter re-export path
+    const today = (() => {
+      const d = new Date()
+      const y = d.getFullYear()
+      const m = String(d.getMonth() + 1).padStart(2, '0')
+      const day = String(d.getDate()).padStart(2, '0')
+      return `${y}-${m}-${day}`
+    })()
 
     const cat = normalizeCatalog({
       version: 1,
@@ -229,10 +238,15 @@ describe('normalizeCatalog', () => {
         },
       ],
     })
-    expect(cat.items.find((i) => i.id === 'wi_1')!.endOn).toBeNull()
+    // invalid datetime → today/today
+    expect(cat.items.find((i) => i.id === 'wi_1')!.startOn).toBe(today)
+    expect(cat.items.find((i) => i.id === 'wi_1')!.endOn).toBe(today)
+    // valid end only → both sides that end
     expect(cat.items.find((i) => i.id === 'wi_2')!.endOn).toBe('2026-07-25')
-    expect(cat.items.find((i) => i.id === 'wi_3')!.endOn).toBeNull()
-    expect(cat.items.find((i) => i.id === 'wi_2')!.startOn).toBeNull()
+    expect(cat.items.find((i) => i.id === 'wi_2')!.startOn).toBe('2026-07-25')
+    // invalid calendar day → today
+    expect(cat.items.find((i) => i.id === 'wi_3')!.endOn).toBe(today)
+    expect(cat.items.find((i) => i.id === 'wi_3')!.startOn).toBe(today)
   })
 
   it('migrates legacy dueOn to endOn and swaps inverted ranges', () => {
@@ -274,7 +288,7 @@ describe('normalizeCatalog', () => {
       ],
     })
     const legacy = cat.items.find((i) => i.id === 'wi_legacy')!
-    expect(legacy.startOn).toBeNull()
+    expect(legacy.startOn).toBe('2026-07-25')
     expect(legacy.endOn).toBe('2026-07-25')
     const swapped = cat.items.find((i) => i.id === 'wi_swap')!
     expect(swapped.startOn).toBe('2026-07-20')

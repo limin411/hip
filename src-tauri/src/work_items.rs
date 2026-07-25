@@ -242,23 +242,22 @@ pub fn validate_catalog(catalog: &WorkItemsCatalog) -> Result<(), String> {
                 return Err(format!("tag too long on {}", item.id));
             }
         }
-        if let Some(ref start) = item.start_on {
-            if !is_valid_due_on(start) {
-                return Err(format!("invalid startOn on {}: {start}", item.id));
-            }
-        }
-        if let Some(ref end) = item.end_on {
-            if !is_valid_due_on(end) {
-                return Err(format!("invalid endOn on {}: {end}", item.id));
-            }
-        }
-        if let (Some(ref start), Some(ref end)) = (&item.start_on, &item.end_on) {
-            if start > end {
-                return Err(format!(
-                    "startOn after endOn on {}: {start} > {end}",
-                    item.id
-                ));
-            }
+        // Save path hard-requires both dates (UI always writes them; load may still see null).
+        let start = match item.start_on.as_ref() {
+            Some(s) if is_valid_due_on(s) => s,
+            Some(s) => return Err(format!("invalid startOn on {}: {s}", item.id)),
+            None => return Err(format!("missing startOn on {}", item.id)),
+        };
+        let end = match item.end_on.as_ref() {
+            Some(e) if is_valid_due_on(e) => e,
+            Some(e) => return Err(format!("invalid endOn on {}: {e}", item.id)),
+            None => return Err(format!("missing endOn on {}", item.id)),
+        };
+        if start > end {
+            return Err(format!(
+                "startOn after endOn on {}: {start} > {end}",
+                item.id
+            ));
         }
         match item.status.as_str() {
             "todo" | "in_progress" | "done" | "cancelled" => {}
@@ -556,11 +555,23 @@ mod tests {
     }
 
     #[test]
-    fn accepts_null_schedule() {
+    fn rejects_missing_schedule() {
         let mut cat = sample_catalog();
         cat.items[0].start_on = None;
         cat.items[0].end_on = None;
-        assert!(validate_catalog(&cat).is_ok());
+        let err = validate_catalog(&cat).unwrap_err();
+        assert!(
+            err.contains("missing startOn") || err.contains("missing endOn"),
+            "err={err}"
+        );
+        cat = sample_catalog();
+        cat.items[0].start_on = None;
+        cat.items[0].end_on = Some("2026-07-25".into());
+        assert!(validate_catalog(&cat).unwrap_err().contains("missing startOn"));
+        cat = sample_catalog();
+        cat.items[0].start_on = Some("2026-07-25".into());
+        cat.items[0].end_on = None;
+        assert!(validate_catalog(&cat).unwrap_err().contains("missing endOn"));
     }
 
     #[test]
@@ -706,8 +717,8 @@ mod tests {
                 list_id: INBOX_LIST_ID.into(),
                 tags: vec![],
                 notes: notes.clone(),
-                start_on: None,
-                end_on: None,
+                start_on: Some("2026-07-25".into()),
+                end_on: Some("2026-07-25".into()),
                 due_on: None,
                 created_at: 0,
                 updated_at: 0,

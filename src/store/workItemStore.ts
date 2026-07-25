@@ -73,9 +73,7 @@ function hasExtras(item: WorkItem, notes: string, todayYmd: string = localTodayY
   if (notes.trim() !== '') return true
   if (item.tags.length > 0) return true
   if (item.links.sessionId || item.links.knowledge || item.links.url) return true
-  if (item.startOn != null || item.endOn != null) {
-    if (!isDefaultScheduleOnly(item.startOn, item.endOn, todayYmd)) return true
-  }
+  if (!isDefaultScheduleOnly(item.startOn, item.endOn, todayYmd)) return true
   return false
 }
 

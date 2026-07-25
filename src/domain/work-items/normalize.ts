@@ -1,4 +1,5 @@
 import { INBOX_LIST_ID, isWorkItemId, isWorkListId } from './ids'
+import { localTodayYmd } from './filter'
 import type {
   WorkItem,
   WorkItemLinks,
@@ -248,7 +249,16 @@ function normalizeItem(
       ? clampUtf8Bytes(o.notes, WORK_ITEM_NOTES_MAX)
       : ''
   const tags = normalizeTags(o.tags)
-  const { startOn, endOn } = normalizeScheduleRange(o)
+  // Always materialize a schedule (product: dates required; missing → today).
+  const range = normalizeScheduleRange(o)
+  const today = localTodayYmd()
+  let startOn = range.startOn ?? range.endOn ?? today
+  let endOn = range.endOn ?? range.startOn ?? today
+  if (startOn > endOn) {
+    const tmp = startOn
+    startOn = endOn
+    endOn = tmp
+  }
   const createdAt = asFiniteNumber(o.createdAt, fallbackNow)
   const updatedAt = asFiniteNumber(o.updatedAt, createdAt)
   const links = normalizeLinks(o.links)

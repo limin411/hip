@@ -175,7 +175,25 @@ export function WorkItemEditorModal() {
 
   const handleUnarchive = async () => {
     if (!editId) return
-    await unarchive(editId)
+    setSaving(true)
+    try {
+      // Flush draft then unarchive and close (consistent with archive).
+      if (draft.title.trim()) {
+        await commitItemDraft(editId, {
+          title: draft.title,
+          startOn: draft.startOn,
+          endOn: draft.endOn,
+          status: draft.status,
+          priority: draft.priority,
+          notes: draft.notes,
+          tags: draft.tags,
+        })
+      }
+      await unarchive(editId)
+      closeModal()
+    } finally {
+      setSaving(false)
+    }
   }
 
   const handleDeleteConfirm = async () => {

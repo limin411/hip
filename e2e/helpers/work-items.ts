@@ -405,8 +405,21 @@ export async function clickSmartFilter(
 }
 
 export async function setSearchQuery(q: string): Promise<void> {
+  await switchWorkItemsToListView()
   await setReactInputValue('work-item-search', q)
   await browser.pause(80)
+}
+
+/** Switch main surface back to month calendar. */
+export async function switchWorkItemsToCalendarView(): Promise<void> {
+  const cal = await browser.$('[data-testid="work-item-month-calendar"]')
+  if (await cal.isExisting()) return
+  const tab = await browser.$('[data-testid="work-item-view-mode-calendar"]')
+  await tab.waitForExist({ timeout: 10000 })
+  await tab.click()
+  await (await browser.$('[data-testid="work-item-month-calendar"]')).waitForExist({
+    timeout: 10000,
+  })
 }
 
 export async function archiveSelected(): Promise<void> {

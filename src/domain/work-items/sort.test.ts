@@ -11,8 +11,8 @@ function wi(partial: Partial<WorkItem> & Pick<WorkItem, 'id'>): WorkItem {
     listId: 'wl_inbox',
     tags: [],
     notes: '',
-    startOn: null,
-    endOn: null,
+    startOn: '2026-07-25',
+    endOn: '2026-07-25',
     createdAt: 1,
     updatedAt: 1,
     completedAt: null,
@@ -32,11 +32,11 @@ describe('PRIORITY_RANK', () => {
 })
 
 describe('sortWorkItems', () => {
-  it('sorts schedule (start/end) ascending with null last', () => {
+  it('sorts schedule (start/end) ascending', () => {
     const items = [
-      wi({ id: 'wi_c', startOn: null, endOn: '2026-07-20' }),
-      wi({ id: 'wi_a', startOn: null, endOn: null }),
-      wi({ id: 'wi_b', startOn: null, endOn: '2026-07-10' }),
+      wi({ id: 'wi_c', startOn: '2026-07-20', endOn: '2026-07-20' }),
+      wi({ id: 'wi_a', startOn: '2026-07-30', endOn: '2026-07-30' }),
+      wi({ id: 'wi_b', startOn: '2026-07-10', endOn: '2026-07-10' }),
     ]
     expect(sortWorkItems(items).map((i) => i.id)).toEqual([
       'wi_b',
@@ -48,7 +48,7 @@ describe('sortWorkItems', () => {
   it('breaks schedule ties by priority desc', () => {
     const prios: WorkItemPriority[] = ['none', 'high', 'low', 'medium']
     const items = prios.map((priority, i) =>
-      wi({ id: `wi_${i}`, startOn: null, endOn: '2026-07-01', priority }),
+      wi({ id: `wi_${i}`, startOn: '2026-07-01', endOn: '2026-07-01', priority }),
     )
     expect(sortWorkItems(items).map((i) => i.priority)).toEqual([
       'high',
@@ -60,30 +60,33 @@ describe('sortWorkItems', () => {
 
   it('breaks priority ties by updatedAt desc', () => {
     const items = [
-      wi({ id: 'wi_old', startOn: null, endOn: '2026-07-01', priority: 'high', updatedAt: 10 }),
-      wi({ id: 'wi_new', startOn: null, endOn: '2026-07-01', priority: 'high', updatedAt: 99 }),
+      wi({ id: 'wi_old', startOn: '2026-07-01', endOn: '2026-07-01', priority: 'high', updatedAt: 10 }),
+      wi({ id: 'wi_new', startOn: '2026-07-01', endOn: '2026-07-01', priority: 'high', updatedAt: 99 }),
     ]
     expect(sortWorkItems(items).map((i) => i.id)).toEqual(['wi_new', 'wi_old'])
   })
 
   it('breaks remaining ties by id asc', () => {
     const items = [
-      wi({ id: 'wi_b', startOn: null, endOn: '2026-07-01', priority: 'high', updatedAt: 5 }),
-      wi({ id: 'wi_a', startOn: null, endOn: '2026-07-01', priority: 'high', updatedAt: 5 }),
+      wi({ id: 'wi_b', startOn: '2026-07-01', endOn: '2026-07-01', priority: 'high', updatedAt: 5 }),
+      wi({ id: 'wi_a', startOn: '2026-07-01', endOn: '2026-07-01', priority: 'high', updatedAt: 5 }),
     ]
     expect(sortWorkItems(items).map((i) => i.id)).toEqual(['wi_a', 'wi_b'])
   })
 
   it('does not mutate input', () => {
-    const items = [wi({ id: 'wi_2', startOn: null, endOn: '2026-07-02' }), wi({ id: 'wi_1', startOn: null, endOn: '2026-07-01' })]
+    const items = [
+      wi({ id: 'wi_2', startOn: '2026-07-02', endOn: '2026-07-02' }),
+      wi({ id: 'wi_1', startOn: '2026-07-01', endOn: '2026-07-01' }),
+    ]
     const copy = [...items]
     sortWorkItems(items)
     expect(items).toEqual(copy)
   })
 
   it('compareWorkItems is antisymmetric for distinct ids', () => {
-    const a = wi({ id: 'wi_a', startOn: null, endOn: '2026-01-01' })
-    const b = wi({ id: 'wi_b', startOn: null, endOn: '2026-02-01' })
+    const a = wi({ id: 'wi_a', startOn: '2026-01-01', endOn: '2026-01-01' })
+    const b = wi({ id: 'wi_b', startOn: '2026-02-01', endOn: '2026-02-01' })
     expect(Math.sign(compareWorkItems(a, b))).toBe(
       -Math.sign(compareWorkItems(b, a)),
     )

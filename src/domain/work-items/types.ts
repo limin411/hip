@@ -18,12 +18,13 @@ export type WorkItem = {
   tags: string[]
   notes: string
   /**
-   * Schedule range as local calendar dates `YYYY-MM-DD`, or null.
-   * No time-of-day. When both set, `startOn <= endOn`.
+   * Schedule range as local calendar dates `YYYY-MM-DD` (always present after normalize).
+   * No time-of-day. Invariant: `startOn <= endOn`.
+   * Disk may still omit dates; load/normalize fills with local today.
    * Legacy single-day `dueOn` is migrated to `endOn` on load (see normalize).
    */
-  startOn: string | null
-  endOn: string | null
+  startOn: string
+  endOn: string
   createdAt: number
   updatedAt: number
   /** Set when entering done or cancelled; null when open. */

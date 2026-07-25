@@ -34,7 +34,7 @@ describe('workItems IPC', () => {
           listId: INBOX_LIST_ID,
           tags: [],
           notes: '',
-          startOn: null,
+          startOn: '2026-07-25',
           endOn: '2026-07-25',
           createdAt: 1,
           updatedAt: 1,
@@ -50,7 +50,8 @@ describe('workItems IPC', () => {
     expect(cat.lists[0]?.id).toBe(INBOX_LIST_ID)
     expect(cat.items).toHaveLength(1)
     expect(cat.items[0]?.endOn).toBe('2026-07-25')
-    expect(cat.items[0]?.startOn).toBeNull()
+    // Normalize fills missing start from end
+    expect(cat.items[0]?.startOn).toBe('2026-07-25')
   })
 
   it('listWorkItems normalizes malformed rows via domain normalizeCatalog', async () => {

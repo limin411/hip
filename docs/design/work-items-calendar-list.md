@@ -943,12 +943,12 @@ Each pre-cutover PR is independently mergeable without breaking e2e. **Cutover i
 - **Dependencies:** PR1–PR5
 - **Description:** **Single intentional cutover.** User-visible calendar-first UX + green e2e. May be large; do not split e2e into a follow-up PR on main. No secondary flag.
 
-### PR7 — Polish (i18n, a11y, non-null types, Rust hard-require)
+### PR7 — Polish (i18n, a11y, non-null types, Rust hard-require) ✅ shipped
 
 - **Title:** `work-items: calendar redesign polish`
-- **Files:** locale files; focus restore; contrast; `types.ts` non-null dates; normalize return types; store tests; Rust `validate_catalog` require start+end; delete unused `WorkItemDetailPane` if fully dead
+- **Files:** `types.ts` non-null `startOn`/`endOn`; normalize fills today; Rust `validate_catalog` requires both dates; deleted `WorkItemDetailPane` / `WorkItemListPane`; e2e calendar + modal helpers
 - **Dependencies:** PR6 (cutover stable)
-- **Description:** D23 types; load still accepts null from disk and fills; save hard-requires both dates (UI-only writer). Optional calendar focus polish.
+- **Description:** D23 types; load still accepts null from disk and fills; save hard-requires both dates.
 
 ```mermaid
 flowchart LR

@@ -53,4 +53,17 @@ describe('DateField', () => {
     fireEvent.change(hidden, { target: { value: '2026-08-01' } })
     expect(onChange).toHaveBeenCalledWith('2026-08-01')
   })
+
+  it('today button selects today', () => {
+    const onChange = vi.fn()
+    // Fixed: value in July so popover opens on that month; Today still picks real local today.
+    render(
+      <DateField data-testid="d" value="2026-07-25" onChange={onChange} />,
+    )
+    fireEvent.click(screen.getByTestId('d-trigger'))
+    fireEvent.click(screen.getByTestId('date-field-today'))
+    expect(onChange).toHaveBeenCalledTimes(1)
+    const ymd = onChange.mock.calls[0]![0] as string
+    expect(ymd).toMatch(/^\d{4}-\d{2}-\d{2}$/)
+  })
 })

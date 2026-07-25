@@ -17,7 +17,8 @@ export const PopoverContent = forwardRef<
       align={align}
       sideOffset={sideOffset}
       className={cn(
-        'z-50 w-[min(360px,calc(100vw-2rem))] rounded-lg border border-border bg-surface p-0 shadow-menu outline-none',
+        // Above Modal overlay/content (z-50) so DateField month grid is clickable.
+        'z-[60] w-[min(360px,calc(100vw-2rem))] rounded-lg border border-border bg-surface p-0 shadow-menu outline-none',
         'origin-[var(--radix-popover-content-transform-origin)] data-[state=open]:animate-menu-in',
         className,
       )}

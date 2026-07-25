@@ -152,8 +152,9 @@ function BarChip({
 }) {
   const item = items.find((i) => i.id === bar.itemId)
   const hex = item ? colorHexForItem(item, colors) : colors.todo
-  const clickable = bar.kind === 'start' || bar.kind === 'single'
-  const label = clickable ? bar.title || '·' : '·'
+  // Title only on start/single; mid/end still open edit so multi-day bars are always clickable.
+  const showTitle = bar.kind === 'start' || bar.kind === 'single'
+  const label = showTitle ? bar.title || '·' : '·'
   const className = cn(
     'block w-full truncate rounded px-1.5 py-0.5 text-left text-[11px] font-medium leading-tight',
     bar.done && 'line-through opacity-70',
@@ -161,7 +162,6 @@ function BarChip({
     bar.kind === 'start' && 'rounded-r-none',
     bar.kind === 'mid' && 'rounded-none text-transparent',
     bar.kind === 'end' && 'rounded-l-none text-transparent',
-    !clickable && 'pointer-events-none',
   )
   const style = {
     ['--bar-color' as string]: hex,
@@ -171,13 +171,6 @@ function BarChip({
     color: '#0f172a',
   } as CSSProperties
 
-  if (!clickable) {
-    return (
-      <div className={className} style={style} aria-hidden>
-        {label}
-      </div>
-    )
-  }
   return (
     <button
       type="button"

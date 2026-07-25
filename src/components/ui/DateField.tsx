@@ -73,7 +73,6 @@ export function DateField({
   const today = useMemo(() => localTodayYmd(), [])
   const [open, setOpen] = useState(false)
 
-  const selected = parseYmd(value)
   const [cursor, setCursor] = useState(() => {
     const p = parseYmd(value)
     if (p) return { year: p.y, monthIndex: p.m }
@@ -113,6 +112,11 @@ export function DateField({
     if (isDisabledDay(ymd)) return
     onChange(ymd)
     setOpen(false)
+  }
+
+  const goToTodayMonth = () => {
+    const p = parseYmd(today)
+    if (p) setCursor({ year: p.y, monthIndex: p.m })
   }
 
   const shiftMonth = (delta: number) => {
@@ -223,7 +227,11 @@ export function DateField({
                   disabled={blocked}
                   aria-selected={selectedDay}
                   data-testid={`date-field-day-${cell.ymd}`}
-                  onClick={() => pick(cell.ymd)}
+                  onClick={(e) => {
+                    e.preventDefault()
+                    e.stopPropagation()
+                    pick(cell.ymd)
+                  }}
                   className={cn(
                     'relative flex h-8 items-center justify-center rounded-md text-caption tabular-nums transition-colors duration-chrome',
                     blocked && 'cursor-not-allowed opacity-30',
@@ -245,10 +253,17 @@ export function DateField({
           <div className="mt-2 flex justify-end border-t border-border pt-2">
             <button
               type="button"
-              className="rounded-md px-2 py-1 text-caption font-medium text-ink-secondary hover:bg-state-hover hover:text-ink"
+              className="rounded-md px-2 py-1 text-caption font-medium text-ink-secondary hover:bg-state-hover hover:text-ink disabled:pointer-events-none disabled:opacity-40"
               data-testid="date-field-today"
               disabled={isDisabledDay(today)}
-              onClick={() => pick(today)}
+              onClick={(e) => {
+                // Keep popover open long enough for the pick; stop dialog from
+                // treating this as an outside interact (Modal also guards this).
+                e.preventDefault()
+                e.stopPropagation()
+                goToTodayMonth()
+                pick(today)
+              }}
             >
               {t('workItems.calendar.today')}
             </button>

@@ -19,6 +19,24 @@ interface ModalProps {
   closeDisabled?: boolean
 }
 
+/**
+ * Portaled floating layers (Popover / Dropdown / Select) render outside Dialog.Content.
+ * Without this guard, picking a day in DateField counts as "outside" and closes the modal.
+ */
+function isPortaledFloatingTarget(target: EventTarget | null): boolean {
+  if (!(target instanceof Element)) return false
+  return Boolean(
+    target.closest(
+      [
+        '[data-radix-popper-content-wrapper]',
+        '[data-radix-menu-content]',
+        '[data-radix-select-content]',
+        '[role="listbox"]',
+      ].join(','),
+    ),
+  )
+}
+
 const DEFAULT_SIZE: Size = { width: 960, height: 700 }
 const DEFAULT_MIN: Size = { width: 600, height: 440 }
 
@@ -66,7 +84,21 @@ export function Modal({
             if (closeDisabled) e.preventDefault()
           }}
           onPointerDownOutside={(e) => {
-            if (closeDisabled) e.preventDefault()
+            if (closeDisabled || isPortaledFloatingTarget(e.target)) {
+              e.preventDefault()
+            }
+          }}
+          onFocusOutside={(e) => {
+            // DateField / menus portal outside Dialog.Content; keep focus trap from
+            // dismissing the modal when those layers receive focus.
+            if (closeDisabled || isPortaledFloatingTarget(e.target)) {
+              e.preventDefault()
+            }
+          }}
+          onInteractOutside={(e) => {
+            if (closeDisabled || isPortaledFloatingTarget(e.target)) {
+              e.preventDefault()
+            }
           }}
         >
           <div

@@ -13,6 +13,7 @@ import {
 import { useWorkItemStore } from '@/store/workItemStore'
 import { useWorkItemViewStore } from '@/store/workItemViewStore'
 import { Button } from '@/components/ui/Button'
+import { DateField } from '@/components/ui/DateField'
 import { Input, inputClassName } from '@/components/ui/Input'
 import { Textarea } from '@/components/ui/Textarea'
 import { Modal } from '@/components/ui/Modal'
@@ -289,14 +290,12 @@ export function WorkItemEditorModal() {
           <div className="grid grid-cols-2 gap-3">
             <label className="flex flex-col gap-1">
               <span className="text-meta text-ink-tertiary">{t('workItems.fields.startOn')}</span>
-              <input
-                type="date"
+              <DateField
                 data-testid="work-item-start-input"
-                className={inputClassName}
+                aria-label={t('workItems.fields.startOn')}
                 value={draft.startOn}
                 max={draft.endOn}
-                onChange={(e) => {
-                  const startOn = e.target.value || localTodayYmd()
+                onChange={(startOn) => {
                   const endOn = startOn > draft.endOn ? startOn : draft.endOn
                   patch({ startOn, endOn })
                 }}
@@ -304,14 +303,12 @@ export function WorkItemEditorModal() {
             </label>
             <label className="flex flex-col gap-1">
               <span className="text-meta text-ink-tertiary">{t('workItems.fields.endOn')}</span>
-              <input
-                type="date"
+              <DateField
                 data-testid="work-item-end-input"
-                className={inputClassName}
+                aria-label={t('workItems.fields.endOn')}
                 value={draft.endOn}
                 min={draft.startOn}
-                onChange={(e) => {
-                  const endOn = e.target.value || localTodayYmd()
+                onChange={(endOn) => {
                   const startOn = endOn < draft.startOn ? endOn : draft.startOn
                   patch({ startOn, endOn })
                 }}

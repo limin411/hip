@@ -729,6 +729,16 @@ export const ja = {
     "cannotPreview": "このファイルはプレビューできません",
     "fileTooLarge": "ファイルが大きすぎてプレビューできません",
     "previewTruncated": "最初の1MBを表示しています",
+    "previewViewTree": "ツリー",
+    "previewViewSource": "ソース",
+    "previewViewTable": "表",
+    "previewViewRendered": "プレビュー",
+    "previewJsonInvalid": "JSONが無効です",
+    "previewCsvEmpty": "空の表",
+    "previewCsvTruncated": "先頭 {{shown}} / {{total}} 行を表示",
+    "previewHtmlLarge": "この HTML は大きいため、フリーズ防止で自動プレビューをオフにしています。必要なときだけプレビューに切り替えてください。",
+    "previewHtmlHardTruncated": "性能のため HTML を切り詰めてから描画しました",
+    "previewHtmlOpenBrowser": "デフォルトブラウザで開く",
     "loading": "読み込み中…",
     "sandboxPending": "最初のメッセージを送信すると、サンドボックスワークスペースが作成されます",
     "needsSessionScope": "プレビューするにはセッションスコープが必要です",
@@ -2151,7 +2161,8 @@ export const ja = {
       "openContainingFolder": "フォルダを開く",
       "refresh": "更新",
       "pathOutsideCwd": "パスがプロジェクトフォルダの外にあります",
-      "openContainingFolderFailed": "フォルダを開けませんでした"
+      "openContainingFolderFailed": "フォルダを開けませんでした",
+      "openWithDefaultAppFailed": "デフォルトアプリで開けませんでした"
     },
     "diffFile": {
       "copyPath": "パスをコピー",

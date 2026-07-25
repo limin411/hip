@@ -67,3 +67,40 @@ export async function openContainingFolder(
     }
   }
 }
+
+/**
+ * Open a file (or dir) with the OS default application (e.g. HTML → default browser).
+ * Same cwd trust boundary as openContainingFolder. Returns whether open was attempted successfully.
+ *
+ * Requires `opener:allow-open-path` **with path scopes** in capabilities
+ * (command-only permission rejects every path as ForbiddenPath).
+ */
+export async function openWithDefaultApp(
+  path: string,
+  options: { cwd: string | null },
+): Promise<boolean> {
+  const { cwd } = options
+  if (!cwd || !path) {
+    toast.error(i18n.t('contextMenu.file.pathOutsideCwd'))
+    return false
+  }
+  if (!isPathUnderRoot(path, cwd)) {
+    toast.error(i18n.t('contextMenu.file.pathOutsideCwd'))
+    return false
+  }
+
+  const target = normalizeFsPath(path)
+  try {
+    await openerOpenPath(target)
+    return true
+  } catch (err) {
+    try {
+      await shellOpen(target)
+      return true
+    } catch (err2) {
+      console.error('[openWithDefaultApp] failed', { path: target, err, err2 })
+      toast.error(i18n.t('contextMenu.file.openWithDefaultAppFailed'))
+      return false
+    }
+  }
+}

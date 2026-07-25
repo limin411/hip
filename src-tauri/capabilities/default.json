@@ -6,7 +6,19 @@
   "permissions": [
     "core:default",
     "opener:default",
-    "opener:allow-open-path",
+    {
+      "identifier": "opener:allow-open-path",
+      "allow": [
+        { "path": "$HOME/**" },
+        { "path": "$TEMP/**" },
+        { "path": "$DOCUMENT/**" },
+        { "path": "$DESKTOP/**" },
+        { "path": "$DOWNLOAD/**" },
+        { "path": "$APPDATA/**" },
+        { "path": "$APPLOCALDATA/**" },
+        { "path": "$RESOURCE/**" }
+      ]
+    },
     {
       "identifier": "shell:allow-execute",
       "allow": [

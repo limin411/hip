@@ -83,6 +83,32 @@ describe('readForPreview', () => {
     expect(r).toMatchObject({ encoding: 'base64', mimeType: 'application/pdf' })
     expect(Buffer.from((r as { content: string }).content, 'base64').toString('binary')).toContain('%PDF-1.4')
   })
+  it('previews code files regardless of extension (content sniff, not allowlist)', async () => {
+    await fs.writeFile(path.join(root, 'App.vue'), '<template><div>hi</div></template>')
+    await fs.writeFile(path.join(root, 'Main.kt'), 'fun main() {}')
+    await fs.writeFile(path.join(root, 'lib.zig'), 'pub fn main() void {}')
+    await fs.writeFile(path.join(root, 'schema.prisma'), 'model User { id String }')
+    await fs.writeFile(path.join(root, 'main.swift'), 'print("hi")')
+    for (const name of ['App.vue', 'Main.kt', 'lib.zig', 'schema.prisma', 'main.swift']) {
+      const r = await readForPreview(root, path.join(root, name))
+      expect(r, name).toMatchObject({ encoding: 'utf8', mimeType: 'text/plain' })
+      expect('content' in r && typeof r.content === 'string' && r.content.length > 0, name).toBe(true)
+    }
+  })
+  it('previews mdx as markdown and extension-less source as text', async () => {
+    await fs.writeFile(path.join(root, 'page.mdx'), '# MDX\n\nHello')
+    await fs.writeFile(path.join(root, 'Makefile'), 'all:\n\techo ok')
+    const mdx = await readForPreview(root, path.join(root, 'page.mdx'))
+    expect(mdx).toMatchObject({ encoding: 'utf8', mimeType: 'text/markdown' })
+    const mk = await readForPreview(root, path.join(root, 'Makefile'))
+    expect(mk).toMatchObject({ encoding: 'utf8', mimeType: 'text/plain' })
+    expect('content' in mk && mk.content).toContain('echo ok')
+  })
+  it('rejects binary content (NUL byte) even with a code-like extension', async () => {
+    await fs.writeFile(path.join(root, 'blob.dat'), Buffer.from([0x00, 0x01, 0x02, 0xff]))
+    const r = await readForPreview(root, path.join(root, 'blob.dat'))
+    expect(r).toEqual({ error: 'binary' })
+  })
   it('throws when the path escapes root', async () => {
     await expect(readForPreview(root, '/etc/passwd')).rejects.toThrow()
   })

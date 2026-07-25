@@ -5,6 +5,13 @@ import { useFsStore } from '@/store/fsStore'
 import { DeclarativeContextMenu } from '@/components/context-menu'
 import { MarkdownBody } from '@/components/chat/MarkdownBody'
 import { previewKind } from './previewKind'
+import {
+  CodePreviewBody,
+  CsvPreviewBody,
+  HtmlPreviewBody,
+  JsonPreviewBody,
+  TextPreviewBody,
+} from './previewBodies'
 
 function Centered({ text, testid }: { text: string; testid: string }) {
   return (
@@ -12,10 +19,6 @@ function Centered({ text, testid }: { text: string; testid: string }) {
       {text}
     </div>
   )
-}
-
-function TruncBanner({ text }: { text: string }) {
-  return <div className="mb-2 rounded-md bg-surface-muted/80 px-2.5 py-1 text-meta text-ink-tertiary">{text}</div>
 }
 
 /**
@@ -105,6 +108,7 @@ export function FilePreview() {
   // Only pass utf8 text content for copy; base64 images/pdf stay out of the clipboard action.
   const textContent =
     preview.encoding === 'base64' ? undefined : preview.content
+  const truncLabel = t('artifact.previewTruncated')
 
   if (kind === 'image' && preview.encoding === 'base64') {
     return withPreviewMenu(
@@ -136,9 +140,13 @@ export function FilePreview() {
       cwd,
       textContent,
       preview.mimeType,
-      <IframePreviewChrome path={preview.path} testid="preview-html-shell">
-        <iframe data-testid="preview-html" title="preview" sandbox="" className="h-full w-full border-0 bg-white" srcDoc={preview.content} />
-      </IframePreviewChrome>,
+      <HtmlPreviewBody
+        path={preview.path}
+        content={preview.content}
+        cwd={cwd}
+        truncated={preview.truncated}
+        truncatedLabel={truncLabel}
+      />,
     )
   }
 
@@ -149,9 +157,57 @@ export function FilePreview() {
       textContent,
       preview.mimeType,
       <article className="h-full overflow-auto p-4" data-testid="preview-markdown">
-        {preview.truncated && <TruncBanner text={t('artifact.previewTruncated')} />}
+        {preview.truncated && (
+          <div className="mb-2 rounded-md bg-surface-muted/80 px-2.5 py-1 text-meta text-ink-tertiary">
+            {truncLabel}
+          </div>
+        )}
         <MarkdownBody content={preview.content} />
       </article>,
+    )
+  }
+
+  if (kind === 'json') {
+    return withPreviewMenu(
+      preview.path,
+      cwd,
+      textContent,
+      preview.mimeType,
+      <JsonPreviewBody
+        content={preview.content}
+        truncated={preview.truncated}
+        truncatedLabel={truncLabel}
+      />,
+    )
+  }
+
+  if (kind === 'csv') {
+    return withPreviewMenu(
+      preview.path,
+      cwd,
+      textContent,
+      preview.mimeType,
+      <CsvPreviewBody
+        path={preview.path}
+        content={preview.content}
+        truncated={preview.truncated}
+        truncatedLabel={truncLabel}
+      />,
+    )
+  }
+
+  if (kind === 'code') {
+    return withPreviewMenu(
+      preview.path,
+      cwd,
+      textContent,
+      preview.mimeType,
+      <CodePreviewBody
+        path={preview.path}
+        content={preview.content}
+        truncated={preview.truncated}
+        truncatedLabel={truncLabel}
+      />,
     )
   }
 
@@ -160,9 +216,10 @@ export function FilePreview() {
     cwd,
     textContent,
     preview.mimeType,
-    <div className="h-full overflow-auto p-4" data-testid="preview-text">
-      {preview.truncated && <TruncBanner text={t('artifact.previewTruncated')} />}
-      <pre className="whitespace-pre-wrap break-words font-mono text-meta text-ink">{preview.content}</pre>
-    </div>,
+    <TextPreviewBody
+      content={preview.content}
+      truncated={preview.truncated}
+      truncatedLabel={truncLabel}
+    />,
   )
 }

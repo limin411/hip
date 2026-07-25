@@ -6,14 +6,21 @@ const IMAGE_MIME: Record<string, string> = {
   '.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.gif': 'image/gif',
   '.webp': 'image/webp', '.svg': 'image/svg+xml', '.bmp': 'image/bmp', '.ico': 'image/x-icon',
 }
-const TEXT_EXT = new Set([
-  '.md', '.markdown', '.txt', '.json', '.js', '.jsx', '.ts', '.tsx', '.html', '.htm', '.css',
-  '.scss', '.less', '.yml', '.yaml', '.toml', '.xml', '.sh', '.py', '.rs', '.go', '.java', '.c',
-  '.h', '.cpp', '.rb', '.php', '.sql', '.env', '.gitignore', '.lock', '.cfg', '.ini', '.csv',
-])
 const TEXT_CAP = 1024 * 1024 // 1 MB
 const IMG_CAP = 5 * 1024 * 1024 // 5 MB
 const PDF_CAP = 5 * 1024 * 1024 // 5 MB
+
+/** Map extension → preview mime (only special cases; everything else is text/plain). */
+function textMimeForExt(ext: string): string {
+  if (ext === '.html' || ext === '.htm' || ext === '.xhtml') return 'text/html'
+  if (ext === '.md' || ext === '.markdown' || ext === '.mdx') return 'text/markdown'
+  return 'text/plain'
+}
+
+/** True if the buffer looks binary (NUL in the sampled head). */
+function looksBinary(buf: Buffer): boolean {
+  return buf.subarray(0, 8000).includes(0)
+}
 
 export type PreviewResult =
   | { content: string; encoding: 'utf8' | 'base64'; mimeType?: string; truncated?: boolean }
@@ -99,7 +106,13 @@ async function resolvePreviewPath(cwd: string, abs: string): Promise<string> {
   }
 }
 
-/** Read a file for UI preview. Text → utf8 (capped+truncated); images/PDFs → base64; else error. */
+/**
+ * Read a file for UI preview.
+ * - images / PDF → base64 (size-capped)
+ * - everything else → utf8 text (1 MB cap + truncate), unless the head contains a NUL
+ *   (treated as binary). Code / config / markup of any extension therefore previews
+ *   without an extension allowlist.
+ */
 export async function readForPreview(cwd: string, abs: string): Promise<PreviewResult> {
   const file = await resolvePreviewPath(cwd, abs)
   const ext = path.extname(file).toLowerCase()
@@ -118,16 +131,13 @@ export async function readForPreview(cwd: string, abs: string): Promise<PreviewR
     return { content: buf.toString('base64'), encoding: 'base64', mimeType: 'application/pdf' }
   }
 
-  if (TEXT_EXT.has(ext) || ext === '') {
-    const truncated = stat.size > TEXT_CAP
-    const buf = truncated ? await readHead(file, TEXT_CAP) : await fs.readFile(file)
-    if (buf.subarray(0, 8000).includes(0)) return { error: 'binary' } // NUL byte → treat as binary
-    const mimeType =
-      ext === '.html' || ext === '.htm' ? 'text/html'
-      : ext === '.md' || ext === '.markdown' ? 'text/markdown'
-      : 'text/plain'
-    return { content: buf.toString('utf8'), encoding: 'utf8', mimeType, truncated }
+  const truncated = stat.size > TEXT_CAP
+  const buf = truncated ? await readHead(file, TEXT_CAP) : await fs.readFile(file)
+  if (looksBinary(buf)) return { error: 'binary' }
+  return {
+    content: buf.toString('utf8'),
+    encoding: 'utf8',
+    mimeType: textMimeForExt(ext),
+    truncated,
   }
-
-  return { error: 'binary' }
 }

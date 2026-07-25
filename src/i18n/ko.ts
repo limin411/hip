@@ -729,6 +729,16 @@ export const ko = {
     "cannotPreview": "이 파일을 미리 볼 수 없습니다",
     "fileTooLarge": "파일이 너무 커서 미리 볼 수 없습니다",
     "previewTruncated": "처음 1MB만 표시 중",
+    "previewViewTree": "트리",
+    "previewViewSource": "소스",
+    "previewViewTable": "표",
+    "previewViewRendered": "미리보기",
+    "previewJsonInvalid": "잘못된 JSON",
+    "previewCsvEmpty": "빈 표",
+    "previewCsvTruncated": "처음 {{shown}} / {{total}} 행 표시",
+    "previewHtmlLarge": "HTML이 커서 앱이 멈추지 않도록 자동 미리보기를 껐습니다. 필요할 때만 미리보기로 전환하세요.",
+    "previewHtmlHardTruncated": "성능상 HTML을 자른 뒤 렌더했습니다",
+    "previewHtmlOpenBrowser": "기본 브라우저로 열기",
     "loading": "로딩 중…",
     "sandboxPending": "첫 번째 메시지를 보내면 샌드박스 작업 공간이 생성됩니다",
     "needsSessionScope": "미리 보려면 세션 범위가 필요합니다",
@@ -2151,7 +2161,8 @@ export const ko = {
       "openContainingFolder": "폴더 열기",
       "refresh": "새로고침",
       "pathOutsideCwd": "경로가 프로젝트 폴더 밖에 있습니다",
-      "openContainingFolderFailed": "폴더를 열 수 없습니다"
+      "openContainingFolderFailed": "폴더를 열 수 없습니다",
+      "openWithDefaultAppFailed": "기본 앱으로 열 수 없습니다"
     },
     "diffFile": {
       "copyPath": "경로 복사",

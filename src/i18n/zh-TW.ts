@@ -737,6 +737,16 @@ export const zhTW = {
     "cannotPreview": "無法預覽此檔案",
     "fileTooLarge": "檔案過大，無法預覽",
     "previewTruncated": "僅顯示前 1 MB",
+    "previewViewTree": "樹狀",
+    "previewViewSource": "原始碼",
+    "previewViewTable": "表格",
+    "previewViewRendered": "預覽",
+    "previewJsonInvalid": "JSON 無效",
+    "previewCsvEmpty": "空表格",
+    "previewCsvTruncated": "顯示前 {{shown}} / {{total}} 列",
+    "previewHtmlLarge": "此 HTML 檔案較大，已關閉自動渲染以免卡住應用。需要時再切換到「預覽」。",
+    "previewHtmlHardTruncated": "為效能已截斷部分 HTML 後再渲染",
+    "previewHtmlOpenBrowser": "用預設瀏覽器開啟",
     "loading": "載入中…",
     "sandboxPending": "傳送第一條訊息後將建立沙箱工作區",
     "needsSessionScope": "需要會話作用域才能預覽",
@@ -2159,7 +2169,8 @@ export const zhTW = {
       "openContainingFolder": "開啟所在資料夾",
       "refresh": "重新整理",
       "pathOutsideCwd": "路徑不在專案資料夾內",
-      "openContainingFolderFailed": "無法開啟資料夾"
+      "openContainingFolderFailed": "無法開啟資料夾",
+      "openWithDefaultAppFailed": "無法用預設應用程式開啟"
     },
     "diffFile": {
       "copyPath": "複製路徑",

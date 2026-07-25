@@ -13,7 +13,7 @@ vi.mock('@/i18n', () => ({
   default: { t: (key: string) => key },
 }))
 
-import { openContainingFolder } from './openPath'
+import { openContainingFolder, openWithDefaultApp } from './openPath'
 
 describe('openContainingFolder', () => {
   beforeEach(() => {
@@ -72,5 +72,34 @@ describe('openContainingFolder', () => {
     })
     expect(ok).toBe(false)
     expect(toastError).toHaveBeenCalledWith('contextMenu.file.openContainingFolderFailed')
+  })
+})
+
+describe('openWithDefaultApp', () => {
+  beforeEach(() => {
+    openPath.mockReset().mockResolvedValue(undefined)
+    shellOpen.mockReset().mockResolvedValue(undefined)
+    toastError.mockReset()
+  })
+
+  it('opens the file itself under cwd', async () => {
+    const ok = await openWithDefaultApp('/project/out/index.html', { cwd: '/project' })
+    expect(ok).toBe(true)
+    expect(openPath).toHaveBeenCalledWith('/project/out/index.html')
+  })
+
+  it('rejects paths outside cwd', async () => {
+    const ok = await openWithDefaultApp('/etc/passwd', { cwd: '/project' })
+    expect(ok).toBe(false)
+    expect(openPath).not.toHaveBeenCalled()
+    expect(toastError).toHaveBeenCalledWith('contextMenu.file.pathOutsideCwd')
+  })
+
+  it('toasts when both openers fail', async () => {
+    openPath.mockRejectedValueOnce(new Error('no'))
+    shellOpen.mockRejectedValueOnce(new Error('no'))
+    const ok = await openWithDefaultApp('/project/a.html', { cwd: '/project' })
+    expect(ok).toBe(false)
+    expect(toastError).toHaveBeenCalledWith('contextMenu.file.openWithDefaultAppFailed')
   })
 })

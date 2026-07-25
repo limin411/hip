@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest'
 import {
   ContextInjectorRegistry,
   SystemPromptInjector,
+  CurrentTimeInjector,
   SkillsListInjector,
   PermissionModeInjector,
   TokenBudgetInjector,
@@ -36,16 +37,28 @@ describe('ContextInjectorRegistry', () => {
     expect(results[1].systemMessages).toEqual([])
   })
 
-  it('runs all 5 default injectors', async () => {
+  it('runs all 6 default injectors', async () => {
     const registry = new ContextInjectorRegistry()
     registry.register(new SystemPromptInjector())
+    registry.register(new CurrentTimeInjector())
     registry.register(new SkillsListInjector())
     registry.register(new PermissionModeInjector())
     registry.register(new TokenBudgetInjector())
     registry.register(new SubagentStatusInjector())
 
     const results = await registry.injectAll(baseState)
-    expect(results).toHaveLength(5)
+    expect(results).toHaveLength(6)
+  })
+})
+
+describe('CurrentTimeInjector', () => {
+  it('always injects a local + UTC time block', async () => {
+    const injector = new CurrentTimeInjector()
+    const result = await injector.inject(baseState)
+    expect(result.systemMessages).toHaveLength(1)
+    expect(result.systemMessages[0]).toMatch(
+      /^Current local time: \d{4}-\d{2}-\d{2} \d{2}:\d{2}:00 \(.+, UTC[+-].+\)\.\nUTC: \d{4}-\d{2}-\d{2} \d{2}:\d{2}:00\.$/,
+    )
   })
 })
 

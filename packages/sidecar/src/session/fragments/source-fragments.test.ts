@@ -27,6 +27,7 @@ import type {
   CheckpointSourcePayload,
   PermissionSourcePayload,
 } from './index.js'
+import { currentTimeIsoMinute } from '../current-time.js'
 
 // ── Fixtures ──────────────────────────────────────────────────────────────────
 
@@ -156,7 +157,7 @@ describe('fragment sources registered in SystemContextRegistry', () => {
     expect((decodedSkills as SkillsSourcePayload).skills).toEqual(skillsFixture)
 
     const decodedTime = ctx.getSources().find((s) => s.key === 'fragment:time')!.codec.decode(gen.snapshot['fragment:time'].value)
-    expect((decodedTime as TimeSourcePayload).now).toBe(fixedDate.toISOString())
+    expect((decodedTime as TimeSourcePayload).now).toBe(currentTimeIsoMinute(fixedDate))
 
     const decodedBudget = ctx.getSources().find((s) => s.key === 'fragment:token-budget')!.codec.decode(gen.snapshot['fragment:token-budget'].value)
     expect((decodedBudget as TokenBudgetSourcePayload).budget).toBe(30)
@@ -258,7 +259,8 @@ describe('FragmentRegistry.assemble()', () => {
     expect(assembled.text).toContain('test-skill')
     expect(assembled.text).toContain('approximately 30%')
     expect(assembled.text).toContain('Pending background tasks')
-    expect(assembled.text).toMatch(/It is \d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2} UTC/)
+    expect(assembled.text).toMatch(/Current local time: \d{4}-\d{2}-\d{2} \d{2}:\d{2}:00/)
+    expect(assembled.text).toMatch(/UTC: \d{4}-\d{2}-\d{2} \d{2}:\d{2}:00/)
     expect(assembled.fragments.map((f) => f.id)).toEqual([
       'fragment:skills',
       'fragment:subagents',

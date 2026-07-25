@@ -1,4 +1,8 @@
 import type { JsonValue, Source } from '../system-context.js'
+import {
+  currentTimeIsoMinute,
+  formatCurrentTimeText,
+} from '../current-time.js'
 
 // ── Payload ───────────────────────────────────────────────────────────────────
 
@@ -25,9 +29,12 @@ function stringField(j: { readonly [key: string]: JsonValue }, key: string): str
   return typeof value === 'string' ? value : ''
 }
 
-function formatTimeText(iso: string): string {
-  const formatted = iso.replace('T', ' ').slice(0, 19)
-  return `It is ${formatted} UTC.`
+function textFromIso(iso: string): string {
+  const parsed = new Date(iso)
+  if (Number.isNaN(parsed.getTime())) {
+    return formatCurrentTimeText()
+  }
+  return formatCurrentTimeText(parsed)
 }
 
 const codec = {
@@ -39,12 +46,12 @@ const codec = {
   },
   decode(j: JsonValue): TimeSourcePayload {
     if (!isObject(j)) {
-      const fallback = new Date().toISOString()
-      return { text: formatTimeText(fallback), now: fallback }
+      const fallback = currentTimeIsoMinute()
+      return { text: textFromIso(fallback), now: fallback }
     }
     const now = stringField(j, 'now')
     return {
-      text: now ? formatTimeText(now) : stringField(j, 'text'),
+      text: now ? textFromIso(now) : stringField(j, 'text'),
       now,
     }
   },
@@ -57,8 +64,9 @@ export function createTimeSource(input: TimeSourceInput = {}): Source<TimeSource
     key: 'fragment:time',
     codec,
     load: async () => {
-      const now = (input.now ?? new Date()).toISOString()
-      return { text: formatTimeText(now), now }
+      const date = input.now ?? new Date()
+      const now = currentTimeIsoMinute(date)
+      return { text: formatCurrentTimeText(date), now }
     },
     baseline: (payload) => payload.text,
   }

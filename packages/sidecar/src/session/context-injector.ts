@@ -1,5 +1,6 @@
 import type { PermissionMode, SkillMeta } from '@hip/protocol'
 import { buildSystemPrompt, skillsBlock } from './system-prompt.js'
+import { formatCurrentTimeText } from './current-time.js'
 import {
   filterSkillsForProfile,
   renderCapabilityNarrative,
@@ -81,6 +82,15 @@ export class SystemPromptInjector implements ContextInjector {
       surface: state.surface,
     })
     return { systemMessages: [prompt] }
+  }
+}
+
+/** Injects wall-clock local + UTC time (minute precision) so the model can anchor "today" / relative time. */
+export class CurrentTimeInjector implements ContextInjector {
+  readonly id = 'current-time'
+
+  async inject(_state: InjectorState): Promise<InjectResult> {
+    return { systemMessages: [formatCurrentTimeText()] }
   }
 }
 

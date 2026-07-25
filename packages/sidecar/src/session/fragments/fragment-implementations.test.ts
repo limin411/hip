@@ -82,12 +82,14 @@ describe('fragment source: skills', () => {
 })
 
 describe('fragment source: time', () => {
-  it('formats the provided date', async () => {
+  it('formats the provided date with local + UTC (minute precision)', async () => {
     const now = new Date('2026-06-21T12:34:56.789Z')
     const source = createTimeSource({ now })
     const payload = (await source.load()) as TimeSourcePayload
-    expect(payload.now).toBe(now.toISOString())
-    expect(payload.text).toBe('It is 2026-06-21 12:34:56 UTC.')
+    expect(payload.now).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:00\.\d{3}Z$/)
+    expect(payload.text).toMatch(
+      /^Current local time: \d{4}-\d{2}-\d{2} \d{2}:\d{2}:00 \(.+, UTC[+-].+\)\.\nUTC: 2026-06-21 12:34:00\.$/,
+    )
   })
 
   it('round-trips through codec', async () => {

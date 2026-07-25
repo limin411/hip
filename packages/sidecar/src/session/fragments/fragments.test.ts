@@ -142,17 +142,18 @@ describe('CurrentTimeFragment', () => {
     expect(f.isActive({ cwd: '/tmp' })).toBe(true)
   })
 
-  it('renders ISO-like timestamp with UTC label', () => {
+  it('renders local + UTC time block', () => {
     const f = new CurrentTimeFragment()
     const text = f.render({})
 
-    // Should match pattern: "It is YYYY-MM-DD HH:MM:SS UTC."
-    expect(text).toMatch(/^It is \d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2} UTC\.$/)
+    expect(text).toMatch(
+      /^Current local time: \d{4}-\d{2}-\d{2} \d{2}:\d{2}:00 \(.+, UTC[+-].+\)\.\nUTC: \d{4}-\d{2}-\d{2} \d{2}:\d{2}:00\.$/,
+    )
   })
 
-  it('estimatedTokens returns 15', () => {
+  it('estimatedTokens returns 40', () => {
     const f = new CurrentTimeFragment()
-    expect(f.estimatedTokens({})).toBe(15)
+    expect(f.estimatedTokens({})).toBe(40)
   })
 })
 

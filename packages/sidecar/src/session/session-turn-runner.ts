@@ -75,6 +75,7 @@ import { validateAttachments, stageAttachments, buildAttachmentContentParts, spl
 import {
   ContextInjectorRegistry,
   SystemPromptInjector,
+  CurrentTimeInjector,
   PermissionModeInjector,
   TokenBudgetInjector,
   SubagentStatusInjector,
@@ -1194,6 +1195,7 @@ export async function runTurn(host: SessionTurnHost, rawSend: SendFn, base?: {
 
     const injectorRegistry = new ContextInjectorRegistry()
     injectorRegistry.register(new SystemPromptInjector())
+    injectorRegistry.register(new CurrentTimeInjector())
     injectorRegistry.register(new ProjectAgentsMdInjector())
     // Skills already embedded by SystemPromptInjector / buildSystemPrompt — skip SkillsListInjector.
     injectorRegistry.register(new PermissionModeInjector())

@@ -92,6 +92,7 @@ E2E_GREP=@live E2E_INVERT=1 yarn test:e2e
 | `@context-menu` | Right-click menus (see plan) | smoke/core cases also tagged `@smoke`/`@core` → in gate |
 | `@knowledge` | Knowledge base full business flows | main path also `@core` → in gate |
 | `@knowledge-perf` | Knowledge open/type usability budgets + unusable hard lines | **no** (nightly / local) |
+| `@work-items` | Work item tracking (事项追踪) full business flows | smoke/core cases also tagged → in gate |
 
 Context-menu helpers: `e2e/helpers/context-menu.ts`. Specs: `context-menu-smoke.spec.ts`, `context-menu-core.spec.ts`, `context-menu-panel.spec.ts`.
 
@@ -127,6 +128,24 @@ yarn test:e2e:knowledge
 yarn test:e2e:knowledge-perf
 ```
 
+Work-item helpers: `e2e/helpers/work-items.ts`. Specs (all unpaid, isolated `HIP_DATA_DIR`, no `@live`):
+
+| Spec | Cases |
+|------|--------|
+| `work-items-smoke.spec.ts` | WS1–2: nav → page (not placeholder); sidebar filters / inbox / CTAs (`@smoke`) |
+| `work-items-lifecycle.spec.ts` | WL1–7: create → fields → disk → complete/cancel/archive/delete → leave flush (`@core`) |
+| `work-items-filters.spec.ts` | WF1–6: smart filters, search, user list CRUD + migrate-to-inbox (`@core`) |
+| `work-items-nav.spec.ts` | WN1–5: palette nav, empty-title discard/Untitled, keyboard N/Space, re-enter (`@core`) |
+
+Persistence: `HIP_DATA_DIR/work-items/catalog.json` (Tauri IPC `work_items_list` / `work_items_save`).  
+List create/rename/delete and hard-delete use in-app Modals (never `window.prompt` / `confirm` — freezes Tauri WKWebView).
+
+```bash
+# All work-item functional specs
+yarn test:e2e:work-items
+# Gate-relevant work-item paths
+E2E_GREP='@work-items @core' yarn test:e2e
+```
 
 ```bash
 E2E_GREP=@context-menu yarn test:e2e

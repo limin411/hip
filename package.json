@@ -36,6 +36,7 @@
     "test:e2e:knowledge": "E2E_GREP=@knowledge wdio run wdio.conf.ts",
     "test:e2e:knowledge-perf": "E2E_GREP=@knowledge-perf wdio run wdio.conf.ts",
     "test:e2e:knowledge-perf-strict": "KNOWLEDGE_PERF_STRICT=1 E2E_GREP=@knowledge-perf wdio run wdio.conf.ts",
+    "test:e2e:work-items": "E2E_GREP=@work-items wdio run wdio.conf.ts",
     "cli:dev": "yarn workspace @hip/cli dev",
     "cli:build": "yarn workspace @hip/cli build",
     "cli:test": "yarn workspace @hip/cli test",

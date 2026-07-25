@@ -123,42 +123,55 @@ describe('WorkItemSidebarLists', () => {
     expect(setFilter).toHaveBeenCalledWith('list:wl_a')
   })
 
-  it('new list button prompts and creates', async () => {
-    const prompt = vi.spyOn(window, 'prompt').mockReturnValue('  My List  ')
+  it('new list button opens modal and creates on confirm', async () => {
     render(<WorkItemSidebarLists />)
     fireEvent.click(screen.getByTestId('sidebar-new-work-item-list'))
-    expect(prompt).toHaveBeenCalled()
+    const input = screen.getByTestId('work-item-list-name-input')
+    fireEvent.change(input, { target: { value: '  My List  ' } })
+    fireEvent.click(screen.getByTestId('work-item-list-create-confirm'))
     expect(createList).toHaveBeenCalledWith('My List')
-    // createList resolves → setFilter list:id
     await vi.waitFor(() => {
       expect(setFilter).toHaveBeenCalledWith('list:wl_new')
     })
-    prompt.mockRestore()
   })
 
-  it('double-click renames non-inbox list', () => {
-    const prompt = vi.spyOn(window, 'prompt').mockReturnValue('Renamed')
+  it('double-click renames non-inbox list via modal', async () => {
     render(<WorkItemSidebarLists />)
     fireEvent.doubleClick(screen.getByTestId('sidebar-work-item-list-wl_a'))
-    expect(renameList).toHaveBeenCalledWith('wl_a', 'Renamed')
-    prompt.mockRestore()
+    const input = screen.getByTestId('work-item-list-name-input')
+    fireEvent.change(input, { target: { value: 'Renamed' } })
+    fireEvent.click(screen.getByTestId('work-item-list-rename-confirm'))
+    await vi.waitFor(() => {
+      expect(renameList).toHaveBeenCalledWith('wl_a', 'Renamed')
+    })
   })
 
-  it('context menu confirms delete on non-inbox list', () => {
-    const confirm = vi.spyOn(window, 'confirm').mockReturnValue(true)
+  it('context menu opens delete modal on non-inbox list', async () => {
     render(<WorkItemSidebarLists />)
     fireEvent.contextMenu(screen.getByTestId('sidebar-work-item-list-wl_a'))
-    expect(confirm).toHaveBeenCalled()
-    expect(deleteList).toHaveBeenCalledWith('wl_a')
-    confirm.mockRestore()
+    fireEvent.click(screen.getByTestId('work-item-list-delete-confirm'))
+    await vi.waitFor(() => {
+      expect(deleteList).toHaveBeenCalledWith('wl_a')
+    })
   })
 
-  it('does not delete Inbox on context menu', () => {
-    const confirm = vi.spyOn(window, 'confirm').mockReturnValue(true)
+  it('does not open delete dialog for Inbox on context menu', () => {
     render(<WorkItemSidebarLists />)
     fireEvent.contextMenu(screen.getByTestId(`sidebar-work-item-list-${INBOX_LIST_ID}`))
-    expect(confirm).not.toHaveBeenCalled()
+    expect(screen.queryByTestId('work-item-list-delete-confirm')).not.toBeInTheDocument()
     expect(deleteList).not.toHaveBeenCalled()
+  })
+
+  it('never uses window.prompt or window.confirm', () => {
+    const prompt = vi.spyOn(window, 'prompt')
+    const confirm = vi.spyOn(window, 'confirm')
+    render(<WorkItemSidebarLists />)
+    fireEvent.click(screen.getByTestId('sidebar-new-work-item-list'))
+    fireEvent.doubleClick(screen.getByTestId('sidebar-work-item-list-wl_a'))
+    fireEvent.contextMenu(screen.getByTestId('sidebar-work-item-list-wl_a'))
+    expect(prompt).not.toHaveBeenCalled()
+    expect(confirm).not.toHaveBeenCalled()
+    prompt.mockRestore()
     confirm.mockRestore()
   })
 })

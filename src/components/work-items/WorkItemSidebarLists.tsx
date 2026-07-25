@@ -1,14 +1,20 @@
 /**
  * Sidebar list pane for work-item tracking: smart filters + user lists.
  * Rendered by AppSidebar when WORK_ITEM_TRACKING && sidebarSection === 'tasks'.
+ *
+ * List create/rename/delete use in-app Modals — never window.prompt/confirm
+ * (WKWebView / Tauri freezes on those blocking dialogs).
  */
-import { useMemo } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Inbox, List, Plus } from 'lucide-react'
 import { INBOX_LIST_ID, type WorkItemList } from '@/domain/work-items'
 import { cn } from '@/lib/utils'
 import { useWorkItemStore } from '@/store/workItemStore'
 import { SIDEBAR_ACTIVE_RAIL } from '@/components/layout/sidebarActiveRail'
+import { Button } from '@/components/ui/Button'
+import { Input } from '@/components/ui/Input'
+import { Modal } from '@/components/ui/Modal'
 
 /** Smart filter order (design IA). */
 export const WORK_ITEM_SMART_FILTERS = [
@@ -38,6 +44,11 @@ export function orderListsForSidebar(lists: WorkItemList[]): WorkItemList[] {
   return [...inbox, ...rest]
 }
 
+type ListDialog =
+  | { kind: 'create' }
+  | { kind: 'rename'; list: WorkItemList }
+  | { kind: 'delete'; list: WorkItemList }
+
 export function WorkItemSidebarLists() {
   const { t } = useTranslation()
   const filterId = useWorkItemStore((s) => s.filterId)
@@ -49,30 +60,62 @@ export function WorkItemSidebarLists() {
 
   const orderedLists = useMemo(() => orderListsForSidebar(lists), [lists])
 
-  const promptNewList = () => {
-    const name = window.prompt(t('workItems.newListPrompt'))
-    if (name == null) return
-    const trimmed = name.trim()
-    if (!trimmed) return
-    void createList(trimmed).then((id) => {
+  const [dialog, setDialog] = useState<ListDialog | null>(null)
+  const [nameDraft, setNameDraft] = useState('')
+  const [busy, setBusy] = useState(false)
+
+  useEffect(() => {
+    if (!dialog) {
+      setNameDraft('')
+      setBusy(false)
+      return
+    }
+    if (dialog.kind === 'create') setNameDraft('')
+    else if (dialog.kind === 'rename') setNameDraft(dialog.list.name)
+  }, [dialog])
+
+  const nameTrimmed = nameDraft.trim()
+  const closeDialog = () => {
+    if (busy) return
+    setDialog(null)
+  }
+
+  const submitCreate = async () => {
+    if (!nameTrimmed || busy) return
+    setBusy(true)
+    try {
+      const id = await createList(nameTrimmed)
       setFilter(`list:${id}`)
-    })
+      setDialog(null)
+    } finally {
+      setBusy(false)
+    }
   }
 
-  const promptRenameList = (list: WorkItemList) => {
-    if (isInboxList(list)) return
-    const name = window.prompt(t('workItems.renameListPrompt'), list.name)
-    if (name == null) return
-    const trimmed = name.trim()
-    if (!trimmed || trimmed === list.name) return
-    void renameList(list.id, trimmed)
+  const submitRename = async () => {
+    if (!dialog || dialog.kind !== 'rename' || !nameTrimmed || busy) return
+    if (nameTrimmed === dialog.list.name) {
+      setDialog(null)
+      return
+    }
+    setBusy(true)
+    try {
+      await renameList(dialog.list.id, nameTrimmed)
+      setDialog(null)
+    } finally {
+      setBusy(false)
+    }
   }
 
-  const confirmDeleteList = (list: WorkItemList) => {
-    if (isInboxList(list)) return
-    const ok = window.confirm(t('workItems.deleteListConfirm', { name: list.name }))
-    if (!ok) return
-    void deleteList(list.id)
+  const submitDelete = async () => {
+    if (!dialog || dialog.kind !== 'delete' || busy) return
+    setBusy(true)
+    try {
+      await deleteList(dialog.list.id)
+      setDialog(null)
+    } finally {
+      setBusy(false)
+    }
   }
 
   return (
@@ -127,7 +170,7 @@ export function WorkItemSidebarLists() {
           data-no-drag
           title={t('workItems.newList')}
           aria-label={t('workItems.newList')}
-          onClick={promptNewList}
+          onClick={() => setDialog({ kind: 'create' })}
           className="rounded-md p-0.5 text-ink-tertiary transition-colors duration-chrome hover:bg-state-hover hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink/20"
         >
           <Plus size={14} strokeWidth={1.75} aria-hidden />
@@ -157,11 +200,14 @@ export function WorkItemSidebarLists() {
                     : t('workItems.listRowHint', { name: list.name })
                 }
                 onClick={() => setFilter(listFilter)}
-                onDoubleClick={() => promptRenameList(list)}
+                onDoubleClick={() => {
+                  if (inbox) return
+                  setDialog({ kind: 'rename', list })
+                }}
                 onContextMenu={(e) => {
                   if (inbox) return
                   e.preventDefault()
-                  confirmDeleteList(list)
+                  setDialog({ kind: 'delete', list })
                 }}
                 className={cn(
                   'mb-0.5 flex w-full items-start gap-2 rounded-lg px-2.5 py-[var(--row-pad-y-session)] text-left transition-colors',
@@ -197,6 +243,91 @@ export function WorkItemSidebarLists() {
           )
         })}
       </ul>
+
+      {dialog?.kind === 'create' || dialog?.kind === 'rename' ? (
+        <Modal
+          open
+          onOpenChange={(o) => !o && closeDialog()}
+          title={
+            dialog.kind === 'create' ? t('workItems.newList') : t('workItems.renameListPrompt')
+          }
+          className="max-w-sm"
+          closeDisabled={busy}
+          footer={
+            <div className="flex justify-end gap-2">
+              <Button variant="secondary" onClick={closeDialog} disabled={busy}>
+                {t('common.cancel')}
+              </Button>
+              <Button
+                data-testid={
+                  dialog.kind === 'create'
+                    ? 'work-item-list-create-confirm'
+                    : 'work-item-list-rename-confirm'
+                }
+                onClick={() =>
+                  void (dialog.kind === 'create' ? submitCreate() : submitRename())
+                }
+                disabled={!nameTrimmed || busy}
+              >
+                {t('common.confirm')}
+              </Button>
+            </div>
+          }
+        >
+          <div className="flex flex-col gap-3 px-5 py-4">
+            <label className="flex flex-col gap-2">
+              <span className="text-body text-ink-secondary">{t('workItems.newListPrompt')}</span>
+              <Input
+                autoFocus
+                data-testid="work-item-list-name-input"
+                value={nameDraft}
+                onChange={(e) => setNameDraft(e.target.value)}
+                placeholder={t('workItems.newListPrompt')}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault()
+                    void (dialog.kind === 'create' ? submitCreate() : submitRename())
+                  }
+                }}
+              />
+            </label>
+          </div>
+        </Modal>
+      ) : null}
+
+      {dialog?.kind === 'delete' ? (
+        <Modal
+          open
+          onOpenChange={(o) => !o && closeDialog()}
+          title={t('workItems.deleteListConfirm', { name: dialog.list.name })}
+          className="max-w-sm"
+          closeDisabled={busy}
+          footer={
+            <div className="flex justify-end gap-2">
+              <Button
+                variant="secondary"
+                data-testid="work-item-list-delete-cancel"
+                onClick={closeDialog}
+                disabled={busy}
+              >
+                {t('common.cancel')}
+              </Button>
+              <Button
+                variant="dangerSoft"
+                data-testid="work-item-list-delete-confirm"
+                onClick={() => void submitDelete()}
+                disabled={busy}
+              >
+                {t('workItems.actions.delete')}
+              </Button>
+            </div>
+          }
+        >
+          <div className="px-5 py-4 text-body text-ink-secondary">
+            {t('workItems.deleteListConfirm', { name: dialog.list.name })}
+          </div>
+        </Modal>
+      ) : null}
     </div>
   )
 }

@@ -14,6 +14,7 @@ import { Button } from '@/components/ui/Button'
 import { Input, inputClassName } from '@/components/ui/Input'
 import { Textarea } from '@/components/ui/Textarea'
 import { EmptyState } from '@/components/ui/EmptyState'
+import { Modal } from '@/components/ui/Modal'
 import { cn } from '@/lib/utils'
 
 const STATUSES: WorkItemStatus[] = ['todo', 'in_progress', 'done', 'cancelled']
@@ -53,6 +54,8 @@ export function WorkItemDetailPane({
 
   const [notesLocal, setNotesLocal] = useState('')
   const [tagDraft, setTagDraft] = useState('')
+  const [deleteOpen, setDeleteOpen] = useState(false)
+  const [deleteBusy, setDeleteBusy] = useState(false)
   const localTitleRef = useRef<HTMLInputElement>(null)
   const titleRef = titleInputRef ?? localTitleRef
   const notesItemId = useRef<string | null>(null)
@@ -63,12 +66,16 @@ export function WorkItemDetailPane({
       notesItemId.current = null
       setNotesLocal('')
       setTagDraft('')
+      setDeleteOpen(false)
+      setDeleteBusy(false)
       return
     }
     if (notesItemId.current !== item.id) {
       notesItemId.current = item.id
       setNotesLocal(item.notes)
       setTagDraft('')
+      setDeleteOpen(false)
+      setDeleteBusy(false)
     }
   }, [item])
 
@@ -129,11 +136,16 @@ export function WorkItemDetailPane({
     void updateItem(item.id, { tags: item.tags.filter((x) => x !== tag) })
   }
 
-  const handleDelete = () => {
-    const ok = window.confirm(t('workItems.deleteConfirm'))
-    if (!ok) return
-    void deleteItem(item.id)
-    onBack?.()
+  const handleDeleteConfirm = async () => {
+    if (deleteBusy) return
+    setDeleteBusy(true)
+    try {
+      await deleteItem(item.id)
+      setDeleteOpen(false)
+      onBack?.()
+    } finally {
+      setDeleteBusy(false)
+    }
   }
 
   return (
@@ -344,13 +356,47 @@ export function WorkItemDetailPane({
             variant="dangerSoft"
             size="sm"
             data-testid="work-item-delete"
-            onClick={handleDelete}
+            onClick={() => setDeleteOpen(true)}
           >
             <Trash2 className="h-3.5 w-3.5" strokeWidth={1.75} />
             {t('workItems.actions.delete')}
           </Button>
         </div>
       </div>
+
+      <Modal
+        open={deleteOpen}
+        onOpenChange={(o) => {
+          if (!o && !deleteBusy) setDeleteOpen(false)
+        }}
+        title={t('workItems.deleteConfirm')}
+        className="max-w-sm"
+        closeDisabled={deleteBusy}
+        footer={
+          <div className="flex justify-end gap-2">
+            <Button
+              variant="secondary"
+              data-testid="work-item-delete-cancel"
+              onClick={() => setDeleteOpen(false)}
+              disabled={deleteBusy}
+            >
+              {t('common.cancel')}
+            </Button>
+            <Button
+              variant="dangerSoft"
+              data-testid="work-item-delete-confirm"
+              onClick={() => void handleDeleteConfirm()}
+              disabled={deleteBusy}
+            >
+              {t('workItems.actions.delete')}
+            </Button>
+          </div>
+        }
+      >
+        <div className="px-5 py-4 text-body text-ink-secondary">
+          {t('workItems.deleteConfirm')}
+        </div>
+      </Modal>
     </div>
   )
 }

@@ -11,8 +11,6 @@ import {
   RefreshCw,
   ChevronDown,
   Server,
-  AlertCircle,
-  Cpu,
   Settings2,
   Search,
   Package,
@@ -257,14 +255,6 @@ export function McpConfig() {
     [plugins, servers],
   )
 
-  const stats = useMemo(() => {
-    const enabledCount = servers.filter((s) => s.enabled).length
-    const connectedCount = mcpStatuses.filter((s) => s.status === 'connected').length
-    const errorCount = mcpStatuses.filter((s) => s.status === 'error').length
-    const toolCount = mcpStatuses.reduce((sum, s) => sum + (s.toolCount ?? 0), 0)
-    return { enabledCount, connectedCount, errorCount, toolCount, total: servers.length }
-  }, [servers, mcpStatuses])
-
   const handleUpdateTools = async (
     server: McpServerConfig,
     toolName: string,
@@ -402,33 +392,6 @@ export function McpConfig() {
               </Button>
             )}
           </div>
-        </div>
-
-        <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
-          <StatCard
-            icon={Plug}
-            value={`${stats.enabledCount}/${stats.total}`}
-            label={t('settings.mcp.statEnabled')}
-            tone="accent"
-          />
-          <StatCard
-            icon={Server}
-            value={String(stats.connectedCount)}
-            label={t('settings.mcp.statConnected')}
-            tone="success"
-          />
-          <StatCard
-            icon={AlertCircle}
-            value={String(stats.errorCount)}
-            label={t('settings.mcp.statErrors')}
-            tone={stats.errorCount > 0 ? 'danger' : 'muted'}
-          />
-          <StatCard
-            icon={Cpu}
-            value={String(stats.toolCount)}
-            label={t('settings.mcp.statTools')}
-            tone="muted"
-          />
         </div>
       </div>
 
@@ -809,36 +772,6 @@ function McpRegistryCard({
           </Button>
         )}
       </div>
-    </div>
-  )
-}
-
-function StatCard({
-  icon: Icon,
-  value,
-  label,
-  tone,
-}: {
-  icon: React.ElementType
-  value: string
-  label: string
-  tone: 'accent' | 'success' | 'danger' | 'muted'
-}) {
-  const toneClasses = {
-    accent: 'bg-accent-subtle text-accent-strong',
-    success: 'bg-success/10 text-success',
-    danger: 'bg-danger/10 text-danger',
-    muted: 'bg-surface-muted text-ink-secondary',
-  }
-  return (
-    <div className="rounded-xl border border-border bg-surface p-4 transition-colors hover:bg-surface-subtle">
-      <div className="flex items-center gap-2">
-        <span className={cn('flex h-8 w-8 items-center justify-center rounded-lg', toneClasses[tone])}>
-          <Icon size={16} />
-        </span>
-      </div>
-      <div className="mt-2 text-stat font-semibold tracking-tight text-ink">{value}</div>
-      <div className="text-caption text-ink-tertiary">{label}</div>
     </div>
   )
 }

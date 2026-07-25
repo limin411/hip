@@ -186,6 +186,7 @@ export function SkillConfig() {
   }, [pluginsLoaded, loadPlugins])
 
   useEffect(() => {
+    // Shared TTL/coalesce in extensionStore — no page banner; conflicts toast bottom-right.
     void inspect()
   }, [inspect])
 

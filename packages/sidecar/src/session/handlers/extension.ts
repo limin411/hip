@@ -2,7 +2,7 @@ import { basename } from 'node:path'
 import type { ClientMessage } from '@hip/protocol'
 import { isPluginEnabled, readPluginsConfig } from '../../config/plugins.js'
 import { inspectExtensions } from '../extensions/load.js'
-import { preflightPluginEnable, summarizeRegistryConflicts } from '../extensions/preflight.js'
+import { preflightPluginEnable } from '../extensions/preflight.js'
 import type { SendFn } from './types.js'
 
 export const EXTENSION_MESSAGE_TYPES = new Set([
@@ -45,8 +45,16 @@ export function handleExtensionMessage(msg: ClientMessage, send: SendFn): void {
       const requestId = msg.requestId
       const cwd = (msg.cwd?.trim() || process.cwd())
       try {
+        // Single load — reuse snapshot conflicts (avoid double disk scan).
         const snapshot = inspectExtensions(cwd)
-        const { notable } = summarizeRegistryConflicts(cwd)
+        const notable = snapshot.conflicts.filter(
+          (c) =>
+            c.kind === 'mcp_capability_duplicate' ||
+            c.kind === 'mcp_name_veto' ||
+            c.kind === 'mcp_id_shadow' ||
+            (c.kind === 'skill_id_shadow' &&
+              (c.loser.kind === 'plugin_skill' || c.winner.kind === 'plugin_skill')),
+        )
         send({
           type: 'extension:inspect:result',
           requestId,

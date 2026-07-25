@@ -88,7 +88,7 @@ export function PluginConfig() {
 
   const applyEnable = async (plugin: PluginMeta, enabled: boolean) => {
     await toggle(plugin.id, enabled)
-    await inspect()
+    await inspect(undefined, { force: true })
   }
 
   const enableWithPreflight = async (plugin: PluginMeta, enabled: boolean) => {
@@ -113,7 +113,7 @@ export function PluginConfig() {
       setPreflightNote(
         t('settings.extensions.preflightEnabledWithConflicts', {
           defaultValue:
-            'Plugin enabled with conflicts resolved by precedence (project/user win). See conflict banner for remediations.',
+            'Plugin enabled with conflicts resolved by precedence (project/user win). Check the bottom-right notification for details.',
         }),
       )
       setPendingEnable(null)
@@ -126,9 +126,8 @@ export function PluginConfig() {
 
   return (
     <>
-      <div className="border-b border-border px-6 pt-4">
-        <ExtensionConflictsBanner />
-      </div>
+      {/* Banner returns null when idle — no wrapper (avoids empty top strip). */}
+      <ExtensionConflictsBanner className="mx-6 mt-4" />
       <PluginConfigView
         plugins={plugins}
         marketEntries={marketEntries}

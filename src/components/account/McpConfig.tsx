@@ -418,9 +418,7 @@ export function McpConfig() {
             )}
           </div>
         </div>
-        <div className="mt-3">
-          <ExtensionConflictsBanner />
-        </div>
+        <ExtensionConflictsBanner className="mt-3" />
       </div>
 
       <div className="flex h-[min(36rem,calc(100vh-14rem))] min-h-[28rem] flex-1">

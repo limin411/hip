@@ -33,7 +33,7 @@ export function ComposerPlanPanel() {
 
   return (
     <div className="shrink-0 bg-surface px-4 py-1.5" data-testid="composer-plan-slot">
-      <div className="w-full max-w-3xl">
+      <div className="w-full">
         <PlanProgressPanel
           view={livePlan}
           onApprove={() => sessionService.respondPlan('approve')}

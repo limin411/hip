@@ -8,10 +8,13 @@ import type {
   WorkItemsCatalogV1,
 } from './types'
 
-/** Title max length (chars). */
+/** Title max length (chars / Unicode scalar-ish via JS string length for BMP). */
 export const WORK_ITEM_TITLE_MAX = 200
 
-/** Notes max length (chars) — 64 KiB. */
+/**
+ * Notes max size in **UTF-8 bytes** — 64 KiB.
+ * Must match Rust `work_items::NOTES_MAX` / `String::len()` so normalize→save never rejects.
+ */
 export const WORK_ITEM_NOTES_MAX = 64 * 1024
 
 /** Max tags per item. */
@@ -22,6 +25,32 @@ export const WORK_ITEM_TAG_MAX_LEN = 32
 
 /** dueOn shape: YYYY-MM-DD. */
 export const DUE_ON_RE = /^\d{4}-\d{2}-\d{2}$/
+
+const textEncoder = new TextEncoder()
+
+/** UTF-8 byte length (same unit as Rust `str::len` / save validation). */
+export function utf8ByteLength(s: string): number {
+  return textEncoder.encode(s).byteLength
+}
+
+/**
+ * Truncate to at most `maxBytes` UTF-8 bytes without splitting a code point.
+ * Aligns with Rust notes cap so a normalized catalog is always saveable.
+ */
+export function clampUtf8Bytes(s: string, maxBytes: number): string {
+  // Worst case 4 bytes per code point; skip encode when obviously under budget.
+  if (s.length * 4 <= maxBytes) return s
+  if (utf8ByteLength(s) <= maxBytes) return s
+  let bytes = 0
+  let out = ''
+  for (const ch of s) {
+    const n = textEncoder.encode(ch).byteLength
+    if (bytes + n > maxBytes) break
+    out += ch
+    bytes += n
+  }
+  return out
+}
 
 /**
  * True when `s` is YYYY-MM-DD and a real local calendar day
@@ -191,7 +220,9 @@ function normalizeItem(
       ? clampStr(o.title.trim(), WORK_ITEM_TITLE_MAX)
       : ''
   const notes =
-    typeof o.notes === 'string' ? clampStr(o.notes, WORK_ITEM_NOTES_MAX) : ''
+    typeof o.notes === 'string'
+      ? clampUtf8Bytes(o.notes, WORK_ITEM_NOTES_MAX)
+      : ''
   const tags = normalizeTags(o.tags)
   const dueOn = normalizeDueOn(o.dueOn)
   const createdAt = asFiniteNumber(o.createdAt, fallbackNow)

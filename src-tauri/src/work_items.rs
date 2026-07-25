@@ -11,10 +11,12 @@ use tauri::AppHandle;
 
 const INBOX_LIST_ID: &str = "wl_inbox";
 const TITLE_MAX: usize = 200;
+/// Notes max size in UTF-8 **bytes** (64 KiB). Matches domain `WORK_ITEM_NOTES_MAX` /
+/// `clampUtf8Bytes` so normalize→save never rejects multi-byte text that passed TS.
 const NOTES_MAX: usize = 64 * 1024;
 const TAGS_MAX: usize = 20;
 const TAG_MAX_LEN: usize = 32;
-/// Soft hard-cap on serialized catalog body (reject oversized saves).
+/// Hard cap on serialized catalog body (reject oversized saves).
 const CATALOG_MAX_BYTES: usize = 20 * 1024 * 1024;
 
 /// Optional outbound links (session / knowledge / url).
@@ -221,6 +223,7 @@ pub fn validate_catalog(catalog: &WorkItemsCatalog) -> Result<(), String> {
         if item.title.chars().count() > TITLE_MAX {
             return Err(format!("title too long: {}", item.id));
         }
+        // UTF-8 byte length (not char count) — see NOTES_MAX.
         if item.notes.len() > NOTES_MAX {
             return Err(format!("notes too long: {}", item.id));
         }
@@ -499,6 +502,165 @@ mod tests {
         let mut cat = sample_catalog();
         cat.items[0].due_on = None;
         assert!(validate_catalog(&cat).is_ok());
+    }
+
+    #[test]
+    fn rejects_missing_inbox() {
+        let cat = WorkItemsCatalog {
+            version: 1,
+            lists: vec![WorkItemList {
+                id: "wl_work".into(),
+                name: "Work".into(),
+                sort_order: 0,
+                created_at: 0,
+                updated_at: 0,
+                system: None,
+            }],
+            items: vec![],
+        };
+        assert!(validate_catalog(&cat)
+            .unwrap_err()
+            .contains("must include wl_inbox"));
+    }
+
+    #[test]
+    fn rejects_forged_system_inbox_on_non_inbox_list() {
+        let mut cat = default_catalog();
+        cat.lists.push(WorkItemList {
+            id: "wl_other".into(),
+            name: "Other".into(),
+            sort_order: 1,
+            created_at: 0,
+            updated_at: 0,
+            system: Some("inbox".into()),
+        });
+        assert!(validate_catalog(&cat)
+            .unwrap_err()
+            .contains("only wl_inbox may have system"));
+    }
+
+    #[test]
+    fn rejects_inbox_without_system_flag() {
+        let mut cat = default_catalog();
+        cat.lists[0].system = None;
+        assert!(validate_catalog(&cat)
+            .unwrap_err()
+            .contains("wl_inbox must have system"));
+    }
+
+    #[test]
+    fn rejects_unknown_list_id_on_item() {
+        let mut cat = default_catalog();
+        cat.items.push(WorkItem {
+            id: "wi_1".into(),
+            title: "x".into(),
+            status: "todo".into(),
+            priority: "none".into(),
+            list_id: "wl_missing".into(),
+            tags: vec![],
+            notes: String::new(),
+            due_on: None,
+            created_at: 0,
+            updated_at: 0,
+            completed_at: None,
+            archived_at: None,
+            links: WorkItemLinks::default(),
+        });
+        assert!(validate_catalog(&cat)
+            .unwrap_err()
+            .contains("unknown listId"));
+    }
+
+    #[test]
+    fn rejects_duplicate_list_and_item_ids() {
+        let mut cat = default_catalog();
+        cat.lists.push(cat.lists[0].clone());
+        assert!(validate_catalog(&cat)
+            .unwrap_err()
+            .contains("duplicate list id"));
+
+        cat = sample_catalog();
+        cat.items.push(cat.items[0].clone());
+        assert!(validate_catalog(&cat)
+            .unwrap_err()
+            .contains("duplicate item id"));
+    }
+
+    #[test]
+    fn rejects_invalid_status_and_priority() {
+        let mut cat = sample_catalog();
+        cat.items[0].status = "blocked".into();
+        assert!(validate_catalog(&cat)
+            .unwrap_err()
+            .contains("invalid status"));
+
+        cat = sample_catalog();
+        cat.items[0].priority = "urgent".into();
+        assert!(validate_catalog(&cat)
+            .unwrap_err()
+            .contains("invalid priority"));
+    }
+
+    #[test]
+    fn rejects_tag_count_and_len_limits() {
+        let mut cat = sample_catalog();
+        cat.items[0].tags = (0..TAGS_MAX + 1).map(|i| format!("t{i}")).collect();
+        assert!(validate_catalog(&cat)
+            .unwrap_err()
+            .contains("too many tags"));
+
+        cat = sample_catalog();
+        cat.items[0].tags = vec!["x".repeat(TAG_MAX_LEN + 1)];
+        assert!(validate_catalog(&cat)
+            .unwrap_err()
+            .contains("tag too long"));
+    }
+
+    #[test]
+    fn rejects_notes_over_utf8_byte_cap_with_multibyte() {
+        // CJK is 3 bytes/char; char-count under 64KiB can still exceed NOTES_MAX bytes.
+        let mut cat = sample_catalog();
+        let over_chars = NOTES_MAX / 3 + 10;
+        cat.items[0].notes = "字".repeat(over_chars);
+        assert!(cat.items[0].notes.chars().count() < NOTES_MAX);
+        assert!(cat.items[0].notes.len() > NOTES_MAX);
+        assert!(validate_catalog(&cat)
+            .unwrap_err()
+            .contains("notes too long"));
+    }
+
+    #[test]
+    fn rejects_catalog_over_20mb_on_save() {
+        let p = tmp_path("huge");
+        let _ = std::fs::remove_file(&p);
+        let mut cat = default_catalog();
+        let notes = "x".repeat(NOTES_MAX);
+        // ~320 × 64KiB notes ≈ 20MiB payload; pretty JSON exceeds CATALOG_MAX_BYTES.
+        for i in 0..340 {
+            cat.items.push(WorkItem {
+                id: format!("wi_{i}"),
+                title: "t".into(),
+                status: "todo".into(),
+                priority: "none".into(),
+                list_id: INBOX_LIST_ID.into(),
+                tags: vec![],
+                notes: notes.clone(),
+                due_on: None,
+                created_at: 0,
+                updated_at: 0,
+                completed_at: None,
+                archived_at: None,
+                links: WorkItemLinks::default(),
+            });
+        }
+        // validate_catalog still passes (per-item limits OK); save rejects body size.
+        assert!(validate_catalog(&cat).is_ok());
+        let err = save_catalog(&p, &cat).unwrap_err();
+        assert!(
+            err.contains("catalog too large"),
+            "expected catalog too large, got: {err}"
+        );
+        assert!(!p.exists(), "must not write oversized catalog");
     }
 
     #[test]

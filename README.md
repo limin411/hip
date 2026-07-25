@@ -290,3 +290,9 @@ Repo root `docs/` (if present) is optional developer notes only and is never rea
 English is the default for GitHub and agent-facing product embeds. Keep technical identifiers (paths, CLI flags, tool names) identical across locales.
 
 App UI languages (Settings → Interface Language): **English**, **简体中文**, **繁體中文**, **日本語**, **한국어**.
+
+## License
+
+Copyright 2026 ljm
+
+Licensed under the [Apache License, Version 2.0](./LICENSE).

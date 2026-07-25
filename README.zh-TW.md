@@ -234,3 +234,9 @@ SQLite 為權威資料來源；`~/.hip/memories/` 存放 Markdown 匯出鏡像�
 英文為 GitHub 與智能體側產品嵌入的預設語言。技術識別符（路徑、CLI 旗標、工具名）在各語言版本中保持一致。
 
 應用介面語言（設定 → 介面語言）：**English**、**简体中文**、**繁體中文**、**日本語**、**한국어**。
+
+## 授權條款
+
+Copyright 2026 ljm
+
+本專案採用 [Apache License, Version 2.0](./LICENSE) 開源協議。

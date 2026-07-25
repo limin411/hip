@@ -62,6 +62,8 @@ import {
   type KvPair,
 } from '@/lib/mcpServerDraft'
 import { ExtensionConflictsBanner } from './ExtensionConflictsBanner'
+import { useExtensionStore } from '@/store/extensionStore'
+import { derivePluginMcpFromSnapshot } from '@/lib/extensionSnapshot'
 
 const inputCls = inputClassName
 
@@ -165,6 +167,7 @@ export function McpConfig() {
   const servers = useMcpServers()
   const { loaded, load, updateSection } = useHipConfigStore()
   const { plugins, loaded: pluginsLoaded, load: loadPlugins } = usePluginsStore()
+  const snapshot = useExtensionStore((s) => s.snapshot)
   const mcpStatuses = useMcpStatuses()
   const market = useMcpRegistryStore()
   const [editing, setEditing] = useState<Editing>(null)
@@ -251,10 +254,27 @@ export function McpConfig() {
   )
 
   const statusByServer = useMemo(() => new Map(mcpStatuses.map((s) => [s.id, s])), [mcpStatuses])
-  const pluginMcpServers = useMemo(
-    () => derivePluginMcpServers(plugins, new Set(servers.map((s) => s.id))),
-    [plugins, servers],
-  )
+  const standaloneIds = useMemo(() => new Set(servers.map((s) => s.id)), [servers])
+  /** Prefer registry snapshot so UI matches agent; fall back to manifest derive. */
+  const pluginMcpServers = useMemo(() => {
+    if (snapshot) {
+      return derivePluginMcpFromSnapshot(snapshot, plugins, standaloneIds).map((row) => ({
+        ...row,
+        // Session reconnect: only enabled when registry-active and parent on
+        enabled: row.registryActive && row.enabled !== false && row.pluginEnabled !== false,
+        pluginId: row.pluginId ?? '',
+        pluginName: row.pluginName ?? row.pluginId ?? 'plugin',
+        pluginEnabled: row.pluginEnabled === true,
+        registryActive: row.registryActive,
+        shadowedReason: row.shadowedReason,
+      }))
+    }
+    return derivePluginMcpServers(plugins, standaloneIds).map((s) => ({
+      ...s,
+      registryActive: s.enabled,
+      shadowedReason: undefined as string | undefined,
+    }))
+  }, [snapshot, plugins, standaloneIds, servers])
 
   const handleUpdateTools = async (
     server: McpServerConfig,
@@ -269,11 +289,15 @@ export function McpConfig() {
   }
 
   const reconnectMcpServers = useCallback(() => {
+    // Prefer snapshot active set when available (single source of truth).
+    const fromSnapshot = snapshot
+      ? snapshot.mcpServers.filter((r) => r.active).map((r) => r.config)
+      : null
     const activePlugin = pluginMcpServers.filter((s) => s.enabled)
-    const allServers: McpServerConfig[] = [...servers, ...activePlugin]
+    const allServers: McpServerConfig[] = fromSnapshot ?? [...servers, ...activePlugin]
     const msg: ClientMessage = { type: 'mcp:reconnect', servers: allServers }
     wsClient.send(msg)
-  }, [servers, pluginMcpServers])
+  }, [servers, pluginMcpServers, snapshot])
 
   const statusRequestedRef = useRef(false)
   const pluginEnableKey = plugins.map((p) => `${p.id}:${p.enabled}`).join('|')
@@ -561,6 +585,8 @@ export function McpConfig() {
                           server={s}
                           pluginName={s.pluginName}
                           pluginEnabled={s.pluginEnabled}
+                          registryActive={s.registryActive}
+                          shadowedReason={s.shadowedReason}
                           status={statusByServer.get(s.id)}
                         />
                       ))}
@@ -1008,11 +1034,16 @@ function PluginMcpServerCard({
   server,
   pluginName,
   pluginEnabled,
+  registryActive = true,
+  shadowedReason,
   status,
 }: {
   server: McpServerConfig
   pluginName: string
   pluginEnabled: boolean
+  /** When false, ExtensionRegistry demoted this server (shadow/capability). */
+  registryActive?: boolean
+  shadowedReason?: string
   status?: McpServerStatusVM
 }) {
   const { t } = useTranslation()
@@ -1024,15 +1055,16 @@ function PluginMcpServerCard({
         : t('settings.mcp.transportHttp')
   const detail =
     server.transport === 'stdio' ? [server.command, ...(server.args ?? [])].join(' ') : (server.url ?? '')
-  const statusLabel = status && pluginEnabled ? getStatusLabel(t, status.status) : null
+  const live = pluginEnabled && registryActive
+  const statusLabel = status && live ? getStatusLabel(t, status.status) : null
   const statusTitle = status?.lastError ? `${statusLabel}: ${status.lastError}` : statusLabel || undefined
-  const toolCount = pluginEnabled ? status?.toolCount : undefined
+  const toolCount = live ? status?.toolCount : undefined
 
   return (
     <div
       className={cn(
         'relative flex min-h-[140px] flex-col rounded-lg border border-border bg-surface p-4',
-        !server.enabled && 'opacity-60',
+        (!server.enabled || !registryActive) && 'opacity-60',
       )}
     >
       <div className="flex items-start gap-3">
@@ -1047,7 +1079,15 @@ function PluginMcpServerCard({
             {!pluginEnabled && (
               <Badge className="bg-surface-muted text-ink-tertiary">{t('settings.mcp.pluginDisabledBadge')}</Badge>
             )}
-            {pluginEnabled && status && (
+            {pluginEnabled && !registryActive && (
+              <Badge
+                className="bg-amber-500/15 text-amber-800 dark:text-amber-200"
+                title={shadowedReason}
+              >
+                {t('settings.extensions.shadowedBadge', { defaultValue: 'Shadowed' })}
+              </Badge>
+            )}
+            {live && status && (
               <span
                 className="inline-flex items-center gap-1 text-caption text-ink-secondary"
                 title={statusTitle}
@@ -1056,7 +1096,7 @@ function PluginMcpServerCard({
                 {statusLabel}
               </span>
             )}
-            {pluginEnabled && !status && (
+            {live && !status && (
               <span className="text-caption text-ink-tertiary">{t('settings.mcp.statusDisconnected')}</span>
             )}
           </div>
@@ -1068,6 +1108,9 @@ function PluginMcpServerCard({
           <div className="mt-2 text-caption text-ink-tertiary">
             {toolCount} {toolCount === 1 ? t('settings.mcp.toolSingular') : t('settings.mcp.toolPlural')}
           </div>
+        )}
+        {shadowedReason && !registryActive && (
+          <div className="mt-2 text-caption text-amber-800/80 dark:text-amber-200/80">{shadowedReason}</div>
         )}
       </div>
     </div>

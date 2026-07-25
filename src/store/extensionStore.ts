@@ -36,6 +36,9 @@ export interface ExtensionPreflightSummary {
   skillConflicts: Array<{ skillId: string }>
   mcpIdConflicts: Array<{ id: string }>
   capabilityConflicts: Array<{ fingerprint: string; existingId: string; incomingId: string }>
+  /** Pending enable target (for modal). */
+  pendingPluginId?: string
+  pendingPluginName?: string
 }
 
 interface ExtensionStore {

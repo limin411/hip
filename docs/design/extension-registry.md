@@ -62,11 +62,16 @@ Resolution emits `ExtensionConflict[]` (`skill_id_shadow`, `mcp_id_shadow`, `mcp
 - **Settings banner** (`ExtensionConflictsBanner`) on MCP + Plugin pages
 - One-click: allow both (`allowDuplicate`) / disable user MCP
 
-## Phase 3+ (not yet)
+## Phase 3 (implemented)
 
-- FE `derivePlugin*` driven purely by registry snapshot  
-- CLI `hip extension inspect`  
-- Richer preflight modal (block vs warn)
+- FE partitions Skills/MCP using registry snapshot (`src/lib/extensionSnapshot.ts`)
+- Shadowed badges on plugin MCP / skill cards
+- Preflight **confirm modal** before enable with conflicts
+- CLI: `hip extension inspect [--cwd] [--json]` (attach to running app)
+
+## Later
+
+- Optional blocking preflight policy for org-managed installs
 
 ## Do not double-install
 

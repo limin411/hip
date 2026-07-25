@@ -9,6 +9,8 @@ import { Modal } from '@/components/ui/Modal'
 import { PluginConfigView, PluginViewModal, type Translate } from './PluginConfigView'
 import { MarketplaceSourceModal } from './MarketplaceSourceModal'
 import { ExtensionConflictsBanner } from './ExtensionConflictsBanner'
+import { PreflightEnableModal } from './PreflightEnableModal'
+import type { ExtensionPreflightSummary } from '@/store/extensionStore'
 
 /**
  * Settings → Plugin Market.
@@ -25,6 +27,11 @@ export function PluginConfig() {
   const [viewing, setViewing] = useState<PluginMeta | null>(null)
   const [sourcesOpen, setSourcesOpen] = useState(false)
   const [preflightNote, setPreflightNote] = useState<string | null>(null)
+  const [pendingEnable, setPendingEnable] = useState<{
+    plugin: PluginMeta
+    summary: ExtensionPreflightSummary
+  } | null>(null)
+  const [enableBusy, setEnableBusy] = useState(false)
 
   useEffect(() => {
     if (!pluginsLoaded) void loadPlugins()
@@ -79,48 +86,42 @@ export function PluginConfig() {
     return undefined
   }
 
+  const applyEnable = async (plugin: PluginMeta, enabled: boolean) => {
+    await toggle(plugin.id, enabled)
+    await inspect()
+  }
+
   const enableWithPreflight = async (plugin: PluginMeta, enabled: boolean) => {
     setError(null)
     setPreflightNote(null)
+    setPendingEnable(null)
     if (enabled) {
       const pf = await preflightEnable({ pluginId: plugin.id, pluginDir: plugin.dir })
       if (pf?.hasConflicts) {
-        const parts: string[] = []
-        if (pf.skillConflictCount > 0) {
-          parts.push(
-            t('settings.extensions.preflightSkills', {
-              count: pf.skillConflictCount,
-              defaultValue: '{{count}} skill id conflict(s)',
-            }),
-          )
-        }
-        if (pf.mcpIdConflictCount > 0) {
-          parts.push(
-            t('settings.extensions.preflightMcpId', {
-              count: pf.mcpIdConflictCount,
-              defaultValue: '{{count}} MCP id conflict(s)',
-            }),
-          )
-        }
-        if (pf.capabilityConflictCount > 0) {
-          parts.push(
-            t('settings.extensions.preflightCapability', {
-              count: pf.capabilityConflictCount,
-              defaultValue: '{{count}} MCP capability conflict(s)',
-            }),
-          )
-        }
-        setPreflightNote(
-          t('settings.extensions.preflightWarn', {
-            defaultValue:
-              'Conflicts detected ({{details}}). Enabling keeps project/user skills and user MCP over plugin duplicates — see MCP settings for remediations.',
-            details: parts.join(', '),
-          }),
-        )
+        setPendingEnable({ plugin, summary: pf })
+        return
       }
     }
-    await toggle(plugin.id, enabled)
-    await inspect()
+    await applyEnable(plugin, enabled)
+  }
+
+  const confirmPendingEnable = async () => {
+    if (!pendingEnable) return
+    setEnableBusy(true)
+    try {
+      await applyEnable(pendingEnable.plugin, true)
+      setPreflightNote(
+        t('settings.extensions.preflightEnabledWithConflicts', {
+          defaultValue:
+            'Plugin enabled with conflicts resolved by precedence (project/user win). See conflict banner for remediations.',
+        }),
+      )
+      setPendingEnable(null)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : t('settings.plugins.toggleError'))
+    } finally {
+      setEnableBusy(false)
+    }
   }
 
   return (
@@ -194,6 +195,19 @@ export function PluginConfig() {
           t={t as Translate}
         />
       )}
+
+      <PreflightEnableModal
+        open={pendingEnable != null}
+        summary={pendingEnable?.summary ?? null}
+        pluginName={pendingEnable?.plugin.name}
+        busy={enableBusy}
+        onCancel={() => {
+          if (!enableBusy) setPendingEnable(null)
+        }}
+        onConfirm={() => {
+          void confirmPendingEnable()
+        }}
+      />
 
       <MarketplaceSourceModal
         open={sourcesOpen}

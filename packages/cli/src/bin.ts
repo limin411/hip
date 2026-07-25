@@ -7,6 +7,7 @@ import { printAuthStatus } from './commands/config.js'
 import { sessionCreate, sessionDelete, sessionList, sessionSend, sessionShow } from './commands/session.js'
 import { worktreeCreate, worktreeList, worktreeRemove } from './commands/worktree.js'
 import { runRepl } from './commands/repl.js'
+import { extensionInspect } from './commands/extension.js'
 import type { HipRunOptions, HitlMode, PermissionModeCli, PresetName, SidecarMode, StreamMode } from './types.js'
 import { CLI_VERSION } from './version.js'
 
@@ -36,6 +37,27 @@ async function main(): Promise<void> {
     .action(async (flags: { sidecarSelfTest?: boolean }) => {
       const code = await runDoctor({ sidecarSelfTest: flags.sidecarSelfTest === true })
       process.exitCode = code
+    })
+
+  const extension = program
+    .command('extension')
+    .description('Inspect plugin / skill / MCP resolution (attach to running hip app)')
+  extension
+    .command('inspect')
+    .description('Show active skills/MCP and conflicts for a project cwd')
+    .option('-c, --cwd <path>', 'Project directory (default: process.cwd())')
+    .option('--json', 'Emit full JSON snapshot')
+    .option('--port <n>', 'Attach port', (v) => Number(v))
+    .option('--token <t>', 'Attach token')
+    .option('--sidecar-log <path>', 'Attach via handshake log')
+    .action(async (flags: Record<string, unknown>) => {
+      process.exitCode = await extensionInspect({
+        cwd: flags.cwd as string | undefined,
+        json: flags.json === true,
+        port: flags.port as number | undefined,
+        token: flags.token as string | undefined,
+        sidecarLog: flags.sidecarLog as string | undefined,
+      })
     })
 
   const config = program.command('config').description('Inspect local hip CLI configuration')

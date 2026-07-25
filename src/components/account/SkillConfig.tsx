@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import type { Components } from 'react-markdown'
 import { Sparkles, FileText, Eye, Trash2, MoreVertical, TerminalSquare, Zap, GitFork, Wrench, BookOpen } from 'lucide-react'
@@ -6,6 +6,8 @@ import { MarkdownBody } from '@/components/chat/MarkdownBody'
 import type { PluginMeta, SkillMeta } from '@hip/protocol'
 import { useSkillsStore } from '@/store/skillsStore'
 import { usePluginsStore } from '@/store/pluginsStore'
+import { useExtensionStore } from '@/store/extensionStore'
+import { partitionSkillsFromSnapshot } from '@/lib/extensionSnapshot'
 import { readSkillFile } from '@/ipc/skills'
 import { Avatar } from '@/components/ui/Avatar'
 import { Badge } from '@/components/ui/Badge'
@@ -148,7 +150,30 @@ export function SkillConfig() {
   const { t } = useTranslation()
   const { skills, enabled, loaded, load, toggle, remove } = useSkillsStore()
   const { plugins, loaded: pluginsLoaded, load: loadPlugins } = usePluginsStore()
-  const { standalone, pluginEntries } = partitionSkillsForSettings(skills, plugins)
+  const snapshot = useExtensionStore((s) => s.snapshot)
+  const inspect = useExtensionStore((s) => s.inspect)
+  const partitioned = useMemo(() => {
+    if (snapshot) {
+      const fromSnap = partitionSkillsFromSnapshot(snapshot, plugins)
+      // Merge scanned skill bodies when snapshot meta is thin
+      const byId = new Map(skills.map((s) => [s.id, s]))
+      return {
+        standalone: fromSnap.standalone.map((s) => byId.get(s.id) ?? s),
+        pluginEntries: fromSnap.pluginEntries.map((e) => ({
+          skill: byId.get(e.skill.id) ?? e.skill,
+          pluginName: e.pluginName,
+          pluginEnabled: e.pluginEnabled,
+          registryActive: e.registryActive,
+        })),
+      }
+    }
+    const base = partitionSkillsForSettings(skills, plugins)
+    return {
+      standalone: base.standalone,
+      pluginEntries: base.pluginEntries.map((e) => ({ ...e, registryActive: e.pluginEnabled })),
+    }
+  }, [snapshot, skills, plugins])
+  const { standalone, pluginEntries } = partitioned
   const [viewing, setViewing] = useState<SkillMeta | null>(null)
   const [deleting, setDeleting] = useState<SkillMeta | null>(null)
 
@@ -159,6 +184,10 @@ export function SkillConfig() {
   useEffect(() => {
     if (!pluginsLoaded) void loadPlugins()
   }, [pluginsLoaded, loadPlugins])
+
+  useEffect(() => {
+    void inspect()
+  }, [inspect])
 
   return (
     <div className="p-6">
@@ -196,18 +225,24 @@ export function SkillConfig() {
                 <h3 className="text-meta font-medium text-ink-secondary">{t('settings.skill.pluginSkills')}</h3>
                 <p className="mt-1 text-caption text-ink-tertiary">{t('settings.skill.pluginSkillsHint')}</p>
                 <div className="mt-2 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                  {pluginEntries.map(({ skill, pluginName, pluginEnabled }) => {
+                  {pluginEntries.map(({ skill, pluginName, pluginEnabled, registryActive }) => {
                     const skillOn = enabled[skill.id] !== false
                     return (
                       <SkillCard
                         key={skill.id}
                         skill={skill}
-                        enabled={effectivePluginSkillEnabled(skillOn, pluginEnabled)}
+                        enabled={
+                          effectivePluginSkillEnabled(skillOn, pluginEnabled) && registryActive !== false
+                        }
                         onToggle={(on) => void toggle(skill.id, on)}
                         onView={() => setViewing(skill)}
                         onDelete={() => {}}
-                        readOnly={{ pluginName, pluginEnabled }}
-                        switchDisabled={!pluginEnabled}
+                        readOnly={{
+                          pluginName,
+                          pluginEnabled,
+                          registryActive,
+                        }}
+                        switchDisabled={!pluginEnabled || registryActive === false}
                       />
                     )
                   })}
@@ -267,7 +302,7 @@ export function SkillCard({
   onToggle: (on: boolean) => void
   onView: () => void
   onDelete: () => void
-  readOnly?: { pluginName: string; pluginEnabled?: boolean }
+  readOnly?: { pluginName: string; pluginEnabled?: boolean; registryActive?: boolean }
   /** When true, the enable switch cannot be flipped (e.g. parent plugin is off). */
   switchDisabled?: boolean
 }) {
@@ -306,6 +341,11 @@ export function SkillCard({
             {readOnly && readOnly.pluginEnabled === false && (
               <Badge className="shrink-0 bg-surface-muted text-ink-tertiary">
                 {t('settings.skill.pluginDisabledBadge')}
+              </Badge>
+            )}
+            {readOnly && readOnly.registryActive === false && (
+              <Badge className="shrink-0 bg-amber-500/15 text-amber-800 dark:text-amber-200">
+                {t('settings.extensions.shadowedBadge', { defaultValue: 'Shadowed' })}
               </Badge>
             )}
           </div>

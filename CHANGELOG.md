@@ -21,6 +21,8 @@ and this project aims to follow [Semantic Versioning](https://semver.org/).
   - Tauri injects `HIP_SKILLS_DIR`; sidecar falls back to `HIP_DATA_DIR/skills` or `~/.hip/skills`
   - Plugin skills/MCP stamp `pluginId` / `scope: 'plugin'` for provenance
   - WS `extension:inspect` / `extension:preflight`; Settings conflict banner with remediations
+  - Settings consume registry snapshot (shadowed badges); preflight enable modal
+  - CLI: `hip extension inspect [--cwd] [--json]`
 
 ## [1.0.1] - 2026-07-25
 

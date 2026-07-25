@@ -169,6 +169,38 @@ describe('buildGlobalCommandGroups', () => {
     expect(ids).not.toContain('action-quick-connect')
   })
 
+  it('includes work item commands when handlers + labels present (K19)', () => {
+    const enterWorkItems = vi.fn()
+    const newWorkItem = vi.fn()
+    const groups = buildGlobalCommandGroups(
+      makeCtx({
+        labels: {
+          ...labels,
+          openWorkItems: 'Open work items',
+          newWorkItem: 'New work item',
+        },
+        enterWorkItems,
+        newWorkItem,
+      }),
+    )
+    const items = groups.flatMap((g) => g.items)
+    const ids = items.map((i) => i.id)
+    expect(ids).toContain('nav-work-items')
+    expect(ids).toContain('action-new-work-item')
+
+    items.find((i) => i.id === 'nav-work-items')!.run?.()
+    expect(enterWorkItems).toHaveBeenCalled()
+    items.find((i) => i.id === 'action-new-work-item')!.run?.()
+    expect(newWorkItem).toHaveBeenCalled()
+  })
+
+  it('omits work item commands without handlers', () => {
+    const groups = buildGlobalCommandGroups(makeCtx())
+    const ids = groups.flatMap((g) => g.items.map((i) => i.id))
+    expect(ids).not.toContain('nav-work-items')
+    expect(ids).not.toContain('action-new-work-item')
+  })
+
   it('shows need-session hint when sessionId is null', () => {
     const ctx = makeCtx({ sessionId: null })
     const groups = buildGlobalCommandGroups(ctx)

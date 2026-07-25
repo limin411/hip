@@ -2343,6 +2343,8 @@ export const ja = {
     "openTerminals": "端末管理を開く",
     "newLocalTerminal": "新しいローカル端末",
     "quickConnect": "クイック接続",
+    "openWorkItems": "ワークアイテムを開く",
+    "newWorkItem": "新規ワークアイテム",
     "settings": {
       "general": "設定：一般",
       "model": "設定：モデル",

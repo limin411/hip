@@ -2351,6 +2351,8 @@ export const zhTW = {
     "openTerminals": "開啟終端管理",
     "newLocalTerminal": "新建本機終端",
     "quickConnect": "快捷連線",
+    "openWorkItems": "開啟事項追蹤",
+    "newWorkItem": "新建事項",
     "settings": {
       "general": "設定：一般",
       "model": "設定：模型",

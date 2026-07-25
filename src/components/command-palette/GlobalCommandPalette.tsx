@@ -19,13 +19,16 @@ import {
   enterKnowledge,
   enterSection,
   enterTerminalsSection,
+  enterWorkItemsSection,
   openHistoryFromChrome,
   openSettingsFromChrome,
   openTrashFromChrome,
 } from '@/components/layout/sidebarActions'
 import { TERMINAL_MANAGEMENT } from '@/components/terminals/feature'
+import { WORK_ITEM_TRACKING } from '@/components/work-items/feature'
 import { useHostLibraryUi } from '@/components/terminals/hostLibraryUi'
 import { useManagedTerminalStore } from '@/store/managedTerminalStore'
+import { useWorkItemStore } from '@/store/workItemStore'
 import { groupModelOptions } from '@/lib/agentModelOptions'
 import { activeModelKey } from '@/lib/modelKey'
 import { toast } from 'sonner'
@@ -141,6 +144,12 @@ export function GlobalCommandPalette() {
             openTerminals: t('commandPalette.openTerminals'),
             newLocalTerminal: t('commandPalette.newLocalTerminal'),
             quickConnect: t('commandPalette.quickConnect'),
+          }
+        : {}),
+      ...(WORK_ITEM_TRACKING
+        ? {
+            openWorkItems: t('commandPalette.openWorkItems'),
+            newWorkItem: t('commandPalette.newWorkItem'),
           }
         : {}),
       themeLight: t('settings.themes.light'),
@@ -277,6 +286,15 @@ export function GlobalCommandPalette() {
               requestAnimationFrame(() => {
                 useHostLibraryUi.getState().requestOpenQuickConnect()
               })
+            },
+          }
+        : {}),
+      ...(WORK_ITEM_TRACKING
+        ? {
+            enterWorkItems: () => void enterWorkItemsSection(),
+            newWorkItem: async () => {
+              await enterWorkItemsSection()
+              await useWorkItemStore.getState().createItem()
             },
           }
         : {}),

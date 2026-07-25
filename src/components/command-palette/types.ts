@@ -49,6 +49,7 @@ export type PaletteIconName =
   | 'link-2'
   | 'book-open'
   | 'terminal'
+  | 'check-square'
 
 export interface CommandWhen {
   /** Restrict command visibility to these shell views (see ActiveView). */

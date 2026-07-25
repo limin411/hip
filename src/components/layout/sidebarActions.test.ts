@@ -5,6 +5,7 @@ import { useDomainStore } from '@/domain'
 import { DEFAULT_CONFIG } from '@/domain/sessionStore'
 
 const flushSave = vi.fn(async () => true)
+const workItemFlushSave = vi.fn(async () => {})
 const openSpace = vi.fn(async (_id: string) => {})
 const setSurface = vi.fn((_view: 'chat' | 'code') => {})
 const selectSession = vi.fn((_id: string) => {})
@@ -19,9 +20,21 @@ const knowledgeState = {
   openSpace: (id: string) => openSpace(id),
 }
 
+const workItemState = {
+  loaded: true,
+  load: vi.fn(async () => {}),
+  flushSave: () => workItemFlushSave(),
+}
+
 vi.mock('@/store/knowledgeStore', () => ({
   useKnowledgeStore: {
     getState: () => knowledgeState,
+  },
+}))
+
+vi.mock('@/store/workItemStore', () => ({
+  useWorkItemStore: {
+    getState: () => workItemState,
   },
 }))
 
@@ -42,8 +55,10 @@ import {
   enterKnowledge,
   enterPlaceholderSection,
   enterSection,
+  enterWorkItemsSection,
   handleMainToolbarBack,
   leaveKnowledge,
+  leaveWorkItems,
   openAutomationFromChrome,
   openHistoryFromChrome,
   openSettingsFromChrome,
@@ -52,6 +67,8 @@ import {
 describe('sidebarActions', () => {
   beforeEach(() => {
     flushSave.mockClear()
+    workItemFlushSave.mockClear()
+    workItemState.load.mockClear()
     knowledgeState.loadSpaces.mockClear()
     openSpace.mockClear()
     setSurface.mockClear()
@@ -61,6 +78,7 @@ describe('sidebarActions', () => {
     knowledgeState.mode = 'home'
     knowledgeState.activeSpaceId = null
     knowledgeState.loadSpaces.mockImplementation(async () => {})
+    workItemState.loaded = true
     useDomainStore.setState({
       sessions: [],
       activeSessionId: null,
@@ -245,15 +263,63 @@ describe('sidebarActions', () => {
     expect(useUiStore.getState().sidebarSection).toBe('chats')
   })
 
-  it('handleMainToolbarBack restores knowledge section', () => {
+  it('handleMainToolbarBack restores knowledge section', async () => {
     useUiStore.setState({
       activeView: 'settings',
       previousView: 'knowledge',
       sidebarSection: 'chats',
     })
-    handleMainToolbarBack()
+    await handleMainToolbarBack()
     expect(useUiStore.getState().activeView).toBe('knowledge')
     expect(useUiStore.getState().sidebarSection).toBe('knowledge')
+  })
+
+  it('leaveWorkItems no-ops when not on tasks', async () => {
+    await leaveWorkItems()
+    expect(workItemFlushSave).not.toHaveBeenCalled()
+  })
+
+  it('leaveWorkItems flushes when on tasks', async () => {
+    useUiStore.setState({ activeView: 'tasks', sidebarSection: 'tasks' })
+    await leaveWorkItems()
+    expect(workItemFlushSave).toHaveBeenCalled()
+    expect(useUiStore.getState().activeView).toBe('tasks')
+  })
+
+  it('handleMainToolbarBack leaves tasks via leaveWorkItems before changing view', async () => {
+    useUiStore.setState({
+      activeView: 'tasks',
+      previousView: 'chat',
+      sidebarSection: 'tasks',
+    })
+    await handleMainToolbarBack()
+    expect(workItemFlushSave).toHaveBeenCalled()
+    expect(useUiStore.getState().activeView).toBe('chat')
+    expect(useUiStore.getState().sidebarSection).toBe('chats')
+  })
+
+  it('enterSection flushes work items when leaving tasks', async () => {
+    useUiStore.setState({ activeView: 'tasks', sidebarSection: 'tasks' })
+    await enterSection('chats')
+    expect(workItemFlushSave).toHaveBeenCalled()
+    expect(setSurface).toHaveBeenCalledWith('chat')
+    expect(useUiStore.getState().sidebarSection).toBe('chats')
+  })
+
+  it('enterWorkItemsSection opens tasks and loads catalog when not loaded', async () => {
+    workItemState.loaded = false
+    useUiStore.setState({ activeView: 'chat', sidebarSection: 'chats' })
+    await enterWorkItemsSection()
+    expect(useUiStore.getState().activeView).toBe('tasks')
+    expect(useUiStore.getState().sidebarSection).toBe('tasks')
+    expect(workItemState.load).toHaveBeenCalled()
+  })
+
+  it('openSettingsFromChrome flushes work items when leaving tasks', async () => {
+    useUiStore.setState({ activeView: 'tasks', sidebarSection: 'tasks' })
+    await openSettingsFromChrome()
+    expect(workItemFlushSave).toHaveBeenCalled()
+    expect(useUiStore.getState().activeView).toBe('settings')
   })
 
   it('assignSectionAfterLeavingKnowledge uses active session surface', () => {

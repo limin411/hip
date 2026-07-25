@@ -2343,6 +2343,8 @@ export const ko = {
     "openTerminals": "터미널 관리 열기",
     "newLocalTerminal": "새 로컬 터미널",
     "quickConnect": "빠른 연결",
+    "openWorkItems": "작업 항목 열기",
+    "newWorkItem": "새 작업 항목",
     "settings": {
       "general": "설정: 일반",
       "model": "설정: 모델",

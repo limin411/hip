@@ -2358,6 +2358,8 @@ export const zhCN = {
       openTerminals: '打开终端管理',
       newLocalTerminal: '新建本地终端',
       quickConnect: '快捷连接',
+      openWorkItems: '打开事项追踪',
+      newWorkItem: '新建事项',
       settings: {
         general: '设置：通用',
         model: '设置：模型',

@@ -7,6 +7,7 @@ import { useKnowledgeStore } from '@/store/knowledgeStore'
 import { useManagedTerminalStore } from '@/store/managedTerminalStore'
 import { type NavEntry, useNavHistoryStore } from '@/store/navHistoryStore'
 import { useUiStore } from '@/store/uiStore'
+import { useWorkItemStore } from '@/store/workItemStore'
 
 export function captureNavEntry(): NavEntry {
   const ui = useUiStore.getState()
@@ -53,6 +54,16 @@ async function flushKnowledgeIfNeeded(leavingKnowledge: boolean): Promise<void> 
   }
 }
 
+/** K19: finalize + drain work-item save chain when leaving tasks (mirrors leaveWorkItems). */
+async function flushWorkItemsIfNeeded(leavingTasks: boolean): Promise<void> {
+  if (!leavingTasks) return
+  try {
+    await useWorkItemStore.getState().flushSave()
+  } catch {
+    // non-Tauri / not loaded
+  }
+}
+
 async function restoreKnowledge(spaceId: string | null): Promise<void> {
   useUiStore.getState().openKnowledgeView()
   useUiStore.getState().setSidebarSection('knowledge')
@@ -73,9 +84,13 @@ export async function applyNavEntry(entry: NavEntry): Promise<void> {
   const store = useNavHistoryStore.getState()
   store.setApplying(true)
   try {
-    const wasKnowledge = useUiStore.getState().activeView === 'knowledge'
-    if (wasKnowledge && entry.activeView !== 'knowledge') {
+    const prevView = useUiStore.getState().activeView
+    if (prevView === 'knowledge' && entry.activeView !== 'knowledge') {
       await flushKnowledgeIfNeeded(true)
+    }
+    // K19: leave tasks (finalize + save chain) before restoring non-tasks entry.
+    if (prevView === 'tasks' && entry.activeView !== 'tasks') {
+      await flushWorkItemsIfNeeded(true)
     }
 
     if (entry.activeView === 'knowledge') {

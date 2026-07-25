@@ -1,6 +1,6 @@
 /**
  * Shell navigation helpers for AppSidebar / MainToolbar / command palette / account chrome.
- * Single source of truth for leave-knowledge flush and section routing (see design spec).
+ * Single source of truth for leave-knowledge / leave-work-items flush and section routing.
  */
 import { sessionService } from '@/domain'
 import { useDomainStore } from '@/domain'
@@ -24,6 +24,29 @@ export async function leaveKnowledge(): Promise<void> {
   } catch {
     // non-Tauri / not loaded
   }
+}
+
+/**
+ * Leave work items: finalize + drain save chain. No-op if not on tasks.
+ * Call before any path that leaves `activeView === 'tasks'` (K19).
+ */
+export async function leaveWorkItems(): Promise<void> {
+  if (useUiStore.getState().activeView !== 'tasks') return
+  try {
+    await useWorkItemStore.getState().flushSave()
+  } catch {
+    // non-Tauri / not loaded
+  }
+}
+
+/**
+ * Flush leave-sensitive surfaces before navigating away.
+ * Only awaits when currently on knowledge or tasks so other callers stay effectively sync.
+ */
+async function leaveActiveSurfaceIfNeeded(): Promise<void> {
+  const view = useUiStore.getState().activeView
+  if (view === 'knowledge') await leaveKnowledge()
+  else if (view === 'tasks') await leaveWorkItems()
 }
 
 /** After leaving knowledge for settings/history (not for setSurface/selectSession). */
@@ -56,6 +79,10 @@ function firstSpaceIdByName(
  * With zero spaces, stays on empty surface so the create CTA is available.
  */
 export async function enterKnowledge(): Promise<void> {
+  // Leave tasks if needed; do not leaveKnowledge (we are entering knowledge).
+  if (useUiStore.getState().activeView === 'tasks') {
+    await leaveWorkItems()
+  }
   useUiStore.getState().openKnowledgeView()
   useUiStore.getState().setSidebarSection('knowledge')
   await useKnowledgeStore.getState().loadSpaces()
@@ -76,10 +103,8 @@ export async function enterKnowledge(): Promise<void> {
 }
 
 export async function enterSection(section: 'projects' | 'chats'): Promise<void> {
-  // Only await when leaving knowledge so non-knowledge callers stay sync (palette tests / click handlers).
-  if (useUiStore.getState().activeView === 'knowledge') {
-    await leaveKnowledge()
-  }
+  // Only await when leaving knowledge/tasks so other callers stay sync (palette tests / click handlers).
+  await leaveActiveSurfaceIfNeeded()
   useUiStore.getState().setSidebarSection(section)
   sessionService.setSurface(section === 'projects' ? 'code' : 'chat')
   recordNavEntry()
@@ -87,16 +112,14 @@ export async function enterSection(section: 'projects' | 'chats'): Promise<void>
 
 /** Enter a primary-nav placeholder (workbench / tasks / automation; terminals when flag off). */
 export async function enterPlaceholderSection(section: PlaceholderSidebarSection): Promise<void> {
-  if (useUiStore.getState().activeView === 'knowledge') {
-    await leaveKnowledge()
-  }
+  await leaveActiveSurfaceIfNeeded()
   useUiStore.getState().setSidebarSection(section)
   useUiStore.getState().setActiveView(section)
   recordNavEntry()
 }
 
 /**
- * Enter terminal management (K14): leave knowledge if needed, set section + view.
+ * Enter terminal management (K14): leave knowledge/tasks if needed, set section + view.
  * Used when TERMINAL_MANAGEMENT is on; flag-off path still uses enterPlaceholderSection.
  *
  * @param opts.library When true (primary nav / “open terminal management”), clear
@@ -106,9 +129,7 @@ export async function enterPlaceholderSection(section: PlaceholderSidebarSection
 export async function enterTerminalsSection(opts?: {
   library?: boolean
 }): Promise<void> {
-  if (useUiStore.getState().activeView === 'knowledge') {
-    await leaveKnowledge()
-  }
+  await leaveActiveSurfaceIfNeeded()
   if (opts?.library) {
     useManagedTerminalStore.getState().focus(null)
   }
@@ -134,28 +155,14 @@ export async function enterWorkItemsSection(): Promise<void> {
   }
 }
 
-/** Leave work items: finalize + drain save chain. No-op if not on tasks. */
-export async function leaveWorkItems(): Promise<void> {
-  if (useUiStore.getState().activeView !== 'tasks') return
-  try {
-    await useWorkItemStore.getState().flushSave()
-  } catch {
-    // non-Tauri / not loaded
-  }
-}
-
 export async function selectSessionFromSidebar(id: string): Promise<void> {
-  if (useUiStore.getState().activeView === 'knowledge') {
-    await leaveKnowledge()
-  }
+  await leaveActiveSurfaceIfNeeded()
   sessionService.selectSession(id)
   recordNavEntry()
 }
 
 export async function newConversationFromSidebar(surface: 'chat' | 'code'): Promise<void> {
-  if (useUiStore.getState().activeView === 'knowledge') {
-    await leaveKnowledge()
-  }
+  await leaveActiveSurfaceIfNeeded()
   sessionService.newConversation(surface)
   useUiStore.getState().setSidebarSection(surface === 'code' ? 'projects' : 'chats')
   recordNavEntry()
@@ -164,6 +171,9 @@ export async function newConversationFromSidebar(surface: 'chat' | 'code'): Prom
 export async function openSpaceFromSidebar(spaceId: string): Promise<void> {
   // Don't go through enterKnowledge (which auto-opens first space) — open the
   // requested id only. Still ensure view + spaces are ready.
+  if (useUiStore.getState().activeView === 'tasks') {
+    await leaveWorkItems()
+  }
   useUiStore.getState().openKnowledgeView()
   useUiStore.getState().setSidebarSection('knowledge')
   const kb = useKnowledgeStore.getState()
@@ -175,10 +185,12 @@ export async function openSpaceFromSidebar(spaceId: string): Promise<void> {
 }
 
 export async function openSettingsFromChrome(): Promise<void> {
-  const wasKnowledge = useUiStore.getState().activeView === 'knowledge'
-  if (wasKnowledge) {
+  const view = useUiStore.getState().activeView
+  if (view === 'knowledge') {
     await leaveKnowledge()
     assignSectionAfterLeavingKnowledge()
+  } else if (view === 'tasks') {
+    await leaveWorkItems()
   }
   // Always land on General when opening Settings from chrome (not last-visited page).
   useUiStore.getState().setSettingsPage('general')
@@ -187,20 +199,24 @@ export async function openSettingsFromChrome(): Promise<void> {
 }
 
 export async function openHistoryFromChrome(): Promise<void> {
-  const wasKnowledge = useUiStore.getState().activeView === 'knowledge'
-  if (wasKnowledge) {
+  const view = useUiStore.getState().activeView
+  if (view === 'knowledge') {
     await leaveKnowledge()
     assignSectionAfterLeavingKnowledge()
+  } else if (view === 'tasks') {
+    await leaveWorkItems()
   }
   useUiStore.getState().setActiveView('history')
   recordNavEntry()
 }
 
 export async function openTrashFromChrome(): Promise<void> {
-  const wasKnowledge = useUiStore.getState().activeView === 'knowledge'
-  if (wasKnowledge) {
+  const view = useUiStore.getState().activeView
+  if (view === 'knowledge') {
     await leaveKnowledge()
     assignSectionAfterLeavingKnowledge()
+  } else if (view === 'tasks') {
+    await leaveWorkItems()
   }
   useUiStore.getState().setActiveView('trash')
   // Opportunistic list + purge
@@ -211,17 +227,25 @@ export async function openTrashFromChrome(): Promise<void> {
 }
 
 export async function openAutomationFromChrome(): Promise<void> {
-  const wasKnowledge = useUiStore.getState().activeView === 'knowledge'
-  if (wasKnowledge) {
+  const view = useUiStore.getState().activeView
+  if (view === 'knowledge') {
     await leaveKnowledge()
     assignSectionAfterLeavingKnowledge()
+  } else if (view === 'tasks') {
+    await leaveWorkItems()
   }
   useUiStore.getState().setActiveView('automation')
   recordNavEntry()
 }
 
-/** MainToolbar / special-view back — keep section in sync with restored view. */
-export function handleMainToolbarBack(): void {
+/**
+ * MainToolbar / special-view back — keep section in sync with restored view.
+ * K19: await leaveWorkItems when leaving tasks (notes debounce + finalize).
+ */
+export async function handleMainToolbarBack(): Promise<void> {
+  if (useUiStore.getState().activeView === 'tasks') {
+    await leaveWorkItems()
+  }
   const target = useUiStore.getState().previousView ?? 'workbench'
   useUiStore.getState().setActiveView(target)
   if (target === 'knowledge') {

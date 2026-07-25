@@ -4,6 +4,17 @@ import { sessionService, useDomainStore } from '@/domain'
 import { DEFAULT_CONFIG } from '@/domain/sessionStore'
 import { useUiStore } from '@/store/uiStore'
 import { useNavHistoryStore, type NavEntry } from '@/store/navHistoryStore'
+
+const workItemFlushSave = vi.fn(async () => {})
+
+vi.mock('@/store/workItemStore', () => ({
+  useWorkItemStore: {
+    getState: () => ({
+      flushSave: () => workItemFlushSave(),
+    }),
+  },
+}))
+
 import {
   applyNavEntry,
   captureNavEntry,
@@ -15,6 +26,7 @@ import {
 
 describe('navHistory helpers', () => {
   beforeEach(() => {
+    workItemFlushSave.mockClear()
     useNavHistoryStore.setState({ stack: [], index: -1, applying: false })
     useDomainStore.setState({
       sessions: [
@@ -106,5 +118,32 @@ describe('navHistory helpers', () => {
   it('goNavBack returns false at start of stack', async () => {
     seedColdLaunchNavHistory()
     expect(await goNavBack()).toBe(false)
+  })
+
+  it('applyNavEntry leaving tasks flushes work items', async () => {
+    useUiStore.setState({ activeView: 'tasks', sidebarSection: 'tasks' })
+    const entry: NavEntry = {
+      ...captureNavEntry(),
+      activeView: 'chat',
+      sidebarSection: 'chats',
+      sessionId: null,
+    }
+    await applyNavEntry(entry)
+    expect(workItemFlushSave).toHaveBeenCalled()
+    expect(useUiStore.getState().activeView).toBe('chat')
+    expect(useUiStore.getState().sidebarSection).toBe('chats')
+  })
+
+  it('applyNavEntry staying on tasks does not flush work items', async () => {
+    useUiStore.setState({ activeView: 'tasks', sidebarSection: 'tasks' })
+    const entry: NavEntry = {
+      ...captureNavEntry(),
+      activeView: 'tasks',
+      sidebarSection: 'tasks',
+      sessionId: null,
+    }
+    await applyNavEntry(entry)
+    expect(workItemFlushSave).not.toHaveBeenCalled()
+    expect(useUiStore.getState().activeView).toBe('tasks')
   })
 })

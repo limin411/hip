@@ -40,6 +40,9 @@ export type GlobalCommandLabels = {
   openTerminals?: string
   newLocalTerminal?: string
   quickConnect?: string
+  /** Work item tracking (K19) — optional when flag off / labels omitted. */
+  openWorkItems?: string
+  newWorkItem?: string
   themeLight: string
   themeDark: string
   themeSystem: string
@@ -129,6 +132,10 @@ export type GlobalCommandContext = {
   openLocalTerminal?: () => void | Promise<void>
   /** Open terminals section for quick-connect (popover lives in sidebar). */
   openQuickConnect?: () => void | Promise<void>
+  /** Work item tracking (K19). */
+  enterWorkItems?: () => void | Promise<void>
+  /** Enter work items section then create a new item. */
+  newWorkItem?: () => void | Promise<void>
   /** Open a nested palette page (theme / model / sessions). */
   openPalettePage?: (page: PalettePageId) => void
   /** Switch model for active session or draft (`provider/model` key). */
@@ -432,6 +439,30 @@ export function buildGlobalCommandGroups(
     })
   }
 
+  // Work item tracking (K19) — only when labels + handlers are provided (flag on).
+  if (labels.openWorkItems && ctx.enterWorkItems) {
+    navigation.push({
+      id: 'nav-work-items',
+      label: labels.openWorkItems,
+      icon: 'check-square',
+      keywords: [
+        'work',
+        'items',
+        'tasks',
+        'todo',
+        '事项',
+        '事項',
+        'タスク',
+        '할 일',
+        labels.openWorkItems,
+      ],
+      group: 'navigation',
+      run: () => {
+        void ctx.enterWorkItems?.()
+      },
+    })
+  }
+
   const actions: GlobalCommand[] = [
     {
       id: 'action-new-conversation',
@@ -523,6 +554,30 @@ export function buildGlobalCommandGroups(
       run: () => {
         if (ctx.openQuickConnect) void ctx.openQuickConnect()
         else void ctx.enterTerminals?.()
+      },
+    })
+  }
+
+  if (labels.newWorkItem && ctx.newWorkItem) {
+    actions.push({
+      id: 'action-new-work-item',
+      label: labels.newWorkItem,
+      icon: 'plus',
+      keywords: [
+        'work',
+        'item',
+        'new',
+        'todo',
+        'task',
+        '新建事项',
+        '新增事項',
+        '新規',
+        '새 항목',
+        labels.newWorkItem,
+      ],
+      group: 'actions',
+      run: () => {
+        void ctx.newWorkItem?.()
       },
     })
   }

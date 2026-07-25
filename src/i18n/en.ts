@@ -2408,6 +2408,8 @@ export const en = {
       openTerminals: 'Open terminal management',
       newLocalTerminal: 'New local terminal',
       quickConnect: 'Quick connect',
+      openWorkItems: 'Open work items',
+      newWorkItem: 'New work item',
       settings: {
         general: 'Settings: General',
         model: 'Settings: Model',

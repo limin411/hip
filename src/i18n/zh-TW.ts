@@ -1733,6 +1733,71 @@ export const zhTW = {
       "errorSecretSave": "主機已儲存，但密碼/口令未能寫入。請重新輸入後儲存。"
     }
   },
+  "workItems": {
+    "title": "事項",
+    "inbox": "收集箱",
+    "untitled": "未命名事項",
+    "searchPlaceholder": "搜尋事項…",
+    "newItem": "新增事項",
+    "emptyTitle": "尚無事項",
+    "emptyHint": "建立事項以追蹤待辦與後續。",
+    "emptyFilterTitle": "此篩選下無事項",
+    "emptyFilterHint": "試試其他篩選，或檢視未完成事項。",
+    "viewOpen": "檢視未完成",
+    "detailEmpty": "選擇一條事項",
+    "detailEmptyHint": "從列表中選擇，或新增一條。",
+    "backToList": "返回列表",
+    "listFilter": "清單",
+    "loading": "載入中…",
+    "filters": {
+      "open": "全部未完成",
+      "today": "今日到期",
+      "overdue": "已逾期",
+      "in_progress": "進行中",
+      "done": "已完成",
+      "cancelled": "已取消",
+      "archived": "已封存"
+    },
+    "status": {
+      "todo": "待辦",
+      "in_progress": "進行中",
+      "done": "已完成",
+      "cancelled": "已取消"
+    },
+    "priority": {
+      "none": "無優先級",
+      "low": "低",
+      "medium": "中",
+      "high": "高"
+    },
+    "fields": {
+      "title": "標題",
+      "titlePlaceholder": "事項標題",
+      "status": "狀態",
+      "priority": "優先級",
+      "dueOn": "截止日期",
+      "list": "清單",
+      "tags": "標籤",
+      "tagsPlaceholder": "新增標籤…",
+      "removeTag": "移除標籤 {{tag}}",
+      "notes": "備註",
+      "notesPlaceholder": "備註…"
+    },
+    "actions": {
+      "complete": "標記完成",
+      "reopen": "重新開啟",
+      "cancel": "取消事項",
+      "archive": "封存",
+      "unarchive": "取消封存",
+      "delete": "刪除"
+    },
+    "help": {
+      "cancelVsArchive": "取消表示決定不做了（可在「已取消」中找回）。封存會從日常列表隱藏（可在「已封存」中找回）。"
+    },
+    "deleteConfirm": "永久刪除此事項？此操作無法復原。",
+    "listsSection": "清單",
+    "smartFilters": "智慧篩選"
+  },
   "tabs": {
     "closeTab": "關閉標籤頁",
     "newSession": "新增工作階段",
@@ -1765,7 +1830,8 @@ export const zhTW = {
       "spaces": "知識空間",
       "projects": "專案會話",
       "chats": "對話歷史",
-      "terminals": "終端管理"
+      "terminals": "終端管理",
+      "workItems": "事項"
     },
     "quickConnect": "快捷連線",
     "badge": {
@@ -1778,6 +1844,7 @@ export const zhTW = {
     "viewAll": "檢視全部",
     "newSpace": "新建知識庫",
     "newTask": "新增任務",
+    "newWorkItem": "新增事項",
     "newProject": "新增專案會話",
     "newChat": "新增對話",
     "newTerminal": "新建終端",

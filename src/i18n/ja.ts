@@ -1725,6 +1725,71 @@ export const ja = {
       "errorSecretSave": "ホストは保存されましたが、パスワード/パスフレーズを保存できませんでした。再入力して保存してください。"
     }
   },
+  "workItems": {
+    "title": "ワークアイテム",
+    "inbox": "受信箱",
+    "untitled": "無題",
+    "searchPlaceholder": "ワークアイテムを検索…",
+    "newItem": "新規ワークアイテム",
+    "emptyTitle": "ワークアイテムはまだありません",
+    "emptyHint": "やることやフォローアップを追跡するアイテムを作成します。",
+    "emptyFilterTitle": "このフィルターに該当する項目がありません",
+    "emptyFilterHint": "別のフィルターを試すか、未完了を表示してください。",
+    "viewOpen": "未完了を表示",
+    "detailEmpty": "ワークアイテムを選択",
+    "detailEmptyHint": "リストから選ぶか、新規作成してください。",
+    "backToList": "リストに戻る",
+    "listFilter": "リスト",
+    "loading": "読み込み中…",
+    "filters": {
+      "open": "未完了",
+      "today": "今日期限",
+      "overdue": "期限超過",
+      "in_progress": "進行中",
+      "done": "完了",
+      "cancelled": "キャンセル済み",
+      "archived": "アーカイブ"
+    },
+    "status": {
+      "todo": "未着手",
+      "in_progress": "進行中",
+      "done": "完了",
+      "cancelled": "キャンセル"
+    },
+    "priority": {
+      "none": "優先度なし",
+      "low": "低",
+      "medium": "中",
+      "high": "高"
+    },
+    "fields": {
+      "title": "タイトル",
+      "titlePlaceholder": "タイトル",
+      "status": "ステータス",
+      "priority": "優先度",
+      "dueOn": "期限",
+      "list": "リスト",
+      "tags": "タグ",
+      "tagsPlaceholder": "タグを追加…",
+      "removeTag": "タグ {{tag}} を削除",
+      "notes": "メモ",
+      "notesPlaceholder": "メモ…"
+    },
+    "actions": {
+      "complete": "完了にする",
+      "reopen": "再開",
+      "cancel": "キャンセル",
+      "archive": "アーカイブ",
+      "unarchive": "アーカイブ解除",
+      "delete": "削除"
+    },
+    "help": {
+      "cancelVsArchive": "キャンセルは「やらない」決定です（「キャンセル済み」で確認）。アーカイブは日常リストから隠します（「アーカイブ」で確認）。"
+    },
+    "deleteConfirm": "このワークアイテムを完全に削除しますか？元に戻せません。",
+    "listsSection": "リスト",
+    "smartFilters": "スマートフィルター"
+  },
   "tabs": {
     "closeTab": "タブを閉じる",
     "newSession": "新しいセッション",
@@ -1757,7 +1822,8 @@ export const ja = {
       "spaces": "スペース",
       "projects": "プロジェクトセッション",
       "chats": "チャット履歴",
-      "terminals": "ターミナル管理"
+      "terminals": "ターミナル管理",
+      "workItems": "ワークアイテム"
     },
     "quickConnect": "クイック接続",
     "badge": {
@@ -1770,6 +1836,7 @@ export const ja = {
     "viewAll": "すべて表示",
     "newSpace": "新しいナレッジベース",
     "newTask": "新しいタスク",
+    "newWorkItem": "新規ワークアイテム",
     "newProject": "新しいプロジェクトセッション",
     "newChat": "新しいチャット",
     "newTerminal": "新しい端末",

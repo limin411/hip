@@ -1725,6 +1725,71 @@ export const ko = {
       "errorSecretSave": "호스트는 저장되었지만 비밀번호/암호 구문을 저장하지 못했습니다. 다시 입력한 뒤 저장하세요."
     }
   },
+  "workItems": {
+    "title": "작업 항목",
+    "inbox": "수신함",
+    "untitled": "제목 없음",
+    "searchPlaceholder": "작업 항목 검색…",
+    "newItem": "새 작업 항목",
+    "emptyTitle": "작업 항목이 없습니다",
+    "emptyHint": "할 일과 후속을 추적할 항목을 만드세요.",
+    "emptyFilterTitle": "이 필터에 항목이 없습니다",
+    "emptyFilterHint": "다른 필터를 시도하거나 미완료 항목을 보세요.",
+    "viewOpen": "미완료 보기",
+    "detailEmpty": "작업 항목 선택",
+    "detailEmptyHint": "목록에서 선택하거나 새로 만드세요.",
+    "backToList": "목록으로",
+    "listFilter": "목록",
+    "loading": "불러오는 중…",
+    "filters": {
+      "open": "미완료",
+      "today": "오늘 마감",
+      "overdue": "기한 초과",
+      "in_progress": "진행 중",
+      "done": "완료",
+      "cancelled": "취소됨",
+      "archived": "보관됨"
+    },
+    "status": {
+      "todo": "할 일",
+      "in_progress": "진행 중",
+      "done": "완료",
+      "cancelled": "취소됨"
+    },
+    "priority": {
+      "none": "우선순위 없음",
+      "low": "낮음",
+      "medium": "보통",
+      "high": "높음"
+    },
+    "fields": {
+      "title": "제목",
+      "titlePlaceholder": "작업 항목 제목",
+      "status": "상태",
+      "priority": "우선순위",
+      "dueOn": "마감일",
+      "list": "목록",
+      "tags": "태그",
+      "tagsPlaceholder": "태그 추가…",
+      "removeTag": "태그 {{tag}} 제거",
+      "notes": "메모",
+      "notesPlaceholder": "메모…"
+    },
+    "actions": {
+      "complete": "완료 표시",
+      "reopen": "다시 열기",
+      "cancel": "항목 취소",
+      "archive": "보관",
+      "unarchive": "보관 취소",
+      "delete": "삭제"
+    },
+    "help": {
+      "cancelVsArchive": "취소는 하지 않기로 한 것입니다(「취소됨」에서 확인). 보관은 일상 목록에서 숨깁니다(「보관됨」에서 확인)."
+    },
+    "deleteConfirm": "이 작업 항목을 영구 삭제할까요? 되돌릴 수 없습니다.",
+    "listsSection": "목록",
+    "smartFilters": "스마트 필터"
+  },
   "tabs": {
     "closeTab": "탭 닫기",
     "newSession": "새 세션",
@@ -1757,7 +1822,8 @@ export const ko = {
       "spaces": "공간",
       "projects": "프로젝트 세션",
       "chats": "채팅 기록",
-      "terminals": "터미널 관리"
+      "terminals": "터미널 관리",
+      "workItems": "작업 항목"
     },
     "quickConnect": "빠른 연결",
     "badge": {
@@ -1770,6 +1836,7 @@ export const ko = {
     "viewAll": "모두 보기",
     "newSpace": "새 지식 베이스",
     "newTask": "새 작업",
+    "newWorkItem": "새 작업 항목",
     "newProject": "새 프로젝트 세션",
     "newChat": "새 채팅",
     "newTerminal": "새 터미널",

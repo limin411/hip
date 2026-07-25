@@ -34,6 +34,8 @@ import { KnowledgeSpaceDialogHost } from '@/components/knowledge/KnowledgeSpaceD
 import { CODE_TERMINAL } from '@/components/artifact/terminalFeature'
 import { TERMINAL_MANAGEMENT } from '@/components/terminals/feature'
 import { TerminalManagementPage } from '@/components/terminals/TerminalManagementPage'
+import { WORK_ITEM_TRACKING } from '@/components/work-items/feature'
+import { WorkItemsPage } from '@/components/work-items/WorkItemsPage'
 import { TerminalFilesPanel } from '@/components/terminals/TerminalFilesPanel'
 import { startTerminalBridge } from '@/ipc/pty'
 import { useProjectPathStore } from '@/store/projectPathStore'
@@ -189,6 +191,7 @@ export function AppLayout() {
       )
     }
     if (activeView === 'tasks') {
+      if (WORK_ITEM_TRACKING) return <WorkItemsPage />
       return (
         <PlaceholderPage
           titleKey="sidebar.nav.tasks"

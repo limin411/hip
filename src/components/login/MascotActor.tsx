@@ -260,10 +260,12 @@ interface MascotActorProps {
 }
 
 /**
- * Motion SVGs keep transparent canvas margin for animation swing (~12–15% bottom).
+ * Motion SVGs keep transparent canvas margin for animation swing (viewBox pad + bottom band).
  * Pull the next sibling into that empty band via negative margin — never clip the SVG.
+ * Assets use viewBox="-72 -72 544 544" so limbs can swing without edge crop; bottom empty
+ * is a larger fraction of the box than the old 0 0 400 400 artboard.
  */
-const BOTTOM_PAD_RATIO = 0.12
+const BOTTOM_PAD_RATIO = 0.18
 
 /**
  * Cycles animated Flat Butt mascot SVGs from `public/motion`.

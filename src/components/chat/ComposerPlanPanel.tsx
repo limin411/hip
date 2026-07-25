@@ -32,8 +32,8 @@ export function ComposerPlanPanel() {
   if (!livePlan) return null
 
   return (
-    <div className="shrink-0 bg-surface px-4 py-2" data-testid="composer-plan-slot">
-      <div className="w-full">
+    <div className="shrink-0 bg-surface px-4 py-1.5" data-testid="composer-plan-slot">
+      <div className="w-full max-w-3xl">
         <PlanProgressPanel
           view={livePlan}
           onApprove={() => sessionService.respondPlan('approve')}

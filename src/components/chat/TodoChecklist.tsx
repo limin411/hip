@@ -18,15 +18,20 @@ const TODO_ICON_CLASS = {
 export function TodoChecklist({
   todos,
   showHeading = true,
+  compact = false,
 }: {
   todos: Todo[]
   /** When false, omit the "Plan" caption (parent panel supplies the header). */
   showHeading?: boolean
+  /** Embedded in PlanProgressPanel: no extra chrome so the sticky bar stays slim. */
+  compact?: boolean
 }) {
   const { t } = useTranslation()
   return (
     <div
-      className="rounded-md border border-border bg-surface-muted/40 px-2 py-1.5"
+      className={cn(
+        !compact && 'rounded-md border border-border bg-surface-muted/40 px-2 py-1.5',
+      )}
       data-testid="todo-checklist"
     >
       {showHeading && (
@@ -36,9 +41,16 @@ export function TodoChecklist({
         {todos.map((todo, i) => {
           const Icon = TODO_ICON[todo.status]
           return (
-            <li key={i} className="flex min-h-[var(--trail-min-h)] items-center gap-[var(--meta-gap)] text-meta leading-5" data-status={todo.status}>
+            <li
+              key={i}
+              className={cn(
+                'flex items-center gap-[var(--meta-gap)] text-meta leading-5',
+                compact ? 'min-h-5' : 'min-h-[var(--trail-min-h)]',
+              )}
+              data-status={todo.status}
+            >
               <Icon
-                size={14}
+                size={compact ? 12 : 14}
                 className={cn('block shrink-0', TODO_ICON_CLASS[todo.status])}
                 aria-label={t(`chat.todos.${todo.status}`)}
               />

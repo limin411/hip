@@ -450,7 +450,9 @@ export const ja = {
       "emptyChecklist": "実行ステップはまだありません。上の計画ドキュメントが承認対象です。",
       "markdownTruncated": "表示のため計画ドキュメントを切り詰めました。",
       "expandMarkdown": "計画本文を表示",
-      "collapseMarkdown": "計画本文を隠す"
+      "collapseMarkdown": "計画本文を隠す",
+      "expand": "計画を展開",
+      "collapse": "計画を折りたたむ"
     },
     "planApproval": {
       "title": "計画の承認",

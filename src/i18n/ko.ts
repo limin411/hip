@@ -450,7 +450,9 @@ export const ko = {
       "emptyChecklist": "실행 단계가 아직 없습니다. 위 계획 문서가 승인 대상입니다.",
       "markdownTruncated": "표시를 위해 계획 문서가 잘렸습니다.",
       "expandMarkdown": "계획 본문 보기",
-      "collapseMarkdown": "계획 본문 숨기기"
+      "collapseMarkdown": "계획 본문 숨기기",
+      "expand": "계획 펼치기",
+      "collapse": "계획 접기"
     },
     "planApproval": {
       "title": "계획 승인",

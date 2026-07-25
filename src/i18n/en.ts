@@ -429,6 +429,8 @@ export const en = {
         markdownTruncated: 'Plan document truncated for display.',
         expandMarkdown: 'Show plan document',
         collapseMarkdown: 'Hide plan document',
+        expand: 'Expand plan',
+        collapse: 'Collapse plan',
       },
       planApproval: {
         title: 'Plan approval',

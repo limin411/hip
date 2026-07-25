@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { ListChecks, Loader2 } from 'lucide-react'
+import { ChevronRight, ListChecks, Loader2 } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
 import { Textarea } from '@/components/ui/Textarea'
 import { cn } from '@/lib/utils'
@@ -21,6 +21,8 @@ export function PlanProgressPanel({ view, onApprove, onReject, onAmend }: PlanPr
   const [amendMode, setAmendMode] = useState(false)
   const [amendContent, setAmendContent] = useState('')
   const [responded, setResponded] = useState(false)
+  // Compact by default while executing/done; expand for review (awaiting approval).
+  const [expanded, setExpanded] = useState(() => view.phase === 'awaiting_approval')
 
   const awaiting = view.phase === 'awaiting_approval'
   const { done, total, current } = view.progress
@@ -30,11 +32,13 @@ export function PlanProgressPanel({ view, onApprove, onReject, onAmend }: PlanPr
   // KD-16 / D4e: after plan:respond:result ok:false the store restores planApprovalPending
   // while this panel stays mounted (activeTurnPlan kept). Re-entry to awaiting_approval
   // must clear local responded so Approve/Reject/Amend are clickable again.
+  // Also auto-expand so the user can re-review the plan.
   useEffect(() => {
     if (view.phase === 'awaiting_approval') {
       setResponded(false)
       setAmendMode(false)
       setAmendContent('')
+      setExpanded(true)
     }
   }, [view.phase])
 
@@ -84,36 +88,59 @@ export function PlanProgressPanel({ view, onApprove, onReject, onAmend }: PlanPr
   }
 
   const progressPct = total > 0 ? Math.min(100, Math.round((done / total) * 100)) : 0
+  const toggleLabel = expanded ? t('chat.planPanel.collapse') : t('chat.planPanel.expand')
 
   return (
     <div
       className={cn(
-        'rounded-lg border px-4 py-3',
+        'rounded-md border px-3 py-2',
         awaiting
           ? 'border-accent/30 border-l-2 border-l-accent bg-accent-subtle'
           : 'border-border bg-surface-muted/40',
       )}
       data-testid="plan-progress-panel"
       data-phase={view.phase}
+      data-expanded={expanded ? 'true' : 'false'}
       aria-live="polite"
     >
-      <div className="flex flex-wrap items-center gap-2 text-body font-medium text-ink">
-        <ListChecks size={16} className="shrink-0 text-accent" aria-hidden />
-        <span>{t('chat.todos.plan')}</span>
-        <span className="text-meta font-normal text-ink-secondary">{phaseLabel}</span>
+      <button
+        type="button"
+        onClick={() => setExpanded((v) => !v)}
+        aria-expanded={expanded}
+        aria-label={toggleLabel}
+        className="flex w-full min-w-0 items-center gap-1.5 text-left text-meta font-medium text-ink transition-colors hover:text-ink"
+        data-testid="plan-progress-toggle"
+      >
+        <ChevronRight
+          size={14}
+          className={cn('block shrink-0 text-ink-tertiary transition-transform', expanded && 'rotate-90')}
+          aria-hidden
+        />
+        <ListChecks size={14} className="shrink-0 text-accent" aria-hidden />
+        <span className="shrink-0">{t('chat.todos.plan')}</span>
+        <span className="shrink-0 font-normal text-ink-secondary">{phaseLabel}</span>
         {total > 0 && (
-          <span className="text-meta font-normal text-ink-tertiary" data-testid="plan-progress-count">
+          <span className="shrink-0 font-normal text-ink-tertiary" data-testid="plan-progress-count">
             {t('chat.planPanel.progress', { done, total })}
           </span>
         )}
         {(view.phase === 'planning' || view.phase === 'executing') && (
-          <Loader2 size={14} className="shrink-0 animate-spin text-accent-strong" aria-hidden />
+          <Loader2 size={12} className="shrink-0 animate-spin text-accent-strong" aria-hidden />
         )}
-      </div>
+        {!expanded && current && view.phase !== 'planning' && (
+          <span
+            className="min-w-0 flex-1 truncate font-normal text-ink-tertiary"
+            data-testid="plan-progress-current"
+            title={current}
+          >
+            {current}
+          </span>
+        )}
+      </button>
 
       {total > 0 && view.phase !== 'planning' && (
         <div
-          className="mt-2 h-1 w-full overflow-hidden rounded-full bg-border"
+          className="mt-1.5 h-0.5 w-full overflow-hidden rounded-full bg-border"
           data-testid="plan-progress-track"
           role="progressbar"
           aria-valuenow={done}
@@ -130,53 +157,60 @@ export function PlanProgressPanel({ view, onApprove, onReject, onAmend }: PlanPr
         </div>
       )}
 
-      {current && view.phase !== 'planning' && (
-        <p className="mt-1 truncate text-meta text-ink-tertiary" data-testid="plan-progress-current">
+      {expanded && current && view.phase !== 'planning' && (
+        <p className="mt-1 truncate text-caption text-ink-tertiary" data-testid="plan-progress-current">
           {current}
         </p>
       )}
 
-      {/* Narrative plan.md above checklist (D2.6 / D3). Expand by default only while awaiting. */}
-      {showMarkdown && view.markdown && (
-        <PlanMarkdownPreview
-          markdown={view.markdown}
-          planPath={view.planPath}
-          truncated={view.markdownTruncated}
-          defaultExpanded={awaiting}
-        />
-      )}
+      {expanded && (
+        <div className="mt-1.5" data-testid="plan-progress-body">
+          {/* Narrative plan.md above checklist (D2.6 / D3). Expand by default only while awaiting. */}
+          {showMarkdown && view.markdown && (
+            <PlanMarkdownPreview
+              markdown={view.markdown}
+              planPath={view.planPath}
+              truncated={view.markdownTruncated}
+              defaultExpanded={awaiting}
+            />
+          )}
 
-      {/* Half-empty meta labels (D3.3 / D4.2) — only relevant while reviewing. */}
-      {awaiting && halfEmpty === 'emptyMarkdown' && (
-        <p className="mt-2 text-meta text-ink-secondary" data-testid="plan-progress-empty-markdown">
-          {t('chat.planPanel.emptyMarkdown')}
-        </p>
-      )}
-      {awaiting && halfEmpty === 'emptyChecklist' && (
-        <p className="mt-2 text-meta text-ink-secondary" data-testid="plan-progress-empty-checklist">
-          {t('chat.planPanel.emptyChecklist')}
-        </p>
-      )}
+          {/* Half-empty meta labels (D3.3 / D4.2) — only relevant while reviewing. */}
+          {awaiting && halfEmpty === 'emptyMarkdown' && (
+            <p className="mt-1.5 text-caption text-ink-secondary" data-testid="plan-progress-empty-markdown">
+              {t('chat.planPanel.emptyMarkdown')}
+            </p>
+          )}
+          {awaiting && halfEmpty === 'emptyChecklist' && (
+            <p className="mt-1.5 text-caption text-ink-secondary" data-testid="plan-progress-empty-checklist">
+              {t('chat.planPanel.emptyChecklist')}
+            </p>
+          )}
 
-      {view.items.length > 0 ? (
-        <div className="mt-2">
-          <TodoChecklist todos={view.items} showHeading={false} />
+          {view.items.length > 0 ? (
+            <div className={cn(showMarkdown && view.markdown ? 'mt-1.5' : undefined)}>
+              <div className="max-h-36 overflow-y-auto overscroll-contain">
+                <TodoChecklist todos={view.items} showHeading={false} compact />
+              </div>
+            </div>
+          ) : view.phase === 'planning' ? (
+            <p className="text-caption text-ink-secondary" data-testid="plan-progress-empty">
+              {t('chat.planPanel.emptyPlanning')}
+            </p>
+          ) : view.phase === 'awaiting_approval' && halfEmpty === 'emptyBoth' ? (
+            <p className="text-caption text-ink-secondary" data-testid="plan-progress-empty-awaiting">
+              {t('chat.planPanel.emptyAwaiting')}
+            </p>
+          ) : null}
         </div>
-      ) : view.phase === 'planning' ? (
-        <p className="mt-2 text-meta text-ink-secondary" data-testid="plan-progress-empty">
-          {t('chat.planPanel.emptyPlanning')}
-        </p>
-      ) : view.phase === 'awaiting_approval' && halfEmpty === 'emptyBoth' ? (
-        <p className="mt-2 text-meta text-ink-secondary" data-testid="plan-progress-empty-awaiting">
-          {t('chat.planPanel.emptyAwaiting')}
-        </p>
-      ) : null}
+      )}
 
+      {/* Approval actions stay visible even when the body is folded — user must act. */}
       {awaiting && (
-        <div className="mt-3" data-testid="plan-approval-card">
-          <p className="text-meta text-ink-secondary">{t('chat.planApproval.hint')}</p>
+        <div className="mt-2" data-testid="plan-approval-card">
+          <p className="text-caption text-ink-secondary">{t('chat.planApproval.hint')}</p>
           {!amendMode ? (
-            <div className="mt-3 flex flex-wrap items-center gap-2">
+            <div className="mt-2 flex flex-wrap items-center gap-1.5">
               <Button
                 variant="primary"
                 size="sm"
@@ -206,7 +240,7 @@ export function PlanProgressPanel({ view, onApprove, onReject, onAmend }: PlanPr
               </Button>
             </div>
           ) : (
-            <div className="mt-3 space-y-2">
+            <div className="mt-2 space-y-1.5">
               <Textarea
                 value={amendContent}
                 onChange={(e) => setAmendContent(e.target.value)}
@@ -216,13 +250,13 @@ export function PlanProgressPanel({ view, onApprove, onReject, onAmend }: PlanPr
                     handleAmendSubmit()
                   }
                 }}
-                rows={3}
+                rows={2}
                 placeholder={t('chat.planApproval.amendPlaceholder')}
                 disabled={responded}
                 aria-label={t('chat.planApproval.amendPlaceholder')}
                 className="border-0 bg-surface"
               />
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-1.5">
                 <Button
                   variant="primary"
                   size="sm"

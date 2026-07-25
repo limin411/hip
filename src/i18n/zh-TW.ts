@@ -458,7 +458,9 @@ export const zhTW = {
       "emptyChecklist": "尚未產生執行步驟。上方計劃文件即為審批內容。",
       "markdownTruncated": "計劃文件已截斷顯示。",
       "expandMarkdown": "查看計劃正文",
-      "collapseMarkdown": "收起計劃正文"
+      "collapseMarkdown": "收起計劃正文",
+      "expand": "展開計劃",
+      "collapse": "折疊計劃"
     },
     "planApproval": {
       "title": "計劃審批",

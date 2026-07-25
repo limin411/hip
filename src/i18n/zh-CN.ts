@@ -420,6 +420,8 @@ export const zhCN = {
         markdownTruncated: '计划文档已截断显示。',
         expandMarkdown: '查看计划正文',
         collapseMarkdown: '收起计划正文',
+        expand: '展开计划',
+        collapse: '折叠计划',
       },
       planApproval: {
         title: '计划审批',

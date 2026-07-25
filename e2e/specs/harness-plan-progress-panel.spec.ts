@@ -45,9 +45,17 @@ describe('harness plan progress panel @harness @core', () => {
     // 1 completed of 3
     expect(countText).toMatch(/1\s*\/\s*3/)
 
+    // Collapsed by default while executing: current item still visible on the header.
     const current = await chat.planProgressCurrent
     await current.waitForExist({ timeout: 5000 })
     expect(await current.getText()).toContain('e2e progress step two')
+
+    // Expand to review the full checklist.
+    const toggle = await browser.$('[data-testid="plan-progress-toggle"]')
+    await toggle.waitForExist({ timeout: 5000 })
+    if ((await toggle.getAttribute('aria-expanded')) !== 'true') {
+      await browser.execute((el: HTMLElement) => el.click(), toggle)
+    }
 
     const list = await chat.todoChecklist
     await list.waitForExist({ timeout: 5000 })
@@ -73,6 +81,12 @@ describe('harness plan progress panel @harness @core', () => {
     const count = await chat.planProgressCount
     await count.waitForExist({ timeout: 5000 })
     expect(await count.getText()).toMatch(/1\s*\/\s*3/)
+
+    const toggle = await browser.$('[data-testid="plan-progress-toggle"]')
+    await toggle.waitForExist({ timeout: 5000 })
+    if ((await toggle.getAttribute('aria-expanded')) !== 'true') {
+      await browser.execute((el: HTMLElement) => el.click(), toggle)
+    }
 
     const text = await panel.getText()
     expect(text).toContain('e2e progress step one')
@@ -116,7 +130,12 @@ describe('harness plan progress panel @harness @core', () => {
         timeoutMsg: 'plan-progress-panel disappeared after approve',
       },
     )
-    const after = await (await chat.planProgressPanel).getText()
+    const afterPanel = await chat.planProgressPanel
+    const afterToggle = await browser.$('[data-testid="plan-progress-toggle"]')
+    if ((await afterToggle.getAttribute('aria-expanded')) !== 'true') {
+      await browser.execute((el: HTMLElement) => el.click(), afterToggle)
+    }
+    const after = await afterPanel.getText()
     expect(after).toContain('e2e plan step one')
   })
 })

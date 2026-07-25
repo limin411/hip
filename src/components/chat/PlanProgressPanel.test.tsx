@@ -22,17 +22,36 @@ function view(over: Partial<LivePlanView> = {}): LivePlanView {
 describe('PlanProgressPanel', () => {
   beforeEach(() => cleanup())
 
-  it('renders checklist, progress count, and current item', () => {
+  it('renders compact header with progress; expands to show checklist', () => {
     render(<PlanProgressPanel view={view()} />)
     expect(screen.getByTestId('plan-progress-panel')).toBeInTheDocument()
+    expect(screen.getByTestId('plan-progress-panel')).toHaveAttribute('data-expanded', 'false')
+    // Collapsed: checklist hidden, current item on the header row
+    expect(screen.queryByTestId('todo-checklist')).not.toBeInTheDocument()
+    expect(screen.getByTestId('plan-progress-count')).toBeInTheDocument()
+    expect(screen.getByTestId('plan-progress-current')).toHaveTextContent('Step two')
+
+    fireEvent.click(screen.getByTestId('plan-progress-toggle'))
+    expect(screen.getByTestId('plan-progress-panel')).toHaveAttribute('data-expanded', 'true')
     expect(screen.getByTestId('todo-checklist')).toBeInTheDocument()
     expect(screen.getByText('Step one')).toBeInTheDocument()
     expect(screen.getAllByText('Step two').length).toBeGreaterThanOrEqual(1)
-    expect(screen.getByTestId('plan-progress-count')).toBeInTheDocument()
-    expect(screen.getByTestId('plan-progress-current')).toHaveTextContent('Step two')
   })
 
-  it('shows empty planning state', () => {
+  it('defaults expanded while awaiting approval', () => {
+    render(
+      <PlanProgressPanel
+        view={view({ phase: 'awaiting_approval', source: 'activeTurnPlan' })}
+        onApprove={vi.fn()}
+        onReject={vi.fn()}
+        onAmend={vi.fn()}
+      />,
+    )
+    expect(screen.getByTestId('plan-progress-panel')).toHaveAttribute('data-expanded', 'true')
+    expect(screen.getByTestId('todo-checklist')).toBeInTheDocument()
+  })
+
+  it('shows empty planning state when expanded', () => {
     render(
       <PlanProgressPanel
         view={view({
@@ -43,6 +62,9 @@ describe('PlanProgressPanel', () => {
         })}
       />,
     )
+    // planning defaults collapsed
+    expect(screen.queryByTestId('plan-progress-empty')).not.toBeInTheDocument()
+    fireEvent.click(screen.getByTestId('plan-progress-toggle'))
     expect(screen.getByTestId('plan-progress-empty')).toBeInTheDocument()
     expect(screen.queryByTestId('todo-checklist')).not.toBeInTheDocument()
   })

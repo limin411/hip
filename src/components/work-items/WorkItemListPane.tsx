@@ -1,4 +1,4 @@
-import { useMemo, useRef } from 'react'
+import { useEffect, useMemo, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Search } from 'lucide-react'
 import {
@@ -11,7 +11,7 @@ import { useWorkItemStore } from '@/store/workItemStore'
 import { EmptyState } from '@/components/ui/EmptyState'
 import { Input } from '@/components/ui/Input'
 import { Button } from '@/components/ui/Button'
-import { WorkItemRow } from './WorkItemRow'
+import { WorkItemRow, workItemOptionId } from './WorkItemRow'
 
 export interface WorkItemListPaneProps {
   searchInputRef?: React.RefObject<HTMLInputElement | null>
@@ -77,13 +77,20 @@ export function WorkItemListPane({
     else void complete(item.id)
   }
 
+  // Keep the active option in view for j/k and keyboard selection.
+  useEffect(() => {
+    if (!selectedId) return
+    const el = document.getElementById(workItemOptionId(selectedId))
+    el?.scrollIntoView({ block: 'nearest' })
+  }, [selectedId, visible])
+
+  const activeDescendant =
+    selectedId && visible.some((i) => i.id === selectedId)
+      ? workItemOptionId(selectedId)
+      : undefined
+
   return (
-    <div
-      className={className}
-      data-testid="work-item-list-pane"
-      role="listbox"
-      aria-label={t('workItems.title')}
-    >
+    <div className={className} data-testid="work-item-list-pane">
       <div className="flex shrink-0 items-center gap-2 border-b border-border px-3 py-2">
         <div className="relative min-w-0 flex-1">
           <Search
@@ -131,7 +138,13 @@ export function WorkItemListPane({
             data-testid="work-item-empty-filter"
           />
         ) : (
-          <div className="flex flex-col gap-0.5">
+          <div
+            role="listbox"
+            aria-label={t('workItems.title')}
+            aria-activedescendant={activeDescendant}
+            data-testid="work-item-listbox"
+            className="flex flex-col gap-0.5"
+          >
             {visible.map((item) => (
               <WorkItemRow
                 key={item.id}

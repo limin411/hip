@@ -123,6 +123,17 @@ export function WorkItemsPage() {
         }
         return
       }
+      // Spec §2.8: Enter keeps/enters detail and focuses title — never complete.
+      if (key === 'Enter') {
+        e.preventDefault()
+        if (!selectedId) {
+          if (visible.length === 0) return
+          select(visible[0]!.id)
+        }
+        if (narrow) setMobileShowDetail(true)
+        focusTitle()
+        return
+      }
       if (key === 'j' || key === 'ArrowDown' || key === 'k' || key === 'ArrowUp') {
         e.preventDefault()
         if (visible.length === 0) return

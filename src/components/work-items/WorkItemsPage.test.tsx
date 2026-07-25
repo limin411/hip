@@ -198,4 +198,65 @@ describe('WorkItemsPage', () => {
     fireEvent.click(screen.getByTestId('work-item-complete-wi_2'))
     expect(complete).toHaveBeenCalledWith('wi_2')
   })
+
+  it('uses listbox only around rows with option ids and activedescendant', () => {
+    storeState.items = [
+      {
+        id: 'wi_a11y',
+        title: 'A11y row',
+        status: 'todo',
+        priority: 'none',
+        listId: INBOX_LIST_ID,
+        tags: [],
+        notes: '',
+        dueOn: null,
+        createdAt: 1,
+        updatedAt: 1,
+        completedAt: null,
+        archivedAt: null,
+        links: {},
+      },
+    ]
+    storeState.selectedId = 'wi_a11y'
+    render(<WorkItemsPage />)
+    const listbox = screen.getByTestId('work-item-listbox')
+    expect(listbox).toHaveAttribute('role', 'listbox')
+    expect(listbox).toHaveAttribute('aria-activedescendant', 'work-item-option-wi_a11y')
+    // Chrome (search) is outside listbox
+    expect(screen.getByTestId('work-item-list-pane').getAttribute('role')).toBeNull()
+    const row = screen.getByTestId('work-item-row-wi_a11y')
+    expect(row).toHaveAttribute('role', 'option')
+    expect(row).toHaveAttribute('id', 'work-item-option-wi_a11y')
+    expect(row).toHaveAttribute('aria-selected', 'true')
+  })
+
+  it('Enter focuses title without completing', async () => {
+    storeState.items = [
+      {
+        id: 'wi_enter',
+        title: 'Focus me',
+        status: 'todo',
+        priority: 'none',
+        listId: INBOX_LIST_ID,
+        tags: [],
+        notes: '',
+        dueOn: null,
+        createdAt: 1,
+        updatedAt: 1,
+        completedAt: null,
+        archivedAt: null,
+        links: {},
+      },
+    ]
+    storeState.selectedId = 'wi_enter'
+    render(<WorkItemsPage />)
+    const title = screen.getByTestId('work-item-title-input') as HTMLInputElement
+    const focusSpy = vi.spyOn(title, 'focus')
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }))
+    expect(complete).not.toHaveBeenCalled()
+    await waitFor(() => {
+      expect(focusSpy).toHaveBeenCalled()
+    })
+    expect(complete).not.toHaveBeenCalled()
+  })
 })

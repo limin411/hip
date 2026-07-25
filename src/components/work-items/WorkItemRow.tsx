@@ -3,6 +3,11 @@ import { Check } from 'lucide-react'
 import type { WorkItem } from '@/domain/work-items'
 import { cn } from '@/lib/utils'
 
+/** Stable DOM id for listbox option + aria-activedescendant. */
+export function workItemOptionId(itemId: string): string {
+  return `work-item-option-${itemId}`
+}
+
 export interface WorkItemRowProps {
   item: WorkItem
   selected: boolean
@@ -32,8 +37,10 @@ export function WorkItemRow({ item, selected, onSelect, onToggleComplete }: Work
 
   return (
     <div
+      id={workItemOptionId(item.id)}
       role="option"
       aria-selected={selected}
+      tabIndex={-1}
       data-testid={`work-item-row-${item.id}`}
       data-selected={selected ? 'true' : undefined}
       className={cn(

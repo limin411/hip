@@ -11,8 +11,10 @@ import {
   setWorkItemTitle,
   setWorkItemStartOn,
   setWorkItemEndOn,
+  pickWorkItemDateToday,
   saveWorkItemModal,
   waitForCatalogTitle,
+  waitForCatalogItemMatch,
   waitForListTitle,
   selectWorkItemByTitle,
   deleteSelected,
@@ -120,7 +122,49 @@ describe('work items calendar @work-items @core', () => {
     await waitForCatalogTitle(dayTitle)
   })
 
-  it('WC4: switch list ↔ calendar; cleanup', async () => {
+  it('WC4: open old calendar item → DateField day pick + 今天 update start/end', async () => {
+    // Past-dated item (the regression: panel opens but day/today had no effect).
+    const pastTitle = `e2e-wi-cal-past-${stamp}`
+    const pastStart = ymdAdd(-40)
+    const pastEnd = ymdAdd(-38)
+    await clickSmartFilter('all')
+    await createWorkItemFromSidebar()
+    await setWorkItemTitle(pastTitle)
+    await setWorkItemStartOn(pastStart)
+    await setWorkItemEndOn(pastEnd)
+    await saveWorkItemModal()
+    await waitForCatalogTitle(pastTitle)
+
+    // Re-open from calendar bar if present, else list
+    const calTab = await browser.$('[data-testid="work-item-view-mode-calendar"]')
+    if (await calTab.isExisting()) await calTab.click()
+    await browser.pause(200)
+    // Jump month nav toward past so bar is visible is hard; use list select.
+    await switchWorkItemsToListView()
+    await selectWorkItemByTitle(pastTitle)
+    await browser.waitUntil(async () => isWorkItemModalOpen(), {
+      timeout: 10000,
+      timeoutMsg: 'edit modal not open for past item',
+    })
+
+    const today = localTodayYmd()
+    // Real UI: Today on start, then set end via day cell
+    await pickWorkItemDateToday('work-item-start-input')
+    await setWorkItemEndOn(today)
+    await saveWorkItemModal()
+
+    await waitForCatalogItemMatch(
+      (i) => i.title === pastTitle && i.startOn === today && i.endOn === today,
+      20000,
+      'past item dates not updated via DateField UI',
+    )
+
+    // cleanup this extra item
+    await selectWorkItemByTitle(pastTitle)
+    await deleteSelected(true)
+  })
+
+  it('WC5: switch list ↔ calendar; cleanup', async () => {
     await switchWorkItemsToListView()
     await waitForListTitle(spanTitle)
     await (await browser.$('[data-testid="work-item-view-mode-calendar"]')).click()

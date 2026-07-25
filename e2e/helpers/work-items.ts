@@ -252,12 +252,108 @@ export async function setWorkItemPriority(priority: string): Promise<void> {
   await setReactSelectValue('work-item-priority-select', priority)
 }
 
+/**
+ * Dispatch primary pointerdown (DateField listens here — Dialog cancels click).
+ */
+async function pointerDownTestId(testid: string): Promise<void> {
+  const el = await browser.$(`[data-testid="${testid}"]`)
+  await el.waitForExist({ timeout: 10000 })
+  await browser.execute((node: HTMLElement) => {
+    node.dispatchEvent(
+      new PointerEvent('pointerdown', {
+        bubbles: true,
+        cancelable: true,
+        button: 0,
+        pointerId: 1,
+        pointerType: 'mouse',
+      }),
+    )
+  }, el)
+}
+
+/**
+ * Pick a YYYY-MM-DD via the real DateField UI (trigger + day cell).
+ * Falls back to hidden-input set if the panel cannot open (legacy).
+ */
+export async function pickWorkItemDateField(
+  inputTestId: 'work-item-start-input' | 'work-item-end-input',
+  ymd: string,
+): Promise<void> {
+  const trigger = await browser.$(`[data-testid="${inputTestId}-trigger"]`)
+  if (!(await trigger.isExisting())) {
+    await setReactInputValue(inputTestId, ymd)
+    return
+  }
+  await trigger.click()
+  const panel = await browser.$(`[data-testid="${inputTestId}-panel"]`)
+  await panel.waitForExist({ timeout: 8000 })
+
+  // Navigate months until the day cell is in the matrix (42-day window).
+  for (let step = 0; step < 48; step++) {
+    const daySel = `date-field-day-${ymd}`
+    const day = await browser.$(`[data-testid="${daySel}"]`)
+    if (await day.isExisting()) {
+      await pointerDownTestId(daySel)
+      break
+    }
+    const sample = await browser.execute(() => {
+      const el = document.querySelector('[data-testid^="date-field-day-"]')
+      return el?.getAttribute('data-testid')?.replace('date-field-day-', '') ?? null
+    })
+    if (!sample) throw new Error('DateField panel has no day cells')
+    // sample is roughly in the visible month; step toward target
+    if (ymd > sample) await pointerDownTestId('date-field-next-month')
+    else await pointerDownTestId('date-field-prev-month')
+    await browser.pause(40)
+    if (step === 47) throw new Error(`DateField could not reach day ${ymd}`)
+  }
+
+  await browser.waitUntil(
+    async () => (await (await browser.$(`[data-testid="${inputTestId}"]`)).getValue()) === ymd,
+    {
+      timeout: 8000,
+      interval: 50,
+      timeoutMsg: `${inputTestId} did not become ${ymd} after DateField pick`,
+    },
+  )
+}
+
 export async function setWorkItemStartOn(ymd: string | null): Promise<void> {
-  await setReactInputValue('work-item-start-input', ymd ?? '')
+  if (ymd == null || ymd === '') {
+    await setReactInputValue('work-item-start-input', '')
+    return
+  }
+  await pickWorkItemDateField('work-item-start-input', ymd)
 }
 
 export async function setWorkItemEndOn(ymd: string | null): Promise<void> {
-  await setReactInputValue('work-item-end-input', ymd ?? '')
+  if (ymd == null || ymd === '') {
+    await setReactInputValue('work-item-end-input', '')
+    return
+  }
+  await pickWorkItemDateField('work-item-end-input', ymd)
+}
+
+/** Click DateField “今天” and assert the hidden input updates. */
+export async function pickWorkItemDateToday(
+  inputTestId: 'work-item-start-input' | 'work-item-end-input',
+): Promise<void> {
+  const trigger = await browser.$(`[data-testid="${inputTestId}-trigger"]`)
+  await trigger.waitForExist({ timeout: 10000 })
+  await trigger.click()
+  await (await browser.$(`[data-testid="${inputTestId}-panel"]`)).waitForExist({
+    timeout: 8000,
+  })
+  await pointerDownTestId('date-field-today')
+  const today = localTodayYmd()
+  await browser.waitUntil(
+    async () => (await (await browser.$(`[data-testid="${inputTestId}"]`)).getValue()) === today,
+    {
+      timeout: 8000,
+      interval: 50,
+      timeoutMsg: `${inputTestId} did not jump to today (${today})`,
+    },
+  )
 }
 
 /** @deprecated use setWorkItemEndOn */

@@ -58,8 +58,8 @@ export function Composer({
   onAnnotationClear?: () => void
   inputRef?: React.RefObject<HTMLTextAreaElement>
   /**
-   * `card` — rounded rectangle (new-conversation empty state).
-   * `flat` — CLI dock style under a horizontal rule (active session InputBar).
+   * `card` — rounded rectangle shell (new-conversation empty state + session InputBar).
+   * `flat` — no chrome (legacy / tests).
    */
   variant?: ComposerVariant
   /** Fixed textarea height in px (session InputBar resize). When set, overrides rows. */

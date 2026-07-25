@@ -266,13 +266,12 @@ export function InputBar() {
     activeId ? (s.bySession[activeId]?.length ?? 0) : 0,
   )
   return (
-    // CLI-style dock: horizontal rule separates transcript (above) from input (below).
-    // Top edge is a drag handle to resize the textarea height.
+    // Floating rounded card under the transcript. Top edge is a drag handle to resize height.
     <div
-      className="relative shrink-0 border-t border-border bg-surface"
+      className="relative shrink-0 bg-surface"
       data-testid="input-bar"
     >
-      {/* Invisible hit target on the top rule — drag still resizes; no visible grip chrome. */}
+      {/* Invisible hit target on the top edge — drag still resizes; no visible grip chrome. */}
       {!sessionActionBlocked && (
         <div
           role="separator"
@@ -280,13 +279,13 @@ export function InputBar() {
           aria-label={t('chat.resizeInput')}
           data-testid="input-bar-resize"
           onPointerDown={onResizePointerDown}
-          className="absolute inset-x-0 top-0 z-10 h-2 -translate-y-1/2 cursor-ns-resize"
+          className="absolute inset-x-4 top-2 z-10 h-2 -translate-y-1/2 cursor-ns-resize"
         />
       )}
-      <div className="w-full px-4 py-2.5">
+      <div className="w-full px-4 pb-3 pt-2">
         {sessionActionBlocked ? (
           <div
-            className="rounded-md bg-surface-muted/50 px-3 py-3 text-left text-meta text-ink-secondary"
+            className="rounded-xl border border-border bg-surface-muted/50 px-3 py-3 text-left text-meta text-ink-secondary"
             data-testid="input-bar-blocked"
             role="status"
           >
@@ -316,7 +315,7 @@ export function InputBar() {
               />
             )}
             <Composer
-              variant="flat"
+              variant="card"
               textareaHeight={textareaHeight}
               value={value}
               onChange={setValue}

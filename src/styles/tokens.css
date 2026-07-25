@@ -3,6 +3,16 @@
 @tailwind utilities;
 
 /*
+ * Floating layers above Modal (z-50). Radix wrappers default to z-index:auto.
+ */
+[data-radix-popper-content-wrapper] {
+  z-index: 60 !important;
+}
+[data-date-field-panel] {
+  z-index: 70 !important;
+}
+
+/*
  * 阴影三档（克制）：
  *   none          — 几乎全部 chrome（默认 Tailwind shadow-* 已压成 none）
  *   shadow-panel  — 右侧浮动卡片等（--shadow-panel）

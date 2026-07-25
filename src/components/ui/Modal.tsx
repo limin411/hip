@@ -32,6 +32,8 @@ function isPortaledFloatingTarget(target: EventTarget | null): boolean {
         '[data-radix-menu-content]',
         '[data-radix-select-content]',
         '[role="listbox"]',
+        // DateField month panel (createPortal to body)
+        '[data-date-field-panel]',
       ].join(','),
     ),
   )
@@ -76,8 +78,18 @@ export function Modal({
     <DialogPrimitive.Root open={open} onOpenChange={onOpenChange}>
       <DialogPrimitive.Portal>
         <DialogPrimitive.Overlay className="fixed inset-0 z-50 bg-overlay backdrop-blur-[2px]" />
+        {/*
+          Content must NOT be full-viewport. A full-screen Content at z-50 sits above
+          portaled Popovers (wrapper often has z-index:auto) and steals day/today clicks
+          in DateField. Center the panel itself instead.
+        */}
         <DialogPrimitive.Content
-          className="fixed inset-0 z-50 flex items-center justify-center outline-none"
+          className={cn(
+            'fixed left-1/2 top-1/2 z-50 flex max-h-[85vh] w-[calc(100vw-2rem)] -translate-x-1/2 -translate-y-1/2 flex-col overflow-hidden rounded-xl border border-border bg-surface shadow-overlay outline-none animate-menu-in',
+            !resizable && 'max-w-lg',
+            className,
+          )}
+          style={resizable ? { width: size.width, height: size.height } : undefined}
           // Opt out of required Description when chrome only supplies a title (avoids Radix stderr noise).
           aria-describedby={undefined}
           onEscapeKeyDown={(e) => {
@@ -101,43 +113,36 @@ export function Modal({
             }
           }}
         >
-          <div
-            className={cn(
-              'relative z-50 flex flex-col overflow-hidden rounded-xl border border-border bg-surface shadow-overlay outline-none animate-menu-in',
-              !resizable && 'max-h-[85vh] w-[calc(100vw-2rem)] max-w-lg',
-              className,
-            )}
-            style={resizable ? { width: size.width, height: size.height } : undefined}
-          >
-            <div className="flex h-12 shrink-0 items-center justify-between border-b border-border px-5">
-              <DialogPrimitive.Title className="text-title font-semibold tracking-tight text-ink">
-                {title}
-              </DialogPrimitive.Title>
-              <DialogPrimitive.Close
-                disabled={closeDisabled}
-                className={cn(
-                  'flex h-7 w-7 items-center justify-center rounded-md text-ink-tertiary transition-colors duration-chrome hover:bg-state-hover hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink/20',
-                  closeDisabled && 'pointer-events-none opacity-40',
-                )}
-                title={t('common.close')}
-                data-testid="modal-close"
-              >
-                <X size={16} strokeWidth={1.75} />
-              </DialogPrimitive.Close>
-            </div>
-            <div className="flex-1 overflow-y-auto">{children}</div>
-            {footer && (
-              <div className="shrink-0 border-t border-border bg-surface-subtle/80 px-5 py-3">{footer}</div>
-            )}
-            {resizable &&
-              RESIZE_HANDLES.map((h) => (
-                <div
-                  key={h.dir}
-                  onPointerDown={(e) => onResizeStart(h.dir, e)}
-                  className={cn('absolute select-none', h.dir.includes('-') ? 'z-20' : 'z-10', h.className)}
-                />
-              ))}
+          <div className="flex h-12 shrink-0 items-center justify-between border-b border-border px-5">
+            <DialogPrimitive.Title className="text-title font-semibold tracking-tight text-ink">
+              {title}
+            </DialogPrimitive.Title>
+            <DialogPrimitive.Close
+              disabled={closeDisabled}
+              className={cn(
+                'flex h-7 w-7 items-center justify-center rounded-md text-ink-tertiary transition-colors duration-chrome hover:bg-state-hover hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink/20',
+                closeDisabled && 'pointer-events-none opacity-40',
+              )}
+              title={t('common.close')}
+              data-testid="modal-close"
+            >
+              <X size={16} strokeWidth={1.75} />
+            </DialogPrimitive.Close>
           </div>
+          <div className="min-h-0 flex-1 overflow-y-auto">{children}</div>
+          {footer && (
+            <div className="shrink-0 border-t border-border bg-surface-subtle/80 px-5 py-3">
+              {footer}
+            </div>
+          )}
+          {resizable &&
+            RESIZE_HANDLES.map((h) => (
+              <div
+                key={h.dir}
+                onPointerDown={(e) => onResizeStart(h.dir, e)}
+                className={cn('absolute select-none', h.dir.includes('-') ? 'z-20' : 'z-10', h.className)}
+              />
+            ))}
         </DialogPrimitive.Content>
       </DialogPrimitive.Portal>
     </DialogPrimitive.Root>

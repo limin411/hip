@@ -10,14 +10,16 @@ export const PopoverClose = PopoverPrimitive.Close
 export const PopoverContent = forwardRef<
   React.ElementRef<typeof PopoverPrimitive.Content>,
   React.ComponentPropsWithoutRef<typeof PopoverPrimitive.Content>
->(({ className, align = 'start', sideOffset = 6, ...props }, ref) => (
+>(({ className, align = 'start', sideOffset = 6, style, ...props }, ref) => (
   <PopoverPrimitive.Portal>
     <PopoverPrimitive.Content
       ref={ref}
       align={align}
       sideOffset={sideOffset}
+      // z-index must win over Modal (z-50). Inline style reaches the positioned
+      // layer more reliably than Tailwind alone on some Radix wrapper setups.
+      style={{ zIndex: 60, ...style }}
       className={cn(
-        // Above Modal overlay/content (z-50) so DateField month grid is clickable.
         'z-[60] w-[min(360px,calc(100vw-2rem))] rounded-lg border border-border bg-surface p-0 shadow-menu outline-none',
         'origin-[var(--radix-popover-content-transform-origin)] data-[state=open]:animate-menu-in',
         className,

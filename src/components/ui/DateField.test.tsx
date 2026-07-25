@@ -66,4 +66,16 @@ describe('DateField', () => {
     const ymd = onChange.mock.calls[0]![0] as string
     expect(ymd).toMatch(/^\d{4}-\d{2}-\d{2}$/)
   })
+
+  it('today works even when value is far in the past (no max clamp)', () => {
+    const onChange = vi.fn()
+    render(
+      <DateField data-testid="d" value="2020-01-15" onChange={onChange} />,
+    )
+    fireEvent.click(screen.getByTestId('d-trigger'))
+    // Today must not be disabled just because the stored date is old.
+    expect(screen.getByTestId('date-field-today')).not.toBeDisabled()
+    fireEvent.click(screen.getByTestId('date-field-today'))
+    expect(onChange).toHaveBeenCalled()
+  })
 })

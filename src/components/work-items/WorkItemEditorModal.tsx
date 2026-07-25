@@ -288,32 +288,37 @@ export function WorkItemEditorModal() {
           </label>
 
           <div className="grid grid-cols-2 gap-3">
-            <label className="flex flex-col gap-1">
+            {/*
+              Use <div> not <label>: DateField is a composite (button + popover).
+              A wrapping <label> steals / retargets clicks and can prevent day picks.
+            */}
+            <div className="flex flex-col gap-1">
               <span className="text-meta text-ink-tertiary">{t('workItems.fields.startOn')}</span>
               <DateField
                 data-testid="work-item-start-input"
                 aria-label={t('workItems.fields.startOn')}
                 value={draft.startOn}
-                max={draft.endOn}
+                // No max: past-dated items must still allow jumping start to today.
+                // onChange clamps end so start ≤ end.
                 onChange={(startOn) => {
                   const endOn = startOn > draft.endOn ? startOn : draft.endOn
                   patch({ startOn, endOn })
                 }}
               />
-            </label>
-            <label className="flex flex-col gap-1">
+            </div>
+            <div className="flex flex-col gap-1">
               <span className="text-meta text-ink-tertiary">{t('workItems.fields.endOn')}</span>
               <DateField
                 data-testid="work-item-end-input"
                 aria-label={t('workItems.fields.endOn')}
                 value={draft.endOn}
-                min={draft.startOn}
+                // No min: same reason as start — free pick + clamp the other side.
                 onChange={(endOn) => {
                   const startOn = endOn < draft.startOn ? endOn : draft.startOn
                   patch({ startOn, endOn })
                 }}
               />
-            </label>
+            </div>
           </div>
 
           <div className="grid grid-cols-2 gap-3">

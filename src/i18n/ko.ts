@@ -100,6 +100,8 @@ export const ko = {
         "init": "프로젝트 가이드 AGENTS.md 생성 또는 업데이트",
         "plan": "다음 턴에 계획 모드 강제 (선택: /plan task…)",
         "plan-off": "이 세션의 강제 계획 모드 해제",
+        "interactive": "대화형 협업 모드로 전환",
+        "autopilot": "엔드투엔드 모드(전체 접근 필요); 모든 승인 자동 허용",
         "memory": "메모리 설정 열기",
         "memory-on": "이 세션에 메모리 주입 활성화",
         "memory-off": "이 세션에 메모리 주입 비활성화",
@@ -361,6 +363,32 @@ export const ko = {
       "forceOffBody": "더 이상 턴에 먼저 계획이 필요하지 않습니다.",
       "respondFailedTitle": "계획 응답 실패",
       "respondFailedBody": "계획 응답을 적용할 수 없습니다({{reason}}). 승인 상태를 복원했습니다."
+    },
+    "executionMode": {
+      "label": "이 대화의 실행 모드",
+      "menuTitle": "모드",
+      "busyTitle": "턴이 실행 중일 때는 실행 모드를 변경할 수 없습니다",
+      "modes": {
+        "interactive": "대화형",
+        "plan": "계획",
+        "autopilot": "자동"
+      },
+      "desc": {
+        "interactive": "단계별 협업",
+        "plan": "먼저 계획하고 준비되면 실행",
+        "autopilot": "중단 없는 엔드투엔드 실행",
+        "autopilotLocked": "전체 접근 권한이 필요합니다"
+      },
+      "setInteractiveTitle": "대화형 모드",
+      "setInteractiveBody": "더 이상 턴에 먼저 계획이 필요하지 않습니다. 권한은 현재 권한 모드를 따릅니다.",
+      "setPlanTitle": "계획 모드 켜짐",
+      "setPlanBody": "다음 턴은 먼저 계획을 세웁니다. 작업을 보내거나 /plan your task를 사용하세요.",
+      "setAutopilotTitle": "자동 모드 켜짐",
+      "setAutopilotBody": "모든 승인이 자동으로 허용됩니다. Stop은 계속 사용할 수 있습니다. 전체 접근이 필요합니다.",
+      "autopilotRequiresFullTitle": "자동 모드를 켤 수 없습니다",
+      "autopilotRequiresFullBody": "먼저 권한 모드를 전체 접근으로 전환하세요.",
+      "autopilotClearedTitle": "자동 모드 꺼짐",
+      "autopilotClearedBody": "권한이 더 이상 전체 접근이 아니므로 대화형으로 돌아갔습니다."
     },
     "permission": {
       "title": "권한 필요",

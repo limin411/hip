@@ -1,5 +1,6 @@
 /** WebSocket ClientMessage / ServerMessage protocol unions. */
 import type { SessionConfig, PermissionMode, PlanItem, AgentRole } from './session-core.js'
+import type { ExecutionMode } from './execution-mode.js'
 import type {
   Attachment,
   Message,
@@ -106,6 +107,7 @@ export type ClientMessage =
   | { type: 'session:setSystemPrompt'; sessionId: string; systemPrompt: string | null }
   | { type: 'session:setPermissionMode'; sessionId: string; permissionMode: PermissionMode }
   | { type: 'session:setForcePlan'; sessionId: string; forcePlan: boolean }
+  | { type: 'session:setExecutionMode'; sessionId: string; executionMode: ExecutionMode }
   /**
    * Mid-session primary agent switch. `agentId` `'builtin'` or `''` clears external
    * primary (hip Supervisor). Otherwise an enabled ACP-capable agent id.
@@ -316,6 +318,7 @@ export type ServerMessage =
   | { type: 'session:systemPrompt'; sessionId: string; systemPrompt: string | null }
   | { type: 'session:permissionMode'; sessionId: string; permissionMode: PermissionMode }
   | { type: 'session:forcePlan'; sessionId: string; forcePlan: boolean }
+  | { type: 'session:executionMode'; sessionId: string; executionMode: ExecutionMode }
   /**
    * Field-echo after session:setAgent. `agentId` is the resolved primary id, or `null`
    * when cleared to the built-in Supervisor (no full SessionConfig merge).

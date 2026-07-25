@@ -23,15 +23,37 @@ export async function planProgressPanelVisible(): Promise<boolean> {
   }
 }
 
-/** Click product Plan mode chip until active (draft or session forcePlan). */
+/**
+ * Click product Plan mode until active (draft or session executionMode=plan / forcePlan).
+ * Supports ExecutionModePicker (menu) and legacy binary plan-mode-chip.
+ */
 export async function enablePlanModeUi(): Promise<void> {
   const { ensureComposerControlVisible } = await import('./composer-overflow')
+
+  // Prefer three-mode picker
+  try {
+    const chip = await ensureComposerControlVisible('execution-mode-chip')
+    const pressed = await chip.getAttribute('aria-pressed')
+    // When plan/autopilot is active, chip is pressed; still need plan specifically.
+    await browser.execute((el: HTMLElement) => el.click(), chip)
+    await browser.pause(150)
+    const planItem = await browser.$('[data-testid="execution-mode-plan"]')
+    if (await planItem.isExisting()) {
+      await planItem.click()
+      await browser.pause(200)
+      return
+    }
+    // Menu failed; if already pressed treat as success
+    if (pressed === 'true') return
+  } catch {
+    // fall through to legacy chip
+  }
+
   const chip = await ensureComposerControlVisible('plan-mode-chip')
   const pressed = await chip.getAttribute('aria-pressed')
   if (pressed === 'true') return
   await browser.execute((el: HTMLElement) => el.click(), chip)
   await browser.pause(200)
-  // If still off (missed click), try once more
   const again = await chip.getAttribute('aria-pressed')
   if (again !== 'true') {
     await browser.execute((el: HTMLElement) => el.click(), chip)

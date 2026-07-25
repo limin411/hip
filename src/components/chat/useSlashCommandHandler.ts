@@ -12,6 +12,8 @@ import {
   extractInitFocus,
   runPlanOn,
   runPlanOff,
+  runInteractive,
+  runAutopilot,
   extractPlanTask,
   setIncognito,
   setUseMemories,
@@ -134,6 +136,18 @@ export function useSlashCommandHandler(
         }
         if (cmd.id === 'plan-off') {
           runPlanOff(sessionId)
+          setText('')
+          focusInput()
+          return
+        }
+        if (cmd.id === 'interactive') {
+          runInteractive(sessionId)
+          setText('')
+          focusInput()
+          return
+        }
+        if (cmd.id === 'autopilot') {
+          runAutopilot(sessionId)
           setText('')
           focusInput()
           return

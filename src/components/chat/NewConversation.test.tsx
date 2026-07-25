@@ -193,6 +193,7 @@ describe('NewConversation', () => {
     render(<NewConversation />)
     expect(screen.getByTestId('permission-chip')).toBeInTheDocument()
     expect(screen.queryByTestId('plan-mode-chip')).not.toBeInTheDocument()
+    expect(screen.queryByTestId('execution-mode-chip')).not.toBeInTheDocument()
     expect(screen.queryByTestId('model-chip')).not.toBeInTheDocument()
   })
 

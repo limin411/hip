@@ -41,11 +41,13 @@ describe('harness plan entry @harness @core', () => {
     }
   })
 
-  it('plan-mode-chip toggles forcePlan on a code session', async () => {
+  it('execution-mode chip selects Plan (forcePlan) on a code session', async () => {
     const sessionId = await createCodeSessionForE2e(tmpCwd)
     expect(sessionId).toBeTruthy()
 
-    const chip = await browser.$('[data-testid="plan-mode-chip"]')
+    const chip = await browser.$(
+      '[data-testid="execution-mode-chip"], [data-testid="plan-mode-chip"]',
+    )
     await chip.waitForExist({ timeout: 15000 })
     expect(await chip.getAttribute('aria-pressed')).not.toBe('true')
 
@@ -53,7 +55,9 @@ describe('harness plan entry @harness @core', () => {
 
     await browser.waitUntil(
       async () => {
-        const el = await browser.$('[data-testid="plan-mode-chip"]')
+        const el = await browser.$(
+          '[data-testid="execution-mode-chip"], [data-testid="plan-mode-chip"]',
+        )
         const pressed = await el.getAttribute('aria-pressed')
         if (pressed === 'true') return true
         const flag = await browser.execute(() => {
@@ -67,7 +71,7 @@ describe('harness plan entry @harness @core', () => {
       {
         timeout: 10000,
         interval: 200,
-        timeoutMsg: 'forcePlan not set after plan-mode-chip click',
+        timeoutMsg: 'forcePlan not set after execution-mode Plan selection',
       },
     )
 

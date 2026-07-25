@@ -102,4 +102,16 @@ describe('draftStore permissionMode', () => {
     useDraftStore.getState().reset()
     expect(useDraftStore.getState().draft).toBeNull()
   })
+  it('leaving full clears autopilot', () => {
+    useDraftStore.getState().setPermissionMode('full')
+    expect(useDraftStore.getState().setExecutionMode('autopilot')).toBe(true)
+    expect(useDraftStore.getState().draft?.executionMode).toBe('autopilot')
+    useDraftStore.getState().setPermissionMode('edit')
+    expect(useDraftStore.getState().draft?.executionMode).toBe('interactive')
+    expect(useDraftStore.getState().draft?.forcePlan).toBe(false)
+  })
+  it('rejects autopilot without full', () => {
+    useDraftStore.getState().setPermissionMode('edit')
+    expect(useDraftStore.getState().setExecutionMode('autopilot')).toBe(false)
+  })
 })

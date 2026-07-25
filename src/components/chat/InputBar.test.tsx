@@ -483,6 +483,7 @@ describe('InputBar', () => {
     render(<InputBar />)
     expect(screen.getByTestId('permission-chip')).toBeInTheDocument()
     expect(screen.queryByTestId('plan-mode-chip')).not.toBeInTheDocument()
+    expect(screen.queryByTestId('execution-mode-chip')).not.toBeInTheDocument()
     expect(screen.queryByTestId('model-chip')).not.toBeInTheDocument()
   })
 

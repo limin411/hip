@@ -1,5 +1,5 @@
 import type { ServerMessage, SessionConfig, AgentRole, Message, AgentRun, FsEntry, TurnUsage, DiffBase, DiffFile, DiffState, DiffSummary, Checkpoint, CommitLogEntry, CheckpointMode, Branch, PermissionMode, WorkflowDef, Hook, SkillMeta, AgentConfig, McpServerConfig, PlanItem, SessionEvent, TimelineStep, Attachment, ContentPart, OrchestrationMode } from '@hip/protocol'
-import { FIXED_AGENTS } from '@hip/protocol'
+import { FIXED_AGENTS, resolveExecutionMode, isAutopilot } from '@hip/protocol'
 import { mkdir, writeFile, rename } from 'node:fs/promises'
 import { join, dirname } from 'node:path'
 import type { BaseChatModel } from '@langchain/core/language_models/chat_models'
@@ -360,12 +360,21 @@ export class Session {
       () => this._config.permissionMode ?? 'edit',
       (mode) => {
         if (this.running) return false
-        this._config = { ...this._config, permissionMode: mode }
+        // Prefer ConfigManager when available so autopilot clears on leave-full.
+        if (this.configMgr) {
+          const ok = this.configMgr.setPermissionMode(mode)
+          if (!ok) return false
+        } else {
+          this._config = { ...this._config, permissionMode: mode }
+        }
         // KD-21: freeze schedule fires in chat; keep running shells
-        this.scheduleFiresPaused = mode === 'chat'
+        this.scheduleFiresPaused = (this._config.permissionMode ?? mode) === 'chat'
         return true
       },
-      { enableStickyApproval: this._config.enableStickyApproval ?? true },
+      {
+        enableStickyApproval: this._config.enableStickyApproval ?? true,
+        isAutopilot: () => isAutopilot(resolveExecutionMode(this._config)),
+      },
     )
     this.permissions.setApprovalCache(this.approvalCache)
     this.agentProv = new AgentProviderManager(id, store, () => this._config, this.invokerFactory)
@@ -537,7 +546,17 @@ export class Session {
   // ── Permission delegation ──
   setPermissionMode(permissionMode: PermissionMode): boolean { return this.configMgr.setPermissionMode(permissionMode) }
   setForcePlan(forcePlan: boolean): boolean { return this.configMgr.setForcePlan(forcePlan) }
+  setExecutionMode(executionMode: import('@hip/protocol').ExecutionMode): boolean {
+    return this.configMgr.setExecutionMode(executionMode)
+  }
   respondPermission(requestId: string, choice: { optionId: string } | { cancelled: true }): void { this.permissions.respondPermission(requestId, choice) }
+
+  /** Autopilot: after plan interrupt is published, auto-approve on next microtask. */
+  scheduleAutopilotPlanApprove(send: (msg: import('@hip/protocol').ServerMessage) => void): void {
+    queueMicrotask(() => {
+      void this.handlePlanResponse('approve', send)
+    })
+  }
 
   // ── Agent provider delegation ──
   async setAgentConfigOption(configId: string, value: string): Promise<void> { await this.agentProv.setAgentConfigOption(configId, value) }
@@ -581,9 +600,9 @@ export class Session {
       await this.agentProv.dispose()
       // 2. clear persisted ACP handle (CRITICAL — avoid loadSession on wrong agent)
       this.store?.setAcpSessionId(this.id, null)
-      // 3. update config (external primary clears hip-only forcePlan — match new-session fork)
+      // 3. update config (external primary clears hip-only forcePlan / executionMode — match new-session fork)
       if (next) {
-        const { forcePlan: _fp, agentId: _prev, ...rest } = this._config
+        const { forcePlan: _fp, executionMode: _em, agentId: _prev, ...rest } = this._config
         this._config = { ...rest, agentId: next }
       } else {
         const { agentId: _cleared, ...rest } = this._config

@@ -4,6 +4,7 @@
  */
 
 export * from './session-core.js'
+export * from './execution-mode.js'
 export * from './providers-agents.js'
 export * from './mcp-config.js'
 export * from './hooks.js'

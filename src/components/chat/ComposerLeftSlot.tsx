@@ -3,7 +3,7 @@ import { SessionAgentPicker } from './SessionAgentPicker'
 import { ModelPicker } from './ModelPicker'
 import { EffortLevelPicker } from './EffortLevelPicker'
 import { PermissionModePicker, resolvePermissionMode } from './PermissionModePicker'
-import { PlanModeChip } from './PlanModeChip'
+import { ExecutionModePicker } from './ExecutionModePicker'
 import { ProjectGuidanceChip } from './ProjectGuidanceChip'
 import { AttachmentButton } from './AttachmentButton'
 import { WorktreeControl } from './WorktreeControl/WorktreeControl'
@@ -14,6 +14,7 @@ import {
   type ControlId,
   type ComposerControlFlags,
 } from './composerControlMatrix'
+import { resolveExecutionMode } from '@hip/protocol'
 import { isExternalPrimary } from '@/lib/sessionAgent'
 import { useActiveSession, useActiveSessionId } from '@/domain'
 import { useDraftStore } from '@/store/draftStore'
@@ -44,7 +45,7 @@ function mountId(id: ControlId, onAttach: (add: LocalAttachment[]) => void): Rea
     case 'permission':
       return <PermissionModePicker key="permission" />
     case 'plan':
-      return <PlanModeChip key="plan" />
+      return <ExecutionModePicker key="plan" />
     case 'guidance':
       return <ProjectGuidanceChip key="guidance" />
     case 'worktree':
@@ -83,9 +84,17 @@ export function ComposerLeftSlot({
   const permissionMode = resolvePermissionMode(
     sessionBound && session ? session.config.permissionMode : draft?.permissionMode,
   )
-  const forcePlan = Boolean(
-    sessionBound && session ? session.config.forcePlan : draft?.forcePlan,
-  )
+  // Pin execution-mode control when not default interactive (plan or autopilot).
+  const forcePlan =
+    resolveExecutionMode(
+      sessionBound && session
+        ? session.config
+        : {
+            executionMode: draft?.executionMode,
+            forcePlan: draft?.forcePlan,
+            permissionMode: draft?.permissionMode,
+          },
+    ) !== 'interactive'
 
   const modelKey =
     sessionBound && session
@@ -155,7 +164,7 @@ export function ComposerLeftSlot({
           {!externalPrimary && <ModelPicker />}
           {!externalPrimary && <EffortLevelPicker />}
           <PermissionModePicker />
-          {!externalPrimary && <PlanModeChip />}
+          {!externalPrimary && <ExecutionModePicker />}
           {sessionBound && <ProjectGuidanceChip />}
           {sessionBound && <WorktreeControl />}
           <AttachmentButton onAttach={onAttach} />

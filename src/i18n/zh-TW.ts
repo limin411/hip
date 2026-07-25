@@ -108,6 +108,8 @@ export const zhTW = {
         "init": "分析專案並產生/更新 AGENTS.md",
         "plan": "強制先規劃再執行（可選：/plan 任務…）",
         "plan-off": "關閉此對話的強制規劃模式",
+        "interactive": "切換為互動協作模式",
+        "autopilot": "端到端自動模式（需完全訪問）；所有審批預設通過",
         "memory": "開啟記憶設定",
         "memory-on": "為此對話啟用記憶注入",
         "memory-off": "為此對話關閉記憶注入",
@@ -369,6 +371,32 @@ export const zhTW = {
       "forceOffBody": "回合不再強制先規劃。",
       "respondFailedTitle": "計劃響應失敗",
       "respondFailedBody": "無法套用計劃響應（{{reason}}）。已恢復審批狀態。"
+    },
+    "executionMode": {
+      "label": "本對話的執行模式",
+      "menuTitle": "模式",
+      "busyTitle": "回合進行中，暫不能切換執行模式",
+      "modes": {
+        "interactive": "互動",
+        "plan": "規劃",
+        "autopilot": "自動"
+      },
+      "desc": {
+        "interactive": "逐步協作，需要時再確認",
+        "plan": "先規劃，就緒後再執行",
+        "autopilot": "端到端執行，所有審批預設通過（需完全訪問）",
+        "autopilotLocked": "需要先將權限設為「完全訪問」"
+      },
+      "setInteractiveTitle": "已切換為互動模式",
+      "setInteractiveBody": "回合不再強制先規劃，權限仍按目前權限模式詢問。",
+      "setPlanTitle": "已開啟規劃模式",
+      "setPlanBody": "後續回合會先規劃。直接傳送任務，或使用 /plan 你的任務。",
+      "setAutopilotTitle": "已切換為自動模式",
+      "setAutopilotBody": "所有審批將預設批准，不再彈出確認；目前為完全訪問。Stop 仍可用。",
+      "autopilotRequiresFullTitle": "無法開啟自動模式",
+      "autopilotRequiresFullBody": "請先將權限切換為「完全訪問」。",
+      "autopilotClearedTitle": "已關閉自動模式",
+      "autopilotClearedBody": "權限不再是完全訪問，已回到互動模式。"
     },
     "permission": {
       "title": "需要授權",

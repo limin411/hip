@@ -43,7 +43,13 @@ export interface SessionConfig {
   /** When true, HITL approval prompts include "always allow/always reject" sticky options.
    *  Defaults to true for new sessions; undefined ⇒ treated as true. */
   enableStickyApproval?: boolean
-  /** When true, always run the plan/execute/verify loop for this session. */
+  /**
+   * Collaboration mode: interactive | plan | autopilot.
+   * Autopilot requires permissionMode === 'full'. Prefer this over forcePlan for new clients.
+   * undefined ⇒ derive via resolveExecutionMode (forcePlan legacy).
+   */
+  executionMode?: import('./execution-mode.js').ExecutionMode
+  /** When true, always run the plan/execute/verify loop for this session. Dual-written with executionMode=plan. */
   forcePlan?: boolean
   /** When true, never run the plan/execute/verify loop (always fast path). Overrides forcePlan. */
   disablePlan?: boolean

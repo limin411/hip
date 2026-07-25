@@ -1,9 +1,10 @@
 import type { ServerMessage } from '@hip/protocol'
+import { resolveExecutionMode } from '@hip/protocol'
 import { logInfo } from '../debug-logger.js'
 
 type ForcePlanHost = {
   id: string
-  _config: { forcePlan?: boolean }
+  _config: { forcePlan?: boolean; executionMode?: import('@hip/protocol').ExecutionMode; permissionMode?: import('@hip/protocol').PermissionMode }
   configMgr: { setForcePlan: (forcePlan: boolean) => boolean }
   store?: { updateConfig: (sessionId: string, configJson: string) => void }
 }
@@ -37,5 +38,10 @@ export function clearForcePlanFlag(host: ForcePlanHost, send: SendFn, reason = '
     }
   }
   send({ type: 'session:forcePlan', sessionId: host.id, forcePlan: false })
+  send({
+    type: 'session:executionMode',
+    sessionId: host.id,
+    executionMode: resolveExecutionMode(host._config),
+  })
   logInfo('session', 'forcePlan:cleared', { sessionId: host.id, reason })
 }

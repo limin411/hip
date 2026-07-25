@@ -506,7 +506,18 @@ export function applyServerMessage(
       }))
 
     case 'session:permissionMode':
-      return update(msg.sessionId, (s) => ({ ...s, config: { ...s.config, permissionMode: msg.permissionMode } }))
+      return update(msg.sessionId, (s) => {
+        const leaveFull = msg.permissionMode !== 'full'
+        const clearAuto = leaveFull && s.config.executionMode === 'autopilot'
+        return {
+          ...s,
+          config: {
+            ...s.config,
+            permissionMode: msg.permissionMode,
+            ...(clearAuto ? { executionMode: 'interactive' as const, forcePlan: false } : {}),
+          },
+        }
+      })
 
     case 'session:agentChanged':
       return update(msg.sessionId, (s) => {
@@ -515,18 +526,34 @@ export function applyServerMessage(
           const { agentId: _cleared, ...rest } = s.config
           return { ...s, config: rest, configOptions: undefined }
         }
-        // Mirror sidecar: external primary drops hip-only forcePlan.
-        const { forcePlan: _fp, ...rest } = s.config
+        // Mirror sidecar: external primary drops hip-only forcePlan / executionMode.
+        const { forcePlan: _fp, executionMode: _em, ...rest } = s.config
         return { ...s, config: { ...rest, agentId: next }, configOptions: undefined }
       })
 
     case 'session:forcePlan':
+      return update(msg.sessionId, (s) => {
+        const keepAuto = s.config.executionMode === 'autopilot' && !msg.forcePlan
+        return {
+          ...s,
+          config: {
+            ...s.config,
+            forcePlan: msg.forcePlan,
+            ...(msg.forcePlan
+              ? { disablePlan: false, executionMode: 'plan' as const }
+              : { executionMode: keepAuto ? ('autopilot' as const) : ('interactive' as const) }),
+          },
+        }
+      })
+
+    case 'session:executionMode':
       return update(msg.sessionId, (s) => ({
         ...s,
         config: {
           ...s.config,
-          forcePlan: msg.forcePlan,
-          ...(msg.forcePlan ? { disablePlan: false } : {}),
+          executionMode: msg.executionMode,
+          forcePlan: msg.executionMode === 'plan',
+          ...(msg.executionMode === 'plan' ? { disablePlan: false } : {}),
         },
       }))
 

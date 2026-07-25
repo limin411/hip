@@ -100,6 +100,8 @@ export const ja = {
         "init": "プロジェクトガイダンス用のAGENTS.mdを作成または更新",
         "plan": "次のターンで計画モードを強制（オプション: /plan task…）",
         "plan-off": "このセッションの計画モード強制を無効化",
+        "interactive": "インタラクティブな共同作業モードに切り替え",
+        "autopilot": "エンドツーエンドモード（フルアクセス必須）。すべての承認を自動許可",
         "memory": "メモリ設定を開く",
         "memory-on": "このセッションでメモリ注入を有効化",
         "memory-off": "このセッションでメモリ注入を無効化",
@@ -361,6 +363,32 @@ export const ja = {
       "forceOffBody": "ターンにプランは不要になりました。",
       "respondFailedTitle": "プラン応答に失敗しました",
       "respondFailedBody": "プラン応答を適用できませんでした（{{reason}}）。承認状態を復元しました。"
+    },
+    "executionMode": {
+      "label": "この会話の実行モード",
+      "menuTitle": "モード",
+      "busyTitle": "ターン実行中は実行モードを変更できません",
+      "modes": {
+        "interactive": "インタラクティブ",
+        "plan": "プラン",
+        "autopilot": "オートパイロット"
+      },
+      "desc": {
+        "interactive": "ステップごとの共同作業",
+        "plan": "先に計画し、準備ができたら実行",
+        "autopilot": "中断なしのエンドツーエンド実行",
+        "autopilotLocked": "フルアクセス権限が必要です"
+      },
+      "setInteractiveTitle": "インタラクティブモード",
+      "setInteractiveBody": "ターンにプランは不要になりました。権限は現在の権限モードに従います。",
+      "setPlanTitle": "プランモード オン",
+      "setPlanBody": "次のターンは最初にプランを立てます。タスクを送信するか、/plan あなたのタスク を使用してください。",
+      "setAutopilotTitle": "オートパイロット オン",
+      "setAutopilotBody": "すべての承認が自動で許可されます。Stop は利用可能です。フルアクセスが必要です。",
+      "autopilotRequiresFullTitle": "オートパイロットを有効にできません",
+      "autopilotRequiresFullBody": "先に権限モードをフルアクセスに切り替えてください。",
+      "autopilotClearedTitle": "オートパイロット オフ",
+      "autopilotClearedBody": "権限がフルアクセスではなくなったため、インタラクティブに戻りました。"
     },
     "permission": {
       "title": "権限が必要です",

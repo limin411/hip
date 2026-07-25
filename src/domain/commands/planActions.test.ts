@@ -1,14 +1,14 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
-import { extractPlanTask, runPlanOn, runPlanOff } from './planActions'
+import { extractPlanTask, runPlanOn, runPlanOff, runAutopilot, runInteractive } from './planActions'
 
-const setForcePlan = vi.fn()
+const setExecutionMode = vi.fn((_id: string, _mode: string) => true)
 const sendMessage = vi.fn()
 const selectSession = vi.fn()
-const setDraftForcePlan = vi.fn()
+const setDraftExecutionMode = vi.fn((_mode: string) => true)
 
 vi.mock('../sessionService', () => ({
   sessionService: {
-    setForcePlan: (...args: unknown[]) => setForcePlan(...args),
+    setExecutionMode: (id: string, mode: string) => setExecutionMode(id, mode),
     sendMessage: (...args: unknown[]) => sendMessage(...args),
     selectSession: (...args: unknown[]) => selectSession(...args),
   },
@@ -16,13 +16,24 @@ vi.mock('../sessionService', () => ({
 
 vi.mock('../sessionStore', () => ({
   useDomainStore: {
-    getState: () => ({ activeSessionId: 's1' }),
+    getState: () => ({
+      activeSessionId: 's1',
+      sessions: [
+        {
+          id: 's1',
+          config: { permissionMode: 'full', llmProvider: 'x', model: 'm', tools: [] },
+        },
+      ],
+    }),
   },
 }))
 
 vi.mock('@/store/draftStore', () => ({
   useDraftStore: {
-    getState: () => ({ setForcePlan: setDraftForcePlan }),
+    getState: () => ({
+      setExecutionMode: setDraftExecutionMode,
+      draft: { permissionMode: 'edit' },
+    }),
   },
 }))
 
@@ -41,34 +52,49 @@ describe('extractPlanTask', () => {
   })
 })
 
-describe('runPlanOn / runPlanOff', () => {
+describe('runPlanOn / runPlanOff / runAutopilot', () => {
   beforeEach(() => {
-    setForcePlan.mockClear()
+    setExecutionMode.mockClear().mockReturnValue(true)
     sendMessage.mockClear()
     selectSession.mockClear()
-    setDraftForcePlan.mockClear()
+    setDraftExecutionMode.mockClear().mockReturnValue(true)
   })
 
-  it('sets forcePlan on session without sending when no task', () => {
+  it('sets plan mode on session without sending when no task', () => {
     runPlanOn('s1')
-    expect(setForcePlan).toHaveBeenCalledWith('s1', true)
+    expect(setExecutionMode).toHaveBeenCalledWith('s1', 'plan')
     expect(sendMessage).not.toHaveBeenCalled()
   })
 
-  it('sets forcePlan and sends task when provided', () => {
+  it('sets plan mode and sends task when provided', () => {
     runPlanOn('s1', 'fix util')
-    expect(setForcePlan).toHaveBeenCalledWith('s1', true)
+    expect(setExecutionMode).toHaveBeenCalledWith('s1', 'plan')
     expect(sendMessage).toHaveBeenCalledWith('fix util')
   })
 
-  it('sets draft forcePlan when no session', () => {
+  it('sets draft execution mode when no session', () => {
     runPlanOn(null)
-    expect(setDraftForcePlan).toHaveBeenCalledWith(true)
-    expect(setForcePlan).not.toHaveBeenCalled()
+    expect(setDraftExecutionMode).toHaveBeenCalledWith('plan')
+    expect(setExecutionMode).not.toHaveBeenCalled()
   })
 
-  it('runPlanOff clears session flag', () => {
+  it('runPlanOff switches to interactive', () => {
     runPlanOff('s1')
-    expect(setForcePlan).toHaveBeenCalledWith('s1', false)
+    expect(setExecutionMode).toHaveBeenCalledWith('s1', 'interactive')
+  })
+
+  it('runInteractive switches to interactive', () => {
+    runInteractive('s1')
+    expect(setExecutionMode).toHaveBeenCalledWith('s1', 'interactive')
+  })
+
+  it('runAutopilot on full permission session', () => {
+    expect(runAutopilot('s1')).toBe(true)
+    expect(setExecutionMode).toHaveBeenCalledWith('s1', 'autopilot')
+  })
+
+  it('runAutopilot rejects draft without full permission', () => {
+    expect(runAutopilot(null)).toBe(false)
+    expect(setDraftExecutionMode).not.toHaveBeenCalled()
   })
 })

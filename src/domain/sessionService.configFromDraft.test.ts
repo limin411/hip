@@ -177,10 +177,25 @@ describe('configFromDraft', () => {
     const cfg = configFromDraft({ tempId: 't', mode: 'project', cwd: '/p', text: '', forcePlan: true })
     expect(cfg.forcePlan).toBe(true)
     expect(cfg.disablePlan).toBe(false)
+    expect(cfg.executionMode).toBe('plan')
+  })
+  it('project draft carries autopilot when full', () => {
+    const cfg = configFromDraft({
+      tempId: 't',
+      mode: 'project',
+      cwd: '/p',
+      text: '',
+      permissionMode: 'full',
+      executionMode: 'autopilot',
+    })
+    expect(cfg.executionMode).toBe('autopilot')
+    expect(cfg.forcePlan).toBe(false)
+    expect(cfg.permissionMode).toBe('full')
   })
   it('chat draft ignores forcePlan', () => {
     const cfg = configFromDraft({ tempId: 't', mode: 'chat', text: '', forcePlan: true })
     expect(cfg.forcePlan).toBeUndefined()
+    expect(cfg.executionMode).toBeUndefined()
   })
   it('draft effort is carried into SessionConfig for chat and code', () => {
     expect(configFromDraft({ tempId: 't', mode: 'chat', text: '', effort: 'high' }).effort).toBe('high')

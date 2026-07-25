@@ -1,4 +1,5 @@
 import type { ClientMessage } from '@hip/protocol'
+import { resolveExecutionMode } from '@hip/protocol'
 import { SqliteWorkflowStore } from '../../persistence/workflow-store.js'
 import { runProviderProbe } from '../../config/provider-probe.js'
 import { CodedError, safeErrorMessage } from '../error.js'
@@ -47,6 +48,7 @@ export const SESSION_MESSAGE_TYPES = new Set([
   'session:setSystemPrompt',
   'session:setPermissionMode',
   'session:setForcePlan',
+  'session:setExecutionMode',
   'session:setAgent',
   'session:setModel',
   'config:setActiveModel',
@@ -374,6 +376,12 @@ export function handleSessionMessage(
         sessionId: msg.sessionId,
         permissionMode: s.config.permissionMode ?? 'edit',
       })
+      // Leaving full may clear autopilot — always echo execution dual-write fields.
+      if (applied) {
+        const mode = resolveExecutionMode(s.config)
+        send({ type: 'session:forcePlan', sessionId: msg.sessionId, forcePlan: Boolean(s.config.forcePlan) })
+        send({ type: 'session:executionMode', sessionId: msg.sessionId, executionMode: mode })
+      }
       return
     }
     case 'session:setForcePlan': {
@@ -386,6 +394,24 @@ export function handleSessionMessage(
         sessionId: msg.sessionId,
         forcePlan: Boolean(s.config.forcePlan),
       })
+      if (applied) {
+        send({
+          type: 'session:executionMode',
+          sessionId: msg.sessionId,
+          executionMode: resolveExecutionMode(s.config),
+        })
+      }
+      return
+    }
+    case 'session:setExecutionMode': {
+      assertSessionActive(ctx, msg.sessionId)
+      const s = ctx.ensureSession(msg.sessionId, send)
+      const applied = s.setExecutionMode(msg.executionMode)
+      if (applied) ctx.store?.updateConfig(msg.sessionId, JSON.stringify(s.config))
+      const mode = resolveExecutionMode(s.config)
+      // Always echo current state (reject keeps previous; FE can reconcile).
+      send({ type: 'session:forcePlan', sessionId: msg.sessionId, forcePlan: Boolean(s.config.forcePlan) })
+      send({ type: 'session:executionMode', sessionId: msg.sessionId, executionMode: mode })
       return
     }
     case 'session:setAgent': {

@@ -2,6 +2,7 @@ import type { ServerMessage, PermissionMode, PermissionOption } from '@hip/proto
 import type { ApprovalFn, ApprovalDecision } from './tools.js'
 import type { ApprovalCache } from './tool-runner/approval-cache.js'
 import type { HookRegistry } from './hooks/registry.js'
+import { logInfo } from '../debug-logger.js'
 
 type SendFn = (msg: ServerMessage) => void
 
@@ -10,6 +11,12 @@ export interface PermissionManagerOptions {
    *  Sticky decisions are recorded by ToolRunner; PermissionManager only
    *  resolves the user's choice. Default false. */
   enableStickyApproval?: boolean
+  /**
+   * When true, HITL is auto-resolved with allow_once (Autopilot).
+   * Under product invariant Autopilot requires full, so buildRequestApproval
+   * already short-circuits full; this covers edit-path HITL if invariant slips.
+   */
+  isAutopilot?: () => boolean
 }
 
 export class PermissionManager {
@@ -20,6 +27,7 @@ export class PermissionManager {
   private approvalCache?: ApprovalCache
 
   private readonly enableStickyApproval: boolean
+  private readonly isAutopilot: () => boolean
 
   constructor(
     private readonly getPermissionMode: () => PermissionMode,
@@ -27,6 +35,7 @@ export class PermissionManager {
     opts: PermissionManagerOptions = {},
   ) {
     this.enableStickyApproval = opts.enableStickyApproval ?? false
+    this.isAutopilot = opts.isAutopilot ?? (() => false)
   }
 
   /** Set the per-conversation permission mode. Clears sticky approval cache when the mode value actually changes. */
@@ -98,6 +107,15 @@ export class PermissionManager {
       )
     }
     return (req) => {
+      if (this.isAutopilot()) {
+        logInfo('session', 'executionMode:auto_approve', {
+          sessionId,
+          kind: 'tool_permission',
+          tool: req.toolName ?? req.title,
+          toolKind: req.kind,
+        })
+        return Promise.resolve({ kind: 'allow_once' as const })
+      }
       const toolName = req.toolName ?? req.title
       const resolveFromHook = async (): Promise<ApprovalDecision | null> => {
         if (!hooks || !hooks.hasMatchingHook('PermissionRequest', toolName)) return null

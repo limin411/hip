@@ -19,6 +19,7 @@ import type {
   Hook,
   OrchestrationMode,
 } from '@hip/protocol'
+import { isAutopilot, resolveExecutionMode } from '@hip/protocol'
 import { FIXED_AGENTS } from '@hip/protocol'
 import { HumanMessage, AIMessage, SystemMessage, type BaseMessage } from '@langchain/core/messages'
 import type { BaseLanguageModel } from '@langchain/core/language_models/base'
@@ -201,6 +202,8 @@ export interface SessionTurnHost {
     markdownTruncated?: boolean
   }) => void
   clearPlanApprovalPause?: () => void
+  /** Autopilot: queue auto plan:respond approve after interrupt is published. */
+  scheduleAutopilotPlanApprove?: (send: SendFn) => void
   modelDirty: boolean
   turnSeq: number
   stopContinued: boolean
@@ -1045,6 +1048,19 @@ export async function runTurn(host: SessionTurnHost, rawSend: SendFn, base?: {
     ensureStarted(childId, 'subagent', 'supervisor', task, undefined, cfg.name)
     const hooks: ExternalAgentHooks = {
       requestPermission: (req) => {
+        if (isAutopilot(resolveExecutionMode(host._config))) {
+          const allowOpt = req.options.find((o) => o.kind.startsWith('allow'))
+          logInfo('session', 'executionMode:auto_approve', {
+            sessionId: host.id,
+            kind: 'acp_permission',
+            requestId: req.requestId,
+            toolKind: req.tool.kind,
+            via: 'dispatch_agent',
+          })
+          if (allowOpt) return Promise.resolve({ optionId: allowOpt.optionId })
+          if (req.options.length > 0) return Promise.resolve({ optionId: req.options[0].optionId })
+          return Promise.resolve({ cancelled: true as const })
+        }
         const auto = tryAutoResolvePermission(mode, req.tool.kind, req.options)
         if (auto) return Promise.resolve(auto)
         return new Promise((resolve) => { host.permissions.pendingPermissions.set(req.requestId, resolve); send({ type: 'permission:request', sessionId: host.id, turnId, requestId: req.requestId, tool: req.tool, options: req.options, agentFrame: { agentId: childId, parentAgentId: 'supervisor', name: cfg.name } }) })
@@ -1415,6 +1431,19 @@ export async function runTurn(host: SessionTurnHost, rawSend: SendFn, base?: {
       }
       const hooks: ExternalAgentHooks = {
         requestPermission: (req) => {
+          if (isAutopilot(resolveExecutionMode(host._config))) {
+            const allowOpt = req.options.find((o) => o.kind.startsWith('allow'))
+            logInfo('session', 'executionMode:auto_approve', {
+              sessionId: host.id,
+              kind: 'acp_permission',
+              requestId: req.requestId,
+              toolKind: req.tool.kind,
+              via: 'primary_acp',
+            })
+            if (allowOpt) return Promise.resolve({ optionId: allowOpt.optionId })
+            if (req.options.length > 0) return Promise.resolve({ optionId: req.options[0].optionId })
+            return Promise.resolve({ cancelled: true as const })
+          }
           const auto = tryAutoResolvePermission(mode, req.tool.kind, req.options)
           if (auto) return Promise.resolve(auto)
           return new Promise((resolve) => { host.permissions.pendingPermissions.set(req.requestId, resolve); send({ type: 'permission:request', sessionId: host.id, turnId, requestId: req.requestId, tool: req.tool, options: req.options }) })
@@ -1587,6 +1616,16 @@ export async function runTurn(host: SessionTurnHost, rawSend: SendFn, base?: {
           question: interruptQuestion,
           ...(interruptContext ? { context: interruptContext } : {}),
         })
+        // Autopilot: zero-click plan approval (sidecar-side; do not wait for FE).
+        if (isPlanApproval && isAutopilot(resolveExecutionMode(host._config))) {
+          logInfo('session', 'executionMode:auto_approve', {
+            sessionId: host.id,
+            kind: 'plan',
+            turnId,
+            planItemCount: finalState.plan?.length ?? 0,
+          })
+          host.scheduleAutopilotPlanApprove?.(send)
+        }
         return stoppedText
       }
       const nextMessages = finalState.messages.slice(ephemeralPrefix)

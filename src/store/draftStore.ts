@@ -1,7 +1,12 @@
 import { create } from 'zustand'
 import { persist, createJSONStorage, type StateStorage } from 'zustand/middleware'
 import { nanoid } from 'nanoid'
-import type { PermissionMode } from '@hip/protocol'
+import type { PermissionMode, ExecutionMode } from '@hip/protocol'
+import {
+  canSelectAutopilot,
+  executionModeConfigPatch,
+  resolveExecutionMode,
+} from '@hip/protocol'
 import type { Surface } from './uiStore'
 import { clampEffortForKey } from '@/lib/modelEffort'
 import { useProvidersStore } from '@/store/providersStore'
@@ -14,6 +19,8 @@ export interface Draft {
   agentId?: string             // primary agent for new sessions: undefined|'builtin' = hip; else ACP agent id
   modelKey?: string            // 'providerID/modelID' chosen for this chat
   permissionMode?: PermissionMode   // 'chat'|'edit'|'full' chosen for this chat; undefined ⇒ server default 'edit'
+  /** Collaboration mode; dual-written with forcePlan. Autopilot requires full. */
+  executionMode?: ExecutionMode
   /** When true, first committed code session forces plan mode (EnterPlanMode path). */
   forcePlan?: boolean
   /** Reasoning effort level when the model supports it. */
@@ -30,6 +37,7 @@ interface DraftStore {
   setModelKey: (modelKey: string) => void
   setPermissionMode: (permissionMode: PermissionMode) => void
   setForcePlan: (forcePlan: boolean) => void
+  setExecutionMode: (executionMode: ExecutionMode) => boolean
   setEffort: (effort: string | undefined) => void
   reset: () => void
 }
@@ -81,7 +89,7 @@ export const useDraftStore = create<DraftStore>()(
             const { agentId: _a, ...rest } = base
             return { draft: rest }
           }
-          const { forcePlan: _f, modelKey: _m, effort: _e, ...rest } = base
+          const { forcePlan: _f, executionMode: _em, modelKey: _m, effort: _e, ...rest } = base
           return { draft: { ...rest, agentId: id } }
         }),
       setModelKey: (modelKey) =>
@@ -95,13 +103,39 @@ export const useDraftStore = create<DraftStore>()(
       setPermissionMode: (permissionMode) =>
         set((s) => {
           const base: Draft = s.draft ?? { tempId: nanoid(), mode: 'chat', text: '' }
-          return { draft: { ...base, permissionMode } }
+          const next: Draft = { ...base, permissionMode }
+          // Leaving full clears autopilot (spec §4.0b).
+          if (permissionMode !== 'full' && resolveExecutionMode(base) === 'autopilot') {
+            next.executionMode = 'interactive'
+            next.forcePlan = false
+          }
+          return { draft: next }
         }),
       setForcePlan: (forcePlan) =>
         set((s) => {
           const base: Draft = s.draft ?? { tempId: nanoid(), mode: 'chat', text: '' }
-          return { draft: { ...base, forcePlan } }
+          if (forcePlan) {
+            return { draft: { ...base, forcePlan: true, executionMode: 'plan' } }
+          }
+          const keepAuto =
+            resolveExecutionMode(base) === 'autopilot' || base.executionMode === 'autopilot'
+          return {
+            draft: {
+              ...base,
+              forcePlan: false,
+              executionMode: keepAuto && canSelectAutopilot(base.permissionMode) ? 'autopilot' : 'interactive',
+            },
+          }
         }),
+      setExecutionMode: (executionMode) => {
+        const base: Draft = get().draft ?? { tempId: nanoid(), mode: 'chat', text: '' }
+        if (executionMode === 'autopilot' && !canSelectAutopilot(base.permissionMode)) {
+          return false
+        }
+        const patch = executionModeConfigPatch(executionMode)
+        set({ draft: { ...base, ...patch } })
+        return true
+      },
       setEffort: (effort) =>
         set((s) => {
           const base: Draft = s.draft ?? { tempId: nanoid(), mode: 'chat', text: '' }

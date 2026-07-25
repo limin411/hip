@@ -32,6 +32,8 @@ export interface SessionConfigLike {
   agentId?: string
   permissionMode?: PermissionMode
   enableStickyApproval?: boolean
+  /** @see SessionConfig.executionMode — dual-written with forcePlan */
+  executionMode?: import('./execution-mode.js').ExecutionMode
   forcePlan?: boolean
   disablePlan?: boolean
   surface?: 'chat' | 'code'

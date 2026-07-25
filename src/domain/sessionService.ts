@@ -15,8 +15,13 @@ import type {
   WorktreeSource,
   WorktreeRemoveErrorCode,
   EmptyGreetingGenerateContext,
+  ExecutionMode,
 } from '@hip/protocol'
-import { normalizeSessionConfig } from '@hip/protocol'
+import {
+  normalizeSessionConfig,
+  resolveExecutionMode,
+  executionModeConfigPatch,
+} from '@hip/protocol'
 import { nanoid } from 'nanoid'
 import type { Transport } from './transport'
 import { WsTransport } from './wsTransport'
@@ -1939,7 +1944,23 @@ export class SessionService {
   }
 
   setPermissionMode(id: string, mode: PermissionMode): void {
+    const sess = useDomainStore.getState().sessions.find((s) => s.id === id)
+    const clearAuto =
+      mode !== 'full' &&
+      (sess?.config.executionMode === 'autopilot' ||
+        resolveExecutionMode(sess?.config ?? {}) === 'autopilot')
     useDomainStore.getState().apply({ type: 'session:permissionMode', sessionId: id, permissionMode: mode }) // optimistic
+    if (clearAuto) {
+      useDomainStore.getState().apply({
+        type: 'session:executionMode',
+        sessionId: id,
+        executionMode: 'interactive',
+      })
+      // Spec §4.0b: toast when leaving full drops Autopilot
+      toast.message(i18n.t('chat.executionMode.autopilotClearedTitle'), {
+        description: i18n.t('chat.executionMode.autopilotClearedBody'),
+      })
+    }
     this.transport.send({ type: 'session:setPermissionMode', sessionId: id, permissionMode: mode })
   }
 
@@ -1947,6 +1968,20 @@ export class SessionService {
   setForcePlan(id: string, forcePlan: boolean): void {
     useDomainStore.getState().apply({ type: 'session:forcePlan', sessionId: id, forcePlan }) // optimistic
     this.transport.send({ type: 'session:setForcePlan', sessionId: id, forcePlan })
+  }
+
+  /**
+   * Collaboration mode (interactive | plan | autopilot). Dual-writes forcePlan.
+   * Autopilot requires permissionMode full — returns false without sending if invalid.
+   */
+  setExecutionMode(id: string, executionMode: ExecutionMode): boolean {
+    const sess = useDomainStore.getState().sessions.find((s) => s.id === id)
+    if (executionMode === 'autopilot' && (sess?.config.permissionMode ?? 'edit') !== 'full') {
+      return false
+    }
+    useDomainStore.getState().apply({ type: 'session:executionMode', sessionId: id, executionMode }) // optimistic
+    this.transport.send({ type: 'session:setExecutionMode', sessionId: id, executionMode })
+    return true
   }
 
   setSystemPrompt(id: string, systemPrompt: string | null): void {
@@ -2321,11 +2356,18 @@ export function configFromDraft(draft: Draft | null): SessionConfig {
       : { ...DEFAULT_CONFIG, surface }
   const withMode: SessionConfig =
     surface === 'code' && draft?.permissionMode ? { ...base, permissionMode: draft.permissionMode } : base
-  // forcePlan is hip-graph only — skip when ACP primary.
-  const withPlan: SessionConfig =
-    surface === 'code' && draft?.forcePlan && !externalAgentId
-      ? { ...withMode, forcePlan: true, disablePlan: false }
-      : withMode
+  // executionMode / forcePlan are hip-graph only — skip when ACP primary.
+  let withPlan: SessionConfig = withMode
+  if (surface === 'code' && !externalAgentId) {
+    const mode = resolveExecutionMode({
+      executionMode: draft?.executionMode,
+      forcePlan: draft?.forcePlan,
+      permissionMode: draft?.permissionMode ?? withMode.permissionMode,
+    })
+    if (mode !== 'interactive') {
+      withPlan = { ...withMode, ...executionModeConfigPatch(mode) }
+    }
+  }
   const { catalog, config } = useProvidersStore.getState()
   // Clamp effort to the model that will actually run (draft modelKey or global active).
   // Hip model/effort are unused on ACP primary; omit so SessionConfig stays clean.

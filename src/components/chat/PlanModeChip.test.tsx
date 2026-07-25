@@ -8,22 +8,55 @@ import { useDraftStore } from '@/store/draftStore'
 import { useDomainStore } from '@/domain'
 import i18n from '@/i18n'
 
-const setForcePlan = vi.fn()
 const runPlanOn = vi.fn()
-const runPlanOff = vi.fn()
+const runInteractive = vi.fn()
+const runAutopilot = vi.fn()
 
 vi.mock('sonner', () => ({
   toast: { message: vi.fn(), error: vi.fn(), success: vi.fn() },
 }))
 
-vi.mock('@/domain', async () => {
-  const actual = await vi.importActual<typeof import('@/domain')>('@/domain')
+vi.mock('@/components/ui/DropdownMenu', async () => {
+  const React = await import('react')
   return {
-    ...actual,
-    sessionService: {
-      ...actual.sessionService,
-      setForcePlan: (...args: unknown[]) => setForcePlan(...args),
-    },
+    DropdownMenu: ({ children }: { children: React.ReactNode }) =>
+      React.createElement('div', { 'data-testid': 'dropdown-menu' }, children),
+    DropdownMenuTrigger: ({ children }: { children: React.ReactNode }) =>
+      React.createElement('div', { 'data-testid': 'dropdown-trigger' }, children),
+    DropdownMenuContent: ({
+      children,
+      ...rest
+    }: {
+      children: React.ReactNode
+      'data-testid'?: string
+    }) =>
+      React.createElement(
+        'div',
+        { 'data-testid': rest['data-testid'] ?? 'dropdown-content' },
+        children,
+      ),
+    DropdownMenuItem: ({
+      children,
+      onSelect,
+      disabled,
+      ...rest
+    }: {
+      children: React.ReactNode
+      onSelect?: () => void
+      disabled?: boolean
+      'data-testid'?: string
+    }) =>
+      React.createElement(
+        'div',
+        {
+          'data-testid': rest['data-testid'] ?? 'dropdown-item',
+          'data-disabled': disabled ? 'true' : undefined,
+          onClick: () => {
+            if (!disabled) onSelect?.()
+          },
+        },
+        children,
+      ),
   }
 })
 
@@ -32,11 +65,12 @@ vi.mock('@/domain/commands', async () => {
   return {
     ...actual,
     runPlanOn: (...args: unknown[]) => runPlanOn(...args),
-    runPlanOff: (...args: unknown[]) => runPlanOff(...args),
+    runInteractive: (...args: unknown[]) => runInteractive(...args),
+    runAutopilot: (...args: unknown[]) => runAutopilot(...args),
   }
 })
 
-describe('PlanModeChip', () => {
+describe('ExecutionModePicker (PlanModeChip export)', () => {
   beforeEach(async () => {
     cleanup()
     vi.clearAllMocks()
@@ -54,33 +88,33 @@ describe('PlanModeChip', () => {
     })
   })
 
-  it('toggles draft forcePlan via runPlanOn when no session', () => {
+  it('selects plan on draft via menu item', () => {
     useDraftStore.setState({
       draft: { tempId: 't1', mode: 'project', cwd: '/p', text: '', forcePlan: false },
     })
     render(<PlanModeChip />)
-    const chip = screen.getByTestId('plan-mode-chip')
+    const chip = screen.getByTestId('execution-mode-chip')
     expect(chip).toHaveAttribute('aria-pressed', 'false')
-
-    fireEvent.click(chip)
+    fireEvent.click(screen.getByTestId('execution-mode-plan'))
     expect(runPlanOn).toHaveBeenCalledWith(null)
-    expect(runPlanOff).not.toHaveBeenCalled()
   })
 
-  it('turns draft forcePlan off via runPlanOff when already on', () => {
+  it('shows pressed when plan mode active', () => {
     useDraftStore.setState({
-      draft: { tempId: 't1', mode: 'project', cwd: '/p', text: '', forcePlan: true },
+      draft: {
+        tempId: 't1',
+        mode: 'project',
+        cwd: '/p',
+        text: '',
+        forcePlan: true,
+        executionMode: 'plan',
+      },
     })
     render(<PlanModeChip />)
-    const chip = screen.getByTestId('plan-mode-chip')
-    expect(chip).toHaveAttribute('aria-pressed', 'true')
-
-    fireEvent.click(chip)
-    expect(runPlanOff).toHaveBeenCalledWith(null)
-    expect(runPlanOn).not.toHaveBeenCalled()
+    expect(screen.getByTestId('execution-mode-chip')).toHaveAttribute('aria-pressed', 'true')
   })
 
-  it('toggles session forcePlan with session id', () => {
+  it('selects plan on session', () => {
     useDomainStore.setState({
       sessions: [
         {
@@ -106,11 +140,11 @@ describe('PlanModeChip', () => {
     } as never)
 
     render(<PlanModeChip />)
-    fireEvent.click(screen.getByTestId('plan-mode-chip'))
+    fireEvent.click(screen.getByTestId('execution-mode-plan'))
     expect(runPlanOn).toHaveBeenCalledWith('s1')
   })
 
-  it('KD-12: while running, chip is aria-disabled and click only toasts', () => {
+  it('KD-12: while running, chip is aria-disabled and menu select only toasts', () => {
     useDomainStore.setState({
       sessions: [
         {
@@ -136,13 +170,41 @@ describe('PlanModeChip', () => {
     } as never)
 
     render(<PlanModeChip />)
-    const chip = screen.getByTestId('plan-mode-chip')
-    // Not HTML-disabled so click can surface toast (KD-12 toast-only).
-    expect(chip).not.toBeDisabled()
+    const chip = screen.getByTestId('execution-mode-chip')
     expect(chip).toHaveAttribute('aria-disabled', 'true')
     fireEvent.click(chip)
+    expect(toast.message).toHaveBeenCalledWith(i18n.t('chat.executionMode.busyTitle'))
     expect(runPlanOn).not.toHaveBeenCalled()
-    expect(runPlanOff).not.toHaveBeenCalled()
-    expect(toast.message).toHaveBeenCalledWith(i18n.t('chat.plan.busyTitle'))
+  })
+
+  it('disables autopilot when permission is not full', () => {
+    useDraftStore.setState({
+      draft: {
+        tempId: 't1',
+        mode: 'project',
+        cwd: '/p',
+        text: '',
+        permissionMode: 'edit',
+      },
+    })
+    render(<PlanModeChip />)
+    expect(screen.getByTestId('execution-mode-autopilot')).toHaveAttribute('data-disabled', 'true')
+    fireEvent.click(screen.getByTestId('execution-mode-autopilot'))
+    expect(runAutopilot).not.toHaveBeenCalled()
+  })
+
+  it('allows autopilot when permission is full', () => {
+    useDraftStore.setState({
+      draft: {
+        tempId: 't1',
+        mode: 'project',
+        cwd: '/p',
+        text: '',
+        permissionMode: 'full',
+      },
+    })
+    render(<PlanModeChip />)
+    fireEvent.click(screen.getByTestId('execution-mode-autopilot'))
+    expect(runAutopilot).toHaveBeenCalledWith(null)
   })
 })

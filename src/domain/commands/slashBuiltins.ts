@@ -78,6 +78,20 @@ export const SLASH_BUILTIN_COMMANDS: SlashBuiltinDef[] = [
     availableIn: ['code'],
   },
   {
+    id: 'interactive',
+    name: 'interactive',
+    description: 'Switch to interactive collaboration mode',
+    kind: 'builtin',
+    availableIn: ['code'],
+  },
+  {
+    id: 'autopilot',
+    name: 'autopilot',
+    description: 'End-to-end mode (requires Full access); auto-approve all prompts',
+    kind: 'builtin',
+    availableIn: ['code'],
+  },
+  {
     id: 'memory',
     name: 'memory',
     description: 'Open Memory settings',

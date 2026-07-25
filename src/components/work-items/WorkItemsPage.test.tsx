@@ -214,6 +214,7 @@ describe('WorkItemsPage', () => {
       },
     ]
     render(<WorkItemsPage />)
-    expect(screen.getByTestId('work-item-bar-wi_span')).toBeInTheDocument()
+    // Multi-day items render one chip per day (start/mid/end).
+    expect(screen.getAllByTestId('work-item-bar-wi_span').length).toBeGreaterThanOrEqual(1)
   })
 })

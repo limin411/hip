@@ -261,7 +261,10 @@ export function WorkItemEditorModal() {
           </div>
         }
       >
-        <div className="flex flex-col gap-3" data-testid="work-item-editor-body">
+        <div
+          className="flex flex-col gap-4 px-5 py-4"
+          data-testid="work-item-editor-body"
+        >
           <label className="flex flex-col gap-1">
             <span className="text-meta text-ink-tertiary">{t('workItems.fields.title')}</span>
             <Input
@@ -466,7 +469,9 @@ export function WorkItemEditorModal() {
           </div>
         }
       >
-        <p className="text-body text-ink-secondary">{t('workItems.deleteConfirm')}</p>
+        <p className="px-5 py-4 text-body leading-relaxed text-ink-secondary">
+          {t('workItems.deleteConfirm')}
+        </p>
       </Modal>
     </>
   )

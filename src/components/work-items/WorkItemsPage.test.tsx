@@ -1,26 +1,13 @@
 // @vitest-environment happy-dom
 import '@testing-library/jest-dom/vitest'
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { render, screen, fireEvent, waitFor, cleanup } from '@testing-library/react'
+import { render, screen, fireEvent, cleanup } from '@testing-library/react'
 import type { WorkItem, WorkItemList } from '@/domain/work-items'
-import { INBOX_LIST_ID } from '@/domain/work-items'
+import { DEFAULT_STATUS_COLORS, INBOX_LIST_ID } from '@/domain/work-items'
 
 const load = vi.fn().mockResolvedValue(undefined)
-const createItem = vi.fn()
-const select = vi.fn()
 const complete = vi.fn().mockResolvedValue(undefined)
 const reopen = vi.fn().mockResolvedValue(undefined)
-const setSearch = vi.fn()
-const setFilter = vi.fn()
-const updateItem = vi.fn().mockResolvedValue(undefined)
-const setStatus = vi.fn().mockResolvedValue(undefined)
-const archive = vi.fn().mockResolvedValue(undefined)
-const unarchive = vi.fn().mockResolvedValue(undefined)
-const cancel = vi.fn().mockResolvedValue(undefined)
-const deleteItem = vi.fn().mockResolvedValue(undefined)
-const finalizeSelectedItem = vi.fn()
-const setNotesDraft = vi.fn()
-const commitNotesDraft = vi.fn()
 
 let storeState: {
   loaded: boolean
@@ -46,47 +33,71 @@ function defaultLists(): WorkItemList[] {
   ]
 }
 
+const requestCreate = vi.fn()
+const requestEdit = vi.fn()
+const setViewMode = vi.fn()
+const setHighlightId = vi.fn()
+const shiftCalendarMonth = vi.fn()
+const setCalendarCursor = vi.fn()
+const closeModal = vi.fn()
+const leaveWorkItems = vi.fn()
+
+let viewState = {
+  modal: { mode: 'closed' as const },
+  viewMode: 'calendar' as 'calendar' | 'list',
+  calendarCursor: { year: 2026, monthIndex: 6 },
+  highlightId: null as string | null,
+}
+
 vi.mock('@/store/workItemStore', () => {
   const useWorkItemStore = (sel: (s: Record<string, unknown>) => unknown) =>
     sel({
       ...storeState,
       load,
-      createItem,
-      select,
       complete,
       reopen,
-      setSearch,
-      setFilter,
-      updateItem,
-      setStatus,
-      archive,
-      unarchive,
-      cancel,
-      deleteItem,
-      finalizeSelectedItem,
-      setNotesDraft,
-      commitNotesDraft,
+      setSearch: vi.fn(),
+      setFilter: vi.fn(),
     })
   useWorkItemStore.getState = () => ({
     ...storeState,
     load,
-    createItem,
-    select,
     complete,
     reopen,
-    setSearch,
-    setFilter,
-    updateItem,
-    setStatus,
-    archive,
-    unarchive,
-    cancel,
-    deleteItem,
-    finalizeSelectedItem,
-    setNotesDraft,
-    commitNotesDraft,
   })
   return { useWorkItemStore }
+})
+
+vi.mock('@/store/workItemViewStore', () => {
+  const useWorkItemViewStore = (sel: (s: Record<string, unknown>) => unknown) =>
+    sel({
+      ...viewState,
+      requestCreate,
+      requestEdit,
+      setViewMode,
+      setHighlightId,
+      shiftCalendarMonth,
+      setCalendarCursor,
+      closeModal,
+      leaveWorkItems,
+    })
+  useWorkItemViewStore.getState = () => ({
+    ...viewState,
+    requestCreate,
+    requestEdit,
+  })
+  return { useWorkItemViewStore }
+})
+
+vi.mock('@/store/workItemUiPrefsStore', () => {
+  const useWorkItemUiPrefsStore = (sel: (s: Record<string, unknown>) => unknown) =>
+    sel({
+      loaded: true,
+      statusColors: { ...DEFAULT_STATUS_COLORS },
+      load: vi.fn().mockResolvedValue(undefined),
+      setStatusColor: vi.fn(),
+    })
+  return { useWorkItemUiPrefsStore }
 })
 
 vi.mock('@/store/uiStore', () => {
@@ -98,6 +109,7 @@ vi.mock('@/store/uiStore', () => {
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({
     t: (key: string) => key,
+    i18n: { language: 'en' },
   }),
 }))
 
@@ -111,28 +123,32 @@ describe('WorkItemsPage', () => {
       error: null,
       lists: defaultLists(),
       items: [],
-      filterId: 'todo',
+      filterId: 'all',
       search: '',
       selectedId: null,
     }
+    viewState = {
+      modal: { mode: 'closed' },
+      viewMode: 'calendar',
+      calendarCursor: { year: 2026, monthIndex: 6 },
+      highlightId: null,
+    }
     load.mockClear().mockResolvedValue(undefined)
-    createItem.mockClear().mockResolvedValue('wi_new')
-    select.mockClear()
-    complete.mockClear().mockResolvedValue(undefined)
-    reopen.mockClear().mockResolvedValue(undefined)
-    setSearch.mockClear()
-    setFilter.mockClear()
+    requestCreate.mockClear()
+    requestEdit.mockClear()
+    complete.mockClear()
+    reopen.mockClear()
   })
 
   afterEach(() => {
     cleanup()
   })
 
-  it('renders empty catalog state', () => {
+  it('renders calendar by default', () => {
     render(<WorkItemsPage />)
     expect(screen.getByTestId('work-items-page')).toBeInTheDocument()
-    expect(screen.getByTestId('work-item-empty-catalog')).toBeInTheDocument()
-    expect(screen.getByTestId('work-item-detail-empty')).toBeInTheDocument()
+    expect(screen.getByTestId('work-item-month-calendar')).toBeInTheDocument()
+    expect(screen.getByTestId('work-item-view-mode')).toBeInTheDocument()
   })
 
   it('loads catalog on mount when not loaded', () => {
@@ -142,27 +158,24 @@ describe('WorkItemsPage', () => {
     expect(load).toHaveBeenCalled()
   })
 
-  it('creates item from empty-state CTA', async () => {
+  it('new button opens create modal bus', () => {
     render(<WorkItemsPage />)
-    const btn = screen.getByRole('button', { name: 'workItems.newItem' })
-    fireEvent.click(btn)
-    await waitFor(() => {
-      expect(createItem).toHaveBeenCalled()
-    })
+    fireEvent.click(screen.getByTestId('work-item-new'))
+    expect(requestCreate).toHaveBeenCalled()
   })
 
-  it('lists items and selects on click', () => {
+  it('switches to list view and shows rows', () => {
     storeState.items = [
       {
         id: 'wi_1',
-        title: 'Ship PR4',
+        title: 'Ship PR',
         status: 'todo',
         priority: 'high',
         listId: INBOX_LIST_ID,
         tags: [],
         notes: '',
-        startOn: null,
-        endOn: '2026-07-26',
+        startOn: '2026-07-25',
+        endOn: '2026-07-25',
         createdAt: 1,
         updatedAt: 1,
         completedAt: null,
@@ -170,25 +183,26 @@ describe('WorkItemsPage', () => {
         links: {},
       },
     ]
+    viewState.viewMode = 'list'
     render(<WorkItemsPage />)
-    expect(screen.queryByTestId('work-item-empty-catalog')).not.toBeInTheDocument()
+    expect(screen.getByTestId('work-item-list-view')).toBeInTheDocument()
     expect(screen.getByTestId('work-item-row-wi_1')).toBeInTheDocument()
     fireEvent.click(screen.getByTestId('work-item-row-wi_1'))
-    expect(select).toHaveBeenCalledWith('wi_1')
+    expect(requestEdit).toHaveBeenCalledWith('wi_1')
   })
 
-  it('toggles complete from row checkbox', () => {
+  it('calendar paints multi-day bars', () => {
     storeState.items = [
       {
-        id: 'wi_2',
-        title: 'Done me',
-        status: 'todo',
+        id: 'wi_span',
+        title: 'Span',
+        status: 'in_progress',
         priority: 'none',
         listId: INBOX_LIST_ID,
         tags: [],
         notes: '',
-        startOn: null,
-        endOn: null,
+        startOn: '2026-07-22',
+        endOn: '2026-07-24',
         createdAt: 1,
         updatedAt: 1,
         completedAt: null,
@@ -197,70 +211,6 @@ describe('WorkItemsPage', () => {
       },
     ]
     render(<WorkItemsPage />)
-    fireEvent.click(screen.getByTestId('work-item-complete-wi_2'))
-    expect(complete).toHaveBeenCalledWith('wi_2')
-  })
-
-  it('uses listbox only around rows with option ids and activedescendant', () => {
-    storeState.items = [
-      {
-        id: 'wi_a11y',
-        title: 'A11y row',
-        status: 'todo',
-        priority: 'none',
-        listId: INBOX_LIST_ID,
-        tags: [],
-        notes: '',
-        startOn: null,
-        endOn: null,
-        createdAt: 1,
-        updatedAt: 1,
-        completedAt: null,
-        archivedAt: null,
-        links: {},
-      },
-    ]
-    storeState.selectedId = 'wi_a11y'
-    render(<WorkItemsPage />)
-    const listbox = screen.getByTestId('work-item-listbox')
-    expect(listbox).toHaveAttribute('role', 'listbox')
-    expect(listbox).toHaveAttribute('aria-activedescendant', 'work-item-option-wi_a11y')
-    // Chrome (search) is outside listbox
-    expect(screen.getByTestId('work-item-list-pane').getAttribute('role')).toBeNull()
-    const row = screen.getByTestId('work-item-row-wi_a11y')
-    expect(row).toHaveAttribute('role', 'option')
-    expect(row).toHaveAttribute('id', 'work-item-option-wi_a11y')
-    expect(row).toHaveAttribute('aria-selected', 'true')
-  })
-
-  it('Enter focuses title without completing', async () => {
-    storeState.items = [
-      {
-        id: 'wi_enter',
-        title: 'Focus me',
-        status: 'todo',
-        priority: 'none',
-        listId: INBOX_LIST_ID,
-        tags: [],
-        notes: '',
-        startOn: null,
-        endOn: null,
-        createdAt: 1,
-        updatedAt: 1,
-        completedAt: null,
-        archivedAt: null,
-        links: {},
-      },
-    ]
-    storeState.selectedId = 'wi_enter'
-    render(<WorkItemsPage />)
-    const title = screen.getByTestId('work-item-title-input') as HTMLInputElement
-    const focusSpy = vi.spyOn(title, 'focus')
-    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }))
-    expect(complete).not.toHaveBeenCalled()
-    await waitFor(() => {
-      expect(focusSpy).toHaveBeenCalled()
-    })
-    expect(complete).not.toHaveBeenCalled()
+    expect(screen.getByTestId('work-item-bar-wi_span')).toBeInTheDocument()
   })
 })

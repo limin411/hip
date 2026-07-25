@@ -172,7 +172,19 @@ export async function leaveWorkItemsToChats(): Promise<void> {
   )
 }
 
-/** Create item via sidebar "new work item" CTA; waits for detail title input. */
+/** Switch main surface to list (rows + search). */
+export async function switchWorkItemsToListView(): Promise<void> {
+  const listAlready = await browser.$('[data-testid="work-item-list-view"]')
+  if (await listAlready.isExisting()) return
+  const tab = await browser.$('[data-testid="work-item-view-mode-list"]')
+  await tab.waitForExist({ timeout: 10000 })
+  await tab.click()
+  await (await browser.$('[data-testid="work-item-list-view"]')).waitForExist({
+    timeout: 10000,
+  })
+}
+
+/** Create item via sidebar "new work item" CTA; waits for modal title input. */
 export async function createWorkItemFromSidebar(): Promise<void> {
   await clickTestId('sidebar-new-work-item')
   await (await browser.$('[data-testid="work-item-title-input"]')).waitForExist({
@@ -180,16 +192,25 @@ export async function createWorkItemFromSidebar(): Promise<void> {
   })
 }
 
-/** Create item (sidebar CTA; list-pane footer removed as redundant). */
+/** Create item (sidebar CTA; modal create). */
 export async function createWorkItemFromListPane(): Promise<void> {
   await createWorkItemFromSidebar()
 }
 
-/** Set title on the open detail pane; wait for React state before optional blur. */
-export async function setWorkItemTitle(title: string, opts?: { blur?: boolean }): Promise<void> {
+/** Persist modal draft (create or edit). */
+export async function saveWorkItemModal(): Promise<void> {
+  await clickTestId('work-item-modal-save')
+  await browser.waitUntil(
+    async () => !(await (await browser.$('[data-testid="work-item-editor-body"]')).isExisting()),
+    { timeout: 10000, interval: 100, timeoutMsg: 'editor modal still open after save' },
+  )
+  await browser.pause(120)
+}
+
+/** Set title on the open editor modal. */
+export async function setWorkItemTitle(title: string, _opts?: { blur?: boolean }): Promise<void> {
   const input = await browser.$('[data-testid="work-item-title-input"]')
   await input.waitForExist({ timeout: 10000 })
-  // Retry value set — controlled React inputs can miss a single synthetic event.
   for (let attempt = 0; attempt < 3; attempt++) {
     await setReactInputValue('work-item-title-input', title)
     const ok = await browser.waitUntil(
@@ -202,20 +223,10 @@ export async function setWorkItemTitle(title: string, opts?: { blur?: boolean })
     async () => (await input.getValue()) === title,
     { timeout: 5000, interval: 50, timeoutMsg: `title input did not accept ${JSON.stringify(title)}` },
   )
-  // Allow Zustand updateItem to land before finalize blur.
-  await browser.pause(120)
-  if (opts?.blur !== false) {
-    await browser.execute(() => {
-      const el = document.querySelector(
-        '[data-testid="work-item-title-input"]',
-      ) as HTMLInputElement | null
-      el?.blur()
-    })
-    await browser.pause(120)
-  }
+  await browser.pause(80)
 }
 
-export async function setWorkItemNotes(notes: string, opts?: { blur?: boolean }): Promise<void> {
+export async function setWorkItemNotes(notes: string, _opts?: { blur?: boolean }): Promise<void> {
   const area = await browser.$('[data-testid="work-item-notes"]')
   await area.waitForExist({ timeout: 10000 })
   for (let attempt = 0; attempt < 3; attempt++) {
@@ -230,17 +241,7 @@ export async function setWorkItemNotes(notes: string, opts?: { blur?: boolean })
     async () => (await area.getValue()) === notes,
     { timeout: 5000, interval: 50, timeoutMsg: `notes did not accept ${JSON.stringify(notes)}` },
   )
-  // Debounce is 300ms — wait past it so draft is enqueued even without blur.
-  await browser.pause(350)
-  if (opts?.blur !== false) {
-    await browser.execute(() => {
-      const el = document.querySelector(
-        '[data-testid="work-item-notes"]',
-      ) as HTMLTextAreaElement | null
-      el?.blur()
-    })
-    await browser.pause(150)
-  }
+  await browser.pause(80)
 }
 
 export async function setWorkItemStatus(status: string): Promise<void> {
@@ -294,16 +295,29 @@ export function localYmdDaysAgo(days: number, d: Date = new Date()): string {
   return localTodayYmd(x)
 }
 
-/** Selected item id from detail pane, or null. */
+/** True when editor modal is open (create or edit). */
+export async function isWorkItemModalOpen(): Promise<boolean> {
+  return (await browser.$('[data-testid="work-item-editor-body"]')).isExisting()
+}
+
+/**
+ * @deprecated Detail pane removed — returns null; use isWorkItemModalOpen / list rows.
+ */
 export async function getSelectedWorkItemId(): Promise<string | null> {
-  const pane = await browser.$('[data-testid="work-item-detail-pane"]')
-  if (!(await pane.isExisting())) return null
-  const id = await pane.getAttribute('data-item-id')
-  return id || null
+  return null
 }
 
 /** True if a listbox row whose visible text includes `title` exists. */
 export async function listContainsTitle(title: string): Promise<boolean> {
+  // Ensure list mode so rows exist.
+  const list = await browser.$('[data-testid="work-item-list-view"]')
+  if (!(await list.isExisting())) {
+    try {
+      await switchWorkItemsToListView()
+    } catch {
+      return false
+    }
+  }
   return browser.execute((t: string) => {
     const rows = document.querySelectorAll('[data-testid^="work-item-row-"]')
     for (const row of rows) {
@@ -317,6 +331,7 @@ export async function waitForListTitle(
   title: string,
   timeoutMs = 10000,
 ): Promise<void> {
+  await switchWorkItemsToListView()
   await browser.waitUntil(async () => listContainsTitle(title), {
     timeout: timeoutMs,
     interval: 150,
@@ -328,6 +343,7 @@ export async function waitForListTitleGone(
   title: string,
   timeoutMs = 10000,
 ): Promise<void> {
+  await switchWorkItemsToListView()
   await browser.waitUntil(async () => !(await listContainsTitle(title)), {
     timeout: timeoutMs,
     interval: 150,
@@ -335,8 +351,9 @@ export async function waitForListTitleGone(
   })
 }
 
-/** Click list row whose text includes title. */
+/** Click list row whose text includes title (switches to list view first). */
 export async function selectWorkItemByTitle(title: string): Promise<void> {
+  await switchWorkItemsToListView()
   await browser.waitUntil(async () => listContainsTitle(title), {
     timeout: 10000,
     interval: 150,
@@ -354,20 +371,18 @@ export async function selectWorkItemByTitle(title: string): Promise<void> {
   }, title)
   await browser.waitUntil(
     async () => {
-      const id = await getSelectedWorkItemId()
-      if (!id) return false
-      // Detail title should match (or be loading into it)
       const input = await browser.$('[data-testid="work-item-title-input"]')
       if (!(await input.isExisting())) return false
       const v = await input.getValue()
       return v === title || v.includes(title)
     },
-    { timeout: 10000, interval: 150, timeoutMsg: `detail not selected for ${title}` },
+    { timeout: 10000, interval: 150, timeoutMsg: `modal not open for ${title}` },
   )
 }
 
-/** Toggle complete checkbox on the row for title. */
+/** Toggle complete checkbox on the row for title (list view). */
 export async function toggleCompleteByTitle(title: string): Promise<void> {
+  await switchWorkItemsToListView()
   await browser.execute((t: string) => {
     const rows = document.querySelectorAll('[data-testid^="work-item-row-"]')
     for (const row of rows) {
@@ -396,15 +411,10 @@ export async function setSearchQuery(q: string): Promise<void> {
 
 export async function archiveSelected(): Promise<void> {
   await clickTestId('work-item-archive')
-  // Archive switches filter to archived and keeps the item selected.
+  // Modal archives (after draft flush) and closes — no filter jump.
   await browser.waitUntil(
-    async () => {
-      const chip = await browser.$('[data-testid="work-item-filter-chip"]')
-      if (!(await chip.isExisting())) return false
-      const text = await chip.getText()
-      return /archived|已归档|已封存|アーカイブ|보관/i.test(text)
-    },
-    { timeout: 10000, interval: 100, timeoutMsg: 'filter chip did not switch to archived' },
+    async () => !(await isWorkItemModalOpen()),
+    { timeout: 10000, interval: 100, timeoutMsg: 'modal still open after archive' },
   )
 }
 
@@ -419,12 +429,16 @@ export async function deleteSelected(confirm = true): Promise<void> {
   })
   if (confirm) {
     await clickTestId('work-item-delete-confirm')
-    // Confirm leaves work-items and opens product recycle bin.
-    await (await browser.$('[data-testid="recycle-bin-page"]')).waitForExist({
-      timeout: 15000,
-    })
+    // Soft-delete closes modal and stays on work-items (no forced trash nav).
+    await browser.waitUntil(
+      async () => !(await isWorkItemModalOpen()),
+      { timeout: 10000, interval: 100, timeoutMsg: 'modal still open after delete' },
+    )
+    await expectWorkItemsPage()
   } else {
-    await clickTestId('work-item-delete-cancel')
+    // Cancel via modal close
+    const close = await browser.$('[data-testid="modal-close"]')
+    if (await close.isExisting()) await close.click()
     await browser.pause(100)
   }
 }
@@ -435,13 +449,6 @@ export async function blurActiveElement(): Promise<void> {
     const el = document.activeElement as HTMLElement | null
     el?.blur?.()
   })
-  // Click list pane chrome (not a row) to ensure focus leaves inputs
-  const pane = await browser.$('[data-testid="work-item-list-pane"]')
-  if (await pane.isExisting()) {
-    await browser.execute((el: HTMLElement) => {
-      el.focus?.()
-    }, pane)
-  }
   await browser.pause(50)
 }
 

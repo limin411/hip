@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { INBOX_LIST_ID } from '@/domain/work-items'
+import { INBOX_LIST_ID, localTodayYmd } from '@/domain/work-items'
 import type { WorkItem, WorkItemList } from '@/domain/work-items'
 
 const listWorkItems = vi.fn()
@@ -76,7 +76,7 @@ describe('workItemStore', () => {
       error: null,
       lists: [inbox()],
       items: [],
-      filterId: 'todo',
+      filterId: 'all',
       search: '',
       selectedId: null,
     })
@@ -86,9 +86,8 @@ describe('workItemStore', () => {
     __resetWorkItemStoreInternalsForTests()
   })
 
-  it('defaults filterId to todo', () => {
-    // Fresh store defaults (before setState in beforeEach would override — assert constant).
-    expect(useWorkItemStore.getState().filterId).toBe('todo')
+  it('defaults filterId to all', () => {
+    expect(useWorkItemStore.getState().filterId).toBe('all')
   })
 
   it('load hydrates lists and items', async () => {
@@ -102,7 +101,14 @@ describe('workItemStore', () => {
     const s = useWorkItemStore.getState()
     expect(s.loaded).toBe(true)
     expect(s.loading).toBe(false)
-    expect(s.items).toEqual([wi])
+    const today = localTodayYmd()
+    expect(s.items).toHaveLength(1)
+    expect(s.items[0]).toMatchObject({
+      id: 'wi_a',
+      title: 'A',
+      startOn: today,
+      endOn: today,
+    })
     expect(s.error).toBeNull()
   })
 
@@ -115,22 +121,43 @@ describe('workItemStore', () => {
   })
 
   it('createItem mints id, defaults, selects, and saves', async () => {
-    const id = await useWorkItemStore.getState().createItem()
+    const id = await useWorkItemStore.getState().createItem({}, { select: true })
     expect(id.startsWith('wi_')).toBe(true)
     const s = useWorkItemStore.getState()
     expect(s.selectedId).toBe(id)
     expect(s.items).toHaveLength(1)
+    const today = localTodayYmd()
     expect(s.items[0]).toMatchObject({
       id,
       title: '',
       status: 'todo',
       priority: 'none',
       listId: INBOX_LIST_ID,
-      startOn: null,
-      endOn: null,
+      startOn: today,
+      endOn: today,
       notes: '',
     })
     expect(saveWorkItems).toHaveBeenCalled()
+  })
+
+  it('finalizeSelectedItem discards empty title with only default schedule', async () => {
+    const id = await useWorkItemStore.getState().createItem({}, { select: true })
+    saveWorkItems.mockClear()
+    useWorkItemStore.getState().finalizeSelectedItem()
+    await useWorkItemStore.getState().flushSave()
+    expect(useWorkItemStore.getState().items.find((i) => i.id === id)).toBeUndefined()
+  })
+
+  it('finalizeSelectedItem keeps Untitled when non-default schedule', async () => {
+    const id = await useWorkItemStore.getState().createItem(
+      { startOn: '2026-07-01', endOn: '2026-07-03' },
+      { select: true },
+    )
+    saveWorkItems.mockClear()
+    useWorkItemStore.getState().finalizeSelectedItem()
+    await useWorkItemStore.getState().flushSave()
+    const wi = useWorkItemStore.getState().items.find((i) => i.id === id)
+    expect(wi?.title).toBe(UNTITLED_WORK_ITEM)
   })
 
   it('createItem uses list filter for listId', async () => {
@@ -152,7 +179,7 @@ describe('workItemStore', () => {
   })
 
   it('finalizeSelectedItem discards empty title with no extras', async () => {
-    const id = await useWorkItemStore.getState().createItem()
+    const id = await useWorkItemStore.getState().createItem({}, { select: true })
     saveWorkItems.mockClear()
     useWorkItemStore.getState().finalizeSelectedItem()
     await useWorkItemStore.getState().flushSave()
@@ -162,7 +189,7 @@ describe('workItemStore', () => {
   })
 
   it('finalizeSelectedItem sets Untitled when empty title has extras', async () => {
-    const id = await useWorkItemStore.getState().createItem()
+    const id = await useWorkItemStore.getState().createItem({}, { select: true })
     await useWorkItemStore.getState().updateItem(id, { notes: 'keep me' })
     saveWorkItems.mockClear()
     useWorkItemStore.getState().finalizeSelectedItem()
@@ -174,8 +201,8 @@ describe('workItemStore', () => {
   })
 
   it('select finalizes previous item (discards empty shell)', async () => {
-    const emptyId = await useWorkItemStore.getState().createItem()
-    const keptId = await useWorkItemStore.getState().createItem({ title: 'Keep' })
+    const emptyId = await useWorkItemStore.getState().createItem({}, { select: true })
+    const keptId = await useWorkItemStore.getState().createItem({ title: 'Keep' }, { select: true })
     // createItem selects the new one; re-select empty then switch away.
     useWorkItemStore.setState({
       items: [
@@ -266,7 +293,7 @@ describe('workItemStore', () => {
   })
 
   it('flushSave finalizes empty selected item before drain', async () => {
-    await useWorkItemStore.getState().createItem()
+    await useWorkItemStore.getState().createItem({}, { select: true })
     saveWorkItems.mockClear()
     await useWorkItemStore.getState().flushSave()
     expect(useWorkItemStore.getState().items).toHaveLength(0)

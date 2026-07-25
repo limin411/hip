@@ -2,6 +2,11 @@
 import { invoke } from '@tauri-apps/api/core'
 import type { WorkItem, WorkItemsCatalogV1 } from '@/domain/work-items/types'
 import { normalizeCatalog } from '@/domain/work-items/normalize'
+import {
+  defaultWorkItemUiPrefs,
+  normalizeWorkItemUiPrefs,
+  type WorkItemUiPrefsV1,
+} from '@/domain/work-items/statusColors'
 
 /**
  * Load the work-items catalog from `~/.hip/work-items/catalog.json`.
@@ -65,4 +70,19 @@ export async function purgeExpiredWorkItemsTrash(
   return invoke<string[]>('work_items_purge_expired_trash', {
     retentionDays: retentionDays ?? null,
   })
+}
+
+/** Load status color prefs (`work-items/ui-prefs.json`). Missing → defaults. */
+export async function listWorkItemUiPrefs(): Promise<WorkItemUiPrefsV1> {
+  try {
+    const raw = await invoke<unknown>('work_items_list_ui_prefs')
+    return normalizeWorkItemUiPrefs(raw)
+  } catch {
+    return defaultWorkItemUiPrefs()
+  }
+}
+
+/** Persist status color prefs (atomic 0o600 on Rust side). */
+export async function saveWorkItemUiPrefs(prefs: WorkItemUiPrefsV1): Promise<void> {
+  await invoke<void>('work_items_save_ui_prefs', { prefs })
 }

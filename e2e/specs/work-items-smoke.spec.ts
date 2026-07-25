@@ -26,7 +26,7 @@ describe('work items smoke @smoke @work-items', () => {
     expect(await (await browser.$('[data-testid="work-items-page"]')).isExisting()).toBe(true)
   })
 
-  it('WS2: sidebar lists smart filters + new CTA (no user lists)', async () => {
+  it('WS2: sidebar smart filters + calendar shell + new CTA (no user lists)', async () => {
     await openWorkItemsFromMenu()
     await (await browser.$('[data-testid="sidebar-work-items"]')).waitForExist({
       timeout: 15000,
@@ -48,8 +48,10 @@ describe('work items smoke @smoke @work-items', () => {
     expect(
       await (await browser.$('[data-testid="sidebar-new-work-item-list"]')).isExisting(),
     ).toBe(false)
-    expect(await (await browser.$('[data-testid="work-item-list-pane"]')).isExisting()).toBe(
+    // Calendar-first default
+    expect(await (await browser.$('[data-testid="work-item-month-calendar"]')).isExisting()).toBe(
       true,
     )
+    expect(await (await browser.$('[data-testid="work-item-view-mode"]')).isExisting()).toBe(true)
   })
 })

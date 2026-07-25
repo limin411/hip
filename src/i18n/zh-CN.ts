@@ -1801,6 +1801,35 @@ export const zhCN = {
           '取消表示决定不做了（可在「全部」中找回）。归档会从日常列表隐藏（可在「已归档」中找回）。',
       },
       deleteConfirm: '将此事项移入回收站？可在回收站中恢复。',
+
+      modal: {
+        createTitle: '新建事项',
+        editTitle: '查看事项',
+        save: '保存',
+        titleRequired: '请填写标题',
+      },
+      view: {
+        modeAria: '展示方式',
+        calendar: '月历',
+        list: '列表',
+        calendarHint: '月历 · 事项必含起止日期（缺省当天）',
+        listHint: '按开始时间排序 · 点击行打开弹窗',
+      },
+      calendar: {
+        aria: '月历',
+        prevMonth: '上一月',
+        nextMonth: '下一月',
+        today: '今天',
+        more: '+{{count}} 更多',
+        addOnDay: '在 {{date}} 新建',
+      },
+      list: {
+        count: '共 {{count}} 项 · 按开始时间排序',
+      },
+      colors: {
+        recolor: '状态颜色',
+        recolorAria: '更改{{status}}颜色',
+      },
       listsSection: '清单',
       listsHeading: '清单',
       smartFilters: '智能筛选',

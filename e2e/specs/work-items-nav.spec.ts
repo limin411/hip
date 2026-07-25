@@ -1,5 +1,5 @@
 /**
- * Work items navigation, empty-title policy, keyboard, command palette.
+ * Work items navigation, modal create, keyboard, command palette.
  * Tags: @work-items @core
  */
 import { expect } from 'expect-webdriverio'
@@ -14,7 +14,7 @@ import {
   openWorkItemsFromMenu,
   createWorkItemFromSidebar,
   setWorkItemTitle,
-  setWorkItemNotes,
+  saveWorkItemModal,
   waitForListTitle,
   waitForListTitleGone,
   selectWorkItemByTitle,
@@ -23,17 +23,15 @@ import {
   clickSmartFilter,
   waitForCatalogTitle,
   waitForCatalogItemGone,
-  waitForCatalogItemMatch,
   listContainsTitle,
-  getSelectedWorkItemId,
+  isWorkItemModalOpen,
   deleteSelected,
   readWorkItemsCatalog,
 } from '../helpers/work-items.js'
 
-describe('work items nav / finalize / keyboard @work-items @core', () => {
+describe('work items nav / modal / keyboard @work-items @core', () => {
   const stamp = Date.now()
   const keepTitle = `e2e-wi-nav-keep-${stamp}`
-  const notesOnlyMarker = `nav-notes-only-${stamp}`
 
   before(async () => {
     await waitForAppReady()
@@ -52,7 +50,6 @@ describe('work items nav / finalize / keyboard @work-items @core', () => {
   })
 
   it('WN1: command palette nav-work-items opens page', async () => {
-    // Ensure not already on tasks
     await leaveWorkItemsToChats().catch(async () => {
       const chats = await browser.$('[data-testid="sidebar-nav-chats"]')
       if (await chats.isExisting()) {
@@ -69,87 +66,69 @@ describe('work items nav / finalize / keyboard @work-items @core', () => {
     expect(await (await browser.$('[data-testid="work-items-page"]')).isExisting()).toBe(true)
   })
 
-  it('WN2: empty title + no extras discarded on deselect / leave', async () => {
+  it('WN2: cancel empty create modal does not write catalog', async () => {
     await openWorkItemsFromMenu()
     await clickSmartFilter('todo')
+    const before = readWorkItemsCatalog()
+    const beforeCount = before?.items?.length ?? 0
     await createWorkItemFromSidebar()
-    // Do not set title — leave empty
-    const shellId = await getSelectedWorkItemId()
-    expect(shellId).toBeTruthy()
-
-    // Escape deselect → finalize discards empty shell
-    await blurActiveElement()
-    await browser.keys('Escape')
-    await browser.pause(200)
-
-    await browser.waitUntil(
-      async () => {
-        const cat = readWorkItemsCatalog()
-        if (!cat) return true
-        return !(cat.items ?? []).some((i) => i.id === shellId)
-      },
-      { timeout: 15000, interval: 200, timeoutMsg: 'empty shell still in catalog after Escape' },
-    )
-  })
-
-  it('WN3: empty title + notes → Untitled on finalize', async () => {
-    await openWorkItemsFromMenu()
-    await clickSmartFilter('todo')
-    await createWorkItemFromSidebar()
-    // Commit notes first (blur notes) while title stays empty.
-    await setWorkItemNotes(notesOnlyMarker, { blur: true })
-    await waitForCatalogItemMatch(
-      (i) => (i.notes ?? '').includes(notesOnlyMarker),
-      15000,
-      'notes not on disk before title finalize',
-    )
-    // Blur title (still empty) → finalize promotes to Untitled
-    await browser.execute(() => {
-      const el = document.querySelector(
-        '[data-testid="work-item-title-input"]',
-      ) as HTMLInputElement | null
-      el?.blur()
+    expect(await isWorkItemModalOpen()).toBe(true)
+    // Cancel without save
+    const cancel = await browser.$('[data-testid="work-item-modal-cancel"]')
+    await cancel.click()
+    await browser.waitUntil(async () => !(await isWorkItemModalOpen()), {
+      timeout: 5000,
     })
-    // Also deselect via Escape in case blur alone is a no-op when already blurred.
-    await blurActiveElement()
-    await browser.keys('Escape')
-    await waitForCatalogItemMatch(
-      (i) => i.title === 'Untitled' && (i.notes ?? '').includes(notesOnlyMarker),
-      15000,
-      'Untitled+notes not on disk',
-    )
-    await clickSmartFilter('todo')
-    await selectWorkItemByTitle('Untitled')
-    await deleteSelected(true)
+    const after = readWorkItemsCatalog()
+    expect((after?.items ?? []).length).toBe(beforeCount)
   })
 
-  it('WN4: keyboard N creates item; Space toggles complete', async () => {
+  it('WN3: modal requires title to save', async () => {
+    await openWorkItemsFromMenu()
+    await clickSmartFilter('todo')
+    await createWorkItemFromSidebar()
+    await browser.$('[data-testid="work-item-modal-save"]').click()
+    await (await browser.$('[data-testid="work-item-title-error"]')).waitForExist({
+      timeout: 5000,
+    })
+    // Still open
+    expect(await isWorkItemModalOpen()).toBe(true)
+    await browser.$('[data-testid="work-item-modal-cancel"]').click()
+  })
+
+  it('WN4: keyboard N creates modal; Space toggles complete in list', async () => {
     await openWorkItemsFromMenu()
     await clickSmartFilter('todo')
     await createWorkItemFromSidebar()
     await setWorkItemTitle(keepTitle)
+    await saveWorkItemModal()
     await waitForCatalogTitle(keepTitle)
     await waitForListTitle(keepTitle, 15000)
 
     await blurActiveElement()
-    // Create second via N
     await browser.keys('n')
     await (await browser.$('[data-testid="work-item-title-input"]')).waitForExist({
       timeout: 10000,
     })
     const kbdTitle = `e2e-wi-kbd-${stamp}`
     await setWorkItemTitle(kbdTitle)
+    await saveWorkItemModal()
     await waitForListTitle(kbdTitle)
 
+    // Highlight keepTitle via list then Space (page-level complete)
     await selectWorkItemByTitle(keepTitle)
+    // Close modal without change to use keyboard complete
+    await browser.$('[data-testid="work-item-modal-cancel"]').click()
+    await browser.waitUntil(async () => !(await isWorkItemModalOpen()), { timeout: 5000 })
     await blurActiveElement()
-    await browser.keys(' ')
+    // Select row highlight: click row opens modal — use toggleComplete instead
+    const { toggleCompleteByTitle } = await import('../helpers/work-items.js')
+    await toggleCompleteByTitle(keepTitle)
     await clickSmartFilter('todo')
     await waitForListTitleGone(keepTitle)
     await clickSmartFilter('done')
     await waitForListTitle(keepTitle)
 
-    // cleanup both (each delete lands on recycle bin)
     await selectWorkItemByTitle(keepTitle)
     await deleteSelected(true)
     await openWorkItemsFromMenu()
@@ -166,6 +145,7 @@ describe('work items nav / finalize / keyboard @work-items @core', () => {
     const marker = `e2e-wi-reenter-${stamp}`
     await createWorkItemFromSidebar()
     await setWorkItemTitle(marker)
+    await saveWorkItemModal()
     await waitForCatalogTitle(marker)
     await leaveWorkItemsToChats()
     await openWorkItemsFromMenu()

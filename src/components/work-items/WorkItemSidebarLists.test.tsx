@@ -25,6 +25,22 @@ vi.mock('@/store/workItemStore', () => {
   return { useWorkItemStore }
 })
 
+vi.mock('@/store/workItemUiPrefsStore', () => {
+  const useWorkItemUiPrefsStore = (sel: (s: Record<string, unknown>) => unknown) =>
+    sel({
+      loaded: true,
+      statusColors: {
+        todo: '#3b82f6',
+        in_progress: '#f59e0b',
+        done: '#22c55e',
+        archived: '#94a3b8',
+      },
+      load: vi.fn().mockResolvedValue(undefined),
+      setStatusColor: vi.fn(),
+    })
+  return { useWorkItemUiPrefsStore }
+})
+
 describe('WorkItemSidebarLists', () => {
   beforeEach(() => {
     setFilter.mockClear()

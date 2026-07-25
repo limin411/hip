@@ -10,6 +10,7 @@ import {
   createWorkItemFromSidebar,
   setWorkItemTitle,
   setWorkItemStatus,
+  saveWorkItemModal,
   setSearchQuery,
   waitForListTitle,
   waitForListTitleGone,
@@ -18,6 +19,7 @@ import {
   waitForCatalogTitle,
   listContainsTitle,
   deleteSelected,
+  switchWorkItemsToListView,
 } from '../helpers/work-items.js'
 
 describe('work items filters @work-items @core', () => {
@@ -39,14 +41,17 @@ describe('work items filters @work-items @core', () => {
 
     await createWorkItemFromSidebar()
     await setWorkItemTitle(todoTitle)
+    await saveWorkItemModal()
 
     await createWorkItemFromSidebar()
     await setWorkItemTitle(progTitle)
     await setWorkItemStatus('in_progress')
+    await saveWorkItemModal()
 
     await createWorkItemFromSidebar()
     await setWorkItemTitle(doneTitle)
     await setWorkItemStatus('done')
+    await saveWorkItemModal()
 
     await waitForCatalogTitle(todoTitle)
     await waitForCatalogTitle(progTitle)
@@ -54,6 +59,7 @@ describe('work items filters @work-items @core', () => {
   })
 
   it('WF2: smart filters isolate each seeded item', async () => {
+    await switchWorkItemsToListView()
     await clickSmartFilter('todo')
     await waitForListTitle(todoTitle)
     expect(await listContainsTitle(progTitle)).toBe(false)
@@ -79,6 +85,7 @@ describe('work items filters @work-items @core', () => {
 
   it('WF4: search filters by title substring', async () => {
     await clickSmartFilter('all')
+    await switchWorkItemsToListView()
     await setSearchQuery('f-prog-')
     await waitForListTitle(progTitle)
     expect(await listContainsTitle(todoTitle)).toBe(false)
@@ -87,7 +94,7 @@ describe('work items filters @work-items @core', () => {
     await waitForListTitle(todoTitle)
   })
 
-  it('WF5: cleanup seeded items (hard delete → recycle bin each time)', async () => {
+  it('WF5: cleanup seeded items', async () => {
     for (const t of [todoTitle, progTitle, doneTitle]) {
       await openWorkItemsFromMenu()
       await clickSmartFilter('all')

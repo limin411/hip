@@ -1796,6 +1796,34 @@ export const zhTW = {
       "cancelVsArchive": "取消表示決定不做了（可在「全部」中找回）。封存會從日常列表隱藏（可在「已封存」中找回）。"
     },
     "deleteConfirm": "將此事項移入回收站？可在回收站中恢復。",
+    "modal": {
+      "createTitle": "新建事項",
+      "editTitle": "查看事項",
+      "save": "儲存",
+      "titleRequired": "請填寫標題"
+    },
+    "view": {
+      "modeAria": "展示方式",
+      "calendar": "月曆",
+      "list": "列表",
+      "calendarHint": "月曆 · 事項必含起迄日期（缺省當天）",
+      "listHint": "依開始時間排序 · 點擊列開啟彈窗"
+    },
+    "calendar": {
+      "aria": "月曆",
+      "prevMonth": "上一月",
+      "nextMonth": "下一月",
+      "today": "今天",
+      "more": "+{{count}} 更多",
+      "addOnDay": "在 {{date}} 新建"
+    },
+    "list": {
+      "count": "共 {{count}} 項 · 依開始時間排序"
+    },
+    "colors": {
+      "recolor": "狀態顏色",
+      "recolorAria": "變更{{status}}顏色"
+    },
     "listsSection": "清單",
     "listsHeading": "清單",
     "smartFilters": "智慧篩選",

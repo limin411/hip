@@ -33,6 +33,9 @@ export async function leaveKnowledge(): Promise<void> {
 export async function leaveWorkItems(): Promise<void> {
   if (useUiStore.getState().activeView !== 'tasks') return
   try {
+    // Close modal session so form-local drafts do not resurrect on re-entry.
+    const { useWorkItemViewStore } = await import('@/store/workItemViewStore')
+    useWorkItemViewStore.getState().leaveWorkItems()
     await useWorkItemStore.getState().flushSave()
   } catch {
     // non-Tauri / not loaded

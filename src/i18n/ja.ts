@@ -1788,6 +1788,34 @@ export const ja = {
       "cancelVsArchive": "キャンセルは「やらない」決定です（「すべて」で確認）。アーカイブは日常リストから隠します（「アーカイブ」で確認）。"
     },
     "deleteConfirm": "このワークアイテムをゴミ箱に移しますか？後で復元できます。",
+    "modal": {
+      "createTitle": "新規アイテム",
+      "editTitle": "アイテム",
+      "save": "保存",
+      "titleRequired": "タイトルは必須です"
+    },
+    "view": {
+      "modeAria": "表示モード",
+      "calendar": "カレンダー",
+      "list": "リスト",
+      "calendarHint": "月表示 · 日付必須（既定は今日）",
+      "listHint": "開始日順 · 行をクリックして開く"
+    },
+    "calendar": {
+      "aria": "月カレンダー",
+      "prevMonth": "前月",
+      "nextMonth": "翌月",
+      "today": "今日",
+      "more": "+{{count}} 件",
+      "addOnDay": "{{date}} に作成"
+    },
+    "list": {
+      "count": "{{count}} 件 · 開始日順"
+    },
+    "colors": {
+      "recolor": "ステータス色",
+      "recolorAria": "{{status}} の色を変更"
+    },
     "listsSection": "リスト",
     "listsHeading": "リスト",
     "smartFilters": "スマートフィルター",

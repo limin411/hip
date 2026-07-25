@@ -16,6 +16,7 @@ mod workspace_file_search;
 mod terminal_hosts;
 mod work_items;
 mod work_items_trash;
+mod work_items_ui_prefs;
 mod terminal_budget;
 mod ssh_path;
 mod ssh_known_hosts;
@@ -806,6 +807,8 @@ pub fn run() {
             terminal_hosts::terminal_hosts_save,
             work_items::work_items_list,
             work_items::work_items_save,
+            work_items_ui_prefs::work_items_list_ui_prefs,
+            work_items_ui_prefs::work_items_save_ui_prefs,
             work_items_trash::work_items_soft_delete,
             work_items_trash::work_items_list_trash,
             work_items_trash::work_items_restore_trash_entry,

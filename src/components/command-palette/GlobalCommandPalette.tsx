@@ -28,7 +28,7 @@ import { TERMINAL_MANAGEMENT } from '@/components/terminals/feature'
 import { WORK_ITEM_TRACKING } from '@/components/work-items/feature'
 import { useHostLibraryUi } from '@/components/terminals/hostLibraryUi'
 import { useManagedTerminalStore } from '@/store/managedTerminalStore'
-import { useWorkItemStore } from '@/store/workItemStore'
+
 import { groupModelOptions } from '@/lib/agentModelOptions'
 import { activeModelKey } from '@/lib/modelKey'
 import { toast } from 'sonner'
@@ -294,7 +294,10 @@ export function GlobalCommandPalette() {
             enterWorkItems: () => void enterWorkItemsSection(),
             newWorkItem: async () => {
               await enterWorkItemsSection()
-              await useWorkItemStore.getState().createItem()
+              const { useWorkItemViewStore } = await import(
+                '@/store/workItemViewStore'
+              )
+              useWorkItemViewStore.getState().requestCreate()
             },
           }
         : {}),

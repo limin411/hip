@@ -1,5 +1,5 @@
 /**
- * Work items full lifecycle: create → edit fields → complete/cancel/archive → hard delete.
+ * Work items full lifecycle: create → edit fields → complete/archive → soft delete.
  * Disk asserts under HIP_DATA_DIR/work-items/catalog.json.
  * Tags: @work-items @core
  */
@@ -16,6 +16,7 @@ import {
   setWorkItemStartOn,
   setWorkItemEndOn,
   addWorkItemTag,
+  saveWorkItemModal,
   waitForCatalogTitle,
   waitForCatalogItemMatch,
   waitForCatalogItemGone,
@@ -29,8 +30,6 @@ import {
   deleteSelected,
   localTodayYmd,
   leaveWorkItemsToChats,
-  listContainsTitle,
-  getSelectedWorkItemId,
 } from '../helpers/work-items.js'
 
 describe('work items lifecycle @work-items @core', () => {
@@ -48,16 +47,13 @@ describe('work items lifecycle @work-items @core', () => {
     await openWorkItemsFromMenu()
   })
 
-  it('WL1: create item from sidebar, set title, appears in todo list', async () => {
+  it('WL1: create item from sidebar modal, appears in todo list', async () => {
     await clickSmartFilter('todo')
     await createWorkItemFromSidebar()
     await setWorkItemTitle(titleA)
-    // Disk first (save chain), then list UI
+    await saveWorkItemModal()
     await waitForCatalogTitle(titleA)
     await waitForListTitle(titleA, 15000)
-    const id = await getSelectedWorkItemId()
-    expect(id).toBeTruthy()
-    expect(id!.startsWith('wi_')).toBe(true)
   })
 
   it('WL2: catalog on disk has title under work-items/', async () => {
@@ -66,6 +62,8 @@ describe('work items lifecycle @work-items @core', () => {
     expect(item.status).toBe('todo')
     expect(item.listId).toBe('wl_inbox')
     expect(item.archivedAt).toBeNull()
+    expect(item.startOn).toBeTruthy()
+    expect(item.endOn).toBeTruthy()
   })
 
   it('WL3: edit status, priority, start/end, tags, notes persist to disk', async () => {
@@ -77,6 +75,7 @@ describe('work items lifecycle @work-items @core', () => {
     await setWorkItemEndOn(today)
     await addWorkItemTag(tagName)
     await setWorkItemNotes(notesMarker)
+    await saveWorkItemModal()
 
     const item = await waitForCatalogItemMatch(
       (i) =>
@@ -112,6 +111,7 @@ describe('work items lifecycle @work-items @core', () => {
     await clickSmartFilter('done')
     await selectWorkItemByTitle(titleA)
     await setWorkItemStatus('todo')
+    await saveWorkItemModal()
     await clickSmartFilter('todo')
     await waitForListTitle(titleA)
     await waitForCatalogItemMatch(
@@ -121,18 +121,22 @@ describe('work items lifecycle @work-items @core', () => {
     )
   })
 
-  it('WL6: archive switches to archived; unarchive; soft-delete → trash → restore', async () => {
+  it('WL6: archive (no filter jump); unarchive; soft-delete stays on page', async () => {
     await clickSmartFilter('todo')
     await selectWorkItemByTitle(titleA)
     await archiveSelected()
-    // archiveSelected already asserts filter chip → archived
-    await waitForListTitle(titleA)
+    // No forced filter jump — open archived filter to see it
     await clickSmartFilter('all')
     await waitForListTitleGone(titleA)
     await clickSmartFilter('archived')
     await waitForListTitle(titleA)
     await selectWorkItemByTitle(titleA)
     await unarchiveSelected()
+    // Save modal if still open after unarchive
+    const saveBtn = await browser.$('[data-testid="work-item-modal-save"]')
+    if (await saveBtn.isExisting()) {
+      await saveWorkItemModal()
+    }
     await clickSmartFilter('archived')
     await waitForListTitleGone(titleA)
     await clickSmartFilter('todo')
@@ -140,51 +144,19 @@ describe('work items lifecycle @work-items @core', () => {
 
     await selectWorkItemByTitle(titleA)
     await deleteSelected(true)
-    // Soft-delete: gone from live catalog, present in recycle bin UI
     await waitForCatalogItemGone(titleA)
-    expect(await (await browser.$('[data-testid="recycle-bin-page"]')).isExisting()).toBe(true)
-    await browser.waitUntil(
-      async () => {
-        const rows = await browser.$$('[data-testid="recycle-bin-row"]')
-        for (const r of rows) {
-          if ((await r.getText()).includes(titleA)) return true
-        }
-        return false
-      },
-      { timeout: 15000, interval: 200, timeoutMsg: 'work item not listed in recycle bin' },
-    )
-    // Restore from recycle bin
-    await browser.execute((title: string) => {
-      const rows = document.querySelectorAll('[data-testid="recycle-bin-row"]')
-      for (const row of rows) {
-        if ((row.textContent ?? '').includes(title)) {
-          const btn = row.querySelector(
-            '[data-testid="recycle-bin-restore"]',
-          ) as HTMLElement | null
-          btn?.click()
-          return
-        }
-      }
-      throw new Error('restore row not found')
-    }, titleA)
-    await waitForCatalogTitle(titleA)
-    await openWorkItemsFromMenu()
-    await clickSmartFilter('todo')
-    await waitForListTitle(titleA, 15000)
-    // cleanup seed A (soft-delete → recycle bin)
-    await selectWorkItemByTitle(titleA)
-    await deleteSelected(true)
-    await waitForCatalogItemGone(titleA)
+    // Stays on work-items (no forced recycle bin nav)
+    await (await browser.$('[data-testid="work-items-page"]')).waitForExist({ timeout: 10000 })
   })
 
-  it('WL7: leave surface flushes second item notes; reopen still shows', async () => {
+  it('WL7: create second item with notes via modal; leave preserves catalog', async () => {
     await openWorkItemsFromMenu()
     await clickSmartFilter('todo')
     await createWorkItemFromSidebar()
     await setWorkItemTitle(titleB)
+    await setWorkItemNotes(`persist-on-leave-${stamp}`)
+    await saveWorkItemModal()
     await waitForCatalogTitle(titleB)
-    await setWorkItemNotes(`persist-on-leave-${stamp}`, { blur: false })
-    // Leave without blur notes — leaveWorkItems should commit draft
     await leaveWorkItemsToChats()
     await openWorkItemsFromMenu()
     await clickSmartFilter('todo')
@@ -193,9 +165,8 @@ describe('work items lifecycle @work-items @core', () => {
     await waitForCatalogItemMatch(
       (i) => i.title === titleB && (i.notes ?? '').includes(`persist-on-leave-${stamp}`),
       20000,
-      'notes not flushed on leave',
+      'notes not on disk',
     )
-    // cleanup → lands on recycle bin
     await deleteSelected(true)
     await waitForCatalogItemGone(titleB)
   })

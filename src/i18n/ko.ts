@@ -1788,6 +1788,34 @@ export const ko = {
       "cancelVsArchive": "취소는 하지 않기로 한 것입니다(「전체」에서 확인). 보관은 일상 목록에서 숨깁니다(「보관됨」에서 확인)."
     },
     "deleteConfirm": "이 작업 항목을 휴지통으로 이동할까요? 나중에 복원할 수 있습니다.",
+    "modal": {
+      "createTitle": "새 항목",
+      "editTitle": "항목",
+      "save": "저장",
+      "titleRequired": "제목은 필수입니다"
+    },
+    "view": {
+      "modeAria": "표시 방식",
+      "calendar": "달력",
+      "list": "목록",
+      "calendarHint": "월간 · 날짜 필수(기본 오늘)",
+      "listHint": "시작일 정렬 · 행을 클릭해 열기"
+    },
+    "calendar": {
+      "aria": "월 달력",
+      "prevMonth": "이전 달",
+      "nextMonth": "다음 달",
+      "today": "오늘",
+      "more": "+{{count}}개 더",
+      "addOnDay": "{{date}}에 만들기"
+    },
+    "list": {
+      "count": "{{count}}개 · 시작일 순"
+    },
+    "colors": {
+      "recolor": "상태 색",
+      "recolorAria": "{{status}} 색 변경"
+    },
     "listsSection": "목록",
     "listsHeading": "목록",
     "smartFilters": "스마트 필터",

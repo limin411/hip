@@ -1846,6 +1846,35 @@ export const en = {
           'Cancel means you decided not to do it (find it under All). Archive hides it from everyday lists (find it under Archived).',
       },
       deleteConfirm: 'Move this work item to the recycle bin? You can restore it later.',
+
+      modal: {
+        createTitle: 'New work item',
+        editTitle: 'Work item',
+        save: 'Save',
+        titleRequired: 'Title is required',
+      },
+      view: {
+        modeAria: 'Display mode',
+        calendar: 'Calendar',
+        list: 'List',
+        calendarHint: 'Month view · dates required (default today)',
+        listHint: 'Sorted by start date · click a row to open',
+      },
+      calendar: {
+        aria: 'Month calendar',
+        prevMonth: 'Previous month',
+        nextMonth: 'Next month',
+        today: 'Today',
+        more: '+{{count}} more',
+        addOnDay: 'Create on {{date}}',
+      },
+      list: {
+        count: '{{count}} items · by start date',
+      },
+      colors: {
+        recolor: 'Status color',
+        recolorAria: 'Change color for {{status}}',
+      },
       listsSection: 'Lists',
       listsHeading: 'Lists',
       smartFilters: 'Smart filters',

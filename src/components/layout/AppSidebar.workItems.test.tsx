@@ -16,7 +16,7 @@ vi.mock('@/components/work-items/feature', () => ({
 
 const enterWorkItemsSection = vi.fn(async () => {})
 const enterPlaceholderSection = vi.fn(async (_section?: string) => {})
-const createItem = vi.fn(async () => 'wi_1')
+const requestCreate = vi.fn()
 
 vi.mock('./sidebarActions', () => ({
   enterKnowledge: vi.fn(async () => {}),
@@ -60,15 +60,38 @@ vi.mock('@/store/knowledgeStore', () => {
 
 vi.mock('@/store/workItemStore', () => {
   const state = {
-    filterId: 'todo',
+    filterId: 'all',
     lists: [],
     items: [],
     setFilter: vi.fn(),
-    createItem: () => createItem(),
   }
   const useWorkItemStore = (sel: (s: typeof state) => unknown) => sel(state)
   useWorkItemStore.getState = () => state
   return { useWorkItemStore }
+})
+
+vi.mock('@/store/workItemViewStore', () => {
+  const state = {
+    requestCreate: () => requestCreate(),
+  }
+  const useWorkItemViewStore = (sel: (s: typeof state) => unknown) => sel(state)
+  useWorkItemViewStore.getState = () => state
+  return { useWorkItemViewStore }
+})
+
+vi.mock('@/store/workItemUiPrefsStore', () => {
+  const useWorkItemUiPrefsStore = (sel: (s: Record<string, unknown>) => unknown) =>
+    sel({
+      statusColors: {
+        todo: '#3b82f6',
+        in_progress: '#f59e0b',
+        done: '#22c55e',
+        archived: '#94a3b8',
+      },
+      load: vi.fn().mockResolvedValue(undefined),
+      setStatusColor: vi.fn(),
+    })
+  return { useWorkItemUiPrefsStore }
 })
 
 import { AppSidebar } from './AppSidebar'
@@ -77,7 +100,7 @@ describe('AppSidebar with WORK_ITEM_TRACKING true', () => {
   beforeEach(() => {
     enterWorkItemsSection.mockClear()
     enterPlaceholderSection.mockClear()
-    createItem.mockClear()
+    requestCreate.mockClear()
     useNavHistoryStore.setState({ stack: [], index: -1, applying: false })
     useUiStore.setState({
       activeView: 'chat',
@@ -128,13 +151,13 @@ describe('AppSidebar with WORK_ITEM_TRACKING true', () => {
     expect(screen.getByTestId('sidebar-new-work-item')).toBeInTheDocument()
   })
 
-  it('new work item button enters section and createItem', async () => {
+  it('new work item button enters section and requestCreate', async () => {
     useUiStore.setState({ sidebarSection: 'tasks', activeView: 'tasks' })
     render(<AppSidebar />)
     fireEvent.click(screen.getByTestId('sidebar-new-work-item'))
     await vi.waitFor(() => {
       expect(enterWorkItemsSection).toHaveBeenCalled()
-      expect(createItem).toHaveBeenCalled()
+      expect(requestCreate).toHaveBeenCalled()
     })
   })
 })

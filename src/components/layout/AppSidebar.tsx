@@ -58,7 +58,7 @@ import { TERMINAL_MANAGEMENT } from '@/components/terminals/feature'
 import { QuickConnectPopover } from '@/components/terminals/QuickConnectPopover'
 import { WORK_ITEM_TRACKING } from '@/components/work-items/feature'
 import { WorkItemSidebarLists } from '@/components/work-items/WorkItemSidebarLists'
-import { useWorkItemStore } from '@/store/workItemStore'
+
 import {
   enterKnowledge,
   enterPlaceholderSection,
@@ -402,7 +402,10 @@ export function AppSidebar() {
               onClick={() => {
                 void (async () => {
                   await enterWorkItemsSection()
-                  await useWorkItemStore.getState().createItem()
+                  const { useWorkItemViewStore } = await import(
+                    '@/store/workItemViewStore'
+                  )
+                  useWorkItemViewStore.getState().requestCreate()
                 })()
               }}
               className="rounded-md px-1.5 py-0.5 text-caption text-ink-tertiary transition-colors duration-chrome hover:bg-state-hover hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink/20"

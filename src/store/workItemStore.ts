@@ -1,7 +1,10 @@
 import { create } from 'zustand'
 import {
   applyStatus,
+  ensureScheduleDates,
   INBOX_LIST_ID,
+  isDefaultScheduleOnly,
+  localTodayYmd,
   mintWorkItemId,
   mintWorkListId,
   type WorkItem,
@@ -62,16 +65,18 @@ function pendingNotesFor(id: string, itemNotes: string): string {
   return itemNotes
 }
 
-function hasExtras(item: WorkItem, notes: string): boolean {
-  return (
-    notes.trim() !== '' ||
-    item.startOn != null ||
-    item.endOn != null ||
-    item.tags.length > 0 ||
-    Boolean(item.links.sessionId) ||
-    Boolean(item.links.knowledge) ||
-    Boolean(item.links.url)
-  )
+/**
+ * User-meaningful content beyond empty title + pure default schedule (today–today).
+ * Default create dates alone must not block empty-shell discard.
+ */
+function hasExtras(item: WorkItem, notes: string, todayYmd: string = localTodayYmd()): boolean {
+  if (notes.trim() !== '') return true
+  if (item.tags.length > 0) return true
+  if (item.links.sessionId || item.links.knowledge || item.links.url) return true
+  if (item.startOn != null || item.endOn != null) {
+    if (!isDefaultScheduleOnly(item.startOn, item.endOn, todayYmd)) return true
+  }
+  return false
 }
 
 function sanitizeLinksPatch(links: WorkItem['links']): WorkItem['links'] {
@@ -98,7 +103,15 @@ function defaultItem(
   now: number,
   listId: string,
   partial?: Partial<WorkItem>,
+  todayYmd: string = localTodayYmd(),
 ): WorkItem {
+  const schedule = ensureScheduleDates(
+    {
+      startOn: partial?.startOn,
+      endOn: partial?.endOn,
+    },
+    todayYmd,
+  )
   const base: WorkItem = {
     id: mintWorkItemId(),
     title: '',
@@ -107,8 +120,8 @@ function defaultItem(
     listId,
     tags: [],
     notes: '',
-    startOn: null,
-    endOn: null,
+    startOn: schedule.startOn,
+    endOn: schedule.endOn,
     createdAt: now,
     updatedAt: now,
     completedAt: null,
@@ -122,8 +135,14 @@ function defaultItem(
     id: partial.id && partial.id.startsWith('wi_') ? partial.id : base.id,
     createdAt: partial.createdAt ?? now,
     updatedAt: now,
+    startOn: schedule.startOn,
+    endOn: schedule.endOn,
     links: partial.links ? sanitizeLinksPatch(partial.links) : base.links,
   }
+  // Re-ensure if partial overwrote with null before we forced schedule.
+  const ensured = ensureScheduleDates(merged, todayYmd)
+  merged.startOn = ensured.startOn
+  merged.endOn = ensured.endOn
   // Uphold completedAt invariant for open vs terminal.
   if (merged.status === 'todo' || merged.status === 'in_progress') {
     merged.completedAt = null
@@ -139,7 +158,7 @@ export interface WorkItemStore {
   error: string | null
   lists: WorkItemList[]
   items: WorkItem[]
-  /** Smart filter or legacy `list:${id}`; default `todo`. */
+  /** Smart filter or legacy `list:${id}`; default `all` (calendar-first cutover). */
   filterId: string
   search: string
   selectedId: string | null
@@ -155,8 +174,31 @@ export interface WorkItemStore {
    */
   finalizeSelectedItem: () => void
 
-  createItem: (partial?: Partial<WorkItem>) => Promise<string>
+  /**
+   * Persist a new work item (dates always ensured).
+   * @param options.select default false (no master-detail).
+   */
+  createItem: (
+    partial?: Partial<WorkItem>,
+    options?: { select?: boolean },
+  ) => Promise<string>
   updateItem: (id: string, patch: Partial<WorkItem>) => Promise<void>
+  /**
+   * Atomic multi-field edit used by the editor modal (one save).
+   * Always ensures schedule dates; empty title is rejected by the modal.
+   */
+  commitItemDraft: (
+    id: string | null,
+    draft: {
+      title: string
+      startOn: string
+      endOn: string
+      status: WorkItemStatus
+      priority: WorkItem['priority']
+      notes: string
+      tags: string[]
+    },
+  ) => Promise<string>
   /** Finalize previous selection, then set selectedId. */
   select: (id: string | null) => void
 
@@ -196,7 +238,7 @@ export const useWorkItemStore = create<WorkItemStore>((set, get) => ({
   error: null,
   lists: [],
   items: [],
-  filterId: 'todo',
+  filterId: 'all',
   search: '',
   selectedId: null,
 
@@ -204,9 +246,15 @@ export const useWorkItemStore = create<WorkItemStore>((set, get) => ({
     set({ loading: true, error: null })
     try {
       const catalog = await listWorkItems()
+      const today = localTodayYmd()
+      const items = catalog.items.map((it) => {
+        const { startOn, endOn } = ensureScheduleDates(it, today)
+        if (it.startOn === startOn && it.endOn === endOn) return it
+        return { ...it, startOn, endOn }
+      })
       set({
         lists: catalog.lists,
-        items: catalog.items,
+        items,
         loaded: true,
         loading: false,
         error: null,
@@ -312,17 +360,27 @@ export const useWorkItemStore = create<WorkItemStore>((set, get) => ({
     }
   },
 
-  createItem: async (partial) => {
+  createItem: async (partial, options) => {
     get().finalizeSelectedItem()
     const now = Date.now()
     const listId =
       partial?.listId && get().lists.some((l) => l.id === partial.listId)
         ? partial.listId
         : listIdFromFilter(get().filterId, get().lists)
-    const item = defaultItem(now, listId, partial)
+    const filterId = get().filterId
+    let status: WorkItemStatus | undefined = partial?.status
+    if (status == null) {
+      if (filterId === 'todo' || filterId === 'in_progress' || filterId === 'done') {
+        status = filterId
+      } else {
+        status = 'todo'
+      }
+    }
+    const item = defaultItem(now, listId, { ...partial, status })
+    const select = options?.select === true
     set((s) => ({
       items: [...s.items, item],
-      selectedId: item.id,
+      selectedId: select ? item.id : s.selectedId,
       error: null,
     }))
     await get().save()
@@ -333,6 +391,7 @@ export const useWorkItemStore = create<WorkItemStore>((set, get) => ({
     const prev = get().items.find((i) => i.id === id)
     if (!prev) return
     const now = Date.now()
+    const today = localTodayYmd()
     const nextPatch: Partial<WorkItem> = { ...patch }
     if (nextPatch.links) {
       nextPatch.links = sanitizeLinksPatch({ ...prev.links, ...nextPatch.links })
@@ -340,6 +399,19 @@ export const useWorkItemStore = create<WorkItemStore>((set, get) => ({
     // Do not let callers stomp id/createdAt via patch.
     delete (nextPatch as { id?: string }).id
     delete (nextPatch as { createdAt?: number }).createdAt
+
+    // Schedule: null clears are filled with ensure; never leave null after write.
+    if ('startOn' in nextPatch || 'endOn' in nextPatch) {
+      const ensured = ensureScheduleDates(
+        {
+          startOn: nextPatch.startOn !== undefined ? nextPatch.startOn : prev.startOn,
+          endOn: nextPatch.endOn !== undefined ? nextPatch.endOn : prev.endOn,
+        },
+        today,
+      )
+      nextPatch.startOn = ensured.startOn
+      nextPatch.endOn = ensured.endOn
+    }
 
     set((s) => ({
       items: s.items.map((i) =>
@@ -355,6 +427,62 @@ export const useWorkItemStore = create<WorkItemStore>((set, get) => ({
       error: null,
     }))
     await get().save()
+  },
+
+  commitItemDraft: async (id, draft) => {
+    const today = localTodayYmd()
+    const schedule = ensureScheduleDates(
+      { startOn: draft.startOn, endOn: draft.endOn },
+      today,
+    )
+    const title = draft.title.trim()
+    if (!title) {
+      throw new Error('title required')
+    }
+    if (id == null) {
+      return get().createItem(
+        {
+          title,
+          startOn: schedule.startOn,
+          endOn: schedule.endOn,
+          status: draft.status,
+          priority: draft.priority,
+          notes: draft.notes,
+          tags: draft.tags,
+        },
+        { select: false },
+      )
+    }
+    const prev = get().items.find((i) => i.id === id)
+    if (!prev) throw new Error('item not found')
+    const now = Date.now()
+    let completedAt = prev.completedAt
+    if (draft.status === 'todo' || draft.status === 'in_progress') {
+      completedAt = null
+    } else if (completedAt == null) {
+      completedAt = now
+    }
+    set((s) => ({
+      items: s.items.map((i) =>
+        i.id === id
+          ? {
+              ...i,
+              title,
+              startOn: schedule.startOn,
+              endOn: schedule.endOn,
+              status: draft.status,
+              priority: draft.priority,
+              notes: draft.notes,
+              tags: draft.tags,
+              completedAt,
+              updatedAt: now,
+            }
+          : i,
+      ),
+      error: null,
+    }))
+    await get().save()
+    return id
   },
 
   select: (id) => {

@@ -13,7 +13,7 @@ vi.mock('@/lib/shikiLazy', () => ({
   highlightCode: vi.fn(async () => '<span class="tok">highlighted</span>'),
 }))
 
-const openWithDefaultApp = vi.fn(async () => true)
+const openWithDefaultApp = vi.fn(async (..._args: unknown[]) => true)
 vi.mock('@/ipc/openPath', () => ({
   openWithDefaultApp: (...args: unknown[]) => openWithDefaultApp(...args),
 }))

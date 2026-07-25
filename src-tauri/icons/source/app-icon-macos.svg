@@ -1,10 +1,9 @@
 <svg width="1024" height="1024" viewBox="0 0 400 400" xmlns="http://www.w3.org/2000/svg">
-  <!-- hip app-icon master (Windows / shared) — Flat Butt body; full-bleed tile for taskbar/start -->
-  <!-- macOS Dock/Finder uses source/app-icon-macos.svg → icon.icns only (has ~9% inset). -->
-  <!-- Regenerate Windows/shared: yarn tauri icon src-tauri/icons/source/app-icon.svg -->
-  <!-- Then restore macOS: yarn tauri icon src-tauri/icons/source/app-icon-macos.svg -o /tmp/hip-macos-icons && cp /tmp/hip-macos-icons/icon.icns src-tauri/icons/icon.icns -->
-  <rect x="0" y="0" width="400" height="400" rx="88" fill="#FFF6EB"/>
-  <g transform="translate(200 200) scale(1.4) translate(-200 -200)">
+  <!-- hip macOS app-icon — ~9% tile inset so Dock/Finder scale matches other products -->
+  <!-- Windows keeps full-bleed app-icon.svg (taskbar/start). Do not regenerate .ico from this file. -->
+  <!-- Regenerate macOS only: yarn tauri icon src-tauri/icons/source/app-icon-macos.svg -o /tmp/hip-macos-icons && cp /tmp/hip-macos-icons/icon.icns src-tauri/icons/icon.icns -->
+  <rect x="36" y="36" width="328" height="328" rx="72" fill="#FFF6EB"/>
+  <g transform="translate(200 200) scale(1.1) translate(-200 -200)">
     <ellipse cx="152" cy="208" rx="90" ry="102" fill="#FF9800"/>
     <ellipse cx="248" cy="208" rx="90" ry="102" fill="#FF9800"/>
     <path d="M200 128 Q192 208 200 278" fill="none" stroke="#E87E00" stroke-width="10" stroke-linecap="round"/>

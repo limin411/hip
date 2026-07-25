@@ -4,7 +4,7 @@ import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { render, screen, fireEvent } from '@testing-library/react'
 import type { Message } from '@hip/protocol'
 
-const openMock = vi.fn(async () => {})
+const openMock = vi.fn(async (_url?: string) => {})
 vi.mock('@tauri-apps/plugin-shell', () => ({
   open: (url: string) => openMock(url),
 }))

@@ -1530,10 +1530,12 @@ export const ja = {
     "filterChat": "作業",
     "filterCode": "コーディング",
     "filterKnowledge": "ナレッジ",
+    "filterWorkItems": "ワークアイテム",
     "kind": {
       "space": "スペース",
       "doc": "ドキュメント",
-      "folder": "フォルダー"
+      "folder": "フォルダー",
+      "workItem": "ワークアイテム"
     },
     "parentMissing": "先に親ノードまたはスペースを復元してください",
     "restore": "復元",
@@ -1784,7 +1786,7 @@ export const ja = {
     "help": {
       "cancelVsArchive": "キャンセルは「やらない」決定です（「すべて」で確認）。アーカイブは日常リストから隠します（「アーカイブ」で確認）。"
     },
-    "deleteConfirm": "このワークアイテムを完全に削除しますか？元に戻せません。",
+    "deleteConfirm": "このワークアイテムをゴミ箱に移しますか？後で復元できます。",
     "listsSection": "リスト",
     "listsHeading": "リスト",
     "smartFilters": "スマートフィルター",

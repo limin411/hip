@@ -1530,10 +1530,12 @@ export const ko = {
     "filterChat": "작업",
     "filterCode": "코딩",
     "filterKnowledge": "지식",
+    "filterWorkItems": "작업 항목",
     "kind": {
       "space": "공간",
       "doc": "문서",
-      "folder": "폴더"
+      "folder": "폴더",
+      "workItem": "작업 항목"
     },
     "parentMissing": "먼저 상위 노드나 공간을 복원하세요",
     "restore": "복원",
@@ -1784,7 +1786,7 @@ export const ko = {
     "help": {
       "cancelVsArchive": "취소는 하지 않기로 한 것입니다(「전체」에서 확인). 보관은 일상 목록에서 숨깁니다(「보관됨」에서 확인)."
     },
-    "deleteConfirm": "이 작업 항목을 영구 삭제할까요? 되돌릴 수 없습니다.",
+    "deleteConfirm": "이 작업 항목을 휴지통으로 이동할까요? 나중에 복원할 수 있습니다.",
     "listsSection": "목록",
     "listsHeading": "목록",
     "smartFilters": "스마트 필터",

@@ -1,6 +1,14 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { MessageSquare, Code2, BookOpen, RotateCcw, Trash2, Search } from 'lucide-react'
+import {
+  MessageSquare,
+  Code2,
+  BookOpen,
+  ListTodo,
+  RotateCcw,
+  Trash2,
+  Search,
+} from 'lucide-react'
 import { sessionService } from '@/domain'
 import { Button } from '@/components/ui/Button'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/Tabs'
@@ -21,13 +29,21 @@ import {
   knowledgeRestoreTrashEntry,
   type KnowledgeTrashItem,
 } from '@/ipc/knowledge'
+import {
+  emptyWorkItemsTrash,
+  hardDeleteWorkItemTrashEntry,
+  listWorkItemsTrash,
+  purgeExpiredWorkItemsTrash,
+  type WorkItemTrashItem,
+} from '@/ipc/workItems'
 import { useKnowledgeStore } from '@/store/knowledgeStore'
+import { useWorkItemStore } from '@/store/workItemStore'
 import { useUiStore } from '@/store/uiStore'
 import { toast } from 'sonner'
 
 const PAGE_SIZE = 20
 
-type KindFilter = 'all' | 'chat' | 'code' | 'knowledge'
+type KindFilter = 'all' | 'chat' | 'code' | 'knowledge' | 'workItems'
 
 type UnifiedRow =
   | {
@@ -49,6 +65,14 @@ type UnifiedRow =
       deletedAt: number
       spaceName?: string
     }
+  | {
+      key: string
+      source: 'workItem'
+      id: string
+      title: string
+      deletedAt: number
+      status: string
+    }
 
 export function RecycleBinPage() {
   const { t } = useTranslation()
@@ -61,6 +85,8 @@ export function RecycleBinPage() {
 
   const [knowledge, setKnowledge] = useState<KnowledgeTrashItem[]>([])
   const [knowledgeLoaded, setKnowledgeLoaded] = useState(false)
+  const [workItems, setWorkItems] = useState<WorkItemTrashItem[]>([])
+  const [workItemsLoaded, setWorkItemsLoaded] = useState(false)
   const [query, setQuery] = useState('')
   const [kindFilter, setKindFilter] = useState<KindFilter>('all')
   const [page, setPage] = useState(1)
@@ -83,6 +109,22 @@ export function RecycleBinPage() {
     }
   }, [])
 
+  const refreshWorkItems = useCallback(async () => {
+    try {
+      const days = resolveTrashRetentionDays(
+        useHipConfigStore.getState().config.trash?.retentionDays,
+      )
+      await purgeExpiredWorkItemsTrash(days).catch(() => [])
+      const items = await listWorkItemsTrash()
+      setWorkItems(items)
+      useTrashBadgeStore.getState().setWorkItemCount(items.length)
+    } catch {
+      setWorkItems([])
+    } finally {
+      setWorkItemsLoaded(true)
+    }
+  }, [])
+
   useEffect(() => {
     if (!hipLoaded) void loadHip()
   }, [hipLoaded, loadHip])
@@ -90,13 +132,15 @@ export function RecycleBinPage() {
   useEffect(() => {
     sessionService.requestTrashList()
     void refreshKnowledge()
+    void refreshWorkItems()
     const onFocus = () => {
       sessionService.requestTrashList()
       void refreshKnowledge()
+      void refreshWorkItems()
     }
     window.addEventListener('focus', onFocus)
     return () => window.removeEventListener('focus', onFocus)
-  }, [refreshKnowledge])
+  }, [refreshKnowledge, refreshWorkItems])
 
   const rows = useMemo<UnifiedRow[]>(() => {
     const sessionRows: UnifiedRow[] = sessions.map((s) => ({
@@ -118,8 +162,18 @@ export function RecycleBinPage() {
       deletedAt: k.deletedAt,
       spaceName: k.spaceName,
     }))
-    return [...sessionRows, ...knowledgeRows].sort((a, b) => b.deletedAt - a.deletedAt)
-  }, [sessions, knowledge])
+    const workItemRows: UnifiedRow[] = workItems.map((w) => ({
+      key: `workItem:${w.id}`,
+      source: 'workItem' as const,
+      id: w.id,
+      title: w.title,
+      deletedAt: w.deletedAt,
+      status: w.status,
+    }))
+    return [...sessionRows, ...knowledgeRows, ...workItemRows].sort(
+      (a, b) => b.deletedAt - a.deletedAt,
+    )
+  }, [sessions, knowledge, workItems])
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase()
@@ -128,6 +182,8 @@ export function RecycleBinPage() {
       list = list.filter((r) => r.source === 'session' && r.surface === kindFilter)
     } else if (kindFilter === 'knowledge') {
       list = list.filter((r) => r.source === 'knowledge')
+    } else if (kindFilter === 'workItems') {
+      list = list.filter((r) => r.source === 'workItem')
     }
     if (q) {
       list = list.filter((r) => {
@@ -143,7 +199,7 @@ export function RecycleBinPage() {
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE))
   const safePage = Math.min(page, totalPages)
   const paged = filtered.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE)
-  const loaded = sessionsLoaded && knowledgeLoaded
+  const loaded = sessionsLoaded && knowledgeLoaded && workItemsLoaded
   const hardTarget = hardDeleteKey
     ? filtered.find((r) => r.key === hardDeleteKey) ?? rows.find((r) => r.key === hardDeleteKey) ?? null
     : null
@@ -215,6 +271,13 @@ export function RecycleBinPage() {
             >
               {t('trash.filterKnowledge')}
             </TabsTrigger>
+            <TabsTrigger
+              className="px-4"
+              value="workItems"
+              data-testid="recycle-bin-filter-work-items"
+            >
+              {t('trash.filterWorkItems')}
+            </TabsTrigger>
           </TabsList>
         </Tabs>
       </div>
@@ -240,19 +303,24 @@ export function RecycleBinPage() {
               const Icon =
                 row.source === 'knowledge'
                   ? BookOpen
-                  : row.surface === 'chat'
-                    ? MessageSquare
-                    : Code2
+                  : row.source === 'workItem'
+                    ? ListTodo
+                    : row.surface === 'chat'
+                      ? MessageSquare
+                      : Code2
               const kindLabel =
                 row.source === 'knowledge'
                   ? t(`trash.kind.${row.entityKind}`, { defaultValue: row.entityKind })
-                  : t(`nav.${row.surface}`)
+                  : row.source === 'workItem'
+                    ? t('trash.kind.workItem')
+                    : t(`nav.${row.surface}`)
               return (
                 <div
                   key={row.key}
                   className="flex items-center gap-3 px-4 py-3 transition-colors duration-chrome hover:bg-state-hover/60"
                   data-testid="recycle-bin-row"
                   data-row-key={row.key}
+                  data-row-source={row.source}
                 >
                   <Icon size={16} strokeWidth={1.75} className="shrink-0 text-ink-tertiary" aria-hidden />
                   <div className="min-w-0 flex-1">
@@ -268,6 +336,13 @@ export function RecycleBinPage() {
                       {row.source === 'knowledge' && row.spaceName ? (
                         <span className="truncate">{row.spaceName}</span>
                       ) : null}
+                      {row.source === 'workItem' ? (
+                        <span className="truncate">
+                          {t(`workItems.status.${row.status as 'todo'}`, {
+                            defaultValue: row.status,
+                          })}
+                        </span>
+                      ) : null}
                     </div>
                   </div>
                   <div className="flex shrink-0 items-center gap-1">
@@ -280,7 +355,7 @@ export function RecycleBinPage() {
                           sessionService.restoreSession(row.id)
                           useTrashListStore.getState().removeSession(row.id)
                           useTrashBadgeStore.getState().adjustSessions(-1)
-                        } else {
+                        } else if (row.source === 'knowledge') {
                           void knowledgeRestoreTrashEntry(row.id)
                             .then(async () => {
                               setKnowledge((k) => k.filter((x) => x.id !== row.id))
@@ -295,6 +370,17 @@ export function RecycleBinPage() {
                               } else {
                                 toast.error(msg)
                               }
+                            })
+                        } else {
+                          void useWorkItemStore
+                            .getState()
+                            .restoreTrashEntry(row.id)
+                            .then(() => {
+                              setWorkItems((w) => w.filter((x) => x.id !== row.id))
+                              toast.success(t('trash.restoredToast'))
+                            })
+                            .catch((e) => {
+                              toast.error(e instanceof Error ? e.message : String(e))
                             })
                         }
                       }}
@@ -353,11 +439,18 @@ export function RecycleBinPage() {
                       meta: { source: 'RecycleBinPage' },
                     })
                     useTrashListStore.getState().removeSession(hardTarget.id)
-                  } else {
+                  } else if (hardTarget.source === 'knowledge') {
                     void knowledgeHardDeleteTrashEntry(hardTarget.id)
                       .then(() => {
                         setKnowledge((k) => k.filter((x) => x.id !== hardTarget.id))
                         useTrashBadgeStore.getState().adjustKnowledge(-1)
+                      })
+                      .catch((e) => toast.error(e instanceof Error ? e.message : String(e)))
+                  } else {
+                    void hardDeleteWorkItemTrashEntry(hardTarget.id)
+                      .then(() => {
+                        setWorkItems((w) => w.filter((x) => x.id !== hardTarget.id))
+                        useTrashBadgeStore.getState().adjustWorkItems(-1)
                       })
                       .catch((e) => toast.error(e instanceof Error ? e.message : String(e)))
                   }
@@ -399,6 +492,12 @@ export function RecycleBinPage() {
                     .then(() => {
                       setKnowledge([])
                       useTrashBadgeStore.getState().setKnowledgeCount(0)
+                    })
+                    .catch(() => {})
+                  void emptyWorkItemsTrash()
+                    .then(() => {
+                      setWorkItems([])
+                      useTrashBadgeStore.getState().setWorkItemCount(0)
                     })
                     .catch(() => {})
                   setEmptyOpen(false)

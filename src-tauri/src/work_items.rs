@@ -9,7 +9,7 @@ use std::io;
 use std::path::{Path, PathBuf};
 use tauri::AppHandle;
 
-const INBOX_LIST_ID: &str = "wl_inbox";
+pub const INBOX_LIST_ID: &str = "wl_inbox";
 const TITLE_MAX: usize = 200;
 /// Notes max size in UTF-8 **bytes** (64 KiB). Matches domain `WORK_ITEM_NOTES_MAX` /
 /// `clampUtf8Bytes` so normalize→save never rejects multi-byte text that passed TS.

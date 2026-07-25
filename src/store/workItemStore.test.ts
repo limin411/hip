@@ -4,10 +4,16 @@ import type { WorkItem, WorkItemList } from '@/domain/work-items'
 
 const listWorkItems = vi.fn()
 const saveWorkItems = vi.fn()
+const softDeleteWorkItem = vi.fn()
+const restoreWorkItemTrashEntry = vi.fn()
+const listWorkItemsTrash = vi.fn()
 
 vi.mock('@/ipc/workItems', () => ({
   listWorkItems: (...a: unknown[]) => listWorkItems(...a),
   saveWorkItems: (...a: unknown[]) => saveWorkItems(...a),
+  softDeleteWorkItem: (...a: unknown[]) => softDeleteWorkItem(...a),
+  restoreWorkItemTrashEntry: (...a: unknown[]) => restoreWorkItemTrashEntry(...a),
+  listWorkItemsTrash: (...a: unknown[]) => listWorkItemsTrash(...a),
 }))
 
 import {
@@ -54,6 +60,15 @@ describe('workItemStore', () => {
       items: [],
     })
     saveWorkItems.mockReset().mockResolvedValue(undefined)
+    softDeleteWorkItem.mockReset().mockResolvedValue({
+      id: 'tentry_1',
+      itemId: 'wi_x',
+      title: 'ops',
+      deletedAt: 1,
+      status: 'todo',
+    })
+    restoreWorkItemTrashEntry.mockReset()
+    listWorkItemsTrash.mockReset().mockResolvedValue([])
     useWorkItemStore.setState({
       loaded: false,
       loading: false,
@@ -274,7 +289,21 @@ describe('workItemStore', () => {
     await useWorkItemStore.getState().unarchive(id)
     expect(useWorkItemStore.getState().items[0]?.archivedAt).toBeNull()
 
+    saveWorkItems.mockClear()
+    softDeleteWorkItem.mockClear()
     await useWorkItemStore.getState().deleteItem(id)
     expect(useWorkItemStore.getState().items).toHaveLength(0)
+    expect(softDeleteWorkItem).toHaveBeenCalledWith(id)
+    // Soft-delete rewrites catalog in Rust; store must not full-save after.
+    expect(saveWorkItems).not.toHaveBeenCalled()
+  })
+
+  it('restoreTrashEntry inserts item back into store', async () => {
+    const restored = item({ id: 'wi_restored', title: 'Back' })
+    restoreWorkItemTrashEntry.mockResolvedValueOnce(restored)
+    const id = await useWorkItemStore.getState().restoreTrashEntry('tentry_1')
+    expect(id).toBe('wi_restored')
+    expect(useWorkItemStore.getState().items.some((i) => i.id === 'wi_restored')).toBe(true)
+    expect(restoreWorkItemTrashEntry).toHaveBeenCalledWith('tentry_1')
   })
 })

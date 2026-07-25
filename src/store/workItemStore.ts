@@ -9,7 +9,13 @@ import {
   type WorkItemStatus,
   type WorkItemsCatalogV1,
 } from '@/domain/work-items'
-import { listWorkItems, saveWorkItems } from '@/ipc/workItems'
+import {
+  listWorkItems,
+  listWorkItemsTrash,
+  saveWorkItems,
+  softDeleteWorkItem,
+  restoreWorkItemTrashEntry,
+} from '@/ipc/workItems'
 
 /** English fallback for empty-title items that still have extras (i18n in UI later). */
 export const UNTITLED_WORK_ITEM = 'Untitled'
@@ -158,7 +164,13 @@ export interface WorkItemStore {
   cancel: (id: string) => Promise<void>
   archive: (id: string) => Promise<void>
   unarchive: (id: string) => Promise<void>
+  /**
+   * Soft-delete into product recycle bin (`trash/work-items`).
+   * Live catalog is updated by the Tauri command (not `save()`).
+   */
   deleteItem: (id: string) => Promise<void>
+  /** Restore a recycle-bin entry and reload it into the live store. */
+  restoreTrashEntry: (entryId: string) => Promise<string>
 
   createList: (name: string) => Promise<string>
   renameList: (id: string, name: string) => Promise<void>
@@ -197,6 +209,14 @@ export const useWorkItemStore = create<WorkItemStore>((set, get) => ({
         loading: false,
         error: null,
       })
+      // Opportunistic trash badge hydrate (non-blocking).
+      void listWorkItemsTrash()
+        .then((items) => {
+          void import('@/store/trashBadgeStore').then(({ useTrashBadgeStore }) => {
+            useTrashBadgeStore.getState().setWorkItemCount(items.length)
+          })
+        })
+        .catch(() => undefined)
     } catch (e) {
       set({
         loaded: true,
@@ -393,14 +413,48 @@ export const useWorkItemStore = create<WorkItemStore>((set, get) => ({
   },
 
   deleteItem: async (id) => {
+    const prev = get().items.find((i) => i.id === id)
+    if (!prev) return
     clearNotesDebounceTimer()
     if (notesDraft?.id === id) notesDraft = null
+    // Optimistic remove; Rust soft-delete rewrites catalog + trash atomically.
     set((s) => ({
       items: s.items.filter((i) => i.id !== id),
       selectedId: s.selectedId === id ? null : s.selectedId,
       error: null,
     }))
-    await get().save()
+    try {
+      await softDeleteWorkItem(id)
+      void import('@/store/trashBadgeStore').then(({ useTrashBadgeStore }) => {
+        useTrashBadgeStore.getState().adjustWorkItems(1)
+      })
+    } catch (e) {
+      // Roll back optimistic removal and re-hydrate from disk.
+      set({ error: e instanceof Error ? e.message : String(e) })
+      try {
+        await get().load()
+      } catch {
+        // keep error
+      }
+      throw e
+    }
+  },
+
+  restoreTrashEntry: async (entryId) => {
+    const item = await restoreWorkItemTrashEntry(entryId)
+    set((s) => {
+      if (s.items.some((i) => i.id === item.id)) {
+        return {
+          items: s.items.map((i) => (i.id === item.id ? item : i)),
+          error: null,
+        }
+      }
+      return { items: [...s.items, item], error: null }
+    })
+    void import('@/store/trashBadgeStore').then(({ useTrashBadgeStore }) => {
+      useTrashBadgeStore.getState().adjustWorkItems(-1)
+    })
+    return item.id
   },
 
   createList: async (name) => {

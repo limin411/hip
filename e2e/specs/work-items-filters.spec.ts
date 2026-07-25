@@ -87,13 +87,13 @@ describe('work items filters @work-items @core', () => {
     await waitForListTitle(todoTitle)
   })
 
-  it('WF5: cleanup seeded items (hard delete)', async () => {
-    await clickSmartFilter('all')
+  it('WF5: cleanup seeded items (hard delete → recycle bin each time)', async () => {
     for (const t of [todoTitle, progTitle, doneTitle]) {
+      await openWorkItemsFromMenu()
+      await clickSmartFilter('all')
       if (await listContainsTitle(t)) {
         await selectWorkItemByTitle(t)
         await deleteSelected(true)
-        await waitForListTitleGone(t)
       }
     }
   })

@@ -127,6 +127,11 @@ pub fn trash_knowledge_dir(app: &AppHandle) -> Option<PathBuf> {
     trash_dir(app).map(|p| p.join("knowledge"))
 }
 
+/// Work-items quarantine under trash (`<base>/trash/work-items`).
+pub fn trash_work_items_dir(app: &AppHandle) -> Option<PathBuf> {
+    trash_dir(app).map(|p| p.join("work-items"))
+}
+
 #[cfg(test)]
 mod tests {
     use super::hip_base_from;

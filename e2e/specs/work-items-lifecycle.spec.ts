@@ -118,10 +118,12 @@ describe('work items lifecycle @work-items @core', () => {
     )
   })
 
-  it('WL6: archive hides from all; unarchive restores; hard delete removes', async () => {
+  it('WL6: archive switches to archived; unarchive; soft-delete → trash → restore', async () => {
     await clickSmartFilter('todo')
     await selectWorkItemByTitle(titleA)
     await archiveSelected()
+    // archiveSelected already asserts filter chip → archived
+    await waitForListTitle(titleA)
     await clickSmartFilter('all')
     await waitForListTitleGone(titleA)
     await clickSmartFilter('archived')
@@ -135,11 +137,45 @@ describe('work items lifecycle @work-items @core', () => {
 
     await selectWorkItemByTitle(titleA)
     await deleteSelected(true)
-    await waitForListTitleGone(titleA)
+    // Soft-delete: gone from live catalog, present in recycle bin UI
+    await waitForCatalogItemGone(titleA)
+    expect(await (await browser.$('[data-testid="recycle-bin-page"]')).isExisting()).toBe(true)
+    await browser.waitUntil(
+      async () => {
+        const rows = await browser.$$('[data-testid="recycle-bin-row"]')
+        for (const r of rows) {
+          if ((await r.getText()).includes(titleA)) return true
+        }
+        return false
+      },
+      { timeout: 15000, interval: 200, timeoutMsg: 'work item not listed in recycle bin' },
+    )
+    // Restore from recycle bin
+    await browser.execute((title: string) => {
+      const rows = document.querySelectorAll('[data-testid="recycle-bin-row"]')
+      for (const row of rows) {
+        if ((row.textContent ?? '').includes(title)) {
+          const btn = row.querySelector(
+            '[data-testid="recycle-bin-restore"]',
+          ) as HTMLElement | null
+          btn?.click()
+          return
+        }
+      }
+      throw new Error('restore row not found')
+    }, titleA)
+    await waitForCatalogTitle(titleA)
+    await openWorkItemsFromMenu()
+    await clickSmartFilter('todo')
+    await waitForListTitle(titleA, 15000)
+    // cleanup seed A (soft-delete → recycle bin)
+    await selectWorkItemByTitle(titleA)
+    await deleteSelected(true)
     await waitForCatalogItemGone(titleA)
   })
 
   it('WL7: leave surface flushes second item notes; reopen still shows', async () => {
+    await openWorkItemsFromMenu()
     await clickSmartFilter('todo')
     await createWorkItemFromSidebar()
     await setWorkItemTitle(titleB)
@@ -156,8 +192,8 @@ describe('work items lifecycle @work-items @core', () => {
       20000,
       'notes not flushed on leave',
     )
-    // cleanup
+    // cleanup → lands on recycle bin
     await deleteSelected(true)
-    expect(await listContainsTitle(titleB)).toBe(false)
+    await waitForCatalogItemGone(titleB)
   })
 })

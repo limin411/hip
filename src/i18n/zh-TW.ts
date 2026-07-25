@@ -1538,10 +1538,12 @@ export const zhTW = {
     "filterChat": "辦公",
     "filterCode": "編碼",
     "filterKnowledge": "知識庫",
+    "filterWorkItems": "事項",
     "kind": {
       "space": "知識空間",
       "doc": "文件",
-      "folder": "資料夾"
+      "folder": "資料夾",
+      "workItem": "事項"
     },
     "parentMissing": "請先恢復父節點或知識空間",
     "restore": "恢復",
@@ -1792,7 +1794,7 @@ export const zhTW = {
     "help": {
       "cancelVsArchive": "取消表示決定不做了（可在「全部」中找回）。封存會從日常列表隱藏（可在「已封存」中找回）。"
     },
-    "deleteConfirm": "永久刪除此事項？此操作無法復原。",
+    "deleteConfirm": "將此事項移入回收站？可在回收站中恢復。",
     "listsSection": "清單",
     "listsHeading": "清單",
     "smartFilters": "智慧篩選",

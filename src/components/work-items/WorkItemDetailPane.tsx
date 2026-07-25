@@ -41,6 +41,7 @@ export function WorkItemDetailPane({
   const archive = useWorkItemStore((s) => s.archive)
   const unarchive = useWorkItemStore((s) => s.unarchive)
   const deleteItem = useWorkItemStore((s) => s.deleteItem)
+  const setFilter = useWorkItemStore((s) => s.setFilter)
   const finalizeSelectedItem = useWorkItemStore((s) => s.finalizeSelectedItem)
   const setNotesDraft = useWorkItemStore((s) => s.setNotesDraft)
   const commitNotesDraft = useWorkItemStore((s) => s.commitNotesDraft)
@@ -121,6 +122,12 @@ export function WorkItemDetailPane({
     void updateItem(item.id, { tags: item.tags.filter((x) => x !== tag) })
   }
 
+  const handleArchive = async () => {
+    await archive(item.id)
+    // Show the item under 已归档 after archiving.
+    setFilter('archived')
+  }
+
   const handleDeleteConfirm = async () => {
     if (deleteBusy) return
     setDeleteBusy(true)
@@ -128,6 +135,9 @@ export function WorkItemDetailPane({
       await deleteItem(item.id)
       setDeleteOpen(false)
       onBack?.()
+      // Dynamic import avoids static cycle (DetailPane → shell → sessionService).
+      const { openTrashFromChrome } = await import('@/components/layout/sidebarActions')
+      await openTrashFromChrome()
     } finally {
       setDeleteBusy(false)
     }
@@ -290,7 +300,7 @@ export function WorkItemDetailPane({
               variant="outline"
               size="sm"
               data-testid="work-item-archive"
-              onClick={() => void archive(item.id)}
+              onClick={() => void handleArchive()}
             >
               <Archive className="h-3.5 w-3.5" strokeWidth={1.75} />
               {t('workItems.actions.archive')}

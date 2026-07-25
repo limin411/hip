@@ -149,9 +149,10 @@ describe('work items nav / finalize / keyboard @work-items @core', () => {
     await clickSmartFilter('done')
     await waitForListTitle(keepTitle)
 
-    // cleanup both
+    // cleanup both (each delete lands on recycle bin)
     await selectWorkItemByTitle(keepTitle)
     await deleteSelected(true)
+    await openWorkItemsFromMenu()
     await clickSmartFilter('todo')
     if (await listContainsTitle(kbdTitle)) {
       await selectWorkItemByTitle(kbdTitle)

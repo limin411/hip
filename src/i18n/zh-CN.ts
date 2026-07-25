@@ -1542,10 +1542,12 @@ export const zhCN = {
       filterChat: '办公',
       filterCode: '编码',
       filterKnowledge: '知识库',
+      filterWorkItems: '事项',
       kind: {
         space: '知识空间',
         doc: '文档',
         folder: '文件夹',
+        workItem: '事项',
       },
       parentMissing: '请先恢复父节点或知识空间',
       restore: '恢复',
@@ -1797,7 +1799,7 @@ export const zhCN = {
         cancelVsArchive:
           '取消表示决定不做了（可在「全部」中找回）。归档会从日常列表隐藏（可在「已归档」中找回）。',
       },
-      deleteConfirm: '永久删除此事项？此操作无法撤销。',
+      deleteConfirm: '将此事项移入回收站？可在回收站中恢复。',
       listsSection: '清单',
       listsHeading: '清单',
       smartFilters: '智能筛选',

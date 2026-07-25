@@ -386,6 +386,16 @@ export async function setSearchQuery(q: string): Promise<void> {
 
 export async function archiveSelected(): Promise<void> {
   await clickTestId('work-item-archive')
+  // Archive switches filter to archived and keeps the item selected.
+  await browser.waitUntil(
+    async () => {
+      const chip = await browser.$('[data-testid="work-item-filter-chip"]')
+      if (!(await chip.isExisting())) return false
+      const text = await chip.getText()
+      return /archived|已归档|已封存|アーカイブ|보관/i.test(text)
+    },
+    { timeout: 10000, interval: 100, timeoutMsg: 'filter chip did not switch to archived' },
+  )
 }
 
 export async function unarchiveSelected(): Promise<void> {
@@ -399,10 +409,14 @@ export async function deleteSelected(confirm = true): Promise<void> {
   })
   if (confirm) {
     await clickTestId('work-item-delete-confirm')
+    // Confirm leaves work-items and opens product recycle bin.
+    await (await browser.$('[data-testid="recycle-bin-page"]')).waitForExist({
+      timeout: 15000,
+    })
   } else {
     await clickTestId('work-item-delete-cancel')
+    await browser.pause(100)
   }
-  await browser.pause(100)
 }
 
 /** Blur any focused field so keyboard shortcuts apply to the page. */

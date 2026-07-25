@@ -1579,10 +1579,12 @@ export const en = {
       filterChat: 'Work',
       filterCode: 'Coding',
       filterKnowledge: 'Knowledge',
+      filterWorkItems: 'Work items',
       kind: {
         space: 'Space',
         doc: 'Document',
         folder: 'Folder',
+        workItem: 'Work item',
       },
       parentMissing: 'Restore the parent node or space first',
       restore: 'Restore',
@@ -1842,7 +1844,7 @@ export const en = {
         cancelVsArchive:
           'Cancel means you decided not to do it (find it under All). Archive hides it from everyday lists (find it under Archived).',
       },
-      deleteConfirm: 'Delete this work item permanently? This cannot be undone.',
+      deleteConfirm: 'Move this work item to the recycle bin? You can restore it later.',
       listsSection: 'Lists',
       listsHeading: 'Lists',
       smartFilters: 'Smart filters',

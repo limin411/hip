@@ -405,6 +405,7 @@ export const zhTW = {
       "reviewAbove": "請先回應上方的許可權請求，以繼續本會話。",
       "label": "本對話的許可權模式",
       "menuTitle": "權限模式",
+      "busyTitle": "回合進行中，暫不能切換權限模式",
       "modes": {
         "chat": "僅對話",
         "edit": "編輯檔案",

@@ -365,6 +365,7 @@ export const zhCN = {
         reviewAbove: '请先回应上方的权限请求，以继续本会话。',
         label: '本对话的权限模式',
         menuTitle: '权限模式',
+        busyTitle: '回合进行中，暂不能切换权限模式',
         modes: {
           // Short chip labels (keep parity with en: Chat only / Edit files / Full access)
           chat: '仅对话',

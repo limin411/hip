@@ -397,6 +397,7 @@ export const ko = {
       "reviewAbove": "위의 권한 요청에 응답하여 이 세션을 계속하세요.",
       "label": "이 대화의 권한 모드",
       "menuTitle": "권한 모드",
+      "busyTitle": "턴이 실행 중일 때는 권한 모드를 변경할 수 없습니다",
       "modes": {
         "chat": "채팅 전용",
         "edit": "파일 편집",

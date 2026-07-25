@@ -1,10 +1,11 @@
 import { useTranslation } from 'react-i18next'
 import { ShieldCheck, Check } from 'lucide-react'
 import type { PermissionMode } from '@hip/protocol'
+import { toast } from 'sonner'
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem } from '@/components/ui/DropdownMenu'
 import { ComposerChip } from './ComposerChip'
 import { useDraftStore } from '@/store/draftStore'
-import { useActiveSession, useActiveSessionId, sessionService } from '@/domain'
+import { useActiveSession, useActiveSessionId, useActiveSessionStatus, sessionService } from '@/domain'
 import { cn } from '@/lib/utils'
 
 /** Pure: the three modes in display order. */
@@ -22,14 +23,22 @@ export function PermissionModePicker() {
   const setDraftMode = useDraftStore((s) => s.setPermissionMode)
   const activeId = useActiveSessionId()
   const session = useActiveSession()
+  const status = useActiveSessionStatus()
+  const busy = status === 'running'
 
   // Committed session reads its config; a new-conversation draft reads the draft.
   // Both are editable here (unlike ModelPicker, which locks the model in a committed session).
+  // While a turn is running, mode cannot change (same lock as ExecutionModePicker).
   const current = activeId && session
     ? resolvePermissionMode(session.config.permissionMode)
     : resolvePermissionMode(draftMode)
 
   const choose = (mode: PermissionMode) => {
+    if (busy) {
+      toast.message(t('chat.permission.busyTitle'))
+      return
+    }
+    if (mode === current) return
     if (activeId && session) sessionService.setPermissionMode(activeId, mode)
     else setDraftMode(mode)
   }
@@ -37,18 +46,32 @@ export function PermissionModePicker() {
   return (
     <DropdownMenu modal={false}>
       <DropdownMenuTrigger asChild>
-        <ComposerChip active={current !== 'edit'} title={t('chat.permission.label')} data-testid="permission-chip">
+        <ComposerChip
+          type="button"
+          active={current !== 'edit'}
+          title={busy ? t('chat.permission.busyTitle') : t('chat.permission.label')}
+          data-testid="permission-chip"
+          aria-disabled={busy || undefined}
+          className={busy ? 'cursor-not-allowed opacity-50' : undefined}
+          onClick={(e) => {
+            if (busy) {
+              e.preventDefault()
+              toast.message(t('chat.permission.busyTitle'))
+            }
+          }}
+        >
           <ShieldCheck size={13} strokeWidth={1.75} className="shrink-0 opacity-80" aria-hidden />
           <span className="max-w-[140px] truncate">{t(`chat.permission.modes.${current}`)}</span>
         </ComposerChip>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="start">
+      <DropdownMenuContent align="start" data-testid="permission-mode-menu">
         <div className="px-2 py-1.5 text-meta font-medium text-ink-tertiary">
           {t('chat.permission.menuTitle')}
         </div>
         {PERMISSION_MODES.map((mode) => (
           <DropdownMenuItem
             key={mode}
+            disabled={busy}
             onSelect={() => choose(mode)}
             className="flex-col items-start gap-0.5"
             data-testid={`permission-mode-${mode}`}

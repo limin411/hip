@@ -374,6 +374,7 @@ export const en = {
         reviewAbove: 'Respond to the permission request above to continue this session.',
         label: 'Permission mode for this conversation',
         menuTitle: 'Permission mode',
+        busyTitle: 'Cannot change permission mode while a turn is running',
         modes: {
           chat: 'Chat only',
           edit: 'Edit files',

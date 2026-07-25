@@ -397,6 +397,7 @@ export const ja = {
       "reviewAbove": "上記の権限リクエストに応答してセッションを続行してください。",
       "label": "この会話の権限モード",
       "menuTitle": "権限モード",
+      "busyTitle": "ターン実行中は権限モードを変更できません",
       "modes": {
         "chat": "チャットのみ",
         "edit": "ファイル編集",

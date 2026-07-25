@@ -14,7 +14,7 @@ const TITLE_MAX: usize = 200;
 /// Notes max size in UTF-8 **bytes** (64 KiB). Matches domain `WORK_ITEM_NOTES_MAX` /
 /// `clampUtf8Bytes` so normalize→save never rejects multi-byte text that passed TS.
 const NOTES_MAX: usize = 64 * 1024;
-const TAGS_MAX: usize = 20;
+const TAGS_MAX: usize = 3;
 const TAG_MAX_LEN: usize = 32;
 /// Hard cap on serialized catalog body (reject oversized saves).
 const CATALOG_MAX_BYTES: usize = 20 * 1024 * 1024;

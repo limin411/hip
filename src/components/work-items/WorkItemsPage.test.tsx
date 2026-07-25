@@ -172,7 +172,7 @@ describe('WorkItemsPage', () => {
         status: 'todo',
         priority: 'high',
         listId: INBOX_LIST_ID,
-        tags: [],
+        tags: ['hip', 'v1'],
         notes: '',
         startOn: '2026-07-25',
         endOn: '2026-07-25',
@@ -187,6 +187,9 @@ describe('WorkItemsPage', () => {
     render(<WorkItemsPage />)
     expect(screen.getByTestId('work-item-list-view')).toBeInTheDocument()
     expect(screen.getByTestId('work-item-row-wi_1')).toBeInTheDocument()
+    expect(screen.getByTestId('work-item-priority-wi_1')).toHaveTextContent(/high|高/)
+    expect(screen.getByTestId('work-item-row-tags-wi_1')).toHaveTextContent('hip')
+    expect(screen.getByTestId('work-item-row-tags-wi_1')).toHaveTextContent('v1')
     fireEvent.click(screen.getByTestId('work-item-row-wi_1'))
     expect(requestEdit).toHaveBeenCalledWith('wi_1')
   })

@@ -8,6 +8,7 @@ import {
   localTodayYmd,
   mintWorkItemId,
   mintWorkListId,
+  WORK_ITEM_TAGS_MAX,
   type WorkItem,
   type WorkItemList,
   type WorkItemStatus,
@@ -136,6 +137,7 @@ function defaultItem(
     updatedAt: now,
     startOn: schedule.startOn,
     endOn: schedule.endOn,
+    tags: (partial.tags ?? base.tags).slice(0, WORK_ITEM_TAGS_MAX),
     links: partial.links ? sanitizeLinksPatch(partial.links) : base.links,
   }
   // Re-ensure if partial overwrote with null before we forced schedule.
@@ -403,6 +405,9 @@ export const useWorkItemStore = create<WorkItemStore>((set, get) => ({
       nextPatch.startOn = ensured.startOn
       nextPatch.endOn = ensured.endOn
     }
+    if (nextPatch.tags) {
+      nextPatch.tags = nextPatch.tags.slice(0, WORK_ITEM_TAGS_MAX)
+    }
 
     set((s) => ({
       items: s.items.map((i) =>
@@ -430,6 +435,7 @@ export const useWorkItemStore = create<WorkItemStore>((set, get) => ({
     if (!title) {
       throw new Error('title required')
     }
+    const tags = draft.tags.slice(0, WORK_ITEM_TAGS_MAX)
     if (id == null) {
       return get().createItem(
         {
@@ -439,7 +445,7 @@ export const useWorkItemStore = create<WorkItemStore>((set, get) => ({
           status: draft.status,
           priority: draft.priority,
           notes: draft.notes,
-          tags: draft.tags,
+          tags,
         },
         { select: false },
       )
@@ -464,7 +470,7 @@ export const useWorkItemStore = create<WorkItemStore>((set, get) => ({
               status: draft.status,
               priority: draft.priority,
               notes: draft.notes,
-              tags: draft.tags,
+              tags,
               completedAt,
               updatedAt: now,
             }

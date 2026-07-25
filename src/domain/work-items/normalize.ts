@@ -19,7 +19,7 @@ export const WORK_ITEM_TITLE_MAX = 200
 export const WORK_ITEM_NOTES_MAX = 64 * 1024
 
 /** Max tags per item. */
-export const WORK_ITEM_TAGS_MAX = 20
+export const WORK_ITEM_TAGS_MAX = 3
 
 /** Max chars per tag. */
 export const WORK_ITEM_TAG_MAX_LEN = 32

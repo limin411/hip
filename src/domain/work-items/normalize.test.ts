@@ -433,7 +433,8 @@ describe('normalizeCatalog', () => {
       ],
     })
     const out = cat.items[0]!.tags
-    expect(out.length).toBeLessThanOrEqual(WORK_ITEM_TAGS_MAX)
+    expect(out.length).toBe(WORK_ITEM_TAGS_MAX)
+    expect(WORK_ITEM_TAGS_MAX).toBe(3)
     expect(out.filter((t) => t.toLowerCase() === 'foo')).toHaveLength(1)
     expect(out[0]).toBe('Foo') // first casing wins
     expect(out.every((t) => t.length <= WORK_ITEM_TAG_MAX_LEN)).toBe(true)

@@ -92,6 +92,16 @@ pub fn terminal_hosts_path(app: &AppHandle) -> Option<PathBuf> {
     Some(config_dir(app)?.join("terminal-hosts.json"))
 }
 
+/// Product work-items root (`<base>/work-items`) — content dir, not under config/.
+pub fn work_items_dir(app: &AppHandle) -> Option<PathBuf> {
+    hip_subdir(app, "work-items")
+}
+
+/// Canonical path of the work-items catalog (`work-items/catalog.json`).
+pub fn work_items_catalog_path(app: &AppHandle) -> Option<PathBuf> {
+    Some(work_items_dir(app)?.join("catalog.json"))
+}
+
 /// Directory holding installed plugins (`<dir>/<plugin-id>/.plugin/plugin.json`).
 pub fn plugins_dir(app: &AppHandle) -> Option<PathBuf> {
     hip_subdir(app, "plugins")
@@ -165,6 +175,21 @@ mod tests {
             base.join("config").join("terminal-hosts.json"),
             PathBuf::from("/Users/x/.hip/config/terminal-hosts.json"),
         );
+    }
+
+    #[test]
+    fn work_items_catalog_lives_under_base_not_config() {
+        let base = hip_base_from(Some(PathBuf::from("/Users/x")), None).unwrap();
+        assert_eq!(
+            base.join("work-items").join("catalog.json"),
+            PathBuf::from("/Users/x/.hip/work-items/catalog.json"),
+        );
+        let s = base
+            .join("work-items")
+            .join("catalog.json")
+            .to_string_lossy()
+            .replace('\\', "/");
+        assert!(!s.contains("/config/"));
     }
 
     #[test]

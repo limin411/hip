@@ -14,6 +14,7 @@ mod pty;
 mod term_fs;
 mod workspace_file_search;
 mod terminal_hosts;
+mod work_items;
 mod terminal_budget;
 mod ssh_path;
 mod ssh_known_hosts;
@@ -802,6 +803,8 @@ pub fn run() {
             window_tray::tray_set_labels,
             terminal_hosts::terminal_hosts_list,
             terminal_hosts::terminal_hosts_save,
+            work_items::work_items_list,
+            work_items::work_items_save,
             models_catalog,
             models_catalog_refresh,
             get_hip_config,

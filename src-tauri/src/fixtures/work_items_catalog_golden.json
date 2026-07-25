@@ -1,0 +1,44 @@
+{
+  "version": 1,
+  "lists": [
+    {
+      "id": "wl_inbox",
+      "name": "Inbox",
+      "sortOrder": 0,
+      "createdAt": 0,
+      "updatedAt": 0,
+      "system": "inbox"
+    },
+    {
+      "id": "wl_work",
+      "name": "Work",
+      "sortOrder": 1,
+      "createdAt": 1720000000000,
+      "updatedAt": 1720000000000
+    }
+  ],
+  "items": [
+    {
+      "id": "wi_abc123",
+      "title": "Ship work-items catalog",
+      "status": "in_progress",
+      "priority": "high",
+      "listId": "wl_work",
+      "tags": ["hip", "v1"],
+      "notes": "Golden fixture locks camelCase field names.",
+      "dueOn": "2026-07-25",
+      "createdAt": 1720000001000,
+      "updatedAt": 1720000002000,
+      "completedAt": null,
+      "archivedAt": null,
+      "links": {
+        "sessionId": "sess_1",
+        "knowledge": {
+          "spaceId": "space_a",
+          "docId": "doc_b"
+        },
+        "url": "https://example.com"
+      }
+    }
+  ]
+}

@@ -4,7 +4,7 @@
  * Regenerate: yarn product:content
  * Check:      yarn product:content:check
  *
- * contentHash=3b30e7d8ce8c0f3a skillVersion=3 productVersion=1.0.1
+ * contentHash=e027ef5680138a9d skillVersion=3 productVersion=1.0.1
  */
 
 export type ProductHelpSectionId = 'overview' | 'memory' | 'config' | 'troubleshooting' | 'agents'
@@ -238,9 +238,90 @@ Project overrides often live under \`<project>/.hip/\` (e.g. \`.hip/skills/\`, \
 
 **Do not** sync \`~/.hip/config/\` to public cloud or public dotfile repos — it may contain API keys.
 
-## Auth model
+## Auth model (BYOK)
 
-Keys are entered in the app Settings panel and stored in \`auth.json\`. Desktop app, standalone sidecar, and tests all read from that store. This is intentional plaintext-on-disk with tight file modes — not a keychain migration target.
+Keys are entered in the app **Settings → Providers** panel and stored in \`auth.json\`. Desktop app, standalone sidecar, and tests all resolve from that store. This is intentional plaintext-on-disk with tight file modes — not a keychain migration target.
+
+Design detail: \`docs/design/byok-spec.md\`.
+
+### Resolution order
+
+When resolving an API key for a provider:
+
+1. **auth.json** entry for \`HIP_MODEL_<PROVIDER>_API_KEY\` (if the key name is present in the file)
+   - Non-empty → use it
+   - Empty string → **cleared** (tombstone); do **not** fall back to env
+2. **Standard environment variables** (e.g. \`ANTHROPIC_API_KEY\`, \`OPENAI_API_KEY\`, \`DEEPSEEK_API_KEY\`, \`MINIMAX_API_KEY\`)
+3. **\`HIP_MODEL_<PROVIDER>_API_KEY\`** env (legacy / Tauri inject / tests)
+
+Saving or clearing a key does **not** require restarting the sidecar; the next request re-reads auth.json.
+
+### Do not put LLM keys in hip.toml
+
+\`[[providers]] api_key\` / \`apiKey\` is **not** used for chat. Use \`auth.json\` or env only. (LangSmith’s \`[langsmith] api_key\` is separate observability config.)
+
+### Custom providers (\`apiKind\`)
+
+\`\`\`toml
+[[providers]]
+id = "my-minimax"
+name = "My MiniMax"
+baseUrl = "https://api.minimaxi.com/anthropic/v1"
+apiKind = "anthropic"   # or "openai" (default)
+enabled = true
+\`\`\`
+
+- \`openai\` — OpenAI Chat Completions compatible  
+- \`anthropic\` — Anthropic Messages API (also used by MiniMax / Kimi gateways)
+
+Set in **Settings → Add custom provider**, or edit the provider detail pane. Keys still go in \`auth.json\`.
+
+### Key expressions in auth.json
+
+\`\`\`json
+{
+  "HIP_MODEL_ANTHROPIC_API_KEY": "$ANTHROPIC_API_KEY",
+  "HIP_MODEL_OPENAI_API_KEY": "!op read 'op://vault/openai/credential'"
+}
+\`\`\`
+
+| Form | Meaning |
+|------|---------|
+| literal | Used as-is |
+| \`$VAR\` / \`\${VAR}\` | Process environment |
+| \`!command\` | Shell stdout (cached for process life). Disable with \`HIP_AUTH_ALLOW_CMD=0\` |
+| \`$!…\` | Literal string starting with \`!\` (no shell) |
+
+### Typed credentials (optional)
+
+\`\`\`json
+{
+  "credentials": {
+    "anthropic": {
+      "type": "oauth",
+      "access": "…",
+      "refresh": "…",
+      "expires": 1893456000000
+    },
+    "cloudflare-ai-gateway": {
+      "type": "api_key",
+      "key": "cf-token",
+      "env": { "CLOUDFLARE_ACCOUNT_ID": "…", "CLOUDFLARE_GATEWAY_ID": "…" }
+    }
+  }
+}
+\`\`\`
+
+Flat \`HIP_MODEL_*\` keys remain fully supported. When both exist, \`credentials[provider]\` wins. Expired OAuth does **not** fall back to env.
+
+### ACP: optional hip key forward
+
+\`\`\`toml
+[acp]
+forward_hip_keys = true   # default false — inject hip keys as ANTHROPIC_API_KEY / OPENAI_API_KEY / …
+\`\`\`
+
+Default remains self-managed ACP (no hip key injection).
 `,
   },
   {
@@ -310,7 +391,9 @@ Custom **internal** agents: persona prompt + bound model + tool grants.
 
 Supported ACP presets (Settings → Agents → Add ACP agent): **OpenCode**, **Grok Build** (\`grok agent stdio\`), **Pi**, **Claude Code**, **Codex**. Grok Build uses native ACP (install via \`https://x.ai/cli\`); auth via \`grok login\` or optional \`XAI_API_KEY\`.
 
-ACP agents are **self-managed** for auth and models: hip does not inject its provider API keys into the ACP child process. Use the agent’s own login / ambient env / optional preset \`authEnvVar\` on the agent config.
+ACP agents are **self-managed** for auth and models by default: hip does not inject its provider API keys into the ACP child process. Use the agent’s own login / ambient env / optional preset \`authEnvVar\` on the agent config.
+
+Opt-in bridge (BYOK Phase E): set \`[acp] forward_hip_keys = true\` in \`hip.toml\` to inject resolved hip keys under standard env names (\`ANTHROPIC_API_KEY\`, \`OPENAI_API_KEY\`, …) for ACP spawns. Agent \`env\` and ambient process env still take precedence when already set.
 
 ## Capability matrix (Built-in vs ACP)
 
@@ -673,9 +756,90 @@ Project overrides often live under \`<project>/.hip/\` (e.g. \`.hip/skills/\`, \
 
 **Do not** sync \`~/.hip/config/\` to public cloud or public dotfile repos — it may contain API keys.
 
-## Auth model
+## Auth model (BYOK)
 
-Keys are entered in the app Settings panel and stored in \`auth.json\`. Desktop app, standalone sidecar, and tests all read from that store. This is intentional plaintext-on-disk with tight file modes — not a keychain migration target.
+Keys are entered in the app **Settings → Providers** panel and stored in \`auth.json\`. Desktop app, standalone sidecar, and tests all resolve from that store. This is intentional plaintext-on-disk with tight file modes — not a keychain migration target.
+
+Design detail: \`docs/design/byok-spec.md\`.
+
+### Resolution order
+
+When resolving an API key for a provider:
+
+1. **auth.json** entry for \`HIP_MODEL_<PROVIDER>_API_KEY\` (if the key name is present in the file)
+   - Non-empty → use it
+   - Empty string → **cleared** (tombstone); do **not** fall back to env
+2. **Standard environment variables** (e.g. \`ANTHROPIC_API_KEY\`, \`OPENAI_API_KEY\`, \`DEEPSEEK_API_KEY\`, \`MINIMAX_API_KEY\`)
+3. **\`HIP_MODEL_<PROVIDER>_API_KEY\`** env (legacy / Tauri inject / tests)
+
+Saving or clearing a key does **not** require restarting the sidecar; the next request re-reads auth.json.
+
+### Do not put LLM keys in hip.toml
+
+\`[[providers]] api_key\` / \`apiKey\` is **not** used for chat. Use \`auth.json\` or env only. (LangSmith’s \`[langsmith] api_key\` is separate observability config.)
+
+### Custom providers (\`apiKind\`)
+
+\`\`\`toml
+[[providers]]
+id = "my-minimax"
+name = "My MiniMax"
+baseUrl = "https://api.minimaxi.com/anthropic/v1"
+apiKind = "anthropic"   # or "openai" (default)
+enabled = true
+\`\`\`
+
+- \`openai\` — OpenAI Chat Completions compatible  
+- \`anthropic\` — Anthropic Messages API (also used by MiniMax / Kimi gateways)
+
+Set in **Settings → Add custom provider**, or edit the provider detail pane. Keys still go in \`auth.json\`.
+
+### Key expressions in auth.json
+
+\`\`\`json
+{
+  "HIP_MODEL_ANTHROPIC_API_KEY": "$ANTHROPIC_API_KEY",
+  "HIP_MODEL_OPENAI_API_KEY": "!op read 'op://vault/openai/credential'"
+}
+\`\`\`
+
+| Form | Meaning |
+|------|---------|
+| literal | Used as-is |
+| \`$VAR\` / \`\${VAR}\` | Process environment |
+| \`!command\` | Shell stdout (cached for process life). Disable with \`HIP_AUTH_ALLOW_CMD=0\` |
+| \`$!…\` | Literal string starting with \`!\` (no shell) |
+
+### Typed credentials (optional)
+
+\`\`\`json
+{
+  "credentials": {
+    "anthropic": {
+      "type": "oauth",
+      "access": "…",
+      "refresh": "…",
+      "expires": 1893456000000
+    },
+    "cloudflare-ai-gateway": {
+      "type": "api_key",
+      "key": "cf-token",
+      "env": { "CLOUDFLARE_ACCOUNT_ID": "…", "CLOUDFLARE_GATEWAY_ID": "…" }
+    }
+  }
+}
+\`\`\`
+
+Flat \`HIP_MODEL_*\` keys remain fully supported. When both exist, \`credentials[provider]\` wins. Expired OAuth does **not** fall back to env.
+
+### ACP: optional hip key forward
+
+\`\`\`toml
+[acp]
+forward_hip_keys = true   # default false — inject hip keys as ANTHROPIC_API_KEY / OPENAI_API_KEY / …
+\`\`\`
+
+Default remains self-managed ACP (no hip key injection).
 `,
   },
   {
@@ -745,7 +909,9 @@ Custom **internal** agents: persona prompt + bound model + tool grants.
 
 Supported ACP presets (Settings → Agents → Add ACP agent): **OpenCode**, **Grok Build** (\`grok agent stdio\`), **Pi**, **Claude Code**, **Codex**. Grok Build uses native ACP (install via \`https://x.ai/cli\`); auth via \`grok login\` or optional \`XAI_API_KEY\`.
 
-ACP agents are **self-managed** for auth and models: hip does not inject its provider API keys into the ACP child process. Use the agent’s own login / ambient env / optional preset \`authEnvVar\` on the agent config.
+ACP agents are **self-managed** for auth and models by default: hip does not inject its provider API keys into the ACP child process. Use the agent’s own login / ambient env / optional preset \`authEnvVar\` on the agent config.
+
+Opt-in bridge (BYOK Phase E): set \`[acp] forward_hip_keys = true\` in \`hip.toml\` to inject resolved hip keys under standard env names (\`ANTHROPIC_API_KEY\`, \`OPENAI_API_KEY\`, …) for ACP spawns. Agent \`env\` and ambient process env still take precedence when already set.
 
 ## Capability matrix (Built-in vs ACP)
 

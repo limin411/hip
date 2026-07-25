@@ -342,4 +342,34 @@ describe('sidebarActions', () => {
     assignSectionAfterLeavingKnowledge()
     expect(useUiStore.getState().sidebarSection).toBe('chats')
   })
+
+  it('enterWorkItemsSection skips load when already loaded', async () => {
+    workItemState.loaded = true
+    workItemState.load.mockClear()
+    await enterWorkItemsSection()
+    expect(workItemState.load).not.toHaveBeenCalled()
+  })
+
+  it('enterKnowledge flushes work items when leaving tasks', async () => {
+    useUiStore.setState({ activeView: 'tasks', sidebarSection: 'tasks' })
+    await enterKnowledge()
+    expect(workItemFlushSave).toHaveBeenCalled()
+    expect(useUiStore.getState().activeView).toBe('knowledge')
+  })
+
+  it('enterTerminalsSection flushes work items when leaving tasks', async () => {
+    const { enterTerminalsSection } = await import('./sidebarActions')
+    useUiStore.setState({ activeView: 'tasks', sidebarSection: 'tasks' })
+    await enterTerminalsSection()
+    expect(workItemFlushSave).toHaveBeenCalled()
+    expect(useUiStore.getState().activeView).toBe('terminals')
+  })
+
+  it('enterPlaceholderSection flushes work items when leaving tasks', async () => {
+    useUiStore.setState({ activeView: 'tasks', sidebarSection: 'tasks' })
+    await enterPlaceholderSection('workbench')
+    expect(workItemFlushSave).toHaveBeenCalled()
+    expect(useUiStore.getState().activeView).toBe('workbench')
+  })
+
 })

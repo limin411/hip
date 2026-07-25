@@ -56,11 +56,15 @@ import { DeclarativeContextMenu } from '@/components/context-menu'
 import { openCreateKnowledgeSpaceDialog } from '@/components/knowledge/knowledgeSpaceDialogStore'
 import { TERMINAL_MANAGEMENT } from '@/components/terminals/feature'
 import { QuickConnectPopover } from '@/components/terminals/QuickConnectPopover'
+import { WORK_ITEM_TRACKING } from '@/components/work-items/feature'
+import { WorkItemSidebarLists } from '@/components/work-items/WorkItemSidebarLists'
+import { useWorkItemStore } from '@/store/workItemStore'
 import {
   enterKnowledge,
   enterPlaceholderSection,
   enterSection,
   enterTerminalsSection,
+  enterWorkItemsSection,
   newConversationFromSidebar,
   openHistoryFromChrome,
   openSettingsFromChrome,
@@ -179,6 +183,7 @@ export function AppSidebar() {
     if (section === 'knowledge') void enterKnowledge()
     else if (section === 'terminals' && TERMINAL_MANAGEMENT)
       void enterTerminalsSection({ library: true })
+    else if (section === 'tasks' && WORK_ITEM_TRACKING) void enterWorkItemsSection()
     else if (isPlaceholderSidebarSection(section)) void enterPlaceholderSection(section)
     else if (section === 'projects' || section === 'chats') void enterSection(section)
   }
@@ -192,7 +197,9 @@ export function AppSidebar() {
           ? t('sidebar.list.chats')
           : sidebarSection === 'terminals' && TERMINAL_MANAGEMENT
             ? t('sidebar.list.terminals')
-            : t(`sidebar.nav.${sidebarSection}`)
+            : sidebarSection === 'tasks' && WORK_ITEM_TRACKING
+              ? t('sidebar.list.workItems')
+              : t(`sidebar.nav.${sidebarSection}`)
 
   const toggleWorktree = (sessionId: string) => {
     setWorktreeCollapsed((prev) => ({ ...prev, [sessionId]: !prev[sessionId] }))
@@ -387,10 +394,27 @@ export function AppSidebar() {
             </button>
           ) : sidebarSection === 'terminals' && TERMINAL_MANAGEMENT ? (
             <QuickConnectPopover />
+          ) : sidebarSection === 'tasks' && WORK_ITEM_TRACKING ? (
+            <button
+              type="button"
+              data-testid="sidebar-new-work-item"
+              data-no-drag
+              onClick={() => {
+                void (async () => {
+                  await enterWorkItemsSection()
+                  await useWorkItemStore.getState().createItem()
+                })()
+              }}
+              className="rounded-md px-1.5 py-0.5 text-caption text-ink-tertiary transition-colors duration-chrome hover:bg-state-hover hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink/20"
+            >
+              {t('sidebar.newWorkItem')}
+            </button>
           ) : null}
         </div>
 
-        {sidebarSection === 'terminals' && TERMINAL_MANAGEMENT ? (
+        {sidebarSection === 'tasks' && WORK_ITEM_TRACKING ? (
+          <WorkItemSidebarLists />
+        ) : sidebarSection === 'terminals' && TERMINAL_MANAGEMENT ? (
           managedTerminals.length === 0 ? (
             <div
               className="flex flex-col items-center gap-1 px-3 py-6 text-center"

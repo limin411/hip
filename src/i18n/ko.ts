@@ -1840,6 +1840,7 @@ export const ko = {
     "newProject": "새 프로젝트 세션",
     "newChat": "새 채팅",
     "newTerminal": "새 터미널",
+    "newWorkItem": "새 작업 항목",
     "emptySearch": "일치 없음",
     "emptySessions": "아직 세션이 없습니다",
     "emptySpaces": "아직 공간이 없습니다",
@@ -1866,6 +1867,25 @@ export const ko = {
     "newChat": "새 워크 채팅",
     "newCode": "새 코딩 작업",
     "newKnowledge": "지식 베이스"
+  },
+  "workItems": {
+    "inbox": "수집함",
+    "filtersAria": "스마트 필터",
+    "filters": {
+      "open": "미완료",
+      "today": "오늘 마감",
+      "overdue": "기한 초과",
+      "in_progress": "진행 중",
+      "done": "완료",
+      "cancelled": "취소됨",
+      "archived": "보관됨"
+    },
+    "listsHeading": "목록",
+    "newList": "새 목록",
+    "newListPrompt": "목록 이름",
+    "renameListPrompt": "목록 이름 바꾸기",
+    "deleteListConfirm": "목록 \"{{name}}\"을(를) 삭제할까요? 항목은 수집함으로 이동합니다.",
+    "listRowHint": "{{name}} · 더블클릭으로 이름 변경 · 우클릭으로 삭제"
   },
   "knowledge": {
     "title": "지식 베이스",

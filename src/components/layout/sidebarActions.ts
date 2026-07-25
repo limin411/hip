@@ -140,8 +140,8 @@ export async function enterTerminalsSection(opts?: {
 
 /**
  * Enter work-item tracking (tasks section).
- * Exported for PR5+ AppSidebar / palette wiring; flag remains false until PR7
- * so AppSidebar still uses enterPlaceholderSection('tasks') for now.
+ * AppSidebar wires onNav to this when WORK_ITEM_TRACKING is true.
+ * Already on tasks: leaveWorkItems would flush unnecessarily — skip.
  */
 export async function enterWorkItemsSection(): Promise<void> {
   if (useUiStore.getState().activeView === 'knowledge') {

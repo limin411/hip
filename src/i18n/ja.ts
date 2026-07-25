@@ -1840,6 +1840,7 @@ export const ja = {
     "newProject": "新しいプロジェクトセッション",
     "newChat": "新しいチャット",
     "newTerminal": "新しい端末",
+    "newWorkItem": "新しいワークアイテム",
     "emptySearch": "一致するものがありません",
     "emptySessions": "セッションはまだありません",
     "emptySpaces": "スペースはまだありません",
@@ -1866,6 +1867,25 @@ export const ja = {
     "newChat": "新しいワークチャット",
     "newCode": "新しいコーディングタスク",
     "newKnowledge": "ナレッジベース"
+  },
+  "workItems": {
+    "inbox": "受信箱",
+    "filtersAria": "スマートフィルタ",
+    "filters": {
+      "open": "未完了",
+      "today": "今日期限",
+      "overdue": "期限超過",
+      "in_progress": "進行中",
+      "done": "完了",
+      "cancelled": "キャンセル済み",
+      "archived": "アーカイブ"
+    },
+    "listsHeading": "リスト",
+    "newList": "新しいリスト",
+    "newListPrompt": "リスト名",
+    "renameListPrompt": "リスト名を変更",
+    "deleteListConfirm": "リスト「{{name}}」を削除しますか？項目は受信箱に移動します。",
+    "listRowHint": "{{name}} · ダブルクリックで名前変更 · 右クリックで削除"
   },
   "knowledge": {
     "title": "ナレッジベース",

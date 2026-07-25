@@ -18,6 +18,7 @@ const enterPlaceholderSection = vi.fn(
   async (_section: 'workbench' | 'tasks' | 'automation') => {},
 )
 const enterTerminalsSection = vi.fn(async (_opts?: { library?: boolean }) => {})
+const enterWorkItemsSection = vi.fn(async () => {})
 const openHistoryFromChrome = vi.fn(async () => {})
 const newConversationFromSidebar = vi.fn(async (_surface: 'chat' | 'code') => {})
 const selectSessionFromSidebar = vi.fn(async (_id: string) => {})
@@ -28,11 +29,13 @@ vi.mock('./sidebarActions', () => ({
   enterPlaceholderSection: (section: 'workbench' | 'tasks' | 'automation') =>
     enterPlaceholderSection(section),
   enterTerminalsSection: (opts?: { library?: boolean }) => enterTerminalsSection(opts),
+  enterWorkItemsSection: () => enterWorkItemsSection(),
   openHistoryFromChrome: () => openHistoryFromChrome(),
   openSettingsFromChrome: vi.fn(),
   openAutomationFromChrome: vi.fn(),
   openTrashFromChrome: vi.fn(),
   leaveKnowledge: vi.fn(async () => {}),
+  leaveWorkItems: vi.fn(async () => {}),
   openSpaceFromSidebar: vi.fn(),
   selectSessionFromSidebar: (id: string) => selectSessionFromSidebar(id),
   newConversationFromSidebar: (surface: 'chat' | 'code') => newConversationFromSidebar(surface),
@@ -74,6 +77,7 @@ describe('AppSidebar', () => {
     enterSection.mockClear()
     enterPlaceholderSection.mockClear()
     enterTerminalsSection.mockClear()
+    enterWorkItemsSection.mockClear()
     openHistoryFromChrome.mockClear()
     newConversationFromSidebar.mockClear()
     selectSessionFromSidebar.mockClear()
@@ -221,10 +225,19 @@ describe('AppSidebar', () => {
     expect(enterPlaceholderSection).not.toHaveBeenCalledWith('terminals')
   })
 
-  it('nav tasks calls enterPlaceholderSection tasks', () => {
+  it('nav tasks calls enterPlaceholderSection while WORK_ITEM_TRACKING is false', () => {
     render(<AppSidebar />)
     fireEvent.click(screen.getByTestId('sidebar-nav-tasks'))
     expect(enterPlaceholderSection).toHaveBeenCalledWith('tasks')
+    expect(enterWorkItemsSection).not.toHaveBeenCalled()
+  })
+
+  it('tasks section shows coming soon placeholder while WORK_ITEM_TRACKING is false', () => {
+    useUiStore.setState({ sidebarSection: 'tasks', activeView: 'tasks' })
+    render(<AppSidebar />)
+    expect(screen.getByText(i18n.t('placeholder.comingSoon'))).toBeInTheDocument()
+    expect(screen.queryByTestId('sidebar-work-items')).not.toBeInTheDocument()
+    expect(screen.queryByTestId('sidebar-new-work-item')).not.toBeInTheDocument()
   })
 
   it('nav automation is below tasks and calls enterPlaceholderSection', () => {

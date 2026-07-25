@@ -56,6 +56,15 @@ pub(crate) struct McpServerEntry {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub(crate) disabled_tools: Option<Vec<String>>,
     pub(crate) enabled: bool,
+    /// MCP Registry reverse-DNS name when installed from a market source.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub(crate) registry_name: Option<String>,
+    /// Market source id (e.g. `mcp-official`).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub(crate) registry_source_id: Option<String>,
+    /// Registry version at install time.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub(crate) registry_version: Option<String>,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
@@ -317,6 +326,12 @@ pub(crate) struct TomlMcpServerEntry {
     #[serde(default, skip_serializing_if = "Option::is_none", alias = "disabledTools")]
     pub(crate) disabled_tools: Option<Vec<String>>,
     pub(crate) enabled: bool,
+    #[serde(default, skip_serializing_if = "Option::is_none", alias = "registryName")]
+    pub(crate) registry_name: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none", alias = "registrySourceId")]
+    pub(crate) registry_source_id: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none", alias = "registryVersion")]
+    pub(crate) registry_version: Option<String>,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
@@ -581,6 +596,9 @@ impl From<McpServerEntry> for TomlMcpServerEntry {
             enabled_tools: s.enabled_tools,
             disabled_tools: s.disabled_tools,
             enabled: s.enabled,
+            registry_name: s.registry_name,
+            registry_source_id: s.registry_source_id,
+            registry_version: s.registry_version,
         }
     }
 }
@@ -599,7 +617,39 @@ impl From<TomlMcpServerEntry> for McpServerEntry {
             enabled_tools: s.enabled_tools,
             disabled_tools: s.disabled_tools,
             enabled: s.enabled,
+            registry_name: s.registry_name,
+            registry_source_id: s.registry_source_id,
+            registry_version: s.registry_version,
         }
+    }
+}
+
+/// Load HipConfig from disk (empty default when missing). Used by marketplace/registry modules.
+pub fn load_hip_config(app: &tauri::AppHandle) -> Result<HipConfig, String> {
+    let path = crate::paths::hip_config_path(app).ok_or("no config dir")?;
+    match std::fs::read_to_string(&path) {
+        Ok(raw) => {
+            let toml_cfg: TomlHipConfig =
+                toml::from_str(&raw).map_err(|e| format!("TOML parse error: {e}"))?;
+            Ok(toml_cfg.into())
+        }
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(HipConfig {
+            version: 1,
+            providers: vec![],
+            active_model: None,
+            mcp_servers: vec![],
+            skills: vec![],
+            agents: vec![],
+            fixed_agents: None,
+            permissions: None,
+            agent_loop: None,
+            langsmith: None,
+            terminal: None,
+            window: None,
+            acp: None,
+            plan: None,
+        }),
+        Err(e) => Err(e.to_string()),
     }
 }
 

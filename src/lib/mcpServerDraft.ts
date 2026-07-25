@@ -54,11 +54,17 @@ function kvToRecord(pairs: KvPair[]): Record<string, string> | undefined {
 }
 
 /** Form → the persisted McpServerConfig minus id (the store mints the id). */
-export function buildMcpDraft(f: McpForm): Omit<McpServerConfig, 'id'> {
+export function buildMcpDraft(
+  f: McpForm,
+  provenance?: Pick<McpServerConfig, 'registryName' | 'registrySourceId' | 'registryVersion'>,
+): Omit<McpServerConfig, 'id'> {
   const base = { name: f.name.trim(), transport: f.transport, enabled: f.enabled }
   const extras: Partial<McpServerConfig> = {}
   if (f.enabledTools.length > 0) extras.enabledTools = f.enabledTools
   if (f.disabledTools.length > 0) extras.disabledTools = f.disabledTools
+  if (provenance?.registryName) extras.registryName = provenance.registryName
+  if (provenance?.registrySourceId) extras.registrySourceId = provenance.registrySourceId
+  if (provenance?.registryVersion) extras.registryVersion = provenance.registryVersion
   if (f.transport === 'stdio') {
     const args = splitArgs(f.args)
     const env = kvToRecord(f.env)

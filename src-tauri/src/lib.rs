@@ -5,6 +5,7 @@ mod atomic_write;
 mod skills;
 mod plugins;
 mod marketplace;
+mod mcp_registry;
 mod path_env;
 mod logging;
 mod hip_config;
@@ -307,6 +308,49 @@ async fn add_marketplace_source(
 #[tauri::command]
 fn remove_marketplace_source(app: tauri::AppHandle, source_id: String) -> Result<(), String> {
     marketplace::remove_source(&app, &source_id)
+}
+
+#[tauri::command]
+fn list_mcp_registry_sources(app: tauri::AppHandle) -> Result<String, String> {
+    let sources = mcp_registry::list_sources(&app)?;
+    serde_json::to_string(&sources).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+fn set_mcp_registry_source_enabled(
+    app: tauri::AppHandle,
+    source_id: String,
+    enabled: bool,
+) -> Result<(), String> {
+    mcp_registry::set_source_enabled(&app, &source_id, enabled)
+}
+
+#[tauri::command]
+async fn refresh_mcp_registry_catalog(
+    app: tauri::AppHandle,
+    source_id: Option<String>,
+) -> Result<(), String> {
+    mcp_registry::refresh_catalog(&app, source_id.as_deref()).await
+}
+
+#[tauri::command]
+fn list_mcp_registry_servers(app: tauri::AppHandle) -> Result<String, String> {
+    let snap = mcp_registry::list_snapshot(&app)?;
+    serde_json::to_string(&snap).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+async fn add_mcp_registry_source(
+    app: tauri::AppHandle,
+    registry_url: String,
+) -> Result<String, String> {
+    let src = mcp_registry::add_source(&app, &registry_url).await?;
+    serde_json::to_string(&src).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+fn remove_mcp_registry_source(app: tauri::AppHandle, source_id: String) -> Result<(), String> {
+    mcp_registry::remove_source(&app, &source_id)
 }
 
 #[tauri::command]
@@ -838,6 +882,12 @@ pub fn run() {
             list_marketplace_plugins,
             add_marketplace_source,
             remove_marketplace_source,
+            list_mcp_registry_sources,
+            set_mcp_registry_source_enabled,
+            refresh_mcp_registry_catalog,
+            list_mcp_registry_servers,
+            add_mcp_registry_source,
+            remove_mcp_registry_source,
             list_worktrees,
             path_tools::which_binaries,
             path_tools::path_is_dir,
@@ -1033,6 +1083,9 @@ mod tests {
                 enabled_tools: None,
                 disabled_tools: None,
                 enabled: true,
+                registry_name: None,
+                registry_source_id: None,
+                registry_version: None,
             }],
             skills: vec![super::SkillEntry { id: "pdf-tools".into(), enabled: true }],
             agents: vec![super::AgentEntry {
@@ -1217,6 +1270,9 @@ mod tests {
                     enabled_tools: None,
                     disabled_tools: None,
                     enabled: true,
+                    registry_name: None,
+                    registry_source_id: None,
+                    registry_version: None,
                 },
                 super::McpServerEntry {
                     id: "github".into(),
@@ -1230,6 +1286,9 @@ mod tests {
                     enabled_tools: None,
                     disabled_tools: None,
                     enabled: false,
+                    registry_name: None,
+                    registry_source_id: None,
+                    registry_version: None,
                 },
             ],
             skills: vec![
@@ -1339,6 +1398,9 @@ mod tests {
                     enabled_tools: Some(vec!["read_file".into(), "write_file".into()]),
                     disabled_tools: None,
                     enabled: true,
+                    registry_name: None,
+                    registry_source_id: None,
+                    registry_version: None,
                 },
                 super::TomlMcpServerEntry {
                     id: "github".into(),
@@ -1356,6 +1418,9 @@ mod tests {
                     enabled_tools: None,
                     disabled_tools: Some(vec!["delete_repo".into()]),
                     enabled: true,
+                    registry_name: None,
+                    registry_source_id: None,
+                    registry_version: None,
                 },
             ],
             skills: vec![

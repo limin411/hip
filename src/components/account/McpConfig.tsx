@@ -1,10 +1,37 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import type { TFunction } from 'i18next'
-import { Plug, Plus, Pencil, Trash2, Check, X, RefreshCw, ChevronDown, Server, AlertCircle, Cpu } from 'lucide-react'
+import {
+  Plug,
+  Plus,
+  Pencil,
+  Trash2,
+  Check,
+  X,
+  RefreshCw,
+  ChevronDown,
+  Server,
+  AlertCircle,
+  Cpu,
+  Settings2,
+  Search,
+  Package,
+  Download,
+  Box,
+} from 'lucide-react'
 import { nanoid } from 'nanoid'
-import type { ClientMessage, McpServerConfig, PluginMeta } from '@hip/protocol'
+import type {
+  ClientMessage,
+  McpRegistryEntry,
+  McpServerConfig,
+  PluginMeta,
+} from '@hip/protocol'
 import { useHipConfigStore, useMcpServers } from '@/store/hipConfigStore'
+import {
+  filterMcpRegistryEntries,
+  overlayMcpInstallState,
+  useMcpRegistryStore,
+} from '@/store/mcpRegistryStore'
 import { wsClient } from '@/ipc/ws-client'
 import { usePluginsStore } from '@/store/pluginsStore'
 import { useMcpStatuses, type McpServerStatusVM } from '@/domain'
@@ -13,8 +40,20 @@ import { Button } from '@/components/ui/Button'
 import { Switch } from '@/components/ui/Switch'
 import { Badge } from '@/components/ui/Badge'
 import { Modal } from '@/components/ui/Modal'
-import { inputClassName } from '@/components/ui/Input'
+import { Input, inputClassName } from '@/components/ui/Input'
+import { EmptyState as UiEmptyState } from '@/components/ui/EmptyState'
+import { Skeleton } from '@/components/ui/Skeleton'
+import { Pagination } from '@/components/ui/Pagination'
 import { DeclarativeContextMenu } from '@/components/context-menu'
+import { paginateItems, PLUGIN_MARKET_PAGE_SIZE } from './PluginConfigView'
+
+const MCP_MARKET_PAGE_SIZE = PLUGIN_MARKET_PAGE_SIZE
+import { McpRegistrySourceModal } from './McpRegistrySourceModal'
+import {
+  buildMcpRegistryInstallDraft,
+  isMcpRegistryEntryInstallable,
+  mcpRegistryInstallMethod,
+} from '@/lib/mcpRegistryInstall'
 
 import {
   buildMcpDraft,
@@ -27,7 +66,11 @@ import {
 
 const inputCls = inputClassName
 
-type Editing = { mode: 'add' } | { mode: 'edit'; server: McpServerConfig } | null
+type Editing =
+  | { mode: 'add' }
+  | { mode: 'edit'; server: McpServerConfig }
+  | { mode: 'install'; initial: McpServerConfig }
+  | null
 
 /** Pure helper: map status to status indicator emoji. */
 export function statusEmoji(status: McpServerStatusVM['status']): string {
@@ -124,20 +167,23 @@ export function McpConfig() {
   const { loaded, load, updateSection } = useHipConfigStore()
   const { plugins, loaded: pluginsLoaded, load: loadPlugins } = usePluginsStore()
   const mcpStatuses = useMcpStatuses()
+  const market = useMcpRegistryStore()
   const [editing, setEditing] = useState<Editing>(null)
   const [deleting, setDeleting] = useState<McpServerConfig | null>(null)
+  const [sourcesOpen, setSourcesOpen] = useState(false)
+  const [marketError, setMarketError] = useState<string | null>(null)
 
-	  const addServer = async (s: Omit<McpServerConfig, 'id'>) => {
-	    await updateSection('mcpServers', (prev) => [...(prev ?? []), { ...s, id: nanoid() }])
-	  }
-	  const updateServer = async (id: string, patch: Partial<McpServerConfig>) => {
-	    await updateSection('mcpServers', (prev) =>
-	      (prev ?? []).map((s) => (s.id === id ? { ...s, ...patch } : s)),
-	    )
-	  }
-	  const removeServer = async (id: string) => {
-	    await updateSection('mcpServers', (prev) => (prev ?? []).filter((s) => s.id !== id))
-	  }
+  const addServer = async (s: Omit<McpServerConfig, 'id'>) => {
+    await updateSection('mcpServers', (prev) => [...(prev ?? []), { ...s, id: nanoid() }])
+  }
+  const updateServer = async (id: string, patch: Partial<McpServerConfig>) => {
+    await updateSection('mcpServers', (prev) =>
+      (prev ?? []).map((s) => (s.id === id ? { ...s, ...patch } : s)),
+    )
+  }
+  const removeServer = async (id: string) => {
+    await updateSection('mcpServers', (prev) => (prev ?? []).filter((s) => s.id !== id))
+  }
 
   useEffect(() => {
     if (!loaded) void load()
@@ -146,6 +192,64 @@ export function McpConfig() {
   useEffect(() => {
     if (!pluginsLoaded) void loadPlugins()
   }, [pluginsLoaded, loadPlugins])
+
+  const marketLoad = useMcpRegistryStore((s) => s.load)
+  const marketRefresh = useMcpRegistryStore((s) => s.refresh)
+  const marketLoaded = useMcpRegistryStore((s) => s.loaded)
+  const marketTab = useMcpRegistryStore((s) => s.tab)
+  const marketSources = useMcpRegistryStore((s) => s.sources)
+  const marketRefreshing = useMcpRegistryStore((s) => s.refreshing)
+  const marketEntriesRaw = useMcpRegistryStore((s) => s.entries)
+  const marketQuery = useMcpRegistryStore((s) => s.query)
+
+  useEffect(() => {
+    if (!marketLoaded) void marketLoad()
+  }, [marketLoaded, marketLoad])
+
+  // Auto-refresh once per mount when catalog is missing or still the offline seed.
+  // Seed-only catalogs report lastFetchedAt=null from Rust after migration.
+  const autoRefreshAttempted = useRef<Set<string>>(new Set())
+  useEffect(() => {
+    if (marketTab === 'custom') return
+    if (!marketLoaded) return
+    const src = marketSources.find((s) => s.id === marketTab)
+    if (!src?.enabled || marketRefreshing) return
+    if (autoRefreshAttempted.current.has(marketTab)) return
+    const catalogSize =
+      src.serverCount ??
+      marketEntriesRaw.filter((e) => e.marketSourceId === marketTab).length
+    // No lastFetchedAt ⇒ never live-fetched (or seed-only). Small catalogs also force refresh.
+    const needsRefresh = !src.lastFetchedAt || catalogSize <= 1
+    if (!needsRefresh) return
+    autoRefreshAttempted.current.add(marketTab)
+    void marketRefresh(marketTab)
+  }, [
+    marketTab,
+    marketSources,
+    marketRefreshing,
+    marketRefresh,
+    marketEntriesRaw,
+    marketLoaded,
+  ])
+
+  const marketEntries = useMemo(() => {
+    const overlaid = overlayMcpInstallState(marketEntriesRaw, servers)
+    return filterMcpRegistryEntries(overlaid, marketTab, marketQuery)
+  }, [marketEntriesRaw, marketTab, marketQuery, servers])
+
+  const [marketPage, setMarketPage] = useState(1)
+  const marketTotalPages = Math.max(1, Math.ceil(marketEntries.length / MCP_MARKET_PAGE_SIZE))
+  const safeMarketPage = Math.min(marketPage, marketTotalPages)
+  useEffect(() => {
+    setMarketPage(1)
+  }, [marketTab, marketQuery])
+  useEffect(() => {
+    if (marketPage > marketTotalPages) setMarketPage(marketTotalPages)
+  }, [marketPage, marketTotalPages])
+  const pageMarketEntries = useMemo(
+    () => paginateItems(marketEntries, safeMarketPage, MCP_MARKET_PAGE_SIZE),
+    [marketEntries, safeMarketPage],
+  )
 
   const statusByServer = useMemo(() => new Map(mcpStatuses.map((s) => [s.id, s])), [mcpStatuses])
   const pluginMcpServers = useMemo(
@@ -174,17 +278,12 @@ export function McpConfig() {
   }
 
   const reconnectMcpServers = useCallback(() => {
-    // Only reconnect enabled plugin MCP servers (disabled plugins stay out of the active set).
     const activePlugin = pluginMcpServers.filter((s) => s.enabled)
     const allServers: McpServerConfig[] = [...servers, ...activePlugin]
     const msg: ClientMessage = { type: 'mcp:reconnect', servers: allServers }
     wsClient.send(msg)
   }, [servers, pluginMcpServers])
 
-  // Ask the sidecar for the current MCP status as soon as the page has both
-  // standalone and plugin server configs loaded. Without this the list stays
-  // blank until the user manually hits the refresh button.
-  // Also re-reconcile when a plugin is enabled/disabled in Plugin Market.
   const statusRequestedRef = useRef(false)
   const pluginEnableKey = plugins.map((p) => `${p.id}:${p.enabled}`).join('|')
   useEffect(() => {
@@ -198,107 +297,401 @@ export function McpConfig() {
     reconnectMcpServers()
   }, [loaded, pluginsLoaded, servers, pluginMcpServers, pluginEnableKey, reconnectMcpServers])
 
+  const handleMarketInstall = (entry: McpRegistryEntry) => {
+    const draft = buildMcpRegistryInstallDraft(entry)
+    if (!draft) {
+      setMarketError(t('settings.mcp.installNotSupported'))
+      return
+    }
+    setMarketError(null)
+    const initial: McpServerConfig = {
+      id: '',
+      name: draft.name,
+      transport: draft.transport,
+      command: draft.command,
+      args: draft.args,
+      env: draft.env,
+      url: draft.url,
+      headers: draft.headers,
+      enabled: true,
+      registryName: draft.registryName,
+      registrySourceId: draft.registrySourceId,
+      registryVersion: draft.registryVersion,
+    }
+    setEditing({ mode: 'install', initial })
+  }
+
+  const handleMarketUninstall = (entry: McpRegistryEntry) => {
+    if (!entry.localServerId) return
+    const server = servers.find((s) => s.id === entry.localServerId)
+    if (server) setDeleting(server)
+  }
+
+  const handleMarketToggle = async (entry: McpRegistryEntry, enabled: boolean) => {
+    if (!entry.localServerId) return
+    setMarketError(null)
+    try {
+      await updateServer(entry.localServerId, { enabled })
+    } catch (err) {
+      setMarketError(err instanceof Error ? err.message : t('settings.mcp.error'))
+    }
+  }
+
+  const activeSource = marketTab !== 'custom'
+    ? marketSources.find((s) => s.id === marketTab)
+    : undefined
+  const sourceDisabled = Boolean(activeSource && activeSource.enabled === false)
+  const combinedError = marketError ?? market.error
+
+  const navItems = useMemo(() => {
+    const items: { id: string; label: string; icon: typeof Package; count?: number }[] = []
+    for (const src of marketSources) {
+      items.push({
+        id: src.id,
+        label: src.name,
+        icon: Box,
+        count: src.serverCount,
+      })
+    }
+    items.push({
+      id: 'custom',
+      label: t('settings.mcp.tabCustom'),
+      icon: Package,
+      count: servers.length,
+    })
+    return items
+  }, [marketSources, servers.length, t])
+
   return (
-    <div className="p-6">
-      <div className="flex flex-col gap-5 sm:flex-row sm:items-start sm:justify-between">
-        <div>
-          <h2 className="text-title font-semibold text-ink">{t('settings.mcp.title')}</h2>
-          <p className="mt-1 text-body text-ink-secondary">{t('settings.mcp.intro')}</p>
-        </div>
-        <Button
-          type="button"
-          variant="primary"
-          size="md"
-          className="gap-1.5 rounded-lg"
-          onClick={() => setEditing({ mode: 'add' })}
-        >
-          <Plus size={16} />
-          {t('settings.mcp.add')}
-        </Button>
-      </div>
-
-      <div className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-4">
-        <StatCard
-          icon={Plug}
-          value={`${stats.enabledCount}/${stats.total}`}
-          label={t('settings.mcp.statEnabled')}
-          tone="accent"
-        />
-        <StatCard
-          icon={Server}
-          value={String(stats.connectedCount)}
-          label={t('settings.mcp.statConnected')}
-          tone="success"
-        />
-        <StatCard
-          icon={AlertCircle}
-          value={String(stats.errorCount)}
-          label={t('settings.mcp.statErrors')}
-          tone={stats.errorCount > 0 ? 'danger' : 'muted'}
-        />
-        <StatCard
-          icon={Cpu}
-          value={String(stats.toolCount)}
-          label={t('settings.mcp.statTools')}
-          tone="muted"
-        />
-      </div>
-
-      <div className="mt-6">
-        <h3 className="text-subtitle font-medium text-ink">{t('settings.mcp.myServersTitle')}</h3>
-        <div className="mt-2 grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
-          {servers.length === 0 ? (
-            <button
-              onClick={() => setEditing({ mode: 'add' })}
-              className="col-span-full flex w-full flex-col items-center justify-center gap-2 rounded-xl border border-dashed border-border py-8 text-body font-medium text-accent-strong transition-colors hover:bg-state-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink/20"
+    <div className="flex min-h-0 flex-col" data-testid="mcp-config">
+      <div className="shrink-0 border-b border-border px-6 py-4">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div className="min-w-0">
+            <h2 className="text-title font-semibold text-ink">{t('settings.mcp.title')}</h2>
+            <p className="mt-1 text-body text-ink-secondary">{t('settings.mcp.intro')}</p>
+          </div>
+          <div className="flex shrink-0 flex-wrap gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setSourcesOpen(true)}
+              data-testid="mcp-registry-sources-open"
             >
-              <Plug size={24} />
-              <span>{t('settings.mcp.empty')}</span>
-            </button>
-          ) : (
-            servers.map((s) => (
-              <McpServerCard
-                key={s.id}
-                server={s}
-                status={statusByServer.get(s.id)}
-                onToggle={async (enabled) => { await updateServer(s.id, { enabled }) }}
-                onEdit={() => setEditing({ mode: 'edit', server: s })}
-                onDelete={() => setDeleting(s)}
-                onToggleTool={async (toolName) => { await handleUpdateTools(s, toolName) }}
-                onResetTools={async () => { await handleResetTools(s) }}
-                onReconnect={reconnectMcpServers}
+              <Settings2 size={14} /> {t('settings.mcp.manageSources')}
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={marketRefreshing || marketTab === 'custom'}
+              onClick={() => void marketRefresh(marketTab === 'custom' ? undefined : marketTab)}
+              data-testid="mcp-registry-refresh"
+            >
+              <RefreshCw size={14} className={marketRefreshing ? 'animate-spin' : undefined} />{' '}
+              {t('settings.mcp.refreshCatalog')}
+            </Button>
+            {marketTab === 'custom' && (
+              <Button
+                type="button"
+                variant="primary"
+                size="sm"
+                className="gap-1.5"
+                onClick={() => setEditing({ mode: 'add' })}
+              >
+                <Plus size={14} />
+                {t('settings.mcp.add')}
+              </Button>
+            )}
+          </div>
+        </div>
+
+        <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
+          <StatCard
+            icon={Plug}
+            value={`${stats.enabledCount}/${stats.total}`}
+            label={t('settings.mcp.statEnabled')}
+            tone="accent"
+          />
+          <StatCard
+            icon={Server}
+            value={String(stats.connectedCount)}
+            label={t('settings.mcp.statConnected')}
+            tone="success"
+          />
+          <StatCard
+            icon={AlertCircle}
+            value={String(stats.errorCount)}
+            label={t('settings.mcp.statErrors')}
+            tone={stats.errorCount > 0 ? 'danger' : 'muted'}
+          />
+          <StatCard
+            icon={Cpu}
+            value={String(stats.toolCount)}
+            label={t('settings.mcp.statTools')}
+            tone="muted"
+          />
+        </div>
+      </div>
+
+      <div className="flex h-[min(36rem,calc(100vh-14rem))] min-h-[28rem] flex-1">
+        <aside
+          className="flex w-44 shrink-0 flex-col border-r border-border bg-surface-subtle/40"
+          data-testid="mcp-registry-sidebar"
+        >
+          <nav
+            className="flex flex-1 flex-col gap-0.5 p-2"
+            aria-label={t('settings.mcp.tabsAria')}
+          >
+            {navItems.map((item) => {
+              const Icon = item.icon
+              const selected = marketTab === item.id
+              return (
+                <button
+                  key={item.id}
+                  type="button"
+                  role="tab"
+                  aria-selected={selected}
+                  data-testid={`mcp-registry-tab-${item.id}`}
+                  onClick={() => market.setTab(item.id)}
+                  className={cn(
+                    'relative flex h-9 items-center gap-2 rounded-lg px-2.5 text-left text-meta font-medium transition-colors duration-chrome',
+                    'text-ink-secondary hover:bg-state-hover hover:text-ink',
+                    'before:absolute before:inset-y-1.5 before:left-0 before:w-[2px] before:rounded-full before:bg-accent before:opacity-0',
+                    selected && 'bg-state-hover text-ink before:opacity-100',
+                  )}
+                >
+                  <Icon size={15} strokeWidth={1.75} className="shrink-0 opacity-70" />
+                  <span className="min-w-0 flex-1 truncate">{item.label}</span>
+                  {item.count != null && item.count > 0 && (
+                    <span className="shrink-0 tabular-nums text-caption text-ink-tertiary">
+                      {item.count}
+                    </span>
+                  )}
+                </button>
+              )
+            })}
+          </nav>
+        </aside>
+
+        <div className="flex min-h-0 min-w-0 flex-1 flex-col">
+          <div className="shrink-0 space-y-3 border-b border-border px-5 py-3">
+            <div className="flex flex-wrap items-center gap-3">
+              <div className="relative min-w-[12rem] max-w-md flex-1">
+                <Search
+                  size={14}
+                  className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-ink-tertiary"
+                />
+                <Input
+                  className="pl-8"
+                  value={marketQuery}
+                  onChange={(e) => market.setQuery(e.target.value)}
+                  placeholder={t('settings.mcp.searchPlaceholder')}
+                  data-testid="mcp-registry-search"
+                />
+              </div>
+              {marketTab !== 'custom' && marketEntries.length > 0 && (
+                <div className="flex shrink-0 flex-wrap items-center gap-3">
+                  <span className="text-caption text-ink-tertiary">
+                    {t('settings.mcp.pageSummary', {
+                      total: marketEntries.length,
+                      page: safeMarketPage,
+                      pages: marketTotalPages,
+                    })}
+                  </span>
+                  <Pagination
+                    currentPage={safeMarketPage}
+                    totalPages={marketTotalPages}
+                    onChange={setMarketPage}
+                    previousLabel={t('settings.mcp.previousPage')}
+                    nextLabel={t('settings.mcp.nextPage')}
+                  />
+                </div>
+              )}
+            </div>
+            {combinedError && (
+              <div className="rounded-md border border-danger/40 bg-danger/10 px-3 py-2 text-meta text-danger">
+                {combinedError}
+              </div>
+            )}
+            {!combinedError && activeSource?.lastError && (
+              <div className="rounded-md border border-danger/40 bg-danger/10 px-3 py-2 text-meta text-danger">
+                {t('settings.mcp.refreshFailed')}: {activeSource.lastError}
+              </div>
+            )}
+            {marketRefreshing && marketTab !== 'custom' && (
+              <div className="rounded-md border border-border bg-surface-subtle px-3 py-2 text-meta text-ink-secondary">
+                {t('settings.mcp.refreshingHint')}
+              </div>
+            )}
+            {sourceDisabled && (
+              <div className="rounded-md border border-border bg-surface-subtle px-3 py-2 text-meta text-ink-secondary">
+                {t('settings.mcp.sourceDisabledBanner')}
+              </div>
+            )}
+          </div>
+
+          <div className="min-h-0 flex-1 overflow-y-auto px-5 py-4">
+            {marketTab === 'custom' ? (
+              <div className="space-y-6">
+                <div>
+                  <h3 className="text-subtitle font-medium text-ink">
+                    {t('settings.mcp.myServersTitle')}
+                  </h3>
+                  <div className="mt-2 grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
+                    {servers.length === 0 ? (
+                      <button
+                        onClick={() => setEditing({ mode: 'add' })}
+                        className="col-span-full flex w-full flex-col items-center justify-center gap-2 rounded-xl border border-dashed border-border py-8 text-body font-medium text-accent-strong transition-colors hover:bg-state-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink/20"
+                      >
+                        <Plug size={24} />
+                        <span>{t('settings.mcp.empty')}</span>
+                      </button>
+                    ) : (
+                      servers
+                        .filter((s) => {
+                          const q = marketQuery.trim().toLowerCase()
+                          if (!q) return true
+                          return [s.name, s.command, s.url, s.registryName]
+                            .filter(Boolean)
+                            .join(' ')
+                            .toLowerCase()
+                            .includes(q)
+                        })
+                        .map((s) => (
+                          <McpServerCard
+                            key={s.id}
+                            server={s}
+                            status={statusByServer.get(s.id)}
+                            onToggle={async (enabled) => {
+                              await updateServer(s.id, { enabled })
+                            }}
+                            onEdit={() => setEditing({ mode: 'edit', server: s })}
+                            onDelete={() => setDeleting(s)}
+                            onToggleTool={async (toolName) => {
+                              await handleUpdateTools(s, toolName)
+                            }}
+                            onResetTools={async () => {
+                              await handleResetTools(s)
+                            }}
+                            onReconnect={reconnectMcpServers}
+                          />
+                        ))
+                    )}
+                  </div>
+                </div>
+
+                {pluginMcpServers.length > 0 && (
+                  <div>
+                    <h3 className="text-subtitle font-medium text-ink">
+                      {t('settings.mcp.pluginSectionTitle')}
+                    </h3>
+                    <p className="mt-1 text-caption text-ink-tertiary">
+                      {t('settings.mcp.pluginSectionHint')}
+                    </p>
+                    <div className="mt-2 grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
+                      {pluginMcpServers.map((s) => (
+                        <PluginMcpServerCard
+                          key={s.id}
+                          server={s}
+                          pluginName={s.pluginName}
+                          pluginEnabled={s.pluginEnabled}
+                          status={statusByServer.get(s.id)}
+                        />
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            ) : market.loading && !market.loaded ? (
+              <div className="space-y-3" data-testid="mcp-registry-loading">
+                <p className="text-body text-ink-tertiary">{t('settings.mcp.loading')}</p>
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
+                  <Skeleton className="h-28 rounded-xl" />
+                  <Skeleton className="h-28 rounded-xl" />
+                  <Skeleton className="h-28 rounded-xl" />
+                </div>
+              </div>
+            ) : marketEntries.length === 0 ? (
+              <UiEmptyState
+                icon={Package}
+                tier="professional"
+                title={
+                  marketQuery.trim()
+                    ? t('settings.mcp.noSearchResults')
+                    : t('settings.mcp.marketEmpty')
+                }
+                description={
+                  marketQuery.trim()
+                    ? t('settings.mcp.noSearchResultsHint')
+                    : t('settings.mcp.marketEmptyHint')
+                }
+                className="border border-dashed border-border bg-surface-subtle"
               />
-            ))
+            ) : (
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
+                {pageMarketEntries.map((entry) => (
+                  <McpRegistryCard
+                    key={entry.key}
+                    entry={entry}
+                    onInstall={() => handleMarketInstall(entry)}
+                    onToggle={(on) => void handleMarketToggle(entry, on)}
+                    onUninstall={() => handleMarketUninstall(entry)}
+                    t={t}
+                  />
+                ))}
+              </div>
+            )}
+          </div>
+
+          {marketTab !== 'custom' && marketEntries.length > 0 && (
+            <div className="flex shrink-0 flex-wrap items-center justify-between gap-3 border-t border-border bg-surface px-5 py-2.5">
+              <span className="text-caption text-ink-tertiary">
+                {t('settings.mcp.pageSummary', {
+                  total: marketEntries.length,
+                  page: safeMarketPage,
+                  pages: marketTotalPages,
+                })}
+              </span>
+              <Pagination
+                currentPage={safeMarketPage}
+                totalPages={marketTotalPages}
+                onChange={setMarketPage}
+                previousLabel={t('settings.mcp.previousPage')}
+                nextLabel={t('settings.mcp.nextPage')}
+              />
+            </div>
           )}
         </div>
       </div>
 
-      {pluginMcpServers.length > 0 && (
-        <div className="mt-6">
-          <h3 className="text-subtitle font-medium text-ink">{t('settings.mcp.pluginSectionTitle')}</h3>
-          <p className="mt-1 text-caption text-ink-tertiary">{t('settings.mcp.pluginSectionHint')}</p>
-          <div className="mt-2 grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
-            {pluginMcpServers.map((s) => (
-              <PluginMcpServerCard
-                key={s.id}
-                server={s}
-                pluginName={s.pluginName}
-                pluginEnabled={s.pluginEnabled}
-                status={statusByServer.get(s.id)}
-              />
-            ))}
-          </div>
-        </div>
-      )}
-
       {editing && (
         <McpServerEditor
-          initial={editing.mode === 'edit' ? editing.server : null}
+          initial={
+            editing.mode === 'edit'
+              ? editing.server
+              : editing.mode === 'install'
+                ? editing.initial
+                : null
+          }
           status={editing.mode === 'edit' ? statusByServer.get(editing.server.id) : undefined}
           onCancel={() => setEditing(null)}
           onSave={async (draft) => {
-            if (editing.mode === 'edit') await updateServer(editing.server.id, draft)
-            else await addServer(draft)
+            if (editing.mode === 'edit') {
+              await updateServer(editing.server.id, {
+                ...draft,
+                registryName: editing.server.registryName,
+                registrySourceId: editing.server.registrySourceId,
+                registryVersion: editing.server.registryVersion,
+              })
+            } else if (editing.mode === 'install') {
+              await addServer({
+                ...draft,
+                registryName: editing.initial.registryName,
+                registrySourceId: editing.initial.registrySourceId,
+                registryVersion: editing.initial.registryVersion,
+              })
+            } else {
+              await addServer(draft)
+            }
             setEditing(null)
           }}
         />
@@ -314,6 +707,108 @@ export function McpConfig() {
           }}
         />
       )}
+
+      <McpRegistrySourceModal
+        open={sourcesOpen}
+        sources={market.sources}
+        refreshing={market.refreshing}
+        adding={market.adding}
+        onClose={() => setSourcesOpen(false)}
+        onToggle={(id, enabled) => {
+          void market.setSourceEnabled(id, enabled)
+        }}
+        onRefresh={(id) => {
+          void market.refresh(id)
+        }}
+        onAdd={async (url) => {
+          await market.addSource(url)
+        }}
+        onRemove={async (id) => {
+          await market.removeSource(id)
+        }}
+        t={t}
+      />
+    </div>
+  )
+}
+
+function McpRegistryCard({
+  entry,
+  onInstall,
+  onToggle,
+  onUninstall,
+  t,
+}: {
+  entry: McpRegistryEntry
+  onInstall: () => void
+  onToggle: (enabled: boolean) => void
+  onUninstall: () => void
+  t: TFunction
+}) {
+  const installed = entry.installState === 'installed'
+  const installable = isMcpRegistryEntryInstallable(entry)
+  const method = mcpRegistryInstallMethod(entry)
+  const title = entry.title?.trim() || entry.name.split('/').pop() || entry.name
+
+  return (
+    <div
+      data-testid="mcp-registry-card"
+      className={cn(
+        'relative flex min-h-[160px] flex-col rounded-lg border border-border bg-surface p-4 transition-colors hover:bg-surface-subtle',
+        installed && !entry.enabled && 'opacity-60',
+      )}
+    >
+      <div className="flex items-start gap-3">
+        <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-accent-subtle text-accent-strong">
+          <Server size={18} />
+        </span>
+        <div className="min-w-0 flex-1">
+          <div className="truncate text-body font-medium text-ink">{title}</div>
+          <div className="mt-1 flex flex-wrap items-center gap-1.5">
+            {method && <Badge>{method}</Badge>}
+            {entry.version && (
+              <span className="text-caption text-ink-tertiary">v{entry.version}</span>
+            )}
+            {installed && (
+              <Badge className="bg-success/10 text-success">
+                {t('settings.mcp.installedBadge')}
+              </Badge>
+            )}
+          </div>
+        </div>
+      </div>
+      <div className="mt-3 flex-1">
+        <div className="line-clamp-2 text-meta text-ink-secondary">
+          {entry.description || entry.name}
+        </div>
+        <div className="mt-1 truncate font-mono text-caption text-ink-tertiary">{entry.name}</div>
+      </div>
+      <div className="mt-4 flex items-center justify-between gap-2">
+        {installed ? (
+          <>
+            <Switch
+              checked={entry.enabled}
+              onCheckedChange={onToggle}
+              ariaLabel={t('settings.mcp.enableThis')}
+            />
+            <Button variant="outline" size="sm" onClick={onUninstall}>
+              {t('settings.mcp.uninstall')}
+            </Button>
+          </>
+        ) : (
+          <Button
+            variant="primary"
+            size="sm"
+            className="gap-1.5"
+            disabled={!installable}
+            title={entry.installBlockedReason || undefined}
+            onClick={onInstall}
+          >
+            <Download size={14} />
+            {t('settings.mcp.install')}
+          </Button>
+        )}
+      </div>
     </div>
   )
 }
@@ -698,7 +1193,13 @@ function McpServerEditor({
     setBusy(true)
     setError(null)
     try {
-      await onSave(buildMcpDraft(form))
+      await onSave(
+        buildMcpDraft(form, {
+          registryName: initial?.registryName,
+          registrySourceId: initial?.registrySourceId,
+          registryVersion: initial?.registryVersion,
+        }),
+      )
     } catch {
       setError(t('settings.mcp.error'))
     } finally {

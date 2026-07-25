@@ -21,5 +21,14 @@ export interface McpServerConfig {
   enabled: boolean
   /** Set when this server is contributed by a plugin, linking it back to the owning plugin. */
   pluginId?: string
+  /**
+   * MCP Registry reverse-DNS name when this config was installed from a market source
+   * (e.g. `io.github.github/github-mcp-server`).
+   */
+  registryName?: string
+  /** Market source id that provided this server (e.g. `mcp-official`). */
+  registrySourceId?: string
+  /** Registry package/version string at install time. */
+  registryVersion?: string
 }
 

@@ -5,6 +5,7 @@ import { render, cleanup, waitFor, screen } from '@testing-library/react'
 import { derivePluginMcpServers, McpConfig } from './McpConfig'
 import { useHipConfigStore } from '@/store/hipConfigStore'
 import { usePluginsStore } from '@/store/pluginsStore'
+import { useMcpRegistryStore } from '@/store/mcpRegistryStore'
 import { wsClient } from '@/ipc/ws-client'
 import type { McpServerConfig, PluginMeta } from '@hip/protocol'
 
@@ -18,6 +19,15 @@ vi.mock(import('react-i18next'), async (importOriginal) => {
     }),
   } as any
 })
+
+vi.mock('@/ipc/mcpRegistry', () => ({
+  listMcpRegistrySources: vi.fn(async () => []),
+  listMcpRegistryServers: vi.fn(async () => ({ sources: [], entries: [] })),
+  refreshMcpRegistryCatalog: vi.fn(async () => {}),
+  setMcpRegistrySourceEnabled: vi.fn(async () => {}),
+  addMcpRegistrySource: vi.fn(async () => ({})),
+  removeMcpRegistrySource: vi.fn(async () => {}),
+}))
 
 type McpMenuProps = {
   kind: string
@@ -160,6 +170,17 @@ describe('McpConfig', () => {
       error: null,
     })
     usePluginsStore.setState({ plugins: [], loaded: true })
+    useMcpRegistryStore.setState({
+      sources: [],
+      entries: [],
+      loaded: true,
+      loading: false,
+      refreshing: false,
+      adding: false,
+      error: null,
+      tab: 'custom',
+      query: '',
+    })
   })
 
   afterEach(() => {

@@ -218,12 +218,10 @@ export function PluginConfigView({
   return (
     <div className="flex min-h-0 flex-col" data-testid="plugin-market">
       <div className="shrink-0 border-b border-border px-6 py-4">
-        <div className="flex flex-wrap items-start justify-between gap-3">
-          <div className="min-w-0">
-            <h2 className="text-title font-semibold text-ink">{t('settings.plugins.title')}</h2>
-            <p className="mt-1 text-body text-ink-secondary">{t('settings.plugins.intro')}</p>
-          </div>
-          <div className="flex shrink-0 flex-wrap gap-2">
+        <div className="min-w-0">
+          <h2 className="text-title font-semibold text-ink">{t('settings.plugins.title')}</h2>
+          <p className="mt-1 text-body text-ink-secondary">{t('settings.plugins.intro')}</p>
+          <div className="mt-3 flex flex-wrap gap-2">
             <Button
               variant="outline"
               size="sm"

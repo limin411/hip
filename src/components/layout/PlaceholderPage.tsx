@@ -8,11 +8,13 @@ export type PlaceholderI18nKey =
   | 'sidebar.nav.terminals'
   | 'sidebar.nav.tasks'
   | 'sidebar.nav.automation'
+  | 'nav.notifications'
   | 'placeholder.comingSoon'
   | 'placeholder.workbench'
   | 'placeholder.terminals'
   | 'placeholder.tasks'
   | 'placeholder.automation'
+  | 'placeholder.notifications'
 
 /**
  * Shared shell for features that are not implemented yet.

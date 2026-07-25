@@ -1634,6 +1634,7 @@ export const ko = {
     "code": "코딩",
     "trash": "휴지통",
     "history": "기록",
+    "notifications": "알림 센터",
     "automation": "자동화",
     "settings": "설정"
   },
@@ -1642,7 +1643,8 @@ export const ko = {
     "workbench": "워크벤치가 곧 출시됩니다 — 개요와 바로가기 입구로 사용됩니다.",
     "terminals": "터미널 관리가 곧 출시됩니다 — 여러 터미널 세션을 한 곳에서 관리하세요.",
     "tasks": "작업 항목 추적이 곧 출시됩니다 — 작업 항목을 추적하세요.",
-    "automation": "자동화가 곧 출시됩니다 — 워크플로우와 예약 작업을 구성하세요."
+    "automation": "자동화가 곧 출시됩니다 — 워크플로우와 예약 작업을 구성하세요.",
+    "notifications": "알림 센터가 곧 출시됩니다 — 작업 완료 알림과 시스템 메시지를 모아서 확인하세요."
   },
   "terminals": {
     "title": "터미널 관리",

@@ -1691,6 +1691,7 @@ export const en = {
       code: 'Coding',
       trash: 'Recycle bin',
       history: 'History',
+      notifications: 'Notifications',
       automation: 'Automation',
       settings: 'Settings',
     },
@@ -1700,6 +1701,7 @@ export const en = {
       terminals: 'Terminal management is coming soon — manage multiple terminal sessions in one place.',
       tasks: 'Work item tracking is coming soon — follow up on work items.',
       automation: 'Automation is coming soon — configure workflows and scheduled jobs.',
+      notifications: 'Notification center is coming soon — agent completions, system alerts, and more.',
     },
     terminals: {
       title: 'Terminal management',

@@ -1649,6 +1649,7 @@ export const zhCN = {
       code: '编码',
       trash: '回收站',
       history: '历史会话',
+      notifications: '通知中心',
       automation: '自动化',
       settings: '设置',
     },
@@ -1658,6 +1659,7 @@ export const zhCN = {
       terminals: '终端管理即将上线，用于集中管理多路终端会话。',
       tasks: '事项追踪即将上线，用于跟进事项。',
       automation: '自动化即将上线，用于配置工作流与定时任务。',
+      notifications: '通知中心即将上线，用于汇总任务完成提醒与系统消息。',
     },
     terminals: {
       title: '终端管理',

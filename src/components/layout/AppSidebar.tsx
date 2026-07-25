@@ -67,6 +67,7 @@ import {
   enterWorkItemsSection,
   newConversationFromSidebar,
   openHistoryFromChrome,
+  openNotificationsFromChrome,
   openSettingsFromChrome,
   openSpaceFromSidebar,
   openTrashFromChrome,
@@ -688,14 +689,17 @@ export function AppSidebar() {
         active={
           activeView === 'settings'
             ? 'settings'
-            : activeView === 'history'
-              ? 'history'
-              : activeView === 'trash'
-                ? 'trash'
-                : null
+            : activeView === 'notifications'
+              ? 'notifications'
+              : activeView === 'history'
+                ? 'history'
+                : activeView === 'trash'
+                  ? 'trash'
+                  : null
         }
         onOpenTrash={() => void openTrashFromChrome()}
         onOpenHistory={() => void openHistoryFromChrome()}
+        onOpenNotifications={() => void openNotificationsFromChrome()}
         onOpenSettings={() => void openSettingsFromChrome()}
       />
     </aside>

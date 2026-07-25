@@ -234,6 +234,19 @@ export async function openHistoryFromChrome(): Promise<void> {
   recordNavEntry()
 }
 
+export async function openNotificationsFromChrome(): Promise<void> {
+  const view = useUiStore.getState().activeView
+  if (view === 'knowledge') {
+    await leaveKnowledge()
+    assignSectionAfterLeavingKnowledge()
+  } else if (view === 'tasks') {
+    await leaveWorkItems()
+    assignSectionAfterLeavingTasks()
+  }
+  useUiStore.getState().setActiveView('notifications')
+  recordNavEntry()
+}
+
 export async function openTrashFromChrome(): Promise<void> {
   const view = useUiStore.getState().activeView
   if (view === 'knowledge') {

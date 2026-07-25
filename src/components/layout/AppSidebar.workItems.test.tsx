@@ -25,6 +25,7 @@ vi.mock('./sidebarActions', () => ({
   enterTerminalsSection: vi.fn(async () => {}),
   enterWorkItemsSection: () => enterWorkItemsSection(),
   openHistoryFromChrome: vi.fn(),
+  openNotificationsFromChrome: vi.fn(),
   openSettingsFromChrome: vi.fn(),
   openAutomationFromChrome: vi.fn(),
   openTrashFromChrome: vi.fn(),

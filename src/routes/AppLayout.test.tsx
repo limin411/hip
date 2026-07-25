@@ -81,6 +81,13 @@ describe('AppLayout', () => {
     expect(screen.getByTestId('main-toolbar')).toBeInTheDocument()
   })
 
+  it('renders notifications placeholder', () => {
+    useUiStore.setState({ activeView: 'notifications' })
+    render(<AppLayout />, { wrapper: MemoryRouter })
+    expect(screen.getByTestId('placeholder-notifications')).toBeInTheDocument()
+    expect(screen.getByTestId('main-toolbar')).toBeInTheDocument()
+  })
+
   it('renders workbench placeholder as default home view', () => {
     useUiStore.setState({ activeView: 'workbench', sidebarSection: 'workbench' })
     render(<AppLayout />, { wrapper: MemoryRouter })

@@ -12,107 +12,84 @@ afterEach(() => cleanup())
 
 const noop = () => {}
 
+const footerProps = {
+  onOpenTrash: noop,
+  onOpenHistory: noop,
+  onOpenNotifications: noop,
+  onOpenSettings: noop,
+}
+
 describe('SidebarAccountFooter', () => {
-  it('renders trash above history above settings', () => {
-    render(
-      <SidebarAccountFooter
-        onOpenTrash={noop}
-        onOpenHistory={noop}
-        onOpenSettings={noop}
-      />,
-    )
+  it('renders trash → history → notifications → settings', () => {
+    render(<SidebarAccountFooter {...footerProps} />)
     const trash = screen.getByTestId('account-trash-button')
     const history = screen.getByTestId('account-history-button')
+    const notifications = screen.getByTestId('account-notifications-button')
     const settings = screen.getByTestId('account-settings-button')
     expect(trash.compareDocumentPosition(history) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
-    expect(history.compareDocumentPosition(settings) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    expect(
+      history.compareDocumentPosition(notifications) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy()
+    expect(
+      notifications.compareDocumentPosition(settings) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy()
     expect(screen.queryByTestId('account-automation-button')).not.toBeInTheDocument()
     expect(screen.getByText('nav.trash')).toBeInTheDocument()
     expect(screen.getByText('nav.history')).toBeInTheDocument()
+    expect(screen.getByText('nav.notifications')).toBeInTheDocument()
     expect(screen.getByText('nav.settings')).toBeInTheDocument()
   })
 
   it('calls onOpenTrash on click', () => {
     const onOpenTrash = vi.fn()
-    render(
-      <SidebarAccountFooter
-        onOpenTrash={onOpenTrash}
-        onOpenHistory={noop}
-        onOpenSettings={noop}
-      />,
-    )
+    render(<SidebarAccountFooter {...footerProps} onOpenTrash={onOpenTrash} />)
     fireEvent.click(screen.getByTestId('account-trash-button'))
     expect(onOpenTrash).toHaveBeenCalledTimes(1)
   })
 
   it('calls onOpenHistory on click', () => {
     const onOpenHistory = vi.fn()
-    render(
-      <SidebarAccountFooter
-        onOpenTrash={noop}
-        onOpenHistory={onOpenHistory}
-        onOpenSettings={noop}
-      />,
-    )
+    render(<SidebarAccountFooter {...footerProps} onOpenHistory={onOpenHistory} />)
     fireEvent.click(screen.getByTestId('account-history-button'))
     expect(onOpenHistory).toHaveBeenCalledTimes(1)
   })
 
+  it('calls onOpenNotifications on click', () => {
+    const onOpenNotifications = vi.fn()
+    render(
+      <SidebarAccountFooter {...footerProps} onOpenNotifications={onOpenNotifications} />,
+    )
+    fireEvent.click(screen.getByTestId('account-notifications-button'))
+    expect(onOpenNotifications).toHaveBeenCalledTimes(1)
+  })
+
   it('calls onOpenSettings on click', () => {
     const onOpenSettings = vi.fn()
-    render(
-      <SidebarAccountFooter
-        onOpenTrash={noop}
-        onOpenHistory={noop}
-        onOpenSettings={onOpenSettings}
-      />,
-    )
+    render(<SidebarAccountFooter {...footerProps} onOpenSettings={onOpenSettings} />)
     fireEvent.click(screen.getByTestId('account-settings-button'))
     expect(onOpenSettings).toHaveBeenCalledTimes(1)
   })
 
   it('marks active destination', () => {
-    const { rerender } = render(
-      <SidebarAccountFooter
-        onOpenTrash={noop}
-        onOpenHistory={noop}
-        onOpenSettings={noop}
-        active="trash"
-      />,
-    )
+    const { rerender } = render(<SidebarAccountFooter {...footerProps} active="trash" />)
     expect(screen.getByTestId('account-trash-button')).toHaveAttribute('aria-current', 'page')
     expect(screen.getByTestId('account-history-button')).not.toHaveAttribute('aria-current')
 
-    rerender(
-      <SidebarAccountFooter
-        onOpenTrash={noop}
-        onOpenHistory={noop}
-        onOpenSettings={noop}
-        active="history"
-      />,
-    )
+    rerender(<SidebarAccountFooter {...footerProps} active="history" />)
     expect(screen.getByTestId('account-history-button')).toHaveAttribute('aria-current', 'page')
 
-    rerender(
-      <SidebarAccountFooter
-        onOpenTrash={noop}
-        onOpenHistory={noop}
-        onOpenSettings={noop}
-        active="settings"
-      />,
+    rerender(<SidebarAccountFooter {...footerProps} active="notifications" />)
+    expect(screen.getByTestId('account-notifications-button')).toHaveAttribute(
+      'aria-current',
+      'page',
     )
+
+    rerender(<SidebarAccountFooter {...footerProps} active="settings" />)
     expect(screen.getByTestId('account-settings-button')).toHaveAttribute('aria-current', 'page')
   })
 
   it('active footer uses sage rail without hairline ring', () => {
-    render(
-      <SidebarAccountFooter
-        onOpenTrash={noop}
-        onOpenHistory={noop}
-        onOpenSettings={noop}
-        active="settings"
-      />,
-    )
+    render(<SidebarAccountFooter {...footerProps} active="settings" />)
     const settings = screen.getByTestId('account-settings-button')
     expect(settings).toHaveClass('before:bg-accent')
     expect(settings).toHaveClass('bg-state-hover')

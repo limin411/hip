@@ -1,5 +1,5 @@
 import { useTranslation } from 'react-i18next'
-import { History, Settings, Trash2 } from 'lucide-react'
+import { Bell, History, Settings, Trash2 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { SIDEBAR_ACTIVE_RAIL } from './sidebarActiveRail'
 import { formatTrashBadge, trashBadgeTotal, useTrashBadgeStore } from '@/store/trashBadgeStore'
@@ -7,18 +7,20 @@ import { formatTrashBadge, trashBadgeTotal, useTrashBadgeStore } from '@/store/t
 interface SidebarAccountFooterProps {
   onOpenTrash: () => void
   onOpenHistory: () => void
+  onOpenNotifications: () => void
   onOpenSettings: () => void
   /** Which footer destination is currently active. */
-  active?: 'trash' | 'history' | 'settings' | null
+  active?: 'trash' | 'history' | 'notifications' | 'settings' | null
 }
 
 /**
- * Sidebar footer: Recycle Bin + History + Settings (icon + label).
- * Order: trash → history → settings.
+ * Sidebar footer: Recycle Bin + History + Notifications + Settings (icon + label).
+ * Order: trash → history → notifications → settings.
  */
 export function SidebarAccountFooter({
   onOpenTrash,
   onOpenHistory,
+  onOpenNotifications,
   onOpenSettings,
   active = null,
 }: SidebarAccountFooterProps) {
@@ -49,6 +51,13 @@ export function SidebarAccountFooter({
         label={t('nav.history')}
         icon={History}
         onClick={onOpenHistory}
+      />
+      <FooterNavButton
+        testId="account-notifications-button"
+        active={active === 'notifications'}
+        label={t('nav.notifications')}
+        icon={Bell}
+        onClick={onOpenNotifications}
       />
       <FooterNavButton
         testId="account-settings-button"

@@ -1790,8 +1790,8 @@ export const en = {
       emptyTitle: 'No work items yet',
       emptyHint: 'Create a work item to track todos and follow-ups.',
       emptyFilterTitle: 'No items in this filter',
-      emptyFilterHint: 'Try another filter, or view open items.',
-      viewOpen: 'View open',
+      emptyFilterHint: 'Try another filter, or view to-do items.',
+      viewTodo: 'View to-do',
       detailEmpty: 'Select a work item',
       detailEmptyHint: 'Choose an item from the list, or create a new one.',
       backToList: 'Back to list',
@@ -1799,12 +1799,10 @@ export const en = {
       loading: 'Loading…',
       filtersAria: 'Smart filters',
       filters: {
-        open: 'Open',
-        today: 'Due today',
-        overdue: 'Overdue',
+        all: 'All',
+        todo: 'To do',
         in_progress: 'In progress',
         done: 'Done',
-        cancelled: 'Cancelled',
         archived: 'Archived',
       },
       status: {
@@ -1842,7 +1840,7 @@ export const en = {
       },
       help: {
         cancelVsArchive:
-          'Cancel means you decided not to do it (find it under Cancelled). Archive hides it from everyday lists (find it under Archived).',
+          'Cancel means you decided not to do it (find it under All). Archive hides it from everyday lists (find it under Archived).',
       },
       deleteConfirm: 'Delete this work item permanently? This cannot be undone.',
       listsSection: 'Lists',

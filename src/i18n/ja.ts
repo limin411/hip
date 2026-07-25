@@ -1734,20 +1734,18 @@ export const ja = {
     "emptyTitle": "ワークアイテムはまだありません",
     "emptyHint": "やることやフォローアップを追跡するアイテムを作成します。",
     "emptyFilterTitle": "このフィルターに該当する項目がありません",
-    "emptyFilterHint": "別のフィルターを試すか、未完了を表示してください。",
-    "viewOpen": "未完了を表示",
+    "emptyFilterHint": "別のフィルターを試すか、未着手を表示してください。",
+    "viewTodo": "未着手を表示",
     "detailEmpty": "ワークアイテムを選択",
     "detailEmptyHint": "リストから選ぶか、新規作成してください。",
     "backToList": "リストに戻る",
     "listFilter": "リスト",
     "loading": "読み込み中…",
     "filters": {
-      "open": "未完了",
-      "today": "今日期限",
-      "overdue": "期限超過",
+      "all": "すべて",
+      "todo": "未着手",
       "in_progress": "進行中",
       "done": "完了",
-      "cancelled": "キャンセル済み",
       "archived": "アーカイブ"
     },
     "status": {
@@ -1784,7 +1782,7 @@ export const ja = {
       "delete": "削除"
     },
     "help": {
-      "cancelVsArchive": "キャンセルは「やらない」決定です（「キャンセル済み」で確認）。アーカイブは日常リストから隠します（「アーカイブ」で確認）。"
+      "cancelVsArchive": "キャンセルは「やらない」決定です（「すべて」で確認）。アーカイブは日常リストから隠します（「アーカイブ」で確認）。"
     },
     "deleteConfirm": "このワークアイテムを完全に削除しますか？元に戻せません。",
     "listsSection": "リスト",

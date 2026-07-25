@@ -150,9 +150,9 @@ export async function openWorkItemsFromMenu(opts?: { resetFilter?: boolean }): P
   await browser.execute((el: HTMLElement) => el.click(), nav)
   await (await browser.$('[data-testid="work-items-page"]')).waitForExist({ timeout: 20000 })
   await (await browser.$('[data-testid="sidebar-work-items"]')).waitForExist({ timeout: 15000 })
-  // Shared Tauri process may leave filterId on a deleted list:* from prior specs.
+  // Shared Tauri process may leave filterId on a stale filter from prior specs.
   if (opts?.resetFilter !== false) {
-    await clickSmartFilter('open')
+    await clickSmartFilter('todo')
   }
 }
 
@@ -179,18 +179,9 @@ export async function createWorkItemFromSidebar(): Promise<void> {
   })
 }
 
-/** Create item via list-pane footer button (catalog non-empty). */
+/** Create item (sidebar CTA; list-pane footer removed as redundant). */
 export async function createWorkItemFromListPane(): Promise<void> {
-  const emptyCta = await browser.$('[data-testid="work-item-empty-catalog"]')
-  if (await emptyCta.isExisting()) {
-    // EmptyState action has no stable testid — use sidebar CTA
-    await createWorkItemFromSidebar()
-    return
-  }
-  await clickTestId('work-item-new-in-list')
-  await (await browser.$('[data-testid="work-item-title-input"]')).waitForExist({
-    timeout: 15000,
-  })
+  await createWorkItemFromSidebar()
 }
 
 /** Set title on the open detail pane; wait for React state before optional blur. */
@@ -261,10 +252,6 @@ export async function setWorkItemPriority(priority: string): Promise<void> {
 
 export async function setWorkItemDueOn(ymd: string | null): Promise<void> {
   await setReactInputValue('work-item-due-input', ymd ?? '')
-}
-
-export async function setWorkItemList(listId: string): Promise<void> {
-  await setReactSelectValue('work-item-list-select', listId)
 }
 
 export async function addWorkItemTag(tag: string): Promise<void> {
@@ -386,101 +373,10 @@ export async function toggleCompleteByTitle(title: string): Promise<void> {
 }
 
 export async function clickSmartFilter(
-  filterId:
-    | 'open'
-    | 'today'
-    | 'overdue'
-    | 'in_progress'
-    | 'done'
-    | 'cancelled'
-    | 'archived',
+  filterId: 'all' | 'todo' | 'in_progress' | 'done' | 'archived',
 ): Promise<void> {
   await clickTestId(`sidebar-work-item-filter-${filterId}`)
   await browser.pause(80)
-}
-
-export async function clickListFilter(listId: string): Promise<void> {
-  await clickTestId(`sidebar-work-item-list-${listId}`)
-  await browser.pause(80)
-}
-
-/** Create a user list via sidebar modal. */
-export async function createUserList(name: string): Promise<string> {
-  await clickTestId('sidebar-new-work-item-list')
-  await (await browser.$('[data-testid="work-item-list-name-input"]')).waitForExist({
-    timeout: 10000,
-  })
-  await setReactInputValue('work-item-list-name-input', name)
-  const confirm = await browser.$('[data-testid="work-item-list-create-confirm"]')
-  await browser.waitUntil(
-    async () => {
-      const disabled = await confirm.getAttribute('disabled')
-      return disabled === null || disabled === 'false'
-    },
-    { timeout: 5000, interval: 100, timeoutMsg: 'list create confirm stayed disabled' },
-  )
-  await browser.execute((node: HTMLElement) => node.click(), confirm)
-
-  let listId = ''
-  await browser.waitUntil(
-    async () => {
-      listId = await browser.execute((n: string) => {
-        const buttons = document.querySelectorAll('[data-testid^="sidebar-work-item-list-"]')
-        for (const b of buttons) {
-          if ((b.textContent ?? '').includes(n)) {
-            return b.getAttribute('data-testid')?.replace('sidebar-work-item-list-', '') ?? ''
-          }
-        }
-        return ''
-      }, name)
-      return Boolean(listId)
-    },
-    { timeout: 10000, interval: 150, timeoutMsg: 'user list not created in sidebar' },
-  )
-  return listId
-}
-
-export async function renameUserList(listId: string, newName: string): Promise<void> {
-  const btn = await browser.$(`[data-testid="sidebar-work-item-list-${listId}"]`)
-  await btn.waitForExist({ timeout: 10000 })
-  await browser.execute((el: HTMLElement) => {
-    el.dispatchEvent(new MouseEvent('dblclick', { bubbles: true, cancelable: true }))
-  }, btn)
-  await (await browser.$('[data-testid="work-item-list-name-input"]')).waitForExist({
-    timeout: 10000,
-  })
-  await setReactInputValue('work-item-list-name-input', newName)
-  await clickTestId('work-item-list-rename-confirm')
-  await browser.waitUntil(
-    async () => {
-      const text = await btn.getText()
-      return text.includes(newName)
-    },
-    { timeout: 10000, interval: 150, timeoutMsg: `list ${listId} not renamed to ${newName}` },
-  )
-}
-
-export async function deleteUserList(listId: string, confirm = true): Promise<void> {
-  const btn = await browser.$(`[data-testid="sidebar-work-item-list-${listId}"]`)
-  await btn.waitForExist({ timeout: 10000 })
-  await browser.execute((el: HTMLElement) => {
-    el.dispatchEvent(
-      new MouseEvent('contextmenu', {
-        bubbles: true,
-        cancelable: true,
-        button: 2,
-      }),
-    )
-  }, btn)
-  await (await browser.$('[data-testid="work-item-list-delete-confirm"]')).waitForExist({
-    timeout: 10000,
-  })
-  if (confirm) {
-    await clickTestId('work-item-list-delete-confirm')
-  } else {
-    await clickTestId('work-item-list-delete-cancel')
-  }
-  await browser.pause(150)
 }
 
 export async function setSearchQuery(q: string): Promise<void> {
@@ -494,10 +390,6 @@ export async function archiveSelected(): Promise<void> {
 
 export async function unarchiveSelected(): Promise<void> {
   await clickTestId('work-item-unarchive')
-}
-
-export async function cancelSelected(): Promise<void> {
-  await clickTestId('work-item-cancel')
 }
 
 export async function deleteSelected(confirm = true): Promise<void> {

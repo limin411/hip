@@ -71,7 +71,7 @@ describe('work items nav / finalize / keyboard @work-items @core', () => {
 
   it('WN2: empty title + no extras discarded on deselect / leave', async () => {
     await openWorkItemsFromMenu()
-    await clickSmartFilter('open')
+    await clickSmartFilter('todo')
     await createWorkItemFromSidebar()
     // Do not set title — leave empty
     const shellId = await getSelectedWorkItemId()
@@ -94,7 +94,7 @@ describe('work items nav / finalize / keyboard @work-items @core', () => {
 
   it('WN3: empty title + notes → Untitled on finalize', async () => {
     await openWorkItemsFromMenu()
-    await clickSmartFilter('open')
+    await clickSmartFilter('todo')
     await createWorkItemFromSidebar()
     // Commit notes first (blur notes) while title stays empty.
     await setWorkItemNotes(notesOnlyMarker, { blur: true })
@@ -118,14 +118,14 @@ describe('work items nav / finalize / keyboard @work-items @core', () => {
       15000,
       'Untitled+notes not on disk',
     )
-    await clickSmartFilter('open')
+    await clickSmartFilter('todo')
     await selectWorkItemByTitle('Untitled')
     await deleteSelected(true)
   })
 
   it('WN4: keyboard N creates item; Space toggles complete', async () => {
     await openWorkItemsFromMenu()
-    await clickSmartFilter('open')
+    await clickSmartFilter('todo')
     await createWorkItemFromSidebar()
     await setWorkItemTitle(keepTitle)
     await waitForCatalogTitle(keepTitle)
@@ -144,7 +144,7 @@ describe('work items nav / finalize / keyboard @work-items @core', () => {
     await selectWorkItemByTitle(keepTitle)
     await blurActiveElement()
     await browser.keys(' ')
-    await clickSmartFilter('open')
+    await clickSmartFilter('todo')
     await waitForListTitleGone(keepTitle)
     await clickSmartFilter('done')
     await waitForListTitle(keepTitle)
@@ -152,7 +152,7 @@ describe('work items nav / finalize / keyboard @work-items @core', () => {
     // cleanup both
     await selectWorkItemByTitle(keepTitle)
     await deleteSelected(true)
-    await clickSmartFilter('open')
+    await clickSmartFilter('todo')
     if (await listContainsTitle(kbdTitle)) {
       await selectWorkItemByTitle(kbdTitle)
       await deleteSelected(true)
@@ -161,14 +161,14 @@ describe('work items nav / finalize / keyboard @work-items @core', () => {
 
   it('WN5: leave via chats then re-enter preserves catalog', async () => {
     await openWorkItemsFromMenu()
-    await clickSmartFilter('open')
+    await clickSmartFilter('todo')
     const marker = `e2e-wi-reenter-${stamp}`
     await createWorkItemFromSidebar()
     await setWorkItemTitle(marker)
     await waitForCatalogTitle(marker)
     await leaveWorkItemsToChats()
     await openWorkItemsFromMenu()
-    await clickSmartFilter('open')
+    await clickSmartFilter('todo')
     await waitForListTitle(marker, 15000)
     await selectWorkItemByTitle(marker)
     await deleteSelected(true)

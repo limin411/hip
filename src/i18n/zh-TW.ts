@@ -1742,24 +1742,22 @@ export const zhTW = {
     "emptyTitle": "尚無事項",
     "emptyHint": "建立事項以追蹤待辦與後續。",
     "emptyFilterTitle": "此篩選下無事項",
-    "emptyFilterHint": "試試其他篩選，或檢視未完成事項。",
-    "viewOpen": "檢視未完成",
+    "emptyFilterHint": "試試其他篩選，或檢視待處理事項。",
+    "viewTodo": "檢視待處理",
     "detailEmpty": "選擇一條事項",
     "detailEmptyHint": "從列表中選擇，或新增一條。",
     "backToList": "返回列表",
     "listFilter": "清單",
     "loading": "載入中…",
     "filters": {
-      "open": "全部未完成",
-      "today": "今日到期",
-      "overdue": "已逾期",
+      "all": "全部",
+      "todo": "待處理",
       "in_progress": "進行中",
       "done": "已完成",
-      "cancelled": "已取消",
       "archived": "已封存"
     },
     "status": {
-      "todo": "待辦",
+      "todo": "待處理",
       "in_progress": "進行中",
       "done": "已完成",
       "cancelled": "已取消"
@@ -1792,7 +1790,7 @@ export const zhTW = {
       "delete": "刪除"
     },
     "help": {
-      "cancelVsArchive": "取消表示決定不做了（可在「已取消」中找回）。封存會從日常列表隱藏（可在「已封存」中找回）。"
+      "cancelVsArchive": "取消表示決定不做了（可在「全部」中找回）。封存會從日常列表隱藏（可在「已封存」中找回）。"
     },
     "deleteConfirm": "永久刪除此事項？此操作無法復原。",
     "listsSection": "清單",

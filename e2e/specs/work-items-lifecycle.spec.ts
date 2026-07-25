@@ -23,7 +23,6 @@ import {
   selectWorkItemByTitle,
   toggleCompleteByTitle,
   clickSmartFilter,
-  cancelSelected,
   archiveSelected,
   unarchiveSelected,
   deleteSelected,
@@ -48,8 +47,8 @@ describe('work items lifecycle @work-items @core', () => {
     await openWorkItemsFromMenu()
   })
 
-  it('WL1: create item from sidebar, set title, appears in open list', async () => {
-    await clickSmartFilter('open')
+  it('WL1: create item from sidebar, set title, appears in todo list', async () => {
+    await clickSmartFilter('todo')
     await createWorkItemFromSidebar()
     await setWorkItemTitle(titleA)
     // Disk first (save chain), then list UI
@@ -92,8 +91,8 @@ describe('work items lifecycle @work-items @core', () => {
     expect(item.status).toBe('in_progress')
   })
 
-  it('WL4: complete via checkbox → open empty for item; done filter shows it', async () => {
-    await clickSmartFilter('open')
+  it('WL4: complete via checkbox → gone from in_progress; done filter shows it', async () => {
+    await clickSmartFilter('in_progress')
     await waitForListTitle(titleA)
     await toggleCompleteByTitle(titleA)
     await waitForListTitleGone(titleA)
@@ -106,31 +105,24 @@ describe('work items lifecycle @work-items @core', () => {
     )
   })
 
-  it('WL5: reopen then cancel → cancelled smart filter', async () => {
+  it('WL5: reopen from done → todo filter shows it', async () => {
     await clickSmartFilter('done')
     await selectWorkItemByTitle(titleA)
-    // Reopen via status select (checkbox also works)
     await setWorkItemStatus('todo')
-    await clickSmartFilter('open')
-    await waitForListTitle(titleA)
-    await selectWorkItemByTitle(titleA)
-    await cancelSelected()
-    await clickSmartFilter('open')
-    await waitForListTitleGone(titleA)
-    await clickSmartFilter('cancelled')
+    await clickSmartFilter('todo')
     await waitForListTitle(titleA)
     await waitForCatalogItemMatch(
-      (i) => i.title === titleA && i.status === 'cancelled',
+      (i) => i.title === titleA && i.status === 'todo',
       15000,
-      'cancelled not on disk',
+      'reopen not on disk',
     )
   })
 
-  it('WL6: archive hides from cancelled; unarchive restores; hard delete removes', async () => {
-    await clickSmartFilter('cancelled')
+  it('WL6: archive hides from all; unarchive restores; hard delete removes', async () => {
+    await clickSmartFilter('todo')
     await selectWorkItemByTitle(titleA)
     await archiveSelected()
-    await clickSmartFilter('cancelled')
+    await clickSmartFilter('all')
     await waitForListTitleGone(titleA)
     await clickSmartFilter('archived')
     await waitForListTitle(titleA)
@@ -138,7 +130,7 @@ describe('work items lifecycle @work-items @core', () => {
     await unarchiveSelected()
     await clickSmartFilter('archived')
     await waitForListTitleGone(titleA)
-    await clickSmartFilter('cancelled')
+    await clickSmartFilter('todo')
     await waitForListTitle(titleA)
 
     await selectWorkItemByTitle(titleA)
@@ -148,7 +140,7 @@ describe('work items lifecycle @work-items @core', () => {
   })
 
   it('WL7: leave surface flushes second item notes; reopen still shows', async () => {
-    await clickSmartFilter('open')
+    await clickSmartFilter('todo')
     await createWorkItemFromSidebar()
     await setWorkItemTitle(titleB)
     await waitForCatalogTitle(titleB)
@@ -156,7 +148,7 @@ describe('work items lifecycle @work-items @core', () => {
     // Leave without blur notes — leaveWorkItems should commit draft
     await leaveWorkItemsToChats()
     await openWorkItemsFromMenu()
-    await clickSmartFilter('open')
+    await clickSmartFilter('todo')
     await waitForListTitle(titleB, 15000)
     await selectWorkItemByTitle(titleB)
     await waitForCatalogItemMatch(

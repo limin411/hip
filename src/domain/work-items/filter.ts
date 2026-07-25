@@ -1,18 +1,14 @@
-import type { WorkItem, WorkItemStatus } from './types'
+import type { WorkItem } from './types'
 
 export type SmartFilterId =
-  | 'open'
-  | 'today'
-  | 'overdue'
+  | 'all'
+  | 'todo'
   | 'in_progress'
   | 'done'
-  | 'cancelled'
   | 'archived'
 
-/** Smart filter ids or `list:${listId}`. */
+/** Smart filter ids or legacy `list:${listId}` (list UI removed; still matches catalog). */
 export type WorkItemFilterId = SmartFilterId | `list:${string}`
-
-const OPEN_STATUSES: ReadonlySet<WorkItemStatus> = new Set(['todo', 'in_progress'])
 
 /** Local calendar day as `YYYY-MM-DD` (system local TZ). */
 export function localTodayYmd(d: Date = new Date()): string {
@@ -22,18 +18,14 @@ export function localTodayYmd(d: Date = new Date()): string {
   return `${y}-${m}-${day}`
 }
 
-function isOpen(item: WorkItem): boolean {
-  return item.archivedAt == null && OPEN_STATUSES.has(item.status)
-}
-
 /**
  * Predicate for a single filterId (no search).
- * `todayYmd` is only required for `today` / `overdue`; omitted → `localTodayYmd()`.
+ * `todayYmd` is unused by current smart filters; kept for call-site compatibility.
  */
 export function matchesFilter(
   item: WorkItem,
   filterId: string,
-  todayYmd?: string,
+  _todayYmd?: string,
 ): boolean {
   if (filterId.startsWith('list:')) {
     const listId = filterId.slice('list:'.length)
@@ -41,23 +33,16 @@ export function matchesFilter(
   }
 
   switch (filterId as SmartFilterId) {
-    case 'open':
-      return isOpen(item)
-    case 'today': {
-      const day = todayYmd ?? localTodayYmd()
-      return isOpen(item) && item.dueOn === day
-    }
-    case 'overdue': {
-      const day = todayYmd ?? localTodayYmd()
-      return isOpen(item) && item.dueOn != null && item.dueOn < day
-    }
+    case 'all':
+      // All non-archived items (any status). Use `archived` for archived.
+      return item.archivedAt == null
+    case 'todo':
+      return item.archivedAt == null && item.status === 'todo'
     case 'in_progress':
-      return isOpen(item) && item.status === 'in_progress'
+      return item.archivedAt == null && item.status === 'in_progress'
     case 'done':
-      // done only — NOT cancelled (K17)
+      // done only — NOT cancelled
       return item.archivedAt == null && item.status === 'done'
-    case 'cancelled':
-      return item.archivedAt == null && item.status === 'cancelled'
     case 'archived':
       return item.archivedAt != null
     default:

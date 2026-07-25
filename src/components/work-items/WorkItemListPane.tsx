@@ -10,7 +10,6 @@ import {
 import { useWorkItemStore } from '@/store/workItemStore'
 import { EmptyState } from '@/components/ui/EmptyState'
 import { Input } from '@/components/ui/Input'
-import { Button } from '@/components/ui/Button'
 import { WorkItemRow, workItemOptionId } from './WorkItemRow'
 
 export interface WorkItemListPaneProps {
@@ -22,16 +21,14 @@ export interface WorkItemListPaneProps {
 function filterLabelKey(filterId: string): string {
   if (filterId.startsWith('list:')) return 'workItems.listFilter'
   switch (filterId) {
-    case 'open':
-    case 'today':
-    case 'overdue':
+    case 'all':
+    case 'todo':
     case 'in_progress':
     case 'done':
-    case 'cancelled':
     case 'archived':
       return `workItems.filters.${filterId}`
     default:
-      return 'workItems.filters.open'
+      return 'workItems.filters.todo'
   }
 }
 
@@ -65,7 +62,7 @@ export function WorkItemListPane({
 
   const chipLabel = filterId.startsWith('list:')
     ? t('workItems.listFilter')
-    : t(filterLabelKey(filterId) as 'workItems.filters.open')
+    : t(filterLabelKey(filterId) as 'workItems.filters.todo')
 
   const handleCreate = async () => {
     await createItem()
@@ -131,8 +128,8 @@ export function WorkItemListPane({
             title={t('workItems.emptyFilterTitle')}
             description={t('workItems.emptyFilterHint')}
             action={{
-              label: t('workItems.viewOpen'),
-              onClick: () => setFilter('open'),
+              label: t('workItems.viewTodo'),
+              onClick: () => setFilter('todo'),
             }}
             className="py-10"
             data-testid="work-item-empty-filter"
@@ -157,21 +154,6 @@ export function WorkItemListPane({
           </div>
         )}
       </div>
-
-      {!catalogEmpty ? (
-        <div className="shrink-0 border-t border-border px-3 py-2">
-          <Button
-            type="button"
-            variant="ghost"
-            size="sm"
-            className="w-full justify-start"
-            data-testid="work-item-new-in-list"
-            onClick={() => void handleCreate()}
-          >
-            {t('workItems.newItem')}
-          </Button>
-        </div>
-      ) : null}
     </div>
   )
 }

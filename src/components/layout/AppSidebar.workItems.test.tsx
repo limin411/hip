@@ -10,8 +10,6 @@ import { useUiStore } from '@/store/uiStore'
 import { useDomainStore } from '@/domain'
 import { DEFAULT_CONFIG } from '@/domain/sessionStore'
 import { useNavHistoryStore } from '@/store/navHistoryStore'
-import { INBOX_LIST_ID } from '@/domain/work-items'
-
 vi.mock('@/components/work-items/feature', () => ({
   WORK_ITEM_TRACKING: true,
 }))
@@ -62,22 +60,10 @@ vi.mock('@/store/knowledgeStore', () => {
 
 vi.mock('@/store/workItemStore', () => {
   const state = {
-    filterId: 'open',
-    lists: [
-      {
-        id: INBOX_LIST_ID,
-        name: 'Inbox',
-        sortOrder: 0,
-        createdAt: 1,
-        updatedAt: 1,
-        system: 'inbox' as const,
-      },
-    ],
+    filterId: 'todo',
+    lists: [],
     items: [],
     setFilter: vi.fn(),
-    createList: vi.fn(),
-    renameList: vi.fn(),
-    deleteList: vi.fn(),
     createItem: () => createItem(),
   }
   const useWorkItemStore = (sel: (s: typeof state) => unknown) => sel(state)
@@ -126,13 +112,19 @@ describe('AppSidebar with WORK_ITEM_TRACKING true', () => {
     expect(enterPlaceholderSection).not.toHaveBeenCalledWith('tasks')
   })
 
-  it('tasks section shows filters, lists, and new work item button', () => {
+  it('tasks section shows smart filters and new work item button (no lists)', () => {
     useUiStore.setState({ sidebarSection: 'tasks', activeView: 'tasks' })
     render(<AppSidebar />)
     expect(screen.getByTestId('sidebar-work-items')).toBeInTheDocument()
-    expect(screen.getByTestId('sidebar-work-item-filter-open')).toBeInTheDocument()
-    expect(screen.getByTestId('sidebar-work-item-filter-cancelled')).toBeInTheDocument()
-    expect(screen.getByTestId(`sidebar-work-item-list-${INBOX_LIST_ID}`)).toBeInTheDocument()
+    expect(screen.getByTestId('sidebar-work-item-filter-all')).toBeInTheDocument()
+    expect(screen.getByTestId('sidebar-work-item-filter-todo')).toBeInTheDocument()
+    expect(screen.getByTestId('sidebar-work-item-filter-in_progress')).toBeInTheDocument()
+    expect(screen.getByTestId('sidebar-work-item-filter-done')).toBeInTheDocument()
+    expect(screen.getByTestId('sidebar-work-item-filter-archived')).toBeInTheDocument()
+    expect(screen.queryByTestId('sidebar-work-item-filter-open')).not.toBeInTheDocument()
+    expect(screen.queryByTestId('sidebar-work-item-filter-cancelled')).not.toBeInTheDocument()
+    expect(screen.queryByTestId('sidebar-new-work-item-list')).not.toBeInTheDocument()
+    expect(screen.queryByTestId(/^sidebar-work-item-list-/)).not.toBeInTheDocument()
     expect(screen.getByTestId('sidebar-new-work-item')).toBeInTheDocument()
   })
 

@@ -1,10 +1,10 @@
 import { describe, expect, it } from 'vitest'
 import {
-  selectCancelled,
+  selectAllItems,
+  selectArchived,
+  selectDone,
   selectInProgress,
-  selectOpenItems,
-  selectOverdue,
-  selectTodayDue,
+  selectTodoItems,
 } from './selectors'
 import type { WorkItem } from './types'
 
@@ -39,31 +39,33 @@ const items: WorkItem[] = [
 ]
 
 describe('selectors', () => {
-  it('selectOpenItems returns todo + in_progress, sorted', () => {
-    const out = selectOpenItems(items)
-    expect(out.map((i) => i.id)).toEqual([
+  it('selectAllItems returns non-archived of any status', () => {
+    // dueOn first (late, today, ip), then null dueOn by id asc (cancel before done)
+    expect(selectAllItems(items).map((i) => i.id)).toEqual([
       'wi_todo_late',
       'wi_todo_today',
       'wi_ip',
+      'wi_cancel',
+      'wi_done',
     ])
   })
 
-  it('selectTodayDue', () => {
-    expect(selectTodayDue(items, today).map((i) => i.id)).toEqual([
+  it('selectTodoItems returns non-archived todo only', () => {
+    expect(selectTodoItems(items).map((i) => i.id)).toEqual([
+      'wi_todo_late',
       'wi_todo_today',
-      'wi_ip',
     ])
-  })
-
-  it('selectOverdue', () => {
-    expect(selectOverdue(items, today).map((i) => i.id)).toEqual(['wi_todo_late'])
   })
 
   it('selectInProgress', () => {
     expect(selectInProgress(items).map((i) => i.id)).toEqual(['wi_ip'])
   })
 
-  it('selectCancelled excludes archived and done', () => {
-    expect(selectCancelled(items).map((i) => i.id)).toEqual(['wi_cancel'])
+  it('selectDone excludes cancelled and archived', () => {
+    expect(selectDone(items).map((i) => i.id)).toEqual(['wi_done'])
+  })
+
+  it('selectArchived', () => {
+    expect(selectArchived(items).map((i) => i.id)).toEqual(['wi_arch_cancel'])
   })
 })

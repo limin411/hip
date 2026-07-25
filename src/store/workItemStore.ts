@@ -131,7 +131,7 @@ export interface WorkItemStore {
   error: string | null
   lists: WorkItemList[]
   items: WorkItem[]
-  /** Smart filter or `list:${id}`; default `open`. */
+  /** Smart filter or legacy `list:${id}`; default `todo`. */
   filterId: string
   search: string
   selectedId: string | null
@@ -182,7 +182,7 @@ export const useWorkItemStore = create<WorkItemStore>((set, get) => ({
   error: null,
   lists: [],
   items: [],
-  filterId: 'open',
+  filterId: 'todo',
   search: '',
   selectedId: null,
 
@@ -456,7 +456,7 @@ export const useWorkItemStore = create<WorkItemStore>((set, get) => ({
         i.listId === id ? { ...i, listId: INBOX_LIST_ID, updatedAt: now } : i,
       ),
       // If filtering this list, fall back to open.
-      filterId: s.filterId === `list:${id}` ? 'open' : s.filterId,
+      filterId: s.filterId === `list:${id}` ? 'todo' : s.filterId,
       error: null,
     }))
     await get().save()

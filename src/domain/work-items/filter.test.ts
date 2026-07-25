@@ -58,19 +58,20 @@ function ids(filterId: string, search = ''): string[] {
 }
 
 describe('matchesFilter', () => {
-  it('open: non-archived todo + in_progress only', () => {
-    expect(ids('open').sort()).toEqual(['wi_ip', 'wi_todo'].sort())
+  it('all: non-archived items of any status', () => {
+    expect(ids('all').sort()).toEqual(
+      ['wi_todo', 'wi_ip', 'wi_done', 'wi_cancel', 'wi_list_a'].sort(),
+    )
+    expect(ids('all')).not.toContain('wi_arch')
+    expect(ids('all')).not.toContain('wi_overdue_arch')
   })
 
-  it('today: open and dueOn === today', () => {
-    expect(ids('today')).toEqual(['wi_todo'])
+  it('todo: non-archived status todo only', () => {
+    expect(ids('todo')).toEqual(['wi_todo'])
+    expect(ids('todo')).not.toContain('wi_ip')
   })
 
-  it('overdue: open and dueOn < today', () => {
-    expect(ids('overdue')).toEqual(['wi_ip'])
-  })
-
-  it('in_progress: open and status in_progress', () => {
+  it('in_progress: non-archived in_progress only', () => {
     expect(ids('in_progress')).toEqual(['wi_ip'])
   })
 
@@ -78,11 +79,6 @@ describe('matchesFilter', () => {
     expect(ids('done').sort()).toEqual(['wi_done', 'wi_list_a'].sort())
     expect(ids('done')).not.toContain('wi_cancel')
     expect(ids('done')).not.toContain('wi_arch')
-  })
-
-  it('cancelled: non-archived cancelled only (K17)', () => {
-    expect(ids('cancelled')).toEqual(['wi_cancel'])
-    expect(ids('cancelled')).not.toContain('wi_done')
   })
 
   it('archived: any status with archivedAt', () => {
@@ -102,20 +98,10 @@ describe('matchesFilter', () => {
     expect(ids('nope')).toEqual([])
   })
 
-  it('archived open-status items excluded from open/today/overdue', () => {
-    expect(matchesFilter(samples.find((i) => i.id === 'wi_arch')!, 'open', today)).toBe(
+  it('archived todo excluded from todo filter', () => {
+    expect(matchesFilter(samples.find((i) => i.id === 'wi_arch')!, 'todo', today)).toBe(
       false,
     )
-    expect(
-      matchesFilter(samples.find((i) => i.id === 'wi_arch')!, 'today', today),
-    ).toBe(false)
-    expect(
-      matchesFilter(
-        samples.find((i) => i.id === 'wi_overdue_arch')!,
-        'overdue',
-        today,
-      ),
-    ).toBe(false)
   })
 })
 
@@ -159,7 +145,7 @@ describe('filterItems search AND filter', () => {
       wi({ id: 'wi_2', status: 'todo', title: 'Beta' }),
       wi({ id: 'wi_3', status: 'done', title: 'Alpha done', completedAt: 1 }),
     ]
-    const out = filterItems(items, 'open', today, 'alpha')
+    const out = filterItems(items, 'todo', today, 'alpha')
     expect(out.map((i) => i.id)).toEqual(['wi_1'])
   })
 })
@@ -174,15 +160,15 @@ describe('localTodayYmd', () => {
 describe('done vs cancelled matrix', () => {
   const statuses: WorkItemStatus[] = ['done', 'cancelled']
   for (const status of statuses) {
-    it(`${status} appears only in its own smart filter (not open)`, () => {
+    it(`${status} appears in all; only done has its own smart filter`, () => {
       const item = wi({
         id: `wi_${status}`,
         status,
         completedAt: 1,
       })
-      expect(matchesFilter(item, 'open', today)).toBe(false)
+      expect(matchesFilter(item, 'todo', today)).toBe(false)
+      expect(matchesFilter(item, 'all', today)).toBe(true)
       expect(matchesFilter(item, 'done', today)).toBe(status === 'done')
-      expect(matchesFilter(item, 'cancelled', today)).toBe(status === 'cancelled')
     })
   }
 })

@@ -1734,20 +1734,18 @@ export const ko = {
     "emptyTitle": "작업 항목이 없습니다",
     "emptyHint": "할 일과 후속을 추적할 항목을 만드세요.",
     "emptyFilterTitle": "이 필터에 항목이 없습니다",
-    "emptyFilterHint": "다른 필터를 시도하거나 미완료 항목을 보세요.",
-    "viewOpen": "미완료 보기",
+    "emptyFilterHint": "다른 필터를 시도하거나 할 일을 보세요.",
+    "viewTodo": "할 일 보기",
     "detailEmpty": "작업 항목 선택",
     "detailEmptyHint": "목록에서 선택하거나 새로 만드세요.",
     "backToList": "목록으로",
     "listFilter": "목록",
     "loading": "불러오는 중…",
     "filters": {
-      "open": "미완료",
-      "today": "오늘 마감",
-      "overdue": "기한 초과",
+      "all": "전체",
+      "todo": "할 일",
       "in_progress": "진행 중",
       "done": "완료",
-      "cancelled": "취소됨",
       "archived": "보관됨"
     },
     "status": {
@@ -1784,7 +1782,7 @@ export const ko = {
       "delete": "삭제"
     },
     "help": {
-      "cancelVsArchive": "취소는 하지 않기로 한 것입니다(「취소됨」에서 확인). 보관은 일상 목록에서 숨깁니다(「보관됨」에서 확인)."
+      "cancelVsArchive": "취소는 하지 않기로 한 것입니다(「전체」에서 확인). 보관은 일상 목록에서 숨깁니다(「보관됨」에서 확인)."
     },
     "deleteConfirm": "이 작업 항목을 영구 삭제할까요? 되돌릴 수 없습니다.",
     "listsSection": "목록",

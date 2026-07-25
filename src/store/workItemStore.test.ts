@@ -60,7 +60,7 @@ describe('workItemStore', () => {
       error: null,
       lists: [inbox()],
       items: [],
-      filterId: 'open',
+      filterId: 'todo',
       search: '',
       selectedId: null,
     })
@@ -70,9 +70,9 @@ describe('workItemStore', () => {
     __resetWorkItemStoreInternalsForTests()
   })
 
-  it('defaults filterId to open', () => {
+  it('defaults filterId to todo', () => {
     // Fresh store defaults (before setState in beforeEach would override — assert constant).
-    expect(useWorkItemStore.getState().filterId).toBe('open')
+    expect(useWorkItemStore.getState().filterId).toBe('todo')
   })
 
   it('load hydrates lists and items', async () => {
@@ -193,7 +193,7 @@ describe('workItemStore', () => {
     const s = useWorkItemStore.getState()
     expect(s.lists.find((l) => l.id === 'wl_gone')).toBeUndefined()
     expect(s.items.find((i) => i.id === 'wi_1')?.listId).toBe(INBOX_LIST_ID)
-    expect(s.filterId).toBe('open')
+    expect(s.filterId).toBe('todo')
     expect(saveWorkItems).toHaveBeenCalled()
   })
 

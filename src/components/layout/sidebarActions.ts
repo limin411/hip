@@ -49,7 +49,11 @@ async function leaveActiveSurfaceIfNeeded(): Promise<void> {
   else if (view === 'tasks') await leaveWorkItems()
 }
 
-/** After leaving knowledge for settings/history (not for setSurface/selectSession). */
+/**
+ * After leaving knowledge/tasks (or other content sections) for settings/history/trash:
+ * restore sidebar list to chats/projects so special views are not paired with a
+ * stale content list (e.g. work-item filters while main is RecycleBin).
+ */
 export function assignSectionAfterLeavingKnowledge(): void {
   const domain = useDomainStore.getState()
   const active = domain.sessions.find((s) => s.id === domain.activeSessionId)
@@ -61,6 +65,9 @@ export function assignSectionAfterLeavingKnowledge(): void {
     useUiStore.getState().setSidebarSection('chats')
   }
 }
+
+/** Alias for callers leaving tasks — same destination rule as knowledge. */
+export const assignSectionAfterLeavingTasks = assignSectionAfterLeavingKnowledge
 
 /** Name ascending — same order as the knowledge sidebar list. */
 function firstSpaceIdByName(
@@ -141,11 +148,19 @@ export async function enterTerminalsSection(opts?: {
 /**
  * Enter work-item tracking (tasks section).
  * AppSidebar wires onNav to this when WORK_ITEM_TRACKING is true.
- * Already on tasks: leaveWorkItems would flush unnecessarily — skip.
+ * Always forces activeView to `tasks` so re-entry from trash/settings/history works
+ * even when sidebarSection is already `tasks` (stale pairing).
+ * Already on tasks: leaveKnowledge/flush are skipped; still re-affirms view.
  */
 export async function enterWorkItemsSection(): Promise<void> {
-  if (useUiStore.getState().activeView === 'knowledge') {
+  const view = useUiStore.getState().activeView
+  if (view === 'knowledge') {
     await leaveKnowledge()
+  }
+  // Already showing work items — no-op beyond idempotent store writes.
+  if (view === 'tasks') {
+    useUiStore.getState().setSidebarSection('tasks')
+    return
   }
   useUiStore.getState().setSidebarSection('tasks')
   useUiStore.getState().setActiveView('tasks')
@@ -191,6 +206,7 @@ export async function openSettingsFromChrome(): Promise<void> {
     assignSectionAfterLeavingKnowledge()
   } else if (view === 'tasks') {
     await leaveWorkItems()
+    assignSectionAfterLeavingTasks()
   }
   // Always land on General when opening Settings from chrome (not last-visited page).
   useUiStore.getState().setSettingsPage('general')
@@ -205,6 +221,7 @@ export async function openHistoryFromChrome(): Promise<void> {
     assignSectionAfterLeavingKnowledge()
   } else if (view === 'tasks') {
     await leaveWorkItems()
+    assignSectionAfterLeavingTasks()
   }
   useUiStore.getState().setActiveView('history')
   recordNavEntry()
@@ -217,6 +234,8 @@ export async function openTrashFromChrome(): Promise<void> {
     assignSectionAfterLeavingKnowledge()
   } else if (view === 'tasks') {
     await leaveWorkItems()
+    // Leave tasks list — otherwise filters stay clickable while main is RecycleBin.
+    assignSectionAfterLeavingTasks()
   }
   useUiStore.getState().setActiveView('trash')
   // Opportunistic list + purge
@@ -233,6 +252,7 @@ export async function openAutomationFromChrome(): Promise<void> {
     assignSectionAfterLeavingKnowledge()
   } else if (view === 'tasks') {
     await leaveWorkItems()
+    assignSectionAfterLeavingTasks()
   }
   useUiStore.getState().setActiveView('automation')
   recordNavEntry()

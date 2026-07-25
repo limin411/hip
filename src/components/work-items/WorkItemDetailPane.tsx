@@ -1,8 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { ArrowLeft, Archive, Ban, Trash2 } from 'lucide-react'
+import { ArrowLeft, Archive, Trash2 } from 'lucide-react'
 import {
-  INBOX_LIST_ID,
   WORK_ITEM_TAG_MAX_LEN,
   WORK_ITEM_TAGS_MAX,
   WORK_ITEM_TITLE_MAX,
@@ -17,7 +16,8 @@ import { EmptyState } from '@/components/ui/EmptyState'
 import { Modal } from '@/components/ui/Modal'
 import { cn } from '@/lib/utils'
 
-const STATUSES: WorkItemStatus[] = ['todo', 'in_progress', 'done', 'cancelled']
+/** Status options aligned with sidebar categories (待处理 / 进行中 / 已完成). */
+const PRIMARY_STATUSES: WorkItemStatus[] = ['todo', 'in_progress', 'done']
 const PRIORITIES: WorkItemPriority[] = ['none', 'low', 'medium', 'high']
 
 export interface WorkItemDetailPaneProps {
@@ -35,13 +35,11 @@ export function WorkItemDetailPane({
 }: WorkItemDetailPaneProps) {
   const { t } = useTranslation()
   const items = useWorkItemStore((s) => s.items)
-  const lists = useWorkItemStore((s) => s.lists)
   const selectedId = useWorkItemStore((s) => s.selectedId)
   const updateItem = useWorkItemStore((s) => s.updateItem)
   const setStatus = useWorkItemStore((s) => s.setStatus)
   const archive = useWorkItemStore((s) => s.archive)
   const unarchive = useWorkItemStore((s) => s.unarchive)
-  const cancel = useWorkItemStore((s) => s.cancel)
   const deleteItem = useWorkItemStore((s) => s.deleteItem)
   const finalizeSelectedItem = useWorkItemStore((s) => s.finalizeSelectedItem)
   const setNotesDraft = useWorkItemStore((s) => s.setNotesDraft)
@@ -87,11 +85,6 @@ export function WorkItemDetailPane({
     return [...set].sort((a, b) => a.localeCompare(b))
   }, [items])
 
-  const sortedLists = useMemo(
-    () => [...lists].sort((a, b) => a.sortOrder - b.sortOrder || a.id.localeCompare(b.id)),
-    [lists],
-  )
-
   if (!item) {
     return (
       <div
@@ -107,14 +100,6 @@ export function WorkItemDetailPane({
         />
       </div>
     )
-  }
-
-  const listLabel = (listId: string) => {
-    const list = lists.find((l) => l.id === listId)
-    if (!list || list.system === 'inbox' || list.id === INBOX_LIST_ID) {
-      return t('workItems.inbox')
-    }
-    return list.name
   }
 
   const addTag = (raw: string) => {
@@ -191,7 +176,10 @@ export function WorkItemDetailPane({
               value={item.status}
               onChange={(e) => void setStatus(item.id, e.target.value as WorkItemStatus)}
             >
-              {STATUSES.map((s) => (
+              {(item.status === 'cancelled'
+                ? (['cancelled', ...PRIMARY_STATUSES] as WorkItemStatus[])
+                : PRIMARY_STATUSES
+              ).map((s) => (
                 <option key={s} value={s}>
                   {t(`workItems.status.${s}`)}
                 </option>
@@ -228,22 +216,6 @@ export function WorkItemDetailPane({
                 void updateItem(item.id, { dueOn: e.target.value ? e.target.value : null })
               }
             />
-          </label>
-
-          <label className="flex flex-col gap-1">
-            <span className="text-meta text-ink-tertiary">{t('workItems.fields.list')}</span>
-            <select
-              data-testid="work-item-list-select"
-              className={inputClassName}
-              value={item.listId}
-              onChange={(e) => void updateItem(item.id, { listId: e.target.value })}
-            >
-              {sortedLists.map((l) => (
-                <option key={l.id} value={l.id}>
-                  {listLabel(l.id)}
-                </option>
-              ))}
-            </select>
           </label>
         </div>
 
@@ -311,23 +283,7 @@ export function WorkItemDetailPane({
           />
         </label>
 
-        <p className="text-meta leading-relaxed text-ink-tertiary">
-          {t('workItems.help.cancelVsArchive')}
-        </p>
-
         <div className="flex flex-wrap gap-2 pt-1">
-          {item.status !== 'cancelled' ? (
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              data-testid="work-item-cancel"
-              onClick={() => void cancel(item.id)}
-            >
-              <Ban className="h-3.5 w-3.5" strokeWidth={1.75} />
-              {t('workItems.actions.cancel')}
-            </Button>
-          ) : null}
           {item.archivedAt == null ? (
             <Button
               type="button"

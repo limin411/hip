@@ -46,6 +46,7 @@ vi.mock('@/domain', async (importOriginal) => {
       setSurface: (view: 'chat' | 'code') => setSurface(view),
       selectSession: (id: string) => selectSession(id),
       newConversation: (surface?: 'chat' | 'code') => newConversation(surface),
+      requestTrashList: vi.fn(),
     },
   }
 })
@@ -62,6 +63,7 @@ import {
   openAutomationFromChrome,
   openHistoryFromChrome,
   openSettingsFromChrome,
+  openTrashFromChrome,
 } from './sidebarActions'
 
 describe('sidebarActions', () => {
@@ -320,6 +322,39 @@ describe('sidebarActions', () => {
     await openSettingsFromChrome()
     expect(workItemFlushSave).toHaveBeenCalled()
     expect(useUiStore.getState().activeView).toBe('settings')
+    // Leave tasks list (parity with knowledge) so special views are not paired with WI filters.
+    expect(useUiStore.getState().sidebarSection).toBe('chats')
+  })
+
+  it('enterWorkItemsSection restores tasks view from trash', async () => {
+    useUiStore.setState({
+      activeView: 'trash',
+      previousView: 'tasks',
+      sidebarSection: 'chats',
+    })
+    await enterWorkItemsSection()
+    expect(useUiStore.getState().activeView).toBe('tasks')
+    expect(useUiStore.getState().sidebarSection).toBe('tasks')
+  })
+
+  it('enterWorkItemsSection restores tasks when section was left stale as tasks under trash', async () => {
+    // Pre-fix pairing: trash main + tasks list (would make filter clicks no-op).
+    useUiStore.setState({
+      activeView: 'trash',
+      previousView: 'tasks',
+      sidebarSection: 'tasks',
+    })
+    await enterWorkItemsSection()
+    expect(useUiStore.getState().activeView).toBe('tasks')
+    expect(useUiStore.getState().sidebarSection).toBe('tasks')
+  })
+
+  it('openTrashFromChrome leaves tasks list section (not stuck on WI filters)', async () => {
+    useUiStore.setState({ activeView: 'tasks', sidebarSection: 'tasks' })
+    await openTrashFromChrome()
+    expect(workItemFlushSave).toHaveBeenCalled()
+    expect(useUiStore.getState().activeView).toBe('trash')
+    expect(useUiStore.getState().sidebarSection).toBe('chats')
   })
 
   it('assignSectionAfterLeavingKnowledge uses active session surface', () => {

@@ -111,7 +111,7 @@ describe('WorkItemsPage', () => {
       error: null,
       lists: defaultLists(),
       items: [],
-      filterId: 'open',
+      filterId: 'todo',
       search: '',
       selectedId: null,
     }

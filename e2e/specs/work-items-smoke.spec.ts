@@ -26,32 +26,28 @@ describe('work items smoke @smoke @work-items', () => {
     expect(await (await browser.$('[data-testid="work-items-page"]')).isExisting()).toBe(true)
   })
 
-  it('WS2: sidebar lists smart filters + inbox + new CTA', async () => {
+  it('WS2: sidebar lists smart filters + new CTA (no user lists)', async () => {
     await openWorkItemsFromMenu()
     await (await browser.$('[data-testid="sidebar-work-items"]')).waitForExist({
       timeout: 15000,
     })
-    for (const id of [
-      'open',
-      'today',
-      'overdue',
-      'in_progress',
-      'done',
-      'cancelled',
-      'archived',
-    ] as const) {
+    for (const id of ['all', 'todo', 'in_progress', 'done', 'archived'] as const) {
       const el = await browser.$(`[data-testid="sidebar-work-item-filter-${id}"]`)
       expect(await el.isExisting()).toBe(true)
     }
+    for (const id of ['open', 'today', 'overdue', 'cancelled'] as const) {
+      const el = await browser.$(`[data-testid="sidebar-work-item-filter-${id}"]`)
+      expect(await el.isExisting()).toBe(false)
+    }
     expect(
       await (await browser.$('[data-testid="sidebar-work-item-list-wl_inbox"]')).isExisting(),
-    ).toBe(true)
+    ).toBe(false)
     expect(await (await browser.$('[data-testid="sidebar-new-work-item"]')).isExisting()).toBe(
       true,
     )
     expect(
       await (await browser.$('[data-testid="sidebar-new-work-item-list"]')).isExisting(),
-    ).toBe(true)
+    ).toBe(false)
     expect(await (await browser.$('[data-testid="work-item-list-pane"]')).isExisting()).toBe(
       true,
     )

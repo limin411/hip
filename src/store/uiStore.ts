@@ -20,7 +20,7 @@ export type ActiveView =
   | 'tasks'
   | 'automation'
 export type Surface = 'chat' | 'code'
-export type ChatTab = 'files' | 'agents' | 'tasks' | 'outline'
+export type ChatTab = 'files' | 'agents' | 'tasks' | 'outline' | 'sources'
 export type Theme = 'light' | 'dark' | 'system'
 export type AppLanguage = 'zh-CN' | 'zh-TW' | 'en' | 'ja' | 'ko'
 export type UiDensity = 'comfortable' | 'compact'

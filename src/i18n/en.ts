@@ -574,6 +574,13 @@ export const en = {
       outlineEmpty: 'Your sent messages will appear here as a jump list',
       outlineCount: '{{count}} turns',
       outlineCount_one: '{{count}} turn',
+      sources: 'Sources',
+      sourcesEmpty: 'No web sources yet',
+      sourcesEmptyHint:
+        'When the agent searches or fetches the web (built-in or MCP tools), links appear here',
+      sourcesCount: '{{count}} sources',
+      sourcesCount_one: '{{count}} source',
+      sourcesQuery: '“{{query}}”',
       terminal: 'Terminal',
       closePanel: 'Close Panel',
       collaborationStructure: 'Collaboration',

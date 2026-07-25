@@ -8,6 +8,7 @@ export type VisibleTabDef = {
     | 'artifact.files'
     | 'artifact.agents'
     | 'artifact.outline'
+    | 'artifact.sources'
     | 'artifact.timeline'
     | 'artifact.changes'
     | 'artifact.terminal'
@@ -27,6 +28,7 @@ export function visibleArtifactTabs(args: {
     return [
       { value: 'outline', labelKey: 'artifact.outline' },
       { value: 'files', labelKey: 'artifact.files' },
+      { value: 'sources', labelKey: 'artifact.sources' },
       { value: 'agents', labelKey: 'artifact.agents' },
     ]
   }

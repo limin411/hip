@@ -15,10 +15,12 @@ export type ToolCategory =
 
 const CATEGORY_BY_NAME: Record<string, ToolCategory> = {
   grep: 'search',
+  web_search: 'search',
   read_file: 'read',
   read_media: 'read',
   ls: 'browse',
   glob: 'browse',
+  web_fetch: 'browse',
   write_file: 'edit',
   edit_file: 'edit',
   run_script: 'shell',

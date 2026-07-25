@@ -231,6 +231,7 @@ export function PanelToggle({ slot = 'toolbar' }: { slot?: PanelToggleSlot }) {
   const chatTabs: PanelTabOption[] = [
     { value: 'outline', label: t('artifact.outline') },
     { value: 'files', label: t('artifact.files') },
+    { value: 'sources', label: t('artifact.sources') },
     { value: 'agents', label: t('artifact.agents') },
   ]
 

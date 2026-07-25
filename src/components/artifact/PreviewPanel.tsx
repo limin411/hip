@@ -9,6 +9,7 @@ import { collectConversationArtifacts } from '@/lib/renderedArtifacts'
 import { iconFor } from './ArtifactCard'
 import { FilePreview } from './FilePreview'
 import { ConversationOutline } from './ConversationOutline'
+import { SearchSourcesPanel } from './SearchSourcesPanel'
 import { AgentsRuntimeSplit } from './AgentsRuntimeSplit'
 import { Button } from '@/components/ui/Button'
 import { PanelToggle } from '@/components/layout/PanelToggle'
@@ -24,11 +25,14 @@ function base64ToBytes(b64: string): Uint8Array {
 
 function tabLabel(
   tab: ChatTab,
-  t: (key: 'artifact.files' | 'artifact.agents' | 'artifact.outline') => string,
+  t: (
+    key: 'artifact.files' | 'artifact.agents' | 'artifact.outline' | 'artifact.sources',
+  ) => string,
 ): string {
   // agents + tasks share the combined Agents/Runtime page
   if (tab === 'agents' || tab === 'tasks') return t('artifact.agents')
   if (tab === 'outline') return t('artifact.outline')
+  if (tab === 'sources') return t('artifact.sources')
   return t('artifact.files')
 }
 
@@ -88,6 +92,7 @@ export function PreviewPanel() {
 
       <div className="min-h-0 flex-1 overflow-hidden" data-testid={`panel-view-${chatActiveTab}`}>
         {chatActiveTab === 'outline' && <ConversationOutline />}
+        {chatActiveTab === 'sources' && <SearchSourcesPanel />}
         {chatActiveTab === 'files' && (
           artifacts.length === 0 ? (
             <div className="flex h-full items-center justify-center p-6 text-center text-body text-ink-tertiary" data-testid="preview-no-artifacts">

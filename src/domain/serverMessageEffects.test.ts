@@ -457,6 +457,82 @@ describe('applyServerMessageEffects', () => {
       expect(deps.sent.some((m) => m.type === 'fs:read' && (m as { path?: string }).path === '/page.html')).toBe(true)
     })
 
+    it('message:complete on chat surface opens Sources when the turn used web search (no file product)', () => {
+      seedSession('chat')
+      useUiStore.setState({
+        activeView: 'chat',
+        chatActiveTab: 'agents',
+        selectedArtifactPath: null,
+      })
+      applyServerMessageEffects(
+        {
+          type: 'message:complete',
+          sessionId: 's1',
+          message: {
+            id: 't1',
+            role: 'assistant',
+            content: 'found it',
+            timestamp: 1,
+            toolCalls: [
+              {
+                callId: 'ws1',
+                agentId: 'supervisor',
+                name: 'web_search',
+                input: JSON.stringify({ query: 'hip desktop agent' }),
+                status: 'finished',
+                seq: 0,
+                output: 'Title: hip\nURL: https://example.com/hip\n\n---\n\nTitle: Docs\nURL: https://example.com/docs',
+              },
+            ],
+          },
+        },
+        makeDeps(),
+      )
+      const sess = useDomainStore.getState().sessions.find((s) => s.id === 's1')!
+      expect(sess.chatPanelOpen).toBe(true)
+      expect(useUiStore.getState().chatActiveTab).toBe('sources')
+    })
+
+    it('message:complete prefers durable files over Sources when both exist', () => {
+      seedSession('chat')
+      useUiStore.setState({ activeView: 'chat', chatActiveTab: 'agents' })
+      applyServerMessageEffects(
+        {
+          type: 'message:complete',
+          sessionId: 's1',
+          message: {
+            id: 't1',
+            role: 'assistant',
+            content: 'done',
+            timestamp: 1,
+            toolCalls: [
+              {
+                callId: 'ws1',
+                agentId: 'supervisor',
+                name: 'web_search',
+                input: JSON.stringify({ query: 'x' }),
+                status: 'finished',
+                seq: 0,
+                output: 'Title: A\nURL: https://a.example/',
+              },
+              {
+                callId: 'c1',
+                agentId: 'supervisor',
+                name: 'write_file',
+                input: JSON.stringify({ path: '/report.md', content: '# hi' }),
+                status: 'finished',
+                seq: 1,
+                output: 'wrote /report.md (4 bytes)',
+              },
+            ],
+          },
+        },
+        makeDeps(),
+      )
+      expect(useUiStore.getState().chatActiveTab).toBe('files')
+      expect(useUiStore.getState().selectedArtifactPath).toBe('/report.md')
+    })
+
     it('message:complete does not open for draft/wip/ephemeral renderables or source-only turns', () => {
       seedSession('chat')
       useUiStore.setState({ activeView: 'chat', selectedArtifactPath: null })

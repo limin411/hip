@@ -9,6 +9,7 @@ import { useDiffStore } from '@/store/diffStore'
 import { useWorkflowStore } from '@/store/workflowStore'
 import { createDebouncedFn, shouldRefreshDiffOnToolFinish } from '@/lib/diffRefreshOnWrite'
 import { extractAutoOpenArtifacts } from '@/lib/renderedArtifacts'
+import { extractSearchSources } from '@/lib/searchSources'
 import { surfaceOf } from '@/lib/sessions'
 import { consumeUserDiffRequest } from '@/domain/commands/diffFeedback'
 import { useParallelStore } from '@/store/parallelStore'
@@ -393,8 +394,9 @@ export function applyServerMessageEffects(msg: ServerMessage, deps: ServerMessag
         focus.clearDeferredWriteFollow()
       }
 
-      // Chat surface: force-open PreviewPanel only for durable final deliverables
-      // (image/md/html/pdf, excluding draft/wip/ephemeral process paths).
+      // Chat surface: force-open PreviewPanel for durable final deliverables
+      // (image/md/html/pdf, excluding draft/wip/ephemeral process paths). When
+      // this turn only did web research (no file product), open Sources instead.
       if (
         sess &&
         surfaceOf(sess.config) === 'chat' &&
@@ -410,6 +412,10 @@ export function applyServerMessageEffects(msg: ServerMessage, deps: ServerMessag
           const ui = useUiStore.getState()
           ui.setChatActiveTab('files')
           ui.setSelectedArtifactPath(last.path)
+          domain.setSessionChatPanelOpen(msg.sessionId, true)
+        } else if (extractSearchSources(msg.message.toolCalls).length > 0) {
+          const ui = useUiStore.getState()
+          ui.setChatActiveTab('sources')
           domain.setSessionChatPanelOpen(msg.sessionId, true)
         }
       }

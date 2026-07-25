@@ -374,7 +374,7 @@ export const zhTW = {
     },
     "executionMode": {
       "label": "本對話的執行模式",
-      "menuTitle": "模式",
+      "menuTitle": "執行模式",
       "busyTitle": "回合進行中，暫不能切換執行模式",
       "modes": {
         "interactive": "互動",
@@ -404,6 +404,7 @@ export const zhTW = {
       "fromSubagent": "來自子智慧體 {{name}} 的請求",
       "reviewAbove": "請先回應上方的許可權請求，以繼續本會話。",
       "label": "本對話的許可權模式",
+      "menuTitle": "權限模式",
       "modes": {
         "chat": "僅對話",
         "edit": "編輯檔案",

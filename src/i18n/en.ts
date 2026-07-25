@@ -342,7 +342,7 @@ export const en = {
       },
       executionMode: {
         label: 'Execution mode for this conversation',
-        menuTitle: 'Mode',
+        menuTitle: 'Execution mode',
         busyTitle: 'Cannot change execution mode while a turn is running',
         modes: {
           interactive: 'Interactive',
@@ -373,6 +373,7 @@ export const en = {
         fromSubagent: 'Requested by sub-agent {{name}}',
         reviewAbove: 'Respond to the permission request above to continue this session.',
         label: 'Permission mode for this conversation',
+        menuTitle: 'Permission mode',
         modes: {
           chat: 'Chat only',
           edit: 'Edit files',

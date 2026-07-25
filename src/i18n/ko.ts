@@ -366,7 +366,7 @@ export const ko = {
     },
     "executionMode": {
       "label": "이 대화의 실행 모드",
-      "menuTitle": "모드",
+      "menuTitle": "실행 모드",
       "busyTitle": "턴이 실행 중일 때는 실행 모드를 변경할 수 없습니다",
       "modes": {
         "interactive": "대화형",
@@ -396,6 +396,7 @@ export const ko = {
       "fromSubagent": "하위 에이전트 {{name}}이(가) 요청함",
       "reviewAbove": "위의 권한 요청에 응답하여 이 세션을 계속하세요.",
       "label": "이 대화의 권한 모드",
+      "menuTitle": "권한 모드",
       "modes": {
         "chat": "채팅 전용",
         "edit": "파일 편집",

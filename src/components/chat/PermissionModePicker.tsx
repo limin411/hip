@@ -43,6 +43,9 @@ export function PermissionModePicker() {
         </ComposerChip>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="start">
+        <div className="px-2 py-1.5 text-meta font-medium text-ink-tertiary">
+          {t('chat.permission.menuTitle')}
+        </div>
         {PERMISSION_MODES.map((mode) => (
           <DropdownMenuItem
             key={mode}

@@ -366,7 +366,7 @@ export const ja = {
     },
     "executionMode": {
       "label": "この会話の実行モード",
-      "menuTitle": "モード",
+      "menuTitle": "実行モード",
       "busyTitle": "ターン実行中は実行モードを変更できません",
       "modes": {
         "interactive": "インタラクティブ",
@@ -396,6 +396,7 @@ export const ja = {
       "fromSubagent": "サブエージェント {{name}} からのリクエスト",
       "reviewAbove": "上記の権限リクエストに応答してセッションを続行してください。",
       "label": "この会話の権限モード",
+      "menuTitle": "権限モード",
       "modes": {
         "chat": "チャットのみ",
         "edit": "ファイル編集",

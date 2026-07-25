@@ -2,6 +2,7 @@ import { create } from 'zustand'
 import { persist, createJSONStorage, type StateStorage } from 'zustand/middleware'
 import type { CheckpointMode } from '@hip/protocol'
 import { TERMINAL_MANAGEMENT } from '@/components/terminals/feature'
+import { WORK_ITEM_TRACKING } from '@/components/work-items/feature'
 // Lazy helpers used only inside closeKnowledgeView to avoid circular init issues
 // are imported dynamically in that method.
 
@@ -36,16 +37,18 @@ export type SidebarSection =
 /**
  * Primary nav sections that only show a "coming soon" placeholder page.
  * When TERMINAL_MANAGEMENT is on, `terminals` is a real section (not placeholder) — K14.
+ * When WORK_ITEM_TRACKING is on, `tasks` is a real section (not placeholder) — PR7 only.
  */
 export type PlaceholderSidebarSection =
   | 'workbench'
-  | 'tasks'
   | 'automation'
   | (typeof TERMINAL_MANAGEMENT extends true ? never : 'terminals')
+  | (typeof WORK_ITEM_TRACKING extends true ? never : 'tasks')
 
 export function isPlaceholderSidebarSection(s: SidebarSection): s is PlaceholderSidebarSection {
   if (s === 'terminals') return !TERMINAL_MANAGEMENT
-  return s === 'workbench' || s === 'tasks' || s === 'automation'
+  if (s === 'tasks') return !WORK_ITEM_TRACKING
+  return s === 'workbench' || s === 'automation'
 }
 
 /** Settings panel left-nav page ids (see SettingsPanel PAGES). */

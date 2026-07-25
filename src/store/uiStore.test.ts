@@ -1,11 +1,13 @@
 // src/store/uiStore.test.ts
 import { describe, it, expect, beforeEach } from 'vitest'
+import { WORK_ITEM_TRACKING } from '@/components/work-items/feature'
 import {
   useUiStore,
   normalizeAppLanguage,
   normalizeUiDensity,
   isUiDensity,
   isEphemeralActiveView,
+  isPlaceholderSidebarSection,
   mergeUiPersistedState,
   applyColdLaunchShell,
   type UiPersistedState,
@@ -417,5 +419,19 @@ describe('uiStore persistence partialize', () => {
     applyColdLaunchShell()
     expect(useUiStore.getState().activeView).toBe('workbench')
     expect(useUiStore.getState().sidebarSection).toBe('workbench')
+  })
+})
+
+describe('uiStore - isPlaceholderSidebarSection (work items flag)', () => {
+  it('keeps tasks as placeholder while WORK_ITEM_TRACKING is false', () => {
+    // PR3..PR6 invariant: flag must stay false so AppSidebar still uses placeholder path.
+    expect(WORK_ITEM_TRACKING).toBe(false)
+    expect(isPlaceholderSidebarSection('tasks')).toBe(true)
+    expect(isPlaceholderSidebarSection('workbench')).toBe(true)
+    expect(isPlaceholderSidebarSection('automation')).toBe(true)
+    // Real sections
+    expect(isPlaceholderSidebarSection('chats')).toBe(false)
+    expect(isPlaceholderSidebarSection('projects')).toBe(false)
+    expect(isPlaceholderSidebarSection('knowledge')).toBe(false)
   })
 })

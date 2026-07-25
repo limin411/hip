@@ -7,6 +7,7 @@ import { useDomainStore } from '@/domain'
 import { surfaceOf } from '@/lib/sessions'
 import { useKnowledgeStore } from '@/store/knowledgeStore'
 import { useManagedTerminalStore } from '@/store/managedTerminalStore'
+import { useWorkItemStore } from '@/store/workItemStore'
 import {
   useUiStore,
   type PlaceholderSidebarSection,
@@ -114,6 +115,33 @@ export async function enterTerminalsSection(opts?: {
   useUiStore.getState().setSidebarSection('terminals')
   useUiStore.getState().setActiveView('terminals')
   recordNavEntry()
+}
+
+/**
+ * Enter work-item tracking (tasks section).
+ * Exported for PR5+ AppSidebar / palette wiring; flag remains false until PR7
+ * so AppSidebar still uses enterPlaceholderSection('tasks') for now.
+ */
+export async function enterWorkItemsSection(): Promise<void> {
+  if (useUiStore.getState().activeView === 'knowledge') {
+    await leaveKnowledge()
+  }
+  useUiStore.getState().setSidebarSection('tasks')
+  useUiStore.getState().setActiveView('tasks')
+  recordNavEntry()
+  if (!useWorkItemStore.getState().loaded) {
+    void useWorkItemStore.getState().load()
+  }
+}
+
+/** Leave work items: finalize + drain save chain. No-op if not on tasks. */
+export async function leaveWorkItems(): Promise<void> {
+  if (useUiStore.getState().activeView !== 'tasks') return
+  try {
+    await useWorkItemStore.getState().flushSave()
+  } catch {
+    // non-Tauri / not loaded
+  }
 }
 
 export async function selectSessionFromSidebar(id: string): Promise<void> {

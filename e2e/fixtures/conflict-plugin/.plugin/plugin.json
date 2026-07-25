@@ -1,0 +1,17 @@
+{
+  "id": "conflict-plugin",
+  "name": "conflict-plugin",
+  "version": "0.0.1",
+  "description": "E2E plugin that conflicts with staged hip.toml MCP + project skill",
+  "skills": ["./skills/shared-formatter"],
+  "mcpServers": [
+    {
+      "id": "plugin-devtools",
+      "name": "Plugin DevTools MCP",
+      "transport": "stdio",
+      "command": "/bin/true",
+      "args": ["chrome-devtools-mcp"],
+      "enabled": true
+    }
+  ]
+}

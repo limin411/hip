@@ -46,20 +46,57 @@ let e2eDataDir: string | undefined
 let viteServer: ViteDevServer | undefined
 
 const FIXTURE_PLUGIN_SRC = path.resolve(__dirname, 'e2e', 'fixtures', 'sample-plugin')
+const CONFLICT_PLUGIN_SRC = path.resolve(__dirname, 'e2e', 'fixtures', 'conflict-plugin')
 const USER_CONFIG_DIR = path.join(os.homedir(), '.hip', 'config')
 
 function stageE2eData(e2eDataDir: string): void {
   const pluginsDir = path.join(e2eDataDir, 'plugins')
   const configDir = path.join(e2eDataDir, 'config')
+  const skillsDir = path.join(e2eDataDir, 'skills')
   const fixtureDest = path.join(pluginsDir, 'sample-plugin')
+  const conflictDest = path.join(pluginsDir, 'conflict-plugin')
 
   fs.mkdirSync(pluginsDir, { recursive: true })
   fs.mkdirSync(configDir, { recursive: true })
+  fs.mkdirSync(skillsDir, { recursive: true })
 
   if (!fs.existsSync(FIXTURE_PLUGIN_SRC)) {
     throw new Error(`Fixture plugin not found at ${FIXTURE_PLUGIN_SRC}`)
   }
   fs.cpSync(FIXTURE_PLUGIN_SRC, fixtureDest, { recursive: true, force: true })
+
+  // Extension-registry e2e: capability + skill id collisions (fast-fail /bin/true MCP).
+  if (fs.existsSync(CONFLICT_PLUGIN_SRC)) {
+    fs.cpSync(CONFLICT_PLUGIN_SRC, conflictDest, { recursive: true, force: true })
+  }
+
+  // User skill with same id as conflict-plugin skill → user/project wins, plugin shadowed.
+  const userSkillDir = path.join(skillsDir, 'shared-formatter')
+  fs.mkdirSync(userSkillDir, { recursive: true })
+  fs.writeFileSync(
+    path.join(userSkillDir, 'SKILL.md'),
+    '---\nname: shared-formatter\ndescription: User shared-formatter (e2e)\n---\n# user body\n',
+  )
+
+  // hip.toml: user MCP shares chrome-devtools-mcp package fingerprint with conflict-plugin.
+  const trueBin = process.platform === 'win32' ? 'C:\\\\Windows\\\\System32\\\\cmd.exe' : '/bin/true'
+  const trueArgs =
+    process.platform === 'win32'
+      ? 'args = ["/c", "exit", "0", "chrome-devtools-mcp"]'
+      : 'args = ["chrome-devtools-mcp"]'
+  fs.writeFileSync(
+    path.join(configDir, 'hip.toml'),
+    `version = 1
+
+[[mcpServers]]
+id = "e2e-user-devtools"
+name = "E2E User DevTools"
+transport = "stdio"
+command = "${trueBin}"
+${trueArgs}
+enabled = true
+`,
+  )
 
   const userAuthPath = path.join(USER_CONFIG_DIR, 'auth.json')
   const destAuthPath = path.join(configDir, 'auth.json')
@@ -72,12 +109,16 @@ function stageE2eData(e2eDataDir: string): void {
 
   const realPluginPaths = readUserPluginPaths(USER_CONFIG_DIR)
   const pluginsConfigPath = path.join(configDir, 'hip-plugins.json')
+  const stagedPlugins = [fixtureDest]
+  if (fs.existsSync(conflictDest)) stagedPlugins.push(conflictDest)
   fs.writeFileSync(
     pluginsConfigPath,
-    JSON.stringify({ plugins: [fixtureDest, ...realPluginPaths] }, null, 2),
+    JSON.stringify({ plugins: [...stagedPlugins, ...realPluginPaths] }, null, 2),
   )
 
   process.env.HIP_PLUGINS_PATH = pluginsConfigPath
+  process.env.HIP_SKILLS_DIR = skillsDir
+  process.env.HIP_CONFIG_PATH = path.join(configDir, 'hip.toml')
 
   // Isolate memory.json under the e2e data dir (sidecar honors HIP_DATA_DIR / this env).
   const memoryPath = path.join(configDir, 'memory.json')

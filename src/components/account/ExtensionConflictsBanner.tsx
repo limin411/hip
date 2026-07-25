@@ -86,6 +86,7 @@ export function ExtensionConflictsBanner({ cwd, className }: ExtensionConflictsB
         className,
       )}
       role="status"
+      data-testid="extension-conflicts-banner"
     >
       <div className="flex items-start gap-2">
         <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-600 dark:text-amber-400" />

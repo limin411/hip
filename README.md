@@ -6,6 +6,20 @@
 
 Each UI tab is an independent session. The product default is a **Supervisor ReAct** loop — the agent uses tools and decides when to delegate via `task` / `dispatch_agent` / `task_batch`. Ordinary turns do **not** force a Planner → Coder → Reviewer pipeline.
 
+> **Note:** hip is an independent project and is **not** affiliated with Anthropic, OpenAI, xAI, or other third-party agent products named for interoperability.
+
+## Download
+
+Prebuilt installers (when published) appear on **[GitHub Releases](https://github.com/limin411/hip/releases)**.  
+Until a release is attached, build from source (see [Development setup](#development-setup)).
+
+## Screenshots
+
+<!-- Maintainers: add product screenshots under docs/images/ and link them here.
+     Example: ![Code surface](./docs/images/code-surface.png) -->
+
+_Screenshots coming soon — contributions welcome._
+
 ## Highlights
 
 | Area | What you get |
@@ -82,6 +96,9 @@ yarn tauri dev
 ```
 
 Then open **Settings**, add a provider API key, and start a session on the **Code** or **Chat** surface.
+
+Optional non-secret config samples: [`docs/examples/hip.toml.example`](./docs/examples/hip.toml.example).  
+Contributor workflow: [CONTRIBUTING.md](./CONTRIBUTING.md).
 
 ### LangSmith tracing (optional)
 
@@ -290,6 +307,20 @@ Repo root `docs/` (if present) is optional developer notes only and is never rea
 English is the default for GitHub and agent-facing product embeds. Keep technical identifiers (paths, CLI flags, tool names) identical across locales.
 
 App UI languages (Settings → Interface Language): **English**, **简体中文**, **繁體中文**, **日本語**, **한국어**.
+
+## Contributing
+
+See [CONTRIBUTING.md](./CONTRIBUTING.md) for setup, tests, and PR expectations.  
+Please read the [Code of Conduct](./CODE_OF_CONDUCT.md).
+
+## Security
+
+Report vulnerabilities privately — see [SECURITY.md](./SECURITY.md).  
+Do not open public issues for security reports.
+
+## Changelog
+
+See [CHANGELOG.md](./CHANGELOG.md). Maintainer release steps: [docs/release.md](./docs/release.md).
 
 ## License
 

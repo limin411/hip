@@ -2,7 +2,29 @@
   "name": "hip",
   "private": true,
   "version": "1.0.1",
+  "description": "Desktop AI workbench (Tauri shell + React UI + Node sidecar)",
   "license": "Apache-2.0",
+  "author": "ljm",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/limin411/hip.git"
+  },
+  "homepage": "https://github.com/limin411/hip#readme",
+  "bugs": {
+    "url": "https://github.com/limin411/hip/issues"
+  },
+  "keywords": [
+    "ai",
+    "agent",
+    "desktop",
+    "tauri",
+    "langgraph",
+    "coding-agent",
+    "workbench"
+  ],
+  "engines": {
+    "node": ">=20"
+  },
   "type": "module",
   "workspaces": [
     "packages/*"

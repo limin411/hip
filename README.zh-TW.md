@@ -4,6 +4,13 @@
 
 **hip** 是一款桌面 AI 工作台（定位類似 Claude Code Desktop / Codex Desktop）：Tauri 殼 + React UI + Node.js sidecar，在本機專案中執行 [LangGraph](https://langchain-ai.github.io/langgraphjs/) 智能體。
 
+> **說明：** hip 為獨立專案，與 Anthropic、OpenAI、xAI 等第三方產品**無隸屬或官方背書**關係；文中名稱僅用於互操作說明。
+
+## 下載
+
+預編譯安裝檔（若已發佈）見 **[GitHub Releases](https://github.com/limin411/hip/releases)**。  
+若尚無附件，請依下文從原始碼建置。
+
 每個 UI 分頁是獨立工作階段。產品預設是 **Supervisor ReAct** 迴路——智能體使用工具，並在需要時透過 `task` / `dispatch_agent` / `task_batch` 委派。一般回合**不會**強制 Planner → Coder → Reviewer 流水線。
 
 ## 核心能力
@@ -234,6 +241,18 @@ SQLite 為權威資料來源；`~/.hip/memories/` 存放 Markdown 匯出鏡像�
 英文為 GitHub 與智能體側產品嵌入的預設語言。技術識別符（路徑、CLI 旗標、工具名）在各語言版本中保持一致。
 
 應用介面語言（設定 → 介面語言）：**English**、**简体中文**、**繁體中文**、**日本語**、**한국어**。
+
+## 貢獻
+
+見 [CONTRIBUTING.md](./CONTRIBUTING.md) 與 [Code of Conduct](./CODE_OF_CONDUCT.md)。
+
+## 安全
+
+漏洞請依 [SECURITY.md](./SECURITY.md) **私下**回報，勿開公開 issue。
+
+## 變更紀錄
+
+見 [CHANGELOG.md](./CHANGELOG.md)。發版說明：[docs/release.md](./docs/release.md)。
 
 ## 授權條款
 

@@ -1,0 +1,83 @@
+name: Bug report
+description: Report a reproducible product or tooling bug
+title: "bug: "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for filing a bug. **Do not** include API keys or `~/.hip/config/auth.json` contents.
+        Security issues → [SECURITY.md](https://github.com/limin411/hip/blob/dev/SECURITY.md).
+
+  - type: input
+    id: version
+    attributes:
+      label: hip version or commit
+      description: e.g. 1.0.1 or `git rev-parse --short HEAD`
+      placeholder: "1.0.1"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: os
+    attributes:
+      label: Operating system
+      options:
+        - macOS (Apple Silicon)
+        - macOS (Intel)
+        - Windows
+        - Linux
+        - Other
+    validations:
+      required: true
+
+  - type: input
+    id: os_version
+    attributes:
+      label: OS version
+      placeholder: "macOS 15.x / Windows 11 / …"
+    validations:
+      required: false
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      description: Minimal steps starting from a clean state if possible
+      placeholder: |
+        1. Open hip …
+        2. …
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+    validations:
+      required: true
+
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behavior
+    validations:
+      required: true
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs / screenshots
+      description: Redact secrets. Sidecar/Tauri logs may live under `~/.hip/logs/`.
+    validations:
+      required: false
+
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Checks
+      options:
+        - label: I searched existing issues for duplicates
+          required: false
+        - label: This is not a security vulnerability (those go to SECURITY.md)
+          required: true

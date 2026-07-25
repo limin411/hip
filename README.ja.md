@@ -4,6 +4,13 @@
 
 **hip** はデスクトップAIワークベンチです（Claude Code Desktop / Codex Desktop の思想に基づく）。Tauriシェル、React UI、Node.jsサイドカーで構成され、プロジェクト内で [LangGraph](https://langchain-ai.github.io/langgraphjs/) エージェントを実行します。
 
+> **注:** hip は独立したプロジェクトであり、Anthropic / OpenAI / xAI など第三者製品とは**提携・公式関係はありません**。名称は相互運用の説明のためにのみ用います。
+
+## ダウンロード
+
+ビルド済みインストーラ（公開時）は **[GitHub Releases](https://github.com/limin411/hip/releases)** にあります。  
+未公開の場合は下記の開発手順でソースからビルドしてください。
+
 各UIタブは独立したセッションです。製品デフォルトは **Supervisor ReAct** ループです。エージェントはツールを使用し、`task` / `dispatch_agent` / `task_batch` を介して委譲するタイミングを決定します。通常のターンでは **Planner → Coder → Reviewer** パイプラインは強制されません。
 
 ## ハイライト
@@ -242,6 +249,18 @@ SQLiteが情報源です。`~/.hip/memories/` にはMarkdownエクスポート�
 英語がGitHubおよびエージェント向け製品埋め込みのデフォルトです。技術的な識別子（パス、CLIフラグ、ツール名）はロケール間で同一に保ってください。
 
 アプリUI言語（設定 → インターフェース言語）：**English**、**简体中文**、**繁體中文**、**日本語**、**한국어**。
+
+## コントリビュート
+
+[CONTRIBUTING.md](./CONTRIBUTING.md) と [Code of Conduct](./CODE_OF_CONDUCT.md) を参照してください。
+
+## セキュリティ
+
+脆弱性は [SECURITY.md](./SECURITY.md) に従い**非公開**で報告してください。公開 Issue は使わないでください。
+
+## 変更履歴
+
+[CHANGELOG.md](./CHANGELOG.md)。リリース手順: [docs/release.md](./docs/release.md)。
 
 ## ライセンス
 

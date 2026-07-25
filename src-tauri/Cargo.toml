@@ -1,7 +1,7 @@
 [package]
 name = "hip"
 version = "1.0.1"
-description = "A Tauri App"
+description = "Desktop AI workbench (Tauri shell + React UI + Node sidecar)"
 authors = ["ljm"]
 edition = "2021"
 license = "Apache-2.0"

@@ -1,0 +1,77 @@
+# Example hip.toml (copy ideas into ~/.hip/config/hip.toml or project .hip/hip.toml).
+# DO NOT put real API keys here. LLM keys live in ~/.hip/config/auth.json (0600).
+#
+# Global config:  ~/.hip/config/hip.toml
+# Project override: <repo>/.hip/hip.toml
+# Some sections (langsmith, acp, agentLoop, window, …) are wholesale-replaced by
+# the project file when present — they are not deep-merged field-by-field.
+
+version = 1
+
+# ── Window & tray (Settings → General → Window & background) ───────────────
+# Defaults when omitted: closeAction = "quit", trayEnabled = false
+[window]
+closeAction = "hide"   # hide | quit | ask
+trayEnabled = true
+# launchAtLogin = false
+# startHiddenOnLogin = true
+# notifyOnAgentComplete = false
+
+# ── ACP host policy (external primary agents only) ─────────────────────────
+# Resolved defaults: fsBridge = true, forwardMcp = false, fsReadMaxBytes = 2000000
+[acp]
+fsBridge = true
+forwardMcp = false          # keep false unless you trust the external agent with MCP env/headers
+# forwardHipKeys = false    # opt-in: inject hip provider keys into ACP spawn env
+fsReadMaxBytes = 2000000
+
+# ── LangSmith tracing (optional; off by default) ───────────────────────────
+# Prefer env LANGSMITH_* when already set (process env wins).
+# [langsmith]
+# enabled = true
+# api_key = "lsv2_REPLACE_ME"   # never commit a real key
+# project = "hip"
+# endpoint = "https://eu.api.smith.langchain.com"  # EU only; omit for US cloud
+
+# ── Agent loop budgets (optional) ──────────────────────────────────────────
+# [agentLoop]
+# maxSteps = 800
+# childMaxSteps = 25
+# exploreChildMaxSteps = 40
+# maxDepth = 3
+# doomLoopStrategy = "nudge_then_pause"  # nudge_then_pause | pause_immediately | auto_continue
+# idleTimeoutMs = 180000
+
+# ── Context / compaction (optional) ────────────────────────────────────────
+# [context]
+# autoCompactPercent = 85
+# subagentCompactPercent = 70
+# targetKeepPercent = 50
+# prefireLeadPercent = 10
+# twoPass = true
+# toolOutputMaxBytes = 40960
+
+# ── Task runtime (shell bg / monitor / scheduler) ───────────────────────────
+# [taskRuntime]
+# enabled = true
+# shellBackground = true
+# monitor = true
+# schedulerWake = true
+# wakeMode = "auto"   # notice | auto
+
+# ── Recycle bin retention ──────────────────────────────────────────────────
+# [trash]
+# retentionDays = 7
+
+# ── Providers (non-secret) ─────────────────────────────────────────────────
+# API keys still go in auth.json — do not use apiKey in hip.toml (ignored for BYOK).
+# [[providers]]
+# id = "openai"
+# name = "OpenAI"
+# baseUrl = "https://api.openai.com/v1"
+# enabled = true
+# # apiKind = "openai"   # or "anthropic" for Messages-compatible gateways
+
+# [activeModel]
+# providerID = "openai"
+# modelID = "gpt-4o"

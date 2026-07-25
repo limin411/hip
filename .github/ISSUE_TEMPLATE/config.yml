@@ -1,0 +1,8 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Security vulnerability
+    url: https://github.com/limin411/hip/security/advisories/new
+    about: Privately report a security issue (do not open a public issue).
+  - name: Contributing guide
+    url: https://github.com/limin411/hip/blob/dev/CONTRIBUTING.md
+    about: How to build, test, and open pull requests.

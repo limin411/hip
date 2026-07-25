@@ -4,6 +4,13 @@
 
 **hip**은 데스크톱 AI 워크벤치입니다(Claude Code Desktop / Codex Desktop의 정신을 계승): Tauri 셸, React UI, 그리고 프로젝트에서 [LangGraph](https://langchain-ai.github.io/langgraphjs/) 에이전트를 실행하는 Node.js 사이드카로 구성됩니다.
 
+> **참고:** hip은 독립 프로젝트이며 Anthropic, OpenAI, xAI 등 타사 제품과 **제휴·공식 관계가 없습니다**. 문서에 나오는 이름은 상호운용 설명용입니다.
+
+## 다운로드
+
+사전 빌드 설치 파일(게시 시)은 **[GitHub Releases](https://github.com/limin411/hip/releases)** 를 확인하세요.  
+아직 없다면 아래 개발 절차로 소스에서 빌드하세요.
+
 각 UI 탭은 독립적인 세션입니다. 제품 기본값은 **Supervisor ReAct** 루프입니다 — 에이전트가 도구를 사용하고 `task` / `dispatch_agent` / `task_batch`를 통해 위임 시기를 결정합니다. 일반적인 턴은 Planner → Coder → Reviewer 파이프라인을 **강제하지 않습니다**.
 
 ## 주요 기능
@@ -241,6 +248,18 @@ SQLite가 진실 공급원입니다; `~/.hip/memories/`는 마크다운 내보�
 영어가 GitHub 및 에이전트 대상 제품 임베드의 기본값입니다. 기술 식별자(경로, CLI 플래그, 도구 이름)는 모든 로케일에서 동일하게 유지하세요.
 
 앱 UI 언어(설정 → 인터페이스 언어): **English**, **简体中文**, **繁體中文**, **日本語**, **한국어**.
+
+## 기여
+
+[CONTRIBUTING.md](./CONTRIBUTING.md) 및 [Code of Conduct](./CODE_OF_CONDUCT.md)를 참고하세요.
+
+## 보안
+
+취약점은 [SECURITY.md](./SECURITY.md)에 따라 **비공개**로 보고하세요. 공개 이슈를 열지 마세요.
+
+## 변경 로그
+
+[CHANGELOG.md](./CHANGELOG.md). 릴리스 가이드: [docs/release.md](./docs/release.md).
 
 ## 라이선스
 

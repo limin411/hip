@@ -1,9 +1,10 @@
-import { useMemo } from 'react'
+import { useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { ExternalLink, Globe, Search } from 'lucide-react'
+import { ExternalLink, Globe } from 'lucide-react'
 import { open } from '@tauri-apps/plugin-shell'
 import { useActiveMessages } from '@/domain'
 import { collectConversationSearchSources, type SearchSource } from '@/lib/searchSources'
+import { faviconCandidatesFor } from '@/lib/siteFavicon'
 import { cn } from '@/lib/utils'
 
 async function openExternalUrl(url: string): Promise<void> {
@@ -35,6 +36,52 @@ function toolLabel(toolName?: string): string | null {
   return toolName
 }
 
+/**
+ * Site favicon with cascade: origin /favicon.ico → DuckDuckGo icons → Globe.
+ * CSP allows https: img-src (see tauri.conf.json).
+ */
+export function SiteFavicon({ pageUrl, className }: { pageUrl: string; className?: string }) {
+  const candidates = useMemo(() => faviconCandidatesFor(pageUrl), [pageUrl])
+  const [index, setIndex] = useState(0)
+  const exhausted = candidates.length === 0 || index >= candidates.length
+  const src = exhausted ? null : candidates[index]
+
+  if (!src) {
+    return (
+      <span
+        className={cn(
+          'flex h-4 w-4 shrink-0 items-center justify-center text-ink-tertiary',
+          className,
+        )}
+        data-testid="source-favicon-fallback"
+        aria-hidden
+      >
+        <Globe size={14} strokeWidth={1.75} />
+      </span>
+    )
+  }
+
+  return (
+    <img
+      src={src}
+      alt=""
+      width={16}
+      height={16}
+      loading="lazy"
+      decoding="async"
+      referrerPolicy="no-referrer"
+      data-testid="source-favicon"
+      data-favicon-src={src}
+      onError={() => setIndex((i) => i + 1)}
+      className={cn(
+        'mt-0.5 h-4 w-4 shrink-0 rounded-sm bg-surface-muted object-contain',
+        className,
+      )}
+      aria-hidden
+    />
+  )
+}
+
 function SourceRow({ source }: { source: SearchSource }) {
   const { t } = useTranslation()
   const host = hostname(source.url)
@@ -54,9 +101,7 @@ function SourceRow({ source }: { source: SearchSource }) {
           'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink/20',
         )}
       >
-        <span className="mt-0.5 shrink-0 text-ink-tertiary" aria-hidden>
-          {source.kind === 'fetch' ? <Globe size={14} strokeWidth={1.75} /> : <Search size={14} strokeWidth={1.75} />}
-        </span>
+        <SiteFavicon pageUrl={source.url} />
         <span className="min-w-0 flex-1">
           <span className="flex items-start gap-1">
             <span className="min-w-0 flex-1 truncate text-meta font-medium leading-snug text-ink">

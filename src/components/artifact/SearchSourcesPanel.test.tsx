@@ -63,6 +63,17 @@ describe('SearchSourcesPanel', () => {
     render(<SearchSourcesPanel />)
     expect(screen.getByTestId('search-sources')).toBeInTheDocument()
     expect(screen.getByText('Hip Home')).toBeInTheDocument()
+    const icon = screen.getByTestId('source-favicon')
+    expect(icon).toHaveAttribute('src', 'https://example.com/favicon.ico')
+    // First candidate fails → cascade to DuckDuckGo icons cache
+    fireEvent.error(icon)
+    expect(screen.getByTestId('source-favicon')).toHaveAttribute(
+      'src',
+      'https://icons.duckduckgo.com/ip3/example.com.ico',
+    )
+    // All candidates fail → Globe fallback
+    fireEvent.error(screen.getByTestId('source-favicon'))
+    expect(screen.getByTestId('source-favicon-fallback')).toBeInTheDocument()
     fireEvent.click(screen.getByTestId('search-source-row'))
     expect(openMock).toHaveBeenCalledWith('https://example.com/hip')
   })

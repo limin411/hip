@@ -327,7 +327,7 @@ export function resolveMcpCandidates(
       conflicts.push({
         kind: 'mcp_capability_duplicate',
         winner: keep.winner,
-        loser: loser.source,
+        loser: loser.winner,
         fingerprint: fp,
         message: `MCP "${loser.id}" duplicates capability of "${keep.id}" (${fp}); only one stays active`,
       })

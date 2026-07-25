@@ -61,6 +61,7 @@ import {
   type McpForm,
   type KvPair,
 } from '@/lib/mcpServerDraft'
+import { ExtensionConflictsBanner } from './ExtensionConflictsBanner'
 
 const inputCls = inputClassName
 
@@ -392,6 +393,9 @@ export function McpConfig() {
               </Button>
             )}
           </div>
+        </div>
+        <div className="mt-3">
+          <ExtensionConflictsBanner />
         </div>
       </div>
 

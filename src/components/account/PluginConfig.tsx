@@ -3,10 +3,12 @@ import { useTranslation } from 'react-i18next'
 import type { MarketPluginEntry, PluginMeta } from '@hip/protocol'
 import { usePluginsStore } from '@/store/pluginsStore'
 import { useMarketplaceStore, tabToSourceId } from '@/store/marketplaceStore'
+import { useExtensionStore } from '@/store/extensionStore'
 import { Button } from '@/components/ui/Button'
 import { Modal } from '@/components/ui/Modal'
 import { PluginConfigView, PluginViewModal, type Translate } from './PluginConfigView'
 import { MarketplaceSourceModal } from './MarketplaceSourceModal'
+import { ExtensionConflictsBanner } from './ExtensionConflictsBanner'
 
 /**
  * Settings → Plugin Market.
@@ -16,10 +18,13 @@ export function PluginConfig() {
   const { t } = useTranslation()
   const { plugins, loaded: pluginsLoaded, load: loadPlugins, remove, toggle } = usePluginsStore()
   const market = useMarketplaceStore()
+  const preflightEnable = useExtensionStore((s) => s.preflightEnable)
+  const inspect = useExtensionStore((s) => s.inspect)
   const [error, setError] = useState<string | null>(null)
   const [deleting, setDeleting] = useState<PluginMeta | null>(null)
   const [viewing, setViewing] = useState<PluginMeta | null>(null)
   const [sourcesOpen, setSourcesOpen] = useState(false)
+  const [preflightNote, setPreflightNote] = useState<string | null>(null)
 
   useEffect(() => {
     if (!pluginsLoaded) void loadPlugins()
@@ -65,7 +70,7 @@ export function PluginConfig() {
     [marketEntriesRaw, marketTab, marketQuery],
   )
 
-  const combinedError = error ?? market.error
+  const combinedError = error ?? market.error ?? preflightNote
 
   const resolveLocal = (entry: MarketPluginEntry): PluginMeta | undefined => {
     if (entry.localPluginId) {
@@ -74,8 +79,55 @@ export function PluginConfig() {
     return undefined
   }
 
+  const enableWithPreflight = async (plugin: PluginMeta, enabled: boolean) => {
+    setError(null)
+    setPreflightNote(null)
+    if (enabled) {
+      const pf = await preflightEnable({ pluginId: plugin.id, pluginDir: plugin.dir })
+      if (pf?.hasConflicts) {
+        const parts: string[] = []
+        if (pf.skillConflictCount > 0) {
+          parts.push(
+            t('settings.extensions.preflightSkills', {
+              count: pf.skillConflictCount,
+              defaultValue: '{{count}} skill id conflict(s)',
+            }),
+          )
+        }
+        if (pf.mcpIdConflictCount > 0) {
+          parts.push(
+            t('settings.extensions.preflightMcpId', {
+              count: pf.mcpIdConflictCount,
+              defaultValue: '{{count}} MCP id conflict(s)',
+            }),
+          )
+        }
+        if (pf.capabilityConflictCount > 0) {
+          parts.push(
+            t('settings.extensions.preflightCapability', {
+              count: pf.capabilityConflictCount,
+              defaultValue: '{{count}} MCP capability conflict(s)',
+            }),
+          )
+        }
+        setPreflightNote(
+          t('settings.extensions.preflightWarn', {
+            defaultValue:
+              'Conflicts detected ({{details}}). Enabling keeps project/user skills and user MCP over plugin duplicates — see MCP settings for remediations.',
+            details: parts.join(', '),
+          }),
+        )
+      }
+    }
+    await toggle(plugin.id, enabled)
+    await inspect()
+  }
+
   return (
     <>
+      <div className="border-b border-border px-6 pt-4">
+        <ExtensionConflictsBanner />
+      </div>
       <PluginConfigView
         plugins={plugins}
         marketEntries={marketEntries}
@@ -93,8 +145,7 @@ export function PluginConfig() {
           setDeleting(plugin)
         }}
         onToggle={(plugin, enabled) => {
-          setError(null)
-          void toggle(plugin.id, enabled).catch((err: Error) => {
+          void enableWithPreflight(plugin, enabled).catch((err: Error) => {
             setError(err.message ?? t('settings.plugins.toggleError'))
           })
         }}
@@ -116,8 +167,7 @@ export function PluginConfig() {
         onMarketToggle={(entry, enabled) => {
           const local = resolveLocal(entry)
           if (!local) return
-          setError(null)
-          void toggle(local.id, enabled)
+          void enableWithPreflight(local, enabled)
             .then(() => market.load())
             .catch((err: Error) => {
               setError(err.message ?? t('settings.plugins.toggleError'))

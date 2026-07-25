@@ -157,6 +157,22 @@ export type ClientMessage =
   | { type: 'plugin:delete'; pluginId: string }
   /** Reload plugin components in all sessions (after enable/disable or disk change). */
   | { type: 'plugin:reload' }
+  /**
+   * Inspect active extension registry for a project cwd (skills/MCP/conflicts).
+   * `requestId` correlates the async result.
+   */
+  | { type: 'extension:inspect'; requestId: string; cwd?: string }
+  /**
+   * Preflight enabling a plugin (skill/MCP id + capability conflicts).
+   * Pass absolute `pluginDir` (or installed plugin id resolved server-side when only pluginId is set).
+   */
+  | {
+      type: 'extension:preflight'
+      requestId: string
+      cwd?: string
+      pluginDir?: string
+      pluginId?: string
+    }
   | {
       type: 'git:worktree:create'
       sessionId: string
@@ -492,6 +508,44 @@ export type ServerMessage =
       modelReview?: import('./marketplace.js').PluginModelReviewSummary
     }
   | { type: 'plugin:delete:result'; pluginId: string; ok: boolean; error?: string }
+  | {
+      type: 'extension:inspect:result'
+      requestId: string
+      ok: boolean
+      error?: string
+      snapshot?: import('./extension-registry.js').ExtensionRegistrySnapshot
+      /** High-signal subset for Settings banners. */
+      notableConflicts?: import('./extension-registry.js').ExtensionConflict[]
+    }
+  | {
+      type: 'extension:preflight:result'
+      requestId: string
+      ok: boolean
+      error?: string
+      preflight?: {
+        pluginId: string
+        pluginDir: string
+        skillConflicts: Array<{
+          skillId: string
+          existing: import('./extension-registry.js').ExtensionSourceRef
+          incoming: import('./extension-registry.js').ExtensionSourceRef
+        }>
+        mcpIdConflicts: Array<{
+          id: string
+          existing: import('./extension-registry.js').ExtensionSourceRef
+          incoming: import('./extension-registry.js').ExtensionSourceRef
+        }>
+        capabilityConflicts: Array<{
+          fingerprint: string
+          existingId: string
+          incomingId: string
+          existing: import('./extension-registry.js').ExtensionSourceRef
+          incoming: import('./extension-registry.js').ExtensionSourceRef
+        }>
+        recommendations: string[]
+        hasConflicts: boolean
+      }
+    }
   | { type: 'replay:result'; sessionId: string; result: ReplayResult }
   | {
       type: 'compact:result'

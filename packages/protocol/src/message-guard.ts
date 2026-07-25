@@ -51,6 +51,8 @@ export const CLIENT_MESSAGE_TYPES = [
   'plugin:install:github',
   'plugin:delete',
   'plugin:reload',
+  'extension:inspect',
+  'extension:preflight',
   'git:worktree:create',
   'git:worktree:list',
   'git:worktree:remove',

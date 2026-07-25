@@ -55,12 +55,18 @@ Sidecar also falls back: `HIP_SKILLS_DIR` → `HIP_DATA_DIR/skills` → `~/.hip/
 Resolution emits `ExtensionConflict[]` (`skill_id_shadow`, `mcp_id_shadow`, `mcp_capability_duplicate`, `mcp_name_veto`, …).  
 `ConfigManager.extensionConflicts` exposes the last load for future Settings / inspect UI.
 
-## Phase 2+ (not yet)
+## Phase 2 (implemented)
 
-- Install / enable **preflight** UX  
-- Settings conflict banner + one-click remediations  
-- `extension:inspect` WS / CLI  
+- **WS** `extension:inspect` / `extension:preflight` (+ results)
+- **Preflight** on plugin enable (skill id / MCP id / capability)
+- **Settings banner** (`ExtensionConflictsBanner`) on MCP + Plugin pages
+- One-click: allow both (`allowDuplicate`) / disable user MCP
+
+## Phase 3+ (not yet)
+
 - FE `derivePlugin*` driven purely by registry snapshot  
+- CLI `hip extension inspect`  
+- Richer preflight modal (block vs warn)
 
 ## Do not double-install
 

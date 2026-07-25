@@ -22,6 +22,7 @@ import { EventStore } from '../persistence/event-store.js'
 import { AttachmentError } from './attachments.js'
 import { handleWorkspaceMessage, isWorkspaceMessage } from './handlers/workspace.js'
 import { handleMcpMessage, isMcpMessage } from './handlers/mcp.js'
+import { handleExtensionMessage, isExtensionMessage } from './handlers/extension.js'
 import { handleMemoryMessage, isMemoryMessage, type MemoryHandlerContext } from '../memory/handlers.js'
 import { MemoryService } from '../memory/service.js'
 import { MemoryStore } from '../memory/store.js'
@@ -118,6 +119,8 @@ export class SessionManager {
         await handleWorkspaceMessage(this.handlerCtx(), msg, send)
       } else if (isMcpMessage(msg)) {
         await handleMcpMessage(msg, send)
+      } else if (isExtensionMessage(msg)) {
+        handleExtensionMessage(msg, send)
       } else if (isMemoryMessage(msg)) {
         handleMemoryMessage(this.memoryCtx(), msg, send)
       } else if (isSessionMessage(msg)) {

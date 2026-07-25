@@ -311,10 +311,21 @@ describe('sidebarActions', () => {
   it('enterWorkItemsSection opens tasks and loads catalog when not loaded', async () => {
     workItemState.loaded = false
     useUiStore.setState({ activeView: 'chat', sidebarSection: 'chats' })
+    const { useWorkItemViewStore } = await import('@/store/workItemViewStore')
+    useWorkItemViewStore.getState().setViewMode('list')
     await enterWorkItemsSection()
     expect(useUiStore.getState().activeView).toBe('tasks')
     expect(useUiStore.getState().sidebarSection).toBe('tasks')
     expect(workItemState.load).toHaveBeenCalled()
+    expect(useWorkItemViewStore.getState().viewMode).toBe('calendar')
+  })
+
+  it('enterWorkItemsSection resets viewMode to calendar when already on tasks', async () => {
+    useUiStore.setState({ activeView: 'tasks', sidebarSection: 'tasks' })
+    const { useWorkItemViewStore } = await import('@/store/workItemViewStore')
+    useWorkItemViewStore.getState().setViewMode('list')
+    await enterWorkItemsSection()
+    expect(useWorkItemViewStore.getState().viewMode).toBe('calendar')
   })
 
   it('openSettingsFromChrome flushes work items when leaving tasks', async () => {

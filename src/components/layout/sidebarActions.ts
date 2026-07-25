@@ -160,7 +160,11 @@ export async function enterWorkItemsSection(): Promise<void> {
   if (view === 'knowledge') {
     await leaveKnowledge()
   }
-  // Already showing work items — no-op beyond idempotent store writes.
+  // Product default: every entry into 事项追踪 opens month calendar (D24).
+  // Resets even when already on tasks so sidebar re-click and e2e re-entry match.
+  const { useWorkItemViewStore } = await import('@/store/workItemViewStore')
+  useWorkItemViewStore.getState().setViewMode('calendar')
+  // Already showing work items — no-op beyond section + calendar default.
   if (view === 'tasks') {
     useUiStore.getState().setSidebarSection('tasks')
     return

@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 /**
- * Regression: editing a past-dated item must allow date changes and Today.
+ * Editing a past-dated item must accept date changes via the native DateField input.
  */
 import '@testing-library/jest-dom/vitest'
 import { afterEach, describe, expect, it, vi } from 'vitest'
@@ -84,29 +84,28 @@ afterEach(() => {
 })
 
 describe('WorkItemEditorModal date pick (old item)', () => {
-  it('can open start date popover and pick a day', async () => {
+  it('updates start via native date input (past item)', () => {
     render(<WorkItemEditorModal />)
     expect(screen.getByTestId('work-item-editor-body')).toBeInTheDocument()
 
-    fireEvent.click(screen.getByTestId('work-item-start-input-trigger'))
-    const day = await screen.findByTestId('date-field-day-2020-03-15')
-    fireEvent.pointerDown(day, { button: 0 })
-
     const start = screen.getByTestId('work-item-start-input') as HTMLInputElement
-    expect(start.value).toBe('2020-03-15')
-    // end auto-clamped to keep start ≤ end
-    const end = screen.getByTestId('work-item-end-input') as HTMLInputElement
-    expect(end.value).toBe('2020-03-15')
+    expect(start.value).toBe('2020-03-10')
+    fireEvent.change(start, { target: { value: '2020-03-15' } })
+    expect((screen.getByTestId('work-item-start-input') as HTMLInputElement).value).toBe(
+      '2020-03-15',
+    )
+    // end auto-clamped
+    expect((screen.getByTestId('work-item-end-input') as HTMLInputElement).value).toBe(
+      '2020-03-15',
+    )
   })
 
-  it('today is clickable for a past-dated item', async () => {
+  it('can jump start to today for a past-dated item', () => {
     render(<WorkItemEditorModal />)
-    fireEvent.click(screen.getByTestId('work-item-start-input-trigger'))
-    const todayBtn = await screen.findByTestId('date-field-today')
-    expect(todayBtn).not.toBeDisabled()
-    fireEvent.pointerDown(todayBtn, { button: 0 })
     const start = screen.getByTestId('work-item-start-input') as HTMLInputElement
-    expect(start.value).toMatch(/^\d{4}-\d{2}-\d{2}$/)
-    expect(start.value).not.toBe('2020-03-10')
+    const today = new Date()
+    const ymd = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`
+    fireEvent.change(start, { target: { value: ymd } })
+    expect((screen.getByTestId('work-item-start-input') as HTMLInputElement).value).toBe(ymd)
   })
 })

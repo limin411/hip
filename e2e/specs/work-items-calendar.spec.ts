@@ -122,8 +122,7 @@ describe('work items calendar @work-items @core', () => {
     await waitForCatalogTitle(dayTitle)
   })
 
-  it('WC4: open old calendar item → DateField day pick + 今天 update start/end', async () => {
-    // Past-dated item (the regression: panel opens but day/today had no effect).
+  it('WC4: open past-dated item → update start/end to today and persist', async () => {
     const pastTitle = `e2e-wi-cal-past-${stamp}`
     const pastStart = ymdAdd(-40)
     const pastEnd = ymdAdd(-38)
@@ -135,11 +134,6 @@ describe('work items calendar @work-items @core', () => {
     await saveWorkItemModal()
     await waitForCatalogTitle(pastTitle)
 
-    // Re-open from calendar bar if present, else list
-    const calTab = await browser.$('[data-testid="work-item-view-mode-calendar"]')
-    if (await calTab.isExisting()) await calTab.click()
-    await browser.pause(200)
-    // Jump month nav toward past so bar is visible is hard; use list select.
     await switchWorkItemsToListView()
     await selectWorkItemByTitle(pastTitle)
     await browser.waitUntil(async () => isWorkItemModalOpen(), {
@@ -148,7 +142,6 @@ describe('work items calendar @work-items @core', () => {
     })
 
     const today = localTodayYmd()
-    // Real UI: Today on start, then set end via day cell
     await pickWorkItemDateToday('work-item-start-input')
     await setWorkItemEndOn(today)
     await saveWorkItemModal()
@@ -156,10 +149,9 @@ describe('work items calendar @work-items @core', () => {
     await waitForCatalogItemMatch(
       (i) => i.title === pastTitle && i.startOn === today && i.endOn === today,
       20000,
-      'past item dates not updated via DateField UI',
+      'past item dates not updated via DateField',
     )
 
-    // cleanup this extra item
     await selectWorkItemByTitle(pastTitle)
     await deleteSelected(true)
   })

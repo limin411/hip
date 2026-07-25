@@ -56,7 +56,15 @@ export function WorkItemEditorModal() {
   const [titleError, setTitleError] = useState(false)
   const titleRef = useRef<HTMLInputElement>(null)
 
-  // Sync draft when session opens / target changes
+  // Sync draft when session opens / target changes (mode + create defaults / edit id).
+  // Do not depend on `item` object identity — only itemId — or in-progress edits get wiped.
+  const sessionKey =
+    modal.mode === 'closed'
+      ? 'closed'
+      : modal.mode === 'create'
+        ? `c:${modal.defaults.startOn}:${modal.defaults.endOn}:${modal.defaults.status ?? 'todo'}`
+        : `e:${modal.itemId}`
+
   useEffect(() => {
     if (modal.mode === 'closed') return
     setTitleError(false)
@@ -78,20 +86,22 @@ export function WorkItemEditorModal() {
         notes: '',
         tags: [],
       })
-    } else if (item) {
-      const schedule = ensureScheduleDates(item, localTodayYmd())
+    } else if (modal.mode === 'edit') {
+      const target = items.find((i) => i.id === modal.itemId)
+      if (!target) return
+      const schedule = ensureScheduleDates(target, localTodayYmd())
       setDraft({
-        title: item.title,
+        title: target.title,
         startOn: schedule.startOn,
         endOn: schedule.endOn,
-        status: item.status,
-        priority: item.priority,
-        notes: item.notes,
-        tags: [...item.tags],
+        status: target.status,
+        priority: target.priority,
+        notes: target.notes,
+        tags: [...target.tags],
       })
     }
     requestAnimationFrame(() => titleRef.current?.focus())
-  }, [modal, item?.id]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [sessionKey]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // If edit target vanished, close
   useEffect(() => {
@@ -299,10 +309,13 @@ export function WorkItemEditorModal() {
                 aria-label={t('workItems.fields.startOn')}
                 value={draft.startOn}
                 // No max: past-dated items must still allow jumping start to today.
-                // onChange clamps end so start ≤ end.
+                // Functional update clamps end so start ≤ end (avoids stale draft).
                 onChange={(startOn) => {
-                  const endOn = startOn > draft.endOn ? startOn : draft.endOn
-                  patch({ startOn, endOn })
+                  setDraft((d) => ({
+                    ...d,
+                    startOn,
+                    endOn: startOn > d.endOn ? startOn : d.endOn,
+                  }))
                 }}
               />
             </div>
@@ -312,10 +325,12 @@ export function WorkItemEditorModal() {
                 data-testid="work-item-end-input"
                 aria-label={t('workItems.fields.endOn')}
                 value={draft.endOn}
-                // No min: same reason as start — free pick + clamp the other side.
                 onChange={(endOn) => {
-                  const startOn = endOn < draft.startOn ? endOn : draft.startOn
-                  patch({ startOn, endOn })
+                  setDraft((d) => ({
+                    ...d,
+                    endOn,
+                    startOn: endOn < d.startOn ? endOn : d.startOn,
+                  }))
                 }}
               />
             </div>

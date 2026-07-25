@@ -122,7 +122,7 @@ export function WorkItemListView({
                 data-testid={`work-item-row-${item.id}`}
                 data-selected={selected ? 'true' : undefined}
                 className={cn(
-                  'grid w-full cursor-pointer grid-cols-[14px_minmax(0,1fr)_auto_auto_auto] items-center gap-2 px-3 py-2.5 text-left transition-colors',
+                  'grid w-full cursor-pointer grid-cols-[14px_minmax(0,1fr)_auto_auto_auto_auto] items-center gap-2 px-3 py-2.5 text-left transition-colors',
                   selected ? 'bg-state-active' : 'hover:bg-state-hover',
                 )}
                 onClick={() => requestEdit(item.id)}
@@ -148,38 +148,34 @@ export function WorkItemListView({
                 >
                   <Check className="h-3 w-3" strokeWidth={2.5} />
                 </button>
-                <div className="min-w-0">
-                  <div className="flex min-w-0 items-center gap-2">
+                <div className="flex min-w-0 items-center gap-2">
+                  <span
+                    className="size-2.5 shrink-0 rounded-full"
+                    style={{ background: hex }}
+                    aria-hidden
+                  />
+                  <span
+                    className={cn(
+                      'truncate text-body text-ink',
+                      (done || cancelled) && 'text-ink-tertiary line-through',
+                    )}
+                  >
+                    {title}
+                  </span>
+                </div>
+                <div
+                  className="flex max-w-[14rem] items-center justify-end gap-1"
+                  data-testid={`work-item-row-tags-${item.id}`}
+                >
+                  {tags.map((tag) => (
                     <span
-                      className="size-2.5 shrink-0 rounded-full"
-                      style={{ background: hex }}
-                      aria-hidden
-                    />
-                    <span
-                      className={cn(
-                        'truncate text-body text-ink',
-                        (done || cancelled) && 'text-ink-tertiary line-through',
-                      )}
+                      key={tag}
+                      className="max-w-[5.5rem] truncate rounded-full bg-surface-muted px-2 py-0.5 text-caption text-ink-secondary"
+                      title={tag}
                     >
-                      {title}
+                      {tag}
                     </span>
-                  </div>
-                  {tags.length > 0 ? (
-                    <div
-                      className="mt-1 flex min-w-0 flex-wrap items-center gap-1 pl-[18px]"
-                      data-testid={`work-item-row-tags-${item.id}`}
-                    >
-                      {tags.map((tag) => (
-                        <span
-                          key={tag}
-                          className="max-w-[8rem] truncate rounded-full bg-surface-muted px-2 py-0.5 text-caption text-ink-secondary"
-                          title={tag}
-                        >
-                          {tag}
-                        </span>
-                      ))}
-                    </div>
-                  ) : null}
+                  ))}
                 </div>
                 <span
                   data-testid={`work-item-priority-${item.id}`}

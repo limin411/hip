@@ -30,7 +30,7 @@ describe('DateField', () => {
     expect(screen.getByTestId('work-item-start-input-trigger')).toBeInTheDocument()
   })
 
-  it('picks a day from the popover', () => {
+  it('picks a day from the popover (pointerdown — click is canceled by Dialog outside guards)', () => {
     const onChange = vi.fn()
     render(
       <DateField
@@ -40,7 +40,8 @@ describe('DateField', () => {
       />,
     )
     fireEvent.click(screen.getByTestId('d-trigger'))
-    fireEvent.click(screen.getByTestId('date-field-day-2026-07-10'))
+    // Real app: Dialog preventDefault on outside pointerdown kills click.
+    fireEvent.pointerDown(screen.getByTestId('date-field-day-2026-07-10'), { button: 0 })
     expect(onChange).toHaveBeenCalledWith('2026-07-10')
   })
 
@@ -61,7 +62,7 @@ describe('DateField', () => {
       <DateField data-testid="d" value="2026-07-25" onChange={onChange} />,
     )
     fireEvent.click(screen.getByTestId('d-trigger'))
-    fireEvent.click(screen.getByTestId('date-field-today'))
+    fireEvent.pointerDown(screen.getByTestId('date-field-today'), { button: 0 })
     expect(onChange).toHaveBeenCalledTimes(1)
     const ymd = onChange.mock.calls[0]![0] as string
     expect(ymd).toMatch(/^\d{4}-\d{2}-\d{2}$/)
@@ -75,7 +76,7 @@ describe('DateField', () => {
     fireEvent.click(screen.getByTestId('d-trigger'))
     // Today must not be disabled just because the stored date is old.
     expect(screen.getByTestId('date-field-today')).not.toBeDisabled()
-    fireEvent.click(screen.getByTestId('date-field-today'))
+    fireEvent.pointerDown(screen.getByTestId('date-field-today'), { button: 0 })
     expect(onChange).toHaveBeenCalled()
   })
 })

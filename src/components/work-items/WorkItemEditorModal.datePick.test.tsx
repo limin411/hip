@@ -90,7 +90,7 @@ describe('WorkItemEditorModal date pick (old item)', () => {
 
     fireEvent.click(screen.getByTestId('work-item-start-input-trigger'))
     const day = await screen.findByTestId('date-field-day-2020-03-15')
-    fireEvent.click(day)
+    fireEvent.pointerDown(day, { button: 0 })
 
     const start = screen.getByTestId('work-item-start-input') as HTMLInputElement
     expect(start.value).toBe('2020-03-15')
@@ -104,7 +104,7 @@ describe('WorkItemEditorModal date pick (old item)', () => {
     fireEvent.click(screen.getByTestId('work-item-start-input-trigger'))
     const todayBtn = await screen.findByTestId('date-field-today')
     expect(todayBtn).not.toBeDisabled()
-    fireEvent.click(todayBtn)
+    fireEvent.pointerDown(todayBtn, { button: 0 })
     const start = screen.getByTestId('work-item-start-input') as HTMLInputElement
     expect(start.value).toMatch(/^\d{4}-\d{2}-\d{2}$/)
     expect(start.value).not.toBe('2020-03-10')

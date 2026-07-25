@@ -53,11 +53,10 @@ function formatDisplay(ymd: string, locale: string): string {
 type PanelPos = { top: number; left: number }
 
 /**
- * App-styled date field: trigger + portaled fixed month grid.
- * Portal uses fixed coords (not Radix Popover) so:
- * - not clipped by Modal overflow
- * - sits above dialog (z-index 70)
- * - day / “今天” clicks are not swallowed by full-screen dialog chrome
+ * IMPORTANT: Day / today / month actions use pointerdown, not click.
+ * DateField portals outside Radix Dialog; Dialog's onPointerDownOutside
+ * preventDefault (needed so the modal stays open) cancels the synthetic
+ * click. pointerdown still fires and must apply the value.
  */
 export function DateField({
   value,
@@ -78,6 +77,13 @@ export function DateField({
   const rootRef = useRef<HTMLDivElement>(null)
   const triggerRef = useRef<HTMLButtonElement>(null)
   const panelRef = useRef<HTMLDivElement>(null)
+  // Stable callback ref so portal handlers always see latest onChange/min/max
+  const onChangeRef = useRef(onChange)
+  onChangeRef.current = onChange
+  const minRef = useRef(min)
+  minRef.current = min
+  const maxRef = useRef(max)
+  maxRef.current = max
 
   const [cursor, setCursor] = useState(() => {
     const p = parseYmd(value)
@@ -99,12 +105,10 @@ export function DateField({
     const gap = 4
     let top = r.bottom + gap
     let left = r.left
-    // Prefer below; flip above if near bottom of viewport
     const approxPanelH = 320
     if (top + approxPanelH > window.innerHeight - 8 && r.top > approxPanelH) {
       top = r.top - approxPanelH - gap
     }
-    // Keep in horizontal viewport
     left = Math.min(left, window.innerWidth - PANEL_WIDTH - 8)
     left = Math.max(8, left)
     setPos({ top, left })
@@ -115,7 +119,6 @@ export function DateField({
     updatePos()
     const onScroll = () => updatePos()
     window.addEventListener('resize', onScroll)
-    // capture scroll from modal body too
     window.addEventListener('scroll', onScroll, true)
     return () => {
       window.removeEventListener('resize', onScroll)
@@ -127,9 +130,10 @@ export function DateField({
     if (!open) return
     const onPointer = (e: PointerEvent) => {
       const t = e.target
-      if (!(t instanceof Node)) return
+      if (!(t instanceof Element)) return
+      // Prefer attribute so we don't race panelRef attachment
+      if (t.closest('[data-date-field-panel]')) return
       if (rootRef.current?.contains(t)) return
-      if (panelRef.current?.contains(t)) return
       setOpen(false)
     }
     const onKey = (e: KeyboardEvent) => {
@@ -138,10 +142,11 @@ export function DateField({
         setOpen(false)
       }
     }
-    document.addEventListener('pointerdown', onPointer, true)
+    // bubble phase — after button handlers; avoid capture stealing
+    document.addEventListener('pointerdown', onPointer)
     document.addEventListener('keydown', onKey, true)
     return () => {
-      document.removeEventListener('pointerdown', onPointer, true)
+      document.removeEventListener('pointerdown', onPointer)
       document.removeEventListener('keydown', onKey, true)
     }
   }, [open])
@@ -162,14 +167,16 @@ export function DateField({
   const monthLabel = formatMonthLabel(cursor.year, cursor.monthIndex, locale)
 
   const isDisabledDay = (ymd: string) => {
-    if (min && ymd < min) return true
-    if (max && ymd > max) return true
+    const lo = minRef.current
+    const hi = maxRef.current
+    if (lo && ymd < lo) return true
+    if (hi && ymd > hi) return true
     return false
   }
 
   const pick = (ymd: string) => {
     if (isDisabledDay(ymd)) return
-    onChange(ymd)
+    onChangeRef.current(ymd)
     setOpen(false)
   }
 
@@ -177,7 +184,7 @@ export function DateField({
     const p = parseYmd(today)
     if (p) setCursor({ year: p.y, monthIndex: p.m })
     if (!isDisabledDay(today)) {
-      onChange(today)
+      onChangeRef.current(today)
       setOpen(false)
     }
   }
@@ -189,12 +196,21 @@ export function DateField({
     })
   }
 
+  /** Apply action on pointerdown — click is often canceled by Dialog outside guards. */
+  const onActivate = (e: React.PointerEvent | React.MouseEvent, fn: () => void) => {
+    // Only primary button
+    if ('button' in e && e.button !== 0) return
+    e.preventDefault()
+    e.stopPropagation()
+    fn()
+  }
+
   const handleHiddenChange = (raw: string) => {
     if (!raw) {
-      onChange(today)
+      onChangeRef.current(today)
       return
     }
-    if (isValidDueOn(raw)) onChange(raw)
+    if (isValidDueOn(raw)) onChangeRef.current(raw)
   }
 
   const panel =
@@ -208,6 +224,8 @@ export function DateField({
             data-date-field-panel=""
             className="fixed z-[70] rounded-lg border border-border bg-surface p-3 shadow-menu"
             style={{ top: pos.top, left: pos.left, width: PANEL_WIDTH }}
+            // Stop dialog dismissable-layer from treating panel as inert outside
+            onPointerDown={(e) => e.stopPropagation()}
           >
             <div className="mb-2 flex items-center gap-1" data-testid="date-field-month-nav">
               <button
@@ -215,7 +233,7 @@ export function DateField({
                 className="inline-flex h-7 w-7 items-center justify-center rounded-md text-ink-secondary hover:bg-state-hover hover:text-ink"
                 aria-label={t('workItems.calendar.prevMonth')}
                 data-testid="date-field-prev-month"
-                onClick={() => shiftMonth(-1)}
+                onPointerDown={(e) => onActivate(e, () => shiftMonth(-1))}
               >
                 <ChevronLeft className="h-4 w-4" strokeWidth={1.75} />
               </button>
@@ -227,7 +245,7 @@ export function DateField({
                 className="inline-flex h-7 w-7 items-center justify-center rounded-md text-ink-secondary hover:bg-state-hover hover:text-ink"
                 aria-label={t('workItems.calendar.nextMonth')}
                 data-testid="date-field-next-month"
-                onClick={() => shiftMonth(1)}
+                onPointerDown={(e) => onActivate(e, () => shiftMonth(1))}
               >
                 <ChevronRight className="h-4 w-4" strokeWidth={1.75} />
               </button>
@@ -258,7 +276,10 @@ export function DateField({
                     disabled={blocked}
                     aria-selected={selectedDay}
                     data-testid={`date-field-day-${cell.ymd}`}
-                    onClick={() => pick(cell.ymd)}
+                    onPointerDown={(e) => {
+                      if (blocked) return
+                      onActivate(e, () => pick(cell.ymd))
+                    }}
                     className={cn(
                       'relative flex h-8 items-center justify-center rounded-md text-caption tabular-nums transition-colors duration-chrome',
                       blocked && 'cursor-not-allowed opacity-30',
@@ -283,7 +304,7 @@ export function DateField({
                 type="button"
                 className="rounded-md px-2 py-1 text-caption font-medium text-ink-secondary hover:bg-state-hover hover:text-ink"
                 data-testid="date-field-today"
-                onClick={() => handleToday()}
+                onPointerDown={(e) => onActivate(e, () => handleToday())}
               >
                 {t('workItems.calendar.today')}
               </button>

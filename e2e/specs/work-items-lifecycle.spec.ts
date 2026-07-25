@@ -13,7 +13,8 @@ import {
   setWorkItemNotes,
   setWorkItemStatus,
   setWorkItemPriority,
-  setWorkItemDueOn,
+  setWorkItemStartOn,
+  setWorkItemEndOn,
   addWorkItemTag,
   waitForCatalogTitle,
   waitForCatalogItemMatch,
@@ -67,12 +68,13 @@ describe('work items lifecycle @work-items @core', () => {
     expect(item.archivedAt).toBeNull()
   })
 
-  it('WL3: edit status, priority, dueOn, tags, notes persist to disk', async () => {
+  it('WL3: edit status, priority, start/end, tags, notes persist to disk', async () => {
     await selectWorkItemByTitle(titleA)
     await setWorkItemStatus('in_progress')
     await setWorkItemPriority('high')
     const today = localTodayYmd()
-    await setWorkItemDueOn(today)
+    await setWorkItemStartOn(today)
+    await setWorkItemEndOn(today)
     await addWorkItemTag(tagName)
     await setWorkItemNotes(notesMarker)
 
@@ -81,7 +83,8 @@ describe('work items lifecycle @work-items @core', () => {
         i.title === titleA &&
         i.status === 'in_progress' &&
         i.priority === 'high' &&
-        i.dueOn === today &&
+        i.startOn === today &&
+        i.endOn === today &&
         (i.tags ?? []).includes(tagName) &&
         (i.notes ?? '').includes(notesMarker),
       20000,

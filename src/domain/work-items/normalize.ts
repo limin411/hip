@@ -23,8 +23,10 @@ export const WORK_ITEM_TAGS_MAX = 20
 /** Max chars per tag. */
 export const WORK_ITEM_TAG_MAX_LEN = 32
 
-/** dueOn shape: YYYY-MM-DD. */
+/** Local calendar date shape: YYYY-MM-DD (startOn / endOn / legacy dueOn). */
 export const DUE_ON_RE = /^\d{4}-\d{2}-\d{2}$/
+/** @deprecated alias — use DUE_ON_RE */
+export const WORK_ITEM_YMD_RE = DUE_ON_RE
 
 const textEncoder = new TextEncoder()
 
@@ -152,12 +154,34 @@ function normalizeLinks(raw: unknown): WorkItemLinks {
   return links
 }
 
-function normalizeDueOn(raw: unknown): string | null {
+function normalizeYmd(raw: unknown): string | null {
   if (raw == null || raw === '') return null
   if (typeof raw !== 'string') return null
   const s = raw.trim()
   if (!isValidDueOn(s)) return null
   return s
+}
+
+/**
+ * Normalize start/end range. Legacy `dueOn` maps to `endOn` when end is absent.
+ * If both are set and inverted, swap so startOn ≤ endOn.
+ */
+export function normalizeScheduleRange(raw: {
+  startOn?: unknown
+  endOn?: unknown
+  dueOn?: unknown
+}): { startOn: string | null; endOn: string | null } {
+  let startOn = normalizeYmd(raw.startOn)
+  let endOn = normalizeYmd(raw.endOn)
+  if (endOn == null) {
+    endOn = normalizeYmd(raw.dueOn)
+  }
+  if (startOn != null && endOn != null && startOn > endOn) {
+    const tmp = startOn
+    startOn = endOn
+    endOn = tmp
+  }
+  return { startOn, endOn }
 }
 
 function normalizeStatus(raw: unknown): WorkItemStatus {
@@ -224,7 +248,7 @@ function normalizeItem(
       ? clampUtf8Bytes(o.notes, WORK_ITEM_NOTES_MAX)
       : ''
   const tags = normalizeTags(o.tags)
-  const dueOn = normalizeDueOn(o.dueOn)
+  const { startOn, endOn } = normalizeScheduleRange(o)
   const createdAt = asFiniteNumber(o.createdAt, fallbackNow)
   const updatedAt = asFiniteNumber(o.updatedAt, createdAt)
   const links = normalizeLinks(o.links)
@@ -252,7 +276,8 @@ function normalizeItem(
     listId,
     tags,
     notes,
-    dueOn,
+    startOn,
+    endOn,
     createdAt,
     updatedAt,
     completedAt,

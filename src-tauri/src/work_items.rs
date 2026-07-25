@@ -51,7 +51,14 @@ pub struct WorkItem {
     pub tags: Vec<String>,
     #[serde(default)]
     pub notes: String,
-    /// Local calendar date `YYYY-MM-DD`, or null. Never time-of-day / `dueAt`.
+    /// Schedule start (local calendar `YYYY-MM-DD`), or null.
+    #[serde(default)]
+    pub start_on: Option<String>,
+    /// Schedule end (local calendar `YYYY-MM-DD`), or null.
+    #[serde(default)]
+    pub end_on: Option<String>,
+    /// Legacy single due date — accepted on read only; never written.
+    #[serde(default, skip_serializing)]
     pub due_on: Option<String>,
     pub created_at: i64,
     pub updated_at: i64,
@@ -235,9 +242,22 @@ pub fn validate_catalog(catalog: &WorkItemsCatalog) -> Result<(), String> {
                 return Err(format!("tag too long on {}", item.id));
             }
         }
-        if let Some(ref due) = item.due_on {
-            if !is_valid_due_on(due) {
-                return Err(format!("invalid dueOn on {}: {due}", item.id));
+        if let Some(ref start) = item.start_on {
+            if !is_valid_due_on(start) {
+                return Err(format!("invalid startOn on {}: {start}", item.id));
+            }
+        }
+        if let Some(ref end) = item.end_on {
+            if !is_valid_due_on(end) {
+                return Err(format!("invalid endOn on {}: {end}", item.id));
+            }
+        }
+        if let (Some(ref start), Some(ref end)) = (&item.start_on, &item.end_on) {
+            if start > end {
+                return Err(format!(
+                    "startOn after endOn on {}: {start} > {end}",
+                    item.id
+                ));
             }
         }
         match item.status.as_str() {
@@ -276,10 +296,36 @@ fn backup_corrupt(path: &Path) -> Option<PathBuf> {
 }
 
 /// Load catalog. Missing → default Inbox. Corrupt → backup + default.
+/// Migrate legacy `dueOn` → `endOn` and drop legacy field.
+fn migrate_item_schedule(item: &mut WorkItem) {
+    if item.end_on.is_none() {
+        if let Some(d) = item.due_on.take() {
+            item.end_on = Some(d);
+        }
+    } else {
+        item.due_on = None;
+    }
+    if let (Some(s), Some(e)) = (item.start_on.clone(), item.end_on.clone()) {
+        if s > e {
+            item.start_on = Some(e);
+            item.end_on = Some(s);
+        }
+    }
+}
+
+fn migrate_catalog_schedule(catalog: &mut WorkItemsCatalog) {
+    for item in &mut catalog.items {
+        migrate_item_schedule(item);
+    }
+}
+
 pub fn load_catalog(path: &Path) -> WorkItemsCatalog {
     match std::fs::read_to_string(path) {
         Ok(body) => match serde_json::from_str::<WorkItemsCatalog>(&body) {
-            Ok(cat) => cat,
+            Ok(mut cat) => {
+                migrate_catalog_schedule(&mut cat);
+                cat
+            }
             Err(_) => {
                 let _ = backup_corrupt(path);
                 default_catalog()
@@ -295,11 +341,13 @@ pub fn load_catalog(path: &Path) -> WorkItemsCatalog {
 
 /// Persist catalog via shared atomic 0o600 helper.
 pub fn save_catalog(path: &Path, catalog: &WorkItemsCatalog) -> Result<(), String> {
-    validate_catalog(catalog)?;
+    let mut catalog = catalog.clone();
+    migrate_catalog_schedule(&mut catalog);
+    validate_catalog(&catalog)?;
     if let Some(parent) = path.parent() {
         std::fs::create_dir_all(parent).map_err(|e| e.to_string())?;
     }
-    let body = serde_json::to_string_pretty(catalog).map_err(|e| e.to_string())?;
+    let body = serde_json::to_string_pretty(&catalog).map_err(|e| e.to_string())?;
     if body.len() > CATALOG_MAX_BYTES {
         return Err(format!(
             "catalog too large: {} bytes (max {CATALOG_MAX_BYTES})",
@@ -318,7 +366,7 @@ pub fn work_items_list(app: AppHandle) -> Result<WorkItemsCatalog, String> {
     Ok(load_catalog(&path))
 }
 
-/// Full replace save. Validates version, ids, sizes, dueOn; atomic private write.
+/// Full replace save. Validates version, ids, sizes, startOn/endOn; atomic private write.
 #[tauri::command]
 pub fn work_items_save(app: AppHandle, catalog: WorkItemsCatalog) -> Result<(), String> {
     let path = crate::paths::work_items_catalog_path(&app)
@@ -350,7 +398,9 @@ mod tests {
             list_id: "wl_work".into(),
             tags: vec!["hip".into(), "v1".into()],
             notes: "Golden fixture locks camelCase field names.".into(),
-            due_on: Some("2026-07-25".into()),
+            start_on: Some("2026-07-20".into()),
+            end_on: Some("2026-07-25".into()),
+            due_on: None,
             created_at: 1_720_000_001_000,
             updated_at: 1_720_000_002_000,
             completed_at: None,
@@ -487,20 +537,29 @@ mod tests {
     }
 
     #[test]
-    fn rejects_invalid_due_on() {
+    fn rejects_invalid_schedule_dates() {
         let mut cat = sample_catalog();
-        cat.items[0].due_on = Some("2026-02-31".into());
-        assert!(validate_catalog(&cat).unwrap_err().contains("invalid dueOn"));
-        cat.items[0].due_on = Some("not-a-date".into());
-        assert!(validate_catalog(&cat).unwrap_err().contains("invalid dueOn"));
-        cat.items[0].due_on = Some("2026-07-25T12:00:00Z".into());
-        assert!(validate_catalog(&cat).unwrap_err().contains("invalid dueOn"));
+        cat.items[0].end_on = Some("2026-02-31".into());
+        assert!(validate_catalog(&cat).unwrap_err().contains("invalid endOn"));
+        cat = sample_catalog();
+        cat.items[0].start_on = Some("not-a-date".into());
+        assert!(validate_catalog(&cat).unwrap_err().contains("invalid startOn"));
+        cat = sample_catalog();
+        cat.items[0].end_on = Some("2026-07-25T12:00:00Z".into());
+        assert!(validate_catalog(&cat).unwrap_err().contains("invalid endOn"));
+        cat = sample_catalog();
+        cat.items[0].start_on = Some("2026-07-30".into());
+        cat.items[0].end_on = Some("2026-07-20".into());
+        assert!(validate_catalog(&cat)
+            .unwrap_err()
+            .contains("startOn after endOn"));
     }
 
     #[test]
-    fn accepts_null_due_on() {
+    fn accepts_null_schedule() {
         let mut cat = sample_catalog();
-        cat.items[0].due_on = None;
+        cat.items[0].start_on = None;
+        cat.items[0].end_on = None;
         assert!(validate_catalog(&cat).is_ok());
     }
 
@@ -559,6 +618,8 @@ mod tests {
             list_id: "wl_missing".into(),
             tags: vec![],
             notes: String::new(),
+            start_on: None,
+            end_on: None,
             due_on: None,
             created_at: 0,
             updated_at: 0,
@@ -645,6 +706,8 @@ mod tests {
                 list_id: INBOX_LIST_ID.into(),
                 tags: vec![],
                 notes: notes.clone(),
+                start_on: None,
+                end_on: None,
                 due_on: None,
                 created_at: 0,
                 updated_at: 0,
@@ -686,10 +749,11 @@ mod tests {
     }
 
     #[test]
-    fn golden_fixture_locks_camel_case_due_on() {
+    fn golden_fixture_locks_camel_case_schedule() {
         let raw = include_str!("fixtures/work_items_catalog_golden.json");
         // Wire shape: camelCase field names (never dueAt).
-        assert!(raw.contains("\"dueOn\""));
+        assert!(raw.contains("\"startOn\""));
+        assert!(raw.contains("\"endOn\""));
         assert!(!raw.contains("\"dueAt\""));
         assert!(raw.contains("\"listId\""));
         assert!(raw.contains("\"sortOrder\""));
@@ -700,10 +764,12 @@ mod tests {
         assert!(raw.contains("\"spaceId\""));
         assert!(raw.contains("\"docId\""));
 
-        let cat: WorkItemsCatalog = serde_json::from_str(raw).expect("golden deserializes");
+        let mut cat: WorkItemsCatalog = serde_json::from_str(raw).expect("golden deserializes");
+        migrate_catalog_schedule(&mut cat);
         assert_eq!(cat.version, 1);
         assert_eq!(cat.items.len(), 1);
-        assert_eq!(cat.items[0].due_on.as_deref(), Some("2026-07-25"));
+        assert_eq!(cat.items[0].start_on.as_deref(), Some("2026-07-20"));
+        assert_eq!(cat.items[0].end_on.as_deref(), Some("2026-07-25"));
         assert_eq!(cat.items[0].list_id, "wl_work");
         assert_eq!(
             cat.items[0]
@@ -714,9 +780,11 @@ mod tests {
             Some(("space_a", "doc_b"))
         );
 
-        // Round-trip serialization keeps camelCase keys.
+        // Round-trip serialization keeps camelCase keys; legacy dueOn is not written.
         let v: serde_json::Value = serde_json::to_value(&cat).unwrap();
-        assert_eq!(v["items"][0]["dueOn"], "2026-07-25");
+        assert_eq!(v["items"][0]["startOn"], "2026-07-20");
+        assert_eq!(v["items"][0]["endOn"], "2026-07-25");
+        assert!(v["items"][0].get("dueOn").is_none());
         assert!(v["items"][0].get("dueAt").is_none());
         assert_eq!(v["items"][0]["listId"], "wl_work");
         assert_eq!(v["lists"][0]["sortOrder"], 0);
@@ -725,6 +793,43 @@ mod tests {
         assert_eq!(v["items"][0]["links"]["knowledge"]["spaceId"], "space_a");
 
         validate_catalog(&cat).expect("golden catalog validates");
+    }
+
+    #[test]
+    fn migrates_legacy_due_on_on_load() {
+        let p = tmp_path("legacy-due");
+        let _ = std::fs::remove_file(&p);
+        let body = r#"{
+          "version": 1,
+          "lists": [{
+            "id": "wl_inbox",
+            "name": "Inbox",
+            "sortOrder": 0,
+            "createdAt": 0,
+            "updatedAt": 0,
+            "system": "inbox"
+          }],
+          "items": [{
+            "id": "wi_1",
+            "title": "legacy",
+            "status": "todo",
+            "priority": "none",
+            "listId": "wl_inbox",
+            "tags": [],
+            "notes": "",
+            "dueOn": "2026-07-25",
+            "createdAt": 1,
+            "updatedAt": 1,
+            "completedAt": null,
+            "archivedAt": null,
+            "links": {}
+          }]
+        }"#;
+        std::fs::write(&p, body).unwrap();
+        let cat = load_catalog(&p);
+        assert_eq!(cat.items[0].end_on.as_deref(), Some("2026-07-25"));
+        assert!(cat.items[0].start_on.is_none());
+        assert!(cat.items[0].due_on.is_none());
     }
 
     #[test]

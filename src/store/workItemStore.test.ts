@@ -41,7 +41,8 @@ function item(partial: Partial<WorkItem> & { id: string }): WorkItem {
     listId: INBOX_LIST_ID,
     tags: [],
     notes: '',
-    dueOn: null,
+    startOn: null,
+    endOn: null,
     createdAt: 1,
     updatedAt: 1,
     completedAt: null,
@@ -125,7 +126,8 @@ describe('workItemStore', () => {
       status: 'todo',
       priority: 'none',
       listId: INBOX_LIST_ID,
-      dueOn: null,
+      startOn: null,
+      endOn: null,
       notes: '',
     })
     expect(saveWorkItems).toHaveBeenCalled()

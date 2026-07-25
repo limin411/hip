@@ -216,15 +216,42 @@ export function WorkItemDetailPane({
           </label>
 
           <label className="flex flex-col gap-1">
-            <span className="text-meta text-ink-tertiary">{t('workItems.fields.dueOn')}</span>
+            <span className="text-meta text-ink-tertiary">{t('workItems.fields.startOn')}</span>
             <input
               type="date"
-              data-testid="work-item-due-input"
+              data-testid="work-item-start-input"
               className={inputClassName}
-              value={item.dueOn ?? ''}
-              onChange={(e) =>
-                void updateItem(item.id, { dueOn: e.target.value ? e.target.value : null })
-              }
+              value={item.startOn ?? ''}
+              max={item.endOn ?? undefined}
+              onChange={(e) => {
+                const startOn = e.target.value ? e.target.value : null
+                const patch: { startOn: string | null; endOn?: string | null } = { startOn }
+                // Keep range valid: if start moves past end, pull end forward.
+                if (startOn != null && item.endOn != null && startOn > item.endOn) {
+                  patch.endOn = startOn
+                }
+                void updateItem(item.id, patch)
+              }}
+            />
+          </label>
+
+          <label className="flex flex-col gap-1">
+            <span className="text-meta text-ink-tertiary">{t('workItems.fields.endOn')}</span>
+            <input
+              type="date"
+              data-testid="work-item-end-input"
+              className={inputClassName}
+              value={item.endOn ?? ''}
+              min={item.startOn ?? undefined}
+              onChange={(e) => {
+                const endOn = e.target.value ? e.target.value : null
+                const patch: { endOn: string | null; startOn?: string | null } = { endOn }
+                // Keep range valid: if end moves before start, pull start back.
+                if (endOn != null && item.startOn != null && endOn < item.startOn) {
+                  patch.startOn = endOn
+                }
+                void updateItem(item.id, patch)
+              }}
             />
           </label>
         </div>

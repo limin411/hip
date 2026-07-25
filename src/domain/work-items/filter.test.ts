@@ -16,7 +16,8 @@ function wi(
     listId: 'wl_inbox',
     tags: [],
     notes: '',
-    dueOn: null,
+    startOn: null,
+    endOn: null,
     createdAt: 1,
     updatedAt: 1,
     completedAt: null,
@@ -29,15 +30,16 @@ function wi(
 const today = '2026-07-25'
 
 const samples: WorkItem[] = [
-  wi({ id: 'wi_todo', status: 'todo', dueOn: today }),
-  wi({ id: 'wi_ip', status: 'in_progress', dueOn: '2026-07-20' }),
+  wi({ id: 'wi_todo', status: 'todo', startOn: null, endOn: today }),
+  wi({ id: 'wi_ip', status: 'in_progress', startOn: null, endOn: '2026-07-20' }),
   wi({ id: 'wi_done', status: 'done', completedAt: 1 }),
   wi({ id: 'wi_cancel', status: 'cancelled', completedAt: 1 }),
   wi({
     id: 'wi_arch',
     status: 'todo',
     archivedAt: 2,
-    dueOn: today,
+    startOn: null,
+    endOn: today,
   }),
   wi({
     id: 'wi_list_a',
@@ -48,7 +50,8 @@ const samples: WorkItem[] = [
   wi({
     id: 'wi_overdue_arch',
     status: 'todo',
-    dueOn: '2026-01-01',
+    startOn: null,
+    endOn: '2026-01-01',
     archivedAt: 9,
   }),
 ]

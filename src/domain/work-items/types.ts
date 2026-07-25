@@ -17,8 +17,13 @@ export type WorkItem = {
   listId: string
   tags: string[]
   notes: string
-  /** Local calendar date YYYY-MM-DD, or null. No time-of-day. NEVER dueAt. */
-  dueOn: string | null
+  /**
+   * Schedule range as local calendar dates `YYYY-MM-DD`, or null.
+   * No time-of-day. When both set, `startOn <= endOn`.
+   * Legacy single-day `dueOn` is migrated to `endOn` on load (see normalize).
+   */
+  startOn: string | null
+  endOn: string | null
   createdAt: number
   updatedAt: number
   /** Set when entering done or cancelled; null when open. */

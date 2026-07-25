@@ -110,7 +110,8 @@ describe('normalizeCatalog', () => {
           listId: 'wl_ok',
           tags: [],
           notes: '',
-          dueOn: null,
+          startOn: null,
+          endOn: null,
           createdAt: 1,
           updatedAt: 1,
           completedAt: null,
@@ -125,7 +126,8 @@ describe('normalizeCatalog', () => {
           listId: 'wl_ok',
           tags: [],
           notes: '',
-          dueOn: null,
+          startOn: null,
+          endOn: null,
           createdAt: 1,
           updatedAt: 1,
           completedAt: null,
@@ -153,7 +155,8 @@ describe('normalizeCatalog', () => {
           listId: 'wl_missing',
           tags: [],
           notes: '',
-          dueOn: null,
+          startOn: null,
+          endOn: null,
           createdAt: 1,
           updatedAt: 1,
           completedAt: null,
@@ -165,7 +168,7 @@ describe('normalizeCatalog', () => {
     expect(cat.items[0]!.listId).toBe(INBOX_LIST_ID)
   })
 
-  it('validates dueOn: null or real calendar YYYY-MM-DD only', () => {
+  it('validates startOn: null, endOn: null or real calendar YYYY-MM-DD only', () => {
     expect(DUE_ON_RE.test('2026-07-25')).toBe(true)
     expect(DUE_ON_RE.test('2026-7-5')).toBe(false)
     expect(isValidDueOn('2026-07-25')).toBe(true)
@@ -184,7 +187,8 @@ describe('normalizeCatalog', () => {
           listId: INBOX_LIST_ID,
           tags: [],
           notes: '',
-          dueOn: '2026-07-25T12:00:00Z',
+          startOn: null,
+          endOn: '2026-07-25T12:00:00Z',
           createdAt: 1,
           updatedAt: 1,
           completedAt: null,
@@ -199,7 +203,8 @@ describe('normalizeCatalog', () => {
           listId: INBOX_LIST_ID,
           tags: [],
           notes: '',
-          dueOn: '2026-07-25',
+          startOn: null,
+          endOn: '2026-07-25',
           createdAt: 1,
           updatedAt: 1,
           completedAt: null,
@@ -214,7 +219,8 @@ describe('normalizeCatalog', () => {
           listId: INBOX_LIST_ID,
           tags: [],
           notes: '',
-          dueOn: '2026-02-31',
+          startOn: null,
+          endOn: '2026-02-31',
           createdAt: 1,
           updatedAt: 1,
           completedAt: null,
@@ -223,9 +229,56 @@ describe('normalizeCatalog', () => {
         },
       ],
     })
-    expect(cat.items.find((i) => i.id === 'wi_1')!.dueOn).toBeNull()
-    expect(cat.items.find((i) => i.id === 'wi_2')!.dueOn).toBe('2026-07-25')
-    expect(cat.items.find((i) => i.id === 'wi_3')!.dueOn).toBeNull()
+    expect(cat.items.find((i) => i.id === 'wi_1')!.endOn).toBeNull()
+    expect(cat.items.find((i) => i.id === 'wi_2')!.endOn).toBe('2026-07-25')
+    expect(cat.items.find((i) => i.id === 'wi_3')!.endOn).toBeNull()
+    expect(cat.items.find((i) => i.id === 'wi_2')!.startOn).toBeNull()
+  })
+
+  it('migrates legacy dueOn to endOn and swaps inverted ranges', () => {
+    const cat = normalizeCatalog({
+      version: 1,
+      lists: [],
+      items: [
+        {
+          id: 'wi_legacy',
+          title: 'legacy',
+          status: 'todo',
+          priority: 'none',
+          listId: INBOX_LIST_ID,
+          tags: [],
+          notes: '',
+          dueOn: '2026-07-25',
+          createdAt: 1,
+          updatedAt: 1,
+          completedAt: null,
+          archivedAt: null,
+          links: {},
+        },
+        {
+          id: 'wi_swap',
+          title: 'swap',
+          status: 'todo',
+          priority: 'none',
+          listId: INBOX_LIST_ID,
+          tags: [],
+          notes: '',
+          startOn: '2026-07-30',
+          endOn: '2026-07-20',
+          createdAt: 1,
+          updatedAt: 1,
+          completedAt: null,
+          archivedAt: null,
+          links: {},
+        },
+      ],
+    })
+    const legacy = cat.items.find((i) => i.id === 'wi_legacy')!
+    expect(legacy.startOn).toBeNull()
+    expect(legacy.endOn).toBe('2026-07-25')
+    const swapped = cat.items.find((i) => i.id === 'wi_swap')!
+    expect(swapped.startOn).toBe('2026-07-20')
+    expect(swapped.endOn).toBe('2026-07-30')
   })
 
   it('trims item titles (whitespace-only becomes empty)', () => {
@@ -241,7 +294,8 @@ describe('normalizeCatalog', () => {
           listId: INBOX_LIST_ID,
           tags: [],
           notes: '',
-          dueOn: null,
+          startOn: null,
+          endOn: null,
           createdAt: 1,
           updatedAt: 1,
           completedAt: null,
@@ -256,7 +310,8 @@ describe('normalizeCatalog', () => {
           listId: INBOX_LIST_ID,
           tags: [],
           notes: '',
-          dueOn: null,
+          startOn: null,
+          endOn: null,
           createdAt: 1,
           updatedAt: 1,
           completedAt: null,
@@ -282,7 +337,8 @@ describe('normalizeCatalog', () => {
           listId: INBOX_LIST_ID,
           tags: [],
           notes: 'n'.repeat(WORK_ITEM_NOTES_MAX + 10),
-          dueOn: null,
+          startOn: null,
+          endOn: null,
           createdAt: 1,
           updatedAt: 1,
           completedAt: null,
@@ -315,7 +371,8 @@ describe('normalizeCatalog', () => {
           listId: INBOX_LIST_ID,
           tags: [],
           notes: over,
-          dueOn: null,
+          startOn: null,
+          endOn: null,
           createdAt: 1,
           updatedAt: 1,
           completedAt: null,
@@ -351,7 +408,8 @@ describe('normalizeCatalog', () => {
           listId: INBOX_LIST_ID,
           tags,
           notes: '',
-          dueOn: null,
+          startOn: null,
+          endOn: null,
           createdAt: 1,
           updatedAt: 1,
           completedAt: null,
@@ -380,7 +438,8 @@ describe('normalizeCatalog', () => {
           listId: INBOX_LIST_ID,
           tags: [],
           notes: '',
-          dueOn: null,
+          startOn: null,
+          endOn: null,
           createdAt: 1,
           updatedAt: 5,
           completedAt: 99,
@@ -395,7 +454,8 @@ describe('normalizeCatalog', () => {
           listId: INBOX_LIST_ID,
           tags: [],
           notes: '',
-          dueOn: null,
+          startOn: null,
+          endOn: null,
           createdAt: 1,
           updatedAt: 5,
           completedAt: null,
@@ -426,7 +486,8 @@ describe('normalizeCatalog', () => {
           listId: INBOX_LIST_ID,
           tags: [],
           notes: '',
-          dueOn: null,
+          startOn: null,
+          endOn: null,
           createdAt: 1,
           updatedAt: 1,
           completedAt: null,
@@ -460,7 +521,8 @@ describe('normalizeCatalog', () => {
           listId: INBOX_LIST_ID,
           tags: [],
           notes: '',
-          dueOn: null,
+          startOn: null,
+          endOn: null,
           createdAt: 1,
           updatedAt: 1,
           completedAt: null,
@@ -475,7 +537,8 @@ describe('normalizeCatalog', () => {
           listId: INBOX_LIST_ID,
           tags: [],
           notes: '',
-          dueOn: null,
+          startOn: null,
+          endOn: null,
           createdAt: 1,
           updatedAt: 1,
           completedAt: 1,
@@ -501,7 +564,8 @@ describe('normalizeCatalog', () => {
           listId: INBOX_LIST_ID,
           tags: [],
           notes: '',
-          dueOn: null,
+          startOn: null,
+          endOn: null,
           createdAt: 1,
           updatedAt: 1,
           completedAt: null,

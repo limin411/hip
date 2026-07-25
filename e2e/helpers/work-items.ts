@@ -28,7 +28,8 @@ export type WorkItemsCatalogFile = {
     listId: string
     tags: string[]
     notes: string
-    dueOn: string | null
+    startOn: string | null
+    endOn: string | null
     archivedAt: number | null
     completedAt: number | null
   }>
@@ -250,8 +251,17 @@ export async function setWorkItemPriority(priority: string): Promise<void> {
   await setReactSelectValue('work-item-priority-select', priority)
 }
 
+export async function setWorkItemStartOn(ymd: string | null): Promise<void> {
+  await setReactInputValue('work-item-start-input', ymd ?? '')
+}
+
+export async function setWorkItemEndOn(ymd: string | null): Promise<void> {
+  await setReactInputValue('work-item-end-input', ymd ?? '')
+}
+
+/** @deprecated use setWorkItemEndOn */
 export async function setWorkItemDueOn(ymd: string | null): Promise<void> {
-  await setReactInputValue('work-item-due-input', ymd ?? '')
+  await setWorkItemEndOn(ymd)
 }
 
 export async function addWorkItemTag(tag: string): Promise<void> {

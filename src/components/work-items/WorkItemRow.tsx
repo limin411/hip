@@ -79,8 +79,14 @@ export function WorkItemRow({ item, selected, onSelect, onToggleComplete }: Work
           {title}
         </div>
         <div className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-meta text-ink-tertiary">
-          {item.dueOn ? (
-            <span data-testid={`work-item-due-${item.id}`}>{item.dueOn}</span>
+          {item.startOn || item.endOn ? (
+            <span data-testid={`work-item-range-${item.id}`}>
+              {item.startOn && item.endOn
+                ? item.startOn === item.endOn
+                  ? item.startOn
+                  : `${item.startOn} – ${item.endOn}`
+                : (item.startOn ?? item.endOn)}
+            </span>
           ) : null}
           {item.priority !== 'none' ? (
             <span

@@ -253,6 +253,8 @@ mod tests {
             list_id: INBOX_LIST_ID.into(),
             tags: vec![],
             notes: String::new(),
+            start_on: None,
+            end_on: None,
             due_on: None,
             created_at: 1,
             updated_at: 1,

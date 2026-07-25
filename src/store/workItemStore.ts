@@ -65,7 +65,8 @@ function pendingNotesFor(id: string, itemNotes: string): string {
 function hasExtras(item: WorkItem, notes: string): boolean {
   return (
     notes.trim() !== '' ||
-    item.dueOn != null ||
+    item.startOn != null ||
+    item.endOn != null ||
     item.tags.length > 0 ||
     Boolean(item.links.sessionId) ||
     Boolean(item.links.knowledge) ||
@@ -106,7 +107,8 @@ function defaultItem(
     listId,
     tags: [],
     notes: '',
-    dueOn: null,
+    startOn: null,
+    endOn: null,
     createdAt: now,
     updatedAt: now,
     completedAt: null,

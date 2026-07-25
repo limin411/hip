@@ -34,7 +34,8 @@ describe('workItems IPC', () => {
           listId: INBOX_LIST_ID,
           tags: [],
           notes: '',
-          dueOn: '2026-07-25',
+          startOn: null,
+          endOn: '2026-07-25',
           createdAt: 1,
           updatedAt: 1,
           completedAt: null,
@@ -48,7 +49,8 @@ describe('workItems IPC', () => {
     expect(cat.version).toBe(1)
     expect(cat.lists[0]?.id).toBe(INBOX_LIST_ID)
     expect(cat.items).toHaveLength(1)
-    expect(cat.items[0]?.dueOn).toBe('2026-07-25')
+    expect(cat.items[0]?.endOn).toBe('2026-07-25')
+    expect(cat.items[0]?.startOn).toBeNull()
   })
 
   it('listWorkItems normalizes malformed rows via domain normalizeCatalog', async () => {

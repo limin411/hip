@@ -13,6 +13,13 @@ and this project aims to follow [Semantic Versioning](https://semver.org/).
   (`CONTRIBUTING.md`, `CODE_OF_CONDUCT.md`, `SECURITY.md`, GitHub issue/PR templates)
 - Example config: `docs/examples/hip.toml.example`
 - Release notes: `docs/release.md`
+- **Extension registry** for plugin / skill / MCP conflict resolution
+  (`docs/design/extension-registry.md`):
+  - Skill precedence: project > user > plugin > builtin (aligned with Settings / Tauri)
+  - MCP: hip.toml id wins (including `enabled = false` name veto); capability
+    fingerprint demotes duplicate packages/URLs unless `allowDuplicate = true`
+  - Tauri injects `HIP_SKILLS_DIR`; sidecar falls back to `HIP_DATA_DIR/skills` or `~/.hip/skills`
+  - Plugin skills/MCP stamp `pluginId` / `scope: 'plugin'` for provenance
 
 ## [1.0.1] - 2026-07-25
 

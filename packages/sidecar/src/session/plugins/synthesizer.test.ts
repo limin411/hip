@@ -139,7 +139,7 @@ describe('synthesizePlugin — mcpServers inline', () => {
 
     expect(r.mcpServers).toHaveLength(1)
     expect(r.mcpServers[0]).toEqual<SynthesizedMcpEntry>({
-      config: mcpConfig,
+      config: { ...mcpConfig, pluginId: 'test-plugin' },
       pluginId: 'test-plugin',
     })
   })

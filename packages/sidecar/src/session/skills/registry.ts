@@ -1,9 +1,27 @@
 // packages/sidecar/src/session/skills/registry.ts
 import { readdirSync, existsSync, statSync, readFileSync } from 'node:fs'
+import { homedir } from 'node:os'
 import { dirname, join, resolve, sep } from 'node:path'
 import type { SkillMeta, HipConfig } from '@hip/protocol'
 import { resolveEffectiveConfig } from '../../config/hip-config.js'
 import { parseFrontmatter } from './frontmatter.js'
+
+/**
+ * Resolve the global skills directory.
+ * Prefer HIP_SKILLS_DIR; else HIP_DATA_DIR/skills; else ~/.hip/skills.
+ * Matches Tauri `paths::skills_dir` when env injection is present.
+ */
+export function resolveGlobalSkillsDir(): string | undefined {
+  const fromEnv = process.env.HIP_SKILLS_DIR?.trim()
+  if (fromEnv) return fromEnv
+  const data = process.env.HIP_DATA_DIR?.trim()
+  if (data) return join(data, 'skills')
+  try {
+    return join(homedir(), '.hip', 'skills')
+  } catch {
+    return undefined
+  }
+}
 
 /** Build the enabled/disabled map from hip.toml (global + project). Missing/corrupt → {} (everything enabled). */
 export function readEnabledMap(cwd: string, effectiveConfig?: HipConfig): Record<string, boolean> {
@@ -182,16 +200,17 @@ export function mergeSkills(global: SkillMeta[], project: SkillMeta[]): SkillMet
 }
 
 /**
- * Scan HIP_SKILLS_DIR for SKILL.md files, parse YAML frontmatter (name/description),
+ * Scan the global skills directory for SKILL.md files, parse YAML frontmatter,
  * cross-reference the hip.toml enabled map (a skill missing from the map counts
  * as enabled), and return the enabled SkillMeta[] sorted by id. Folders without a
  * SKILL.md, or whose frontmatter has no name, are skipped. Called every turn; never throws.
  *
- * When cwd is provided, also scans .hip/skills/ relative to the project root and
- * merges project skills over global skills (project overrides global for same id).
+ * Global root resolution: HIP_SKILLS_DIR → HIP_DATA_DIR/skills → ~/.hip/skills.
+ * When cwd is provided, also scans .hip/skills/ and merges project over global
+ * (project overrides global for same id).
  */
 export function readEnabledSkills(cwd?: string, effectiveConfig?: HipConfig): SkillMeta[] {
-  const root = process.env.HIP_SKILLS_DIR?.trim()
+  const root = resolveGlobalSkillsDir()
   if (!root || !existsSync(root)) {
     // No global skills dir — try project-only scan
     if (cwd) return readProjectSkills(cwd, effectiveConfig)

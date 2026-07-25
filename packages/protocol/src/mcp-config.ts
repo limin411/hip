@@ -30,5 +30,10 @@ export interface McpServerConfig {
   registrySourceId?: string
   /** Registry package/version string at install time. */
   registryVersion?: string
+  /**
+   * When true, keep this server active even if another enabled server shares
+   * the same capability fingerprint (package / URL). Default false.
+   */
+  allowDuplicate?: boolean
 }
 

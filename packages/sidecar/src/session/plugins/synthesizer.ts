@@ -123,7 +123,11 @@ function synthesizeMcpServers(manifest: PluginManifest): SynthesizedMcpEntry[] {
   for (const config of configs) {
     if (!config.id || seen.has(config.id)) continue
     seen.add(config.id)
-    out.push({ config, pluginId: manifest.id })
+    // Stamp pluginId on the config itself so session / ACP / Settings share provenance.
+    out.push({
+      config: { ...config, pluginId: manifest.id },
+      pluginId: manifest.id,
+    })
   }
 
   return out

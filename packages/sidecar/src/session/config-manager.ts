@@ -1,39 +1,13 @@
 import type { SessionConfig, SkillMeta, AgentConfig, McpServerConfig } from '@hip/protocol'
-import { existsSync, readFileSync } from 'node:fs'
-import { join } from 'node:path'
-import { resolveEffectiveConfig } from '../config/hip-config.js'
-import { isPluginEnabled, readPluginsConfig } from '../config/plugins.js'
-import { readEnabledSkills, mergeSkills, extractSkillMetaFromData, readEnabledMap } from './skills/registry.js'
-import { parseFrontmatter } from './skills/frontmatter.js'
-import {
-  parsePluginManifest,
-  PluginManifestError,
-  type PluginManifestDiagnostic,
-} from './plugins/parser.js'
-import { synthesizePlugin } from './plugins/synthesizer.js'
+import { loadExtensions } from './extensions/load.js'
 import { HookRegistry } from './hooks/registry.js'
-import { getBuiltinSkills } from './product/builtin-skills.js'
-
-/** Read a plugin skill directory's SKILL.md and build a SkillMeta entry. */
-function skillMetaFromDir(dir: string, id: string): SkillMeta | null {
-  try {
-    const skillMd = join(dir, 'SKILL.md')
-    if (!existsSync(skillMd)) return null
-    const raw = readFileSync(skillMd, 'utf8')
-    const { data } = parseFrontmatter(raw)
-    const name = typeof data.name === 'string' ? data.name.trim() : undefined
-    if (!name) return null
-    const extra = extractSkillMetaFromData(dir, data)
-    return { id, name, description: typeof data.description === 'string' ? data.description.trim() : '', dir, ...extra }
-  } catch {
-    return null
-  }
-}
 
 export class ConfigManager {
   private cachedSkills: SkillMeta[] | null = null
   private cachedMcpConfigs: McpServerConfig[] | null = null
   private cachedPluginAgents: AgentConfig[] | null = null
+  /** Last extension conflicts from ExtensionRegistry (for inspect / future UI). */
+  private cachedConflicts: import('@hip/protocol').ExtensionConflict[] = []
 
   constructor(
     private getConfig: () => SessionConfig,
@@ -50,70 +24,56 @@ export class ConfigManager {
   get skills(): SkillMeta[] { return this.cachedSkills ?? [] }
   get mcpConfigs(): McpServerConfig[] { return this.cachedMcpConfigs ?? [] }
   get pluginAgents(): AgentConfig[] { return this.cachedPluginAgents ?? [] }
+  get extensionConflicts(): import('@hip/protocol').ExtensionConflict[] {
+    return this.cachedConflicts
+  }
 
-  /** Load (or reload) per-session plugin components. */
+  /** Load (or reload) per-session plugin components via ExtensionRegistry SSOT. */
   loadPluginComponents(): void {
     if (this.isExternalAgent()) {
       this.cachedSkills = []
       this.cachedMcpConfigs = []
       this.cachedPluginAgents = []
+      this.cachedConflicts = []
       return
     }
     this.hookRegistry.clear()
     const cwd = this.getConfig().cwd ?? process.cwd()
-    const cfg = resolveEffectiveConfig(cwd)
-    const enabled = readEnabledMap(cwd, cfg)
-    try { this.cachedSkills = readEnabledSkills(this.getConfig().cwd, cfg) } catch { this.cachedSkills = [] }
-    // Built-in product skill (L1) is lowest priority — global/project/plugin same-id wins.
-    // mergeSkills(base, override): later overrides earlier for the same id.
-    // Honor hip.toml skills disable for builtin ids (e.g. skills.hip.enabled = false).
-    const builtin = getBuiltinSkills().filter((s) => enabled[s.id] !== false)
-    this.cachedSkills = mergeSkills(builtin, this.cachedSkills)
-    this.cachedMcpConfigs = cfg.mcpServers ?? []
-    const pluginAgents: AgentConfig[] = []
     try {
-      const pluginsCfg = readPluginsConfig()
-      for (const pluginDir of pluginsCfg.plugins) {
-        if (!isPluginEnabled(pluginDir, pluginsCfg)) continue
-        try {
-          const diagnostics: PluginManifestDiagnostic[] = []
-          const manifest = parsePluginManifest(pluginDir, { diagnostics })
-          // parsePluginManifest already console.warns each diagnostic; re-log with id for load pipeline.
-          for (const d of diagnostics) {
-            console.warn(
-              `[plugin:load] id=${manifest.id} code=${d.code} dir=${pluginDir}: ${d.message}`,
-            )
-          }
-          const synth = synthesizePlugin(manifest)
-          const pluginSkills: SkillMeta[] = []
-          for (const se of synth.skills) {
-            if (enabled[se.id] === false) continue
-            const meta = skillMetaFromDir(se.dir, se.id)
-            if (meta) pluginSkills.push(meta)
-          }
-          if (pluginSkills.length > 0) this.cachedSkills = mergeSkills(this.cachedSkills!, pluginSkills)
-          for (const mcp of synth.mcpServers) this.cachedMcpConfigs!.push(mcp.config)
-          for (const agent of synth.agents) pluginAgents.push(agent.config)
-          for (const hookEntry of synth.hooks) {
-            for (const hook of hookEntry.hooks) {
-              this.hookRegistry.register(hook)
-            }
-          }
-        } catch (e) {
-          if (e instanceof PluginManifestError) {
-            console.warn(
-              `[plugin:load] Skipping invalid plugin dir=${pluginDir}: ${e.message}`,
-            )
-          } else {
-            console.warn(
-              `[plugin:load] Unexpected error loading plugin dir=${pluginDir}:`,
-              e instanceof Error ? e.message : e,
-            )
-          }
+      const loaded = loadExtensions(cwd)
+      this.cachedSkills = loaded.skills
+      this.cachedMcpConfigs = loaded.mcpConfigs
+      this.cachedPluginAgents = loaded.pluginAgents
+      this.cachedConflicts = loaded.conflicts
+      for (const entry of loaded.pluginHooks) {
+        for (const hook of entry.hooks) {
+          this.hookRegistry.register(hook)
         }
       }
-    } catch { /* degrade: skip plugins */ }
-    this.cachedPluginAgents = pluginAgents
+      // Log only high-signal conflicts (not routine project/user overrides of builtin).
+      const notable = loaded.conflicts.filter(
+        (c) =>
+          c.kind === 'mcp_capability_duplicate' ||
+          c.kind === 'mcp_name_veto' ||
+          c.kind === 'mcp_id_shadow' ||
+          (c.kind === 'skill_id_shadow' &&
+            (c.loser.kind === 'plugin_skill' || c.winner.kind === 'plugin_skill')),
+      )
+      if (notable.length > 0) {
+        console.warn(
+          `[extensions] ${notable.length} notable conflict(s) (MCP id/capability or plugin skill shadow)`,
+        )
+      }
+    } catch (e) {
+      console.warn(
+        '[extensions] load failed; skills/MCP empty for this session:',
+        e instanceof Error ? e.message : e,
+      )
+      this.cachedSkills = []
+      this.cachedMcpConfigs = []
+      this.cachedPluginAgents = []
+      this.cachedConflicts = []
+    }
   }
 
   /** Reload plugin components after config changes. */
@@ -121,6 +81,7 @@ export class ConfigManager {
     this.cachedSkills = null
     this.cachedMcpConfigs = null
     this.cachedPluginAgents = null
+    this.cachedConflicts = []
     this.loadPluginComponents()
   }
 

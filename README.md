@@ -27,7 +27,7 @@ _Screenshots coming soon — contributions welcome._
 | **Surfaces** | **Code** — full project workbench (files, git guidance, MCP, tools). **Chat** — lighter conversation; write previewable deliverables into the workspace for the artifacts panel. |
 | **Permissions** | **edit** (default, project sandbox), **chat** (read-only), **full** (user-granted whole filesystem). |
 | **Agents** | Supervisor plus roster agents (**explore** / **plan** / **coder**); agent-driven isolation and true parallel work via `task_batch`. |
-| **Extensibility** | Skills (`SKILL.md`), plugins, MCP servers, hooks — global under `~/.hip/` and project under `.hip/`. |
+| **Extensibility** | Skills (`SKILL.md`), plugins, MCP servers, hooks — global under `~/.hip/` and project under `.hip/`. Conflict resolution: [extension-registry](./docs/design/extension-registry.md). |
 | **Memory** | Cross-session memory **off by default**; enable under **Settings → Memory**. |
 | **CLI** | Attach-only `@hip/cli` for the **running** desktop app (`doctor`, `session`, `run`, `repl`). |
 | **Local-first** | Config, SQLite DB, skills, plugins, and logs live under `~/.hip/`. |

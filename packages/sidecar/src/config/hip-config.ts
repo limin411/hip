@@ -80,8 +80,16 @@ function normalizeMcpServerEntry(raw: Record<string, unknown>): McpServerConfig 
   if (raw.disabled_tools !== undefined && raw.disabledTools === undefined) {
     raw.disabledTools = raw.disabled_tools
   }
+  if (raw.allow_duplicate !== undefined && raw.allowDuplicate === undefined) {
+    raw.allowDuplicate = raw.allow_duplicate
+  }
+  if (raw.plugin_id !== undefined && raw.pluginId === undefined) {
+    raw.pluginId = raw.plugin_id
+  }
   delete raw.enabled_tools
   delete raw.disabled_tools
+  delete raw.allow_duplicate
+  delete raw.plugin_id
   return raw as unknown as McpServerConfig
 }
 

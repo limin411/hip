@@ -75,3 +75,23 @@ fsReadMaxBytes = 2000000
 # [activeModel]
 # providerID = "openai"
 # modelID = "gpt-4o"
+
+# ── Skills enable map (missing id ⇒ enabled) ───────────────────────────────
+# [[skills]]
+# id = "my-skill"
+# enabled = true
+
+# ── MCP servers ────────────────────────────────────────────────────────────
+# User/project entries win over plugin MCP with the same id.
+# enabled = false claims the id as a veto (plugins cannot fill it).
+# allowDuplicate = true keeps this server even if another shares the same
+# capability fingerprint (e.g. same npm package). Default false.
+# See docs/design/extension-registry.md
+# [[mcpServers]]
+# id = "chrome-devtools"
+# name = "Chrome DevTools"
+# transport = "stdio"
+# command = "npx"
+# args = ["-y", "chrome-devtools-mcp@latest"]
+# enabled = true
+# # allowDuplicate = false

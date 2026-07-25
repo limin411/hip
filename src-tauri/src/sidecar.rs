@@ -137,6 +137,11 @@ pub async fn spawn_sidecar(app: &AppHandle) -> Result<u16, String> {
     if let Some(p) = crate::paths::plugins_dir(app) {
         cmd = cmd.env("HIP_PLUGINS_DIR", p.to_string_lossy().into_owned());
     }
+    // Point the sidecar at global Claude-format skills (~/.hip/skills or HIP_DATA_DIR/skills).
+    // Without this, Settings can list global skills that the agent never loads.
+    if let Some(p) = crate::paths::skills_dir(app) {
+        cmd = cmd.env("HIP_SKILLS_DIR", p.to_string_lossy().into_owned());
+    }
     // Tell the sidecar where agent worktrees live (centralised isolation dir).
     if let Some(p) = crate::paths::worktrees_dir(app) {
         cmd = cmd.env("HIP_WORKTREES_DIR", p.to_string_lossy().into_owned());

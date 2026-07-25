@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
+  defaultStatusFromFilter,
   filterItems,
   localTodayYmd,
   matchesFilter,
@@ -157,6 +158,21 @@ describe('localTodayYmd', () => {
   it('formats local calendar date as YYYY-MM-DD', () => {
     const d = new Date(2026, 6, 25) // July is month 6
     expect(localTodayYmd(d)).toBe('2026-07-25')
+  })
+})
+
+describe('defaultStatusFromFilter', () => {
+  it('maps status smart filters 1:1', () => {
+    expect(defaultStatusFromFilter('todo')).toBe('todo')
+    expect(defaultStatusFromFilter('in_progress')).toBe('in_progress')
+    expect(defaultStatusFromFilter('done')).toBe('done')
+  })
+
+  it('falls back to todo for all, archived, and list filters', () => {
+    expect(defaultStatusFromFilter('all')).toBe('todo')
+    expect(defaultStatusFromFilter('archived')).toBe('todo')
+    expect(defaultStatusFromFilter('list:wl_inbox')).toBe('todo')
+    expect(defaultStatusFromFilter('unknown')).toBe('todo')
   })
 })
 

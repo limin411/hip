@@ -1,5 +1,10 @@
 import { create } from 'zustand'
-import { localTodayYmd, type WorkItemStatus } from '@/domain/work-items'
+import {
+  defaultStatusFromFilter,
+  localTodayYmd,
+  type WorkItemStatus,
+} from '@/domain/work-items'
+import { useWorkItemStore } from '@/store/workItemStore'
 
 export type CreateDefaults = {
   startOn: string
@@ -46,13 +51,17 @@ export const useWorkItemViewStore = create<WorkItemViewStore>((set, get) => ({
 
   requestCreate: (defaults) => {
     const today = localTodayYmd()
+    // Prefer explicit status; otherwise inherit the active sidebar filter category.
+    const status =
+      defaults?.status ??
+      defaultStatusFromFilter(useWorkItemStore.getState().filterId)
     set({
       modal: {
         mode: 'create',
         defaults: {
           startOn: defaults?.startOn ?? today,
           endOn: defaults?.endOn ?? defaults?.startOn ?? today,
-          status: defaults?.status,
+          status,
         },
       },
     })

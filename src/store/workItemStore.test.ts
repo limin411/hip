@@ -178,6 +178,14 @@ describe('workItemStore', () => {
     )
   })
 
+  it('createItem defaults status from active status filter', async () => {
+    useWorkItemStore.setState({ filterId: 'in_progress' })
+    const id = await useWorkItemStore.getState().createItem()
+    expect(useWorkItemStore.getState().items.find((i) => i.id === id)?.status).toBe(
+      'in_progress',
+    )
+  })
+
   it('finalizeSelectedItem discards empty title with no extras', async () => {
     const id = await useWorkItemStore.getState().createItem({}, { select: true })
     saveWorkItems.mockClear()

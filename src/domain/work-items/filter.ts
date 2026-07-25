@@ -1,4 +1,4 @@
-import type { WorkItem } from './types'
+import type { WorkItem, WorkItemStatus } from './types'
 
 export type SmartFilterId =
   | 'all'
@@ -9,6 +9,18 @@ export type SmartFilterId =
 
 /** Smart filter ids or legacy `list:${listId}` (list UI removed; still matches catalog). */
 export type WorkItemFilterId = SmartFilterId | `list:${string}`
+
+/**
+ * Default create status from the active sidebar smart filter.
+ * Status filters map 1:1; `all` / `archived` / lists fall back to `todo`
+ * (archived is not a WorkItemStatus — it is `archivedAt`).
+ */
+export function defaultStatusFromFilter(filterId: string): WorkItemStatus {
+  if (filterId === 'todo' || filterId === 'in_progress' || filterId === 'done') {
+    return filterId
+  }
+  return 'todo'
+}
 
 /** Local calendar day as `YYYY-MM-DD` (system local TZ). */
 export function localTodayYmd(d: Date = new Date()): string {

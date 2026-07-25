@@ -1,6 +1,7 @@
 import { create } from 'zustand'
 import {
   applyStatus,
+  defaultStatusFromFilter,
   ensureScheduleDates,
   INBOX_LIST_ID,
   isDefaultScheduleOnly,
@@ -365,15 +366,7 @@ export const useWorkItemStore = create<WorkItemStore>((set, get) => ({
       partial?.listId && get().lists.some((l) => l.id === partial.listId)
         ? partial.listId
         : listIdFromFilter(get().filterId, get().lists)
-    const filterId = get().filterId
-    let status: WorkItemStatus | undefined = partial?.status
-    if (status == null) {
-      if (filterId === 'todo' || filterId === 'in_progress' || filterId === 'done') {
-        status = filterId
-      } else {
-        status = 'todo'
-      }
-    }
+    const status = partial?.status ?? defaultStatusFromFilter(get().filterId)
     const item = defaultItem(now, listId, { ...partial, status })
     const select = options?.select === true
     set((s) => ({

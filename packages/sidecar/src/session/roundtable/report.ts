@@ -2,13 +2,26 @@
  * Self-contained HTML reports for a convened roundtable (Chat artifact deliverables).
  *
  * Bundle:
- * - roundtable-report.html — hip summary (decision, full discussion, rebuttal map, links to roles)
- * - roundtable-report-{persona}.html — each seat's own understanding + their exchanges
+ * - roundtable-report.html — hip summary (visual flow, debate graph, decision, roles)
+ * - roundtable-report-{persona}.html — each seat's stance + exchanges
  *
- * Template: fixed TOC shell, wide main pane, data-jump nav (srcDoc-safe).
- * Cross-file links are relative (work when opened in the system browser).
+ * Template: fixed TOC, wide main, data-jump nav, code blocks, collapsible prose, inline SVG.
  */
 import { personaLabel } from './prompts.js'
+import {
+  metricsRow,
+  PERSONA_HUE,
+  svgDebateGraph,
+  svgFlowPipeline,
+  svgSeatArchitecture,
+} from './report-diagrams.js'
+import {
+  collapsibleProse,
+  esc,
+  firstLine,
+  richProseHtml,
+  snip,
+} from './report-prose.js'
 import type {
   PersonaId,
   RoundtableEdgeResult,
@@ -91,6 +104,18 @@ const LABELS: Record<
     process: string
     seats: string
     none: string
+    more: string
+    less: string
+    overview: string
+    flow: string
+    architecture: string
+    debateMap: string
+    metricRounds: string
+    metricSeats: string
+    metricEdges: string
+    metricRebuts: string
+    detailsList: string
+    keyPoints: string
   }
 > = {
   en: {
@@ -119,8 +144,7 @@ const LABELS: Record<
     backToTop: 'Back to top',
     top: 'Top',
     subReports: 'Role reports',
-    subReportsHint:
-      'Each role’s own reading of the debate. Open this file in a browser to follow the links; or open the matching HTML from the workspace.',
+    subReportsHint: 'Open a seat report for that perspective. Browser links work; preview uses in-app open.',
     openMain: '← Back to hip summary',
     hipBadge: 'hip summary',
     roleBadge: 'role report',
@@ -134,9 +158,21 @@ const LABELS: Record<
     questionedMe: 'Asked me',
     noExchange: 'No direct exchanges recorded for this seat.',
     vsDecision: 'Against hip’s decision',
-    process: 'Discussion timeline',
+    process: 'Discussion flow',
     seats: 'Seats',
     none: '—',
+    more: 'Show full text',
+    less: 'Collapse',
+    overview: 'At a glance',
+    flow: 'Meeting flow',
+    architecture: 'Council architecture',
+    debateMap: 'Debate graph',
+    metricRounds: 'Rounds',
+    metricSeats: 'Seats',
+    metricEdges: 'Exchanges',
+    metricRebuts: 'Rebuttals',
+    detailsList: 'Exchange list',
+    keyPoints: 'Highlights',
   },
   'zh-CN': {
     title: '圆桌会议报告（hip 汇总）',
@@ -164,8 +200,7 @@ const LABELS: Record<
     backToTop: '返回顶部',
     top: '顶部',
     subReports: '各角色子报告',
-    subReportsHint:
-      '各席位对自己立场与交锋的理解。在浏览器中打开本文件可点击跳转；也可在工作区中打开对应 HTML。',
+    subReportsHint: '点卡片进入该席位视角。浏览器中可直接跳转；侧栏预览会在应用内打开文件。',
     openMain: '← 返回 hip 汇总',
     hipBadge: 'hip 汇总',
     roleBadge: '角色报告',
@@ -179,9 +214,21 @@ const LABELS: Record<
     questionedMe: '向我提问的',
     noExchange: '本席位未记录到直接交锋。',
     vsDecision: '对照 hip 决策',
-    process: '讨论时间线',
+    process: '讨论流程',
     seats: '席位',
     none: '—',
+    more: '展开全文',
+    less: '收起',
+    overview: '一览',
+    flow: '会议流程',
+    architecture: '席位架构',
+    debateMap: '交锋关系图',
+    metricRounds: '轮次',
+    metricSeats: '席位',
+    metricEdges: '交锋',
+    metricRebuts: '反驳',
+    detailsList: '交锋明细',
+    keyPoints: '要点',
   },
   'zh-TW': {
     title: '圓桌會議報告（hip 匯總）',
@@ -209,8 +256,7 @@ const LABELS: Record<
     backToTop: '返回頂部',
     top: '頂部',
     subReports: '各角色子報告',
-    subReportsHint:
-      '各席位對自己立場與交鋒的理解。在瀏覽器中開啟本檔可點擊跳轉；也可在工作區開啟對應 HTML。',
+    subReportsHint: '點卡片進入該席位視角。瀏覽器可直接跳轉；側欄預覽會在應用內開啟。',
     openMain: '← 返回 hip 匯總',
     hipBadge: 'hip 匯總',
     roleBadge: '角色報告',
@@ -224,9 +270,21 @@ const LABELS: Record<
     questionedMe: '向我提問的',
     noExchange: '本席位未記錄到直接交鋒。',
     vsDecision: '對照 hip 決策',
-    process: '討論時間線',
+    process: '討論流程',
     seats: '席位',
     none: '—',
+    more: '展開全文',
+    less: '收起',
+    overview: '一覽',
+    flow: '會議流程',
+    architecture: '席位架構',
+    debateMap: '交鋒關係圖',
+    metricRounds: '輪次',
+    metricSeats: '席位',
+    metricEdges: '交鋒',
+    metricRebuts: '反駁',
+    detailsList: '交鋒明細',
+    keyPoints: '要點',
   },
   ja: {
     title: '円卓会議レポート（hip 要約）',
@@ -254,8 +312,7 @@ const LABELS: Record<
     backToTop: '先頭へ',
     top: '先頭',
     subReports: '役割別レポート',
-    subReportsHint:
-      '各席の理解。ブラウザで開くとリンクで移動できます。ワークスペースの HTML からも開けます。',
+    subReportsHint: 'カードから各席へ。ブラウザでリンク可。',
     openMain: '← hip 要約へ戻る',
     hipBadge: 'hip 要約',
     roleBadge: '役割',
@@ -269,9 +326,21 @@ const LABELS: Record<
     questionedMe: '私への質問',
     noExchange: '直接のやり取りは記録されていません。',
     vsDecision: 'hip 決定との対照',
-    process: '議論タイムライン',
+    process: '議論フロー',
     seats: '席',
     none: '—',
+    more: '全文を表示',
+    less: '折りたたむ',
+    overview: '概要',
+    flow: '会議フロー',
+    architecture: '構成',
+    debateMap: '議論グラフ',
+    metricRounds: 'ラウンド',
+    metricSeats: '席',
+    metricEdges: 'やり取り',
+    metricRebuts: '反論',
+    detailsList: '詳細リスト',
+    keyPoints: '要点',
   },
   ko: {
     title: '원탁 회의 보고서 (hip 요약)',
@@ -299,8 +368,7 @@ const LABELS: Record<
     backToTop: '맨 위로',
     top: '맨 위',
     subReports: '역할별 보고서',
-    subReportsHint:
-      '각 좌석의 이해. 브라우저에서 열면 링크로 이동할 수 있습니다. 작업 공간 HTML에서도 열 수 있습니다.',
+    subReportsHint: '카드로 각 좌석 보고서를 엽니다.',
     openMain: '← hip 요약으로',
     hipBadge: 'hip 요약',
     roleBadge: '역할',
@@ -314,9 +382,21 @@ const LABELS: Record<
     questionedMe: '나에게 질문한',
     noExchange: '직접 교환이 기록되지 않았습니다.',
     vsDecision: 'hip 결정 대비',
-    process: '토론 타임라인',
+    process: '토론 흐름',
     seats: '좌석',
     none: '—',
+    more: '전문 보기',
+    less: '접기',
+    overview: '한눈에',
+    flow: '회의 흐름',
+    architecture: '구성',
+    debateMap: '논쟁 그래프',
+    metricRounds: '라운드',
+    metricSeats: '좌석',
+    metricEdges: '교환',
+    metricRebuts: '반박',
+    detailsList: '상세 목록',
+    keyPoints: '핵심',
   },
 }
 
@@ -328,25 +408,30 @@ interface TocItem {
   depth: 1 | 2
 }
 
-/** Soft accent per persona for cards / speech bars. */
-const PERSONA_HUE: Record<PersonaId, string> = {
-  strategist: '220',
-  skeptic: '0',
-  creative: '280',
-  operator: '150',
-  audience: '35',
+export const ROUNDTABLE_REPORT_FILENAME = 'roundtable-report.html'
+
+export function personaReportFilename(persona: PersonaId): string {
+  return `roundtable-report-${persona}.html`
 }
 
-function esc(s: string): string {
-  return s
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
+function jumpLink(id: string, label: string, className = ''): string {
+  const cls = className ? ` class="${esc(className)}"` : ''
+  return `<a href="#${esc(id)}" data-jump="${esc(id)}"${cls}>${label}</a>`
 }
 
-function proseHtml(s: string): string {
-  return esc(s).replace(/\n/g, '<br/>')
+function fileLink(href: string, label: string, className = ''): string {
+  const cls = className ? ` class="${esc(className)}"` : ''
+  return `<a href="${esc(href)}" data-file="${esc(href)}"${cls}>${label}</a>`
+}
+
+function backLink(L: Labels): string {
+  return `<p class="back">${jumpLink('top', esc(L.backToTop))}</p>`
+}
+
+function sectionOpen(id: string, title: string, extraClass = ''): string {
+  const cls = extraClass ? ` card ${extraClass}` : ' card'
+  return `<section id="${esc(id)}" class="${cls.trim()}" tabindex="-1">
+  <h2>${jumpLink(id, '#', 'anchor')}${esc(title)}</h2>`
 }
 
 function bullets(items: string[]): string {
@@ -378,9 +463,7 @@ function edgeRel(lang: RoundtableLang, rel: string): string {
     if (rel === 'support') return '지지'
     return '질문'
   }
-  if (rel === 'rebut') return 'rebut'
-  if (rel === 'support') return 'support'
-  return 'question'
+  return rel
 }
 
 function personaName(id: string, lang: RoundtableLang): string {
@@ -390,48 +473,6 @@ function personaName(id: string, lang: RoundtableLang): string {
   return id
 }
 
-/** Default deliverable filename under the session cwd. */
-export const ROUNDTABLE_REPORT_FILENAME = 'roundtable-report.html'
-
-export function personaReportFilename(persona: PersonaId): string {
-  return `roundtable-report-${persona}.html`
-}
-
-/** In-page jump — data-jump + script avoids srcDoc iframe hash white-screen. */
-function jumpLink(id: string, label: string, className = ''): string {
-  const cls = className ? ` class="${esc(className)}"` : ''
-  return `<a href="#${esc(id)}" data-jump="${esc(id)}"${cls}>${label}</a>`
-}
-
-/**
- * Cross-file link. `href` works when opened in a system browser.
- * `data-file` + nav script: in hip srcDoc preview, postMessage parent instead of navigating
- * (relative href in srcDoc blanks the iframe).
- */
-function fileLink(href: string, label: string, className = ''): string {
-  const cls = className ? ` class="${esc(className)}"` : ''
-  return `<a href="${esc(href)}" data-file="${esc(href)}"${cls}>${label}</a>`
-}
-
-function backLink(L: Labels): string {
-  return `<p class="back">${jumpLink('top', esc(L.backToTop))}</p>`
-}
-
-function sectionOpen(id: string, title: string, extraClass = ''): string {
-  const cls = extraClass ? ` card ${extraClass}` : ' card'
-  return `<section id="${esc(id)}" class="${cls.trim()}" tabindex="-1">
-  <h2>${jumpLink(id, '#', 'anchor')}${esc(title)}</h2>`
-}
-
-/**
- * Navigation script:
- * - data-jump: scroll main pane without location.hash (srcDoc-safe)
- * - data-file: when embedded (window.parent !== window), postMessage parent to open sibling HTML
- *   instead of navigating the srcDoc iframe (which blanks). Standalone browser keeps normal href.
- *
- * Message shape (must match src/components/artifact/htmlReportNav.ts):
- *   { source: 'hip-roundtable-report', type: 'open-file', file: 'roundtable-report-strategist.html' }
- */
 export const ROUNDTABLE_REPORT_NAV_SCRIPT = /* js */ `
 (function () {
   var main = document.getElementById('report-main');
@@ -480,11 +521,10 @@ export const ROUNDTABLE_REPORT_NAV_SCRIPT = /* js */ `
 })();
 `.trim()
 
-/** Shared CSS (fixed TOC + wide content + debate / role aesthetics). */
 export const ROUNDTABLE_REPORT_STYLES = /* css */ `
 :root {
-  --bg: #0c0e12;
-  --card: #151922;
+  --bg: #0b0d12;
+  --card: #141820;
   --ink: #e8eaed;
   --muted: #9aa0a6;
   --accent: #7aa2ff;
@@ -498,10 +538,20 @@ export const ROUNDTABLE_REPORT_STYLES = /* css */ `
   --support-soft: rgba(127, 217, 154, 0.12);
   --question: #e0b45a;
   --question-soft: rgba(224, 180, 90, 0.12);
+  --code-bg: #0a0c10;
+  --code-border: #2c3340;
+  --code-ink: #d7dde8;
   --toc-w: 15.5rem;
   --radius: 14px;
   --shadow: 0 1px 0 rgba(255,255,255,0.03) inset;
-  --glow: 0 8px 32px rgba(0,0,0,0.28);
+  --glow: 0 12px 40px rgba(0,0,0,0.35);
+  --diag-issue-fill: rgba(122, 162, 255, 0.12);
+  --diag-issue-stroke: #7aa2ff;
+  --diag-round-fill: rgba(255,255,255,0.04);
+  --diag-round-stroke: #4a5568;
+  --diag-decision-fill: rgba(127, 217, 154, 0.12);
+  --diag-decision-stroke: #7fd99a;
+  --diag-ring: #3a4252;
 }
 @media (prefers-color-scheme: light) {
   :root {
@@ -520,145 +570,83 @@ export const ROUNDTABLE_REPORT_STYLES = /* css */ `
     --support-soft: rgba(26, 127, 75, 0.08);
     --question: #9a6b00;
     --question-soft: rgba(154, 107, 0, 0.08);
+    --code-bg: #f6f8fb;
+    --code-border: #d8dee8;
+    --code-ink: #1f2937;
     --shadow: 0 1px 2px rgba(16, 24, 40, 0.04);
-    --glow: 0 10px 28px rgba(16, 24, 40, 0.06);
+    --glow: 0 12px 32px rgba(16, 24, 40, 0.07);
+    --diag-issue-fill: rgba(59, 110, 245, 0.08);
+    --diag-issue-stroke: #3b6ef5;
+    --diag-round-fill: #f8fafc;
+    --diag-round-stroke: #c5ccd8;
+    --diag-decision-fill: rgba(26, 127, 75, 0.08);
+    --diag-decision-stroke: #1a7f4b;
+    --diag-ring: #c5ccd8;
   }
 }
 * { box-sizing: border-box; }
-html, body {
-  height: 100%;
-  margin: 0;
-  overflow: hidden;
-}
+html, body { height: 100%; margin: 0; overflow: hidden; }
 body {
-  font: 15px/1.6 system-ui, -apple-system, "Segoe UI", "PingFang SC", "Noto Sans SC", sans-serif;
+  font: 15px/1.55 system-ui, -apple-system, "Segoe UI", "PingFang SC", "Noto Sans SC", sans-serif;
   color: var(--ink);
   background:
-    radial-gradient(1200px 600px at 10% -10%, color-mix(in srgb, var(--accent) 12%, transparent), transparent 55%),
-    radial-gradient(900px 500px at 100% 0%, color-mix(in srgb, var(--support) 8%, transparent), transparent 50%),
+    radial-gradient(1000px 520px at 8% -8%, color-mix(in srgb, var(--accent) 14%, transparent), transparent 55%),
+    radial-gradient(800px 420px at 100% 0%, color-mix(in srgb, var(--support) 10%, transparent), transparent 50%),
     var(--bg);
 }
 a { color: var(--accent); text-decoration: none; }
 a:hover { text-decoration: underline; }
 
-.shell {
-  display: flex;
-  flex-direction: column;
-  height: 100%;
-  width: 100%;
-  min-height: 0;
-}
-@media (min-width: 720px) {
-  .shell { flex-direction: row; }
-}
+.shell { display: flex; flex-direction: column; height: 100%; width: 100%; min-height: 0; }
+@media (min-width: 720px) { .shell { flex-direction: row; } }
 
 .toc {
-  flex: 0 0 auto;
-  border-bottom: 1px solid var(--border);
+  flex: 0 0 auto; border-bottom: 1px solid var(--border);
   background: color-mix(in srgb, var(--card) 92%, transparent);
   backdrop-filter: blur(8px);
-  padding: 0.75rem 0.85rem 0.85rem;
-  max-height: 38vh;
-  overflow: auto;
-  -webkit-overflow-scrolling: touch;
+  padding: 0.75rem 0.85rem 0.85rem; max-height: 38vh; overflow: auto;
 }
 @media (min-width: 720px) {
   .toc {
-    width: var(--toc-w);
-    min-width: var(--toc-w);
-    max-width: var(--toc-w);
-    max-height: none;
-    height: 100%;
-    border-bottom: 0;
-    border-right: 1px solid var(--border);
+    width: var(--toc-w); min-width: var(--toc-w); max-width: var(--toc-w);
+    max-height: none; height: 100%; border-bottom: 0; border-right: 1px solid var(--border);
     padding: 1rem 0.85rem 1.25rem;
   }
 }
 .toc-title {
-  font-size: 0.72rem;
-  font-weight: 700;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  color: var(--muted);
-  margin: 0 0 0.55rem;
-  padding: 0 0.35rem;
+  font-size: 0.72rem; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase;
+  color: var(--muted); margin: 0 0 0.55rem; padding: 0 0.35rem;
 }
 .toc ol { list-style: none; margin: 0; padding: 0; }
-.toc > ol > li { margin: 0; }
 .toc a {
-  display: block;
-  padding: 0.38rem 0.5rem;
-  border-radius: 8px;
-  color: var(--ink);
-  font-size: 0.88rem;
-  line-height: 1.35;
-  text-decoration: none;
-  cursor: pointer;
+  display: block; padding: 0.38rem 0.5rem; border-radius: 8px; color: var(--ink);
+  font-size: 0.88rem; line-height: 1.35; text-decoration: none; cursor: pointer;
 }
-.toc a:hover {
-  background: var(--accent-soft);
-  color: var(--accent);
-  text-decoration: none;
-}
-.toc a:focus-visible {
-  outline: 2px solid var(--accent);
-  outline-offset: 1px;
-}
-.toc .depth-2 a {
-  padding-left: 1rem;
-  font-size: 0.82rem;
-  color: var(--muted);
-}
-.toc .depth-2 a:hover { color: var(--accent); }
+.toc a:hover { background: var(--accent-soft); color: var(--accent); text-decoration: none; }
+.toc .depth-2 a { padding-left: 1rem; font-size: 0.82rem; color: var(--muted); }
 
 #report-main {
-  flex: 1 1 auto;
-  min-width: 0;
-  min-height: 0;
-  overflow: auto;
-  -webkit-overflow-scrolling: touch;
-  width: 100%;
+  flex: 1 1 auto; min-width: 0; min-height: 0; overflow: auto; width: 100%;
 }
-.main-inner {
-  width: 100%;
-  max-width: none;
-  margin: 0;
-  padding: 1.1rem 1.25rem 2.5rem;
-}
-@media (min-width: 720px) {
-  .main-inner { padding: 1.35rem 1.75rem 3rem; }
-}
-@media (min-width: 1200px) {
-  .main-inner { padding: 1.5rem 2.25rem 3rem; }
-}
+.main-inner { width: 100%; max-width: none; margin: 0; padding: 1.1rem 1.25rem 2.5rem; }
+@media (min-width: 720px) { .main-inner { padding: 1.35rem 1.75rem 3rem; } }
+@media (min-width: 1200px) { .main-inner { padding: 1.5rem 2.25rem 3rem; } }
 
 .report-header {
-  margin-bottom: 1.25rem;
-  padding: 1.15rem 1.25rem;
-  border-radius: var(--radius);
+  margin-bottom: 1rem; padding: 1.15rem 1.25rem; border-radius: var(--radius);
   border: 1px solid var(--border);
   background: linear-gradient(135deg, color-mix(in srgb, var(--card) 88%, var(--accent-soft)), var(--card));
   box-shadow: var(--glow);
 }
 .report-header h1 {
-  font-size: 1.55rem;
-  margin: 0.35rem 0 0.35rem;
-  letter-spacing: -0.02em;
-  line-height: 1.25;
+  font-size: 1.5rem; margin: 0.35rem 0 0.35rem; letter-spacing: -0.02em; line-height: 1.25;
 }
 .sub { color: var(--muted); font-size: 0.85rem; margin: 0; }
 .pill {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.35rem;
-  padding: 0.18rem 0.6rem;
-  border-radius: 999px;
-  font-size: 0.72rem;
-  font-weight: 700;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-  background: var(--accent-soft);
-  color: var(--accent);
+  display: inline-flex; align-items: center; gap: 0.35rem;
+  padding: 0.18rem 0.6rem; border-radius: 999px; font-size: 0.72rem; font-weight: 700;
+  letter-spacing: 0.04em; text-transform: uppercase;
+  background: var(--accent-soft); color: var(--accent);
   border: 1px solid color-mix(in srgb, var(--accent) 35%, var(--border));
 }
 .pill.role {
@@ -667,303 +655,256 @@ a:hover { text-decoration: underline; }
   border-color: color-mix(in srgb, hsl(var(--persona-h, 220) 55% 50%) 35%, var(--border));
 }
 
+.metrics {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(6.5rem, 1fr));
+  gap: 0.55rem; margin: 0.85rem 0 0.25rem;
+}
+.metric {
+  padding: 0.7rem 0.75rem; border-radius: 12px; border: 1px solid var(--border);
+  background: color-mix(in srgb, var(--card) 90%, transparent); text-align: center;
+}
+.metric-value {
+  font-size: 1.35rem; font-weight: 750; letter-spacing: -0.03em;
+  font-variant-numeric: tabular-nums; color: var(--accent);
+}
+.metric-label { font-size: 0.72rem; color: var(--muted); margin-top: 0.15rem; }
+
 .card {
-  background: var(--card);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  padding: 1.15rem 1.35rem;
-  margin-bottom: 0.95rem;
-  box-shadow: var(--shadow);
+  background: var(--card); border: 1px solid var(--border); border-radius: var(--radius);
+  padding: 1.1rem 1.25rem; margin-bottom: 0.9rem; box-shadow: var(--shadow);
   scroll-margin-top: 0.75rem;
 }
-.card.is-active { box-shadow: 0 0 0 2px var(--accent); }
 .decision {
   border-color: color-mix(in srgb, var(--accent) 55%, var(--border));
   background: linear-gradient(180deg, color-mix(in srgb, var(--accent-soft) 70%, var(--card)), var(--card));
 }
+.card.diagram-card { padding-bottom: 1.35rem; }
 h2 {
-  font-size: 1.12rem;
-  margin: 0 0 0.75rem;
-  line-height: 1.3;
-  display: flex;
-  align-items: baseline;
-  gap: 0.35rem;
+  font-size: 1.08rem; margin: 0 0 0.7rem; line-height: 1.3;
+  display: flex; align-items: baseline; gap: 0.35rem;
 }
 h2 .anchor {
-  color: var(--muted);
-  font-weight: 500;
-  font-size: 0.9em;
-  opacity: 0;
-  text-decoration: none;
+  color: var(--muted); font-weight: 500; font-size: 0.9em; opacity: 0; text-decoration: none;
 }
-.card:hover h2 .anchor,
-h2:focus-within .anchor { opacity: 0.7; }
-h2 .anchor:hover { opacity: 1; color: var(--accent); }
-h3 {
-  font-size: 0.92rem;
-  margin: 1rem 0 0.4rem;
-  color: var(--muted);
-  font-weight: 600;
-}
-h4 {
-  font-size: 0.9rem;
-  margin: 0 0 0.35rem;
-  color: var(--accent);
-}
-.prose { white-space: pre-wrap; word-break: break-word; }
-.lead { font-size: 1.06rem; }
-.meta { color: var(--muted); margin: 0 0 0.75rem; }
-ul, ol { margin: 0.25rem 0 0.75rem; padding-left: 1.2rem; }
-li { margin: 0.2rem 0; }
+.card:hover h2 .anchor, h2:focus-within .anchor { opacity: 0.7; }
+h3 { font-size: 0.9rem; margin: 0.9rem 0 0.4rem; color: var(--muted); font-weight: 600; }
+h4 { font-size: 0.9rem; margin: 0 0 0.35rem; color: var(--accent); }
+.prose { word-break: break-word; }
+.prose-p { margin: 0 0 0.55rem; white-space: pre-wrap; }
+.prose-p:last-child { margin-bottom: 0; }
+.lead .prose-p, .lead { font-size: 1.04rem; }
+.meta { color: var(--muted); margin: 0 0 0.65rem; font-size: 0.9rem; }
+ul, ol { margin: 0.2rem 0 0.55rem; padding-left: 1.15rem; }
+li { margin: 0.15rem 0; }
 .muted { color: var(--muted); }
+.hint { font-size: 0.82rem; color: var(--muted); margin: 0.25rem 0 0.65rem; line-height: 1.45; }
+
+/* Code */
+.inline-code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 0.88em; padding: 0.1em 0.35em; border-radius: 5px;
+  background: var(--code-bg); border: 1px solid var(--code-border); color: var(--code-ink);
+}
+.code-block {
+  position: relative; margin: 0.55rem 0 0.75rem; border-radius: 10px;
+  border: 1px solid var(--code-border); background: var(--code-bg); overflow: hidden;
+}
+.code-block .code-lang {
+  display: block; padding: 0.3rem 0.7rem; font-size: 0.7rem; font-weight: 700;
+  letter-spacing: 0.04em; text-transform: uppercase; color: var(--muted);
+  border-bottom: 1px solid var(--code-border); background: color-mix(in srgb, var(--card) 50%, var(--code-bg));
+}
+.code-block pre {
+  margin: 0; padding: 0.75rem 0.85rem; overflow: auto; max-height: 22rem;
+}
+.code-block code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 0.82rem; line-height: 1.5; color: var(--code-ink); white-space: pre;
+}
+
+/* Fold long text */
+.prose-fold .prose-preview {
+  margin: 0 0 0.35rem; color: var(--ink); font-size: 0.95rem; line-height: 1.45;
+}
+.fold { margin: 0; border: 0; }
+.fold > summary {
+  cursor: pointer; list-style: none; display: inline-flex; align-items: center; gap: 0.25rem;
+  font-size: 0.8rem; font-weight: 600; color: var(--accent); user-select: none;
+  padding: 0.15rem 0;
+}
+.fold > summary::-webkit-details-marker { display: none; }
+.fold > summary .less { display: none; }
+.fold[open] > summary .more { display: none; }
+.fold[open] > summary .less { display: inline; }
+.fold-body { margin-top: 0.55rem; padding-top: 0.55rem; border-top: 1px dashed var(--border); }
 
 .speech {
   border-left: 3px solid hsl(var(--persona-h, 220) 55% 55%);
-  padding: 0.55rem 0.85rem 0.55rem 0.95rem;
-  margin: 0.7rem 0;
+  padding: 0.5rem 0.8rem 0.5rem 0.9rem; margin: 0.55rem 0;
   background: color-mix(in srgb, var(--card) 85%, hsl(var(--persona-h, 220) 40% 50%));
   border-radius: 0 10px 10px 0;
 }
 .speech-head {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 0.4rem 0.65rem;
-  margin-bottom: 0.35rem;
+  display: flex; flex-wrap: wrap; align-items: center; gap: 0.35rem 0.65rem; margin-bottom: 0.3rem;
 }
 .speech-head h4 { margin: 0; color: hsl(var(--persona-h, 220) 55% 68%); }
-.speech a.role-link {
-  font-size: 0.78rem;
-  color: var(--muted);
-}
-.speech a.role-link:hover { color: var(--accent); }
+.speech a.role-link { font-size: 0.78rem; color: var(--muted); }
 
 .badge {
-  display: inline-block;
-  margin-top: 0.5rem;
-  padding: 0.2rem 0.55rem;
-  border-radius: 999px;
-  background: var(--badge);
-  color: var(--badge-ink);
-  font-size: 0.8rem;
+  display: inline-block; margin-top: 0.45rem; padding: 0.2rem 0.55rem; border-radius: 999px;
+  background: var(--badge); color: var(--badge-ink); font-size: 0.8rem;
 }
 
-/* Debate / edges */
+/* Diagrams */
+.diagram-wrap {
+  margin: 0.35rem 0 0.5rem; padding: 0.65rem; border-radius: 12px;
+  border: 1px solid var(--border); background: color-mix(in srgb, var(--bg) 55%, var(--card));
+  overflow-x: auto;
+}
+.diagram { display: block; }
+.flow-label {
+  fill: var(--ink); font-size: 12px; font-weight: 700;
+  font-family: system-ui, -apple-system, sans-serif;
+}
+.flow-sub {
+  fill: var(--muted); font-size: 10px;
+  font-family: system-ui, -apple-system, sans-serif;
+}
+.flow-arrow { stroke: var(--accent); stroke-width: 1.75; }
+.flow-arrow-head { fill: var(--accent); }
+.debate-node-label, .arch-chair-label {
+  fill: #fff; font-size: 10px; font-weight: 700;
+  font-family: system-ui, -apple-system, "PingFang SC", sans-serif;
+  paint-order: stroke; stroke: rgba(0,0,0,0.35); stroke-width: 2px;
+}
+.legend-text {
+  fill: var(--muted); font-size: 11px;
+  font-family: system-ui, -apple-system, "PingFang SC", sans-serif;
+}
+.diagram-row {
+  display: grid; grid-template-columns: 1fr; gap: 0.75rem;
+}
+@media (min-width: 960px) {
+  .diagram-row.two { grid-template-columns: 1.15fr 0.85fr; align-items: start; }
+}
+
 .edges { list-style: none; padding: 0; margin: 0; }
 .edges li {
-  display: grid;
-  gap: 0.25rem;
-  padding: 0.7rem 0.85rem;
-  margin: 0.45rem 0;
-  border-radius: 10px;
-  border: 1px solid var(--border);
+  display: grid; gap: 0.2rem; padding: 0.55rem 0.75rem; margin: 0.35rem 0;
+  border-radius: 10px; border: 1px solid var(--border);
   background: color-mix(in srgb, var(--card) 90%, transparent);
 }
 .edge-line {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 0.35rem 0.45rem;
-  font-size: 0.92rem;
+  display: flex; flex-wrap: wrap; align-items: center; gap: 0.3rem 0.4rem; font-size: 0.9rem;
 }
 .rel-chip {
-  display: inline-flex;
-  align-items: center;
-  padding: 0.12rem 0.5rem;
-  border-radius: 999px;
-  font-size: 0.75rem;
-  font-weight: 700;
-  letter-spacing: 0.02em;
+  display: inline-flex; align-items: center; padding: 0.1rem 0.45rem; border-radius: 999px;
+  font-size: 0.72rem; font-weight: 700;
 }
 .rel-chip.rebut {
-  background: var(--rebut-soft);
-  color: var(--rebut);
+  background: var(--rebut-soft); color: var(--rebut);
   border: 1px solid color-mix(in srgb, var(--rebut) 35%, var(--border));
 }
 .rel-chip.support {
-  background: var(--support-soft);
-  color: var(--support);
+  background: var(--support-soft); color: var(--support);
   border: 1px solid color-mix(in srgb, var(--support) 35%, var(--border));
 }
 .rel-chip.question {
-  background: var(--question-soft);
-  color: var(--question);
+  background: var(--question-soft); color: var(--question);
   border: 1px solid color-mix(in srgb, var(--question) 35%, var(--border));
 }
 .round-tag {
-  color: var(--muted);
-  font-size: 0.78rem;
-  margin-left: 0.15rem;
-  font-variant-numeric: tabular-nums;
+  color: var(--muted); font-size: 0.76rem; font-variant-numeric: tabular-nums;
 }
-.sum { color: var(--muted); font-size: 0.88rem; line-height: 1.45; }
+.sum { color: var(--muted); font-size: 0.85rem; line-height: 1.4; }
 
-/* Timeline */
-.timeline { list-style: none; margin: 0; padding: 0 0 0 0.15rem; }
-.timeline > li {
-  position: relative;
-  padding: 0 0 1.1rem 1.15rem;
-  border-left: 2px solid color-mix(in srgb, var(--accent) 35%, var(--border));
+.stage-grid { display: grid; grid-template-columns: 1fr; gap: 0.65rem; }
+@media (min-width: 800px) { .stage-grid { grid-template-columns: 1fr 1fr; } }
+.stage-col {
+  padding: 0.55rem 0.7rem; border-radius: 10px; border: 1px solid var(--border);
+  background: color-mix(in srgb, var(--card) 94%, var(--accent-soft));
 }
-.timeline > li:last-child { padding-bottom: 0; border-left-color: transparent; }
-.timeline > li::before {
-  content: '';
-  position: absolute;
-  left: -0.35rem;
-  top: 0.25rem;
-  width: 0.55rem;
-  height: 0.55rem;
-  border-radius: 50%;
-  background: var(--accent);
-  box-shadow: 0 0 0 3px var(--accent-soft);
-}
-.tl-title {
-  font-weight: 650;
-  margin: 0 0 0.25rem;
-  font-size: 0.95rem;
-}
-.tl-meta { color: var(--muted); font-size: 0.85rem; margin: 0 0 0.45rem; }
+.stage-col h3 { margin-top: 0; }
 
-/* Role gallery */
 .role-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(11.5rem, 1fr));
-  gap: 0.75rem;
-  margin: 0.5rem 0 0.25rem;
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(11rem, 1fr));
+  gap: 0.65rem; margin: 0.4rem 0 0.2rem;
 }
 .role-card {
-  display: flex;
-  flex-direction: column;
-  gap: 0.35rem;
-  padding: 0.9rem 0.95rem;
-  border-radius: 12px;
-  border: 1px solid var(--border);
+  display: flex; flex-direction: column; gap: 0.3rem; padding: 0.85rem 0.9rem;
+  border-radius: 12px; border: 1px solid var(--border);
   background: color-mix(in srgb, var(--card) 88%, hsl(var(--persona-h, 220) 40% 50%));
-  text-decoration: none !important;
-  color: inherit;
+  text-decoration: none !important; color: inherit; min-height: 5.2rem;
   transition: border-color 0.15s ease, transform 0.15s ease, box-shadow 0.15s ease;
-  min-height: 5.5rem;
 }
 .role-card:hover {
   border-color: color-mix(in srgb, hsl(var(--persona-h, 220) 55% 50%) 55%, var(--border));
-  transform: translateY(-1px);
-  box-shadow: var(--glow);
-  text-decoration: none !important;
+  transform: translateY(-1px); box-shadow: var(--glow); text-decoration: none !important;
 }
 .role-card .name {
-  font-weight: 700;
-  font-size: 0.98rem;
-  color: hsl(var(--persona-h, 220) 55% 68%);
+  font-weight: 700; font-size: 0.95rem; color: hsl(var(--persona-h, 220) 55% 68%);
 }
 .role-card .snip {
-  font-size: 0.8rem;
-  color: var(--muted);
-  line-height: 1.4;
-  display: -webkit-box;
-  -webkit-line-clamp: 3;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
+  font-size: 0.78rem; color: var(--muted); line-height: 1.35;
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
 }
-.role-card .go {
-  margin-top: auto;
-  font-size: 0.78rem;
-  color: var(--accent);
-  font-weight: 600;
-}
+.role-card .go { margin-top: auto; font-size: 0.76rem; color: var(--accent); font-weight: 600; }
 
 .exchange-block {
-  margin: 0.65rem 0;
-  padding: 0.65rem 0.85rem;
-  border-radius: 10px;
-  border: 1px solid var(--border);
-  background: color-mix(in srgb, var(--card) 92%, transparent);
+  margin: 0.55rem 0; padding: 0.55rem 0.75rem; border-radius: 10px; border: 1px solid var(--border);
 }
 .exchange-block h4 {
-  margin: 0 0 0.45rem;
-  font-size: 0.85rem;
-  color: var(--muted);
-  font-weight: 650;
-  text-transform: none;
-  letter-spacing: 0;
+  margin: 0 0 0.35rem; font-size: 0.82rem; color: var(--muted); font-weight: 650;
 }
 .exchange-block.rebut { border-color: color-mix(in srgb, var(--rebut) 30%, var(--border)); }
 .exchange-block.support { border-color: color-mix(in srgb, var(--support) 30%, var(--border)); }
 .exchange-block.question { border-color: color-mix(in srgb, var(--question) 30%, var(--border)); }
 
-.back {
-  margin: 0.85rem 0 0;
-  font-size: 0.8rem;
+.highlights {
+  display: flex; flex-wrap: wrap; gap: 0.4rem; margin: 0.35rem 0 0.15rem;
 }
+.chip {
+  display: inline-flex; align-items: center; max-width: 100%;
+  padding: 0.28rem 0.6rem; border-radius: 999px; font-size: 0.8rem;
+  background: var(--accent-soft); color: var(--ink);
+  border: 1px solid color-mix(in srgb, var(--accent) 25%, var(--border));
+}
+.chip.open {
+  background: var(--question-soft);
+  border-color: color-mix(in srgb, var(--question) 30%, var(--border));
+}
+
+.back { margin: 0.75rem 0 0; font-size: 0.8rem; }
 .back a { color: var(--muted); }
 .back a:hover { color: var(--accent); }
-.nav-row {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.5rem 0.85rem;
-  align-items: center;
-  margin-bottom: 0.35rem;
-}
-.nav-row a.file-nav {
-  font-size: 0.85rem;
-  font-weight: 600;
-}
-.hint {
-  font-size: 0.82rem;
-  color: var(--muted);
-  margin: 0.35rem 0 0.75rem;
-  line-height: 1.45;
-}
+.nav-row { display: flex; flex-wrap: wrap; gap: 0.5rem 0.85rem; margin-bottom: 0.3rem; }
+.nav-row a.file-nav { font-size: 0.85rem; font-weight: 600; }
 .report-footer {
-  margin-top: 1.25rem;
-  padding-top: 0.75rem;
-  border-top: 1px solid var(--border);
-  color: var(--muted);
-  font-size: 0.8rem;
+  margin-top: 1.15rem; padding-top: 0.7rem; border-top: 1px solid var(--border);
+  color: var(--muted); font-size: 0.8rem;
 }
 .skip-link {
-  position: absolute;
-  left: -9999px;
-  top: 0;
-  background: var(--accent);
-  color: #fff;
-  padding: 0.4rem 0.7rem;
-  z-index: 10;
-  border-radius: 0 0 6px 0;
+  position: absolute; left: -9999px; top: 0; background: var(--accent); color: #fff;
+  padding: 0.4rem 0.7rem; z-index: 10; border-radius: 0 0 6px 0;
 }
 .skip-link:focus { left: 0; }
-.stage-grid {
-  display: grid;
-  grid-template-columns: 1fr;
-  gap: 0.75rem;
-}
-@media (min-width: 800px) {
-  .stage-grid { grid-template-columns: 1fr 1fr; }
-}
-.stage-col {
-  padding: 0.65rem 0.8rem;
-  border-radius: 10px;
-  border: 1px solid var(--border);
-  background: color-mix(in srgb, var(--card) 94%, var(--accent-soft));
-}
-.stage-col h3 { margin-top: 0; }
+.decision-lead { font-size: 1.12rem; font-weight: 600; line-height: 1.45; margin: 0 0 0.65rem; }
 `.trim()
 
 function speakersInData(data: RoundtableReportData): PersonaId[] {
   const seen = new Set<PersonaId>()
   for (const r of data.rounds) {
     for (const s of r.speeches) {
-      if ((PERSONA_IDS as readonly string[]).includes(s.speaker)) {
-        seen.add(s.speaker)
-      }
+      if ((PERSONA_IDS as readonly string[]).includes(s.speaker)) seen.add(s.speaker)
     }
   }
   return PERSONA_IDS.filter((id) => seen.has(id))
 }
 
-function snip(text: string, n = 96): string {
-  const t = text.replace(/\s+/g, ' ').trim()
-  if (t.length <= n) return t
-  return `${t.slice(0, n - 1)}…`
+function seatLabelMap(lang: RoundtableLang, seats: PersonaId[]): Record<string, string> {
+  const m: Record<string, string> = {}
+  for (const id of seats) m[id] = personaLabel(id, lang)
+  return m
 }
 
 function edgeListHtml(
@@ -976,16 +917,10 @@ function edgeListHtml(
     ${edges
       .map((e) => {
         const from = opts?.linkRoles
-          ? fileLink(
-              personaReportFilename(e.from as PersonaId),
-              esc(personaName(e.from, lang)),
-            )
+          ? fileLink(personaReportFilename(e.from as PersonaId), esc(personaName(e.from, lang)))
           : esc(personaName(e.from, lang))
         const to = opts?.linkRoles
-          ? fileLink(
-              personaReportFilename(e.to as PersonaId),
-              esc(personaName(e.to, lang)),
-            )
+          ? fileLink(personaReportFilename(e.to as PersonaId), esc(personaName(e.to, lang)))
           : esc(personaName(e.to, lang))
         const relClass =
           e.relation === 'rebut' || e.relation === 'support' || e.relation === 'question'
@@ -1008,6 +943,7 @@ function edgeListHtml(
 function speechArticle(
   s: SpeechRecord,
   lang: RoundtableLang,
+  L: Labels,
   round: number,
   opts?: { linkRole?: boolean },
 ): string {
@@ -1022,7 +958,7 @@ function speechArticle(
           <div class="speech-head">
             <h4>${esc(name)}</h4>${link}
           </div>
-          <div class="prose">${proseHtml(s.content)}</div>
+          ${collapsibleProse(s.content, { more: L.more, less: L.less })}
         </article>`
 }
 
@@ -1041,10 +977,7 @@ function documentShell(args: {
   <p class="toc-title">${esc(L.toc)}</p>
   <ol>
     ${args.toc
-      .map(
-        (item) =>
-          `<li class="depth-${item.depth}">${jumpLink(item.id, esc(item.label))}</li>`,
-      )
+      .map((item) => `<li class="depth-${item.depth}">${jumpLink(item.id, esc(item.label))}</li>`)
       .join('\n    ')}
   </ol>
 </nav>`
@@ -1093,98 +1026,179 @@ function buildMainReport(data: RoundtableReportData, seats: PersonaId[]): string
   const edges = data.edges ?? []
   const rebutEdges = edges.filter((e) => e.relation === 'rebut')
   const otherEdges = edges.filter((e) => e.relation !== 'rebut')
+  const labelsMap = seatLabelMap(lang, seats)
 
   const toc: TocItem[] = [
-    { id: 'sec-issue', label: L.issue, depth: 1 },
-    { id: 'sec-plan', label: L.plan, depth: 1 },
+    { id: 'sec-overview', label: L.overview, depth: 1 },
+    { id: 'sec-decision', label: L.decision, depth: 1 },
     { id: 'sec-process', label: L.process, depth: 1 },
   ]
   for (const r of data.rounds) {
-    const label = roundHeading(lang, r.round)
-    const focus = r.focus.trim()
     toc.push({
       id: `sec-round-${r.round}`,
-      label: focus ? `${label} · ${focus.slice(0, 36)}${focus.length > 36 ? '…' : ''}` : label,
+      label: roundHeading(lang, r.round),
       depth: 2,
     })
   }
-  if (edges.length > 0) {
-    toc.push({ id: 'sec-edges', label: L.edges, depth: 1 })
-    if (rebutEdges.length) {
-      toc.push({ id: 'sec-rebuttals', label: L.rebuttals, depth: 2 })
-    }
-  }
-  if (data.decision) {
-    toc.push({ id: 'sec-decision', label: L.decision, depth: 1 })
-  }
-  if (seats.length > 0) {
-    toc.push({ id: 'sec-roles', label: L.subReports, depth: 1 })
+  if (edges.length > 0) toc.push({ id: 'sec-edges', label: L.edges, depth: 1 })
+  if (seats.length > 0) toc.push({ id: 'sec-roles', label: L.subReports, depth: 1 })
+
+  // If no decision yet, still show overview/issue
+  if (!data.decision) {
+    toc.splice(1, 1, { id: 'sec-issue', label: L.issue, depth: 1 })
   }
 
-  const issueHtml = `
-${sectionOpen('sec-issue', L.issue)}
-  <div class="prose lead">${proseHtml(data.issue)}</div>
-  ${backLink(L)}
-</section>`
+  const metrics = metricsRow([
+    { label: L.metricRounds, value: String(data.rounds.length) },
+    { label: L.metricSeats, value: String(seats.length) },
+    { label: L.metricEdges, value: String(edges.length) },
+    { label: L.metricRebuts, value: String(rebutEdges.length) },
+  ])
 
-  const planHtml = `
-${sectionOpen('sec-plan', L.plan)}
-  <p class="meta"><strong>${esc(L.why)}:</strong> ${esc(data.rationale || L.none)}</p>
-  <h3>${esc(L.agenda)}</h3>
-  <ol>${
-    data.agenda.length
-      ? data.agenda.map((a) => `<li>${esc(a)}</li>`).join('\n')
-      : `<li class="muted">${esc(L.none)}</li>`
-  }</ol>
+  const flowSvg = svgFlowPipeline({
+    lang,
+    issue: data.issue,
+    rounds: data.rounds.map((r) => ({ round: r.round, focus: r.focus })),
+    decision: data.decision?.decision,
+    labels: {
+      issue: L.issue,
+      decision: L.decision,
+      round: (n) => roundHeading(lang, n),
+    },
+  })
+
+  const archSvg = seats.length
+    ? svgSeatArchitecture({
+        lang,
+        seats,
+        seatLabels: labelsMap,
+        chairLabel: 'hip',
+        title: L.architecture,
+      })
+    : ''
+
+  const debateSvg =
+    edges.length > 0 && seats.length
+      ? svgDebateGraph({
+          lang,
+          seats,
+          seatLabels: labelsMap,
+          edges,
+          title: L.debateMap,
+        })
+      : ''
+
+  const overviewHtml = `
+${sectionOpen('sec-overview', L.overview, 'diagram-card')}
+  <p class="meta"><strong>${esc(L.issue)}:</strong> ${esc(firstLine(data.issue, 160))}</p>
   ${
-    seats.length
-      ? `<h3>${esc(L.seats)}</h3>
-  <p class="meta">${seats.map((id) => esc(personaLabel(id, lang))).join(' · ')}</p>`
+    data.rationale
+      ? `<p class="meta"><strong>${esc(L.why)}:</strong> ${esc(snip(data.rationale, 120))}</p>`
+      : ''
+  }
+  ${metrics}
+  <h3>${esc(L.flow)}</h3>
+  ${flowSvg}
+  ${
+    archSvg
+      ? `<h3>${esc(L.architecture)}</h3>
+  <div class="diagram-row">${archSvg}</div>`
+      : ''
+  }
+  ${
+    data.agenda.length
+      ? `<h3>${esc(L.agenda)}</h3>
+  <div class="highlights">${data.agenda.map((a) => `<span class="chip">${esc(a)}</span>`).join('')}</div>`
       : ''
   }
   ${backLink(L)}
 </section>`
 
-  const timelineItems = data.rounds
-    .map((r) => {
-      const nSpeeches = r.speeches.length
-      const nRebut = edges.filter((e) => e.round === r.round && e.relation === 'rebut').length
-      const nSupport = edges.filter((e) => e.round === r.round && e.relation === 'support').length
-      const stats =
-        lang === 'zh-CN' || lang === 'zh-TW'
-          ? `${nSpeeches} 次发言${nRebut ? ` · ${nRebut} 次反驳` : ''}${nSupport ? ` · ${nSupport} 次附议` : ''}`
-          : `${nSpeeches} speeches${nRebut ? ` · ${nRebut} rebuttals` : ''}${nSupport ? ` · ${nSupport} supports` : ''}`
-      return `<li>
-      <p class="tl-title">${esc(roundHeading(lang, r.round))}</p>
-      <p class="tl-meta"><strong>${esc(L.focus)}:</strong> ${esc(r.focus)} · ${esc(stats)}</p>
-      <p class="meta">${jumpLink(`sec-round-${r.round}`, lang === 'zh-CN' || lang === 'zh-TW' ? '查看本轮详情 →' : 'View round →')}</p>
-    </li>`
-    })
-    .join('\n')
+  const decide = data.decision
+  const decideHtml = decide
+    ? `
+${sectionOpen('sec-decision', L.decision, 'decision')}
+  <p class="decision-lead">${esc(snip(decide.decision, 400))}</p>
+  ${
+    decide.decision.length > 400
+      ? collapsibleProse(decide.decision, { more: L.more, less: L.less }, 400)
+      : /```/.test(decide.decision)
+        ? `<div class="prose">${richProseHtml(decide.decision)}</div>`
+        : ''
+  }
+  <div class="stage-grid">
+    <div class="stage-col">
+      <h3>${esc(L.residual)}</h3>
+      <ul>${bullets(decide.residual)}</ul>
+    </div>
+    <div class="stage-col">
+      <h3>${esc(L.next)}</h3>
+      <ol>${
+        decide.nextSteps.length
+          ? decide.nextSteps.map((x) => `<li>${esc(x)}</li>`).join('\n')
+          : `<li class="muted">${esc(L.none)}</li>`
+      }</ol>
+    </div>
+  </div>
+  ${data.earlyExit ? `<p class="badge">${esc(L.early)}</p>` : ''}
+  ${backLink(L)}
+</section>`
+    : `
+${sectionOpen('sec-issue', L.issue)}
+  ${collapsibleProse(data.issue, { more: L.more, less: L.less }, 180)}
+  ${backLink(L)}
+</section>`
 
   const processHtml = `
-${sectionOpen('sec-process', L.process, 'process')}
+${sectionOpen('sec-process', L.process, 'diagram-card process')}
   <p class="hint">${esc(L.discussion)}</p>
-  <ol class="timeline">
-    ${timelineItems || `<li class="muted">${esc(L.none)}</li>`}
-  </ol>
+  ${
+    debateSvg
+      ? `<h3>${esc(L.debateMap)}</h3>${debateSvg}`
+      : ''
+  }
+  <div class="highlights" style="margin-top:0.75rem">
+    ${data.rounds
+      .map(
+        (r) =>
+          `<a class="chip" href="#sec-round-${r.round}" data-jump="sec-round-${r.round}">${esc(roundHeading(lang, r.round))}: ${esc(snip(r.focus, 24))}</a>`,
+      )
+      .join('')}
+  </div>
   ${backLink(L)}
 </section>`
 
   const roundsHtml = data.rounds
     .map((r) => {
       const speeches = r.speeches
-        .map((s) => speechArticle(s, lang, r.round, { linkRole: seats.includes(s.speaker) }))
+        .map((s) => speechArticle(s, lang, L, r.round, { linkRole: seats.includes(s.speaker) }))
         .join('\n')
       const roundEdges = edges.filter((e) => e.round === r.round)
+      const agreedChips = r.stage.agreed
+        .slice(0, 6)
+        .map((a) => `<span class="chip">${esc(a)}</span>`)
+        .join('')
+      const openChips = r.stage.open
+        .slice(0, 6)
+        .map((a) => `<span class="chip open">${esc(a)}</span>`)
+        .join('')
       return `
 ${sectionOpen(`sec-round-${r.round}`, roundHeading(lang, r.round), 'round')}
   <p class="meta"><strong>${esc(L.focus)}:</strong> ${esc(r.focus)}</p>
+  ${
+    agreedChips || openChips
+      ? `<h3>${esc(L.keyPoints)}</h3>
+  <div class="highlights">${agreedChips}${openChips}</div>`
+      : ''
+  }
   <h3>${esc(L.speeches)}</h3>
   <div class="speeches">${speeches || `<p class="muted">${esc(L.none)}</p>`}</div>
   ${
     roundEdges.length
-      ? `<h3>${esc(L.edges)}</h3>${edgeListHtml(roundEdges, lang, { linkRoles: true })}`
+      ? `<details class="fold" style="margin-top:0.65rem">
+    <summary><span class="more">${esc(L.detailsList)} (${roundEdges.length})</span><span class="less">${esc(L.less)}</span></summary>
+    <div class="fold-body">${edgeListHtml(roundEdges, lang, { linkRoles: true })}</div>
+  </details>`
       : ''
   }
   <h3>${esc(L.stage)}</h3>
@@ -1208,47 +1222,28 @@ ${sectionOpen(`sec-round-${r.round}`, roundHeading(lang, r.round), 'round')}
     })
     .join('\n')
 
-  const edgeHint =
-    lang === 'zh-CN' || lang === 'zh-TW'
-      ? '箭头方向：发起方 → 关系 → 目标方。摘要来自发言中的主张与攻击点。'
-      : 'Direction: actor → relation → target. Summaries come from claims and attacks in speeches.'
-
   const edgesHtml =
     edges.length === 0
       ? ''
       : `
-${sectionOpen('sec-edges', L.edges)}
-  <p class="hint">${esc(edgeHint)}</p>
-  ${otherEdges.length ? edgeListHtml(otherEdges, lang, { linkRoles: true }) : ''}
-  ${
-    rebutEdges.length
-      ? `
-  <div id="sec-rebuttals" tabindex="-1">
-    <h3>${esc(L.rebuttals)}</h3>
-    ${edgeListHtml(rebutEdges, lang, { linkRoles: true })}
-  </div>`
-      : ''
-  }
+${sectionOpen('sec-edges', L.edges, 'diagram-card')}
+  ${debateSvg || ''}
+  <details class="fold" style="margin-top:0.75rem">
+    <summary><span class="more">${esc(L.detailsList)}</span><span class="less">${esc(L.less)}</span></summary>
+    <div class="fold-body">
+      ${otherEdges.length ? edgeListHtml(otherEdges, lang, { linkRoles: true }) : ''}
+      ${
+        rebutEdges.length
+          ? `<div id="sec-rebuttals" tabindex="-1">
+        <h3>${esc(L.rebuttals)}</h3>
+        ${edgeListHtml(rebutEdges, lang, { linkRoles: true })}
+      </div>`
+          : ''
+      }
+    </div>
+  </details>
   ${backLink(L)}
 </section>`
-
-  const decide = data.decision
-  const decideHtml = decide
-    ? `
-${sectionOpen('sec-decision', L.decision, 'decision')}
-  <div class="prose lead">${proseHtml(decide.decision)}</div>
-  <h3>${esc(L.residual)}</h3>
-  <ul>${bullets(decide.residual)}</ul>
-  <h3>${esc(L.next)}</h3>
-  <ol>${
-    decide.nextSteps.length
-      ? decide.nextSteps.map((x) => `<li>${esc(x)}</li>`).join('\n')
-      : `<li class="muted">${esc(L.none)}</li>`
-  }</ol>
-  ${data.earlyExit ? `<p class="badge">${esc(L.early)}</p>` : ''}
-  ${backLink(L)}
-</section>`
-    : ''
 
   const openLabel = lang === 'zh-CN' || lang === 'zh-TW' ? '打开子报告 →' : 'Open →'
   const rolesHtml =
@@ -1262,13 +1257,11 @@ ${sectionOpen('sec-roles', L.subReports)}
       .map((id) => {
         const hue = PERSONA_HUE[id]
         const first =
-          data.rounds
-            .flatMap((r) => r.speeches)
-            .find((s) => s.speaker === id)?.content ?? ''
+          data.rounds.flatMap((r) => r.speeches).find((s) => s.speaker === id)?.content ?? ''
         const href = personaReportFilename(id)
         return `<a class="role-card" style="--persona-h:${hue}" href="${esc(href)}" data-file="${esc(href)}">
       <span class="name">${esc(personaLabel(id, lang))}</span>
-      <span class="snip">${esc(snip(first, 110) || L.none)}</span>
+      <span class="snip">${esc(firstLine(first, 90) || L.none)}</span>
       <span class="go">${esc(openLabel)}</span>
     </a>`
       })
@@ -1284,18 +1277,18 @@ ${sectionOpen('sec-roles', L.subReports)}
   <p class="sub">${esc(when)}${data.earlyExit ? ` · ${esc(L.early)}` : ''}</p>
 </header>`
 
+  // Prefer decision near top for scannability
   return documentShell({
     lang,
     title: L.title,
     issueTitle,
     headerHtml,
     toc,
-    bodyHtml: `${issueHtml}
-        ${planHtml}
+    bodyHtml: `${overviewHtml}
+        ${decideHtml}
         ${processHtml}
         ${roundsHtml}
         ${edgesHtml}
-        ${decideHtml}
         ${rolesHtml}`,
     footer: L.footer,
   })
@@ -1309,6 +1302,8 @@ function buildPersonaReport(data: RoundtableReportData, persona: PersonaId): str
   const name = personaLabel(persona, lang)
   const hue = PERSONA_HUE[persona]
   const edges = data.edges ?? []
+  const seats = speakersInData(data)
+  const labelsMap = seatLabelMap(lang, seats)
 
   const mySpeeches = data.rounds.flatMap((r) =>
     r.speeches
@@ -1316,6 +1311,7 @@ function buildPersonaReport(data: RoundtableReportData, persona: PersonaId): str
       .map((s) => ({ round: r.round, focus: r.focus, content: s.content })),
   )
 
+  const myEdges = edges.filter((e) => e.from === persona || e.to === persona)
   const outRebut = edges.filter((e) => e.from === persona && e.relation === 'rebut')
   const outSupport = edges.filter((e) => e.from === persona && e.relation === 'support')
   const outQ = edges.filter((e) => e.from === persona && e.relation === 'question')
@@ -1339,9 +1335,18 @@ function buildPersonaReport(data: RoundtableReportData, persona: PersonaId): str
     { id: 'sec-speeches', label: L.mySpeeches, depth: 1 },
     { id: 'sec-exchange', label: L.edges, depth: 1 },
   ]
-  if (data.decision) {
-    toc.push({ id: 'sec-decision', label: L.vsDecision, depth: 1 })
-  }
+  if (data.decision) toc.push({ id: 'sec-decision', label: L.vsDecision, depth: 1 })
+
+  const personalGraph =
+    myEdges.length && seats.length
+      ? svgDebateGraph({
+          lang,
+          seats,
+          seatLabels: labelsMap,
+          edges: myEdges,
+          title: L.debateMap,
+        })
+      : ''
 
   const exchangeBlock = (
     title: string,
@@ -1377,7 +1382,12 @@ function buildPersonaReport(data: RoundtableReportData, persona: PersonaId): str
 
   const body = `
 ${sectionOpen('sec-stance', L.myStance)}
-  <div class="prose lead">${proseHtml(stanceBody)}</div>
+  ${metricsRow([
+    { label: L.mySpeeches, value: String(mySpeeches.length) },
+    { label: L.metricEdges, value: String(myEdges.length) },
+    { label: L.metricRebuts, value: String(outRebut.length + inRebut.length) },
+  ])}
+  ${collapsibleProse(stanceBody, { more: L.more, less: L.less }, 200)}
   ${backLink(L)}
 </section>
 
@@ -1392,7 +1402,7 @@ ${sectionOpen('sec-speeches', L.mySpeeches)}
       <h4>${esc(roundHeading(lang, s.round))}</h4>
       <span class="round-tag">${esc(L.focus)}: ${esc(s.focus)}</span>
     </div>
-    <div class="prose">${proseHtml(s.content)}</div>
+    ${collapsibleProse(s.content, { more: L.more, less: L.less })}
   </article>`,
           )
           .join('\n')
@@ -1401,15 +1411,21 @@ ${sectionOpen('sec-speeches', L.mySpeeches)}
   ${backLink(L)}
 </section>
 
-${sectionOpen('sec-exchange', L.edges)}
+${sectionOpen('sec-exchange', L.edges, 'diagram-card')}
+  ${personalGraph}
   ${
     hasExchange
-      ? `${exchangeBlock(L.iRebutted, outRebut, 'rebut', 'to')}
+      ? `<details class="fold" style="margin-top:0.65rem" open>
+    <summary><span class="more">${esc(L.detailsList)}</span><span class="less">${esc(L.less)}</span></summary>
+    <div class="fold-body">
+  ${exchangeBlock(L.iRebutted, outRebut, 'rebut', 'to')}
   ${exchangeBlock(L.iSupported, outSupport, 'support', 'to')}
   ${exchangeBlock(L.iQuestioned, outQ, 'question', 'to')}
   ${exchangeBlock(L.rebuttedMe, inRebut, 'rebut', 'from')}
   ${exchangeBlock(L.supportedMe, inSupport, 'support', 'from')}
-  ${exchangeBlock(L.questionedMe, inQ, 'question', 'from')}`
+  ${exchangeBlock(L.questionedMe, inQ, 'question', 'from')}
+    </div>
+  </details>`
       : `<p class="muted">${esc(L.noExchange)}</p>`
   }
   ${backLink(L)}
@@ -1419,15 +1435,21 @@ ${
   data.decision
     ? `
 ${sectionOpen('sec-decision', L.vsDecision, 'decision')}
-  <div class="prose lead">${proseHtml(data.decision.decision)}</div>
-  <h3>${esc(L.residual)}</h3>
-  <ul>${bullets(data.decision.residual)}</ul>
-  <h3>${esc(L.next)}</h3>
-  <ol>${
-    data.decision.nextSteps.length
-      ? data.decision.nextSteps.map((x) => `<li>${esc(x)}</li>`).join('\n')
-      : `<li class="muted">${esc(L.none)}</li>`
-  }</ol>
+  <p class="decision-lead">${esc(snip(data.decision.decision, 320))}</p>
+  <div class="stage-grid">
+    <div class="stage-col">
+      <h3>${esc(L.residual)}</h3>
+      <ul>${bullets(data.decision.residual)}</ul>
+    </div>
+    <div class="stage-col">
+      <h3>${esc(L.next)}</h3>
+      <ol>${
+        data.decision.nextSteps.length
+          ? data.decision.nextSteps.map((x) => `<li>${esc(x)}</li>`).join('\n')
+          : `<li class="muted">${esc(L.none)}</li>`
+      }</ol>
+    </div>
+  </div>
   ${backLink(L)}
 </section>`
     : ''
@@ -1454,9 +1476,7 @@ ${sectionOpen('sec-decision', L.vsDecision, 'decision')}
   })
 }
 
-/**
- * Build the full deliverable set: hip summary + one HTML per speaking seat.
- */
+/** Build the full deliverable set: hip summary + one HTML per speaking seat. */
 export function buildRoundtableReportBundle(data: RoundtableReportData): RoundtableReportFile[] {
   const seats = speakersInData(data)
   const files: RoundtableReportFile[] = [

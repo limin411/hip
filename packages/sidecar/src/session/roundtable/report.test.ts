@@ -18,7 +18,10 @@ const sample = {
       round: 1,
       focus: '方向',
       speeches: [
-        { speaker: 'strategist' as const, content: '长期选 A' },
+        {
+          speaker: 'strategist' as const,
+          content: '长期选 A。示例：\n\n```ts\nexport const plan = "A"\n```\n\n并用 `plan` 落地。',
+        },
         { speaker: 'skeptic' as const, content: 'A 太贵' },
         { speaker: 'creative' as const, content: '混合方案' },
         { speaker: 'operator' as const, content: '分阶段' },
@@ -67,7 +70,6 @@ describe('roundtable report html template', () => {
     expect(html).toContain('受众倡导者')
     expect(html).toContain('分阶段推进 A')
     expect(html).toContain('反驳')
-    // User content is escaped; template may include a safe nav <script>.
     expect(html).toContain('&lt;script&gt;')
     expect(html).not.toContain('Should we rewrite the API? <script>')
     expect(html).toContain('<!DOCTYPE html>')
@@ -79,8 +81,7 @@ describe('roundtable report html template', () => {
     expect(html).toContain('目录')
     expect(html).toContain('class="shell"')
     expect(html).toContain('id="report-main"')
-    expect(html).toContain('data-jump="sec-issue"')
-    expect(html).toContain('data-jump="sec-plan"')
+    expect(html).toContain('data-jump="sec-overview"')
     expect(html).toContain('data-jump="sec-process"')
     expect(html).toContain('data-jump="sec-round-1"')
     expect(html).toContain('data-jump="sec-round-2"')
@@ -88,34 +89,54 @@ describe('roundtable report html template', () => {
     expect(html).toContain('data-jump="sec-decision"')
     expect(html).toContain('data-jump="sec-roles"')
     expect(html).toContain('data-jump="top"')
-    expect(html).toContain('id="sec-issue"')
+    expect(html).toContain('id="sec-overview"')
     expect(html).toContain('id="sec-decision"')
     expect(html).toContain('返回顶部')
     expect(html).toContain(ROUNDTABLE_REPORT_NAV_SCRIPT.slice(0, 40))
-    // Wide layout: no narrow max-width on shell/content
     expect(ROUNDTABLE_REPORT_STYLES).toContain('overflow: hidden')
     expect(ROUNDTABLE_REPORT_STYLES).toContain('#report-main')
     expect(ROUNDTABLE_REPORT_STYLES).toContain('max-width: none')
   })
 
-  it('includes discussion process, rebuttal map, and role sub-report links', () => {
+  it('includes SVG diagrams, metrics, and code blocks', () => {
     const html = buildRoundtableReportHtml(sample)
-    expect(html).toContain('讨论时间线')
-    expect(html).toContain('交锋图谱')
-    expect(html).toContain('反驳与挑战')
-    expect(html).toContain('各角色子报告')
-    expect(html).toContain('rel-chip rebut')
-    expect(html).toContain('rel-chip support')
-    expect(html).toContain(`href="${personaReportFilename('strategist')}"`)
-    expect(html).toContain(`data-file="${personaReportFilename('strategist')}"`)
-    expect(html).toContain(`href="${personaReportFilename('skeptic')}"`)
-    expect(html).toContain(`data-file="${personaReportFilename('skeptic')}"`)
+    expect(html).toContain('class="diagram flow-diagram"')
+    expect(html).toContain('class="diagram debate-diagram"')
+    expect(html).toContain('class="diagram arch-diagram"')
+    expect(html).toContain('class="metrics"')
+    expect(html).toContain('会议流程')
+    expect(html).toContain('席位架构')
+    expect(html).toContain('交锋关系图')
+    expect(html).toContain('class="code-block"')
+    expect(html).toContain('data-lang="ts"')
+    expect(html).toContain('export const plan')
+    expect(html).toContain('class="inline-code"')
+    expect(html).toContain('plan')
     expect(html).toContain('class="role-card"')
-    expect(html).toContain('hip 汇总')
-    // Cross-file open via postMessage (srcDoc-safe)
+    expect(html).toContain(`data-file="${personaReportFilename('strategist')}"`)
+    expect(ROUNDTABLE_REPORT_STYLES).toContain('.code-block')
     expect(ROUNDTABLE_REPORT_NAV_SCRIPT).toContain('hip-roundtable-report')
-    expect(ROUNDTABLE_REPORT_NAV_SCRIPT).toContain('open-file')
-    expect(ROUNDTABLE_REPORT_NAV_SCRIPT).toContain('data-file')
+  })
+
+  it('collapses long speeches and lists exchange details', () => {
+    const html = buildRoundtableReportHtml({
+      ...sample,
+      rounds: [
+        {
+          round: 1,
+          focus: 'f',
+          speeches: [
+            {
+              speaker: 'strategist',
+              content: '很长的发言内容'.repeat(40),
+            },
+          ],
+          stage: { round: 1, agreed: ['a'], open: [] },
+        },
+      ],
+    })
+    expect(html).toContain('prose-fold')
+    expect(html).toContain('展开全文')
   })
 
   it('omits empty optional TOC entries', () => {
@@ -133,10 +154,11 @@ describe('roundtable report html template', () => {
         },
       ],
     })
-    expect(html).toContain('data-jump="sec-issue"')
+    expect(html).toContain('data-jump="sec-overview"')
     expect(html).toContain('data-jump="sec-round-1"')
     expect(html).toContain('data-jump="sec-roles"')
     expect(html).not.toContain('data-jump="sec-edges"')
+    // no decision → issue section instead of decision jump
     expect(html).not.toContain('data-jump="sec-decision"')
     expect(html).toContain('Contents')
   })
@@ -147,12 +169,10 @@ describe('roundtable report bundle (main + role sub-reports)', () => {
     const files = buildRoundtableReportBundle(sample)
     expect(files[0]?.filename).toBe(ROUNDTABLE_REPORT_FILENAME)
     expect(files[0]?.kind).toBe('main')
-    // 5 unique speakers across rounds
     expect(files).toHaveLength(1 + 5)
     const names = files.map((f) => f.filename)
     expect(names).toContain(personaReportFilename('strategist'))
     expect(names).toContain(personaReportFilename('operator'))
-    expect(names).toContain(personaReportFilename('audience'))
   })
 
   it('persona report includes stance, exchanges, back-link, and decision context', () => {
@@ -171,8 +191,8 @@ describe('roundtable report bundle (main + role sub-reports)', () => {
     expect(html).toContain('分阶段推进 A')
     expect(html).toContain(`href="${ROUNDTABLE_REPORT_FILENAME}"`)
     expect(html).toContain('返回 hip 汇总')
-    // Escaping still applied
     expect(html).toContain('&lt;script&gt;')
+    expect(html).toContain('class="diagram debate-diagram"')
   })
 
   it('persona report lists inbound challenges for the target seat', () => {
@@ -184,5 +204,6 @@ describe('roundtable report bundle (main + role sub-reports)', () => {
     expect(html).toContain('怀疑论者')
     expect(html).toContain('支持我的')
     expect(html).toContain('执行者')
+    expect(html).toContain('class="code-block"')
   })
 })

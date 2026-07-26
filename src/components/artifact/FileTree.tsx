@@ -1,6 +1,6 @@
 import { useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
-import { ChevronRight, ChevronDown, File, Folder, FolderOpen, FolderGit2, RefreshCw, MessageSquare } from 'lucide-react'
+import { ChevronRight, ChevronDown, Folder, FolderOpen, FolderGit2, RefreshCw, MessageSquare } from 'lucide-react'
 import type { FsEntry } from '@hip/protocol'
 import { sessionService } from '@/domain'
 import { useFsStore } from '@/store/fsStore'
@@ -10,6 +10,7 @@ import { pickDirectory } from '@/ipc/dialog'
 import { Button } from '@/components/ui/Button'
 import { Skeleton } from '@/components/ui/Skeleton'
 import { DeclarativeContextMenu } from '@/components/context-menu'
+import { fileIconForName } from '@/lib/fileIcon'
 import { cn } from '@/lib/utils'
 
 function basename(p: string): string {
@@ -21,6 +22,19 @@ function basename(p: string): string {
 /** Only treat a real non-empty string as a bound workspace root. */
 function asRootPath(cwd: unknown): string | undefined {
   return typeof cwd === 'string' && cwd.length > 0 ? cwd : undefined
+}
+
+function FileTypeIcon({ name, size = 15 }: { name: string; size?: number }) {
+  const { Icon, className } = fileIconForName(name)
+  return (
+    <Icon
+      size={size}
+      strokeWidth={1.75}
+      className={cn('shrink-0', className)}
+      data-testid="file-type-icon"
+      data-file-name={name}
+    />
+  )
 }
 
 function Node({
@@ -81,8 +95,10 @@ function Node({
             ? open ? <ChevronDown size={14} strokeWidth={1.75} className="text-ink-tertiary" /> : <ChevronRight size={14} strokeWidth={1.75} className="text-ink-tertiary" />
             : <span className="w-3.5" />}
           {entry.isDir
-            ? open ? <FolderOpen size={15} strokeWidth={1.75} className="text-ink-tertiary" /> : <Folder size={15} strokeWidth={1.75} className="text-ink-tertiary" />
-            : <File size={15} strokeWidth={1.75} className="text-ink-tertiary" />}
+            ? open
+              ? <FolderOpen size={15} strokeWidth={1.75} className="shrink-0 text-amber-600/80 dark:text-amber-400/90" />
+              : <Folder size={15} strokeWidth={1.75} className="shrink-0 text-amber-600/80 dark:text-amber-400/90" />
+            : <FileTypeIcon name={entry.name} />}
           <span className="truncate">{entry.name}</span>
         </div>
       </DeclarativeContextMenu>

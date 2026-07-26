@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next'
 import { ChevronDown, ChevronRight } from 'lucide-react'
 import type { DiffFile, DiffHunk, DiffLine, DiffLineType, DiffFileStatus, DiffSummary } from '@hip/protocol'
 import { cn } from '@/lib/utils'
+import { fileIconForName } from '@/lib/fileIcon'
 import { computeHunkWordDiffs } from '@/lib/wordDiff'
 import { buildSplitRows } from '@/lib/diffSplit'
 import { DeclarativeContextMenu } from '@/components/context-menu'
@@ -14,6 +15,18 @@ export const STATUS_CHIP = {
   deleted: { cls: 'bg-danger/10 text-danger', key: 'artifact.diffView.statusDeleted' },
   renamed: { cls: 'bg-surface-muted text-ink-secondary', key: 'artifact.diffView.statusRenamed' },
 } as const satisfies Record<DiffFileStatus, { cls: string; key: string }>
+
+function DiffFileTypeIcon({ path, size = 14 }: { path: string; size?: number }) {
+  const { Icon, className } = fileIconForName(path)
+  return (
+    <Icon
+      size={size}
+      strokeWidth={1.75}
+      className={cn('shrink-0', className)}
+      data-testid="file-type-icon"
+    />
+  )
+}
 
 /** Soft row tint — hierarchy from background, not hard borders. */
 function lineStyle(t: DiffLineType): string {
@@ -147,16 +160,15 @@ function FileDiff({
           >
             {isCollapsed ? <ChevronRight size={14} strokeWidth={1.75} /> : <ChevronDown size={14} strokeWidth={1.75} />}
           </button>
-          <span className="min-w-0 truncate">
-            <span
-              className={cn('mr-1.5 rounded-md px-1.5 py-px text-caption font-medium', chip.cls)}
-              data-testid="diff-status"
-            >
-              {t(chip.key)}
-            </span>
-            <span className="font-mono text-ink">
-              {file.oldPath && <span className="text-ink-tertiary">{file.oldPath} → </span>}{file.path}
-            </span>
+          <span
+            className={cn('shrink-0 rounded-md px-1.5 py-px text-caption font-medium', chip.cls)}
+            data-testid="diff-status"
+          >
+            {t(chip.key)}
+          </span>
+          <DiffFileTypeIcon path={file.path} size={14} />
+          <span className="min-w-0 truncate font-mono text-ink">
+            {file.oldPath && <span className="text-ink-tertiary">{file.oldPath} → </span>}{file.path}
           </span>
         </span>
         <span className="flex shrink-0 items-center gap-2 font-mono text-caption leading-none tabular-nums">
@@ -280,9 +292,10 @@ export function DiffDisplay({
               onClick={() => document.getElementById(`diff-file-${file.path}`)?.scrollIntoView({ block: 'start' })}
               className="flex w-full items-center justify-between gap-2 px-3 py-1.5 text-meta leading-none transition-colors duration-chrome hover:bg-state-hover"
             >
-              <span className="min-w-0 flex-1 truncate text-left">
-                <span className={cn('mr-1.5 rounded-md px-1.5 py-px text-caption font-medium', STATUS_CHIP[file.status].cls)}>{t(STATUS_CHIP[file.status].key)}</span>
-                <span className="font-mono text-ink-secondary">{file.path}</span>
+              <span className="flex min-w-0 flex-1 items-center gap-1.5 truncate text-left">
+                <span className={cn('shrink-0 rounded-md px-1.5 py-px text-caption font-medium', STATUS_CHIP[file.status].cls)}>{t(STATUS_CHIP[file.status].key)}</span>
+                <DiffFileTypeIcon path={file.path} size={13} />
+                <span className="min-w-0 truncate font-mono text-ink-secondary">{file.path}</span>
               </span>
               <span className="shrink-0 font-mono text-caption tabular-nums">
                 <span className="text-success">+{file.additions}</span>{' '}

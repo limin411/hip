@@ -94,4 +94,34 @@ describe('FileTree', () => {
     fireEvent.click(screen.getByText('README.md'))
     expect(readFile).toHaveBeenCalledWith('s1', '/project/README.md')
   })
+
+  it('renders colored file-type icons by extension', () => {
+    useFsStore.setState({
+      bySession: {
+        s1: {
+          cwd: '/project',
+          entriesByDir: {
+            '/project': [
+              { path: '/project/a.ts', name: 'a.ts', isDir: false },
+              { path: '/project/b.py', name: 'b.py', isDir: false },
+              { path: '/project/README.md', name: 'README.md', isDir: false },
+            ],
+          },
+          expanded: {},
+          activePath: null,
+        },
+      },
+    } as any)
+
+    render(<FileTree />)
+    const icons = screen.getAllByTestId('file-type-icon')
+    expect(icons).toHaveLength(3)
+    expect(icons[0]).toHaveAttribute('data-file-name', 'a.ts')
+    expect(icons[1]).toHaveAttribute('data-file-name', 'b.py')
+    expect(icons[2]).toHaveAttribute('data-file-name', 'README.md')
+    // Distinct color classes per family (sky / blue / slate)
+    expect(icons[0].getAttribute('class')).toMatch(/sky/)
+    expect(icons[1].getAttribute('class')).toMatch(/blue/)
+    expect(icons[2].getAttribute('class')).toMatch(/slate/)
+  })
 })

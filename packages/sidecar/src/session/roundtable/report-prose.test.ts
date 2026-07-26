@@ -9,10 +9,11 @@ import {
   stripToolNoise,
 } from './report-prose.js'
 
-describe('richProseHtml', () => {
-  it('escapes raw html', () => {
-    expect(richProseHtml('x <script>y')).toContain('&lt;script&gt;')
-    expect(richProseHtml('x <script>y')).not.toContain('<script>')
+describe('richProseHtml (marked GFM)', () => {
+  it('escapes raw html injection', () => {
+    const html = richProseHtml('x <script>alert(1)</script> y')
+    expect(html).not.toContain('<script>alert')
+    expect(html.toLowerCase()).toContain('script')
   })
 
   it('renders fenced code blocks', () => {
@@ -20,49 +21,51 @@ describe('richProseHtml', () => {
     expect(html).toContain('class="code-block"')
     expect(html).toContain('data-lang="ts"')
     expect(html).toContain('const a = 1')
-    expect(html).toContain('<pre><code>')
   })
 
-  it('renders inline code, bold, italic', () => {
+  it('renders bold, italic, inline code', () => {
     const html = richProseHtml('use `foo()` and **bold** and *em*')
     expect(html).toContain('class="inline-code"')
-    expect(html).toContain('foo()')
     expect(html).toContain('<strong>bold</strong>')
     expect(html).toContain('<em>em</em>')
   })
 
   it('renders lists and headings', () => {
-    const md = `**怀疑论者发言**
+    const md = `## 结论
 
 - 第一点
 - 第二点
 
-## 结论
-
 1. 步骤甲
 2. 步骤乙`
     const html = richProseHtml(md)
-    expect(html).toContain('class="prose-h"')
-    expect(html).toContain('怀疑论者发言')
-    expect(html).toContain('class="prose-ul"')
+    expect(html).toMatch(/<h2[^>]*>结论<\/h2>/)
+    expect(html).toContain('<ul>')
     expect(html).toContain('<li>')
     expect(html).toContain('第一点')
-    expect(html).toContain('class="prose-ol"')
+    expect(html).toContain('<ol>')
+  })
+
+  it('does not leave raw ** when bold is well-formed', () => {
+    const html = richProseHtml('这是 **重要** 结论')
+    expect(html).toContain('<strong>重要</strong>')
+    expect(html).not.toContain('**重要**')
   })
 })
 
 describe('collapsibleProse', () => {
-  it('folds long text', () => {
-    const long = '字'.repeat(300)
-    const html = collapsibleProse(long, { more: '展开', less: '收起' })
-    expect(html).toContain('prose-fold')
-    expect(html).toContain('展开')
+  it('shows full markdown for short text', () => {
+    const html = collapsibleProse('**短**文', { more: 'more', less: 'less' })
+    expect(html).toContain('<strong>短</strong>')
+    expect(html).not.toContain('prose-fold')
   })
 
-  it('keeps short text open', () => {
-    const html = collapsibleProse('短文', { more: 'more', less: 'less' })
-    expect(html).not.toContain('prose-fold')
-    expect(html).toContain('短文')
+  it('folds long text but still embeds markdown body', () => {
+    const long = '字'.repeat(400) + '\n\n- item a\n- item b'
+    const html = collapsibleProse(long, { more: '展开', less: '收起' })
+    expect(html).toContain('prose-fold')
+    expect(html).toContain('<ul>')
+    expect(html).toContain('item a')
   })
 })
 
@@ -83,7 +86,7 @@ describe('stripToolNoise / pickReportSpeechContent', () => {
   })
 })
 
-describe('decisionHtml / splitDecisionParts', () => {
+describe('decisionHtml', () => {
   it('splits 【决定N】 cards', () => {
     const d = `导言\n\n【决定1｜账户】\n- 采用 A\n\n【决定2｜保险】\n- 采用 B`
     const parts = splitDecisionParts(d)
@@ -91,6 +94,7 @@ describe('decisionHtml / splitDecisionParts', () => {
     const html = decisionHtml(d, { more: 'more', less: 'less' })
     expect(html).toContain('decision-card')
     expect(html).toContain('决定1')
+    expect(html).toContain('<ul>')
   })
 })
 

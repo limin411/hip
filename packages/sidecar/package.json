@@ -21,6 +21,7 @@
     "@langchain/openai": "^1.4",
     "@modelcontextprotocol/sdk": "^1.29.0",
     "gpt-tokenizer": "^3.4.0",
+    "marked": "^15",
     "pdf-parse": "^1.1.1",
     "sqlite-vec": "^0.1.9",
     "ws": "^8",

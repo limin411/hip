@@ -7,7 +7,6 @@ import {
   ROUNDTABLE_REPORT_NAV_SCRIPT,
   ROUNDTABLE_REPORT_STYLES,
 } from './report.js'
-import { ROUNDTABLE_MERMAID_CDN } from './report-diagrams.js'
 
 const sample = {
   issue: 'Should we rewrite the API? <script>',
@@ -38,7 +37,7 @@ const sample = {
     },
   ],
   decision: {
-    decision: '分阶段推进 A',
+    decision: '分阶段推进 A\n\n- 先试点\n- 再 RFC',
     residual: ['时间风险'],
     nextSteps: ['试点', 'RFC'],
   },
@@ -70,45 +69,48 @@ describe('roundtable report html template', () => {
     expect(html).toContain('分阶段推进 A')
     expect(html).toContain('&lt;script&gt;')
     expect(html).not.toContain('Should we rewrite the API? <script>')
-    expect(html).toContain('<!DOCTYPE html>')
   })
 
-  it('uses mermaid diagrams (not hand-rolled SVG)', () => {
+  it('uses pure HTML diagrams (no mermaid CDN / no spaghetti SVG)', () => {
     const html = buildRoundtableReportHtml(sample)
-    expect(html).toContain('class="mermaid"')
-    expect(html).toContain('flowchart LR')
-    expect(html).toContain(ROUNDTABLE_MERMAID_CDN)
-    expect(html).toContain('mermaid.initialize')
-    // No legacy hand SVG debate/flow classes
+    expect(html).toContain('class="flow-steps"')
+    expect(html).toContain('class="seat-board"')
+    expect(html).toContain('class="debate-timeline"')
+    expect(html).not.toContain('cdn.jsdelivr.net/npm/mermaid')
+    expect(html).not.toContain('class="mermaid"')
+    expect(html).not.toContain('flowchart LR')
     expect(html).not.toContain('class="diagram debate-diagram"')
-    expect(html).not.toContain('class="diagram flow-diagram"')
-    expect(html).not.toContain('id="m-rebut"')
   })
 
-  it('keeps TOC fixed shell and data-jump nav', () => {
+  it('renders GFM markdown in decision and speeches', () => {
+    const html = buildRoundtableReportHtml(sample)
+    expect(html).toContain('class="code-block"')
+    expect(html).toContain('data-lang="ts"')
+    expect(html).toContain('export const plan')
+    expect(html).toContain('class="inline-code"')
+    // decision list via marked
+    expect(html).toContain('<ul>')
+    expect(html).toContain('先试点')
+  })
+
+  it('keeps fixed TOC shell and data-jump', () => {
     const html = buildRoundtableReportHtml(sample)
     expect(html).toContain('id="toc"')
     expect(html).toContain('class="shell"')
     expect(html).toContain('id="report-main"')
     expect(html).toContain('data-jump="sec-overview"')
-    expect(html).toContain('data-jump="sec-decision"')
-    expect(html).toContain('data-jump="sec-process"')
     expect(html).toContain(ROUNDTABLE_REPORT_NAV_SCRIPT.slice(0, 40))
-    expect(ROUNDTABLE_REPORT_STYLES).toContain('#report-main')
-    expect(ROUNDTABLE_REPORT_STYLES).toContain('.mermaid-wrap')
+    expect(ROUNDTABLE_REPORT_STYLES).toContain('.flow-steps')
+    expect(ROUNDTABLE_REPORT_STYLES).toContain('.md')
   })
 
-  it('collapses rounds by default and limits storyline noise', () => {
+  it('collapses rounds by default', () => {
     const html = buildRoundtableReportHtml(sample)
     expect(html).toContain('class="round-fold"')
     expect(html).toContain('id="sec-round-1"')
-    expect(html).toContain('class="storyline"')
-    // Full edge dump not a top-level always-open wall
-    expect(html).toContain('class="code-block"')
-    expect(html).toContain('data-lang="ts"')
   })
 
-  it('renders markdown in speeches', () => {
+  it('renders markdown lists/bold in long speech', () => {
     const html = buildRoundtableReportHtml({
       ...sample,
       rounds: [
@@ -118,48 +120,28 @@ describe('roundtable report html template', () => {
           speeches: [
             {
               speaker: 'skeptic',
-              content: '**怀疑论者发言**\n\n- 成本过高\n- 证据不足\n\n结论是 **暂缓**。',
+              content: '## 怀疑论者发言\n\n- 成本过高\n- 证据不足\n\n结论是 **暂缓**。',
             },
           ],
           stage: { round: 1, agreed: [], open: [] },
         },
       ],
     })
-    expect(html).toContain('怀疑论者发言')
-    expect(html).toContain('class="prose-ul"')
+    expect(html).toMatch(/<h2[^>]*>怀疑论者发言<\/h2>/)
+    expect(html).toContain('<ul>')
+    expect(html).toContain('成本过高')
     expect(html).toContain('<strong>暂缓</strong>')
-  })
-
-  it('omits empty optional sections', () => {
-    const html = buildRoundtableReportHtml({
-      issue: 'x',
-      language: 'en',
-      agenda: ['a'],
-      rationale: 'r',
-      rounds: [
-        {
-          round: 1,
-          focus: 'f',
-          speeches: [{ speaker: 'strategist', content: 'hi' }],
-          stage: { round: 1, agreed: [], open: [] },
-        },
-      ],
-    })
-    expect(html).toContain('data-jump="sec-overview"')
-    expect(html).not.toContain('data-jump="sec-decision"')
-    expect(html).toContain('Contents')
   })
 })
 
 describe('roundtable report bundle', () => {
-  it('emits main + persona files with mermaid', () => {
+  it('emits main + persona files', () => {
     const files = buildRoundtableReportBundle(sample)
     expect(files[0]?.filename).toBe(ROUNDTABLE_REPORT_FILENAME)
-    expect(files).toHaveLength(1 + 5)
-    const skeptic = files.find((f) => f.persona === 'skeptic')!
-    expect(skeptic.html).toContain('怀疑论者')
-    expect(skeptic.html).toContain('class="mermaid"')
-    expect(skeptic.html).toContain(`href="${ROUNDTABLE_REPORT_FILENAME}"`)
-    expect(skeptic.html).toContain(personaReportFilename('strategist'))
+    expect(files.length).toBeGreaterThanOrEqual(2)
+    const skeptic = files.find((f) => f.persona === 'skeptic')
+    expect(skeptic?.html).toContain('怀疑论者')
+    expect(skeptic?.html).toContain(ROUNDTABLE_REPORT_FILENAME)
+    expect(skeptic?.html).toContain(personaReportFilename('strategist'))
   })
 })

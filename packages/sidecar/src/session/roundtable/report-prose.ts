@@ -1,8 +1,9 @@
 /**
- * Lightweight markdown → HTML for roundtable reports.
- * Supports: fenced code, inline code, **bold**, *italic*, headings, lists, hr, paragraphs.
- * Also: clean advisor raw output; structured decision cards.
+ * Report prose: GFM markdown → HTML via marked (build-time, no client JS).
+ * html:false via custom renderer so user/model content cannot inject tags.
  */
+import { Marked, type TokenizerAndRendererExtension } from 'marked'
+import type { Tokens } from 'marked'
 
 export function esc(s: string): string {
   return s
@@ -12,176 +13,73 @@ export function esc(s: string): string {
     .replace(/"/g, '&quot;')
 }
 
-/** Inline: `code`, **bold**, *italic*. */
-export function inlineProseHtml(s: string): string {
-  return applyInline(s)
+/** Strip raw HTML tokens — treat as escaped text. */
+const stripHtmlExt: TokenizerAndRendererExtension = {
+  name: 'html',
+  level: 'block',
+  renderer(token) {
+    const t = token as Tokens.HTML
+    return `<p class="prose-p">${esc(t.text || '')}</p>\n`
+  },
 }
 
-function applyInline(s: string): string {
-  type Seg = { kind: 'text' | 'code' | 'bold' | 'em'; v: string }
-  const segs: Seg[] = []
-  const re = /(`([^`\n]+)`|\*\*([^*]+)\*\*|\*([^*\n]+)\*)/g
-  let last = 0
-  let m: RegExpExecArray | null
-  while ((m = re.exec(s)) !== null) {
-    if (m.index > last) segs.push({ kind: 'text', v: s.slice(last, m.index) })
-    if (m[2] != null) segs.push({ kind: 'code', v: m[2] })
-    else if (m[3] != null) segs.push({ kind: 'bold', v: m[3] })
-    else if (m[4] != null) segs.push({ kind: 'em', v: m[4] })
-    last = m.index + m[0].length
-  }
-  if (last < s.length) segs.push({ kind: 'text', v: s.slice(last) })
+const marked = new Marked({
+  gfm: true,
+  breaks: true,
+  pedantic: false,
+  extensions: [stripHtmlExt],
+})
 
-  return segs
-    .map((seg) => {
-      if (seg.kind === 'code') return `<code class="inline-code">${esc(seg.v)}</code>`
-      if (seg.kind === 'bold') return `<strong>${esc(seg.v)}</strong>`
-      if (seg.kind === 'em') return `<em>${esc(seg.v)}</em>`
-      return esc(seg.v).replace(/\n/g, '<br/>')
-    })
-    .join('')
-}
+// Escape any residual raw HTML blocks/inlines the default renderer might emit.
+marked.use({
+  renderer: {
+    html({ text }) {
+      return esc(text)
+    },
+    code({ text, lang }) {
+      const language = (lang || '').trim()
+      const langAttr = language ? ` data-lang="${esc(language)}"` : ''
+      const langLabel = language
+        ? `<span class="code-lang">${esc(language)}</span>`
+        : ''
+      return `<div class="code-block"${langAttr}>${langLabel}<pre><code>${esc(text)}</code></pre></div>\n`
+    },
+    codespan({ text }) {
+      return `<code class="inline-code">${esc(text)}</code>`
+    },
+    link({ href, title, text }) {
+      // Only allow relative .html sibling links + http(s); block javascript:
+      const h = (href || '').trim()
+      if (!h || /^javascript:/i.test(h) || h.startsWith('data:')) {
+        return esc(text)
+      }
+      const t = title ? ` title="${esc(title)}"` : ''
+      return `<a href="${esc(h)}"${t}>${text}</a>`
+    },
+  },
+})
 
-/** Render text with fenced code + markdown-lite blocks. */
+/** GFM markdown → safe HTML. */
 export function richProseHtml(s: string): string {
-  const text = s.replace(/\r\n/g, '\n')
-  if (!text.trim()) return ''
-
-  const fenceRe = /```([A-Za-z0-9_+#.-]*)\n?([\s\S]*?)```/g
-  const chunks: string[] = []
-  let last = 0
-  let m: RegExpExecArray | null
-  while ((m = fenceRe.exec(text)) !== null) {
-    if (m.index > last) {
-      chunks.push(blocksHtml(text.slice(last, m.index)))
-    }
-    const lang = (m[1] || '').trim()
-    const code = (m[2] ?? '').replace(/\n$/, '')
-    const langAttr = lang ? ` data-lang="${esc(lang)}"` : ''
-    const langLabel = lang ? `<span class="code-lang">${esc(lang)}</span>` : ''
-    chunks.push(
-      `<div class="code-block"${langAttr}>${langLabel}<pre><code>${esc(code)}</code></pre></div>`,
-    )
-    last = m.index + m[0].length
+  const text = s.replace(/\r\n/g, '\n').trim()
+  if (!text) return ''
+  try {
+    const html = marked.parse(text, { async: false }) as string
+    return `<div class="md">${html}</div>`
+  } catch {
+    return `<div class="md"><p class="prose-p">${esc(text)}</p></div>`
   }
-  if (last < text.length) {
-    chunks.push(blocksHtml(text.slice(last)))
-  }
-  return chunks.join('\n')
 }
 
-function blocksHtml(raw: string): string {
-  const lines = raw.replace(/\r\n/g, '\n').split('\n')
-  const out: string[] = []
-  let i = 0
-
-  while (i < lines.length) {
-    const line = lines[i] ?? ''
-    const trimmed = line.trim()
-
-    if (!trimmed) {
-      i++
-      continue
-    }
-
-    if (/^(-{3,}|\*{3,}|_{3,})$/.test(trimmed)) {
-      out.push('<hr class="prose-hr"/>')
-      i++
-      continue
-    }
-
-    const hm = trimmed.match(/^(#{1,3})\s+(.+)$/)
-    if (hm) {
-      const level = hm[1]!.length
-      const tag = level <= 2 ? 'h3' : 'h4'
-      out.push(`<${tag} class="prose-h">${applyInline(hm[2]!)}</${tag}>`)
-      i++
-      continue
-    }
-
-    const titleBold = trimmed.match(/^\*\*(.+)\*\*$/)
-    if (titleBold && titleBold[1]!.length < 80) {
-      out.push(`<h3 class="prose-h">${applyInline(titleBold[1]!)}</h3>`)
-      i++
-      continue
-    }
-    if (/^【[^】]{1,60}】/.test(trimmed) && trimmed.length < 120) {
-      out.push(`<h3 class="prose-h">${applyInline(trimmed)}</h3>`)
-      i++
-      continue
-    }
-    // Chinese section labels only (not "1. item" — those are ordered lists)
-    if (
-      /^[一二三四五六七八九十]+、\S/.test(trimmed) &&
-      trimmed.length < 56 &&
-      !/[。！？]/.test(trimmed.slice(-1))
-    ) {
-      out.push(`<h4 class="prose-h">${applyInline(trimmed)}</h4>`)
-      i++
-      continue
-    }
-
-    if (/^[-*+]\s+\S/.test(trimmed)) {
-      const items: string[] = []
-      while (i < lines.length) {
-        const t = (lines[i] ?? '').trim()
-        if (/^[-*+]\s+\S/.test(t)) {
-          items.push(`<li>${applyInline(t.replace(/^[-*+]\s+/, ''))}</li>`)
-          i++
-          continue
-        }
-        if (/^\s{2,}\S/.test(lines[i] ?? '') && items.length) {
-          const prev = items.pop()!
-          items.push(prev.replace(/<\/li>$/, `<br/>${applyInline(t)}</li>`))
-          i++
-          continue
-        }
-        break
-      }
-      out.push(`<ul class="prose-ul">${items.join('')}</ul>`)
-      continue
-    }
-
-    if (/^\d+[.)、]\s+\S/.test(trimmed) || /^\([ivxIVX\d]+\)\s+\S/.test(trimmed)) {
-      const items: string[] = []
-      while (i < lines.length) {
-        const t = (lines[i] ?? '').trim()
-        if (/^\d+[.)、]\s+\S/.test(t)) {
-          items.push(`<li>${applyInline(t.replace(/^\d+[.)、]\s+/, ''))}</li>`)
-          i++
-          continue
-        }
-        if (/^\([ivxIVX\d]+\)\s+\S/.test(t)) {
-          items.push(`<li>${applyInline(t.replace(/^\([ivxIVX\d]+\)\s+/, ''))}</li>`)
-          i++
-          continue
-        }
-        break
-      }
-      out.push(`<ol class="prose-ol">${items.join('')}</ol>`)
-      continue
-    }
-
-    const buf: string[] = [line]
-    i++
-    while (i < lines.length) {
-      const n = lines[i] ?? ''
-      const nt = n.trim()
-      if (!nt) break
-      if (/^(-{3,}|\*{3,}|_{3,})$/.test(nt)) break
-      if (/^#{1,3}\s+/.test(nt)) break
-      if (/^[-*+]\s+\S/.test(nt)) break
-      if (/^\d+[.)、]\s+\S/.test(nt)) break
-      if (/^\*\*.+\*\*$/.test(nt) && nt.length < 80) break
-      if (/^【[^】]+】/.test(nt) && nt.length < 120) break
-      buf.push(n)
-      i++
-    }
-    const t = buf.join('\n').trim()
-    if (t) out.push(`<p class="prose-p">${applyInline(t)}</p>`)
+/** Inline-only markdown (no block wrappers). */
+export function inlineProseHtml(s: string): string {
+  const text = s.replace(/\r\n/g, '\n').trim()
+  if (!text) return ''
+  try {
+    return marked.parseInline(text, { async: false }) as string
+  } catch {
+    return esc(text)
   }
-
-  return out.join('\n')
 }
 
 export function snip(text: string, n = 140): string {
@@ -214,10 +112,15 @@ export function firstLine(text: string, n = 100): string {
       .split('\n')
       .map((l) => l.trim())
       .find((l) => l && !l.startsWith('```') && !/^---+$/.test(l) && l !== '…') ?? cleaned.trim()
-  return snip(line.replace(/^#+\s*/, '').replace(/^\*\*(.+)\*\*$/, '$1'), n)
+  return snip(
+    line
+      .replace(/^#+\s*/, '')
+      .replace(/^\*\*(.+)\*\*$/, '$1')
+      .replace(/\*\*/g, ''),
+    n,
+  )
 }
 
-/** Strip tool chatter / envelope tails from managed-agent advisor output. */
 export function stripToolNoise(raw: string): string {
   let t = raw.replace(/\r\n/g, '\n').trim()
   if (!t) return t
@@ -246,12 +149,9 @@ export function stripToolNoise(raw: string): string {
   while (paras.length > 1 && noise.test(paras[0]!.trim()) && paras[0]!.length < 420) {
     paras.shift()
   }
-  t = paras.join('\n\n').trim()
-
-  return t.trim() || raw.trim()
+  return paras.join('\n\n').trim() || raw.trim()
 }
 
-/** Prefer cleaned full raw when richer than short envelope.prose. */
 export function pickReportSpeechContent(raw: string, envelopeProse: string): string {
   const cleaned = stripToolNoise(raw)
   const prose = (envelopeProse || '').trim()
@@ -262,22 +162,31 @@ export function pickReportSpeechContent(raw: string, envelopeProse: string): str
   return cleaned || prose || '…'
 }
 
+/**
+ * Collapsible body: always render full markdown in fold.
+ * Preview is plain first line (not raw ** markers).
+ * Medium content opens by default so markdown is immediately visible.
+ */
 export function collapsibleProse(
   content: string,
   labels: { more: string; less: string },
-  threshold = 280,
+  threshold = 220,
   opts?: { open?: boolean },
 ): string {
   const body = stripToolNoise(content)
   const full = richProseHtml(body)
   const plain = body.replace(/\s+/g, ' ').trim()
 
-  if (plain.length <= threshold && !/```/.test(body)) {
+  if (plain.length <= threshold) {
     return `<div class="prose">${full}</div>`
   }
 
+  // Auto-open moderately long structured content so markdown isn't "hidden"
+  const structured = /^#{1,3}\s|^\*\*.+\*\*|^\s*[-*+]\s|^\s*\d+[.)]/m.test(body)
+  const open = opts?.open ?? (structured || plain.length < 900)
+  const openAttr = open ? ' open' : ''
   const preview = esc(firstLine(body, 140))
-  const openAttr = opts?.open ? ' open' : ''
+
   return `<div class="prose prose-fold">
   <p class="prose-preview">${preview}</p>
   <details class="fold"${openAttr}>
@@ -296,7 +205,6 @@ export function splitDecisionParts(decision: string): DecisionPart[] {
   const t = decision.replace(/\r\n/g, '\n').trim()
   if (!t) return []
 
-  // Zero-width lookaheads: advance lastIndex manually to avoid infinite loops.
   const r2 =
     /(?=【决定[^】]*】)|(?=#{1,3}\s*决定)|(?=\*\*决定[^*]*\*\*)|(?=决定\s*[1-9１-９][\s:：.|｜])/g
   const idxs: number[] = []
@@ -307,15 +215,7 @@ export function splitDecisionParts(decision: string): DecisionPart[] {
   }
 
   if (idxs.length === 0) {
-    if (t.length > 600 && t.includes('\n\n')) {
-      const chunks = t.split(/\n{2,}/).filter((c) => c.trim())
-      if (chunks.length >= 2 && chunks.length <= 8) {
-        return chunks.map((c, i) => ({
-          title: String(i + 1),
-          body: c.trim(),
-        }))
-      }
-    }
+    // Prefer single rich markdown body — don't over-split
     return [{ title: '', body: t }]
   }
 
@@ -343,7 +243,7 @@ export function decisionHtml(
   labels: { more: string; less: string },
 ): string {
   const parts = splitDecisionParts(decision)
-  if (parts.length <= 1 && (parts[0]?.body.length ?? 0) < 360) {
+  if (parts.length <= 1) {
     return `<div class="prose decision-body">${richProseHtml(decision)}</div>`
   }
 
@@ -352,10 +252,10 @@ export function decisionHtml(
     .map((p, i) => {
       const title = p.title || String(i + 1)
       const body = p.body
-      const short = body.replace(/\s+/g, ' ').length < 320
+      const short = body.replace(/\s+/g, ' ').length < 400
       const inner = short
         ? `<div class="prose">${richProseHtml(body)}</div>`
-        : collapsibleProse(body, labels, 240)
+        : collapsibleProse(body, labels, 280, { open: true })
       return `<article class="decision-card">
     <h3 class="decision-card-title">${esc(title)}</h3>
     ${inner}

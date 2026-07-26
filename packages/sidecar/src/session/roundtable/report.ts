@@ -16,8 +16,6 @@ import {
   metricsRow,
   PERSONA_HUE,
   resetDiagramIds,
-  ROUNDTABLE_MERMAID_BOOT_SCRIPT,
-  ROUNDTABLE_MERMAID_CDN,
 } from './report-diagrams.js'
 import {
   collapsibleProse,
@@ -759,29 +757,90 @@ li { margin: 0.15rem 0; }
   background: var(--badge); color: var(--badge-ink); font-size: 0.8rem;
 }
 
-/* Mermaid */
-.mermaid-wrap {
-  margin: 0.35rem 0 0.65rem; padding: 0.75rem 0.85rem; border-radius: 12px;
-  border: 1px solid var(--border); background: color-mix(in srgb, var(--bg) 55%, var(--card));
-  overflow-x: auto;
+/* Flow steps (pure CSS — no mermaid) */
+.flow-steps {
+  display: flex; flex-wrap: wrap; align-items: stretch; gap: 0.35rem 0.25rem;
+  margin: 0.35rem 0 0.75rem; padding: 0.75rem; border-radius: 12px;
+  border: 1px solid var(--border); background: color-mix(in srgb, var(--bg) 50%, var(--card));
 }
-.mermaid-wrap pre.mermaid {
-  margin: 0; background: transparent; border: 0; padding: 0.25rem 0;
-  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-  font-size: 0.78rem; line-height: 1.4; color: var(--muted);
-  white-space: pre-wrap;
+.flow-step {
+  flex: 1 1 6.5rem; min-width: 5.5rem; max-width: 11rem;
+  padding: 0.65rem 0.7rem; border-radius: 10px; border: 1px solid var(--border);
+  background: var(--card); text-align: center;
 }
-.mermaid-wrap svg { max-width: 100%; height: auto; display: block; margin: 0 auto; }
-.mermaid-wrap.mermaid-offline pre.mermaid {
-  color: var(--ink); padding: 0.5rem; border-radius: 8px;
-  background: var(--code-bg); border: 1px solid var(--code-border);
+.flow-step.flow-issue { border-color: color-mix(in srgb, var(--accent) 45%, var(--border)); background: var(--diag-issue-fill); }
+.flow-step.flow-decision { border-color: color-mix(in srgb, var(--support) 45%, var(--border)); background: var(--diag-decision-fill); }
+.flow-step-title { font-weight: 700; font-size: 0.88rem; line-height: 1.3; }
+.flow-step-sub { margin-top: 0.25rem; font-size: 0.75rem; color: var(--muted); line-height: 1.35; }
+.flow-arrow {
+  align-self: center; color: var(--accent); font-weight: 700; padding: 0 0.15rem;
+  user-select: none; opacity: 0.75;
 }
-.diagram-row {
-  display: grid; grid-template-columns: 1fr; gap: 0.75rem;
+
+/* Seat board */
+.seat-board {
+  margin: 0.35rem 0 0.75rem; padding: 0.85rem; border-radius: 12px;
+  border: 1px solid var(--border); background: color-mix(in srgb, var(--bg) 50%, var(--card));
+  text-align: center;
 }
+.seat-chair {
+  display: inline-flex; align-items: center; justify-content: center;
+  min-width: 4.5rem; padding: 0.4rem 0.9rem; border-radius: 999px;
+  font-weight: 750; font-size: 0.9rem;
+  background: var(--accent-soft); color: var(--accent);
+  border: 1px solid color-mix(in srgb, var(--accent) 40%, var(--border));
+  margin-bottom: 0.65rem;
+}
+.seat-ring { display: flex; flex-wrap: wrap; justify-content: center; gap: 0.45rem; }
+.seat-chip {
+  display: inline-flex; padding: 0.35rem 0.7rem; border-radius: 999px; font-size: 0.82rem; font-weight: 650;
+  background: color-mix(in srgb, hsl(var(--persona-h, 220) 50% 50%) 18%, var(--card));
+  color: hsl(var(--persona-h, 220) 55% 68%);
+  border: 1px solid color-mix(in srgb, hsl(var(--persona-h, 220) 50% 50%) 40%, var(--border));
+}
+
+/* Debate timeline (replaces messy graph) */
+.debate-timeline-wrap { margin: 0.25rem 0 0.5rem; }
+.debate-timeline { list-style: none; margin: 0; padding: 0; }
+.dt-item {
+  padding: 0.55rem 0.75rem; margin: 0.35rem 0; border-radius: 10px;
+  border: 1px solid var(--border); border-left-width: 3px;
+  background: color-mix(in srgb, var(--card) 94%, transparent);
+}
+.dt-item.rebut { border-left-color: var(--rebut); }
+.dt-item.support { border-left-color: var(--support); }
+.dt-item.question { border-left-color: var(--question); }
+.dt-line { display: flex; flex-wrap: wrap; align-items: center; gap: 0.3rem 0.45rem; font-size: 0.9rem; }
+.dt-from, .dt-to { font-weight: 650; }
+
+.diagram-row { display: grid; grid-template-columns: 1fr; gap: 0.75rem; }
 @media (min-width: 960px) {
   .diagram-row.two { grid-template-columns: 1.2fr 0.8fr; align-items: start; }
 }
+
+/* marked output */
+.md { line-height: 1.55; }
+.md > *:first-child { margin-top: 0; }
+.md > *:last-child { margin-bottom: 0; }
+.md p { margin: 0 0 0.55rem; }
+.md h1, .md h2, .md h3, .md h4 {
+  margin: 0.85rem 0 0.4rem; font-weight: 700; line-height: 1.3; color: var(--ink);
+}
+.md h1 { font-size: 1.1rem; }
+.md h2, .md h3 { font-size: 1rem; }
+.md h4 { font-size: 0.92rem; color: var(--muted); }
+.md ul, .md ol { margin: 0.3rem 0 0.65rem; padding-left: 1.25rem; }
+.md li { margin: 0.2rem 0; }
+.md li > p { margin: 0.15rem 0; }
+.md blockquote {
+  margin: 0.45rem 0; padding: 0.35rem 0.75rem;
+  border-left: 3px solid var(--accent); color: var(--muted);
+  background: var(--accent-soft); border-radius: 0 8px 8px 0;
+}
+.md hr { border: 0; border-top: 1px solid var(--border); margin: 0.75rem 0; }
+.md table { border-collapse: collapse; width: 100%; margin: 0.5rem 0; font-size: 0.88rem; }
+.md th, .md td { border: 1px solid var(--border); padding: 0.35rem 0.5rem; text-align: left; }
+.md th { background: var(--accent-soft); }
 /* Round blocks default collapsed */
 .round-fold {
   margin: 0 0 0.65rem; border: 1px solid var(--border); border-radius: var(--radius);
@@ -1051,12 +1110,8 @@ ${ROUNDTABLE_REPORT_STYLES}
       </div>
     </div>
   </div>
-  <script src="${ROUNDTABLE_MERMAID_CDN}"></script>
   <script>
 ${ROUNDTABLE_REPORT_NAV_SCRIPT}
-  </script>
-  <script>
-${ROUNDTABLE_MERMAID_BOOT_SCRIPT}
   </script>
 </body>
 </html>

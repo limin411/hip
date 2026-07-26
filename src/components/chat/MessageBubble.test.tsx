@@ -86,6 +86,41 @@ describe('MessageBubble', () => {
     expect(screen.getByText('你')).toBeInTheDocument()
   })
 
+  it('wraps user message content in a right-aligned bubble', () => {
+    render(
+      <MessageBubble
+        message={{
+          id: 'm1b',
+          role: 'user',
+          content: 'hello bubble',
+          timestamp: Date.now(),
+        } as any}
+      />,
+    )
+    const bubble = screen.getByTestId('user-message-bubble')
+    expect(bubble).toBeInTheDocument()
+    expect(bubble).toHaveTextContent('hello bubble')
+    expect(bubble).toHaveClass('rounded-2xl', 'bg-surface-muted')
+    const shell = screen.getByTestId('message-context-menu')
+    expect(shell).toHaveClass('items-end')
+  })
+
+  it('does not wrap assistant message content in a user bubble', () => {
+    render(
+      <MessageBubble
+        message={{
+          id: 'm1c',
+          role: 'assistant',
+          content: 'assistant reply',
+          timestamp: Date.now(),
+        } as any}
+      />,
+    )
+    expect(screen.queryByTestId('user-message-bubble')).not.toBeInTheDocument()
+    expect(screen.getByText('assistant reply')).toBeInTheDocument()
+    expect(screen.getByTestId('message-context-menu')).not.toHaveClass('items-end')
+  })
+
   it('renders an assistant message', () => {
     render(
       <MessageBubble

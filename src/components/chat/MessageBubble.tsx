@@ -136,11 +136,16 @@ function MessageBubbleImpl({ message, streaming, isLastAssistant, hidePlan }: Me
         isLastAssistant: !!isLastAssistant,
         sessionId,
       }}
-      className="min-w-0 w-full"
+      className={cn('min-w-0 w-full', isUser && 'flex flex-col items-end')}
       data-testid="message-context-menu"
     >
-      {/* CLI-style: role + time on one quiet meta line */}
-      <div className="mb-1.5 flex min-h-[var(--trail-min-h)] items-center gap-[var(--meta-gap)] text-meta leading-5 text-ink-tertiary">
+      {/* CLI-style: role + time on one quiet meta line (user: right-aligned with bubble) */}
+      <div
+        className={cn(
+          'mb-1.5 flex min-h-[var(--trail-min-h)] items-center gap-[var(--meta-gap)] text-meta leading-5 text-ink-tertiary',
+          isUser && 'justify-end',
+        )}
+      >
         <span className="font-medium text-ink-secondary" data-testid="message-role">
           {isUser ? t('chat.you') : 'hip'}
         </span>
@@ -150,7 +155,7 @@ function MessageBubbleImpl({ message, streaming, isLastAssistant, hidePlan }: Me
           </span>
         )}
       </div>
-      <div className="min-w-0">
+      <div className={cn('min-w-0', isUser && 'flex w-full max-w-[min(100%,36rem)] flex-col items-end')}>
         {/* Process trail (tools / timeline) stays above the answer; live stage is TurnStatusLine below. */}
         {message.role === 'assistant' && hasProcess && (
           // O3: when interleaved, do not force text-meta/tertiary on the whole process
@@ -199,46 +204,65 @@ function MessageBubbleImpl({ message, streaming, isLastAssistant, hidePlan }: Me
             </ActivityBar>
           </div>
         )}
-        {!hideAnswerBody && (
-          <div data-testid="message-answer">
-            <MarkdownBody content={displayContent} />
-          </div>
-        )}
-        {isUser && message.attachments && message.attachments.length > 0 && (
-          <div className="mt-2 flex flex-wrap gap-2">
-            {message.attachments.map((a) => (
-              <div
-                key={a.id}
-                className="flex items-center gap-1 rounded-md border border-border bg-surface-muted px-2 py-1 text-meta"
-                data-testid="message-attachment"
-              >
-                <span className="max-w-[160px] truncate">{a.name}</span>
-                {a.size !== undefined && (
-                  <span className="text-caption text-ink-tertiary">({formatBytes(a.size)})</span>
-                )}
+        {/* User turns: right-aligned soft bubble; assistant stays full-bleed CLI. */}
+        {isUser ? (
+          <div
+            className="w-fit max-w-full rounded-2xl bg-surface-muted px-3.5 py-2"
+            data-testid="user-message-bubble"
+          >
+            {!hideAnswerBody && (
+              <div data-testid="message-answer">
+                <MarkdownBody content={displayContent} />
               </div>
-            ))}
+            )}
+            {message.attachments && message.attachments.length > 0 && (
+              <div className={cn('flex flex-wrap justify-end gap-2', displayContent.trim() && 'mt-2')}>
+                {message.attachments.map((a) => (
+                  <div
+                    key={a.id}
+                    className="flex items-center gap-1 rounded-md border border-border bg-surface px-2 py-1 text-meta"
+                    data-testid="message-attachment"
+                  >
+                    <span className="max-w-[160px] truncate">{a.name}</span>
+                    {a.size !== undefined && (
+                      <span className="text-caption text-ink-tertiary">({formatBytes(a.size)})</span>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
-        )}
-        {streaming && <StreamingCursor />}
-        {/* Bottom turn status: live phase while streaming; settle status + duration when done. */}
-        {!isUser && (
-          <TurnStatusLine
-            streaming={!!streaming}
-            stopped={!!message.stopped}
-            hasAssistantContent={!!displayContent.trim()}
-            steps={message.timeline}
-            toolCalls={message.toolCalls}
-            agentRuns={message.agentRuns}
-            startedAt={message.timestamp}
-          />
+        ) : (
+          <>
+            {!hideAnswerBody && (
+              <div data-testid="message-answer">
+                <MarkdownBody content={displayContent} />
+              </div>
+            )}
+            {streaming && <StreamingCursor />}
+            {/* Bottom turn status: live phase while streaming; settle status + duration when done. */}
+            <TurnStatusLine
+              streaming={!!streaming}
+              stopped={!!message.stopped}
+              hasAssistantContent={!!displayContent.trim()}
+              steps={message.timeline}
+              toolCalls={message.toolCalls}
+              agentRuns={message.agentRuns}
+              startedAt={message.timestamp}
+            />
+          </>
         )}
       </div>
       {!streaming && message.role === 'assistant' && (
         <ArtifactCard toolCalls={message.toolCalls} />
       )}
       {!streaming && (
-        <div className="mt-1 flex min-h-[var(--trail-min-h)] items-center gap-[var(--meta-gap)] text-meta leading-5">
+        <div
+          className={cn(
+            'mt-1 flex min-h-[var(--trail-min-h)] items-center gap-[var(--meta-gap)] text-meta leading-5',
+            isUser && 'justify-end',
+          )}
+        >
           <MessageActions message={message} isLastAssistant={!!isLastAssistant} />
           {message.role === 'assistant' && message.memoryCitations && message.memoryCitations.length > 0 && (
             <DropdownMenu>

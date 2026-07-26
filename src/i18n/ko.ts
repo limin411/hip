@@ -875,10 +875,19 @@ export const ko = {
         "checkpoint": "체크포인트",
         "commit": "커밋",
         "terminal": "터미널",
+        "managedTerminal": "관리 터미널",
+        "sftpEntry": "SFTP 파일",
+        "termFsEntry": "터미널 파일",
         "agentConfig": "에이전트",
         "skillConfig": "스킬",
         "mcpServer": "MCP 서버",
-        "plugin": "플러그인"
+        "plugin": "플러그인",
+        "knowledgeNode": "지식 트리",
+        "knowledgeSpace": "지식 스페이스",
+        "knowledgeTree": "지식 빈 영역",
+        "workItem": "작업 항목",
+        "workItemBlank": "작업 항목 빈 영역",
+        "trashEntry": "휴지통"
       }
     },
     "apiKey": "DeepSeek API 키",
@@ -2418,6 +2427,16 @@ export const ko = {
       "copyTask": "작업 복사",
       "copyOutput": "출력 복사",
       "empty": "복사할 내용 없음"
+    },
+    "workItem": {
+      "open": "열기",
+      "copyTitle": "제목 복사",
+      "openSession": "연결된 세션 열기",
+      "openKnowledge": "연결된 문서 열기",
+      "openUrl": "링크 열기"
+    },
+    "trashEntry": {
+      "copyTitle": "제목 복사"
     }
   },
   "commandPalette": {

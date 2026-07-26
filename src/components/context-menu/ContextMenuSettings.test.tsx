@@ -79,6 +79,23 @@ describe('catalogKinds', () => {
     }
     expect(kinds).toEqual(expect.arrayContaining(['message', 'fileEntry', 'sessionHistory']))
   })
+
+  it('includes shipped knowledge and terminal-management kinds in section order', () => {
+    const kinds = catalogKinds()
+    expect(kinds).toEqual(
+      expect.arrayContaining([
+        'managedTerminal',
+        'sftpEntry',
+        'termFsEntry',
+        'knowledgeNode',
+        'knowledgeSpace',
+        'knowledgeTree',
+      ]),
+    )
+    // Section order: managedTerminal after terminal; knowledge kinds after plugin.
+    expect(kinds.indexOf('managedTerminal')).toBeGreaterThan(kinds.indexOf('terminal'))
+    expect(kinds.indexOf('knowledgeNode')).toBeGreaterThan(kinds.indexOf('plugin'))
+  })
 })
 
 function openContextMenuSettingsDialog() {

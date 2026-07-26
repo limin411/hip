@@ -29,10 +29,19 @@ const KIND_SECTION_ORDER: ContextKind[] = [
   'checkpoint',
   'commit',
   'terminal',
+  'managedTerminal',
+  'sftpEntry',
+  'termFsEntry',
   'agentConfig',
   'skillConfig',
   'mcpServer',
   'plugin',
+  'knowledgeNode',
+  'knowledgeSpace',
+  'knowledgeTree',
+  'workItem',
+  'workItemBlank',
+  'trashEntry',
 ]
 
 const KIND_LABEL_KEY = {
@@ -49,10 +58,19 @@ const KIND_LABEL_KEY = {
   checkpoint: 'settings.contextMenu.kinds.checkpoint',
   commit: 'settings.contextMenu.kinds.commit',
   terminal: 'settings.contextMenu.kinds.terminal',
+  managedTerminal: 'settings.contextMenu.kinds.managedTerminal',
+  sftpEntry: 'settings.contextMenu.kinds.sftpEntry',
+  termFsEntry: 'settings.contextMenu.kinds.termFsEntry',
   agentConfig: 'settings.contextMenu.kinds.agentConfig',
   skillConfig: 'settings.contextMenu.kinds.skillConfig',
   mcpServer: 'settings.contextMenu.kinds.mcpServer',
   plugin: 'settings.contextMenu.kinds.plugin',
+  knowledgeNode: 'settings.contextMenu.kinds.knowledgeNode',
+  knowledgeSpace: 'settings.contextMenu.kinds.knowledgeSpace',
+  knowledgeTree: 'settings.contextMenu.kinds.knowledgeTree',
+  workItem: 'settings.contextMenu.kinds.workItem',
+  workItemBlank: 'settings.contextMenu.kinds.workItemBlank',
+  trashEntry: 'settings.contextMenu.kinds.trashEntry',
 } as const satisfies Partial<Record<ContextKind, string>>
 
 type KindLabelKey = (typeof KIND_LABEL_KEY)[keyof typeof KIND_LABEL_KEY]

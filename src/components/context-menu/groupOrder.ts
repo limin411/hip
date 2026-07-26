@@ -5,6 +5,7 @@ export const GROUP_ORDER: ContextGroupId[] = [
   'primary',
   'edit',
   'clipboard',
+  'agent',
   'navigation',
   'session',
   'workspace',

@@ -32,6 +32,9 @@ import { managedTerminalProvider } from './providers/managedTerminal'
 import { sftpEntryProvider } from './providers/sftpEntry'
 import { termFsEntryProvider } from './providers/termFsEntry'
 import { toolCallProvider } from './providers/toolCall'
+import { workItemProvider } from './providers/workItem'
+import { workItemBlankProvider } from './providers/workItemBlank'
+import { trashEntryProvider } from './providers/trashEntry'
 
 /**
  * Builtin providers — assembled inside buildContextMenuItems (not side-effect registration).
@@ -60,6 +63,9 @@ const BUILTIN_PROVIDERS: ContextProvider[] = [
   sftpEntryProvider,
   termFsEntryProvider,
   toolCallProvider,
+  workItemProvider,
+  workItemBlankProvider,
+  trashEntryProvider,
 ]
 
 const extraProviders: ContextProvider[] = []

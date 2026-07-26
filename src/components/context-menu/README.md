@@ -69,6 +69,11 @@ unregMeta()
 | `agentConfig` | `AgentCard` | edit, delete |
 | `skillConfig` | `SkillCard` | view; delete if `canDelete` |
 | `mcpServer` | standalone MCP card | edit, delete |
-| `plugin` | plugin card | uninstall |
+| `plugin` | plugin / market downloaded card | view (when `onView`); uninstall |
+| `workItem` | work-item list row / calendar bar | open, status, archive, links, copy, soft-delete |
+| `workItemBlank` | calendar day blank | create |
+| `trashEntry` | recycle bin row | restore, copy title, permanent delete |
 
-Hosts pass action callbacks in the payload so menus share the same dialogs as kebabs/buttons. Kebabs stay for discoverability.
+Hosts pass action callbacks in the payload so menus share the same dialogs as kebabs/buttons (except `workItem` delete, which uses `openWorkItemDeleteDialog` like sessionHistory). Kebabs stay for discoverability.
+
+See also: `docs/design/context-menus-completion.md`.

@@ -27,7 +27,10 @@ describe('listCatalogItems', () => {
       'agentConfig.edit',
       'agentConfig.delete',
     ])
-    expect(listCatalogItems('plugin').map((m) => m.id)).toEqual(['plugin.uninstall'])
+    expect(listCatalogItems('plugin').map((m) => m.id)).toEqual([
+      'plugin.view',
+      'plugin.uninstall',
+    ])
   })
 
   it('lists extras and filters by kind', () => {
@@ -35,6 +38,7 @@ describe('listCatalogItems', () => {
       { id: 'plugin.extra', labelKey: 'plugin.extra', kind: 'plugin', group: 'extensions' },
     ])
     expect(listCatalogItems('plugin').map((m) => m.id)).toEqual([
+      'plugin.view',
       'plugin.uninstall',
       'plugin.extra',
     ])

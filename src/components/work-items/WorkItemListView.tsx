@@ -11,6 +11,7 @@ import { useWorkItemStore } from '@/store/workItemStore'
 import { useWorkItemUiPrefsStore } from '@/store/workItemUiPrefsStore'
 import { useWorkItemViewStore } from '@/store/workItemViewStore'
 import { EmptyState } from '@/components/ui/EmptyState'
+import { DeclarativeContextMenu } from '@/components/context-menu'
 import { cn } from '@/lib/utils'
 import { workItemOptionId } from './WorkItemRow'
 
@@ -121,89 +122,98 @@ export function WorkItemListView({
                 aria-selected={selected}
                 data-testid={`work-item-row-${item.id}`}
                 data-selected={selected ? 'true' : undefined}
-                className={cn(
-                  'grid w-full cursor-pointer grid-cols-[14px_minmax(0,1fr)_auto_auto_auto_auto] items-center gap-2 px-3 py-2.5 text-left transition-colors',
-                  selected ? 'bg-state-active' : 'hover:bg-state-hover',
-                )}
+                className={cn(selected ? 'bg-state-active' : 'hover:bg-state-hover')}
                 onClick={() => requestEdit(item.id)}
               >
-                <button
-                  type="button"
-                  data-testid={`work-item-complete-${item.id}`}
-                  aria-label={
-                    done ? t('workItems.actions.reopen') : t('workItems.actions.complete')
-                  }
-                  aria-pressed={done}
-                  className={cn(
-                    'flex h-4 w-4 shrink-0 items-center justify-center rounded border',
-                    done
-                      ? 'border-success bg-success text-on-accent'
-                      : 'border-border bg-surface text-transparent hover:border-ink-tertiary',
-                  )}
-                  onClick={(e) => {
-                    e.stopPropagation()
-                    if (done) void reopen(item.id)
-                    else void complete(item.id)
+                <DeclarativeContextMenu
+                  kind="workItem"
+                  payload={{
+                    itemId: item.id,
+                    title,
+                    status: item.status,
+                    archived: item.archivedAt != null,
+                    links: item.links ?? {},
                   }}
+                  className="grid w-full cursor-pointer grid-cols-[14px_minmax(0,1fr)_auto_auto_auto_auto] items-center gap-2 px-3 py-2.5 text-left transition-colors"
                 >
-                  <Check className="h-3 w-3" strokeWidth={2.5} />
-                </button>
-                <div className="flex min-w-0 items-center gap-2">
-                  <span
-                    className="size-2.5 shrink-0 rounded-full"
-                    style={{ background: hex }}
-                    aria-hidden
-                  />
-                  <span
+                  <button
+                    type="button"
+                    data-testid={`work-item-complete-${item.id}`}
+                    aria-label={
+                      done ? t('workItems.actions.reopen') : t('workItems.actions.complete')
+                    }
+                    aria-pressed={done}
                     className={cn(
-                      'truncate text-body text-ink',
-                      (done || cancelled) && 'text-ink-tertiary line-through',
+                      'flex h-4 w-4 shrink-0 items-center justify-center rounded border',
+                      done
+                        ? 'border-success bg-success text-on-accent'
+                        : 'border-border bg-surface text-transparent hover:border-ink-tertiary',
+                    )}
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      if (done) void reopen(item.id)
+                      else void complete(item.id)
+                    }}
+                  >
+                    <Check className="h-3 w-3" strokeWidth={2.5} />
+                  </button>
+                  <div className="flex min-w-0 items-center gap-2">
+                    <span
+                      className="size-2.5 shrink-0 rounded-full"
+                      style={{ background: hex }}
+                      aria-hidden
+                    />
+                    <span
+                      className={cn(
+                        'truncate text-body text-ink',
+                        (done || cancelled) && 'text-ink-tertiary line-through',
+                      )}
+                    >
+                      {title}
+                    </span>
+                  </div>
+                  <div
+                    className="flex max-w-[14rem] items-center justify-end gap-1"
+                    data-testid={`work-item-row-tags-${item.id}`}
+                  >
+                    {tags.map((tag) => (
+                      <span
+                        key={tag}
+                        className="max-w-[5.5rem] truncate rounded-full bg-surface-muted px-2 py-0.5 text-caption text-ink-secondary"
+                        title={tag}
+                      >
+                        {tag}
+                      </span>
+                    ))}
+                  </div>
+                  <span
+                    data-testid={`work-item-priority-${item.id}`}
+                    className={cn(
+                      'min-w-[2rem] text-right text-caption font-medium',
+                      item.priority === 'none'
+                        ? 'text-ink-tertiary'
+                        : priorityMetaClass(item.priority),
                     )}
                   >
-                    {title}
+                    {item.priority === 'none'
+                      ? ''
+                      : t(`workItems.priority.${item.priority}`)}
                   </span>
-                </div>
-                <div
-                  className="flex max-w-[14rem] items-center justify-end gap-1"
-                  data-testid={`work-item-row-tags-${item.id}`}
-                >
-                  {tags.map((tag) => (
-                    <span
-                      key={tag}
-                      className="max-w-[5.5rem] truncate rounded-full bg-surface-muted px-2 py-0.5 text-caption text-ink-secondary"
-                      title={tag}
-                    >
-                      {tag}
-                    </span>
-                  ))}
-                </div>
-                <span
-                  data-testid={`work-item-priority-${item.id}`}
-                  className={cn(
-                    'min-w-[2rem] text-right text-caption font-medium',
-                    item.priority === 'none'
-                      ? 'text-ink-tertiary'
-                      : priorityMetaClass(item.priority),
-                  )}
-                >
-                  {item.priority === 'none'
-                    ? ''
-                    : t(`workItems.priority.${item.priority}`)}
-                </span>
-                <span
-                  className="rounded-full px-2 py-0.5 text-caption font-medium"
-                  style={{
-                    background: `color-mix(in srgb, ${hex} 16%, white)`,
-                    color: `color-mix(in srgb, ${hex} 70%, #0f172a)`,
-                  }}
-                >
-                  {item.archivedAt != null
-                    ? t('workItems.filters.archived')
-                    : t(`workItems.status.${item.status}`)}
-                </span>
-                <span className="text-meta tabular-nums text-ink-secondary">
-                  {formatRange(schedule.startOn, schedule.endOn)}
-                </span>
+                  <span
+                    className="rounded-full px-2 py-0.5 text-caption font-medium"
+                    style={{
+                      background: `color-mix(in srgb, ${hex} 16%, white)`,
+                      color: `color-mix(in srgb, ${hex} 70%, #0f172a)`,
+                    }}
+                  >
+                    {item.archivedAt != null
+                      ? t('workItems.filters.archived')
+                      : t(`workItems.status.${item.status}`)}
+                  </span>
+                  <span className="text-meta tabular-nums text-ink-secondary">
+                    {formatRange(schedule.startOn, schedule.endOn)}
+                  </span>
+                </DeclarativeContextMenu>
               </div>
             </li>
           )

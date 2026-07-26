@@ -3,6 +3,7 @@ import type { Message, ToolCall } from '@hip/protocol'
 import type { PaletteIconName } from '@/components/command-palette/types'
 import type { TurnAgent } from '@/lib/turnAgents'
 import type { ActiveView, Surface } from '@/store/uiStore'
+import type { WorkItemLinks, WorkItemStatus } from '@/domain/work-items'
 
 export type ContextKind =
   | 'message'
@@ -33,11 +34,18 @@ export type ContextKind =
   | 'knowledgeSpace'
   | 'knowledgeTree'
   | 'worktree'
+  /** Work-item list row / calendar bar / day-more row. */
+  | 'workItem'
+  /** Calendar day blank / list empty create. */
+  | 'workItemBlank'
+  /** Recycle bin unified row. */
+  | 'trashEntry'
 
 export type ContextGroupId =
   | 'primary'
   | 'edit'
   | 'clipboard'
+  | 'agent'
   | 'navigation'
   | 'session'
   | 'workspace'
@@ -134,10 +142,12 @@ export type ContextPayloadMap = {
     onEdit: () => void
     onDelete: () => void
   }
-  /** Settings plugin row — uninstall only. */
+  /** Settings plugin row — view (when available) + uninstall. */
   plugin: {
     pluginId: string
     onUninstall: () => void
+    /** Local cards and market detail paths; omit when no view action. */
+    onView?: () => void
   }
   chatEmpty: { sessionId: string | null }
   artifactChrome: { tab: string }
@@ -168,6 +178,31 @@ export type ContextPayloadMap = {
   knowledgeTree: {
     onNewDoc: () => void
     onNewFolder: () => void
+  }
+  /**
+   * Work item row/bar. Identity-only payload; provider imports stores/dialogs
+   * (sessionHistory pattern). No onSoftDelete — delete opens dialog store.
+   */
+  workItem: {
+    itemId: string
+    title: string
+    status: WorkItemStatus
+    archived: boolean
+    links: WorkItemLinks
+  }
+  /** Blank area create; missing dates normalize to local today. */
+  workItemBlank: {
+    startOn?: string
+    endOn?: string
+  }
+  /** Recycle bin row — host supplies restore / hard-delete openers. */
+  trashEntry: {
+    key: string
+    source: 'session' | 'knowledge' | 'workItem'
+    id: string
+    title: string
+    onRestore: () => void
+    onHardDelete: () => void
   }
 }
 

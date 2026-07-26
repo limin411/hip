@@ -2,6 +2,7 @@
 import '@testing-library/jest-dom/vitest'
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen, fireEvent, cleanup } from '@testing-library/react'
+import type { ReactNode } from 'react'
 import type { WorkItem, WorkItemList } from '@/domain/work-items'
 import { DEFAULT_STATUS_COLORS, INBOX_LIST_ID } from '@/domain/work-items'
 
@@ -111,6 +112,26 @@ vi.mock('react-i18next', () => ({
     t: (key: string) => key,
     i18n: { language: 'en' },
   }),
+}))
+
+// Pass-through host so page tests do not load context-menu registry → sessionService.
+// Preserve className / data-testid (list rows put testid on the host).
+vi.mock('@/components/context-menu', () => ({
+  DeclarativeContextMenu: ({
+    children,
+    className,
+    'data-testid': testId,
+  }: {
+    children: ReactNode
+    className?: string
+    'data-testid'?: string
+  }) => (
+    <div className={className} data-testid={testId}>
+      {children}
+    </div>
+  ),
+  ControlledContextMenu: () => null,
+  CONTEXT_MENUS: false,
 }))
 
 import { WorkItemsPage } from './WorkItemsPage'

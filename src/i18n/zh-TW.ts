@@ -883,10 +883,19 @@ export const zhTW = {
         "checkpoint": "檢查點",
         "commit": "提交",
         "terminal": "終端",
+        "managedTerminal": "託管終端",
+        "sftpEntry": "SFTP 檔案",
+        "termFsEntry": "終端檔案",
         "agentConfig": "智慧體",
         "skillConfig": "技能",
         "mcpServer": "MCP 伺服器",
-        "plugin": "外掛"
+        "plugin": "外掛",
+        "knowledgeNode": "知識樹節點",
+        "knowledgeSpace": "知識空間",
+        "knowledgeTree": "知識樹空白區",
+        "workItem": "工作事項",
+        "workItemBlank": "事項空白區",
+        "trashEntry": "回收站"
       }
     },
     "apiKey": "DeepSeek API Key",
@@ -2426,6 +2435,16 @@ export const zhTW = {
       "copyTask": "複製任務",
       "copyOutput": "複製輸出",
       "empty": "無可複製內容"
+    },
+    "workItem": {
+      "open": "開啟",
+      "copyTitle": "複製標題",
+      "openSession": "開啟關聯會話",
+      "openKnowledge": "開啟關聯文件",
+      "openUrl": "開啟連結"
+    },
+    "trashEntry": {
+      "copyTitle": "複製標題"
     }
   },
   "commandPalette": {

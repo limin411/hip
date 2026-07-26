@@ -17,6 +17,7 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from '@/components/ui/Popover'
+import { DeclarativeContextMenu } from '@/components/context-menu'
 
 const WEEKDAYS_SUN_FIRST = [0, 1, 2, 3, 4, 5, 6] as const
 
@@ -82,56 +83,62 @@ export function WorkItemMonthCalendar({
             data-testid={`work-item-day-${cell.ymd}`}
             data-date={cell.ymd}
             className={cn(
-              'group relative flex min-h-[5.5rem] flex-col gap-0.5 border-b border-r border-border p-1',
+              'group relative flex min-h-[5.5rem] flex-col border-b border-r border-border',
               cell.out && 'bg-surface-subtle/60 text-ink-tertiary',
             )}
             onDoubleClick={() =>
               requestCreate({ startOn: cell.ymd, endOn: cell.ymd })
             }
           >
-            <div className="flex items-center justify-between">
-              <span
-                className={cn(
-                  'flex h-6 w-6 items-center justify-center rounded-full text-caption font-semibold tabular-nums',
-                  isToday && 'bg-accent text-on-accent',
-                )}
-              >
-                {cell.d}
-              </span>
-              <button
-                type="button"
-                className="flex h-5 w-5 items-center justify-center rounded text-ink-tertiary opacity-0 hover:bg-state-hover hover:text-ink group-hover:opacity-100"
-                data-testid={`work-item-day-add-${cell.ymd}`}
-                aria-label={t('workItems.calendar.addOnDay', { date: cell.ymd })}
-                onClick={(e) => {
-                  e.stopPropagation()
-                  requestCreate({ startOn: cell.ymd, endOn: cell.ymd })
-                }}
-              >
-                +
-              </button>
-            </div>
-            <div className="flex min-h-0 flex-1 flex-col gap-0.5">
-              {shown.map((bar) => (
-                <BarChip
-                  key={`${bar.itemId}-${bar.kind}-${cell.ymd}`}
-                  bar={bar}
-                  items={items}
-                  colors={colors}
-                  onOpen={() => requestEdit(bar.itemId)}
-                />
-              ))}
-              {extra > 0 ? (
-                <DayMorePopover
-                  date={cell.ymd}
-                  bars={bars}
-                  items={items}
-                  colors={colors}
-                  extra={extra}
-                  onOpen={(id) => requestEdit(id)}
-                />
-              ) : null}
-            </div>
+            <DeclarativeContextMenu
+              kind="workItemBlank"
+              payload={{ startOn: cell.ymd, endOn: cell.ymd }}
+              className="flex min-h-0 flex-1 flex-col gap-0.5 p-1"
+            >
+              <div className="flex items-center justify-between">
+                <span
+                  className={cn(
+                    'flex h-6 w-6 items-center justify-center rounded-full text-caption font-semibold tabular-nums',
+                    isToday && 'bg-accent text-on-accent',
+                  )}
+                >
+                  {cell.d}
+                </span>
+                <button
+                  type="button"
+                  className="flex h-5 w-5 items-center justify-center rounded text-ink-tertiary opacity-0 hover:bg-state-hover hover:text-ink group-hover:opacity-100"
+                  data-testid={`work-item-day-add-${cell.ymd}`}
+                  aria-label={t('workItems.calendar.addOnDay', { date: cell.ymd })}
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    requestCreate({ startOn: cell.ymd, endOn: cell.ymd })
+                  }}
+                >
+                  +
+                </button>
+              </div>
+              <div className="flex min-h-0 flex-1 flex-col gap-0.5">
+                {shown.map((bar) => (
+                  <BarChip
+                    key={`${bar.itemId}-${bar.kind}-${cell.ymd}`}
+                    bar={bar}
+                    items={items}
+                    colors={colors}
+                    onOpen={() => requestEdit(bar.itemId)}
+                  />
+                ))}
+                {extra > 0 ? (
+                  <DayMorePopover
+                    date={cell.ymd}
+                    bars={bars}
+                    items={items}
+                    colors={colors}
+                    extra={extra}
+                    onOpen={(id) => requestEdit(id)}
+                  />
+                ) : null}
+              </div>
+            </DeclarativeContextMenu>
           </div>
         )
       })}
@@ -171,20 +178,33 @@ function BarChip({
     color: '#0f172a',
   } as CSSProperties
 
+  const itemTitle = item?.title.trim() || bar.title || ''
   return (
-    <button
-      type="button"
-      className={className}
-      style={style}
-      data-testid={`work-item-bar-${bar.itemId}`}
-      title={bar.title}
-      onClick={(e) => {
-        e.stopPropagation()
-        onOpen()
+    <DeclarativeContextMenu
+      kind="workItem"
+      payload={{
+        itemId: bar.itemId,
+        title: itemTitle,
+        status: item?.status ?? 'todo',
+        archived: item?.archivedAt != null || Boolean(bar.archived),
+        links: item?.links ?? {},
       }}
+      className="block w-full min-w-0"
     >
-      {label}
-    </button>
+      <button
+        type="button"
+        className={className}
+        style={style}
+        data-testid={`work-item-bar-${bar.itemId}`}
+        title={bar.title}
+        onClick={(e) => {
+          e.stopPropagation()
+          onOpen()
+        }}
+      >
+        {label}
+      </button>
+    </DeclarativeContextMenu>
   )
 }
 
@@ -233,22 +253,36 @@ function DayMorePopover({
           {unique.map((b) => {
             const item = items.find((i) => i.id === b.itemId)
             const hex = item ? colorHexForItem(item, colors) : colors.todo
+            const title = b.title || t('workItems.untitled')
             return (
               <li key={b.itemId}>
-                <button
-                  type="button"
-                  className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-body hover:bg-state-hover"
-                  onClick={() => {
-                    setOpen(false)
-                    onOpen(b.itemId)
+                <DeclarativeContextMenu
+                  kind="workItem"
+                  payload={{
+                    itemId: b.itemId,
+                    title,
+                    status: item?.status ?? 'todo',
+                    archived: item?.archivedAt != null || Boolean(b.archived),
+                    links: item?.links ?? {},
                   }}
+                  data-testid={`work-item-day-more-item-${b.itemId}`}
+                  className="block w-full"
                 >
-                  <span
-                    className="size-2.5 shrink-0 rounded-full"
-                    style={{ background: hex }}
-                  />
-                  <span className="truncate">{b.title || t('workItems.untitled')}</span>
-                </button>
+                  <button
+                    type="button"
+                    className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-body hover:bg-state-hover"
+                    onClick={() => {
+                      setOpen(false)
+                      onOpen(b.itemId)
+                    }}
+                  >
+                    <span
+                      className="size-2.5 shrink-0 rounded-full"
+                      style={{ background: hex }}
+                    />
+                    <span className="truncate">{title}</span>
+                  </button>
+                </DeclarativeContextMenu>
               </li>
             )
           })}

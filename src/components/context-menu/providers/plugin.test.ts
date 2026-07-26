@@ -29,7 +29,7 @@ describe('pluginProvider', () => {
     ).toEqual([])
   })
 
-  it('emits uninstall (danger)', () => {
+  it('emits uninstall only when onView is absent', () => {
     const items = pluginProvider(
       { kind: 'plugin', payload: { pluginId: 'p1', onUninstall: () => {} } },
       makeCtx(),
@@ -39,13 +39,30 @@ describe('pluginProvider', () => {
     expect(items[0]?.label).toBe('settings.plugins.uninstall')
   })
 
-  it('run() invokes host onUninstall', () => {
-    const onUninstall = vi.fn()
+  it('emits view + uninstall when onView is present', () => {
     const items = pluginProvider(
-      { kind: 'plugin', payload: { pluginId: 'p1', onUninstall } },
+      {
+        kind: 'plugin',
+        payload: { pluginId: 'p1', onUninstall: () => {}, onView: () => {} },
+      },
       makeCtx(),
     )
-    items[0]!.run()
+    expect(items.map((i) => i.id)).toEqual(['plugin.view', 'plugin.uninstall'])
+    expect(items[0]?.group).toBe('primary')
+    expect(items[0]?.label).toBe('settings.plugins.view')
+    expect(items[1]?.danger).toBe(true)
+  })
+
+  it('run() invokes host handlers', () => {
+    const onUninstall = vi.fn()
+    const onView = vi.fn()
+    const items = pluginProvider(
+      { kind: 'plugin', payload: { pluginId: 'p1', onUninstall, onView } },
+      makeCtx(),
+    )
+    items.find((i) => i.id === 'plugin.view')!.run()
+    items.find((i) => i.id === 'plugin.uninstall')!.run()
+    expect(onView).toHaveBeenCalledTimes(1)
     expect(onUninstall).toHaveBeenCalledTimes(1)
   })
 })

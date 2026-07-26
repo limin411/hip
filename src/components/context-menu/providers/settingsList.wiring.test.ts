@@ -38,7 +38,10 @@ describe('settings list builtins + catalog', () => {
       'mcpServer.edit',
       'mcpServer.delete',
     ])
-    expect(listCatalogItems('plugin').map((m) => m.id)).toEqual(['plugin.uninstall'])
+    expect(listCatalogItems('plugin').map((m) => m.id)).toEqual([
+      'plugin.view',
+      'plugin.uninstall',
+    ])
   })
 
   it('buildContextMenuItems resolves agent edit/delete via builtins', () => {
@@ -85,5 +88,14 @@ describe('settings list builtins + catalog', () => {
       makeCtx(),
     )
     expect(plugin.map((i) => i.id)).toEqual(['plugin.uninstall'])
+
+    const pluginWithView = buildContextMenuItems(
+      {
+        kind: 'plugin',
+        payload: { pluginId: 'p1', onUninstall: () => {}, onView: () => {} },
+      },
+      makeCtx(),
+    )
+    expect(pluginWithView.map((i) => i.id)).toEqual(['plugin.view', 'plugin.uninstall'])
   })
 })

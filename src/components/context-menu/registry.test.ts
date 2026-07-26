@@ -7,6 +7,7 @@ import {
   registerContextProvider,
 } from './registry'
 import { sortMetaByGroup } from './groupOrder'
+import { listCatalogItems } from './catalog'
 import type {
   ContextMenuBuildContext,
   ContextMenuItemDef,
@@ -76,6 +77,38 @@ describe('sortMetaByGroup', () => {
       { id: 'c2', labelKey: 'c2', kind: 'message', group: 'clipboard' },
     ]
     expect(sortMetaByGroup(meta).map((m) => m.id)).toEqual(['p', 'c', 'c2', 'd'])
+  })
+
+  it('ranks clipboard before agent before navigation (Settings baseline)', () => {
+    const meta: ContextMenuItemMeta[] = [
+      { id: 'nav', labelKey: 'nav', kind: 'terminal', group: 'navigation' },
+      { id: 'agent', labelKey: 'agent', kind: 'terminal', group: 'agent' },
+      { id: 'clip', labelKey: 'clip', kind: 'terminal', group: 'clipboard' },
+    ]
+    expect(sortMetaByGroup(meta).map((m) => m.id)).toEqual(['clip', 'agent', 'nav'])
+  })
+
+  it('places agent group between clipboard and navigation for diffHunk catalog', () => {
+    const ordered = sortMetaByGroup(listCatalogItems('diffHunk'))
+    const groups = ordered.map((m) => m.group)
+    const clip = groups.indexOf('clipboard')
+    const agent = groups.indexOf('agent')
+    const nav = groups.indexOf('navigation')
+    expect(clip).toBeGreaterThanOrEqual(0)
+    expect(agent).toBeGreaterThan(clip)
+    // navigation may be absent; if present must rank after agent
+    if (nav >= 0) expect(nav).toBeGreaterThan(agent)
+  })
+
+  it('places agent group between clipboard and navigation for terminal catalog', () => {
+    const ordered = sortMetaByGroup(listCatalogItems('terminal'))
+    const byGroup = ordered.map((m) => m.group)
+    const firstClip = byGroup.indexOf('clipboard')
+    const firstAgent = byGroup.indexOf('agent')
+    const firstNav = byGroup.indexOf('navigation')
+    expect(firstClip).toBeGreaterThanOrEqual(0)
+    expect(firstAgent).toBeGreaterThan(firstClip)
+    expect(firstNav).toBeGreaterThan(firstAgent)
   })
 })
 

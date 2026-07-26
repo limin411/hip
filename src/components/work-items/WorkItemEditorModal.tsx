@@ -17,6 +17,7 @@ import { DateField } from '@/components/ui/DateField'
 import { Input, inputClassName } from '@/components/ui/Input'
 import { Textarea } from '@/components/ui/Textarea'
 import { Modal } from '@/components/ui/Modal'
+import { openWorkItemDeleteDialog } from './workItemDeleteDialogStore'
 
 const PRIMARY_STATUSES: WorkItemStatus[] = ['todo', 'in_progress', 'done']
 const PRIORITIES: WorkItemPriority[] = ['none', 'low', 'medium', 'high']
@@ -39,7 +40,6 @@ export function WorkItemEditorModal() {
   const commitItemDraft = useWorkItemStore((s) => s.commitItemDraft)
   const archive = useWorkItemStore((s) => s.archive)
   const unarchive = useWorkItemStore((s) => s.unarchive)
-  const deleteItem = useWorkItemStore((s) => s.deleteItem)
 
   const open = modal.mode !== 'closed'
   const editId = modal.mode === 'edit' ? modal.itemId : null
@@ -51,8 +51,6 @@ export function WorkItemEditorModal() {
   const [draft, setDraft] = useState<Draft>(() => emptyDraft())
   const [tagDraft, setTagDraft] = useState('')
   const [saving, setSaving] = useState(false)
-  const [deleteOpen, setDeleteOpen] = useState(false)
-  const [deleteBusy, setDeleteBusy] = useState(false)
   const [titleError, setTitleError] = useState(false)
   const titleRef = useRef<HTMLInputElement>(null)
 
@@ -69,8 +67,6 @@ export function WorkItemEditorModal() {
     if (modal.mode === 'closed') return
     setTitleError(false)
     setTagDraft('')
-    setDeleteOpen(false)
-    setDeleteBusy(false)
     if (modal.mode === 'create') {
       const today = localTodayYmd()
       const schedule = ensureScheduleDates(
@@ -207,32 +203,19 @@ export function WorkItemEditorModal() {
     }
   }
 
-  const handleDeleteConfirm = async () => {
-    if (!editId || deleteBusy) return
-    setDeleteBusy(true)
-    try {
-      await deleteItem(editId)
-      setDeleteOpen(false)
-      closeModal()
-    } finally {
-      setDeleteBusy(false)
-    }
-  }
-
   if (!open) return null
 
   const title =
     modal.mode === 'create' ? t('workItems.modal.createTitle') : t('workItems.modal.editTitle')
 
   return (
-    <>
-      <Modal
+    <Modal
         open={open}
         onOpenChange={(o) => {
-          if (!o && !saving && !deleteBusy) closeModal()
+          if (!o && !saving) closeModal()
         }}
         title={title}
-        closeDisabled={saving || deleteBusy}
+        closeDisabled={saving}
         className="max-w-md"
         footer={
           <div className="flex w-full items-center gap-2">
@@ -243,7 +226,11 @@ export function WorkItemEditorModal() {
                 size="sm"
                 className="text-danger"
                 data-testid="work-item-delete"
-                onClick={() => setDeleteOpen(true)}
+                onClick={() => {
+                  const label =
+                    draft.title.trim() || item?.title.trim() || t('workItems.untitled')
+                  openWorkItemDeleteDialog(editId, label)
+                }}
               >
                 <Trash2 className="h-3.5 w-3.5" strokeWidth={1.75} />
                 {t('workItems.actions.delete')}
@@ -454,43 +441,6 @@ export function WorkItemEditorModal() {
           ) : null}
         </div>
       </Modal>
-
-      <Modal
-        open={deleteOpen}
-        onOpenChange={(o) => {
-          if (!deleteBusy) setDeleteOpen(o)
-        }}
-        title={t('workItems.actions.delete')}
-        closeDisabled={deleteBusy}
-        footer={
-          <div className="flex w-full justify-end gap-2">
-            <Button
-              type="button"
-              variant="ghost"
-              size="sm"
-              disabled={deleteBusy}
-              onClick={() => setDeleteOpen(false)}
-            >
-              {t('common.cancel')}
-            </Button>
-            <Button
-              type="button"
-              variant="danger"
-              size="sm"
-              data-testid="work-item-delete-confirm"
-              disabled={deleteBusy}
-              onClick={() => void handleDeleteConfirm()}
-            >
-              {t('workItems.actions.delete')}
-            </Button>
-          </div>
-        }
-      >
-        <p className="px-5 py-4 text-body leading-relaxed text-ink-secondary">
-          {t('workItems.deleteConfirm')}
-        </p>
-      </Modal>
-    </>
   )
 }
 

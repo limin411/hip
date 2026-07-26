@@ -25,6 +25,7 @@ import { Skeleton } from '@/components/ui/Skeleton'
 import { MarkdownBody } from '@/components/chat/MarkdownBody'
 import { readPluginFile } from '@/ipc/plugins'
 import { cn } from '@/lib/utils'
+import { DeclarativeContextMenu } from '@/components/context-menu'
 
 /** Cards per page in the market grid (3-col × 4 rows on large screens). */
 export const PLUGIN_MARKET_PAGE_SIZE = 12
@@ -510,12 +511,8 @@ function MarketPluginCard({
     ...(entry.keywords?.slice(0, 3) ?? []),
   ].filter((x): x is string => Boolean(x))
 
-  return (
-    <div
-      data-testid="market-plugin-card"
-      data-plugin-key={entry.key}
-      className={marketCardShell}
-    >
+  const cardBody = (
+    <>
       {/* Header: fixed 2-line title block + switch slot */}
       <div className="flex min-h-[2.75rem] shrink-0 items-start gap-3">
         <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-accent-subtle text-accent-strong">
@@ -619,6 +616,38 @@ function MarketPluginCard({
           </Button>
         )}
       </div>
+    </>
+  )
+
+  // Undownloaded cards: no context menu (download is the only primary action).
+  if (!downloaded) {
+    return (
+      <div
+        data-testid="market-plugin-card"
+        data-plugin-key={entry.key}
+        className={marketCardShell}
+      >
+        {cardBody}
+      </div>
+    )
+  }
+
+  return (
+    <div
+      data-testid="market-plugin-card"
+      data-plugin-key={entry.key}
+      className={marketCardShell}
+    >
+      <DeclarativeContextMenu
+        kind="plugin"
+        payload={{
+          pluginId: entry.key,
+          onUninstall,
+        }}
+        className="flex h-full min-h-0 flex-col"
+      >
+        {cardBody}
+      </DeclarativeContextMenu>
     </div>
   )
 }
@@ -642,80 +671,90 @@ function PluginCard({
       data-plugin-id={plugin.id}
       className={marketCardShell}
     >
-      <div className="flex min-h-[2.75rem] shrink-0 items-start gap-3">
-        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-accent-subtle text-accent-strong">
-          <Package size={18} />
-        </span>
-        <div className="min-w-0 flex-1">
-          <div className="flex items-center gap-2">
-            <span className="truncate text-body font-medium text-ink" title={plugin.name}>
-              {plugin.name}
-            </span>
-            <span className="shrink-0 text-caption text-ink-tertiary">{plugin.version}</span>
-            <span className="shrink-0 rounded bg-surface-muted px-1.5 py-0.5 text-caption text-ink-tertiary">
-              {t('settings.plugins.localBadge')}
-            </span>
-          </div>
-          <div className="mt-0.5 h-4 truncate text-caption text-ink-tertiary">
-            {plugin.author ?? '\u00a0'}
-          </div>
-        </div>
-        <div className="flex h-9 w-9 shrink-0 items-center justify-center">
-          <Switch
-            checked={plugin.enabled}
-            onCheckedChange={onToggle}
-            ariaLabel={t('settings.plugins.enableThis')}
-            data-testid={`plugin-enable-${plugin.id}`}
-          />
-        </div>
-      </div>
-      <div
-        className="mt-3 line-clamp-2 min-h-[2.5rem] text-body text-ink-secondary"
-        title={plugin.description}
+      <DeclarativeContextMenu
+        kind="plugin"
+        payload={{
+          pluginId: plugin.id,
+          onUninstall: onDelete,
+          onView,
+        }}
+        className="flex h-full min-h-0 flex-col"
       >
-        {plugin.description?.trim() || '\u00a0'}
-      </div>
-      <div className="mt-2 h-4 truncate text-caption text-ink-tertiary">
-        {formatComponentCounts(plugin, t)}
-      </div>
-      <div className="mt-2 flex min-h-[1.375rem] flex-wrap items-center gap-1.5 overflow-hidden">
-        {plugin.license ? (
-          <span className="rounded bg-surface-subtle px-1.5 py-0.5 text-caption text-ink-tertiary">
-            {plugin.license}
+        <div className="flex min-h-[2.75rem] shrink-0 items-start gap-3">
+          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-accent-subtle text-accent-strong">
+            <Package size={18} />
           </span>
-        ) : null}
-        {plugin.keywords?.slice(0, 3).map((kw) => (
-          <span
-            key={kw}
-            className="max-w-[8rem] truncate rounded bg-surface-subtle px-1.5 py-0.5 text-caption text-ink-tertiary"
-          >
-            {kw}
-          </span>
-        ))}
-        {plugin.sourceUrl ? (
-          <a
-            href={plugin.sourceUrl}
-            data-testid="plugin-source-link"
-            className="inline-flex items-center gap-0.5 text-caption text-accent-strong hover:underline"
-            onClick={(e) => {
-              e.preventDefault()
-              e.stopPropagation()
-              void openExternalUrl(plugin.sourceUrl!)
-            }}
-          >
-            <ExternalLink size={12} />
-            {t('settings.plugins.source')}
-          </a>
-        ) : null}
-      </div>
-      <div className="mt-auto flex justify-end gap-2 pt-3">
-        <Button variant="outline" size="sm" onClick={onView} data-testid="plugin-view">
-          <Eye size={14} /> {t('settings.plugins.view')}
-        </Button>
-        <Button variant="outline" size="sm" onClick={onDelete} data-testid="plugin-uninstall">
-          <Trash2 size={14} /> {t('settings.plugins.uninstall')}
-        </Button>
-      </div>
+          <div className="min-w-0 flex-1">
+            <div className="flex items-center gap-2">
+              <span className="truncate text-body font-medium text-ink" title={plugin.name}>
+                {plugin.name}
+              </span>
+              <span className="shrink-0 text-caption text-ink-tertiary">{plugin.version}</span>
+              <span className="shrink-0 rounded bg-surface-muted px-1.5 py-0.5 text-caption text-ink-tertiary">
+                {t('settings.plugins.localBadge')}
+              </span>
+            </div>
+            <div className="mt-0.5 h-4 truncate text-caption text-ink-tertiary">
+              {plugin.author ?? '\u00a0'}
+            </div>
+          </div>
+          <div className="flex h-9 w-9 shrink-0 items-center justify-center">
+            <Switch
+              checked={plugin.enabled}
+              onCheckedChange={onToggle}
+              ariaLabel={t('settings.plugins.enableThis')}
+              data-testid={`plugin-enable-${plugin.id}`}
+            />
+          </div>
+        </div>
+        <div
+          className="mt-3 line-clamp-2 min-h-[2.5rem] text-body text-ink-secondary"
+          title={plugin.description}
+        >
+          {plugin.description?.trim() || '\u00a0'}
+        </div>
+        <div className="mt-2 h-4 truncate text-caption text-ink-tertiary">
+          {formatComponentCounts(plugin, t)}
+        </div>
+        <div className="mt-2 flex min-h-[1.375rem] flex-wrap items-center gap-1.5 overflow-hidden">
+          {plugin.license ? (
+            <span className="rounded bg-surface-subtle px-1.5 py-0.5 text-caption text-ink-tertiary">
+              {plugin.license}
+            </span>
+          ) : null}
+          {plugin.keywords?.slice(0, 3).map((kw) => (
+            <span
+              key={kw}
+              className="max-w-[8rem] truncate rounded bg-surface-subtle px-1.5 py-0.5 text-caption text-ink-tertiary"
+            >
+              {kw}
+            </span>
+          ))}
+          {plugin.sourceUrl ? (
+            <a
+              href={plugin.sourceUrl}
+              data-testid="plugin-source-link"
+              className="inline-flex items-center gap-0.5 text-caption text-accent-strong hover:underline"
+              onClick={(e) => {
+                e.preventDefault()
+                e.stopPropagation()
+                void openExternalUrl(plugin.sourceUrl!)
+              }}
+            >
+              <ExternalLink size={12} />
+              {t('settings.plugins.source')}
+            </a>
+          ) : null}
+        </div>
+        <div className="mt-auto flex justify-end gap-2 pt-3">
+          <Button variant="outline" size="sm" onClick={onView} data-testid="plugin-view">
+            <Eye size={14} /> {t('settings.plugins.view')}
+          </Button>
+          <Button variant="outline" size="sm" onClick={onDelete} data-testid="plugin-uninstall">
+            <Trash2 size={14} /> {t('settings.plugins.uninstall')}
+          </Button>
+        </div>
+      </DeclarativeContextMenu>
     </div>
   )
 }

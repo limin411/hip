@@ -40,6 +40,7 @@ import { useKnowledgeStore } from '@/store/knowledgeStore'
 import { useWorkItemStore } from '@/store/workItemStore'
 import { useUiStore } from '@/store/uiStore'
 import { toast } from 'sonner'
+import { DeclarativeContextMenu } from '@/components/context-menu'
 
 const PAGE_SIZE = 20
 
@@ -314,91 +315,104 @@ export function RecycleBinPage() {
                   : row.source === 'workItem'
                     ? t('trash.kind.workItem')
                     : t(`nav.${row.surface}`)
+              const restoreRow = () => {
+                if (row.source === 'session') {
+                  sessionService.restoreSession(row.id)
+                  useTrashListStore.getState().removeSession(row.id)
+                  useTrashBadgeStore.getState().adjustSessions(-1)
+                } else if (row.source === 'knowledge') {
+                  void knowledgeRestoreTrashEntry(row.id)
+                    .then(async () => {
+                      setKnowledge((k) => k.filter((x) => x.id !== row.id))
+                      useTrashBadgeStore.getState().adjustKnowledge(-1)
+                      toast.success(t('trash.restoredToast'))
+                      await useKnowledgeStore.getState().loadSpaces()
+                    })
+                    .catch((e) => {
+                      const msg = e instanceof Error ? e.message : String(e)
+                      if (msg.includes('parent_missing')) {
+                        toast.error(t('trash.parentMissing'))
+                      } else {
+                        toast.error(msg)
+                      }
+                    })
+                } else {
+                  void useWorkItemStore
+                    .getState()
+                    .restoreTrashEntry(row.id)
+                    .then(() => {
+                      setWorkItems((w) => w.filter((x) => x.id !== row.id))
+                      toast.success(t('trash.restoredToast'))
+                    })
+                    .catch((e) => {
+                      toast.error(e instanceof Error ? e.message : String(e))
+                    })
+                }
+              }
               return (
                 <div
                   key={row.key}
-                  className="flex items-center gap-3 px-4 py-3 transition-colors duration-chrome hover:bg-state-hover/60"
                   data-testid="recycle-bin-row"
                   data-row-key={row.key}
                   data-row-source={row.source}
                 >
-                  <Icon size={16} strokeWidth={1.75} className="shrink-0 text-ink-tertiary" aria-hidden />
-                  <div className="min-w-0 flex-1">
-                    <div className="truncate text-body font-medium text-ink">{row.title}</div>
-                    <div className="mt-0.5 flex flex-wrap items-center gap-2 text-meta text-ink-tertiary">
-                      <span className="rounded-md bg-surface-muted px-1.5 py-0.5 text-caption font-medium text-ink-secondary">
-                        {kindLabel}
-                      </span>
-                      <span>{t('trash.daysLeft', { days: left })}</span>
-                      {row.source === 'session' && row.preview ? (
-                        <span className="truncate">{row.preview}</span>
-                      ) : null}
-                      {row.source === 'knowledge' && row.spaceName ? (
-                        <span className="truncate">{row.spaceName}</span>
-                      ) : null}
-                      {row.source === 'workItem' ? (
-                        <span className="truncate">
-                          {t(`workItems.status.${row.status as 'todo'}`, {
-                            defaultValue: row.status,
-                          })}
+                  <DeclarativeContextMenu
+                    kind="trashEntry"
+                    payload={{
+                      key: row.key,
+                      source: row.source,
+                      id: row.id,
+                      title: row.title,
+                      onRestore: restoreRow,
+                      onHardDelete: () => setHardDeleteKey(row.key),
+                    }}
+                    className="flex items-center gap-3 px-4 py-3 transition-colors duration-chrome hover:bg-state-hover/60"
+                  >
+                    <Icon size={16} strokeWidth={1.75} className="shrink-0 text-ink-tertiary" aria-hidden />
+                    <div className="min-w-0 flex-1">
+                      <div className="truncate text-body font-medium text-ink">{row.title}</div>
+                      <div className="mt-0.5 flex flex-wrap items-center gap-2 text-meta text-ink-tertiary">
+                        <span className="rounded-md bg-surface-muted px-1.5 py-0.5 text-caption font-medium text-ink-secondary">
+                          {kindLabel}
                         </span>
-                      ) : null}
+                        <span>{t('trash.daysLeft', { days: left })}</span>
+                        {row.source === 'session' && row.preview ? (
+                          <span className="truncate">{row.preview}</span>
+                        ) : null}
+                        {row.source === 'knowledge' && row.spaceName ? (
+                          <span className="truncate">{row.spaceName}</span>
+                        ) : null}
+                        {row.source === 'workItem' ? (
+                          <span className="truncate">
+                            {t(`workItems.status.${row.status as 'todo'}`, {
+                              defaultValue: row.status,
+                            })}
+                          </span>
+                        ) : null}
+                      </div>
                     </div>
-                  </div>
-                  <div className="flex shrink-0 items-center gap-1">
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      data-testid="recycle-bin-restore"
-                      onClick={() => {
-                        if (row.source === 'session') {
-                          sessionService.restoreSession(row.id)
-                          useTrashListStore.getState().removeSession(row.id)
-                          useTrashBadgeStore.getState().adjustSessions(-1)
-                        } else if (row.source === 'knowledge') {
-                          void knowledgeRestoreTrashEntry(row.id)
-                            .then(async () => {
-                              setKnowledge((k) => k.filter((x) => x.id !== row.id))
-                              useTrashBadgeStore.getState().adjustKnowledge(-1)
-                              toast.success(t('trash.restoredToast'))
-                              await useKnowledgeStore.getState().loadSpaces()
-                            })
-                            .catch((e) => {
-                              const msg = e instanceof Error ? e.message : String(e)
-                              if (msg.includes('parent_missing')) {
-                                toast.error(t('trash.parentMissing'))
-                              } else {
-                                toast.error(msg)
-                              }
-                            })
-                        } else {
-                          void useWorkItemStore
-                            .getState()
-                            .restoreTrashEntry(row.id)
-                            .then(() => {
-                              setWorkItems((w) => w.filter((x) => x.id !== row.id))
-                              toast.success(t('trash.restoredToast'))
-                            })
-                            .catch((e) => {
-                              toast.error(e instanceof Error ? e.message : String(e))
-                            })
-                        }
-                      }}
-                    >
-                      <RotateCcw size={14} className="mr-1" />
-                      {t('trash.restore')}
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="text-ink-secondary hover:text-danger"
-                      title={t('trash.deleteForever')}
-                      aria-label={t('trash.deleteForever')}
-                      onClick={() => setHardDeleteKey(row.key)}
-                    >
-                      <Trash2 size={16} />
-                    </Button>
-                  </div>
+                    <div className="flex shrink-0 items-center gap-1">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        data-testid="recycle-bin-restore"
+                        onClick={restoreRow}
+                      >
+                        <RotateCcw size={14} className="mr-1" />
+                        {t('trash.restore')}
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="text-ink-secondary hover:text-danger"
+                        title={t('trash.deleteForever')}
+                        aria-label={t('trash.deleteForever')}
+                        onClick={() => setHardDeleteKey(row.key)}
+                      >
+                        <Trash2 size={16} />
+                      </Button>
+                    </div>
+                  </DeclarativeContextMenu>
                 </div>
               )
             })}

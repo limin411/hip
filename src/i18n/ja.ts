@@ -875,10 +875,19 @@ export const ja = {
         "checkpoint": "チェックポイント",
         "commit": "コミット",
         "terminal": "ターミナル",
+        "managedTerminal": "管理ターミナル",
+        "sftpEntry": "SFTP ファイル",
+        "termFsEntry": "ターミナルファイル",
         "agentConfig": "エージェント",
         "skillConfig": "スキル",
         "mcpServer": "MCPサーバー",
-        "plugin": "プラグイン"
+        "plugin": "プラグイン",
+        "knowledgeNode": "ナレッジツリー",
+        "knowledgeSpace": "ナレッジスペース",
+        "knowledgeTree": "ナレッジ空白領域",
+        "workItem": "ワークアイテム",
+        "workItemBlank": "ワークアイテム空白",
+        "trashEntry": "ごみ箱"
       }
     },
     "apiKey": "DeepSeek APIキー",
@@ -2418,6 +2427,16 @@ export const ja = {
       "copyTask": "タスクをコピー",
       "copyOutput": "出力をコピー",
       "empty": "コピーするものがありません"
+    },
+    "workItem": {
+      "open": "開く",
+      "copyTitle": "タイトルをコピー",
+      "openSession": "リンクしたセッションを開く",
+      "openKnowledge": "リンクしたドキュメントを開く",
+      "openUrl": "リンクを開く"
+    },
+    "trashEntry": {
+      "copyTitle": "タイトルをコピー"
     }
   },
   "commandPalette": {

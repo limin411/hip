@@ -18,6 +18,7 @@ import { cn } from '@/lib/utils'
 import { WorkItemMonthCalendar } from './WorkItemMonthCalendar'
 import { WorkItemListView } from './WorkItemListView'
 import { WorkItemEditorModal } from './WorkItemEditorModal'
+import { WorkItemDeleteConfirmHost } from './WorkItemDeleteConfirmHost'
 
 const NARROW_MQ = '(max-width: 719px)'
 
@@ -326,6 +327,7 @@ export function WorkItemsPage() {
       </div>
 
       <WorkItemEditorModal />
+      <WorkItemDeleteConfirmHost />
     </div>
   )
 }

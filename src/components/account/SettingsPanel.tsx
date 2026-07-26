@@ -124,14 +124,14 @@ export function SettingsPanel() {
       </div>
       <div className="w-px shrink-0 bg-border" aria-hidden data-testid="settings-nav-divider" />
 
-      <div className="min-w-0 flex-1">
+      <div className="min-h-0 min-w-0 flex-1">
         {PAGES.map((page) => {
           const Page = page.Component
           return (
             <TabsPrimitive.Content
               key={page.id}
               value={page.id}
-              className="h-full min-w-0 overflow-y-auto focus-visible:outline-none"
+              className="h-full min-h-0 min-w-0 overflow-y-auto focus-visible:outline-none"
             >
               <Page />
             </TabsPrimitive.Content>

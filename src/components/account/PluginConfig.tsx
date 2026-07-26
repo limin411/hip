@@ -125,67 +125,69 @@ export function PluginConfig() {
   }
 
   return (
-    <>
+    <div className="flex h-full min-h-0 flex-col">
       {/* Banner returns null when idle — no wrapper (avoids empty top strip). */}
-      <ExtensionConflictsBanner className="mx-6 mt-4" />
-      <PluginConfigView
-        plugins={plugins}
-        marketEntries={marketEntries}
-        sources={market.sources}
-        tab={market.tab}
-        query={market.query}
-        error={combinedError}
-        loading={market.loading && !market.loaded}
-        refreshing={market.refreshing}
-        downloadingKey={market.downloadingKey}
-        onTabChange={market.setTab}
-        onQueryChange={market.setQuery}
-        onDelete={(plugin) => {
-          setError(null)
-          setDeleting(plugin)
-        }}
-        onToggle={(plugin, enabled) => {
-          void enableWithPreflight(plugin, enabled).catch((err: Error) => {
-            setError(err.message ?? t('settings.plugins.toggleError'))
-          })
-        }}
-        onView={(plugin) => {
-          setError(null)
-          setViewing(plugin)
-        }}
-        onDownload={(entry) => {
-          setError(null)
-          void market.download(entry).then(
-            async () => {
-              await loadPlugins()
-            },
-            (err: Error) => {
-              setError(err.message ?? t('settings.plugins.installError'))
-            },
-          )
-        }}
-        onMarketToggle={(entry, enabled) => {
-          const local = resolveLocal(entry)
-          if (!local) return
-          void enableWithPreflight(local, enabled)
-            .then(() => market.load())
-            .catch((err: Error) => {
+      <ExtensionConflictsBanner className="mx-6 mt-4 shrink-0" />
+      <div className="min-h-0 flex-1">
+        <PluginConfigView
+          plugins={plugins}
+          marketEntries={marketEntries}
+          sources={market.sources}
+          tab={market.tab}
+          query={market.query}
+          error={combinedError}
+          loading={market.loading && !market.loaded}
+          refreshing={market.refreshing}
+          downloadingKey={market.downloadingKey}
+          onTabChange={market.setTab}
+          onQueryChange={market.setQuery}
+          onDelete={(plugin) => {
+            setError(null)
+            setDeleting(plugin)
+          }}
+          onToggle={(plugin, enabled) => {
+            void enableWithPreflight(plugin, enabled).catch((err: Error) => {
               setError(err.message ?? t('settings.plugins.toggleError'))
             })
-        }}
-        onMarketUninstall={(entry) => {
-          const local = resolveLocal(entry)
-          if (!local) return
-          setError(null)
-          setDeleting(local)
-        }}
-        onOpenSources={() => setSourcesOpen(true)}
-        onRefreshCatalog={() => {
-          const sourceId = tabToSourceId(market.tab) ?? undefined
-          void market.refresh(sourceId)
-        }}
-        t={t as Translate}
-      />
+          }}
+          onView={(plugin) => {
+            setError(null)
+            setViewing(plugin)
+          }}
+          onDownload={(entry) => {
+            setError(null)
+            void market.download(entry).then(
+              async () => {
+                await loadPlugins()
+              },
+              (err: Error) => {
+                setError(err.message ?? t('settings.plugins.installError'))
+              },
+            )
+          }}
+          onMarketToggle={(entry, enabled) => {
+            const local = resolveLocal(entry)
+            if (!local) return
+            void enableWithPreflight(local, enabled)
+              .then(() => market.load())
+              .catch((err: Error) => {
+                setError(err.message ?? t('settings.plugins.toggleError'))
+              })
+          }}
+          onMarketUninstall={(entry) => {
+            const local = resolveLocal(entry)
+            if (!local) return
+            setError(null)
+            setDeleting(local)
+          }}
+          onOpenSources={() => setSourcesOpen(true)}
+          onRefreshCatalog={() => {
+            const sourceId = tabToSourceId(market.tab) ?? undefined
+            void market.refresh(sourceId)
+          }}
+          t={t as Translate}
+        />
+      </div>
 
       {viewing && (
         <PluginViewModal
@@ -270,6 +272,6 @@ export function PluginConfig() {
           </div>
         </Modal>
       )}
-    </>
+    </div>
   )
 }

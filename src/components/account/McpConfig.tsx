@@ -378,7 +378,7 @@ export function McpConfig() {
   }, [marketSources, servers.length, t])
 
   return (
-    <div className="flex min-h-0 flex-col" data-testid="mcp-config">
+    <div className="flex h-full min-h-0 flex-col" data-testid="mcp-config">
       <div className="shrink-0 border-b border-border px-6 py-4">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div className="min-w-0">
@@ -421,7 +421,8 @@ export function McpConfig() {
         <ExtensionConflictsBanner className="mt-3" />
       </div>
 
-      <div className="flex h-[min(36rem,calc(100vh-14rem))] min-h-[28rem] flex-1">
+      {/* Fill remaining height so the source nav divider runs to the pane bottom. */}
+      <div className="flex min-h-0 flex-1">
         <aside
           className="flex w-44 shrink-0 flex-col border-r border-border bg-surface-subtle/40"
           data-testid="mcp-registry-sidebar"

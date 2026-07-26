@@ -216,7 +216,7 @@ export function PluginConfigView({
   }, [sources, customCount, t])
 
   return (
-    <div className="flex min-h-0 flex-col" data-testid="plugin-market">
+    <div className="flex h-full min-h-0 flex-col" data-testid="plugin-market">
       <div className="shrink-0 border-b border-border px-6 py-4">
         <div className="min-w-0">
           <h2 className="text-title font-semibold text-ink">{t('settings.plugins.title')}</h2>
@@ -244,8 +244,9 @@ export function PluginConfigView({
         </div>
       </div>
 
-      {/* Fixed-height body so cards scroll inside and pagination stays pinned (not scrolled away). */}
-      <div className="flex h-[min(36rem,calc(100vh-12rem))] min-h-[28rem] flex-1">
+      {/* Fill remaining height so the source nav divider runs to the pane bottom;
+          cards scroll inside, pagination stays pinned. */}
+      <div className="flex min-h-0 flex-1">
         {/* Left: market source nav */}
         <aside
           className="flex w-44 shrink-0 flex-col border-r border-border bg-surface-subtle/40"

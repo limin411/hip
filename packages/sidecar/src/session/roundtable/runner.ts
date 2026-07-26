@@ -27,6 +27,7 @@ import { councilAgentId } from './ids.js'
 import { renderEventMarkdown } from './render.js'
 import { parseChairActionFromText } from './schema.js'
 import { parseSpeechEnvelope } from './speech-schema.js'
+import { pickReportSpeechContent } from './report-prose.js'
 import {
   PERSONA_IDS,
   type ChairAction,
@@ -268,7 +269,8 @@ export async function runRoundtable(args: RunRoundtableArgs): Promise<Roundtable
             })
         const raw = speech.trim() || '…'
         const envelope = councilMode ? parseSpeechEnvelope(raw) : { acts: [], prose: raw }
-        const content = envelope.prose.trim() || raw
+        // Prefer cleaned full agent output for the HTML report (not a short envelope.prose).
+        const content = pickReportSpeechContent(raw, envelope.prose)
         if (councilMode) {
           allEdges.push(...edgesFromEnvelope(r, speaker, envelope))
         }

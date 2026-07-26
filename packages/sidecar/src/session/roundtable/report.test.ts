@@ -98,7 +98,7 @@ describe('roundtable report html template', () => {
     expect(ROUNDTABLE_REPORT_STYLES).toContain('max-width: none')
   })
 
-  it('includes SVG diagrams, metrics, and code blocks', () => {
+  it('includes SVG diagrams, metrics, code blocks, and unique marker ids', () => {
     const html = buildRoundtableReportHtml(sample)
     expect(html).toContain('class="diagram flow-diagram"')
     expect(html).toContain('class="diagram debate-diagram"')
@@ -111,11 +111,51 @@ describe('roundtable report html template', () => {
     expect(html).toContain('data-lang="ts"')
     expect(html).toContain('export const plan')
     expect(html).toContain('class="inline-code"')
-    expect(html).toContain('plan')
     expect(html).toContain('class="role-card"')
     expect(html).toContain(`data-file="${personaReportFilename('strategist')}"`)
     expect(ROUNDTABLE_REPORT_STYLES).toContain('.code-block')
     expect(ROUNDTABLE_REPORT_NAV_SCRIPT).toContain('hip-roundtable-report')
+    // Debate graph once (not duplicated in edges section)
+    expect(html.match(/class="diagram debate-diagram"/g)?.length).toBe(1)
+    // Unique marker ids (no bare id="m-rebut")
+    expect(html).not.toContain('id="m-rebut"')
+    expect(html).toMatch(/id="d\d+-debate-m-rebut"/)
+    // Visible storyline for rebuttals
+    expect(html).toContain('class="storyline"')
+    expect(html).toContain('rel-chip rebut')
+  })
+
+  it('renders markdown bold/lists in speeches and structured decisions', () => {
+    const html = buildRoundtableReportHtml({
+      ...sample,
+      rounds: [
+        {
+          round: 1,
+          focus: 'f',
+          speeches: [
+            {
+              speaker: 'skeptic',
+              content: '**怀疑论者发言**\n\n- 成本过高\n- 证据不足\n\n结论是 **暂缓**。',
+            },
+          ],
+          stage: { round: 1, agreed: [], open: [] },
+        },
+      ],
+      decision: {
+        decision:
+          '【决定1｜路径】\n- 采用分阶段\n\n【决定2｜保险】\n- 强制保额',
+        residual: [],
+        nextSteps: ['试点'],
+      },
+      edges: sample.edges,
+    })
+    expect(html).toContain('class="prose-h"')
+    expect(html).toContain('怀疑论者发言')
+    expect(html).toContain('class="prose-ul"')
+    expect(html).toContain('成本过高')
+    expect(html).toContain('<strong>暂缓</strong>')
+    expect(html).toContain('decision-card')
+    expect(html).toContain('决定1')
   })
 
   it('collapses long speeches and lists exchange details', () => {
@@ -128,7 +168,7 @@ describe('roundtable report html template', () => {
           speeches: [
             {
               speaker: 'strategist',
-              content: '很长的发言内容'.repeat(40),
+              content: '很长的发言内容，需要折叠展示。'.repeat(30),
             },
           ],
           stage: { round: 1, agreed: ['a'], open: [] },
@@ -137,6 +177,7 @@ describe('roundtable report html template', () => {
     })
     expect(html).toContain('prose-fold')
     expect(html).toContain('展开全文')
+    expect(html).toContain('class="storyline"')
   })
 
   it('omits empty optional TOC entries', () => {

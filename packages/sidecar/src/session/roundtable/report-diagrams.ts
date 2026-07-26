@@ -1,8 +1,9 @@
 /**
  * Inline SVG diagrams for roundtable HTML reports (self-contained, no CDN).
+ * Each diagram uses a unique idPrefix so marker ids never collide in one document.
  */
 import type { PersonaId, RoundtableEdgeResult, RoundtableLang } from './types.js'
-import { esc } from './report-prose.js'
+import { esc, shortLabel } from './report-prose.js'
 
 export const PERSONA_HUE: Record<PersonaId, string> = {
   strategist: '220',
@@ -16,6 +17,18 @@ const REL_STROKE: Record<string, string> = {
   rebut: '#f07178',
   support: '#7fd99a',
   question: '#e0b45a',
+}
+
+let diagramSeq = 0
+
+/** Reset between report builds (tests / multi-file bundle). */
+export function resetDiagramIds(): void {
+  diagramSeq = 0
+}
+
+function nextPrefix(kind: string): string {
+  diagramSeq += 1
+  return `d${diagramSeq}-${kind}`
 }
 
 function relLabel(lang: RoundtableLang, rel: string): string {
@@ -37,6 +50,18 @@ function relLabel(lang: RoundtableLang, rel: string): string {
   return rel
 }
 
+/** Prefer short round focus for flow boxes (not truncated long issue text). */
+function flowSubLabel(kind: string, text: string, lang: RoundtableLang): string {
+  if (kind === 'issue') {
+    return lang === 'zh-CN' || lang === 'zh-TW' ? '议题' : lang === 'ja' ? '議題' : lang === 'ko' ? '안건' : 'Issue'
+  }
+  if (kind === 'decision') {
+    return lang === 'zh-CN' || lang === 'zh-TW' ? '结论' : lang === 'ja' ? '決定' : lang === 'ko' ? '결정' : 'Decision'
+  }
+  // round: use compact focus
+  return shortLabel(text, 14)
+}
+
 /** Horizontal pipeline: Issue → R1 → R2 → … → Decision */
 export function svgFlowPipeline(args: {
   lang: RoundtableLang
@@ -45,11 +70,14 @@ export function svgFlowPipeline(args: {
   decision?: string
   labels: { issue: string; decision: string; round: (n: number) => string }
 }): string {
+  const prefix = nextPrefix('flow')
+  const arrowId = `${prefix}-arrow`
+
   const nodes: Array<{ id: string; label: string; sub: string; kind: string }> = [
     {
       id: 'issue',
       label: args.labels.issue,
-      sub: snipSvg(args.issue, 28),
+      sub: flowSubLabel('issue', args.issue, args.lang),
       kind: 'issue',
     },
   ]
@@ -57,7 +85,7 @@ export function svgFlowPipeline(args: {
     nodes.push({
       id: `r${r.round}`,
       label: args.labels.round(r.round),
-      sub: snipSvg(r.focus, 22),
+      sub: flowSubLabel('round', r.focus, args.lang),
       kind: 'round',
     })
   }
@@ -65,17 +93,17 @@ export function svgFlowPipeline(args: {
     nodes.push({
       id: 'dec',
       label: args.labels.decision,
-      sub: snipSvg(args.decision, 28),
+      sub: flowSubLabel('decision', args.decision, args.lang),
       kind: 'decision',
     })
   }
 
   const n = Math.max(nodes.length, 1)
-  const boxW = 118
-  const boxH = 64
-  const gap = 36
-  const padX = 16
-  const padY = 20
+  const boxW = 128
+  const boxH = 68
+  const gap = 32
+  const padX = 12
+  const padY = 16
   const width = padX * 2 + n * boxW + (n - 1) * gap
   const height = padY * 2 + boxH + 8
 
@@ -99,9 +127,9 @@ export function svgFlowPipeline(args: {
       <g class="flow-node flow-${esc(node.kind)}">
         <rect x="${x}" y="${y}" width="${boxW}" height="${boxH}" rx="12" ry="12"
           fill="${fill}" stroke="${stroke}" stroke-width="1.5"/>
-        <text x="${x + boxW / 2}" y="${y + 24}" text-anchor="middle"
+        <text x="${x + boxW / 2}" y="${y + 26}" text-anchor="middle"
           class="flow-label">${esc(node.label)}</text>
-        <text x="${x + boxW / 2}" y="${y + 44}" text-anchor="middle"
+        <text x="${x + boxW / 2}" y="${y + 48}" text-anchor="middle"
           class="flow-sub">${esc(node.sub)}</text>
       </g>`
     })
@@ -115,7 +143,7 @@ export function svgFlowPipeline(args: {
       const y = padY + boxH / 2
       return `
       <line x1="${x1 + 4}" y1="${y}" x2="${x2 - 10}" y2="${y}"
-        class="flow-arrow" marker-end="url(#arrowHead)"/>`
+        class="flow-arrow" marker-end="url(#${arrowId})"/>`
     })
     .join('')
 
@@ -123,7 +151,7 @@ export function svgFlowPipeline(args: {
 <svg class="diagram flow-diagram" viewBox="0 0 ${width} ${height}" width="100%" height="${height}"
   preserveAspectRatio="xMidYMid meet">
   <defs>
-    <marker id="arrowHead" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
+    <marker id="${arrowId}" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
       <path d="M0,0 L6,3 L0,6 Z" class="flow-arrow-head"/>
     </marker>
   </defs>
@@ -133,19 +161,23 @@ export function svgFlowPipeline(args: {
 </div>`
 }
 
-/** Circular debate graph: seats as nodes, edges as colored arcs. */
+/**
+ * Circular debate graph. Caps edges for readability; prefers rebuttals.
+ * Unique marker ids via idPrefix.
+ */
 export function svgDebateGraph(args: {
   lang: RoundtableLang
   seats: PersonaId[]
   seatLabels: Record<string, string>
   edges: RoundtableEdgeResult[]
   title: string
+  /** Max edges to draw (default 18). */
+  maxEdges?: number
 }): string {
   const seats = args.seats
-  if (!seats.length) {
-    return `<p class="muted">—</p>`
-  }
+  if (!seats.length) return `<p class="muted">—</p>`
 
+  const prefix = nextPrefix('debate')
   const size = 360
   const cx = size / 2
   const cy = size / 2
@@ -162,10 +194,18 @@ export function svgDebateGraph(args: {
     })
   })
 
-  // Multi-edges between same pair: offset slightly
-  const pairCount = new Map<string, number>()
-  const edgePaths = args.edges
+  // Prefer rebut → question → support; cap count
+  const maxEdges = args.maxEdges ?? 18
+  const ranked = [...args.edges]
     .filter((e) => pos.has(e.from) && pos.has(e.to))
+    .sort((a, b) => {
+      const rank = (r: string) => (r === 'rebut' ? 0 : r === 'question' ? 1 : 2)
+      return rank(a.relation) - rank(b.relation) || a.round - b.round
+    })
+    .slice(0, maxEdges)
+
+  const pairCount = new Map<string, number>()
+  const edgePaths = ranked
     .map((e) => {
       const key = [e.from, e.to].sort().join('|')
       const idx = pairCount.get(key) ?? 0
@@ -174,7 +214,6 @@ export function svgDebateGraph(args: {
       const b = pos.get(e.to)!
       const mx = (a.x + b.x) / 2
       const my = (a.y + b.y) / 2
-      // Perpendicular offset for curve
       const dx = b.x - a.x
       const dy = b.y - a.y
       const len = Math.hypot(dx, dy) || 1
@@ -183,13 +222,8 @@ export function svgDebateGraph(args: {
       const cpx = mx + ox
       const cpy = my + oy
       const stroke = REL_STROKE[e.relation] ?? REL_STROKE.question
-      const dash = e.relation === 'question' ? '4 3' : e.relation === 'support' ? '0' : '0'
-      const marker =
-        e.relation === 'rebut'
-          ? 'url(#m-rebut)'
-          : e.relation === 'support'
-            ? 'url(#m-support)'
-            : 'url(#m-question)'
+      const dash = e.relation === 'question' ? '4 3' : '0'
+      const marker = `url(#${prefix}-m-${e.relation})`
       return `<path d="M ${a.x.toFixed(1)} ${a.y.toFixed(1)} Q ${cpx.toFixed(1)} ${cpy.toFixed(1)} ${b.x.toFixed(1)} ${b.y.toFixed(1)}"
         fill="none" stroke="${stroke}" stroke-width="2" stroke-dasharray="${dash}"
         marker-end="${marker}" opacity="0.9">
@@ -201,7 +235,7 @@ export function svgDebateGraph(args: {
   const nodes = seats
     .map((id) => {
       const p = pos.get(id)!
-      const label = snipSvg(args.seatLabels[id] ?? id, 6)
+      const label = shortLabel(args.seatLabels[id] ?? id, 5)
       return `
       <g class="debate-node">
         <circle cx="${p.x.toFixed(1)}" cy="${p.y.toFixed(1)}" r="${nodeR}"
@@ -224,17 +258,26 @@ export function svgDebateGraph(args: {
     })
     .join('')
 
+  const capNote =
+    args.edges.length > ranked.length
+      ? `<p class="hint diagram-cap">${esc(
+          args.lang === 'zh-CN' || args.lang === 'zh-TW'
+            ? `图中展示 ${ranked.length}/${args.edges.length} 条交锋（优先反驳）`
+            : `Showing ${ranked.length}/${args.edges.length} edges (rebuttals first)`,
+        )}</p>`
+      : ''
+
   return `<div class="diagram-wrap debate-wrap" role="img" aria-label="${esc(args.title)}">
 <svg class="diagram debate-diagram" viewBox="0 0 ${size} ${size}" width="100%"
   style="max-width:${size}px;margin:0 auto;display:block" preserveAspectRatio="xMidYMid meet">
   <defs>
-    <marker id="m-rebut" markerWidth="8" markerHeight="8" refX="7" refY="3" orient="auto">
+    <marker id="${prefix}-m-rebut" markerWidth="8" markerHeight="8" refX="7" refY="3" orient="auto">
       <path d="M0,0 L7,3 L0,6 Z" fill="${REL_STROKE.rebut}"/>
     </marker>
-    <marker id="m-support" markerWidth="8" markerHeight="8" refX="7" refY="3" orient="auto">
+    <marker id="${prefix}-m-support" markerWidth="8" markerHeight="8" refX="7" refY="3" orient="auto">
       <path d="M0,0 L7,3 L0,6 Z" fill="${REL_STROKE.support}"/>
     </marker>
-    <marker id="m-question" markerWidth="8" markerHeight="8" refX="7" refY="3" orient="auto">
+    <marker id="${prefix}-m-question" markerWidth="8" markerHeight="8" refX="7" refY="3" orient="auto">
       <path d="M0,0 L7,3 L0,6 Z" fill="${REL_STROKE.question}"/>
     </marker>
   </defs>
@@ -243,6 +286,7 @@ export function svgDebateGraph(args: {
   ${nodes}
   ${legend}
 </svg>
+${capNote}
 </div>`
 }
 
@@ -254,15 +298,16 @@ export function svgSeatArchitecture(args: {
   chairLabel: string
   title: string
 }): string {
-  const size = 320
+  const prefix = nextPrefix('arch')
+  const size = 300
   const cx = size / 2
-  const cy = size / 2 + 6
-  const R = 100
+  const cy = size / 2 + 4
+  const R = 96
   const seats = args.seats
 
   const chair = `
-    <g class="arch-chair">
-      <rect x="${cx - 42}" y="${cy - 22}" width="84" height="44" rx="12"
+    <g class="arch-chair" data-id="${prefix}">
+      <rect x="${cx - 40}" y="${cy - 20}" width="80" height="40" rx="12"
         fill="var(--diag-decision-fill)" stroke="var(--diag-decision-stroke)" stroke-width="1.5"/>
       <text x="${cx}" y="${cy + 5}" text-anchor="middle" class="arch-chair-label">${esc(args.chairLabel)}</text>
     </g>`
@@ -273,12 +318,12 @@ export function svgSeatArchitecture(args: {
       const x = cx + R * Math.cos(ang)
       const y = cy + R * Math.sin(ang)
       const hue = PERSONA_HUE[id] ?? '220'
-      const label = snipSvg(args.seatLabels[id] ?? id, 5)
+      const label = shortLabel(args.seatLabels[id] ?? id, 4)
       return `
       <line x1="${cx}" y1="${cy}" x2="${x.toFixed(1)}" y2="${y.toFixed(1)}"
         stroke="var(--diag-ring)" stroke-width="1" stroke-dasharray="2 4" opacity="0.55"/>
       <g>
-        <circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="26"
+        <circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="24"
           fill="hsl(${hue} 42% 40%)" stroke="hsl(${hue} 55% 65%)" stroke-width="1.5"/>
         <text x="${x.toFixed(1)}" y="${(y + 4).toFixed(1)}" text-anchor="middle"
           class="debate-node-label">${esc(label)}</text>
@@ -296,7 +341,6 @@ export function svgSeatArchitecture(args: {
 </div>`
 }
 
-/** Compact KPI strip as SVG-friendly HTML metrics (not pure SVG). */
 export function metricsRow(items: Array<{ label: string; value: string }>): string {
   if (!items.length) return ''
   return `<div class="metrics" role="group">
@@ -311,8 +355,58 @@ export function metricsRow(items: Array<{ label: string; value: string }>): stri
 </div>`
 }
 
-function snipSvg(s: string, n: number): string {
-  const t = s.replace(/\s+/g, ' ').trim()
-  if (t.length <= n) return t
-  return `${t.slice(0, Math.max(1, n - 1))}…`
+/** Visible rebuttal/support storyline (not buried in details). */
+export function edgeStorylineHtml(args: {
+  lang: RoundtableLang
+  edges: RoundtableEdgeResult[]
+  seatLabels: Record<string, string>
+  /** Prefer rebuttals first; default show all up to max. */
+  max?: number
+  linkRoles?: boolean
+  fileLink?: (href: string, label: string) => string
+  personaFile?: (id: string) => string
+}): string {
+  const max = args.max ?? 24
+  const ranked = [...args.edges]
+    .sort((a, b) => {
+      const rank = (r: string) => (r === 'rebut' ? 0 : r === 'question' ? 1 : 2)
+      return a.round - b.round || rank(a.relation) - rank(b.relation)
+    })
+    .slice(0, max)
+
+  if (!ranked.length) return `<p class="muted">—</p>`
+
+  const nameOf = (id: string): string => {
+    const label = esc(args.seatLabels[id] ?? id)
+    if (args.linkRoles && args.fileLink && args.personaFile) {
+      return args.fileLink(args.personaFile(id), label)
+    }
+    return label
+  }
+
+  return `<ol class="storyline">
+  ${ranked
+    .map((e) => {
+      const relClass =
+        e.relation === 'rebut' || e.relation === 'support' || e.relation === 'question'
+          ? e.relation
+          : 'question'
+      return `<li class="storyline-item ${relClass}">
+    <span class="round-tag">R${e.round}</span>
+    <span class="from">${nameOf(e.from)}</span>
+    <span class="rel-chip ${relClass}">${esc(relLabel(args.lang, e.relation))}</span>
+    <span class="to">${nameOf(e.to)}</span>
+    ${e.summary ? `<div class="sum">${esc(e.summary)}</div>` : ''}
+  </li>`
+    })
+    .join('\n')}
+</ol>${
+    args.edges.length > ranked.length
+      ? `<p class="hint">${esc(
+          args.lang === 'zh-CN' || args.lang === 'zh-TW'
+            ? `已展示 ${ranked.length}/${args.edges.length} 条（完整列表见下方）`
+            : `Showing ${ranked.length}/${args.edges.length} (full list below)`,
+        )}</p>`
+      : ''
+  }`
 }

@@ -9,17 +9,19 @@
  */
 import { personaLabel } from './prompts.js'
 import {
+  edgeStorylineHtml,
   metricsRow,
   PERSONA_HUE,
+  resetDiagramIds,
   svgDebateGraph,
   svgFlowPipeline,
   svgSeatArchitecture,
 } from './report-diagrams.js'
 import {
   collapsibleProse,
+  decisionHtml,
   esc,
   firstLine,
-  richProseHtml,
   snip,
 } from './report-prose.js'
 import type {
@@ -772,11 +774,6 @@ li { margin: 0.15rem 0; }
 }
 .flow-arrow { stroke: var(--accent); stroke-width: 1.75; }
 .flow-arrow-head { fill: var(--accent); }
-.debate-node-label, .arch-chair-label {
-  fill: #fff; font-size: 10px; font-weight: 700;
-  font-family: system-ui, -apple-system, "PingFang SC", sans-serif;
-  paint-order: stroke; stroke: rgba(0,0,0,0.35); stroke-width: 2px;
-}
 .legend-text {
   fill: var(--muted); font-size: 11px;
   font-family: system-ui, -apple-system, "PingFang SC", sans-serif;
@@ -889,6 +886,46 @@ li { margin: 0.15rem 0; }
 }
 .skip-link:focus { left: 0; }
 .decision-lead { font-size: 1.12rem; font-weight: 600; line-height: 1.45; margin: 0 0 0.65rem; }
+
+/* Markdown-lite blocks */
+.prose-h { margin: 0.75rem 0 0.4rem; font-size: 0.98rem; font-weight: 700; color: var(--ink); line-height: 1.35; }
+.prose-ul, .prose-ol { margin: 0.35rem 0 0.65rem; padding-left: 1.25rem; }
+.prose-ul li, .prose-ol li { margin: 0.25rem 0; line-height: 1.45; }
+.prose-hr { border: 0; border-top: 1px solid var(--border); margin: 0.75rem 0; }
+.prose strong { font-weight: 700; color: var(--ink); }
+.prose em { font-style: italic; }
+
+/* Decision cards */
+.decision-cards { display: grid; gap: 0.65rem; margin: 0.35rem 0 0.5rem; }
+.decision-card {
+  padding: 0.75rem 0.9rem; border-radius: 12px; border: 1px solid var(--border);
+  background: color-mix(in srgb, var(--card) 92%, var(--accent-soft));
+}
+.decision-card-title {
+  margin: 0 0 0.45rem; font-size: 0.95rem; font-weight: 750; color: var(--accent);
+  line-height: 1.35;
+}
+.decision-body { margin-top: 0.25rem; }
+
+/* Storyline (visible debate path) */
+.storyline { list-style: none; margin: 0.35rem 0 0.5rem; padding: 0; }
+.storyline-item {
+  padding: 0.55rem 0.75rem; margin: 0.35rem 0; border-radius: 10px;
+  border: 1px solid var(--border); border-left-width: 3px;
+  background: color-mix(in srgb, var(--card) 92%, transparent);
+}
+.storyline-item.rebut { border-left-color: var(--rebut); }
+.storyline-item.support { border-left-color: var(--support); }
+.storyline-item.question { border-left-color: var(--question); }
+.storyline-item .from, .storyline-item .to { font-weight: 600; }
+.diagram-cap { margin: 0.35rem 0 0; text-align: center; }
+
+/* Node labels: readable on colored discs (keep light text + soft shadow) */
+.debate-node-label, .arch-chair-label {
+  fill: #f8fafc; font-size: 10px; font-weight: 700;
+  font-family: system-ui, -apple-system, "PingFang SC", sans-serif;
+  paint-order: stroke; stroke: rgba(0,0,0,0.45); stroke-width: 2.5px;
+}
 `.trim()
 
 function speakersInData(data: RoundtableReportData): PersonaId[] {
@@ -897,6 +934,11 @@ function speakersInData(data: RoundtableReportData): PersonaId[] {
     for (const s of r.speeches) {
       if ((PERSONA_IDS as readonly string[]).includes(s.speaker)) seen.add(s.speaker)
     }
+  }
+  // Include edge endpoints so debate graphs still render when a seat only appears in acts.
+  for (const e of data.edges ?? []) {
+    if ((PERSONA_IDS as readonly string[]).includes(e.from)) seen.add(e.from as PersonaId)
+    if ((PERSONA_IDS as readonly string[]).includes(e.to)) seen.add(e.to as PersonaId)
   }
   return PERSONA_IDS.filter((id) => seen.has(id))
 }
@@ -1019,6 +1061,7 @@ export function buildRoundtableReportHtml(data: RoundtableReportData): string {
 }
 
 function buildMainReport(data: RoundtableReportData, seats: PersonaId[]): string {
+  resetDiagramIds()
   const lang = data.language
   const L = LABELS[lang]
   const when = data.generatedAt ?? new Date().toISOString()
@@ -1118,14 +1161,7 @@ ${sectionOpen('sec-overview', L.overview, 'diagram-card')}
   const decideHtml = decide
     ? `
 ${sectionOpen('sec-decision', L.decision, 'decision')}
-  <p class="decision-lead">${esc(snip(decide.decision, 400))}</p>
-  ${
-    decide.decision.length > 400
-      ? collapsibleProse(decide.decision, { more: L.more, less: L.less }, 400)
-      : /```/.test(decide.decision)
-        ? `<div class="prose">${richProseHtml(decide.decision)}</div>`
-        : ''
-  }
+  ${decisionHtml(decide.decision, { more: L.more, less: L.less })}
   <div class="stage-grid">
     <div class="stage-col">
       <h3>${esc(L.residual)}</h3>
@@ -1149,12 +1185,23 @@ ${sectionOpen('sec-issue', L.issue)}
   ${backLink(L)}
 </section>`
 
+  // Single debate graph here (not repeated in edges section — avoids SVG id collision & spaghetti twice)
   const processHtml = `
 ${sectionOpen('sec-process', L.process, 'diagram-card process')}
   <p class="hint">${esc(L.discussion)}</p>
+  ${debateSvg ? `<h3>${esc(L.debateMap)}</h3>${debateSvg}` : ''}
   ${
-    debateSvg
-      ? `<h3>${esc(L.debateMap)}</h3>${debateSvg}`
+    edges.length
+      ? `<h3>${esc(L.rebuttals)}</h3>
+  ${edgeStorylineHtml({
+    lang,
+    edges: rebutEdges.length ? rebutEdges : edges,
+    seatLabels: labelsMap,
+    max: 20,
+    linkRoles: true,
+    fileLink,
+    personaFile: (id) => personaReportFilename(id as PersonaId),
+  })}`
       : ''
   }
   <div class="highlights" style="margin-top:0.75rem">
@@ -1174,6 +1221,7 @@ ${sectionOpen('sec-process', L.process, 'diagram-card process')}
         .map((s) => speechArticle(s, lang, L, r.round, { linkRole: seats.includes(s.speaker) }))
         .join('\n')
       const roundEdges = edges.filter((e) => e.round === r.round)
+      const roundRebuts = roundEdges.filter((e) => e.relation === 'rebut')
       const agreedChips = r.stage.agreed
         .slice(0, 6)
         .map((a) => `<span class="chip">${esc(a)}</span>`)
@@ -1191,16 +1239,22 @@ ${sectionOpen(`sec-round-${r.round}`, roundHeading(lang, r.round), 'round')}
   <div class="highlights">${agreedChips}${openChips}</div>`
       : ''
   }
-  <h3>${esc(L.speeches)}</h3>
-  <div class="speeches">${speeches || `<p class="muted">${esc(L.none)}</p>`}</div>
   ${
     roundEdges.length
-      ? `<details class="fold" style="margin-top:0.65rem">
-    <summary><span class="more">${esc(L.detailsList)} (${roundEdges.length})</span><span class="less">${esc(L.less)}</span></summary>
-    <div class="fold-body">${edgeListHtml(roundEdges, lang, { linkRoles: true })}</div>
-  </details>`
+      ? `<h3>${esc(L.edges)}</h3>
+  ${edgeStorylineHtml({
+    lang,
+    edges: roundRebuts.length ? roundRebuts : roundEdges,
+    seatLabels: labelsMap,
+    max: 12,
+    linkRoles: true,
+    fileLink,
+    personaFile: (id) => personaReportFilename(id as PersonaId),
+  })}`
       : ''
   }
+  <h3>${esc(L.speeches)}</h3>
+  <div class="speeches">${speeches || `<p class="muted">${esc(L.none)}</p>`}</div>
   <h3>${esc(L.stage)}</h3>
   <div class="stage-grid">
     <div class="stage-col">
@@ -1222,26 +1276,33 @@ ${sectionOpen(`sec-round-${r.round}`, roundHeading(lang, r.round), 'round')}
     })
     .join('\n')
 
+  // Edges section: full list only (graph already in process)
   const edgesHtml =
     edges.length === 0
       ? ''
       : `
-${sectionOpen('sec-edges', L.edges, 'diagram-card')}
-  ${debateSvg || ''}
-  <details class="fold" style="margin-top:0.75rem">
-    <summary><span class="more">${esc(L.detailsList)}</span><span class="less">${esc(L.less)}</span></summary>
-    <div class="fold-body">
-      ${otherEdges.length ? edgeListHtml(otherEdges, lang, { linkRoles: true }) : ''}
-      ${
-        rebutEdges.length
-          ? `<div id="sec-rebuttals" tabindex="-1">
-        <h3>${esc(L.rebuttals)}</h3>
-        ${edgeListHtml(rebutEdges, lang, { linkRoles: true })}
-      </div>`
-          : ''
-      }
-    </div>
-  </details>
+${sectionOpen('sec-edges', L.edges)}
+  <p class="hint">${esc(
+    lang === 'zh-CN' || lang === 'zh-TW'
+      ? '完整交锋明细。图示见上方「讨论流程」。'
+      : 'Full exchange list. See Discussion flow above for the graph.',
+  )}</p>
+  ${
+    rebutEdges.length
+      ? `<div id="sec-rebuttals" tabindex="-1">
+    <h3>${esc(L.rebuttals)}</h3>
+    ${edgeListHtml(rebutEdges, lang, { linkRoles: true })}
+  </div>`
+      : ''
+  }
+  ${
+    otherEdges.length
+      ? `<h3>${esc(
+          lang === 'zh-CN' || lang === 'zh-TW' ? '附议与提问' : 'Support & questions',
+        )}</h3>
+  ${edgeListHtml(otherEdges, lang, { linkRoles: true })}`
+      : ''
+  }
   ${backLink(L)}
 </section>`
 
@@ -1295,6 +1356,7 @@ ${sectionOpen('sec-roles', L.subReports)}
 }
 
 function buildPersonaReport(data: RoundtableReportData, persona: PersonaId): string {
+  resetDiagramIds()
   const lang = data.language
   const L = LABELS[lang]
   const when = data.generatedAt ?? new Date().toISOString()
@@ -1415,17 +1477,22 @@ ${sectionOpen('sec-exchange', L.edges, 'diagram-card')}
   ${personalGraph}
   ${
     hasExchange
-      ? `<details class="fold" style="margin-top:0.65rem" open>
-    <summary><span class="more">${esc(L.detailsList)}</span><span class="less">${esc(L.less)}</span></summary>
-    <div class="fold-body">
+      ? `<h3>${esc(L.rebuttals)}</h3>
+  ${edgeStorylineHtml({
+    lang,
+    edges: myEdges,
+    seatLabels: labelsMap,
+    max: 24,
+    linkRoles: true,
+    fileLink,
+    personaFile: (id) => personaReportFilename(id as PersonaId),
+  })}
   ${exchangeBlock(L.iRebutted, outRebut, 'rebut', 'to')}
   ${exchangeBlock(L.iSupported, outSupport, 'support', 'to')}
   ${exchangeBlock(L.iQuestioned, outQ, 'question', 'to')}
   ${exchangeBlock(L.rebuttedMe, inRebut, 'rebut', 'from')}
   ${exchangeBlock(L.supportedMe, inSupport, 'support', 'from')}
-  ${exchangeBlock(L.questionedMe, inQ, 'question', 'from')}
-    </div>
-  </details>`
+  ${exchangeBlock(L.questionedMe, inQ, 'question', 'from')}`
       : `<p class="muted">${esc(L.noExchange)}</p>`
   }
   ${backLink(L)}
@@ -1435,7 +1502,7 @@ ${
   data.decision
     ? `
 ${sectionOpen('sec-decision', L.vsDecision, 'decision')}
-  <p class="decision-lead">${esc(snip(data.decision.decision, 320))}</p>
+  ${decisionHtml(data.decision.decision, { more: L.more, less: L.less })}
   <div class="stage-grid">
     <div class="stage-col">
       <h3>${esc(L.residual)}</h3>

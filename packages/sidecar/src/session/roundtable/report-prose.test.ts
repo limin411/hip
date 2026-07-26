@@ -60,12 +60,20 @@ describe('collapsibleProse', () => {
     expect(html).not.toContain('prose-fold')
   })
 
-  it('folds long text but still embeds markdown body', () => {
+  it('renders long structured text once without preview+body duplicate', () => {
     const long = '字'.repeat(400) + '\n\n- item a\n- item b'
     const html = collapsibleProse(long, { more: '展开', less: '收起' })
-    expect(html).toContain('prose-fold')
+    // open-by-default path: single markdown body, no fold preview pair
     expect(html).toContain('<ul>')
     expect(html).toContain('item a')
+    expect(html).not.toContain('prose-preview')
+  })
+
+  it('collapses very long non-structured text with preview only when closed', () => {
+    const long = '纯叙述。'.repeat(200)
+    const html = collapsibleProse(long, { more: '展开', less: '收起' }, 220, { open: false })
+    expect(html).toContain('prose-fold')
+    expect(html).toContain('prose-preview')
   })
 })
 

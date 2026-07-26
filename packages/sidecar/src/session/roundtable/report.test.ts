@@ -2,7 +2,6 @@ import { describe, it, expect } from 'vitest'
 import {
   buildRoundtableReportHtml,
   buildRoundtableReportBundle,
-  personaReportFilename,
   ROUNDTABLE_REPORT_FILENAME,
   ROUNDTABLE_REPORT_NAV_SCRIPT,
   ROUNDTABLE_REPORT_STYLES,
@@ -52,7 +51,7 @@ const sample = {
   ],
   decision: {
     verdict: '分阶段推进 A：先试点再 RFC，拒绝一次性重写。',
-    decision: '分阶段推进 A\n\n- 先试点\n- 再 RFC',
+    decision: '## 路径\n\n- 先试点\n- 再 RFC\n\n```ts\nexport const plan = "A"\n```',
     keyTradeoffs: ['速度换风险可控'],
     residual: ['时间风险'],
     nextSteps: ['试点', 'RFC'],
@@ -66,62 +65,56 @@ const sample = {
       relation: 'rebut' as const,
       summary: '成本',
     },
-    {
-      round: 1,
-      from: 'operator',
-      to: 'strategist',
-      relation: 'support' as const,
-      summary: '可分期',
-    },
   ],
   generatedAt: '2026-07-26T00:00:00.000Z',
 }
 
-describe('roundtable report html template', () => {
-  it('renders issue, seats, decision, escapes html', () => {
+describe('roundtable conclusion report', () => {
+  it('renders verdict, decision, escapes html', () => {
     const html = buildRoundtableReportHtml(sample)
     expect(ROUNDTABLE_REPORT_FILENAME).toBe('roundtable-report.html')
     expect(html).toContain('圆桌会议报告')
-    expect(html).toContain('长期架构官')
     expect(html).toContain('分阶段推进 A')
     expect(html).toContain('&lt;script&gt;')
     expect(html).not.toContain('Should we rewrite the API? <script>')
   })
 
-  it('puts core verdict hero before overview/process', () => {
+  it('is conclusion-only: no process / rounds / speech dumps', () => {
     const html = buildRoundtableReportHtml(sample)
-    const v = html.indexOf('id="sec-verdict"')
-    const o = html.indexOf('id="sec-overview"')
-    const p = html.indexOf('id="sec-process"')
-    expect(v).toBeGreaterThan(0)
-    expect(o).toBeGreaterThan(v)
-    expect(p).toBeGreaterThan(o)
+    expect(html).toContain('id="sec-verdict"')
+    expect(html).toContain('id="sec-decision"')
     expect(html).toMatch(/class="[^"]*verdict-hero/)
     expect(html).toContain('核心结论')
     expect(html).toContain('拒绝一次性重写')
     expect(html).toContain('关键取舍')
+    // process removed
+    expect(html).not.toContain('id="sec-process"')
+    expect(html).not.toContain('id="sec-rounds"')
+    expect(html).not.toContain('id="sec-overview"')
+    expect(html).not.toContain('class="round-fold"')
+    expect(html).not.toContain('class="flow-steps"')
+    expect(html).not.toContain('class="debate-timeline"')
+    expect(html).not.toContain('A 太贵') // advisor speech text
+    expect(html).not.toContain('两周试点')
+    expect(html).toContain('讨论过程不写入')
   })
 
-  it('uses pure HTML diagrams (no mermaid CDN / no spaghetti SVG)', () => {
-    const html = buildRoundtableReportHtml(sample)
-    expect(html).toContain('class="flow-steps"')
-    expect(html).toContain('class="seat-board"')
-    expect(html).toContain('class="debate-timeline"')
-    expect(html).not.toContain('cdn.jsdelivr.net/npm/mermaid')
-    expect(html).not.toContain('class="mermaid"')
-    expect(html).not.toContain('flowchart LR')
-    expect(html).not.toContain('class="diagram debate-diagram"')
-  })
-
-  it('renders GFM markdown in decision and speeches', () => {
+  it('renders GFM in decision once (no preview+body duplicate)', () => {
     const html = buildRoundtableReportHtml(sample)
     expect(html).toContain('class="code-block"')
     expect(html).toContain('data-lang="ts"')
     expect(html).toContain('export const plan')
-    expect(html).toContain('class="inline-code"')
-    // decision list via marked
     expect(html).toContain('<ul>')
     expect(html).toContain('先试点')
+    // collapsible open path should not emit prose-preview
+    expect(html).not.toContain('class="prose-preview"')
+  })
+
+  it('shows cast titles in context, not full discussion', () => {
+    const html = buildRoundtableReportHtml(sample)
+    expect(html).toContain('长期架构官')
+    expect(html).toContain('成本怀疑论者')
+    expect(html).toContain('id="sec-context"')
   })
 
   it('keeps fixed TOC shell and data-jump', () => {
@@ -129,50 +122,37 @@ describe('roundtable report html template', () => {
     expect(html).toContain('id="toc"')
     expect(html).toContain('class="shell"')
     expect(html).toContain('id="report-main"')
-    expect(html).toContain('data-jump="sec-overview"')
+    expect(html).toContain('data-jump="sec-verdict"')
     expect(html).toContain(ROUNDTABLE_REPORT_NAV_SCRIPT.slice(0, 40))
-    expect(ROUNDTABLE_REPORT_STYLES).toContain('.flow-steps')
     expect(ROUNDTABLE_REPORT_STYLES).toContain('.md')
   })
 
-  it('collapses rounds by default', () => {
-    const html = buildRoundtableReportHtml(sample)
-    expect(html).toContain('class="round-fold"')
-    expect(html).toContain('id="sec-round-1"')
-  })
-
-  it('renders markdown lists/bold in long speech', () => {
+  it('strips verdict echo from decision body', () => {
     const html = buildRoundtableReportHtml({
       ...sample,
-      rounds: [
-        {
-          round: 1,
-          focus: 'f',
-          speeches: [
-            {
-              speaker: 'skeptic',
-              content: '## 怀疑论者发言\n\n- 成本过高\n- 证据不足\n\n结论是 **暂缓**。',
-            },
-          ],
-          stage: { round: 1, agreed: [], open: [] },
-        },
-      ],
+      decision: {
+        verdict: '只保留这一句结论。',
+        decision: '只保留这一句结论。\n\n## 细则\n\n- 第一步',
+        keyTradeoffs: [],
+        residual: [],
+        nextSteps: ['做'],
+      },
     })
-    expect(html).toMatch(/<h2[^>]*>怀疑论者发言<\/h2>/)
-    expect(html).toContain('<ul>')
-    expect(html).toContain('成本过高')
-    expect(html).toContain('<strong>暂缓</strong>')
+    // verdict appears in hero
+    expect(html).toContain('只保留这一句结论。')
+    // decision section should still have 细则, not only a second full hero dump
+    expect(html).toContain('细则')
+    expect(html).toContain('第一步')
   })
 })
 
 describe('roundtable report bundle', () => {
-  it('emits main + persona files', () => {
+  it('emits main conclusion file only', () => {
     const files = buildRoundtableReportBundle(sample)
+    expect(files).toHaveLength(1)
     expect(files[0]?.filename).toBe(ROUNDTABLE_REPORT_FILENAME)
-    expect(files.length).toBeGreaterThanOrEqual(2)
-    const skeptic = files.find((f) => f.persona === 'skeptic')
-    expect(skeptic?.html).toContain('怀疑论者')
-    expect(skeptic?.html).toContain(ROUNDTABLE_REPORT_FILENAME)
-    expect(skeptic?.html).toContain(personaReportFilename('strategist'))
+    expect(files[0]?.kind).toBe('main')
+    expect(files[0]?.html).toContain('核心结论')
+    expect(files[0]?.html).not.toContain('id="sec-rounds"')
   })
 })

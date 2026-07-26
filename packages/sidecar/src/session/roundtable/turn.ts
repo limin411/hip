@@ -377,29 +377,14 @@ export async function tryRunRoundtableTurn(
         }
 
         const mainRel = ROUNDTABLE_REPORT_FILENAME
-        const roleRels = written
-          .filter((w) => w.rel !== mainRel)
-          .map((w) => w.rel)
-        const roleList =
-          roleRels.length > 0
-            ? roleRels.map((p) => `- [\`${p}\`](${p})`).join('\n')
-            : ''
         reportNote =
           lang === 'zh-CN' || lang === 'zh-TW'
-            ? `\n\n---\n\n**圆桌报告（hip 汇总）：** [\`${mainRel}\`](${mainRel})\n` +
-              (roleList
-                ? `\n**各角色子报告：**\n${roleList}\n\n（汇总页可跳转子报告；浏览器打开后链接可用，或在右侧文件列表中打开）\n`
-                : `\n（已写入工作区，可在右侧预览）\n`)
+            ? `\n\n---\n\n**圆桌结论报告（hip）：** [\`${mainRel}\`](${mainRel})\n\n（仅含最终结论与后续步骤；讨论过程不写入报告。）\n`
             : lang === 'ja'
-              ? `\n\n---\n\n**円卓レポート (hip):** [\`${mainRel}\`](${mainRel})\n` +
-                (roleList ? `\n**役割別:**\n${roleList}\n` : '')
+              ? `\n\n---\n\n**円卓結論レポート (hip):** [\`${mainRel}\`](${mainRel})\n`
               : lang === 'ko'
-                ? `\n\n---\n\n**원탁 보고서 (hip):** [\`${mainRel}\`](${mainRel})\n` +
-                  (roleList ? `\n**역할별:**\n${roleList}\n` : '')
-                : `\n\n---\n\n**Roundtable report (hip summary):** [\`${mainRel}\`](${mainRel})\n` +
-                  (roleList
-                    ? `\n**Role reports:**\n${roleList}\n\n(Open the summary in a browser to follow cross-links, or open files from the preview panel.)\n`
-                    : `\n(Saved; open in the preview panel)\n`)
+                ? `\n\n---\n\n**원탁 결론 보고서 (hip):** [\`${mainRel}\`](${mainRel})\n`
+                : `\n\n---\n\n**Roundtable conclusion report (hip):** [\`${mainRel}\`](${mainRel})\n\n(Conclusion-only; deliberation is not included.)\n`
         pushBurst(reportNote)
         logInfo('session', 'roundtable:report', {
           sessionId: host.id,

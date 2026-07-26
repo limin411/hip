@@ -163,9 +163,9 @@ export function pickReportSpeechContent(raw: string, envelopeProse: string): str
 }
 
 /**
- * Collapsible body: always render full markdown in fold.
- * Preview is plain first line (not raw ** markers).
- * Medium content opens by default so markdown is immediately visible.
+ * Collapsible body: full markdown once.
+ * When open by default (or short enough), do NOT also show a plain-text preview —
+ * that was duplicating long decision/speech content.
  */
 export function collapsibleProse(
   content: string,
@@ -181,19 +181,52 @@ export function collapsibleProse(
     return `<div class="prose">${full}</div>`
   }
 
-  // Auto-open moderately long structured content so markdown isn't "hidden"
+  // Auto-open moderately long structured content so markdown is immediately visible
   const structured = /^#{1,3}\s|^\*\*.+\*\*|^\s*[-*+]\s|^\s*\d+[.)]/m.test(body)
   const open = opts?.open ?? (structured || plain.length < 900)
-  const openAttr = open ? ' open' : ''
-  const preview = esc(firstLine(body, 140))
+  if (open) {
+    // Single render — no preview + full body pair
+    return `<div class="prose">${full}</div>`
+  }
 
+  const preview = esc(firstLine(body, 140))
   return `<div class="prose prose-fold">
   <p class="prose-preview">${preview}</p>
-  <details class="fold"${openAttr}>
+  <details class="fold">
     <summary><span class="more">${esc(labels.more)}</span><span class="less">${esc(labels.less)}</span></summary>
     <div class="fold-body">${full}</div>
   </details>
 </div>`
+}
+
+/** Drop decision body lines that merely restate the hero verdict. */
+export function stripVerdictEcho(decision: string, verdict: string): string {
+  const v = (verdict || '').replace(/\s+/g, ' ').trim()
+  let d = (decision || '').replace(/\r\n/g, '\n').trim()
+  if (!v || !d) return d
+  const vNorm = v.toLowerCase()
+  // Whole-body echo
+  if (d.replace(/\s+/g, ' ').trim().toLowerCase() === vNorm) return ''
+  const lines = d.split('\n')
+  while (lines.length) {
+    const first = lines[0]!.replace(/\s+/g, ' ').trim()
+    if (!first) {
+      lines.shift()
+      continue
+    }
+    const fNorm = first
+      .replace(/^#+\s*/, '')
+      .replace(/^\*\*(.+)\*\*$/, '$1')
+      .replace(/\s+/g, ' ')
+      .trim()
+      .toLowerCase()
+    if (fNorm === vNorm || vNorm.startsWith(fNorm) || fNorm.startsWith(vNorm.slice(0, Math.min(40, vNorm.length)))) {
+      lines.shift()
+      continue
+    }
+    break
+  }
+  return lines.join('\n').trim()
 }
 
 export interface DecisionPart {
@@ -205,8 +238,9 @@ export function splitDecisionParts(decision: string): DecisionPart[] {
   const t = decision.replace(/\r\n/g, '\n').trim()
   if (!t) return []
 
+  // Prefer 【决定…】 / ## 决定 / 决定N｜ forms; avoid over-splitting prose.
   const r2 =
-    /(?=【决定[^】]*】)|(?=#{1,3}\s*决定)|(?=\*\*决定[^*]*\*\*)|(?=决定\s*[1-9１-９][\s:：.|｜])/g
+    /(?=【\s*决定[^】]*】)|(?=#{1,3}\s*决定)|(?=\*\*决定[^*]*\*\*)|(?=决定\s*[1-9１-９][\s:：.|｜\-—])/g
   const idxs: number[] = []
   let m: RegExpExecArray | null
   while ((m = r2.exec(t)) !== null) {
@@ -215,7 +249,6 @@ export function splitDecisionParts(decision: string): DecisionPart[] {
   }
 
   if (idxs.length === 0) {
-    // Prefer single rich markdown body — don't over-split
     return [{ title: '', body: t }]
   }
 
@@ -226,12 +259,17 @@ export function splitDecisionParts(decision: string): DecisionPart[] {
     if (!slice) continue
     const fl = slice.split('\n')[0]!.trim()
     const titleMatch =
-      fl.match(/^【([^】]+)】/) || fl.match(/^\*\*(.+?)\*\*/) || fl.match(/^(#{1,3}\s*.+)$/)
+      fl.match(/^【\s*([^】]+)】/) ||
+      fl.match(/^\*\*(.+?)\*\*/) ||
+      fl.match(/^(#{1,3}\s*.+)$/) ||
+      fl.match(/^(决定\s*[1-9１-９][^\n]{0,80})/)
     if (titleMatch) {
       const title = titleMatch[1]!.replace(/^#+\s*/, '').trim()
       const body = slice.slice(fl.length).trim()
-      parts.push({ title, body: body || slice })
-    } else {
+      // Title in h3; body is remainder only (never re-include the heading line alone)
+      parts.push({ title, body })
+    } else if (slice.replace(/\s+/g, ' ').trim().length > 20) {
+      // Lead-in before first titled decision
       parts.push({ title: '', body: slice })
     }
   }
@@ -241,26 +279,33 @@ export function splitDecisionParts(decision: string): DecisionPart[] {
 export function decisionHtml(
   decision: string,
   labels: { more: string; less: string },
+  opts?: { verdict?: string },
 ): string {
-  const parts = splitDecisionParts(decision)
+  const cleaned = opts?.verdict ? stripVerdictEcho(decision, opts.verdict) : decision
+  if (!cleaned.trim()) return ''
+
+  const parts = splitDecisionParts(cleaned)
   if (parts.length <= 1) {
-    return `<div class="prose decision-body">${richProseHtml(decision)}</div>`
+    const body = parts[0]?.body || cleaned
+    return `<div class="prose decision-body">${richProseHtml(body)}</div>`
   }
 
   return `<div class="decision-cards">
   ${parts
-    .map((p, i) => {
-      const title = p.title || String(i + 1)
-      const body = p.body
-      const short = body.replace(/\s+/g, ' ').length < 400
-      const inner = short
-        ? `<div class="prose">${richProseHtml(body)}</div>`
-        : collapsibleProse(body, labels, 280, { open: true })
+    .map((p) => {
+      if (!p.title && !p.body.trim()) return ''
+      const bodyHtml = p.body.trim()
+        ? collapsibleProse(p.body, labels, 280, { open: true })
+        : ''
+      if (!p.title) {
+        return `<article class="decision-card">${bodyHtml}</article>`
+      }
       return `<article class="decision-card">
-    <h3 class="decision-card-title">${esc(title)}</h3>
-    ${inner}
+    <h3 class="decision-card-title">${esc(p.title)}</h3>
+    ${bodyHtml}
   </article>`
     })
+    .filter(Boolean)
     .join('\n')}
 </div>`
 }

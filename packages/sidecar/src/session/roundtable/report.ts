@@ -11,8 +11,6 @@ import { personaLabel } from './prompts.js'
 import {
   edgeStorylineHtml,
   mermaidDebateGraph,
-  mermaidFlowPipeline,
-  mermaidSeatArchitecture,
   metricsRow,
   PERSONA_HUE,
   resetDiagramIds,
@@ -1158,252 +1156,128 @@ export function buildRoundtableReportHtml(data: RoundtableReportData): string {
   return buildMainReport(data, speakersInData(data))
 }
 
+/**
+ * Conclusion-only deliverable: verdict + decision + tradeoffs / residual / next steps.
+ * Deliberately omits discussion process (rounds, edges, diagrams, role sub-reports).
+ */
 function buildMainReport(data: RoundtableReportData, seats: PersonaId[]): string {
-  resetDiagramIds()
+  void seats
   const lang = data.language
   const L = LABELS[lang]
   const when = data.generatedAt ?? new Date().toISOString()
   const issueTitle = data.issue.replace(/\s+/g, ' ').trim().slice(0, 80)
-  const edges = data.edges ?? []
-  const rebutEdges = edges.filter((e) => e.relation === 'rebut')
-  const otherEdges = edges.filter((e) => e.relation !== 'rebut')
+  const decide = data.decision
+  const verdictText = (decide?.verdict || '').trim()
   const labelsMap = seatLabelMap(lang, seats, data.cast)
 
-  // TOC: verdict first → decision body → overview → process → rounds → roles
   const toc: TocItem[] = []
-  if (data.decision?.verdict || data.decision?.decision) {
+  if (decide?.verdict || decide?.decision) {
     toc.push({ id: 'sec-verdict', label: L.verdict, depth: 1 })
-    toc.push({ id: 'sec-decision', label: L.decision, depth: 1 })
+    if (decide.decision?.trim()) toc.push({ id: 'sec-decision', label: L.decision, depth: 1 })
+    if (decide.keyTradeoffs?.length || decide.residual.length || decide.nextSteps.length) {
+      toc.push({ id: 'sec-actions', label: L.next, depth: 1 })
+    }
   } else {
     toc.push({ id: 'sec-issue', label: L.issue, depth: 1 })
   }
-  toc.push({ id: 'sec-overview', label: L.overview, depth: 1 })
-  if (edges.length > 0 || data.rounds.length > 0) {
-    toc.push({ id: 'sec-process', label: L.process, depth: 1 })
+  if (data.cast?.length || data.agenda.length) {
+    toc.push({ id: 'sec-context', label: L.plan, depth: 1 })
   }
-  if (data.rounds.length > 0) toc.push({ id: 'sec-rounds', label: L.discussion, depth: 1 })
-  if (seats.length > 0) toc.push({ id: 'sec-roles', label: L.subReports, depth: 1 })
 
-  const metrics = metricsRow([
-    { label: L.metricRounds, value: String(data.rounds.length) },
-    { label: L.metricSeats, value: String(seats.length) },
-    { label: L.metricEdges, value: String(edges.length) },
-    { label: L.metricRebuts, value: String(rebutEdges.length) },
-  ])
+  const castChips =
+    data.cast?.length
+      ? data.cast
+          .map((s) => {
+            const label = labelsMap[s.id] || s.title || personaLabel(s.id, lang)
+            return `<span class="chip" title="${esc(s.lens || '')}">${esc(label)}</span>`
+          })
+          .join('')
+      : seats
+          .map((id) => `<span class="chip">${esc(labelsMap[id] || personaLabel(id, lang))}</span>`)
+          .join('')
 
-  const flowMmd = mermaidFlowPipeline({
-    lang,
-    rounds: data.rounds.map((r) => ({ round: r.round, focus: r.focus })),
-    hasDecision: Boolean(data.decision),
-    labels: {
-      issue: L.issue,
-      decision: L.decision,
-      round: (n) => roundHeading(lang, n),
-    },
-  })
-
-  const archMmd = seats.length
-    ? mermaidSeatArchitecture({
-        seats,
-        seatLabels: labelsMap,
-        chairLabel: 'hip',
-      })
-    : ''
-
-  const debateMmd =
-    edges.length > 0 && seats.length
-      ? mermaidDebateGraph({
-          lang,
-          seats,
-          seatLabels: labelsMap,
-          edges,
-          maxEdges: 12,
-        })
-      : ''
-
-  const overviewHtml = `
-${sectionOpen('sec-overview', L.overview, 'diagram-card')}
-  <p class="meta"><strong>${esc(L.issue)}:</strong> ${esc(firstLine(data.issue, 140))}</p>
-  ${
-    data.rationale
-      ? `<p class="meta"><strong>${esc(L.why)}:</strong> ${esc(snip(data.rationale, 100))}</p>`
-      : ''
-  }
-  ${metrics}
-  <h3>${esc(L.flow)}</h3>
-  ${flowMmd}
-  ${
-    archMmd
-      ? `<div class="diagram-row two">
-    <div><h3>${esc(L.architecture)}</h3>${archMmd}</div>
-  </div>`
-      : ''
-  }
-  ${
-    data.agenda.length
-      ? `<div class="highlights">${data.agenda.map((a) => `<span class="chip">${esc(snip(a, 36))}</span>`).join('')}</div>`
-      : ''
-  }
-  ${backLink(L)}
-</section>`
-
-  const decide = data.decision
-  const verdictText = (decide?.verdict || '').trim()
   const heroHtml =
     decide && (verdictText || decide.decision)
       ? `
 ${sectionOpen('sec-verdict', L.verdict, 'decision verdict-hero')}
   ${decide.confidence ? `<span class="verdict-conf">${esc(String(decide.confidence))}</span>` : ''}
   <p class="verdict-text">${esc(verdictText || firstLine(decide.decision, 280))}</p>
-  <p class="meta"><strong>${esc(L.issue)}:</strong> ${esc(firstLine(data.issue, 140))}</p>
+  <p class="meta"><strong>${esc(L.issue)}:</strong> ${esc(firstLine(data.issue, 200))}</p>
   ${data.earlyExit ? `<p class="badge">${esc(L.early)}</p>` : ''}
-  ${backLink(L)}
 </section>`
       : `
 ${sectionOpen('sec-issue', L.issue)}
   ${collapsibleProse(data.issue, { more: L.more, less: L.less }, 160)}
-  ${backLink(L)}
 </section>`
 
-  const decideHtml = decide
-    ? `
+  const bodyDecision =
+    decide?.decision?.trim()
+      ? decisionHtml(decide.decision, { more: L.more, less: L.less }, { verdict: verdictText })
+      : ''
+
+  const decideHtmlBlock =
+    decide && bodyDecision
+      ? `
 ${sectionOpen('sec-decision', L.decision, 'decision')}
-  ${decisionHtml(decide.decision, { more: L.more, less: L.less })}
+  ${bodyDecision}
+</section>`
+      : ''
+
+  const actionsHtml =
+    decide &&
+    (decide.keyTradeoffs?.length || decide.residual.length || decide.nextSteps.length)
+      ? `
+${sectionOpen('sec-actions', L.next)}
   ${
     decide.keyTradeoffs?.length
       ? `<h3>${esc(L.tradeoffs)}</h3><ul>${bullets(decide.keyTradeoffs.slice(0, 8))}</ul>`
       : ''
   }
-  ${
-    decide.residual.length || decide.nextSteps.length
-      ? `<div class="stage-grid">
+  <div class="stage-grid">
     <div class="stage-col">
       <h3>${esc(L.residual)}</h3>
-      <ul>${bullets(decide.residual.slice(0, 6))}</ul>
+      <ul>${bullets(decide.residual.slice(0, 8))}</ul>
     </div>
     <div class="stage-col">
       <h3>${esc(L.next)}</h3>
       <ol>${
         decide.nextSteps.length
-          ? decide.nextSteps.slice(0, 6).map((x) => `<li>${esc(x)}</li>`).join('\n')
+          ? decide.nextSteps.slice(0, 8).map((x) => `<li>${esc(x)}</li>`).join('\n')
           : `<li class="muted">${esc(L.none)}</li>`
       }</ol>
     </div>
-  </div>`
-      : ''
-  }
-  ${backLink(L)}
+  </div>
 </section>`
       : ''
 
-  // Debate: one mermaid + short storyline; full edge list collapsed
-  const processHtml =
-    edges.length === 0 && data.rounds.length === 0
-      ? ''
-      : `
-${sectionOpen('sec-process', L.process, 'diagram-card process')}
-  ${debateMmd ? `<h3>${esc(L.debateMap)}</h3>${debateMmd}` : ''}
+  const contextHtml =
+    data.cast?.length || data.agenda.length || data.rationale
+      ? `
+${sectionOpen('sec-context', L.plan)}
   ${
-    edges.length
-      ? `<h3>${esc(L.rebuttals)}</h3>
-  ${edgeStorylineHtml({
-    lang,
-    edges: rebutEdges.length ? rebutEdges : edges,
-    seatLabels: labelsMap,
-    max: 8,
-    linkRoles: true,
-    fileLink,
-    personaFile: (id) => personaReportFilename(id as PersonaId),
-  })}
-  <details class="fold" style="margin-top:0.65rem">
-    <summary><span class="more">${esc(L.detailsList)} (${edges.length})</span><span class="less">${esc(L.less)}</span></summary>
-    <div class="fold-body">
-      ${rebutEdges.length ? `<h3>${esc(L.rebuttals)}</h3>${edgeListHtml(rebutEdges, lang, { linkRoles: true })}` : ''}
-      ${
-        otherEdges.length
-          ? `<h3>${esc(
-              lang === 'zh-CN' || lang === 'zh-TW' ? '附议与提问' : 'Support & questions',
-            )}</h3>${edgeListHtml(otherEdges, lang, { linkRoles: true })}`
-          : ''
-      }
-    </div>
-  </details>`
+    data.rationale
+      ? `<p class="meta"><strong>${esc(L.why)}:</strong> ${esc(snip(data.rationale, 160))}</p>`
       : ''
   }
-  ${backLink(L)}
-</section>`
-
-  // Rounds: default collapsed — only summary + chips visible
-  const roundsHtml =
-    data.rounds.length === 0
-      ? ''
-      : `
-<section id="sec-rounds" class="card" tabindex="-1">
-  <h2>${jumpLink('sec-rounds', '#', 'anchor')}${esc(L.discussion)}</h2>
+  ${
+    data.agenda.length
+      ? `<p class="meta"><strong>${esc(L.agenda)}:</strong></p>
+  <div class="highlights">${data.agenda.map((a) => `<span class="chip">${esc(snip(a, 48))}</span>`).join('')}</div>`
+      : ''
+  }
+  ${
+    castChips
+      ? `<p class="meta" style="margin-top:0.75rem"><strong>${esc(L.seats)}:</strong></p>
+  <div class="highlights">${castChips}</div>`
+      : ''
+  }
   <p class="hint">${esc(
     lang === 'zh-CN' || lang === 'zh-TW'
-      ? '默认收起各轮全文；展开可查看发言与阶段结论。'
-      : 'Rounds are collapsed by default — expand for speeches.',
+      ? '本报告仅保留 hip 最终结论与可执行项；讨论过程不写入交付件。'
+      : 'This deliverable is conclusion-only; deliberation is not included.',
   )}</p>
-  ${data.rounds
-    .map((r) => {
-      const speeches = r.speeches
-        .map((s) => speechArticle(s, lang, L, r.round, { linkRole: seats.includes(s.speaker) }))
-        .join('\n')
-      const agreedChips = r.stage.agreed
-        .slice(0, 4)
-        .map((a) => `<span class="chip">${esc(snip(a, 28))}</span>`)
-        .join('')
-      const openChips = r.stage.open
-        .slice(0, 3)
-        .map((a) => `<span class="chip open">${esc(snip(a, 28))}</span>`)
-        .join('')
-      return `
-  <details class="round-fold" id="sec-round-${r.round}">
-    <summary>
-      <span class="round-title">${esc(roundHeading(lang, r.round))}</span>
-      <span class="round-focus">${esc(snip(r.focus, 48))}</span>
-      <span class="round-tag">${r.speeches.length}${lang === 'zh-CN' || lang === 'zh-TW' ? ' 发言' : ' speeches'}</span>
-    </summary>
-    ${agreedChips || openChips ? `<div class="highlights">${agreedChips}${openChips}</div>` : ''}
-    <div class="speeches">${speeches || `<p class="muted">${esc(L.none)}</p>`}</div>
-    ${
-      r.stage.agreed.length || r.stage.open.length
-        ? `<div class="stage-grid">
-      <div class="stage-col"><h3>${esc(L.agreed)}</h3><ul>${bullets(r.stage.agreed)}</ul></div>
-      <div class="stage-col"><h3>${esc(L.open)}</h3><ul>${bullets(r.stage.open)}</ul></div>
-    </div>`
-        : ''
-    }
-  </details>`
-    })
-    .join('\n')}
-  ${backLink(L)}
 </section>`
-
-  const openLabel = lang === 'zh-CN' || lang === 'zh-TW' ? '打开 →' : 'Open →'
-  const rolesHtml =
-    seats.length === 0
-      ? ''
-      : `
-${sectionOpen('sec-roles', L.subReports)}
-  <div class="role-grid">
-    ${seats
-      .map((id) => {
-        const hue = PERSONA_HUE[id]
-        const first =
-          data.rounds.flatMap((r) => r.speeches).find((s) => s.speaker === id)?.content ?? ''
-        const href = personaReportFilename(id)
-        return `<a class="role-card" style="--persona-h:${hue}" href="${esc(href)}" data-file="${esc(href)}">
-      <span class="name">${esc(personaLabel(id, lang))}</span>
-      <span class="snip">${esc(firstLine(first, 72) || L.none)}</span>
-      <span class="go">${esc(openLabel)}</span>
-    </a>`
-      })
-      .join('\n    ')}
-  </div>
-  ${backLink(L)}
-</section>`
+      : ''
 
   const headerHtml = `
 <header class="report-header">
@@ -1419,11 +1293,9 @@ ${sectionOpen('sec-roles', L.subReports)}
     headerHtml,
     toc,
     bodyHtml: `${heroHtml}
-        ${decideHtml}
-        ${overviewHtml}
-        ${processHtml}
-        ${roundsHtml}
-        ${rolesHtml}`,
+        ${decideHtmlBlock}
+        ${actionsHtml}
+        ${contextHtml}`,
     footer: L.footer,
   })
 }
@@ -1626,23 +1498,17 @@ ${sectionOpen('sec-decision', L.vsDecision, 'decision')}
   })
 }
 
-/** Build the full deliverable set: hip summary + one HTML per speaking seat. */
+/**
+ * Deliverable set: conclusion report only (no per-role process dumps).
+ * Persona HTML builder remains for optional tooling; bundle does not emit it.
+ */
 export function buildRoundtableReportBundle(data: RoundtableReportData): RoundtableReportFile[] {
   const seats = speakersInData(data)
-  const files: RoundtableReportFile[] = [
+  return [
     {
       filename: ROUNDTABLE_REPORT_FILENAME,
       html: buildMainReport(data, seats),
       kind: 'main',
     },
   ]
-  for (const persona of seats) {
-    files.push({
-      filename: personaReportFilename(persona),
-      html: buildPersonaReport(data, persona),
-      kind: 'persona',
-      persona,
-    })
-  }
-  return files
 }

@@ -939,6 +939,7 @@ export const zhTW = {
       "inputDevice": "麥克風",
       "inputDeviceDesc": "用於 Composer 聽寫的輸入裝置。進入本頁不會自動開啟麥克風；僅在重新整理裝置、選擇裝置或麥克風測試時才會請求。",
       "systemDefault": "系統預設",
+      "savedDevice": "已儲存的麥克風",
       "refresh": "重新整理裝置",
       "permissionHint": "需要麥克風權限才能顯示裝置名稱。",
       "micTest": "麥克風測試",

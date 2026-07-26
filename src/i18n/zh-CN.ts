@@ -905,6 +905,7 @@ export const zhCN = {
         inputDeviceDesc:
           '用于 Composer 听写的输入设备。进入本页不会自动打开麦克风；仅在刷新设备、选择设备或麦克风测试时才会请求。',
         systemDefault: '系统默认',
+        savedDevice: '已保存的麦克风',
         refresh: '刷新设备',
         permissionHint: '需要麦克风权限才能显示设备名称。',
         micTest: '麦克风测试',

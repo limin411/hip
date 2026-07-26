@@ -16,6 +16,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/DropdownMenu'
+import { listAudioInputDevices } from '@/domain/voice/listAudioInputDevices'
 import { resolveInputDevice, type VoiceInputDevice } from '@/domain/voice/resolveInputDevice'
 import { startVoiceCapture, type CaptureHandle } from '@/domain/voice/voiceCapture'
 import {
@@ -112,28 +113,10 @@ export function VoiceSettingsSection({
 
   /** List mics without opening a capture stream (never seize the mic on page load). */
   const listDevicesOnly = useCallback(async () => {
-    if (!navigator.mediaDevices?.enumerateDevices) {
-      setDevices([])
-      return
-    }
-    try {
-      const list = await navigator.mediaDevices.enumerateDevices()
-      setDevices(
-        list
-          .filter((d) => d.kind === 'audioinput')
-          .map((d, i) => ({
-            id: d.deviceId,
-            label:
-              d.label?.trim() ||
-              (d.deviceId
-                ? `${t('settings.voice.unnamedDevice')} ${i + 1}`
-                : t('settings.voice.unnamedDevice')),
-            groupId: d.groupId,
-          })),
-      )
-    } catch {
-      setDevices([])
-    }
+    const { devices: next } = await listAudioInputDevices({
+      unnamedLabel: (i) => `${t('settings.voice.unnamedDevice')} ${i + 1}`,
+    })
+    setDevices(next)
   }, [t])
 
   /**
@@ -141,26 +124,13 @@ export function VoiceSettingsSection({
    * Always stop tracks immediately so we do not hold the device.
    */
   const refreshDevicesWithPermission = useCallback(async () => {
-    if (!navigator.mediaDevices?.enumerateDevices) {
-      setDevices([])
-      return
-    }
-    if (navigator.mediaDevices.getUserMedia) {
-      try {
-        const stream = await Promise.race([
-          navigator.mediaDevices.getUserMedia({ audio: true, video: false }),
-          new Promise<never>((_, rej) => {
-            setTimeout(() => rej(new Error('mic-permission-timeout')), 2000)
-          }),
-        ])
-        stream.getTracks().forEach((tr) => tr.stop())
-        setPermissionDenied(false)
-      } catch {
-        setPermissionDenied(true)
-      }
-    }
-    await listDevicesOnly()
-  }, [listDevicesOnly])
+    const { devices: next, permissionDenied: denied } = await listAudioInputDevices({
+      unlockPermission: true,
+      unnamedLabel: (i) => `${t('settings.voice.unnamedDevice')} ${i + 1}`,
+    })
+    setPermissionDenied(denied)
+    setDevices(next)
+  }, [t])
 
   /** Quick status (size/sidecar) — safe on every page open. Full SHA only when verify=true. */
   const checkAllModels = useCallback(async (opts?: { verify?: boolean }) => {
@@ -315,36 +285,52 @@ export function VoiceSettingsSection({
     setMicTestBusy(true)
     try {
       // Explicit user action: may request permission and open the mic.
-      await refreshDevicesWithPermission()
-      const deviceId = resolveInputDevice(
-        {
-          id: voice?.inputDeviceId,
-          label: voice?.inputDeviceLabel,
-          groupId: voice?.inputDeviceGroupId,
-        },
-        // devices state may not have flushed yet; re-list
-        await (async () => {
-          try {
-            const list = await navigator.mediaDevices.enumerateDevices()
-            return list
-              .filter((d) => d.kind === 'audioinput')
-              .map((d, i) => ({
-                id: d.deviceId,
-                label: d.label?.trim() || `${t('settings.voice.unnamedDevice')} ${i + 1}`,
-                groupId: d.groupId,
-              }))
-          } catch {
-            return [] as VoiceInputDevice[]
+      const preferred = {
+        id: voice?.inputDeviceId,
+        label: voice?.inputDeviceLabel,
+        groupId: voice?.inputDeviceGroupId,
+      }
+      const wantsPreferred = Boolean(preferred.id && preferred.id !== 'default')
+      const { devices: live, permissionDenied: denied } = await listAudioInputDevices({
+        // Mic test is user-initiated — always unlock labels for rebind.
+        unlockPermission: true,
+        unnamedLabel: (i) => `${t('settings.voice.unnamedDevice')} ${i + 1}`,
+      })
+      setPermissionDenied(denied)
+      setDevices(live)
+      const resolved = resolveInputDevice(preferred, live)
+      const deviceId = resolved.deviceId || 'default'
+      const fallbackDeviceIds = live
+        .filter((d) => d.id !== deviceId)
+        .filter((d) => {
+          if (preferred.groupId && d.groupId === preferred.groupId) return true
+          const lab = preferred.label?.trim()
+          if (lab && d.label && (d.label === lab || d.label.includes(lab) || lab.includes(d.label))) {
+            return true
           }
-        })(),
-      ).deviceId
+          return false
+        })
+        .map((d) => d.id)
 
       const handle = await startVoiceCapture({
-        deviceId: deviceId || 'default',
+        deviceId,
+        fallbackDeviceIds,
         maxDurationSec: 120,
         onLevel: (rms) => setMicLevel(rms),
       })
       micTestRef.current = handle
+      // Refresh persisted id after rebind so restart keeps this mic.
+      if (!handle.preferredUnavailable && handle.openedDeviceId && handle.openedDeviceId !== 'default') {
+        const dev = live.find((d) => d.id === handle.openedDeviceId)
+        void updateSection('voice', (prev) => ({
+          ...(prev ?? {}),
+          inputDeviceId: handle.openedDeviceId,
+          inputDeviceLabel: dev?.label || prev?.inputDeviceLabel || preferred.label || '',
+          inputDeviceGroupId: dev?.groupId || prev?.inputDeviceGroupId || preferred.groupId || '',
+        }))
+      } else if (handle.preferredUnavailable && wantsPreferred) {
+        toast.message(t('voice.deviceFallback'))
+      }
       setMicTesting(true)
       setMicTestHint(t('settings.voice.micTestListening'))
       const tick = () => {
@@ -366,9 +352,9 @@ export function VoiceSettingsSection({
     }
   }, [
     micTesting,
-    refreshDevicesWithPermission,
     stopMicTest,
     t,
+    updateSection,
     voice?.inputDeviceGroupId,
     voice?.inputDeviceId,
     voice?.inputDeviceLabel,
@@ -520,10 +506,16 @@ export function VoiceSettingsSection({
   const showProgress = shouldShowVoiceDownloadProgress(downloading, progress)
   const progressPct = showProgress ? voiceDownloadProgressPercent(progress) : null
 
+  // Prefer live resolved name; if devices not enumerated yet after restart, show
+  // the label persisted in hip.toml so the last mic is still visible.
+  const preferredStored =
+    voice?.inputDeviceId && voice.inputDeviceId !== 'default' ? voice.inputDeviceId : null
+  const liveDeviceLabel = devices.find((d) => d.id === resolved.deviceId)?.label
+  const savedDeviceLabel = voice?.inputDeviceLabel?.trim()
   const deviceLabel =
-    resolved.deviceId === 'default'
-      ? t('settings.voice.systemDefault')
-      : (devices.find((d) => d.id === resolved.deviceId)?.label ?? t('settings.voice.systemDefault'))
+    liveDeviceLabel ||
+    savedDeviceLabel ||
+    (preferredStored ? t('settings.voice.savedDevice') : t('settings.voice.systemDefault'))
 
   return (
     <>
@@ -643,7 +635,7 @@ export function VoiceSettingsSection({
                       size={14}
                       className={cn(
                         'shrink-0',
-                        resolved.deviceId === 'default' ? 'opacity-100' : 'opacity-0',
+                        !preferredStored ? 'opacity-100' : 'opacity-0',
                       )}
                     />
                     <span>{t('settings.voice.systemDefault')}</span>
@@ -658,7 +650,9 @@ export function VoiceSettingsSection({
                         size={14}
                         className={cn(
                           'shrink-0',
-                          resolved.deviceId === d.id ? 'opacity-100' : 'opacity-0',
+                          preferredStored && resolved.deviceId === d.id
+                            ? 'opacity-100'
+                            : 'opacity-0',
                         )}
                       />
                       <span className="max-w-[220px] truncate">{d.label}</span>

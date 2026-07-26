@@ -9,12 +9,21 @@ export type CaptureHandle = {
   cancel: () => void
   /** Current input RMS 0..1 (updated while recording). */
   getLevel: () => number
+  /** deviceId from the opened MediaStreamTrack settings when available. */
+  openedDeviceId: string
+  /** True when preferred exact device failed and system default was used. */
+  preferredUnavailable: boolean
 }
 
 type StartOpts = {
   deviceId: string | 'default'
   maxDurationSec: number
   onLevel?: (rms: number) => void
+  /**
+   * When exact deviceId fails (common after restart when WebView rotates ids),
+   * try these as soft ideal before falling back to system default.
+   */
+  fallbackDeviceIds?: string[]
 }
 
 /**
@@ -28,31 +37,63 @@ type StartOpts = {
  */
 export async function startVoiceCapture(opts: StartOpts): Promise<CaptureHandle> {
   const maxMs = Math.max(5, Math.min(120, opts.maxDurationSec)) * 1000
-  const constraints: MediaStreamConstraints = {
-    audio:
-      opts.deviceId === 'default'
-        ? { echoCancellation: true, noiseSuppression: true }
-        : {
-            deviceId: { exact: opts.deviceId },
-            echoCancellation: true,
-            noiseSuppression: true,
-          },
-    video: false,
-  }
+  const audioBase = { echoCancellation: true, noiseSuppression: true } as const
 
   let stream: MediaStream
+  let preferredUnavailable = false
+  const requested = opts.deviceId || 'default'
+
+  const open = async (audio: MediaTrackConstraints | true) =>
+    navigator.mediaDevices.getUserMedia({ audio, video: false })
+
   try {
-    stream = await navigator.mediaDevices.getUserMedia(constraints)
-  } catch (e) {
-    if (opts.deviceId !== 'default' && e instanceof DOMException && e.name === 'OverconstrainedError') {
-      stream = await navigator.mediaDevices.getUserMedia({
-        audio: { echoCancellation: true, noiseSuppression: true },
-        video: false,
-      })
+    if (requested === 'default') {
+      stream = await open({ ...audioBase })
     } else {
-      throw e
+      stream = await open({
+        ...audioBase,
+        deviceId: { exact: requested },
+      })
     }
+  } catch (e) {
+    const overconstrained =
+      e instanceof DOMException &&
+      (e.name === 'OverconstrainedError' || e.name === 'NotFoundError')
+    if (requested === 'default' || !overconstrained) throw e
+
+    // Try soft ideal on the same id, then alternate ids (rebind targets), then default.
+    const candidates = [
+      requested,
+      ...(opts.fallbackDeviceIds ?? []).filter((id) => id && id !== requested && id !== 'default'),
+    ]
+    let opened: MediaStream | null = null
+    for (const id of candidates) {
+      try {
+        opened = await open({
+          ...audioBase,
+          deviceId: { ideal: id },
+        })
+        // ideal may still pick another device; accept if we got a stream.
+        break
+      } catch {
+        /* try next */
+      }
+    }
+    if (!opened) {
+      opened = await open({ ...audioBase })
+      preferredUnavailable = true
+    } else {
+      const actual = opened.getAudioTracks()[0]?.getSettings?.()?.deviceId
+      if (actual && actual !== requested && !candidates.includes(actual)) {
+        preferredUnavailable = true
+      }
+    }
+    stream = opened
   }
+
+  const openedDeviceId =
+    stream.getAudioTracks()[0]?.getSettings?.()?.deviceId ||
+    (requested === 'default' ? 'default' : requested)
 
   const audioCtx = new AudioContext()
   // WKWebView / Chromium autoplay policy: context starts suspended until resume.
@@ -134,6 +175,8 @@ export async function startVoiceCapture(opts: StartOpts): Promise<CaptureHandle>
 
   return {
     getLevel: () => lastLevel,
+    openedDeviceId,
+    preferredUnavailable,
     cancel: () => {
       if (cancelled || stopped) return
       cancelled = true

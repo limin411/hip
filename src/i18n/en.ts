@@ -924,6 +924,7 @@ export const en = {
         inputDeviceDesc:
           'Input device for composer dictation. The page does not open the mic until you refresh devices, pick a device, or run a mic test.',
         systemDefault: 'System default',
+        savedDevice: 'Saved microphone',
         refresh: 'Refresh devices',
         permissionHint: 'Microphone permission is required to list device names.',
         micTest: 'Microphone test',

@@ -931,6 +931,7 @@ export const ko = {
       "inputDevice": "마이크",
       "inputDeviceDesc": "작성기 받아쓰기에 사용할 입력 장치. 이 페이지만 열 때는 마이크를 열지 않습니다. 새로고침·선택·마이크 테스트 시에만 요청합니다.",
       "systemDefault": "시스템 기본값",
+      "savedDevice": "저장된 마이크",
       "refresh": "장치 새로고침",
       "permissionHint": "장치 이름을 보려면 마이크 권한이 필요합니다.",
       "micTest": "마이크 테스트",

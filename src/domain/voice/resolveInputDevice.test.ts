@@ -36,4 +36,12 @@ describe('resolveInputDevice', () => {
     const r = resolveInputDevice({ id: 'gone', label: 'Nope' }, devices)
     expect(r).toEqual({ deviceId: 'default', matched: 'default', stale: true })
   })
+
+  it('keeps preferred id when device list is empty (pre-enumerate / restart)', () => {
+    const r = resolveInputDevice(
+      { id: 'saved-id', label: 'USB Headset', groupId: 'g2' },
+      [],
+    )
+    expect(r).toEqual({ deviceId: 'saved-id', matched: 'id', stale: false })
+  })
 })

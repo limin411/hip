@@ -5,6 +5,7 @@ import { VOICE_MODEL_IDS, type VoiceLanguage, type VoiceModelId } from '@hip/pro
 import { useHipConfigStore } from '@/store/hipConfigStore'
 import { useCommandPaletteStore } from '@/store/commandPaletteStore'
 import { appendTranscript } from '@/domain/voice/appendTranscript'
+import { listAudioInputDevices } from '@/domain/voice/listAudioInputDevices'
 import { startVoiceCapture, type CaptureHandle } from '@/domain/voice/voiceCapture'
 import { resolveInputDevice } from '@/domain/voice/resolveInputDevice'
 import { startVoiceModelDownload } from '@/domain/voice/voiceDownloadStore'
@@ -173,36 +174,76 @@ export function useVoiceDictation(opts: {
 
       activeModelRef.current = useModel
 
-      let deviceId = voiceCfg?.inputDeviceId ?? 'default'
-      try {
-        const list = await navigator.mediaDevices.enumerateDevices()
-        const inputs = list
-          .filter((d) => d.kind === 'audioinput')
-          .map((d) => ({ id: d.deviceId, label: d.label || d.deviceId, groupId: d.groupId }))
-        const resolved = resolveInputDevice(
-          {
-            id: voiceCfg?.inputDeviceId,
-            label: voiceCfg?.inputDeviceLabel,
-            groupId: voiceCfg?.inputDeviceGroupId,
-          },
-          inputs,
-        )
-        deviceId = resolved.deviceId
-        if (resolved.stale && resolved.matched !== 'default') {
-          void updateSection('voice', (prev) => ({
-            ...(prev ?? {}),
-            inputDeviceId: resolved.deviceId,
-          }))
-        }
-      } catch {
-        /* keep default */
+      // Rebind preferred mic after restart: match id → groupId → label.
+      // Only unlock permission when the stored id is missing (ids often rotate
+      // across WebView restarts until getUserMedia has run once).
+      const preferred = {
+        id: voiceCfg?.inputDeviceId,
+        label: voiceCfg?.inputDeviceLabel,
+        groupId: voiceCfg?.inputDeviceGroupId,
       }
+      const wantsPreferred = Boolean(preferred.id && preferred.id !== 'default')
+      let { devices: inputs } = await listAudioInputDevices()
+      let resolved = resolveInputDevice(preferred, inputs)
+      if (
+        wantsPreferred &&
+        (inputs.length === 0 ||
+          resolved.matched === 'default' ||
+          !inputs.some((d) => d.id === preferred.id))
+      ) {
+        const again = await listAudioInputDevices({ unlockPermission: true })
+        inputs = again.devices
+        resolved = resolveInputDevice(preferred, inputs)
+      }
+      const deviceId = resolved.deviceId || 'default'
+      // Other live ids to try if exact preferred id rotated after restart.
+      const fallbackDeviceIds = inputs
+        .filter((d) => d.id !== deviceId)
+        .filter((d) => {
+          if (preferred.groupId && d.groupId === preferred.groupId) return true
+          const lab = preferred.label?.trim()
+          if (lab && d.label && (d.label === lab || d.label.includes(lab) || lab.includes(d.label))) {
+            return true
+          }
+          return false
+        })
+        .map((d) => d.id)
 
       const handle = await startVoiceCapture({
-        deviceId: deviceId || 'default',
+        deviceId,
+        fallbackDeviceIds,
         maxDurationSec,
       })
       captureRef.current = handle
+
+      // Persist rebind / refresh device identity so next cold start matches faster.
+      // Never clear a saved preference when we had to fall back to system default.
+      if (!handle.preferredUnavailable) {
+        const opened = handle.openedDeviceId
+        const dev =
+          (opened && inputs.find((d) => d.id === opened)) ||
+          (resolved.matched !== 'default' ? inputs.find((d) => d.id === resolved.deviceId) : undefined)
+        const nextId = opened && opened !== 'default' ? opened : resolved.deviceId
+        if (nextId && nextId !== 'default') {
+          const nextLabel = dev?.label || preferred.label || ''
+          const nextGroup = dev?.groupId || preferred.groupId || ''
+          if (
+            nextId !== preferred.id ||
+            (nextLabel && nextLabel !== preferred.label) ||
+            (nextGroup && nextGroup !== preferred.groupId)
+          ) {
+            void updateSection('voice', (prev) => ({
+              ...(prev ?? {}),
+              inputDeviceId: nextId,
+              inputDeviceLabel: nextLabel || prev?.inputDeviceLabel,
+              inputDeviceGroupId: nextGroup || prev?.inputDeviceGroupId,
+            }))
+          }
+        }
+      } else if (wantsPreferred) {
+        toast.message(t('voice.deviceFallback'))
+      }
+
       setState('recording')
       maxTimerRef.current = setTimeout(() => {
         void finishAndTranscribe()

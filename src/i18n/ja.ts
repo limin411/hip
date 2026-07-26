@@ -931,6 +931,7 @@ export const ja = {
       "inputDevice": "マイク",
       "inputDeviceDesc": "コンポーザー音声入力に使うデバイス。このページを開いただけではマイクは使いません。更新・選択・マイクテスト時のみ要求します。",
       "systemDefault": "システム既定",
+      "savedDevice": "保存したマイク",
       "refresh": "デバイスを更新",
       "permissionHint": "デバイス名の表示にはマイク権限が必要です。",
       "micTest": "マイクテスト",

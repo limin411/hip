@@ -540,7 +540,7 @@ export function MemoryConfig() {
         </div>
 
         <div
-          className="rounded-xl bg-surface-muted/40 px-4 py-4"
+          className="rounded-xl border border-border bg-surface-muted/40 px-4 py-4"
           data-testid="memory-howto-empty"
         >
           <div className="mb-2 flex items-center gap-2 text-prose font-medium text-ink">
@@ -600,7 +600,7 @@ export function MemoryConfig() {
 
       {/* How to use (collapsible) */}
       <section
-        className="rounded-xl bg-surface-muted/30"
+        className="rounded-xl border border-border bg-surface-muted/30"
         data-testid="memory-howto"
       >
         <button
@@ -621,11 +621,11 @@ export function MemoryConfig() {
               <li>{t('settings.memory.howtoStep3On')}</li>
             </ol>
             <div className="grid gap-2 sm:grid-cols-2">
-              <div className="rounded-lg bg-surface px-3 py-2">
+              <div className="rounded-lg border border-border bg-surface px-3 py-2">
                 <div className="text-meta font-medium text-ink">{t('settings.memory.useMemories')}</div>
                 <p className="mt-0.5 text-caption text-ink-tertiary">{t('settings.memory.useMemoriesPlain')}</p>
               </div>
-              <div className="rounded-lg bg-surface px-3 py-2">
+              <div className="rounded-lg border border-border bg-surface px-3 py-2">
                 <div className="text-meta font-medium text-ink">{t('settings.memory.generateMemories')}</div>
                 <p className="mt-0.5 text-caption text-ink-tertiary">{t('settings.memory.generateMemoriesPlain')}</p>
               </div>

@@ -1,6 +1,6 @@
 /**
- * Inline SVG diagrams for roundtable HTML reports (self-contained, no CDN).
- * Each diagram uses a unique idPrefix so marker ids never collide in one document.
+ * Mermaid diagram sources for roundtable HTML reports.
+ * Rendered client-side via mermaid.js (CDN) — see ROUNDTABLE_MERMAID_BOOT_SCRIPT.
  */
 import type { PersonaId, RoundtableEdgeResult, RoundtableLang } from './types.js'
 import { esc, shortLabel } from './report-prose.js'
@@ -13,22 +13,9 @@ export const PERSONA_HUE: Record<PersonaId, string> = {
   audience: '35',
 }
 
-const REL_STROKE: Record<string, string> = {
-  rebut: '#f07178',
-  support: '#7fd99a',
-  question: '#e0b45a',
-}
-
-let diagramSeq = 0
-
-/** Reset between report builds (tests / multi-file bundle). */
+/** Kept for API compatibility; mermaid has no id collision issues. */
 export function resetDiagramIds(): void {
-  diagramSeq = 0
-}
-
-function nextPrefix(kind: string): string {
-  diagramSeq += 1
-  return `d${diagramSeq}-${kind}`
+  /* no-op */
 }
 
 function relLabel(lang: RoundtableLang, rel: string): string {
@@ -50,295 +37,114 @@ function relLabel(lang: RoundtableLang, rel: string): string {
   return rel
 }
 
-/** Prefer short round focus for flow boxes (not truncated long issue text). */
-function flowSubLabel(kind: string, text: string, lang: RoundtableLang): string {
-  if (kind === 'issue') {
-    return lang === 'zh-CN' || lang === 'zh-TW' ? '议题' : lang === 'ja' ? '議題' : lang === 'ko' ? '안건' : 'Issue'
-  }
-  if (kind === 'decision') {
-    return lang === 'zh-CN' || lang === 'zh-TW' ? '结论' : lang === 'ja' ? '決定' : lang === 'ko' ? '결정' : 'Decision'
-  }
-  // round: use compact focus
-  return shortLabel(text, 14)
+/** Mermaid node / edge label: no raw quotes or newlines that break syntax. */
+function mLabel(s: string, max = 28): string {
+  return shortLabel(s.replace(/["#[\]{}|]/g, ' ').replace(/\s+/g, ' ').trim(), max)
 }
 
-/** Horizontal pipeline: Issue → R1 → R2 → … → Decision */
-export function svgFlowPipeline(args: {
-  lang: RoundtableLang
-  issue: string
-  rounds: Array<{ round: number; focus: string }>
-  decision?: string
-  labels: { issue: string; decision: string; round: (n: number) => string }
-}): string {
-  const prefix = nextPrefix('flow')
-  const arrowId = `${prefix}-arrow`
+function mermaidPre(code: string): string {
+  // Escape so </pre> in content cannot break out; mermaid reads decoded textContent.
+  return `<pre class="mermaid">${esc(code.trim())}</pre>`
+}
 
-  const nodes: Array<{ id: string; label: string; sub: string; kind: string }> = [
-    {
-      id: 'issue',
-      label: args.labels.issue,
-      sub: flowSubLabel('issue', args.issue, args.lang),
-      kind: 'issue',
-    },
-  ]
-  for (const r of args.rounds) {
-    nodes.push({
-      id: `r${r.round}`,
-      label: args.labels.round(r.round),
-      sub: flowSubLabel('round', r.focus, args.lang),
-      kind: 'round',
-    })
-  }
-  if (args.decision) {
-    nodes.push({
-      id: 'dec',
-      label: args.labels.decision,
-      sub: flowSubLabel('decision', args.decision, args.lang),
-      kind: 'decision',
-    })
-  }
-
-  const n = Math.max(nodes.length, 1)
-  const boxW = 128
-  const boxH = 68
-  const gap = 32
-  const padX = 12
-  const padY = 16
-  const width = padX * 2 + n * boxW + (n - 1) * gap
-  const height = padY * 2 + boxH + 8
-
-  const boxes = nodes
-    .map((node, i) => {
-      const x = padX + i * (boxW + gap)
-      const y = padY
-      const fill =
-        node.kind === 'decision'
-          ? 'var(--diag-decision-fill)'
-          : node.kind === 'issue'
-            ? 'var(--diag-issue-fill)'
-            : 'var(--diag-round-fill)'
-      const stroke =
-        node.kind === 'decision'
-          ? 'var(--diag-decision-stroke)'
-          : node.kind === 'issue'
-            ? 'var(--diag-issue-stroke)'
-            : 'var(--diag-round-stroke)'
-      return `
-      <g class="flow-node flow-${esc(node.kind)}">
-        <rect x="${x}" y="${y}" width="${boxW}" height="${boxH}" rx="12" ry="12"
-          fill="${fill}" stroke="${stroke}" stroke-width="1.5"/>
-        <text x="${x + boxW / 2}" y="${y + 26}" text-anchor="middle"
-          class="flow-label">${esc(node.label)}</text>
-        <text x="${x + boxW / 2}" y="${y + 48}" text-anchor="middle"
-          class="flow-sub">${esc(node.sub)}</text>
-      </g>`
-    })
-    .join('')
-
-  const arrows = nodes
-    .slice(0, -1)
-    .map((_, i) => {
-      const x1 = padX + i * (boxW + gap) + boxW
-      const x2 = padX + (i + 1) * (boxW + gap)
-      const y = padY + boxH / 2
-      return `
-      <line x1="${x1 + 4}" y1="${y}" x2="${x2 - 10}" y2="${y}"
-        class="flow-arrow" marker-end="url(#${arrowId})"/>`
-    })
-    .join('')
-
-  return `<div class="diagram-wrap" role="img" aria-label="flow">
-<svg class="diagram flow-diagram" viewBox="0 0 ${width} ${height}" width="100%" height="${height}"
-  preserveAspectRatio="xMidYMid meet">
-  <defs>
-    <marker id="${arrowId}" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
-      <path d="M0,0 L6,3 L0,6 Z" class="flow-arrow-head"/>
-    </marker>
-  </defs>
-  ${arrows}
-  ${boxes}
-</svg>
+export function mermaidWrap(code: string, caption?: string): string {
+  return `<div class="mermaid-wrap">
+  ${caption ? `<p class="diagram-cap">${esc(caption)}</p>` : ''}
+  ${mermaidPre(code)}
+  <noscript><p class="hint">Mermaid requires JavaScript.</p></noscript>
 </div>`
 }
 
+/** Meeting pipeline: Issue → rounds → Decision */
+export function mermaidFlowPipeline(args: {
+  lang: RoundtableLang
+  rounds: Array<{ round: number; focus: string }>
+  hasDecision: boolean
+  labels: { issue: string; decision: string; round: (n: number) => string }
+}): string {
+  const lines = ['flowchart LR']
+  lines.push(`  I["${mLabel(args.labels.issue, 12)}"]`)
+  let prev = 'I'
+  for (const r of args.rounds) {
+    const id = `R${r.round}`
+    const focus = mLabel(r.focus, 16)
+    lines.push(`  ${id}["${mLabel(args.labels.round(r.round), 10)}<br/>${focus}"]`)
+    lines.push(`  ${prev} --> ${id}`)
+    prev = id
+  }
+  if (args.hasDecision) {
+    lines.push(`  D["${mLabel(args.labels.decision, 12)}"]`)
+    lines.push(`  ${prev} --> D`)
+    lines.push(`  style D fill:#1a7f4b22,stroke:#7fd99a`)
+  }
+  lines.push(`  style I fill:#3b6ef522,stroke:#7aa2ff`)
+  return mermaidWrap(lines.join('\n'))
+}
+
+/** Council seats around hip chair */
+export function mermaidSeatArchitecture(args: {
+  seats: PersonaId[]
+  seatLabels: Record<string, string>
+  chairLabel: string
+}): string {
+  if (!args.seats.length) return ''
+  const lines = ['flowchart TB']
+  lines.push(`  HIP(("${mLabel(args.chairLabel, 8)}"))`)
+  for (const id of args.seats) {
+    const nid = id.slice(0, 3).toUpperCase()
+    lines.push(`  ${nid}["${mLabel(args.seatLabels[id] ?? id, 8)}"]`)
+    lines.push(`  HIP --- ${nid}`)
+  }
+  lines.push(`  style HIP fill:#7aa2ff33,stroke:#7aa2ff`)
+  return mermaidWrap(lines.join('\n'))
+}
+
 /**
- * Circular debate graph. Caps edges for readability; prefers rebuttals.
- * Unique marker ids via idPrefix.
+ * Debate graph as flowchart (rebuttals first, capped).
+ * Uses --> 反驳, -.-> 提问, ==> 附议 for visual distinction.
  */
-export function svgDebateGraph(args: {
+export function mermaidDebateGraph(args: {
   lang: RoundtableLang
   seats: PersonaId[]
   seatLabels: Record<string, string>
   edges: RoundtableEdgeResult[]
-  title: string
-  /** Max edges to draw (default 18). */
   maxEdges?: number
 }): string {
-  const seats = args.seats
-  if (!seats.length) return `<p class="muted">—</p>`
+  if (!args.seats.length) return `<p class="muted">—</p>`
 
-  const prefix = nextPrefix('debate')
-  const size = 360
-  const cx = size / 2
-  const cy = size / 2
-  const R = 118
-  const nodeR = 28
-
-  const pos = new Map<string, { x: number; y: number; hue: string }>()
-  seats.forEach((id, i) => {
-    const ang = -Math.PI / 2 + (2 * Math.PI * i) / seats.length
-    pos.set(id, {
-      x: cx + R * Math.cos(ang),
-      y: cy + R * Math.sin(ang),
-      hue: PERSONA_HUE[id] ?? '220',
-    })
-  })
-
-  // Prefer rebut → question → support; cap count
-  const maxEdges = args.maxEdges ?? 18
+  const maxEdges = args.maxEdges ?? 12
   const ranked = [...args.edges]
-    .filter((e) => pos.has(e.from) && pos.has(e.to))
+    .filter((e) => args.seats.includes(e.from as PersonaId) && args.seats.includes(e.to as PersonaId))
     .sort((a, b) => {
       const rank = (r: string) => (r === 'rebut' ? 0 : r === 'question' ? 1 : 2)
       return rank(a.relation) - rank(b.relation) || a.round - b.round
     })
     .slice(0, maxEdges)
 
-  const pairCount = new Map<string, number>()
-  const edgePaths = ranked
-    .map((e) => {
-      const key = [e.from, e.to].sort().join('|')
-      const idx = pairCount.get(key) ?? 0
-      pairCount.set(key, idx + 1)
-      const a = pos.get(e.from)!
-      const b = pos.get(e.to)!
-      const mx = (a.x + b.x) / 2
-      const my = (a.y + b.y) / 2
-      const dx = b.x - a.x
-      const dy = b.y - a.y
-      const len = Math.hypot(dx, dy) || 1
-      const ox = (-dy / len) * (18 + idx * 12)
-      const oy = (dx / len) * (18 + idx * 12)
-      const cpx = mx + ox
-      const cpy = my + oy
-      const stroke = REL_STROKE[e.relation] ?? REL_STROKE.question
-      const dash = e.relation === 'question' ? '4 3' : '0'
-      const marker = `url(#${prefix}-m-${e.relation})`
-      return `<path d="M ${a.x.toFixed(1)} ${a.y.toFixed(1)} Q ${cpx.toFixed(1)} ${cpy.toFixed(1)} ${b.x.toFixed(1)} ${b.y.toFixed(1)}"
-        fill="none" stroke="${stroke}" stroke-width="2" stroke-dasharray="${dash}"
-        marker-end="${marker}" opacity="0.9">
-        <title>${esc(args.seatLabels[e.from] ?? e.from)} → ${esc(relLabel(args.lang, e.relation))} → ${esc(args.seatLabels[e.to] ?? e.to)}${e.summary ? `: ${esc(e.summary)}` : ''}</title>
-      </path>`
-    })
-    .join('\n')
+  const idOf = (p: string) => p.replace(/[^a-zA-Z0-9]/g, '_').slice(0, 12) || 'n'
 
-  const nodes = seats
-    .map((id) => {
-      const p = pos.get(id)!
-      const label = shortLabel(args.seatLabels[id] ?? id, 5)
-      return `
-      <g class="debate-node">
-        <circle cx="${p.x.toFixed(1)}" cy="${p.y.toFixed(1)}" r="${nodeR}"
-          fill="hsl(${p.hue} 45% 42%)" stroke="hsl(${p.hue} 60% 68%)" stroke-width="2"/>
-        <text x="${p.x.toFixed(1)}" y="${(p.y + 4).toFixed(1)}" text-anchor="middle"
-          class="debate-node-label">${esc(label)}</text>
-        <title>${esc(args.seatLabels[id] ?? id)}</title>
-      </g>`
-    })
-    .join('')
+  const lines = ['flowchart LR']
+  for (const s of args.seats) {
+    lines.push(`  ${idOf(s)}("${mLabel(args.seatLabels[s] ?? s, 8)}")`)
+  }
 
-  const legend = (['rebut', 'support', 'question'] as const)
-    .map((rel, i) => {
-      const x = 18 + i * 115
-      return `
-      <line x1="${x}" y1="${size - 14}" x2="${x + 22}" y2="${size - 14}"
-        stroke="${REL_STROKE[rel]}" stroke-width="2.5"
-        stroke-dasharray="${rel === 'question' ? '4 3' : '0'}"/>
-      <text x="${x + 28}" y="${size - 10}" class="legend-text">${esc(relLabel(args.lang, rel))}</text>`
-    })
-    .join('')
+  for (const e of ranked) {
+    const a = idOf(e.from)
+    const b = idOf(e.to)
+    const lab = mLabel(`${relLabel(args.lang, e.relation)}${e.summary ? ': ' + e.summary : ''}`, 22)
+    if (e.relation === 'rebut') lines.push(`  ${a} -->|"${lab}"| ${b}`)
+    else if (e.relation === 'support') lines.push(`  ${a} ==>|"${lab}"| ${b}`)
+    else lines.push(`  ${a} -.->|"${lab}"| ${b}`)
+  }
 
-  const capNote =
+  const cap =
     args.edges.length > ranked.length
-      ? `<p class="hint diagram-cap">${esc(
-          args.lang === 'zh-CN' || args.lang === 'zh-TW'
-            ? `图中展示 ${ranked.length}/${args.edges.length} 条交锋（优先反驳）`
-            : `Showing ${ranked.length}/${args.edges.length} edges (rebuttals first)`,
-        )}</p>`
-      : ''
+      ? args.lang === 'zh-CN' || args.lang === 'zh-TW'
+        ? `展示 ${ranked.length}/${args.edges.length} 条（优先反驳）`
+        : `${ranked.length}/${args.edges.length} edges (rebuttals first)`
+      : undefined
 
-  return `<div class="diagram-wrap debate-wrap" role="img" aria-label="${esc(args.title)}">
-<svg class="diagram debate-diagram" viewBox="0 0 ${size} ${size}" width="100%"
-  style="max-width:${size}px;margin:0 auto;display:block" preserveAspectRatio="xMidYMid meet">
-  <defs>
-    <marker id="${prefix}-m-rebut" markerWidth="8" markerHeight="8" refX="7" refY="3" orient="auto">
-      <path d="M0,0 L7,3 L0,6 Z" fill="${REL_STROKE.rebut}"/>
-    </marker>
-    <marker id="${prefix}-m-support" markerWidth="8" markerHeight="8" refX="7" refY="3" orient="auto">
-      <path d="M0,0 L7,3 L0,6 Z" fill="${REL_STROKE.support}"/>
-    </marker>
-    <marker id="${prefix}-m-question" markerWidth="8" markerHeight="8" refX="7" refY="3" orient="auto">
-      <path d="M0,0 L7,3 L0,6 Z" fill="${REL_STROKE.question}"/>
-    </marker>
-  </defs>
-  <circle cx="${cx}" cy="${cy}" r="${R}" fill="none" stroke="var(--diag-ring)" stroke-width="1" stroke-dasharray="3 5" opacity="0.5"/>
-  ${edgePaths}
-  ${nodes}
-  ${legend}
-</svg>
-${capNote}
-</div>`
-}
-
-/** Seat architecture: hip chair center + advisor ring. */
-export function svgSeatArchitecture(args: {
-  lang: RoundtableLang
-  seats: PersonaId[]
-  seatLabels: Record<string, string>
-  chairLabel: string
-  title: string
-}): string {
-  const prefix = nextPrefix('arch')
-  const size = 300
-  const cx = size / 2
-  const cy = size / 2 + 4
-  const R = 96
-  const seats = args.seats
-
-  const chair = `
-    <g class="arch-chair" data-id="${prefix}">
-      <rect x="${cx - 40}" y="${cy - 20}" width="80" height="40" rx="12"
-        fill="var(--diag-decision-fill)" stroke="var(--diag-decision-stroke)" stroke-width="1.5"/>
-      <text x="${cx}" y="${cy + 5}" text-anchor="middle" class="arch-chair-label">${esc(args.chairLabel)}</text>
-    </g>`
-
-  const advisors = seats
-    .map((id, i) => {
-      const ang = -Math.PI / 2 + (2 * Math.PI * i) / Math.max(seats.length, 1)
-      const x = cx + R * Math.cos(ang)
-      const y = cy + R * Math.sin(ang)
-      const hue = PERSONA_HUE[id] ?? '220'
-      const label = shortLabel(args.seatLabels[id] ?? id, 4)
-      return `
-      <line x1="${cx}" y1="${cy}" x2="${x.toFixed(1)}" y2="${y.toFixed(1)}"
-        stroke="var(--diag-ring)" stroke-width="1" stroke-dasharray="2 4" opacity="0.55"/>
-      <g>
-        <circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="24"
-          fill="hsl(${hue} 42% 40%)" stroke="hsl(${hue} 55% 65%)" stroke-width="1.5"/>
-        <text x="${x.toFixed(1)}" y="${(y + 4).toFixed(1)}" text-anchor="middle"
-          class="debate-node-label">${esc(label)}</text>
-        <title>${esc(args.seatLabels[id] ?? id)}</title>
-      </g>`
-    })
-    .join('')
-
-  return `<div class="diagram-wrap" role="img" aria-label="${esc(args.title)}">
-<svg class="diagram arch-diagram" viewBox="0 0 ${size} ${size}" width="100%"
-  style="max-width:${size}px;margin:0 auto;display:block" preserveAspectRatio="xMidYMid meet">
-  ${advisors}
-  ${chair}
-</svg>
-</div>`
+  return mermaidWrap(lines.join('\n'), cap)
 }
 
 export function metricsRow(items: Array<{ label: string; value: string }>): string {
@@ -355,18 +161,17 @@ export function metricsRow(items: Array<{ label: string; value: string }>): stri
 </div>`
 }
 
-/** Visible rebuttal/support storyline (not buried in details). */
+/** Compact visible rebuttal list (not buried). */
 export function edgeStorylineHtml(args: {
   lang: RoundtableLang
   edges: RoundtableEdgeResult[]
   seatLabels: Record<string, string>
-  /** Prefer rebuttals first; default show all up to max. */
   max?: number
   linkRoles?: boolean
   fileLink?: (href: string, label: string) => string
   personaFile?: (id: string) => string
 }): string {
-  const max = args.max ?? 24
+  const max = args.max ?? 10
   const ranked = [...args.edges]
     .sort((a, b) => {
       const rank = (r: string) => (r === 'rebut' ? 0 : r === 'question' ? 1 : 2)
@@ -396,7 +201,7 @@ export function edgeStorylineHtml(args: {
     <span class="from">${nameOf(e.from)}</span>
     <span class="rel-chip ${relClass}">${esc(relLabel(args.lang, e.relation))}</span>
     <span class="to">${nameOf(e.to)}</span>
-    ${e.summary ? `<div class="sum">${esc(e.summary)}</div>` : ''}
+    ${e.summary ? `<div class="sum">${esc(shortLabel(e.summary, 80))}</div>` : ''}
   </li>`
     })
     .join('\n')}
@@ -404,9 +209,55 @@ export function edgeStorylineHtml(args: {
     args.edges.length > ranked.length
       ? `<p class="hint">${esc(
           args.lang === 'zh-CN' || args.lang === 'zh-TW'
-            ? `已展示 ${ranked.length}/${args.edges.length} 条（完整列表见下方）`
-            : `Showing ${ranked.length}/${args.edges.length} (full list below)`,
+            ? `关键交锋 ${ranked.length}/${args.edges.length}（完整列表在「交锋明细」）`
+            : `Key ${ranked.length}/${args.edges.length} (full list below)`,
         )}</p>`
       : ''
   }`
 }
+
+/**
+ * Boot mermaid after load. Uses CDN; if offline, leaves source visible in .mermaid pre.
+ * Must run after mermaid.min.js is loaded.
+ */
+export const ROUNDTABLE_MERMAID_BOOT_SCRIPT = /* js */ `
+(function () {
+  function theme() {
+    try {
+      return window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches
+        ? 'dark'
+        : 'default';
+    } catch (e) {
+      return 'dark';
+    }
+  }
+  function run() {
+    if (!window.mermaid) {
+      document.querySelectorAll('.mermaid-wrap').forEach(function (w) {
+        w.classList.add('mermaid-offline');
+      });
+      return;
+    }
+    try {
+      window.mermaid.initialize({
+        startOnLoad: false,
+        theme: theme(),
+        securityLevel: 'strict',
+        flowchart: { curve: 'basis', htmlLabels: false },
+      });
+      window.mermaid.run({ querySelector: '.mermaid' });
+    } catch (err) {
+      console.warn('mermaid render failed', err);
+    }
+  }
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', run);
+  } else {
+    run();
+  }
+})();
+`.trim()
+
+/** CDN script tag for mermaid (browser + srcDoc with allow-scripts + network). */
+export const ROUNDTABLE_MERMAID_CDN =
+  'https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js'

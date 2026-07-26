@@ -10,12 +10,14 @@
 import { personaLabel } from './prompts.js'
 import {
   edgeStorylineHtml,
+  mermaidDebateGraph,
+  mermaidFlowPipeline,
+  mermaidSeatArchitecture,
   metricsRow,
   PERSONA_HUE,
   resetDiagramIds,
-  svgDebateGraph,
-  svgFlowPipeline,
-  svgSeatArchitecture,
+  ROUNDTABLE_MERMAID_BOOT_SCRIPT,
+  ROUNDTABLE_MERMAID_CDN,
 } from './report-diagrams.js'
 import {
   collapsibleProse,
@@ -757,33 +759,42 @@ li { margin: 0.15rem 0; }
   background: var(--badge); color: var(--badge-ink); font-size: 0.8rem;
 }
 
-/* Diagrams */
-.diagram-wrap {
-  margin: 0.35rem 0 0.5rem; padding: 0.65rem; border-radius: 12px;
+/* Mermaid */
+.mermaid-wrap {
+  margin: 0.35rem 0 0.65rem; padding: 0.75rem 0.85rem; border-radius: 12px;
   border: 1px solid var(--border); background: color-mix(in srgb, var(--bg) 55%, var(--card));
   overflow-x: auto;
 }
-.diagram { display: block; }
-.flow-label {
-  fill: var(--ink); font-size: 12px; font-weight: 700;
-  font-family: system-ui, -apple-system, sans-serif;
+.mermaid-wrap pre.mermaid {
+  margin: 0; background: transparent; border: 0; padding: 0.25rem 0;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.78rem; line-height: 1.4; color: var(--muted);
+  white-space: pre-wrap;
 }
-.flow-sub {
-  fill: var(--muted); font-size: 10px;
-  font-family: system-ui, -apple-system, sans-serif;
-}
-.flow-arrow { stroke: var(--accent); stroke-width: 1.75; }
-.flow-arrow-head { fill: var(--accent); }
-.legend-text {
-  fill: var(--muted); font-size: 11px;
-  font-family: system-ui, -apple-system, "PingFang SC", sans-serif;
+.mermaid-wrap svg { max-width: 100%; height: auto; display: block; margin: 0 auto; }
+.mermaid-wrap.mermaid-offline pre.mermaid {
+  color: var(--ink); padding: 0.5rem; border-radius: 8px;
+  background: var(--code-bg); border: 1px solid var(--code-border);
 }
 .diagram-row {
   display: grid; grid-template-columns: 1fr; gap: 0.75rem;
 }
 @media (min-width: 960px) {
-  .diagram-row.two { grid-template-columns: 1.15fr 0.85fr; align-items: start; }
+  .diagram-row.two { grid-template-columns: 1.2fr 0.8fr; align-items: start; }
 }
+/* Round blocks default collapsed */
+.round-fold {
+  margin: 0 0 0.65rem; border: 1px solid var(--border); border-radius: var(--radius);
+  background: var(--card); padding: 0.15rem 0.85rem 0.55rem;
+}
+.round-fold > summary {
+  cursor: pointer; list-style: none; padding: 0.75rem 0.15rem; font-weight: 650;
+  display: flex; flex-wrap: wrap; align-items: baseline; gap: 0.35rem 0.65rem;
+}
+.round-fold > summary::-webkit-details-marker { display: none; }
+.round-fold > summary .round-title { font-size: 1rem; color: var(--ink); }
+.round-fold > summary .round-focus { font-size: 0.85rem; color: var(--muted); font-weight: 500; }
+.round-fold[open] > summary { border-bottom: 1px dashed var(--border); margin-bottom: 0.55rem; }
 
 .edges { list-style: none; padding: 0; margin: 0; }
 .edges li {
@@ -918,14 +929,7 @@ li { margin: 0.15rem 0; }
 .storyline-item.support { border-left-color: var(--support); }
 .storyline-item.question { border-left-color: var(--question); }
 .storyline-item .from, .storyline-item .to { font-weight: 600; }
-.diagram-cap { margin: 0.35rem 0 0; text-align: center; }
-
-/* Node labels: readable on colored discs (keep light text + soft shadow) */
-.debate-node-label, .arch-chair-label {
-  fill: #f8fafc; font-size: 10px; font-weight: 700;
-  font-family: system-ui, -apple-system, "PingFang SC", sans-serif;
-  paint-order: stroke; stroke: rgba(0,0,0,0.45); stroke-width: 2.5px;
-}
+.diagram-cap { margin: 0 0 0.45rem; text-align: center; font-size: 0.8rem; color: var(--muted); }
 `.trim()
 
 function speakersInData(data: RoundtableReportData): PersonaId[] {
@@ -1000,7 +1004,7 @@ function speechArticle(
           <div class="speech-head">
             <h4>${esc(name)}</h4>${link}
           </div>
-          ${collapsibleProse(s.content, { more: L.more, less: L.less })}
+          ${collapsibleProse(s.content, { more: L.more, less: L.less }, 160)}
         </article>`
 }
 
@@ -1047,8 +1051,12 @@ ${ROUNDTABLE_REPORT_STYLES}
       </div>
     </div>
   </div>
+  <script src="${ROUNDTABLE_MERMAID_CDN}"></script>
   <script>
 ${ROUNDTABLE_REPORT_NAV_SCRIPT}
+  </script>
+  <script>
+${ROUNDTABLE_MERMAID_BOOT_SCRIPT}
   </script>
 </body>
 </html>
@@ -1071,25 +1079,17 @@ function buildMainReport(data: RoundtableReportData, seats: PersonaId[]): string
   const otherEdges = edges.filter((e) => e.relation !== 'rebut')
   const labelsMap = seatLabelMap(lang, seats)
 
+  // Slim TOC: overview → decision → debate → rounds (collapsed) → roles
   const toc: TocItem[] = [
     { id: 'sec-overview', label: L.overview, depth: 1 },
-    { id: 'sec-decision', label: L.decision, depth: 1 },
-    { id: 'sec-process', label: L.process, depth: 1 },
   ]
-  for (const r of data.rounds) {
-    toc.push({
-      id: `sec-round-${r.round}`,
-      label: roundHeading(lang, r.round),
-      depth: 2,
-    })
+  if (data.decision) toc.push({ id: 'sec-decision', label: L.decision, depth: 1 })
+  else toc.push({ id: 'sec-issue', label: L.issue, depth: 1 })
+  if (edges.length > 0 || data.rounds.length > 0) {
+    toc.push({ id: 'sec-process', label: L.process, depth: 1 })
   }
-  if (edges.length > 0) toc.push({ id: 'sec-edges', label: L.edges, depth: 1 })
+  if (data.rounds.length > 0) toc.push({ id: 'sec-rounds', label: L.discussion, depth: 1 })
   if (seats.length > 0) toc.push({ id: 'sec-roles', label: L.subReports, depth: 1 })
-
-  // If no decision yet, still show overview/issue
-  if (!data.decision) {
-    toc.splice(1, 1, { id: 'sec-issue', label: L.issue, depth: 1 })
-  }
 
   const metrics = metricsRow([
     { label: L.metricRounds, value: String(data.rounds.length) },
@@ -1098,11 +1098,10 @@ function buildMainReport(data: RoundtableReportData, seats: PersonaId[]): string
     { label: L.metricRebuts, value: String(rebutEdges.length) },
   ])
 
-  const flowSvg = svgFlowPipeline({
+  const flowMmd = mermaidFlowPipeline({
     lang,
-    issue: data.issue,
     rounds: data.rounds.map((r) => ({ round: r.round, focus: r.focus })),
-    decision: data.decision?.decision,
+    hasDecision: Boolean(data.decision),
     labels: {
       issue: L.issue,
       decision: L.decision,
@@ -1110,48 +1109,46 @@ function buildMainReport(data: RoundtableReportData, seats: PersonaId[]): string
     },
   })
 
-  const archSvg = seats.length
-    ? svgSeatArchitecture({
-        lang,
+  const archMmd = seats.length
+    ? mermaidSeatArchitecture({
         seats,
         seatLabels: labelsMap,
         chairLabel: 'hip',
-        title: L.architecture,
       })
     : ''
 
-  const debateSvg =
+  const debateMmd =
     edges.length > 0 && seats.length
-      ? svgDebateGraph({
+      ? mermaidDebateGraph({
           lang,
           seats,
           seatLabels: labelsMap,
           edges,
-          title: L.debateMap,
+          maxEdges: 12,
         })
       : ''
 
   const overviewHtml = `
 ${sectionOpen('sec-overview', L.overview, 'diagram-card')}
-  <p class="meta"><strong>${esc(L.issue)}:</strong> ${esc(firstLine(data.issue, 160))}</p>
+  <p class="meta"><strong>${esc(L.issue)}:</strong> ${esc(firstLine(data.issue, 140))}</p>
   ${
     data.rationale
-      ? `<p class="meta"><strong>${esc(L.why)}:</strong> ${esc(snip(data.rationale, 120))}</p>`
+      ? `<p class="meta"><strong>${esc(L.why)}:</strong> ${esc(snip(data.rationale, 100))}</p>`
       : ''
   }
   ${metrics}
   <h3>${esc(L.flow)}</h3>
-  ${flowSvg}
+  ${flowMmd}
   ${
-    archSvg
-      ? `<h3>${esc(L.architecture)}</h3>
-  <div class="diagram-row">${archSvg}</div>`
+    archMmd
+      ? `<div class="diagram-row two">
+    <div><h3>${esc(L.architecture)}</h3>${archMmd}</div>
+  </div>`
       : ''
   }
   ${
     data.agenda.length
-      ? `<h3>${esc(L.agenda)}</h3>
-  <div class="highlights">${data.agenda.map((a) => `<span class="chip">${esc(a)}</span>`).join('')}</div>`
+      ? `<div class="highlights">${data.agenda.map((a) => `<span class="chip">${esc(snip(a, 36))}</span>`).join('')}</div>`
       : ''
   }
   ${backLink(L)}
@@ -1162,34 +1159,40 @@ ${sectionOpen('sec-overview', L.overview, 'diagram-card')}
     ? `
 ${sectionOpen('sec-decision', L.decision, 'decision')}
   ${decisionHtml(decide.decision, { more: L.more, less: L.less })}
-  <div class="stage-grid">
+  ${
+    decide.residual.length || decide.nextSteps.length
+      ? `<div class="stage-grid">
     <div class="stage-col">
       <h3>${esc(L.residual)}</h3>
-      <ul>${bullets(decide.residual)}</ul>
+      <ul>${bullets(decide.residual.slice(0, 6))}</ul>
     </div>
     <div class="stage-col">
       <h3>${esc(L.next)}</h3>
       <ol>${
         decide.nextSteps.length
-          ? decide.nextSteps.map((x) => `<li>${esc(x)}</li>`).join('\n')
+          ? decide.nextSteps.slice(0, 6).map((x) => `<li>${esc(x)}</li>`).join('\n')
           : `<li class="muted">${esc(L.none)}</li>`
       }</ol>
     </div>
-  </div>
+  </div>`
+      : ''
+  }
   ${data.earlyExit ? `<p class="badge">${esc(L.early)}</p>` : ''}
   ${backLink(L)}
 </section>`
     : `
 ${sectionOpen('sec-issue', L.issue)}
-  ${collapsibleProse(data.issue, { more: L.more, less: L.less }, 180)}
+  ${collapsibleProse(data.issue, { more: L.more, less: L.less }, 160)}
   ${backLink(L)}
 </section>`
 
-  // Single debate graph here (not repeated in edges section — avoids SVG id collision & spaghetti twice)
-  const processHtml = `
+  // Debate: one mermaid + short storyline; full edge list collapsed
+  const processHtml =
+    edges.length === 0 && data.rounds.length === 0
+      ? ''
+      : `
 ${sectionOpen('sec-process', L.process, 'diagram-card process')}
-  <p class="hint">${esc(L.discussion)}</p>
-  ${debateSvg ? `<h3>${esc(L.debateMap)}</h3>${debateSvg}` : ''}
+  ${debateMmd ? `<h3>${esc(L.debateMap)}</h3>${debateMmd}` : ''}
   ${
     edges.length
       ? `<h3>${esc(L.rebuttals)}</h3>
@@ -1197,122 +1200,83 @@ ${sectionOpen('sec-process', L.process, 'diagram-card process')}
     lang,
     edges: rebutEdges.length ? rebutEdges : edges,
     seatLabels: labelsMap,
-    max: 20,
+    max: 8,
     linkRoles: true,
     fileLink,
     personaFile: (id) => personaReportFilename(id as PersonaId),
-  })}`
+  })}
+  <details class="fold" style="margin-top:0.65rem">
+    <summary><span class="more">${esc(L.detailsList)} (${edges.length})</span><span class="less">${esc(L.less)}</span></summary>
+    <div class="fold-body">
+      ${rebutEdges.length ? `<h3>${esc(L.rebuttals)}</h3>${edgeListHtml(rebutEdges, lang, { linkRoles: true })}` : ''}
+      ${
+        otherEdges.length
+          ? `<h3>${esc(
+              lang === 'zh-CN' || lang === 'zh-TW' ? '附议与提问' : 'Support & questions',
+            )}</h3>${edgeListHtml(otherEdges, lang, { linkRoles: true })}`
+          : ''
+      }
+    </div>
+  </details>`
       : ''
   }
-  <div class="highlights" style="margin-top:0.75rem">
-    ${data.rounds
-      .map(
-        (r) =>
-          `<a class="chip" href="#sec-round-${r.round}" data-jump="sec-round-${r.round}">${esc(roundHeading(lang, r.round))}: ${esc(snip(r.focus, 24))}</a>`,
-      )
-      .join('')}
-  </div>
   ${backLink(L)}
 </section>`
 
-  const roundsHtml = data.rounds
+  // Rounds: default collapsed — only summary + chips visible
+  const roundsHtml =
+    data.rounds.length === 0
+      ? ''
+      : `
+<section id="sec-rounds" class="card" tabindex="-1">
+  <h2>${jumpLink('sec-rounds', '#', 'anchor')}${esc(L.discussion)}</h2>
+  <p class="hint">${esc(
+    lang === 'zh-CN' || lang === 'zh-TW'
+      ? '默认收起各轮全文；展开可查看发言与阶段结论。'
+      : 'Rounds are collapsed by default — expand for speeches.',
+  )}</p>
+  ${data.rounds
     .map((r) => {
       const speeches = r.speeches
         .map((s) => speechArticle(s, lang, L, r.round, { linkRole: seats.includes(s.speaker) }))
         .join('\n')
-      const roundEdges = edges.filter((e) => e.round === r.round)
-      const roundRebuts = roundEdges.filter((e) => e.relation === 'rebut')
       const agreedChips = r.stage.agreed
-        .slice(0, 6)
-        .map((a) => `<span class="chip">${esc(a)}</span>`)
+        .slice(0, 4)
+        .map((a) => `<span class="chip">${esc(snip(a, 28))}</span>`)
         .join('')
       const openChips = r.stage.open
-        .slice(0, 6)
-        .map((a) => `<span class="chip open">${esc(a)}</span>`)
+        .slice(0, 3)
+        .map((a) => `<span class="chip open">${esc(snip(a, 28))}</span>`)
         .join('')
       return `
-${sectionOpen(`sec-round-${r.round}`, roundHeading(lang, r.round), 'round')}
-  <p class="meta"><strong>${esc(L.focus)}:</strong> ${esc(r.focus)}</p>
-  ${
-    agreedChips || openChips
-      ? `<h3>${esc(L.keyPoints)}</h3>
-  <div class="highlights">${agreedChips}${openChips}</div>`
-      : ''
-  }
-  ${
-    roundEdges.length
-      ? `<h3>${esc(L.edges)}</h3>
-  ${edgeStorylineHtml({
-    lang,
-    edges: roundRebuts.length ? roundRebuts : roundEdges,
-    seatLabels: labelsMap,
-    max: 12,
-    linkRoles: true,
-    fileLink,
-    personaFile: (id) => personaReportFilename(id as PersonaId),
-  })}`
-      : ''
-  }
-  <h3>${esc(L.speeches)}</h3>
-  <div class="speeches">${speeches || `<p class="muted">${esc(L.none)}</p>`}</div>
-  <h3>${esc(L.stage)}</h3>
-  <div class="stage-grid">
-    <div class="stage-col">
-      <h3>${esc(L.agreed)}</h3>
-      <ul>${bullets(r.stage.agreed)}</ul>
-    </div>
-    <div class="stage-col">
-      <h3>${esc(L.open)}</h3>
-      <ul>${bullets(r.stage.open)}</ul>
-    </div>
-  </div>
-  ${
-    r.stage.earlyExit
-      ? `<p class="badge">${esc(L.early)}${r.stage.earlyExitReason ? `: ${esc(r.stage.earlyExitReason)}` : ''}</p>`
-      : ''
-  }
-  ${backLink(L)}
-</section>`
+  <details class="round-fold" id="sec-round-${r.round}">
+    <summary>
+      <span class="round-title">${esc(roundHeading(lang, r.round))}</span>
+      <span class="round-focus">${esc(snip(r.focus, 48))}</span>
+      <span class="round-tag">${r.speeches.length}${lang === 'zh-CN' || lang === 'zh-TW' ? ' 发言' : ' speeches'}</span>
+    </summary>
+    ${agreedChips || openChips ? `<div class="highlights">${agreedChips}${openChips}</div>` : ''}
+    <div class="speeches">${speeches || `<p class="muted">${esc(L.none)}</p>`}</div>
+    ${
+      r.stage.agreed.length || r.stage.open.length
+        ? `<div class="stage-grid">
+      <div class="stage-col"><h3>${esc(L.agreed)}</h3><ul>${bullets(r.stage.agreed)}</ul></div>
+      <div class="stage-col"><h3>${esc(L.open)}</h3><ul>${bullets(r.stage.open)}</ul></div>
+    </div>`
+        : ''
+    }
+  </details>`
     })
-    .join('\n')
-
-  // Edges section: full list only (graph already in process)
-  const edgesHtml =
-    edges.length === 0
-      ? ''
-      : `
-${sectionOpen('sec-edges', L.edges)}
-  <p class="hint">${esc(
-    lang === 'zh-CN' || lang === 'zh-TW'
-      ? '完整交锋明细。图示见上方「讨论流程」。'
-      : 'Full exchange list. See Discussion flow above for the graph.',
-  )}</p>
-  ${
-    rebutEdges.length
-      ? `<div id="sec-rebuttals" tabindex="-1">
-    <h3>${esc(L.rebuttals)}</h3>
-    ${edgeListHtml(rebutEdges, lang, { linkRoles: true })}
-  </div>`
-      : ''
-  }
-  ${
-    otherEdges.length
-      ? `<h3>${esc(
-          lang === 'zh-CN' || lang === 'zh-TW' ? '附议与提问' : 'Support & questions',
-        )}</h3>
-  ${edgeListHtml(otherEdges, lang, { linkRoles: true })}`
-      : ''
-  }
+    .join('\n')}
   ${backLink(L)}
 </section>`
 
-  const openLabel = lang === 'zh-CN' || lang === 'zh-TW' ? '打开子报告 →' : 'Open →'
+  const openLabel = lang === 'zh-CN' || lang === 'zh-TW' ? '打开 →' : 'Open →'
   const rolesHtml =
     seats.length === 0
       ? ''
       : `
 ${sectionOpen('sec-roles', L.subReports)}
-  <p class="hint">${esc(L.subReportsHint)}</p>
   <div class="role-grid">
     ${seats
       .map((id) => {
@@ -1322,7 +1286,7 @@ ${sectionOpen('sec-roles', L.subReports)}
         const href = personaReportFilename(id)
         return `<a class="role-card" style="--persona-h:${hue}" href="${esc(href)}" data-file="${esc(href)}">
       <span class="name">${esc(personaLabel(id, lang))}</span>
-      <span class="snip">${esc(firstLine(first, 90) || L.none)}</span>
+      <span class="snip">${esc(firstLine(first, 72) || L.none)}</span>
       <span class="go">${esc(openLabel)}</span>
     </a>`
       })
@@ -1338,7 +1302,6 @@ ${sectionOpen('sec-roles', L.subReports)}
   <p class="sub">${esc(when)}${data.earlyExit ? ` · ${esc(L.early)}` : ''}</p>
 </header>`
 
-  // Prefer decision near top for scannability
   return documentShell({
     lang,
     title: L.title,
@@ -1349,7 +1312,6 @@ ${sectionOpen('sec-roles', L.subReports)}
         ${decideHtml}
         ${processHtml}
         ${roundsHtml}
-        ${edgesHtml}
         ${rolesHtml}`,
     footer: L.footer,
   })
@@ -1401,12 +1363,12 @@ function buildPersonaReport(data: RoundtableReportData, persona: PersonaId): str
 
   const personalGraph =
     myEdges.length && seats.length
-      ? svgDebateGraph({
+      ? mermaidDebateGraph({
           lang,
           seats,
           seatLabels: labelsMap,
           edges: myEdges,
-          title: L.debateMap,
+          maxEdges: 10,
         })
       : ''
 
@@ -1449,7 +1411,7 @@ ${sectionOpen('sec-stance', L.myStance)}
     { label: L.metricEdges, value: String(myEdges.length) },
     { label: L.metricRebuts, value: String(outRebut.length + inRebut.length) },
   ])}
-  ${collapsibleProse(stanceBody, { more: L.more, less: L.less }, 200)}
+  ${collapsibleProse(stanceBody, { more: L.more, less: L.less }, 160)}
   ${backLink(L)}
 </section>
 
@@ -1462,9 +1424,9 @@ ${sectionOpen('sec-speeches', L.mySpeeches)}
   <article class="speech" style="--persona-h:${hue}">
     <div class="speech-head">
       <h4>${esc(roundHeading(lang, s.round))}</h4>
-      <span class="round-tag">${esc(L.focus)}: ${esc(s.focus)}</span>
+      <span class="round-tag">${esc(L.focus)}: ${esc(snip(s.focus, 32))}</span>
     </div>
-    ${collapsibleProse(s.content, { more: L.more, less: L.less })}
+    ${collapsibleProse(s.content, { more: L.more, less: L.less }, 160)}
   </article>`,
           )
           .join('\n')
@@ -1477,22 +1439,26 @@ ${sectionOpen('sec-exchange', L.edges, 'diagram-card')}
   ${personalGraph}
   ${
     hasExchange
-      ? `<h3>${esc(L.rebuttals)}</h3>
-  ${edgeStorylineHtml({
+      ? `${edgeStorylineHtml({
     lang,
     edges: myEdges,
     seatLabels: labelsMap,
-    max: 24,
+    max: 8,
     linkRoles: true,
     fileLink,
     personaFile: (id) => personaReportFilename(id as PersonaId),
   })}
+  <details class="fold" style="margin-top:0.5rem">
+    <summary><span class="more">${esc(L.detailsList)}</span><span class="less">${esc(L.less)}</span></summary>
+    <div class="fold-body">
   ${exchangeBlock(L.iRebutted, outRebut, 'rebut', 'to')}
   ${exchangeBlock(L.iSupported, outSupport, 'support', 'to')}
   ${exchangeBlock(L.iQuestioned, outQ, 'question', 'to')}
   ${exchangeBlock(L.rebuttedMe, inRebut, 'rebut', 'from')}
   ${exchangeBlock(L.supportedMe, inSupport, 'support', 'from')}
-  ${exchangeBlock(L.questionedMe, inQ, 'question', 'from')}`
+  ${exchangeBlock(L.questionedMe, inQ, 'question', 'from')}
+    </div>
+  </details>`
       : `<p class="muted">${esc(L.noExchange)}</p>`
   }
   ${backLink(L)}

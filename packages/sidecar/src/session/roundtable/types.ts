@@ -182,6 +182,19 @@ export interface RunRoundtableArgs {
   councilMode?: boolean
   /** Project multi-agent lifecycle (council → agent:started/finished). */
   advisorHooks?: AdvisorSpeechHooks
+  /**
+   * Real advisor delegation (managed agent). When set, used instead of llm.complete
+   * for advisor speeches so each seat is a true nested agent run.
+   */
+  runAdvisor?: (args: {
+    speaker: PersonaId
+    system: string
+    user: string
+    signal: AbortSignal
+    round: number
+    focus: string
+    agentId: string
+  }) => Promise<string>
   roundsMin?: number
   roundsMax?: number
   maxAdvisorsPerRound?: number

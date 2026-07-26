@@ -78,6 +78,51 @@ describe('runRoundtable', () => {
     expect(result.edges?.some((e) => e.relation === 'rebut')).toBe(true)
   })
 
+  it('runAdvisor is used instead of llm.complete for advisor seats', async () => {
+    const advisorIds: string[] = []
+    let completeAdvisorCalls = 0
+    const llm = scriptedCompleteFns([
+      j({ type: 'route', convene: true }),
+      j({ type: 'plan', rounds: 2, agenda: ['a', 'b'], rationale: 'r' }),
+      j({
+        type: 'open_round',
+        round: 1,
+        focus: 'f',
+        speakers: ['strategist', 'skeptic'],
+      }),
+      j({ type: 'stage', round: 1, agreed: ['ok'], open: [], nextFocus: 'x' }),
+      j({
+        type: 'open_round',
+        round: 2,
+        focus: 'x',
+        speakers: ['operator'],
+      }),
+      j({ type: 'stage', round: 2, agreed: ['done'], open: [] }),
+      j({ type: 'decide', decision: 'go', residual: [], nextSteps: ['1'] }),
+    ])
+    // Wrap complete to count advisor tags (should stay 0 when runAdvisor is set)
+    const baseComplete = llm.complete.bind(llm)
+    llm.complete = async (args) => {
+      if (args.tag.startsWith('advisor:')) completeAdvisorCalls++
+      return baseComplete(args)
+    }
+    const result = await runRoundtable({
+      issue: 'topic',
+      language: 'en',
+      signal: new AbortController().signal,
+      llm,
+      councilMode: true,
+      runAdvisor: async ({ agentId }) => {
+        advisorIds.push(agentId)
+        return `speech from ${agentId}`
+      },
+    })
+    expect(result.phase).toBe('done')
+    expect(completeAdvisorCalls).toBe(0)
+    expect(advisorIds.length).toBe(6) // 3+3 padded parallel
+    expect(advisorIds.every((id) => id.startsWith('roundtable:'))).toBe(true)
+  })
+
   it('route skip → normal reply, zero advisor calls', async () => {
     const events: RoundtableEvent[] = []
     const llm = scriptedCompleteFns([

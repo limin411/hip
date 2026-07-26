@@ -88,18 +88,27 @@ export async function runManagedAgent(args: RunManagedAgentArgs): Promise<string
   const summarizer = args.summarizer ?? createSummarizer()
   // base + git tools + skill/script/mcp extras (no task/dispatch closures → depth-1).
   // Optional allowedTools gates built-ins (explore); skills/mcp were pre-filtered by the caller.
-  const baseTools = buildTools(cwd, undefined, cwd, undefined, {
-    mcpTools,
-    skills,
-    requestApproval,
-    permissionMode,
-    webSearchEnabled: true,
-    sessionId: args.sessionId,
-    networkPolicy,
-    ...(allowedTools?.length ? { allowedTools } : {}),
-  })
+  // Empty allowedTools = tool-free agent (roundtable council advisors debate without tools).
+  const baseTools =
+    allowedTools && allowedTools.length === 0
+      ? []
+      : buildTools(cwd, undefined, cwd, undefined, {
+          mcpTools,
+          skills,
+          requestApproval,
+          permissionMode,
+          webSearchEnabled: true,
+          sessionId: args.sessionId,
+          networkPolicy,
+          ...(allowedTools?.length ? { allowedTools } : {}),
+        })
   // Mandatory order (KD-7 / design §7): buildTools → append extraTools → toolNames → prompt → systemExtra
-  const tools = extraTools?.length ? [...baseTools, ...extraTools] : baseTools
+  const tools =
+    allowedTools && allowedTools.length === 0
+      ? []
+      : extraTools?.length
+        ? [...baseTools, ...extraTools]
+        : baseTools
   const toolNames = tools.map((t) => t.name)
   // Inherit doom strategy from effective hip.toml (same as parent turn path).
   const doomLoopStrategy = resolveDoomLoopStrategy(

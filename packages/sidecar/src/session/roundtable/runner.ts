@@ -66,7 +66,7 @@ export async function runRoundtable(args: RunRoundtableArgs): Promise<Roundtable
   let roundsRan = 0
   const stages: StageRecord[] = []
   const allEdges: CouncilEdge[] = []
-  const councilMode = Boolean(args.councilMode || args.advisorHooks)
+  const councilMode = Boolean(args.councilMode || args.advisorHooks || args.runAdvisor)
   const edgeField = () => {
     const e = dedupeEdges(allEdges)
     return e.length ? { edges: e } : {}
@@ -218,22 +218,35 @@ export async function runRoundtable(args: RunRoundtableArgs): Promise<Roundtable
           focus: open.focus,
           agentId,
         })
-        const speech = await args.llm.complete({
-          system: advisorSystemPrompt(speaker, lang),
-          user: advisorUserPrompt({
-            issue: args.issue,
-            minutes,
-            focus: open.focus,
-            priorThisRound: prior,
-            persona: speaker,
-            lang,
-          }),
-          signal,
-          tag: `advisor:${speaker}${tagSuffix}`,
-          onText: (delta) => {
-            args.advisorHooks?.onToken?.({ agentId, delta })
-          },
+        const system = advisorSystemPrompt(speaker, lang)
+        const user = advisorUserPrompt({
+          issue: args.issue,
+          minutes,
+          focus: open.focus,
+          priorThisRound: prior,
+          persona: speaker,
+          lang,
         })
+        // Prefer real managed-agent delegation when provided (council path).
+        const speech = args.runAdvisor
+          ? await args.runAdvisor({
+              speaker,
+              system,
+              user,
+              signal,
+              round: r,
+              focus: open.focus,
+              agentId,
+            })
+          : await args.llm.complete({
+              system,
+              user,
+              signal,
+              tag: `advisor:${speaker}${tagSuffix}`,
+              onText: (delta) => {
+                args.advisorHooks?.onToken?.({ agentId, delta })
+              },
+            })
         const raw = speech.trim() || '…'
         const envelope = councilMode ? parseSpeechEnvelope(raw) : { acts: [], prose: raw }
         const content = envelope.prose.trim() || raw

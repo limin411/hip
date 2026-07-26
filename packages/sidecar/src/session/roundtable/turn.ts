@@ -1,7 +1,6 @@
 /**
- * Integrate RoundtableRunner into a session turn (stream + finalize).
- * Council mode projects each advisor as a nested agent for the Agents panel,
- * with live token:stream into each agentRun so the right panel shows speech as it generates.
+ * Integrate RoundtableRunner into a session turn.
+ * Council mode delegates each advisor via runManagedAgent (real nested agent runs).
  */
 import type { AgentRole, RoundtableMeta, TurnUsage } from '@hip/protocol'
 import type { TraceRun } from '../tool-trace.js'
@@ -17,7 +16,7 @@ import { resolveRoundtableEngine } from './constants.js'
 import { councilDisplayName } from './ids.js'
 import { runRoundtable } from './runner.js'
 import { renderEventMarkdown } from './render.js'
-import { formatSpeechOutput, parseSpeechEnvelope } from './speech-schema.js'
+import { runCouncilAdvisor } from './council-advisor.js'
 import { logInfo } from '../../debug-logger.js'
 
 /**
@@ -62,6 +61,8 @@ export async function tryRunRoundtableTurn(
     reasoningBursts: [],
     textBursts: [],
   })
+  // Track council agent ids for cleanup
+  const councilAgentIds = new Set<string>()
 
   rawSend({
     type: 'agent:started',
@@ -104,11 +105,71 @@ export async function tryRunRoundtableTurn(
     })
   }
 
-  /** Bytes already streamed to FE for each advisor (avoid double-writing on finish). */
-  const streamedLen = new Map<string, number>()
-
   const lang = resolveRoundtableLang(host._config.language)
   const llm = completeFnsFromModelRunner(host.modelRunner())
+  const cwd = host._config.cwd?.trim() || process.cwd()
+
+  const startCouncilAgent = (p: {
+    agentId: string
+    name: string
+    focus: string
+  }) => {
+    councilAgentIds.add(p.agentId)
+    host.spawnedSubagentIds.add(p.agentId)
+    host.subagentInstances.set(p.agentId, { description: p.focus })
+    trajectory.set(p.agentId, {
+      role: 'subagent',
+      output: '',
+      startedAt: Date.now(),
+      finishedAt: null,
+      seq: agentSeq++,
+      toolCalls: new Map(),
+      reasoningBursts: [],
+      parentAgentId: 'supervisor',
+      name: p.name,
+      taskInput: p.focus,
+    })
+    rawSend({
+      type: 'agent:started',
+      sessionId: host.id,
+      turnId,
+      agentId: p.agentId,
+      role: 'subagent',
+      parentAgentId: 'supervisor',
+      name: p.name,
+      taskInput: p.focus,
+    })
+    host.activeSteps.set(p.agentId, p.agentId)
+    host.emit({
+      type: 'step_started',
+      sessionId: host.id,
+      turnId: p.agentId,
+      agentId: p.agentId,
+      timestamp: Date.now(),
+    })
+    host.emit({
+      type: 'text_started',
+      sessionId: host.id,
+      messageId: p.agentId,
+      timestamp: Date.now(),
+    })
+  }
+
+  const finishCouncilAgent = (agentId: string, text: string) => {
+    const run = trajectory.get(agentId)
+    if (run) {
+      run.output = text
+      run.finishedAt = Date.now()
+    }
+    rawSend({ type: 'agent:finished', sessionId: host.id, turnId, agentId })
+    host.emit({
+      type: 'text_ended',
+      sessionId: host.id,
+      messageId: agentId,
+      content: text,
+      timestamp: Date.now(),
+    })
+  }
 
   try {
     const result = await runRoundtable({
@@ -118,7 +179,6 @@ export async function tryRunRoundtableTurn(
       llm,
       councilMode: council,
       onEvent: (ev) => {
-        // Slim main transcript for council: skip full speech bodies (detail in Agents panel).
         if (council && ev.kind === 'roundtable.speech') {
           const line =
             lang === 'zh-CN' || lang === 'zh-TW'
@@ -130,105 +190,49 @@ export async function tryRunRoundtableTurn(
         const chunk = renderEventMarkdown(ev, lang)
         if (chunk) pushBurst(chunk)
       },
-      advisorHooks: council
-        ? {
-            onStart: ({ speaker, agentId, focus }) => {
-              const name = councilDisplayName(speaker, lang)
-              // Fresh run state for this speech (re-enter running on multi-round).
-              trajectory.set(agentId, {
-                role: 'subagent',
-                output: '',
-                startedAt: Date.now(),
-                finishedAt: null,
-                seq: agentSeq++,
-                toolCalls: new Map(),
-                reasoningBursts: [],
-                parentAgentId: 'supervisor',
-                name,
-                taskInput: focus,
-              })
-              streamedLen.set(agentId, 0)
-              // Always re-announce so FE clears finishedAt and shows running.
-              rawSend({
-                type: 'agent:started',
+      // Real subagent path for council — not llm.complete projection.
+      runAdvisor: council
+        ? async ({ speaker, user, focus, agentId }) => {
+            return runCouncilAdvisor(
+              {
+                runner: host.modelRunner(),
+                summarizer: host.summarizer(),
                 sessionId: host.id,
                 turnId,
-                agentId,
-                role: 'subagent',
-                parentAgentId: 'supervisor',
-                name,
-                taskInput: focus,
-              })
-              host.activeSteps.set(agentId, agentId)
-              host.emit({
-                type: 'step_started',
-                sessionId: host.id,
-                turnId: agentId,
-                agentId,
-                timestamp: Date.now(),
-              })
-              host.emit({
-                type: 'text_started',
-                sessionId: host.id,
-                messageId: agentId,
-                timestamp: Date.now(),
-              })
-            },
-            onToken: ({ agentId, delta }) => {
-              if (!delta) return
-              const run = trajectory.get(agentId)
-              if (run) run.output += delta
-              streamedLen.set(agentId, (streamedLen.get(agentId) ?? 0) + delta.length)
-              // Subagent path: no stepSeq → FE appends to agentRuns[].output only.
-              rawSend({
-                type: 'token:stream',
-                sessionId: host.id,
-                turnId,
-                agentId,
-                delta,
-                role: 'subagent',
-              })
-            },
-            onFinish: ({ agentId, prose, content, round, focus }) => {
-              const run = trajectory.get(agentId)
-              if (!run) return
-              const envelope = parseSpeechEnvelope(content)
-              const block = formatSpeechOutput({
-                acts: envelope.acts,
-                prose: prose || envelope.prose,
-              })
-              // Prefer live-streamed raw text for panel readability; keep acts footer for machine.
-              const streamed = run.output
-              const section =
-                streamed.trim().length > 0
-                  ? `${streamed.trim()}\n\n<!--hip.speech_acts-->\n${JSON.stringify({ acts: envelope.acts })}`
-                  : `### Round ${round}${focus ? ` — ${focus}` : ''}\n${block}`
-
-              // If model did not stream (or stream empty), push full prose now.
-              if (!streamed.trim() && prose.trim()) {
-                rawSend({
-                  type: 'token:stream',
-                  sessionId: host.id,
-                  turnId,
-                  agentId,
-                  delta: prose,
-                  role: 'subagent',
-                })
-              }
-
-              run.output = section
-              run.finishedAt = Date.now()
-              rawSend({ type: 'agent:finished', sessionId: host.id, turnId, agentId })
-              host.emit({
-                type: 'text_ended',
-                sessionId: host.id,
-                messageId: agentId,
-                content: run.output,
-                timestamp: Date.now(),
-              })
-            },
+                cwd,
+                language: lang,
+                signal,
+                onAgentStart: ({ agentId: id, name, focus: f }) => {
+                  startCouncilAgent({ agentId: id, name, focus: f })
+                },
+                onToken: (id, delta) => {
+                  const run = trajectory.get(id)
+                  if (run) run.output += delta
+                  rawSend({
+                    type: 'token:stream',
+                    sessionId: host.id,
+                    turnId,
+                    agentId: id,
+                    delta,
+                    role: 'subagent',
+                  })
+                },
+                onAgentFinish: ({ agentId: id, text }) => {
+                  finishCouncilAgent(id, text)
+                },
+              },
+              { persona: speaker, task: user, focus },
+            )
           }
         : undefined,
+      // Loop path still uses complete + optional hooks for tests
+      advisorHooks: council
+        ? undefined
+        : {
+            onStart: () => {},
+            onToken: () => {},
+            onFinish: () => {},
+          },
     })
 
     for (const [agentId, run] of trajectory) {
@@ -303,7 +307,7 @@ export async function tryRunRoundtableTurn(
       phase: result.phase,
       advisorCalls: result.advisorCalls,
       convened: result.convened,
-      agents: [...trajectory.keys()].filter((k) => k !== 'supervisor').length,
+      agents: [...councilAgentIds],
     })
     return finalText
   } catch (e) {
@@ -344,8 +348,8 @@ export async function tryRunRoundtableTurn(
     host.running = false
     host.abortController = null
     host.activeSteps.delete('supervisor')
-    for (const id of trajectory.keys()) {
-      if (id !== 'supervisor') host.activeSteps.delete(id)
+    for (const id of councilAgentIds) {
+      host.activeSteps.delete(id)
     }
   }
 }

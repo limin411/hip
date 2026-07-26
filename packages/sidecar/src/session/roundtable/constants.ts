@@ -1,0 +1,23 @@
+/** Keep in sync with src/lib/roundtable.ts (FE). */
+export const ROUNDTABLE_MARKER = '<!--hip.roundtable.v1-->'
+export const ROUNDTABLE_SEP = '\n\n---user---\n\n'
+
+export const ROUNDTABLE_ROUNDS_MIN = 2
+export const ROUNDTABLE_ROUNDS_MAX = 4
+export const MAX_ADVISORS_PER_ROUND = 4
+export const MAX_ADVISOR_CALLS_PER_MEETING = 12
+export const MAX_CHAIR_ACTIONS = 24
+export const CHAIR_PARSE_RETRIES = 2
+
+export type RoundtableEngine = 'sim' | 'loop'
+
+/**
+ * Default engine when a roundtable-framed first message is detected.
+ * Override with HIP_ROUNDTABLE_ENGINE=sim|loop.
+ */
+export function resolveRoundtableEngine(
+  env: NodeJS.ProcessEnv = process.env,
+): RoundtableEngine {
+  const raw = (env.HIP_ROUNDTABLE_ENGINE ?? 'loop').trim().toLowerCase()
+  return raw === 'sim' ? 'sim' : 'loop'
+}

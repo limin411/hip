@@ -2,6 +2,8 @@ import { describe, it, expect } from 'vitest'
 import {
   ROUNDTABLE_MARKER,
   ROUNDTABLE_PERSONAS,
+  ROUNDTABLE_ROUNDS_MAX,
+  ROUNDTABLE_ROUNDS_MIN,
   buildRoundtableOutbound,
   isRoundtableMessage,
   resolveRoundtableLang,
@@ -22,7 +24,9 @@ describe('roundtable', () => {
   it('buildRoundtableOutbound wraps user text with marker and frame', () => {
     const out = buildRoundtableOutbound('Should we rewrite the API?', 'en')
     expect(out.startsWith(ROUNDTABLE_MARKER)).toBe(true)
-    expect(out).toContain('You own the routing decision')
+    expect(out).toContain('chair and final decision-maker')
+    expect(out).toContain('MULTI-ROUND DIALOGUE')
+    expect(out).toContain('Stage conclusion')
     expect(out).toContain('Should we rewrite the API?')
     expect(isRoundtableMessage(out)).toBe(true)
   })
@@ -39,14 +43,21 @@ describe('roundtable', () => {
     expect(stripRoundtableFrame('plain hello')).toBe('plain hello')
   })
 
-  it('zh-CN frame includes routing + advisors', () => {
+  it('zh-CN frame includes multi-round dialogue + hip as chair', () => {
     const f = roundtableFrame('zh-CN')
-    expect(f).toContain('路由裁决权')
+    expect(f).toContain('主持人兼最终决策者')
+    expect(f).toContain('多轮讨论')
+    expect(f).toContain('阶段性结论')
+    expect(f).toContain('计划回合数')
     expect(f).toContain('战略家')
     expect(f).toContain('怀疑论者')
   })
 
-  it('has five personas', () => {
+  it('has five personas and round bounds', () => {
     expect(ROUNDTABLE_PERSONAS).toHaveLength(5)
+    expect(ROUNDTABLE_ROUNDS_MIN).toBe(2)
+    expect(ROUNDTABLE_ROUNDS_MAX).toBe(4)
+    expect(roundtableFrame('en')).toContain(String(ROUNDTABLE_ROUNDS_MIN))
+    expect(roundtableFrame('en')).toContain(String(ROUNDTABLE_ROUNDS_MAX))
   })
 })

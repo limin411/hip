@@ -118,6 +118,7 @@ import { isRichContentParts } from './session-message-codec.js'
 import type { PermissionManager } from './permission-manager.js'
 import type { AgentProviderManager } from './agent-provider.js'
 import type { ConfigManager } from './config-manager.js'
+import { tryRunRoundtableTurn } from './roundtable/index.js'
 
 export type SendFn = (msg: ServerMessage) => void
 
@@ -725,6 +726,17 @@ export async function runTurn(host: SessionTurnHost, rawSend: SendFn, base?: {
     } finally {
       host.running = false
       host.abortController = null
+    }
+  }
+
+  // Roundtable multi-round loop (docs/design/roundtable-loop.md).
+  // Only on fresh turns (not plan resume / regenerate base) when user content
+  // carries the roundtable marker and engine=loop.
+  if (!base) {
+    const userText = extractLastUserText(host.messages)
+    if (userText) {
+      const rtText = await tryRunRoundtableTurn(host, rawSend, userText)
+      if (rtText !== null) return rtText
     }
   }
 

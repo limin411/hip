@@ -192,10 +192,10 @@ export const en = {
       roundtable: {
         chip: 'Roundtable',
         chipAria: 'Toggle roundtable mode for the first message',
-        chipHint: 'The agent decides whether a multi-advisor debate is needed',
+        chipHint: 'hip chairs multi-round debate when the topic needs it',
         disabledHint: 'Unavailable while a skill or slash command is active',
         helper:
-          'Simple questions stay normal chat. Complex tradeoffs get a five-advisor debate, then a practical answer.',
+          'Simple questions stay normal chat. Complex topics: advisors debate over multiple rounds; hip sets round count, stage conclusions, and the final decision.',
         badge: 'Roundtable',
         personas: {
           strategist: 'Strategist',

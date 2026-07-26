@@ -181,9 +181,9 @@ export const zhTW = {
     "roundtable": {
       "chip": "圓桌會議",
       "chipAria": "開關首則訊息的圓桌會議模式",
-      "chipHint": "智慧體會判斷是否需要多視角辯論",
+      "chipHint": "議題需要時，hip 主持多輪討論並拍板",
       "disabledHint": "使用技能或斜線命令時不可用",
-      "helper": "簡單問題仍以普通對話回答；有取捨時五位顧問會先辯論，再給出實用終案與步驟。",
+      "helper": "簡單問題仍以普通對話回答。複雜議題：顧問多輪交鋒；hip 決定討論回合數、給出階段性結論並拍板終案。",
       "badge": "圓桌",
       "personas": {
         "strategist": "戰略家",

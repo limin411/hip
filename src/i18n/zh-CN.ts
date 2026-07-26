@@ -184,9 +184,10 @@ export const zhCN = {
       roundtable: {
         chip: '圆桌会议',
         chipAria: '开关首条消息的圆桌会议模式',
-        chipHint: '智能体会判断是否需要多视角辩论',
+        chipHint: '议题需要时，hip 主持多轮讨论并拍板',
         disabledHint: '使用技能或斜杠命令时不可用',
-        helper: '简单问题仍按普通对话回答；存在取舍时五位顾问会先辩论，再给出实用终案与步骤。',
+        helper:
+          '简单问题仍按普通对话回答。复杂议题：顾问多轮交锋；hip 决定讨论回合数、给出阶段性结论并拍板终案。',
         badge: '圆桌',
         personas: {
           strategist: '战略家',

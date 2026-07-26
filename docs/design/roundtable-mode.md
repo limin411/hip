@@ -4,7 +4,7 @@
 |-------|--------|
 | **Title** | Chat Roundtable (one-shot empty-state starter) |
 | **Date** | 2026-07-26 |
-| **Status** | Implemented (P0–P1) |
+| **Status** | Implemented (P0–P1 + multi-round chair protocol) |
 | **Audience** | hip core (React UI / domain / i18n) |
 | **Reference** | Claude empty-state starters + hip Execution Mode / Effort holographic language |
 
@@ -52,13 +52,14 @@
 
 | 角色 | 权责 |
 |------|------|
-| 用户开启 chip | **邀请** 多视角审议，不是强制五人格式 |
-| 智能体 | 判断是否值得开会；简单题 **必须** 普通对话 |
-| 系统 | 只注入框架；不客户端打分 |
+| 用户开启 chip | **邀请** 多视角审议，不是强制开会 |
+| **hip（模型）** | 路由是否开会；**主持多轮讨论**；**决定回合数 N**；每轮 **阶段性结论**；**终局拍板** |
+| 五顾问 | 以 **对话** 方式跨轮回应 / 反驳 / 修正，禁止一人一句走过场 |
+| 系统 | 只注入框架；不客户端打分或固定 N |
 
 ### 3.2 Routing 规则（写入 frame，模型必遵）
 
-**普通对话**（满足任一条即跳过委员会）：
+**普通对话**（满足任一条即跳过会议）：
 
 - 事实 / 定义 / 翻译 / 语法等单点问题
 - 一步可完成、几乎无决策空间
@@ -66,7 +67,7 @@
 - 用户已给出明确答案，只需执行或轻润色
 - 信息不足时先澄清，不空开辩论
 
-**召开委员会**（存在真实权衡）：
+**召开会议**（存在真实权衡）：
 
 - 多方案取舍、战略 / 产品 / 技术路径
 - 明显风险、假设或受众差异
@@ -75,15 +76,27 @@
 
 默认偏 **降级**：拿不准且看起来简单 → 普通对话。
 
-### 3.3 五顾问（仅 convened 时）
+### 3.3 角色与多轮协议（仅 convened 时）
 
-1. **战略家** — 长期目标与方向  
-2. **怀疑论者** — 风险、薄弱假设、盲点  
-3. **创意者** — 新颖想法与更好角度  
-4. **执行者** — 实际步骤与实施  
-5. **受众倡导者** — 用户 / 客户 / 观众需求  
+| 角色 | 职责 |
+|------|------|
+| **hip** | 主席 + **决策者**：定议程、定 N（2–4）、每轮阶段性结论、最终决策 |
+| 战略家 | 长期目标与方向 |
+| 怀疑论者 | 风险、薄弱假设、盲点 |
+| 创意者 | 新颖想法与更好角度 |
+| 执行者 | 实际步骤与实施 |
+| 受众倡导者 | 用户 / 客户 / 观众需求 |
 
-输出：每人简短观点 → 分歧 → 最终实用答案 → 清晰后续步骤。
+**讨论规则：**
+
+1. **禁止** 五人各说一遍即收场；必须跨轮互相对话，立场可演进。
+2. hip 在 Round 1 前声明 **计划回合数 N**（2–4）及每轮议程；可因共识提前闭会。
+3. 每轮结束后 hip 输出 **阶段性结论**：已共识 / 仍开放 / 下一焦点。
+4. 终局仅 hip 拍板（非投票平均）+ 残留分歧 + 后续步骤。
+
+**输出骨架：** 会议规划 → Round 1…N（对话体 + Stage conclusion）→ Decision (hip) → 后续步骤。
+
+**实现注：** 默认 **loop 引擎**（真多轮，见 [`roundtable-loop.md`](./roundtable-loop.md)）。`HIP_ROUNDTABLE_ENGINE=sim` 时回退为单 completion 模拟多轮（本文件 v1 frame）。
 
 ---
 
@@ -98,7 +111,7 @@ RoundtableStarter   ← 仅 chat + ROUNDTABLE_STARTER
 ```
 
 - **未选中**：次级 chip「圆桌会议」+ 短 hint（智能体判断是否辩论）。
-- **选中**：chip active；展开 5 席位 strip（stagger）；helper 说明简单题自动普通答。
+- **选中**：chip active；展开 5 席位 strip（stagger）；helper 说明：简单题普通答；复杂题多轮讨论，hip 定回合数与阶段性结论并拍板。
 - **禁用**：slash 查询中或已绑定 skill 参数。
 
 ### 4.2 会话内
@@ -186,6 +199,8 @@ export const ROUNDTABLE_STARTER = true
 ## 7. Follow-ups (optional)
 
 - P2: sidecar inject / `displayContent` 协议字段  
-- P2: assistant meta `roundtable: skipped | convened`  
+- P2: assistant meta `roundtable: skipped | convened | rounds=N`  
+- P2: **真多轮 LLM loop** — 完整设计见 **[`roundtable-loop.md`](./roundtable-loop.md)**（Chair 状态机、ChairAction schema、P2a 切片）  
 - P3: three.js 空态装饰环  
-- P3: heading 角色色点  
+- P3: 阶段结论 / 回合 heading 角色色与折叠 UI  
+

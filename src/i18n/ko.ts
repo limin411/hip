@@ -177,6 +177,19 @@ export const ko = {
       "disabledHint": "스킬 또는 슬래시 명령 사용 중에는 사용할 수 없습니다",
       "helper": "간단한 질문은 일반 대화로 답합니다. 복잡한 안건에서는 고문들이 여러 라운드 토론하고, hip이 라운드 수·단계 결론·최종 결정을 합니다.",
       "badge": "원탁",
+      "metaRounds": "라운드 {{ran}}/{{planned}}",
+      "metaAdvisors": "고문 발언 {{count}}회",
+      "metaEarlyExit": "조기 종료",
+      "sectionFallback": "섹션",
+      "status": {
+        "routing": "원탁 · 소집 여부 판단 중…",
+        "planning": "원탁 · 안건 설정 중…",
+        "round": "원탁 · 토론 중…",
+        "roundN": "원탁 · 라운드 {{n}}…",
+        "stage": "원탁 · 단계 결론…",
+        "deciding": "원탁 · hip 결정 중…",
+        "done": "원탁 · 완료"
+      },
       "personas": {
         "strategist": "전략가",
         "skeptic": "회의론자",

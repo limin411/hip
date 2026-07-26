@@ -165,6 +165,62 @@ describe('runRoundtable', () => {
     expect(result.markdown).toMatch(/Meeting plan|Convening|cancelled/i)
   })
 
+  it('parallel_then_synth runs advisors concurrently without cross-talk order dependency', async () => {
+    let inFlight = 0
+    let maxInFlight = 0
+    let chairStep = 0
+    const chairScripts = [
+      j({ type: 'route', convene: true }),
+      j({ type: 'plan', rounds: 2, agenda: ['a', 'b'], rationale: 'r' }),
+      j({
+        type: 'open_round',
+        round: 1,
+        focus: 'f',
+        speakers: ['strategist', 'skeptic', 'creative'],
+        mode: 'parallel_then_synth',
+      }),
+      j({ type: 'stage', round: 1, agreed: ['x'], open: [], nextFocus: 'y' }),
+      j({
+        type: 'open_round',
+        round: 2,
+        focus: 'y',
+        speakers: ['operator'],
+        mode: 'serial_react',
+      }),
+      j({ type: 'stage', round: 2, agreed: ['z'], open: [] }),
+      j({ type: 'decide', decision: 'ok', residual: [], nextSteps: ['n'] }),
+    ]
+    const hybrid = {
+      complete: async ({ tag, signal }: { tag: string; signal: AbortSignal }) => {
+        if (signal.aborted) {
+          const err = new Error('aborted')
+          err.name = 'AbortError'
+          throw err
+        }
+        if (tag.startsWith('chair')) {
+          const s = chairScripts[chairStep++]
+          if (!s) throw new Error('chair exhausted')
+          return s
+        }
+        inFlight++
+        maxInFlight = Math.max(maxInFlight, inFlight)
+        await new Promise((r) => setTimeout(r, 20))
+        inFlight--
+        return `ok-${tag}`
+      },
+    }
+    const result = await runRoundtable({
+      issue: 'parallel topic',
+      language: 'en',
+      signal: new AbortController().signal,
+      llm: hybrid,
+    })
+    expect(result.phase).toBe('done')
+    expect(result.advisorCalls).toBe(4)
+    expect(maxInFlight).toBeGreaterThanOrEqual(2)
+    expect(result.markdown).toContain('ok')
+  })
+
   it('maxAdvisorCalls forces exit to decide path via break', async () => {
     // After max advisors, stage still runs then loop breaks → decide
     const llm = scriptedCompleteFns([

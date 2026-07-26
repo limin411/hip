@@ -51,7 +51,7 @@ Each step emit EXACTLY one JSON object (no markdown prose outside JSON) matching
 {"type":"route","convene":false,"reply":"..."} 
 {"type":"route","convene":true,"reason":"..."}
 {"type":"plan","rounds":2|3|4,"agenda":["..."],"rationale":"..."}
-{"type":"open_round","round":1,"focus":"...","speakers":["strategist","skeptic"],"mode":"serial_react"}
+{"type":"open_round","round":1,"focus":"...","speakers":["strategist","skeptic"],"mode":"serial_react"|"parallel_then_synth"}
 {"type":"stage","round":1,"agreed":["..."],"open":["..."],"nextFocus":"...","earlyExit":false}
 {"type":"decide","decision":"...","residual":["..."],"nextSteps":["..."]}
 
@@ -61,6 +61,8 @@ Rules:
 - Real tradeoffs/risk/strategy → convene true, then plan, then open_round/stage loop, then decide.
 - rounds must be between ${ROUNDTABLE_ROUNDS_MIN} and ${ROUNDTABLE_ROUNDS_MAX}.
 - speakers: 1–${MAX_ADVISORS_PER_ROUND} from ${PERSONA_IDS.join(', ')}; prefer 2–3.
+- open_round.mode: "serial_react" (default, speakers hear each other) or "parallel_then_synth"
+  (simultaneous independent takes when cross-talk is less important).
 - Never role-play all advisors yourself; only emit ChairAction JSON.
 - You alone decide the final answer (not a vote).
 - Respond in language: ${lang} for any user-facing strings inside JSON.`

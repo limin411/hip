@@ -182,7 +182,17 @@ export class SessionStore {
   /** Same writes as insertTurn, but without transaction management. Used by
    *  Session.emit() so legacy persistence and new events share one transaction. */
   insertTurnBody(
-    assistant: { id: string; sessionId: string; agentId: string; content: string; timestamp: number; stopped?: boolean; timeline?: TimelineStep[]; memoryCitations?: MemoryCitation[] } | null,
+    assistant: {
+      id: string
+      sessionId: string
+      agentId: string
+      content: string
+      timestamp: number
+      stopped?: boolean
+      timeline?: TimelineStep[]
+      memoryCitations?: MemoryCitation[]
+      roundtable?: import('@hip/protocol').RoundtableMeta
+    } | null,
     sessionId: string,
     runs: AgentRun[],
   ): void {
@@ -194,6 +204,12 @@ export class SessionStore {
         ? JSON.stringify(assistant.memoryCitations)
         : null
       this.db.prepare(`UPDATE messages SET memory_citations=? WHERE id=?`).run(cites, assistant.id)
+      const rt = assistant.roundtable ? JSON.stringify(assistant.roundtable) : null
+      try {
+        this.db.prepare(`UPDATE messages SET roundtable=? WHERE id=?`).run(rt, assistant.id)
+      } catch {
+        // Column missing on pre-v24 DBs that skipped migrate (should not happen in prod).
+      }
     }
     const runStmt = this.db.prepare(
       `INSERT INTO agent_runs(session_id,message_id,seq,agent_id,role,output,started_at,finished_at,task_input,parent_agent_id,prompt_tokens,completion_tokens,total_tokens,context_tokens,name) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
@@ -221,8 +237,33 @@ export class SessionStore {
   }
 
   loadMessages(sessionId: string): Message[] {
-    const rows = this.db.prepare(`SELECT id,role,agent_id,content,timestamp,stopped,timeline,attachments,memory_citations FROM messages WHERE session_id=? ORDER BY seq`).all(sessionId) as
-      { id: string; role: 'user' | 'assistant'; agent_id: string | null; content: string; timestamp: number; stopped: number; timeline: string | null; attachments: string | null; memory_citations: string | null }[]
+    // roundtable column added in v24 — SELECT * style via try/fallback for safety.
+    type MsgRow = {
+      id: string
+      role: 'user' | 'assistant'
+      agent_id: string | null
+      content: string
+      timestamp: number
+      stopped: number
+      timeline: string | null
+      attachments: string | null
+      memory_citations: string | null
+      roundtable?: string | null
+    }
+    let rows: MsgRow[]
+    try {
+      rows = this.db
+        .prepare(
+          `SELECT id,role,agent_id,content,timestamp,stopped,timeline,attachments,memory_citations,roundtable FROM messages WHERE session_id=? ORDER BY seq`,
+        )
+        .all(sessionId) as MsgRow[]
+    } catch {
+      rows = this.db
+        .prepare(
+          `SELECT id,role,agent_id,content,timestamp,stopped,timeline,attachments,memory_citations FROM messages WHERE session_id=? ORDER BY seq`,
+        )
+        .all(sessionId) as MsgRow[]
+    }
     const toolStmt = this.db.prepare(
       `SELECT tc.call_id,tc.agent_id,tc.name,tc.input,tc.output,tc.status,tc.error,tc.seq,tc.truncated
        FROM tool_calls tc JOIN agent_runs ar ON ar.id = tc.agent_run_id
@@ -240,6 +281,14 @@ export class SessionStore {
           if (Array.isArray(cites) && cites.length) base.memoryCitations = cites
         } catch {
           // ignore corrupt column
+        }
+      }
+      if (r.roundtable != null && r.roundtable !== '') {
+        try {
+          const meta = JSON.parse(r.roundtable) as import('@hip/protocol').RoundtableMeta
+          if (meta && typeof meta === 'object' && 'engine' in meta) base.roundtable = meta
+        } catch {
+          // ignore corrupt
         }
       }
       // toolCalls are keyed by agent_runs.message_id — load them even when timeline is null

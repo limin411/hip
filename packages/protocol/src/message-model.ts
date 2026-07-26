@@ -13,6 +13,18 @@ export type ContentPart =
   | { type: 'text'; text: string }
   | { type: 'image_url'; image_url: { url: string } }
 
+/** Assistant turn metadata when the roundtable loop engine ran (docs/design/roundtable-loop.md). */
+export interface RoundtableMeta {
+  engine: 'loop' | 'sim'
+  convened: boolean
+  roundsPlanned?: number
+  roundsRan?: number
+  earlyExit?: boolean
+  advisorCalls?: number
+  /** Final runner phase */
+  phase?: 'done' | 'aborted'
+}
+
 export interface Message {
   id: string
   role: 'user' | 'assistant' | 'notice'
@@ -26,6 +38,8 @@ export interface Message {
   usage?: TurnUsage          // turn total = sum of agentRuns' usage; present once usage was reported
   attachments?: Attachment[]
   memoryCitations?: MemoryCitation[]
+  /** Present when this assistant turn was produced by the roundtable engine. */
+  roundtable?: RoundtableMeta
 }
 
 /** Provider-reported token counts for a turn or a single agent's slice of it.

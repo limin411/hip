@@ -252,7 +252,16 @@ export interface SessionTurnHost {
     runs?: AgentRun[]
     assistant?: { id: string; sessionId: string; agentId: string; content: string; timestamp: number; stopped?: boolean; timeline?: TimelineStep[]; memoryCitations?: import('@hip/protocol').MemoryCitation[] } | null
   }): void
-  finalizeAndPersist(send: SendFn, turnId: string, supervisorText: string, trajectory: Map<string, TraceRun>, stopped: boolean, usageByAgent?: Map<string, TurnUsage>, targetMessages?: BaseMessage[]): string
+  finalizeAndPersist(
+    send: SendFn,
+    turnId: string,
+    supervisorText: string,
+    trajectory: Map<string, TraceRun>,
+    stopped: boolean,
+    usageByAgent?: Map<string, TurnUsage>,
+    targetMessages?: BaseMessage[],
+    extras?: { roundtable?: import('@hip/protocol').RoundtableMeta },
+  ): string
   startActivity(description: string, totalSteps?: number): Activity
   endActivity(): void
   consumeActivitySteps(steps: number): void

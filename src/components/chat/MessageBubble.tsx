@@ -23,6 +23,9 @@ import { TurnStatusLine } from './TurnStatusLine'
 import * as chatFeature from './feature'
 import { hasRenderableSupervisorText } from '@/lib/timelineFilter'
 import { isRoundtableMessage, stripRoundtableFrame } from '@/lib/roundtable'
+import { looksLikeRoundtableTranscript } from '@/lib/roundtableSections'
+import { RoundtableBody } from './RoundtableBody'
+import { RoundtableStatusLine } from './RoundtableStatusLine'
 import { cn } from '@/lib/utils'
 
 function formatBytes(bytes?: number): string {
@@ -73,7 +76,8 @@ export function messageRenderEqual(a: Message, b: Message): boolean {
     a.agentRuns === b.agentRuns &&
     a.attachments === b.attachments &&
     a.memoryCitations === b.memoryCitations &&
-    a.usage === b.usage
+    a.usage === b.usage &&
+    a.roundtable === b.roundtable
   )
 }
 
@@ -248,20 +252,31 @@ function MessageBubbleImpl({ message, streaming, isLastAssistant, hidePlan }: Me
           <>
             {!hideAnswerBody && (
               <div data-testid="message-answer">
-                <MarkdownBody content={displayContent} />
+                {message.roundtable || looksLikeRoundtableTranscript(displayContent) ? (
+                  <RoundtableBody
+                    content={displayContent}
+                    meta={message.roundtable}
+                    streaming={streaming}
+                  />
+                ) : (
+                  <MarkdownBody content={displayContent} />
+                )}
               </div>
             )}
             {streaming && <StreamingCursor />}
-            {/* Bottom turn status: live phase while streaming; settle status + duration when done. */}
-            <TurnStatusLine
-              streaming={!!streaming}
-              stopped={!!message.stopped}
-              hasAssistantContent={!!displayContent.trim()}
-              steps={message.timeline}
-              toolCalls={message.toolCalls}
-              agentRuns={message.agentRuns}
-              startedAt={message.timestamp}
-            />
+            {streaming && (message.roundtable || looksLikeRoundtableTranscript(displayContent)) ? (
+              <RoundtableStatusLine content={displayContent} streaming />
+            ) : (
+              <TurnStatusLine
+                streaming={!!streaming}
+                stopped={!!message.stopped}
+                hasAssistantContent={!!displayContent.trim()}
+                steps={message.timeline}
+                toolCalls={message.toolCalls}
+                agentRuns={message.agentRuns}
+                startedAt={message.timestamp}
+              />
+            )}
           </>
         )}
       </div>

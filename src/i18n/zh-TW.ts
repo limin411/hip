@@ -185,6 +185,19 @@ export const zhTW = {
       "disabledHint": "使用技能或斜線命令時不可用",
       "helper": "簡單問題仍以普通對話回答。複雜議題：顧問多輪交鋒；hip 決定討論回合數、給出階段性結論並拍板終案。",
       "badge": "圓桌",
+      "metaRounds": "回合 {{ran}}/{{planned}}",
+      "metaAdvisors": "顧問發言 {{count}} 次",
+      "metaEarlyExit": "提前結束",
+      "sectionFallback": "章節",
+      "status": {
+        "routing": "圓桌 · 判斷是否開會…",
+        "planning": "圓桌 · 制定議程…",
+        "round": "圓桌 · 討論進行中…",
+        "roundN": "圓桌 · 第 {{n}} 輪…",
+        "stage": "圓桌 · 階段性結論…",
+        "deciding": "圓桌 · hip 拍板中…",
+        "done": "圓桌 · 已結束"
+      },
       "personas": {
         "strategist": "戰略家",
         "skeptic": "懷疑論者",

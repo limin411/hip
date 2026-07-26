@@ -1,12 +1,13 @@
 /**
  * Integrate RoundtableRunner into a session turn (stream + finalize).
  */
-import type { AgentRole, TurnUsage } from '@hip/protocol'
+import type { AgentRole, RoundtableMeta, TurnUsage } from '@hip/protocol'
 import type { TraceRun } from '../tool-trace.js'
 import type { SendFn, SessionTurnHost } from '../session-turn-runner.js'
 import { completeFnsFromModelRunner } from './complete.js'
 import { resolveRoundtableLang, shouldEnterRoundtableLoop, stripRoundtableFrame } from './detect.js'
 import { runRoundtable } from './runner.js'
+import { renderEventMarkdown } from './render.js'
 import { logInfo } from '../../debug-logger.js'
 
 /**
@@ -71,17 +72,20 @@ export async function tryRunRoundtableTurn(
   })
 
   let stepSeq = 0
-  const sendDelta = (delta: string) => {
-    if (!delta) return
+  const pushBurst = (content: string) => {
+    if (!content) return
     const r = trajectory.get('supervisor')
-    if (r) r.output += delta
+    if (!r) return
+    if (!r.textBursts) r.textBursts = []
+    r.textBursts.push({ stepSeq: stepSeq++, content })
+    r.output += content
     rawSend({
       type: 'token:stream',
       sessionId: host.id,
       turnId,
       agentId: 'supervisor',
-      delta,
-      stepSeq: stepSeq++,
+      delta: content,
+      stepSeq: stepSeq - 1,
       role: 'supervisor',
     })
   }
@@ -95,7 +99,11 @@ export async function tryRunRoundtableTurn(
       language: lang,
       signal,
       llm,
-      onMarkdownDelta: sendDelta,
+      onEvent: (ev) => {
+        // Structured timeline: one text step per logical section (plan, speech, stage, …).
+        const chunk = renderEventMarkdown(ev, lang)
+        if (chunk) pushBurst(chunk)
+      },
     })
 
     const stopped = result.phase === 'aborted' && result.abortReason === 'cancelled'
@@ -104,6 +112,10 @@ export async function tryRunRoundtableTurn(
     if (r) {
       r.output = text
       r.finishedAt = Date.now()
+      // If event-driven bursts empty (shouldn't), fall back to one burst
+      if (!r.textBursts?.length && text) {
+        r.textBursts = [{ stepSeq: 0, content: text }]
+      }
     }
 
     rawSend({ type: 'agent:finished', sessionId: host.id, turnId, agentId: 'supervisor' })
@@ -115,6 +127,16 @@ export async function tryRunRoundtableTurn(
       timestamp: Date.now(),
     })
 
+    const roundtable: RoundtableMeta = {
+      engine: 'loop',
+      convened: result.convened,
+      phase: result.phase,
+      advisorCalls: result.advisorCalls,
+      ...(result.roundsPlanned != null ? { roundsPlanned: result.roundsPlanned } : {}),
+      ...(result.roundsRan != null ? { roundsRan: result.roundsRan } : {}),
+      ...(result.earlyExit ? { earlyExit: true } : {}),
+    }
+
     const usageByAgent = new Map<string, TurnUsage>()
     const finalText = host.finalizeAndPersist(
       rawSend,
@@ -123,14 +145,13 @@ export async function tryRunRoundtableTurn(
       trajectory,
       stopped,
       usageByAgent,
+      undefined,
+      { roundtable },
     )
 
-    // First-turn title from issue + decision snippet
-    void host.generateFirstTurnTitle(
-      { type: 'message', content: issue },
-      finalText,
-      rawSend,
-    ).catch(() => {})
+    void host
+      .generateFirstTurnTitle({ type: 'message', content: issue }, finalText, rawSend)
+      .catch(() => {})
 
     logInfo('session', 'roundtable:done', {
       sessionId: host.id,
@@ -149,6 +170,7 @@ export async function tryRunRoundtableTurn(
     if (r) {
       r.output = body
       r.finishedAt = Date.now()
+      if (!r.textBursts?.length) r.textBursts = [{ stepSeq: 0, content: body }]
     }
     rawSend({ type: 'agent:finished', sessionId: host.id, turnId, agentId: 'supervisor' })
     host.emit({
@@ -158,7 +180,14 @@ export async function tryRunRoundtableTurn(
       content: body,
       timestamp: Date.now(),
     })
-    return host.finalizeAndPersist(rawSend, turnId, body, trajectory, true, new Map())
+    return host.finalizeAndPersist(rawSend, turnId, body, trajectory, true, new Map(), undefined, {
+      roundtable: {
+        engine: 'loop',
+        convened: false,
+        phase: 'aborted',
+        advisorCalls: 0,
+      },
+    })
   } finally {
     host.running = false
     host.abortController = null

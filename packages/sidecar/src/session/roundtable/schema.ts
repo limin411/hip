@@ -78,12 +78,15 @@ export function parseChairAction(raw: unknown): ChairAction {
       if (speakers.length >= MAX_ADVISORS_PER_ROUND) break
     }
     if (speakers.length === 0) speakers.push('strategist', 'skeptic')
+    const modeRaw = o.mode
+    const mode =
+      modeRaw === 'parallel_then_synth' ? ('parallel_then_synth' as const) : ('serial_react' as const)
     return {
       type: 'open_round',
       round: Math.floor(round),
       focus,
       speakers,
-      mode: 'serial_react',
+      mode,
     }
   }
   if (type === 'stage') {

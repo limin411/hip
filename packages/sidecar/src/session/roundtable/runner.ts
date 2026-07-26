@@ -169,6 +169,7 @@ export async function runRoundtable(args: RunRoundtableArgs): Promise<Roundtable
       )
       if (open.type !== 'open_round') throw new Error('expected open_round')
       const speakers = open.speakers.slice(0, maxPerRound)
+      const speakMode = open.mode === 'parallel_then_synth' ? 'parallel_then_synth' : 'serial_react'
       emit({
         kind: 'roundtable.round_open',
         round: r,
@@ -177,26 +178,62 @@ export async function runRoundtable(args: RunRoundtableArgs): Promise<Roundtable
       })
 
       const roundLocal: SpeechRecord[] = []
-      for (const speaker of speakers) {
+      const remainingSlots = Math.max(0, maxAdvisor - advisorCalls)
+      const speakersThisRound = speakers.slice(0, remainingSlots)
+
+      if (speakMode === 'parallel_then_synth' && speakersThisRound.length > 1) {
+        // Half-parallel: concurrent independent takes (no cross-talk within the round).
         throwIfBudget()
-        if (advisorCalls >= maxAdvisor) break
-        advisorCalls++
-        const speech = await args.llm.complete({
-          system: advisorSystemPrompt(speaker, lang),
-          user: advisorUserPrompt({
-            issue: args.issue,
-            minutes,
-            focus: open.focus,
-            priorThisRound: roundLocal,
-            persona: speaker,
-            lang,
+        const results = await Promise.all(
+          speakersThisRound.map(async (speaker) => {
+            const speech = await args.llm.complete({
+              system: advisorSystemPrompt(speaker, lang),
+              user: advisorUserPrompt({
+                issue: args.issue,
+                minutes,
+                focus: open.focus,
+                priorThisRound: [],
+                persona: speaker,
+                lang,
+              }),
+              signal,
+              tag: `advisor:${speaker}:parallel`,
+            })
+            return { speaker, content: speech.trim() || '…' }
           }),
-          signal,
-          tag: `advisor:${speaker}`,
-        })
-        const content = speech.trim() || '…'
-        roundLocal.push({ speaker, content })
-        emit({ kind: 'roundtable.speech', round: r, speaker, content })
+        )
+        advisorCalls += results.length
+        // Emit in chair-declared order for stable transcript
+        for (const speaker of speakersThisRound) {
+          const hit = results.find((x) => x.speaker === speaker) ?? {
+            speaker,
+            content: '…',
+          }
+          roundLocal.push(hit)
+          emit({ kind: 'roundtable.speech', round: r, speaker: hit.speaker, content: hit.content })
+        }
+      } else {
+        for (const speaker of speakersThisRound) {
+          throwIfBudget()
+          if (advisorCalls >= maxAdvisor) break
+          advisorCalls++
+          const speech = await args.llm.complete({
+            system: advisorSystemPrompt(speaker, lang),
+            user: advisorUserPrompt({
+              issue: args.issue,
+              minutes,
+              focus: open.focus,
+              priorThisRound: roundLocal,
+              persona: speaker,
+              lang,
+            }),
+            signal,
+            tag: `advisor:${speaker}`,
+          })
+          const content = speech.trim() || '…'
+          roundLocal.push({ speaker, content })
+          emit({ kind: 'roundtable.speech', round: r, speaker, content })
+        }
       }
 
       const stageAction = await chairOnce(

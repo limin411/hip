@@ -1048,8 +1048,27 @@ export class Session {
     }
   }
 
-  private finalizeAndPersist(send: SendFn, turnId: string, supervisorText: string, trajectory: Map<string, TraceRun>, stopped: boolean, usageByAgent?: Map<string, TurnUsage>, targetMessages: BaseMessage[] = this.messages): string {
-    return finalizeAndPersistTurn(this.persistDeps(), send, turnId, supervisorText, trajectory, stopped, usageByAgent, targetMessages)
+  private finalizeAndPersist(
+    send: SendFn,
+    turnId: string,
+    supervisorText: string,
+    trajectory: Map<string, TraceRun>,
+    stopped: boolean,
+    usageByAgent?: Map<string, TurnUsage>,
+    targetMessages: BaseMessage[] = this.messages,
+    extras?: { roundtable?: import('@hip/protocol').RoundtableMeta },
+  ): string {
+    return finalizeAndPersistTurn(
+      this.persistDeps(),
+      send,
+      turnId,
+      supervisorText,
+      trajectory,
+      stopped,
+      usageByAgent,
+      targetMessages,
+      extras,
+    )
   }
 
   async regenerate(send: SendFn): Promise<void> {

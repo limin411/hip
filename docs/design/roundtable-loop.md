@@ -4,7 +4,7 @@
 |-------|--------|
 | **Title** | Roundtable Multi-Round Loop Engine |
 | **Date** | 2026-07-26 |
-| **Status** | Implemented (P2a) — loop engine default; set `HIP_ROUNDTABLE_ENGINE=sim` to force v1 sim |
+| **Status** | Implemented (P2a–P2c) — loop + parallel mode + meta/timeline + FE fold/status |
 | **Audience** | hip core (sidecar session / protocol / React UI) |
 | **Depends on** | [`roundtable-mode.md`](./roundtable-mode.md)（空态入口、产品语义、v1 sim framing） |
 | **Reference** | hip subagent timeline · ActivityBar lanes · plan-mode one-shot enter |
@@ -495,14 +495,14 @@ N=2 × 3 speakers → ~1 route + 1 plan + 2 open + 6 advisor + 2 stage + 1 decid
 
 - [x] JSON parse + repair retries（`CHAIR_PARSE_RETRIES`）  
 - [x] Minutes 滚动截断（`truncateMinutes`）  
-- [ ] `meta.roundtable` 持久化（可选后续）  
-- [ ] timeline 结构化 steps（当前 markdown 章节 + token stream）  
+- [x] `Message.roundtable` 持久化（SQLite v24 + message:complete）  
+- [x] timeline 结构化 text steps（每逻辑段落一个 textBurst）  
 - [x] 预算用尽强制 interim decide  
 
 ### P2c
 
-- [ ] 半并行顾问  
-- [ ] FE 回合折叠、stage 强调、status line i18n  
+- [x] 半并行顾问（`parallel_then_synth`）  
+- [x] FE 回合折叠、stage 强调、status line i18n  
 - [x] wall-clock budget（默认 180s）  
 
 ### P3+

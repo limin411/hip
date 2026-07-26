@@ -189,6 +189,19 @@ export const zhCN = {
         helper:
           '简单问题仍按普通对话回答。复杂议题：顾问多轮交锋；hip 决定讨论回合数、给出阶段性结论并拍板终案。',
         badge: '圆桌',
+        metaRounds: '回合 {{ran}}/{{planned}}',
+        metaAdvisors: '顾问发言 {{count}} 次',
+        metaEarlyExit: '提前结束',
+        sectionFallback: '章节',
+        status: {
+          routing: '圆桌 · 判断是否开会…',
+          planning: '圆桌 · 制定议程…',
+          round: '圆桌 · 讨论进行中…',
+          roundN: '圆桌 · 第 {{n}} 轮…',
+          stage: '圆桌 · 阶段性结论…',
+          deciding: '圆桌 · hip 拍板中…',
+          done: '圆桌 · 已结束',
+        },
         personas: {
           strategist: '战略家',
           skeptic: '怀疑论者',

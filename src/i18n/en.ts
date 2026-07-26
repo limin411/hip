@@ -197,6 +197,19 @@ export const en = {
         helper:
           'Simple questions stay normal chat. Complex topics: advisors debate over multiple rounds; hip sets round count, stage conclusions, and the final decision.',
         badge: 'Roundtable',
+        metaRounds: 'Rounds {{ran}}/{{planned}}',
+        metaAdvisors: '{{count}} advisor turns',
+        metaEarlyExit: 'Ended early',
+        sectionFallback: 'Section',
+        status: {
+          routing: 'Roundtable · deciding whether to convene…',
+          planning: 'Roundtable · setting agenda…',
+          round: 'Roundtable · discussion in progress…',
+          roundN: 'Roundtable · round {{n}}…',
+          stage: 'Roundtable · stage conclusion…',
+          deciding: 'Roundtable · hip deciding…',
+          done: 'Roundtable · done',
+        },
         personas: {
           strategist: 'Strategist',
           skeptic: 'Skeptic',

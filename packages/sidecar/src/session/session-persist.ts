@@ -1,5 +1,14 @@
 /** Dual-write session event persistence + turn finalize helpers. */
-import type { ServerMessage, SessionConfig, AgentRun, SessionEvent, TimelineStep, TurnUsage, MemoryCitation } from '@hip/protocol'
+import type {
+  ServerMessage,
+  SessionConfig,
+  AgentRun,
+  SessionEvent,
+  TimelineStep,
+  TurnUsage,
+  MemoryCitation,
+  RoundtableMeta,
+} from '@hip/protocol'
 import { AIMessage, AIMessageChunk, type BaseMessage } from '@langchain/core/messages'
 import { contentFromTimeline, trajectoryToRuns, trajectoryToTimeline, type TraceRun } from './tool-trace.js'
 import { verifyWrites } from './verify.js'
@@ -44,6 +53,7 @@ export function emitSessionEvent(
       stopped?: boolean
       timeline?: TimelineStep[]
       memoryCitations?: MemoryCitation[]
+      roundtable?: RoundtableMeta
     } | null
   },
 ): void {
@@ -90,6 +100,7 @@ export function finalizeAndPersistTurn(
   stopped: boolean,
   usageByAgent?: Map<string, TurnUsage>,
   targetMessages: BaseMessage[] = deps.messages,
+  extras?: { roundtable?: RoundtableMeta },
 ): string {
   // Authoritative body: join supervisor text steps when present (KD-17); else legacy supervisorText
   // (ACP / turns without TextBurstTracker). Preserve stop/error suffixes the caller appended.
@@ -156,6 +167,7 @@ export function finalizeAndPersistTurn(
               stopped,
               timeline,
               ...(memoryCitations ? { memoryCitations } : {}),
+              ...(extras?.roundtable ? { roundtable: extras.roundtable } : {}),
             }
           : null,
       },
@@ -186,6 +198,7 @@ export function finalizeAndPersistTurn(
       ...(turnUsage ? { usage: turnUsage } : {}),
       ...(stopped ? { stopped: true } : {}),
       ...(memoryCitations ? { memoryCitations } : {}),
+      ...(extras?.roundtable ? { roundtable: extras.roundtable } : {}),
     },
   })
   return finalText

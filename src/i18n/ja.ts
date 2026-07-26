@@ -177,6 +177,19 @@ export const ja = {
       "disabledHint": "スキルまたはスラッシュコマンド使用中は利用できません",
       "helper": "簡単な質問は通常の会話のまま。複雑な議題では顧問が複数ラウンドで議論し、hip がラウンド数・段階結論・最終決定を担います。",
       "badge": "円卓",
+      "metaRounds": "ラウンド {{ran}}/{{planned}}",
+      "metaAdvisors": "顧問発言 {{count}} 回",
+      "metaEarlyExit": "早期終了",
+      "sectionFallback": "セクション",
+      "status": {
+        "routing": "円卓 · 開催可否を判断中…",
+        "planning": "円卓 · アジェンダ設定中…",
+        "round": "円卓 · 議論中…",
+        "roundN": "円卓 · ラウンド {{n}}…",
+        "stage": "円卓 · 段階結論…",
+        "deciding": "円卓 · hip が決定中…",
+        "done": "円卓 · 完了"
+      },
       "personas": {
         "strategist": "戦略家",
         "skeptic": "懐疑派",

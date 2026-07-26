@@ -585,6 +585,18 @@ export function migrate(db: DatabaseSync): void {
       throw e
     }
   }
+  if (version < 24) {
+    db.exec('BEGIN')
+    try {
+      // Roundtable loop meta JSON (RoundtableMeta) on assistant messages.
+      db.exec(`ALTER TABLE messages ADD COLUMN roundtable TEXT`)
+      db.exec('PRAGMA user_version = 24')
+      db.exec('COMMIT')
+    } catch (e) {
+      db.exec('ROLLBACK')
+      throw e
+    }
+  }
 }
 
 /** Try to create the FTS5 objects. Returns true if FTS is available. */

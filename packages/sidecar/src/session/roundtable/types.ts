@@ -40,7 +40,8 @@ export type ChairAction =
       round: number
       focus: string
       speakers: PersonaId[]
-      mode?: 'serial_react'
+      /** serial_react (default): each speaker sees prior this round. parallel_then_synth: all concurrent. */
+      mode?: 'serial_react' | 'parallel_then_synth'
     }
   | {
       type: 'stage'

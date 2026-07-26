@@ -107,9 +107,15 @@ describe('roundtable report html template', () => {
     expect(html).toContain('rel-chip rebut')
     expect(html).toContain('rel-chip support')
     expect(html).toContain(`href="${personaReportFilename('strategist')}"`)
+    expect(html).toContain(`data-file="${personaReportFilename('strategist')}"`)
     expect(html).toContain(`href="${personaReportFilename('skeptic')}"`)
+    expect(html).toContain(`data-file="${personaReportFilename('skeptic')}"`)
     expect(html).toContain('class="role-card"')
     expect(html).toContain('hip 汇总')
+    // Cross-file open via postMessage (srcDoc-safe)
+    expect(ROUNDTABLE_REPORT_NAV_SCRIPT).toContain('hip-roundtable-report')
+    expect(ROUNDTABLE_REPORT_NAV_SCRIPT).toContain('open-file')
+    expect(ROUNDTABLE_REPORT_NAV_SCRIPT).toContain('data-file')
   })
 
   it('omits empty optional TOC entries', () => {

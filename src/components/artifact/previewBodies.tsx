@@ -8,6 +8,10 @@ import { ChevronDown, ChevronRight, ExternalLink } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { openWithDefaultApp } from '@/ipc/openPath'
 import { resolvePathUnderCwd } from '@/lib/pathScope'
+import { sessionService } from '@/domain'
+import { useFsScope } from '@/store/useFsScope'
+import { useFsStore } from '@/store/fsStore'
+import { useUiStore } from '@/store/uiStore'
 import { highlightLangFromPath } from './previewLang'
 import {
   CSV_PREVIEW_MAX_ROWS,
@@ -18,6 +22,11 @@ import {
   htmlForIframe,
   shouldAutoRenderHtml,
 } from './htmlPreviewPolicy'
+import {
+  parseHipReportOpenFile,
+  prepareHtmlReportForPreview,
+  resolveSiblingHtmlFile,
+} from './htmlReportNav'
 
 function TruncBanner({ text }: { text: string }) {
   return (
@@ -447,6 +456,7 @@ export function HtmlPreviewBody({
   truncatedLabel: string
 }) {
   const { t } = useTranslation()
+  const { scopeId, isDraft } = useFsScope()
   const large = !shouldAutoRenderHtml(content)
   const [mode, setMode] = useState<'render' | 'source'>(() => (large ? 'source' : 'render'))
   const [iframeReady, setIframeReady] = useState(false)
@@ -476,7 +486,27 @@ export function HtmlPreviewBody({
     }
   }, [mode, content])
 
-  const { srcDoc, hardTruncated } = useMemo(() => htmlForIframe(content), [content])
+  // Roundtable (and similar) multi-file HTML: sibling links postMessage instead of
+  // navigating srcDoc (relative href → blank iframe).
+  useEffect(() => {
+    const onMessage = (ev: MessageEvent) => {
+      const file = parseHipReportOpenFile(ev.data)
+      if (!file || !scopeId) return
+      const target = resolveSiblingHtmlFile(path, file, cwd)
+      if (!target) return
+      useFsStore.getState().setActive(scopeId, target)
+      if (isDraft) sessionService.readDraftFile(scopeId, target)
+      else sessionService.readFile(scopeId, target)
+      useUiStore.getState().setSelectedArtifactPath(target)
+    }
+    window.addEventListener('message', onMessage)
+    return () => window.removeEventListener('message', onMessage)
+  }, [path, cwd, scopeId, isDraft])
+
+  const { srcDoc, hardTruncated } = useMemo(
+    () => htmlForIframe(prepareHtmlReportForPreview(content)),
+    [content],
+  )
 
   return (
     <div className="flex h-full min-h-0 flex-col" data-testid="preview-html-shell">

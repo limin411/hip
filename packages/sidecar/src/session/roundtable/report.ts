@@ -403,10 +403,14 @@ function jumpLink(id: string, label: string, className = ''): string {
   return `<a href="#${esc(id)}" data-jump="${esc(id)}"${cls}>${label}</a>`
 }
 
-/** Cross-file link (relative; works in system browser). */
+/**
+ * Cross-file link. `href` works when opened in a system browser.
+ * `data-file` + nav script: in hip srcDoc preview, postMessage parent instead of navigating
+ * (relative href in srcDoc blanks the iframe).
+ */
 function fileLink(href: string, label: string, className = ''): string {
   const cls = className ? ` class="${esc(className)}"` : ''
-  return `<a href="${esc(href)}"${cls}>${label}</a>`
+  return `<a href="${esc(href)}" data-file="${esc(href)}"${cls}>${label}</a>`
 }
 
 function backLink(L: Labels): string {
@@ -420,7 +424,13 @@ function sectionOpen(id: string, title: string, extraClass = ''): string {
 }
 
 /**
- * Navigation script: scroll main pane without location.hash (srcDoc-safe).
+ * Navigation script:
+ * - data-jump: scroll main pane without location.hash (srcDoc-safe)
+ * - data-file: when embedded (window.parent !== window), postMessage parent to open sibling HTML
+ *   instead of navigating the srcDoc iframe (which blanks). Standalone browser keeps normal href.
+ *
+ * Message shape (must match src/components/artifact/htmlReportNav.ts):
+ *   { source: 'hip-roundtable-report', type: 'open-file', file: 'roundtable-report-strategist.html' }
  */
 export const ROUNDTABLE_REPORT_NAV_SCRIPT = /* js */ `
 (function () {
@@ -441,11 +451,31 @@ export const ROUNDTABLE_REPORT_NAV_SCRIPT = /* js */ `
       el.scrollIntoView({ behavior: 'smooth', block: 'start' });
     }
   }
+  function openSibling(file) {
+    if (!file) return false;
+    if (!window.parent || window.parent === window) return false;
+    try {
+      window.parent.postMessage(
+        { source: 'hip-roundtable-report', type: 'open-file', file: file },
+        '*'
+      );
+      return true;
+    } catch (err) {
+      return false;
+    }
+  }
   document.addEventListener('click', function (e) {
-    var a = e.target && e.target.closest ? e.target.closest('a[data-jump]') : null;
+    var a = e.target && e.target.closest ? e.target.closest('a[data-jump], a[data-file]') : null;
     if (!a) return;
-    e.preventDefault();
-    jump(a.getAttribute('data-jump'));
+    if (a.hasAttribute('data-jump')) {
+      e.preventDefault();
+      jump(a.getAttribute('data-jump'));
+      return;
+    }
+    var file = a.getAttribute('data-file');
+    if (file && openSibling(file)) {
+      e.preventDefault();
+    }
   });
 })();
 `.trim()
@@ -1235,7 +1265,8 @@ ${sectionOpen('sec-roles', L.subReports)}
           data.rounds
             .flatMap((r) => r.speeches)
             .find((s) => s.speaker === id)?.content ?? ''
-        return `<a class="role-card" style="--persona-h:${hue}" href="${esc(personaReportFilename(id))}">
+        const href = personaReportFilename(id)
+        return `<a class="role-card" style="--persona-h:${hue}" href="${esc(href)}" data-file="${esc(href)}">
       <span class="name">${esc(personaLabel(id, lang))}</span>
       <span class="snip">${esc(snip(first, 110) || L.none)}</span>
       <span class="go">${esc(openLabel)}</span>

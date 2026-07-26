@@ -13,9 +13,33 @@ vi.mock('@/lib/shikiLazy', () => ({
   highlightCode: vi.fn(async () => '<span class="tok">highlighted</span>'),
 }))
 
-const openWithDefaultApp = vi.fn(async (..._args: unknown[]) => true)
+const {
+  openWithDefaultApp,
+  readFile,
+  readDraftFile,
+  setSelectedArtifactPathMock,
+} = vi.hoisted(() => ({
+  openWithDefaultApp: vi.fn(async (..._args: unknown[]) => true),
+  readFile: vi.fn(),
+  readDraftFile: vi.fn(),
+  setSelectedArtifactPathMock: vi.fn(),
+}))
+
 vi.mock('@/ipc/openPath', () => ({
   openWithDefaultApp: (...args: unknown[]) => openWithDefaultApp(...args),
+}))
+
+vi.mock('@/domain', () => ({
+  sessionService: {
+    readFile: (...args: unknown[]) => readFile(...args),
+    readDraftFile: (...args: unknown[]) => readDraftFile(...args),
+  },
+}))
+
+vi.mock('@/store/uiStore', () => ({
+  useUiStore: Object.assign((sel: (s: unknown) => unknown) => sel({}), {
+    getState: () => ({ setSelectedArtifactPath: setSelectedArtifactPathMock }),
+  }),
 }))
 
 describe('FilePreview', () => {
@@ -23,6 +47,9 @@ describe('FilePreview', () => {
     cleanup()
     useFsStore.setState({ bySession: {} } as any)
     openWithDefaultApp.mockClear().mockResolvedValue(true)
+    readFile.mockClear()
+    readDraftFile.mockClear()
+    setSelectedArtifactPathMock.mockClear()
   })
 
   function setPreview(state: any) {
@@ -209,6 +236,59 @@ describe('FilePreview', () => {
     expect(openWithDefaultApp).toHaveBeenCalledWith('/tmp/roundtable-report.html', {
       cwd: '/tmp',
     })
+  })
+
+  it('opens sibling HTML report files via postMessage from srcDoc iframe', async () => {
+    setPreview({
+      status: 'ready',
+      path: 'roundtable-report.html',
+      content: '<p>summary</p>',
+      mimeType: 'text/html',
+      encoding: 'utf8',
+    })
+    render(<FilePreview />)
+    await waitFor(() => expect(screen.getByTestId('preview-html')).toBeInTheDocument())
+
+    window.dispatchEvent(
+      new MessageEvent('message', {
+        data: {
+          source: 'hip-roundtable-report',
+          type: 'open-file',
+          file: 'roundtable-report-strategist.html',
+        },
+      }),
+    )
+
+    expect(readFile).toHaveBeenCalledWith('s1', '/tmp/roundtable-report-strategist.html')
+    expect(setSelectedArtifactPathMock).toHaveBeenCalledWith(
+      '/tmp/roundtable-report-strategist.html',
+    )
+    expect(useFsStore.getState().bySession.s1?.activePath).toBe(
+      '/tmp/roundtable-report-strategist.html',
+    )
+  })
+
+  it('ignores unsafe postMessage file paths', async () => {
+    setPreview({
+      status: 'ready',
+      path: 'roundtable-report.html',
+      content: '<p>summary</p>',
+      mimeType: 'text/html',
+      encoding: 'utf8',
+    })
+    render(<FilePreview />)
+    await waitFor(() => expect(screen.getByTestId('preview-html')).toBeInTheDocument())
+
+    window.dispatchEvent(
+      new MessageEvent('message', {
+        data: {
+          source: 'hip-roundtable-report',
+          type: 'open-file',
+          file: '../etc/passwd.html',
+        },
+      }),
+    )
+    expect(readFile).not.toHaveBeenCalled()
   })
 
   it('shows path chrome above PDF iframe', () => {

@@ -18,13 +18,13 @@ import {
 } from '@/components/ui/DropdownMenu'
 import { resolveInputDevice, type VoiceInputDevice } from '@/domain/voice/resolveInputDevice'
 import {
-  listenVoiceDownloadProgress,
-  voiceCancelDownload,
-  voiceDownloadModel,
+  useVoiceDownloadStore,
+  voiceDownloadProgressPercent,
+} from '@/domain/voice/voiceDownloadStore'
+import {
   voiceModelStatus,
   voiceOpenModelsDir,
   voiceRuntimeStatus,
-  type VoiceDownloadProgress,
   type VoiceModelStatus,
   type VoiceRuntimeStatus,
 } from '@/ipc/voice'
@@ -75,9 +75,15 @@ export function VoiceSettingsSection({
     {},
   )
   const [checking, setChecking] = useState(false)
-  const [downloading, setDownloading] = useState(false)
-  const [progress, setProgress] = useState<VoiceDownloadProgress | null>(null)
   const [runtime, setRuntime] = useState<VoiceRuntimeStatus | null>(null)
+  // Download state lives in a module store so switching Settings pages does not drop it.
+  const activeModels = useVoiceDownloadStore((s) => s.activeModels)
+  const progressByModel = useVoiceDownloadStore((s) => s.progressByModel)
+  const primaryModel = useVoiceDownloadStore((s) => s.primaryModel)
+  const startDownload = useVoiceDownloadStore((s) => s.startDownload)
+  const cancelDownload = useVoiceDownloadStore((s) => s.cancelDownload)
+  const downloading = Object.keys(activeModels).length > 0
+  const progress = primaryModel ? (progressByModel[primaryModel] ?? null) : null
 
   // Opt-in: only true when user explicitly enables.
   const enabled = voice?.enabled === true
@@ -186,9 +192,9 @@ export function VoiceSettingsSection({
 
   // When voice is turned on, load runtime + model statuses (not before — opt-in).
   // Device list uses enumerate only — never getUserMedia on mount (would seize system mic/audio).
+  // Download progress is owned by voiceDownloadStore (survives page switch).
   useEffect(() => {
     if (!enabled) return
-    let cancelled = false
     void refreshRuntime()
     void checkAllModels()
     void listDevicesOnly()
@@ -198,30 +204,28 @@ export function VoiceSettingsSection({
     } catch {
       /* test env */
     }
-    let un: (() => void) | undefined
-    void listenVoiceDownloadProgress((p) => {
-      if (!cancelled) setProgress(p)
-    })
-      .then((fn) => {
-        un = fn
-      })
-      .catch(() => {
-        /* non-tauri */
-      })
     return () => {
-      cancelled = true
       try {
         navigator.mediaDevices?.removeEventListener?.('devicechange', onChange)
       } catch {
         /* ignore */
       }
-      try {
-        un?.()
-      } catch {
-        /* ignore */
-      }
     }
   }, [enabled, listDevicesOnly, checkAllModels, refreshRuntime])
+
+  // When a download finishes while this page is mounted, refresh model statuses.
+  const wasDownloading = useRef(false)
+  useEffect(() => {
+    if (!enabled) return
+    if (downloading) {
+      wasDownloading.current = true
+      return
+    }
+    if (wasDownloading.current) {
+      wasDownloading.current = false
+      void checkAllModels()
+    }
+  }, [enabled, downloading, checkAllModels])
 
   // Re-check selected model after model id change (still only when enabled).
   useEffect(() => {
@@ -281,10 +285,9 @@ export function VoiceSettingsSection({
   }
 
   const onDownload = async (id: VoiceModelId = model) => {
-    setDownloading(true)
-    setProgress({ model: id, downloaded: 0, phase: 'downloading' })
+    // Dedupe + persistent state live in the store; re-click while in-flight joins the same promise.
     try {
-      await voiceDownloadModel(id)
+      await startDownload(id)
       toast.success(t('settings.voice.downloadDone'))
       await checkAllModels()
     } catch (e) {
@@ -297,19 +300,15 @@ export function VoiceSettingsSection({
               ? String((e as { message: unknown }).message)
               : String(e)
       if (msg.includes('cancelled')) toast.message(t('settings.voice.downloadCancelled'))
-      else toast.error(`${t('voice.downloadFailed')}: ${msg}`)
-    } finally {
-      setDownloading(false)
-      setProgress(null)
+      else if (msg.includes('download_in_progress')) {
+        // Another path already owns this download — UI still shows store progress.
+        toast.message(t('settings.voice.downloading'))
+      } else toast.error(`${t('voice.downloadFailed')}: ${msg}`)
     }
   }
 
   const onCancelDownload = async () => {
-    try {
-      await voiceCancelDownload(model)
-    } catch {
-      /* ignore */
-    }
+    await cancelDownload(primaryModel ?? model)
   }
 
   const onCheckStatus = async () => {
@@ -318,17 +317,7 @@ export function VoiceSettingsSection({
     toast.success(t('settings.voice.checkDone'))
   }
 
-  const progressPct =
-    downloading && progress
-      ? Math.min(
-          100,
-          Math.round(
-            (progress.downloaded /
-              Math.max(1, progress.total ?? (progress.downloaded > 0 ? progress.downloaded : 1))) *
-              100,
-          ),
-        )
-      : null
+  const progressPct = downloading ? voiceDownloadProgressPercent(progress) : null
 
   const deviceLabel =
     resolved.deviceId === 'default'
@@ -664,10 +653,18 @@ export function VoiceSettingsSection({
                       </div>
                     </div>
                     <div className="flex shrink-0 gap-1.5">
-                      {!st?.ready && !downloading ? (
+                      {activeModels[id] ? (
+                        <span
+                          className="text-meta text-ink-tertiary"
+                          data-testid={`settings-voice-downloading-${id}`}
+                        >
+                          {t('settings.voice.downloading')}
+                        </span>
+                      ) : !st?.ready ? (
                         <button
                           type="button"
                           className={btnCls}
+                          disabled={downloading}
                           onClick={() => {
                             if (id !== model) {
                               void updateSection('voice', (prev) => ({

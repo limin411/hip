@@ -4,6 +4,7 @@ import React from 'react'
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen, fireEvent, waitFor, cleanup } from '@testing-library/react'
 import { VoiceSettingsSection } from './VoiceSettingsSection'
+import { useVoiceDownloadStore } from '@/domain/voice/voiceDownloadStore'
 
 const updateSection = vi.fn().mockResolvedValue(undefined)
 const hipConfigState = {
@@ -75,6 +76,7 @@ vi.mock('sonner', () => ({ toast: { success: vi.fn(), error: vi.fn(), message: v
 describe('VoiceSettingsSection', () => {
   beforeEach(() => {
     cleanup()
+    useVoiceDownloadStore.getState()._resetForTests()
     updateSection.mockClear()
     hipConfigState.config.voice = { enabled: false, model: 'base' }
     voiceRuntimeStatus.mockResolvedValue({
@@ -101,7 +103,10 @@ describe('VoiceSettingsSection', () => {
     })
   })
 
-  afterEach(() => cleanup())
+  afterEach(() => {
+    cleanup()
+    useVoiceDownloadStore.getState()._resetForTests()
+  })
 
   it('shows only master switch when voice is disabled (opt-in)', () => {
     render(<VoiceSettingsSection />)
@@ -205,5 +210,44 @@ describe('VoiceSettingsSection', () => {
     expect(getUserMedia).not.toHaveBeenCalled()
     fireEvent.click(screen.getByTestId('settings-voice-refresh-devices'))
     await waitFor(() => expect(getUserMedia).toHaveBeenCalledTimes(1))
+  })
+
+  it('keeps download progress when remounting (page switch)', async () => {
+    let resolveDl!: (v: { path: string }) => void
+    voiceDownloadModel.mockImplementation(
+      () =>
+        new Promise<{ path: string }>((res) => {
+          resolveDl = res
+        }),
+    )
+    hipConfigState.config.voice = { enabled: true, model: 'base' }
+    const { unmount } = render(<VoiceSettingsSection />)
+    await waitFor(() => expect(screen.getByTestId('settings-voice-download')).toBeEnabled())
+    fireEvent.click(screen.getByTestId('settings-voice-download'))
+    await waitFor(() => expect(voiceDownloadModel).toHaveBeenCalledWith('base'))
+
+    useVoiceDownloadStore.getState().applyProgress({
+      model: 'base',
+      downloaded: 70_000_000,
+      total: 147_951_465,
+      phase: 'downloading',
+    })
+
+    unmount()
+    // Simulate navigating away then back — store must still hold progress.
+    render(<VoiceSettingsSection />)
+    await waitFor(() => {
+      expect(screen.getByTestId('settings-voice-download-progress')).toBeInTheDocument()
+    })
+    expect(screen.getByTestId('settings-voice-download')).toBeDisabled()
+    // In-flight download is shared; re-click (even if not disabled in DOM) must not re-invoke IPC.
+    const callsBefore = voiceDownloadModel.mock.calls.length
+    fireEvent.click(screen.getByTestId('settings-voice-download'))
+    expect(voiceDownloadModel).toHaveBeenCalledTimes(callsBefore)
+
+    resolveDl({ path: '/tmp/m' })
+    await waitFor(() => {
+      expect(screen.queryByTestId('settings-voice-download-progress')).not.toBeInTheDocument()
+    })
   })
 })

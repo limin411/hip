@@ -31,6 +31,25 @@ fn cancel_flags() -> &'static Mutex<HashMap<String, AtomicBool>> {
     CANCEL_FLAGS.get_or_init(|| Mutex::new(HashMap::new()))
 }
 
+/// Register an active download. Rejects if the same model is already downloading.
+fn begin_download(id: &str) -> Result<(), String> {
+    let mut map = cancel_flags().lock().map_err(|e| e.to_string())?;
+    if let Some(flag) = map.get(id) {
+        // false = still running; true = cancelled but not yet cleaned up
+        if !flag.load(Ordering::SeqCst) {
+            return Err("voice.download_in_progress".into());
+        }
+    }
+    map.insert(id.to_string(), AtomicBool::new(false));
+    Ok(())
+}
+
+fn end_download(id: &str) {
+    if let Ok(mut map) = cancel_flags().lock() {
+        map.remove(id);
+    }
+}
+
 fn env_truthy(name: &str) -> bool {
     match std::env::var(name) {
         Ok(v) => {
@@ -215,11 +234,22 @@ pub async fn voice_download_model(
         let _ = std::fs::remove_file(&dest);
     }
 
-    {
-        let mut map = cancel_flags().lock().map_err(|e| e.to_string())?;
-        map.insert(id.clone(), AtomicBool::new(false));
-    }
+    // Reject concurrent same-model downloads (second start would truncate .partial
+    // and make progress events thrash between two writers).
+    begin_download(&id)?;
 
+    let result = download_model_body(app, &id, spec, &models_dir, &dest).await;
+    end_download(&id);
+    result
+}
+
+async fn download_model_body(
+    app: AppHandle,
+    id: &str,
+    spec: &crate::voice_models::ModelSpec,
+    models_dir: &Path,
+    dest: &Path,
+) -> Result<serde_json::Value, String> {
     let partial = models_dir.join(format!("{}.partial", spec.filename));
     let _ = std::fs::remove_file(&partial);
 
@@ -238,7 +268,8 @@ pub async fn voice_download_model(
     if !resp.status().is_success() {
         return Err(format!("voice.http_status:{}", resp.status().as_u16()));
     }
-    let total = resp.content_length();
+    // Prefer HTTP Content-Length; fall back to catalog approx so UI can show a bar.
+    let total = resp.content_length().or(Some(spec.approx_bytes));
     let mut file = std::fs::File::create(&partial).map_err(|e| e.to_string())?;
     let mut downloaded: u64 = 0;
 
@@ -246,7 +277,7 @@ pub async fn voice_download_model(
         if cancel_flags()
             .lock()
             .ok()
-            .and_then(|m| m.get(&id).map(|f| f.load(Ordering::SeqCst)))
+            .and_then(|m| m.get(id).map(|f| f.load(Ordering::SeqCst)))
             .unwrap_or(false)
         {
             let _ = std::fs::remove_file(&partial);
@@ -262,7 +293,7 @@ pub async fn voice_download_model(
         let _ = app.emit(
             "voice://download-progress",
             DownloadProgress {
-                model: id.clone(),
+                model: id.to_string(),
                 downloaded,
                 total,
                 phase: "downloading".into(),
@@ -274,7 +305,7 @@ pub async fn voice_download_model(
     let _ = app.emit(
         "voice://download-progress",
         DownloadProgress {
-            model: id.clone(),
+            model: id.to_string(),
             downloaded,
             total,
             phase: "hashing".into(),
@@ -286,11 +317,11 @@ pub async fn voice_download_model(
         let _ = std::fs::remove_file(&partial);
         return Err("voice.download_hash_mismatch".into());
     }
-    std::fs::rename(&partial, &dest).map_err(|e| e.to_string())?;
+    std::fs::rename(&partial, dest).map_err(|e| e.to_string())?;
     let _ = app.emit(
         "voice://download-progress",
         DownloadProgress {
-            model: id.clone(),
+            model: id.to_string(),
             downloaded,
             total,
             phase: "ready".into(),

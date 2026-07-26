@@ -7,12 +7,8 @@ import { useCommandPaletteStore } from '@/store/commandPaletteStore'
 import { appendTranscript } from '@/domain/voice/appendTranscript'
 import { startVoiceCapture, type CaptureHandle } from '@/domain/voice/voiceCapture'
 import { resolveInputDevice } from '@/domain/voice/resolveInputDevice'
-import {
-  voiceModelStatus,
-  voiceRuntimeStatus,
-  voiceTranscribe,
-  voiceDownloadModel,
-} from '@/ipc/voice'
+import { startVoiceModelDownload } from '@/domain/voice/voiceDownloadStore'
+import { voiceModelStatus, voiceRuntimeStatus, voiceTranscribe } from '@/ipc/voice'
 
 export type VoiceMicState = 'idle' | 'recording' | 'transcribing' | 'unavailable' | 'downloading'
 
@@ -142,7 +138,7 @@ export function useVoiceDictation(opts: {
         if (!ok) return
         setState('downloading')
         try {
-          await voiceDownloadModel(model)
+          await startVoiceModelDownload(model)
         } catch {
           toast.error(t('voice.downloadFailed'))
           setState('idle')

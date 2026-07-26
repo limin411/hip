@@ -25,6 +25,8 @@ import {
   snip,
 } from './report-prose.js'
 import type {
+  CastSeat,
+  DecidePayload,
   PersonaId,
   RoundtableEdgeResult,
   RoundtableLang,
@@ -44,11 +46,8 @@ export interface RoundtableReportData {
     speeches: SpeechRecord[]
     stage: StageRecord
   }>
-  decision?: {
-    decision: string
-    residual: string[]
-    nextSteps: string[]
-  }
+  cast?: CastSeat[]
+  decision?: DecidePayload
   edges?: RoundtableEdgeResult[]
   earlyExit?: boolean
   generatedAt?: string
@@ -81,6 +80,8 @@ const LABELS: Record<
     discussion: string
     rebuttals: string
     decision: string
+    verdict: string
+    tradeoffs: string
     residual: string
     next: string
     early: string
@@ -138,6 +139,8 @@ const LABELS: Record<
     discussion: 'Discussion process',
     rebuttals: 'Rebuttals & challenges',
     decision: 'Decision (hip)',
+    verdict: 'Core verdict (hip)',
+    tradeoffs: 'Key tradeoffs',
     residual: 'Residual disagreements',
     next: 'Next steps',
     early: 'Ended early',
@@ -194,6 +197,8 @@ const LABELS: Record<
     discussion: '讨论过程',
     rebuttals: '反驳与挑战',
     decision: '决策（hip）',
+    verdict: '核心结论（hip）',
+    tradeoffs: '关键取舍',
     residual: '残留分歧',
     next: '后续步骤',
     early: '提前结束',
@@ -250,6 +255,8 @@ const LABELS: Record<
     discussion: '討論過程',
     rebuttals: '反駁與挑戰',
     decision: '決策（hip）',
+    verdict: '核心結論（hip）',
+    tradeoffs: '關鍵取捨',
     residual: '殘留分歧',
     next: '後續步驟',
     early: '提前結束',
@@ -306,6 +313,8 @@ const LABELS: Record<
     discussion: '議論の流れ',
     rebuttals: '反論と挑戦',
     decision: '決定 (hip)',
+    verdict: '核心結論 (hip)',
+    tradeoffs: '主なトレードオフ',
     residual: '残る対立',
     next: '次のステップ',
     early: '早期終了',
@@ -362,6 +371,8 @@ const LABELS: Record<
     discussion: '토론 과정',
     rebuttals: '반박과 도전',
     decision: '결정 (hip)',
+    verdict: '핵심 결론 (hip)',
+    tradeoffs: '핵심 트레이드오프',
     residual: '잔여 이견',
     next: '다음 단계',
     early: '조기 종료',
@@ -956,6 +967,20 @@ li { margin: 0.15rem 0; }
 }
 .skip-link:focus { left: 0; }
 .decision-lead { font-size: 1.12rem; font-weight: 600; line-height: 1.45; margin: 0 0 0.65rem; }
+.verdict-hero {
+  border: 1px solid var(--diag-decision-stroke);
+  background: linear-gradient(135deg, var(--diag-decision-fill), transparent 70%);
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.06);
+}
+.verdict-hero h2 { color: var(--diag-decision-stroke); font-size: 1.15rem; }
+.verdict-text {
+  font-size: 1.2rem; font-weight: 700; line-height: 1.45; margin: 0.15rem 0 0.55rem;
+  letter-spacing: -0.01em;
+}
+.verdict-conf {
+  display: inline-block; font-size: 0.75rem; font-weight: 600; color: var(--muted);
+  border: 1px solid var(--border); border-radius: 999px; padding: 0.12rem 0.55rem; margin-bottom: 0.35rem;
+}
 
 /* Markdown-lite blocks */
 .prose-h { margin: 0.75rem 0 0.4rem; font-size: 0.98rem; font-weight: 700; color: var(--ink); line-height: 1.35; }
@@ -993,6 +1018,9 @@ li { margin: 0.15rem 0; }
 
 function speakersInData(data: RoundtableReportData): PersonaId[] {
   const seen = new Set<PersonaId>()
+  for (const s of data.cast ?? []) {
+    if ((PERSONA_IDS as readonly string[]).includes(s.id)) seen.add(s.id)
+  }
   for (const r of data.rounds) {
     for (const s of r.speeches) {
       if ((PERSONA_IDS as readonly string[]).includes(s.speaker)) seen.add(s.speaker)
@@ -1006,9 +1034,16 @@ function speakersInData(data: RoundtableReportData): PersonaId[] {
   return PERSONA_IDS.filter((id) => seen.has(id))
 }
 
-function seatLabelMap(lang: RoundtableLang, seats: PersonaId[]): Record<string, string> {
+function seatLabelMap(
+  lang: RoundtableLang,
+  seats: PersonaId[],
+  cast?: CastSeat[],
+): Record<string, string> {
   const m: Record<string, string> = {}
-  for (const id of seats) m[id] = personaLabel(id, lang)
+  for (const id of seats) {
+    const hit = cast?.find((s) => s.id === id)
+    m[id] = hit?.title?.trim() || personaLabel(id, lang)
+  }
   return m
 }
 
@@ -1132,14 +1167,17 @@ function buildMainReport(data: RoundtableReportData, seats: PersonaId[]): string
   const edges = data.edges ?? []
   const rebutEdges = edges.filter((e) => e.relation === 'rebut')
   const otherEdges = edges.filter((e) => e.relation !== 'rebut')
-  const labelsMap = seatLabelMap(lang, seats)
+  const labelsMap = seatLabelMap(lang, seats, data.cast)
 
-  // Slim TOC: overview → decision → debate → rounds (collapsed) → roles
-  const toc: TocItem[] = [
-    { id: 'sec-overview', label: L.overview, depth: 1 },
-  ]
-  if (data.decision) toc.push({ id: 'sec-decision', label: L.decision, depth: 1 })
-  else toc.push({ id: 'sec-issue', label: L.issue, depth: 1 })
+  // TOC: verdict first → decision body → overview → process → rounds → roles
+  const toc: TocItem[] = []
+  if (data.decision?.verdict || data.decision?.decision) {
+    toc.push({ id: 'sec-verdict', label: L.verdict, depth: 1 })
+    toc.push({ id: 'sec-decision', label: L.decision, depth: 1 })
+  } else {
+    toc.push({ id: 'sec-issue', label: L.issue, depth: 1 })
+  }
+  toc.push({ id: 'sec-overview', label: L.overview, depth: 1 })
   if (edges.length > 0 || data.rounds.length > 0) {
     toc.push({ id: 'sec-process', label: L.process, depth: 1 })
   }
@@ -1210,10 +1248,32 @@ ${sectionOpen('sec-overview', L.overview, 'diagram-card')}
 </section>`
 
   const decide = data.decision
+  const verdictText = (decide?.verdict || '').trim()
+  const heroHtml =
+    decide && (verdictText || decide.decision)
+      ? `
+${sectionOpen('sec-verdict', L.verdict, 'decision verdict-hero')}
+  ${decide.confidence ? `<span class="verdict-conf">${esc(String(decide.confidence))}</span>` : ''}
+  <p class="verdict-text">${esc(verdictText || firstLine(decide.decision, 280))}</p>
+  <p class="meta"><strong>${esc(L.issue)}:</strong> ${esc(firstLine(data.issue, 140))}</p>
+  ${data.earlyExit ? `<p class="badge">${esc(L.early)}</p>` : ''}
+  ${backLink(L)}
+</section>`
+      : `
+${sectionOpen('sec-issue', L.issue)}
+  ${collapsibleProse(data.issue, { more: L.more, less: L.less }, 160)}
+  ${backLink(L)}
+</section>`
+
   const decideHtml = decide
     ? `
 ${sectionOpen('sec-decision', L.decision, 'decision')}
   ${decisionHtml(decide.decision, { more: L.more, less: L.less })}
+  ${
+    decide.keyTradeoffs?.length
+      ? `<h3>${esc(L.tradeoffs)}</h3><ul>${bullets(decide.keyTradeoffs.slice(0, 8))}</ul>`
+      : ''
+  }
   ${
     decide.residual.length || decide.nextSteps.length
       ? `<div class="stage-grid">
@@ -1232,14 +1292,9 @@ ${sectionOpen('sec-decision', L.decision, 'decision')}
   </div>`
       : ''
   }
-  ${data.earlyExit ? `<p class="badge">${esc(L.early)}</p>` : ''}
   ${backLink(L)}
 </section>`
-    : `
-${sectionOpen('sec-issue', L.issue)}
-  ${collapsibleProse(data.issue, { more: L.more, less: L.less }, 160)}
-  ${backLink(L)}
-</section>`
+      : ''
 
   // Debate: one mermaid + short storyline; full edge list collapsed
   const processHtml =
@@ -1363,8 +1418,9 @@ ${sectionOpen('sec-roles', L.subReports)}
     issueTitle,
     headerHtml,
     toc,
-    bodyHtml: `${overviewHtml}
+    bodyHtml: `${heroHtml}
         ${decideHtml}
+        ${overviewHtml}
         ${processHtml}
         ${roundsHtml}
         ${rolesHtml}`,
@@ -1378,11 +1434,12 @@ function buildPersonaReport(data: RoundtableReportData, persona: PersonaId): str
   const L = LABELS[lang]
   const when = data.generatedAt ?? new Date().toISOString()
   const issueTitle = data.issue.replace(/\s+/g, ' ').trim().slice(0, 80)
-  const name = personaLabel(persona, lang)
+  const castSeat = data.cast?.find((s) => s.id === persona)
+  const name = castSeat?.title?.trim() || personaLabel(persona, lang)
   const hue = PERSONA_HUE[persona]
   const edges = data.edges ?? []
   const seats = speakersInData(data)
-  const labelsMap = seatLabelMap(lang, seats)
+  const labelsMap = seatLabelMap(lang, seats, data.cast)
 
   const mySpeeches = data.rounds.flatMap((r) =>
     r.speeches
@@ -1523,6 +1580,11 @@ ${
   data.decision
     ? `
 ${sectionOpen('sec-decision', L.vsDecision, 'decision')}
+  ${
+    data.decision.verdict
+      ? `<p class="verdict-text" style="font-size:1.05rem">${esc(data.decision.verdict)}</p>`
+      : ''
+  }
   ${decisionHtml(data.decision.decision, { more: L.more, less: L.less })}
   <div class="stage-grid">
     <div class="stage-col">

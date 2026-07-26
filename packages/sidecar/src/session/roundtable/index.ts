@@ -27,8 +27,16 @@ export { completeFnsFromModelRunner, scriptedCompleteFns } from './complete.js'
 export { councilAgentId, isCouncilAgentId, councilDisplayName } from './ids.js'
 export { parseSpeechEnvelope, formatSpeechOutput } from './speech-schema.js'
 export { edgesFromEnvelope, dedupeEdges } from './edges.js'
+export {
+  getPersonaBrief,
+  defaultCastSeats,
+  resolveCast,
+  seatTitle,
+} from './persona-briefs.js'
 export type {
   ChairAction,
+  CastSeat,
+  DecidePayload,
   PersonaId,
   RoundtableEvent,
   RoundtableResult,

@@ -11,6 +11,7 @@ import type { NetworkPolicy } from '../network-policy.js'
 import type { PersonaId, RoundtableLang } from './types.js'
 import { councilAgentId, councilDisplayName } from './ids.js'
 import { advisorSystemPrompt } from './prompts.js'
+import type { CastSeat } from './types.js'
 
 /** Research-oriented allow-list: network + read-only local. No write/exec/delegation. */
 export const COUNCIL_ADVISOR_TOOLS = [
@@ -71,11 +72,19 @@ export async function runCouncilAdvisor(
     persona: PersonaId
     task: string
     focus: string
+    /** L1+L2+L3 system prompt from runner; falls back to base L1 if omitted. */
+    system?: string
+    /** L3 cast title for Agents panel. */
+    displayName?: string
+    cast?: CastSeat[] | null
   },
 ): Promise<string> {
   const agentId = councilAgentId(opts.persona)
-  const name = councilDisplayName(opts.persona, deps.language)
-  const system = advisorSystemPrompt(opts.persona, deps.language)
+  const name =
+    opts.displayName?.trim() ||
+    councilDisplayName(opts.persona, deps.language, opts.cast)
+  const system =
+    opts.system?.trim() || advisorSystemPrompt(opts.persona, deps.language)
 
   deps.onAgentStart({ agentId, name, persona: opts.persona, focus: opts.focus })
 

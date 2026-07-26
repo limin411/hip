@@ -63,8 +63,21 @@ function renderPlan(
         : lang === 'ko'
           ? '안건'
           : 'Agenda'
+  const castLabel =
+    lang === 'zh-CN' || lang === 'zh-TW'
+      ? '本场席位'
+      : lang === 'ja'
+        ? 'キャスト'
+        : lang === 'ko'
+          ? '캐스트'
+          : 'Cast'
   const lines = ev.agenda.map((a, i) => `${i + 1}. ${a}`).join('\n')
-  return `${title}\n- ${roundsLabel}: ${ev.rounds}\n- ${why}: ${ev.rationale}\n- ${agenda}:\n${lines}\n`
+  let body = `${title}\n- ${roundsLabel}: ${ev.rounds}\n- ${why}: ${ev.rationale}\n- ${agenda}:\n${lines}\n`
+  if (ev.cast?.length) {
+    const castLines = ev.cast.map((s) => `- **${s.title}** (\`${s.id}\`): ${s.lens}`).join('\n')
+    body += `- ${castLabel}:\n${castLines}\n`
+  }
+  return body
 }
 
 function renderStage(
@@ -122,6 +135,14 @@ function renderDecide(
   ev: Extract<RoundtableEvent, { kind: 'roundtable.decide' }>,
   lang: RoundtableLang,
 ): string {
+  const v =
+    lang === 'zh-CN' || lang === 'zh-TW'
+      ? '## 核心结论（hip）'
+      : lang === 'ja'
+        ? '## 核心結論 (hip)'
+        : lang === 'ko'
+          ? '## 핵심 결론 (hip)'
+          : '## Core verdict (hip)'
   const d =
     lang === 'zh-CN' || lang === 'zh-TW'
       ? '## 决策（hip）'
@@ -130,6 +151,14 @@ function renderDecide(
         : lang === 'ko'
           ? '## 결정 (hip)'
           : '## Decision (hip)'
+  const t =
+    lang === 'zh-CN' || lang === 'zh-TW'
+      ? '## 关键取舍'
+      : lang === 'ja'
+        ? '## 主なトレードオフ'
+        : lang === 'ko'
+          ? '## 핵심 트레이드오프'
+          : '## Key tradeoffs'
   const r =
     lang === 'zh-CN' || lang === 'zh-TW'
       ? '## 残留分歧'
@@ -152,7 +181,18 @@ function renderDecide(
   const steps = ev.nextSteps.length
     ? ev.nextSteps.map((x, i) => `${i + 1}. ${x}`).join('\n')
     : '1. —'
-  return `\n${d}\n${ev.decision.trim()}\n\n${r}\n${residual}\n\n${n}\n${steps}\n`
+  const tradeoffs =
+    ev.keyTradeoffs?.length
+      ? `\n${t}\n${ev.keyTradeoffs.map((x) => `- ${x}`).join('\n')}\n`
+      : ''
+  const conf =
+    ev.confidence
+      ? lang === 'zh-CN' || lang === 'zh-TW'
+        ? `\n*置信度: ${ev.confidence}*\n`
+        : `\n*Confidence: ${ev.confidence}*\n`
+      : ''
+  const verdict = (ev.verdict || '').trim() || ev.decision.trim().split('\n')[0] || ''
+  return `\n${v}\n${verdict}\n${conf}\n${d}\n${ev.decision.trim()}\n${tradeoffs}\n${r}\n${residual}\n\n${n}\n${steps}\n`
 }
 
 function roundTitle(lang: RoundtableLang, round: number): string {

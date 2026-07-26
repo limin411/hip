@@ -36,10 +36,27 @@ const sample = {
       stage: { round: 2, agreed: ['试点'], open: [] },
     },
   ],
+  cast: [
+    {
+      id: 'strategist' as const,
+      title: '长期架构官',
+      lens: '长期 API 边界',
+      mustCover: ['不可逆承诺'],
+    },
+    {
+      id: 'skeptic' as const,
+      title: '成本怀疑论者',
+      lens: '成本与失败模式',
+      mustCover: ['最坏下行'],
+    },
+  ],
   decision: {
+    verdict: '分阶段推进 A：先试点再 RFC，拒绝一次性重写。',
     decision: '分阶段推进 A\n\n- 先试点\n- 再 RFC',
+    keyTradeoffs: ['速度换风险可控'],
     residual: ['时间风险'],
     nextSteps: ['试点', 'RFC'],
+    confidence: 'high' as const,
   },
   edges: [
     {
@@ -65,10 +82,24 @@ describe('roundtable report html template', () => {
     const html = buildRoundtableReportHtml(sample)
     expect(ROUNDTABLE_REPORT_FILENAME).toBe('roundtable-report.html')
     expect(html).toContain('圆桌会议报告')
-    expect(html).toContain('战略家')
+    expect(html).toContain('长期架构官')
     expect(html).toContain('分阶段推进 A')
     expect(html).toContain('&lt;script&gt;')
     expect(html).not.toContain('Should we rewrite the API? <script>')
+  })
+
+  it('puts core verdict hero before overview/process', () => {
+    const html = buildRoundtableReportHtml(sample)
+    const v = html.indexOf('id="sec-verdict"')
+    const o = html.indexOf('id="sec-overview"')
+    const p = html.indexOf('id="sec-process"')
+    expect(v).toBeGreaterThan(0)
+    expect(o).toBeGreaterThan(v)
+    expect(p).toBeGreaterThan(o)
+    expect(html).toMatch(/class="[^"]*verdict-hero/)
+    expect(html).toContain('核心结论')
+    expect(html).toContain('拒绝一次性重写')
+    expect(html).toContain('关键取舍')
   })
 
   it('uses pure HTML diagrams (no mermaid CDN / no spaghetti SVG)', () => {

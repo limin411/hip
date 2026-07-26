@@ -15,6 +15,32 @@ export const PERSONA_IDS: readonly PersonaId[] = [
 
 export type RoundtableLang = 'en' | 'zh-CN' | 'zh-TW' | 'ja' | 'ko'
 
+/** L3 meeting-specific seat (base PersonaId + issue lenses). */
+export interface CastSeat {
+  id: PersonaId
+  /** Meeting-specific display title. */
+  title: string
+  /** How this seat views THIS issue. */
+  lens: string
+  /** Concrete angles / questions for this meeting. */
+  mustCover: string[]
+  /** Optional taboos for this meeting. */
+  mustNot?: string[]
+}
+
+export type DecideConfidence = 'high' | 'medium' | 'low'
+
+export interface DecidePayload {
+  /** 1–3 sentence standalone executive answer. */
+  verdict: string
+  /** Structured body: adopted / rejected / boundaries. */
+  decision: string
+  keyTradeoffs: string[]
+  residual: string[]
+  nextSteps: string[]
+  confidence?: DecideConfidence
+}
+
 export type RoundtablePhase =
   | 'routing'
   | 'normal_reply'
@@ -34,6 +60,8 @@ export type ChairAction =
       rounds: 2 | 3 | 4
       agenda: string[]
       rationale: string
+      /** Optional L3 cast; runner always resolves to a normalized cast. */
+      cast?: CastSeat[]
     }
   | {
       type: 'open_round'
@@ -52,12 +80,9 @@ export type ChairAction =
       earlyExit?: boolean
       earlyExitReason?: string
     }
-  | {
+  | ({
       type: 'decide'
-      decision: string
-      residual: string[]
-      nextSteps: string[]
-    }
+    } & DecidePayload)
 
 export type RoundtableEvent =
   | { kind: 'roundtable.route'; convene: boolean; reason?: string }
@@ -66,6 +91,7 @@ export type RoundtableEvent =
       rounds: number
       agenda: string[]
       rationale: string
+      cast?: CastSeat[]
     }
   | {
       kind: 'roundtable.round_open'
@@ -88,12 +114,9 @@ export type RoundtableEvent =
       earlyExitReason?: string
       nextFocus?: string
     }
-  | {
+  | ({
       kind: 'roundtable.decide'
-      decision: string
-      residual: string[]
-      nextSteps: string[]
-    }
+    } & DecidePayload)
   | {
       kind: 'roundtable.done'
       earlyExit?: boolean
@@ -137,11 +160,9 @@ export interface RoundtableReportPayload {
   agenda: string[]
   rationale: string
   rounds: RoundtableReportRound[]
-  decision?: {
-    decision: string
-    residual: string[]
-    nextSteps: string[]
-  }
+  /** Normalized L3 cast used for the meeting. */
+  cast?: CastSeat[]
+  decision?: DecidePayload
   earlyExit?: boolean
 }
 
@@ -216,6 +237,8 @@ export interface RunRoundtableArgs {
     round: number
     focus: string
     agentId: string
+    /** L3 display title for Agents panel. */
+    displayName?: string
   }) => Promise<string>
   roundsMin?: number
   roundsMax?: number

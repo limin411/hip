@@ -209,7 +209,7 @@ export async function tryRunRoundtableTurn(
       },
       // Real subagent path for council — not llm.complete projection.
       runAdvisor: council
-        ? async ({ speaker, user, focus }) => {
+        ? async ({ speaker, system, user, focus, displayName }) => {
             let toolSeq = 0
             return runCouncilAdvisor(
               {
@@ -284,7 +284,13 @@ export async function tryRunRoundtableTurn(
                   finishCouncilAgent(id, text)
                 },
               },
-              { persona: speaker, task: user, focus },
+              {
+                persona: speaker,
+                task: user,
+                focus,
+                system,
+                ...(displayName ? { displayName } : {}),
+              },
             )
           }
         : undefined,
@@ -316,6 +322,7 @@ export async function tryRunRoundtableTurn(
           agenda: result.report.agenda,
           rationale: result.report.rationale,
           rounds: result.report.rounds,
+          cast: result.report.cast,
           decision: result.report.decision,
           edges: result.edges,
           earlyExit: result.report.earlyExit ?? result.earlyExit,

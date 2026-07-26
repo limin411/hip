@@ -1,5 +1,6 @@
 /**
  * Roundtable multi-round chair loop (docs/design/roundtable-loop.md).
+ * L1/L2/L3 cast + verdict: docs/design/roundtable-dynamic-cast-verdict.md
  */
 import {
   CHAIR_PARSE_RETRIES,
@@ -12,15 +13,18 @@ import {
 } from './constants.js'
 import { resolveRoundtableLang } from './detect.js'
 import { updateMinutes } from './minutes.js'
+import { castIds, castSeatMap, defaultCastSeats, resolveCast } from './persona-briefs.js'
 import {
   advisorSystemPrompt,
   advisorUserPrompt,
   chairSystemPrompt,
   chairUserForDecide,
+  chairUserForDecideQualityRetry,
   chairUserForOpenRound,
   chairUserForPlan,
   chairUserForRoute,
   chairUserForStage,
+  decideQualityFailures,
 } from './prompts.js'
 import { dedupeEdges, edgesFromEnvelope, type CouncilEdge } from './edges.js'
 import { councilAgentId } from './ids.js'
@@ -28,17 +32,18 @@ import { renderEventMarkdown } from './render.js'
 import { parseChairActionFromText } from './schema.js'
 import { parseSpeechEnvelope } from './speech-schema.js'
 import { pickReportSpeechContent } from './report-prose.js'
-import {
-  PERSONA_IDS,
-  type ChairAction,
-  type PersonaId,
-  type RunRoundtableArgs,
-  type RoundtableEvent,
-  type RoundtableReportPayload,
-  type RoundtableReportRound,
-  type RoundtableResult,
-  type SpeechRecord,
-  type StageRecord,
+import type {
+  CastSeat,
+  ChairAction,
+  DecidePayload,
+  PersonaId,
+  RunRoundtableArgs,
+  RoundtableEvent,
+  RoundtableReportPayload,
+  RoundtableReportRound,
+  RoundtableResult,
+  SpeechRecord,
+  StageRecord,
 } from './types.js'
 
 function throwIfAborted(signal: AbortSignal): void {
@@ -46,6 +51,17 @@ function throwIfAborted(signal: AbortSignal): void {
     const err = new Error('aborted')
     err.name = 'AbortError'
     throw err
+  }
+}
+
+function toDecidePayload(d: Extract<ChairAction, { type: 'decide' }>): DecidePayload {
+  return {
+    verdict: d.verdict,
+    decision: d.decision,
+    keyTradeoffs: d.keyTradeoffs ?? [],
+    residual: d.residual,
+    nextSteps: d.nextSteps,
+    ...(d.confidence ? { confidence: d.confidence } : {}),
   }
 }
 
@@ -72,6 +88,7 @@ export async function runRoundtable(args: RunRoundtableArgs): Promise<Roundtable
   let roundsRan = 0
   let planRationale = ''
   let planAgenda: string[] = []
+  let meetingCast: CastSeat[] = defaultCastSeats(lang)
   const reportRounds: RoundtableReportRound[] = []
   let reportDecision: RoundtableReportPayload['decision']
   const stages: StageRecord[] = []
@@ -88,6 +105,7 @@ export async function runRoundtable(args: RunRoundtableArgs): Promise<Roundtable
         agenda: planAgenda,
         rationale: planRationale,
         rounds: reportRounds,
+        cast: meetingCast,
         ...(reportDecision ? { decision: reportDecision } : {}),
         ...(earlyExit ? { earlyExit: true } : {}),
       },
@@ -113,6 +131,7 @@ export async function runRoundtable(args: RunRoundtableArgs): Promise<Roundtable
   const chairOnce = async (
     expect: ChairAction['type'] | ChairAction['type'][],
     user: string,
+    opts?: { softVerdict?: boolean },
   ): Promise<ChairAction> => {
     const allowed = new Set(Array.isArray(expect) ? expect : [expect])
     let lastErr: Error | undefined
@@ -133,7 +152,11 @@ export async function runRoundtable(args: RunRoundtableArgs): Promise<Roundtable
         tag: `chair:${[...allowed].join('|')}`,
       })
       try {
-        const action = parseChairActionFromText(text)
+        // Last retry for decide: soft-derive verdict so the meeting can finish.
+        const softVerdict =
+          opts?.softVerdict === true ||
+          (allowed.has('decide') && attempt === CHAIR_PARSE_RETRIES)
+        const action = parseChairActionFromText(text, { lang, softVerdict })
         if (!allowed.has(action.type)) {
           throw new Error(`expected ${[...allowed].join('|')}, got ${action.type}`)
         }
@@ -170,7 +193,7 @@ export async function runRoundtable(args: RunRoundtableArgs): Promise<Roundtable
       ...(route.reason ? { reason: route.reason } : {}),
     })
 
-    // ── Plan ──
+    // ── Plan (+ L3 cast) ──
     const plan = await chairOnce('plan', chairUserForPlan(args.issue, route.reason))
     if (plan.type !== 'plan') throw new Error('expected plan')
     let N = plan.rounds
@@ -180,11 +203,16 @@ export async function runRoundtable(args: RunRoundtableArgs): Promise<Roundtable
     roundsPlanned = N
     planAgenda = agenda
     planRationale = plan.rationale
+    meetingCast = resolveCast(plan.cast, lang)
+    const seatById = castSeatMap(meetingCast)
+    const castIdList = castIds(meetingCast)
+
     emit({
       kind: 'roundtable.plan',
       rounds: N,
       agenda,
       rationale: plan.rationale,
+      cast: meetingCast,
     })
 
     // ── Rounds ──
@@ -200,15 +228,21 @@ export async function runRoundtable(args: RunRoundtableArgs): Promise<Roundtable
           round: r,
           agendaLine: agenda[r - 1] ?? `Round ${r}`,
           plannedRounds: N,
+          cast: meetingCast,
         }),
       )
       if (open.type !== 'open_round') throw new Error('expected open_round')
-      // Council: full 5-seat roster in parallel every round (no "waiting" seats left idle).
-      // Loop engine: honor chair's speaker list (capped).
-      let speakers = open.speakers.slice(0, maxPerRound)
+
+      // Council: speak the meeting cast (not always hard-coded five).
+      // Loop: honor chair speakers ∩ cast; empty → full cast.
+      let speakers: PersonaId[]
       if (councilMode) {
-        speakers = [...PERSONA_IDS]
+        speakers = castIdList.slice(0, maxPerRound)
+      } else {
+        const filtered = open.speakers.filter((id) => seatById.has(id)).slice(0, maxPerRound)
+        speakers = filtered.length ? filtered : castIdList.slice(0, maxPerRound)
       }
+
       const speakMode: 'serial_react' | 'parallel_then_synth' =
         councilMode && speakers.length > 1
           ? 'parallel_then_synth'
@@ -232,22 +266,25 @@ export async function runRoundtable(args: RunRoundtableArgs): Promise<Roundtable
         tagSuffix: string,
       ): Promise<SpeechRecord> => {
         const agentId = councilAgentId(speaker)
+        const seat = seatById.get(speaker) ?? meetingCast[0]!
         await args.advisorHooks?.onStart?.({
           speaker,
           round: r,
           focus: open.focus,
           agentId,
         })
-        const system = advisorSystemPrompt(speaker, lang)
-        const user = advisorUserPrompt({
-          issue: args.issue,
-          minutes,
-          focus: open.focus,
-          priorThisRound: prior,
+        const promptCtx = {
           persona: speaker,
           lang,
-        })
-        // Prefer real managed-agent delegation when provided (council path).
+          issue: args.issue,
+          agenda,
+          focus: open.focus,
+          minutes,
+          priorThisRound: prior,
+          seat,
+        }
+        const system = advisorSystemPrompt(promptCtx)
+        const user = advisorUserPrompt(promptCtx)
         const speech = args.runAdvisor
           ? await args.runAdvisor({
               speaker,
@@ -257,6 +294,7 @@ export async function runRoundtable(args: RunRoundtableArgs): Promise<Roundtable
               round: r,
               focus: open.focus,
               agentId,
+              displayName: seat.title,
             })
           : await args.llm.complete({
               system,
@@ -269,7 +307,6 @@ export async function runRoundtable(args: RunRoundtableArgs): Promise<Roundtable
             })
         const raw = speech.trim() || '…'
         const envelope = councilMode ? parseSpeechEnvelope(raw) : { acts: [], prose: raw }
-        // Prefer cleaned full agent output for the HTML report (not a short envelope.prose).
         const content = pickReportSpeechContent(raw, envelope.prose)
         if (councilMode) {
           allEdges.push(...edgesFromEnvelope(r, speaker, envelope))
@@ -356,23 +393,49 @@ export async function runRoundtable(args: RunRoundtableArgs): Promise<Roundtable
       }
     }
 
-    // ── Decide ──
+    // ── Decide (verdict + quality gate) ──
     throwIfBudget()
-    const decide = await chairOnce(
+    let decide = await chairOnce(
       'decide',
-      chairUserForDecide({ issue: args.issue, minutes }),
+      chairUserForDecide({ issue: args.issue, minutes, cast: meetingCast }),
     )
     if (decide.type !== 'decide') throw new Error('expected decide')
-    reportDecision = {
-      decision: decide.decision,
-      residual: decide.residual,
-      nextSteps: decide.nextSteps,
+
+    let payload = toDecidePayload(decide)
+    let fails = decideQualityFailures(payload)
+    if (fails.length) {
+      const retry = await chairOnce(
+        'decide',
+        chairUserForDecideQualityRetry({
+          issue: args.issue,
+          minutes,
+          cast: meetingCast,
+          failures: fails,
+          priorJsonHint: JSON.stringify({
+            verdict: payload.verdict,
+            decision: payload.decision,
+            keyTradeoffs: payload.keyTradeoffs,
+            residual: payload.residual,
+            nextSteps: payload.nextSteps,
+          }),
+        }),
+        { softVerdict: true },
+      )
+      if (retry.type === 'decide') {
+        const second = toDecidePayload(retry)
+        const fails2 = decideQualityFailures(second)
+        // Prefer second if it passes or is no worse on verdict length.
+        if (!fails2.length || second.verdict.length >= payload.verdict.length) {
+          payload = second
+          fails = fails2
+        }
+      }
     }
+
+    reportDecision = payload
     emit({
       kind: 'roundtable.decide',
-      decision: decide.decision,
-      residual: decide.residual,
-      nextSteps: decide.nextSteps,
+      ...payload,
     })
     emit({
       kind: 'roundtable.done',
@@ -400,23 +463,27 @@ export async function runRoundtable(args: RunRoundtableArgs): Promise<Roundtable
       (e instanceof Error && (e.name === 'AbortError' || e.message === 'aborted'))
     const budgetHit = reason.includes('wall-clock') || reason.includes('max chair')
 
-    // If we already convened and have minutes, force a synthetic decide on budget errors.
     if (convened && budgetHit && !aborted && minutes.trim()) {
+      const verdict =
+        lang === 'zh-CN' || lang === 'zh-TW'
+          ? '（预算用尽）基于已有讨论的临时结论：优先处理未决议题。'
+          : '(Budget exhausted.) Interim conclusion: prioritize unresolved open items.'
       const decision =
         lang === 'zh-CN' || lang === 'zh-TW'
           ? `（时间/步数预算用尽）基于已有讨论的临时结论：请优先处理未决议题。\n\n纪要摘要：\n${minutes.slice(0, 1200)}`
           : `(Budget exhausted.) Interim conclusion from discussion so far:\n\n${minutes.slice(0, 1200)}`
-      reportDecision = {
+      const payload: DecidePayload = {
+        verdict,
         decision,
+        keyTradeoffs: [],
         residual: ['Meeting ended early due to budget'],
         nextSteps: ['Review partial transcript', 'Re-run roundtable if needed'],
       }
+      reportDecision = payload
       earlyExit = true
       emit({
         kind: 'roundtable.decide',
-        decision,
-        residual: ['Meeting ended early due to budget'],
-        nextSteps: ['Review partial transcript', 'Re-run roundtable if needed'],
+        ...payload,
       })
       emit({
         kind: 'roundtable.done',
@@ -462,7 +529,6 @@ export async function runRoundtable(args: RunRoundtableArgs): Promise<Roundtable
         ...reportField(),
       }
     }
-    // Best-effort decide note on hard failure if we already convened
     const failNote =
       lang === 'zh-CN' || lang === 'zh-TW'
         ? `\n\n*(圆桌引擎出错：${reason})*\n`

@@ -7,11 +7,26 @@ function j(obj: unknown): string {
   return JSON.stringify(obj)
 }
 
+/** Valid high-quality decide payload (passes structural quality bar). */
+function decideOk(overrides: Record<string, unknown> = {}): string {
+  return j({
+    type: 'decide',
+    verdict: 'Ship a phased rewrite with a two-week pilot before full cutover.',
+    decision:
+      'Adopt phased path A: pilot first, then RFC. Reject big-bang rewrite due to risk and cost.',
+    keyTradeoffs: ['Speed vs risk'],
+    residual: [],
+    nextSteps: ['Run two-week pilot', 'Write RFC'],
+    confidence: 'high',
+    ...overrides,
+  })
+}
+
 describe('runRoundtable', () => {
   it('council runs all 5 seats in parallel each round and collects edges', async () => {
     const starts: string[] = []
     const finishes: string[] = []
-    // Council forces full 5-seat parallel roster every round.
+    // Council default cast = full 5-seat parallel roster every round.
     const fiveSpeeches = (round: number) =>
       [
         JSON.stringify({
@@ -61,7 +76,11 @@ describe('runRoundtable', () => {
       }),
       ...fiveSpeeches(2),
       j({ type: 'stage', round: 2, agreed: ['phased'], open: [] }),
-      j({ type: 'decide', decision: 'phased', residual: [], nextSteps: ['1'] }),
+      decideOk({
+        verdict: 'Phased rewrite is the right call.',
+        decision:
+          'Adopt phased delivery over big-bang rewrite; residual cost risk stays open for RFC.',
+      }),
     ])
     const result = await runRoundtable({
       issue: 'api rewrite',
@@ -87,7 +106,9 @@ describe('runRoundtable', () => {
     expect(result.edges?.some((e) => e.relation === 'rebut')).toBe(true)
     expect(result.report?.rounds).toHaveLength(2)
     expect(result.report?.rounds[0]?.speeches).toHaveLength(5)
-    expect(result.report?.decision?.decision).toBe('phased')
+    expect(result.report?.decision?.verdict).toContain('Phased rewrite')
+    expect(result.report?.cast?.length).toBe(5)
+    expect(result.markdown).toContain('Core verdict')
   })
 
   it('runAdvisor is used instead of llm.complete for advisor seats', async () => {
@@ -110,7 +131,7 @@ describe('runRoundtable', () => {
         speakers: ['operator'],
       }),
       j({ type: 'stage', round: 2, agreed: ['done'], open: [] }),
-      j({ type: 'decide', decision: 'go', residual: [], nextSteps: ['1'] }),
+      decideOk(),
     ])
     // Wrap complete to count advisor tags (should stay 0 when runAdvisor is set)
     const baseComplete = llm.complete.bind(llm)
@@ -124,8 +145,10 @@ describe('runRoundtable', () => {
       signal: new AbortController().signal,
       llm,
       councilMode: true,
-      runAdvisor: async ({ agentId }) => {
+      runAdvisor: async ({ agentId, system, displayName }) => {
         advisorIds.push(agentId)
+        expect(system).toMatch(/Mission|lens|Skeptic|Strategist|must/i)
+        if (displayName) expect(displayName.length).toBeGreaterThan(0)
         return `speech from ${agentId}`
       },
     })
@@ -134,6 +157,86 @@ describe('runRoundtable', () => {
     expect(advisorIds.length).toBe(10) // 5 seats × 2 rounds, full parallel
     expect(advisorIds.every((id) => id.startsWith('roundtable:'))).toBe(true)
     expect(new Set(advisorIds).size).toBe(5)
+  })
+
+  it('L3 cast of 3 seats limits council speakers and injects custom titles', async () => {
+    const advisorIds: string[] = []
+    const titles: string[] = []
+    const cast = [
+      {
+        id: 'skeptic',
+        title: 'Reg risk challenger',
+        lens: 'Regulatory failure modes for this product',
+        mustCover: ['Who is liable if model errs?'],
+      },
+      {
+        id: 'operator',
+        title: 'Launch operator',
+        lens: 'Ship checklist and ownership',
+        mustCover: ['Critical path this quarter'],
+      },
+      {
+        id: 'audience',
+        title: 'User trust advocate',
+        lens: 'Trust and clarity for end users',
+        mustCover: ['What confuses non-experts?'],
+      },
+    ]
+    // Speeches come from runAdvisor — chair scripts only (no advisor complete queue).
+    const llm = scriptedCompleteFns([
+      j({ type: 'route', convene: true }),
+      j({
+        type: 'plan',
+        rounds: 2,
+        agenda: ['risk', 'ship'],
+        rationale: 'narrow cast',
+        cast,
+      }),
+      j({
+        type: 'open_round',
+        round: 1,
+        focus: 'risk',
+        speakers: ['skeptic', 'operator', 'audience'],
+      }),
+      j({ type: 'stage', round: 1, agreed: ['a'], open: [], nextFocus: 'ship' }),
+      j({
+        type: 'open_round',
+        round: 2,
+        focus: 'ship',
+        speakers: ['operator'],
+      }),
+      j({ type: 'stage', round: 2, agreed: ['b'], open: [] }),
+      decideOk({
+        verdict: 'Launch with trust gates and explicit liability owners.',
+        decision:
+          'Adopt operator checklist plus skeptic liability mapping; reject silent launch without user-facing risk copy.',
+      }),
+    ])
+    const result = await runRoundtable({
+      issue: 'Should we ship AI agents that can move money?',
+      language: 'en',
+      signal: new AbortController().signal,
+      llm,
+      councilMode: true,
+      runAdvisor: async ({ agentId, system, displayName, user }) => {
+        advisorIds.push(agentId)
+        if (displayName) titles.push(displayName)
+        expect(system).toMatch(/Reg risk|Launch operator|User trust|Mission|lens/i)
+        expect(user).toContain('Should we ship AI agents')
+        return `speech ${agentId}`
+      },
+    })
+    expect(result.phase).toBe('done')
+    expect(result.advisorCalls).toBe(6) // 3 × 2
+    expect(new Set(advisorIds).size).toBe(3)
+    expect(advisorIds).not.toContain('roundtable:strategist')
+    expect(titles).toContain('Reg risk challenger')
+    expect(result.report?.cast?.map((c) => c.id).sort()).toEqual([
+      'audience',
+      'operator',
+      'skeptic',
+    ])
+    expect(result.markdown).toContain('Reg risk challenger')
   })
 
   it('route skip → normal reply, zero advisor calls', async () => {
@@ -195,9 +298,10 @@ describe('runRoundtable', () => {
         agreed: ['phased A'],
         open: [],
       }),
-      j({
-        type: 'decide',
-        decision: 'Adopt phased A',
+      decideOk({
+        verdict: 'Adopt phased A with a spike before full rewrite.',
+        decision:
+          'Adopt phased A: spike then RFC. Reject big-bang due to timeline risk and user reliability needs.',
         residual: ['timeline risk'],
         nextSteps: ['spike', 'RFC'],
       }),
@@ -217,6 +321,7 @@ describe('runRoundtable', () => {
     expect(result.markdown).toContain('Strategist:')
     expect(result.markdown).toContain('Stage conclusion')
     expect(result.markdown).toContain('Adopt phased A')
+    expect(result.markdown).toContain('Core verdict')
     expect(result.markdown).toContain('Next steps')
   })
 
@@ -244,10 +349,10 @@ describe('runRoundtable', () => {
         earlyExit: true,
         earlyExitReason: 'enough agreement',
       }),
-      j({
-        type: 'decide',
-        decision: 'Go',
-        residual: [],
+      decideOk({
+        verdict: 'Go with the consensus path from round 1.',
+        decision:
+          'Enough agreement after round 1: ship the clear consensus path without further rounds.',
         nextSteps: ['do it'],
       }),
     ])
@@ -260,7 +365,7 @@ describe('runRoundtable', () => {
     expect(result.earlyExit).toBe(true)
     expect(result.roundsRan).toBe(1)
     expect(result.advisorCalls).toBe(1)
-    expect(result.markdown).toContain('Go')
+    expect(result.markdown).toContain('consensus path')
   })
 
   it('abort mid-meeting keeps partial markdown', async () => {
@@ -316,7 +421,7 @@ describe('runRoundtable', () => {
         mode: 'serial_react',
       }),
       j({ type: 'stage', round: 2, agreed: ['z'], open: [] }),
-      j({ type: 'decide', decision: 'ok', residual: [], nextSteps: ['n'] }),
+      decideOk(),
     ]
     const hybrid = {
       complete: async ({ tag, signal }: { tag: string; signal: AbortSignal }) => {
@@ -371,11 +476,11 @@ describe('runRoundtable', () => {
         nextFocus: 'x',
       }),
       // round 2 open would be skipped if advisorCalls>=max at loop head — after r1 we have 2 calls
-      j({
-        type: 'decide',
-        decision: 'forced wrap',
-        residual: [],
-        nextSteps: ['stop'],
+      decideOk({
+        verdict: 'Forced wrap due to advisor budget.',
+        decision:
+          'Meeting hit max advisor calls; wrap with partial consensus and re-run if needed.',
+        nextSteps: ['stop', 're-run if needed'],
       }),
     ])
     const result = await runRoundtable({
@@ -387,6 +492,6 @@ describe('runRoundtable', () => {
     })
     expect(result.phase).toBe('done')
     expect(result.advisorCalls).toBe(2)
-    expect(result.markdown).toContain('forced wrap')
+    expect(result.markdown).toContain('Forced wrap')
   })
 })

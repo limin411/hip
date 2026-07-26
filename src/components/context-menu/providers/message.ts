@@ -4,6 +4,7 @@ import { setComposerQuote } from '@/components/command-palette/composerBridge'
 import { sessionService } from '@/domain'
 import { exportSessionDebugBundle } from '@/lib/exportSessionDebug'
 import { normalizeMessageContent } from '@/lib/normalizeMessageContent'
+import { stripRoundtableFrame } from '@/lib/roundtable'
 import type {
   ContextMenuBuildContext,
   ContextMenuItemDef,
@@ -11,9 +12,14 @@ import type {
   ContextRequest,
 } from '../types'
 
-/** Display/copy text: user raw content; assistant normalized (matches bubble display). */
+/**
+ * Display/copy text matching the bubble (never leaks roundtable system framing).
+ * User: strip `<!--hip.roundtable.v1-->` wire frame if present.
+ * Assistant: normalize markdown/content for display.
+ */
 export function messageCopyText(message: Message): string {
-  return message.role === 'user' ? message.content : normalizeMessageContent(message.content)
+  if (message.role === 'user') return stripRoundtableFrame(message.content)
+  return normalizeMessageContent(message.content)
 }
 
 /** Quote body prepended on send (markdown blockquote + trailing blank line). */

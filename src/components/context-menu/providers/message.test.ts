@@ -161,6 +161,21 @@ describe('messageProvider', () => {
     expect(copyText).toHaveBeenCalledWith('hello world')
   })
 
+  it('copy strips roundtable system framing from user messages', async () => {
+    const copyText = vi.fn(async () => true)
+    const wire =
+      '<!--hip.roundtable.v1-->\nMode: Roundtable…\n\n---user---\n\nShould we rewrite the API?'
+    const msg = makeMessage({ id: 'm-rt', role: 'user', content: wire })
+    const items = messageProvider(
+      { kind: 'message', payload: { message: msg, isLastAssistant: false, sessionId: 's1' } },
+      makeCtx({ copyText }),
+    )
+    await items.find((i) => i.id === 'message.copy')!.run()
+    expect(copyText).toHaveBeenCalledWith('Should we rewrite the API?')
+    expect(copyText.mock.calls[0]![0]).not.toContain('hip.roundtable')
+    expect(copyText.mock.calls[0]![0]).not.toContain('Mode: Roundtable')
+  })
+
   it('quote sets pending quote chip via setComposerQuote (does not dump into draft)', () => {
     let quote: string | null = null
     let draft = 'existing draft'

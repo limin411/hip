@@ -216,7 +216,7 @@ export function AppSidebar() {
 
   return (
     <aside
-      className="glass-surface flex h-full w-[260px] shrink-0 flex-col border-r border-glass"
+      className="flex h-full w-[260px] shrink-0 flex-col border-r border-border bg-surface"
       data-testid="app-sidebar"
       aria-label={t('sidebar.aria')}
     >

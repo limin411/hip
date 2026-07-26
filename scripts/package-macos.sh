@@ -20,10 +20,11 @@
 #   yarn package:macos
 #   # 或：bash scripts/package-macos.sh
 #
-# 语音引擎（whisper-cli）：
-#   正式发行包默认捆绑引擎（模型仍按需下载）。
+# 语音引擎（whisper-cli）— 自包含树，不依赖用户机 Homebrew：
+#   正式发行包默认捆绑（HIP_BUNDLE_WHISPER 默认 1；模型仍按需下载）。
 #   跳过：HIP_BUNDLE_WHISPER=0 yarn package:macos
-#   强制重编引擎：HIP_WHISPER_REBUILD=1 yarn package:macos
+#   强制重编：HIP_WHISPER_REBUILD=1 yarn package:macos
+#   见 src-tauri/resources/whisper/README.md（macOS 生产 / Windows 生产 / 开发）
 #
 set -euo pipefail
 

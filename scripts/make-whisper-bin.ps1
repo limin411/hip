@@ -1,9 +1,15 @@
-# Stage whisper-cli.exe under src-tauri/resources/whisper/<triple>/ for release bundles.
-# Used by package-windows.ps1 when HIP_BUNDLE_WHISPER=1 (release default).
+# Stage a self-contained whisper-cli.exe tree for Windows release bundles.
+#
+# Layout (production — package-windows.ps1 when HIP_BUNDLE_WHISPER=1):
+#   src-tauri/resources/whisper/<triple>/
+#     whisper-cli.exe
+#     *.dll   (same directory — Windows PE loads adjacent DLLs)
+#
+# Also installs a copy under %USERPROFILE%\.hip\bin for local dev discovery.
 #
 # Env:
-#   HIP_WHISPER_TRIPLE   override host triple (default rustc host or x86_64-pc-windows-msvc)
-#   HIP_WHISPER_REBUILD=1 force cmake rebuild even if already staged
+#   HIP_WHISPER_TRIPLE    override host triple
+#   HIP_WHISPER_REBUILD=1 force cmake rebuild
 $ErrorActionPreference = "Stop"
 $Root = Split-Path -Parent $PSScriptRoot
 if (-not $Root) { $Root = (Resolve-Path "$PSScriptRoot\..").Path }
@@ -27,6 +33,19 @@ $UserBin = Join-Path $env:USERPROFILE ".hip\bin"
 
 Write-Host "[make-whisper-bin] ref=$Ref triple=$Triple out=$OutDir"
 
+function Copy-WhisperDlls {
+    param(
+        [Parameter(Mandatory = $true)][string]$FromDir,
+        [Parameter(Mandatory = $true)][string]$ToDir
+    )
+    if (-not (Test-Path $FromDir)) { return }
+    Get-ChildItem -Path $FromDir -Recurse -Include `
+        'whisper*.dll', 'ggml*.dll', 'libwhisper*.dll', 'libggml*.dll' `
+        -ErrorAction SilentlyContinue | ForEach-Object {
+        Copy-Item $_.FullName (Join-Path $ToDir $_.Name) -Force
+    }
+}
+
 $needBuild = $true
 if ((Test-Path $Stage) -and $env:HIP_WHISPER_REBUILD -ne '1') {
     Write-Host "[make-whisper-bin] already staged $Stage (HIP_WHISPER_REBUILD=1 to rebuild)"
@@ -35,7 +54,7 @@ if ((Test-Path $Stage) -and $env:HIP_WHISPER_REBUILD -ne '1') {
 
 if ($needBuild) {
     if (-not (Get-Command cmake -ErrorAction SilentlyContinue)) {
-        throw "cmake is required to build whisper-cli.exe"
+        throw "cmake is required to build whisper-cli.exe for Windows production packages"
     }
     $Work = Join-Path $env:TEMP "hip-whisper-build-$PID"
     if (Test-Path $Work) { Remove-Item -Recurse -Force $Work }
@@ -49,9 +68,13 @@ if ($needBuild) {
         if ($LASTEXITCODE -ne 0) { throw "cmake configure failed" }
         cmake --build "$Work\build" --config Release -j
         if ($LASTEXITCODE -ne 0) { throw "cmake build failed" }
-        $Bin = Get-ChildItem -Path "$Work\build" -Recurse -Filter "whisper-cli.exe" -ErrorAction SilentlyContinue | Select-Object -First 1
+        $Bin = Get-ChildItem -Path "$Work\build" -Recurse -Filter "whisper-cli.exe" -ErrorAction SilentlyContinue |
+            Select-Object -First 1
         if (-not $Bin) { throw "whisper-cli.exe not found after build" }
         Copy-Item $Bin.FullName $Stage -Force
+        # Co-locate DLLs next to the exe (Windows production load path).
+        Copy-WhisperDlls -FromDir $Bin.DirectoryName -ToDir $OutDir
+        Copy-WhisperDlls -FromDir (Join-Path $Work 'build') -ToDir $OutDir
     } finally {
         if (Test-Path $Work) { Remove-Item -Recurse -Force $Work -ErrorAction SilentlyContinue }
     }
@@ -61,8 +84,13 @@ if (-not (Test-Path $Stage)) {
     throw "whisper-cli.exe not staged at $Stage"
 }
 
+# Dev install: full self-contained copy under %USERPROFILE%\.hip\bin
 New-Item -ItemType Directory -Force -Path $UserBin | Out-Null
 Copy-Item $Stage (Join-Path $UserBin "whisper-cli.exe") -Force
+Get-ChildItem -Path $OutDir -Filter '*.dll' -ErrorAction SilentlyContinue | ForEach-Object {
+    Copy-Item $_.FullName (Join-Path $UserBin $_.Name) -Force
+}
 
-Write-Host "[make-whisper-bin] staged $Stage"
+Write-Host "[make-whisper-bin] staged self-contained tree:"
+Get-ChildItem $OutDir | ForEach-Object { Write-Host ("  " + $_.Name) }
 Write-Host "[make-whisper-bin] installed $UserBin\whisper-cli.exe"

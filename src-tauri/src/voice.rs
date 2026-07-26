@@ -113,56 +113,119 @@ fn is_executable_file(path: &Path) -> bool {
     }
 }
 
-/// Resolve whisper-cli:
-/// 1. `HIP_WHISPER_BIN`
-/// 2. `~/.hip/bin/whisper-cli` (user install / make-whisper-bin)
-/// 3. App resources (`resources/whisper/<triple>/`)
-/// 4. Well-known Homebrew prefixes (macOS GUI apps often lack shell PATH)
-/// 5. Directories on `PATH`
+/// Shared libs that must be loadable next to (or under `../lib` of) whisper-cli.
 ///
-/// Returns a **canonical** path when possible so `@loader_path/../lib` rpaths
-/// (Homebrew bottles) resolve correctly when the bin is a symlink.
+/// Layouts we support:
+/// - **Production (self-contained)**: `resources/whisper/<triple>/whisper-cli` + dylibs/DLLs
+///   in the **same directory** (`@loader_path`) or `../lib` (`@loader_path/../lib`).
+/// - **Homebrew bottle**: `…/opt/whisper-cpp/bin/whisper-cli` + `…/lib/libwhisper.*`.
+/// - **Windows**: `whisper-cli.exe` + `*.dll` beside the exe (PE search path).
+fn whisper_libs_resolvable(bin: &Path) -> bool {
+    let real = std::fs::canonicalize(bin).unwrap_or_else(|_| bin.to_path_buf());
+    let Some(parent) = real.parent() else {
+        return false;
+    };
+
+    #[cfg(windows)]
+    {
+        // On Windows a standalone build is often fully static or loads DLLs from the
+        // same directory. Accept exe if it exists; also accept when whisper*.dll is present.
+        let dll_hints = ["whisper.dll", "libwhisper.dll", "ggml.dll", "libggml.dll"];
+        if dll_hints.iter().any(|n| parent.join(n).is_file()) {
+            return true;
+        }
+        // No adjacent DLL → assume static / system PATH; still usable.
+        return true;
+    }
+
+    #[cfg(not(windows))]
+    {
+        let lib_names = [
+            "libwhisper.1.dylib",
+            "libwhisper.dylib",
+            "libwhisper.so.1",
+            "libwhisper.so",
+        ];
+        for name in lib_names {
+            if parent.join(name).is_file() {
+                return true;
+            }
+            if parent.join("lib").join(name).is_file() {
+                return true;
+            }
+            if parent.join("../lib").join(name).is_file() {
+                return true;
+            }
+            // …/bin/whisper-cli → …/lib/libwhisper (Homebrew prefix layout)
+            if parent.file_name().is_some_and(|n| n == "bin") {
+                if let Some(prefix) = parent.parent() {
+                    if prefix.join("lib").join(name).is_file() {
+                        return true;
+                    }
+                }
+            }
+        }
+        false
+    }
+}
+
+fn finalize_bin_path(path: PathBuf) -> PathBuf {
+    std::fs::canonicalize(&path).unwrap_or(path)
+}
+
+fn push_if_exe(out: &mut Vec<PathBuf>, p: PathBuf) {
+    if is_executable_file(&p) {
+        out.push(p);
+    }
+}
+
+/// Resolve whisper-cli for three product scenarios:
+///
+/// | Scenario | Preferred source |
+/// |----------|------------------|
+/// | **macOS / Windows production** (packaged app) | App `resources/whisper/<triple>/` self-contained tree |
+/// | **Development** (tauri dev) | `HIP_WHISPER_BIN` → system Homebrew/PATH → staged resources → `~/.hip/bin` |
+/// | **Override** | `HIP_WHISPER_BIN` always wins when set and executable |
+///
+/// Orphan copies of brew bottles into `~/.hip/bin` **without** libs are skipped
+/// (they fail with `libwhisper.1.dylib (no such file)`).
 pub fn resolve_whisper_binary(app: &AppHandle) -> Option<PathBuf> {
     if let Ok(p) = std::env::var("HIP_WHISPER_BIN") {
         let path = PathBuf::from(p);
         if is_executable_file(&path) {
-            return Some(std::fs::canonicalize(&path).unwrap_or(path));
+            return Some(finalize_bin_path(path));
         }
     }
 
     let names = whisper_bin_names();
-    let mut candidates: Vec<PathBuf> = Vec::new();
+    // Tier A: self-contained or known-good system installs (safe for production + dev).
+    let mut tier_a: Vec<PathBuf> = Vec::new();
+    // Tier B: may need DYLD_FALLBACK (dev only; often broken).
+    let mut tier_b: Vec<PathBuf> = Vec::new();
 
-    // User-managed install location (shared with make-whisper-bin.sh).
-    if let Some(home) = dirs::home_dir() {
-        let hip_bin = home.join(".hip").join("bin");
-        for n in names {
-            candidates.push(hip_bin.join(n));
-        }
-    }
-
-    // Bundled resources (optional HIP_BUNDLE_WHISPER).
+    // --- Production: bundled resources first (no Homebrew on end-user machines) ---
     if let Ok(resource_dir) = app.path().resource_dir() {
         let triple = target_triple();
         for n in names {
-            candidates.push(resource_dir.join("whisper").join(&triple).join(n));
-            candidates.push(resource_dir.join("whisper").join(n));
+            push_if_exe(
+                &mut tier_a,
+                resource_dir.join("whisper").join(&triple).join(n),
+            );
+            push_if_exe(&mut tier_a, resource_dir.join("whisper").join(n));
         }
     }
 
-    // Homebrew / common absolute prefixes — GUI launches rarely include these in PATH.
-    // Prefer Cellar/opt real paths (have @loader_path/../lib) over bare /bin symlinks.
+    // --- Dev / optional system engines ---
     #[cfg(target_os = "macos")]
     {
         for prefix in [
             "/opt/homebrew/opt/whisper-cpp/bin",
             "/usr/local/opt/whisper-cpp/bin",
             "/opt/homebrew/bin",
-            "/opt/homebrew/sbin",
             "/usr/local/bin",
         ] {
             for n in names {
-                candidates.push(PathBuf::from(prefix).join(n));
+                push_if_exe(&mut tier_a, PathBuf::from(prefix).join(n));
             }
         }
     }
@@ -170,7 +233,38 @@ pub fn resolve_whisper_binary(app: &AppHandle) -> Option<PathBuf> {
     {
         for prefix in ["/usr/local/bin", "/usr/bin", "/home/linuxbrew/.linuxbrew/bin"] {
             for n in names {
-                candidates.push(PathBuf::from(prefix).join(n));
+                push_if_exe(&mut tier_a, PathBuf::from(prefix).join(n));
+            }
+        }
+    }
+    #[cfg(windows)]
+    {
+        // Common optional locations for a user-built or package-managed CLI.
+        if let Some(home) = dirs::home_dir() {
+            for n in names {
+                push_if_exe(&mut tier_a, home.join(".hip").join("bin").join(n));
+            }
+        }
+        if let Ok(pf) = std::env::var("ProgramFiles") {
+            for n in names {
+                push_if_exe(&mut tier_a, PathBuf::from(&pf).join("whisper-cpp").join(n));
+                push_if_exe(&mut tier_a, PathBuf::from(&pf).join("hip").join("bin").join(n));
+            }
+        }
+    }
+
+    // User-local install (macOS/Linux). Prefer only when libs resolve.
+    #[cfg(not(windows))]
+    if let Some(home) = dirs::home_dir() {
+        let hip_bin = home.join(".hip").join("bin");
+        for n in names {
+            let p = hip_bin.join(n);
+            if is_executable_file(&p) {
+                if whisper_libs_resolvable(&p) {
+                    tier_a.push(p);
+                } else {
+                    tier_b.push(p);
+                }
             }
         }
     }
@@ -178,17 +272,50 @@ pub fn resolve_whisper_binary(app: &AppHandle) -> Option<PathBuf> {
     if let Ok(path_var) = std::env::var("PATH") {
         for dir in std::env::split_paths(&path_var) {
             for n in names {
-                candidates.push(dir.join(n));
+                let p = dir.join(n);
+                if !is_executable_file(&p) {
+                    continue;
+                }
+                if whisper_libs_resolvable(&p) {
+                    tier_a.push(p);
+                } else {
+                    tier_b.push(p);
+                }
             }
         }
     }
 
-    candidates.into_iter().find_map(|p| {
-        if !is_executable_file(&p) {
-            return None;
+    // Pick first resolvable path.
+    for p in &tier_a {
+        if whisper_libs_resolvable(p) {
+            return Some(finalize_bin_path(p.clone()));
         }
-        Some(std::fs::canonicalize(&p).unwrap_or(p))
-    })
+    }
+    // Production Windows static builds: tier_a entries with no DLL still OK.
+    #[cfg(windows)]
+    {
+        if let Some(p) = tier_a.into_iter().next() {
+            return Some(finalize_bin_path(p));
+        }
+    }
+    // Dev last resort: brew opt even if resolvable check failed, then tier_b with env injection.
+    #[cfg(target_os = "macos")]
+    {
+        for prefix in ["/opt/homebrew/opt/whisper-cpp/bin", "/usr/local/opt/whisper-cpp/bin"] {
+            for n in names {
+                let p = PathBuf::from(prefix).join(n);
+                if is_executable_file(&p) {
+                    return Some(finalize_bin_path(p));
+                }
+            }
+        }
+    }
+    for p in tier_b {
+        if is_executable_file(&p) {
+            return Some(finalize_bin_path(p));
+        }
+    }
+    None
 }
 
 fn cleanup_stale_scratch(dir: &Path) {
@@ -579,25 +706,113 @@ fn estimate_audio_ms(wav: &[u8]) -> Option<u64> {
     Some(data_len * 1000 / 32_000)
 }
 
-/// Ensure GUI-spawned processes can find Homebrew dylibs / bins (macOS Dock PATH is bare).
-fn whisper_command_env(cmd: &mut Command) {
+/// Process environment for spawning whisper-cli across scenarios.
+///
+/// - **Production (mac/win)**: primarily relies on self-contained layout (same-dir libs /
+///   correct rpath). Env only augments PATH.
+/// - **Dev (macOS)**: may inject `DYLD_FALLBACK_LIBRARY_PATH` for Homebrew libs when an
+///   orphan copy is used. Hardened Runtime on signed release builds can strip DYLD_*;
+///   that is why release packaging must ship a self-contained tree.
+fn whisper_command_env(cmd: &mut Command, bin: &Path) {
     let mut path = std::env::var("PATH").unwrap_or_default();
-    for prefix in [
-        "/opt/homebrew/bin",
-        "/opt/homebrew/sbin",
-        "/usr/local/bin",
-        "/usr/bin",
-        "/bin",
-    ] {
-        if !path.split(':').any(|p| p == prefix) {
-            if path.is_empty() {
-                path = prefix.to_string();
-            } else {
-                path = format!("{prefix}:{path}");
+    #[cfg(windows)]
+    {
+        let sep = ';';
+        for prefix in [
+            r"C:\Program Files\whisper-cpp",
+            r"C:\Program Files\hip\bin",
+        ] {
+            if !path.split(sep).any(|p| p.eq_ignore_ascii_case(prefix)) {
+                path = if path.is_empty() {
+                    prefix.to_string()
+                } else {
+                    format!("{prefix}{sep}{path}")
+                };
             }
         }
+        // Ensure the directory of the exe is on PATH so adjacent DLLs resolve.
+        if let Ok(real) = std::fs::canonicalize(bin) {
+            if let Some(parent) = real.parent() {
+                let p = parent.display().to_string();
+                if !path.split(sep).any(|x| x.eq_ignore_ascii_case(&p)) {
+                    path = if path.is_empty() {
+                        p
+                    } else {
+                        format!("{p}{sep}{path}")
+                    };
+                }
+            }
+        }
+        cmd.env("PATH", path);
+        return;
     }
-    cmd.env("PATH", path);
+
+    #[cfg(not(windows))]
+    {
+        for prefix in [
+            "/opt/homebrew/bin",
+            "/opt/homebrew/sbin",
+            "/usr/local/bin",
+            "/usr/bin",
+            "/bin",
+        ] {
+            if !path.split(':').any(|p| p == prefix) {
+                path = if path.is_empty() {
+                    prefix.to_string()
+                } else {
+                    format!("{prefix}:{path}")
+                };
+            }
+        }
+        cmd.env("PATH", &path);
+
+        let mut lib_dirs: Vec<PathBuf> = Vec::new();
+        let real = std::fs::canonicalize(bin).unwrap_or_else(|_| bin.to_path_buf());
+        if let Some(parent) = real.parent() {
+            lib_dirs.push(parent.to_path_buf());
+            lib_dirs.push(parent.join("lib"));
+            lib_dirs.push(parent.join("../lib"));
+            if parent.file_name().is_some_and(|n| n == "bin") {
+                if let Some(prefix) = parent.parent() {
+                    lib_dirs.push(prefix.join("lib"));
+                }
+            }
+        }
+        for p in [
+            "/opt/homebrew/opt/whisper-cpp/lib",
+            "/opt/homebrew/opt/ggml/lib",
+            "/opt/homebrew/lib",
+            "/usr/local/opt/whisper-cpp/lib",
+            "/usr/local/opt/ggml/lib",
+            "/usr/local/lib",
+        ] {
+            lib_dirs.push(PathBuf::from(p));
+        }
+        let lib_path = lib_dirs
+            .into_iter()
+            .filter(|p| p.is_dir())
+            .map(|p| p.display().to_string())
+            .collect::<Vec<_>>()
+            .join(":");
+        if !lib_path.is_empty() {
+            let merged = match std::env::var("DYLD_FALLBACK_LIBRARY_PATH") {
+                Ok(existing) if !existing.is_empty() => format!("{lib_path}:{existing}"),
+                _ => lib_path.clone(),
+            };
+            cmd.env("DYLD_FALLBACK_LIBRARY_PATH", &merged);
+            // Also set Linux-style for cross-compile / rare linux builds of the shell.
+            #[cfg(target_os = "linux")]
+            {
+                let merged_ld = match std::env::var("LD_LIBRARY_PATH") {
+                    Ok(existing) if !existing.is_empty() => format!("{lib_path}:{existing}"),
+                    _ => lib_path.clone(),
+                };
+                cmd.env("LD_LIBRARY_PATH", merged_ld);
+            }
+            #[cfg(target_os = "macos")]
+            cmd.env("DYLD_LIBRARY_PATH", &merged);
+        }
+    }
 }
 
 fn run_whisper_cli(
@@ -611,7 +826,7 @@ fn run_whisper_cli(
         .unwrap_or(4);
     // Prefer long form flags; brew whisper-cli 1.9 accepts both.
     let mut cmd = Command::new(bin);
-    whisper_command_env(&mut cmd);
+    whisper_command_env(&mut cmd, bin);
     let mut child = cmd
         .args([
             "-m",

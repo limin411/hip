@@ -56,10 +56,6 @@ Users/
 **/rw.*.dmg
 tmp/
 
-# Staged whisper-cli (built by scripts/make-whisper-bin.*; not committed)
-src-tauri/resources/whisper/**/whisper-cli
-src-tauri/resources/whisper/**/whisper-cli.exe
-src-tauri/resources/whisper/**/*.dylib
-src-tauri/resources/whisper/**/*.dll
-src-tauri/resources/whisper/**/*.so
+# Staged whisper engine tree (built by scripts/make-whisper-bin.*; not committed)
+src-tauri/resources/whisper/**
 !src-tauri/resources/whisper/README.md

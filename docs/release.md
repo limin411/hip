@@ -56,22 +56,38 @@ Release packaging expects production sidecar binaries and resources as produced 
 
 ### Voice engine (whisper-cli)
 
-Release packages **include** the local speech engine by default:
+Release packages **include** a **self-contained** speech engine by default.
+Models stay on-demand.
 
-| | Engine (`whisper-cli`) | Models (`ggml-*.bin`) |
-|--|------------------------|------------------------|
+| Scenario | Engine | Models |
+|----------|--------|--------|
+| **macOS production** (`yarn package:macos`) | Bundled under `resources/whisper/<triple>/` with dylibs + `@loader_path` fixups | Download in Settings |
+| **Windows production** (`yarn package:windows`) | Bundled `whisper-cli.exe` + adjacent DLLs | Download in Settings |
+| **Development** | Not bundled by default; use Homebrew / `make-whisper-bin` / `HIP_WHISPER_BIN` | Download in Settings |
+
+| | Engine | Models |
+|--|--------|--------|
 | Release package | Bundled (`HIP_BUNDLE_WHISPER` defaults to `1`) | **Not** bundled |
-| How users get it | Ships with app | Settings → Voice → download |
+| End-user machine | No Homebrew required | `~/.hip/models/whisper/` |
 
 Requirements for packaging with engine (default):
 
-- macOS: `cmake`, git, Xcode CLT (or set `HIP_WHISPER_SOURCE=brew` after `brew install whisper-cpp` for a faster non-pinned dogfood stage)
-- Windows: `cmake`, MSVC build tools, git
+- **macOS**: `cmake`, git, Xcode CLT (`HIP_WHISPER_SOURCE=build` is the release default).  
+  Optional dogfood only: `HIP_WHISPER_SOURCE=brew` after `brew install whisper-cpp` (script still rewrites rpaths into a self-contained tree).
+- **Windows**: `cmake`, MSVC build tools, git (`make-whisper-bin.ps1` copies `whisper*.dll` / `ggml*.dll` next to the exe).
 
-Opt out (slimmer artifact, voice needs a system engine):
+**Critical packaging rule:** never ship a bare `whisper-cli` copied from Homebrew without its libraries.  
+`@rpath/libwhisper` with `LC_RPATH=@loader_path/../lib` fails on customer machines and for orphan `~/.hip/bin` copies. Staging always co-locates libs and runs `install_name_tool` on macOS.
+
+Opt out (slimmer artifact; voice needs a system engine at runtime):
 
 ```bash
 HIP_BUNDLE_WHISPER=0 yarn package:macos
+```
+
+```powershell
+$env:HIP_BUNDLE_WHISPER = '0'
+yarn package:windows
 ```
 
 Force rebuild of a previously staged binary:
@@ -81,6 +97,8 @@ HIP_WHISPER_REBUILD=1 yarn package:macos
 ```
 
 Pin is `scripts/whisper-version.txt`. Staged files are gitignored under `src-tauri/resources/whisper/<triple>/`.
+
+See also `src-tauri/resources/whisper/README.md` for the full scenario matrix and resolution order.
 
 ## GitHub Release checklist
 

@@ -446,7 +446,8 @@ export function GlobalCommandPalette() {
               }
             }}
             className={cn(
-              'fixed inset-x-0 top-[min(20vh,8rem)] z-[210] mx-auto w-[min(32rem,calc(100vw-2rem))]',
+              // Center with flex + inset (not translate) so enter animations cannot wipe centering.
+              'fixed inset-0 z-[210] m-auto h-fit w-[min(32rem,calc(100vw-2rem))]',
               'overflow-hidden rounded-xl border border-border bg-surface shadow-overlay outline-none',
               'animate-menu-in motion-reduce:animate-none',
             )}

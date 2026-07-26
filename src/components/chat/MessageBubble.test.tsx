@@ -10,6 +10,7 @@ import {
   messageRenderEqual,
 } from './MessageBubble'
 import type { Message } from '@hip/protocol'
+import { buildRoundtableOutbound } from '@/lib/roundtable'
 
 vi.mock('@tauri-apps/plugin-shell', () => ({ open: vi.fn() }))
 vi.mock('@/ipc/clipboard', () => ({ copyText: vi.fn() }))
@@ -71,6 +72,23 @@ describe('MessageBubble', () => {
     cleanup()
     featureState.interleaved = false
   })
+  it('strips roundtable frame and shows badge on user bubble', () => {
+    const wire = buildRoundtableOutbound('只问现在几点', 'zh-CN')
+    render(
+      <MessageBubble
+        message={{
+          id: 'm-rt',
+          role: 'user',
+          content: wire,
+          timestamp: Date.now(),
+        }}
+      />,
+    )
+    expect(screen.getByTestId('roundtable-badge')).toBeInTheDocument()
+    expect(screen.getByTestId('message-answer')).toHaveTextContent('只问现在几点')
+    expect(screen.queryByText(/hip.roundtable/)).not.toBeInTheDocument()
+  })
+
   it('renders a user message with content', () => {
     render(
       <MessageBubble

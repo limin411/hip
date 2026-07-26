@@ -180,6 +180,22 @@ export const zhCN = {
       newConversationGreeting: '我们来做点什么？',
       codeGreeting: '我们来写点什么？',
       codeNeedFolder: '选择一个项目文件夹以开始编码',
+      /** Chat 空态一次启用：圆桌框架（是否开会由智能体裁决） */
+      roundtable: {
+        chip: '圆桌会议',
+        chipAria: '开关首条消息的圆桌会议模式',
+        chipHint: '智能体会判断是否需要多视角辩论',
+        disabledHint: '使用技能或斜杠命令时不可用',
+        helper: '简单问题仍按普通对话回答；存在取舍时五位顾问会先辩论，再给出实用终案与步骤。',
+        badge: '圆桌',
+        personas: {
+          strategist: '战略家',
+          skeptic: '怀疑论者',
+          creative: '创意者',
+          operator: '执行者',
+          audience: '受众',
+        },
+      },
       greeting: {
         default: '我们来做点什么？',
         wave: '你好呀！',

@@ -188,6 +188,23 @@ export const en = {
       newConversationGreeting: 'What are we building?',
       codeGreeting: 'What should we build?',
       codeNeedFolder: 'Choose a project folder to start coding',
+      /** Chat empty-state one-shot: advisory council framing (agent decides if to convene). */
+      roundtable: {
+        chip: 'Roundtable',
+        chipAria: 'Toggle roundtable mode for the first message',
+        chipHint: 'The agent decides whether a multi-advisor debate is needed',
+        disabledHint: 'Unavailable while a skill or slash command is active',
+        helper:
+          'Simple questions stay normal chat. Complex tradeoffs get a five-advisor debate, then a practical answer.',
+        badge: 'Roundtable',
+        personas: {
+          strategist: 'Strategist',
+          skeptic: 'Skeptic',
+          creative: 'Creative',
+          operator: 'Operator',
+          audience: 'Audience',
+        },
+      },
       greeting: {
         default: 'What are we building?',
         wave: 'Hey there!',

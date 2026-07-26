@@ -16,3 +16,5 @@ export const ACTIVITY_LANES = true
 export const CODEBLOCK_STRUCTURE_CRAFT = true
 /** Lazy Shiki when fence enters viewport (completed messages only). */
 export const CODEBLOCK_LAZY_HIGHLIGHT = true
+/** Chat empty-state roundtable starter (docs/design/roundtable-mode.md). */
+export const ROUNDTABLE_STARTER = true

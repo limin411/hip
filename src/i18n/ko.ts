@@ -170,6 +170,21 @@ export const ko = {
     "newConversationGreeting": "무엇을 만들까요?",
     "codeGreeting": "무엇을 만들어 볼까요?",
     "codeNeedFolder": "코딩을 시작하려면 프로젝트 폴더를 선택하세요",
+    "roundtable": {
+      "chip": "원탁 회의",
+      "chipAria": "첫 메시지의 원탁 모드 전환",
+      "chipHint": "다관점 토론이 필요한지는 에이전트가 판단합니다",
+      "disabledHint": "스킬 또는 슬래시 명령 사용 중에는 사용할 수 없습니다",
+      "helper": "간단한 질문은 일반 대화로 답합니다. 복잡한 선택의 여지가 있을 때만 다섯 고문이 토론한 뒤 실용적 결론과 다음 단계를 제시합니다.",
+      "badge": "원탁",
+      "personas": {
+        "strategist": "전략가",
+        "skeptic": "회의론자",
+        "creative": "크리에이티브",
+        "operator": "실행자",
+        "audience": "청중"
+      }
+    },
     "greeting": {
       "default": "무엇을 만들까요?",
       "wave": "안녕하세요!",

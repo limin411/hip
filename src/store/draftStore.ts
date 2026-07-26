@@ -25,6 +25,11 @@ export interface Draft {
   forcePlan?: boolean
   /** Reasoning effort level when the model supports it. */
   effort?: string
+  /**
+   * Chat empty-state one-shot: first message gets roundtable framing.
+   * Cleared on draft reset after session commit. Ignored for project/code drafts.
+   */
+  roundtable?: boolean
 }
 
 interface DraftStore {
@@ -39,6 +44,7 @@ interface DraftStore {
   setForcePlan: (forcePlan: boolean) => void
   setExecutionMode: (executionMode: ExecutionMode) => boolean
   setEffort: (effort: string | undefined) => void
+  setRoundtable: (roundtable: boolean) => void
   reset: () => void
 }
 
@@ -140,6 +146,20 @@ export const useDraftStore = create<DraftStore>()(
         set((s) => {
           const base: Draft = s.draft ?? { tempId: nanoid(), mode: 'chat', text: '' }
           return { draft: { ...base, effort: effort || undefined } }
+        }),
+      setRoundtable: (roundtable) =>
+        set((s) => {
+          const base: Draft = s.draft ?? { tempId: nanoid(), mode: 'chat', text: '' }
+          if (!roundtable) {
+            if (!base.roundtable) return s
+            const { roundtable: _r, ...rest } = base
+            return { draft: rest }
+          }
+          // Chat-only product surface; keep flag off project drafts.
+          if (base.mode === 'project') {
+            return { draft: { ...base, roundtable: undefined } }
+          }
+          return { draft: { ...base, roundtable: true } }
         }),
       reset: () => set({ draft: null }),
     }),

@@ -61,6 +61,7 @@ import { auditSessionDelete, debugSessionDelete } from '@/lib/sessionDelete'
 import { StreamCoalescer, type CoalesceBucket, type StreamKind } from '@/lib/streamCoalesce'
 import { useKnowledgeStore } from '@/store/knowledgeStore'
 import { KNOWLEDGE_LIVE_FLAG_KEY } from '@/domain/knowledge/editorMode'
+import { buildRoundtableOutbound } from '@/lib/roundtable'
 
 /**
  * Map the current i18next language to a SessionConfig-supported value.
@@ -2179,9 +2180,8 @@ export class SessionService {
   }
 
   sendMessage(content: string, attachments: LocalAttachment[] = []): void {
-    const text = content.trim()
+    let text = content.trim()
     if (!text && attachments.length === 0) return
-    this.lastOutboundUserContent = text
     const st = useDomainStore.getState()
     const active = st.sessions.find((s) => s.id === st.activeSessionId)
     // KD-8 / KD-PA-1: planApprovalPending → amend only (never soft-approve via resume).
@@ -2203,6 +2203,11 @@ export class SessionService {
         toast.error(i18n.t('chat.missingProject.sendBlocked'))
         return
       }
+      // Chat empty-state one-shot: wrap first message when roundtable is armed.
+      // Agent still owns route-to-normal for simple topics (see roundtable frame).
+      if (draft?.roundtable && draft.mode !== 'project' && text) {
+        text = buildRoundtableOutbound(text, currentLanguage())
+      }
       const config: SessionConfig = configFromDraft(draft)
       activeSessionId = this.createSession(config)
       if (draft?.cwd) useFsStore.getState().clearSession(draft.cwd)
@@ -2215,6 +2220,7 @@ export class SessionService {
         return
       }
     }
+    this.lastOutboundUserContent = text
     const id = nanoid()
     // New user turn: re-enable write-follow / panel auto-open for this turn.
     useFocusStore.getState().resetFollowForTurn()

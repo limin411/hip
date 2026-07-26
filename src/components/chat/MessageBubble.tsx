@@ -22,6 +22,7 @@ import { MarkdownBody } from './MarkdownBody'
 import { TurnStatusLine } from './TurnStatusLine'
 import * as chatFeature from './feature'
 import { hasRenderableSupervisorText } from '@/lib/timelineFilter'
+import { isRoundtableMessage, stripRoundtableFrame } from '@/lib/roundtable'
 import { cn } from '@/lib/utils'
 
 function formatBytes(bytes?: number): string {
@@ -102,10 +103,13 @@ function MessageBubbleImpl({ message, streaming, isLastAssistant, hidePlan }: Me
   // so per-agent tool order is preserved (not stripped before ActivityBar).
   const nested = isUser || isNotice ? [] : splitAgents(groupByAgent(message, !!streaming)).nested
 
-  const displayContent = useMemo(
-    () => (isUser || isNotice ? message.content : normalizeMessageContent(message.content)),
-    [isUser, isNotice, message.content],
-  )
+  const displayContent = useMemo(() => {
+    if (isNotice) return message.content
+    if (isUser) return stripRoundtableFrame(message.content)
+    return normalizeMessageContent(message.content)
+  }, [isUser, isNotice, message.content])
+
+  const showRoundtableBadge = isUser && isRoundtableMessage(message.content)
 
   const hasProcess =
     !isUser &&
@@ -149,6 +153,14 @@ function MessageBubbleImpl({ message, streaming, isLastAssistant, hidePlan }: Me
         <span className="font-medium text-ink-secondary" data-testid="message-role">
           {isUser ? t('chat.you') : 'hip'}
         </span>
+        {showRoundtableBadge && (
+          <span
+            className="rounded-md border border-border bg-surface-muted px-1.5 py-0.5 text-caption font-medium text-ink-secondary"
+            data-testid="roundtable-badge"
+          >
+            {t('chat.roundtable.badge')}
+          </span>
+        )}
         {message.timestamp > 0 && (
           <span className="font-normal tabular-nums" title={formatAbsolute(message.timestamp, locale)} data-testid="message-time">
             {formatClockTime(message.timestamp, locale)}

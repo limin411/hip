@@ -23,6 +23,8 @@ import { ComposerLeftSlot } from './ComposerLeftSlot'
 import { CHAT_COLUMN_CLASS } from './ChatColumn'
 import { FirstRunSetupCard } from './FirstRunSetupCard'
 import { AcpCapabilityCliffBanner } from './AcpCapabilityCliffBanner'
+import { RoundtableStarter } from './RoundtableStarter'
+import { ROUNDTABLE_STARTER } from './craftFeature'
 import { isAttachmentSupported } from '@/lib/attachmentEligibility'
 import { activeModelKey, parseModelKey } from '@/lib/modelKey'
 import { cn } from '@/lib/utils'
@@ -384,6 +386,9 @@ export function NewConversation() {
             />
           )}
         </div>
+        {surface === 'chat' && ROUNDTABLE_STARTER && (
+          <RoundtableStarter disabled={query !== null || !!selectedSkill} />
+        )}
         {surface === 'code' && (
           <div className="mt-2 flex flex-col items-center gap-1">
             <FolderPill />

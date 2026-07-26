@@ -49,6 +49,18 @@ describe('draftStore', () => {
     useDraftStore.getState().reset()
     expect(useDraftStore.getState().draft).toBeNull()
   })
+  it('setRoundtable arms chat drafts and clears with false', () => {
+    useDraftStore.getState().ensureDraft('chat')
+    useDraftStore.getState().setRoundtable(true)
+    expect(useDraftStore.getState().draft?.roundtable).toBe(true)
+    useDraftStore.getState().setRoundtable(false)
+    expect(useDraftStore.getState().draft?.roundtable).toBeUndefined()
+  })
+  it('setRoundtable(true) does not stick on project drafts', () => {
+    useDraftStore.getState().ensureDraft('code')
+    useDraftStore.getState().setRoundtable(true)
+    expect(useDraftStore.getState().draft?.roundtable).toBeUndefined()
+  })
 })
 
 describe('draftStore agentId', () => {

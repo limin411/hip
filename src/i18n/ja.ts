@@ -170,6 +170,21 @@ export const ja = {
     "newConversationGreeting": "何を作りますか？",
     "codeGreeting": "何を作りましょうか？",
     "codeNeedFolder": "コーディングを開始するにはプロジェクトフォルダーを選択してください",
+    "roundtable": {
+      "chip": "円卓会議",
+      "chipAria": "最初のメッセージの円卓モードを切り替え",
+      "chipHint": "複数視点の議論が必要かはエージェントが判断します",
+      "disabledHint": "スキルまたはスラッシュコマンド使用中は利用できません",
+      "helper": "簡単な質問は通常の会話のまま。複雑な取捨があるときだけ5人の顧問が議論し、実用的な結論と次の手順を出します。",
+      "badge": "円卓",
+      "personas": {
+        "strategist": "戦略家",
+        "skeptic": "懐疑派",
+        "creative": "クリエイティブ",
+        "operator": "実行者",
+        "audience": "オーディエンス"
+      }
+    },
     "greeting": {
       "default": "何を作りますか？",
       "wave": "こんにちは！",

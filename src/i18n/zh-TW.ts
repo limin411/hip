@@ -178,6 +178,21 @@ export const zhTW = {
     "newConversationGreeting": "我們來做點什麼？",
     "codeGreeting": "我們來寫點什麼？",
     "codeNeedFolder": "選擇一個專案資料夾以開始編碼",
+    "roundtable": {
+      "chip": "圓桌會議",
+      "chipAria": "開關首則訊息的圓桌會議模式",
+      "chipHint": "智慧體會判斷是否需要多視角辯論",
+      "disabledHint": "使用技能或斜線命令時不可用",
+      "helper": "簡單問題仍以普通對話回答；有取捨時五位顧問會先辯論，再給出實用終案與步驟。",
+      "badge": "圓桌",
+      "personas": {
+        "strategist": "戰略家",
+        "skeptic": "懷疑論者",
+        "creative": "創意者",
+        "operator": "執行者",
+        "audience": "受眾"
+      }
+    },
     "greeting": {
       "default": "我們來做點什麼？",
       "wave": "你好呀！",

@@ -116,6 +116,28 @@ describe('NewConversation', () => {
     useSkillsStore.setState({ skills: [], enabled: {}, loaded: false })
   })
 
+  it('shows roundtable starter on chat empty state and toggles draft flag', () => {
+    setDraftModel('openai/gpt-4o')
+    render(<NewConversation />)
+    expect(screen.getByTestId('roundtable-starter')).toBeInTheDocument()
+    const chip = screen.getByTestId('roundtable-chip')
+    expect(chip).toHaveAttribute('aria-pressed', 'false')
+    fireEvent.click(chip)
+    expect(useDraftStore.getState().draft?.roundtable).toBe(true)
+    expect(chip).toHaveAttribute('aria-pressed', 'true')
+    expect(screen.getByTestId('roundtable-panel')).toBeInTheDocument()
+    expect(screen.getByTestId('roundtable-seat-strategist')).toBeInTheDocument()
+    fireEvent.click(chip)
+    expect(useDraftStore.getState().draft?.roundtable).toBeUndefined()
+  })
+
+  it('hides roundtable starter on code surface', () => {
+    mockActiveView = 'code'
+    setDraftModel('openai/gpt-4o')
+    render(<NewConversation />)
+    expect(screen.queryByTestId('roundtable-starter')).not.toBeInTheDocument()
+  })
+
   it('shows effort picker when the draft model advertises effort levels', () => {
     setDraftModel('openai/gpt-5.4')
     render(<NewConversation />)

@@ -192,7 +192,8 @@ export async function tryRunRoundtableTurn(
       },
       // Real subagent path for council — not llm.complete projection.
       runAdvisor: council
-        ? async ({ speaker, user, focus, agentId }) => {
+        ? async ({ speaker, user, focus }) => {
+            let toolSeq = 0
             return runCouncilAdvisor(
               {
                 runner: host.modelRunner(),
@@ -202,6 +203,7 @@ export async function tryRunRoundtableTurn(
                 cwd,
                 language: lang,
                 signal,
+                networkPolicy: host.networkPolicy,
                 onAgentStart: ({ agentId: id, name, focus: f }) => {
                   startCouncilAgent({ agentId: id, name, focus: f })
                 },
@@ -215,6 +217,50 @@ export async function tryRunRoundtableTurn(
                     agentId: id,
                     delta,
                     role: 'subagent',
+                  })
+                },
+                onToolStarted: ({ agentId: id, callId, name, input }) => {
+                  const run = trajectory.get(id)
+                  const seq = toolSeq++
+                  if (run) {
+                    run.toolCalls.set(callId, {
+                      callId,
+                      agentId: id,
+                      name,
+                      input,
+                      status: 'running',
+                      seq,
+                    })
+                  }
+                  rawSend({
+                    type: 'tool:started',
+                    sessionId: host.id,
+                    turnId,
+                    agentId: id,
+                    role: 'subagent',
+                    callId,
+                    name,
+                    input,
+                    seq,
+                  })
+                },
+                onToolFinished: ({ agentId: id, callId, status, output, error }) => {
+                  const run = trajectory.get(id)
+                  const tc = run?.toolCalls.get(callId)
+                  if (tc) {
+                    tc.status = status
+                    if (output !== undefined) tc.output = output
+                    if (error !== undefined) tc.error = error
+                  }
+                  rawSend({
+                    type: 'tool:finished',
+                    sessionId: host.id,
+                    turnId,
+                    agentId: id,
+                    callId,
+                    status,
+                    ...(output !== undefined ? { output } : {}),
+                    ...(error !== undefined ? { error } : {}),
                   })
                 },
                 onAgentFinish: ({ agentId: id, text }) => {

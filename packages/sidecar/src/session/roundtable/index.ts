@@ -15,7 +15,7 @@ export {
 } from './detect.js'
 export { runRoundtable } from './runner.js'
 export { tryRunRoundtableTurn } from './turn.js'
-export { runCouncilAdvisor } from './council-advisor.js'
+export { runCouncilAdvisor, COUNCIL_ADVISOR_TOOLS } from './council-advisor.js'
 export { parseChairActionFromText, extractJsonObject } from './schema.js'
 export { completeFnsFromModelRunner, scriptedCompleteFns } from './complete.js'
 export { councilAgentId, isCouncilAgentId, councilDisplayName } from './ids.js'

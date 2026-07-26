@@ -24,6 +24,11 @@ export function useVoiceDictation(opts: {
   const voiceCfg = useHipConfigStore((s) => s.config.voice)
   const updateSection = useHipConfigStore((s) => s.updateSection)
   const paletteOpen = useCommandPaletteStore((s) => s.open)
+  // Opt-in: Settings → Voice must be explicitly enabled (default off).
+  const enabled = voiceCfg?.enabled === true
+  const model = (voiceCfg?.model ?? 'base') as VoiceModelId
+  const language = (voiceCfg?.language ?? 'auto') as VoiceLanguage
+  const maxDurationSec = Math.max(5, Math.min(120, voiceCfg?.maxDurationSec ?? 60))
   const [state, setState] = useState<VoiceMicState>('idle')
   const [envDisabled, setEnvDisabled] = useState(false)
   const [binaryOk, setBinaryOk] = useState(true)
@@ -31,12 +36,6 @@ export function useVoiceDictation(opts: {
   const maxTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   /** Model id resolved at record-start (may fall back from base→tiny). */
   const activeModelRef = useRef<VoiceModelId>(model)
-
-  // Opt-in: Settings → Voice must be explicitly enabled (default off).
-  const enabled = voiceCfg?.enabled === true
-  const model = (voiceCfg?.model ?? 'base') as VoiceModelId
-  const language = (voiceCfg?.language ?? 'auto') as VoiceLanguage
-  const maxDurationSec = Math.max(5, Math.min(120, voiceCfg?.maxDurationSec ?? 60))
 
   useEffect(() => {
     let cancelled = false

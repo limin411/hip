@@ -1,0 +1,3 @@
+# Pin whisper.cpp revision for optional make-whisper-bin builds.
+# Update this when bumping the bundled engine.
+v1.7.5

@@ -216,6 +216,27 @@ pub(crate) struct PlanConfig {
     pub(crate) soft_approve_on_composer: Option<bool>,
 }
 
+/// Optional `[voice]` local dictation (whisper.cpp). JSON uses camelCase for the UI.
+/// Must be preserved on set_hip_config rewrites so device / model prefs are not stripped.
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct VoiceConfig {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub(crate) enabled: Option<bool>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub(crate) input_device_id: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub(crate) input_device_label: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub(crate) input_device_group_id: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub(crate) language: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub(crate) model: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub(crate) max_duration_sec: Option<u32>,
+}
+
 #[derive(Serialize, Deserialize, Clone, Debug)]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct HipConfig {
@@ -252,6 +273,9 @@ pub(crate) struct HipConfig {
     /// Optional plan-mode product knobs. Preserved on set_hip_config rewrites.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub(crate) plan: Option<PlanConfig>,
+    /// Optional local voice dictation. Preserved on set_hip_config rewrites.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub(crate) voice: Option<VoiceConfig>,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
@@ -485,6 +509,27 @@ pub(crate) struct TomlPlanConfig {
     pub(crate) soft_approve_on_composer: Option<bool>,
 }
 
+/// TOML mirror for `[voice]` (snake_case keys; camelCase aliases for hand-edited files).
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+#[allow(dead_code)]
+pub(crate) struct TomlVoiceConfig {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub(crate) enabled: Option<bool>,
+    #[serde(default, skip_serializing_if = "Option::is_none", alias = "inputDeviceId")]
+    pub(crate) input_device_id: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none", alias = "inputDeviceLabel")]
+    pub(crate) input_device_label: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none", alias = "inputDeviceGroupId")]
+    pub(crate) input_device_group_id: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub(crate) language: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub(crate) model: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none", alias = "maxDurationSec")]
+    pub(crate) max_duration_sec: Option<u32>,
+}
+
 #[derive(Serialize, Deserialize, Clone, Debug)]
 #[serde(rename_all = "snake_case")]
 #[allow(dead_code)]
@@ -516,6 +561,8 @@ pub(crate) struct TomlHipConfig {
     pub(crate) acp: Option<TomlAcpHostConfig>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub(crate) plan: Option<TomlPlanConfig>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub(crate) voice: Option<TomlVoiceConfig>,
 }
 
 // ── From impls: HipConfig ↔ TomlHipConfig (recursive field mapping) ──
@@ -648,6 +695,7 @@ pub fn load_hip_config(app: &tauri::AppHandle) -> Result<HipConfig, String> {
             window: None,
             acp: None,
             plan: None,
+            voice: None,
         }),
         Err(e) => Err(e.to_string()),
     }
@@ -881,6 +929,34 @@ impl From<TomlPlanConfig> for PlanConfig {
     }
 }
 
+impl From<VoiceConfig> for TomlVoiceConfig {
+    fn from(v: VoiceConfig) -> Self {
+        TomlVoiceConfig {
+            enabled: v.enabled,
+            input_device_id: v.input_device_id,
+            input_device_label: v.input_device_label,
+            input_device_group_id: v.input_device_group_id,
+            language: v.language,
+            model: v.model,
+            max_duration_sec: v.max_duration_sec,
+        }
+    }
+}
+
+impl From<TomlVoiceConfig> for VoiceConfig {
+    fn from(v: TomlVoiceConfig) -> Self {
+        VoiceConfig {
+            enabled: v.enabled,
+            input_device_id: v.input_device_id,
+            input_device_label: v.input_device_label,
+            input_device_group_id: v.input_device_group_id,
+            language: v.language,
+            model: v.model,
+            max_duration_sec: v.max_duration_sec,
+        }
+    }
+}
+
 impl From<HipConfig> for TomlHipConfig {
     fn from(cfg: HipConfig) -> Self {
         TomlHipConfig {
@@ -898,6 +974,7 @@ impl From<HipConfig> for TomlHipConfig {
             window: cfg.window.map(|x| x.into()),
             acp: cfg.acp.map(|x| x.into()),
             plan: cfg.plan.map(|x| x.into()),
+            voice: cfg.voice.map(|x| x.into()),
         }
     }
 }
@@ -919,7 +996,86 @@ impl From<TomlHipConfig> for HipConfig {
             window: cfg.window.map(|x| x.into()),
             acp: cfg.acp.map(|x| x.into()),
             plan: cfg.plan.map(|x| x.into()),
+            voice: cfg.voice.map(|x| x.into()),
         }
+    }
+}
+
+#[cfg(test)]
+mod voice_preserve_tests {
+    use super::*;
+
+    #[test]
+    fn voice_round_trips_toml_with_terminal_and_window() {
+        let cfg = HipConfig {
+            version: 1,
+            providers: vec![],
+            active_model: None,
+            mcp_servers: vec![],
+            skills: vec![],
+            agents: vec![],
+            fixed_agents: None,
+            permissions: None,
+            agent_loop: None,
+            langsmith: None,
+            terminal: Some(TerminalConfig {
+                shell: Some("zsh".into()),
+                color_theme: Some("dracula".into()),
+            }),
+            window: Some(WindowConfig {
+                close_action: Some("hide".into()),
+                tray_enabled: Some(true),
+                tray_always_visible: None,
+                close_prompt_seen: None,
+                hide_hint_shown: None,
+                launch_at_login: None,
+                start_hidden_on_login: None,
+                notify_on_agent_complete: None,
+            }),
+            acp: None,
+            plan: None,
+            voice: Some(VoiceConfig {
+                enabled: Some(true),
+                input_device_id: Some("default".into()),
+                input_device_label: Some("Mic".into()),
+                input_device_group_id: Some("g1".into()),
+                language: Some("auto".into()),
+                model: Some("base".into()),
+                max_duration_sec: Some(60),
+            }),
+        };
+        let toml_cfg: TomlHipConfig = cfg.clone().into();
+        let text = toml::to_string_pretty(&toml_cfg).expect("serialize");
+        assert!(text.contains("[voice]"), "{text}");
+        assert!(text.contains("[terminal]"), "{text}");
+        assert!(text.contains("[window]"), "{text}");
+        let parsed: TomlHipConfig = toml::from_str(&text).expect("parse");
+        let back: HipConfig = parsed.into();
+        assert_eq!(back.voice, cfg.voice);
+        assert_eq!(back.terminal, cfg.terminal);
+        assert_eq!(back.window, cfg.window);
+    }
+
+    #[test]
+    fn voice_accepts_camel_case_toml_aliases() {
+        let text = r#"
+version = 1
+[voice]
+enabled = true
+inputDeviceId = "dev-1"
+inputDeviceLabel = "USB Mic"
+inputDeviceGroupId = "grp"
+language = "zh"
+model = "tiny"
+maxDurationSec = 45
+"#;
+        let parsed: TomlHipConfig = toml::from_str(text).expect("parse");
+        let cfg: HipConfig = parsed.into();
+        let v = cfg.voice.expect("voice");
+        assert_eq!(v.input_device_id.as_deref(), Some("dev-1"));
+        assert_eq!(v.input_device_label.as_deref(), Some("USB Mic"));
+        assert_eq!(v.max_duration_sec, Some(45));
+        assert_eq!(v.model.as_deref(), Some("tiny"));
     }
 }
 

@@ -63,6 +63,19 @@ fsReadMaxBytes = 2000000
 # [trash]
 # retentionDays = 7
 
+# ── Voice dictation (Settings → General → Voice; local whisper.cpp) ─────────
+# Opt-in: default enabled=false when omitted — not every user needs voice.
+# Enable in Settings, then download a model there (status check + download).
+# Models land in ~/.hip/models/whisper/ (not in the default app package).
+# [voice]
+# enabled = false
+# input_device_id = "default"       # or MediaDevices deviceId
+# input_device_label = ""
+# input_device_group_id = ""
+# language = "auto"                 # auto | zh | en | ja | ko
+# model = "base"                    # tiny | base | small
+# max_duration_sec = 60
+
 # ── Providers (non-secret) ─────────────────────────────────────────────────
 # API keys still go in auth.json — do not use apiKey in hip.toml (ignored for BYOK).
 # [[providers]]

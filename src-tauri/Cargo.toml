@@ -56,7 +56,7 @@ tauri-plugin-autostart = "2"
 tokio = { version = "1", features = ["sync"] }
 # Pinned to 0.12 (rustls-tls): bumping to 0.13 to dedupe the transitive 0.13.4 fails
 # here — 0.13's `rustls` feature requires aws-lc-rs ^1.14, unavailable in this index.
-reqwest = { version = "0.12", default-features = false, features = ["rustls-tls"] }
+reqwest = { version = "0.12", default-features = false, features = ["rustls-tls", "stream"] }
 # Skill install: unzip uploaded skill bundles (zip-slip-safe extraction in skills.rs).
 zip = { version = "2", default-features = false, features = ["deflate"] }
 # Skill metadata: parse SKILL.md YAML frontmatter (name/description).
@@ -67,6 +67,8 @@ dirs = "6"
 # Interactive code-panel terminal (PR-2): PTY + base64 event payloads.
 portable-pty = "0.9"
 base64 = "0.22"
+# Voice model SHA-256 verification (whisper ggml downloads).
+sha2 = "0.10"
 # Process-group kill for PTY children (Unix).
 libc = "0.2"
 # Knowledge link index (per-space SQLite under .hip/).

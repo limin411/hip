@@ -897,3 +897,18 @@ describe('protocol: McpServerConfig extended fields (Todo 1)', () => {
     expect(round.acp).toEqual(acp)
   })
 
+  it('round-trips voice on HipConfig through JSON', () => {
+    const voice = {
+      enabled: true,
+      inputDeviceId: 'default',
+      inputDeviceLabel: 'Built-in Mic',
+      inputDeviceGroupId: 'group-1',
+      language: 'zh' as const,
+      model: 'base' as const,
+      maxDurationSec: 60,
+    }
+    const cfg: HipConfig = { version: 1, voice }
+    const round = JSON.parse(JSON.stringify(cfg)) as HipConfig
+    expect(round.voice).toEqual(voice)
+  })
+

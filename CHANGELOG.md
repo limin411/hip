@@ -9,6 +9,11 @@ and this project aims to follow [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- **Composer voice dictation** (local [whisper.cpp](https://github.com/ggml-org/whisper.cpp)):
+  opt-in in Settings → General (default off). Model download + status check for
+  tiny/base/small under `~/.hip/models/whisper/`; mic appears only when enabled.
+  Optional `whisper-cli` via `scripts/make-whisper-bin.sh` / `HIP_BUNDLE_WHISPER=1`
+  (`docs/design/composer-voice-input-whisper.md`). Audio stays on-device; no cloud ASR.
 - Apache License 2.0 (`LICENSE`, `NOTICE`) and open-source contributor docs
   (`CONTRIBUTING.md`, `CODE_OF_CONDUCT.md`, `SECURITY.md`, GitHub issue/PR templates)
 - Example config: `docs/examples/hip.toml.example`

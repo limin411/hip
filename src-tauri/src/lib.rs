@@ -25,6 +25,8 @@ mod sftp_path;
 mod knowledge;
 mod knowledge_trash;
 mod knowledge_link_index;
+mod voice_models;
+mod voice;
 // Production SSH (default feature `ssh`); stubs keep IPC registered when stripped.
 #[cfg(feature = "ssh")]
 mod ssh_session;
@@ -124,6 +126,7 @@ fn get_hip_config(app: tauri::AppHandle) -> Result<String, String> {
                 window: None,
                 acp: None,
                 plan: None,
+                voice: None,
             };
             serde_json::to_string(&cfg).map_err(|e| e.to_string())
         }
@@ -961,6 +964,12 @@ pub fn run() {
             knowledge_link_index::knowledge_set_schema,
             knowledge_link_index::knowledge_get_views,
             knowledge_link_index::knowledge_set_views,
+            voice::voice_runtime_status,
+            voice::voice_model_status,
+            voice::voice_download_model,
+            voice::voice_cancel_download,
+            voice::voice_transcribe,
+            voice::voice_open_models_dir,
         ])
         .build(tauri::generate_context!())
         .expect("error while running tauri application");
@@ -1115,6 +1124,7 @@ mod tests {
             window: None,
             acp: None,
             plan: None,
+            voice: None,
         }
     }
 
@@ -1306,6 +1316,7 @@ mod tests {
             window: None,
             acp: None,
             plan: None,
+            voice: None,
         };
 
         let toml_str = toml::to_string_pretty(&cfg).unwrap();
@@ -1487,6 +1498,7 @@ mod tests {
             window: None,
             acp: None,
             plan: None,
+            voice: None,
         };
 
         let toml_str = toml::to_string_pretty(&cfg).unwrap();
@@ -1605,6 +1617,7 @@ mod tests {
             window: None,
             acp: None,
             plan: None,
+            voice: None,
         };
 
         let json = serde_json::to_string(&cfg).unwrap();
@@ -1645,6 +1658,7 @@ mod tests {
             window: None,
             acp: None,
             plan: None,
+            voice: None,
         };
 
         // UI path: JSON (camelCase) → HipConfig → TomlHipConfig → TOML → back
@@ -1722,6 +1736,7 @@ doomLoopStrategy = "auto_continue"
             window: None,
             acp: None,
             plan: None,
+            voice: None,
         };
 
         let json = serde_json::to_string(&cfg).unwrap();
@@ -1827,6 +1842,7 @@ colorTheme = "one-dark"
             }),
             acp: None,
             plan: None,
+            voice: None,
         };
 
         let json = serde_json::to_string(&cfg).unwrap();
@@ -1924,6 +1940,7 @@ trayEnabled = true
                 fs_read_max_bytes: Some(1_000_000),
             }),
             plan: None,
+            voice: None,
         };
 
         let json = serde_json::to_string(&cfg).unwrap();
@@ -1996,6 +2013,7 @@ fsReadMaxBytes = 2000000
             plan: Some(super::hip_config::PlanConfig {
                 soft_approve_on_composer: Some(true),
             }),
+            voice: None,
         };
 
         let json = serde_json::to_string(&cfg).unwrap();
@@ -2073,6 +2091,7 @@ softApproveOnComposer = false
             window: None,
             acp: None,
             plan: None,
+            voice: None,
         };
 
         let json = serde_json::to_string(&cfg).unwrap();

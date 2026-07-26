@@ -5,6 +5,8 @@ import { Textarea } from '@/components/ui/Textarea'
 import { cn } from '@/lib/utils'
 import type { LocalAttachment } from './attachmentTypes'
 import { TokenUsageChip } from './TokenUsageChip'
+import { VOICE_INPUT } from './voiceFeature'
+import { VoiceMicButton } from './VoiceMicButton'
 
 /** Collapse whitespace for the one-line quote chip; CSS truncate handles overflow. */
 function quotePreviewLine(text: string): string {
@@ -185,6 +187,14 @@ export function Composer({
         </div>
         <div className="flex items-center gap-1.5">
           <TokenUsageChip />
+          {VOICE_INPUT ? (
+            <VoiceMicButton
+              value={value}
+              onChange={onChange}
+              disabled={locked}
+              inputRef={inputRef}
+            />
+          ) : null}
           {running && onStop ? (
             <>
               {reconnecting && (

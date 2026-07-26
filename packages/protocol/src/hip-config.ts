@@ -327,6 +327,56 @@ export interface PlanConfig {
   softApproveOnComposer?: boolean
 }
 
+/** ASR recognition language for local whisper-cli (`-l`). */
+export type VoiceLanguage = 'auto' | 'zh' | 'en' | 'ja' | 'ko'
+
+export const VOICE_LANGUAGES: readonly VoiceLanguage[] = ['auto', 'zh', 'en', 'ja', 'ko'] as const
+
+export function isVoiceLanguage(v: string): v is VoiceLanguage {
+  return (VOICE_LANGUAGES as readonly string[]).includes(v)
+}
+
+/** ggml whisper model id (maps to `ggml-{id}.bin`). */
+export type VoiceModelId = 'tiny' | 'base' | 'small'
+
+export const VOICE_MODEL_IDS: readonly VoiceModelId[] = ['tiny', 'base', 'small'] as const
+
+export function isVoiceModelId(v: string): v is VoiceModelId {
+  return (VOICE_MODEL_IDS as readonly string[]).includes(v)
+}
+
+/**
+ * Optional `[voice]` section in hip.toml — composer local dictation (whisper.cpp).
+ *
+ * ```toml
+ * [voice]
+ * enabled = false
+ * input_device_id = "default"
+ * input_device_label = ""
+ * input_device_group_id = ""
+ * language = "auto"
+ * model = "base"
+ * max_duration_sec = 60
+ * ```
+ *
+ * Resolved defaults when omitted: **enabled=false** (opt-in; not every user needs voice),
+ * device=default, language=auto, model=base, maxDurationSec=60.
+ * Models are downloaded on demand in Settings (not shipped in the default package).
+ */
+export interface VoiceConfig {
+  /** Runtime master switch (Settings). Default **false** when omitted — opt-in dictation. */
+  enabled?: boolean
+  /** MediaDevices deviceId, or `"default"`. */
+  inputDeviceId?: string
+  /** Persisted for rebind across restarts. */
+  inputDeviceLabel?: string
+  inputDeviceGroupId?: string
+  language?: VoiceLanguage
+  model?: VoiceModelId
+  /** Clamp 5–120 in resolvers; default 60. */
+  maxDurationSec?: number
+}
+
 export interface HipConfig {
   version: number
   providers?: ProviderEntry[]
@@ -357,6 +407,8 @@ export interface HipConfig {
   acp?: AcpHostConfig
   /** Optional plan-mode product knobs (composer soft-approve, etc.). */
   plan?: PlanConfig
+  /** Optional local voice dictation (whisper.cpp). */
+  voice?: VoiceConfig
 }
 
 /** User-configurable network policy persisted to ~/.hip/config/network.json.

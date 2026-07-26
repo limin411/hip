@@ -36,6 +36,12 @@ case "$(uname -s)" in
     ;;
 esac
 
+# Optional local whisper-cli for composer voice dictation (not required for build).
+if [ "${HIP_BUNDLE_WHISPER:-0}" = "1" ]; then
+  echo "==> HIP_BUNDLE_WHISPER=1 — building/staging whisper-cli resources"
+  bash "${SCRIPT_DIR}/make-whisper-bin.sh"
+fi
+
 # ── 1. Signing identity ─────────────────────────────────────────────────────
 if [ -z "${APPLE_SIGNING_IDENTITY:-}" ]; then
   APPLE_SIGNING_IDENTITY="$(

@@ -38,6 +38,8 @@ const labels: GlobalCommandLabels = {
   current: 'Current',
   settings: {
     general: 'Settings: General',
+    voice: 'Settings: Voice',
+    window: 'Settings: Window',
     model: 'Settings: Model',
     agents: 'Settings: Agents',
     mcp: 'Settings: MCP',

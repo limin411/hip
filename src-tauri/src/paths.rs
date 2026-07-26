@@ -44,6 +44,33 @@ pub fn config_dir(app: &AppHandle) -> Option<PathBuf> { hip_subdir(app, "config"
 pub fn cache_dir(app: &AppHandle) -> Option<PathBuf> { hip_subdir(app, "cache") }
 pub fn scratch_dir(app: &AppHandle) -> Option<PathBuf> { hip_subdir(app, "scratch") }
 
+/// Create `dir` with mode `0700` on Unix (for voice models / scratch).
+fn ensure_private_dir(dir: &std::path::Path) -> Option<()> {
+    std::fs::create_dir_all(dir).ok()?;
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        if let Err(e) = std::fs::set_permissions(dir, std::fs::Permissions::from_mode(0o700)) {
+            eprintln!("[tauri] could not set 0700 on {}: {e}", dir.display());
+        }
+    }
+    Some(())
+}
+
+/// Local whisper.cpp models (`~/.hip/models/whisper/`, mode 0700).
+pub fn whisper_models_dir(app: &AppHandle) -> Option<PathBuf> {
+    let dir = hip_base_dir(app)?.join("models").join("whisper");
+    ensure_private_dir(&dir)?;
+    Some(dir)
+}
+
+/// Voice capture scratch (`~/.hip/scratch/voice/`, mode 0700).
+pub fn voice_scratch_dir(app: &AppHandle) -> Option<PathBuf> {
+    let dir = scratch_dir(app)?.join("voice");
+    ensure_private_dir(&dir)?;
+    Some(dir)
+}
+
 /// Runtime discovery for product CLI attach (`run/sidecar.json`).
 pub fn run_dir(app: &AppHandle) -> Option<PathBuf> {
     let dir = hip_subdir(app, "run")?;
@@ -230,5 +257,18 @@ mod tests {
         assert!(s.ends_with("/.hip") || s.ends_with(".hip"));
         assert!(!s.contains("AppData"));
         assert!(!s.contains("com.ljm.hip"));
+    }
+
+    #[test]
+    fn whisper_and_voice_paths_live_under_base() {
+        let base = hip_base_from(Some(PathBuf::from("/Users/x")), None).unwrap();
+        assert_eq!(
+            base.join("models").join("whisper"),
+            PathBuf::from("/Users/x/.hip/models/whisper")
+        );
+        assert_eq!(
+            base.join("scratch").join("voice"),
+            PathBuf::from("/Users/x/.hip/scratch/voice")
+        );
     }
 }

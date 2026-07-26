@@ -1,10 +1,25 @@
 import { useTranslation } from 'react-i18next'
 import * as TabsPrimitive from '@radix-ui/react-tabs'
-import { SlidersHorizontal, Cpu, Bot, Plug, Cable, Sparkles, Package, Brain, Link2 } from 'lucide-react'
+import {
+  SlidersHorizontal,
+  Cpu,
+  Bot,
+  Plug,
+  Cable,
+  Sparkles,
+  Package,
+  Brain,
+  Link2,
+  Mic,
+  AppWindow,
+} from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useUiStore, type SettingsPageId } from '@/store/uiStore'
+import { VOICE_INPUT } from '@/components/chat/voiceFeature'
 
 import { GeneralSettings } from './GeneralSettings'
+import { VoiceSettings } from './VoiceSettings'
+import { WindowSettings } from './WindowSettings'
 import { ModelConfig } from './ModelConfig'
 import { AgentManagement } from './AgentManagement'
 import { McpConfig } from './McpConfig'
@@ -19,6 +34,8 @@ type SettingsPageDef = {
   icon: typeof SlidersHorizontal
   labelKey:
     | 'settings.general'
+    | 'settings.voicePage'
+    | 'settings.window'
     | 'settings.model'
     | 'settings.agentsLabel'
     | 'settings.mcpLabel'
@@ -43,6 +60,17 @@ const NAV_GROUPS: SettingsNavGroup[] = [
     labelKey: 'settings.groups.basics',
     pages: [
       { id: 'general', icon: SlidersHorizontal, labelKey: 'settings.general', Component: GeneralSettings },
+      ...(VOICE_INPUT
+        ? ([
+            {
+              id: 'voice',
+              icon: Mic,
+              labelKey: 'settings.voicePage',
+              Component: VoiceSettings,
+            },
+          ] as SettingsPageDef[])
+        : []),
+      { id: 'window', icon: AppWindow, labelKey: 'settings.window', Component: WindowSettings },
       { id: 'model', icon: Cpu, labelKey: 'settings.model', Component: ModelConfig },
       { id: 'connectors', icon: Cable, labelKey: 'settings.connectorsLabel', Component: ConnectorsSettings },
       { id: 'memory', icon: Brain, labelKey: 'settings.memoryLabel', Component: MemoryConfig },

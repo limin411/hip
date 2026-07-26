@@ -183,11 +183,25 @@ import {
 } from './EffortLevelPicker'
 
 describe('isMaxBudgetEffort', () => {
-  it('marks max always, and xhigh only when it is the top of the scale', () => {
-    expect(isMaxBudgetEffort('max', ['low', 'medium', 'high', 'max'])).toBe(true)
-    expect(isMaxBudgetEffort('xhigh', ['low', 'medium', 'high', 'xhigh', 'max'])).toBe(false)
-    expect(isMaxBudgetEffort('xhigh', ['none', 'low', 'medium', 'high', 'xhigh'])).toBe(true)
+  it('glows from the 5th level onward only when the model has 5+ levels', () => {
+    // ≤4 levels: never
+    expect(isMaxBudgetEffort('max', ['low', 'medium', 'high', 'max'])).toBe(false)
     expect(isMaxBudgetEffort('high', ['low', 'medium', 'high'])).toBe(false)
+
+    // 5 levels: only the 5th (index 4)
+    const five = ['none', 'low', 'medium', 'high', 'xhigh']
+    expect(isMaxBudgetEffort('none', five)).toBe(false)
+    expect(isMaxBudgetEffort('high', five)).toBe(false)
+    expect(isMaxBudgetEffort('xhigh', five)).toBe(true)
+
+    // 6 levels: 5th and 6th
+    const six = ['low', 'medium', 'high', 'xhigh', 'max', 'ultra']
+    expect(isMaxBudgetEffort('xhigh', six)).toBe(false)
+    expect(isMaxBudgetEffort('max', six)).toBe(true)
+    expect(isMaxBudgetEffort('ultra', six)).toBe(true)
+
+    // Unknown id
+    expect(isMaxBudgetEffort('missing', five)).toBe(false)
   })
 })
 
@@ -311,27 +325,38 @@ describe('EffortLevelPicker', () => {
     expect(mockSetSessionEffort).not.toHaveBeenCalled()
   })
 
-  it('applies max-budget chrome when at xhigh (top of openai scale)', () => {
+  it('glows only when a 5th+ level is selected (not unselected high tiers)', () => {
+    // medium selected: xhigh is 5th tier but not selected → no glow on that row
+    mockDraftStore.draft = { tempId: 't', mode: 'chat', text: '', effort: 'medium' }
+    const { rerender } = render(<EffortLevelPicker />)
+    expect(screen.getByTestId('effort-chip')).not.toHaveClass('effort-max-chip')
+    expect(screen.getByTestId('effort-level-xhigh')).toHaveAttribute('data-max-budget', 'false')
+    expect(screen.getByTestId('effort-level-medium')).toHaveAttribute('data-max-budget', 'false')
+
     mockDraftStore.draft = { tempId: 't', mode: 'chat', text: '', effort: 'xhigh' }
-    render(<EffortLevelPicker />)
+    rerender(<EffortLevelPicker />)
     expect(screen.getByTestId('effort-chip')).toHaveClass('effort-max-chip')
     expect(screen.getByTestId('effort-level-xhigh')).toHaveAttribute('data-max-budget', 'true')
     expect(screen.getByTestId('effort-level-xhigh')).toHaveAttribute('data-selected', 'true')
+    expect(screen.getByTestId('effort-level-high')).toHaveAttribute('data-max-budget', 'false')
   })
 
-  it('marks anthropic max as max-budget, not xhigh when max exists', () => {
+  it('on anthropic 5-scale: only selected max glows; unselected max does not', () => {
     mockProvidersStore.config.activeModel = {
       providerID: 'anthropic',
       modelID: 'claude-opus-4-8',
     }
     mockDraftStore.draft = { tempId: 't', mode: 'chat', text: '', effort: 'xhigh' }
     const { rerender } = render(<EffortLevelPicker />)
+    // xhigh is 4th → not a glow tier even when selected
     expect(screen.getByTestId('effort-level-xhigh')).toHaveAttribute('data-max-budget', 'false')
-    expect(screen.getByTestId('effort-level-max')).toHaveAttribute('data-max-budget', 'true')
+    expect(screen.getByTestId('effort-level-max')).toHaveAttribute('data-max-budget', 'false')
+    expect(screen.getByTestId('effort-chip')).not.toHaveClass('effort-max-chip')
 
     mockDraftStore.draft = { tempId: 't', mode: 'chat', text: '', effort: 'max' }
     rerender(<EffortLevelPicker />)
     expect(screen.getByTestId('effort-level-max')).toHaveAttribute('data-selected', 'true')
+    expect(screen.getByTestId('effort-level-max')).toHaveAttribute('data-max-budget', 'true')
     expect(screen.getByTestId('effort-chip')).toHaveClass('effort-max-chip')
   })
 })

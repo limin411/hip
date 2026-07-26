@@ -16,13 +16,19 @@ import { clampEffortForKey, effortLevelsForKey, resolveEffort } from '@/lib/mode
 import { cn } from '@/lib/utils'
 
 /**
- * Max-tier effort levels get Claude-style purple holographic chrome.
- * `max` always; `xhigh` only when it is the top of the model’s scale (no higher `max`).
+ * High-tier effort levels get Claude-style purple holographic chrome.
+ *
+ * Count-based (catalog order, 1-based rank):
+ * - Model has ≤4 levels → nothing glows.
+ * - Model has 5+ levels → the 5th level and every level after it glow
+ *   (index ≥ 4), so e.g. a 6-level Claude scale lights both 5th and 6th (`ultra`).
+ * Independent of the string id (`max` / `xhigh` / `ultra` / …).
  */
 export function isMaxBudgetEffort(level: string, levels: readonly string[]): boolean {
-  if (level === 'max') return true
-  if (level !== 'xhigh') return false
-  return levels[levels.length - 1] === 'xhigh'
+  if (levels.length <= 4) return false
+  const index = levels.indexOf(level)
+  if (index < 0) return false
+  return index >= 4
 }
 
 /**
@@ -274,7 +280,8 @@ export function EffortLevelPicker() {
 
         {levels.map((level, i) => {
           const selected = level === current
-          const rowMax = isMaxBudgetEffort(level, levels)
+          // Glow only when this high-tier level is the active selection.
+          const glow = selected && isMaxBudgetEffort(level, levels)
           const name = t(`chat.effort.levels.${level}`, { defaultValue: level })
           const desc = t(`chat.effort.desc.${level}`, { defaultValue: '' })
 
@@ -284,20 +291,17 @@ export function EffortLevelPicker() {
               disabled={busy}
               onSelect={() => choose(level)}
               title={desc || undefined}
-              className={cn(
-                'gap-2 py-1',
-                selected && rowMax && 'bg-state-hover',
-              )}
+              className={cn('gap-2 py-1', glow && 'bg-state-hover')}
               data-testid={`effort-level-${level}`}
               data-selected={selected ? 'true' : 'false'}
-              data-max-budget={rowMax ? 'true' : 'false'}
+              data-max-budget={glow ? 'true' : 'false'}
             >
               <Check
                 size={13}
                 className={cn(
                   'shrink-0',
                   selected
-                    ? rowMax
+                    ? glow
                       ? 'text-effort-max opacity-100'
                       : 'opacity-100'
                     : 'opacity-0',
@@ -308,18 +312,14 @@ export function EffortLevelPicker() {
               <EffortIntensityMeter
                 index={i}
                 total={levels.length}
-                maxBudget={rowMax}
+                maxBudget={glow}
               />
 
               <span
                 className={cn(
                   'min-w-0 flex-1 truncate text-meta',
                   selected && 'font-medium',
-                  rowMax && selected
-                    ? 'effort-max-text'
-                    : rowMax
-                      ? 'text-effort-max'
-                      : 'text-ink',
+                  glow ? 'effort-max-text' : 'text-ink',
                 )}
               >
                 {name}

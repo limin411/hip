@@ -11,6 +11,7 @@ describe('runRoundtable', () => {
   it('council hooks fire on advisor speech and collect edges', async () => {
     const starts: string[] = []
     const finishes: string[] = []
+    // Council pads to ≥3 speakers and runs them in parallel each round.
     const llm = scriptedCompleteFns([
       j({ type: 'route', convene: true }),
       j({ type: 'plan', rounds: 2, agenda: ['a', 'b'], rationale: 'r' }),
@@ -20,6 +21,7 @@ describe('runRoundtable', () => {
         focus: 'f',
         speakers: ['strategist', 'skeptic'],
       }),
+      // 3 parallel speakers (strategist, skeptic, + padded creative)
       JSON.stringify({
         prose: 'Go big.',
         acts: [{ kind: 'open', claim: 'Go big' }],
@@ -35,6 +37,10 @@ describe('runRoundtable', () => {
           },
         ],
       }),
+      JSON.stringify({
+        prose: 'Try hybrid.',
+        acts: [{ kind: 'open', claim: 'hybrid' }],
+      }),
       j({ type: 'stage', round: 1, agreed: ['split'], open: [], nextFocus: 'x' }),
       j({
         type: 'open_round',
@@ -42,7 +48,10 @@ describe('runRoundtable', () => {
         focus: 'x',
         speakers: ['operator'],
       }),
+      // padded to 3 again
       'Ship phased.',
+      'Watch risk.',
+      'Users first.',
       j({ type: 'stage', round: 2, agreed: ['phased'], open: [] }),
       j({ type: 'decide', decision: 'phased', residual: [], nextSteps: ['1'] }),
     ])
@@ -61,13 +70,11 @@ describe('runRoundtable', () => {
         },
       },
     })
-    expect(result.advisorCalls).toBe(3)
-    expect(starts).toEqual([
-      'roundtable:strategist',
-      'roundtable:skeptic',
-      'roundtable:operator',
-    ])
+    expect(result.advisorCalls).toBe(6)
+    expect(starts.length).toBe(6)
     expect(finishes).toEqual(starts)
+    expect(starts).toContain('roundtable:strategist')
+    expect(starts).toContain('roundtable:skeptic')
     expect(result.edges?.some((e) => e.relation === 'rebut')).toBe(true)
   })
 

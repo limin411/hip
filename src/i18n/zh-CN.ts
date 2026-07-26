@@ -205,6 +205,7 @@ export const zhCN = {
         councilLabel: '议会',
         councilSeats: '议会席位',
         seatWaiting: '等待发言',
+        liveStage: '正在发言（{{count}} 人）',
         edgesTitle: '交锋关系',
         edgeRebut: '反驳',
         edgeSupport: '附议',

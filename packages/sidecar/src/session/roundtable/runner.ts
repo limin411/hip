@@ -178,8 +178,22 @@ export async function runRoundtable(args: RunRoundtableArgs): Promise<Roundtable
         }),
       )
       if (open.type !== 'open_round') throw new Error('expected open_round')
-      const speakers = open.speakers.slice(0, maxPerRound)
-      const speakMode = open.mode === 'parallel_then_synth' ? 'parallel_then_synth' : 'serial_react'
+      // Council: pad to ≥3 speakers and force parallel so the Agents panel shows
+      // multiple people speaking at once (serial feels like a monologue).
+      let speakers = open.speakers.slice(0, maxPerRound)
+      if (councilMode) {
+        const want = Math.min(Math.max(3, speakers.length), maxPerRound, 5)
+        for (const p of PERSONA_IDS) {
+          if (speakers.length >= want) break
+          if (!speakers.includes(p)) speakers.push(p)
+        }
+      }
+      const speakMode: 'serial_react' | 'parallel_then_synth' =
+        councilMode && speakers.length > 1
+          ? 'parallel_then_synth'
+          : open.mode === 'parallel_then_synth'
+            ? 'parallel_then_synth'
+            : 'serial_react'
       emit({
         kind: 'roundtable.round_open',
         round: r,

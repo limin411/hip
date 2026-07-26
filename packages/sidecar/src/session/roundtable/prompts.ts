@@ -151,18 +151,19 @@ export function advisorUserPrompt(args: {
 }): string {
   const prior =
     args.priorThisRound.length === 0
-      ? '(you speak first this round)'
+      ? '(independent take this round — no concurrent speeches yet; react to Minutes if any)'
       : args.priorThisRound.map((s) => `**${s.speaker}:** ${s.content}`).join('\n\n')
   return `Issue:
 ${args.issue}
 
-Minutes:
-${args.minutes || '(none)'}
+Minutes (prior rounds / stage conclusions — treat as what others already said):
+${args.minutes || '(none yet)'}
 
 This round focus: ${args.focus}
 
-Prior speeches this round:
+Prior speeches this round (serial mode only; empty if parallel):
 ${prior}
 
-You are ${personaLabel(args.persona, args.lang)}. Give your contribution now.`
+You are ${personaLabel(args.persona, args.lang)}. Give your contribution now.
+If Minutes or prior speeches exist, explicitly agree or rebut a named persona when relevant.`
 }

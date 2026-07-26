@@ -37,9 +37,10 @@ export function completeFnsFromModelRunner(runner: ModelRunner): RoundtableCompl
   }
 }
 
-/** Scripted responses for unit tests (FIFO). */
+/** Scripted responses for unit tests (FIFO). Safe under parallel Promise.all. */
 export function scriptedCompleteFns(responses: string[]): RoundtableCompleteFns {
   const queue = [...responses]
+  let i = 0
   return {
     async complete({ signal }) {
       if (signal.aborted) {
@@ -47,8 +48,10 @@ export function scriptedCompleteFns(responses: string[]): RoundtableCompleteFns 
         err.name = 'AbortError'
         throw err
       }
-      const next = queue.shift()
-      if (next === undefined) throw new Error('scripted LLM exhausted')
+      // Atomic index take (sync) so parallel advisors each get a unique response.
+      const idx = i++
+      const next = queue[idx]
+      if (next === undefined) throw new Error(`scripted LLM exhausted at ${idx}`)
       return next
     },
   }

@@ -305,7 +305,14 @@ export function applyServerMessage(
         ...(msg.name ? { name: msg.name } : {}),
       }
       return update(msg.sessionId, (s) => {
-        const base = msg.role === 'supervisor' ? ensureAssistantMessage(s.messages, msg.turnId, msg.agentId, now) : s.messages
+        // Always ensure the turn assistant message exists (council subagents may
+        // race or re-enter after supervisor start; upsertRun no-ops without it).
+        const base = ensureAssistantMessage(
+          s.messages,
+          msg.turnId,
+          msg.role === 'supervisor' ? msg.agentId : 'supervisor',
+          now,
+        )
         return {
           ...s,
           status: 'running',

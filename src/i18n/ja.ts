@@ -193,6 +193,7 @@ export const ja = {
       "councilLabel": "評議会",
       "councilSeats": "評議会席",
       "seatWaiting": "発言待ち",
+      "liveStage": "発言中（{{count}}人）",
       "edgesTitle": "議論の関係",
       "edgeRebut": "反論",
       "edgeSupport": "支持",

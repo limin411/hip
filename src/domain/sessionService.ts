@@ -203,6 +203,9 @@ export class SessionService {
       case 'tool:finished':
       case 'agent:interrupt':
       case 'permission:request':
+      case 'agent:finished':
+        // Flush so subagent speech is applied before status flips to done
+        // (roundtable council streams into agentRuns via token:stream).
         this.streamCoalescer.flushTurn(msg.sessionId, msg.turnId)
         return
       case 'message:complete':

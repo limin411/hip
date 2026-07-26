@@ -201,6 +201,7 @@ export const zhTW = {
       "councilLabel": "議會",
       "councilSeats": "議會席位",
       "seatWaiting": "等待發言",
+      "liveStage": "正在發言（{{count}} 人）",
       "edgesTitle": "交鋒關係",
       "edgeRebut": "反駁",
       "edgeSupport": "附議",

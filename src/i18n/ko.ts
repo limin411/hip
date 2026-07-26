@@ -193,6 +193,7 @@ export const ko = {
       "councilLabel": "의회",
       "councilSeats": "의회 좌석",
       "seatWaiting": "발언 대기",
+      "liveStage": "발언 중 ({{count}}명)",
       "edgesTitle": "토론 관계",
       "edgeRebut": "반박",
       "edgeSupport": "지지",

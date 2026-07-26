@@ -107,6 +107,47 @@ export function AgentDashboard() {
         </div>
       )}
 
+      {/* Multi-speaker live stage: show every currently speaking council advisor with preview */}
+      {live &&
+        (() => {
+          const speaking = agents.filter(
+            (a) => a.agentId.startsWith('roundtable:') && a.status === 'running',
+          )
+          if (speaking.length === 0) return null
+          return (
+            <div
+              className="mx-2.5 mb-1 flex max-h-48 shrink-0 flex-col gap-1.5 overflow-auto rounded-lg border border-effort-max/30 bg-surface-muted/50 p-2"
+              data-testid="council-live-stage"
+            >
+              <div className="text-caption font-medium text-ink-tertiary">
+                {t('chat.roundtable.liveStage', {
+                  defaultValue: 'Speaking now ({{count}})',
+                  count: speaking.length,
+                })}
+              </div>
+              {speaking.map((a) => {
+                const preview = (a.output || '').trim().slice(-280)
+                return (
+                  <div
+                    key={a.agentId}
+                    className="rounded-md border border-border/70 bg-surface px-2 py-1.5"
+                    data-testid="council-live-speaker"
+                    data-agent-id={a.agentId}
+                  >
+                    <div className="mb-0.5 flex items-center gap-1.5 text-meta font-medium text-ink">
+                      <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-accent" />
+                      {a.name || a.agentId}
+                    </div>
+                    <p className="max-h-16 overflow-hidden whitespace-pre-wrap text-caption leading-snug text-ink-secondary">
+                      {preview || t('chat.roundtable.seatWaiting')}
+                    </p>
+                  </div>
+                )
+              })}
+            </div>
+          )
+        })()}
+
       <div
         className="flex min-h-0 flex-1 flex-col gap-3 overflow-auto px-2.5 pb-3"
         data-testid="agents-live-turn"

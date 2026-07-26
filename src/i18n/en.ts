@@ -213,6 +213,7 @@ export const en = {
         councilLabel: 'Council',
         councilSeats: 'Council seats',
         seatWaiting: 'Waiting to speak',
+        liveStage: 'Speaking now ({{count}})',
         edgesTitle: 'Discussion edges',
         edgeRebut: 'rebuts',
         edgeSupport: 'supports',

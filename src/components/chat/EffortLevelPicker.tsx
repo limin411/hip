@@ -1,7 +1,12 @@
-import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Gauge } from 'lucide-react'
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/Popover'
+import { Check, Gauge } from 'lucide-react'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/DropdownMenu'
 import { ComposerChip } from './ComposerChip'
 import { useDraftStore } from '@/store/draftStore'
 import { useProvidersStore } from '@/store/providersStore'
@@ -11,7 +16,7 @@ import { clampEffortForKey, effortLevelsForKey, resolveEffort } from '@/lib/mode
 import { cn } from '@/lib/utils'
 
 /**
- * Max-tier effort levels get Claude-style purple holographic glow on the slider.
+ * Max-tier effort levels get Claude-style purple holographic chrome.
  * `max` always; `xhigh` only when it is the top of the model’s scale (no higher `max`).
  */
 export function isMaxBudgetEffort(level: string, levels: readonly string[]): boolean {
@@ -20,16 +25,72 @@ export function isMaxBudgetEffort(level: string, levels: readonly string[]): boo
   return levels[levels.length - 1] === 'xhigh'
 }
 
-/** Map continuous 0..1 track ratio → nearest discrete level index. */
-export function nearestEffortIndex(ratio: number, levelCount: number): number {
-  if (levelCount <= 1) return 0
-  const max = levelCount - 1
-  return Math.round(Math.min(1, Math.max(0, ratio)) * max)
+/**
+ * Step effort index from a wheel/keyboard delta.
+ * Positive step → higher effort; clamps at ends (no wrap).
+ */
+export function stepEffortIndex(index: number, step: number, length: number): number {
+  if (length <= 0) return 0
+  return Math.min(length - 1, Math.max(0, index + step))
+}
+
+/**
+ * Mini intensity meter: `filled` of `total` ticks so list rows still read as an ordered scale.
+ * Pure helper — exported for unit tests.
+ */
+export function EffortIntensityMeter({
+  index,
+  total,
+  maxBudget,
+  className,
+}: {
+  index: number
+  total: number
+  maxBudget?: boolean
+  className?: string
+}) {
+  const n = Math.max(1, total)
+  const filled = Math.min(n, Math.max(0, index + 1))
+  return (
+    <span
+      className={cn('flex shrink-0 items-end gap-px', className)}
+      aria-hidden
+      data-testid="effort-intensity-meter"
+      data-filled={filled}
+      data-total={n}
+    >
+      {Array.from({ length: n }, (_, i) => {
+        const on = i < filled
+        const isTopTick = i === n - 1
+        return (
+          <span
+            key={i}
+            className={cn(
+              'w-[2.5px] rounded-[1px] transition-colors duration-chrome',
+              i === 0 && 'h-1',
+              i === 1 && 'h-1.5',
+              i >= 2 && i < n - 1 && 'h-2',
+              isTopTick && 'h-2.5',
+              n <= 2 && i === 0 && 'h-1.5',
+              n <= 2 && i === 1 && 'h-2.5',
+              on
+                ? maxBudget && isTopTick
+                  ? 'bg-effort-max-node shadow-[0_0_4px_rgba(168,85,247,0.55)]'
+                  : maxBudget
+                    ? 'bg-effort-max-node opacity-80'
+                    : 'bg-ink'
+                : 'bg-ink-tertiary/30',
+            )}
+          />
+        )
+      })}
+    </span>
+  )
 }
 
 /**
  * Composer control for reasoning effort / thinking intensity.
- * Opens a discrete drag slider with snap nodes (Claude Desktop style).
+ * Compact dropdown list; wheel on the chip steps levels.
  * Hidden when the current model does not advertise effort levels in the catalog.
  */
 export function EffortLevelPicker() {
@@ -43,8 +104,6 @@ export function EffortLevelPicker() {
   const session = useActiveSession()
   const status = useActiveSessionStatus()
   const busy = status === 'running'
-  const [open, setOpen] = useState(false)
-  const sliderId = useId()
 
   const modelKey =
     activeId && session
@@ -55,6 +114,16 @@ export function EffortLevelPicker() {
 
   const levels = effortLevelsForKey(catalog, modelKey)
   const stored = activeId && session ? session.config.effort : draftEffort
+  const [open, setOpen] = useState(false)
+  const chipRef = useRef<HTMLButtonElement>(null)
+  const menuRef = useRef<HTMLDivElement>(null)
+  // Latest values for non-passive wheel listeners (chip + open menu).
+  const wheelRef = useRef({
+    busy: false,
+    levels: null as string[] | null,
+    currentIndex: 0,
+    chooseIndex: (_i: number) => {},
+  })
 
   // Keep stored effort aligned with the *current* model (model switch, catalog refresh).
   useEffect(() => {
@@ -65,38 +134,93 @@ export function EffortLevelPicker() {
     else setDraftEffort(next)
   }, [activeId, session, busy, catalog, modelKey, stored, setDraftEffort])
 
-  if (!levels) return null
-
-  const current = resolveEffort(stored, levels) ?? defaultFallback(levels)
-  const currentIndex = Math.max(0, levels.indexOf(current))
-  const levelLabel = t(`chat.effort.levels.${current}`, { defaultValue: current })
-  const chipText = t('chat.effort.chip', { level: levelLabel })
-  const maxBudget = isMaxBudgetEffort(current, levels)
-
   const choose = (effort: string) => {
     if (busy) return
     if (activeId && session) sessionService.setEffort(activeId, effort)
     else setDraftEffort(effort)
   }
 
+  const current =
+    levels != null
+      ? (resolveEffort(stored, levels) ?? defaultFallback(levels))
+      : ''
+  const currentIndex =
+    levels != null && current ? Math.max(0, levels.indexOf(current)) : 0
+
   const chooseIndex = (index: number) => {
+    if (!levels) return
     const next = levels[index]
     if (next) choose(next)
   }
 
-  const levelName = (level: string) => t(`chat.effort.levels.${level}`, { defaultValue: level })
+  wheelRef.current = { busy, levels, currentIndex, chooseIndex }
+
+  /** Scroll up → higher effort; scroll down → lower. */
+  const handleWheelStep = (e: WheelEvent) => {
+    const { busy: isBusy, levels: lv, currentIndex: idx, chooseIndex: stepTo } =
+      wheelRef.current
+    if (isBusy || !lv || lv.length <= 1) return false
+    if (Math.abs(e.deltaY) < Math.abs(e.deltaX) || e.deltaY === 0) return false
+    e.preventDefault()
+    e.stopPropagation()
+    // Scroll down the list → higher effort; scroll up → lower (matches menu order).
+    const step = e.deltaY > 0 ? 1 : -1
+    const next = stepEffortIndex(idx, step, lv.length)
+    if (next !== idx) stepTo(next)
+    return true
+  }
+
+  // Chip: non-passive listener (React onWheel is passive in many browsers).
+  useEffect(() => {
+    if (!levels) return
+    const el = chipRef.current
+    if (!el) return
+    const onWheel = (e: WheelEvent) => {
+      handleWheelStep(e)
+    }
+    el.addEventListener('wheel', onWheel, { passive: false })
+    return () => el.removeEventListener('wheel', onWheel)
+  }, [levels != null])
+
+  // Open menu (portaled): capture-phase on document so wheel over the panel steps levels.
+  useEffect(() => {
+    if (!open || !levels) return
+    const onWheel = (e: WheelEvent) => {
+      const menu = menuRef.current
+      if (!menu) return
+      const target = e.target
+      if (!(target instanceof Node) || !menu.contains(target)) return
+      handleWheelStep(e)
+    }
+    document.addEventListener('wheel', onWheel, { passive: false, capture: true })
+    return () => document.removeEventListener('wheel', onWheel, { capture: true })
+  }, [open, levels != null])
+
+  if (!levels) return null
+
+  const levelLabel = t(`chat.effort.levels.${current}`, { defaultValue: current })
+  const chipText = t('chat.effort.chip', { level: levelLabel })
+  const maxBudget = isMaxBudgetEffort(current, levels)
+  const currentDesc = t(`chat.effort.desc.${current}`, { defaultValue: '' })
+
+  const chipTitle = busy
+    ? t('chat.effort.busyTitle')
+    : currentDesc
+      ? `${t('chat.effort.label')}\n${currentDesc}`
+      : t('chat.effort.label')
 
   return (
-    <Popover open={open} onOpenChange={setOpen} modal={false}>
-      <PopoverTrigger asChild>
+    <DropdownMenu modal={false} open={open} onOpenChange={setOpen}>
+      <DropdownMenuTrigger asChild>
         <ComposerChip
+          ref={chipRef}
           active={false}
-          title={busy ? t('chat.effort.busyTitle') : t('chat.effort.label')}
+          title={chipTitle}
           aria-label={chipText}
           data-testid="effort-chip"
           disabled={busy}
           aria-disabled={busy}
-          className={cn(maxBudget && 'text-effort-max')}
+          className={cn(maxBudget && 'text-effort-max effort-max-chip')}
         >
           <Gauge
             size={13}
@@ -105,330 +229,106 @@ export function EffortLevelPicker() {
             aria-hidden
           />
           <span className="max-w-[160px] truncate" data-testid="effort-chip-label">
-            <span className={cn(maxBudget ? 'text-effort-max opacity-90' : 'text-ink-tertiary')}>
+            <span className={cn(maxBudget ? 'effort-max-text opacity-95' : 'text-ink-tertiary')}>
               {t('chat.effort.chipPrefix')}
             </span>
-            <span className={cn('mx-0.5', maxBudget ? 'text-effort-max opacity-80' : 'text-ink-tertiary')} aria-hidden>
+            <span
+              className={cn(
+                'mx-0.5',
+                maxBudget ? 'text-effort-max opacity-70' : 'text-ink-tertiary',
+              )}
+              aria-hidden
+            >
               ·
             </span>
-            <span className={cn(maxBudget && 'font-semibold')}>{levelLabel}</span>
+            <span className={cn(maxBudget ? 'effort-max-text font-semibold' : undefined)}>
+              {levelLabel}
+            </span>
           </span>
         </ComposerChip>
-      </PopoverTrigger>
-      <PopoverContent
+      </DropdownMenuTrigger>
+
+      <DropdownMenuContent
+        ref={menuRef}
         align="start"
-        className="w-[min(300px,calc(100vw-2rem))] p-3.5"
-        data-testid="effort-popover"
-        onOpenAutoFocus={(e) => e.preventDefault()}
+        className="min-w-[12rem] w-auto max-w-[min(20rem,calc(100vw-2rem))]"
+        data-testid="effort-menu"
       >
-        <div className="mb-3 flex items-baseline justify-between gap-2">
-          <label htmlFor={sliderId} className="text-meta font-medium text-ink">
-            {t('chat.effort.label')}
-          </label>
-          <span
-            className={cn(
-              'text-meta font-semibold tabular-nums transition-colors duration-chrome',
-              maxBudget ? 'text-effort-max' : 'text-ink',
-            )}
-            data-testid="effort-current-label"
-          >
-            {levelLabel}
+        <div className="flex items-baseline justify-between gap-3 px-2.5 py-1">
+          <span className="shrink-0 text-caption font-medium text-ink-tertiary">
+            {t('chat.effort.title', { defaultValue: t('chat.effort.label') })}
           </span>
+          {currentDesc ? (
+            <span
+              className={cn(
+                'min-w-0 truncate text-caption text-right leading-snug',
+                maxBudget ? 'text-effort-max opacity-80' : 'text-ink-tertiary',
+              )}
+              data-testid="effort-current-desc"
+              title={currentDesc}
+            >
+              {currentDesc}
+            </span>
+          ) : null}
         </div>
 
-        <EffortSlider
-          id={sliderId}
-          levels={levels}
-          index={currentIndex}
-          disabled={busy}
-          onChange={chooseIndex}
-          ariaLabel={t('chat.effort.label')}
-          levelLabel={levelName}
-        />
-      </PopoverContent>
-    </Popover>
-  )
-}
+        {levels.map((level, i) => {
+          const selected = level === current
+          const rowMax = isMaxBudgetEffort(level, levels)
+          const name = t(`chat.effort.levels.${level}`, { defaultValue: level })
+          const desc = t(`chat.effort.desc.${level}`, { defaultValue: '' })
 
-interface EffortSliderProps {
-  id: string
-  levels: readonly string[]
-  index: number
-  disabled?: boolean
-  onChange: (index: number) => void
-  ariaLabel: string
-  levelLabel: (level: string) => string
-}
-
-/**
- * Discrete value slider with continuous drag feel.
- * Thumb follows the pointer while dragging; value snaps to the nearest node
- * on release (and updates live when the nearest stop changes mid-drag).
- */
-function EffortSlider({
-  id,
-  levels,
-  index,
-  disabled,
-  onChange,
-  ariaLabel,
-  levelLabel,
-}: EffortSliderProps) {
-  const trackRef = useRef<HTMLDivElement>(null)
-  const dragging = useRef(false)
-  const lastCommitted = useRef(index)
-  /** Continuous 0..1 while dragging; null when resting on a discrete stop. */
-  const [dragRatio, setDragRatio] = useState<number | null>(null)
-  const dragRatioRef = useRef<number | null>(null)
-
-  const max = Math.max(0, levels.length - 1)
-  const restingRatio = max === 0 ? 0 : index / max
-  const ratio = dragRatio ?? restingRatio
-  const nearest = nearestEffortIndex(ratio, levels.length)
-  const pct = ratio * 100
-  const active = dragRatio !== null
-  const visualMaxBudget = isMaxBudgetEffort(levels[nearest] ?? '', levels)
-
-  const stops = useMemo(
-    () => levels.map((level, i) => ({ level, i, pct: max === 0 ? 0 : (i / max) * 100 })),
-    [levels, max],
-  )
-
-  useEffect(() => {
-    lastCommitted.current = index
-  }, [index])
-
-  const ratioFromClientX = useCallback((clientX: number): number => {
-    const el = trackRef.current
-    if (!el) return 0
-    const rect = el.getBoundingClientRect()
-    if (rect.width <= 0) return 0
-    const x = Math.min(Math.max(clientX - rect.left, 0), rect.width)
-    return x / rect.width
-  }, [])
-
-  const commitNearest = useCallback(
-    (r: number, { force = false }: { force?: boolean } = {}) => {
-      if (disabled) return
-      const next = nearestEffortIndex(r, levels.length)
-      if (!force && next === lastCommitted.current) return
-      lastCommitted.current = next
-      onChange(next)
-    },
-    [disabled, levels.length, onChange],
-  )
-
-  /** Follow finger continuously; commit discrete value when nearest stop changes. */
-  const setVisual = useCallback(
-    (r: number) => {
-      const clamped = Math.min(1, Math.max(0, r))
-      dragRatioRef.current = clamped
-      setDragRatio(clamped)
-      commitNearest(clamped)
-    },
-    [commitNearest],
-  )
-
-  const endDrag = useCallback(
-    (e: React.PointerEvent<HTMLDivElement>) => {
-      if (!dragging.current) return
-      dragging.current = false
-      const r = dragRatioRef.current ?? ratioFromClientX(e.clientX)
-      commitNearest(r, { force: true })
-      dragRatioRef.current = null
-      // Clear continuous ratio → thumb eases back to the discrete stop.
-      setDragRatio(null)
-      if (e.currentTarget.hasPointerCapture(e.pointerId)) {
-        e.currentTarget.releasePointerCapture(e.pointerId)
-      }
-    },
-    [commitNearest, ratioFromClientX],
-  )
-
-  const startDrag = (clientX: number, target: HTMLElement, pointerId: number) => {
-    if (disabled || max === 0) return
-    dragging.current = true
-    target.setPointerCapture(pointerId)
-    setVisual(ratioFromClientX(clientX))
-  }
-
-  const onTrackPointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
-    if (disabled || e.button !== 0) return
-    if ((e.target as HTMLElement).closest('[data-effort-node]')) return
-    e.preventDefault()
-    startDrag(e.clientX, e.currentTarget, e.pointerId)
-  }
-
-  const onNodePointerDown = (e: React.PointerEvent, i: number) => {
-    if (disabled || e.button !== 0) return
-    e.preventDefault()
-    e.stopPropagation()
-    const track = trackRef.current
-    if (!track) {
-      lastCommitted.current = i
-      onChange(i)
-      return
-    }
-    dragging.current = true
-    track.setPointerCapture(e.pointerId)
-    // Start continuous slide from this node.
-    setVisual(max === 0 ? 0 : i / max)
-  }
-
-  const onPointerMove = (e: React.PointerEvent) => {
-    if (!dragging.current) return
-    setVisual(ratioFromClientX(e.clientX))
-  }
-
-  const onKeyDown = (e: React.KeyboardEvent) => {
-    if (disabled) return
-    if (e.key === 'ArrowLeft' || e.key === 'ArrowDown' || e.key === 'Home') {
-      e.preventDefault()
-      const next = e.key === 'Home' ? 0 : Math.max(0, index - 1)
-      lastCommitted.current = next
-      onChange(next)
-    } else if (e.key === 'ArrowRight' || e.key === 'ArrowUp' || e.key === 'End') {
-      e.preventDefault()
-      const next = e.key === 'End' ? max : Math.min(max, index + 1)
-      lastCommitted.current = next
-      onChange(next)
-    }
-  }
-
-  // Continuous position along the scale (for fill/node “reached” while dragging).
-  const continuousIndex = ratio * max
-
-  return (
-    <div className="select-none px-1">
-      <div
-        ref={trackRef}
-        id={id}
-        role="slider"
-        tabIndex={disabled ? -1 : 0}
-        aria-label={ariaLabel}
-        aria-valuemin={0}
-        aria-valuemax={max}
-        aria-valuenow={nearest}
-        aria-valuetext={levelLabel(levels[nearest] ?? '')}
-        aria-disabled={disabled || undefined}
-        data-testid="effort-slider"
-        data-dragging={active ? 'true' : 'false'}
-        className={cn(
-          'relative h-8 touch-none outline-none',
-          'focus-visible:ring-2 focus-visible:ring-ink/15 focus-visible:ring-offset-2 focus-visible:ring-offset-surface rounded-md',
-          disabled ? 'cursor-not-allowed opacity-50' : 'cursor-grab active:cursor-grabbing',
-        )}
-        onPointerDown={onTrackPointerDown}
-        onPointerMove={onPointerMove}
-        onPointerUp={endDrag}
-        onPointerCancel={endDrag}
-        onKeyDown={onKeyDown}
-      >
-        {/* Rail */}
-        <div
-          className="pointer-events-none absolute left-0 right-0 top-1/2 h-1.5 -translate-y-1/2 rounded-full bg-surface-muted"
-          data-testid="effort-slider-track"
-          aria-hidden
-        />
-
-        {/* Fill follows finger continuously while dragging */}
-        <div
-          className={cn(
-            'pointer-events-none absolute left-0 top-1/2 h-1.5 -translate-y-1/2 rounded-full will-change-[width]',
-            active
-              ? 'transition-none'
-              : 'transition-[width,background] duration-content ease-out',
-            visualMaxBudget ? 'effort-max-track' : 'bg-ink/75',
-          )}
-          style={{ width: `${pct}%` }}
-          data-testid="effort-slider-fill"
-          data-max-budget={visualMaxBudget ? 'true' : 'false'}
-          aria-hidden
-        />
-
-        {/* Snap nodes — landmarks; thumb slides freely between them */}
-        {stops.map(({ level, i, pct: stopPct }) => {
-          const reached = continuousIndex + 0.02 >= i
-          const selected = !active && i === index
-          const near = active && nearest === i
-          const nodeMax = isMaxBudgetEffort(level, levels)
           return (
-            <button
+            <DropdownMenuItem
               key={level}
-              type="button"
-              data-effort-node=""
-              data-testid={`effort-level-${level}`}
-              disabled={disabled}
-              tabIndex={-1}
-              aria-label={levelLabel(level)}
-              title={levelLabel(level)}
-              onPointerDown={(e) => onNodePointerDown(e, i)}
-              onClick={(e) => {
-                e.stopPropagation()
-                if (disabled || dragging.current) return
-                lastCommitted.current = i
-                onChange(i)
-              }}
+              disabled={busy}
+              onSelect={() => choose(level)}
+              title={desc || undefined}
               className={cn(
-                'absolute top-1/2 z-[1] flex h-7 w-7 -translate-x-1/2 -translate-y-1/2 items-center justify-center',
-                'rounded-full focus-visible:outline-none',
-                'disabled:cursor-not-allowed',
+                'gap-2 py-1',
+                selected && rowMax && 'bg-state-hover',
               )}
-              style={{ left: `${stopPct}%` }}
+              data-testid={`effort-level-${level}`}
+              data-selected={selected ? 'true' : 'false'}
+              data-max-budget={rowMax ? 'true' : 'false'}
             >
-              <span
+              <Check
+                size={13}
                 className={cn(
-                  'block rounded-full transition-[transform,background-color,box-shadow,width,height] duration-chrome',
-                  selected || near
-                    ? cn(
-                        'h-2.5 w-2.5',
-                        nodeMax || visualMaxBudget
-                          ? 'bg-effort-max-node effort-max-node-selected'
-                          : 'bg-ink shadow-sm',
-                      )
-                    : reached
-                      ? cn(
-                          'h-[5px] w-[5px]',
-                          visualMaxBudget ? 'bg-white/90' : 'bg-surface ring-1 ring-ink/25',
-                        )
-                      : 'h-[5px] w-[5px] bg-ink-tertiary/40',
+                  'shrink-0',
+                  selected
+                    ? rowMax
+                      ? 'text-effort-max opacity-100'
+                      : 'opacity-100'
+                    : 'opacity-0',
                 )}
                 aria-hidden
               />
-            </button>
+
+              <EffortIntensityMeter
+                index={i}
+                total={levels.length}
+                maxBudget={rowMax}
+              />
+
+              <span
+                className={cn(
+                  'min-w-0 flex-1 truncate text-meta',
+                  selected && 'font-medium',
+                  rowMax && selected
+                    ? 'effort-max-text'
+                    : rowMax
+                      ? 'text-effort-max'
+                      : 'text-ink',
+                )}
+              >
+                {name}
+              </span>
+            </DropdownMenuItem>
           )
         })}
-
-        {/* Thumb — free while dragging, ease-out snap on release */}
-        <div
-          className={cn(
-            'pointer-events-none absolute top-1/2 z-[2] -translate-x-1/2 -translate-y-1/2 rounded-full border-2 bg-surface will-change-[left]',
-            active
-              ? 'h-4 w-4 transition-none'
-              : 'h-3.5 w-3.5 transition-[left,width,height,box-shadow,border-color] duration-content ease-out',
-            visualMaxBudget ? 'effort-max-thumb border-effort-max' : 'border-ink/85 shadow-sm',
-          )}
-          style={{ left: `${pct}%` }}
-          data-testid="effort-slider-thumb"
-          aria-hidden
-        />
-      </div>
-
-      {/* End caps only */}
-      {levels.length > 1 ? (
-        <div className="mt-1 flex justify-between px-0.5" aria-hidden>
-          <span className="text-caption text-ink-tertiary">{levelLabel(levels[0]!)}</span>
-          <span
-            className={cn(
-              'text-caption',
-              isMaxBudgetEffort(levels[max]!, levels) ? 'text-effort-max' : 'text-ink-tertiary',
-            )}
-          >
-            {levelLabel(levels[max]!)}
-          </span>
-        </div>
-      ) : null}
-    </div>
+      </DropdownMenuContent>
+    </DropdownMenu>
   )
 }
 

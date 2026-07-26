@@ -411,6 +411,7 @@ export const ja = {
     },
     "effort": {
       "label": "この会話の推論努力",
+      "title": "推論努力",
       "busyTitle": "ターン実行中は努力レベルを変更できません",
       "chipPrefix": "努力",
       "chip": "努力 · {{level}}",

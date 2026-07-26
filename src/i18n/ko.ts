@@ -411,6 +411,7 @@ export const ko = {
     },
     "effort": {
       "label": "이 대화의 추론 노력",
+      "title": "추론 노력",
       "busyTitle": "턴이 실행 중일 때는 노력을 변경할 수 없습니다",
       "chipPrefix": "노력",
       "chip": "노력 · {{level}}",

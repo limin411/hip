@@ -388,6 +388,8 @@ export const en = {
       },
       effort: {
         label: 'Reasoning effort for this conversation',
+        /** Short popover heading. */
+        title: 'Reasoning effort',
         busyTitle: 'Cannot change effort while a turn is running',
         /** Short category word shown on the composer chip before the level. */
         chipPrefix: 'Effort',

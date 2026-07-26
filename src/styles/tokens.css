@@ -370,7 +370,7 @@ html[data-window-focus='false'] [data-tauri-drag-region] {
 }
 
 /*
- * Effort Max budget — Claude Desktop–style purple holographic track.
+ * Effort Max budget — Claude Desktop–style purple holographic chrome.
  * Applied when reasoning effort is at max (or top-of-scale xhigh).
  */
 :root {
@@ -378,17 +378,43 @@ html[data-window-focus='false'] [data-tauri-drag-region] {
   --effort-max-bright: #a855f7;
   --effort-max-pink: #e879f9;
   --effort-max-indigo: #6366f1;
+  --effort-max-cyan: #818cf8;
+  --effort-max-glow: rgba(168, 85, 247, 0.55);
+  --effort-max-glow-hot: rgba(232, 121, 249, 0.7);
 }
 .dark {
   --effort-max: #c4b5fd;
   --effort-max-bright: #d8b4fe;
   --effort-max-pink: #f0abfc;
   --effort-max-indigo: #a5b4fc;
+  --effort-max-cyan: #c4b5fd;
+  --effort-max-glow: rgba(196, 181, 253, 0.55);
+  --effort-max-glow-hot: rgba(240, 171, 252, 0.7);
 }
 
 .text-effort-max {
   color: var(--effort-max);
 }
+
+/* Iridescent label / chip text (Claude-style holographic type) */
+.effort-max-text {
+  background-image: linear-gradient(
+    105deg,
+    var(--effort-max) 0%,
+    var(--effort-max-bright) 22%,
+    var(--effort-max-pink) 45%,
+    var(--effort-max-cyan) 68%,
+    var(--effort-max-bright) 85%,
+    var(--effort-max) 100%
+  );
+  background-size: 220% 100%;
+  background-clip: text;
+  -webkit-background-clip: text;
+  color: transparent;
+  -webkit-text-fill-color: transparent;
+  animation: effort-max-shimmer 3.2s ease-in-out infinite;
+}
+
 .border-effort-max {
   border-color: var(--effort-max-bright);
 }
@@ -397,8 +423,9 @@ html[data-window-focus='false'] [data-tauri-drag-region] {
 }
 .effort-max-node-selected {
   box-shadow:
-    0 0 0 2px color-mix(in srgb, var(--effort-max-bright) 35%, transparent),
-    0 0 8px rgba(168, 85, 247, 0.45);
+    0 0 0 2px color-mix(in srgb, var(--effort-max-bright) 40%, transparent),
+    0 0 10px var(--effort-max-glow),
+    0 0 18px rgba(232, 121, 249, 0.35);
 }
 
 @keyframes effort-max-shimmer {
@@ -409,61 +436,149 @@ html[data-window-focus='false'] [data-tauri-drag-region] {
 @keyframes effort-max-glow-pulse {
   0%, 100% {
     box-shadow:
-      0 0 6px rgba(168, 85, 247, 0.55),
-      0 0 14px rgba(139, 92, 246, 0.35),
-      inset 0 0 4px rgba(255, 255, 255, 0.28);
+      0 0 6px var(--effort-max-glow),
+      0 0 16px rgba(139, 92, 246, 0.4),
+      0 0 28px rgba(168, 85, 247, 0.2),
+      inset 0 0 5px rgba(255, 255, 255, 0.32);
   }
   50% {
     box-shadow:
-      0 0 10px rgba(232, 121, 249, 0.65),
-      0 0 22px rgba(168, 85, 247, 0.45),
-      inset 0 0 6px rgba(255, 255, 255, 0.38);
+      0 0 12px var(--effort-max-glow-hot),
+      0 0 26px rgba(168, 85, 247, 0.55),
+      0 0 40px rgba(232, 121, 249, 0.28),
+      inset 0 0 8px rgba(255, 255, 255, 0.45);
   }
+}
+@keyframes effort-max-thumb-pulse {
+  0%, 100% {
+    box-shadow:
+      0 0 0 1.5px color-mix(in srgb, var(--effort-max-bright) 55%, transparent),
+      0 0 12px var(--effort-max-glow),
+      0 0 22px rgba(232, 121, 249, 0.35),
+      0 0 36px rgba(139, 92, 246, 0.18);
+  }
+  50% {
+    box-shadow:
+      0 0 0 2px color-mix(in srgb, var(--effort-max-pink) 65%, transparent),
+      0 0 16px var(--effort-max-glow-hot),
+      0 0 30px rgba(168, 85, 247, 0.5),
+      0 0 48px rgba(232, 121, 249, 0.28);
+  }
+}
+@keyframes effort-max-ambient-breathe {
+  0%, 100% { opacity: 0.45; transform: scale(1); }
+  50% { opacity: 0.7; transform: scale(1.04); }
+}
+
+/* Soft purple rail under the holographic fill */
+.effort-max-rail {
+  background-color: color-mix(in srgb, var(--effort-max) 16%, var(--surface-muted));
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--effort-max-bright) 22%, transparent);
+}
+
+/* Soft bloom behind the slider when max budget is selected */
+.effort-max-ambient {
+  position: relative;
+}
+.effort-max-ambient::before {
+  content: '';
+  position: absolute;
+  left: 8%;
+  right: 0;
+  top: 50%;
+  height: 28px;
+  translate: 0 -50%;
+  border-radius: 9999px;
+  background: radial-gradient(
+    70% 120% at 85% 50%,
+    color-mix(in srgb, var(--effort-max-pink) 55%, transparent) 0%,
+    color-mix(in srgb, var(--effort-max-bright) 35%, transparent) 40%,
+    transparent 75%
+  );
+  filter: blur(10px);
+  pointer-events: none;
+  z-index: 0;
+  animation: effort-max-ambient-breathe 2.6s ease-in-out infinite;
 }
 
 .effort-max-track {
   position: relative;
-  /* Multi-stop purple → magenta → indigo; oversize for animated pan */
+  /* Specular hatch + iridescent base + moving highlight */
   background-image:
-    /* Fine diagonal “花纹” hatching */
+    linear-gradient(
+      100deg,
+      transparent 0%,
+      rgba(255, 255, 255, 0.45) 42%,
+      rgba(255, 255, 255, 0.12) 50%,
+      transparent 62%
+    ),
     repeating-linear-gradient(
       118deg,
       transparent 0 2px,
-      rgba(255, 255, 255, 0.14) 2px 3px,
-      transparent 3px 6px
+      rgba(255, 255, 255, 0.16) 2px 3px,
+      transparent 3px 5px
     ),
-    /* Soft iridescent sheen */
     linear-gradient(
       110deg,
       var(--effort-max) 0%,
-      var(--effort-max-bright) 18%,
-      var(--effort-max-pink) 38%,
-      var(--effort-max-bright) 55%,
-      var(--effort-max-indigo) 72%,
+      var(--effort-max-bright) 14%,
+      var(--effort-max-pink) 32%,
+      var(--effort-max-cyan) 48%,
+      var(--effort-max-bright) 62%,
+      var(--effort-max-indigo) 78%,
+      var(--effort-max-pink) 90%,
       var(--effort-max) 100%
     );
-  background-size: auto, 220% 100%;
-  background-position: 0 0, 0% 50%;
+  background-size: 180% 100%, auto, 260% 100%;
+  background-position: 0% 50%, 0 0, 0% 50%;
   animation:
-    effort-max-shimmer 2.8s ease-in-out infinite,
-    effort-max-glow-pulse 2.2s ease-in-out infinite;
+    effort-max-shimmer 2.4s ease-in-out infinite,
+    effort-max-glow-pulse 2s ease-in-out infinite;
 }
 
 .effort-max-thumb {
-  box-shadow:
-    0 0 0 1px rgba(168, 85, 247, 0.35),
-    0 0 10px rgba(168, 85, 247, 0.55),
-    0 0 18px rgba(232, 121, 249, 0.3);
+  border-color: var(--effort-max-bright) !important;
+  background:
+    radial-gradient(circle at 35% 30%, rgba(255, 255, 255, 0.95) 0%, rgba(255, 255, 255, 0.55) 28%, transparent 55%),
+    linear-gradient(145deg, #faf5ff 0%, #f3e8ff 45%, #ede9fe 100%);
+  animation: effort-max-thumb-pulse 2s ease-in-out infinite;
+}
+.dark .effort-max-thumb {
+  background:
+    radial-gradient(circle at 35% 30%, rgba(255, 255, 255, 0.55) 0%, rgba(255, 255, 255, 0.12) 30%, transparent 55%),
+    linear-gradient(145deg, #2e1065 0%, #4c1d95 50%, #5b21b6 100%);
 }
 
 .effort-max-icon {
   color: var(--effort-max);
-  filter: drop-shadow(0 0 4px rgba(168, 85, 247, 0.55));
+  filter: drop-shadow(0 0 5px var(--effort-max-glow)) drop-shadow(0 0 10px rgba(232, 121, 249, 0.35));
+}
+
+/* Chip subtle outer glow at max */
+.effort-max-chip {
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--effort-max-bright) 22%, transparent);
+}
+.effort-max-chip:hover {
+  box-shadow:
+    0 0 0 1px color-mix(in srgb, var(--effort-max-bright) 35%, transparent),
+    0 0 12px color-mix(in srgb, var(--effort-max-bright) 28%, transparent);
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .effort-max-track {
+  .effort-max-track,
+  .effort-max-text,
+  .effort-max-thumb,
+  .effort-max-ambient::before {
     animation: none;
-    background-position: 0 0, 40% 50%;
+  }
+  .effort-max-track {
+    background-position: 40% 50%, 0 0, 40% 50%;
+  }
+  .effort-max-text {
+    background-position: 40% 50%;
+  }
+  .effort-max-ambient::before {
+    opacity: 0.5;
+    transform: none;
   }
 }

@@ -419,6 +419,7 @@ export const zhTW = {
     },
     "effort": {
       "label": "本對話的思考強度",
+      "title": "思考強度",
       "busyTitle": "回合進行中，暫不能切換思考強度",
       "chipPrefix": "思考",
       "chip": "思考 · {{level}}",

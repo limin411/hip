@@ -16,10 +16,12 @@ import { resolveSearchRoot } from '@/lib/resolveSearchRoot'
 import { isMultimodalAttachmentMime } from '@/lib/attachmentAllowlist'
 import { readSkillFile } from '@/ipc/skills'
 import { ComposerLeftSlot } from './ComposerLeftSlot'
+import { CHAT_COLUMN_CLASS } from './ChatColumn'
 import { sessionService, useActiveSession, useActiveSessionId, useActiveSessionStatus, useActivePendingPermission, useConnectionStatus } from '@/domain'
 import { formatDiffAnnotationsForComposer, useDiffAnnotationStore } from '@/store/diffAnnotationStore'
 import { isProjectPathBlocked } from '@/lib/projectPathGate'
 import { surfaceOf } from '@/lib/sessions'
+import { cn } from '@/lib/utils'
 import { useProjectPathStore } from '@/store/projectPathStore'
 import { hasPlanApproval } from './planApproval'
 import { isAttachmentSupported } from '@/lib/attachmentEligibility'
@@ -271,18 +273,21 @@ export function InputBar() {
       className="relative shrink-0 bg-surface"
       data-testid="input-bar"
     >
-      {/* Invisible hit target on the top edge — drag still resizes; no visible grip chrome. */}
-      {!sessionActionBlocked && (
-        <div
-          role="separator"
-          aria-orientation="horizontal"
-          aria-label={t('chat.resizeInput')}
-          data-testid="input-bar-resize"
-          onPointerDown={onResizePointerDown}
-          className="absolute inset-x-4 top-2 z-10 h-2 -translate-y-1/2 cursor-ns-resize"
-        />
-      )}
-      <div className="w-full px-4 pb-3 pt-2">
+      <div
+        className={cn('relative px-4 pb-3 pt-2', CHAT_COLUMN_CLASS)}
+        data-testid="chat-column"
+      >
+        {/* Invisible hit target on the top edge — drag still resizes; no visible grip chrome. */}
+        {!sessionActionBlocked && (
+          <div
+            role="separator"
+            aria-orientation="horizontal"
+            aria-label={t('chat.resizeInput')}
+            data-testid="input-bar-resize"
+            onPointerDown={onResizePointerDown}
+            className="absolute inset-x-4 top-2 z-10 h-2 -translate-y-1/2 cursor-ns-resize"
+          />
+        )}
         {sessionActionBlocked ? (
           <div
             className="rounded-xl border border-border bg-surface-muted/50 px-3 py-3 text-left text-meta text-ink-secondary"

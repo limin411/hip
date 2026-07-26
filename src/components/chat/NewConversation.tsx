@@ -20,6 +20,7 @@ import { useProjectPathStore } from '@/store/projectPathStore'
 import { readSkillFile } from '@/ipc/skills'
 import { FolderPill } from './FolderPill'
 import { ComposerLeftSlot } from './ComposerLeftSlot'
+import { CHAT_COLUMN_CLASS } from './ChatColumn'
 import { FirstRunSetupCard } from './FirstRunSetupCard'
 import { AcpCapabilityCliffBanner } from './AcpCapabilityCliffBanner'
 import { isAttachmentSupported } from '@/lib/attachmentEligibility'
@@ -322,7 +323,7 @@ export function NewConversation() {
       data-testid="new-conversation"
       data-surface={surface}
     >
-      <div className="w-full max-w-2xl">
+      <div className={CHAT_COLUMN_CLASS} data-testid="chat-column">
         <div className="mb-3 flex justify-center">
           <MascotActor
             key={surface}

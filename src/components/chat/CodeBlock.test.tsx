@@ -216,14 +216,17 @@ describe('markdownProseClassName (KD11 + prose contract)', () => {
     expect(markdownProseClassName).toContain('[&_hr]:my-4')
     expect(markdownProseClassName).toContain('[&_hr]:border-t')
     expect(markdownProseClassName).toContain('[&_hr]:border-border')
-    // Denser table cells
+    // Denser table cells + wrap so column max-width holds
     expect(markdownProseClassName).toContain('[&_th]:px-2.5')
     expect(markdownProseClassName).toContain('[&_th]:py-1.5')
     expect(markdownProseClassName).toContain('[&_th]:text-meta')
     expect(markdownProseClassName).toContain('[&_th]:font-semibold')
+    expect(markdownProseClassName).toContain('[&_th]:break-words')
     expect(markdownProseClassName).toContain('[&_td]:px-2.5')
     expect(markdownProseClassName).toContain('[&_td]:py-1.5')
     expect(markdownProseClassName).toContain('[&_td]:text-meta')
+    expect(markdownProseClassName).toContain('[&_td]:break-words')
+    expect(markdownProseClassName).toContain('[&_table]:table-fixed')
     // GFM task list checkboxes
     expect(markdownProseClassName).toContain('[&_input[type=checkbox]]:mr-2')
     expect(markdownProseClassName).toContain('[&_input[type=checkbox]]:align-middle')

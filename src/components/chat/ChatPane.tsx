@@ -41,6 +41,7 @@ import { TRANSCRIPT_ROW_GAP_PX } from './feature'
 import { shouldHideInterruptForPlanApproval } from './planApproval'
 import { MessageBubble, NoticeRow } from './MessageBubble'
 import { ThinkingBubble } from './ThinkingBubble'
+import { CHAT_COLUMN_CLASS } from './ChatColumn'
 import { SkeletonText } from '@/components/ui/Skeleton'
 import type { Message } from '@hip/protocol'
 
@@ -446,14 +447,15 @@ export function ChatPane() {
         data-testid="chat-transcript-scroll"
         data-transcript-virtual={virtualize ? 'true' : undefined}
       >
-        {/* CLI-style transcript: full-width left-aligned, no centered chat column */}
+        {/* Centered reading column (max-w-4xl) for both chat and code surfaces. */}
         <div
-          className="flex w-full flex-col px-4 py-4"
+          className={cn('flex flex-col px-4 py-4', CHAT_COLUMN_CLASS)}
           style={{
             // Code: design ladder gap-5 (20px). Chat: slightly looser reading room.
             gap: isChatSurface ? TRANSCRIPT_ROW_GAP_PX + 4 : TRANSCRIPT_ROW_GAP_PX,
           }}
           data-surface={isChatSurface ? 'chat' : 'code'}
+          data-testid="chat-column"
         >
           {hasEarlier && (
             <div className="flex justify-center">

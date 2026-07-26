@@ -557,7 +557,9 @@ export function HtmlPreviewBody({
             <iframe
               data-testid="preview-html"
               title="preview"
-              sandbox=""
+              // allow-scripts: in-page TOC jump (srcDoc hash nav blanks WebView).
+              // No allow-same-origin → script cannot touch parent app.
+              sandbox="allow-scripts"
               className="absolute inset-0 h-full w-full border-0 bg-white"
               srcDoc={srcDoc}
             />

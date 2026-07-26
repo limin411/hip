@@ -19,7 +19,7 @@ import { runRoundtable } from './runner.js'
 import { renderEventMarkdown } from './render.js'
 import { runCouncilAdvisor } from './council-advisor.js'
 import {
-  buildRoundtableReportHtml,
+  buildRoundtableReportBundle,
   ROUNDTABLE_REPORT_FILENAME,
 } from './report.js'
 import { logInfo } from '../../debug-logger.js'
@@ -306,11 +306,11 @@ export async function tryRunRoundtableTurn(
       }
     }
 
-    // End-of-meeting HTML deliverable (Chat artifact preview via write_file).
+    // End-of-meeting HTML deliverables: hip summary + per-role sub-reports.
     let reportNote = ''
     if (result.convened && result.report && result.phase === 'done') {
       try {
-        const html = buildRoundtableReportHtml({
+        const bundle = buildRoundtableReportBundle({
           issue: result.report.issue,
           language: lang,
           agenda: result.report.agenda,
@@ -321,62 +321,84 @@ export async function tryRunRoundtableTurn(
           earlyExit: result.report.earlyExit ?? result.earlyExit,
           generatedAt: new Date().toISOString(),
         })
-        const absPath = path.join(cwd, ROUNDTABLE_REPORT_FILENAME)
-        await fs.mkdir(path.dirname(absPath), { recursive: true })
-        await fs.writeFile(absPath, html, 'utf8')
-
-        const callId = `roundtable-report-${Date.now()}`
-        const relPath = ROUNDTABLE_REPORT_FILENAME
-        // Absolute path so write-follow + "open in browser" pass cwd trust checks.
-        const wirePath = absPath
-        const input = JSON.stringify({ path: wirePath })
+        await fs.mkdir(cwd, { recursive: true })
         const sup = trajectory.get('supervisor')
-        const seq = sup?.toolCalls.size ?? 0
-        if (sup) {
-          sup.toolCalls.set(callId, {
-            callId,
+        const written: Array<{ rel: string; abs: string; bytes: number }> = []
+        const baseTs = Date.now()
+
+        for (let i = 0; i < bundle.length; i++) {
+          const file = bundle[i]!
+          const absPath = path.join(cwd, file.filename)
+          await fs.writeFile(absPath, file.html, 'utf8')
+          written.push({ rel: file.filename, abs: absPath, bytes: file.html.length })
+
+          // Absolute path so write-follow + "open in browser" pass cwd trust checks.
+          const callId = `roundtable-report-${baseTs}-${i}`
+          const input = JSON.stringify({ path: absPath })
+          const seq = sup?.toolCalls.size ?? i
+          if (sup) {
+            sup.toolCalls.set(callId, {
+              callId,
+              agentId: 'supervisor',
+              name: 'write_file',
+              input,
+              status: 'finished',
+              seq,
+              output: `wrote ${file.filename} (${file.html.length} bytes)`,
+            })
+          }
+          rawSend({
+            type: 'tool:started',
+            sessionId: host.id,
+            turnId,
             agentId: 'supervisor',
+            role: 'supervisor',
+            callId,
             name: 'write_file',
             input,
-            status: 'finished',
             seq,
-            output: `wrote ${relPath} (${html.length} bytes)`,
+          })
+          rawSend({
+            type: 'tool:finished',
+            sessionId: host.id,
+            turnId,
+            agentId: 'supervisor',
+            callId,
+            status: 'finished',
+            output: `wrote ${file.filename} (${file.html.length} bytes)`,
           })
         }
-        rawSend({
-          type: 'tool:started',
-          sessionId: host.id,
-          turnId,
-          agentId: 'supervisor',
-          role: 'supervisor',
-          callId,
-          name: 'write_file',
-          input,
-          seq,
-        })
-        rawSend({
-          type: 'tool:finished',
-          sessionId: host.id,
-          turnId,
-          agentId: 'supervisor',
-          callId,
-          status: 'finished',
-          output: `wrote ${relPath} (${html.length} bytes)`,
-        })
+
+        const mainRel = ROUNDTABLE_REPORT_FILENAME
+        const roleRels = written
+          .filter((w) => w.rel !== mainRel)
+          .map((w) => w.rel)
+        const roleList =
+          roleRels.length > 0
+            ? roleRels.map((p) => `- [\`${p}\`](${p})`).join('\n')
+            : ''
         reportNote =
           lang === 'zh-CN' || lang === 'zh-TW'
-            ? `\n\n---\n\n**圆桌报告：** [\`${relPath}\`](${relPath})（已写入工作区，可在右侧预览）\n`
+            ? `\n\n---\n\n**圆桌报告（hip 汇总）：** [\`${mainRel}\`](${mainRel})\n` +
+              (roleList
+                ? `\n**各角色子报告：**\n${roleList}\n\n（汇总页可跳转子报告；浏览器打开后链接可用，或在右侧文件列表中打开）\n`
+                : `\n（已写入工作区，可在右侧预览）\n`)
             : lang === 'ja'
-              ? `\n\n---\n\n**円卓レポート:** [\`${relPath}\`](${relPath})\n`
+              ? `\n\n---\n\n**円卓レポート (hip):** [\`${mainRel}\`](${mainRel})\n` +
+                (roleList ? `\n**役割別:**\n${roleList}\n` : '')
               : lang === 'ko'
-                ? `\n\n---\n\n**원탁 보고서:** [\`${relPath}\`](${relPath})\n`
-                : `\n\n---\n\n**Roundtable report:** [\`${relPath}\`](${relPath}) (saved; open in the preview panel)\n`
+                ? `\n\n---\n\n**원탁 보고서 (hip):** [\`${mainRel}\`](${mainRel})\n` +
+                  (roleList ? `\n**역할별:**\n${roleList}\n` : '')
+                : `\n\n---\n\n**Roundtable report (hip summary):** [\`${mainRel}\`](${mainRel})\n` +
+                  (roleList
+                    ? `\n**Role reports:**\n${roleList}\n\n(Open the summary in a browser to follow cross-links, or open files from the preview panel.)\n`
+                    : `\n(Saved; open in the preview panel)\n`)
         pushBurst(reportNote)
         logInfo('session', 'roundtable:report', {
           sessionId: host.id,
           turnId,
-          path: absPath,
-          bytes: html.length,
+          files: written.map((w) => ({ path: w.abs, bytes: w.bytes })),
+          count: written.length,
         })
       } catch (err) {
         logInfo('session', 'roundtable:report-error', {

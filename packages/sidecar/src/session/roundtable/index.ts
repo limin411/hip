@@ -15,7 +15,12 @@ export {
 } from './detect.js'
 export { runRoundtable } from './runner.js'
 export { tryRunRoundtableTurn } from './turn.js'
-export { buildRoundtableReportHtml, ROUNDTABLE_REPORT_FILENAME } from './report.js'
+export {
+  buildRoundtableReportHtml,
+  buildRoundtableReportBundle,
+  personaReportFilename,
+  ROUNDTABLE_REPORT_FILENAME,
+} from './report.js'
 export { runCouncilAdvisor, COUNCIL_ADVISOR_TOOLS } from './council-advisor.js'
 export { parseChairActionFromText, extractJsonObject } from './schema.js'
 export { completeFnsFromModelRunner, scriptedCompleteFns } from './complete.js'

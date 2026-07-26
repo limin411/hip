@@ -126,7 +126,7 @@ describe('FilePreview', () => {
     expect(screen.getByTestId('preview-html-shell')).toBeInTheDocument()
     // Deferred mount: pending first, then iframe.
     await waitFor(() => {
-      expect(screen.getByTestId('preview-html')).toHaveAttribute('sandbox', '')
+      expect(screen.getByTestId('preview-html')).toHaveAttribute('sandbox', 'allow-scripts')
     })
   })
 

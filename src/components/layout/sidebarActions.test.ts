@@ -226,7 +226,7 @@ describe('sidebarActions', () => {
     expect(useUiStore.getState().activeView).toBe('automation')
   })
 
-  it('openSettingsFromChrome flushes knowledge and assigns section', async () => {
+  it('openSettingsFromChrome flushes knowledge and keeps knowledge section', async () => {
     useDomainStore.setState({
       sessions: [
         {
@@ -252,7 +252,8 @@ describe('sidebarActions', () => {
     expect(useUiStore.getState().activeView).toBe('settings')
     expect(useUiStore.getState().settingsPage).toBe('general')
     expect(useUiStore.getState().previousView).toBe('knowledge')
-    expect(useUiStore.getState().sidebarSection).toBe('projects')
+    // Settings preserves content section (unlike trash/history).
+    expect(useUiStore.getState().sidebarSection).toBe('knowledge')
   })
 
   it('openHistoryFromChrome uses same flush/section rule', async () => {
@@ -340,13 +341,13 @@ describe('sidebarActions', () => {
     expect(useWorkItemViewStore.getState().viewMode).toBe('calendar')
   })
 
-  it('openSettingsFromChrome flushes work items when leaving tasks', async () => {
+  it('openSettingsFromChrome flushes work items and keeps tasks section', async () => {
     useUiStore.setState({ activeView: 'tasks', sidebarSection: 'tasks' })
     await openSettingsFromChrome()
     expect(workItemFlushSave).toHaveBeenCalled()
     expect(useUiStore.getState().activeView).toBe('settings')
-    // Leave tasks list (parity with knowledge) so special views are not paired with WI filters.
-    expect(useUiStore.getState().sidebarSection).toBe('chats')
+    // Keep tasks rail highlight; do not snap to chats/projects.
+    expect(useUiStore.getState().sidebarSection).toBe('tasks')
   })
 
   it('enterWorkItemsSection restores tasks view from trash', async () => {

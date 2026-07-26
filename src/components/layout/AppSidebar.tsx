@@ -334,7 +334,9 @@ export function AppSidebar() {
         />
         <NavItem
           section="tasks"
-          active={sidebarSection === 'tasks' && activeView === 'tasks'}
+          // Section-only (like chats/knowledge): Settings keeps `tasks` so the
+          // rail stays on Tasks; trash/history still reassign section away.
+          active={sidebarSection === 'tasks'}
           label={t('sidebar.nav.tasks')}
           icon={<CheckSquare size={16} strokeWidth={1.75} />}
           onClick={() => onNav('tasks')}

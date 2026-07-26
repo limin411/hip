@@ -27,7 +27,7 @@ export function AgentsRuntimeSplit() {
           </div>
         </Panel>
         <PanelResizeHandle className="group relative z-10 h-2 -my-1 bg-transparent">
-          <div className="mx-2 h-px bg-border transition-colors group-hover:bg-accent group-data-[resize-handle-state=drag]:bg-accent" />
+          <div className="h-px w-full bg-border transition-colors group-hover:bg-accent group-data-[resize-handle-state=drag]:bg-accent" />
         </PanelResizeHandle>
         <Panel defaultSize={50} minSize={20} className="min-h-0">
           <div className="flex h-full min-h-0 flex-col">

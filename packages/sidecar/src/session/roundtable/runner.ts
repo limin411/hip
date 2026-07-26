@@ -26,14 +26,15 @@ import { councilAgentId } from './ids.js'
 import { renderEventMarkdown } from './render.js'
 import { parseChairActionFromText } from './schema.js'
 import { parseSpeechEnvelope } from './speech-schema.js'
-import type {
-  ChairAction,
-  PersonaId,
-  RunRoundtableArgs,
-  RoundtableEvent,
-  RoundtableResult,
-  SpeechRecord,
-  StageRecord,
+import {
+  PERSONA_IDS,
+  type ChairAction,
+  type PersonaId,
+  type RunRoundtableArgs,
+  type RoundtableEvent,
+  type RoundtableResult,
+  type SpeechRecord,
+  type StageRecord,
 } from './types.js'
 
 function throwIfAborted(signal: AbortSignal): void {

@@ -55,24 +55,19 @@ export function RoundtableStarter({ disabled = false }: RoundtableStarterProps) 
 
       {active && !disabled && (
         <div
-          className="mt-2.5 w-full max-w-full rounded-xl border border-border/80 bg-surface-muted/60 px-3 py-2.5"
+          className="mt-2.5 flex w-full max-w-full flex-wrap items-center justify-center gap-1.5"
           data-testid="roundtable-panel"
         >
-          <div className="mb-2 flex flex-wrap items-center justify-center gap-1.5">
-            {ROUNDTABLE_PERSONAS.map((id, i) => (
-              <span
-                key={id}
-                data-testid={`roundtable-seat-${id}`}
-                className="animate-roundtable-seat inline-flex items-center rounded-md border border-border bg-surface px-2 py-1 text-caption text-ink-secondary"
-                style={{ animationDelay: `${i * 80}ms` }}
-              >
-                {t(`chat.roundtable.personas.${id}`)}
-              </span>
-            ))}
-          </div>
-          <p className="text-center text-meta leading-snug text-ink-tertiary">
-            {t('chat.roundtable.helper')}
-          </p>
+          {ROUNDTABLE_PERSONAS.map((id, i) => (
+            <span
+              key={id}
+              data-testid={`roundtable-seat-${id}`}
+              className="animate-roundtable-seat inline-flex items-center rounded-md border border-border bg-surface px-2 py-1 text-caption text-ink-secondary"
+              style={{ animationDelay: `${i * 80}ms` }}
+            >
+              {t(`chat.roundtable.personas.${id}`)}
+            </span>
+          ))}
         </div>
       )}
     </div>

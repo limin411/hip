@@ -1915,6 +1915,10 @@ export const zhCN = {
       },
       list: {
         count: '共 {{count}} 项 · 按开始时间排序',
+        range: '第 {{start}}–{{end}} 项',
+        pageInfo: '第 {{page}} / {{total}} 页',
+        previous: '上一页',
+        next: '下一页',
       },
       colors: {
         recolor: '状态颜色',

@@ -26,6 +26,8 @@ type WorkItemViewStore = {
   calendarCursor: { year: number; monthIndex: number }
   /** List-mode keyboard highlight only */
   highlightId: string | null
+  /** 1-based page index for list view pagination */
+  listPage: number
 
   requestCreate: (defaults?: Partial<CreateDefaults>) => void
   requestEdit: (itemId: string) => void
@@ -34,6 +36,7 @@ type WorkItemViewStore = {
   setCalendarCursor: (year: number, monthIndex: number) => void
   shiftCalendarMonth: (delta: number) => void
   setHighlightId: (id: string | null) => void
+  setListPage: (page: number) => void
   /** Reset modal + highlight when leaving tasks view */
   leaveWorkItems: () => void
 }
@@ -48,6 +51,7 @@ export const useWorkItemViewStore = create<WorkItemViewStore>((set, get) => ({
   viewMode: 'calendar',
   calendarCursor: nowCursor(),
   highlightId: null,
+  listPage: 1,
 
   requestCreate: (defaults) => {
     const today = localTodayYmd()
@@ -85,8 +89,10 @@ export const useWorkItemViewStore = create<WorkItemViewStore>((set, get) => ({
 
   setHighlightId: (id) => set({ highlightId: id }),
 
+  setListPage: (page) => set({ listPage: Math.max(1, Math.floor(page)) }),
+
   leaveWorkItems: () => {
-    set({ modal: { mode: 'closed' }, highlightId: null })
+    set({ modal: { mode: 'closed' }, highlightId: null, listPage: 1 })
   },
 }))
 
@@ -96,5 +102,6 @@ export function __resetWorkItemViewStoreForTests(): void {
     viewMode: 'calendar',
     calendarCursor: nowCursor(),
     highlightId: null,
+    listPage: 1,
   })
 }

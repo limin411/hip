@@ -38,6 +38,9 @@ const requestCreate = vi.fn()
 const requestEdit = vi.fn()
 const setViewMode = vi.fn()
 const setHighlightId = vi.fn()
+const setListPage = vi.fn((page: number) => {
+  viewState.listPage = Math.max(1, Math.floor(page))
+})
 const shiftCalendarMonth = vi.fn()
 const setCalendarCursor = vi.fn()
 const closeModal = vi.fn()
@@ -48,6 +51,7 @@ let viewState = {
   viewMode: 'calendar' as 'calendar' | 'list',
   calendarCursor: { year: 2026, monthIndex: 6 },
   highlightId: null as string | null,
+  listPage: 1,
 }
 
 vi.mock('@/store/workItemStore', () => {
@@ -77,6 +81,7 @@ vi.mock('@/store/workItemViewStore', () => {
       requestEdit,
       setViewMode,
       setHighlightId,
+      setListPage,
       shiftCalendarMonth,
       setCalendarCursor,
       closeModal,
@@ -86,6 +91,7 @@ vi.mock('@/store/workItemViewStore', () => {
     ...viewState,
     requestCreate,
     requestEdit,
+    setListPage,
   })
   return { useWorkItemViewStore }
 })
@@ -153,10 +159,13 @@ describe('WorkItemsPage', () => {
       viewMode: 'calendar',
       calendarCursor: { year: 2026, monthIndex: 6 },
       highlightId: null,
+      listPage: 1,
     }
     load.mockClear().mockResolvedValue(undefined)
     requestCreate.mockClear()
     requestEdit.mockClear()
+    setListPage.mockClear()
+    setHighlightId.mockClear()
     complete.mockClear()
     reopen.mockClear()
   })
@@ -237,5 +246,40 @@ describe('WorkItemsPage', () => {
     render(<WorkItemsPage />)
     // Multi-day items render one chip per day (start/mid/end).
     expect(screen.getAllByTestId('work-item-bar-wi_span').length).toBeGreaterThanOrEqual(1)
+  })
+
+  it('paginates list view and only renders the current page', async () => {
+    const { WORK_ITEM_LIST_PAGE_SIZE } = await import('./WorkItemListView')
+    const total = WORK_ITEM_LIST_PAGE_SIZE + 5
+    // Equal timestamps → sort falls back to id asc; first page is wi_00..wi_{PAGE_SIZE-1}.
+    storeState.items = Array.from({ length: total }, (_, i) => ({
+      id: `wi_${String(i).padStart(2, '0')}`,
+      title: `Item ${i}`,
+      status: 'todo' as const,
+      priority: 'none' as const,
+      listId: INBOX_LIST_ID,
+      tags: [],
+      notes: '',
+      startOn: '2026-07-25',
+      endOn: '2026-07-25',
+      createdAt: 1,
+      updatedAt: 1,
+      completedAt: null,
+      archivedAt: null,
+      links: {},
+    }))
+    viewState.viewMode = 'list'
+    viewState.listPage = 1
+    render(<WorkItemsPage />)
+    expect(screen.getByTestId('work-item-list-pagination')).toBeInTheDocument()
+    expect(screen.getByTestId('work-item-row-wi_00')).toBeInTheDocument()
+    expect(
+      screen.queryByTestId(`work-item-row-wi_${String(WORK_ITEM_LIST_PAGE_SIZE).padStart(2, '0')}`),
+    ).not.toBeInTheDocument()
+    expect(screen.getAllByTestId(/^work-item-row-wi_/).length).toBe(WORK_ITEM_LIST_PAGE_SIZE)
+
+    // Jump to page 2 via next control
+    fireEvent.click(screen.getByLabelText('workItems.list.next'))
+    expect(setListPage).toHaveBeenCalledWith(2)
   })
 })

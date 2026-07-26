@@ -1905,7 +1905,11 @@ export const zhTW = {
       "addOnDay": "在 {{date}} 新建"
     },
     "list": {
-      "count": "共 {{count}} 項 · 依開始時間排序"
+      "count": "共 {{count}} 項 · 依開始時間排序",
+      "range": "第 {{start}}–{{end}} 項",
+      "pageInfo": "第 {{page}} / {{total}} 頁",
+      "previous": "上一頁",
+      "next": "下一頁"
     },
     "colors": {
       "recolor": "狀態顏色",

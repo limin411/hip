@@ -1,4 +1,4 @@
-import { useMemo } from 'react'
+import { useEffect, useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Check } from 'lucide-react'
 import {
@@ -11,9 +11,30 @@ import { useWorkItemStore } from '@/store/workItemStore'
 import { useWorkItemUiPrefsStore } from '@/store/workItemUiPrefsStore'
 import { useWorkItemViewStore } from '@/store/workItemViewStore'
 import { EmptyState } from '@/components/ui/EmptyState'
+import { Pagination } from '@/components/ui/Pagination'
 import { DeclarativeContextMenu } from '@/components/context-menu'
 import { cn } from '@/lib/utils'
 import { workItemOptionId } from './WorkItemRow'
+
+/** Rows per page in list mode — caps DOM nodes when catalogs grow large. */
+export const WORK_ITEM_LIST_PAGE_SIZE = 30
+
+export function paginateWorkItems<T>(
+  items: readonly T[],
+  page: number,
+  pageSize = WORK_ITEM_LIST_PAGE_SIZE,
+): T[] {
+  const safePage = Math.max(1, page)
+  const start = (safePage - 1) * pageSize
+  return items.slice(start, start + pageSize) as T[]
+}
+
+export function workItemListTotalPages(
+  count: number,
+  pageSize = WORK_ITEM_LIST_PAGE_SIZE,
+): number {
+  return Math.max(1, Math.ceil(count / pageSize))
+}
 
 function formatRange(start: string, end: string): string {
   if (start === end) return start
@@ -43,13 +64,44 @@ export function WorkItemListView({
   const { t } = useTranslation()
   const search = useWorkItemStore((s) => s.search)
   const setSearch = useWorkItemStore((s) => s.setSearch)
+  const filterId = useWorkItemStore((s) => s.filterId)
   const complete = useWorkItemStore((s) => s.complete)
   const reopen = useWorkItemStore((s) => s.reopen)
   const colors = useWorkItemUiPrefsStore((s) => s.statusColors)
   const highlightId = useWorkItemViewStore((s) => s.highlightId)
+  const listPage = useWorkItemViewStore((s) => s.listPage)
+  const setListPage = useWorkItemViewStore((s) => s.setListPage)
+  const setHighlightId = useWorkItemViewStore((s) => s.setHighlightId)
   const requestEdit = useWorkItemViewStore((s) => s.requestEdit)
   const requestCreate = useWorkItemViewStore((s) => s.requestCreate)
   const today = useMemo(() => localTodayYmd(), [])
+
+  const totalPages = workItemListTotalPages(items.length)
+  const safePage = Math.min(listPage, totalPages)
+  const pagedItems = useMemo(
+    () => paginateWorkItems(items, safePage),
+    [items, safePage],
+  )
+
+  // Filter / search changes: first page (and drop stale keyboard highlight).
+  useEffect(() => {
+    setListPage(1)
+    setHighlightId(null)
+  }, [filterId, search, setListPage, setHighlightId])
+
+  // Clamp when the filtered set shrinks below the current page.
+  useEffect(() => {
+    if (listPage > totalPages) setListPage(totalPages)
+  }, [listPage, totalPages, setListPage])
+
+  // Keyboard highlight may land off-page; follow it.
+  useEffect(() => {
+    if (!highlightId) return
+    const idx = items.findIndex((i) => i.id === highlightId)
+    if (idx < 0) return
+    const target = Math.floor(idx / WORK_ITEM_LIST_PAGE_SIZE) + 1
+    if (target !== listPage) setListPage(target)
+  }, [highlightId, items, listPage, setListPage])
 
   if (items.length === 0) {
     return (
@@ -79,6 +131,9 @@ export function WorkItemListView({
     )
   }
 
+  const rangeStart = (safePage - 1) * WORK_ITEM_LIST_PAGE_SIZE + 1
+  const rangeEnd = Math.min(items.length, safePage * WORK_ITEM_LIST_PAGE_SIZE)
+
   return (
     <div
       className={cn(
@@ -87,9 +142,12 @@ export function WorkItemListView({
       )}
       data-testid="work-item-list-view"
     >
-      <div className="flex items-center gap-2 border-b border-border bg-surface-subtle px-3 py-2">
-        <span className="text-meta text-ink-secondary">
+      <div className="flex flex-wrap items-center gap-2 border-b border-border bg-surface-subtle px-3 py-2">
+        <span className="text-meta text-ink-secondary" data-testid="work-item-list-count">
           {t('workItems.list.count', { count: items.length })}
+          {totalPages > 1
+            ? ` · ${t('workItems.list.range', { start: rangeStart, end: rangeEnd })}`
+            : null}
         </span>
         <input
           type="search"
@@ -106,7 +164,7 @@ export function WorkItemListView({
         aria-label={t('workItems.title')}
         data-testid="work-item-list"
       >
-        {items.map((item) => {
+        {pagedItems.map((item) => {
           const schedule = ensureScheduleDates(item, today)
           const hex = colorHexForItem(item, colors)
           const done = item.status === 'done'
@@ -219,6 +277,26 @@ export function WorkItemListView({
           )
         })}
       </ul>
+      {totalPages > 1 ? (
+        <div
+          className="flex shrink-0 flex-wrap items-center justify-between gap-2 border-t border-border bg-surface-subtle px-3 py-2"
+          data-testid="work-item-list-pagination"
+        >
+          <span className="text-caption text-ink-secondary">
+            {t('workItems.list.pageInfo', { page: safePage, total: totalPages })}
+          </span>
+          <Pagination
+            currentPage={safePage}
+            totalPages={totalPages}
+            onChange={(page) => {
+              setHighlightId(null)
+              setListPage(page)
+            }}
+            previousLabel={t('workItems.list.previous')}
+            nextLabel={t('workItems.list.next')}
+          />
+        </div>
+      ) : null}
     </div>
   )
 }

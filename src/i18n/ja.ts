@@ -1897,7 +1897,11 @@ export const ja = {
       "addOnDay": "{{date}} に作成"
     },
     "list": {
-      "count": "{{count}} 件 · 開始日順"
+      "count": "{{count}} 件 · 開始日順",
+      "range": "{{start}}–{{end}} 件",
+      "pageInfo": "{{page}} / {{total}} ページ",
+      "previous": "前のページ",
+      "next": "次のページ"
     },
     "colors": {
       "recolor": "ステータス色",

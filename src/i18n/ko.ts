@@ -1897,7 +1897,11 @@ export const ko = {
       "addOnDay": "{{date}}에 만들기"
     },
     "list": {
-      "count": "{{count}}개 · 시작일 순"
+      "count": "{{count}}개 · 시작일 순",
+      "range": "{{start}}–{{end}}",
+      "pageInfo": "{{page}}/{{total}} 페이지",
+      "previous": "이전 페이지",
+      "next": "다음 페이지"
     },
     "colors": {
       "recolor": "상태 색",

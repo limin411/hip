@@ -1965,6 +1965,10 @@ export const en = {
       },
       list: {
         count: '{{count}} items · by start date',
+        range: '{{start}}–{{end}}',
+        pageInfo: 'Page {{page}} of {{total}}',
+        previous: 'Previous page',
+        next: 'Next page',
       },
       colors: {
         recolor: 'Status color',

@@ -72,6 +72,16 @@ export function XtermSurface({
 
   const [starting, setStarting] = useState(false)
   const [loadingXterm, setLoadingXterm] = useState(false)
+  /**
+   * Shell bg around the canvas (padding + fit remainder). Must track terminal
+   * palette — not app `bg-surface` — or a dark terminal on a light chrome shows a gap.
+   */
+  const [terminalBg, setTerminalBg] = useState<string | undefined>(() =>
+    resolveXtermTheme(
+      useHipConfigStore.getState().config.terminal?.colorTheme,
+      isDarkDom(),
+    ).background,
+  )
   /** Point-anchored canvas context menu (ControlledContextMenu). */
   const [canvasMenu, setCanvasMenu] = useState<{
     open: boolean
@@ -158,7 +168,10 @@ export function XtermSurface({
       const applyTheme = () => {
         if (!term) return
         const pref = useHipConfigStore.getState().config.terminal?.colorTheme
-        term.options.theme = resolveXtermTheme(pref, isDarkDom())
+        const theme = resolveXtermTheme(pref, isDarkDom())
+        term.options.theme = theme
+        // Keep padding/fit gaps painted with the same palette (not app chrome surface).
+        setTerminalBg(theme.background)
       }
       applyTheme()
 
@@ -293,10 +306,11 @@ export function XtermSurface({
   }, [terminalId, cwd])
 
   useEffect(() => {
-    const term = termRef.current
-    if (!term) return
     const pref = useHipConfigStore.getState().config.terminal?.colorTheme
-    term.options.theme = resolveXtermTheme(pref, isDarkDom())
+    const theme = resolveXtermTheme(pref, isDarkDom())
+    const term = termRef.current
+    if (term) term.options.theme = theme
+    setTerminalBg(theme.background)
   }, [uiTheme, colorTheme])
 
   const exited = status === 'exited'
@@ -320,7 +334,11 @@ export function XtermSurface({
   })()
 
   return (
-    <div className="flex h-full min-h-0 flex-col bg-surface" data-testid="xterm-surface">
+    <div
+      className="flex h-full min-h-0 flex-col"
+      style={{ backgroundColor: terminalBg }}
+      data-testid="xterm-surface"
+    >
       {showStatus && (
         <div
           className={cn(
@@ -379,10 +397,15 @@ export function XtermSurface({
       )}
 
       {/* Outer shell reserves bottom margin; host fills the remaining box so fit() is correct. */}
-      <div className="flex min-h-0 flex-1 flex-col bg-surface px-1.5 pt-1 pb-4">
+      <div
+        className="flex min-h-0 flex-1 flex-col px-1.5 pt-1 pb-4"
+        style={{ backgroundColor: terminalBg }}
+        data-testid="terminal-canvas-shell"
+      >
         <div
           ref={containerRef}
           className="min-h-0 flex-1 overflow-hidden"
+          style={{ backgroundColor: terminalBg }}
           data-testid="terminal-xterm"
           data-no-drag
           data-tauri-drag-region="false"

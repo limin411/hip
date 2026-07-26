@@ -167,6 +167,11 @@ describe('TerminalView', () => {
     expect(screen.getByTestId('terminal-view')).toBeInTheDocument()
     expect(screen.getByTestId('terminal-xterm')).toBeInTheDocument()
     expect(screen.getByTestId('terminal-cwd')).toHaveTextContent('/Users/me/hip')
+    // Canvas shell must use terminal palette bg (not app bg-surface) so padding/fit
+    // gaps do not flash chrome color when terminal theme differs from app theme.
+    const shell = screen.getByTestId('terminal-canvas-shell')
+    expect(shell).toHaveStyle({ backgroundColor: '#fff' })
+    expect(shell.className).not.toMatch(/\bbg-surface\b/)
     await waitFor(() => {
       expect(ptyOpen).toHaveBeenCalledWith('s1', '/Users/me/hip', expect.any(Number), expect.any(Number))
     })

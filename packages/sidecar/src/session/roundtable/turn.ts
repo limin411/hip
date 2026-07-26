@@ -2,6 +2,8 @@
  * Integrate RoundtableRunner into a session turn.
  * Council mode delegates each advisor via runManagedAgent (real nested agent runs).
  */
+import { promises as fs } from 'node:fs'
+import * as path from 'node:path'
 import type { AgentRole, RoundtableMeta, TurnUsage } from '@hip/protocol'
 import type { TraceRun } from '../tool-trace.js'
 import type { SendFn, SessionTurnHost } from '../session-turn-runner.js'
@@ -13,10 +15,13 @@ import {
   stripRoundtableFrame,
 } from './detect.js'
 import { resolveRoundtableEngine } from './constants.js'
-import { councilDisplayName } from './ids.js'
 import { runRoundtable } from './runner.js'
 import { renderEventMarkdown } from './render.js'
 import { runCouncilAdvisor } from './council-advisor.js'
+import {
+  buildRoundtableReportHtml,
+  ROUNDTABLE_REPORT_FILENAME,
+} from './report.js'
 import { logInfo } from '../../debug-logger.js'
 
 /**
@@ -117,14 +122,20 @@ export async function tryRunRoundtableTurn(
     councilAgentIds.add(p.agentId)
     host.spawnedSubagentIds.add(p.agentId)
     host.subagentInstances.set(p.agentId, { description: p.focus })
+    // Carry prior-round speech when the same seat speaks again.
+    const existing = trajectory.get(p.agentId)
+    const prior =
+      existing?.output?.trim() && existing.finishedAt != null
+        ? existing.output.trim() + '\n\n---\n\n'
+        : existing?.output ?? ''
     trajectory.set(p.agentId, {
       role: 'subagent',
-      output: '',
-      startedAt: Date.now(),
+      output: prior,
+      startedAt: existing?.startedAt ?? Date.now(),
       finishedAt: null,
-      seq: agentSeq++,
-      toolCalls: new Map(),
-      reasoningBursts: [],
+      seq: existing?.seq ?? agentSeq++,
+      toolCalls: existing?.toolCalls ?? new Map(),
+      reasoningBursts: existing?.reasoningBursts ?? [],
       parentAgentId: 'supervisor',
       name: p.name,
       taskInput: p.focus,
@@ -158,7 +169,18 @@ export async function tryRunRoundtableTurn(
   const finishCouncilAgent = (agentId: string, text: string) => {
     const run = trajectory.get(agentId)
     if (run) {
-      run.output = text
+      // onToken streams into output (after optional prior-round carry).
+      // If nothing streamed, attach this round's speech after the separator.
+      const cur = (run.output ?? '').trimEnd()
+      const speech = text.trim()
+      if (!cur) {
+        run.output = speech
+      } else if (speech && cur.endsWith('---')) {
+        run.output = `${cur}\n\n${speech}`
+      } else if (speech && !cur.includes(speech.slice(0, Math.min(24, speech.length)))) {
+        // Restart without stream: replace only if we still only have prior block.
+        run.output = cur.includes('---') ? `${cur}\n\n${speech}` : speech
+      }
       run.finishedAt = Date.now()
     }
     rawSend({ type: 'agent:finished', sessionId: host.id, turnId, agentId })
@@ -166,7 +188,7 @@ export async function tryRunRoundtableTurn(
       type: 'text_ended',
       sessionId: host.id,
       messageId: agentId,
-      content: text,
+      content: run?.output ?? text,
       timestamp: Date.now(),
     })
   }
@@ -179,14 +201,9 @@ export async function tryRunRoundtableTurn(
       llm,
       councilMode: council,
       onEvent: (ev) => {
-        if (council && ev.kind === 'roundtable.speech') {
-          const line =
-            lang === 'zh-CN' || lang === 'zh-TW'
-              ? `*${councilDisplayName(ev.speaker, lang)} 已发言（详见右侧智能体）*\n\n`
-              : `*${councilDisplayName(ev.speaker, lang)} spoke (see Agents panel)*\n\n`
-          pushBurst(line)
-          return
-        }
+        // Council advisor speech lives only in agentRuns (Agents panel) —
+        // do not inject placeholder lines into the main transcript.
+        if (council && ev.kind === 'roundtable.speech') return
         const chunk = renderEventMarkdown(ev, lang)
         if (chunk) pushBurst(chunk)
       },
@@ -289,8 +306,89 @@ export async function tryRunRoundtableTurn(
       }
     }
 
+    // End-of-meeting HTML deliverable (Chat artifact preview via write_file).
+    let reportNote = ''
+    if (result.convened && result.report && result.phase === 'done') {
+      try {
+        const html = buildRoundtableReportHtml({
+          issue: result.report.issue,
+          language: lang,
+          agenda: result.report.agenda,
+          rationale: result.report.rationale,
+          rounds: result.report.rounds,
+          decision: result.report.decision,
+          edges: result.edges,
+          earlyExit: result.report.earlyExit ?? result.earlyExit,
+          generatedAt: new Date().toISOString(),
+        })
+        const absPath = path.join(cwd, ROUNDTABLE_REPORT_FILENAME)
+        await fs.mkdir(path.dirname(absPath), { recursive: true })
+        await fs.writeFile(absPath, html, 'utf8')
+
+        const callId = `roundtable-report-${Date.now()}`
+        const relPath = ROUNDTABLE_REPORT_FILENAME
+        // Absolute path so write-follow + "open in browser" pass cwd trust checks.
+        const wirePath = absPath
+        const input = JSON.stringify({ path: wirePath })
+        const sup = trajectory.get('supervisor')
+        const seq = sup?.toolCalls.size ?? 0
+        if (sup) {
+          sup.toolCalls.set(callId, {
+            callId,
+            agentId: 'supervisor',
+            name: 'write_file',
+            input,
+            status: 'finished',
+            seq,
+            output: `wrote ${relPath} (${html.length} bytes)`,
+          })
+        }
+        rawSend({
+          type: 'tool:started',
+          sessionId: host.id,
+          turnId,
+          agentId: 'supervisor',
+          role: 'supervisor',
+          callId,
+          name: 'write_file',
+          input,
+          seq,
+        })
+        rawSend({
+          type: 'tool:finished',
+          sessionId: host.id,
+          turnId,
+          agentId: 'supervisor',
+          callId,
+          status: 'finished',
+          output: `wrote ${relPath} (${html.length} bytes)`,
+        })
+        reportNote =
+          lang === 'zh-CN' || lang === 'zh-TW'
+            ? `\n\n---\n\n**圆桌报告：** [\`${relPath}\`](${relPath})（已写入工作区，可在右侧预览）\n`
+            : lang === 'ja'
+              ? `\n\n---\n\n**円卓レポート:** [\`${relPath}\`](${relPath})\n`
+              : lang === 'ko'
+                ? `\n\n---\n\n**원탁 보고서:** [\`${relPath}\`](${relPath})\n`
+                : `\n\n---\n\n**Roundtable report:** [\`${relPath}\`](${relPath}) (saved; open in the preview panel)\n`
+        pushBurst(reportNote)
+        logInfo('session', 'roundtable:report', {
+          sessionId: host.id,
+          turnId,
+          path: absPath,
+          bytes: html.length,
+        })
+      } catch (err) {
+        logInfo('session', 'roundtable:report-error', {
+          sessionId: host.id,
+          turnId,
+          error: err instanceof Error ? err.message : String(err),
+        })
+      }
+    }
+
     const stopped = result.phase === 'aborted' && result.abortReason === 'cancelled'
-    const text = result.markdown.trim() || (stopped ? '' : '…')
+    const text = (result.markdown.trim() + reportNote).trim() || (stopped ? '' : '…')
     const r = trajectory.get('supervisor')
     if (r) {
       r.output = text

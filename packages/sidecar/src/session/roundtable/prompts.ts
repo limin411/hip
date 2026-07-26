@@ -60,9 +60,10 @@ Rules:
 - Simple/low-stakes/single-answer → convene false with a normal assistant reply.
 - Real tradeoffs/risk/strategy → convene true, then plan, then open_round/stage loop, then decide.
 - rounds must be between ${ROUNDTABLE_ROUNDS_MIN} and ${ROUNDTABLE_ROUNDS_MAX}.
-- speakers: 1–${MAX_ADVISORS_PER_ROUND} from ${PERSONA_IDS.join(', ')}; prefer 2–3.
-- open_round.mode: prefer "parallel_then_synth" for opening positions (speakers generate
-  concurrently — better UX). Use "serial_react" when later rounds need rebuttal of prior speech.
+- speakers: list who should contribute this round from ${PERSONA_IDS.join(', ')}.
+  Prefer all five seats when the topic benefits from full perspectives (up to ${MAX_ADVISORS_PER_ROUND}).
+- open_round.mode: prefer "parallel_then_synth" so seats speak concurrently.
+  Use "serial_react" only when a later round must react in strict order.
 - Never role-play all advisors yourself; only emit ChairAction JSON.
 - You alone decide the final answer (not a vote).
 - Respond in language: ${lang} for any user-facing strings inside JSON.`

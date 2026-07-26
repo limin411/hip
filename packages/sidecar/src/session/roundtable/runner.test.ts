@@ -8,10 +8,40 @@ function j(obj: unknown): string {
 }
 
 describe('runRoundtable', () => {
-  it('council hooks fire on advisor speech and collect edges', async () => {
+  it('council runs all 5 seats in parallel each round and collects edges', async () => {
     const starts: string[] = []
     const finishes: string[] = []
-    // Council pads to ≥3 speakers and runs them in parallel each round.
+    // Council forces full 5-seat parallel roster every round.
+    const fiveSpeeches = (round: number) =>
+      [
+        JSON.stringify({
+          prose: `R${round} strategist.`,
+          acts: [{ kind: 'open', claim: 'Go big' }],
+        }),
+        JSON.stringify({
+          prose: `R${round} skeptic.`,
+          acts: [
+            {
+              kind: 'rebut',
+              claim: 'Too risky',
+              target: 'strategist',
+              attack: 'cost',
+            },
+          ],
+        }),
+        JSON.stringify({
+          prose: `R${round} creative.`,
+          acts: [{ kind: 'open', claim: 'hybrid' }],
+        }),
+        JSON.stringify({
+          prose: `R${round} operator.`,
+          acts: [{ kind: 'open', claim: 'phased' }],
+        }),
+        JSON.stringify({
+          prose: `R${round} audience.`,
+          acts: [{ kind: 'support', claim: 'users first', target: 'operator' }],
+        }),
+      ] as string[]
     const llm = scriptedCompleteFns([
       j({ type: 'route', convene: true }),
       j({ type: 'plan', rounds: 2, agenda: ['a', 'b'], rationale: 'r' }),
@@ -21,26 +51,7 @@ describe('runRoundtable', () => {
         focus: 'f',
         speakers: ['strategist', 'skeptic'],
       }),
-      // 3 parallel speakers (strategist, skeptic, + padded creative)
-      JSON.stringify({
-        prose: 'Go big.',
-        acts: [{ kind: 'open', claim: 'Go big' }],
-      }),
-      JSON.stringify({
-        prose: 'Too risky.',
-        acts: [
-          {
-            kind: 'rebut',
-            claim: 'Too risky',
-            target: 'strategist',
-            attack: 'cost',
-          },
-        ],
-      }),
-      JSON.stringify({
-        prose: 'Try hybrid.',
-        acts: [{ kind: 'open', claim: 'hybrid' }],
-      }),
+      ...fiveSpeeches(1),
       j({ type: 'stage', round: 1, agreed: ['split'], open: [], nextFocus: 'x' }),
       j({
         type: 'open_round',
@@ -48,10 +59,7 @@ describe('runRoundtable', () => {
         focus: 'x',
         speakers: ['operator'],
       }),
-      // padded to 3 again
-      'Ship phased.',
-      'Watch risk.',
-      'Users first.',
+      ...fiveSpeeches(2),
       j({ type: 'stage', round: 2, agreed: ['phased'], open: [] }),
       j({ type: 'decide', decision: 'phased', residual: [], nextSteps: ['1'] }),
     ])
@@ -70,12 +78,16 @@ describe('runRoundtable', () => {
         },
       },
     })
-    expect(result.advisorCalls).toBe(6)
-    expect(starts.length).toBe(6)
+    expect(result.advisorCalls).toBe(10) // 5 × 2 rounds
+    expect(starts.length).toBe(10)
     expect(finishes).toEqual(starts)
     expect(starts).toContain('roundtable:strategist')
-    expect(starts).toContain('roundtable:skeptic')
+    expect(starts).toContain('roundtable:audience')
+    expect(new Set(starts).size).toBe(5)
     expect(result.edges?.some((e) => e.relation === 'rebut')).toBe(true)
+    expect(result.report?.rounds).toHaveLength(2)
+    expect(result.report?.rounds[0]?.speeches).toHaveLength(5)
+    expect(result.report?.decision?.decision).toBe('phased')
   })
 
   it('runAdvisor is used instead of llm.complete for advisor seats', async () => {
@@ -119,8 +131,9 @@ describe('runRoundtable', () => {
     })
     expect(result.phase).toBe('done')
     expect(completeAdvisorCalls).toBe(0)
-    expect(advisorIds.length).toBe(6) // 3+3 padded parallel
+    expect(advisorIds.length).toBe(10) // 5 seats × 2 rounds, full parallel
     expect(advisorIds.every((id) => id.startsWith('roundtable:'))).toBe(true)
+    expect(new Set(advisorIds).size).toBe(5)
   })
 
   it('route skip → normal reply, zero advisor calls', async () => {

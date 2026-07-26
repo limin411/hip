@@ -6,6 +6,7 @@ import {
   MAX_ADVISOR_CALLS_PER_MEETING,
   MAX_ADVISORS_PER_ROUND,
   MAX_CHAIR_ACTIONS,
+  ROUNDTABLE_COUNCIL_WALL_MS,
   ROUNDTABLE_ROUNDS_MAX,
   ROUNDTABLE_ROUNDS_MIN,
 } from './constants.js'
@@ -32,6 +33,8 @@ import {
   type PersonaId,
   type RunRoundtableArgs,
   type RoundtableEvent,
+  type RoundtableReportPayload,
+  type RoundtableReportRound,
   type RoundtableResult,
   type SpeechRecord,
   type StageRecord,
@@ -53,7 +56,9 @@ export async function runRoundtable(args: RunRoundtableArgs): Promise<Roundtable
   const maxPerRound = args.maxAdvisorsPerRound ?? MAX_ADVISORS_PER_ROUND
   const roundsMin = args.roundsMin ?? ROUNDTABLE_ROUNDS_MIN
   const roundsMax = args.roundsMax ?? ROUNDTABLE_ROUNDS_MAX
-  const wallClockMs = args.wallClockMs ?? 180_000
+  const councilMode = Boolean(args.councilMode || args.advisorHooks || args.runAdvisor)
+  const wallClockMs =
+    args.wallClockMs ?? (councilMode ? ROUNDTABLE_COUNCIL_WALL_MS : 180_000)
   const startedAt = Date.now()
 
   let advisorCalls = 0
@@ -64,12 +69,28 @@ export async function runRoundtable(args: RunRoundtableArgs): Promise<Roundtable
   let earlyExit = false
   let roundsPlanned: number | undefined
   let roundsRan = 0
+  let planRationale = ''
+  let planAgenda: string[] = []
+  const reportRounds: RoundtableReportRound[] = []
+  let reportDecision: RoundtableReportPayload['decision']
   const stages: StageRecord[] = []
   const allEdges: CouncilEdge[] = []
-  const councilMode = Boolean(args.councilMode || args.advisorHooks || args.runAdvisor)
   const edgeField = () => {
     const e = dedupeEdges(allEdges)
     return e.length ? { edges: e } : {}
+  }
+  const reportField = (): { report?: RoundtableReportPayload } => {
+    if (!convened) return {}
+    return {
+      report: {
+        issue: args.issue,
+        agenda: planAgenda,
+        rationale: planRationale,
+        rounds: reportRounds,
+        ...(reportDecision ? { decision: reportDecision } : {}),
+        ...(earlyExit ? { earlyExit: true } : {}),
+      },
+    }
   }
 
   const emit = (ev: RoundtableEvent) => {
@@ -156,6 +177,8 @@ export async function runRoundtable(args: RunRoundtableArgs): Promise<Roundtable
     const agenda = plan.agenda.slice(0, N)
     while (agenda.length < N) agenda.push(`Round ${agenda.length + 1}`)
     roundsPlanned = N
+    planAgenda = agenda
+    planRationale = plan.rationale
     emit({
       kind: 'roundtable.plan',
       rounds: N,
@@ -179,15 +202,11 @@ export async function runRoundtable(args: RunRoundtableArgs): Promise<Roundtable
         }),
       )
       if (open.type !== 'open_round') throw new Error('expected open_round')
-      // Council: pad to ≥3 speakers and force parallel so the Agents panel shows
-      // multiple people speaking at once (serial feels like a monologue).
+      // Council: full 5-seat roster in parallel every round (no "waiting" seats left idle).
+      // Loop engine: honor chair's speaker list (capped).
       let speakers = open.speakers.slice(0, maxPerRound)
       if (councilMode) {
-        const want = Math.min(Math.max(3, speakers.length), maxPerRound, 5)
-        for (const p of PERSONA_IDS) {
-          if (speakers.length >= want) break
-          if (!speakers.includes(p)) speakers.push(p)
-        }
+        speakers = [...PERSONA_IDS]
       }
       const speakMode: 'serial_react' | 'parallel_then_synth' =
         councilMode && speakers.length > 1
@@ -312,6 +331,12 @@ export async function runRoundtable(args: RunRoundtableArgs): Promise<Roundtable
       }
       stages.push(stage)
       roundsRan = r
+      reportRounds.push({
+        round: r,
+        focus: open.focus,
+        speeches: roundLocal,
+        stage,
+      })
       emit({
         kind: 'roundtable.stage',
         round: r,
@@ -336,6 +361,11 @@ export async function runRoundtable(args: RunRoundtableArgs): Promise<Roundtable
       chairUserForDecide({ issue: args.issue, minutes }),
     )
     if (decide.type !== 'decide') throw new Error('expected decide')
+    reportDecision = {
+      decision: decide.decision,
+      residual: decide.residual,
+      nextSteps: decide.nextSteps,
+    }
     emit({
       kind: 'roundtable.decide',
       decision: decide.decision,
@@ -359,6 +389,7 @@ export async function runRoundtable(args: RunRoundtableArgs): Promise<Roundtable
       roundsPlanned,
       roundsRan,
       ...edgeField(),
+      ...reportField(),
     }
   } catch (e) {
     const reason = e instanceof Error ? e.message : String(e)
@@ -373,6 +404,12 @@ export async function runRoundtable(args: RunRoundtableArgs): Promise<Roundtable
         lang === 'zh-CN' || lang === 'zh-TW'
           ? `（时间/步数预算用尽）基于已有讨论的临时结论：请优先处理未决议题。\n\n纪要摘要：\n${minutes.slice(0, 1200)}`
           : `(Budget exhausted.) Interim conclusion from discussion so far:\n\n${minutes.slice(0, 1200)}`
+      reportDecision = {
+        decision,
+        residual: ['Meeting ended early due to budget'],
+        nextSteps: ['Review partial transcript', 'Re-run roundtable if needed'],
+      }
+      earlyExit = true
       emit({
         kind: 'roundtable.decide',
         decision,
@@ -395,6 +432,7 @@ export async function runRoundtable(args: RunRoundtableArgs): Promise<Roundtable
         roundsPlanned,
         roundsRan,
         ...edgeField(),
+        ...reportField(),
       }
     }
 
@@ -419,6 +457,7 @@ export async function runRoundtable(args: RunRoundtableArgs): Promise<Roundtable
         roundsRan,
         abortReason: 'cancelled',
         ...edgeField(),
+        ...reportField(),
       }
     }
     // Best-effort decide note on hard failure if we already convened
@@ -440,6 +479,7 @@ export async function runRoundtable(args: RunRoundtableArgs): Promise<Roundtable
       roundsRan,
       abortReason: reason,
       ...edgeField(),
+      ...reportField(),
     }
   }
 }

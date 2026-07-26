@@ -7,11 +7,12 @@ import { formatClockTime } from '@/lib/datetime'
 import { cn } from '@/lib/utils'
 import { useFocusStore } from '@/store/focusStore'
 import { EmptyState } from '@/components/ui/EmptyState'
+import type { RoundtableMeta } from '@hip/protocol'
 import {
   councilEdges,
-  isCouncilLiveAgents,
-  isCouncilRoundtable,
+  deriveCouncilDiscussionRound,
   mergeCouncilRoster,
+  type CouncilRosterSeat,
 } from '@/lib/roundtableCouncil'
 import { AgentCard } from './AgentCard'
 import { CollaborationStructure } from './CollaborationStructure'
@@ -34,10 +35,27 @@ export function AgentDashboard() {
         [...messages].reverse().find((m) => m.role === 'assistant')
       : null
   const rtMeta = latestMsg?.roundtable
-  const roster = mergeCouncilRoster(latest?.agents ?? [], rtMeta)
+  const agents = latest?.agents ?? []
+  const roster = mergeCouncilRoster(agents, rtMeta)
   const edges = councilEdges(rtMeta)
 
-  if (!latest && !roster) {
+  // ── Council-only layout (roundtable multi-agent). Does not affect normal Chat/Code. ──
+  if (roster) {
+    return (
+      <CouncilAgentsView
+        latest={latest}
+        live={live}
+        locale={locale}
+        roster={roster}
+        edges={edges}
+        focusedAgentId={focusedAgentId}
+        content={latestMsg?.content ?? ''}
+        rtMeta={rtMeta}
+      />
+    )
+  }
+
+  if (!latest) {
     return (
       <div className="flex h-full items-center justify-center p-4" data-testid="agents-empty">
         <EmptyState
@@ -55,22 +73,18 @@ export function AgentDashboard() {
     )
   }
 
+  // ── Default Agents layout (unchanged for normal Chat / Code / task sub-agents) ──
   const turnLive = live
-  const agents = latest?.agents ?? []
   const liveRunning = agents.find((a) => a.status === 'running')
   const liveTool = liveRunning?.tools.find((tc) => tc.status === 'running')
   const supervisor = agents.find((a) => a.role === 'supervisor')
   const children = agents.filter((a) => a.role !== 'supervisor')
-  const childCount = roster?.length ?? children.length
+  const childCount = children.length
 
   const turnMeta = [
-    latest ? t('artifact.timelineView.turn', { n: latest.turnIndex }) : null,
-    latest ? formatClockTime(latest.timestamp, locale) : null,
-    isCouncilLiveAgents(agents, rtMeta) || isCouncilRoundtable(rtMeta)
-      ? t('chat.roundtable.councilLabel')
-      : childCount > 0
-        ? t('artifact.subAgentCount', { count: childCount })
-        : null,
+    t('artifact.timelineView.turn', { n: latest.turnIndex }),
+    formatClockTime(latest.timestamp, locale),
+    childCount > 0 ? t('artifact.subAgentCount', { count: childCount }) : null,
     liveRunning
       ? t('artifact.agentsLiveRunning', {
           defaultValue: 'Running: {{name}}',
@@ -107,56 +121,11 @@ export function AgentDashboard() {
         </div>
       )}
 
-      {/* Multi-speaker live stage: show every currently speaking council advisor with preview */}
-      {live &&
-        (() => {
-          const speaking = agents.filter(
-            (a) => a.agentId.startsWith('roundtable:') && a.status === 'running',
-          )
-          if (speaking.length === 0) return null
-          return (
-            <div
-              className="mx-2.5 mb-1 flex max-h-48 shrink-0 flex-col gap-1.5 overflow-auto rounded-lg border border-effort-max/30 bg-surface-muted/50 p-2"
-              data-testid="council-live-stage"
-            >
-              <div className="text-caption font-medium text-ink-tertiary">
-                {t('chat.roundtable.liveStage', {
-                  defaultValue: 'Speaking now ({{count}})',
-                  count: speaking.length,
-                })}
-              </div>
-              {speaking.map((a) => {
-                const preview = (a.output || '').trim().slice(-280)
-                return (
-                  <div
-                    key={a.agentId}
-                    className="rounded-md border border-border/70 bg-surface px-2 py-1.5"
-                    data-testid="council-live-speaker"
-                    data-agent-id={a.agentId}
-                  >
-                    <div className="mb-0.5 flex items-center gap-1.5 text-meta font-medium text-ink">
-                      <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-accent" />
-                      {a.name || a.agentId}
-                    </div>
-                    <p className="max-h-16 overflow-hidden whitespace-pre-wrap text-caption leading-snug text-ink-secondary">
-                      {preview || t('chat.roundtable.seatWaiting')}
-                    </p>
-                  </div>
-                )
-              })}
-            </div>
-          )
-        })()}
-
       <div
         className="flex min-h-0 flex-1 flex-col gap-3 overflow-auto px-2.5 pb-3"
         data-testid="agents-live-turn"
       >
-        {children.length > 0 && (
-          <CollaborationStructure agents={agents} live={turnLive} />
-        )}
-
-        {edges.length > 0 && <CouncilEdges edges={edges} />}
+        {children.length > 0 && <CollaborationStructure agents={agents} live={turnLive} />}
 
         {supervisor && (
           <div
@@ -167,55 +136,7 @@ export function AgentDashboard() {
           </div>
         )}
 
-        {roster ? (
-          <div className="flex flex-col gap-1" data-testid="council-roster">
-            <div className="px-1.5 pt-1 text-caption font-medium text-ink-tertiary">
-              {t('chat.roundtable.councilSeats')}
-            </div>
-            {roster.map((seat) => {
-              const agent: TurnAgent =
-                seat.agent ??
-                ({
-                  agentId: seat.agentId,
-                  role: 'subagent',
-                  reasoning: '',
-                  tools: [],
-                  status: 'done',
-                  output: '',
-                  elapsedMs: 0,
-                  parentAgentId: 'supervisor',
-                  name: t(seat.nameKey),
-                  taskInput:
-                    seat.status === 'waiting'
-                      ? t('chat.roundtable.seatWaiting')
-                      : undefined,
-                } satisfies TurnAgent)
-              const waiting = seat.status === 'waiting'
-              return (
-                <div
-                  key={seat.agentId}
-                  data-testid={`council-seat-${seat.persona}`}
-                  data-focus-highlight={focusedAgentId === seat.agentId ? 'true' : undefined}
-                  className={cn(waiting && 'opacity-60')}
-                >
-                  <AgentCard
-                    agent={{
-                      ...agent,
-                      name: agent.name || t(seat.nameKey),
-                      status: waiting ? 'done' : agent.status,
-                    }}
-                    live={turnLive && !waiting}
-                  />
-                  {waiting && (
-                    <p className="px-2 pb-1 text-caption text-ink-tertiary">
-                      {t('chat.roundtable.seatWaiting')}
-                    </p>
-                  )}
-                </div>
-              )
-            })}
-          </div>
-        ) : children.length > 0 ? (
+        {children.length > 0 ? (
           <div className="flex flex-col gap-1">
             <div className="px-1.5 pt-1 text-caption font-medium text-ink-tertiary">
               {t('artifact.subAgents')}
@@ -231,6 +152,150 @@ export function AgentDashboard() {
           </div>
         ) : null}
       </div>
+    </div>
+  )
+}
+
+/** Compact roundtable council roster — no tree / live-stage / supervisor chrome. */
+function CouncilAgentsView({
+  latest,
+  live,
+  locale,
+  roster,
+  edges,
+  focusedAgentId,
+  content,
+  rtMeta,
+}: {
+  latest: GroupedTurn | null
+  live: boolean
+  locale: string
+  roster: CouncilRosterSeat[]
+  edges: ReturnType<typeof councilEdges>
+  focusedAgentId: string | null
+  content: string
+  rtMeta?: RoundtableMeta | null
+}) {
+  const { t } = useTranslation()
+  const speaking = roster.filter((s) => s.status === 'running')
+  const spoken = roster.filter((s) => s.status !== 'waiting').length
+  // Discussion round (1..N), not the chat turn index (always 1 for a single meeting).
+  const discussion = deriveCouncilDiscussionRound(rtMeta, content)
+  const roundLabel =
+    discussion && discussion.current > 0
+      ? discussion.planned != null && discussion.planned > 0
+        ? t('chat.roundtable.councilRoundOf', {
+            n: discussion.current,
+            total: discussion.planned,
+          })
+        : t('chat.roundtable.councilRound', { n: discussion.current })
+      : discussion?.planned != null
+        ? t('chat.roundtable.councilRoundPlanned', { total: discussion.planned })
+        : null
+
+  const turnMeta = [
+    t('chat.roundtable.councilLabel'),
+    roundLabel,
+    latest ? formatClockTime(latest.timestamp, locale) : null,
+    t('chat.roundtable.councilProgress', {
+      spoken,
+      total: roster.length,
+    }),
+    speaking.length === 1
+      ? t('artifact.agentsLiveRunning', {
+          defaultValue: 'Running: {{name}}',
+          name: speaking[0]!.agent?.name || t(speaking[0]!.nameKey),
+        })
+      : speaking.length > 1
+        ? t('chat.roundtable.liveStage', { count: speaking.length })
+        : null,
+  ]
+    .filter(Boolean)
+    .join(' · ')
+
+  return (
+    <div className="flex h-full min-h-0 flex-col" data-testid="agents-dashboard">
+      <div className="flex h-8 shrink-0 items-center justify-between gap-2 px-3">
+        <p className="min-w-0 truncate text-caption font-medium text-ink-tertiary">{turnMeta}</p>
+        {live && speaking.length > 0 && (
+          <span className="flex shrink-0 items-center gap-1.5 text-caption text-accent">
+            <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-accent" aria-hidden />
+            live
+          </span>
+        )}
+      </div>
+
+      <div
+        className="flex min-h-0 flex-1 flex-col gap-2 overflow-auto px-2.5 pb-3"
+        data-testid="agents-live-turn"
+      >
+        {edges.length > 0 && <CouncilEdges edges={edges} />}
+
+        <div className="flex flex-col gap-0.5" data-testid="council-roster">
+          {roster.map((seat) => (
+            <CouncilSeatRow
+              key={seat.agentId}
+              seat={seat}
+              live={live}
+              focused={focusedAgentId === seat.agentId}
+            />
+          ))}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function CouncilSeatRow({
+  seat,
+  live,
+  focused,
+}: {
+  seat: CouncilRosterSeat
+  live: boolean
+  focused: boolean
+}) {
+  const { t } = useTranslation()
+  const waiting = seat.status === 'waiting'
+  const name = seat.agent?.name || t(seat.nameKey)
+
+  if (waiting) {
+    return (
+      <div
+        data-testid={`council-seat-${seat.persona}`}
+        data-focus-highlight={focused ? 'true' : undefined}
+        className="flex min-h-[var(--trail-min-h)] items-center gap-2 px-1.5 py-1 opacity-55"
+      >
+        <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-ink-tertiary/40" aria-hidden />
+        <span className="min-w-0 flex-1 truncate text-meta font-medium text-ink-secondary">
+          {name}
+        </span>
+        <span className="shrink-0 text-caption text-ink-tertiary">
+          {t('chat.roundtable.seatWaiting')}
+        </span>
+      </div>
+    )
+  }
+
+  const base = seat.agent
+  if (!base) {
+    // Defensive: non-waiting seats always have a run in mergeCouncilRoster.
+    return null
+  }
+  const agent: TurnAgent = {
+    ...base,
+    name: base.name || name,
+    // Avoid "Delegated by Supervisor · …" noise for council seats.
+    taskInput: undefined,
+  }
+
+  return (
+    <div
+      data-testid={`council-seat-${seat.persona}`}
+      data-focus-highlight={focused ? 'true' : undefined}
+      className={cn(focused && 'text-ink')}
+    >
+      <AgentCard agent={agent} live={live} />
     </div>
   )
 }

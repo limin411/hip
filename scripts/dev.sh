@@ -8,6 +8,7 @@
 #   sidecar  —— 仅 DeepSeek WebSocket 后端 (tsx，动态端口)
 #
 # app 模式已包含前端(vite)与后端(sidecar)，无需再单独启 web/sidecar。
+# start app 会先 regenerate src-tauri/binaries/sidecar-* dev wrapper（避免 prod-bin 残留）。
 # web/sidecar 仅用于不开桌面窗口的轻量调试（浏览器 UI / 后端单测）。
 #
 # 用法 / Usage:
@@ -94,9 +95,19 @@ warn_missing_key() {
     echo "[dev] ⚠ ~/.hip/config/auth.json 未配置 key（请在应用内「设置」填入），仍会启动但真实 LLM 请求会失败。"
 }
 
+# Tauri externalBin 读 src-tauri/binaries/sidecar-<triple>。
+# yarn sidecar:prod-bin / package-macos.sh 会把它换成 Mach-O + 打包 index.js；
+# 若未恢复 dev wrapper，tauri dev 会跑过期 bundle（例如缺 roundtable council）。
+# 每次 start app 都重写 shell wrapper → node --import tsx packages/sidecar/src/main.ts。
+ensure_sidecar_dev_bin() {
+  echo "[dev] 确保 sidecar 为 dev wrapper（热源码，覆盖可能存在的 prod launcher）…"
+  ( cd "$ROOT" && node scripts/make-sidecar-dev-bin.js )
+}
+
 start_app() {
   if is_running app; then echo "[dev] app 已在运行 (pid $(cat "$(pid_file app)"))"; return 0; fi
   echo "[dev] 桌面应用从「设置」面板读取 Key（写入 ~/.hip/config/auth.json）；首次启动需在应用内填入一次。"
+  ensure_sidecar_dev_bin
   free_port "$WEB_PORT"   # tauri 的 beforeDevCommand 会在该端口起 vite
   echo "[dev] 启动桌面应用 (yarn tauri dev)… 改动过 Rust 时需编译，窗口会稍后弹出。"
   [ "$DEBUG_MODE" -eq 1 ] && echo "[dev] 🔍 DEBUG 模式已启用 — 详细日志 → ~/.hip/logs/{sidecar-debug,tauri-debug}.log"

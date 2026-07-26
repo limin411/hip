@@ -4,10 +4,14 @@ export const ROUNDTABLE_SEP = '\n\n---user---\n\n'
 
 export const ROUNDTABLE_ROUNDS_MIN = 2
 export const ROUNDTABLE_ROUNDS_MAX = 4
-export const MAX_ADVISORS_PER_ROUND = 4
-export const MAX_ADVISOR_CALLS_PER_MEETING = 12
+/** Full 5-seat roster can speak each round (council parallel). */
+export const MAX_ADVISORS_PER_ROUND = 5
+/** 5 seats × 4 rounds max. */
+export const MAX_ADVISOR_CALLS_PER_MEETING = 20
 export const MAX_CHAIR_ACTIONS = 24
 export const CHAIR_PARSE_RETRIES = 2
+/** Council wall-clock: 5 parallel advisors + chair steps. */
+export const ROUNDTABLE_COUNCIL_WALL_MS = 240_000
 
 export type RoundtableEngine = 'sim' | 'loop' | 'council'
 

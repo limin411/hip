@@ -4,6 +4,7 @@
  */
 import type { RoundtableEdge, RoundtableMeta } from '@hip/protocol'
 import type { TurnAgent } from '@/lib/turnAgents'
+import { deriveRoundtableRoundNumber } from '@/lib/roundtableSections'
 
 export const COUNCIL_AGENT_PREFIX = 'roundtable:'
 
@@ -67,4 +68,39 @@ export function mergeCouncilRoster(
 
 export function councilEdges(meta?: RoundtableMeta | null): RoundtableEdge[] {
   return meta?.edges ?? []
+}
+
+/**
+ * Discussion round for the Agents panel header — NOT the chat turn index.
+ * Prefer live transcript headings, then edges, then finished meta.roundsRan.
+ */
+export function deriveCouncilDiscussionRound(
+  meta?: RoundtableMeta | null,
+  content?: string | null,
+): { current: number; planned?: number } | null {
+  let current = 0
+  if (typeof meta?.roundsRan === 'number' && meta.roundsRan > 0) {
+    current = Math.max(current, meta.roundsRan)
+  }
+  if (meta?.edges?.length) {
+    for (const e of meta.edges) {
+      if (typeof e.round === 'number' && e.round > current) current = e.round
+    }
+  }
+  const fromContent = content ? deriveRoundtableRoundNumber(content) : undefined
+  if (fromContent && fromContent > current) current = fromContent
+
+  const planned =
+    typeof meta?.roundsPlanned === 'number' && meta.roundsPlanned > 0
+      ? meta.roundsPlanned
+      : undefined
+
+  if (current <= 0) {
+    // Planning / convened but no round opened yet — still expose planned count.
+    if (planned != null || meta?.convened) {
+      return { current: 0, ...(planned != null ? { planned } : {}) }
+    }
+    return null
+  }
+  return { current, ...(planned != null ? { planned } : {}) }
 }

@@ -7,7 +7,7 @@ import { useTranslation } from 'react-i18next'
 import { ChevronDown, ChevronRight, ExternalLink } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { openWithDefaultApp } from '@/ipc/openPath'
-import { isPathUnderRoot } from '@/lib/pathBoundary'
+import { resolvePathUnderCwd } from '@/lib/pathScope'
 import { highlightLangFromPath } from './previewLang'
 import {
   CSV_PREVIEW_MAX_ROWS,
@@ -450,7 +450,9 @@ export function HtmlPreviewBody({
   const large = !shouldAutoRenderHtml(content)
   const [mode, setMode] = useState<'render' | 'source'>(() => (large ? 'source' : 'render'))
   const [iframeReady, setIframeReady] = useState(false)
-  const canOpenBrowser = Boolean(cwd && path && isPathUnderRoot(path, cwd))
+  // Resolve relative deliverables (e.g. roundtable-report.html) against session cwd.
+  const absolutePath = resolvePathUnderCwd(cwd, path) ?? (path.startsWith('/') || /^[A-Za-z]:[\\/]/.test(path) ? path : null)
+  const canOpenBrowser = Boolean(cwd && absolutePath)
 
   // Reset mode when the selected file changes.
   useEffect(() => {
@@ -483,7 +485,7 @@ export function HtmlPreviewBody({
         <div
           className="min-w-0 flex-1 truncate font-mono text-caption text-ink-tertiary"
           data-testid="preview-chrome"
-          title={path}
+          title={absolutePath ?? path}
         >
           {path}
         </div>
@@ -510,8 +512,8 @@ export function HtmlPreviewBody({
             'hover:bg-surface-muted disabled:pointer-events-none disabled:opacity-40',
           )}
           onClick={() => {
-            if (!canOpenBrowser) return
-            void openWithDefaultApp(path, { cwd: cwd ?? null })
+            if (!canOpenBrowser || !absolutePath) return
+            void openWithDefaultApp(absolutePath, { cwd: cwd ?? null })
           }}
         >
           <ExternalLink className="size-3 shrink-0" aria-hidden />
@@ -524,20 +526,26 @@ export function HtmlPreviewBody({
         {truncated && <TruncBanner text={truncatedLabel} />}
         {large && (
           <div
-            className="mb-2 rounded-md bg-amber-500/10 px-2.5 py-1.5 text-meta text-amber-900 dark:text-amber-100"
+            className="mb-2 shrink-0 rounded-md bg-amber-500/10 px-2.5 py-1.5 text-meta text-amber-900 dark:text-amber-100"
             data-testid="preview-html-large-warn"
           >
             {t('artifact.previewHtmlLarge')}
           </div>
         )}
         {hardTruncated && mode === 'render' && (
-          <div className="mb-2 rounded-md bg-surface-muted/80 px-2.5 py-1 text-meta text-ink-tertiary">
+          <div className="mb-2 shrink-0 rounded-md bg-surface-muted/80 px-2.5 py-1 text-meta text-ink-tertiary">
             {t('artifact.previewHtmlHardTruncated')}
           </div>
         )}
-        <div className="min-h-0 flex-1 overflow-auto">
+        {/*
+          Outer must NOT scroll — a full-height iframe inside overflow-auto leaves a
+          dead outer scrollbar. Give the iframe a bounded box and let its document scroll.
+        */}
+        <div className="relative min-h-0 flex-1 overflow-hidden rounded-md border border-border/50 bg-white dark:bg-surface">
           {mode === 'source' ? (
-            <PlainPre content={content} testid="preview-html-source" />
+            <div className="h-full overflow-auto">
+              <PlainPre content={content} testid="preview-html-source" />
+            </div>
           ) : !iframeReady ? (
             <div
               className="flex h-full items-center justify-center text-meta text-ink-tertiary"
@@ -550,7 +558,7 @@ export function HtmlPreviewBody({
               data-testid="preview-html"
               title="preview"
               sandbox=""
-              className="h-full min-h-[12rem] w-full border-0 bg-white"
+              className="absolute inset-0 h-full w-full border-0 bg-white"
               srcDoc={srcDoc}
             />
           )}

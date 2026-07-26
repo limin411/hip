@@ -4,6 +4,7 @@ import {
   isCouncilRoundtable,
   isCouncilLiveAgents,
   councilAgentId,
+  deriveCouncilDiscussionRound,
 } from './roundtableCouncil'
 import type { TurnAgent } from './turnAgents'
 
@@ -56,5 +57,35 @@ describe('roundtableCouncil', () => {
       'running',
     )
     expect(mergeCouncilRoster([], null)).toBeNull()
+  })
+
+  it('deriveCouncilDiscussionRound uses transcript rounds not chat turn index', () => {
+    expect(
+      deriveCouncilDiscussionRound(
+        { engine: 'council', convened: true, roundsPlanned: 3 },
+        '## 会议规划\n\n## 第 1 轮 — a\n\n### 阶段性结论\n\n## 第 3 轮 — c\n',
+      ),
+    ).toEqual({ current: 3, planned: 3 })
+
+    expect(
+      deriveCouncilDiscussionRound(
+        {
+          engine: 'council',
+          convened: true,
+          roundsRan: 2,
+          roundsPlanned: 4,
+          edges: [{ round: 2, from: 'a', to: 'b', relation: 'rebut', summary: 'x' }],
+        },
+        '',
+      ),
+    ).toEqual({ current: 2, planned: 4 })
+
+    // Prefer content when ahead of finished meta (live stream).
+    expect(
+      deriveCouncilDiscussionRound(
+        { engine: 'council', convened: true, roundsRan: 1, roundsPlanned: 3 },
+        '## Round 3 — focus',
+      ),
+    ).toEqual({ current: 3, planned: 3 })
   })
 })

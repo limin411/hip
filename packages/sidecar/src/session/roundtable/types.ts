@@ -125,6 +125,26 @@ export interface RoundtableEdgeResult {
   summary: string
 }
 
+export interface RoundtableReportRound {
+  round: number
+  focus: string
+  speeches: SpeechRecord[]
+  stage: StageRecord
+}
+
+export interface RoundtableReportPayload {
+  issue: string
+  agenda: string[]
+  rationale: string
+  rounds: RoundtableReportRound[]
+  decision?: {
+    decision: string
+    residual: string[]
+    nextSteps: string[]
+  }
+  earlyExit?: boolean
+}
+
 export interface RoundtableResult {
   phase: 'done' | 'aborted'
   convened: boolean
@@ -137,6 +157,8 @@ export interface RoundtableResult {
   abortReason?: string
   /** Council discussion edges */
   edges?: RoundtableEdgeResult[]
+  /** Structured data for the end-of-meeting HTML deliverable. */
+  report?: RoundtableReportPayload
 }
 
 export interface RoundtableCompleteFns {

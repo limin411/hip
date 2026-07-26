@@ -136,9 +136,14 @@ export function deriveRoundtableStatusKey(
 }
 
 export function deriveRoundtableRoundNumber(content: string): number | undefined {
-  const matches = [...content.matchAll(/第\s*(\d+)\s*轮|Round\s+(\d+)|ラウンド\s*(\d+)|라운드\s*(\d+)/gi)]
+  // zh-CN 轮 / zh-TW 輪 / en Round / ja ラウンド / ko 라운드
+  const matches = [
+    ...content.matchAll(
+      /第\s*(\d+)\s*轮|第\s*(\d+)\s*輪|Round\s+(\d+)|ラウンド\s*(\d+)|라운드\s*(\d+)/gi,
+    ),
+  ]
   if (!matches.length) return undefined
   const last = matches[matches.length - 1]!
-  const n = Number(last[1] || last[2] || last[3] || last[4])
+  const n = Number(last[1] || last[2] || last[3] || last[4] || last[5])
   return Number.isFinite(n) ? n : undefined
 }

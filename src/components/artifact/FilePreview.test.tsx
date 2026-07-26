@@ -194,6 +194,23 @@ describe('FilePreview', () => {
     expect(openWithDefaultApp).toHaveBeenCalledWith('/tmp/index.html', { cwd: '/tmp' })
   })
 
+  it('resolves relative HTML paths against cwd for open-in-browser', async () => {
+    setPreview({
+      status: 'ready',
+      path: 'roundtable-report.html',
+      content: '<p>report</p>',
+      mimeType: 'text/html',
+      encoding: 'utf8',
+    })
+    render(<FilePreview />)
+    const btn = screen.getByTestId('preview-html-open-browser')
+    expect(btn).not.toBeDisabled()
+    fireEvent.click(btn)
+    expect(openWithDefaultApp).toHaveBeenCalledWith('/tmp/roundtable-report.html', {
+      cwd: '/tmp',
+    })
+  })
+
   it('shows path chrome above PDF iframe', () => {
     setPreview({
       status: 'ready',

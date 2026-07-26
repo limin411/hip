@@ -54,6 +54,34 @@ yarn release:windows
 
 Release packaging expects production sidecar binaries and resources as produced by the package scripts (`sidecar:prod-bin` / script internals). Prefer the release scripts over ad-hoc partial builds unless you know the layout under `src-tauri/binaries` and `src-tauri/resources`.
 
+### Voice engine (whisper-cli)
+
+Release packages **include** the local speech engine by default:
+
+| | Engine (`whisper-cli`) | Models (`ggml-*.bin`) |
+|--|------------------------|------------------------|
+| Release package | Bundled (`HIP_BUNDLE_WHISPER` defaults to `1`) | **Not** bundled |
+| How users get it | Ships with app | Settings → Voice → download |
+
+Requirements for packaging with engine (default):
+
+- macOS: `cmake`, git, Xcode CLT (or set `HIP_WHISPER_SOURCE=brew` after `brew install whisper-cpp` for a faster non-pinned dogfood stage)
+- Windows: `cmake`, MSVC build tools, git
+
+Opt out (slimmer artifact, voice needs a system engine):
+
+```bash
+HIP_BUNDLE_WHISPER=0 yarn package:macos
+```
+
+Force rebuild of a previously staged binary:
+
+```bash
+HIP_WHISPER_REBUILD=1 yarn package:macos
+```
+
+Pin is `scripts/whisper-version.txt`. Staged files are gitignored under `src-tauri/resources/whisper/<triple>/`.
+
 ## GitHub Release checklist
 
 1. Push the release commit / tag (`vX.Y.Z`).

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Check, ChevronDown, RefreshCw } from 'lucide-react'
+import { Check, ChevronDown, Mic, MicOff, RefreshCw } from 'lucide-react'
 import {
   VOICE_LANGUAGES,
   VOICE_MODEL_IDS,
@@ -17,7 +17,10 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/DropdownMenu'
 import { resolveInputDevice, type VoiceInputDevice } from '@/domain/voice/resolveInputDevice'
+import { startVoiceCapture, type CaptureHandle } from '@/domain/voice/voiceCapture'
 import {
+  seedProgressFromPartial,
+  shouldShowVoiceDownloadProgress,
   useVoiceDownloadStore,
   voiceDownloadProgressPercent,
 } from '@/domain/voice/voiceDownloadStore'
@@ -25,6 +28,7 @@ import {
   voiceModelStatus,
   voiceOpenModelsDir,
   voiceRuntimeStatus,
+  voiceTranscribe,
   type VoiceModelStatus,
   type VoiceRuntimeStatus,
 } from '@/ipc/voice'
@@ -76,6 +80,13 @@ export function VoiceSettingsSection({
   )
   const [checking, setChecking] = useState(false)
   const [runtime, setRuntime] = useState<VoiceRuntimeStatus | null>(null)
+  /** Mic test: live level 0..1 while testing; never auto-start on page open. */
+  const [micTesting, setMicTesting] = useState(false)
+  const [micLevel, setMicLevel] = useState(0)
+  const [micTestHint, setMicTestHint] = useState<string | null>(null)
+  const [micTestBusy, setMicTestBusy] = useState(false)
+  const micTestRef = useRef<CaptureHandle | null>(null)
+  const micLevelRaf = useRef<number | null>(null)
   // Download state lives in a module store so switching Settings pages does not drop it.
   const activeModels = useVoiceDownloadStore((s) => s.activeModels)
   const progressByModel = useVoiceDownloadStore((s) => s.progressByModel)
@@ -151,13 +162,15 @@ export function VoiceSettingsSection({
     await listDevicesOnly()
   }, [listDevicesOnly])
 
-  const checkAllModels = useCallback(async () => {
+  /** Quick status (size/sidecar) — safe on every page open. Full SHA only when verify=true. */
+  const checkAllModels = useCallback(async (opts?: { verify?: boolean }) => {
     setChecking(true)
     try {
+      const verify = opts?.verify === true
       const results = await Promise.all(
         VOICE_MODEL_IDS.map(async (id) => {
           try {
-            return await voiceModelStatus(id)
+            return await voiceModelStatus(id, { verify })
           } catch {
             return {
               model: id,
@@ -190,28 +203,33 @@ export function VoiceSettingsSection({
     }
   }, [])
 
-  // When voice is turned on, load runtime + model statuses (not before — opt-in).
-  // Device list uses enumerate only — never getUserMedia on mount (would seize system mic/audio).
-  // Download progress is owned by voiceDownloadStore (survives page switch).
+  // When voice is turned on, load runtime + model statuses only.
+  // Do NOT enumerate devices or open the mic on page open — that seizes the system mic.
+  // Devices load only when the user refreshes, opens the picker, or starts a mic test.
   useEffect(() => {
     if (!enabled) return
     void refreshRuntime()
     void checkAllModels()
-    void listDevicesOnly()
-    const onChange = () => void listDevicesOnly()
-    try {
-      navigator.mediaDevices?.addEventListener?.('devicechange', onChange)
-    } catch {
-      /* test env */
-    }
+  }, [enabled, checkAllModels, refreshRuntime])
+
+  // Always release mic test capture on unmount / disable.
+  useEffect(() => {
     return () => {
-      try {
-        navigator.mediaDevices?.removeEventListener?.('devicechange', onChange)
-      } catch {
-        /* ignore */
-      }
+      if (micLevelRaf.current != null) cancelAnimationFrame(micLevelRaf.current)
+      micTestRef.current?.cancel()
+      micTestRef.current = null
     }
-  }, [enabled, listDevicesOnly, checkAllModels, refreshRuntime])
+  }, [])
+
+  useEffect(() => {
+    if (!enabled && micTestRef.current) {
+      micTestRef.current.cancel()
+      micTestRef.current = null
+      setMicTesting(false)
+      setMicLevel(0)
+      setMicTestHint(null)
+    }
+  }, [enabled])
 
   // When a download finishes while this page is mounted, refresh model statuses.
   const wasDownloading = useRef(false)
@@ -227,10 +245,21 @@ export function VoiceSettingsSection({
     }
   }, [enabled, downloading, checkAllModels])
 
-  // Re-check selected model after model id change (still only when enabled).
+  // Seed progress bar from on-disk .partial so resume does not look like 0%.
   useEffect(() => {
     if (!enabled) return
-    void voiceModelStatus(model)
+    for (const id of VOICE_MODEL_IDS) {
+      const st = modelStatuses[id]
+      if (st?.partialBytes && st.partialBytes > 0 && !st.ready) {
+        seedProgressFromPartial(id, st.partialBytes, st.approxBytes)
+      }
+    }
+  }, [enabled, modelStatuses])
+
+  // Re-check selected model after model id change (quick only — never full hash here).
+  useEffect(() => {
+    if (!enabled) return
+    void voiceModelStatus(model, { verify: false })
       .then((st) => setModelStatuses((prev) => ({ ...prev, [model]: st })))
       .catch(() => {})
   }, [enabled, model])
@@ -265,6 +294,169 @@ export function VoiceSettingsSection({
     voice?.inputDeviceId,
   ])
 
+  const stopMicTest = useCallback(() => {
+    if (micLevelRaf.current != null) {
+      cancelAnimationFrame(micLevelRaf.current)
+      micLevelRaf.current = null
+    }
+    micTestRef.current?.cancel()
+    micTestRef.current = null
+    setMicTesting(false)
+    setMicLevel(0)
+  }, [])
+
+  const startMicTest = useCallback(async () => {
+    if (micTesting) {
+      stopMicTest()
+      setMicTestHint(t('settings.voice.micTestStopped'))
+      return
+    }
+    setMicTestHint(null)
+    setMicTestBusy(true)
+    try {
+      // Explicit user action: may request permission and open the mic.
+      await refreshDevicesWithPermission()
+      const deviceId = resolveInputDevice(
+        {
+          id: voice?.inputDeviceId,
+          label: voice?.inputDeviceLabel,
+          groupId: voice?.inputDeviceGroupId,
+        },
+        // devices state may not have flushed yet; re-list
+        await (async () => {
+          try {
+            const list = await navigator.mediaDevices.enumerateDevices()
+            return list
+              .filter((d) => d.kind === 'audioinput')
+              .map((d, i) => ({
+                id: d.deviceId,
+                label: d.label?.trim() || `${t('settings.voice.unnamedDevice')} ${i + 1}`,
+                groupId: d.groupId,
+              }))
+          } catch {
+            return [] as VoiceInputDevice[]
+          }
+        })(),
+      ).deviceId
+
+      const handle = await startVoiceCapture({
+        deviceId: deviceId || 'default',
+        maxDurationSec: 120,
+        onLevel: (rms) => setMicLevel(rms),
+      })
+      micTestRef.current = handle
+      setMicTesting(true)
+      setMicTestHint(t('settings.voice.micTestListening'))
+      const tick = () => {
+        if (!micTestRef.current) return
+        setMicLevel(micTestRef.current.getLevel())
+        micLevelRaf.current = requestAnimationFrame(tick)
+      }
+      micLevelRaf.current = requestAnimationFrame(tick)
+    } catch (e) {
+      stopMicTest()
+      if (e instanceof DOMException && (e.name === 'NotAllowedError' || e.name === 'PermissionDeniedError')) {
+        setPermissionDenied(true)
+        toast.error(t('voice.permissionDenied'))
+      } else {
+        toast.error(t('voice.captureFailed'))
+      }
+    } finally {
+      setMicTestBusy(false)
+    }
+  }, [
+    micTesting,
+    refreshDevicesWithPermission,
+    stopMicTest,
+    t,
+    voice?.inputDeviceGroupId,
+    voice?.inputDeviceId,
+    voice?.inputDeviceLabel,
+  ])
+
+  const resolveReadyModel = useCallback(async (): Promise<VoiceModelId | null> => {
+    // Prefer configured model if ready; otherwise any ready catalog model (e.g. tiny while UI still base).
+    let st = modelStatuses[model]
+    if (st?.ready) return model
+    for (const id of VOICE_MODEL_IDS) {
+      if (modelStatuses[id]?.ready) return id
+    }
+    // Status map may be empty — re-query quickly.
+    for (const id of VOICE_MODEL_IDS) {
+      try {
+        const s = await voiceModelStatus(id, { verify: false })
+        if (s.ready) {
+          if (id !== model) {
+            void updateSection('voice', (prev) => ({ ...(prev ?? {}), model: id }))
+            toast.message(t('voice.modelFallback', { model: id }))
+          }
+          setModelStatuses((prev) => ({ ...prev, [id]: s }))
+          return id
+        }
+      } catch {
+        /* continue */
+      }
+    }
+    return null
+  }, [model, modelStatuses, t, updateSection])
+
+  const runMicTestTranscribe = useCallback(async () => {
+    if (!micTestRef.current) {
+      toast.message(t('settings.voice.micTestStartFirst'))
+      return
+    }
+    setMicTestBusy(true)
+    setMicTestHint(t('settings.voice.micTestTranscribing'))
+    try {
+      if (micLevelRaf.current != null) {
+        cancelAnimationFrame(micLevelRaf.current)
+        micLevelRaf.current = null
+      }
+      const handle = micTestRef.current
+      micTestRef.current = null
+      setMicTesting(false)
+      const { wavBase64, audioMs } = await handle.stop()
+      setMicLevel(0)
+      if (audioMs < 400 || !wavBase64) {
+        toast.message(t('voice.tooShort'))
+        setMicTestHint(t('settings.voice.micTestStopped'))
+        return
+      }
+      const useModel = await resolveReadyModel()
+      if (!useModel) {
+        toast.error(t('voice.modelMissing'))
+        setMicTestHint(t('voice.modelMissing'))
+        return
+      }
+      const result = await voiceTranscribe({
+        wavBase64,
+        language,
+        model: useModel,
+      })
+      const text = result.text?.trim() ?? ''
+      if (!text) {
+        toast.message(t('voice.emptyTranscript'))
+        setMicTestHint(t('settings.voice.micTestEmpty'))
+      } else {
+        toast.success(t('settings.voice.micTestOk', { text: text.slice(0, 80) }))
+        setMicTestHint(t('settings.voice.micTestOk', { text: text.slice(0, 120) }))
+      }
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e)
+      if (msg.includes('binary_missing') || msg.includes('spawn_failed')) {
+        toast.error(t('voice.binaryMissing'))
+      } else if (msg.includes('model_missing')) {
+        // Include path detail when present (voice.model_missing:dir=... preferred=...).
+        toast.error(`${t('voice.modelMissing')}${msg.includes(':') ? ` (${msg})` : ''}`)
+      } else {
+        toast.error(`${t('voice.transcribeFailed')}: ${msg}`)
+      }
+      setMicTestHint(t('settings.voice.micTestFailed'))
+    } finally {
+      setMicTestBusy(false)
+    }
+  }, [language, resolveReadyModel, t])
+
   const selectDevice = (id: string) => {
     if (id === 'default') {
       void updateSection('voice', (prev) => ({
@@ -286,6 +478,7 @@ export function VoiceSettingsSection({
 
   const onDownload = async (id: VoiceModelId = model) => {
     // Dedupe + persistent state live in the store; re-click while in-flight joins the same promise.
+    // Backend Range-resumes from `{filename}.partial` when present.
     try {
       await startDownload(id)
       toast.success(t('settings.voice.downloadDone'))
@@ -301,8 +494,14 @@ export function VoiceSettingsSection({
               : String(e)
       if (msg.includes('cancelled')) toast.message(t('settings.voice.downloadCancelled'))
       else if (msg.includes('download_in_progress')) {
-        // Another path already owns this download — UI still shows store progress.
         toast.message(t('settings.voice.downloading'))
+      } else if (msg.includes('download_incomplete') || msg.includes('voice.network')) {
+        // Partial kept on disk — next click resumes.
+        toast.error(t('settings.voice.downloadIncomplete'))
+        void checkAllModels()
+      } else if (msg.includes('hash_mismatch')) {
+        toast.error(t('settings.voice.downloadHashMismatch'))
+        void checkAllModels()
       } else toast.error(`${t('voice.downloadFailed')}: ${msg}`)
     }
   }
@@ -313,11 +512,13 @@ export function VoiceSettingsSection({
 
   const onCheckStatus = async () => {
     await refreshRuntime()
-    await checkAllModels()
+    // Explicit user action: full SHA-256 integrity check (may take a few seconds).
+    await checkAllModels({ verify: true })
     toast.success(t('settings.voice.checkDone'))
   }
 
-  const progressPct = downloading ? voiceDownloadProgressPercent(progress) : null
+  const showProgress = shouldShowVoiceDownloadProgress(downloading, progress)
+  const progressPct = showProgress ? voiceDownloadProgressPercent(progress) : null
 
   const deviceLabel =
     resolved.deviceId === 'default'
@@ -375,9 +576,16 @@ export function VoiceSettingsSection({
                   : runtime.mock
                     ? t('settings.voice.engineMock')
                     : runtime.binaryAvailable
-                      ? t('settings.voice.engineReady')
+                      ? runtime.binaryPath
+                        ? `${t('settings.voice.engineReady')}: ${runtime.binaryPath}`
+                        : t('settings.voice.engineReady')
                       : t('settings.voice.binaryMissing')}
               </div>
+              {runtime && !runtime.binaryAvailable && !runtime.mock ? (
+                <p className="mt-1 text-meta text-amber-600 dark:text-amber-400">
+                  {t('settings.voice.engineInstallHint')}
+                </p>
+              ) : null}
             </div>
           </div>
 
@@ -417,6 +625,10 @@ export function VoiceSettingsSection({
                     type="button"
                     className={selectTriggerCls}
                     data-testid="settings-voice-device-trigger"
+                    onClick={() => {
+                      // Lazy-load device labels only when the user opens the picker.
+                      if (devices.length === 0) void listDevicesOnly()
+                    }}
                   >
                     <span className="max-w-[180px] truncate">{deviceLabel}</span>
                     <ChevronDown size={14} className="shrink-0 text-ink-tertiary" />
@@ -454,6 +666,64 @@ export function VoiceSettingsSection({
                   ))}
                 </DropdownMenuContent>
               </DropdownMenu>
+            </div>
+          </div>
+
+          {/* Microphone test — only opens mic on explicit user action */}
+          <div
+            className="flex flex-col gap-3 px-8 py-4"
+            data-testid="settings-voice-mic-test"
+          >
+            <div className="flex items-start justify-between gap-6">
+              <div className="min-w-0 flex-1">
+                <div className="text-body font-medium text-ink">{t('settings.voice.micTest')}</div>
+                <div className="mt-0.5 text-meta leading-relaxed text-ink-tertiary">
+                  {t('settings.voice.micTestDesc')}
+                </div>
+                {micTestHint ? (
+                  <p className="mt-1 text-meta text-ink-secondary" data-testid="settings-voice-mic-test-hint">
+                    {micTestHint}
+                  </p>
+                ) : null}
+              </div>
+              <div className="flex shrink-0 flex-wrap items-center gap-2">
+                <button
+                  type="button"
+                  className={cn(btnCls, 'inline-flex items-center gap-1.5')}
+                  disabled={micTestBusy}
+                  onClick={() => void startMicTest()}
+                  data-testid="settings-voice-mic-test-toggle"
+                >
+                  {micTesting ? <MicOff size={14} /> : <Mic size={14} />}
+                  {micTesting
+                    ? t('settings.voice.micTestStop')
+                    : t('settings.voice.micTestStart')}
+                </button>
+                <button
+                  type="button"
+                  className={btnCls}
+                  disabled={!micTesting || micTestBusy}
+                  onClick={() => void runMicTestTranscribe()}
+                  data-testid="settings-voice-mic-test-transcribe"
+                >
+                  {t('settings.voice.micTestTranscribe')}
+                </button>
+              </div>
+            </div>
+            <div
+              className="h-2 overflow-hidden rounded-full bg-border"
+              data-testid="settings-voice-mic-level"
+              aria-hidden
+            >
+              <div
+                className={cn(
+                  'h-full rounded-full transition-[width] duration-75',
+                  micTesting ? 'bg-accent' : 'bg-border',
+                )}
+                style={{
+                  width: `${micTesting ? Math.min(100, Math.round(micLevel * 400)) : 0}%`,
+                }}
+              />
             </div>
           </div>
 
@@ -564,10 +834,14 @@ export function VoiceSettingsSection({
                   data-testid="settings-voice-download"
                 >
                   {downloading
-                    ? t('settings.voice.downloading')
+                    ? progress?.phase === 'hashing'
+                      ? t('settings.voice.verifying')
+                      : t('settings.voice.downloading')
                     : activeStatus?.ready
                       ? t('settings.voice.redownload')
-                      : t('settings.voice.download')}
+                      : (activeStatus?.partialBytes ?? 0) > 0
+                        ? t('settings.voice.resumeDownload')
+                        : t('settings.voice.download')}
                 </button>
                 {downloading ? (
                   <button
@@ -598,13 +872,24 @@ export function VoiceSettingsSection({
               <div className="mt-3" data-testid="settings-voice-download-progress">
                 <div className="mb-1 flex justify-between text-caption text-ink-tertiary">
                   <span>
-                    {t('settings.voice.downloadingModel', { model: progress?.model ?? model })}
+                    {progress?.phase === 'hashing'
+                      ? t('settings.voice.verifying')
+                      : progress?.phase === 'ready'
+                        ? t('settings.voice.downloadDone')
+                        : progress?.phase === 'error'
+                          ? t('settings.voice.downloadPaused')
+                          : t('settings.voice.downloadingModel', {
+                              model: progress?.model ?? model,
+                            })}
                   </span>
                   <span>{progressPct}%</span>
                 </div>
                 <div className="h-1.5 overflow-hidden rounded-full bg-border">
                   <div
-                    className="h-full rounded-full bg-accent transition-[width] duration-200"
+                    className={cn(
+                      'h-full rounded-full transition-[width] duration-200',
+                      progress?.phase === 'error' ? 'bg-amber-500' : 'bg-accent',
+                    )}
                     style={{ width: `${progressPct}%` }}
                   />
                 </div>
@@ -676,7 +961,9 @@ export function VoiceSettingsSection({
                           }}
                           data-testid={`settings-voice-download-${id}`}
                         >
-                          {t('settings.voice.download')}
+                          {(st?.partialBytes ?? 0) > 0
+                            ? t('settings.voice.resumeDownload')
+                            : t('settings.voice.download')}
                         </button>
                       ) : null}
                       {st?.ready && id !== model ? (

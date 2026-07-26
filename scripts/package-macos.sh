@@ -20,6 +20,11 @@
 #   yarn package:macos
 #   # 或：bash scripts/package-macos.sh
 #
+# 语音引擎（whisper-cli）：
+#   正式发行包默认捆绑引擎（模型仍按需下载）。
+#   跳过：HIP_BUNDLE_WHISPER=0 yarn package:macos
+#   强制重编引擎：HIP_WHISPER_REBUILD=1 yarn package:macos
+#
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -36,10 +41,20 @@ case "$(uname -s)" in
     ;;
 esac
 
-# Optional local whisper-cli for composer voice dictation (not required for build).
-if [ "${HIP_BUNDLE_WHISPER:-0}" = "1" ]; then
-  echo "==> HIP_BUNDLE_WHISPER=1 — building/staging whisper-cli resources"
+# Release default: bundle whisper-cli. Models stay opt-in (Settings download).
+# Slim / CI-without-cmake: HIP_BUNDLE_WHISPER=0
+if [ "${HIP_BUNDLE_WHISPER:-1}" = "1" ]; then
+  echo "==> bundling whisper-cli (release default; HIP_BUNDLE_WHISPER=0 to skip)"
   bash "${SCRIPT_DIR}/make-whisper-bin.sh"
+  WHISPER_TRIPLE="${HIP_WHISPER_TRIPLE:-$(rustc -vV | sed -n 's/^host: //p')}"
+  WHISPER_BIN="${ROOT_DIR}/src-tauri/resources/whisper/${WHISPER_TRIPLE}/whisper-cli"
+  if [ ! -x "${WHISPER_BIN}" ]; then
+    echo "error: expected whisper-cli at ${WHISPER_BIN} after make-whisper-bin.sh" >&2
+    exit 1
+  fi
+  echo "    staged: ${WHISPER_BIN} ($(wc -c < "${WHISPER_BIN}" | tr -d ' ') bytes)"
+else
+  echo "==> HIP_BUNDLE_WHISPER=0 — skipping whisper-cli (voice needs brew/HIP_WHISPER_BIN at runtime)"
 fi
 
 # ── 1. Signing identity ─────────────────────────────────────────────────────

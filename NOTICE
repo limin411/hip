@@ -8,9 +8,11 @@ See the LICENSE file for the full license text.
 
 Optional speech recognition uses whisper.cpp (MIT License)
   https://github.com/ggml-org/whisper.cpp
-when the whisper-cli binary is bundled via scripts/make-whisper-bin.sh.
+The whisper-cli engine is included in official release packages by default
+(built/staged via scripts/make-whisper-bin.sh during packaging). Slim builds
+may omit it with HIP_BUNDLE_WHISPER=0.
 
 Whisper model weights are subject to the OpenAI Whisper model license /
 use terms as redistributed by the Hugging Face ggerganov/whisper.cpp repo.
 Models are downloaded on demand to ~/.hip/models/whisper/ and are not
-shipped in the default hip package.
+shipped in the hip application package.

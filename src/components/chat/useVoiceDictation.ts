@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
-import type { VoiceLanguage, VoiceModelId } from '@hip/protocol'
+import { VOICE_MODEL_IDS, type VoiceLanguage, type VoiceModelId } from '@hip/protocol'
 import { useHipConfigStore } from '@/store/hipConfigStore'
 import { useCommandPaletteStore } from '@/store/commandPaletteStore'
 import { appendTranscript } from '@/domain/voice/appendTranscript'
@@ -29,6 +29,8 @@ export function useVoiceDictation(opts: {
   const [binaryOk, setBinaryOk] = useState(true)
   const captureRef = useRef<CaptureHandle | null>(null)
   const maxTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  /** Model id resolved at record-start (may fall back from base→tiny). */
+  const activeModelRef = useRef<VoiceModelId>(model)
 
   // Opt-in: Settings → Voice must be explicitly enabled (default off).
   const enabled = voiceCfg?.enabled === true
@@ -85,7 +87,7 @@ export function useVoiceDictation(opts: {
       const result = await voiceTranscribe({
         wavBase64,
         language,
-        model,
+        model: activeModelRef.current,
       })
       const text = result.text?.trim() ?? ''
       if (!text) {
@@ -95,15 +97,24 @@ export function useVoiceDictation(opts: {
         queueMicrotask(() => opts.inputRef?.current?.focus())
       }
     } catch (e) {
-      const msg = e instanceof Error ? e.message : String(e)
+      const msg =
+        e instanceof Error
+          ? e.message
+          : typeof e === 'string'
+            ? e
+            : e && typeof e === 'object' && 'message' in e
+              ? String((e as { message: unknown }).message)
+              : String(e)
       if (msg.includes('binary_missing')) toast.error(t('voice.binaryMissing'))
       else if (msg.includes('model_missing')) toast.error(t('voice.modelMissing'))
       else if (msg.includes('payload_too_large')) toast.error(t('voice.payloadTooLarge'))
-      else toast.error(t('voice.transcribeFailed'))
+      else if (msg.includes('spawn_failed')) toast.error(t('voice.binaryMissing'))
+      else if (msg.includes('timeout')) toast.error(t('voice.transcribeTimeout'))
+      else toast.error(`${t('voice.transcribeFailed')}${msg ? `: ${msg}` : ''}`)
     } finally {
       setState('idle')
     }
-  }, [language, model, opts, t])
+  }, [language, opts, t])
 
   const startRecording = useCallback(async () => {
     if (opts.disabled || !enabled || envDisabled) return
@@ -123,7 +134,22 @@ export function useVoiceDictation(opts: {
       }
       setBinaryOk(true)
 
-      const st = await voiceModelStatus(model)
+      // Prefer configured model; if missing, use any ready local model (e.g. tiny while UI still base).
+      let useModel = model
+      let st = await voiceModelStatus(model, { verify: false })
+      if (!st.ready) {
+        for (const id of VOICE_MODEL_IDS) {
+          if (id === model) continue
+          const alt = await voiceModelStatus(id, { verify: false })
+          if (alt.ready) {
+            useModel = id
+            st = alt
+            void updateSection('voice', (prev) => ({ ...(prev ?? {}), model: id }))
+            toast.message(t('voice.modelFallback', { model: id }))
+            break
+          }
+        }
+      }
       if (!st.ready) {
         if (st.corrupt) {
           toast.error(t('voice.modelCorrupt'))
@@ -131,20 +157,22 @@ export function useVoiceDictation(opts: {
         }
         const ok = window.confirm(
           t('voice.downloadConfirm', {
-            model,
+            model: useModel,
             sizeMb: Math.round((st.approxBytes ?? 150_000_000) / (1024 * 1024)),
           }),
         )
         if (!ok) return
         setState('downloading')
         try {
-          await startVoiceModelDownload(model)
+          await startVoiceModelDownload(useModel)
         } catch {
           toast.error(t('voice.downloadFailed'))
           setState('idle')
           return
         }
       }
+
+      activeModelRef.current = useModel
 
       let deviceId = voiceCfg?.inputDeviceId ?? 'default'
       try {

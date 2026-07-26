@@ -21,7 +21,7 @@ hip 是本地优先的 Tauri v2 桌面 AI 工作台，当前 Composer（`src/com
 
 1. **采集**：Webview `getUserMedia` → **AudioWorklet（或 ScriptProcessor 回退）** 取 Float32 PCM → **重采样到 16 kHz mono** → **纯 TS WAV 头编码**（**禁止**把 MediaRecorder 当 v1 编码器）。
 2. **转写**：WAV 经 **base64 IPC** 交给 Rust；Rust 落盘 `~/.hip/scratch/voice/` 后用 **`std::process::Command`** 起本机 `whisper-cli`（**不**走 shell plugin / `externalBin`，避免破坏现有打包）。
-3. **打包**：二进制放在 **`resources/whisper/`**（可选拷贝）；**永不**写入 `tauri.conf.json` 的 `externalBin`（该数组缺文件会使 Tauri 构建失败，且 `package-macos.sh` 对 sidecar 是硬依赖）。
+3. **打包**：二进制放在 **`resources/whisper/`**；**正式发行包默认捆绑**引擎（`HIP_BUNDLE_WHISPER` 默认 `1`，可用 `0` 关闭）；**永不**写入 `tauri.conf.json` 的 `externalBin`（该数组缺文件会使 Tauri 构建失败，且 `package-macos.sh` 对 sidecar 是硬依赖）。模型仍按需下载，不随包。
 4. **设置**：`[voice]` 持久化设备 **id + label + groupId**，重启后 **rebinding**；模型按需下载到 `~/.hip/models/whisper/`。
 
 v1 目标：**隐私优先、可离线、短句听写、可测、主构建不依赖 whisper 二进制**。
@@ -76,7 +76,7 @@ v1 目标：**隐私优先、可离线、短句听写、可测、主构建不依
 6. `VOICE_INPUT = false` first merge；运行时 `[voice].enabled` 可关。
 7. i18n：en / zh-CN / zh-TW / ja / ko。
 8. 单测 + e2e mock（CI **无**真 mic、**无** HF 下载）。
-9. **主 app 构建在缺少 whisper 二进制时仍成功**；仅语音功能降级。
+9. **开发 / 未捆绑构建**在缺少 whisper 二进制时仍成功；仅语音功能降级。**正式 `package:*` 默认要求并捆绑引擎**（`HIP_BUNDLE_WHISPER=0` 可跳过）。
 
 ### Non-Goals（v1）
 

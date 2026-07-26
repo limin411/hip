@@ -16,6 +16,8 @@ export type VoiceModelStatus = {
   bytesOnDisk?: number
   corrupt?: boolean
   approxBytes?: number
+  /** Incomplete `{filename}.partial` size — enables resume UI. */
+  partialBytes?: number
 }
 
 export type VoiceTranscriptResult = {
@@ -36,8 +38,17 @@ export async function voiceRuntimeStatus(): Promise<VoiceRuntimeStatus> {
   return invoke<VoiceRuntimeStatus>('voice_runtime_status')
 }
 
-export async function voiceModelStatus(model?: VoiceModelId): Promise<VoiceModelStatus> {
-  return invoke<VoiceModelStatus>('voice_model_status', { args: { model } })
+/**
+ * Model status. Default is **quick** (size / sidecar only) so Settings open never
+ * freezes hashing multi‑hundred‑MB files. Pass `{ verify: true }` for full SHA-256.
+ */
+export async function voiceModelStatus(
+  model?: VoiceModelId,
+  opts?: { verify?: boolean },
+): Promise<VoiceModelStatus> {
+  return invoke<VoiceModelStatus>('voice_model_status', {
+    args: { model, verify: opts?.verify === true },
+  })
 }
 
 export async function voiceDownloadModel(model: VoiceModelId): Promise<{ path: string }> {

@@ -62,7 +62,30 @@ describe('voiceDownloadStore', () => {
     resolveDl({ path: '/tmp/ggml-base.bin' })
     await expect(p1).resolves.toEqual({ path: '/tmp/ggml-base.bin' })
     expect(useVoiceDownloadStore.getState().isDownloading()).toBe(false)
-    expect(useVoiceDownloadStore.getState().progressByModel.base).toBeUndefined()
+    // Success keeps a short-lived ready progress so the bar does not vanish mid-verify.
+    expect(useVoiceDownloadStore.getState().progressByModel.base?.phase).toBe('ready')
+  })
+
+  it('keeps last percent on error so resume is visible', async () => {
+    voiceDownloadModel.mockRejectedValue(new Error('voice.network:timeout'))
+    useVoiceDownloadStore.getState().applyProgress({
+      model: 'tiny',
+      downloaded: 40_000_000,
+      total: 77_691_713,
+      phase: 'downloading',
+    })
+    // Manually seed active + inflight via startDownload
+    const p = startVoiceModelDownload('tiny')
+    useVoiceDownloadStore.getState().applyProgress({
+      model: 'tiny',
+      downloaded: 40_000_000,
+      total: 77_691_713,
+      phase: 'downloading',
+    })
+    await expect(p).rejects.toThrow(/network/)
+    const prog = useVoiceDownloadStore.getState().progressByModel.tiny
+    expect(prog?.phase).toBe('error')
+    expect(prog?.downloaded).toBe(40_000_000)
   })
 
   it('voiceDownloadProgressPercent uses approx when total missing', () => {

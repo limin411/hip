@@ -155,7 +155,7 @@ describe('VoiceSettingsSection', () => {
     })
   })
 
-  it('does not open microphone on page load (enumerate only)', async () => {
+  it('does not open microphone or enumerate devices on page load', async () => {
     const getUserMedia = vi.fn().mockRejectedValue(new Error('should not be called'))
     const enumerateDevices = vi.fn().mockResolvedValue([
       { kind: 'audioinput', deviceId: 'mic1', label: '', groupId: 'g1' },
@@ -171,8 +171,10 @@ describe('VoiceSettingsSection', () => {
     })
     hipConfigState.config.voice = { enabled: true, model: 'base' }
     render(<VoiceSettingsSection />)
-    await waitFor(() => expect(enumerateDevices).toHaveBeenCalled())
+    // Give effects a tick — must stay hands-off for mic.
+    await waitFor(() => expect(screen.getByTestId('settings-voice-mic-test')).toBeInTheDocument())
     expect(getUserMedia).not.toHaveBeenCalled()
+    expect(enumerateDevices).not.toHaveBeenCalled()
   })
 
   it('allows model download even when whisper binary is missing', async () => {
@@ -206,10 +208,20 @@ describe('VoiceSettingsSection', () => {
     })
     hipConfigState.config.voice = { enabled: true, model: 'base' }
     render(<VoiceSettingsSection />)
-    await waitFor(() => expect(enumerateDevices).toHaveBeenCalled())
+    await waitFor(() => expect(screen.getByTestId('settings-voice-refresh-devices')).toBeInTheDocument())
     expect(getUserMedia).not.toHaveBeenCalled()
+    expect(enumerateDevices).not.toHaveBeenCalled()
     fireEvent.click(screen.getByTestId('settings-voice-refresh-devices'))
     await waitFor(() => expect(getUserMedia).toHaveBeenCalledTimes(1))
+    expect(enumerateDevices).toHaveBeenCalled()
+  })
+
+  it('shows mic test controls when voice is enabled', async () => {
+    hipConfigState.config.voice = { enabled: true, model: 'base' }
+    render(<VoiceSettingsSection />)
+    expect(screen.getByTestId('settings-voice-mic-test')).toBeInTheDocument()
+    expect(screen.getByTestId('settings-voice-mic-test-toggle')).toBeInTheDocument()
+    expect(screen.getByTestId('settings-voice-mic-test-transcribe')).toBeDisabled()
   })
 
   it('keeps download progress when remounting (page switch)', async () => {

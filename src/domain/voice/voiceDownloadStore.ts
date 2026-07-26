@@ -129,26 +129,51 @@ export const useVoiceDownloadStore = create<VoiceDownloadStore>((set, get) => ({
         inflight.delete(model)
         set((s) => {
           const { [model]: _drop, ...restActive } = s.activeModels
-          const { [model]: _dropP, ...restProgress } = s.progressByModel
           const remaining = Object.keys(restActive) as VoiceModelId[]
+          // Keep last progress at ready/100% briefly; page will refresh model status.
+          const prev = s.progressByModel[model]
           return {
             activeModels: restActive as Partial<Record<VoiceModelId, true>>,
-            progressByModel: restProgress,
+            progressByModel: {
+              ...s.progressByModel,
+              [model]: prev
+                ? { ...prev, phase: 'ready', downloaded: prev.total ?? prev.downloaded }
+                : {
+                    model,
+                    downloaded: VOICE_MODEL_APPROX_BYTES[model],
+                    total: VOICE_MODEL_APPROX_BYTES[model],
+                    phase: 'ready',
+                  },
+            },
             primaryModel:
               s.primaryModel === model ? (remaining[0] ?? null) : s.primaryModel,
           }
         })
+        // Drop ready progress after a short tick so the bar does not stick forever.
+        setTimeout(() => {
+          set((s) => {
+            if (s.progressByModel[model]?.phase !== 'ready') return s
+            const { [model]: _dropP, ...restProgress } = s.progressByModel
+            return { progressByModel: restProgress }
+          })
+        }, 1500)
         resolveGate(result)
       })
       .catch((err) => {
         inflight.delete(model)
         set((s) => {
           const { [model]: _drop, ...restActive } = s.activeModels
-          const { [model]: _dropP, ...restProgress } = s.progressByModel
           const remaining = Object.keys(restActive) as VoiceModelId[]
+          const prev = s.progressByModel[model]
+          // Keep last % with phase=error so the bar does not vanish; partial stays on disk for resume.
           return {
             activeModels: restActive as Partial<Record<VoiceModelId, true>>,
-            progressByModel: restProgress,
+            progressByModel: prev
+              ? {
+                  ...s.progressByModel,
+                  [model]: { ...prev, phase: 'error' },
+                }
+              : s.progressByModel,
             primaryModel:
               s.primaryModel === model ? (remaining[0] ?? null) : s.primaryModel,
           }
@@ -189,5 +214,49 @@ export function voiceDownloadProgressPercent(p: VoiceDownloadProgress | null | u
         : 0
   if (!total || total <= 0) return null
   if (p.phase === 'hashing' || p.phase === 'ready') return 100
+  // error / incomplete: show last known percent (capped)
   return Math.min(99, Math.max(0, Math.round((p.downloaded / total) * 100)))
+}
+
+/** Whether the UI should still show the progress bar (active, verifying, or failed mid-way). */
+export function shouldShowVoiceDownloadProgress(
+  downloading: boolean,
+  p: VoiceDownloadProgress | null | undefined,
+): boolean {
+  if (downloading) return true
+  if (!p) return false
+  return p.phase === 'hashing' || p.phase === 'ready' || p.phase === 'error' || p.phase === 'downloading'
+}
+
+/** Seed UI progress from a `.partial` left on disk (resume). Idempotent. */
+export function seedProgressFromPartial(
+  model: VoiceModelId,
+  partialBytes: number,
+  approxBytes?: number,
+): void {
+  if (partialBytes <= 0) return
+  const s = useVoiceDownloadStore.getState()
+  if (s.activeModels[model] || s.progressByModel[model]?.phase === 'downloading') return
+  const total = approxBytes && approxBytes > 0 ? approxBytes : VOICE_MODEL_APPROX_BYTES[model]
+  const prev = s.progressByModel[model]
+  if (
+    prev &&
+    prev.downloaded === partialBytes &&
+    (prev.total ?? 0) === total &&
+    (prev.phase === 'error' || prev.phase === 'downloading')
+  ) {
+    return
+  }
+  useVoiceDownloadStore.setState({
+    progressByModel: {
+      ...s.progressByModel,
+      [model]: {
+        model,
+        downloaded: partialBytes,
+        total,
+        phase: 'error', // paused / incomplete — not actively downloading
+      },
+    },
+    primaryModel: s.primaryModel ?? model,
+  })
 }

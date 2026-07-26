@@ -15,6 +15,11 @@
 #   # or:
 #   powershell -ExecutionPolicy Bypass -File scripts/package-windows.ps1
 #
+# Voice engine (whisper-cli):
+#   Release packages bundle the engine by default (models still download on demand).
+#   Skip: $env:HIP_BUNDLE_WHISPER='0'; yarn package:windows
+#   Force rebuild engine: $env:HIP_WHISPER_REBUILD='1'
+#
 # PowerShell 5.1 safe: ASCII-only, no double-quoted [tag] literals.
 
 $ErrorActionPreference = 'Stop'
@@ -28,6 +33,33 @@ Write-Host '==> hip package:windows'
 if ($env:OS -ne 'Windows_NT') {
     Write-Error 'error: package-windows.ps1 must run on Windows'
     exit 1
+}
+
+# Release default: bundle whisper-cli. Models stay opt-in (Settings download).
+$bundleWhisper = if ($null -ne $env:HIP_BUNDLE_WHISPER -and $env:HIP_BUNDLE_WHISPER -ne '') {
+    $env:HIP_BUNDLE_WHISPER
+} else {
+    '1'
+}
+if ($bundleWhisper -eq '1') {
+    Write-Host '==> bundling whisper-cli (release default; HIP_BUNDLE_WHISPER=0 to skip)'
+    & powershell -ExecutionPolicy Bypass -File (Join-Path $ScriptDir 'make-whisper-bin.ps1')
+    if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+    $rustcOut = rustc -vV 2>&1 | Out-String
+    $Triple = if ($env:HIP_WHISPER_TRIPLE) {
+        $env:HIP_WHISPER_TRIPLE
+    } else {
+        if ($rustcOut -match 'host:\s+(\S+)') { $Matches[1] } else { 'x86_64-pc-windows-msvc' }
+    }
+    $WhisperBin = Join-Path $RootDir ("src-tauri\resources\whisper\$Triple\whisper-cli.exe")
+    if (-not (Test-Path $WhisperBin)) {
+        Write-Error ("error: expected whisper-cli at $WhisperBin after make-whisper-bin.ps1")
+        exit 1
+    }
+    $WhisperSize = (Get-Item $WhisperBin).Length
+    Write-Host ("    staged: $WhisperBin ($WhisperSize bytes)")
+} else {
+    Write-Host '==> HIP_BUNDLE_WHISPER=0 - skipping whisper-cli'
 }
 
 # ── 1. Production sidecar ───────────────────────────────────────────────────

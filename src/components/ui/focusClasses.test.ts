@@ -4,18 +4,18 @@ import { focusChrome, focusField, focusFieldWithin } from './focusClasses'
 import { inputClassName } from './Input'
 
 describe('focusClasses allowlist', () => {
-  it('focusField is soft accent Field geometry', () => {
-    expect(focusField).toContain('focus-visible:border-accent')
-    expect(focusField).toContain('focus-visible:ring-[3px]')
-    expect(focusField).toContain('focus-visible:ring-accent/10')
+  it('focusField is outline-only (no tinted chrome)', () => {
+    expect(focusField).toBe('focus-visible:outline-none')
+    expect(focusField).not.toContain('border-accent')
+    expect(focusField).not.toContain('ring-accent')
+    expect(focusField).not.toContain('ring-ink')
     expect(focusField).not.toContain('ring-focus-ring')
-    expect(focusField).not.toContain('ring-accent/60')
   })
 
-  it('focusFieldWithin matches Field ring alpha for containers', () => {
-    expect(focusFieldWithin).toContain('focus-within:border-accent')
-    expect(focusFieldWithin).toContain('focus-within:ring-[3px]')
-    expect(focusFieldWithin).toContain('focus-within:ring-accent/10')
+  it('focusFieldWithin has no focus chrome', () => {
+    expect(focusFieldWithin).toBe('')
+    expect(focusFieldWithin).not.toContain('border-accent')
+    expect(focusFieldWithin).not.toContain('ring-')
   })
 
   it('focusChrome is quiet ink ring only', () => {
@@ -26,7 +26,8 @@ describe('focusClasses allowlist', () => {
   })
 
   it('inputClassName embeds focusField fragments', () => {
-    expect(inputClassName).toContain('focus-visible:border-accent')
-    expect(inputClassName).toContain('focus-visible:ring-accent/10')
+    expect(inputClassName).toContain('focus-visible:outline-none')
+    expect(inputClassName).not.toContain('border-accent')
+    expect(inputClassName).not.toContain('ring-accent')
   })
 })

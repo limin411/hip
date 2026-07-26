@@ -801,6 +801,35 @@ describe('workspace diff', () => {
     expect(json).toContain('AGENT_ERROR')
   })
 
+  it('seedRoundtableCouncil adds five council seats and edges meta', () => {
+    const t = new FakeTransport()
+    const svc = new SessionService(t)
+    useDomainStore.setState({
+      sessions: [
+        {
+          id: 's1',
+          config: { ...DEFAULT_CONFIG, surface: 'chat' },
+          title: 't',
+          preview: '',
+          updatedAtMs: 0,
+          loaded: true,
+          messages: [],
+          status: 'idle',
+          error: null,
+        },
+      ],
+      activeSessionId: 's1',
+    })
+    const { turnId } = svc.seedRoundtableCouncil('s1')
+    const sess = useDomainStore.getState().sessions.find((s) => s.id === 's1')!
+    const msg = sess.messages.find((m) => m.id === turnId)
+    expect(msg?.roundtable?.engine).toBe('council')
+    expect(msg?.roundtable?.edges?.length).toBeGreaterThanOrEqual(1)
+    const runs = msg?.agentRuns ?? []
+    expect(runs.some((r) => r.agentId === 'roundtable:strategist')).toBe(true)
+    expect(runs.filter((r) => r.agentId.startsWith('roundtable:')).length).toBe(5)
+  })
+
   it('seedAgentCollaboration adds supervisor and coder runs with tool', () => {
     const t = new FakeTransport()
     const svc = new SessionService(t)

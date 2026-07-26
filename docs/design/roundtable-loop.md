@@ -7,6 +7,7 @@
 | **Status** | Implemented (P2a–P2c) — loop + parallel mode + meta/timeline + FE fold/status |
 | **Audience** | hip core (sidecar session / protocol / React UI) |
 | **Depends on** | [`roundtable-mode.md`](./roundtable-mode.md)（空态入口、产品语义、v1 sim framing） |
+| **Next** | 多智能体议会 / 右侧 Agents：[`roundtable-council.md`](./roundtable-council.md) |
 | **Reference** | hip subagent timeline · ActivityBar lanes · plan-mode one-shot enter |
 
 ---
@@ -552,3 +553,4 @@ N=2 × 3 speakers → ~1 route + 1 plan + 2 open + 6 advisor + 2 stage + 1 decid
 |------|------|
 | 2026-07-26 | Initial draft (Chair-loop, state machine, P2a slice) |
 | 2026-07-26 | P2a implemented under `packages/sidecar/src/session/roundtable/`; default engine `loop` |
+| 2026-07-26 | P2b/P2c polish; council multi-agent design → [`roundtable-council.md`](./roundtable-council.md) |

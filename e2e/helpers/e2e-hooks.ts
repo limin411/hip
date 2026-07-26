@@ -35,6 +35,7 @@ type HipE2E = {
   simulateTurnCancelled: (s: string) => void
   simulateSessionError: (s: string, code?: string, message?: string) => void
   seedAgentCollaboration: (s: string) => { turnId: string; callId: string }
+  seedRoundtableCouncil?: (s: string) => { turnId: string }
   getSessionDebugBundleJson: () => string | null
   simulatePermissionRequest: (s: string) => { turnId: string; requestId: string }
   seedCheckpoints: (s: string) => { count: number }
@@ -174,6 +175,15 @@ export async function seedAgentCollaboration(sessionId: string): Promise<{ turnI
     const hooks = (window as unknown as { __hipE2E?: HipE2E }).__hipE2E
     if (!hooks) throw new Error('__hipE2E missing')
     return hooks.seedAgentCollaboration(id)
+  }, sessionId)
+}
+
+/** Seed completed council roundtable turn (5 seats + edges) for Agents panel e2e. */
+export async function seedRoundtableCouncil(sessionId: string): Promise<{ turnId: string }> {
+  return browser.execute((id: string) => {
+    const hooks = (window as unknown as { __hipE2E?: HipE2E }).__hipE2E
+    if (!hooks?.seedRoundtableCouncil) throw new Error('__hipE2E.seedRoundtableCouncil missing')
+    return hooks.seedRoundtableCouncil(id)
   }, sessionId)
 }
 

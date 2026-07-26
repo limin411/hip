@@ -23,6 +23,8 @@ describe('roundtable detect', () => {
     const wire = `${ROUNDTABLE_MARKER}\nx${ROUNDTABLE_SEP}q`
     process.env.HIP_ROUNDTABLE_ENGINE = 'loop'
     expect(shouldEnterRoundtableLoop(wire)).toBe(true)
+    process.env.HIP_ROUNDTABLE_ENGINE = 'council'
+    expect(shouldEnterRoundtableLoop(wire)).toBe(true)
     process.env.HIP_ROUNDTABLE_ENGINE = 'sim'
     expect(shouldEnterRoundtableLoop(wire)).toBe(false)
     expect(shouldEnterRoundtableLoop('plain')).toBe(false)

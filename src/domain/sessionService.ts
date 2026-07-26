@@ -784,6 +784,77 @@ export class SessionService {
     return { turnId, callId }
   }
 
+  /**
+   * E2E: seed a completed council roundtable turn so Agents panel shows
+   * 5 seats + edges without a live LLM (docs/design/roundtable-council.md).
+   */
+  seedRoundtableCouncil(sessionId: string): { turnId: string } {
+    const turnId = `e2e-council-${nanoid(8)}`
+    const now = Date.now()
+    const seats = [
+      { id: 'roundtable:strategist', name: 'Strategist', out: 'Go long-term path A.' },
+      { id: 'roundtable:skeptic', name: 'Skeptic', out: 'Path A underestimates risk.' },
+      { id: 'roundtable:creative', name: 'Creative', out: 'Try a hybrid framing.' },
+      { id: 'roundtable:operator', name: 'Operator', out: 'Phase delivery in two steps.' },
+      { id: 'roundtable:audience', name: 'Audience', out: 'Users need reliability first.' },
+    ] as const
+    const agentRuns = [
+      {
+        agentId: 'supervisor',
+        role: 'supervisor' as const,
+        output: 'Council decision: phased A',
+        startedAt: now - 5000,
+        finishedAt: now,
+        seq: 0,
+        messageId: turnId,
+        name: 'hip',
+      },
+      ...seats.map((s, i) => ({
+        agentId: s.id,
+        role: 'subagent' as const,
+        output: s.out,
+        startedAt: now - 4000 + i * 100,
+        finishedAt: now - 3000 + i * 100,
+        seq: i + 1,
+        messageId: turnId,
+        parentAgentId: 'supervisor',
+        name: s.name,
+        taskInput: 'e2e council focus',
+      })),
+    ]
+    this.receive({
+      type: 'message:complete',
+      sessionId,
+      message: {
+        id: turnId,
+        role: 'assistant',
+        content:
+          '## Meeting plan\n- Rounds planned: 2\n\n## Decision (hip)\nPhased path A.\n\n## Next steps\n1. spike\n',
+        agentId: 'supervisor',
+        timestamp: now,
+        agentRuns,
+        roundtable: {
+          engine: 'council',
+          convened: true,
+          roundsPlanned: 2,
+          roundsRan: 2,
+          advisorCalls: 5,
+          phase: 'done',
+          edges: [
+            {
+              round: 1,
+              from: 'skeptic',
+              to: 'strategist',
+              relation: 'rebut',
+              summary: 'underestimates risk',
+            },
+          ],
+        },
+      },
+    })
+    return { turnId }
+  }
+
   /** E2E H4: same redacted JSON builder as ChatPane copy-debug (avoids clipboard flake). */
   getSessionDebugBundleJson(): string | null {
     const { activeSessionId, sessions } = useDomainStore.getState()
@@ -2413,6 +2484,7 @@ export type HipE2EHooks = {
   simulateTurnCancelled: (sessionId: string) => void
   simulateSessionError: (sessionId: string, code?: string, message?: string) => void
   seedAgentCollaboration: (sessionId: string) => { turnId: string; callId: string }
+  seedRoundtableCouncil: (sessionId: string) => { turnId: string }
   getSessionDebugBundleJson: () => string | null
   simulatePermissionRequest: (sessionId: string) => { turnId: string; requestId: string }
   seedCheckpoints: (sessionId: string) => { count: number }
@@ -2561,6 +2633,7 @@ function installE2eHooks(svc: SessionService): void {
     simulateTurnCancelled: (sessionId) => svc.simulateTurnCancelled(sessionId),
     simulateSessionError: (sessionId, code, message) => svc.simulateSessionError(sessionId, code, message),
     seedAgentCollaboration: (sessionId) => svc.seedAgentCollaboration(sessionId),
+    seedRoundtableCouncil: (sessionId) => svc.seedRoundtableCouncil(sessionId),
     getSessionDebugBundleJson: () => svc.getSessionDebugBundleJson(),
     simulatePermissionRequest: (sessionId) => svc.simulatePermissionRequest(sessionId),
     seedCheckpoints: (sessionId) => svc.seedCheckpoints(sessionId),

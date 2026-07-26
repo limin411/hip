@@ -210,6 +210,13 @@ export const en = {
           deciding: 'Roundtable · hip deciding…',
           done: 'Roundtable · done',
         },
+        councilLabel: 'Council',
+        councilSeats: 'Council seats',
+        seatWaiting: 'Waiting to speak',
+        edgesTitle: 'Discussion edges',
+        edgeRebut: 'rebuts',
+        edgeSupport: 'supports',
+        edgeQuestion: 'asks',
         personas: {
           strategist: 'Strategist',
           skeptic: 'Skeptic',

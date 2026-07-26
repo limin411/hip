@@ -21,10 +21,14 @@ import {
   chairUserForRoute,
   chairUserForStage,
 } from './prompts.js'
+import { dedupeEdges, edgesFromEnvelope, type CouncilEdge } from './edges.js'
+import { councilAgentId } from './ids.js'
 import { renderEventMarkdown } from './render.js'
 import { parseChairActionFromText } from './schema.js'
+import { parseSpeechEnvelope } from './speech-schema.js'
 import type {
   ChairAction,
+  PersonaId,
   RunRoundtableArgs,
   RoundtableEvent,
   RoundtableResult,
@@ -60,6 +64,12 @@ export async function runRoundtable(args: RunRoundtableArgs): Promise<Roundtable
   let roundsPlanned: number | undefined
   let roundsRan = 0
   const stages: StageRecord[] = []
+  const allEdges: CouncilEdge[] = []
+  const councilMode = Boolean(args.councilMode || args.advisorHooks)
+  const edgeField = () => {
+    const e = dedupeEdges(allEdges)
+    return e.length ? { edges: e } : {}
+  }
 
   const emit = (ev: RoundtableEvent) => {
     args.onEvent?.(ev)
@@ -181,29 +191,54 @@ export async function runRoundtable(args: RunRoundtableArgs): Promise<Roundtable
       const remainingSlots = Math.max(0, maxAdvisor - advisorCalls)
       const speakersThisRound = speakers.slice(0, remainingSlots)
 
+      const runOneAdvisor = async (
+        speaker: PersonaId,
+        prior: SpeechRecord[],
+        tagSuffix: string,
+      ): Promise<SpeechRecord> => {
+        const agentId = councilAgentId(speaker)
+        await args.advisorHooks?.onStart?.({
+          speaker,
+          round: r,
+          focus: open.focus,
+          agentId,
+        })
+        const speech = await args.llm.complete({
+          system: advisorSystemPrompt(speaker, lang),
+          user: advisorUserPrompt({
+            issue: args.issue,
+            minutes,
+            focus: open.focus,
+            priorThisRound: prior,
+            persona: speaker,
+            lang,
+          }),
+          signal,
+          tag: `advisor:${speaker}${tagSuffix}`,
+        })
+        const raw = speech.trim() || '…'
+        const envelope = councilMode ? parseSpeechEnvelope(raw) : { acts: [], prose: raw }
+        const content = envelope.prose.trim() || raw
+        if (councilMode) {
+          allEdges.push(...edgesFromEnvelope(r, speaker, envelope))
+        }
+        await args.advisorHooks?.onFinish?.({
+          speaker,
+          round: r,
+          focus: open.focus,
+          agentId,
+          content: raw,
+          prose: content,
+        })
+        return { speaker, content }
+      }
+
       if (speakMode === 'parallel_then_synth' && speakersThisRound.length > 1) {
-        // Half-parallel: concurrent independent takes (no cross-talk within the round).
         throwIfBudget()
         const results = await Promise.all(
-          speakersThisRound.map(async (speaker) => {
-            const speech = await args.llm.complete({
-              system: advisorSystemPrompt(speaker, lang),
-              user: advisorUserPrompt({
-                issue: args.issue,
-                minutes,
-                focus: open.focus,
-                priorThisRound: [],
-                persona: speaker,
-                lang,
-              }),
-              signal,
-              tag: `advisor:${speaker}:parallel`,
-            })
-            return { speaker, content: speech.trim() || '…' }
-          }),
+          speakersThisRound.map((speaker) => runOneAdvisor(speaker, [], ':parallel')),
         )
         advisorCalls += results.length
-        // Emit in chair-declared order for stable transcript
         for (const speaker of speakersThisRound) {
           const hit = results.find((x) => x.speaker === speaker) ?? {
             speaker,
@@ -217,22 +252,9 @@ export async function runRoundtable(args: RunRoundtableArgs): Promise<Roundtable
           throwIfBudget()
           if (advisorCalls >= maxAdvisor) break
           advisorCalls++
-          const speech = await args.llm.complete({
-            system: advisorSystemPrompt(speaker, lang),
-            user: advisorUserPrompt({
-              issue: args.issue,
-              minutes,
-              focus: open.focus,
-              priorThisRound: roundLocal,
-              persona: speaker,
-              lang,
-            }),
-            signal,
-            tag: `advisor:${speaker}`,
-          })
-          const content = speech.trim() || '…'
-          roundLocal.push({ speaker, content })
-          emit({ kind: 'roundtable.speech', round: r, speaker, content })
+          const rec = await runOneAdvisor(speaker, roundLocal, '')
+          roundLocal.push(rec)
+          emit({ kind: 'roundtable.speech', round: r, speaker, content: rec.content })
         }
       }
 
@@ -305,6 +327,7 @@ export async function runRoundtable(args: RunRoundtableArgs): Promise<Roundtable
       earlyExit,
       roundsPlanned,
       roundsRan,
+      ...edgeField(),
     }
   } catch (e) {
     const reason = e instanceof Error ? e.message : String(e)
@@ -340,6 +363,7 @@ export async function runRoundtable(args: RunRoundtableArgs): Promise<Roundtable
         earlyExit: true,
         roundsPlanned,
         roundsRan,
+        ...edgeField(),
       }
     }
 
@@ -363,6 +387,7 @@ export async function runRoundtable(args: RunRoundtableArgs): Promise<Roundtable
         roundsPlanned,
         roundsRan,
         abortReason: 'cancelled',
+        ...edgeField(),
       }
     }
     // Best-effort decide note on hard failure if we already convened
@@ -383,6 +408,7 @@ export async function runRoundtable(args: RunRoundtableArgs): Promise<Roundtable
       roundsPlanned,
       roundsRan,
       abortReason: reason,
+      ...edgeField(),
     }
   }
 }

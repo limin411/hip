@@ -132,7 +132,12 @@ export function advisorSystemPrompt(persona: PersonaId, lang: RoundtableLang): s
   const label = personaLabel(persona, lang)
   return `You are ${label} in a hip roundtable meeting.
 Speak only from your role (2–5 sentences). Address other speakers when relevant.
-Do not claim final authority. No tools. No JSON.
+Do not claim final authority. No tools.
+
+Prefer JSON:
+{"prose":"your short speech","acts":[{"kind":"open|support|rebut|revise|question","claim":"...","target":"strategist|skeptic|creative|operator|audience"}]}
+Use rebut/support/question with target when reacting to another advisor.
+If you cannot emit JSON, plain prose is acceptable.
 Language: ${lang}.`
 }
 

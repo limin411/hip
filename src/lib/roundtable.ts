@@ -1,9 +1,8 @@
 /**
  * Chat roundtable framing (empty-state one-shot).
- * Wire marker is consumed by the sidecar loop engine by default
- * (`packages/sidecar/src/session/roundtable/`, docs/design/roundtable-loop.md).
- * Set HIP_ROUNDTABLE_ENGINE=sim to keep a single-completion path that uses this
- * full multi-round frame as the model prompt instead.
+ * Wire marker is consumed by the sidecar engine by default (council multi-agent;
+ * `packages/sidecar/src/session/roundtable/`, docs/design/roundtable-council.md).
+ * HIP_ROUNDTABLE_ENGINE=loop|sim for chair-only loop or single-completion sim.
  * See also docs/design/roundtable-mode.md.
  */
 

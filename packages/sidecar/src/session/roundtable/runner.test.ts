@@ -8,6 +8,69 @@ function j(obj: unknown): string {
 }
 
 describe('runRoundtable', () => {
+  it('council hooks fire on advisor speech and collect edges', async () => {
+    const starts: string[] = []
+    const finishes: string[] = []
+    const llm = scriptedCompleteFns([
+      j({ type: 'route', convene: true }),
+      j({ type: 'plan', rounds: 2, agenda: ['a', 'b'], rationale: 'r' }),
+      j({
+        type: 'open_round',
+        round: 1,
+        focus: 'f',
+        speakers: ['strategist', 'skeptic'],
+      }),
+      JSON.stringify({
+        prose: 'Go big.',
+        acts: [{ kind: 'open', claim: 'Go big' }],
+      }),
+      JSON.stringify({
+        prose: 'Too risky.',
+        acts: [
+          {
+            kind: 'rebut',
+            claim: 'Too risky',
+            target: 'strategist',
+            attack: 'cost',
+          },
+        ],
+      }),
+      j({ type: 'stage', round: 1, agreed: ['split'], open: [], nextFocus: 'x' }),
+      j({
+        type: 'open_round',
+        round: 2,
+        focus: 'x',
+        speakers: ['operator'],
+      }),
+      'Ship phased.',
+      j({ type: 'stage', round: 2, agreed: ['phased'], open: [] }),
+      j({ type: 'decide', decision: 'phased', residual: [], nextSteps: ['1'] }),
+    ])
+    const result = await runRoundtable({
+      issue: 'api rewrite',
+      language: 'en',
+      signal: new AbortController().signal,
+      llm,
+      councilMode: true,
+      advisorHooks: {
+        onStart: ({ agentId }) => {
+          starts.push(agentId)
+        },
+        onFinish: ({ agentId }) => {
+          finishes.push(agentId)
+        },
+      },
+    })
+    expect(result.advisorCalls).toBe(3)
+    expect(starts).toEqual([
+      'roundtable:strategist',
+      'roundtable:skeptic',
+      'roundtable:operator',
+    ])
+    expect(finishes).toEqual(starts)
+    expect(result.edges?.some((e) => e.relation === 'rebut')).toBe(true)
+  })
+
   it('route skip → normal reply, zero advisor calls', async () => {
     const events: RoundtableEvent[] = []
     const llm = scriptedCompleteFns([

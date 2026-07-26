@@ -202,6 +202,13 @@ export const zhCN = {
           deciding: '圆桌 · hip 拍板中…',
           done: '圆桌 · 已结束',
         },
+        councilLabel: '议会',
+        councilSeats: '议会席位',
+        seatWaiting: '等待发言',
+        edgesTitle: '交锋关系',
+        edgeRebut: '反驳',
+        edgeSupport: '附议',
+        edgeQuestion: '提问',
         personas: {
           strategist: '战略家',
           skeptic: '怀疑论者',

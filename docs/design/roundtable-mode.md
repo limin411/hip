@@ -96,7 +96,7 @@
 
 **输出骨架：** 会议规划 → Round 1…N（对话体 + Stage conclusion）→ Decision (hip) → 后续步骤。
 
-**实现注：** 默认 **loop 引擎**（真多轮，见 [`roundtable-loop.md`](./roundtable-loop.md)）。`HIP_ROUNDTABLE_ENGINE=sim` 时回退为单 completion 模拟多轮（本文件 v1 frame）。
+**实现注：** 默认 **loop 引擎**（真多轮，见 [`roundtable-loop.md`](./roundtable-loop.md)）。`HIP_ROUNDTABLE_ENGINE=sim` 时回退为单 completion 模拟多轮（本文件 v1 frame）。多智能体议会 + 右侧 Agents：[`roundtable-council.md`](./roundtable-council.md)。
 
 ---
 
@@ -200,7 +200,7 @@ export const ROUNDTABLE_STARTER = true
 
 - P2: sidecar inject / `displayContent` 协议字段  
 - P2: assistant meta `roundtable: skipped | convened | rounds=N`  
-- P2: **真多轮 LLM loop** — 完整设计见 **[`roundtable-loop.md`](./roundtable-loop.md)**（Chair 状态机、ChairAction schema、P2a 切片）  
-- P3: three.js 空态装饰环  
-- P3: 阶段结论 / 回合 heading 角色色与折叠 UI  
+- P2: **真多轮 LLM loop** — 见 **[`roundtable-loop.md`](./roundtable-loop.md)**（已实现 P2a–P2c）  
+- P3: **多智能体议会 Council** — 见 **[`roundtable-council.md`](./roundtable-council.md)**（真 agent、反驳边、投票、右侧 Agents）  
+- P3+: three.js 空态装饰环（可选）  
 

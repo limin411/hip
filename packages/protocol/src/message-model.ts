@@ -13,9 +13,18 @@ export type ContentPart =
   | { type: 'text'; text: string }
   | { type: 'image_url'; image_url: { url: string } }
 
-/** Assistant turn metadata when the roundtable loop engine ran (docs/design/roundtable-loop.md). */
+/** Discussion edge between council advisors (docs/design/roundtable-council.md). */
+export interface RoundtableEdge {
+  round: number
+  from: string
+  to: string
+  relation: 'support' | 'rebut' | 'question'
+  summary: string
+}
+
+/** Assistant turn metadata when the roundtable engine ran. */
 export interface RoundtableMeta {
-  engine: 'loop' | 'sim'
+  engine: 'loop' | 'sim' | 'council'
   convened: boolean
   roundsPlanned?: number
   roundsRan?: number
@@ -23,6 +32,17 @@ export interface RoundtableMeta {
   advisorCalls?: number
   /** Final runner phase */
   phase?: 'done' | 'aborted'
+  /** Council: structured discussion edges */
+  edges?: RoundtableEdge[]
+  /** Council: optional vote casts */
+  votes?: Array<{
+    voter: string
+    optionId: string
+    strength: 1 | 2 | 3
+    reason?: string
+  }>
+  tally?: Array<{ optionId: string; label: string; score: number }>
+  hipOverruledMajority?: boolean
 }
 
 export interface Message {

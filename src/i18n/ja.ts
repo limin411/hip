@@ -190,6 +190,13 @@ export const ja = {
         "deciding": "円卓 · hip が決定中…",
         "done": "円卓 · 完了"
       },
+      "councilLabel": "評議会",
+      "councilSeats": "評議会席",
+      "seatWaiting": "発言待ち",
+      "edgesTitle": "議論の関係",
+      "edgeRebut": "反論",
+      "edgeSupport": "支持",
+      "edgeQuestion": "質問",
       "personas": {
         "strategist": "戦略家",
         "skeptic": "懐疑派",

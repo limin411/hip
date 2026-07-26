@@ -9,15 +9,18 @@ export const MAX_ADVISOR_CALLS_PER_MEETING = 12
 export const MAX_CHAIR_ACTIONS = 24
 export const CHAIR_PARSE_RETRIES = 2
 
-export type RoundtableEngine = 'sim' | 'loop'
+export type RoundtableEngine = 'sim' | 'loop' | 'council'
 
 /**
  * Default engine when a roundtable-framed first message is detected.
- * Override with HIP_ROUNDTABLE_ENGINE=sim|loop.
+ * Override with HIP_ROUNDTABLE_ENGINE=sim|loop|council.
+ * Default **council** (multi-agent + Agents panel); use loop for chair-only path.
  */
 export function resolveRoundtableEngine(
   env: NodeJS.ProcessEnv = process.env,
 ): RoundtableEngine {
-  const raw = (env.HIP_ROUNDTABLE_ENGINE ?? 'loop').trim().toLowerCase()
-  return raw === 'sim' ? 'sim' : 'loop'
+  const raw = (env.HIP_ROUNDTABLE_ENGINE ?? 'council').trim().toLowerCase()
+  if (raw === 'sim') return 'sim'
+  if (raw === 'loop') return 'loop'
+  return 'council'
 }

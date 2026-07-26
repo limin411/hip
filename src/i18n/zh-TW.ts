@@ -198,6 +198,13 @@ export const zhTW = {
         "deciding": "圓桌 · hip 拍板中…",
         "done": "圓桌 · 已結束"
       },
+      "councilLabel": "議會",
+      "councilSeats": "議會席位",
+      "seatWaiting": "等待發言",
+      "edgesTitle": "交鋒關係",
+      "edgeRebut": "反駁",
+      "edgeSupport": "附議",
+      "edgeQuestion": "提問",
       "personas": {
         "strategist": "戰略家",
         "skeptic": "懷疑論者",

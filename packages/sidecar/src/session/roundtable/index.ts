@@ -11,11 +11,15 @@ export {
   stripRoundtableFrame,
   resolveRoundtableLang,
   shouldEnterRoundtableLoop,
+  isCouncilEngine,
 } from './detect.js'
 export { runRoundtable } from './runner.js'
 export { tryRunRoundtableTurn } from './turn.js'
 export { parseChairActionFromText, extractJsonObject } from './schema.js'
 export { completeFnsFromModelRunner, scriptedCompleteFns } from './complete.js'
+export { councilAgentId, isCouncilAgentId, councilDisplayName } from './ids.js'
+export { parseSpeechEnvelope, formatSpeechOutput } from './speech-schema.js'
+export { edgesFromEnvelope, dedupeEdges } from './edges.js'
 export type {
   ChairAction,
   PersonaId,

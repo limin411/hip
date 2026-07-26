@@ -190,6 +190,13 @@ export const ko = {
         "deciding": "원탁 · hip 결정 중…",
         "done": "원탁 · 완료"
       },
+      "councilLabel": "의회",
+      "councilSeats": "의회 좌석",
+      "seatWaiting": "발언 대기",
+      "edgesTitle": "토론 관계",
+      "edgeRebut": "반박",
+      "edgeSupport": "지지",
+      "edgeQuestion": "질문",
       "personas": {
         "strategist": "전략가",
         "skeptic": "회의론자",

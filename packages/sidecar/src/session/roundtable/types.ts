@@ -117,6 +117,14 @@ export interface StageRecord {
   nextFocus?: string
 }
 
+export interface RoundtableEdgeResult {
+  round: number
+  from: string
+  to: string
+  relation: 'support' | 'rebut' | 'question'
+  summary: string
+}
+
 export interface RoundtableResult {
   phase: 'done' | 'aborted'
   convened: boolean
@@ -127,6 +135,8 @@ export interface RoundtableResult {
   roundsPlanned?: number
   roundsRan?: number
   abortReason?: string
+  /** Council discussion edges */
+  edges?: RoundtableEdgeResult[]
 }
 
 export interface RoundtableCompleteFns {
@@ -139,6 +149,23 @@ export interface RoundtableCompleteFns {
   }) => Promise<string>
 }
 
+export interface AdvisorSpeechHooks {
+  onStart: (p: {
+    speaker: PersonaId
+    round: number
+    focus: string
+    agentId: string
+  }) => void | Promise<void>
+  onFinish: (p: {
+    speaker: PersonaId
+    round: number
+    focus: string
+    agentId: string
+    content: string
+    prose: string
+  }) => void | Promise<void>
+}
+
 export interface RunRoundtableArgs {
   issue: string
   language?: RoundtableLang | string | null
@@ -147,6 +174,10 @@ export interface RunRoundtableArgs {
   onEvent?: (ev: RoundtableEvent) => void
   /** Stream visible markdown chunks (for token:stream). */
   onMarkdownDelta?: (delta: string) => void
+  /** Parse SpeechEnvelope + collect edges (council). */
+  councilMode?: boolean
+  /** Project multi-agent lifecycle (council → agent:started/finished). */
+  advisorHooks?: AdvisorSpeechHooks
   roundsMin?: number
   roundsMax?: number
   maxAdvisorsPerRound?: number

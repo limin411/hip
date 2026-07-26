@@ -26,7 +26,7 @@ export function resolveRoundtableLang(language?: string | null): RoundtableLang 
 }
 
 /**
- * Whether this turn should enter RoundtableRunner (loop engine).
+ * Whether this turn should enter RoundtableRunner (loop or council).
  * sim → false (caller keeps normal agent turn with framed prompt).
  */
 export function shouldEnterRoundtableLoop(
@@ -34,9 +34,13 @@ export function shouldEnterRoundtableLoop(
   opts?: { surface?: string; engine?: ReturnType<typeof resolveRoundtableEngine> },
 ): boolean {
   if (!isRoundtableMessage(userContent)) return false
-  // Roundtable product surface is Chat; if surface is code, still allow if framed
-  // (marker only comes from Chat empty-state today).
   void opts?.surface
   const engine = opts?.engine ?? resolveRoundtableEngine()
-  return engine === 'loop'
+  return engine === 'loop' || engine === 'council'
+}
+
+export function isCouncilEngine(
+  engine?: ReturnType<typeof resolveRoundtableEngine>,
+): boolean {
+  return (engine ?? resolveRoundtableEngine()) === 'council'
 }

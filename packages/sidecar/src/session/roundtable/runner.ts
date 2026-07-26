@@ -215,6 +215,9 @@ export async function runRoundtable(args: RunRoundtableArgs): Promise<Roundtable
           }),
           signal,
           tag: `advisor:${speaker}${tagSuffix}`,
+          onText: (delta) => {
+            args.advisorHooks?.onToken?.({ agentId, delta })
+          },
         })
         const raw = speech.trim() || '…'
         const envelope = councilMode ? parseSpeechEnvelope(raw) : { acts: [], prose: raw }

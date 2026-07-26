@@ -106,9 +106,10 @@ export function AgentCard({ agent, live }: { agent: TurnAgent; live: boolean }) 
   const color = ROLE_COLOR[agent.role]
   const running = live && agent.status === 'running'
   const isError = agent.status === 'error'
-  // Body: collapsed by default; user toggles to inspect tools / output.
+  // Body: collapsed by default, but auto-open while running so live speech is visible
+  // (roundtable council advisors stream into agentRuns.output).
   const [manual, setManual] = useState<boolean | null>(null)
-  const open = manual ?? false
+  const open = manual ?? (live && agent.status === 'running')
   const setScrollTarget = useUiStore((s) => s.setScrollTarget)
 
   const jumpToTurn = () => {
@@ -195,7 +196,7 @@ export function AgentCard({ agent, live }: { agent: TurnAgent; live: boolean }) 
             <ToolTrace tools={agent.tools} onToolClick={agent.messageId ? jumpToTurn : undefined} />
           )}
           {isSubAgent && cleanOutput && (
-            <OutputDisclosure content={cleanOutput} defaultOpen={false} />
+            <OutputDisclosure content={cleanOutput} defaultOpen={running || live} />
           )}
         </div>
       )}

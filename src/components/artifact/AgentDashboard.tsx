@@ -9,6 +9,7 @@ import { useFocusStore } from '@/store/focusStore'
 import { EmptyState } from '@/components/ui/EmptyState'
 import {
   councilEdges,
+  isCouncilLiveAgents,
   isCouncilRoundtable,
   mergeCouncilRoster,
 } from '@/lib/roundtableCouncil'
@@ -65,7 +66,7 @@ export function AgentDashboard() {
   const turnMeta = [
     latest ? t('artifact.timelineView.turn', { n: latest.turnIndex }) : null,
     latest ? formatClockTime(latest.timestamp, locale) : null,
-    isCouncilRoundtable(rtMeta)
+    isCouncilLiveAgents(agents, rtMeta) || isCouncilRoundtable(rtMeta)
       ? t('chat.roundtable.councilLabel')
       : childCount > 0
         ? t('artifact.subAgentCount', { count: childCount })

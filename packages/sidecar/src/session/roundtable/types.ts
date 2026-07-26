@@ -146,6 +146,8 @@ export interface RoundtableCompleteFns {
     user: string
     signal: AbortSignal
     tag: string
+    /** Live text deltas (used by council to stream into Agents panel). */
+    onText?: (delta: string) => void
   }) => Promise<string>
 }
 
@@ -156,6 +158,8 @@ export interface AdvisorSpeechHooks {
     focus: string
     agentId: string
   }) => void | Promise<void>
+  /** Stream partial advisor text into FE agentRuns (token:stream). */
+  onToken?: (p: { agentId: string; delta: string }) => void
   onFinish: (p: {
     speaker: PersonaId
     round: number

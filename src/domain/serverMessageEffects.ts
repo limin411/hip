@@ -137,6 +137,32 @@ export function applyServerMessageEffects(msg: ServerMessage, deps: ServerMessag
       deps.resyncActiveIfRunning()
       return
 
+    case 'agent:started': {
+      // Roundtable council: open Chat Agents panel so multi-agent speech is visible live.
+      // Respect user panel-dismiss for this turn (same as write-follow auto-open).
+      if (
+        typeof msg.agentId === 'string' &&
+        msg.agentId.startsWith('roundtable:') &&
+        msg.role === 'subagent'
+      ) {
+        const domain = useDomainStore.getState()
+        const focus = useFocusStore.getState()
+        const sess = domain.sessions.find((s) => s.id === msg.sessionId)
+        if (
+          sess &&
+          surfaceOf(sess.config) === 'chat' &&
+          domain.activeSessionId === msg.sessionId &&
+          !focus.panelDismissedThisTurn
+        ) {
+          const ui = useUiStore.getState()
+          ui.setChatActiveTab('agents')
+          domain.setSessionChatPanelOpen(msg.sessionId, true)
+          focus.setFocusedAgentId(msg.agentId)
+        }
+      }
+      return
+    }
+
     case 'error':
       // Dedicated soft-reject from session:setAgent (running or already switching).
       if (msg.code === 'AGENT_BUSY') {

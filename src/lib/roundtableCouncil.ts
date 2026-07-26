@@ -29,6 +29,12 @@ export function isCouncilRoundtable(meta?: RoundtableMeta | null): boolean {
   return meta?.engine === 'council' && meta.convened === true
 }
 
+/** Live council detection before message:complete meta arrives. */
+export function isCouncilLiveAgents(agents: TurnAgent[], meta?: RoundtableMeta | null): boolean {
+  if (isCouncilRoundtable(meta)) return true
+  return agents.some((a) => a.agentId.startsWith(COUNCIL_AGENT_PREFIX))
+}
+
 export type CouncilRosterStatus = TurnAgent['status'] | 'waiting'
 
 export interface CouncilRosterSeat {
@@ -44,7 +50,7 @@ export function mergeCouncilRoster(
   agents: TurnAgent[],
   meta?: RoundtableMeta | null,
 ): CouncilRosterSeat[] | null {
-  if (!isCouncilRoundtable(meta)) return null
+  if (!isCouncilLiveAgents(agents, meta)) return null
   const byId = new Map(agents.map((a) => [a.agentId, a]))
   return COUNCIL_PERSONAS.map((persona) => {
     const agentId = councilAgentId(persona)

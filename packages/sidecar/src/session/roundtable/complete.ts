@@ -22,12 +22,14 @@ function aiText(msg: AIMessage): string {
 /** Build LLM complete fns from session ModelRunner (no tools). */
 export function completeFnsFromModelRunner(runner: ModelRunner): RoundtableCompleteFns {
   return {
-    async complete({ system, user, signal }) {
+    async complete({ system, user, signal, onText }) {
       const msg = await runner.run([new SystemMessage(system), new HumanMessage(user)], {
         tools: [],
         bindTools: false,
         signal,
-        onText: () => {},
+        onText: (delta) => {
+          if (delta) onText?.(delta)
+        },
         onReasoning: () => {},
       })
       return aiText(msg)

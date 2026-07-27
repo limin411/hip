@@ -1,7 +1,6 @@
 import type { SessionConfig } from '@hip/protocol'
 import { HumanMessage, SystemMessage } from '@langchain/core/messages'
 import { getActiveModel, cheapModelFor } from '../config/providers.js'
-import { withoutLangSmithTracing } from '../observability/langsmith.js'
 import { buildChatModel } from './model-factory.js'
 
 const TITLE_LEN = 40
@@ -40,13 +39,10 @@ export function buildDefaultTitleGenerator(_config: SessionConfig): TitleGenerat
     const { providerID, modelID, baseURL } = getActiveModel()
     const model = buildChatModel({ providerID, modelID: cheapModelFor(providerID, modelID), baseURL })
     // Title refine is a product side-effect, not part of the agent turn graph.
-    // Force-off LangSmith so it never posts a root run (hip.model / hip.title).
-    const res = await withoutLangSmithTracing(() =>
-      model.invoke([
-        new SystemMessage(TITLE_SYSTEM_PROMPT),
-        new HumanMessage(`${firstUserMessage}\n\n[assistant reply]: ${firstReply.slice(0, 200)}`),
-      ]),
-    )
+    const res = await model.invoke([
+      new SystemMessage(TITLE_SYSTEM_PROMPT),
+      new HumanMessage(`${firstUserMessage}\n\n[assistant reply]: ${firstReply.slice(0, 200)}`),
+    ])
     return typeof res.content === 'string' ? res.content : ''
   }
 }

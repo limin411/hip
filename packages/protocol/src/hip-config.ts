@@ -104,33 +104,6 @@ export interface TaskRuntimeConfig {
 }
 
 /**
- * Optional `[langsmith]` section in hip.toml.
- * When `enabled = true`, the sidecar exports traces to LangSmith (LangChain auto-tracing).
- * All fields optional; env vars (`LANGSMITH_*`) still override when already set.
- *
- * ```toml
- * [langsmith]
- * enabled = true
- * api_key = "lsv2_…"
- * project = "hip"
- * endpoint = "https://eu.api.smith.langchain.com"
- * ```
- */
-export interface LangSmithConfig {
-  /** Master switch. Default false when section/field omitted. */
-  enabled?: boolean
-  /** LangSmith API key (`lsv2_…`). Prefer file mode 0600 on hip.toml. */
-  apiKey?: string
-  /** Project name in LangSmith UI. */
-  project?: string
-  /**
-   * API host. Omit for default US cloud; EU workspaces use
-   * `https://eu.api.smith.langchain.com`.
-   */
-  endpoint?: string
-}
-
-/**
  * Preferred interactive shell for the code-panel Terminal tab.
  * - `default`: platform default (Windows → cmd; Unix → `$SHELL` then zsh/bash)
  * - `cmd` / `powershell` / `pwsh`: Windows shells
@@ -260,7 +233,7 @@ export interface WindowConfig {
  * ```
  *
  * Resolved defaults when fields are omitted: `fsBridge=true`, `forwardMcp=false`,
- * `fsReadMaxBytes=2_000_000`. Project `[acp]` wholesale-replaces global (same as langsmith).
+ * `fsReadMaxBytes=2_000_000`. Project `[acp]` wholesale-replaces global (same as agentLoop).
  *
  * When `forwardMcp=true`, hip maps enabled `mcpServers` (toml + enabled plugins) into
  * ACP session/new|load. Warning: this exposes MCP commands, env, and headers to the
@@ -453,8 +426,6 @@ export interface HipConfig {
   context?: ContextConfig
   /** Optional TaskRuntime (shell bg / monitor / scheduler / wake). */
   taskRuntime?: TaskRuntimeConfig
-  /** Optional LangSmith tracing (observability). */
-  langsmith?: LangSmithConfig
   /** Optional interactive Terminal defaults. */
   terminal?: TerminalConfig
   /** Optional product recycle-bin retention. */

@@ -5,7 +5,7 @@
 | パス | 目的 |
 |------|---------|
 | `~/.hip/config/auth.json` | プロバイダAPIキー (設計上0600のプレーンテキスト) |
-| `~/.hip/config/hip.toml` | グローバル製品設定 (スキル、エージェントループ、LangSmithなど) |
+| `~/.hip/config/hip.toml` | グローバル製品設定 (スキル、エージェントループなど) |
 | `~/.hip/config/memory.json` | メモリ機能フラグ / パイプラインノブ |
 | `~/.hip/config/network.json` | オプションのネットワークポリシー |
 | `~/.hip/config/hip-plugins.json` | インストール済みプラグインレジストリ |
@@ -40,7 +40,7 @@
 | `HIP_AUTH_PATH` | auth.jsonパスのオーバーライド |
 | `HIP_CONFIG_PATH` | hip.tomlパスのオーバーライド |
 | `HIP_MEMORY_CONFIG_PATH` | memory.jsonパスのオーバーライド |
-| `LANGSMITH_*` | オプションのLangSmithトレーシング (`hip.toml`の`[langsmith]`も参照) |
+
 
 `~/.hip/config/` をパブリッククラウドや公開ドットファイルリポジトリに同期**しないでください** — APIキーが含まれている可能性があります。
 

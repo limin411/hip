@@ -88,25 +88,6 @@ yarn tauri dev
 
 その後、**Settings** を開き、プロバイダのAPIキーを追加し、**Code** または **Chat** サーフェスでセッションを開始します。
 
-### LangSmith トレーシング（オプション）
-
-サイドカーで実行される LangGraph / LangChain は [LangSmith](https://smith.langchain.com/) にトレースをエクスポートできます。トレーシングは **デフォルトでオフ** です。
-
-**推奨方法:** `~/.hip/config/hip.toml` に設定を記述します（サイドカー起動時に `HIP_CONFIG_PATH` 経由で読み込まれます）。
-
-```toml
-[langsmith]
-enabled = true
-api_key = "lsv2_…"                                    # LangSmith設定から取得
-project = "hip"
-endpoint = "https://eu.api.smith.langchain.com"       # EUのみ。USクラウドの場合は省略
-```
-
-プロジェクトレベルの `.hip/hip.toml` でグローバルセクション全体を上書きできます（`[agentLoop]` と同じマージルール）。
-
-**上書き:** プロセス環境変数がすでに設定されている場合はそちらが優先されます（`LANGSMITH_TRACING`、`LANGSMITH_API_KEY`、`LANGSMITH_PROJECT`、`LANGSMITH_ENDPOINT`、およびレガシー `LANGCHAIN_*` エイリアス）。Tauriはこれらをサイドカーに転送します。
-
-各ユーザーターンは1つのルートトレースになります。同じhipセッションのマルチターン実行は、`metadata.thread_id` / `metadata.session_id`（= セッションID）を介して1つのLangSmith **Thread** にグループ化されます。ルート実行の **name** もセッションIDです。LLMスパンは `hip.model` という名前になります。`api_key` をgitに含めないでください。hip.toml は `~/.hip/config/` 配下にあります（このディレクトリを公開クラウド/ドットファイルリポジトリと同期しないでください）。
 
 ### ACP ホストポリシー（オプション）
 
@@ -119,7 +100,7 @@ forwardMcp = false       # 有効な hip/plugin MCP サーバーを session/new 
 fsReadMaxBytes = 2000000 # fs/read_text_file あたりの最大バイト数（デフォルト 2_000_000）
 ```
 
-スネークケースのエイリアス（`fs_bridge`、`forward_mcp`、`fs_read_max_bytes`）も受け入れられます。プロジェクトの `.hip/hip.toml` はグローバルの `[acp]` セクションを**全体置換**します（`[langsmith]` と同じルール）。
+スネークケースのエイリアス（`fs_bridge`、`forward_mcp`、`fs_read_max_bytes`）も受け入れられます。プロジェクトの `.hip/hip.toml` はグローバルの `[acp]` セクションを**全体置換**します（`[agentLoop]` と同じルール）。
 
 **MCP転送のセキュリティ注意:** `forwardMcp` はデフォルトで **false** です。これにより、hipがMCPコマンド、環境変数、HTTPヘッダー（APIキーを含む）を外部エージェントプロセスに黙って渡すことを防ぎます。`true` に設定すると、hip.toml の `mcpServers` から有効なサーバーと有効なプラグインがACPの `session/new` / `session/load` にマッピングされます（`stdio` は常に、`http`/`sse` はエージェントがそれらのMCP機能をアドバタイズしている場合のみ）。hipのツール許可/拒否リスト（`enabledTools` / `disabledTools`）は**転送されません**。エージェントは完全なMCPサーフェスを参照します。
 

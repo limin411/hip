@@ -5,7 +5,7 @@
 | 路径 | 用途 |
 |------|------|
 | `~/.hip/config/auth.json` | 提供商 API 密钥（0600 明文，按设计） |
-| `~/.hip/config/hip.toml` | 全局产品配置（技能、agent loop、langsmith 等） |
+| `~/.hip/config/hip.toml` | 全局产品配置（技能、agent loop 等） |
 | `~/.hip/config/memory.json` | 记忆功能开关 / 流水线参数 |
 | `~/.hip/config/network.json` | 可选网络策略 |
 | `~/.hip/config/hip-plugins.json` | 已安装插件注册表 |
@@ -30,7 +30,6 @@
 | `HIP_AUTH_PATH` | 覆盖 auth.json 路径 |
 | `HIP_CONFIG_PATH` | 覆盖 hip.toml 路径 |
 | `HIP_MEMORY_CONFIG_PATH` | 覆盖 memory.json 路径 |
-| `LANGSMITH_*` | 可选 LangSmith 追踪（也可用 hip.toml `[langsmith]`） |
 
 **不要**把 `~/.hip/config/` 同步到公开云或公开 dotfile 仓库——可能含 API 密钥。
 

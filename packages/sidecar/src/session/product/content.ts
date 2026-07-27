@@ -4,7 +4,7 @@
  * Regenerate: yarn product:content
  * Check:      yarn product:content:check
  *
- * contentHash=e027ef5680138a9d skillVersion=3 productVersion=1.0.1
+ * contentHash=34ffdbb4d612da97 skillVersion=3 productVersion=1.0.1
  */
 
 /** Schema / materialization version for builtin skill files (from packages/product-content/meta.json). */
@@ -166,7 +166,7 @@ export const CONFIG_REFERENCE_MD = `# hip config & local data (Level 3)
 | Path | Purpose |
 |------|---------|
 | \`~/.hip/config/auth.json\` | Provider API keys (0600 plaintext by design) |
-| \`~/.hip/config/hip.toml\` | Global product config (skills, agent loop, langsmith, …) |
+| \`~/.hip/config/hip.toml\` | Global product config (skills, agent loop, …) |
 | \`~/.hip/config/memory.json\` | Memory feature flags / pipeline knobs |
 | \`~/.hip/config/network.json\` | Optional network policy |
 | \`~/.hip/config/hip-plugins.json\` | Installed plugins registry |
@@ -201,7 +201,6 @@ Project overrides often live under \`<project>/.hip/\` (e.g. \`.hip/skills/\`, \
 | \`HIP_AUTH_PATH\` | Override auth.json path |
 | \`HIP_CONFIG_PATH\` | Override hip.toml path |
 | \`HIP_MEMORY_CONFIG_PATH\` | Override memory.json path |
-| \`LANGSMITH_*\` | Optional LangSmith tracing (also \`[langsmith]\` in hip.toml) |
 
 **Do not** sync \`~/.hip/config/\` to public cloud or public dotfile repos — it may contain API keys.
 
@@ -225,7 +224,7 @@ Saving or clearing a key does **not** require restarting the sidecar; the next r
 
 ### Do not put LLM keys in hip.toml
 
-\`[[providers]] api_key\` / \`apiKey\` is **not** used for chat. Use \`auth.json\` or env only. (LangSmith’s \`[langsmith] api_key\` is separate observability config.)
+\`[[providers]] api_key\` / \`apiKey\` is **not** used for chat. Use \`auth.json\` or env only.
 
 ### Custom providers (\`apiKind\`)
 

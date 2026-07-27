@@ -4,7 +4,7 @@
  * Regenerate: yarn product:content
  * Check:      yarn product:content:check
  *
- * contentHash=e027ef5680138a9d skillVersion=3 productVersion=1.0.1
+ * contentHash=34ffdbb4d612da97 skillVersion=3 productVersion=1.0.1
  */
 
 export type ProductHelpSectionId = 'overview' | 'memory' | 'config' | 'troubleshooting' | 'agents'
@@ -199,7 +199,7 @@ Managed sub-agents may get read-only core injection; external ACP agents default
 | Path | Purpose |
 |------|---------|
 | \`~/.hip/config/auth.json\` | Provider API keys (0600 plaintext by design) |
-| \`~/.hip/config/hip.toml\` | Global product config (skills, agent loop, langsmith, …) |
+| \`~/.hip/config/hip.toml\` | Global product config (skills, agent loop, …) |
 | \`~/.hip/config/memory.json\` | Memory feature flags / pipeline knobs |
 | \`~/.hip/config/network.json\` | Optional network policy |
 | \`~/.hip/config/hip-plugins.json\` | Installed plugins registry |
@@ -234,7 +234,6 @@ Project overrides often live under \`<project>/.hip/\` (e.g. \`.hip/skills/\`, \
 | \`HIP_AUTH_PATH\` | Override auth.json path |
 | \`HIP_CONFIG_PATH\` | Override hip.toml path |
 | \`HIP_MEMORY_CONFIG_PATH\` | Override memory.json path |
-| \`LANGSMITH_*\` | Optional LangSmith tracing (also \`[langsmith]\` in hip.toml) |
 
 **Do not** sync \`~/.hip/config/\` to public cloud or public dotfile repos — it may contain API keys.
 
@@ -258,7 +257,7 @@ Saving or clearing a key does **not** require restarting the sidecar; the next r
 
 ### Do not put LLM keys in hip.toml
 
-\`[[providers]] api_key\` / \`apiKey\` is **not** used for chat. Use \`auth.json\` or env only. (LangSmith’s \`[langsmith] api_key\` is separate observability config.)
+\`[[providers]] api_key\` / \`apiKey\` is **not** used for chat. Use \`auth.json\` or env only.
 
 ### Custom providers (\`apiKind\`)
 
@@ -717,7 +716,7 @@ Managed sub-agents may get read-only core injection; external ACP agents default
 | Path | Purpose |
 |------|---------|
 | \`~/.hip/config/auth.json\` | Provider API keys (0600 plaintext by design) |
-| \`~/.hip/config/hip.toml\` | Global product config (skills, agent loop, langsmith, …) |
+| \`~/.hip/config/hip.toml\` | Global product config (skills, agent loop, …) |
 | \`~/.hip/config/memory.json\` | Memory feature flags / pipeline knobs |
 | \`~/.hip/config/network.json\` | Optional network policy |
 | \`~/.hip/config/hip-plugins.json\` | Installed plugins registry |
@@ -752,7 +751,6 @@ Project overrides often live under \`<project>/.hip/\` (e.g. \`.hip/skills/\`, \
 | \`HIP_AUTH_PATH\` | Override auth.json path |
 | \`HIP_CONFIG_PATH\` | Override hip.toml path |
 | \`HIP_MEMORY_CONFIG_PATH\` | Override memory.json path |
-| \`LANGSMITH_*\` | Optional LangSmith tracing (also \`[langsmith]\` in hip.toml) |
 
 **Do not** sync \`~/.hip/config/\` to public cloud or public dotfile repos — it may contain API keys.
 
@@ -776,7 +774,7 @@ Saving or clearing a key does **not** require restarting the sidecar; the next r
 
 ### Do not put LLM keys in hip.toml
 
-\`[[providers]] api_key\` / \`apiKey\` is **not** used for chat. Use \`auth.json\` or env only. (LangSmith’s \`[langsmith] api_key\` is separate observability config.)
+\`[[providers]] api_key\` / \`apiKey\` is **not** used for chat. Use \`auth.json\` or env only.
 
 ### Custom providers (\`apiKind\`)
 
@@ -1233,7 +1231,7 @@ SQLite（\`memory_items\`）中的结构化条目：偏好、约定、教训、�
 | 路径 | 用途 |
 |------|------|
 | \`~/.hip/config/auth.json\` | 提供商 API 密钥（0600 明文，按设计） |
-| \`~/.hip/config/hip.toml\` | 全局产品配置（技能、agent loop、langsmith 等） |
+| \`~/.hip/config/hip.toml\` | 全局产品配置（技能、agent loop 等） |
 | \`~/.hip/config/memory.json\` | 记忆功能开关 / 流水线参数 |
 | \`~/.hip/config/network.json\` | 可选网络策略 |
 | \`~/.hip/config/hip-plugins.json\` | 已安装插件注册表 |
@@ -1258,7 +1256,6 @@ SQLite（\`memory_items\`）中的结构化条目：偏好、约定、教训、�
 | \`HIP_AUTH_PATH\` | 覆盖 auth.json 路径 |
 | \`HIP_CONFIG_PATH\` | 覆盖 hip.toml 路径 |
 | \`HIP_MEMORY_CONFIG_PATH\` | 覆盖 memory.json 路径 |
-| \`LANGSMITH_*\` | 可选 LangSmith 追踪（也可用 hip.toml \`[langsmith]\`） |
 
 **不要**把 \`~/.hip/config/\` 同步到公开云或公开 dotfile 仓库——可能含 API 密钥。
 
@@ -1666,7 +1663,7 @@ SQLite（\`memory_items\`）結構化條目：偏好、約定、教訓、工作�
 
 ## 環境變數（進階）
 
-\`HIP_DATA_DIR\`、\`HIP_SKILLS_DIR\`、\`HIP_PLUGINS_DIR\`、\`HIP_AUTH_PATH\`、\`HIP_CONFIG_PATH\`、\`HIP_MEMORY_CONFIG_PATH\`、\`LANGSMITH_*\`。
+\`HIP_DATA_DIR\`、\`HIP_SKILLS_DIR\`、\`HIP_PLUGINS_DIR\`、\`HIP_AUTH_PATH\`、\`HIP_CONFIG_PATH\`、\`HIP_MEMORY_CONFIG_PATH\`。
 `,
   },
   {
@@ -1988,7 +1985,7 @@ SQLite（\`memory_items\`）内の構造化アイテム：設定、慣習、教�
 | パス | 目的 |
 |------|---------|
 | \`~/.hip/config/auth.json\` | プロバイダAPIキー (設計上0600のプレーンテキスト) |
-| \`~/.hip/config/hip.toml\` | グローバル製品設定 (スキル、エージェントループ、LangSmithなど) |
+| \`~/.hip/config/hip.toml\` | グローバル製品設定 (スキル、エージェントループなど) |
 | \`~/.hip/config/memory.json\` | メモリ機能フラグ / パイプラインノブ |
 | \`~/.hip/config/network.json\` | オプションのネットワークポリシー |
 | \`~/.hip/config/hip-plugins.json\` | インストール済みプラグインレジストリ |
@@ -2023,7 +2020,7 @@ SQLite（\`memory_items\`）内の構造化アイテム：設定、慣習、教�
 | \`HIP_AUTH_PATH\` | auth.jsonパスのオーバーライド |
 | \`HIP_CONFIG_PATH\` | hip.tomlパスのオーバーライド |
 | \`HIP_MEMORY_CONFIG_PATH\` | memory.jsonパスのオーバーライド |
-| \`LANGSMITH_*\` | オプションのLangSmithトレーシング (\`hip.toml\`の\`[langsmith]\`も参照) |
+
 
 \`~/.hip/config/\` をパブリッククラウドや公開ドットファイルリポジトリに同期**しないでください** — APIキーが含まれている可能性があります。
 
@@ -2348,7 +2345,7 @@ SQLite의 구조화된 항목(\`memory_items\`): 선호도, 규칙, 학습 내�
 | 경로 | 용도 |
 |------|---------|
 | \`~/.hip/config/auth.json\` | 제공자 API 키 (설계상 0600 일반 텍스트) |
-| \`~/.hip/config/hip.toml\` | 전역 제품 설정 (스킬, 에이전트 루프, LangSmith 등) |
+| \`~/.hip/config/hip.toml\` | 전역 제품 설정 (스킬, 에이전트 루프 등) |
 | \`~/.hip/config/memory.json\` | 메모리 기능 플래그 / 파이프라인 설정값 |
 | \`~/.hip/config/network.json\` | 선택적 네트워크 정책 |
 | \`~/.hip/config/hip-plugins.json\` | 설치된 플러그인 레지스트리 |
@@ -2383,7 +2380,7 @@ SQLite의 구조화된 항목(\`memory_items\`): 선호도, 규칙, 학습 내�
 | \`HIP_AUTH_PATH\` | auth.json 경로 재정의 |
 | \`HIP_CONFIG_PATH\` | hip.toml 경로 재정의 |
 | \`HIP_MEMORY_CONFIG_PATH\` | memory.json 경로 재정의 |
-| \`LANGSMITH_*\` | 선택적 LangSmith 추적 (hip.toml의 \`[langsmith]\`도 함께) |
+
 
 **\`~/.hip/config/\`를** 퍼블릭 클라우드나 공개 dotfile 저장소에 동기화하지 마십시오 — API 키가 포함될 수 있습니다.
 

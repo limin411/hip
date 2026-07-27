@@ -35,10 +35,7 @@ export interface ModelRunOptions {
    * Keeps idle watchdogs alive during large write_file / edit_file arg generation.
    */
   onActivity?: () => void
-  /**
-   * LangChain runnable fragments so LangSmith nests this LLM under the parent
-   * graph/node run (when LANGSMITH_TRACING=true).
-   */
+  /** LangChain runnable fragments (callbacks / metadata / tags / runName). */
   callbacks?: Callbacks
   metadata?: Record<string, unknown>
   tags?: string[]
@@ -94,7 +91,7 @@ export function reasoningDelta(chunk: AIMessageChunk): string {
 /**
  * Collapse streamed array content (many micro text/reasoning blocks) into a
  * single text string, or [reasoning, text] when chain-of-thought is present.
- * Keeps LangSmith / message state readable; real newlines stay as real `\n`.
+ * Keeps message state readable; real newlines stay as real `\n`.
  */
 export function collapseStreamedAiContent(
   content: AIMessage['content'],
@@ -266,7 +263,7 @@ export class RealModelRunner implements ModelRunner {
       logInfo('model', 'stream:end', { totalMs: Date.now() - t0, contentLen: typeof gathered?.content === 'string' ? gathered.content.length : 0, hadText: emitted })
       if (!gathered) throw new Error('model produced no output')
       // Collapse micro text/reasoning blocks from stream concat before DSML recovery
-      // and before the message enters graph state / LangSmith child spans.
+      // and before the message enters graph state.
       return recoverDsmlToolCalls(collapseStreamedAiMessage(gathered as AIMessage))
     }
     // Retry only transient failures thrown BEFORE the first delta — retrying mid-stream would

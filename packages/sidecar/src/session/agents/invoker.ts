@@ -28,7 +28,7 @@ export interface InvokerExtras {
   requestApproval?: ApprovalFn
   permissionMode?: PermissionMode
   sessionId?: string
-  /** Conversation title for LangSmith runName (optional). */
+  /** Conversation title (optional). */
   title?: string
   networkPolicy?: NetworkPolicy
   toolOutputStore?: ToolOutputStore

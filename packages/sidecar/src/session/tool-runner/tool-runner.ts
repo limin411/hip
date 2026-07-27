@@ -127,7 +127,7 @@ export class ToolRunner {
     name: string
     callId: string
     args: Record<string, unknown>
-    /** When set (LangGraph node config.callbacks), nests tool spans under the parent run in LangSmith. */
+    /** When set (LangGraph node config.callbacks), nests tool spans under the parent run. */
     callbacks?: Callbacks
   }): Promise<ToolCallResult> {
     const {

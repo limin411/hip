@@ -2,7 +2,6 @@ import { describe, it, expect } from 'vitest'
 import type {
   HipConfig,
   AgentLoopConfig,
-  LangSmithConfig,
   AcpHostConfig,
   ProviderEntry,
   SkillEntry,
@@ -839,18 +838,6 @@ describe('protocol: McpServerConfig extended fields (Todo 1)', () => {
     const agentLoop: AgentLoopConfig = { doomLoopStrategy: 'nudge_then_pause' }
     const cfg: HipConfig = { version: 1, agentLoop }
     expect(cfg.agentLoop?.doomLoopStrategy).toBe('nudge_then_pause')
-  })
-
-  it('round-trips langsmith on HipConfig through JSON', () => {
-    const langsmith: LangSmithConfig = {
-      enabled: true,
-      apiKey: 'lsv2_x',
-      project: 'hip',
-      endpoint: 'https://eu.api.smith.langchain.com',
-    }
-    const cfg: HipConfig = { version: 1, langsmith }
-    const round = JSON.parse(JSON.stringify(cfg)) as HipConfig
-    expect(round.langsmith).toEqual(langsmith)
   })
 
   it('round-trips plan.softApproveOnComposer on HipConfig through JSON', () => {

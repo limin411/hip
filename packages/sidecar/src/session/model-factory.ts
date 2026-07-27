@@ -9,7 +9,6 @@ import {
   resolveChatApiKind,
 } from '../config/chat-api-kind.js'
 import { resolveApiKey, resolveProviderAuth } from '../config/auth-file.js'
-import { langSmithModelCallConfig } from '../observability/langsmith.js'
 import { SUMMARY_OUTPUT_TOKENS, type Summarizer } from './compaction.js'
 
 /** Thrown when buildChatModel is called without a configured API key (no sk-missing). */
@@ -68,8 +67,8 @@ export function stripReasoningBlocks(messages: readonly { content: unknown }[]):
  *
  * Bug: when only the first delta has reasoning_content we used to emit
  * `[reasoning@7, text@0]`, then later plain-string deltas. concat appends those
- * strings as separate unindexed `text` blocks → LangSmith shows dozens of
- * micro-blocks and literal `\\n` fragments.
+ * strings as separate unindexed `text` blocks → dozens of micro-blocks and
+ * literal `\\n` fragments in traces / message state.
  *
  * Fix: every string delta becomes indexed content blocks (text always index 0)
  * so consecutive tokens merge into one text field (real newlines stay real).
@@ -89,8 +88,8 @@ export function projectReasoningStreamContent(
 
 export class ReasoningChatOpenAI extends ChatOpenAI {
   /**
-   * LangSmith / serialize id segment. Without this, traces show the class name
-   * `ReasoningChatOpenAI` as the LLM run name when no explicit runName is set.
+   * Stable serialize / run-name id segment. Without this, the class name
+   * `ReasoningChatOpenAI` is used when no explicit runName is set.
    */
   static lc_name(): string {
     return 'hip.model'
@@ -246,17 +245,10 @@ class RealSummarizer implements Summarizer {
     const focusNote = opts?.focus?.trim()
       ? `\n\nAdditional focus for this summary (prioritize these topics):\n${opts.focus.trim()}`
       : ''
-    const res = await model.invoke(
-      [
-        new SystemMessage(SUMMARY_TEMPLATE + focusNote),
-        new HumanMessage(transcript),
-      ],
-      langSmithModelCallConfig({
-        runName: 'hip.summarize',
-        sessionId: opts?.sessionId,
-        kind: 'summarize',
-      }),
-    )
+    const res = await model.invoke([
+      new SystemMessage(SUMMARY_TEMPLATE + focusNote),
+      new HumanMessage(transcript),
+    ])
     return typeof res.content === 'string' ? res.content : ''
   }
 }

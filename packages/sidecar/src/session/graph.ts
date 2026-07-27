@@ -79,7 +79,6 @@ import type { CircuitBreaker } from '../orchestrator/circuit-breaker.js'
 import { emitLoopSignal, type LoopEventSink } from './loop-events.js'
 // decideReplan only — do not import planner PlanMode (collides with plan-mode.PlanMode).
 import { decideReplan, TurnReplanGuard, REPLAN_ERROR_THRESHOLD } from './planner.js'
-import { tracingChildMetadata } from '../observability/langsmith.js'
 
 function fullPlanReminder(planFilePath: string): string {
   return `Plan mode is active. You MUST NOT make any edits (with the exception of the current plan file) or otherwise make changes to the system unless a tool request is explicitly approved. Prefer read-only tools. Use Bash only for read operations — do not write/modify files via shell commands. This supersedes any other instructions you have received.
@@ -728,9 +727,8 @@ export function buildGraph(maxSteps: number = MAX_STEPS, compactBudget: number =
         tools,
         bindTools: !capped,
         signal: config.signal,
-        // Nest LLM under the LangGraph node run when LangSmith tracing is on.
         callbacks: config.callbacks,
-        metadata: tracingChildMetadata(ctx, config.metadata as Record<string, unknown> | undefined),
+        metadata: config.metadata as Record<string, unknown> | undefined,
         tags: config.tags,
         runName: 'hip.model',
         onText: (d) => emit.token(d),

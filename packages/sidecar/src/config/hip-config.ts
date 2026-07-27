@@ -13,7 +13,6 @@ import type {
   TeamPipelineStep,
   AgentLoopConfig,
   ContextConfig,
-  LangSmithConfig,
   TerminalConfig,
   TerminalShellPref,
   TrashConfig,
@@ -272,28 +271,6 @@ function normalizeAgentLoop(raw: Record<string, unknown>): AgentLoopConfig {
   return out
 }
 
-function normalizeLangSmith(raw: Record<string, unknown>): LangSmithConfig {
-  if (raw.api_key !== undefined && raw.apiKey === undefined) {
-    raw.apiKey = raw.api_key
-  }
-  delete raw.api_key
-
-  const out: LangSmithConfig = {}
-  if (typeof raw.enabled === 'boolean') {
-    out.enabled = raw.enabled
-  }
-  if (typeof raw.apiKey === 'string' && raw.apiKey.trim()) {
-    out.apiKey = raw.apiKey.trim()
-  }
-  if (typeof raw.project === 'string' && raw.project.trim()) {
-    out.project = raw.project.trim()
-  }
-  if (typeof raw.endpoint === 'string' && raw.endpoint.trim()) {
-    out.endpoint = raw.endpoint.trim()
-  }
-  return out
-}
-
 const TERMINAL_SHELL_PREFS = new Set<TerminalShellPref>([
   'default',
   'cmd',
@@ -455,11 +432,6 @@ function validateConfig(parsed: unknown, filePath: string): HipConfig {
     config.context = normalizeContext(context as Record<string, unknown>)
   }
 
-  const langsmith = obj.langsmith
-  if (langsmith && typeof langsmith === 'object' && !Array.isArray(langsmith)) {
-    config.langsmith = normalizeLangSmith(langsmith as Record<string, unknown>)
-  }
-
   const terminal = obj.terminal
   if (terminal && typeof terminal === 'object' && !Array.isArray(terminal)) {
     config.terminal = normalizeTerminal(terminal as Record<string, unknown>)
@@ -559,11 +531,7 @@ function deepMergeConfig(global: HipConfig, project: HipConfig): HipConfig {
   if (project.context !== undefined) {
     merged.context = project.context
   }
-  // Project langsmith replaces global wholesale (same as agentLoop).
-  if (project.langsmith !== undefined) {
-    merged.langsmith = project.langsmith
-  }
-  // Project acp replaces global wholesale (same as langsmith / agentLoop).
+  // Project acp replaces global wholesale (same as agentLoop).
   if (project.acp !== undefined) {
     merged.acp = project.acp
   }

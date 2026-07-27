@@ -137,21 +137,6 @@ pub(crate) struct AgentLoopConfig {
     pub(crate) doom_loop_strategy: Option<String>,
 }
 
-/// Optional `[langsmith]` section. JSON uses camelCase for the UI.
-/// Must be preserved on set_hip_config rewrites so tracing config is not stripped.
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
-#[serde(rename_all = "camelCase")]
-pub(crate) struct LangSmithConfig {
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub(crate) enabled: Option<bool>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub(crate) api_key: Option<String>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub(crate) project: Option<String>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub(crate) endpoint: Option<String>,
-}
-
 /// Optional `[terminal]` section. JSON uses camelCase for the UI.
 /// Must be preserved on set_hip_config rewrites so shell / colorTheme are not stripped.
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
@@ -278,9 +263,6 @@ pub(crate) struct HipConfig {
     /// Optional agent-loop controls (doom strategy, etc.). Preserved on set_hip_config rewrites.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub(crate) agent_loop: Option<AgentLoopConfig>,
-    /// Optional LangSmith tracing. Preserved on set_hip_config rewrites.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub(crate) langsmith: Option<LangSmithConfig>,
     /// Optional Terminal defaults. Preserved on set_hip_config rewrites.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub(crate) terminal: Option<TerminalConfig>,
@@ -457,21 +439,6 @@ pub(crate) struct TomlAgentLoopConfig {
     pub(crate) doom_loop_strategy: Option<String>,
 }
 
-/// TOML mirror for `[langsmith]`.
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
-#[serde(rename_all = "snake_case")]
-#[allow(dead_code)]
-pub(crate) struct TomlLangSmithConfig {
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub(crate) enabled: Option<bool>,
-    #[serde(default, skip_serializing_if = "Option::is_none", alias = "apiKey")]
-    pub(crate) api_key: Option<String>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub(crate) project: Option<String>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub(crate) endpoint: Option<String>,
-}
-
 /// TOML mirror for `[terminal]` (snake_case keys; camelCase aliases for hand-edited files).
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
@@ -593,8 +560,6 @@ pub(crate) struct TomlHipConfig {
     pub(crate) permissions: Option<TomlPermissionEntry>,
     #[serde(default, skip_serializing_if = "Option::is_none", alias = "agentLoop")]
     pub(crate) agent_loop: Option<TomlAgentLoopConfig>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub(crate) langsmith: Option<TomlLangSmithConfig>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub(crate) terminal: Option<TomlTerminalConfig>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -734,7 +699,6 @@ pub fn load_hip_config(app: &tauri::AppHandle) -> Result<HipConfig, String> {
             fixed_agents: None,
             permissions: None,
             agent_loop: None,
-            langsmith: None,
             terminal: None,
             window: None,
             acp: None,
@@ -864,28 +828,6 @@ impl From<TomlAgentLoopConfig> for AgentLoopConfig {
             max_depth: a.max_depth,
             subagent_hitl: a.subagent_hitl,
             doom_loop_strategy: a.doom_loop_strategy,
-        }
-    }
-}
-
-impl From<LangSmithConfig> for TomlLangSmithConfig {
-    fn from(l: LangSmithConfig) -> Self {
-        TomlLangSmithConfig {
-            enabled: l.enabled,
-            api_key: l.api_key,
-            project: l.project,
-            endpoint: l.endpoint,
-        }
-    }
-}
-
-impl From<TomlLangSmithConfig> for LangSmithConfig {
-    fn from(l: TomlLangSmithConfig) -> Self {
-        LangSmithConfig {
-            enabled: l.enabled,
-            api_key: l.api_key,
-            project: l.project,
-            endpoint: l.endpoint,
         }
     }
 }
@@ -1040,7 +982,6 @@ impl From<HipConfig> for TomlHipConfig {
             fixed_agents: cfg.fixed_agents,
             permissions: cfg.permissions.map(|x| x.into()),
             agent_loop: cfg.agent_loop.map(|x| x.into()),
-            langsmith: cfg.langsmith.map(|x| x.into()),
             terminal: cfg.terminal.map(|x| x.into()),
             window: cfg.window.map(|x| x.into()),
             acp: cfg.acp.map(|x| x.into()),
@@ -1063,7 +1004,6 @@ impl From<TomlHipConfig> for HipConfig {
             fixed_agents: cfg.fixed_agents,
             permissions: cfg.permissions.map(|x| x.into()),
             agent_loop: cfg.agent_loop.map(|x| x.into()),
-            langsmith: cfg.langsmith.map(|x| x.into()),
             terminal: cfg.terminal.map(|x| x.into()),
             window: cfg.window.map(|x| x.into()),
             acp: cfg.acp.map(|x| x.into()),
@@ -1090,7 +1030,6 @@ mod voice_preserve_tests {
             fixed_agents: None,
             permissions: None,
             agent_loop: None,
-            langsmith: None,
             terminal: Some(TerminalConfig {
                 shell: Some("zsh".into()),
                 color_theme: Some("dracula".into()),

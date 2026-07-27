@@ -69,7 +69,7 @@ export interface CompactOptions {
   overflowRecovery?: boolean
   /** Optional focus instruction for the summarizer (manual `/compact focus…`). */
   focus?: string
-  /** Session id for LangSmith thread attachment on the summarizer LLM call. */
+  /** Session id (optional context for the summarizer path). */
   sessionId?: string
   /**
    * Tool-rounds kept at the tail when falling back to tool-round mode

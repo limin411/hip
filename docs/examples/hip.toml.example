@@ -3,7 +3,7 @@
 #
 # Global config:  ~/.hip/config/hip.toml
 # Project override: <repo>/.hip/hip.toml
-# Some sections (langsmith, acp, agentLoop, window, …) are wholesale-replaced by
+# Some sections (acp, agentLoop, window, …) are wholesale-replaced by
 # the project file when present — they are not deep-merged field-by-field.
 
 version = 1
@@ -24,14 +24,6 @@ fsBridge = true
 forwardMcp = false          # keep false unless you trust the external agent with MCP env/headers
 # forwardHipKeys = false    # opt-in: inject hip provider keys into ACP spawn env
 fsReadMaxBytes = 2000000
-
-# ── LangSmith tracing (optional; off by default) ───────────────────────────
-# Prefer env LANGSMITH_* when already set (process env wins).
-# [langsmith]
-# enabled = true
-# api_key = "lsv2_REPLACE_ME"   # never commit a real key
-# project = "hip"
-# endpoint = "https://eu.api.smith.langchain.com"  # EU only; omit for US cloud
 
 # ── Agent loop budgets (optional) ──────────────────────────────────────────
 # [agentLoop]

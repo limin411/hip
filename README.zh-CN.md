@@ -88,32 +88,6 @@ yarn tauri dev
 
 然后打开 **设置**，添加提供商 API 密钥，在 **Code** 或 **Chat** 界面开始会话。
 
-### LangSmith 追踪（可选）
-
-sidecar 中的 LangGraph / LangChain 运行可导出追踪到
-[LangSmith](https://smith.langchain.com/)。追踪**默认关闭**。
-
-**推荐：** 写入 `~/.hip/config/hip.toml`（sidecar 启动时经 `HIP_CONFIG_PATH` 加载）：
-
-```toml
-[langsmith]
-enabled = true
-api_key = "lsv2_…"                                    # 来自 LangSmith 设置
-project = "hip"
-endpoint = "https://eu.api.smith.langchain.com"       # 仅欧盟；美国云可省略
-```
-
-项目级 `.hip/hip.toml` 可整段覆盖全局同名节（与 `[agentLoop]` 合并规则相同）。
-
-**覆盖：** 若进程环境变量已设置则优先（`LANGSMITH_TRACING`、
-`LANGSMITH_API_KEY`、`LANGSMITH_PROJECT`、`LANGSMITH_ENDPOINT`，以及旧版
-`LANGCHAIN_*` 别名）。Tauri 也会把这些转发进 sidecar。
-
-每个用户回合是一条根 trace；同一 hip 会话的多轮运行通过
-`metadata.thread_id` / `metadata.session_id`（= session id）归入同一
-LangSmith **Thread**。根 run 的 **name** 也是 session id。LLM span 名为
-`hip.model`。请勿将 `api_key` 提交进 git；hip.toml 位于 `~/.hip/config/`
-（请勿把该目录同步到公开网盘/dotfile 仓库）。
 
 ### 本地数据布局（`~/.hip/`）
 

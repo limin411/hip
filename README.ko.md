@@ -86,25 +86,6 @@ yarn tauri dev
 
 그런 다음 **설정**을 열고 제공자 API 키를 추가한 후 **Code** 또는 **Chat** 표면에서 세션을 시작하세요.
 
-### LangSmith 추적 (선택 사항)
-
-사이드카에서 실행되는 LangGraph / LangChain은 [LangSmith](https://smith.langchain.com/)로 추적을 내보낼 수 있습니다. 추적은 **기본적으로 비활성화**되어 있습니다.
-
-**권장:** `~/.hip/config/hip.toml`에 설정을 배치합니다(사이드카 시작 시 `HIP_CONFIG_PATH`를 통해 로드됨):
-
-```toml
-[langsmith]
-enabled = true
-api_key = "lsv2_…"                                    # LangSmith 설정에서 가져옴
-project = "hip"
-endpoint = "https://eu.api.smith.langchain.com"       # EU 전용; US 클라우드는 생략
-```
-
-프로젝트 수준 `.hip/hip.toml`은 전역 섹션을 완전히 덮어쓸 수 있습니다(`[agentLoop]`와 동일한 병합 규칙).
-
-**재정의:** 프로세스 환경 변수(`LANGSMITH_TRACING`, `LANGSMITH_API_KEY`, `LANGSMITH_PROJECT`, `LANGSMITH_ENDPOINT`, 그리고 레거시 `LANGCHAIN_*` 별칭)가 이미 설정된 경우 여전히 우선합니다. Tauri는 이를 사이드카로 전달합니다.
-
-각 사용자 턴은 하나의 루트 추적입니다; 동일한 hip 세션에 대한 다중 턴 실행은 `metadata.thread_id` / `metadata.session_id`(= 세션 ID)를 통해 하나의 LangSmith **Thread**로 그룹화됩니다. 루트 실행 **이름**도 세션 ID입니다. LLM 스팬은 `hip.model`로 이름이 지정됩니다. `api_key`를 git에 보관하지 마십시오; hip.toml은 `~/.hip/config/` 아래에 있습니다(해당 디렉토리를 공개 클라우드/도트파일 저장소에 동기화하지 마십시오).
 
 ### ACP 호스트 정책 (선택 사항)
 
@@ -118,7 +99,7 @@ fsReadMaxBytes = 2000000 # fs/read_text_file당 최대 바이트 (기본값 2_00
 ```
 
 Snake_case 별칭(`fs_bridge`, `forward_mcp`, `fs_read_max_bytes`)도 허용됩니다.
-프로젝트 `.hip/hip.toml`은 전역 `[acp]` 섹션을 **완전히 대체**합니다(`[langsmith]`와 동일한 규칙).
+프로젝트 `.hip/hip.toml`은 전역 `[acp]` 섹션을 **완전히 대체**합니다(`[agentLoop]`와 동일한 규칙).
 
 **MCP 전달 보안 참고:** `forwardMcp`는 기본적으로 **false**이므로 hip이 MCP 명령, 환경 변수 또는 HTTP 헤더(API 키 포함)를 외부 에이전트 프로세스에 조용히 전달하지 않습니다. `true`로 설정하면 hip.toml `mcpServers`의 활성화된 서버 **및** 활성화된 플러그인이 ACP `session/new` / `session/load`에 매핑됩니다(`stdio`는 항상; `http`/`sse`는 에이전트가 해당 MCP 기능을 광고한 경우에만). Hip 도구 허용/거부 목록(`enabledTools` / `disabledTools`)은 **전달되지 않습니다** — 에이전트는 전체 MCP 표면을 봅니다.
 

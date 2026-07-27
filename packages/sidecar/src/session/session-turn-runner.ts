@@ -29,7 +29,6 @@ import { getActiveModel, isOpenAICompatible } from '../config/providers.js'
 import { isMultimodalModel } from '../config/catalog.js'
 import { resolveApiKey } from '../config/auth-file.js'
 import { resolveEffectiveConfig, resolveAcpHostConfig } from '../config/hip-config.js'
-import { flushLangSmithTraces, tracingInvokeFields } from '../observability/langsmith.js'
 import { buildGraph, type GraphEmit, type GraphCtx, type LoopState } from './graph.js'
 import { selectImageAgent } from './agents/registry.js'
 import { SessionApprovalCache } from './tool-runner/approval-cache.js'
@@ -459,11 +458,6 @@ export async function processInput(host: SessionTurnHost, input: SessionInput, _
     : new HumanMessage({ content: parts }))
   const supervisorText = await runTurn(host, _send)
 
-  // Flush the turn's LangSmith root *before* any post-turn work that forces
-  // tracing off (title refine). Otherwise the first-turn batch can race and
-  // never appear in the project while later turns do.
-  await flushLangSmithTraces()
-
   if (isFirstTurn) {
     // Background: must not block the input queue or race the next turn's ALS.
     void host.generateFirstTurnTitle(input, supervisorText, _send).catch((err) => {
@@ -684,7 +678,6 @@ export async function runManagedAgentTurn(host: SessionTurnHost, input: SessionI
     },
   })
 
-  await flushLangSmithTraces()
   if (isFirstTurn) {
     void host.generateFirstTurnTitle(input, finalAgentText, _send).catch((err) => {
       logNonCritical('generateFirstTurnTitle', err)
@@ -1536,14 +1529,6 @@ export async function runTurn(host: SessionTurnHost, rawSend: SendFn, base?: {
           configurable: { ctx },
           signal: host.abortController.signal,
           recursionLimit: recursionLimit(maxSteps),
-          ...tracingInvokeFields({
-            kind: 'session-turn',
-            sessionId: host.id,
-            turnId,
-            agentId: 'supervisor',
-            // LangSmith project list shows this runName — use session id.
-            title: host.store?.getSession(host.id)?.title,
-          }),
         },
       )
       host.consumeActivitySteps(finalState.steps - stepsBefore)

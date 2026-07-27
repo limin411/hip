@@ -5,7 +5,7 @@
 | 경로 | 용도 |
 |------|---------|
 | `~/.hip/config/auth.json` | 제공자 API 키 (설계상 0600 일반 텍스트) |
-| `~/.hip/config/hip.toml` | 전역 제품 설정 (스킬, 에이전트 루프, LangSmith 등) |
+| `~/.hip/config/hip.toml` | 전역 제품 설정 (스킬, 에이전트 루프 등) |
 | `~/.hip/config/memory.json` | 메모리 기능 플래그 / 파이프라인 설정값 |
 | `~/.hip/config/network.json` | 선택적 네트워크 정책 |
 | `~/.hip/config/hip-plugins.json` | 설치된 플러그인 레지스트리 |
@@ -40,7 +40,7 @@
 | `HIP_AUTH_PATH` | auth.json 경로 재정의 |
 | `HIP_CONFIG_PATH` | hip.toml 경로 재정의 |
 | `HIP_MEMORY_CONFIG_PATH` | memory.json 경로 재정의 |
-| `LANGSMITH_*` | 선택적 LangSmith 추적 (hip.toml의 `[langsmith]`도 함께) |
+
 
 **`~/.hip/config/`를** 퍼블릭 클라우드나 공개 dotfile 저장소에 동기화하지 마십시오 — API 키가 포함될 수 있습니다.
 

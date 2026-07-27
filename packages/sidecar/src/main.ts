@@ -9,7 +9,6 @@ import { WORKFLOW_DDL } from './persistence/schema.js'
 import { watchParentViaStdin } from './parent-watch.js'
 import { loadActiveModelFromEnv } from './config/providers.js'
 import { acpConnections } from './session/agents/acp-connection.js'
-import { initLangSmith } from './observability/langsmith.js'
 
 /** Best-effort boot log under ~/.hip/logs (or HIP_DATA_DIR) for Windows install diagnosis. */
 function bootLog(msg: string): void {
@@ -51,8 +50,6 @@ async function main(): Promise<void> {
   // via persistence/sqlite.ts so Vite/vitest never sees the bare specifier.
   const dbPath = process.env.HIP_DB_PATH?.trim() || ':memory:'
   bootLog(`HIP_DB_PATH=${dbPath}`)
-  // Opt-in LangSmith traces (LANGSMITH_TRACING=true + API key). No-op when unset.
-  initLangSmith()
   loadActiveModelFromEnv()
   const { db, ftsEnabled } = openDatabase(dbPath)
 

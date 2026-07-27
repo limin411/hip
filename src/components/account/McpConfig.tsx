@@ -378,14 +378,16 @@ export function McpConfig() {
   }, [marketSources, servers.length, t])
 
   return (
-    <div className="flex h-full min-h-0 flex-col" data-testid="mcp-config">
-      <div className="shrink-0 border-b border-border px-6 py-4">
-        <div className="flex flex-wrap items-start justify-between gap-3">
-          <div className="min-w-0">
-            <h2 className="text-title font-semibold text-ink">{t('settings.mcp.title')}</h2>
-            <p className="mt-1 text-body text-ink-secondary">{t('settings.mcp.intro')}</p>
-          </div>
-          <div className="flex shrink-0 flex-wrap gap-2">
+    // overflow-hidden: keep header chrome (管理源 / refresh) pinned; only the card
+    // list scrolls. Side-by-side title+actions used to clip/wrap off-screen when the
+    // Official catalog (GitHub MCP seed → live registry) grew and the outer Settings
+    // pane became the scroll container.
+    <div className="flex h-full min-h-0 flex-col overflow-hidden" data-testid="mcp-config">
+      <div className="shrink-0 border-b border-border bg-surface px-6 py-4">
+        <div className="min-w-0">
+          <h2 className="text-title font-semibold text-ink">{t('settings.mcp.title')}</h2>
+          <p className="mt-1 text-body text-ink-secondary">{t('settings.mcp.intro')}</p>
+          <div className="mt-3 flex flex-wrap gap-2">
             <Button
               variant="outline"
               size="sm"

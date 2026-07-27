@@ -883,7 +883,8 @@ export const zhCN = {
         ask: '每次询问',
       },
       trayEnabled: '系统托盘图标',
-      trayEnabledDesc: '通过托盘图标恢复窗口或退出。选择「隐藏到系统托盘」时会自动开启。',
+      trayEnabledDesc:
+        '通过托盘图标恢复窗口或退出。开启时会将「关闭窗口时」设为「隐藏到系统托盘」；选择隐藏/每次询问时也会自动开启托盘。',
       closeActionsAskNote: '每次关闭窗口时询问。',
       launchAtLogin: '开机时启动 hip',
       launchAtLoginDesc: '登录系统时启动 hip。从登录项启动时默认隐藏到托盘。',

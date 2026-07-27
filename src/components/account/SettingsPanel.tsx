@@ -152,9 +152,12 @@ export function SettingsPanel() {
       </div>
       <div className="w-px shrink-0 bg-border" aria-hidden data-testid="settings-nav-divider" />
 
-      <div className="min-h-0 min-w-0 flex-1">
+      <div className="min-h-0 min-w-0 flex-1 overflow-hidden">
         {PAGES.map((page) => {
           const Page = page.Component
+          // Full-height market pages (MCP / plugins) manage their own scroll inside
+          // overflow-hidden roots so title actions stay pinned. Long form pages
+          // (general, model, …) still scroll via overflow-y-auto here.
           return (
             <TabsPrimitive.Content
               key={page.id}

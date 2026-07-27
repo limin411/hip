@@ -266,4 +266,50 @@ describe('McpConfig', () => {
       })
     })
   })
+
+  it('keeps manage-sources and refresh actions when Official catalog shows GitHub MCP', async () => {
+    // lastFetchedAt + serverCount > 1 skip the mount auto-refresh that would
+    // replace the store with empty IPC mocks.
+    useMcpRegistryStore.setState({
+      sources: [
+        {
+          id: 'mcp-official',
+          name: 'MCP Official',
+          description: 'Official registry',
+          registryUrl: 'https://registry.modelcontextprotocol.io',
+          enabled: true,
+          builtin: true,
+          serverCount: 2,
+          lastFetchedAt: '2026-07-01T00:00:00Z',
+        },
+      ],
+      entries: [
+        {
+          key: 'mcp-official:io.github.github/github-mcp-server',
+          marketSourceId: 'mcp-official',
+          name: 'io.github.github/github-mcp-server',
+          title: 'GitHub',
+          description: 'Connect AI assistants to GitHub',
+          version: '1.7.0',
+          installState: 'not_installed',
+          remotes: [{ type: 'streamable-http', url: 'https://api.githubcopilot.com/mcp/' }],
+        },
+      ],
+      loaded: true,
+      loading: false,
+      refreshing: false,
+      tab: 'mcp-official',
+      query: '',
+      error: null,
+    })
+
+    render(<McpConfig />)
+
+    await waitFor(() => {
+      expect(screen.getByTestId('mcp-registry-card')).toBeInTheDocument()
+    })
+    expect(screen.getByTestId('mcp-registry-sources-open')).toBeInTheDocument()
+    expect(screen.getByTestId('mcp-registry-refresh')).toBeInTheDocument()
+    expect(screen.getByText('GitHub')).toBeInTheDocument()
+  })
 })

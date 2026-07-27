@@ -913,7 +913,7 @@ export const ko = {
       "ask": "매번 묻기"
     },
     "trayEnabled": "시스템 트레이 아이콘",
-    "trayEnabledDesc": "트레이에서 창을 복원하거나 종료할 수 있습니다. 「시스템 트레이로 숨기기」 선택 시 자동으로 켜집니다.",
+    "trayEnabledDesc": "트레이에서 창을 복원하거나 종료할 수 있습니다. 켜면 「창을 닫을 때」가 「시스템 트레이로 숨기기」로 바뀌며, 숨기기/매번 확인을 고르면 트레이도 자동으로 켜집니다.",
     "closeActionsAskNote": "창을 닫을 때마다 묻습니다.",
     "launchAtLogin": "로그인 시 시작",
     "launchAtLoginDesc": "컴퓨터에 로그인할 때 hip을 시작합니다. 로그인 항목에서 실행되면 기본적으로 트레이로 숨깁니다.",

@@ -59,8 +59,15 @@ export function WindowSettings() {
   }
 
   const setTrayEnabled = (enabled: boolean) => {
-    const nextClose: WindowCloseAction =
-      !enabled && (closeAction === 'hide' || closeAction === 'ask') ? 'quit' : closeAction
+    // Pair tray with close policy: enabling tray ⇒ hide-to-tray; disabling while
+    // hide/ask is selected ⇒ quit (hide/ask require a tray).
+    const nextClose: WindowCloseAction = enabled
+      ? closeAction === 'quit'
+        ? 'hide'
+        : closeAction
+      : closeAction === 'hide' || closeAction === 'ask'
+        ? 'quit'
+        : closeAction
     void updateSection('window', (prev) => ({
       ...(prev ?? {}),
       closeAction: nextClose,

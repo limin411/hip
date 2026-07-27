@@ -116,7 +116,7 @@ describe('WindowSettings', () => {
     expect(screen.getByTestId('settings-close-action-ask')).toBeInTheDocument()
   })
 
-  it('enabling tray switch persists trayEnabled', async () => {
+  it('enabling tray switch sets close action to hide and persists policy', async () => {
     render(<WindowSettings />)
     fireEvent.click(screen.getByTestId('settings-tray-enabled-switch'))
     await waitFor(() => {
@@ -132,8 +132,57 @@ describe('WindowSettings', () => {
       closePromptSeen?: boolean
     }
     expect(updater({ closeAction: 'quit', trayEnabled: false })).toEqual({
-      closeAction: 'quit',
+      closeAction: 'hide',
       trayEnabled: true,
+      closePromptSeen: true,
+    })
+    await waitFor(() => {
+      expect(setWindowPolicy).toHaveBeenCalledWith('hide', true, true)
+    })
+  })
+
+  it('enabling tray keeps ask close action', async () => {
+    hipConfigState.config.window = { closeAction: 'ask', trayEnabled: false }
+    render(<WindowSettings />)
+    fireEvent.click(screen.getByTestId('settings-tray-enabled-switch'))
+    await waitFor(() => {
+      expect(updateSection).toHaveBeenCalledWith('window', expect.any(Function))
+    })
+    const updater = updateSection.mock.calls[0][1] as (prev: {
+      closeAction?: string
+      trayEnabled?: boolean
+      closePromptSeen?: boolean
+    }) => {
+      closeAction?: string
+      trayEnabled?: boolean
+      closePromptSeen?: boolean
+    }
+    expect(updater({ closeAction: 'ask', trayEnabled: false })).toEqual({
+      closeAction: 'ask',
+      trayEnabled: true,
+      closePromptSeen: true,
+    })
+  })
+
+  it('disabling tray forces quit when close was hide', async () => {
+    hipConfigState.config.window = { closeAction: 'hide', trayEnabled: true }
+    render(<WindowSettings />)
+    fireEvent.click(screen.getByTestId('settings-tray-enabled-switch'))
+    await waitFor(() => {
+      expect(updateSection).toHaveBeenCalledWith('window', expect.any(Function))
+    })
+    const updater = updateSection.mock.calls[0][1] as (prev: {
+      closeAction?: string
+      trayEnabled?: boolean
+      closePromptSeen?: boolean
+    }) => {
+      closeAction?: string
+      trayEnabled?: boolean
+      closePromptSeen?: boolean
+    }
+    expect(updater({ closeAction: 'hide', trayEnabled: true })).toEqual({
+      closeAction: 'quit',
+      trayEnabled: false,
       closePromptSeen: true,
     })
   })

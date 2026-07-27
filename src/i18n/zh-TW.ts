@@ -921,7 +921,7 @@ export const zhTW = {
       "ask": "每次詢問"
     },
     "trayEnabled": "系統匣圖示",
-    "trayEnabledDesc": "透過系統匣圖示還原視窗或結束。選擇「隱藏到系統匣」時會自動開啟。",
+    "trayEnabledDesc": "透過系統匣圖示還原視窗或結束。開啟時會將「關閉視窗時」設為「隱藏到系統匣」；選擇隱藏/每次詢問時也會自動開啟系統匣。",
     "closeActionsAskNote": "每次關閉視窗時詢問。",
     "launchAtLogin": "開機時啟動 hip",
     "launchAtLoginDesc": "登入系統時啟動 hip。從登入項目啟動時預設隱藏到系統匣。",

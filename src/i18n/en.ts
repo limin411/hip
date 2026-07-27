@@ -900,7 +900,7 @@ export const en = {
       },
       trayEnabled: 'System tray icon',
       trayEnabledDesc:
-        'Show a tray icon to restore the window or quit. Required for “Hide to system tray”.',
+        'Show a tray icon to restore the window or quit. Turning this on sets “When closing the window” to “Hide to system tray”; choosing hide/ask also enables the tray.',
       closeActionsAskNote: 'Ask each time you close the window.',
       launchAtLogin: 'Launch at login',
       launchAtLoginDesc:

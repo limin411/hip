@@ -208,23 +208,23 @@ describe('AppSidebar', () => {
   })
 
   it('resize handle drag updates sidebarWidth', () => {
-    useUiStore.setState({ sidebarWidth: 260 })
+    useUiStore.setState({ sidebarWidth: 300 })
     render(<AppSidebar />)
     const handle = screen.getByTestId('sidebar-resize-handle')
-    fireEvent.pointerDown(handle, { button: 0, clientX: 260 })
-    fireEvent.pointerMove(window, { clientX: 320 })
-    fireEvent.pointerUp(window, { button: 0, clientX: 320 })
-    expect(useUiStore.getState().sidebarWidth).toBe(320)
+    fireEvent.pointerDown(handle, { button: 0, clientX: 300 })
+    fireEvent.pointerMove(window, { clientX: 360 })
+    fireEvent.pointerUp(window, { button: 0, clientX: 360 })
+    expect(useUiStore.getState().sidebarWidth).toBe(360)
   })
 
   it('resize handle keyboard arrows nudge width; double-click resets', () => {
-    useUiStore.setState({ sidebarWidth: 260 })
+    useUiStore.setState({ sidebarWidth: 300 })
     render(<AppSidebar />)
     const handle = screen.getByTestId('sidebar-resize-handle')
     fireEvent.keyDown(handle, { key: 'ArrowRight' })
-    expect(useUiStore.getState().sidebarWidth).toBe(276)
+    expect(useUiStore.getState().sidebarWidth).toBe(316)
     fireEvent.doubleClick(handle)
-    expect(useUiStore.getState().sidebarWidth).toBe(260)
+    expect(useUiStore.getState().sidebarWidth).toBe(300)
   })
 
   it('nav knowledge calls enterKnowledge', () => {

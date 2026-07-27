@@ -427,18 +427,18 @@ describe('uiStore persistence partialize', () => {
     const current = {
       activeView: 'workbench' as const,
       sidebarSection: 'workbench' as const,
-      sidebarWidth: 260,
+      sidebarWidth: 300,
     }
     expect(mergeUiPersistedState({ sidebarWidth: 9999 }, current).sidebarWidth).toBe(480)
     expect(mergeUiPersistedState({ sidebarWidth: 50 }, current).sidebarWidth).toBe(200)
-    expect(mergeUiPersistedState({ sidebarWidth: 'wide' }, current).sidebarWidth).toBe(260)
+    expect(mergeUiPersistedState({ sidebarWidth: 'wide' }, current).sidebarWidth).toBe(300)
   })
 })
 
 describe('uiStore - sidebarWidth', () => {
-  it('defaults to 260 and clamps via setSidebarWidth', () => {
-    useUiStore.setState({ sidebarWidth: 260 })
-    expect(useUiStore.getState().sidebarWidth).toBe(260)
+  it('defaults to 300 and clamps via setSidebarWidth', () => {
+    useUiStore.setState({ sidebarWidth: 300 })
+    expect(useUiStore.getState().sidebarWidth).toBe(300)
     useUiStore.getState().setSidebarWidth(320)
     expect(useUiStore.getState().sidebarWidth).toBe(320)
     useUiStore.getState().setSidebarWidth(10)

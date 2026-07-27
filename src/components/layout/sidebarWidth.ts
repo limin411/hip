@@ -1,5 +1,5 @@
 /** Default / clamp bounds for the left AppSidebar width (px). */
-export const SIDEBAR_WIDTH_DEFAULT = 260
+export const SIDEBAR_WIDTH_DEFAULT = 300
 export const SIDEBAR_WIDTH_MIN = 200
 export const SIDEBAR_WIDTH_MAX = 480
 

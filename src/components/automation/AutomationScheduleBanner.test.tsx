@@ -87,4 +87,21 @@ describe('AutomationScheduleBanner', () => {
     expect(setSettingsPage).toHaveBeenCalledWith('window')
     expect(setActiveView).toHaveBeenCalledWith('settings')
   })
+
+  it('uses needTrayDescWithLogin when launchAtLogin is off', () => {
+    windowCfg = { closeAction: 'quit', trayEnabled: false, launchAtLogin: false }
+    render(<AutomationScheduleBanner automations={[dailyAuto(true)]} />)
+    // Without i18n instance, t returns the key path.
+    expect(screen.getByTestId('automation-schedule-banner')).toHaveTextContent(
+      'automation.banner.needTrayDescWithLogin',
+    )
+  })
+
+  it('uses shorter needTrayDesc when launchAtLogin is on', () => {
+    windowCfg = { closeAction: 'quit', trayEnabled: false, launchAtLogin: true }
+    render(<AutomationScheduleBanner automations={[dailyAuto(true)]} />)
+    const banner = screen.getByTestId('automation-schedule-banner')
+    expect(banner).toHaveTextContent('automation.banner.needTrayDesc')
+    expect(banner).not.toHaveTextContent('automation.banner.needTrayDescWithLogin')
+  })
 })

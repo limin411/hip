@@ -47,7 +47,7 @@ vi.mock('@/components/automation/AutomationsPage', () => ({
   AutomationsPage: () => <div data-testid="automations-page" />,
 }))
 vi.mock('@/components/automation/AutomationRunHost', () => ({
-  AutomationRunHost: () => null,
+  AutomationRunHost: () => <div data-testid="automation-run-host" />,
 }))
 vi.mock('@/components/automation/feature', () => ({
   AUTOMATION_PAGE: true,
@@ -122,5 +122,11 @@ describe('AppLayout', () => {
     render(<AppLayout />, { wrapper: MemoryRouter })
     expect(screen.getByTestId('automations-page')).toBeInTheDocument()
     expect(screen.queryByTestId('placeholder-automation')).not.toBeInTheDocument()
+  })
+
+  it('mounts AutomationRunHost when AUTOMATION_PAGE is on', () => {
+    useUiStore.setState({ sidebarOpen: true })
+    render(<AppLayout />, { wrapper: MemoryRouter })
+    expect(screen.getByTestId('automation-run-host')).toBeInTheDocument()
   })
 })

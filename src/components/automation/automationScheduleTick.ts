@@ -70,6 +70,9 @@ export function runAutomationOnTick(
 /**
  * Sample open watches against domain sessions and complete / patch waiting_user.
  * Call on each host tick so schedule/manual fires reach a terminal status.
+ *
+ * Unloaded list summaries always look `idle` without HITL — not trustworthy for
+ * terminal success (same guard as recoverOrphanRuns). Leave the watch open.
  */
 export function sampleAutomationWatches(nowMs: number = Date.now()): void {
   const store = useAutomationStore.getState()
@@ -77,6 +80,12 @@ export function sampleAutomationWatches(nowMs: number = Date.now()): void {
 
   for (const w of listWatches()) {
     const session = sessions.find((s) => s.id === w.sessionId)
+
+    // Mirror recover: unloaded summaries must not complete as succeeded.
+    if (session && session.loaded === false) {
+      continue
+    }
+
     const kind = classifySessionForAutomation(session)
 
     if (kind === 'in_flight') continue

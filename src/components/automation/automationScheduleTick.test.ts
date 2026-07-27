@@ -16,6 +16,7 @@ let watches: Array<{ runId: string; sessionId: string; automationId: string }> =
 let sessions: Array<{
   id: string
   status: 'idle' | 'running' | 'error'
+  loaded?: boolean
   pendingPermission?: unknown
   interrupt?: unknown
   planApprovalPending?: boolean
@@ -217,6 +218,14 @@ describe('sampleAutomationWatches', () => {
     watches = [{ runId: 'arun_3', sessionId: 's3', automationId: 'a3' }]
     sessions = [{ id: 's3', status: 'running' }]
     sampleAutomationWatches(7000)
+    expect(completeRun).not.toHaveBeenCalled()
+    expect(patchRunStatus).not.toHaveBeenCalled()
+  })
+
+  it('skips unloaded list summaries (no false success)', () => {
+    watches = [{ runId: 'arun_4', sessionId: 's4', automationId: 'a4' }]
+    sessions = [{ id: 's4', status: 'idle', loaded: false }]
+    sampleAutomationWatches(8000)
     expect(completeRun).not.toHaveBeenCalled()
     expect(patchRunStatus).not.toHaveBeenCalled()
   })

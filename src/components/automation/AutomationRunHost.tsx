@@ -63,6 +63,9 @@ export function AutomationRunHost({
   clockRef.current = { ...defaultClock(), ...clockPartial }
 
   const tick = useCallback((forcedNow?: number) => {
+    // Do not evaluate schedules or burn coldStart until catalog is loaded.
+    // focus/visibility can fire while load() IPC is in flight (empty catalog).
+    if (!useAutomationStore.getState().loaded) return
     const now = forcedNow ?? clockRef.current.nowMs()
     const coldStart = coldStartPending
     if (coldStartPending) coldStartPending = false
@@ -102,7 +105,7 @@ export function AutomationRunHost({
         try {
           await useAutomationStore.getState().load()
         } catch {
-          /* load already sets error; still allow ticks */
+          /* load already sets error; still allow ticks once loaded flips */
         }
       }
       if (cancelled) return

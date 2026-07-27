@@ -287,6 +287,60 @@ describe('AutomationRunHost', () => {
       }),
     )
   })
+
+  it('focus during deferred load does not burn coldStart (app_was_quit after load)', async () => {
+    const next = 1_000_000
+    const far = next + MISS_WINDOW_MS + 1
+    automations = [daily('auto_race', next)]
+    loaded = false
+
+    let resolveLoad!: () => void
+    load.mockImplementation(
+      () =>
+        new Promise<void>((resolve) => {
+          resolveLoad = () => {
+            loaded = true
+            resolve()
+          }
+        }),
+    )
+
+    render(
+      <AutomationRunHost
+        fireOnMount
+        clock={{
+          nowMs: () => far,
+          setInterval: () => 1,
+          clearInterval: () => undefined,
+        }}
+      />,
+    )
+
+    await waitFor(() => expect(load).toHaveBeenCalled())
+
+    // Focus while load still pending — must not consume coldStart or fire.
+    act(() => {
+      window.dispatchEvent(new Event('focus'))
+    })
+    expect(recordSkip).not.toHaveBeenCalled()
+    expect(runNow).not.toHaveBeenCalled()
+
+    // Catalog arrives; first real evaluation keeps coldStart → app_was_quit.
+    await act(async () => {
+      resolveLoad()
+      await Promise.resolve()
+    })
+
+    await waitFor(() =>
+      expect(recordSkip).toHaveBeenCalledWith('auto_race', {
+        trigger: 'catchup',
+        error: 'app_was_quit',
+        now: far,
+        rollNextRunAt: true,
+      }),
+    )
+    expect(recordSkip).toHaveBeenCalledTimes(1)
+  })
 })
 
 /** Local helper type — keep test file free of exporting host clock type noise. */

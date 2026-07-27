@@ -139,6 +139,21 @@ pub fn work_items_ui_prefs_path(app: &AppHandle) -> Option<PathBuf> {
     Some(work_items_dir(app)?.join("ui-prefs.json"))
 }
 
+/// Product automations root (`<base>/automations`) — content dir, not under config/.
+pub fn automations_dir(app: &AppHandle) -> Option<PathBuf> {
+    hip_subdir(app, "automations")
+}
+
+/// Canonical path of the automations catalog (`automations/catalog.json`).
+pub fn automations_catalog_path(app: &AppHandle) -> Option<PathBuf> {
+    Some(automations_dir(app)?.join("catalog.json"))
+}
+
+/// Canonical path of the automation runs log (`automations/runs.json`).
+pub fn automations_runs_path(app: &AppHandle) -> Option<PathBuf> {
+    Some(automations_dir(app)?.join("runs.json"))
+}
+
 /// Directory holding installed plugins (`<dir>/<plugin-id>/.plugin/plugin.json`).
 pub fn plugins_dir(app: &AppHandle) -> Option<PathBuf> {
     hip_subdir(app, "plugins")
@@ -247,6 +262,27 @@ mod tests {
             .to_string_lossy()
             .replace('\\', "/");
         assert!(!s.contains("/config/"));
+    }
+
+    #[test]
+    fn automations_catalog_and_runs_live_under_base_not_config() {
+        let base = hip_base_from(Some(PathBuf::from("/Users/x")), None).unwrap();
+        assert_eq!(
+            base.join("automations").join("catalog.json"),
+            PathBuf::from("/Users/x/.hip/automations/catalog.json"),
+        );
+        assert_eq!(
+            base.join("automations").join("runs.json"),
+            PathBuf::from("/Users/x/.hip/automations/runs.json"),
+        );
+        for name in ["catalog.json", "runs.json"] {
+            let s = base
+                .join("automations")
+                .join(name)
+                .to_string_lossy()
+                .replace('\\', "/");
+            assert!(!s.contains("/config/"), "{s}");
+        }
     }
 
     #[test]

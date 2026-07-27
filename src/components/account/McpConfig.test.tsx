@@ -292,6 +292,7 @@ describe('McpConfig', () => {
           description: 'Connect AI assistants to GitHub',
           version: '1.7.0',
           installState: 'not_installed',
+          enabled: false,
           remotes: [{ type: 'streamable-http', url: 'https://api.githubcopilot.com/mcp/' }],
         },
       ],

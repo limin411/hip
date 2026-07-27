@@ -3,6 +3,7 @@ import '@testing-library/jest-dom/vitest'
 import React from 'react'
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen, fireEvent, waitFor, cleanup } from '@testing-library/react'
+import type { WindowCloseAction } from '@hip/protocol'
 import { WindowSettings } from './WindowSettings'
 
 const updateSection = vi.fn().mockResolvedValue(undefined)
@@ -11,7 +12,7 @@ const load = vi.fn().mockResolvedValue(undefined)
 const hipConfigState = {
   config: {
     version: 1 as const,
-    window: { closeAction: 'quit' as const, trayEnabled: false },
+    window: { closeAction: 'quit' as WindowCloseAction, trayEnabled: false },
   },
   loaded: true,
   load,

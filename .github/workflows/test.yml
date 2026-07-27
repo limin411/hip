@@ -54,6 +54,7 @@ jobs:
           name: coverage
           path: coverage/
           if-no-files-found: ignore
+          retention-days: 1
 
   rust-unit:
     runs-on: ubuntu-latest

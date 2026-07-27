@@ -111,7 +111,7 @@ jobs:
           name: hip-macos-${{ steps.collect.outputs.triple }}
           path: dist-ci/macos/
           if-no-files-found: error
-          retention-days: 14
+          retention-days: 1
 
   package-windows:
     name: package-windows
@@ -197,4 +197,4 @@ jobs:
           name: hip-windows-${{ steps.collect.outputs.triple }}
           path: dist-ci/windows/
           if-no-files-found: error
-          retention-days: 14
+          retention-days: 1

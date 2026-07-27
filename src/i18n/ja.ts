@@ -1499,7 +1499,11 @@ export const ja = {
       "loadError": "このスキルファイルを読み込めませんでした。",
       "pluginSkills": "プラグインスキル",
       "pluginSkillsHint": "インストール済みプラグインが所有するスキルです。ここで各スキルの有効/無効を切り替えられます。削除するにはプラグインマーケットでプラグインをアンインストールしてください。プラグインマーケットでプラグインが無効の場合、そのすべてのスキルはオフのままです。",
-      "pluginDisabledBadge": "プラグインオフ"
+      "pluginDisabledBadge": "プラグインオフ",
+      "builtinSkills": "組み込みスキル",
+      "builtinSkillsHint": "hip 同梱（製品ヘルプとコーディング方針）。常に有効で、無効化や削除はできません。",
+      "builtinBadge": "組み込み",
+      "builtinAlwaysOn": "組み込みスキル（常にオン）"
     },
     "agents": {
       "title": "エージェント管理",

@@ -99,6 +99,11 @@ pub fn skills_dir(app: &AppHandle) -> Option<PathBuf> {
     hip_subdir(app, "skills")
 }
 
+/// Product built-in skills materialised by the sidecar (`<dir>/<skill-id>/SKILL.md`).
+pub fn builtin_skills_dir(app: &AppHandle) -> Option<PathBuf> {
+    hip_subdir(app, "builtin-skills")
+}
+
 /// Canonical path of the plugin registry inside `config/`.
 pub fn plugins_config_path(app: &AppHandle) -> Option<PathBuf> {
     Some(config_dir(app)?.join("hip-plugins.json"))

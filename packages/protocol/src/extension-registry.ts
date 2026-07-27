@@ -177,7 +177,9 @@ export function mcpCapabilityFingerprint(config: McpServerConfig): string {
 
 /**
  * Resolve skill candidates: one active winner per id.
- * Disabled ids (from hip.toml [[skills]] enabled=false) never become active.
+ * Disabled ids (from hip.toml [[skills]] enabled=false) never become active,
+ * except product built-ins (`tier === builtin` / source kind `builtin`), which
+ * stay always-on so Settings cannot turn them off.
  */
 export function resolveSkillCandidates(
   candidates: SkillCandidate[],
@@ -196,7 +198,9 @@ export function resolveSkillCandidates(
   for (const [id, list] of byId) {
     list.sort((a, b) => a.tier - b.tier || a.order - b.order)
     const winner = list[0]!
-    if (disabledIds.has(id)) {
+    const isBuiltinWinner =
+      winner.tier === SKILL_TIER.builtin || winner.source.kind === 'builtin'
+    if (disabledIds.has(id) && !isBuiltinWinner) {
       skills.push({
         id,
         active: false,

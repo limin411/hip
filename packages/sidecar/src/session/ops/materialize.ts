@@ -92,7 +92,7 @@ export function getOpsBuiltinSkills(): SkillMeta[] {
         hasScripts: false,
         hasReferences: false,
         hasAssets: false,
-        scope: 'global',
+        scope: 'builtin',
         autoInvoke: true,
         userInvocable: true,
       },

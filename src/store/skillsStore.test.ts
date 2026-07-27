@@ -100,4 +100,21 @@ describe('skillsStore', () => {
     const result = fn([{ id: 'pdf', enabled: true }])
     expect(result).toEqual([])
   })
+
+  it('refuses toggle/remove for built-in skills', async () => {
+    const builtin = {
+      id: 'hip',
+      name: 'hip',
+      description: 'd',
+      dir: '/tmp/builtin-skills/hip',
+      hasScripts: false,
+      scope: 'builtin' as const,
+    }
+    const { useSkillsStore } = await import('./skillsStore.js')
+    useSkillsStore.setState({ skills: [builtin], enabled: {}, loaded: true })
+    await expect(useSkillsStore.getState().toggle('hip', false)).rejects.toThrow(/Built-in/)
+    await expect(useSkillsStore.getState().remove('hip')).rejects.toThrow(/Built-in/)
+    expect(deleteSkill).not.toHaveBeenCalled()
+    expect(hipConfigState.updateSection).not.toHaveBeenCalled()
+  })
 })

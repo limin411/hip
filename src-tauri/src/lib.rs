@@ -549,6 +549,18 @@ fn delete_skill(app: tauri::AppHandle, id: String) -> Result<(), String> {
     if id.is_empty() || id.contains('/') || id.contains('\\') || id.contains("..") {
         return Err("非法 skill id".to_string());
     }
+    // Never delete product built-ins under ~/.hip/builtin-skills.
+    if let Some(builtin) = paths::builtin_skills_dir(&app) {
+        let builtin_dir = builtin.join(&id);
+        if builtin_dir.is_dir() {
+            // Only refuse when there is no user override under skills/; otherwise
+            // delete removes the user copy and the built-in remains.
+            let user = paths::skills_dir(&app).map(|d| d.join(&id)).filter(|d| d.is_dir());
+            if user.is_none() {
+                return Err("内置 skill 不可删除".to_string());
+            }
+        }
+    }
     let dir = paths::skills_dir(&app).ok_or("no skills dir")?.join(&id);
     if !dir.is_dir() {
         return Err("skill 不存在".to_string());
@@ -567,8 +579,16 @@ fn read_skill_file(app: tauri::AppHandle, id: String, rel: String) -> Result<Str
     let skill_dir = match standalone_dir {
         Some(d) => d,
         None => {
-            let plugins_dir = paths::plugins_dir(&app).ok_or("no plugin dir")?;
-            skills::find_plugin_skill_dir(&plugins_dir, &id).ok_or("skill not found")?
+            let builtin_dir = paths::builtin_skills_dir(&app)
+                .map(|d| d.join(&id))
+                .filter(|d| d.is_dir());
+            match builtin_dir {
+                Some(d) => d,
+                None => {
+                    let plugins_dir = paths::plugins_dir(&app).ok_or("no plugin dir")?;
+                    skills::find_plugin_skill_dir(&plugins_dir, &id).ok_or("skill not found")?
+                }
+            }
         }
     };
     let target = skills::safe_join(&skill_dir, &rel).ok_or("非法文件路径")?;

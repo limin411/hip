@@ -7,6 +7,7 @@ import {
   toolAllowlistPreview,
   derivePluginSkills,
   isPluginManagedSkill,
+  isBuiltinSkill,
   partitionSkillsForSettings,
   effectivePluginSkillEnabled,
 } from './SkillConfig'
@@ -167,6 +168,26 @@ describe('derivePluginSkills', () => {
   })
 })
 
+describe('isBuiltinSkill', () => {
+  it('detects scope=builtin', () => {
+    expect(isBuiltinSkill(baseSkill({ scope: 'builtin' }))).toBe(true)
+  })
+
+  it('detects builtin-skills path fallback', () => {
+    expect(
+      isBuiltinSkill(
+        baseSkill({ scope: 'global', dir: '/Users/x/.hip/builtin-skills/hip' }),
+      ),
+    ).toBe(true)
+  })
+
+  it('is false for normal user skills', () => {
+    expect(isBuiltinSkill(baseSkill({ scope: 'global', dir: '/Users/x/.hip/skills/pdf' }))).toBe(
+      false,
+    )
+  })
+})
+
 describe('isPluginManagedSkill / partitionSkillsForSettings', () => {
   it('detects plugin-managed skills by scope or pluginId', () => {
     expect(isPluginManagedSkill(baseSkill())).toBe(false)
@@ -185,11 +206,28 @@ describe('isPluginManagedSkill / partitionSkillsForSettings', () => {
       }),
     ]
     const plugins = [basePlugin({ skills: ['from-plugin', 'manifest-only'] })]
-    const { standalone, pluginEntries } = partitionSkillsForSettings(skills, plugins)
+    const { standalone, builtin, pluginEntries } = partitionSkillsForSettings(skills, plugins)
     expect(standalone.map((s) => s.id)).toEqual(['local'])
+    expect(builtin).toEqual([])
     expect(pluginEntries.map((e) => e.skill.id).sort()).toEqual(['from-plugin', 'manifest-only'])
     expect(pluginEntries.find((e) => e.skill.id === 'from-plugin')?.pluginName).toBe('Test Plugin')
     expect(pluginEntries.every((e) => e.pluginEnabled)).toBe(true)
+  })
+
+  it('splits product built-ins out of standalone', () => {
+    const skills = [
+      baseSkill({ id: 'local', name: 'Local' }),
+      baseSkill({
+        id: 'hip',
+        name: 'hip',
+        scope: 'builtin',
+        dir: '/Users/x/.hip/builtin-skills/hip',
+      }),
+    ]
+    const { standalone, builtin, pluginEntries } = partitionSkillsForSettings(skills, [])
+    expect(standalone.map((s) => s.id)).toEqual(['local'])
+    expect(builtin.map((s) => s.id)).toEqual(['hip'])
+    expect(pluginEntries).toEqual([])
   })
 
   it('marks skills disabled when parent plugin is off', () => {

@@ -24,7 +24,7 @@ import { TERMINAL_COLOR_THEME_IDS, isTerminalColorThemeId } from './hip-config.j
 // TYPE GUARDS (checked only by tsc, NOT by vitest)
 // ──────────────────────────────────────────────────────────────────
 
-const _skillScopes = (['global', 'project', 'plugin'] as const) satisfies readonly SkillScope[]
+const _skillScopes = (['global', 'project', 'plugin', 'builtin'] as const) satisfies readonly SkillScope[]
 void _skillScopes
 
 // ──────────────────────────────────────────────────────────────────
@@ -235,9 +235,9 @@ describe('protocol: SkillScope + SkillMeta extension (Todo 8)', () => {
     expect(round.pluginId).toBe('my-plugin')
   })
 
-  it('SkillScope admits exactly the three literals', () => {
-    const scopes: SkillScope[] = ['global', 'project', 'plugin']
-    expect(scopes).toEqual(['global', 'project', 'plugin'])
+  it('SkillScope admits global, project, plugin, and builtin', () => {
+    const scopes: SkillScope[] = ['global', 'project', 'plugin', 'builtin']
+    expect(scopes).toEqual(['global', 'project', 'plugin', 'builtin'])
   })
 })
 

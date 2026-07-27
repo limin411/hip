@@ -350,7 +350,7 @@ describe('ConfigManager — builtin product skill', () => {
     expect(existsSync(join(hip!.dir, 'SKILL.md'))).toBe(true)
   })
 
-  it('honors hip.toml skills disable for builtin hip', () => {
+  it('keeps builtin hip active even when hip.toml lists it disabled', () => {
     const dataDir = tmpDir()
     dirs.push(dataDir)
     process.env.HIP_DATA_DIR = dataDir
@@ -368,7 +368,9 @@ describe('ConfigManager — builtin product skill', () => {
     const mgr = makeManager(cwdDir)
     mgr.loadPluginComponents()
 
-    expect(mgr.skills.find((s) => s.id === 'hip')).toBeUndefined()
+    const hip = mgr.skills.find((s) => s.id === 'hip')
+    expect(hip).toBeDefined()
+    expect(hip!.scope).toBe('builtin')
   })
 
   it('user skill with same id overrides builtin dir', () => {

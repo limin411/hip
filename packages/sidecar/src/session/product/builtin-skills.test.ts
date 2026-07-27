@@ -93,6 +93,7 @@ describe('builtin product skill materialization', () => {
   it('getBuiltinSkills includes product hip and operational hip-coding', () => {
     const skills = getBuiltinSkills()
     expect(skills.map((s) => s.id).sort()).toEqual(['hip', 'hip-coding'])
+    expect(skills.every((s) => s.scope === 'builtin')).toBe(true)
   })
 })
 

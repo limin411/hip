@@ -1506,7 +1506,11 @@ export const zhTW = {
       "loadError": "無法讀取該技能檔案。",
       "pluginSkills": "外掛技能",
       "pluginSkillsHint": "由已安裝外掛提供。可在此開關啟用；刪除只能透過在「外掛市場」解除安裝整個外掛。外掛在市場中禁用時，其全部技能一併關閉。",
-      "pluginDisabledBadge": "外掛已關"
+      "pluginDisabledBadge": "外掛已關",
+      "builtinSkills": "內建技能",
+      "builtinSkillsHint": "隨 hip 提供（產品說明與編碼策略）。一律啟用，不可關閉或刪除。",
+      "builtinBadge": "內建",
+      "builtinAlwaysOn": "內建技能（一律開啟）"
     },
     "agents": {
       "title": "智慧體管理",

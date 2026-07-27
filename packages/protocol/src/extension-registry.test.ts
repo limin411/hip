@@ -104,7 +104,7 @@ describe('resolveSkillCandidates', () => {
     expect(conflicts.filter((c) => c.kind === 'skill_id_shadow')).toHaveLength(2)
   })
 
-  it('marks disabled skills inactive', () => {
+  it('keeps product built-ins active even when listed disabled in hip.toml', () => {
     const { skills } = resolveSkillCandidates(
       [
         {
@@ -116,6 +116,22 @@ describe('resolveSkillCandidates', () => {
         },
       ],
       new Set(['hip']),
+    )
+    expect(skills[0]!.active).toBe(true)
+  })
+
+  it('marks non-builtin disabled skills inactive', () => {
+    const { skills } = resolveSkillCandidates(
+      [
+        {
+          id: 'pdf',
+          meta: skill('pdf', 'PDF', '/u/pdf'),
+          source: { kind: 'user_skill', configId: 'pdf' },
+          tier: SKILL_TIER.user,
+          order: 0,
+        },
+      ],
+      new Set(['pdf']),
     )
     expect(skills[0]!.active).toBe(false)
   })

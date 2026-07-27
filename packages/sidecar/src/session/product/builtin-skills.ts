@@ -120,7 +120,7 @@ export function getProductBuiltinSkills(): SkillMeta[] {
         hasScripts: false,
         hasReferences: true,
         hasAssets: false,
-        scope: 'global',
+        scope: 'builtin',
         autoInvoke: true,
         userInvocable: true,
       },

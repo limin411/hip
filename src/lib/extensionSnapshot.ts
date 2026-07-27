@@ -101,7 +101,9 @@ export function skillRowsFromSnapshot(
             ? 'plugin'
             : r.winner.kind === 'project_skill'
               ? 'project'
-              : 'global'),
+              : r.winner.kind === 'builtin'
+                ? 'builtin'
+                : 'global'),
         pluginId: pluginId ?? r.meta.pluginId,
       },
       registryActive: r.active,
@@ -126,6 +128,7 @@ export function partitionSkillsFromSnapshot(
   plugins: PluginMeta[],
 ): {
   standalone: SkillMeta[]
+  builtin: SkillMeta[]
   pluginEntries: Array<{
     skill: SkillMeta
     pluginName: string
@@ -134,8 +137,14 @@ export function partitionSkillsFromSnapshot(
   }>
 } {
   const rows = skillRowsFromSnapshot(snapshot, plugins)
-  const standalone = rows
-    .filter((r) => r.sourceKind !== 'plugin_skill' && r.registryActive)
+  const nonPluginActive = rows.filter(
+    (r) => r.sourceKind !== 'plugin_skill' && r.registryActive,
+  )
+  const builtin = nonPluginActive
+    .filter((r) => r.sourceKind === 'builtin' || r.skill.scope === 'builtin')
+    .map((r) => r.skill)
+  const standalone = nonPluginActive
+    .filter((r) => r.sourceKind !== 'builtin' && r.skill.scope !== 'builtin')
     .map((r) => r.skill)
   const pluginEntries = rows
     .filter((r) => r.sourceKind === 'plugin_skill')
@@ -145,5 +154,5 @@ export function partitionSkillsFromSnapshot(
       pluginEnabled: r.pluginEnabled === true,
       registryActive: r.registryActive,
     }))
-  return { standalone, pluginEntries }
+  return { standalone, builtin, pluginEntries }
 }

@@ -34,6 +34,10 @@ export const useSkillsStore = create<SkillsStore>((set, get) => ({
     set({ skills, enabled: entriesToEnabled(useHipConfigStore.getState().config.skills), loaded: true })
   },
   toggle: async (id, on) => {
+    const skill = get().skills.find((s) => s.id === id)
+    if (skill?.scope === 'builtin' || /(?:^|[\\/])builtin-skills[\\/]/.test(skill?.dir ?? '')) {
+      throw new Error('Built-in skills cannot be disabled.')
+    }
     const enabled = { ...get().enabled, [id]: on }
     await useHipConfigStore.getState().updateSection('skills', (prev) => {
       const list = prev ?? []
@@ -53,6 +57,9 @@ export const useSkillsStore = create<SkillsStore>((set, get) => ({
     const skill = get().skills.find((s) => s.id === id)
     if (skill?.scope === 'plugin' || skill?.pluginId) {
       throw new Error('Plugin-managed skills cannot be deleted individually; uninstall the plugin instead.')
+    }
+    if (skill?.scope === 'builtin' || /(?:^|[\\/])builtin-skills[\\/]/.test(skill?.dir ?? '')) {
+      throw new Error('Built-in skills cannot be deleted.')
     }
     await deleteSkill(id)
     const enabled = { ...get().enabled }

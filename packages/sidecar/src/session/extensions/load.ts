@@ -84,7 +84,7 @@ export function collectSkillCandidates(
   for (const [order, s] of getBuiltinSkills().entries()) {
     candidates.push({
       id: s.id,
-      meta: { ...s, scope: s.scope ?? 'global' },
+      meta: { ...s, scope: 'builtin' },
       source: { kind: 'builtin', configId: s.id, path: s.dir },
       tier: SKILL_TIER.builtin,
       order,

@@ -207,6 +207,57 @@ describe('SkillConfig partitions plugin-managed skills', () => {
   })
 })
 
+describe('SkillCard builtin (locked) variant', () => {
+  it('disables the switch, hides delete, and shows built-in badge', () => {
+    render(
+      <SkillCard
+        skill={skill({ id: 'hip', name: 'hip', scope: 'builtin' })}
+        enabled
+        onToggle={() => {}}
+        onView={() => {}}
+        onDelete={() => {}}
+        locked
+        switchDisabled
+      />,
+    )
+    const toggle = screen.getByRole('switch')
+    expect(toggle).toBeDisabled()
+    expect(toggle).toHaveAttribute('aria-checked', 'true')
+    expect(screen.getByText('settings.skill.builtinBadge')).toBeInTheDocument()
+    expect(screen.getByText('settings.skill.view')).toBeInTheDocument()
+    expect(screen.queryByText('settings.skill.delete')).not.toBeInTheDocument()
+    expect(lastSkillMenuProps?.payload.canDelete).toBe(false)
+  })
+})
+
+describe('SkillConfig builtin section', () => {
+  it('renders built-in skills locked without delete', () => {
+    useSkillsStore.setState({
+      skills: [
+        skill({ id: 'local', name: 'Local' }),
+        skill({
+          id: 'hip',
+          name: 'hip',
+          scope: 'builtin',
+          dir: '/tmp/builtin-skills/hip',
+        }),
+      ],
+      enabled: {},
+      loaded: true,
+    })
+    render(<SkillConfig />)
+    expect(screen.getByText('settings.skill.builtinSkills')).toBeInTheDocument()
+    expect(screen.getByText('hip')).toBeInTheDocument()
+    expect(screen.getByText('Local')).toBeInTheDocument()
+    // One delete (local only); builtin has view but no delete
+    expect(screen.queryAllByText('settings.skill.delete')).toHaveLength(1)
+    const cards = screen.getAllByTestId('skill-card')
+    const locked = cards.find((c) => c.getAttribute('data-skill-locked') === 'true')
+    expect(locked).toBeTruthy()
+    expect(locked!.querySelector('[role="switch"]')).toBeDisabled()
+  })
+})
+
 describe('SkillCard standalone variant', () => {
   it('remains interactive and keeps the delete menu item', () => {
     render(

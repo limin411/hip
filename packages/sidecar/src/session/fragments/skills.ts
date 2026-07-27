@@ -46,7 +46,7 @@ function optionalStringArray(j: { readonly [key: string]: JsonValue }, key: stri
 
 function optionalScope(j: { readonly [key: string]: JsonValue }, key: string): SkillScope | undefined {
   const value = j[key]
-  if (value === 'global' || value === 'project' || value === 'plugin') return value
+  if (value === 'global' || value === 'project' || value === 'plugin' || value === 'builtin') return value
   return undefined
 }
 

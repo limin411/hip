@@ -1542,6 +1542,11 @@ export const en = {
         pluginSkillsHint:
           'Owned by an installed plugin. You can enable or disable each skill here; delete only by uninstalling the plugin in Plugin Market. If the plugin is disabled in Plugin Market, all of its skills stay off.',
         pluginDisabledBadge: 'Plugin off',
+        builtinSkills: 'Built-in Skills',
+        builtinSkillsHint:
+          'Shipped with hip (product help and coding policy). Always on — cannot be disabled or deleted.',
+        builtinBadge: 'Built-in',
+        builtinAlwaysOn: 'Built-in skill (always on)',
       },
       agents: {
         title: 'Agent Management',

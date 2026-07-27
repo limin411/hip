@@ -1502,6 +1502,10 @@ export const zhCN = {
         pluginSkillsHint:
           '由已安装插件提供。可在此开关启用；删除只能通过在「插件市场」卸载整个插件。插件在市场中禁用时，其全部技能一并关闭。',
         pluginDisabledBadge: '插件已关',
+        builtinSkills: '内置技能',
+        builtinSkillsHint: '随 hip 提供（产品帮助与编码策略）。始终启用，不可关闭或删除。',
+        builtinBadge: '内置',
+        builtinAlwaysOn: '内置技能（始终开启）',
       },
       agents: {
         title: '智能体管理',

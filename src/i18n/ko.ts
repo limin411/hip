@@ -1499,7 +1499,11 @@ export const ko = {
       "loadError": "이 스킬 파일을 읽을 수 없습니다.",
       "pluginSkills": "플러그인 스킬",
       "pluginSkillsHint": "설치된 플러그인이 소유한 스킬입니다. 여기서 각 스킬을 켜거나 끌 수 있으며, 삭제하려면 플러그인 마켓에서 플러그인을 제거해야 합니다. 플러그인 마켓에서 플러그인이 비활성화되면 모든 스킬이 꺼집니다.",
-      "pluginDisabledBadge": "플러그인 꺼짐"
+      "pluginDisabledBadge": "플러그인 꺼짐",
+      "builtinSkills": "내장 스킬",
+      "builtinSkillsHint": "hip에 포함됩니다(제품 도움말 및 코딩 정책). 항상 켜져 있으며 끄거나 삭제할 수 없습니다.",
+      "builtinBadge": "내장",
+      "builtinAlwaysOn": "내장 스킬(항상 켜짐)"
     },
     "agents": {
       "title": "에이전트 관리",

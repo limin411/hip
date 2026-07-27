@@ -4,8 +4,8 @@
 // ──────────────────────────────────────────────────────────────────
 
 /** One installed skill, scanned from ~/.hip/skills/<id>/SKILL.md frontmatter. */
-/** Multi-level skill scope: global (~/.hip/skills), project (.hip/skills), or plugin-scoped. */
-export type SkillScope = 'global' | 'project' | 'plugin'
+/** Multi-level skill scope: global (~/.hip/skills), project (.hip/skills), plugin, or product builtin. */
+export type SkillScope = 'global' | 'project' | 'plugin' | 'builtin'
 
 /** One installed skill, scanned from ~/.hip/skills/<id>/SKILL.md frontmatter. */
 export interface SkillMeta {

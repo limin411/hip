@@ -59,6 +59,13 @@ export function isPluginManagedSkill(skill: SkillMeta): boolean {
   return skill.scope === 'plugin' || Boolean(skill.pluginId)
 }
 
+/** True when a skill is a product built-in (hip / hip-coding under ~/.hip/builtin-skills). */
+export function isBuiltinSkill(skill: SkillMeta): boolean {
+  if (skill.scope === 'builtin') return true
+  // Fallback for older snapshots that still stamp scope=global.
+  return /(?:^|[\\/])builtin-skills[\\/]/.test(skill.dir)
+}
+
 /**
  * Build read-only SkillMeta entries from plugin manifests.
  * - Standalone skills take precedence over plugin-provided skills with the same id.
@@ -93,7 +100,8 @@ export function derivePluginSkills(
 }
 
 /**
- * Split scanned skills into standalone (deletable) vs plugin-managed (toggle-only).
+ * Split scanned skills into standalone (user-owned), product built-ins (locked),
+ * and plugin-managed (toggle-only).
  * Merges list_skills plugin-scoped rows with manifest-derived rows so neither is lost.
  * `pluginEnabled` follows the parent plugin market switch (false when parent is off).
  */
@@ -102,10 +110,13 @@ export function partitionSkillsForSettings(
   plugins: PluginMeta[],
 ): {
   standalone: SkillMeta[]
+  builtin: SkillMeta[]
   pluginEntries: Array<{ skill: SkillMeta; pluginName: string; pluginEnabled: boolean }>
 } {
-  const standalone = skills.filter((s) => !isPluginManagedSkill(s))
-  const standaloneIds = new Set(standalone.map((s) => s.id))
+  const nonPlugin = skills.filter((s) => !isPluginManagedSkill(s))
+  const builtin = nonPlugin.filter((s) => isBuiltinSkill(s))
+  const standalone = nonPlugin.filter((s) => !isBuiltinSkill(s))
+  const standaloneIds = new Set(nonPlugin.map((s) => s.id))
   const pluginById = new Map(plugins.map((p) => [p.id, p]))
 
   const pluginEntries: Array<{ skill: SkillMeta; pluginName: string; pluginEnabled: boolean }> = []
@@ -135,7 +146,7 @@ export function partitionSkillsForSettings(
     })
   }
 
-  return { standalone, pluginEntries }
+  return { standalone, builtin, pluginEntries }
 }
 
 /** Effective skill switch: parent plugin must be on AND per-skill enabled. */
@@ -159,6 +170,7 @@ export function SkillConfig() {
       const byId = new Map(skills.map((s) => [s.id, s]))
       return {
         standalone: fromSnap.standalone.map((s) => byId.get(s.id) ?? s),
+        builtin: fromSnap.builtin.map((s) => byId.get(s.id) ?? s),
         pluginEntries: fromSnap.pluginEntries.map((e) => ({
           skill: byId.get(e.skill.id) ?? e.skill,
           pluginName: e.pluginName,
@@ -170,10 +182,11 @@ export function SkillConfig() {
     const base = partitionSkillsForSettings(skills, plugins)
     return {
       standalone: base.standalone,
+      builtin: base.builtin,
       pluginEntries: base.pluginEntries.map((e) => ({ ...e, registryActive: e.pluginEnabled })),
     }
   }, [snapshot, skills, plugins])
-  const { standalone, pluginEntries } = partitioned
+  const { standalone, builtin, pluginEntries } = partitioned
   const [viewing, setViewing] = useState<SkillMeta | null>(null)
   const [deleting, setDeleting] = useState<SkillMeta | null>(null)
 
@@ -198,7 +211,7 @@ export function SkillConfig() {
       </div>
 
       <div className="mt-5">
-        {standalone.length === 0 && pluginEntries.length === 0 ? (
+        {standalone.length === 0 && builtin.length === 0 && pluginEntries.length === 0 ? (
           <EmptyState
             icon={Sparkles}
             tier="professional"
@@ -209,18 +222,40 @@ export function SkillConfig() {
           />
         ) : (
           <>
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-              {standalone.map((skill) => (
-                <SkillCard
-                  key={skill.id}
-                  skill={skill}
-                  enabled={enabled[skill.id] !== false}
-                  onToggle={(on) => void toggle(skill.id, on)}
-                  onView={() => setViewing(skill)}
-                  onDelete={() => setDeleting(skill)}
-                />
-              ))}
-            </div>
+            {standalone.length > 0 && (
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                {standalone.map((skill) => (
+                  <SkillCard
+                    key={skill.id}
+                    skill={skill}
+                    enabled={enabled[skill.id] !== false}
+                    onToggle={(on) => void toggle(skill.id, on)}
+                    onView={() => setViewing(skill)}
+                    onDelete={() => setDeleting(skill)}
+                  />
+                ))}
+              </div>
+            )}
+            {builtin.length > 0 && (
+              <div className={standalone.length > 0 ? 'mt-6' : undefined}>
+                <h3 className="text-meta font-medium text-ink-secondary">{t('settings.skill.builtinSkills')}</h3>
+                <p className="mt-1 text-caption text-ink-tertiary">{t('settings.skill.builtinSkillsHint')}</p>
+                <div className="mt-2 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                  {builtin.map((skill) => (
+                    <SkillCard
+                      key={skill.id}
+                      skill={skill}
+                      enabled
+                      onToggle={() => {}}
+                      onView={() => setViewing(skill)}
+                      onDelete={() => {}}
+                      locked
+                      switchDisabled
+                    />
+                  ))}
+                </div>
+              </div>
+            )}
             {pluginEntries.length > 0 && (
               <div className="mt-6">
                 <h3 className="text-meta font-medium text-ink-secondary">{t('settings.skill.pluginSkills')}</h3>
@@ -296,6 +331,7 @@ export function SkillCard({
   onView,
   onDelete,
   readOnly,
+  locked,
   switchDisabled,
 }: {
   skill: SkillMeta
@@ -304,6 +340,8 @@ export function SkillCard({
   onView: () => void
   onDelete: () => void
   readOnly?: { pluginName: string; pluginEnabled?: boolean; registryActive?: boolean }
+  /** Product built-in: always on, not deletable, not toggleable. */
+  locked?: boolean
   /** When true, the enable switch cannot be flipped (e.g. parent plugin is off). */
   switchDisabled?: boolean
 }) {
@@ -312,11 +350,12 @@ export function SkillCard({
   const ctxBadge = badgeForContext(skill)
   const refLabel = refCountLabel(skill)
   const toolsPreview = toolAllowlistPreview(skill)
-  const canDelete = !readOnly
+  const canDelete = !readOnly && !locked
   // Card chrome on permanent outer so CONTEXT_MENUS=false keeps layout.
   return (
     <div
       data-testid="skill-card"
+      data-skill-locked={locked ? 'true' : undefined}
       className={`flex flex-col gap-3 rounded-lg border border-border bg-surface p-4${!enabled ? ' opacity-60' : ''}`}
     >
       <DeclarativeContextMenu
@@ -334,6 +373,11 @@ export function SkillCard({
           <Avatar name={skill.name} shape="square" size={38} />
           <div className="flex min-w-0 flex-1 items-center gap-2">
             <span className="min-w-0 flex-1 truncate text-body font-medium text-ink">{skill.name}</span>
+            {locked && (
+              <Badge variant="accent" className="shrink-0">
+                {t('settings.skill.builtinBadge')}
+              </Badge>
+            )}
             {readOnly && (
               <Badge variant="accent" className="shrink-0">
                 via {readOnly.pluginName}
@@ -354,8 +398,10 @@ export function SkillCard({
             <Switch
               checked={enabled}
               onCheckedChange={onToggle}
-              disabled={switchDisabled}
-              ariaLabel={t('settings.skill.enableThis')}
+              disabled={switchDisabled || locked}
+              ariaLabel={
+                locked ? t('settings.skill.builtinAlwaysOn') : t('settings.skill.enableThis')
+              }
             />
             {/* modal={false}: a modal menu + a dialog its item opens both lock body{pointer-events:none};
                 stacking them leaves the lock stuck after close. A kebab needs no trap, so non-modal is safe. */}

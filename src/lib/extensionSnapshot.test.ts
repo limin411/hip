@@ -108,10 +108,32 @@ describe('extensionSnapshot helpers', () => {
   })
 
   it('partitionSkillsFromSnapshot splits standalone vs plugin', () => {
-    const { standalone, pluginEntries } = partitionSkillsFromSnapshot(snap, [plugin('p1')])
+    const { standalone, builtin, pluginEntries } = partitionSkillsFromSnapshot(snap, [plugin('p1')])
     expect(standalone.map((s) => s.id)).toEqual(['fmt'])
+    expect(builtin).toEqual([])
     expect(pluginEntries.map((e) => e.skill.id).sort()).toEqual(['plug-skill', 'shadowed'])
     const sh = pluginEntries.find((e) => e.skill.id === 'shadowed')
     expect(sh?.registryActive).toBe(false)
+  })
+
+  it('partitionSkillsFromSnapshot puts product built-ins in builtin bucket', () => {
+    const withBuiltin: ExtensionRegistrySnapshot = {
+      ...snap,
+      skills: [
+        ...snap.skills,
+        {
+          id: 'hip',
+          active: true,
+          meta: skill('hip', { scope: 'builtin', dir: '/home/.hip/builtin-skills/hip' }),
+          winner: { kind: 'builtin', configId: 'hip' },
+        },
+      ],
+    }
+    const { standalone, builtin, pluginEntries } = partitionSkillsFromSnapshot(withBuiltin, [
+      plugin('p1'),
+    ])
+    expect(standalone.map((s) => s.id)).toEqual(['fmt'])
+    expect(builtin.map((s) => s.id)).toEqual(['hip'])
+    expect(pluginEntries.map((e) => e.skill.id).sort()).toEqual(['plug-skill', 'shadowed'])
   })
 })

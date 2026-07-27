@@ -195,6 +195,18 @@ fn atomic_write(path: &Path, data: &[u8]) -> Result<(), String> {
         f.write_all(data).map_err(|e| e.to_string())?;
         f.sync_all().map_err(|e| e.to_string())?;
     }
+    // Windows: rename fails when destination exists — remove first (same as atomic_write_private).
+    #[cfg(windows)]
+    {
+        match fs::remove_file(path) {
+            Ok(()) => {}
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => {}
+            Err(e) => {
+                let _ = fs::remove_file(&tmp);
+                return Err(e.to_string());
+            }
+        }
+    }
     fs::rename(&tmp, path).map_err(|e| {
         let _ = fs::remove_file(&tmp);
         e.to_string()

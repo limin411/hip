@@ -384,6 +384,27 @@ fn secret_passphrase_key(host_id: &str) -> String {
     format!("hip.ssh.{host_id}.passphrase")
 }
 
+/// Load an OpenSSH/PKCS8 private key, tolerant of Windows text quirks.
+///
+/// Strips a UTF-8 BOM and normalizes CRLF so `-----BEGIN …-----` line matches
+/// succeed (russh matches BEGIN markers with exact equality on each line).
+fn load_private_key_file(
+    path: &std::path::Path,
+    passphrase: Option<&str>,
+) -> Result<keys::PrivateKey, String> {
+    let raw = std::fs::read(path).map_err(|e| format!("failed to read private key: {e}"))?;
+    let text = String::from_utf8_lossy(&raw);
+    let normalized = text
+        .strip_prefix('\u{feff}')
+        .unwrap_or(text.as_ref())
+        .replace("\r\n", "\n")
+        .replace('\r', "\n");
+    keys::decode_secret_key(&normalized, passphrase).map_err(|e| {
+        // Do not include passphrase in error.
+        format!("failed to load private key: {e}")
+    })
+}
+
 /// Pin TOFU key after successful first-use connect (serialized RMW).
 fn pin_tofu_if_needed(
     app: &AppHandle,
@@ -669,10 +690,9 @@ async fn open_ssh_connection(
             }
             let passphrase = crate::get_secret_value(app, &secret_passphrase_key(&host.id))
                 .filter(|s| !s.is_empty());
-            let key = keys::load_secret_key(&key_path, passphrase.as_deref()).map_err(|e| {
-                // Do not include passphrase in error.
-                format!("failed to load private key: {e}")
-            })?;
+            // Read + decode ourselves so Windows CRLF / UTF-8 BOM keys still parse
+            // (russh `load_secret_key` matches BEGIN lines with exact equality).
+            let key = load_private_key_file(&key_path, passphrase.as_deref())?;
             let hash_alg = handle
                 .best_supported_rsa_hash()
                 .await
@@ -947,3 +967,39 @@ pub fn ssh_list(manager: State<'_, SshManager>) -> Result<Vec<String>, String> {
 // Silence unused import if MAX is only used via budget module.
 #[allow(dead_code)]
 const _MAX_CHECK: usize = MAX_INTERACTIVE_TERMINALS;
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::io::Write;
+
+    // Unencrypted OpenSSH ed25519 fixture (same as ssh_spike size probe).
+    const OPENSSH_ED25519: &str = "-----BEGIN OPENSSH PRIVATE KEY-----\n\
+b3BlbnNzaC1rZXktdjEAAAAABG5vbmUAAAAEbm9uZQAAAAAAAAABAAAAMwAAAAtzc2gtZW\n\
+QyNTUxOQAAACBiokB8lBPXaGEXVkH9v1rrviDBWGvRJIcrEU8b2c21sAAAAJB5NdCqeTXQ\n\
+qgAAAAtzc2gtZWQyNTUxOQAAACBiokB8lBPXaGEXVkH9v1rrviDBWGvRJIcrEU8b2c21sA\n\
+AAAEAiHKsrDB1m0zH9AuSSfT6+zH7bgUmYYCLK4d01XZqczGKiQHyUE9doYRdWQf2/Wuu+\n\
+IMFYa9EkhysRTxvZzbWwAAAACWhpcC1zcGlrZQECAwQ=\n\
+-----END OPENSSH PRIVATE KEY-----\n";
+
+    #[test]
+    fn load_private_key_tolerates_bom_and_crlf() {
+        let dir = std::env::temp_dir().join(format!(
+            "hip-ssh-key-test-{}-{}",
+            std::process::id(),
+            "bom-crlf"
+        ));
+        let _ = std::fs::create_dir_all(&dir);
+        let path = dir.join("id_ed25519");
+        let crlf: String = OPENSSH_ED25519.replace('\n', "\r\n");
+        let mut body = Vec::from("\u{feff}".as_bytes());
+        body.extend_from_slice(crlf.as_bytes());
+        {
+            let mut f = std::fs::File::create(&path).unwrap();
+            f.write_all(&body).unwrap();
+        }
+        let key = load_private_key_file(&path, None).expect("decode bom+crlf key");
+        let _ = key.public_key();
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+}

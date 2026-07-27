@@ -217,7 +217,15 @@ export function XtermSurface({
         useTerminalStore.getState().setGeneration(terminalId, openGen)
       } catch (e) {
         if (disposed) return
-        const msg = e instanceof Error ? e.message : String(e)
+        // Tauri invoke may throw a string, Error, or plain { message } object.
+        const msg =
+          typeof e === 'string'
+            ? e
+            : e instanceof Error
+              ? e.message
+              : e && typeof e === 'object' && 'message' in e
+                ? String((e as { message: unknown }).message)
+                : String(e ?? 'terminal open failed')
         useTerminalStore.getState().setError(terminalId, msg)
         setStarting(false)
         return
@@ -323,12 +331,29 @@ export function XtermSurface({
       return t('artifact.terminalView.unsupportedPlatform')
     }
     if (lastError.includes('Too many terminals')) return t('artifact.terminalView.softCap')
+    // Shell resolution only (PTY). Do not map "private key not found" / "host not found".
     if (
-      lastError.includes('not found') ||
       lastError.includes('no usable shell') ||
-      lastError.includes('HIP_SHELL')
+      lastError.includes('HIP_SHELL') ||
+      /(?:^|[\s:(])(?:pwsh|powershell|cmd|bash|zsh)(?:\.exe)? not found/i.test(lastError)
     ) {
       return t('artifact.terminalView.noShell')
+    }
+    // SSH / backend detail: surface the real message so Windows connect failures
+    // are actionable (auth, key path, network) instead of a generic label only.
+    if (
+      /\bSSH\b/i.test(lastError) ||
+      lastError.includes('private key') ||
+      lastError.includes('host not found') ||
+      lastError.includes('hostname is empty') ||
+      lastError.includes('username is empty') ||
+      lastError.includes('host_key_mismatch') ||
+      lastError.includes('password not configured') ||
+      lastError.includes('not compiled into this build') ||
+      lastError.includes('authentication failed')
+    ) {
+      // Cap length for the status bar; full text remains on title/tooltip.
+      return lastError.length > 160 ? `${lastError.slice(0, 157)}…` : lastError
     }
     return t('artifact.terminalView.error')
   })()

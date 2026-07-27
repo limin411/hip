@@ -103,37 +103,12 @@ export function WorkItemListView({
     if (target !== listPage) setListPage(target)
   }, [highlightId, items, listPage, setListPage])
 
-  if (items.length === 0) {
-    return (
-      <div
-        className={cn('flex min-h-0 flex-1 flex-col', className)}
-        data-testid="work-item-list-view"
-      >
-        <EmptyState
-          tier="professional"
-          title={
-            search.trim()
-              ? t('workItems.emptyFilterTitle')
-              : t('workItems.emptyTitle')
-          }
-          description={
-            search.trim()
-              ? t('workItems.emptyFilterHint')
-              : t('workItems.emptyHint')
-          }
-          className="flex-1"
-          action={{
-            label: t('workItems.newItem'),
-            onClick: () => requestCreate(),
-          }}
-        />
-      </div>
-    )
-  }
-
+  const hasSearch = search.trim().length > 0
   const rangeStart = (safePage - 1) * WORK_ITEM_LIST_PAGE_SIZE + 1
   const rangeEnd = Math.min(items.length, safePage * WORK_ITEM_LIST_PAGE_SIZE)
 
+  // Always keep the search toolbar mounted — empty filter/search results used to
+  // replace the whole view with EmptyState and trap the user (no way to clear).
   return (
     <div
       className={cn(
@@ -145,19 +120,65 @@ export function WorkItemListView({
       <div className="flex flex-wrap items-center gap-2 border-b border-border bg-surface-subtle px-3 py-2">
         <span className="text-meta text-ink-secondary" data-testid="work-item-list-count">
           {t('workItems.list.count', { count: items.length })}
-          {totalPages > 1
+          {items.length > 0 && totalPages > 1
             ? ` · ${t('workItems.list.range', { start: rangeStart, end: rangeEnd })}`
             : null}
         </span>
-        <input
-          type="search"
-          data-testid="work-item-search"
-          className="ml-auto h-7 w-48 max-w-[40vw] rounded-md border border-border bg-surface px-2 text-body text-ink placeholder:text-ink-tertiary"
-          placeholder={t('workItems.searchPlaceholder')}
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-        />
+        <div className="ml-auto flex min-w-0 flex-wrap items-center justify-end gap-1.5">
+          {hasSearch ? (
+            <button
+              type="button"
+              data-testid="work-item-search-clear"
+              className="h-7 shrink-0 rounded-md px-2 text-meta font-medium text-ink-secondary transition-colors hover:bg-state-hover hover:text-ink"
+              onClick={() => setSearch('')}
+            >
+              {t('workItems.clearSearch')}
+            </button>
+          ) : null}
+          <input
+            type="search"
+            data-testid="work-item-search"
+            className="h-7 w-48 max-w-[40vw] rounded-md border border-border bg-surface px-2 text-body text-ink placeholder:text-ink-tertiary"
+            placeholder={t('workItems.searchPlaceholder')}
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+          />
+        </div>
       </div>
+      {items.length === 0 ? (
+        <EmptyState
+          tier="professional"
+          title={
+            hasSearch || filterId !== 'all'
+              ? t('workItems.emptyFilterTitle')
+              : t('workItems.emptyTitle')
+          }
+          description={
+            hasSearch
+              ? t('workItems.emptySearchHint')
+              : filterId !== 'all'
+                ? t('workItems.emptyFilterHint')
+                : t('workItems.emptyHint')
+          }
+          className="flex-1"
+          action={
+            hasSearch
+              ? {
+                  label: t('workItems.clearSearch'),
+                  onClick: () => setSearch(''),
+                }
+              : filterId !== 'all'
+                ? {
+                    label: t('workItems.showAll'),
+                    onClick: () => useWorkItemStore.getState().setFilter('all'),
+                  }
+                : {
+                    label: t('workItems.newItem'),
+                    onClick: () => requestCreate(),
+                  }
+          }
+        />
+      ) : (
       <ul
         className="m-0 min-h-0 flex-1 list-none overflow-y-auto p-0"
         role="listbox"
@@ -277,7 +298,8 @@ export function WorkItemListView({
           )
         })}
       </ul>
-      {totalPages > 1 ? (
+      )}
+      {items.length > 0 && totalPages > 1 ? (
         <div
           className="flex shrink-0 flex-wrap items-center justify-between gap-2 border-t border-border bg-surface-subtle px-3 py-2"
           data-testid="work-item-list-pagination"

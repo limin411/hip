@@ -12,6 +12,10 @@ use std::path::Path;
 /// so a secrets/inventory file is never briefly world-readable (including when
 /// a stale temp from a crash pre-existed with wider perms). On failure the
 /// temp is removed. Caller is responsible for creating parent directories.
+///
+/// On Windows, `std::fs::rename` fails when the destination already exists, so
+/// we remove the destination first (same-volume replace). That keeps
+/// auth/host/known_hosts updates working after the first write.
 pub fn atomic_write_private(path: &Path, body: &[u8]) -> io::Result<()> {
     let tmp = path.with_extension("tmp");
 
@@ -35,7 +39,7 @@ pub fn atomic_write_private(path: &Path, body: &[u8]) -> io::Result<()> {
         {
             std::fs::write(&tmp, body)?;
         }
-        std::fs::rename(&tmp, path)
+        replace_file(&tmp, path)
     };
 
     let result = write_and_rename();
@@ -43,6 +47,24 @@ pub fn atomic_write_private(path: &Path, body: &[u8]) -> io::Result<()> {
         let _ = std::fs::remove_file(&tmp);
     }
     result
+}
+
+/// Move `from` onto `to`, replacing an existing destination on all platforms.
+fn replace_file(from: &Path, to: &Path) -> io::Result<()> {
+    #[cfg(windows)]
+    {
+        // std::fs::rename does not overwrite on Windows.
+        match std::fs::remove_file(to) {
+            Ok(()) => {}
+            Err(e) if e.kind() == io::ErrorKind::NotFound => {}
+            Err(e) => return Err(e),
+        }
+        std::fs::rename(from, to)
+    }
+    #[cfg(not(windows))]
+    {
+        std::fs::rename(from, to)
+    }
 }
 
 #[cfg(test)]
@@ -66,6 +88,16 @@ mod tests {
         let _ = std::fs::remove_file(&p);
         atomic_write_private(&p, br#"{"ok":true}"#).unwrap();
         assert_eq!(std::fs::read_to_string(&p).unwrap(), r#"{"ok":true}"#);
+    }
+
+    #[test]
+    fn overwrite_existing_destination() {
+        // Critical on Windows: rename-over-existing must not fail (auth.json, hosts).
+        let p = tmp_path("overwrite");
+        let _ = std::fs::remove_file(&p);
+        atomic_write_private(&p, br#"{"v":1}"#).unwrap();
+        atomic_write_private(&p, br#"{"v":2}"#).unwrap();
+        assert_eq!(std::fs::read_to_string(&p).unwrap(), r#"{"v":2}"#);
     }
 
     #[test]

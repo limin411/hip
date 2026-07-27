@@ -38,6 +38,7 @@ import { WORK_ITEM_TRACKING } from '@/components/work-items/feature'
 import { WorkItemsPage } from '@/components/work-items/WorkItemsPage'
 import { AUTOMATION_PAGE } from '@/components/automation/feature'
 import { AutomationsPage } from '@/components/automation/AutomationsPage'
+import { AutomationRunHost } from '@/components/automation/AutomationRunHost'
 import { TerminalFilesPanel } from '@/components/terminals/TerminalFilesPanel'
 import { startTerminalBridge } from '@/ipc/pty'
 import { useProjectPathStore } from '@/store/projectPathStore'
@@ -246,6 +247,7 @@ export function AppLayout() {
     // the left sidebar; main column stays opaque for readable content.
     <div className="flex h-dvh w-screen flex-row overflow-hidden bg-transparent">
       <WindowLifecycleHost />
+      {AUTOMATION_PAGE ? <AutomationRunHost /> : null}
       {sidebarOpen ? <AppSidebar /> : null}
       <PanelGroup direction="horizontal" className="min-w-0 flex-1 bg-surface">
         <Panel minSize={34} className="flex min-w-0 flex-col bg-surface">

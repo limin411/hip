@@ -4,7 +4,11 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen, cleanup, fireEvent } from '@testing-library/react'
 import type { Automation } from '@/domain/automations'
 
-let windowCfg: { closeAction: string; trayEnabled: boolean }
+let windowCfg: {
+  closeAction: string
+  trayEnabled: boolean
+  launchAtLogin?: boolean
+}
 
 vi.mock('@/store/hipConfigStore', () => {
   const useHipConfigStore = (sel: (s: { config: { window: typeof windowCfg } }) => unknown) =>

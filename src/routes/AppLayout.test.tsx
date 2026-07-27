@@ -46,6 +46,9 @@ vi.mock('@/components/work-items/WorkItemsPage', () => ({
 vi.mock('@/components/automation/AutomationsPage', () => ({
   AutomationsPage: () => <div data-testid="automations-page" />,
 }))
+vi.mock('@/components/automation/AutomationRunHost', () => ({
+  AutomationRunHost: () => null,
+}))
 vi.mock('@/components/automation/feature', () => ({
   AUTOMATION_PAGE: true,
 }))

@@ -2209,7 +2209,8 @@ export const zhTW = {
     },
     "banner": {
       "needTray": "定時執行需要 hip 保持存活",
-      "needTrayDesc": "目前關閉視窗會退出 hip，或系統匣圖示已關閉。建議「關閉時隱藏到系統匣」，並可開啟登入時啟動。",
+      "needTrayDesc": "目前關閉視窗會退出 hip，或系統匣圖示已關閉。建議「關閉時隱藏到系統匣」，以便每日/每週任務在背景準時觸發。",
+      "needTrayDescWithLogin": "目前關閉視窗會退出 hip，或系統匣圖示已關閉。建議「關閉時隱藏到系統匣」並開啟「登入時啟動」，以便重啟後定時任務仍能背景執行。",
       "openWindowSettings": "視窗與背景設定",
       "dismiss": "知道了"
     },

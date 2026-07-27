@@ -104,6 +104,19 @@ export function getWatch(
   return watches.get(runId)
 }
 
+/** Snapshot of open run watches for the schedule host session sampler. */
+export function listWatches(): Array<{
+  runId: string
+  sessionId: string
+  automationId: string
+}> {
+  return [...watches.entries()].map(([runId, w]) => ({
+    runId,
+    sessionId: w.sessionId,
+    automationId: w.automationId,
+  }))
+}
+
 export type RunNowOpts = {
   /** KD-13: true for Create-and-run / list manual Run; false for schedule/catchup */
   focus?: boolean

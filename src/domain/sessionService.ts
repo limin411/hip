@@ -2662,6 +2662,12 @@ export type HipE2EHooks = {
   knowledgeGetEditorMode: () => string | null
   /** Open a knowledge doc by id (awaits openDoc). */
   knowledgeOpenDoc: (docId: string) => Promise<void>
+  /**
+   * Force an automation schedule tick (DEV). Optional `now` is epoch ms so e2e
+   * can advance due slots without waiting the real 30s host interval.
+   * Installed by AutomationRunHost when AUTOMATION_PAGE is on.
+   */
+  automationTick?: (now?: number) => void
 }
 
 declare global {

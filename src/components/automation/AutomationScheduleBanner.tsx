@@ -18,16 +18,18 @@ export type AutomationScheduleBannerProps = {
  * Sticky banner when any enabled scheduled automation exists but
  * close-to-quit / tray-off makes background scheduling unreliable.
  * Session-only dismiss (memory); re-evaluates each visit.
+ *
+ * Design: show when `closeAction === 'quit'` OR tray disabled. Copy also
+ * nudges launch-at-login so daily/weekly jobs survive reboot when the user
+ * enables hide-to-tray.
  */
 export function AutomationScheduleBanner({ automations }: AutomationScheduleBannerProps) {
   const { t } = useTranslation()
   const [dismissed, setDismissed] = useState(false)
-  const closeAction = resolveCloseAction(
-    useHipConfigStore((s) => s.config.window?.closeAction),
-  )
-  const trayEnabled = resolveTrayEnabled(
-    useHipConfigStore((s) => s.config.window?.trayEnabled),
-  )
+  const windowCfg = useHipConfigStore((s) => s.config.window)
+  const closeAction = resolveCloseAction(windowCfg?.closeAction)
+  const trayEnabled = resolveTrayEnabled(windowCfg?.trayEnabled)
+  const launchAtLogin = Boolean(windowCfg?.launchAtLogin)
 
   const hasScheduledEnabled = useMemo(
     () => automations.some((a) => a.enabled && a.trigger.kind !== 'manual'),
@@ -44,12 +46,17 @@ export function AutomationScheduleBanner({ automations }: AutomationScheduleBann
     useUiStore.getState().setActiveView('settings')
   }
 
+  // Prefer the fuller copy when login-at-start is also off (common default).
+  const description = launchAtLogin
+    ? t('automation.banner.needTrayDesc')
+    : t('automation.banner.needTrayDescWithLogin')
+
   return (
     <ActionBanner
       tone="warning"
       data-testid="automation-schedule-banner"
       title={t('automation.banner.needTray')}
-      description={t('automation.banner.needTrayDesc')}
+      description={description}
       actions={
         <>
           <Button

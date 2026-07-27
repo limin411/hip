@@ -2295,7 +2295,9 @@ export const en = {
       banner: {
         needTray: 'Scheduled runs need hip to stay running',
         needTrayDesc:
-          'Close currently quits hip, or the tray icon is off. Prefer “Hide to tray” and optionally launch at login so daily/weekly jobs can fire.',
+          'Close currently quits hip, or the tray icon is off. Prefer “Hide to tray” so daily/weekly jobs can fire while hip stays in the background.',
+        needTrayDescWithLogin:
+          'Close currently quits hip, or the tray icon is off. Prefer “Hide to tray” and turn on “Launch at login” so scheduled jobs survive reboot and keep running in the background.',
         openWindowSettings: 'Window & background settings',
         dismiss: 'Dismiss',
       },

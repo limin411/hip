@@ -53,9 +53,45 @@ if ((Test-Path $Stage) -and $env:HIP_WHISPER_REBUILD -ne '1') {
 }
 
 if ($needBuild) {
-    if (-not (Get-Command cmake -ErrorAction SilentlyContinue)) {
-        throw "cmake is required to build whisper-cli.exe for Windows production packages"
+    $cmakeExe = $null
+    $cmd = Get-Command cmake -ErrorAction SilentlyContinue
+    if ($cmd) { $cmakeExe = $cmd.Path }
+    if (-not $cmakeExe) {
+        # Get-Command can miss cmake on some shells (PATH not reloaded,
+        # or a stale shim ahead of the real exe). Fall back to where.exe.
+        $where = & where.exe cmake 2>$null | Select-Object -First 1
+        if ($where -and (Test-Path $where)) { $cmakeExe = $where }
     }
+    if (-not $cmakeExe) {
+        # Last resort: probe well-known install locations.
+        $candidates = @(
+            "$env:ProgramFiles\CMake\bin\cmake.exe",
+            "${env:ProgramFiles(x86)}\CMake\bin\cmake.exe",
+            'D:\cmake\bin\cmake.exe',
+            'C:\cmake\bin\cmake.exe'
+        )
+        foreach ($c in $candidates) { if ($c -and (Test-Path $c)) { $cmakeExe = $c; break } }
+    }
+    if (-not $cmakeExe) {
+        $pathHead = (@($env:Path -split ';') | Select-Object -First 5) -join "`n    "
+        Write-Error @"
+cmake is required to build whisper-cli.exe for Windows production packages.
+
+We searched:
+  - Get-Command cmake             -> not found on this shell's PATH
+  - where.exe cmake               -> not found on PATH
+  - known install locations       -> not found
+
+PATH (first 5 entries):
+    $pathHead
+
+Install CMake (https://cmake.org/download/) and ensure cmake.exe is on PATH,
+then re-open this terminal so PATH is reloaded.
+"@
+        exit 1
+    }
+    Write-Host "[make-whisper-bin] using cmake: $cmakeExe"
+
     $Work = Join-Path $env:TEMP "hip-whisper-build-$PID"
     if (Test-Path $Work) { Remove-Item -Recurse -Force $Work }
     New-Item -ItemType Directory -Force -Path $Work | Out-Null
@@ -64,9 +100,9 @@ if ($needBuild) {
         if ($LASTEXITCODE -ne 0) {
             git clone --depth 1 https://github.com/ggml-org/whisper.cpp.git "$Work\src"
         }
-        cmake -S "$Work\src" -B "$Work\build" -DWHISPER_BUILD_EXAMPLES=ON -DCMAKE_BUILD_TYPE=Release
+        & $cmakeExe -S "$Work\src" -B "$Work\build" -DWHISPER_BUILD_EXAMPLES=ON -DCMAKE_BUILD_TYPE=Release
         if ($LASTEXITCODE -ne 0) { throw "cmake configure failed" }
-        cmake --build "$Work\build" --config Release -j
+        & $cmakeExe --build "$Work\build" --config Release -j
         if ($LASTEXITCODE -ne 0) { throw "cmake build failed" }
         $Bin = Get-ChildItem -Path "$Work\build" -Recurse -Filter "whisper-cli.exe" -ErrorAction SilentlyContinue |
             Select-Object -First 1

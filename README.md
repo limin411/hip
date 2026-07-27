@@ -76,7 +76,7 @@ src-tauri/           Rust shell
 
 ### Prerequisites
 
-- Node.js + [Yarn](https://yarnpkg.com/) (workspaces)
+- Node.js ≥ 22.5 + [Yarn](https://yarnpkg.com/) classic (workspaces; see `.nvmrc`)
 - Rust toolchain (for Tauri)
 - Platform deps for [Tauri v2](https://v2.tauri.app/start/prerequisites/)
 

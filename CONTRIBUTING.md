@@ -19,7 +19,7 @@ Security vulnerabilities: see [SECURITY.md](./SECURITY.md) — **do not** file p
 
 | Tool | Notes |
 |------|--------|
-| **Node.js** | **20+** (CI uses Node 20; see [`.nvmrc`](./.nvmrc)) |
+| **Node.js** | **≥ 22.5** (prod sidecar / `node:sqlite`; see [`.nvmrc`](./.nvmrc)) |
 | **Yarn** | Classic workspaces (`yarn` 1.x). Use the repo `yarn.lock`. |
 | **Rust** | Stable toolchain (see [`rust-toolchain.toml`](./rust-toolchain.toml)) |
 | **Tauri v2 platform deps** | Follow [Tauri prerequisites](https://v2.tauri.app/start/prerequisites/) for your OS |
@@ -57,7 +57,17 @@ Optional config reference (no secrets): [`docs/examples/hip.toml.example`](./doc
 | `yarn test:e2e:smoke` | Desktop smoke e2e (needs built app) |
 | `yarn product:content` | Regenerate product embeds after editing `packages/product-content/` |
 | `yarn product:content:check` | CI-style check that embeds are up to date |
+| `yarn package:macos` | Signed macOS `.app` + `.dmg` (needs Developer ID) |
+| `HIP_SKIP_SIGN=1 yarn package:macos` | Unsigned macOS package (CI / dogfood) |
+| `yarn package:windows` | Windows NSIS installer |
 | `cargo test` (in `src-tauri/`) | Rust unit tests |
+
+CI workflows:
+
+| Workflow | Purpose |
+|----------|---------|
+| [`.github/workflows/test.yml`](./.github/workflows/test.yml) | Type-check, unit, rust, e2e smoke |
+| [`.github/workflows/build.yml`](./.github/workflows/build.yml) | macOS + Windows production-layout packages (artifacts) |
 
 Paid / real-LLM tests are skipped when no keys are present.  
 Note: `vitest run src …` can substring-match `packages/sidecar/src` and accidentally run paid tests; prefer `yarn test` or move `auth.json` aside for a guaranteed key-free run.

@@ -23,8 +23,9 @@
     "workbench"
   ],
   "engines": {
-    "node": ">=20"
+    "node": ">=22.5"
   },
+  "packageManager": "yarn@1.22.22",
   "type": "module",
   "workspaces": [
     "packages/*"
@@ -133,6 +134,7 @@
     "@wdio/tauri-plugin": "^1.0.0",
     "@wdio/tauri-service": "^1.0.0",
     "autoprefixer": "^10",
+    "esbuild": "^0.25.0",
     "happy-dom": "^20.10.6",
     "postcss": "^8",
     "tailwindcss": "^3",

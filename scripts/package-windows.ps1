@@ -15,6 +15,9 @@
 #   # or:
 #   powershell -ExecutionPolicy Bypass -File scripts/package-windows.ps1
 #
+# CI (GitHub Actions build.yml): same command; set HIP_BUNDLE_WHISPER=0 for faster
+# branch builds (whisper cmake is opt-in on tags / workflow_dispatch).
+#
 # Voice engine (whisper-cli):
 #   Release packages bundle the engine by default (models still download on demand).
 #   Skip: $env:HIP_BUNDLE_WHISPER='0'; yarn package:windows

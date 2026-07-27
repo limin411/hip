@@ -12,9 +12,32 @@ How maintainers cut a **hip** desktop release. Product version today is coordina
 ## Prerequisites
 
 - Clean git working tree on the intended release commit
-- Node 20+, Yarn, Rust stable, platform Tauri deps
+- Node **≥ 22.5**, Yarn, Rust stable, platform Tauri deps
 - macOS: Xcode CLT; signing/notarization credentials if you distribute signed builds
 - Windows: environment capable of running `scripts/package-windows.ps1`
+
+## CI packaging (GitHub Actions)
+
+Workflow [`.github/workflows/build.yml`](../.github/workflows/build.yml) builds **production-layout** packages on every PR / push to `main`/`master`/`dev` and on `v*` tags:
+
+| Job | Runner | Output artifact |
+|-----|--------|-----------------|
+| `package-macos` | `macos-latest` | `hip-macos-<triple>` — `.dmg` + `hip.app.tar.gz` |
+| `package-windows` | `windows-latest` | `hip-windows-<triple>` — NSIS `.exe` |
+
+Both jobs run `yarn package:macos` / `yarn package:windows` (prod sidecar + real launcher, not the dev shell wrapper).
+
+**macOS CI is unsigned:** `HIP_SKIP_SIGN=1` so runners without a Developer ID can still produce a bundle. Those DMGs are for CI verification only — Gatekeeper will reject them on other Macs. Ship releases only from a signed local `yarn package:macos` (or a future secrets-backed job).
+
+**Whisper engine:**
+
+| Trigger | `HIP_BUNDLE_WHISPER` |
+|---------|----------------------|
+| PR / branch push | `0` (faster) |
+| Tag `v*` | `1` (cmake + engine staged) |
+| `workflow_dispatch` + “bundle whisper” | `1` |
+
+Unit / type-check / smoke e2e live in [`.github/workflows/test.yml`](../.github/workflows/test.yml).
 
 ## Version bump
 

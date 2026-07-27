@@ -2840,6 +2840,7 @@ export const ko = {
     "quickConnect": "빠른 연결",
     "openWorkItems": "작업 항목 열기",
     "newWorkItem": "새 작업 항목",
+    "openAutomations": "자동화 열기",
     "settings": {
       "general": "설정: 일반",
       "voice": "설정: 음성 기능",

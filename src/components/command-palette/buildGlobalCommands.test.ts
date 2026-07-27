@@ -203,6 +203,31 @@ describe('buildGlobalCommandGroups', () => {
     expect(ids).not.toContain('action-new-work-item')
   })
 
+  it('includes automations command when handlers + labels present', () => {
+    const enterAutomations = vi.fn()
+    const groups = buildGlobalCommandGroups(
+      makeCtx({
+        labels: {
+          ...labels,
+          openAutomations: 'Open automations',
+        },
+        enterAutomations,
+      }),
+    )
+    const items = groups.flatMap((g) => g.items)
+    const ids = items.map((i) => i.id)
+    expect(ids).toContain('nav-automations')
+
+    items.find((i) => i.id === 'nav-automations')!.run?.()
+    expect(enterAutomations).toHaveBeenCalled()
+  })
+
+  it('omits automations command without handlers', () => {
+    const groups = buildGlobalCommandGroups(makeCtx())
+    const ids = groups.flatMap((g) => g.items.map((i) => i.id))
+    expect(ids).not.toContain('nav-automations')
+  })
+
   it('shows need-session hint when sessionId is null', () => {
     const ctx = makeCtx({ sessionId: null })
     const groups = buildGlobalCommandGroups(ctx)

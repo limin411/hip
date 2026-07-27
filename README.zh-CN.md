@@ -94,11 +94,15 @@ yarn tauri dev
 | 路径 | 用途 |
 |------|------|
 | `~/.hip/config/` | `auth.json`、`hip.toml`、网络策略（适用处模式 `0600`） |
+| `~/.hip/config/terminal-hosts.json` | SSH / 终端主机库（模式 `0600`） |
 | `~/.hip/db/hip.db` | SQLite：会话、消息、智能体运行、工具、事件 |
 | `~/.hip/data/tool-output/` | 大型工具输出（不进 DB） |
 | `~/.hip/logs/` | Sidecar / Tauri 日志 |
 | `~/.hip/skills/`、`plugins/`、`scratch/` | 技能、插件、安装临时区 |
 | `~/.hip/memories/` | 开启记忆后的 Markdown 导出镜像 |
+| `~/.hip/work-items/` | 事项追踪目录（`catalog.json`）与 UI 偏好 |
+| `~/.hip/automations/` | 自动化目录与运行日志（`catalog.json`、`runs.json`；模式 `0600`） |
+| `~/.hip/knowledge/` | 本地优先知识库空间/文档（文件系统内容） |
 | `~/.hip/trash/` | 产品回收站隔离区（知识库文件；会话用 SQLite `deleted_at`） |
 
 ### 回收站（软删除）

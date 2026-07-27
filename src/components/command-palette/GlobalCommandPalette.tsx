@@ -20,6 +20,7 @@ import {
   enterSection,
   enterTerminalsSection,
   enterWorkItemsSection,
+  enterAutomationsSection,
   openHistoryFromChrome,
   openNotificationsFromChrome,
   openSettingsFromChrome,
@@ -27,6 +28,7 @@ import {
 } from '@/components/layout/sidebarActions'
 import { TERMINAL_MANAGEMENT } from '@/components/terminals/feature'
 import { WORK_ITEM_TRACKING } from '@/components/work-items/feature'
+import { AUTOMATION_PAGE } from '@/components/automation/feature'
 import { useHostLibraryUi } from '@/components/terminals/hostLibraryUi'
 import { useManagedTerminalStore } from '@/store/managedTerminalStore'
 
@@ -152,6 +154,11 @@ export function GlobalCommandPalette() {
         ? {
             openWorkItems: t('commandPalette.openWorkItems'),
             newWorkItem: t('commandPalette.newWorkItem'),
+          }
+        : {}),
+      ...(AUTOMATION_PAGE
+        ? {
+            openAutomations: t('commandPalette.openAutomations'),
           }
         : {}),
       themeLight: t('settings.themes.light'),
@@ -304,6 +311,11 @@ export function GlobalCommandPalette() {
               )
               useWorkItemViewStore.getState().requestCreate()
             },
+          }
+        : {}),
+      ...(AUTOMATION_PAGE
+        ? {
+            enterAutomations: () => void enterAutomationsSection(),
           }
         : {}),
     }),

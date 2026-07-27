@@ -101,6 +101,7 @@ E2E_GREP=@live E2E_INVERT=1 yarn test:e2e
 | `@knowledge` | Knowledge base full business flows | main path also `@core` → in gate |
 | `@knowledge-perf` | Knowledge open/type usability budgets + unusable hard lines | **no** (nightly / `test:e2e:full`) |
 | `@work-items` | Work item tracking (事项追踪) full business flows | smoke/core cases also tagged → in gate |
+| `@automations` | Automations page (local schedule jobs) | smoke also `@smoke` → in gate |
 
 Context-menu helpers: `e2e/helpers/context-menu.ts`. Specs: `context-menu-smoke.spec.ts`, `context-menu-core.spec.ts`, `context-menu-panel.spec.ts`.
 
@@ -153,6 +154,20 @@ List create/rename/delete and hard-delete use in-app Modals (never `window.promp
 yarn test:e2e:work-items
 # Gate-relevant work-item paths
 E2E_GREP='@work-items @core' yarn test:e2e
+```
+
+Automations helpers: `e2e/helpers/automations.ts`. Specs (unpaid, isolated `HIP_DATA_DIR`, no `@live`):
+
+| Spec | Cases |
+|------|--------|
+| `automations-smoke.spec.ts` | AS1–3: sidebar nav → page (not placeholder); palette `nav-automations`; `__hipE2E.automationTick` callable (`@smoke`) |
+
+Persistence: `HIP_DATA_DIR/automations/catalog.json` + `runs.json` (Tauri IPC).  
+Schedule due is forced via `window.__hipE2E.automationTick(now)` — never wait the real 30s host interval.
+
+```bash
+E2E_GREP=@automations yarn test:e2e
+yarn test:e2e --spec e2e/specs/automations-smoke.spec.ts
 ```
 
 ```bash

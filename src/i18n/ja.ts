@@ -2840,6 +2840,7 @@ export const ja = {
     "quickConnect": "クイック接続",
     "openWorkItems": "ワークアイテムを開く",
     "newWorkItem": "新規ワークアイテム",
+    "openAutomations": "オートメーションを開く",
     "settings": {
       "general": "設定：一般",
       "voice": "設定：音声入力",

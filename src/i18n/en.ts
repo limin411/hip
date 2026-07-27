@@ -2943,6 +2943,7 @@ export const en = {
       quickConnect: 'Quick connect',
       openWorkItems: 'Open work items',
       newWorkItem: 'New work item',
+      openAutomations: 'Open automations',
       settings: {
         general: 'Settings: General',
         voice: 'Settings: Voice',

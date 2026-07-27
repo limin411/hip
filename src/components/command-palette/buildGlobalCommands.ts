@@ -44,6 +44,8 @@ export type GlobalCommandLabels = {
   /** Work item tracking (K19) — optional when flag off / labels omitted. */
   openWorkItems?: string
   newWorkItem?: string
+  /** Automations page — optional when flag off / labels omitted. */
+  openAutomations?: string
   themeLight: string
   themeDark: string
   themeSystem: string
@@ -140,6 +142,8 @@ export type GlobalCommandContext = {
   enterWorkItems?: () => void | Promise<void>
   /** Enter work items section then create a new item. */
   newWorkItem?: () => void | Promise<void>
+  /** Automations section (flag-gated). */
+  enterAutomations?: () => void | Promise<void>
   /** Open a nested palette page (theme / model / sessions). */
   openPalettePage?: (page: PalettePageId) => void
   /** Switch model for active session or draft (`provider/model` key). */
@@ -478,6 +482,32 @@ export function buildGlobalCommandGroups(
       group: 'navigation',
       run: () => {
         void ctx.enterWorkItems?.()
+      },
+    })
+  }
+
+  // Automations — only when labels + handlers are provided (flag on).
+  if (labels.openAutomations && ctx.enterAutomations) {
+    navigation.push({
+      id: 'nav-automations',
+      label: labels.openAutomations,
+      icon: 'zap',
+      keywords: [
+        'automation',
+        'automations',
+        'schedule',
+        'cron',
+        'scheduled',
+        '自动',
+        '自動化',
+        '自动化',
+        'オートメーション',
+        '자동화',
+        labels.openAutomations,
+      ],
+      group: 'navigation',
+      run: () => {
+        void ctx.enterAutomations?.()
       },
     })
   }

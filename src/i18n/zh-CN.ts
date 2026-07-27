@@ -2883,6 +2883,7 @@ export const zhCN = {
       quickConnect: '快捷连接',
       openWorkItems: '打开事项追踪',
       newWorkItem: '新建事项',
+      openAutomations: '打开自动化',
       settings: {
         general: '设置：通用',
         voice: '设置：语音功能',

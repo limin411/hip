@@ -130,11 +130,15 @@ are **not** forwarded — the agent sees the full MCP surface.
 | Path | Purpose |
 |------|---------|
 | `~/.hip/config/` | `auth.json`, `hip.toml`, network policy (mode `0600` where applicable) |
+| `~/.hip/config/terminal-hosts.json` | SSH / terminal host library (mode `0600`) |
 | `~/.hip/db/hip.db` | SQLite sessions, messages, agent runs, tools, events |
 | `~/.hip/data/tool-output/` | Large tool outputs (kept out of the DB) |
 | `~/.hip/logs/` | Sidecar / Tauri logs |
 | `~/.hip/skills/`, `plugins/`, `scratch/` | Skills, plugins, install scratch |
 | `~/.hip/memories/` | Markdown export mirrors when memory is enabled |
+| `~/.hip/work-items/` | Work item catalog (`catalog.json`) + UI prefs |
+| `~/.hip/automations/` | Automations catalog + runs log (`catalog.json`, `runs.json`; mode `0600`) |
+| `~/.hip/knowledge/` | Local-first knowledge base spaces/docs (FS content) |
 | `~/.hip/trash/` | Product recycle bin quarantine (knowledge FS payloads; sessions use SQLite `deleted_at`) |
 
 ### Recycle bin (soft-delete)

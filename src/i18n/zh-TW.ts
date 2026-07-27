@@ -2847,6 +2847,7 @@ export const zhTW = {
     "quickConnect": "快捷連線",
     "openWorkItems": "開啟事項追蹤",
     "newWorkItem": "新建事項",
+    "openAutomations": "開啟自動化",
     "settings": {
       "general": "設定：一般",
       "voice": "設定：語音功能",

@@ -50,6 +50,7 @@ export type PaletteIconName =
   | 'book-open'
   | 'terminal'
   | 'check-square'
+  | 'zap'
 
 export interface CommandWhen {
   /** Restrict command visibility to these shell views (see ActiveView). */

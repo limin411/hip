@@ -76,6 +76,19 @@ fsReadMaxBytes = 2000000
 # language = "auto"                 # auto | zh | en | ja | ko
 # model = "base"                    # tiny | base | small
 # max_duration_sec = 60
+# Optional per-model download URL overrides (mirror / private CDN):
+# [voice.model_urls]
+# base = "https://hf-mirror.com/ggerganov/whisper.cpp/resolve/main/ggml-base.bin"
+
+# ── Network proxy (Settings → General) ──────────────────────────────────────
+# When enabled, injected as HTTP_PROXY / HTTPS_PROXY / ALL_PROXY / NO_PROXY
+# for the sidecar (agent web tools). Voice model downloads also honor this.
+# [proxy]
+# enabled = true
+# http = "http://127.0.0.1:7890"
+# https = "http://127.0.0.1:7890"
+# # all = "http://127.0.0.1:7890"
+# no_proxy = "localhost,127.0.0.1,::1"
 
 # ── Providers (non-secret) ─────────────────────────────────────────────────
 # API keys still go in auth.json — do not use apiKey in hip.toml (ignored for BYOK).

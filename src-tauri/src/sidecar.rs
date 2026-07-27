@@ -184,6 +184,34 @@ pub async fn spawn_sidecar(app: &AppHandle) -> Result<u16, String> {
             cmd = cmd.env(key, val);
         }
     }
+    // HTTP(S) proxy from hip.toml `[proxy]` (Settings → General). When enabled,
+    // override sidecar proxy env so web tools / fetches honor user settings.
+    // When disabled, process env (Clash etc.) still applies if the shell inherits it.
+    if let Ok(cfg) = crate::hip_config::load_hip_config(app) {
+        if let Some(proxy) = cfg.proxy {
+            if proxy.enabled == Some(true) {
+                let apply = |raw: Option<&str>| -> String {
+                    raw.map(str::trim)
+                        .filter(|s| !s.is_empty())
+                        .unwrap_or("")
+                        .to_string()
+                };
+                let http = apply(proxy.http.as_deref());
+                let https = apply(proxy.https.as_deref());
+                let all = apply(proxy.all.as_deref());
+                let no = apply(proxy.no_proxy.as_deref());
+                cmd = cmd
+                    .env("HTTP_PROXY", &http)
+                    .env("http_proxy", &http)
+                    .env("HTTPS_PROXY", &https)
+                    .env("https_proxy", &https)
+                    .env("ALL_PROXY", &all)
+                    .env("all_proxy", &all)
+                    .env("NO_PROXY", &no)
+                    .env("no_proxy", &no);
+            }
+        }
+    }
     let (mut rx, child) = cmd.spawn().map_err(|e| e.to_string())?;
     // Sidecar child pid for product CLI discovery (not the Tauri host pid).
     let sidecar_pid = child.pid();

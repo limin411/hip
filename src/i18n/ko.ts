@@ -825,7 +825,7 @@ export const ko = {
     "turnOutputs_one": "이번 턴에 {{count}}개의 출력"
   },
   "voice": {
-    "micTitle": "음성 입력 (⌘⇧M)",
+    "micTitle": "음성 입력 ({{shortcut}})",
     "micAria": "음성 입력 시작",
     "stopTitle": "중지 후 변환",
     "stopAria": "녹음 중지",
@@ -992,8 +992,24 @@ export const ko = {
       "useModel": "사용",
       "activeModel": "사용 중",
       "selectedStatus": "선택: {{model}} — {{status}}",
-      "unnamedDevice": "마이크"
+      "unnamedDevice": "마이크",
+      "modelUrls": "모델 다운로드 URL",
+      "modelUrlsDesc":
+        "각 Whisper 모델 다운로드 주소를 확인·변경합니다(미러 등). 다운로드 후에도 SHA-256을 검증합니다.",
+      "modelUrlsResetAll": "모두 초기화",
+      "modelUrlReset": "기본값",
+      "shortcut": "작성기 단축키",
+      "shortcutDesc": "채팅 입력에서 음성 입력을 전환합니다. 녹음 중 Escape로 취소합니다."
     },
+    "proxy": "네트워크 프록시",
+    "proxyDesc": "에이전트 웹 도구와 로컬 모델 다운로드용 HTTP(S) 프록시(Clash 등).",
+    "proxyHttp": "HTTP 프록시",
+    "proxyHttps": "HTTPS 프록시",
+    "proxyAll": "ALL_PROXY(선택)",
+    "proxyAllPlaceholder": "HTTP/HTTPS가 비어 있을 때 대체",
+    "proxyNoProxy": "NO_PROXY",
+    "proxyRestartHint":
+      "프록시 변경은 sidecar 재시작 후 에이전트에 반영됩니다(앱 재실행 또는 재연결). 모델 다운로드는 즉시 새 프록시를 사용합니다.",
     "contextMenu": {
       "title": "컨텍스트 메뉴",
       "description": "표시할 오른쪽 클릭 동작과 순서를 선택하세요.",
@@ -2119,6 +2135,15 @@ export const ko = {
       "expand": "{{name}} 아래 대화 펼치기",
       "collapse": "{{name}} 아래 대화 접기"
     },
+    "dateGroup": {
+      "today": "오늘",
+      "yesterday": "어제",
+      "previous7": "지난 7일",
+      "previous30": "지난 30일",
+      "older": "이전",
+      "expand": "{{name}} 펼치기",
+      "collapse": "{{name}} 접기"
+    },
     "parallel": {
       "group": "병렬 · {{id}}",
       "winner": "선택됨",
@@ -2660,6 +2685,7 @@ export const ko = {
       "description": "hip의 일반적인 단축키",
       "openPalette": "명령 팔레트 열기",
       "slash": "컴포저에서 슬래시 명령",
+      "voiceToggle": "컴포저 음성 입력 전환",
       "hotkeys": "팔레트에서 n번째 명령 실행",
       "prefixCmd": "명령만 필터링",
       "prefixSess": "세션만 필터링",

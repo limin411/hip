@@ -833,7 +833,7 @@ export const zhTW = {
     "turnOutputs_one": "本輪產物 ({{count}})"
   },
   "voice": {
-    "micTitle": "語音聽寫 (⌘⇧M)",
+    "micTitle": "語音聽寫 ({{shortcut}})",
     "micAria": "開始語音聽寫",
     "stopTitle": "停止並轉寫",
     "stopAria": "停止錄音",
@@ -999,8 +999,24 @@ export const zhTW = {
       "useModel": "使用",
       "activeModel": "目前",
       "selectedStatus": "已選：{{model}} — {{status}}",
-      "unnamedDevice": "麥克風"
+      "unnamedDevice": "麥克風",
+      "modelUrls": "模型下載連結",
+      "modelUrlsDesc":
+        "檢視或修改各 Whisper 模型的下載位址（例如鏡像站）。下載完成後仍會校驗 SHA-256。",
+      "modelUrlsResetAll": "全部重設",
+      "modelUrlReset": "恢復預設",
+      "shortcut": "對話輸入快捷鍵",
+      "shortcutDesc": "在對話輸入框中切換語音聽寫。錄音中按 Escape 可取消。"
     },
+    "proxy": "網路代理",
+    "proxyDesc": "用於智慧體連網工具與本機模型下載的 HTTP(S) 代理（如 Clash）。",
+    "proxyHttp": "HTTP 代理",
+    "proxyHttps": "HTTPS 代理",
+    "proxyAll": "ALL_PROXY（可選）",
+    "proxyAllPlaceholder": "HTTP/HTTPS 為空時的回退",
+    "proxyNoProxy": "NO_PROXY",
+    "proxyRestartHint":
+      "代理變更後，智慧體工具需重啟 sidecar（重新開啟應用或重連）才會生效；模型下載會立即使用新代理。",
     "contextMenu": {
       "title": "右鍵選單",
       "description": "選擇要顯示的右鍵操作及其順序。",
@@ -2126,6 +2142,15 @@ export const zhTW = {
       "expand": "展開 {{name}} 下的對話",
       "collapse": "收起 {{name}} 下的對話"
     },
+    "dateGroup": {
+      "today": "今天",
+      "yesterday": "昨天",
+      "previous7": "近 7 天",
+      "previous30": "近 30 天",
+      "older": "更早",
+      "expand": "展開 {{name}}",
+      "collapse": "收起 {{name}}"
+    },
     "parallel": {
       "group": "並行 · {{id}}",
       "winner": "已選用",
@@ -2667,6 +2692,7 @@ export const zhTW = {
       "description": "hip 常用快捷鍵",
       "openPalette": "開啟命令面板",
       "slash": "輸入框中的斜線指令",
+      "voiceToggle": "切換對話輸入語音聽寫",
       "hotkeys": "執行面板中第 n 條命令",
       "prefixCmd": "僅顯示命令",
       "prefixSess": "僅顯示對話",

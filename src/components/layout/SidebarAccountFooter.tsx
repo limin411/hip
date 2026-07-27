@@ -11,6 +11,8 @@ interface SidebarAccountFooterProps {
   onOpenSettings: () => void
   /** Which footer destination is currently active. */
   active?: 'trash' | 'history' | 'notifications' | 'settings' | null
+  /** Active session catalog size (history badge; excludes nested worktrees when provided). */
+  historyCount?: number
 }
 
 /**
@@ -23,6 +25,7 @@ export function SidebarAccountFooter({
   onOpenNotifications,
   onOpenSettings,
   active = null,
+  historyCount = 0,
 }: SidebarAccountFooterProps) {
   const { t } = useTranslation()
   const sessionCount = useTrashBadgeStore((s) => s.sessionCount)
@@ -31,6 +34,7 @@ export function SidebarAccountFooter({
   const badge = formatTrashBadge(
     trashBadgeTotal(sessionCount, knowledgeCount, workItemCount),
   )
+  const historyBadge = formatTrashBadge(historyCount)
 
   return (
     <div
@@ -44,6 +48,7 @@ export function SidebarAccountFooter({
         icon={Trash2}
         onClick={onOpenTrash}
         badge={badge}
+        badgeTestId="account-trash-badge"
       />
       <FooterNavButton
         testId="account-history-button"
@@ -51,6 +56,8 @@ export function SidebarAccountFooter({
         label={t('nav.history')}
         icon={History}
         onClick={onOpenHistory}
+        badge={historyBadge}
+        badgeTestId="account-history-badge"
       />
       <FooterNavButton
         testId="account-notifications-button"
@@ -77,6 +84,7 @@ function FooterNavButton({
   icon: Icon,
   onClick,
   badge,
+  badgeTestId,
 }: {
   testId: string
   active: boolean
@@ -84,6 +92,7 @@ function FooterNavButton({
   icon: typeof Settings
   onClick: () => void
   badge?: string
+  badgeTestId?: string
 }) {
   return (
     <button
@@ -108,7 +117,7 @@ function FooterNavButton({
       {badge ? (
         <span
           className="shrink-0 rounded-full bg-surface-muted px-1.5 py-0.5 text-caption font-medium tabular-nums text-ink-tertiary"
-          data-testid="account-trash-badge"
+          data-testid={badgeTestId ?? `${testId}-badge`}
         >
           {badge}
         </span>

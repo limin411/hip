@@ -21,6 +21,7 @@ import type {
   WindowCloseAction,
   AcpHostConfig,
   PlanConfig,
+  ProxyConfig,
 } from '@hip/protocol'
 import { isTerminalColorThemeId, isWindowCloseAction } from '@hip/protocol'
 import { parseDoomLoopStrategy } from '../session/doom-loop.js'
@@ -329,6 +330,17 @@ function normalizeTrash(raw: Record<string, unknown>): TrashConfig {
   return out
 }
 
+function normalizeProxy(raw: Record<string, unknown>): ProxyConfig {
+  const out: ProxyConfig = {}
+  if (typeof raw.enabled === 'boolean') out.enabled = raw.enabled
+  if (typeof raw.http === 'string') out.http = raw.http.trim() || undefined
+  if (typeof raw.https === 'string') out.https = raw.https.trim() || undefined
+  if (typeof raw.all === 'string') out.all = raw.all.trim() || undefined
+  const no = raw.noProxy ?? raw.no_proxy
+  if (typeof no === 'string') out.noProxy = no.trim() || undefined
+  return out
+}
+
 /** Normalize `[window]` close / tray policy (camelCase + snake_case aliases). */
 function normalizeWindow(raw: Record<string, unknown>): WindowConfig {
   const out: WindowConfig = {}
@@ -471,6 +483,11 @@ function validateConfig(parsed: unknown, filePath: string): HipConfig {
   const plan = obj.plan
   if (plan && typeof plan === 'object' && !Array.isArray(plan)) {
     config.plan = normalizePlan(plan as Record<string, unknown>)
+  }
+
+  const proxy = obj.proxy
+  if (proxy && typeof proxy === 'object' && !Array.isArray(proxy)) {
+    config.proxy = normalizeProxy(proxy as Record<string, unknown>)
   }
 
   return config

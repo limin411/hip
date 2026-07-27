@@ -127,6 +127,7 @@ fn get_hip_config(app: tauri::AppHandle) -> Result<String, String> {
                 acp: None,
                 plan: None,
                 voice: None,
+            proxy: None,
             };
             serde_json::to_string(&cfg).map_err(|e| e.to_string())
         }
@@ -1125,6 +1126,7 @@ mod tests {
             acp: None,
             plan: None,
             voice: None,
+        proxy: None,
         }
     }
 
@@ -1317,6 +1319,7 @@ mod tests {
             acp: None,
             plan: None,
             voice: None,
+        proxy: None,
         };
 
         let toml_str = toml::to_string_pretty(&cfg).unwrap();
@@ -1499,6 +1502,7 @@ mod tests {
             acp: None,
             plan: None,
             voice: None,
+        proxy: None,
         };
 
         let toml_str = toml::to_string_pretty(&cfg).unwrap();
@@ -1618,6 +1622,7 @@ mod tests {
             acp: None,
             plan: None,
             voice: None,
+        proxy: None,
         };
 
         let json = serde_json::to_string(&cfg).unwrap();
@@ -1659,6 +1664,7 @@ mod tests {
             acp: None,
             plan: None,
             voice: None,
+        proxy: None,
         };
 
         // UI path: JSON (camelCase) → HipConfig → TomlHipConfig → TOML → back
@@ -1737,6 +1743,7 @@ doomLoopStrategy = "auto_continue"
             acp: None,
             plan: None,
             voice: None,
+        proxy: None,
         };
 
         let json = serde_json::to_string(&cfg).unwrap();
@@ -1843,6 +1850,7 @@ colorTheme = "one-dark"
             acp: None,
             plan: None,
             voice: None,
+        proxy: None,
         };
 
         let json = serde_json::to_string(&cfg).unwrap();
@@ -1941,6 +1949,7 @@ trayEnabled = true
             }),
             plan: None,
             voice: None,
+        proxy: None,
         };
 
         let json = serde_json::to_string(&cfg).unwrap();
@@ -2014,6 +2023,7 @@ fsReadMaxBytes = 2000000
                 soft_approve_on_composer: Some(true),
             }),
             voice: None,
+        proxy: None,
         };
 
         let json = serde_json::to_string(&cfg).unwrap();
@@ -2092,6 +2102,7 @@ softApproveOnComposer = false
             acp: None,
             plan: None,
             voice: None,
+        proxy: None,
         };
 
         let json = serde_json::to_string(&cfg).unwrap();

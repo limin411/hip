@@ -2,6 +2,7 @@ import { Mic, Loader2, Square } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { Button } from '@/components/ui/Button'
 import { cn } from '@/lib/utils'
+import { isMacPlatform } from '@/lib/platform'
 import { useVoiceDictation } from './useVoiceDictation'
 
 export function VoiceMicButton({
@@ -32,6 +33,7 @@ export function VoiceMicButton({
 
   const recording = state === 'recording'
   const busy = state === 'transcribing' || state === 'downloading'
+  const shortcutLabel = isMacPlatform() ? '⌘⇧M' : 'Ctrl+Shift+M'
 
   return (
     <Button
@@ -51,7 +53,7 @@ export function VoiceMicButton({
           ? t('voice.stopTitle')
           : busy
             ? t('voice.busyTitle')
-            : t('voice.micTitle')
+            : t('voice.micTitle', { shortcut: shortcutLabel })
       }
       aria-label={recording ? t('voice.stopAria') : t('voice.micAria')}
     >

@@ -22,6 +22,7 @@ import { HIP_PRODUCT_VERSION } from '@/domain/product'
 import { isMacPlatform } from '@/lib/platform'
 import { surfaceOf } from '@/lib/sessions'
 import { groupSessionsByProjectPath, projectPathKey } from '@/lib/sessionProjectGroups'
+import { groupSessionsByDate } from '@/lib/sessionDateGroups'
 import { cn } from '@/lib/utils'
 import { useWindowDrag } from '@/lib/useWindowDrag'
 import { useCommandPaletteStore } from '@/store/commandPaletteStore'
@@ -91,6 +92,8 @@ export function AppSidebar() {
   const [worktreeCollapsed, setWorktreeCollapsed] = useState<Record<string, boolean>>({})
   /** Project path keys whose session list is collapsed (default = expanded). */
   const [projectGroupCollapsed, setProjectGroupCollapsed] = useState<Record<string, boolean>>({})
+  /** Chat date-bucket keys whose session list is collapsed (default = expanded). */
+  const [chatDateGroupCollapsed, setChatDateGroupCollapsed] = useState<Record<string, boolean>>({})
   const sidebarSection = useUiStore((s) => s.sidebarSection)
   const activeView = useUiStore((s) => s.activeView)
   const sessions = useSessions()
@@ -151,6 +154,18 @@ export function AppSidebar() {
     if (sidebarSection !== 'projects') return []
     return groupSessionsByProjectPath(filteredSessions)
   }, [sidebarSection, filteredSessions])
+
+  /** Chat sessions: newest-first within date buckets (Today / Yesterday / …). */
+  const chatDateGroups = useMemo(() => {
+    if (sidebarSection !== 'chats') return []
+    return groupSessionsByDate(filteredSessions)
+  }, [sidebarSection, filteredSessions])
+
+  /** History footer badge: first-class sessions only (no nested worktree slots). */
+  const historyCount = useMemo(
+    () => sessions.filter((s) => !nestedWorktreeSessionIds.has(s.id)).length,
+    [sessions, nestedWorktreeSessionIds],
+  )
 
   const pathStatusByKey = useProjectPathStore((s) => s.byKey)
 
@@ -213,6 +228,12 @@ export function AppSidebar() {
   }
 
   const isProjectGroupExpanded = (groupId: string) => projectGroupCollapsed[groupId] !== true
+
+  const toggleChatDateGroup = (bucketId: string) => {
+    setChatDateGroupCollapsed((prev) => ({ ...prev, [bucketId]: !prev[bucketId] }))
+  }
+
+  const isChatDateGroupExpanded = (bucketId: string) => chatDateGroupCollapsed[bucketId] !== true
 
   return (
     <aside
@@ -665,6 +686,72 @@ export function AppSidebar() {
               )
             })}
           </ul>
+        ) : sidebarSection === 'chats' ? (
+          <ul className="m-0 list-none p-0" aria-labelledby="sidebar-list-heading">
+            {chatDateGroups.map((group) => {
+              const groupExpanded = isChatDateGroupExpanded(group.bucketId)
+              const groupLabel = t(`sidebar.dateGroup.${group.bucketId}`)
+              return (
+                <li
+                  key={group.bucketId}
+                  className="mb-2"
+                  data-testid={`sidebar-chat-date-group-${group.bucketId}`}
+                >
+                  <button
+                    type="button"
+                    className={cn(
+                      'mb-0.5 flex w-full items-center gap-1.5 rounded-md px-2 py-1 text-left',
+                      'transition-colors hover:bg-state-hover',
+                      'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink/20',
+                    )}
+                    data-testid={`sidebar-chat-date-group-header-${group.bucketId}`}
+                    data-no-drag
+                    aria-expanded={groupExpanded}
+                    aria-label={
+                      groupExpanded
+                        ? t('sidebar.dateGroup.collapse', { name: groupLabel })
+                        : t('sidebar.dateGroup.expand', { name: groupLabel })
+                    }
+                    onClick={() => toggleChatDateGroup(group.bucketId)}
+                  >
+                    {groupExpanded ? (
+                      <ChevronDown size={12} className="shrink-0 text-ink-tertiary" aria-hidden />
+                    ) : (
+                      <ChevronRight size={12} className="shrink-0 text-ink-tertiary" aria-hidden />
+                    )}
+                    <span className="min-w-0 flex-1 truncate text-caption font-medium text-ink-tertiary">
+                      {groupLabel}
+                    </span>
+                    {!groupExpanded || group.sessions.length > 1 ? (
+                      <span className="shrink-0 tabular-nums text-caption text-ink-tertiary">
+                        {group.sessions.length}
+                      </span>
+                    ) : null}
+                  </button>
+                  {groupExpanded ? (
+                    <ul className="m-0 list-none p-0" aria-label={groupLabel}>
+                      {group.sessions.map((session) => (
+                        <SidebarSessionRow
+                          key={session.id}
+                          session={session}
+                          activeSessionId={activeSessionId}
+                          activeView={activeView}
+                          parallelRuns={parallelRuns}
+                          runsByHost={runsByHost}
+                          worktreeExpanded={isWorktreeExpanded(session.id)}
+                          onToggleWorktree={() => {
+                            const next = !isWorktreeExpanded(session.id)
+                            toggleWorktree(session.id)
+                            if (next) hydrateWorktrees(session.id)
+                          }}
+                        />
+                      ))}
+                    </ul>
+                  ) : null}
+                </li>
+              )
+            })}
+          </ul>
         ) : (
           <ul className="m-0 list-none p-0" aria-labelledby="sidebar-list-heading">
             {filteredSessions.map((session) => (
@@ -699,6 +786,7 @@ export function AppSidebar() {
                   ? 'trash'
                   : null
         }
+        historyCount={historyCount}
         onOpenTrash={() => void openTrashFromChrome()}
         onOpenHistory={() => void openHistoryFromChrome()}
         onOpenNotifications={() => void openNotificationsFromChrome()}

@@ -2,7 +2,7 @@
 
 use crate::paths::{voice_scratch_dir, whisper_models_dir};
 use crate::voice_models::{
-    resolve_installed_model, resolve_model_id, sha256_hex_of_file, spec_for,
+    resolve_download_url, resolve_installed_model, resolve_model_id, sha256_hex_of_file, spec_for,
     status_for_model_full, status_for_model_quick, write_sha256_sidecar, ModelStatus,
 };
 use base64::Engine;
@@ -560,6 +560,58 @@ fn finalize_partial(
     Ok(serde_json::json!({ "path": dest.display().to_string() }))
 }
 
+/// Build a download client that honors `[proxy]` when enabled (else env proxies).
+fn download_http_client(app: &AppHandle) -> Result<reqwest::Client, String> {
+    let mut builder = reqwest::Client::builder()
+        .user_agent(USER_AGENT)
+        .connect_timeout(DOWNLOAD_CONNECT_TIMEOUT)
+        .timeout(DOWNLOAD_TIMEOUT);
+    if let Ok(cfg) = crate::hip_config::load_hip_config(app) {
+        if let Some(proxy) = cfg.proxy {
+            if proxy.enabled == Some(true) {
+                // Prefer https → http → all for HTTPS model downloads.
+                let url = proxy
+                    .https
+                    .as_deref()
+                    .map(str::trim)
+                    .filter(|s| !s.is_empty())
+                    .or_else(|| {
+                        proxy
+                            .http
+                            .as_deref()
+                            .map(str::trim)
+                            .filter(|s| !s.is_empty())
+                    })
+                    .or_else(|| {
+                        proxy
+                            .all
+                            .as_deref()
+                            .map(str::trim)
+                            .filter(|s| !s.is_empty())
+                    });
+                if let Some(u) = url {
+                    if let Ok(p) = reqwest::Proxy::all(u) {
+                        builder = builder.proxy(p);
+                    }
+                }
+            }
+        }
+    }
+    builder.build().map_err(|e| format!("voice.network:{e}"))
+}
+
+/// Optional URL override from `[voice.model_urls]` for this model id.
+fn voice_model_url_override(app: &AppHandle, id: &str) -> Option<String> {
+    let cfg = crate::hip_config::load_hip_config(app).ok()?;
+    let urls = cfg.voice?.model_urls?;
+    let raw = urls.get(id)?.trim();
+    if raw.is_empty() {
+        None
+    } else {
+        Some(raw.to_string())
+    }
+}
+
 async fn download_model_body(
     app: AppHandle,
     id: &str,
@@ -587,15 +639,12 @@ async fn download_model_body(
         return finalize_partial(&app, id, spec, &partial, dest, downloaded, Some(expected));
     }
 
-    let client = reqwest::Client::builder()
-        .user_agent(USER_AGENT)
-        .connect_timeout(DOWNLOAD_CONNECT_TIMEOUT)
-        .timeout(DOWNLOAD_TIMEOUT)
-        .build()
-        .map_err(|e| format!("voice.network:{e}"))?;
+    let client = download_http_client(&app)?;
 
-    let url = spec.urls[0];
-    let mut req = client.get(url);
+    let override_url = voice_model_url_override(&app, id);
+    let url = resolve_download_url(id, override_url.as_deref())
+        .ok_or_else(|| "voice.unknown_model".to_string())?;
+    let mut req = client.get(&url);
     if downloaded > 0 {
         req = req.header(
             reqwest::header::RANGE,

@@ -40,6 +40,24 @@ function App() {
       console.error('Failed to preload knowledge spaces:', err)
       useKnowledgeStore.setState({ loaded: true })
     })
+    // Early trash badge hydrate (knowledge + work items). Session trash is
+    // requested on WS `ready` via serverMessageEffects.
+    void import('@/ipc/knowledge')
+      .then(({ knowledgeListTrash }) => knowledgeListTrash())
+      .then((items) =>
+        import('@/store/trashBadgeStore').then(({ useTrashBadgeStore }) => {
+          useTrashBadgeStore.getState().setKnowledgeCount(items.length)
+        }),
+      )
+      .catch(() => undefined)
+    void import('@/ipc/workItems')
+      .then(({ listWorkItemsTrash }) => listWorkItemsTrash())
+      .then((items) =>
+        import('@/store/trashBadgeStore').then(({ useTrashBadgeStore }) => {
+          useTrashBadgeStore.getState().setWorkItemCount(items.length)
+        }),
+      )
+      .catch(() => undefined)
   }, [])
 
   if (!providersLoaded) {

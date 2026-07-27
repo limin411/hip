@@ -8,7 +8,9 @@ import { VoiceSettingsSection } from './VoiceSettingsSection'
 export function VoiceSettings() {
   const { t } = useTranslation()
   return (
-    <div className="flex flex-col" data-testid="settings-page-voice">
+    // pb-20: long page (models + URLs + shortcut) scrolls inside SettingsPanel;
+    // without bottom pad the last rows sit flush / feel clipped against the pane edge.
+    <div className="flex flex-col pb-20" data-testid="settings-page-voice">
       <div className="px-8 pb-1 pt-7">
         <h2 className="text-title font-semibold tracking-tight text-ink">{t('settings.voicePage')}</h2>
         <p className="mt-1 text-meta leading-relaxed text-ink-tertiary">

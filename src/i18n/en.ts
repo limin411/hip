@@ -804,7 +804,7 @@ export const en = {
       turnOutputs_one: '{{count}} output this turn',
     },
     voice: {
-      micTitle: 'Voice dictation (⌘⇧M)',
+      micTitle: 'Voice dictation ({{shortcut}})',
       micAria: 'Start voice dictation',
       stopTitle: 'Stop and transcribe',
       stopAria: 'Stop recording',
@@ -989,7 +989,25 @@ export const en = {
         activeModel: 'Active',
         selectedStatus: 'Selected: {{model}} — {{status}}',
         unnamedDevice: 'Microphone',
+        modelUrls: 'Model download URLs',
+        modelUrlsDesc:
+          'View or override where each Whisper model is downloaded from (e.g. a mirror). SHA-256 is still verified after download.',
+        modelUrlsResetAll: 'Reset all',
+        modelUrlReset: 'Default',
+        shortcut: 'Composer shortcut',
+        shortcutDesc:
+          'Toggle voice dictation in the chat input. Escape cancels an in-progress recording.',
       },
+      proxy: 'Network proxy',
+      proxyDesc:
+        'HTTP(S) proxy for agent web tools and local model downloads. Useful with Clash / system proxies.',
+      proxyHttp: 'HTTP proxy',
+      proxyHttps: 'HTTPS proxy',
+      proxyAll: 'ALL_PROXY (optional)',
+      proxyAllPlaceholder: 'Fallback when HTTP/HTTPS empty',
+      proxyNoProxy: 'NO_PROXY',
+      proxyRestartHint:
+        'Agent tools pick up proxy changes after the sidecar restarts (reopen the app or reconnect). Downloads use the new proxy immediately.',
       contextMenu: {
         title: 'Context menus',
         description: 'Choose which right-click actions appear and in what order.',
@@ -2197,6 +2215,15 @@ export const en = {
         expand: 'Expand conversations under {{name}}',
         collapse: 'Collapse conversations under {{name}}',
       },
+      dateGroup: {
+        today: 'Today',
+        yesterday: 'Yesterday',
+        previous7: 'Previous 7 days',
+        previous30: 'Previous 30 days',
+        older: 'Older',
+        expand: 'Expand {{name}}',
+        collapse: 'Collapse {{name}}',
+      },
       parallel: {
         group: 'Parallel · {{id}}',
         winner: 'selected',
@@ -2748,6 +2775,7 @@ export const en = {
         description: 'Common shortcuts in hip',
         openPalette: 'Open command palette',
         slash: 'Slash commands in composer',
+        voiceToggle: 'Toggle voice dictation in composer',
         hotkeys: 'Run the nth command in the palette',
         prefixCmd: 'Filter to commands only',
         prefixSess: 'Filter to sessions only',

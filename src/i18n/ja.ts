@@ -825,7 +825,7 @@ export const ja = {
     "turnOutputs_one": "このターンの出力: {{count}}"
   },
   "voice": {
-    "micTitle": "音声入力 (⌘⇧M)",
+    "micTitle": "音声入力 ({{shortcut}})",
     "micAria": "音声入力を開始",
     "stopTitle": "停止して文字起こし",
     "stopAria": "録音を停止",
@@ -992,8 +992,24 @@ export const ja = {
       "useModel": "使用",
       "activeModel": "使用中",
       "selectedStatus": "選択: {{model}} — {{status}}",
-      "unnamedDevice": "マイク"
+      "unnamedDevice": "マイク",
+      "modelUrls": "モデルのダウンロード URL",
+      "modelUrlsDesc":
+        "各 Whisper モデルの取得元 URL を確認・変更できます（ミラーなど）。ダウンロード後も SHA-256 を検証します。",
+      "modelUrlsResetAll": "すべてリセット",
+      "modelUrlReset": "デフォルト",
+      "shortcut": "コンポーザーのショートカット",
+      "shortcutDesc": "チャット入力で音声入力を切り替え。録音中は Escape でキャンセル。"
     },
+    "proxy": "ネットワークプロキシ",
+    "proxyDesc": "エージェントの Web ツールとローカルモデル取得用の HTTP(S) プロキシ（Clash など）。",
+    "proxyHttp": "HTTP プロキシ",
+    "proxyHttps": "HTTPS プロキシ",
+    "proxyAll": "ALL_PROXY（任意）",
+    "proxyAllPlaceholder": "HTTP/HTTPS が空のときのフォールバック",
+    "proxyNoProxy": "NO_PROXY",
+    "proxyRestartHint":
+      "プロキシ変更は sidecar 再起動後にエージェントへ反映されます（アプリ再起動または再接続）。モデルのダウンロードはすぐに新プロキシを使います。",
     "contextMenu": {
       "title": "コンテキストメニュー",
       "description": "右クリックで表示するアクションとその順序を選択します。",
@@ -2119,6 +2135,15 @@ export const ja = {
       "expand": "{{name}} の会話を展開",
       "collapse": "{{name}} の会話を折りたたむ"
     },
+    "dateGroup": {
+      "today": "今日",
+      "yesterday": "昨日",
+      "previous7": "過去 7 日",
+      "previous30": "過去 30 日",
+      "older": "それ以前",
+      "expand": "{{name}} を展開",
+      "collapse": "{{name}} を折りたたむ"
+    },
     "parallel": {
       "group": "並列 · {{id}}",
       "winner": "選択済み",
@@ -2660,6 +2685,7 @@ export const ja = {
       "description": "hip のよく使うショートカット",
       "openPalette": "コマンドパレットを開く",
       "slash": "コンポーザーでスラッシュコマンド",
+      "voiceToggle": "コンポーザーの音声入力を切り替え",
       "hotkeys": "パレット内の n 番目のコマンドを実行",
       "prefixCmd": "コマンドのみにフィルター",
       "prefixSess": "セッションのみにフィルター",

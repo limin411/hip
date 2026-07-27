@@ -80,10 +80,11 @@ describe('applyServerMessageEffects', () => {
     })
   })
 
-  it('ready resets diff transient and requests session:list', () => {
+  it('ready resets diff transient and requests session:list + trash:list', () => {
     const deps = makeDeps()
     applyServerMessageEffects({ type: 'ready', hasApiKey: true }, deps)
     expect(deps.sent.some((m) => m.type === 'session:list')).toBe(true)
+    expect(deps.sent.some((m) => m.type === 'session:trash:list')).toBe(true)
     expect(deps.resyncActiveIfRunning).toHaveBeenCalled()
   })
 

@@ -26,6 +26,7 @@ import { CONTEXT_MENUS } from '@/components/context-menu/feature'
 import { CODE_TERMINAL } from '@/components/artifact/terminalFeature'
 import { TERMINAL_MANAGEMENT } from '@/components/terminals/feature'
 import { normalizeTerminalColorThemeId } from '@/components/artifact/terminalTheme'
+import { Switch } from '@/components/ui/Switch'
 
 const LANGUAGE_KEYS: AppLanguage[] = ['zh-CN', 'zh-TW', 'en', 'ja', 'ko']
 
@@ -60,10 +61,15 @@ export function GeneralSettings() {
   const trashRetention = resolveTrashRetentionDays(
     useHipConfigStore((s) => s.config.trash?.retentionDays),
   )
+  const proxy = useHipConfigStore((s) => s.config.proxy)
   const updateSection = useHipConfigStore((s) => s.updateSection)
   const loadHipConfig = useHipConfigStore((s) => s.load)
   const hipLoaded = useHipConfigStore((s) => s.loaded)
   const [retentionDraft, setRetentionDraft] = useState(String(trashRetention))
+  const [proxyHttp, setProxyHttp] = useState(proxy?.http ?? '')
+  const [proxyHttps, setProxyHttps] = useState(proxy?.https ?? '')
+  const [proxyAll, setProxyAll] = useState(proxy?.all ?? '')
+  const [proxyNoProxy, setProxyNoProxy] = useState(proxy?.noProxy ?? '')
 
   useEffect(() => {
     if (!hipLoaded) void loadHipConfig()
@@ -72,6 +78,13 @@ export function GeneralSettings() {
   useEffect(() => {
     setRetentionDraft(String(trashRetention))
   }, [trashRetention])
+
+  useEffect(() => {
+    setProxyHttp(proxy?.http ?? '')
+    setProxyHttps(proxy?.https ?? '')
+    setProxyAll(proxy?.all ?? '')
+    setProxyNoProxy(proxy?.noProxy ?? '')
+  }, [proxy?.http, proxy?.https, proxy?.all, proxy?.noProxy])
 
   const shellKeys = shellOptionsForPlatform()
   const showTerminalColor = CODE_TERMINAL || TERMINAL_MANAGEMENT
@@ -86,6 +99,21 @@ export function GeneralSettings() {
     const n = resolveTrashRetentionDays(Number(retentionDraft))
     setRetentionDraft(String(n))
     void updateSection('trash', { retentionDays: n })
+  }
+
+  const proxyEnabled = proxy?.enabled === true
+  const setProxyEnabled = (enabled: boolean) => {
+    void updateSection('proxy', (prev) => ({ ...(prev ?? {}), enabled }))
+  }
+  const commitProxyField = (
+    field: 'http' | 'https' | 'all' | 'noProxy',
+    value: string,
+  ) => {
+    const trimmed = value.trim()
+    void updateSection('proxy', (prev) => ({
+      ...(prev ?? {}),
+      [field]: trimmed || undefined,
+    }))
   }
 
   return (
@@ -271,6 +299,84 @@ export function GeneralSettings() {
             {t('settings.trashRetentionUnit', { defaultValue: 'days' })}
           </span>
         </div>
+      </div>
+      {/* Network proxy */}
+      <div
+        className="flex flex-col gap-3 px-8 py-4"
+        data-testid="settings-proxy"
+      >
+        <div className="flex items-center justify-between gap-6">
+          <div className="min-w-0 flex-1">
+            <div className="text-body font-medium text-ink">{t('settings.proxy')}</div>
+            <div className="mt-0.5 text-meta leading-relaxed text-ink-tertiary">
+              {t('settings.proxyDesc')}
+            </div>
+          </div>
+          <Switch
+            checked={proxyEnabled}
+            onCheckedChange={setProxyEnabled}
+            data-testid="settings-proxy-enabled"
+          />
+        </div>
+        {proxyEnabled ? (
+          <div className="grid gap-3 sm:grid-cols-2">
+            <label className="flex min-w-0 flex-col gap-1">
+              <span className="text-meta text-ink-tertiary">{t('settings.proxyHttp')}</span>
+              <input
+                type="url"
+                value={proxyHttp}
+                data-testid="settings-proxy-http"
+                placeholder="http://127.0.0.1:7890"
+                spellCheck={false}
+                onChange={(e) => setProxyHttp(e.target.value)}
+                onBlur={() => commitProxyField('http', proxyHttp)}
+                className="h-8 rounded-md border border-border bg-surface px-2 text-body text-ink transition-[border-color,box-shadow] duration-chrome focus-visible:border-accent focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-accent/10"
+              />
+            </label>
+            <label className="flex min-w-0 flex-col gap-1">
+              <span className="text-meta text-ink-tertiary">{t('settings.proxyHttps')}</span>
+              <input
+                type="url"
+                value={proxyHttps}
+                data-testid="settings-proxy-https"
+                placeholder="http://127.0.0.1:7890"
+                spellCheck={false}
+                onChange={(e) => setProxyHttps(e.target.value)}
+                onBlur={() => commitProxyField('https', proxyHttps)}
+                className="h-8 rounded-md border border-border bg-surface px-2 text-body text-ink transition-[border-color,box-shadow] duration-chrome focus-visible:border-accent focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-accent/10"
+              />
+            </label>
+            <label className="flex min-w-0 flex-col gap-1">
+              <span className="text-meta text-ink-tertiary">{t('settings.proxyAll')}</span>
+              <input
+                type="url"
+                value={proxyAll}
+                data-testid="settings-proxy-all"
+                placeholder={t('settings.proxyAllPlaceholder')}
+                spellCheck={false}
+                onChange={(e) => setProxyAll(e.target.value)}
+                onBlur={() => commitProxyField('all', proxyAll)}
+                className="h-8 rounded-md border border-border bg-surface px-2 text-body text-ink transition-[border-color,box-shadow] duration-chrome focus-visible:border-accent focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-accent/10"
+              />
+            </label>
+            <label className="flex min-w-0 flex-col gap-1">
+              <span className="text-meta text-ink-tertiary">{t('settings.proxyNoProxy')}</span>
+              <input
+                type="text"
+                value={proxyNoProxy}
+                data-testid="settings-proxy-no-proxy"
+                placeholder="localhost,127.0.0.1,::1"
+                spellCheck={false}
+                onChange={(e) => setProxyNoProxy(e.target.value)}
+                onBlur={() => commitProxyField('noProxy', proxyNoProxy)}
+                className="h-8 rounded-md border border-border bg-surface px-2 text-body text-ink transition-[border-color,box-shadow] duration-chrome focus-visible:border-accent focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-accent/10"
+              />
+            </label>
+            <p className="text-caption leading-relaxed text-ink-tertiary sm:col-span-2">
+              {t('settings.proxyRestartHint')}
+            </p>
+          </div>
+        ) : null}
       </div>
       {CONTEXT_MENUS ? <ContextMenuSettings /> : null}
     </div>

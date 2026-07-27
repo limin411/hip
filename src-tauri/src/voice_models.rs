@@ -53,6 +53,22 @@ pub fn spec_for(id: &str) -> Option<&'static ModelSpec> {
     MODEL_SPECS.iter().find(|s| s.id == id)
 }
 
+/// Catalog primary URL for a model id (empty when unknown).
+pub fn default_download_url(id: &str) -> Option<&'static str> {
+    spec_for(id).map(|s| s.urls[0])
+}
+
+/// Prefer a non-empty override; otherwise catalog primary URL.
+pub fn resolve_download_url(id: &str, override_url: Option<&str>) -> Option<String> {
+    if let Some(raw) = override_url {
+        let t = raw.trim();
+        if !t.is_empty() {
+            return Some(t.to_string());
+        }
+    }
+    default_download_url(id).map(|u| u.to_string())
+}
+
 pub fn model_path(models_dir: &Path, id: &str) -> Option<PathBuf> {
     let spec = spec_for(id)?;
     Some(models_dir.join(spec.filename))

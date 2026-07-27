@@ -134,6 +134,8 @@ export function applyServerMessageEffects(msg: ServerMessage, deps: ServerMessag
     case 'ready':
       useDiffStore.getState().resetTransient()
       deps.send({ type: 'session:list' })
+      // Early trash badge hydrate — do not wait for first Recycle Bin open.
+      deps.send({ type: 'session:trash:list' })
       deps.resyncActiveIfRunning()
       return
 

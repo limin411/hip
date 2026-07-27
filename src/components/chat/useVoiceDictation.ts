@@ -290,22 +290,47 @@ export function useVoiceDictation(opts: {
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
+      // Ignore IME composition (e.g. Chinese input) so shortcuts do not fire mid-compose.
+      if (e.isComposing || e.key === 'Process') return
       if (e.key === 'Escape' && state === 'recording') {
         e.preventDefault()
         e.stopPropagation()
         cancelRecording()
         return
       }
+      // Mod+Shift+M — use e.code so non-Latin layouts still toggle dictation.
       const mod = e.metaKey || e.ctrlKey
-      if (mod && e.shiftKey && (e.key === 'm' || e.key === 'M')) {
-        if (paletteOpen || opts.disabled) return
+      if (mod && e.shiftKey && e.code === 'KeyM') {
+        if (paletteOpen || opts.disabled || !enabled || envDisabled) return
+        // Avoid firing when typing in unrelated text fields outside the composer.
+        const target = e.target
+        if (target instanceof HTMLElement) {
+          const tag = target.tagName
+          const isEditable =
+            tag === 'INPUT' ||
+            tag === 'TEXTAREA' ||
+            target.isContentEditable
+          if (isEditable && opts.inputRef?.current && target !== opts.inputRef.current) {
+            return
+          }
+        }
         e.preventDefault()
+        e.stopPropagation()
         toggle()
       }
     }
     window.addEventListener('keydown', onKey, true)
     return () => window.removeEventListener('keydown', onKey, true)
-  }, [cancelRecording, opts.disabled, paletteOpen, state, toggle])
+  }, [
+    cancelRecording,
+    enabled,
+    envDisabled,
+    opts.disabled,
+    opts.inputRef,
+    paletteOpen,
+    state,
+    toggle,
+  ])
 
   const micDisabled =
     !!opts.disabled || !enabled || envDisabled || state === 'transcribing' || state === 'downloading'

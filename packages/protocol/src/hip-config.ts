@@ -346,6 +346,26 @@ export function isVoiceModelId(v: string): v is VoiceModelId {
 }
 
 /**
+ * Default Hugging Face resolve URLs for whisper ggml models
+ * (same catalog as `src-tauri/src/voice_models.rs`).
+ */
+export const DEFAULT_VOICE_MODEL_URLS: Readonly<Record<VoiceModelId, string>> = {
+  tiny: 'https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-tiny.bin',
+  base: 'https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-base.bin',
+  small: 'https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-small.bin',
+}
+
+/** Resolve effective download URL for a model (override wins when non-empty). */
+export function resolveVoiceModelUrl(
+  model: VoiceModelId,
+  overrides?: Partial<Record<VoiceModelId, string>> | null,
+): string {
+  const raw = overrides?.[model]?.trim()
+  if (raw) return raw
+  return DEFAULT_VOICE_MODEL_URLS[model]
+}
+
+/**
  * Optional `[voice]` section in hip.toml — composer local dictation (whisper.cpp).
  *
  * ```toml
@@ -357,6 +377,9 @@ export function isVoiceModelId(v: string): v is VoiceModelId {
  * language = "auto"
  * model = "base"
  * max_duration_sec = 60
+ *
+ * [voice.model_urls]
+ * base = "https://hf-mirror.com/ggerganov/whisper.cpp/resolve/main/ggml-base.bin"
  * ```
  *
  * Resolved defaults when omitted: **enabled=false** (opt-in; not every user needs voice),
@@ -375,6 +398,41 @@ export interface VoiceConfig {
   model?: VoiceModelId
   /** Clamp 5–120 in resolvers; default 60. */
   maxDurationSec?: number
+  /**
+   * Optional per-model download URL overrides (mirror / private CDN).
+   * Empty / omitted keys use {@link DEFAULT_VOICE_MODEL_URLS}.
+   * TOML: `[voice.model_urls]` / `modelUrls`.
+   */
+  modelUrls?: Partial<Record<VoiceModelId, string>>
+}
+
+/**
+ * Optional `[proxy]` section in hip.toml — HTTP(S) proxy for sidecar + model downloads.
+ *
+ * ```toml
+ * [proxy]
+ * enabled = true
+ * http = "http://127.0.0.1:7890"
+ * https = "http://127.0.0.1:7890"
+ * # all = "http://127.0.0.1:7890"   # optional fallback (ALL_PROXY)
+ * no_proxy = "localhost,127.0.0.1,::1"
+ * ```
+ *
+ * When `enabled=true`, values are injected as `HTTP_PROXY` / `HTTPS_PROXY` /
+ * `ALL_PROXY` / `NO_PROXY` for the sidecar process (and used by local downloads).
+ * When disabled or omitted, process/environment proxies (if any) still apply.
+ */
+export interface ProxyConfig {
+  /** Master switch. Default false when omitted. */
+  enabled?: boolean
+  /** HTTP proxy URL (`HTTP_PROXY`). */
+  http?: string
+  /** HTTPS proxy URL (`HTTPS_PROXY`). */
+  https?: string
+  /** Fallback for both (`ALL_PROXY`). */
+  all?: string
+  /** Comma-separated hosts that bypass the proxy (`NO_PROXY`). */
+  noProxy?: string
 }
 
 export interface HipConfig {
@@ -409,6 +467,8 @@ export interface HipConfig {
   plan?: PlanConfig
   /** Optional local voice dictation (whisper.cpp). */
   voice?: VoiceConfig
+  /** Optional HTTP(S) network proxy (General Settings). */
+  proxy?: ProxyConfig
 }
 
 /** User-configurable network policy persisted to ~/.hip/config/network.json.

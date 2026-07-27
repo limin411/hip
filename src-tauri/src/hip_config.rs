@@ -235,6 +235,26 @@ pub(crate) struct VoiceConfig {
     pub(crate) model: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub(crate) max_duration_sec: Option<u32>,
+    /// Per-model download URL overrides (`[voice.model_urls]` / modelUrls).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub(crate) model_urls: Option<HashMap<String, String>>,
+}
+
+/// Optional `[proxy]` HTTP(S) proxy. JSON uses camelCase for the UI.
+/// Must be preserved on set_hip_config rewrites.
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct ProxyConfig {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub(crate) enabled: Option<bool>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub(crate) http: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub(crate) https: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub(crate) all: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub(crate) no_proxy: Option<String>,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
@@ -276,6 +296,9 @@ pub(crate) struct HipConfig {
     /// Optional local voice dictation. Preserved on set_hip_config rewrites.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub(crate) voice: Option<VoiceConfig>,
+    /// Optional HTTP(S) proxy. Preserved on set_hip_config rewrites.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub(crate) proxy: Option<ProxyConfig>,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
@@ -528,6 +551,25 @@ pub(crate) struct TomlVoiceConfig {
     pub(crate) model: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none", alias = "maxDurationSec")]
     pub(crate) max_duration_sec: Option<u32>,
+    #[serde(default, skip_serializing_if = "Option::is_none", alias = "modelUrls")]
+    pub(crate) model_urls: Option<HashMap<String, String>>,
+}
+
+/// TOML mirror for `[proxy]` (snake_case keys; camelCase aliases for hand-edited files).
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+#[allow(dead_code)]
+pub(crate) struct TomlProxyConfig {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub(crate) enabled: Option<bool>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub(crate) http: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub(crate) https: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub(crate) all: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none", alias = "noProxy")]
+    pub(crate) no_proxy: Option<String>,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
@@ -563,6 +605,8 @@ pub(crate) struct TomlHipConfig {
     pub(crate) plan: Option<TomlPlanConfig>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub(crate) voice: Option<TomlVoiceConfig>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub(crate) proxy: Option<TomlProxyConfig>,
 }
 
 // ── From impls: HipConfig ↔ TomlHipConfig (recursive field mapping) ──
@@ -696,6 +740,7 @@ pub fn load_hip_config(app: &tauri::AppHandle) -> Result<HipConfig, String> {
             acp: None,
             plan: None,
             voice: None,
+            proxy: None,
         }),
         Err(e) => Err(e.to_string()),
     }
@@ -939,6 +984,7 @@ impl From<VoiceConfig> for TomlVoiceConfig {
             language: v.language,
             model: v.model,
             max_duration_sec: v.max_duration_sec,
+            model_urls: v.model_urls,
         }
     }
 }
@@ -953,6 +999,31 @@ impl From<TomlVoiceConfig> for VoiceConfig {
             language: v.language,
             model: v.model,
             max_duration_sec: v.max_duration_sec,
+            model_urls: v.model_urls,
+        }
+    }
+}
+
+impl From<ProxyConfig> for TomlProxyConfig {
+    fn from(p: ProxyConfig) -> Self {
+        TomlProxyConfig {
+            enabled: p.enabled,
+            http: p.http,
+            https: p.https,
+            all: p.all,
+            no_proxy: p.no_proxy,
+        }
+    }
+}
+
+impl From<TomlProxyConfig> for ProxyConfig {
+    fn from(p: TomlProxyConfig) -> Self {
+        ProxyConfig {
+            enabled: p.enabled,
+            http: p.http,
+            https: p.https,
+            all: p.all,
+            no_proxy: p.no_proxy,
         }
     }
 }
@@ -975,6 +1046,7 @@ impl From<HipConfig> for TomlHipConfig {
             acp: cfg.acp.map(|x| x.into()),
             plan: cfg.plan.map(|x| x.into()),
             voice: cfg.voice.map(|x| x.into()),
+            proxy: cfg.proxy.map(|x| x.into()),
         }
     }
 }
@@ -997,6 +1069,7 @@ impl From<TomlHipConfig> for HipConfig {
             acp: cfg.acp.map(|x| x.into()),
             plan: cfg.plan.map(|x| x.into()),
             voice: cfg.voice.map(|x| x.into()),
+            proxy: cfg.proxy.map(|x| x.into()),
         }
     }
 }
@@ -1042,7 +1115,9 @@ mod voice_preserve_tests {
                 language: Some("auto".into()),
                 model: Some("base".into()),
                 max_duration_sec: Some(60),
+                model_urls: None,
             }),
+            proxy: None,
         };
         let toml_cfg: TomlHipConfig = cfg.clone().into();
         let text = toml::to_string_pretty(&toml_cfg).expect("serialize");

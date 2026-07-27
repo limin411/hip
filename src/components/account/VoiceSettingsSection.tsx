@@ -2,11 +2,14 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Check, ChevronDown, Mic, MicOff, RefreshCw } from 'lucide-react'
 import {
+  DEFAULT_VOICE_MODEL_URLS,
   VOICE_LANGUAGES,
   VOICE_MODEL_IDS,
+  resolveVoiceModelUrl,
   type VoiceLanguage,
   type VoiceModelId,
 } from '@hip/protocol'
+import { isMacPlatform } from '@/lib/platform'
 import { cn } from '@/lib/utils'
 import { useHipConfigStore } from '@/store/hipConfigStore'
 import { Switch } from '@/components/ui/Switch'
@@ -86,6 +89,8 @@ export function VoiceSettingsSection({
   const [micLevel, setMicLevel] = useState(0)
   const [micTestHint, setMicTestHint] = useState<string | null>(null)
   const [micTestBusy, setMicTestBusy] = useState(false)
+  /** Local drafts for model URL fields (commit on blur). */
+  const [urlDrafts, setUrlDrafts] = useState<Partial<Record<VoiceModelId, string>>>({})
   const micTestRef = useRef<CaptureHandle | null>(null)
   const micLevelRaf = useRef<number | null>(null)
   // Download state lives in a module store so switching Settings pages does not drop it.
@@ -181,6 +186,16 @@ export function VoiceSettingsSection({
     void refreshRuntime()
     void checkAllModels()
   }, [enabled, checkAllModels, refreshRuntime])
+
+  // Sync URL drafts from persisted config when overrides change (reset / external load).
+  useEffect(() => {
+    if (!enabled) return
+    const next: Partial<Record<VoiceModelId, string>> = {}
+    for (const id of VOICE_MODEL_IDS) {
+      next[id] = resolveVoiceModelUrl(id, voice?.modelUrls)
+    }
+    setUrlDrafts(next)
+  }, [enabled, voice?.modelUrls])
 
   // Always release mic test capture on unmount / disable.
   useEffect(() => {
@@ -992,6 +1007,127 @@ export function VoiceSettingsSection({
                 }),
               })}
             </p>
+          </div>
+
+          {/* Download URL overrides (mirror / private CDN) */}
+          <div
+            className="flex flex-col gap-3 px-8 py-4"
+            data-testid="settings-voice-model-urls"
+          >
+            <div className="flex items-start justify-between gap-4">
+              <div className="min-w-0 flex-1">
+                <div className="text-body font-medium text-ink">{t('settings.voice.modelUrls')}</div>
+                <div className="mt-0.5 text-meta leading-relaxed text-ink-tertiary">
+                  {t('settings.voice.modelUrlsDesc')}
+                </div>
+              </div>
+              <button
+                type="button"
+                className={btnCls}
+                data-testid="settings-voice-model-urls-reset-all"
+                onClick={() =>
+                  void updateSection('voice', (prev) => ({
+                    ...(prev ?? {}),
+                    modelUrls: undefined,
+                  }))
+                }
+              >
+                {t('settings.voice.modelUrlsResetAll')}
+              </button>
+            </div>
+            <ul className="divide-y divide-border rounded-md border border-border bg-surface">
+              {VOICE_MODEL_IDS.map((id) => {
+                const current =
+                  urlDrafts[id] ?? resolveVoiceModelUrl(id, voice?.modelUrls)
+                const isCustom = Boolean(voice?.modelUrls?.[id]?.trim())
+                const commitUrl = (raw: string) => {
+                  const next = raw.trim()
+                  const def = DEFAULT_VOICE_MODEL_URLS[id]
+                  void updateSection('voice', (prev) => {
+                    const urls = { ...(prev?.modelUrls ?? {}) }
+                    if (!next || next === def) {
+                      delete urls[id]
+                    } else {
+                      urls[id] = next
+                    }
+                    const empty = Object.keys(urls).length === 0
+                    return {
+                      ...(prev ?? {}),
+                      modelUrls: empty ? undefined : urls,
+                    }
+                  })
+                }
+                return (
+                  <li
+                    key={id}
+                    className="flex flex-col gap-1.5 px-3 py-2.5 sm:flex-row sm:items-center sm:gap-3"
+                    data-testid={`settings-voice-model-url-row-${id}`}
+                  >
+                    <div className="w-24 shrink-0 text-meta font-medium text-ink-secondary">
+                      {id}
+                    </div>
+                    <input
+                      type="url"
+                      className="h-8 min-w-0 flex-1 rounded-md border border-border bg-surface px-2 text-meta text-ink transition-[border-color,box-shadow] duration-chrome focus-visible:border-accent focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-accent/10"
+                      value={current}
+                      data-testid={`settings-voice-model-url-input-${id}`}
+                      spellCheck={false}
+                      onChange={(e) =>
+                        setUrlDrafts((prev) => ({ ...prev, [id]: e.target.value }))
+                      }
+                      onBlur={() => commitUrl(current)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          e.currentTarget.blur()
+                        }
+                      }}
+                    />
+                    <button
+                      type="button"
+                      className={btnCls}
+                      disabled={!isCustom && current === DEFAULT_VOICE_MODEL_URLS[id]}
+                      data-testid={`settings-voice-model-url-reset-${id}`}
+                      onClick={() => {
+                        setUrlDrafts((prev) => ({
+                          ...prev,
+                          [id]: DEFAULT_VOICE_MODEL_URLS[id],
+                        }))
+                        void updateSection('voice', (prev) => {
+                          const urls = { ...(prev?.modelUrls ?? {}) }
+                          delete urls[id]
+                          const empty = Object.keys(urls).length === 0
+                          return {
+                            ...(prev ?? {}),
+                            modelUrls: empty ? undefined : urls,
+                          }
+                        })
+                      }}
+                    >
+                      {t('settings.voice.modelUrlReset')}
+                    </button>
+                  </li>
+                )
+              })}
+            </ul>
+          </div>
+
+          {/* Keyboard shortcut (composer) */}
+          <div
+            className="flex items-center justify-between gap-6 px-8 py-4"
+            data-testid="settings-voice-shortcut"
+          >
+            <div className="min-w-0 flex-1">
+              <div className="text-body font-medium text-ink">{t('settings.voice.shortcut')}</div>
+              <div className="mt-0.5 text-meta leading-relaxed text-ink-tertiary">
+                {t('settings.voice.shortcutDesc')}
+              </div>
+            </div>
+            <kbd
+              className="shrink-0 rounded-md border border-border bg-surface-muted px-2 py-1 font-mono text-meta text-ink-secondary"
+              data-testid="settings-voice-shortcut-keys"
+            >
+              {isMacPlatform() ? '⌘ ⇧ M' : 'Ctrl + Shift + M'}
+            </kbd>
           </div>
         </>
       )}

@@ -2320,7 +2320,12 @@ export class SessionService {
   /**
    * Send a user message to an explicit session without reading or changing activeSessionId.
    * Used by automation background fires (createSession activate:false + this).
-   * Does not handle plan-approval amend / interrupt resume (those stay on the active composer path).
+   *
+   * Intentionally thin vs `sendMessage`:
+   * - No plan-approval amend / interrupt resume (composer path only)
+   * - No draft commit / project-path gates — caller must ensure a sendable config
+   *   (e.g. buildSessionConfigFromAutomation; code templates require a project cwd)
+   * - No-ops (no wire) when sessionId is unknown in the domain store
    */
   sendMessageToSession(
     sessionId: string,
@@ -2329,6 +2334,7 @@ export class SessionService {
   ): void {
     const text = content.trim()
     if (!text && attachments.length === 0) return
+    if (!useDomainStore.getState().sessions.some((s) => s.id === sessionId)) return
     const id = nanoid()
     useDomainStore.getState().appendUserMessage(sessionId, id, text, attachments)
     this.transport.send({

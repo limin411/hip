@@ -187,9 +187,33 @@ describe('SessionService', () => {
   })
 
   it('createSession default still activates (back-compat)', () => {
+    useUiStore.setState({
+      activeView: 'chat',
+      chatSessionId: 's1',
+      codeSessionId: 'code-keep',
+    })
     const t = new FakeTransport()
     const id = new SessionService(t).createSession({ ...DEFAULT_CONFIG, surface: 'chat' })
     expect(useDomainStore.getState().activeSessionId).toBe(id)
+    // rememberActiveForSurface still runs on activate path (restore-on-switch pointer).
+    expect(useUiStore.getState().chatSessionId).toBe(id)
+    expect(useUiStore.getState().codeSessionId).toBe('code-keep')
+  })
+
+  it('createSession with activate:true refreshes chat surface pointer', () => {
+    useUiStore.setState({
+      activeView: 'chat',
+      chatSessionId: 's1',
+      codeSessionId: 'code-keep',
+    })
+    const t = new FakeTransport()
+    const id = new SessionService(t).createSession(
+      { ...DEFAULT_CONFIG, surface: 'chat' },
+      { activate: true },
+    )
+    expect(useDomainStore.getState().activeSessionId).toBe(id)
+    expect(useUiStore.getState().chatSessionId).toBe(id)
+    expect(useUiStore.getState().codeSessionId).toBe('code-keep')
   })
 
   it('sendMessageToSession sends to target session without switching active', () => {
@@ -225,6 +249,17 @@ describe('SessionService', () => {
       content: 'look',
       attachments: [{ id: 'a1', name: 'notes.md', mimeType: 'text/markdown', path: '/proj/notes.md' }],
     })
+  })
+
+  it('sendMessageToSession no-ops for unknown sessionId (no wire split-brain)', () => {
+    const t = new FakeTransport()
+    const svc = new SessionService(t)
+    const before = t.sent.length
+    svc.sendMessageToSession('missing-session', 'hello')
+    expect(useDomainStore.getState().activeSessionId).toBe('s1')
+    expect(t.sent.filter((m) => m.type === 'message:send')).toHaveLength(0)
+    expect(t.sent.length).toBe(before)
+    expect(useDomainStore.getState().sessions.find((s) => s.id === 's1')!.messages).toHaveLength(0)
   })
 
   it('deleteSession soft-deletes (recycle bin) and notifies backend', () => {

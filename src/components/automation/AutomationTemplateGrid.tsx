@@ -51,7 +51,10 @@ export function AutomationTemplateGrid({
             </span>
             <div className="flex shrink-0 items-center gap-1">
               {tpl.requiresProject ? (
-                <span title={t('automation.templates.requiresProject')}>
+                <span
+                  title={t('automation.templates.requiresProject')}
+                  aria-label={t('automation.templates.requiresProject')}
+                >
                   <FolderGit2
                     className="h-3.5 w-3.5 text-ink-tertiary"
                     strokeWidth={1.75}

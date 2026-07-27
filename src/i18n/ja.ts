@@ -2091,7 +2091,7 @@ export const ja = {
     "startCta": "自動化を始める",
     "loading": "読み込み中…",
     "untitled": "無題の自動化",
-    "localOnlyHint": "この Mac で実行。スケジュール実行には hip を開いたままかトレイに隠す必要があります。",
+    "localOnlyHint": "このコンピュータで実行。スケジュール実行には hip を開いたままかトレイに隠す必要があります。",
     "projectRequired": "このテンプレートにはプロジェクトフォルダが必要です。",
     "templatesHeading": "テンプレート",
     "templatesHint": "起点を選び、プロンプトとスケジュールを調整します。",
@@ -2102,6 +2102,10 @@ export const ja = {
     "skillDisabled": "スキルは無効です",
     "skillMissing": "スキルが利用できません",
     "createFromSkill": "スキルから作成",
+    "softWarnings": {
+      "no_work_items_context": "agent は work-items カタログを自動では読み込みません — プロンプトに TODO を貼るか説明してください。",
+      "needs_edit_permission": "コード系の実行では、プロジェクト内のファイルを読む・変更するために編集権限が必要な場合があります。"
+    },
     "skillSeedName": "{{name}} 自動化",
     "skillSeedPrompt": "可能ならスキル「{{name}}」を使ってください。\n\nスキル説明:\n{{description}}\n\nスキルの指示に従って実行してください。",
     "templates": {
@@ -2239,6 +2243,7 @@ export const ja = {
       "time": "時刻",
       "project": "プロジェクトフォルダ",
       "projectOptional": "任意 — 空ならチャット面",
+      "projectRequiredHint": "このテンプレートでは必須",
       "pickProject": "フォルダを選択…",
       "clearProject": "プロジェクトをクリア",
       "model": "モデル（任意）",
@@ -2287,8 +2292,10 @@ export const ja = {
       "projects": "プロジェクトセッション",
       "chats": "チャット履歴",
       "terminals": "ターミナル管理",
-      "workItems": "ワークアイテム"
+      "workItems": "ワークアイテム",
+      "automations": "自動化"
     },
+    "automationsHint": "メインパネルで自動化を管理します。",
     "quickConnect": "クイック接続",
     "badge": {
       "chat": "チャット",

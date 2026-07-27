@@ -4,6 +4,7 @@ import type { Automation, AutomationRunStatus } from '@/domain/automations'
 import { Badge } from '@/components/ui/Badge'
 import { Button } from '@/components/ui/Button'
 import { Switch } from '@/components/ui/Switch'
+import { useSkillsStore } from '@/store/skillsStore'
 import { cn } from '@/lib/utils'
 
 export type AutomationRowProps = {
@@ -62,7 +63,14 @@ const WEEKDAY_KEYS = [
 
 function triggerLabel(
   a: Automation,
-  t: (key: (typeof WEEKDAY_KEYS)[number] | 'automation.trigger.manual' | 'automation.trigger.dailyAt' | 'automation.trigger.weeklyAt', opts?: Record<string, unknown>) => string,
+  t: (
+    key:
+      | (typeof WEEKDAY_KEYS)[number]
+      | 'automation.trigger.manual'
+      | 'automation.trigger.dailyAt'
+      | 'automation.trigger.weeklyAt',
+    opts?: Record<string, unknown>,
+  ) => string,
 ): string {
   const tr = a.trigger
   if (tr.kind === 'manual') return t('automation.trigger.manual')
@@ -75,6 +83,44 @@ function triggerLabel(
     weekday: t(WEEKDAY_KEYS[wd]!),
     time,
   })
+}
+
+/** Skill honesty chips: missing / disabled (does not block Run). */
+function SkillHonestyChips({ skillIds }: { skillIds: string[] }) {
+  const { t } = useTranslation()
+  const skills = useSkillsStore((s) => s.skills)
+  const enabled = useSkillsStore((s) => s.enabled)
+
+  if (skillIds.length === 0) return null
+
+  const chips: { id: string; kind: 'missing' | 'disabled' }[] = []
+  for (const id of skillIds) {
+    const meta = skills.find((s) => s.id === id)
+    if (!meta) {
+      chips.push({ id, kind: 'missing' })
+    } else if (enabled[id] === false) {
+      chips.push({ id, kind: 'disabled' })
+    }
+  }
+  if (chips.length === 0) return null
+
+  return (
+    <>
+      {chips.map((c) => (
+        <Badge
+          key={`${c.kind}-${c.id}`}
+          size="sm"
+          variant="warning"
+          data-testid={`automation-skill-chip-${c.kind}-${c.id}`}
+          title={c.id}
+        >
+          {c.kind === 'missing'
+            ? t('automation.skillMissing')
+            : t('automation.skillDisabled')}
+        </Badge>
+      ))}
+    </>
+  )
 }
 
 export function AutomationRow({
@@ -135,6 +181,9 @@ export function AutomationRow({
               {t(`automation.status.${status}` as 'automation.status.succeeded')}
             </Badge>
           ) : null}
+          {automation.skillIds?.length ? (
+            <SkillHonestyChips skillIds={automation.skillIds} />
+          ) : null}
         </div>
         <div className="mt-0.5 flex flex-wrap gap-x-3 gap-y-0.5 text-meta text-ink-tertiary">
           <span data-testid={`automation-next-${automation.id}`}>
@@ -173,7 +222,7 @@ export function AutomationRow({
           onClick={onEdit}
           aria-label={t('automation.list.edit')}
         >
-          <Pencil className="h-3.5 w-3.5" strokeWidth={1.75} />
+          <Pencil className="h-3.5 w-3.5" strokeWidth={1.75} aria-hidden />
         </Button>
         <Button
           type="button"
@@ -183,7 +232,7 @@ export function AutomationRow({
           onClick={onDelete}
           aria-label={t('automation.list.delete')}
         >
-          <Trash2 className="h-3.5 w-3.5" strokeWidth={1.75} />
+          <Trash2 className="h-3.5 w-3.5" strokeWidth={1.75} aria-hidden />
         </Button>
       </div>
     </div>

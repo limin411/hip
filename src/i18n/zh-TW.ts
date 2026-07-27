@@ -2109,6 +2109,10 @@ export const zhTW = {
     "skillDisabled": "技能已關閉",
     "skillMissing": "技能不可用",
     "createFromSkill": "從技能建立",
+    "softWarnings": {
+      "no_work_items_context": "agent 不會自動載入事項目錄 — 請在提示詞中貼上或描述待辦。",
+      "needs_edit_permission": "程式碼類執行可能需要編輯權限以讀取或修改專案檔案。"
+    },
     "skillSeedName": "{{name}} 自動化",
     "skillSeedPrompt": "若可用，請使用技能「{{name}}」。\n\n技能說明：\n{{description}}\n\n請依該技能的說明完成本次執行。",
     "templates": {
@@ -2246,6 +2250,7 @@ export const zhTW = {
       "time": "時間",
       "project": "專案目錄",
       "projectOptional": "可選 — 為空則走對話表面",
+      "projectRequiredHint": "此範本必填",
       "pickProject": "選擇資料夾…",
       "clearProject": "清除專案",
       "model": "模型（可選）",
@@ -2294,8 +2299,10 @@ export const zhTW = {
       "projects": "專案會話",
       "chats": "對話歷史",
       "terminals": "終端管理",
-      "workItems": "事項"
+      "workItems": "事項",
+      "automations": "自動化"
     },
+    "automationsHint": "在主面板中管理自動化。",
     "quickConnect": "快捷連線",
     "badge": {
       "chat": "對話",

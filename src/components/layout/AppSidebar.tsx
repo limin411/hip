@@ -299,7 +299,9 @@ export function AppSidebar() {
             ? t('sidebar.list.terminals')
             : sidebarSection === 'tasks' && WORK_ITEM_TRACKING
               ? t('sidebar.list.workItems')
-              : t(`sidebar.nav.${sidebarSection}`)
+              : sidebarSection === 'automation' && AUTOMATION_PAGE
+                ? t('sidebar.list.automations')
+                : t(`sidebar.nav.${sidebarSection}`)
 
   const toggleWorktree = (sessionId: string) => {
     setWorktreeCollapsed((prev) => ({ ...prev, [sessionId]: !prev[sessionId] }))
@@ -526,6 +528,16 @@ export function AppSidebar() {
 
         {sidebarSection === 'tasks' && WORK_ITEM_TRACKING ? (
           <WorkItemSidebarLists />
+        ) : sidebarSection === 'automation' && AUTOMATION_PAGE ? (
+          <div
+            className="flex flex-col items-center gap-1 px-3 py-6 text-center"
+            role="status"
+            data-testid="sidebar-automations-empty"
+          >
+            <p className="text-meta text-ink-tertiary">
+              {t('sidebar.automationsHint')}
+            </p>
+          </div>
         ) : sidebarSection === 'terminals' && TERMINAL_MANAGEMENT ? (
           managedTerminals.length === 0 ? (
             <div

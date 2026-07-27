@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Zap } from 'lucide-react'
-import { useAutomationStore } from '@/store/automationStore'
+import { isInFlight, useAutomationStore } from '@/store/automationStore'
 import { EmptyState } from '@/components/ui/EmptyState'
 import { Button } from '@/components/ui/Button'
 import { AutomationEmptyState, type SkillSeedDraft } from './AutomationEmptyState'
@@ -9,7 +9,6 @@ import { AutomationList } from './AutomationList'
 import { AutomationEditorModal, type EditorMode } from './AutomationEditorModal'
 import { AutomationScheduleBanner } from './AutomationScheduleBanner'
 import type { AutomationTemplate } from './templates'
-import { isInFlight } from '@/store/automationStore'
 
 /**
  * Automations product surface (flag-gated from AppLayout).

@@ -11,7 +11,11 @@ import { Modal } from '@/components/ui/Modal'
 import { SegmentedControl } from '@/components/ui/SegmentedControl'
 import { pickDirectory } from '@/ipc/dialog'
 import { cn } from '@/lib/utils'
-import type { AutomationTemplate } from './templates'
+import {
+  getAutomationTemplate,
+  type AutomationTemplate,
+  type AutomationTemplateSoftWarning,
+} from './templates'
 import type { SkillSeedDraft } from './AutomationEmptyState'
 
 export type EditorMode =
@@ -42,6 +46,7 @@ type Draft = {
   skillIds: string[]
   templateId: string | null
   requiresProject: boolean
+  softWarnings: AutomationTemplateSoftWarning[]
 }
 
 function emptyDraft(): Draft {
@@ -58,11 +63,27 @@ function emptyDraft(): Draft {
     skillIds: [],
     templateId: null,
     requiresProject: false,
+    softWarnings: [],
+  }
+}
+
+/** Re-derive template constraints from catalog templateId (edit path honesty). */
+function constraintsFromTemplateId(templateId: string | null | undefined): {
+  requiresProject: boolean
+  softWarnings: AutomationTemplateSoftWarning[]
+} {
+  if (!templateId) return { requiresProject: false, softWarnings: [] }
+  const tpl = getAutomationTemplate(templateId)
+  if (!tpl) return { requiresProject: false, softWarnings: [] }
+  return {
+    requiresProject: tpl.requiresProject,
+    softWarnings: tpl.softWarnings ? [...tpl.softWarnings] : [],
   }
 }
 
 function draftFromAutomation(a: Automation): Draft {
   const tr = a.trigger
+  const constraints = constraintsFromTemplateId(a.templateId)
   return {
     name: a.name,
     prompt: a.prompt,
@@ -76,7 +97,8 @@ function draftFromAutomation(a: Automation): Draft {
       a.llmProvider && a.model ? `${a.llmProvider}/${a.model}` : a.model ?? '',
     skillIds: a.skillIds ? [...a.skillIds] : [],
     templateId: a.templateId ?? null,
-    requiresProject: false,
+    requiresProject: constraints.requiresProject,
+    softWarnings: constraints.softWarnings,
   }
 }
 
@@ -129,6 +151,8 @@ export function AutomationEditorModal({
   const [promptError, setPromptError] = useState(false)
   const [projectError, setProjectError] = useState(false)
   const nameRef = useRef<HTMLInputElement>(null)
+  const promptRef = useRef<HTMLTextAreaElement>(null)
+  const projectPickRef = useRef<HTMLButtonElement>(null)
 
   const sessionKey =
     state.mode === 'closed'
@@ -160,6 +184,7 @@ export function AutomationEditorModal({
         }
         d.templateId = tpl.id
         d.requiresProject = tpl.requiresProject
+        d.softWarnings = tpl.softWarnings ? [...tpl.softWarnings] : []
       }
       if (seed) {
         d.name = seed.name
@@ -181,6 +206,9 @@ export function AutomationEditorModal({
 
   const patch = (p: Partial<Draft>) => setDraft((d) => ({ ...d, ...p }))
 
+  const projectMissing =
+    draft.requiresProject && !draft.projectPath.trim()
+
   const pickProject = async () => {
     const dir = await pickDirectory()
     if (dir) {
@@ -189,20 +217,32 @@ export function AutomationEditorModal({
     }
   }
 
+  const clearProject = () => {
+    patch({ projectPath: '' })
+    if (draft.requiresProject) setProjectError(true)
+  }
+
   const validate = (): boolean => {
     let ok = true
+    let focus: 'name' | 'prompt' | 'project' | null = null
     if (!draft.name.trim()) {
       setNameError(true)
       ok = false
+      focus = 'name'
     }
     if (!draft.prompt.trim()) {
       setPromptError(true)
       ok = false
+      if (!focus) focus = 'prompt'
     }
-    if (draft.requiresProject && !draft.projectPath.trim()) {
+    if (projectMissing) {
       setProjectError(true)
       ok = false
+      if (!focus) focus = 'project'
     }
+    if (focus === 'name') nameRef.current?.focus()
+    else if (focus === 'prompt') promptRef.current?.focus()
+    else if (focus === 'project') projectPickRef.current?.focus()
     return ok
   }
 
@@ -223,10 +263,7 @@ export function AutomationEditorModal({
   }
 
   const handleSave = async (andRun: boolean) => {
-    if (!validate()) {
-      nameRef.current?.focus()
-      return
-    }
+    if (!validate()) return
     setSaving(true)
     try {
       if (state.mode === 'edit' && editId) {
@@ -253,6 +290,8 @@ export function AutomationEditorModal({
       ? t('automation.editor.editTitle')
       : t('automation.editor.createTitle')
 
+  const saveDisabled = saving || projectMissing
+
   return (
     <Modal
       open={open}
@@ -277,7 +316,7 @@ export function AutomationEditorModal({
             type="button"
             variant="secondary"
             size="sm"
-            disabled={saving}
+            disabled={saveDisabled}
             data-testid="automation-editor-save"
             onClick={() => void handleSave(false)}
           >
@@ -288,7 +327,7 @@ export function AutomationEditorModal({
           <Button
             type="button"
             size="sm"
-            disabled={saving}
+            disabled={saveDisabled}
             data-testid="automation-editor-save-run"
             onClick={() => void handleSave(true)}
           >
@@ -312,6 +351,25 @@ export function AutomationEditorModal({
           </p>
         ) : null}
 
+        {draft.softWarnings.length > 0 ? (
+          <ul
+            className="flex flex-col gap-1"
+            data-testid="automation-soft-warnings"
+          >
+            {draft.softWarnings.map((w) => (
+              <li
+                key={w}
+                className="rounded-md border border-warning/30 bg-warning/10 px-2.5 py-1.5 text-meta text-ink-secondary"
+                data-testid={`automation-soft-warning-${w}`}
+              >
+                {t(
+                  `automation.softWarnings.${w}` as 'automation.softWarnings.no_work_items_context',
+                )}
+              </li>
+            ))}
+          </ul>
+        ) : null}
+
         <p className="text-meta text-ink-tertiary" data-testid="automation-local-hint">
           {t('automation.localOnlyHint')}
         </p>
@@ -331,9 +389,10 @@ export function AutomationEditorModal({
             placeholder={t('automation.editor.namePlaceholder')}
             data-testid="automation-editor-name"
             aria-invalid={nameError}
+            aria-describedby={nameError ? 'automation-name-error' : undefined}
           />
           {nameError ? (
-            <span className="text-caption text-danger">
+            <span id="automation-name-error" className="text-caption text-danger">
               {t('automation.editor.nameRequired')}
             </span>
           ) : null}
@@ -393,6 +452,7 @@ export function AutomationEditorModal({
             {t('automation.editor.prompt')}
           </span>
           <Textarea
+            ref={promptRef}
             value={draft.prompt}
             rows={6}
             onChange={(e) => {
@@ -402,9 +462,10 @@ export function AutomationEditorModal({
             placeholder={t('automation.editor.promptPlaceholder')}
             data-testid="automation-editor-prompt"
             aria-invalid={promptError}
+            aria-describedby={promptError ? 'automation-prompt-error' : undefined}
           />
           {promptError ? (
-            <span className="text-caption text-danger">
+            <span id="automation-prompt-error" className="text-caption text-danger">
               {t('automation.editor.promptRequired')}
             </span>
           ) : null}
@@ -419,11 +480,16 @@ export function AutomationEditorModal({
           </span>
           <div className="flex items-center gap-2">
             <Button
+              ref={projectPickRef}
               type="button"
               size="sm"
               variant="secondary"
               data-testid="automation-editor-pick-project"
               onClick={() => void pickProject()}
+              aria-invalid={projectError || undefined}
+              aria-describedby={
+                projectError ? 'automation-project-error' : undefined
+              }
             >
               <Folder className="h-3.5 w-3.5" strokeWidth={1.75} aria-hidden />
               {t('automation.editor.pickProject')}
@@ -439,19 +505,25 @@ export function AutomationEditorModal({
                   className="shrink-0 text-ink-tertiary hover:text-ink"
                   aria-label={t('automation.editor.clearProject')}
                   data-testid="automation-editor-clear-project"
-                  onClick={() => patch({ projectPath: '' })}
+                  onClick={clearProject}
                 >
-                  <X className="h-3.5 w-3.5" />
+                  <X className="h-3.5 w-3.5" aria-hidden />
                 </button>
               </div>
             ) : (
               <span className="text-meta text-ink-tertiary">
-                {t('automation.editor.projectOptional')}
+                {draft.requiresProject
+                  ? t('automation.editor.projectRequiredHint')
+                  : t('automation.editor.projectOptional')}
               </span>
             )}
           </div>
           {projectError ? (
-            <span className="text-caption text-danger" data-testid="automation-project-required">
+            <span
+              id="automation-project-error"
+              className="text-caption text-danger"
+              data-testid="automation-project-required"
+            >
               {t('automation.projectRequired')}
             </span>
           ) : null}

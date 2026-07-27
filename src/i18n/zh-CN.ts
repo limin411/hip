@@ -2131,6 +2131,12 @@ export const zhCN = {
       skillDisabled: '技能已关闭',
       skillMissing: '技能不可用',
       createFromSkill: '从技能创建',
+      softWarnings: {
+        no_work_items_context:
+          'agent 不会自动加载事项目录 — 请在提示词中粘贴或描述待办。',
+        needs_edit_permission:
+          '代码类运行可能需要编辑权限以读取或修改项目文件。',
+      },
       skillSeedName: '{{name}} 自动化',
       skillSeedPrompt:
         '若可用，请使用技能「{{name}}」。\n\n技能说明：\n{{description}}\n\n请按该技能的说明完成本次运行。',
@@ -2277,6 +2283,7 @@ export const zhCN = {
         time: '时间',
         project: '项目目录',
         projectOptional: '可选 — 为空则走对话表面',
+        projectRequiredHint: '此模板必填',
         pickProject: '选择文件夹…',
         clearProject: '清除项目',
         model: '模型（可选）',
@@ -2326,7 +2333,9 @@ export const zhCN = {
         chats: '对话历史',
         terminals: '终端管理',
         workItems: '事项',
+        automations: '自动化',
       },
+      automationsHint: '在主面板中管理自动化。',
       quickConnect: '快捷连接',
       badge: {
         chat: '对话',

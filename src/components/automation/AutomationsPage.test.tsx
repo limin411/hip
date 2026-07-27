@@ -109,6 +109,8 @@ describe('AutomationsPage', () => {
     expect(screen.getByTestId('automation-list')).toBeInTheDocument()
     expect(screen.getByTestId('automation-row-auto_test1')).toBeInTheDocument()
     expect(screen.queryByTestId('automation-empty-state')).not.toBeInTheDocument()
+    // hipConfig mock: close=quit + tray off → schedule banner for daily enabled
+    expect(screen.getByTestId('automation-schedule-banner')).toBeInTheDocument()
   })
 
   it('shows loading empty while catalog loads', () => {

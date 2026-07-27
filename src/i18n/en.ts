@@ -2172,7 +2172,7 @@ export const en = {
       startCta: 'Start automating',
       loading: 'Loading…',
       untitled: 'Untitled automation',
-      localOnlyHint: 'Runs on this Mac. hip must be open or hidden to the tray for scheduled runs.',
+      localOnlyHint: 'Runs on this computer. hip must be open or hidden to the tray for scheduled runs.',
       projectRequired: 'This template requires a project folder.',
       templatesHeading: 'Templates',
       templatesHint: 'Pick a starting point, then adjust the prompt and schedule.',
@@ -2184,6 +2184,12 @@ export const en = {
       skillDisabled: 'Skill is disabled',
       skillMissing: 'Skill unavailable',
       createFromSkill: 'Create from skill',
+      softWarnings: {
+        no_work_items_context:
+          'The agent does not automatically load your work-items catalog — paste or describe todos in the prompt.',
+        needs_edit_permission:
+          'Code-oriented runs may need edit permission to read or change files in the project.',
+      },
       skillSeedName: '{{name}} automation',
       skillSeedPrompt:
         'Use the skill “{{name}}” if available.\n\nSkill description:\n{{description}}\n\nFollow the skill’s instructions for this run.',
@@ -2330,6 +2336,7 @@ export const en = {
         time: 'Time',
         project: 'Project folder',
         projectOptional: 'Optional — chat surface if empty',
+        projectRequiredHint: 'Required for this template',
         pickProject: 'Choose folder…',
         clearProject: 'Clear project',
         model: 'Model (optional)',
@@ -2379,7 +2386,9 @@ export const en = {
         chats: 'Chat history',
         terminals: 'Terminal management',
         workItems: 'Work items',
+        automations: 'Automations',
       },
+      automationsHint: 'Manage automations in the main panel.',
       quickConnect: 'Quick connect',
       badge: {
         chat: 'Chat',

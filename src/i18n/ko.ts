@@ -2091,7 +2091,7 @@ export const ko = {
     "startCta": "자동화 시작",
     "loading": "로드 중…",
     "untitled": "제목 없는 자동화",
-    "localOnlyHint": "이 Mac에서 실행. 예약 실행에는 hip을 열어 두거나 트레이에 숨겨 두어야 합니다.",
+    "localOnlyHint": "이 컴퓨터에서 실행. 예약 실행에는 hip을 열어 두거나 트레이에 숨겨 두어야 합니다.",
     "projectRequired": "이 템플릿에는 프로젝트 폴더가 필요합니다.",
     "templatesHeading": "템플릿",
     "templatesHint": "시작점을 고른 뒤 프롬프트와 일정을 조정하세요.",
@@ -2102,6 +2102,10 @@ export const ko = {
     "skillDisabled": "스킬이 꺼져 있음",
     "skillMissing": "스킬을 사용할 수 없음",
     "createFromSkill": "스킬에서 만들기",
+    "softWarnings": {
+      "no_work_items_context": "agent는 work-items 카탈로그를 자동으로 불러오지 않습니다 — 프롬프트에 할 일을 붙여 넣거나 설명하세요.",
+      "needs_edit_permission": "코드 관련 실행에는 프로젝트 파일을 읽거나 수정하기 위해 편집 권한이 필요할 수 있습니다."
+    },
     "skillSeedName": "{{name}} 자동화",
     "skillSeedPrompt": "가능하면 스킬 「{{name}}」을(를) 사용하세요.\n\n스킬 설명:\n{{description}}\n\n스킬 안내에 따라 이번 실행을 완료하세요.",
     "templates": {
@@ -2239,6 +2243,7 @@ export const ko = {
       "time": "시간",
       "project": "프로젝트 폴더",
       "projectOptional": "선택 — 비우면 채팅 표면",
+      "projectRequiredHint": "이 템플릿에서는 필수",
       "pickProject": "폴더 선택…",
       "clearProject": "프로젝트 지우기",
       "model": "모델(선택)",
@@ -2287,8 +2292,10 @@ export const ko = {
       "projects": "프로젝트 세션",
       "chats": "채팅 기록",
       "terminals": "터미널 관리",
-      "workItems": "작업 항목"
+      "workItems": "작업 항목",
+      "automations": "자동화"
     },
+    "automationsHint": "메인 패널에서 자동화를 관리하세요.",
     "quickConnect": "빠른 연결",
     "badge": {
       "chat": "채팅",

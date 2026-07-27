@@ -178,6 +178,33 @@ export async function enterWorkItemsSection(): Promise<void> {
   }
 }
 
+
+/**
+ * Enter automations section.
+ * AppSidebar wires onNav to this when AUTOMATION_PAGE is true.
+ * Always forces activeView to `automation` so re-entry from trash/settings/history works
+ * even when sidebarSection is already `automation` (stale pairing).
+ */
+export async function enterAutomationsSection(): Promise<void> {
+  const view = useUiStore.getState().activeView
+  if (view === 'knowledge') {
+    await leaveKnowledge()
+  } else if (view === 'tasks') {
+    await leaveWorkItems()
+  }
+  if (view === 'automation') {
+    useUiStore.getState().setSidebarSection('automation')
+    return
+  }
+  useUiStore.getState().setSidebarSection('automation')
+  useUiStore.getState().setActiveView('automation')
+  recordNavEntry()
+  const { useAutomationStore } = await import('@/store/automationStore')
+  if (!useAutomationStore.getState().loaded) {
+    void useAutomationStore.getState().load()
+  }
+}
+
 export async function selectSessionFromSidebar(id: string): Promise<void> {
   await leaveActiveSurfaceIfNeeded()
   sessionService.selectSession(id)
@@ -269,6 +296,11 @@ export async function openTrashFromChrome(): Promise<void> {
 }
 
 export async function openAutomationFromChrome(): Promise<void> {
+  const { AUTOMATION_PAGE } = await import('@/components/automation/feature')
+  if (AUTOMATION_PAGE) {
+    await enterAutomationsSection()
+    return
+  }
   const view = useUiStore.getState().activeView
   if (view === 'knowledge') {
     await leaveKnowledge()

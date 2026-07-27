@@ -2,10 +2,10 @@ import { describe, expect, it } from 'vitest'
 import { AUTOMATION_PAGE } from './feature'
 
 describe('AUTOMATION_PAGE flag', () => {
-  it('is false until UI wiring (PR4)', () => {
-    expect(AUTOMATION_PAGE).toBe(false)
+  it('is true when UI wiring is enabled (PR4)', () => {
+    expect(AUTOMATION_PAGE).toBe(true)
     // `as const` narrows for PlaceholderSidebarSection conditional types
-    const flag: false = AUTOMATION_PAGE
-    expect(flag).toBe(false)
+    const flag: true = AUTOMATION_PAGE
+    expect(flag).toBe(true)
   })
 })

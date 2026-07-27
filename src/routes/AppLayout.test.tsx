@@ -43,6 +43,12 @@ vi.mock('@/components/terminals/feature', () => ({
 vi.mock('@/components/work-items/WorkItemsPage', () => ({
   WorkItemsPage: () => <div data-testid="work-items-page" />,
 }))
+vi.mock('@/components/automation/AutomationsPage', () => ({
+  AutomationsPage: () => <div data-testid="automations-page" />,
+}))
+vi.mock('@/components/automation/feature', () => ({
+  AUTOMATION_PAGE: true,
+}))
 
 describe('AppLayout', () => {
   it('renders final shell: sidebar + main toolbar, no title bar / floating avatar', () => {
@@ -108,9 +114,10 @@ describe('AppLayout', () => {
     expect(screen.queryByTestId('placeholder-tasks')).not.toBeInTheDocument()
   })
 
-  it('renders automation placeholder', () => {
+  it('renders AutomationsPage when automation view and AUTOMATION_PAGE on', () => {
     useUiStore.setState({ activeView: 'automation' })
     render(<AppLayout />, { wrapper: MemoryRouter })
-    expect(screen.getByTestId('placeholder-automation')).toBeInTheDocument()
+    expect(screen.getByTestId('automations-page')).toBeInTheDocument()
+    expect(screen.queryByTestId('placeholder-automation')).not.toBeInTheDocument()
   })
 })

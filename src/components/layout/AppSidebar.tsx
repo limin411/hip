@@ -67,6 +67,7 @@ import { TERMINAL_MANAGEMENT } from '@/components/terminals/feature'
 import { QuickConnectPopover } from '@/components/terminals/QuickConnectPopover'
 import { WORK_ITEM_TRACKING } from '@/components/work-items/feature'
 import { WorkItemSidebarLists } from '@/components/work-items/WorkItemSidebarLists'
+import { AUTOMATION_PAGE } from '@/components/automation/feature'
 
 import {
   enterKnowledge,
@@ -74,6 +75,7 @@ import {
   enterSection,
   enterTerminalsSection,
   enterWorkItemsSection,
+  enterAutomationsSection,
   newConversationFromSidebar,
   openHistoryFromChrome,
   openNotificationsFromChrome,
@@ -281,6 +283,7 @@ export function AppSidebar() {
     else if (section === 'terminals' && TERMINAL_MANAGEMENT)
       void enterTerminalsSection({ library: true })
     else if (section === 'tasks' && WORK_ITEM_TRACKING) void enterWorkItemsSection()
+    else if (section === 'automation' && AUTOMATION_PAGE) void enterAutomationsSection()
     else if (isPlaceholderSidebarSection(section)) void enterPlaceholderSection(section)
     else if (section === 'projects' || section === 'chats') void enterSection(section)
   }

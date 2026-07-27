@@ -15,6 +15,7 @@ vi.mock('@/components/work-items/feature', () => ({
 }))
 
 const enterWorkItemsSection = vi.fn(async () => {})
+const enterAutomationsSection = vi.fn(async () => {})
 const enterPlaceholderSection = vi.fn(async (_section?: string) => {})
 const requestCreate = vi.fn()
 
@@ -24,6 +25,7 @@ vi.mock('./sidebarActions', () => ({
   enterPlaceholderSection: (section: string) => enterPlaceholderSection(section),
   enterTerminalsSection: vi.fn(async () => {}),
   enterWorkItemsSection: () => enterWorkItemsSection(),
+  enterAutomationsSection: () => enterAutomationsSection(),
   openHistoryFromChrome: vi.fn(),
   openNotificationsFromChrome: vi.fn(),
   openSettingsFromChrome: vi.fn(),

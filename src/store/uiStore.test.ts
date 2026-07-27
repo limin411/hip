@@ -1,6 +1,7 @@
 // src/store/uiStore.test.ts
 import { describe, it, expect, beforeEach } from 'vitest'
 import { WORK_ITEM_TRACKING } from '@/components/work-items/feature'
+import { AUTOMATION_PAGE } from '@/components/automation/feature'
 import {
   useUiStore,
   normalizeAppLanguage,
@@ -448,12 +449,13 @@ describe('uiStore - sidebarWidth', () => {
   })
 })
 
-describe('uiStore - isPlaceholderSidebarSection (work items flag)', () => {
-  it('excludes tasks from placeholder when WORK_ITEM_TRACKING is true', () => {
+describe('uiStore - isPlaceholderSidebarSection (work items / automation flags)', () => {
+  it('excludes tasks and automation from placeholder when flags are true', () => {
     expect(WORK_ITEM_TRACKING).toBe(true)
+    expect(AUTOMATION_PAGE).toBe(true)
     expect(isPlaceholderSidebarSection('tasks')).toBe(false)
+    expect(isPlaceholderSidebarSection('automation')).toBe(false)
     expect(isPlaceholderSidebarSection('workbench')).toBe(true)
-    expect(isPlaceholderSidebarSection('automation')).toBe(true)
     // Real sections
     expect(isPlaceholderSidebarSection('chats')).toBe(false)
     expect(isPlaceholderSidebarSection('projects')).toBe(false)

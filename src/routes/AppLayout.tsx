@@ -36,6 +36,8 @@ import { TERMINAL_MANAGEMENT } from '@/components/terminals/feature'
 import { TerminalManagementPage } from '@/components/terminals/TerminalManagementPage'
 import { WORK_ITEM_TRACKING } from '@/components/work-items/feature'
 import { WorkItemsPage } from '@/components/work-items/WorkItemsPage'
+import { AUTOMATION_PAGE } from '@/components/automation/feature'
+import { AutomationsPage } from '@/components/automation/AutomationsPage'
 import { TerminalFilesPanel } from '@/components/terminals/TerminalFilesPanel'
 import { startTerminalBridge } from '@/ipc/pty'
 import { useProjectPathStore } from '@/store/projectPathStore'
@@ -210,6 +212,7 @@ export function AppLayout() {
       )
     }
     if (activeView === 'automation') {
+      if (AUTOMATION_PAGE) return <AutomationsPage />
       return (
         <PlaceholderPage
           titleKey="sidebar.nav.automation"

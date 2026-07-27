@@ -19,6 +19,7 @@ const enterPlaceholderSection = vi.fn(
 )
 const enterTerminalsSection = vi.fn(async (_opts?: { library?: boolean }) => {})
 const enterWorkItemsSection = vi.fn(async () => {})
+const enterAutomationsSection = vi.fn(async () => {})
 const openHistoryFromChrome = vi.fn(async () => {})
 const newConversationFromSidebar = vi.fn(async (_surface: 'chat' | 'code') => {})
 const selectSessionFromSidebar = vi.fn(async (_id: string) => {})
@@ -30,6 +31,7 @@ vi.mock('./sidebarActions', () => ({
     enterPlaceholderSection(section),
   enterTerminalsSection: (opts?: { library?: boolean }) => enterTerminalsSection(opts),
   enterWorkItemsSection: () => enterWorkItemsSection(),
+  enterAutomationsSection: () => enterAutomationsSection(),
   openHistoryFromChrome: () => openHistoryFromChrome(),
   openNotificationsFromChrome: vi.fn(),
   openSettingsFromChrome: vi.fn(),
@@ -79,6 +81,7 @@ describe('AppSidebar', () => {
     enterPlaceholderSection.mockClear()
     enterTerminalsSection.mockClear()
     enterWorkItemsSection.mockClear()
+    enterAutomationsSection.mockClear()
     openHistoryFromChrome.mockClear()
     newConversationFromSidebar.mockClear()
     selectSessionFromSidebar.mockClear()
@@ -259,13 +262,14 @@ describe('AppSidebar', () => {
     expect(enterPlaceholderSection).not.toHaveBeenCalledWith('tasks')
   })
 
-  it('nav automation is below tasks and calls enterPlaceholderSection', () => {
+  it('nav automation is below tasks and calls enterAutomationsSection when AUTOMATION_PAGE is on', () => {
     render(<AppSidebar />)
     const tasks = screen.getByTestId('sidebar-nav-tasks')
     const automation = screen.getByTestId('sidebar-nav-automation')
     expect(tasks.compareDocumentPosition(automation) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
     fireEvent.click(automation)
-    expect(enterPlaceholderSection).toHaveBeenCalledWith('automation')
+    expect(enterAutomationsSection).toHaveBeenCalled()
+    expect(enterPlaceholderSection).not.toHaveBeenCalledWith('automation')
   })
 
   it('chats section new chat starts chat conversation', () => {

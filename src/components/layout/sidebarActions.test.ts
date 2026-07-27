@@ -26,6 +26,11 @@ const workItemState = {
   flushSave: () => workItemFlushSave(),
 }
 
+const automationState = {
+  loaded: true,
+  load: vi.fn(async () => {}),
+}
+
 vi.mock('@/store/knowledgeStore', () => ({
   useKnowledgeStore: {
     getState: () => knowledgeState,
@@ -35,6 +40,12 @@ vi.mock('@/store/knowledgeStore', () => ({
 vi.mock('@/store/workItemStore', () => ({
   useWorkItemStore: {
     getState: () => workItemState,
+  },
+}))
+
+vi.mock('@/store/automationStore', () => ({
+  useAutomationStore: {
+    getState: () => automationState,
   },
 }))
 
@@ -57,6 +68,7 @@ import {
   enterPlaceholderSection,
   enterSection,
   enterWorkItemsSection,
+  enterAutomationsSection,
   handleMainToolbarBack,
   leaveKnowledge,
   leaveWorkItems,
@@ -213,17 +225,22 @@ describe('sidebarActions', () => {
     expect(useManagedTerminalStore.getState().focusedId).toBe('tm_keep')
   })
 
-  it('enterPlaceholderSection opens automation under primary nav', async () => {
+  it('enterAutomationsSection opens automation and loads catalog when not loaded', async () => {
+    automationState.loaded = false
+    automationState.load.mockClear()
     useUiStore.setState({ activeView: 'chat', sidebarSection: 'chats' })
-    await enterPlaceholderSection('automation')
+    await enterAutomationsSection()
     expect(useUiStore.getState().activeView).toBe('automation')
     expect(useUiStore.getState().sidebarSection).toBe('automation')
+    expect(automationState.load).toHaveBeenCalled()
+    automationState.loaded = true
   })
 
-  it('openAutomationFromChrome opens automation special view', async () => {
+  it('openAutomationFromChrome opens automation via enterAutomationsSection when flag on', async () => {
     useUiStore.setState({ activeView: 'chat', sidebarSection: 'chats' })
     await openAutomationFromChrome()
     expect(useUiStore.getState().activeView).toBe('automation')
+    expect(useUiStore.getState().sidebarSection).toBe('automation')
   })
 
   it('openSettingsFromChrome flushes knowledge and keeps knowledge section', async () => {

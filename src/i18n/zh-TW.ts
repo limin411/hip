@@ -2104,6 +2104,7 @@ export const zhTW = {
     "collapseAria": "隱藏左側邊欄",
     "expand": "顯示側邊欄",
     "expandAria": "顯示左側邊欄",
+    "resizeAria": "調整左側邊欄寬度",
     "navBack": "後退",
     "navBackAria": "後退到上一位置",
     "navForward": "前進",

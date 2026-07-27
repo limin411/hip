@@ -1,4 +1,12 @@
-import { useEffect, useMemo, useState, type ReactNode } from 'react'
+import {
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type KeyboardEvent as ReactKeyboardEvent,
+  type PointerEvent as ReactPointerEvent,
+  type ReactNode,
+} from 'react'
 import { useTranslation } from 'react-i18next'
 import {
   AlertTriangle,
@@ -79,6 +87,13 @@ import { SidebarAccountFooter } from './SidebarAccountFooter'
 import { goNavBack, goNavForward } from './navHistory'
 import { useNavHistoryStore } from '@/store/navHistoryStore'
 import { titlebarIconBtnClass, titlebarIconProps, titlebarRowClass } from './titlebarChrome'
+import {
+  clampSidebarWidth,
+  SIDEBAR_WIDTH_DEFAULT,
+  SIDEBAR_WIDTH_MAX,
+  SIDEBAR_WIDTH_MIN,
+  SIDEBAR_WIDTH_STEP,
+} from './sidebarWidth'
 
 const titlebarNavBtnClass = cn(
   titlebarIconBtnClass,
@@ -95,6 +110,8 @@ export function AppSidebar() {
   /** Chat date-bucket keys whose session list is collapsed (default = expanded). */
   const [chatDateGroupCollapsed, setChatDateGroupCollapsed] = useState<Record<string, boolean>>({})
   const sidebarSection = useUiStore((s) => s.sidebarSection)
+  const sidebarWidth = useUiStore((s) => s.sidebarWidth)
+  const setSidebarWidth = useUiStore((s) => s.setSidebarWidth)
   const activeView = useUiStore((s) => s.activeView)
   const sessions = useSessions()
   const activeSessionId = useActiveSessionId()
@@ -111,6 +128,70 @@ export function AppSidebar() {
   const navStackLen = useNavHistoryStore((s) => s.stack.length)
   const canGoBack = navIndex > 0
   const canGoForward = navIndex >= 0 && navIndex < navStackLen - 1
+  const [resizing, setResizing] = useState(false)
+  const resizeDrag = useRef<{ startX: number; startW: number } | null>(null)
+  const resizeTeardown = useRef<(() => void) | null>(null)
+
+  useEffect(() => () => resizeTeardown.current?.(), [])
+
+  const liveMaxWidth = () =>
+    typeof window !== 'undefined' ? Math.floor(window.innerWidth * 0.5) : SIDEBAR_WIDTH_MAX
+
+  const onResizePointerDown = (e: ReactPointerEvent<HTMLDivElement>) => {
+    if (e.button !== 0 || resizeDrag.current) return
+    e.preventDefault()
+    e.stopPropagation()
+    resizeDrag.current = { startX: e.clientX, startW: sidebarWidth }
+    setResizing(true)
+
+    const onMove = (ev: PointerEvent) => {
+      const d = resizeDrag.current
+      if (!d) return
+      setSidebarWidth(clampSidebarWidth(d.startW + (ev.clientX - d.startX), liveMaxWidth()))
+    }
+    const finish = () => {
+      if (!resizeDrag.current) return
+      resizeDrag.current = null
+      resizeTeardown.current = null
+      setResizing(false)
+      window.removeEventListener('pointermove', onMove)
+      window.removeEventListener('pointerup', onUp)
+      window.removeEventListener('pointercancel', onCancel)
+      document.body.style.userSelect = ''
+      document.body.style.cursor = ''
+    }
+    const onUp = (ev: PointerEvent) => {
+      if (ev.button !== 0) return
+      finish()
+    }
+    const onCancel = () => finish()
+
+    resizeTeardown.current = finish
+    document.body.style.userSelect = 'none'
+    document.body.style.cursor = 'col-resize'
+    window.addEventListener('pointermove', onMove)
+    window.addEventListener('pointerup', onUp)
+    window.addEventListener('pointercancel', onCancel)
+  }
+
+  const onResizeKeyDown = (e: ReactKeyboardEvent<HTMLDivElement>) => {
+    if (e.key === 'ArrowLeft') {
+      e.preventDefault()
+      setSidebarWidth(sidebarWidth - SIDEBAR_WIDTH_STEP)
+    } else if (e.key === 'ArrowRight') {
+      e.preventDefault()
+      setSidebarWidth(sidebarWidth + SIDEBAR_WIDTH_STEP)
+    } else if (e.key === 'Home') {
+      e.preventDefault()
+      setSidebarWidth(SIDEBAR_WIDTH_MIN)
+    } else if (e.key === 'End') {
+      e.preventDefault()
+      setSidebarWidth(SIDEBAR_WIDTH_MAX)
+    } else if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault()
+      setSidebarWidth(SIDEBAR_WIDTH_DEFAULT)
+    }
+  }
 
   const hydrateWorktrees = (sessionId: string) => {
     sessionService.requestWorktreeList(sessionId)
@@ -237,7 +318,8 @@ export function AppSidebar() {
 
   return (
     <aside
-      className="glass-surface flex h-full w-[260px] shrink-0 flex-col border-r border-border"
+      className="glass-surface relative flex h-full shrink-0 flex-col border-r border-border"
+      style={{ width: sidebarWidth }}
       data-testid="app-sidebar"
       aria-label={t('sidebar.aria')}
     >
@@ -772,6 +854,31 @@ export function AppSidebar() {
             ))}
           </ul>
         )}
+      </div>
+
+      {/* Edge resize — overlaps the border so the hit target is easy without a layout gap. */}
+      <div
+        role="separator"
+        aria-orientation="vertical"
+        aria-label={t('sidebar.resizeAria')}
+        aria-valuenow={sidebarWidth}
+        aria-valuemin={SIDEBAR_WIDTH_MIN}
+        aria-valuemax={SIDEBAR_WIDTH_MAX}
+        tabIndex={0}
+        data-testid="sidebar-resize-handle"
+        data-dragging={resizing ? 'true' : undefined}
+        onPointerDown={onResizePointerDown}
+        onDoubleClick={() => setSidebarWidth(SIDEBAR_WIDTH_DEFAULT)}
+        onKeyDown={onResizeKeyDown}
+        className="group absolute inset-y-0 -right-1 z-20 w-2 cursor-col-resize touch-none outline-none focus-visible:ring-1 focus-visible:ring-ink/20"
+      >
+        <div
+          className={cn(
+            'mx-auto h-full w-px bg-transparent transition-colors duration-chrome',
+            'group-hover:bg-accent group-focus-visible:bg-accent group-data-[dragging=true]:bg-accent',
+          )}
+          aria-hidden
+        />
       </div>
 
       <SidebarAccountFooter

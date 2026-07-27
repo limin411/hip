@@ -3,6 +3,10 @@ import { persist, createJSONStorage, type StateStorage } from 'zustand/middlewar
 import type { CheckpointMode } from '@hip/protocol'
 import { TERMINAL_MANAGEMENT } from '@/components/terminals/feature'
 import { WORK_ITEM_TRACKING } from '@/components/work-items/feature'
+import {
+  clampSidebarWidth,
+  SIDEBAR_WIDTH_DEFAULT,
+} from '@/components/layout/sidebarWidth'
 // Lazy helpers used only inside closeKnowledgeView to avoid circular init issues
 // are imported dynamically in that method.
 
@@ -146,6 +150,8 @@ export type UiPersistedState = {
   checkpointMode: CheckpointMode
   /** Left nav rail open; default true when missing from older storage. */
   sidebarOpen: boolean
+  /** Left sidebar width in px; clamped on write / rehydrate. */
+  sidebarWidth: number
 }
 
 /** Special / placeholder views are session-ephemeral; cold launch always lands on workbench. */
@@ -192,6 +198,7 @@ export function mergeUiPersistedState<
     density: normalizeUiDensity((rest as { density?: unknown }).density),
     // Drop removed pages (e.g. legacy 'help') so tabs stay valid.
     settingsPage: normalizeSettingsPage((rest as { settingsPage?: unknown }).settingsPage),
+    sidebarWidth: clampSidebarWidth((rest as { sidebarWidth?: unknown }).sidebarWidth),
   }
 }
 
@@ -232,6 +239,10 @@ interface UiState {
   sidebarOpen: boolean
   setSidebarOpen: (open: boolean) => void
   toggleSidebar: () => void
+
+  /** Left sidebar width in px (persisted; clamped). */
+  sidebarWidth: number
+  setSidebarWidth: (width: number) => void
 
   openKnowledgeView: () => void
   /** Flush knowledge draft then restore chat/code from domain active session. */
@@ -333,6 +344,13 @@ export const useUiStore = create<UiState>()(
         set((s) => (s.sidebarOpen === open ? s : { sidebarOpen: open })),
       toggleSidebar: () => set((s) => ({ sidebarOpen: !s.sidebarOpen })),
 
+      sidebarWidth: SIDEBAR_WIDTH_DEFAULT,
+      setSidebarWidth: (width) =>
+        set((s) => {
+          const next = clampSidebarWidth(width)
+          return s.sidebarWidth === next ? s : { sidebarWidth: next }
+        }),
+
       openKnowledgeView: () => set({ activeView: 'knowledge' }),
       closeKnowledgeView: async () => {
         // Tier A: await draft flush before leaving.
@@ -392,6 +410,7 @@ export const useUiStore = create<UiState>()(
         diffViewMode: s.diffViewMode,
         checkpointMode: s.checkpointMode,
         sidebarOpen: s.sidebarOpen,
+        sidebarWidth: s.sidebarWidth,
       }),
       merge: (persistedState, currentState) =>
         mergeUiPersistedState(persistedState, currentState as UiState),

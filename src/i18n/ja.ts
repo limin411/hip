@@ -2097,6 +2097,7 @@ export const ja = {
     "collapseAria": "左サイドバーを隠す",
     "expand": "サイドバーを表示",
     "expandAria": "左サイドバーを表示",
+    "resizeAria": "左サイドバーの幅を変更",
     "navBack": "戻る",
     "navBackAria": "前の位置に戻る",
     "navForward": "進む",

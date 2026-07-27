@@ -2178,6 +2178,7 @@ export const en = {
       collapseAria: 'Hide left sidebar',
       expand: 'Show sidebar',
       expandAria: 'Show left sidebar',
+      resizeAria: 'Resize left sidebar',
       navBack: 'Back',
       navBackAria: 'Go back',
       navForward: 'Forward',

@@ -339,6 +339,7 @@ describe('uiStore persistence partialize', () => {
       diffViewMode: s.diffViewMode,
       checkpointMode: s.checkpointMode,
       sidebarOpen: s.sidebarOpen,
+      sidebarWidth: s.sidebarWidth,
     }
     expect(persisted).toEqual({
       chatSessionId: 'a',
@@ -350,6 +351,7 @@ describe('uiStore persistence partialize', () => {
       diffViewMode: 'split',
       checkpointMode: 'since-start',
       sidebarOpen: s.sidebarOpen,
+      sidebarWidth: s.sidebarWidth,
     })
     expect(persisted).not.toHaveProperty('activeTab')
     expect(persisted).not.toHaveProperty('scrollTargetMessageId')
@@ -419,6 +421,30 @@ describe('uiStore persistence partialize', () => {
     applyColdLaunchShell()
     expect(useUiStore.getState().activeView).toBe('workbench')
     expect(useUiStore.getState().sidebarSection).toBe('workbench')
+  })
+
+  it('merge clamps invalid sidebarWidth', () => {
+    const current = {
+      activeView: 'workbench' as const,
+      sidebarSection: 'workbench' as const,
+      sidebarWidth: 260,
+    }
+    expect(mergeUiPersistedState({ sidebarWidth: 9999 }, current).sidebarWidth).toBe(480)
+    expect(mergeUiPersistedState({ sidebarWidth: 50 }, current).sidebarWidth).toBe(200)
+    expect(mergeUiPersistedState({ sidebarWidth: 'wide' }, current).sidebarWidth).toBe(260)
+  })
+})
+
+describe('uiStore - sidebarWidth', () => {
+  it('defaults to 260 and clamps via setSidebarWidth', () => {
+    useUiStore.setState({ sidebarWidth: 260 })
+    expect(useUiStore.getState().sidebarWidth).toBe(260)
+    useUiStore.getState().setSidebarWidth(320)
+    expect(useUiStore.getState().sidebarWidth).toBe(320)
+    useUiStore.getState().setSidebarWidth(10)
+    expect(useUiStore.getState().sidebarWidth).toBe(200)
+    useUiStore.getState().setSidebarWidth(900)
+    expect(useUiStore.getState().sidebarWidth).toBe(480)
   })
 })
 

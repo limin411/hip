@@ -2097,6 +2097,7 @@ export const ko = {
     "collapseAria": "왼쪽 사이드바 숨기기",
     "expand": "사이드바 보이기",
     "expandAria": "왼쪽 사이드바 보이기",
+    "resizeAria": "왼쪽 사이드바 너비 조절",
     "navBack": "뒤로",
     "navBackAria": "이전 위치로 이동",
     "navForward": "앞으로",

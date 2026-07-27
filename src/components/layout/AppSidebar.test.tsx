@@ -201,6 +201,32 @@ describe('AppSidebar', () => {
     expect(useUiStore.getState().sidebarOpen).toBe(false)
   })
 
+  it('applies sidebarWidth from the store', () => {
+    useUiStore.setState({ sidebarWidth: 320 })
+    render(<AppSidebar />)
+    expect(screen.getByTestId('app-sidebar')).toHaveStyle({ width: '320px' })
+  })
+
+  it('resize handle drag updates sidebarWidth', () => {
+    useUiStore.setState({ sidebarWidth: 260 })
+    render(<AppSidebar />)
+    const handle = screen.getByTestId('sidebar-resize-handle')
+    fireEvent.pointerDown(handle, { button: 0, clientX: 260 })
+    fireEvent.pointerMove(window, { clientX: 320 })
+    fireEvent.pointerUp(window, { button: 0, clientX: 320 })
+    expect(useUiStore.getState().sidebarWidth).toBe(320)
+  })
+
+  it('resize handle keyboard arrows nudge width; double-click resets', () => {
+    useUiStore.setState({ sidebarWidth: 260 })
+    render(<AppSidebar />)
+    const handle = screen.getByTestId('sidebar-resize-handle')
+    fireEvent.keyDown(handle, { key: 'ArrowRight' })
+    expect(useUiStore.getState().sidebarWidth).toBe(276)
+    fireEvent.doubleClick(handle)
+    expect(useUiStore.getState().sidebarWidth).toBe(260)
+  })
+
   it('nav knowledge calls enterKnowledge', () => {
     render(<AppSidebar />)
     fireEvent.click(screen.getByTestId('sidebar-nav-knowledge'))

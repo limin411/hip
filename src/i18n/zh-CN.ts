@@ -2126,6 +2126,7 @@ export const zhCN = {
       collapseAria: '隐藏左侧边栏',
       expand: '显示侧边栏',
       expandAria: '显示左侧边栏',
+      resizeAria: '调整左侧边栏宽度',
       navBack: '后退',
       navBackAria: '后退到上一位置',
       navForward: '前进',

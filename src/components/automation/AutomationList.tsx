@@ -15,6 +15,8 @@ export type AutomationListProps = {
   onRun: (id: string) => void
   onEdit: (id: string) => void
   onDelete: (id: string) => void
+  onSelect?: (id: string) => void
+  selectedId?: string | null
   runningIds?: Set<string>
 }
 
@@ -24,6 +26,8 @@ export function AutomationList({
   onRun,
   onEdit,
   onDelete,
+  onSelect,
+  selectedId,
   runningIds,
 }: AutomationListProps) {
   const { t } = useTranslation()
@@ -101,6 +105,8 @@ export function AutomationList({
                 onRun={() => onRun(a.id)}
                 onEdit={() => onEdit(a.id)}
                 onDelete={() => onDelete(a.id)}
+                onSelect={onSelect ? () => onSelect(a.id) : undefined}
+                selected={selectedId === a.id}
                 running={runningIds?.has(a.id)}
               />
             </li>

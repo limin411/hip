@@ -1,8 +1,8 @@
 // @vitest-environment happy-dom
 import '@testing-library/jest-dom/vitest'
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { render, screen, cleanup } from '@testing-library/react'
-import type { Automation } from '@/domain/automations'
+import { render, screen, cleanup, fireEvent } from '@testing-library/react'
+import type { Automation, AutomationRun } from '@/domain/automations'
 
 const load = vi.fn().mockResolvedValue(undefined)
 const setEnabled = vi.fn().mockResolvedValue(undefined)
@@ -16,8 +16,10 @@ let storeState: {
   loading: boolean
   error: string | null
   automations: Automation[]
-  runs: unknown[]
+  runs: AutomationRun[]
 }
+
+const selectSession = vi.fn()
 
 vi.mock('@/store/automationStore', () => {
   const useAutomationStore = (sel: (s: Record<string, unknown>) => unknown) =>
@@ -44,6 +46,12 @@ vi.mock('@/store/automationStore', () => {
     isInFlight: () => false,
   }
 })
+
+vi.mock('@/domain', () => ({
+  sessionService: {
+    selectSession: (...args: unknown[]) => selectSession(...args),
+  },
+}))
 
 vi.mock('@/store/skillsStore', () => {
   const state = { skills: [], enabled: {}, loaded: true, load: vi.fn() }
@@ -118,5 +126,43 @@ describe('AutomationsPage', () => {
     storeState.loading = true
     render(<AutomationsPage />)
     expect(screen.getByTestId('automations-page')).toBeInTheDocument()
+  })
+
+  it('selecting a row opens run history panel; session deep-link works', () => {
+    storeState.automations = [
+      {
+        id: 'auto_test1',
+        name: 'Daily notes',
+        prompt: 'Write notes',
+        enabled: true,
+        trigger: { kind: 'daily', hour: 9, minute: 0 },
+        createdAt: 1,
+        updatedAt: 1,
+        lastStatus: 'succeeded',
+      },
+    ]
+    storeState.runs = [
+      {
+        id: 'arun_1',
+        automationId: 'auto_test1',
+        status: 'succeeded',
+        trigger: 'manual',
+        sessionId: 'sess_deep',
+        startedAt: 100,
+        finishedAt: 110,
+      },
+    ]
+    render(<AutomationsPage />)
+    expect(screen.queryByTestId('automation-run-history')).not.toBeInTheDocument()
+
+    fireEvent.click(screen.getByTestId('automation-row-auto_test1'))
+    expect(screen.getByTestId('automation-run-history')).toBeInTheDocument()
+    expect(screen.getByTestId('automation-run-row-arun_1')).toBeInTheDocument()
+
+    fireEvent.click(screen.getByTestId('automation-run-row-arun_1'))
+    expect(selectSession).toHaveBeenCalledWith('sess_deep')
+
+    fireEvent.click(screen.getByTestId('automation-run-history-close'))
+    expect(screen.queryByTestId('automation-run-history')).not.toBeInTheDocument()
   })
 })

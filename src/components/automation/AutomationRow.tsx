@@ -13,6 +13,9 @@ export type AutomationRowProps = {
   onRun: () => void
   onEdit: () => void
   onDelete: () => void
+  /** Select row to show run history panel. */
+  onSelect?: () => void
+  selected?: boolean
   running?: boolean
 }
 
@@ -129,6 +132,8 @@ export function AutomationRow({
   onRun,
   onEdit,
   onDelete,
+  onSelect,
+  selected,
   running,
 }: AutomationRowProps) {
   const { t, i18n } = useTranslation()
@@ -145,25 +150,49 @@ export function AutomationRow({
   return (
     <div
       data-testid={`automation-row-${automation.id}`}
+      data-selected={selected ? 'true' : undefined}
+      role={onSelect ? 'button' : undefined}
+      tabIndex={onSelect ? 0 : undefined}
+      onClick={onSelect}
+      onKeyDown={
+        onSelect
+          ? (e) => {
+              if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault()
+                onSelect()
+              }
+            }
+          : undefined
+      }
       className={cn(
         'group flex flex-wrap items-center gap-3 rounded-lg border border-border bg-surface px-3 py-2.5',
         'transition-colors duration-chrome hover:bg-state-hover/40',
+        selected && 'border-accent/50 bg-accent/5 ring-1 ring-accent/30',
         !automation.enabled && 'opacity-70',
+        onSelect && 'cursor-pointer',
       )}
     >
-      <Switch
-        checked={automation.enabled}
-        onCheckedChange={onToggle}
-        ariaLabel={t('automation.list.enableAria', { name })}
-        data-testid={`automation-enable-${automation.id}`}
-      />
+      <div
+        onClick={(e) => e.stopPropagation()}
+        onKeyDown={(e) => e.stopPropagation()}
+      >
+        <Switch
+          checked={automation.enabled}
+          onCheckedChange={onToggle}
+          ariaLabel={t('automation.list.enableAria', { name })}
+          data-testid={`automation-enable-${automation.id}`}
+        />
+      </div>
 
       <div className="min-w-0 flex-1">
         <div className="flex flex-wrap items-center gap-2">
           <button
             type="button"
             className="truncate text-left text-body font-medium text-ink hover:underline"
-            onClick={onEdit}
+            onClick={(e) => {
+              e.stopPropagation()
+              onEdit()
+            }}
             data-testid={`automation-name-${automation.id}`}
           >
             {name}
@@ -201,7 +230,11 @@ export function AutomationRow({
         </div>
       </div>
 
-      <div className="flex shrink-0 items-center gap-1">
+      <div
+        className="flex shrink-0 items-center gap-1"
+        onClick={(e) => e.stopPropagation()}
+        onKeyDown={(e) => e.stopPropagation()}
+      >
         <Button
           type="button"
           size="sm"

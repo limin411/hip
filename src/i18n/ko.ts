@@ -2254,7 +2254,11 @@ export const ko = {
     "run": {
       "history": "최근 실행",
       "openSession": "세션 열기",
-      "noRuns": "아직 실행 없음"
+      "noRuns": "아직 실행 없음",
+      "close": "실행 기록 닫기",
+      "triggerManual": "수동",
+      "triggerSchedule": "예약",
+      "triggerCatchup": "따라잡기"
     },
     "sessionTitle": "⏱ {{name}}"
   },

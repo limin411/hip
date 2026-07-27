@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Zap } from 'lucide-react'
 import { isInFlight, useAutomationStore } from '@/store/automationStore'
@@ -8,6 +8,7 @@ import { AutomationEmptyState, type SkillSeedDraft } from './AutomationEmptyStat
 import { AutomationList } from './AutomationList'
 import { AutomationEditorModal, type EditorMode } from './AutomationEditorModal'
 import { AutomationScheduleBanner } from './AutomationScheduleBanner'
+import { AutomationRunHistory } from './AutomationRunHistory'
 import type { AutomationTemplate } from './templates'
 
 /**
@@ -26,6 +27,7 @@ export function AutomationsPage() {
   const runNow = useAutomationStore((s) => s.runNow)
 
   const [editor, setEditor] = useState<EditorMode>({ mode: 'closed' })
+  const [selectedId, setSelectedId] = useState<string | null>(null)
   // Force re-render while any run is in-flight so Run buttons disable.
   const [, setTick] = useState(0)
 
@@ -70,6 +72,18 @@ export function AutomationsPage() {
     automations.filter((a) => isInFlight(a.id)).map((a) => a.id),
   )
 
+  // Drop selection if the automation was deleted.
+  const selected = useMemo(
+    () =>
+      selectedId
+        ? (automations.find((a) => a.id === selectedId) ?? null)
+        : null,
+    [automations, selectedId],
+  )
+  useEffect(() => {
+    if (selectedId && !selected) setSelectedId(null)
+  }, [selectedId, selected])
+
   return (
     <div
       className="flex h-full min-h-0 flex-1 flex-col"
@@ -109,19 +123,35 @@ export function AutomationsPage() {
       </div>
 
       {hasItems ? (
-        <div className="flex min-h-0 flex-1 flex-col p-3">
-          <AutomationList
-            automations={automations}
-            runningIds={runningIds}
-            onToggle={(id, enabled) => void setEnabled(id, enabled)}
-            onRun={(id) => void runNow(id, { focus: true, trigger: 'manual' })}
-            onEdit={openEdit}
-            onDelete={(id) => {
-              if (window.confirm(t('automation.list.deleteConfirm'))) {
-                void remove(id)
+        <div className="flex min-h-0 flex-1 flex-row">
+          <div className="flex min-h-0 min-w-0 flex-1 flex-col p-3">
+            <AutomationList
+              automations={automations}
+              runningIds={runningIds}
+              selectedId={selected?.id ?? null}
+              onSelect={(id) =>
+                setSelectedId((cur) => (cur === id ? null : id))
               }
-            }}
-          />
+              onToggle={(id, enabled) => void setEnabled(id, enabled)}
+              onRun={(id) =>
+                void runNow(id, { focus: true, trigger: 'manual' })
+              }
+              onEdit={openEdit}
+              onDelete={(id) => {
+                if (window.confirm(t('automation.list.deleteConfirm'))) {
+                  void remove(id)
+                  if (selectedId === id) setSelectedId(null)
+                }
+              }}
+            />
+          </div>
+          {selected ? (
+            <AutomationRunHistory
+              automation={selected}
+              onClose={() => setSelectedId(null)}
+              className="w-[min(22rem,40%)] shrink-0 border-l"
+            />
+          ) : null}
         </div>
       ) : (
         <AutomationEmptyState

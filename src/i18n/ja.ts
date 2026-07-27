@@ -2254,7 +2254,11 @@ export const ja = {
     "run": {
       "history": "最近の実行",
       "openSession": "セッションを開く",
-      "noRuns": "まだ実行がありません"
+      "noRuns": "まだ実行がありません",
+      "close": "実行履歴を閉じる",
+      "triggerManual": "手動",
+      "triggerSchedule": "スケジュール",
+      "triggerCatchup": "キャッチアップ"
     },
     "sessionTitle": "⏱ {{name}}"
   },

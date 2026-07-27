@@ -2261,7 +2261,11 @@ export const zhTW = {
     "run": {
       "history": "最近執行",
       "openSession": "開啟工作階段",
-      "noRuns": "尚無執行紀錄"
+      "noRuns": "尚無執行紀錄",
+      "close": "關閉執行歷史",
+      "triggerManual": "手動",
+      "triggerSchedule": "排程",
+      "triggerCatchup": "補跑"
     },
     "sessionTitle": "⏱ {{name}}"
   },

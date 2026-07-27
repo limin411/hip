@@ -5,7 +5,7 @@ import { focusChrome } from './focusClasses'
 
 export const buttonVariants = cva(
   cn(
-    'inline-flex items-center justify-center gap-1.5 border border-transparent font-medium transition-[background-color,color,border-color,transform,opacity] duration-chrome active:scale-[0.985] disabled:opacity-40 disabled:pointer-events-none',
+    'inline-flex items-center justify-center gap-1.5 border border-transparent font-medium transition-[background-color,color,border-color,transform,opacity,box-shadow] duration-chrome ease-out active:scale-[0.97] disabled:opacity-40 disabled:pointer-events-none',
     focusChrome,
   ),
   {

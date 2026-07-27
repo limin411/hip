@@ -5,7 +5,7 @@ import { SettingsPanel } from './SettingsPanel'
  */
 export function SettingsPage() {
   return (
-    <div className="h-full bg-surface">
+    <div className="flex h-full min-h-0 flex-1 flex-col bg-surface">
       <SettingsPanel />
     </div>
   )

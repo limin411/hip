@@ -5,7 +5,7 @@ import { focusField } from './focusClasses'
 /** Canonical textarea chrome — use when a native textarea cannot use <Textarea />. */
 export const textareaClassName = cn(
   'w-full resize-none rounded-md border border-border bg-surface px-3 py-2 text-body text-ink',
-  'placeholder:text-ink-tertiary transition-[border-color,box-shadow] duration-chrome',
+  'placeholder:text-ink-tertiary transition-[border-color,box-shadow,background-color] duration-chrome ease-out',
   focusField,
 )
 

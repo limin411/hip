@@ -132,10 +132,10 @@ export function SettingsPanel() {
                       value={page.id}
                       data-testid={`settings-nav-${page.id}`}
                       className={cn(
-                        'relative flex h-[var(--row-h-sidebar)] w-full items-center gap-2.5 rounded-lg px-2.5 text-left text-body font-medium transition-colors duration-chrome',
+                        'relative flex h-[var(--row-h-sidebar)] w-full items-center gap-2.5 rounded-lg px-2.5 text-left text-body font-medium transition-colors duration-chrome ease-out',
                         'text-ink-secondary hover:bg-state-hover hover:text-ink',
                         // Quiet lift + Sage rail — same signal as AppSidebar (no hairline ring).
-                        'before:absolute before:inset-y-1.5 before:left-0 before:w-[2px] before:rounded-full before:bg-accent before:opacity-0',
+                        'before:absolute before:inset-y-1.5 before:left-0 before:w-[2px] before:rounded-full before:bg-accent before:opacity-0 before:transition-opacity before:duration-chrome before:ease-out',
                         'data-[state=active]:bg-state-hover data-[state=active]:text-ink data-[state=active]:before:opacity-100',
                         'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink/20',
                       )}
@@ -162,7 +162,7 @@ export function SettingsPanel() {
             <TabsPrimitive.Content
               key={page.id}
               value={page.id}
-              className="h-full min-h-0 min-w-0 overflow-y-auto focus-visible:outline-none"
+              className="h-full min-h-0 min-w-0 overflow-y-auto focus-visible:outline-none data-[state=active]:animate-view-enter"
             >
               <Page />
             </TabsPrimitive.Content>

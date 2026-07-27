@@ -61,7 +61,7 @@ export function ActionBanner({
   return (
     <div
       className={cn(
-        'flex shrink-0 items-start gap-3 px-4 py-2.5',
+        'flex shrink-0 items-start gap-3 px-4 py-2.5 animate-view-enter',
         t.shell,
         className,
       )}

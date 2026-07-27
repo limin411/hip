@@ -81,7 +81,7 @@ export function WikiLinkPicker({
       role="listbox"
       data-testid="knowledge-wiki-picker"
       ref={listRef}
-      className="fixed z-[60] max-h-56 w-64 overflow-y-auto rounded-md border border-border bg-surface py-1 shadow-overlay"
+      className="fixed z-[60] max-h-56 w-64 animate-menu-in overflow-y-auto rounded-md border border-border bg-surface py-1 shadow-overlay"
       style={{ top: anchor.top, left: anchor.left }}
     >
       {candidates.length === 0 ? (

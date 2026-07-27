@@ -118,7 +118,7 @@ export function KnowledgeSlashMenu({
       data-testid="knowledge-slash-menu"
       style={style}
       className={cn(
-        'z-50 max-h-56 overflow-y-auto rounded-lg border border-border bg-surface shadow-overlay',
+        'z-50 max-h-56 animate-menu-in overflow-y-auto rounded-lg border border-border bg-surface shadow-overlay',
         className,
       )}
     >

@@ -7,7 +7,7 @@ export const titlebarRowClass =
   'box-border flex h-[var(--titlebar-height)] shrink-0 items-center border-b border-border'
 
 export const titlebarIconBtnClass =
-  'inline-flex size-7 shrink-0 items-center justify-center rounded-md border-0 bg-transparent p-0 leading-none text-ink-secondary transition-colors duration-chrome hover:bg-state-hover hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink/20'
+  'inline-flex size-7 shrink-0 items-center justify-center rounded-md border-0 bg-transparent p-0 leading-none text-ink-secondary transition-[background-color,color,transform] duration-chrome ease-out hover:bg-state-hover hover:text-ink active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink/20'
 
 export const titlebarIconProps = {
   size: 16 as const,

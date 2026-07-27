@@ -46,7 +46,7 @@ export function PermissionModal() {
     >
       <div className={cn('px-4', CHAT_COLUMN_CLASS)}>
         <div
-          className="flex flex-col gap-3 rounded-lg border border-accent/30 bg-accent-subtle px-4 py-3"
+          className="flex flex-col gap-3 rounded-lg border border-accent/30 bg-accent-subtle px-4 py-3 animate-view-enter"
           data-testid="permission-modal"
           role="region"
           aria-label={t('chat.permission.title')}

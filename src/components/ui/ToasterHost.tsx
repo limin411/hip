@@ -27,9 +27,13 @@ export function ToasterHost() {
     <Toaster
       position="bottom-right"
       theme={mode}
+      visibleToasts={4}
+      gap={8}
+      duration={4000}
       toastOptions={{
         classNames: {
-          toast: 'border border-border bg-surface text-ink shadow-menu',
+          toast:
+            'border border-border bg-surface text-ink shadow-menu transition-[transform,opacity] duration-content ease-out',
           title: 'text-body font-medium text-ink',
           description: 'text-meta text-ink-secondary',
           success: 'border-l-2 border-l-success',

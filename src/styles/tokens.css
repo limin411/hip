@@ -366,7 +366,7 @@ html[data-window-focus='false'] [data-tauri-drag-region] {
   to   { opacity: 1; transform: translateY(0); }
 }
 .animate-greeting-enter {
-  animation: greeting-enter var(--duration-celebrate, 450ms) ease-out both;
+  animation: greeting-enter var(--duration-celebrate, 450ms) var(--ease-out, cubic-bezier(0.16, 1, 0.3, 1)) both;
 }
 
 /* Roundtable seat strip (Chat empty-state starter; stagger via animation-delay) */
@@ -375,7 +375,7 @@ html[data-window-focus='false'] [data-tauri-drag-region] {
   to   { opacity: 1; transform: translateY(0) scale(1); }
 }
 .animate-roundtable-seat {
-  animation: roundtable-seat-enter 320ms ease-out both;
+  animation: roundtable-seat-enter 320ms var(--ease-out, cubic-bezier(0.16, 1, 0.3, 1)) both;
 }
 
 /*

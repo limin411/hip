@@ -23,8 +23,8 @@ export const TabsTrigger = forwardRef<
   <TabsPrimitive.Trigger
     ref={ref}
     className={cn(
-      'relative inline-flex h-full items-center text-body font-medium text-ink-secondary transition-colors hover:text-ink',
-      'after:absolute after:inset-x-0 after:bottom-[-1px] after:h-0.5 after:rounded-full after:bg-accent after:opacity-0 hover:after:opacity-40 hover:after:bg-border',
+      'relative inline-flex h-full items-center text-body font-medium text-ink-secondary transition-colors duration-chrome ease-out hover:text-ink',
+      'after:absolute after:inset-x-0 after:bottom-[-1px] after:h-0.5 after:rounded-full after:bg-accent after:opacity-0 after:transition-opacity after:duration-chrome after:ease-out hover:after:opacity-40 hover:after:bg-border',
       'data-[state=active]:text-ink data-[state=active]:after:opacity-100',
       className,
     )}
@@ -39,7 +39,10 @@ export const TabsContent = forwardRef<
 >(({ className, ...props }, ref) => (
   <TabsPrimitive.Content
     ref={ref}
-    className={cn('flex-1 overflow-auto focus-visible:outline-none', className)}
+    className={cn(
+      'flex-1 overflow-auto focus-visible:outline-none data-[state=active]:animate-view-enter',
+      className,
+    )}
     {...props}
   />
 ))

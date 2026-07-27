@@ -1,6 +1,7 @@
 import * as ContextMenuPrimitive from '@radix-ui/react-context-menu'
 import { forwardRef } from 'react'
 import { cn } from '@/lib/utils'
+import { menuMotion } from './motionClasses'
 
 export const ContextMenu = ContextMenuPrimitive.Root
 export const ContextMenuTrigger = ContextMenuPrimitive.Trigger
@@ -16,7 +17,8 @@ export const ContextMenuContent = forwardRef<
       ref={ref}
       className={cn(
         'z-50 min-w-[160px] rounded-lg border border-border bg-surface p-1 shadow-menu',
-        'origin-[var(--radix-context-menu-content-transform-origin)] data-[state=open]:animate-menu-in',
+        'origin-[var(--radix-context-menu-content-transform-origin)]',
+        menuMotion,
         className,
       )}
       {...props}
@@ -32,7 +34,7 @@ export const ContextMenuItem = forwardRef<
   <ContextMenuPrimitive.Item
     ref={ref}
     className={cn(
-      'flex cursor-pointer items-center gap-2.5 rounded-md px-2.5 py-1.5 text-body text-ink outline-none transition-colors duration-chrome',
+      'flex cursor-pointer items-center gap-2.5 rounded-md px-2.5 py-1.5 text-body text-ink outline-none transition-[background-color,color] duration-chrome ease-out',
       'focus:bg-state-hover data-[disabled]:opacity-50',
       className,
     )}

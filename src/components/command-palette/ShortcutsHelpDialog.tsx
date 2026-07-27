@@ -16,12 +16,18 @@ export function ShortcutsHelpDialog({
   return (
     <Dialog.Root open={open} onOpenChange={onOpenChange}>
       <Dialog.Portal>
-        <Dialog.Overlay className="fixed inset-0 z-[220] bg-overlay backdrop-blur-[2px] motion-reduce:backdrop-blur-none" />
+        <Dialog.Overlay
+          className={cn(
+            'fixed inset-0 z-[220] bg-overlay backdrop-blur-[2px] motion-reduce:backdrop-blur-none',
+            'data-[state=open]:animate-overlay-in data-[state=closed]:animate-overlay-out',
+          )}
+        />
         <Dialog.Content
           className={cn(
-            // Center with flex + inset (not translate) so enter animations cannot wipe centering.
+            // Center with flex + inset (not translate); modalMotion is scale-only.
             'fixed inset-0 z-[230] m-auto h-fit w-[min(24rem,calc(100vw-2rem))]',
-            'rounded-xl border border-border bg-surface p-5 shadow-overlay outline-none animate-menu-in motion-reduce:animate-none',
+            'rounded-xl border border-border bg-surface p-5 shadow-overlay outline-none',
+            'data-[state=open]:animate-modal-in data-[state=closed]:animate-modal-out',
           )}
           data-testid="keyboard-shortcuts-dialog"
         >

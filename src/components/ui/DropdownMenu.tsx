@@ -1,6 +1,7 @@
 import * as DropdownPrimitive from '@radix-ui/react-dropdown-menu'
 import { forwardRef } from 'react'
 import { cn } from '@/lib/utils'
+import { menuMotion } from './motionClasses'
 
 export const DropdownMenu = DropdownPrimitive.Root
 export const DropdownMenuTrigger = DropdownPrimitive.Trigger
@@ -17,7 +18,8 @@ export const DropdownMenuContent = forwardRef<
       sideOffset={sideOffset}
       className={cn(
         'z-50 min-w-[200px] rounded-lg border border-border bg-surface p-1 shadow-menu',
-        'origin-[var(--radix-dropdown-menu-content-transform-origin)] data-[state=open]:animate-menu-in',
+        'origin-[var(--radix-dropdown-menu-content-transform-origin)]',
+        menuMotion,
         className,
       )}
       {...props}
@@ -33,7 +35,7 @@ export const DropdownMenuItem = forwardRef<
   <DropdownPrimitive.Item
     ref={ref}
     className={cn(
-      'flex cursor-pointer items-center gap-2.5 rounded-md px-2.5 py-1.5 text-body text-ink outline-none transition-colors duration-chrome',
+      'flex cursor-pointer items-center gap-2.5 rounded-md px-2.5 py-1.5 text-body text-ink outline-none transition-[background-color,color] duration-chrome ease-out',
       'focus:bg-state-hover data-[disabled]:opacity-50',
       className,
     )}

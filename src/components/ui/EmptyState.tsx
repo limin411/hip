@@ -2,6 +2,7 @@ import type { LucideIcon } from 'lucide-react'
 import { Inbox } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Button } from './Button'
+import { viewEnterMotion } from './motionClasses'
 
 export type EmptyStateTier = 'friendly' | 'professional'
 
@@ -40,6 +41,7 @@ export function EmptyState({
       data-testid={testId}
       className={cn(
         'flex flex-col items-center justify-center rounded-lg py-14 text-center',
+        viewEnterMotion,
         className,
       )}
     >

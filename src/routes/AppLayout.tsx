@@ -247,7 +247,12 @@ export function AppLayout() {
       <PanelGroup direction="horizontal" className="min-w-0 flex-1 bg-surface">
         <Panel minSize={34} className="flex min-w-0 flex-col bg-surface">
           <MainToolbar />
-          {renderMainContent()}
+          <div
+            key={activeView}
+            className="flex min-h-0 min-w-0 flex-1 flex-col animate-view-enter"
+          >
+            {renderMainContent()}
+          </div>
         </Panel>
 
         {/* Overlap neighbors (w-2 -mx-1) so the divider is only a 1px line — no layout gap. */}
@@ -281,7 +286,7 @@ export function AppLayout() {
         >
           {rightOpen ? (
             <div
-              className="flex h-full min-h-0 flex-col bg-surface-subtle"
+              className="flex h-full min-h-0 flex-col bg-surface-subtle animate-panel-in"
               data-testid="right-panel-drawer"
             >
               {codeOpen ? (

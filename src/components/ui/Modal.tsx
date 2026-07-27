@@ -2,6 +2,7 @@ import * as DialogPrimitive from '@radix-ui/react-dialog'
 import { useTranslation } from 'react-i18next'
 import { X } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { modalMotion, overlayMotion } from './motionClasses'
 import { useResizableBox, type Size, type ResizeDir } from './useResizableBox'
 
 interface ModalProps {
@@ -77,15 +78,22 @@ export function Modal({
   return (
     <DialogPrimitive.Root open={open} onOpenChange={onOpenChange}>
       <DialogPrimitive.Portal>
-        <DialogPrimitive.Overlay className="fixed inset-0 z-50 bg-overlay backdrop-blur-[2px]" />
+        <DialogPrimitive.Overlay
+          className={cn(
+            'fixed inset-0 z-50 bg-overlay backdrop-blur-[2px]',
+            overlayMotion,
+          )}
+        />
         {/*
           Content must NOT be full-viewport. A full-screen Content at z-50 sits above
           portaled Popovers (wrapper often has z-index:auto) and steals day/today clicks
           in DateField. Center the panel itself instead.
+          modalMotion uses scale (not translate) so -translate-x/y centering is preserved.
         */}
         <DialogPrimitive.Content
           className={cn(
-            'fixed left-1/2 top-1/2 z-50 flex max-h-[85vh] w-[calc(100vw-2rem)] -translate-x-1/2 -translate-y-1/2 flex-col overflow-hidden rounded-xl border border-border bg-surface shadow-overlay outline-none animate-menu-in',
+            'fixed left-1/2 top-1/2 z-50 flex max-h-[85vh] w-[calc(100vw-2rem)] -translate-x-1/2 -translate-y-1/2 flex-col overflow-hidden rounded-xl border border-border bg-surface shadow-overlay outline-none',
+            modalMotion,
             !resizable && 'max-w-lg',
             className,
           )}
@@ -120,7 +128,7 @@ export function Modal({
             <DialogPrimitive.Close
               disabled={closeDisabled}
               className={cn(
-                'flex h-7 w-7 items-center justify-center rounded-md text-ink-tertiary transition-colors duration-chrome hover:bg-state-hover hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink/20',
+                'flex h-7 w-7 items-center justify-center rounded-md text-ink-tertiary transition-[background-color,color,transform] duration-chrome ease-out hover:bg-state-hover hover:text-ink active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink/20',
                 closeDisabled && 'pointer-events-none opacity-40',
               )}
               title={t('common.close')}

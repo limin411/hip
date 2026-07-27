@@ -438,7 +438,12 @@ export function GlobalCommandPalette() {
     <>
       <Dialog.Root open={open} onOpenChange={setOpen}>
         <Dialog.Portal>
-          <Dialog.Overlay className="fixed inset-0 z-[200] bg-overlay backdrop-blur-[2px] motion-reduce:transition-none motion-reduce:backdrop-blur-none" />
+          <Dialog.Overlay
+            className={cn(
+              'fixed inset-0 z-[200] bg-overlay backdrop-blur-[2px] motion-reduce:backdrop-blur-none',
+              'data-[state=open]:animate-overlay-in data-[state=closed]:animate-overlay-out',
+            )}
+          />
           <Dialog.Content
             aria-describedby={undefined}
             onEscapeKeyDown={(e) => {
@@ -448,10 +453,10 @@ export function GlobalCommandPalette() {
               }
             }}
             className={cn(
-              // Center with flex + inset (not translate) so enter animations cannot wipe centering.
+              // Center with flex + inset (not translate); modalMotion is scale-only.
               'fixed inset-0 z-[210] m-auto h-fit w-[min(32rem,calc(100vw-2rem))]',
               'overflow-hidden rounded-xl border border-border bg-surface shadow-overlay outline-none',
-              'animate-menu-in motion-reduce:animate-none',
+              'data-[state=open]:animate-modal-in data-[state=closed]:animate-modal-out',
             )}
             data-testid="global-command-palette"
             role="dialog"

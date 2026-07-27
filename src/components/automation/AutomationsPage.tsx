@@ -43,6 +43,19 @@ export function AutomationsPage() {
     return () => window.clearInterval(id)
   }, [])
 
+  // Drop selection if the automation was deleted.
+  // Must run before any early return so hook order is stable (loaded→loading path).
+  const selected = useMemo(
+    () =>
+      selectedId
+        ? (automations.find((a) => a.id === selectedId) ?? null)
+        : null,
+    [automations, selectedId],
+  )
+  useEffect(() => {
+    if (selectedId && !selected) setSelectedId(null)
+  }, [selectedId, selected])
+
   const openCreate = () => setEditor({ mode: 'create' })
   const openTemplate = (template: AutomationTemplate) =>
     setEditor({ mode: 'create', template })
@@ -71,18 +84,6 @@ export function AutomationsPage() {
   const runningIds = new Set(
     automations.filter((a) => isInFlight(a.id)).map((a) => a.id),
   )
-
-  // Drop selection if the automation was deleted.
-  const selected = useMemo(
-    () =>
-      selectedId
-        ? (automations.find((a) => a.id === selectedId) ?? null)
-        : null,
-    [automations, selectedId],
-  )
-  useEffect(() => {
-    if (selectedId && !selected) setSelectedId(null)
-  }, [selectedId, selected])
 
   return (
     <div

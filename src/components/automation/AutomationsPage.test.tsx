@@ -77,9 +77,24 @@ vi.mock('@/ipc/dialog', () => ({
 
 import { AutomationsPage } from './AutomationsPage'
 
+const sampleAutomation: Automation = {
+  id: 'auto_test1',
+  name: 'Daily notes',
+  prompt: 'Write notes',
+  enabled: true,
+  trigger: { kind: 'daily', hour: 9, minute: 0 },
+  createdAt: 1,
+  updatedAt: 1,
+  nextRunAt: Date.now() + 60_000,
+}
+
 describe('AutomationsPage', () => {
   beforeEach(() => {
     load.mockClear()
+    setEnabled.mockClear()
+    remove.mockClear()
+    runNow.mockClear()
+    selectSession.mockClear()
     storeState = {
       loaded: true,
       loading: false,
@@ -101,18 +116,7 @@ describe('AutomationsPage', () => {
   })
 
   it('renders list when automations exist', () => {
-    storeState.automations = [
-      {
-        id: 'auto_test1',
-        name: 'Daily notes',
-        prompt: 'Write notes',
-        enabled: true,
-        trigger: { kind: 'daily', hour: 9, minute: 0 },
-        createdAt: 1,
-        updatedAt: 1,
-        nextRunAt: Date.now() + 60_000,
-      },
-    ]
+    storeState.automations = [sampleAutomation]
     render(<AutomationsPage />)
     expect(screen.getByTestId('automation-list')).toBeInTheDocument()
     expect(screen.getByTestId('automation-row-auto_test1')).toBeInTheDocument()
@@ -128,16 +132,21 @@ describe('AutomationsPage', () => {
     expect(screen.getByTestId('automations-page')).toBeInTheDocument()
   })
 
+  it('keeps hook order stable when entering the loading early return', () => {
+    // Mirrors real store: first paint often loaded=false/loading=false (full tree),
+    // then load() sets loading=true (early return). Hooks must not drop.
+    storeState.loaded = false
+    storeState.loading = false
+    const { rerender } = render(<AutomationsPage />)
+    storeState.loading = true
+    expect(() => rerender(<AutomationsPage />)).not.toThrow()
+    expect(screen.getByTestId('automations-page')).toBeInTheDocument()
+  })
+
   it('selecting a row opens run history panel; session deep-link works', () => {
     storeState.automations = [
       {
-        id: 'auto_test1',
-        name: 'Daily notes',
-        prompt: 'Write notes',
-        enabled: true,
-        trigger: { kind: 'daily', hour: 9, minute: 0 },
-        createdAt: 1,
-        updatedAt: 1,
+        ...sampleAutomation,
         lastStatus: 'succeeded',
       },
     ]
@@ -164,5 +173,37 @@ describe('AutomationsPage', () => {
 
     fireEvent.click(screen.getByTestId('automation-run-history-close'))
     expect(screen.queryByTestId('automation-run-history')).not.toBeInTheDocument()
+  })
+
+  it('row action controls do not toggle run history selection', () => {
+    storeState.automations = [sampleAutomation]
+    render(<AutomationsPage />)
+
+    // Closed → Run does not open history
+    fireEvent.click(screen.getByTestId('automation-run-btn'))
+    expect(runNow).toHaveBeenCalledWith('auto_test1', {
+      focus: true,
+      trigger: 'manual',
+    })
+    expect(screen.queryByTestId('automation-run-history')).not.toBeInTheDocument()
+
+    // Open history via row select
+    fireEvent.click(screen.getByTestId('automation-row-auto_test1'))
+    expect(screen.getByTestId('automation-run-history')).toBeInTheDocument()
+    expect(screen.getByTestId('automation-row-auto_test1')).toHaveAttribute(
+      'data-selected',
+      'true',
+    )
+
+    // Nested actions keep selection / panel open
+    fireEvent.click(screen.getByTestId('automation-run-btn'))
+    expect(screen.getByTestId('automation-run-history')).toBeInTheDocument()
+
+    fireEvent.click(screen.getByTestId('automation-enable-auto_test1'))
+    expect(screen.getByTestId('automation-run-history')).toBeInTheDocument()
+    expect(setEnabled).toHaveBeenCalled()
+
+    fireEvent.click(screen.getByTestId('automation-edit-auto_test1'))
+    expect(screen.getByTestId('automation-run-history')).toBeInTheDocument()
   })
 })

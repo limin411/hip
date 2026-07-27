@@ -193,6 +193,7 @@ export function AutomationRow({
               e.stopPropagation()
               onEdit()
             }}
+            onKeyDown={(e) => e.stopPropagation()}
             data-testid={`automation-name-${automation.id}`}
           >
             {name}

@@ -127,11 +127,24 @@ export function normalizeTrigger(raw: unknown): AutomationTrigger {
   return { kind: 'manual' }
 }
 
+/** Run row status: unknown/missing → `pending` (open work). */
 function normalizeRunStatus(raw: unknown): AutomationRunStatus {
   if (typeof raw === 'string' && RUN_STATUSES.has(raw)) {
     return raw as AutomationRunStatus
   }
   return 'pending'
+}
+
+/**
+ * Catalog denorm lastStatus: unknown/empty → `null` (no badge),
+ * not `'pending'` (avoids false "pending" after corrupt disk data).
+ */
+function normalizeLastStatus(raw: unknown): AutomationRunStatus | null {
+  if (raw == null || raw === '') return null
+  if (typeof raw === 'string' && RUN_STATUSES.has(raw)) {
+    return raw as AutomationRunStatus
+  }
+  return null
 }
 
 function normalizeRunTrigger(raw: unknown): AutomationRunTrigger {
@@ -231,11 +244,7 @@ export function normalizeAutomation(raw: unknown, fallbackNow: number = Date.now
   }
 
   auto.lastRunAt = asOptionalFiniteNumber(o.lastRunAt)
-  if (o.lastStatus == null || o.lastStatus === '') {
-    auto.lastStatus = null
-  } else {
-    auto.lastStatus = normalizeRunStatus(o.lastStatus)
-  }
+  auto.lastStatus = normalizeLastStatus(o.lastStatus)
   if (o.lastError == null || o.lastError === '') {
     auto.lastError = null
   } else if (typeof o.lastError === 'string') {

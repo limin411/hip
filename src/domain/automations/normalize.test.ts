@@ -187,6 +187,49 @@ describe('normalizeCatalog', () => {
     expect(a!.lastRunAt).toBe(123)
     expect(a!.nextRunAt).toBeNull()
   })
+
+  it('catalog lastStatus: unknown/corrupt → null (not pending badge)', () => {
+    const id = mintAutomationId()
+    const a = normalizeAutomation({
+      id,
+      name: 'x',
+      prompt: 'y',
+      enabled: true,
+      trigger: { kind: 'manual' },
+      lastStatus: 'not_a_real_status',
+      createdAt: 1,
+      updatedAt: 1,
+    })
+    expect(a!.lastStatus).toBeNull()
+  })
+
+  it('catalog lastStatus empty → null; valid preserved', () => {
+    const id = mintAutomationId()
+    expect(
+      normalizeAutomation({
+        id,
+        name: 'x',
+        prompt: '',
+        enabled: true,
+        trigger: { kind: 'manual' },
+        lastStatus: '',
+        createdAt: 1,
+        updatedAt: 1,
+      })!.lastStatus,
+    ).toBeNull()
+    expect(
+      normalizeAutomation({
+        id,
+        name: 'x',
+        prompt: '',
+        enabled: true,
+        trigger: { kind: 'manual' },
+        lastStatus: 'succeeded',
+        createdAt: 1,
+        updatedAt: 1,
+      })!.lastStatus,
+    ).toBe('succeeded')
+  })
 })
 
 describe('normalizeRunsLog', () => {

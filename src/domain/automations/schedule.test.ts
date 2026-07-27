@@ -46,7 +46,7 @@ describe('computeNextRunAt / nextDailyAt', () => {
     expect(next).toBe(at(2026, 7, 27, 10, 0))
   })
 
-  it('daily: exactly at slot → today (due immediately)', () => {
+  it('daily: exactly at slot → today (due immediately, inclusive seed)', () => {
     const now = at(2026, 7, 27, 10, 0, 0, 0)
     const next = computeNextRunAt(daily10, now)
     expect(next).toBe(at(2026, 7, 27, 10, 0))
@@ -62,6 +62,32 @@ describe('computeNextRunAt / nextDailyAt', () => {
     const now = at(2026, 12, 31, 23, 0)
     const next = nextDailyAt(10, 0, now)
     expect(next).toBe(at(2027, 1, 1, 10, 0))
+  })
+})
+
+describe('rollNextRunAt (exclusive — no re-fire at lag 0)', () => {
+  it('fire_due at exact slot → roll advances past slot; re-eval is noop', () => {
+    const slot = at(2026, 7, 27, 10, 0)
+    const now = slot // lag 0
+    expect(evaluateSchedule({ nextRunAt: slot, nowMs: now })).toEqual({
+      action: 'fire_due',
+    })
+    // Inclusive seed would return the same slot — roll must not.
+    expect(computeNextRunAt(daily10, now)).toBe(slot)
+    const rolled = rollNextRunAt(daily10, now)
+    expect(rolled).not.toBe(slot)
+    expect(rolled).toBe(at(2026, 7, 28, 10, 0))
+    expect(
+      evaluateSchedule({ nextRunAt: rolled, nowMs: now }),
+    ).toEqual({ action: 'noop' })
+  })
+
+  it('roll after fire_due with small lag still advances to next day', () => {
+    const slot = at(2026, 7, 27, 10, 0)
+    const now = slot + 5_000
+    const rolled = rollNextRunAt(daily10, now)
+    expect(rolled).toBe(at(2026, 7, 28, 10, 0))
+    expect(rolled).toBeGreaterThan(now)
   })
 })
 
@@ -108,17 +134,17 @@ describe('evaluateSchedule matrix', () => {
 
   it('daily 10:00, now=10:00:00 → fire_due', () => {
     const now = at(2026, 7, 27, 10, 0, 0, 0)
-    expect(
-      evaluateSchedule({ nextRunAt: slot, trigger: daily10, nowMs: now }),
-    ).toEqual({ action: 'fire_due' })
+    expect(evaluateSchedule({ nextRunAt: slot, nowMs: now })).toEqual({
+      action: 'fire_due',
+    })
     expect(isDue(slot, now)).toBe(true)
   })
 
   it('daily 10:00, now within 30s slack → fire_due', () => {
     const now = slot + DUE_SLACK_MS
-    expect(
-      evaluateSchedule({ nextRunAt: slot, trigger: daily10, nowMs: now }),
-    ).toEqual({ action: 'fire_due' })
+    expect(evaluateSchedule({ nextRunAt: slot, nowMs: now })).toEqual({
+      action: 'fire_due',
+    })
   })
 
   it('daily 10:00, now=15:59 lag<6h → fire_catchup once', () => {
@@ -126,17 +152,35 @@ describe('evaluateSchedule matrix', () => {
     const lag = now - slot
     expect(lag).toBeLessThan(MISS_WINDOW_MS)
     expect(lag).toBeGreaterThan(DUE_SLACK_MS)
-    expect(
-      evaluateSchedule({ nextRunAt: slot, trigger: daily10, nowMs: now }),
-    ).toEqual({ action: 'fire_catchup' })
+    expect(evaluateSchedule({ nextRunAt: slot, nowMs: now })).toEqual({
+      action: 'fire_catchup',
+    })
   })
 
-  it('daily 10:00, now=17:00 lag≥6h → skip_miss missed_over_6h', () => {
-    const now = at(2026, 7, 27, 16, 0) // exactly 6h
+  it('daily 10:00, lag≥6h → skip_miss and roll to tomorrow 10:00', () => {
+    // Design matrix: now=17:00 lag≥6h; use exact 6h boundary (16:00) + roll check
+    const now = at(2026, 7, 27, 16, 0)
     expect(now - slot).toBe(MISS_WINDOW_MS)
+    expect(evaluateSchedule({ nextRunAt: slot, nowMs: now })).toEqual({
+      action: 'skip_miss',
+      reason: 'missed_over_6h',
+    })
+    // Design: nextRunAt 滚到明日 10:00
+    const rolled = rollNextRunAt(daily10, now)
+    expect(rolled).toBe(at(2026, 7, 28, 10, 0))
     expect(
-      evaluateSchedule({ nextRunAt: slot, trigger: daily10, nowMs: now }),
-    ).toEqual({ action: 'skip_miss', reason: 'missed_over_6h' })
+      evaluateSchedule({ nextRunAt: rolled, nowMs: now }),
+    ).toEqual({ action: 'noop' })
+  })
+
+  it('daily 10:00, now=17:00 lag>6h → skip_miss + roll tomorrow', () => {
+    const now = at(2026, 7, 27, 17, 0)
+    expect(now - slot).toBeGreaterThan(MISS_WINDOW_MS)
+    expect(evaluateSchedule({ nextRunAt: slot, nowMs: now })).toEqual({
+      action: 'skip_miss',
+      reason: 'missed_over_6h',
+    })
+    expect(rollNextRunAt(daily10, now)).toBe(at(2026, 7, 28, 10, 0))
   })
 
   it('lag≥6h coldStart → app_was_quit', () => {
@@ -144,7 +188,6 @@ describe('evaluateSchedule matrix', () => {
     expect(
       evaluateSchedule({
         nextRunAt: slot,
-        trigger: daily10,
         nowMs: now,
         coldStart: true,
       }),
@@ -153,16 +196,16 @@ describe('evaluateSchedule matrix', () => {
 
   it('lag just under 6h → fire_catchup (boundary)', () => {
     const now = slot + MISS_WINDOW_MS - 1
-    expect(
-      evaluateSchedule({ nextRunAt: slot, trigger: daily10, nowMs: now }),
-    ).toEqual({ action: 'fire_catchup' })
+    expect(evaluateSchedule({ nextRunAt: slot, nowMs: now })).toEqual({
+      action: 'fire_catchup',
+    })
   })
 
   it('nextRunAt in future → noop', () => {
     const now = at(2026, 7, 27, 9, 0)
-    expect(
-      evaluateSchedule({ nextRunAt: slot, trigger: daily10, nowMs: now }),
-    ).toEqual({ action: 'noop' })
+    expect(evaluateSchedule({ nextRunAt: slot, nowMs: now })).toEqual({
+      action: 'noop',
+    })
     expect(isDue(slot, now)).toBe(false)
   })
 
@@ -170,17 +213,15 @@ describe('evaluateSchedule matrix', () => {
     expect(
       evaluateSchedule({
         nextRunAt: null,
-        trigger: daily10,
         nowMs: at(2026, 7, 27, 10, 0),
       }),
     ).toEqual({ action: 'noop' })
   })
 
-  it('manual trigger: nextRunAt null → noop (onTick never fires)', () => {
+  it('manual has no nextRunAt seed → noop (onTick never fires)', () => {
     expect(
       evaluateSchedule({
         nextRunAt: null,
-        trigger: manual,
         nowMs: Date.now(),
       }),
     ).toEqual({ action: 'noop' })
@@ -195,7 +236,6 @@ describe('multi-day miss: single catch-up or single skip, no N-chain', () => {
     const now = at(2026, 7, 27, 12, 0)
     const decision = evaluateSchedule({
       nextRunAt: oldSlot,
-      trigger: daily10,
       nowMs: now,
       coldStart: true,
     })
@@ -207,7 +247,6 @@ describe('multi-day miss: single catch-up or single skip, no N-chain', () => {
     expect(
       evaluateSchedule({
         nextRunAt: rolled,
-        trigger: daily10,
         nowMs: now,
       }),
     ).toEqual({ action: 'noop' })
@@ -216,20 +255,18 @@ describe('multi-day miss: single catch-up or single skip, no N-chain', () => {
   it('after fire_catchup, roll yields one next slot', () => {
     const slot = at(2026, 7, 27, 10, 0)
     const now = at(2026, 7, 27, 12, 0) // lag 2h < 6h
-    expect(
-      evaluateSchedule({ nextRunAt: slot, trigger: daily10, nowMs: now }),
-    ).toEqual({ action: 'fire_catchup' })
+    expect(evaluateSchedule({ nextRunAt: slot, nowMs: now })).toEqual({
+      action: 'fire_catchup',
+    })
     const rolled = rollNextRunAt(daily10, now)
     expect(rolled).toBe(at(2026, 7, 28, 10, 0))
   })
 })
 
-describe('DST notes (local Date; no luxon)', () => {
+describe('DST portable (local Date; no luxon)', () => {
   /**
-   * Host TZ may not observe DST (e.g. Asia/Shanghai). We assert:
-   * - local wall construction never throws for any hour 0–23
-   * - successive nextRunAt values are strictly increasing (monotonic)
-   * - spring-forward-ish: constructing 02:30 then advancing still works
+   * Portable asserts for any host TZ. Fixed America/New_York wall outcomes live in
+   * schedule.dst.test.ts (process.env.TZ pin).
    */
   it('every hour of day constructs without throw', () => {
     for (let h = 0; h < 24; h++) {
@@ -241,32 +278,23 @@ describe('DST notes (local Date; no luxon)', () => {
   })
 
   it('nextRunAt is strictly monotonic across many daily rolls', () => {
-    let t = at(2026, 3, 1, 0, 0)
-    let prev = computeNextRunAt(daily10, t)!
+    let prev = computeNextRunAt(daily10, at(2026, 3, 1, 0, 0))!
     for (let i = 0; i < 40; i++) {
-      // Simulate fire at prev + 1s then roll
-      const after = prev + 1000
-      const next = computeNextRunAt(daily10, after)!
+      // Simulate fire at prev then exclusive roll
+      const next = rollNextRunAt(daily10, prev)!
       expect(next).toBeGreaterThan(prev)
       prev = next
     }
   })
 
   it('fall-back style: same local time only once per day after roll', () => {
-    // Two evaluates on same nextRunAt still fire once conceptually;
-    // after roll, next is tomorrow same wall clock.
     const slot = at(2026, 11, 1, 1, 30)
-    const now = slot + 1000
-    const rolled = rollNextRunAt(
-      { kind: 'daily', hour: 1, minute: 30 },
-      now,
-    )!
+    const now = slot // lag 0
+    const rolled = rollNextRunAt({ kind: 'daily', hour: 1, minute: 30 }, now)!
     expect(rolled).toBeGreaterThan(slot)
-    // Only one local 01:30 between slot and rolled exclusive of re-fire
     expect(
       evaluateSchedule({
         nextRunAt: rolled,
-        trigger: { kind: 'daily', hour: 1, minute: 30 },
         nowMs: now,
       }),
     ).toEqual({ action: 'noop' })

@@ -51,6 +51,18 @@ describe('classifySessionForAutomation', () => {
     ).toBe('waiting_user')
   })
 
+  it('running + interrupt → waiting_user (HITL before status)', () => {
+    // interrupt can leave status idle *or* still running depending on agent path
+    expect(
+      classifySessionForAutomation(
+        snap({
+          status: 'running',
+          interrupt: { turnId: 't2', question: 'continue?' },
+        }),
+      ),
+    ).toBe('waiting_user')
+  })
+
   it('idle + planApprovalPending → waiting_user', () => {
     expect(
       classifySessionForAutomation(

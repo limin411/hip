@@ -102,11 +102,11 @@ export function nextWeeklyAt(
 }
 
 /**
- * Next scheduled fire time at or after `fromMs` (local TZ).
+ * Next scheduled fire time at or after `fromMs` (local TZ, inclusive).
  * Manual triggers → `null` (no schedule).
  *
- * After a successful/skipped run, call with `fromMs = now` so the just-fired
- * slot is skipped when now is past that wall time.
+ * Use for **seeding** `nextRunAt` when enabling / first load (slot may be due now).
+ * After fire/skip, use {@link rollNextRunAt} (exclusive) so the same slot cannot re-fire.
  */
 export function computeNextRunAt(
   trigger: AutomationTrigger,
@@ -130,7 +130,6 @@ export function isDue(nextRunAt: number | null | undefined, nowMs: number): bool
 export type EvaluateScheduleInput = {
   /** Current nextRunAt from catalog (null → needs seed → noop after compute) */
   nextRunAt: number | null | undefined
-  trigger: AutomationTrigger
   nowMs: number
   /**
    * Cold start after process launch: lag ≥ 6h uses `app_was_quit`.
@@ -141,6 +140,9 @@ export type EvaluateScheduleInput = {
 
 /**
  * Pure schedule decision (normative evaluateSchedule from design).
+ *
+ * Host should only pass scheduled automations (skip `trigger.kind === 'manual'`
+ * before calling). Decision depends only on nextRunAt / now / coldStart.
  *
  * - nextRunAt null → noop (caller should seed via computeNextRunAt)
  * - nextRunAt > now → noop
@@ -166,12 +168,16 @@ export function evaluateSchedule(input: EvaluateScheduleInput): ScheduleDecision
 }
 
 /**
- * After fire or skip_miss: roll nextRunAt from `nowMs` (single step; no multi-slot catch-up).
- * Manual → null.
+ * After fire or skip_miss: next slot **strictly after** `nowMs` (exclusive).
+ * Manual → null. Single step — no multi-slot catch-up chain.
+ *
+ * Must not reuse inclusive {@link computeNextRunAt}: at lag 0 (`nowMs === nextRunAt`)
+ * inclusive seed would return the same slot and the next tick would re-fire forever.
  */
 export function rollNextRunAt(
   trigger: AutomationTrigger,
   nowMs: number,
 ): number | null {
-  return computeNextRunAt(trigger, nowMs)
+  // +1 ms forces exclusive: same wall-clock slot as now is skipped.
+  return computeNextRunAt(trigger, nowMs + 1)
 }

@@ -37,7 +37,7 @@ Both jobs run `yarn package:macos` / `yarn package:windows` (prod sidecar + real
 | Tag `v*` | `1` (cmake + engine staged) |
 | `workflow_dispatch` + “bundle whisper” | `1` |
 
-Unit / type-check / smoke e2e live in [`.github/workflows/test.yml`](../.github/workflows/test.yml).
+Unit / type-check / desktop e2e (gate on PR; full unpaid on main/nightly) live in [`.github/workflows/test.yml`](../.github/workflows/test.yml).
 
 ## Version bump
 
@@ -133,8 +133,10 @@ See also `src-tauri/resources/whisper/README.md` for the full scenario matrix an
 ## Smoke after packaging
 
 ```bash
-# optional: smoke e2e against a debug build (CI uses yarn tauri build --debug)
-yarn test:e2e:smoke
+# optional: desktop e2e against a debug build (CI uses yarn tauri build --debug)
+yarn test:e2e:smoke   # fast shell smoke
+yarn test:e2e:gate    # pre-merge gate (no paid LLM)
+# yarn test:e2e:full  # full unpaid suite (slow)
 ```
 
 Kill leftover app processes in e2e teardown if the user enabled hide-to-tray (`[window]`); do not rely on close = quit.

@@ -19,7 +19,7 @@ const chat = new ChatPage()
  * These tests verify the absence case deterministically and gate the presence
  * assertion on the chip actually being rendered (manual QA covers live usage).
  */
-describe('session usage chip @settings', () => {
+describe('session usage chip @settings @smoke @core', () => {
   before(async () => {
     await waitForAppReady()
     await skipLoginIfPresent()

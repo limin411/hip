@@ -55,6 +55,8 @@ Optional config reference (no secrets): [`docs/examples/hip.toml.example`](./doc
 | `yarn workspace @hip/sidecar type-check` | Sidecar TypeScript |
 | `yarn test` | Vitest unit / contract tests |
 | `yarn test:e2e:smoke` | Desktop smoke e2e (needs built app) |
+| `yarn test:e2e:gate` | Pre-merge desktop gate (smoke/core/harness/memory/panel/settings/voice) |
+| `yarn test:e2e:full` | Full unpaid desktop e2e (excludes `@live`) |
 | `yarn product:content` | Regenerate product embeds after editing `packages/product-content/` |
 | `yarn product:content:check` | CI-style check that embeds are up to date |
 | `yarn package:macos` | Signed macOS `.app` + `.dmg` (needs Developer ID) |
@@ -66,7 +68,7 @@ CI workflows:
 
 | Workflow | Purpose |
 |----------|---------|
-| [`.github/workflows/test.yml`](./.github/workflows/test.yml) | Type-check, unit, rust, e2e smoke |
+| [`.github/workflows/test.yml`](./.github/workflows/test.yml) | Type-check, unit, rust, e2e gate (+ full unpaid on main/nightly) |
 | [`.github/workflows/build.yml`](./.github/workflows/build.yml) | macOS + Windows production-layout packages (artifacts) |
 
 Paid / real-LLM tests are skipped when no keys are present.  

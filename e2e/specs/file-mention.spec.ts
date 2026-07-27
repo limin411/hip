@@ -18,7 +18,7 @@ async function typeInComposer(text: string): Promise<void> {
   await browser.keys(text)
 }
 
-describe('file mention @ @core', () => {
+describe('file mention @core', () => {
   before(async () => {
     await waitForAppReady()
     await skipLoginIfPresent()

@@ -13,6 +13,9 @@ const PAGES = [
   { id: 'mcp', label: '外部工具服务' },
   { id: 'skill', label: '技能' },
   { id: 'plugins', label: '插件市场' },
+  // Memory / voice pages: match panel heading copy (locale-independent substring).
+  { id: 'memory', label: '记忆' },
+  { id: 'voice', label: '语音' },
 ] as const
 
 describe('settings smoke @settings @smoke', () => {

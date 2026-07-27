@@ -5,6 +5,19 @@ on:
     branches: [main, master, dev]
   pull_request:
     branches: [main, master, dev]
+  schedule:
+    # Nightly unpaid full desktop e2e (UTC 16:00 ≈ Asia/Shanghai 00:00).
+    - cron: "0 16 * * *"
+  workflow_dispatch:
+    inputs:
+      e2e_suite:
+        description: "Which desktop e2e suite to run"
+        type: choice
+        options:
+          - gate
+          - full
+          - both
+        default: both
 
 concurrency:
   group: test-${{ github.workflow }}-${{ github.ref }}
@@ -13,6 +26,8 @@ concurrency:
 env:
   # Prod sidecar / node:sqlite need >= 22.5; keep CI on a current LTS line.
   NODE_VERSION: "22"
+  # Local whisper mock — no real mic / model download in desktop e2e.
+  HIP_VOICE_MOCK: "1"
 
 jobs:
   type-check:
@@ -69,13 +84,19 @@ jobs:
         working-directory: src-tauri
         run: cargo test
 
-  e2e-smoke:
+  # Pre-merge desktop gate: smoke + core + harness + memory/panel/settings/voice.
+  # No paid LLM (@live self-skips; gate grep does not select them).
+  e2e-gate:
+    if: >
+      github.event_name != 'schedule' &&
+      (github.event_name != 'workflow_dispatch' ||
+       inputs.e2e_suite == 'gate' ||
+       inputs.e2e_suite == 'both')
     runs-on: macos-latest
     needs: [type-check]
-    # Full desktop e2e remains non-blocking until the smoke suite is stable enough
-    # to gate merges.
+    # Still non-blocking until the expanded gate is stable enough to fail merges.
     continue-on-error: true
-    timeout-minutes: 90
+    timeout-minutes: 180
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -88,8 +109,62 @@ jobs:
       - uses: Swatinem/rust-cache@v2
         with:
           workspaces: src-tauri -> target
+          shared-key: e2e-macos
       - run: yarn install --frozen-lockfile
       # externalBin binaries/ are gitignored — generate the dev sidecar wrapper first.
       - run: yarn sidecar:dev-bin
       - run: yarn tauri build --debug
-      - run: yarn test:e2e:smoke
+      - name: Desktop e2e gate
+        env:
+          HIP_VOICE_MOCK: "1"
+          E2E_SCREENSHOT_DIR: ${{ runner.temp }}/hip-e2e-screenshots
+        run: yarn test:e2e:gate
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: e2e-gate-screenshots
+          path: ${{ runner.temp }}/hip-e2e-screenshots/
+          if-no-files-found: ignore
+          retention-days: 7
+
+  # Full unpaid desktop suite (everything except @live). Nightly + manual + mainline pushes.
+  # Skips `dev` pushes so day-to-day work only pays for the gate (still covers core features).
+  e2e-full:
+    if: >
+      github.event_name == 'schedule' ||
+      (github.event_name == 'workflow_dispatch' &&
+       (inputs.e2e_suite == 'full' || inputs.e2e_suite == 'both')) ||
+      (github.event_name == 'push' &&
+       (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'))
+    runs-on: macos-latest
+    needs: [type-check]
+    continue-on-error: true
+    timeout-minutes: 360
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: yarn
+      - name: Enable Yarn (classic)
+        run: corepack enable && corepack prepare yarn@1.22.22 --activate
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri -> target
+          shared-key: e2e-macos
+      - run: yarn install --frozen-lockfile
+      - run: yarn sidecar:dev-bin
+      - run: yarn tauri build --debug
+      - name: Desktop e2e full (exclude @live)
+        env:
+          HIP_VOICE_MOCK: "1"
+          E2E_SCREENSHOT_DIR: ${{ runner.temp }}/hip-e2e-screenshots
+        run: yarn test:e2e:full
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: e2e-full-screenshots
+          path: ${{ runner.temp }}/hip-e2e-screenshots/
+          if-no-files-found: ignore
+          retention-days: 7

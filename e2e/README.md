@@ -35,8 +35,15 @@ yarn test:e2e
 # Smoke only
 yarn test:e2e:smoke
 
-# Pre-public gate: smoke + core + harness (no paid LLM)
+# Pre-merge gate: smoke + core + harness + memory + panel + settings + voice (no paid LLM)
+# Sets HIP_VOICE_MOCK=1 so voice specs do not need whisper-cli / mic.
 yarn test:e2e:gate
+
+# Full unpaid suite (everything except @live — knowledge-phase1/p2, perf, …)
+yarn test:e2e:full
+
+# Voice only (mock engine)
+yarn test:e2e:voice
 
 # Live LLM (opt-in; needs ~/.hip/config/auth.json staged by wdio)
 yarn test:e2e:live
@@ -81,9 +88,10 @@ E2E_GREP=@live E2E_INVERT=1 yarn test:e2e
 | `@smoke` | Launch, shell, settings entry | yes |
 | `@core` | Session + Code workspace + Changes | yes |
 | `@harness` | Inject bridge (write/cancel/debug/agents) | yes |
-| `@panel` | Terminal / Agents panels | optional / nightly |
-| `@settings` | Settings smoke, usage chip | optional |
-| `@memory` | Memory settings / slash / citations harness (no paid LLM) | optional (not yet in gate) |
+| `@panel` | Terminal / Agents panels | yes (in gate) |
+| `@settings` | Settings smoke, usage chip | yes (in gate) |
+| `@memory` | Memory settings / slash / citations harness (no paid LLM) | yes (in gate) |
+| `@voice` | Composer voice dictation (Settings + mic; use `HIP_VOICE_MOCK=1`) | yes (in gate) |
 | `@live` | Real LLM (opt-in only) | **no** |
 | `@eval` | UI-first capability eval (smoke unpaid; live needs `HIP_EVAL_BYTEBASE_PATH`) | smoke yes via `@eval @smoke`; live **no** |
 | `@hard` | L2 multi-file / TDD / feature (`bytebase-hard`) | **no** (live opt-in) |
@@ -91,7 +99,7 @@ E2E_GREP=@live E2E_INVERT=1 yarn test:e2e
 | `@adv` | L4 noisy / safety (`bytebase-adv`) | **no** |
 | `@context-menu` | Right-click menus (see plan) | smoke/core cases also tagged `@smoke`/`@core` → in gate |
 | `@knowledge` | Knowledge base full business flows | main path also `@core` → in gate |
-| `@knowledge-perf` | Knowledge open/type usability budgets + unusable hard lines | **no** (nightly / local) |
+| `@knowledge-perf` | Knowledge open/type usability budgets + unusable hard lines | **no** (nightly / `test:e2e:full`) |
 | `@work-items` | Work item tracking (事项追踪) full business flows | smoke/core cases also tagged → in gate |
 
 Context-menu helpers: `e2e/helpers/context-menu.ts`. Specs: `context-menu-smoke.spec.ts`, `context-menu-core.spec.ts`, `context-menu-panel.spec.ts`.
@@ -213,14 +221,47 @@ Bridge seeds (DEV `__hipE2E`):
 
 Helpers: `e2e/helpers/e2e-hooks.ts`, `e2e/helpers/memory.ts`, `git-workspace.ts`, `history.ts`.
 
-## CI suggestion
+## CI (`.github/workflows/test.yml`)
 
-| Job | Grep | When |
-|-----|------|------|
-| Gate | `@smoke\|@core\|@harness` | PR / main |
-| Nightly | (full, exclude `@live`) | schedule |
-| Live | `@live` | manual / secret present |
-| Live memory | `@live` + `@memory` | manual; stages accelerated `memory.json` (`idleMinutes: 0`) |
+| Job | Command | When |
+|-----|---------|------|
+| `e2e-gate` | `yarn test:e2e:gate` | PR + push (not schedule); `continue-on-error` until stable |
+| `e2e-full` | `yarn test:e2e:full` | Nightly schedule, push to `main`/`master`, or manual `workflow_dispatch` |
+| Live | `yarn test:e2e:live` | **not in CI** (paid / secret) |
+
+Gate grep: `@smoke\|@core\|@harness\|@memory\|@panel\|@settings\|@voice`  
+Full unpaid: invert `@live` (includes knowledge-phase1/p2, knowledge-perf, etc.).
+
+Failure PNGs upload as Actions artifacts (`e2e-*-screenshots`, 7-day retention).
+
+## Feature coverage map (unpaid desktop)
+
+| Product area | Specs (representative) | Gate? |
+|--------------|------------------------|-------|
+| App launch / shell | `app-launch`, `smooth-p0` | yes |
+| Surfaces (chat/code) | `surface-switch`, `project-workspace` | yes |
+| Sessions / history | `session-management`, `session-history` | yes |
+| Composer / slash / @files | `composer-widgets`, `slash-commands`, `file-mention` | yes |
+| Command palette | `command-palette` | yes |
+| Settings | `settings-smoke` (+ model verify precheck) | yes |
+| Voice dictation | `voice-dictation` (`HIP_VOICE_MOCK=1`) | yes |
+| Memory | `memory-settings`, `memory-slash`, `memory-citations-harness` | yes |
+| Knowledge (main) | `knowledge-*` with `@core` | yes |
+| Knowledge (extra) | `knowledge-phase1`, `knowledge-live`, `knowledge-p2` | full only |
+| Knowledge perf | `knowledge-perf` | full only |
+| Work items | `work-items-*` | yes |
+| Diff / Changes | `diff-workspace`, `write-to-changes`, harness cancel keeps diff | yes |
+| Code terminal | `code-terminal` | yes |
+| Context menus | `context-menu-*` | yes (panel via `@panel`) |
+| Recycle bin / trash | `recycle-bin`, `context-menu-trash` | yes |
+| Plugins / extensions | `plugin-install-error`, `extension-registry`, `skill-plugin-dialogue` | yes |
+| Agents / plan / cancel | `harness-*`, `smooth-p*` | yes |
+| Timeline / roundtable | `timeline-*`, `roundtable-council` | yes |
+| Token usage chip | `token-usage-chip` | yes |
+| Eval UI smoke | `eval-ui-smoke`, `eval-ui-visual-capture` | yes (`@eval @smoke`) |
+| Live LLM / coding eval | `live-*`, `eval-*-hard/orch/adv` | **no** (paid) |
+
+Not automated as full desktop e2e (unit/Rust/manual instead): real PTY bytes, SSH/SFTP hosts, paid model verify, native Gatekeeper signing, whisper model download integrity.
 
 ## Flakes
 
@@ -229,3 +270,4 @@ Helpers: `e2e/helpers/e2e-hooks.ts`, `e2e/helpers/memory.ts`, `git-workspace.ts`
 - Shared app state: each harness file should create its own session via `__hipE2E` or explicit UI setup.
 - On failure, `wdio.conf.ts` writes a PNG under `E2E_SCREENSHOT_DIR` (or `/tmp/hip-e2e-screenshots`).
 - Spec layout stays flat under `e2e/specs/` for now (`specs/{smoke,core,…}` deferred — imports and `--spec` paths stay stable).
+- Voice mic record/transcribe depends on OS capture; CI uses mock engine and only asserts Settings + mic presence / no shell crash.

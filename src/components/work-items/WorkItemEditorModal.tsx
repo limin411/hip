@@ -17,7 +17,10 @@ import { DateField } from '@/components/ui/DateField'
 import { Input, inputClassName } from '@/components/ui/Input'
 import { Textarea } from '@/components/ui/Textarea'
 import { Modal } from '@/components/ui/Modal'
-import { openWorkItemDeleteDialog } from './workItemDeleteDialogStore'
+import {
+  openWorkItemDeleteDialog,
+  useWorkItemDeleteDialog,
+} from './workItemDeleteDialogStore'
 
 const PRIMARY_STATUSES: WorkItemStatus[] = ['todo', 'in_progress', 'done']
 const PRIORITIES: WorkItemPriority[] = ['none', 'low', 'medium', 'high']
@@ -43,6 +46,10 @@ export function WorkItemEditorModal() {
 
   const open = modal.mode !== 'closed'
   const editId = modal.mode === 'edit' ? modal.itemId : null
+  // Sibling delete confirm is a separate Dialog root; hide the editor while it is
+  // open so two Radix overlays/panels do not stack (double-dialog UX).
+  const deleteDialog = useWorkItemDeleteDialog()
+  const showEditor = open && deleteDialog == null
   const item = useMemo(
     () => (editId ? items.find((i) => i.id === editId) ?? null : null),
     [editId, items],
@@ -203,6 +210,7 @@ export function WorkItemEditorModal() {
     }
   }
 
+  // Keep session mounted while delete confirm is up so cancel restores the editor.
   if (!open) return null
 
   const title =
@@ -210,9 +218,10 @@ export function WorkItemEditorModal() {
 
   return (
     <Modal
-        open={open}
+        open={showEditor}
         onOpenChange={(o) => {
-          if (!o && !saving) closeModal()
+          // Ignore dismiss while deliberately hidden for the delete confirm.
+          if (!o && !saving && deleteDialog == null) closeModal()
         }}
         title={title}
         closeDisabled={saving}

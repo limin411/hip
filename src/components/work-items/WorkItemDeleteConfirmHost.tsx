@@ -11,6 +11,7 @@ import {
 
 /**
  * Sibling soft-delete confirm (not nested in WorkItemEditorModal).
+ * WorkItemEditorModal hides itself while this is open (no stacked overlays).
  * Confirm: soft-delete then close editor when it targets the same item.
  */
 export function WorkItemDeleteConfirmHost() {

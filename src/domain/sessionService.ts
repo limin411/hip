@@ -388,6 +388,18 @@ export class SessionService {
         /* logging must never crash receive */
       }
       this.restoreOpenTabsFromPersistence()
+      // Automation orphan recovery: only after session catalog is authoritative
+      // (design: sessionListReady post session:list:result). Dynamic import avoids
+      // sessionService ↔ automationStore init cycles.
+      void import('@/store/automationStore')
+        .then(({ useAutomationStore }) => {
+          const st = useAutomationStore.getState()
+          st.markSessionListReady()
+          void st.recoverOrphanRuns()
+        })
+        .catch(() => {
+          /* automation store optional at boot */
+        })
     }
     // E2E seed wins over empty/real sidecar list:result for the seeded session.
     if (

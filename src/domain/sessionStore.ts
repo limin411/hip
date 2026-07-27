@@ -825,7 +825,8 @@ interface DomainStore {
   pluginInstall: PluginInstallState | null
 
   apply: (msg: ServerMessage) => void
-  createSession: (id: string, config: SessionConfig) => string
+  /** Create a session. `activate` defaults true (sets activeSessionId); false leaves prior active unchanged. */
+  createSession: (id: string, config: SessionConfig, opts?: { activate?: boolean }) => string
   selectSession: (id: string) => void
   deselect: () => void
   deleteSession: (id: string) => void
@@ -870,8 +871,12 @@ export const useDomainStore = create<DomainStore>((set) => ({
       return applyServerMessage(s, msg, Date.now())
     }),
 
-  createSession: (id, config) => {
-    set((s) => ({ sessions: [{ ...emptySession(id), config }, ...s.sessions], activeSessionId: id }))
+  createSession: (id, config, opts) => {
+    const activate = opts?.activate !== false
+    set((s) => ({
+      sessions: [{ ...emptySession(id), config }, ...s.sessions],
+      ...(activate ? { activeSessionId: id } : {}),
+    }))
     return id
   },
 

@@ -170,6 +170,63 @@ describe('SessionService', () => {
     expect(t.sent.at(-1)).toMatchObject({ type: 'session:create', id })
   })
 
+  it('createSession with activate:false leaves prior activeSessionId and surface pointers unchanged', () => {
+    useUiStore.setState({
+      activeView: 'chat',
+      chatSessionId: 's1',
+      codeSessionId: 'code-keep',
+    })
+    const t = new FakeTransport()
+    const svc = new SessionService(t)
+    const bgId = svc.createSession({ ...DEFAULT_CONFIG, surface: 'chat' }, { activate: false })
+    expect(useDomainStore.getState().activeSessionId).toBe('s1')
+    expect(useDomainStore.getState().sessions.some((s) => s.id === bgId)).toBe(true)
+    expect(t.sent.at(-1)).toMatchObject({ type: 'session:create', id: bgId })
+    expect(useUiStore.getState().chatSessionId).toBe('s1')
+    expect(useUiStore.getState().codeSessionId).toBe('code-keep')
+  })
+
+  it('createSession default still activates (back-compat)', () => {
+    const t = new FakeTransport()
+    const id = new SessionService(t).createSession({ ...DEFAULT_CONFIG, surface: 'chat' })
+    expect(useDomainStore.getState().activeSessionId).toBe(id)
+  })
+
+  it('sendMessageToSession sends to target session without switching active', () => {
+    const t = new FakeTransport()
+    const svc = new SessionService(t)
+    const bgId = svc.createSession({ ...DEFAULT_CONFIG, surface: 'chat' }, { activate: false })
+    expect(useDomainStore.getState().activeSessionId).toBe('s1')
+    svc.sendMessageToSession(bgId, '  automation prompt  ')
+    expect(useDomainStore.getState().activeSessionId).toBe('s1')
+    const bg = useDomainStore.getState().sessions.find((s) => s.id === bgId)!
+    expect(bg.messages.at(-1)).toMatchObject({ role: 'user', content: 'automation prompt' })
+    expect(bg.status).toBe('running')
+    expect(t.sent.at(-1)).toMatchObject({
+      type: 'message:send',
+      sessionId: bgId,
+      content: 'automation prompt',
+      role: 'user',
+    })
+    // Active chat messages untouched.
+    expect(useDomainStore.getState().sessions.find((s) => s.id === 's1')!.messages).toHaveLength(0)
+  })
+
+  it('sendMessageToSession forwards attachments without changing active', () => {
+    const t = new FakeTransport()
+    const svc = new SessionService(t)
+    const bgId = svc.createSession({ ...DEFAULT_CONFIG, surface: 'chat' }, { activate: false })
+    const attachments = [{ id: 'a1', name: 'notes.md', mimeType: 'text/markdown', path: '/proj/notes.md' }]
+    svc.sendMessageToSession(bgId, 'look', attachments)
+    expect(useDomainStore.getState().activeSessionId).toBe('s1')
+    expect(t.sent.at(-1)).toMatchObject({
+      type: 'message:send',
+      sessionId: bgId,
+      content: 'look',
+      attachments: [{ id: 'a1', name: 'notes.md', mimeType: 'text/markdown', path: '/proj/notes.md' }],
+    })
+  })
+
   it('deleteSession soft-deletes (recycle bin) and notifies backend', () => {
     const t = new FakeTransport()
     const svc = new SessionService(t)

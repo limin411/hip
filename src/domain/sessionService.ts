@@ -1227,11 +1227,19 @@ export class SessionService {
     this.receive({ type: 'plugin:install:result', ok: false, error })
   }
 
-  createSession(config: SessionConfig = DEFAULT_CONFIG): string {
+  /**
+   * Create a session and notify the sidecar.
+   * `activate` defaults true (sets activeSessionId + surface pointer) for back-compat.
+   * Pass `{ activate: false }` for background automation so the open chat is not stolen.
+   */
+  createSession(config: SessionConfig = DEFAULT_CONFIG, opts?: { activate?: boolean }): string {
     const id = nanoid()
     const enriched: SessionConfig = normalizeSessionConfig({ ...config, language: currentLanguage() })
-    useDomainStore.getState().createSession(id, enriched)
-    this.rememberActiveForSurface(id)
+    const activate = opts?.activate !== false
+    useDomainStore.getState().createSession(id, enriched, { activate })
+    if (activate) {
+      this.rememberActiveForSurface(id)
+    }
     this.transport.send({ type: 'session:create', id, config: enriched })
     return id
   }
@@ -2302,6 +2310,30 @@ export class SessionService {
     this.transport.send({
       type: 'message:send',
       sessionId: activeSessionId,
+      id,
+      content: text,
+      role: 'user',
+      attachments: attachments.map((a) => ({ id: a.id, name: a.name, mimeType: a.mimeType, path: a.path })),
+    })
+  }
+
+  /**
+   * Send a user message to an explicit session without reading or changing activeSessionId.
+   * Used by automation background fires (createSession activate:false + this).
+   * Does not handle plan-approval amend / interrupt resume (those stay on the active composer path).
+   */
+  sendMessageToSession(
+    sessionId: string,
+    content: string,
+    attachments: LocalAttachment[] = [],
+  ): void {
+    const text = content.trim()
+    if (!text && attachments.length === 0) return
+    const id = nanoid()
+    useDomainStore.getState().appendUserMessage(sessionId, id, text, attachments)
+    this.transport.send({
+      type: 'message:send',
+      sessionId,
       id,
       content: text,
       role: 'user',

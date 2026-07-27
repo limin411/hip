@@ -1046,6 +1046,31 @@ describe('useDomainStore actions', () => {
     expect(useDomainStore.getState().activeSessionId).toBe(id)
   })
 
+  it('createSession with activate:false leaves prior activeSessionId unchanged', () => {
+    reset()
+    useDomainStore.getState().createSession('s-prior', { llmProvider: 'deepseek', model: 'm', tools: [] })
+    expect(useDomainStore.getState().activeSessionId).toBe('s-prior')
+    const bgId = useDomainStore.getState().createSession(
+      's-bg',
+      { llmProvider: 'deepseek', model: 'm', tools: [] },
+      { activate: false },
+    )
+    expect(bgId).toBe('s-bg')
+    expect(useDomainStore.getState().sessions[0].id).toBe('s-bg')
+    expect(useDomainStore.getState().activeSessionId).toBe('s-prior')
+  })
+
+  it('createSession with activate:true (explicit) still activates', () => {
+    reset()
+    useDomainStore.getState().createSession('s-prior', { llmProvider: 'deepseek', model: 'm', tools: [] })
+    const id = useDomainStore.getState().createSession(
+      's-next',
+      { llmProvider: 'deepseek', model: 'm', tools: [] },
+      { activate: true },
+    )
+    expect(useDomainStore.getState().activeSessionId).toBe(id)
+  })
+
   it('appendUserMessage adds a user message to the session', () => {
     reset()
     useDomainStore.getState().createSession('s1', { llmProvider: 'deepseek', model: 'm', tools: [] })

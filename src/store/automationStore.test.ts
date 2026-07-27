@@ -40,6 +40,8 @@ vi.mock('@/domain/automations/buildSessionConfig', () => ({
 const domainSessions: Array<{
   id: string
   status: 'idle' | 'running' | 'error'
+  /** false = list summary only (summaryToVM); true = full VM with reliable status */
+  loaded?: boolean
   pendingPermission?: unknown | null
   interrupt?: unknown | null
   planApprovalPending?: boolean | null
@@ -256,9 +258,13 @@ describe('automationStore', () => {
     expect(useAutomationStore.getState().automations[0].lastStatus).toBe('running')
   })
 
-  // ─── concurrent runNow TOCTOU ───────────────────────────────
+  // ─── concurrent runNow (enqueue + claim hold) ──────────────
+  // Note: global enqueueRunNow serializes bodies, so the second body starts
+  // only after the first finishes. This asserts post-body claim hold + skip,
+  // not parallel interleaving at the first await. True mid-await TOCTOU is
+  // covered by tryClaimInFlight direct tests + recover-vs-live-claim below.
 
-  it('concurrent runNow → single session; other skip_previous_running', async () => {
+  it('serialized concurrent runNow → single session; other skip_previous_running', async () => {
     useAutomationStore.setState({
       automations: [auto({ id: 'auto_conc', prompt: 'go' })],
       loaded: true,
@@ -287,6 +293,11 @@ describe('automationStore', () => {
     // Let microtasks flush so first body starts and hits await
     await Promise.resolve()
     await Promise.resolve()
+    // Mid-await: direct claim for same id still blocked (sync claim hold)
+    expect(tryClaimInFlight('auto_conc', { trigger: 'manual' })).toEqual({
+      ok: false,
+      error: 'skip_previous_running',
+    })
     resolveCfg!({ ok: true, config: okConfig })
 
     await Promise.all([p1, p2])
@@ -484,8 +495,8 @@ describe('automationStore', () => {
     expect(isInFlight('auto_miss')).toBe(false)
   })
 
-  it('recover: live idle no HITL → succeeded', async () => {
-    domainSessions.push({ id: 's-ok', status: 'idle' })
+  it('recover: loaded idle no HITL → succeeded', async () => {
+    domainSessions.push({ id: 's-ok', status: 'idle', loaded: true })
     useAutomationStore.setState({
       sessionListReady: true,
       automations: [auto({ id: 'auto_ok' })],
@@ -505,10 +516,83 @@ describe('automationStore', () => {
     expect(useAutomationStore.getState().runs[0].error).toBeNull()
   })
 
+  it('recover: unloaded idle list summary → process_interrupted (not succeeded)', async () => {
+    // summaryToVM always sets status idle + loaded:false — not completion evidence
+    domainSessions.push({ id: 's-sum', status: 'idle', loaded: false })
+    useAutomationStore.setState({
+      sessionListReady: true,
+      automations: [auto({ id: 'auto_sum' })],
+      runs: [
+        run({
+          id: 'arun_sum',
+          automationId: 'auto_sum',
+          status: 'running',
+          sessionId: 's-sum',
+          startedAt: 1,
+        }),
+      ],
+      loaded: true,
+    })
+    await useAutomationStore.getState().recoverOrphanRuns(7100)
+    const r = useAutomationStore.getState().runs[0]
+    expect(r.status).toBe('failed')
+    expect(r.error).toBe('process_interrupted')
+  })
+
+  it('recover: live claim + sessionId null → no-op (claim stays)', async () => {
+    useAutomationStore.setState({
+      sessionListReady: true,
+      automations: [auto({ id: 'auto_live' })],
+      runs: [
+        run({
+          id: 'arun_live',
+          automationId: 'auto_live',
+          status: 'running',
+          sessionId: null,
+          startedAt: 1,
+        }),
+      ],
+      loaded: true,
+    })
+    tryClaimInFlight('auto_live', { trigger: 'manual' })
+    await useAutomationStore.getState().recoverOrphanRuns(7200)
+    expect(useAutomationStore.getState().runs[0].status).toBe('running')
+    expect(useAutomationStore.getState().runs[0].sessionId).toBeNull()
+    expect(isInFlight('auto_live')).toBe(true)
+    expect(saveAutomationRuns).not.toHaveBeenCalled()
+  })
+
+  it('recover: live claim + sessionId present → ensure watch only, no complete', async () => {
+    domainSessions.push({ id: 's-claimed', status: 'idle', loaded: true })
+    useAutomationStore.setState({
+      sessionListReady: true,
+      automations: [auto({ id: 'auto_cl' })],
+      runs: [
+        run({
+          id: 'arun_cl',
+          automationId: 'auto_cl',
+          status: 'running',
+          sessionId: 's-claimed',
+          startedAt: 1,
+        }),
+      ],
+      loaded: true,
+    })
+    tryClaimInFlight('auto_cl', { trigger: 'manual' })
+    await useAutomationStore.getState().recoverOrphanRuns(7300)
+    expect(useAutomationStore.getState().runs[0].status).toBe('running')
+    expect(isInFlight('auto_cl')).toBe(true)
+    expect(getWatch('arun_cl')).toEqual({
+      sessionId: 's-claimed',
+      automationId: 'auto_cl',
+    })
+  })
+
   it('recover: live session error → failed + message', async () => {
     domainSessions.push({
       id: 's-err',
       status: 'error',
+      loaded: true,
       error: { message: 'provider_down' },
     })
     useAutomationStore.setState({
@@ -535,6 +619,7 @@ describe('automationStore', () => {
     domainSessions.push({
       id: 's-hitl',
       status: 'running',
+      loaded: true,
       pendingPermission: { requestId: 'p1' },
     })
     useAutomationStore.setState({
@@ -562,7 +647,7 @@ describe('automationStore', () => {
   })
 
   it('recover: in_flight live session → re-claim + watch (no complete)', async () => {
-    domainSessions.push({ id: 's-run', status: 'running' })
+    domainSessions.push({ id: 's-run', status: 'running', loaded: true })
     useAutomationStore.setState({
       sessionListReady: true,
       automations: [auto({ id: 'auto_run' })],
@@ -607,6 +692,110 @@ describe('automationStore', () => {
     expect(useAutomationStore.getState().runs[0].error).toBe(
       'process_interrupted',
     )
+  })
+
+  // ─── release on IPC failure (finally) ──────────────────────
+
+  it('completeRun releases claim when saveRuns rejects', async () => {
+    useAutomationStore.setState({
+      automations: [auto({ id: 'auto_ipc' })],
+      runs: [
+        run({
+          id: 'arun_ipc',
+          automationId: 'auto_ipc',
+          status: 'running',
+          sessionId: 's1',
+          startedAt: 10,
+        }),
+      ],
+      loaded: true,
+    })
+    tryClaimInFlight('auto_ipc', { trigger: 'manual' })
+    saveAutomationRuns.mockRejectedValueOnce(new Error('disk full'))
+
+    await expect(
+      useAutomationStore.getState().completeRun('arun_ipc', {
+        status: 'succeeded',
+        error: null,
+        finishedAt: 99,
+      }),
+    ).rejects.toThrow()
+
+    expect(isInFlight('auto_ipc')).toBe(false)
+  })
+
+  it('failBeforeSession releases claim when saveRuns rejects', async () => {
+    useAutomationStore.setState({
+      automations: [auto({ id: 'auto_fb' })],
+      loaded: true,
+    })
+    tryClaimInFlight('auto_fb', { trigger: 'manual' })
+    saveAutomationRuns.mockRejectedValueOnce(new Error('disk full'))
+
+    await expect(
+      useAutomationStore.getState().failBeforeSession('auto_fb', {
+        trigger: 'manual',
+        error: 'no_model_configured',
+        now: 1,
+      }),
+    ).rejects.toThrow()
+
+    expect(isInFlight('auto_fb')).toBe(false)
+  })
+
+  it('failBeforeSession rolls nextRunAt for schedule trigger', async () => {
+    const nextRunAt = Date.now() - 1000
+    useAutomationStore.setState({
+      automations: [
+        auto({
+          id: 'auto_roll',
+          trigger: { kind: 'daily', hour: 9, minute: 0 },
+          nextRunAt,
+        }),
+      ],
+      loaded: true,
+    })
+    tryClaimInFlight('auto_roll', { trigger: 'schedule' })
+    await useAutomationStore.getState().failBeforeSession('auto_roll', {
+      trigger: 'schedule',
+      error: 'project_missing',
+      now: Date.now(),
+    })
+    const a = useAutomationStore.getState().automations[0]
+    expect(a.nextRunAt).not.toBe(nextRunAt)
+    expect(a.nextRunAt).toEqual(expect.any(Number))
+    expect(isInFlight('auto_roll')).toBe(false)
+  })
+
+  // ─── delete vs runNow race ─────────────────────────────────
+
+  it('runNow aborts after delete during config build (no session)', async () => {
+    useAutomationStore.setState({
+      automations: [auto({ id: 'auto_del', prompt: 'x' })],
+      loaded: true,
+    })
+    let resolveCfg!: (v: unknown) => void
+    buildSessionConfigFromAutomation.mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          resolveCfg = resolve
+        }),
+    )
+
+    const p = useAutomationStore.getState().runNow('auto_del', {
+      trigger: 'manual',
+      nowMs: 1,
+    })
+    await Promise.resolve()
+    await Promise.resolve()
+    // Catalog drop while body still holds claim (delete race mid-await)
+    useAutomationStore.setState({ automations: [] })
+
+    resolveCfg!({ ok: true, config: okConfig })
+    await p
+
+    expect(createSession).not.toHaveBeenCalled()
+    expect(isInFlight('auto_del')).toBe(false)
   })
 
   // ─── patchRunStatus does not release ───────────────────────

@@ -74,10 +74,9 @@ export async function buildSessionConfigFromAutomation(
     }
   }
 
+  // surface is code iff projectPath is non-empty (project_required is reserved
+  // for a future explicit surface pin without path; unreachable with current mapping).
   const surface: 'chat' | 'code' = a.projectPath?.trim() ? 'code' : 'chat'
-  if (surface === 'code' && !a.projectPath?.trim()) {
-    return { ok: false, error: 'project_required' }
-  }
 
   // 2. Mirror configFromDraft model/agent path
   const agents = useHipConfigStore.getState().config.agents ?? []

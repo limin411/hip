@@ -333,9 +333,43 @@ export const useAutomationStore = create<AutomationStore>((set, get) => ({
     const sessions = useDomainStore.getState().sessions
 
     for (const r of open) {
-      const session = r.sessionId
-        ? sessions.find((s) => s.id === r.sessionId)
-        : undefined
+      // Live runNow holds memory claim: never complete/interrupt that auto.
+      // Between beginRun and attachSessionToRun sessionId is still null; a
+      // concurrent session:list:result must not release the claim.
+      if (inFlight.has(r.automationId)) {
+        if (r.sessionId) {
+          get().registerWatch(r.id, r.sessionId, r.automationId)
+        }
+        continue
+      }
+
+      // Still binding sessionId (no live claim either) — leave open; next
+      // recover / host sample will resolve. Avoid process_interrupted race
+      // if disk wrote beginRun but process died before attach (rare) — without
+      // claim and without sessionId we treat as interrupted below only when
+      // we have no binding in progress. Null sessionId + no claim = crash mid bind.
+      if (!r.sessionId) {
+        await get().completeRun(r.id, {
+          status: 'failed',
+          error: 'process_interrupted',
+          finishedAt: nowMs,
+        })
+        continue
+      }
+
+      const session = sessions.find((s) => s.id === r.sessionId)
+
+      // Unloaded list summaries always have status 'idle' (summaryToVM) and
+      // drop HITL — not trustworthy for terminal success. Prefer interrupted.
+      if (session && session.loaded === false) {
+        await get().completeRun(r.id, {
+          status: 'failed',
+          error: 'process_interrupted',
+          finishedAt: nowMs,
+        })
+        continue
+      }
+
       const kind = classifySessionForAutomation(session)
 
       if (session && kind === 'in_flight') {
@@ -343,7 +377,7 @@ export const useAutomationStore = create<AutomationStore>((set, get) => ({
           inFlight.add(r.automationId)
           globalInFlight++
         }
-        get().registerWatch(r.id, r.sessionId!, r.automationId)
+        get().registerWatch(r.id, r.sessionId, r.automationId)
         continue
       }
       if (session && kind === 'waiting_user') {
@@ -354,10 +388,11 @@ export const useAutomationStore = create<AutomationStore>((set, get) => ({
         if (r.status !== 'waiting_user') {
           await get().patchRunStatus(r.id, 'waiting_user')
         }
-        get().registerWatch(r.id, r.sessionId!, r.automationId)
+        get().registerWatch(r.id, r.sessionId, r.automationId)
         continue
       }
       if (session && kind === 'succeeded') {
+        // Only when loaded VM is idle with no HITL (true completion evidence).
         await get().completeRun(r.id, {
           status: 'succeeded',
           error: null,
@@ -542,7 +577,8 @@ export const useAutomationStore = create<AutomationStore>((set, get) => ({
   },
 
   /**
-   * Dual-file + releaseInFlight MUST. Rolls nextRunAt for scheduled autos.
+   * Dual-file + releaseInFlight MUST (in finally so IPC throw cannot leak claim).
+   * Rolls nextRunAt for scheduled autos.
    */
   completeRun: async (runId, input) => {
     const existing = get().runs.find((r) => r.id === runId)
@@ -557,77 +593,89 @@ export const useAutomationStore = create<AutomationStore>((set, get) => ({
     }
 
     const automationId = existing.automationId
-    const finished: AutomationRun = {
-      ...existing,
-      status: input.status,
-      error: input.error ?? null,
-      finishedAt: input.finishedAt,
+    try {
+      const finished: AutomationRun = {
+        ...existing,
+        status: input.status,
+        error: input.error ?? null,
+        finishedAt: input.finishedAt,
+      }
+
+      set((s) => ({
+        runs: s.runs.map((r) => (r.id === runId ? finished : r)),
+      }))
+      await get().saveRuns()
+
+      const auto = get().automations.find((a) => a.id === automationId)
+      let nextRunAt = auto?.nextRunAt ?? null
+      if (auto && auto.trigger.kind !== 'manual') {
+        nextRunAt = rollNextRunAt(auto.trigger, input.finishedAt)
+      }
+
+      set((s) => ({
+        automations: patchAutomationInList(s.automations, automationId, {
+          lastRunAt: existing.startedAt,
+          lastStatus: input.status,
+          lastError: input.error ?? null,
+          lastSessionId: existing.sessionId ?? null,
+          nextRunAt,
+          updatedAt: Date.now(),
+        }),
+      }))
+      await get().saveCatalog()
+    } finally {
+      // releaseInFlight MUST even when dual-file IPC throws
+      releaseInFlight(automationId)
+      watches.delete(runId)
     }
-
-    set((s) => ({
-      runs: s.runs.map((r) => (r.id === runId ? finished : r)),
-    }))
-    await get().saveRuns()
-
-    const auto = get().automations.find((a) => a.id === automationId)
-    let nextRunAt = auto?.nextRunAt ?? null
-    if (auto && auto.trigger.kind !== 'manual') {
-      nextRunAt = rollNextRunAt(auto.trigger, input.finishedAt)
-    }
-
-    set((s) => ({
-      automations: patchAutomationInList(s.automations, automationId, {
-        lastRunAt: existing.startedAt,
-        lastStatus: input.status,
-        lastError: input.error ?? null,
-        lastSessionId: existing.sessionId ?? null,
-        nextRunAt,
-        updatedAt: Date.now(),
-      }),
-    }))
-    await get().saveCatalog()
-
-    // releaseInFlight MUST
-    releaseInFlight(automationId)
-    watches.delete(runId)
   },
 
   /**
    * Config/project/model fail BEFORE session create.
-   * Writes a failed run row + last* + MUST releaseInFlight.
+   * Writes a failed run row + last* + MUST releaseInFlight (finally).
+   * Non-manual triggers roll nextRunAt so schedule ticks do not spam fails.
    */
   failBeforeSession: async (automationId, input) => {
-    const runId = mintAutomationRunId()
-    const run: AutomationRun = {
-      id: runId,
-      automationId,
-      status: 'failed',
-      trigger: input.trigger,
-      startedAt: input.now,
-      finishedAt: input.now,
-      sessionId: null,
-      error: input.error,
+    try {
+      const runId = mintAutomationRunId()
+      const run: AutomationRun = {
+        id: runId,
+        automationId,
+        status: 'failed',
+        trigger: input.trigger,
+        startedAt: input.now,
+        finishedAt: input.now,
+        sessionId: null,
+        error: input.error,
+      }
+      const normalized = normalizeAutomationRun(run, input.now) ?? run
+
+      set((s) => ({
+        runs: truncateRuns([normalized, ...s.runs]),
+      }))
+      await get().saveRuns()
+
+      const auto = get().automations.find((a) => a.id === automationId)
+      let nextRunAt = auto?.nextRunAt ?? null
+      if (auto && auto.trigger.kind !== 'manual') {
+        nextRunAt = rollNextRunAt(auto.trigger, input.now)
+      }
+
+      set((s) => ({
+        automations: patchAutomationInList(s.automations, automationId, {
+          lastRunAt: input.now,
+          lastStatus: 'failed',
+          lastError: input.error,
+          lastSessionId: null,
+          nextRunAt,
+          updatedAt: Date.now(),
+        }),
+      }))
+      await get().saveCatalog()
+    } finally {
+      // MUST releaseInFlight even when dual-file IPC throws
+      releaseInFlight(automationId)
     }
-    const normalized = normalizeAutomationRun(run, input.now) ?? run
-
-    set((s) => ({
-      runs: truncateRuns([normalized, ...s.runs]),
-    }))
-    await get().saveRuns()
-
-    set((s) => ({
-      automations: patchAutomationInList(s.automations, automationId, {
-        lastRunAt: input.now,
-        lastStatus: 'failed',
-        lastError: input.error,
-        lastSessionId: null,
-        updatedAt: Date.now(),
-      }),
-    }))
-    await get().saveCatalog()
-
-    // MUST releaseInFlight
-    releaseInFlight(automationId)
   },
 
   /**
@@ -763,6 +811,13 @@ async function runNowBody(
         error: built.error,
         now,
       })
+      return
+    }
+
+    // Delete-vs-run race: re-check catalog after await; release if removed.
+    const stillThere = get().automations.some((x) => x.id === automationId)
+    if (!stillThere) {
+      releaseInFlight(automationId)
       return
     }
 

@@ -381,6 +381,37 @@ describe('SessionService', () => {
     expect(useUiStore.getState().sidebarSection).toBe('chats')
   })
 
+  it('session:list:result marks automation sessionListReady and invokes recoverOrphanRuns', async () => {
+    const {
+      useAutomationStore,
+      __resetAutomationStoreInternalsForTests,
+    } = await import('@/store/automationStore')
+    __resetAutomationStoreInternalsForTests()
+    const mark = vi.fn(() => {
+      useAutomationStore.setState({ sessionListReady: true })
+    })
+    const recover = vi.fn().mockResolvedValue(undefined)
+    useAutomationStore.setState({
+      markSessionListReady: mark,
+      recoverOrphanRuns: recover,
+    })
+
+    const t = new FakeTransport()
+    new SessionService(t)
+    t.push({
+      type: 'session:list:result',
+      sessions: [
+        { id: 'keep-chat', title: 'Chat', preview: '', updatedAt: 2, messageCount: 1, surface: 'chat' },
+      ],
+    })
+
+    await vi.waitFor(() => {
+      expect(mark).toHaveBeenCalledTimes(1)
+      expect(recover).toHaveBeenCalledTimes(1)
+    })
+    __resetAutomationStoreInternalsForTests()
+  })
+
   it('previewSurface changes activeView without restoring a remembered session', () => {
     const svc = new SessionService(new FakeTransport())
     const id = svc.createSession({ ...DEFAULT_CONFIG, surface: 'chat' })

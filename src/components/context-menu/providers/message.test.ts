@@ -151,7 +151,7 @@ describe('messageProvider', () => {
   })
 
   it('copy uses ctx.copyText with message content', async () => {
-    const copyText = vi.fn(async () => true)
+    const copyText = vi.fn<(text: string) => Promise<boolean>>(async () => true)
     const msg = makeMessage({ id: 'm1', role: 'user', content: 'hello world' })
     const items = messageProvider(
       { kind: 'message', payload: { message: msg, isLastAssistant: false, sessionId: 's1' } },
@@ -162,7 +162,7 @@ describe('messageProvider', () => {
   })
 
   it('copy strips roundtable system framing from user messages', async () => {
-    const copyText = vi.fn(async () => true)
+    const copyText = vi.fn<(text: string) => Promise<boolean>>(async () => true)
     const wire =
       '<!--hip.roundtable.v1-->\nMode: Roundtable…\n\n---user---\n\nShould we rewrite the API?'
     const msg = makeMessage({ id: 'm-rt', role: 'user', content: wire })
@@ -228,7 +228,7 @@ describe('messageProvider', () => {
   })
 
   it('copyId copies message.id', async () => {
-    const copyText = vi.fn(async () => true)
+    const copyText = vi.fn<(text: string) => Promise<boolean>>(async () => true)
     const msg = makeMessage({ id: 'msg-42', role: 'user', content: 'x' })
     const items = messageProvider(
       { kind: 'message', payload: { message: msg, isLastAssistant: false, sessionId: 's1' } },
@@ -307,7 +307,7 @@ describe('messageProvider', () => {
     const jsonSpy = vi
       .spyOn(sessionService, 'getSessionDebugBundleJson')
       .mockReturnValue('{"version":1}\n')
-    const copyText = vi.fn(async () => true)
+    const copyText = vi.fn<(text: string) => Promise<boolean>>(async () => true)
     const items = messageProvider(
       {
         kind: 'message',

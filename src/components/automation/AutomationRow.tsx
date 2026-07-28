@@ -19,8 +19,6 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/DropdownMenu'
-import { useSkillsStore } from '@/store/skillsStore'
-import { formatAbsolute, formatRelativeTime } from '@/lib/datetime'
 import { cn } from '@/lib/utils'
 
 export type AutomationRowProps = {
@@ -61,78 +59,6 @@ function statusVariant(
   }
 }
 
-const WEEKDAY_KEYS = [
-  'automation.weekday.0',
-  'automation.weekday.1',
-  'automation.weekday.2',
-  'automation.weekday.3',
-  'automation.weekday.4',
-  'automation.weekday.5',
-  'automation.weekday.6',
-] as const
-
-function triggerLabel(
-  a: Automation,
-  t: (
-    key:
-      | (typeof WEEKDAY_KEYS)[number]
-      | 'automation.trigger.manual'
-      | 'automation.trigger.dailyAt'
-      | 'automation.trigger.weeklyAt',
-    opts?: Record<string, unknown>,
-  ) => string,
-): string {
-  const tr = a.trigger
-  if (tr.kind === 'manual') return t('automation.trigger.manual')
-  const time = `${String(tr.hour).padStart(2, '0')}:${String(tr.minute).padStart(2, '0')}`
-  if (tr.kind === 'daily') {
-    return t('automation.trigger.dailyAt', { time })
-  }
-  const wd = ((tr.weekday % 7) + 7) % 7
-  return t('automation.trigger.weeklyAt', {
-    weekday: t(WEEKDAY_KEYS[wd]!),
-    time,
-  })
-}
-
-/** Skill honesty chips: missing / disabled (does not block Run). */
-function SkillHonestyChips({ skillIds }: { skillIds: string[] }) {
-  const { t } = useTranslation()
-  const skills = useSkillsStore((s) => s.skills)
-  const enabled = useSkillsStore((s) => s.enabled)
-
-  if (skillIds.length === 0) return null
-
-  const chips: { id: string; kind: 'missing' | 'disabled' }[] = []
-  for (const id of skillIds) {
-    const meta = skills.find((s) => s.id === id)
-    if (!meta) {
-      chips.push({ id, kind: 'missing' })
-    } else if (enabled[id] === false) {
-      chips.push({ id, kind: 'disabled' })
-    }
-  }
-  if (chips.length === 0) return null
-
-  return (
-    <>
-      {chips.map((c) => (
-        <Badge
-          key={`${c.kind}-${c.id}`}
-          size="sm"
-          variant="warning"
-          data-testid={`automation-skill-chip-${c.kind}-${c.id}`}
-          title={c.id}
-        >
-          {c.kind === 'missing'
-            ? t('automation.skillMissing')
-            : t('automation.skillDisabled')}
-        </Badge>
-      ))}
-    </>
-  )
-}
-
 export function AutomationRow({
   automation,
   onToggle,
@@ -145,8 +71,7 @@ export function AutomationRow({
   running,
   scheduleUnreliable = false,
 }: AutomationRowProps) {
-  const { t, i18n } = useTranslation()
-  const locale = i18n.language || 'en'
+  const { t } = useTranslation()
   const name = automation.name.trim() || t('automation.untitled')
   const status = automation.lastStatus
   const errorLine =
@@ -186,7 +111,7 @@ export function AutomationRow({
           : undefined
       }
       className={cn(
-        'group flex items-start gap-3 border-b border-border px-3 py-2.5 last:border-b-0',
+        'group flex items-center gap-3 border-b border-border px-3 py-2 last:border-b-0',
         'transition-colors duration-chrome',
         selected ? 'bg-state-active' : 'hover:bg-state-hover/50',
         onSelect && 'cursor-pointer',
@@ -194,7 +119,6 @@ export function AutomationRow({
       )}
     >
       <div
-        className="pt-0.5"
         onClick={(e) => e.stopPropagation()}
         onKeyDown={(e) => e.stopPropagation()}
       >
@@ -228,30 +152,6 @@ export function AutomationRow({
               <TriangleAlert className="h-3.5 w-3.5" strokeWidth={1.75} aria-hidden />
             </span>
           ) : null}
-        </div>
-
-        <div className="mt-0.5 flex min-w-0 flex-wrap items-center gap-x-2 gap-y-0.5 text-meta text-ink-tertiary">
-          <span>{triggerLabel(automation, t as Parameters<typeof triggerLabel>[1])}</span>
-          <span data-testid={`automation-next-${automation.id}`}>
-            {automation.trigger.kind === 'manual'
-              ? t('automation.list.nextManual')
-              : t('automation.list.nextRun', {
-                  when:
-                    automation.nextRunAt != null
-                      ? formatAbsolute(automation.nextRunAt, locale)
-                      : '—',
-                })}
-          </span>
-          {automation.lastRunAt != null ? (
-            <span
-              data-testid={`automation-last-${automation.id}`}
-              title={formatAbsolute(automation.lastRunAt, locale)}
-            >
-              {t('automation.list.lastRun', {
-                when: formatRelativeTime(automation.lastRunAt, locale),
-              })}
-            </span>
-          ) : null}
           {statusLabel ? (
             <Badge
               size="sm"
@@ -262,14 +162,6 @@ export function AutomationRow({
             >
               {statusLabel}
             </Badge>
-          ) : null}
-          {automation.projectPath ? (
-            <span className="max-w-[14rem] truncate" title={automation.projectPath}>
-              {automation.projectPath}
-            </span>
-          ) : null}
-          {automation.skillIds?.length ? (
-            <SkillHonestyChips skillIds={automation.skillIds} />
           ) : null}
         </div>
 
@@ -285,7 +177,7 @@ export function AutomationRow({
       </div>
 
       <div
-        className="flex shrink-0 items-center gap-1 pt-0.5"
+        className="flex shrink-0 items-center gap-1"
         onClick={(e) => e.stopPropagation()}
         onKeyDown={(e) => e.stopPropagation()}
       >
@@ -302,7 +194,8 @@ export function AutomationRow({
           {t('automation.list.runNow')}
         </Button>
 
-        <DropdownMenu>
+        {/* modal={false}: Delete opens a Dialog; stacking modal menu + dialog locks body. */}
+        <DropdownMenu modal={false}>
           <DropdownMenuTrigger asChild>
             <Button
               type="button"

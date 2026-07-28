@@ -133,15 +133,9 @@ export function AutomationsPage() {
         <h1 className="text-body font-semibold tracking-tight text-ink">
           {t('automation.title')}
         </h1>
-        <p className="mt-0.5 text-meta text-ink-tertiary">
-          {t('automation.subtitle')}
-        </p>
-        <p className="mt-0.5 text-caption text-ink-tertiary/90">
-          {t('automation.localOnlyHint')}
-        </p>
         {hasItems ? (
           <p
-            className="mt-1.5 text-meta text-ink-secondary"
+            className="mt-1 text-meta text-ink-secondary"
             data-testid="automations-page-stats"
           >
             {t('automation.list.stats', {

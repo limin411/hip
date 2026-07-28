@@ -178,7 +178,9 @@ export function AutomationList({
 
         {onCreate ? (
           onCreateFromTemplate ? (
-            <DropdownMenu>
+            /* modal={false}: menu item opens Modal; two body pointer-events locks
+               stack and leave the app unclickable after the dialog closes. */
+            <DropdownMenu modal={false}>
               <DropdownMenuTrigger asChild>
                 <Button
                   type="button"

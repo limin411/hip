@@ -202,6 +202,78 @@ describe('automationStore', () => {
     expect(saveAutomations.mock.calls.length).toBeGreaterThanOrEqual(3)
   })
 
+  it('update reseeds nextRunAt when schedule trigger time changes', async () => {
+    const oldNext = Date.now() + 86_400_000
+    useAutomationStore.setState({
+      automations: [
+        auto({
+          id: 'auto_sched',
+          enabled: true,
+          trigger: { kind: 'daily', hour: 9, minute: 0 },
+          nextRunAt: oldNext,
+        }),
+      ],
+      loaded: true,
+    })
+
+    await useAutomationStore.getState().update('auto_sched', {
+      trigger: { kind: 'daily', hour: 15, minute: 30 },
+    })
+
+    const a = useAutomationStore.getState().automations[0]
+    expect(a.trigger).toEqual({ kind: 'daily', hour: 15, minute: 30 })
+    expect(a.nextRunAt).not.toBe(oldNext)
+    expect(a.nextRunAt).toEqual(expect.any(Number))
+    // Seeded slot must match the new wall-clock time (local).
+    const d = new Date(a.nextRunAt!)
+    expect(d.getHours()).toBe(15)
+    expect(d.getMinutes()).toBe(30)
+  })
+
+  it('update does not reseed nextRunAt when trigger is unchanged', async () => {
+    const nextRunAt = Date.now() + 3_600_000
+    useAutomationStore.setState({
+      automations: [
+        auto({
+          id: 'auto_keep',
+          enabled: true,
+          trigger: { kind: 'daily', hour: 9, minute: 0 },
+          nextRunAt,
+        }),
+      ],
+      loaded: true,
+    })
+
+    await useAutomationStore.getState().update('auto_keep', {
+      name: 'Only rename',
+      trigger: { kind: 'daily', hour: 9, minute: 0 },
+    })
+
+    expect(useAutomationStore.getState().automations[0].nextRunAt).toBe(nextRunAt)
+  })
+
+  it('update clears nextRunAt when switching to manual', async () => {
+    useAutomationStore.setState({
+      automations: [
+        auto({
+          id: 'auto_man',
+          enabled: true,
+          trigger: { kind: 'daily', hour: 9, minute: 0 },
+          nextRunAt: Date.now() + 60_000,
+        }),
+      ],
+      loaded: true,
+    })
+
+    await useAutomationStore.getState().update('auto_man', {
+      trigger: { kind: 'manual' },
+    })
+
+    const a = useAutomationStore.getState().automations[0]
+    expect(a.trigger).toEqual({ kind: 'manual' })
+    expect(a.nextRunAt).toBeNull()
+  })
+
   it('select sets selectedId; remove clears selection for that id', async () => {
     useAutomationStore.setState({
       automations: [

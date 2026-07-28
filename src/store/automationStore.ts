@@ -328,6 +328,19 @@ function patchAutomationInList(
   return list.map((a) => (a.id === id ? { ...a, ...patch } : a))
 }
 
+/** True when two triggers fire at the same local schedule (or both manual). */
+function triggersEqual(a: AutomationTrigger, b: AutomationTrigger): boolean {
+  if (a.kind !== b.kind) return false
+  if (a.kind === 'manual') return true
+  if (a.kind === 'daily' && b.kind === 'daily') {
+    return a.hour === b.hour && a.minute === b.minute
+  }
+  if (a.kind === 'weekly' && b.kind === 'weekly') {
+    return a.weekday === b.weekday && a.hour === b.hour && a.minute === b.minute
+  }
+  return false
+}
+
 // ─── store ───────────────────────────────────────────────────
 
 export const useAutomationStore = create<AutomationStore>((set, get) => ({
@@ -557,11 +570,24 @@ export const useAutomationStore = create<AutomationStore>((set, get) => ({
     set((s) => {
       const automations = s.automations.map((a) => {
         if (a.id !== id) return a
+        // Host fires from nextRunAt, not trigger fields — reseed when schedule changes.
+        let nextRunAt = a.nextRunAt
+        if (patch.nextRunAt !== undefined) {
+          nextRunAt = patch.nextRunAt
+        } else if (
+          patch.trigger !== undefined &&
+          !triggersEqual(a.trigger, patch.trigger)
+        ) {
+          nextRunAt =
+            patch.trigger.kind === 'manual'
+              ? null
+              : computeNextRunAt(patch.trigger, now)
+        }
         const merged = normalizeAutomation(
-          { ...a, ...patch, id: a.id, updatedAt: now },
+          { ...a, ...patch, id: a.id, nextRunAt, updatedAt: now },
           now,
         )
-        return merged ?? { ...a, ...patch, updatedAt: now }
+        return merged ?? { ...a, ...patch, nextRunAt, updatedAt: now }
       })
       return { automations, error: null }
     })

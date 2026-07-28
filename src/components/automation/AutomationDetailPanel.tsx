@@ -144,6 +144,13 @@ export function AutomationDetailPanel({
               {t('automation.status.running')}
             </Badge>
           ) : null}
+          {automation.lastRunAt != null ? (
+            <span title={formatAbsolute(automation.lastRunAt, locale)}>
+              {t('automation.list.lastRun', {
+                when: formatRelativeTime(automation.lastRunAt, locale),
+              })}
+            </span>
+          ) : null}
           {automation.nextRunAt != null && automation.trigger.kind !== 'manual' ? (
             <span title={formatAbsolute(automation.nextRunAt, locale)}>
               {t('automation.list.nextRun', {
@@ -153,13 +160,6 @@ export function AutomationDetailPanel({
           ) : (
             <span>{t('automation.list.nextManual')}</span>
           )}
-          {automation.lastRunAt != null ? (
-            <span title={formatAbsolute(automation.lastRunAt, locale)}>
-              {t('automation.list.lastRun', {
-                when: formatRelativeTime(automation.lastRunAt, locale),
-              })}
-            </span>
-          ) : null}
         </div>
 
         {automation.projectPath ? (

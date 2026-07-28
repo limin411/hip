@@ -184,6 +184,11 @@ pub fn trash_work_items_dir(app: &AppHandle) -> Option<PathBuf> {
     trash_dir(app).map(|p| p.join("work-items"))
 }
 
+/// Automations quarantine under trash (`<base>/trash/automations`).
+pub fn trash_automations_dir(app: &AppHandle) -> Option<PathBuf> {
+    trash_dir(app).map(|p| p.join("automations"))
+}
+
 #[cfg(test)]
 mod tests {
     use super::hip_base_from;

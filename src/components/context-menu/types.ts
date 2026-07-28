@@ -198,7 +198,7 @@ export type ContextPayloadMap = {
   /** Recycle bin row — host supplies restore / hard-delete openers. */
   trashEntry: {
     key: string
-    source: 'session' | 'knowledge' | 'workItem'
+    source: 'session' | 'knowledge' | 'workItem' | 'automation'
     id: string
     title: string
     onRestore: () => void

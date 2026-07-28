@@ -1778,11 +1778,13 @@ export const ja = {
     "filterCode": "コーディング",
     "filterKnowledge": "ナレッジ",
     "filterWorkItems": "ワークアイテム",
+    "filterAutomations": "自動化",
     "kind": {
       "space": "スペース",
       "doc": "ドキュメント",
       "folder": "フォルダー",
-      "workItem": "ワークアイテム"
+      "workItem": "ワークアイテム",
+      "automation": "自動化"
     },
     "parentMissing": "先に親ノードまたはスペースを復元してください",
     "restore": "復元",
@@ -2225,8 +2227,8 @@ export const ja = {
       "runAndOpen": "実行して開く",
       "edit": "編集",
       "delete": "削除",
-      "deleteConfirm": "この自動化を削除しますか？元に戻せません。",
-      "deleteConfirmNamed": "「{{name}}」を削除しますか？元に戻せません。",
+      "deleteConfirm": "この自動化をゴミ箱に移しますか？後から復元できます。",
+      "deleteConfirmNamed": "「{{name}}」をゴミ箱に移しますか？後から復元できます。",
       "nextRun": "次回 · {{when}}",
       "nextManual": "手動のみ",
       "lastRun": "前回 · {{when}}",

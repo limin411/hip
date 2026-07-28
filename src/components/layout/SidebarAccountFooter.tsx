@@ -31,8 +31,9 @@ export function SidebarAccountFooter({
   const sessionCount = useTrashBadgeStore((s) => s.sessionCount)
   const knowledgeCount = useTrashBadgeStore((s) => s.knowledgeCount)
   const workItemCount = useTrashBadgeStore((s) => s.workItemCount)
+  const automationCount = useTrashBadgeStore((s) => s.automationCount)
   const badge = formatTrashBadge(
-    trashBadgeTotal(sessionCount, knowledgeCount, workItemCount),
+    trashBadgeTotal(sessionCount, knowledgeCount, workItemCount, automationCount),
   )
   const historyBadge = formatTrashBadge(historyCount)
 

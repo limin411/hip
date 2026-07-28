@@ -10,6 +10,9 @@ import {
   saveAutomations,
   listAutomationRuns,
   saveAutomationRuns,
+  softDeleteAutomation,
+  restoreAutomationTrashEntry,
+  listAutomationsTrash,
 } from '@/ipc/automations'
 import {
   type Automation,
@@ -224,7 +227,13 @@ export interface AutomationStore {
 
   create: (input?: CreateAutomationInput) => Promise<string>
   update: (id: string, patch: Partial<Automation>) => Promise<void>
+  /**
+   * Soft-delete into product recycle bin (`trash/automations`).
+   * Live catalog is updated by the Tauri command (not `saveCatalog()` alone).
+   */
   remove: (id: string) => Promise<void>
+  /** Restore a recycle-bin entry and reload it into the live store. */
+  restoreTrashEntry: (entryId: string) => Promise<string>
   setEnabled: (id: string, enabled: boolean) => Promise<void>
 
   runNow: (automationId: string, opts?: RunNowOpts) => Promise<void>
@@ -393,6 +402,14 @@ export const useAutomationStore = create<AutomationStore>((set, get) => ({
         loading: false,
         error: null,
       })
+      // Opportunistic trash badge hydrate (non-blocking).
+      void listAutomationsTrash()
+        .then((items) => {
+          void import('@/store/trashBadgeStore').then(({ useTrashBadgeStore }) => {
+            useTrashBadgeStore.getState().setAutomationCount(items.length)
+          })
+        })
+        .catch(() => undefined)
       // Do NOT recoverOrphanRuns here — wait for sessionListReady.
     } catch (e) {
       set({
@@ -625,7 +642,10 @@ export const useAutomationStore = create<AutomationStore>((set, get) => ({
   },
 
   remove: async (id) => {
-    // Hard delete v1; runs may retain orphan automationId rows.
+    // Soft-delete into recycle bin; runs may retain orphan automationId rows.
+    const prev = get().automations.find((a) => a.id === id)
+    if (!prev) return
+    // Optimistic remove; Rust soft-delete rewrites catalog + trash atomically.
     set((s) => ({
       automations: s.automations.filter((a) => a.id !== id),
       selectedId: s.selectedId === id ? null : s.selectedId,
@@ -636,7 +656,38 @@ export const useAutomationStore = create<AutomationStore>((set, get) => ({
     for (const [runId, w] of [...watches.entries()]) {
       if (w.automationId === id) watches.delete(runId)
     }
-    await get().saveCatalog()
+    try {
+      await softDeleteAutomation(id)
+      void import('@/store/trashBadgeStore').then(({ useTrashBadgeStore }) => {
+        useTrashBadgeStore.getState().adjustAutomations(1)
+      })
+    } catch (e) {
+      // Roll back optimistic removal and re-hydrate from disk.
+      set({ error: e instanceof Error ? e.message : String(e) })
+      try {
+        await get().load()
+      } catch {
+        // keep error
+      }
+      throw e
+    }
+  },
+
+  restoreTrashEntry: async (entryId) => {
+    const a = await restoreAutomationTrashEntry(entryId)
+    set((s) => {
+      if (s.automations.some((x) => x.id === a.id)) {
+        return {
+          automations: s.automations.map((x) => (x.id === a.id ? a : x)),
+          error: null,
+        }
+      }
+      return { automations: [a, ...s.automations], error: null }
+    })
+    void import('@/store/trashBadgeStore').then(({ useTrashBadgeStore }) => {
+      useTrashBadgeStore.getState().adjustAutomations(-1)
+    })
+    return a.id
   },
 
   setEnabled: async (id, enabled) => {

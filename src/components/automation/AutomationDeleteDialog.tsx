@@ -11,7 +11,7 @@ export type AutomationDeleteDialogProps = {
 }
 
 /**
- * Hard-delete confirm for an automation (no recycle bin in v1).
+ * Soft-delete confirm — moves automation to the product recycle bin.
  * Enter confirms; Escape / cancel dismisses (blocked while busy).
  */
 export function AutomationDeleteDialog({

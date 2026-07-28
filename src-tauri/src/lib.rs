@@ -19,6 +19,7 @@ mod work_items;
 mod work_items_trash;
 mod work_items_ui_prefs;
 mod automations;
+mod automations_trash;
 mod terminal_budget;
 mod ssh_path;
 mod ssh_known_hosts;
@@ -881,6 +882,12 @@ pub fn run() {
             automations::automations_save,
             automations::automation_runs_list,
             automations::automation_runs_save,
+            automations_trash::automations_soft_delete,
+            automations_trash::automations_list_trash,
+            automations_trash::automations_restore_trash_entry,
+            automations_trash::automations_hard_delete_trash_entry,
+            automations_trash::automations_empty_trash,
+            automations_trash::automations_purge_expired_trash,
             work_items_trash::work_items_soft_delete,
             work_items_trash::work_items_list_trash,
             work_items_trash::work_items_restore_trash_entry,

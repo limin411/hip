@@ -1850,11 +1850,13 @@ export const en = {
       filterCode: 'Coding',
       filterKnowledge: 'Knowledge',
       filterWorkItems: 'Work items',
+      filterAutomations: 'Automations',
       kind: {
         space: 'Space',
         doc: 'Document',
         folder: 'Folder',
         workItem: 'Work item',
+        automation: 'Automation',
       },
       parentMissing: 'Restore the parent node or space first',
       restore: 'Restore',
@@ -2319,8 +2321,10 @@ export const en = {
         runAndOpen: 'Run and open',
         edit: 'Edit',
         delete: 'Delete',
-        deleteConfirm: 'Delete this automation? This cannot be undone.',
-        deleteConfirmNamed: 'Delete “{{name}}”? This cannot be undone.',
+        deleteConfirm:
+          'Move this automation to the recycle bin? You can restore it later.',
+        deleteConfirmNamed:
+          'Move “{{name}}” to the recycle bin? You can restore it later.',
         nextRun: 'Next · {{when}}',
         nextManual: 'Manual only',
         lastRun: 'Last · {{when}}',

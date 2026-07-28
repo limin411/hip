@@ -7,12 +7,18 @@ const listAutomations = vi.fn()
 const saveAutomations = vi.fn()
 const listAutomationRuns = vi.fn()
 const saveAutomationRuns = vi.fn()
+const softDeleteAutomation = vi.fn()
+const restoreAutomationTrashEntry = vi.fn()
+const listAutomationsTrash = vi.fn()
 
 vi.mock('@/ipc/automations', () => ({
   listAutomations: (...a: unknown[]) => listAutomations(...a),
   saveAutomations: (...a: unknown[]) => saveAutomations(...a),
   listAutomationRuns: (...a: unknown[]) => listAutomationRuns(...a),
   saveAutomationRuns: (...a: unknown[]) => saveAutomationRuns(...a),
+  softDeleteAutomation: (...a: unknown[]) => softDeleteAutomation(...a),
+  restoreAutomationTrashEntry: (...a: unknown[]) => restoreAutomationTrashEntry(...a),
+  listAutomationsTrash: (...a: unknown[]) => listAutomationsTrash(...a),
 }))
 
 const createSession = vi.fn()
@@ -107,6 +113,16 @@ describe('automationStore', () => {
     saveAutomations.mockReset().mockResolvedValue(undefined)
     listAutomationRuns.mockReset().mockResolvedValue({ version: 1, runs: [] })
     saveAutomationRuns.mockReset().mockResolvedValue(undefined)
+    softDeleteAutomation.mockReset().mockResolvedValue({
+      id: 'tentry_1',
+      automationId: 'auto_u',
+      name: 'Daily standup',
+      deletedAt: 1,
+      enabled: true,
+      triggerKind: 'manual',
+    })
+    restoreAutomationTrashEntry.mockReset()
+    listAutomationsTrash.mockReset().mockResolvedValue([])
     createSession.mockReset().mockImplementation(() => `sess_${createSession.mock.calls.length}`)
     sendMessageToSession.mockReset()
     renameSession.mockReset()
@@ -238,7 +254,7 @@ describe('automationStore', () => {
     expect(saveAutomations.mock.calls.length).toBe(savesBefore)
   })
 
-  it('update / setEnabled / remove touch catalog', async () => {
+  it('update / setEnabled / remove soft-delete via trash IPC', async () => {
     useAutomationStore.setState({
       automations: [auto({ id: 'auto_u', enabled: true })],
       loaded: true,
@@ -251,7 +267,19 @@ describe('automationStore', () => {
 
     await useAutomationStore.getState().remove('auto_u')
     expect(useAutomationStore.getState().automations).toHaveLength(0)
-    expect(saveAutomations.mock.calls.length).toBeGreaterThanOrEqual(3)
+    expect(softDeleteAutomation).toHaveBeenCalledWith('auto_u')
+    // update + setEnabled still persist live catalog; remove uses soft-delete IPC.
+    expect(saveAutomations.mock.calls.length).toBeGreaterThanOrEqual(2)
+  })
+
+  it('restoreTrashEntry reinserts automation from recycle bin', async () => {
+    const restored = auto({ id: 'auto_restored', name: 'Back' })
+    restoreAutomationTrashEntry.mockResolvedValueOnce(restored)
+    useAutomationStore.setState({ automations: [], loaded: true })
+    const id = await useAutomationStore.getState().restoreTrashEntry('tentry_x')
+    expect(id).toBe('auto_restored')
+    expect(useAutomationStore.getState().automations[0]?.name).toBe('Back')
+    expect(restoreAutomationTrashEntry).toHaveBeenCalledWith('tentry_x')
   })
 
   it('update rejects rename onto another automation name', async () => {

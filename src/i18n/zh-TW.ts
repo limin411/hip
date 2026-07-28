@@ -1785,11 +1785,13 @@ export const zhTW = {
     "filterCode": "編碼",
     "filterKnowledge": "知識庫",
     "filterWorkItems": "事項",
+    "filterAutomations": "自動化",
     "kind": {
       "space": "知識空間",
       "doc": "文件",
       "folder": "資料夾",
-      "workItem": "事項"
+      "workItem": "事項",
+      "automation": "自動化"
     },
     "parentMissing": "請先恢復父節點或知識空間",
     "restore": "恢復",
@@ -2232,8 +2234,8 @@ export const zhTW = {
       "runAndOpen": "執行並開啟",
       "edit": "編輯",
       "delete": "刪除",
-      "deleteConfirm": "刪除此自動化？此操作無法復原。",
-      "deleteConfirmNamed": "刪除「{{name}}」？此操作無法復原。",
+      "deleteConfirm": "將此自動化移入回收站？之後可以恢復。",
+      "deleteConfirmNamed": "將「{{name}}」移入回收站？之後可以恢復。",
       "nextRun": "下次 · {{when}}",
       "nextManual": "僅手動",
       "lastRun": "上次 · {{when}}",

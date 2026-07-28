@@ -12,6 +12,12 @@ import {
   saveAutomations,
   listAutomationRuns,
   saveAutomationRuns,
+  softDeleteAutomation,
+  listAutomationsTrash,
+  restoreAutomationTrashEntry,
+  hardDeleteAutomationTrashEntry,
+  emptyAutomationsTrash,
+  purgeExpiredAutomationsTrash,
 } from './automations'
 
 describe('automations IPC', () => {
@@ -135,5 +141,61 @@ describe('automations IPC', () => {
     const log = emptyAutomationRunsLog()
     await saveAutomationRuns(log)
     expect(invoke).toHaveBeenCalledWith('automation_runs_save', { log })
+  })
+
+  it('softDeleteAutomation invokes automations_soft_delete', async () => {
+    const id = mintAutomationId()
+    invoke.mockResolvedValueOnce({
+      id: 'tentry_1',
+      automationId: id,
+      name: 'X',
+      deletedAt: 1,
+      enabled: true,
+      triggerKind: 'manual',
+    })
+    const item = await softDeleteAutomation(id)
+    expect(invoke).toHaveBeenCalledWith('automations_soft_delete', { id })
+    expect(item.automationId).toBe(id)
+  })
+
+  it('listAutomationsTrash invokes automations_list_trash', async () => {
+    invoke.mockResolvedValueOnce([])
+    await listAutomationsTrash()
+    expect(invoke).toHaveBeenCalledWith('automations_list_trash')
+  })
+
+  it('restoreAutomationTrashEntry normalizes restored automation', async () => {
+    const id = mintAutomationId()
+    invoke.mockResolvedValueOnce({
+      id,
+      name: '  Restored  ',
+      prompt: 'p',
+      enabled: true,
+      trigger: { kind: 'manual' },
+      createdAt: 1,
+      updatedAt: 2,
+    })
+    const a = await restoreAutomationTrashEntry('tentry_1')
+    expect(invoke).toHaveBeenCalledWith('automations_restore_trash_entry', {
+      entryId: 'tentry_1',
+    })
+    expect(a.id).toBe(id)
+    expect(a.name).toBe('Restored')
+  })
+
+  it('hardDelete / empty / purge trash invoke matching commands', async () => {
+    invoke.mockResolvedValue(undefined)
+    await hardDeleteAutomationTrashEntry('tentry_1')
+    expect(invoke).toHaveBeenCalledWith('automations_hard_delete_trash_entry', {
+      entryId: 'tentry_1',
+    })
+    invoke.mockResolvedValueOnce(3)
+    expect(await emptyAutomationsTrash()).toBe(3)
+    expect(invoke).toHaveBeenCalledWith('automations_empty_trash')
+    invoke.mockResolvedValueOnce(['tentry_old'])
+    expect(await purgeExpiredAutomationsTrash(7)).toEqual(['tentry_old'])
+    expect(invoke).toHaveBeenCalledWith('automations_purge_expired_trash', {
+      retentionDays: 7,
+    })
   })
 })

@@ -1778,11 +1778,13 @@ export const ko = {
     "filterCode": "코딩",
     "filterKnowledge": "지식",
     "filterWorkItems": "작업 항목",
+    "filterAutomations": "자동화",
     "kind": {
       "space": "공간",
       "doc": "문서",
       "folder": "폴더",
-      "workItem": "작업 항목"
+      "workItem": "작업 항목",
+      "automation": "자동화"
     },
     "parentMissing": "먼저 상위 노드나 공간을 복원하세요",
     "restore": "복원",
@@ -2225,8 +2227,8 @@ export const ko = {
       "runAndOpen": "실행하고 열기",
       "edit": "편집",
       "delete": "삭제",
-      "deleteConfirm": "이 자동화를 삭제할까요? 되돌릴 수 없습니다.",
-      "deleteConfirmNamed": "\"{{name}}\"을(를) 삭제할까요? 되돌릴 수 없습니다.",
+      "deleteConfirm": "이 자동화를 휴지통으로 옮길까요? 나중에 복원할 수 있습니다.",
+      "deleteConfirmNamed": "\"{{name}}\"을(를) 휴지통으로 옮길까요? 나중에 복원할 수 있습니다.",
       "nextRun": "다음 · {{when}}",
       "nextManual": "수동만",
       "lastRun": "최근 · {{when}}",

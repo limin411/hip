@@ -261,6 +261,17 @@ function toRunsLog(runs: AutomationRun[]) {
 }
 
 /**
+ * Ordering key for "latest" run when reconciling catalog last*.
+ *
+ * Prefer finishedAt when present so a mid-run `skipped` row (claim reject while
+ * the real session is still open) cannot outrank a later-finished succeeded run
+ * that started earlier. Open runs (finishedAt null) fall back to startedAt.
+ */
+export function runRecencyMs(r: AutomationRun): number {
+  return r.finishedAt ?? r.startedAt
+}
+
+/**
  * Re-derive denormalized last* from the newest run per automation (runs win).
  */
 export function reconcileLastFromRuns(
@@ -272,7 +283,7 @@ export function reconcileLastFromRuns(
   const latestByAuto = new Map<string, AutomationRun>()
   for (const r of runs) {
     const prev = latestByAuto.get(r.automationId)
-    if (!prev || r.startedAt > prev.startedAt) {
+    if (!prev || runRecencyMs(r) > runRecencyMs(prev)) {
       latestByAuto.set(r.automationId, r)
     }
   }
@@ -315,7 +326,7 @@ function findLatestRun(
   let best: AutomationRun | undefined
   for (const r of runs) {
     if (r.automationId !== automationId) continue
-    if (!best || r.startedAt > best.startedAt) best = r
+    if (!best || runRecencyMs(r) > runRecencyMs(best)) best = r
   }
   return best
 }
@@ -775,6 +786,11 @@ export const useAutomationStore = create<AutomationStore>((set, get) => ({
   /**
    * Skip without claim (skip_previous_running / skip_global_cap / miss).
    * Does NOT release.
+   *
+   * Always appends a runs-log row. Catalog last* is updated unless this auto
+   * already holds the in-flight claim (claim-reject while a real run is open) —
+   * otherwise lastStatus flips to "skipped" over a still-running / soon-to-succeed
+   * session and stays wrong after reconcile-by-startedAt.
    */
   recordSkip: async (automationId, input) => {
     const runId = mintAutomationRunId()
@@ -794,6 +810,11 @@ export const useAutomationStore = create<AutomationStore>((set, get) => ({
       runs: truncateRuns([normalized, ...s.runs]),
     }))
     await get().saveRuns()
+
+    // Real run still open: keep last* (running/waiting_user) for list UX.
+    if (inFlight.has(automationId)) {
+      return
+    }
 
     const auto = get().automations.find((a) => a.id === automationId)
     let nextRunAt = auto?.nextRunAt ?? null

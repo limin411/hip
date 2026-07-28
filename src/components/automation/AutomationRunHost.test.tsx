@@ -34,6 +34,7 @@ vi.mock('@/store/automationStore', () => {
   return {
     useAutomationStore,
     listWatches: () => [],
+    isInFlight: () => false,
   }
 })
 

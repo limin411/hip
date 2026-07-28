@@ -23,6 +23,8 @@ let sessions: Array<{
   error?: { message?: string; code?: string } | null
 }> = []
 
+const inFlightIds = new Set<string>()
+
 vi.mock('@/store/automationStore', () => {
   const getState = () => ({
     automations,
@@ -36,6 +38,7 @@ vi.mock('@/store/automationStore', () => {
   return {
     useAutomationStore: { getState },
     listWatches: () => watches,
+    isInFlight: (id: string) => inFlightIds.has(id),
   }
 })
 
@@ -72,6 +75,7 @@ describe('runAutomationOnTick', () => {
     runs = []
     watches = []
     sessions = []
+    inFlightIds.clear()
     runNow.mockClear()
     recordSkip.mockClear()
     patchNextRunAt.mockClear()
@@ -165,6 +169,28 @@ describe('runAutomationOnTick', () => {
     const next = 2_000_000
     automations = [daily({ id: 'auto_future', nextRunAt: next })]
     runAutomationOnTick(1_000_000)
+    expect(runNow).not.toHaveBeenCalled()
+    expect(recordSkip).not.toHaveBeenCalled()
+  })
+
+  it('does not re-fire or skip_miss while automation is already in-flight', () => {
+    // nextRunAt still the due slot (rolled only on complete) — must not spam
+    // skip_previous_running or clobber lastStatus while the session runs.
+    const next = 1_000_000
+    const now = next + DUE_SLACK_MS + 5_000
+    automations = [daily({ id: 'auto_busy', nextRunAt: next })]
+    inFlightIds.add('auto_busy')
+    runAutomationOnTick(now)
+    expect(runNow).not.toHaveBeenCalled()
+    expect(recordSkip).not.toHaveBeenCalled()
+  })
+
+  it('does not skip_miss while in-flight even when lag ≥ 6h', () => {
+    const next = 1_000_000
+    const now = next + MISS_WINDOW_MS + 1
+    automations = [daily({ id: 'auto_long', nextRunAt: next })]
+    inFlightIds.add('auto_long')
+    runAutomationOnTick(now)
     expect(runNow).not.toHaveBeenCalled()
     expect(recordSkip).not.toHaveBeenCalled()
   })

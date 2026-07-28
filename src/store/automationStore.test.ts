@@ -170,6 +170,42 @@ describe('automationStore', () => {
     expect(out[0].lastSessionId).toBe('s1')
   })
 
+  it('reconcileLastFromRuns prefers later finishedAt over mid-run skip spam', () => {
+    // Real fire at T=100, completes at T=500; claim-reject skips at 130/160 must not win.
+    const a = auto({ id: 'auto_sk', lastStatus: 'skipped', lastRunAt: 160 })
+    const runs = [
+      run({
+        id: 'arun_ok',
+        automationId: 'auto_sk',
+        status: 'succeeded',
+        startedAt: 100,
+        finishedAt: 500,
+        sessionId: 's-ok',
+      }),
+      run({
+        id: 'arun_skip1',
+        automationId: 'auto_sk',
+        status: 'skipped',
+        startedAt: 130,
+        finishedAt: 130,
+        error: 'skip_previous_running',
+      }),
+      run({
+        id: 'arun_skip2',
+        automationId: 'auto_sk',
+        status: 'skipped',
+        startedAt: 160,
+        finishedAt: 160,
+        error: 'skip_previous_running',
+      }),
+    ]
+    const out = reconcileLastFromRuns([a], runs)
+    expect(out[0].lastStatus).toBe('succeeded')
+    expect(out[0].lastRunAt).toBe(100)
+    expect(out[0].lastSessionId).toBe('s-ok')
+    expect(out[0].lastError).toBeNull()
+  })
+
   // ─── CRUD ──────────────────────────────────────────────────
 
   it('create persists catalog and returns id', async () => {
@@ -408,6 +444,35 @@ describe('automationStore', () => {
     expect(skips.some((r) => r.error === 'skip_previous_running')).toBe(true)
     // Winner still holds claim until completeRun
     expect(isInFlight('auto_conc')).toBe(true)
+    // Claim-reject must not clobber list lastStatus over the open run
+    expect(useAutomationStore.getState().automations[0].lastStatus).toBe('running')
+  })
+
+  it('recordSkip does not clobber last* while claim is held', async () => {
+    useAutomationStore.setState({
+      automations: [
+        auto({
+          id: 'auto_hold',
+          lastStatus: 'running',
+          lastRunAt: 50,
+          lastSessionId: 's-live',
+        }),
+      ],
+      loaded: true,
+    })
+    expect(tryClaimInFlight('auto_hold', { trigger: 'schedule' }).ok).toBe(true)
+
+    await useAutomationStore.getState().recordSkip('auto_hold', {
+      trigger: 'schedule',
+      error: 'skip_previous_running',
+      now: 999,
+    })
+
+    const st = useAutomationStore.getState()
+    expect(st.runs.some((r) => r.status === 'skipped')).toBe(true)
+    expect(st.automations[0].lastStatus).toBe('running')
+    expect(st.automations[0].lastRunAt).toBe(50)
+    expect(st.automations[0].lastSessionId).toBe('s-live')
   })
 
   // ─── failBeforeSession releases claim ──────────────────────

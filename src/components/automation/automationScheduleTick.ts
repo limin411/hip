@@ -10,7 +10,11 @@ import {
   evaluateSchedule,
 } from '@/domain/automations'
 import { useDomainStore } from '@/domain/sessionStore'
-import { listWatches, useAutomationStore } from '@/store/automationStore'
+import {
+  isInFlight,
+  listWatches,
+  useAutomationStore,
+} from '@/store/automationStore'
 
 export type AutomationTickOpts = {
   /**
@@ -23,6 +27,12 @@ export type AutomationTickOpts = {
 /**
  * Evaluate enabled scheduled automations and fire / skip as due.
  * `void runNow` is OK: tryClaimInFlight is sync; enqueueRunNow serializes bodies.
+ *
+ * While an automation holds the in-flight claim, skip re-evaluation entirely.
+ * nextRunAt is only rolled on completeRun/fail/skip_miss — so without this
+ * guard every ~30s tick would re-see the same due slot, fail tryClaim with
+ * skip_previous_running, and clobber lastStatus to "skipped" even though the
+ * real session is still running (or already succeeded with an earlier startedAt).
  */
 export function runAutomationOnTick(
   nowMs: number,
@@ -34,6 +44,9 @@ export function runAutomationOnTick(
   )
 
   for (const a of enabled) {
+    // Single-flight: do not fire/skip_miss while a prior run is still open.
+    if (isInFlight(a.id)) continue
+
     // Seed missing nextRunAt then wait for a later tick (design evaluateSchedule).
     if (a.nextRunAt == null) {
       const next = computeNextRunAt(a.trigger, nowMs)

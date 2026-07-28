@@ -2371,6 +2371,9 @@ export const zhCN = {
         automations: '自动化',
       },
       automationsHint: '在主面板中启用任务后，会显示在此处。',
+      automationsDisabledHint: '有 {{count}} 个已禁用任务，可在主面板管理。',
+      automationsDisabledLink: '{{count}} 个已禁用 — 在主面板查看',
+      viewAllAutomations: '在主面板查看全部',
       quickConnect: '快捷连接',
       badge: {
         chat: '对话',

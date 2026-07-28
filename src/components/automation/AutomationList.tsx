@@ -34,6 +34,8 @@ export type AutomationListProps = {
   onSelect?: (id: string) => void
   selectedId?: string | null
   runningIds?: Set<string>
+  /** Tray/quit config makes scheduled fires unreliable (per-row warning). */
+  scheduleUnreliable?: boolean
 }
 
 function sortAutomations(
@@ -86,6 +88,7 @@ export function AutomationList({
   onSelect,
   selectedId,
   runningIds,
+  scheduleUnreliable = false,
 }: AutomationListProps) {
   const { t } = useTranslation()
   const [filter, setFilter] = useState<AutomationFilter>('all')
@@ -287,6 +290,7 @@ export function AutomationList({
                 onSelect={onSelect ? () => onSelect(a.id) : undefined}
                 selected={selectedId === a.id}
                 running={runningIds?.has(a.id)}
+                scheduleUnreliable={scheduleUnreliable}
               />
             </li>
           ))}

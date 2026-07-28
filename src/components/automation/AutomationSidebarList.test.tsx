@@ -79,6 +79,25 @@ describe('AutomationSidebarList', () => {
     render(<AutomationSidebarList />)
     expect(screen.getByTestId('sidebar-automations-empty')).toBeInTheDocument()
     expect(screen.queryByTestId('sidebar-automations')).not.toBeInTheDocument()
+    expect(screen.getByTestId('sidebar-automations-view-all')).toBeInTheDocument()
+  })
+
+  it('marks failed enabled jobs and links to main panel for disabled count', () => {
+    storeState.automations = [
+      auto({
+        id: 'auto_fail',
+        name: 'Broken',
+        enabled: true,
+        lastStatus: 'failed',
+      }),
+      auto({ id: 'auto_off', name: 'Off', enabled: false }),
+    ]
+    render(<AutomationSidebarList />)
+    expect(screen.getByTestId('sidebar-automation-auto_fail')).toHaveAttribute(
+      'data-failed',
+      'true',
+    )
+    expect(screen.getByTestId('sidebar-automations-view-all')).toBeInTheDocument()
   })
 
   it('lists only enabled automations', () => {

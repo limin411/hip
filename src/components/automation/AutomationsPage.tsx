@@ -4,7 +4,10 @@ import { Zap } from 'lucide-react'
 import { useAutomationStore } from '@/store/automationStore'
 import { sessionService } from '@/domain'
 import { EmptyState } from '@/components/ui/EmptyState'
-import { AutomationEmptyState } from './AutomationEmptyState'
+import {
+  AutomationEmptyState,
+  type SkillSeedDraft,
+} from './AutomationEmptyState'
 import { AutomationList } from './AutomationList'
 import { AutomationEditorModal, type EditorMode } from './AutomationEditorModal'
 import { AutomationScheduleBanner } from './AutomationScheduleBanner'
@@ -12,6 +15,11 @@ import { AutomationDetailPanel } from './AutomationDetailPanel'
 import { AutomationDeleteDialog } from './AutomationDeleteDialog'
 import { useInFlightIds } from './useAutomationInFlight'
 import type { AutomationTemplate } from './templates'
+import { useHipConfigStore } from '@/store/hipConfigStore'
+import {
+  resolveCloseAction,
+  resolveTrayEnabled,
+} from '@/ipc/windowPolicy'
 
 /**
  * Automations product surface (flag-gated from AppLayout).
@@ -38,6 +46,12 @@ export function AutomationsPage() {
     name: string
   } | null>(null)
   const runningIds = useInFlightIds()
+  const windowCfg = useHipConfigStore((s) => s.config.window)
+  const scheduleUnreliable = useMemo(() => {
+    const closeAction = resolveCloseAction(windowCfg?.closeAction)
+    const trayEnabled = resolveTrayEnabled(windowCfg?.trayEnabled)
+    return closeAction === 'quit' || !trayEnabled
+  }, [windowCfg?.closeAction, windowCfg?.trayEnabled])
 
   useEffect(() => {
     if (!useAutomationStore.getState().loaded) {
@@ -68,6 +82,8 @@ export function AutomationsPage() {
   const openCreate = () => setEditor({ mode: 'create' })
   const openTemplate = (template: AutomationTemplate) =>
     setEditor({ mode: 'create', template })
+  const openSkill = (skillSeed: SkillSeedDraft) =>
+    setEditor({ mode: 'create', skillSeed })
   const openEdit = (id: string) => setEditor({ mode: 'edit', automationId: id })
   const closeEditor = () => setEditor({ mode: 'closed' })
 
@@ -145,6 +161,7 @@ export function AutomationsPage() {
             <AutomationList
               automations={automations}
               runningIds={runningIds}
+              scheduleUnreliable={scheduleUnreliable}
               selectedId={selected?.id ?? null}
               onSelect={(id) => select(selectedId === id ? null : id)}
               onCreate={openCreate}
@@ -176,6 +193,7 @@ export function AutomationsPage() {
             <AutomationDetailPanel
               automation={selected}
               running={runningIds.has(selected.id)}
+              scheduleUnreliable={scheduleUnreliable}
               onClose={() => select(null)}
               onRun={(opts) =>
                 void runNow(selected.id, {
@@ -192,6 +210,7 @@ export function AutomationsPage() {
         <AutomationEmptyState
           onStartBlank={openCreate}
           onSelectTemplate={openTemplate}
+          onSelectSkill={openSkill}
         />
       )}
 

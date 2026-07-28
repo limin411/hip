@@ -45,13 +45,30 @@ function sortEnabled(
   b: Automation,
   runningIds: Set<string>,
 ): number {
+  // Failed / skipped first among non-running, then running, then next run.
   const aRun = runningIds.has(a.id) ? 0 : 1
   const bRun = runningIds.has(b.id) ? 0 : 1
   if (aRun !== bRun) return aRun - bRun
+  const aFail =
+    a.lastStatus === 'failed' || a.lastStatus === 'skipped' ? 0 : 1
+  const bFail =
+    b.lastStatus === 'failed' || b.lastStatus === 'skipped' ? 0 : 1
+  if (aFail !== bFail) return aFail - bFail
   const aNext = a.nextRunAt ?? Number.POSITIVE_INFINITY
   const bNext = b.nextRunAt ?? Number.POSITIVE_INFINITY
   if (aNext !== bNext) return aNext - bNext
   return a.name.localeCompare(b.name, undefined, { sensitivity: 'base' })
+}
+
+function statusTone(
+  status: Automation['lastStatus'],
+  running: boolean,
+): string {
+  if (running) return 'text-accent'
+  if (status === 'failed' || status === 'cancelled') return 'text-danger'
+  if (status === 'skipped' || status === 'waiting_user') return 'text-warning'
+  if (status === 'succeeded') return 'text-ink-tertiary'
+  return 'text-ink-tertiary'
 }
 
 export function AutomationSidebarList() {
@@ -77,6 +94,15 @@ export function AutomationSidebarList() {
       .sort((a, b) => sortEnabled(a, b, runningIds))
   }, [automations, runningIds])
 
+  const disabledCount = useMemo(
+    () => automations.filter((a) => !a.enabled).length,
+    [automations],
+  )
+
+  const openMainPanel = () => {
+    void enterAutomationsSection()
+  }
+
   if (!loaded && automations.length === 0) {
     return (
       <p
@@ -92,83 +118,129 @@ export function AutomationSidebarList() {
   if (enabled.length === 0) {
     return (
       <div
-        className="flex flex-col items-center gap-1 px-3 py-6 text-center"
+        className="flex flex-col items-center gap-1.5 px-3 py-6 text-center"
         role="status"
         data-testid="sidebar-automations-empty"
       >
         <p className="text-meta text-ink-tertiary">{t('sidebar.emptyAutomations')}</p>
         <p className="text-caption leading-relaxed text-ink-tertiary/80">
-          {t('sidebar.automationsHint')}
+          {disabledCount > 0
+            ? t('sidebar.automationsDisabledHint', { count: disabledCount })
+            : t('sidebar.automationsHint')}
         </p>
+        {disabledCount > 0 ? (
+          <button
+            type="button"
+            data-testid="sidebar-automations-view-all"
+            data-no-drag
+            onClick={openMainPanel}
+            className="mt-1 text-caption text-accent hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink/20"
+          >
+            {t('sidebar.viewAllAutomations')}
+          </button>
+        ) : null}
       </div>
     )
   }
 
   return (
-    <ul
-      className="m-0 list-none p-0"
-      aria-labelledby="sidebar-list-heading"
-      data-testid="sidebar-automations"
-    >
-      {enabled.map((a) => {
-        const active = selectedId === a.id && activeView === 'automation'
-        const running = runningIds.has(a.id)
-        const name = a.name.trim() || t('automation.untitled')
-        const status = a.lastStatus
-        return (
-          <li key={a.id}>
-            <button
-              type="button"
-              data-testid={`sidebar-automation-${a.id}`}
-              data-no-drag
-              aria-current={active ? 'true' : undefined}
-              onClick={() => {
-                select(a.id)
-                if (activeView !== 'automation') {
-                  void enterAutomationsSection()
-                }
-              }}
-              className={cn(
-                'mb-0.5 flex w-full items-start gap-2 rounded-lg px-2.5 py-[var(--row-pad-y-session)] text-left transition-colors',
-                'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink/20',
-                active ? SIDEBAR_ACTIVE_RAIL : 'hover:bg-state-hover',
-              )}
-            >
-              <span
+    <div className="flex min-h-0 flex-col" data-testid="sidebar-automations-wrap">
+      <ul
+        className="m-0 list-none p-0"
+        aria-labelledby="sidebar-list-heading"
+        data-testid="sidebar-automations"
+      >
+        {enabled.map((a) => {
+          const active = selectedId === a.id && activeView === 'automation'
+          const running = runningIds.has(a.id)
+          const name = a.name.trim() || t('automation.untitled')
+          const status = a.lastStatus
+          const failed =
+            status === 'failed' || status === 'skipped' || status === 'cancelled'
+          return (
+            <li key={a.id}>
+              <button
+                type="button"
+                data-testid={`sidebar-automation-${a.id}`}
+                data-failed={failed ? 'true' : undefined}
+                data-no-drag
+                aria-current={active ? 'true' : undefined}
+                onClick={() => {
+                  select(a.id)
+                  if (activeView !== 'automation') {
+                    void enterAutomationsSection()
+                  }
+                }}
                 className={cn(
-                  'mt-1.5 size-1.5 shrink-0 rounded-full',
-                  active || running ? 'bg-accent' : 'bg-transparent',
+                  'mb-0.5 flex w-full items-start gap-2 rounded-lg px-2.5 py-[var(--row-pad-y-session)] text-left transition-colors',
+                  'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink/20',
+                  active ? SIDEBAR_ACTIVE_RAIL : 'hover:bg-state-hover',
                 )}
-                aria-hidden
-              />
-              <Zap
-                size={14}
-                className={cn(
-                  'mt-0.5 shrink-0',
-                  running ? 'text-accent' : 'text-ink-tertiary',
-                )}
-                aria-hidden
-              />
-              <span className="min-w-0 flex-1">
-                <span className="block truncate text-body font-medium text-ink">
-                  {name}
-                </span>
-                <span className="block truncate text-caption text-ink-tertiary">
-                  {triggerSubtitle(
-                    a,
-                    t as (key: string, opts?: Record<string, unknown>) => string,
+              >
+                <span
+                  className={cn(
+                    'mt-1.5 size-1.5 shrink-0 rounded-full',
+                    running
+                      ? 'bg-accent'
+                      : failed
+                        ? 'bg-danger'
+                        : active
+                          ? 'bg-accent'
+                          : 'bg-transparent',
                   )}
-                  {running
-                    ? ` · ${t('sidebar.status.running')}`
-                    : status
-                      ? ` · ${t(`automation.status.${status}` as 'automation.status.succeeded')}`
-                      : ''}
+                  aria-hidden
+                />
+                <Zap
+                  size={14}
+                  className={cn(
+                    'mt-0.5 shrink-0',
+                    running
+                      ? 'text-accent'
+                      : failed
+                        ? 'text-danger'
+                        : 'text-ink-tertiary',
+                  )}
+                  aria-hidden
+                />
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate text-body font-medium text-ink">
+                    {name}
+                  </span>
+                  <span
+                    className={cn(
+                      'block truncate text-caption',
+                      statusTone(status, running),
+                    )}
+                  >
+                    {triggerSubtitle(
+                      a,
+                      t as (key: string, opts?: Record<string, unknown>) => string,
+                    )}
+                    {running
+                      ? ` · ${t('sidebar.status.running')}`
+                      : status
+                        ? ` · ${t(`automation.status.${status}` as 'automation.status.succeeded')}`
+                        : ''}
+                  </span>
                 </span>
-              </span>
-            </button>
-          </li>
-        )
-      })}
-    </ul>
+              </button>
+            </li>
+          )
+        })}
+      </ul>
+      {disabledCount > 0 ? (
+        <div className="mt-1 border-t border-border px-2.5 py-2">
+          <button
+            type="button"
+            data-testid="sidebar-automations-view-all"
+            data-no-drag
+            onClick={openMainPanel}
+            className="w-full text-left text-caption text-ink-tertiary transition-colors hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink/20"
+          >
+            {t('sidebar.automationsDisabledLink', { count: disabledCount })}
+          </button>
+        </div>
+      ) : null}
+    </div>
   )
 }

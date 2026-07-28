@@ -2337,6 +2337,9 @@ export const zhTW = {
       "automations": "自動化"
     },
     "automationsHint": "在主面板中啟用任務後，會顯示在此處。",
+    "automationsDisabledHint": "有 {{count}} 個已停用任務，可在主面板管理。",
+    "automationsDisabledLink": "{{count}} 個已停用 — 在主面板查看",
+    "viewAllAutomations": "在主面板查看全部",
     "quickConnect": "快捷連線",
     "badge": {
       "chat": "對話",

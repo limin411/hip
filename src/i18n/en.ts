@@ -2427,6 +2427,10 @@ export const en = {
         automations: 'Automations',
       },
       automationsHint: 'Enable a job in the main panel to pin it here.',
+      automationsDisabledHint:
+        '{{count}} disabled job(s). Open the main panel to manage them.',
+      automationsDisabledLink: '{{count}} disabled — view in main panel',
+      viewAllAutomations: 'View all in main panel',
       quickConnect: 'Quick connect',
       badge: {
         chat: 'Chat',

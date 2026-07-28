@@ -2330,6 +2330,9 @@ export const ko = {
       "automations": "자동화"
     },
     "automationsHint": "메인 패널에서 작업을 활성화하면 여기에 표시됩니다.",
+    "automationsDisabledHint": "사용 안 함 작업 {{count}}개. 메인 패널에서 관리하세요.",
+    "automationsDisabledLink": "사용 안 함 {{count}} — 메인 패널에서 보기",
+    "viewAllAutomations": "메인 패널에서 전체 보기",
     "quickConnect": "빠른 연결",
     "badge": {
       "chat": "채팅",

@@ -189,6 +189,17 @@ describe('AutomationsPage', () => {
     expect(screen.getByTestId('automations-page-header')).toBeInTheDocument()
     expect(screen.getByTestId('automation-empty-state')).toBeInTheDocument()
     expect(screen.getByTestId('automation-template-grid')).toBeInTheDocument()
+    expect(screen.getByTestId('automation-skills-section')).toBeInTheDocument()
+    // Hero CTA is the blank entry; dashed blank template card is hidden.
+    expect(screen.queryByTestId('automation-template-blank')).not.toBeInTheDocument()
+  })
+
+  it('shows schedule reliability warning on enabled scheduled rows', () => {
+    storeState.automations = [sampleAutomation]
+    render(<AutomationsPage />)
+    expect(
+      screen.getByTestId('automation-schedule-warn-auto_test1'),
+    ).toBeInTheDocument()
   })
 
   it('renders list when automations exist', () => {

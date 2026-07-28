@@ -2330,6 +2330,9 @@ export const ja = {
       "automations": "自動化"
     },
     "automationsHint": "メインパネルでジョブを有効にすると、ここに表示されます。",
+    "automationsDisabledHint": "無効なジョブが {{count}} 件あります。メインパネルで管理できます。",
+    "automationsDisabledLink": "無効 {{count}} 件 — メインパネルで表示",
+    "viewAllAutomations": "メインパネルですべて表示",
     "quickConnect": "クイック接続",
     "badge": {
       "chat": "チャット",

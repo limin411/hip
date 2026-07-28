@@ -11,6 +11,8 @@ export type AutomationTemplateGridProps = {
   onSelect: (template: AutomationTemplate) => void
   /** Hide skill-bootstrap (used only from skills section). */
   excludeIds?: string[]
+  /** Show dashed blank card (default true). Empty state uses hero CTA instead. */
+  showBlank?: boolean
   className?: string
 }
 
@@ -21,6 +23,7 @@ function cadenceBadgeKey(cadence: AutomationTemplate['cadence']): string {
 export function AutomationTemplateGrid({
   onSelect,
   excludeIds = ['skill-bootstrap'],
+  showBlank = true,
   className,
 }: AutomationTemplateGridProps) {
   const { t } = useTranslation()
@@ -72,34 +75,35 @@ export function AutomationTemplateGrid({
           </p>
         </button>
       ))}
-      {/* Blank start card */}
-      <button
-        type="button"
-        data-testid="automation-template-blank"
-        onClick={() =>
-          onSelect({
-            id: 'blank',
-            nameKey: 'automation.templates.blank.name',
-            descriptionKey: 'automation.templates.blank.description',
-            cadence: 'manual',
-            defaultTrigger: { kind: 'manual' },
-            promptKey: 'automation.templates.blank.prompt',
-            requiresProject: false,
-          })
-        }
-        className={cn(
-          'flex flex-col items-start gap-2 rounded-lg border border-dashed border-border bg-surface/50 p-3 text-left',
-          'transition-colors duration-chrome hover:bg-state-hover',
-        )}
-      >
-        <span className="inline-flex items-center gap-1.5 text-body font-medium text-ink">
-          <Zap className="h-3.5 w-3.5 text-ink-tertiary" strokeWidth={1.75} aria-hidden />
-          {t('automation.templates.blank.name')}
-        </span>
-        <p className="text-meta text-ink-secondary">
-          {t('automation.templates.blank.description')}
-        </p>
-      </button>
+      {showBlank ? (
+        <button
+          type="button"
+          data-testid="automation-template-blank"
+          onClick={() =>
+            onSelect({
+              id: 'blank',
+              nameKey: 'automation.templates.blank.name',
+              descriptionKey: 'automation.templates.blank.description',
+              cadence: 'manual',
+              defaultTrigger: { kind: 'manual' },
+              promptKey: 'automation.templates.blank.prompt',
+              requiresProject: false,
+            })
+          }
+          className={cn(
+            'flex flex-col items-start gap-2 rounded-lg border border-dashed border-border bg-surface/50 p-3 text-left',
+            'transition-colors duration-chrome hover:bg-state-hover',
+          )}
+        >
+          <span className="inline-flex items-center gap-1.5 text-body font-medium text-ink">
+            <Zap className="h-3.5 w-3.5 text-ink-tertiary" strokeWidth={1.75} aria-hidden />
+            {t('automation.templates.blank.name')}
+          </span>
+          <p className="text-meta text-ink-secondary">
+            {t('automation.templates.blank.description')}
+          </p>
+        </button>
+      ) : null}
     </div>
   )
 }

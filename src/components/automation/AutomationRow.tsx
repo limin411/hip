@@ -6,6 +6,7 @@ import {
   Trash2,
   MessageSquare,
   ExternalLink,
+  TriangleAlert,
 } from 'lucide-react'
 import type { Automation, AutomationRunStatus } from '@/domain/automations'
 import { Badge } from '@/components/ui/Badge'
@@ -33,6 +34,8 @@ export type AutomationRowProps = {
   onSelect?: () => void
   selected?: boolean
   running?: boolean
+  /** Enabled scheduled job but tray/quit makes fire unreliable. */
+  scheduleUnreliable?: boolean
 }
 
 function statusVariant(
@@ -140,6 +143,7 @@ export function AutomationRow({
   onSelect,
   selected,
   running,
+  scheduleUnreliable = false,
 }: AutomationRowProps) {
   const { t, i18n } = useTranslation()
   const locale = i18n.language || 'en'
@@ -152,6 +156,11 @@ export function AutomationRow({
           { defaultValue: automation.lastError },
         )
       : null
+
+  const showScheduleWarn =
+    scheduleUnreliable &&
+    automation.enabled &&
+    automation.trigger.kind !== 'manual'
 
   const statusLabel = running
     ? t('automation.status.running')
@@ -209,6 +218,16 @@ export function AutomationRow({
           >
             {name}
           </span>
+          {showScheduleWarn ? (
+            <span
+              className="shrink-0 text-warning"
+              title={t('automation.banner.needTray')}
+              data-testid={`automation-schedule-warn-${automation.id}`}
+              aria-label={t('automation.banner.needTray')}
+            >
+              <TriangleAlert className="h-3.5 w-3.5" strokeWidth={1.75} aria-hidden />
+            </span>
+          ) : null}
           {statusLabel ? (
             <Badge
               size="sm"

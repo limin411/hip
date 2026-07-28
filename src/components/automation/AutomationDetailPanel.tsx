@@ -1,5 +1,5 @@
 import { useTranslation } from 'react-i18next'
-import { MessageSquare, Pencil, Play, X } from 'lucide-react'
+import { MessageSquare, Pencil, Play, TriangleAlert, X } from 'lucide-react'
 import type { Automation } from '@/domain/automations'
 import { sessionService } from '@/domain'
 import { Badge } from '@/components/ui/Badge'
@@ -11,6 +11,7 @@ import { AutomationRunHistory } from './AutomationRunHistory'
 export type AutomationDetailPanelProps = {
   automation: Automation
   running?: boolean
+  scheduleUnreliable?: boolean
   onClose: () => void
   onRun: (opts?: { focus?: boolean }) => void
   onEdit: () => void
@@ -50,6 +51,7 @@ function triggerLabel(
 export function AutomationDetailPanel({
   automation,
   running,
+  scheduleUnreliable = false,
   onClose,
   onRun,
   onEdit,
@@ -65,6 +67,10 @@ export function AutomationDetailPanel({
           defaultValue: automation.lastError,
         })
       : null
+  const showScheduleWarn =
+    scheduleUnreliable &&
+    automation.enabled &&
+    automation.trigger.kind !== 'manual'
 
   const openLastSession = () => {
     if (automation.lastSessionId) {
@@ -168,6 +174,20 @@ export function AutomationDetailPanel({
         {errorLine ? (
           <p className="text-meta text-danger" title={errorLine}>
             {errorLine}
+          </p>
+        ) : null}
+
+        {showScheduleWarn ? (
+          <p
+            className="flex items-start gap-1.5 text-meta text-warning"
+            data-testid="automation-detail-schedule-warn"
+          >
+            <TriangleAlert
+              className="mt-0.5 h-3.5 w-3.5 shrink-0"
+              strokeWidth={1.75}
+              aria-hidden
+            />
+            <span>{t('automation.banner.needTray')}</span>
           </p>
         ) : null}
 

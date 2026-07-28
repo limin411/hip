@@ -17,6 +17,7 @@ import { AutomationRow } from './AutomationRow'
 import { AutomationTemplateGrid } from './AutomationTemplateGrid'
 import type { AutomationTemplate } from './templates'
 import { isInFlight } from '@/store/automationStore'
+import { cn } from '@/lib/utils'
 
 export type AutomationFilter = 'all' | 'enabled' | 'disabled'
 export type AutomationSort = 'nextRun' | 'recent' | 'name' | 'failedFirst'
@@ -115,10 +116,10 @@ export function AutomationList({
 
   return (
     <div
-      className="flex min-h-0 flex-1 flex-col overflow-hidden bg-surface"
+      className="flex min-h-0 flex-1 flex-col overflow-hidden bg-surface-subtle/40"
       data-testid="automation-list"
     >
-      <div className="flex flex-wrap items-center gap-2 border-b border-border bg-surface-subtle px-3 py-2">
+      <div className="flex flex-wrap items-center gap-2 border-b border-border bg-surface px-4 py-2.5">
         <span
           className="shrink-0 text-meta text-ink-tertiary"
           data-testid="automation-list-count"
@@ -272,9 +273,16 @@ export function AutomationList({
           </div>
         </div>
       ) : (
-        <ul className="m-0 min-h-0 flex-1 list-none overflow-y-auto p-0">
+        <ul
+          className={cn(
+            'm-0 grid min-h-0 flex-1 list-none content-start gap-3 overflow-y-auto p-4',
+            'grid-cols-1 sm:grid-cols-2',
+            /* Detail panel open: keep two max so cards stay readable. */
+            selectedId ? 'xl:grid-cols-2' : 'xl:grid-cols-3',
+          )}
+        >
           {filtered.map((a) => (
-            <li key={a.id}>
+            <li key={a.id} className="min-w-0">
               <AutomationRow
                 automation={a}
                 onToggle={(en) => onToggle(a.id, en)}

@@ -2,15 +2,16 @@
  * Sidebar list of enabled automations.
  * Rendered by AppSidebar when AUTOMATION_PAGE && sidebarSection === 'automation'.
  */
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Zap } from 'lucide-react'
 import type { Automation } from '@/domain/automations'
 import { cn } from '@/lib/utils'
-import { isInFlight, useAutomationStore } from '@/store/automationStore'
+import { useAutomationStore } from '@/store/automationStore'
 import { useUiStore } from '@/store/uiStore'
 import { SIDEBAR_ACTIVE_RAIL } from '@/components/layout/sidebarActiveRail'
 import { enterAutomationsSection } from '@/components/layout/sidebarActions'
+import { useInFlightIds } from './useAutomationInFlight'
 
 const WEEKDAY_KEYS = [
   'automation.weekday.0',
@@ -39,9 +40,13 @@ function triggerSubtitle(
   })
 }
 
-function sortEnabled(a: Automation, b: Automation): number {
-  const aRun = isInFlight(a.id) ? 0 : 1
-  const bRun = isInFlight(b.id) ? 0 : 1
+function sortEnabled(
+  a: Automation,
+  b: Automation,
+  runningIds: Set<string>,
+): number {
+  const aRun = runningIds.has(a.id) ? 0 : 1
+  const bRun = runningIds.has(b.id) ? 0 : 1
   if (aRun !== bRun) return aRun - bRun
   const aNext = a.nextRunAt ?? Number.POSITIVE_INFINITY
   const bNext = b.nextRunAt ?? Number.POSITIVE_INFINITY
@@ -57,8 +62,7 @@ export function AutomationSidebarList() {
   const selectedId = useAutomationStore((s) => s.selectedId)
   const select = useAutomationStore((s) => s.select)
   const activeView = useUiStore((s) => s.activeView)
-  // Poll so in-flight claim shows as "running" without a dedicated store field.
-  const [tick, setTick] = useState(0)
+  const runningIds = useInFlightIds()
 
   useEffect(() => {
     if (!useAutomationStore.getState().loaded) {
@@ -66,15 +70,12 @@ export function AutomationSidebarList() {
     }
   }, [load])
 
-  useEffect(() => {
-    const id = window.setInterval(() => setTick((n) => n + 1), 1000)
-    return () => window.clearInterval(id)
-  }, [])
-
   const enabled = useMemo(() => {
-    void tick
-    return automations.filter((a) => a.enabled).slice().sort(sortEnabled)
-  }, [automations, tick])
+    return automations
+      .filter((a) => a.enabled)
+      .slice()
+      .sort((a, b) => sortEnabled(a, b, runningIds))
+  }, [automations, runningIds])
 
   if (!loaded && automations.length === 0) {
     return (
@@ -111,7 +112,7 @@ export function AutomationSidebarList() {
     >
       {enabled.map((a) => {
         const active = selectedId === a.id && activeView === 'automation'
-        const running = isInFlight(a.id)
+        const running = runningIds.has(a.id)
         const name = a.name.trim() || t('automation.untitled')
         const status = a.lastStatus
         return (
@@ -153,7 +154,10 @@ export function AutomationSidebarList() {
                   {name}
                 </span>
                 <span className="block truncate text-caption text-ink-tertiary">
-                  {triggerSubtitle(a, t)}
+                  {triggerSubtitle(
+                    a,
+                    t as (key: string, opts?: Record<string, unknown>) => string,
+                  )}
                   {running
                     ? ` · ${t('sidebar.status.running')}`
                     : status

@@ -56,6 +56,9 @@ vi.mock('@/store/automationStore', () => {
   return {
     useAutomationStore,
     isInFlight: () => false,
+    subscribeInFlight: () => () => {},
+    getInFlightVersion: () => 0,
+    listInFlightIds: () => [],
   }
 })
 
@@ -105,6 +108,44 @@ vi.mock('@/ipc/dialog', () => ({
   pickDirectory: vi.fn().mockResolvedValue(null),
 }))
 
+/** Radix portal menus are flaky in happy-dom; render items inline for tests. */
+vi.mock('@/components/ui/DropdownMenu', () => ({
+  DropdownMenu: ({ children }: { children: React.ReactNode }) => (
+    <div data-testid="mock-dropdown">{children}</div>
+  ),
+  DropdownMenuTrigger: ({ children }: { children: React.ReactNode }) => <>{children}</>,
+  DropdownMenuContent: ({
+    children,
+    ...props
+  }: {
+    children: React.ReactNode
+    'data-testid'?: string
+  }) => (
+    <div role="menu" {...props}>
+      {children}
+    </div>
+  ),
+  DropdownMenuItem: ({
+    children,
+    onSelect,
+    ...props
+  }: {
+    children: React.ReactNode
+    onSelect?: () => void
+    'data-testid'?: string
+    className?: string
+    disabled?: boolean
+  }) => (
+    <button type="button" {...props} onClick={() => onSelect?.()}>
+      {children}
+    </button>
+  ),
+  DropdownMenuSeparator: () => <hr />,
+  DropdownMenuLabel: ({ children }: { children: React.ReactNode }) => (
+    <div>{children}</div>
+  ),
+}))
+
 import { AutomationsPage } from './AutomationsPage'
 
 const sampleAutomation: Automation = {
@@ -145,6 +186,7 @@ describe('AutomationsPage', () => {
   it('renders page root with empty gallery when no automations', () => {
     render(<AutomationsPage />)
     expect(screen.getByTestId('automations-page')).toBeInTheDocument()
+    expect(screen.getByTestId('automations-page-header')).toBeInTheDocument()
     expect(screen.getByTestId('automation-empty-state')).toBeInTheDocument()
     expect(screen.getByTestId('automation-template-grid')).toBeInTheDocument()
   })
@@ -157,6 +199,7 @@ describe('AutomationsPage', () => {
     expect(screen.queryByTestId('automation-empty-state')).not.toBeInTheDocument()
     // hipConfig mock: close=quit + tray off → schedule banner for daily enabled
     expect(screen.getByTestId('automation-schedule-banner')).toBeInTheDocument()
+    expect(screen.getByTestId('automations-page-stats')).toBeInTheDocument()
   })
 
   it('shows loading empty while catalog loads', () => {
@@ -177,7 +220,7 @@ describe('AutomationsPage', () => {
     expect(screen.getByTestId('automations-page')).toBeInTheDocument()
   })
 
-  it('selecting a row opens run history panel; session deep-link works', () => {
+  it('selecting a row opens detail panel with run history; session deep-link works', () => {
     storeState.automations = [
       {
         ...sampleAutomation,
@@ -196,41 +239,42 @@ describe('AutomationsPage', () => {
       },
     ]
     const { rerender } = render(<AutomationsPage />)
-    expect(screen.queryByTestId('automation-run-history')).not.toBeInTheDocument()
+    expect(screen.queryByTestId('automation-detail-panel')).not.toBeInTheDocument()
 
     fireEvent.click(screen.getByTestId('automation-row-auto_test1'))
     expect(select).toHaveBeenCalledWith('auto_test1')
     // Mock store does not subscribe; re-render with selectedId applied by select mock.
     rerender(<AutomationsPage />)
+    expect(screen.getByTestId('automation-detail-panel')).toBeInTheDocument()
     expect(screen.getByTestId('automation-run-history')).toBeInTheDocument()
     expect(screen.getByTestId('automation-run-row-arun_1')).toBeInTheDocument()
 
     fireEvent.click(screen.getByTestId('automation-run-row-arun_1'))
     expect(selectSession).toHaveBeenCalledWith('sess_deep')
 
-    fireEvent.click(screen.getByTestId('automation-run-history-close'))
+    fireEvent.click(screen.getByTestId('automation-detail-close'))
     expect(select).toHaveBeenCalledWith(null)
     rerender(<AutomationsPage />)
-    expect(screen.queryByTestId('automation-run-history')).not.toBeInTheDocument()
+    expect(screen.queryByTestId('automation-detail-panel')).not.toBeInTheDocument()
   })
 
-  it('row action controls do not toggle run history selection', () => {
+  it('row action controls do not toggle run history selection; Run stays on page by default', () => {
     storeState.automations = [sampleAutomation]
     const { rerender } = render(<AutomationsPage />)
 
-    // Closed → Run does not open history
+    // Closed → Run does not open history; default focus false
     fireEvent.click(screen.getByTestId('automation-run-btn'))
     expect(runNow).toHaveBeenCalledWith('auto_test1', {
-      focus: true,
+      focus: false,
       trigger: 'manual',
     })
-    expect(screen.queryByTestId('automation-run-history')).not.toBeInTheDocument()
+    expect(screen.queryByTestId('automation-detail-panel')).not.toBeInTheDocument()
 
     // Open history via row select
     fireEvent.click(screen.getByTestId('automation-row-auto_test1'))
     expect(select).toHaveBeenCalledWith('auto_test1')
     rerender(<AutomationsPage />)
-    expect(screen.getByTestId('automation-run-history')).toBeInTheDocument()
+    expect(screen.getByTestId('automation-detail-panel')).toBeInTheDocument()
     expect(screen.getByTestId('automation-row-auto_test1')).toHaveAttribute(
       'data-selected',
       'true',
@@ -238,14 +282,21 @@ describe('AutomationsPage', () => {
 
     // Nested actions keep selection / panel open
     fireEvent.click(screen.getByTestId('automation-run-btn'))
-    expect(screen.getByTestId('automation-run-history')).toBeInTheDocument()
+    expect(screen.getByTestId('automation-detail-panel')).toBeInTheDocument()
 
     fireEvent.click(screen.getByTestId('automation-enable-auto_test1'))
-    expect(screen.getByTestId('automation-run-history')).toBeInTheDocument()
+    expect(screen.getByTestId('automation-detail-panel')).toBeInTheDocument()
     expect(setEnabled).toHaveBeenCalled()
+  })
 
-    fireEvent.click(screen.getByTestId('automation-edit-auto_test1'))
-    expect(screen.getByTestId('automation-run-history')).toBeInTheDocument()
+  it('delete opens confirm dialog instead of window.confirm', () => {
+    storeState.automations = [sampleAutomation]
+    render(<AutomationsPage />)
+
+    fireEvent.click(screen.getByTestId('automation-delete-auto_test1'))
+    expect(screen.getByTestId('automation-delete-confirm')).toBeInTheDocument()
+    fireEvent.click(screen.getByTestId('automation-delete-confirm'))
+    expect(remove).toHaveBeenCalledWith('auto_test1')
   })
 
   it('opens create editor when pendingCreate is set', () => {

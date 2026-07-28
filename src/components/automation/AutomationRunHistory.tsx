@@ -21,6 +21,8 @@ export type AutomationRunHistoryProps = {
   automation: Automation
   onClose?: () => void
   className?: string
+  /** When embedded in detail panel, skip the outer title chrome. */
+  hideHeader?: boolean
 }
 
 function statusVariant(
@@ -95,6 +97,7 @@ export function AutomationRunHistory({
   automation,
   onClose,
   className,
+  hideHeader = false,
 }: AutomationRunHistoryProps) {
   const { t, i18n } = useTranslation()
   const runs = useAutomationStore((s) => s.runs)
@@ -122,32 +125,40 @@ export function AutomationRunHistory({
       data-testid="automation-run-history"
       aria-label={t('automation.run.history')}
     >
-      <div className="flex shrink-0 items-start gap-2 border-b border-border px-3 py-2.5">
-        <div className="min-w-0 flex-1">
-          <h2 className="truncate text-body font-semibold text-ink">
+      {hideHeader ? (
+        <div className="shrink-0 border-b border-border px-3 py-2">
+          <h3 className="text-meta font-medium text-ink-secondary">
             {t('automation.run.history')}
-          </h2>
-          <p
-            className="truncate text-meta text-ink-tertiary"
-            data-testid="automation-run-history-name"
-            title={name}
-          >
-            {name}
-          </p>
+          </h3>
         </div>
-        {onClose ? (
-          <Button
-            type="button"
-            size="icon"
-            variant="ghost"
-            data-testid="automation-run-history-close"
-            onClick={onClose}
-            aria-label={t('automation.run.close')}
-          >
-            <X className="h-3.5 w-3.5" strokeWidth={1.75} aria-hidden />
-          </Button>
-        ) : null}
-      </div>
+      ) : (
+        <div className="flex shrink-0 items-start gap-2 border-b border-border px-3 py-2.5">
+          <div className="min-w-0 flex-1">
+            <h2 className="truncate text-body font-semibold text-ink">
+              {t('automation.run.history')}
+            </h2>
+            <p
+              className="truncate text-meta text-ink-tertiary"
+              data-testid="automation-run-history-name"
+              title={name}
+            >
+              {name}
+            </p>
+          </div>
+          {onClose ? (
+            <Button
+              type="button"
+              size="icon"
+              variant="ghost"
+              data-testid="automation-run-history-close"
+              onClick={onClose}
+              aria-label={t('automation.run.close')}
+            >
+              <X className="h-3.5 w-3.5" strokeWidth={1.75} aria-hidden />
+            </Button>
+          ) : null}
+        </div>
+      )}
 
       {recent.length === 0 ? (
         <EmptyState

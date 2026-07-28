@@ -30,12 +30,22 @@ import {
 import { buildSessionConfigFromAutomation } from '@/domain/automations/buildSessionConfig'
 import { sessionService } from '@/domain/sessionService'
 import { useDomainStore } from '@/domain/sessionStore'
+import { toast } from 'sonner'
+import i18n from '@/i18n'
 
 // ─── In-flight claim (sync, memory-only) ─────────────────────
 // Disk run.status is NOT the claim — see recoverOrphanRuns on load.
 
 const inFlight = new Set<string>()
 let globalInFlight = 0
+/** Bumps on claim/release so UI can subscribe without 1s polling. */
+let inFlightVersion = 0
+const inFlightListeners = new Set<() => void>()
+
+function notifyInFlight(): void {
+  inFlightVersion += 1
+  for (const listener of inFlightListeners) listener()
+}
 
 /** Active watches: runId → { sessionId, automationId } (Host may subscribe later). */
 const watches = new Map<string, { sessionId: string; automationId: string }>()
@@ -80,6 +90,7 @@ export function tryClaimInFlight(
   }
   inFlight.add(automationId)
   globalInFlight++
+  notifyInFlight()
   return { ok: true }
 }
 
@@ -87,6 +98,7 @@ export function releaseInFlight(automationId: string): void {
   if (!inFlight.has(automationId)) return
   inFlight.delete(automationId)
   globalInFlight = Math.max(0, globalInFlight - 1)
+  notifyInFlight()
 }
 
 /** Test / debug: whether an automation currently holds the claim. */
@@ -96,6 +108,24 @@ export function isInFlight(automationId: string): boolean {
 
 export function getGlobalInFlight(): number {
   return globalInFlight
+}
+
+/** Subscribe to claim set changes (for useSyncExternalStore). */
+export function subscribeInFlight(onStoreChange: () => void): () => void {
+  inFlightListeners.add(onStoreChange)
+  return () => {
+    inFlightListeners.delete(onStoreChange)
+  }
+}
+
+/** Snapshot version for useSyncExternalStore (changes on claim/release). */
+export function getInFlightVersion(): number {
+  return inFlightVersion
+}
+
+/** Current automation ids holding the in-flight claim. */
+export function listInFlightIds(): string[] {
+  return [...inFlight]
 }
 
 export function getWatch(
@@ -411,6 +441,7 @@ export const useAutomationStore = create<AutomationStore>((set, get) => ({
         if (!inFlight.has(r.automationId)) {
           inFlight.add(r.automationId)
           globalInFlight++
+          notifyInFlight()
         }
         get().registerWatch(r.id, r.sessionId, r.automationId)
         continue
@@ -419,6 +450,7 @@ export const useAutomationStore = create<AutomationStore>((set, get) => ({
         if (!inFlight.has(r.automationId)) {
           inFlight.add(r.automationId)
           globalInFlight++
+          notifyInFlight()
         }
         if (r.status !== 'waiting_user') {
           await get().patchRunStatus(r.id, 'waiting_user')
@@ -834,6 +866,13 @@ async function runNowBody(
       error: claim.error,
       now,
     })
+    if (trigger === 'manual') {
+      toast.error(
+        i18n.t(`automation.skipReasons.${claim.error}` as 'automation.skipReasons.skip_previous_running', {
+          defaultValue: claim.error,
+        }),
+      )
+    }
     return
   }
 
@@ -847,6 +886,16 @@ async function runNowBody(
         error: built.error,
         now,
       })
+      if (trigger === 'manual') {
+        toast.error(
+          i18n.t(`automation.errors.${built.error}` as 'automation.errors.no_model_configured', {
+            defaultValue: i18n.t(
+              `automation.skipReasons.${built.error}` as 'automation.skipReasons.project_missing',
+              { defaultValue: built.error },
+            ),
+          }),
+        )
+      }
       return
     }
 
@@ -902,6 +951,8 @@ async function runNowBody(
 export function __resetAutomationStoreInternalsForTests(): void {
   inFlight.clear()
   globalInFlight = 0
+  inFlightVersion += 1
+  for (const listener of inFlightListeners) listener()
   watches.clear()
   runNowChain = Promise.resolve()
   saveChain = Promise.resolve()

@@ -31,6 +31,9 @@ vi.mock('@/store/automationStore', () => {
   return {
     useAutomationStore,
     isInFlight: () => false,
+    subscribeInFlight: () => () => {},
+    getInFlightVersion: () => 0,
+    listInFlightIds: () => [],
   }
 })
 

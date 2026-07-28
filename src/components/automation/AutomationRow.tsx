@@ -1,19 +1,35 @@
 import { useTranslation } from 'react-i18next'
-import { Play, Pencil, Trash2 } from 'lucide-react'
+import {
+  MoreHorizontal,
+  Pencil,
+  Play,
+  Trash2,
+  MessageSquare,
+  ExternalLink,
+} from 'lucide-react'
 import type { Automation, AutomationRunStatus } from '@/domain/automations'
 import { Badge } from '@/components/ui/Badge'
 import { Button } from '@/components/ui/Button'
 import { Switch } from '@/components/ui/Switch'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/DropdownMenu'
 import { useSkillsStore } from '@/store/skillsStore'
+import { formatAbsolute, formatRelativeTime } from '@/lib/datetime'
 import { cn } from '@/lib/utils'
 
 export type AutomationRowProps = {
   automation: Automation
   onToggle: (enabled: boolean) => void
-  onRun: () => void
+  onRun: (opts?: { focus?: boolean }) => void
   onEdit: () => void
   onDelete: () => void
-  /** Select row to show run history panel. */
+  onOpenLastSession?: () => void
+  /** Select row to show detail panel. */
   onSelect?: () => void
   selected?: boolean
   running?: boolean
@@ -21,7 +37,9 @@ export type AutomationRowProps = {
 
 function statusVariant(
   status: AutomationRunStatus | null | undefined,
+  running?: boolean,
 ): 'default' | 'success' | 'warning' | 'danger' | 'accent' {
+  if (running) return 'accent'
   switch (status) {
     case 'succeeded':
       return 'success'
@@ -37,20 +55,6 @@ function statusVariant(
       return 'default'
     default:
       return 'default'
-  }
-}
-
-function formatNextRun(ms: number | null | undefined, locale: string): string {
-  if (ms == null) return '—'
-  try {
-    return new Date(ms).toLocaleString(locale, {
-      month: 'short',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
-    })
-  } catch {
-    return new Date(ms).toLocaleString()
   }
 }
 
@@ -132,19 +136,27 @@ export function AutomationRow({
   onRun,
   onEdit,
   onDelete,
+  onOpenLastSession,
   onSelect,
   selected,
   running,
 }: AutomationRowProps) {
   const { t, i18n } = useTranslation()
+  const locale = i18n.language || 'en'
   const name = automation.name.trim() || t('automation.untitled')
   const status = automation.lastStatus
-  const skipReason =
-    status === 'skipped' && automation.lastError
+  const errorLine =
+    (status === 'failed' || status === 'skipped') && automation.lastError
       ? t(
           `automation.skipReasons.${automation.lastError}` as 'automation.skipReasons.missed_over_6h',
           { defaultValue: automation.lastError },
         )
+      : null
+
+  const statusLabel = running
+    ? t('automation.status.running')
+    : status
+      ? t(`automation.status.${status}` as 'automation.status.succeeded')
       : null
 
   return (
@@ -165,14 +177,15 @@ export function AutomationRow({
           : undefined
       }
       className={cn(
-        'group flex flex-wrap items-center gap-3 rounded-lg border border-border bg-surface px-3 py-2.5',
-        'transition-colors duration-chrome hover:bg-state-hover/40',
-        selected && 'border-accent/50 bg-accent/5 ring-1 ring-accent/30',
-        !automation.enabled && 'opacity-70',
+        'group flex items-start gap-3 border-b border-border px-3 py-2.5 last:border-b-0',
+        'transition-colors duration-chrome',
+        selected ? 'bg-state-active' : 'hover:bg-state-hover/50',
         onSelect && 'cursor-pointer',
+        !automation.enabled && 'opacity-90',
       )}
     >
       <div
+        className="pt-0.5"
         onClick={(e) => e.stopPropagation()}
         onKeyDown={(e) => e.stopPropagation()}
       >
@@ -185,54 +198,75 @@ export function AutomationRow({
       </div>
 
       <div className="min-w-0 flex-1">
-        <div className="flex flex-wrap items-center gap-2">
-          <button
-            type="button"
-            className="truncate text-left text-body font-medium text-ink hover:underline"
-            onClick={(e) => {
-              e.stopPropagation()
-              onEdit()
-            }}
-            onKeyDown={(e) => e.stopPropagation()}
+        <div className="flex min-w-0 items-center gap-2">
+          <span
+            className={cn(
+              'min-w-0 flex-1 truncate text-body font-medium',
+              automation.enabled ? 'text-ink' : 'text-ink-secondary',
+            )}
             data-testid={`automation-name-${automation.id}`}
+            title={name}
           >
             {name}
-          </button>
-          <Badge size="sm" variant="default">
-            {triggerLabel(automation, t as Parameters<typeof triggerLabel>[1])}
-          </Badge>
-          {status ? (
+          </span>
+          {statusLabel ? (
             <Badge
               size="sm"
-              variant={statusVariant(status)}
-              title={skipReason ?? automation.lastError ?? undefined}
+              variant={statusVariant(status, running)}
+              title={errorLine ?? automation.lastError ?? undefined}
               data-testid={`automation-status-${automation.id}`}
+              className="shrink-0"
             >
-              {t(`automation.status.${status}` as 'automation.status.succeeded')}
+              {statusLabel}
             </Badge>
+          ) : null}
+        </div>
+
+        <div className="mt-0.5 flex min-w-0 flex-wrap items-center gap-x-2 gap-y-0.5 text-meta text-ink-tertiary">
+          <span>{triggerLabel(automation, t as Parameters<typeof triggerLabel>[1])}</span>
+          <span data-testid={`automation-next-${automation.id}`}>
+            {automation.trigger.kind === 'manual'
+              ? t('automation.list.nextManual')
+              : t('automation.list.nextRun', {
+                  when:
+                    automation.nextRunAt != null
+                      ? formatAbsolute(automation.nextRunAt, locale)
+                      : '—',
+                })}
+          </span>
+          {automation.lastRunAt != null ? (
+            <span
+              data-testid={`automation-last-${automation.id}`}
+              title={formatAbsolute(automation.lastRunAt, locale)}
+            >
+              {t('automation.list.lastRun', {
+                when: formatRelativeTime(automation.lastRunAt, locale),
+              })}
+            </span>
+          ) : null}
+          {automation.projectPath ? (
+            <span className="max-w-[14rem] truncate" title={automation.projectPath}>
+              {automation.projectPath}
+            </span>
           ) : null}
           {automation.skillIds?.length ? (
             <SkillHonestyChips skillIds={automation.skillIds} />
           ) : null}
         </div>
-        <div className="mt-0.5 flex flex-wrap gap-x-3 gap-y-0.5 text-meta text-ink-tertiary">
-          <span data-testid={`automation-next-${automation.id}`}>
-            {automation.trigger.kind === 'manual'
-              ? t('automation.list.nextManual')
-              : t('automation.list.nextRun', {
-                  when: formatNextRun(automation.nextRunAt, i18n.language || 'en'),
-                })}
-          </span>
-          {automation.projectPath ? (
-            <span className="truncate max-w-[16rem]" title={automation.projectPath}>
-              {automation.projectPath}
-            </span>
-          ) : null}
-        </div>
+
+        {errorLine ? (
+          <p
+            className="mt-0.5 truncate text-meta text-danger"
+            title={errorLine}
+            data-testid={`automation-error-${automation.id}`}
+          >
+            {errorLine}
+          </p>
+        ) : null}
       </div>
 
       <div
-        className="flex shrink-0 items-center gap-1"
+        className="flex shrink-0 items-center gap-1 pt-0.5"
         onClick={(e) => e.stopPropagation()}
         onKeyDown={(e) => e.stopPropagation()}
       >
@@ -242,32 +276,61 @@ export function AutomationRow({
           variant="secondary"
           data-testid="automation-run-btn"
           disabled={running}
-          onClick={onRun}
+          onClick={() => onRun({ focus: false })}
           aria-label={t('automation.list.runNow')}
         >
           <Play className="h-3.5 w-3.5" strokeWidth={2} aria-hidden />
           {t('automation.list.runNow')}
         </Button>
-        <Button
-          type="button"
-          size="icon"
-          variant="ghost"
-          data-testid={`automation-edit-${automation.id}`}
-          onClick={onEdit}
-          aria-label={t('automation.list.edit')}
-        >
-          <Pencil className="h-3.5 w-3.5" strokeWidth={1.75} aria-hidden />
-        </Button>
-        <Button
-          type="button"
-          size="icon"
-          variant="ghost"
-          data-testid={`automation-delete-${automation.id}`}
-          onClick={onDelete}
-          aria-label={t('automation.list.delete')}
-        >
-          <Trash2 className="h-3.5 w-3.5" strokeWidth={1.75} aria-hidden />
-        </Button>
+
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button
+              type="button"
+              size="icon"
+              variant="ghost"
+              data-testid={`automation-more-${automation.id}`}
+              aria-label={t('automation.list.moreAria', { name })}
+            >
+              <MoreHorizontal className="h-3.5 w-3.5" strokeWidth={1.75} aria-hidden />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" data-testid={`automation-menu-${automation.id}`}>
+            <DropdownMenuItem
+              data-testid={`automation-edit-${automation.id}`}
+              onSelect={() => onEdit()}
+            >
+              <Pencil className="h-3.5 w-3.5" strokeWidth={1.75} aria-hidden />
+              {t('automation.list.edit')}
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              disabled={running}
+              data-testid={`automation-run-open-${automation.id}`}
+              onSelect={() => onRun({ focus: true })}
+            >
+              <ExternalLink className="h-3.5 w-3.5" strokeWidth={1.75} aria-hidden />
+              {t('automation.list.runAndOpen')}
+            </DropdownMenuItem>
+            {automation.lastSessionId && onOpenLastSession ? (
+              <DropdownMenuItem
+                data-testid={`automation-open-session-${automation.id}`}
+                onSelect={() => onOpenLastSession()}
+              >
+                <MessageSquare className="h-3.5 w-3.5" strokeWidth={1.75} aria-hidden />
+                {t('automation.run.openSession')}
+              </DropdownMenuItem>
+            ) : null}
+            <DropdownMenuSeparator />
+            <DropdownMenuItem
+              className="text-danger focus:text-danger"
+              data-testid={`automation-delete-${automation.id}`}
+              onSelect={() => onDelete()}
+            >
+              <Trash2 className="h-3.5 w-3.5" strokeWidth={1.75} aria-hidden />
+              {t('automation.list.delete')}
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
       </div>
     </div>
   )

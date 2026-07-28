@@ -87,12 +87,6 @@ export function AutomationsPage() {
   const openEdit = (id: string) => setEditor({ mode: 'edit', automationId: id })
   const closeEditor = () => setEditor({ mode: 'closed' })
 
-  const enabledCount = useMemo(
-    () => automations.filter((a) => a.enabled).length,
-    [automations],
-  )
-  const runningCount = runningIds.size
-
   if (!loaded && loading) {
     return (
       <div
@@ -126,32 +120,11 @@ export function AutomationsPage() {
         </div>
       ) : null}
 
-      <header
-        className="shrink-0 border-b border-border px-4 py-3"
-        data-testid="automations-page-header"
-      >
-        <h1 className="text-body font-semibold tracking-tight text-ink">
-          {t('automation.title')}
-        </h1>
-        {hasItems ? (
-          <p
-            className="mt-1 text-meta text-ink-secondary"
-            data-testid="automations-page-stats"
-          >
-            {t('automation.list.stats', {
-              total: automations.length,
-              enabled: enabledCount,
-              running: runningCount,
-            })}
-          </p>
-        ) : null}
-      </header>
-
       <AutomationScheduleBanner automations={automations} />
 
       {hasItems ? (
         <div className="flex min-h-0 flex-1 flex-row">
-          <div className="flex min-h-0 min-w-0 flex-1 flex-col p-3">
+          <div className="flex min-h-0 min-w-0 flex-1 flex-col">
             <AutomationList
               automations={automations}
               runningIds={runningIds}

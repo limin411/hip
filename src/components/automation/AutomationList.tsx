@@ -13,7 +13,6 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/DropdownMenu'
 import { Modal } from '@/components/ui/Modal'
-import { cn } from '@/lib/utils'
 import { AutomationRow } from './AutomationRow'
 import { AutomationTemplateGrid } from './AutomationTemplateGrid'
 import type { AutomationTemplate } from './templates'
@@ -116,9 +115,7 @@ export function AutomationList({
 
   return (
     <div
-      className={cn(
-        'flex min-h-0 flex-1 flex-col overflow-hidden rounded-xl border border-border bg-surface',
-      )}
+      className="flex min-h-0 flex-1 flex-col overflow-hidden bg-surface"
       data-testid="automation-list"
     >
       <div className="flex flex-wrap items-center gap-2 border-b border-border bg-surface-subtle px-3 py-2">

@@ -186,7 +186,7 @@ describe('AutomationsPage', () => {
   it('renders page root with empty gallery when no automations', () => {
     render(<AutomationsPage />)
     expect(screen.getByTestId('automations-page')).toBeInTheDocument()
-    expect(screen.getByTestId('automations-page-header')).toBeInTheDocument()
+    expect(screen.queryByTestId('automations-page-header')).not.toBeInTheDocument()
     expect(screen.getByTestId('automation-empty-state')).toBeInTheDocument()
     expect(screen.getByTestId('automation-template-grid')).toBeInTheDocument()
     expect(screen.getByTestId('automation-skills-section')).toBeInTheDocument()
@@ -210,7 +210,8 @@ describe('AutomationsPage', () => {
     expect(screen.queryByTestId('automation-empty-state')).not.toBeInTheDocument()
     // hipConfig mock: close=quit + tray off → schedule banner for daily enabled
     expect(screen.getByTestId('automation-schedule-banner')).toBeInTheDocument()
-    expect(screen.getByTestId('automations-page-stats')).toBeInTheDocument()
+    expect(screen.queryByTestId('automations-page-header')).not.toBeInTheDocument()
+    expect(screen.queryByTestId('automations-page-stats')).not.toBeInTheDocument()
   })
 
   it('shows loading empty while catalog loads', () => {

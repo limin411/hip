@@ -2253,6 +2253,7 @@ export const ko = {
       "name": "이름",
       "namePlaceholder": "예: 일일 코드 리뷰",
       "nameRequired": "이름은 필수입니다",
+      "nameDuplicate": "“{{name}}” 이름의 자동화가 이미 있습니다",
       "prompt": "프롬프트",
       "promptPlaceholder": "이 자동화가 무엇을 할지 설명하세요…",
       "promptRequired": "프롬프트는 필수입니다",

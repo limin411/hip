@@ -2348,6 +2348,7 @@ export const en = {
         name: 'Name',
         namePlaceholder: 'e.g., Daily code review',
         nameRequired: 'Name is required',
+        nameDuplicate: 'An automation named “{{name}}” already exists',
         prompt: 'Prompt',
         promptPlaceholder:
           'Describe what this automation should do…',

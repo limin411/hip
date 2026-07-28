@@ -2260,6 +2260,7 @@ export const zhTW = {
       "name": "名稱",
       "namePlaceholder": "例如：每日程式碼審查",
       "nameRequired": "請填寫名稱",
+      "nameDuplicate": "已存在同名自動化「{{name}}」",
       "prompt": "提示詞",
       "promptPlaceholder": "描述這個自動化要做什麼…",
       "promptRequired": "請填寫提示詞",

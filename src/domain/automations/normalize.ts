@@ -19,6 +19,27 @@ export const AUTOMATION_NAME_MAX = 200
  */
 export const AUTOMATION_PROMPT_MAX = 256 * 1024
 
+/** Case-insensitive name equality for catalog uniqueness. */
+export function automationNamesEqual(a: string, b: string): boolean {
+  return a.trim().localeCompare(b.trim(), undefined, { sensitivity: 'base' }) === 0
+}
+
+/**
+ * True when `name` collides with another automation (excluding `excludeId` when renaming).
+ * Empty / whitespace-only names are not treated as duplicates (required check is separate).
+ */
+export function isAutomationNameTaken(
+  name: string,
+  automations: readonly Pick<Automation, 'id' | 'name'>[],
+  excludeId?: string | null,
+): boolean {
+  const n = name.trim()
+  if (!n) return false
+  return automations.some(
+    (a) => a.id !== excludeId && automationNamesEqual(a.name, n),
+  )
+}
+
 /** Max skill ids retained as UI metadata. */
 export const AUTOMATION_SKILL_IDS_MAX = 20
 

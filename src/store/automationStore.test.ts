@@ -222,6 +222,22 @@ describe('automationStore', () => {
     expect(saveAutomations).toHaveBeenCalled()
   })
 
+  it('create rejects duplicate names (case-insensitive)', async () => {
+    useAutomationStore.setState({
+      automations: [auto({ id: 'auto_exist', name: 'Daily Notes' })],
+      loaded: true,
+    })
+    const savesBefore = saveAutomations.mock.calls.length
+    await expect(
+      useAutomationStore.getState().create({
+        name: 'daily notes',
+        prompt: 'P',
+      }),
+    ).rejects.toThrow()
+    expect(useAutomationStore.getState().automations).toHaveLength(1)
+    expect(saveAutomations.mock.calls.length).toBe(savesBefore)
+  })
+
   it('update / setEnabled / remove touch catalog', async () => {
     useAutomationStore.setState({
       automations: [auto({ id: 'auto_u', enabled: true })],
@@ -236,6 +252,36 @@ describe('automationStore', () => {
     await useAutomationStore.getState().remove('auto_u')
     expect(useAutomationStore.getState().automations).toHaveLength(0)
     expect(saveAutomations.mock.calls.length).toBeGreaterThanOrEqual(3)
+  })
+
+  it('update rejects rename onto another automation name', async () => {
+    useAutomationStore.setState({
+      automations: [
+        auto({ id: 'auto_a', name: 'Alpha' }),
+        auto({ id: 'auto_b', name: 'Beta' }),
+      ],
+      loaded: true,
+    })
+    await expect(
+      useAutomationStore.getState().update('auto_a', { name: 'beta' }),
+    ).rejects.toThrow()
+    expect(useAutomationStore.getState().automations.find((a) => a.id === 'auto_a')?.name).toBe(
+      'Alpha',
+    )
+  })
+
+  it('update allows keeping the same name on self', async () => {
+    useAutomationStore.setState({
+      automations: [auto({ id: 'auto_self', name: 'Same' })],
+      loaded: true,
+    })
+    await useAutomationStore.getState().update('auto_self', {
+      name: 'same',
+      prompt: 'updated',
+    })
+    const a = useAutomationStore.getState().automations[0]
+    expect(a.name).toBe('same')
+    expect(a.prompt).toBe('updated')
   })
 
   it('update reseeds nextRunAt when schedule trigger time changes', async () => {

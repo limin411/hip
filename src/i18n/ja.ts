@@ -2253,6 +2253,7 @@ export const ja = {
       "name": "名前",
       "namePlaceholder": "例：デイリーコードレビュー",
       "nameRequired": "名前は必須です",
+      "nameDuplicate": "「{{name}}」という名前の自動化は既に存在します",
       "prompt": "プロンプト",
       "promptPlaceholder": "この自動化で何をするか説明してください…",
       "promptRequired": "プロンプトは必須です",

@@ -2,9 +2,11 @@ import { describe, expect, it } from 'vitest'
 import {
   AUTOMATION_NAME_MAX,
   AUTOMATION_PROMPT_MAX,
+  automationNamesEqual,
   clampUtf8Bytes,
   emptyAutomationsCatalog,
   emptyAutomationRunsLog,
+  isAutomationNameTaken,
   normalizeAutomation,
   normalizeCatalog,
   normalizeRunsLog,
@@ -229,6 +231,26 @@ describe('normalizeCatalog', () => {
         updatedAt: 1,
       })!.lastStatus,
     ).toBe('succeeded')
+  })
+})
+
+describe('automation name uniqueness', () => {
+  it('automationNamesEqual is case-insensitive', () => {
+    expect(automationNamesEqual('Daily', 'daily')).toBe(true)
+    expect(automationNamesEqual('  Review ', 'review')).toBe(true)
+    expect(automationNamesEqual('a', 'b')).toBe(false)
+  })
+
+  it('isAutomationNameTaken detects collisions and allows rename of self', () => {
+    const list = [
+      { id: 'auto_a', name: 'Daily standup' },
+      { id: 'auto_b', name: 'Weekly review' },
+    ]
+    expect(isAutomationNameTaken('daily standup', list)).toBe(true)
+    expect(isAutomationNameTaken('New task', list)).toBe(false)
+    expect(isAutomationNameTaken('Daily standup', list, 'auto_a')).toBe(false)
+    expect(isAutomationNameTaken('weekly review', list, 'auto_a')).toBe(true)
+    expect(isAutomationNameTaken('  ', list)).toBe(false)
   })
 })
 

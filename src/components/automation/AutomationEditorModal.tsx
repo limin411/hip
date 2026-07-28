@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Check, ChevronDown, Folder, Search, X } from 'lucide-react'
 import type { Automation, AutomationTrigger, AutomationTriggerKind } from '@/domain/automations'
-import { AUTOMATION_NAME_MAX } from '@/domain/automations'
+import { AUTOMATION_NAME_MAX, isAutomationNameTaken } from '@/domain/automations'
 import { useAutomationStore } from '@/store/automationStore'
 import { useProvidersStore } from '@/store/providersStore'
 import { useAgents } from '@/store/hipConfigStore'
@@ -202,7 +202,10 @@ export function AutomationEditorModal({
 
   const [draft, setDraft] = useState<Draft>(() => emptyDraft())
   const [saving, setSaving] = useState(false)
-  const [nameError, setNameError] = useState(false)
+  /** Name field: empty vs catalog collision. */
+  const [nameError, setNameError] = useState<'required' | 'duplicate' | null>(
+    null,
+  )
   const [promptError, setPromptError] = useState(false)
   const [projectError, setProjectError] = useState(false)
   const [modelQuery, setModelQuery] = useState('')
@@ -220,7 +223,7 @@ export function AutomationEditorModal({
 
   useEffect(() => {
     if (state.mode === 'closed') return
-    setNameError(false)
+    setNameError(null)
     setPromptError(false)
     setProjectError(false)
     setModelQuery('')
@@ -285,10 +288,17 @@ export function AutomationEditorModal({
   const validate = (): boolean => {
     let ok = true
     let focus: 'name' | 'prompt' | 'project' | null = null
-    if (!draft.name.trim()) {
-      setNameError(true)
+    const trimmedName = draft.name.trim()
+    if (!trimmedName) {
+      setNameError('required')
       ok = false
       focus = 'name'
+    } else if (isAutomationNameTaken(trimmedName, automations, editId)) {
+      setNameError('duplicate')
+      ok = false
+      focus = 'name'
+    } else {
+      setNameError(null)
     }
     if (!draft.prompt.trim()) {
       setPromptError(true)
@@ -340,6 +350,20 @@ export function AutomationEditorModal({
         onCreated?.(id, andRun)
         onClose()
       }
+    } catch (e) {
+      // Store enforces uniqueness (race / non-UI callers); map to field error.
+      if (
+        isAutomationNameTaken(
+          draft.name,
+          useAutomationStore.getState().automations,
+          editId,
+        )
+      ) {
+        setNameError('duplicate')
+        nameRef.current?.focus()
+        return
+      }
+      throw e
     } finally {
       setSaving(false)
     }
@@ -507,16 +531,24 @@ export function AutomationEditorModal({
             maxLength={AUTOMATION_NAME_MAX}
             onChange={(e) => {
               patch({ name: e.target.value })
-              setNameError(false)
+              setNameError(null)
             }}
             placeholder={t('automation.editor.namePlaceholder')}
             data-testid="automation-editor-name"
-            aria-invalid={nameError}
+            aria-invalid={nameError != null}
             aria-describedby={nameError ? 'automation-name-error' : undefined}
           />
           {nameError ? (
-            <span id="automation-name-error" className="text-caption text-danger">
-              {t('automation.editor.nameRequired')}
+            <span
+              id="automation-name-error"
+              className="text-caption text-danger"
+              data-testid="automation-name-error"
+            >
+              {nameError === 'duplicate'
+                ? t('automation.editor.nameDuplicate', {
+                    name: draft.name.trim(),
+                  })
+                : t('automation.editor.nameRequired')}
             </span>
           ) : null}
         </div>

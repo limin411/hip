@@ -26,6 +26,7 @@ import {
   classifySessionForAutomation,
   computeNextRunAt,
   rollNextRunAt,
+  isAutomationNameTaken,
 } from '@/domain/automations'
 import { buildSessionConfigFromAutomation } from '@/domain/automations/buildSessionConfig'
 import { sessionService } from '@/domain/sessionService'
@@ -543,10 +544,18 @@ export const useAutomationStore = create<AutomationStore>((set, get) => ({
 
   create: async (input = {}) => {
     const now = Date.now()
+    const name = input.name ?? ''
+    if (isAutomationNameTaken(name, get().automations)) {
+      const msg = i18n.t('automation.editor.nameDuplicate', {
+        name: name.trim(),
+      })
+      set({ error: msg })
+      throw new Error(msg)
+    }
     const trigger = input.trigger ?? { kind: 'manual' as const }
     const raw: Automation = {
       id: mintAutomationId(),
-      name: input.name ?? '',
+      name,
       prompt: input.prompt ?? '',
       enabled: input.enabled ?? true,
       trigger,
@@ -578,6 +587,16 @@ export const useAutomationStore = create<AutomationStore>((set, get) => ({
 
   update: async (id, patch) => {
     const now = Date.now()
+    if (
+      patch.name !== undefined &&
+      isAutomationNameTaken(patch.name, get().automations, id)
+    ) {
+      const msg = i18n.t('automation.editor.nameDuplicate', {
+        name: patch.name.trim(),
+      })
+      set({ error: msg })
+      throw new Error(msg)
+    }
     set((s) => {
       const automations = s.automations.map((a) => {
         if (a.id !== id) return a

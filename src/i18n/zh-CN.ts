@@ -2294,6 +2294,7 @@ export const zhCN = {
         name: '名称',
         namePlaceholder: '例如：每日代码审查',
         nameRequired: '请填写名称',
+        nameDuplicate: '已存在同名自动化「{{name}}」',
         prompt: '提示词',
         promptPlaceholder: '描述这个自动化要做什么…',
         promptRequired: '请填写提示词',

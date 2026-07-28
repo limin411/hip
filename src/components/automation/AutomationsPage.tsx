@@ -3,7 +3,6 @@ import { useTranslation } from 'react-i18next'
 import { Zap } from 'lucide-react'
 import { isInFlight, useAutomationStore } from '@/store/automationStore'
 import { EmptyState } from '@/components/ui/EmptyState'
-import { Button } from '@/components/ui/Button'
 import { AutomationEmptyState, type SkillSeedDraft } from './AutomationEmptyState'
 import { AutomationList } from './AutomationList'
 import { AutomationEditorModal, type EditorMode } from './AutomationEditorModal'
@@ -102,27 +101,6 @@ export function AutomationsPage() {
 
       <AutomationScheduleBanner automations={automations} />
 
-      <div className="flex shrink-0 flex-wrap items-center gap-2 border-b border-border px-4 py-2.5">
-        <div className="min-w-0">
-          <h1
-            className="truncate text-body font-semibold text-ink"
-            data-testid="automation-page-title"
-          >
-            {t('automation.title')}
-          </h1>
-          <p className="text-meta text-ink-tertiary">{t('automation.subtitle')}</p>
-        </div>
-        <div className="flex-1" />
-        <Button
-          type="button"
-          size="sm"
-          data-testid="automation-new"
-          onClick={openCreate}
-        >
-          {t('automation.startCta')}
-        </Button>
-      </div>
-
       {hasItems ? (
         <div className="flex min-h-0 flex-1 flex-row">
           <div className="flex min-h-0 min-w-0 flex-1 flex-col p-3">
@@ -133,6 +111,7 @@ export function AutomationsPage() {
               onSelect={(id) =>
                 setSelectedId((cur) => (cur === id ? null : id))
               }
+              onCreate={openCreate}
               onToggle={(id, enabled) => void setEnabled(id, enabled)}
               onRun={(id) =>
                 void runNow(id, { focus: true, trigger: 'manual' })

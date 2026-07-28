@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next'
 import { Search } from 'lucide-react'
 import type { Automation } from '@/domain/automations'
 import { Input } from '@/components/ui/Input'
+import { Button } from '@/components/ui/Button'
 import { SegmentedControl } from '@/components/ui/SegmentedControl'
 import { EmptyState } from '@/components/ui/EmptyState'
 import { AutomationRow } from './AutomationRow'
@@ -15,6 +16,7 @@ export type AutomationListProps = {
   onRun: (id: string) => void
   onEdit: (id: string) => void
   onDelete: (id: string) => void
+  onCreate?: () => void
   onSelect?: (id: string) => void
   selectedId?: string | null
   runningIds?: Set<string>
@@ -26,6 +28,7 @@ export function AutomationList({
   onRun,
   onEdit,
   onDelete,
+  onCreate,
   onSelect,
   selectedId,
   runningIds,
@@ -77,6 +80,16 @@ export function AutomationList({
             { value: 'disabled', label: t('automation.list.filterDisabled') },
           ]}
         />
+        {onCreate ? (
+          <Button
+            type="button"
+            size="sm"
+            data-testid="automation-new"
+            onClick={onCreate}
+          >
+            {t('automation.startCta')}
+          </Button>
+        ) : null}
       </div>
 
       {filtered.length === 0 ? (

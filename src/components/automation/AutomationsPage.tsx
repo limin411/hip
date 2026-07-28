@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next'
 import { Zap } from 'lucide-react'
 import { isInFlight, useAutomationStore } from '@/store/automationStore'
 import { EmptyState } from '@/components/ui/EmptyState'
-import { AutomationEmptyState, type SkillSeedDraft } from './AutomationEmptyState'
+import { AutomationEmptyState } from './AutomationEmptyState'
 import { AutomationList } from './AutomationList'
 import { AutomationEditorModal, type EditorMode } from './AutomationEditorModal'
 import { AutomationScheduleBanner } from './AutomationScheduleBanner'
@@ -12,7 +12,7 @@ import type { AutomationTemplate } from './templates'
 
 /**
  * Automations product surface (flag-gated from AppLayout).
- * Empty → template gallery + skills seed; list when catalog has items.
+ * Empty → template gallery; list when catalog has items.
  */
 export function AutomationsPage() {
   const { t } = useTranslation()
@@ -58,8 +58,6 @@ export function AutomationsPage() {
   const openCreate = () => setEditor({ mode: 'create' })
   const openTemplate = (template: AutomationTemplate) =>
     setEditor({ mode: 'create', template })
-  const openSkill = (skillSeed: SkillSeedDraft) =>
-    setEditor({ mode: 'create', skillSeed })
   const openEdit = (id: string) => setEditor({ mode: 'edit', automationId: id })
   const closeEditor = () => setEditor({ mode: 'closed' })
 
@@ -137,7 +135,6 @@ export function AutomationsPage() {
         <AutomationEmptyState
           onStartBlank={openCreate}
           onSelectTemplate={openTemplate}
-          onCreateFromSkill={openSkill}
         />
       )}
 

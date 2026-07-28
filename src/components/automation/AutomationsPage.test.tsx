@@ -10,6 +10,12 @@ const remove = vi.fn().mockResolvedValue(undefined)
 const runNow = vi.fn().mockResolvedValue(undefined)
 const create = vi.fn().mockResolvedValue('auto_1')
 const update = vi.fn().mockResolvedValue(undefined)
+const select = vi.fn((id: string | null) => {
+  storeState.selectedId = id
+})
+const clearPendingCreate = vi.fn(() => {
+  storeState.pendingCreate = false
+})
 
 let storeState: {
   loaded: boolean
@@ -17,6 +23,8 @@ let storeState: {
   error: string | null
   automations: Automation[]
   runs: AutomationRun[]
+  selectedId: string | null
+  pendingCreate: boolean
 }
 
 const selectSession = vi.fn()
@@ -31,6 +39,8 @@ vi.mock('@/store/automationStore', () => {
       runNow,
       create,
       update,
+      select,
+      clearPendingCreate,
     })
   useAutomationStore.getState = () => ({
     ...storeState,
@@ -40,6 +50,8 @@ vi.mock('@/store/automationStore', () => {
     runNow,
     create,
     update,
+    select,
+    clearPendingCreate,
   })
   return {
     useAutomationStore,
@@ -112,12 +124,16 @@ describe('AutomationsPage', () => {
     setEnabled.mockClear()
     remove.mockClear()
     runNow.mockClear()
+    select.mockClear()
+    clearPendingCreate.mockClear()
     selectSession.mockClear()
     storeState = {
       loaded: true,
       loading: false,
       error: null,
       automations: [],
+      selectedId: null,
+      pendingCreate: false,
       runs: [],
     }
   })
@@ -179,10 +195,13 @@ describe('AutomationsPage', () => {
         finishedAt: 110,
       },
     ]
-    render(<AutomationsPage />)
+    const { rerender } = render(<AutomationsPage />)
     expect(screen.queryByTestId('automation-run-history')).not.toBeInTheDocument()
 
     fireEvent.click(screen.getByTestId('automation-row-auto_test1'))
+    expect(select).toHaveBeenCalledWith('auto_test1')
+    // Mock store does not subscribe; re-render with selectedId applied by select mock.
+    rerender(<AutomationsPage />)
     expect(screen.getByTestId('automation-run-history')).toBeInTheDocument()
     expect(screen.getByTestId('automation-run-row-arun_1')).toBeInTheDocument()
 
@@ -190,12 +209,14 @@ describe('AutomationsPage', () => {
     expect(selectSession).toHaveBeenCalledWith('sess_deep')
 
     fireEvent.click(screen.getByTestId('automation-run-history-close'))
+    expect(select).toHaveBeenCalledWith(null)
+    rerender(<AutomationsPage />)
     expect(screen.queryByTestId('automation-run-history')).not.toBeInTheDocument()
   })
 
   it('row action controls do not toggle run history selection', () => {
     storeState.automations = [sampleAutomation]
-    render(<AutomationsPage />)
+    const { rerender } = render(<AutomationsPage />)
 
     // Closed → Run does not open history
     fireEvent.click(screen.getByTestId('automation-run-btn'))
@@ -207,6 +228,8 @@ describe('AutomationsPage', () => {
 
     // Open history via row select
     fireEvent.click(screen.getByTestId('automation-row-auto_test1'))
+    expect(select).toHaveBeenCalledWith('auto_test1')
+    rerender(<AutomationsPage />)
     expect(screen.getByTestId('automation-run-history')).toBeInTheDocument()
     expect(screen.getByTestId('automation-row-auto_test1')).toHaveAttribute(
       'data-selected',
@@ -223,5 +246,12 @@ describe('AutomationsPage', () => {
 
     fireEvent.click(screen.getByTestId('automation-edit-auto_test1'))
     expect(screen.getByTestId('automation-run-history')).toBeInTheDocument()
+  })
+
+  it('opens create editor when pendingCreate is set', () => {
+    storeState.pendingCreate = true
+    render(<AutomationsPage />)
+    expect(clearPendingCreate).toHaveBeenCalled()
+    expect(screen.getByTestId('automation-editor-modal')).toBeInTheDocument()
   })
 })

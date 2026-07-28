@@ -2314,7 +2314,7 @@ export const ja = {
       "workItems": "ワークアイテム",
       "automations": "自動化"
     },
-    "automationsHint": "メインパネルで自動化を管理します。",
+    "automationsHint": "メインパネルでジョブを有効にすると、ここに表示されます。",
     "quickConnect": "クイック接続",
     "badge": {
       "chat": "チャット",
@@ -2327,12 +2327,14 @@ export const ja = {
     "newSpace": "新しいナレッジベース",
     "newTask": "新しいタスク",
     "newWorkItem": "新規ワークアイテム",
+    "newAutomation": "新しい自動化",
     "newProject": "新しいプロジェクトセッション",
     "newChat": "新しいチャット",
     "newTerminal": "新しい端末",
     "emptySearch": "一致するものがありません",
     "emptySessions": "セッションはまだありません",
     "emptySpaces": "スペースはまだありません",
+    "emptyAutomations": "有効な自動化はありません",
     "projectGroup": {
       "unbound": "プロジェクトフォルダなし",
       "missingBadge": "利用不可",

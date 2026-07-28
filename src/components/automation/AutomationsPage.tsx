@@ -24,9 +24,12 @@ export function AutomationsPage() {
   const setEnabled = useAutomationStore((s) => s.setEnabled)
   const remove = useAutomationStore((s) => s.remove)
   const runNow = useAutomationStore((s) => s.runNow)
+  const selectedId = useAutomationStore((s) => s.selectedId)
+  const select = useAutomationStore((s) => s.select)
+  const pendingCreate = useAutomationStore((s) => s.pendingCreate)
+  const clearPendingCreate = useAutomationStore((s) => s.clearPendingCreate)
 
   const [editor, setEditor] = useState<EditorMode>({ mode: 'closed' })
-  const [selectedId, setSelectedId] = useState<string | null>(null)
   // Force re-render while any run is in-flight so Run buttons disable.
   const [, setTick] = useState(0)
 
@@ -42,6 +45,13 @@ export function AutomationsPage() {
     return () => window.clearInterval(id)
   }, [])
 
+  // Sidebar "New" sets pendingCreate; open the create editor and clear the flag.
+  useEffect(() => {
+    if (!pendingCreate) return
+    setEditor({ mode: 'create' })
+    clearPendingCreate()
+  }, [pendingCreate, clearPendingCreate])
+
   // Drop selection if the automation was deleted.
   // Must run before any early return so hook order is stable (loaded→loading path).
   const selected = useMemo(
@@ -52,8 +62,8 @@ export function AutomationsPage() {
     [automations, selectedId],
   )
   useEffect(() => {
-    if (selectedId && !selected) setSelectedId(null)
-  }, [selectedId, selected])
+    if (selectedId && !selected) select(null)
+  }, [selectedId, selected, select])
 
   const openCreate = () => setEditor({ mode: 'create' })
   const openTemplate = (template: AutomationTemplate) =>
@@ -106,9 +116,7 @@ export function AutomationsPage() {
               automations={automations}
               runningIds={runningIds}
               selectedId={selected?.id ?? null}
-              onSelect={(id) =>
-                setSelectedId((cur) => (cur === id ? null : id))
-              }
+              onSelect={(id) => select(selectedId === id ? null : id)}
               onCreate={openCreate}
               onToggle={(id, enabled) => void setEnabled(id, enabled)}
               onRun={(id) =>
@@ -118,7 +126,6 @@ export function AutomationsPage() {
               onDelete={(id) => {
                 if (window.confirm(t('automation.list.deleteConfirm'))) {
                   void remove(id)
-                  if (selectedId === id) setSelectedId(null)
                 }
               }}
             />
@@ -126,7 +133,7 @@ export function AutomationsPage() {
           {selected ? (
             <AutomationRunHistory
               automation={selected}
-              onClose={() => setSelectedId(null)}
+              onClose={() => select(null)}
               className="w-[min(22rem,40%)] shrink-0 border-l"
             />
           ) : null}

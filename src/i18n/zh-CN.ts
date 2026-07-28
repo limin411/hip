@@ -2355,7 +2355,7 @@ export const zhCN = {
         workItems: '事项',
         automations: '自动化',
       },
-      automationsHint: '在主面板中管理自动化。',
+      automationsHint: '在主面板中启用任务后，会显示在此处。',
       quickConnect: '快捷连接',
       badge: {
         chat: '对话',
@@ -2368,12 +2368,14 @@ export const zhCN = {
       newSpace: '新建知识库',
       newTask: '新建任务',
       newWorkItem: '新建事项',
+      newAutomation: '新建自动化',
       newProject: '新建项目会话',
       newChat: '新建对话',
       newTerminal: '新建终端',
       emptySearch: '无匹配项',
       emptySessions: '暂无会话',
       emptySpaces: '暂无知识空间',
+      emptyAutomations: '暂无已启用的自动化',
       projectGroup: {
         unbound: '未绑定项目路径',
         missingBadge: '不可用',

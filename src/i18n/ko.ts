@@ -2314,7 +2314,7 @@ export const ko = {
       "workItems": "작업 항목",
       "automations": "자동화"
     },
-    "automationsHint": "메인 패널에서 자동화를 관리하세요.",
+    "automationsHint": "메인 패널에서 작업을 활성화하면 여기에 표시됩니다.",
     "quickConnect": "빠른 연결",
     "badge": {
       "chat": "채팅",
@@ -2327,12 +2327,14 @@ export const ko = {
     "newSpace": "새 지식 베이스",
     "newTask": "새 작업",
     "newWorkItem": "새 작업 항목",
+    "newAutomation": "새 자동화",
     "newProject": "새 프로젝트 세션",
     "newChat": "새 채팅",
     "newTerminal": "새 터미널",
     "emptySearch": "일치 없음",
     "emptySessions": "아직 세션이 없습니다",
     "emptySpaces": "아직 공간이 없습니다",
+    "emptyAutomations": "사용 중인 자동화 없음",
     "projectGroup": {
       "unbound": "프로젝트 폴더 없음",
       "missingBadge": "사용 불가",

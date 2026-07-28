@@ -2411,7 +2411,7 @@ export const en = {
         workItems: 'Work items',
         automations: 'Automations',
       },
-      automationsHint: 'Manage automations in the main panel.',
+      automationsHint: 'Enable a job in the main panel to pin it here.',
       quickConnect: 'Quick connect',
       badge: {
         chat: 'Chat',
@@ -2424,12 +2424,14 @@ export const en = {
       newSpace: 'New knowledge base',
       newTask: 'New task',
       newWorkItem: 'New work item',
+      newAutomation: 'New automation',
       newProject: 'New project session',
       newChat: 'New chat',
       newTerminal: 'New terminal',
       emptySearch: 'No matches',
       emptySessions: 'No sessions yet',
       emptySpaces: 'No spaces yet',
+      emptyAutomations: 'No enabled automations',
       projectGroup: {
         unbound: 'No project folder',
         missingBadge: 'Unavailable',

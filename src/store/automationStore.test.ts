@@ -202,6 +202,33 @@ describe('automationStore', () => {
     expect(saveAutomations.mock.calls.length).toBeGreaterThanOrEqual(3)
   })
 
+  it('select sets selectedId; remove clears selection for that id', async () => {
+    useAutomationStore.setState({
+      automations: [
+        auto({ id: 'auto_a' }),
+        auto({ id: 'auto_b' }),
+      ],
+      loaded: true,
+      selectedId: null,
+    })
+    useAutomationStore.getState().select('auto_a')
+    expect(useAutomationStore.getState().selectedId).toBe('auto_a')
+
+    await useAutomationStore.getState().remove('auto_b')
+    expect(useAutomationStore.getState().selectedId).toBe('auto_a')
+
+    await useAutomationStore.getState().remove('auto_a')
+    expect(useAutomationStore.getState().selectedId).toBeNull()
+  })
+
+  it('requestCreate / clearPendingCreate toggles pendingCreate', () => {
+    expect(useAutomationStore.getState().pendingCreate).toBe(false)
+    useAutomationStore.getState().requestCreate()
+    expect(useAutomationStore.getState().pendingCreate).toBe(true)
+    useAutomationStore.getState().clearPendingCreate()
+    expect(useAutomationStore.getState().pendingCreate).toBe(false)
+  })
+
   // ─── claim lock ────────────────────────────────────────────
 
   it('tryClaimInFlight is sync and blocks second claim on same id', () => {

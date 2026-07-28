@@ -2321,7 +2321,7 @@ export const zhTW = {
       "workItems": "事項",
       "automations": "自動化"
     },
-    "automationsHint": "在主面板中管理自動化。",
+    "automationsHint": "在主面板中啟用任務後，會顯示在此處。",
     "quickConnect": "快捷連線",
     "badge": {
       "chat": "對話",
@@ -2334,12 +2334,14 @@ export const zhTW = {
     "newSpace": "新建知識庫",
     "newTask": "新增任務",
     "newWorkItem": "新建事項",
+    "newAutomation": "新建自動化",
     "newProject": "新增專案會話",
     "newChat": "新增對話",
     "newTerminal": "新建終端",
     "emptySearch": "無符合項目",
     "emptySessions": "尚無會話",
     "emptySpaces": "尚無知識空間",
+    "emptyAutomations": "尚無已啟用的自動化",
     "projectGroup": {
       "unbound": "未綁定專案路徑",
       "missingBadge": "不可用",

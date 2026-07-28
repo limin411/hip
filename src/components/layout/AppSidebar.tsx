@@ -68,6 +68,7 @@ import { QuickConnectPopover } from '@/components/terminals/QuickConnectPopover'
 import { WORK_ITEM_TRACKING } from '@/components/work-items/feature'
 import { WorkItemSidebarLists } from '@/components/work-items/WorkItemSidebarLists'
 import { AUTOMATION_PAGE } from '@/components/automation/feature'
+import { AutomationSidebarList } from '@/components/automation/AutomationSidebarList'
 
 import {
   enterKnowledge,
@@ -523,21 +524,31 @@ export function AppSidebar() {
             >
               {t('sidebar.newWorkItem')}
             </button>
+          ) : sidebarSection === 'automation' && AUTOMATION_PAGE ? (
+            <button
+              type="button"
+              data-testid="sidebar-new-automation"
+              data-no-drag
+              onClick={() => {
+                void (async () => {
+                  await enterAutomationsSection()
+                  const { useAutomationStore } = await import(
+                    '@/store/automationStore'
+                  )
+                  useAutomationStore.getState().requestCreate()
+                })()
+              }}
+              className="rounded-md px-1.5 py-0.5 text-caption text-ink-tertiary transition-colors duration-chrome hover:bg-state-hover hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink/20"
+            >
+              {t('sidebar.newAutomation')}
+            </button>
           ) : null}
         </div>
 
         {sidebarSection === 'tasks' && WORK_ITEM_TRACKING ? (
           <WorkItemSidebarLists />
         ) : sidebarSection === 'automation' && AUTOMATION_PAGE ? (
-          <div
-            className="flex flex-col items-center gap-1 px-3 py-6 text-center"
-            role="status"
-            data-testid="sidebar-automations-empty"
-          >
-            <p className="text-meta text-ink-tertiary">
-              {t('sidebar.automationsHint')}
-            </p>
-          </div>
+          <AutomationSidebarList />
         ) : sidebarSection === 'terminals' && TERMINAL_MANAGEMENT ? (
           managedTerminals.length === 0 ? (
             <div

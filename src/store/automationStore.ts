@@ -178,10 +178,18 @@ export interface AutomationStore {
   runs: AutomationRun[]
   /** True after first session:list:result (and reconnect lists). */
   sessionListReady: boolean
+  /** Sidebar / list selection for run history panel. */
+  selectedId: string | null
+  /** Sidebar "New" sets this; AutomationsPage opens the create editor and clears it. */
+  pendingCreate: boolean
 
   load: () => Promise<void>
   markSessionListReady: () => void
   recoverOrphanRuns: (nowMs?: number) => Promise<void>
+
+  select: (id: string | null) => void
+  requestCreate: () => void
+  clearPendingCreate: () => void
 
   create: (input?: CreateAutomationInput) => Promise<string>
   update: (id: string, patch: Partial<Automation>) => Promise<void>
@@ -299,6 +307,20 @@ export const useAutomationStore = create<AutomationStore>((set, get) => ({
   automations: [],
   runs: [],
   sessionListReady: false,
+  selectedId: null,
+  pendingCreate: false,
+
+  select: (id) => {
+    set({ selectedId: id })
+  },
+
+  requestCreate: () => {
+    set({ pendingCreate: true })
+  },
+
+  clearPendingCreate: () => {
+    set({ pendingCreate: false })
+  },
 
   load: async () => {
     set({ loading: true })
@@ -518,6 +540,7 @@ export const useAutomationStore = create<AutomationStore>((set, get) => ({
     // Hard delete v1; runs may retain orphan automationId rows.
     set((s) => ({
       automations: s.automations.filter((a) => a.id !== id),
+      selectedId: s.selectedId === id ? null : s.selectedId,
       error: null,
     }))
     // Drop claim/watch if any
@@ -889,5 +912,7 @@ export function __resetAutomationStoreInternalsForTests(): void {
     automations: [],
     runs: [],
     sessionListReady: false,
+    selectedId: null,
+    pendingCreate: false,
   })
 }

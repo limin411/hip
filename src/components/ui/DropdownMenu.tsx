@@ -11,13 +11,15 @@ export const DropdownMenuGroup = DropdownPrimitive.Group
 export const DropdownMenuContent = forwardRef<
   React.ElementRef<typeof DropdownPrimitive.Content>,
   React.ComponentPropsWithoutRef<typeof DropdownPrimitive.Content>
->(({ className, sideOffset = 6, ...props }, ref) => (
+>(({ className, sideOffset = 6, style, ...props }, ref) => (
   <DropdownPrimitive.Portal>
     <DropdownPrimitive.Content
       ref={ref}
       sideOffset={sideOffset}
+      // Above Modal (z-50). Inline style is more reliable than class alone on portaled layers.
+      style={{ zIndex: 100, ...style }}
       className={cn(
-        'z-50 min-w-[200px] rounded-lg border border-border bg-surface p-1 shadow-menu',
+        'z-[100] min-w-[200px] rounded-lg border border-border bg-surface p-1 shadow-menu',
         'origin-[var(--radix-dropdown-menu-content-transform-origin)]',
         menuMotion,
         className,

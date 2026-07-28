@@ -6,7 +6,8 @@
  * Floating layers above Modal (z-50). Radix wrappers default to z-index:auto.
  */
 [data-radix-popper-content-wrapper] {
-  z-index: 60 !important;
+  /* Above Modal (z-50). Must be on the wrapper (positioned layer), not only Content. */
+  z-index: 100 !important;
 }
 [data-date-field-panel] {
   z-index: 70 !important;

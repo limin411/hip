@@ -35,6 +35,8 @@ function isPortaledFloatingTarget(target: EventTarget | null): boolean {
         '[role="listbox"]',
         // DateField month panel (createPortal to body)
         '[data-date-field-panel]',
+        // ModelSelectField panel (createPortal to body; includes search input)
+        '[data-model-select-panel]',
       ].join(','),
     ),
   )

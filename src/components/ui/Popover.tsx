@@ -19,6 +19,7 @@ export const PopoverContent = forwardRef<
       sideOffset={sideOffset}
       // z-index must win over Modal (z-50). Inline style reaches the positioned
       // layer more reliably than Tailwind alone on some Radix wrapper setups.
+      // Caller may raise further (e.g. ModelSelectField uses 100).
       style={{ zIndex: 60, ...style }}
       className={cn(
         'z-[60] w-[min(360px,calc(100vw-2rem))] rounded-lg border border-border bg-surface p-0 shadow-menu outline-none',

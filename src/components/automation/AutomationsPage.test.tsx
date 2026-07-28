@@ -62,13 +62,31 @@ vi.mock('@/store/skillsStore', () => {
 
 vi.mock('@/store/hipConfigStore', () => {
   const state = {
-    config: { window: { closeAction: 'quit', trayEnabled: false } },
+    config: {
+      window: { closeAction: 'quit', trayEnabled: false },
+      agents: [] as { id: string; name: string; kind: string; enabled: boolean }[],
+    },
     loaded: true,
     load: vi.fn(),
   }
   const useHipConfigStore = (sel: (s: typeof state) => unknown) => sel(state)
   useHipConfigStore.getState = () => state
-  return { useHipConfigStore }
+  return {
+    useHipConfigStore,
+    useAgents: () => state.config.agents,
+  }
+})
+
+vi.mock('@/store/providersStore', () => {
+  const state = {
+    catalog: {},
+    config: { providers: {} },
+    keyConfigured: {},
+    loaded: true,
+  }
+  const useProvidersStore = (sel: (s: typeof state) => unknown) => sel(state)
+  useProvidersStore.getState = () => state
+  return { useProvidersStore }
 })
 
 vi.mock('@/ipc/dialog', () => ({

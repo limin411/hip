@@ -1,13 +1,16 @@
 import { describe, it, expect } from 'vitest'
 import type { AgentModelGroup } from '@/lib/agentModelOptions'
+import { groupModelOptions } from '@/lib/agentModelOptions'
 import {
-  modelPickerItems,
   currentModelLabel,
   filterModelGroups,
   flattenModelKeys,
   countModels,
   MODEL_SEARCH_THRESHOLD,
-} from './ModelPicker.js'
+} from '@/lib/modelPickerSearch.js'
+
+/** Alias kept in parity with ModelPicker.modelPickerItems. */
+const modelPickerItems = groupModelOptions
 
 const catalog = {
   openai: { id: 'openai', name: 'OpenAI', env: [], api: 'x', models: { 'gpt-4o': {} } },

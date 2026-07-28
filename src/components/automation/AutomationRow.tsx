@@ -228,17 +228,6 @@ export function AutomationRow({
               <TriangleAlert className="h-3.5 w-3.5" strokeWidth={1.75} aria-hidden />
             </span>
           ) : null}
-          {statusLabel ? (
-            <Badge
-              size="sm"
-              variant={statusVariant(status, running)}
-              title={errorLine ?? automation.lastError ?? undefined}
-              data-testid={`automation-status-${automation.id}`}
-              className="shrink-0"
-            >
-              {statusLabel}
-            </Badge>
-          ) : null}
         </div>
 
         <div className="mt-0.5 flex min-w-0 flex-wrap items-center gap-x-2 gap-y-0.5 text-meta text-ink-tertiary">
@@ -262,6 +251,17 @@ export function AutomationRow({
                 when: formatRelativeTime(automation.lastRunAt, locale),
               })}
             </span>
+          ) : null}
+          {statusLabel ? (
+            <Badge
+              size="sm"
+              variant={statusVariant(status, running)}
+              title={errorLine ?? automation.lastError ?? undefined}
+              data-testid={`automation-status-${automation.id}`}
+              className="shrink-0"
+            >
+              {statusLabel}
+            </Badge>
           ) : null}
           {automation.projectPath ? (
             <span className="max-w-[14rem] truncate" title={automation.projectPath}>

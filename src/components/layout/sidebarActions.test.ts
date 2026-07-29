@@ -65,7 +65,7 @@ vi.mock('@/domain', async (importOriginal) => {
 import {
   assignSectionAfterLeavingKnowledge,
   enterKnowledge,
-  enterPlaceholderSection,
+  enterWorkbenchSection,
   enterSection,
   enterWorkItemsSection,
   enterAutomationsSection,
@@ -167,9 +167,9 @@ describe('sidebarActions', () => {
     expect(useUiStore.getState().sidebarSection).toBe('projects')
   })
 
-  it('enterPlaceholderSection sets workbench view and section', async () => {
+  it('enterWorkbenchSection sets workbench view and section', async () => {
     useUiStore.setState({ activeView: 'chat', sidebarSection: 'chats' })
-    await enterPlaceholderSection('workbench')
+    await enterWorkbenchSection()
     expect(useUiStore.getState().activeView).toBe('workbench')
     expect(useUiStore.getState().sidebarSection).toBe('workbench')
     expect(setSurface).not.toHaveBeenCalled()
@@ -429,9 +429,9 @@ describe('sidebarActions', () => {
     expect(useUiStore.getState().activeView).toBe('terminals')
   })
 
-  it('enterPlaceholderSection flushes work items when leaving tasks', async () => {
+  it('enterWorkbenchSection flushes work items when leaving tasks', async () => {
     useUiStore.setState({ activeView: 'tasks', sidebarSection: 'tasks' })
-    await enterPlaceholderSection('workbench')
+    await enterWorkbenchSection()
     expect(workItemFlushSave).toHaveBeenCalled()
     expect(useUiStore.getState().activeView).toBe('workbench')
   })

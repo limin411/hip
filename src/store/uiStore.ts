@@ -4,6 +4,7 @@ import type { CheckpointMode } from '@hip/protocol'
 import { TERMINAL_MANAGEMENT } from '@/components/terminals/feature'
 import { WORK_ITEM_TRACKING } from '@/components/work-items/feature'
 import { AUTOMATION_PAGE } from '@/components/automation/feature'
+import { WORKBENCH_PAGE } from '@/components/workbench/feature'
 import {
   clampSidebarWidth,
   SIDEBAR_WIDTH_DEFAULT,
@@ -41,21 +42,23 @@ export type SidebarSection =
 
 /**
  * Primary nav sections that only show a "coming soon" placeholder page.
+ * When WORKBENCH_PAGE is on, `workbench` is a real section (not placeholder).
  * When TERMINAL_MANAGEMENT is on, `terminals` is a real section (not placeholder) — K14.
  * When WORK_ITEM_TRACKING is on, `tasks` is a real section (not placeholder).
  * When AUTOMATION_PAGE is on, `automation` is a real section (not placeholder).
  */
 export type PlaceholderSidebarSection =
-  | 'workbench'
+  | (typeof WORKBENCH_PAGE extends true ? never : 'workbench')
   | (typeof AUTOMATION_PAGE extends true ? never : 'automation')
   | (typeof TERMINAL_MANAGEMENT extends true ? never : 'terminals')
   | (typeof WORK_ITEM_TRACKING extends true ? never : 'tasks')
 
 export function isPlaceholderSidebarSection(s: SidebarSection): s is PlaceholderSidebarSection {
+  if (s === 'workbench') return !WORKBENCH_PAGE
   if (s === 'terminals') return !TERMINAL_MANAGEMENT
   if (s === 'tasks') return !WORK_ITEM_TRACKING
   if (s === 'automation') return !AUTOMATION_PAGE
-  return s === 'workbench'
+  return false
 }
 
 /** Settings panel left-nav page ids (see SettingsPanel PAGES). */
@@ -139,6 +142,10 @@ function seedLanguage(): AppLanguage {
   return 'zh-CN'
 }
 
+export function normalizeBool(raw: unknown, fallback: boolean): boolean {
+  return typeof raw === 'boolean' ? raw : fallback
+}
+
 /** Slice of uiStore written to localStorage under `hip-ui`. */
 export type UiPersistedState = {
   chatSessionId: string | null
@@ -154,6 +161,10 @@ export type UiPersistedState = {
   sidebarOpen: boolean
   /** Left sidebar width in px; clamped on write / rehydrate. */
   sidebarWidth: number
+  /** Workbench: show Flat Butt cartoon on zone cards / hero. */
+  workbenchShowCartoon: boolean
+  /** Workbench: force static mascot (also honors prefers-reduced-motion). */
+  workbenchReduceMotion: boolean
 }
 
 /** Special / placeholder views are session-ephemeral; cold launch always lands on workbench. */
@@ -200,6 +211,14 @@ export function mergeUiPersistedState<
     // Drop removed pages (e.g. legacy 'help') so tabs stay valid.
     settingsPage: normalizeSettingsPage((rest as { settingsPage?: unknown }).settingsPage),
     sidebarWidth: clampSidebarWidth((rest as { sidebarWidth?: unknown }).sidebarWidth),
+    workbenchShowCartoon: normalizeBool(
+      (rest as { workbenchShowCartoon?: unknown }).workbenchShowCartoon,
+      true,
+    ),
+    workbenchReduceMotion: normalizeBool(
+      (rest as { workbenchReduceMotion?: unknown }).workbenchReduceMotion,
+      false,
+    ),
   }
 }
 
@@ -278,6 +297,13 @@ interface UiState {
 
   density: UiDensity
   setDensity: (d: UiDensity) => void
+
+  /** Workbench: show cartoon mascots (default true). */
+  workbenchShowCartoon: boolean
+  setWorkbenchShowCartoon: (v: boolean) => void
+  /** Workbench: force reduced motion for mascots. */
+  workbenchReduceMotion: boolean
+  setWorkbenchReduceMotion: (v: boolean) => void
 }
 
 // In-memory fallback so node test runs (no localStorage/DOM) don't crash on persist.
@@ -394,6 +420,13 @@ export const useUiStore = create<UiState>()(
 
       density: 'comfortable',
       setDensity: (d) => set((s) => (s.density === d ? s : { density: d })),
+
+      workbenchShowCartoon: true,
+      setWorkbenchShowCartoon: (v) =>
+        set((s) => (s.workbenchShowCartoon === v ? s : { workbenchShowCartoon: v })),
+      workbenchReduceMotion: false,
+      setWorkbenchReduceMotion: (v) =>
+        set((s) => (s.workbenchReduceMotion === v ? s : { workbenchReduceMotion: v })),
     }),
     {
       name: 'hip-ui',
@@ -411,6 +444,8 @@ export const useUiStore = create<UiState>()(
         checkpointMode: s.checkpointMode,
         sidebarOpen: s.sidebarOpen,
         sidebarWidth: s.sidebarWidth,
+        workbenchShowCartoon: s.workbenchShowCartoon,
+        workbenchReduceMotion: s.workbenchReduceMotion,
       }),
       merge: (persistedState, currentState) =>
         mergeUiPersistedState(persistedState, currentState as UiState),

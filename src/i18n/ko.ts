@@ -880,6 +880,11 @@ export const ko = {
       "comfortable": "편안하게",
       "compact": "조밀하게"
     },
+      "workbenchSection": "워크벤치",
+      "workbenchShowCartoon": "만화 캐릭터 표시",
+      "workbenchShowCartoonDesc": "영역 카드와 개요 히어로에 Flat Butt 마스코트를 표시합니다.",
+      "workbenchReduceMotion": "캐릭터 움직임 줄이기",
+      "workbenchReduceMotionDesc": "모션 대신 정적 로고를 사용합니다(시스템 설정도 존중).",
     "terminalShell": "기본 터미널",
     "terminalShellDesc": "코드 패널 터미널에서 사용하는 셸입니다. 변경 사항을 적용하려면 터미널을 다시 시작하세요.",
     "terminalShells": {
@@ -1854,6 +1859,74 @@ export const ko = {
     "terminals": "터미널 관리가 곧 출시됩니다 — 여러 터미널 세션을 한 곳에서 관리하세요.",
     "tasks": "작업 항목 추적이 곧 출시됩니다 — 작업 항목을 추적하세요.",
     "automation": "자동화가 곧 출시됩니다 — 워크플로우와 예약 작업을 구성하세요."
+  },
+  "workbench": {
+    "hero": {
+      "region": "워크벤치 개요",
+      "titleIdle": "워크벤치 준비됨",
+      "titleRunning": "작업이 진행 중입니다",
+      "titleAttention": "확인이 필요한 영역이 있습니다",
+      "titleDone": "잘 마무리되었습니다",
+      "greetingMorning": "좋은 아침입니다 — 워크벤치 준비됨",
+      "greetingAfternoon": "좋은 오후입니다 — 워크벤치 준비됨",
+      "greetingEvening": "좋은 저녁입니다 — 워크벤치 준비됨",
+      "greetingNight": "늦은 밤에도 — 워크벤치 준비됨",
+      "subIdle": "영역 상태를 한눈에 · 숫자는 신뢰할 수 있는 정보원입니다",
+      "subRunning": "실행 중인 영역은 캐릭터 동작이 빨라집니다",
+      "subAttention": "차단/실패는 경고로 표시 · 클릭하여 처리",
+      "subDone": "최근 완료는 잠시 강조됩니다"
+    },
+    "metrics": {
+      "running": "실행 중",
+      "attention": "주의",
+      "done": "완료"
+    },
+    "state": {
+      "idle": "대기",
+      "running": "실행",
+      "blocked": "차단",
+      "done": "완료",
+      "fail": "실패"
+    },
+    "zone": {
+      "sessions": "세션",
+      "tasks": "작업",
+      "automations": "자동화",
+      "knowledge": "지식",
+      "terminals": "터미널",
+      "workflows": "워크플로"
+    },
+    "metric": {
+      "sessionsRunning": "턴 {{count}}",
+      "sessionsIdle": "실행 없음",
+      "sessionsSecondary": "활성 작업 {{count}}",
+      "tasksProgress": "{{done}} / {{total}}",
+      "tasksInProgress": "진행 중 {{count}}",
+      "tasksOpen": "미완료 {{count}}",
+      "automationsFailed": "실패 {{count}}",
+      "automationsWaiting": "대기 {{count}}",
+      "automationsRunning": "실행 중 {{count}}",
+      "automationsIdle": "예약됨",
+      "automationsEnabled": "사용 {{count}}",
+      "knowledgeSynced": "동기화됨",
+      "knowledgeSpaces": "스페이스 {{count}}",
+      "terminalsRunning": "shell {{count}}",
+      "terminalsOpen": "열림 {{count}}",
+      "terminalsIdle": "대기",
+      "terminalsSecondary": "터미널 {{count}}"
+    },
+    "openZone": "{{name}} 열기 →",
+    "zonesRegion": "기능 영역",
+    "shortcuts": {
+      "title": "빠른 시작",
+      "continueSession": "계속: {{title}}",
+      "continueSessionEmpty": "최근 세션 없음",
+      "newChat": "새 대화",
+      "openKnowledge": "지식 열기",
+      "openTasks": "작업 열기",
+      "openAutomations": "자동화 열기",
+      "openTerminals": "터미널 열기"
+    }
   },
   "terminals": {
     "title": "터미널 관리",

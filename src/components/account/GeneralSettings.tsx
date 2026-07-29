@@ -27,6 +27,7 @@ import { CODE_TERMINAL } from '@/components/artifact/terminalFeature'
 import { TERMINAL_MANAGEMENT } from '@/components/terminals/feature'
 import { normalizeTerminalColorThemeId } from '@/components/artifact/terminalTheme'
 import { Switch } from '@/components/ui/Switch'
+import { WORKBENCH_PAGE } from '@/components/workbench/feature'
 
 const LANGUAGE_KEYS: AppLanguage[] = ['zh-CN', 'zh-TW', 'en', 'ja', 'ko']
 
@@ -53,6 +54,10 @@ export function GeneralSettings() {
   const setTheme = useUiStore((s) => s.setTheme)
   const density = useUiStore((s) => s.density)
   const setDensity = useUiStore((s) => s.setDensity)
+  const workbenchShowCartoon = useUiStore((s) => s.workbenchShowCartoon)
+  const setWorkbenchShowCartoon = useUiStore((s) => s.setWorkbenchShowCartoon)
+  const workbenchReduceMotion = useUiStore((s) => s.workbenchReduceMotion)
+  const setWorkbenchReduceMotion = useUiStore((s) => s.setWorkbenchReduceMotion)
 
   const terminalShell = useHipConfigStore((s) => s.config.terminal?.shell ?? 'default')
   const terminalColor = useHipConfigStore((s) =>
@@ -193,6 +198,47 @@ export function GeneralSettings() {
           </DropdownMenu>
         </div>
       </div>
+      {WORKBENCH_PAGE ? (
+        <>
+          <div className="px-8 pb-1 pt-5">
+            <div className="text-meta font-semibold uppercase tracking-wide text-ink-tertiary">
+              {t('settings.workbenchSection')}
+            </div>
+          </div>
+          <div
+            className="flex items-center justify-between gap-6 px-8 py-4"
+            data-testid="settings-workbench-cartoon"
+          >
+            <div className="min-w-0 flex-1">
+              <div className="text-body font-medium text-ink">{t('settings.workbenchShowCartoon')}</div>
+              <div className="mt-0.5 text-meta leading-relaxed text-ink-tertiary">
+                {t('settings.workbenchShowCartoonDesc')}
+              </div>
+            </div>
+            <Switch
+              checked={workbenchShowCartoon}
+              onCheckedChange={setWorkbenchShowCartoon}
+              aria-label={t('settings.workbenchShowCartoon')}
+            />
+          </div>
+          <div
+            className="flex items-center justify-between gap-6 px-8 py-4"
+            data-testid="settings-workbench-reduce-motion"
+          >
+            <div className="min-w-0 flex-1">
+              <div className="text-body font-medium text-ink">{t('settings.workbenchReduceMotion')}</div>
+              <div className="mt-0.5 text-meta leading-relaxed text-ink-tertiary">
+                {t('settings.workbenchReduceMotionDesc')}
+              </div>
+            </div>
+            <Switch
+              checked={workbenchReduceMotion}
+              onCheckedChange={setWorkbenchReduceMotion}
+              aria-label={t('settings.workbenchReduceMotion')}
+            />
+          </div>
+        </>
+      ) : null}
       {CODE_TERMINAL ? (
         <div className="flex items-center justify-between gap-6 px-8 py-4" data-testid="settings-terminal-shell">
           <div className="min-w-0 flex-1">

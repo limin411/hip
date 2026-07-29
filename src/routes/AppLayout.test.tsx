@@ -52,6 +52,12 @@ vi.mock('@/components/automation/AutomationRunHost', () => ({
 vi.mock('@/components/automation/feature', () => ({
   AUTOMATION_PAGE: true,
 }))
+vi.mock('@/components/workbench/WorkbenchPage', () => ({
+  WorkbenchPage: () => <div data-testid="workbench-page" />,
+}))
+vi.mock('@/components/workbench/feature', () => ({
+  WORKBENCH_PAGE: true,
+}))
 
 describe('AppLayout', () => {
   it('renders final shell: sidebar + main toolbar, no title bar / floating avatar', () => {
@@ -90,10 +96,11 @@ describe('AppLayout', () => {
     expect(screen.getByTestId('main-toolbar')).toBeInTheDocument()
   })
 
-  it('renders workbench placeholder as default home view', () => {
+  it('renders WorkbenchPage as default home view when WORKBENCH_PAGE on', () => {
     useUiStore.setState({ activeView: 'workbench', sidebarSection: 'workbench' })
     render(<AppLayout />, { wrapper: MemoryRouter })
-    expect(screen.getByTestId('placeholder-workbench')).toBeInTheDocument()
+    expect(screen.getByTestId('workbench-page')).toBeInTheDocument()
+    expect(screen.queryByTestId('placeholder-workbench')).not.toBeInTheDocument()
   })
 
   it('renders TerminalManagementPage when terminals view and flag on', () => {

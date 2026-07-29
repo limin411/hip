@@ -130,6 +130,17 @@ export async function enterPlaceholderSection(section: PlaceholderSidebarSection
 }
 
 /**
+ * Enter workbench home (overview + zone progress).
+ * Used when WORKBENCH_PAGE is on; flag-off path still uses enterPlaceholderSection.
+ */
+export async function enterWorkbenchSection(): Promise<void> {
+  await leaveActiveSurfaceIfNeeded()
+  useUiStore.getState().setSidebarSection('workbench')
+  useUiStore.getState().setActiveView('workbench')
+  recordNavEntry()
+}
+
+/**
  * Enter terminal management (K14): leave knowledge/tasks if needed, set section + view.
  * Used when TERMINAL_MANAGEMENT is on; flag-off path still uses enterPlaceholderSection.
  *

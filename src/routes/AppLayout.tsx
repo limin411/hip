@@ -39,6 +39,8 @@ import { WorkItemsPage } from '@/components/work-items/WorkItemsPage'
 import { AUTOMATION_PAGE } from '@/components/automation/feature'
 import { AutomationsPage } from '@/components/automation/AutomationsPage'
 import { AutomationRunHost } from '@/components/automation/AutomationRunHost'
+import { WORKBENCH_PAGE } from '@/components/workbench/feature'
+import { WorkbenchPage } from '@/components/workbench/WorkbenchPage'
 import { TerminalFilesPanel } from '@/components/terminals/TerminalFilesPanel'
 import { startTerminalBridge } from '@/ipc/pty'
 import { useProjectPathStore } from '@/store/projectPathStore'
@@ -173,6 +175,7 @@ export function AppLayout() {
     if (activeView === 'settings') return <SettingsPage />
     if (activeView === 'knowledge') return <KnowledgePage />
     if (activeView === 'workbench') {
+      if (WORKBENCH_PAGE) return <WorkbenchPage />
       return (
         <PlaceholderPage
           titleKey="sidebar.nav.workbench"

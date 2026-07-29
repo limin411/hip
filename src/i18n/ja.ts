@@ -880,6 +880,11 @@ export const ja = {
       "comfortable": "ゆったり",
       "compact": "コンパクト"
     },
+      "workbenchSection": "ワークベンチ",
+      "workbenchShowCartoon": "マスコットを表示",
+      "workbenchShowCartoonDesc": "ゾーンカードと概要ヒーローに Flat Butt を表示します。",
+      "workbenchReduceMotion": "マスコットの動きを抑える",
+      "workbenchReduceMotionDesc": "モーションの代わりに静止ロゴを使います（システムの設定も尊重）。",
     "terminalShell": "デフォルトのターミナル",
     "terminalShellDesc": "コードパネルのターミナルで使用するシェルです。変更を反映するにはターミナルを再起動してください。",
     "terminalShells": {
@@ -1854,6 +1859,74 @@ export const ja = {
     "terminals": "ターミナル管理は近日公開 — 複数のターミナルセッションを一箇所で管理できます。",
     "tasks": "事項トラッキングは近日公開 — 作業項目をフォローアップできます。",
     "automation": "自動化は近日公開 — ワークフローやスケジュールジョブを設定できます。"
+  },
+  "workbench": {
+    "hero": {
+      "region": "ワークベンチ概要",
+      "titleIdle": "ワークベンチ準備完了",
+      "titleRunning": "作業が進行中です",
+      "titleAttention": "確認が必要なエリアがあります",
+      "titleDone": "一段落お疲れさま",
+      "greetingMorning": "おはようございます — ワークベンチ準備完了",
+      "greetingAfternoon": "こんにちは — ワークベンチ準備完了",
+      "greetingEvening": "こんばんは — ワークベンチ準備完了",
+      "greetingNight": "夜遅くまで — ワークベンチ準備完了",
+      "subIdle": "各エリアの状況を一覧 · 数値は信頼できる情報源です",
+      "subRunning": "実行中のエリアはマスコットが活発になります",
+      "subAttention": "ブロック/失敗は警告表示 · クリックで対処",
+      "subDone": "最近の完了はしばらくハイライトされます"
+    },
+    "metrics": {
+      "running": "実行中",
+      "attention": "要確認",
+      "done": "完了"
+    },
+    "state": {
+      "idle": "待機",
+      "running": "実行中",
+      "blocked": "ブロック",
+      "done": "完了",
+      "fail": "失敗"
+    },
+    "zone": {
+      "sessions": "セッション",
+      "tasks": "タスク",
+      "automations": "自動化",
+      "knowledge": "ナレッジ",
+      "terminals": "ターミナル",
+      "workflows": "ワークフロー"
+    },
+    "metric": {
+      "sessionsRunning": "{{count}} ターン",
+      "sessionsIdle": "実行なし",
+      "sessionsSecondary": "アクティブ作業 {{count}}",
+      "tasksProgress": "{{done}} / {{total}}",
+      "tasksInProgress": "進行中 {{count}}",
+      "tasksOpen": "未完了 {{count}}",
+      "automationsFailed": "失敗 {{count}}",
+      "automationsWaiting": "待機 {{count}}",
+      "automationsRunning": "実行中 {{count}}",
+      "automationsIdle": "予定",
+      "automationsEnabled": "有効 {{count}}",
+      "knowledgeSynced": "同期済み",
+      "knowledgeSpaces": "スペース {{count}}",
+      "terminalsRunning": "shell {{count}}",
+      "terminalsOpen": "開いています {{count}}",
+      "terminalsIdle": "待機",
+      "terminalsSecondary": "ターミナル {{count}}"
+    },
+    "openZone": "{{name}} を開く →",
+    "zonesRegion": "機能エリア",
+    "shortcuts": {
+      "title": "クイック起動",
+      "continueSession": "続行: {{title}}",
+      "continueSessionEmpty": "最近のセッションなし",
+      "newChat": "新しい会話",
+      "openKnowledge": "ナレッジを開く",
+      "openTasks": "タスクを開く",
+      "openAutomations": "自動化を開く",
+      "openTerminals": "ターミナルを開く"
+    }
   },
   "terminals": {
     "title": "ターミナル管理",

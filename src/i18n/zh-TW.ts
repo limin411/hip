@@ -888,6 +888,11 @@ export const zhTW = {
       "comfortable": "舒適",
       "compact": "緊湊"
     },
+      "workbenchSection": "工作台",
+      "workbenchShowCartoon": "顯示卡通",
+      "workbenchShowCartoonDesc": "在功能區卡片與總覽 Hero 上展示 Flat Butt 吉祥物。",
+      "workbenchReduceMotion": "減少卡通動效",
+      "workbenchReduceMotionDesc": "使用靜態 Logo 替代 motion 片段（也尊重系統減少動態偏好）。",
     "terminalShell": "預設終端",
     "terminalShellDesc": "程式碼面板終端使用的預設 shell。修改後需重新啟動終端生效。",
     "terminalShells": {
@@ -1861,6 +1866,74 @@ export const zhTW = {
     "terminals": "終端管理即將上線，用於集中管理多路終端會話。",
     "tasks": "事項追蹤即將上線，用於跟進事項。",
     "automation": "自動化即將上線，用於設定工作流與定時任務。"
+  },
+  "workbench": {
+    "hero": {
+      "region": "工作台總覽",
+      "titleIdle": "工作台就緒",
+      "titleRunning": "有任務在推進",
+      "titleAttention": "有區域需要關注",
+      "titleDone": "階段收工漂亮",
+      "greetingMorning": "早上好，工作台就緒",
+      "greetingAfternoon": "下午好，工作台就緒",
+      "greetingEvening": "晚上好，工作台就緒",
+      "greetingNight": "夜深了，工作台仍就緒",
+      "subIdle": "各功能區進度一覽 · 數字仍是可信資訊源",
+      "subRunning": "執行中的區域會加快卡通動作",
+      "subAttention": "阻塞或失敗區會標警告 · 點擊前往處理",
+      "subDone": "近期完成的區域會短暫慶祝"
+    },
+    "metrics": {
+      "running": "執行中",
+      "attention": "需關注",
+      "done": "完成"
+    },
+    "state": {
+      "idle": "閒置",
+      "running": "執行",
+      "blocked": "阻塞",
+      "done": "完成",
+      "fail": "失敗"
+    },
+    "zone": {
+      "sessions": "會話",
+      "tasks": "事項",
+      "automations": "自動化",
+      "knowledge": "知識",
+      "terminals": "終端",
+      "workflows": "工作流"
+    },
+    "metric": {
+      "sessionsRunning": "{{count}} 個 turn",
+      "sessionsIdle": "無執行",
+      "sessionsSecondary": "{{count}} 項活躍工作",
+      "tasksProgress": "{{done}} / {{total}}",
+      "tasksInProgress": "{{count}} 進行中",
+      "tasksOpen": "{{count}} 未完成",
+      "automationsFailed": "{{count}} 失敗",
+      "automationsWaiting": "{{count}} 等待確認",
+      "automationsRunning": "{{count}} 執行中",
+      "automationsIdle": "計畫中",
+      "automationsEnabled": "{{count}} 已啟用",
+      "knowledgeSynced": "已同步",
+      "knowledgeSpaces": "{{count}} 個空間",
+      "terminalsRunning": "{{count}} shell",
+      "terminalsOpen": "{{count}} 已開啟",
+      "terminalsIdle": "空閒",
+      "terminalsSecondary": "{{count}} 個終端"
+    },
+    "openZone": "開啟{{name}} →",
+    "zonesRegion": "功能區域",
+    "shortcuts": {
+      "title": "快捷入口",
+      "continueSession": "繼續：{{title}}",
+      "continueSessionEmpty": "暫無最近會話",
+      "newChat": "新建對話",
+      "openKnowledge": "開啟知識庫",
+      "openTasks": "開啟事項",
+      "openAutomations": "開啟自動化",
+      "openTerminals": "開啟終端"
+    }
   },
   "terminals": {
     "title": "終端管理",

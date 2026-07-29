@@ -341,6 +341,8 @@ describe('uiStore persistence partialize', () => {
       checkpointMode: s.checkpointMode,
       sidebarOpen: s.sidebarOpen,
       sidebarWidth: s.sidebarWidth,
+      workbenchShowCartoon: s.workbenchShowCartoon,
+      workbenchReduceMotion: s.workbenchReduceMotion,
     }
     expect(persisted).toEqual({
       chatSessionId: 'a',
@@ -353,6 +355,8 @@ describe('uiStore persistence partialize', () => {
       checkpointMode: 'since-start',
       sidebarOpen: s.sidebarOpen,
       sidebarWidth: s.sidebarWidth,
+      workbenchShowCartoon: true,
+      workbenchReduceMotion: false,
     })
     expect(persisted).not.toHaveProperty('activeTab')
     expect(persisted).not.toHaveProperty('scrollTargetMessageId')
@@ -455,7 +459,7 @@ describe('uiStore - isPlaceholderSidebarSection (work items / automation flags)'
     expect(AUTOMATION_PAGE).toBe(true)
     expect(isPlaceholderSidebarSection('tasks')).toBe(false)
     expect(isPlaceholderSidebarSection('automation')).toBe(false)
-    expect(isPlaceholderSidebarSection('workbench')).toBe(true)
+    expect(isPlaceholderSidebarSection('workbench')).toBe(false)
     // Real sections
     expect(isPlaceholderSidebarSection('chats')).toBe(false)
     expect(isPlaceholderSidebarSection('projects')).toBe(false)

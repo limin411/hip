@@ -69,10 +69,12 @@ import { WORK_ITEM_TRACKING } from '@/components/work-items/feature'
 import { WorkItemSidebarLists } from '@/components/work-items/WorkItemSidebarLists'
 import { AUTOMATION_PAGE } from '@/components/automation/feature'
 import { AutomationSidebarList } from '@/components/automation/AutomationSidebarList'
+import { WORKBENCH_PAGE } from '@/components/workbench/feature'
 
 import {
   enterKnowledge,
   enterPlaceholderSection,
+  enterWorkbenchSection,
   enterSection,
   enterTerminalsSection,
   enterWorkItemsSection,
@@ -279,7 +281,8 @@ export function AppSidebar() {
   )
 
   const onNav = (section: SidebarSection) => {
-    if (section === 'knowledge') void enterKnowledge()
+    if (section === 'workbench' && WORKBENCH_PAGE) void enterWorkbenchSection()
+    else if (section === 'knowledge') void enterKnowledge()
     else if (section === 'terminals' && TERMINAL_MANAGEMENT)
       void enterTerminalsSection({ library: true })
     else if (section === 'tasks' && WORK_ITEM_TRACKING) void enterWorkItemsSection()

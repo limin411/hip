@@ -21,6 +21,7 @@ import {
   BookOpen,
   Terminal,
   CheckSquare,
+  Zap,
   type LucideIcon,
 } from 'lucide-react'
 import type { ContextIconName } from './types'
@@ -48,6 +49,7 @@ const ICONS: Record<ContextIconName, LucideIcon> = {
   'link-2': Link2,
   'book-open': BookOpen,
   terminal: Terminal,
+  zap: Zap,
   'check-square': CheckSquare,
 }
 

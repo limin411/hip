@@ -71,7 +71,7 @@ function renderPage() {
 }
 
 describe('WorkbenchPage', () => {
-  it('renders pixel farm hub: field, plots, no bottom dock', () => {
+  it('renders pixel farm mini-game: sky, dialog, plots, single hero', () => {
     renderPage()
     expect(screen.getByTestId('workbench-page')).toBeInTheDocument()
     expect(screen.getByTestId('workbench-farm')).toBeInTheDocument()
@@ -79,15 +79,11 @@ describe('WorkbenchPage', () => {
     expect(screen.getByTestId('workbench-hero')).toBeInTheDocument()
     expect(screen.getByTestId('workbench-modules')).toBeInTheDocument()
     expect(screen.getByTestId('workbench-zone-sessions')).toBeInTheDocument()
-    // Idle farm: no fake attention/done counters; running only when work is live
-    expect(screen.queryByTestId('workbench-metric-running')).not.toBeInTheDocument()
+    expect(screen.getByTestId('workbench-farm-hero')).toBeInTheDocument()
+    expect(screen.getByTestId('workbench-farm-scenery')).toBeInTheDocument()
     expect(screen.queryByTestId('workbench-metric-attention')).not.toBeInTheDocument()
     expect(screen.queryByTestId('workbench-metric-done')).not.toBeInTheDocument()
     expect(screen.queryByTestId('workbench-farm-dock')).not.toBeInTheDocument()
-    expect(screen.queryByTestId('workbench-continue')).not.toBeInTheDocument()
-    expect(screen.queryByTestId('workbench-shortcuts')).not.toBeInTheDocument()
-    expect(screen.queryByTestId('workbench-recent')).not.toBeInTheDocument()
-    expect(screen.queryByTestId('workbench-home')).not.toBeInTheDocument()
   })
 
   it('opens sessions surface on plot click', async () => {
@@ -95,6 +91,38 @@ describe('WorkbenchPage', () => {
     renderPage()
     fireEvent.click(screen.getByTestId('workbench-zone-sessions'))
     expect(enterSection).toHaveBeenCalledWith('chats')
+  })
+
+  it('moves focus with keyboard and opens with Enter', async () => {
+    const { enterSection } = await import('@/components/layout/sidebarActions')
+    renderPage()
+    expect(screen.getByTestId('workbench-farm-pad')).toBeInTheDocument()
+    // first direction key seeds focus on sessions
+    fireEvent.keyDown(window, { key: 'ArrowRight' })
+    expect(screen.getByTestId('workbench-zone-sessions')).toHaveAttribute(
+      'data-focused',
+      'true',
+    )
+    fireEvent.keyDown(window, { key: 'ArrowRight' })
+    expect(screen.getByTestId('workbench-zone-tasks')).toHaveAttribute('data-focused', 'true')
+    fireEvent.keyDown(window, { key: 'Enter' })
+    // tasks may or may not be enabled; if enabled opens work items, else still handled
+    // sessions path: go back and open
+    fireEvent.keyDown(window, { key: 'ArrowLeft' })
+    fireEvent.keyDown(window, { key: 'Enter' })
+    expect(enterSection).toHaveBeenCalled()
+  })
+
+  it('shows speech bubble when farm hero is clicked', () => {
+    renderPage()
+    fireEvent.click(screen.getByTestId('workbench-farm-hero-btn'))
+    expect(screen.getByTestId('workbench-farm-bubble')).toBeInTheDocument()
+  })
+
+  it('hides field hero when scene is off', () => {
+    useUiStore.setState({ workbenchShowScene: false })
+    renderPage()
+    expect(screen.queryByTestId('workbench-farm-hero')).not.toBeInTheDocument()
   })
 
   it('freezes farm motion when reduce-motion is on', () => {

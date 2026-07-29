@@ -1923,8 +1923,20 @@ export const ko = {
       },
       "farm": {
       "kicker": "픽셀 농장",
-      "hint": "밭을 클릭해 서피스 열기 · 작물은 실제 작업으로 자랍니다",
-      "dock": "도구 창고 — 바로가기와 최근 세션"
+      "hint": "WASD / 방향키 이동 · Enter 입장 · 호버 따라가기 · 농부 클릭 대화",
+      "hoverHint": "→ {{name}} · {{state}} · Enter 또는 클릭으로 열기",
+      "padAria": "농장 조작",
+      "padMove": "이동",
+      "padOpen": "입장",
+      "padClick": "농부 클릭하면 대화",
+      "dock": "도구 창고 — 바로가기와 최근 세션",
+      "heroAria": "농장 주인공 — 클릭하면 한마디",
+      "bubble": {
+        "hi": "안녕! 오늘 뭐 심을까?",
+        "tip": "밭마다 서피스야. 클릭해서 들어가!",
+        "hungry": "작물이 목마른 걸까… 아니면 나?",
+        "cheer": "오늘 밭일 잘했어!"
+      }
     },
     "office": {
       "kicker": "픽셀 오피스"

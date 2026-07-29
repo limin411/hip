@@ -1930,8 +1930,20 @@ export const zhTW = {
       },
       "farm": {
       "kicker": "像素農莊",
-      "hint": "點擊菜畦開啟功能面 · 作物隨真實工作生長",
-      "dock": "工具棚 — 快捷入口與最近工作階段"
+      "hint": "WASD / 方向鍵移動 · Enter 進入 · 懸停跟隨 · 點農夫說話",
+      "hoverHint": "→ {{name}} · {{state}} · Enter 或點擊進入",
+      "padAria": "農莊操作",
+      "padMove": "移動",
+      "padOpen": "進入",
+      "padClick": "點農夫說話",
+      "dock": "工具棚 — 快捷入口與最近工作階段",
+      "heroAria": "農莊主角 — 點擊說話",
+      "bubble": {
+        "hi": "嗨！今天種點什麼？",
+        "tip": "每塊田對應一個功能面，點進去就行！",
+        "hungry": "作物好像渴了……還是我餓了？",
+        "cheer": "今天田裡幹得不錯！"
+      }
     },
     "office": {
       "kicker": "像素辦公室"

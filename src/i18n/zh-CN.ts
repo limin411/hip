@@ -1955,8 +1955,20 @@ export const zhCN = {
       },
       farm: {
         kicker: '像素农庄',
-        hint: '点击菜畦打开功能面 · 作物随真实工作生长',
+        hint: 'WASD / 方向键移动 · Enter 进入 · 悬停跟随 · 点农夫说话',
+        hoverHint: '→ {{name}} · {{state}} · Enter 或点击进入',
+        padAria: '农庄操作',
+        padMove: '移动',
+        padOpen: '进入',
+        padClick: '点农夫说话',
         dock: '工具棚 — 快捷入口与最近会话',
+        heroAria: '农庄主角 — 点击说话',
+        bubble: {
+          hi: '嗨！今天种点什么？',
+          tip: '每块田对应一个功能面，点进去就行！',
+          hungry: '作物好像渴了……还是我饿了？',
+          cheer: '今天田里干得不错！',
+        },
       },
       office: {
         kicker: '像素办公室',

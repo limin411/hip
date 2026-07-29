@@ -4,7 +4,7 @@
 |------|-----|
 | **Title** | Workbench Pixel Farm — interactive pixel farming hub |
 | **Date** | 2026-07-29 |
-| **Status** | **Active** (implements & supersedes ambient Calm Home as cold-start UI) |
+| **Status** | **Active** — P1/P2 shipped (pixel sky, dialog HUD, plot buildings, single field hero) |
 | **Supersedes** | [`2026-07-29-workbench-ambient-home.md`](./2026-07-29-workbench-ambient-home.md) as default workbench shell |
 | **Builds on** | `IsoFarmMap` / `FarmSky` / `zoneProgress` / GSAP (in-repo) |
 | **Audience** | Engineers on `src/components/workbench/` |

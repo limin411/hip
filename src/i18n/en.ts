@@ -2004,8 +2004,20 @@ export const en = {
       },
       farm: {
         kicker: 'Pixel farm',
-        hint: 'Click a plot to open a surface · crops grow with real work',
+        hint: 'WASD / arrows move · Enter opens · hover follows · click the farmer to chat',
+        hoverHint: '→ {{name}} · {{state}} · Enter or click to open',
+        padAria: 'Farm controls',
+        padMove: 'move',
+        padOpen: 'open',
+        padClick: 'click farmer to talk',
         dock: 'Toolshed — shortcuts and recent sessions',
+        heroAria: 'Farm hero — click for a line',
+        bubble: {
+          hi: 'Hey! Ready to grow something?',
+          tip: 'Those plots are your surfaces — jump in!',
+          hungry: 'Crops look thirsty… or is that me?',
+          cheer: 'Nice work on the field today!',
+        },
       },
       office: {
         kicker: 'Pixel office',

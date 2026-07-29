@@ -8,8 +8,7 @@ import {
   playPlotHover,
   resetPlotHover,
 } from '../farm/farmJuice'
-import { mascotForZone } from './mascotForZone'
-import { IsoMascot } from './IsoMascot'
+import { PlotBuilding } from '../farm/PlotBuilding'
 import { ISO_TH, ISO_TW, isoProject, ZONE_CELL } from './isoLayout'
 
 const ACCENT: Record<ZoneId, string> = {
@@ -40,17 +39,22 @@ export function IsoPlot({
   originX,
   originY,
   selected,
+  focused = false,
   forceStatic,
   plotIndex,
   onOpen,
+  onHover,
 }: {
   zone: ZoneModel
   originX: number
   originY: number
   selected: boolean
+  /** Keyboard / pointer focus ring (cursor on plot). */
+  focused?: boolean
   forceStatic: boolean
   plotIndex: number
   onOpen: (zone: ZoneModel) => void
+  onHover?: (id: ZoneId | null) => void
 }) {
   const { t } = useTranslation()
   const tr = t as (key: string, opts?: Record<string, string | number>) => string
@@ -60,18 +64,9 @@ export function IsoPlot({
   const label = tr(zone.labelKey)
   const stateLabel = tr(`workbench.state.${zone.state}`)
   const primary = tr(zone.primaryMetricKey, zone.primaryMetricValues)
-  const secondary = zone.secondaryMetricKey
-    ? tr(zone.secondaryMetricKey, zone.secondaryMetricValues)
-    : null
-  const action = mascotForZone(zone.id, zone.state)
   const delay = `${(plotIndex % 5) * 0.28}s`
-  const pct =
-    zone.progress != null && zone.progress > 0
-      ? Math.round(zone.progress * 100)
-      : null
   const growth = growthForZone(zone.state, zone.progress)
   const ticks = Math.max(1, Math.min(4, growth + 1))
-
   const juice = !forceStatic
 
   return (
@@ -83,21 +78,27 @@ export function IsoPlot({
       data-state={zone.state}
       data-growth={growth}
       data-selected={selected ? 'true' : 'false'}
+      data-focused={focused ? 'true' : 'false'}
       data-zone={zone.id}
-      aria-pressed={selected}
+      aria-pressed={selected || focused}
+      tabIndex={focused ? 0 : -1}
       aria-label={`${label}, ${stateLabel}, ${primary}`}
       onClick={() => {
         if (juice) playPlotClick(btnRef.current)
         onOpen(zone)
       }}
       onPointerEnter={() => {
+        onHover?.(zone.id)
         if (juice) playPlotHover(btnRef.current)
       }}
       onPointerLeave={() => {
+        onHover?.(null)
         if (juice) resetPlotHover(btnRef.current)
         else killFarmJuice(btnRef.current)
       }}
+      onFocus={() => onHover?.(zone.id)}
       onBlur={() => {
+        onHover?.(null)
         if (juice) resetPlotHover(btnRef.current)
       }}
       style={
@@ -106,47 +107,48 @@ export function IsoPlot({
           top: originY + y,
           width: ISO_TW,
           height: ISO_TH + 132,
-          zIndex: Math.round(cell.col + cell.row * 10) + 2,
+          zIndex: Math.round(cell.col + cell.row * 10) + 8,
           ['--plot-accent' as string]: ACCENT[zone.id],
           ['--plot-delay' as string]: delay,
         } as CSSProperties
       }
     >
-      <div className="iso-plot-actor" aria-hidden>
-        <div className="iso-plot-actor-bob">
-          <IsoMascot action={action} size={88} forceStatic={forceStatic} />
-        </div>
+      <div className="iso-plot-actor px-plot-build" aria-hidden>
+        <PlotBuilding zoneId={zone.id} />
       </div>
 
       <div className="iso-plot-diamond" aria-hidden>
         <div className="iso-plot-top">
+          {/* tilled furrows */}
+          <span className="px-furrow a" />
+          <span className="px-furrow b" />
+          <span className="px-furrow c" />
           <span className="iso-crop iso-crop-a" />
           <span className="iso-crop iso-crop-b" />
           <span className="iso-crop iso-crop-c" />
           <span className="iso-crop iso-crop-d" />
+          <span className="iso-crop iso-crop-e" />
           {zone.state === 'running' && (
             <span className="iso-plot-spray">
               <i />
               <i />
               <i />
+              <i />
             </span>
           )}
+          {zone.state === 'done' && <span className="px-sparkle" />}
         </div>
         <div className="iso-plot-left" />
         <div className="iso-plot-right" />
       </div>
 
+      {/* wooden stake + signboard */}
       <div className="iso-plot-sign">
+        <span className="px-sign-stake" aria-hidden />
         <span className="iso-plot-sign-name">{label}</span>
         <span className="iso-plot-sign-badge">{stateLabel}</span>
         <span className="iso-plot-sign-metric">{primary}</span>
-        {secondary != null && (
-          <span className="iso-plot-sign-sec">
-            {secondary}
-            {pct != null ? ` · ${pct}%` : ''}
-          </span>
-        )}
-        <span className="px-growth-bar" aria-hidden>
+        <span className="px-growth-bar" aria-hidden title={`${ticks}/4`}>
           {Array.from({ length: 4 }, (_, i) => (
             <i key={i} data-on={i < ticks ? 'true' : 'false'} />
           ))}

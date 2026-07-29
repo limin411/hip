@@ -15,28 +15,23 @@ const noop = () => {}
 const footerProps = {
   onOpenTrash: noop,
   onOpenHistory: noop,
-  onOpenNotifications: noop,
   onOpenSettings: noop,
 }
 
 describe('SidebarAccountFooter', () => {
-  it('renders trash → history → notifications → settings', () => {
+  it('renders trash → history → settings', () => {
     render(<SidebarAccountFooter {...footerProps} />)
     const trash = screen.getByTestId('account-trash-button')
     const history = screen.getByTestId('account-history-button')
-    const notifications = screen.getByTestId('account-notifications-button')
     const settings = screen.getByTestId('account-settings-button')
     expect(trash.compareDocumentPosition(history) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
     expect(
-      history.compareDocumentPosition(notifications) & Node.DOCUMENT_POSITION_FOLLOWING,
+      history.compareDocumentPosition(settings) & Node.DOCUMENT_POSITION_FOLLOWING,
     ).toBeTruthy()
-    expect(
-      notifications.compareDocumentPosition(settings) & Node.DOCUMENT_POSITION_FOLLOWING,
-    ).toBeTruthy()
+    expect(screen.queryByTestId('account-notifications-button')).not.toBeInTheDocument()
     expect(screen.queryByTestId('account-automation-button')).not.toBeInTheDocument()
     expect(screen.getByText('nav.trash')).toBeInTheDocument()
     expect(screen.getByText('nav.history')).toBeInTheDocument()
-    expect(screen.getByText('nav.notifications')).toBeInTheDocument()
     expect(screen.getByText('nav.settings')).toBeInTheDocument()
   })
 
@@ -54,15 +49,6 @@ describe('SidebarAccountFooter', () => {
     expect(onOpenHistory).toHaveBeenCalledTimes(1)
   })
 
-  it('calls onOpenNotifications on click', () => {
-    const onOpenNotifications = vi.fn()
-    render(
-      <SidebarAccountFooter {...footerProps} onOpenNotifications={onOpenNotifications} />,
-    )
-    fireEvent.click(screen.getByTestId('account-notifications-button'))
-    expect(onOpenNotifications).toHaveBeenCalledTimes(1)
-  })
-
   it('calls onOpenSettings on click', () => {
     const onOpenSettings = vi.fn()
     render(<SidebarAccountFooter {...footerProps} onOpenSettings={onOpenSettings} />)
@@ -77,12 +63,6 @@ describe('SidebarAccountFooter', () => {
 
     rerender(<SidebarAccountFooter {...footerProps} active="history" />)
     expect(screen.getByTestId('account-history-button')).toHaveAttribute('aria-current', 'page')
-
-    rerender(<SidebarAccountFooter {...footerProps} active="notifications" />)
-    expect(screen.getByTestId('account-notifications-button')).toHaveAttribute(
-      'aria-current',
-      'page',
-    )
 
     rerender(<SidebarAccountFooter {...footerProps} active="settings" />)
     expect(screen.getByTestId('account-settings-button')).toHaveAttribute('aria-current', 'page')

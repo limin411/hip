@@ -22,7 +22,6 @@ import {
   enterWorkItemsSection,
   enterAutomationsSection,
   openHistoryFromChrome,
-  openNotificationsFromChrome,
   openSettingsFromChrome,
   openTrashFromChrome,
 } from '@/components/layout/sidebarActions'
@@ -130,7 +129,6 @@ export function GlobalCommandPalette() {
       navChat: t('nav.chat'),
       navCode: t('nav.code'),
       navHistory: t('nav.history'),
-      navNotifications: t('nav.notifications'),
       navTrash: t('nav.trash'),
       navSettings: t('nav.settings'),
       navKnowledge: t('commandPalette.navKnowledge'),
@@ -238,7 +236,6 @@ export function GlobalCommandPalette() {
       },
       enterSection: (section: 'projects' | 'chats') => void enterSection(section),
       openHistoryFromChrome: () => void openHistoryFromChrome(),
-      openNotificationsFromChrome: () => void openNotificationsFromChrome(),
       openTrashFromChrome: () => void openTrashFromChrome(),
       openSettingsFromChrome: () => void openSettingsFromChrome(),
       enterKnowledge: () => void enterKnowledge(),

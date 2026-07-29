@@ -1852,7 +1852,6 @@ export const zhTW = {
     "code": "編碼",
     "trash": "回收站",
     "history": "歷史會話",
-    "notifications": "通知中心",
     "automation": "自動化",
     "settings": "設定"
   },
@@ -1861,8 +1860,7 @@ export const zhTW = {
     "workbench": "工作台即將上線，用於總覽與快捷入口。",
     "terminals": "終端管理即將上線，用於集中管理多路終端會話。",
     "tasks": "事項追蹤即將上線，用於跟進事項。",
-    "automation": "自動化即將上線，用於設定工作流與定時任務。",
-    "notifications": "通知中心即將上線，用於彙總任務完成提醒與系統訊息。"
+    "automation": "自動化即將上線，用於設定工作流與定時任務。"
   },
   "terminals": {
     "title": "終端管理",

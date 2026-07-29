@@ -74,7 +74,6 @@ import {
   leaveWorkItems,
   openAutomationFromChrome,
   openHistoryFromChrome,
-  openNotificationsFromChrome,
   openSettingsFromChrome,
   openTrashFromChrome,
 } from './sidebarActions'
@@ -281,17 +280,6 @@ describe('sidebarActions', () => {
     await openHistoryFromChrome()
     expect(flushSave).toHaveBeenCalled()
     expect(useUiStore.getState().activeView).toBe('history')
-    expect(useUiStore.getState().sidebarSection).toBe('chats')
-  })
-
-  it('openNotificationsFromChrome uses same flush/section rule', async () => {
-    useUiStore.setState({
-      activeView: 'knowledge',
-      sidebarSection: 'knowledge',
-    })
-    await openNotificationsFromChrome()
-    expect(flushSave).toHaveBeenCalled()
-    expect(useUiStore.getState().activeView).toBe('notifications')
     expect(useUiStore.getState().sidebarSection).toBe('chats')
   })
 

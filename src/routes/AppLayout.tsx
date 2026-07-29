@@ -170,15 +170,6 @@ export function AppLayout() {
   const renderMainContent = () => {
     if (activeView === 'history') return <SessionHistory />
     if (activeView === 'trash') return <RecycleBinPage />
-    if (activeView === 'notifications') {
-      return (
-        <PlaceholderPage
-          titleKey="nav.notifications"
-          descriptionKey="placeholder.notifications"
-          testId="placeholder-notifications"
-        />
-      )
-    }
     if (activeView === 'settings') return <SettingsPage />
     if (activeView === 'knowledge') return <KnowledgePage />
     if (activeView === 'workbench') {

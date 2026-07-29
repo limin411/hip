@@ -19,7 +19,6 @@ export type ActiveView =
   | 'code'
   | 'settings'
   | 'history'
-  | 'notifications'
   | 'knowledge'
   | 'trash'
   | 'terminals'
@@ -162,7 +161,6 @@ export function isEphemeralActiveView(v: ActiveView): boolean {
   return (
     v === 'settings' ||
     v === 'history' ||
-    v === 'notifications' ||
     v === 'trash' ||
     v === 'knowledge' ||
     v === 'workbench' ||
@@ -328,7 +326,6 @@ export const useUiStore = create<UiState>()(
           const isSpecial = (view: ActiveView) =>
             view === 'settings' ||
             view === 'history' ||
-            view === 'notifications' ||
             view === 'trash'
           const enteringSpecial = isSpecial(v) && !isSpecial(s.activeView)
           const leavingSpecial = isSpecial(s.activeView) && !isSpecial(v)

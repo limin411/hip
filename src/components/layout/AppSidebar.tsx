@@ -79,7 +79,6 @@ import {
   enterAutomationsSection,
   newConversationFromSidebar,
   openHistoryFromChrome,
-  openNotificationsFromChrome,
   openSettingsFromChrome,
   openSpaceFromSidebar,
   openTrashFromChrome,
@@ -911,18 +910,15 @@ export function AppSidebar() {
         active={
           activeView === 'settings'
             ? 'settings'
-            : activeView === 'notifications'
-              ? 'notifications'
-              : activeView === 'history'
-                ? 'history'
-                : activeView === 'trash'
-                  ? 'trash'
-                  : null
+            : activeView === 'history'
+              ? 'history'
+              : activeView === 'trash'
+                ? 'trash'
+                : null
         }
         historyCount={historyCount}
         onOpenTrash={() => void openTrashFromChrome()}
         onOpenHistory={() => void openHistoryFromChrome()}
-        onOpenNotifications={() => void openNotificationsFromChrome()}
         onOpenSettings={() => void openSettingsFromChrome()}
       />
     </aside>

@@ -24,7 +24,6 @@ export type GlobalCommandLabels = {
   navChat: string
   navCode: string
   navHistory: string
-  navNotifications?: string
   navTrash: string
   navSettings: string
   navKnowledge: string
@@ -117,7 +116,6 @@ export type GlobalCommandContext = {
   /** Shell helpers (preferred over bare setActiveView for leave-knowledge flush). */
   enterSection?: (section: 'projects' | 'chats') => void | Promise<void>
   openHistoryFromChrome?: () => void | Promise<void>
-  openNotificationsFromChrome?: () => void | Promise<void>
   openTrashFromChrome?: () => void | Promise<void>
   openSettingsFromChrome?: () => void | Promise<void>
   enterKnowledge?: () => void | Promise<void>
@@ -365,17 +363,6 @@ export function buildGlobalCommandGroups(
       run: () => {
         if (ctx.openHistoryFromChrome) void ctx.openHistoryFromChrome()
         else ctx.setActiveView('history')
-      },
-    },
-    {
-      id: 'nav-notifications',
-      label: labels.navNotifications ?? labels.navHistory,
-      icon: 'history',
-      keywords: ['notifications', 'alerts', 'bell', '通知', '알림', '通知'],
-      group: 'navigation',
-      run: () => {
-        if (ctx.openNotificationsFromChrome) void ctx.openNotificationsFromChrome()
-        else ctx.setActiveView('notifications')
       },
     },
     {

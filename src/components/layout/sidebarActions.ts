@@ -53,7 +53,7 @@ async function leaveActiveSurfaceIfNeeded(): Promise<void> {
 }
 
 /**
- * After leaving knowledge/tasks for history/trash/notifications:
+ * After leaving knowledge/tasks for history/trash:
  * restore sidebar list to chats/projects so those special views are not paired
  * with a stale content list (e.g. work-item filters while main is RecycleBin).
  * Settings intentionally keeps the content section (see openSettingsFromChrome).
@@ -242,7 +242,7 @@ export async function openSettingsFromChrome(): Promise<void> {
   } else if (view === 'tasks') {
     await leaveWorkItems()
     // Keep tasks section — same as opening Settings from chats/projects.
-    // Trash/history/notifications still reassign (interactive filters must not
+    // Trash/history still reassign (interactive filters must not
     // stay paired with those special mains).
   }
   // Always land on General when opening Settings from chrome (not last-visited page).
@@ -261,19 +261,6 @@ export async function openHistoryFromChrome(): Promise<void> {
     assignSectionAfterLeavingTasks()
   }
   useUiStore.getState().setActiveView('history')
-  recordNavEntry()
-}
-
-export async function openNotificationsFromChrome(): Promise<void> {
-  const view = useUiStore.getState().activeView
-  if (view === 'knowledge') {
-    await leaveKnowledge()
-    assignSectionAfterLeavingKnowledge()
-  } else if (view === 'tasks') {
-    await leaveWorkItems()
-    assignSectionAfterLeavingTasks()
-  }
-  useUiStore.getState().setActiveView('notifications')
   recordNavEntry()
 }
 

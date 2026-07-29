@@ -889,10 +889,10 @@ export const zhTW = {
       "compact": "緊湊"
     },
       "workbenchSection": "工作台",
-      "workbenchShowCartoon": "顯示卡通",
-      "workbenchShowCartoonDesc": "在田地菜畦與總覽 Hero 上展示 Flat Butt 吉祥物。",
-      "workbenchReduceMotion": "減少卡通動效",
-      "workbenchReduceMotionDesc": "凍結田野環境動效並使用靜態 Logo（也尊重系統減少動態偏好）。",
+      "workbenchShowScene": "宇宙背景",
+      "workbenchShowSceneDesc": "迷你太陽系：星空、恆星，每個功能面一顆行星（需 WebGL；關閉則為純頁面）。",
+      "workbenchReduceMotion": "減少動效",
+      "workbenchReduceMotionDesc": "凍結宇宙動畫並弱化過渡（也尊重系統減少動態偏好）。",
     "terminalShell": "預設終端",
     "terminalShellDesc": "程式碼面板終端使用的預設 shell。修改後需重新啟動終端生效。",
     "terminalShells": {
@@ -1878,12 +1878,13 @@ export const zhTW = {
       "greetingAfternoon": "下午好，工作台就緒",
       "greetingEvening": "晚上好，工作台就緒",
       "greetingNight": "夜深了，工作台仍就緒",
-      "subIdle": "烈日下田地很安靜 · 菜畦上即時顯示各區狀態",
-      "subRunning": "有作物在生長 · 點擊菜畦即可進入",
-      "subAttention": "有菜畦需要澆灌 · 枯萎或阻塞，點擊處理",
-      "subDone": "剛收成的菜畦會短暫發光慶祝"
+      "subIdle": "各模組待機 · 選擇一個系統入口進入",
+      "subRunning": "偵測到活躍鏈路 · 開啟模組即可接入",
+      "subAttention": "有模組告警 · 點開排查",
+      "subDone": "近期完成的模組仍在面板上高亮"
     },
     "metrics": {
+      "summary": "狀態摘要",
       "running": "執行中",
       "attention": "需關注",
       "done": "完成"
@@ -1922,13 +1923,21 @@ export const zhTW = {
       "terminalsIdle": "空閒",
       "terminalsSecondary": "{{count}} 個終端"
     },
-    "openZone": "照料{{name}} →",
-    "zonesRegion": "田地菜畦",
-    "farm": {
+    "openZone": "開啟{{name}} →",
+    "zonesRegion": "功能面",
+    "deck": {
+        "kicker": "總覽"
+      },
+      "farm": {
       "kicker": "烈日田野"
     },
     "office": {
       "kicker": "像素辦公室"
+    },
+    
+    "home": {
+      "eyebrow": "工作台",
+      "surfaces": "功能面"
     },
     "shortcuts": {
       "title": "快捷入口",

@@ -161,9 +161,12 @@ export type UiPersistedState = {
   sidebarOpen: boolean
   /** Left sidebar width in px; clamped on write / rehydrate. */
   sidebarWidth: number
-  /** Workbench: show Flat Butt cartoon on zone cards / hero. */
-  workbenchShowCartoon: boolean
-  /** Workbench: force static mascot (also honors prefers-reduced-motion). */
+  /**
+   * Workbench: show Three.js command-deck scene.
+   * Legacy key `workbenchShowCartoon` is migrated on rehydrate.
+   */
+  workbenchShowScene: boolean
+  /** Workbench: reduce GSAP / scene motion (also honors prefers-reduced-motion). */
   workbenchReduceMotion: boolean
 }
 
@@ -211,8 +214,10 @@ export function mergeUiPersistedState<
     // Drop removed pages (e.g. legacy 'help') so tabs stay valid.
     settingsPage: normalizeSettingsPage((rest as { settingsPage?: unknown }).settingsPage),
     sidebarWidth: clampSidebarWidth((rest as { sidebarWidth?: unknown }).sidebarWidth),
-    workbenchShowCartoon: normalizeBool(
-      (rest as { workbenchShowCartoon?: unknown }).workbenchShowCartoon,
+    workbenchShowScene: normalizeBool(
+      (rest as { workbenchShowScene?: unknown }).workbenchShowScene !== undefined
+        ? (rest as { workbenchShowScene?: unknown }).workbenchShowScene
+        : (rest as { workbenchShowCartoon?: unknown }).workbenchShowCartoon,
       true,
     ),
     workbenchReduceMotion: normalizeBool(
@@ -298,10 +303,10 @@ interface UiState {
   density: UiDensity
   setDensity: (d: UiDensity) => void
 
-  /** Workbench: show cartoon mascots (default true). */
-  workbenchShowCartoon: boolean
-  setWorkbenchShowCartoon: (v: boolean) => void
-  /** Workbench: force reduced motion for mascots. */
+  /** Workbench: Three.js scene layer (default true). */
+  workbenchShowScene: boolean
+  setWorkbenchShowScene: (v: boolean) => void
+  /** Workbench: reduce GSAP / scene motion. */
   workbenchReduceMotion: boolean
   setWorkbenchReduceMotion: (v: boolean) => void
 }
@@ -421,9 +426,9 @@ export const useUiStore = create<UiState>()(
       density: 'comfortable',
       setDensity: (d) => set((s) => (s.density === d ? s : { density: d })),
 
-      workbenchShowCartoon: true,
-      setWorkbenchShowCartoon: (v) =>
-        set((s) => (s.workbenchShowCartoon === v ? s : { workbenchShowCartoon: v })),
+      workbenchShowScene: true,
+      setWorkbenchShowScene: (v) =>
+        set((s) => (s.workbenchShowScene === v ? s : { workbenchShowScene: v })),
       workbenchReduceMotion: false,
       setWorkbenchReduceMotion: (v) =>
         set((s) => (s.workbenchReduceMotion === v ? s : { workbenchReduceMotion: v })),
@@ -444,7 +449,7 @@ export const useUiStore = create<UiState>()(
         checkpointMode: s.checkpointMode,
         sidebarOpen: s.sidebarOpen,
         sidebarWidth: s.sidebarWidth,
-        workbenchShowCartoon: s.workbenchShowCartoon,
+        workbenchShowScene: s.workbenchShowScene,
         workbenchReduceMotion: s.workbenchReduceMotion,
       }),
       merge: (persistedState, currentState) =>

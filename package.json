@@ -117,6 +117,7 @@
     "shiki": "^3.12.0",
     "sonner": "^2.0.7",
     "tailwind-merge": "^2",
+    "three": "^0.185.1",
     "zustand": "^5"
   },
   "devDependencies": {
@@ -126,6 +127,7 @@
     "@testing-library/react": "^16.3.2",
     "@types/react": "^18.3.1",
     "@types/react-dom": "^18.3.1",
+    "@types/three": "^0.185.1",
     "@vitejs/plugin-react": "^4.3.4",
     "@vitest/coverage-v8": "^2.0.0",
     "@wdio/cli": "^9.27.2",

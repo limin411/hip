@@ -5,10 +5,10 @@
 | **Title** | hip Workbench · Cartoon Progress Visualization |
 | **Author** | hip design (agent-assisted) |
 | **Date** | 2026-07-29 |
-| **Status** | Implemented（仅 L1 卡片；Three 舞台已移除） |
+| **Status** | **Superseded** by [`2026-07-29-workbench-command-deck.md`](./2026-07-29-workbench-command-deck.md) |
 | **Audience** | 熟悉 hip 代码库的工程师 + 产品 |
-| **Revision** | R4 — 删除 L2 舞台模式 / three 依赖；保留卡片 + 设置 |
-| **Prototype** | [`prototypes/workbench-cartoon-progress.html`](./prototypes/workbench-cartoon-progress.html) |
+| **Revision** | R5 — 农场/卡通工作台已由 Command Deck（DOM + GSAP + Three）替换 |
+| **Prototype** | [`prototypes/workbench-cartoon-progress.html`](./prototypes/workbench-cartoon-progress.html)（历史） |
 
 ---
 

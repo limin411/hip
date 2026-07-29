@@ -58,7 +58,7 @@ vi.mock('@/lib/activeWork', () => ({
 
 beforeEach(() => {
   useUiStore.setState({
-    workbenchShowCartoon: true,
+    workbenchShowScene: true,
     workbenchReduceMotion: false,
   })
 })
@@ -76,41 +76,35 @@ function renderPage() {
 }
 
 describe('WorkbenchPage', () => {
-  it('renders sunny farm field, hero, and plots', () => {
+  it('renders 2.5D farm map with hero and plots (no footer shortcuts)', () => {
     renderPage()
     expect(screen.getByTestId('workbench-page')).toBeInTheDocument()
-    expect(screen.getByTestId('workbench-farm')).toBeInTheDocument()
+    expect(screen.getByTestId('workbench-farm-map')).toBeInTheDocument()
     expect(screen.getByTestId('workbench-hero')).toBeInTheDocument()
+    expect(screen.getByTestId('workbench-modules')).toBeInTheDocument()
+    expect(screen.queryByTestId('workbench-shortcuts')).not.toBeInTheDocument()
     expect(screen.getByTestId('workbench-zone-sessions')).toBeInTheDocument()
     expect(screen.getByTestId('workbench-zone-knowledge')).toBeInTheDocument()
-    expect(screen.queryByTestId('workbench-shortcuts')).not.toBeInTheDocument()
-    expect(screen.queryByTestId('workbench-office')).not.toBeInTheDocument()
+    expect(screen.getAllByTestId('workbench-mascot').length).toBeGreaterThan(0)
     expect(screen.getByTestId('workbench-metric-running')).toHaveTextContent('0')
   })
 
-  it('shows sessions and knowledge zone states as idle by default', () => {
+  it('shows plot state idle by default', () => {
     renderPage()
     expect(screen.getByTestId('workbench-zone-sessions')).toHaveAttribute('data-state', 'idle')
-    expect(screen.getByTestId('workbench-zone-knowledge')).toHaveAttribute('data-state', 'idle')
   })
 
-  it('opens sessions zone on plot click', async () => {
+  it('opens sessions plot on click', async () => {
     const { enterSection } = await import('@/components/layout/sidebarActions')
     renderPage()
     fireEvent.click(screen.getByTestId('workbench-zone-sessions'))
     expect(enterSection).toHaveBeenCalledWith('chats')
   })
 
-  it('hides cartoon when workbenchShowCartoon is false', () => {
-    useUiStore.setState({ workbenchShowCartoon: false })
+  it('hides mascots when farmers toggle is off', () => {
+    useUiStore.setState({ workbenchShowScene: false })
     renderPage()
+    // forceStatic path still may show HipLogo as decorative — no motion mascot action
     expect(screen.queryByTestId('workbench-mascot')).not.toBeInTheDocument()
-    expect(screen.queryByTestId('workbench-field-hero')).not.toBeInTheDocument()
-  })
-
-  it('shows field foreman when cartoons are on', () => {
-    renderPage()
-    expect(screen.getByTestId('workbench-field-hero')).toBeInTheDocument()
-    expect(screen.getAllByTestId('workbench-mascot').length).toBeGreaterThan(0)
   })
 })

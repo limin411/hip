@@ -12,7 +12,7 @@ import {
 import { AUTOMATION_PAGE } from '@/components/automation/feature'
 import { TERMINAL_MANAGEMENT } from '@/components/terminals/feature'
 import { WORK_ITEM_TRACKING } from '@/components/work-items/feature'
-import { FarmScene } from './FarmScene'
+import { IsoFarmMap } from './map/IsoFarmMap'
 import { aggregateHero, buildZoneModels } from './zoneProgress'
 import { useWorkbenchSnapshot } from './useWorkbenchSnapshot'
 import { resolveHeroCopy } from './heroGreeting'
@@ -58,10 +58,6 @@ async function openZone(zone: ZoneModel): Promise<void> {
 export function WorkbenchPage() {
   const { t } = useTranslation()
   const snap = useWorkbenchSnapshot()
-
-  const showCartoon = useUiStore((s) => s.workbenchShowCartoon)
-  const reduceMotion = useUiStore((s) => s.workbenchReduceMotion)
-
   const [selectedId, setSelectedId] = useState<string | null>(null)
 
   const zones = useMemo(() => buildZoneModels(snap), [snap])
@@ -81,13 +77,11 @@ export function WorkbenchPage() {
       className="flex min-h-0 flex-1 flex-col overflow-hidden"
       data-testid="workbench-page"
     >
-      <FarmScene
+      <IsoFarmMap
         zones={zones}
         hero={heroBase}
         heroTitle={t(heroCopy.titleKey)}
         heroSubtitle={t(heroCopy.subtitleKey)}
-        showCartoon={showCartoon}
-        reduceMotion={reduceMotion}
         selectedId={selectedId}
         onOpenZone={handleOpenZone}
       />

@@ -54,8 +54,8 @@ export function GeneralSettings() {
   const setTheme = useUiStore((s) => s.setTheme)
   const density = useUiStore((s) => s.density)
   const setDensity = useUiStore((s) => s.setDensity)
-  const workbenchShowCartoon = useUiStore((s) => s.workbenchShowCartoon)
-  const setWorkbenchShowCartoon = useUiStore((s) => s.setWorkbenchShowCartoon)
+  const workbenchShowScene = useUiStore((s) => s.workbenchShowScene)
+  const setWorkbenchShowScene = useUiStore((s) => s.setWorkbenchShowScene)
   const workbenchReduceMotion = useUiStore((s) => s.workbenchReduceMotion)
   const setWorkbenchReduceMotion = useUiStore((s) => s.setWorkbenchReduceMotion)
 
@@ -207,18 +207,18 @@ export function GeneralSettings() {
           </div>
           <div
             className="flex items-center justify-between gap-6 px-8 py-4"
-            data-testid="settings-workbench-cartoon"
+            data-testid="settings-workbench-scene"
           >
             <div className="min-w-0 flex-1">
-              <div className="text-body font-medium text-ink">{t('settings.workbenchShowCartoon')}</div>
+              <div className="text-body font-medium text-ink">{t('settings.workbenchShowScene')}</div>
               <div className="mt-0.5 text-meta leading-relaxed text-ink-tertiary">
-                {t('settings.workbenchShowCartoonDesc')}
+                {t('settings.workbenchShowSceneDesc')}
               </div>
             </div>
             <Switch
-              checked={workbenchShowCartoon}
-              onCheckedChange={setWorkbenchShowCartoon}
-              aria-label={t('settings.workbenchShowCartoon')}
+              checked={workbenchShowScene}
+              onCheckedChange={setWorkbenchShowScene}
+              aria-label={t('settings.workbenchShowScene')}
             />
           </div>
           <div

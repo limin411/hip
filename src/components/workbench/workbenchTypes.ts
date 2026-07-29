@@ -1,4 +1,3 @@
-import type { MascotAction } from '@/components/login/MascotActor'
 import type { ActiveView } from '@/store/uiStore'
 
 export type ZoneId =
@@ -75,12 +74,10 @@ export interface ZoneModel {
   hrefView: ActiveView
   hrefHint?: 'last-session' | 'none'
   accentClass: string
-  mascotAction: MascotAction
 }
 
 export interface HeroModel {
   state: ZoneState
-  mascotAction: MascotAction
   titleKey: HeroTitleKey
   subtitleKey: HeroSubtitleKey
   runningCount: number

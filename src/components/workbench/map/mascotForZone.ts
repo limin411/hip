@@ -1,10 +1,7 @@
 import type { MascotAction } from '@/components/login/MascotActor'
-import type { ZoneId, ZoneState } from './workbenchTypes'
+import type { ZoneId, ZoneState } from '../workbenchTypes'
 
-/**
- * Farm-field mascot clips — hot-sun tending vibe, not desk coding.
- * Still pure + table-driven for tests.
- */
+/** Farm-field clips — tending soil, not desk coding. */
 const STATE_ACTION: Record<ZoneState, MascotAction> = {
   idle: 'hot',
   running: 'run',
@@ -13,7 +10,6 @@ const STATE_ACTION: Record<ZoneState, MascotAction> = {
   fail: 'melt',
 }
 
-/** Zone flavour while tending (running). */
 const RUNNING_BY_ZONE: Partial<Record<ZoneId, MascotAction>> = {
   sessions: 'sprint',
   tasks: 'jog',
@@ -42,15 +38,9 @@ const DONE_BY_ZONE: Partial<Record<ZoneId, MascotAction>> = {
 }
 
 export function mascotForZone(zoneId: ZoneId, state: ZoneState): MascotAction {
-  if (state === 'running') {
-    return RUNNING_BY_ZONE[zoneId] ?? STATE_ACTION.running
-  }
-  if (state === 'idle') {
-    return IDLE_BY_ZONE[zoneId] ?? STATE_ACTION.idle
-  }
-  if (state === 'done') {
-    return DONE_BY_ZONE[zoneId] ?? STATE_ACTION.done
-  }
+  if (state === 'running') return RUNNING_BY_ZONE[zoneId] ?? STATE_ACTION.running
+  if (state === 'idle') return IDLE_BY_ZONE[zoneId] ?? STATE_ACTION.idle
+  if (state === 'done') return DONE_BY_ZONE[zoneId] ?? STATE_ACTION.done
   return STATE_ACTION[state]
 }
 

@@ -881,10 +881,10 @@ export const ja = {
       "compact": "コンパクト"
     },
       "workbenchSection": "ワークベンチ",
-      "workbenchShowCartoon": "マスコットを表示",
-      "workbenchShowCartoonDesc": "畑の区画と概要ヒーローに Flat Butt を表示します。",
-      "workbenchReduceMotion": "マスコットの動きを抑える",
-      "workbenchReduceMotionDesc": "畑の環境アニメを止め、静止ロゴを使います（システムの設定も尊重）。",
+      "workbenchShowScene": "コスモス背景",
+      "workbenchShowSceneDesc": "ミニ太陽系：星・太陽・サーフェスごとの惑星（WebGL。オフで通常ページ）。",
+      "workbenchReduceMotion": "モーションを抑える",
+      "workbenchReduceMotionDesc": "コスモスを止め、トランジションを弱めます（システムの設定も尊重）。",
     "terminalShell": "デフォルトのターミナル",
     "terminalShellDesc": "コードパネルのターミナルで使用するシェルです。変更を反映するにはターミナルを再起動してください。",
     "terminalShells": {
@@ -1877,6 +1877,7 @@ export const ja = {
       "subDone": "収穫した区画がしばらく光ります"
     },
     "metrics": {
+      "summary": "ステータス概要",
       "running": "実行中",
       "attention": "要確認",
       "done": "完了"
@@ -1915,13 +1916,21 @@ export const ja = {
       "terminalsIdle": "待機",
       "terminalsSecondary": "ターミナル {{count}}"
     },
-    "openZone": "{{name}} を世話する →",
-    "zonesRegion": "畑の区画",
-    "farm": {
+    "openZone": "{{name}} を開く →",
+    "zonesRegion": "サーフェス",
+    "deck": {
+        "kicker": "概要"
+      },
+      "farm": {
       "kicker": "日差しの畑"
     },
     "office": {
       "kicker": "ピクセルオフィス"
+    },
+    
+    "home": {
+      "eyebrow": "ワークベンチ",
+      "surfaces": "サーフェス"
     },
     "shortcuts": {
       "title": "クイック起動",

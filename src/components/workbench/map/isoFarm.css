@@ -1,0 +1,1065 @@
+/*
+ * 2.5D isometric farm map — each surface is a tilled plot with a farmer.
+ * DOM + CSS projection (no game engine). Mascots = public/motion SVGs.
+ */
+
+.iso-farm {
+  --iso-soil: #c47a3a;
+  --iso-soil-deep: #8b4f22;
+  --iso-soil-dry: #d4a06a;
+  --iso-grass: #6bb36a;
+  --iso-grass-deep: #3d8f45;
+  --iso-sky-top: #87ceeb;
+  --iso-sky-bot: #ffe8b0;
+  position: relative;
+  display: flex;
+  min-height: 0;
+  flex: 1;
+  flex-direction: column;
+  overflow: hidden;
+  color: var(--ink);
+  background: var(--bg-app);
+}
+
+.dark .iso-farm {
+  --iso-soil: #6b4423;
+  --iso-soil-deep: #3d2614;
+  --iso-soil-dry: #8b6340;
+  --iso-grass: #3d6b38;
+  --iso-grass-deep: #1e3d24;
+  --iso-sky-top: #1a3a5c;
+  --iso-sky-bot: #4a3010;
+}
+
+/* —— sky / parallax farm world —— */
+.iso-farm-sky {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  overflow: hidden;
+  background: linear-gradient(
+    180deg,
+    var(--iso-sky-top) 0%,
+    color-mix(in srgb, var(--iso-sky-top) 70%, #b8dff5) 18%,
+    color-mix(in srgb, var(--iso-sky-bot) 55%, #c8e8ff) 38%,
+    var(--iso-sky-bot) 52%,
+    color-mix(in srgb, var(--iso-grass) 35%, var(--iso-sky-bot)) 68%,
+    color-mix(in srgb, var(--iso-grass) 70%, var(--iso-grass-deep)) 84%,
+    var(--iso-grass-deep) 100%
+  );
+}
+
+/* soft atmospheric haze + light rays */
+.iso-sky-haze {
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(ellipse 70% 45% at 78% 12%, color-mix(in srgb, #fff8d0 55%, transparent), transparent 70%),
+    radial-gradient(ellipse 50% 30% at 20% 8%, color-mix(in srgb, #fff 28%, transparent), transparent 65%),
+    radial-gradient(ellipse 90% 40% at 50% 100%, color-mix(in srgb, var(--iso-grass) 40%, transparent), transparent 60%);
+  opacity: 0.9;
+}
+
+/* distant blue mountains (far layer) */
+.iso-sky-mountains {
+  position: absolute;
+  left: -8%;
+  right: -8%;
+  bottom: 42%;
+  height: 28%;
+  background:
+    /* peak chain */
+    linear-gradient(165deg, transparent 42%, color-mix(in srgb, #5a8ab0 55%, #2a4a6a) 42.2%, color-mix(in srgb, #5a8ab0 55%, #2a4a6a) 58%, transparent 58.2%) no-repeat 8% 100% / 22% 90%,
+    linear-gradient(155deg, transparent 38%, color-mix(in srgb, #6a9ab8 50%, #3a5a78) 38.2%, color-mix(in srgb, #6a9ab8 50%, #3a5a78) 62%, transparent 62.2%) no-repeat 28% 100% / 30% 100%,
+    linear-gradient(170deg, transparent 45%, color-mix(in srgb, #4a7a9a 60%, #1e3a55) 45.2%, color-mix(in srgb, #4a7a9a 60%, #1e3a55) 55%, transparent 55.2%) no-repeat 52% 100% / 26% 85%,
+    linear-gradient(160deg, transparent 40%, color-mix(in srgb, #5f8fb0 52%, #2a4a68) 40.2%, color-mix(in srgb, #5f8fb0 52%, #2a4a68) 60%, transparent 60.2%) no-repeat 72% 100% / 28% 95%,
+    linear-gradient(168deg, transparent 44%, color-mix(in srgb, #4a7598 58%, #243e58) 44.2%, color-mix(in srgb, #4a7598 58%, #243e58) 56%, transparent 56.2%) no-repeat 90% 100% / 20% 80%;
+  opacity: 0.55;
+  filter: blur(0.3px);
+}
+
+.dark .iso-sky-mountains {
+  opacity: 0.4;
+  filter: brightness(0.55) blur(0.4px);
+}
+
+/* mid ridge between mountains and hills */
+.iso-sky-ridge {
+  position: absolute;
+  left: -4%;
+  right: -4%;
+  bottom: 34%;
+  height: 16%;
+  background:
+    radial-gradient(ellipse 38% 100% at 12% 100%, color-mix(in srgb, var(--iso-grass-deep) 80%, #2a5a35) 0%, transparent 72%),
+    radial-gradient(ellipse 42% 110% at 38% 100%, color-mix(in srgb, var(--iso-grass) 70%, #3a7040) 0%, transparent 70%),
+    radial-gradient(ellipse 36% 95% at 62% 100%, color-mix(in srgb, var(--iso-grass-deep) 85%, #1e4a28) 0%, transparent 72%),
+    radial-gradient(ellipse 40% 105% at 88% 100%, color-mix(in srgb, var(--iso-grass) 75%, #2f6238) 0%, transparent 70%);
+  opacity: 0.9;
+}
+
+.iso-farm-sun {
+  position: absolute;
+  top: 5%;
+  right: 9%;
+  width: min(20vw, 140px);
+  height: min(20vw, 140px);
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 35%, #fffef0, #ffe566 42%, #ffb020 72%, #ff7a18 100%);
+  box-shadow:
+    0 0 40px 14px color-mix(in srgb, #ffc040 45%, transparent),
+    0 0 90px 30px color-mix(in srgb, #ffaa20 22%, transparent),
+    0 0 140px 50px color-mix(in srgb, #ffd080 12%, transparent);
+  opacity: 0.95;
+}
+
+.iso-farm-cloud {
+  position: absolute;
+  background: color-mix(in srgb, #fff 92%, #ffe8b0);
+  border-radius: 40% 60% 50% 50% / 50% 40% 60% 50%;
+  opacity: 0.88;
+  box-shadow:
+    18px 5px 0 -2px color-mix(in srgb, #fff 90%, #ffe8b0),
+    -14px 7px 0 -4px color-mix(in srgb, #fff 88%, #ffe8b0),
+    6px 10px 0 -6px color-mix(in srgb, #fff 80%, #e8f0ff);
+  filter: drop-shadow(0 2px 3px color-mix(in srgb, #4a7ab0 12%, transparent));
+}
+.iso-farm-cloud-a {
+  top: 8%;
+  left: 6%;
+  width: 100px;
+  height: 34px;
+}
+.iso-farm-cloud-b {
+  top: 14%;
+  left: 26%;
+  width: 72px;
+  height: 28px;
+  opacity: 0.7;
+}
+.iso-farm-cloud-c {
+  top: 7%;
+  left: 52%;
+  width: 56px;
+  height: 22px;
+  opacity: 0.55;
+}
+.iso-farm-cloud-d {
+  top: 18%;
+  right: 22%;
+  width: 90px;
+  height: 30px;
+  opacity: 0.75;
+}
+
+/* simple V birds */
+.iso-birds {
+  position: absolute;
+  top: 12%;
+  left: 42%;
+  width: 120px;
+  height: 40px;
+  opacity: 0.35;
+}
+.iso-birds i {
+  position: absolute;
+  width: 10px;
+  height: 10px;
+  border: 1.5px solid color-mix(in srgb, var(--ink) 45%, transparent);
+  border-bottom: none;
+  border-right: none;
+  transform: rotate(45deg) skewX(-12deg);
+  border-radius: 2px 0 0 0;
+}
+.iso-birds i:nth-child(1) {
+  left: 10px;
+  top: 12px;
+}
+.iso-birds i:nth-child(2) {
+  left: 36px;
+  top: 4px;
+  width: 8px;
+  height: 8px;
+  opacity: 0.75;
+}
+.iso-birds i:nth-child(3) {
+  left: 58px;
+  top: 16px;
+  width: 7px;
+  height: 7px;
+  opacity: 0.6;
+}
+
+.iso-farm-hills {
+  position: absolute;
+  left: -5%;
+  right: -5%;
+  bottom: 22%;
+  height: 24%;
+  background:
+    radial-gradient(ellipse 42% 100% at 15% 100%, var(--iso-grass) 0%, transparent 70%),
+    radial-gradient(ellipse 48% 110% at 48% 100%, var(--iso-grass-deep) 0%, transparent 68%),
+    radial-gradient(ellipse 40% 95% at 78% 100%, var(--iso-grass) 0%, transparent 70%),
+    radial-gradient(ellipse 30% 90% at 95% 100%, var(--iso-grass-deep) 0%, transparent 72%);
+  opacity: 0.92;
+}
+
+/* tree silhouettes on ridge */
+.iso-tree-line {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 26%;
+  height: 14%;
+}
+.iso-tree {
+  position: absolute;
+  bottom: 0;
+  width: 18px;
+  height: 36px;
+  background: var(--iso-grass-deep);
+  border-radius: 50% 50% 40% 40% / 60% 60% 30% 30%;
+  box-shadow:
+    0 -8px 0 -2px color-mix(in srgb, var(--iso-grass-deep) 90%, #1a3a20),
+    0 0 0 0 transparent;
+  opacity: 0.85;
+}
+.iso-tree::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  bottom: -4px;
+  width: 4px;
+  height: 10px;
+  margin-left: -2px;
+  background: color-mix(in srgb, var(--iso-soil-deep) 80%, #2a1a0a);
+  border-radius: 1px;
+}
+.iso-tree-a {
+  left: 6%;
+  height: 42px;
+  width: 20px;
+}
+.iso-tree-b {
+  left: 14%;
+  height: 28px;
+  width: 14px;
+  opacity: 0.7;
+}
+.iso-tree-c {
+  left: 38%;
+  height: 48px;
+  width: 22px;
+}
+.iso-tree-d {
+  left: 48%;
+  height: 32px;
+  width: 16px;
+  opacity: 0.75;
+}
+.iso-tree-e {
+  right: 18%;
+  height: 40px;
+  width: 19px;
+}
+.iso-tree-f {
+  right: 8%;
+  height: 30px;
+  width: 15px;
+  opacity: 0.7;
+}
+
+/* foreground meadow fill */
+.iso-meadow {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 38%;
+  background:
+    linear-gradient(
+      180deg,
+      transparent 0%,
+      color-mix(in srgb, var(--iso-grass) 55%, transparent) 18%,
+      color-mix(in srgb, var(--iso-grass) 80%, var(--iso-grass-deep)) 55%,
+      var(--iso-grass-deep) 100%
+    );
+}
+
+/* subtle grass / soil texture via layered dots */
+.iso-meadow-texture {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 42%;
+  opacity: 0.28;
+  background-image:
+    radial-gradient(circle at 12% 20%, color-mix(in srgb, #fff 40%, transparent) 0 1px, transparent 1.5px),
+    radial-gradient(circle at 28% 55%, color-mix(in srgb, #1a3a18 50%, transparent) 0 1px, transparent 1.5px),
+    radial-gradient(circle at 45% 30%, color-mix(in srgb, #fff 35%, transparent) 0 1px, transparent 1.5px),
+    radial-gradient(circle at 62% 70%, color-mix(in srgb, #1a3a18 45%, transparent) 0 1px, transparent 1.5px),
+    radial-gradient(circle at 78% 40%, color-mix(in srgb, #fff 30%, transparent) 0 1px, transparent 1.5px),
+    radial-gradient(circle at 90% 65%, color-mix(in srgb, #1a3a18 40%, transparent) 0 1px, transparent 1.5px);
+  background-size:
+    48px 40px,
+    52px 44px,
+    40px 36px,
+    56px 48px,
+    44px 38px,
+    50px 42px;
+  background-position:
+    0 0,
+    12px 8px,
+    6px 16px,
+    20px 4px,
+    8px 20px,
+    16px 12px;
+  mask-image: linear-gradient(180deg, transparent 0%, #000 35%, #000 100%);
+}
+
+/* dirt path snaking under the map stage */
+.iso-path {
+  position: absolute;
+  left: 50%;
+  bottom: 0;
+  width: min(52vw, 420px);
+  height: 36%;
+  margin-left: calc(min(52vw, 420px) * -0.5);
+  background:
+    linear-gradient(
+      185deg,
+      transparent 0%,
+      color-mix(in srgb, var(--iso-soil-dry) 55%, transparent) 12%,
+      color-mix(in srgb, var(--iso-soil) 70%, var(--iso-soil-dry)) 40%,
+      color-mix(in srgb, var(--iso-soil-deep) 60%, var(--iso-soil)) 100%
+    );
+  clip-path: polygon(
+    42% 0%,
+    58% 0%,
+    72% 28%,
+    78% 55%,
+    70% 100%,
+    30% 100%,
+    22% 55%,
+    28% 28%
+  );
+  opacity: 0.55;
+  filter: blur(0.4px);
+}
+
+/* split-rail fence silhouette near bottom */
+.iso-fence {
+  position: absolute;
+  left: -2%;
+  right: -2%;
+  bottom: 6%;
+  height: 28px;
+  opacity: 0.22;
+  background:
+    repeating-linear-gradient(
+      90deg,
+      transparent 0 28px,
+      color-mix(in srgb, var(--iso-soil-deep) 90%, #1a1008) 28px 32px,
+      transparent 32px 56px
+    ),
+    linear-gradient(
+      180deg,
+      transparent 0,
+      transparent 8px,
+      color-mix(in srgb, var(--iso-soil-deep) 85%, #1a1008) 8px 11px,
+      transparent 11px 18px,
+      color-mix(in srgb, var(--iso-soil-deep) 85%, #1a1008) 18px 21px,
+      transparent 21px
+    );
+}
+
+/* wildflower dots along meadow edge */
+.iso-wildflowers {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 8%;
+  height: 18%;
+}
+.iso-wildflowers i {
+  position: absolute;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  box-shadow: 0 1px 0 color-mix(in srgb, #000 15%, transparent);
+}
+.iso-wildflowers i:nth-child(1) {
+  left: 8%;
+  top: 40%;
+  background: #f5a0c0;
+}
+.iso-wildflowers i:nth-child(2) {
+  left: 14%;
+  top: 70%;
+  background: #f5e070;
+  width: 4px;
+  height: 4px;
+}
+.iso-wildflowers i:nth-child(3) {
+  left: 22%;
+  top: 30%;
+  background: #e8f0ff;
+}
+.iso-wildflowers i:nth-child(4) {
+  left: 68%;
+  top: 50%;
+  background: #f5a0c0;
+  width: 4px;
+  height: 4px;
+}
+.iso-wildflowers i:nth-child(5) {
+  left: 76%;
+  top: 25%;
+  background: #f5e070;
+}
+.iso-wildflowers i:nth-child(6) {
+  left: 84%;
+  top: 60%;
+  background: #c8a0f0;
+}
+.iso-wildflowers i:nth-child(7) {
+  left: 4%;
+  top: 55%;
+  background: #c8a0f0;
+  width: 3px;
+  height: 3px;
+}
+.iso-wildflowers i:nth-child(8) {
+  left: 92%;
+  top: 40%;
+  background: #e8f0ff;
+  width: 4px;
+  height: 4px;
+}
+
+/* edge vignette so HUD + plots read cleaner */
+.iso-vignet {
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(ellipse 85% 75% at 50% 48%, transparent 40%, color-mix(in srgb, #1a2a18 18%, transparent) 100%),
+    linear-gradient(180deg, color-mix(in srgb, var(--iso-sky-top) 25%, transparent) 0%, transparent 18%);
+  opacity: 0.85;
+}
+
+.dark .iso-vignet {
+  background:
+    radial-gradient(ellipse 85% 75% at 50% 48%, transparent 35%, color-mix(in srgb, #000 45%, transparent) 100%),
+    linear-gradient(180deg, color-mix(in srgb, #0a1520 40%, transparent) 0%, transparent 22%);
+}
+
+.iso-farm[data-motion='live'] .iso-farm-cloud-a {
+  animation: iso-cloud 22s ease-in-out infinite;
+}
+.iso-farm[data-motion='live'] .iso-farm-cloud-b {
+  animation: iso-cloud 28s ease-in-out infinite reverse;
+}
+.iso-farm[data-motion='live'] .iso-farm-cloud-c {
+  animation: iso-cloud 34s ease-in-out infinite;
+}
+.iso-farm[data-motion='live'] .iso-farm-cloud-d {
+  animation: iso-cloud 26s ease-in-out infinite reverse;
+}
+.iso-farm[data-motion='live'] .iso-farm-sun {
+  animation: iso-sun 4s ease-in-out infinite;
+}
+.iso-farm[data-motion='live'] .iso-birds {
+  animation: iso-birds 18s ease-in-out infinite;
+}
+.iso-farm[data-motion='live'] .iso-wildflowers i:nth-child(odd) {
+  animation: iso-bloom 3.2s ease-in-out infinite;
+}
+.iso-farm[data-motion='live'] .iso-wildflowers i:nth-child(even) {
+  animation: iso-bloom 3.8s ease-in-out infinite reverse;
+}
+
+@keyframes iso-cloud {
+  0%,
+  100% {
+    transform: translateX(0);
+  }
+  50% {
+    transform: translateX(22px);
+  }
+}
+@keyframes iso-sun {
+  0%,
+  100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.04);
+  }
+}
+@keyframes iso-birds {
+  0%,
+  100% {
+    transform: translate(0, 0);
+  }
+  50% {
+    transform: translate(40px, -8px);
+  }
+}
+@keyframes iso-bloom {
+  0%,
+  100% {
+    transform: scale(1);
+    opacity: 0.85;
+  }
+  50% {
+    transform: scale(1.25);
+    opacity: 1;
+  }
+}
+
+/* —— HUD —— */
+.iso-hud {
+  position: relative;
+  z-index: 20;
+  flex-shrink: 0;
+  padding: 0.85rem 1rem 0;
+  pointer-events: none;
+}
+
+.iso-hud-inner {
+  pointer-events: auto;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.85rem 1.25rem;
+  align-items: center;
+  max-width: 920px;
+  margin: 0 auto;
+  padding: 0.75rem 1rem;
+  border: 1px solid color-mix(in srgb, var(--border) 80%, transparent);
+  border-radius: 14px;
+  background: color-mix(in srgb, var(--bg-app) 82%, transparent);
+  backdrop-filter: blur(16px) saturate(140%);
+  -webkit-backdrop-filter: blur(16px) saturate(140%);
+  box-shadow: var(--shadow-panel, 0 2px 14px -4px rgba(17, 17, 17, 0.1));
+}
+
+.iso-hud-mascot {
+  flex-shrink: 0;
+  width: 72px;
+  height: 72px;
+  margin-bottom: -8px;
+}
+
+.iso-hud-kicker {
+  margin: 0;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--accent);
+}
+
+.iso-hud-title {
+  margin: 0.15rem 0 0;
+  font-size: clamp(1.05rem, 2vw, 1.25rem);
+  font-weight: 650;
+  letter-spacing: -0.025em;
+  line-height: 1.2;
+  color: var(--ink);
+}
+
+.iso-hud-sub {
+  margin: 0.2rem 0 0;
+  font-size: 12.5px;
+  color: var(--ink-secondary);
+  line-height: 1.4;
+}
+
+.iso-hud-stats {
+  display: flex;
+  gap: 0;
+  margin: 0 0 0 auto;
+  padding: 0;
+}
+
+.iso-hud-stats > div {
+  padding: 0 0.9rem;
+  border-right: 1px solid var(--border);
+  text-align: center;
+  min-width: 3.75rem;
+}
+.iso-hud-stats > div:last-child {
+  border-right: none;
+  padding-right: 0;
+}
+.iso-hud-stats > div:first-child {
+  padding-left: 0;
+}
+
+.iso-hud-stats dt {
+  margin: 0;
+  font-size: 10px;
+  font-weight: 500;
+  color: var(--ink-tertiary);
+  order: 2;
+}
+.iso-hud-stats dd {
+  margin: 0 0 0.1rem;
+  font-size: 1.2rem;
+  font-weight: 650;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.02em;
+  color: var(--ink);
+  order: 1;
+}
+.iso-hud-stats > div {
+  display: flex;
+  flex-direction: column;
+}
+
+/* —— map stage —— */
+.iso-stage {
+  position: relative;
+  z-index: 10;
+  display: flex;
+  min-height: 0;
+  flex: 1;
+  align-items: center;
+  justify-content: center;
+  overflow: auto;
+  padding: 0.75rem 1rem 1.5rem;
+}
+
+.iso-world {
+  position: relative;
+  flex-shrink: 0;
+  margin: auto;
+}
+
+.iso-ground {
+  position: absolute;
+  z-index: 1;
+  border-radius: 48%;
+  background:
+    radial-gradient(
+      ellipse at 40% 45%,
+      color-mix(in srgb, var(--iso-soil) 45%, var(--iso-grass)) 0%,
+      color-mix(in srgb, var(--iso-grass) 55%, var(--iso-soil)) 45%,
+      color-mix(in srgb, var(--iso-grass-deep) 65%, transparent) 72%,
+      transparent 100%
+    ),
+    repeating-linear-gradient(
+      125deg,
+      transparent 0 10px,
+      color-mix(in srgb, var(--iso-soil-deep) 12%, transparent) 10px 11px
+    );
+  opacity: 0.72;
+  transform: scaleY(0.52);
+  pointer-events: none;
+  box-shadow: 0 12px 40px color-mix(in srgb, #1a2a14 18%, transparent);
+}
+
+/* —— plot —— */
+.iso-plot {
+  position: absolute;
+  margin: 0;
+  padding: 0;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  color: inherit;
+  text-align: center;
+  transition: transform var(--duration-chrome) var(--ease-out), filter var(--duration-chrome);
+  transform-origin: 50% 70%;
+}
+
+.iso-plot:hover,
+.iso-plot:focus-visible {
+  transform: translateY(-10px) scale(1.05);
+  z-index: 40 !important;
+  filter: drop-shadow(0 14px 12px color-mix(in srgb, #000 22%, transparent));
+  outline: none;
+}
+
+.iso-plot:focus-visible .iso-plot-top {
+  box-shadow:
+    0 0 0 3px var(--bg-app),
+    0 0 0 5px var(--accent);
+}
+
+.iso-plot[data-selected='true'] .iso-plot-top {
+  box-shadow:
+    0 0 0 3px var(--bg-app),
+    0 0 0 5px color-mix(in srgb, var(--plot-accent) 70%, var(--accent));
+}
+
+/* diamond bed: clip-path iso + side faces for 2.5D thickness */
+.iso-plot-diamond {
+  position: absolute;
+  left: 50%;
+  bottom: 48px;
+  width: 128px;
+  height: 72px;
+  margin-left: -64px;
+  z-index: 2;
+  pointer-events: none;
+}
+
+.iso-plot-top {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 128px;
+  height: 64px;
+  background: linear-gradient(
+    160deg,
+    var(--iso-soil-dry) 0%,
+    var(--iso-soil) 48%,
+    var(--iso-soil-deep) 100%
+  );
+  clip-path: polygon(50% 0%, 100% 50%, 50% 100%, 0% 50%);
+  box-shadow: 0 4px 0 color-mix(in srgb, var(--iso-soil-deep) 80%, #000);
+}
+
+.iso-plot[data-state='running'] .iso-plot-top {
+  background: linear-gradient(
+    160deg,
+    color-mix(in srgb, var(--iso-soil-dry) 55%, #8fd18a),
+    color-mix(in srgb, var(--iso-soil) 65%, #5aad52)
+  );
+}
+.iso-plot[data-state='done'] .iso-plot-top {
+  background: linear-gradient(
+    160deg,
+    color-mix(in srgb, #9be07a 45%, var(--iso-soil-dry)),
+    var(--iso-soil)
+  );
+}
+.iso-plot[data-state='fail'] .iso-plot-top,
+.iso-plot[data-state='blocked'] .iso-plot-top {
+  background: linear-gradient(160deg, #c9a06a, #8b5a2b);
+  filter: saturate(0.7);
+}
+
+/* thickness wedges under diamond */
+.iso-plot-left,
+.iso-plot-right {
+  position: absolute;
+  bottom: 0;
+  width: 64px;
+  height: 14px;
+  background: var(--iso-soil-deep);
+}
+.iso-plot-left {
+  left: 0;
+  clip-path: polygon(0 0, 100% 0, 100% 100%, 0 40%);
+  opacity: 0.85;
+}
+.iso-plot-right {
+  right: 0;
+  background: color-mix(in srgb, var(--iso-soil-deep) 75%, #000);
+  clip-path: polygon(0 0, 100% 0, 100% 40%, 0 100%);
+  opacity: 0.9;
+}
+
+/* crops sit on diamond face */
+.iso-crop {
+  position: absolute;
+  width: 9px;
+  height: 13px;
+  border-radius: 40% 40% 30% 30%;
+  background: var(--plot-accent);
+  opacity: 0.75;
+  box-shadow: 0 2px 0 color-mix(in srgb, #000 12%, transparent);
+  z-index: 1;
+}
+.iso-crop-a {
+  left: 42%;
+  top: 28%;
+}
+.iso-crop-b {
+  left: 54%;
+  top: 36%;
+  height: 16px;
+}
+.iso-crop-c {
+  left: 36%;
+  top: 42%;
+}
+.iso-crop-d {
+  left: 50%;
+  top: 48%;
+  height: 11px;
+  opacity: 0.45;
+}
+
+.iso-plot[data-state='idle'] .iso-crop {
+  height: 7px;
+  opacity: 0.35;
+}
+.iso-plot[data-state='running'] .iso-crop {
+  height: 16px;
+  opacity: 0.95;
+}
+.iso-plot[data-state='done'] .iso-crop {
+  width: 11px;
+  height: 11px;
+  border-radius: 50%;
+  opacity: 1;
+}
+.iso-plot[data-state='fail'] .iso-crop,
+.iso-plot[data-state='blocked'] .iso-crop {
+  height: 8px;
+  opacity: 0.3;
+  filter: grayscale(0.4);
+  transform: rotate(14deg);
+}
+
+.iso-plot-spray {
+  position: absolute;
+  inset: 20% 20%;
+  pointer-events: none;
+}
+.iso-plot-spray i {
+  position: absolute;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: color-mix(in srgb, #4ec4f5 70%, #fff);
+  opacity: 0;
+}
+.iso-plot-spray i:nth-child(1) {
+  left: 20%;
+  top: 30%;
+}
+.iso-plot-spray i:nth-child(2) {
+  left: 50%;
+  top: 10%;
+}
+.iso-plot-spray i:nth-child(3) {
+  left: 70%;
+  top: 40%;
+}
+
+.iso-farm[data-motion='live'] .iso-plot[data-state='running'] .iso-plot-spray i {
+  animation: iso-spray 1.1s ease-out infinite;
+}
+.iso-farm[data-motion='live'] .iso-plot[data-state='running'] .iso-plot-spray i:nth-child(2) {
+  animation-delay: 0.2s;
+}
+.iso-farm[data-motion='live'] .iso-plot[data-state='running'] .iso-plot-spray i:nth-child(3) {
+  animation-delay: 0.4s;
+}
+
+@keyframes iso-spray {
+  0% {
+    transform: translate(0, 0) scale(0.5);
+    opacity: 0;
+  }
+  40% {
+    opacity: 0.85;
+  }
+  100% {
+    transform: translate(3px, 12px) scale(1);
+    opacity: 0;
+  }
+}
+
+/* mascot upright above bed */
+.iso-plot-actor {
+  position: absolute;
+  left: 50%;
+  bottom: 78px;
+  width: 100px;
+  height: 100px;
+  margin-left: -50px;
+  z-index: 5;
+  pointer-events: none;
+  filter: drop-shadow(0 4px 3px color-mix(in srgb, #000 20%, transparent));
+}
+
+.iso-plot-actor-bob {
+  width: 100%;
+  height: 100%;
+  transform-origin: 50% 92%;
+}
+
+.iso-farm[data-motion='live'] .iso-plot[data-state='idle'] .iso-plot-actor-bob {
+  animation: iso-idle 3.4s ease-in-out infinite;
+  animation-delay: var(--plot-delay, 0s);
+}
+.iso-farm[data-motion='live'] .iso-plot[data-state='running'] .iso-plot-actor-bob {
+  animation: iso-tend 1.1s ease-in-out infinite;
+  animation-delay: var(--plot-delay, 0s);
+}
+.iso-farm[data-motion='live'] .iso-plot[data-state='done'] .iso-plot-actor-bob {
+  animation: iso-cheer 0.95s ease-in-out infinite;
+  animation-delay: var(--plot-delay, 0s);
+}
+.iso-farm[data-motion='live'] .iso-plot[data-state='blocked'] .iso-plot-actor-bob,
+.iso-farm[data-motion='live'] .iso-plot[data-state='fail'] .iso-plot-actor-bob {
+  animation: iso-fidget 0.75s ease-in-out infinite;
+  animation-delay: var(--plot-delay, 0s);
+}
+.iso-farm[data-motion='live'] .iso-plot:hover .iso-plot-actor-bob {
+  animation: iso-pop 0.55s ease-in-out infinite;
+}
+
+@keyframes iso-idle {
+  0%,
+  100% {
+    transform: translateY(0) rotate(-2deg);
+  }
+  50% {
+    transform: translateY(-5px) rotate(2deg);
+  }
+}
+@keyframes iso-tend {
+  0%,
+  100% {
+    transform: translate(0, 0) rotate(-3deg);
+  }
+  25% {
+    transform: translate(6px, -8px) rotate(3deg) scale(1.02, 0.96);
+  }
+  75% {
+    transform: translate(-6px, -8px) rotate(-2deg) scale(1.02, 0.96);
+  }
+}
+@keyframes iso-cheer {
+  0%,
+  100% {
+    transform: translateY(0) scale(1);
+  }
+  40% {
+    transform: translateY(-14px) scale(1.06, 0.94) rotate(-4deg);
+  }
+}
+@keyframes iso-fidget {
+  0%,
+  100% {
+    transform: translateX(0) rotate(0);
+  }
+  30% {
+    transform: translateX(-4px) rotate(-5deg);
+  }
+  70% {
+    transform: translateX(4px) rotate(5deg);
+  }
+}
+@keyframes iso-pop {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-8px) scale(1.06);
+  }
+}
+
+.iso-mascot {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* sign card under diamond */
+.iso-plot-sign {
+  position: absolute;
+  left: 50%;
+  bottom: 0;
+  z-index: 6;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1px;
+  min-width: 96px;
+  max-width: 130px;
+  padding: 5px 8px 6px;
+  transform: translateX(-50%);
+  border: 1.5px solid color-mix(in srgb, var(--plot-accent) 25%, var(--border));
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--bg-app) 90%, transparent);
+  backdrop-filter: blur(8px);
+  box-shadow: 0 2px 8px color-mix(in srgb, #000 10%, transparent);
+  pointer-events: none;
+}
+
+.iso-plot-sign-name {
+  font-size: 12px;
+  font-weight: 650;
+  letter-spacing: -0.01em;
+  color: var(--ink);
+  line-height: 1.2;
+}
+.iso-plot-sign-badge {
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--ink-tertiary);
+  padding: 0 5px;
+  border-radius: 999px;
+  background: var(--bg-muted);
+  line-height: 1.4;
+}
+.iso-plot[data-state='running'] .iso-plot-sign-badge {
+  color: var(--plot-accent);
+  background: color-mix(in srgb, var(--plot-accent) 12%, var(--bg-app));
+}
+.iso-plot[data-state='done'] .iso-plot-sign-badge {
+  color: var(--success);
+  background: color-mix(in srgb, var(--success) 12%, var(--bg-app));
+}
+.iso-plot[data-state='fail'] .iso-plot-sign-badge,
+.iso-plot[data-state='blocked'] .iso-plot-sign-badge {
+  color: var(--danger);
+  background: color-mix(in srgb, var(--danger) 12%, var(--bg-app));
+}
+.iso-plot-sign-metric {
+  margin-top: 2px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--ink-secondary);
+  font-variant-numeric: tabular-nums;
+}
+.iso-plot-sign-sec {
+  font-size: 10px;
+  color: var(--ink-tertiary);
+}
+
+@media (max-width: 640px) {
+  .iso-hud-mascot {
+    display: none;
+  }
+  .iso-sky-mountains {
+    opacity: 0.35;
+  }
+  .iso-fence {
+    display: none;
+  }
+  .iso-hud-stats > div {
+    min-width: 3rem;
+    padding: 0 0.55rem;
+  }
+  .iso-stage {
+    padding: 0.25rem 0.5rem;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .iso-farm[data-motion='live'] .iso-farm-cloud-a,
+  .iso-farm[data-motion='live'] .iso-farm-cloud-b,
+  .iso-farm[data-motion='live'] .iso-farm-cloud-c,
+  .iso-farm[data-motion='live'] .iso-farm-cloud-d,
+  .iso-farm[data-motion='live'] .iso-farm-sun,
+  .iso-farm[data-motion='live'] .iso-birds,
+  .iso-farm[data-motion='live'] .iso-wildflowers i,
+  .iso-farm[data-motion='live'] .iso-plot-actor-bob,
+  .iso-farm[data-motion='live'] .iso-plot-spray i {
+    animation: none !important;
+  }
+  .iso-plot {
+    transition: none;
+  }
+}

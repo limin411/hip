@@ -863,10 +863,12 @@ export const en = {
         compact: 'Compact',
       },
       workbenchSection: 'Workbench',
-      workbenchShowCartoon: 'Show cartoons',
-      workbenchShowCartoonDesc: 'Flat Butt farmers on field plots and the overview hero.',
-      workbenchReduceMotion: 'Reduce cartoon motion',
-      workbenchReduceMotionDesc: 'Freeze field ambience and use a static logo (also honors system preference).',
+      workbenchShowScene: 'Show farmers',
+      workbenchShowSceneDesc:
+        'Flat Butt farmers on each field plot of the 2.5D workbench map.',
+      workbenchReduceMotion: 'Reduce motion',
+      workbenchReduceMotionDesc:
+        'Freeze field ambience and use static logos (also honors system preference).',
       terminalShell: 'Default terminal',
       terminalShellDesc:
         'Shell used by the code-panel Terminal. Restart the terminal for changes to take effect.',
@@ -1945,14 +1947,15 @@ export const en = {
         greetingAfternoon: 'Good afternoon — workbench ready',
         greetingEvening: 'Good evening — workbench ready',
         greetingNight: 'Still here? Workbench is ready',
-        subIdle: 'The field is quiet under a hot sun — plots show live zone status',
-        subRunning: 'Something is growing — tap a plot to jump in',
-        subAttention: 'A plot needs care — wilted or blocked; click to handle',
-        subDone: 'Fresh harvest still glows for a short while',
+        subIdle: 'The field is quiet — pick a plot to tend.',
+        subRunning: 'Farmers are busy — tap a plot to join the work.',
+        subAttention: 'A plot needs care — open it to help.',
+        subDone: 'Fresh harvest still glows on the map.',
       },
       metrics: {
+        summary: 'Status summary',
         running: 'Running',
-        attention: 'Needs care',
+        attention: 'Attention',
         done: 'Done',
       },
       state: {
@@ -1989,8 +1992,15 @@ export const en = {
         terminalsIdle: 'Idle',
         terminalsSecondary: '{{count}} terminal(s)',
       },
-      openZone: 'Tend {{name}} →',
+      openZone: 'Tend {{name}}',
       zonesRegion: 'Field plots',
+      home: {
+        eyebrow: 'Farm map',
+        surfaces: 'Plots',
+      },
+      deck: {
+        kicker: 'Overview',
+      },
       farm: {
         kicker: 'Sunny field',
       },

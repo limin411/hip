@@ -1,0 +1,399 @@
+/*
+ * Workbench home — Linear / Raycast–inspired calm overview.
+ * Uses hip tokens only. No neon, glass theater, or 3D stage.
+ */
+
+.wb-home {
+  position: relative;
+  display: flex;
+  min-height: 0;
+  flex: 1;
+  flex-direction: column;
+  background: var(--bg-app);
+  color: var(--ink);
+  overflow: hidden;
+}
+
+/* Cosmos — ambient solar system under content */
+.wb-cosmos {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  opacity: 0.88;
+  /* keep stars/sun visible up top; fade so list stays readable */
+  mask-image: radial-gradient(
+    ellipse 95% 75% at 50% 18%,
+    #000 0%,
+    #000 38%,
+    rgba(0, 0, 0, 0.55) 58%,
+    transparent 78%
+  );
+  -webkit-mask-image: radial-gradient(
+    ellipse 95% 75% at 50% 18%,
+    #000 0%,
+    #000 38%,
+    rgba(0, 0, 0, 0.55) 58%,
+    transparent 78%
+  );
+}
+
+.dark .wb-cosmos {
+  opacity: 1;
+}
+
+.wb-cosmos canvas {
+  display: block;
+  width: 100% !important;
+  height: 100% !important;
+}
+
+/* subtle space tint so light mode still feels cosmic */
+.wb-home::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(ellipse 80% 50% at 50% 8%, color-mix(in srgb, #1e1b4b 8%, transparent), transparent 55%),
+    radial-gradient(ellipse 60% 40% at 70% 20%, color-mix(in srgb, var(--accent) 6%, transparent), transparent 50%);
+  opacity: 0.9;
+}
+
+.dark .wb-home::before {
+  background:
+    radial-gradient(ellipse 90% 55% at 50% 5%, color-mix(in srgb, #312e81 35%, transparent), transparent 55%),
+    radial-gradient(ellipse 50% 35% at 75% 15%, color-mix(in srgb, #c2410c 12%, transparent), transparent 50%),
+    radial-gradient(ellipse 100% 80% at 50% 100%, #050510 0%, transparent 45%);
+  opacity: 1;
+}
+
+.wb-home-scroll {
+  position: relative;
+  z-index: 1;
+  min-height: 0;
+  flex: 1;
+  overflow: auto;
+}
+
+.wb-home-inner {
+  width: 100%;
+  max-width: 44rem; /* ~704px — editorial column */
+  margin: 0 auto;
+  padding: 2.5rem 1.75rem 3.5rem;
+}
+
+@media (min-width: 900px) {
+  .wb-home-inner {
+    padding-top: 3.25rem;
+  }
+}
+
+/* —— Header —— */
+.wb-home-header {
+  margin-bottom: 2.25rem;
+  /* slight frosted legibility over particles */
+  padding: 0.15rem 0.1rem;
+}
+
+.wb-home-eyebrow {
+  margin: 0 0 0.65rem;
+  font-size: 12px;
+  font-weight: 500;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ink-tertiary);
+}
+
+.wb-home-title {
+  margin: 0;
+  font-size: clamp(1.75rem, 3.2vw, 2.125rem);
+  font-weight: 600;
+  letter-spacing: -0.04em;
+  line-height: 1.15;
+  color: var(--ink);
+}
+
+.wb-home-sub {
+  margin: 0.55rem 0 0;
+  max-width: 34rem;
+  font-size: 15px;
+  font-weight: 400;
+  line-height: 1.5;
+  color: var(--ink-secondary);
+}
+
+.wb-home-stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0;
+  margin: 1.75rem 0 0;
+  padding: 0;
+}
+
+.wb-home-stat {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  min-width: 5.5rem;
+  padding: 0 1.35rem 0 0;
+  margin: 0 1.35rem 0 0;
+  border-right: 1px solid var(--border);
+}
+
+.wb-home-stat:last-child {
+  border-right: none;
+  margin-right: 0;
+  padding-right: 0;
+}
+
+.wb-home-stat dt {
+  margin: 0;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--ink-tertiary);
+  order: 2;
+}
+
+.wb-home-stat dd {
+  margin: 0;
+  font-size: 1.5rem;
+  font-weight: 600;
+  letter-spacing: -0.03em;
+  font-variant-numeric: tabular-nums;
+  color: var(--ink);
+  line-height: 1.1;
+  order: 1;
+}
+
+.wb-home-stat dd[data-tone='warn'] {
+  color: var(--warning);
+}
+
+/* —— Sections —— */
+.wb-home-section-label {
+  margin: 0 0 0.75rem;
+  font-size: 12px;
+  font-weight: 500;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--ink-tertiary);
+}
+
+.wb-home-surfaces {
+  margin-bottom: 2.25rem;
+}
+
+/* —— Surface list (Linear-style rows) —— */
+.wb-home-list {
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--bg-app) 88%, transparent);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  overflow: hidden;
+  box-shadow: var(--shadow-panel, 0 2px 14px -4px rgba(17, 17, 17, 0.08));
+}
+
+.wb-surface {
+  --surface-accent: var(--role-coder);
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: 0.9rem;
+  width: 100%;
+  margin: 0;
+  padding: 0.95rem 1rem;
+  border: none;
+  border-bottom: 1px solid var(--border);
+  background: transparent;
+  text-align: left;
+  color: inherit;
+  cursor: pointer;
+  transition: background-color var(--duration-chrome) var(--ease-out);
+}
+
+.wb-surface:last-child {
+  border-bottom: none;
+}
+
+.wb-surface:hover,
+.wb-surface:focus-visible {
+  background: var(--state-hover);
+  outline: none;
+}
+
+.wb-surface:focus-visible {
+  box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--accent) 45%, transparent);
+}
+
+.wb-surface[data-selected='true'] {
+  background: var(--state-active);
+}
+
+.wb-surface-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.25rem;
+  height: 2.25rem;
+  border-radius: 8px;
+  color: var(--surface-accent);
+  background: color-mix(in srgb, var(--surface-accent) 11%, var(--bg-subtle));
+  flex-shrink: 0;
+}
+
+.wb-surface-body {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+
+.wb-surface-top {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-width: 0;
+}
+
+.wb-surface-name {
+  font-size: 14px;
+  font-weight: 600;
+  letter-spacing: -0.015em;
+  color: var(--ink);
+  line-height: 1.25;
+}
+
+.wb-surface-badge {
+  flex-shrink: 0;
+  font-size: 11px;
+  font-weight: 500;
+  padding: 0.1rem 0.45rem;
+  border-radius: 999px;
+  color: var(--ink-tertiary);
+  background: var(--bg-muted);
+  line-height: 1.4;
+}
+
+.wb-surface-badge--active {
+  color: var(--surface-accent);
+  background: color-mix(in srgb, var(--surface-accent) 12%, var(--bg-app));
+}
+.wb-surface-badge--warn {
+  color: var(--warning);
+  background: color-mix(in srgb, var(--warning) 12%, var(--bg-app));
+}
+.wb-surface-badge--danger {
+  color: var(--danger);
+  background: color-mix(in srgb, var(--danger) 12%, var(--bg-app));
+}
+.wb-surface-badge--success {
+  color: var(--success);
+  background: color-mix(in srgb, var(--success) 12%, var(--bg-app));
+}
+
+.wb-surface-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.35rem 0.65rem;
+  min-width: 0;
+}
+
+.wb-surface-primary {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--ink-secondary);
+  font-variant-numeric: tabular-nums;
+}
+
+.wb-surface-secondary {
+  font-size: 12px;
+  color: var(--ink-tertiary);
+}
+
+.wb-surface-bar {
+  display: block;
+  width: 100%;
+  max-width: 12rem;
+  height: 2px;
+  margin-top: 0.35rem;
+  border-radius: 999px;
+  background: var(--bg-muted);
+  overflow: hidden;
+}
+
+.wb-surface-bar-fill {
+  display: block;
+  height: 100%;
+  border-radius: 999px;
+  background: var(--surface-accent);
+  opacity: 0.75;
+  transition: width var(--duration-content) var(--ease-out);
+}
+
+.wb-surface-chevron {
+  color: var(--ink-tertiary);
+  opacity: 0.55;
+  flex-shrink: 0;
+  transition:
+    opacity var(--duration-chrome) var(--ease-out),
+    transform var(--duration-chrome) var(--ease-out),
+    color var(--duration-chrome) var(--ease-out);
+}
+
+.wb-surface:hover .wb-surface-chevron,
+.wb-surface:focus-visible .wb-surface-chevron {
+  opacity: 1;
+  color: var(--ink-secondary);
+  transform: translateX(2px);
+}
+
+/* —— Quick start —— */
+.wb-home-quick {
+  margin-top: 0.25rem;
+}
+
+.wb-home-quick-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+}
+
+@media (max-width: 520px) {
+  .wb-home-inner {
+    padding: 1.5rem 1.1rem 2.5rem;
+  }
+
+  .wb-home-stat {
+    min-width: 4.5rem;
+    margin-right: 1rem;
+    padding-right: 1rem;
+  }
+
+  .wb-home-stat dd {
+    font-size: 1.25rem;
+  }
+
+  .wb-surface {
+    gap: 0.7rem;
+    padding: 0.85rem 0.85rem;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .wb-surface,
+  .wb-surface-chevron,
+  .wb-surface-bar-fill {
+    transition: none;
+  }
+
+  .wb-surface:hover .wb-surface-chevron,
+  .wb-surface:focus-visible .wb-surface-chevron {
+    transform: none;
+  }
+}

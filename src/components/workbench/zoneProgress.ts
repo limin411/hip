@@ -7,7 +7,6 @@ import {
   type ZoneModel,
   type ZoneState,
 } from './workbenchTypes'
-import { mascotForHero, mascotForZone } from './mascotForZone'
 
 function maxState(a: ZoneState, b: ZoneState): ZoneState {
   return ZONE_STATE_PRIORITY[a] >= ZONE_STATE_PRIORITY[b] ? a : b
@@ -38,7 +37,6 @@ function buildSessions(snap: WorkbenchSnapshot): ZoneModel {
     hrefView: 'chat',
     hrefHint: 'last-session',
     accentClass: 'border-t-[var(--role-supervisor)]',
-    mascotAction: mascotForZone('sessions', state),
   }
 }
 
@@ -73,7 +71,6 @@ function buildTasks(snap: WorkbenchSnapshot): ZoneModel | null {
     hrefView: 'tasks',
     hrefHint: 'none',
     accentClass: 'border-t-[var(--role-coder)]',
-    mascotAction: mascotForZone('tasks', state),
   }
 }
 
@@ -112,7 +109,6 @@ function buildAutomations(snap: WorkbenchSnapshot): ZoneModel | null {
     hrefView: 'automation',
     hrefHint: 'none',
     accentClass: 'border-t-[var(--role-reviewer)]',
-    mascotAction: mascotForZone('automations', state),
   }
 }
 
@@ -129,7 +125,6 @@ function buildKnowledge(snap: WorkbenchSnapshot): ZoneModel {
     hrefView: 'knowledge',
     hrefHint: 'none',
     accentClass: 'border-t-[var(--role-planner)]',
-    mascotAction: mascotForZone('knowledge', state),
   }
 }
 
@@ -137,7 +132,6 @@ function buildTerminals(snap: WorkbenchSnapshot): ZoneModel | null {
   if (!snap.flags.terminals) return null
   const { activeCount, runningShells } = snap.terminals
   const busy = runningShells > 0 || activeCount > 0
-  const state: ZoneState = runningShells > 0 ? 'running' : activeCount > 0 ? 'idle' : 'idle'
 
   return {
     id: 'terminals',
@@ -161,7 +155,6 @@ function buildTerminals(snap: WorkbenchSnapshot): ZoneModel | null {
     hrefView: 'terminals',
     hrefHint: 'none',
     accentClass: 'border-t-[var(--role-worker)]',
-    mascotAction: mascotForZone('terminals', state),
   }
 }
 
@@ -212,7 +205,6 @@ export function aggregateHero(zones: ZoneModel[]): HeroModel {
 
   return {
     state,
-    mascotAction: mascotForHero(state),
     titleKey,
     subtitleKey,
     runningCount,

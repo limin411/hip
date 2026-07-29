@@ -881,10 +881,10 @@ export const ko = {
       "compact": "조밀하게"
     },
       "workbenchSection": "워크벤치",
-      "workbenchShowCartoon": "만화 캐릭터 표시",
-      "workbenchShowCartoonDesc": "밭 구역과 개요 히어로에 Flat Butt 마스코트를 표시합니다.",
-      "workbenchReduceMotion": "캐릭터 움직임 줄이기",
-      "workbenchReduceMotionDesc": "들판 환경 애니메이션을 멈추고 정적 로고를 사용합니다(시스템 설정도 존중).",
+      "workbenchShowScene": "우주 배경",
+      "workbenchShowSceneDesc": "미니 태양계: 별·태양·서피스별 행성(WebGL. 끄면 일반 페이지).",
+      "workbenchReduceMotion": "움직임 줄이기",
+      "workbenchReduceMotionDesc": "우주를 멈추고 전환을 약화합니다(시스템 설정도 존중).",
     "terminalShell": "기본 터미널",
     "terminalShellDesc": "코드 패널 터미널에서 사용하는 셸입니다. 변경 사항을 적용하려면 터미널을 다시 시작하세요.",
     "terminalShells": {
@@ -1877,6 +1877,7 @@ export const ko = {
       "subDone": "수확한 구역이 잠시 빛납니다"
     },
     "metrics": {
+      "summary": "상태 요약",
       "running": "실행 중",
       "attention": "주의",
       "done": "완료"
@@ -1915,13 +1916,21 @@ export const ko = {
       "terminalsIdle": "대기",
       "terminalsSecondary": "터미널 {{count}}"
     },
-    "openZone": "{{name}} 돌보기 →",
-    "zonesRegion": "밭 구역",
-    "farm": {
+    "openZone": "{{name}} 열기 →",
+    "zonesRegion": "서피스",
+    "deck": {
+        "kicker": "개요"
+      },
+      "farm": {
       "kicker": "햇살 들판"
     },
     "office": {
       "kicker": "픽셀 오피스"
+    },
+    
+    "home": {
+      "eyebrow": "워크벤치",
+      "surfaces": "서피스"
     },
     "shortcuts": {
       "title": "빠른 시작",

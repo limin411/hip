@@ -341,7 +341,7 @@ describe('uiStore persistence partialize', () => {
       checkpointMode: s.checkpointMode,
       sidebarOpen: s.sidebarOpen,
       sidebarWidth: s.sidebarWidth,
-      workbenchShowCartoon: s.workbenchShowCartoon,
+      workbenchShowScene: s.workbenchShowScene,
       workbenchReduceMotion: s.workbenchReduceMotion,
     }
     expect(persisted).toEqual({
@@ -355,7 +355,7 @@ describe('uiStore persistence partialize', () => {
       checkpointMode: 'since-start',
       sidebarOpen: s.sidebarOpen,
       sidebarWidth: s.sidebarWidth,
-      workbenchShowCartoon: true,
+      workbenchShowScene: true,
       workbenchReduceMotion: false,
     })
     expect(persisted).not.toHaveProperty('activeTab')

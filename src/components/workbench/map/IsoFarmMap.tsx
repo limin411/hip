@@ -69,20 +69,14 @@ export function IsoFarmMap({
             <h1 className="iso-hud-title">{heroTitle}</h1>
             <p className="iso-hud-sub">{heroSubtitle}</p>
           </div>
-          <dl className="iso-hud-stats">
-            <div data-testid="workbench-metric-running">
-              <dt>{t('workbench.metrics.running')}</dt>
-              <dd>{hero.runningCount}</dd>
-            </div>
-            <div data-testid="workbench-metric-attention">
-              <dt>{t('workbench.metrics.attention')}</dt>
-              <dd>{hero.attentionCount}</dd>
-            </div>
-            <div data-testid="workbench-metric-done">
-              <dt>{t('workbench.metrics.done')}</dt>
-              <dd>{hero.doneCount}</dd>
-            </div>
-          </dl>
+          {hero.runningCount > 0 && (
+            <dl className="iso-hud-stats" aria-label={t('workbench.metrics.summary')}>
+              <div data-testid="workbench-metric-running">
+                <dt>{t('workbench.metrics.running')}</dt>
+                <dd>{hero.runningCount}</dd>
+              </div>
+            </dl>
+          )}
         </div>
       </header>
 

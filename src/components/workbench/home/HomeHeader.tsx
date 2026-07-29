@@ -23,20 +23,14 @@ export function HomeHeader({
       <h1 className="wb-home-title">{title}</h1>
       <p className="wb-home-sub">{subtitle}</p>
 
-      <dl className="wb-home-stats" aria-label={t('workbench.metrics.summary')}>
-        <div className="wb-home-stat" data-testid="workbench-metric-running">
-          <dt>{t('workbench.metrics.running')}</dt>
-          <dd>{hero.runningCount}</dd>
-        </div>
-        <div className="wb-home-stat" data-testid="workbench-metric-attention">
-          <dt>{t('workbench.metrics.attention')}</dt>
-          <dd data-tone={hero.attentionCount > 0 ? 'warn' : undefined}>{hero.attentionCount}</dd>
-        </div>
-        <div className="wb-home-stat" data-testid="workbench-metric-done">
-          <dt>{t('workbench.metrics.done')}</dt>
-          <dd>{hero.doneCount}</dd>
-        </div>
-      </dl>
+      {hero.runningCount > 0 && (
+        <dl className="wb-home-stats" aria-label={t('workbench.metrics.summary')}>
+          <div className="wb-home-stat" data-testid="workbench-metric-running">
+            <dt>{t('workbench.metrics.running')}</dt>
+            <dd>{hero.runningCount}</dd>
+          </div>
+        </dl>
+      )}
     </header>
   )
 }

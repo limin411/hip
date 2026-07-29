@@ -71,22 +71,14 @@ export function PixelFarmShell({
             <p className="iso-hud-sub">{heroSubtitle}</p>
             <p className="px-hud-hint">{t('workbench.farm.hint')}</p>
           </div>
-          <dl className="iso-hud-stats px-hud-stats">
-            <div data-testid="workbench-metric-running">
-              <dt>{t('workbench.metrics.running')}</dt>
-              <dd>{hero.runningCount}</dd>
-            </div>
-            <div data-testid="workbench-metric-attention">
-              <dt>{t('workbench.metrics.attention')}</dt>
-              <dd data-tone={hero.attentionCount > 0 ? 'warn' : undefined}>
-                {hero.attentionCount}
-              </dd>
-            </div>
-            <div data-testid="workbench-metric-done">
-              <dt>{t('workbench.metrics.done')}</dt>
-              <dd>{hero.doneCount}</dd>
-            </div>
-          </dl>
+          {hero.runningCount > 0 && (
+            <dl className="iso-hud-stats px-hud-stats" aria-label={t('workbench.metrics.summary')}>
+              <div data-testid="workbench-metric-running">
+                <dt>{t('workbench.metrics.running')}</dt>
+                <dd>{hero.runningCount}</dd>
+              </div>
+            </dl>
+          )}
         </div>
       </header>
 
@@ -96,18 +88,17 @@ export function PixelFarmShell({
           style={{ width: mapW, height: mapH }}
           aria-label={t('workbench.zonesRegion')}
         >
+          {/* Soft pad under the even 3×2 field — no grid texture */}
           <div
             className="iso-ground px-ground"
             style={{
-              left: originX + bounds.minX - 40,
-              top: originY + bounds.minY + 20,
-              width: bounds.width + 80,
-              height: bounds.height * 0.55 + 60,
+              left: originX + bounds.minX - 24,
+              top: originY + bounds.minY + Math.round(bounds.height * 0.18),
+              width: bounds.width + 48,
+              height: Math.round(bounds.height * 0.62),
             }}
             aria-hidden
           />
-
-          <div className="px-path" aria-hidden />
 
           {zones.map((zone, i) => (
             <IsoPlot

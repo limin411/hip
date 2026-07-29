@@ -9,20 +9,18 @@ export const ISO_TW = 260
 export const ISO_TH = 150
 
 /**
- * Grid cells with a gap column/row between neighbors so the 6 farmers
- * read as a roomy diamond field rather than a packed 2×3 cluster.
+ * Even 3×2 iso grid (step 2 so ~90px mascots don't collide).
  *
- *   (0,0) sessions     (2,0) tasks      (4,0) automations
- *         (1,2) knowledge   (3,2) terminals
- *                  (2,4) workflows
+ *   (0,0) sessions   (2,0) tasks      (4,0) automations
+ *   (0,2) knowledge  (2,2) terminals  (4,2) workflows
  */
 export const ZONE_CELL: Record<ZoneId, { col: number; row: number }> = {
   sessions: { col: 0, row: 0 },
   tasks: { col: 2, row: 0 },
   automations: { col: 4, row: 0 },
-  knowledge: { col: 1, row: 2 },
-  terminals: { col: 3, row: 2 },
-  workflows: { col: 2, row: 4 },
+  knowledge: { col: 0, row: 2 },
+  terminals: { col: 2, row: 2 },
+  workflows: { col: 4, row: 2 },
 }
 
 export function isoProject(col: number, row: number): { x: number; y: number } {

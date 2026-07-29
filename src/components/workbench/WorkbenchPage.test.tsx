@@ -79,7 +79,10 @@ describe('WorkbenchPage', () => {
     expect(screen.getByTestId('workbench-hero')).toBeInTheDocument()
     expect(screen.getByTestId('workbench-modules')).toBeInTheDocument()
     expect(screen.getByTestId('workbench-zone-sessions')).toBeInTheDocument()
-    expect(screen.getByTestId('workbench-metric-running')).toHaveTextContent('0')
+    // Idle farm: no fake attention/done counters; running only when work is live
+    expect(screen.queryByTestId('workbench-metric-running')).not.toBeInTheDocument()
+    expect(screen.queryByTestId('workbench-metric-attention')).not.toBeInTheDocument()
+    expect(screen.queryByTestId('workbench-metric-done')).not.toBeInTheDocument()
     expect(screen.queryByTestId('workbench-farm-dock')).not.toBeInTheDocument()
     expect(screen.queryByTestId('workbench-continue')).not.toBeInTheDocument()
     expect(screen.queryByTestId('workbench-shortcuts')).not.toBeInTheDocument()

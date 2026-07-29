@@ -68,30 +68,27 @@
   min-height: 12rem;
 }
 
-/* checkerboard-ish meadow under plots */
+/*
+ * Soft soil wash under plots only — no checkerboard / grid.
+ * Far meadow is already painted by FarmSky; this is a subtle pad so beds sit on dirt.
+ */
 .px-farm .px-ground {
-  border-radius: 0;
-  opacity: 0.88;
-  background:
-    repeating-conic-gradient(
-      from 45deg,
-      color-mix(in srgb, var(--iso-grass) 90%, #fff) 0% 25%,
-      color-mix(in srgb, var(--iso-grass-deep) 70%, var(--iso-soil)) 0% 50%
-    )
-      0 0 / 16px 16px,
-    radial-gradient(
-      ellipse at 40% 45%,
-      color-mix(in srgb, var(--iso-soil) 40%, var(--iso-grass)) 0%,
-      color-mix(in srgb, var(--iso-grass-deep) 55%, transparent) 70%,
-      transparent 100%
-    );
-  transform: scaleY(0.5) rotate(0deg);
-  box-shadow: 0 8px 0 color-mix(in srgb, #1a2a14 25%, transparent);
-  image-rendering: pixelated;
+  border-radius: 50%;
+  opacity: 0.55;
+  background: radial-gradient(
+    ellipse 70% 55% at 50% 48%,
+    color-mix(in srgb, var(--iso-soil) 42%, var(--iso-grass)) 0%,
+    color-mix(in srgb, var(--iso-grass) 50%, var(--iso-soil)) 38%,
+    color-mix(in srgb, var(--iso-grass-deep) 40%, transparent) 68%,
+    transparent 100%
+  );
+  transform: scaleY(0.48);
+  box-shadow: none;
+  filter: none;
 }
 
 .px-path {
-  display: none; /* reserved decorative hook */
+  display: none;
 }
 
 /* —— plot pixel upgrades —— */

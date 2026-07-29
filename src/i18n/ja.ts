@@ -882,9 +882,9 @@ export const ja = {
     },
       "workbenchSection": "ワークベンチ",
       "workbenchShowCartoon": "マスコットを表示",
-      "workbenchShowCartoonDesc": "ゾーンカードと概要ヒーローに Flat Butt を表示します。",
+      "workbenchShowCartoonDesc": "オフィスデスクと概要ヒーローに Flat Butt を表示します。",
       "workbenchReduceMotion": "マスコットの動きを抑える",
-      "workbenchReduceMotionDesc": "モーションの代わりに静止ロゴを使います（システムの設定も尊重）。",
+      "workbenchReduceMotionDesc": "オフィス環境アニメを止め、静止ロゴを使います（システムの設定も尊重）。",
     "terminalShell": "デフォルトのターミナル",
     "terminalShellDesc": "コードパネルのターミナルで使用するシェルです。変更を反映するにはターミナルを再起動してください。",
     "terminalShells": {
@@ -1871,10 +1871,10 @@ export const ja = {
       "greetingAfternoon": "こんにちは — ワークベンチ準備完了",
       "greetingEvening": "こんばんは — ワークベンチ準備完了",
       "greetingNight": "夜遅くまで — ワークベンチ準備完了",
-      "subIdle": "各エリアの状況を一覧 · 数値は信頼できる情報源です",
-      "subRunning": "実行中のエリアはマスコットが活発になります",
-      "subAttention": "ブロック/失敗は警告表示 · クリックで対処",
-      "subDone": "最近の完了はしばらくハイライトされます"
+      "subIdle": "ピクセルオフィスは静か · デスクに各ゾーンの状態を表示",
+      "subRunning": "忙しいデスクが点灯 · タップして移動",
+      "subAttention": "要確認のデスクがあります · ブロック/失敗はクリックで対処",
+      "subDone": "完了したデスクがしばらく光ります"
     },
     "metrics": {
       "running": "実行中",
@@ -1916,7 +1916,7 @@ export const ja = {
       "terminalsSecondary": "ターミナル {{count}}"
     },
     "openZone": "{{name}} を開く →",
-    "zonesRegion": "機能エリア",
+    "zonesRegion": "オフィスデスク",
     "shortcuts": {
       "title": "クイック起動",
       "continueSession": "続行: {{title}}",

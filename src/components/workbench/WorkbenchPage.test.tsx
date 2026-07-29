@@ -76,9 +76,10 @@ function renderPage() {
 }
 
 describe('WorkbenchPage', () => {
-  it('renders hero, zones, and shortcuts', () => {
+  it('renders immersive office, hero, desks, and shortcuts', () => {
     renderPage()
     expect(screen.getByTestId('workbench-page')).toBeInTheDocument()
+    expect(screen.getByTestId('workbench-office')).toBeInTheDocument()
     expect(screen.getByTestId('workbench-hero')).toBeInTheDocument()
     expect(screen.getByTestId('workbench-zone-sessions')).toBeInTheDocument()
     expect(screen.getByTestId('workbench-zone-knowledge')).toBeInTheDocument()

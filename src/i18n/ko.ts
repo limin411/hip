@@ -882,9 +882,9 @@ export const ko = {
     },
       "workbenchSection": "워크벤치",
       "workbenchShowCartoon": "만화 캐릭터 표시",
-      "workbenchShowCartoonDesc": "영역 카드와 개요 히어로에 Flat Butt 마스코트를 표시합니다.",
+      "workbenchShowCartoonDesc": "사무실 책상과 개요 히어로에 Flat Butt 마스코트를 표시합니다.",
       "workbenchReduceMotion": "캐릭터 움직임 줄이기",
-      "workbenchReduceMotionDesc": "모션 대신 정적 로고를 사용합니다(시스템 설정도 존중).",
+      "workbenchReduceMotionDesc": "사무실 환경 애니메이션을 멈추고 정적 로고를 사용합니다(시스템 설정도 존중).",
     "terminalShell": "기본 터미널",
     "terminalShellDesc": "코드 패널 터미널에서 사용하는 셸입니다. 변경 사항을 적용하려면 터미널을 다시 시작하세요.",
     "terminalShells": {
@@ -1871,10 +1871,10 @@ export const ko = {
       "greetingAfternoon": "좋은 오후입니다 — 워크벤치 준비됨",
       "greetingEvening": "좋은 저녁입니다 — 워크벤치 준비됨",
       "greetingNight": "늦은 밤에도 — 워크벤치 준비됨",
-      "subIdle": "영역 상태를 한눈에 · 숫자는 신뢰할 수 있는 정보원입니다",
-      "subRunning": "실행 중인 영역은 캐릭터 동작이 빨라집니다",
-      "subAttention": "차단/실패는 경고로 표시 · 클릭하여 처리",
-      "subDone": "최근 완료는 잠시 강조됩니다"
+      "subIdle": "픽셀 사무실이 조용합니다 · 책상에 영역 상태를 표시",
+      "subRunning": "바쁜 책상이 밝아집니다 · 탭하여 이동",
+      "subAttention": "확인이 필요한 책상 · 차단/실패는 클릭하여 처리",
+      "subDone": "최근 완료된 책상이 잠시 빛납니다"
     },
     "metrics": {
       "running": "실행 중",
@@ -1916,7 +1916,7 @@ export const ko = {
       "terminalsSecondary": "터미널 {{count}}"
     },
     "openZone": "{{name}} 열기 →",
-    "zonesRegion": "기능 영역",
+    "zonesRegion": "사무실 책상",
     "shortcuts": {
       "title": "빠른 시작",
       "continueSession": "계속: {{title}}",

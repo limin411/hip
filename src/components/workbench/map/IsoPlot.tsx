@@ -65,7 +65,7 @@ export function IsoPlot({
           left: originX + x - ISO_TW / 2,
           top: originY + y,
           width: ISO_TW,
-          height: ISO_TH + 118,
+          height: ISO_TH + 132,
           zIndex: Math.round(cell.col + cell.row * 10) + 2,
           ['--plot-accent' as string]: ACCENT[zone.id],
           ['--plot-delay' as string]: delay,
@@ -75,7 +75,7 @@ export function IsoPlot({
       {/* farmer stands ON the bed — upright billboard */}
       <div className="iso-plot-actor" aria-hidden>
         <div className="iso-plot-actor-bob">
-          <IsoMascot action={action} size={100} forceStatic={forceStatic} />
+          <IsoMascot action={action} size={88} forceStatic={forceStatic} />
         </div>
       </div>
 

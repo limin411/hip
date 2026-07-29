@@ -699,10 +699,10 @@
 .iso-plot-diamond {
   position: absolute;
   left: 50%;
-  bottom: 48px;
-  width: 128px;
-  height: 72px;
-  margin-left: -64px;
+  bottom: 52px;
+  width: 148px;
+  height: 84px;
+  margin-left: -74px;
   z-index: 2;
   pointer-events: none;
 }
@@ -711,8 +711,8 @@
   position: absolute;
   left: 0;
   top: 0;
-  width: 128px;
-  height: 64px;
+  width: 148px;
+  height: 74px;
   background: linear-gradient(
     160deg,
     var(--iso-soil-dry) 0%,
@@ -720,7 +720,7 @@
     var(--iso-soil-deep) 100%
   );
   clip-path: polygon(50% 0%, 100% 50%, 50% 100%, 0% 50%);
-  box-shadow: 0 4px 0 color-mix(in srgb, var(--iso-soil-deep) 80%, #000);
+  box-shadow: 0 5px 0 color-mix(in srgb, var(--iso-soil-deep) 80%, #000);
 }
 
 .iso-plot[data-state='running'] .iso-plot-top {
@@ -748,8 +748,8 @@
 .iso-plot-right {
   position: absolute;
   bottom: 0;
-  width: 64px;
-  height: 14px;
+  width: 74px;
+  height: 16px;
   background: var(--iso-soil-deep);
 }
 .iso-plot-left {
@@ -871,10 +871,10 @@
 .iso-plot-actor {
   position: absolute;
   left: 50%;
-  bottom: 78px;
-  width: 100px;
-  height: 100px;
-  margin-left: -50px;
+  bottom: 92px;
+  width: 88px;
+  height: 88px;
+  margin-left: -44px;
   z-index: 5;
   pointer-events: none;
   filter: drop-shadow(0 4px 3px color-mix(in srgb, #000 20%, transparent));

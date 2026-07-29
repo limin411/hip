@@ -1937,17 +1937,43 @@ export const zhTW = {
     
     "home": {
       "eyebrow": "工作台",
-      "surfaces": "功能面"
+      "surfaces": "功能面",
+      "aside": "快捷入口與最近"
+    },
+    "continue": {
+      "title": "繼續工作",
+      "resume": "繼續",
+      "startNew": "開始",
+      "emptyTitle": "開始新對話",
+      "emptyHint": "還沒有最近會話 — 開啟對話即可開始。",
+      "untitled": "未命名會話",
+      "surface": {
+        "chat": "對話",
+        "code": "編碼"
+      }
+    },
+    "attention": {
+      "title": "需要關注"
+    },
+    "recent": {
+      "title": "最近會話",
+      "empty": "開啟過的會話會出現在這裡。",
+      "viewAll": "查看全部"
     },
     "shortcuts": {
       "title": "快捷入口",
       "continueSession": "繼續：{{title}}",
       "continueSessionEmpty": "暫無最近會話",
       "newChat": "新建對話",
-      "openKnowledge": "開啟知識庫",
-      "openTasks": "開啟事項",
-      "openAutomations": "開啟自動化",
-      "openTerminals": "開啟終端"
+      "newChatHint": "開始對話或編碼會話",
+      "openKnowledge": "知識庫",
+      "openKnowledgeHint": "空間、筆記與記憶",
+      "openTasks": "事項",
+      "openTasksHint": "追蹤工作項",
+      "openAutomations": "自動化",
+      "openAutomationsHint": "排程與作業",
+      "openTerminals": "終端",
+      "openTerminalsHint": "本機與遠端 shell"
     }
   },
   "terminals": {

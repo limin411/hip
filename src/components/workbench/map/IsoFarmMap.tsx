@@ -6,6 +6,7 @@ import { IsoPlot } from './IsoPlot'
 import { isoBounds, ZONE_CELL } from './isoLayout'
 import { mascotForHero } from './mascotForZone'
 import { IsoMascot } from './IsoMascot'
+import { FarmSky } from './FarmSky'
 import './isoFarm.css'
 
 const PAD = 48
@@ -49,46 +50,7 @@ export function IsoFarmMap({
       data-hero-state={hero.state}
       data-testid="workbench-farm-map"
     >
-      <div className="iso-farm-sky" aria-hidden>
-        {/* depth layers back → front */}
-        <div className="iso-sky-haze" />
-        <div className="iso-sky-mountains" />
-        <div className="iso-farm-sun" />
-        <div className="iso-farm-cloud iso-farm-cloud-a" />
-        <div className="iso-farm-cloud iso-farm-cloud-b" />
-        <div className="iso-farm-cloud iso-farm-cloud-c" />
-        <div className="iso-farm-cloud iso-farm-cloud-d" />
-        <div className="iso-birds">
-          <i />
-          <i />
-          <i />
-        </div>
-        <div className="iso-sky-ridge" />
-        <div className="iso-farm-hills" />
-        <div className="iso-tree-line">
-          <span className="iso-tree iso-tree-a" />
-          <span className="iso-tree iso-tree-b" />
-          <span className="iso-tree iso-tree-c" />
-          <span className="iso-tree iso-tree-d" />
-          <span className="iso-tree iso-tree-e" />
-          <span className="iso-tree iso-tree-f" />
-        </div>
-        <div className="iso-meadow" />
-        <div className="iso-meadow-texture" />
-        <div className="iso-path" />
-        <div className="iso-fence" />
-        <div className="iso-wildflowers">
-          <i />
-          <i />
-          <i />
-          <i />
-          <i />
-          <i />
-          <i />
-          <i />
-        </div>
-        <div className="iso-vignet" />
-      </div>
+      <FarmSky motion={motion} />
 
       {/* floating HUD */}
       <header

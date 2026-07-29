@@ -4,7 +4,7 @@
 |------|-----|
 | **Title** | hip Workbench · Calm Home |
 | **Date** | 2026-07-29 |
-| **Status** | Implemented |
+| **Status** | Implemented (see also ambient mesh: `2026-07-29-workbench-ambient-home.md`) |
 | **Replaces** | Farm cartoons · Command Deck (Three/GSAP sci-fi) |
 
 ---

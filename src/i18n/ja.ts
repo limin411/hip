@@ -1871,10 +1871,10 @@ export const ja = {
       "greetingAfternoon": "こんにちは — ワークベンチ準備完了",
       "greetingEvening": "こんばんは — ワークベンチ準備完了",
       "greetingNight": "夜遅くまで — ワークベンチ準備完了",
-      "subIdle": "強い陽射しの下で畑は静か · 区画に各ゾーンの状態を表示",
-      "subRunning": "作物が育っています · 区画をタップして移動",
-      "subAttention": "世話が必要な区画 · 枯れ/ブロックはクリックで対処",
-      "subDone": "収穫した区画がしばらく光ります"
+      "subIdle": "各サーフェスは待機中 · ひとつ開いて始めましょう",
+      "subRunning": "実行中の作業があります · サーフェスを開いて確認",
+      "subAttention": "確認が必要なサーフェスがあります · 開いて対処",
+      "subDone": "最近完了した作業が概要に残っています"
     },
     "metrics": {
       "summary": "ステータス概要",
@@ -1930,17 +1930,43 @@ export const ja = {
     
     "home": {
       "eyebrow": "ワークベンチ",
-      "surfaces": "サーフェス"
+      "surfaces": "サーフェス",
+      "aside": "クイック起動と最近"
+    },
+    "continue": {
+      "title": "続ける",
+      "resume": "再開",
+      "startNew": "開始",
+      "emptyTitle": "新しい会話を始める",
+      "emptyHint": "最近のセッションはまだありません",
+      "untitled": "無題のセッション",
+      "surface": {
+        "chat": "チャット",
+        "code": "コード"
+      }
+    },
+    "attention": {
+      "title": "要確認"
+    },
+    "recent": {
+      "title": "最近のセッション",
+      "empty": "開いたセッションがここに表示されます",
+      "viewAll": "すべて表示"
     },
     "shortcuts": {
       "title": "クイック起動",
       "continueSession": "続行: {{title}}",
       "continueSessionEmpty": "最近のセッションなし",
       "newChat": "新しい会話",
-      "openKnowledge": "ナレッジを開く",
-      "openTasks": "タスクを開く",
-      "openAutomations": "自動化を開く",
-      "openTerminals": "ターミナルを開く"
+      "newChatHint": "会話またはコーディングを開始",
+      "openKnowledge": "ナレッジ",
+      "openKnowledgeHint": "スペース・ノート・メモリ",
+      "openTasks": "タスク",
+      "openTasksHint": "作業項目を追跡",
+      "openAutomations": "自動化",
+      "openAutomationsHint": "スケジュールとジョブ",
+      "openTerminals": "ターミナル",
+      "openTerminalsHint": "ローカルとリモートシェル"
     }
   },
   "terminals": {

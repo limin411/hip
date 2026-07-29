@@ -1871,10 +1871,10 @@ export const ko = {
       "greetingAfternoon": "좋은 오후입니다 — 워크벤치 준비됨",
       "greetingEvening": "좋은 저녁입니다 — 워크벤치 준비됨",
       "greetingNight": "늦은 밤에도 — 워크벤치 준비됨",
-      "subIdle": "뜨거운 햇살 아래 밭이 조용합니다 · 구역에 상태를 표시",
-      "subRunning": "작물이 자라고 있습니다 · 구역을 탭하여 이동",
-      "subAttention": "돌볼 구역이 있습니다 · 시들거나 차단됨, 클릭하여 처리",
-      "subDone": "수확한 구역이 잠시 빛납니다"
+      "subIdle": "모든 서피스가 대기 중 · 하나를 열어 시작하세요",
+      "subRunning": "진행 중인 작업이 있습니다 · 서피스를 열어 확인",
+      "subAttention": "확인이 필요한 서피스가 있습니다 · 열어 처리",
+      "subDone": "최근 완료 항목이 개요에 남아 있습니다"
     },
     "metrics": {
       "summary": "상태 요약",
@@ -1930,17 +1930,43 @@ export const ko = {
     
     "home": {
       "eyebrow": "워크벤치",
-      "surfaces": "서피스"
+      "surfaces": "서피스",
+      "aside": "빠른 시작과 최근"
+    },
+    "continue": {
+      "title": "이어서 하기",
+      "resume": "계속",
+      "startNew": "시작",
+      "emptyTitle": "새 대화 시작",
+      "emptyHint": "최근 세션이 아직 없습니다",
+      "untitled": "제목 없는 세션",
+      "surface": {
+        "chat": "채팅",
+        "code": "코드"
+      }
+    },
+    "attention": {
+      "title": "주의 필요"
+    },
+    "recent": {
+      "title": "최근 세션",
+      "empty": "연 세션이 여기에 표시됩니다",
+      "viewAll": "모두 보기"
     },
     "shortcuts": {
       "title": "빠른 시작",
       "continueSession": "계속: {{title}}",
       "continueSessionEmpty": "최근 세션 없음",
       "newChat": "새 대화",
-      "openKnowledge": "지식 열기",
-      "openTasks": "작업 열기",
-      "openAutomations": "자동화 열기",
-      "openTerminals": "터미널 열기"
+      "newChatHint": "대화 또는 코딩 세션 시작",
+      "openKnowledge": "지식",
+      "openKnowledgeHint": "스페이스, 노트, 메모리",
+      "openTasks": "작업",
+      "openTasksHint": "작업 항목 추적",
+      "openAutomations": "자동화",
+      "openAutomationsHint": "일정과 작업",
+      "openTerminals": "터미널",
+      "openTerminalsHint": "로컬 및 원격 셸"
     }
   },
   "terminals": {

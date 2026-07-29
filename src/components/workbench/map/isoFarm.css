@@ -1,16 +1,35 @@
 /*
  * 2.5D isometric farm map — each surface is a tilled plot with a farmer.
  * DOM + CSS projection (no game engine). Mascots = public/motion SVGs.
+ * Far scene: FarmSky layered SVG (docs/design/2026-07-29-workbench-farm-sky.md).
  */
 
 .iso-farm {
+  /* soil / grass (plots + ground) */
   --iso-soil: #c47a3a;
   --iso-soil-deep: #8b4f22;
   --iso-soil-dry: #d4a06a;
   --iso-grass: #6bb36a;
   --iso-grass-deep: #3d8f45;
-  --iso-sky-top: #87ceeb;
-  --iso-sky-bot: #ffe8b0;
+  /* sky & illustrated far scene — light */
+  --iso-sky-top: #8ec8ec;
+  --iso-sky-mid: #c5e6f8;
+  --iso-sky-bot: #ffe4b0;
+  --farm-mountain-far: #8a9bb8;
+  --farm-mountain-near: #6a8fa8;
+  --farm-mountain-snow: color-mix(in srgb, #fff 72%, #c8e4f5);
+  --farm-ridge-back: color-mix(in srgb, var(--iso-grass) 72%, #4a7a58);
+  --farm-ridge: var(--iso-grass);
+  --farm-ridge-deep: var(--iso-grass-deep);
+  --farm-tree: color-mix(in srgb, var(--iso-grass-deep) 88%, #1a3020);
+  --farm-sun-core: #fff6d0;
+  --farm-sun-mid: #ffc94a;
+  --farm-sun-edge: #ff9a28;
+  --farm-sun-glow: color-mix(in srgb, #ffc040 42%, transparent);
+  --farm-cloud: color-mix(in srgb, #fff 94%, #ffe8c0);
+  --farm-haze: color-mix(in srgb, #fff8d8 48%, transparent);
+  --farm-vignet-edge: color-mix(in srgb, #1a2a18 16%, transparent);
+  --farm-sky-sat: 1;
   position: relative;
   display: flex;
   min-height: 0;
@@ -27,495 +46,225 @@
   --iso-soil-dry: #8b6340;
   --iso-grass: #3d6b38;
   --iso-grass-deep: #1e3d24;
-  --iso-sky-top: #1a3a5c;
-  --iso-sky-bot: #4a3010;
+  --iso-sky-top: #0c1a2e;
+  --iso-sky-mid: #1a3352;
+  --iso-sky-bot: #2a2818;
+  --farm-mountain-far: #2a4058;
+  --farm-mountain-near: #1e3448;
+  --farm-mountain-snow: color-mix(in srgb, #8ab0c8 35%, transparent);
+  --farm-ridge-back: color-mix(in srgb, var(--iso-grass-deep) 80%, #0a1810);
+  --farm-ridge: var(--iso-grass);
+  --farm-ridge-deep: var(--iso-grass-deep);
+  --farm-tree: color-mix(in srgb, #0e1c12 70%, var(--iso-grass-deep));
+  --farm-sun-core: #f0e8d0;
+  --farm-sun-mid: #e0b868;
+  --farm-sun-edge: #c88840;
+  --farm-sun-glow: color-mix(in srgb, #d4a050 22%, transparent);
+  --farm-cloud: color-mix(in srgb, #c8d8e8 28%, transparent);
+  --farm-haze: color-mix(in srgb, #4a6080 22%, transparent);
+  --farm-vignet-edge: color-mix(in srgb, #000 42%, transparent);
 }
 
-/* —— sky / parallax farm world —— */
+/* hero-state micro tint (sky only; absolute colors — no self-ref vars) */
+.iso-farm[data-hero-state='running'] {
+  --farm-sky-sat: 1.06;
+  --iso-sky-top: #96d0f2;
+}
+.iso-farm[data-hero-state='attention'],
+.iso-farm[data-hero-state='fail'] {
+  --farm-sky-sat: 0.92;
+  --iso-sky-top: #7aa0b8;
+  --farm-sun-glow: color-mix(in srgb, #ffc040 22%, transparent);
+}
+.iso-farm[data-hero-state='done'] {
+  --farm-sky-sat: 1.04;
+  --iso-sky-bot: #ffd898;
+}
+.dark .iso-farm[data-hero-state='running'] {
+  --iso-sky-top: #142a48;
+}
+.dark .iso-farm[data-hero-state='attention'],
+.dark .iso-farm[data-hero-state='fail'] {
+  --iso-sky-top: #101c2c;
+  --farm-sun-glow: color-mix(in srgb, #d4a050 12%, transparent);
+}
+.dark .iso-farm[data-hero-state='done'] {
+  --iso-sky-bot: #3a3020;
+}
+
+/* —— illustrated farm sky (FarmSky) —— */
 .iso-farm-sky {
   position: absolute;
   inset: 0;
   z-index: 0;
   pointer-events: none;
   overflow: hidden;
+}
+
+.farm-sky-gradient {
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(ellipse 68% 42% at 78% 10%, var(--farm-haze), transparent 68%),
+    radial-gradient(ellipse 48% 28% at 18% 8%, color-mix(in srgb, #fff 22%, transparent), transparent 62%),
+    linear-gradient(
+      180deg,
+      var(--iso-sky-top) 0%,
+      var(--iso-sky-mid) 22%,
+      color-mix(in srgb, var(--iso-sky-mid) 55%, var(--iso-sky-bot)) 42%,
+      var(--iso-sky-bot) 54%,
+      color-mix(in srgb, var(--iso-grass) 40%, var(--iso-sky-bot)) 70%,
+      color-mix(in srgb, var(--iso-grass) 75%, var(--iso-grass-deep)) 86%,
+      var(--iso-grass-deep) 100%
+    );
+  filter: saturate(var(--farm-sky-sat));
+}
+
+.farm-atmosphere {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+}
+
+.farm-sun {
+  position: absolute;
+  top: 4.5%;
+  right: 8%;
+  width: min(18vw, 128px);
+  height: min(18vw, 128px);
+  border-radius: 50%;
+  background: radial-gradient(
+    circle at 36% 34%,
+    var(--farm-sun-core) 0%,
+    var(--farm-sun-mid) 42%,
+    var(--farm-sun-edge) 78%,
+    color-mix(in srgb, var(--farm-sun-edge) 40%, transparent) 100%
+  );
+  box-shadow:
+    0 0 36px 12px var(--farm-sun-glow),
+    0 0 80px 28px color-mix(in srgb, var(--farm-sun-glow) 55%, transparent),
+    0 0 120px 48px color-mix(in srgb, var(--farm-sun-glow) 28%, transparent);
+  opacity: 0.94;
+}
+
+.dark .farm-sun {
+  opacity: 0.72;
+  width: min(14vw, 96px);
+  height: min(14vw, 96px);
+}
+
+.farm-cloud {
+  position: absolute;
+  opacity: 0.88;
+  filter: drop-shadow(0 2px 4px color-mix(in srgb, #4a7ab0 10%, transparent));
+  overflow: visible;
+}
+.farm-cloud-a {
+  top: 7%;
+  left: 5%;
+  width: min(18vw, 150px);
+  height: auto;
+}
+.farm-cloud-b {
+  top: 12%;
+  left: 28%;
+  width: min(12vw, 110px);
+  opacity: 0.68;
+}
+.farm-cloud-c {
+  top: 6%;
+  left: 48%;
+  width: min(10vw, 88px);
+  opacity: 0.52;
+}
+
+.dark .farm-cloud {
+  opacity: 0.45;
+  filter: none;
+}
+
+.farm-mountains {
+  position: absolute;
+  left: -2%;
+  right: -2%;
+  bottom: 34%;
+  width: 104%;
+  height: 36%;
+  z-index: 2;
+  display: block;
+}
+
+.farm-ridge {
+  position: absolute;
+  left: -2%;
+  right: -2%;
+  bottom: 18%;
+  width: 104%;
+  height: 32%;
+  z-index: 3;
+  display: block;
+}
+
+.dark .farm-mountain-highlight {
+  opacity: 0.35;
+}
+
+.farm-meadow {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 36%;
+  z-index: 4;
   background: linear-gradient(
     180deg,
-    var(--iso-sky-top) 0%,
-    color-mix(in srgb, var(--iso-sky-top) 70%, #b8dff5) 18%,
-    color-mix(in srgb, var(--iso-sky-bot) 55%, #c8e8ff) 38%,
-    var(--iso-sky-bot) 52%,
-    color-mix(in srgb, var(--iso-grass) 35%, var(--iso-sky-bot)) 68%,
-    color-mix(in srgb, var(--iso-grass) 70%, var(--iso-grass-deep)) 84%,
+    transparent 0%,
+    color-mix(in srgb, var(--iso-grass) 45%, transparent) 22%,
+    color-mix(in srgb, var(--iso-grass) 82%, var(--iso-grass-deep)) 58%,
     var(--iso-grass-deep) 100%
   );
 }
 
-/* soft atmospheric haze + light rays */
-.iso-sky-haze {
+.farm-vignet {
   position: absolute;
   inset: 0;
+  z-index: 5;
   background:
-    radial-gradient(ellipse 70% 45% at 78% 12%, color-mix(in srgb, #fff8d0 55%, transparent), transparent 70%),
-    radial-gradient(ellipse 50% 30% at 20% 8%, color-mix(in srgb, #fff 28%, transparent), transparent 65%),
-    radial-gradient(ellipse 90% 40% at 50% 100%, color-mix(in srgb, var(--iso-grass) 40%, transparent), transparent 60%);
-  opacity: 0.9;
-}
-
-/* distant blue mountains (far layer) */
-.iso-sky-mountains {
-  position: absolute;
-  left: -8%;
-  right: -8%;
-  bottom: 42%;
-  height: 28%;
-  background:
-    /* peak chain */
-    linear-gradient(165deg, transparent 42%, color-mix(in srgb, #5a8ab0 55%, #2a4a6a) 42.2%, color-mix(in srgb, #5a8ab0 55%, #2a4a6a) 58%, transparent 58.2%) no-repeat 8% 100% / 22% 90%,
-    linear-gradient(155deg, transparent 38%, color-mix(in srgb, #6a9ab8 50%, #3a5a78) 38.2%, color-mix(in srgb, #6a9ab8 50%, #3a5a78) 62%, transparent 62.2%) no-repeat 28% 100% / 30% 100%,
-    linear-gradient(170deg, transparent 45%, color-mix(in srgb, #4a7a9a 60%, #1e3a55) 45.2%, color-mix(in srgb, #4a7a9a 60%, #1e3a55) 55%, transparent 55.2%) no-repeat 52% 100% / 26% 85%,
-    linear-gradient(160deg, transparent 40%, color-mix(in srgb, #5f8fb0 52%, #2a4a68) 40.2%, color-mix(in srgb, #5f8fb0 52%, #2a4a68) 60%, transparent 60.2%) no-repeat 72% 100% / 28% 95%,
-    linear-gradient(168deg, transparent 44%, color-mix(in srgb, #4a7598 58%, #243e58) 44.2%, color-mix(in srgb, #4a7598 58%, #243e58) 56%, transparent 56.2%) no-repeat 90% 100% / 20% 80%;
-  opacity: 0.55;
-  filter: blur(0.3px);
-}
-
-.dark .iso-sky-mountains {
-  opacity: 0.4;
-  filter: brightness(0.55) blur(0.4px);
-}
-
-/* mid ridge between mountains and hills */
-.iso-sky-ridge {
-  position: absolute;
-  left: -4%;
-  right: -4%;
-  bottom: 34%;
-  height: 16%;
-  background:
-    radial-gradient(ellipse 38% 100% at 12% 100%, color-mix(in srgb, var(--iso-grass-deep) 80%, #2a5a35) 0%, transparent 72%),
-    radial-gradient(ellipse 42% 110% at 38% 100%, color-mix(in srgb, var(--iso-grass) 70%, #3a7040) 0%, transparent 70%),
-    radial-gradient(ellipse 36% 95% at 62% 100%, color-mix(in srgb, var(--iso-grass-deep) 85%, #1e4a28) 0%, transparent 72%),
-    radial-gradient(ellipse 40% 105% at 88% 100%, color-mix(in srgb, var(--iso-grass) 75%, #2f6238) 0%, transparent 70%);
-  opacity: 0.9;
-}
-
-.iso-farm-sun {
-  position: absolute;
-  top: 5%;
-  right: 9%;
-  width: min(20vw, 140px);
-  height: min(20vw, 140px);
-  border-radius: 50%;
-  background: radial-gradient(circle at 35% 35%, #fffef0, #ffe566 42%, #ffb020 72%, #ff7a18 100%);
-  box-shadow:
-    0 0 40px 14px color-mix(in srgb, #ffc040 45%, transparent),
-    0 0 90px 30px color-mix(in srgb, #ffaa20 22%, transparent),
-    0 0 140px 50px color-mix(in srgb, #ffd080 12%, transparent);
-  opacity: 0.95;
-}
-
-.iso-farm-cloud {
-  position: absolute;
-  background: color-mix(in srgb, #fff 92%, #ffe8b0);
-  border-radius: 40% 60% 50% 50% / 50% 40% 60% 50%;
+    radial-gradient(ellipse 86% 76% at 50% 48%, transparent 42%, var(--farm-vignet-edge) 100%),
+    linear-gradient(180deg, color-mix(in srgb, var(--iso-sky-top) 22%, transparent) 0%, transparent 16%);
   opacity: 0.88;
-  box-shadow:
-    18px 5px 0 -2px color-mix(in srgb, #fff 90%, #ffe8b0),
-    -14px 7px 0 -4px color-mix(in srgb, #fff 88%, #ffe8b0),
-    6px 10px 0 -6px color-mix(in srgb, #fff 80%, #e8f0ff);
-  filter: drop-shadow(0 2px 3px color-mix(in srgb, #4a7ab0 12%, transparent));
-}
-.iso-farm-cloud-a {
-  top: 8%;
-  left: 6%;
-  width: 100px;
-  height: 34px;
-}
-.iso-farm-cloud-b {
-  top: 14%;
-  left: 26%;
-  width: 72px;
-  height: 28px;
-  opacity: 0.7;
-}
-.iso-farm-cloud-c {
-  top: 7%;
-  left: 52%;
-  width: 56px;
-  height: 22px;
-  opacity: 0.55;
-}
-.iso-farm-cloud-d {
-  top: 18%;
-  right: 22%;
-  width: 90px;
-  height: 30px;
-  opacity: 0.75;
 }
 
-/* simple V birds */
-.iso-birds {
-  position: absolute;
-  top: 12%;
-  left: 42%;
-  width: 120px;
-  height: 40px;
-  opacity: 0.35;
+/* motion — gated by FarmSky data-motion (and parent reduce-motion store) */
+.iso-farm-sky[data-motion='live'] .farm-cloud-a {
+  animation: farm-cloud 24s ease-in-out infinite;
 }
-.iso-birds i {
-  position: absolute;
-  width: 10px;
-  height: 10px;
-  border: 1.5px solid color-mix(in srgb, var(--ink) 45%, transparent);
-  border-bottom: none;
-  border-right: none;
-  transform: rotate(45deg) skewX(-12deg);
-  border-radius: 2px 0 0 0;
+.iso-farm-sky[data-motion='live'] .farm-cloud-b {
+  animation: farm-cloud 32s ease-in-out infinite reverse;
 }
-.iso-birds i:nth-child(1) {
-  left: 10px;
-  top: 12px;
+.iso-farm-sky[data-motion='live'] .farm-cloud-c {
+  animation: farm-cloud 38s ease-in-out infinite;
 }
-.iso-birds i:nth-child(2) {
-  left: 36px;
-  top: 4px;
-  width: 8px;
-  height: 8px;
-  opacity: 0.75;
-}
-.iso-birds i:nth-child(3) {
-  left: 58px;
-  top: 16px;
-  width: 7px;
-  height: 7px;
-  opacity: 0.6;
+.iso-farm-sky[data-motion='live'] .farm-sun {
+  animation: farm-sun 5.5s ease-in-out infinite;
 }
 
-.iso-farm-hills {
-  position: absolute;
-  left: -5%;
-  right: -5%;
-  bottom: 22%;
-  height: 24%;
-  background:
-    radial-gradient(ellipse 42% 100% at 15% 100%, var(--iso-grass) 0%, transparent 70%),
-    radial-gradient(ellipse 48% 110% at 48% 100%, var(--iso-grass-deep) 0%, transparent 68%),
-    radial-gradient(ellipse 40% 95% at 78% 100%, var(--iso-grass) 0%, transparent 70%),
-    radial-gradient(ellipse 30% 90% at 95% 100%, var(--iso-grass-deep) 0%, transparent 72%);
-  opacity: 0.92;
-}
-
-/* tree silhouettes on ridge */
-.iso-tree-line {
-  position: absolute;
-  left: 0;
-  right: 0;
-  bottom: 26%;
-  height: 14%;
-}
-.iso-tree {
-  position: absolute;
-  bottom: 0;
-  width: 18px;
-  height: 36px;
-  background: var(--iso-grass-deep);
-  border-radius: 50% 50% 40% 40% / 60% 60% 30% 30%;
-  box-shadow:
-    0 -8px 0 -2px color-mix(in srgb, var(--iso-grass-deep) 90%, #1a3a20),
-    0 0 0 0 transparent;
-  opacity: 0.85;
-}
-.iso-tree::after {
-  content: '';
-  position: absolute;
-  left: 50%;
-  bottom: -4px;
-  width: 4px;
-  height: 10px;
-  margin-left: -2px;
-  background: color-mix(in srgb, var(--iso-soil-deep) 80%, #2a1a0a);
-  border-radius: 1px;
-}
-.iso-tree-a {
-  left: 6%;
-  height: 42px;
-  width: 20px;
-}
-.iso-tree-b {
-  left: 14%;
-  height: 28px;
-  width: 14px;
-  opacity: 0.7;
-}
-.iso-tree-c {
-  left: 38%;
-  height: 48px;
-  width: 22px;
-}
-.iso-tree-d {
-  left: 48%;
-  height: 32px;
-  width: 16px;
-  opacity: 0.75;
-}
-.iso-tree-e {
-  right: 18%;
-  height: 40px;
-  width: 19px;
-}
-.iso-tree-f {
-  right: 8%;
-  height: 30px;
-  width: 15px;
-  opacity: 0.7;
-}
-
-/* foreground meadow fill */
-.iso-meadow {
-  position: absolute;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  height: 38%;
-  background:
-    linear-gradient(
-      180deg,
-      transparent 0%,
-      color-mix(in srgb, var(--iso-grass) 55%, transparent) 18%,
-      color-mix(in srgb, var(--iso-grass) 80%, var(--iso-grass-deep)) 55%,
-      var(--iso-grass-deep) 100%
-    );
-}
-
-/* subtle grass / soil texture via layered dots */
-.iso-meadow-texture {
-  position: absolute;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  height: 42%;
-  opacity: 0.28;
-  background-image:
-    radial-gradient(circle at 12% 20%, color-mix(in srgb, #fff 40%, transparent) 0 1px, transparent 1.5px),
-    radial-gradient(circle at 28% 55%, color-mix(in srgb, #1a3a18 50%, transparent) 0 1px, transparent 1.5px),
-    radial-gradient(circle at 45% 30%, color-mix(in srgb, #fff 35%, transparent) 0 1px, transparent 1.5px),
-    radial-gradient(circle at 62% 70%, color-mix(in srgb, #1a3a18 45%, transparent) 0 1px, transparent 1.5px),
-    radial-gradient(circle at 78% 40%, color-mix(in srgb, #fff 30%, transparent) 0 1px, transparent 1.5px),
-    radial-gradient(circle at 90% 65%, color-mix(in srgb, #1a3a18 40%, transparent) 0 1px, transparent 1.5px);
-  background-size:
-    48px 40px,
-    52px 44px,
-    40px 36px,
-    56px 48px,
-    44px 38px,
-    50px 42px;
-  background-position:
-    0 0,
-    12px 8px,
-    6px 16px,
-    20px 4px,
-    8px 20px,
-    16px 12px;
-  mask-image: linear-gradient(180deg, transparent 0%, #000 35%, #000 100%);
-}
-
-/* dirt path snaking under the map stage */
-.iso-path {
-  position: absolute;
-  left: 50%;
-  bottom: 0;
-  width: min(52vw, 420px);
-  height: 36%;
-  margin-left: calc(min(52vw, 420px) * -0.5);
-  background:
-    linear-gradient(
-      185deg,
-      transparent 0%,
-      color-mix(in srgb, var(--iso-soil-dry) 55%, transparent) 12%,
-      color-mix(in srgb, var(--iso-soil) 70%, var(--iso-soil-dry)) 40%,
-      color-mix(in srgb, var(--iso-soil-deep) 60%, var(--iso-soil)) 100%
-    );
-  clip-path: polygon(
-    42% 0%,
-    58% 0%,
-    72% 28%,
-    78% 55%,
-    70% 100%,
-    30% 100%,
-    22% 55%,
-    28% 28%
-  );
-  opacity: 0.55;
-  filter: blur(0.4px);
-}
-
-/* split-rail fence silhouette near bottom */
-.iso-fence {
-  position: absolute;
-  left: -2%;
-  right: -2%;
-  bottom: 6%;
-  height: 28px;
-  opacity: 0.22;
-  background:
-    repeating-linear-gradient(
-      90deg,
-      transparent 0 28px,
-      color-mix(in srgb, var(--iso-soil-deep) 90%, #1a1008) 28px 32px,
-      transparent 32px 56px
-    ),
-    linear-gradient(
-      180deg,
-      transparent 0,
-      transparent 8px,
-      color-mix(in srgb, var(--iso-soil-deep) 85%, #1a1008) 8px 11px,
-      transparent 11px 18px,
-      color-mix(in srgb, var(--iso-soil-deep) 85%, #1a1008) 18px 21px,
-      transparent 21px
-    );
-}
-
-/* wildflower dots along meadow edge */
-.iso-wildflowers {
-  position: absolute;
-  left: 0;
-  right: 0;
-  bottom: 8%;
-  height: 18%;
-}
-.iso-wildflowers i {
-  position: absolute;
-  width: 5px;
-  height: 5px;
-  border-radius: 50%;
-  box-shadow: 0 1px 0 color-mix(in srgb, #000 15%, transparent);
-}
-.iso-wildflowers i:nth-child(1) {
-  left: 8%;
-  top: 40%;
-  background: #f5a0c0;
-}
-.iso-wildflowers i:nth-child(2) {
-  left: 14%;
-  top: 70%;
-  background: #f5e070;
-  width: 4px;
-  height: 4px;
-}
-.iso-wildflowers i:nth-child(3) {
-  left: 22%;
-  top: 30%;
-  background: #e8f0ff;
-}
-.iso-wildflowers i:nth-child(4) {
-  left: 68%;
-  top: 50%;
-  background: #f5a0c0;
-  width: 4px;
-  height: 4px;
-}
-.iso-wildflowers i:nth-child(5) {
-  left: 76%;
-  top: 25%;
-  background: #f5e070;
-}
-.iso-wildflowers i:nth-child(6) {
-  left: 84%;
-  top: 60%;
-  background: #c8a0f0;
-}
-.iso-wildflowers i:nth-child(7) {
-  left: 4%;
-  top: 55%;
-  background: #c8a0f0;
-  width: 3px;
-  height: 3px;
-}
-.iso-wildflowers i:nth-child(8) {
-  left: 92%;
-  top: 40%;
-  background: #e8f0ff;
-  width: 4px;
-  height: 4px;
-}
-
-/* edge vignette so HUD + plots read cleaner */
-.iso-vignet {
-  position: absolute;
-  inset: 0;
-  background:
-    radial-gradient(ellipse 85% 75% at 50% 48%, transparent 40%, color-mix(in srgb, #1a2a18 18%, transparent) 100%),
-    linear-gradient(180deg, color-mix(in srgb, var(--iso-sky-top) 25%, transparent) 0%, transparent 18%);
-  opacity: 0.85;
-}
-
-.dark .iso-vignet {
-  background:
-    radial-gradient(ellipse 85% 75% at 50% 48%, transparent 35%, color-mix(in srgb, #000 45%, transparent) 100%),
-    linear-gradient(180deg, color-mix(in srgb, #0a1520 40%, transparent) 0%, transparent 22%);
-}
-
-.iso-farm[data-motion='live'] .iso-farm-cloud-a {
-  animation: iso-cloud 22s ease-in-out infinite;
-}
-.iso-farm[data-motion='live'] .iso-farm-cloud-b {
-  animation: iso-cloud 28s ease-in-out infinite reverse;
-}
-.iso-farm[data-motion='live'] .iso-farm-cloud-c {
-  animation: iso-cloud 34s ease-in-out infinite;
-}
-.iso-farm[data-motion='live'] .iso-farm-cloud-d {
-  animation: iso-cloud 26s ease-in-out infinite reverse;
-}
-.iso-farm[data-motion='live'] .iso-farm-sun {
-  animation: iso-sun 4s ease-in-out infinite;
-}
-.iso-farm[data-motion='live'] .iso-birds {
-  animation: iso-birds 18s ease-in-out infinite;
-}
-.iso-farm[data-motion='live'] .iso-wildflowers i:nth-child(odd) {
-  animation: iso-bloom 3.2s ease-in-out infinite;
-}
-.iso-farm[data-motion='live'] .iso-wildflowers i:nth-child(even) {
-  animation: iso-bloom 3.8s ease-in-out infinite reverse;
-}
-
-@keyframes iso-cloud {
+@keyframes farm-cloud {
   0%,
   100% {
     transform: translateX(0);
   }
   50% {
-    transform: translateX(22px);
+    transform: translateX(2.2%);
   }
 }
-@keyframes iso-sun {
+@keyframes farm-sun {
   0%,
   100% {
     transform: scale(1);
   }
   50% {
-    transform: scale(1.04);
-  }
-}
-@keyframes iso-birds {
-  0%,
-  100% {
-    transform: translate(0, 0);
-  }
-  50% {
-    transform: translate(40px, -8px);
-  }
-}
-@keyframes iso-bloom {
-  0%,
-  100% {
-    transform: scale(1);
-    opacity: 0.85;
-  }
-  50% {
-    transform: scale(1.25);
-    opacity: 1;
+    transform: scale(1.03);
   }
 }
 
@@ -539,7 +288,7 @@
   padding: 0.75rem 1rem;
   border: 1px solid color-mix(in srgb, var(--border) 80%, transparent);
   border-radius: 14px;
-  background: color-mix(in srgb, var(--bg-app) 82%, transparent);
+  background: color-mix(in srgb, var(--bg-app) 78%, transparent);
   backdrop-filter: blur(16px) saturate(140%);
   -webkit-backdrop-filter: blur(16px) saturate(140%);
   box-shadow: var(--shadow-panel, 0 2px 14px -4px rgba(17, 17, 17, 0.1));
@@ -1032,10 +781,10 @@
   .iso-hud-mascot {
     display: none;
   }
-  .iso-sky-mountains {
-    opacity: 0.35;
+  .farm-mountains {
+    opacity: 0.85;
   }
-  .iso-fence {
+  .farm-cloud-c {
     display: none;
   }
   .iso-hud-stats > div {
@@ -1048,13 +797,10 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .iso-farm[data-motion='live'] .iso-farm-cloud-a,
-  .iso-farm[data-motion='live'] .iso-farm-cloud-b,
-  .iso-farm[data-motion='live'] .iso-farm-cloud-c,
-  .iso-farm[data-motion='live'] .iso-farm-cloud-d,
-  .iso-farm[data-motion='live'] .iso-farm-sun,
-  .iso-farm[data-motion='live'] .iso-birds,
-  .iso-farm[data-motion='live'] .iso-wildflowers i,
+  .iso-farm-sky[data-motion='live'] .farm-cloud-a,
+  .iso-farm-sky[data-motion='live'] .farm-cloud-b,
+  .iso-farm-sky[data-motion='live'] .farm-cloud-c,
+  .iso-farm-sky[data-motion='live'] .farm-sun,
   .iso-farm[data-motion='live'] .iso-plot-actor-bob,
   .iso-farm[data-motion='live'] .iso-plot-spray i {
     animation: none !important;

@@ -18,7 +18,6 @@ import {
   Code2,
   Folder,
   GitBranch,
-  LayoutDashboard,
   MessageSquare,
   PanelLeftClose,
   Search,
@@ -69,12 +68,9 @@ import { WORK_ITEM_TRACKING } from '@/components/work-items/feature'
 import { WorkItemSidebarLists } from '@/components/work-items/WorkItemSidebarLists'
 import { AUTOMATION_PAGE } from '@/components/automation/feature'
 import { AutomationSidebarList } from '@/components/automation/AutomationSidebarList'
-import { WORKBENCH_PAGE } from '@/components/workbench/feature'
-
 import {
   enterKnowledge,
   enterPlaceholderSection,
-  enterWorkbenchSection,
   enterSection,
   enterTerminalsSection,
   enterWorkItemsSection,
@@ -281,8 +277,7 @@ export function AppSidebar() {
   )
 
   const onNav = (section: SidebarSection) => {
-    if (section === 'workbench' && WORKBENCH_PAGE) void enterWorkbenchSection()
-    else if (section === 'knowledge') void enterKnowledge()
+    if (section === 'knowledge') void enterKnowledge()
     else if (section === 'terminals' && TERMINAL_MANAGEMENT)
       void enterTerminalsSection({ library: true })
     else if (section === 'tasks' && WORK_ITEM_TRACKING) void enterWorkItemsSection()
@@ -405,13 +400,6 @@ export function AppSidebar() {
       </div>
 
       <nav className="flex shrink-0 flex-col gap-0.5 px-2 pb-3" aria-label={t('sidebar.navAria')}>
-        <NavItem
-          section="workbench"
-          active={sidebarSection === 'workbench' && activeView === 'workbench'}
-          label={t('sidebar.nav.workbench')}
-          icon={<LayoutDashboard size={16} strokeWidth={1.75} />}
-          onClick={() => onNav('workbench')}
-        />
         <NavItem
           section="chats"
           active={sidebarSection === 'chats'}

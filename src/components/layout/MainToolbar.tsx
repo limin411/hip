@@ -33,13 +33,12 @@ export function MainToolbar() {
   const isMac = isMacPlatform()
 
   // Terminals keeps MainToolbar panel chrome (right-rail toggle) like chat/code/knowledge.
-  // workbench / tasks / automation / settings / history / trash stay chrome-light.
+  // tasks / automation / settings / history / trash stay chrome-light.
   const isSpecial =
     activeView === 'settings' ||
     activeView === 'history' ||
     activeView === 'trash' ||
     activeView === 'automation' ||
-    activeView === 'workbench' ||
     activeView === 'tasks'
   const showPanelChrome = !isSpecial
   const showSidebarExpand = !sidebarOpen
@@ -51,8 +50,6 @@ export function MainToolbar() {
     title = '' // page keeps h2
   } else if (activeView === 'automation') {
     title = t('sidebar.nav.automation')
-  } else if (activeView === 'workbench') {
-    title = t('sidebar.nav.workbench')
   } else if (activeView === 'terminals') {
     title = t('sidebar.nav.terminals')
   } else if (activeView === 'tasks') {

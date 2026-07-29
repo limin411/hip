@@ -888,11 +888,6 @@ export const zhTW = {
       "comfortable": "舒適",
       "compact": "緊湊"
     },
-      "workbenchSection": "工作台",
-      "workbenchShowScene": "農莊動效",
-      "workbenchShowSceneDesc": "播放像素農場動效（雲、農夫、澆水）。仍尊重減少動效與系統偏好。",
-      "workbenchReduceMotion": "減少動效",
-      "workbenchReduceMotionDesc": "凍結工作台農場動畫（也尊重系統減少動態偏好）。",
     "terminalShell": "預設終端",
     "terminalShellDesc": "程式碼面板終端使用的預設 shell。修改後需重新啟動終端生效。",
     "terminalShells": {
@@ -1862,133 +1857,9 @@ export const zhTW = {
   },
   "placeholder": {
     "comingSoon": "功能開發中，敬請期待",
-    "workbench": "工作台即將上線，用於總覽與快捷入口。",
     "terminals": "終端管理即將上線，用於集中管理多路終端會話。",
     "tasks": "事項追蹤即將上線，用於跟進事項。",
     "automation": "自動化即將上線，用於設定工作流與定時任務。"
-  },
-  "workbench": {
-    "hero": {
-      "region": "工作台總覽",
-      "titleIdle": "工作台就緒",
-      "titleRunning": "有任務在推進",
-      "titleAttention": "有區域需要關注",
-      "titleDone": "階段收工漂亮",
-      "greetingMorning": "早上好，工作台就緒",
-      "greetingAfternoon": "下午好，工作台就緒",
-      "greetingEvening": "晚上好，工作台就緒",
-      "greetingNight": "夜深了，工作台仍就緒",
-      "subIdle": "各模組待機 · 選擇一個系統入口進入",
-      "subRunning": "偵測到活躍鏈路 · 開啟模組即可接入",
-      "subAttention": "有模組告警 · 點開排查",
-      "subDone": "近期完成的模組仍在面板上高亮"
-    },
-    "metrics": {
-      "summary": "狀態摘要",
-      "running": "執行中",
-      "attention": "需關注",
-      "done": "完成"
-    },
-    "state": {
-      "idle": "閒置",
-      "running": "執行",
-      "blocked": "阻塞",
-      "done": "完成",
-      "fail": "失敗"
-    },
-    "zone": {
-      "sessions": "會話",
-      "tasks": "事項",
-      "automations": "自動化",
-      "knowledge": "知識",
-      "terminals": "終端",
-      "workflows": "工作流"
-    },
-    "metric": {
-      "sessionsRunning": "{{count}} 個 turn",
-      "sessionsIdle": "無執行",
-      "sessionsSecondary": "{{count}} 項活躍工作",
-      "tasksProgress": "{{done}} / {{total}}",
-      "tasksInProgress": "{{count}} 進行中",
-      "tasksOpen": "{{count}} 未完成",
-      "automationsFailed": "{{count}} 失敗",
-      "automationsWaiting": "{{count}} 等待確認",
-      "automationsRunning": "{{count}} 執行中",
-      "automationsIdle": "計畫中",
-      "automationsEnabled": "{{count}} 已啟用",
-      "knowledgeSynced": "已同步",
-      "knowledgeSpaces": "{{count}} 個空間",
-      "terminalsRunning": "{{count}} shell",
-      "terminalsOpen": "{{count}} 已開啟",
-      "terminalsIdle": "空閒",
-      "terminalsSecondary": "{{count}} 個終端"
-    },
-    "openZone": "開啟{{name}} →",
-    "zonesRegion": "功能面",
-    "deck": {
-        "kicker": "總覽"
-      },
-      "farm": {
-      "kicker": "像素農莊",
-      "hint": "WASD / 方向鍵移動 · Enter 進入 · 懸停跟隨 · 點農夫說話",
-      "hoverHint": "→ {{name}} · {{state}} · Enter 或點擊進入",
-      "padAria": "農莊操作",
-      "padMove": "移動",
-      "padOpen": "進入",
-      "padClick": "點農夫說話",
-      "dock": "工具棚 — 快捷入口與最近工作階段",
-      "heroAria": "農莊主角 — 點擊說話",
-      "bubble": {
-        "hi": "嗨！今天種點什麼？",
-        "tip": "每塊田對應一個功能面，點進去就行！",
-        "hungry": "作物好像渴了……還是我餓了？",
-        "cheer": "今天田裡幹得不錯！"
-      }
-    },
-    "office": {
-      "kicker": "像素辦公室"
-    },
-    
-    "home": {
-      "eyebrow": "工作台",
-      "surfaces": "功能面",
-      "aside": "快捷入口與最近"
-    },
-    "continue": {
-      "title": "繼續工作",
-      "resume": "繼續",
-      "startNew": "開始",
-      "emptyTitle": "開始新對話",
-      "emptyHint": "還沒有最近會話 — 開啟對話即可開始。",
-      "untitled": "未命名會話",
-      "surface": {
-        "chat": "對話",
-        "code": "編碼"
-      }
-    },
-    "attention": {
-      "title": "需要關注"
-    },
-    "recent": {
-      "title": "最近會話",
-      "empty": "開啟過的會話會出現在這裡。",
-      "viewAll": "查看全部"
-    },
-    "shortcuts": {
-      "title": "快捷入口",
-      "continueSession": "繼續：{{title}}",
-      "continueSessionEmpty": "暫無最近會話",
-      "newChat": "新建對話",
-      "newChatHint": "開始對話或編碼會話",
-      "openKnowledge": "知識庫",
-      "openKnowledgeHint": "空間、筆記與記憶",
-      "openTasks": "事項",
-      "openTasksHint": "追蹤工作項",
-      "openAutomations": "自動化",
-      "openAutomationsHint": "排程與作業",
-      "openTerminals": "終端",
-      "openTerminalsHint": "本機與遠端 shell"
-    }
   },
   "terminals": {
     "title": "終端管理",
@@ -2456,7 +2327,6 @@ export const zhTW = {
     "navForward": "前進",
     "navForwardAria": "前進到下一位置",
     "nav": {
-      "workbench": "工作台",
       "knowledge": "知識庫",
       "projects": "專案",
       "chats": "對話",

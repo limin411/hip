@@ -65,7 +65,6 @@ vi.mock('@/domain', async (importOriginal) => {
 import {
   assignSectionAfterLeavingKnowledge,
   enterKnowledge,
-  enterWorkbenchSection,
   enterSection,
   enterWorkItemsSection,
   enterAutomationsSection,
@@ -167,13 +166,6 @@ describe('sidebarActions', () => {
     expect(useUiStore.getState().sidebarSection).toBe('projects')
   })
 
-  it('enterWorkbenchSection sets workbench view and section', async () => {
-    useUiStore.setState({ activeView: 'chat', sidebarSection: 'chats' })
-    await enterWorkbenchSection()
-    expect(useUiStore.getState().activeView).toBe('workbench')
-    expect(useUiStore.getState().sidebarSection).toBe('workbench')
-    expect(setSurface).not.toHaveBeenCalled()
-  })
 
   it('enterTerminalsSection flushes knowledge then opens terminals', async () => {
     const { enterTerminalsSection } = await import('./sidebarActions')
@@ -429,11 +421,5 @@ describe('sidebarActions', () => {
     expect(useUiStore.getState().activeView).toBe('terminals')
   })
 
-  it('enterWorkbenchSection flushes work items when leaving tasks', async () => {
-    useUiStore.setState({ activeView: 'tasks', sidebarSection: 'tasks' })
-    await enterWorkbenchSection()
-    expect(workItemFlushSave).toHaveBeenCalled()
-    expect(useUiStore.getState().activeView).toBe('workbench')
-  })
 
 })

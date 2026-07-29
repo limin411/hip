@@ -341,8 +341,6 @@ describe('uiStore persistence partialize', () => {
       checkpointMode: s.checkpointMode,
       sidebarOpen: s.sidebarOpen,
       sidebarWidth: s.sidebarWidth,
-      workbenchShowScene: s.workbenchShowScene,
-      workbenchReduceMotion: s.workbenchReduceMotion,
     }
     expect(persisted).toEqual({
       chatSessionId: 'a',
@@ -355,8 +353,6 @@ describe('uiStore persistence partialize', () => {
       checkpointMode: 'since-start',
       sidebarOpen: s.sidebarOpen,
       sidebarWidth: s.sidebarWidth,
-      workbenchShowScene: true,
-      workbenchReduceMotion: false,
     })
     expect(persisted).not.toHaveProperty('activeTab')
     expect(persisted).not.toHaveProperty('scrollTargetMessageId')
@@ -364,12 +360,12 @@ describe('uiStore persistence partialize', () => {
     expect(persisted).not.toHaveProperty('openSessionIds')
   })
 
-  it('merge strips legacy activeView / tabs / knowledge so cold launch stays on workbench', () => {
+  it('merge strips legacy activeView / tabs / knowledge so cold launch stays on chats', () => {
     expect(isEphemeralActiveView('knowledge')).toBe(true)
 
     const current = {
-      activeView: 'workbench' as const,
-      sidebarSection: 'workbench' as const,
+      activeView: 'chat' as const,
+      sidebarSection: 'chats' as const,
       theme: 'system' as const,
       density: 'comfortable' as const,
     }
@@ -384,8 +380,8 @@ describe('uiStore persistence partialize', () => {
       },
       current,
     )
-    expect(merged.activeView).toBe('workbench')
-    expect(merged.sidebarSection).toBe('workbench')
+    expect(merged.activeView).toBe('chat')
+    expect(merged.sidebarSection).toBe('chats')
     expect(merged).not.toHaveProperty('openSessionIds')
     expect(merged).not.toHaveProperty('knowledgeTabOpen')
     expect(merged.theme).toBe('dark')
@@ -418,20 +414,20 @@ describe('uiStore persistence partialize', () => {
     expect(merged.density).toBe('comfortable')
   })
 
-  it('applyColdLaunchShell forces workbench section', () => {
+  it('applyColdLaunchShell forces chats section', () => {
     useUiStore.setState({
       activeView: 'knowledge',
       sidebarSection: 'knowledge',
     })
     applyColdLaunchShell()
-    expect(useUiStore.getState().activeView).toBe('workbench')
-    expect(useUiStore.getState().sidebarSection).toBe('workbench')
+    expect(useUiStore.getState().activeView).toBe('chat')
+    expect(useUiStore.getState().sidebarSection).toBe('chats')
   })
 
   it('merge clamps invalid sidebarWidth', () => {
     const current = {
-      activeView: 'workbench' as const,
-      sidebarSection: 'workbench' as const,
+      activeView: 'chat' as const,
+      sidebarSection: 'chats' as const,
       sidebarWidth: 300,
     }
     expect(mergeUiPersistedState({ sidebarWidth: 9999 }, current).sidebarWidth).toBe(480)
@@ -459,7 +455,6 @@ describe('uiStore - isPlaceholderSidebarSection (work items / automation flags)'
     expect(AUTOMATION_PAGE).toBe(true)
     expect(isPlaceholderSidebarSection('tasks')).toBe(false)
     expect(isPlaceholderSidebarSection('automation')).toBe(false)
-    expect(isPlaceholderSidebarSection('workbench')).toBe(false)
     // Real sections
     expect(isPlaceholderSidebarSection('chats')).toBe(false)
     expect(isPlaceholderSidebarSection('projects')).toBe(false)

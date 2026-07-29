@@ -880,11 +880,6 @@ export const ko = {
       "comfortable": "편안하게",
       "compact": "조밀하게"
     },
-      "workbenchSection": "워크벤치",
-      "workbenchShowScene": "농장 연출",
-      "workbenchShowSceneDesc": "픽셀 농장 움직임(구름·농부·물주기). 동작 줄이기 설정도 존중합니다.",
-      "workbenchReduceMotion": "움직임 줄이기",
-      "workbenchReduceMotionDesc": "워크벤치 농장 애니메이션을 멈춥니다(시스템 설정도 존중).",
     "terminalShell": "기본 터미널",
     "terminalShellDesc": "코드 패널 터미널에서 사용하는 셸입니다. 변경 사항을 적용하려면 터미널을 다시 시작하세요.",
     "terminalShells": {
@@ -1855,133 +1850,9 @@ export const ko = {
   },
   "placeholder": {
     "comingSoon": "출시 예정",
-    "workbench": "워크벤치가 곧 출시됩니다 — 개요와 바로가기 입구로 사용됩니다.",
     "terminals": "터미널 관리가 곧 출시됩니다 — 여러 터미널 세션을 한 곳에서 관리하세요.",
     "tasks": "작업 항목 추적이 곧 출시됩니다 — 작업 항목을 추적하세요.",
     "automation": "자동화가 곧 출시됩니다 — 워크플로우와 예약 작업을 구성하세요."
-  },
-  "workbench": {
-    "hero": {
-      "region": "워크벤치 개요",
-      "titleIdle": "워크벤치 준비됨",
-      "titleRunning": "작업이 진행 중입니다",
-      "titleAttention": "확인이 필요한 영역이 있습니다",
-      "titleDone": "잘 마무리되었습니다",
-      "greetingMorning": "좋은 아침입니다 — 워크벤치 준비됨",
-      "greetingAfternoon": "좋은 오후입니다 — 워크벤치 준비됨",
-      "greetingEvening": "좋은 저녁입니다 — 워크벤치 준비됨",
-      "greetingNight": "늦은 밤에도 — 워크벤치 준비됨",
-      "subIdle": "모든 서피스가 대기 중 · 하나를 열어 시작하세요",
-      "subRunning": "진행 중인 작업이 있습니다 · 서피스를 열어 확인",
-      "subAttention": "확인이 필요한 서피스가 있습니다 · 열어 처리",
-      "subDone": "최근 완료 항목이 개요에 남아 있습니다"
-    },
-    "metrics": {
-      "summary": "상태 요약",
-      "running": "실행 중",
-      "attention": "주의",
-      "done": "완료"
-    },
-    "state": {
-      "idle": "대기",
-      "running": "실행",
-      "blocked": "차단",
-      "done": "완료",
-      "fail": "실패"
-    },
-    "zone": {
-      "sessions": "세션",
-      "tasks": "작업",
-      "automations": "자동화",
-      "knowledge": "지식",
-      "terminals": "터미널",
-      "workflows": "워크플로"
-    },
-    "metric": {
-      "sessionsRunning": "턴 {{count}}",
-      "sessionsIdle": "실행 없음",
-      "sessionsSecondary": "활성 작업 {{count}}",
-      "tasksProgress": "{{done}} / {{total}}",
-      "tasksInProgress": "진행 중 {{count}}",
-      "tasksOpen": "미완료 {{count}}",
-      "automationsFailed": "실패 {{count}}",
-      "automationsWaiting": "대기 {{count}}",
-      "automationsRunning": "실행 중 {{count}}",
-      "automationsIdle": "예약됨",
-      "automationsEnabled": "사용 {{count}}",
-      "knowledgeSynced": "동기화됨",
-      "knowledgeSpaces": "스페이스 {{count}}",
-      "terminalsRunning": "shell {{count}}",
-      "terminalsOpen": "열림 {{count}}",
-      "terminalsIdle": "대기",
-      "terminalsSecondary": "터미널 {{count}}"
-    },
-    "openZone": "{{name}} 열기 →",
-    "zonesRegion": "서피스",
-    "deck": {
-        "kicker": "개요"
-      },
-      "farm": {
-      "kicker": "픽셀 농장",
-      "hint": "WASD / 방향키 이동 · Enter 입장 · 호버 따라가기 · 농부 클릭 대화",
-      "hoverHint": "→ {{name}} · {{state}} · Enter 또는 클릭으로 열기",
-      "padAria": "농장 조작",
-      "padMove": "이동",
-      "padOpen": "입장",
-      "padClick": "농부 클릭하면 대화",
-      "dock": "도구 창고 — 바로가기와 최근 세션",
-      "heroAria": "농장 주인공 — 클릭하면 한마디",
-      "bubble": {
-        "hi": "안녕! 오늘 뭐 심을까?",
-        "tip": "밭마다 서피스야. 클릭해서 들어가!",
-        "hungry": "작물이 목마른 걸까… 아니면 나?",
-        "cheer": "오늘 밭일 잘했어!"
-      }
-    },
-    "office": {
-      "kicker": "픽셀 오피스"
-    },
-    
-    "home": {
-      "eyebrow": "워크벤치",
-      "surfaces": "서피스",
-      "aside": "빠른 시작과 최근"
-    },
-    "continue": {
-      "title": "이어서 하기",
-      "resume": "계속",
-      "startNew": "시작",
-      "emptyTitle": "새 대화 시작",
-      "emptyHint": "최근 세션이 아직 없습니다",
-      "untitled": "제목 없는 세션",
-      "surface": {
-        "chat": "채팅",
-        "code": "코드"
-      }
-    },
-    "attention": {
-      "title": "주의 필요"
-    },
-    "recent": {
-      "title": "최근 세션",
-      "empty": "연 세션이 여기에 표시됩니다",
-      "viewAll": "모두 보기"
-    },
-    "shortcuts": {
-      "title": "빠른 시작",
-      "continueSession": "계속: {{title}}",
-      "continueSessionEmpty": "최근 세션 없음",
-      "newChat": "새 대화",
-      "newChatHint": "대화 또는 코딩 세션 시작",
-      "openKnowledge": "지식",
-      "openKnowledgeHint": "스페이스, 노트, 메모리",
-      "openTasks": "작업",
-      "openTasksHint": "작업 항목 추적",
-      "openAutomations": "자동화",
-      "openAutomationsHint": "일정과 작업",
-      "openTerminals": "터미널",
-      "openTerminalsHint": "로컬 및 원격 셸"
-    }
   },
   "terminals": {
     "title": "터미널 관리",
@@ -2449,7 +2320,6 @@ export const ko = {
     "navForward": "앞으로",
     "navForwardAria": "다음 위치로 이동",
     "nav": {
-      "workbench": "워크벤치",
       "knowledge": "지식",
       "projects": "프로젝트",
       "chats": "채팅",

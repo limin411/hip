@@ -54,8 +54,8 @@ describe('navHistory helpers', () => {
       activeSessionId: null,
     } as never)
     useUiStore.setState({
-      activeView: 'workbench',
-      sidebarSection: 'workbench',
+      activeView: 'chat',
+      sidebarSection: 'chats',
       settingsPage: 'general',
     })
   })

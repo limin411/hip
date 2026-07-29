@@ -4,19 +4,17 @@ import { EmptyState } from '@/components/ui/EmptyState'
 
 /** i18n keys used by placeholder pages (typed for strict TFunction). */
 export type PlaceholderI18nKey =
-  | 'sidebar.nav.workbench'
   | 'sidebar.nav.terminals'
   | 'sidebar.nav.tasks'
   | 'sidebar.nav.automation'
   | 'placeholder.comingSoon'
-  | 'placeholder.workbench'
   | 'placeholder.terminals'
   | 'placeholder.tasks'
   | 'placeholder.automation'
 
 /**
  * Shared shell for features that are not implemented yet.
- * Used by workbench / terminal management / task tracking / automation.
+ * Used by terminal management / task tracking / automation when flags are off.
  */
 export function PlaceholderPage({
   titleKey,

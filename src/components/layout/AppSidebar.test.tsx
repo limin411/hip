@@ -15,9 +15,8 @@ const enterKnowledge = vi.fn(async () => {})
 const openCreateKnowledgeSpaceDialog = vi.fn()
 const enterSection = vi.fn(async (_section: 'projects' | 'chats') => {})
 const enterPlaceholderSection = vi.fn(
-  async (_section: 'workbench' | 'tasks' | 'automation') => {},
+  async (_section: 'tasks' | 'automation') => {},
 )
-const enterWorkbenchSection = vi.fn(async () => {})
 const enterTerminalsSection = vi.fn(async (_opts?: { library?: boolean }) => {})
 const enterWorkItemsSection = vi.fn(async () => {})
 const enterAutomationsSection = vi.fn(async () => {})
@@ -28,9 +27,8 @@ const selectSessionFromSidebar = vi.fn(async (_id: string) => {})
 vi.mock('./sidebarActions', () => ({
   enterKnowledge: () => enterKnowledge(),
   enterSection: (section: 'projects' | 'chats') => enterSection(section),
-  enterPlaceholderSection: (section: 'workbench' | 'tasks' | 'automation') =>
+  enterPlaceholderSection: (section: 'tasks' | 'automation') =>
     enterPlaceholderSection(section),
-  enterWorkbenchSection: () => enterWorkbenchSection(),
   enterTerminalsSection: (opts?: { library?: boolean }) => enterTerminalsSection(opts),
   enterWorkItemsSection: () => enterWorkItemsSection(),
   enterAutomationsSection: () => enterAutomationsSection(),
@@ -80,7 +78,6 @@ describe('AppSidebar', () => {
     openCreateKnowledgeSpaceDialog.mockClear()
     enterSection.mockClear()
     enterPlaceholderSection.mockClear()
-    enterWorkbenchSection.mockClear()
     enterTerminalsSection.mockClear()
     enterWorkItemsSection.mockClear()
     enterAutomationsSection.mockClear()
@@ -138,7 +135,6 @@ describe('AppSidebar', () => {
     expect(screen.getByTestId('sidebar-search').tagName).toBe('BUTTON')
     expect(screen.getByTestId('sidebar-toggle')).toBeInTheDocument()
     expect(screen.getByTestId('sidebar-app-version')).toHaveTextContent(/^HIP \d+\.\d+\.\d+/)
-    expect(screen.getByTestId('sidebar-nav-workbench')).toBeInTheDocument()
     expect(screen.getByTestId('sidebar-nav-terminals')).toBeInTheDocument()
     expect(screen.getByTestId('sidebar-nav-tasks')).toBeInTheDocument()
     expect(screen.getByTestId('sidebar-nav-automation')).toBeInTheDocument()
@@ -244,12 +240,6 @@ describe('AppSidebar', () => {
     expect(enterSection).toHaveBeenCalledWith('projects')
   })
 
-  it('nav workbench calls enterWorkbenchSection when WORKBENCH_PAGE on', () => {
-    render(<AppSidebar />)
-    fireEvent.click(screen.getByTestId('sidebar-nav-workbench'))
-    expect(enterWorkbenchSection).toHaveBeenCalled()
-    expect(enterPlaceholderSection).not.toHaveBeenCalledWith('workbench')
-  })
 
   it('nav terminals opens library landing (not last focused session)', () => {
     render(<AppSidebar />)

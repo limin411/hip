@@ -23,7 +23,7 @@ describe('navHistoryStore', () => {
   })
 
   it('reset seeds a single entry', () => {
-    const a = entry({ activeView: 'workbench', sidebarSection: 'workbench' })
+    const a = entry({ activeView: 'chat', sidebarSection: 'chats' })
     useNavHistoryStore.getState().reset(a)
     expect(useNavHistoryStore.getState().stack).toEqual([a])
     expect(useNavHistoryStore.getState().index).toBe(0)
@@ -32,7 +32,7 @@ describe('navHistoryStore', () => {
   })
 
   it('push truncates forward branch and enables back', () => {
-    const a = entry({ activeView: 'workbench', sidebarSection: 'workbench' })
+    const a = entry({ activeView: 'chat', sidebarSection: 'chats' })
     const b = entry({ activeView: 'chat', sessionId: 's1' })
     const c = entry({ activeView: 'chat', sessionId: 's2' })
     const d = entry({ activeView: 'code', sessionId: 's3', sidebarSection: 'projects' })
@@ -62,7 +62,7 @@ describe('navHistoryStore', () => {
   })
 
   it('push is no-op while applying', () => {
-    const a = entry({ activeView: 'workbench', sidebarSection: 'workbench' })
+    const a = entry({ activeView: 'chat', sidebarSection: 'chats' })
     const b = entry({ activeView: 'chat', sessionId: 's1' })
     useNavHistoryStore.getState().reset(a)
     useNavHistoryStore.getState().setApplying(true)
@@ -71,7 +71,7 @@ describe('navHistoryStore', () => {
   })
 
   it('back/forward move index and return entries', () => {
-    const a = entry({ activeView: 'workbench', sidebarSection: 'workbench' })
+    const a = entry({ activeView: 'chat', sidebarSection: 'chats' })
     const b = entry({ activeView: 'chat', sessionId: 's1' })
     useNavHistoryStore.getState().reset(a)
     useNavHistoryStore.getState().push(b)

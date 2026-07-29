@@ -4,7 +4,6 @@ import type { CheckpointMode } from '@hip/protocol'
 import { TERMINAL_MANAGEMENT } from '@/components/terminals/feature'
 import { WORK_ITEM_TRACKING } from '@/components/work-items/feature'
 import { AUTOMATION_PAGE } from '@/components/automation/feature'
-import { WORKBENCH_PAGE } from '@/components/workbench/feature'
 import {
   clampSidebarWidth,
   SIDEBAR_WIDTH_DEFAULT,
@@ -15,7 +14,6 @@ import {
 export type ArtifactTab = 'files' | 'agents' | 'tasks' | 'outline' | 'timeline' | 'changes' | 'terminal'
 
 export type ActiveView =
-  | 'workbench'
   | 'chat'
   | 'code'
   | 'settings'
@@ -30,9 +28,8 @@ export type ChatTab = 'files' | 'agents' | 'tasks' | 'outline' | 'sources'
 export type Theme = 'light' | 'dark' | 'system'
 export type AppLanguage = 'zh-CN' | 'zh-TW' | 'en' | 'ja' | 'ko'
 export type UiDensity = 'comfortable' | 'compact'
-/** Left sidebar primary section (memory-only; cold launch always 'workbench'). */
+/** Left sidebar primary section (memory-only; cold launch always 'chats'). */
 export type SidebarSection =
-  | 'workbench'
   | 'knowledge'
   | 'projects'
   | 'chats'
@@ -42,19 +39,16 @@ export type SidebarSection =
 
 /**
  * Primary nav sections that only show a "coming soon" placeholder page.
- * When WORKBENCH_PAGE is on, `workbench` is a real section (not placeholder).
  * When TERMINAL_MANAGEMENT is on, `terminals` is a real section (not placeholder) — K14.
  * When WORK_ITEM_TRACKING is on, `tasks` is a real section (not placeholder).
  * When AUTOMATION_PAGE is on, `automation` is a real section (not placeholder).
  */
 export type PlaceholderSidebarSection =
-  | (typeof WORKBENCH_PAGE extends true ? never : 'workbench')
   | (typeof AUTOMATION_PAGE extends true ? never : 'automation')
   | (typeof TERMINAL_MANAGEMENT extends true ? never : 'terminals')
   | (typeof WORK_ITEM_TRACKING extends true ? never : 'tasks')
 
 export function isPlaceholderSidebarSection(s: SidebarSection): s is PlaceholderSidebarSection {
-  if (s === 'workbench') return !WORKBENCH_PAGE
   if (s === 'terminals') return !TERMINAL_MANAGEMENT
   if (s === 'tasks') return !WORK_ITEM_TRACKING
   if (s === 'automation') return !AUTOMATION_PAGE
@@ -142,15 +136,11 @@ function seedLanguage(): AppLanguage {
   return 'zh-CN'
 }
 
-export function normalizeBool(raw: unknown, fallback: boolean): boolean {
-  return typeof raw === 'boolean' ? raw : fallback
-}
-
 /** Slice of uiStore written to localStorage under `hip-ui`. */
 export type UiPersistedState = {
   chatSessionId: string | null
   codeSessionId: string | null
-  // activeView is intentionally NOT persisted — cold launch always Workbench.
+  // activeView is intentionally NOT persisted — cold launch always Chats.
   theme: Theme
   language: AppLanguage
   density: UiDensity
@@ -161,23 +151,15 @@ export type UiPersistedState = {
   sidebarOpen: boolean
   /** Left sidebar width in px; clamped on write / rehydrate. */
   sidebarWidth: number
-  /**
-   * Workbench: show Three.js command-deck scene.
-   * Legacy key `workbenchShowCartoon` is migrated on rehydrate.
-   */
-  workbenchShowScene: boolean
-  /** Workbench: reduce GSAP / scene motion (also honors prefers-reduced-motion). */
-  workbenchReduceMotion: boolean
 }
 
-/** Special / placeholder views are session-ephemeral; cold launch always lands on workbench. */
+/** Special / placeholder views are session-ephemeral; cold launch always lands on chats. */
 export function isEphemeralActiveView(v: ActiveView): boolean {
   return (
     v === 'settings' ||
     v === 'history' ||
     v === 'trash' ||
     v === 'knowledge' ||
-    v === 'workbench' ||
     v === 'terminals' ||
     v === 'tasks' ||
     v === 'automation'
@@ -202,28 +184,25 @@ export function mergeUiPersistedState<
     sidebarSection: _legacySection,
     openSessionIds: _legacyTabs,
     settingsNavCollapsed: _legacySettingsNav,
+    workbenchShowScene: _legacyWbScene,
+    workbenchReduceMotion: _legacyWbMotion,
+    workbenchShowCartoon: _legacyWbCartoon,
     ...rest
-  } = p
+  } = p as typeof p & {
+    workbenchShowScene?: unknown
+    workbenchReduceMotion?: unknown
+    workbenchShowCartoon?: unknown
+  }
   return {
     ...currentState,
     ...rest,
-    // Always cold-start on Workbench (product rule).
-    activeView: 'workbench' as const,
-    sidebarSection: 'workbench' as const,
+    // Always cold-start on Chats (product rule).
+    activeView: 'chat' as const,
+    sidebarSection: 'chats' as const,
     density: normalizeUiDensity((rest as { density?: unknown }).density),
     // Drop removed pages (e.g. legacy 'help') so tabs stay valid.
     settingsPage: normalizeSettingsPage((rest as { settingsPage?: unknown }).settingsPage),
     sidebarWidth: clampSidebarWidth((rest as { sidebarWidth?: unknown }).sidebarWidth),
-    workbenchShowScene: normalizeBool(
-      (rest as { workbenchShowScene?: unknown }).workbenchShowScene !== undefined
-        ? (rest as { workbenchShowScene?: unknown }).workbenchShowScene
-        : (rest as { workbenchShowCartoon?: unknown }).workbenchShowCartoon,
-      true,
-    ),
-    workbenchReduceMotion: normalizeBool(
-      (rest as { workbenchReduceMotion?: unknown }).workbenchReduceMotion,
-      false,
-    ),
   }
 }
 
@@ -256,7 +235,7 @@ interface UiState {
   setActiveView: (v: ActiveView) => void
   previousView: ActiveView | null
 
-  /** Left sidebar section highlight (not persisted; cold launch 'workbench'). */
+  /** Left sidebar section highlight (not persisted; cold launch 'chats'). */
   sidebarSection: SidebarSection
   setSidebarSection: (s: SidebarSection) => void
 
@@ -302,13 +281,6 @@ interface UiState {
 
   density: UiDensity
   setDensity: (d: UiDensity) => void
-
-  /** Workbench: Three.js scene layer (default true). */
-  workbenchShowScene: boolean
-  setWorkbenchShowScene: (v: boolean) => void
-  /** Workbench: reduce GSAP / scene motion. */
-  workbenchReduceMotion: boolean
-  setWorkbenchReduceMotion: (v: boolean) => void
 }
 
 // In-memory fallback so node test runs (no localStorage/DOM) don't crash on persist.
@@ -349,7 +321,7 @@ export const useUiStore = create<UiState>()(
       codeSessionId: null,
       setCodeSessionId: (id) => set((s) => (s.codeSessionId === id ? s : { codeSessionId: id })),
 
-      activeView: 'workbench',
+      activeView: 'chat',
       previousView: null,
       setActiveView: (v) =>
         set((s) => {
@@ -366,7 +338,7 @@ export const useUiStore = create<UiState>()(
           }
         }),
 
-      sidebarSection: 'workbench',
+      sidebarSection: 'chats',
       setSidebarSection: (sec) =>
         set((s) => (s.sidebarSection === sec ? s : { sidebarSection: sec })),
 
@@ -425,13 +397,6 @@ export const useUiStore = create<UiState>()(
 
       density: 'comfortable',
       setDensity: (d) => set((s) => (s.density === d ? s : { density: d })),
-
-      workbenchShowScene: true,
-      setWorkbenchShowScene: (v) =>
-        set((s) => (s.workbenchShowScene === v ? s : { workbenchShowScene: v })),
-      workbenchReduceMotion: false,
-      setWorkbenchReduceMotion: (v) =>
-        set((s) => (s.workbenchReduceMotion === v ? s : { workbenchReduceMotion: v })),
     }),
     {
       name: 'hip-ui',
@@ -449,8 +414,6 @@ export const useUiStore = create<UiState>()(
         checkpointMode: s.checkpointMode,
         sidebarOpen: s.sidebarOpen,
         sidebarWidth: s.sidebarWidth,
-        workbenchShowScene: s.workbenchShowScene,
-        workbenchReduceMotion: s.workbenchReduceMotion,
       }),
       merge: (persistedState, currentState) =>
         mergeUiPersistedState(persistedState, currentState as UiState),
@@ -477,10 +440,10 @@ export const useUiStore = create<UiState>()(
 )
 
 /**
- * Cold launch shell: Workbench placeholder (default home).
+ * Cold launch shell: Chats (default home).
  * Safe to call after rehydrate and once from AppLayout.
  * Nav history is seeded separately from AppLayout (see seedNavHistoryIfEmpty).
  */
 export function applyColdLaunchShell(): void {
-  useUiStore.setState({ activeView: 'workbench', sidebarSection: 'workbench' })
+  useUiStore.setState({ activeView: 'chat', sidebarSection: 'chats' })
 }

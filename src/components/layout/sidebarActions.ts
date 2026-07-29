@@ -121,22 +121,11 @@ export async function enterSection(section: 'projects' | 'chats'): Promise<void>
   recordNavEntry()
 }
 
-/** Enter a primary-nav placeholder (workbench / tasks / automation; terminals when flag off). */
+/** Enter a primary-nav placeholder (tasks / automation; terminals when flag off). */
 export async function enterPlaceholderSection(section: PlaceholderSidebarSection): Promise<void> {
   await leaveActiveSurfaceIfNeeded()
   useUiStore.getState().setSidebarSection(section)
   useUiStore.getState().setActiveView(section)
-  recordNavEntry()
-}
-
-/**
- * Enter workbench home (overview + zone progress).
- * Used when WORKBENCH_PAGE is on; flag-off path still uses enterPlaceholderSection.
- */
-export async function enterWorkbenchSection(): Promise<void> {
-  await leaveActiveSurfaceIfNeeded()
-  useUiStore.getState().setSidebarSection('workbench')
-  useUiStore.getState().setActiveView('workbench')
   recordNavEntry()
 }
 
@@ -319,12 +308,11 @@ export async function handleMainToolbarBack(): Promise<void> {
   if (useUiStore.getState().activeView === 'tasks') {
     await leaveWorkItems()
   }
-  const target = useUiStore.getState().previousView ?? 'workbench'
+  const target = useUiStore.getState().previousView ?? 'chat'
   useUiStore.getState().setActiveView(target)
   if (target === 'knowledge') {
     useUiStore.getState().setSidebarSection('knowledge')
   } else if (
-    target === 'workbench' ||
     target === 'terminals' ||
     target === 'tasks' ||
     target === 'automation'

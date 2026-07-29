@@ -1,3 +1,4 @@
+import type { CSSProperties } from 'react'
 import { useTranslation } from 'react-i18next'
 import { cn } from '@/lib/utils'
 import type { ZoneId, ZoneModel } from './workbenchTypes'
@@ -12,7 +13,6 @@ const ACCENT_BY_ZONE: Record<ZoneId, string> = {
   workflows: 'var(--role-supervisor)',
 }
 
-/** Abstract crop glyph per zone — playful, not literal produce. */
 const CROP_CLASS: Record<ZoneId, string> = {
   sessions: 'wb-crop--chat',
   tasks: 'wb-crop--task',
@@ -22,18 +22,31 @@ const CROP_CLASS: Record<ZoneId, string> = {
   workflows: 'wb-crop--auto',
 }
 
+/** Per-plot lane bias so the row of farmers doesn't mirror each other. */
+const LANE_BY_ZONE: Record<ZoneId, 'left' | 'center' | 'right'> = {
+  sessions: 'left',
+  tasks: 'center',
+  automations: 'right',
+  knowledge: 'left',
+  terminals: 'right',
+  workflows: 'center',
+}
+
 export function FarmPlot({
   zone,
   onOpen,
   showCartoon = true,
   forceStatic = false,
   selected = false,
+  /** Index in the row — staggers idle animation phase. */
+  plotIndex = 0,
 }: {
   zone: ZoneModel
   onOpen: (zone: ZoneModel) => void
   showCartoon?: boolean
   forceStatic?: boolean
   selected?: boolean
+  plotIndex?: number
 }) {
   const { t } = useTranslation()
   const tr = t as (key: string, opts?: Record<string, string | number>) => string
@@ -49,19 +62,27 @@ export function FarmPlot({
       ? ` · ${Math.round(zone.progress * 100)}%`
       : ''
 
+  const lane = LANE_BY_ZONE[zone.id]
+  const animDelay = `${(plotIndex % 5) * 0.35}s`
+
   return (
     <button
       type="button"
       data-testid={`workbench-zone-${zone.id}`}
       data-state={zone.state}
       data-selected={selected ? 'true' : 'false'}
+      data-lane={lane}
       aria-pressed={selected}
       onClick={() => onOpen(zone)}
       className={cn('wb-plot', CROP_CLASS[zone.id])}
-      style={{ ['--plot-accent' as string]: ACCENT_BY_ZONE[zone.id] }}
+      style={
+        {
+          ['--plot-accent' as string]: ACCENT_BY_ZONE[zone.id],
+          ['--mascot-delay' as string]: animDelay,
+        } as CSSProperties
+      }
       aria-label={`${label}, ${stateLabel}, ${primary}`}
     >
-      {/* Wooden stake sign */}
       <div className="wb-plot-stake" aria-hidden>
         <div className="wb-plot-stake-pole" />
         <div className="wb-plot-stake-sign">
@@ -70,44 +91,51 @@ export function FarmPlot({
         </div>
       </div>
 
-      {/* Raised bed */}
-      <div className="wb-plot-bed">
-        <div className="wb-plot-soil">
-          <div className="wb-plot-furrow" />
-          <div className="wb-plot-furrow" />
-          <div className="wb-plot-furrow" />
-        </div>
-
-        {/* Abstract crops — density follows state via CSS */}
-        <div className="wb-plot-crops" aria-hidden>
-          <span className="wb-crop wb-crop-a" />
-          <span className="wb-crop wb-crop-b" />
-          <span className="wb-crop wb-crop-c" />
-          <span className="wb-crop wb-crop-d" />
-          <span className="wb-crop wb-crop-e" />
-        </div>
-
-        {/* Running: water sparkles */}
-        {zone.state === 'running' && (
-          <div className="wb-plot-spray" aria-hidden>
-            <i />
-            <i />
-            <i />
+      {/* Stage: bed + free mascot (mascot outside bed overflow) */}
+      <div className="wb-plot-stage">
+        <div className="wb-plot-bed">
+          <div className="wb-plot-soil">
+            <div className="wb-plot-furrow" />
+            <div className="wb-plot-furrow" />
+            <div className="wb-plot-furrow" />
           </div>
-        )}
 
-        {/* Fail/blocked: heat cracks */}
-        {(zone.state === 'fail' || zone.state === 'blocked') && (
-          <div className="wb-plot-cracks" aria-hidden />
-        )}
+          <div className="wb-plot-crops" aria-hidden>
+            <span className="wb-crop wb-crop-a" />
+            <span className="wb-crop wb-crop-b" />
+            <span className="wb-crop wb-crop-c" />
+            <span className="wb-crop wb-crop-d" />
+            <span className="wb-crop wb-crop-e" />
+          </div>
+
+          {zone.state === 'running' && (
+            <div className="wb-plot-spray" aria-hidden>
+              <i />
+              <i />
+              <i />
+            </div>
+          )}
+
+          {(zone.state === 'fail' || zone.state === 'blocked') && (
+            <div className="wb-plot-cracks" aria-hidden />
+          )}
+        </div>
 
         {showCartoon && (
-          <div className="wb-plot-mascot">
-            <WorkbenchMascot
-              action={zone.mascotAction}
-              size={72}
-              forceStatic={forceStatic}
-            />
+          <div
+            className="wb-plot-mascot"
+            data-state={zone.state}
+            data-lane={lane}
+            aria-hidden
+          >
+            <div className="wb-plot-mascot-bob">
+              <WorkbenchMascot
+                action={zone.mascotAction}
+                size={80}
+                forceStatic={forceStatic}
+              />
+            </div>
+            <span className="wb-plot-mascot-ground" />
           </div>
         )}
       </div>

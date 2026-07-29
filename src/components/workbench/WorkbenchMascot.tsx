@@ -15,7 +15,7 @@ function prefersReducedMotion(): boolean {
 
 /**
  * Pinned Flat Butt motion clip (no idle rotation).
- * Used on workbench zone cards / hero for state-driven actions.
+ * Crossfades when `action` changes so pose swaps feel alive.
  */
 export function WorkbenchMascot({
   action,
@@ -30,6 +30,8 @@ export function WorkbenchMascot({
   forceStatic?: boolean
 }) {
   const [systemReduced, setSystemReduced] = useState(prefersReducedMotion)
+  const [displayAction, setDisplayAction] = useState(action)
+  const [fading, setFading] = useState(false)
 
   useEffect(() => {
     const mq = window.matchMedia?.('(prefers-reduced-motion: reduce)')
@@ -38,6 +40,20 @@ export function WorkbenchMascot({
     onChange()
     return () => mq?.removeEventListener?.('change', onChange)
   }, [])
+
+  useEffect(() => {
+    if (action === displayAction) return
+    if (forceStatic || systemReduced) {
+      setDisplayAction(action)
+      return
+    }
+    setFading(true)
+    const t = window.setTimeout(() => {
+      setDisplayAction(action)
+      setFading(false)
+    }, 140)
+    return () => window.clearTimeout(t)
+  }, [action, displayAction, forceStatic, systemReduced])
 
   if (forceStatic || systemReduced) {
     return <HipLogo size={size} className={className} decorative />
@@ -48,15 +64,19 @@ export function WorkbenchMascot({
       className={['flex items-center justify-center', className].filter(Boolean).join(' ')}
       style={{ width: size, height: size }}
       aria-hidden
-      data-mascot-action={action}
+      data-mascot-action={displayAction}
       data-testid="workbench-mascot"
     >
       <img
-        src={motionUrl(action)}
+        key={displayAction}
+        src={motionUrl(displayAction)}
         alt=""
         width={size}
         height={size}
-        className="h-full w-full select-none object-contain"
+        className={[
+          'h-full w-full select-none object-contain transition-opacity duration-150',
+          fading ? 'opacity-0' : 'opacity-100',
+        ].join(' ')}
         draggable={false}
       />
     </div>

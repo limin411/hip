@@ -5,7 +5,6 @@ import { FarmPlot } from './FarmPlot'
 import { WorkbenchMascot } from './WorkbenchMascot'
 import './farmScene.css'
 
-/** Heat shimmer flecks — decorative only. */
 const HEAT_SPECS = [
   { left: '18%', top: '38%', delay: '0s' },
   { left: '35%', top: '42%', delay: '1.2s' },
@@ -41,9 +40,9 @@ export function FarmScene({
     <div
       className="wb-farm relative flex min-h-0 flex-1 flex-col overflow-hidden"
       data-motion={motion}
+      data-hero-state={hero.state}
       data-testid="workbench-farm"
     >
-      {/* Abstract sunny field backdrop */}
       <div className="wb-farm-bg" aria-hidden>
         <div className="wb-farm-sky" />
         <div className="wb-farm-sun">
@@ -55,12 +54,10 @@ export function FarmScene({
         <div className="wb-farm-cloud wb-farm-cloud-b" />
         <div className="wb-farm-heat" />
 
-        {/* Distant hills — soft blobs */}
         <div className="wb-farm-hill wb-farm-hill-a" />
         <div className="wb-farm-hill wb-farm-hill-b" />
         <div className="wb-farm-hill wb-farm-hill-c" />
 
-        {/* Field strips */}
         <div className="wb-farm-field">
           <div className="wb-farm-row" />
           <div className="wb-farm-row" />
@@ -69,7 +66,6 @@ export function FarmScene({
           <div className="wb-farm-row" />
         </div>
 
-        {/* Fence line */}
         <div className="wb-farm-fence">
           {Array.from({ length: 9 }).map((_, i) => (
             <span key={i} className="wb-farm-fence-post" />
@@ -78,7 +74,6 @@ export function FarmScene({
           <div className="wb-farm-fence-rail wb-farm-fence-rail-bot" />
         </div>
 
-        {/* Playful props */}
         <div className="wb-farm-scarecrow">
           <div className="wb-farm-scarecrow-head" />
           <div className="wb-farm-scarecrow-body" />
@@ -101,7 +96,6 @@ export function FarmScene({
           <div className="wb-farm-tree-trunk" />
         </div>
 
-        {/* Decorative veggie stickers in distance */}
         <div className="wb-farm-sticker wb-farm-sticker-a" />
         <div className="wb-farm-sticker wb-farm-sticker-b" />
         <div className="wb-farm-sticker wb-farm-sticker-c" />
@@ -115,26 +109,14 @@ export function FarmScene({
         ))}
       </div>
 
-      {/* HUD + plots */}
       <div className="relative z-10 flex min-h-0 flex-1 flex-col">
+        {/* Compact status strip — no pinned mascot (field hero carries character) */}
         <header
           className="wb-farm-hud"
           aria-label={t('workbench.hero.region')}
           data-testid="workbench-hero"
         >
           <div className="wb-farm-hud-inner">
-            {showCartoon ? (
-              <div className="wb-farm-hero-mascot relative shrink-0">
-                <WorkbenchMascot
-                  action={hero.mascotAction}
-                  size={64}
-                  forceStatic={reduceMotion}
-                />
-                <span className="wb-farm-hero-hat" aria-hidden />
-              </div>
-            ) : (
-              <div className="h-16 w-16 shrink-0" aria-hidden />
-            )}
             <div className="min-w-0 flex-1">
               <div className="wb-farm-hud-kicker">{t('workbench.farm.kicker')}</div>
               <h1 className="wb-farm-hud-title">{heroTitle}</h1>
@@ -164,11 +146,32 @@ export function FarmScene({
         </header>
 
         <section aria-label={t('workbench.zonesRegion')} className="wb-farm-stage min-h-0">
+          {/* Field foreman — free roamer above the plots */}
+          {showCartoon && (
+            <div
+              className="wb-field-hero"
+              data-state={hero.state}
+              data-testid="workbench-field-hero"
+              aria-hidden
+            >
+              <div className="wb-field-hero-body">
+                <WorkbenchMascot
+                  action={hero.mascotAction}
+                  size={96}
+                  forceStatic={reduceMotion}
+                />
+                <span className="wb-field-hero-hat" />
+              </div>
+              <span className="wb-field-hero-ground" />
+            </div>
+          )}
+
           <div className="wb-plot-cluster" data-count={count}>
-            {zones.map((zone) => (
+            {zones.map((zone, i) => (
               <FarmPlot
                 key={zone.id}
                 zone={zone}
+                plotIndex={i}
                 showCartoon={showCartoon}
                 forceStatic={reduceMotion}
                 selected={selectedId === zone.id}

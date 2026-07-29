@@ -489,10 +489,11 @@
 
 .wb-farm-hud-inner {
   pointer-events: auto;
-  display: grid;
-  grid-template-columns: auto 1fr;
+  display: flex;
+  flex-wrap: wrap;
   gap: 12px 16px;
   align-items: center;
+  justify-content: space-between;
   max-width: 920px;
   margin: 0 auto;
   padding: 10px 14px;
@@ -507,26 +508,6 @@
 
 .dark .wb-farm-hud-inner {
   background: color-mix(in srgb, var(--bg-app) 78%, #4a3010 22%);
-}
-
-@media (min-width: 640px) {
-  .wb-farm-hud-inner {
-    grid-template-columns: auto 1fr auto;
-  }
-}
-
-.wb-farm-hero-hat {
-  position: absolute;
-  top: -2px;
-  left: 50%;
-  width: 36px;
-  height: 10px;
-  transform: translateX(-50%);
-  background: #e85d04;
-  border-radius: 4px 4px 0 0;
-  box-shadow: 0 -4px 0 4px #e85d04;
-  pointer-events: none;
-  opacity: 0.9;
 }
 
 .wb-farm-hud-kicker {
@@ -558,14 +539,7 @@
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
-  grid-column: 1 / -1;
-}
-
-@media (min-width: 640px) {
-  .wb-farm-hud-metrics {
-    grid-column: auto;
-    justify-content: flex-end;
-  }
+  justify-content: flex-end;
 }
 
 .wb-farm-metric {
@@ -616,6 +590,55 @@
   align-items: center;
   padding: 0.75rem 1rem 1.5rem;
   z-index: 10;
+}
+
+/* Field foreman — free character above the plot row */
+.wb-field-hero {
+  position: absolute;
+  top: 2%;
+  left: 50%;
+  z-index: 8;
+  width: 104px;
+  height: 120px;
+  pointer-events: none;
+  transform: translateX(-50%);
+  filter: drop-shadow(0 4px 6px color-mix(in srgb, var(--ink) 18%, transparent));
+}
+
+.wb-field-hero-body {
+  position: relative;
+  display: flex;
+  justify-content: center;
+  transform-origin: 50% 90%;
+}
+
+.wb-field-hero-hat {
+  position: absolute;
+  top: 2px;
+  left: 50%;
+  width: 42px;
+  height: 12px;
+  transform: translateX(-50%);
+  background: #e85d04;
+  border-radius: 4px 4px 0 0;
+  box-shadow: 0 -5px 0 5px #e85d04;
+  opacity: 0.95;
+  pointer-events: none;
+}
+
+.wb-field-hero-ground {
+  position: absolute;
+  bottom: 4px;
+  left: 50%;
+  width: 56px;
+  height: 12px;
+  transform: translateX(-50%);
+  border-radius: 50%;
+  background: radial-gradient(
+    ellipse at center,
+    color-mix(in srgb, #000 28%, transparent),
+    transparent 70%
+  );
 }
 
 .wb-plot-cluster {
@@ -766,11 +789,20 @@
   background: color-mix(in srgb, var(--success) 14%, var(--bg-app));
 }
 
+/* Stage holds bed + free mascot (mascot not clipped by bed) */
+.wb-plot-stage {
+  position: relative;
+  width: 100%;
+  /* room above bed for standing/celebrating mascots */
+  padding-top: 52px;
+  margin-top: -8px;
+}
+
 /* Raised bed */
 .wb-plot-bed {
   position: relative;
   width: 100%;
-  min-height: 118px;
+  min-height: 108px;
   border: 3px solid var(--wb-plot-wood-dark);
   border-radius: 10px 10px 18px 18px;
   background: linear-gradient(
@@ -977,14 +1009,128 @@
   pointer-events: none;
 }
 
+/*
+ * Free mascot poses — stand ON the bed rim / soil, not glued to the floor.
+ * Position is state × lane; motion lives on .wb-plot-mascot-bob.
+ */
 .wb-plot-mascot {
+  --mascot-x: 50%;
+  --mascot-y: 42%;
+  --mascot-scale: 1;
+  --mascot-rot: 0deg;
   position: absolute;
-  bottom: 28%;
-  left: 50%;
-  transform: translateX(-50%);
-  z-index: 4;
-  filter: drop-shadow(0 2px 2px color-mix(in srgb, var(--ink) 18%, transparent));
+  left: var(--mascot-x);
+  bottom: var(--mascot-y);
+  z-index: 5;
+  width: 80px;
+  height: 80px;
+  margin-left: -40px;
   pointer-events: none;
+  transform: scale(var(--mascot-scale)) rotate(var(--mascot-rot));
+  transform-origin: 50% 90%;
+  filter: drop-shadow(0 3px 3px color-mix(in srgb, var(--ink) 16%, transparent));
+  transition:
+    left 0.45s var(--ease-out),
+    bottom 0.45s var(--ease-out),
+    transform 0.35s var(--ease-out);
+}
+
+.wb-plot-mascot-bob {
+  width: 100%;
+  height: 100%;
+  transform-origin: 50% 92%;
+  will-change: transform;
+}
+
+.wb-plot-mascot-ground {
+  position: absolute;
+  left: 50%;
+  bottom: 2px;
+  width: 44px;
+  height: 10px;
+  margin-left: -22px;
+  border-radius: 50%;
+  background: radial-gradient(
+    ellipse at center,
+    color-mix(in srgb, #000 30%, transparent),
+    transparent 72%
+  );
+  z-index: -1;
+  transition: width 0.3s ease, opacity 0.3s ease;
+}
+
+/* —— State poses —— */
+.wb-plot[data-state='idle'] .wb-plot-mascot {
+  --mascot-y: 48%;
+  --mascot-scale: 0.95;
+}
+
+.wb-plot[data-state='running'] .wb-plot-mascot {
+  --mascot-y: 40%;
+  --mascot-scale: 1.05;
+}
+
+.wb-plot[data-state='done'] .wb-plot-mascot {
+  --mascot-y: 68%;
+  --mascot-scale: 1.08;
+}
+
+.wb-plot[data-state='blocked'] .wb-plot-mascot {
+  --mascot-y: 34%;
+  --mascot-scale: 0.92;
+  --mascot-rot: -6deg;
+}
+
+.wb-plot[data-state='fail'] .wb-plot-mascot {
+  --mascot-y: 30%;
+  --mascot-scale: 0.88;
+  --mascot-rot: 8deg;
+}
+
+/* Lane bias — avoid a line of centered clones */
+.wb-plot[data-lane='left'] .wb-plot-mascot {
+  --mascot-x: 28%;
+}
+.wb-plot[data-lane='center'] .wb-plot-mascot {
+  --mascot-x: 50%;
+}
+.wb-plot[data-lane='right'] .wb-plot-mascot {
+  --mascot-x: 72%;
+}
+
+.wb-plot[data-state='running'][data-lane='left'] .wb-plot-mascot {
+  --mascot-x: 38%;
+}
+.wb-plot[data-state='running'][data-lane='right'] .wb-plot-mascot {
+  --mascot-x: 62%;
+}
+.wb-plot[data-state='done'][data-lane='left'] .wb-plot-mascot {
+  --mascot-x: 42%;
+}
+.wb-plot[data-state='done'][data-lane='right'] .wb-plot-mascot {
+  --mascot-x: 58%;
+}
+.wb-plot[data-state='idle'][data-lane='left'] .wb-plot-mascot {
+  --mascot-x: 22%;
+}
+.wb-plot[data-state='idle'][data-lane='right'] .wb-plot-mascot {
+  --mascot-x: 78%;
+}
+
+/* Hover: hop forward to greet */
+.wb-plot:hover .wb-plot-mascot,
+.wb-plot:focus-visible .wb-plot-mascot {
+  --mascot-y: 58%;
+  --mascot-scale: 1.12;
+  --mascot-rot: 0deg;
+  --mascot-x: 50%;
+}
+
+.wb-plot:hover .wb-plot-mascot-ground,
+.wb-plot:focus-visible .wb-plot-mascot-ground {
+  width: 52px;
+  margin-left: -26px;
+  opacity: 0.85;
 }
 
 .wb-plot-meta {
@@ -1092,12 +1238,54 @@
 .wb-farm[data-motion='live'] .wb-plot[data-state='running'] .wb-plot-spray i:nth-child(3) {
   animation-delay: 0.5s;
 }
-.wb-farm[data-motion='live'] .wb-plot[data-state='running'] .wb-plot-mascot {
-  animation: wb-farmer-bob 1.8s ease-in-out infinite;
+/* Plot mascot motion by state (on bob layer so pose left/bottom stays free) */
+.wb-farm[data-motion='live'] .wb-plot[data-state='idle'] .wb-plot-mascot-bob {
+  animation: wb-mascot-idle 3.2s ease-in-out infinite;
+  animation-delay: var(--mascot-delay, 0s);
 }
-.wb-farm[data-motion='live'] .wb-farm-hero-mascot {
-  animation: wb-hero-bob 2.4s ease-in-out infinite;
+.wb-farm[data-motion='live'] .wb-plot[data-state='running'] .wb-plot-mascot-bob {
+  animation: wb-mascot-tend 1.05s ease-in-out infinite;
+  animation-delay: var(--mascot-delay, 0s);
 }
+.wb-farm[data-motion='live'] .wb-plot[data-state='done'] .wb-plot-mascot-bob {
+  animation: wb-mascot-cheer 0.9s ease-in-out infinite;
+  animation-delay: var(--mascot-delay, 0s);
+}
+.wb-farm[data-motion='live'] .wb-plot[data-state='blocked'] .wb-plot-mascot-bob {
+  animation: wb-mascot-fidget 0.7s ease-in-out infinite;
+  animation-delay: var(--mascot-delay, 0s);
+}
+.wb-farm[data-motion='live'] .wb-plot[data-state='fail'] .wb-plot-mascot-bob {
+  animation: wb-mascot-wilt 2.4s ease-in-out infinite;
+  animation-delay: var(--mascot-delay, 0s);
+}
+.wb-farm[data-motion='live'] .wb-plot:hover .wb-plot-mascot-bob,
+.wb-farm[data-motion='live'] .wb-plot:focus-visible .wb-plot-mascot-bob {
+  animation: wb-mascot-pop 0.55s ease-in-out infinite;
+}
+
+/* Field foreman patrol + state motion */
+.wb-farm[data-motion='live'] .wb-field-hero {
+  animation: wb-foreman-patrol 9s ease-in-out infinite;
+}
+.wb-farm[data-motion='live'] .wb-field-hero[data-state='idle'] .wb-field-hero-body {
+  animation: wb-mascot-idle 2.8s ease-in-out infinite;
+}
+.wb-farm[data-motion='live'] .wb-field-hero[data-state='running'] .wb-field-hero-body {
+  animation: wb-mascot-tend 0.9s ease-in-out infinite;
+}
+.wb-farm[data-motion='live'] .wb-field-hero[data-state='done'] .wb-field-hero-body {
+  animation: wb-mascot-cheer 0.85s ease-in-out infinite;
+}
+.wb-farm[data-motion='live'] .wb-field-hero[data-state='blocked'] .wb-field-hero-body,
+.wb-farm[data-motion='live'] .wb-field-hero[data-state='fail'] .wb-field-hero-body {
+  animation: wb-mascot-fidget 0.75s ease-in-out infinite;
+}
+.wb-farm[data-motion='live'] .wb-field-hero[data-state='fail'] {
+  filter: drop-shadow(0 4px 6px color-mix(in srgb, var(--ink) 18%, transparent))
+    saturate(0.85);
+}
+
 .wb-farm[data-motion='live'] .wb-farm-scarecrow-arm-l {
   animation: wb-scare-l 3s ease-in-out infinite;
 }
@@ -1166,24 +1354,101 @@
     opacity: 0;
   }
 }
-@keyframes wb-farmer-bob {
+/* Idle: gentle sway + breath */
+@keyframes wb-mascot-idle {
   0%,
   100% {
-    transform: translateX(-50%) translateY(0);
+    transform: translateY(0) rotate(-2deg);
   }
-  50% {
-    transform: translateX(-50%) translateY(-3px);
+  40% {
+    transform: translateY(-4px) rotate(2deg);
+  }
+  70% {
+    transform: translateY(-1px) rotate(-1deg);
   }
 }
-@keyframes wb-hero-bob {
+
+/* Running: hop while shifting — looks like tending rows */
+@keyframes wb-mascot-tend {
   0%,
   100% {
-    transform: translateY(0);
+    transform: translate(0, 0) rotate(-3deg) scale(1, 1);
+  }
+  25% {
+    transform: translate(5px, -7px) rotate(2deg) scale(1.02, 0.96);
   }
   50% {
-    transform: translateY(-3px);
+    transform: translate(0, -2px) rotate(0deg) scale(1, 1);
+  }
+  75% {
+    transform: translate(-5px, -7px) rotate(-2deg) scale(1.02, 0.96);
   }
 }
+
+/* Done: celebratory bounce */
+@keyframes wb-mascot-cheer {
+  0%,
+  100% {
+    transform: translateY(0) scale(1, 1) rotate(0deg);
+  }
+  30% {
+    transform: translateY(-12px) scale(1.05, 0.95) rotate(-4deg);
+  }
+  55% {
+    transform: translateY(-4px) scale(0.98, 1.04) rotate(3deg);
+  }
+}
+
+/* Blocked: nervous fidget */
+@keyframes wb-mascot-fidget {
+  0%,
+  100% {
+    transform: translateX(0) rotate(0deg);
+  }
+  20% {
+    transform: translateX(-3px) rotate(-4deg);
+  }
+  50% {
+    transform: translateX(3px) rotate(4deg);
+  }
+  80% {
+    transform: translateX(-2px) rotate(-2deg);
+  }
+}
+
+/* Fail: heat wilt */
+@keyframes wb-mascot-wilt {
+  0%,
+  100% {
+    transform: translateY(2px) rotate(6deg) scale(0.96, 1);
+  }
+  50% {
+    transform: translateY(5px) rotate(10deg) scale(0.94, 0.98);
+  }
+}
+
+/* Hover greet */
+@keyframes wb-mascot-pop {
+  0%,
+  100% {
+    transform: translateY(0) scale(1);
+  }
+  50% {
+    transform: translateY(-6px) scale(1.06);
+  }
+}
+
+/* Foreman walks across the field */
+@keyframes wb-foreman-patrol {
+  0%,
+  100% {
+    transform: translateX(calc(-50% - 76px));
+  }
+  50% {
+    transform: translateX(calc(-50% + 76px));
+  }
+}
+
 @keyframes wb-scare-l {
   0%,
   100% {
@@ -1241,6 +1506,13 @@
   }
 }
 
+@media (max-width: 640px) {
+  .wb-field-hero {
+    top: 0;
+    transform: translateX(-50%) scale(0.85);
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .wb-farm[data-motion='live'] .wb-farm-sun-rays,
   .wb-farm[data-motion='live'] .wb-farm-sun-core,
@@ -1249,10 +1521,15 @@
   .wb-farm[data-motion='live'] .wb-farm-shimmer,
   .wb-farm[data-motion='live'] .wb-crop,
   .wb-farm[data-motion='live'] .wb-plot-spray i,
-  .wb-farm[data-motion='live'] .wb-plot-mascot,
-  .wb-farm[data-motion='live'] .wb-farm-hero-mascot,
+  .wb-farm[data-motion='live'] .wb-plot-mascot-bob,
+  .wb-farm[data-motion='live'] .wb-field-hero,
+  .wb-farm[data-motion='live'] .wb-field-hero-body,
   .wb-farm[data-motion='live'] .wb-farm-scarecrow-arm-l,
   .wb-farm[data-motion='live'] .wb-farm-scarecrow-arm-r {
     animation: none !important;
+  }
+
+  .wb-plot-mascot {
+    transition: none;
   }
 }

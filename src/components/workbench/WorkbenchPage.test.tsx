@@ -105,5 +105,12 @@ describe('WorkbenchPage', () => {
     useUiStore.setState({ workbenchShowCartoon: false })
     renderPage()
     expect(screen.queryByTestId('workbench-mascot')).not.toBeInTheDocument()
+    expect(screen.queryByTestId('workbench-field-hero')).not.toBeInTheDocument()
+  })
+
+  it('shows field foreman when cartoons are on', () => {
+    renderPage()
+    expect(screen.getByTestId('workbench-field-hero')).toBeInTheDocument()
+    expect(screen.getAllByTestId('workbench-mascot').length).toBeGreaterThan(0)
   })
 })

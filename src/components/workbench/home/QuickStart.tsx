@@ -31,6 +31,7 @@ type Action = {
 /** Icon action cards — denser than a row of ghost buttons. */
 export function QuickStart() {
   const { t } = useTranslation()
+  const tr = t as (key: string) => string
 
   const actions: Action[] = [
     {
@@ -104,8 +105,8 @@ export function QuickStart() {
               <span className="wb-quick-card-icon" aria-hidden>
                 <Icon size={18} strokeWidth={1.75} />
               </span>
-              <span className="wb-quick-card-label">{t(a.labelKey)}</span>
-              <span className="wb-quick-card-hint">{t(a.hintKey)}</span>
+              <span className="wb-quick-card-label">{tr(a.labelKey)}</span>
+              <span className="wb-quick-card-hint">{tr(a.hintKey)}</span>
             </button>
           )
         })}

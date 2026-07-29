@@ -889,10 +889,10 @@ export const zhTW = {
       "compact": "緊湊"
     },
       "workbenchSection": "工作台",
-      "workbenchShowScene": "宇宙背景",
-      "workbenchShowSceneDesc": "迷你太陽系：星空、恆星，每個功能面一顆行星（需 WebGL；關閉則為純頁面）。",
+      "workbenchShowScene": "農莊動效",
+      "workbenchShowSceneDesc": "播放像素農場動效（雲、農夫、澆水）。仍尊重減少動效與系統偏好。",
       "workbenchReduceMotion": "減少動效",
-      "workbenchReduceMotionDesc": "凍結宇宙動畫並弱化過渡（也尊重系統減少動態偏好）。",
+      "workbenchReduceMotionDesc": "凍結工作台農場動畫（也尊重系統減少動態偏好）。",
     "terminalShell": "預設終端",
     "terminalShellDesc": "程式碼面板終端使用的預設 shell。修改後需重新啟動終端生效。",
     "terminalShells": {
@@ -1929,7 +1929,9 @@ export const zhTW = {
         "kicker": "總覽"
       },
       "farm": {
-      "kicker": "烈日田野"
+      "kicker": "像素農莊",
+      "hint": "點擊菜畦開啟功能面 · 作物隨真實工作生長",
+      "dock": "工具棚 — 快捷入口與最近工作階段"
     },
     "office": {
       "kicker": "像素辦公室"

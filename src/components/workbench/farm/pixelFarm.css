@@ -1,0 +1,246 @@
+/*
+ * Pixel farm skin + toolshed dock.
+ * Spec: docs/design/2026-07-29-workbench-pixel-farm.md
+ */
+
+/* —— root pixel dialect —— */
+.px-farm {
+  --px-frame: #3d2914;
+  --px-frame-hi: #f0d9a8;
+  --px-panel: color-mix(in srgb, var(--bg-app) 88%, #f5e6c8);
+  --px-tile: #6bb36a;
+  --px-tile-dark: #3d8f45;
+  image-rendering: pixelated;
+  image-rendering: crisp-edges;
+}
+
+.dark .px-farm {
+  --px-frame: #1a1208;
+  --px-frame-hi: #6a5638;
+  --px-panel: color-mix(in srgb, var(--bg-app) 90%, #2a2010);
+}
+
+/* pixelate illustrated sky slightly via harder cloud edges */
+.px-farm .farm-cloud {
+  filter: none;
+}
+.px-farm .farm-sun {
+  /* hard disc instead of soft photo sun */
+  box-shadow:
+    0 0 0 3px color-mix(in srgb, var(--farm-sun-edge) 55%, transparent),
+    0 0 0 8px var(--farm-sun-glow),
+    0 0 48px 16px color-mix(in srgb, var(--farm-sun-glow) 40%, transparent);
+}
+
+/* —— HUD: SNES-ish dialog frame —— */
+.px-farm .px-hud {
+  padding: 0.75rem 0.85rem 0;
+}
+
+.px-farm .px-hud-inner {
+  border: 3px solid var(--px-frame);
+  border-radius: 4px;
+  background: var(--px-panel);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  box-shadow:
+    inset 0 0 0 2px var(--px-frame-hi),
+    4px 4px 0 color-mix(in srgb, var(--px-frame) 35%, transparent);
+}
+
+.px-hud-hint {
+  margin: 0.35rem 0 0;
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+  color: var(--ink-tertiary);
+}
+
+.px-farm .px-hud-stats dd[data-tone='warn'] {
+  color: var(--warning);
+}
+
+/* —— full-height field —— */
+.px-farm .px-stage {
+  position: relative;
+  z-index: 10;
+  flex: 1 1 auto;
+  min-height: 12rem;
+}
+
+/* checkerboard-ish meadow under plots */
+.px-farm .px-ground {
+  border-radius: 0;
+  opacity: 0.88;
+  background:
+    repeating-conic-gradient(
+      from 45deg,
+      color-mix(in srgb, var(--iso-grass) 90%, #fff) 0% 25%,
+      color-mix(in srgb, var(--iso-grass-deep) 70%, var(--iso-soil)) 0% 50%
+    )
+      0 0 / 16px 16px,
+    radial-gradient(
+      ellipse at 40% 45%,
+      color-mix(in srgb, var(--iso-soil) 40%, var(--iso-grass)) 0%,
+      color-mix(in srgb, var(--iso-grass-deep) 55%, transparent) 70%,
+      transparent 100%
+    );
+  transform: scaleY(0.5) rotate(0deg);
+  box-shadow: 0 8px 0 color-mix(in srgb, #1a2a14 25%, transparent);
+  image-rendering: pixelated;
+}
+
+.px-path {
+  display: none; /* reserved decorative hook */
+}
+
+/* —— plot pixel upgrades —— */
+.px-farm .iso-plot {
+  /* GSAP owns transform when motion is live; CSS hover as fallback for static */
+  will-change: transform;
+}
+
+.px-farm[data-motion='static'] .iso-plot:hover,
+.px-farm[data-motion='static'] .iso-plot:focus-visible {
+  transform: translateY(-8px) scale(1.04);
+}
+
+.px-farm[data-motion='live'] .iso-plot:hover,
+.px-farm[data-motion='live'] .iso-plot:focus-visible {
+  /* juice handles hover lift */
+  transform: none;
+  filter: drop-shadow(0 10px 0 color-mix(in srgb, #000 18%, transparent));
+}
+
+.px-farm .iso-plot-top {
+  /* harder diamond edge */
+  box-shadow: 0 4px 0 color-mix(in srgb, var(--iso-soil-deep) 90%, #000);
+}
+
+.px-farm .iso-plot-sign {
+  border: 2px solid var(--px-frame);
+  border-radius: 2px;
+  background: var(--px-panel);
+  backdrop-filter: none;
+  box-shadow:
+    inset 0 0 0 1px var(--px-frame-hi),
+    2px 2px 0 color-mix(in srgb, var(--px-frame) 40%, transparent);
+}
+
+/* growth stages */
+.px-farm .iso-crop {
+  border-radius: 0;
+  image-rendering: pixelated;
+  box-shadow: 1px 1px 0 color-mix(in srgb, #000 25%, transparent);
+}
+
+.px-farm .iso-plot[data-growth='0'] .iso-crop {
+  width: 6px;
+  height: 4px;
+  opacity: 0.25;
+  background: #8b7355;
+}
+.px-farm .iso-plot[data-growth='1'] .iso-crop {
+  width: 7px;
+  height: 9px;
+  opacity: 0.55;
+}
+.px-farm .iso-plot[data-growth='2'] .iso-crop {
+  width: 9px;
+  height: 16px;
+  opacity: 0.95;
+}
+.px-farm .iso-plot[data-growth='3'] .iso-crop {
+  width: 12px;
+  height: 12px;
+  border-radius: 0;
+  opacity: 1;
+  /* fruit block */
+  box-shadow:
+    1px 1px 0 color-mix(in srgb, #000 20%, transparent),
+    inset -1px -1px 0 color-mix(in srgb, #000 15%, transparent);
+}
+
+/* pixel progress ticks on sign */
+.px-growth-bar {
+  display: flex;
+  gap: 2px;
+  margin-top: 3px;
+  height: 6px;
+}
+.px-growth-bar i {
+  display: block;
+  width: 6px;
+  height: 6px;
+  background: var(--bg-muted);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--px-frame) 30%, transparent);
+}
+.px-growth-bar i[data-on='true'] {
+  background: var(--plot-accent);
+}
+
+/* GSAP spark particles */
+.px-farm-sparks {
+  position: absolute;
+  left: 50%;
+  top: 42%;
+  width: 0;
+  height: 0;
+  z-index: 30;
+  pointer-events: none;
+}
+.px-farm-spark {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 6px;
+  height: 6px;
+  margin: -3px 0 0 -3px;
+  border-radius: 0;
+  pointer-events: none;
+  box-shadow: 1px 1px 0 color-mix(in srgb, #000 20%, transparent);
+}
+
+/* ambient birds (CSS only, live motion) */
+.px-farm::after {
+  content: '';
+  position: absolute;
+  top: 12%;
+  left: 8%;
+  width: 8px;
+  height: 4px;
+  z-index: 6;
+  pointer-events: none;
+  background: color-mix(in srgb, var(--ink) 35%, transparent);
+  opacity: 0;
+  box-shadow:
+    48px 20px 0 color-mix(in srgb, var(--ink) 28%, transparent),
+    120px 8px 0 color-mix(in srgb, var(--ink) 22%, transparent);
+}
+
+.px-farm[data-motion='live']::after {
+  opacity: 0.55;
+  animation: px-birds 18s linear infinite;
+}
+
+@keyframes px-birds {
+  0% {
+    transform: translateX(0);
+  }
+  100% {
+    transform: translateX(40vw);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .px-farm[data-motion='live']::after {
+    animation: none !important;
+    opacity: 0.35;
+  }
+}
+
+@media (max-width: 640px) {
+  .px-hud-hint {
+    display: none;
+  }
+}

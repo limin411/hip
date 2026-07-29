@@ -12,7 +12,7 @@ import {
 import { AUTOMATION_PAGE } from '@/components/automation/feature'
 import { TERMINAL_MANAGEMENT } from '@/components/terminals/feature'
 import { WORK_ITEM_TRACKING } from '@/components/work-items/feature'
-import { HomeShell } from './home/HomeShell'
+import { PixelFarmShell } from './farm/PixelFarmShell'
 import { aggregateHero, buildZoneModels } from './zoneProgress'
 import { useWorkbenchSnapshot } from './useWorkbenchSnapshot'
 import { resolveHeroCopy } from './heroGreeting'
@@ -77,7 +77,7 @@ export function WorkbenchPage() {
       className="flex min-h-0 flex-1 flex-col overflow-hidden"
       data-testid="workbench-page"
     >
-      <HomeShell
+      <PixelFarmShell
         zones={zones}
         hero={heroBase}
         heroTitle={t(heroCopy.titleKey)}

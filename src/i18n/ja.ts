@@ -881,10 +881,10 @@ export const ja = {
       "compact": "コンパクト"
     },
       "workbenchSection": "ワークベンチ",
-      "workbenchShowScene": "コスモス背景",
-      "workbenchShowSceneDesc": "ミニ太陽系：星・太陽・サーフェスごとの惑星（WebGL。オフで通常ページ）。",
+      "workbenchShowScene": "ファーム演出",
+      "workbenchShowSceneDesc": "ピクセル農場の動き（雲・農夫・水やり）。モーション軽減設定も尊重します。",
       "workbenchReduceMotion": "モーションを抑える",
-      "workbenchReduceMotionDesc": "コスモスを止め、トランジションを弱めます（システムの設定も尊重）。",
+      "workbenchReduceMotionDesc": "ワークベンチの農場アニメを止めます（システムの設定も尊重）。",
     "terminalShell": "デフォルトのターミナル",
     "terminalShellDesc": "コードパネルのターミナルで使用するシェルです。変更を反映するにはターミナルを再起動してください。",
     "terminalShells": {
@@ -1922,7 +1922,9 @@ export const ja = {
         "kicker": "概要"
       },
       "farm": {
-      "kicker": "日差しの畑"
+      "kicker": "ピクセル農場",
+      "hint": "畑をクリックしてサーフェスを開く · 作物は実作業で育ちます",
+      "dock": "道具小屋 — ショートカットと最近のセッション"
     },
     "office": {
       "kicker": "ピクセルオフィス"

@@ -863,12 +863,12 @@ export const en = {
         compact: 'Compact',
       },
       workbenchSection: 'Workbench',
-      workbenchShowScene: 'Ambient motion',
+      workbenchShowScene: 'Farm life',
       workbenchShowSceneDesc:
-        'Allow subtle ambient mesh motion on the workbench (also respects reduce-motion).',
+        'Animate the pixel farm (clouds, farmers, crop spray). Still respects reduce-motion.',
       workbenchReduceMotion: 'Reduce motion',
       workbenchReduceMotionDesc:
-        'Freeze ambient mesh motion on the workbench (also honors system preference).',
+        'Freeze farm animations on the workbench (also honors system preference).',
       terminalShell: 'Default terminal',
       terminalShellDesc:
         'Shell used by the code-panel Terminal. Restart the terminal for changes to take effect.',
@@ -2003,7 +2003,9 @@ export const en = {
         kicker: 'Overview',
       },
       farm: {
-        kicker: 'Sunny field',
+        kicker: 'Pixel farm',
+        hint: 'Click a plot to open a surface · crops grow with real work',
+        dock: 'Toolshed — shortcuts and recent sessions',
       },
       office: {
         kicker: 'Pixel office',

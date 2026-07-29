@@ -881,10 +881,10 @@ export const ko = {
       "compact": "조밀하게"
     },
       "workbenchSection": "워크벤치",
-      "workbenchShowScene": "우주 배경",
-      "workbenchShowSceneDesc": "미니 태양계: 별·태양·서피스별 행성(WebGL. 끄면 일반 페이지).",
+      "workbenchShowScene": "농장 연출",
+      "workbenchShowSceneDesc": "픽셀 농장 움직임(구름·농부·물주기). 동작 줄이기 설정도 존중합니다.",
       "workbenchReduceMotion": "움직임 줄이기",
-      "workbenchReduceMotionDesc": "우주를 멈추고 전환을 약화합니다(시스템 설정도 존중).",
+      "workbenchReduceMotionDesc": "워크벤치 농장 애니메이션을 멈춥니다(시스템 설정도 존중).",
     "terminalShell": "기본 터미널",
     "terminalShellDesc": "코드 패널 터미널에서 사용하는 셸입니다. 변경 사항을 적용하려면 터미널을 다시 시작하세요.",
     "terminalShells": {
@@ -1922,7 +1922,9 @@ export const ko = {
         "kicker": "개요"
       },
       "farm": {
-      "kicker": "햇살 들판"
+      "kicker": "픽셀 농장",
+      "hint": "밭을 클릭해 서피스 열기 · 작물은 실제 작업으로 자랍니다",
+      "dock": "도구 창고 — 바로가기와 최근 세션"
     },
     "office": {
       "kicker": "픽셀 오피스"

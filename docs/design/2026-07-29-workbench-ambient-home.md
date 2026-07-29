@@ -4,8 +4,8 @@
 |------|-----|
 | **Title** | Workbench Ambient Calm Home |
 | **Date** | 2026-07-29 |
-| **Status** | **Implemented** |
-| **Supersedes** | `2026-07-29-workbench-farm-sky.md`（农场远景 SVG）、`IsoFarmMap` 作为冷启动主界面 |
+| **Status** | **Superseded** by [`2026-07-29-workbench-pixel-farm.md`](./2026-07-29-workbench-pixel-farm.md)（像素种田小游戏） |
+| **Supersedes** | `2026-07-29-workbench-farm-sky.md`（农场远景 SVG）、`IsoFarmMap` 作为冷启动主界面（后被 Ambient 替代，再被 Pixel Farm 接回） |
 | **References** | Linear, Raycast, Stripe mesh / Apple aurora, Craft, Awwwards gradient craft |
 
 ---

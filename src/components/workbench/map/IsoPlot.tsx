@@ -1,7 +1,13 @@
-import type { CSSProperties } from 'react'
+import { useRef, type CSSProperties } from 'react'
 import { useTranslation } from 'react-i18next'
 import { cn } from '@/lib/utils'
-import type { ZoneId, ZoneModel } from '../workbenchTypes'
+import type { ZoneId, ZoneModel, ZoneState } from '../workbenchTypes'
+import {
+  killFarmJuice,
+  playPlotClick,
+  playPlotHover,
+  resetPlotHover,
+} from '../farm/farmJuice'
 import { mascotForZone } from './mascotForZone'
 import { IsoMascot } from './IsoMascot'
 import { ISO_TH, ISO_TW, isoProject, ZONE_CELL } from './isoLayout'
@@ -13,6 +19,20 @@ const ACCENT: Record<ZoneId, string> = {
   knowledge: 'var(--role-planner)',
   terminals: 'var(--role-worker)',
   workflows: 'var(--role-supervisor)',
+}
+
+/** 0 wilted · 1 seedling · 2 growing · 3 harvest-ready */
+export function growthForZone(state: ZoneState, progress: number | null | undefined): 0 | 1 | 2 | 3 {
+  if (state === 'fail' || state === 'blocked') return 0
+  if (state === 'done') return 3
+  if (state === 'running') {
+    if (progress != null && progress >= 0.75) return 3
+    if (progress != null && progress >= 0.35) return 2
+    return 2
+  }
+  if (progress != null && progress > 0.5) return 2
+  if (progress != null && progress > 0.1) return 1
+  return 1
 }
 
 export function IsoPlot({
@@ -34,6 +54,7 @@ export function IsoPlot({
 }) {
   const { t } = useTranslation()
   const tr = t as (key: string, opts?: Record<string, string | number>) => string
+  const btnRef = useRef<HTMLButtonElement>(null)
   const cell = ZONE_CELL[zone.id]
   const { x, y } = isoProject(cell.col, cell.row)
   const label = tr(zone.labelKey)
@@ -48,18 +69,37 @@ export function IsoPlot({
     zone.progress != null && zone.progress > 0
       ? Math.round(zone.progress * 100)
       : null
+  const growth = growthForZone(zone.state, zone.progress)
+  const ticks = Math.max(1, Math.min(4, growth + 1))
+
+  const juice = !forceStatic
 
   return (
     <button
+      ref={btnRef}
       type="button"
       className={cn('iso-plot')}
       data-testid={`workbench-zone-${zone.id}`}
       data-state={zone.state}
+      data-growth={growth}
       data-selected={selected ? 'true' : 'false'}
       data-zone={zone.id}
       aria-pressed={selected}
       aria-label={`${label}, ${stateLabel}, ${primary}`}
-      onClick={() => onOpen(zone)}
+      onClick={() => {
+        if (juice) playPlotClick(btnRef.current)
+        onOpen(zone)
+      }}
+      onPointerEnter={() => {
+        if (juice) playPlotHover(btnRef.current)
+      }}
+      onPointerLeave={() => {
+        if (juice) resetPlotHover(btnRef.current)
+        else killFarmJuice(btnRef.current)
+      }}
+      onBlur={() => {
+        if (juice) resetPlotHover(btnRef.current)
+      }}
       style={
         {
           left: originX + x - ISO_TW / 2,
@@ -72,14 +112,12 @@ export function IsoPlot({
         } as CSSProperties
       }
     >
-      {/* farmer stands ON the bed — upright billboard */}
       <div className="iso-plot-actor" aria-hidden>
         <div className="iso-plot-actor-bob">
           <IsoMascot action={action} size={88} forceStatic={forceStatic} />
         </div>
       </div>
 
-      {/* isometric diamond soil */}
       <div className="iso-plot-diamond" aria-hidden>
         <div className="iso-plot-top">
           <span className="iso-crop iso-crop-a" />
@@ -98,7 +136,6 @@ export function IsoPlot({
         <div className="iso-plot-right" />
       </div>
 
-      {/* stake sign (screen-aligned) */}
       <div className="iso-plot-sign">
         <span className="iso-plot-sign-name">{label}</span>
         <span className="iso-plot-sign-badge">{stateLabel}</span>
@@ -109,6 +146,11 @@ export function IsoPlot({
             {pct != null ? ` · ${pct}%` : ''}
           </span>
         )}
+        <span className="px-growth-bar" aria-hidden>
+          {Array.from({ length: 4 }, (_, i) => (
+            <i key={i} data-on={i < ticks ? 'true' : 'false'} />
+          ))}
+        </span>
       </div>
     </button>
   )

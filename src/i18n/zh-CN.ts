@@ -850,10 +850,10 @@ export const zhCN = {
         compact: '紧凑',
       },
       workbenchSection: '工作台',
-      workbenchShowScene: '氛围动效',
-      workbenchShowSceneDesc: '允许工作台环境色场缓慢漂移（仍尊重「减少动效」与系统偏好）。',
+      workbenchShowScene: '农庄动效',
+      workbenchShowSceneDesc: '播放像素农场动效（云、农夫、浇水）。仍尊重「减少动效」与系统偏好。',
       workbenchReduceMotion: '减少动效',
-      workbenchReduceMotionDesc: '冻结工作台环境色场动效（也尊重系统「减少动态」偏好）。',
+      workbenchReduceMotionDesc: '冻结工作台农场动画（也尊重系统「减少动态」偏好）。',
       terminalShell: '默认终端',
       terminalShellDesc: '代码面板终端使用的默认 shell。修改后需重新启动终端生效。',
       terminalShells: {
@@ -1954,7 +1954,9 @@ export const zhCN = {
         kicker: '总览',
       },
       farm: {
-        kicker: '烈日田野',
+        kicker: '像素农庄',
+        hint: '点击菜畦打开功能面 · 作物随真实工作生长',
+        dock: '工具棚 — 快捷入口与最近会话',
       },
       office: {
         kicker: '像素办公室',

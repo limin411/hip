@@ -890,9 +890,9 @@ export const zhTW = {
     },
       "workbenchSection": "工作台",
       "workbenchShowCartoon": "顯示卡通",
-      "workbenchShowCartoonDesc": "在辦公室工位與總覽 Hero 上展示 Flat Butt 吉祥物。",
+      "workbenchShowCartoonDesc": "在田地菜畦與總覽 Hero 上展示 Flat Butt 吉祥物。",
       "workbenchReduceMotion": "減少卡通動效",
-      "workbenchReduceMotionDesc": "凍結辦公室環境動效並使用靜態 Logo（也尊重系統減少動態偏好）。",
+      "workbenchReduceMotionDesc": "凍結田野環境動效並使用靜態 Logo（也尊重系統減少動態偏好）。",
     "terminalShell": "預設終端",
     "terminalShellDesc": "程式碼面板終端使用的預設 shell。修改後需重新啟動終端生效。",
     "terminalShells": {
@@ -1878,10 +1878,10 @@ export const zhTW = {
       "greetingAfternoon": "下午好，工作台就緒",
       "greetingEvening": "晚上好，工作台就緒",
       "greetingNight": "夜深了，工作台仍就緒",
-      "subIdle": "像素辦公室很安靜 · 工位上即時顯示各區狀態",
-      "subRunning": "忙碌工位會亮屏 · 點擊工位即可進入",
-      "subAttention": "有工位需要關注 · 阻塞或失敗，點擊處理",
-      "subDone": "剛收工的工位會短暫發光慶祝"
+      "subIdle": "烈日下田地很安靜 · 菜畦上即時顯示各區狀態",
+      "subRunning": "有作物在生長 · 點擊菜畦即可進入",
+      "subAttention": "有菜畦需要澆灌 · 枯萎或阻塞，點擊處理",
+      "subDone": "剛收成的菜畦會短暫發光慶祝"
     },
     "metrics": {
       "running": "執行中",
@@ -1922,8 +1922,14 @@ export const zhTW = {
       "terminalsIdle": "空閒",
       "terminalsSecondary": "{{count}} 個終端"
     },
-    "openZone": "開啟{{name}} →",
-    "zonesRegion": "辦公室工位",
+    "openZone": "照料{{name}} →",
+    "zonesRegion": "田地菜畦",
+    "farm": {
+      "kicker": "烈日田野"
+    },
+    "office": {
+      "kicker": "像素辦公室"
+    },
     "shortcuts": {
       "title": "快捷入口",
       "continueSession": "繼續：{{title}}",

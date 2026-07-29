@@ -864,9 +864,9 @@ export const en = {
       },
       workbenchSection: 'Workbench',
       workbenchShowCartoon: 'Show cartoons',
-      workbenchShowCartoonDesc: 'Flat Butt mascots on office desks and the overview hero.',
+      workbenchShowCartoonDesc: 'Flat Butt farmers on field plots and the overview hero.',
       workbenchReduceMotion: 'Reduce cartoon motion',
-      workbenchReduceMotionDesc: 'Freeze office ambience and use a static logo (also honors system preference).',
+      workbenchReduceMotionDesc: 'Freeze field ambience and use a static logo (also honors system preference).',
       terminalShell: 'Default terminal',
       terminalShellDesc:
         'Shell used by the code-panel Terminal. Restart the terminal for changes to take effect.',
@@ -1945,10 +1945,10 @@ export const en = {
         greetingAfternoon: 'Good afternoon — workbench ready',
         greetingEvening: 'Good evening — workbench ready',
         greetingNight: 'Still here? Workbench is ready',
-        subIdle: 'Your pixel office is quiet — desks show live zone status',
-        subRunning: 'Busy desks light up — tap a desk to jump in',
-        subAttention: 'A desk needs care — blocked or failed; click to handle',
-        subDone: 'Recent finishes still glow on the floor for a short while',
+        subIdle: 'The field is quiet under a hot sun — plots show live zone status',
+        subRunning: 'Something is growing — tap a plot to jump in',
+        subAttention: 'A plot needs care — wilted or blocked; click to handle',
+        subDone: 'Fresh harvest still glows for a short while',
       },
       metrics: {
         running: 'Running',
@@ -1989,8 +1989,14 @@ export const en = {
         terminalsIdle: 'Idle',
         terminalsSecondary: '{{count}} terminal(s)',
       },
-      openZone: 'Open {{name}} →',
-      zonesRegion: 'Office desks',
+      openZone: 'Tend {{name}} →',
+      zonesRegion: 'Field plots',
+      farm: {
+        kicker: 'Sunny field',
+      },
+      office: {
+        kicker: 'Pixel office',
+      },
       shortcuts: {
         title: 'Quick start',
         continueSession: 'Continue: {{title}}',

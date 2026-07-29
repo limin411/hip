@@ -882,9 +882,9 @@ export const ja = {
     },
       "workbenchSection": "ワークベンチ",
       "workbenchShowCartoon": "マスコットを表示",
-      "workbenchShowCartoonDesc": "オフィスデスクと概要ヒーローに Flat Butt を表示します。",
+      "workbenchShowCartoonDesc": "畑の区画と概要ヒーローに Flat Butt を表示します。",
       "workbenchReduceMotion": "マスコットの動きを抑える",
-      "workbenchReduceMotionDesc": "オフィス環境アニメを止め、静止ロゴを使います（システムの設定も尊重）。",
+      "workbenchReduceMotionDesc": "畑の環境アニメを止め、静止ロゴを使います（システムの設定も尊重）。",
     "terminalShell": "デフォルトのターミナル",
     "terminalShellDesc": "コードパネルのターミナルで使用するシェルです。変更を反映するにはターミナルを再起動してください。",
     "terminalShells": {
@@ -1871,10 +1871,10 @@ export const ja = {
       "greetingAfternoon": "こんにちは — ワークベンチ準備完了",
       "greetingEvening": "こんばんは — ワークベンチ準備完了",
       "greetingNight": "夜遅くまで — ワークベンチ準備完了",
-      "subIdle": "ピクセルオフィスは静か · デスクに各ゾーンの状態を表示",
-      "subRunning": "忙しいデスクが点灯 · タップして移動",
-      "subAttention": "要確認のデスクがあります · ブロック/失敗はクリックで対処",
-      "subDone": "完了したデスクがしばらく光ります"
+      "subIdle": "強い陽射しの下で畑は静か · 区画に各ゾーンの状態を表示",
+      "subRunning": "作物が育っています · 区画をタップして移動",
+      "subAttention": "世話が必要な区画 · 枯れ/ブロックはクリックで対処",
+      "subDone": "収穫した区画がしばらく光ります"
     },
     "metrics": {
       "running": "実行中",
@@ -1915,8 +1915,14 @@ export const ja = {
       "terminalsIdle": "待機",
       "terminalsSecondary": "ターミナル {{count}}"
     },
-    "openZone": "{{name}} を開く →",
-    "zonesRegion": "オフィスデスク",
+    "openZone": "{{name}} を世話する →",
+    "zonesRegion": "畑の区画",
+    "farm": {
+      "kicker": "日差しの畑"
+    },
+    "office": {
+      "kicker": "ピクセルオフィス"
+    },
     "shortcuts": {
       "title": "クイック起動",
       "continueSession": "続行: {{title}}",

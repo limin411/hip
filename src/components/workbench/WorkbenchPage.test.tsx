@@ -76,14 +76,15 @@ function renderPage() {
 }
 
 describe('WorkbenchPage', () => {
-  it('renders immersive office, hero, desks, and shortcuts', () => {
+  it('renders sunny farm field, hero, and plots', () => {
     renderPage()
     expect(screen.getByTestId('workbench-page')).toBeInTheDocument()
-    expect(screen.getByTestId('workbench-office')).toBeInTheDocument()
+    expect(screen.getByTestId('workbench-farm')).toBeInTheDocument()
     expect(screen.getByTestId('workbench-hero')).toBeInTheDocument()
     expect(screen.getByTestId('workbench-zone-sessions')).toBeInTheDocument()
     expect(screen.getByTestId('workbench-zone-knowledge')).toBeInTheDocument()
-    expect(screen.getByTestId('workbench-shortcuts')).toBeInTheDocument()
+    expect(screen.queryByTestId('workbench-shortcuts')).not.toBeInTheDocument()
+    expect(screen.queryByTestId('workbench-office')).not.toBeInTheDocument()
     expect(screen.getByTestId('workbench-metric-running')).toHaveTextContent('0')
   })
 
@@ -93,10 +94,10 @@ describe('WorkbenchPage', () => {
     expect(screen.getByTestId('workbench-zone-knowledge')).toHaveAttribute('data-state', 'idle')
   })
 
-  it('new chat shortcut is clickable', async () => {
+  it('opens sessions zone on plot click', async () => {
     const { enterSection } = await import('@/components/layout/sidebarActions')
     renderPage()
-    fireEvent.click(screen.getByTestId('workbench-shortcut-new-chat'))
+    fireEvent.click(screen.getByTestId('workbench-zone-sessions'))
     expect(enterSection).toHaveBeenCalledWith('chats')
   })
 

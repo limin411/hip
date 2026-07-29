@@ -851,9 +851,9 @@ export const zhCN = {
       },
       workbenchSection: '工作台',
       workbenchShowCartoon: '显示卡通',
-      workbenchShowCartoonDesc: '在办公室工位与总览 Hero 上展示 Flat Butt 吉祥物。',
+      workbenchShowCartoonDesc: '在田地菜畦与总览 Hero 上展示 Flat Butt 吉祥物。',
       workbenchReduceMotion: '减少卡通动效',
-      workbenchReduceMotionDesc: '冻结办公室环境动效并使用静态 Logo（也尊重系统减少动态偏好）。',
+      workbenchReduceMotionDesc: '冻结田野环境动效并使用静态 Logo（也尊重系统减少动态偏好）。',
       terminalShell: '默认终端',
       terminalShellDesc: '代码面板终端使用的默认 shell。修改后需重新启动终端生效。',
       terminalShells: {
@@ -1898,10 +1898,10 @@ export const zhCN = {
         greetingAfternoon: '下午好，工作台就绪',
         greetingEvening: '晚上好，工作台就绪',
         greetingNight: '夜深了，工作台仍就绪',
-        subIdle: '像素办公室很安静 · 工位上实时显示各区状态',
-        subRunning: '忙碌工位会亮屏 · 点击工位即可进入',
-        subAttention: '有工位需要关注 · 阻塞或失败，点击处理',
-        subDone: '刚收工的工位会短暂发光庆祝',
+        subIdle: '烈日下田地很安静 · 菜畦上实时显示各区状态',
+        subRunning: '有作物在生长 · 点击菜畦即可进入',
+        subAttention: '有菜畦需要浇灌 · 枯萎或阻塞，点击处理',
+        subDone: '刚收成的菜畦会短暂发光庆祝',
       },
       metrics: {
         running: '运行中',
@@ -1942,8 +1942,14 @@ export const zhCN = {
         terminalsIdle: '空闲',
         terminalsSecondary: '{{count}} 个终端',
       },
-      openZone: '打开{{name}} →',
-      zonesRegion: '办公室工位',
+      openZone: '照料{{name}} →',
+      zonesRegion: '田地菜畦',
+      farm: {
+        kicker: '烈日田野',
+      },
+      office: {
+        kicker: '像素办公室',
+      },
       shortcuts: {
         title: '快捷入口',
         continueSession: '继续：{{title}}',

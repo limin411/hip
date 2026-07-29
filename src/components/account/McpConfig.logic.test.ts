@@ -1,5 +1,13 @@
 import { describe, it, expect } from 'vitest'
-import { statusEmoji, statusLabelKey, resolveToolEnabled, toggleTool } from './McpConfig'
+import {
+  statusEmoji,
+  statusLabelKey,
+  resolveToolEnabled,
+  toggleTool,
+  countEnabledTools,
+  applyToolEnablement,
+  encodeToolSelection,
+} from './McpConfig'
 
 describe('statusEmoji', () => {
   it('returns green circle for connected', () => {
@@ -84,5 +92,84 @@ describe('toggleTool', () => {
     // enabled=resolveToolEnabled('tool_a', ['tool_a','tool_b'], ['tool_a']) = false (deny wins)
     // Since enabledTools has items, enabling adds to enabledTools
     expect(result.enabledTools).toContain('tool_a')
+  })
+})
+
+describe('countEnabledTools', () => {
+  const tools = ['a', 'b', 'c']
+
+  it('counts all when no filters', () => {
+    expect(countEnabledTools(tools, [], [])).toBe(3)
+  })
+
+  it('respects denylist', () => {
+    expect(countEnabledTools(tools, [], ['b'])).toBe(2)
+  })
+
+  it('respects allowlist', () => {
+    expect(countEnabledTools(tools, ['a'], [])).toBe(1)
+  })
+})
+
+describe('encodeToolSelection', () => {
+  const tools = ['a', 'b', 'c', 'd']
+
+  it('encodes all-on as empty lists', () => {
+    expect(encodeToolSelection(tools, new Set(tools))).toEqual({
+      enabledTools: [],
+      disabledTools: [],
+    })
+  })
+
+  it('encodes all-off as full denylist', () => {
+    expect(encodeToolSelection(tools, new Set())).toEqual({
+      enabledTools: [],
+      disabledTools: tools,
+    })
+  })
+
+  it('prefers denylist when most tools stay on', () => {
+    expect(encodeToolSelection(tools, new Set(['a', 'b', 'c']))).toEqual({
+      enabledTools: [],
+      disabledTools: ['d'],
+    })
+  })
+
+  it('prefers allowlist when most tools are off', () => {
+    expect(encodeToolSelection(tools, new Set(['a']))).toEqual({
+      enabledTools: ['a'],
+      disabledTools: [],
+    })
+  })
+})
+
+describe('applyToolEnablement', () => {
+  const tools = ['a', 'b', 'c']
+
+  it('disables a filtered subset (allowlist when majority off)', () => {
+    // 1 of 3 on ⇒ allowlist is the compact encoding
+    const result = applyToolEnablement(['a', 'c'], tools, [], [], false)
+    expect(result).toEqual({ enabledTools: ['b'], disabledTools: [] })
+    expect(resolveToolEnabled('a', result.enabledTools, result.disabledTools)).toBe(false)
+    expect(resolveToolEnabled('b', result.enabledTools, result.disabledTools)).toBe(true)
+    expect(resolveToolEnabled('c', result.enabledTools, result.disabledTools)).toBe(false)
+  })
+
+  it('re-enables filtered tools from denylist', () => {
+    const result = applyToolEnablement(['a'], tools, [], ['a', 'b'], true)
+    expect(result.disabledTools).toEqual(['b'])
+  })
+
+  it('enable all filtered with empty lists is a no-op', () => {
+    const result = applyToolEnablement(tools, tools, [], [], true)
+    expect(result).toEqual({ enabledTools: [], disabledTools: [] })
+  })
+
+  it('disable all does not re-enable via empty allowlist edge case', () => {
+    // Starting from allowlist of all tools — iterative toggle used to clear the last
+    // allowlist entry and accidentally re-enable everything.
+    const result = applyToolEnablement(tools, tools, ['a', 'b', 'c'], [], false)
+    expect(result).toEqual({ enabledTools: [], disabledTools: tools })
+    expect(countEnabledTools(tools, result.enabledTools, result.disabledTools)).toBe(0)
   })
 })

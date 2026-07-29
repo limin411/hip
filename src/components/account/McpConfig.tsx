@@ -9,7 +9,6 @@ import {
   Check,
   X,
   RefreshCw,
-  ChevronDown,
   Server,
   Settings2,
   Search,
@@ -134,6 +133,71 @@ export function toggleTool(
   }
   return { enabledTools, disabledTools: disabledTools.filter((t) => t !== toolName) }
 }
+
+/** Count how many discovered tools are currently enabled. */
+export function countEnabledTools(
+  toolNames: string[],
+  enabledTools: string[],
+  disabledTools: string[],
+): number {
+  let n = 0
+  for (const name of toolNames) {
+    if (resolveToolEnabled(name, enabledTools, disabledTools)) n += 1
+  }
+  return n
+}
+
+/**
+ * Encode a desired enabled-set as allowlist or denylist.
+ * Prefer denylist when most tools stay on (matches the default “all enabled” model).
+ */
+export function encodeToolSelection(
+  allToolNames: string[],
+  desiredEnabled: ReadonlySet<string>,
+): { enabledTools: string[]; disabledTools: string[] } {
+  const enabledCount = allToolNames.reduce((n, name) => n + (desiredEnabled.has(name) ? 1 : 0), 0)
+  if (enabledCount === allToolNames.length) {
+    return { enabledTools: [], disabledTools: [] }
+  }
+  if (enabledCount === 0) {
+    return { enabledTools: [], disabledTools: [...allToolNames] }
+  }
+  const disabledCount = allToolNames.length - enabledCount
+  if (disabledCount <= enabledCount) {
+    return {
+      enabledTools: [],
+      disabledTools: allToolNames.filter((name) => !desiredEnabled.has(name)),
+    }
+  }
+  return {
+    enabledTools: allToolNames.filter((name) => desiredEnabled.has(name)),
+    disabledTools: [],
+  }
+}
+
+/**
+ * Apply enable/disable to a subset of tools without the allowlist edge-case where
+ * clearing the last allowlist entry accidentally re-enables everything.
+ */
+export function applyToolEnablement(
+  targetToolNames: string[],
+  allToolNames: string[],
+  enabledTools: string[],
+  disabledTools: string[],
+  enable: boolean,
+): { enabledTools: string[]; disabledTools: string[] } {
+  const desired = new Set(
+    allToolNames.filter((name) => resolveToolEnabled(name, enabledTools, disabledTools)),
+  )
+  for (const name of targetToolNames) {
+    if (enable) desired.add(name)
+    else desired.delete(name)
+  }
+  return encodeToolSelection(allToolNames, desired)
+}
+
+/** Show tool search once the list is long enough that scanning is painful. */
+const MCP_TOOL_SEARCH_THRESHOLD = 6
 
 /** Pure helper: derive read-only plugin-contributed MCP servers, excluding duplicates already owned by standalone configs or earlier plugins.
  *  When the parent plugin is disabled in the market, the server is forced `enabled: false`. */
@@ -286,6 +350,13 @@ export function McpConfig() {
 
   const handleResetTools = async (server: McpServerConfig) => {
     await updateServer(server.id, { enabledTools: [], disabledTools: [] })
+  }
+
+  const handleSetTools = async (
+    server: McpServerConfig,
+    lists: { enabledTools: string[]; disabledTools: string[] },
+  ) => {
+    await updateServer(server.id, lists)
   }
 
   const reconnectMcpServers = useCallback(() => {
@@ -564,6 +635,9 @@ export function McpConfig() {
                             onResetTools={async () => {
                               await handleResetTools(s)
                             }}
+                            onSetTools={async (lists) => {
+                              await handleSetTools(s, lists)
+                            }}
                             onReconnect={reconnectMcpServers}
                           />
                         ))
@@ -830,6 +904,7 @@ function McpServerCard({
   onDelete,
   onToggleTool,
   onResetTools,
+  onSetTools,
   onReconnect,
 }: {
   server: McpServerConfig
@@ -839,13 +914,14 @@ function McpServerCard({
   onDelete: () => void
   onToggleTool: (toolName: string) => Promise<void>
   onResetTools: () => Promise<void>
+  onSetTools: (lists: { enabledTools: string[]; disabledTools: string[] }) => Promise<void>
   onReconnect: () => void
 }) {
   const { t } = useTranslation()
   const [toolsOpen, setToolsOpen] = useState(false)
   const [toggleBusy, setToggleBusy] = useState(false)
   const [toolBusy, setToolBusy] = useState<Record<string, boolean>>({})
-  const [resetBusy, setResetBusy] = useState(false)
+  const [listBusy, setListBusy] = useState(false)
   const [actionError, setActionError] = useState<string | null>(null)
   const [reconnectBusy, setReconnectBusy] = useState(false)
   const reconnectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -868,165 +944,364 @@ function McpServerCard({
   const toolCount = status?.toolCount ?? 0
   const discoveredTools = status?.toolNames ?? []
   const hasTools = discoveredTools.length > 0
+  const enabledTools = server.enabledTools ?? []
+  const disabledTools = server.disabledTools ?? []
+  const enabledCount = countEnabledTools(discoveredTools, enabledTools, disabledTools)
 
   // Card chrome on permanent outer so CONTEXT_MENUS=false keeps layout.
   return (
-    <div
-      data-testid="mcp-server-card"
-      className={cn(
-        'relative flex min-h-[180px] flex-col rounded-lg border border-border bg-surface p-4 transition-colors hover:bg-surface-subtle',
-        !server.enabled && 'opacity-60',
-      )}
-    >
-      <DeclarativeContextMenu
-        kind="mcpServer"
-        payload={{ serverId: server.id, onEdit, onDelete }}
-        className="flex min-h-0 flex-1 flex-col"
+    <>
+      <div
+        data-testid="mcp-server-card"
+        className={cn(
+          'relative flex min-h-[180px] flex-col rounded-lg border border-border bg-surface p-4 transition-colors hover:bg-surface-subtle',
+          !server.enabled && 'opacity-60',
+        )}
       >
-        <div className="flex items-start gap-3">
-          <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-accent-subtle text-accent-strong">
-            <Plug size={18} />
-          </span>
-          <div className="min-w-0 flex-1">
-            <div className="truncate text-body font-medium text-ink">{server.name}</div>
-            <div className="mt-1 flex flex-wrap items-center gap-1.5">
-              <Badge>{transportLabel}</Badge>
-              {status && (
-                <span
-                  className="inline-flex items-center gap-1 text-caption text-ink-secondary"
-                  title={statusTitle}
-                >
-                  <StatusDot status={status.status} />
-                  {statusLabel}
-                </span>
-              )}
+        <DeclarativeContextMenu
+          kind="mcpServer"
+          payload={{ serverId: server.id, onEdit, onDelete }}
+          className="flex min-h-0 flex-1 flex-col"
+        >
+          <div className="flex items-start gap-3">
+            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-accent-subtle text-accent-strong">
+              <Plug size={18} />
+            </span>
+            <div className="min-w-0 flex-1">
+              <div className="truncate text-body font-medium text-ink">{server.name}</div>
+              <div className="mt-1 flex flex-wrap items-center gap-1.5">
+                <Badge>{transportLabel}</Badge>
+                {status && (
+                  <span
+                    className="inline-flex items-center gap-1 text-caption text-ink-secondary"
+                    title={statusTitle}
+                  >
+                    <StatusDot status={status.status} />
+                    {statusLabel}
+                  </span>
+                )}
+              </div>
             </div>
           </div>
-        </div>
 
-        <div className="mt-3 flex-1">
-          <div className="truncate font-mono text-caption text-ink-tertiary">{detail}</div>
-          {status && (
-            <div className="mt-2 flex items-center gap-3 text-caption text-ink-tertiary">
-              <span>
-                {toolCount} {toolCount === 1 ? t('settings.mcp.toolSingular') : t('settings.mcp.toolPlural')}
-              </span>
-              {hasTools && (
-                <button
-                  onClick={() => setToolsOpen((o) => !o)}
-                  className="inline-flex items-center gap-0.5 text-accent-strong transition-colors hover:text-accent"
-                >
-                  {t('settings.mcp.manageTools')}
-                  <ChevronDown size={14} className={cn('transition-transform', toolsOpen && 'rotate-180')} />
-                </button>
-              )}
-            </div>
-          )}
-          {toolsOpen && hasTools && (
-            <div className="mt-3 rounded-md bg-surface-subtle p-3">
-              <div className="mb-2 flex items-center justify-between">
-                <span className="text-caption font-medium text-ink-tertiary">
-                  {t('settings.mcp.sectionTools')}
-                </span>
-                {(server.enabledTools?.length || server.disabledTools?.length) ? (
+          <div className="mt-3 flex-1">
+            <div className="truncate font-mono text-caption text-ink-tertiary">{detail}</div>
+            {status && (
+              <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-caption text-ink-tertiary">
+                {hasTools ? (
+                  <span className="tabular-nums" title={t('settings.mcp.toolEnabledCount', { enabled: enabledCount, total: toolCount })}>
+                    {t('settings.mcp.toolEnabledCount', { enabled: enabledCount, total: toolCount })}
+                  </span>
+                ) : (
+                  <span>
+                    {toolCount} {toolCount === 1 ? t('settings.mcp.toolSingular') : t('settings.mcp.toolPlural')}
+                  </span>
+                )}
+                {hasTools && (
                   <button
                     type="button"
-                    onClick={async () => {
-                      setActionError(null)
-                      setResetBusy(true)
-                      try {
-                        await onResetTools()
-                      } catch {
-                        setActionError(t('settings.mcp.error'))
-                      } finally {
-                        setResetBusy(false)
-                      }
-                    }}
-                    disabled={resetBusy}
-                    className="text-caption text-accent hover:underline disabled:opacity-50"
+                    data-testid="mcp-manage-tools"
+                    onClick={() => setToolsOpen(true)}
+                    className="inline-flex items-center gap-0.5 text-accent-strong transition-colors hover:text-accent"
                   >
-                    {t('settings.mcp.toolToggleAll')}
+                    {t('settings.mcp.manageTools')}
+                    <Settings2 size={13} className="opacity-70" />
                   </button>
-                ) : null}
+                )}
               </div>
-              <div className="grid gap-1.5 sm:grid-cols-2">
-                {discoveredTools.map((toolName) => {
-                  const enabled = resolveToolEnabled(toolName, server.enabledTools ?? [], server.disabledTools ?? [])
-                  return (
-                    <label
-                      key={toolName}
-                      className="flex items-center gap-2 rounded-md p-1.5 hover:bg-state-hover cursor-pointer"
-                    >
-                      <Switch
-                        checked={enabled}
-                        disabled={!!toolBusy[toolName] || resetBusy}
-                        onCheckedChange={async () => {
-                          setActionError(null)
-                          setToolBusy((b) => ({ ...b, [toolName]: true }))
-                          try {
-                            await onToggleTool(toolName)
-                          } catch {
-                            setActionError(t('settings.mcp.error'))
-                          } finally {
-                            setToolBusy((b) => ({ ...b, [toolName]: false }))
-                          }
-                        }}
-                        ariaLabel={toolName}
-                      />
-                      <span className="truncate font-mono text-body text-ink-secondary">{toolName}</span>
-                    </label>
-                  )
-                })}
-              </div>
-            </div>
-          )}
-        </div>
+            )}
+          </div>
 
-        <div className="mt-4 flex items-center justify-between">
-          <div className="flex flex-col gap-1">
-            <Switch
-              checked={server.enabled}
-              disabled={toggleBusy}
-              onCheckedChange={async (enabled) => {
+          <div className="mt-4 flex items-center justify-between">
+            <div className="flex flex-col gap-1">
+              <Switch
+                checked={server.enabled}
+                disabled={toggleBusy}
+                onCheckedChange={async (enabled) => {
+                  setActionError(null)
+                  setToggleBusy(true)
+                  try {
+                    await onToggle(enabled)
+                  } catch {
+                    setActionError(t('settings.mcp.error'))
+                  } finally {
+                    setToggleBusy(false)
+                  }
+                }}
+                ariaLabel={t('settings.mcp.enableThis')}
+              />
+              {actionError && <span className="text-meta text-danger">{actionError}</span>}
+            </div>
+            <div className="flex items-center gap-1">
+              {status?.status === 'disconnected' && server.enabled && (
+                <ActionButton
+                  icon={<RefreshCw size={14} />}
+                  label={t('settings.mcp.reconnect')}
+                  onClick={() => {
+                    setActionError(null)
+                    setReconnectBusy(true)
+                    try {
+                      onReconnect()
+                      // Debounce only on success; synchronous failures allow immediate retry.
+                      reconnectTimerRef.current = setTimeout(() => { setReconnectBusy(false) }, 1000)
+                    } catch {
+                      setActionError(t('settings.mcp.error'))
+                      setReconnectBusy(false)
+                    }
+                  }}
+                  disabled={reconnectBusy}
+                />
+              )}
+              <ActionButton icon={<Pencil size={14} />} label={t('settings.mcp.edit')} onClick={onEdit} />
+              <ActionButton icon={<Trash2 size={14} />} label={t('settings.mcp.delete')} onClick={onDelete} danger />
+            </div>
+          </div>
+        </DeclarativeContextMenu>
+      </div>
+
+      {toolsOpen && hasTools && (
+        <Modal
+          open
+          onOpenChange={(o) => {
+            if (!o) setToolsOpen(false)
+          }}
+          title={t('settings.mcp.manageToolsTitle', { name: server.name })}
+          className="max-w-md"
+          footer={
+            <div className="flex justify-end">
+              <Button variant="primary" size="sm" onClick={() => setToolsOpen(false)}>
+                {t('settings.mcp.done')}
+              </Button>
+            </div>
+          }
+        >
+          <div className="p-4" data-testid="mcp-tools-modal">
+            <p className="mb-3 text-caption text-ink-tertiary">{t('settings.mcp.toolToggleDesc')}</p>
+            <McpToolTogglePanel
+              toolNames={discoveredTools}
+              enabledTools={enabledTools}
+              disabledTools={disabledTools}
+              toolBusy={toolBusy}
+              actionBusy={listBusy}
+              listMaxClassName="max-h-[min(22rem,50vh)]"
+              onToggle={async (toolName) => {
                 setActionError(null)
-                setToggleBusy(true)
+                setToolBusy((b) => ({ ...b, [toolName]: true }))
                 try {
-                  await onToggle(enabled)
+                  await onToggleTool(toolName)
                 } catch {
                   setActionError(t('settings.mcp.error'))
                 } finally {
-                  setToggleBusy(false)
+                  setToolBusy((b) => ({ ...b, [toolName]: false }))
                 }
               }}
-              ariaLabel={t('settings.mcp.enableThis')}
+              onReset={async () => {
+                setActionError(null)
+                setListBusy(true)
+                try {
+                  await onResetTools()
+                } catch {
+                  setActionError(t('settings.mcp.error'))
+                } finally {
+                  setListBusy(false)
+                }
+              }}
+              onApplyLists={async (lists) => {
+                setActionError(null)
+                setListBusy(true)
+                try {
+                  await onSetTools(lists)
+                } catch {
+                  setActionError(t('settings.mcp.error'))
+                } finally {
+                  setListBusy(false)
+                }
+              }}
             />
-            {actionError && <span className="text-meta text-danger">{actionError}</span>}
+            {actionError && <p className="mt-3 text-meta text-danger">{actionError}</p>}
           </div>
-          <div className="flex items-center gap-1">
-            {status?.status === 'disconnected' && server.enabled && (
-              <ActionButton
-                icon={<RefreshCw size={14} />}
-                label={t('settings.mcp.reconnect')}
-                onClick={() => {
-                  setActionError(null)
-                  setReconnectBusy(true)
-                  try {
-                    onReconnect()
-                    // Debounce only on success; synchronous failures allow immediate retry.
-                    reconnectTimerRef.current = setTimeout(() => { setReconnectBusy(false) }, 1000)
-                  } catch {
-                    setActionError(t('settings.mcp.error'))
-                    setReconnectBusy(false)
-                  }
-                }}
-                disabled={reconnectBusy}
-              />
-            )}
-            <ActionButton icon={<Pencil size={14} />} label={t('settings.mcp.edit')} onClick={onEdit} />
-            <ActionButton icon={<Trash2 size={14} />} label={t('settings.mcp.delete')} onClick={onDelete} danger />
-          </div>
+        </Modal>
+      )}
+    </>
+  )
+}
+
+/**
+ * Searchable, scroll-capped tool enable/disable list.
+ * Keeps cards compact when a server exposes many tools (GitHub / Chrome DevTools, etc.).
+ */
+function McpToolTogglePanel({
+  toolNames,
+  enabledTools,
+  disabledTools,
+  onToggle,
+  onReset,
+  onApplyLists,
+  toolBusy = {},
+  actionBusy = false,
+  listMaxClassName = 'max-h-60 sm:max-h-72',
+}: {
+  toolNames: string[]
+  enabledTools: string[]
+  disabledTools: string[]
+  onToggle: (toolName: string) => void | Promise<void>
+  onReset: () => void | Promise<void>
+  onApplyLists: (lists: { enabledTools: string[]; disabledTools: string[] }) => void | Promise<void>
+  toolBusy?: Record<string, boolean>
+  actionBusy?: boolean
+  listMaxClassName?: string
+}) {
+  const { t } = useTranslation()
+  const [query, setQuery] = useState('')
+  const filtered = useMemo(() => {
+    const q = query.trim().toLowerCase()
+    if (!q) return toolNames
+    return toolNames.filter((name) => name.toLowerCase().includes(q))
+  }, [toolNames, query])
+
+  const enabledCount = countEnabledTools(toolNames, enabledTools, disabledTools)
+  const showSearch = toolNames.length >= MCP_TOOL_SEARCH_THRESHOLD
+  const hasCustomFilter = enabledTools.length > 0 || disabledTools.length > 0
+  const allFilteredOn =
+    filtered.length > 0 && filtered.every((name) => resolveToolEnabled(name, enabledTools, disabledTools))
+  const allFilteredOff =
+    filtered.length > 0 && filtered.every((name) => !resolveToolEnabled(name, enabledTools, disabledTools))
+  const anyBusy = actionBusy || Object.values(toolBusy).some(Boolean)
+
+  return (
+    <div
+      className="flex min-h-0 flex-col overflow-hidden rounded-xl border border-border bg-surface"
+      data-testid="mcp-tool-toggle-panel"
+    >
+      <div className="shrink-0 space-y-2 border-b border-border bg-surface-subtle/50 px-3 py-2.5">
+        <div className="flex items-center justify-between gap-2">
+          <span className="text-caption font-medium text-ink-secondary">{t('settings.mcp.sectionTools')}</span>
+          {toolNames.length > 0 && (
+            <Badge size="sm" className="shrink-0 tabular-nums">
+              {t('settings.mcp.toolEnabledCount', { enabled: enabledCount, total: toolNames.length })}
+            </Badge>
+          )}
         </div>
-      </DeclarativeContextMenu>
+
+        {toolNames.length > 0 && (
+          <div className="flex items-center gap-1.5">
+            {showSearch && (
+              <div className="relative min-w-0 flex-1">
+                <Search
+                  size={12}
+                  className="pointer-events-none absolute left-2 top-1/2 -translate-y-1/2 text-ink-tertiary"
+                />
+                <input
+                  value={query}
+                  onChange={(e) => setQuery(e.target.value)}
+                  placeholder={t('settings.mcp.toolSearch')}
+                  data-testid="mcp-tool-search"
+                  className={cn(
+                    'h-7 w-full rounded-md border border-border bg-surface pl-7 pr-2 text-caption text-ink',
+                    'placeholder:text-ink-tertiary focus-visible:outline-none focus-visible:border-accent focus-visible:ring-[3px] focus-visible:ring-accent/10',
+                  )}
+                />
+              </div>
+            )}
+            <div className={cn('flex shrink-0 items-center gap-0.5', !showSearch && 'ml-auto')}>
+              <button
+                type="button"
+                disabled={anyBusy || allFilteredOn || filtered.length === 0}
+                onClick={() => {
+                  void onApplyLists(
+                    applyToolEnablement(filtered, toolNames, enabledTools, disabledTools, true),
+                  )
+                }}
+                className={cn(
+                  'rounded-md px-1.5 py-1 text-caption font-medium text-accent-strong transition-colors',
+                  'hover:bg-state-hover disabled:pointer-events-none disabled:opacity-40',
+                  'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink/20',
+                )}
+              >
+                {t('settings.mcp.toolEnableAll')}
+              </button>
+              <span className="text-ink-tertiary/50">·</span>
+              <button
+                type="button"
+                disabled={anyBusy || allFilteredOff || filtered.length === 0}
+                onClick={() => {
+                  void onApplyLists(
+                    applyToolEnablement(filtered, toolNames, enabledTools, disabledTools, false),
+                  )
+                }}
+                className={cn(
+                  'rounded-md px-1.5 py-1 text-caption font-medium text-ink-secondary transition-colors',
+                  'hover:bg-state-hover hover:text-ink disabled:pointer-events-none disabled:opacity-40',
+                  'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink/20',
+                )}
+              >
+                {t('settings.mcp.toolDisableAll')}
+              </button>
+              {hasCustomFilter && (
+                <>
+                  <span className="text-ink-tertiary/50">·</span>
+                  <button
+                    type="button"
+                    disabled={anyBusy}
+                    onClick={() => {
+                      void onReset()
+                    }}
+                    className={cn(
+                      'rounded-md px-1.5 py-1 text-caption font-medium text-ink-secondary transition-colors',
+                      'hover:bg-state-hover hover:text-ink disabled:pointer-events-none disabled:opacity-40',
+                      'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink/20',
+                    )}
+                  >
+                    {t('settings.mcp.toolToggleAll')}
+                  </button>
+                </>
+              )}
+            </div>
+          </div>
+        )}
+      </div>
+
+      {toolNames.length === 0 ? (
+        <div className="px-3 py-6 text-center text-caption text-ink-tertiary">
+          {t('settings.mcp.noToolsDiscovered')}
+        </div>
+      ) : filtered.length === 0 ? (
+        <div className="px-3 py-6 text-center text-caption text-ink-tertiary">
+          {t('settings.mcp.toolNoMatch')}
+        </div>
+      ) : (
+        <div
+          className={cn(
+            'divide-y divide-border overflow-y-auto overscroll-contain',
+            listMaxClassName,
+          )}
+        >
+          {filtered.map((toolName) => {
+            const enabled = resolveToolEnabled(toolName, enabledTools, disabledTools)
+            return (
+              <label
+                key={toolName}
+                className={cn(
+                  'flex cursor-pointer items-center gap-2.5 px-3 py-2 transition-colors',
+                  enabled ? 'bg-accent-subtle/30' : 'hover:bg-state-hover',
+                )}
+              >
+                <span className="min-w-0 flex-1 truncate font-mono text-body text-ink-secondary" title={toolName}>
+                  {toolName}
+                </span>
+                <Switch
+                  checked={enabled}
+                  disabled={!!toolBusy[toolName] || actionBusy}
+                  onCheckedChange={() => {
+                    void onToggle(toolName)
+                  }}
+                  ariaLabel={toolName}
+                />
+              </label>
+            )
+          })}
+        </div>
+      )}
     </div>
   )
 }
@@ -1254,46 +1529,25 @@ function McpServerEditor({
 
         {initial && (
           <Section label={t('settings.mcp.sectionTools')}>
-            <p className="text-caption text-ink-tertiary">{t('settings.mcp.toolToggleDesc')}</p>
+            <p className="mb-2 text-caption text-ink-tertiary">{t('settings.mcp.toolToggleDesc')}</p>
             {hasDiscoveredTools ? (
-              <>
-                <div className="mt-2 flex items-center gap-2">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      if (form.enabledTools.length > 0 || form.disabledTools.length > 0) {
-                        patch({ enabledTools: [], disabledTools: [] })
-                      }
-                    }}
-                    className="text-caption text-accent hover:underline"
-                  >
-                    {t('settings.mcp.toolToggleAll')}
-                  </button>
-                </div>
-                <div className="mt-1 max-h-40 space-y-1 overflow-y-auto">
-                  {discoveredTools.map((toolName) => {
-                    const enabled = resolveToolEnabled(toolName, form.enabledTools, form.disabledTools)
-                    return (
-                      <label
-                        key={toolName}
-                        className="flex items-center gap-2 rounded px-1 py-1 hover:bg-state-hover cursor-pointer"
-                      >
-                        <Switch
-                          checked={enabled}
-                          onCheckedChange={() => {
-                            const result = toggleTool(toolName, form.enabledTools, form.disabledTools)
-                            patch(result)
-                          }}
-                          ariaLabel={toolName}
-                        />
-                        <span className="text-body font-mono text-ink-secondary">{toolName}</span>
-                      </label>
-                    )
-                  })}
-                </div>
-              </>
+              <McpToolTogglePanel
+                toolNames={discoveredTools}
+                enabledTools={form.enabledTools}
+                disabledTools={form.disabledTools}
+                listMaxClassName="max-h-52 sm:max-h-60"
+                onToggle={(toolName) => {
+                  patch(toggleTool(toolName, form.enabledTools, form.disabledTools))
+                }}
+                onReset={() => {
+                  patch({ enabledTools: [], disabledTools: [] })
+                }}
+                onApplyLists={(lists) => {
+                  patch(lists)
+                }}
+              />
             ) : (
-              <div className="mt-1 text-caption text-ink-tertiary">{t('settings.mcp.noToolsDiscovered')}</div>
+              <div className="text-caption text-ink-tertiary">{t('settings.mcp.noToolsDiscovered')}</div>
             )}
           </Section>
         )}

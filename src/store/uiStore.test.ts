@@ -26,6 +26,7 @@ beforeEach(() => {
     settingsPage: 'general',
     diffViewMode: 'unified',
     checkpointMode: 'this-turn',
+    overlay: null,
   })
 })
 
@@ -142,6 +143,58 @@ describe('uiStore - activeView', () => {
     const before = useUiStore.getState()
     useUiStore.getState().setActiveView('chat')
     expect(useUiStore.getState()).toBe(before)
+  })
+})
+
+describe('uiStore - overlay', () => {
+  it('defaults to null', () => {
+    expect(useUiStore.getState().overlay).toBeNull()
+  })
+
+  it('setOverlay opens and closes without changing activeView', () => {
+    useUiStore.setState({ activeView: 'chat', sidebarSection: 'chats' })
+    useUiStore.getState().setOverlay('history')
+    expect(useUiStore.getState().overlay).toBe('history')
+    expect(useUiStore.getState().activeView).toBe('chat')
+    useUiStore.getState().setOverlay(null)
+    expect(useUiStore.getState().overlay).toBeNull()
+    expect(useUiStore.getState().activeView).toBe('chat')
+  })
+
+  it('toggleOverlay opens then closes', () => {
+    useUiStore.getState().toggleOverlay('trash')
+    expect(useUiStore.getState().overlay).toBe('trash')
+    useUiStore.getState().toggleOverlay('trash')
+    expect(useUiStore.getState().overlay).toBeNull()
+  })
+
+  it('toggleOverlay switches between kinds', () => {
+    useUiStore.getState().setOverlay('history')
+    useUiStore.getState().toggleOverlay('trash')
+    expect(useUiStore.getState().overlay).toBe('trash')
+  })
+
+  it('setOverlay coerces residual special activeView to work surface', () => {
+    useUiStore.setState({
+      activeView: 'history',
+      sidebarSection: 'chats',
+      chatSessionId: null,
+      codeSessionId: null,
+      overlay: null,
+    })
+    useUiStore.getState().setOverlay('trash')
+    expect(useUiStore.getState().overlay).toBe('trash')
+    // No session → chat home
+    expect(useUiStore.getState().activeView).toBe('chat')
+    expect(useUiStore.getState().sidebarSection).toBe('chats')
+  })
+
+  it('overlay is not in partialize / UiPersistedState shape', () => {
+    useUiStore.getState().setOverlay('history')
+    // Re-read: overlay exists at runtime but cold launch clears it
+    applyColdLaunchShell()
+    expect(useUiStore.getState().overlay).toBeNull()
+    expect(useUiStore.getState().activeView).toBe('chat')
   })
 })
 

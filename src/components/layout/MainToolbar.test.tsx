@@ -88,27 +88,16 @@ describe('MainToolbar', () => {
     expect(screen.queryByTestId('toggle-panel')).not.toBeInTheDocument()
   })
 
-  it('history: no back, empty toolbar title, hides connection and panel', () => {
+  it('history/trash are no longer special toolbar chrome (overlays own title)', () => {
+    // Residual activeView history is not treated as special; work-surface chrome shows.
     useUiStore.setState({
       activeView: 'history',
       previousView: 'chat',
     })
     render(<MainToolbar />)
     expect(screen.queryByTestId('main-toolbar-back')).not.toBeInTheDocument()
-    expect(screen.getByTestId('main-toolbar-title')).toHaveTextContent('')
-    expect(screen.queryByTestId('connection-status')).not.toBeInTheDocument()
-    expect(screen.queryByTestId('toggle-panel')).not.toBeInTheDocument()
-  })
-
-  it('trash: empty toolbar title (page owns h2), hides connection and panel', () => {
-    useUiStore.setState({
-      activeView: 'trash',
-      previousView: 'chat',
-    })
-    render(<MainToolbar />)
-    expect(screen.getByTestId('main-toolbar-title')).toHaveTextContent('')
-    expect(screen.queryByTestId('connection-status')).not.toBeInTheDocument()
-    expect(screen.queryByTestId('toggle-panel')).not.toBeInTheDocument()
+    // Falls through to new-conversation title path (no active session).
+    expect(screen.getByTestId('connection-status')).toBeInTheDocument()
   })
 
   it('terminals: shows title and panel chrome (files rail via PanelToggle)', () => {

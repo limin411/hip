@@ -18,9 +18,8 @@ import { AppSidebar } from '@/components/layout/AppSidebar'
 import { MainToolbar } from '@/components/layout/MainToolbar'
 import { PlaceholderPage } from '@/components/layout/PlaceholderPage'
 import { SettingsPage } from '@/components/account/SettingsPage'
-import { SessionHistory } from '@/components/history/SessionHistory'
-import { RecycleBinPage } from '@/components/history/RecycleBinPage'
 import { KnowledgePage } from '@/components/knowledge/KnowledgePage'
+import { OverlayShellHost } from '@/components/layout/OverlayShellHost'
 import { KnowledgeOutlinePanel } from '@/components/knowledge/KnowledgeOutlinePanel'
 import { useKnowledgeStore } from '@/store/knowledgeStore'
 import {
@@ -170,8 +169,7 @@ export function AppLayout() {
   }
 
   const renderMainContent = () => {
-    if (activeView === 'history') return <SessionHistory />
-    if (activeView === 'trash') return <RecycleBinPage />
+    // History / Trash are overlay shells (OverlayShellHost); not main column.
     if (activeView === 'settings') return <SettingsPage />
     if (activeView === 'knowledge') return <KnowledgePage />
     if (activeView === 'terminals') {
@@ -299,6 +297,7 @@ export function AppLayout() {
 
       <GlobalCommandPalette />
       <GlobalHotkeysBinder />
+      <OverlayShellHost />
       <SessionMenuDialogHost />
       <ManagedTerminalDialogHost />
       <WorktreeDeleteDialogHost />

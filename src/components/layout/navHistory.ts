@@ -1,8 +1,10 @@
 /**
  * Shell back/forward history (ChatGPT Desktop-style).
  * Captures / restores active view, sidebar section, session, knowledge space, etc.
+ * Overlay open/close is not recorded; apply always clears overlay first.
  */
 import { sessionService, useDomainStore } from '@/domain'
+import { coerceUnderlyingFromEntry } from '@/lib/overlayNav'
 import { useKnowledgeStore } from '@/store/knowledgeStore'
 import { useManagedTerminalStore } from '@/store/managedTerminalStore'
 import { type NavEntry, useNavHistoryStore } from '@/store/navHistoryStore'
@@ -84,6 +86,9 @@ export async function applyNavEntry(entry: NavEntry): Promise<void> {
   const store = useNavHistoryStore.getState()
   store.setApplying(true)
   try {
+    // Always clear overlay first — back/forward restores work surface, not shells.
+    useUiStore.getState().setOverlay(null)
+
     const prevView = useUiStore.getState().activeView
     if (prevView === 'knowledge' && entry.activeView !== 'knowledge') {
       await flushKnowledgeIfNeeded(true)
@@ -91,6 +96,23 @@ export async function applyNavEntry(entry: NavEntry): Promise<void> {
     // K19: leave tasks (finalize + save chain) before restoring non-tasks entry.
     if (prevView === 'tasks' && entry.activeView !== 'tasks') {
       await flushWorkItemsIfNeeded(true)
+    }
+
+    // Legacy special-view frames: history/trash reopen as overlays over coerced surface.
+    // Settings stays full-page activeView until PR4.
+    if (entry.activeView === 'history' || entry.activeView === 'trash') {
+      const surface = coerceUnderlyingFromEntry(entry)
+      useUiStore.getState().setSidebarSection(surface.section)
+      useUiStore.getState().setActiveView(surface.view)
+      if (entry.sessionId) {
+        const exists = useDomainStore.getState().sessions.some((s) => s.id === entry.sessionId)
+        if (exists) sessionService.selectSession(entry.sessionId)
+      }
+      useUiStore.getState().setOverlay(entry.activeView)
+      if (entry.activeView === 'trash') {
+        void sessionService.requestTrashList()
+      }
+      return
     }
 
     if (entry.activeView === 'knowledge') {

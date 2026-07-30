@@ -152,7 +152,19 @@ export function Modal({
           // Shell Esc gate (PR3): document.querySelector('[data-confirm-dialog]')
           {...(variant === 'confirm' ? { 'data-confirm-dialog': true } : {})}
           onEscapeKeyDown={(e) => {
-            if (closeDisabled) e.preventDefault()
+            if (closeDisabled) {
+              e.preventDefault()
+              return
+            }
+            // Shell Esc gate: when a Confirm dialog is open (sibling Dialog.Root),
+            // do not also close the shell — Esc should dismiss confirm first.
+            if (
+              variant === 'shell' &&
+              typeof document !== 'undefined' &&
+              document.querySelector('[data-confirm-dialog]')
+            ) {
+              e.preventDefault()
+            }
           }}
           onPointerDownOutside={(e) => {
             if (closeDisabled || isPortaledFloatingTarget(e.target)) {

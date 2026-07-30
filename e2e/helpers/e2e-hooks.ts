@@ -44,6 +44,7 @@ type HipE2E = {
   openSettingsPageForE2e?: (page?: string) => void
   openHistoryPageForE2e?: () => void
   openTrashPageForE2e?: () => void
+  closeOverlayForE2e?: () => void
   simulatePluginInstallError: (error?: string) => void
   getMemoryConfig?: () => Promise<Record<string, unknown>>
   setMemoryConfig?: (partial: Record<string, unknown>) => Promise<Record<string, unknown>>
@@ -256,6 +257,15 @@ export async function openTrashPageForE2e(): Promise<void> {
     const hooks = (window as unknown as { __hipE2E?: HipE2E }).__hipE2E
     if (!hooks?.openTrashPageForE2e) throw new Error('__hipE2E.openTrashPageForE2e missing')
     hooks.openTrashPageForE2e()
+  })
+}
+
+/** Close any footer utility overlay shell (DEV bridge). */
+export async function closeOverlayForE2e(): Promise<void> {
+  await browser.execute(() => {
+    const hooks = (window as unknown as { __hipE2E?: HipE2E }).__hipE2E
+    if (!hooks?.closeOverlayForE2e) throw new Error('__hipE2E.closeOverlayForE2e missing')
+    hooks.closeOverlayForE2e()
   })
 }
 

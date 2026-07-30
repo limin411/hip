@@ -2,6 +2,7 @@ import { useState, useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Search, MessageSquare, Code2, Trash2, Inbox } from 'lucide-react'
 import { useSessions, sessionService } from '@/domain'
+import { selectSessionFromSidebar } from '@/components/layout/sidebarActions'
 import { surfaceOf } from '@/lib/sessions'
 import {
   collectNestedWorktreeSessionIds,
@@ -24,7 +25,12 @@ const PAGE_SIZE = 20
 
 type SurfaceFilter = 'all' | 'chat' | 'code'
 
-export function SessionHistory() {
+export function SessionHistory({
+  embeddedInShell = false,
+}: {
+  /** When true, suppress page-level h2 (shell Modal already shows title). */
+  embeddedInShell?: boolean
+} = {}) {
   const { t } = useTranslation()
   const sessions = useSessions()
   const parallelRuns = useParallelStore((s) => s.runs)
@@ -93,7 +99,11 @@ export function SessionHistory() {
   return (
     <div className="flex flex-1 flex-col overflow-y-auto px-6 py-5" data-testid="session-history">
       <div className="mb-4 flex items-center justify-between">
-        <h2 className="text-display font-semibold text-ink">{t('history.title')}</h2>
+        {embeddedInShell ? (
+          <span className="sr-only">{t('history.title')}</span>
+        ) : (
+          <h2 className="text-display font-semibold text-ink">{t('history.title')}</h2>
+        )}
         {filtered.length > 0 && (
           <Button variant="danger" size="sm" onClick={() => setClearAllOpen(true)}>
             {t('history.clearAll')}
@@ -183,7 +193,7 @@ export function SessionHistory() {
                     >
                       <button
                         type="button"
-                        onClick={() => sessionService.selectSession(session.id)}
+                        onClick={() => void selectSessionFromSidebar(session.id)}
                         className="flex min-w-0 flex-1 items-center justify-between text-left"
                       >
                         <div className="flex min-w-0 flex-col gap-0.5">

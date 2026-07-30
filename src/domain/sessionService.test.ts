@@ -1269,21 +1269,31 @@ describe('workspace diff', () => {
     expect(useUiStore.getState().settingsPage).toBe('memory')
   })
 
-  it('openHistoryPageForE2e sets activeView history', () => {
-    useUiStore.setState({ activeView: 'chat' })
+  it('openHistoryPageForE2e sets overlay history without activeView change', () => {
+    useUiStore.setState({ activeView: 'chat', overlay: null })
     const t = new FakeTransport()
     const svc = new SessionService(t)
     svc.openHistoryPageForE2e()
-    expect(useUiStore.getState().activeView).toBe('history')
+    expect(useUiStore.getState().overlay).toBe('history')
+    expect(useUiStore.getState().activeView).toBe('chat')
   })
 
-  it('openTrashPageForE2e sets activeView trash and requests trash list', () => {
-    useUiStore.setState({ activeView: 'chat' })
+  it('openTrashPageForE2e sets overlay trash and requests trash list', () => {
+    useUiStore.setState({ activeView: 'chat', overlay: null })
     const t = new FakeTransport()
     const svc = new SessionService(t)
     svc.openTrashPageForE2e()
-    expect(useUiStore.getState().activeView).toBe('trash')
+    expect(useUiStore.getState().overlay).toBe('trash')
+    expect(useUiStore.getState().activeView).toBe('chat')
     expect(t.sent.some((m) => (m as { type: string }).type === 'session:trash:list')).toBe(true)
+  })
+
+  it('closeOverlayForE2e clears overlay', () => {
+    useUiStore.setState({ overlay: 'history' })
+    const t = new FakeTransport()
+    const svc = new SessionService(t)
+    svc.closeOverlayForE2e()
+    expect(useUiStore.getState().overlay).toBeNull()
   })
 
   it('simulatePluginInstallError sets pluginInstall result failure', () => {

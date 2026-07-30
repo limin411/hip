@@ -76,13 +76,14 @@ import {
   enterWorkItemsSection,
   enterAutomationsSection,
   newConversationFromSidebar,
-  openHistoryFromChrome,
   openSettingsFromChrome,
   openSpaceFromSidebar,
-  openTrashFromChrome,
   selectSessionFromSidebar,
+  toggleHistoryOverlay,
+  toggleTrashOverlay,
 } from './sidebarActions'
 import { SIDEBAR_ACTIVE_RAIL } from './sidebarActiveRail'
+import { sidebarFooterActive } from './sidebarFooterActive'
 import { SidebarAccountFooter } from './SidebarAccountFooter'
 import { goNavBack, goNavForward } from './navHistory'
 import { useNavHistoryStore } from '@/store/navHistoryStore'
@@ -113,6 +114,7 @@ export function AppSidebar() {
   const sidebarWidth = useUiStore((s) => s.sidebarWidth)
   const setSidebarWidth = useUiStore((s) => s.setSidebarWidth)
   const activeView = useUiStore((s) => s.activeView)
+  const overlay = useUiStore((s) => s.overlay)
   const sessions = useSessions()
   const activeSessionId = useActiveSessionId()
   const spaces = useKnowledgeStore((s) => s.spaces)
@@ -898,18 +900,10 @@ export function AppSidebar() {
       </div>
 
       <SidebarAccountFooter
-        active={
-          activeView === 'settings'
-            ? 'settings'
-            : activeView === 'history'
-              ? 'history'
-              : activeView === 'trash'
-                ? 'trash'
-                : null
-        }
+        active={sidebarFooterActive({ overlay, activeView })}
         historyCount={historyCount}
-        onOpenTrash={() => void openTrashFromChrome()}
-        onOpenHistory={() => void openHistoryFromChrome()}
+        onOpenTrash={() => toggleTrashOverlay()}
+        onOpenHistory={() => toggleHistoryOverlay()}
         onOpenSettings={() => void openSettingsFromChrome()}
       />
     </aside>

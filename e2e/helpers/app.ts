@@ -37,11 +37,19 @@ export async function waitForMainApp(timeoutMs = 60000): Promise<void> {
 }
 
 /**
- * Leave Settings / History special views so later specs see main shell chrome
- * (new-session, surface switch, composer). Shared Tauri process retains activeView.
- * Shell v2: special views leave via sidebar nav (no titlebar-back).
+ * Leave Settings / History / Trash (overlays + residual full-page specials)
+ * so later specs see main shell chrome. Shared Tauri process retains state.
+ * Prefer closeOverlayForE2e; chats-nav only for residual full-page views.
  */
 export async function leaveSpecialViewsIfOpen(): Promise<void> {
+  try {
+    const { closeOverlayForE2e, waitForHipE2E } = await import('./e2e-hooks.js')
+    await waitForHipE2E()
+    await closeOverlayForE2e()
+  } catch {
+    // Bridge may be missing in some harnesses
+  }
+
   for (let i = 0; i < 3; i++) {
     const back = await browser.$('[data-testid="titlebar-back"]')
     const settingsBack = await browser.$('[data-testid="settings-back"]')
@@ -59,7 +67,26 @@ export async function leaveSpecialViewsIfOpen(): Promise<void> {
 
     const settingsPage = await browser.$('[data-testid="settings-page"]')
     const historyPage = await browser.$('[data-testid="session-history"]')
-    if (!(await settingsPage.isExisting()) && !(await historyPage.isExisting())) break
+    const trashPage = await browser.$('[data-testid="recycle-bin-page"]')
+    const historyShell = await browser.$('[data-testid="overlay-shell-history"]')
+    const trashShell = await browser.$('[data-testid="overlay-shell-trash"]')
+    if (
+      !(await settingsPage.isExisting()) &&
+      !(await historyPage.isExisting()) &&
+      !(await trashPage.isExisting()) &&
+      !(await historyShell.isExisting()) &&
+      !(await trashShell.isExisting())
+    ) {
+      break
+    }
+
+    // Overlay still open: try modal-close then footer.
+    const modalClose = await browser.$('[data-testid="modal-close"]')
+    if (await modalClose.isExisting()) {
+      await browser.execute((el: HTMLElement) => el.click(), modalClose)
+      await browser.pause(200)
+      continue
+    }
 
     const chats = await browser.$('[data-testid="sidebar-nav-chats"]')
     if (await chats.isExisting()) {
@@ -73,9 +100,14 @@ export async function leaveSpecialViewsIfOpen(): Promise<void> {
     async () => {
       const settingsPage = await browser.$('[data-testid="settings-page"]')
       const historyPage = await browser.$('[data-testid="session-history"]')
-      return !(await settingsPage.isExisting()) && !(await historyPage.isExisting())
+      const trashPage = await browser.$('[data-testid="recycle-bin-page"]')
+      return (
+        !(await settingsPage.isExisting()) &&
+        !(await historyPage.isExisting()) &&
+        !(await trashPage.isExisting())
+      )
     },
-    { timeout: 10000, interval: 200, timeoutMsg: 'still on settings/history after leaveSpecialViewsIfOpen' },
+    { timeout: 10000, interval: 200, timeoutMsg: 'still on settings/history/trash after leaveSpecialViewsIfOpen' },
   ).catch(() => {
     // Best-effort: some residual dialogs may keep a special view open.
   })

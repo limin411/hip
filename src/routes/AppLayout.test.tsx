@@ -10,7 +10,7 @@ vi.mock('@/components/history/SessionHistory', () => ({ SessionHistory: () => <d
 
 afterEach(() => {
   cleanup()
-  useUiStore.setState({ activeView: 'chat', sidebarOpen: true })
+  useUiStore.setState({ activeView: 'chat', sidebarOpen: true, overlay: null })
 })
 
 vi.mock('react-resizable-panels', () => ({
@@ -71,11 +71,20 @@ describe('AppLayout', () => {
     expect(screen.getByTestId('main-toolbar')).toBeInTheDocument()
   })
 
-  it('renders history view with main toolbar', () => {
-    useUiStore.setState({ activeView: 'history' })
+  it('does not render history as main content when activeView is history', () => {
+    // History is an overlay shell; residual activeView history is not a main branch.
+    useUiStore.setState({ activeView: 'history', overlay: null })
+    render(<AppLayout />, { wrapper: MemoryRouter })
+    expect(screen.queryByTestId('session-history')).not.toBeInTheDocument()
+    expect(screen.getByTestId('main-toolbar')).toBeInTheDocument()
+  })
+
+  it('renders history via OverlayShellHost when overlay is history', () => {
+    useUiStore.setState({ activeView: 'chat', overlay: 'history' })
     render(<AppLayout />, { wrapper: MemoryRouter })
     expect(screen.getByTestId('session-history')).toBeInTheDocument()
-    expect(screen.getByTestId('main-toolbar')).toBeInTheDocument()
+    // Underlying work surface stays chat (no session → new conversation)
+    expect(screen.getByTestId('new-conversation')).toBeInTheDocument()
   })
 
   it('renders knowledge view', () => {

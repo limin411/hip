@@ -30,6 +30,8 @@ vi.mock('./sidebarActions', () => ({
   openSettingsFromChrome: vi.fn(),
   openAutomationFromChrome: vi.fn(),
   openTrashFromChrome: vi.fn(),
+  toggleHistoryOverlay: vi.fn(),
+  toggleTrashOverlay: vi.fn(),
   leaveKnowledge: vi.fn(async () => {}),
   leaveWorkItems: vi.fn(async () => {}),
   openSpaceFromSidebar: vi.fn(),

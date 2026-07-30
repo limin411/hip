@@ -20,7 +20,8 @@ const enterPlaceholderSection = vi.fn(
 const enterTerminalsSection = vi.fn(async (_opts?: { library?: boolean }) => {})
 const enterWorkItemsSection = vi.fn(async () => {})
 const enterAutomationsSection = vi.fn(async () => {})
-const openHistoryFromChrome = vi.fn(async () => {})
+const toggleHistoryOverlay = vi.fn(() => {})
+const toggleTrashOverlay = vi.fn(() => {})
 const newConversationFromSidebar = vi.fn(async (_surface: 'chat' | 'code') => {})
 const selectSessionFromSidebar = vi.fn(async (_id: string) => {})
 
@@ -32,10 +33,12 @@ vi.mock('./sidebarActions', () => ({
   enterTerminalsSection: (opts?: { library?: boolean }) => enterTerminalsSection(opts),
   enterWorkItemsSection: () => enterWorkItemsSection(),
   enterAutomationsSection: () => enterAutomationsSection(),
-  openHistoryFromChrome: () => openHistoryFromChrome(),
+  openHistoryFromChrome: vi.fn(),
   openSettingsFromChrome: vi.fn(),
   openAutomationFromChrome: vi.fn(),
   openTrashFromChrome: vi.fn(),
+  toggleHistoryOverlay: () => toggleHistoryOverlay(),
+  toggleTrashOverlay: () => toggleTrashOverlay(),
   leaveKnowledge: vi.fn(async () => {}),
   leaveWorkItems: vi.fn(async () => {}),
   openSpaceFromSidebar: vi.fn(),
@@ -81,7 +84,8 @@ describe('AppSidebar', () => {
     enterTerminalsSection.mockClear()
     enterWorkItemsSection.mockClear()
     enterAutomationsSection.mockClear()
-    openHistoryFromChrome.mockClear()
+    toggleHistoryOverlay.mockClear()
+    toggleTrashOverlay.mockClear()
     newConversationFromSidebar.mockClear()
     selectSessionFromSidebar.mockClear()
     knowledgeState.spaces = []
@@ -91,6 +95,7 @@ describe('AppSidebar', () => {
       activeView: 'chat',
       sidebarSection: 'chats',
       sidebarOpen: true,
+      overlay: null,
     })
     useDomainStore.setState({
       sessions: [

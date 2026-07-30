@@ -92,8 +92,15 @@ type UnifiedRow =
       triggerKind: string
     }
 
-export function RecycleBinPage() {
+export function RecycleBinPage({
+  embeddedInShell = false,
+}: {
+  /** When true, suppress page-level h2 (shell Modal already shows title). */
+  embeddedInShell?: boolean
+} = {}) {
   const { t } = useTranslation()
+  const overlay = useUiStore((s) => s.overlay)
+  const confirmNested = overlay != null
   const sessions = useTrashListStore((s) => s.sessions)
   const sessionsLoaded = useTrashListStore((s) => s.loaded)
   const retentionRaw = useHipConfigStore((s) => s.config.trash?.retentionDays)
@@ -256,7 +263,11 @@ export function RecycleBinPage() {
   return (
     <div className="flex flex-1 flex-col overflow-y-auto px-6 py-5" data-testid="recycle-bin-page">
       <div className="mb-1 flex items-center justify-between">
-        <h2 className="text-display font-semibold text-ink">{t('trash.title')}</h2>
+        {embeddedInShell ? (
+          <span className="sr-only">{t('trash.title')}</span>
+        ) : (
+          <h2 className="text-display font-semibold text-ink">{t('trash.title')}</h2>
+        )}
         {rows.length > 0 && (
           <Button variant="danger" size="sm" onClick={() => setEmptyOpen(true)}>
             {t('trash.empty')}
@@ -273,6 +284,8 @@ export function RecycleBinPage() {
           className="text-accent-strong underline-offset-2 hover:underline"
           data-testid="recycle-bin-memory-settings-link"
           onClick={() => {
+            // Never leave trash overlay + settings main double-booked.
+            useUiStore.getState().setOverlay(null)
             useUiStore.getState().setSettingsPage('memory')
             useUiStore.getState().setActiveView('settings')
           }}
@@ -510,7 +523,8 @@ export function RecycleBinPage() {
             if (!open) setHardDeleteKey(null)
           }}
           title={t('trash.deleteForeverTitle', { title: hardTarget.title })}
-          className="max-w-sm"
+          variant="confirm"
+          nested={confirmNested}
         >
           <div className="p-5">
             <DialogPrimitive.Description className="text-body text-ink-secondary">
@@ -570,7 +584,8 @@ export function RecycleBinPage() {
             if (!open) setEmptyOpen(false)
           }}
           title={t('trash.emptyConfirmTitle')}
-          className="max-w-sm"
+          variant="confirm"
+          nested={confirmNested}
         >
           <div className="p-5">
             <DialogPrimitive.Description className="text-body text-ink-secondary">

@@ -205,11 +205,24 @@ export async function enterAutomationsSection(): Promise<void> {
   }
 }
 
+/**
+ * Select a session from sidebar / History (row or context-menu Open).
+ * Leaves knowledge/tasks if needed, selects session, records nav.
+ * Dismisses history/trash overlay so the work surface is visible.
+ * Does **not** dismiss settings overlay.
+ */
 export async function selectSessionFromSidebar(id: string): Promise<void> {
   await leaveActiveSurfaceIfNeeded()
   sessionService.selectSession(id)
   recordNavEntry()
+  const o = useUiStore.getState().overlay
+  if (o === 'history' || o === 'trash') {
+    useUiStore.getState().setOverlay(null)
+  }
 }
+
+/** Alias: open session from History shell (same dismiss rules as sidebar select). */
+export const openSessionFromHistory = selectSessionFromSidebar
 
 export async function newConversationFromSidebar(surface: 'chat' | 'code'): Promise<void> {
   await leaveActiveSurfaceIfNeeded()
@@ -251,35 +264,51 @@ export async function openSettingsFromChrome(): Promise<void> {
   recordNavEntry()
 }
 
-export async function openHistoryFromChrome(): Promise<void> {
-  const view = useUiStore.getState().activeView
-  if (view === 'knowledge') {
-    await leaveKnowledge()
-    assignSectionAfterLeavingKnowledge()
-  } else if (view === 'tasks') {
-    await leaveWorkItems()
-    assignSectionAfterLeavingTasks()
-  }
-  useUiStore.getState().setActiveView('history')
-  recordNavEntry()
+/**
+ * Open History overlay shell. No leave-*, no recordNavEntry, no activeView change.
+ * Work surface stays mounted underneath.
+ */
+export function openHistoryOverlay(): void {
+  useUiStore.getState().setOverlay('history')
 }
 
-export async function openTrashFromChrome(): Promise<void> {
-  const view = useUiStore.getState().activeView
-  if (view === 'knowledge') {
-    await leaveKnowledge()
-    assignSectionAfterLeavingKnowledge()
-  } else if (view === 'tasks') {
-    await leaveWorkItems()
-    // Leave tasks list — otherwise filters stay clickable while main is RecycleBin.
-    assignSectionAfterLeavingTasks()
-  }
-  useUiStore.getState().setActiveView('trash')
-  // Opportunistic list + purge
-  void import('@/domain').then(({ sessionService }) => {
-    sessionService.requestTrashList()
+/** Footer / chrome toggle for History (re-click closes). */
+export function toggleHistoryOverlay(): void {
+  useUiStore.getState().toggleOverlay('history')
+}
+
+/**
+ * Open Trash overlay shell. Requests trash list. No leave-*, no recordNavEntry.
+ */
+export function openTrashOverlay(): void {
+  useUiStore.getState().setOverlay('trash')
+  void import('@/domain').then(({ sessionService: svc }) => {
+    svc.requestTrashList()
   })
-  recordNavEntry()
+}
+
+/** Footer / chrome toggle for Trash (re-click closes). */
+export function toggleTrashOverlay(): void {
+  const ui = useUiStore.getState()
+  if (ui.overlay === 'trash') {
+    ui.setOverlay(null)
+    return
+  }
+  openTrashOverlay()
+}
+
+export function closeOverlay(): void {
+  useUiStore.getState().setOverlay(null)
+}
+
+/** @deprecated Prefer openHistoryOverlay / toggleHistoryOverlay — chrome openers now use overlays. */
+export function openHistoryFromChrome(): void {
+  openHistoryOverlay()
+}
+
+/** @deprecated Prefer openTrashOverlay / toggleTrashOverlay. */
+export function openTrashFromChrome(): void {
+  openTrashOverlay()
 }
 
 export async function openAutomationFromChrome(): Promise<void> {

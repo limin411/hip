@@ -37,6 +37,11 @@ vi.mock('@/domain', () => ({
   },
 }))
 
+const selectSessionFromSidebar = vi.fn(async (_id: string) => {})
+vi.mock('@/components/layout/sidebarActions', () => ({
+  selectSessionFromSidebar: (id: string) => selectSessionFromSidebar(id),
+}))
+
 vi.mock('@/components/ui/Tabs', async () => {
   const React = await import('react')
   const TabsContext = React.createContext<{ onValueChange?: (value: string) => void }>({})
@@ -114,10 +119,11 @@ describe('SessionHistory', () => {
     expect(screen.getByText('Session 21')).toBeInTheDocument()
   })
 
-  it('opens session on click', () => {
+  it('opens session on click via selectSessionFromSidebar (closes overlay)', () => {
+    selectSessionFromSidebar.mockClear()
     render(<SessionHistory />)
     fireEvent.click(screen.getByText('Session 5'))
-    expect(sessionService.selectSession).toHaveBeenCalledWith('s5')
+    expect(selectSessionFromSidebar).toHaveBeenCalledWith('s5')
   })
 
   it('shows empty state when filtered results are empty', () => {

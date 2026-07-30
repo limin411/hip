@@ -450,14 +450,19 @@ export class SessionService {
     }
 
     // Cold launch / reconnect with no active session: New Conversation.
-    // Force-clear knowledge/settings/history if a legacy persist left them as activeView.
+    // Force-clear knowledge/settings/history/trash + any residual overlay.
     const st = useUiStore.getState()
-    if (
+    const special =
       st.activeView === 'knowledge' ||
       st.activeView === 'settings' ||
-      st.activeView === 'history'
-    ) {
-      useUiStore.setState({ activeView: 'chat', sidebarSection: 'chats' })
+      st.activeView === 'history' ||
+      st.activeView === 'trash'
+    if (special || st.overlay != null) {
+      useUiStore.setState({
+        activeView: 'chat',
+        sidebarSection: 'chats',
+        overlay: null,
+      })
     }
     useDomainStore.getState().deselect()
   }
@@ -1223,15 +1228,20 @@ export class SessionService {
     useUiStore.getState().setActiveView('settings')
   }
 
-  /** E2E: open Session History via uiStore (sidebar no longer has account menu entry). */
+  /** E2E: open Session History overlay shell. */
   openHistoryPageForE2e(): void {
-    useUiStore.getState().setActiveView('history')
+    useUiStore.getState().setOverlay('history')
   }
 
-  /** E2E: open product Recycle Bin via uiStore. */
+  /** E2E: open product Recycle Bin overlay shell. */
   openTrashPageForE2e(): void {
-    useUiStore.getState().setActiveView('trash')
+    useUiStore.getState().setOverlay('trash')
     this.requestTrashList()
+  }
+
+  /** E2E: close any footer utility overlay shell. */
+  closeOverlayForE2e(): void {
+    useUiStore.getState().setOverlay(null)
   }
 
   /** E2E T2: install failure payload (UI must have submitted form to show error). */
@@ -2549,6 +2559,8 @@ export type HipE2EHooks = {
   openHistoryPageForE2e: () => void
   /** E2E: open Recycle Bin via store. */
   openTrashPageForE2e: () => void
+  /** E2E: close any footer utility overlay. */
+  closeOverlayForE2e: () => void
   simulatePluginInstallError: (error?: string) => void
   /** Cross-session memory (WS via SessionService). */
   getMemoryConfig: () => Promise<MemoryFileConfig>
@@ -2701,6 +2713,7 @@ function installE2eHooks(svc: SessionService): void {
     openSettingsPageForE2e: (page) => svc.openSettingsPageForE2e(page),
     openHistoryPageForE2e: () => svc.openHistoryPageForE2e(),
     openTrashPageForE2e: () => svc.openTrashPageForE2e(),
+    closeOverlayForE2e: () => svc.closeOverlayForE2e(),
     simulatePluginInstallError: (error) => svc.simulatePluginInstallError(error),
     getMemoryConfig: () => svc.getMemoryConfig(),
     setMemoryConfig: (partial) => svc.setMemoryConfig(partial),

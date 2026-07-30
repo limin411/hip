@@ -73,8 +73,13 @@ import {
   leaveWorkItems,
   openAutomationFromChrome,
   openHistoryFromChrome,
+  openHistoryOverlay,
   openSettingsFromChrome,
   openTrashFromChrome,
+  openTrashOverlay,
+  selectSessionFromSidebar,
+  toggleHistoryOverlay,
+  toggleTrashOverlay,
 } from './sidebarActions'
 
 describe('sidebarActions', () => {
@@ -100,6 +105,7 @@ describe('sidebarActions', () => {
       activeView: 'chat',
       previousView: null,
       sidebarSection: 'chats',
+      overlay: null,
     })
   })
 
@@ -264,15 +270,35 @@ describe('sidebarActions', () => {
     expect(useUiStore.getState().sidebarSection).toBe('knowledge')
   })
 
-  it('openHistoryFromChrome uses same flush/section rule', async () => {
+  it('openHistoryOverlay does not leave knowledge / change activeView', () => {
     useUiStore.setState({
       activeView: 'knowledge',
       sidebarSection: 'knowledge',
+      overlay: null,
     })
-    await openHistoryFromChrome()
-    expect(flushSave).toHaveBeenCalled()
-    expect(useUiStore.getState().activeView).toBe('history')
-    expect(useUiStore.getState().sidebarSection).toBe('chats')
+    openHistoryOverlay()
+    expect(flushSave).not.toHaveBeenCalled()
+    expect(useUiStore.getState().activeView).toBe('knowledge')
+    expect(useUiStore.getState().sidebarSection).toBe('knowledge')
+    expect(useUiStore.getState().overlay).toBe('history')
+  })
+
+  it('openHistoryFromChrome opens overlay without leave-flush', () => {
+    useUiStore.setState({
+      activeView: 'knowledge',
+      sidebarSection: 'knowledge',
+      overlay: null,
+    })
+    openHistoryFromChrome()
+    expect(flushSave).not.toHaveBeenCalled()
+    expect(useUiStore.getState().overlay).toBe('history')
+    expect(useUiStore.getState().activeView).toBe('knowledge')
+  })
+
+  it('toggleHistoryOverlay closes when already open', () => {
+    useUiStore.setState({ overlay: 'history', activeView: 'chat' })
+    toggleHistoryOverlay()
+    expect(useUiStore.getState().overlay).toBeNull()
   })
 
   it('handleMainToolbarBack restores knowledge section', async () => {
@@ -370,12 +396,44 @@ describe('sidebarActions', () => {
     expect(useUiStore.getState().sidebarSection).toBe('tasks')
   })
 
-  it('openTrashFromChrome leaves tasks list section (not stuck on WI filters)', async () => {
-    useUiStore.setState({ activeView: 'tasks', sidebarSection: 'tasks' })
-    await openTrashFromChrome()
-    expect(workItemFlushSave).toHaveBeenCalled()
-    expect(useUiStore.getState().activeView).toBe('trash')
-    expect(useUiStore.getState().sidebarSection).toBe('chats')
+  it('openTrashOverlay does not leave tasks / change activeView', () => {
+    useUiStore.setState({ activeView: 'tasks', sidebarSection: 'tasks', overlay: null })
+    openTrashOverlay()
+    expect(workItemFlushSave).not.toHaveBeenCalled()
+    expect(useUiStore.getState().activeView).toBe('tasks')
+    expect(useUiStore.getState().sidebarSection).toBe('tasks')
+    expect(useUiStore.getState().overlay).toBe('trash')
+  })
+
+  it('openTrashFromChrome opens overlay without leave-flush', () => {
+    useUiStore.setState({ activeView: 'tasks', sidebarSection: 'tasks', overlay: null })
+    openTrashFromChrome()
+    expect(workItemFlushSave).not.toHaveBeenCalled()
+    expect(useUiStore.getState().overlay).toBe('trash')
+    expect(useUiStore.getState().activeView).toBe('tasks')
+  })
+
+  it('toggleTrashOverlay closes when already open', () => {
+    useUiStore.setState({ overlay: 'trash', activeView: 'chat' })
+    toggleTrashOverlay()
+    expect(useUiStore.getState().overlay).toBeNull()
+  })
+
+  it('selectSessionFromSidebar dismisses history overlay but not settings', async () => {
+    useUiStore.setState({ overlay: 'history', activeView: 'chat' })
+    await selectSessionFromSidebar('s1')
+    expect(selectSession).toHaveBeenCalledWith('s1')
+    expect(useUiStore.getState().overlay).toBeNull()
+
+    useUiStore.setState({ overlay: 'settings', activeView: 'chat' })
+    await selectSessionFromSidebar('s1')
+    expect(useUiStore.getState().overlay).toBe('settings')
+  })
+
+  it('selectSessionFromSidebar dismisses trash overlay', async () => {
+    useUiStore.setState({ overlay: 'trash', activeView: 'chat' })
+    await selectSessionFromSidebar('s1')
+    expect(useUiStore.getState().overlay).toBeNull()
   })
 
   it('assignSectionAfterLeavingKnowledge uses active session surface', () => {

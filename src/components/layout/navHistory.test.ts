@@ -146,4 +146,38 @@ describe('navHistory helpers', () => {
     expect(workItemFlushSave).not.toHaveBeenCalled()
     expect(useUiStore.getState().activeView).toBe('tasks')
   })
+
+  it('applyNavEntry always clears overlay', async () => {
+    useUiStore.setState({
+      activeView: 'chat',
+      sidebarSection: 'chats',
+      overlay: 'history',
+    })
+    const entry: NavEntry = {
+      ...captureNavEntry(),
+      activeView: 'chat',
+      sidebarSection: 'chats',
+      sessionId: null,
+    }
+    await applyNavEntry(entry)
+    expect(useUiStore.getState().overlay).toBeNull()
+  })
+
+  it('applyNavEntry legacy history frame reopens as overlay over work surface', async () => {
+    useUiStore.setState({
+      activeView: 'chat',
+      sidebarSection: 'chats',
+      overlay: null,
+    })
+    const entry: NavEntry = {
+      ...captureNavEntry(),
+      activeView: 'history',
+      sidebarSection: 'chats',
+      sessionId: null,
+    }
+    await applyNavEntry(entry)
+    expect(useUiStore.getState().overlay).toBe('history')
+    expect(useUiStore.getState().activeView).toBe('chat')
+    expect(useUiStore.getState().sidebarSection).toBe('chats')
+  })
 })

@@ -363,8 +363,13 @@ export function buildGlobalCommandGroups(
       keywords: ['sessions', 'past', '历史', '歷史'],
       group: 'navigation',
       run: () => {
+        // Overlay openers (no leave-flush / no activeView history).
         if (ctx.openHistoryFromChrome) void ctx.openHistoryFromChrome()
-        else ctx.setActiveView('history')
+        else {
+          void import('@/components/layout/sidebarActions').then(({ openHistoryOverlay }) => {
+            openHistoryOverlay()
+          })
+        }
       },
     },
     {
@@ -375,7 +380,11 @@ export function buildGlobalCommandGroups(
       group: 'navigation',
       run: () => {
         if (ctx.openTrashFromChrome) void ctx.openTrashFromChrome()
-        else ctx.setActiveView('trash')
+        else {
+          void import('@/components/layout/sidebarActions').then(({ openTrashOverlay }) => {
+            openTrashOverlay()
+          })
+        }
       },
     },
     {

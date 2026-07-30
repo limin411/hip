@@ -3,6 +3,7 @@ import * as DialogPrimitive from '@radix-ui/react-dialog'
 import { Modal } from '@/components/ui/Modal'
 import { Button } from '@/components/ui/Button'
 import { useHipConfigStore } from '@/store/hipConfigStore'
+import { useUiStore } from '@/store/uiStore'
 import { resolveTrashRetentionDays } from '@/lib/trashRetention'
 
 export type ClearAllScope = 'all' | 'chat' | 'code' | 'search'
@@ -23,6 +24,7 @@ export function ClearAllSessionsDialog({
   onCancel,
 }: ClearAllSessionsDialogProps) {
   const { t } = useTranslation()
+  const nested = useUiStore((s) => s.overlay != null)
   const scopeLabel = t(`history.clearAllScope.${scope}`)
   const days = resolveTrashRetentionDays(useHipConfigStore((s) => s.config.trash?.retentionDays))
   return (
@@ -33,6 +35,7 @@ export function ClearAllSessionsDialog({
       }}
       title={t('history.clearAllConfirmTitle')}
       variant="confirm"
+      nested={nested}
     >
       <div className="p-5">
         <DialogPrimitive.Description className="text-body text-ink-secondary">

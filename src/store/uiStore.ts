@@ -8,10 +8,14 @@ import {
   clampSidebarWidth,
   SIDEBAR_WIDTH_DEFAULT,
 } from '@/components/layout/sidebarWidth'
+import { coerceWorkSurfaceFromUi } from '@/lib/overlayNav'
 // Lazy helpers used only inside closeKnowledgeView to avoid circular init issues
 // are imported dynamically in that method.
 
 export type ArtifactTab = 'files' | 'agents' | 'tasks' | 'outline' | 'timeline' | 'changes' | 'terminal'
+
+/** Footer utility shells (ephemeral — not persisted). */
+export type AppOverlay = 'history' | 'trash' | 'settings'
 
 export type ActiveView =
   | 'chat'
@@ -235,6 +239,15 @@ interface UiState {
   setActiveView: (v: ActiveView) => void
   previousView: ActiveView | null
 
+  /**
+   * Ephemeral footer utility shell (history / trash / settings).
+   * Not persisted; independent of activeView (work surface).
+   */
+  overlay: AppOverlay | null
+  setOverlay: (o: AppOverlay | null) => void
+  /** Toggle: if already open, close; else open. */
+  toggleOverlay: (o: AppOverlay) => void
+
   /** Left sidebar section highlight (not persisted; cold launch 'chats'). */
   sidebarSection: SidebarSection
   setSidebarSection: (s: SidebarSection) => void
@@ -336,6 +349,46 @@ export const useUiStore = create<UiState>()(
             activeView: v,
             previousView: enteringSpecial ? s.activeView : leavingSpecial ? null : s.previousView,
           }
+        }),
+
+      overlay: null,
+      setOverlay: (o) =>
+        set((s) => {
+          if (s.overlay === o) return s
+          // Migration safety: opening an overlay while residual special activeView
+          // is set remaps the main column to a real work surface (no double-booking).
+          if (
+            o != null &&
+            (s.activeView === 'history' ||
+              s.activeView === 'trash' ||
+              s.activeView === 'settings')
+          ) {
+            const surface = coerceWorkSurfaceFromUi(s)
+            return {
+              overlay: o,
+              activeView: surface.view,
+              sidebarSection: surface.section,
+            }
+          }
+          return { overlay: o }
+        }),
+      toggleOverlay: (o) =>
+        set((s) => {
+          if (s.overlay === o) return { overlay: null }
+          // Same coerce as setOverlay when opening over residual special view.
+          if (
+            s.activeView === 'history' ||
+            s.activeView === 'trash' ||
+            s.activeView === 'settings'
+          ) {
+            const surface = coerceWorkSurfaceFromUi(s)
+            return {
+              overlay: o,
+              activeView: surface.view,
+              sidebarSection: surface.section,
+            }
+          }
+          return { overlay: o }
         }),
 
       sidebarSection: 'chats',
@@ -445,5 +498,5 @@ export const useUiStore = create<UiState>()(
  * Nav history is seeded separately from AppLayout (see seedNavHistoryIfEmpty).
  */
 export function applyColdLaunchShell(): void {
-  useUiStore.setState({ activeView: 'chat', sidebarSection: 'chats' })
+  useUiStore.setState({ activeView: 'chat', sidebarSection: 'chats', overlay: null })
 }

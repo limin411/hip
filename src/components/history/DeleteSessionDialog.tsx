@@ -4,6 +4,7 @@ import * as DialogPrimitive from '@radix-ui/react-dialog'
 import { Modal } from '@/components/ui/Modal'
 import { Button } from '@/components/ui/Button'
 import { useHipConfigStore } from '@/store/hipConfigStore'
+import { useUiStore } from '@/store/uiStore'
 import { resolveTrashRetentionDays } from '@/lib/trashRetention'
 
 export interface DeleteSessionDialogProps {
@@ -14,6 +15,7 @@ export interface DeleteSessionDialogProps {
 
 export function DeleteSessionDialog({ title, onConfirm, onCancel }: DeleteSessionDialogProps) {
   const { t } = useTranslation()
+  const nested = useUiStore((s) => s.overlay != null)
   const [deleteDerivedMemories, setDeleteDerivedMemories] = useState(false)
   const retentionDays = resolveTrashRetentionDays(
     useHipConfigStore((s) => s.config.trash?.retentionDays),
@@ -27,6 +29,7 @@ export function DeleteSessionDialog({ title, onConfirm, onCancel }: DeleteSessio
       }}
       title={t('history.deleteSessionConfirmTitle', { title })}
       variant="confirm"
+      nested={nested}
     >
       <div className="p-5">
         <DialogPrimitive.Description className="text-body text-ink-secondary">

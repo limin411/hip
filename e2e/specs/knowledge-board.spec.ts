@@ -1,5 +1,5 @@
 /**
- * Knowledge whiteboard (Excalidraw board) e2e smoke.
+ * Knowledge whiteboard (hip SVG board) e2e smoke.
  * Tags: @knowledge @core
  *
  * Headless freehand strokes are flaky — we assert create + canvas mount +
@@ -99,16 +99,15 @@ describe('knowledge whiteboard e2e smoke @knowledge @core', () => {
     const boards = await listKnowledgeBoardTestIds()
     expect(boards.some((tid) => tid.includes(boardId))).toBe(true)
 
-    // createBoard writes empty dehydrated scene immediately
+    // createBoard writes empty dehydrated hip-board scene immediately
     const diskPath = await waitForBoardFileOnDisk(boardId, 15000)
+    expect(diskPath.endsWith('.board.json') || diskPath.endsWith('.excalidraw')).toBe(true)
     const raw = fs.readFileSync(diskPath, 'utf8')
-    expect(raw).toContain('"type":"excalidraw"')
+    expect(raw).toContain('"type":"hip-board"')
     expect(raw).toContain('"source":"hip"')
   })
 
-  it('KB2: Excalidraw engine mounts inside board canvas host', async () => {
-    // Freehand strokes stay out of scope; wait until the lazy Excalidraw chunk
-    // paints a real engine surface under knowledge-board-canvas.
+  it('KB2: hip SVG engine mounts inside board canvas host', async () => {
     await waitForKnowledgeBoardCanvas(20000)
     const host = await browser.$('[data-testid="knowledge-board-canvas"]')
     expect(await host.isExisting()).toBe(true)
@@ -120,15 +119,14 @@ describe('knowledge whiteboard e2e smoke @knowledge @core', () => {
           const root = document.querySelector('[data-testid="knowledge-board-canvas"]')
           if (!root) return false
           return Boolean(
-            root.querySelector('canvas') ||
-              root.querySelector('.excalidraw') ||
-              root.querySelector('[class*="excalidraw"]'),
+            root.querySelector('[data-testid="hip-board-svg"]') ||
+              root.querySelector('svg'),
           )
         }),
       {
         timeout: 20000,
         interval: 300,
-        timeoutMsg: 'Excalidraw engine DOM not mounted under knowledge-board-canvas',
+        timeoutMsg: 'hip board SVG not mounted under knowledge-board-canvas',
       },
     )
   })
@@ -141,8 +139,8 @@ describe('knowledge whiteboard e2e smoke @knowledge @core', () => {
     await expectTreeContains(docTitle, 10000)
 
     const scene = JSON.stringify({
-      type: 'excalidraw',
-      version: 2,
+      type: 'hip-board',
+      version: 1,
       source: 'hip',
       hip: { schemaVersion: 1, boardId },
       elements: [],
@@ -177,11 +175,11 @@ describe('knowledge whiteboard e2e smoke @knowledge @core', () => {
     }
     await waitForKnowledgeBoardCanvas(20000)
 
-    exportJson = path.join(os.tmpdir(), `hip-e2e-board-export-${Date.now()}.excalidraw`)
+    exportJson = path.join(os.tmpdir(), `hip-e2e-board-export-${Date.now()}.board.json`)
     await exportActiveBoardJsonTo(exportJson)
     const exported = fs.readFileSync(exportJson, 'utf8')
     expect(exported.length).toBeGreaterThan(0)
-    expect(exported).toContain('"type":"excalidraw"')
+    expect(exported).toContain('"type":"hip-board"')
     expect(exported).toContain('"source":"hip"')
     // Prefer content marker when engine / flush preserved appState.
     if (exported.includes(bgMarker)) {

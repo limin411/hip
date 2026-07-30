@@ -83,9 +83,12 @@ vi.mock('./HipBoardCanvas', async () => {
         getSelectedIds: () => [],
         getElements: () => [],
         getFilesRel: () => ({}),
+        getPendingImportIds: () => [],
+        getRuntimeImageUrl: () => undefined,
         getHistoryPastLength: () => 0,
         undo: () => {},
         redo: () => {},
+        insertImageFiles: async () => {},
       }
       useImperativeHandle(ref, () => handle)
       // Keep a side-channel for assertions if needed

@@ -16,17 +16,3 @@ Whisper model weights are subject to the OpenAI Whisper model license /
 use terms as redistributed by the Hugging Face ggerganov/whisper.cpp repo.
 Models are downloaded on demand to ~/.hip/models/whisper/ and are not
 shipped in the hip application package.
-
----
-
-Whiteboard (knowledge board) UI embeds @excalidraw/excalidraw (MIT License)
-  https://github.com/excalidraw/excalidraw
-  npm: @excalidraw/excalidraw@0.18.1
-
-Excalidraw fonts are self-hosted under public/excalidraw-assets/fonts
-(copied from the package dist/prod/fonts via scripts/copy-excalidraw-assets.mjs)
-so offline Tauri builds do not load CDN fonts. Individual typefaces are
-typically under the SIL Open Font License (OFL) or similar free font licenses
-as redistributed by the Excalidraw project (e.g. Virgil, Excalifont, Cascadia,
-Assistant, Nunito, Lilita, Comic Shanns, Liberation, Xiaolai). See
-public/excalidraw-assets/FONTS-LICENSE.txt.

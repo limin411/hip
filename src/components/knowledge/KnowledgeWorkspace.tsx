@@ -75,7 +75,6 @@ import {
   HipBoardCanvas,
   type HipBoardCanvasHandle,
 } from './HipBoardCanvas'
-import type { KnowledgeBoardCanvasHandle } from './KnowledgeBoardCanvas'
 import { InlineDocTitle } from './InlineDocTitle'
 import { DocPropertiesRow } from './DocPropertiesRow'
 import { MarkdownToolbar } from './MarkdownToolbar'
@@ -167,7 +166,7 @@ export function KnowledgeWorkspace() {
   /** Live host handle for attach/paste (PR-2); wired now for insertMarkdown. */
   const liveEditorRef = useRef<DocLiveEditorHandle>(null)
   /** Board canvas handle — Workspace-only beforeOpenDocFlush (KD-9); sync flushToStore (KD-13). */
-  const boardCanvasRef = useRef<HipBoardCanvasHandle | KnowledgeBoardCanvasHandle>(null)
+  const boardCanvasRef = useRef<HipBoardCanvasHandle>(null)
   const [treeFilter, setTreeFilter] = useState('')
   const [filterExpandSnapshot, setFilterExpandSnapshot] = useState<Record<
     string,

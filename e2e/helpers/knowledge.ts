@@ -1265,21 +1265,15 @@ export async function createNewDocFromMenu(): Promise<void> {
 
 // ── Whiteboard (board kind) helpers ───────────────────────────────────────
 
-/** Wait until the board canvas host is mounted (Excalidraw chunk may still be loading). */
+/** Wait until the hip board canvas host is mounted. */
 export async function waitForKnowledgeBoardCanvas(timeoutMs = 30000): Promise<void> {
   await browser.waitUntil(
     async () => {
       const canvas = await browser.$('[data-testid="knowledge-board-canvas"]')
       if (await canvas.isExisting()) return true
-      // Accept transient loading shell while hydrate / chunk resolves.
-      const loading = await browser.$('[data-testid="knowledge-board-loading"]')
-      const chunk = await browser.$('[data-testid="knowledge-board-chunk-loading"]')
+      // Accept transient Suspense fallback while canvas mounts.
       const suspense = await browser.$('[data-testid="knowledge-board-suspense"]')
-      return (
-        (await loading.isExisting()) ||
-        (await chunk.isExisting()) ||
-        (await suspense.isExisting())
-      )
+      return await suspense.isExisting()
     },
     {
       timeout: timeoutMs,
@@ -1335,14 +1329,19 @@ export async function createBoardAndExpectCanvas(): Promise<string> {
   return boardId
 }
 
-/** Resolve on-disk path for a board id under HIP_DATA_DIR/knowledge. */
+/** Resolve on-disk path for a board id under HIP_DATA_DIR/knowledge.
+ * Prefers primary `.board.json`, falls back to legacy `.excalidraw`.
+ */
 export function findBoardPathOnDisk(boardId: string): string | null {
   const root = knowledgeRootOnDisk()
   if (!fs.existsSync(root)) return null
   for (const ent of fs.readdirSync(root, { withFileTypes: true })) {
     if (!ent.isDirectory() || !ent.name.startsWith('spc_')) continue
-    const candidate = path.join(root, ent.name, 'boards', `${boardId}.excalidraw`)
-    if (fs.existsSync(candidate)) return candidate
+    const boardsDir = path.join(root, ent.name, 'boards')
+    const primary = path.join(boardsDir, `${boardId}.board.json`)
+    if (fs.existsSync(primary)) return primary
+    const legacy = path.join(boardsDir, `${boardId}.excalidraw`)
+    if (fs.existsSync(legacy)) return legacy
   }
   return null
 }
@@ -1386,7 +1385,8 @@ export async function waitForBoardBodyOnDisk(
         const boardsDir = path.join(root, ent.name, 'boards')
         if (!fs.existsSync(boardsDir)) continue
         for (const f of fs.readdirSync(boardsDir)) {
-          if (!f.endsWith('.excalidraw')) continue
+          // Dual-ext: primary .board.json or legacy .excalidraw
+          if (!f.endsWith('.board.json') && !f.endsWith('.excalidraw')) continue
           const full = path.join(boardsDir, f)
           try {
             if (fs.readFileSync(full, 'utf8').includes(marker)) {
@@ -1403,7 +1403,7 @@ export async function waitForBoardBodyOnDisk(
     {
       timeout: timeoutMs,
       interval: 300,
-      timeoutMsg: `no board .excalidraw on disk contains: ${marker}`,
+      timeoutMsg: `no board .board.json/.excalidraw on disk contains: ${marker}`,
     },
   )
   return found

@@ -1263,6 +1263,221 @@ export async function createNewDocFromMenu(): Promise<void> {
   await browser.pause(200)
 }
 
+// ── Whiteboard (board kind) helpers ───────────────────────────────────────
+
+/** Wait until the board canvas host is mounted (Excalidraw chunk may still be loading). */
+export async function waitForKnowledgeBoardCanvas(timeoutMs = 30000): Promise<void> {
+  await browser.waitUntil(
+    async () => {
+      const canvas = await browser.$('[data-testid="knowledge-board-canvas"]')
+      if (await canvas.isExisting()) return true
+      // Accept transient loading shell while hydrate / chunk resolves.
+      const loading = await browser.$('[data-testid="knowledge-board-loading"]')
+      const chunk = await browser.$('[data-testid="knowledge-board-chunk-loading"]')
+      const suspense = await browser.$('[data-testid="knowledge-board-suspense"]')
+      return (
+        (await loading.isExisting()) ||
+        (await chunk.isExisting()) ||
+        (await suspense.isExisting())
+      )
+    },
+    {
+      timeout: timeoutMs,
+      interval: 200,
+      timeoutMsg: 'knowledge board surface not present',
+    },
+  )
+  const canvas = await browser.$('[data-testid="knowledge-board-canvas"]')
+  await canvas.waitForExist({ timeout: timeoutMs })
+}
+
+/** Active board id from canvas `data-board-id`, or selected tree row. */
+export async function getActiveBoardId(): Promise<string | null> {
+  return browser.execute(() => {
+    const canvas = document.querySelector(
+      '[data-testid="knowledge-board-canvas"]',
+    ) as HTMLElement | null
+    const fromCanvas = canvas?.getAttribute('data-board-id')
+    if (fromCanvas?.startsWith('brd_')) return fromCanvas
+    const row = document.querySelector(
+      '[data-testid^="knowledge-tree-board-"][aria-selected="true"]',
+    ) as HTMLElement | null
+    const tid = row?.getAttribute('data-testid')
+    if (!tid?.startsWith('knowledge-tree-board-')) return null
+    return tid.slice('knowledge-tree-board-'.length)
+  })
+}
+
+/** All board row testids currently in the tree. */
+export async function listKnowledgeBoardTestIds(): Promise<string[]> {
+  return browser.execute(() =>
+    Array.from(document.querySelectorAll('[data-testid^="knowledge-tree-board-"]'))
+      .map((el) => el.getAttribute('data-testid') ?? '')
+      .filter(Boolean),
+  )
+}
+
+/**
+ * Create a whiteboard via tree blank-area context menu and wait for canvas mount.
+ * Prefer empty-state CTA when present (no active leaf).
+ */
+export async function createBoardAndExpectCanvas(): Promise<string> {
+  const emptyBtn = await browser.$('[data-testid="knowledge-empty-new-board"]')
+  if (await emptyBtn.isExisting()) {
+    await browser.execute((node: HTMLElement) => node.click(), emptyBtn)
+  } else {
+    await openContextMenu('[data-testid="knowledge-tree-pane"]')
+    await clickContextMenuItem('knowledgeTree.newBoard')
+  }
+  await waitForKnowledgeBoardCanvas(30000)
+  const boardId = await getActiveBoardId()
+  if (!boardId) throw new Error('createBoard: no active board id after create')
+  return boardId
+}
+
+/** Resolve on-disk path for a board id under HIP_DATA_DIR/knowledge. */
+export function findBoardPathOnDisk(boardId: string): string | null {
+  const root = knowledgeRootOnDisk()
+  if (!fs.existsSync(root)) return null
+  for (const ent of fs.readdirSync(root, { withFileTypes: true })) {
+    if (!ent.isDirectory() || !ent.name.startsWith('spc_')) continue
+    const candidate = path.join(root, ent.name, 'boards', `${boardId}.excalidraw`)
+    if (fs.existsSync(candidate)) return candidate
+  }
+  return null
+}
+
+/** Wait until board file exists on disk (createBoard writes empty scene). */
+export async function waitForBoardFileOnDisk(
+  boardId: string,
+  timeoutMs = 15000,
+): Promise<string> {
+  let found = ''
+  await browser.waitUntil(
+    async () => {
+      const p = findBoardPathOnDisk(boardId)
+      if (p && fs.existsSync(p)) {
+        found = p
+        return true
+      }
+      return false
+    },
+    {
+      timeout: timeoutMs,
+      interval: 250,
+      timeoutMsg: `board file not on disk: ${boardId}`,
+    },
+  )
+  return found
+}
+
+/** Wait until some board file on disk contains marker text. */
+export async function waitForBoardBodyOnDisk(
+  marker: string,
+  timeoutMs = 15000,
+): Promise<string> {
+  let found = ''
+  await browser.waitUntil(
+    async () => {
+      const root = knowledgeRootOnDisk()
+      if (!fs.existsSync(root)) return false
+      for (const ent of fs.readdirSync(root, { withFileTypes: true })) {
+        if (!ent.isDirectory() || !ent.name.startsWith('spc_')) continue
+        const boardsDir = path.join(root, ent.name, 'boards')
+        if (!fs.existsSync(boardsDir)) continue
+        for (const f of fs.readdirSync(boardsDir)) {
+          if (!f.endsWith('.excalidraw')) continue
+          const full = path.join(boardsDir, f)
+          try {
+            if (fs.readFileSync(full, 'utf8').includes(marker)) {
+              found = full
+              return true
+            }
+          } catch {
+            // mid-write
+          }
+        }
+      }
+      return false
+    },
+    {
+      timeout: timeoutMs,
+      interval: 300,
+      timeoutMsg: `no board .excalidraw on disk contains: ${marker}`,
+    },
+  )
+  return found
+}
+
+/**
+ * Write dehydrated scene JSON into a board file on disk.
+ * Prefer while board is not the dirty active leaf (or right after create with
+ * clean empty draft) so a subsequent openDoc re-reads without flush clobber.
+ */
+export function writeBoardBodyOnDisk(boardId: string, body: string): string {
+  const p = findBoardPathOnDisk(boardId)
+  if (!p) throw new Error(`board file not found on disk for ${boardId}`)
+  fs.writeFileSync(p, body, 'utf8')
+  return p
+}
+
+/** Open a tree board row by title (or partial title match). */
+export async function openTreeBoardByTitle(title: string): Promise<void> {
+  const boardId = await browser.waitUntil(
+    async () => {
+      return browser.execute((t: string) => {
+        const rows = Array.from(
+          document.querySelectorAll('[data-testid^="knowledge-tree-board-"]'),
+        ) as HTMLElement[]
+        const row = rows.find((r) => (r.textContent ?? '').includes(t))
+        const tid = row?.getAttribute('data-testid')
+        if (!tid?.startsWith('knowledge-tree-board-')) return null
+        return tid.slice('knowledge-tree-board-'.length)
+      }, title)
+    },
+    {
+      timeout: 15000,
+      interval: 300,
+      timeoutMsg: `tree board not found: ${title}`,
+    },
+  )
+  if (!boardId || typeof boardId !== 'string') {
+    throw new Error(`tree board id missing for title: ${title}`)
+  }
+  const viaHook = await browser.execute(async (id: string) => {
+    const hooks = (
+      window as unknown as {
+        __hipE2E?: { knowledgeOpenDoc?: (docId: string) => Promise<void> }
+      }
+    ).__hipE2E
+    if (!hooks?.knowledgeOpenDoc) return false
+    await hooks.knowledgeOpenDoc(id)
+    return true
+  }, boardId)
+  if (!viaHook) {
+    await browser.execute((id: string) => {
+      const row = document.querySelector(
+        `[data-testid="knowledge-tree-board-${id}"]`,
+      ) as HTMLElement | null
+      const btn = row?.querySelector('button') as HTMLElement | null
+      ;(btn ?? row)?.click()
+    }, boardId)
+  }
+  await waitForKnowledgeBoardCanvas(20000)
+}
+
+/** Export active whiteboard JSON via board menu + save-path seam. */
+export async function exportActiveBoardJsonTo(destPath: string): Promise<void> {
+  await installSavePathSeam(destPath)
+  await waitForKnowledgeBoardCanvas(20000)
+  await browser.pause(300)
+  await clickMenuItem('knowledge-board-menu', 'knowledge-export-board-json')
+  await browser.waitUntil(
+    async () => fs.existsSync(destPath) && fs.statSync(destPath).size > 0,
+    { timeout: 15000, interval: 300, timeoutMsg: `export board json not written: ${destPath}` },
+  )
+}
+
 // ── Phase 1 + Live helpers (Batch E–F) ────────────────────────────────────
 
 /** Attachment file picker seam (`pickAttachmentFiles`). */

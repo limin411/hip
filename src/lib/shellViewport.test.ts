@@ -63,14 +63,12 @@ describe('gutters', () => {
   })
 
   it('A uses 4% of viewport clamped into [32,64]×[28,56]', () => {
-    // 1280×800: 0.04*1280=51.2 → 51, 0.04*800=32 → 32
+    // Golden: 0.04*1280=51.2 → 51, 0.04*800=32 → 32
     expect(gutters(1280, 800)).toEqual({ gx: 51, gy: 32 })
     // very large: caps at 64 / 56
     expect(gutters(2000, 2000)).toEqual({ gx: 64, gy: 56 })
-    // just over A floor but small 4%: still floors at 32 / 28
-    // 1280 is already above floor for gx; for a viewport that is A but 4% < floor:
-    // need W≥1280, H≥800, 0.04*W < 32 → W < 800 — impossible. Floors always hit only via clampNum.
-    // At exactly A boundary we already checked.
+    // Note: lower clamps 32/28 are unreachable on true A (W≥1280 → 4%W≥51.2;
+    // H≥800 → 4%H≥32). Upper caps 64/56 are reachable. Design-as-specified.
   })
 })
 
@@ -91,11 +89,8 @@ describe('shellSize', () => {
   it('600×500 → D, no overflow (fills within 4px gutters)', () => {
     const size = shellSize(600, 500, 'settings')
     expectWithinBounds(size, 600, 500)
-    // max = 600-8=592, 500-8=492; floor min = min(480,max)
-    expect(size).toEqual({
-      width: Math.round(clampNum(Math.min(FLOOR.width, 592), Math.min(1100, 0.62 * 600), 592)),
-      height: Math.round(clampNum(Math.min(FLOOR.height, 492), Math.min(780, 0.72 * 500), 492)),
-    })
+    // Golden independent of helper reimplementation
+    expect(size).toEqual({ width: 480, height: 360 })
   })
 
   it('defaults kind to settings', () => {
@@ -133,75 +128,80 @@ describe('shellSize', () => {
     expect(Number.isInteger(size.height)).toBe(true)
   })
 
-  it('respects FLOOR when viewport allows', () => {
-    // large enough that max ≥ FLOOR and ideal can be below floor on tiny ideal —
-    // force via clampSize path: ideal is usually above floor; check min bound via clampSizeToViewport.
-    const huge: Size = { width: 10, height: 10 }
-    const clamped = clampSizeToViewport(huge, 1280, 800)
-    expect(clamped.width).toBe(FLOOR.width)
-    expect(clamped.height).toBe(FLOOR.height)
+  it('raises ideal to FLOOR when ideal < FLOOR ≤ max', () => {
+    // 720×560 settings: idealW = min(1100, 0.62*720) = 446.4 → floor to 480
+    // idealH = min(780, 0.72*560) = 403.2 → stays above floor height
+    const size = shellSize(720, 560, 'settings')
+    expect(size.width).toBe(FLOOR.width)
+    expect(size.height).toBe(403)
   })
 
   it('drops floor when max is smaller than FLOOR', () => {
-    // maxW = 400 - 8 = 392 < 480
+    // maxW = 400 - 8 = 392 < 480; maxH = 300 - 8 = 292 < 360
     const size = shellSize(400, 300, 'settings')
-    expect(size.width).toBeLessThanOrEqual(392)
-    expect(size.width).toBe(392) // ideal and max both push to max
+    expect(size.width).toBe(392)
+    expect(size.height).toBe(292)
   })
 
-  it('matches exact formula on 1280×800 settings', () => {
-    const w = 1280
-    const h = 800
-    const { gx, gy } = gutters(w, h)
-    const maxW = w - 2 * gx
-    const maxH = h - 2 * gy
-    const idealW = Math.min(1100, 0.62 * w)
-    const idealH = Math.min(780, 0.72 * h)
-    expect(shellSize(w, h, 'settings')).toEqual({
-      width: Math.round(clampNum(Math.min(FLOOR.width, maxW), idealW, maxW)),
-      height: Math.round(clampNum(Math.min(FLOOR.height, maxH), idealH, maxH)),
-    })
-  })
-
-  it('matches exact formula on 1280×800 history', () => {
-    const w = 1280
-    const h = 800
-    const { gx, gy } = gutters(w, h)
-    const maxW = w - 2 * gx
-    const maxH = h - 2 * gy
-    const idealW = Math.min(960, 0.55 * w)
-    const idealH = Math.min(720, 0.68 * h)
-    expect(shellSize(w, h, 'history')).toEqual({
-      width: Math.round(clampNum(Math.min(FLOOR.width, maxW), idealW, maxW)),
-      height: Math.round(clampNum(Math.min(FLOOR.height, maxH), idealH, maxH)),
-    })
+  // Hard-coded goldens (independent of clampNum/gutters reimplementation)
+  it.each([
+    {
+      label: '1280×800 settings',
+      w: 1280,
+      h: 800,
+      kind: 'settings' as const,
+      size: { width: 794, height: 576 },
+    },
+    {
+      label: '1280×800 history',
+      w: 1280,
+      h: 800,
+      kind: 'history' as const,
+      size: { width: 704, height: 544 },
+    },
+    {
+      label: '1000×700 settings',
+      w: 1000,
+      h: 700,
+      kind: 'settings' as const,
+      size: { width: 620, height: 504 },
+    },
+    {
+      label: '1800×1100 settings',
+      w: 1800,
+      h: 1100,
+      kind: 'settings' as const,
+      size: { width: 1100, height: 780 },
+    },
+  ])('golden $label', ({ w, h, kind, size }) => {
+    expect(shellSize(w, h, kind)).toEqual(size)
   })
 })
 
 describe('clampSizeToViewport', () => {
   it('shrinks oversized shells', () => {
     const size = clampSizeToViewport({ width: 5000, height: 5000 }, 1000, 700)
-    const { gx, gy } = gutters(1000, 700)
     expect(size).toEqual({
-      width: 1000 - 2 * gx,
-      height: 700 - 2 * gy,
+      width: 1000 - 2 * 24,
+      height: 700 - 2 * 20,
     })
   })
 
   it('raises undersized shells to floor when space allows', () => {
     const size = clampSizeToViewport({ width: 100, height: 100 }, 1280, 800)
-    expect(size).toEqual(FLOOR)
+    expect(size).toEqual({ width: 480, height: 360 })
   })
 
   it('does not exceed max when floor is larger than max', () => {
     const size = clampSizeToViewport({ width: 10, height: 10 }, 400, 300)
-    expect(size.width).toBeLessThanOrEqual(400 - 8)
-    expect(size.height).toBeLessThanOrEqual(300 - 8)
+    expect(size.width).toBe(392)
+    expect(size.height).toBe(292)
   })
 })
 
 describe('FLOOR', () => {
-  it('is 480×360', () => {
+  it('is 480×360 and frozen', () => {
     expect(FLOOR).toEqual({ width: 480, height: 360 })
+    expect(Object.isFrozen(FLOOR)).toBe(true)
   })
 })

@@ -7,7 +7,7 @@ export type ViewportTier = 'A' | 'B' | 'C' | 'D'
 export type Size = { width: number; height: number }
 
 /** Preferred minimum shell size; reduced when viewport max is smaller. */
-export const FLOOR: Size = { width: 480, height: 360 }
+export const FLOOR: Readonly<Size> = Object.freeze({ width: 480, height: 360 })
 
 /** Clamp `v` into [min, max]. If max < min, returns max (degenerate viewport). */
 export function clampNum(min: number, v: number, max: number): number {
@@ -31,12 +31,18 @@ export function classifyTier(w: number, h: number): ViewportTier {
 
 /** Horizontal / vertical margin per side for the active tier. */
 export function gutters(w: number, h: number): { gx: number; gy: number } {
-  if (w < 720 || h < 560) return { gx: 4, gy: 4 }
-  if (w < 1000 || h < 700) return { gx: 10, gy: 10 }
-  if (w < 1280 || h < 800) return { gx: 24, gy: 20 }
-  return {
-    gx: Math.round(clampNum(32, 0.04 * w, 64)),
-    gy: Math.round(clampNum(28, 0.04 * h, 56)),
+  switch (classifyTier(w, h)) {
+    case 'D':
+      return { gx: 4, gy: 4 }
+    case 'C':
+      return { gx: 10, gy: 10 }
+    case 'B':
+      return { gx: 24, gy: 20 }
+    case 'A':
+      return {
+        gx: Math.round(clampNum(32, 0.04 * w, 64)),
+        gy: Math.round(clampNum(28, 0.04 * h, 56)),
+      }
   }
 }
 

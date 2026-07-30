@@ -1,5 +1,6 @@
 /**
- * Knowledge whiteboard canvas — Excalidraw embed with KD-6 / KD-13 contracts.
+ * Knowledge whiteboard canvas — Excalidraw embed (legacy; production uses HipBoardCanvas).
+ * Kept until PR-7 removes @excalidraw/excalidraw. Handle types remain shared.
  *
  * Invariants:
  * - Store draftBody is always dehydrated (hipAssetRel, never dataURL).
@@ -22,8 +23,6 @@ import { toast } from 'sonner'
 import {
   assertNoDataUrlInBoardJson,
   buildDiskScene,
-  EMPTY_BOARD_SCENE,
-  EMPTY_BOARD_SCENE_JSON,
   estimateDataUrlBytes,
   hydrateBoardFiles,
   importBoardFileBytes,
@@ -35,6 +34,18 @@ import {
   type HipBoardFileRuntime,
   type LegacyExcalidrawSceneDisk,
 } from '@/domain/knowledge/boardScene'
+
+/** Local empty for Excalidraw-only path (production EMPTY is hip-board). */
+const LEGACY_EMPTY_EXCALIDRAW: LegacyExcalidrawSceneDisk = {
+  type: 'excalidraw',
+  version: 2,
+  source: 'hip',
+  hip: { schemaVersion: 1 },
+  elements: [],
+  appState: { viewBackgroundColor: '#ffffff' },
+  files: {},
+}
+const LEGACY_EMPTY_EXCALIDRAW_JSON = stableSerializeBoard(LEGACY_EMPTY_EXCALIDRAW)
 import { KNOWLEDGE_ASSET_INLINE_MAX_BYTES } from '@/domain/knowledge/limits'
 import { isAllowedAssetMime, isImageMime } from '@/domain/knowledge/assetUrl'
 import { useKnowledgeStore } from '@/store/knowledgeStore'
@@ -131,18 +142,17 @@ export const KnowledgeBoardCanvas = forwardRef<
     activeRef.current = true
     let cancelled = false
 
-    // Excalidraw path until PR-C: only seed excalidraw scenes. Hip-board JSON
-    // (dual-parse) must not feed hip shapes into Excalidraw (would corrupt on flush).
-    let scene: LegacyExcalidrawSceneDisk = EMPTY_BOARD_SCENE
+    // Legacy Excalidraw-only seed. Hip-board JSON must not feed hip shapes into Excalidraw.
+    let scene: LegacyExcalidrawSceneDisk = LEGACY_EMPTY_EXCALIDRAW
     try {
-      const parsed = parseBoardScene(initialJson || EMPTY_BOARD_SCENE_JSON)
+      const parsed = parseBoardScene(initialJson || LEGACY_EMPTY_EXCALIDRAW_JSON)
       if (isExcalidrawScene(parsed)) {
         scene = parsed
       } else {
-        scene = EMPTY_BOARD_SCENE
+        scene = LEGACY_EMPTY_EXCALIDRAW
       }
     } catch {
-      scene = EMPTY_BOARD_SCENE
+      scene = LEGACY_EMPTY_EXCALIDRAW
     }
 
     // SYNC seed — must complete before hydrate await / any flushToStore.

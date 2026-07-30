@@ -1,6 +1,6 @@
 /**
  * Pure Excalidraw → hip-board migration (LKD-8 mapping table).
- * PR-1: dead code — not wired to openDoc. Production upgrade lands in PR-C.
+ * Wired on openDoc board path (PR-C); upgrade write + unsupported gate in knowledgeStore.
  */
 import type {
   HipBoardElement,

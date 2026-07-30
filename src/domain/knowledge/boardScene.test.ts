@@ -24,29 +24,27 @@ import {
 } from './boardScene'
 
 describe('boardScene EMPTY', () => {
-  it('EMPTY_BOARD_SCENE_JSON is valid dehydrated excalidraw scene (production until PR-C)', () => {
+  it('EMPTY_BOARD_SCENE_JSON is valid dehydrated hip-board scene (PR-C production)', () => {
     const scene = parseBoardScene(EMPTY_BOARD_SCENE_JSON)
-    expect(scene.type).toBe('excalidraw')
-    expect(scene.version).toBe(2)
+    expect(scene.type).toBe('hip-board')
+    expect(scene.version).toBe(1)
     expect(scene.source).toBe('hip')
     expect(scene.hip?.schemaVersion).toBe(1)
     expect(scene.elements).toEqual([])
     expect(scene.files).toEqual({})
     expect(scene.appState.viewBackgroundColor).toBe('#ffffff')
     expect(() => assertNoDataUrlInBoardJson(EMPTY_BOARD_SCENE_JSON)).not.toThrow()
+    expect(isHipBoardScene(scene)).toBe(true)
   })
 
   it('EMPTY_BOARD_SCENE serializes to EMPTY_BOARD_SCENE_JSON', () => {
     expect(stableSerializeBoard(EMPTY_BOARD_SCENE)).toBe(EMPTY_BOARD_SCENE_JSON)
   })
 
-  it('EMPTY_HIP_BOARD_SCENE is hip-board (fixtures only; not production EMPTY)', () => {
-    expect(EMPTY_HIP_BOARD_SCENE.type).toBe('hip-board')
-    expect(EMPTY_HIP_BOARD_SCENE.version).toBe(1)
-    const parsed = parseBoardScene(EMPTY_HIP_BOARD_SCENE_JSON)
-    expect(parsed.type).toBe('hip-board')
-    expect(isHipBoardScene(parsed)).toBe(true)
-    expect(serializeHipBoard(EMPTY_HIP_BOARD_SCENE)).toBe(EMPTY_HIP_BOARD_SCENE_JSON)
+  it('EMPTY_HIP_BOARD_SCENE aliases production EMPTY', () => {
+    expect(EMPTY_HIP_BOARD_SCENE).toBe(EMPTY_BOARD_SCENE)
+    expect(EMPTY_HIP_BOARD_SCENE_JSON).toBe(EMPTY_BOARD_SCENE_JSON)
+    expect(serializeHipBoard(EMPTY_HIP_BOARD_SCENE)).toBe(EMPTY_BOARD_SCENE_JSON)
   })
 
   it('KNOWLEDGE_BOARD_MAX_BYTES is 25MB', () => {

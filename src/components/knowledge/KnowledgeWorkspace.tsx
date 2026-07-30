@@ -71,9 +71,10 @@ import { SpaceTree } from './SpaceTree'
 import { DocEditor, type DocEditorHandle } from './DocEditor'
 import type { DocLiveEditorHandle } from './DocLiveEditor'
 import {
-  KnowledgeBoardCanvas,
-  type KnowledgeBoardCanvasHandle,
-} from './KnowledgeBoardCanvas'
+  HipBoardCanvas,
+  type HipBoardCanvasHandle,
+} from './HipBoardCanvas'
+import type { KnowledgeBoardCanvasHandle } from './KnowledgeBoardCanvas'
 import { InlineDocTitle } from './InlineDocTitle'
 import { DocPropertiesRow } from './DocPropertiesRow'
 import { MarkdownToolbar } from './MarkdownToolbar'
@@ -165,7 +166,7 @@ export function KnowledgeWorkspace() {
   /** Live host handle for attach/paste (PR-2); wired now for insertMarkdown. */
   const liveEditorRef = useRef<DocLiveEditorHandle>(null)
   /** Board canvas handle — Workspace-only beforeOpenDocFlush (KD-9); sync flushToStore (KD-13). */
-  const boardCanvasRef = useRef<KnowledgeBoardCanvasHandle>(null)
+  const boardCanvasRef = useRef<HipBoardCanvasHandle | KnowledgeBoardCanvasHandle>(null)
   const [treeFilter, setTreeFilter] = useState('')
   const [filterExpandSnapshot, setFilterExpandSnapshot] = useState<Record<
     string,
@@ -476,7 +477,7 @@ export function KnowledgeWorkspace() {
     }
   }
 
-  /** KD-10: export dehydrated hip board JSON (same as on-disk). */
+  /** KD-10 / LKD-15: export dehydrated hip-board JSON (same as on-disk). */
   const exportActiveBoardJson = async () => {
     if (!activeSpaceId || !activeDocId) return
     // Flush canvas strokes into draft then disk before export.
@@ -485,9 +486,9 @@ export function KnowledgeWorkspace() {
     const title = activeNode?.title ?? t('knowledge.board.untitled')
     const safe = sanitizeExportName(title, 'whiteboard')
     const dest = await pickSavePath({
-      defaultPath: `${safe}.excalidraw`,
+      defaultPath: `${safe}.board.json`,
       title: t('knowledge.export.boardJson'),
-      filters: [{ name: 'Excalidraw', extensions: ['excalidraw'] }],
+      filters: [{ name: 'Whiteboard', extensions: ['json'] }],
     })
     if (!dest) return
     try {
@@ -647,7 +648,7 @@ export function KnowledgeWorkspace() {
 
   // KD-9: single Workspace registration. Board → flushToStore(mode);
   // Live → flushDraft; Source → CM getView. leaveActiveLeaf drives KD-13 mode.
-  // KnowledgeBoardCanvas must NOT call registerBeforeOpenDocFlush itself.
+  // HipBoardCanvas must NOT call registerBeforeOpenDocFlush itself.
   useEffect(() => {
     registerBeforeOpenDocFlush((opts) => {
       const st = useKnowledgeStore.getState()
@@ -882,10 +883,10 @@ export function KnowledgeWorkspace() {
                     return
                   }
                   if (node.kind === 'board') {
-                    // knowledge_reveal_path allows boards/ (same commit as UI shell).
+                    // Prefer primary `.board.json` (PR-C+); dual-resolve lives in read/write.
                     void knowledgeRevealPath(
                       activeSpaceId,
-                      `boards/${node.id}.excalidraw`,
+                      `boards/${node.id}.board.json`,
                     ).catch((e) => {
                       toast.error(knowledgeErrorMessage(e))
                     })
@@ -1145,7 +1146,7 @@ export function KnowledgeWorkspace() {
                 </div>
               }
             >
-              <KnowledgeBoardCanvas
+              <HipBoardCanvas
                 ref={boardCanvasRef}
                 key={activeDocId}
                 boardId={activeDocId}

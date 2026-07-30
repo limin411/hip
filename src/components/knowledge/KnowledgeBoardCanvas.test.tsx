@@ -9,12 +9,22 @@ import {
   type KnowledgeBoardCanvasHandle,
 } from './KnowledgeBoardCanvas'
 import {
-  EMPTY_BOARD_SCENE_JSON,
   assertNoDataUrlInBoardJson,
   buildDiskScene,
   stableSerializeBoard,
   type LegacyExcalidrawSceneDisk,
 } from '@/domain/knowledge/boardScene'
+
+/** Legacy empty for Excalidraw canvas tests (production EMPTY is hip-board). */
+const LEGACY_EMPTY_EXCALIDRAW_JSON = stableSerializeBoard({
+  type: 'excalidraw',
+  version: 2,
+  source: 'hip',
+  hip: { schemaVersion: 1 },
+  elements: [],
+  appState: { viewBackgroundColor: '#ffffff' },
+  files: {},
+} satisfies LegacyExcalidrawSceneDisk)
 
 /** Non-empty dehydrated scene for pre-hydrate flush regression. */
 const LOADED_BOARD_JSON = stableSerializeBoard({
@@ -139,7 +149,7 @@ describe('KnowledgeBoardCanvas', () => {
       <KnowledgeBoardCanvas
         boardId="brd_testboard01"
         spaceId="spc_1"
-        initialJson={EMPTY_BOARD_SCENE_JSON}
+        initialJson={LEGACY_EMPTY_EXCALIDRAW_JSON}
       />,
     )
     await waitFor(() => {
@@ -156,7 +166,7 @@ describe('KnowledgeBoardCanvas', () => {
         ref={ref}
         boardId="brd_testboard01"
         spaceId="spc_1"
-        initialJson={EMPTY_BOARD_SCENE_JSON}
+        initialJson={LEGACY_EMPTY_EXCALIDRAW_JSON}
       />,
     )
     await waitFor(() => expect(lastOnChange).toBeTruthy())
@@ -205,7 +215,7 @@ describe('KnowledgeBoardCanvas', () => {
         ref={ref}
         boardId="brd_testboard01"
         spaceId="spc_1"
-        initialJson={EMPTY_BOARD_SCENE_JSON}
+        initialJson={LEGACY_EMPTY_EXCALIDRAW_JSON}
       />,
     )
     await waitFor(() => expect(lastOnChange).toBeTruthy())
@@ -251,7 +261,7 @@ describe('KnowledgeBoardCanvas', () => {
       <KnowledgeBoardCanvas
         boardId="brd_testboard01"
         spaceId="spc_1"
-        initialJson={EMPTY_BOARD_SCENE_JSON}
+        initialJson={LEGACY_EMPTY_EXCALIDRAW_JSON}
       />,
     )
     await waitFor(() => expect(lastOnChange).toBeTruthy())
@@ -320,7 +330,7 @@ describe('KnowledgeBoardCanvas', () => {
         ref={ref}
         boardId="brd_testboard01"
         spaceId="spc_1"
-        initialJson={EMPTY_BOARD_SCENE_JSON}
+        initialJson={LEGACY_EMPTY_EXCALIDRAW_JSON}
       />,
     )
     await waitFor(() => expect(lastOnChange).toBeTruthy())

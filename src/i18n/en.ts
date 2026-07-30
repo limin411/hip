@@ -2562,6 +2562,17 @@ export const en = {
         pendingImageDropped:
           'An image was still importing and was not saved. Paste it again if needed.',
         hydratePartial: 'Some whiteboard images could not be loaded',
+        legacyImported: 'Whiteboard upgraded to the new format',
+        legacyPartial:
+          'Whiteboard upgraded; {{count}} unsupported shape(s) were skipped',
+        legacyUnsupported:
+          'This whiteboard uses shapes that cannot be converted. Editing will replace it with an empty board after you confirm.',
+        legacyUpgradeFailed:
+          'Could not save the upgraded whiteboard; the previous file was kept. Changes will retry on next save.',
+        legacyReplaceConfirm:
+          'Replace this legacy whiteboard with the new format? The previous file will be removed.',
+        legacyWriteBlocked:
+          'Save blocked until you confirm replacing the legacy whiteboard.',
       },
       export: {
         doc: 'Export document…',

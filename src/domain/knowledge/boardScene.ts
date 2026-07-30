@@ -4,8 +4,8 @@
  * Invariant (KD-6): on-disk / store draft is always dehydrated — `files[*]` has
  * `hipAssetRel`, never `dataURL`. Runtime BinaryFiles live only in the canvas component.
  *
- * PR-1: parse accepts both `excalidraw` and `hip-board`. Production EMPTY / createBoard
- * remain excalidraw until PR-C cutover (LKD-C).
+ * PR-C+: production EMPTY / createBoard use `type: "hip-board"`. Dual-parse still
+ * accepts legacy `excalidraw` for open migrate (LKD-8).
  */
 
 /** Max UTF-8 body size for knowledge_write_board (aligned with asset disk cap). */
@@ -20,7 +20,7 @@ export type HipBoardFileOnDisk = {
   // dataURL MUST NOT be present
 }
 
-// ─── Hip native element model (engine types; production EMPTY stays excalidraw) ─
+// ─── Hip native element model (production EMPTY is hip-board as of PR-C) ─
 
 export type HipBoardElementType =
   | 'rect'
@@ -106,7 +106,7 @@ export type HipBoardAppStateDisk = {
 
 /**
  * Target disk / draft shape for the hip SVG engine (`type: "hip-board"`).
- * Production EMPTY stays LegacyExcalidrawSceneDisk until PR-C.
+ * Production EMPTY / createBoard as of PR-C.
  */
 export type HipBoardSceneDisk = {
   type: 'hip-board'
@@ -119,7 +119,7 @@ export type HipBoardSceneDisk = {
 }
 
 /**
- * Legacy Excalidraw dehydrated scene (production createBoard / EMPTY until PR-C).
+ * Legacy Excalidraw dehydrated scene (read + migrate on open; LKD-8).
  * Elements are opaque Excalidraw shapes.
  */
 export type LegacyExcalidrawSceneDisk = {
@@ -148,22 +148,8 @@ export type HipBoardFileRuntime = {
 
 export type HipBoardFilesRuntime = Record<string, HipBoardFileRuntime>
 
-/** Empty dehydrated scene written on createBoard / missing file (excalidraw until PR-C). */
-export const EMPTY_BOARD_SCENE: LegacyExcalidrawSceneDisk = {
-  type: 'excalidraw',
-  version: 2,
-  source: 'hip',
-  hip: { schemaVersion: 1 },
-  elements: [],
-  appState: { viewBackgroundColor: '#ffffff' },
-  files: {},
-}
-
-/**
- * Empty hip-board scene for engine fixtures / tests.
- * Not used by createBoard until PR-C (LKD-C).
- */
-export const EMPTY_HIP_BOARD_SCENE: HipBoardSceneDisk = {
+/** Empty dehydrated scene written on createBoard / missing file (hip-board, PR-C+). */
+export const EMPTY_BOARD_SCENE: HipBoardSceneDisk = {
   type: 'hip-board',
   version: 1,
   source: 'hip',
@@ -173,11 +159,16 @@ export const EMPTY_HIP_BOARD_SCENE: HipBoardSceneDisk = {
   files: {},
 }
 
-/** Stable empty-scene JSON for create / missing-file fallbacks (excalidraw). */
+/**
+ * Alias of {@link EMPTY_BOARD_SCENE} (kept for HipBoardCanvas / fixture imports).
+ */
+export const EMPTY_HIP_BOARD_SCENE: HipBoardSceneDisk = EMPTY_BOARD_SCENE
+
+/** Stable empty-scene JSON for create / missing-file fallbacks (hip-board). */
 export const EMPTY_BOARD_SCENE_JSON: string = stableSerializeBoard(EMPTY_BOARD_SCENE)
 
-/** Stable empty hip-board JSON (fixtures only until PR-C). */
-export const EMPTY_HIP_BOARD_SCENE_JSON: string = stableSerializeBoard(EMPTY_HIP_BOARD_SCENE)
+/** Alias of {@link EMPTY_BOARD_SCENE_JSON}. */
+export const EMPTY_HIP_BOARD_SCENE_JSON: string = EMPTY_BOARD_SCENE_JSON
 
 export function isHipBoardScene(scene: BoardSceneDisk): scene is HipBoardSceneDisk {
   return scene.type === 'hip-board'
@@ -438,9 +429,9 @@ export function pickPersistAppState(
 }
 
 /**
- * Build dehydrated on-disk scene from runtime refs (Excalidraw production path).
+ * Build dehydrated on-disk scene from Excalidraw runtime refs (legacy path only).
  * `relByFileId` only includes completed imports (hipAssetRel); pending files omitted.
- * Remains type:excalidraw until PR-C.
+ * Production hip engine uses {@link buildHipDiskScene}.
  */
 export function buildDiskScene(args: {
   elements: unknown[]
@@ -486,8 +477,7 @@ export function buildDiskScene(args: {
 }
 
 /**
- * Build dehydrated hip-board scene from engine refs (fixtures / PR-C+).
- * Not used by production createBoard until cutover.
+ * Build dehydrated hip-board scene from engine refs (production PR-C+).
  */
 export function buildHipDiskScene(args: {
   elements: HipBoardElement[]

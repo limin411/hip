@@ -21,8 +21,8 @@ const KNOWLEDGE_BOARD_MAX_BYTES: usize = 25 * 1024 * 1024;
 /// Max decoded payload for `knowledge_export_bytes` (PNG etc.).
 const KNOWLEDGE_EXPORT_BYTES_MAX: usize = 25 * 1024 * 1024;
 
-/// Empty dehydrated Excalidraw scene returned when board file is missing.
-pub(crate) const EMPTY_BOARD_SCENE_JSON: &str = r##"{"type":"excalidraw","version":2,"source":"hip","hip":{"schemaVersion":1},"elements":[],"appState":{"viewBackgroundColor":"#ffffff"},"files":{}}"##;
+/// Empty dehydrated hip-board scene returned when board file is missing (PR-C+).
+pub(crate) const EMPTY_BOARD_SCENE_JSON: &str = r##"{"type":"hip-board","version":1,"source":"hip","hip":{"schemaVersion":1},"elements":[],"appState":{"viewBackgroundColor":"#ffffff"},"files":{}}"##;
 
 /// Same rule as TS `KNOWLEDGE_ID_RE`.
 pub(crate) fn is_knowledge_id(id: &str) -> bool {
@@ -104,10 +104,10 @@ pub(crate) fn board_path_legacy(
     board_path_with_ext(root, space_id, board_id, "excalidraw")
 }
 
-/// Default create-path board file (legacy `.excalidraw` until PR-C cutover).
+/// Default create-path board file (primary `.board.json` as of PR-C).
 /// Prefer `board_path_for_write` / `write_board_file` for dual-extension writes.
 pub(crate) fn board_path(root: &Path, space_id: &str, board_id: &str) -> Result<PathBuf, String> {
-    board_path_legacy(root, space_id, board_id)
+    board_path_primary(root, space_id, board_id)
 }
 
 fn board_path_with_ext(
@@ -145,24 +145,17 @@ pub(crate) fn resolve_board_path(
     Ok(primary)
 }
 
-/// Dual-aware write destination (pre-PR-C):
-/// - if primary exists → overwrite primary (keep restore/import coherent with read)
-/// - else → legacy (createBoard / first write still lands on `.excalidraw`)
+/// Write destination (PR-C+): always primary `.board.json`.
 pub(crate) fn board_path_for_write(
     root: &Path,
     space_id: &str,
     board_id: &str,
 ) -> Result<PathBuf, String> {
-    let primary = board_path_primary(root, space_id, board_id)?;
-    if primary.exists() {
-        return Ok(primary);
-    }
-    board_path_legacy(root, space_id, board_id)
+    board_path_primary(root, space_id, board_id)
 }
 
-/// Write board body with dual-ext coherence: target `board_path_for_write`, and when
-/// writing primary also remove a leftover legacy sibling so both-exist cannot hide
-/// newer edits on a later restore (stale-primary + fresh-legacy).
+/// Write board body to primary `.board.json` and remove a leftover legacy sibling
+/// so both-exist cannot hide newer edits (LKD-6 both-exist matrix; PR-C+).
 pub(crate) fn write_board_file(
     root: &Path,
     space_id: &str,
@@ -171,14 +164,11 @@ pub(crate) fn write_board_file(
 ) -> Result<(), String> {
     let primary = board_path_primary(root, space_id, board_id)?;
     let legacy = board_path_legacy(root, space_id, board_id)?;
-    if primary.exists() {
-        atomic_write_str(&primary, body)?;
-        if legacy.exists() {
-            let _ = fs::remove_file(&legacy);
-        }
-        return Ok(());
+    atomic_write_str(&primary, body)?;
+    if legacy.exists() {
+        let _ = fs::remove_file(&legacy);
     }
-    atomic_write_str(&legacy, body)
+    Ok(())
 }
 
 /// Both candidate board paths (primary then legacy) for dual-extension delete.
@@ -773,8 +763,7 @@ pub fn knowledge_read_board(app: AppHandle, args: BoardArgs) -> Result<String, S
 pub fn knowledge_write_board(app: AppHandle, args: WriteBoardArgs) -> Result<(), String> {
     validate_board_write_body(&args.body)?;
     let root = knowledge_root(&app)?;
-    // Dual-aware: overwrite existing primary (restore/import dest), else create/update
-    // legacy so createBoard stays on `.excalidraw` until PR-C.
+    // PR-C+: always write primary `.board.json` and delete leftover legacy sibling.
     write_board_file(&root, &args.space_id, &args.board_id, &args.body)
 }
 
@@ -2574,22 +2563,22 @@ mod tests {
         assert!(board_path(root, "bad", "brd_abc123def456").is_err());
         assert!(board_path(root, "spc_oktoken1", "doc_notaboard1").is_err());
         assert!(board_path(root, "spc_oktoken1", "nod_notaboard1").is_err());
-        // board_path remains the create-default legacy alias until PR-C.
+        // PR-C+: board_path is primary `.board.json`.
         let ok = board_path(root, "spc_oktoken1", "brd_abc123def456").unwrap();
         assert!(
-            ok.ends_with("boards/brd_abc123def456.excalidraw")
-                || ok.ends_with("boards\\brd_abc123def456.excalidraw")
+            ok.ends_with("boards/brd_abc123def456.board.json")
+                || ok.ends_with("boards\\brd_abc123def456.board.json")
         );
         let primary = board_path_primary(root, "spc_oktoken1", "brd_abc123def456").unwrap();
-        assert!(
-            primary.ends_with("boards/brd_abc123def456.board.json")
-                || primary.ends_with("boards\\brd_abc123def456.board.json")
-        );
+        assert_eq!(ok, primary);
         let legacy = board_path_legacy(root, "spc_oktoken1", "brd_abc123def456").unwrap();
-        assert_eq!(ok, legacy);
-        // No files → write dest is still legacy (createBoard gate).
+        assert!(
+            legacy.ends_with("boards/brd_abc123def456.excalidraw")
+                || legacy.ends_with("boards\\brd_abc123def456.excalidraw")
+        );
+        // No files → write dest is primary (createBoard).
         let for_write = board_path_for_write(root, "spc_oktoken1", "brd_abc123def456").unwrap();
-        assert_eq!(for_write, legacy);
+        assert_eq!(for_write, primary);
     }
 
     #[test]
@@ -2623,7 +2612,7 @@ mod tests {
     }
 
     #[test]
-    fn write_board_file_dual_aware_create_legacy_overwrite_primary() {
+    fn write_board_file_always_primary_deletes_legacy() {
         with_temp_root(|base| {
             let root = base.join("knowledge");
             let space_id = "spc_writedual01";
@@ -2632,26 +2621,17 @@ mod tests {
             let primary = board_path_primary(&root, space_id, board_id).unwrap();
             let legacy = board_path_legacy(&root, space_id, board_id).unwrap();
 
-            // Neither exists → create legacy (createBoard path).
-            let create_body =
-                r#"{"type":"excalidraw","version":2,"source":"hip","elements":[{"id":"c1"}],"files":{}}"#;
+            // Neither exists → create primary (createBoard path, PR-C+).
+            let create_body = r#"{"type":"hip-board","version":1,"source":"hip","elements":[{"id":"c1"}],"files":{}}"#;
             write_board_file(&root, space_id, board_id, create_body).unwrap();
-            assert!(legacy.is_file());
-            assert!(!primary.exists());
-            assert!(fs::read_to_string(&legacy).unwrap().contains("c1"));
+            assert!(primary.is_file());
+            assert!(!legacy.exists());
+            assert!(fs::read_to_string(&primary).unwrap().contains("c1"));
 
-            // Legacy only → update legacy.
-            let leg_body =
-                r#"{"type":"excalidraw","version":2,"source":"hip","elements":[{"id":"leg2"}],"files":{}}"#;
-            write_board_file(&root, space_id, board_id, leg_body).unwrap();
-            assert!(legacy.is_file());
-            assert!(!primary.exists());
-            assert!(fs::read_to_string(&legacy).unwrap().contains("leg2"));
-
-            // Primary present (e.g. after restore/import) → overwrite primary, drop legacy.
+            // Legacy sibling present → write primary + delete legacy.
             fs::write(
-                &primary,
-                r#"{"type":"hip-board","elements":[{"id":"old"}],"files":{}}"#,
+                &legacy,
+                r#"{"type":"excalidraw","version":2,"source":"hip","elements":[{"id":"leg2"}],"files":{}}"#,
             )
             .unwrap();
             let new_body =
@@ -2662,7 +2642,7 @@ mod tests {
             let read_path = resolve_board_path(&root, space_id, board_id).unwrap();
             assert_eq!(read_path, primary);
             assert!(fs::read_to_string(&primary).unwrap().contains("new"));
-            assert!(!fs::read_to_string(&primary).unwrap().contains("old"));
+            assert!(!fs::read_to_string(&primary).unwrap().contains("c1"));
         });
     }
 
@@ -2796,8 +2776,11 @@ mod tests {
             validate_board_write_body(body).unwrap();
             atomic_write_str(&path, body).unwrap();
             assert!(path.is_file());
+            assert!(
+                path.ends_with("board.json") || path.to_string_lossy().ends_with("board.json")
+            );
             let read = fs::read_to_string(&path).unwrap();
-            assert!(read.contains("excalidraw"));
+            assert!(read.contains("hip-board"));
             assert!(read.contains("\"source\":\"hip\""));
         });
     }

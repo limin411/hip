@@ -70,7 +70,7 @@ vi.mock('@/ipc/knowledge', () => ({
 }))
 
 vi.mock('sonner', () => ({
-  toast: { error: vi.fn(), success: vi.fn(), message: vi.fn() },
+  toast: { error: vi.fn(), success: vi.fn(), message: vi.fn(), warning: vi.fn() },
 }))
 
 vi.mock('@/i18n', () => ({
@@ -81,13 +81,19 @@ vi.mock('@/i18n', () => ({
 }))
 
 import { toast } from 'sonner'
-import { EMPTY_BOARD_SCENE_JSON } from '@/domain/knowledge/boardScene'
+import {
+  EMPTY_BOARD_SCENE_JSON,
+  stableSerializeBoard,
+} from '@/domain/knowledge/boardScene'
 import {
   listKnowledgeDocsForWiki,
   registerBeforeOpenDocFlush,
   setExpandPersistSuspended,
   syncActiveEditorToDraft,
   useKnowledgeStore,
+  __resetBoardSessionFlagsForTests,
+  __legacyPreserveRawHasForTests,
+  __pendingUpgradeRetryHasForTests,
 } from './knowledgeStore'
 
 describe('knowledgeStore openDoc editorMode default', () => {
@@ -1972,7 +1978,7 @@ describe('knowledgeStore version snapshots', () => {
   })
 })
 
-describe('knowledgeStore board shell (PR-2)', () => {
+describe('knowledgeStore board shell (PR-C hip cutover)', () => {
   const emptyScene = EMPTY_BOARD_SCENE_JSON
   const boardNode = {
     id: 'brd_board000001',
@@ -1994,6 +2000,7 @@ describe('knowledgeStore board shell (PR-2)', () => {
   }
 
   beforeEach(() => {
+    __resetBoardSessionFlagsForTests()
     knowledgeReadDoc.mockReset()
     knowledgeWriteDoc.mockReset()
     knowledgeReadBoard.mockReset()
@@ -2015,6 +2022,7 @@ describe('knowledgeStore board shell (PR-2)', () => {
     knowledgeReadBoard.mockResolvedValue(emptyScene)
     vi.mocked(toast.error).mockClear()
     vi.mocked(toast.message).mockClear()
+    vi.mocked(toast.warning).mockClear()
     registerBeforeOpenDocFlush(null)
     useKnowledgeStore.setState({
       loaded: true,
@@ -2053,13 +2061,14 @@ describe('knowledgeStore board shell (PR-2)', () => {
     registerBeforeOpenDocFlush(null)
   })
 
-  it('createBoard writes empty scene, does not bump spaceDocCounts, opens board', async () => {
+  it('createBoard writes hip-board empty scene, does not bump spaceDocCounts, opens board', async () => {
     await useKnowledgeStore.getState().createBoard(null, 'Arch')
     expect(knowledgeWriteBoard).toHaveBeenCalled()
     const [spaceId, boardId, body] = knowledgeWriteBoard.mock.calls[0]
     expect(spaceId).toBe('spc_1')
     expect(String(boardId)).toMatch(/^brd_/)
     expect(body).toBe(emptyScene)
+    expect(String(body)).toContain('"type":"hip-board"')
     expect(knowledgeReadDoc).not.toHaveBeenCalled()
     expect(knowledgeReadBoard).toHaveBeenCalledWith('spc_1', boardId)
     const s = useKnowledgeStore.getState()
@@ -2093,18 +2102,21 @@ describe('knowledgeStore board shell (PR-2)', () => {
 
   it('openDoc board does not force source for large body', async () => {
     const { KNOWLEDGE_LARGE_DOC_CHARS } = await import('@/domain/knowledge/limits')
-    const big = '{"type":"excalidraw","version":2,"source":"hip","elements":[],"appState":{},"files":{},"pad":"' +
+    const big =
+      '{"type":"hip-board","version":1,"source":"hip","elements":[],"appState":{},"files":{},"pad":"' +
       'x'.repeat(KNOWLEDGE_LARGE_DOC_CHARS + 10) +
       '"}'
     knowledgeReadBoard.mockResolvedValueOnce(big)
     useKnowledgeStore.setState({ editorMode: 'live' })
     await useKnowledgeStore.getState().openDoc('brd_board000001')
     expect(useKnowledgeStore.getState().editorMode).toBe('live')
-    expect(toast.message).not.toHaveBeenCalled()
+    // large pad is not a legacy upgrade toast
+    expect(toast.message).not.toHaveBeenCalledWith('knowledge.board.legacyImported')
   })
 
   it('flushSave dirty board writes via knowledgeWriteBoard and skips version/link', async () => {
-    const dirty = '{"type":"excalidraw","version":2,"source":"hip","elements":[{"id":"e1"}],"appState":{},"files":{}}'
+    const dirty =
+      '{"type":"hip-board","version":1,"source":"hip","elements":[{"id":"e1","type":"rect","x":0,"y":0,"w":10,"h":10,"fill":"#fff","stroke":"#111","strokeWidth":2,"cornerRadius":0}],"appState":{"viewBackgroundColor":"#ffffff"},"files":{}}'
     useKnowledgeStore.setState({
       activeDocId: 'brd_board000001',
       docBody: emptyScene,
@@ -2122,8 +2134,8 @@ describe('knowledgeStore board shell (PR-2)', () => {
 
   it('flushSave rejects board draft with files.*.dataURL', async () => {
     const bad = JSON.stringify({
-      type: 'excalidraw',
-      version: 2,
+      type: 'hip-board',
+      version: 1,
       source: 'hip',
       elements: [],
       appState: {},
@@ -2142,7 +2154,8 @@ describe('knowledgeStore board shell (PR-2)', () => {
   })
 
   it('openDoc abort on dirty board keeps draft when write fails', async () => {
-    const dirty = '{"type":"excalidraw","version":2,"source":"hip","elements":[1],"appState":{},"files":{}}'
+    const dirty =
+      '{"type":"hip-board","version":1,"source":"hip","elements":[{"id":"e1"}],"appState":{},"files":{}}'
     useKnowledgeStore.setState({
       activeDocId: 'brd_board000001',
       docBody: emptyScene,
@@ -2156,6 +2169,156 @@ describe('knowledgeStore board shell (PR-2)', () => {
     expect(s.activeDocId).toBe('brd_board000001')
     expect(s.draftBody).toBe(dirty)
     expect(knowledgeReadDoc).not.toHaveBeenCalled()
+  })
+
+  it('openDoc legacy excalidraw upgrades to hip-board and writes primary', async () => {
+    const legacy = JSON.stringify({
+      type: 'excalidraw',
+      version: 2,
+      source: 'hip',
+      elements: [
+        {
+          id: 'r1',
+          type: 'rectangle',
+          x: 0,
+          y: 0,
+          width: 40,
+          height: 20,
+          backgroundColor: '#fff',
+          strokeColor: '#111',
+          strokeWidth: 2,
+        },
+      ],
+      appState: { viewBackgroundColor: '#ffffff' },
+      files: {},
+    })
+    knowledgeReadBoard.mockResolvedValueOnce(legacy)
+    knowledgeWriteBoard.mockClear()
+    await useKnowledgeStore.getState().openDoc('brd_board000001')
+    const s = useKnowledgeStore.getState()
+    expect(s.activeDocId).toBe('brd_board000001')
+    expect(s.docBody).toContain('"type":"hip-board"')
+    expect(s.draftBody).toContain('"type":"hip-board"')
+    expect(s.docBody).toContain('"type":"rect"')
+    // open upgrade write
+    await vi.waitFor(() => {
+      expect(knowledgeWriteBoard).toHaveBeenCalled()
+    })
+    const upgradeCall = knowledgeWriteBoard.mock.calls.find(
+      (c) => c[1] === 'brd_board000001' && String(c[2]).includes('hip-board'),
+    )
+    expect(upgradeCall).toBeTruthy()
+    expect(toast.message).toHaveBeenCalledWith('knowledge.board.legacyImported')
+    expect(__legacyPreserveRawHasForTests('brd_board000001')).toBe(false)
+    expect(__pendingUpgradeRetryHasForTests('brd_board000001')).toBe(false)
+  })
+
+  it('openDoc upgrade write failure keeps memory hip, sets pendingUpgradeRetry, no legacy delete side-effect', async () => {
+    const legacy = JSON.stringify({
+      type: 'excalidraw',
+      version: 2,
+      source: 'hip',
+      elements: [
+        {
+          id: 'r1',
+          type: 'rectangle',
+          x: 0,
+          y: 0,
+          width: 10,
+          height: 10,
+          backgroundColor: '#fff',
+          strokeColor: '#000',
+          strokeWidth: 1,
+        },
+      ],
+      appState: { viewBackgroundColor: '#ffffff' },
+      files: {},
+    })
+    knowledgeReadBoard.mockResolvedValueOnce(legacy)
+    knowledgeWriteBoard.mockRejectedValueOnce(new Error('disk full'))
+    await useKnowledgeStore.getState().openDoc('brd_board000001')
+    await vi.waitFor(() => {
+      expect(toast.error).toHaveBeenCalledWith('knowledge.board.legacyUpgradeFailed')
+    })
+    const s = useKnowledgeStore.getState()
+    expect(s.docBody).toContain('"type":"hip-board"')
+    expect(s.draftBody).toContain('"type":"hip-board"')
+    expect(__pendingUpgradeRetryHasForTests('brd_board000001')).toBe(true)
+    // Force retry even when draft===doc
+    knowledgeWriteBoard.mockResolvedValueOnce(undefined)
+    knowledgeWriteBoard.mockClear()
+    const ok = await useKnowledgeStore.getState().flushSave()
+    expect(ok).toBe(true)
+    expect(knowledgeWriteBoard).toHaveBeenCalledWith(
+      'spc_1',
+      'brd_board000001',
+      s.draftBody,
+    )
+    expect(__pendingUpgradeRetryHasForTests('brd_board000001')).toBe(false)
+  })
+
+  it('unsupported board: flush blocked until confirm', async () => {
+    const unsupported = JSON.stringify({
+      type: 'excalidraw',
+      version: 2,
+      source: 'hip',
+      elements: [
+        { id: 'd1', type: 'diamond', x: 0, y: 0, width: 10, height: 10 },
+        { id: 'f1', type: 'freedraw', x: 0, y: 0, points: [[0, 0]] },
+      ],
+      appState: { viewBackgroundColor: '#ffffff' },
+      files: {},
+    })
+    knowledgeReadBoard.mockResolvedValueOnce(unsupported)
+    await useKnowledgeStore.getState().openDoc('brd_board000001')
+    expect(toast.warning).toHaveBeenCalledWith('knowledge.board.legacyUnsupported')
+    expect(__legacyPreserveRawHasForTests('brd_board000001')).toBe(true)
+    // Memory is empty hip; disk not written on open
+    expect(useKnowledgeStore.getState().docBody).toBe(emptyScene)
+    // No upgrade write on unsupported
+    expect(
+      knowledgeWriteBoard.mock.calls.every((c) => c[1] !== 'brd_board000001'),
+    ).toBe(true)
+
+    // Make dirty so flush attempts a write
+    const dirty = stableSerializeBoard({
+      type: 'hip-board',
+      version: 1,
+      source: 'hip',
+      hip: { schemaVersion: 1 },
+      elements: [
+        {
+          id: 'r1',
+          type: 'rect',
+          x: 0,
+          y: 0,
+          w: 20,
+          h: 20,
+          fill: '#fff',
+          stroke: '#111',
+          strokeWidth: 2,
+          cornerRadius: 0,
+        },
+      ],
+      appState: { viewBackgroundColor: '#ffffff' },
+      files: {},
+    })
+    useKnowledgeStore.setState({ draftBody: dirty })
+
+    const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(false)
+    knowledgeWriteBoard.mockClear()
+    const blocked = await useKnowledgeStore.getState().flushSave()
+    expect(blocked).toBe(false)
+    expect(knowledgeWriteBoard).not.toHaveBeenCalled()
+    expect(toast.message).toHaveBeenCalledWith('knowledge.board.legacyWriteBlocked')
+    expect(__legacyPreserveRawHasForTests('brd_board000001')).toBe(true)
+
+    confirmSpy.mockReturnValue(true)
+    const allowed = await useKnowledgeStore.getState().flushSave()
+    expect(allowed).toBe(true)
+    expect(knowledgeWriteBoard).toHaveBeenCalledWith('spc_1', 'brd_board000001', dirty)
+    expect(__legacyPreserveRawHasForTests('brd_board000001')).toBe(false)
+    confirmSpy.mockRestore()
   })
 
   it('setDraftBody docId guard ignores cross-leaf board write', () => {
@@ -2382,7 +2545,7 @@ describe('knowledgeStore board shell (PR-2)', () => {
 
   it('pre-sync hook dirtying draft is persisted by deleteNode', async () => {
     const dirty =
-      '{"type":"excalidraw","version":2,"source":"hip","elements":[{"id":"stroke"}],"appState":{},"files":{}}'
+      '{"type":"hip-board","version":1,"source":"hip","elements":[{"id":"stroke","type":"rect","x":0,"y":0,"w":1,"h":1,"fill":"#fff","stroke":"#111","strokeWidth":1,"cornerRadius":0}],"appState":{"viewBackgroundColor":"#ffffff"},"files":{}}'
     registerBeforeOpenDocFlush(() => {
       useKnowledgeStore.getState().setDraftBody(dirty, {
         docId: 'brd_board000001',
@@ -2497,7 +2660,8 @@ describe('knowledgeStore board shell (PR-2)', () => {
     useKnowledgeStore.setState({
       activeDocId: 'brd_missing00001',
       docBody: emptyScene,
-      draftBody: '{"type":"excalidraw","version":2,"source":"hip","elements":[1],"appState":{},"files":{}}',
+      draftBody:
+        '{"type":"hip-board","version":1,"source":"hip","elements":[{"id":"e1"}],"appState":{},"files":{}}',
       nodes: [docNode],
     })
     const ok = await useKnowledgeStore.getState().flushSave()

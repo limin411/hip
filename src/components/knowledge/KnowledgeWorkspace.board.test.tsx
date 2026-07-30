@@ -14,7 +14,7 @@ import {
 import { EMPTY_BOARD_SCENE_JSON } from '@/domain/knowledge/boardScene'
 import { KNOWLEDGE_LIVE_FLAG_KEY } from '@/domain/knowledge/editorMode'
 import { KnowledgeWorkspace } from './KnowledgeWorkspace'
-import type { KnowledgeBoardCanvasHandle } from './KnowledgeBoardCanvas'
+import type { HipBoardCanvasHandle } from './HipBoardCanvas'
 
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({
@@ -61,23 +61,47 @@ vi.mock('./DocLiveEditor', async () => {
 })
 
 const boardFlushToStore = vi.fn()
-const boardCanvasHandleRef = createRef<KnowledgeBoardCanvasHandle>()
+const boardCanvasHandleRef = createRef<HipBoardCanvasHandle>()
 
-vi.mock('./KnowledgeBoardCanvas', async () => {
+vi.mock('./HipBoardCanvas', async () => {
   const { forwardRef, useImperativeHandle } = await import('react')
   return {
-    KnowledgeBoardCanvas: forwardRef(function MockBoardCanvas(
+    HipBoardCanvas: forwardRef(function MockBoardCanvas(
       props: { boardId: string; spaceId: string; initialJson: string },
-      ref: React.ForwardedRef<KnowledgeBoardCanvasHandle>,
+      ref: React.ForwardedRef<HipBoardCanvasHandle>,
     ) {
       useImperativeHandle(ref, () => ({
         flushToStore: (opts) => boardFlushToStore(opts),
         exportPngBlob: async () => null,
+        isReady: () => true,
+        selectAndScrollTo: () => {},
+        applyStylePatch: () => {},
+        updateText: () => {},
+        getCamera: () => ({ x: 0, y: 0, zoom: 1 }),
+        getTool: () => 'select' as const,
+        getSelectedIds: () => [],
+        getElements: () => [],
+        getFilesRel: () => ({}),
+        getHistoryPastLength: () => 0,
+        undo: () => {},
+        redo: () => {},
       }))
       // Keep a side-channel for assertions if needed
-      ;(boardCanvasHandleRef as { current: KnowledgeBoardCanvasHandle | null }).current = {
+      ;(boardCanvasHandleRef as { current: HipBoardCanvasHandle | null }).current = {
         flushToStore: (opts) => boardFlushToStore(opts),
         exportPngBlob: async () => null,
+        isReady: () => true,
+        selectAndScrollTo: () => {},
+        applyStylePatch: () => {},
+        updateText: () => {},
+        getCamera: () => ({ x: 0, y: 0, zoom: 1 }),
+        getTool: () => 'select' as const,
+        getSelectedIds: () => [],
+        getElements: () => [],
+        getFilesRel: () => ({}),
+        getHistoryPastLength: () => 0,
+        undo: () => {},
+        redo: () => {},
       }
       return (
         <div

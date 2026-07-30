@@ -2465,7 +2465,13 @@ export const zhTW = {
       "loading": "正在載入畫板…",
       "loadFailed": "無法開啟畫板",
       "pendingImageDropped": "有圖片仍在匯入，未儲存。如需請重新貼上。",
-      "hydratePartial": "部分畫板圖片無法載入"
+      "hydratePartial": "部分畫板圖片無法載入",
+      "legacyImported": "畫板已升級為新格式",
+      "legacyPartial": "畫板已升級；已跳過 {{count}} 個不支援的圖形",
+      "legacyUnsupported": "此畫板包含無法轉換的圖形。確認後，編輯將以空白畫板取代舊檔案。",
+      "legacyUpgradeFailed": "升級後的畫板未能儲存，已保留舊檔案。下次儲存時將重試。",
+      "legacyReplaceConfirm": "用新格式取代此舊畫板？舊檔案將被刪除。",
+      "legacyWriteBlocked": "儲存已阻止，請先確認取代舊畫板。"
     },
     "export": {
       "doc": "匯出文件…",

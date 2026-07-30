@@ -2501,6 +2501,14 @@ export const zhCN = {
         loadFailed: '无法打开画板',
         pendingImageDropped: '有图片仍在导入，未保存。如需请重新粘贴。',
         hydratePartial: '部分画板图片无法加载',
+        legacyImported: '画板已升级为新格式',
+        legacyPartial: '画板已升级；已跳过 {{count}} 个不支持的图形',
+        legacyUnsupported:
+          '此画板包含无法转换的图形。确认后，编辑将以空白画板替换旧文件。',
+        legacyUpgradeFailed:
+          '升级后的画板未能保存，已保留旧文件。下次保存时将重试。',
+        legacyReplaceConfirm: '用新格式替换此旧画板？旧文件将被删除。',
+        legacyWriteBlocked: '保存已阻止，请先确认替换旧画板。',
       },
       export: {
         doc: '导出文档…',

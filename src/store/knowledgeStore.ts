@@ -26,7 +26,10 @@ import {
 import {
   assertNoDataUrlInBoardJson,
   EMPTY_BOARD_SCENE_JSON,
+  parseBoardScene,
+  stableSerializeBoard,
 } from '@/domain/knowledge/boardScene'
+import { migrateExcalidrawToHipBoard } from '@/domain/knowledge/boardMigrate'
 import {
   collectBoardIdsInSubtree,
   collectDocIdsInSubtree,
@@ -610,6 +613,30 @@ let saveChain: Promise<boolean> = Promise.resolve(true)
  * write the wrong body into the active buffer (data cross-talk).
  */
 let openDocGeneration = 0
+
+/**
+ * LKD-8 session flags (not persisted).
+ * - legacyPreserveRaw: unsupported excalidraw open — block write until user confirms replace.
+ * - pendingUpgradeRetry: open upgrade write failed — force next flush to write primary.
+ */
+const legacyPreserveRaw = new Set<string>()
+const pendingUpgradeRetry = new Set<string>()
+
+/** Test helper: clear LKD-8 session flags between cases. */
+export function __resetBoardSessionFlagsForTests(): void {
+  legacyPreserveRaw.clear()
+  pendingUpgradeRetry.clear()
+}
+
+/** Test helper: inspect unsupported gate state. */
+export function __legacyPreserveRawHasForTests(boardId: string): boolean {
+  return legacyPreserveRaw.has(boardId)
+}
+
+/** Test helper: inspect upgrade-retry flag. */
+export function __pendingUpgradeRetryHasForTests(boardId: string): boolean {
+  return pendingUpgradeRetry.has(boardId)
+}
 
 /**
  * Options for {@link syncActiveEditorToDraft} / Workspace dispatcher.
@@ -1754,6 +1781,35 @@ export const useKnowledgeStore = create<KnowledgeState>((set, get) => ({
       }
 
       if (isBoard) {
+        // LKD-8: dual-parse; migrate excalidraw → hip-board; open upgrade write.
+        let finalBody = body
+        let upgradePayload: {
+          json: string
+          skipped: number
+        } | null = null
+        // Clear per-open flags for this board; re-set when re-detecting unsupported.
+        legacyPreserveRaw.delete(id)
+        try {
+          const parsed = parseBoardScene(body)
+          if (parsed.type === 'excalidraw') {
+            const mig = migrateExcalidrawToHipBoard(parsed, { boardId: id })
+            if (mig.unsupported) {
+              toast.warning(i18n.t('knowledge.board.legacyUnsupported'))
+              legacyPreserveRaw.add(id)
+              finalBody = EMPTY_BOARD_SCENE_JSON
+              // DO NOT write disk; DO NOT delete .excalidraw
+            } else {
+              finalBody = stableSerializeBoard(mig.scene)
+              upgradePayload = { json: finalBody, skipped: mig.skipped }
+            }
+          }
+          // hip-board: use as-is
+        } catch {
+          toast.error(i18n.t('knowledge.board.loadFailed'))
+          finalBody = EMPTY_BOARD_SCENE_JSON
+          // invalid: EMPTY in memory; no write
+        }
+
         // Board: dehydrated JSON; do NOT change editorMode; no large-doc / link panel.
         set((s) => {
           const rest = s.recent.filter(
@@ -1763,8 +1819,8 @@ export const useKnowledgeStore = create<KnowledgeState>((set, get) => ({
           persistRecent(recent)
           return {
             activeDocId: id,
-            docBody: body,
-            draftBody: body,
+            docBody: finalBody,
+            draftBody: finalBody,
             // editorMode: OMIT — leave previous
             saveState: 'idle' as const,
             treeFocusId: id,
@@ -1778,8 +1834,42 @@ export const useKnowledgeStore = create<KnowledgeState>((set, get) => ({
         })
         // Title-only search upsert on open (optional for docs; required path for boards).
         indexBoardTitle(spaceId, id, node.title, spaceName, get().nodes)
-        kbPerfOpenStore(body.length, get().editorMode)
+        kbPerfOpenStore(finalBody.length, get().editorMode)
         schedulePersistExpand(spaceId, get)
+
+        // OPEN UPGRADE (async, generation-guarded). Write primary + del legacy on success.
+        if (upgradePayload) {
+          const upgradeJson = upgradePayload.json
+          const skipped = upgradePayload.skipped
+          const upgradeBoardId = id
+          const upgradeSpaceId = spaceId
+          const upgradeGen = gen
+          void (async () => {
+            // Guard before write: gen miss → silent skip, no write/delete/toast.
+            if (upgradeGen !== openDocGeneration) return
+            if (get().activeDocId !== upgradeBoardId) return
+            if (get().activeSpaceId !== upgradeSpaceId) return
+            try {
+              await knowledgeWriteBoard(upgradeSpaceId, upgradeBoardId, upgradeJson)
+              // Success: clear retry flag. Toast only if still the same open.
+              pendingUpgradeRetry.delete(upgradeBoardId)
+              if (upgradeGen !== openDocGeneration) return
+              if (get().activeDocId !== upgradeBoardId) return
+              if (get().activeSpaceId !== upgradeSpaceId) return
+              if (skipped > 0) {
+                toast.message(i18n.t('knowledge.board.legacyPartial', { count: skipped }))
+              } else {
+                toast.message(i18n.t('knowledge.board.legacyImported'))
+              }
+            } catch {
+              // Keep memory hip; do not delete legacy (write failed → no primary or atomic).
+              pendingUpgradeRetry.add(upgradeBoardId)
+              if (upgradeGen !== openDocGeneration) return
+              if (get().activeDocId !== upgradeBoardId) return
+              toast.error(i18n.t('knowledge.board.legacyUpgradeFailed'))
+            }
+          })()
+        }
         return
       }
 
@@ -1903,10 +1993,6 @@ export const useKnowledgeStore = create<KnowledgeState>((set, get) => ({
         resolveWrite?.(true)
         return true
       }
-      if (s.draftBody === s.docBody) {
-        resolveWrite?.(true)
-        return true
-      }
       // Capture targets up front — openDoc may switch activeDoc mid-await.
       const spaceId = s.activeSpaceId
       const docId = s.activeDocId
@@ -1920,13 +2006,35 @@ export const useKnowledgeStore = create<KnowledgeState>((set, get) => ({
       const spaceName = s.spaces.find((sp) => sp.id === spaceId)?.name ?? ''
       const nodesSnap = s.nodes
       const isBoard = isBoardNode(node, docId)
+      // Upgrade-failure retry: force write even when draft===doc (both already hip in mem).
+      const needsUpgradeRetry = isBoard && pendingUpgradeRetry.has(docId)
+      if (s.draftBody === s.docBody && !needsUpgradeRetry) {
+        resolveWrite?.(true)
+        return true
+      }
 
       set({ saveState: 'saving' })
       try {
         if (isBoard) {
+          // LKD-8 unsupported gate: block write until user confirms replace (PR-C must-pass).
+          if (legacyPreserveRaw.has(docId)) {
+            const confirmed =
+              typeof window !== 'undefined' &&
+              typeof window.confirm === 'function' &&
+              window.confirm(i18n.t('knowledge.board.legacyReplaceConfirm'))
+            if (!confirmed) {
+              toast.message(i18n.t('knowledge.board.legacyWriteBlocked'))
+              set({ saveState: 'idle' })
+              resolveWrite?.(false)
+              return false
+            }
+            legacyPreserveRaw.delete(docId)
+          }
           // Prerequisite: caller already ran syncActiveEditorToDraft when structural.
           assertNoDataUrlInBoardJson(body)
           await knowledgeWriteBoard(spaceId, docId, body)
+          // Successful write upgrades primary + deletes legacy (Rust write_board_file).
+          pendingUpgradeRetry.delete(docId)
           if (get().activeDocId === docId && get().activeSpaceId === spaceId) {
             set({ docBody: body, saveState: 'saved' })
           } else if (get().saveState === 'saving') {

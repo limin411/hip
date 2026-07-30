@@ -1,7 +1,6 @@
 /**
- * Hip SVG whiteboard (PR-3: selection, transform, undo).
+ * Hip SVG whiteboard (PR-C production engine).
  *
- * Not mounted from KnowledgeWorkspace until PR-C.
  * Camera is session-only — pan/zoom never call setDraftBody (LKD-14).
  * Draft throttle only when dehydrated scene serializes differently.
  * Undo ring: { elements, filesRel }[] max 50 (LKD-12).
@@ -29,6 +28,7 @@ import {
   type HipBoardSceneDisk,
   type HipBoardText,
 } from '@/domain/knowledge/boardScene'
+import { useKnowledgeStore } from '@/store/knowledgeStore'
 import {
   BOARD_DEFAULT_CORNER_RADIUS,
   BOARD_DEFAULT_FILL,
@@ -280,8 +280,8 @@ export const HipBoardCanvas = forwardRef<HipBoardCanvasHandle, HipBoardCanvasPro
         if (parsed.type === 'hip-board') {
           scene = parsed
         } else {
-          // Dual-parse accepted excalidraw, but this canvas only renders hip-board.
-          // Production cutover + migrate happen in PR-C; keep empty hip for now.
+          // openDoc migrates excalidraw → hip before mount; if we still see
+          // excalidraw JSON, fall back to empty hip (do not feed legacy shapes).
           scene = EMPTY_HIP_BOARD_SCENE
         }
       } catch {
@@ -330,6 +330,19 @@ export const HipBoardCanvas = forwardRef<HipBoardCanvasHandle, HipBoardCanvasPro
       return serializeHipBoard(scene)
     }, [])
 
+    /** Write draft via prop override or knowledgeStore (production path). */
+    const writeDraft = useCallback(
+      (raw: string, persist: 'auto' | 'none') => {
+        const docId = boardIdRef.current
+        if (onDraftBody) {
+          onDraftBody(raw, { docId, persist })
+          return
+        }
+        useKnowledgeStore.getState().setDraftBody(raw, { docId, persist })
+      },
+      [onDraftBody],
+    )
+
     /** Schedule setDraftBody only when dehydrated serialize changes (LKD-14). */
     const scheduleDraftAuto = useCallback(() => {
       if (!activeRef.current) return
@@ -340,9 +353,9 @@ export const HipBoardCanvas = forwardRef<HipBoardCanvasHandle, HipBoardCanvasPro
         const raw = buildDiskJson()
         if (raw === lastSerializedRef.current) return
         lastSerializedRef.current = raw
-        onDraftBody?.(raw, { docId: boardIdRef.current, persist: 'auto' })
+        writeDraft(raw, 'auto')
       }, THROTTLE_MS)
-    }, [buildDiskJson, onDraftBody])
+    }, [buildDiskJson, writeDraft])
 
     const setElementsBoth = useCallback(
       (next: HipBoardElement[], opts?: { draft?: boolean }) => {
@@ -581,9 +594,9 @@ export const HipBoardCanvas = forwardRef<HipBoardCanvasHandle, HipBoardCanvasPro
         }
         const raw = buildDiskJson()
         lastSerializedRef.current = raw
-        onDraftBody?.(raw, { docId: boardIdRef.current, persist: 'none' })
+        writeDraft(raw, 'none')
       },
-      [buildDiskJson, clearHistory, clearThrottle, foldOpenTextDraft, onDraftBody],
+      [buildDiskJson, clearHistory, clearThrottle, foldOpenTextDraft, writeDraft],
     )
 
     const applyStylePatch = useCallback(

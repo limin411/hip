@@ -250,6 +250,39 @@ describe('parseBoardScene dual accept', () => {
     expect(again.type).toBe('hip-board')
     expect(again.appState.viewBackgroundColor).toBe('#eee')
   })
+
+  it('omits structurally invalid hip elements (validate-or-skip)', () => {
+    const raw = JSON.stringify({
+      type: 'hip-board',
+      version: 1,
+      source: 'hip',
+      elements: [
+        {
+          id: 'ok',
+          type: 'rect',
+          x: 0,
+          y: 0,
+          w: 10,
+          h: 10,
+          fill: '#fff',
+          stroke: '#000',
+          strokeWidth: 1,
+          cornerRadius: 0,
+        },
+        { id: 'bad', type: 'rect', x: 0, y: 0 }, // missing w/h/fill
+        { type: 'ellipse', x: 0, y: 0, w: 1, h: 1 }, // missing id
+        { id: 'unk', type: 'diamond', x: 0, y: 0 },
+      ],
+      appState: { viewBackgroundColor: '#ffffff' },
+      files: {},
+    })
+    const parsed = parseBoardScene(raw)
+    expect(parsed.type).toBe('hip-board')
+    if (isHipBoardScene(parsed)) {
+      expect(parsed.elements).toHaveLength(1)
+      expect(parsed.elements[0]?.id).toBe('ok')
+    }
+  })
 })
 
 describe('pickPersistAppState / buildDiskScene (dehydrate)', () => {

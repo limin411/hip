@@ -22,16 +22,18 @@ import { toast } from 'sonner'
 import {
   assertNoDataUrlInBoardJson,
   buildDiskScene,
+  EMPTY_BOARD_SCENE,
   EMPTY_BOARD_SCENE_JSON,
   estimateDataUrlBytes,
   hydrateBoardFiles,
   importBoardFileBytes,
+  isExcalidrawScene,
   parseBoardScene,
   stableSerializeBoard,
   stripImageElementsForFiles,
   type HipBoardFilesRuntime,
   type HipBoardFileRuntime,
-  type BoardSceneDisk,
+  type LegacyExcalidrawSceneDisk,
 } from '@/domain/knowledge/boardScene'
 import { KNOWLEDGE_ASSET_INLINE_MAX_BYTES } from '@/domain/knowledge/limits'
 import { isAllowedAssetMime, isImageMime } from '@/domain/knowledge/assetUrl'
@@ -129,11 +131,18 @@ export const KnowledgeBoardCanvas = forwardRef<
     activeRef.current = true
     let cancelled = false
 
-    let scene: BoardSceneDisk
+    // Excalidraw path until PR-C: only seed excalidraw scenes. Hip-board JSON
+    // (dual-parse) must not feed hip shapes into Excalidraw (would corrupt on flush).
+    let scene: LegacyExcalidrawSceneDisk = EMPTY_BOARD_SCENE
     try {
-      scene = parseBoardScene(initialJson || EMPTY_BOARD_SCENE_JSON)
+      const parsed = parseBoardScene(initialJson || EMPTY_BOARD_SCENE_JSON)
+      if (isExcalidrawScene(parsed)) {
+        scene = parsed
+      } else {
+        scene = EMPTY_BOARD_SCENE
+      }
     } catch {
-      scene = parseBoardScene(EMPTY_BOARD_SCENE_JSON)
+      scene = EMPTY_BOARD_SCENE
     }
 
     // SYNC seed — must complete before hydrate await / any flushToStore.

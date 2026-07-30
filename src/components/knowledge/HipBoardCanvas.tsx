@@ -25,6 +25,7 @@ import {
   type HipBoardSceneDisk,
 } from '@/domain/knowledge/boardScene'
 import {
+  arrowHeadPoints,
   clampCamera,
   worldGroupTransform,
   zoomAtScreenPoint,
@@ -144,13 +145,17 @@ export const HipBoardCanvas = forwardRef<HipBoardCanvasHandle, HipBoardCanvasPro
 
     const flushToStore = useCallback(
       (opts?: FlushToStoreOpts) => {
-        if (!activeRef.current && opts?.mode !== 'leave') return
+        const isLeave = opts?.mode === 'leave'
+        // KD-13: freeze first on leave so concurrent input cannot re-dirty.
+        if (isLeave) {
+          activeRef.current = false
+          panRef.current = null
+        } else if (!activeRef.current) {
+          return
+        }
         const raw = buildDiskJson()
         lastSerializedRef.current = raw
         onDraftBody?.(raw, { docId: boardIdRef.current, persist: 'none' })
-        if (opts?.mode === 'leave') {
-          activeRef.current = false
-        }
       },
       [buildDiskJson, onDraftBody],
     )
@@ -182,6 +187,7 @@ export const HipBoardCanvas = forwardRef<HipBoardCanvasHandle, HipBoardCanvasPro
     }, [])
 
     const applyCamera = useCallback((next: HipBoardCamera) => {
+      if (!activeRef.current) return
       const c = clampCamera(next)
       cameraRef.current = c
       setCamera(c)
@@ -190,6 +196,7 @@ export const HipBoardCanvas = forwardRef<HipBoardCanvasHandle, HipBoardCanvasPro
 
     const onWheel = useCallback(
       (e: React.WheelEvent) => {
+        if (!activeRef.current) return
         e.preventDefault()
         const rect = rootRef.current?.getBoundingClientRect()
         if (!rect) return
@@ -203,6 +210,7 @@ export const HipBoardCanvas = forwardRef<HipBoardCanvasHandle, HipBoardCanvasPro
     )
 
     const onPointerDown = useCallback((e: React.PointerEvent) => {
+      if (!activeRef.current) return
       // PR-1 shell: primary or middle drag pans (no select tool yet). Camera-only.
       if (e.button !== 0 && e.button !== 1) return
       e.currentTarget.setPointerCapture(e.pointerId)
@@ -217,6 +225,7 @@ export const HipBoardCanvas = forwardRef<HipBoardCanvasHandle, HipBoardCanvasPro
 
     const onPointerMove = useCallback(
       (e: React.PointerEvent) => {
+        if (!activeRef.current) return
         const pan = panRef.current
         if (!pan || pan.pointerId !== e.pointerId) return
         const dx = e.clientX - pan.startSX
@@ -297,7 +306,7 @@ export const HipBoardCanvas = forwardRef<HipBoardCanvasHandle, HipBoardCanvasPro
                   />
                 )
               }
-              if (el.type === 'line' || el.type === 'arrow') {
+              if (el.type === 'line') {
                 return (
                   <line
                     key={el.id}
@@ -309,6 +318,23 @@ export const HipBoardCanvas = forwardRef<HipBoardCanvasHandle, HipBoardCanvasPro
                     strokeWidth={el.strokeWidth}
                     data-element-id={el.id}
                   />
+                )
+              }
+              if (el.type === 'arrow') {
+                // Filled triangle head in world space (L = max(8, 4 * strokeWidth)).
+                const head = arrowHeadPoints(el.x, el.y, el.x2, el.y2, el.strokeWidth)
+                return (
+                  <g key={el.id} data-element-id={el.id} data-element-type="arrow">
+                    <line
+                      x1={el.x}
+                      y1={el.y}
+                      x2={el.x2}
+                      y2={el.y2}
+                      stroke={el.stroke}
+                      strokeWidth={el.strokeWidth}
+                    />
+                    <polygon points={head} fill={el.stroke} stroke="none" />
+                  </g>
                 )
               }
               if (el.type === 'text') {

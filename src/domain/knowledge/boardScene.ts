@@ -187,6 +187,113 @@ export function isExcalidrawScene(scene: BoardSceneDisk): scene is LegacyExcalid
   return scene.type === 'excalidraw'
 }
 
+function isFiniteNum(v: unknown): v is number {
+  return typeof v === 'number' && Number.isFinite(v)
+}
+
+/**
+ * Lightweight structural validate-or-skip for hip-board elements.
+ * Corrupt/partial entries are omitted rather than thrown (parse still succeeds).
+ */
+export function validateHipBoardElement(raw: unknown): HipBoardElement | null {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return null
+  const o = raw as Record<string, unknown>
+  if (typeof o.id !== 'string' || o.id.length === 0) return null
+  if (!isFiniteNum(o.x) || !isFiniteNum(o.y)) return null
+  const locked = o.locked === true ? true : undefined
+
+  switch (o.type) {
+    case 'rect': {
+      if (!isFiniteNum(o.w) || !isFiniteNum(o.h)) return null
+      if (typeof o.fill !== 'string' || typeof o.stroke !== 'string') return null
+      if (!isFiniteNum(o.strokeWidth) || !isFiniteNum(o.cornerRadius)) return null
+      return {
+        id: o.id,
+        type: 'rect',
+        x: o.x,
+        y: o.y,
+        w: o.w,
+        h: o.h,
+        fill: o.fill,
+        stroke: o.stroke,
+        strokeWidth: o.strokeWidth,
+        cornerRadius: o.cornerRadius,
+        ...(locked ? { locked } : {}),
+      }
+    }
+    case 'ellipse': {
+      if (!isFiniteNum(o.w) || !isFiniteNum(o.h)) return null
+      if (typeof o.fill !== 'string' || typeof o.stroke !== 'string') return null
+      if (!isFiniteNum(o.strokeWidth)) return null
+      return {
+        id: o.id,
+        type: 'ellipse',
+        x: o.x,
+        y: o.y,
+        w: o.w,
+        h: o.h,
+        fill: o.fill,
+        stroke: o.stroke,
+        strokeWidth: o.strokeWidth,
+        ...(locked ? { locked } : {}),
+      }
+    }
+    case 'line':
+    case 'arrow': {
+      if (!isFiniteNum(o.x2) || !isFiniteNum(o.y2)) return null
+      if (typeof o.stroke !== 'string' || !isFiniteNum(o.strokeWidth)) return null
+      return {
+        id: o.id,
+        type: o.type,
+        x: o.x,
+        y: o.y,
+        x2: o.x2,
+        y2: o.y2,
+        stroke: o.stroke,
+        strokeWidth: o.strokeWidth,
+        ...(locked ? { locked } : {}),
+      }
+    }
+    case 'text': {
+      if (!isFiniteNum(o.w) || !isFiniteNum(o.h)) return null
+      if (typeof o.text !== 'string' || typeof o.fill !== 'string') return null
+      const fontSize = o.fontSize
+      if (fontSize !== 12 && fontSize !== 16 && fontSize !== 24) return null
+      const fontWeight =
+        o.fontWeight === 400 || o.fontWeight === 600 ? o.fontWeight : undefined
+      return {
+        id: o.id,
+        type: 'text',
+        x: o.x,
+        y: o.y,
+        w: o.w,
+        h: o.h,
+        text: o.text,
+        fill: o.fill,
+        fontSize,
+        ...(fontWeight !== undefined ? { fontWeight } : {}),
+        ...(locked ? { locked } : {}),
+      }
+    }
+    case 'image': {
+      if (!isFiniteNum(o.w) || !isFiniteNum(o.h)) return null
+      if (typeof o.fileId !== 'string' || o.fileId.length === 0) return null
+      return {
+        id: o.id,
+        type: 'image',
+        x: o.x,
+        y: o.y,
+        w: o.w,
+        h: o.h,
+        fileId: o.fileId,
+        ...(locked ? { locked } : {}),
+      }
+    }
+    default:
+      return null
+  }
+}
+
 /**
  * Parse a board scene from JSON. Throws on invalid JSON or wrong top-level shape.
  * Accepts both `type: "excalidraw"` and `type: "hip-board"` (PR-1 dual parse).
@@ -216,6 +323,11 @@ export function parseBoardScene(raw: string): BoardSceneDisk {
       : undefined
 
   if (o.type === 'hip-board') {
+    const validated: HipBoardElement[] = []
+    for (const el of elements) {
+      const v = validateHipBoardElement(el)
+      if (v) validated.push(v)
+    }
     return {
       type: 'hip-board',
       version: 1,
@@ -224,7 +336,7 @@ export function parseBoardScene(raw: string): BoardSceneDisk {
         schemaVersion: 1,
         ...(hip?.boardId ? { boardId: hip.boardId } : {}),
       },
-      elements: elements as HipBoardElement[],
+      elements: validated,
       appState: {
         viewBackgroundColor:
           typeof appState.viewBackgroundColor === 'string'
@@ -326,11 +438,8 @@ export function pickPersistAppState(
 }
 
 /**
- * Build dehydrated on-disk scene from runtime refs.
- * `relByFileId` only includes completed imports (hipAssetRel); pending files omitted.
- */
-/**
  * Build dehydrated on-disk scene from runtime refs (Excalidraw production path).
+ * `relByFileId` only includes completed imports (hipAssetRel); pending files omitted.
  * Remains type:excalidraw until PR-C.
  */
 export function buildDiskScene(args: {

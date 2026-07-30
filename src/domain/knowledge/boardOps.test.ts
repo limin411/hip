@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
+  arrowHeadPoints,
   clampZoom,
   deleteElements,
   elementAabb,
@@ -109,6 +110,12 @@ describe('boardOps hit-test', () => {
     const els = [rect({ id: 'a', x: 0, y: 0, w: 10, h: 10 }), rect({ id: 'b', x: 50, y: 50, w: 10, h: 10 })]
     expect(hitTestMarquee(els, { x: -1, y: -1, w: 20, h: 20 })).toEqual(['a'])
   })
+
+  it('marquee with inverted w/h (drag right→left) still hits', () => {
+    const els = [rect({ id: 'a', x: 0, y: 0, w: 10, h: 10 })]
+    // Drag from (15,15) to (-5,-5) → w/h negative
+    expect(hitTestMarquee(els, { x: 15, y: 15, w: -20, h: -20 })).toEqual(['a'])
+  })
 })
 
 describe('boardOps transforms', () => {
@@ -154,5 +161,12 @@ describe('boardOps transforms', () => {
       strokeWidth: 1,
     })
     expect(box).toEqual({ x: 0, y: 0, w: 10, h: 20 })
+  })
+
+  it('arrowHeadPoints returns triangle at tip', () => {
+    const pts = arrowHeadPoints(0, 0, 100, 0, 2)
+    // Tip at (100,0); three vertices
+    expect(pts.split(' ')).toHaveLength(3)
+    expect(pts.startsWith('100,0')).toBe(true)
   })
 })

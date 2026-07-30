@@ -188,23 +188,38 @@ export function hitTest(
   return null
 }
 
+/** Normalize AABB so w/h are non-negative (handles inverted marquee drag). */
+export function normalizeAabb(box: WorldAabb): WorldAabb {
+  return {
+    x: Math.min(box.x, box.x + box.w),
+    y: Math.min(box.y, box.y + box.h),
+    w: Math.abs(box.w),
+    h: Math.abs(box.h),
+  }
+}
+
 /** Marquee: world AABB intersects element AABB (ellipse uses bounding box). */
 export function hitTestMarquee(
   elements: readonly HipBoardElement[],
   marquee: WorldAabb,
 ): string[] {
   const ids: string[] = []
-  const mx2 = marquee.x + marquee.w
-  const my2 = marquee.y + marquee.h
+  const m = normalizeAabb(marquee)
+  const mx2 = m.x + m.w
+  const my2 = m.y + m.h
   for (const el of elements) {
     const b = elementAabb(el)
     const bx2 = b.x + b.w
     const by2 = b.y + b.h
-    if (b.x <= mx2 && bx2 >= marquee.x && b.y <= my2 && by2 >= marquee.y) {
+    if (b.x <= mx2 && bx2 >= m.x && b.y <= my2 && by2 >= m.y) {
       ids.push(el.id)
     }
   }
   return ids
+}
+
+function isLocked(el: HipBoardElement): boolean {
+  return el.locked === true
 }
 
 /** Translate elements by (dx, dy). Skips locked. Returns new array (same refs for untouched). */
@@ -216,7 +231,7 @@ export function moveElements(
 ): HipBoardElement[] {
   if (ids.size === 0 || (dx === 0 && dy === 0)) return elements as HipBoardElement[]
   return elements.map((el) => {
-    if (!ids.has(el.id) || el.locked) return el
+    if (!ids.has(el.id) || isLocked(el)) return el
     if (el.type === 'line' || el.type === 'arrow') {
       return { ...el, x: el.x + dx, y: el.y + dy, x2: el.x2 + dx, y2: el.y2 + dy }
     }
@@ -230,11 +245,41 @@ export function deleteElements(
   ids: ReadonlySet<string>,
 ): HipBoardElement[] {
   if (ids.size === 0) return elements as HipBoardElement[]
-  return elements.filter((el) => !ids.has(el.id) || el.locked === true)
+  return elements.filter((el) => !ids.has(el.id) || isLocked(el))
 }
 
 /** SVG transform for the world group: translate(pan) scale(zoom). */
 export function worldGroupTransform(camera: HipBoardCamera): string {
   const c = clampCamera(camera)
   return `translate(${c.x},${c.y}) scale(${c.zoom})`
+}
+
+/**
+ * Filled triangle arrow head at (x2,y2) in world space.
+ * L = max(8, 4 * strokeWidth); independent of CSS markers so zoom does not double-scale.
+ */
+export function arrowHeadPoints(
+  x: number,
+  y: number,
+  x2: number,
+  y2: number,
+  strokeWidth: number,
+): string {
+  const L = Math.max(8, 4 * strokeWidth)
+  const dx = x2 - x
+  const dy = y2 - y
+  const len = Math.hypot(dx, dy)
+  if (len < 1e-6) {
+    // Degenerate: point straight left of tip
+    return `${x2},${y2} ${x2 - L},${y2 - L / 2} ${x2 - L},${y2 + L / 2}`
+  }
+  const ux = dx / len
+  const uy = dy / len
+  // Base center sits L back from tip along the shaft
+  const bx = x2 - ux * L
+  const by = y2 - uy * L
+  // Perpendicular half-width ~ L/2
+  const px = -uy * (L / 2)
+  const py = ux * (L / 2)
+  return `${x2},${y2} ${bx + px},${by + py} ${bx - px},${by - py}`
 }

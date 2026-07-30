@@ -203,4 +203,39 @@ describe('migrateExcalidrawToHipBoard', () => {
     const r = scene.elements[0]
     expect(r && r.type === 'rect' && r.cornerRadius).toBe(8)
   })
+
+  it('line/arrow first point offset is applied to start (not only end)', () => {
+    const { scene } = migrateExcalidrawToHipBoard({
+      elements: [
+        {
+          id: 'l1',
+          type: 'line',
+          x: 100,
+          y: 100,
+          points: [
+            [10, 20],
+            [50, 60],
+          ],
+          strokeColor: '#111',
+          strokeWidth: 2,
+        },
+        {
+          id: 'a1',
+          type: 'arrow',
+          x: 0,
+          y: 0,
+          points: [
+            [5, 5],
+            [25, 5],
+          ],
+          strokeColor: '#111',
+          strokeWidth: 2,
+        },
+      ],
+    })
+    const line = scene.elements.find((e) => e.id === 'l1')
+    expect(line).toMatchObject({ type: 'line', x: 110, y: 120, x2: 150, y2: 160 })
+    const arrow = scene.elements.find((e) => e.id === 'a1')
+    expect(arrow).toMatchObject({ type: 'arrow', x: 5, y: 5, x2: 25, y2: 5 })
+  })
 })

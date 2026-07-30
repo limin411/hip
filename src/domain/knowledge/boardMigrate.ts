@@ -99,14 +99,18 @@ function mapElement(raw: unknown): HipBoardElement | null {
   }
 
   if (type === 'line' || type === 'arrow') {
-    // Multi-point → first/last; prefer points array if present.
-    let x2 = asNum(o.x) + asNum(o.width, 0)
-    let y2 = asNum(o.y) + asNum(o.height, 0)
+    // Multi-point → first/last in element-local coords offset by origin.
+    let x = asNum(o.x)
+    let y = asNum(o.y)
+    let x2 = x + asNum(o.width, 0)
+    let y2 = y + asNum(o.height, 0)
     const points = o.points
     if (Array.isArray(points) && points.length >= 2) {
       const first = points[0]
       const last = points[points.length - 1]
       if (Array.isArray(first) && Array.isArray(last)) {
+        x = asNum(o.x) + asNum(first[0])
+        y = asNum(o.y) + asNum(first[1])
         x2 = asNum(o.x) + asNum(last[0])
         y2 = asNum(o.y) + asNum(last[1])
       }
@@ -114,8 +118,8 @@ function mapElement(raw: unknown): HipBoardElement | null {
     return {
       id,
       type: type === 'arrow' ? 'arrow' : 'line',
-      x: asNum(o.x),
-      y: asNum(o.y),
+      x,
+      y,
       x2,
       y2,
       stroke: asStr(o.strokeColor, '#111111'),

@@ -150,4 +150,115 @@ describe('HipBoardCanvas shell', () => {
     )
     expect(ref.current?.isReady()).toBe(true)
   })
+
+  it('invalid initialJson falls back to empty hip scene', () => {
+    render(
+      <HipBoardCanvas
+        boardId="brd_hip_shell"
+        spaceId="spc_1"
+        initialJson="not-json{{{"
+      />,
+    )
+    expect(screen.getByTestId('hip-board-world').children).toHaveLength(0)
+  })
+
+  it('excalidraw initialJson seeds empty hip (no silent migrate)', () => {
+    const excal = JSON.stringify({
+      type: 'excalidraw',
+      version: 2,
+      source: 'hip',
+      elements: [{ id: 'stroke1', type: 'freedraw' }],
+      appState: { viewBackgroundColor: '#fff' },
+      files: {},
+    })
+    render(
+      <HipBoardCanvas boardId="brd_hip_shell" spaceId="spc_1" initialJson={excal} />,
+    )
+    expect(document.querySelector('[data-element-id="stroke1"]')).toBeNull()
+    expect(screen.getByTestId('hip-board-world').children).toHaveLength(0)
+  })
+
+  it('flushToStore leave freezes isReady and ignores further camera/draft', () => {
+    const onDraftBody = vi.fn()
+    const ref = createRef<HipBoardCanvasHandle>()
+    render(
+      <HipBoardCanvas
+        ref={ref}
+        boardId="brd_hip_shell"
+        spaceId="spc_1"
+        initialJson={EMPTY_HIP_BOARD_SCENE_JSON}
+        onDraftBody={onDraftBody}
+      />,
+    )
+    act(() => {
+      ref.current?.flushToStore({ mode: 'leave' })
+    })
+    expect(onDraftBody).toHaveBeenCalledTimes(1)
+    expect(ref.current?.isReady()).toBe(false)
+
+    const camBefore = ref.current!.getCamera()
+    const root = screen.getByTestId('knowledge-board-canvas')
+    act(() => {
+      fireEvent.wheel(root, { deltaY: -200, clientX: 10, clientY: 10 })
+      fireEvent.pointerDown(root, { button: 0, clientX: 0, clientY: 0, pointerId: 2 })
+      fireEvent.pointerMove(root, { button: 0, clientX: 50, clientY: 50, pointerId: 2 })
+      fireEvent.pointerUp(root, { button: 0, clientX: 50, clientY: 50, pointerId: 2 })
+    })
+    expect(ref.current!.getCamera()).toEqual(camBefore)
+    // Snapshot flush after leave is a no-op for draft
+    act(() => {
+      ref.current?.flushToStore({ mode: 'snapshot' })
+    })
+    expect(onDraftBody).toHaveBeenCalledTimes(1)
+  })
+
+  it('flushToStore without onDraftBody does not throw', () => {
+    const ref = createRef<HipBoardCanvasHandle>()
+    render(
+      <HipBoardCanvas
+        ref={ref}
+        boardId="brd_hip_shell"
+        spaceId="spc_1"
+        initialJson={EMPTY_HIP_BOARD_SCENE_JSON}
+      />,
+    )
+    expect(() => {
+      act(() => {
+        ref.current?.flushToStore({ mode: 'snapshot' })
+      })
+    }).not.toThrow()
+  })
+
+  it('renders arrow with polygon head', () => {
+    const scene: HipBoardSceneDisk = {
+      type: 'hip-board',
+      version: 1,
+      source: 'hip',
+      hip: { schemaVersion: 1 },
+      elements: [
+        {
+          id: 'a1',
+          type: 'arrow',
+          x: 0,
+          y: 0,
+          x2: 40,
+          y2: 0,
+          stroke: '#111',
+          strokeWidth: 2,
+        },
+      ],
+      appState: { viewBackgroundColor: '#fff' },
+      files: {},
+    }
+    render(
+      <HipBoardCanvas
+        boardId="brd_hip_shell"
+        spaceId="spc_1"
+        initialJson={serializeHipBoard(scene)}
+      />,
+    )
+    const g = document.querySelector('[data-element-id="a1"][data-element-type="arrow"]')
+    expect(g).toBeTruthy()
+    expect(g?.querySelector('polygon')).toBeTruthy()
+  })
 })

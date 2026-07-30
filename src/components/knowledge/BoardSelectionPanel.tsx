@@ -1,15 +1,13 @@
 import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import {
-  getBoardCanvasStyleApi,
-  useKnowledgeStore,
-} from '@/store/knowledgeStore'
+import { getBoardCanvasStyleApi } from '@/store/knowledgeStore'
 import type { BoardSelectionSnapshot } from '@/domain/knowledge/boardOutline'
 import { cn } from '@/lib/utils'
 
 /**
  * Selection style editors via canvas applyStylePatch / updateText (LKD-10).
  * Never mutates draftBody by parsing JSON.
+ * One panel field commit = one undo (blur/change, not per keystroke).
  */
 export function BoardSelectionPanel({
   selection,
@@ -22,10 +20,17 @@ export function BoardSelectionPanel({
   const mixed = style?.mixed
 
   const [textDraft, setTextDraft] = useState(style?.text ?? '')
+  const [strokeWidthDraft, setStrokeWidthDraft] = useState(
+    style?.strokeWidth != null ? String(style.strokeWidth) : '',
+  )
 
   useEffect(() => {
     setTextDraft(style?.text ?? '')
   }, [style?.text, selection?.ids.join('\0')])
+
+  useEffect(() => {
+    setStrokeWidthDraft(style?.strokeWidth != null ? String(style.strokeWidth) : '')
+  }, [style?.strokeWidth, selection?.ids.join('\0')])
 
   if (ids.length === 0) {
     return (
@@ -47,6 +52,19 @@ export function BoardSelectionPanel({
     }>,
   ) => {
     getBoardCanvasStyleApi()?.applyStylePatch(ids, patch)
+  }
+
+  const commitStrokeWidth = () => {
+    if (style?.strokeWidth === undefined) return
+    const n = Number(strokeWidthDraft)
+    if (!Number.isFinite(n)) {
+      setStrokeWidthDraft(String(style.strokeWidth))
+      return
+    }
+    const clamped = Math.max(0, Math.min(32, n))
+    setStrokeWidthDraft(String(clamped))
+    if (clamped === style.strokeWidth && !mixed?.strokeWidth) return
+    applyPatch({ strokeWidth: clamped })
   }
 
   const commitText = () => {
@@ -134,12 +152,15 @@ export function BoardSelectionPanel({
               className={cn(
                 'h-7 w-16 rounded-md border border-border bg-surface px-1.5 text-meta text-ink',
               )}
-              value={style.strokeWidth}
+              value={strokeWidthDraft}
               data-testid="knowledge-board-style-stroke-width"
-              onChange={(e) => {
-                const n = Number(e.target.value)
-                if (!Number.isFinite(n)) return
-                applyPatch({ strokeWidth: Math.max(0, Math.min(32, n)) })
+              onChange={(e) => setStrokeWidthDraft(e.target.value)}
+              onBlur={commitStrokeWidth}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  e.preventDefault()
+                  ;(e.target as HTMLInputElement).blur()
+                }
               }}
             />
           </span>

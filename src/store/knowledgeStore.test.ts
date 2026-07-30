@@ -3123,4 +3123,49 @@ describe('knowledgeStore board companion rail (PR-4)', () => {
     expect(p?.scroll).toBe(true)
     expect(p?.nonce).toBe(2)
   })
+
+  it('deleteNode active board clears board panel state (LKD-24)', async () => {
+    knowledgeSoftDeleteNodes.mockResolvedValue(['tentry_1'])
+    await useKnowledgeStore.getState().deleteNode('brd_board000001')
+    const s = useKnowledgeStore.getState()
+    expect(s.activeDocId).toBeNull()
+    expect(s.boardOutline).toBeNull()
+    expect(s.boardSelection).toBeNull()
+    expect(s.pendingBoardFocus).toBeNull()
+  })
+
+  it('openSpace without selectDocId clears board panel state (LKD-24)', async () => {
+    knowledgeGetTree.mockResolvedValue({ version: 1, nodes: [boardNode, docNode] })
+    await useKnowledgeStore.getState().openSpace('spc_1')
+    const s = useKnowledgeStore.getState()
+    expect(s.activeDocId).toBeNull()
+    expect(s.boardOutline).toBeNull()
+    expect(s.boardSelection).toBeNull()
+    expect(s.pendingBoardFocus).toBeNull()
+  })
+
+  it('openDoc fail path clears board panel state (LKD-24)', async () => {
+    // Must not already be on target id (same-id open is a no-op).
+    knowledgeReadDoc.mockResolvedValueOnce('# hi')
+    await useKnowledgeStore.getState().openDoc('doc_1')
+    expect(useKnowledgeStore.getState().boardOutline).toBeNull()
+
+    useKnowledgeStore.setState({
+      boardOutline: outlineSnap,
+      boardSelection: selWithRect,
+      pendingBoardFocus: {
+        ids: ['r1'],
+        nonce: 1,
+        scroll: true,
+        boardId: 'brd_board000001',
+      },
+    })
+    knowledgeReadBoard.mockRejectedValueOnce(new Error('disk fail'))
+    await useKnowledgeStore.getState().openDoc('brd_board000001')
+    const s = useKnowledgeStore.getState()
+    expect(s.activeDocId).toBeNull()
+    expect(s.boardOutline).toBeNull()
+    expect(s.boardSelection).toBeNull()
+    expect(s.pendingBoardFocus).toBeNull()
+  })
 })

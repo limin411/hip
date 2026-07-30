@@ -2,7 +2,10 @@
 import '@testing-library/jest-dom/vitest'
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen, cleanup, fireEvent } from '@testing-library/react'
-import { useKnowledgeStore } from '@/store/knowledgeStore'
+import {
+  registerBoardCanvasStyleApi,
+  useKnowledgeStore,
+} from '@/store/knowledgeStore'
 import { useUiStore } from '@/store/uiStore'
 import { KnowledgeOutlinePanel } from './KnowledgeOutlinePanel'
 
@@ -204,5 +207,74 @@ describe('KnowledgeOutlinePanel', () => {
     render(<KnowledgeOutlinePanel />)
     fireEvent.click(screen.getByTestId('knowledge-outline-panel-close'))
     expect(useUiStore.getState().knowledgePanelOpen).toBe(false)
+  })
+
+  it('style fill change goes through canvas API, not draftBody (LKD-10)', () => {
+    const applyStylePatch = vi.fn()
+    const updateText = vi.fn()
+    registerBoardCanvasStyleApi({ applyStylePatch, updateText })
+    const draftBefore =
+      '{"type":"hip-board","version":1,"source":"hip","elements":[],"appState":{"viewBackgroundColor":"#ffffff"},"files":{}}'
+    useKnowledgeStore.setState({
+      activeDocId: 'brd_board000001',
+      nodes: [
+        {
+          id: 'brd_board000001',
+          parentId: null,
+          kind: 'board',
+          title: 'Arch',
+          order: 0,
+          createdAt: 1,
+          updatedAt: 1,
+        },
+      ],
+      draftBody: draftBefore,
+      docBody: draftBefore,
+      boardOutline: {
+        boardId: 'brd_board000001',
+        items: [
+          {
+            id: 'r1',
+            type: 'rect',
+            label: 'rect r1',
+            depth: 0,
+            locked: false,
+            order: 0,
+          },
+        ],
+        totalElements: 1,
+        truncated: false,
+        imageCount: 0,
+      },
+      boardSelection: {
+        boardId: 'brd_board000001',
+        ids: ['r1'],
+        items: [
+          {
+            id: 'r1',
+            type: 'rect',
+            label: 'rect r1',
+            depth: 0,
+            locked: false,
+            order: 0,
+          },
+        ],
+        style: { fill: '#ffffff', stroke: '#111111', strokeWidth: 2 },
+      },
+    })
+    render(<KnowledgeOutlinePanel />)
+    fireEvent.change(screen.getByTestId('knowledge-board-style-fill'), {
+      target: { value: '#ff0000' },
+    })
+    expect(applyStylePatch).toHaveBeenCalledWith(['r1'], { fill: '#ff0000' })
+    expect(useKnowledgeStore.getState().draftBody).toBe(draftBefore)
+    // strokeWidth: keystrokes do not patch until blur
+    fireEvent.change(screen.getByTestId('knowledge-board-style-stroke-width'), {
+      target: { value: '5' },
+    })
+    expect(applyStylePatch).toHaveBeenCalledTimes(1)
+    fireEvent.blur(screen.getByTestId('knowledge-board-style-stroke-width'))
+    expect(applyStylePatch).toHaveBeenCalledWith(['r1'], { strokeWidth: 5 })
+    registerBoardCanvasStyleApi(null)
   })
 })

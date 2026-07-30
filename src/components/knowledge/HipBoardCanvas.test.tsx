@@ -1306,7 +1306,7 @@ describe('HipBoardCanvas companion rail publish (PR-4)', () => {
     expect(useKnowledgeStore.getState().boardSelection).toBeNull()
   })
 
-  it('pendingBoardFocus selects when ready; holds when frozen', async () => {
+  it('pendingBoardFocus selects when ready', async () => {
     const { ref } = renderCanvas({
       boardId: 'brd_hip_shell',
       initialJson: serializeHipBoard(SCENE_WITH_RECT),
@@ -1323,5 +1323,47 @@ describe('HipBoardCanvas companion rail publish (PR-4)', () => {
     })
     expect(ref.current!.getSelectedIds()).toEqual(['r1'])
     expect(useKnowledgeStore.getState().pendingBoardFocus).toBeNull()
+  })
+
+  it('pendingBoardFocus holds while frozen; resumeEditing re-consumes (LKD-25)', async () => {
+    const { ref } = renderCanvas({
+      boardId: 'brd_hip_shell',
+      initialJson: serializeHipBoard(SCENE_WITH_RECT),
+    })
+    await act(async () => {
+      await new Promise((r) => requestAnimationFrame(() => r(undefined)))
+    })
+
+    act(() => {
+      ref.current!.flushToStore({ mode: 'leave' })
+    })
+    expect(ref.current!.isReady()).toBe(false)
+
+    act(() => {
+      useKnowledgeStore.getState().requestBoardFocus(['r1'], { scroll: false })
+    })
+    // Still frozen — pending held
+    expect(useKnowledgeStore.getState().pendingBoardFocus?.ids).toEqual(['r1'])
+    expect(ref.current!.getSelectedIds()).toEqual([])
+
+    act(() => {
+      ref.current!.resumeEditing()
+    })
+    expect(ref.current!.isReady()).toBe(true)
+    expect(ref.current!.getSelectedIds()).toEqual(['r1'])
+    expect(useKnowledgeStore.getState().pendingBoardFocus).toBeNull()
+  })
+
+  it('applyStylePatch no-ops when activeDocId !== boardId', async () => {
+    const { ref } = renderCanvas({
+      boardId: 'brd_hip_shell',
+      initialJson: serializeHipBoard(SCENE_WITH_RECT),
+    })
+    useKnowledgeStore.setState({ activeDocId: 'brd_other' })
+    act(() => {
+      ref.current!.applyStylePatch(['r1'], { fill: '#ff0000' })
+    })
+    const el = ref.current!.getElements().find((e) => e.id === 'r1')
+    expect(el && el.type === 'rect' ? el.fill : null).toBe('#ffffff')
   })
 })

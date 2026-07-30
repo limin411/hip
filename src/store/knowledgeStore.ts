@@ -756,7 +756,8 @@ export function syncActiveEditorToDraft(opts?: SyncActiveEditorOpts): void {
 
 /**
  * Board companion style editors → canvas (LKD-10).
- * Registered by HipBoardCanvas; panel must not JSON.parse(draftBody).
+ * Module registry (not Workspace canvasRef): Outline lives under AppLayout.
+ * Intentional — panel must never JSON.parse(draftBody) for style edits.
  */
 export type BoardCanvasStyleApi = {
   applyStylePatch: (

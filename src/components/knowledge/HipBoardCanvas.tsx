@@ -758,6 +758,10 @@ export const HipBoardCanvas = forwardRef<HipBoardCanvasHandle, HipBoardCanvasPro
     const applyStylePatch = useCallback(
       (ids: string[], patch: StylePatch) => {
         if (!activeRef.current) return
+        // LKD-10 / handle contract: refuse cross-board stale registry ticks.
+        // Skip only when store has a different active leaf (null = unit-test / no leaf).
+        const activeId = useKnowledgeStore.getState().activeDocId
+        if (activeId != null && activeId !== boardIdRef.current) return
         if (ids.length === 0) return
         const idSet = new Set(ids)
         let changed = false
@@ -839,6 +843,8 @@ export const HipBoardCanvas = forwardRef<HipBoardCanvasHandle, HipBoardCanvasPro
     const updateText = useCallback(
       (id: string, text: string) => {
         if (!activeRef.current) return
+        const activeId = useKnowledgeStore.getState().activeDocId
+        if (activeId != null && activeId !== boardIdRef.current) return
         const el = elementsRef.current.find((e) => e.id === id)
         if (!el || el.type !== 'text' || el.locked) return
         const h = measureTextHeight(text, el.fontSize)
@@ -882,11 +888,33 @@ export const HipBoardCanvas = forwardRef<HipBoardCanvasHandle, HipBoardCanvasPro
       setSelection(ids.filter((id) => next.some((e) => e.id === id)))
     }, [commitHistory, setElementsBoth, setSelection, snapshotHistory])
 
+    /**
+     * Consume pendingBoardFocus when ready (LKD-25).
+     * Returns true if pending was applied or cleared (mismatch); false if still HOLD.
+     */
+    const consumePendingFocus = useCallback(() => {
+      const pending = useKnowledgeStore.getState().pendingBoardFocus
+      if (!pending?.ids.length) return true
+      if (!activeRef.current || !readyRef.current) return false // HOLD
+      const id = boardIdRef.current
+      if (pending.boardId !== id || useKnowledgeStore.getState().activeDocId !== id) {
+        useKnowledgeStore.getState().clearPendingBoardFocus()
+        return true
+      }
+      if (textEditRef.current) commitTextEdit()
+      setSelection(pending.ids)
+      if (pending.scroll) fitSelectionInView(pending.ids)
+      useKnowledgeStore.getState().clearPendingBoardFocus()
+      return true
+    }, [commitTextEdit, fitSelectionInView, setSelection])
+
     const resumeEditing = useCallback(() => {
       // After leave-mode freeze when flush/open aborts; unmount still freezes for real leave.
       activeRef.current = true
       readyRef.current = true
-    }, [])
+      // LKD-25: re-consume pending held during freeze (effect alone will not re-run).
+      consumePendingFocus()
+    }, [consumePendingFocus])
 
     useImperativeHandle(
       ref,
@@ -926,7 +954,8 @@ export const HipBoardCanvas = forwardRef<HipBoardCanvasHandle, HipBoardCanvasPro
       ],
     )
 
-    // Style editors in right rail call applyStylePatch/updateText via registry (LKD-10).
+    // Style editors in right rail (AppLayout) — module registry, not canvas ref
+    // (Outline is outside Workspace). Intentional LKD-10 path: no draftBody parse.
     useEffect(() => {
       registerBoardCanvasStyleApi({ applyStylePatch, updateText })
       return () => registerBoardCanvasStyleApi(null)
@@ -935,23 +964,8 @@ export const HipBoardCanvas = forwardRef<HipBoardCanvasHandle, HipBoardCanvasPro
     // pendingBoardFocus → selectAndScrollTo; hold until isReady (LKD-25).
     const pendingBoardFocus = useKnowledgeStore((s) => s.pendingBoardFocus)
     useEffect(() => {
-      const pending = pendingBoardFocus
-      if (!pending?.ids.length) return
-      if (!activeRef.current || !readyRef.current) return // HOLD
-      const id = boardIdRef.current
-      if (pending.boardId !== id) {
-        useKnowledgeStore.getState().clearPendingBoardFocus()
-        return
-      }
-      if (useKnowledgeStore.getState().activeDocId !== id) {
-        useKnowledgeStore.getState().clearPendingBoardFocus()
-        return
-      }
-      if (textEditRef.current) commitTextEdit()
-      setSelection(pending.ids)
-      if (pending.scroll) fitSelectionInView(pending.ids)
-      useKnowledgeStore.getState().clearPendingBoardFocus()
-    }, [pendingBoardFocus, commitTextEdit, fitSelectionInView, setSelection])
+      consumePendingFocus()
+    }, [pendingBoardFocus, consumePendingFocus])
 
     useEffect(() => {
       return () => {

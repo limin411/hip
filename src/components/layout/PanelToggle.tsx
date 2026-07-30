@@ -76,6 +76,8 @@ export function PanelToggle({ slot = 'toolbar' }: { slot?: PanelToggleSlot }) {
   const setSessionChatPanelOpen = useDomainStore((s) => s.setSessionChatPanelOpen)
   const resetChatActiveTab = useUiStore((s) => s.resetChatActiveTab)
   const kbMode = useKnowledgeStore((s) => s.mode)
+  const kbActiveDocId = useKnowledgeStore((s) => s.activeDocId)
+  const kbNodes = useKnowledgeStore((s) => s.nodes)
   const focusedManagedId = useManagedTerminalStore((s) => s.focusedId)
   const isGitRepo =
     useDiffStore((s) => (activeSessionId ? s.bySession[activeSessionId]?.isGitRepo : false)) ?? false
@@ -113,9 +115,16 @@ export function PanelToggle({ slot = 'toolbar' }: { slot?: PanelToggleSlot }) {
   )
   const triggerTitle = panelOpen ? t('artifact.closePanel') : t('chat.togglePanel')
 
-  // Knowledge: no session required; show outline when a space workspace is open.
+  // Knowledge: no session required; show outline/canvas when a space workspace is open.
   if (activeView === 'knowledge') {
     if (kbMode !== 'workspace') return null
+    const activeNode = kbNodes?.find((n) => n.id === kbActiveDocId)
+    const isBoard =
+      activeNode?.kind === 'board' ||
+      (kbActiveDocId != null && kbActiveDocId.startsWith('brd_'))
+    const knowledgePanelLabel = isBoard
+      ? t('knowledge.board.panelTitle')
+      : t('knowledge.outline.title')
     // Expanded: one-click collapse at the former X slot (single option surface).
     if (panelOpen) {
       return (
@@ -156,7 +165,7 @@ export function PanelToggle({ slot = 'toolbar' }: { slot?: PanelToggleSlot }) {
             <span className="flex w-4 shrink-0 items-center justify-center">
               {knowledgePanelOpen ? <Check size={14} className="text-accent" /> : null}
             </span>
-            {t('knowledge.outline.title')}
+            {knowledgePanelLabel}
           </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>

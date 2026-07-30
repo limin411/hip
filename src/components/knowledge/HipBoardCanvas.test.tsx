@@ -1282,21 +1282,15 @@ describe('HipBoardCanvas companion rail publish (PR-4)', () => {
     act(() => {
       ref.current!.selectAndScrollTo(['r1'], { scroll: false })
     })
-    await act(async () => {
-      await new Promise((r) => requestAnimationFrame(() => r(undefined)))
-    })
+    // Sync publish — no rAF wait required
     const afterSelect = useKnowledgeStore.getState().boardSelection
     expect(afterSelect?.ids).toEqual(['r1'])
 
-    // Second select same ids — store equality no-op; lastSel sig short-circuits rAF set
+    // Second select same ids — store equality no-op
     const setSpy = vi.spyOn(useKnowledgeStore.getState(), 'setBoardSelection')
     act(() => {
       ref.current!.selectAndScrollTo(['r1'], { scroll: false })
     })
-    await act(async () => {
-      await new Promise((r) => requestAnimationFrame(() => r(undefined)))
-    })
-    // rAF may call setBoardSelection but store equality keeps same reference
     expect(useKnowledgeStore.getState().boardSelection).toBe(afterSelect)
 
     // Pan/zoom must not change selection store
@@ -1309,7 +1303,46 @@ describe('HipBoardCanvas companion rail publish (PR-4)', () => {
     setSpy.mockRestore()
   })
 
-  it('leave cancels companion publish so delayed rAF does not write store', async () => {
+  it('pointer select keeps boardSelection after pointerup (no empty flash)', async () => {
+    const { ref, root } = renderCanvas({
+      boardId: 'brd_hip_shell',
+      initialJson: serializeHipBoard(SCENE_WITH_RECT),
+    })
+    vi.spyOn(root as HTMLElement, 'getBoundingClientRect').mockReturnValue({
+      x: 0,
+      y: 0,
+      top: 0,
+      left: 0,
+      bottom: 400,
+      right: 600,
+      width: 600,
+      height: 400,
+      toJSON: () => ({}),
+    })
+    await act(async () => {
+      await new Promise((r) => requestAnimationFrame(() => r(undefined)))
+    })
+
+    act(() => {
+      // Select r1 at world (30,40) — see SCENE_WITH_RECT
+      fireEvent.pointerDown(root, { button: 0, clientX: 30, clientY: 40, pointerId: 1 })
+    })
+    expect(ref.current!.getSelectedIds()).toEqual(['r1'])
+    expect(useKnowledgeStore.getState().boardSelection?.ids).toEqual(['r1'])
+
+    act(() => {
+      fireEvent.pointerUp(root, { button: 0, clientX: 30, clientY: 40, pointerId: 1 })
+    })
+    // Must remain selected after click (not flash back to canvas empty)
+    expect(ref.current!.getSelectedIds()).toEqual(['r1'])
+    expect(useKnowledgeStore.getState().boardSelection?.ids).toEqual(['r1'])
+    await act(async () => {
+      await new Promise((r) => requestAnimationFrame(() => r(undefined)))
+    })
+    expect(useKnowledgeStore.getState().boardSelection?.ids).toEqual(['r1'])
+  })
+
+  it('leave freezes canvas so further selection cannot write store', async () => {
     const { ref } = renderCanvas({
       boardId: 'brd_hip_shell',
       initialJson: serializeHipBoard(SCENE_WITH_RECT),
@@ -1320,14 +1353,10 @@ describe('HipBoardCanvas companion rail publish (PR-4)', () => {
 
     useKnowledgeStore.getState().clearBoardPanelState()
     act(() => {
-      ref.current!.selectAndScrollTo(['r1'], { scroll: false })
-      // Freeze before rAF runs
+      // leave freezes activeRef; subsequent select must not publish
       ref.current!.flushToStore({ mode: 'leave' })
+      ref.current!.selectAndScrollTo(['r1'], { scroll: false })
     })
-    await act(async () => {
-      await new Promise((r) => requestAnimationFrame(() => r(undefined)))
-    })
-    // Leave cancelled selRaf; selection must stay cleared
     expect(useKnowledgeStore.getState().boardSelection).toBeNull()
   })
 

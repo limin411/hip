@@ -302,6 +302,8 @@ export const HipBoardCanvas = forwardRef<HipBoardCanvasHandle, HipBoardCanvasPro
     const outlineTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
     const lastSelPublishSigRef = useRef('')
     const lastOutSigRef = useRef('')
+    /** True while drawing a not-yet-committed shape (no companion selection publish). */
+    const provisionalCreateRef = useRef(false)
     const gestureRef = useRef<Gesture | null>(null)
     const spaceDownRef = useRef(false)
     const toolRef = useRef<BoardTool>('select')
@@ -331,7 +333,9 @@ export const HipBoardCanvas = forwardRef<HipBoardCanvasHandle, HipBoardCanvasPro
     const [imageTick, setImageTick] = useState(0)
 
     toolRef.current = tool
-    selectedIdsRef.current = selectedIds
+    // Do NOT assign selectedIdsRef from selectedIds state here — setSelection /
+    // layout seed own the ref. A parent re-render with stale selectedIds would
+    // clobber a just-applied selection and make the companion rail flash empty.
     textEditRef.current = textEdit
 
     const revokeAllRuntimeImages = useCallback(() => {
@@ -401,26 +405,38 @@ export const HipBoardCanvas = forwardRef<HipBoardCanvasHandle, HipBoardCanvasPro
       lastOutSigRef.current = ''
     }, [])
 
-    /** Selection → store on rAF when ids+style sig changed (LKD-22/23). */
+    /**
+     * Selection → store. Sync path for setSelection (avoids rAF cancel / stale
+     * empty flash on the companion rail). rAF path coalesces style refreshes
+     * from element mutations (LKD-22/23).
+     */
+    const publishSelectionToStore = useCallback(() => {
+      if (!activeRef.current) return
+      // Skip while a shape is still being drawn (zero-size provisional).
+      if (provisionalCreateRef.current) return
+      const id = boardIdRef.current
+      if (useKnowledgeStore.getState().activeDocId !== id) return
+      const snap = buildSelectionSnapshot(
+        id,
+        elementsRef.current,
+        selectedIdsRef.current,
+      )
+      const sig = selectionPublishSignature(snap.ids, snap.style)
+      if (sig === lastSelPublishSigRef.current) return
+      lastSelPublishSigRef.current = sig
+      useKnowledgeStore.getState().setBoardSelection(snap)
+    }, [])
+
+    /** Coalesce selection style refresh onto rAF (element edit path). */
     const scheduleSelectionPublish = useCallback(() => {
       if (!activeRef.current) return
+      if (provisionalCreateRef.current) return
       if (selRafRef.current != null) return
       selRafRef.current = requestAnimationFrame(() => {
         selRafRef.current = null
-        if (!activeRef.current) return
-        const id = boardIdRef.current
-        if (useKnowledgeStore.getState().activeDocId !== id) return
-        const snap = buildSelectionSnapshot(
-          id,
-          elementsRef.current,
-          selectedIdsRef.current,
-        )
-        const sig = selectionPublishSignature(snap.ids, snap.style)
-        if (sig === lastSelPublishSigRef.current) return
-        lastSelPublishSigRef.current = sig
-        useKnowledgeStore.getState().setBoardSelection(snap)
+        publishSelectionToStore()
       })
-    }, [])
+    }, [publishSelectionToStore])
 
     /** Structure → store debounced 150ms from elements refs (LKD-21/22). */
     const scheduleOutlinePublish = useCallback(() => {
@@ -442,7 +458,8 @@ export const HipBoardCanvas = forwardRef<HipBoardCanvasHandle, HipBoardCanvasPro
         lastOutSigRef.current = sig
         useKnowledgeStore.getState().setBoardOutline(extractBoardOutline(id, els))
         // Refresh selection style/labels when selection non-empty (text/fill edit).
-        if (selectedIdsRef.current.length > 0) {
+        // Skip during provisional create — zero-size shape must not flash the rail.
+        if (selectedIdsRef.current.length > 0 && !provisionalCreateRef.current) {
           const snap = buildSelectionSnapshot(id, els, selectedIdsRef.current)
           const selSig = selectionPublishSignature(snap.ids, snap.style)
           if (selSig !== lastSelPublishSigRef.current) {
@@ -542,10 +559,11 @@ export const HipBoardCanvas = forwardRef<HipBoardCanvasHandle, HipBoardCanvasPro
       toolRef.current = 'select'
       setSelectedIds([])
       selectedIdsRef.current = []
+      provisionalCreateRef.current = false
       setTextEdit(null)
       readyRef.current = true
 
-// Immediate companion seed so rail is not empty-flash (LKD-21).
+      // Immediate companion seed so rail is not empty-flash (LKD-21).
       if (useKnowledgeStore.getState().activeDocId === boardId) {
         const emptySel = buildSelectionSnapshot(boardId, scene.elements, [])
         lastSelPublishSigRef.current = selectionPublishSignature(
@@ -689,10 +707,12 @@ export const HipBoardCanvas = forwardRef<HipBoardCanvasHandle, HipBoardCanvasPro
       (ids: string[]) => {
         selectedIdsRef.current = ids
         setSelectedIds(ids)
-        // Selection-only — never schedule draft (LKD-14 / LKD-16)
-        scheduleSelectionPublish()
+        // Selection-only — never schedule draft (LKD-14 / LKD-16).
+        // Publish sync so the right rail does not flash empty when a later
+        // rAF is cancelled (leave) or a parent re-render races the frame.
+        publishSelectionToStore()
       },
-      [scheduleSelectionPublish],
+      [publishSelectionToStore],
     )
 
     /** Apply a history entry (undo/redo). Does not re-push history. */
@@ -913,6 +933,7 @@ export const HipBoardCanvas = forwardRef<HipBoardCanvasHandle, HipBoardCanvasPro
         if (isLeave) {
           activeRef.current = false
           gestureRef.current = null
+          provisionalCreateRef.current = false
           clearThrottle()
           cancelCompanionPublish()
           clearHistory()
@@ -1591,8 +1612,11 @@ cancelCompanionPublish()
             startWY: world.y,
             before,
           }
+          // Local selection chrome only — companion rail waits until commit.
+          provisionalCreateRef.current = true
+          selectedIdsRef.current = [el.id]
+          setSelectedIds([el.id])
           setElementsBoth([...elementsRef.current, el], { draft: false })
-          setSelection([el.id])
           return
         }
 
@@ -1832,16 +1856,21 @@ cancelCompanionPublish()
             discard = isTinyLine(el.x, el.y, el.x2, el.y2)
           }
           if (discard) {
+            provisionalCreateRef.current = false
             setElementsBoth(
               elementsRef.current.filter((x) => x.id !== g.elementId),
               { draft: false },
             )
+            // Clear local chrome; keep rail on canvas (empty selection).
             setSelection([])
             return
           }
+          provisionalCreateRef.current = false
           commitHistory(g.before)
           scheduleDraftAuto()
           scheduleOutlinePublish()
+          // Commit selection to companion rail now that the shape is real.
+          publishSelectionToStore()
           // Stay on shape tool for multi-draw (common whiteboard UX).
           return
         }
@@ -1868,6 +1897,7 @@ cancelCompanionPublish()
       },
       [
         commitHistory,
+        publishSelectionToStore,
         scheduleDraftAuto,
         scheduleOutlinePublish,
         setElementsBoth,

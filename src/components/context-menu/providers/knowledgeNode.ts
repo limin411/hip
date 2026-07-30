@@ -1,9 +1,10 @@
 import type { ContextMenuItemDef, ContextProvider } from '../types'
 
-/** Knowledge tree row: new doc/folder, rename, optional reveal, delete. */
+/** Knowledge tree row: new doc/whiteboard/folder, rename, optional reveal, delete. */
 export const knowledgeNodeProvider: ContextProvider = (req, ctx) => {
   if (req.kind !== 'knowledgeNode') return []
-  const { kind, onNewDoc, onNewFolder, onRename, onDelete, onReveal } = req.payload
+  const { kind, onNewDoc, onNewBoard, onNewFolder, onRename, onDelete, onReveal } =
+    req.payload
 
   const items: ContextMenuItemDef[] = [
     {
@@ -12,6 +13,14 @@ export const knowledgeNodeProvider: ContextProvider = (req, ctx) => {
       group: 'primary',
       run: () => {
         onNewDoc()
+      },
+    },
+    {
+      id: 'knowledgeNode.newBoard',
+      label: ctx.t('knowledge.tree.newBoard'),
+      group: 'primary',
+      run: () => {
+        onNewBoard()
       },
     },
     {
@@ -32,7 +41,7 @@ export const knowledgeNodeProvider: ContextProvider = (req, ctx) => {
     },
   ]
 
-  if (onReveal && kind === 'doc') {
+  if (onReveal && (kind === 'doc' || kind === 'board')) {
     items.push({
       id: 'knowledgeNode.reveal',
       label: ctx.t('knowledge.tree.reveal'),

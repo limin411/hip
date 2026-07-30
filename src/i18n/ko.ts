@@ -2433,14 +2433,16 @@ export const ko = {
     },
     "tree": {
       "newDoc": "문서",
+      "newBoard": "화이트보드",
       "newFolder": "폴더",
       "rename": "이름 바꾸기",
       "delete": "삭제",
       "nameLabel": "이름",
       "deleteTitle": "“{{title}}”을(를) 삭제할까요?",
       "deleteDocBody": "이 문서가 영구 삭제되며 되돌릴 수 없습니다.",
+      "deleteBoardBody": "이 화이트보드가 영구 삭제되며 되돌릴 수 없습니다.",
       "deleteFolderBody": "이 폴더와 그 안의 모든 항목이 영구 삭제되며 되돌릴 수 없습니다.",
-      "empty": "문서나 폴더를 만들어 시작하세요",
+      "empty": "문서, 화이트보드 또는 폴더를 만들어 시작하세요",
       "filterPlaceholder": "트리 필터…",
       "filterEmpty": "일치하는 항목 없음",
       "reveal": "Finder에서 보기",
@@ -2450,8 +2452,20 @@ export const ko = {
       "renameUpdateLinks": "이전 제목을 가리키는 위키 링크도 업데이트",
       "renameLinksDone": "{{count}}개 문서의 위키 링크를 업데이트했습니다"
     },
+    "board": {
+      "untitled": "제목 없는 화이트보드",
+      "loading": "화이트보드 로딩 중…",
+      "loadFailed": "화이트보드를 불러올 수 없습니다",
+      "pendingImageDropped": "이미지 가져오기가 진행 중이어서 저장되지 않았습니다.",
+      "placeholderTitle": "화이트보드",
+      "placeholderHint": "화이트보드는 다음 PR에서 로드됩니다"
+    },
     "export": {
       "doc": "문서 내보내기…",
+      "boardJson": "화이트보드 내보내기 (JSON)…",
+      "boardPng": "화이트보드 내보내기 (PNG)…",
+      "boardJsonDone": "화이트보드 JSON 내보내기 완료",
+      "boardPngDone": "화이트보드 PNG 내보내기 완료",
       "spaceZip": "스페이스를 ZIP으로 내보내기…",
       "docDone": "문서 내보내기 완료",
       "htmlDone": "HTML 내보내기 완료 (브라우저에서 열기; 필요 시 인쇄 → PDF 사용)",

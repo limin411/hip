@@ -2440,14 +2440,16 @@ export const zhTW = {
     },
     "tree": {
       "newDoc": "文件",
+      "newBoard": "畫板",
       "newFolder": "資料夾",
       "rename": "重新命名",
       "delete": "刪除",
       "nameLabel": "名稱",
       "deleteTitle": "刪除「{{title}}」？",
       "deleteDocBody": "將永久刪除此文件，此操作無法復原。",
+      "deleteBoardBody": "將永久刪除此畫板，此操作無法復原。",
       "deleteFolderBody": "將永久刪除此資料夾及其全部內容，此操作無法復原。",
-      "empty": "新增文件或資料夾以開始",
+      "empty": "新增文件、畫板或資料夾以開始",
       "filterPlaceholder": "過濾目錄…",
       "filterEmpty": "無符合項目",
       "reveal": "在 Finder 中顯示",
@@ -2457,8 +2459,20 @@ export const zhTW = {
       "renameUpdateLinks": "同時更新指向舊標題的 wiki 連結",
       "renameLinksDone": "已在 {{count}} 篇文件中更新 wiki 連結"
     },
+    "board": {
+      "untitled": "未命名畫板",
+      "loading": "正在載入畫板…",
+      "loadFailed": "無法載入畫板",
+      "pendingImageDropped": "有圖片仍在匯入，未能儲存。",
+      "placeholderTitle": "畫板",
+      "placeholderHint": "畫板將在後續版本載入"
+    },
     "export": {
       "doc": "匯出文件…",
+      "boardJson": "匯出畫板（JSON）…",
+      "boardPng": "匯出畫板（PNG）…",
+      "boardJsonDone": "畫板 JSON 已匯出",
+      "boardPngDone": "畫板 PNG 已匯出",
       "spaceZip": "匯出空間為 ZIP…",
       "docDone": "文件已匯出",
       "htmlDone": "已匯出 HTML（可用瀏覽器開啟；列印 → PDF）",

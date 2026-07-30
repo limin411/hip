@@ -8,6 +8,7 @@ import {
   FolderOpen,
   GripVertical,
   Library,
+  PencilRuler,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import type { KnowledgeNode } from '@/domain/knowledge/types'
@@ -19,6 +20,7 @@ interface SpaceTreeProps {
   onRename: (node: KnowledgeNode) => void
   onDelete: (node: KnowledgeNode) => void
   onNewDoc: (parentId: string | null) => void
+  onNewBoard: (parentId: string | null) => void
   onNewFolder: (parentId: string | null) => void
   onReveal?: (node: KnowledgeNode) => void
   /** When set, only render nodes in this set (matches ∪ ancestors). */
@@ -126,6 +128,7 @@ export function SpaceTree({
   onRename,
   onDelete,
   onNewDoc,
+  onNewBoard,
   onNewFolder,
   onReveal,
   visibleIds,
@@ -404,33 +407,38 @@ export function SpaceTree({
 
     const spaceId = activeSpaceId ?? ''
     const parentForNew = node.kind === 'folder' ? node.id : node.parentId
-    const isActiveDoc = node.kind === 'doc' && activeDocId === node.id
+    const isLeaf = node.kind === 'doc' || node.kind === 'board'
+    const isActiveLeaf = isLeaf && activeDocId === node.id
     const isFocused = treeFocusId === node.id
     // Roving target: focused visible row, or first root when focus is missing/hidden.
     const isRovingTarget =
       (focusInVisible && isFocused) || (!focusInVisible && node === roots[0])
     const isFolder = node.kind === 'folder'
     const isOpen = isFolder && expanded[node.id] === true
+    const treeTestId =
+      node.kind === 'doc'
+        ? `knowledge-tree-doc-${node.id}`
+        : node.kind === 'board'
+          ? `knowledge-tree-board-${node.id}`
+          : `knowledge-tree-folder-${node.id}`
 
     const row = (
       <div
         key={node.id}
-        data-testid={
-          node.kind === 'doc' ? `knowledge-tree-doc-${node.id}` : `knowledge-tree-folder-${node.id}`
-        }
+        data-testid={treeTestId}
         data-tree-node-id={node.id}
         role="treeitem"
         aria-expanded={isFolder ? isOpen : undefined}
-        aria-selected={isActiveDoc}
+        aria-selected={isActiveLeaf}
         tabIndex={isRovingTarget ? 0 : -1}
         onFocus={() => {
           if (treeFocusId !== node.id) setTreeFocusId(node.id)
         }}
         className={cn(
           'group relative flex w-full min-h-[32px] items-center gap-0.5 rounded-lg py-1 pr-1.5 text-body transition-[background-color,color,box-shadow,opacity] duration-100 outline-none select-none',
-          isActiveDoc ? TREE_ACTIVE_DOC : 'text-ink hover:bg-state-hover',
+          isActiveLeaf ? TREE_ACTIVE_DOC : 'text-ink hover:bg-state-hover',
           // Keyboard focus: fill only (Chrome ring omitted — row uses roving tabindex)
-          isFocused && !isActiveDoc && 'bg-state-hover',
+          isFocused && !isActiveLeaf && 'bg-state-hover',
           draggingId === node.id && 'opacity-45',
           dropHint?.targetId === node.id &&
             dropHint.mode === 'into' &&
@@ -528,22 +536,26 @@ export function SpaceTree({
               void openDoc(node.id)
             }}
           >
-            {/* Align docs with folder titles (chevron column reserved) */}
+            {/* Align leaves with folder titles (chevron column reserved) */}
             <span className="w-4 shrink-0" aria-hidden />
             <span
               className={cn(
                 'flex h-5 w-5 shrink-0 items-center justify-center rounded-md',
-                isActiveDoc
+                isActiveLeaf
                   ? 'bg-accent-strong/12 text-accent-strong'
                   : 'text-ink-tertiary group-hover:text-ink-secondary',
               )}
             >
-              <FileText size={14} strokeWidth={1.75} />
+              {node.kind === 'board' ? (
+                <PencilRuler size={14} strokeWidth={1.75} />
+              ) : (
+                <FileText size={14} strokeWidth={1.75} />
+              )}
             </span>
             <span
               className={cn(
                 'truncate leading-snug tracking-tight',
-                isActiveDoc ? 'font-medium text-ink' : 'font-normal text-ink',
+                isActiveLeaf ? 'font-medium text-ink' : 'font-normal text-ink',
               )}
             >
               {node.title}
@@ -563,11 +575,14 @@ export function SpaceTree({
           kind: node.kind,
           spaceId,
           onNewDoc: () => onNewDoc(parentForNew),
+          onNewBoard: () => onNewBoard(parentForNew),
           onNewFolder: () => onNewFolder(parentForNew),
           onRename: () => onRename(node),
           onDelete: () => onDelete(node),
           onReveal:
-            node.kind === 'doc' && onReveal ? () => onReveal(node) : undefined,
+            (node.kind === 'doc' || node.kind === 'board') && onReveal
+              ? () => onReveal(node)
+              : undefined,
         }}
       >
         {row}

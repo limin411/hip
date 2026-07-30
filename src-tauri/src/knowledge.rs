@@ -1399,10 +1399,10 @@ pub fn knowledge_reveal_path(app: AppHandle, args: AssetRelArgs) -> Result<(), S
     if trimmed.is_empty() {
         return Err("empty path".into());
     }
-    // Only allow docs/… or assets/… under space.
+    // Only allow docs/…, assets/…, or boards/… under space.
     let first = trimmed.split(['/', '\\']).next().unwrap_or("");
-    if first != "docs" && first != "assets" {
-        return Err("path must be under docs/ or assets/".into());
+    if first != "docs" && first != "assets" && first != "boards" {
+        return Err("path must be under docs/, assets/, or boards/".into());
     }
     let path = safe_join(&space, trimmed).ok_or_else(|| "illegal path".to_string())?;
     // Ensure resolved path stays under space (safe_join already rejects ..).

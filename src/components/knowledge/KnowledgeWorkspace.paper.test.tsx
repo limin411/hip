@@ -64,8 +64,11 @@ vi.mock('@/ipc/dialog', () => ({
 vi.mock('@/ipc/knowledge', () => ({
   knowledgeErrorMessage: (e: unknown) => String(e),
   knowledgeExportDoc: vi.fn(),
+  knowledgeExportText: vi.fn(),
   knowledgeExportSpaceZip: vi.fn(),
+  knowledgeReadVersion: vi.fn(),
   knowledgeRevealDoc: vi.fn(),
+  knowledgeRevealPath: vi.fn(),
 }))
 
 function seedWorkspace(editorMode: EditorMode) {

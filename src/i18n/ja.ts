@@ -2433,14 +2433,16 @@ export const ja = {
     },
     "tree": {
       "newDoc": "ドキュメント",
+      "newBoard": "ホワイトボード",
       "newFolder": "フォルダ",
       "rename": "名前変更",
       "delete": "削除",
       "nameLabel": "名前",
       "deleteTitle": "「{{title}}」を削除しますか？",
       "deleteDocBody": "この操作はドキュメントを完全に削除します。元に戻すことはできません。",
+      "deleteBoardBody": "この操作はホワイトボードを完全に削除します。元に戻すことはできません。",
       "deleteFolderBody": "この操作はフォルダとその中身をすべて完全に削除します。元に戻すことはできません。",
-      "empty": "ドキュメントまたはフォルダを作成して開始してください",
+      "empty": "ドキュメント、ホワイトボード、またはフォルダを作成して開始してください",
       "filterPlaceholder": "ツリーをフィルタ…",
       "filterEmpty": "一致する項目がありません",
       "reveal": "Finderで表示",
@@ -2450,8 +2452,20 @@ export const ja = {
       "renameUpdateLinks": "古いタイトルを参照するWikiリンクも更新する",
       "renameLinksDone": "{{count}}件のドキュメントのWikiリンクを更新しました"
     },
+    "board": {
+      "untitled": "無題のホワイトボード",
+      "loading": "ホワイトボードを読み込み中…",
+      "loadFailed": "ホワイトボードを読み込めませんでした",
+      "pendingImageDropped": "画像のインポート中のため保存されませんでした。",
+      "placeholderTitle": "ホワイトボード",
+      "placeholderHint": "ホワイトボードは次のPRで読み込まれます"
+    },
     "export": {
       "doc": "ドキュメントをエクスポート…",
+      "boardJson": "ホワイトボードをエクスポート（JSON）…",
+      "boardPng": "ホワイトボードをエクスポート（PNG）…",
+      "boardJsonDone": "ホワイトボード JSON をエクスポートしました",
+      "boardPngDone": "ホワイトボード PNG をエクスポートしました",
       "spaceZip": "スペースをZIPでエクスポート…",
       "docDone": "ドキュメントをエクスポートしました",
       "htmlDone": "HTMLをエクスポートしました（ブラウザで開き、必要に応じて印刷→PDFを使用）",

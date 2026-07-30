@@ -8,8 +8,9 @@ const ctx = {
 } as ContextMenuBuildContext
 
 describe('knowledgeNodeProvider', () => {
-  it('returns folder actions including new doc/folder', () => {
+  it('returns folder actions including new doc/whiteboard/folder', () => {
     const onNewDoc = vi.fn()
+    const onNewBoard = vi.fn()
     const onNewFolder = vi.fn()
     const onRename = vi.fn()
     const onDelete = vi.fn()
@@ -21,6 +22,7 @@ describe('knowledgeNodeProvider', () => {
           kind: 'folder',
           spaceId: 'spc_a',
           onNewDoc,
+          onNewBoard,
           onNewFolder,
           onRename,
           onDelete,
@@ -30,12 +32,18 @@ describe('knowledgeNodeProvider', () => {
     )
     expect(items.map((i) => i.id)).toEqual([
       'knowledgeNode.newDoc',
+      'knowledgeNode.newBoard',
       'knowledgeNode.newFolder',
       'knowledgeNode.rename',
       'knowledgeNode.delete',
     ])
     items.find((i) => i.id === 'knowledgeNode.newDoc')!.run()
     expect(onNewDoc).toHaveBeenCalled()
+    items.find((i) => i.id === 'knowledgeNode.newBoard')!.run()
+    expect(onNewBoard).toHaveBeenCalled()
+    expect(items.find((i) => i.id === 'knowledgeNode.newBoard')!.label).toBe(
+      'knowledge.tree.newBoard',
+    )
   })
 
   it('includes reveal for docs when provided', () => {
@@ -48,6 +56,31 @@ describe('knowledgeNodeProvider', () => {
           kind: 'doc',
           spaceId: 'spc_a',
           onNewDoc: () => {},
+          onNewBoard: () => {},
+          onNewFolder: () => {},
+          onRename: () => {},
+          onDelete: () => {},
+          onReveal,
+        },
+      },
+      ctx,
+    )
+    expect(items.map((i) => i.id)).toContain('knowledgeNode.reveal')
+    items.find((i) => i.id === 'knowledgeNode.reveal')!.run()
+    expect(onReveal).toHaveBeenCalled()
+  })
+
+  it('includes reveal for boards when provided', () => {
+    const onReveal = vi.fn()
+    const items = knowledgeNodeProvider(
+      {
+        kind: 'knowledgeNode',
+        payload: {
+          nodeId: 'brd_a',
+          kind: 'board',
+          spaceId: 'spc_a',
+          onNewDoc: () => {},
+          onNewBoard: () => {},
           onNewFolder: () => {},
           onRename: () => {},
           onDelete: () => {},

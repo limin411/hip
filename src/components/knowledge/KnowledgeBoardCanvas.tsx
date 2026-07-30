@@ -31,7 +31,7 @@ import {
   stripImageElementsForFiles,
   type HipBoardFilesRuntime,
   type HipBoardFileRuntime,
-  type HipBoardSceneDisk,
+  type BoardSceneDisk,
 } from '@/domain/knowledge/boardScene'
 import { KNOWLEDGE_ASSET_INLINE_MAX_BYTES } from '@/domain/knowledge/limits'
 import { isAllowedAssetMime, isImageMime } from '@/domain/knowledge/assetUrl'
@@ -129,7 +129,7 @@ export const KnowledgeBoardCanvas = forwardRef<
     activeRef.current = true
     let cancelled = false
 
-    let scene: HipBoardSceneDisk
+    let scene: BoardSceneDisk
     try {
       scene = parseBoardScene(initialJson || EMPTY_BOARD_SCENE_JSON)
     } catch {

@@ -1,0 +1,158 @@
+import { describe, expect, it } from 'vitest'
+import {
+  clampZoom,
+  deleteElements,
+  elementAabb,
+  hitTest,
+  hitTestMarquee,
+  moveElements,
+  screenToWorld,
+  worldGroupTransform,
+  worldToScreen,
+  zoomAtScreenPoint,
+} from './boardOps'
+import type { HipBoardElement } from './boardScene'
+import { HIP_BOARD_ZOOM_MAX, HIP_BOARD_ZOOM_MIN } from './boardScene'
+
+const rect = (
+  partial: Partial<Extract<HipBoardElement, { type: 'rect' }>> & { id: string },
+): Extract<HipBoardElement, { type: 'rect' }> => ({
+  type: 'rect',
+  x: 0,
+  y: 0,
+  w: 100,
+  h: 50,
+  fill: '#fff',
+  stroke: '#111',
+  strokeWidth: 2,
+  cornerRadius: 0,
+  ...partial,
+})
+
+describe('boardOps camera', () => {
+  it('clamps zoom to 0.25..4', () => {
+    expect(clampZoom(0.01)).toBe(HIP_BOARD_ZOOM_MIN)
+    expect(clampZoom(99)).toBe(HIP_BOARD_ZOOM_MAX)
+    expect(clampZoom(1)).toBe(1)
+  })
+
+  it('screenToWorld / worldToScreen invert', () => {
+    const cam = { x: 40, y: -20, zoom: 2 }
+    const w = screenToWorld(100, 50, cam)
+    const s = worldToScreen(w.x, w.y, cam)
+    expect(s.x).toBeCloseTo(100)
+    expect(s.y).toBeCloseTo(50)
+  })
+
+  it('zoomAtScreenPoint keeps world under cursor fixed', () => {
+    const cam = { x: 0, y: 0, zoom: 1 }
+    const next = zoomAtScreenPoint(cam, 200, 100, 2)
+    const before = screenToWorld(200, 100, cam)
+    const after = screenToWorld(200, 100, next)
+    expect(after.x).toBeCloseTo(before.x)
+    expect(after.y).toBeCloseTo(before.y)
+    expect(next.zoom).toBe(2)
+  })
+
+  it('worldGroupTransform matches camera', () => {
+    expect(worldGroupTransform({ x: 10, y: 20, zoom: 1.5 })).toBe(
+      'translate(10,20) scale(1.5)',
+    )
+  })
+})
+
+describe('boardOps hit-test', () => {
+  it('hits rect AABB; topmost wins', () => {
+    const els: HipBoardElement[] = [
+      rect({ id: 'bottom', x: 0, y: 0, w: 100, h: 100 }),
+      rect({ id: 'top', x: 10, y: 10, w: 20, h: 20 }),
+    ]
+    expect(hitTest(els, 15, 15)).toBe('top')
+    expect(hitTest(els, 90, 90)).toBe('bottom')
+    expect(hitTest(els, 200, 200)).toBeNull()
+  })
+
+  it('hits ellipse via equation not only AABB', () => {
+    const el: HipBoardElement = {
+      id: 'e',
+      type: 'ellipse',
+      x: 0,
+      y: 0,
+      w: 100,
+      h: 100,
+      fill: '#fff',
+      stroke: '#000',
+      strokeWidth: 0,
+    }
+    // Corner of AABB is outside the ellipse
+    expect(hitTest([el], 1, 1)).toBeNull()
+    // Center is inside
+    expect(hitTest([el], 50, 50)).toBe('e')
+  })
+
+  it('hits line within screen-stable slab', () => {
+    const line: HipBoardElement = {
+      id: 'l',
+      type: 'line',
+      x: 0,
+      y: 0,
+      x2: 100,
+      y2: 0,
+      stroke: '#000',
+      strokeWidth: 2,
+    }
+    expect(hitTest([line], 50, 0, 1)).toBe('l')
+    expect(hitTest([line], 50, 20, 1)).toBeNull()
+  })
+
+  it('marquee intersects AABB', () => {
+    const els = [rect({ id: 'a', x: 0, y: 0, w: 10, h: 10 }), rect({ id: 'b', x: 50, y: 50, w: 10, h: 10 })]
+    expect(hitTestMarquee(els, { x: -1, y: -1, w: 20, h: 20 })).toEqual(['a'])
+  })
+})
+
+describe('boardOps transforms', () => {
+  it('moveElements skips locked and translates line endpoints', () => {
+    const els: HipBoardElement[] = [
+      rect({ id: 'a', x: 0, y: 0 }),
+      { ...rect({ id: 'locked', x: 0, y: 0 }), locked: true },
+      {
+        id: 'ln',
+        type: 'line',
+        x: 0,
+        y: 0,
+        x2: 10,
+        y2: 10,
+        stroke: '#000',
+        strokeWidth: 1,
+      },
+    ]
+    const out = moveElements(els, new Set(['a', 'locked', 'ln']), 5, 3)
+    expect((out[0] as { x: number }).x).toBe(5)
+    expect((out[1] as { x: number }).x).toBe(0)
+    expect(out[2]).toMatchObject({ x: 5, y: 3, x2: 15, y2: 13 })
+  })
+
+  it('deleteElements keeps locked', () => {
+    const els = [
+      rect({ id: 'a' }),
+      { ...rect({ id: 'b' }), locked: true },
+    ]
+    const out = deleteElements(els, new Set(['a', 'b']))
+    expect(out.map((e) => e.id)).toEqual(['b'])
+  })
+
+  it('elementAabb for line', () => {
+    const box = elementAabb({
+      id: 'l',
+      type: 'arrow',
+      x: 10,
+      y: 20,
+      x2: 0,
+      y2: 0,
+      stroke: '#0',
+      strokeWidth: 1,
+    })
+    expect(box).toEqual({ x: 0, y: 0, w: 10, h: 20 })
+  })
+})

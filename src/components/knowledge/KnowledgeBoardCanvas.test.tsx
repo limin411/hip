@@ -13,7 +13,7 @@ import {
   assertNoDataUrlInBoardJson,
   buildDiskScene,
   stableSerializeBoard,
-  type HipBoardSceneDisk,
+  type LegacyExcalidrawSceneDisk,
 } from '@/domain/knowledge/boardScene'
 
 /** Non-empty dehydrated scene for pre-hydrate flush regression. */
@@ -35,7 +35,7 @@ const LOADED_BOARD_JSON = stableSerializeBoard({
       hipAssetRel: 'assets/ast_ok.png',
     },
   },
-} satisfies HipBoardSceneDisk)
+} satisfies LegacyExcalidrawSceneDisk)
 
 const setDraftBody = vi.fn()
 const hydrateBoardFiles = vi.fn()
@@ -301,7 +301,7 @@ describe('KnowledgeBoardCanvas', () => {
     expect(opts).toEqual({ docId: 'brd_testboard01', persist: 'none' })
     expect(() => assertNoDataUrlInBoardJson(body as string)).not.toThrow()
 
-    const parsed = JSON.parse(body as string) as HipBoardSceneDisk
+    const parsed = JSON.parse(body as string) as LegacyExcalidrawSceneDisk
     // Must NOT be empty wipe of a real board.
     expect(parsed.elements.length).toBeGreaterThan(0)
     expect(parsed.elements.some((e) => (e as { id: string }).id === 'stroke1')).toBe(

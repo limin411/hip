@@ -2,22 +2,29 @@ import { describe, expect, it, vi } from 'vitest'
 import {
   EMPTY_BOARD_SCENE,
   EMPTY_BOARD_SCENE_JSON,
+  EMPTY_HIP_BOARD_SCENE,
+  EMPTY_HIP_BOARD_SCENE_JSON,
   KNOWLEDGE_BOARD_MAX_BYTES,
   assertNoDataUrlInBoardJson,
   buildDiskScene,
+  buildHipDiskScene,
   dataUrlToBase64,
   estimateDataUrlBytes,
   hydrateBoardFiles,
   importBoardFileBytes,
+  isExcalidrawScene,
+  isHipBoardScene,
   parseBoardScene,
   pickPersistAppState,
+  serializeHipBoard,
   stableSerializeBoard,
   stripImageElementsForFiles,
   type HipBoardSceneDisk,
+  type LegacyExcalidrawSceneDisk,
 } from './boardScene'
 
 describe('boardScene EMPTY', () => {
-  it('EMPTY_BOARD_SCENE_JSON is valid dehydrated hip scene', () => {
+  it('EMPTY_BOARD_SCENE_JSON is valid dehydrated excalidraw scene (production until PR-C)', () => {
     const scene = parseBoardScene(EMPTY_BOARD_SCENE_JSON)
     expect(scene.type).toBe('excalidraw')
     expect(scene.version).toBe(2)
@@ -33,6 +40,15 @@ describe('boardScene EMPTY', () => {
     expect(stableSerializeBoard(EMPTY_BOARD_SCENE)).toBe(EMPTY_BOARD_SCENE_JSON)
   })
 
+  it('EMPTY_HIP_BOARD_SCENE is hip-board (fixtures only; not production EMPTY)', () => {
+    expect(EMPTY_HIP_BOARD_SCENE.type).toBe('hip-board')
+    expect(EMPTY_HIP_BOARD_SCENE.version).toBe(1)
+    const parsed = parseBoardScene(EMPTY_HIP_BOARD_SCENE_JSON)
+    expect(parsed.type).toBe('hip-board')
+    expect(isHipBoardScene(parsed)).toBe(true)
+    expect(serializeHipBoard(EMPTY_HIP_BOARD_SCENE)).toBe(EMPTY_HIP_BOARD_SCENE_JSON)
+  })
+
   it('KNOWLEDGE_BOARD_MAX_BYTES is 25MB', () => {
     expect(KNOWLEDGE_BOARD_MAX_BYTES).toBe(25 * 1024 * 1024)
   })
@@ -40,7 +56,7 @@ describe('boardScene EMPTY', () => {
 
 describe('stableSerializeBoard', () => {
   it('is stable across key insertion order for files', () => {
-    const a: HipBoardSceneDisk = {
+    const a: LegacyExcalidrawSceneDisk = {
       type: 'excalidraw',
       version: 2,
       source: 'hip',
@@ -62,7 +78,7 @@ describe('stableSerializeBoard', () => {
         },
       },
     }
-    const b: HipBoardSceneDisk = {
+    const b: LegacyExcalidrawSceneDisk = {
       ...a,
       files: {
         a_file: a.files.a_file,
@@ -151,14 +167,88 @@ describe('assertNoDataUrlInBoardJson (field-level)', () => {
   })
 })
 
-describe('parseBoardScene', () => {
+describe('parseBoardScene dual accept', () => {
   it('throws on non-object JSON', () => {
     expect(() => parseBoardScene('[]')).toThrow(/expected object/)
     expect(() => parseBoardScene('"str"')).toThrow(/expected object/)
   })
 
-  it('throws when type is not excalidraw', () => {
-    expect(() => parseBoardScene('{"type":"other"}')).toThrow(/excalidraw/)
+  it('throws when type is neither excalidraw nor hip-board', () => {
+    expect(() => parseBoardScene('{"type":"other"}')).toThrow(/excalidraw or hip-board/)
+  })
+
+  it('accepts type excalidraw', () => {
+    const scene = parseBoardScene(
+      JSON.stringify({
+        type: 'excalidraw',
+        version: 2,
+        source: 'hip',
+        elements: [{ id: 'e1' }],
+        appState: { viewBackgroundColor: '#fff' },
+        files: {},
+      }),
+    )
+    expect(scene.type).toBe('excalidraw')
+    expect(isExcalidrawScene(scene)).toBe(true)
+    expect(scene.elements).toHaveLength(1)
+  })
+
+  it('accepts type hip-board with elements', () => {
+    const hip: HipBoardSceneDisk = {
+      type: 'hip-board',
+      version: 1,
+      source: 'hip',
+      hip: { schemaVersion: 1, boardId: 'brd_fixture01' },
+      elements: [
+        {
+          id: 'r1',
+          type: 'rect',
+          x: 10,
+          y: 20,
+          w: 100,
+          h: 50,
+          fill: '#ffffff',
+          stroke: '#111111',
+          strokeWidth: 2,
+          cornerRadius: 0,
+        },
+      ],
+      appState: { viewBackgroundColor: '#ffffff' },
+      files: {},
+    }
+    const raw = serializeHipBoard(hip)
+    const parsed = parseBoardScene(raw)
+    expect(parsed.type).toBe('hip-board')
+    expect(isHipBoardScene(parsed)).toBe(true)
+    if (isHipBoardScene(parsed)) {
+      expect(parsed.elements[0]?.type).toBe('rect')
+      expect(parsed.hip.boardId).toBe('brd_fixture01')
+    }
+  })
+
+  it('round-trips hip-board via buildHipDiskScene', () => {
+    const scene = buildHipDiskScene({
+      elements: [
+        {
+          id: 't1',
+          type: 'text',
+          x: 0,
+          y: 0,
+          w: 160,
+          h: 24,
+          text: 'hello',
+          fill: '#111111',
+          fontSize: 16,
+        },
+      ],
+      appState: { viewBackgroundColor: '#eee' },
+      relByFileId: {},
+      boardId: 'brd_hip01',
+    })
+    expect(scene.type).toBe('hip-board')
+    const again = parseBoardScene(stableSerializeBoard(scene))
+    expect(again.type).toBe('hip-board')
+    expect(again.appState.viewBackgroundColor).toBe('#eee')
   })
 })
 

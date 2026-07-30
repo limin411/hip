@@ -1,8 +1,11 @@
 /**
- * Board (Excalidraw whiteboard) scene types and pure helpers.
+ * Board scene types and pure helpers (Excalidraw + hip-board dual track).
  *
  * Invariant (KD-6): on-disk / store draft is always dehydrated — `files[*]` has
  * `hipAssetRel`, never `dataURL`. Runtime BinaryFiles live only in the canvas component.
+ *
+ * PR-1: parse accepts both `excalidraw` and `hip-board`. Production EMPTY / createBoard
+ * remain excalidraw until PR-C cutover (LKD-C).
  */
 
 /** Max UTF-8 body size for knowledge_write_board (aligned with asset disk cap). */
@@ -17,7 +20,109 @@ export type HipBoardFileOnDisk = {
   // dataURL MUST NOT be present
 }
 
+// ─── Hip native element model (engine types; production EMPTY stays excalidraw) ─
+
+export type HipBoardElementType =
+  | 'rect'
+  | 'ellipse'
+  | 'line'
+  | 'arrow'
+  | 'text'
+  | 'image'
+
+export type HipBoardElementBase = {
+  id: string
+  type: HipBoardElementType
+  x: number
+  y: number
+  /** v1: always 0 (reserved). */
+  rotation?: number
+  locked?: boolean
+}
+
+export type HipBoardRect = HipBoardElementBase & {
+  type: 'rect'
+  w: number
+  h: number
+  fill: string
+  stroke: string
+  strokeWidth: number
+  cornerRadius: number
+}
+
+export type HipBoardEllipse = HipBoardElementBase & {
+  type: 'ellipse'
+  w: number
+  h: number
+  fill: string
+  stroke: string
+  strokeWidth: number
+}
+
+export type HipBoardLine = HipBoardElementBase & {
+  type: 'line' | 'arrow'
+  x2: number
+  y2: number
+  stroke: string
+  strokeWidth: number
+}
+
+export type HipBoardText = HipBoardElementBase & {
+  type: 'text'
+  w: number
+  h: number
+  text: string
+  fill: string
+  fontSize: 12 | 16 | 24
+  fontWeight?: 400 | 600
+}
+
+export type HipBoardImage = HipBoardElementBase & {
+  type: 'image'
+  w: number
+  h: number
+  fileId: string
+}
+
+export type HipBoardElement =
+  | HipBoardRect
+  | HipBoardEllipse
+  | HipBoardLine
+  | HipBoardText
+  | HipBoardImage
+
+/** Session-only camera (LKD-14); never persisted to draft/disk. */
+export type HipBoardCamera = { x: number; y: number; zoom: number }
+
+export const HIP_BOARD_ZOOM_MIN = 0.25
+export const HIP_BOARD_ZOOM_MAX = 4
+export const HIP_BOARD_DEFAULT_CAMERA: HipBoardCamera = { x: 0, y: 0, zoom: 1 }
+
+export type HipBoardAppStateDisk = {
+  viewBackgroundColor: string
+  gridSize?: number | null
+  // camera / selectedIds MUST NOT be present (LKD-14 / LKD-16)
+}
+
+/**
+ * Target disk / draft shape for the hip SVG engine (`type: "hip-board"`).
+ * Production EMPTY stays LegacyExcalidrawSceneDisk until PR-C.
+ */
 export type HipBoardSceneDisk = {
+  type: 'hip-board'
+  version: 1
+  source: 'hip'
+  hip: { schemaVersion: 1; boardId?: string }
+  elements: HipBoardElement[]
+  appState: HipBoardAppStateDisk
+  files: Record<string, HipBoardFileOnDisk>
+}
+
+/**
+ * Legacy Excalidraw dehydrated scene (production createBoard / EMPTY until PR-C).
+ * Elements are opaque Excalidraw shapes.
+ */
+export type LegacyExcalidrawSceneDisk = {
   type: 'excalidraw'
   version: number
   source: 'hip'
@@ -26,6 +131,9 @@ export type HipBoardSceneDisk = {
   appState: Record<string, unknown>
   files: Record<string, HipBoardFileOnDisk>
 }
+
+/** Dual-accept on-disk / draft body. */
+export type BoardSceneDisk = HipBoardSceneDisk | LegacyExcalidrawSceneDisk
 
 /**
  * Runtime only — never stringified into draftBody.
@@ -40,8 +148,8 @@ export type HipBoardFileRuntime = {
 
 export type HipBoardFilesRuntime = Record<string, HipBoardFileRuntime>
 
-/** Empty dehydrated scene written on createBoard / missing file. */
-export const EMPTY_BOARD_SCENE: HipBoardSceneDisk = {
+/** Empty dehydrated scene written on createBoard / missing file (excalidraw until PR-C). */
+export const EMPTY_BOARD_SCENE: LegacyExcalidrawSceneDisk = {
   type: 'excalidraw',
   version: 2,
   source: 'hip',
@@ -51,21 +159,47 @@ export const EMPTY_BOARD_SCENE: HipBoardSceneDisk = {
   files: {},
 }
 
-/** Stable empty-scene JSON for create / missing-file fallbacks. */
+/**
+ * Empty hip-board scene for engine fixtures / tests.
+ * Not used by createBoard until PR-C (LKD-C).
+ */
+export const EMPTY_HIP_BOARD_SCENE: HipBoardSceneDisk = {
+  type: 'hip-board',
+  version: 1,
+  source: 'hip',
+  hip: { schemaVersion: 1 },
+  elements: [],
+  appState: { viewBackgroundColor: '#ffffff' },
+  files: {},
+}
+
+/** Stable empty-scene JSON for create / missing-file fallbacks (excalidraw). */
 export const EMPTY_BOARD_SCENE_JSON: string = stableSerializeBoard(EMPTY_BOARD_SCENE)
+
+/** Stable empty hip-board JSON (fixtures only until PR-C). */
+export const EMPTY_HIP_BOARD_SCENE_JSON: string = stableSerializeBoard(EMPTY_HIP_BOARD_SCENE)
+
+export function isHipBoardScene(scene: BoardSceneDisk): scene is HipBoardSceneDisk {
+  return scene.type === 'hip-board'
+}
+
+export function isExcalidrawScene(scene: BoardSceneDisk): scene is LegacyExcalidrawSceneDisk {
+  return scene.type === 'excalidraw'
+}
 
 /**
  * Parse a board scene from JSON. Throws on invalid JSON or wrong top-level shape.
+ * Accepts both `type: "excalidraw"` and `type: "hip-board"` (PR-1 dual parse).
  * Does not validate dataURL absence (use assertNoDataUrlInBoardJson for that).
  */
-export function parseBoardScene(raw: string): HipBoardSceneDisk {
+export function parseBoardScene(raw: string): BoardSceneDisk {
   const parsed = JSON.parse(raw) as unknown
   if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
     throw new Error('invalid board scene: expected object')
   }
   const o = parsed as Record<string, unknown>
-  if (o.type !== 'excalidraw') {
-    throw new Error('invalid board scene: type must be excalidraw')
+  if (o.type !== 'excalidraw' && o.type !== 'hip-board') {
+    throw new Error('invalid board scene: type must be excalidraw or hip-board')
   }
   const files =
     o.files && typeof o.files === 'object' && !Array.isArray(o.files)
@@ -80,6 +214,28 @@ export function parseBoardScene(raw: string): HipBoardSceneDisk {
     o.hip && typeof o.hip === 'object' && !Array.isArray(o.hip)
       ? (o.hip as { schemaVersion: number; boardId?: string })
       : undefined
+
+  if (o.type === 'hip-board') {
+    return {
+      type: 'hip-board',
+      version: 1,
+      source: 'hip',
+      hip: {
+        schemaVersion: 1,
+        ...(hip?.boardId ? { boardId: hip.boardId } : {}),
+      },
+      elements: elements as HipBoardElement[],
+      appState: {
+        viewBackgroundColor:
+          typeof appState.viewBackgroundColor === 'string'
+            ? appState.viewBackgroundColor
+            : '#ffffff',
+        ...(appState.gridSize !== undefined ? { gridSize: appState.gridSize as number | null } : {}),
+      },
+      files,
+    }
+  }
+
   return {
     type: 'excalidraw',
     version: typeof o.version === 'number' ? o.version : 2,
@@ -94,8 +250,9 @@ export function parseBoardScene(raw: string): HipBoardSceneDisk {
 /**
  * Stable JSON serialization for dirty checks and disk writes.
  * Key order is fixed so string equality is meaningful for dehydrated scenes.
+ * Preserves scene.type (excalidraw | hip-board).
  */
-export function stableSerializeBoard(scene: HipBoardSceneDisk): string {
+export function stableSerializeBoard(scene: BoardSceneDisk): string {
   // Serialize files with sorted keys for stability; elements keep author order.
   const fileIds = Object.keys(scene.files).sort()
   const files: Record<string, HipBoardFileOnDisk> = {}
@@ -109,7 +266,7 @@ export function stableSerializeBoard(scene: HipBoardSceneDisk): string {
     }
   }
   const out: Record<string, unknown> = {
-    type: 'excalidraw',
+    type: scene.type,
     version: scene.version,
     source: 'hip',
   }
@@ -120,6 +277,11 @@ export function stableSerializeBoard(scene: HipBoardSceneDisk): string {
   out.appState = scene.appState
   out.files = files
   return JSON.stringify(out)
+}
+
+/** Serialize a hip-board scene (alias of stableSerializeBoard for typed callers). */
+export function serializeHipBoard(scene: HipBoardSceneDisk): string {
+  return stableSerializeBoard(scene)
 }
 
 /**
@@ -167,6 +329,10 @@ export function pickPersistAppState(
  * Build dehydrated on-disk scene from runtime refs.
  * `relByFileId` only includes completed imports (hipAssetRel); pending files omitted.
  */
+/**
+ * Build dehydrated on-disk scene from runtime refs (Excalidraw production path).
+ * Remains type:excalidraw until PR-C.
+ */
 export function buildDiskScene(args: {
   elements: unknown[]
   appState: Record<string, unknown> | null | undefined
@@ -175,7 +341,7 @@ export function buildDiskScene(args: {
   /** Optional runtime files for mimeType / created (when rel exists). */
   runtimeFiles?: HipBoardFilesRuntime | Record<string, { mimeType?: string; created?: number }>
   boardId?: string
-}): HipBoardSceneDisk {
+}): LegacyExcalidrawSceneDisk {
   const relMap =
     args.relByFileId instanceof Map
       ? args.relByFileId
@@ -206,6 +372,57 @@ export function buildDiskScene(args: {
     },
     elements: Array.isArray(args.elements) ? args.elements : [],
     appState: pickPersistAppState(args.appState),
+    files,
+  }
+}
+
+/**
+ * Build dehydrated hip-board scene from engine refs (fixtures / PR-C+).
+ * Not used by production createBoard until cutover.
+ */
+export function buildHipDiskScene(args: {
+  elements: HipBoardElement[]
+  appState?: Partial<HipBoardAppStateDisk> | null
+  relByFileId: ReadonlyMap<string, string> | Record<string, string>
+  runtimeFiles?: Record<string, { mimeType?: string; created?: number }>
+  boardId?: string
+}): HipBoardSceneDisk {
+  const relMap =
+    args.relByFileId instanceof Map
+      ? args.relByFileId
+      : new Map(Object.entries(args.relByFileId))
+
+  const files: Record<string, HipBoardFileOnDisk> = {}
+  for (const [fileId, rel] of relMap) {
+    if (!rel || typeof rel !== 'string') continue
+    const rt = args.runtimeFiles?.[fileId]
+    files[fileId] = {
+      id: fileId,
+      mimeType: rt?.mimeType && typeof rt.mimeType === 'string' ? rt.mimeType : 'image/png',
+      created:
+        rt && typeof rt.created === 'number' && Number.isFinite(rt.created)
+          ? rt.created
+          : Date.now(),
+      hipAssetRel: rel,
+    }
+  }
+
+  return {
+    type: 'hip-board',
+    version: 1,
+    source: 'hip',
+    hip: {
+      schemaVersion: 1,
+      ...(args.boardId ? { boardId: args.boardId } : {}),
+    },
+    elements: Array.isArray(args.elements) ? args.elements : [],
+    appState: {
+      viewBackgroundColor:
+        typeof args.appState?.viewBackgroundColor === 'string'
+          ? args.appState.viewBackgroundColor
+          : '#ffffff',
+      ...(args.appState?.gridSize !== undefined ? { gridSize: args.appState.gridSize } : {}),
+    },
     files,
   }
 }

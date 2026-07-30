@@ -2558,10 +2558,10 @@ export const en = {
         untitled: 'Untitled whiteboard',
         titleLabel: 'Whiteboard title',
         loading: 'Loading whiteboard…',
-        loadFailed: 'Could not load whiteboard',
-        pendingImageDropped: 'An image was still importing and was not saved.',
-        placeholderTitle: 'Whiteboard',
-        placeholderHint: 'Drawing canvas arrives in an upcoming update.',
+        loadFailed: 'Could not open whiteboard',
+        pendingImageDropped:
+          'An image was still importing and was not saved. Paste it again if needed.',
+        hydratePartial: 'Some whiteboard images could not be loaded',
       },
       export: {
         doc: 'Export document…',

@@ -44,6 +44,8 @@
     "release:macos": "bash scripts/package-macos.sh",
     "release:windows": "powershell -ExecutionPolicy Bypass -File scripts/package-windows.ps1",
     "type-check": "tsc --noEmit",
+    "postinstall": "node scripts/copy-excalidraw-assets.mjs",
+    "copy:excalidraw-assets": "node scripts/copy-excalidraw-assets.mjs",
     "check:visual-dialects": "node scripts/check-visual-dialects.mjs",
     "test": "vitest run",
     "test:watch": "vitest",
@@ -76,6 +78,7 @@
   "dependencies": {
     "@codemirror/lang-markdown": "^6.5.0",
     "@codemirror/language-data": "^6.5.2",
+    "@excalidraw/excalidraw": "0.18.1",
     "@hip/protocol": "*",
     "@milkdown/kit": "7.21.3",
     "@radix-ui/react-context-menu": "^2.3.0",

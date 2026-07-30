@@ -2455,11 +2455,10 @@ export const ko = {
     "board": {
       "untitled": "제목 없는 화이트보드",
       "titleLabel": "화이트보드 제목",
-      "loading": "화이트보드 로딩 중…",
-      "loadFailed": "화이트보드를 불러올 수 없습니다",
-      "pendingImageDropped": "이미지 가져오기가 진행 중이어서 저장되지 않았습니다.",
-      "placeholderTitle": "화이트보드",
-      "placeholderHint": "그리기 캔버스는 향후 업데이트에서 제공됩니다."
+      "loading": "화이트보드 불러오는 중…",
+      "loadFailed": "화이트보드를 열 수 없습니다",
+      "pendingImageDropped": "이미지 가져오기가 끝나기 전에 저장되지 않았습니다. 필요하면 다시 붙여넣으세요.",
+      "hydratePartial": "일부 화이트보드 이미지를 불러오지 못했습니다"
     },
     "export": {
       "doc": "문서 내보내기…",

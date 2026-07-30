@@ -2498,10 +2498,9 @@ export const zhCN = {
         untitled: '未命名画板',
         titleLabel: '画板标题',
         loading: '正在加载画板…',
-        loadFailed: '无法加载画板',
-        pendingImageDropped: '有图片仍在导入，未能保存。',
-        placeholderTitle: '画板',
-        placeholderHint: '画板将在后续版本加载',
+        loadFailed: '无法打开画板',
+        pendingImageDropped: '有图片仍在导入，未保存。如需请重新粘贴。',
+        hydratePartial: '部分画板图片无法加载',
       },
       export: {
         doc: '导出文档…',

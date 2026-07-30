@@ -136,3 +136,205 @@ export function assertNoDataUrlInBoardJson(raw: string): void {
     }
   }
 }
+
+/** appState fields persisted to disk / store draft (KD-6). Theme is injected at runtime. */
+export const BOARD_APP_STATE_PERSIST_KEYS = [
+  'viewBackgroundColor',
+  'gridSize',
+  'gridModeEnabled',
+  'scrollX',
+  'scrollY',
+  'zoom',
+] as const
+
+export type BoardAppStatePersistKey = (typeof BOARD_APP_STATE_PERSIST_KEYS)[number]
+
+/** Whitelist appState for disk / draft. */
+export function pickPersistAppState(
+  appState: Record<string, unknown> | null | undefined,
+): Record<string, unknown> {
+  const out: Record<string, unknown> = { viewBackgroundColor: '#ffffff' }
+  if (!appState || typeof appState !== 'object') return out
+  for (const key of BOARD_APP_STATE_PERSIST_KEYS) {
+    if (key in appState) {
+      out[key] = appState[key]
+    }
+  }
+  return out
+}
+
+/**
+ * Build dehydrated on-disk scene from runtime refs.
+ * `relByFileId` only includes completed imports (hipAssetRel); pending files omitted.
+ */
+export function buildDiskScene(args: {
+  elements: unknown[]
+  appState: Record<string, unknown> | null | undefined
+  /** fileId → completed hipAssetRel */
+  relByFileId: ReadonlyMap<string, string> | Record<string, string>
+  /** Optional runtime files for mimeType / created (when rel exists). */
+  runtimeFiles?: HipBoardFilesRuntime | Record<string, { mimeType?: string; created?: number }>
+  boardId?: string
+}): HipBoardSceneDisk {
+  const relMap =
+    args.relByFileId instanceof Map
+      ? args.relByFileId
+      : new Map(Object.entries(args.relByFileId))
+
+  const files: Record<string, HipBoardFileOnDisk> = {}
+  for (const [fileId, rel] of relMap) {
+    if (!rel || typeof rel !== 'string') continue
+    const rt = args.runtimeFiles?.[fileId]
+    files[fileId] = {
+      id: fileId,
+      mimeType: rt?.mimeType && typeof rt.mimeType === 'string' ? rt.mimeType : 'image/png',
+      created:
+        rt && typeof rt.created === 'number' && Number.isFinite(rt.created)
+          ? rt.created
+          : Date.now(),
+      hipAssetRel: rel,
+    }
+  }
+
+  return {
+    type: 'excalidraw',
+    version: 2,
+    source: 'hip',
+    hip: {
+      schemaVersion: 1,
+      ...(args.boardId ? { boardId: args.boardId } : {}),
+    },
+    elements: Array.isArray(args.elements) ? args.elements : [],
+    appState: pickPersistAppState(args.appState),
+    files,
+  }
+}
+
+/** Approximate raw byte length of a data URL payload (base64). */
+export function estimateDataUrlBytes(dataURL: string): number {
+  if (!dataURL || typeof dataURL !== 'string') return 0
+  const i = dataURL.indexOf(',')
+  const b64 = i >= 0 ? dataURL.slice(i + 1) : dataURL
+  // 4 base64 chars → 3 bytes; ignore padding edge (close enough for caps).
+  return Math.floor((b64.length * 3) / 4)
+}
+
+/** Extract base64 payload from a data URL (no prefix). */
+export function dataUrlToBase64(dataURL: string): string {
+  const i = dataURL.indexOf(',')
+  return i >= 0 ? dataURL.slice(i + 1) : dataURL
+}
+
+/**
+ * Drop image elements whose `fileId` is in `fileIds` (leave-mode pending drop).
+ * Non-image elements and images with other fileIds are kept as-is.
+ */
+export function stripImageElementsForFiles(
+  elements: unknown[],
+  fileIds: ReadonlySet<string>,
+): unknown[] {
+  if (fileIds.size === 0) return elements
+  return elements.filter((el) => {
+    if (!el || typeof el !== 'object') return true
+    const o = el as { type?: string; fileId?: string; isDeleted?: boolean }
+    if (o.type !== 'image') return true
+    if (o.fileId && fileIds.has(o.fileId)) return false
+    return true
+  })
+}
+
+export type HydrateBoardFilesResult = {
+  files: HipBoardFilesRuntime
+  /** fileId → hipAssetRel for entries that hydrated successfully */
+  relByFileId: Map<string, string>
+  /** fileIds that failed to load (omitted from files) */
+  failedIds: string[]
+}
+
+/**
+ * Load BinaryFiles from disk `hipAssetRel` via existing asset IPC / cache.
+ * Failed entries are omitted (caller toasts once).
+ */
+export async function hydrateBoardFiles(
+  spaceId: string,
+  diskFiles: Record<string, HipBoardFileOnDisk>,
+  opts?: {
+    resolve?: (
+      spaceId: string,
+      relPath: string,
+    ) => Promise<{ dataUrl: string; mime: string } | null>
+  },
+): Promise<HydrateBoardFilesResult> {
+  const { resolveAssetDataUrl } = await import('./assetUrl')
+  const resolve = opts?.resolve ?? resolveAssetDataUrl
+  const files: HipBoardFilesRuntime = {}
+  const relByFileId = new Map<string, string>()
+  const failedIds: string[] = []
+
+  const entries = Object.entries(diskFiles ?? {})
+  await Promise.all(
+    entries.map(async ([id, f]) => {
+      if (!f || typeof f !== 'object') {
+        failedIds.push(id)
+        return
+      }
+      const rel = f.hipAssetRel
+      if (!rel || typeof rel !== 'string') {
+        failedIds.push(id)
+        return
+      }
+      try {
+        const resolved = await resolve(spaceId, rel)
+        if (!resolved?.dataUrl) {
+          failedIds.push(id)
+          return
+        }
+        files[id] = {
+          id,
+          mimeType: f.mimeType || resolved.mime || 'image/png',
+          created: typeof f.created === 'number' ? f.created : Date.now(),
+          dataURL: resolved.dataUrl,
+        }
+        relByFileId.set(id, rel)
+      } catch {
+        failedIds.push(id)
+      }
+    }),
+  )
+
+  return { files, relByFileId, failedIds }
+}
+
+/**
+ * Import a runtime BinaryFile (dataURL) into space assets; returns hipAssetRel.
+ * Caller enforces inline size cap before calling.
+ */
+export async function importBoardFileBytes(
+  spaceId: string,
+  file: HipBoardFileRuntime,
+  opts?: {
+    importBytes?: (
+      spaceId: string,
+      args: { base64: string; fileName: string; mime: string },
+    ) => Promise<{ relPath: string; mime: string; byteLength: number }>
+  },
+): Promise<string> {
+  const { knowledgeImportAssetBytes } = await import('@/ipc/knowledge')
+  const importBytes = opts?.importBytes ?? knowledgeImportAssetBytes
+  const mime = file.mimeType || 'image/png'
+  const ext =
+    mime === 'image/jpeg'
+      ? 'jpg'
+      : mime === 'image/gif'
+        ? 'gif'
+        : mime === 'image/webp'
+          ? 'webp'
+          : 'png'
+  const base64 = dataUrlToBase64(file.dataURL)
+  const meta = await importBytes(spaceId, {
+    base64,
+    fileName: `board-${file.id}.${ext}`,
+    mime,
+  })
+  return meta.relPath
+}

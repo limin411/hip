@@ -2456,10 +2456,9 @@ export const ja = {
       "untitled": "無題のホワイトボード",
       "titleLabel": "ホワイトボードのタイトル",
       "loading": "ホワイトボードを読み込み中…",
-      "loadFailed": "ホワイトボードを読み込めませんでした",
-      "pendingImageDropped": "画像のインポート中のため保存されませんでした。",
-      "placeholderTitle": "ホワイトボード",
-      "placeholderHint": "描画キャンバスは今後のアップデートで利用できます。"
+      "loadFailed": "ホワイトボードを開けませんでした",
+      "pendingImageDropped": "画像の取り込みが完了前で保存されませんでした。必要なら再度貼り付けてください。",
+      "hydratePartial": "一部のホワイトボード画像を読み込めませんでした"
     },
     "export": {
       "doc": "ドキュメントをエクスポート…",

@@ -160,7 +160,7 @@ export function KnowledgeWorkspace() {
   const editorRef = useRef<DocEditorHandle>(null)
   /** Live host handle for attach/paste (PR-2); wired now for insertMarkdown. */
   const liveEditorRef = useRef<DocLiveEditorHandle>(null)
-  /** Board canvas handle — Workspace-only beforeOpenDocFlush registration (KD-9). */
+  /** Board canvas handle — Workspace-only beforeOpenDocFlush (KD-9); sync flushToStore (KD-13). */
   const boardCanvasRef = useRef<KnowledgeBoardCanvasHandle>(null)
   const [treeFilter, setTreeFilter] = useState('')
   const [filterExpandSnapshot, setFilterExpandSnapshot] = useState<Record<
@@ -423,7 +423,7 @@ export function KnowledgeWorkspace() {
   const showSourceEditor = !isBoard && !showLiveEditor
   /** Body for editor mount (mode/doc switch); not a per-keystroke subscription. */
   const mountMarkdown = useKnowledgeStore.getState().draftBody || docBody
-  /** Board scene JSON for mount; same draft||doc pattern as Live (Issue 6). */
+  /** Dehydrated board JSON for canvas mount (read once; not a draft subscription). */
   const mountBoardJson = useKnowledgeStore.getState().draftBody || docBody
 
   const onLiveParseError = () => {
@@ -586,8 +586,8 @@ export function KnowledgeWorkspace() {
     }
   }
 
-  // KD-9: single Workspace registration for syncActiveEditorToDraft dispatcher.
-  // Board → flushToStore({ mode }); Live → flushDraft; Source → getView + setDraftBody.
+  // KD-9: single Workspace registration. Board → flushToStore(mode);
+  // Live → flushDraft; Source → CM getView. leaveActiveLeaf drives KD-13 mode.
   // KnowledgeBoardCanvas must NOT call registerBeforeOpenDocFlush itself.
   useEffect(() => {
     registerBeforeOpenDocFlush((opts) => {
@@ -1034,7 +1034,7 @@ export function KnowledgeWorkspace() {
               <HipLogo size={32} decorative />
             </EmptyState>
           </div>
-        ) : isBoard ? (
+        ) : isBoard && activeSpaceId ? (
           <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
             <div className="shrink-0 border-b border-border/60 px-5 py-2">
               <InlineDocTitle
@@ -1046,13 +1046,24 @@ export function KnowledgeWorkspace() {
                 className="pt-1 pb-1 sm:pt-1 text-title"
               />
             </div>
-            <KnowledgeBoardCanvas
-              ref={boardCanvasRef}
-              key={activeDocId}
-              boardId={activeDocId}
-              spaceId={activeSpaceId!}
-              initialJson={mountBoardJson}
-            />
+            <Suspense
+              fallback={
+                <div
+                  className="flex flex-1 items-center justify-center text-meta text-ink-tertiary"
+                  data-testid="knowledge-board-suspense"
+                >
+                  {t('knowledge.board.loading')}
+                </div>
+              }
+            >
+              <KnowledgeBoardCanvas
+                ref={boardCanvasRef}
+                key={activeDocId}
+                boardId={activeDocId}
+                spaceId={activeSpaceId}
+                initialJson={mountBoardJson}
+              />
+            </Suspense>
           </div>
         ) : showLiveEditor ? (
           <div className="flex min-h-0 flex-1 flex-col overflow-hidden">

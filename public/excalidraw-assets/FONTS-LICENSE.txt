@@ -1,0 +1,4 @@
+Fonts bundled from @excalidraw/excalidraw (MIT) for offline hip whiteboards.
+Individual typefaces ship under their own licenses (typically SIL Open Font License).
+Source package: node_modules/@excalidraw/excalidraw/dist/prod/fonts
+See the hip NOTICE file and the upstream Excalidraw project for details.

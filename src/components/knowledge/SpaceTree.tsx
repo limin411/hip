@@ -414,6 +414,7 @@ export function SpaceTree({
     const isRovingTarget =
       (focusInVisible && isFocused) || (!focusInVisible && node === roots[0])
     const isFolder = node.kind === 'folder'
+    const isBoard = node.kind === 'board'
     const isOpen = isFolder && expanded[node.id] === true
     const treeTestId =
       node.kind === 'doc'
@@ -546,7 +547,7 @@ export function SpaceTree({
                   : 'text-ink-tertiary group-hover:text-ink-secondary',
               )}
             >
-              {node.kind === 'board' ? (
+              {isBoard ? (
                 <PencilRuler size={14} strokeWidth={1.75} />
               ) : (
                 <FileText size={14} strokeWidth={1.75} />

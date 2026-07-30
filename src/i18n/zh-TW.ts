@@ -2463,10 +2463,9 @@ export const zhTW = {
       "untitled": "未命名畫板",
       "titleLabel": "畫板標題",
       "loading": "正在載入畫板…",
-      "loadFailed": "無法載入畫板",
-      "pendingImageDropped": "有圖片仍在匯入，未能儲存。",
-      "placeholderTitle": "畫板",
-      "placeholderHint": "繪圖畫布將於後續版本提供。"
+      "loadFailed": "無法開啟畫板",
+      "pendingImageDropped": "有圖片仍在匯入，未儲存。如需請重新貼上。",
+      "hydratePartial": "部分畫板圖片無法載入"
     },
     "export": {
       "doc": "匯出文件…",

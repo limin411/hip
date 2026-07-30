@@ -112,6 +112,8 @@ type Gesture =
 type TextEditState = {
   id: string
   draft: string
+  /** True only for text placed via text tool this session; Escape may drop it. */
+  isNew?: boolean
 }
 
 function newElementId(prefix: string): string {
@@ -268,6 +270,45 @@ export const HipBoardCanvas = forwardRef<HipBoardCanvasHandle, HipBoardCanvasPro
       setTool(next)
     }, [])
 
+    /**
+     * Fold open textarea draft into elementsRef (and React state).
+     * close=true clears the editor UI (leave / explicit commit).
+     * close=false soft-commits for snapshot flush while keeping the editor open.
+     */
+    const foldOpenTextDraft = useCallback(
+      (opts: { close: boolean }) => {
+        const edit = textEditRef.current
+        if (!edit) return
+        const el = elementsRef.current.find((e) => e.id === edit.id)
+        if (el && el.type === 'text') {
+          const h = measureTextHeight(edit.draft, el.fontSize)
+          if (el.text !== edit.draft || el.h !== h) {
+            const next = elementsRef.current.map((e) =>
+              e.id === edit.id && e.type === 'text'
+                ? { ...e, text: edit.draft, h }
+                : e,
+            )
+            elementsRef.current = next
+            setElements(next)
+          }
+          // Soft-commit becomes the new baseline for cancel.
+          textEditOriginalRef.current = edit.draft
+          // After flush soft-commit, cancel must not delete the placement.
+          if (!opts.close && edit.isNew) {
+            const st: TextEditState = { ...edit, isNew: false }
+            textEditRef.current = st
+            setTextEdit(st)
+          }
+        }
+        if (opts.close) {
+          textEditRef.current = null
+          setTextEdit(null)
+          textEditOriginalRef.current = ''
+        }
+      },
+      [],
+    )
+
     const commitTextEdit = useCallback(
       (opts?: { cancel?: boolean }) => {
         const edit = textEditRef.current
@@ -276,24 +317,31 @@ export const HipBoardCanvas = forwardRef<HipBoardCanvasHandle, HipBoardCanvasPro
         if (!el || el.type !== 'text') {
           textEditRef.current = null
           setTextEdit(null)
+          textEditOriginalRef.current = ''
           return
         }
         if (opts?.cancel) {
-          // Restore original; drop empty brand-new text created this session.
-          const original = textEditOriginalRef.current
-          if (original === '' && el.text === '') {
+          // Drop only brand-new placements from text tool this session (isNew).
+          if (edit.isNew) {
             setElementsBoth(
               elementsRef.current.filter((e) => e.id !== edit.id),
             )
-          } else if (el.text !== original || el.h !== measureTextHeight(original, el.fontSize)) {
-            const restored: HipBoardText = {
-              ...el,
-              text: original,
-              h: measureTextHeight(original, el.fontSize),
+            setSelection([])
+          } else {
+            const original = textEditOriginalRef.current
+            if (
+              el.text !== original ||
+              el.h !== measureTextHeight(original, el.fontSize)
+            ) {
+              const restored: HipBoardText = {
+                ...el,
+                text: original,
+                h: measureTextHeight(original, el.fontSize),
+              }
+              setElementsBoth(
+                elementsRef.current.map((e) => (e.id === edit.id ? restored : e)),
+              )
             }
-            setElementsBoth(
-              elementsRef.current.map((e) => (e.id === edit.id ? restored : e)),
-            )
           }
         } else {
           const nextText = edit.draft
@@ -311,11 +359,11 @@ export const HipBoardCanvas = forwardRef<HipBoardCanvasHandle, HipBoardCanvasPro
         // Return focus to canvas for shortcuts.
         requestAnimationFrame(() => rootRef.current?.focus())
       },
-      [setElementsBoth],
+      [setElementsBoth, setSelection],
     )
 
     const beginTextEdit = useCallback(
-      (id: string) => {
+      (id: string, editOpts?: { isNew?: boolean }) => {
         if (!activeRef.current) return
         const el = elementsRef.current.find((e) => e.id === id)
         if (!el || el.type !== 'text') return
@@ -325,7 +373,11 @@ export const HipBoardCanvas = forwardRef<HipBoardCanvasHandle, HipBoardCanvasPro
           commitTextEdit()
         }
         textEditOriginalRef.current = el.text
-        const state: TextEditState = { id, draft: el.text }
+        const state: TextEditState = {
+          id,
+          draft: el.text,
+          ...(editOpts?.isNew ? { isNew: true } : {}),
+        }
         textEditRef.current = state
         setTextEdit(state)
         setSelection([id])
@@ -348,28 +400,19 @@ export const HipBoardCanvas = forwardRef<HipBoardCanvasHandle, HipBoardCanvasPro
           gestureRef.current = null
           clearThrottle()
           // Commit in-progress text into elements before serializing (no cancel).
-          const edit = textEditRef.current
-          if (edit) {
-            const el = elementsRef.current.find((e) => e.id === edit.id)
-            if (el && el.type === 'text') {
-              const h = measureTextHeight(edit.draft, el.fontSize)
-              elementsRef.current = elementsRef.current.map((e) =>
-                e.id === edit.id && e.type === 'text'
-                  ? { ...e, text: edit.draft, h }
-                  : e,
-              )
-            }
-            textEditRef.current = null
-            setTextEdit(null)
-          }
+          foldOpenTextDraft({ close: true })
         } else if (!activeRef.current) {
           return
+        } else {
+          // Snapshot / syncActiveEditorToDraft: include live textarea in draftBody
+          // without closing the editor.
+          foldOpenTextDraft({ close: false })
         }
         const raw = buildDiskJson()
         lastSerializedRef.current = raw
         onDraftBody?.(raw, { docId: boardIdRef.current, persist: 'none' })
       },
-      [buildDiskJson, clearThrottle, onDraftBody],
+      [buildDiskJson, clearThrottle, foldOpenTextDraft, onDraftBody],
     )
 
     const applyStylePatch = useCallback(
@@ -463,7 +506,11 @@ export const HipBoardCanvas = forwardRef<HipBoardCanvasHandle, HipBoardCanvasPro
           ),
         )
         if (textEditRef.current?.id === id) {
-          const st = { id, draft: text }
+          const st: TextEditState = {
+            id,
+            draft: text,
+            ...(textEditRef.current.isNew ? { isNew: true } : {}),
+          }
           textEditRef.current = st
           setTextEdit(st)
         }
@@ -610,7 +657,7 @@ export const HipBoardCanvas = forwardRef<HipBoardCanvasHandle, HipBoardCanvasPro
         // Switch off text tool before edit (changeTool no-ops while editing).
         toolRef.current = 'select'
         setTool('select')
-        beginTextEdit(id)
+        beginTextEdit(id, { isNew: true })
       },
       [beginTextEdit, setElementsBoth, setSelection],
     )
@@ -1105,7 +1152,11 @@ export const HipBoardCanvas = forwardRef<HipBoardCanvasHandle, HipBoardCanvasPro
               const draft = e.target.value
               // Normalize only \r\n → \n; never insert soft-wrap breaks.
               const normalized = draft.replace(/\r\n/g, '\n').replace(/\r/g, '\n')
-              const st = { id: textEdit.id, draft: normalized }
+              const st: TextEditState = {
+                id: textEdit.id,
+                draft: normalized,
+                ...(textEdit.isNew ? { isNew: true } : {}),
+              }
               textEditRef.current = st
               setTextEdit(st)
             }}

@@ -608,4 +608,171 @@ describe('HipBoardCanvas tools + text (PR-2)', () => {
     expect(document.querySelector('[data-element-type="rect"]')).toBeNull()
     expect(onDraftBody).not.toHaveBeenCalled()
   })
+
+  it('toolbar pointerDown does not place text or create shapes on the canvas', () => {
+    const { ref, root } = renderCanvas()
+    vi.spyOn(root as HTMLElement, 'getBoundingClientRect').mockReturnValue({
+      left: 0,
+      top: 0,
+      right: 400,
+      bottom: 300,
+      width: 400,
+      height: 300,
+      x: 0,
+      y: 0,
+      toJSON: () => ({}),
+    })
+
+    act(() => {
+      fireEvent.click(screen.getByTestId('hip-board-tool-text'))
+    })
+    expect(ref.current?.getTool()).toBe('text')
+
+    // Pointer on toolbar must not bubble into canvas placeTextAt / create-drag.
+    const textBtn = screen.getByTestId('hip-board-tool-rect')
+    act(() => {
+      fireEvent.pointerDown(textBtn, { button: 0, clientX: 200, clientY: 10, pointerId: 11 })
+      fireEvent.pointerUp(textBtn, { button: 0, clientX: 200, clientY: 10, pointerId: 11 })
+      fireEvent.click(textBtn)
+    })
+    expect(ref.current?.getTool()).toBe('rect')
+    expect(document.querySelector('[data-element-type="text"]')).toBeNull()
+    expect(document.querySelector('[data-element-type="rect"]')).toBeNull()
+    expect(screen.queryByTestId('hip-board-text-edit')).toBeNull()
+  })
+
+  it('Escape drops brand-new text placement and clears selection', () => {
+    const { ref, onDraftBody, root } = renderCanvas()
+    vi.spyOn(root as HTMLElement, 'getBoundingClientRect').mockReturnValue({
+      left: 0,
+      top: 0,
+      right: 400,
+      bottom: 300,
+      width: 400,
+      height: 300,
+      x: 0,
+      y: 0,
+      toJSON: () => ({}),
+    })
+
+    act(() => {
+      fireEvent.click(screen.getByTestId('hip-board-tool-text'))
+      fireEvent.pointerDown(root, { button: 0, clientX: 40, clientY: 40, pointerId: 3 })
+      fireEvent.pointerUp(root, { button: 0, clientX: 40, clientY: 40, pointerId: 3 })
+    })
+    const ta = screen.getByTestId('hip-board-text-edit') as HTMLTextAreaElement
+    act(() => {
+      fireEvent.change(ta, { target: { value: 'scratch' } })
+      fireEvent.keyDown(ta, { key: 'Escape' })
+    })
+    expect(screen.queryByTestId('hip-board-text-edit')).toBeNull()
+    expect(document.querySelector('[data-element-type="text"]')).toBeNull()
+    expect(ref.current?.getSelectedIds()).toEqual([])
+
+    act(() => {
+      vi.advanceTimersByTime(150)
+    })
+    // Place scheduled a draft then cancel removed the element — net flush is empty or last draft empty.
+    onDraftBody.mockClear()
+    act(() => {
+      ref.current?.flushToStore({ mode: 'snapshot' })
+    })
+    expect(JSON.parse(onDraftBody.mock.calls[0]![0] as string).elements).toHaveLength(0)
+  })
+
+  it('Escape does not delete pre-existing empty text', () => {
+    const scene: HipBoardSceneDisk = {
+      type: 'hip-board',
+      version: 1,
+      source: 'hip',
+      hip: { schemaVersion: 1 },
+      elements: [
+        {
+          id: 'empty_txt',
+          type: 'text',
+          x: 0,
+          y: 0,
+          w: 160,
+          h: 28,
+          text: '',
+          fill: '#111111',
+          fontSize: 16,
+        },
+      ],
+      appState: { viewBackgroundColor: '#ffffff' },
+      files: {},
+    }
+    const { ref, onDraftBody, root } = renderCanvas({
+      initialJson: serializeHipBoard(scene),
+    })
+    vi.spyOn(root as HTMLElement, 'getBoundingClientRect').mockReturnValue({
+      left: 0,
+      top: 0,
+      right: 400,
+      bottom: 300,
+      width: 400,
+      height: 300,
+      x: 0,
+      y: 0,
+      toJSON: () => ({}),
+    })
+
+    act(() => {
+      fireEvent.doubleClick(root, { clientX: 5, clientY: 5 })
+    })
+    const ta = screen.getByTestId('hip-board-text-edit') as HTMLTextAreaElement
+    act(() => {
+      fireEvent.change(ta, { target: { value: 'typed' } })
+      fireEvent.keyDown(ta, { key: 'Escape' })
+    })
+    expect(screen.queryByTestId('hip-board-text-edit')).toBeNull()
+    // Element must remain (empty original restored).
+    expect(document.querySelector('[data-element-id="empty_txt"]')).toBeTruthy()
+    expect(ref.current?.getSelectedIds()).toContain('empty_txt')
+
+    onDraftBody.mockClear()
+    act(() => {
+      ref.current?.flushToStore({ mode: 'snapshot' })
+    })
+    const el = JSON.parse(onDraftBody.mock.calls[0]![0] as string).elements[0]
+    expect(el.id).toBe('empty_txt')
+    expect(el.text).toBe('')
+  })
+
+  it('flushToStore snapshot includes in-progress textarea text', () => {
+    const { ref, onDraftBody, root } = renderCanvas({
+      initialJson: serializeHipBoard(SCENE_WITH_TEXT),
+    })
+    vi.spyOn(root as HTMLElement, 'getBoundingClientRect').mockReturnValue({
+      left: 0,
+      top: 0,
+      right: 400,
+      bottom: 300,
+      width: 400,
+      height: 300,
+      x: 0,
+      y: 0,
+      toJSON: () => ({}),
+    })
+
+    act(() => {
+      fireEvent.doubleClick(root, { clientX: 5, clientY: 5 })
+    })
+    const ta = screen.getByTestId('hip-board-text-edit') as HTMLTextAreaElement
+    act(() => {
+      fireEvent.change(ta, { target: { value: 'mid-edit\nbody' } })
+    })
+    // Editor stays open; snapshot must capture live draft.
+    expect(screen.getByTestId('hip-board-text-edit')).toBeTruthy()
+    onDraftBody.mockClear()
+    act(() => {
+      ref.current?.flushToStore({ mode: 'snapshot' })
+    })
+    expect(onDraftBody).toHaveBeenCalledTimes(1)
+    const parsed = JSON.parse(onDraftBody.mock.calls[0]![0] as string)
+    expect(parsed.elements[0].text).toBe('mid-edit\nbody')
+    expect(parsed.elements[0].h).toBe(48)
+    // Editor still mounted after soft-commit.
+    expect(screen.getByTestId('hip-board-text-edit')).toBeTruthy()
+  })
 })

@@ -37,6 +37,11 @@ const TOOLS: Array<{
   { id: 'text', shortcut: 'T', label: 'Text', testId: 'hip-board-tool-text', Icon: Type },
 ]
 
+/** Prevent canvas root from treating toolbar clicks as scene gestures. */
+function stopPointerBubble(e: React.PointerEvent) {
+  e.stopPropagation()
+}
+
 export function BoardToolbar({ tool, onToolChange, disabled, className }: BoardToolbarProps) {
   return (
     <div
@@ -47,6 +52,10 @@ export function BoardToolbar({ tool, onToolChange, disabled, className }: BoardT
       role="toolbar"
       aria-label="Whiteboard tools"
       data-testid="hip-board-toolbar"
+      onPointerDown={stopPointerBubble}
+      onPointerMove={stopPointerBubble}
+      onPointerUp={stopPointerBubble}
+      onPointerCancel={stopPointerBubble}
     >
       {TOOLS.map(({ id, shortcut, label, testId, Icon }) => {
         const pressed = tool === id
@@ -66,6 +75,7 @@ export function BoardToolbar({ tool, onToolChange, disabled, className }: BoardT
             disabled={disabled}
             data-testid={testId}
             data-tool={id}
+            onPointerDown={stopPointerBubble}
             onMouseDown={(e) => {
               // Keep canvas focus for keyboard shortcuts after tool click.
               e.preventDefault()

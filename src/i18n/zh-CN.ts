@@ -2502,12 +2502,16 @@ export const zhCN = {
         pendingImageDropped: '有图片仍在导入，未保存。如需请重新粘贴。',
         hydratePartial: '部分画板图片无法加载',
         legacyImported: '画板已升级为新格式',
-        legacyPartial: '画板已升级；已跳过 {{count}} 个不支持的图形',
+        legacyPartial:
+          '画板已升级。已跳过 {{count}} 个不支持的图形，新格式中不可用。',
         legacyUnsupported:
-          '此画板包含无法转换的图形。确认后，编辑将以空白画板替换旧文件。',
+          '此画板包含无法转换的图形。编辑会打开空白画板；保存时确认后才会替换旧文件。',
         legacyUpgradeFailed:
           '升级后的画板未能保存，已保留旧文件。下次保存时将重试。',
-        legacyReplaceConfirm: '用新格式替换此旧画板？旧文件将被删除。',
+        legacyReplaceTitle: '替换旧画板？',
+        legacyReplaceConfirm:
+          '此画板无法完整转换。替换将删除旧文件，并保留当前（空白或已编辑）的新格式画板。',
+        legacyReplaceAction: '替换',
         legacyWriteBlocked: '保存已阻止，请先确认替换旧画板。',
         panelTitle: '画板',
         sectionStructure: '结构',

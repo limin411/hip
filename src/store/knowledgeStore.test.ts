@@ -73,6 +73,12 @@ vi.mock('sonner', () => ({
   toast: { error: vi.fn(), success: vi.fn(), message: vi.fn(), warning: vi.fn() },
 }))
 
+const requestLegacyBoardReplaceConfirm = vi.fn()
+vi.mock('@/components/knowledge/legacyBoardReplaceDialogStore', () => ({
+  requestLegacyBoardReplaceConfirm: (...a: unknown[]) =>
+    requestLegacyBoardReplaceConfirm(...a),
+}))
+
 vi.mock('@/i18n', () => ({
   default: {
     t: (key: string, opts?: { name?: string }) =>
@@ -2117,7 +2123,7 @@ describe('knowledgeStore board shell (PR-C hip cutover)', () => {
     await useKnowledgeStore.getState().openDoc('brd_board000001')
     expect(useKnowledgeStore.getState().editorMode).toBe('live')
     // large pad is not a legacy upgrade toast
-    expect(toast.message).not.toHaveBeenCalledWith('knowledge.board.legacyImported')
+    expect(toast.success).not.toHaveBeenCalledWith('knowledge.board.legacyImported')
   })
 
   it('flushSave dirty board writes via knowledgeWriteBoard and skips version/link', async () => {
@@ -2201,7 +2207,7 @@ describe('knowledgeStore board shell (PR-C hip cutover)', () => {
     knowledgeReadBoard.mockResolvedValueOnce(legacy)
     knowledgeWriteBoard.mockReset()
     knowledgeWriteBoard.mockResolvedValue(undefined)
-    vi.mocked(toast.message).mockClear()
+    vi.mocked(toast.success).mockClear()
     await useKnowledgeStore.getState().openDoc('brd_board000001')
     const s = useKnowledgeStore.getState()
     expect(s.activeDocId).toBe('brd_board000001')
@@ -2217,7 +2223,7 @@ describe('knowledgeStore board shell (PR-C hip cutover)', () => {
       ).toBe(true)
     })
     await vi.waitFor(() => {
-      expect(toast.message).toHaveBeenCalledWith('knowledge.board.legacyImported')
+      expect(toast.success).toHaveBeenCalledWith('knowledge.board.legacyImported')
     })
     expect(__legacyPreserveRawHasForTests('brd_board000001')).toBe(false)
     expect(__pendingUpgradeRetryHasForTests('brd_board000001')).toBe(false)
@@ -2321,21 +2327,22 @@ describe('knowledgeStore board shell (PR-C hip cutover)', () => {
 
     const resume = vi.fn()
     registerOnBoardFlushAbort(resume)
-    const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(false)
+    requestLegacyBoardReplaceConfirm.mockReset()
+    requestLegacyBoardReplaceConfirm.mockResolvedValue(false)
     knowledgeWriteBoard.mockClear()
     const blocked = await useKnowledgeStore.getState().flushSave()
     expect(blocked).toBe(false)
+    expect(requestLegacyBoardReplaceConfirm).toHaveBeenCalledWith('brd_board000001')
     expect(knowledgeWriteBoard).not.toHaveBeenCalled()
     expect(toast.message).toHaveBeenCalledWith('knowledge.board.legacyWriteBlocked')
     expect(__legacyPreserveRawHasForTests('brd_board000001')).toBe(true)
     expect(resume).toHaveBeenCalled()
 
-    confirmSpy.mockReturnValue(true)
+    requestLegacyBoardReplaceConfirm.mockResolvedValue(true)
     const allowed = await useKnowledgeStore.getState().flushSave()
     expect(allowed).toBe(true)
     expect(knowledgeWriteBoard).toHaveBeenCalledWith('spc_1', 'brd_board000001', dirty)
     expect(__legacyPreserveRawHasForTests('brd_board000001')).toBe(false)
-    confirmSpy.mockRestore()
     registerOnBoardFlushAbort(null)
   })
 
@@ -2354,7 +2361,7 @@ describe('knowledgeStore board shell (PR-C hip cutover)', () => {
     const s = useKnowledgeStore.getState()
     expect(s.draftBody).toBe(s.docBody)
 
-    const confirmSpy = vi.spyOn(window, 'confirm')
+    requestLegacyBoardReplaceConfirm.mockClear()
     knowledgeWriteBoard.mockClear()
     knowledgeReadDoc.mockResolvedValueOnce('# note')
     // leave flush uses leaveActiveLeaf; register a sync that does not change draft
@@ -2362,10 +2369,9 @@ describe('knowledgeStore board shell (PR-C hip cutover)', () => {
       /* canvas would stamp boardId; store already stamped on open */
     })
     await useKnowledgeStore.getState().openDoc('doc_doc00000001')
-    expect(confirmSpy).not.toHaveBeenCalled()
+    expect(requestLegacyBoardReplaceConfirm).not.toHaveBeenCalled()
     expect(knowledgeWriteBoard).not.toHaveBeenCalled()
     expect(useKnowledgeStore.getState().activeDocId).toBe('doc_doc00000001')
-    confirmSpy.mockRestore()
     registerBeforeOpenDocFlush(null)
   })
 
@@ -2505,7 +2511,7 @@ describe('knowledgeStore board shell (PR-C hip cutover)', () => {
 
     knowledgeReadBoard.mockResolvedValueOnce(legacy)
     knowledgeWriteBoard.mockClear()
-    vi.mocked(toast.message).mockClear()
+    vi.mocked(toast.success).mockClear()
     // openDoc: no dirty wait (doc flush already wrote). Opens board and enqueues upgrade
     // after the still-held flush run on saveChain.
     await useKnowledgeStore.getState().openDoc('brd_board000001')
@@ -2520,7 +2526,7 @@ describe('knowledgeStore board shell (PR-C hip cutover)', () => {
     releaseLink()
     await new Promise((r) => setTimeout(r, 30))
     expect(knowledgeWriteBoard).not.toHaveBeenCalled()
-    expect(toast.message).not.toHaveBeenCalledWith('knowledge.board.legacyImported')
+    expect(toast.success).not.toHaveBeenCalledWith('knowledge.board.legacyImported')
     knowledgeLinkIndexUpsert.mockResolvedValue(undefined)
   })
 

@@ -31,6 +31,7 @@ import {
   stableSerializeBoard,
 } from '@/domain/knowledge/boardScene'
 import { migrateExcalidrawToHipBoard } from '@/domain/knowledge/boardMigrate'
+import { requestLegacyBoardReplaceConfirm } from '@/components/knowledge/legacyBoardReplaceDialogStore'
 import {
   boardOutlinePublishSignature,
   selectionPublishSignature,
@@ -2090,9 +2091,9 @@ export const useKnowledgeStore = create<KnowledgeState>((set, get) => ({
               if (get().activeDocId !== upgradeBoardId) return prev
               if (get().activeSpaceId !== upgradeSpaceId) return prev
               if (skipped > 0) {
-                toast.message(i18n.t('knowledge.board.legacyPartial', { count: skipped }))
+                toast.warning(i18n.t('knowledge.board.legacyPartial', { count: skipped }))
               } else {
-                toast.message(i18n.t('knowledge.board.legacyImported'))
+                toast.success(i18n.t('knowledge.board.legacyImported'))
               }
             } catch {
               // Keep memory hip; do not delete legacy (write failed → no primary or atomic).
@@ -2233,7 +2234,6 @@ export const useKnowledgeStore = create<KnowledgeState>((set, get) => ({
       // Capture targets up front — openDoc may switch activeDoc mid-await.
       const spaceId = s.activeSpaceId
       const docId = s.activeDocId
-      const body = s.draftBody
       const node = s.nodes.find((n) => n.id === docId)
       // Design: missing node → no-op success (avoid mis-routing board drafts to write_doc).
       if (!node) {
@@ -2250,24 +2250,31 @@ export const useKnowledgeStore = create<KnowledgeState>((set, get) => ({
         return true
       }
 
+      // LKD-8 unsupported gate (PR-C must-pass; PR-M uses design-system Modal).
+      // Confirm *before* saveState=saving so the Modal is not under a saving chrome.
+      if (isBoard && legacyPreserveRaw.has(docId)) {
+        const confirmed = await requestLegacyBoardReplaceConfirm(docId)
+        if (!confirmed) {
+          toast.message(i18n.t('knowledge.board.legacyWriteBlocked'))
+          notifyBoardFlushAbort()
+          resolveWrite?.(false)
+          return false
+        }
+        // User may have navigated away while the Modal was open.
+        if (get().activeDocId !== docId || get().activeSpaceId !== spaceId) {
+          notifyBoardFlushAbort()
+          resolveWrite?.(false)
+          return false
+        }
+        legacyPreserveRaw.delete(docId)
+      }
+
+      // Re-read body after possible Modal wait (user may have edited).
+      const body = get().draftBody
+
       set({ saveState: 'saving' })
       try {
         if (isBoard) {
-          // LKD-8 unsupported gate: block write until user confirms replace (PR-C must-pass).
-          if (legacyPreserveRaw.has(docId)) {
-            const confirmed =
-              typeof window !== 'undefined' &&
-              typeof window.confirm === 'function' &&
-              window.confirm(i18n.t('knowledge.board.legacyReplaceConfirm'))
-            if (!confirmed) {
-              toast.message(i18n.t('knowledge.board.legacyWriteBlocked'))
-              set({ saveState: 'idle' })
-              notifyBoardFlushAbort()
-              resolveWrite?.(false)
-              return false
-            }
-            legacyPreserveRaw.delete(docId)
-          }
           // Prerequisite: caller already ran syncActiveEditorToDraft when structural.
           assertNoDataUrlInBoardJson(body)
           await knowledgeWriteBoard(spaceId, docId, body)

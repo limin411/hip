@@ -2564,13 +2564,15 @@ export const en = {
         hydratePartial: 'Some whiteboard images could not be loaded',
         legacyImported: 'Whiteboard upgraded to the new format',
         legacyPartial:
-          'Whiteboard upgraded; {{count}} unsupported shape(s) were skipped',
+          'Whiteboard upgraded. {{count}} unsupported shape(s) were skipped and are not available in the new format.',
         legacyUnsupported:
-          'This whiteboard uses shapes that cannot be converted. Editing will replace it with an empty board after you confirm.',
+          'This whiteboard uses shapes that cannot be converted. Your edits open an empty board; saving replaces the old file after you confirm.',
         legacyUpgradeFailed:
-          'Could not save the upgraded whiteboard; the previous file was kept. Changes will retry on next save.',
+          'Could not save the upgraded whiteboard. The previous file was kept; hip will retry on the next save.',
+        legacyReplaceTitle: 'Replace legacy whiteboard?',
         legacyReplaceConfirm:
-          'Replace this legacy whiteboard with the new format? The previous file will be removed.',
+          'This board could not be converted. Replacing discards the old file and keeps your current (empty or edited) board in the new format.',
+        legacyReplaceAction: 'Replace',
         legacyWriteBlocked:
           'Save blocked until you confirm replacing the legacy whiteboard.',
         panelTitle: 'Whiteboard',

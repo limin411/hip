@@ -31,6 +31,7 @@ import { SessionMenuDialogHost } from '@/components/history/SessionMenuDialogHos
 import { ManagedTerminalDialogHost } from '@/components/terminals/ManagedTerminalDialogHost'
 import { WorktreeDeleteDialogHost } from '@/components/chat/WorktreeControl/WorktreeDeleteDialogHost'
 import { KnowledgeSpaceDialogHost } from '@/components/knowledge/KnowledgeSpaceDialogHost'
+import { LegacyBoardReplaceConfirmHost } from '@/components/knowledge/LegacyBoardReplaceConfirmHost'
 import { CODE_TERMINAL } from '@/components/artifact/terminalFeature'
 import { TERMINAL_MANAGEMENT } from '@/components/terminals/feature'
 import { TerminalManagementPage } from '@/components/terminals/TerminalManagementPage'
@@ -302,6 +303,7 @@ export function AppLayout() {
       <ManagedTerminalDialogHost />
       <WorktreeDeleteDialogHost />
       <KnowledgeSpaceDialogHost />
+      <LegacyBoardReplaceConfirmHost />
     </div>
   )
 }

@@ -8,7 +8,7 @@ import type {
   KnowledgeTemplate,
   KnowledgeVersionEntry,
 } from '@/domain/knowledge/types'
-import { newDocId, newFolderId } from '@/domain/knowledge/ids'
+import { newBoardId, newDocId, newFolderId } from '@/domain/knowledge/ids'
 import {
   KNOWLEDGE_INDEX_YIELD_EVERY,
   KNOWLEDGE_LARGE_DOC_CHARS,
@@ -24,6 +24,11 @@ import {
   kbPerfOpenStore,
 } from '@/domain/knowledge/knowledgePerf'
 import {
+  assertNoDataUrlInBoardJson,
+  EMPTY_BOARD_SCENE_JSON,
+} from '@/domain/knowledge/boardScene'
+import {
+  collectBoardIdsInSubtree,
   collectDocIdsInSubtree,
   getPathTitles,
   insertNode,
@@ -64,6 +69,7 @@ import {
   knowledgeListSpaces,
   knowledgeListTemplates,
   knowledgeReadDoc,
+  knowledgeReadBoard,
   knowledgeSaveTemplate,
   knowledgeListVersions,
   knowledgeRestoreVersion,
@@ -71,6 +77,7 @@ import {
   knowledgeSaveVersion,
   knowledgeUpdateSpace,
   knowledgeWriteDoc,
+  knowledgeWriteBoard,
   knowledgeLinkIndexUpsert,
   knowledgeLinkIndexRemoveDoc,
   knowledgeLinkIndexReplaceAll,
@@ -430,6 +437,11 @@ interface KnowledgeState {
     opts?: { body?: string },
   ) => Promise<void>
   /**
+   * Create a whiteboard (board) node and open it.
+   * Does not change spaceDocCounts (Option B: doc-only counts).
+   */
+  createBoard: (parentId: string | null, title: string) => Promise<void>
+  /**
    * If the space has templates, open the picker (no node yet). Otherwise create empty.
    * Cancel on the picker leaves no orphan empty doc.
    */
@@ -593,22 +605,71 @@ function applySearchFilters(hits: KnowledgeSearchHit[]): KnowledgeSearchHit[] {
 let saveTimer: ReturnType<typeof setTimeout> | null = null
 let saveChain: Promise<boolean> = Promise.resolve(true)
 /**
- * Monotonic token for openDoc. After `await knowledgeReadDoc`, only apply state
- * if this open is still the latest — otherwise rapid tree clicks write the wrong
- * body into the active buffer (data cross-talk).
+ * Monotonic token for openDoc. After `await knowledgeReadDoc` / `knowledgeReadBoard`,
+ * only apply state if this open is still the latest — otherwise rapid tree clicks
+ * write the wrong body into the active buffer (data cross-talk).
  */
 let openDocGeneration = 0
 
 /**
- * Optional UI hook: push Live/Source editor buffer into draftBody *before*
- * openDoc's flushSave. Registered by KnowledgeWorkspace; all openDoc callers
- * (tree, outline, crumbs, IPC) get correct last-keystroke capture.
+ * Options for {@link syncActiveEditorToDraft} / Workspace dispatcher.
+ * `leaveActiveLeaf` drives board flushToStore mode: leave vs snapshot (KD-13).
  */
-let beforeOpenDocFlush: (() => void) | null = null
+export type SyncActiveEditorOpts = {
+  /**
+   * true → active leaf will change or be destroyed after the following flushSave
+   *        (board flushToStore mode = 'leave').
+   * false/omit → snapshot: keep pending board imports.
+   */
+  leaveActiveLeaf?: boolean
+}
 
-/** Register (or clear with null) the pre-openDoc editor flush callback. */
-export function registerBeforeOpenDocFlush(fn: (() => void) | null): void {
+type BeforeOpenDocFlush = (opts?: SyncActiveEditorOpts) => void
+
+/**
+ * Optional UI hook: push Live/Source/board editor buffer into draftBody *before*
+ * any structural flushSave. Registered by KnowledgeWorkspace (KD-9).
+ */
+let beforeOpenDocFlush: BeforeOpenDocFlush | null = null
+
+/** Register (or clear with null) the pre-flush editor sync callback. */
+export function registerBeforeOpenDocFlush(fn: BeforeOpenDocFlush | null): void {
   beforeOpenDocFlush = fn
+}
+
+/**
+ * Call before any flushSave that may leave or structurally change the tree/space
+ * (KD-14). Never throws into callers.
+ */
+export function syncActiveEditorToDraft(opts?: SyncActiveEditorOpts): void {
+  try {
+    beforeOpenDocFlush?.(opts)
+  } catch {
+    // never block structural ops on UI flush errors
+  }
+}
+
+/** Title-only MiniSearch upsert for boards (no body / frontmatter). */
+function indexBoardTitle(
+  spaceId: string,
+  boardId: string,
+  title: string,
+  spaceName: string,
+  nodes: KnowledgeNode[],
+) {
+  const path = getPathTitles(nodes, boardId).join(' / ') || title
+  const order = nodes.find((n) => n.id === boardId)?.order ?? Number.MAX_SAFE_INTEGER
+  upsertSearchDoc(kbIndex, {
+    id: docKey(spaceId, boardId),
+    spaceId,
+    docId: boardId,
+    title,
+    body: '',
+    spaceName,
+    path,
+    order,
+    metaSink: kbMeta,
+  })
 }
 
 function cancelScheduledSave() {
@@ -723,8 +784,24 @@ export const useKnowledgeStore = create<KnowledgeState>((set, get) => ({
       for (const { space, nodes } of loaded) {
         if (gen !== indexBuildGen) return
         for (const node of nodes) {
-          if (node.kind !== 'doc') continue
           if (gen !== indexBuildGen) return
+          if (node.kind === 'board') {
+            // Title-only; do not read board scene JSON for search (KD Option B / search design).
+            const path = getPathTitles(nodes, node.id).join(' / ') || node.title
+            upsertSearchDoc(next, {
+              id: docKey(space.id, node.id),
+              spaceId: space.id,
+              docId: node.id,
+              title: node.title,
+              body: '',
+              spaceName: space.name,
+              path,
+              order: node.order,
+              metaSink: nextMeta,
+            })
+            continue
+          }
+          if (node.kind !== 'doc') continue
           let body = ''
           try {
             body = await knowledgeReadDoc(space.id, node.id)
@@ -861,9 +938,15 @@ export const useKnowledgeStore = create<KnowledgeState>((set, get) => ({
     set({ busy: true, error: null })
     try {
       const wasActive = get().activeSpaceId === id
-      // Leave workspace *before* disk delete: avoid flushSave rewriting into a wiped
-      // tree, and unmount workspace dialogs cleanly while the space still exists in UI.
+      // KD-14 / R4: sync → flushSave success → clear UI → soft-delete.
+      // Flush fail aborts (stay in workspace); never clear buffer before persist.
       if (wasActive) {
+        syncActiveEditorToDraft({ leaveActiveLeaf: true })
+        const ok = await get().flushSave()
+        if (!ok) {
+          set({ busy: false })
+          return
+        }
         if (saveTimer) {
           clearTimeout(saveTimer)
           saveTimer = null
@@ -920,6 +1003,7 @@ export const useKnowledgeStore = create<KnowledgeState>((set, get) => ({
   },
 
   openSpace: async (id, opts) => {
+    syncActiveEditorToDraft({ leaveActiveLeaf: true })
     const ok = await get().flushSave()
     if (!ok) return // stay on current space/doc; saveState error + retry chrome
     // Write current space expand before replacing the in-memory map.
@@ -1194,6 +1278,7 @@ export const useKnowledgeStore = create<KnowledgeState>((set, get) => ({
   },
 
   openHome: async () => {
+    syncActiveEditorToDraft({ leaveActiveLeaf: true })
     const ok = await get().flushSave()
     if (!ok) return // stay in workspace; saveState error + retry chrome
     flushPendingExpandPersist(get)
@@ -1249,6 +1334,8 @@ export const useKnowledgeStore = create<KnowledgeState>((set, get) => ({
   createDoc: async (parentId, title, opts) => {
     const spaceId = get().activeSpaceId
     if (!spaceId || get().busy) return
+    // Pre-sync current leaf (snapshot: still on it until openDoc(new)).
+    syncActiveEditorToDraft({ leaveActiveLeaf: false })
     // Flush-gate before creating so a failed dirty save cannot orphan a new empty doc.
     const flushed = await get().flushSave()
     if (!flushed) return
@@ -1287,6 +1374,47 @@ export const useKnowledgeStore = create<KnowledgeState>((set, get) => ({
       }
       get().runSearch(get().searchQuery)
       // openDoc defaults to preferred writable mode (source, or live when flag on)
+      await get().openDoc(id)
+    } catch (e) {
+      const msg = knowledgeErrorMessage(e)
+      set({ busy: false, error: msg })
+      toast.error(msg)
+    }
+  },
+
+  createBoard: async (parentId, title) => {
+    const spaceId = get().activeSpaceId
+    if (!spaceId || get().busy) return
+    // Pre-flush of *current* leaf — user still on it until openDoc(new) (snapshot).
+    syncActiveEditorToDraft({ leaveActiveLeaf: false })
+    const flushed = await get().flushSave()
+    if (!flushed) return
+    set({ busy: true })
+    try {
+      const now = Date.now()
+      const id = newBoardId()
+      await knowledgeWriteBoard(spaceId, id, EMPTY_BOARD_SCENE_JSON)
+      const node = {
+        id,
+        parentId,
+        kind: 'board' as const,
+        title: title || 'Untitled whiteboard',
+        order: nextOrder(get().nodes, parentId),
+        createdAt: now,
+        updatedAt: now,
+      }
+      const nodes = insertNode(get().nodes, node)
+      await knowledgeSaveTree(spaceId, { version: 1, nodes })
+      const spaceName = get().spaces.find((s) => s.id === spaceId)?.name ?? ''
+      indexBoardTitle(spaceId, id, node.title, spaceName, nodes)
+      // Option B: do NOT increment spaceDocCounts for boards.
+      set({ nodes, busy: false })
+      if (parentId) {
+        set((s) => ({ expandedFolderIds: { ...s.expandedFolderIds, [parentId]: true } }))
+        schedulePersistExpand(spaceId, get)
+      }
+      get().runSearch(get().searchQuery)
+      // openDoc(id≠current) → leaveActiveLeaf true then open board path.
       await get().openDoc(id)
     } catch (e) {
       const msg = knowledgeErrorMessage(e)
@@ -1396,6 +1524,11 @@ export const useKnowledgeStore = create<KnowledgeState>((set, get) => ({
         void get().rebuildSpaceLinkIndex(spaceId)
         syncFacetsToState(set)
         get().runSearch(get().searchQuery)
+      } else if (renamed?.kind === 'board') {
+        // Title-only search; no link-index / wiki rewrite for boards.
+        const spaceName = get().spaces.find((s) => s.id === spaceId)?.name ?? ''
+        indexBoardTitle(spaceId, id, renamed.title, spaceName, nodes)
+        get().runSearch(get().searchQuery)
       }
       // update recent title if needed
       set((s) => ({
@@ -1414,6 +1547,8 @@ export const useKnowledgeStore = create<KnowledgeState>((set, get) => ({
   moveNode: async (id, parentId, toIndex) => {
     const spaceId = get().activeSpaceId
     if (!spaceId || get().busy) return
+    // Active usually stays open → snapshot (keep pending board imports).
+    syncActiveEditorToDraft({ leaveActiveLeaf: false })
     const flushed = await get().flushSave()
     if (!flushed) return
     set({ busy: true })
@@ -1437,6 +1572,11 @@ export const useKnowledgeStore = create<KnowledgeState>((set, get) => ({
         }
         indexCurrentDoc(spaceId, docId, title, body, spaceName, nodes)
       }
+      // Boards: path titles may change — title-only reindex.
+      for (const boardId of collectBoardIdsInSubtree(nodes, id)) {
+        const title = nodes.find((n) => n.id === boardId)?.title ?? ''
+        indexBoardTitle(spaceId, boardId, title, spaceName, nodes)
+      }
       syncFacetsToState(set)
       get().runSearch(get().searchQuery)
     } catch (e) {
@@ -1449,23 +1589,31 @@ export const useKnowledgeStore = create<KnowledgeState>((set, get) => ({
   deleteNode: async (id) => {
     const spaceId = get().activeSpaceId
     if (!spaceId || get().busy) return
+    // Preview subtree so leaveActiveLeaf is correct for folder deletes that nest active.
+    const preview = removeNodeSubtree(get().nodes, id)
+    const leaveActive =
+      get().activeDocId != null && preview.removedLeafIds.includes(get().activeDocId!)
+    syncActiveEditorToDraft({ leaveActiveLeaf: leaveActive })
     const flushed = await get().flushSave()
     if (!flushed) return
     set({ busy: true })
     try {
-      const { nodes, removedDocIds } = removeNodeSubtree(get().nodes, id)
+      const { nodes, removedDocIds, removedLeafIds } = removeNodeSubtree(get().nodes, id)
       // Soft-delete into recycle bin (tree + files moved by Tauri).
       await knowledgeSoftDeleteNodes(spaceId, [id])
-      for (const docId of removedDocIds) {
-        removeSearchDoc(kbIndex, docKey(spaceId, docId), kbMeta)
+      for (const leafId of removedLeafIds) {
+        removeSearchDoc(kbIndex, docKey(spaceId, leafId), kbMeta)
       }
+      // Boards: no link-index; docs only.
       await removeLinkIndexDocs(spaceId, removedDocIds)
       void import('@/store/trashBadgeStore').then(({ useTrashBadgeStore }) => {
         useTrashBadgeStore.getState().adjustKnowledge(1)
       })
-      const activeRemoved = get().activeDocId != null && removedDocIds.includes(get().activeDocId!)
+      const activeRemoved =
+        get().activeDocId != null && removedLeafIds.includes(get().activeDocId!)
       set((s) => {
         const prevCount = s.spaceDocCounts[spaceId]
+        // Option B: counts are doc-only.
         const nextCounts =
           prevCount == null
             ? s.spaceDocCounts
@@ -1476,7 +1624,7 @@ export const useKnowledgeStore = create<KnowledgeState>((set, get) => ({
         const pendingTargetsRemoved =
           s.pendingReveal != null &&
           s.pendingReveal.spaceId === spaceId &&
-          removedDocIds.includes(s.pendingReveal.docId)
+          removedLeafIds.includes(s.pendingReveal.docId)
         const expandedFolderIds = pruneExpandedToFolders(s.expandedFolderIds, nodes)
         return {
           nodes,
@@ -1484,7 +1632,7 @@ export const useKnowledgeStore = create<KnowledgeState>((set, get) => ({
           spaceDocCounts: nextCounts,
           expandedFolderIds,
           recent: s.recent.filter(
-            (r) => !(r.spaceId === spaceId && removedDocIds.includes(r.docId)),
+            (r) => !(r.spaceId === spaceId && removedLeafIds.includes(r.docId)),
           ),
           ...(activeRemoved
             ? {
@@ -1499,7 +1647,7 @@ export const useKnowledgeStore = create<KnowledgeState>((set, get) => ({
               : {}),
           treeFocusId:
             s.treeFocusId != null &&
-            (removedDocIds.includes(s.treeFocusId) ||
+            (removedLeafIds.includes(s.treeFocusId) ||
               !nodes.some((n) => n.id === s.treeFocusId))
               ? null
               : s.treeFocusId,
@@ -1523,12 +1671,9 @@ export const useKnowledgeStore = create<KnowledgeState>((set, get) => ({
       return
     }
 
-    // Sync in-editor buffer → draftBody while activeDocId is still the old doc.
-    try {
-      beforeOpenDocFlush?.()
-    } catch {
-      // never block open on UI flush errors
-    }
+    // Sync in-editor buffer → draftBody while activeDocId is still the old leaf.
+    // leave: active leaf will change (KD-13/14).
+    syncActiveEditorToDraft({ leaveActiveLeaf: true })
 
     // Only await a disk write when dirty. Clean switches must NOT wait on saveChain
     // (prior link-index / daily version IPC would freeze tree clicks).
@@ -1539,9 +1684,15 @@ export const useKnowledgeStore = create<KnowledgeState>((set, get) => ({
     }
 
     const spaceId = get().activeSpaceId
-    const node = get().nodes.find((n) => n.id === id && n.kind === 'doc')
-    if (!node || !spaceId) {
-      toast.error('Could not load document')
+    const node = get().nodes.find((n) => n.id === id)
+    const isDoc = node?.kind === 'doc' && id.startsWith('doc_')
+    const isBoard = node?.kind === 'board' && id.startsWith('brd_')
+    if (!spaceId || !node || (!isDoc && !isBoard)) {
+      toast.error(
+        id.startsWith('brd_') || node?.kind === 'board'
+          ? 'Could not load whiteboard'
+          : 'Could not load document',
+      )
       get().dropRecent(spaceId, id)
       set({
         activeDocId: null,
@@ -1550,6 +1701,9 @@ export const useKnowledgeStore = create<KnowledgeState>((set, get) => ({
         draftBody: '',
         editorMode: 'live',
         pendingReveal: null,
+        backlinks: [],
+        outboundLinks: [],
+        linkPanelStatus: 'idle',
       })
       return
     }
@@ -1558,7 +1712,9 @@ export const useKnowledgeStore = create<KnowledgeState>((set, get) => ({
     try {
       kbPerfOpenStart()
       const ipcT0 = isKnowledgePerfEnabled() ? performance.now() : 0
-      const body = await knowledgeReadDoc(spaceId, id)
+      const body = isBoard
+        ? await knowledgeReadBoard(spaceId, id)
+        : await knowledgeReadDoc(spaceId, id)
       if (isKnowledgePerfEnabled()) {
         kbPerfOpenIpc(performance.now() - ipcT0)
       }
@@ -1566,15 +1722,8 @@ export const useKnowledgeStore = create<KnowledgeState>((set, get) => ({
       if (gen !== openDocGeneration) return
       // Space may have changed while we awaited disk.
       if (get().activeSpaceId !== spaceId) return
-      // Always real-time (Live). Source only when Live is off or doc is too large.
-      // Do not restore a prior Source preference — product is Notion/Feishu-style.
-      let editorMode = resolveEditorMode('live')
-      // Large docs force Source (Live / Milkdown cost); toast once per open.
-      if (editorMode === 'live' && body.length > KNOWLEDGE_LARGE_DOC_CHARS) {
-        editorMode = 'source'
-        toast.message(i18n.t('knowledge.doc.largeDocForceSource'))
-      }
-      // Drop pending reveal if it targets a different doc (tree/recent nav mid-flight).
+
+      // Drop pending reveal if it targets a different leaf (tree/recent nav mid-flight).
       const pending = get().pendingReveal
       const revealMatches =
         pending != null && pending.spaceId === spaceId && pending.docId === id
@@ -1587,6 +1736,45 @@ export const useKnowledgeStore = create<KnowledgeState>((set, get) => ({
         title: node.title,
         spaceName,
         at: Date.now(),
+      }
+
+      if (isBoard) {
+        // Board: dehydrated JSON; do NOT change editorMode; no large-doc / link panel.
+        set((s) => {
+          const rest = s.recent.filter(
+            (r) => !(r.spaceId === item.spaceId && r.docId === item.docId),
+          )
+          const recent = [item, ...rest].slice(0, RECENT_CAP)
+          persistRecent(recent)
+          return {
+            activeDocId: id,
+            docBody: body,
+            draftBody: body,
+            // editorMode: OMIT — leave previous
+            saveState: 'idle' as const,
+            treeFocusId: id,
+            expandedFolderIds,
+            backlinks: [],
+            outboundLinks: [],
+            linkPanelStatus: 'idle' as const,
+            recent,
+            ...(revealMatches ? {} : { pendingReveal: null }),
+          }
+        })
+        // Title-only search upsert on open (optional for docs; required path for boards).
+        indexBoardTitle(spaceId, id, node.title, spaceName, get().nodes)
+        kbPerfOpenStore(body.length, get().editorMode)
+        schedulePersistExpand(spaceId, get)
+        return
+      }
+
+      // Doc path: Always real-time (Live). Source only when Live is off or doc is too large.
+      // Do not restore a prior Source preference — product is Notion/Feishu-style.
+      let editorMode = resolveEditorMode('live')
+      // Large docs force Source (Live / Milkdown cost); toast once per open.
+      if (editorMode === 'live' && body.length > KNOWLEDGE_LARGE_DOC_CHARS) {
+        editorMode = 'source'
+        toast.message(i18n.t('knowledge.doc.largeDocForceSource'))
       }
       // Single set: body + selection + recent — avoid double React render on open.
       set((s) => {
@@ -1621,7 +1809,7 @@ export const useKnowledgeStore = create<KnowledgeState>((set, get) => ({
     } catch (e) {
       // Stale open failure must not clear a newer successful open.
       if (gen !== openDocGeneration) return
-      const msg = knowledgeErrorMessage(e)
+      const msg = isBoard ? 'Could not load whiteboard' : knowledgeErrorMessage(e)
       toast.error(msg)
       get().dropRecent(spaceId, id)
       set({
@@ -1631,6 +1819,9 @@ export const useKnowledgeStore = create<KnowledgeState>((set, get) => ({
         draftBody: '',
         editorMode: 'live',
         pendingReveal: null,
+        backlinks: [],
+        outboundLinks: [],
+        linkPanelStatus: 'idle',
       })
     }
   },
@@ -1701,9 +1892,28 @@ export const useKnowledgeStore = create<KnowledgeState>((set, get) => ({
       const node = s.nodes.find((n) => n.id === docId)
       const spaceName = s.spaces.find((sp) => sp.id === spaceId)?.name ?? ''
       const nodesSnap = s.nodes
+      const isBoard = node?.kind === 'board'
 
       set({ saveState: 'saving' })
       try {
+        if (isBoard) {
+          // Prerequisite: caller already ran syncActiveEditorToDraft when structural.
+          assertNoDataUrlInBoardJson(body)
+          await knowledgeWriteBoard(spaceId, docId, body)
+          if (get().activeDocId === docId && get().activeSpaceId === spaceId) {
+            set({ docBody: body, saveState: 'saved' })
+          } else if (get().saveState === 'saving') {
+            set({ saveState: 'idle' })
+          }
+          resolveWrite?.(true)
+          resolveWrite = null
+          // Skip link-index, daily version, frontmatter facets (board v1).
+          setTimeout(() => {
+            if (get().saveState === 'saved') set({ saveState: 'idle' })
+          }, 1500)
+          return true
+        }
+
         await knowledgeWriteDoc(spaceId, docId, body)
         // Prefer not to clobber a newer doc's docBody if the user already switched.
         if (get().activeDocId === docId && get().activeSpaceId === spaceId) {

@@ -1,6 +1,7 @@
 export * from './types'
 export * from './ids'
 export * from './tree'
+export * from './boardScene'
 export * from './search'
 export * from './searchReveal'
 export * from './spaceName'

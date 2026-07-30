@@ -3,6 +3,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 const knowledgeReadDoc = vi.fn()
 const knowledgeWriteDoc = vi.fn()
+const knowledgeReadBoard = vi.fn()
+const knowledgeWriteBoard = vi.fn()
 const knowledgeGetTree = vi.fn()
 const knowledgeEnsureRoot = vi.fn()
 const knowledgeListSpaces = vi.fn()
@@ -22,6 +24,8 @@ const knowledgeReadVersion = vi.fn()
 const knowledgeRestoreVersion = vi.fn()
 const knowledgeCreateSpace = vi.fn()
 const knowledgeUpdateSpace = vi.fn()
+const knowledgeLinkIndexUpsert = vi.fn()
+const knowledgeLinkIndexRemoveDoc = vi.fn()
 
 const EXPANDED_KEY = 'hip-knowledge-expanded-v1'
 
@@ -40,7 +44,10 @@ vi.mock('@/ipc/knowledge', () => ({
   knowledgeSaveTree: (...a: unknown[]) => knowledgeSaveTree(...a),
   knowledgeReadDoc: (...a: unknown[]) => knowledgeReadDoc(...a),
   knowledgeWriteDoc: (...a: unknown[]) => knowledgeWriteDoc(...a),
+  knowledgeReadBoard: (...a: unknown[]) => knowledgeReadBoard(...a),
+  knowledgeWriteBoard: (...a: unknown[]) => knowledgeWriteBoard(...a),
   knowledgeDeleteDocFile: vi.fn(),
+  knowledgeDeleteBoardFile: vi.fn(),
   knowledgeListTemplates: (...a: unknown[]) => knowledgeListTemplates(...a),
   knowledgeSaveTemplate: (...a: unknown[]) => knowledgeSaveTemplate(...a),
   knowledgeDeleteTemplate: (...a: unknown[]) => knowledgeDeleteTemplate(...a),
@@ -48,8 +55,8 @@ vi.mock('@/ipc/knowledge', () => ({
   knowledgeListVersions: (...a: unknown[]) => knowledgeListVersions(...a),
   knowledgeReadVersion: (...a: unknown[]) => knowledgeReadVersion(...a),
   knowledgeRestoreVersion: (...a: unknown[]) => knowledgeRestoreVersion(...a),
-  knowledgeLinkIndexUpsert: vi.fn().mockResolvedValue(undefined),
-  knowledgeLinkIndexRemoveDoc: vi.fn().mockResolvedValue(undefined),
+  knowledgeLinkIndexUpsert: (...a: unknown[]) => knowledgeLinkIndexUpsert(...a),
+  knowledgeLinkIndexRemoveDoc: (...a: unknown[]) => knowledgeLinkIndexRemoveDoc(...a),
   knowledgeLinkIndexReplaceAll: vi.fn().mockResolvedValue(undefined),
   knowledgeLinkIndexBacklinks: vi.fn().mockResolvedValue([]),
   knowledgeLinkIndexOutbound: vi.fn().mockResolvedValue([]),
@@ -74,9 +81,12 @@ vi.mock('@/i18n', () => ({
 }))
 
 import { toast } from 'sonner'
+import { EMPTY_BOARD_SCENE_JSON } from '@/domain/knowledge/boardScene'
 import {
   listKnowledgeDocsForWiki,
+  registerBeforeOpenDocFlush,
   setExpandPersistSuspended,
+  syncActiveEditorToDraft,
   useKnowledgeStore,
 } from './knowledgeStore'
 
@@ -212,14 +222,20 @@ describe('knowledgeStore deleteSpace', () => {
     })
   })
 
-  it('leaves workspace before disk delete and does not flush dirty draft', async () => {
+  it('flushes dirty draft then clears workspace then soft-deletes (KD-14)', async () => {
+    knowledgeWriteDoc.mockResolvedValueOnce(undefined)
+    knowledgeSaveVersion.mockResolvedValue(undefined)
     useKnowledgeStore.setState({
       pendingReveal: { query: 'q', spaceId: 'spc_1', docId: 'doc_1' },
     })
     await useKnowledgeStore.getState().deleteSpace('spc_1')
     const s = useKnowledgeStore.getState()
+    expect(knowledgeWriteDoc).toHaveBeenCalledWith('spc_1', 'doc_1', 'dirty-unsaved')
     expect(knowledgeSoftDeleteSpace).toHaveBeenCalledWith('spc_1')
-    expect(knowledgeWriteDoc).not.toHaveBeenCalled()
+    // Write before soft-delete.
+    const writeOrder = knowledgeWriteDoc.mock.invocationCallOrder[0]
+    const delOrder = knowledgeSoftDeleteSpace.mock.invocationCallOrder[0]
+    expect(writeOrder).toBeLessThan(delOrder)
     expect(s.mode).toBe('home')
     expect(s.activeSpaceId).toBeNull()
     expect(s.activeDocId).toBeNull()
@@ -230,7 +246,20 @@ describe('knowledgeStore deleteSpace', () => {
     expect(s.pendingReveal).toBeNull()
   })
 
-  it('deletes non-active space without changing mode', async () => {
+  it('aborts soft-delete when flush fails and stays in workspace', async () => {
+    knowledgeWriteDoc.mockRejectedValueOnce(new Error('disk full'))
+    await useKnowledgeStore.getState().deleteSpace('spc_1')
+    const s = useKnowledgeStore.getState()
+    expect(knowledgeSoftDeleteSpace).not.toHaveBeenCalled()
+    expect(s.mode).toBe('workspace')
+    expect(s.activeSpaceId).toBe('spc_1')
+    expect(s.activeDocId).toBe('doc_1')
+    expect(s.draftBody).toBe('dirty-unsaved')
+    expect(s.saveState).toBe('error')
+    expect(s.busy).toBe(false)
+  })
+
+  it('deletes non-active space without flush or mode change', async () => {
     useKnowledgeStore.setState({
       activeSpaceId: 'spc_2',
       mode: 'workspace',
@@ -238,8 +267,10 @@ describe('knowledgeStore deleteSpace', () => {
       draftBody: '',
       docBody: '',
     })
+    knowledgeWriteDoc.mockClear()
     await useKnowledgeStore.getState().deleteSpace('spc_1')
     const s = useKnowledgeStore.getState()
+    expect(knowledgeWriteDoc).not.toHaveBeenCalled()
     expect(s.mode).toBe('workspace')
     expect(s.activeSpaceId).toBe('spc_2')
     expect(s.spaces.map((x) => x.id)).toEqual(['spc_2'])
@@ -1938,5 +1969,467 @@ describe('knowledgeStore version snapshots', () => {
     const list = await useKnowledgeStore.getState().listVersions()
     expect(list).toHaveLength(1)
     expect(knowledgeListVersions).toHaveBeenCalledWith('spc_1', 'doc_1')
+  })
+})
+
+describe('knowledgeStore board shell (PR-2)', () => {
+  const emptyScene = EMPTY_BOARD_SCENE_JSON
+  const boardNode = {
+    id: 'brd_board000001',
+    parentId: null as string | null,
+    kind: 'board' as const,
+    title: 'Sketch',
+    order: 0,
+    createdAt: 1,
+    updatedAt: 1,
+  }
+  const docNode = {
+    id: 'doc_doc00000001',
+    parentId: null as string | null,
+    kind: 'doc' as const,
+    title: 'Note',
+    order: 1,
+    createdAt: 1,
+    updatedAt: 1,
+  }
+
+  beforeEach(() => {
+    knowledgeReadDoc.mockReset()
+    knowledgeWriteDoc.mockReset()
+    knowledgeReadBoard.mockReset()
+    knowledgeWriteBoard.mockReset()
+    knowledgeSaveTree.mockReset()
+    knowledgeSoftDeleteNodes.mockReset()
+    knowledgeSoftDeleteSpace.mockReset()
+    knowledgeSaveVersion.mockReset()
+    knowledgeLinkIndexUpsert.mockReset()
+    knowledgeLinkIndexRemoveDoc.mockReset()
+    knowledgeWriteDoc.mockResolvedValue(undefined)
+    knowledgeWriteBoard.mockResolvedValue(undefined)
+    knowledgeSaveTree.mockResolvedValue(undefined)
+    knowledgeSoftDeleteNodes.mockResolvedValue(['tentry_1'])
+    knowledgeSoftDeleteSpace.mockResolvedValue(undefined)
+    knowledgeSaveVersion.mockResolvedValue(undefined)
+    knowledgeLinkIndexUpsert.mockResolvedValue(undefined)
+    knowledgeLinkIndexRemoveDoc.mockResolvedValue(undefined)
+    knowledgeReadBoard.mockResolvedValue(emptyScene)
+    vi.mocked(toast.error).mockClear()
+    vi.mocked(toast.message).mockClear()
+    registerBeforeOpenDocFlush(null)
+    useKnowledgeStore.setState({
+      loaded: true,
+      spaces: [{ id: 'spc_1', name: 'S', createdAt: 1, updatedAt: 1 }],
+      activeSpaceId: 'spc_1',
+      nodes: [boardNode, docNode],
+      activeDocId: null,
+      docBody: '',
+      draftBody: '',
+      editorMode: 'live',
+      mode: 'workspace',
+      searchQuery: '',
+      searchHits: [],
+      indexStatus: 'ready',
+      spaceDocCounts: { spc_1: 1 },
+      recent: [],
+      expandedFolderIds: {},
+      busy: false,
+      error: null,
+      saveState: 'idle',
+      backlinks: [
+        {
+          fromDocId: 'x',
+          fromTitle: 'X',
+          raw: 'y',
+          kind: 'wiki',
+          fragment: null,
+        },
+      ],
+      outboundLinks: [],
+      linkPanelStatus: 'ready',
+    })
+  })
+
+  afterEach(() => {
+    registerBeforeOpenDocFlush(null)
+  })
+
+  it('createBoard writes empty scene, does not bump spaceDocCounts, opens board', async () => {
+    await useKnowledgeStore.getState().createBoard(null, 'Arch')
+    expect(knowledgeWriteBoard).toHaveBeenCalled()
+    const [spaceId, boardId, body] = knowledgeWriteBoard.mock.calls[0]
+    expect(spaceId).toBe('spc_1')
+    expect(String(boardId)).toMatch(/^brd_/)
+    expect(body).toBe(emptyScene)
+    expect(knowledgeReadDoc).not.toHaveBeenCalled()
+    expect(knowledgeReadBoard).toHaveBeenCalledWith('spc_1', boardId)
+    const s = useKnowledgeStore.getState()
+    expect(s.activeDocId).toBe(boardId)
+    expect(s.docBody).toBe(emptyScene)
+    expect(s.draftBody).toBe(emptyScene)
+    expect(s.spaceDocCounts.spc_1).toBe(1) // Option B: unchanged
+    expect(s.nodes.some((n) => n.id === boardId && n.kind === 'board')).toBe(true)
+    expect(knowledgeLinkIndexUpsert).not.toHaveBeenCalled()
+  })
+
+  it('openDoc board uses knowledgeReadBoard and skips large-doc / link panel', async () => {
+    const huge = emptyScene // size irrelevant; boards skip large-doc path
+    knowledgeReadBoard.mockResolvedValueOnce(huge)
+    useKnowledgeStore.setState({ editorMode: 'source' })
+    await useKnowledgeStore.getState().openDoc('brd_board000001')
+    const s = useKnowledgeStore.getState()
+    expect(knowledgeReadBoard).toHaveBeenCalledWith('spc_1', 'brd_board000001')
+    expect(knowledgeReadDoc).not.toHaveBeenCalled()
+    expect(s.activeDocId).toBe('brd_board000001')
+    expect(s.docBody).toBe(huge)
+    expect(s.draftBody).toBe(huge)
+    // editorMode left unchanged for boards
+    expect(s.editorMode).toBe('source')
+    expect(s.backlinks).toEqual([])
+    expect(s.linkPanelStatus).toBe('idle')
+    expect(toast.message).not.toHaveBeenCalled()
+    expect(knowledgeLinkIndexUpsert).not.toHaveBeenCalled()
+    expect(s.recent[0]?.docId).toBe('brd_board000001')
+  })
+
+  it('openDoc board does not force source for large body', async () => {
+    const { KNOWLEDGE_LARGE_DOC_CHARS } = await import('@/domain/knowledge/limits')
+    const big = '{"type":"excalidraw","version":2,"source":"hip","elements":[],"appState":{},"files":{},"pad":"' +
+      'x'.repeat(KNOWLEDGE_LARGE_DOC_CHARS + 10) +
+      '"}'
+    knowledgeReadBoard.mockResolvedValueOnce(big)
+    useKnowledgeStore.setState({ editorMode: 'live' })
+    await useKnowledgeStore.getState().openDoc('brd_board000001')
+    expect(useKnowledgeStore.getState().editorMode).toBe('live')
+    expect(toast.message).not.toHaveBeenCalled()
+  })
+
+  it('flushSave dirty board writes via knowledgeWriteBoard and skips version/link', async () => {
+    const dirty = '{"type":"excalidraw","version":2,"source":"hip","elements":[{"id":"e1"}],"appState":{},"files":{}}'
+    useKnowledgeStore.setState({
+      activeDocId: 'brd_board000001',
+      docBody: emptyScene,
+      draftBody: dirty,
+      nodes: [boardNode],
+    })
+    const ok = await useKnowledgeStore.getState().flushSave()
+    expect(ok).toBe(true)
+    expect(knowledgeWriteBoard).toHaveBeenCalledWith('spc_1', 'brd_board000001', dirty)
+    expect(knowledgeWriteDoc).not.toHaveBeenCalled()
+    expect(knowledgeSaveVersion).not.toHaveBeenCalled()
+    expect(knowledgeLinkIndexUpsert).not.toHaveBeenCalled()
+    expect(useKnowledgeStore.getState().docBody).toBe(dirty)
+  })
+
+  it('flushSave rejects board draft with files.*.dataURL', async () => {
+    const bad = JSON.stringify({
+      type: 'excalidraw',
+      version: 2,
+      source: 'hip',
+      elements: [],
+      appState: {},
+      files: { f1: { id: 'f1', mimeType: 'image/png', created: 1, dataURL: 'data:x' } },
+    })
+    useKnowledgeStore.setState({
+      activeDocId: 'brd_board000001',
+      docBody: emptyScene,
+      draftBody: bad,
+      nodes: [boardNode],
+    })
+    const ok = await useKnowledgeStore.getState().flushSave()
+    expect(ok).toBe(false)
+    expect(knowledgeWriteBoard).not.toHaveBeenCalled()
+    expect(useKnowledgeStore.getState().saveState).toBe('error')
+  })
+
+  it('openDoc abort on dirty board keeps draft when write fails', async () => {
+    const dirty = '{"type":"excalidraw","version":2,"source":"hip","elements":[1],"appState":{},"files":{}}'
+    useKnowledgeStore.setState({
+      activeDocId: 'brd_board000001',
+      docBody: emptyScene,
+      draftBody: dirty,
+      nodes: [boardNode, docNode],
+    })
+    knowledgeWriteBoard.mockRejectedValueOnce(new Error('disk full'))
+    knowledgeReadDoc.mockResolvedValueOnce('# note')
+    await useKnowledgeStore.getState().openDoc('doc_doc00000001')
+    const s = useKnowledgeStore.getState()
+    expect(s.activeDocId).toBe('brd_board000001')
+    expect(s.draftBody).toBe(dirty)
+    expect(knowledgeReadDoc).not.toHaveBeenCalled()
+  })
+
+  it('setDraftBody docId guard ignores cross-leaf board write', () => {
+    useKnowledgeStore.setState({
+      activeDocId: 'brd_board000001',
+      docBody: emptyScene,
+      draftBody: emptyScene,
+    })
+    useKnowledgeStore.getState().setDraftBody('other', { docId: 'brd_other000001', persist: 'none' })
+    expect(useKnowledgeStore.getState().draftBody).toBe(emptyScene)
+    useKnowledgeStore.getState().setDraftBody('ok', { docId: 'brd_board000001', persist: 'none' })
+    expect(useKnowledgeStore.getState().draftBody).toBe('ok')
+  })
+
+  it('deleteNode active board clears activeDocId/draft and does not decrement doc counts', async () => {
+    useKnowledgeStore.setState({
+      activeDocId: 'brd_board000001',
+      docBody: emptyScene,
+      draftBody: emptyScene,
+      spaceDocCounts: { spc_1: 1 },
+      recent: [
+        { spaceId: 'spc_1', docId: 'brd_board000001', title: 'Sketch', spaceName: 'S', at: 1 },
+        { spaceId: 'spc_1', docId: 'doc_doc00000001', title: 'Note', spaceName: 'S', at: 2 },
+      ],
+    })
+    await useKnowledgeStore.getState().deleteNode('brd_board000001')
+    const s = useKnowledgeStore.getState()
+    expect(s.activeDocId).toBeNull()
+    expect(s.docBody).toBe('')
+    expect(s.draftBody).toBe('')
+    expect(s.spaceDocCounts.spc_1).toBe(1)
+    expect(s.nodes.find((n) => n.id === 'brd_board000001')).toBeUndefined()
+    expect(s.recent.map((r) => r.docId)).toEqual(['doc_doc00000001'])
+    expect(knowledgeSoftDeleteNodes).toHaveBeenCalledWith('spc_1', ['brd_board000001'])
+    // boards: no link-index remove for board-only leaf
+    expect(knowledgeLinkIndexRemoveDoc).not.toHaveBeenCalled()
+  })
+
+  it('deleteNode folder with doc+board decrements only docs and clears active board', async () => {
+    const folder = {
+      id: 'nod_folder00001',
+      parentId: null as string | null,
+      kind: 'folder' as const,
+      title: 'F',
+      order: 0,
+      createdAt: 1,
+      updatedAt: 1,
+    }
+    const nestedDoc = { ...docNode, id: 'doc_nested00001', parentId: 'nod_folder00001' }
+    const nestedBoard = { ...boardNode, id: 'brd_nested00001', parentId: 'nod_folder00001' }
+    useKnowledgeStore.setState({
+      nodes: [folder, nestedDoc, nestedBoard],
+      activeDocId: 'brd_nested00001',
+      docBody: emptyScene,
+      draftBody: emptyScene,
+      spaceDocCounts: { spc_1: 1 },
+    })
+    await useKnowledgeStore.getState().deleteNode('nod_folder00001')
+    const s = useKnowledgeStore.getState()
+    expect(s.nodes).toEqual([])
+    expect(s.activeDocId).toBeNull()
+    expect(s.spaceDocCounts.spc_1).toBe(0)
+    expect(knowledgeLinkIndexRemoveDoc).toHaveBeenCalledWith('spc_1', 'doc_nested00001')
+  })
+
+  it('renameNode board updates recent title without reading board body', async () => {
+    useKnowledgeStore.setState({
+      recent: [
+        { spaceId: 'spc_1', docId: 'brd_board000001', title: 'Sketch', spaceName: 'S', at: 1 },
+      ],
+    })
+    await useKnowledgeStore.getState().renameNode('brd_board000001', 'New board')
+    expect(knowledgeReadBoard).not.toHaveBeenCalled()
+    expect(knowledgeReadDoc).not.toHaveBeenCalled()
+    expect(knowledgeLinkIndexUpsert).not.toHaveBeenCalled()
+    expect(useKnowledgeStore.getState().nodes.find((n) => n.id === 'brd_board000001')?.title).toBe(
+      'New board',
+    )
+    expect(useKnowledgeStore.getState().recent[0]?.title).toBe('New board')
+  })
+
+  it('syncActiveEditorToDraft is invoked before structural flush paths with leave flags', async () => {
+    const spy = vi.fn()
+    registerBeforeOpenDocFlush(spy)
+
+    // openDoc leave=true
+    knowledgeReadDoc.mockResolvedValueOnce('# b')
+    useKnowledgeStore.setState({
+      activeDocId: 'doc_doc00000001',
+      docBody: 'clean',
+      draftBody: 'clean',
+      nodes: [docNode, boardNode],
+    })
+    await useKnowledgeStore.getState().openDoc('brd_board000001')
+    expect(spy).toHaveBeenCalledWith({ leaveActiveLeaf: true })
+    spy.mockClear()
+
+    // deleteNode active → leave true
+    useKnowledgeStore.setState({
+      activeDocId: 'brd_board000001',
+      docBody: emptyScene,
+      draftBody: emptyScene,
+      nodes: [boardNode, docNode],
+      busy: false,
+    })
+    await useKnowledgeStore.getState().deleteNode('brd_board000001')
+    expect(spy).toHaveBeenCalledWith({ leaveActiveLeaf: true })
+    spy.mockClear()
+
+    // deleteNode other → leave false
+    useKnowledgeStore.setState({
+      activeDocId: 'doc_doc00000001',
+      docBody: 'x',
+      draftBody: 'x',
+      nodes: [boardNode, docNode],
+      busy: false,
+    })
+    await useKnowledgeStore.getState().deleteNode('brd_board000001')
+    expect(spy).toHaveBeenCalledWith({ leaveActiveLeaf: false })
+    spy.mockClear()
+
+    // moveNode → leave false
+    useKnowledgeStore.setState({
+      activeDocId: 'doc_doc00000001',
+      docBody: 'x',
+      draftBody: 'x',
+      nodes: [
+        { ...boardNode },
+        { ...docNode },
+        {
+          id: 'nod_folder00001',
+          parentId: null,
+          kind: 'folder',
+          title: 'F',
+          order: 2,
+          createdAt: 1,
+          updatedAt: 1,
+        },
+      ],
+      busy: false,
+    })
+    await useKnowledgeStore.getState().moveNode('brd_board000001', 'nod_folder00001')
+    expect(spy).toHaveBeenCalledWith({ leaveActiveLeaf: false })
+    spy.mockClear()
+
+    // createBoard → leave false (snapshot of current)
+    useKnowledgeStore.setState({
+      activeDocId: 'doc_doc00000001',
+      docBody: 'x',
+      draftBody: 'x',
+      nodes: [docNode],
+      busy: false,
+    })
+    await useKnowledgeStore.getState().createBoard(null, 'B')
+    expect(spy).toHaveBeenCalledWith({ leaveActiveLeaf: false })
+    // createBoard then openDoc(new) also fires leave true
+    expect(spy).toHaveBeenCalledWith({ leaveActiveLeaf: true })
+    spy.mockClear()
+
+    // createDoc → leave false
+    knowledgeListTemplates.mockResolvedValue([])
+    useKnowledgeStore.setState({
+      activeDocId: 'brd_board000001',
+      docBody: emptyScene,
+      draftBody: emptyScene,
+      nodes: [boardNode],
+      busy: false,
+    })
+    knowledgeWriteDoc.mockResolvedValue(undefined)
+    knowledgeReadDoc.mockResolvedValue('')
+    await useKnowledgeStore.getState().createDoc(null, 'D')
+    expect(spy).toHaveBeenCalledWith({ leaveActiveLeaf: false })
+    spy.mockClear()
+
+    // openHome leave true
+    useKnowledgeStore.setState({
+      activeDocId: 'doc_doc00000001',
+      docBody: 'x',
+      draftBody: 'x',
+      mode: 'workspace',
+      activeSpaceId: 'spc_1',
+      busy: false,
+    })
+    await useKnowledgeStore.getState().openHome()
+    expect(spy).toHaveBeenCalledWith({ leaveActiveLeaf: true })
+    spy.mockClear()
+
+    // openSpace leave true
+    knowledgeGetTree.mockResolvedValueOnce({ version: 1, nodes: [] })
+    useKnowledgeStore.setState({
+      activeDocId: 'doc_doc00000001',
+      docBody: 'x',
+      draftBody: 'x',
+      mode: 'workspace',
+      activeSpaceId: 'spc_1',
+      spaces: [
+        { id: 'spc_1', name: 'S', createdAt: 1, updatedAt: 1 },
+        { id: 'spc_2', name: 'T', createdAt: 1, updatedAt: 1 },
+      ],
+      busy: false,
+    })
+    await useKnowledgeStore.getState().openSpace('spc_2')
+    expect(spy).toHaveBeenCalledWith({ leaveActiveLeaf: true })
+    spy.mockClear()
+
+    // deleteSpace active leave true
+    knowledgeWriteDoc.mockResolvedValue(undefined)
+    useKnowledgeStore.setState({
+      activeDocId: 'doc_doc00000001',
+      docBody: 'x',
+      draftBody: 'dirty',
+      mode: 'workspace',
+      activeSpaceId: 'spc_1',
+      spaces: [
+        { id: 'spc_1', name: 'S', createdAt: 1, updatedAt: 1 },
+        { id: 'spc_2', name: 'T', createdAt: 1, updatedAt: 1 },
+      ],
+      nodes: [docNode],
+      busy: false,
+    })
+    await useKnowledgeStore.getState().deleteSpace('spc_1')
+    expect(spy).toHaveBeenCalledWith({ leaveActiveLeaf: true })
+  })
+
+  it('pre-sync hook dirtying draft is persisted by deleteNode', async () => {
+    const dirty =
+      '{"type":"excalidraw","version":2,"source":"hip","elements":[{"id":"stroke"}],"appState":{},"files":{}}'
+    registerBeforeOpenDocFlush(() => {
+      useKnowledgeStore.getState().setDraftBody(dirty, {
+        docId: 'brd_board000001',
+        persist: 'none',
+      })
+    })
+    useKnowledgeStore.setState({
+      activeDocId: 'brd_board000001',
+      docBody: emptyScene,
+      draftBody: emptyScene, // clean until sync
+      nodes: [boardNode],
+      busy: false,
+    })
+    await useKnowledgeStore.getState().deleteNode('brd_board000001')
+    expect(knowledgeWriteBoard).toHaveBeenCalledWith('spc_1', 'brd_board000001', dirty)
+    expect(knowledgeSoftDeleteNodes).toHaveBeenCalled()
+  })
+
+  it('export syncActiveEditorToDraft is callable and swallows hook errors', () => {
+    registerBeforeOpenDocFlush(() => {
+      throw new Error('boom')
+    })
+    expect(() => syncActiveEditorToDraft({ leaveActiveLeaf: true })).not.toThrow()
+  })
+
+  it('openRecent brd_* opens board path', async () => {
+    knowledgeGetTree.mockResolvedValueOnce({
+      version: 1,
+      nodes: [boardNode],
+    })
+    knowledgeReadBoard.mockResolvedValueOnce(emptyScene)
+    useKnowledgeStore.setState({
+      activeSpaceId: null,
+      mode: 'home',
+      activeDocId: null,
+      docBody: '',
+      draftBody: '',
+      spaces: [{ id: 'spc_1', name: 'S', createdAt: 1, updatedAt: 1 }],
+    })
+    await useKnowledgeStore.getState().openRecent({
+      spaceId: 'spc_1',
+      docId: 'brd_board000001',
+      title: 'Sketch',
+      spaceName: 'S',
+      at: 1,
+    })
+    expect(knowledgeReadBoard).toHaveBeenCalledWith('spc_1', 'brd_board000001')
+    expect(useKnowledgeStore.getState().activeDocId).toBe('brd_board000001')
   })
 })

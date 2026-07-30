@@ -5,6 +5,9 @@ import { cn } from '@/lib/utils'
 import { modalMotion, overlayMotion } from './motionClasses'
 import { useResizableBox, type Size, type ResizeDir } from './useResizableBox'
 
+/** Visual/behavior role. Omit for legacy (current full scrim + max-w-lg) behavior. */
+export type ModalVariant = 'shell' | 'task' | 'confirm'
+
 interface ModalProps {
   open: boolean
   onOpenChange: (open: boolean) => void
@@ -18,6 +21,16 @@ interface ModalProps {
   storageKey?: string
   /** When true, header X is disabled and Escape/outside dismiss is prevented (busy operations). */
   closeDisabled?: boolean
+  /**
+   * Visual/behavior role. **Default: undefined = legacy** (full scrim + blur,
+   * max-w-lg when not resizable). Never defaults to `confirm`.
+   */
+  variant?: ModalVariant
+  /**
+   * When true, confirm/task use nested stacking policy (light scrim, no blur).
+   * Shell always uses full-strength scrim.
+   */
+  nested?: boolean
 }
 
 /**
@@ -44,6 +57,9 @@ function isPortaledFloatingTarget(target: EventTarget | null): boolean {
 
 const DEFAULT_SIZE: Size = { width: 960, height: 700 }
 const DEFAULT_MIN: Size = { width: 600, height: 440 }
+/** Medium default for task variant when resizable. */
+const TASK_DEFAULT_SIZE: Size = { width: 720, height: 560 }
+const TASK_DEFAULT_MIN: Size = { width: 480, height: 360 }
 
 const RESIZE_HANDLES: { dir: ResizeDir; className: string }[] = [
   { dir: 'top', className: 'inset-x-0 top-0 h-1.5 cursor-ns-resize' },
@@ -68,21 +84,35 @@ export function Modal({
   minSize,
   storageKey,
   closeDisabled = false,
+  variant,
+  nested = false,
 }: ModalProps) {
   const { t } = useTranslation()
+  // Confirm is never resizable regardless of prop.
+  const effectiveResizable = variant === 'confirm' ? false : !!resizable
+  const resolvedDefault =
+    defaultSize ?? (variant === 'task' ? TASK_DEFAULT_SIZE : DEFAULT_SIZE)
+  const resolvedMin = minSize ?? (variant === 'task' ? TASK_DEFAULT_MIN : DEFAULT_MIN)
+
   const { size, onResizeStart } = useResizableBox({
-    enabled: !!resizable,
-    defaultSize: defaultSize ?? DEFAULT_SIZE,
-    minSize: minSize ?? DEFAULT_MIN,
+    enabled: effectiveResizable,
+    defaultSize: resolvedDefault,
+    minSize: resolvedMin,
     storageKey,
   })
+
+  // Nested confirm/task: light scrim without blur. Shell and legacy always full strength.
+  const useLightScrim = nested && (variant === 'confirm' || variant === 'task')
 
   return (
     <DialogPrimitive.Root open={open} onOpenChange={onOpenChange}>
       <DialogPrimitive.Portal>
         <DialogPrimitive.Overlay
           className={cn(
-            'fixed inset-0 z-50 bg-overlay backdrop-blur-[2px]',
+            'fixed inset-0 z-50',
+            useLightScrim
+              ? 'bg-overlay-light'
+              : 'bg-overlay backdrop-blur-[2px]',
             overlayMotion,
           )}
         />
@@ -98,14 +128,29 @@ export function Modal({
         */}
         <DialogPrimitive.Content
           className={cn(
-            'fixed inset-0 z-50 m-auto flex h-fit max-h-[85vh] w-[calc(100vw-2rem)] flex-col overflow-hidden rounded-xl border border-border bg-surface shadow-overlay outline-none',
+            'fixed inset-0 z-50 m-auto flex h-fit flex-col overflow-hidden rounded-xl border border-border bg-surface shadow-overlay outline-none',
             modalMotion,
-            !resizable && 'max-w-lg',
+            // Size constraints by variant. Omit variant → legacy (max-w-lg when not resizable).
+            variant === 'shell'
+              ? 'max-h-[100dvh]'
+              : variant === 'confirm'
+                ? 'max-h-[85vh] w-[calc(100vw-2rem)] max-w-sm'
+                : variant === 'task'
+                  ? cn(
+                      'max-h-[85vh] w-[calc(100vw-2rem)]',
+                      !effectiveResizable && 'max-w-2xl',
+                    )
+                  : cn(
+                      'max-h-[85vh] w-[calc(100vw-2rem)]',
+                      !effectiveResizable && 'max-w-lg',
+                    ),
             className,
           )}
-          style={resizable ? { width: size.width, height: size.height } : undefined}
+          style={effectiveResizable ? { width: size.width, height: size.height } : undefined}
           // Opt out of required Description when chrome only supplies a title (avoids Radix stderr noise).
           aria-describedby={undefined}
+          // Shell Esc gate (PR3): document.querySelector('[data-confirm-dialog]')
+          {...(variant === 'confirm' ? { 'data-confirm-dialog': true } : {})}
           onEscapeKeyDown={(e) => {
             if (closeDisabled) e.preventDefault()
           }}
@@ -149,14 +194,22 @@ export function Modal({
             title bar remains (embedding/rerank endpoint dialogs, etc.).
             flex-auto keeps content height for non-resizable modals and still fills
             remaining space when height is fixed (resizable).
+            Shell: flex column so large panels can fill height without outer scroll.
           */}
-          <div className="min-h-0 flex-auto overflow-y-auto">{children}</div>
+          <div
+            className={cn(
+              'min-h-0 flex-auto',
+              variant === 'shell' ? 'flex flex-col overflow-hidden' : 'overflow-y-auto',
+            )}
+          >
+            {children}
+          </div>
           {footer && (
             <div className="shrink-0 border-t border-border bg-surface-subtle/80 px-5 py-3">
               {footer}
             </div>
           )}
-          {resizable &&
+          {effectiveResizable &&
             RESIZE_HANDLES.map((h) => (
               <div
                 key={h.dir}

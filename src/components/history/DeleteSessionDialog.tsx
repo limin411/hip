@@ -26,7 +26,7 @@ export function DeleteSessionDialog({ title, onConfirm, onCancel }: DeleteSessio
         if (!open) onCancel()
       }}
       title={t('history.deleteSessionConfirmTitle', { title })}
-      className="max-w-sm"
+      variant="confirm"
     >
       <div className="p-5">
         <DialogPrimitive.Description className="text-body text-ink-secondary">

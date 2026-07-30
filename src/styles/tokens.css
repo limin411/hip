@@ -72,6 +72,8 @@
   --shadow-panel: 0 2px 14px -4px rgba(17, 17, 17, 0.1), 0 1px 3px rgba(17, 17, 17, 0.04);
   /* 浮层遮罩（Modal / 全屏 palette） */
   --overlay-scrim: rgba(17, 17, 17, 0.28);
+  /* Nested confirm/task over a shell — light, no blur (see Modal variant=confirm nested) */
+  --overlay-scrim-light: rgba(17, 17, 17, 0.12);
   /* 公共交互状态 —— 由现有变量派生，不引入新的硬编码颜色 */
   --state-hover: var(--accent-subtle);
   --state-active: var(--accent-active);
@@ -158,6 +160,8 @@ html[data-platform="linux"] {
   --titlebar-backdrop: var(--glass-backdrop);
   --shadow-panel: 0 2px 14px -4px rgba(0, 0, 0, 0.5), 0 1px 3px rgba(0, 0, 0, 0.28);
   --overlay-scrim: rgba(0, 0, 0, 0.48);
+  /* Nested confirm/task over a shell — light, no blur */
+  --overlay-scrim-light: rgba(0, 0, 0, 0.28);
   /* 公共交互状态 —— 复用暗色令牌 */
   --state-hover: var(--accent-subtle);
   --state-active: var(--accent-active);

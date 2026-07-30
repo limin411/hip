@@ -41,7 +41,10 @@ export default {
           disabled: 'var(--state-disabled)',
         },
         'focus-ring': 'var(--focus-ring)',
-        overlay: 'var(--overlay-scrim)',
+        overlay: {
+          DEFAULT: 'var(--overlay-scrim)',
+          light: 'var(--overlay-scrim-light)',
+        },
         glass: {
           DEFAULT: 'var(--glass-bg)',
           border: 'var(--glass-border)',

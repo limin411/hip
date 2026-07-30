@@ -32,7 +32,7 @@ export function ClearAllSessionsDialog({
         if (!open) onCancel()
       }}
       title={t('history.clearAllConfirmTitle')}
-      className="max-w-sm"
+      variant="confirm"
     >
       <div className="p-5">
         <DialogPrimitive.Description className="text-body text-ink-secondary">

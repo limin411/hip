@@ -18,13 +18,20 @@ const DIR_SIGN: Record<ResizeDir, { sx: number; sy: number }> = {
   'top-left': { sx: -1, sy: -1 },
 }
 
-function clampToViewport(s: Size, min: Size): Size {
+/**
+ * Clamp size into [effMin, max] where max is ~96%×92% of the viewport and
+ * effMin never exceeds max (small windows must not stick at DEFAULT_MIN).
+ * Exported for unit tests.
+ */
+export function clampToViewport(s: Size, min: Size): Size {
   if (typeof window === 'undefined') return s
-  const maxW = Math.max(min.width, Math.round(window.innerWidth * 0.96))
-  const maxH = Math.max(min.height, Math.round(window.innerHeight * 0.92))
+  const maxW = Math.round(window.innerWidth * 0.96)
+  const maxH = Math.round(window.innerHeight * 0.92)
+  const effMinW = Math.min(min.width, maxW)
+  const effMinH = Math.min(min.height, maxH)
   return {
-    width: Math.max(min.width, Math.min(s.width, maxW)),
-    height: Math.max(min.height, Math.min(s.height, maxH)),
+    width: Math.max(effMinW, Math.min(s.width, maxW)),
+    height: Math.max(effMinH, Math.min(s.height, maxH)),
   }
 }
 
@@ -60,18 +67,40 @@ export function useResizableBox({ enabled, defaultSize, minSize, storageKey }: O
   const drag = useRef<{ dir: ResizeDir; x: number; y: number; w: number; h: number } | null>(null)
   // Tear-down for an in-flight drag; held in a ref so the unmount effect can run it.
   const teardown = useRef<(() => void) | null>(null)
+  // Keep minSize readable from the resize listener without rebinding on every object identity.
+  const minSizeRef = useRef(minSize)
+  minSizeRef.current = minSize
 
   const apply = useCallback((s: Size) => {
     latest.current = s
     setSize(s)
   }, [])
 
-  // Re-clamp when the box becomes enabled (e.g. window already resized since last open).
+  // Re-read storage + clamp when enabled, or when size sources change while enabled.
   useEffect(() => {
     if (!enabled) return
     apply(readStoredSize(storageKey, defaultSize, minSize))
+    // Primitive deps so inline { width, height } from parents do not thrash.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [enabled])
+  }, [
+    enabled,
+    storageKey,
+    defaultSize.width,
+    defaultSize.height,
+    minSize.width,
+    minSize.height,
+    apply,
+  ])
+
+  // Re-clamp current size when the window shrinks/grows (min must never exceed max).
+  useEffect(() => {
+    if (!enabled) return
+    const onResize = () => {
+      apply(clampToViewport(latest.current, minSizeRef.current))
+    }
+    window.addEventListener('resize', onResize)
+    return () => window.removeEventListener('resize', onResize)
+  }, [enabled, apply])
 
   // If the modal unmounts mid-drag (e.g. Escape closes it while a handle is held),
   // tear the drag down so window listeners and body.userSelect never leak.
@@ -91,7 +120,7 @@ export function useResizableBox({ enabled, defaultSize, minSize, storageKey }: O
         apply(
           clampToViewport(
             { width: d.w + 2 * sx * (ev.clientX - d.x), height: d.h + 2 * sy * (ev.clientY - d.y) },
-            minSize,
+            minSizeRef.current,
           ),
         )
       }
@@ -123,7 +152,7 @@ export function useResizableBox({ enabled, defaultSize, minSize, storageKey }: O
       window.addEventListener('pointerup', onUp)
       window.addEventListener('pointercancel', onCancel)
     },
-    [enabled, minSize, storageKey, apply],
+    [enabled, storageKey, apply],
   )
 
   return { size, onResizeStart }

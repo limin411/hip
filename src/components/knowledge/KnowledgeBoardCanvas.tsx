@@ -13,6 +13,7 @@ import {
   useCallback,
   useEffect,
   useImperativeHandle,
+  useLayoutEffect,
   useRef,
   useState,
 } from 'react'
@@ -92,6 +93,10 @@ export const KnowledgeBoardCanvas = forwardRef<
   const pendingImportRef = useRef<Set<string>>(new Set())
   const importSerialRef = useRef<Promise<void>>(Promise.resolve())
   const throttleTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  /**
+   * false after unmount or leave flush — freezes onChange / import queue / auto draft
+   * so post-leave Excalidraw events cannot re-enqueue dropped images (KD-13).
+   */
   const activeRef = useRef(true)
   const boardIdRef = useRef(boardId)
   boardIdRef.current = boardId
@@ -115,34 +120,53 @@ export const KnowledgeBoardCanvas = forwardRef<
     return () => obs.disconnect()
   }, [])
 
-  // Mount: parse dehydrated JSON → hydrate BinaryFiles → initialData once.
-  useEffect(() => {
+  /**
+   * Mount: SYNC-seed disk scene into refs before any await so flushToStore never
+   * serializes empty refs over a real board (Issue 1 / pre-hydrate leave wipe).
+   * Then async hydrate BinaryFiles for Excalidraw initialData.
+   */
+  useLayoutEffect(() => {
     activeRef.current = true
     let cancelled = false
 
-    ;(async () => {
-      let scene: HipBoardSceneDisk
-      try {
-        scene = parseBoardScene(initialJson || EMPTY_BOARD_SCENE_JSON)
-      } catch {
-        scene = parseBoardScene(EMPTY_BOARD_SCENE_JSON)
-      }
+    let scene: HipBoardSceneDisk
+    try {
+      scene = parseBoardScene(initialJson || EMPTY_BOARD_SCENE_JSON)
+    } catch {
+      scene = parseBoardScene(EMPTY_BOARD_SCENE_JSON)
+    }
 
+    // SYNC seed — must complete before hydrate await / any flushToStore.
+    elementsRef.current = scene.elements
+    appStateRef.current = scene.appState
+    const relMap = new Map<string, string>()
+    for (const [id, f] of Object.entries(scene.files ?? {})) {
+      if (f && typeof f.hipAssetRel === 'string' && f.hipAssetRel.length > 0) {
+        relMap.set(id, f.hipAssetRel)
+      }
+    }
+    relByFileIdRef.current = relMap
+    pendingImportRef.current = new Set()
+    // Runtime dataURLs only after hydrate; flush uses hipAssetRel map above.
+    filesRef.current = {}
+
+    void (async () => {
       const { files, relByFileId, failedIds } = await hydrateBoardFiles(
         spaceId,
         scene.files,
       )
-      if (cancelled) return
+      // Leave freezes activeRef; unmount sets cancelled — do not clobber after leave.
+      if (cancelled || !activeRef.current) return
 
       if (failedIds.length > 0) {
         toast.warning(t('knowledge.board.hydratePartial'))
       }
 
-      elementsRef.current = scene.elements
-      appStateRef.current = scene.appState
+      // Prefer hydrate rel map (same sources); keep any sync-seeded rels on failure.
+      for (const [id, rel] of relByFileId) {
+        relByFileIdRef.current.set(id, rel)
+      }
       filesRef.current = files
-      relByFileIdRef.current = relByFileId
-      pendingImportRef.current = new Set()
 
       setInitialData({
         elements: scene.elements,
@@ -166,6 +190,7 @@ export const KnowledgeBoardCanvas = forwardRef<
   }, [boardId, spaceId])
 
   const pushDraftAuto = useCallback(() => {
+    // Frozen after leave / unmount — never schedule dirty draft post-leave.
     if (!activeRef.current) return
     const id = boardIdRef.current
     if (useKnowledgeStore.getState().activeDocId !== id) return
@@ -190,6 +215,7 @@ export const KnowledgeBoardCanvas = forwardRef<
   }, [])
 
   const scheduleDraftAuto = useCallback(() => {
+    if (!activeRef.current) return
     if (throttleTimerRef.current != null) return
     throttleTimerRef.current = setTimeout(() => {
       throttleTimerRef.current = null
@@ -199,6 +225,8 @@ export const KnowledgeBoardCanvas = forwardRef<
 
   const enqueueImport = useCallback(
     (fileId: string, file: HipBoardFileRuntime) => {
+      // Leave freezes activeRef — do not re-open import queue after drop toast.
+      if (!activeRef.current) return
       if (pendingImportRef.current.has(fileId)) return
       if (relByFileIdRef.current.has(fileId)) return
 
@@ -273,6 +301,9 @@ export const KnowledgeBoardCanvas = forwardRef<
       appState: Record<string, unknown>,
       files: Record<string, unknown>,
     ) => {
+      // Frozen after leave — ignore Excalidraw events that would re-import dropped files.
+      if (!activeRef.current) return
+
       // A. EVERY call — so sync flush never misses strokes.
       elementsRef.current = elements as unknown[]
       appStateRef.current = appState
@@ -310,8 +341,10 @@ export const KnowledgeBoardCanvas = forwardRef<
         throttleTimerRef.current = null
       }
 
-      // 2. leave → drop pending imports + toast once.
+      // 2. leave → freeze canvas + drop pending imports + toast once.
       if (mode === 'leave') {
+        // Freeze first so concurrent onChange cannot re-enqueue while we strip.
+        activeRef.current = false
         const pending = pendingImportRef.current
         if (pending.size > 0) {
           const dropIds = new Set(pending)
@@ -321,12 +354,13 @@ export const KnowledgeBoardCanvas = forwardRef<
           elementsRef.current = stripImageElementsForFiles(elementsRef.current, dropIds)
           pendingImportRef.current = new Set()
           toast.warning(t('knowledge.board.pendingImageDropped'))
-          // Do not await in-flight IPC; results ignored if board no longer active.
+          // Do not await in-flight IPC; results ignored (activeRef false + pending cleared).
         }
       }
-      // snapshot: keep pending set / filesRef / image elements
+      // snapshot: keep pending set / filesRef / image elements / activeRef true
 
       // 3–5. Dehydrated only; completed rels; persist none.
+      // Uses sync-seeded refs even if hydrate has not finished (Issue 1).
       const disk = buildDiskScene({
         elements: elementsRef.current,
         appState: appStateRef.current,

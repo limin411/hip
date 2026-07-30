@@ -13,7 +13,29 @@ import {
   assertNoDataUrlInBoardJson,
   buildDiskScene,
   stableSerializeBoard,
+  type HipBoardSceneDisk,
 } from '@/domain/knowledge/boardScene'
+
+/** Non-empty dehydrated scene for pre-hydrate flush regression. */
+const LOADED_BOARD_JSON = stableSerializeBoard({
+  type: 'excalidraw',
+  version: 2,
+  source: 'hip',
+  hip: { schemaVersion: 1, boardId: 'brd_testboard01' },
+  elements: [
+    { id: 'stroke1', type: 'freedraw', points: [[0, 0], [1, 1]] },
+    { id: 'img1', type: 'image', fileId: 'file_ok' },
+  ],
+  appState: { viewBackgroundColor: '#abcdef' },
+  files: {
+    file_ok: {
+      id: 'file_ok',
+      mimeType: 'image/png',
+      created: 99,
+      hipAssetRel: 'assets/ast_ok.png',
+    },
+  },
+} satisfies HipBoardSceneDisk)
 
 const setDraftBody = vi.fn()
 const hydrateBoardFiles = vi.fn()
@@ -252,6 +274,117 @@ describe('KnowledgeBoardCanvas', () => {
     const [body, opts] = setDraftBody.mock.calls.at(-1)!
     expect(opts).toMatchObject({ docId: 'brd_testboard01', persist: 'auto' })
     expect(() => assertNoDataUrlInBoardJson(body as string)).not.toThrow()
+  })
+
+  it('Issue 1: leave flush before hydrate resolves keeps loaded scene (not empty wipe)', async () => {
+    // Hydrate hangs forever — refs must be sync-seeded from parseBoardScene.
+    hydrateBoardFiles.mockReturnValue(new Promise(() => {}))
+
+    const ref = createRef<KnowledgeBoardCanvasHandle>()
+    render(
+      <KnowledgeBoardCanvas
+        ref={ref}
+        boardId="brd_testboard01"
+        spaceId="spc_1"
+        initialJson={LOADED_BOARD_JSON}
+      />,
+    )
+
+    // Still loading UI; flush must work from sync-seeded refs (useLayoutEffect).
+    setDraftBody.mockClear()
+    act(() => {
+      ref.current?.flushToStore({ mode: 'leave' })
+    })
+
+    expect(setDraftBody).toHaveBeenCalled()
+    const [body, opts] = setDraftBody.mock.calls.at(-1)!
+    expect(opts).toEqual({ docId: 'brd_testboard01', persist: 'none' })
+    expect(() => assertNoDataUrlInBoardJson(body as string)).not.toThrow()
+
+    const parsed = JSON.parse(body as string) as HipBoardSceneDisk
+    // Must NOT be empty wipe of a real board.
+    expect(parsed.elements.length).toBeGreaterThan(0)
+    expect(parsed.elements.some((e) => (e as { id: string }).id === 'stroke1')).toBe(
+      true,
+    )
+    expect(parsed.files.file_ok?.hipAssetRel).toBe('assets/ast_ok.png')
+    expect(parsed.appState.viewBackgroundColor).toBe('#abcdef')
+    // Still dehydrated — no dataURL in files map.
+    expect(parsed.files.file_ok).not.toHaveProperty('dataURL')
+  })
+
+  it('Issue 2: after leave, onChange cannot re-enqueue imports or auto-draft', async () => {
+    const ref = createRef<KnowledgeBoardCanvasHandle>()
+    render(
+      <KnowledgeBoardCanvas
+        ref={ref}
+        boardId="brd_testboard01"
+        spaceId="spc_1"
+        initialJson={EMPTY_BOARD_SCENE_JSON}
+      />,
+    )
+    await waitFor(() => expect(lastOnChange).toBeTruthy())
+
+    importBoardFileBytes.mockReturnValue(new Promise(() => {}))
+    act(() => {
+      lastOnChange?.(
+        [
+          { id: 'r1', type: 'rectangle' },
+          { id: 'img1', type: 'image', fileId: 'file_pending' },
+        ],
+        { viewBackgroundColor: '#ffffff' },
+        {
+          file_pending: {
+            id: 'file_pending',
+            mimeType: 'image/png',
+            created: 1,
+            dataURL: 'data:image/png;base64,QUJD',
+          },
+        },
+      )
+    })
+    // Serial import queue is microtask-scheduled.
+    await waitFor(() => expect(importBoardFileBytes).toHaveBeenCalledTimes(1))
+
+    setDraftBody.mockClear()
+    importBoardFileBytes.mockClear()
+    toastWarning.mockClear()
+
+    act(() => {
+      ref.current?.flushToStore({ mode: 'leave' })
+    })
+    expect(toastWarning).toHaveBeenCalledWith('knowledge.board.pendingImageDropped')
+    const leaveCallCount = setDraftBody.mock.calls.length
+    expect(leaveCallCount).toBeGreaterThanOrEqual(1)
+
+    // Excalidraw still mounted and may fire onChange with the same BinaryFiles.
+    setDraftBody.mockClear()
+    act(() => {
+      lastOnChange?.(
+        [
+          { id: 'r1', type: 'rectangle' },
+          { id: 'img1', type: 'image', fileId: 'file_pending' },
+        ],
+        { viewBackgroundColor: '#ffffff' },
+        {
+          file_pending: {
+            id: 'file_pending',
+            mimeType: 'image/png',
+            created: 1,
+            dataURL: 'data:image/png;base64,QUJD',
+          },
+        },
+      )
+    })
+    // Flush any microtasks that would have re-enqueued.
+    await act(async () => {
+      await Promise.resolve()
+      await Promise.resolve()
+    })
+
+    expect(importBoardFileBytes).not.toHaveBeenCalled()
+    // No auto draft after freeze (leave already wrote persist:none).
+    expect(setDraftBody).not.toHaveBeenCalled()
   })
 })
 

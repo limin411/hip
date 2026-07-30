@@ -151,6 +151,19 @@ describe('knowledge tree helpers', () => {
     )
   })
 
+  it('removeNodeSubtree on board leaf collects only that board', () => {
+    const { nodes, removedDocIds, removedBoardIds, removedLeafIds } = removeNodeSubtree(
+      [folder, docA, boardA, rootDoc],
+      'brd_board0001',
+    )
+    expect(removedDocIds).toEqual([])
+    expect(removedBoardIds).toEqual(['brd_board0001'])
+    expect(removedLeafIds).toEqual(['brd_board0001'])
+    expect(nodes.map((x) => x.id).sort()).toEqual(
+      ['doc_aaaaaaa1', 'doc_root0001', 'nod_folder001'].sort(),
+    )
+  })
+
   it('nextOrder is max+1', () => {
     expect(nextOrder([folder, docA, docB], 'nod_folder001')).toBe(2)
     expect(nextOrder([], null)).toBe(0)

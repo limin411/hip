@@ -3,6 +3,8 @@ import { useTranslation } from 'react-i18next'
 import { useKnowledgeStore } from '@/store/knowledgeStore'
 import { PanelToggle } from '@/components/layout/PanelToggle'
 import { DocOutline } from './DocOutline'
+import { BoardStructureList } from './BoardStructureList'
+import { BoardSelectionPanel } from './BoardSelectionPanel'
 import { cn } from '@/lib/utils'
 import { extractDocOutline, slugifyHeading } from '@/domain/knowledge/mdPreview'
 
@@ -10,7 +12,8 @@ import { extractDocOutline, slugifyHeading } from '@/domain/knowledge/mdPreview'
 const OUTLINE_BODY_DEBOUNCE_MS = 200
 
 /**
- * Knowledge right-rail: Outline + Backlinks + Outbound.
+ * Knowledge right-rail: Outline + Backlinks + Outbound (docs),
+ * or Whiteboard companion: Selection + Structure + stats (boards, LKD-20…32).
  * Same chrome as ArtifactPanel / PreviewPanel — hosted in AppLayout's resizable drawer.
  */
 export function KnowledgeOutlinePanel() {
@@ -25,6 +28,8 @@ export function KnowledgeOutlinePanel() {
   const linkPanelStatus = useKnowledgeStore((s) => s.linkPanelStatus)
   const requestOutlineJump = useKnowledgeStore((s) => s.requestOutlineJump)
   const openDoc = useKnowledgeStore((s) => s.openDoc)
+  const boardOutline = useKnowledgeStore((s) => s.boardOutline)
+  const boardSelection = useKnowledgeStore((s) => s.boardSelection)
 
   const activeNode = activeDocId ? nodes.find((n) => n.id === activeDocId) : undefined
   const isBoard = activeNode?.kind === 'board'
@@ -65,6 +70,13 @@ export function KnowledgeOutlinePanel() {
     }
   }
 
+  // LKD-27: only show outline/selection stamped for the active board.
+  const outlineForBoard =
+    isBoard && boardOutline?.boardId === activeDocId ? boardOutline : null
+  const selectionForBoard =
+    isBoard && boardSelection?.boardId === activeDocId ? boardSelection : null
+  const selectedIdSet = new Set(selectionForBoard?.ids ?? [])
+
   return (
     <div
       className="flex h-full min-h-0 flex-col border-l border-border bg-surface"
@@ -79,7 +91,7 @@ export function KnowledgeOutlinePanel() {
           data-tauri-drag-region="false"
           data-testid="panel-title"
         >
-          {t('knowledge.outline.title')}
+          {isBoard ? t('knowledge.board.panelTitle') : t('knowledge.outline.title')}
         </span>
         <div className="flex items-center gap-2" data-tauri-drag-region="false">
           {/* Relocated from main toolbar when open — same toggle collapses the rail. */}
@@ -98,11 +110,39 @@ export function KnowledgeOutlinePanel() {
           </div>
         ) : isBoard ? (
           <div
-            className="flex h-full items-center justify-center px-4 py-8 text-center"
-            data-testid="knowledge-outline-board-empty"
-            role="status"
+            className="flex flex-col gap-4 p-2 pb-6"
+            data-testid="knowledge-board-companion"
           >
-            <p className="text-meta text-ink-tertiary">{t('knowledge.outline.noBoard')}</p>
+            <section data-testid="knowledge-board-selection-section">
+              <h3 className="px-1 pb-1 text-caption font-medium text-ink-tertiary">
+                {t('knowledge.board.sectionSelection')}
+              </h3>
+              <BoardSelectionPanel selection={selectionForBoard} />
+            </section>
+
+            <section data-testid="knowledge-board-structure-section">
+              <h3 className="px-1 pb-1 text-caption font-medium text-ink-tertiary">
+                {t('knowledge.board.sectionStructure')}
+              </h3>
+              <BoardStructureList
+                items={outlineForBoard?.items ?? []}
+                selectedIds={selectedIdSet}
+                truncated={outlineForBoard?.truncated ?? false}
+                totalElements={outlineForBoard?.totalElements ?? 0}
+              />
+            </section>
+
+            <section data-testid="knowledge-board-stats-section">
+              <h3 className="px-1 pb-1 text-caption font-medium text-ink-tertiary">
+                {t('knowledge.board.sectionBoard')}
+              </h3>
+              <p className="px-1 text-meta text-ink-secondary" data-testid="knowledge-board-stats">
+                {t('knowledge.board.stats', {
+                  elements: outlineForBoard?.totalElements ?? 0,
+                  images: outlineForBoard?.imageCount ?? 0,
+                })}
+              </p>
+            </section>
           </div>
         ) : (
           <div className="flex flex-col gap-4 p-2 pb-6">

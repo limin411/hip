@@ -2471,7 +2471,32 @@ export const zhTW = {
       "legacyUnsupported": "此畫板包含無法轉換的圖形。確認後，編輯將以空白畫板取代舊檔案。",
       "legacyUpgradeFailed": "升級後的畫板未能儲存，已保留舊檔案。下次儲存時將重試。",
       "legacyReplaceConfirm": "用新格式取代此舊畫板？舊檔案將被刪除。",
-      "legacyWriteBlocked": "儲存已阻止，請先確認取代舊畫板。"
+      "legacyWriteBlocked": "儲存已阻止，請先確認取代舊畫板。",
+      "panelTitle": "畫板",
+      "sectionStructure": "結構",
+      "sectionSelection": "選取",
+      "sectionBoard": "畫板",
+      "structureEmpty": "尚無元素 — 在畫布上繪製",
+      "selectionEmpty": "選取元素以編輯樣式",
+      "selectionCount": "已選 {{count}} 個",
+      "selectionCount_one": "已選 {{count}} 個",
+      "structureTruncated": "顯示 {{shown}} / {{total}}",
+      "stats": "{{elements}} 個元素 · {{images}} 張圖片",
+      "locked": "已鎖定",
+      "styleFill": "填色",
+      "styleStroke": "描邊",
+      "styleStrokeWidth": "描邊寬度",
+      "styleFontSize": "字級",
+      "styleText": "文字",
+      "styleMixed": "混合",
+      "elementType": {
+        "rect": "矩形",
+        "ellipse": "橢圓",
+        "line": "直線",
+        "arrow": "箭頭",
+        "text": "文字",
+        "image": "圖片"
+      }
     },
     "export": {
       "doc": "匯出文件…",

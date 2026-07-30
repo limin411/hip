@@ -41,7 +41,7 @@ describe('KnowledgeOutlinePanel', () => {
     expect(screen.getByTestId('knowledge-doc-outline-no-doc')).toBeInTheDocument()
   })
 
-  it('shows whiteboard empty state and skips markdown outline parse for boards', () => {
+  it('shows board companion rail (structure + selection + stats), not empty placeholder', () => {
     useKnowledgeStore.setState({
       activeDocId: 'brd_board000001',
       nodes: [
@@ -55,16 +55,105 @@ describe('KnowledgeOutlinePanel', () => {
           updatedAt: 1,
         },
       ],
-      draftBody: '{"type":"hip-board","version":1,"source":"hip","elements":[],"appState":{"viewBackgroundColor":"#ffffff"},"files":{}}',
-      docBody: '{"type":"hip-board","version":1,"source":"hip","elements":[],"appState":{"viewBackgroundColor":"#ffffff"},"files":{}}',
+      draftBody:
+        '{"type":"hip-board","version":1,"source":"hip","elements":[],"appState":{"viewBackgroundColor":"#ffffff"},"files":{}}',
+      docBody:
+        '{"type":"hip-board","version":1,"source":"hip","elements":[],"appState":{"viewBackgroundColor":"#ffffff"},"files":{}}',
       backlinks: [],
       outboundLinks: [],
       linkPanelStatus: 'idle',
+      boardOutline: {
+        boardId: 'brd_board000001',
+        items: [
+          {
+            id: 'r1',
+            type: 'rect',
+            label: 'rect r1',
+            depth: 0,
+            locked: false,
+            order: 0,
+          },
+        ],
+        totalElements: 1,
+        truncated: false,
+        imageCount: 0,
+      },
+      boardSelection: {
+        boardId: 'brd_board000001',
+        ids: [],
+        items: [],
+        style: {},
+      },
     })
     render(<KnowledgeOutlinePanel />)
-    expect(screen.getByTestId('knowledge-outline-board-empty')).toBeInTheDocument()
+    expect(screen.queryByTestId('knowledge-outline-board-empty')).toBeNull()
+    expect(screen.getByTestId('knowledge-board-companion')).toBeInTheDocument()
+    expect(screen.getByTestId('knowledge-board-structure-list')).toBeInTheDocument()
+    expect(screen.getByTestId('knowledge-board-selection-empty')).toBeInTheDocument()
+    expect(screen.getByTestId('knowledge-board-stats')).toBeInTheDocument()
     expect(screen.queryByTestId('knowledge-outline-section')).toBeNull()
     expect(screen.queryByTestId('knowledge-doc-outline')).toBeNull()
+    expect(screen.getByTestId('panel-title').textContent).toBe('knowledge.board.panelTitle')
+  })
+
+  it('structure click requests board focus', () => {
+    const requestBoardFocus = vi.fn()
+    useKnowledgeStore.setState({
+      activeDocId: 'brd_board000001',
+      nodes: [
+        {
+          id: 'brd_board000001',
+          parentId: null,
+          kind: 'board',
+          title: 'Arch',
+          order: 0,
+          createdAt: 1,
+          updatedAt: 1,
+        },
+      ],
+      draftBody: '',
+      docBody: '',
+      boardOutline: {
+        boardId: 'brd_board000001',
+        items: [
+          {
+            id: 'r1',
+            type: 'rect',
+            label: 'rect r1',
+            depth: 0,
+            locked: false,
+            order: 0,
+          },
+        ],
+        totalElements: 1,
+        truncated: false,
+        imageCount: 0,
+      },
+      boardSelection: {
+        boardId: 'brd_board000001',
+        ids: ['r1'],
+        items: [
+          {
+            id: 'r1',
+            type: 'rect',
+            label: 'rect r1',
+            depth: 0,
+            locked: false,
+            order: 0,
+          },
+        ],
+        style: { fill: '#ffffff', stroke: '#111111', strokeWidth: 2 },
+      },
+      requestBoardFocus,
+    })
+    render(<KnowledgeOutlinePanel />)
+    fireEvent.click(screen.getByTestId('knowledge-board-structure-item-r1'))
+    expect(requestBoardFocus).toHaveBeenCalledWith(['r1'], { scroll: true })
+    expect(screen.getByTestId('knowledge-board-structure-item-r1')).toHaveAttribute(
+      'aria-current',
+      'true',
+    )
+    expect(screen.getByTestId('knowledge-board-style-fill')).toBeInTheDocument()
   })
 
   it('renders outline items and requests jump on click', () => {

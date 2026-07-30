@@ -2464,7 +2464,32 @@ export const ja = {
       "legacyUnsupported": "このホワイトボードには変換できない図形があります。確認後、編集すると空のボードで置き換えます。",
       "legacyUpgradeFailed": "アップグレード後の保存に失敗しました。以前のファイルを保持しています。次回の保存で再試行します。",
       "legacyReplaceConfirm": "このレガシーホワイトボードを新しい形式で置き換えますか？以前のファイルは削除されます。",
-      "legacyWriteBlocked": "保存はブロックされています。レガシーボードの置き換えを確認してください。"
+      "legacyWriteBlocked": "保存はブロックされています。レガシーボードの置き換えを確認してください。",
+      "panelTitle": "ホワイトボード",
+      "sectionStructure": "構造",
+      "sectionSelection": "選択",
+      "sectionBoard": "ボード",
+      "structureEmpty": "要素がありません — キャンバスに描画してください",
+      "selectionEmpty": "要素を選択してスタイルを編集",
+      "selectionCount": "{{count}} 件選択中",
+      "selectionCount_one": "{{count}} 件選択中",
+      "structureTruncated": "{{shown}} / {{total}} を表示",
+      "stats": "{{elements}} 要素 · {{images}} 画像",
+      "locked": "ロック済み",
+      "styleFill": "塗り",
+      "styleStroke": "線",
+      "styleStrokeWidth": "線の太さ",
+      "styleFontSize": "フォントサイズ",
+      "styleText": "テキスト",
+      "styleMixed": "混在",
+      "elementType": {
+        "rect": "矩形",
+        "ellipse": "楕円",
+        "line": "直線",
+        "arrow": "矢印",
+        "text": "テキスト",
+        "image": "画像"
+      }
     },
     "export": {
       "doc": "ドキュメントをエクスポート…",

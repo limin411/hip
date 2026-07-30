@@ -2464,7 +2464,32 @@ export const ko = {
       "legacyUnsupported": "이 화이트보드에는 변환할 수 없는 도형이 있습니다. 확인 후 편집하면 빈 보드로 교체됩니다.",
       "legacyUpgradeFailed": "업그레이드된 화이트보드를 저장하지 못했습니다. 이전 파일을 유지합니다. 다음 저장 시 재시도합니다.",
       "legacyReplaceConfirm": "이 레거시 화이트보드를 새 형식으로 바꿀까요? 이전 파일은 삭제됩니다.",
-      "legacyWriteBlocked": "저장이 차단되었습니다. 레거시 보드 교체를 먼저 확인하세요."
+      "legacyWriteBlocked": "저장이 차단되었습니다. 레거시 보드 교체를 먼저 확인하세요.",
+      "panelTitle": "화이트보드",
+      "sectionStructure": "구조",
+      "sectionSelection": "선택",
+      "sectionBoard": "보드",
+      "structureEmpty": "요소 없음 — 캔버스에 그려 보세요",
+      "selectionEmpty": "요소를 선택해 스타일을 편집하세요",
+      "selectionCount": "{{count}}개 선택됨",
+      "selectionCount_one": "{{count}}개 선택됨",
+      "structureTruncated": "{{shown}} / {{total}} 표시",
+      "stats": "{{elements}}개 요소 · {{images}}개 이미지",
+      "locked": "잠김",
+      "styleFill": "채우기",
+      "styleStroke": "선",
+      "styleStrokeWidth": "선 굵기",
+      "styleFontSize": "글자 크기",
+      "styleText": "텍스트",
+      "styleMixed": "혼합",
+      "elementType": {
+        "rect": "사각형",
+        "ellipse": "타원",
+        "line": "선",
+        "arrow": "화살표",
+        "text": "텍스트",
+        "image": "이미지"
+      }
     },
     "export": {
       "doc": "문서 내보내기…",

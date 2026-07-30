@@ -64,6 +64,22 @@ export function boardOutlineSignature(elements: readonly HipBoardElement[]): str
     .join('\n')
 }
 
+/** Equality for store setBoardOutline (no-op when structure list unchanged). */
+export function boardOutlinePublishSignature(outline: BoardOutline): string {
+  return [
+    outline.boardId,
+    String(outline.totalElements),
+    String(outline.imageCount),
+    outline.truncated ? '1' : '0',
+    ...outline.items.map(
+      (i) => `${i.id}|${i.type}|${i.label}|${i.locked ? 1 : 0}|${i.order}`,
+    ),
+  ].join('\n')
+}
+
+/** Structure publish debounce (LKD-22). */
+export const BOARD_OUTLINE_DEBOUNCE_MS = 150
+
 function shortId(id: string): string {
   if (id.length <= 8) return id
   return id.slice(0, 8)

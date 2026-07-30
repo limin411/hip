@@ -28,7 +28,10 @@ import {
   type HipBoardSceneDisk,
   type HipBoardText,
 } from '@/domain/knowledge/boardScene'
-import { useKnowledgeStore } from '@/store/knowledgeStore'
+import {
+  registerBoardCanvasStyleApi,
+  useKnowledgeStore,
+} from '@/store/knowledgeStore'
 import {
   BOARD_DEFAULT_CORNER_RADIUS,
   BOARD_DEFAULT_FILL,
@@ -42,6 +45,7 @@ import {
   arrowHeadPoints,
   boxHandlePositions,
   clampCamera,
+  clampZoom,
   cloneHistoryEntry,
   deleteElements,
   elementAabb,
@@ -70,6 +74,13 @@ import {
   type EndpointHandle,
   type WorldAabb,
 } from '@/domain/knowledge/boardOps'
+import {
+  BOARD_OUTLINE_DEBOUNCE_MS,
+  boardOutlineSignature,
+  buildSelectionSnapshot,
+  extractBoardOutline,
+  selectionPublishSignature,
+} from '@/domain/knowledge/boardOutline'
 import type { FlushToStoreOpts, KnowledgeBoardCanvasHandle } from './KnowledgeBoardCanvas'
 import { BoardToolbar } from './BoardToolbar'
 
@@ -84,7 +95,7 @@ export type StylePatch = Partial<{
 /** Extended handle for PR-2+ selection/transform/undo (PR-3). */
 export type HipBoardCanvasHandle = KnowledgeBoardCanvasHandle & {
   isReady: () => boolean
-  selectAndScrollTo: (ids: string[]) => void
+  selectAndScrollTo: (ids: string[], opts?: { scroll?: boolean }) => void
   applyStylePatch: (ids: string[], patch: StylePatch) => void
   updateText: (id: string, text: string) => void
   /**
@@ -213,6 +224,12 @@ export const HipBoardCanvas = forwardRef<HipBoardCanvasHandle, HipBoardCanvasPro
     const lastSerializedRef = useRef<string>('')
     const readyRef = useRef(false)
     const throttleTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+    /** Companion selection publish rAF (LKD-22/23/26). */
+    const selRafRef = useRef<number | null>(null)
+    /** Companion structure debounce timer (LKD-22/26). */
+    const outlineTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+    const lastSelPublishSigRef = useRef('')
+    const lastOutSigRef = useRef('')
     const gestureRef = useRef<Gesture | null>(null)
     const spaceDownRef = useRef(false)
     const toolRef = useRef<BoardTool>('select')
@@ -250,6 +267,72 @@ export const HipBoardCanvas = forwardRef<HipBoardCanvasHandle, HipBoardCanvasPro
       }
     }, [])
 
+    /** Cancel companion rAF/timer and reset publish signatures (LKD-26). */
+    const cancelCompanionPublish = useCallback(() => {
+      if (selRafRef.current != null) {
+        cancelAnimationFrame(selRafRef.current)
+        selRafRef.current = null
+      }
+      if (outlineTimerRef.current != null) {
+        clearTimeout(outlineTimerRef.current)
+        outlineTimerRef.current = null
+      }
+      lastSelPublishSigRef.current = ''
+      lastOutSigRef.current = ''
+    }, [])
+
+    /** Selection → store on rAF when ids+style sig changed (LKD-22/23). */
+    const scheduleSelectionPublish = useCallback(() => {
+      if (!activeRef.current) return
+      if (selRafRef.current != null) return
+      selRafRef.current = requestAnimationFrame(() => {
+        selRafRef.current = null
+        if (!activeRef.current) return
+        const id = boardIdRef.current
+        if (useKnowledgeStore.getState().activeDocId !== id) return
+        const snap = buildSelectionSnapshot(
+          id,
+          elementsRef.current,
+          selectedIdsRef.current,
+        )
+        const sig = selectionPublishSignature(snap.ids, snap.style)
+        if (sig === lastSelPublishSigRef.current) return
+        lastSelPublishSigRef.current = sig
+        useKnowledgeStore.getState().setBoardSelection(snap)
+      })
+    }, [])
+
+    /** Structure → store debounced 150ms from elements refs (LKD-21/22). */
+    const scheduleOutlinePublish = useCallback(() => {
+      if (!activeRef.current) return
+      const nextSig = boardOutlineSignature(elementsRef.current)
+      if (nextSig === lastOutSigRef.current && outlineTimerRef.current == null) {
+        return
+      }
+      if (outlineTimerRef.current != null) {
+        clearTimeout(outlineTimerRef.current)
+      }
+      outlineTimerRef.current = setTimeout(() => {
+        outlineTimerRef.current = null
+        if (!activeRef.current) return
+        const id = boardIdRef.current
+        if (useKnowledgeStore.getState().activeDocId !== id) return
+        const els = elementsRef.current
+        const sig = boardOutlineSignature(els)
+        lastOutSigRef.current = sig
+        useKnowledgeStore.getState().setBoardOutline(extractBoardOutline(id, els))
+        // Refresh selection style/labels when selection non-empty (text/fill edit).
+        if (selectedIdsRef.current.length > 0) {
+          const snap = buildSelectionSnapshot(id, els, selectedIdsRef.current)
+          const selSig = selectionPublishSignature(snap.ids, snap.style)
+          if (selSig !== lastSelPublishSigRef.current) {
+            lastSelPublishSigRef.current = selSig
+            useKnowledgeStore.getState().setBoardSelection(snap)
+          }
+        }
+      }, BOARD_OUTLINE_DEBOUNCE_MS)
+    }, [])
+
     const snapshotHistory = useCallback((): BoardHistoryEntry => {
       return cloneHistoryEntry(elementsRef.current, filesRelRef.current)
     }, [])
@@ -270,6 +353,7 @@ export const HipBoardCanvas = forwardRef<HipBoardCanvasHandle, HipBoardCanvasPro
       activeRef.current = true
       readyRef.current = false
       clearThrottle()
+      cancelCompanionPublish()
       gestureRef.current = null
       spaceDownRef.current = false
       textEditOriginalRef.current = ''
@@ -323,10 +407,25 @@ export const HipBoardCanvas = forwardRef<HipBoardCanvasHandle, HipBoardCanvasPro
       setTextEdit(null)
       readyRef.current = true
 
+      // Immediate companion seed so rail is not empty-flash (LKD-21).
+      if (useKnowledgeStore.getState().activeDocId === boardId) {
+        const emptySel = buildSelectionSnapshot(boardId, scene.elements, [])
+        lastSelPublishSigRef.current = selectionPublishSignature(
+          emptySel.ids,
+          emptySel.style,
+        )
+        lastOutSigRef.current = boardOutlineSignature(scene.elements)
+        useKnowledgeStore.getState().setBoardOutline(
+          extractBoardOutline(boardId, scene.elements),
+        )
+        useKnowledgeStore.getState().setBoardSelection(emptySel)
+      }
+
       return () => {
         activeRef.current = false
         readyRef.current = false
         clearThrottle()
+        cancelCompanionPublish()
         gestureRef.current = null
         historyPastRef.current = []
         historyFutureRef.current = []
@@ -377,15 +476,21 @@ export const HipBoardCanvas = forwardRef<HipBoardCanvasHandle, HipBoardCanvasPro
         elementsRef.current = next
         setElements(next)
         if (opts?.draft !== false) scheduleDraftAuto()
+        scheduleOutlinePublish()
+        scheduleSelectionPublish()
       },
-      [scheduleDraftAuto],
+      [scheduleDraftAuto, scheduleOutlinePublish, scheduleSelectionPublish],
     )
 
-    const setSelection = useCallback((ids: string[]) => {
-      selectedIdsRef.current = ids
-      setSelectedIds(ids)
-      // Selection-only — never schedule draft (LKD-14 / LKD-16)
-    }, [])
+    const setSelection = useCallback(
+      (ids: string[]) => {
+        selectedIdsRef.current = ids
+        setSelectedIds(ids)
+        // Selection-only — never schedule draft (LKD-14 / LKD-16)
+        scheduleSelectionPublish()
+      },
+      [scheduleSelectionPublish],
+    )
 
     /** Apply a history entry (undo/redo). Does not re-push history. */
     const applyHistoryEntry = useCallback(
@@ -398,8 +503,9 @@ export const HipBoardCanvas = forwardRef<HipBoardCanvasHandle, HipBoardCanvasPro
         const alive = new Set(els.map((e) => e.id))
         setSelection(selectedIdsRef.current.filter((id) => alive.has(id)))
         scheduleDraftAuto()
+        scheduleOutlinePublish()
       },
-      [scheduleDraftAuto, setSelection],
+      [scheduleDraftAuto, scheduleOutlinePublish, setSelection],
     )
 
     const undo = useCallback(() => {
@@ -596,6 +702,7 @@ export const HipBoardCanvas = forwardRef<HipBoardCanvasHandle, HipBoardCanvasPro
           activeRef.current = false
           gestureRef.current = null
           clearThrottle()
+          cancelCompanionPublish()
           clearHistory()
           setMarquee(null)
           // Commit in-progress text into elements before serializing (no cancel).
@@ -611,7 +718,41 @@ export const HipBoardCanvas = forwardRef<HipBoardCanvasHandle, HipBoardCanvasPro
         lastSerializedRef.current = raw
         writeDraft(raw, 'none')
       },
-      [buildDiskJson, clearHistory, clearThrottle, foldOpenTextDraft, writeDraft],
+      [
+        buildDiskJson,
+        cancelCompanionPublish,
+        clearHistory,
+        clearThrottle,
+        foldOpenTextDraft,
+        writeDraft,
+      ],
+    )
+
+    const fitSelectionInView = useCallback(
+      (ids: string[]) => {
+        const aabb = selectionUnionAabb(elementsRef.current, ids)
+        if (!aabb) return
+        const root = rootRef.current
+        if (!root) return
+        const rect = root.getBoundingClientRect()
+        const pad = 48
+        const vw = Math.max(1, rect.width - pad * 2)
+        const vh = Math.max(1, rect.height - pad * 2)
+        const zw = aabb.w > 0 ? vw / aabb.w : 1
+        const zh = aabb.h > 0 ? vh / aabb.h : 1
+        const zoom = clampZoom(Math.min(zw, zh, 2))
+        const cx = aabb.x + aabb.w / 2
+        const cy = aabb.y + aabb.h / 2
+        const next = clampCamera({
+          x: rect.width / 2 - cx * zoom,
+          y: rect.height / 2 - cy * zoom,
+          zoom,
+        })
+        cameraRef.current = next
+        setCamera(next)
+        if (textEditRef.current) setOverlayTick((n) => n + 1)
+      },
+      [],
     )
 
     const applyStylePatch = useCallback(
@@ -754,11 +895,11 @@ export const HipBoardCanvas = forwardRef<HipBoardCanvasHandle, HipBoardCanvasPro
         exportPngBlob: async () => null,
         isReady: () => readyRef.current && activeRef.current,
         resumeEditing,
-        selectAndScrollTo: (ids: string[]) => {
+        selectAndScrollTo: (ids: string[], opts?: { scroll?: boolean }) => {
           if (!activeRef.current) return
           if (textEditRef.current) commitTextEdit()
           setSelection(ids)
-          // Camera fit deferred to companion rail (PR-4).
+          if (opts?.scroll !== false) fitSelectionInView(ids)
         },
         applyStylePatch,
         updateText,
@@ -775,6 +916,7 @@ export const HipBoardCanvas = forwardRef<HipBoardCanvasHandle, HipBoardCanvasPro
       [
         applyStylePatch,
         commitTextEdit,
+        fitSelectionInView,
         flushToStore,
         redo,
         resumeEditing,
@@ -784,12 +926,40 @@ export const HipBoardCanvas = forwardRef<HipBoardCanvasHandle, HipBoardCanvasPro
       ],
     )
 
+    // Style editors in right rail call applyStylePatch/updateText via registry (LKD-10).
+    useEffect(() => {
+      registerBoardCanvasStyleApi({ applyStylePatch, updateText })
+      return () => registerBoardCanvasStyleApi(null)
+    }, [applyStylePatch, updateText])
+
+    // pendingBoardFocus → selectAndScrollTo; hold until isReady (LKD-25).
+    const pendingBoardFocus = useKnowledgeStore((s) => s.pendingBoardFocus)
+    useEffect(() => {
+      const pending = pendingBoardFocus
+      if (!pending?.ids.length) return
+      if (!activeRef.current || !readyRef.current) return // HOLD
+      const id = boardIdRef.current
+      if (pending.boardId !== id) {
+        useKnowledgeStore.getState().clearPendingBoardFocus()
+        return
+      }
+      if (useKnowledgeStore.getState().activeDocId !== id) {
+        useKnowledgeStore.getState().clearPendingBoardFocus()
+        return
+      }
+      if (textEditRef.current) commitTextEdit()
+      setSelection(pending.ids)
+      if (pending.scroll) fitSelectionInView(pending.ids)
+      useKnowledgeStore.getState().clearPendingBoardFocus()
+    }, [pendingBoardFocus, commitTextEdit, fitSelectionInView, setSelection])
+
     useEffect(() => {
       return () => {
         activeRef.current = false
         clearThrottle()
+        cancelCompanionPublish()
       }
-    }, [clearThrottle])
+    }, [cancelCompanionPublish, clearThrottle])
 
     // Focus textarea when edit starts.
     useEffect(() => {
@@ -1217,6 +1387,7 @@ export const HipBoardCanvas = forwardRef<HipBoardCanvasHandle, HipBoardCanvasPro
           }
           commitHistory(g.before)
           scheduleDraftAuto()
+          scheduleOutlinePublish()
           // Stay on shape tool for multi-draw (common whiteboard UX).
           return
         }
@@ -1230,6 +1401,7 @@ export const HipBoardCanvas = forwardRef<HipBoardCanvasHandle, HipBoardCanvasPro
           if (!anyUnlocked) return
           commitHistory(g.before)
           scheduleDraftAuto()
+          scheduleOutlinePublish()
           return
         }
 
@@ -1237,9 +1409,16 @@ export const HipBoardCanvas = forwardRef<HipBoardCanvasHandle, HipBoardCanvasPro
           if (!g.changed) return
           commitHistory(g.before)
           scheduleDraftAuto()
+          scheduleOutlinePublish()
         }
       },
-      [commitHistory, scheduleDraftAuto, setElementsBoth, setSelection],
+      [
+        commitHistory,
+        scheduleDraftAuto,
+        scheduleOutlinePublish,
+        setElementsBoth,
+        setSelection,
+      ],
     )
 
     const onDoubleClick = useCallback(

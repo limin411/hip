@@ -32,6 +32,12 @@ import {
 } from '@/domain/knowledge/boardScene'
 import { migrateExcalidrawToHipBoard } from '@/domain/knowledge/boardMigrate'
 import {
+  boardOutlinePublishSignature,
+  selectionPublishSignature,
+  type BoardOutline,
+  type BoardSelectionSnapshot,
+} from '@/domain/knowledge/boardOutline'
+import {
   collectBoardIdsInSubtree,
   collectDocIdsInSubtree,
   getPathTitles,
@@ -318,6 +324,22 @@ export type KnowledgePendingOutlineJump = {
   nonce: number
 }
 
+/** Right-rail structure click → HipBoardCanvas selectAndScrollTo (LKD-20/25). */
+export type KnowledgePendingBoardFocus = {
+  ids: string[]
+  nonce: number
+  scroll: boolean
+  /** Ignore if activeDocId diverges (LKD-27). */
+  boardId: string
+}
+
+/** Cleared on every activeDocId change (LKD-24). */
+const CLEARED_BOARD_PANEL = {
+  boardOutline: null,
+  boardSelection: null,
+  pendingBoardFocus: null,
+} as const
+
 /** Yield so React can paint index progress (and avoid long freezes). */
 function yieldToUi(): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, 0))
@@ -352,6 +374,18 @@ interface KnowledgeState {
   pendingReveal: KnowledgePendingReveal | null
   /** Outline (TOC) click — consumed by KnowledgeWorkspace for mode-aware scroll. */
   pendingOutlineJump: KnowledgePendingOutlineJump | null
+  /**
+   * Whiteboard companion (LKD-20): structure list from canvas elements.
+   * Null when not on a board / after clearBoardPanelState.
+   */
+  boardOutline: BoardOutline | null
+  /**
+   * Whiteboard companion selection + style snapshot (LKD-10/20).
+   * Null when empty clear or after leaf change.
+   */
+  boardSelection: BoardSelectionSnapshot | null
+  /** Structure click → canvas selectAndScrollTo; held until isReady (LKD-25). */
+  pendingBoardFocus: KnowledgePendingBoardFocus | null
   /** SQLite link-index panel (active doc). */
   backlinks: KnowledgeLinkBacklink[]
   outboundLinks: KnowledgeLinkOutboundRow[]
@@ -406,6 +440,21 @@ interface KnowledgeState {
     line: number
   }) => void
   clearPendingOutlineJump: () => void
+  /**
+   * Canvas → store structure publish. Ignores boardId !== activeDocId (LKD-27).
+   * Equality no-op when publish signature unchanged.
+   */
+  setBoardOutline: (outline: BoardOutline | null) => void
+  /**
+   * Canvas → store selection + style snapshot. Ignores boardId mismatch.
+   * Equality on selectionPublishSignature (ids + style) — LKD-23.
+   */
+  setBoardSelection: (sel: BoardSelectionSnapshot | null) => void
+  /** Structure row click; canvas holds until isReady (LKD-25). */
+  requestBoardFocus: (ids: string[], opts?: { scroll?: boolean }) => void
+  clearPendingBoardFocus: () => void
+  /** Clear outline / selection / pending focus (LKD-24). */
+  clearBoardPanelState: () => void
   /** Refresh backlinks + outbound for the active doc (or given id). */
   refreshLinkPanel: (docId?: string) => Promise<void>
   /** Full rebuild of space link index from disk docs. */
@@ -706,6 +755,36 @@ export function syncActiveEditorToDraft(opts?: SyncActiveEditorOpts): void {
 }
 
 /**
+ * Board companion style editors → canvas (LKD-10).
+ * Registered by HipBoardCanvas; panel must not JSON.parse(draftBody).
+ */
+export type BoardCanvasStyleApi = {
+  applyStylePatch: (
+    ids: string[],
+    patch: Partial<{
+      fill: string
+      stroke: string
+      strokeWidth: number
+      fontSize: 12 | 16 | 24
+      cornerRadius: number
+    }>,
+  ) => void
+  updateText: (id: string, text: string) => void
+}
+
+let boardCanvasStyleApi: BoardCanvasStyleApi | null = null
+
+/** Register (or clear with null) the live board canvas style API. */
+export function registerBoardCanvasStyleApi(api: BoardCanvasStyleApi | null): void {
+  boardCanvasStyleApi = api
+}
+
+/** Panel → canvas style / text edits. */
+export function getBoardCanvasStyleApi(): BoardCanvasStyleApi | null {
+  return boardCanvasStyleApi
+}
+
+/**
  * When leave-flush freezes the board canvas but openDoc aborts (flush false),
  * Workspace re-activates via this hook so the user is not stuck on a dead canvas.
  */
@@ -786,6 +865,9 @@ export const useKnowledgeStore = create<KnowledgeState>((set, get) => ({
   indexProgress: null,
   pendingReveal: null,
   pendingOutlineJump: null,
+  boardOutline: null,
+  boardSelection: null,
+  pendingBoardFocus: null,
   backlinks: [],
   outboundLinks: [],
   linkPanelStatus: 'idle',
@@ -1052,6 +1134,7 @@ export const useKnowledgeStore = create<KnowledgeState>((set, get) => ({
           templatePicker: null,
           saveState: 'idle',
           pendingReveal: null,
+          ...CLEARED_BOARD_PANEL,
         })
       }
       await knowledgeSoftDeleteSpace(id)
@@ -1133,6 +1216,7 @@ export const useKnowledgeStore = create<KnowledgeState>((set, get) => ({
           draftBody: '',
           editorMode: 'live',
           pendingReveal: null,
+          ...CLEARED_BOARD_PANEL,
         })
       }
     } catch (e) {
@@ -1175,6 +1259,57 @@ export const useKnowledgeStore = create<KnowledgeState>((set, get) => ({
       },
     })),
   clearPendingOutlineJump: () => set({ pendingOutlineJump: null }),
+
+  setBoardOutline: (outline) => {
+    if (outline != null) {
+      if (get().activeDocId !== outline.boardId) return
+      const prev = get().boardOutline
+      if (
+        prev != null &&
+        boardOutlinePublishSignature(prev) === boardOutlinePublishSignature(outline)
+      ) {
+        return
+      }
+    } else if (get().boardOutline == null) {
+      return
+    }
+    set({ boardOutline: outline })
+  },
+
+  setBoardSelection: (sel) => {
+    if (sel != null) {
+      if (get().activeDocId !== sel.boardId) return
+      const prev = get().boardSelection
+      if (
+        prev != null &&
+        selectionPublishSignature(prev.ids, prev.style) ===
+          selectionPublishSignature(sel.ids, sel.style)
+      ) {
+        return
+      }
+    } else if (get().boardSelection == null) {
+      return
+    }
+    set({ boardSelection: sel })
+  },
+
+  requestBoardFocus: (ids, opts) => {
+    const boardId = get().activeDocId
+    if (!boardId || !boardId.startsWith('brd_')) return
+    const sorted = [...ids].sort()
+    set((s) => ({
+      pendingBoardFocus: {
+        ids: sorted,
+        scroll: opts?.scroll !== false,
+        boardId,
+        nonce: (s.pendingBoardFocus?.nonce ?? 0) + 1,
+      },
+    }))
+  },
+
+  clearPendingBoardFocus: () => set({ pendingBoardFocus: null }),
+
+  clearBoardPanelState: () => set({ ...CLEARED_BOARD_PANEL }),
 
   refreshLinkPanel: async (docId) => {
     const spaceId = get().activeSpaceId
@@ -1381,6 +1516,7 @@ export const useKnowledgeStore = create<KnowledgeState>((set, get) => ({
       expandedFolderIds: {},
       templatePicker: null,
       activeViewId: null,
+      ...CLEARED_BOARD_PANEL,
     })
     get().runSearch(get().searchQuery)
   },
@@ -1731,6 +1867,7 @@ export const useKnowledgeStore = create<KnowledgeState>((set, get) => ({
                 backlinks: [],
                 outboundLinks: [],
                 linkPanelStatus: 'idle' as const,
+                ...CLEARED_BOARD_PANEL,
               }
             : pendingTargetsRemoved
               ? { pendingReveal: null }
@@ -1802,6 +1939,7 @@ export const useKnowledgeStore = create<KnowledgeState>((set, get) => ({
         backlinks: [],
         outboundLinks: [],
         linkPanelStatus: 'idle',
+        ...CLEARED_BOARD_PANEL,
       })
       return
     }
@@ -1888,6 +2026,7 @@ export const useKnowledgeStore = create<KnowledgeState>((set, get) => ({
             outboundLinks: [],
             linkPanelStatus: 'idle' as const,
             recent,
+            ...CLEARED_BOARD_PANEL,
             ...(revealMatches ? {} : { pendingReveal: null }),
           }
         })
@@ -1995,6 +2134,7 @@ export const useKnowledgeStore = create<KnowledgeState>((set, get) => ({
           outboundLinks: [],
           linkPanelStatus: 'loading' as const,
           recent,
+          ...CLEARED_BOARD_PANEL,
           ...(revealMatches ? {} : { pendingReveal: null }),
         }
       })
@@ -2022,6 +2162,7 @@ export const useKnowledgeStore = create<KnowledgeState>((set, get) => ({
         backlinks: [],
         outboundLinks: [],
         linkPanelStatus: 'idle',
+        ...CLEARED_BOARD_PANEL,
       })
     }
   },

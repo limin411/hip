@@ -2951,3 +2951,176 @@ describe('knowledgeStore board shell (PR-C hip cutover)', () => {
     expect(s.linkPanelStatus).toBe('idle')
   })
 })
+
+describe('knowledgeStore board companion rail (PR-4)', () => {
+  const boardNode = {
+    id: 'brd_board000001',
+    parentId: null as string | null,
+    kind: 'board' as const,
+    title: 'Board',
+    order: 0,
+    createdAt: 1,
+    updatedAt: 1,
+  }
+  const docNode = {
+    id: 'doc_1',
+    parentId: null as string | null,
+    kind: 'doc' as const,
+    title: 'Doc',
+    order: 1,
+    createdAt: 1,
+    updatedAt: 1,
+  }
+  const emptySel = {
+    boardId: 'brd_board000001',
+    ids: [] as string[],
+    items: [] as [],
+    style: {},
+  }
+  const selWithRect = {
+    boardId: 'brd_board000001',
+    ids: ['r1'],
+    items: [
+      {
+        id: 'r1',
+        type: 'rect' as const,
+        label: 'rect r1',
+        depth: 0,
+        locked: false,
+        order: 0,
+      },
+    ],
+    style: { fill: '#ffffff', stroke: '#111111', strokeWidth: 2 },
+  }
+  const outlineSnap = {
+    boardId: 'brd_board000001',
+    items: selWithRect.items,
+    totalElements: 1,
+    truncated: false,
+    imageCount: 0,
+  }
+
+  beforeEach(() => {
+    knowledgeEnsureRoot.mockResolvedValue(undefined)
+    knowledgeListSpaces.mockResolvedValue([
+      { id: 'spc_1', name: 'Space', icon: '📚', createdAt: 1, updatedAt: 1 },
+    ])
+    knowledgeGetTree.mockResolvedValue({ version: 1, nodes: [boardNode, docNode] })
+    knowledgeReadBoard.mockResolvedValue(EMPTY_BOARD_SCENE_JSON)
+    knowledgeReadDoc.mockResolvedValue('# hi')
+    knowledgeWriteBoard.mockResolvedValue(undefined)
+    knowledgeWriteDoc.mockResolvedValue(undefined)
+    knowledgeSaveTree.mockResolvedValue(undefined)
+    __resetBoardSessionFlagsForTests()
+    useKnowledgeStore.setState({
+      loaded: true,
+      spaces: [{ id: 'spc_1', name: 'Space', icon: '📚', createdAt: 1, updatedAt: 1 }],
+      activeSpaceId: 'spc_1',
+      nodes: [boardNode, docNode],
+      activeDocId: 'brd_board000001',
+      docBody: EMPTY_BOARD_SCENE_JSON,
+      draftBody: EMPTY_BOARD_SCENE_JSON,
+      mode: 'workspace',
+      boardOutline: outlineSnap,
+      boardSelection: selWithRect,
+      pendingBoardFocus: {
+        ids: ['r1'],
+        nonce: 1,
+        scroll: true,
+        boardId: 'brd_board000001',
+      },
+      busy: false,
+      error: null,
+      saveState: 'idle',
+      pendingReveal: null,
+      pendingOutlineJump: null,
+    })
+  })
+
+  it('setBoardSelection equality no-op when ids+style signature unchanged', () => {
+    const before = useKnowledgeStore.getState().boardSelection
+    useKnowledgeStore.getState().setBoardSelection({
+      ...selWithRect,
+      ids: ['r1'],
+      style: { fill: '#ffffff', stroke: '#111111', strokeWidth: 2 },
+    })
+    expect(useKnowledgeStore.getState().boardSelection).toBe(before)
+
+    useKnowledgeStore.getState().setBoardSelection({
+      ...selWithRect,
+      style: { fill: '#ff0000', stroke: '#111111', strokeWidth: 2 },
+    })
+    expect(useKnowledgeStore.getState().boardSelection?.style.fill).toBe('#ff0000')
+  })
+
+  it('setBoardSelection ignores boardId !== activeDocId', () => {
+    useKnowledgeStore.getState().setBoardSelection({
+      ...selWithRect,
+      boardId: 'brd_other',
+      style: { fill: '#00ff00' },
+    })
+    expect(useKnowledgeStore.getState().boardSelection?.style.fill).toBe('#ffffff')
+  })
+
+  it('setBoardOutline equality no-op', () => {
+    const before = useKnowledgeStore.getState().boardOutline
+    useKnowledgeStore.getState().setBoardOutline({ ...outlineSnap })
+    expect(useKnowledgeStore.getState().boardOutline).toBe(before)
+  })
+
+  it('clearBoardPanelState nulls outline, selection, pending focus', () => {
+    useKnowledgeStore.getState().clearBoardPanelState()
+    const s = useKnowledgeStore.getState()
+    expect(s.boardOutline).toBeNull()
+    expect(s.boardSelection).toBeNull()
+    expect(s.pendingBoardFocus).toBeNull()
+  })
+
+  it('openDoc to doc clears board panel state', async () => {
+    await useKnowledgeStore.getState().openDoc('doc_1')
+    const s = useKnowledgeStore.getState()
+    expect(s.activeDocId).toBe('doc_1')
+    expect(s.boardOutline).toBeNull()
+    expect(s.boardSelection).toBeNull()
+    expect(s.pendingBoardFocus).toBeNull()
+  })
+
+  it('openDoc boardA→boardB clears then allows new canvas to publish', async () => {
+    const boardB = {
+      ...boardNode,
+      id: 'brd_board000002',
+      title: 'B',
+      order: 2,
+    }
+    useKnowledgeStore.setState({ nodes: [boardNode, boardB, docNode] })
+    knowledgeGetTree.mockResolvedValue({
+      version: 1,
+      nodes: [boardNode, boardB, docNode],
+    })
+    knowledgeReadBoard.mockResolvedValue(EMPTY_BOARD_SCENE_JSON)
+    await useKnowledgeStore.getState().openDoc('brd_board000002')
+    const s = useKnowledgeStore.getState()
+    expect(s.activeDocId).toBe('brd_board000002')
+    expect(s.boardOutline).toBeNull()
+    expect(s.boardSelection).toBeNull()
+    expect(s.pendingBoardFocus).toBeNull()
+  })
+
+  it('openHome clears board panel state', async () => {
+    await useKnowledgeStore.getState().openHome()
+    const s = useKnowledgeStore.getState()
+    expect(s.mode).toBe('home')
+    expect(s.boardOutline).toBeNull()
+    expect(s.boardSelection).toBeNull()
+    expect(s.pendingBoardFocus).toBeNull()
+  })
+
+  it('requestBoardFocus stamps boardId and bumps nonce', () => {
+    useKnowledgeStore.getState().requestBoardFocus(['r1', 'r2'], { scroll: true })
+    const p = useKnowledgeStore.getState().pendingBoardFocus
+    expect(p?.boardId).toBe('brd_board000001')
+    expect(p?.ids).toEqual(['r1', 'r2'])
+    expect(p?.scroll).toBe(true)
+    expect(p?.nonce).toBe(2)
+  })
+})

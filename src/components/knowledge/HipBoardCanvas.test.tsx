@@ -10,6 +10,7 @@ import {
   serializeHipBoard,
   type HipBoardSceneDisk,
 } from '@/domain/knowledge/boardScene'
+import { useKnowledgeStore } from '@/store/knowledgeStore'
 
 afterEach(() => {
   cleanup()
@@ -1212,5 +1213,115 @@ describe('HipBoardCanvas selection / transform / undo (PR-3)', () => {
     })
     // Frozen after leave; elements stay
     expect(ref.current!.getElements()).toHaveLength(1)
+  })
+})
+
+describe('HipBoardCanvas companion rail publish (PR-4)', () => {
+  beforeEach(() => {
+    useKnowledgeStore.setState({
+      activeDocId: 'brd_hip_shell',
+      boardOutline: null,
+      boardSelection: null,
+      pendingBoardFocus: null,
+    })
+  })
+
+  afterEach(() => {
+    cleanup()
+    vi.useRealTimers()
+  })
+
+  it('publishes empty selection + outline on mount when activeDocId matches', async () => {
+    renderCanvas({
+      boardId: 'brd_hip_shell',
+      initialJson: serializeHipBoard(SCENE_WITH_RECT),
+    })
+    await act(async () => {
+      await new Promise((r) => requestAnimationFrame(() => r(undefined)))
+    })
+    // Immediate outline seed (sync layout)
+    expect(useKnowledgeStore.getState().boardOutline?.boardId).toBe('brd_hip_shell')
+    expect(useKnowledgeStore.getState().boardOutline?.totalElements).toBe(1)
+    expect(useKnowledgeStore.getState().boardSelection?.ids).toEqual([])
+  })
+
+  it('selection publish no-ops when signature unchanged (pan does not thrash)', async () => {
+    const { ref, root } = renderCanvas({
+      boardId: 'brd_hip_shell',
+      initialJson: serializeHipBoard(SCENE_WITH_RECT),
+    })
+    await act(async () => {
+      await new Promise((r) => requestAnimationFrame(() => r(undefined)))
+    })
+
+    act(() => {
+      ref.current!.selectAndScrollTo(['r1'], { scroll: false })
+    })
+    await act(async () => {
+      await new Promise((r) => requestAnimationFrame(() => r(undefined)))
+    })
+    const afterSelect = useKnowledgeStore.getState().boardSelection
+    expect(afterSelect?.ids).toEqual(['r1'])
+
+    // Second select same ids — store equality no-op; lastSel sig short-circuits rAF set
+    const setSpy = vi.spyOn(useKnowledgeStore.getState(), 'setBoardSelection')
+    act(() => {
+      ref.current!.selectAndScrollTo(['r1'], { scroll: false })
+    })
+    await act(async () => {
+      await new Promise((r) => requestAnimationFrame(() => r(undefined)))
+    })
+    // rAF may call setBoardSelection but store equality keeps same reference
+    expect(useKnowledgeStore.getState().boardSelection).toBe(afterSelect)
+
+    // Pan/zoom must not change selection store
+    act(() => {
+      fireEvent.pointerDown(root, { button: 1, clientX: 10, clientY: 10, pointerId: 9 })
+      fireEvent.pointerMove(root, { button: 1, clientX: 40, clientY: 50, pointerId: 9 })
+      fireEvent.pointerUp(root, { button: 1, clientX: 40, clientY: 50, pointerId: 9 })
+    })
+    expect(useKnowledgeStore.getState().boardSelection).toBe(afterSelect)
+    setSpy.mockRestore()
+  })
+
+  it('leave cancels companion publish so delayed rAF does not write store', async () => {
+    const { ref } = renderCanvas({
+      boardId: 'brd_hip_shell',
+      initialJson: serializeHipBoard(SCENE_WITH_RECT),
+    })
+    await act(async () => {
+      await new Promise((r) => requestAnimationFrame(() => r(undefined)))
+    })
+
+    useKnowledgeStore.getState().clearBoardPanelState()
+    act(() => {
+      ref.current!.selectAndScrollTo(['r1'], { scroll: false })
+      // Freeze before rAF runs
+      ref.current!.flushToStore({ mode: 'leave' })
+    })
+    await act(async () => {
+      await new Promise((r) => requestAnimationFrame(() => r(undefined)))
+    })
+    // Leave cancelled selRaf; selection must stay cleared
+    expect(useKnowledgeStore.getState().boardSelection).toBeNull()
+  })
+
+  it('pendingBoardFocus selects when ready; holds when frozen', async () => {
+    const { ref } = renderCanvas({
+      boardId: 'brd_hip_shell',
+      initialJson: serializeHipBoard(SCENE_WITH_RECT),
+    })
+    await act(async () => {
+      await new Promise((r) => requestAnimationFrame(() => r(undefined)))
+    })
+
+    act(() => {
+      useKnowledgeStore.getState().requestBoardFocus(['r1'], { scroll: false })
+    })
+    await act(async () => {
+      await new Promise((r) => requestAnimationFrame(() => r(undefined)))
+    })
+    expect(ref.current!.getSelectedIds()).toEqual(['r1'])
+    expect(useKnowledgeStore.getState().pendingBoardFocus).toBeNull()
   })
 })

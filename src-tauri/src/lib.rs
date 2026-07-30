@@ -969,6 +969,8 @@ pub fn run() {
             knowledge::knowledge_read_board,
             knowledge::knowledge_write_board,
             knowledge::knowledge_delete_board_file,
+            knowledge::knowledge_export_board,
+            knowledge::knowledge_export_bytes,
             knowledge::knowledge_save_version,
             knowledge::knowledge_list_versions,
             knowledge::knowledge_read_version,

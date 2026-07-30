@@ -18,6 +18,8 @@ const KNOWLEDGE_ASSET_MAX_BYTES: u64 = 25 * 1024 * 1024;
 const KNOWLEDGE_ASSET_INLINE_MAX_BYTES: u64 = 1_500_000;
 /// Max board scene JSON size for `knowledge_write_board` (v1).
 const KNOWLEDGE_BOARD_MAX_BYTES: usize = 25 * 1024 * 1024;
+/// Max decoded payload for `knowledge_export_bytes` (PNG etc.).
+const KNOWLEDGE_EXPORT_BYTES_MAX: usize = 25 * 1024 * 1024;
 
 /// Empty dehydrated Excalidraw scene returned when board file is missing.
 pub(crate) const EMPTY_BOARD_SCENE_JSON: &str = r##"{"type":"excalidraw","version":2,"source":"hip","hip":{"schemaVersion":1},"elements":[],"appState":{"viewBackgroundColor":"#ffffff"},"files":{}}"##;
@@ -663,6 +665,71 @@ pub fn knowledge_delete_board_file(app: AppHandle, args: BoardArgs) -> Result<()
     Ok(())
 }
 
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ExportBoardArgs {
+    pub space_id: String,
+    pub board_id: String,
+    pub dest_path: String,
+}
+
+/// Export dehydrated hip board JSON (same as on-disk) to an absolute path.
+#[tauri::command]
+pub fn knowledge_export_board(app: AppHandle, args: ExportBoardArgs) -> Result<(), String> {
+    let root = knowledge_root(&app)?;
+    let src = board_path(&root, &args.space_id, &args.board_id)?;
+    let body = if src.exists() {
+        fs::read_to_string(&src).map_err(|e| e.to_string())?
+    } else {
+        EMPTY_BOARD_SCENE_JSON.to_string()
+    };
+    let dest = PathBuf::from(&args.dest_path);
+    if !dest.is_absolute() {
+        return Err("destPath must be absolute".into());
+    }
+    if let Some(parent) = dest.parent() {
+        fs::create_dir_all(parent).map_err(|e| e.to_string())?;
+    }
+    atomic_write_str(&dest, &body)
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ExportBytesArgs {
+    pub dest_path: String,
+    pub base64: String,
+    pub mime: String,
+}
+
+/// Decode base64 bytes and write to an absolute path (v1: image/png only, ≤25MB).
+#[tauri::command]
+pub fn knowledge_export_bytes(_app: AppHandle, args: ExportBytesArgs) -> Result<(), String> {
+    let bytes = decode_export_bytes(&args.base64, &args.mime)?;
+    let dest = PathBuf::from(&args.dest_path);
+    if !dest.is_absolute() {
+        return Err("destPath must be absolute".into());
+    }
+    if let Some(parent) = dest.parent() {
+        fs::create_dir_all(parent).map_err(|e| e.to_string())?;
+    }
+    atomic_write(&dest, &bytes)
+}
+
+/// Decode + validate export payload (image/png, ≤25MB). Testable without AppHandle.
+fn decode_export_bytes(base64: &str, mime: &str) -> Result<Vec<u8>, String> {
+    let mime = mime.trim().to_ascii_lowercase();
+    if mime != "image/png" {
+        return Err("unsupported export mime (image/png only)".into());
+    }
+    let bytes = B64
+        .decode(base64.trim())
+        .map_err(|e| format!("invalid base64: {e}"))?;
+    if bytes.len() > KNOWLEDGE_EXPORT_BYTES_MAX {
+        return Err("export body too large".into());
+    }
+    Ok(bytes)
+}
+
 // ── Version snapshots (P1.8) ──────────────────────────────────────────────
 
 /// Max retained snapshots per document (matches TS `KNOWLEDGE_VERSION_CAP`).
@@ -1068,8 +1135,8 @@ pub struct ExportSpaceZipArgs {
     pub dest_path: String,
 }
 
-/// Portable hip layout (K17): meta.json + tree.json + docs/ + assets/.
-/// Space-root-relative `assets/…` links in MD survive re-import.
+/// Portable hip layout (K17): meta.json + tree.json + docs/ + boards/ + assets/.
+/// Space-root-relative `assets/…` links in MD / board hipAssetRel survive re-import.
 #[tauri::command]
 pub fn knowledge_export_space_zip(app: AppHandle, args: ExportSpaceZipArgs) -> Result<(), String> {
     use std::io::Write as _;
@@ -1098,14 +1165,15 @@ pub fn knowledge_export_space_zip(app: AppHandle, args: ExportSpaceZipArgs) -> R
         fs::create_dir_all(parent).map_err(|e| e.to_string())?;
     }
 
-    let mut doc_count = 0usize;
+    // Leaf cap: docs + boards combined (v1 aligns with prior 5000 doc spirit).
+    let mut leaf_count = 0usize;
     for n in &tree.nodes {
-        if n.kind == "doc" {
-            doc_count += 1;
+        if n.kind == "doc" || n.kind == "board" {
+            leaf_count += 1;
         }
     }
-    if doc_count > 5000 {
-        return Err("space has too many documents to export (max 5000)".into());
+    if leaf_count > 5000 {
+        return Err("space has too many documents/boards to export (max 5000)".into());
     }
 
     let file = fs::File::create(&dest).map_err(|e| e.to_string())?;
@@ -1148,6 +1216,28 @@ pub fn knowledge_export_space_zip(app: AppHandle, args: ExportSpaceZipArgs) -> R
             } else {
                 Vec::new()
             }
+        };
+        zip.start_file(entry_name, opts)
+            .map_err(|e| e.to_string())?;
+        zip.write_all(&body).map_err(|e| e.to_string())?;
+    }
+
+    // boards/* (KD-10 / PR-5): missing file → empty dehydrated scene, do not fail zip.
+    for n in &tree.nodes {
+        if n.kind != "board" {
+            continue;
+        }
+        if !n.id.starts_with("brd_") || !is_knowledge_id(&n.id) {
+            continue;
+        }
+        let entry_name = format!("boards/{}.excalidraw", n.id);
+        if !is_safe_zip_entry(&entry_name) {
+            return Err("illegal export path".into());
+        }
+        let body = match board_path(&root, &args.space_id, &n.id) {
+            Ok(p) if p.exists() => fs::read(&p).map_err(|e| e.to_string())?,
+            Ok(_) => EMPTY_BOARD_SCENE_JSON.as_bytes().to_vec(),
+            Err(_) => continue,
         };
         zip.start_file(entry_name, opts)
             .map_err(|e| e.to_string())?;
@@ -1438,7 +1528,8 @@ fn is_hip_portable_layout(source: &Path) -> bool {
     source.join("tree.json").is_file() && source.join("docs").is_dir()
 }
 
-/// Import a portable hip layout folder (meta/tree/docs/assets) into a new space.
+/// Import a portable hip layout folder (meta/tree/docs/boards/assets) into a new space.
+/// Invalid board nodes are omitted from the saved tree (PR-5); missing board files → EMPTY scene.
 fn import_hip_portable_folder(
     app: &AppHandle,
     source: &Path,
@@ -1489,35 +1580,54 @@ fn import_hip_portable_folder(
     };
 
     let mut imported = 0u32;
+    let mut out_nodes: Vec<KnowledgeNode> = Vec::with_capacity(tree.nodes.len());
+    let mut skipped_boards = 0u32;
     let docs_src = source.join("docs");
+    let boards_src = source.join("boards");
+
     for n in &tree.nodes {
-        if n.kind != "doc" {
-            continue;
-        }
-        if imported >= MAX_IMPORT_DOCS {
-            let _ = knowledge_delete_space(
-                app.clone(),
-                DeleteSpaceArgs {
-                    id: space.id.clone(),
-                },
-            );
-            return Err(format!("import exceeds max documents ({MAX_IMPORT_DOCS})"));
-        }
-        if !n.id.starts_with("doc_") || !is_knowledge_id(&n.id) {
-            let _ = knowledge_delete_space(
-                app.clone(),
-                DeleteSpaceArgs {
-                    id: space.id.clone(),
-                },
-            );
-            return Err(format!("invalid doc id in tree: {}", n.id));
-        }
-        let src_doc = docs_src.join(format!("{}.md", n.id));
-        // Skip symlink escape
-        if src_doc.exists() {
-            let meta = fs::symlink_metadata(&src_doc).map_err(|e| e.to_string());
-            let meta = match meta {
-                Ok(m) => m,
+        if n.kind == "board" {
+            // PR-5: omit invalid board tree nodes (do not fail whole import).
+            if !is_valid_import_board_node(n) {
+                skipped_boards += 1;
+                eprintln!(
+                    "knowledge import: skipping invalid board node id={} kind={}",
+                    n.id, n.kind
+                );
+                continue;
+            }
+            let src_board = boards_src.join(format!("{}.excalidraw", n.id));
+            let mut body = EMPTY_BOARD_SCENE_JSON.to_string();
+            if src_board.is_file() {
+                let meta = match fs::symlink_metadata(&src_board) {
+                    Ok(m) => m,
+                    Err(e) => {
+                        let _ = knowledge_delete_space(
+                            app.clone(),
+                            DeleteSpaceArgs {
+                                id: space.id.clone(),
+                            },
+                        );
+                        return Err(e.to_string());
+                    }
+                };
+                if !meta.file_type().is_symlink() {
+                    let mut ok = true;
+                    if let Ok(canon) = src_board.canonicalize() {
+                        if !canon.starts_with(source_canon) {
+                            ok = false;
+                        }
+                    }
+                    if ok {
+                        body = fs::read_to_string(&src_board).unwrap_or_else(|_| {
+                            EMPTY_BOARD_SCENE_JSON.to_string()
+                        });
+                    }
+                }
+            }
+            // Missing or unreadable file → EMPTY scene; keep tree node.
+            let dest = match board_path(&root, &space.id, &n.id) {
+                Ok(p) => p,
                 Err(e) => {
                     let _ = knowledge_delete_space(
                         app.clone(),
@@ -1528,23 +1638,7 @@ fn import_hip_portable_folder(
                     return Err(e);
                 }
             };
-            if meta.file_type().is_symlink() {
-                continue;
-            }
-            if let Ok(canon) = src_doc.canonicalize() {
-                if !canon.starts_with(source_canon) {
-                    continue;
-                }
-            }
-        }
-        let body = if src_doc.is_file() {
-            fs::read_to_string(&src_doc).unwrap_or_default()
-        } else {
-            String::new()
-        };
-        let dest = match doc_path(&root, &space.id, &n.id) {
-            Ok(p) => p,
-            Err(e) => {
+            if let Err(e) = atomic_write_str(&dest, &body) {
                 let _ = knowledge_delete_space(
                     app.clone(),
                     DeleteSpaceArgs {
@@ -1553,17 +1647,99 @@ fn import_hip_portable_folder(
                 );
                 return Err(e);
             }
-        };
-        if let Err(e) = atomic_write_str(&dest, &body) {
-            let _ = knowledge_delete_space(
-                app.clone(),
-                DeleteSpaceArgs {
-                    id: space.id.clone(),
-                },
-            );
-            return Err(e);
+            out_nodes.push(n.clone());
+            continue;
         }
-        imported += 1;
+
+        if n.kind == "doc" {
+            if imported >= MAX_IMPORT_DOCS {
+                let _ = knowledge_delete_space(
+                    app.clone(),
+                    DeleteSpaceArgs {
+                        id: space.id.clone(),
+                    },
+                );
+                return Err(format!("import exceeds max documents ({MAX_IMPORT_DOCS})"));
+            }
+            if !n.id.starts_with("doc_") || !is_knowledge_id(&n.id) {
+                let _ = knowledge_delete_space(
+                    app.clone(),
+                    DeleteSpaceArgs {
+                        id: space.id.clone(),
+                    },
+                );
+                return Err(format!("invalid doc id in tree: {}", n.id));
+            }
+            let src_doc = docs_src.join(format!("{}.md", n.id));
+            // Skip symlink escape
+            if src_doc.exists() {
+                let meta = fs::symlink_metadata(&src_doc).map_err(|e| e.to_string());
+                let meta = match meta {
+                    Ok(m) => m,
+                    Err(e) => {
+                        let _ = knowledge_delete_space(
+                            app.clone(),
+                            DeleteSpaceArgs {
+                                id: space.id.clone(),
+                            },
+                        );
+                        return Err(e);
+                    }
+                };
+                if meta.file_type().is_symlink() {
+                    // Still keep tree node? Existing code continued without writing.
+                    // Preserve prior behavior: skip file write but keep node via out_nodes.
+                    out_nodes.push(n.clone());
+                    imported += 1;
+                    continue;
+                }
+                if let Ok(canon) = src_doc.canonicalize() {
+                    if !canon.starts_with(source_canon) {
+                        out_nodes.push(n.clone());
+                        imported += 1;
+                        continue;
+                    }
+                }
+            }
+            let body = if src_doc.is_file() {
+                fs::read_to_string(&src_doc).unwrap_or_default()
+            } else {
+                String::new()
+            };
+            let dest = match doc_path(&root, &space.id, &n.id) {
+                Ok(p) => p,
+                Err(e) => {
+                    let _ = knowledge_delete_space(
+                        app.clone(),
+                        DeleteSpaceArgs {
+                            id: space.id.clone(),
+                        },
+                    );
+                    return Err(e);
+                }
+            };
+            if let Err(e) = atomic_write_str(&dest, &body) {
+                let _ = knowledge_delete_space(
+                    app.clone(),
+                    DeleteSpaceArgs {
+                        id: space.id.clone(),
+                    },
+                );
+                return Err(e);
+            }
+            out_nodes.push(n.clone());
+            imported += 1;
+            continue;
+        }
+
+        // folder or other kinds: keep tree node as-is (existing behavior).
+        out_nodes.push(n.clone());
+    }
+
+    if skipped_boards > 0 {
+        eprintln!(
+            "knowledge import: omitted {skipped_boards} invalid board node(s) from tree"
+        );
     }
 
     // Copy assets (flat files only)
@@ -1625,7 +1801,11 @@ fn import_hip_portable_folder(
         }
     }
 
-    if let Err(e) = write_json_file(&space_root.join("tree.json"), &tree) {
+    let out_tree = KnowledgeTreeFile {
+        version: tree.version,
+        nodes: out_nodes,
+    };
+    if let Err(e) = write_json_file(&space_root.join("tree.json"), &out_tree) {
         let _ = knowledge_delete_space(
             app.clone(),
             DeleteSpaceArgs {
@@ -1639,6 +1819,29 @@ fn import_hip_portable_folder(
         space_id: space.id,
         imported_docs: imported,
     })
+}
+
+/// Pure helper: whether a tree node is a valid portable-import board (kind+prefix).
+fn is_valid_import_board_node(n: &KnowledgeNode) -> bool {
+    n.kind == "board" && n.id.starts_with("brd_") && is_knowledge_id(&n.id)
+}
+
+/// Pure helper used by tests: filter tree nodes for portable import (omit invalid boards).
+fn filter_portable_import_nodes(nodes: &[KnowledgeNode]) -> (Vec<KnowledgeNode>, u32) {
+    let mut out = Vec::with_capacity(nodes.len());
+    let mut skipped = 0u32;
+    for n in nodes {
+        if n.kind == "board" {
+            if is_valid_import_board_node(n) {
+                out.push(n.clone());
+            } else {
+                skipped += 1;
+            }
+            continue;
+        }
+        out.push(n.clone());
+    }
+    (out, skipped)
 }
 
 #[tauri::command]
@@ -2379,6 +2582,7 @@ mod tests {
             let space_id = "spc_ziptest01";
             let dir = space_dir(&root, space_id).unwrap();
             fs::create_dir_all(dir.join("docs")).unwrap();
+            fs::create_dir_all(dir.join("boards")).unwrap();
             fs::create_dir_all(dir.join("assets")).unwrap();
             let space = KnowledgeSpace {
                 id: space_id.to_string(),
@@ -2389,22 +2593,40 @@ mod tests {
             };
             write_json_file(&dir.join("meta.json"), &space).unwrap();
             let doc_id = "doc_ziptest01";
+            let board_id = "brd_ziptest01";
             let tree = KnowledgeTreeFile {
                 version: 1,
-                nodes: vec![KnowledgeNode {
-                    id: doc_id.into(),
-                    parent_id: None,
-                    kind: "doc".into(),
-                    title: "Hello".into(),
-                    order: 0,
-                    created_at: 1,
-                    updated_at: 1,
-                }],
+                nodes: vec![
+                    KnowledgeNode {
+                        id: doc_id.into(),
+                        parent_id: None,
+                        kind: "doc".into(),
+                        title: "Hello".into(),
+                        order: 0,
+                        created_at: 1,
+                        updated_at: 1,
+                    },
+                    KnowledgeNode {
+                        id: board_id.into(),
+                        parent_id: None,
+                        kind: "board".into(),
+                        title: "Sketch".into(),
+                        order: 1,
+                        created_at: 1,
+                        updated_at: 1,
+                    },
+                ],
             };
             write_json_file(&dir.join("tree.json"), &tree).unwrap();
             atomic_write_str(
                 &doc_path(&root, space_id, doc_id).unwrap(),
                 "![x](assets/ast_ziptest01_a.png)\n",
+            )
+            .unwrap();
+            let board_scene = r##"{"type":"excalidraw","version":2,"source":"hip","hip":{"schemaVersion":1},"elements":[{"type":"rectangle","id":"e1"}],"appState":{"viewBackgroundColor":"#ffffff"},"files":{"f1":{"id":"f1","mimeType":"image/png","created":1,"hipAssetRel":"assets/ast_ziptest01_a.png"}}}"##;
+            atomic_write_str(
+                &board_path(&root, space_id, board_id).unwrap(),
+                board_scene,
             )
             .unwrap();
             atomic_write(
@@ -2421,7 +2643,7 @@ mod tests {
             )
             .unwrap();
 
-            // Build portable zip without AppHandle (inline the same layout rules).
+            // Build portable zip without AppHandle (inline the same layout rules as export).
             let dest = base.join("out.zip");
             {
                 use std::io::Write as _;
@@ -2440,6 +2662,10 @@ mod tests {
                 zip.start_file(format!("docs/{doc_id}.md"), opts).unwrap();
                 zip.write_all(b"![x](assets/ast_ziptest01_a.png)\n")
                     .unwrap();
+                // boards/ entry (mixed doc+board portable layout)
+                zip.start_file(format!("boards/{board_id}.excalidraw"), opts)
+                    .unwrap();
+                zip.write_all(board_scene.as_bytes()).unwrap();
                 zip.start_file("assets/ast_ziptest01_a.png", opts).unwrap();
                 zip.write_all(b"fakepng").unwrap();
                 zip.finish().unwrap();
@@ -2454,6 +2680,9 @@ mod tests {
             assert!(names.iter().any(|n| n == "meta.json"));
             assert!(names.iter().any(|n| n == "tree.json"));
             assert!(names.iter().any(|n| n == &format!("docs/{doc_id}.md")));
+            assert!(names
+                .iter()
+                .any(|n| n == &format!("boards/{board_id}.excalidraw")));
             assert!(names.iter().any(|n| n == "assets/ast_ziptest01_a.png"));
             // Not the old human-readable title paths
             assert!(!names.iter().any(|n| n == "Hello.md"));
@@ -2465,6 +2694,235 @@ mod tests {
                 .read_to_string(&mut body)
                 .unwrap();
             assert!(body.contains("assets/ast_ziptest01_a.png"));
+
+            let mut board_body = String::new();
+            archive
+                .by_name(&format!("boards/{board_id}.excalidraw"))
+                .unwrap()
+                .read_to_string(&mut board_body)
+                .unwrap();
+            assert!(board_body.contains("hipAssetRel"));
+            assert!(board_body.contains("excalidraw"));
+        });
+    }
+
+    #[test]
+    fn portable_import_omits_invalid_board_keeps_valid_missing_file_empty() {
+        // Pure filter: invalid board id/prefix omitted; valid kept.
+        let nodes = vec![
+            KnowledgeNode {
+                id: "doc_importok01".into(),
+                parent_id: None,
+                kind: "doc".into(),
+                title: "D".into(),
+                order: 0,
+                created_at: 1,
+                updated_at: 1,
+            },
+            KnowledgeNode {
+                id: "brd_importok01".into(),
+                parent_id: None,
+                kind: "board".into(),
+                title: "Good".into(),
+                order: 1,
+                created_at: 1,
+                updated_at: 1,
+            },
+            KnowledgeNode {
+                id: "doc_notaboard1".into(),
+                parent_id: None,
+                kind: "board".into(),
+                title: "Bad prefix".into(),
+                order: 2,
+                created_at: 1,
+                updated_at: 1,
+            },
+            KnowledgeNode {
+                id: "brd_x".into(), // too short rest
+                parent_id: None,
+                kind: "board".into(),
+                title: "Bad id".into(),
+                order: 3,
+                created_at: 1,
+                updated_at: 1,
+            },
+            KnowledgeNode {
+                id: "nod_folder001".into(),
+                parent_id: None,
+                kind: "folder".into(),
+                title: "F".into(),
+                order: 4,
+                created_at: 1,
+                updated_at: 1,
+            },
+        ];
+        let (out, skipped) = filter_portable_import_nodes(&nodes);
+        assert_eq!(skipped, 2);
+        assert_eq!(out.len(), 3);
+        assert!(out.iter().any(|n| n.id == "brd_importok01"));
+        assert!(out.iter().any(|n| n.id == "doc_importok01"));
+        assert!(out.iter().any(|n| n.id == "nod_folder001"));
+        assert!(!out.iter().any(|n| n.id == "doc_notaboard1"));
+        assert!(!out.iter().any(|n| n.id == "brd_x"));
+
+        // Missing board file → write EMPTY scene (round-trip layout without AppHandle).
+        with_temp_root(|base| {
+            let root = base.join("knowledge");
+            let space_id = "spc_importbrd1";
+            let board_id = "brd_importok01";
+            let dir = space_dir(&root, space_id).unwrap();
+            fs::create_dir_all(dir.join("boards")).unwrap();
+            // No boards/{id}.excalidraw on source → EMPTY on dest.
+            let dest = board_path(&root, space_id, board_id).unwrap();
+            atomic_write_str(&dest, EMPTY_BOARD_SCENE_JSON).unwrap();
+            let read = fs::read_to_string(&dest).unwrap();
+            assert!(read.contains("\"source\":\"hip\""));
+            assert!(read.contains("\"elements\":[]"));
+            assert!(is_valid_import_board_node(&KnowledgeNode {
+                id: board_id.into(),
+                parent_id: None,
+                kind: "board".into(),
+                title: "G".into(),
+                order: 0,
+                created_at: 1,
+                updated_at: 1,
+            }));
+        });
+    }
+
+    #[test]
+    fn export_bytes_size_cap_and_mime() {
+        // Valid small PNG payload
+        let tiny = B64.encode(b"\x89PNG\r\n\x1a\n");
+        let ok = decode_export_bytes(&tiny, "image/png").unwrap();
+        assert_eq!(ok.len(), 8);
+
+        // mime must be image/png
+        assert!(decode_export_bytes(&tiny, "image/jpeg")
+            .unwrap_err()
+            .contains("mime"));
+
+        // oversize decoded payload
+        let over = B64.encode(vec![0u8; KNOWLEDGE_EXPORT_BYTES_MAX + 1]);
+        let err = decode_export_bytes(&over, "image/png").unwrap_err();
+        assert!(err.contains("too large"), "{err}");
+    }
+
+    #[test]
+    fn portable_zip_mixed_doc_board_roundtrip_layout() {
+        // Source folder with doc + board + asset → dest tree + files (helper-level RT).
+        with_temp_root(|base| {
+            let source = base.join("portable_src");
+            fs::create_dir_all(source.join("docs")).unwrap();
+            fs::create_dir_all(source.join("boards")).unwrap();
+            fs::create_dir_all(source.join("assets")).unwrap();
+
+            let doc_id = "doc_mixrt0001";
+            let board_id = "brd_mixrt0001";
+            let bad_board = "nod_notboard1";
+            let tree = KnowledgeTreeFile {
+                version: 1,
+                nodes: vec![
+                    KnowledgeNode {
+                        id: doc_id.into(),
+                        parent_id: None,
+                        kind: "doc".into(),
+                        title: "Note".into(),
+                        order: 0,
+                        created_at: 1,
+                        updated_at: 1,
+                    },
+                    KnowledgeNode {
+                        id: board_id.into(),
+                        parent_id: None,
+                        kind: "board".into(),
+                        title: "Sketch".into(),
+                        order: 1,
+                        created_at: 1,
+                        updated_at: 1,
+                    },
+                    KnowledgeNode {
+                        id: bad_board.into(),
+                        parent_id: None,
+                        kind: "board".into(),
+                        title: "Invalid".into(),
+                        order: 2,
+                        created_at: 1,
+                        updated_at: 1,
+                    },
+                ],
+            };
+            write_json_file(&source.join("tree.json"), &tree).unwrap();
+            fs::write(source.join("docs").join(format!("{doc_id}.md")), "# hi\n").unwrap();
+            // valid board present
+            fs::write(
+                source
+                    .join("boards")
+                    .join(format!("{board_id}.excalidraw")),
+                r#"{"type":"excalidraw","version":2,"source":"hip","elements":[{"id":"r1"}],"appState":{},"files":{}}"#,
+            )
+            .unwrap();
+            // no file for bad board (would be omitted from tree anyway)
+            fs::write(source.join("assets").join("ast_mix_a.png"), b"pngdata").unwrap();
+
+            let (filtered, skipped) = filter_portable_import_nodes(&tree.nodes);
+            assert_eq!(skipped, 1);
+            assert_eq!(filtered.len(), 2);
+            assert!(filtered.iter().any(|n| n.id == board_id));
+            assert!(!filtered.iter().any(|n| n.id == bad_board));
+
+            // Simulate import write of boards into a new space layout
+            let root = base.join("knowledge");
+            let space_id = "spc_miximport1";
+            let dir = space_dir(&root, space_id).unwrap();
+            fs::create_dir_all(dir.join("docs")).unwrap();
+            fs::create_dir_all(dir.join("boards")).unwrap();
+            fs::create_dir_all(dir.join("assets")).unwrap();
+
+            for n in &filtered {
+                if n.kind == "doc" {
+                    let body = fs::read_to_string(
+                        source.join("docs").join(format!("{}.md", n.id)),
+                    )
+                    .unwrap_or_default();
+                    atomic_write_str(&doc_path(&root, space_id, &n.id).unwrap(), &body).unwrap();
+                } else if n.kind == "board" {
+                    let src = source
+                        .join("boards")
+                        .join(format!("{}.excalidraw", n.id));
+                    let body = if src.is_file() {
+                        fs::read_to_string(&src).unwrap()
+                    } else {
+                        EMPTY_BOARD_SCENE_JSON.to_string()
+                    };
+                    atomic_write_str(&board_path(&root, space_id, &n.id).unwrap(), &body).unwrap();
+                }
+            }
+            // board missing file case
+            let missing_id = "brd_missing0001";
+            assert!(is_valid_import_board_node(&KnowledgeNode {
+                id: missing_id.into(),
+                parent_id: None,
+                kind: "board".into(),
+                title: "M".into(),
+                order: 0,
+                created_at: 1,
+                updated_at: 1,
+            }));
+            atomic_write_str(
+                &board_path(&root, space_id, missing_id).unwrap(),
+                EMPTY_BOARD_SCENE_JSON,
+            )
+            .unwrap();
+
+            let board_live =
+                fs::read_to_string(board_path(&root, space_id, board_id).unwrap()).unwrap();
+            assert!(board_live.contains("\"id\":\"r1\""));
+            let missing_live =
+                fs::read_to_string(board_path(&root, space_id, missing_id).unwrap()).unwrap();
+            assert!(missing_live.contains("\"elements\":[]"));
+            let doc_live = fs::read_to_string(doc_path(&root, space_id, doc_id).unwrap()).unwrap();
+            assert!(doc_live.contains("# hi"));
         });
     }
 

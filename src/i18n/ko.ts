@@ -2469,7 +2469,11 @@ export const ko = {
       "spaceZip": "스페이스를 ZIP으로 내보내기…",
       "docDone": "문서 내보내기 완료",
       "htmlDone": "HTML 내보내기 완료 (브라우저에서 열기; 필요 시 인쇄 → PDF 사용)",
-      "spaceDone": "스페이스 내보내기 완료 (자산 포함 이식 가능한 레이아웃)"
+      "spaceDone": "스페이스 내보내기 완료 (자산 포함 이식 가능한 레이아웃)",
+      "boardJson": "화이트보드 내보내기 (JSON)…",
+      "boardPng": "화이트보드 내보내기 (PNG)…",
+      "boardJsonDone": "화이트보드를 내보냈습니다",
+      "boardPngDone": "화이트보드 PNG를 내보냈습니다"
     },
     "import": {
       "folder": "폴더 가져오기…",

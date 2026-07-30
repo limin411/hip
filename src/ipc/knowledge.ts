@@ -155,6 +155,27 @@ export async function knowledgeDeleteBoardFile(spaceId: string, boardId: string)
   await invoke('knowledge_delete_board_file', { args: { spaceId, boardId } })
 }
 
+/** Export dehydrated hip board JSON (same as on-disk) to an absolute path. */
+export async function knowledgeExportBoard(
+  spaceId: string,
+  boardId: string,
+  destPath: string,
+): Promise<void> {
+  await invoke('knowledge_export_board', { args: { spaceId, boardId, destPath } })
+}
+
+/**
+ * Write binary export payload (v1: image/png only, raw ≤ 25MB) to an absolute path.
+ * `base64` is raw base64 without a data: prefix.
+ */
+export async function knowledgeExportBytes(
+  destPath: string,
+  base64: string,
+  mime: string,
+): Promise<void> {
+  await invoke('knowledge_export_bytes', { args: { destPath, base64, mime } })
+}
+
 export async function knowledgeExportDoc(
   spaceId: string,
   docId: string,

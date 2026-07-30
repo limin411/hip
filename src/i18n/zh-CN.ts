@@ -2512,6 +2512,10 @@ export const zhCN = {
         docDone: '文档已导出',
         htmlDone: '已导出 HTML（可用浏览器打开；打印 → PDF）',
         spaceDone: '空间已导出（便携布局，含附件）',
+        boardJson: '导出画板（JSON）…',
+        boardPng: '导出画板（PNG）…',
+        boardJsonDone: '画板已导出',
+        boardPngDone: '画板 PNG 已导出',
       },
       import: {
         folder: '导入文件夹…',

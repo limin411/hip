@@ -45,6 +45,8 @@ import {
 import { pickAttachmentFiles, pickSavePath } from '@/ipc/dialog'
 import {
   knowledgeErrorMessage,
+  knowledgeExportBoard,
+  knowledgeExportBytes,
   knowledgeExportDoc,
   knowledgeExportText,
   knowledgeExportSpaceZip,
@@ -52,6 +54,7 @@ import {
   knowledgeRevealDoc,
   knowledgeRevealPath,
 } from '@/ipc/knowledge'
+import { blobToBase64 } from '@/domain/knowledge/assetUrl'
 import { buildDocHtmlDocument } from '@/domain/knowledge/htmlExport'
 import { collectionViewDisplayName } from '@/domain/knowledge/propDisplay'
 import { diffLines } from '@/domain/knowledge/textDiff'
@@ -434,11 +437,14 @@ export function KnowledgeWorkspace() {
     void setEditorMode('source')
   }
 
+  const sanitizeExportName = (title: string, fallback: string) =>
+    title.replace(/[<>:"/\\|?*]/g, '_').slice(0, 80) || fallback
+
   const exportActiveDoc = async () => {
     if (!activeSpaceId || !activeDocId) return
     await flushSave()
     const title = activeNode?.title ?? 'document'
-    const safe = title.replace(/[<>:"/\\|?*]/g, '_').slice(0, 80) || 'document'
+    const safe = sanitizeExportName(title, 'document')
     const dest = await pickSavePath({
       defaultPath: `${safe}.md`,
       title: t('knowledge.export.doc'),
@@ -464,6 +470,55 @@ export function KnowledgeWorkspace() {
         await knowledgeExportDoc(activeSpaceId, activeDocId, dest)
         toast.success(t('knowledge.export.docDone'))
       }
+    } catch (e) {
+      toast.error(knowledgeErrorMessage(e))
+    }
+  }
+
+  /** KD-10: export dehydrated hip board JSON (same as on-disk). */
+  const exportActiveBoardJson = async () => {
+    if (!activeSpaceId || !activeDocId) return
+    // Flush canvas strokes into draft then disk before export.
+    boardCanvasRef.current?.flushToStore({ mode: 'snapshot' })
+    await flushSave()
+    const title = activeNode?.title ?? t('knowledge.board.untitled')
+    const safe = sanitizeExportName(title, 'whiteboard')
+    const dest = await pickSavePath({
+      defaultPath: `${safe}.excalidraw`,
+      title: t('knowledge.export.boardJson'),
+      filters: [{ name: 'Excalidraw', extensions: ['excalidraw'] }],
+    })
+    if (!dest) return
+    try {
+      await knowledgeExportBoard(activeSpaceId, activeDocId, dest)
+      toast.success(t('knowledge.export.boardJsonDone'))
+    } catch (e) {
+      toast.error(knowledgeErrorMessage(e))
+    }
+  }
+
+  /** KD-10: PNG via canvas exportToBlob → knowledge_export_bytes (≤25MB). */
+  const exportActiveBoardPng = async () => {
+    if (!activeSpaceId || !activeDocId) return
+    boardCanvasRef.current?.flushToStore({ mode: 'snapshot' })
+    await flushSave()
+    const title = activeNode?.title ?? t('knowledge.board.untitled')
+    const safe = sanitizeExportName(title, 'whiteboard')
+    const dest = await pickSavePath({
+      defaultPath: `${safe}.png`,
+      title: t('knowledge.export.boardPng'),
+      filters: [{ name: 'PNG', extensions: ['png'] }],
+    })
+    if (!dest) return
+    try {
+      const blob = await boardCanvasRef.current?.exportPngBlob()
+      if (!blob) {
+        toast.error(t('knowledge.board.loadFailed'))
+        return
+      }
+      const base64 = await blobToBase64(blob)
+      await knowledgeExportBytes(dest, base64, 'image/png')
+      toast.success(t('knowledge.export.boardPngDone'))
     } catch (e) {
       toast.error(knowledgeErrorMessage(e))
     }
@@ -938,6 +993,36 @@ export function KnowledgeWorkspace() {
               />
               {saveState === 'saving' ? t('knowledge.doc.saving') : t('knowledge.doc.saved')}
             </span>
+          )}
+          {activeDocId && isBoard && (
+            <DropdownMenu modal={false}>
+              <DropdownMenuTrigger asChild>
+                <button
+                  type="button"
+                  className="rounded-md p-1.5 text-ink-tertiary hover:bg-state-hover hover:text-ink"
+                  aria-label={t('knowledge.space.menu')}
+                  data-testid="knowledge-board-menu"
+                >
+                  <MoreHorizontal size={16} />
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem
+                  data-testid="knowledge-export-board-json"
+                  onClick={() => void exportActiveBoardJson()}
+                >
+                  <Download size={14} />
+                  {t('knowledge.export.boardJson')}
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  data-testid="knowledge-export-board-png"
+                  onClick={() => void exportActiveBoardPng()}
+                >
+                  <Download size={14} />
+                  {t('knowledge.export.boardPng')}
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           )}
           {activeDocId && !isBoard && (
             /* modal={false}: modal menu + version-history / save-as-template Modal both lock

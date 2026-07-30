@@ -52,6 +52,8 @@ describe('knowledge IPC', () => {
       knowledgeReadBoard,
       knowledgeWriteBoard,
       knowledgeDeleteBoardFile,
+      knowledgeExportBoard,
+      knowledgeExportBytes,
     } = await import('./knowledge.js')
 
     invoke.mockResolvedValueOnce('{"type":"excalidraw"}')
@@ -71,6 +73,22 @@ describe('knowledge IPC', () => {
     await knowledgeDeleteBoardFile('spc_1', 'brd_abc123def456')
     expect(invoke).toHaveBeenCalledWith('knowledge_delete_board_file', {
       args: { spaceId: 'spc_1', boardId: 'brd_abc123def456' },
+    })
+
+    invoke.mockResolvedValueOnce(undefined)
+    await knowledgeExportBoard('spc_1', 'brd_abc123def456', '/tmp/board.excalidraw')
+    expect(invoke).toHaveBeenCalledWith('knowledge_export_board', {
+      args: {
+        spaceId: 'spc_1',
+        boardId: 'brd_abc123def456',
+        destPath: '/tmp/board.excalidraw',
+      },
+    })
+
+    invoke.mockResolvedValueOnce(undefined)
+    await knowledgeExportBytes('/tmp/board.png', 'aGVsbG8=', 'image/png')
+    expect(invoke).toHaveBeenCalledWith('knowledge_export_bytes', {
+      args: { destPath: '/tmp/board.png', base64: 'aGVsbG8=', mime: 'image/png' },
     })
   })
 

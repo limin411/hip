@@ -2476,7 +2476,11 @@ export const zhTW = {
       "spaceZip": "匯出空間為 ZIP…",
       "docDone": "文件已匯出",
       "htmlDone": "已匯出 HTML（可用瀏覽器開啟；列印 → PDF）",
-      "spaceDone": "空間已匯出（可攜佈局，含附件）"
+      "spaceDone": "空間已匯出（可攜佈局，含附件）",
+      "boardJson": "匯出畫板（JSON）…",
+      "boardPng": "匯出畫板（PNG）…",
+      "boardJsonDone": "畫板已匯出",
+      "boardPngDone": "畫板 PNG 已匯出"
     },
     "import": {
       "folder": "匯入資料夾…",

@@ -33,6 +33,7 @@ import { inputClassName } from '@/components/ui/Input'
 import { textareaClassName } from '@/components/ui/Textarea'
 import { Skeleton, SkeletonText } from '@/components/ui/Skeleton'
 import { cn } from '@/lib/utils'
+import { SETTINGS_SHELL_PAGE, useUiStore } from '@/store/uiStore'
 
 const inputCls = inputClassName
 
@@ -107,12 +108,15 @@ export function MemoryConfig() {
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [listStatus, setListStatus] = useState<MemoryStatus>('active')
-  const [editing, setEditing] = useState<MemoryItem | null>(null)
+  const settingsShellRoute = useUiStore((s) => s.settingsShellRoute)
+  const setSettingsShellRoute = useUiStore((s) => s.setSettingsShellRoute)
+  const memoryEditRoute =
+    settingsShellRoute.type === 'memory-edit' ? settingsShellRoute : null
+  const isAdding = memoryEditRoute != null && memoryEditRoute.memoryId == null
   const [editTitle, setEditTitle] = useState('')
   const [editContent, setEditContent] = useState('')
   const [deleting, setDeleting] = useState<MemoryItem | null>(null)
   const [confirmEmptyTrash, setConfirmEmptyTrash] = useState(false)
-  const [adding, setAdding] = useState(false)
   const [addTitle, setAddTitle] = useState('')
   const [addContent, setAddContent] = useState('')
   const [addKind, setAddKind] = useState<MemoryKind>('preference')
@@ -264,14 +268,29 @@ export function MemoryConfig() {
     }
   }
 
-  const openEdit = (item: MemoryItem) => {
-    setEditing(item)
-    setEditTitle(item.title)
-    setEditContent(item.content)
+  const openAdd = () => {
+    setAddTitle('')
+    setAddContent('')
+    setAddKind('preference')
+    setAddScope('global')
+    setSettingsShellRoute({ type: 'memory-edit' })
   }
 
+  const openEdit = (item: MemoryItem) => {
+    setEditTitle(item.title)
+    setEditContent(item.content)
+    setSettingsShellRoute({ type: 'memory-edit', memoryId: item.id })
+  }
+
+  const closeMemoryEditor = () => setSettingsShellRoute(SETTINGS_SHELL_PAGE)
+
+  const editingItem =
+    memoryEditRoute?.memoryId != null
+      ? (items.find((it) => it.id === memoryEditRoute.memoryId) ?? null)
+      : null
+
   const onSaveEdit = async () => {
-    if (!editing) return
+    if (!editingItem) return
     const title = editTitle.trim()
     const content = editContent.trim()
     if (!title || !content) return
@@ -279,15 +298,15 @@ export function MemoryConfig() {
     setError(null)
     try {
       const updated = await sessionService.upsertMemory({
-        id: editing.id,
+        id: editingItem.id,
         title,
         content,
-        kind: editing.kind,
-        scope: editing.scope,
-        pinned: editing.pinned,
+        kind: editingItem.kind,
+        scope: editingItem.scope,
+        pinned: editingItem.pinned,
       })
       setItems((prev) => prev.map((it) => (it.id === updated.id ? updated : it)))
-      setEditing(null)
+      closeMemoryEditor()
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e))
     } finally {
@@ -309,7 +328,7 @@ export function MemoryConfig() {
         scope: addScope,
         source: 'user',
       })
-      setAdding(false)
+      closeMemoryEditor()
       setAddTitle('')
       setAddContent('')
       setAddKind('preference')
@@ -585,6 +604,145 @@ export function MemoryConfig() {
     )
   }
 
+  // In-shell L2: memory add/edit replaces list body (no second Modal).
+  if (isAdding) {
+    return (
+      <div className="flex h-full min-h-0 flex-col" data-testid="settings-memory-editor">
+        <div className="flex h-12 shrink-0 items-center border-b border-border px-5">
+          <h2 className="text-title font-semibold tracking-tight text-ink">
+            {t('settings.memory.addTitle')}
+          </h2>
+        </div>
+        <div className="min-h-0 flex-1 overflow-y-auto">
+          <div className="space-y-3 p-5" data-testid="memory-add-modal">
+            <p className="text-meta text-ink-tertiary">{t('settings.memory.addHint')}</p>
+            <div>
+              <label className="mb-1.5 block text-meta text-ink-tertiary" htmlFor="memory-add-title">
+                {t('settings.memory.fieldTitle')}
+              </label>
+              <input
+                id="memory-add-title"
+                className={inputCls}
+                value={addTitle}
+                data-testid="memory-add-title"
+                placeholder={t('settings.memory.addTitlePlaceholder')}
+                onChange={(e) => setAddTitle(e.target.value)}
+              />
+            </div>
+            <div>
+              <label className="mb-1.5 block text-meta text-ink-tertiary" htmlFor="memory-add-content">
+                {t('settings.memory.fieldContent')}
+              </label>
+              <textarea
+                id="memory-add-content"
+                className={textareaCls}
+                value={addContent}
+                data-testid="memory-add-content"
+                placeholder={t('settings.memory.addContentPlaceholder')}
+                onChange={(e) => setAddContent(e.target.value)}
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              <label className="block text-meta text-ink-tertiary">
+                {t('settings.memory.fieldKind')}
+                <select
+                  className={cn(inputCls, 'mt-1')}
+                  value={addKind}
+                  data-testid="memory-add-kind"
+                  onChange={(e) => setAddKind(e.target.value as MemoryKind)}
+                >
+                  {KIND_OPTIONS.map((k) => (
+                    <option key={k} value={k}>
+                      {t(`settings.memory.kind.${k}`)}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className="block text-meta text-ink-tertiary">
+                {t('settings.memory.fieldScope')}
+                <select
+                  className={cn(inputCls, 'mt-1')}
+                  value={addScope}
+                  data-testid="memory-add-scope"
+                  onChange={(e) => setAddScope(e.target.value as MemoryScope)}
+                >
+                  <option value="global">{t('settings.memory.scope.global')}</option>
+                  <option value="project">{t('settings.memory.scope.project')}</option>
+                </select>
+              </label>
+            </div>
+          </div>
+        </div>
+        <div className="flex shrink-0 justify-end gap-2 border-t border-border bg-surface-subtle/80 px-5 py-3">
+          <Button variant="ghost" size="sm" onClick={closeMemoryEditor}>
+            {t('common.cancel')}
+          </Button>
+          <Button
+            size="sm"
+            disabled={busy || !addTitle.trim() || !addContent.trim()}
+            data-testid="memory-add-save"
+            onClick={() => void onSaveAdd()}
+          >
+            {t('settings.memory.save')}
+          </Button>
+        </div>
+      </div>
+    )
+  }
+
+  if (editingItem) {
+    return (
+      <div className="flex h-full min-h-0 flex-col" data-testid="settings-memory-editor">
+        <div className="flex h-12 shrink-0 items-center border-b border-border px-5">
+          <h2 className="text-title font-semibold tracking-tight text-ink">
+            {t('settings.memory.editTitle')}
+          </h2>
+        </div>
+        <div className="min-h-0 flex-1 overflow-y-auto">
+          <div className="space-y-3 p-5">
+            <div>
+              <label className="mb-1.5 block text-meta text-ink-tertiary" htmlFor="memory-edit-title">
+                {t('settings.memory.fieldTitle')}
+              </label>
+              <input
+                id="memory-edit-title"
+                className={inputCls}
+                value={editTitle}
+                data-testid="memory-edit-title"
+                onChange={(e) => setEditTitle(e.target.value)}
+              />
+            </div>
+            <div>
+              <label className="mb-1.5 block text-meta text-ink-tertiary" htmlFor="memory-edit-content">
+                {t('settings.memory.fieldContent')}
+              </label>
+              <textarea
+                id="memory-edit-content"
+                className={textareaCls}
+                value={editContent}
+                data-testid="memory-edit-content"
+                onChange={(e) => setEditContent(e.target.value)}
+              />
+            </div>
+          </div>
+        </div>
+        <div className="flex shrink-0 justify-end gap-2 border-t border-border bg-surface-subtle/80 px-5 py-3">
+          <Button variant="ghost" size="sm" onClick={closeMemoryEditor}>
+            {t('common.cancel')}
+          </Button>
+          <Button
+            size="sm"
+            disabled={busy || !editTitle.trim() || !editContent.trim()}
+            data-testid="memory-edit-save"
+            onClick={() => void onSaveEdit()}
+          >
+            {t('settings.memory.save')}
+          </Button>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className={rootCls} data-testid="memory-config">
       {/* Header */}
@@ -745,7 +903,7 @@ export function MemoryConfig() {
                 size="sm"
                 disabled={busy}
                 data-testid="memory-add"
-                onClick={() => setAdding(true)}
+                onClick={openAdd}
               >
                 <Plus size={14} />
                 {t('settings.memory.add')}
@@ -837,7 +995,7 @@ export function MemoryConfig() {
             </p>
             {!isTrash && (
               <div className="mt-3 flex flex-wrap justify-center gap-2">
-                <Button size="sm" disabled={busy} onClick={() => setAdding(true)} data-testid="memory-add-empty">
+                <Button size="sm" disabled={busy} onClick={openAdd} data-testid="memory-add-empty">
                   <Plus size={14} />
                   {t('settings.memory.add')}
                 </Button>
@@ -1193,149 +1351,14 @@ export function MemoryConfig() {
         )}
       </section>
 
-      {/* Add modal */}
-      {adding && (
-        <Modal
-          open
-          onOpenChange={(o) => {
-            if (!o) setAdding(false)
-          }}
-          title={t('settings.memory.addTitle')}
-          className="max-w-md"
-        >
-          <div className="space-y-3 p-5" data-testid="memory-add-modal">
-            <p className="text-meta text-ink-tertiary">{t('settings.memory.addHint')}</p>
-            <div>
-              <label className="mb-1.5 block text-meta text-ink-tertiary" htmlFor="memory-add-title">
-                {t('settings.memory.fieldTitle')}
-              </label>
-              <input
-                id="memory-add-title"
-                className={inputCls}
-                value={addTitle}
-                data-testid="memory-add-title"
-                placeholder={t('settings.memory.addTitlePlaceholder')}
-                onChange={(e) => setAddTitle(e.target.value)}
-              />
-            </div>
-            <div>
-              <label className="mb-1.5 block text-meta text-ink-tertiary" htmlFor="memory-add-content">
-                {t('settings.memory.fieldContent')}
-              </label>
-              <textarea
-                id="memory-add-content"
-                className={textareaCls}
-                value={addContent}
-                data-testid="memory-add-content"
-                placeholder={t('settings.memory.addContentPlaceholder')}
-                onChange={(e) => setAddContent(e.target.value)}
-              />
-            </div>
-            <div className="grid grid-cols-2 gap-2">
-              <label className="block text-meta text-ink-tertiary">
-                {t('settings.memory.fieldKind')}
-                <select
-                  className={cn(inputCls, 'mt-1')}
-                  value={addKind}
-                  data-testid="memory-add-kind"
-                  onChange={(e) => setAddKind(e.target.value as MemoryKind)}
-                >
-                  {KIND_OPTIONS.map((k) => (
-                    <option key={k} value={k}>
-                      {t(`settings.memory.kind.${k}`)}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <label className="block text-meta text-ink-tertiary">
-                {t('settings.memory.fieldScope')}
-                <select
-                  className={cn(inputCls, 'mt-1')}
-                  value={addScope}
-                  data-testid="memory-add-scope"
-                  onChange={(e) => setAddScope(e.target.value as MemoryScope)}
-                >
-                  <option value="global">{t('settings.memory.scope.global')}</option>
-                  <option value="project">{t('settings.memory.scope.project')}</option>
-                </select>
-              </label>
-            </div>
-            <div className="flex justify-end gap-2 pt-1">
-              <Button variant="ghost" size="sm" onClick={() => setAdding(false)}>
-                {t('common.cancel')}
-              </Button>
-              <Button
-                size="sm"
-                disabled={busy || !addTitle.trim() || !addContent.trim()}
-                data-testid="memory-add-save"
-                onClick={() => void onSaveAdd()}
-              >
-                {t('settings.memory.save')}
-              </Button>
-            </div>
-          </div>
-        </Modal>
-      )}
-
-      {editing && (
-        <Modal
-          open
-          onOpenChange={(o) => {
-            if (!o) setEditing(null)
-          }}
-          title={t('settings.memory.editTitle')}
-          className="max-w-md"
-        >
-          <div className="space-y-3 p-5">
-            <div>
-              <label className="mb-1.5 block text-meta text-ink-tertiary" htmlFor="memory-edit-title">
-                {t('settings.memory.fieldTitle')}
-              </label>
-              <input
-                id="memory-edit-title"
-                className={inputCls}
-                value={editTitle}
-                data-testid="memory-edit-title"
-                onChange={(e) => setEditTitle(e.target.value)}
-              />
-            </div>
-            <div>
-              <label className="mb-1.5 block text-meta text-ink-tertiary" htmlFor="memory-edit-content">
-                {t('settings.memory.fieldContent')}
-              </label>
-              <textarea
-                id="memory-edit-content"
-                className={textareaCls}
-                value={editContent}
-                data-testid="memory-edit-content"
-                onChange={(e) => setEditContent(e.target.value)}
-              />
-            </div>
-            <div className="flex justify-end gap-2 pt-1">
-              <Button variant="ghost" size="sm" onClick={() => setEditing(null)}>
-                {t('common.cancel')}
-              </Button>
-              <Button
-                size="sm"
-                disabled={busy || !editTitle.trim() || !editContent.trim()}
-                data-testid="memory-edit-save"
-                onClick={() => void onSaveEdit()}
-              >
-                {t('settings.memory.save')}
-              </Button>
-            </div>
-          </div>
-        </Modal>
-      )}
-
       {deleting && (
         <Modal
           open
+          variant="confirm"
           onOpenChange={(o) => {
             if (!o) setDeleting(null)
           }}
           title={t('settings.memory.deleteConfirmTitle')}
-          className="max-w-sm"
         >
           <div className="p-5">
             <p className="text-body text-ink-secondary">
@@ -1362,11 +1385,11 @@ export function MemoryConfig() {
       {confirmEmptyTrash && (
         <Modal
           open
+          variant="confirm"
           onOpenChange={(o) => {
             if (!o) setConfirmEmptyTrash(false)
           }}
           title={t('settings.memory.emptyTrashConfirmTitle')}
-          className="max-w-sm"
         >
           <div className="p-5">
             <p className="text-body text-ink-secondary">{t('settings.memory.emptyTrashConfirmBody')}</p>
@@ -1391,11 +1414,11 @@ export function MemoryConfig() {
       {needEmbedOpen && (
         <Modal
           open
+          variant="confirm"
           onOpenChange={(o) => {
             if (!o) setNeedEmbedOpen(false)
           }}
           title={t('settings.memory.hybridNeedsEmbeddingTitle')}
-          className="max-w-sm"
         >
           <div className="p-5" data-testid="memory-need-embed-modal">
             <p className="text-body text-ink-secondary">{t('settings.memory.hybridNeedsEmbeddingBody')}</p>

@@ -28,11 +28,14 @@ export function AgentEditor({
   initialKind,
   onSave,
   onCancel,
+  mode = 'inline',
 }: {
   initial: AgentConfig | null
   initialKind?: AgentConfig['kind']
   onSave: (draft: Omit<AgentConfig, 'id'>) => Promise<void>
   onCancel: () => void
+  /** `inline` = in-shell Settings L2 (default). `modal` = legacy portaled Task dialog. */
+  mode?: 'modal' | 'inline'
 }) {
   const { t } = useTranslation()
   const { config, catalog, keyConfigured } = useProvidersStore()
@@ -318,6 +321,27 @@ export function AgentEditor({
     </div>
   )
 
+  const body = isPickStep ? (
+    <div className="p-5 sm:p-6">
+      <AcpProviderPicker checked={detectionChecked} installed={installed} agents={agents} onPick={pickPreset} onRefresh={() => void refreshDetection()} />
+    </div>
+  ) : (
+    formBody
+  )
+  const footer = isPickStep ? pickFooter : formFooter
+
+  if (mode === 'inline') {
+    return (
+      <div className="flex h-full min-h-0 flex-col" data-testid="settings-agent-editor">
+        <div className="flex h-12 shrink-0 items-center border-b border-border px-5">
+          <h2 className="text-title font-semibold tracking-tight text-ink">{title}</h2>
+        </div>
+        <div className="min-h-0 flex-1 overflow-y-auto">{body}</div>
+        <div className="shrink-0 border-t border-border bg-surface-subtle/80 px-5 py-3">{footer}</div>
+      </div>
+    )
+  }
+
   return (
     <Modal
       open
@@ -325,16 +349,12 @@ export function AgentEditor({
         if (!o) onCancel()
       }}
       title={title}
+      variant="task"
+      nested
       className={isPickStep || isInternal ? 'max-w-2xl' : undefined}
-      footer={isPickStep ? pickFooter : formFooter}
+      footer={footer}
     >
-      {isPickStep ? (
-        <div className="p-5 sm:p-6">
-          <AcpProviderPicker checked={detectionChecked} installed={installed} agents={agents} onPick={pickPreset} onRefresh={() => void refreshDetection()} />
-        </div>
-      ) : (
-        formBody
-      )}
+      {body}
     </Modal>
   )
 }

@@ -763,13 +763,17 @@ export function PluginViewModal({
   plugin,
   onClose,
   t,
+  mode = 'inline',
 }: {
   plugin: PluginMeta
   onClose: () => void
   t: Translate
+  /** `inline` = in-shell Settings L2 (default). `modal` = legacy portaled Task dialog. */
+  mode?: 'modal' | 'inline'
 }) {
   const [body, setBody] = useState<string | null>(null)
   const [docError, setDocError] = useState(false)
+  const title = t('settings.plugins.viewTitle', { name: plugin.name })
 
   useEffect(() => {
     let live = true
@@ -806,91 +810,108 @@ export function PluginViewModal({
     ? body.replace(/^---\r?\n[\s\S]*?\r?\n---\r?\n?/, '').trim()
     : null
 
+  const content = (
+    <div className="space-y-4 p-6" data-testid="plugin-view-modal">
+      <div className="flex flex-wrap items-center gap-2 text-meta text-ink-tertiary">
+        <span>{plugin.version}</span>
+        {plugin.author && <span>· {plugin.author}</span>}
+        {plugin.license && <span>· {plugin.license}</span>}
+        <span
+          className={
+            plugin.enabled
+              ? 'rounded bg-success/10 px-1.5 py-0.5 text-success'
+              : 'rounded bg-surface-muted px-1.5 py-0.5'
+          }
+        >
+          {plugin.enabled ? t('settings.plugins.statusEnabled') : t('settings.plugins.statusDisabled')}
+        </span>
+      </div>
+
+      {plugin.description && (
+        <p className="text-body text-ink-secondary">{plugin.description}</p>
+      )}
+
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+        <ComponentList
+          title={t('settings.plugins.skillsSection')}
+          items={plugin.skills}
+          empty={t('settings.plugins.none')}
+        />
+        <ComponentList
+          title={t('settings.plugins.mcpSection')}
+          items={plugin.mcpServers.map((s) => s.name || s.id)}
+          empty={t('settings.plugins.none')}
+        />
+        <ComponentList
+          title={t('settings.plugins.agentsSection')}
+          items={plugin.agents}
+          empty={t('settings.plugins.none')}
+        />
+        <ComponentList
+          title={t('settings.plugins.hooksSection')}
+          items={
+            plugin.hookEvents.length > 0
+              ? plugin.hookEvents
+              : plugin.hookCount > 0
+                ? [t('settings.plugins.hookCountOnly', { count: plugin.hookCount })]
+                : []
+          }
+          empty={t('settings.plugins.none')}
+        />
+      </div>
+
+      {plugin.dir && (
+        <div className="break-all text-caption text-ink-tertiary">
+          {t('settings.plugins.pathLabel')}: {plugin.dir}
+        </div>
+      )}
+
+      {plugin.hasPluginMd && (
+        <div className="border-t border-border pt-4">
+          <h3 className="mb-2 text-meta font-medium text-ink-secondary">
+            {t('settings.plugins.docSection')}
+          </h3>
+          {docError ? (
+            <div className="flex items-center gap-2 text-body text-danger">
+              <FileText size={16} /> {t('settings.plugins.loadError')}
+            </div>
+          ) : displayBody === null ? (
+            <div className="text-body text-ink-tertiary">…</div>
+          ) : displayBody === '' ? (
+            <div className="text-meta text-ink-tertiary">{t('settings.plugins.noDocBody')}</div>
+          ) : (
+            <MarkdownBody content={displayBody} components={markdownComponents} />
+          )}
+        </div>
+      )}
+    </div>
+  )
+
+  if (mode === 'inline') {
+    return (
+      <div className="flex h-full min-h-0 flex-col" data-testid="settings-plugin-view">
+        <div className="flex h-12 shrink-0 items-center border-b border-border px-5">
+          <h2 className="text-title font-semibold tracking-tight text-ink">{title}</h2>
+        </div>
+        <div className="min-h-0 flex-1 overflow-y-auto">{content}</div>
+      </div>
+    )
+  }
+
   return (
     <Modal
       open
+      variant="task"
+      nested
       onOpenChange={(o) => {
         if (!o) onClose()
       }}
-      title={t('settings.plugins.viewTitle', { name: plugin.name })}
+      title={title}
       resizable
       storageKey="plugin-view"
       className="max-w-2xl"
     >
-      <div className="space-y-4 p-6" data-testid="plugin-view-modal">
-        <div className="flex flex-wrap items-center gap-2 text-meta text-ink-tertiary">
-          <span>{plugin.version}</span>
-          {plugin.author && <span>· {plugin.author}</span>}
-          {plugin.license && <span>· {plugin.license}</span>}
-          <span
-            className={
-              plugin.enabled
-                ? 'rounded bg-success/10 px-1.5 py-0.5 text-success'
-                : 'rounded bg-surface-muted px-1.5 py-0.5'
-            }
-          >
-            {plugin.enabled ? t('settings.plugins.statusEnabled') : t('settings.plugins.statusDisabled')}
-          </span>
-        </div>
-
-        {plugin.description && (
-          <p className="text-body text-ink-secondary">{plugin.description}</p>
-        )}
-
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-          <ComponentList
-            title={t('settings.plugins.skillsSection')}
-            items={plugin.skills}
-            empty={t('settings.plugins.none')}
-          />
-          <ComponentList
-            title={t('settings.plugins.mcpSection')}
-            items={plugin.mcpServers.map((s) => s.name || s.id)}
-            empty={t('settings.plugins.none')}
-          />
-          <ComponentList
-            title={t('settings.plugins.agentsSection')}
-            items={plugin.agents}
-            empty={t('settings.plugins.none')}
-          />
-          <ComponentList
-            title={t('settings.plugins.hooksSection')}
-            items={
-              plugin.hookEvents.length > 0
-                ? plugin.hookEvents
-                : plugin.hookCount > 0
-                  ? [t('settings.plugins.hookCountOnly', { count: plugin.hookCount })]
-                  : []
-            }
-            empty={t('settings.plugins.none')}
-          />
-        </div>
-
-        {plugin.dir && (
-          <div className="break-all text-caption text-ink-tertiary">
-            {t('settings.plugins.pathLabel')}: {plugin.dir}
-          </div>
-        )}
-
-        {plugin.hasPluginMd && (
-          <div className="border-t border-border pt-4">
-            <h3 className="mb-2 text-meta font-medium text-ink-secondary">
-              {t('settings.plugins.docSection')}
-            </h3>
-            {docError ? (
-              <div className="flex items-center gap-2 text-body text-danger">
-                <FileText size={16} /> {t('settings.plugins.loadError')}
-              </div>
-            ) : displayBody === null ? (
-              <div className="text-body text-ink-tertiary">…</div>
-            ) : displayBody === '' ? (
-              <div className="text-meta text-ink-tertiary">{t('settings.plugins.noDocBody')}</div>
-            ) : (
-              <MarkdownBody content={displayBody} components={markdownComponents} />
-            )}
-          </div>
-        )}
-      </div>
+      {content}
     </Modal>
   )
 }

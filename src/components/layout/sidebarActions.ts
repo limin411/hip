@@ -269,6 +269,8 @@ export function openSettingsOverlay(
   } else if (opts?.resetToGeneral !== false) {
     ui.setSettingsPage('general')
   }
+  // Always land on category page (pop any leftover L2 editor).
+  ui.setSettingsShellRoute({ type: 'page' })
   ui.setOverlay('settings')
 }
 

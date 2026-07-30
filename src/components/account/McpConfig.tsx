@@ -24,6 +24,7 @@ import type {
   PluginMeta,
 } from '@hip/protocol'
 import { useHipConfigStore, useMcpServers } from '@/store/hipConfigStore'
+import { SETTINGS_SHELL_PAGE, useUiStore } from '@/store/uiStore'
 import {
   filterMcpRegistryEntries,
   overlayMcpInstallState,
@@ -65,12 +66,6 @@ import { useExtensionStore } from '@/store/extensionStore'
 import { derivePluginMcpFromSnapshot } from '@/lib/extensionSnapshot'
 
 const inputCls = inputClassName
-
-type Editing =
-  | { mode: 'add' }
-  | { mode: 'edit'; server: McpServerConfig }
-  | { mode: 'install'; initial: McpServerConfig }
-  | null
 
 /** Pure helper: map status to status indicator emoji. */
 export function statusEmoji(status: McpServerStatusVM['status']): string {
@@ -234,10 +229,14 @@ export function McpConfig() {
   const snapshot = useExtensionStore((s) => s.snapshot)
   const mcpStatuses = useMcpStatuses()
   const market = useMcpRegistryStore()
-  const [editing, setEditing] = useState<Editing>(null)
+  const settingsShellRoute = useUiStore((s) => s.settingsShellRoute)
+  const setSettingsShellRoute = useUiStore((s) => s.setSettingsShellRoute)
   const [deleting, setDeleting] = useState<McpServerConfig | null>(null)
   const [sourcesOpen, setSourcesOpen] = useState(false)
   const [marketError, setMarketError] = useState<string | null>(null)
+
+  const mcpEditRoute =
+    settingsShellRoute.type === 'mcp-edit' ? settingsShellRoute : null
 
   const addServer = async (s: Omit<McpServerConfig, 'id'>) => {
     await updateSection('mcpServers', (prev) => [...(prev ?? []), { ...s, id: nanoid() }])
@@ -404,7 +403,7 @@ export function McpConfig() {
       registrySourceId: draft.registrySourceId,
       registryVersion: draft.registryVersion,
     }
-    setEditing({ mode: 'install', initial })
+    setSettingsShellRoute({ type: 'mcp-edit', installInitial: initial })
   }
 
   const handleMarketUninstall = (entry: McpRegistryEntry) => {
@@ -448,6 +447,57 @@ export function McpConfig() {
     return items
   }, [marketSources, servers.length, t])
 
+  // In-shell L2: MCP add/edit/install replaces list body (no second Modal).
+  if (mcpEditRoute) {
+    const editServer =
+      mcpEditRoute.serverId != null
+        ? (servers.find((s) => s.id === mcpEditRoute.serverId) ?? null)
+        : null
+    const initial =
+      editServer ?? mcpEditRoute.installInitial ?? null
+    const isInstall = !editServer && mcpEditRoute.installInitial != null
+    return (
+      <div className="flex h-full min-h-0 flex-col" data-testid="mcp-config">
+        <McpServerEditor
+          mode="inline"
+          initial={initial}
+          status={editServer ? statusByServer.get(editServer.id) : undefined}
+          onCancel={() => setSettingsShellRoute(SETTINGS_SHELL_PAGE)}
+          onSave={async (draft) => {
+            if (editServer) {
+              await updateServer(editServer.id, {
+                ...draft,
+                registryName: editServer.registryName,
+                registrySourceId: editServer.registrySourceId,
+                registryVersion: editServer.registryVersion,
+              })
+            } else if (isInstall && mcpEditRoute.installInitial) {
+              await addServer({
+                ...draft,
+                registryName: mcpEditRoute.installInitial.registryName,
+                registrySourceId: mcpEditRoute.installInitial.registrySourceId,
+                registryVersion: mcpEditRoute.installInitial.registryVersion,
+              })
+            } else {
+              await addServer(draft)
+            }
+            setSettingsShellRoute(SETTINGS_SHELL_PAGE)
+          }}
+        />
+        {deleting && (
+          <DeleteServerDialog
+            server={deleting}
+            onCancel={() => setDeleting(null)}
+            onConfirm={async () => {
+              await removeServer(deleting.id)
+              setDeleting(null)
+            }}
+          />
+        )}
+      </div>
+    )
+  }
+
   return (
     // overflow-hidden: keep header chrome (管理源 / refresh) pinned; only the card
     // list scrolls. Side-by-side title+actions used to clip/wrap off-screen when the
@@ -483,7 +533,7 @@ export function McpConfig() {
                 variant="primary"
                 size="sm"
                 className="gap-1.5"
-                onClick={() => setEditing({ mode: 'add' })}
+                onClick={() => setSettingsShellRoute({ type: 'mcp-edit' })}
               >
                 <Plus size={14} />
                 {t('settings.mcp.add')}
@@ -602,7 +652,7 @@ export function McpConfig() {
                   <div className="mt-2 grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
                     {servers.length === 0 ? (
                       <button
-                        onClick={() => setEditing({ mode: 'add' })}
+                        onClick={() => setSettingsShellRoute({ type: 'mcp-edit' })}
                         className="col-span-full flex w-full flex-col items-center justify-center gap-2 rounded-xl border border-dashed border-border py-8 text-body font-medium text-accent-strong transition-colors hover:bg-state-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink/20"
                       >
                         <Plug size={24} />
@@ -627,7 +677,7 @@ export function McpConfig() {
                             onToggle={async (enabled) => {
                               await updateServer(s.id, { enabled })
                             }}
-                            onEdit={() => setEditing({ mode: 'edit', server: s })}
+                            onEdit={() => setSettingsShellRoute({ type: 'mcp-edit', serverId: s.id })}
                             onDelete={() => setDeleting(s)}
                             onToggleTool={async (toolName) => {
                               await handleUpdateTools(s, toolName)
@@ -730,40 +780,6 @@ export function McpConfig() {
           )}
         </div>
       </div>
-
-      {editing && (
-        <McpServerEditor
-          initial={
-            editing.mode === 'edit'
-              ? editing.server
-              : editing.mode === 'install'
-                ? editing.initial
-                : null
-          }
-          status={editing.mode === 'edit' ? statusByServer.get(editing.server.id) : undefined}
-          onCancel={() => setEditing(null)}
-          onSave={async (draft) => {
-            if (editing.mode === 'edit') {
-              await updateServer(editing.server.id, {
-                ...draft,
-                registryName: editing.server.registryName,
-                registrySourceId: editing.server.registrySourceId,
-                registryVersion: editing.server.registryVersion,
-              })
-            } else if (editing.mode === 'install') {
-              await addServer({
-                ...draft,
-                registryName: editing.initial.registryName,
-                registrySourceId: editing.initial.registrySourceId,
-                registryVersion: editing.initial.registryVersion,
-              })
-            } else {
-              await addServer(draft)
-            }
-            setEditing(null)
-          }}
-        />
-      )}
 
       {deleting && (
         <DeleteServerDialog
@@ -1426,16 +1442,19 @@ function ActionButton({
   )
 }
 
-function McpServerEditor({
+export function McpServerEditor({
   initial,
   status,
   onSave,
   onCancel,
+  mode = 'inline',
 }: {
   initial: McpServerConfig | null
   status?: McpServerStatusVM
   onSave: (draft: Omit<McpServerConfig, 'id'>) => Promise<void>
   onCancel: () => void
+  /** `inline` = in-shell Settings L2 (default). `modal` = legacy portaled Task dialog. */
+  mode?: 'modal' | 'inline'
 }) {
   const { t } = useTranslation()
   const [form, setForm] = useState<McpForm>(initial ? mcpConfigToForm(initial) : EMPTY_MCP_FORM)
@@ -1444,6 +1463,7 @@ function McpServerEditor({
 
   const patch = (p: Partial<McpForm>) => setForm((f) => ({ ...f, ...p }))
   const isStdio = form.transport === 'stdio'
+  const title = initial ? t('settings.mcp.editTitle') : t('settings.mcp.addTitle')
 
   const submit = async () => {
     setBusy(true)
@@ -1481,79 +1501,97 @@ function McpServerEditor({
     </div>
   )
 
+  const body = (
+    <div className="space-y-5 p-5">
+      <Field label={t('settings.mcp.name')}>
+        <input className={inputCls} value={form.name} onChange={(e) => patch({ name: e.target.value })} placeholder={t('settings.mcp.namePlaceholder')} />
+      </Field>
+
+      <Section label={t('settings.mcp.sectionTransport')}>
+        <div role="radiogroup" aria-label={t('settings.mcp.sectionTransport')} className="flex flex-col gap-2">
+          <ChoiceCard selected={form.transport === 'stdio'} title={t('settings.mcp.transportStdio')} desc={t('settings.mcp.transportStdioDesc')} onClick={() => patch({ transport: 'stdio' })} />
+          <ChoiceCard selected={form.transport === 'sse'} title={t('settings.mcp.transportSse')} desc={t('settings.mcp.transportSseDesc')} onClick={() => patch({ transport: 'sse' })} />
+          <ChoiceCard selected={form.transport === 'http'} title={t('settings.mcp.transportHttp')} desc={t('settings.mcp.transportHttpDesc')} onClick={() => patch({ transport: 'http' })} />
+        </div>
+      </Section>
+
+      {isStdio ? (
+        <Section label={t('settings.mcp.sectionCommand')}>
+          <Field label={t('settings.mcp.command')}>
+            <input className={cn(inputCls, 'font-mono')} value={form.command} onChange={(e) => patch({ command: e.target.value })} placeholder={t('settings.mcp.commandPlaceholder')} />
+          </Field>
+          <Field label={t('settings.mcp.args')}>
+            <input className={cn(inputCls, 'font-mono')} value={form.args} onChange={(e) => patch({ args: e.target.value })} placeholder={t('settings.mcp.argsPlaceholder')} />
+          </Field>
+          <Field label={t('settings.mcp.env')}>
+            <KvEditor pairs={form.env} onChange={(env) => patch({ env })} />
+          </Field>
+        </Section>
+      ) : (
+        <Section label={t('settings.mcp.sectionConnection')}>
+          <Field label={t('settings.mcp.url')}>
+            <input className={cn(inputCls, 'font-mono')} value={form.url} onChange={(e) => patch({ url: e.target.value })} placeholder={t('settings.mcp.urlPlaceholder')} />
+          </Field>
+          <Field label={t('settings.mcp.headers')}>
+            <KvEditor pairs={form.headers} onChange={(headers) => patch({ headers })} />
+          </Field>
+          <div className="text-caption text-ink-tertiary">{t('settings.mcp.remoteNote')}</div>
+        </Section>
+      )}
+
+      {initial && (
+        <Section label={t('settings.mcp.sectionTools')}>
+          <p className="mb-2 text-caption text-ink-tertiary">{t('settings.mcp.toolToggleDesc')}</p>
+          {hasDiscoveredTools ? (
+            <McpToolTogglePanel
+              toolNames={discoveredTools}
+              enabledTools={form.enabledTools}
+              disabledTools={form.disabledTools}
+              listMaxClassName="max-h-52 sm:max-h-60"
+              onToggle={(toolName) => {
+                patch(toggleTool(toolName, form.enabledTools, form.disabledTools))
+              }}
+              onReset={() => {
+                patch({ enabledTools: [], disabledTools: [] })
+              }}
+              onApplyLists={(lists) => {
+                patch(lists)
+              }}
+            />
+          ) : (
+            <div className="text-caption text-ink-tertiary">{t('settings.mcp.noToolsDiscovered')}</div>
+          )}
+        </Section>
+      )}
+
+      {error && <div className="text-meta text-danger">{error}</div>}
+    </div>
+  )
+
+  if (mode === 'inline') {
+    return (
+      <div className="flex h-full min-h-0 flex-col" data-testid="settings-mcp-editor">
+        <div className="flex h-12 shrink-0 items-center border-b border-border px-5">
+          <h2 className="text-title font-semibold tracking-tight text-ink">{title}</h2>
+        </div>
+        <div className="min-h-0 flex-1 overflow-y-auto">{body}</div>
+        <div className="shrink-0 border-t border-border bg-surface-subtle/80 px-5 py-3">{footer}</div>
+      </div>
+    )
+  }
+
   return (
     <Modal
       open
+      variant="task"
+      nested
       onOpenChange={(o) => {
         if (!o) onCancel()
       }}
-      title={initial ? t('settings.mcp.editTitle') : t('settings.mcp.addTitle')}
+      title={title}
       footer={footer}
     >
-      <div className="space-y-5 p-5">
-        <Field label={t('settings.mcp.name')}>
-          <input className={inputCls} value={form.name} onChange={(e) => patch({ name: e.target.value })} placeholder={t('settings.mcp.namePlaceholder')} />
-        </Field>
-
-        <Section label={t('settings.mcp.sectionTransport')}>
-          <div role="radiogroup" aria-label={t('settings.mcp.sectionTransport')} className="flex flex-col gap-2">
-            <ChoiceCard selected={form.transport === 'stdio'} title={t('settings.mcp.transportStdio')} desc={t('settings.mcp.transportStdioDesc')} onClick={() => patch({ transport: 'stdio' })} />
-            <ChoiceCard selected={form.transport === 'sse'} title={t('settings.mcp.transportSse')} desc={t('settings.mcp.transportSseDesc')} onClick={() => patch({ transport: 'sse' })} />
-            <ChoiceCard selected={form.transport === 'http'} title={t('settings.mcp.transportHttp')} desc={t('settings.mcp.transportHttpDesc')} onClick={() => patch({ transport: 'http' })} />
-          </div>
-        </Section>
-
-        {isStdio ? (
-          <Section label={t('settings.mcp.sectionCommand')}>
-            <Field label={t('settings.mcp.command')}>
-              <input className={cn(inputCls, 'font-mono')} value={form.command} onChange={(e) => patch({ command: e.target.value })} placeholder={t('settings.mcp.commandPlaceholder')} />
-            </Field>
-            <Field label={t('settings.mcp.args')}>
-              <input className={cn(inputCls, 'font-mono')} value={form.args} onChange={(e) => patch({ args: e.target.value })} placeholder={t('settings.mcp.argsPlaceholder')} />
-            </Field>
-            <Field label={t('settings.mcp.env')}>
-              <KvEditor pairs={form.env} onChange={(env) => patch({ env })} />
-            </Field>
-          </Section>
-        ) : (
-          <Section label={t('settings.mcp.sectionConnection')}>
-            <Field label={t('settings.mcp.url')}>
-              <input className={cn(inputCls, 'font-mono')} value={form.url} onChange={(e) => patch({ url: e.target.value })} placeholder={t('settings.mcp.urlPlaceholder')} />
-            </Field>
-            <Field label={t('settings.mcp.headers')}>
-              <KvEditor pairs={form.headers} onChange={(headers) => patch({ headers })} />
-            </Field>
-            <div className="text-caption text-ink-tertiary">{t('settings.mcp.remoteNote')}</div>
-          </Section>
-        )}
-
-        {initial && (
-          <Section label={t('settings.mcp.sectionTools')}>
-            <p className="mb-2 text-caption text-ink-tertiary">{t('settings.mcp.toolToggleDesc')}</p>
-            {hasDiscoveredTools ? (
-              <McpToolTogglePanel
-                toolNames={discoveredTools}
-                enabledTools={form.enabledTools}
-                disabledTools={form.disabledTools}
-                listMaxClassName="max-h-52 sm:max-h-60"
-                onToggle={(toolName) => {
-                  patch(toggleTool(toolName, form.enabledTools, form.disabledTools))
-                }}
-                onReset={() => {
-                  patch({ enabledTools: [], disabledTools: [] })
-                }}
-                onApplyLists={(lists) => {
-                  patch(lists)
-                }}
-              />
-            ) : (
-              <div className="text-caption text-ink-tertiary">{t('settings.mcp.noToolsDiscovered')}</div>
-            )}
-          </Section>
-        )}
-
-        {error && <div className="text-meta text-danger">{error}</div>}
-      </div>
+      {body}
     </Modal>
   )
 }
@@ -1584,11 +1622,11 @@ function DeleteServerDialog({
   return (
     <Modal
       open
+      variant="confirm"
       onOpenChange={(o) => {
         if (!o) onCancel()
       }}
       title={t('settings.mcp.deleteConfirmTitle', { name: server.name })}
-      className="max-w-sm"
     >
       <div className="p-5">
         <p className="text-body text-ink-secondary">{t('settings.mcp.deleteConfirmBody')}</p>

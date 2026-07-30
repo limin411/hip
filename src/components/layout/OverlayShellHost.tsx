@@ -8,7 +8,7 @@ import { SessionHistory } from '@/components/history/SessionHistory'
 import { RecycleBinPage } from '@/components/history/RecycleBinPage'
 import { SettingsPage } from '@/components/account/SettingsPage'
 import { FLOOR, shellSize } from '@/lib/shellViewport'
-import { useUiStore } from '@/store/uiStore'
+import { SETTINGS_SHELL_PAGE, useUiStore } from '@/store/uiStore'
 
 export function OverlayShellHost() {
   const overlay = useUiStore((s) => s.overlay)
@@ -20,6 +20,16 @@ export function OverlayShellHost() {
 
   const onOpenChange = (open: boolean) => {
     if (!open) useUiStore.getState().setOverlay(null)
+  }
+
+  /** Esc: pop Settings L2 route before closing the shell. */
+  const onSettingsEscape = (): boolean => {
+    const ui = useUiStore.getState()
+    if (ui.settingsShellRoute.type !== 'page') {
+      ui.setSettingsShellRoute(SETTINGS_SHELL_PAGE)
+      return true
+    }
+    return false
   }
 
   const w = typeof window !== 'undefined' ? window.innerWidth : 1800
@@ -86,6 +96,7 @@ export function OverlayShellHost() {
       defaultSize={defaultSize}
       minSize={minSize}
       storageKey="overlay-shell-settings"
+      onEscapeKeyDown={onSettingsEscape}
     >
       <div
         data-testid="overlay-shell-settings"

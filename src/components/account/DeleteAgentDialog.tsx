@@ -16,11 +16,11 @@ export function DeleteAgentDialog({
   return (
     <Modal
       open
+      variant="confirm"
       onOpenChange={(o) => {
         if (!o) onCancel()
       }}
       title={t('settings.agents.deleteConfirmTitle', { name: agent.name })}
-      className="max-w-sm"
     >
       <div className="p-5">
         <p className="text-body text-ink-secondary">{t('settings.agents.deleteConfirmBody')}</p>

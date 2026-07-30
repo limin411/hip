@@ -1,6 +1,6 @@
 import { create } from 'zustand'
 import { persist, createJSONStorage, type StateStorage } from 'zustand/middleware'
-import type { CheckpointMode } from '@hip/protocol'
+import type { AgentConfig, CheckpointMode, McpServerConfig } from '@hip/protocol'
 import { TERMINAL_MANAGEMENT } from '@/components/terminals/feature'
 import { WORK_ITEM_TRACKING } from '@/components/work-items/feature'
 import { AUTOMATION_PAGE } from '@/components/automation/feature'
@@ -16,6 +16,26 @@ export type ArtifactTab = 'files' | 'agents' | 'tasks' | 'outline' | 'timeline' 
 
 /** Footer utility shells (ephemeral — not persisted). */
 export type AppOverlay = 'history' | 'trash' | 'settings'
+
+/**
+ * Settings overlay L2 route stack (ephemeral — not persisted).
+ * `page` = category body; other types replace that body with an in-shell editor
+ * (avoids a second centered Task modal over the Settings shell).
+ */
+export type SettingsShellRoute =
+  | { type: 'page' }
+  | { type: 'agent-edit'; agentId?: string; kind?: AgentConfig['kind'] }
+  | {
+      type: 'mcp-edit'
+      serverId?: string
+      /** Registry install: prefilled draft (no serverId yet). */
+      installInitial?: McpServerConfig
+    }
+  | { type: 'skill-view'; skillId: string }
+  | { type: 'plugin-view'; pluginId: string }
+  | { type: 'memory-edit'; memoryId?: string }
+
+export const SETTINGS_SHELL_PAGE: SettingsShellRoute = { type: 'page' }
 
 export type ActiveView =
   | 'chat'
@@ -248,6 +268,13 @@ interface UiState {
   /** Toggle: if already open, close; else open. */
   toggleOverlay: (o: AppOverlay) => void
 
+  /**
+   * Settings shell L2 route (Agent/MCP/Skill/Plugin/Memory editors).
+   * Ephemeral — not persisted. Reset when overlay leaves settings.
+   */
+  settingsShellRoute: SettingsShellRoute
+  setSettingsShellRoute: (r: SettingsShellRoute) => void
+
   /** Left sidebar section highlight (not persisted; cold launch 'chats'). */
   sidebarSection: SidebarSection
   setSidebarSection: (s: SidebarSection) => void
@@ -315,7 +342,29 @@ export const useUiStore = create<UiState>()(
     (set) => ({
       settingsPage: 'general',
       setSettingsPage: (page) =>
-        set((s) => (s.settingsPage === page ? s : { settingsPage: page })),
+        set((s) => {
+          if (s.settingsPage === page) return s
+          // Switching category pops any L2 editor (nav while on agent-edit, etc.).
+          return {
+            settingsPage: page,
+            settingsShellRoute:
+              s.settingsShellRoute.type === 'page'
+                ? s.settingsShellRoute
+                : SETTINGS_SHELL_PAGE,
+          }
+        }),
+
+      settingsShellRoute: SETTINGS_SHELL_PAGE,
+      setSettingsShellRoute: (r) =>
+        set((s) => {
+          if (
+            s.settingsShellRoute.type === r.type &&
+            JSON.stringify(s.settingsShellRoute) === JSON.stringify(r)
+          ) {
+            return s
+          }
+          return { settingsShellRoute: r }
+        }),
 
       scrollTargetMessageId: null,
       setScrollTarget: (id) => set((s) => (s.scrollTargetMessageId === id ? s : { scrollTargetMessageId: id })),
@@ -362,6 +411,9 @@ export const useUiStore = create<UiState>()(
       setOverlay: (o) =>
         set((s) => {
           if (s.overlay === o) return s
+          // Leaving settings (or any non-settings overlay) clears L2 route.
+          const routePatch =
+            o === 'settings' ? {} : { settingsShellRoute: SETTINGS_SHELL_PAGE }
           // Migration safety: opening an overlay while residual special activeView
           // is set remaps the main column to a real work surface (no double-booking).
           if (
@@ -375,14 +427,19 @@ export const useUiStore = create<UiState>()(
               overlay: o,
               activeView: surface.view,
               sidebarSection: surface.section,
+              ...routePatch,
             }
           }
-          return { overlay: o }
+          return { overlay: o, ...routePatch }
         }),
       toggleOverlay: (o) =>
         set((s) => {
-          if (s.overlay === o) return { overlay: null }
+          if (s.overlay === o) {
+            return { overlay: null, settingsShellRoute: SETTINGS_SHELL_PAGE }
+          }
           // Same coerce as setOverlay when opening over residual special view.
+          const routePatch =
+            o === 'settings' ? {} : { settingsShellRoute: SETTINGS_SHELL_PAGE }
           if (
             s.activeView === 'history' ||
             s.activeView === 'trash' ||
@@ -393,9 +450,10 @@ export const useUiStore = create<UiState>()(
               overlay: o,
               activeView: surface.view,
               sidebarSection: surface.section,
+              ...routePatch,
             }
           }
-          return { overlay: o }
+          return { overlay: o, ...routePatch }
         }),
 
       sidebarSection: 'chats',
@@ -505,5 +563,10 @@ export const useUiStore = create<UiState>()(
  * Nav history is seeded separately from AppLayout (see seedNavHistoryIfEmpty).
  */
 export function applyColdLaunchShell(): void {
-  useUiStore.setState({ activeView: 'chat', sidebarSection: 'chats', overlay: null })
+  useUiStore.setState({
+    activeView: 'chat',
+    sidebarSection: 'chats',
+    overlay: null,
+    settingsShellRoute: SETTINGS_SHELL_PAGE,
+  })
 }

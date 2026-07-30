@@ -11,17 +11,22 @@ import {
   PLUGIN_MARKET_PAGE_SIZE,
 } from './PluginConfigView'
 
-vi.mock('react-i18next', () => ({
-  useTranslation: () => ({
-    t: (key: string, options?: Record<string, unknown>) => {
-      if (key === 'settings.plugins.componentCounts') {
-        return `${options?.skills} skills · ${options?.mcpServers} MCP · ${options?.agents} agents · ${options?.hooks} hooks`
-      }
-      if (key === 'settings.plugins.viewTitle') return `Plugin: ${options?.name}`
-      return key
-    },
-  }),
-}))
+vi.mock(import('react-i18next'), async (importOriginal) => {
+  const actual = await importOriginal<typeof import('react-i18next')>()
+  return {
+    ...actual,
+    useTranslation: () => ({
+      t: (key: string, options?: Record<string, unknown>) => {
+        if (key === 'settings.plugins.componentCounts') {
+          return `${options?.skills} skills · ${options?.mcpServers} MCP · ${options?.agents} agents · ${options?.hooks} hooks`
+        }
+        if (key === 'settings.plugins.viewTitle') return `Plugin: ${options?.name}`
+        return key
+      },
+      i18n: { language: 'en', changeLanguage: vi.fn() },
+    }),
+  } as any
+})
 
 vi.mock('@/ipc/plugins', () => ({
   listPlugins: vi.fn().mockResolvedValue([]),

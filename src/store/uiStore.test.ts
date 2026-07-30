@@ -27,6 +27,7 @@ beforeEach(() => {
     diffViewMode: 'unified',
     checkpointMode: 'this-turn',
     overlay: null,
+    settingsShellRoute: { type: 'page' },
   })
 })
 
@@ -159,6 +160,23 @@ describe('uiStore - overlay', () => {
     useUiStore.getState().setOverlay(null)
     expect(useUiStore.getState().overlay).toBeNull()
     expect(useUiStore.getState().activeView).toBe('chat')
+  })
+
+  it('settingsShellRoute defaults to page and resets when overlay leaves settings', () => {
+    expect(useUiStore.getState().settingsShellRoute).toEqual({ type: 'page' })
+    useUiStore.getState().setOverlay('settings')
+    useUiStore.getState().setSettingsShellRoute({ type: 'agent-edit', kind: 'internal' })
+    expect(useUiStore.getState().settingsShellRoute.type).toBe('agent-edit')
+    useUiStore.getState().setOverlay(null)
+    expect(useUiStore.getState().settingsShellRoute).toEqual({ type: 'page' })
+  })
+
+  it('setSettingsPage pops L2 route when category changes', () => {
+    useUiStore.getState().setSettingsPage('agents')
+    useUiStore.getState().setSettingsShellRoute({ type: 'agent-edit', agentId: 'a1' })
+    useUiStore.getState().setSettingsPage('mcp')
+    expect(useUiStore.getState().settingsShellRoute).toEqual({ type: 'page' })
+    expect(useUiStore.getState().settingsPage).toBe('mcp')
   })
 
   it('toggleOverlay opens then closes', () => {

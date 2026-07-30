@@ -2,6 +2,7 @@ import * as DialogPrimitive from '@radix-ui/react-dialog'
 import { useTranslation } from 'react-i18next'
 import { X } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { useUiStore } from '@/store/uiStore'
 import { modalMotion, overlayMotion } from './motionClasses'
 import { useResizableBox, type Size, type ResizeDir } from './useResizableBox'
 
@@ -29,8 +30,14 @@ interface ModalProps {
   /**
    * When true, confirm/task use nested stacking policy (light scrim, no blur).
    * Shell always uses full-strength scrim.
+   * Confirm auto-nests when a footer overlay shell is open unless explicitly false.
    */
   nested?: boolean
+  /**
+   * Extra Esc handler (e.g. Settings L2 pop). Called after closeDisabled check.
+   * Return true (or call preventDefault) to stop the shell from closing.
+   */
+  onEscapeKeyDown?: (event: KeyboardEvent) => boolean | void
 }
 
 /**
@@ -85,7 +92,8 @@ export function Modal({
   storageKey,
   closeDisabled = false,
   variant,
-  nested = false,
+  nested,
+  onEscapeKeyDown,
 }: ModalProps) {
   const { t } = useTranslation()
   // Confirm is never resizable regardless of prop.
@@ -101,8 +109,13 @@ export function Modal({
     storageKey,
   })
 
+  // Confirm auto-nests over footer shells unless caller forces nested={false}.
+  const overlayOpen = useUiStore((s) => s.overlay != null)
+  const effectiveNested =
+    nested ?? (variant === 'confirm' && overlayOpen)
+
   // Nested confirm/task: light scrim without blur. Shell and legacy always full strength.
-  const useLightScrim = nested && (variant === 'confirm' || variant === 'task')
+  const useLightScrim = effectiveNested && (variant === 'confirm' || variant === 'task')
 
   return (
     <DialogPrimitive.Root open={open} onOpenChange={onOpenChange}>
@@ -153,6 +166,11 @@ export function Modal({
           {...(variant === 'confirm' ? { 'data-confirm-dialog': true } : {})}
           onEscapeKeyDown={(e) => {
             if (closeDisabled) {
+              e.preventDefault()
+              return
+            }
+            // Caller-handled Esc (Settings L2 pop, etc.).
+            if (onEscapeKeyDown?.(e as unknown as KeyboardEvent)) {
               e.preventDefault()
               return
             }

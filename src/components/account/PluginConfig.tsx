@@ -11,6 +11,7 @@ import { MarketplaceSourceModal } from './MarketplaceSourceModal'
 import { ExtensionConflictsBanner } from './ExtensionConflictsBanner'
 import { PreflightEnableModal } from './PreflightEnableModal'
 import type { ExtensionPreflightSummary } from '@/store/extensionStore'
+import { SETTINGS_SHELL_PAGE, useUiStore } from '@/store/uiStore'
 
 /**
  * Settings → Plugin Market.
@@ -24,8 +25,16 @@ export function PluginConfig() {
   const inspect = useExtensionStore((s) => s.inspect)
   const [error, setError] = useState<string | null>(null)
   const [deleting, setDeleting] = useState<PluginMeta | null>(null)
-  const [viewing, setViewing] = useState<PluginMeta | null>(null)
+  const settingsShellRoute = useUiStore((s) => s.settingsShellRoute)
+  const setSettingsShellRoute = useUiStore((s) => s.setSettingsShellRoute)
   const [sourcesOpen, setSourcesOpen] = useState(false)
+
+  const pluginViewId =
+    settingsShellRoute.type === 'plugin-view' ? settingsShellRoute.pluginId : null
+  const viewing = useMemo(() => {
+    if (!pluginViewId) return null
+    return plugins.find((p) => p.id === pluginViewId) ?? null
+  }, [pluginViewId, plugins])
   const [preflightNote, setPreflightNote] = useState<string | null>(null)
   const [pendingEnable, setPendingEnable] = useState<{
     plugin: PluginMeta
@@ -51,12 +60,12 @@ export function PluginConfig() {
     if (!marketLoaded) void marketLoad()
   }, [marketLoaded, marketLoad])
 
+  // Drop L2 route if the viewed plugin was uninstalled (only after plugins loaded).
   useEffect(() => {
-    setViewing((v) => {
-      if (!v) return v
-      return plugins.find((p) => p.id === v.id) ?? null
-    })
-  }, [plugins])
+    if (pluginViewId && pluginsLoaded && !viewing) {
+      setSettingsShellRoute(SETTINGS_SHELL_PAGE)
+    }
+  }, [pluginViewId, viewing, pluginsLoaded, setSettingsShellRoute])
 
   // Auto-refresh each source at most once per mount when no catalog yet.
   const autoRefreshAttempted = useRef<Set<string>>(new Set())
@@ -124,6 +133,71 @@ export function PluginConfig() {
     }
   }
 
+  // In-shell L2: plugin detail replaces list body (no second Modal).
+  if (viewing) {
+    return (
+      <div className="flex h-full min-h-0 flex-col">
+        <PluginViewModal
+          plugin={viewing}
+          mode="inline"
+          onClose={() => setSettingsShellRoute(SETTINGS_SHELL_PAGE)}
+          t={t as Translate}
+        />
+        {deleting && (
+          <Modal
+            open
+            variant="confirm"
+            onOpenChange={(o) => {
+              if (!o) setDeleting(null)
+            }}
+            title={t('settings.plugins.deleteConfirmTitle', { name: deleting.name })}
+          >
+            <div className="p-5">
+              <p className="text-body text-ink-secondary">{t('settings.plugins.deleteConfirmBody')}</p>
+              <div className="mt-5 flex justify-end gap-2">
+                <Button variant="outline" size="sm" onClick={() => setDeleting(null)}>
+                  {t('settings.plugins.cancel')}
+                </Button>
+                <Button
+                  variant="danger"
+                  size="sm"
+                  onClick={() => {
+                    remove(deleting.id)
+                      .then(async () => {
+                        if (viewing?.id === deleting.id) {
+                          setSettingsShellRoute(SETTINGS_SHELL_PAGE)
+                        }
+                        setDeleting(null)
+                        await market.load()
+                      })
+                      .catch((err: Error) => {
+                        setDeleting(null)
+                        setError(err.message ?? t('settings.plugins.deleteError'))
+                      })
+                  }}
+                >
+                  {t('settings.plugins.uninstall')}
+                </Button>
+              </div>
+            </div>
+          </Modal>
+        )}
+        <PreflightEnableModal
+          open={pendingEnable != null}
+          summary={pendingEnable?.summary ?? null}
+          pluginName={pendingEnable?.plugin.name}
+          busy={enableBusy}
+          onCancel={() => {
+            if (!enableBusy) setPendingEnable(null)
+          }}
+          onConfirm={() => {
+            void confirmPendingEnable()
+          }}
+        />
+      </div>
+    )
+  }
+
   return (
     <div className="flex h-full min-h-0 flex-col">
       {/* Banner returns null when idle — no wrapper (avoids empty top strip). */}
@@ -152,7 +226,7 @@ export function PluginConfig() {
           }}
           onView={(plugin) => {
             setError(null)
-            setViewing(plugin)
+            setSettingsShellRoute({ type: 'plugin-view', pluginId: plugin.id })
           }}
           onDownload={(entry) => {
             setError(null)
@@ -188,14 +262,6 @@ export function PluginConfig() {
           t={t as Translate}
         />
       </div>
-
-      {viewing && (
-        <PluginViewModal
-          plugin={viewing}
-          onClose={() => setViewing(null)}
-          t={t as Translate}
-        />
-      )}
 
       <PreflightEnableModal
         open={pendingEnable != null}
@@ -238,11 +304,11 @@ export function PluginConfig() {
       {deleting && (
         <Modal
           open
+          variant="confirm"
           onOpenChange={(o) => {
             if (!o) setDeleting(null)
           }}
           title={t('settings.plugins.deleteConfirmTitle', { name: deleting.name })}
-          className="max-w-sm"
         >
           <div className="p-5">
             <p className="text-body text-ink-secondary">{t('settings.plugins.deleteConfirmBody')}</p>
@@ -256,7 +322,6 @@ export function PluginConfig() {
                 onClick={() => {
                   remove(deleting.id)
                     .then(async () => {
-                      if (viewing?.id === deleting.id) setViewing(null)
                       setDeleting(null)
                       await market.load()
                     })

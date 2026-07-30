@@ -6,17 +6,13 @@ import { useAgentsStore } from '@/store/agentsStore'
 import { useHipConfigStore } from '@/store/hipConfigStore'
 import { useDetectionStore } from '@/store/detectionStore'
 import { FIXED_AGENTS } from '@/lib/fixedAgents'
+import { SETTINGS_SHELL_PAGE, useUiStore } from '@/store/uiStore'
 import { AgentToolbar } from './AgentToolbar'
 import { AgentGrid } from './AgentGrid'
 import { AgentEditor } from './AgentEditor'
 import { DeleteAgentDialog } from './DeleteAgentDialog'
 import { FixedAgentCard } from './FixedAgentCard'
 import { AcpHostPolicySection } from './AcpSettings'
-
-type Editing =
-  | { mode: 'add'; kind: AgentConfig['kind'] }
-  | { mode: 'edit'; agent: AgentConfig }
-  | null
 
 export function AgentManagement() {
   const { t } = useTranslation()
@@ -26,9 +22,13 @@ export function AgentManagement() {
   const installed = useDetectionStore((s) => s.installed)
   const detectionChecked = useDetectionStore((s) => s.checked)
   const refreshDetection = useDetectionStore((s) => s.refresh)
+  const settingsShellRoute = useUiStore((s) => s.settingsShellRoute)
+  const setSettingsShellRoute = useUiStore((s) => s.setSettingsShellRoute)
   const [search, setSearch] = useState('')
-  const [editing, setEditing] = useState<Editing>(null)
   const [deleting, setDeleting] = useState<AgentConfig | null>(null)
+
+  const agentEditRoute =
+    settingsShellRoute.type === 'agent-edit' ? settingsShellRoute : null
 
   useEffect(() => {
     if (!loaded) void load()
@@ -81,6 +81,39 @@ export function AgentManagement() {
     return t('settings.agents.gridEmptyTitle')
   })()
 
+  // In-shell L2: agent add/edit replaces list body (no second Modal).
+  if (agentEditRoute) {
+    const initial =
+      agentEditRoute.agentId != null
+        ? (agents.find((a) => a.id === agentEditRoute.agentId) ?? null)
+        : null
+    return (
+      <div className="flex h-full min-h-0 flex-col">
+        <AgentEditor
+          mode="inline"
+          initial={initial}
+          initialKind={agentEditRoute.kind}
+          onCancel={() => setSettingsShellRoute(SETTINGS_SHELL_PAGE)}
+          onSave={async (draft) => {
+            if (agentEditRoute.agentId) await updateAgent(agentEditRoute.agentId, draft)
+            else await addAgent(draft)
+            setSettingsShellRoute(SETTINGS_SHELL_PAGE)
+          }}
+        />
+        {deleting && (
+          <DeleteAgentDialog
+            agent={deleting}
+            onCancel={() => setDeleting(null)}
+            onConfirm={() => {
+              void removeAgent(deleting.id)
+              setDeleting(null)
+            }}
+          />
+        )}
+      </div>
+    )
+  }
+
   return (
     <div className="flex h-full flex-col p-6">
       <div className="flex flex-col gap-5 sm:flex-row sm:items-start sm:justify-between shrink-0">
@@ -97,7 +130,7 @@ export function AgentManagement() {
         <AgentToolbar
           search={search}
           onSearchChange={setSearch}
-          onAdd={(kind) => setEditing({ mode: 'add', kind })}
+          onAdd={(kind) => setSettingsShellRoute({ type: 'agent-edit', kind })}
         />
       </div>
 
@@ -147,26 +180,13 @@ export function AgentManagement() {
               }
               installed={installed}
               detectionChecked={detectionChecked}
-              onEdit={(a) => setEditing({ mode: 'edit', agent: a })}
+              onEdit={(a) => setSettingsShellRoute({ type: 'agent-edit', agentId: a.id })}
               onToggle={(a, enabled) => void updateAgent(a.id, { enabled })}
               onDelete={(a) => setDeleting(a)}
             />
           </section>
         </div>
       </div>
-
-      {editing && (
-        <AgentEditor
-          initial={editing.mode === 'edit' ? editing.agent : null}
-          initialKind={editing.mode === 'add' ? editing.kind : undefined}
-          onCancel={() => setEditing(null)}
-          onSave={async (draft) => {
-            if (editing.mode === 'edit') await updateAgent(editing.agent.id, draft)
-            else await addAgent(draft)
-            setEditing(null)
-          }}
-        />
-      )}
 
       {deleting && (
         <DeleteAgentDialog

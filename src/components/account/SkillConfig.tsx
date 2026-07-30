@@ -23,6 +23,7 @@ import {
   DropdownMenuSeparator,
 } from '@/components/ui/DropdownMenu'
 import { DeclarativeContextMenu } from '@/components/context-menu'
+import { SETTINGS_SHELL_PAGE, useUiStore } from '@/store/uiStore'
 
 // ── Display helpers (pure functions, testable) ──
 
@@ -187,8 +188,20 @@ export function SkillConfig() {
     }
   }, [snapshot, skills, plugins])
   const { standalone, builtin, pluginEntries } = partitioned
-  const [viewing, setViewing] = useState<SkillMeta | null>(null)
+  const settingsShellRoute = useUiStore((s) => s.settingsShellRoute)
+  const setSettingsShellRoute = useUiStore((s) => s.setSettingsShellRoute)
   const [deleting, setDeleting] = useState<SkillMeta | null>(null)
+
+  const skillViewId =
+    settingsShellRoute.type === 'skill-view' ? settingsShellRoute.skillId : null
+  const viewingSkill = useMemo(() => {
+    if (!skillViewId) return null
+    const fromStandalone = standalone.find((s) => s.id === skillViewId)
+    if (fromStandalone) return fromStandalone
+    const fromBuiltin = builtin.find((s) => s.id === skillViewId)
+    if (fromBuiltin) return fromBuiltin
+    return pluginEntries.find((e) => e.skill.id === skillViewId)?.skill ?? null
+  }, [skillViewId, standalone, builtin, pluginEntries])
 
   useEffect(() => {
     if (!loaded) void load()
@@ -202,6 +215,48 @@ export function SkillConfig() {
     // Shared TTL/coalesce in extensionStore — no page banner; conflicts toast bottom-right.
     void inspect()
   }, [inspect])
+
+  // In-shell L2: skill detail replaces list body (no second Modal).
+  if (viewingSkill) {
+    return (
+      <div className="flex h-full min-h-0 flex-col">
+        <SkillViewModal
+          skill={viewingSkill}
+          mode="inline"
+          onClose={() => setSettingsShellRoute(SETTINGS_SHELL_PAGE)}
+        />
+        {deleting && (
+          <Modal
+            open
+            variant="confirm"
+            onOpenChange={(o) => {
+              if (!o) setDeleting(null)
+            }}
+            title={t('settings.skill.deleteConfirmTitle', { name: deleting.name })}
+          >
+            <div className="p-5">
+              <p className="text-body text-ink-secondary">{t('settings.skill.deleteConfirmBody')}</p>
+              <div className="mt-5 flex justify-end gap-2">
+                <Button variant="ghost" size="sm" onClick={() => setDeleting(null)}>
+                  {t('settings.skill.cancel')}
+                </Button>
+                <Button
+                  variant="danger"
+                  size="sm"
+                  onClick={() => {
+                    void remove(deleting.id)
+                    setDeleting(null)
+                  }}
+                >
+                  {t('settings.skill.delete')}
+                </Button>
+              </div>
+            </div>
+          </Modal>
+        )}
+      </div>
+    )
+  }
 
   return (
     <div className="p-6">
@@ -230,7 +285,7 @@ export function SkillConfig() {
                     skill={skill}
                     enabled={enabled[skill.id] !== false}
                     onToggle={(on) => void toggle(skill.id, on)}
-                    onView={() => setViewing(skill)}
+                    onView={() => setSettingsShellRoute({ type: 'skill-view', skillId: skill.id })}
                     onDelete={() => setDeleting(skill)}
                   />
                 ))}
@@ -247,7 +302,7 @@ export function SkillConfig() {
                       skill={skill}
                       enabled
                       onToggle={() => {}}
-                      onView={() => setViewing(skill)}
+                      onView={() => setSettingsShellRoute({ type: 'skill-view', skillId: skill.id })}
                       onDelete={() => {}}
                       locked
                       switchDisabled
@@ -271,7 +326,7 @@ export function SkillConfig() {
                           effectivePluginSkillEnabled(skillOn, pluginEnabled) && registryActive !== false
                         }
                         onToggle={(on) => void toggle(skill.id, on)}
-                        onView={() => setViewing(skill)}
+                        onView={() => setSettingsShellRoute({ type: 'skill-view', skillId: skill.id })}
                         onDelete={() => {}}
                         readOnly={{
                           pluginName,
@@ -289,16 +344,14 @@ export function SkillConfig() {
         )}
       </div>
 
-      {viewing && <SkillViewModal skill={viewing} onClose={() => setViewing(null)} />}
-
       {deleting && (
         <Modal
           open
+          variant="confirm"
           onOpenChange={(o) => {
             if (!o) setDeleting(null)
           }}
           title={t('settings.skill.deleteConfirmTitle', { name: deleting.name })}
-          className="max-w-sm"
         >
           <div className="p-5">
             <p className="text-body text-ink-secondary">{t('settings.skill.deleteConfirmBody')}</p>
@@ -478,10 +531,20 @@ export function SkillCard({
   )
 }
 
-function SkillViewModal({ skill, onClose }: { skill: SkillMeta; onClose: () => void }) {
+export function SkillViewModal({
+  skill,
+  onClose,
+  mode = 'inline',
+}: {
+  skill: SkillMeta
+  onClose: () => void
+  /** `inline` = in-shell Settings L2 (default). `modal` = legacy portaled Task dialog. */
+  mode?: 'modal' | 'inline'
+}) {
   const { t } = useTranslation()
   const [body, setBody] = useState<string | null>(null)
   const [error, setError] = useState(false)
+  const title = t('settings.skill.viewTitle', { name: skill.name })
 
   useEffect(() => {
     let live = true
@@ -522,27 +585,44 @@ function SkillViewModal({ skill, onClose }: { skill: SkillMeta; onClose: () => v
     },
   }
 
+  const content = (
+    <div className="p-6" data-testid="settings-skill-view">
+      {error ? (
+        <div className="flex items-center gap-2 text-body text-danger">
+          <FileText size={16} /> {t('settings.skill.loadError')}
+        </div>
+      ) : body === null ? (
+        <div className="text-body text-ink-tertiary">…</div>
+      ) : (
+        <MarkdownBody content={body} components={markdownComponents} />
+      )}
+    </div>
+  )
+
+  if (mode === 'inline') {
+    return (
+      <div className="flex h-full min-h-0 flex-col">
+        <div className="flex h-12 shrink-0 items-center border-b border-border px-5">
+          <h2 className="text-title font-semibold tracking-tight text-ink">{title}</h2>
+        </div>
+        <div className="min-h-0 flex-1 overflow-y-auto">{content}</div>
+      </div>
+    )
+  }
+
   return (
     <Modal
       open
+      variant="task"
+      nested
       onOpenChange={(o) => {
         if (!o) onClose()
       }}
-      title={t('settings.skill.viewTitle', { name: skill.name })}
+      title={title}
       resizable
       storageKey="skill-view"
     >
-      <div className="p-6">
-        {error ? (
-          <div className="flex items-center gap-2 text-body text-danger">
-            <FileText size={16} /> {t('settings.skill.loadError')}
-          </div>
-        ) : body === null ? (
-          <div className="text-body text-ink-tertiary">…</div>
-        ) : (
-          <MarkdownBody content={body} components={markdownComponents} />
-        )}
-      </div>
+      {content}
     </Modal>
   )
 }

@@ -81,11 +81,11 @@ export function ArtifactPanel() {
           <div className="flex h-full flex-col">
             {!isGitRepo && <GitInitBanner />}
             <PanelGroup direction="horizontal" className="min-h-0 flex-1">
-              <Panel defaultSize={42} minSize={24}><FileTree /></Panel>
+              <Panel minSize={30}><FilePreview /></Panel>
               <PanelResizeHandle className="group relative z-10 w-2 -mx-1 bg-transparent">
                 <div className="mx-auto h-full w-px bg-border transition-colors group-hover:bg-accent group-data-[resize-handle-state=drag]:bg-accent" />
               </PanelResizeHandle>
-              <Panel minSize={30}><FilePreview /></Panel>
+              <Panel defaultSize={42} minSize={24}><FileTree /></Panel>
             </PanelGroup>
           </div>
         )}

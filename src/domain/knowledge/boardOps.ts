@@ -344,3 +344,252 @@ export function isTinyLine(
 ): boolean {
   return Math.hypot(x2 - x, y2 - y) < BOARD_MIN_SHAPE_SIZE
 }
+
+// ─── Resize / selection handles (PR-3) ──────────────────────────────────────
+
+/** 8 box resize handles (corners + edges). */
+export type BoxHandle = 'nw' | 'n' | 'ne' | 'e' | 'se' | 's' | 'sw' | 'w'
+
+export const BOX_HANDLES: readonly BoxHandle[] = [
+  'nw',
+  'n',
+  'ne',
+  'e',
+  'se',
+  's',
+  'sw',
+  'w',
+] as const
+
+/** Line/arrow endpoint handles. */
+export type EndpointHandle = 'start' | 'end'
+
+/** Max undo/redo past depth (LKD-12). */
+export const BOARD_HISTORY_MAX = 50
+
+/**
+ * Undo ring entry: elements + dehydrated filesRel (fileId → hipAssetRel).
+ * Camera / selection are never stored (LKD-14 / LKD-16).
+ */
+export type BoardHistoryEntry = {
+  elements: HipBoardElement[]
+  filesRel: Record<string, string>
+}
+
+/** Shallow-clone each element + clone filesRel map for history snapshots. */
+export function cloneHistoryEntry(
+  elements: readonly HipBoardElement[],
+  filesRel: Readonly<Record<string, string>>,
+): BoardHistoryEntry {
+  return {
+    elements: elements.map((el) => ({ ...el })) as HipBoardElement[],
+    filesRel: { ...filesRel },
+  }
+}
+
+/**
+ * Push `entry` onto past and clear future. Caps past at BOARD_HISTORY_MAX.
+ * Mutates arrays in place (canvas owns them).
+ */
+export function pushHistory(
+  past: BoardHistoryEntry[],
+  future: BoardHistoryEntry[],
+  entry: BoardHistoryEntry,
+): void {
+  past.push(entry)
+  while (past.length > BOARD_HISTORY_MAX) past.shift()
+  future.length = 0
+}
+
+/** World-space positions of the 8 box handles. */
+export function boxHandlePositions(box: WorldAabb): Record<BoxHandle, WorldPoint> {
+  const { x, y, w, h } = box
+  const cx = x + w / 2
+  const cy = y + h / 2
+  return {
+    nw: { x, y },
+    n: { x: cx, y },
+    ne: { x: x + w, y },
+    e: { x: x + w, y: cy },
+    se: { x: x + w, y: y + h },
+    s: { x: cx, y: y + h },
+    sw: { x, y: y + h },
+    w: { x, y: cy },
+  }
+}
+
+/**
+ * Hit-test a box resize handle. Radius is screen-stable (`hitRadiusScreen / zoom`).
+ * Corners checked before edges so corners win near junctions.
+ */
+export function hitTestBoxHandle(
+  box: WorldAabb,
+  worldX: number,
+  worldY: number,
+  zoom = 1,
+  hitRadiusScreen = 8,
+): BoxHandle | null {
+  const r = hitRadiusScreen / (zoom || 1)
+  const pos = boxHandlePositions(box)
+  const order: BoxHandle[] = ['nw', 'ne', 'se', 'sw', 'n', 'e', 's', 'w']
+  for (const h of order) {
+    const p = pos[h]
+    if (Math.hypot(worldX - p.x, worldY - p.y) <= r) return h
+  }
+  return null
+}
+
+/**
+ * Resize an AABB from a handle drag. Opposite edges stay fixed; min size enforced.
+ */
+export function resizeBoxFromHandle(
+  origin: WorldAabb,
+  handle: BoxHandle,
+  wx: number,
+  wy: number,
+  minSize = BOARD_MIN_SHAPE_SIZE,
+): WorldAabb {
+  let left = origin.x
+  let top = origin.y
+  let right = origin.x + origin.w
+  let bottom = origin.y + origin.h
+
+  switch (handle) {
+    case 'nw':
+      left = wx
+      top = wy
+      break
+    case 'n':
+      top = wy
+      break
+    case 'ne':
+      right = wx
+      top = wy
+      break
+    case 'e':
+      right = wx
+      break
+    case 'se':
+      right = wx
+      bottom = wy
+      break
+    case 's':
+      bottom = wy
+      break
+    case 'sw':
+      left = wx
+      bottom = wy
+      break
+    case 'w':
+      left = wx
+      break
+  }
+
+  // Allow drag past opposite edge (flip), then normalize.
+  let x = Math.min(left, right)
+  let y = Math.min(top, bottom)
+  let w = Math.abs(right - left)
+  let h = Math.abs(bottom - top)
+
+  if (w < minSize) {
+    // Keep the fixed edge: which edge moved?
+    const movedLeft = handle === 'nw' || handle === 'w' || handle === 'sw'
+    if (movedLeft) {
+      // Prefer anchoring right of origin
+      const fixedRight = origin.x + origin.w
+      x = fixedRight - minSize
+      w = minSize
+    } else {
+      x = origin.x
+      w = minSize
+    }
+  }
+  if (h < minSize) {
+    const movedTop = handle === 'nw' || handle === 'n' || handle === 'ne'
+    if (movedTop) {
+      const fixedBottom = origin.y + origin.h
+      y = fixedBottom - minSize
+      h = minSize
+    } else {
+      y = origin.y
+      h = minSize
+    }
+  }
+
+  return { x, y, w, h }
+}
+
+/** Types that support 8-handle box resize. */
+export function isBoxResizable(
+  el: HipBoardElement,
+): el is Extract<HipBoardElement, { type: 'rect' | 'ellipse' | 'text' | 'image' }> {
+  return el.type === 'rect' || el.type === 'ellipse' || el.type === 'text' || el.type === 'image'
+}
+
+/**
+ * Apply a resized AABB to a box element. Skips locked (returns same ref).
+ * Text height is not auto-remeasured on resize (user sets box; wrap contract uses w only).
+ */
+export function applyBoxResize(
+  el: HipBoardElement,
+  box: WorldAabb,
+): HipBoardElement {
+  if (isLocked(el)) return el
+  if (!isBoxResizable(el)) return el
+  return { ...el, x: box.x, y: box.y, w: box.w, h: box.h }
+}
+
+/**
+ * Hit-test line/arrow endpoints (screen-stable radius).
+ */
+export function hitTestLineEndpoint(
+  el: HipBoardLine,
+  worldX: number,
+  worldY: number,
+  zoom = 1,
+  hitRadiusScreen = 8,
+): EndpointHandle | null {
+  const r = hitRadiusScreen / (zoom || 1)
+  if (Math.hypot(worldX - el.x, worldY - el.y) <= r) return 'start'
+  if (Math.hypot(worldX - el.x2, worldY - el.y2) <= r) return 'end'
+  return null
+}
+
+/** Move a line/arrow endpoint. Skips locked. */
+export function moveLineEndpoint(
+  el: HipBoardLine,
+  which: EndpointHandle,
+  wx: number,
+  wy: number,
+): HipBoardLine {
+  if (isLocked(el)) return el
+  if (which === 'start') return { ...el, x: wx, y: wy }
+  return { ...el, x2: wx, y2: wy }
+}
+
+/**
+ * Union AABB of selected elements (for multi-select outline). Empty ids → null.
+ */
+export function selectionUnionAabb(
+  elements: readonly HipBoardElement[],
+  ids: ReadonlySet<string> | readonly string[],
+): WorldAabb | null {
+  const idSet = ids instanceof Set ? ids : new Set(ids)
+  if (idSet.size === 0) return null
+  let minX = Infinity
+  let minY = Infinity
+  let maxX = -Infinity
+  let maxY = -Infinity
+  let any = false
+  for (const el of elements) {
+    if (!idSet.has(el.id)) continue
+    const b = elementAabb(el)
+    any = true
+    minX = Math.min(minX, b.x)
+    minY = Math.min(minY, b.y)
+    maxX = Math.max(maxX, b.x + b.w)
+    maxY = Math.max(maxY, b.y + b.h)
+  }
+  if (!any) return null
+  return { x: minX, y: minY, w: maxX - minX, h: maxY - minY }
+}

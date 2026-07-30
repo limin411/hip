@@ -1,9 +1,10 @@
 /**
- * Hip SVG whiteboard (PR-2: shape + text tools).
+ * Hip SVG whiteboard (PR-3: selection, transform, undo).
  *
  * Not mounted from KnowledgeWorkspace until PR-C.
  * Camera is session-only — pan/zoom never call setDraftBody (LKD-14).
  * Draft throttle only when dehydrated scene serializes differently.
+ * Undo ring: { elements, filesRel }[] max 50 (LKD-12).
  */
 import {
   forwardRef,
@@ -24,6 +25,7 @@ import {
   serializeHipBoard,
   type HipBoardCamera,
   type HipBoardElement,
+  type HipBoardLine,
   type HipBoardSceneDisk,
   type HipBoardText,
 } from '@/domain/knowledge/boardScene'
@@ -32,23 +34,41 @@ import {
   BOARD_DEFAULT_FILL,
   BOARD_DEFAULT_STROKE,
   BOARD_DEFAULT_STROKE_WIDTH,
+  BOARD_HISTORY_MAX,
   BOARD_TEXT_DEFAULT_FONT_SIZE,
   BOARD_TEXT_DEFAULT_W,
   BOARD_TEXT_PADDING,
+  applyBoxResize,
   arrowHeadPoints,
+  boxHandlePositions,
   clampCamera,
+  cloneHistoryEntry,
+  deleteElements,
   elementAabb,
   hitTest,
+  hitTestBoxHandle,
+  hitTestLineEndpoint,
+  hitTestMarquee,
+  isBoxResizable,
   isTinyBox,
   isTinyLine,
   measureTextHeight,
+  moveElements,
+  moveLineEndpoint,
   normalizeRectFromDrag,
+  pushHistory,
+  resizeBoxFromHandle,
   screenToWorld,
+  selectionUnionAabb,
   textLineHeight,
   worldGroupTransform,
   worldToScreen,
   zoomAtScreenPoint,
+  type BoardHistoryEntry,
   type BoardTool,
+  type BoxHandle,
+  type EndpointHandle,
+  type WorldAabb,
 } from '@/domain/knowledge/boardOps'
 import type { FlushToStoreOpts, KnowledgeBoardCanvasHandle } from './KnowledgeBoardCanvas'
 import { BoardToolbar } from './BoardToolbar'
@@ -61,7 +81,7 @@ export type StylePatch = Partial<{
   cornerRadius: number
 }>
 
-/** Extended handle for PR-2+; selection/transform fill in PR-3. */
+/** Extended handle for PR-2+ selection/transform/undo (PR-3). */
 export type HipBoardCanvasHandle = KnowledgeBoardCanvasHandle & {
   isReady: () => boolean
   selectAndScrollTo: (ids: string[]) => void
@@ -73,6 +93,14 @@ export type HipBoardCanvasHandle = KnowledgeBoardCanvasHandle & {
   getTool: () => BoardTool
   /** Test / debug: selected element ids. */
   getSelectedIds: () => string[]
+  /** Test / debug: current elements snapshot. */
+  getElements: () => HipBoardElement[]
+  /** Test / debug: filesRel map (fileId → hipAssetRel). */
+  getFilesRel: () => Record<string, string>
+  /** Test / debug: undo past depth. */
+  getHistoryPastLength: () => number
+  undo: () => void
+  redo: () => void
 }
 
 export type HipBoardCanvasProps = {
@@ -107,6 +135,44 @@ type Gesture =
       elementId: string
       startWX: number
       startWY: number
+      /** Snapshot before create (for undo + discard). */
+      before: BoardHistoryEntry
+    }
+  | {
+      kind: 'marquee'
+      pointerId: number
+      startWX: number
+      startWY: number
+      currentWX: number
+      currentWY: number
+    }
+  | {
+      kind: 'move'
+      pointerId: number
+      startWX: number
+      startWY: number
+      /** Elements at pointerdown (preview applies delta from these). */
+      originElements: HipBoardElement[]
+      ids: string[]
+      before: BoardHistoryEntry
+      moved: boolean
+    }
+  | {
+      kind: 'resize'
+      pointerId: number
+      elementId: string
+      handle: BoxHandle
+      originBox: WorldAabb
+      before: BoardHistoryEntry
+      changed: boolean
+    }
+  | {
+      kind: 'endpoint'
+      pointerId: number
+      elementId: string
+      which: EndpointHandle
+      before: BoardHistoryEntry
+      changed: boolean
     }
 
 type TextEditState = {
@@ -148,6 +214,12 @@ export const HipBoardCanvas = forwardRef<HipBoardCanvasHandle, HipBoardCanvasPro
     const selectedIdsRef = useRef<string[]>([])
     const textEditOriginalRef = useRef<string>('')
     const textEditRef = useRef<TextEditState | null>(null)
+    /** Undo past (older → newer). Cleared on leave. */
+    const historyPastRef = useRef<BoardHistoryEntry[]>([])
+    /** Redo future. Cleared on leave and on new commits. */
+    const historyFutureRef = useRef<BoardHistoryEntry[]>([])
+    /** Text edit: snapshot before edit for undo on commit. */
+    const textEditBeforeRef = useRef<BoardHistoryEntry | null>(null)
 
     const [camera, setCamera] = useState<HipBoardCamera>(() => ({
       ...HIP_BOARD_DEFAULT_CAMERA,
@@ -159,6 +231,8 @@ export const HipBoardCanvas = forwardRef<HipBoardCanvasHandle, HipBoardCanvasPro
     const [textEdit, setTextEdit] = useState<TextEditState | null>(null)
     // Bump when camera moves during text edit so overlay screen-box recalculates.
     const [overlayTick, setOverlayTick] = useState(0)
+    /** Live marquee AABB in world space (null when idle). */
+    const [marquee, setMarquee] = useState<WorldAabb | null>(null)
 
     toolRef.current = tool
     selectedIdsRef.current = selectedIds
@@ -171,6 +245,22 @@ export const HipBoardCanvas = forwardRef<HipBoardCanvasHandle, HipBoardCanvasPro
       }
     }, [])
 
+    const snapshotHistory = useCallback((): BoardHistoryEntry => {
+      return cloneHistoryEntry(elementsRef.current, filesRelRef.current)
+    }, [])
+
+    const commitHistory = useCallback(
+      (before: BoardHistoryEntry) => {
+        pushHistory(historyPastRef.current, historyFutureRef.current, before)
+      },
+      [],
+    )
+
+    const clearHistory = useCallback(() => {
+      historyPastRef.current = []
+      historyFutureRef.current = []
+    }, [])
+
     useLayoutEffect(() => {
       activeRef.current = true
       readyRef.current = false
@@ -179,6 +269,10 @@ export const HipBoardCanvas = forwardRef<HipBoardCanvasHandle, HipBoardCanvasPro
       spaceDownRef.current = false
       textEditOriginalRef.current = ''
       textEditRef.current = null
+      textEditBeforeRef.current = null
+      historyPastRef.current = []
+      historyFutureRef.current = []
+      setMarquee(null)
 
       let scene: HipBoardSceneDisk = EMPTY_HIP_BOARD_SCENE
       try {
@@ -219,6 +313,8 @@ export const HipBoardCanvas = forwardRef<HipBoardCanvasHandle, HipBoardCanvasPro
         readyRef.current = false
         clearThrottle()
         gestureRef.current = null
+        historyPastRef.current = []
+        historyFutureRef.current = []
       }
       // Mount once per boardId (parent keys remount).
       // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -262,6 +358,46 @@ export const HipBoardCanvas = forwardRef<HipBoardCanvasHandle, HipBoardCanvasPro
       setSelectedIds(ids)
       // Selection-only — never schedule draft (LKD-14 / LKD-16)
     }, [])
+
+    /** Apply a history entry (undo/redo). Does not re-push history. */
+    const applyHistoryEntry = useCallback(
+      (entry: BoardHistoryEntry) => {
+        const els = entry.elements.map((e) => ({ ...e })) as HipBoardElement[]
+        const rel = { ...entry.filesRel }
+        elementsRef.current = els
+        filesRelRef.current = rel
+        setElements(els)
+        const alive = new Set(els.map((e) => e.id))
+        setSelection(selectedIdsRef.current.filter((id) => alive.has(id)))
+        scheduleDraftAuto()
+      },
+      [scheduleDraftAuto, setSelection],
+    )
+
+    const undo = useCallback(() => {
+      if (!activeRef.current) return
+      if (textEditRef.current) return
+      const past = historyPastRef.current
+      if (past.length === 0) return
+      const current = snapshotHistory()
+      const prev = past.pop()!
+      historyFutureRef.current.push(current)
+      applyHistoryEntry(prev)
+    }, [applyHistoryEntry, snapshotHistory])
+
+    const redo = useCallback(() => {
+      if (!activeRef.current) return
+      if (textEditRef.current) return
+      const future = historyFutureRef.current
+      if (future.length === 0) return
+      const current = snapshotHistory()
+      const next = future.pop()!
+      historyPastRef.current.push(current)
+      while (historyPastRef.current.length > BOARD_HISTORY_MAX) {
+        historyPastRef.current.shift()
+      }
+      applyHistoryEntry(next)
+    }, [applyHistoryEntry, snapshotHistory])
 
     const changeTool = useCallback((next: BoardTool) => {
       if (!activeRef.current) return
@@ -314,6 +450,8 @@ export const HipBoardCanvas = forwardRef<HipBoardCanvasHandle, HipBoardCanvasPro
         const edit = textEditRef.current
         if (!edit) return
         const el = elementsRef.current.find((e) => e.id === edit.id)
+        const before = textEditBeforeRef.current
+        textEditBeforeRef.current = null
         if (!el || el.type !== 'text') {
           textEditRef.current = null
           setTextEdit(null)
@@ -322,10 +460,21 @@ export const HipBoardCanvas = forwardRef<HipBoardCanvasHandle, HipBoardCanvasPro
         }
         if (opts?.cancel) {
           // Drop only brand-new placements from text tool this session (isNew).
+          // before snapshot already excludes the new placement (captured at place).
           if (edit.isNew) {
-            setElementsBoth(
-              elementsRef.current.filter((e) => e.id !== edit.id),
-            )
+            // Restore pre-place scene without an extra history push (cancel).
+            if (before) {
+              elementsRef.current = before.elements.map((e) => ({
+                ...e,
+              })) as HipBoardElement[]
+              filesRelRef.current = { ...before.filesRel }
+              setElements(elementsRef.current)
+              scheduleDraftAuto()
+            } else {
+              setElementsBoth(
+                elementsRef.current.filter((e) => e.id !== edit.id),
+              )
+            }
             setSelection([])
           } else {
             const original = textEditOriginalRef.current
@@ -342,11 +491,27 @@ export const HipBoardCanvas = forwardRef<HipBoardCanvasHandle, HipBoardCanvasPro
                 elementsRef.current.map((e) => (e.id === edit.id ? restored : e)),
               )
             }
+            // Cancel existing edit: no history push (scene back to original).
           }
         } else {
           const nextText = edit.draft
           const h = measureTextHeight(nextText, el.fontSize)
-          if (el.text !== nextText || el.h !== h) {
+          const changed = el.text !== nextText || el.h !== h
+          // For brand-new text, placement already mutated elements; push pre-place.
+          // For existing text, push only if content changed vs original baseline.
+          if (edit.isNew) {
+            if (before) commitHistory(before)
+            if (changed) {
+              const updated: HipBoardText = { ...el, text: nextText, h }
+              setElementsBoth(
+                elementsRef.current.map((e) => (e.id === edit.id ? updated : e)),
+              )
+            } else {
+              // Empty new text still committed as a placement.
+              scheduleDraftAuto()
+            }
+          } else if (changed) {
+            if (before) commitHistory(before)
             const updated: HipBoardText = { ...el, text: nextText, h }
             setElementsBoth(
               elementsRef.current.map((e) => (e.id === edit.id ? updated : e)),
@@ -359,7 +524,7 @@ export const HipBoardCanvas = forwardRef<HipBoardCanvasHandle, HipBoardCanvasPro
         // Return focus to canvas for shortcuts.
         requestAnimationFrame(() => rootRef.current?.focus())
       },
-      [setElementsBoth, setSelection],
+      [commitHistory, scheduleDraftAuto, setElementsBoth, setSelection],
     )
 
     const beginTextEdit = useCallback(
@@ -371,6 +536,10 @@ export const HipBoardCanvas = forwardRef<HipBoardCanvasHandle, HipBoardCanvasPro
         // Commit any prior edit first.
         if (textEditRef.current && textEditRef.current.id !== id) {
           commitTextEdit()
+        }
+        // Capture undo baseline. For isNew, caller already set textEditBeforeRef.
+        if (!editOpts?.isNew) {
+          textEditBeforeRef.current = snapshotHistory()
         }
         textEditOriginalRef.current = el.text
         const state: TextEditState = {
@@ -388,7 +557,7 @@ export const HipBoardCanvas = forwardRef<HipBoardCanvasHandle, HipBoardCanvasPro
           ta.select()
         })
       },
-      [commitTextEdit, setSelection],
+      [commitTextEdit, setSelection, snapshotHistory],
     )
 
     const flushToStore = useCallback(
@@ -399,6 +568,8 @@ export const HipBoardCanvas = forwardRef<HipBoardCanvasHandle, HipBoardCanvasPro
           activeRef.current = false
           gestureRef.current = null
           clearThrottle()
+          clearHistory()
+          setMarquee(null)
           // Commit in-progress text into elements before serializing (no cancel).
           foldOpenTextDraft({ close: true })
         } else if (!activeRef.current) {
@@ -412,7 +583,7 @@ export const HipBoardCanvas = forwardRef<HipBoardCanvasHandle, HipBoardCanvasPro
         lastSerializedRef.current = raw
         onDraftBody?.(raw, { docId: boardIdRef.current, persist: 'none' })
       },
-      [buildDiskJson, clearThrottle, foldOpenTextDraft, onDraftBody],
+      [buildDiskJson, clearHistory, clearThrottle, foldOpenTextDraft, onDraftBody],
     )
 
     const applyStylePatch = useCallback(
@@ -488,9 +659,12 @@ export const HipBoardCanvas = forwardRef<HipBoardCanvasHandle, HipBoardCanvasPro
           }
           return el
         })
-        if (changed) setElementsBoth(next)
+        if (changed) {
+          commitHistory(snapshotHistory())
+          setElementsBoth(next)
+        }
       },
-      [setElementsBoth],
+      [commitHistory, setElementsBoth, snapshotHistory],
     )
 
     const updateText = useCallback(
@@ -500,6 +674,10 @@ export const HipBoardCanvas = forwardRef<HipBoardCanvasHandle, HipBoardCanvasPro
         if (!el || el.type !== 'text' || el.locked) return
         const h = measureTextHeight(text, el.fontSize)
         if (el.text === text && el.h === h) return
+        // If mid-edit via textarea, skip separate history (commitTextEdit owns it).
+        if (!textEditRef.current || textEditRef.current.id !== id) {
+          commitHistory(snapshotHistory())
+        }
         setElementsBoth(
           elementsRef.current.map((e) =>
             e.id === id && e.type === 'text' ? { ...e, text, h } : e,
@@ -515,8 +693,25 @@ export const HipBoardCanvas = forwardRef<HipBoardCanvasHandle, HipBoardCanvasPro
           setTextEdit(st)
         }
       },
-      [setElementsBoth],
+      [commitHistory, setElementsBoth, snapshotHistory],
     )
+
+    const deleteSelection = useCallback(() => {
+      if (!activeRef.current) return
+      if (textEditRef.current) return
+      const ids = selectedIdsRef.current
+      if (ids.length === 0) return
+      const idSet = new Set(ids)
+      // Only push if at least one unlocked selected element will be removed.
+      const willDelete = elementsRef.current.some(
+        (el) => idSet.has(el.id) && el.locked !== true,
+      )
+      if (!willDelete) return
+      commitHistory(snapshotHistory())
+      const next = deleteElements(elementsRef.current, idSet)
+      setElementsBoth(next)
+      setSelection(ids.filter((id) => next.some((e) => e.id === id)))
+    }, [commitHistory, setElementsBoth, setSelection, snapshotHistory])
 
     useImperativeHandle(
       ref,
@@ -528,15 +723,29 @@ export const HipBoardCanvas = forwardRef<HipBoardCanvasHandle, HipBoardCanvasPro
           if (!activeRef.current) return
           if (textEditRef.current) commitTextEdit()
           setSelection(ids)
-          // Scroll/camera fit deferred to PR-3/4.
+          // Camera fit deferred to companion rail (PR-4).
         },
         applyStylePatch,
         updateText,
         getCamera: () => ({ ...cameraRef.current }),
         getTool: () => toolRef.current,
         getSelectedIds: () => [...selectedIdsRef.current],
+        getElements: () =>
+          elementsRef.current.map((e) => ({ ...e })) as HipBoardElement[],
+        getFilesRel: () => ({ ...filesRelRef.current }),
+        getHistoryPastLength: () => historyPastRef.current.length,
+        undo,
+        redo,
       }),
-      [applyStylePatch, commitTextEdit, flushToStore, setSelection, updateText],
+      [
+        applyStylePatch,
+        commitTextEdit,
+        flushToStore,
+        redo,
+        setSelection,
+        undo,
+        updateText,
+      ],
     )
 
     useEffect(() => {
@@ -639,6 +848,8 @@ export const HipBoardCanvas = forwardRef<HipBoardCanvasHandle, HipBoardCanvasPro
 
     const placeTextAt = useCallback(
       (wx: number, wy: number) => {
+        // Pre-place snapshot for undo / Escape cancel.
+        textEditBeforeRef.current = snapshotHistory()
         const id = newElementId('txt')
         const fontSize = BOARD_TEXT_DEFAULT_FONT_SIZE
         const el: HipBoardText = {
@@ -652,14 +863,15 @@ export const HipBoardCanvas = forwardRef<HipBoardCanvasHandle, HipBoardCanvasPro
           fill: BOARD_DEFAULT_STROKE,
           fontSize,
         }
-        setElementsBoth([...elementsRef.current, el])
+        // Placement is provisional until text commit; draft on blur/leave.
+        setElementsBoth([...elementsRef.current, el], { draft: false })
         setSelection([id])
         // Switch off text tool before edit (changeTool no-ops while editing).
         toolRef.current = 'select'
         setTool('select')
         beginTextEdit(id, { isNew: true })
       },
-      [beginTextEdit, setElementsBoth, setSelection],
+      [beginTextEdit, setElementsBoth, setSelection, snapshotHistory],
     )
 
     const onPointerDown = useCallback(
@@ -694,6 +906,7 @@ export const HipBoardCanvas = forwardRef<HipBoardCanvasHandle, HipBoardCanvasPro
 
         const world = clientToWorld(e.clientX, e.clientY)
         const currentTool = toolRef.current
+        const zoom = cameraRef.current.zoom
 
         if (currentTool === 'text') {
           placeTextAt(world.x, world.y)
@@ -706,6 +919,7 @@ export const HipBoardCanvas = forwardRef<HipBoardCanvasHandle, HipBoardCanvasPro
           currentTool === 'line' ||
           currentTool === 'arrow'
         ) {
+          const before = snapshotHistory()
           const el = createShapeAt(currentTool, world.x, world.y)
           e.currentTarget.setPointerCapture(e.pointerId)
           gestureRef.current = {
@@ -715,25 +929,98 @@ export const HipBoardCanvas = forwardRef<HipBoardCanvasHandle, HipBoardCanvasPro
             elementId: el.id,
             startWX: world.x,
             startWY: world.y,
+            before,
           }
           setElementsBoth([...elementsRef.current, el], { draft: false })
           setSelection([el.id])
           return
         }
 
-        // Select tool (PR-2 stub): click select / clear. Marquee/move in PR-3.
+        // Select tool: handles → resize/endpoint; shape → move; empty → marquee.
         if (currentTool === 'select') {
-          const hit = hitTest(
-            elementsRef.current,
-            world.x,
-            world.y,
-            cameraRef.current.zoom,
-          )
-          if (hit) {
-            setSelection([hit])
-          } else {
-            setSelection([])
+          // Resize handle (single selected unlocked box).
+          if (selectedIdsRef.current.length === 1) {
+            const onlyId = selectedIdsRef.current[0]!
+            const only = elementsRef.current.find((x) => x.id === onlyId)
+            if (only && !only.locked) {
+              if (isBoxResizable(only)) {
+                const handle = hitTestBoxHandle(
+                  elementAabb(only),
+                  world.x,
+                  world.y,
+                  zoom,
+                )
+                if (handle) {
+                  e.currentTarget.setPointerCapture(e.pointerId)
+                  gestureRef.current = {
+                    kind: 'resize',
+                    pointerId: e.pointerId,
+                    elementId: only.id,
+                    handle,
+                    originBox: elementAabb(only),
+                    before: snapshotHistory(),
+                    changed: false,
+                  }
+                  return
+                }
+              }
+              if (only.type === 'line' || only.type === 'arrow') {
+                const ep = hitTestLineEndpoint(only, world.x, world.y, zoom)
+                if (ep) {
+                  e.currentTarget.setPointerCapture(e.pointerId)
+                  gestureRef.current = {
+                    kind: 'endpoint',
+                    pointerId: e.pointerId,
+                    elementId: only.id,
+                    which: ep,
+                    before: snapshotHistory(),
+                    changed: false,
+                  }
+                  return
+                }
+              }
+            }
           }
+
+          const hit = hitTest(elementsRef.current, world.x, world.y, zoom)
+          if (hit) {
+            const hitEl = elementsRef.current.find((x) => x.id === hit)
+            let ids = selectedIdsRef.current
+            if (!ids.includes(hit)) {
+              ids = [hit]
+              setSelection(ids)
+            }
+            // Locked: select only, no move gesture.
+            if (hitEl?.locked) return
+            // Move all selected (unlocked ones move; locked stay via moveElements).
+            e.currentTarget.setPointerCapture(e.pointerId)
+            gestureRef.current = {
+              kind: 'move',
+              pointerId: e.pointerId,
+              startWX: world.x,
+              startWY: world.y,
+              originElements: elementsRef.current.map((el) => ({
+                ...el,
+              })) as HipBoardElement[],
+              ids: [...ids],
+              before: snapshotHistory(),
+              moved: false,
+            }
+            return
+          }
+
+          // Empty space → marquee.
+          setSelection([])
+          e.currentTarget.setPointerCapture(e.pointerId)
+          gestureRef.current = {
+            kind: 'marquee',
+            pointerId: e.pointerId,
+            startWX: world.x,
+            startWY: world.y,
+            currentWX: world.x,
+            currentWY: world.y,
+          }
+          setMarquee({ x: world.x, y: world.y, w: 0, h: 0 })
         }
       },
       [
@@ -743,6 +1030,7 @@ export const HipBoardCanvas = forwardRef<HipBoardCanvasHandle, HipBoardCanvasPro
         placeTextAt,
         setElementsBoth,
         setSelection,
+        snapshotHistory,
       ],
     )
 
@@ -784,6 +1072,63 @@ export const HipBoardCanvas = forwardRef<HipBoardCanvasHandle, HipBoardCanvasPro
           // Live preview only — draft on pointerup commit.
           elementsRef.current = next
           setElements(next)
+          return
+        }
+
+        if (g.kind === 'marquee') {
+          const world = clientToWorld(e.clientX, e.clientY)
+          g.currentWX = world.x
+          g.currentWY = world.y
+          setMarquee(
+            normalizeRectFromDrag(g.startWX, g.startWY, world.x, world.y),
+          )
+          return
+        }
+
+        if (g.kind === 'move') {
+          const world = clientToWorld(e.clientX, e.clientY)
+          const dx = world.x - g.startWX
+          const dy = world.y - g.startWY
+          if (dx !== 0 || dy !== 0) g.moved = true
+          const next = moveElements(
+            g.originElements,
+            new Set(g.ids),
+            dx,
+            dy,
+          )
+          elementsRef.current = next
+          setElements(next)
+          return
+        }
+
+        if (g.kind === 'resize') {
+          const world = clientToWorld(e.clientX, e.clientY)
+          const box = resizeBoxFromHandle(
+            g.originBox,
+            g.handle,
+            world.x,
+            world.y,
+          )
+          g.changed = true
+          const next = elementsRef.current.map((el) => {
+            if (el.id !== g.elementId) return el
+            return applyBoxResize(el, box)
+          })
+          elementsRef.current = next
+          setElements(next)
+          return
+        }
+
+        if (g.kind === 'endpoint') {
+          const world = clientToWorld(e.clientX, e.clientY)
+          g.changed = true
+          const next = elementsRef.current.map((el) => {
+            if (el.id !== g.elementId) return el
+            if (el.type !== 'line' && el.type !== 'arrow') return el
+            return moveLineEndpoint(el as HipBoardLine, g.which, world.x, world.y)
+          })
+          elementsRef.current = next
+          setElements(next)
         }
       },
       [applyCamera, clientToWorld],
@@ -802,6 +1147,21 @@ export const HipBoardCanvas = forwardRef<HipBoardCanvasHandle, HipBoardCanvasPro
 
         if (g.kind === 'pan') return
 
+        if (g.kind === 'marquee') {
+          const box = normalizeRectFromDrag(
+            g.startWX,
+            g.startWY,
+            g.currentWX,
+            g.currentWY,
+          )
+          setMarquee(null)
+          // Click without drag: already cleared selection on down.
+          if (box.w < 2 && box.h < 2) return
+          const ids = hitTestMarquee(elementsRef.current, box)
+          setSelection(ids)
+          return
+        }
+
         if (g.kind === 'create') {
           const el = elementsRef.current.find((x) => x.id === g.elementId)
           if (!el) return
@@ -819,12 +1179,31 @@ export const HipBoardCanvas = forwardRef<HipBoardCanvasHandle, HipBoardCanvasPro
             setSelection([])
             return
           }
-          // Commit scene change → throttle draft.
+          commitHistory(g.before)
           scheduleDraftAuto()
           // Stay on shape tool for multi-draw (common whiteboard UX).
+          return
+        }
+
+        if (g.kind === 'move') {
+          if (!g.moved) return
+          const idSet = new Set(g.ids)
+          const anyUnlocked = g.originElements.some(
+            (el) => idSet.has(el.id) && el.locked !== true,
+          )
+          if (!anyUnlocked) return
+          commitHistory(g.before)
+          scheduleDraftAuto()
+          return
+        }
+
+        if (g.kind === 'resize' || g.kind === 'endpoint') {
+          if (!g.changed) return
+          commitHistory(g.before)
+          scheduleDraftAuto()
         }
       },
-      [scheduleDraftAuto, setElementsBoth, setSelection],
+      [commitHistory, scheduleDraftAuto, setElementsBoth, setSelection],
     )
 
     const onDoubleClick = useCallback(
@@ -877,9 +1256,31 @@ export const HipBoardCanvas = forwardRef<HipBoardCanvasHandle, HipBoardCanvasPro
           return
         }
 
-        // While editing text: tool shortcuts disabled.
+        // While editing text: tool shortcuts disabled (except handled above).
         if (textEditRef.current) return
         if (isEditableTarget(e.target)) return
+
+        // Undo / redo (Cmd/Ctrl+Z, Shift+Z or Y) — LKD-12
+        if ((e.metaKey || e.ctrlKey) && !e.altKey) {
+          const k = e.key.toLowerCase()
+          if (k === 'z' && !e.shiftKey) {
+            e.preventDefault()
+            undo()
+            return
+          }
+          if ((k === 'z' && e.shiftKey) || k === 'y') {
+            e.preventDefault()
+            redo()
+            return
+          }
+        }
+
+        // Delete / Backspace removes selected (skips locked) — PR-3
+        if (e.key === 'Delete' || e.key === 'Backspace') {
+          e.preventDefault()
+          deleteSelection()
+          return
+        }
 
         // Enter → edit single selected text.
         if (e.key === 'Enter') {
@@ -910,7 +1311,15 @@ export const HipBoardCanvas = forwardRef<HipBoardCanvasHandle, HipBoardCanvasPro
           changeTool(next)
         }
       },
-      [beginTextEdit, changeTool, commitTextEdit, setSelection],
+      [
+        beginTextEdit,
+        changeTool,
+        commitTextEdit,
+        deleteSelection,
+        redo,
+        setSelection,
+        undo,
+      ],
     )
 
     const onKeyUp = useCallback((e: React.KeyboardEvent) => {
@@ -1114,29 +1523,117 @@ export const HipBoardCanvas = forwardRef<HipBoardCanvasHandle, HipBoardCanvasPro
               return null
             })}
 
-            {/* Lightweight selection outline (handles/marquee in PR-3). */}
+            {/* Selection outlines + handles (PR-3). */}
             {selectedIds.map((id) => {
               const el = elements.find((x) => x.id === id)
               if (!el) return null
               if (textEdit?.id === id) return null
               const box = elementAabb(el)
               const inv = 1 / (camera.zoom || 1)
+              const stroke = 'var(--accent, #3b82f6)'
+              const showHandles =
+                selectedIds.length === 1 &&
+                !el.locked &&
+                (isBoxResizable(el) || el.type === 'line' || el.type === 'arrow')
               return (
-                <rect
-                  key={`sel-${id}`}
-                  x={box.x}
-                  y={box.y}
-                  width={Math.max(box.w, 0)}
-                  height={Math.max(box.h, 0)}
-                  fill="none"
-                  stroke="var(--accent, #3b82f6)"
-                  strokeWidth={1.5 * inv}
-                  strokeDasharray={`${4 * inv} ${3 * inv}`}
-                  pointerEvents="none"
-                  data-testid={`hip-board-selection-${id}`}
-                />
+                <g key={`sel-${id}`} data-testid={`hip-board-selection-${id}`}>
+                  <rect
+                    x={box.x}
+                    y={box.y}
+                    width={Math.max(box.w, 0)}
+                    height={Math.max(box.h, 0)}
+                    fill="none"
+                    stroke={stroke}
+                    strokeWidth={1.5 * inv}
+                    strokeDasharray={`${4 * inv} ${3 * inv}`}
+                    pointerEvents="none"
+                  />
+                  {showHandles && isBoxResizable(el)
+                    ? (Object.entries(boxHandlePositions(box)) as [
+                        BoxHandle,
+                        { x: number; y: number },
+                      ][]).map(([handle, p]) => {
+                        const hs = 7 * inv
+                        return (
+                          <rect
+                            key={handle}
+                            x={p.x - hs / 2}
+                            y={p.y - hs / 2}
+                            width={hs}
+                            height={hs}
+                            fill="#fff"
+                            stroke={stroke}
+                            strokeWidth={1 * inv}
+                            data-testid={`hip-board-handle-${handle}`}
+                            data-handle={handle}
+                            style={{ cursor: `${handle}-resize` }}
+                          />
+                        )
+                      })
+                    : null}
+                  {showHandles && (el.type === 'line' || el.type === 'arrow')
+                    ? (['start', 'end'] as const).map((which) => {
+                        const px = which === 'start' ? el.x : el.x2
+                        const py = which === 'start' ? el.y : el.y2
+                        const r = 5 * inv
+                        return (
+                          <circle
+                            key={which}
+                            cx={px}
+                            cy={py}
+                            r={r}
+                            fill="#fff"
+                            stroke={stroke}
+                            strokeWidth={1 * inv}
+                            data-testid={`hip-board-endpoint-${which}`}
+                            data-handle={which}
+                          />
+                        )
+                      })
+                    : null}
+                </g>
               )
             })}
+
+            {/* Multi-select union outline (no handles). */}
+            {selectedIds.length > 1
+              ? (() => {
+                  const union = selectionUnionAabb(elements, selectedIds)
+                  if (!union) return null
+                  const inv = 1 / (camera.zoom || 1)
+                  return (
+                    <rect
+                      data-testid="hip-board-selection-union"
+                      x={union.x}
+                      y={union.y}
+                      width={Math.max(union.w, 0)}
+                      height={Math.max(union.h, 0)}
+                      fill="none"
+                      stroke="var(--accent, #3b82f6)"
+                      strokeWidth={1 * inv}
+                      strokeOpacity={0.5}
+                      pointerEvents="none"
+                    />
+                  )
+                })()
+              : null}
+
+            {/* Marquee rubber-band. */}
+            {marquee && marquee.w + marquee.h > 0 ? (
+              <rect
+                data-testid="hip-board-marquee"
+                x={marquee.x}
+                y={marquee.y}
+                width={marquee.w}
+                height={marquee.h}
+                fill="var(--accent, #3b82f6)"
+                fillOpacity={0.08}
+                stroke="var(--accent, #3b82f6)"
+                strokeWidth={1 / (camera.zoom || 1)}
+                strokeDasharray={`${4 / (camera.zoom || 1)} ${3 / (camera.zoom || 1)}`}
+                pointerEvents="none"
+              />
+            ) : null}
           </g>
         </svg>
 

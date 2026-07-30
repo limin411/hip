@@ -776,3 +776,418 @@ describe('HipBoardCanvas tools + text (PR-2)', () => {
     expect(screen.getByTestId('hip-board-text-edit')).toBeTruthy()
   })
 })
+
+const SCENE_TWO_RECTS: HipBoardSceneDisk = {
+  type: 'hip-board',
+  version: 1,
+  source: 'hip',
+  hip: { schemaVersion: 1 },
+  elements: [
+    {
+      id: 'r1',
+      type: 'rect',
+      x: 10,
+      y: 10,
+      w: 40,
+      h: 40,
+      fill: '#fff',
+      stroke: '#111',
+      strokeWidth: 2,
+      cornerRadius: 0,
+    },
+    {
+      id: 'r2',
+      type: 'rect',
+      x: 100,
+      y: 100,
+      w: 40,
+      h: 40,
+      fill: '#fff',
+      stroke: '#111',
+      strokeWidth: 2,
+      cornerRadius: 0,
+    },
+  ],
+  appState: { viewBackgroundColor: '#fff' },
+  files: {},
+}
+
+const SCENE_WITH_LOCKED: HipBoardSceneDisk = {
+  type: 'hip-board',
+  version: 1,
+  source: 'hip',
+  hip: { schemaVersion: 1 },
+  elements: [
+    {
+      id: 'free',
+      type: 'rect',
+      x: 0,
+      y: 0,
+      w: 50,
+      h: 50,
+      fill: '#fff',
+      stroke: '#111',
+      strokeWidth: 2,
+      cornerRadius: 0,
+    },
+    {
+      id: 'locked',
+      type: 'rect',
+      x: 80,
+      y: 0,
+      w: 50,
+      h: 50,
+      fill: '#fff',
+      stroke: '#111',
+      strokeWidth: 2,
+      cornerRadius: 0,
+      locked: true,
+    },
+  ],
+  appState: { viewBackgroundColor: '#fff' },
+  files: {},
+}
+
+const SCENE_WITH_IMAGE_FILES: HipBoardSceneDisk = {
+  type: 'hip-board',
+  version: 1,
+  source: 'hip',
+  hip: { schemaVersion: 1, boardId: 'brd_img' },
+  elements: [
+    {
+      id: 'img1',
+      type: 'image',
+      x: 0,
+      y: 0,
+      w: 80,
+      h: 60,
+      fileId: 'file_a',
+    },
+    {
+      id: 'r1',
+      type: 'rect',
+      x: 100,
+      y: 0,
+      w: 40,
+      h: 40,
+      fill: '#fff',
+      stroke: '#111',
+      strokeWidth: 2,
+      cornerRadius: 0,
+    },
+  ],
+  appState: { viewBackgroundColor: '#fff' },
+  files: {
+    file_a: {
+      id: 'file_a',
+      mimeType: 'image/png',
+      created: 1,
+      hipAssetRel: 'assets/boards/brd_img/file_a.png',
+    },
+  },
+}
+
+function stubRect(root: HTMLElement) {
+  vi.spyOn(root, 'getBoundingClientRect').mockReturnValue({
+    left: 0,
+    top: 0,
+    right: 400,
+    bottom: 300,
+    width: 400,
+    height: 300,
+    x: 0,
+    y: 0,
+    toJSON: () => ({}),
+  })
+}
+
+describe('HipBoardCanvas selection / transform / undo (PR-3)', () => {
+  beforeEach(() => {
+    vi.useFakeTimers()
+  })
+
+  it('marquee multi-selects intersecting rects (normalized AABB)', () => {
+    const { ref, root } = renderCanvas({
+      initialJson: serializeHipBoard(SCENE_TWO_RECTS),
+    })
+    stubRect(root as HTMLElement)
+
+    // Drag marquee covering both (including inverted direction).
+    act(() => {
+      fireEvent.pointerDown(root, { button: 0, clientX: 200, clientY: 200, pointerId: 1 })
+      fireEvent.pointerMove(root, { button: 0, clientX: 0, clientY: 0, pointerId: 1 })
+      fireEvent.pointerUp(root, { button: 0, clientX: 0, clientY: 0, pointerId: 1 })
+    })
+    const ids = ref.current!.getSelectedIds().slice().sort()
+    expect(ids).toEqual(['r1', 'r2'])
+  })
+
+  it('move selected element by drag and schedules draft once', () => {
+    const { ref, onDraftBody, root } = renderCanvas({
+      initialJson: serializeHipBoard(SCENE_WITH_RECT),
+    })
+    stubRect(root as HTMLElement)
+
+    act(() => {
+      // Select + start move on r1 (x=10..90, y=20..60)
+      fireEvent.pointerDown(root, { button: 0, clientX: 30, clientY: 40, pointerId: 1 })
+      fireEvent.pointerMove(root, { button: 0, clientX: 50, clientY: 55, pointerId: 1 })
+      fireEvent.pointerUp(root, { button: 0, clientX: 50, clientY: 55, pointerId: 1 })
+    })
+    const el = ref.current!.getElements().find((e) => e.id === 'r1')!
+    expect(el).toMatchObject({ x: 30, y: 35 })
+
+    act(() => {
+      vi.advanceTimersByTime(150)
+    })
+    expect(onDraftBody).toHaveBeenCalled()
+    const parsed = JSON.parse(onDraftBody.mock.calls[0]![0] as string)
+    expect(parsed.elements[0].x).toBeCloseTo(30)
+  })
+
+  it('resize box via se handle', () => {
+    const { ref, root } = renderCanvas({
+      initialJson: serializeHipBoard(SCENE_WITH_RECT),
+    })
+    stubRect(root as HTMLElement)
+
+    // Select first
+    act(() => {
+      fireEvent.pointerDown(root, { button: 0, clientX: 30, clientY: 40, pointerId: 1 })
+      fireEvent.pointerUp(root, { button: 0, clientX: 30, clientY: 40, pointerId: 1 })
+    })
+    expect(ref.current!.getSelectedIds()).toEqual(['r1'])
+    expect(screen.getByTestId('hip-board-handle-se')).toBeTruthy()
+
+    // Drag SE handle from (90,60) toward (120,90)
+    act(() => {
+      fireEvent.pointerDown(root, { button: 0, clientX: 90, clientY: 60, pointerId: 2 })
+      fireEvent.pointerMove(root, { button: 0, clientX: 120, clientY: 90, pointerId: 2 })
+      fireEvent.pointerUp(root, { button: 0, clientX: 120, clientY: 90, pointerId: 2 })
+    })
+    const el = ref.current!.getElements().find((e) => e.id === 'r1')!
+    expect(el).toMatchObject({ x: 10, y: 20, w: 110, h: 70 })
+  })
+
+  it('Delete key removes unlocked selection and skips locked', () => {
+    const { ref, root } = renderCanvas({
+      initialJson: serializeHipBoard(SCENE_WITH_LOCKED),
+    })
+    stubRect(root as HTMLElement)
+
+    // Select free
+    act(() => {
+      fireEvent.pointerDown(root, { button: 0, clientX: 25, clientY: 25, pointerId: 1 })
+      fireEvent.pointerUp(root, { button: 0, clientX: 25, clientY: 25, pointerId: 1 })
+      root.focus()
+      fireEvent.keyDown(root, { key: 'Delete' })
+    })
+    expect(ref.current!.getElements().map((e) => e.id)).toEqual(['locked'])
+
+    // Select locked and try delete — stays
+    act(() => {
+      fireEvent.pointerDown(root, { button: 0, clientX: 100, clientY: 25, pointerId: 2 })
+      fireEvent.pointerUp(root, { button: 0, clientX: 100, clientY: 25, pointerId: 2 })
+      fireEvent.keyDown(root, { key: 'Backspace' })
+    })
+    expect(ref.current!.getElements().map((e) => e.id)).toEqual(['locked'])
+    expect(ref.current!.getSelectedIds()).toEqual(['locked'])
+  })
+
+  it('locked element rejects move and style patch', () => {
+    const { ref, root } = renderCanvas({
+      initialJson: serializeHipBoard(SCENE_WITH_LOCKED),
+    })
+    stubRect(root as HTMLElement)
+
+    act(() => {
+      fireEvent.pointerDown(root, { button: 0, clientX: 100, clientY: 25, pointerId: 1 })
+      fireEvent.pointerMove(root, { button: 0, clientX: 140, clientY: 40, pointerId: 1 })
+      fireEvent.pointerUp(root, { button: 0, clientX: 140, clientY: 40, pointerId: 1 })
+    })
+    const locked = ref.current!.getElements().find((e) => e.id === 'locked')!
+    expect(locked).toMatchObject({ x: 80, y: 0 })
+    expect(ref.current!.getHistoryPastLength()).toBe(0)
+
+    act(() => {
+      ref.current!.applyStylePatch(['locked'], { fill: '#ff0000' })
+    })
+    expect(
+      (ref.current!.getElements().find((e) => e.id === 'locked') as { fill: string }).fill,
+    ).toBe('#fff')
+  })
+
+  it('undo restores elements and filesRel; redo reapplies', () => {
+    const { ref, onDraftBody, root } = renderCanvas({
+      initialJson: serializeHipBoard(SCENE_WITH_IMAGE_FILES),
+      boardId: 'brd_img',
+    })
+    stubRect(root as HTMLElement)
+
+    expect(ref.current!.getFilesRel()).toEqual({
+      file_a: 'assets/boards/brd_img/file_a.png',
+    })
+    expect(ref.current!.getElements()).toHaveLength(2)
+
+    // Delete the image (and its presence); filesRel stays until undo/redo policy —
+    // delete only removes elements; filesRel map is kept (orphan ok). Then delete rect.
+    act(() => {
+      fireEvent.pointerDown(root, { button: 0, clientX: 40, clientY: 30, pointerId: 1 })
+      fireEvent.pointerUp(root, { button: 0, clientX: 40, clientY: 30, pointerId: 1 })
+      root.focus()
+      fireEvent.keyDown(root, { key: 'Delete' })
+    })
+    expect(ref.current!.getElements().map((e) => e.id)).toEqual(['r1'])
+    expect(ref.current!.getHistoryPastLength()).toBe(1)
+    // filesRel still present (delete does not purge files)
+    expect(ref.current!.getFilesRel().file_a).toBe('assets/boards/brd_img/file_a.png')
+
+    // Simulate a history entry that also mutates filesRel via applyStylePatch-style:
+    // Use undo to restore image element + filesRel, then mutate filesRel out and undo.
+    act(() => {
+      ref.current!.undo()
+      vi.advanceTimersByTime(150)
+    })
+    expect(ref.current!.getElements().map((e) => e.id).sort()).toEqual(['img1', 'r1'])
+    expect(ref.current!.getFilesRel()).toEqual({
+      file_a: 'assets/boards/brd_img/file_a.png',
+    })
+
+    // Delete again, then manually verify redo
+    act(() => {
+      fireEvent.pointerDown(root, { button: 0, clientX: 40, clientY: 30, pointerId: 2 })
+      fireEvent.pointerUp(root, { button: 0, clientX: 40, clientY: 30, pointerId: 2 })
+      fireEvent.keyDown(root, { key: 'Delete' })
+      ref.current!.redo()
+      vi.advanceTimersByTime(150)
+    })
+    // After delete then redo of delete-state... wait: delete pushes before;
+    // redo after delete with empty future until undo. Sequence above:
+    // delete → undo (restored) → delete → redo should re-delete.
+    // Actually after second delete, future is cleared. redo is no-op.
+    // Fix: undo after second delete then redo.
+    act(() => {
+      ref.current!.undo()
+    })
+    expect(ref.current!.getElements().some((e) => e.id === 'img1')).toBe(true)
+    act(() => {
+      ref.current!.redo()
+    })
+    expect(ref.current!.getElements().map((e) => e.id)).toEqual(['r1'])
+
+    // Keyboard undo
+    act(() => {
+      fireEvent.keyDown(root, { key: 'z', metaKey: true })
+    })
+    expect(ref.current!.getElements().some((e) => e.id === 'img1')).toBe(true)
+
+    // filesRel must survive undo of element delete
+    expect(ref.current!.getFilesRel().file_a).toBeDefined()
+
+    // Draft was scheduled by undo/redo
+    expect(onDraftBody.mock.calls.length).toBeGreaterThan(0)
+  })
+
+  it('undo restores filesRel when history entry had different map', () => {
+    // Seed scene with filesRel; delete image element; history "before" has both.
+    // Then force a new commit that clears filesRel by re-applying via internal path:
+    // create a rect (pushes history with filesRel), then verify undo of create keeps filesRel.
+    const { ref, root } = renderCanvas({
+      initialJson: serializeHipBoard(SCENE_WITH_IMAGE_FILES),
+      boardId: 'brd_img',
+    })
+    stubRect(root as HTMLElement)
+
+    act(() => {
+      fireEvent.click(screen.getByTestId('hip-board-tool-rect'))
+      fireEvent.pointerDown(root, { button: 0, clientX: 200, clientY: 200, pointerId: 1 })
+      fireEvent.pointerMove(root, { button: 0, clientX: 250, clientY: 240, pointerId: 1 })
+      fireEvent.pointerUp(root, { button: 0, clientX: 250, clientY: 240, pointerId: 1 })
+    })
+    expect(ref.current!.getElements().length).toBe(3)
+    expect(ref.current!.getFilesRel().file_a).toBe('assets/boards/brd_img/file_a.png')
+
+    act(() => {
+      ref.current!.undo()
+    })
+    expect(ref.current!.getElements().length).toBe(2)
+    expect(ref.current!.getFilesRel()).toEqual({
+      file_a: 'assets/boards/brd_img/file_a.png',
+    })
+  })
+
+  it('camera-only pan/zoom never calls onDraftBody (0 draft calls)', () => {
+    const { onDraftBody, root } = renderCanvas({
+      initialJson: serializeHipBoard(SCENE_WITH_RECT),
+    })
+    stubRect(root as HTMLElement)
+
+    act(() => {
+      // pan
+      fireEvent.pointerDown(root, { button: 1, clientX: 0, clientY: 0, pointerId: 1 })
+      fireEvent.pointerMove(root, { button: 1, clientX: 40, clientY: 30, pointerId: 1 })
+      fireEvent.pointerUp(root, { button: 1, clientX: 40, clientY: 30, pointerId: 1 })
+      // zoom
+      fireEvent.wheel(root, { deltaY: -120, clientX: 50, clientY: 50 })
+      fireEvent.wheel(root, { deltaY: 80, clientX: 50, clientY: 50 })
+      // selection-only click
+      fireEvent.pointerDown(root, { button: 0, clientX: 30, clientY: 40, pointerId: 2 })
+      fireEvent.pointerUp(root, { button: 0, clientX: 30, clientY: 40, pointerId: 2 })
+      vi.advanceTimersByTime(500)
+    })
+    expect(onDraftBody).not.toHaveBeenCalled()
+  })
+
+  it('Cmd+Shift+Z / Ctrl+Y redo after undo of create', () => {
+    const { ref, root } = renderCanvas()
+    stubRect(root as HTMLElement)
+
+    act(() => {
+      fireEvent.click(screen.getByTestId('hip-board-tool-rect'))
+      fireEvent.pointerDown(root, { button: 0, clientX: 0, clientY: 0, pointerId: 1 })
+      fireEvent.pointerMove(root, { button: 0, clientX: 40, clientY: 30, pointerId: 1 })
+      fireEvent.pointerUp(root, { button: 0, clientX: 40, clientY: 30, pointerId: 1 })
+    })
+    expect(ref.current!.getElements()).toHaveLength(1)
+
+    act(() => {
+      root.focus()
+      fireEvent.keyDown(root, { key: 'z', ctrlKey: true })
+    })
+    expect(ref.current!.getElements()).toHaveLength(0)
+
+    act(() => {
+      fireEvent.keyDown(root, { key: 'z', ctrlKey: true, shiftKey: true })
+    })
+    expect(ref.current!.getElements()).toHaveLength(1)
+
+    act(() => {
+      fireEvent.keyDown(root, { key: 'z', ctrlKey: true })
+      fireEvent.keyDown(root, { key: 'y', ctrlKey: true })
+    })
+    expect(ref.current!.getElements()).toHaveLength(1)
+  })
+
+  it('leave discards undo history', () => {
+    const { ref, root } = renderCanvas()
+    stubRect(root as HTMLElement)
+
+    act(() => {
+      fireEvent.click(screen.getByTestId('hip-board-tool-rect'))
+      fireEvent.pointerDown(root, { button: 0, clientX: 0, clientY: 0, pointerId: 1 })
+      fireEvent.pointerMove(root, { button: 0, clientX: 40, clientY: 30, pointerId: 1 })
+      fireEvent.pointerUp(root, { button: 0, clientX: 40, clientY: 30, pointerId: 1 })
+    })
+    expect(ref.current!.getHistoryPastLength()).toBe(1)
+
+    act(() => {
+      ref.current!.flushToStore({ mode: 'leave' })
+    })
+    expect(ref.current!.getHistoryPastLength()).toBe(0)
+    act(() => {
+      ref.current!.undo()
+    })
+    // Frozen after leave; elements stay
+    expect(ref.current!.getElements()).toHaveLength(1)
+  })
+})

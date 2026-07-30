@@ -1,22 +1,32 @@
 import { describe, expect, it } from 'vitest'
 import {
+  applyBoxResize,
   arrowHeadPoints,
+  BOARD_HISTORY_MAX,
+  BOARD_TEXT_PADDING,
   clampZoom,
+  cloneHistoryEntry,
   deleteElements,
   elementAabb,
   hitTest,
+  hitTestBoxHandle,
+  hitTestLineEndpoint,
   hitTestMarquee,
   isTinyBox,
   isTinyLine,
   measureTextHeight,
   moveElements,
+  moveLineEndpoint,
   normalizeRectFromDrag,
+  pushHistory,
+  resizeBoxFromHandle,
   screenToWorld,
+  selectionUnionAabb,
   textLineHeight,
   worldGroupTransform,
   worldToScreen,
   zoomAtScreenPoint,
-  BOARD_TEXT_PADDING,
+  type BoardHistoryEntry,
 } from './boardOps'
 import type { HipBoardElement } from './boardScene'
 import { HIP_BOARD_ZOOM_MAX, HIP_BOARD_ZOOM_MIN } from './boardScene'
@@ -199,5 +209,92 @@ describe('boardOps text contract', () => {
     expect(isTinyBox(10, 0)).toBe(false)
     expect(isTinyLine(0, 0, 0.5, 0)).toBe(true)
     expect(isTinyLine(0, 0, 10, 0)).toBe(false)
+  })
+})
+
+describe('boardOps resize + handles (PR-3)', () => {
+  it('resizeBoxFromHandle se grows box; nw moves origin', () => {
+    const origin = { x: 10, y: 20, w: 100, h: 50 }
+    const se = resizeBoxFromHandle(origin, 'se', 150, 100)
+    expect(se).toEqual({ x: 10, y: 20, w: 140, h: 80 })
+    const nw = resizeBoxFromHandle(origin, 'nw', 0, 0)
+    expect(nw).toEqual({ x: 0, y: 0, w: 110, h: 70 })
+  })
+
+  it('resizeBoxFromHandle enforces min size', () => {
+    const origin = { x: 0, y: 0, w: 100, h: 100 }
+    const tiny = resizeBoxFromHandle(origin, 'se', 1, 1, 2)
+    expect(tiny.w).toBeGreaterThanOrEqual(2)
+    expect(tiny.h).toBeGreaterThanOrEqual(2)
+  })
+
+  it('hitTestBoxHandle finds se corner', () => {
+    const box = { x: 0, y: 0, w: 100, h: 50 }
+    expect(hitTestBoxHandle(box, 100, 50, 1)).toBe('se')
+    expect(hitTestBoxHandle(box, 50, 25, 1)).toBeNull()
+  })
+
+  it('applyBoxResize skips locked', () => {
+    const el = { ...rect({ id: 'a', x: 0, y: 0, w: 10, h: 10 }), locked: true }
+    const out = applyBoxResize(el, { x: 5, y: 5, w: 20, h: 20 })
+    expect(out).toBe(el)
+  })
+
+  it('applyBoxResize updates rect geometry', () => {
+    const el = rect({ id: 'a', x: 0, y: 0, w: 10, h: 10 })
+    const out = applyBoxResize(el, { x: 1, y: 2, w: 30, h: 40 })
+    expect(out).toMatchObject({ x: 1, y: 2, w: 30, h: 40 })
+  })
+
+  it('line endpoint move + hit', () => {
+    const line: Extract<HipBoardElement, { type: 'line' }> = {
+      id: 'l',
+      type: 'line',
+      x: 0,
+      y: 0,
+      x2: 100,
+      y2: 0,
+      stroke: '#000',
+      strokeWidth: 2,
+    }
+    expect(hitTestLineEndpoint(line, 0, 0, 1)).toBe('start')
+    expect(hitTestLineEndpoint(line, 100, 0, 1)).toBe('end')
+    expect(moveLineEndpoint(line, 'end', 50, 25)).toMatchObject({ x2: 50, y2: 25 })
+    const locked = { ...line, locked: true }
+    expect(moveLineEndpoint(locked, 'end', 1, 1)).toBe(locked)
+  })
+
+  it('selectionUnionAabb unions selected boxes', () => {
+    const els = [
+      rect({ id: 'a', x: 0, y: 0, w: 10, h: 10 }),
+      rect({ id: 'b', x: 50, y: 50, w: 10, h: 10 }),
+    ]
+    expect(selectionUnionAabb(els, ['a', 'b'])).toEqual({ x: 0, y: 0, w: 60, h: 60 })
+    expect(selectionUnionAabb(els, [])).toBeNull()
+  })
+})
+
+describe('boardOps history ring (LKD-12)', () => {
+  it('cloneHistoryEntry deep-enough clones elements and filesRel', () => {
+    const els = [rect({ id: 'a' })]
+    const files = { f1: 'assets/img.png' }
+    const entry = cloneHistoryEntry(els, files)
+    expect(entry.elements[0]).not.toBe(els[0])
+    expect(entry.elements[0]).toEqual(els[0])
+    expect(entry.filesRel).not.toBe(files)
+    expect(entry.filesRel).toEqual(files)
+  })
+
+  it('pushHistory caps at BOARD_HISTORY_MAX and clears future', () => {
+    const past: BoardHistoryEntry[] = []
+    const future: BoardHistoryEntry[] = [
+      cloneHistoryEntry([], { stale: 'x' }),
+    ]
+    for (let i = 0; i < BOARD_HISTORY_MAX + 5; i++) {
+      pushHistory(past, future, cloneHistoryEntry([rect({ id: `r${i}` })], {}))
+    }
+    expect(past.length).toBe(BOARD_HISTORY_MAX)
+    expect(past[0]!.elements[0]!.id).toBe('r5')
+    expect(future).toHaveLength(0)
   })
 })

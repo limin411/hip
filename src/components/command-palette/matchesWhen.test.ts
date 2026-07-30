@@ -34,10 +34,10 @@ describe('resolvePaletteSurface', () => {
     )
   })
 
-  it('uses session surface on history view', () => {
+  it('uses session surface on non-chat/code work surfaces', () => {
     expect(
       resolvePaletteSurface({
-        activeView: 'history',
+        activeView: 'knowledge',
         sessionId: 's1',
         sessions: [session({ id: 's1', surface: 'code' })],
       }),

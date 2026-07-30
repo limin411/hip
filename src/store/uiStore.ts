@@ -8,7 +8,6 @@ import {
   clampSidebarWidth,
   SIDEBAR_WIDTH_DEFAULT,
 } from '@/components/layout/sidebarWidth'
-import { coerceWorkSurfaceFromUi } from '@/lib/overlayNav'
 // Lazy helpers used only inside closeKnowledgeView to avoid circular init issues
 // are imported dynamically in that method.
 
@@ -37,13 +36,11 @@ export type SettingsShellRoute =
 
 export const SETTINGS_SHELL_PAGE: SettingsShellRoute = { type: 'page' }
 
+/** Work-surface main column only. History / Trash / Settings are AppOverlay. */
 export type ActiveView =
   | 'chat'
   | 'code'
-  | 'settings'
-  | 'history'
   | 'knowledge'
-  | 'trash'
   | 'terminals'
   | 'tasks'
   | 'automation'
@@ -177,12 +174,9 @@ export type UiPersistedState = {
   sidebarWidth: number
 }
 
-/** Special / placeholder views are session-ephemeral; cold launch always lands on chats. */
+/** Non-chat/code work surfaces are session-ephemeral; cold launch always lands on chats. */
 export function isEphemeralActiveView(v: ActiveView): boolean {
   return (
-    v === 'settings' ||
-    v === 'history' ||
-    v === 'trash' ||
     v === 'knowledge' ||
     v === 'terminals' ||
     v === 'tasks' ||
@@ -257,7 +251,6 @@ interface UiState {
 
   activeView: ActiveView
   setActiveView: (v: ActiveView) => void
-  previousView: ActiveView | null
 
   /**
    * Ephemeral footer utility shell (history / trash / settings).
@@ -384,28 +377,8 @@ export const useUiStore = create<UiState>()(
       setCodeSessionId: (id) => set((s) => (s.codeSessionId === id ? s : { codeSessionId: id })),
 
       activeView: 'chat',
-      previousView: null,
       setActiveView: (v) =>
-        set((s) => {
-          if (s.activeView === v) return s
-          const isSpecial = (view: ActiveView) =>
-            view === 'settings' ||
-            view === 'history' ||
-            view === 'trash'
-          const enteringSpecial = isSpecial(v) && !isSpecial(s.activeView)
-          const leavingSpecial = isSpecial(s.activeView) && !isSpecial(v)
-          // PR4: Settings is shown via overlay only. Residual setActiveView('settings')
-          // still updates activeView for legacy/tests but does NOT clear overlay
-          // (reversed from PR3 full-page path). Production openers use openSettingsOverlay.
-          return {
-            activeView: v,
-            previousView: enteringSpecial
-              ? s.activeView
-              : leavingSpecial
-                ? null
-                : s.previousView,
-          }
-        }),
+        set((s) => (s.activeView === v ? s : { activeView: v })),
 
       overlay: null,
       setOverlay: (o) =>
@@ -414,22 +387,6 @@ export const useUiStore = create<UiState>()(
           // Leaving settings (or any non-settings overlay) clears L2 route.
           const routePatch =
             o === 'settings' ? {} : { settingsShellRoute: SETTINGS_SHELL_PAGE }
-          // Migration safety: opening an overlay while residual special activeView
-          // is set remaps the main column to a real work surface (no double-booking).
-          if (
-            o != null &&
-            (s.activeView === 'history' ||
-              s.activeView === 'trash' ||
-              s.activeView === 'settings')
-          ) {
-            const surface = coerceWorkSurfaceFromUi(s)
-            return {
-              overlay: o,
-              activeView: surface.view,
-              sidebarSection: surface.section,
-              ...routePatch,
-            }
-          }
           return { overlay: o, ...routePatch }
         }),
       toggleOverlay: (o) =>
@@ -437,25 +394,10 @@ export const useUiStore = create<UiState>()(
           if (s.overlay === o) {
             return { overlay: null, settingsShellRoute: SETTINGS_SHELL_PAGE }
           }
-          // Same coerce as setOverlay when opening over residual special view.
           const routePatch =
             o === 'settings' ? {} : { settingsShellRoute: SETTINGS_SHELL_PAGE }
-          if (
-            s.activeView === 'history' ||
-            s.activeView === 'trash' ||
-            s.activeView === 'settings'
-          ) {
-            const surface = coerceWorkSurfaceFromUi(s)
-            return {
-              overlay: o,
-              activeView: surface.view,
-              sidebarSection: surface.section,
-              ...routePatch,
-            }
-          }
           return { overlay: o, ...routePatch }
         }),
-
       sidebarSection: 'chats',
       setSidebarSection: (sec) =>
         set((s) => (s.sidebarSection === sec ? s : { sidebarSection: sec })),

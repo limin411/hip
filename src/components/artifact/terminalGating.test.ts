@@ -29,7 +29,6 @@ describe('terminal gating matrix', () => {
       activeView: 'chat',
       activeTab: 'agents',
       chatActiveTab: 'files',
-      previousView: null,
     })
   })
 
@@ -54,11 +53,11 @@ describe('terminal gating matrix', () => {
     expect(useUiStore.getState().activeTab).toBe('terminal')
   })
 
-  // G6: settings/history → no right panel terminal host
-  it('G6: settings and history never open code ArtifactPanel (terminal host)', () => {
+  // G6: non chat/code/knowledge work surfaces never open ArtifactPanel (terminal host)
+  it('G6: tasks and automation never open code ArtifactPanel (terminal host)', () => {
     expect(
       rightPanelKind({
-        activeView: 'settings',
+        activeView: 'tasks',
         codePanelOpen: true,
         chatPanelOpen: true,
         knowledgePanelOpen: true,
@@ -67,7 +66,7 @@ describe('terminal gating matrix', () => {
     ).toBe('none')
     expect(
       rightPanelKind({
-        activeView: 'history',
+        activeView: 'automation',
         codePanelOpen: true,
         chatPanelOpen: true,
         knowledgePanelOpen: true,

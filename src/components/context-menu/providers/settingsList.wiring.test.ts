@@ -11,7 +11,7 @@ function makeCtx(): ContextMenuBuildContext {
   return {
     t: ((key: string) => key) as ContextMenuBuildContext['t'],
     isMac: true,
-    activeView: 'settings',
+    activeView: 'chat',
     surface: null,
     activeSessionId: null,
     sessionStatus: 'idle',

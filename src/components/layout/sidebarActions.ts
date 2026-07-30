@@ -250,7 +250,7 @@ export async function openSpaceFromSidebar(spaceId: string): Promise<void> {
 
 /**
  * Canonical Settings open. All product entry points must call this (or a thin wrapper).
- * Never setActiveView('settings').
+ * Never assign settings as activeView — overlays own that destination.
  *
  * Param semantics (page always wins when provided):
  * - If `page` is defined → setSettingsPage(page)
@@ -349,30 +349,6 @@ export async function openAutomationFromChrome(): Promise<void> {
     assignSectionAfterLeavingTasks()
   }
   useUiStore.getState().setActiveView('automation')
-  recordNavEntry()
-}
-
-/**
- * MainToolbar / special-view back — keep section in sync with restored view.
- * K19: await leaveWorkItems when leaving tasks (notes debounce + finalize).
- */
-export async function handleMainToolbarBack(): Promise<void> {
-  if (useUiStore.getState().activeView === 'tasks') {
-    await leaveWorkItems()
-  }
-  const target = useUiStore.getState().previousView ?? 'chat'
-  useUiStore.getState().setActiveView(target)
-  if (target === 'knowledge') {
-    useUiStore.getState().setSidebarSection('knowledge')
-  } else if (
-    target === 'terminals' ||
-    target === 'tasks' ||
-    target === 'automation'
-  ) {
-    useUiStore.getState().setSidebarSection(target)
-  } else if (target === 'chat' || target === 'code') {
-    useUiStore.getState().setSidebarSection(target === 'code' ? 'projects' : 'chats')
-  }
   recordNavEntry()
 }
 

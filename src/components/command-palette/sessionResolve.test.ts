@@ -12,10 +12,10 @@ describe('resolvePaletteSessionId', () => {
     expect(resolvePaletteSessionId('code', 'c1', null)).toBeNull()
   })
 
-  it('falls back chat then code on history/settings', () => {
-    expect(resolvePaletteSessionId('history', 'c1', 'd1')).toBe('c1')
-    expect(resolvePaletteSessionId('history', null, 'd1')).toBe('d1')
-    expect(resolvePaletteSessionId('settings', null, null)).toBeNull()
-    expect(resolvePaletteSessionId('settings', null, 'd1')).toBe('d1')
+  it('falls back chat then code on other work surfaces', () => {
+    expect(resolvePaletteSessionId('knowledge', 'c1', 'd1')).toBe('c1')
+    expect(resolvePaletteSessionId('knowledge', null, 'd1')).toBe('d1')
+    expect(resolvePaletteSessionId('tasks', null, null)).toBeNull()
+    expect(resolvePaletteSessionId('tasks', null, 'd1')).toBe('d1')
   })
 })

@@ -2,7 +2,7 @@ import type { ActiveView } from '@/store/uiStore'
 
 /**
  * Session id for palette context commands.
- * Prefer the active surface; on History/Settings fall back to remembered chat then code.
+ * Prefer the active surface; on other work surfaces fall back to remembered chat then code.
  */
 export function resolvePaletteSessionId(
   activeView: ActiveView,

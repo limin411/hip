@@ -6,7 +6,7 @@ import { useTranslation } from 'react-i18next'
 import { sessionService, useActiveSession, useSessions } from '@/domain'
 import { useCommandPaletteStore } from '@/store/commandPaletteStore'
 import { useSkillsStore } from '@/store/skillsStore'
-import { useUiStore } from '@/store/uiStore'
+import { useUiStore, type SettingsPageId } from '@/store/uiStore'
 import { useDraftStore } from '@/store/draftStore'
 import { useProvidersStore } from '@/store/providersStore'
 import {
@@ -240,7 +240,7 @@ export function GlobalCommandPalette() {
       openHistoryFromChrome: () => void openHistoryFromChrome(),
       openTrashFromChrome: () => void openTrashFromChrome(),
       openSettingsFromChrome: () => void openSettingsFromChrome(),
-      openSettingsOverlay: (page) => openSettingsOverlay(page),
+      openSettingsOverlay: (page?: SettingsPageId) => openSettingsOverlay(page),
       enterKnowledge: () => void enterKnowledge(),
       openKnowledgeView: () => {
         openKnowledgeView()

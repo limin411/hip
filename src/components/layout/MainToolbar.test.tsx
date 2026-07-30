@@ -23,9 +23,9 @@ describe('MainToolbar', () => {
   beforeEach(() => {
     useUiStore.setState({
       activeView: 'chat',
-      previousView: null,
       sidebarSection: 'chats',
       sidebarOpen: true,
+      overlay: null,
     })
     useDomainStore.setState({
       sessions: [],
@@ -75,10 +75,10 @@ describe('MainToolbar', () => {
     expect(screen.getByTestId('main-toolbar-title')).toHaveTextContent('My Session')
   })
 
-  it('settings residual activeView is not special toolbar chrome', () => {
+  it('under settings overlay still shows work-surface chrome', () => {
     useUiStore.setState({
-      activeView: 'settings',
-      previousView: 'chat',
+      activeView: 'chat',
+      overlay: 'settings',
       sidebarSection: 'chats',
     })
     render(<MainToolbar />)
@@ -86,10 +86,10 @@ describe('MainToolbar', () => {
     expect(screen.getByTestId('connection-status')).toBeInTheDocument()
   })
 
-  it('history residual activeView is not special toolbar chrome', () => {
+  it('under history overlay still shows work-surface chrome', () => {
     useUiStore.setState({
-      activeView: 'history',
-      previousView: 'chat',
+      activeView: 'chat',
+      overlay: 'history',
     })
     render(<MainToolbar />)
     // Falls through to new-conversation title path (no active session).

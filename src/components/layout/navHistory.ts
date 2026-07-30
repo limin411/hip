@@ -8,7 +8,7 @@ import { coerceUnderlyingFromEntry } from '@/lib/overlayNav'
 import { useKnowledgeStore } from '@/store/knowledgeStore'
 import { useManagedTerminalStore } from '@/store/managedTerminalStore'
 import { type NavEntry, useNavHistoryStore } from '@/store/navHistoryStore'
-import { useUiStore } from '@/store/uiStore'
+import { useUiStore, type ActiveView } from '@/store/uiStore'
 import { useWorkItemStore } from '@/store/workItemStore'
 
 export function captureNavEntry(): NavEntry {
@@ -99,37 +99,42 @@ export async function applyNavEntry(entry: NavEntry): Promise<void> {
     }
 
     // Legacy special-view frames: settings/history/trash reopen as overlays over coerced surface.
-    if (
+    const legacyOverlay =
       entry.activeView === 'history' ||
       entry.activeView === 'trash' ||
       entry.activeView === 'settings'
-    ) {
+        ? entry.activeView
+        : null
+    if (legacyOverlay) {
       const surface = coerceUnderlyingFromEntry(entry)
       useUiStore.getState().setSidebarSection(surface.section)
       useUiStore.getState().setActiveView(surface.view)
-      if (entry.activeView === 'settings') {
+      if (legacyOverlay === 'settings') {
         useUiStore.getState().setSettingsPage(entry.settingsPage)
       }
       if (entry.sessionId) {
         const exists = useDomainStore.getState().sessions.some((s) => s.id === entry.sessionId)
         if (exists) sessionService.selectSession(entry.sessionId)
       }
-      useUiStore.getState().setOverlay(entry.activeView)
-      if (entry.activeView === 'trash') {
+      useUiStore.getState().setOverlay(legacyOverlay)
+      if (legacyOverlay === 'trash') {
         void sessionService.requestTrashList()
       }
       return
     }
 
-    if (entry.activeView === 'knowledge') {
+    // After legacy branch, activeView is a real work surface.
+    const view = entry.activeView as ActiveView
+
+    if (view === 'knowledge') {
       await restoreKnowledge(entry.knowledgeSpaceId)
       return
     }
 
     useUiStore.getState().setSidebarSection(entry.sidebarSection)
-    useUiStore.getState().setActiveView(entry.activeView)
+    useUiStore.getState().setActiveView(view)
 
-    if (entry.activeView === 'terminals') {
+    if (view === 'terminals') {
       useManagedTerminalStore.getState().focus(entry.managedTerminalId)
     }
 
@@ -140,20 +145,20 @@ export async function applyNavEntry(entry: NavEntry): Promise<void> {
         return
       }
       useDomainStore.getState().deselect()
-      if (entry.activeView === 'chat' || entry.activeView === 'code') {
-        useUiStore.getState().setActiveView(entry.activeView)
+      if (view === 'chat' || view === 'code') {
+        useUiStore.getState().setActiveView(view)
         useUiStore
           .getState()
-          .setSidebarSection(entry.activeView === 'code' ? 'projects' : 'chats')
+          .setSidebarSection(view === 'code' ? 'projects' : 'chats')
       }
       return
     }
 
     useDomainStore.getState().deselect()
-    if (entry.activeView === 'chat' || entry.activeView === 'code') {
+    if (view === 'chat' || view === 'code') {
       useUiStore
         .getState()
-        .setSidebarSection(entry.activeView === 'code' ? 'projects' : 'chats')
+        .setSidebarSection(view === 'code' ? 'projects' : 'chats')
     }
   } finally {
     useNavHistoryStore.getState().setApplying(false)

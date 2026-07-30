@@ -1,22 +1,10 @@
-import type { ActiveView, AppOverlay } from '@/store/uiStore'
+import type { AppOverlay } from '@/store/uiStore'
 
 /**
- * Hybrid footer active until special ActiveView values are removed (PR6).
- * Overlay wins when set; residual special activeView still highlights mid-migration.
+ * Footer utility highlight is overlay-only (History / Trash / Settings are shells).
  */
 export function sidebarFooterActive(ui: {
   overlay: AppOverlay | null
-  activeView: ActiveView
-}): 'history' | 'trash' | 'settings' | null {
-  if (ui.overlay === 'history' || ui.overlay === 'trash' || ui.overlay === 'settings') {
-    return ui.overlay
-  }
-  if (
-    ui.activeView === 'history' ||
-    ui.activeView === 'trash' ||
-    ui.activeView === 'settings'
-  ) {
-    return ui.activeView
-  }
-  return null
+}): AppOverlay | null {
+  return ui.overlay
 }

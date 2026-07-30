@@ -71,9 +71,8 @@ describe('AppLayout', () => {
     expect(screen.getByTestId('main-toolbar')).toBeInTheDocument()
   })
 
-  it('does not render history as main content when activeView is history', () => {
-    // History is an overlay shell; residual activeView history is not a main branch.
-    useUiStore.setState({ activeView: 'history', overlay: null })
+  it('does not render history as main content when overlay is closed', () => {
+    useUiStore.setState({ activeView: 'chat', overlay: null })
     render(<AppLayout />, { wrapper: MemoryRouter })
     expect(screen.queryByTestId('session-history')).not.toBeInTheDocument()
     expect(screen.getByTestId('main-toolbar')).toBeInTheDocument()
@@ -93,9 +92,8 @@ describe('AppLayout', () => {
     expect(screen.getByTestId('knowledge-page')).toBeInTheDocument()
   })
 
-  it('does not render settings as main content when activeView is settings', () => {
-    // Settings is an overlay shell; residual activeView settings is not a main branch.
-    useUiStore.setState({ activeView: 'settings', overlay: null })
+  it('does not render settings as main content when overlay is closed', () => {
+    useUiStore.setState({ activeView: 'chat', overlay: null })
     render(<AppLayout />, { wrapper: MemoryRouter })
     expect(screen.queryByTestId('settings-page')).not.toBeInTheDocument()
     expect(screen.getByTestId('main-toolbar')).toBeInTheDocument()

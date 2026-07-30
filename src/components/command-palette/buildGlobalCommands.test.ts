@@ -311,8 +311,8 @@ describe('buildGlobalCommandGroups', () => {
     expect(ctx.newConversation).toHaveBeenCalledWith('code')
   })
 
-  it('new conversation defaults to chat for settings/history views', () => {
-    const ctx = makeCtx({ activeView: 'settings' })
+  it('new conversation defaults to chat for non-code work surfaces', () => {
+    const ctx = makeCtx({ activeView: 'knowledge' })
     const groups = buildGlobalCommandGroups(ctx)
     const item = groups.flatMap((g) => g.items).find((i) => i.id === 'action-new-conversation')!
     item.run?.()

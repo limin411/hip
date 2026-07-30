@@ -6,7 +6,7 @@ function makeCtx(overrides: Partial<ContextMenuBuildContext> = {}): ContextMenuB
   return {
     t: ((key: string) => key) as ContextMenuBuildContext['t'],
     isMac: true,
-    activeView: 'trash',
+    activeView: 'chat',
     surface: null,
     activeSessionId: null,
     sessionStatus: 'idle',

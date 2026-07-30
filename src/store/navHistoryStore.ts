@@ -1,9 +1,15 @@
 import { create } from 'zustand'
-import type { ActiveView, SettingsPageId, SidebarSection } from '@/store/uiStore'
+import type { ActiveView, AppOverlay, SettingsPageId, SidebarSection } from '@/store/uiStore'
+
+/**
+ * Work surfaces for new captures. Legacy stack frames may still hold AppOverlay
+ * values (settings/history/trash); applyNavEntry coerces those to overlays.
+ */
+export type NavEntryActiveView = ActiveView | AppOverlay
 
 /** Snapshot of shell location for back/forward (ChatGPT-style browsing history). */
 export type NavEntry = {
-  activeView: ActiveView
+  activeView: NavEntryActiveView
   sidebarSection: SidebarSection
   sessionId: string | null
   knowledgeSpaceId: string | null

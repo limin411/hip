@@ -5,16 +5,19 @@
 import { useDomainStore } from '@/domain/sessionStore'
 import { surfaceOf } from '@/lib/sessions'
 import type { NavEntry } from '@/store/navHistoryStore'
-import type { ActiveView, SidebarSection } from '@/store/uiStore'
+import type { ActiveView, AppOverlay, SidebarSection } from '@/store/uiStore'
 
 export type WorkSurface = { view: ActiveView; section: SidebarSection }
+
+/** Historical / coerced inputs may still mention AppOverlay as a view string. */
+export type CoerceableView = ActiveView | AppOverlay
 
 /**
  * Resolve a non-special work surface for the main column under an overlay.
  * Never returns settings|history|trash.
  */
 export function coerceWorkSurfaceFromUi(s: {
-  activeView: ActiveView
+  activeView: CoerceableView
   sidebarSection: SidebarSection
   chatSessionId: string | null
   codeSessionId: string | null

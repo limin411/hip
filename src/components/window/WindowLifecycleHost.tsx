@@ -19,7 +19,6 @@ import {
   windowForceQuit,
 } from '@/ipc/windowPolicy'
 import { openSettingsOverlay } from '@/components/layout/sidebarActions'
-import { useUiStore } from '@/store/uiStore'
 import { Modal } from '@/components/ui/Modal'
 import { Button } from '@/components/ui/Button'
 import { Switch } from '@/components/ui/Switch'

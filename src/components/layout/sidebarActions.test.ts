@@ -68,7 +68,6 @@ import {
   enterSection,
   enterWorkItemsSection,
   enterAutomationsSection,
-  handleMainToolbarBack,
   leaveKnowledge,
   leaveWorkItems,
   openAutomationFromChrome,
@@ -104,7 +103,6 @@ describe('sidebarActions', () => {
     } as never)
     useUiStore.setState({
       activeView: 'chat',
-      previousView: null,
       sidebarSection: 'chats',
       overlay: null,
     })
@@ -322,17 +320,6 @@ describe('sidebarActions', () => {
     expect(useUiStore.getState().overlay).toBeNull()
   })
 
-  it('handleMainToolbarBack restores knowledge section', async () => {
-    useUiStore.setState({
-      activeView: 'settings',
-      previousView: 'knowledge',
-      sidebarSection: 'chats',
-    })
-    await handleMainToolbarBack()
-    expect(useUiStore.getState().activeView).toBe('knowledge')
-    expect(useUiStore.getState().sidebarSection).toBe('knowledge')
-  })
-
   it('leaveWorkItems no-ops when not on tasks', async () => {
     await leaveWorkItems()
     expect(workItemFlushSave).not.toHaveBeenCalled()
@@ -343,18 +330,6 @@ describe('sidebarActions', () => {
     await leaveWorkItems()
     expect(workItemFlushSave).toHaveBeenCalled()
     expect(useUiStore.getState().activeView).toBe('tasks')
-  })
-
-  it('handleMainToolbarBack leaves tasks via leaveWorkItems before changing view', async () => {
-    useUiStore.setState({
-      activeView: 'tasks',
-      previousView: 'chat',
-      sidebarSection: 'tasks',
-    })
-    await handleMainToolbarBack()
-    expect(workItemFlushSave).toHaveBeenCalled()
-    expect(useUiStore.getState().activeView).toBe('chat')
-    expect(useUiStore.getState().sidebarSection).toBe('chats')
   })
 
   it('enterSection flushes work items when leaving tasks', async () => {
@@ -413,23 +388,22 @@ describe('sidebarActions', () => {
     expect(useUiStore.getState().overlay).toBeNull()
   })
 
-  it('enterWorkItemsSection restores tasks view from trash', async () => {
+  it('enterWorkItemsSection opens tasks while trash overlay is open', async () => {
     useUiStore.setState({
-      activeView: 'trash',
-      previousView: 'tasks',
+      activeView: 'chat',
       sidebarSection: 'chats',
+      overlay: 'trash',
     })
     await enterWorkItemsSection()
     expect(useUiStore.getState().activeView).toBe('tasks')
     expect(useUiStore.getState().sidebarSection).toBe('tasks')
   })
 
-  it('enterWorkItemsSection restores tasks when section was left stale as tasks under trash', async () => {
-    // Pre-fix pairing: trash main + tasks list (would make filter clicks no-op).
+  it('enterWorkItemsSection opens tasks when already on tasks section under trash overlay', async () => {
     useUiStore.setState({
-      activeView: 'trash',
-      previousView: 'tasks',
+      activeView: 'chat',
       sidebarSection: 'tasks',
+      overlay: 'trash',
     })
     await enterWorkItemsSection()
     expect(useUiStore.getState().activeView).toBe('tasks')

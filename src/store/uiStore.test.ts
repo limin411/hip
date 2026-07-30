@@ -65,78 +65,15 @@ describe('uiStore - activeView', () => {
     expect(useUiStore.getState().activeView).toBe('chat')
   })
 
-  it('setActiveView switches between chat, code, and settings', () => {
+  it('setActiveView switches between work surfaces', () => {
     useUiStore.getState().setActiveView('code')
     expect(useUiStore.getState().activeView).toBe('code')
 
-    useUiStore.getState().setActiveView('settings')
-    expect(useUiStore.getState().activeView).toBe('settings')
+    useUiStore.getState().setActiveView('knowledge')
+    expect(useUiStore.getState().activeView).toBe('knowledge')
 
     useUiStore.getState().setActiveView('chat')
     expect(useUiStore.getState().activeView).toBe('chat')
-  })
-
-  it('remembers previousView when entering settings from chat or code', () => {
-    useUiStore.setState({ activeView: 'code', previousView: null })
-    useUiStore.getState().setActiveView('settings')
-    expect(useUiStore.getState().previousView).toBe('code')
-
-    useUiStore.getState().setActiveView('chat')
-    expect(useUiStore.getState().previousView).toBeNull()
-  })
-
-  it('remembers previousView when entering history from code', () => {
-    useUiStore.setState({ activeView: 'code', previousView: null })
-    useUiStore.getState().setActiveView('history')
-    expect(useUiStore.getState().previousView).toBe('code')
-  })
-
-  it('remembers previousView when entering settings from chat', () => {
-    useUiStore.setState({ activeView: 'chat', previousView: null })
-    useUiStore.getState().setActiveView('settings')
-    expect(useUiStore.getState().previousView).toBe('chat')
-  })
-
-  it('clears previousView when leaving history to chat', () => {
-    useUiStore.setState({ activeView: 'chat', previousView: null })
-    useUiStore.getState().setActiveView('history')
-    expect(useUiStore.getState().previousView).toBe('chat')
-
-    useUiStore.getState().setActiveView('chat')
-    expect(useUiStore.getState().previousView).toBeNull()
-  })
-
-  it('clears previousView when leaving settings to code', () => {
-    useUiStore.setState({ activeView: 'code', previousView: null })
-    useUiStore.getState().setActiveView('settings')
-    expect(useUiStore.getState().previousView).toBe('code')
-
-    useUiStore.getState().setActiveView('code')
-    expect(useUiStore.getState().previousView).toBeNull()
-  })
-
-  it('preserves the original non-special previousView when switching between special views', () => {
-    useUiStore.setState({ activeView: 'code', previousView: null })
-    useUiStore.getState().setActiveView('settings')
-    expect(useUiStore.getState().previousView).toBe('code')
-
-    useUiStore.getState().setActiveView('history')
-    expect(useUiStore.getState().activeView).toBe('history')
-    expect(useUiStore.getState().previousView).toBe('code')
-
-    useUiStore.getState().setActiveView('trash')
-    expect(useUiStore.getState().activeView).toBe('trash')
-    expect(useUiStore.getState().previousView).toBe('code')
-
-    useUiStore.getState().setActiveView('chat')
-    expect(useUiStore.getState().previousView).toBeNull()
-  })
-
-  it('treats trash as ephemeral special view', () => {
-    expect(isEphemeralActiveView('trash')).toBe(true)
-    useUiStore.setState({ activeView: 'chat', previousView: null })
-    useUiStore.getState().setActiveView('trash')
-    expect(useUiStore.getState().previousView).toBe('chat')
   })
 
   it('setActiveView to the same value is a no-op (same reference)', () => {
@@ -192,19 +129,16 @@ describe('uiStore - overlay', () => {
     expect(useUiStore.getState().overlay).toBe('trash')
   })
 
-  it('setOverlay coerces residual special activeView to work surface', () => {
+  it('setOverlay does not change activeView', () => {
     useUiStore.setState({
-      activeView: 'history',
-      sidebarSection: 'chats',
-      chatSessionId: null,
-      codeSessionId: null,
+      activeView: 'knowledge',
+      sidebarSection: 'knowledge',
       overlay: null,
     })
     useUiStore.getState().setOverlay('trash')
     expect(useUiStore.getState().overlay).toBe('trash')
-    // No session → chat home
-    expect(useUiStore.getState().activeView).toBe('chat')
-    expect(useUiStore.getState().sidebarSection).toBe('chats')
+    expect(useUiStore.getState().activeView).toBe('knowledge')
+    expect(useUiStore.getState().sidebarSection).toBe('knowledge')
   })
 
   it('overlay is not in partialize / UiPersistedState shape', () => {
@@ -230,11 +164,10 @@ describe('uiStore - overlay', () => {
     expect(useUiStore.getState().activeView).toBe('chat')
   })
 
-  it('setActiveView(settings) does not clear overlay (settings is overlay-only path)', () => {
-    // Residual setActiveView('settings') no longer dismisses utility shells (PR4).
+  it('setActiveView does not clear overlay', () => {
     useUiStore.setState({ activeView: 'chat', overlay: 'trash' })
-    useUiStore.getState().setActiveView('settings')
-    expect(useUiStore.getState().activeView).toBe('settings')
+    useUiStore.getState().setActiveView('code')
+    expect(useUiStore.getState().activeView).toBe('code')
     expect(useUiStore.getState().overlay).toBe('trash')
   })
 })
@@ -554,5 +487,52 @@ describe('uiStore - isPlaceholderSidebarSection (work items / automation flags)'
     expect(isPlaceholderSidebarSection('chats')).toBe(false)
     expect(isPlaceholderSidebarSection('projects')).toBe(false)
     expect(isPlaceholderSidebarSection('knowledge')).toBe(false)
+  })
+})
+
+/**
+ * Grep gate (PR6): production code must not use settings|history|trash as ActiveView.
+ * Overlay shells own those destinations.
+ */
+describe('ActiveView narrow grep gate', () => {
+  it('production sources do not setActiveView or assign special activeViews', async () => {
+    const { readdir, readFile } = await import('node:fs/promises')
+    const { join, relative } = await import('node:path')
+    const root = join(process.cwd(), 'src')
+
+    async function walk(dir: string): Promise<string[]> {
+      const out: string[] = []
+      for (const ent of await readdir(dir, { withFileTypes: true })) {
+        const p = join(dir, ent.name)
+        if (ent.isDirectory()) {
+          if (ent.name === 'i18n' || ent.name === 'node_modules') continue
+          out.push(...(await walk(p)))
+        } else if (/\.(ts|tsx)$/.test(ent.name) && !/\.test\.(ts|tsx)$/.test(ent.name)) {
+          out.push(p)
+        }
+      }
+      return out
+    }
+
+    const patterns = [
+      /setActiveView\(\s*['"]settings['"]\s*\)/,
+      /setActiveView\(\s*['"]history['"]\s*\)/,
+      /setActiveView\(\s*['"]trash['"]\s*\)/,
+      /activeView:\s*['"]settings['"]/,
+      /activeView:\s*['"]history['"]/,
+      /activeView:\s*['"]trash['"]/,
+    ]
+    // Comment-only mentions (e.g. "Never setActiveView('settings')") are allowed if they
+    // are pure docs — still flag them so docs stay accurate after PR6.
+    const hits: string[] = []
+    for (const file of await walk(root)) {
+      const text = await readFile(file, 'utf8')
+      for (const re of patterns) {
+        if (re.test(text)) {
+          hits.push(`${relative(process.cwd(), file)} matches ${re}`)
+        }
+      }
+    }
+    expect(hits).toEqual([])
   })
 })

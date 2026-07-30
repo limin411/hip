@@ -900,7 +900,7 @@ export function AppSidebar() {
       </div>
 
       <SidebarAccountFooter
-        active={sidebarFooterActive({ overlay, activeView })}
+        active={sidebarFooterActive({ overlay })}
         historyCount={historyCount}
         onOpenTrash={() => toggleTrashOverlay()}
         onOpenHistory={() => toggleHistoryOverlay()}

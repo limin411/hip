@@ -2489,6 +2489,14 @@ export const ko = {
       "quote": "인용",
       "fence": "코드 블록"
     },
+    "bubble": {
+      "label": "서식",
+      "turnInto": "변환",
+      "paragraph": "본문",
+      "linkApply": "적용",
+      "linkRemove": "링크 제거",
+      "linkHref": "URL"
+    },
     "slash": {
       "listLabel": "블록 삽입",
       "noMatch": "일치하는 항목이 없습니다",
@@ -2609,6 +2617,9 @@ export const ko = {
       "titleLabel": "문서 제목",
       "done": "완료",
       "placeholder": "작성 시작…",
+      "emptySlashHint": "'/'를 입력해 명령 열기",
+      "viewSource": "소스 보기",
+      "viewLive": "시각 편집",
       "untitled": "제목 없음",
       "emptyTitle": "빈 문서",
       "emptyHint": "작성 시작…",

@@ -2496,6 +2496,14 @@ export const zhTW = {
       "quote": "引用",
       "fence": "程式碼區塊"
     },
+    "bubble": {
+      "label": "格式",
+      "turnInto": "轉換為",
+      "paragraph": "正文",
+      "linkApply": "套用",
+      "linkRemove": "移除連結",
+      "linkHref": "連結網址"
+    },
     "slash": {
       "listLabel": "插入區塊",
       "noMatch": "沒有符合的插入項",
@@ -2616,6 +2624,9 @@ export const zhTW = {
       "titleLabel": "文件標題",
       "done": "完成",
       "placeholder": "開始寫作…",
+      "emptySlashHint": "輸入 / 開啟命令",
+      "viewSource": "檢視原始碼",
+      "viewLive": "視覺化編輯",
       "untitled": "未命名",
       "emptyTitle": "文件為空",
       "emptyHint": "開始寫作…",

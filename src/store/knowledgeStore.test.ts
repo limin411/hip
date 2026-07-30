@@ -566,6 +566,121 @@ describe('knowledgeStore setDraftBody persist modes', () => {
     expect(useKnowledgeStore.getState().draftBody).toBe('b')
     expect(useKnowledgeStore.getState().docBody).toBe('saved')
   })
+
+  it('ignores setDraftBody when docId does not match activeDocId (cross-doc guard)', () => {
+    useKnowledgeStore.setState({
+      activeDocId: 'doc_1',
+      draftBody: 'body-of-doc-1',
+      editorMode: 'live',
+    })
+    // Simulate Live unmount for a previous doc after tree switch already moved activeDocId.
+    useKnowledgeStore.getState().setDraftBody('STALE-FROM-OTHER-DOC', {
+      docId: 'doc_other',
+      persist: 'none',
+    })
+    expect(useKnowledgeStore.getState().draftBody).toBe('body-of-doc-1')
+  })
+
+  it('accepts setDraftBody when docId matches activeDocId', () => {
+    useKnowledgeStore.setState({
+      activeDocId: 'doc_1',
+      draftBody: 'old',
+      editorMode: 'live',
+    })
+    useKnowledgeStore.getState().setDraftBody('fresh', {
+      docId: 'doc_1',
+      persist: 'none',
+    })
+    expect(useKnowledgeStore.getState().draftBody).toBe('fresh')
+  })
+})
+
+describe('knowledgeStore openDoc generation (rapid switch)', () => {
+  beforeEach(() => {
+    knowledgeWriteDoc.mockReset()
+    knowledgeReadDoc.mockReset()
+    knowledgeWriteDoc.mockResolvedValue(undefined)
+    useKnowledgeStore.setState({
+      loaded: true,
+      spaces: [{ id: 'spc_1', name: 'S', createdAt: 1, updatedAt: 1 }],
+      activeSpaceId: 'spc_1',
+      nodes: [
+        {
+          id: 'doc_a',
+          parentId: null,
+          kind: 'doc',
+          title: 'A',
+          order: 0,
+          createdAt: 1,
+          updatedAt: 1,
+        },
+        {
+          id: 'doc_b',
+          parentId: null,
+          kind: 'doc',
+          title: 'B',
+          order: 1,
+          createdAt: 1,
+          updatedAt: 1,
+        },
+        {
+          id: 'doc_c',
+          parentId: null,
+          kind: 'doc',
+          title: 'C',
+          order: 2,
+          createdAt: 1,
+          updatedAt: 1,
+        },
+      ],
+      activeDocId: 'doc_a',
+      docBody: '# a',
+      draftBody: '# a',
+      editorMode: 'live',
+      mode: 'workspace',
+      searchQuery: '',
+      searchHits: [],
+      indexStatus: 'idle',
+      spaceDocCounts: { spc_1: 3 },
+      recent: [],
+      expandedFolderIds: {},
+      busy: false,
+      error: null,
+      saveState: 'idle',
+    })
+  })
+
+  it('stale openDoc result does not overwrite a newer open', async () => {
+    let resolveB!: (v: string) => void
+    let resolveC!: (v: string) => void
+    const pB = new Promise<string>((r) => {
+      resolveB = r
+    })
+    const pC = new Promise<string>((r) => {
+      resolveC = r
+    })
+    knowledgeReadDoc.mockImplementation(async (_space: string, id: string) => {
+      if (id === 'doc_b') return pB
+      if (id === 'doc_c') return pC
+      return '# a'
+    })
+
+    const openB = useKnowledgeStore.getState().openDoc('doc_b')
+    const openC = useKnowledgeStore.getState().openDoc('doc_c')
+
+    // C finishes first (user's last click), then B returns late.
+    resolveC('# c-body')
+    await openC
+    expect(useKnowledgeStore.getState().activeDocId).toBe('doc_c')
+    expect(useKnowledgeStore.getState().draftBody).toBe('# c-body')
+
+    resolveB('# b-body-STALE')
+    await openB
+    // Must still be C — B must not cross into the buffer.
+    expect(useKnowledgeStore.getState().activeDocId).toBe('doc_c')
+    expect(useKnowledgeStore.getState().draftBody).toBe('# c-body')
+    expect(useKnowledgeStore.getState().docBody).toBe('# c-body')
+  })
 })
 
 describe('knowledgeStore setEditorMode', () => {

@@ -12,7 +12,11 @@ import {
   Search,
 } from 'lucide-react'
 import { toast } from 'sonner'
-import { setExpandPersistSuspended, useKnowledgeStore } from '@/store/knowledgeStore'
+import {
+  registerBeforeOpenDocFlush,
+  setExpandPersistSuspended,
+  useKnowledgeStore,
+} from '@/store/knowledgeStore'
 import { filterTreeVisible, getPath } from '@/domain/knowledge/tree'
 import { resolveParentForNew } from '@/domain/knowledge/parentForNew'
 import {
@@ -82,11 +86,17 @@ import type { SpaceSchemaV1 } from '@/domain/knowledge/schema'
 function DocPropertiesConnected({ schema }: { schema: SpaceSchemaV1 }) {
   const draftBody = useKnowledgeStore((s) => s.draftBody)
   const setDraftBody = useKnowledgeStore((s) => s.setDraftBody)
+  const activeDocId = useKnowledgeStore((s) => s.activeDocId)
   return (
     <DocPropertiesRow
       body={draftBody}
       schema={schema}
-      onBodyChange={(next) => setDraftBody(next, { persist: 'auto' })}
+      onBodyChange={(next) =>
+        setDraftBody(next, {
+          persist: 'auto',
+          ...(activeDocId ? { docId: activeDocId } : {}),
+        })
+      }
     />
   )
 }
@@ -114,7 +124,7 @@ export function KnowledgeWorkspace() {
   const setDraftBody = useKnowledgeStore((s) => s.setDraftBody)
   const flushSave = useKnowledgeStore((s) => s.flushSave)
   const toggleFolder = useKnowledgeStore((s) => s.toggleFolder)
-  const openDoc = useKnowledgeStore((s) => s.openDoc)
+  const openDocStore = useKnowledgeStore((s) => s.openDoc)
   const saveDocAsTemplate = useKnowledgeStore((s) => s.saveDocAsTemplate)
   const saveVersionManual = useKnowledgeStore((s) => s.saveVersionManual)
   const listVersions = useKnowledgeStore((s) => s.listVersions)
@@ -541,10 +551,31 @@ export function KnowledgeWorkspace() {
       if (before !== '\n') snippet = `\n${snippet}`
       snippet = `${snippet}\n`
       if (insertTextAtCursor(view, snippet)) {
-        setDraftBody(view.state.doc.toString())
+        setDraftBody(view.state.doc.toString(), {
+          docId: useKnowledgeStore.getState().activeDocId ?? undefined,
+        })
       }
     }
   }
+
+  // All openDoc paths (tree, outline, crumbs, IPC) go through the store; register
+  // a pre-flush so Live throttle / Source buffer is in draftBody before flushSave.
+  useEffect(() => {
+    registerBeforeOpenDocFlush(() => {
+      const currentId = useKnowledgeStore.getState().activeDocId
+      if (!currentId) return
+      liveEditorRef.current?.flushDraft()
+      const view = editorRef.current?.getView()
+      if (view) {
+        useKnowledgeStore.getState().setDraftBody(view.state.doc.toString(), {
+          docId: currentId,
+        })
+      }
+    })
+    return () => registerBeforeOpenDocFlush(null)
+  }, [])
+
+  const openDoc = openDocStore
 
   const onCrumbClick = (node: KnowledgeNode) => {
     if (node.kind === 'folder') {
@@ -869,6 +900,30 @@ export function KnowledgeWorkspace() {
                 </button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
+                {showLiveEditor ? (
+                  <DropdownMenuItem
+                    data-testid="knowledge-view-source"
+                    onClick={() => void setEditorMode('source')}
+                  >
+                    {t('knowledge.doc.viewSource')}
+                  </DropdownMenuItem>
+                ) : showSourceEditor && liveEnabled && !liveSuppressed ? (
+                  <DropdownMenuItem
+                    data-testid="knowledge-view-live"
+                    onClick={() => void setEditorMode('live')}
+                  >
+                    {t('knowledge.doc.viewLive')}
+                  </DropdownMenuItem>
+                ) : showSourceEditor && liveEnabled && liveSuppressed ? (
+                  <DropdownMenuItem
+                    data-testid="knowledge-view-live"
+                    disabled
+                    title={t('knowledge.doc.largeDocForceSource')}
+                  >
+                    {t('knowledge.doc.viewLive')}
+                  </DropdownMenuItem>
+                ) : null}
+                {(showLiveEditor || showSourceEditor) && <DropdownMenuSeparator />}
                 <DropdownMenuItem
                   data-testid="knowledge-save-version"
                   onClick={() => void onSaveVersion()}
@@ -930,6 +985,9 @@ export function KnowledgeWorkspace() {
                 docId={activeDocId}
                 title={activeNode?.title ?? t('knowledge.doc.untitled')}
                 onCommit={(title) => void renameNode(activeDocId, title)}
+                onEnterCommit={() => {
+                  liveEditorRef.current?.focus({ at: 'start' })
+                }}
               />
               <DocPropertiesConnected schema={spaceSchema} />
               <Suspense
@@ -948,7 +1006,9 @@ export function KnowledgeWorkspace() {
                   docId={activeDocId}
                   initialMarkdown={mountMarkdown}
                   spaceId={activeSpaceId}
-                  onDraftChange={setDraftBody}
+                  onDraftChange={(v, meta) =>
+                    setDraftBody(v, { docId: meta.docId })
+                  }
                   onBlur={() => void flushSave()}
                   onSave={() => void flushSave()}
                   onParseError={onLiveParseError}
@@ -976,7 +1036,9 @@ export function KnowledgeWorkspace() {
                 <MarkdownToolbar
                   className="mb-0 border-0 bg-transparent p-0 opacity-100"
                   getView={() => editorRef.current?.getView() ?? null}
-                  onAfterEdit={(text) => setDraftBody(text)}
+                  onAfterEdit={(text) =>
+                    setDraftBody(text, { docId: activeDocId })
+                  }
                 />
                 <span className="mx-0.5 h-4 w-px bg-border" aria-hidden />
                 <Button
@@ -1000,7 +1062,7 @@ export function KnowledgeWorkspace() {
                 docId={activeDocId}
                 initialValue={mountMarkdown}
                 spaceId={activeSpaceId}
-                onDraftChange={setDraftBody}
+                onDraftChange={(v) => setDraftBody(v, { docId: activeDocId })}
                 onBlur={() => void flushSave()}
                 onSave={() => void flushSave()}
                 onAssetImportError={toastAssetError}

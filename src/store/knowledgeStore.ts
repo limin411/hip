@@ -450,8 +450,15 @@ interface KnowledgeState {
    * Update draft body. Default persist mode: 'auto' when shouldAutosave(mode)
    * (live|source), 'none' in preview. Pass `persist: 'now'` for immediate flush
    * (e.g. preview task write-back).
+   *
+   * Pass `docId` from the editor instance that produced the draft. If it does
+   * not match `activeDocId`, the update is ignored (prevents Live unmount after
+   * a doc switch from writing doc A into doc B's buffer).
    */
-  setDraftBody: (v: string, opts?: { persist?: 'auto' | 'now' | 'none' }) => void
+  setDraftBody: (
+    v: string,
+    opts?: { persist?: 'auto' | 'now' | 'none'; docId?: string },
+  ) => void
   /**
    * Returns false if a write was attempted and failed.
    * On successful write, awaits the daily snapshot on the same chain so callers
@@ -582,6 +589,24 @@ function applySearchFilters(hits: KnowledgeSearchHit[]): KnowledgeSearchHit[] {
 
 let saveTimer: ReturnType<typeof setTimeout> | null = null
 let saveChain: Promise<boolean> = Promise.resolve(true)
+/**
+ * Monotonic token for openDoc. After `await knowledgeReadDoc`, only apply state
+ * if this open is still the latest — otherwise rapid tree clicks write the wrong
+ * body into the active buffer (data cross-talk).
+ */
+let openDocGeneration = 0
+
+/**
+ * Optional UI hook: push Live/Source editor buffer into draftBody *before*
+ * openDoc's flushSave. Registered by KnowledgeWorkspace; all openDoc callers
+ * (tree, outline, crumbs, IPC) get correct last-keystroke capture.
+ */
+let beforeOpenDocFlush: (() => void) | null = null
+
+/** Register (or clear with null) the pre-openDoc editor flush callback. */
+export function registerBeforeOpenDocFlush(fn: (() => void) | null): void {
+  beforeOpenDocFlush = fn
+}
 
 function cancelScheduledSave() {
   if (saveTimer) {
@@ -1489,6 +1514,12 @@ export const useKnowledgeStore = create<KnowledgeState>((set, get) => ({
   },
 
   openDoc: async (id) => {
+    // Sync in-editor buffer → draftBody while activeDocId is still the old doc.
+    try {
+      beforeOpenDocFlush?.()
+    } catch {
+      // never block open on UI flush errors
+    }
     const ok = await get().flushSave()
     if (!ok) return // stay on current activeDocId; saveState error + retry chrome
     const spaceId = get().activeSpaceId
@@ -1506,6 +1537,8 @@ export const useKnowledgeStore = create<KnowledgeState>((set, get) => ({
       })
       return
     }
+    // Claim this open; any prior in-flight openDoc must not apply after us.
+    const gen = ++openDocGeneration
     try {
       kbPerfOpenStart()
       const ipcT0 = isKnowledgePerfEnabled() ? performance.now() : 0
@@ -1513,6 +1546,10 @@ export const useKnowledgeStore = create<KnowledgeState>((set, get) => ({
       if (isKnowledgePerfEnabled()) {
         kbPerfOpenIpc(performance.now() - ipcT0)
       }
+      // Superseded by a newer openDoc (rapid tree clicks) — drop this result.
+      if (gen !== openDocGeneration) return
+      // Space may have changed while we awaited disk.
+      if (get().activeSpaceId !== spaceId) return
       // Always real-time (Live). Source only when Live is off or doc is too large.
       // Do not restore a prior Source preference — product is Notion/Feishu-style.
       let editorMode = resolveEditorMode('live')
@@ -1542,9 +1579,12 @@ export const useKnowledgeStore = create<KnowledgeState>((set, get) => ({
       })
       kbPerfOpenStore(body.length, editorMode)
       schedulePersistExpand(spaceId, get)
-      void upsertLinkIndexDoc(spaceId, id, node.title, body, get().nodes).then(() =>
-        get().refreshLinkPanel(id),
-      )
+      void upsertLinkIndexDoc(spaceId, id, node.title, body, get().nodes).then(() => {
+        // Only refresh link panel if this open is still current and doc still active.
+        if (gen === openDocGeneration && get().activeDocId === id) {
+          get().refreshLinkPanel(id)
+        }
+      })
       const spaceName = get().spaces.find((s) => s.id === spaceId)?.name ?? ''
       const item: KnowledgeRecentItem = {
         spaceId,
@@ -1560,6 +1600,8 @@ export const useKnowledgeStore = create<KnowledgeState>((set, get) => ({
         return { recent }
       })
     } catch (e) {
+      // Stale open failure must not clear a newer successful open.
+      if (gen !== openDocGeneration) return
       const msg = knowledgeErrorMessage(e)
       toast.error(msg)
       get().dropRecent(spaceId, id)
@@ -1597,6 +1639,11 @@ export const useKnowledgeStore = create<KnowledgeState>((set, get) => ({
   },
 
   setDraftBody: (v, opts) => {
+    // Live/Source unmount or throttled emit after a doc switch must not clobber
+    // the newly active buffer (would "cross" doc A text into doc B).
+    if (opts?.docId != null && get().activeDocId !== opts.docId) {
+      return
+    }
     kbPerfDraftSet()
     set({ draftBody: v })
     const persist =

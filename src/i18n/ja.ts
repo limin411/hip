@@ -2489,6 +2489,14 @@ export const ja = {
       "quote": "引用",
       "fence": "コードブロック"
     },
+    "bubble": {
+      "label": "書式",
+      "turnInto": "変換",
+      "paragraph": "本文",
+      "linkApply": "適用",
+      "linkRemove": "リンクを削除",
+      "linkHref": "URL"
+    },
     "slash": {
       "listLabel": "ブロックを挿入",
       "noMatch": "一致する挿入項目がありません",
@@ -2609,6 +2617,9 @@ export const ja = {
       "titleLabel": "ドキュメントタイトル",
       "done": "完了",
       "placeholder": "書き始めてください…",
+      "emptySlashHint": "「/」でコマンドを入力",
+      "viewSource": "ソースを表示",
+      "viewLive": "ビジュアル編集",
       "untitled": "無題",
       "emptyTitle": "空のドキュメント",
       "emptyHint": "書き始めてください…",

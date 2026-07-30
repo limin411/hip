@@ -44,6 +44,8 @@ vi.mock('./DocLiveEditor', async () => {
       liveEditorProps(props)
       useImperativeHandle(ref, () => ({
         insertMarkdown: () => true,
+        focus: () => true,
+        flushDraft: () => {},
       }))
       return <div data-testid="knowledge-doc-live-editor" />
     }),

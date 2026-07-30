@@ -18,7 +18,10 @@ import type {
 } from '@milkdown/kit/prose/view'
 import { codeBlockSchema } from '@milkdown/kit/preset/commonmark'
 import { $prose, $view } from '@milkdown/kit/utils'
-import { normalizeHighlightLang } from '@/domain/knowledge/codeHighlight'
+import {
+  KNOWLEDGE_HIGHLIGHT_LANGS,
+  normalizeHighlightLang,
+} from '@/domain/knowledge/codeHighlight'
 import { isDocDark, subscribeDocTheme } from '@/lib/docTheme'
 import { highlightCode } from '@/lib/shikiLazy'
 import { copyText } from '@/ipc/clipboard'
@@ -45,7 +48,7 @@ class LiveCodeBlockNodeView implements NodeView {
   private getPos: () => number | undefined
   private previewEl: HTMLElement
   private editPre: HTMLElement
-  private langEl: HTMLElement
+  private langEl: HTMLSelectElement
   private editing = true
   private highlightGen = 0
   private destroyed = false
@@ -80,10 +83,44 @@ class LiveCodeBlockNodeView implements NodeView {
       'flex h-7 items-center justify-between gap-2 border-b border-border/80 px-2.5'
     header.contentEditable = 'false'
 
-    this.langEl = document.createElement('span')
+    this.langEl = document.createElement('select')
     this.langEl.className =
-      'min-w-0 truncate text-caption font-medium text-ink-tertiary'
-    this.langEl.textContent = (node.attrs.language as string) ?? ''
+      'min-w-0 max-w-[9rem] truncate rounded border-0 bg-transparent py-0 pl-0 pr-1 text-caption font-medium text-ink-tertiary outline-none hover:text-ink'
+    this.langEl.setAttribute('data-testid', 'knowledge-live-code-lang')
+    this.langEl.setAttribute('aria-label', 'Language')
+    const plainOpt = document.createElement('option')
+    plainOpt.value = ''
+    plainOpt.textContent = 'plain'
+    this.langEl.appendChild(plainOpt)
+    for (const lang of KNOWLEDGE_HIGHLIGHT_LANGS) {
+      const opt = document.createElement('option')
+      opt.value = lang
+      opt.textContent = lang
+      this.langEl.appendChild(opt)
+    }
+    const curLang = (node.attrs.language as string) ?? ''
+    // Keep raw language even if not in allowlist so it serializes back.
+    if (curLang && !KNOWLEDGE_HIGHLIGHT_LANGS.includes(curLang as never)) {
+      const extra = document.createElement('option')
+      extra.value = curLang
+      extra.textContent = curLang
+      this.langEl.appendChild(extra)
+    }
+    this.langEl.value = curLang
+    this.langEl.addEventListener('mousedown', (e) => {
+      e.stopPropagation()
+    })
+    this.langEl.addEventListener('change', () => {
+      const pos = this.getPos()
+      if (pos == null) return
+      const language = this.langEl.value
+      this.view.dispatch(
+        this.view.state.tr.setNodeMarkup(pos, undefined, {
+          ...this.node.attrs,
+          language,
+        }),
+      )
+    })
 
     const copyBtn = document.createElement('button')
     copyBtn.type = 'button'
@@ -272,8 +309,15 @@ class LiveCodeBlockNodeView implements NodeView {
     const langChanged =
       (node.attrs.language as string) !== (this.node.attrs.language as string)
     this.node = node
-    this.langEl.textContent = (node.attrs.language as string) ?? ''
-    this.dom.dataset.language = (node.attrs.language as string) ?? ''
+    const lang = (node.attrs.language as string) ?? ''
+    if (lang && ![...this.langEl.options].some((o) => o.value === lang)) {
+      const extra = document.createElement('option')
+      extra.value = lang
+      extra.textContent = lang
+      this.langEl.appendChild(extra)
+    }
+    this.langEl.value = lang
+    this.dom.dataset.language = lang
     if (!this.editing || langChanged) {
       void this.refreshPreview()
     }
@@ -299,6 +343,7 @@ class LiveCodeBlockNodeView implements NodeView {
   stopEvent(event: Event): boolean {
     const t = event.target as HTMLElement | null
     if (t?.closest?.('button')) return true
+    if (t?.closest?.('select')) return true
     // Preview is not contentDOM; swallow so PM does not try to interpret it.
     if (t && this.previewEl.contains(t)) return true
     return false

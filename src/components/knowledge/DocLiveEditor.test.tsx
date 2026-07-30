@@ -177,6 +177,29 @@ describe('DocLiveEditor', () => {
     })
   }, 20_000)
 
+  it('flushDraft / draft emit always tags bound docId (cross-doc guard)', async () => {
+    const onDraftChange = vi.fn()
+    const ref = createRef<DocLiveEditorHandle>()
+    render(
+      <DocLiveEditor
+        ref={ref}
+        docId="doc-bound-a"
+        initialMarkdown="alpha"
+        onDraftChange={onDraftChange}
+      />,
+    )
+    await waitForProseMirror()
+    await act(async () => {
+      ref.current?.flushDraft()
+    })
+    await waitFor(() => {
+      expect(onDraftChange).toHaveBeenCalled()
+    })
+    const last = onDraftChange.mock.calls.at(-1)
+    expect(last?.[0]).toMatch(/alpha/)
+    expect(last?.[1]).toEqual({ docId: 'doc-bound-a' })
+  }, 20_000)
+
   it('opens slash menu for line-start / with block catalog items', async () => {
     await openSlashMenu('/')
     expect(screen.getByTestId('knowledge-slash-h1')).toBeInTheDocument()

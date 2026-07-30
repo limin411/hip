@@ -64,4 +64,22 @@ describe('InlineDocTitle', () => {
     fireEvent.keyDown(input, { key: 'Enter' })
     expect(onCommit).toHaveBeenCalledWith('Enter title')
   })
+
+  it('Enter calls onEnterCommit even when title is empty (restore path)', () => {
+    const onCommit = vi.fn()
+    const onEnterCommit = vi.fn()
+    render(
+      <InlineDocTitle
+        docId="d1"
+        title="Note"
+        onCommit={onCommit}
+        onEnterCommit={onEnterCommit}
+      />,
+    )
+    const input = screen.getByTestId('knowledge-doc-title') as HTMLInputElement
+    fireEvent.change(input, { target: { value: '   ' } })
+    fireEvent.keyDown(input, { key: 'Enter' })
+    expect(onCommit).not.toHaveBeenCalled()
+    expect(onEnterCommit).toHaveBeenCalled()
+  })
 })

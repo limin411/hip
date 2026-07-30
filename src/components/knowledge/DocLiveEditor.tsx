@@ -37,11 +37,21 @@ import { WikiLinkPicker } from './WikiLinkPicker'
 import { KnowledgeSlashMenu } from './KnowledgeSlashMenu'
 import { liveCodeBlockPlugins } from './blocks/liveCodeBlockView'
 import {
+  configureKnowledgeBubble,
+  knowledgeBubbleTooltip,
+  type BubbleProviderHandle,
+} from './blocks/liveBubblePlugins'
+import { livePlaceholderPlugins } from './blocks/livePlaceholderPlugin'
+import { liveListItemPlugins } from './blocks/liveListItemView'
+import { liveCalloutPlugins } from './blocks/liveCalloutView'
+import { createLiveBlockHandlePlugin } from './blocks/liveBlockHandle'
+import {
   isKnowledgePerfEnabled,
   kbPerfLiveCreateEnd,
   kbPerfLiveCreateStart,
   kbPerfSerialize,
 } from '@/domain/knowledge/knowledgePerf'
+import i18n from '@/i18n'
 
 import '@milkdown/kit/prose/view/style/prosemirror.css'
 import '@milkdown/kit/prose/tables/style/tables.css'
@@ -49,6 +59,16 @@ import '@milkdown/kit/prose/tables/style/tables.css'
 export type DocLiveEditorHandle = {
   /** Structured MD insert via Milkdown `insert` (never multi-line tr.insertText). */
   insertMarkdown: (md: string) => boolean
+  /**
+   * Focus ProseMirror. Returns false if editor not ready / destroyed.
+   * at: 'start' | 'end' — TextSelection near doc start/end + scrollIntoView.
+   */
+  focus: (opts?: { at?: 'start' | 'end' }) => boolean
+  /**
+   * Synchronously serialize Live PM → onDraftChange (clears throttle).
+   * Call before openDoc / doc switch so store draft is not missing keystrokes.
+   */
+  flushDraft: () => void
 }
 
 export interface DocLiveEditorProps {
@@ -56,8 +76,11 @@ export interface DocLiveEditorProps {
   docId: string
   /** Full markdown including optional YAML frontmatter. */
   initialMarkdown: string
-  /** Full markdown (FM re-prefixed). Goes through setDraftBody. */
-  onDraftChange: (v: string) => void
+  /**
+   * Full markdown (FM re-prefixed). Goes through setDraftBody.
+   * Second arg is this editor's bound docId — store should ignore mismatches.
+   */
+  onDraftChange: (v: string, meta: { docId: string }) => void
   onBlur?: () => void
   /** Optional Cmd/Ctrl+S → flush save (Workspace). */
   onSave?: () => void
@@ -204,7 +227,7 @@ function applyLiveSlashInsert(
 export const DocLiveEditor = forwardRef<DocLiveEditorHandle, DocLiveEditorProps>(
   function DocLiveEditor(
     {
-      docId: _docId,
+      docId,
       initialMarkdown,
       onDraftChange,
       onBlur,
@@ -223,6 +246,9 @@ export const DocLiveEditor = forwardRef<DocLiveEditorHandle, DocLiveEditorProps>
     const rootRef = useRef<HTMLDivElement>(null)
     const editorRef = useRef<Editor | null>(null)
     const fmTextRef = useRef('')
+    /** Bound at mount — this instance only ever speaks for this doc. */
+    const boundDocIdRef = useRef(docId)
+    boundDocIdRef.current = docId
     /** Flush pending Live draft to store (blur / save / unmount). */
     const flushDraftRef = useRef<() => void>(() => {})
     const onDraftChangeRef = useRef(onDraftChange)
@@ -250,6 +276,13 @@ export const DocLiveEditor = forwardRef<DocLiveEditorHandle, DocLiveEditorProps>
     const [slash, setSlash] = useState<SlashPickerState | null>(null)
     const slashRef = useRef<SlashPickerState | null>(null)
     slashRef.current = slash
+    const pickerRef = useRef<WikiPickerState | null>(null)
+    pickerRef.current = picker
+    /** Shared with bubble shouldShow — true when slash or wiki menu is open. */
+    const menusOpenRef = useRef({ current: false })
+    menusOpenRef.current.current = slash != null || picker != null
+    const bubbleHandleRef = useRef<BubbleProviderHandle | null>(null)
+    const syncPickersRef = useRef<() => void>(() => {})
 
     const insertMarkdown = useCallback((md: string): boolean => {
       const ed = editorRef.current
@@ -263,12 +296,37 @@ export const DocLiveEditor = forwardRef<DocLiveEditorHandle, DocLiveEditorProps>
       }
     }, [])
 
+    const focusEditor = useCallback((opts?: { at?: 'start' | 'end' }): boolean => {
+      const ed = editorRef.current
+      if (!ed) return false
+      try {
+        const view = ed.ctx.get(editorViewCtx)
+        if (!view?.dom) return false
+        const at = opts?.at ?? 'start'
+        const sel =
+          at === 'end'
+            ? TextSelection.atEnd(view.state.doc)
+            : TextSelection.atStart(view.state.doc)
+        view.dispatch(view.state.tr.setSelection(sel).scrollIntoView())
+        view.focus()
+        return true
+      } catch {
+        return false
+      }
+    }, [])
+
+    const flushDraft = useCallback(() => {
+      flushDraftRef.current()
+    }, [])
+
     useImperativeHandle(
       ref,
       () => ({
         insertMarkdown,
+        focus: focusEditor,
+        flushDraft,
       }),
-      [insertMarkdown],
+      [insertMarkdown, focusEditor, flushDraft],
     )
 
     const updateSlash = useCallback((next: SlashPickerState | null) => {
@@ -432,7 +490,11 @@ export const DocLiveEditor = forwardRef<DocLiveEditorHandle, DocLiveEditorProps>
       fmTextRef.current = fmText
 
       const emitDraft = (bodyMd: string) => {
-        onDraftChangeRef.current(joinYamlFrontmatter(fmTextRef.current, bodyMd))
+        // Always tag with this instance's docId so store can drop stale unmounts.
+        onDraftChangeRef.current(
+          joinYamlFrontmatter(fmTextRef.current, bodyMd),
+          { docId: boundDocIdRef.current },
+        )
       }
 
       const flushDraftFromEditor = () => {
@@ -462,6 +524,18 @@ export const DocLiveEditor = forwardRef<DocLiveEditorHandle, DocLiveEditorProps>
 
       flushDraftRef.current = flushDraftFromEditor
 
+      // Empty-paragraph slash hint (R4): CSS variable + decoration class.
+      // content: var(...) requires a quoted string value.
+      const slashHint = i18n.t('knowledge.doc.emptySlashHint', {
+        defaultValue: "Type '/' for commands",
+      })
+      const slashHintCss = JSON.stringify(slashHint)
+      const liveRoot = rootRef.current
+      if (liveRoot) {
+        liveRoot.style.setProperty('--knowledge-pm-placeholder', slashHintCss)
+      }
+      root.style.setProperty('--knowledge-pm-placeholder', slashHintCss)
+
       // Doc changes only — not milkdown markdownUpdated (full serialize every tx).
       const draftSyncPlugin = $prose(
         () =>
@@ -475,6 +549,12 @@ export const DocLiveEditor = forwardRef<DocLiveEditorHandle, DocLiveEditorProps>
           }),
       )
 
+      const blockHandlePlugin = createLiveBlockHandlePlugin({
+        onOpened: () => {
+          requestAnimationFrame(() => syncPickersRef.current())
+        },
+      })
+
       ;(async () => {
         try {
           kbPerfLiveCreateStart()
@@ -482,11 +562,23 @@ export const DocLiveEditor = forwardRef<DocLiveEditorHandle, DocLiveEditorProps>
             .config((ctx) => {
               ctx.set(rootCtx, root)
               ctx.set(defaultValueCtx, body)
+              // Bubble needs root for floating-ui; menusOpenRef tracks slash/wiki.
+              configureKnowledgeBubble(
+                ctx,
+                rootRef.current ?? root,
+                menusOpenRef.current,
+                bubbleHandleRef,
+              )
             })
             .use(commonmark)
             .use(gfm)
             .use(history)
+            .use(knowledgeBubbleTooltip)
+            .use(livePlaceholderPlugins)
+            .use(liveListItemPlugins)
+            .use(liveCalloutPlugins)
             .use(liveCodeBlockPlugins)
+            .use(blockHandlePlugin)
             .use(draftSyncPlugin)
             .create()
 
@@ -510,6 +602,7 @@ export const DocLiveEditor = forwardRef<DocLiveEditorHandle, DocLiveEditorProps>
         const ed = editorRef.current
         editorRef.current = null
         liveEditor = null
+        bubbleHandleRef.current = null
         if (ed) void ed.destroy()
         // Clear host so remount starts clean (Milkdown leaves DOM under root).
         root.replaceChildren()
@@ -543,6 +636,21 @@ export const DocLiveEditor = forwardRef<DocLiveEditorHandle, DocLiveEditorProps>
           e.preventDefault()
           flushDraftRef.current()
           onSaveRef.current?.()
+          return
+        }
+        // R4: Escape hides bubble when slash/wiki are closed (menus win first).
+        if (e.key === 'Escape') {
+          if (slashRef.current || pickerRef.current) return
+          const bubble = bubbleHandleRef.current
+          if (bubble?.isVisible()) {
+            e.preventDefault()
+            bubble.hide()
+            try {
+              editorRef.current?.ctx.get(editorViewCtx).focus()
+            } catch {
+              // ignore
+            }
+          }
         }
       }
 
@@ -562,6 +670,11 @@ export const DocLiveEditor = forwardRef<DocLiveEditorHandle, DocLiveEditorProps>
         host.removeEventListener('click', onInputOrKey)
       }
     }, [syncPickers, updateSlash])
+
+    // Keep syncPickersRef current for block-handle openSlash path A.
+    useEffect(() => {
+      syncPickersRef.current = syncPickers
+    }, [syncPickers])
 
     // Asset paste/drop on the outer Live root (capture, mirror DocEditor).
     useEffect(() => {
@@ -671,7 +784,7 @@ export const DocLiveEditor = forwardRef<DocLiveEditorHandle, DocLiveEditorProps>
       >
         <div
           ref={hostRef}
-          className="knowledge-live-editor min-h-0 flex-1 overflow-y-auto px-0.5 pb-24 text-prose text-ink outline-none [&_.ProseMirror]:min-h-full [&_.ProseMirror]:outline-none [&_.ProseMirror]:leading-[1.7] [&_.ProseMirror_p]:my-2 [&_.ProseMirror_h1]:mb-3 [&_.ProseMirror_h1]:mt-4 [&_.ProseMirror_h1]:text-xl [&_.ProseMirror_h1]:font-semibold [&_.ProseMirror_h2]:mb-2 [&_.ProseMirror_h2]:mt-3 [&_.ProseMirror_h2]:text-lg [&_.ProseMirror_h2]:font-semibold [&_.ProseMirror_h3]:mb-2 [&_.ProseMirror_h3]:mt-3 [&_.ProseMirror_h3]:text-base [&_.ProseMirror_h3]:font-semibold [&_.ProseMirror_blockquote]:border-l-2 [&_.ProseMirror_blockquote]:border-border [&_.ProseMirror_blockquote]:pl-3 [&_.ProseMirror_blockquote]:text-ink-secondary [&_.ProseMirror_code]:rounded [&_.ProseMirror_code]:bg-surface-subtle [&_.ProseMirror_code]:px-1 [&_.ProseMirror_pre]:overflow-x-auto [&_.ProseMirror_pre]:rounded-md [&_.ProseMirror_pre]:bg-surface-subtle [&_.ProseMirror_pre]:p-3 [&_.ProseMirror_table]:border-collapse [&_.ProseMirror_td]:border [&_.ProseMirror_td]:border-border [&_.ProseMirror_td]:px-2 [&_.ProseMirror_td]:py-1 [&_.ProseMirror_th]:border [&_.ProseMirror_th]:border-border [&_.ProseMirror_th]:px-2 [&_.ProseMirror_th]:py-1 [&_.ProseMirror_th]:font-semibold [&_.ProseMirror_ul]:my-2 [&_.ProseMirror_ul]:list-disc [&_.ProseMirror_ul]:pl-6 [&_.ProseMirror_ol]:my-2 [&_.ProseMirror_ol]:list-decimal [&_.ProseMirror_ol]:pl-6"
+          className="knowledge-live-editor min-h-0 flex-1 overflow-y-auto px-0.5 pb-24 text-prose text-ink outline-none [&_.ProseMirror]:min-h-full [&_.ProseMirror]:outline-none [&_.ProseMirror]:leading-[1.7] [&_.ProseMirror_p]:my-2 [&_.ProseMirror_h1]:mb-3 [&_.ProseMirror_h1]:mt-4 [&_.ProseMirror_h1]:text-xl [&_.ProseMirror_h1]:font-semibold [&_.ProseMirror_h2]:mb-2 [&_.ProseMirror_h2]:mt-3 [&_.ProseMirror_h2]:text-lg [&_.ProseMirror_h2]:font-semibold [&_.ProseMirror_h3]:mb-2 [&_.ProseMirror_h3]:mt-3 [&_.ProseMirror_h3]:text-base [&_.ProseMirror_h3]:font-semibold [&_.ProseMirror_blockquote]:border-l-2 [&_.ProseMirror_blockquote]:border-border [&_.ProseMirror_blockquote]:pl-3 [&_.ProseMirror_blockquote]:text-ink-secondary [&_.ProseMirror_code]:rounded [&_.ProseMirror_code]:bg-surface-subtle [&_.ProseMirror_code]:px-1 [&_.ProseMirror_pre]:overflow-x-auto [&_.ProseMirror_pre]:rounded-md [&_.ProseMirror_pre]:bg-surface-subtle [&_.ProseMirror_pre]:p-3 [&_.ProseMirror_table]:border-collapse [&_.ProseMirror_td]:border [&_.ProseMirror_td]:border-border [&_.ProseMirror_td]:px-2 [&_.ProseMirror_td]:py-1 [&_.ProseMirror_th]:border [&_.ProseMirror_th]:border-border [&_.ProseMirror_th]:px-2 [&_.ProseMirror_th]:py-1 [&_.ProseMirror_th]:font-semibold [&_.ProseMirror_ul]:my-2 [&_.ProseMirror_ul]:list-disc [&_.ProseMirror_ul]:pl-6 [&_.ProseMirror_ol]:my-2 [&_.ProseMirror_ol]:list-decimal [&_.ProseMirror_ol]:pl-6 [&_p.knowledge-pm-empty]:before:pointer-events-none [&_p.knowledge-pm-empty]:before:float-left [&_p.knowledge-pm-empty]:before:h-0 [&_p.knowledge-pm-empty]:before:text-ink-tertiary [&_p.knowledge-pm-empty]:before:content-[var(--knowledge-pm-placeholder)]"
           data-placeholder={placeholder}
         />
         {slash ? (

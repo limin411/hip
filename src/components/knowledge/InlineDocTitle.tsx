@@ -7,6 +7,11 @@ export interface InlineDocTitleProps {
   title: string
   readOnly?: boolean
   onCommit: (title: string) => void | Promise<void>
+  /**
+   * Called after Enter commit path (including empty-title restore).
+   * Used to move focus into the Live body (R4).
+   */
+  onEnterCommit?: () => void
   className?: string
 }
 
@@ -19,6 +24,7 @@ export function InlineDocTitle({
   title,
   readOnly = false,
   onCommit,
+  onEnterCommit,
   className,
 }: InlineDocTitleProps) {
   const { t } = useTranslation()
@@ -86,6 +92,8 @@ export function InlineDocTitle({
           e.preventDefault()
           skipBlurCommit.current = true
           commit()
+          // Always leave title for body (even if empty restore / no rename).
+          onEnterCommit?.()
           ;(e.target as HTMLInputElement).blur()
         } else if (e.key === 'Escape') {
           e.preventDefault()

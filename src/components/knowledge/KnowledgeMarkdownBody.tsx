@@ -12,21 +12,12 @@ import { CodeBlock } from '@/components/chat/CodeBlock'
 import { KnowledgeMermaid } from './KnowledgeMermaid'
 import { KnowledgeSvg } from './KnowledgeSvg'
 import { firstTextLine, parseCalloutHeader } from '@/domain/knowledge/callout'
+import { calloutStyleClass } from './calloutStyles'
 
 export interface KnowledgeMarkdownBodyProps {
   content: string
   className?: string
   components?: Components
-}
-
-const CALLOUT_STYLE: Record<string, string> = {
-  note: 'border-accent/50 bg-accent/5',
-  tip: 'border-success/50 bg-success/5',
-  info: 'border-accent/50 bg-accent/5',
-  warning: 'border-warning/50 bg-warning/5',
-  caution: 'border-warning/50 bg-warning/5',
-  danger: 'border-danger/50 bg-danger/5',
-  important: 'border-accent/60 bg-accent/10',
 }
 
 /**
@@ -74,7 +65,7 @@ export function KnowledgeMarkdownBody({
         if (!header) {
           return <blockquote {...props}>{children}</blockquote>
         }
-        const style = CALLOUT_STYLE[header.type] ?? CALLOUT_STYLE.note
+        const style = calloutStyleClass(header.type)
         // Drop the first paragraph if it was only the [!type] header line
         const rest = stripCalloutHeaderChild(children)
         const typeLabel = t(`knowledge.callout.${header.type}`, {

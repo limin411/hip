@@ -15,6 +15,7 @@ import { toast } from 'sonner'
 import {
   registerBeforeOpenDocFlush,
   setExpandPersistSuspended,
+  syncActiveEditorToDraft,
   useKnowledgeStore,
 } from '@/store/knowledgeStore'
 import { filterTreeVisible, getPath } from '@/domain/knowledge/tree'
@@ -554,7 +555,10 @@ export function KnowledgeWorkspace() {
 
   const exportSpaceZip = async () => {
     if (!activeSpaceId) return
-    await flushSave()
+    // Snapshot flush so open board strokes land in draft before pack (PR-5 review #3).
+    syncActiveEditorToDraft({ leaveActiveLeaf: false })
+    const ok = await flushSave()
+    if (!ok) return
     const safe =
       (space?.name ?? 'space').replace(/[<>:"/\\|?*]/g, '_').slice(0, 80) || 'space'
     const dest = await pickSavePath({

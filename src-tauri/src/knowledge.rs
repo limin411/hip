@@ -1523,9 +1523,16 @@ pub struct ImportFolderResult {
     pub imported_docs: u32,
 }
 
-/// Portable hip export/import: `tree.json` + `docs/` at the folder root.
+/// Portable hip export/import: `tree.json` plus at least one of meta/docs/boards.
+/// Boards-only packages (no docs/) must still detect as portable so re-import
+/// restores whiteboards (PR-5 review #1).
 fn is_hip_portable_layout(source: &Path) -> bool {
-    source.join("tree.json").is_file() && source.join("docs").is_dir()
+    if !source.join("tree.json").is_file() {
+        return false;
+    }
+    source.join("meta.json").is_file()
+        || source.join("docs").is_dir()
+        || source.join("boards").is_dir()
 }
 
 /// Import a portable hip layout folder (meta/tree/docs/boards/assets) into a new space.
@@ -1626,6 +1633,17 @@ fn import_hip_portable_folder(
                 }
             }
             // Missing or unreadable file → EMPTY scene; keep tree node.
+            // Present body must pass the same size/dataURL gates as knowledge_write_board
+            // (PR-5 review #2 — no import backdoor past KD-6).
+            if let Err(e) = validate_board_write_body(&body) {
+                let _ = knowledge_delete_space(
+                    app.clone(),
+                    DeleteSpaceArgs {
+                        id: space.id.clone(),
+                    },
+                );
+                return Err(format!("invalid board {}: {e}", n.id));
+            }
             let dest = match board_path(&root, &space.id, &n.id) {
                 Ok(p) => p,
                 Err(e) => {
@@ -2931,9 +2949,111 @@ mod tests {
         with_temp_root(|base| {
             assert!(!is_hip_portable_layout(base));
             fs::write(base.join("tree.json"), "{}").unwrap();
+            // tree alone is not enough (could be arbitrary folder)
             assert!(!is_hip_portable_layout(base));
             fs::create_dir_all(base.join("docs")).unwrap();
             assert!(is_hip_portable_layout(base));
+        });
+    }
+
+    #[test]
+    fn is_hip_portable_layout_accepts_boards_only_or_meta() {
+        with_temp_root(|base| {
+            // boards-only (no docs/) — whiteboard-first space export
+            fs::write(base.join("tree.json"), "{}").unwrap();
+            fs::create_dir_all(base.join("boards")).unwrap();
+            assert!(is_hip_portable_layout(base));
+        });
+        with_temp_root(|base| {
+            // meta.json + tree without docs/ or boards/
+            fs::write(base.join("tree.json"), "{}").unwrap();
+            fs::write(base.join("meta.json"), r#"{"id":"spc_x","name":"S"}"#).unwrap();
+            assert!(is_hip_portable_layout(base));
+        });
+        with_temp_root(|base| {
+            // docs alone still works
+            fs::write(base.join("tree.json"), "{}").unwrap();
+            fs::create_dir_all(base.join("docs")).unwrap();
+            assert!(is_hip_portable_layout(base));
+        });
+    }
+
+    #[test]
+    fn boards_only_portable_layout_roundtrip_helpers() {
+        // Boards-only package: detect portable + import validation path + EMPTY on missing.
+        with_temp_root(|base| {
+            let source = base.join("portable_boards_only");
+            fs::create_dir_all(source.join("boards")).unwrap();
+            let board_id = "brd_boardsonly1";
+            let tree = KnowledgeTreeFile {
+                version: 1,
+                nodes: vec![KnowledgeNode {
+                    id: board_id.into(),
+                    parent_id: None,
+                    kind: "board".into(),
+                    title: "OnlyBoard".into(),
+                    order: 0,
+                    created_at: 1,
+                    updated_at: 1,
+                }],
+            };
+            write_json_file(&source.join("tree.json"), &tree).unwrap();
+            write_json_file(
+                &source.join("meta.json"),
+                &KnowledgeSpace {
+                    id: "spc_exportsrc1".into(),
+                    name: "WB".into(),
+                    icon: None,
+                    created_at: 1,
+                    updated_at: 1,
+                },
+            )
+            .unwrap();
+            let scene = r##"{"type":"excalidraw","version":2,"source":"hip","elements":[{"id":"e1"}],"appState":{},"files":{}}"##;
+            fs::write(
+                source
+                    .join("boards")
+                    .join(format!("{board_id}.excalidraw")),
+                scene,
+            )
+            .unwrap();
+
+            assert!(is_hip_portable_layout(&source));
+            assert!(!source.join("docs").is_dir()); // no docs/ — must still detect
+
+            let (filtered, skipped) = filter_portable_import_nodes(&tree.nodes);
+            assert_eq!(skipped, 0);
+            assert_eq!(filtered.len(), 1);
+            assert_eq!(filtered[0].id, board_id);
+
+            // validate_board_write_body accepts clean scene
+            validate_board_write_body(scene).unwrap();
+
+            // dataURL body rejected (import must use this gate)
+            let hostile = r##"{"type":"excalidraw","files":{"f1":{"id":"f1","mimeType":"image/png","dataURL":"data:image/png;base64,xx"}}}"##;
+            assert!(validate_board_write_body(hostile)
+                .unwrap_err()
+                .contains("dataURL"));
+
+            // Simulate import write into new space
+            let root = base.join("knowledge");
+            let space_id = "spc_boardsonly1";
+            fs::create_dir_all(space_dir(&root, space_id).unwrap().join("boards")).unwrap();
+            for n in &filtered {
+                let src = source
+                    .join("boards")
+                    .join(format!("{}.excalidraw", n.id));
+                let body = if src.is_file() {
+                    fs::read_to_string(&src).unwrap()
+                } else {
+                    EMPTY_BOARD_SCENE_JSON.to_string()
+                };
+                validate_board_write_body(&body).unwrap();
+                atomic_write_str(&board_path(&root, space_id, &n.id).unwrap(), &body).unwrap();
+            }
+            let live =
+                fs::read_to_string(board_path(&root, space_id, board_id).unwrap()).unwrap();
+            assert!(live.contains("\"id\":\"e1\""));
         });
     }
 

@@ -649,6 +649,9 @@ export function syncActiveEditorToDraft(opts?: SyncActiveEditorOpts): void {
   }
 }
 
+/** Default title for new / empty-renamed whiteboards (KD-12). */
+const DEFAULT_BOARD_TITLE = 'Untitled whiteboard'
+
 /** Title-only MiniSearch upsert for boards (no body / frontmatter). */
 function indexBoardTitle(
   spaceId: string,
@@ -670,6 +673,11 @@ function indexBoardTitle(
     order,
     metaSink: kbMeta,
   })
+}
+
+/** True when node is a board leaf (kind ⇔ prefix). */
+function isBoardNode(node: KnowledgeNode | undefined, id: string): boolean {
+  return node?.kind === 'board' && id.startsWith('brd_')
 }
 
 function cancelScheduledSave() {
@@ -1398,7 +1406,7 @@ export const useKnowledgeStore = create<KnowledgeState>((set, get) => ({
         id,
         parentId,
         kind: 'board' as const,
-        title: title || 'Untitled whiteboard',
+        title: title || DEFAULT_BOARD_TITLE,
         order: nextOrder(get().nodes, parentId),
         createdAt: now,
         updatedAt: now,
@@ -1506,7 +1514,11 @@ export const useKnowledgeStore = create<KnowledgeState>((set, get) => ({
     if (!spaceId || get().busy) return
     set({ busy: true })
     try {
-      const nodes = renameNode(get().nodes, id, title.trim() || 'Untitled')
+      const existing = get().nodes.find((n) => n.id === id)
+      const fallbackTitle =
+        existing?.kind === 'board' ? DEFAULT_BOARD_TITLE : 'Untitled'
+      const nextTitle = title.trim() || fallbackTitle
+      const nodes = renameNode(get().nodes, id, nextTitle)
       await knowledgeSaveTree(spaceId, { version: 1, nodes })
       set({ nodes, busy: false })
       const renamed = nodes.find((n) => n.id === id)
@@ -1533,7 +1545,7 @@ export const useKnowledgeStore = create<KnowledgeState>((set, get) => ({
       // update recent title if needed
       set((s) => ({
         recent: s.recent.map((r) =>
-          r.spaceId === spaceId && r.docId === id ? { ...r, title: title.trim() || 'Untitled' } : r,
+          r.spaceId === spaceId && r.docId === id ? { ...r, title: nextTitle } : r,
         ),
       }))
       persistRecent(get().recent)
@@ -1641,6 +1653,9 @@ export const useKnowledgeStore = create<KnowledgeState>((set, get) => ({
                 draftBody: '',
                 editorMode: 'live' as const,
                 pendingReveal: null,
+                backlinks: [],
+                outboundLinks: [],
+                linkPanelStatus: 'idle' as const,
               }
             : pendingTargetsRemoved
               ? { pendingReveal: null }
@@ -1809,8 +1824,8 @@ export const useKnowledgeStore = create<KnowledgeState>((set, get) => ({
     } catch (e) {
       // Stale open failure must not clear a newer successful open.
       if (gen !== openDocGeneration) return
-      const msg = isBoard ? 'Could not load whiteboard' : knowledgeErrorMessage(e)
-      toast.error(msg)
+      // Catch path: surface IPC detail (gate path keeps a generic string).
+      toast.error(knowledgeErrorMessage(e))
       get().dropRecent(spaceId, id)
       set({
         activeDocId: null,
@@ -1827,6 +1842,13 @@ export const useKnowledgeStore = create<KnowledgeState>((set, get) => ({
   },
 
   setEditorMode: async (mode) => {
+    // Boards do not participate in Live/Source/Preview (openDoc omits editorMode).
+    const activeId = get().activeDocId
+    const activeNode = activeId
+      ? get().nodes.find((n) => n.id === activeId)
+      : undefined
+    if (isBoardNode(activeNode, activeId ?? '')) return
+
     let next = resolveEditorMode(mode)
     if (next === 'live') {
       const len = Math.max(get().draftBody.length, get().docBody.length)
@@ -1890,9 +1912,14 @@ export const useKnowledgeStore = create<KnowledgeState>((set, get) => ({
       const docId = s.activeDocId
       const body = s.draftBody
       const node = s.nodes.find((n) => n.id === docId)
+      // Design: missing node → no-op success (avoid mis-routing board drafts to write_doc).
+      if (!node) {
+        resolveWrite?.(true)
+        return true
+      }
       const spaceName = s.spaces.find((sp) => sp.id === spaceId)?.name ?? ''
       const nodesSnap = s.nodes
-      const isBoard = node?.kind === 'board'
+      const isBoard = isBoardNode(node, docId)
 
       set({ saveState: 'saving' })
       try {
@@ -1925,14 +1952,12 @@ export const useKnowledgeStore = create<KnowledgeState>((set, get) => ({
         resolveWrite?.(true)
         resolveWrite = null
 
-        if (node) {
-          indexCurrentDoc(spaceId, docId, node.title, body, spaceName, nodesSnap)
-          await upsertLinkIndexDoc(spaceId, docId, node.title, body, nodesSnap)
-          if (get().activeDocId === docId && get().activeSpaceId === spaceId) {
-            syncFacetsToState(set)
-            get().runSearch(get().searchQuery)
-            void get().refreshLinkPanel(docId)
-          }
+        indexCurrentDoc(spaceId, docId, node.title, body, spaceName, nodesSnap)
+        await upsertLinkIndexDoc(spaceId, docId, node.title, body, nodesSnap)
+        if (get().activeDocId === docId && get().activeSpaceId === spaceId) {
+          syncFacetsToState(set)
+          get().runSearch(get().searchQuery)
+          void get().refreshLinkPanel(docId)
         }
         // Daily snapshot stays on the chain so delete/manual never race it.
         try {
@@ -1961,6 +1986,9 @@ export const useKnowledgeStore = create<KnowledgeState>((set, get) => ({
     const spaceId = get().activeSpaceId
     const id = docId ?? get().activeDocId
     if (!spaceId || !id) return null
+    // Board v1 has no version history.
+    const target = get().nodes.find((n) => n.id === id)
+    if (isBoardNode(target, id) || id.startsWith('brd_')) return null
     const ok = await get().flushSave()
     if (!ok) return null
     // Serialize on saveChain so manual never RMW-races a concurrent daily.
@@ -1988,6 +2016,9 @@ export const useKnowledgeStore = create<KnowledgeState>((set, get) => ({
     const spaceId = get().activeSpaceId
     const id = docId ?? get().activeDocId
     if (!spaceId || !id) return []
+    // Board v1 has no version history.
+    const target = get().nodes.find((n) => n.id === id)
+    if (isBoardNode(target, id) || id.startsWith('brd_')) return []
     try {
       return await knowledgeListVersions(spaceId, id)
     } catch (e) {
@@ -2000,6 +2031,9 @@ export const useKnowledgeStore = create<KnowledgeState>((set, get) => ({
     const spaceId = get().activeSpaceId
     const id = docId ?? get().activeDocId
     if (!spaceId || !id) return false
+    // Board v1 has no version history — never restore into a board leaf.
+    const target = get().nodes.find((n) => n.id === id)
+    if (isBoardNode(target, id) || id.startsWith('brd_')) return false
     // Flush current dirty buffer first so we don't silently drop it.
     const ok = await get().flushSave()
     if (!ok) return false

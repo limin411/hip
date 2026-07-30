@@ -1,9 +1,10 @@
 /**
- * Hip SVG whiteboard (PR-C production engine).
+ * Hip SVG whiteboard (PR-C production engine + PR-5 images / PNG export).
  *
  * Camera is session-only — pan/zoom never call setDraftBody (LKD-14).
  * Draft throttle only when dehydrated scene serializes differently.
  * Undo ring: { elements, filesRel }[] max 50 (LKD-12).
+ * Images: draft dehydrated (hipAssetRel); runtime blob URL cache (LKD-7).
  */
 import {
   forwardRef,
@@ -15,19 +16,37 @@ import {
   useState,
 } from 'react'
 import { nanoid } from 'nanoid'
+import { useTranslation } from 'react-i18next'
+import { toast } from 'sonner'
 import {
   EMPTY_HIP_BOARD_SCENE,
   EMPTY_HIP_BOARD_SCENE_JSON,
   HIP_BOARD_DEFAULT_CAMERA,
+  assertNoDataUrlInBoardJson,
   buildHipDiskScene,
+  estimateDataUrlBytes,
+  hydrateBoardFiles,
+  importBoardFileBytes,
   parseBoardScene,
   serializeHipBoard,
+  stripImageElementsForFiles,
   type HipBoardCamera,
   type HipBoardElement,
+  type HipBoardImage,
   type HipBoardLine,
   type HipBoardSceneDisk,
   type HipBoardText,
 } from '@/domain/knowledge/boardScene'
+import {
+  blobToDataUrl,
+  dataUrlToBlobUrl,
+  decodeImageNaturalSize,
+  exportBoardPngBlob,
+  fitImageSize,
+  resolveDataUrlForExport,
+} from '@/domain/knowledge/boardExport'
+import { isAllowedAssetMime, isImageMime, mimeFromFileName } from '@/domain/knowledge/assetUrl'
+import { KNOWLEDGE_ASSET_INLINE_MAX_BYTES } from '@/domain/knowledge/limits'
 import {
   registerBoardCanvasStyleApi,
   useKnowledgeStore,
@@ -81,8 +100,35 @@ import {
   extractBoardOutline,
   selectionPublishSignature,
 } from '@/domain/knowledge/boardOutline'
-import type { FlushToStoreOpts, KnowledgeBoardCanvasHandle } from './KnowledgeBoardCanvas'
 import { BoardToolbar } from './BoardToolbar'
+
+/** Runtime display cache for board images (never stringified into draft). */
+type RuntimeImage = {
+  fileId: string
+  mimeType: string
+  /** Prefer blob: for <image href>. */
+  url: string
+  revoke?: () => void
+  /** Kept for PNG export (data: only). */
+  dataURL?: string
+  naturalW?: number
+  naturalH?: number
+  /** Stable disk metadata (mime/created); not blob-lifetime-bound. */
+  created?: number
+}
+
+/** Long-lived file metadata for dehydrate (survives blob revoke). */
+type FilesMeta = { mimeType: string; created: number }
+
+export type BoardFlushMode = 'snapshot' | 'leave'
+
+export type FlushToStoreOpts = {
+  /**
+   * snapshot (default): stay on this board after the structural op — keep pending imports.
+   * leave: active leaf will change or be destroyed — drop pending + toast.
+   */
+  mode?: BoardFlushMode
+}
 
 export type StylePatch = Partial<{
   fill: string
@@ -92,8 +138,14 @@ export type StylePatch = Partial<{
   cornerRadius: number
 }>
 
-/** Extended handle for PR-2+ selection/transform/undo (PR-3). */
-export type HipBoardCanvasHandle = KnowledgeBoardCanvasHandle & {
+/** Imperative handle for HipBoardCanvas (production whiteboard engine). */
+export type HipBoardCanvasHandle = {
+  /**
+   * 100% synchronous. mode 'leave' drops pending imports + toast;
+   * mode 'snapshot' (default) keeps queue. Always setDraftBody dehydrated persist none.
+   */
+  flushToStore: (opts?: FlushToStoreOpts) => void
+  exportPngBlob: () => Promise<Blob | null>
   isReady: () => boolean
   selectAndScrollTo: (ids: string[], opts?: { scroll?: boolean }) => void
   applyStylePatch: (ids: string[], patch: StylePatch) => void
@@ -113,10 +165,16 @@ export type HipBoardCanvasHandle = KnowledgeBoardCanvasHandle & {
   getElements: () => HipBoardElement[]
   /** Test / debug: filesRel map (fileId → hipAssetRel). */
   getFilesRel: () => Record<string, string>
+  /** Test / debug: pending import fileIds. */
+  getPendingImportIds: () => string[]
+  /** Test / debug: runtime image URL for a fileId (blob: or data:). */
+  getRuntimeImageUrl: (fileId: string) => string | undefined
   /** Test / debug: undo past depth. */
   getHistoryPastLength: () => number
   undo: () => void
   redo: () => void
+  /** Test / production: insert image files (same as paste/drop/picker). */
+  insertImageFiles: (files: File[]) => Promise<void>
 }
 
 export type HipBoardCanvasProps = {
@@ -211,16 +269,30 @@ function isEditableTarget(target: EventTarget | null): boolean {
 }
 
 export const HipBoardCanvas = forwardRef<HipBoardCanvasHandle, HipBoardCanvasProps>(
-  function HipBoardCanvas({ boardId, spaceId: _spaceId, initialJson, onDraftBody }, ref) {
+  function HipBoardCanvas({ boardId, spaceId, initialJson, onDraftBody }, ref) {
+    const { t } = useTranslation()
     const rootRef = useRef<HTMLDivElement>(null)
     const textareaRef = useRef<HTMLTextAreaElement>(null)
+    const fileInputRef = useRef<HTMLInputElement>(null)
     const elementsRef = useRef<HipBoardElement[]>([])
     const filesRelRef = useRef<Record<string, string>>({})
+    /** Runtime image display cache (blob: URLs); never in draft. */
+    const filesRuntimeRef = useRef<Map<string, RuntimeImage>>(new Map())
+    /**
+     * Stable mime/created for dehydrate — independent of blob lifetime so leave
+     * serialize does not rewrite metadata (LKD-7 leave order / review Issue 1).
+     */
+    const filesMetaRef = useRef<Record<string, FilesMeta>>({})
+    /** fileIds with in-flight asset import (no hipAssetRel yet). */
+    const pendingImportRef = useRef<Set<string>>(new Set())
+    const importSerialRef = useRef<Promise<void>>(Promise.resolve())
     const viewBgRef = useRef('#ffffff')
     const cameraRef = useRef<HipBoardCamera>({ ...HIP_BOARD_DEFAULT_CAMERA })
     const activeRef = useRef(true)
     const boardIdRef = useRef(boardId)
     boardIdRef.current = boardId
+    const spaceIdRef = useRef(spaceId)
+    spaceIdRef.current = spaceId
     const lastSerializedRef = useRef<string>('')
     const readyRef = useRef(false)
     const throttleTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -255,10 +327,58 @@ export const HipBoardCanvas = forwardRef<HipBoardCanvasHandle, HipBoardCanvasPro
     const [overlayTick, setOverlayTick] = useState(0)
     /** Live marquee AABB in world space (null when idle). */
     const [marquee, setMarquee] = useState<WorldAabb | null>(null)
+    /** Bump when runtime image URLs change so SVG <image> re-renders. */
+    const [imageTick, setImageTick] = useState(0)
 
     toolRef.current = tool
     selectedIdsRef.current = selectedIds
     textEditRef.current = textEdit
+
+    const revokeAllRuntimeImages = useCallback(() => {
+      for (const rt of filesRuntimeRef.current.values()) {
+        try {
+          rt.revoke?.()
+        } catch {
+          /* ignore */
+        }
+      }
+      filesRuntimeRef.current = new Map()
+    }, [])
+
+    const putRuntimeImage = useCallback((rt: RuntimeImage) => {
+      const prev = filesRuntimeRef.current.get(rt.fileId)
+      if (prev && prev.url !== rt.url) {
+        try {
+          prev.revoke?.()
+        } catch {
+          /* ignore */
+        }
+      }
+      filesRuntimeRef.current.set(rt.fileId, rt)
+      setImageTick((n) => n + 1)
+    }, [])
+
+    const dropRuntimeImages = useCallback((fileIds: ReadonlySet<string>) => {
+      let changed = false
+      for (const id of fileIds) {
+        const rt = filesRuntimeRef.current.get(id)
+        if (rt) {
+          try {
+            rt.revoke?.()
+          } catch {
+            /* ignore */
+          }
+          filesRuntimeRef.current.delete(id)
+          changed = true
+        }
+        delete filesMetaRef.current[id]
+      }
+      if (changed) setImageTick((n) => n + 1)
+    }, [])
+
+    const setFileMeta = useCallback((fileId: string, meta: FilesMeta) => {
+      filesMetaRef.current = { ...filesMetaRef.current, [fileId]: meta }
+    }, [])
 
     const clearThrottle = useCallback(() => {
       if (throttleTimerRef.current != null) {
@@ -361,6 +481,9 @@ export const HipBoardCanvas = forwardRef<HipBoardCanvasHandle, HipBoardCanvasPro
       textEditBeforeRef.current = null
       historyPastRef.current = []
       historyFutureRef.current = []
+      pendingImportRef.current = new Set()
+      revokeAllRuntimeImages()
+      filesMetaRef.current = {}
       setMarquee(null)
 
       let scene: HipBoardSceneDisk = EMPTY_HIP_BOARD_SCENE
@@ -387,13 +510,28 @@ export const HipBoardCanvas = forwardRef<HipBoardCanvasHandle, HipBoardCanvasPro
         }
       }
 
+      // SYNC seed — must complete before hydrate await / any flushToStore.
       elementsRef.current = scene.elements
       viewBgRef.current = scene.appState.viewBackgroundColor || '#ffffff'
       const rel: Record<string, string> = {}
+      const meta: Record<string, FilesMeta> = {}
       for (const [id, f] of Object.entries(scene.files ?? {})) {
         if (f?.hipAssetRel) rel[id] = f.hipAssetRel
+        if (f) {
+          meta[id] = {
+            mimeType:
+              typeof f.mimeType === 'string' && f.mimeType.length > 0
+                ? f.mimeType
+                : 'image/png',
+            created:
+              typeof f.created === 'number' && Number.isFinite(f.created)
+                ? f.created
+                : Date.now(),
+          }
+        }
       }
       filesRelRef.current = rel
+      filesMetaRef.current = meta
       lastSerializedRef.current = serializeHipBoard(scene)
       cameraRef.current = { ...HIP_BOARD_DEFAULT_CAMERA }
 
@@ -407,7 +545,7 @@ export const HipBoardCanvas = forwardRef<HipBoardCanvasHandle, HipBoardCanvasPro
       setTextEdit(null)
       readyRef.current = true
 
-      // Immediate companion seed so rail is not empty-flash (LKD-21).
+// Immediate companion seed so rail is not empty-flash (LKD-21).
       if (useKnowledgeStore.getState().activeDocId === boardId) {
         const emptySel = buildSelectionSnapshot(boardId, scene.elements, [])
         lastSelPublishSigRef.current = selectionPublishSignature(
@@ -421,7 +559,52 @@ export const HipBoardCanvas = forwardRef<HipBoardCanvasHandle, HipBoardCanvasPro
         useKnowledgeStore.getState().setBoardSelection(emptySel)
       }
 
+      let cancelled = false
+      const diskFiles = scene.files
+      const space = spaceId
+      void (async () => {
+        if (Object.keys(diskFiles).length === 0) return
+        const { files, relByFileId, failedIds } = await hydrateBoardFiles(space, diskFiles)
+        if (cancelled || !activeRef.current) return
+        if (failedIds.length > 0) {
+          toast.warning(t('knowledge.board.hydratePartial'))
+        }
+        for (const [id, relPath] of relByFileId) {
+          filesRelRef.current[id] = relPath
+        }
+        for (const [id, file] of Object.entries(files)) {
+          if (!file?.dataURL) continue
+          const mimeType = file.mimeType || 'image/png'
+          const created =
+            typeof file.created === 'number' && Number.isFinite(file.created)
+              ? file.created
+              : filesMetaRef.current[id]?.created ?? Date.now()
+          setFileMeta(id, { mimeType, created })
+          try {
+            const blobbed = dataUrlToBlobUrl(file.dataURL)
+            putRuntimeImage({
+              fileId: id,
+              mimeType: mimeType || blobbed.mimeType,
+              url: blobbed.url,
+              revoke: blobbed.revoke,
+              dataURL: file.dataURL,
+              created,
+            })
+          } catch {
+            // Fall back to data: URL for display.
+            putRuntimeImage({
+              fileId: id,
+              mimeType,
+              url: file.dataURL,
+              dataURL: file.dataURL,
+              created,
+            })
+          }
+        }
+      })()
+
       return () => {
+        cancelled = true
         activeRef.current = false
         readyRef.current = false
         clearThrottle()
@@ -429,19 +612,39 @@ export const HipBoardCanvas = forwardRef<HipBoardCanvasHandle, HipBoardCanvasPro
         gestureRef.current = null
         historyPastRef.current = []
         historyFutureRef.current = []
+        pendingImportRef.current = new Set()
+        // Real leave / remount: free all blob memory (completed kept across leave-freeze).
+        revokeAllRuntimeImages()
+        filesMetaRef.current = {}
       }
       // Mount once per boardId (parent keys remount).
       // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [boardId])
 
     const buildDiskJson = useCallback((): string => {
+      // Prefer long-lived filesMeta (mime/created) so serialize does not depend on
+      // blob cache lifetime; fall back to runtime for any missing meta.
+      const runtimeFiles: Record<string, { mimeType?: string; created?: number }> = {
+        ...filesMetaRef.current,
+      }
+      for (const [id, rt] of filesRuntimeRef.current) {
+        if (!runtimeFiles[id]) {
+          runtimeFiles[id] = {
+            mimeType: rt.mimeType,
+            created: rt.created,
+          }
+        }
+      }
       const scene = buildHipDiskScene({
         elements: elementsRef.current,
         appState: { viewBackgroundColor: viewBgRef.current },
         relByFileId: filesRelRef.current,
+        runtimeFiles,
         boardId: boardIdRef.current,
       })
-      return serializeHipBoard(scene)
+      const raw = serializeHipBoard(scene)
+      assertNoDataUrlInBoardJson(raw)
+      return raw
     }, [])
 
     /** Write draft via prop override or knowledgeStore (production path). */
@@ -502,6 +705,15 @@ export const HipBoardCanvas = forwardRef<HipBoardCanvasHandle, HipBoardCanvasPro
         setElements(els)
         const alive = new Set(els.map((e) => e.id))
         setSelection(selectedIdsRef.current.filter((id) => alive.has(id)))
+        // Drop pending that no longer match any image element (undo while importing).
+        const liveFileIds = new Set(
+          els.filter((e): e is HipBoardImage => e.type === 'image').map((e) => e.fileId),
+        )
+        for (const fid of [...pendingImportRef.current]) {
+          if (!liveFileIds.has(fid)) pendingImportRef.current.delete(fid)
+        }
+        // Runtime cache: keep entries still referenced; orphan blobs stay until leave
+        // (undo may resurrect image elements that still have a cached URL).
         scheduleDraftAuto()
         scheduleOutlinePublish()
       },
@@ -707,23 +919,50 @@ export const HipBoardCanvas = forwardRef<HipBoardCanvasHandle, HipBoardCanvasPro
           setMarquee(null)
           // Commit in-progress text into elements before serializing (no cancel).
           foldOpenTextDraft({ close: true })
-        } else if (!activeRef.current) {
+          // Drop pending image imports + strip elements + toast (LKD-7 leave).
+          // Only revoke *pending* blobs here (option A): completed stay for
+          // resumeEditing after flush abort; full revoke on unmount/boardId cleanup.
+          const pending = pendingImportRef.current
+          if (pending.size > 0) {
+            const dropIds = new Set(pending)
+            elementsRef.current = stripImageElementsForFiles(
+              elementsRef.current,
+              dropIds,
+            ) as HipBoardElement[]
+            setElements(elementsRef.current)
+            for (const fid of dropIds) {
+              delete filesRelRef.current[fid]
+            }
+            // dropRuntimeImages also clears filesMeta for those ids + revokes blobs.
+            dropRuntimeImages(dropIds)
+            pendingImportRef.current = new Set()
+            toast.warning(t('knowledge.board.pendingImageDropped'))
+          }
+          // LKD-7 leave order: build disk scene / setDraftBody *while* completed
+          // runtime meta still present, then do not revoke completed (unmount does).
+          const raw = buildDiskJson()
+          lastSerializedRef.current = raw
+          writeDraft(raw, 'none')
           return
-        } else {
-          // Snapshot / syncActiveEditorToDraft: include live textarea in draftBody
-          // without closing the editor.
-          foldOpenTextDraft({ close: false })
         }
+        if (!activeRef.current) {
+          return
+        }
+        // Snapshot / syncActiveEditorToDraft: include live textarea in draftBody
+        // without closing the editor. Keep pending imports (mode snapshot).
+        foldOpenTextDraft({ close: false })
         const raw = buildDiskJson()
         lastSerializedRef.current = raw
         writeDraft(raw, 'none')
       },
       [
         buildDiskJson,
-        cancelCompanionPublish,
+cancelCompanionPublish,
         clearHistory,
         clearThrottle,
+        dropRuntimeImages,
         foldOpenTextDraft,
+        t,
         writeDraft,
       ],
     )
@@ -910,17 +1149,211 @@ export const HipBoardCanvas = forwardRef<HipBoardCanvasHandle, HipBoardCanvasPro
 
     const resumeEditing = useCallback(() => {
       // After leave-mode freeze when flush/open aborts; unmount still freezes for real leave.
+      // Completed image blobs are kept across leave (only pending revoked), so display
+      // continues without re-hydrate when abort stays on this board.
       activeRef.current = true
       readyRef.current = true
       // LKD-25: re-consume pending held during freeze (effect alone will not re-run).
       consumePendingFocus()
     }, [consumePendingFocus])
 
+    /**
+     * Place image elements from File list (paste / drop / picker).
+     * Import runs async; leave drops pending + strips elements.
+     */
+    const insertImageFiles = useCallback(
+      async (files: File[]) => {
+        if (!activeRef.current) return
+        if (textEditRef.current) commitTextEdit()
+        const space = spaceIdRef.current
+        const board = boardIdRef.current
+        const imageFiles = files.filter((f) => {
+          const mime =
+            (f.type && isImageMime(f.type) ? f.type : null) ??
+            (f.type && isAllowedAssetMime(f.type) ? f.type : null) ??
+            mimeFromFileName(f.name)
+          return Boolean(mime && isImageMime(mime))
+        })
+        if (imageFiles.length === 0) return
+
+        // Viewport center in world coords for placement.
+        const rect = rootRef.current?.getBoundingClientRect()
+        const cx = rect ? rect.width / 2 : 200
+        const cy = rect ? rect.height / 2 : 150
+        const center = screenToWorld(cx, cy, cameraRef.current)
+
+        for (const file of imageFiles) {
+          if (!activeRef.current) return
+          const mime =
+            (file.type && isImageMime(file.type) ? file.type : null) ??
+            mimeFromFileName(file.name) ??
+            'image/png'
+          if (!isImageMime(mime) || !isAllowedAssetMime(mime)) {
+            toast.error(t('knowledge.asset.unsupported'))
+            continue
+          }
+
+          let dataURL: string
+          try {
+            dataURL = await blobToDataUrl(file)
+          } catch {
+            toast.error(t('knowledge.asset.importFailed'))
+            continue
+          }
+          if (!activeRef.current) return
+
+          const bytes = estimateDataUrlBytes(dataURL)
+          if (bytes > KNOWLEDGE_ASSET_INLINE_MAX_BYTES) {
+            toast.error(t('knowledge.asset.tooLargePaste'))
+            continue
+          }
+
+          const fileId = `img_${nanoid(10)}`
+          let blobUrl: string
+          let revoke: (() => void) | undefined
+          try {
+            const blobbed = dataUrlToBlobUrl(dataURL)
+            blobUrl = blobbed.url
+            revoke = blobbed.revoke
+          } catch {
+            blobUrl = dataURL
+          }
+
+          let naturalW = 200
+          let naturalH = 150
+          try {
+            const sz = await decodeImageNaturalSize(blobUrl)
+            naturalW = sz.naturalW
+            naturalH = sz.naturalH
+          } catch {
+            /* keep defaults */
+          }
+          if (!activeRef.current) {
+            revoke?.()
+            return
+          }
+
+          const { w, h } = fitImageSize(naturalW, naturalH)
+          const el: HipBoardImage = {
+            id: newElementId('img'),
+            type: 'image',
+            x: center.x - w / 2,
+            y: center.y - h / 2,
+            w,
+            h,
+            fileId,
+          }
+
+          const created = Date.now()
+          const before = snapshotHistory()
+          commitHistory(before)
+          pendingImportRef.current.add(fileId)
+          setFileMeta(fileId, { mimeType: mime, created })
+          putRuntimeImage({
+            fileId,
+            mimeType: mime,
+            url: blobUrl,
+            revoke,
+            dataURL,
+            naturalW,
+            naturalH,
+            created,
+          })
+          setElementsBoth([...elementsRef.current, el])
+          setSelection([el.id])
+          toolRef.current = 'select'
+          setTool('select')
+
+          // Serial import queue (one at a time).
+          importSerialRef.current = importSerialRef.current
+            .then(async () => {
+              if (!activeRef.current) return
+              if (!pendingImportRef.current.has(fileId)) return
+              // Production path: skip if leaf changed (leave already dropped).
+              // Tests inject onDraftBody without store activeDoc — allow continue.
+              if (
+                !onDraftBody &&
+                useKnowledgeStore.getState().activeDocId !== board
+              ) {
+                return
+              }
+              try {
+                const rel = await importBoardFileBytes(space, {
+                  id: fileId,
+                  mimeType: mime,
+                  created,
+                  dataURL,
+                })
+                if (!activeRef.current) return
+                if (!pendingImportRef.current.has(fileId)) return
+                filesRelRef.current = { ...filesRelRef.current, [fileId]: rel }
+                // Keep stable meta (created) from placement; reaffirm mime.
+                setFileMeta(fileId, { mimeType: mime, created })
+                pendingImportRef.current.delete(fileId)
+                scheduleDraftAuto()
+              } catch {
+                if (!activeRef.current) return
+                pendingImportRef.current.delete(fileId)
+                dropRuntimeImages(new Set([fileId]))
+                elementsRef.current = stripImageElementsForFiles(
+                  elementsRef.current,
+                  new Set([fileId]),
+                ) as HipBoardElement[]
+                setElements(elementsRef.current)
+                toast.error(t('knowledge.asset.importFailed'))
+                scheduleDraftAuto()
+              }
+            })
+            .catch(() => {
+              /* serial chain must not break */
+            })
+        }
+      },
+      [
+        commitHistory,
+        commitTextEdit,
+        dropRuntimeImages,
+        onDraftBody,
+        putRuntimeImage,
+        scheduleDraftAuto,
+        setElementsBoth,
+        setFileMeta,
+        setSelection,
+        snapshotHistory,
+        t,
+      ],
+    )
+
+    const exportPngBlob = useCallback(async (): Promise<Blob | null> => {
+      try {
+        const imageSrc: Record<string, { dataURL: string }> = {}
+        for (const el of elementsRef.current) {
+          if (el.type !== 'image') continue
+          const rt = filesRuntimeRef.current.get(el.fileId)
+          if (!rt) continue
+          const dataURL = await resolveDataUrlForExport(rt.url, rt.dataURL)
+          if (dataURL) imageSrc[el.fileId] = { dataURL }
+        }
+        return await exportBoardPngBlob(elementsRef.current, {
+          viewBackgroundColor: viewBgRef.current,
+          imageSrc,
+        })
+      } catch {
+        return null
+      }
+    }, [])
+
+    const openImagePicker = useCallback(() => {
+      if (!activeRef.current) return
+      if (textEditRef.current) commitTextEdit()
+      fileInputRef.current?.click()
+    }, [commitTextEdit])
+
     useImperativeHandle(
       ref,
       () => ({
         flushToStore,
-        exportPngBlob: async () => null,
+        exportPngBlob,
         isReady: () => readyRef.current && activeRef.current,
         resumeEditing,
         selectAndScrollTo: (ids: string[], opts?: { scroll?: boolean }) => {
@@ -937,15 +1370,21 @@ export const HipBoardCanvas = forwardRef<HipBoardCanvasHandle, HipBoardCanvasPro
         getElements: () =>
           elementsRef.current.map((e) => ({ ...e })) as HipBoardElement[],
         getFilesRel: () => ({ ...filesRelRef.current }),
+        getPendingImportIds: () => [...pendingImportRef.current],
+        getRuntimeImageUrl: (fileId: string) =>
+          filesRuntimeRef.current.get(fileId)?.url,
         getHistoryPastLength: () => historyPastRef.current.length,
         undo,
         redo,
+        insertImageFiles,
       }),
       [
         applyStylePatch,
         commitTextEdit,
+exportPngBlob,
         fitSelectionInView,
         flushToStore,
+        insertImageFiles,
         redo,
         resumeEditing,
         setSelection,
@@ -971,9 +1410,10 @@ export const HipBoardCanvas = forwardRef<HipBoardCanvasHandle, HipBoardCanvasPro
       return () => {
         activeRef.current = false
         clearThrottle()
-        cancelCompanionPublish()
+cancelCompanionPublish()
+        revokeAllRuntimeImages()
       }
-    }, [cancelCompanionPublish, clearThrottle])
+    }, [cancelCompanionPublish, clearThrottle, revokeAllRuntimeImages])
 
     // Focus textarea when edit starts.
     useEffect(() => {
@@ -1557,7 +1997,66 @@ export const HipBoardCanvas = forwardRef<HipBoardCanvasHandle, HipBoardCanvasPro
       }
     }, [])
 
+    const onPaste = useCallback(
+      (e: React.ClipboardEvent) => {
+        if (!activeRef.current) return
+        if (textEditRef.current) return
+        if (isEditableTarget(e.target)) return
+        const items = e.clipboardData?.items
+        if (!items || items.length === 0) return
+        const files: File[] = []
+        for (const item of Array.from(items)) {
+          if (item.kind !== 'file') continue
+          if (!item.type.startsWith('image/') || item.type === 'image/svg+xml') continue
+          const f = item.getAsFile()
+          if (f) files.push(f)
+        }
+        if (files.length === 0) return
+        e.preventDefault()
+        e.stopPropagation()
+        void insertImageFiles(files)
+      },
+      [insertImageFiles],
+    )
+
+    const onDragOver = useCallback((e: React.DragEvent) => {
+      if (!activeRef.current) return
+      if (!e.dataTransfer?.types?.includes('Files')) return
+      e.preventDefault()
+      e.dataTransfer.dropEffect = 'copy'
+    }, [])
+
+    const onDrop = useCallback(
+      (e: React.DragEvent) => {
+        if (!activeRef.current) return
+        if (!e.dataTransfer?.files?.length) return
+        const files = Array.from(e.dataTransfer.files).filter((f) => {
+          const mime = f.type || mimeFromFileName(f.name) || ''
+          return isImageMime(mime)
+        })
+        if (files.length === 0) return
+        e.preventDefault()
+        e.stopPropagation()
+        void insertImageFiles(files)
+      },
+      [insertImageFiles],
+    )
+
+    const onFileInputChange = useCallback(
+      (e: React.ChangeEvent<HTMLInputElement>) => {
+        const list = e.target.files
+        if (!list || list.length === 0) return
+        const files = Array.from(list)
+        // Reset so the same file can be re-picked.
+        e.target.value = ''
+        void insertImageFiles(files)
+      },
+      [insertImageFiles],
+    )
+
     const transform = worldGroupTransform(camera)
+    // imageTick forces re-render when runtime blob URLs hydrate.
+    void imageTick
 
     // Textarea overlay screen box (recompute from camera + element).
     let textOverlayStyle: React.CSSProperties | undefined
@@ -1623,12 +2122,25 @@ export const HipBoardCanvas = forwardRef<HipBoardCanvasHandle, HipBoardCanvasPro
         onDoubleClick={onDoubleClick}
         onKeyDown={onKeyDown}
         onKeyUp={onKeyUp}
+        onPaste={onPaste}
+        onDragOver={onDragOver}
+        onDrop={onDrop}
         style={{ backgroundColor: viewBg, touchAction: 'none', cursor }}
       >
         <BoardToolbar
           tool={tool}
           onToolChange={changeTool}
           disabled={Boolean(textEdit)}
+          onInsertImage={openImagePicker}
+        />
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept="image/png,image/jpeg,image/gif,image/webp"
+          multiple
+          className="hidden"
+          data-testid="hip-board-image-input"
+          onChange={onFileInputChange}
         />
 
         <svg
@@ -1733,13 +2245,30 @@ export const HipBoardCanvas = forwardRef<HipBoardCanvasHandle, HipBoardCanvasPro
                 )
               }
               if (el.type === 'image') {
+                const rt = filesRuntimeRef.current.get(el.fileId)
+                if (rt?.url) {
+                  return (
+                    <image
+                      key={el.id}
+                      x={el.x}
+                      y={el.y}
+                      width={Math.max(0, el.w)}
+                      height={Math.max(0, el.h)}
+                      href={rt.url}
+                      preserveAspectRatio="none"
+                      data-element-id={el.id}
+                      data-element-type="image"
+                      data-file-id={el.fileId}
+                    />
+                  )
+                }
                 return (
                   <rect
                     key={el.id}
                     x={el.x}
                     y={el.y}
-                    width={el.w}
-                    height={el.h}
+                    width={Math.max(0, el.w)}
+                    height={Math.max(0, el.h)}
                     fill="#e5e5e5"
                     stroke="#999"
                     strokeWidth={1}

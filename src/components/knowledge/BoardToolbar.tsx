@@ -1,10 +1,11 @@
 /**
- * Hip whiteboard tool chrome (PR-2).
+ * Hip whiteboard tool chrome (PR-2 + PR-5 image attach).
  * role="toolbar"; each tool button uses aria-pressed.
  */
 import {
   ArrowUpRight,
   Circle,
+  ImagePlus,
   Minus,
   MousePointer2,
   Square,
@@ -19,6 +20,8 @@ export type BoardToolbarProps = {
   onToolChange: (tool: BoardTool) => void
   /** When true (e.g. text editing), tools stay visible but non-interactive. */
   disabled?: boolean
+  /** PR-5: open image file picker (paste/drop also work on canvas). */
+  onInsertImage?: () => void
   className?: string
 }
 
@@ -42,7 +45,13 @@ function stopPointerBubble(e: React.PointerEvent) {
   e.stopPropagation()
 }
 
-export function BoardToolbar({ tool, onToolChange, disabled, className }: BoardToolbarProps) {
+export function BoardToolbar({
+  tool,
+  onToolChange,
+  disabled,
+  onInsertImage,
+  className,
+}: BoardToolbarProps) {
   return (
     <div
       className={cn(
@@ -86,6 +95,25 @@ export function BoardToolbar({ tool, onToolChange, disabled, className }: BoardT
           </Button>
         )
       })}
+      {onInsertImage ? (
+        <Button
+          type="button"
+          size="icon"
+          variant="ghost"
+          className="h-8 w-8"
+          title="Insert image"
+          aria-label="Insert image"
+          disabled={disabled}
+          data-testid="hip-board-tool-image"
+          onPointerDown={stopPointerBubble}
+          onMouseDown={(e) => {
+            e.preventDefault()
+          }}
+          onClick={() => onInsertImage()}
+        >
+          <ImagePlus size={15} strokeWidth={2} />
+        </Button>
+      ) : null}
     </div>
   )
 }

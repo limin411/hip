@@ -12,6 +12,31 @@ import {
 } from '@/domain/knowledge/boardScene'
 import { useKnowledgeStore } from '@/store/knowledgeStore'
 
+vi.mock('sonner', () => ({
+  toast: {
+    warning: vi.fn(),
+    error: vi.fn(),
+    success: vi.fn(),
+    message: vi.fn(),
+  },
+}))
+
+vi.mock('@/domain/knowledge/boardScene', async () => {
+  const actual = await vi.importActual<typeof import('@/domain/knowledge/boardScene')>(
+    '@/domain/knowledge/boardScene',
+  )
+  return {
+    ...actual,
+    // Avoid real asset IPC during shell/selection tests that seed image files.
+    hydrateBoardFiles: vi.fn(async () => ({
+      files: {},
+      relByFileId: new Map(),
+      failedIds: [],
+    })),
+    importBoardFileBytes: vi.fn(async () => 'assets/mock.png'),
+  }
+})
+
 afterEach(() => {
   cleanup()
   vi.useRealTimers()

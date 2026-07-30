@@ -1,4 +1,4 @@
-export type KnowledgeNodeKind = 'folder' | 'doc'
+export type KnowledgeNodeKind = 'folder' | 'doc' | 'board'
 
 export interface KnowledgeSpace {
   id: string
@@ -30,6 +30,7 @@ export interface KnowledgeTreeFile {
 
 export interface KnowledgeRecentItem {
   spaceId: string
+  /** Leaf id: `doc_*` or `brd_*` (field name kept for localStorage compat). */
   docId: string
   title: string
   spaceName: string

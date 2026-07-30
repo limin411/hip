@@ -89,7 +89,13 @@ export function renameNode(
 export function removeNodeSubtree(
   nodes: KnowledgeNode[],
   id: string,
-): { nodes: KnowledgeNode[]; removedDocIds: string[] } {
+): {
+  nodes: KnowledgeNode[]
+  removedDocIds: string[]
+  removedBoardIds: string[]
+  /** doc + board — use for active clear / recent when counting leaves */
+  removedLeafIds: string[]
+} {
   const toRemove = new Set<string>()
   const walk = (target: string) => {
     toRemove.add(target)
@@ -99,12 +105,15 @@ export function removeNodeSubtree(
   }
   walk(id)
 
-  const removedDocIds = nodes
-    .filter((n) => toRemove.has(n.id) && n.kind === 'doc')
-    .map((n) => n.id)
+  const removed = nodes.filter((n) => toRemove.has(n.id))
+  const removedDocIds = removed.filter((n) => n.kind === 'doc').map((n) => n.id)
+  const removedBoardIds = removed.filter((n) => n.kind === 'board').map((n) => n.id)
+  const removedLeafIds = [...removedDocIds, ...removedBoardIds]
   return {
     nodes: nodes.filter((n) => !toRemove.has(n.id)),
     removedDocIds,
+    removedBoardIds,
+    removedLeafIds,
   }
 }
 
@@ -209,10 +218,52 @@ export function collectDocIdsInSubtree(nodes: KnowledgeNode[], rootId: string): 
   return ids
 }
 
+/** Collect all board ids under a node (including self if board). */
+export function collectBoardIdsInSubtree(nodes: KnowledgeNode[], rootId: string): string[] {
+  const ids: string[] = []
+  const walk = (id: string) => {
+    const n = nodes.find((x) => x.id === id)
+    if (!n) return
+    if (n.kind === 'board') ids.push(n.id)
+    for (const c of listChildren(nodes, id)) walk(c.id)
+  }
+  walk(rootId)
+  return ids
+}
+
+/** Collect doc + board leaf ids under a node (including self if leaf). */
+export function collectLeafIdsInSubtree(nodes: KnowledgeNode[], rootId: string): string[] {
+  const ids: string[] = []
+  const walk = (id: string) => {
+    const n = nodes.find((x) => x.id === id)
+    if (!n) return
+    if (n.kind === 'doc' || n.kind === 'board') ids.push(n.id)
+    for (const c of listChildren(nodes, id)) walk(c.id)
+  }
+  walk(rootId)
+  return ids
+}
+
 export function filterNodesByTitle(nodes: KnowledgeNode[], query: string): KnowledgeNode[] {
   const q = query.trim().toLowerCase()
   if (!q) return nodes
   return nodes.filter((n) => n.title.toLowerCase().includes(q))
+}
+
+/** kind ⇔ id prefix strong invariant (Issue 13). */
+function expectedPrefixForKind(kind: KnowledgeNode['kind']): string {
+  switch (kind) {
+    case 'folder':
+      return 'nod_'
+    case 'doc':
+      return 'doc_'
+    case 'board':
+      return 'brd_'
+    default: {
+      const _exhaustive: never = kind
+      return _exhaustive
+    }
+  }
 }
 
 /** Unit-test / debug invariant checks. */
@@ -222,7 +273,13 @@ export function assertTreeInvariants(nodes: KnowledgeNode[]): void {
     if (!isKnowledgeId(n.id)) throw new Error(`invalid id: ${n.id}`)
     if (ids.has(n.id)) throw new Error(`duplicate id: ${n.id}`)
     ids.add(n.id)
-    if (n.kind !== 'folder' && n.kind !== 'doc') throw new Error(`invalid kind: ${n.kind}`)
+    if (n.kind !== 'folder' && n.kind !== 'doc' && n.kind !== 'board') {
+      throw new Error(`invalid kind: ${n.kind}`)
+    }
+    const prefix = expectedPrefixForKind(n.kind)
+    if (!n.id.startsWith(prefix)) {
+      throw new Error(`kind ${n.kind} requires id prefix ${prefix}: ${n.id}`)
+    }
   }
   for (const n of nodes) {
     if (n.parentId != null && !ids.has(n.parentId)) {

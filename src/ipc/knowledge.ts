@@ -55,7 +55,7 @@ export async function knowledgeSoftDeleteNodes(
   })
 }
 
-export type KnowledgeTrashKind = 'space' | 'doc' | 'folder'
+export type KnowledgeTrashKind = 'space' | 'doc' | 'folder' | 'board'
 
 export interface KnowledgeTrashItem {
   id: string
@@ -126,6 +126,33 @@ export async function knowledgeWriteDoc(spaceId: string, docId: string, body: st
 
 export async function knowledgeDeleteDocFile(spaceId: string, docId: string): Promise<void> {
   await invoke('knowledge_delete_doc_file', { args: { spaceId, docId } })
+}
+
+export async function knowledgeReadBoard(spaceId: string, boardId: string): Promise<string> {
+  return invoke<string>('knowledge_read_board', { args: { spaceId, boardId } })
+}
+
+/**
+ * Write board body (dehydrated JSON). Shares `__hipKnowledgeWriteFail` with docs
+ * (boolean true, or a function that returns true for this write).
+ */
+export async function knowledgeWriteBoard(
+  spaceId: string,
+  boardId: string,
+  body: string,
+): Promise<void> {
+  const fail = (globalThis as unknown as {
+    __hipKnowledgeWriteFail?: boolean | ((spaceId: string, boardId: string) => boolean)
+  }).__hipKnowledgeWriteFail
+  const shouldFail = typeof fail === 'function' ? fail(spaceId, boardId) : fail === true
+  if (shouldFail) {
+    throw new Error('e2e knowledge write fail')
+  }
+  await invoke('knowledge_write_board', { args: { spaceId, boardId, body } })
+}
+
+export async function knowledgeDeleteBoardFile(spaceId: string, boardId: string): Promise<void> {
+  await invoke('knowledge_delete_board_file', { args: { spaceId, boardId } })
 }
 
 export async function knowledgeExportDoc(

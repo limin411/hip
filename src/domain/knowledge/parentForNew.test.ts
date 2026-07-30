@@ -21,8 +21,14 @@ const docInFolder = n({
   title: 'Child',
   parentId: 'fld_1',
 })
+const boardInFolder = n({
+  id: 'brd_child01',
+  kind: 'board',
+  title: 'Board',
+  parentId: 'fld_1',
+})
 const rootDoc = n({ id: 'doc_root', kind: 'doc', title: 'Root' })
-const nodes = [folder, docInFolder, rootDoc]
+const nodes = [folder, docInFolder, boardInFolder, rootDoc]
 
 describe('resolveParentForNew', () => {
   it('returns folder id when tree focus is a folder', () => {
@@ -45,6 +51,16 @@ describe('resolveParentForNew', () => {
     ).toBe('fld_1')
   })
 
+  it('returns parent of focused board (sibling create)', () => {
+    expect(
+      resolveParentForNew({
+        treeFocusId: 'brd_child01',
+        activeDocId: 'doc_root',
+        nodes,
+      }),
+    ).toBe('fld_1')
+  })
+
   it('returns null for focused root doc', () => {
     expect(
       resolveParentForNew({
@@ -60,6 +76,16 @@ describe('resolveParentForNew', () => {
       resolveParentForNew({
         treeFocusId: null,
         activeDocId: 'doc_child',
+        nodes,
+      }),
+    ).toBe('fld_1')
+  })
+
+  it('falls back to active board parent when no focus', () => {
+    expect(
+      resolveParentForNew({
+        treeFocusId: null,
+        activeDocId: 'brd_child01',
         nodes,
       }),
     ).toBe('fld_1')

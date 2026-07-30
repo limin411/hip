@@ -1,7 +1,9 @@
 import { describe, it, expect } from 'vitest'
 import {
   assertTreeInvariants,
+  collectBoardIdsInSubtree,
   collectDocIdsInSubtree,
+  collectLeafIdsInSubtree,
   filterNodesByTitle,
   filterTreeVisible,
   getPath,
@@ -44,6 +46,13 @@ describe('knowledge tree helpers', () => {
     order: 0,
   })
   const rootDoc = n({ id: 'doc_root0001', kind: 'doc', title: '概览', order: 1 })
+  const boardA = n({
+    id: 'brd_board0001',
+    kind: 'board',
+    title: '架构草图',
+    parentId: 'nod_folder001',
+    order: 2,
+  })
 
   it('listChildren sorts by order then title', () => {
     const kids = listChildren([folder, docA, docB, rootDoc], 'nod_folder001')
@@ -104,6 +113,19 @@ describe('knowledge tree helpers', () => {
     )
   })
 
+  it('collectBoardIdsInSubtree includes nested boards only', () => {
+    expect(collectBoardIdsInSubtree([folder, docA, boardA], 'nod_folder001')).toEqual([
+      'brd_board0001',
+    ])
+    expect(collectDocIdsInSubtree([folder, docA, boardA], 'nod_folder001')).toEqual(['doc_aaaaaaa1'])
+  })
+
+  it('collectLeafIdsInSubtree is doc ∪ board', () => {
+    expect(collectLeafIdsInSubtree([folder, docA, boardA], 'nod_folder001').sort()).toEqual(
+      ['brd_board0001', 'doc_aaaaaaa1'].sort(),
+    )
+  })
+
   it('insertNode appends immutably', () => {
     const next = insertNode([folder], docA)
     expect(next).toHaveLength(2)
@@ -116,10 +138,17 @@ describe('knowledge tree helpers', () => {
     expect(next[0].updatedAt).toBe(99)
   })
 
-  it('removeNodeSubtree removes descendants and collects doc ids', () => {
-    const { nodes, removedDocIds } = removeNodeSubtree([folder, docA, docB, rootDoc], 'nod_folder001')
+  it('removeNodeSubtree removes descendants and collects doc/board/leaf ids', () => {
+    const { nodes, removedDocIds, removedBoardIds, removedLeafIds } = removeNodeSubtree(
+      [folder, docA, docB, boardA, rootDoc],
+      'nod_folder001',
+    )
     expect(nodes.map((x) => x.id)).toEqual(['doc_root0001'])
     expect(removedDocIds.sort()).toEqual(['doc_aaaaaaa1', 'doc_bbbbbbb2'].sort())
+    expect(removedBoardIds).toEqual(['brd_board0001'])
+    expect(removedLeafIds.sort()).toEqual(
+      ['brd_board0001', 'doc_aaaaaaa1', 'doc_bbbbbbb2'].sort(),
+    )
   })
 
   it('nextOrder is max+1', () => {
@@ -133,11 +162,36 @@ describe('knowledge tree helpers', () => {
     expect(hits[0].id).toBe('doc_bbbbbbb2')
   })
 
-  it('assertTreeInvariants accepts valid tree', () => {
-    expect(() => assertTreeInvariants([folder, docA, docB, rootDoc])).not.toThrow()
+  it('filterTreeVisible matches board titles', () => {
+    const visible = filterTreeVisible([folder, boardA], '架构')
+    expect(visible).not.toBeNull()
+    expect(visible!.has('brd_board0001')).toBe(true)
+    expect(visible!.has('nod_folder001')).toBe(true)
+  })
+
+  it('assertTreeInvariants accepts valid tree including board', () => {
+    expect(() => assertTreeInvariants([folder, docA, docB, rootDoc, boardA])).not.toThrow()
   })
 
   it('assertTreeInvariants rejects duplicate ids', () => {
     expect(() => assertTreeInvariants([docA, { ...docA }])).toThrow(/duplicate/)
+  })
+
+  it('assertTreeInvariants enforces kind ⇔ prefix', () => {
+    expect(() =>
+      assertTreeInvariants([
+        n({ id: 'doc_wrongkind1', kind: 'board', title: 'bad' }),
+      ]),
+    ).toThrow(/prefix/)
+    expect(() =>
+      assertTreeInvariants([
+        n({ id: 'brd_wrongkind1', kind: 'doc', title: 'bad' }),
+      ]),
+    ).toThrow(/prefix/)
+    expect(() =>
+      assertTreeInvariants([
+        n({ id: 'nod_wrongkind1', kind: 'doc', title: 'bad' }),
+      ]),
+    ).toThrow(/prefix/)
   })
 })

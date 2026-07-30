@@ -31,6 +31,7 @@ pub enum TrashEntityKind {
     Space,
     Doc,
     Folder,
+    Board,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -320,20 +321,44 @@ fn collect_subtree(nodes: &[KnowledgeNode], root_id: &str) -> Vec<KnowledgeNode>
     out
 }
 
-#[tauri::command]
-pub fn knowledge_soft_delete_nodes(
-    app: AppHandle,
-    args: SoftDeleteNodesArgs,
+/// Classify soft-delete root. NEVER map kind=="board" to Doc.
+fn classify_trash_root(root: &KnowledgeNode) -> Result<TrashEntityKind, String> {
+    match root.kind.as_str() {
+        "folder" => Ok(TrashEntityKind::Folder),
+        "board" => Ok(TrashEntityKind::Board),
+        "doc" => Ok(TrashEntityKind::Doc),
+        _ if root.id.starts_with("brd_") => Ok(TrashEntityKind::Board),
+        _ if root.id.starts_with("doc_") => Ok(TrashEntityKind::Doc),
+        _ if root.id.starts_with("nod_") => Ok(TrashEntityKind::Folder),
+        _ => Err(format!(
+            "cannot classify trash kind for node {} kind={}",
+            root.id, root.kind
+        )),
+    }
+}
+
+fn is_doc_node(n: &KnowledgeNode) -> bool {
+    n.kind == "doc" || n.id.starts_with("doc_")
+}
+
+fn is_board_node(n: &KnowledgeNode) -> bool {
+    n.kind == "board" || n.id.starts_with("brd_")
+}
+
+/// Path-based soft-delete (testable without AppHandle).
+pub(crate) fn soft_delete_nodes_at(
+    kroot: &Path,
+    trash: &Path,
+    space_id: &str,
+    node_ids: &[String],
 ) -> Result<Vec<String>, String> {
-    require_id(&args.space_id, "spaceId")?;
-    if args.node_ids.is_empty() {
+    require_id(space_id, "spaceId")?;
+    if node_ids.is_empty() {
         return Ok(vec![]);
     }
-    let kroot = knowledge_root(&app)?;
-    let trash = trash_root(&app)?;
     fs::create_dir_all(trash.join("docs")).map_err(|e| e.to_string())?;
 
-    let space_dir = space_live_dir(&kroot, &args.space_id)?;
+    let space_dir = space_live_dir(kroot, space_id)?;
     if !space_dir.exists() {
         return Err("space not found".into());
     }
@@ -358,7 +383,7 @@ pub fn knowledge_soft_delete_nodes(
     let mut fragments: Vec<(TrashKnowledgeEntry, Vec<KnowledgeNode>)> = Vec::new();
     let deleted_at = now_ms();
 
-    for root_id in &args.node_ids {
+    for root_id in node_ids {
         if removed_ids.contains(root_id) {
             continue;
         }
@@ -368,11 +393,7 @@ pub fn knowledge_soft_delete_nodes(
             continue;
         }
         let root = subtree.iter().find(|n| n.id == *root_id).cloned().unwrap();
-        let kind = if root.kind == "folder" {
-            TrashEntityKind::Folder
-        } else {
-            TrashEntityKind::Doc
-        };
+        let kind = classify_trash_root(&root)?;
         let entry_id = gen_entry_id();
         let payload_rel = format!("docs/{entry_id}");
         let entry = TrashKnowledgeEntry {
@@ -380,7 +401,7 @@ pub fn knowledge_soft_delete_nodes(
             status: TrashEntryStatus::PendingMove,
             kind: kind.clone(),
             entity_id: root_id.clone(),
-            space_id: args.space_id.clone(),
+            space_id: space_id.to_string(),
             title: root.title.clone(),
             deleted_at,
             payload_rel: payload_rel.clone(),
@@ -399,16 +420,17 @@ pub fn knowledge_soft_delete_nodes(
         return Ok(vec![]);
     }
 
-    let mut manifest = load_manifest(&trash)?;
+    let mut manifest = load_manifest(trash)?;
     for (e, _) in &fragments {
         manifest.entries.push(e.clone());
     }
-    save_manifest(&trash, &manifest)?;
+    save_manifest(trash, &manifest)?;
 
-    // Move payloads
+    // Move payloads (docs + boards)
     for (entry, subtree) in &fragments {
         let dest = trash.join(&entry.payload_rel);
         fs::create_dir_all(dest.join("docs")).map_err(|e| e.to_string())?;
+        fs::create_dir_all(dest.join("boards")).map_err(|e| e.to_string())?;
         fs::create_dir_all(dest.join("versions")).map_err(|e| e.to_string())?;
 
         let meta = NodePayloadMeta {
@@ -432,19 +454,26 @@ pub fn knowledge_soft_delete_nodes(
         .map_err(|e| e.to_string())?;
 
         for n in subtree {
-            if n.kind != "doc" && !n.id.starts_with("doc_") {
-                continue;
+            if is_doc_node(n) && n.id.starts_with("doc_") {
+                let src_md = space_dir.join("docs").join(format!("{}.md", n.id));
+                if src_md.exists() {
+                    let _ = fs::rename(&src_md, dest.join("docs").join(format!("{}.md", n.id)));
+                }
+                let src_ver = space_dir.join("versions").join(&n.id);
+                if src_ver.exists() {
+                    let _ = fs::rename(&src_ver, dest.join("versions").join(&n.id));
+                }
             }
-            if !n.id.starts_with("doc_") {
-                continue;
-            }
-            let src_md = space_dir.join("docs").join(format!("{}.md", n.id));
-            if src_md.exists() {
-                let _ = fs::rename(&src_md, dest.join("docs").join(format!("{}.md", n.id)));
-            }
-            let src_ver = space_dir.join("versions").join(&n.id);
-            if src_ver.exists() {
-                let _ = fs::rename(&src_ver, dest.join("versions").join(&n.id));
+            if is_board_node(n) && n.id.starts_with("brd_") {
+                let src_board = space_dir
+                    .join("boards")
+                    .join(format!("{}.excalidraw", n.id));
+                if src_board.exists() {
+                    let _ = fs::rename(
+                        &src_board,
+                        dest.join("boards").join(format!("{}.excalidraw", n.id)),
+                    );
+                }
             }
         }
     }
@@ -466,14 +495,24 @@ pub fn knowledge_soft_delete_nodes(
     .map_err(|e| e.to_string())?;
     let _ = fs::remove_file(&bak);
 
-    let mut m = load_manifest(&trash)?;
+    let mut m = load_manifest(trash)?;
     for (entry, _) in &fragments {
         if let Some(e) = m.entries.iter_mut().find(|x| x.id == entry.id) {
             e.status = TrashEntryStatus::Ready;
         }
     }
-    save_manifest(&trash, &m)?;
+    save_manifest(trash, &m)?;
     Ok(fragments.iter().map(|(e, _)| e.id.clone()).collect())
+}
+
+#[tauri::command]
+pub fn knowledge_soft_delete_nodes(
+    app: AppHandle,
+    args: SoftDeleteNodesArgs,
+) -> Result<Vec<String>, String> {
+    let kroot = knowledge_root(&app)?;
+    let trash = trash_root(&app)?;
+    soft_delete_nodes_at(&kroot, &trash, &args.space_id, &args.node_ids)
 }
 
 // ── List / restore / hard / empty / purge / reconcile ───────────────────────
@@ -499,18 +538,17 @@ pub struct TrashEntryIdArgs {
     pub entry_id: String,
 }
 
-#[tauri::command]
-pub fn knowledge_restore_trash_entry(
-    app: AppHandle,
-    args: TrashEntryIdArgs,
+/// Path-based restore (testable without AppHandle).
+pub(crate) fn restore_trash_entry_at(
+    kroot: &Path,
+    trash: &Path,
+    entry_id: &str,
 ) -> Result<TrashListItem, String> {
-    let kroot = knowledge_root(&app)?;
-    let trash = trash_root(&app)?;
-    let mut m = load_manifest(&trash)?;
+    let mut m = load_manifest(trash)?;
     let idx = m
         .entries
         .iter()
-        .position(|e| e.id == args.entry_id)
+        .position(|e| e.id == entry_id)
         .ok_or_else(|| "trash entry not found".to_string())?;
     let entry = m.entries[idx].clone();
     if entry.status != TrashEntryStatus::Ready {
@@ -519,13 +557,13 @@ pub fn knowledge_restore_trash_entry(
     let payload = trash.join(&entry.payload_rel);
     if !payload.exists() {
         m.entries.remove(idx);
-        save_manifest(&trash, &m)?;
+        save_manifest(trash, &m)?;
         return Err("trash payload missing".into());
     }
 
     match entry.kind {
         TrashEntityKind::Space => {
-            let mut index = load_index(&kroot)?;
+            let mut index = load_index(kroot)?;
             let mut name = entry.title.clone();
             // Auto-suffix if name taken
             if index
@@ -554,7 +592,7 @@ pub fn knowledge_restore_trash_entry(
                     }
                 }
             }
-            let dest = space_live_dir(&kroot, &entry.entity_id)?;
+            let dest = space_live_dir(kroot, &entry.entity_id)?;
             if dest.exists() {
                 return Err("live space directory already exists".into());
             }
@@ -597,10 +635,10 @@ pub fn knowledge_restore_trash_entry(
             let _ = fs::remove_file(dest.join("trash_meta.json"));
 
             index.spaces.push(space);
-            save_index_spaces(&kroot, index.spaces)?;
+            save_index_spaces(kroot, index.spaces)?;
         }
-        TrashEntityKind::Doc | TrashEntityKind::Folder => {
-            let space_dir = space_live_dir(&kroot, &entry.space_id)?;
+        TrashEntityKind::Doc | TrashEntityKind::Folder | TrashEntityKind::Board => {
+            let space_dir = space_live_dir(kroot, &entry.space_id)?;
             if !space_dir.exists() {
                 return Err("parent space missing; restore the space first".into());
             }
@@ -634,22 +672,34 @@ pub fn knowledge_restore_trash_entry(
                 }
             }
 
-            // Move docs back
+            // Move docs + boards back
             for n in &fragment {
-                if !n.id.starts_with("doc_") {
-                    continue;
+                if n.id.starts_with("doc_") {
+                    let src = payload.join("docs").join(format!("{}.md", n.id));
+                    if src.exists() {
+                        fs::create_dir_all(space_dir.join("docs")).map_err(|e| e.to_string())?;
+                        fs::rename(&src, space_dir.join("docs").join(format!("{}.md", n.id)))
+                            .map_err(|e| e.to_string())?;
+                    }
+                    let src_ver = payload.join("versions").join(&n.id);
+                    if src_ver.exists() {
+                        fs::create_dir_all(space_dir.join("versions"))
+                            .map_err(|e| e.to_string())?;
+                        fs::rename(&src_ver, space_dir.join("versions").join(&n.id))
+                            .map_err(|e| e.to_string())?;
+                    }
                 }
-                let src = payload.join("docs").join(format!("{}.md", n.id));
-                if src.exists() {
-                    fs::create_dir_all(space_dir.join("docs")).map_err(|e| e.to_string())?;
-                    fs::rename(&src, space_dir.join("docs").join(format!("{}.md", n.id)))
+                if n.id.starts_with("brd_") || n.kind == "board" {
+                    let src = payload.join("boards").join(format!("{}.excalidraw", n.id));
+                    if src.exists() {
+                        fs::create_dir_all(space_dir.join("boards")).map_err(|e| e.to_string())?;
+                        fs::rename(
+                            &src,
+                            space_dir.join("boards").join(format!("{}.excalidraw", n.id)),
+                        )
                         .map_err(|e| e.to_string())?;
-                }
-                let src_ver = payload.join("versions").join(&n.id);
-                if src_ver.exists() {
-                    fs::create_dir_all(space_dir.join("versions")).map_err(|e| e.to_string())?;
-                    fs::rename(&src_ver, space_dir.join("versions").join(&n.id))
-                        .map_err(|e| e.to_string())?;
+                    }
+                    // Missing board file: still restore tree node (open yields empty scene).
                 }
             }
 
@@ -663,9 +713,36 @@ pub fn knowledge_restore_trash_entry(
         }
     }
 
-    m.entries.retain(|e| e.id != args.entry_id);
-    save_manifest(&trash, &m)?;
+    m.entries.retain(|e| e.id != entry_id);
+    save_manifest(trash, &m)?;
     Ok(to_list_item(&entry))
+}
+
+#[tauri::command]
+pub fn knowledge_restore_trash_entry(
+    app: AppHandle,
+    args: TrashEntryIdArgs,
+) -> Result<TrashListItem, String> {
+    let kroot = knowledge_root(&app)?;
+    let trash = trash_root(&app)?;
+    restore_trash_entry_at(&kroot, &trash, &args.entry_id)
+}
+
+/// Path-based hard-delete (testable without AppHandle).
+pub(crate) fn hard_delete_trash_entry_at(trash: &Path, entry_id: &str) -> Result<(), String> {
+    let mut m = load_manifest(trash)?;
+    let idx = m
+        .entries
+        .iter()
+        .position(|e| e.id == entry_id)
+        .ok_or_else(|| "trash entry not found".to_string())?;
+    let entry = m.entries.remove(idx);
+    let payload = trash.join(&entry.payload_rel);
+    if payload.exists() {
+        let _ = fs::remove_dir_all(&payload);
+    }
+    save_manifest(trash, &m)?;
+    Ok(())
 }
 
 #[tauri::command]
@@ -674,19 +751,7 @@ pub fn knowledge_hard_delete_trash_entry(
     args: TrashEntryIdArgs,
 ) -> Result<(), String> {
     let trash = trash_root(&app)?;
-    let mut m = load_manifest(&trash)?;
-    let idx = m
-        .entries
-        .iter()
-        .position(|e| e.id == args.entry_id)
-        .ok_or_else(|| "trash entry not found".to_string())?;
-    let entry = m.entries.remove(idx);
-    let payload = trash.join(&entry.payload_rel);
-    if payload.exists() {
-        let _ = fs::remove_dir_all(&payload);
-    }
-    save_manifest(&trash, &m)?;
-    Ok(())
+    hard_delete_trash_entry_at(&trash, &args.entry_id)
 }
 
 #[tauri::command]
@@ -839,4 +904,274 @@ pub fn knowledge_reconcile_trash(app: AppHandle) -> Result<u32, String> {
 
     save_manifest(&trash, &m)?;
     Ok(fixed)
+}
+
+// ── Tests ─────────────────────────────────────────────────────────────────
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::knowledge::EMPTY_BOARD_SCENE_JSON;
+    use std::sync::Mutex;
+
+    static ENV_LOCK: Mutex<()> = Mutex::new(());
+
+    fn with_temp_roots<F: FnOnce(&Path, &Path)>(f: F) {
+        let _g = ENV_LOCK.lock().unwrap();
+        let base = std::env::temp_dir().join(format!(
+            "hip-kb-trash-{}",
+            SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        let kroot = base.join("knowledge");
+        let trash = base.join("trash").join("knowledge");
+        fs::create_dir_all(&kroot).unwrap();
+        fs::create_dir_all(&trash).unwrap();
+        f(&kroot, &trash);
+        let _ = fs::remove_dir_all(&base);
+    }
+
+    fn write_space_with_tree(
+        kroot: &Path,
+        space_id: &str,
+        nodes: Vec<KnowledgeNode>,
+    ) -> PathBuf {
+        let space = space_live_dir(kroot, space_id).unwrap();
+        fs::create_dir_all(space.join("docs")).unwrap();
+        fs::create_dir_all(space.join("boards")).unwrap();
+        let tree = KnowledgeTreeFile {
+            version: 1,
+            nodes,
+        };
+        fs::write(
+            space.join("tree.json"),
+            serde_json::to_string_pretty(&tree).unwrap(),
+        )
+        .unwrap();
+        space
+    }
+
+    fn node(
+        id: &str,
+        kind: &str,
+        title: &str,
+        parent_id: Option<&str>,
+        order: i32,
+    ) -> KnowledgeNode {
+        KnowledgeNode {
+            id: id.into(),
+            parent_id: parent_id.map(|s| s.to_string()),
+            kind: kind.into(),
+            title: title.into(),
+            order,
+            created_at: 1,
+            updated_at: 1,
+        }
+    }
+
+    #[test]
+    fn classify_never_maps_board_to_doc() {
+        let board = node("brd_board0001ab", "board", "W", None, 0);
+        assert_eq!(classify_trash_root(&board).unwrap(), TrashEntityKind::Board);
+        let by_prefix = node("brd_board0002cd", "unknown", "W", None, 0);
+        assert_eq!(
+            classify_trash_root(&by_prefix).unwrap(),
+            TrashEntityKind::Board
+        );
+        let doc = node("doc_doc00000001", "doc", "D", None, 0);
+        assert_eq!(classify_trash_root(&doc).unwrap(), TrashEntityKind::Doc);
+        let folder = node("nod_folder001xx", "folder", "F", None, 0);
+        assert_eq!(
+            classify_trash_root(&folder).unwrap(),
+            TrashEntityKind::Folder
+        );
+    }
+
+    #[test]
+    fn soft_delete_board_only_moves_excalidraw_payload() {
+        with_temp_roots(|kroot, trash| {
+            let space_id = "spc_trashboard01";
+            let board_id = "brd_boardonly01";
+            let space = write_space_with_tree(
+                kroot,
+                space_id,
+                vec![node(board_id, "board", "Sketch", None, 0)],
+            );
+            let live_board = space.join("boards").join(format!("{board_id}.excalidraw"));
+            fs::write(&live_board, EMPTY_BOARD_SCENE_JSON).unwrap();
+
+            let entry_ids = soft_delete_nodes_at(
+                kroot,
+                trash,
+                space_id,
+                &[board_id.to_string()],
+            )
+            .unwrap();
+            assert_eq!(entry_ids.len(), 1);
+
+            // Live board gone
+            assert!(!live_board.exists());
+            // Tree empty
+            let tree: KnowledgeTreeFile =
+                serde_json::from_str(&fs::read_to_string(space.join("tree.json")).unwrap())
+                    .unwrap();
+            assert!(tree.nodes.is_empty());
+
+            let m = load_manifest(trash).unwrap();
+            let e = m.entries.iter().find(|e| e.id == entry_ids[0]).unwrap();
+            assert_eq!(e.kind, TrashEntityKind::Board);
+            assert_eq!(e.status, TrashEntryStatus::Ready);
+            let payload_board = trash
+                .join(&e.payload_rel)
+                .join("boards")
+                .join(format!("{board_id}.excalidraw"));
+            assert!(payload_board.is_file(), "payload should have board file");
+        });
+    }
+
+    #[test]
+    fn soft_delete_folder_moves_doc_and_board() {
+        with_temp_roots(|kroot, trash| {
+            let space_id = "spc_trashmixed01";
+            let folder_id = "nod_folder001xx";
+            let doc_id = "doc_doc00000001";
+            let board_id = "brd_boardmix001";
+            let space = write_space_with_tree(
+                kroot,
+                space_id,
+                vec![
+                    node(folder_id, "folder", "Folder", None, 0),
+                    node(doc_id, "doc", "Doc", Some(folder_id), 0),
+                    node(board_id, "board", "Board", Some(folder_id), 1),
+                ],
+            );
+            fs::write(
+                space.join("docs").join(format!("{doc_id}.md")),
+                "# hello",
+            )
+            .unwrap();
+            fs::write(
+                space.join("boards").join(format!("{board_id}.excalidraw")),
+                EMPTY_BOARD_SCENE_JSON,
+            )
+            .unwrap();
+
+            let entry_ids = soft_delete_nodes_at(
+                kroot,
+                trash,
+                space_id,
+                &[folder_id.to_string()],
+            )
+            .unwrap();
+            assert_eq!(entry_ids.len(), 1);
+            let m = load_manifest(trash).unwrap();
+            let e = m.entries.iter().find(|e| e.id == entry_ids[0]).unwrap();
+            assert_eq!(e.kind, TrashEntityKind::Folder);
+            let payload = trash.join(&e.payload_rel);
+            assert!(payload.join("docs").join(format!("{doc_id}.md")).is_file());
+            assert!(payload
+                .join("boards")
+                .join(format!("{board_id}.excalidraw"))
+                .is_file());
+            assert!(!space.join("docs").join(format!("{doc_id}.md")).exists());
+            assert!(!space
+                .join("boards")
+                .join(format!("{board_id}.excalidraw"))
+                .exists());
+        });
+    }
+
+    #[test]
+    fn restore_board_round_trip() {
+        with_temp_roots(|kroot, trash| {
+            let space_id = "spc_trashrestore1";
+            let board_id = "brd_boardrest01";
+            let body = r#"{"type":"excalidraw","version":2,"source":"hip","elements":[{"id":"stroke1"}],"files":{}}"#;
+            let space = write_space_with_tree(
+                kroot,
+                space_id,
+                vec![node(board_id, "board", "Sketch", None, 0)],
+            );
+            fs::write(
+                space.join("boards").join(format!("{board_id}.excalidraw")),
+                body,
+            )
+            .unwrap();
+
+            let entry_ids = soft_delete_nodes_at(
+                kroot,
+                trash,
+                space_id,
+                &[board_id.to_string()],
+            )
+            .unwrap();
+            assert!(!space
+                .join("boards")
+                .join(format!("{board_id}.excalidraw"))
+                .exists());
+
+            let item = restore_trash_entry_at(kroot, trash, &entry_ids[0]).unwrap();
+            assert_eq!(item.kind, TrashEntityKind::Board);
+            assert_eq!(item.entity_id, board_id);
+
+            let restored = fs::read_to_string(
+                space.join("boards").join(format!("{board_id}.excalidraw")),
+            )
+            .unwrap();
+            assert!(restored.contains("stroke1"));
+
+            let tree: KnowledgeTreeFile =
+                serde_json::from_str(&fs::read_to_string(space.join("tree.json")).unwrap())
+                    .unwrap();
+            assert_eq!(tree.nodes.len(), 1);
+            assert_eq!(tree.nodes[0].id, board_id);
+            assert_eq!(tree.nodes[0].kind, "board");
+
+            // Manifest entry removed
+            let m = load_manifest(trash).unwrap();
+            assert!(m.entries.iter().all(|e| e.id != entry_ids[0]));
+        });
+    }
+
+    #[test]
+    fn hard_delete_removes_board_payload() {
+        with_temp_roots(|kroot, trash| {
+            let space_id = "spc_trashhard001";
+            let board_id = "brd_boardhard001";
+            let space = write_space_with_tree(
+                kroot,
+                space_id,
+                vec![node(board_id, "board", "Sketch", None, 0)],
+            );
+            fs::write(
+                space.join("boards").join(format!("{board_id}.excalidraw")),
+                EMPTY_BOARD_SCENE_JSON,
+            )
+            .unwrap();
+
+            let entry_ids = soft_delete_nodes_at(
+                kroot,
+                trash,
+                space_id,
+                &[board_id.to_string()],
+            )
+            .unwrap();
+            let m = load_manifest(trash).unwrap();
+            let payload = trash.join(
+                &m.entries
+                    .iter()
+                    .find(|e| e.id == entry_ids[0])
+                    .unwrap()
+                    .payload_rel,
+            );
+            assert!(payload.exists());
+
+            hard_delete_trash_entry_at(trash, &entry_ids[0]).unwrap();
+            assert!(!payload.exists());
+            let m2 = load_manifest(trash).unwrap();
+            assert!(m2.entries.iter().all(|e| e.id != entry_ids[0]));
+        });
+    }
 }

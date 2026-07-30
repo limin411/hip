@@ -157,7 +157,7 @@ export type ContextPayloadMap = {
    */
   knowledgeNode: {
     nodeId: string
-    kind: 'folder' | 'doc'
+    kind: 'folder' | 'doc' | 'board'
     spaceId: string
     onNewDoc: () => void
     onNewFolder: () => void

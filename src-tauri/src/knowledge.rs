@@ -16,6 +16,11 @@ use crate::skills::safe_join;
 const KNOWLEDGE_ASSET_MAX_BYTES: u64 = 25 * 1024 * 1024;
 /// Max raw bytes for base64 IPC (`read_asset_data`, `import_asset_bytes`).
 const KNOWLEDGE_ASSET_INLINE_MAX_BYTES: u64 = 1_500_000;
+/// Max board scene JSON size for `knowledge_write_board` (v1).
+const KNOWLEDGE_BOARD_MAX_BYTES: usize = 25 * 1024 * 1024;
+
+/// Empty dehydrated Excalidraw scene returned when board file is missing.
+pub(crate) const EMPTY_BOARD_SCENE_JSON: &str = r##"{"type":"excalidraw","version":2,"source":"hip","hip":{"schemaVersion":1},"elements":[],"appState":{"viewBackgroundColor":"#ffffff"},"files":{}}"##;
 
 /// Same rule as TS `KNOWLEDGE_ID_RE`.
 pub(crate) fn is_knowledge_id(id: &str) -> bool {
@@ -23,7 +28,7 @@ pub(crate) fn is_knowledge_id(id: &str) -> bool {
         Some(p) => p,
         None => return false,
     };
-    if prefix != "spc" && prefix != "nod" && prefix != "doc" {
+    if prefix != "spc" && prefix != "nod" && prefix != "doc" && prefix != "brd" {
         return false;
     }
     let len = rest.len();
@@ -77,6 +82,86 @@ fn doc_path(root: &Path, space_id: &str, doc_id: &str) -> Result<PathBuf, String
     let docs = safe_join(&space, "docs").ok_or_else(|| "illegal docs path".to_string())?;
     let file = format!("{doc_id}.md");
     safe_join(&docs, &file).ok_or_else(|| "illegal doc path".to_string())
+}
+
+/// `~/.hip/knowledge/<space>/boards/<brd_*.excalidraw>`
+pub(crate) fn board_path(root: &Path, space_id: &str, board_id: &str) -> Result<PathBuf, String> {
+    require_id(space_id, "spaceId")?;
+    require_id(board_id, "boardId")?;
+    if !board_id.starts_with("brd_") {
+        return Err(format!("boardId must start with brd_: {board_id}"));
+    }
+    let space = space_dir(root, space_id)?;
+    let boards = safe_join(&space, "boards").ok_or_else(|| "illegal boards path".to_string())?;
+    let file = format!("{board_id}.excalidraw");
+    safe_join(&boards, &file).ok_or_else(|| "illegal board path".to_string())
+}
+
+/// Field-level reject: any `files[*]` object that has a `dataURL` key is illegal.
+/// Element text containing the substring `dataURL` is allowed.
+pub(crate) fn assert_no_data_url_in_board_json(raw: &str) -> Result<(), String> {
+    let scene: serde_json::Value =
+        serde_json::from_str(raw).map_err(|e| format!("invalid board JSON: {e}"))?;
+    let Some(files) = scene.get("files") else {
+        return Ok(());
+    };
+    let Some(obj) = files.as_object() else {
+        return Ok(());
+    };
+    for (id, f) in obj {
+        if let Some(map) = f.as_object() {
+            if map.contains_key("dataURL") {
+                return Err(format!("board file {id} must not contain dataURL"));
+            }
+        }
+    }
+    Ok(())
+}
+
+fn validate_board_write_body(body: &str) -> Result<(), String> {
+    if body.len() > KNOWLEDGE_BOARD_MAX_BYTES {
+        return Err(format!(
+            "board body exceeds {} bytes",
+            KNOWLEDGE_BOARD_MAX_BYTES
+        ));
+    }
+    assert_no_data_url_in_board_json(body)
+}
+
+/// kind ⇔ id prefix (Issue 13). Used by save_tree validation.
+fn kind_prefix_ok(kind: &str, id: &str) -> bool {
+    match kind {
+        "folder" => id.starts_with("nod_"),
+        "doc" => id.starts_with("doc_"),
+        "board" => id.starts_with("brd_"),
+        _ => false,
+    }
+}
+
+fn validate_tree_nodes(nodes: &[KnowledgeNode]) -> Result<(), String> {
+    let mut ids = std::collections::HashSet::new();
+    for n in nodes {
+        if !is_knowledge_id(&n.id) {
+            return Err(format!("invalid node id: {}", n.id));
+        }
+        if !ids.insert(n.id.clone()) {
+            return Err(format!("duplicate node id: {}", n.id));
+        }
+        if !kind_prefix_ok(&n.kind, &n.id) {
+            return Err(format!(
+                "kind {} requires matching id prefix for {}",
+                n.kind, n.id
+            ));
+        }
+    }
+    for n in nodes {
+        if let Some(ref pid) = n.parent_id {
+            if !ids.contains(pid) {
+                return Err(format!("missing parent {pid} for {}", n.id));
+            }
+        }
+    }
+    Ok(())
 }
 
 /// Resolve a space-root-relative path that must stay under `assets/`.
@@ -481,6 +566,7 @@ pub fn knowledge_save_tree(app: AppHandle, args: SaveTreeArgs) -> Result<(), Str
     if !dir.exists() {
         return Err("space not found".into());
     }
+    validate_tree_nodes(&args.tree.nodes)?;
     write_json_file(&dir.join("tree.json"), &args.tree)
 }
 
@@ -528,6 +614,51 @@ pub fn knowledge_delete_doc_file(app: AppHandle, args: DocArgs) -> Result<(), St
         if vdir.exists() {
             let _ = fs::remove_dir_all(&vdir);
         }
+    }
+    Ok(())
+}
+
+// ── Board files (Excalidraw dehydrated JSON under boards/) ────────────────
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct BoardArgs {
+    pub space_id: String,
+    pub board_id: String,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct WriteBoardArgs {
+    pub space_id: String,
+    pub board_id: String,
+    pub body: String,
+}
+
+#[tauri::command]
+pub fn knowledge_read_board(app: AppHandle, args: BoardArgs) -> Result<String, String> {
+    let root = knowledge_root(&app)?;
+    let path = board_path(&root, &args.space_id, &args.board_id)?;
+    if !path.exists() {
+        return Ok(EMPTY_BOARD_SCENE_JSON.to_string());
+    }
+    fs::read_to_string(&path).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn knowledge_write_board(app: AppHandle, args: WriteBoardArgs) -> Result<(), String> {
+    validate_board_write_body(&args.body)?;
+    let root = knowledge_root(&app)?;
+    let path = board_path(&root, &args.space_id, &args.board_id)?;
+    atomic_write_str(&path, &args.body)
+}
+
+#[tauri::command]
+pub fn knowledge_delete_board_file(app: AppHandle, args: BoardArgs) -> Result<(), String> {
+    let root = knowledge_root(&app)?;
+    let path = board_path(&root, &args.space_id, &args.board_id)?;
+    if path.exists() {
+        fs::remove_file(&path).map_err(|e| e.to_string())?;
     }
     Ok(())
 }
@@ -1991,6 +2122,8 @@ mod tests {
         assert!(is_knowledge_id("spc_xYzAbCdEfGhI"));
         assert!(is_knowledge_id("doc_abc123def456"));
         assert!(is_knowledge_id("nod_folder001"));
+        assert!(is_knowledge_id("brd_board0001ab"));
+        assert!(!is_knowledge_id("brd_ab")); // too short
     }
 
     #[test]
@@ -2085,6 +2218,97 @@ mod tests {
         assert!(doc_path(root, "bad", "doc_abc123def456").is_err());
         assert!(doc_path(root, "spc_oktoken1", "nod_notadoc1").is_err());
         assert!(doc_path(root, "spc_oktoken1", "doc_abc123def456").is_ok());
+    }
+
+    #[test]
+    fn board_path_rejects_bad_ids() {
+        let root = Path::new("/tmp/kb");
+        assert!(board_path(root, "bad", "brd_abc123def456").is_err());
+        assert!(board_path(root, "spc_oktoken1", "doc_notaboard1").is_err());
+        assert!(board_path(root, "spc_oktoken1", "nod_notaboard1").is_err());
+        let ok = board_path(root, "spc_oktoken1", "brd_abc123def456").unwrap();
+        assert!(
+            ok.ends_with("boards/brd_abc123def456.excalidraw")
+                || ok.ends_with("boards\\brd_abc123def456.excalidraw")
+        );
+    }
+
+    #[test]
+    fn board_write_rejects_dataurl_field_allows_text_substring() {
+        // files.*.dataURL key → reject
+        let bad = r#"{"type":"excalidraw","files":{"f1":{"id":"f1","mimeType":"image/png","dataURL":"data:image/png;base64,xx"}}}"#;
+        assert!(assert_no_data_url_in_board_json(bad)
+            .unwrap_err()
+            .contains("dataURL"));
+
+        // element text containing substring dataURL → allow
+        let ok = r#"{"type":"excalidraw","elements":[{"type":"text","text":"see dataURL docs"}],"files":{"f1":{"id":"f1","mimeType":"image/png","hipAssetRel":"assets/ast_x.png"}}}"#;
+        assert!(assert_no_data_url_in_board_json(ok).is_ok());
+
+        // hipAssetRel only → allow
+        let ok2 = r#"{"type":"excalidraw","files":{"f1":{"id":"f1","hipAssetRel":"assets/a.png"}}}"#;
+        assert!(assert_no_data_url_in_board_json(ok2).is_ok());
+    }
+
+    #[test]
+    fn board_write_rejects_oversize_body() {
+        let over = "x".repeat(KNOWLEDGE_BOARD_MAX_BYTES + 1);
+        let err = validate_board_write_body(&over).unwrap_err();
+        assert!(err.contains("exceeds"), "{err}");
+    }
+
+    #[test]
+    fn board_read_write_helpers_roundtrip() {
+        with_temp_root(|base| {
+            let root = base.join("knowledge");
+            let space_id = "spc_boardtest01";
+            let board_id = "brd_boardtest01";
+            let dir = space_dir(&root, space_id).unwrap();
+            fs::create_dir_all(dir.join("boards")).unwrap();
+            let path = board_path(&root, space_id, board_id).unwrap();
+            let body = EMPTY_BOARD_SCENE_JSON;
+            validate_board_write_body(body).unwrap();
+            atomic_write_str(&path, body).unwrap();
+            assert!(path.is_file());
+            let read = fs::read_to_string(&path).unwrap();
+            assert!(read.contains("excalidraw"));
+            assert!(read.contains("\"source\":\"hip\""));
+        });
+    }
+
+    #[test]
+    fn validate_tree_nodes_kind_prefix() {
+        let ok = vec![
+            KnowledgeNode {
+                id: "nod_folder001".into(),
+                parent_id: None,
+                kind: "folder".into(),
+                title: "F".into(),
+                order: 0,
+                created_at: 1,
+                updated_at: 1,
+            },
+            KnowledgeNode {
+                id: "brd_board0001".into(),
+                parent_id: Some("nod_folder001".into()),
+                kind: "board".into(),
+                title: "B".into(),
+                order: 0,
+                created_at: 1,
+                updated_at: 1,
+            },
+        ];
+        assert!(validate_tree_nodes(&ok).is_ok());
+        let bad = vec![KnowledgeNode {
+            id: "doc_wrongboard1".into(),
+            parent_id: None,
+            kind: "board".into(),
+            title: "B".into(),
+            order: 0,
+            created_at: 1,
+            updated_at: 1,
+        }];
+        assert!(validate_tree_nodes(&bad).unwrap_err().contains("prefix"));
     }
 
     #[test]

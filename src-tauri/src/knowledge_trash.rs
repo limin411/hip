@@ -9,8 +9,8 @@ use std::time::{SystemTime, UNIX_EPOCH};
 use tauri::AppHandle;
 
 use crate::knowledge::{
-    board_path_primary, board_paths_for_trash_move, is_knowledge_id, KnowledgeNode,
-    KnowledgeSpace, KnowledgeTreeFile,
+    board_path_legacy, board_path_primary, board_paths_for_trash_move, is_knowledge_id,
+    resolve_board_path, write_board_file, KnowledgeNode, KnowledgeSpace, KnowledgeTreeFile,
 };
 use crate::paths;
 use crate::skills::safe_join;
@@ -994,7 +994,7 @@ mod tests {
     }
 
     #[test]
-    fn soft_delete_board_only_moves_excalidraw_payload() {
+    fn soft_delete_board_moves_legacy_only_payload() {
         with_temp_roots(|kroot, trash| {
             let space_id = "spc_trashboard01";
             let board_id = "brd_boardonly01";
@@ -1145,6 +1145,21 @@ mod tests {
             // Manifest entry removed
             let m = load_manifest(trash).unwrap();
             assert!(m.entries.iter().all(|e| e.id != entry_ids[0]));
+
+            // Post-restore write must update primary (not orphan edits on legacy).
+            let edited =
+                r#"{"type":"excalidraw","version":2,"source":"hip","elements":[{"id":"after-restore"}],"files":{}}"#;
+            write_board_file(kroot, space_id, board_id, edited).unwrap();
+            let read_path = resolve_board_path(kroot, space_id, board_id).unwrap();
+            assert_eq!(
+                read_path,
+                board_path_primary(kroot, space_id, board_id).unwrap()
+            );
+            let after = fs::read_to_string(&read_path).unwrap();
+            assert!(after.contains("after-restore"));
+            assert!(!board_path_legacy(kroot, space_id, board_id)
+                .unwrap()
+                .exists());
         });
     }
 

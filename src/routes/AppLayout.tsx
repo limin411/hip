@@ -223,8 +223,7 @@ export function AppLayout() {
 
   return (
     // Final shell: AppSidebar | (MainToolbar + main | edge drawer)
-    // Shell is transparent so native vibrancy (macOS Sidebar / Win Mica) shows through
-    // the left sidebar; main column stays opaque for readable content.
+    // AppSidebar is solid bg-surface (same as Settings); main column stays opaque.
     <div className="flex h-dvh w-screen flex-row overflow-hidden bg-transparent">
       <WindowLifecycleHost />
       {AUTOMATION_PAGE ? <AutomationRunHost /> : null}

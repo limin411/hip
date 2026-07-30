@@ -323,7 +323,7 @@ export function AppSidebar() {
 
   return (
     <aside
-      className="glass-surface relative flex h-full shrink-0 flex-col border-r border-border"
+      className="relative flex h-full shrink-0 flex-col border-r border-border bg-surface"
       style={{ width: sidebarWidth }}
       data-testid="app-sidebar"
       aria-label={t('sidebar.aria')}

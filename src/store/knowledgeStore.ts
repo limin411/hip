@@ -460,11 +460,14 @@ interface KnowledgeState {
     opts?: { persist?: 'auto' | 'now' | 'none'; docId?: string },
   ) => void
   /**
+   * Persist dirty draft to disk.
+   * - `phase: 'full'` (default): write + link-index + daily version (for delete/manual safety).
+   * - `phase: 'write'`: resolves as soon as the file write finishes; secondary work still
+   *   runs on the same chain afterward (openDoc uses this so doc switch is not blocked on
+   *   link-index / daily snapshot IPC).
    * Returns false if a write was attempted and failed.
-   * On successful write, awaits the daily snapshot on the same chain so callers
-   * (delete / manual version) never race an in-flight daily.
    */
-  flushSave: () => Promise<boolean>
+  flushSave: (opts?: { phase?: 'full' | 'write' }) => Promise<boolean>
   /** Manual snapshot of the active (or given) doc; flushes first, then serializes on saveChain. */
   saveVersionManual: (docId?: string) => Promise<KnowledgeVersionEntry | null>
   listVersions: (docId?: string) => Promise<KnowledgeVersionEntry[]>
@@ -1514,14 +1517,27 @@ export const useKnowledgeStore = create<KnowledgeState>((set, get) => ({
   },
 
   openDoc: async (id) => {
+    // Already focused: avoid flush + disk read + Live remount (main jank source).
+    if (get().activeDocId === id) {
+      if (get().treeFocusId !== id) set({ treeFocusId: id })
+      return
+    }
+
     // Sync in-editor buffer → draftBody while activeDocId is still the old doc.
     try {
       beforeOpenDocFlush?.()
     } catch {
       // never block open on UI flush errors
     }
-    const ok = await get().flushSave()
-    if (!ok) return // stay on current activeDocId; saveState error + retry chrome
+
+    // Only await a disk write when dirty. Clean switches must NOT wait on saveChain
+    // (prior link-index / daily version IPC would freeze tree clicks).
+    const cur = get()
+    if (cur.activeDocId && cur.draftBody !== cur.docBody) {
+      const ok = await get().flushSave({ phase: 'write' })
+      if (!ok) return // stay on current activeDocId; saveState error + retry chrome
+    }
+
     const spaceId = get().activeSpaceId
     const node = get().nodes.find((n) => n.id === id && n.kind === 'doc')
     if (!node || !spaceId) {
@@ -1564,27 +1580,6 @@ export const useKnowledgeStore = create<KnowledgeState>((set, get) => ({
         pending != null && pending.spaceId === spaceId && pending.docId === id
       // Expand ancestors so the focused row is mounted for keyboard/roving tabindex.
       const expandedFolderIds = expandAncestorsOf(get().nodes, id, get().expandedFolderIds)
-      set({
-        activeDocId: id,
-        docBody: body,
-        draftBody: body,
-        editorMode,
-        saveState: 'idle',
-        treeFocusId: id,
-        expandedFolderIds,
-        backlinks: [],
-        outboundLinks: [],
-        linkPanelStatus: 'loading',
-        ...(revealMatches ? {} : { pendingReveal: null }),
-      })
-      kbPerfOpenStore(body.length, editorMode)
-      schedulePersistExpand(spaceId, get)
-      void upsertLinkIndexDoc(spaceId, id, node.title, body, get().nodes).then(() => {
-        // Only refresh link panel if this open is still current and doc still active.
-        if (gen === openDocGeneration && get().activeDocId === id) {
-          get().refreshLinkPanel(id)
-        }
-      })
       const spaceName = get().spaces.find((s) => s.id === spaceId)?.name ?? ''
       const item: KnowledgeRecentItem = {
         spaceId,
@@ -1593,11 +1588,35 @@ export const useKnowledgeStore = create<KnowledgeState>((set, get) => ({
         spaceName,
         at: Date.now(),
       }
+      // Single set: body + selection + recent — avoid double React render on open.
       set((s) => {
-        const rest = s.recent.filter((r) => !(r.spaceId === item.spaceId && r.docId === item.docId))
+        const rest = s.recent.filter(
+          (r) => !(r.spaceId === item.spaceId && r.docId === item.docId),
+        )
         const recent = [item, ...rest].slice(0, RECENT_CAP)
         persistRecent(recent)
-        return { recent }
+        return {
+          activeDocId: id,
+          docBody: body,
+          draftBody: body,
+          editorMode,
+          saveState: 'idle' as const,
+          treeFocusId: id,
+          expandedFolderIds,
+          backlinks: [],
+          outboundLinks: [],
+          linkPanelStatus: 'loading' as const,
+          recent,
+          ...(revealMatches ? {} : { pendingReveal: null }),
+        }
+      })
+      kbPerfOpenStore(body.length, editorMode)
+      schedulePersistExpand(spaceId, get)
+      void upsertLinkIndexDoc(spaceId, id, node.title, body, get().nodes).then(() => {
+        // Only refresh link panel if this open is still current and doc still active.
+        if (gen === openDocGeneration && get().activeDocId === id) {
+          get().refreshLinkPanel(id)
+        }
       })
     } catch (e) {
       // Stale open failure must not clear a newer successful open.
@@ -1653,47 +1672,61 @@ export const useKnowledgeStore = create<KnowledgeState>((set, get) => ({
     else cancelScheduledSave() // 'none': draft only; drop any pending autosave
   },
 
-  flushSave: () => {
+  flushSave: (opts) => {
     cancelScheduledSave()
+    const phase = opts?.phase ?? 'full'
+    /** When phase==='write', resolve as soon as disk write finishes (secondary still chained). */
+    let resolveWrite: ((ok: boolean) => void) | null = null
+    const writeGate =
+      phase === 'write'
+        ? new Promise<boolean>((res) => {
+            resolveWrite = res
+          })
+        : null
+
     const run = async (): Promise<boolean> => {
       const s = get()
-      if (!s.activeSpaceId || !s.activeDocId) return true
-      if (s.draftBody === s.docBody) return true
+      if (!s.activeSpaceId || !s.activeDocId) {
+        resolveWrite?.(true)
+        return true
+      }
+      if (s.draftBody === s.docBody) {
+        resolveWrite?.(true)
+        return true
+      }
+      // Capture targets up front — openDoc may switch activeDoc mid-await.
+      const spaceId = s.activeSpaceId
+      const docId = s.activeDocId
+      const body = s.draftBody
+      const node = s.nodes.find((n) => n.id === docId)
+      const spaceName = s.spaces.find((sp) => sp.id === spaceId)?.name ?? ''
+      const nodesSnap = s.nodes
+
       set({ saveState: 'saving' })
       try {
-        await knowledgeWriteDoc(s.activeSpaceId, s.activeDocId, s.draftBody)
-        set({ docBody: s.draftBody, saveState: 'saved' })
-        const node = get().nodes.find((n) => n.id === s.activeDocId)
-        const spaceName = get().spaces.find((sp) => sp.id === s.activeSpaceId)?.name ?? ''
-        if (node && s.activeSpaceId && s.activeDocId) {
-          indexCurrentDoc(
-            s.activeSpaceId,
-            s.activeDocId,
-            node.title,
-            s.draftBody,
-            spaceName,
-            get().nodes,
-          )
-          await upsertLinkIndexDoc(
-            s.activeSpaceId,
-            s.activeDocId,
-            node.title,
-            s.draftBody,
-            get().nodes,
-          )
-          syncFacetsToState(set)
-          get().runSearch(get().searchQuery)
-          void get().refreshLinkPanel(s.activeDocId)
+        await knowledgeWriteDoc(spaceId, docId, body)
+        // Prefer not to clobber a newer doc's docBody if the user already switched.
+        if (get().activeDocId === docId && get().activeSpaceId === spaceId) {
+          set({ docBody: body, saveState: 'saved' })
+        } else if (get().saveState === 'saving') {
+          set({ saveState: 'idle' })
         }
-        // Daily snapshot on the same chain step so await flushSave drains it
-        // (delete/manual must not race an in-flight daily).
+        // openDoc(write) can proceed — secondary work continues on this chain.
+        resolveWrite?.(true)
+        resolveWrite = null
+
+        if (node) {
+          indexCurrentDoc(spaceId, docId, node.title, body, spaceName, nodesSnap)
+          await upsertLinkIndexDoc(spaceId, docId, node.title, body, nodesSnap)
+          if (get().activeDocId === docId && get().activeSpaceId === spaceId) {
+            syncFacetsToState(set)
+            get().runSearch(get().searchQuery)
+            void get().refreshLinkPanel(docId)
+          }
+        }
+        // Daily snapshot stays on the chain so delete/manual never race it.
         try {
-          await knowledgeSaveVersion(
-            s.activeSpaceId,
-            s.activeDocId,
-            'daily',
-            localDayKey(),
-          )
+          await knowledgeSaveVersion(spaceId, docId, 'daily', localDayKey())
         } catch {
           // Snapshots must not surface as save failures.
         }
@@ -1702,6 +1735,8 @@ export const useKnowledgeStore = create<KnowledgeState>((set, get) => ({
         }, 1500)
         return true
       } catch (e) {
+        resolveWrite?.(false)
+        resolveWrite = null
         const msg = knowledgeErrorMessage(e)
         set({ saveState: 'error' })
         toast.error(msg)
@@ -1709,7 +1744,7 @@ export const useKnowledgeStore = create<KnowledgeState>((set, get) => ({
       }
     }
     saveChain = saveChain.then(run, () => run())
-    return saveChain
+    return writeGate ?? saveChain
   },
 
   saveVersionManual: async (docId) => {

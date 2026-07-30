@@ -404,6 +404,30 @@ describe('knowledgeStore flush-abort navigation', () => {
     expect(knowledgeReadDoc).toHaveBeenCalledWith('spc_1', 'doc_b')
   })
 
+  it('openDoc same id is a no-op (no read / no write)', async () => {
+    knowledgeReadDoc.mockClear()
+    knowledgeWriteDoc.mockClear()
+    useKnowledgeStore.setState({ draftBody: 'saved-a', docBody: 'saved-a' })
+
+    await useKnowledgeStore.getState().openDoc('doc_a')
+
+    expect(knowledgeReadDoc).not.toHaveBeenCalled()
+    expect(knowledgeWriteDoc).not.toHaveBeenCalled()
+    expect(useKnowledgeStore.getState().activeDocId).toBe('doc_a')
+  })
+
+  it('openDoc clean switch skips flushSave write (no write IPC)', async () => {
+    knowledgeWriteDoc.mockClear()
+    knowledgeReadDoc.mockResolvedValueOnce('# b-clean')
+    useKnowledgeStore.setState({ draftBody: 'saved-a', docBody: 'saved-a' })
+
+    await useKnowledgeStore.getState().openDoc('doc_b')
+
+    expect(knowledgeWriteDoc).not.toHaveBeenCalled()
+    expect(knowledgeReadDoc).toHaveBeenCalledWith('spc_1', 'doc_b')
+    expect(useKnowledgeStore.getState().draftBody).toBe('# b-clean')
+  })
+
   it('openSpace aborts when flush fails and leaves prior space', async () => {
     knowledgeWriteDoc.mockRejectedValueOnce(new Error('write failed'))
     knowledgeGetTree.mockResolvedValue({ version: 1, nodes: [] })
@@ -648,6 +672,37 @@ describe('knowledgeStore openDoc generation (rapid switch)', () => {
       error: null,
       saveState: 'idle',
     })
+  })
+
+  it('flushSave phase write resolves before daily version IPC', async () => {
+    let resolveDaily!: () => void
+    const dailyP = new Promise<void>((r) => {
+      resolveDaily = r
+    })
+    knowledgeWriteDoc.mockResolvedValue(undefined)
+    knowledgeSaveVersion.mockImplementation(() => dailyP as never)
+
+    useKnowledgeStore.setState({
+      activeDocId: 'doc_a',
+      docBody: 'saved',
+      draftBody: 'dirty-write-phase',
+      editorMode: 'live',
+      saveState: 'idle',
+    })
+
+    const writeDone = useKnowledgeStore.getState().flushSave({ phase: 'write' })
+    // Write gate must not wait for daily snapshot.
+    await expect(writeDone).resolves.toBe(true)
+    expect(knowledgeWriteDoc).toHaveBeenCalledWith(
+      'spc_1',
+      'doc_a',
+      'dirty-write-phase',
+    )
+    expect(useKnowledgeStore.getState().docBody).toBe('dirty-write-phase')
+
+    resolveDaily()
+    // Drain full chain so the suite does not leak pending work.
+    await useKnowledgeStore.getState().flushSave()
   })
 
   it('stale openDoc result does not overwrite a newer open', async () => {

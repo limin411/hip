@@ -177,7 +177,7 @@ describe('DocLiveEditor', () => {
     })
   }, 20_000)
 
-  it('flushDraft / draft emit always tags bound docId (cross-doc guard)', async () => {
+  it('flushDraft skips when clean; after edit tags bound docId', async () => {
     const onDraftChange = vi.fn()
     const ref = createRef<DocLiveEditorHandle>()
     render(
@@ -189,6 +189,16 @@ describe('DocLiveEditor', () => {
       />,
     )
     await waitForProseMirror()
+    // Clean editor: no getMarkdown / no emit (switch-path jank guard).
+    await act(async () => {
+      ref.current?.flushDraft()
+    })
+    expect(onDraftChange).not.toHaveBeenCalled()
+
+    await act(async () => {
+      expect(ref.current?.insertMarkdown(' beta')).toBe(true)
+    })
+    // Throttled emit or explicit flush both carry bound docId.
     await act(async () => {
       ref.current?.flushDraft()
     })
@@ -196,7 +206,6 @@ describe('DocLiveEditor', () => {
       expect(onDraftChange).toHaveBeenCalled()
     })
     const last = onDraftChange.mock.calls.at(-1)
-    expect(last?.[0]).toMatch(/alpha/)
     expect(last?.[1]).toEqual({ docId: 'doc-bound-a' })
   }, 20_000)
 

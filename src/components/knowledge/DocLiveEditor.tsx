@@ -484,12 +484,19 @@ export const DocLiveEditor = forwardRef<DocLiveEditorHandle, DocLiveEditorProps>
 
       let cancelled = false
       let draftTimer: ReturnType<typeof setTimeout> | null = null
+      /**
+       * Skip getMarkdown when the PM doc has not changed since last emit.
+       * Doc switch unmount + beforeOpenDocFlush both call flush — serializing a
+       * clean editor is pure jank on the open path.
+       */
+      let draftDirty = false
       /** Set after `.create()` so the draft-sync plugin can schedule. */
       let liveEditor: Editor | null = null
       const { fmText, body } = splitYamlFrontmatter(initialRef.current)
       fmTextRef.current = fmText
 
       const emitDraft = (bodyMd: string) => {
+        draftDirty = false
         // Always tag with this instance's docId so store can drop stale unmounts.
         onDraftChangeRef.current(
           joinYamlFrontmatter(fmTextRef.current, bodyMd),
@@ -502,6 +509,7 @@ export const DocLiveEditor = forwardRef<DocLiveEditorHandle, DocLiveEditorProps>
           clearTimeout(draftTimer)
           draftTimer = null
         }
+        if (!draftDirty) return
         const ed = liveEditor ?? editorRef.current
         if (!ed) return
         try {
@@ -516,6 +524,7 @@ export const DocLiveEditor = forwardRef<DocLiveEditorHandle, DocLiveEditorProps>
 
       const scheduleDraftFromEditor = () => {
         if (cancelled || draftTimer) return
+        draftDirty = true
         draftTimer = setTimeout(() => {
           draftTimer = null
           if (!cancelled) flushDraftFromEditor()
@@ -543,6 +552,7 @@ export const DocLiveEditor = forwardRef<DocLiveEditorHandle, DocLiveEditorProps>
             view: () => ({
               update(view, prevState) {
                 if (view.state.doc.eq(prevState.doc)) return
+                draftDirty = true
                 scheduleDraftFromEditor()
               },
             }),

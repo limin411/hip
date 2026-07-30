@@ -133,8 +133,20 @@ export function createLiveBlockHandlePlugin(opts: {
     return new Plugin({
       key,
       view(view) {
-        const onMove = (e: MouseEvent) => {
-          if (!view.editable) {
+        let moveRaf = 0
+        let lastMove: MouseEvent | null = null
+        const processMove = () => {
+          moveRaf = 0
+          const e = lastMove
+          lastMove = null
+          if (!e || !view.editable) {
+            hide()
+            return
+          }
+          // Cheap reject before posAtCoords (main cost).
+          const pmRect = view.dom.getBoundingClientRect()
+          if (e.clientX > pmRect.left + 48) {
+            if (handle && handle.contains(e.target as Node)) return
             hide()
             return
           }
@@ -143,18 +155,20 @@ export function createLiveBlockHandlePlugin(opts: {
             hide()
             return
           }
-          // Only show when pointer is near left gutter of the editor
-          const pmRect = view.dom.getBoundingClientRect()
-          if (e.clientX > pmRect.left + 48) {
-            // Keep visible if over the button itself
-            if (handle && handle.contains(e.target as Node)) return
-            hide()
-            return
-          }
           showAt(view, range.from, range.top)
+        }
+        const onMove = (e: MouseEvent) => {
+          lastMove = e
+          if (moveRaf) return
+          moveRaf = requestAnimationFrame(processMove)
         }
         const onLeave = (e: MouseEvent) => {
           if (handle && handle.contains(e.relatedTarget as Node)) return
+          lastMove = null
+          if (moveRaf) {
+            cancelAnimationFrame(moveRaf)
+            moveRaf = 0
+          }
           hide()
         }
         view.dom.addEventListener('mousemove', onMove)
@@ -163,6 +177,7 @@ export function createLiveBlockHandlePlugin(opts: {
           destroy() {
             view.dom.removeEventListener('mousemove', onMove)
             view.dom.removeEventListener('mouseleave', onLeave)
+            if (moveRaf) cancelAnimationFrame(moveRaf)
             handle?.remove()
             handle = null
             root = null

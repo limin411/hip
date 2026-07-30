@@ -58,7 +58,9 @@ describe('sessionHistoryProvider', () => {
     expect(items.some((i) => i.id.includes('close') || i.id.includes('openTab'))).toBe(false)
   })
 
-  it('open calls selectSessionFromSidebar (flush-safe)', () => {
+  it('open calls selectSessionFromSidebar (flush-safe; overlay dismiss owned by that helper)', () => {
+    // Provider wires Open → selectSessionFromSidebar; history/trash overlay dismiss
+    // is covered in sidebarActions.test.ts (not re-tested under this mock).
     const items = sessionHistoryProvider(
       { kind: 'sessionHistory', payload: { sessionId: 's1', title: 'Alpha', surface: 'chat' } },
       makeCtx(),

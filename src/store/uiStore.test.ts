@@ -191,10 +191,32 @@ describe('uiStore - overlay', () => {
 
   it('overlay is not in partialize / UiPersistedState shape', () => {
     useUiStore.getState().setOverlay('history')
-    // Re-read: overlay exists at runtime but cold launch clears it
+    const s = useUiStore.getState()
+    // Mirror the store partialize projection (runtime omit of overlay).
+    const persisted: UiPersistedState = {
+      chatSessionId: s.chatSessionId,
+      codeSessionId: s.codeSessionId,
+      theme: s.theme,
+      language: s.language,
+      density: s.density,
+      settingsPage: s.settingsPage,
+      diffViewMode: s.diffViewMode,
+      checkpointMode: s.checkpointMode,
+      sidebarOpen: s.sidebarOpen,
+      sidebarWidth: s.sidebarWidth,
+    }
+    expect(persisted).not.toHaveProperty('overlay')
+    expect(s.overlay).toBe('history')
     applyColdLaunchShell()
     expect(useUiStore.getState().overlay).toBeNull()
     expect(useUiStore.getState().activeView).toBe('chat')
+  })
+
+  it('setActiveView(settings) clears any open utility overlay', () => {
+    useUiStore.setState({ activeView: 'chat', overlay: 'trash' })
+    useUiStore.getState().setActiveView('settings')
+    expect(useUiStore.getState().activeView).toBe('settings')
+    expect(useUiStore.getState().overlay).toBeNull()
   })
 })
 
@@ -411,6 +433,7 @@ describe('uiStore persistence partialize', () => {
     expect(persisted).not.toHaveProperty('scrollTargetMessageId')
     expect(persisted).not.toHaveProperty('activeView')
     expect(persisted).not.toHaveProperty('openSessionIds')
+    expect(persisted).not.toHaveProperty('overlay')
   })
 
   it('merge strips legacy activeView / tabs / knowledge so cold launch stays on chats', () => {

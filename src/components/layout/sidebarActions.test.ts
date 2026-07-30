@@ -373,6 +373,18 @@ describe('sidebarActions', () => {
     expect(useUiStore.getState().sidebarSection).toBe('tasks')
   })
 
+  it('openSettingsFromChrome clears trash/history overlay before full-page settings', async () => {
+    useUiStore.setState({
+      activeView: 'chat',
+      sidebarSection: 'chats',
+      overlay: 'trash',
+    })
+    await openSettingsFromChrome()
+    expect(useUiStore.getState().overlay).toBeNull()
+    expect(useUiStore.getState().activeView).toBe('settings')
+    expect(useUiStore.getState().settingsPage).toBe('general')
+  })
+
   it('enterWorkItemsSection restores tasks view from trash', async () => {
     useUiStore.setState({
       activeView: 'trash',

@@ -4,6 +4,7 @@ import * as DialogPrimitive from '@radix-ui/react-dialog'
 import { Modal } from '@/components/ui/Modal'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
+import { useUiStore } from '@/store/uiStore'
 
 export interface RenameSessionDialogProps {
   title: string
@@ -30,6 +31,9 @@ export function RenameSessionDialog({
   confirmTestId = 'rename-session-confirm',
 }: RenameSessionDialogProps) {
   const { t } = useTranslation()
+  // Small form over History shell: confirm role gets data-confirm-dialog (shell Esc gate)
+  // + nested light scrim when a utility overlay is open.
+  const nested = useUiStore((s) => s.overlay != null)
   const [value, setValue] = useState(title)
   const trimmed = value.trim()
   const canSave = trimmed.length > 0
@@ -41,7 +45,8 @@ export function RenameSessionDialog({
         if (!open) onCancel()
       }}
       title={dialogTitle ?? t('contextMenu.renameSession.title')}
-      className="max-w-sm"
+      variant="confirm"
+      nested={nested}
     >
       <div className="p-5">
         <DialogPrimitive.Description className="sr-only">

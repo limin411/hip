@@ -396,6 +396,10 @@ export function buildGlobalCommandGroups(
       run: () => {
         if (ctx.openSettingsFromChrome) void ctx.openSettingsFromChrome()
         else {
+          // Full-page Settings: dismiss any History/Trash shell first.
+          void import('@/store/uiStore').then(({ useUiStore }) => {
+            useUiStore.getState().setOverlay(null)
+          })
           ctx.setSettingsPage('general')
           ctx.setActiveView('settings')
         }

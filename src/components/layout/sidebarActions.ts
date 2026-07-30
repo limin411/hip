@@ -248,6 +248,8 @@ export async function openSpaceFromSidebar(spaceId: string): Promise<void> {
 }
 
 export async function openSettingsFromChrome(): Promise<void> {
+  // Dismiss History/Trash shell before full-page Settings (no double-booking).
+  useUiStore.getState().setOverlay(null)
   const view = useUiStore.getState().activeView
   if (view === 'knowledge') {
     await leaveKnowledge()

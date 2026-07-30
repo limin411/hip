@@ -338,7 +338,9 @@ export const useUiStore = create<UiState>()(
       previousView: null,
       setActiveView: (v) =>
         set((s) => {
-          if (s.activeView === v) return s
+          // Full-page Settings must not stack under History/Trash shells (PR3).
+          const clearOverlay = v === 'settings' && s.overlay != null
+          if (s.activeView === v && !clearOverlay) return s
           const isSpecial = (view: ActiveView) =>
             view === 'settings' ||
             view === 'history' ||
@@ -347,7 +349,12 @@ export const useUiStore = create<UiState>()(
           const leavingSpecial = isSpecial(s.activeView) && !isSpecial(v)
           return {
             activeView: v,
-            previousView: enteringSpecial ? s.activeView : leavingSpecial ? null : s.previousView,
+            previousView: enteringSpecial
+              ? s.activeView
+              : leavingSpecial
+                ? null
+                : s.previousView,
+            ...(clearOverlay ? { overlay: null as AppOverlay | null } : {}),
           }
         }),
 

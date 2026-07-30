@@ -101,10 +101,14 @@ export async function leaveSpecialViewsIfOpen(): Promise<void> {
       const settingsPage = await browser.$('[data-testid="settings-page"]')
       const historyPage = await browser.$('[data-testid="session-history"]')
       const trashPage = await browser.$('[data-testid="recycle-bin-page"]')
+      const historyShell = await browser.$('[data-testid="overlay-shell-history"]')
+      const trashShell = await browser.$('[data-testid="overlay-shell-trash"]')
       return (
         !(await settingsPage.isExisting()) &&
         !(await historyPage.isExisting()) &&
-        !(await trashPage.isExisting())
+        !(await trashPage.isExisting()) &&
+        !(await historyShell.isExisting()) &&
+        !(await trashShell.isExisting())
       )
     },
     { timeout: 10000, interval: 200, timeoutMsg: 'still on settings/history/trash after leaveSpecialViewsIfOpen' },

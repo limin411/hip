@@ -1,7 +1,7 @@
 // @vitest-environment happy-dom
 import '@testing-library/jest-dom/vitest'
 import { describe, it, expect, vi, afterEach } from 'vitest'
-import { render, screen, cleanup } from '@testing-library/react'
+import { render, screen, cleanup, fireEvent } from '@testing-library/react'
 import { Modal } from './Modal'
 
 vi.mock('react-i18next', () => ({
@@ -79,5 +79,45 @@ describe('Modal variants', () => {
     )
     const content = screen.getByText('Task').closest('[role="dialog"]')
     expect(content?.className).toMatch(/max-w-2xl/)
+  })
+
+  it('shell Esc gate: confirm sets data-confirm-dialog; Escape leaves shell open', () => {
+    const shellOpenChange = vi.fn()
+    const confirmOpenChange = vi.fn()
+    render(
+      <>
+        <Modal open onOpenChange={shellOpenChange} title="Shell" variant="shell">
+          <div data-testid="shell-body">history</div>
+        </Modal>
+        <Modal
+          open
+          onOpenChange={confirmOpenChange}
+          title="Confirm"
+          variant="confirm"
+          nested
+        >
+          <div data-testid="confirm-body">delete?</div>
+        </Modal>
+      </>,
+    )
+    // PR3 Esc matrix: confirm Content carries the gate attribute.
+    expect(document.querySelector('[data-confirm-dialog]')).not.toBeNull()
+    const shellDialog = screen.getByText('Shell').closest('[role="dialog"]') as HTMLElement
+    const confirmDialog = screen
+      .getByText('Confirm')
+      .closest('[role="dialog"]') as HTMLElement
+    expect(shellDialog).not.toBeNull()
+    expect(confirmDialog).not.toBeNull()
+
+    // Escape while confirm is open: shell must stay (gate preventDefault on shell).
+    // Focus confirm first (topmost layer), then Escape.
+    confirmDialog.focus()
+    fireEvent.keyDown(confirmDialog, { key: 'Escape', code: 'Escape' })
+    fireEvent.keyDown(document, { key: 'Escape', code: 'Escape' })
+
+    expect(screen.getByTestId('shell-body')).toBeInTheDocument()
+    // Confirm may close via its own onOpenChange — shell must not.
+    const shellClosed = shellOpenChange.mock.calls.some((c) => c[0] === false)
+    expect(shellClosed).toBe(false)
   })
 })

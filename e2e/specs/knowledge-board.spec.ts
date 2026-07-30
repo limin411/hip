@@ -37,9 +37,11 @@ import {
 } from '../helpers/knowledge.js'
 
 describe('knowledge whiteboard e2e smoke @knowledge @core', () => {
-  const spaceName = `e2e-kb-board-${Date.now()}`
-  const docTitle = `e2e-board-doc-${Date.now()}`
-  const boardTitle = 'Untitled whiteboard'
+  const stamp = Date.now()
+  const spaceName = `e2e-kb-board-${stamp}`
+  const docTitle = `e2e-board-doc-${stamp}`
+  /** Locale-proof unique title (i18n default is zh-CN「未命名画板」 / en “Untitled whiteboard”). */
+  const boardTitle = `e2e-board-${stamp}`
   /**
    * Content marker via viewBackgroundColor (BOARD_APP_STATE_PERSIST_KEYS).
    * Survives buildDiskScene / leave flush without freehand strokes.
@@ -91,6 +93,8 @@ describe('knowledge whiteboard e2e smoke @knowledge @core', () => {
     expect(await canvas.isExisting()).toBe(true)
     expect(await canvas.getAttribute('data-board-id')).toBe(boardId)
 
+    // Rename to stamped title — never depend on i18n default board title.
+    await setKnowledgeDocTitle(boardTitle)
     await expectTreeContains(boardTitle, 10000)
     const boards = await listKnowledgeBoardTestIds()
     expect(boards.some((tid) => tid.includes(boardId))).toBe(true)
@@ -102,24 +106,31 @@ describe('knowledge whiteboard e2e smoke @knowledge @core', () => {
     expect(raw).toContain('"source":"hip"')
   })
 
-  it('KB2: canvas host stays mounted (optional Excalidraw surface)', async () => {
-    // Full freehand strokes are flaky under headless WebDriver; assert host +
-    // optional engine mount instead of drawing.
+  it('KB2: Excalidraw engine mounts inside board canvas host', async () => {
+    // Freehand strokes stay out of scope; wait until the lazy Excalidraw chunk
+    // paints a real engine surface under knowledge-board-canvas.
     await waitForKnowledgeBoardCanvas(20000)
     const host = await browser.$('[data-testid="knowledge-board-canvas"]')
     expect(await host.isExisting()).toBe(true)
+    expect(await host.getAttribute('data-board-id')).toBe(boardId)
 
-    // Best-effort: Excalidraw often mounts a canvas or .excalidraw root.
-    // Host mount is the hard contract; engine DOM is soft.
-    await browser.execute(() => {
-      const root = document.querySelector('[data-testid="knowledge-board-canvas"]')
-      if (!root) return false
-      return Boolean(
-        root.querySelector('canvas') ||
-          root.querySelector('.excalidraw') ||
-          root.querySelector('[class*="excalidraw"]'),
-      )
-    })
+    await browser.waitUntil(
+      async () =>
+        browser.execute(() => {
+          const root = document.querySelector('[data-testid="knowledge-board-canvas"]')
+          if (!root) return false
+          return Boolean(
+            root.querySelector('canvas') ||
+              root.querySelector('.excalidraw') ||
+              root.querySelector('[class*="excalidraw"]'),
+          )
+        }),
+      {
+        timeout: 20000,
+        interval: 300,
+        timeoutMsg: 'Excalidraw engine DOM not mounted under knowledge-board-canvas',
+      },
+    )
   })
 
   it('KB3: switch to another doc and back — board leaf + scene persist', async () => {

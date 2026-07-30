@@ -143,7 +143,14 @@ export function Modal({
               <X size={16} strokeWidth={1.75} />
             </DialogPrimitive.Close>
           </div>
-          <div className="min-h-0 flex-1 overflow-y-auto">{children}</div>
+          {/*
+            Use flex-auto (1 1 auto), not flex-1 (1 1 0%). With h-fit / content-sized
+            panels, flex-basis 0% + min-h-0 collapses the body to 0 height so only the
+            title bar remains (embedding/rerank endpoint dialogs, etc.).
+            flex-auto keeps content height for non-resizable modals and still fills
+            remaining space when height is fixed (resizable).
+          */}
+          <div className="min-h-0 flex-auto overflow-y-auto">{children}</div>
           {footer && (
             <div className="shrink-0 border-t border-border bg-surface-subtle/80 px-5 py-3">
               {footer}

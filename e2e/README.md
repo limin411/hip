@@ -121,7 +121,10 @@ Knowledge helpers: `e2e/helpers/knowledge.ts`. Specs (all unpaid, isolated `HIP_
 | `knowledge-live.spec.ts` | KF1 Source slash `/h1`; KF2 Live type + disk; KF3 live blocks hard (`@knowledge`) |
 | `knowledge-live-r3.spec.ts` | KR1–4: default Live, Live slash, fixture blocks hard, large→Source (`@knowledge @core`) |
 | `knowledge-p2.spec.ts` | KP2: graph modal, table/board views, outline, backlinks, soft-delete restore (`@knowledge`) |
+| `knowledge-board.spec.ts` | KB1–5: create hip whiteboard → draw rect → leaf switch → structure click (if rail) → export JSON (`@knowledge @core`) |
 | `knowledge-perf.spec.ts` | KP-O/T: fixture open/type budgets; large-doc → Source (`@knowledge-perf`) |
+
+Whiteboard helpers (`.board.json` primary, hip-board type): `createBoardAndExpectCanvas`, `drawHipBoardRect`, `clickBoardStructureItemIfAvailable`, `findBoardPathOnDisk` in `e2e/helpers/knowledge.ts`. Pure path helpers are covered by `e2e/eval/board-disk.test.ts` (vitest; no display). Full GUI smoke needs the Tauri app: `yarn test:e2e --spec e2e/specs/knowledge-board.spec.ts`.
 
 Perf budgets: `e2e/helpers/knowledge-perf-budgets.ts` (hard unusable lines always; targets soft unless `KNOWLEDGE_PERF_STRICT=1`).
 

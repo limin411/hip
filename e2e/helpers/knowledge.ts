@@ -1329,6 +1329,34 @@ export async function createBoardAndExpectCanvas(): Promise<string> {
   return boardId
 }
 
+/** Primary on-disk filename for a board id (PR-C+ hip-board). */
+export function boardPrimaryFilename(boardId: string): string {
+  return `${boardId}.board.json`
+}
+
+/** Legacy Excalidraw filename (dual-resolve read / migrate only). */
+export function boardLegacyFilename(boardId: string): string {
+  return `${boardId}.excalidraw`
+}
+
+/**
+ * Prefer primary `.board.json` over legacy `.excalidraw` when both may exist.
+ * Pure helper — unit-tested without a live app.
+ */
+export function preferBoardDiskPath(
+  primaryPath: string | null | undefined,
+  legacyPath: string | null | undefined,
+): string | null {
+  if (primaryPath) return primaryPath
+  if (legacyPath) return legacyPath
+  return null
+}
+
+/** True when body looks like dehydrated hip-board JSON (type field). */
+export function isHipBoardSceneBody(raw: string): boolean {
+  return raw.includes('"type":"hip-board"') || raw.includes('"type": "hip-board"')
+}
+
 /** Resolve on-disk path for a board id under HIP_DATA_DIR/knowledge.
  * Prefers primary `.board.json`, falls back to legacy `.excalidraw`.
  */
@@ -1338,10 +1366,13 @@ export function findBoardPathOnDisk(boardId: string): string | null {
   for (const ent of fs.readdirSync(root, { withFileTypes: true })) {
     if (!ent.isDirectory() || !ent.name.startsWith('spc_')) continue
     const boardsDir = path.join(root, ent.name, 'boards')
-    const primary = path.join(boardsDir, `${boardId}.board.json`)
-    if (fs.existsSync(primary)) return primary
-    const legacy = path.join(boardsDir, `${boardId}.excalidraw`)
-    if (fs.existsSync(legacy)) return legacy
+    const primary = path.join(boardsDir, boardPrimaryFilename(boardId))
+    const legacy = path.join(boardsDir, boardLegacyFilename(boardId))
+    const found = preferBoardDiskPath(
+      fs.existsSync(primary) ? primary : null,
+      fs.existsSync(legacy) ? legacy : null,
+    )
+    if (found) return found
   }
   return null
 }
@@ -1476,6 +1507,201 @@ export async function exportActiveBoardJsonTo(destPath: string): Promise<void> {
     async () => fs.existsSync(destPath) && fs.statSync(destPath).size > 0,
     { timeout: 15000, interval: 300, timeoutMsg: `export board json not written: ${destPath}` },
   )
+}
+
+/** Wait until hip SVG scene is mounted under the board host. */
+export async function waitForHipBoardSvg(timeoutMs = 20000): Promise<void> {
+  await waitForKnowledgeBoardCanvas(timeoutMs)
+  await browser.waitUntil(
+    async () =>
+      browser.execute(() => {
+        const root = document.querySelector('[data-testid="knowledge-board-canvas"]')
+        if (!root) return false
+        return Boolean(
+          root.querySelector('[data-testid="hip-board-svg"]') ||
+            root.querySelector('svg.board-scene') ||
+            root.querySelector('svg'),
+        )
+      }),
+    {
+      timeout: timeoutMs,
+      interval: 300,
+      timeoutMsg: 'hip board SVG not mounted under knowledge-board-canvas',
+    },
+  )
+}
+
+/**
+ * Activate a hip toolbar tool (`select` | `rect` | `ellipse` | `line` | `arrow` | `text`).
+ * Asserts `aria-pressed` when the toolbar is present.
+ */
+export async function selectHipBoardTool(
+  tool: 'select' | 'rect' | 'ellipse' | 'line' | 'arrow' | 'text',
+): Promise<void> {
+  await waitForHipBoardSvg(20000)
+  const testId = `hip-board-tool-${tool}`
+  const btn = await browser.$(`[data-testid="${testId}"]`)
+  await btn.waitForExist({ timeout: 10000 })
+  await browser.execute((el: HTMLElement) => el.click(), btn)
+  await browser.waitUntil(
+    async () => {
+      const pressed = await btn.getAttribute('aria-pressed')
+      return pressed === 'true'
+    },
+    {
+      timeout: 5000,
+      interval: 100,
+      timeoutMsg: `hip board tool not pressed: ${tool}`,
+    },
+  )
+}
+
+/**
+ * Drag-create a rect on the hip canvas (world ≈ screen when camera is default).
+ * Dispatches PointerEvents on the board root so headless WDIO does not need
+ * native multi-step actions. Returns true when a new rect DOM node appears.
+ */
+export async function drawHipBoardRect(opts?: {
+  startX?: number
+  startY?: number
+  endX?: number
+  endY?: number
+}): Promise<boolean> {
+  await selectHipBoardTool('rect')
+  const before = await countHipBoardElements('rect')
+  const startX = opts?.startX ?? 80
+  const startY = opts?.startY ?? 80
+  const endX = opts?.endX ?? 200
+  const endY = opts?.endY ?? 160
+
+  const ok = await browser.execute(
+    (sx: number, sy: number, ex: number, ey: number) => {
+      const root = document.querySelector(
+        '[data-testid="knowledge-board-canvas"]',
+      ) as HTMLElement | null
+      if (!root) return false
+      // Focus so keyboard shortcuts still work after the gesture.
+      root.focus()
+      const rect = root.getBoundingClientRect()
+      // Prefer coordinates relative to the board host (camera identity ≈ screen).
+      const toClient = (x: number, y: number) => ({
+        clientX: rect.left + x,
+        clientY: rect.top + y,
+      })
+      const p0 = toClient(sx, sy)
+      const p1 = toClient(ex, ey)
+      const fire = (
+        type: string,
+        clientX: number,
+        clientY: number,
+        extra: PointerEventInit = {},
+      ) => {
+        root.dispatchEvent(
+          new PointerEvent(type, {
+            bubbles: true,
+            cancelable: true,
+            pointerId: 1,
+            pointerType: 'mouse',
+            button: 0,
+            buttons: type === 'pointerup' || type === 'pointercancel' ? 0 : 1,
+            clientX,
+            clientY,
+            ...extra,
+          }),
+        )
+      }
+      fire('pointerdown', p0.clientX, p0.clientY)
+      fire('pointermove', p1.clientX, p1.clientY)
+      fire('pointerup', p1.clientX, p1.clientY)
+      return true
+    },
+    startX,
+    startY,
+    endX,
+    endY,
+  )
+  if (!ok) return false
+
+  try {
+    await browser.waitUntil(
+      async () => (await countHipBoardElements('rect')) > before,
+      {
+        timeout: 8000,
+        interval: 150,
+        timeoutMsg: 'hip board rect not created after drag',
+      },
+    )
+    return true
+  } catch {
+    return false
+  }
+}
+
+/** Count scene elements by `data-element-type` (omit type for all). */
+export async function countHipBoardElements(
+  type?: 'rect' | 'ellipse' | 'line' | 'arrow' | 'text' | 'image',
+): Promise<number> {
+  return browser.execute((t: string | null) => {
+    const root = document.querySelector('[data-testid="knowledge-board-canvas"]')
+    if (!root) return 0
+    const sel = t
+      ? `[data-element-type="${t}"]`
+      : '[data-element-id]'
+    return root.querySelectorAll(sel).length
+  }, type ?? null)
+}
+
+/**
+ * Best-effort: open companion rail and click the first Structure row.
+ * Returns false when the rail/structure is unavailable (soft path for headless).
+ */
+export async function clickBoardStructureItemIfAvailable(): Promise<boolean> {
+  try {
+    await openKnowledgeOutlinePanel()
+  } catch {
+    return false
+  }
+
+  // Companion structure is board-mode only.
+  const companion = await browser.$('[data-testid="knowledge-board-companion"]')
+  if (!(await companion.isExisting())) return false
+
+  // Outline publish is debounced (~150ms); wait briefly for rows after a draw.
+  try {
+    await browser.waitUntil(
+      async () => {
+        const item = await browser.$('[data-testid^="knowledge-board-structure-item-"]')
+        return item.isExisting()
+      },
+      { timeout: 4000, interval: 150 },
+    )
+  } catch {
+    // Empty structure is still a valid soft result.
+    const empty = await browser.$('[data-testid="knowledge-board-structure-empty"]')
+    if (await empty.isExisting()) return false
+    return false
+  }
+
+  const item = await browser.$('[data-testid^="knowledge-board-structure-item-"]')
+  if (!(await item.isExisting())) return false
+  await browser.execute((el: HTMLElement) => el.click(), item)
+  await browser.pause(150)
+
+  // Focus should mark the row aria-current when selection publish lands.
+  try {
+    await browser.waitUntil(
+      async () => {
+        const current = await browser.$(
+          '[data-testid^="knowledge-board-structure-item-"][aria-current="true"]',
+        )
+        return current.isExisting()
+      },
+      { timeout: 3000, interval: 100 },
+    )
+  } catch {
+    // Click still exercised; selection highlight is best-effort.
+  }
+  return true
 }
 
 // ── Phase 1 + Live helpers (Batch E–F) ────────────────────────────────────

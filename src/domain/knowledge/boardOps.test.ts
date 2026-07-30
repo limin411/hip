@@ -6,11 +6,17 @@ import {
   elementAabb,
   hitTest,
   hitTestMarquee,
+  isTinyBox,
+  isTinyLine,
+  measureTextHeight,
   moveElements,
+  normalizeRectFromDrag,
   screenToWorld,
+  textLineHeight,
   worldGroupTransform,
   worldToScreen,
   zoomAtScreenPoint,
+  BOARD_TEXT_PADDING,
 } from './boardOps'
 import type { HipBoardElement } from './boardScene'
 import { HIP_BOARD_ZOOM_MAX, HIP_BOARD_ZOOM_MIN } from './boardScene'
@@ -168,5 +174,30 @@ describe('boardOps transforms', () => {
     // Tip at (100,0); three vertices
     expect(pts.split(' ')).toHaveLength(3)
     expect(pts.startsWith('100,0')).toBe(true)
+  })
+})
+
+describe('boardOps text contract', () => {
+  it('measureTextHeight uses explicit \\n lines only', () => {
+    const fontSize = 16
+    const lh = textLineHeight(fontSize)
+    // empty → 1 line
+    expect(measureTextHeight('', fontSize)).toBe(BOARD_TEXT_PADDING * 2 + lh)
+    expect(measureTextHeight('hello', fontSize)).toBe(BOARD_TEXT_PADDING * 2 + lh)
+    expect(measureTextHeight('a\nb', fontSize)).toBe(BOARD_TEXT_PADDING * 2 + 2 * lh)
+    expect(measureTextHeight('a\nb\nc', fontSize)).toBe(BOARD_TEXT_PADDING * 2 + 3 * lh)
+    // trailing newline still counts as an extra line (split behavior)
+    expect(measureTextHeight('a\n', fontSize)).toBe(BOARD_TEXT_PADDING * 2 + 2 * lh)
+  })
+
+  it('normalizeRectFromDrag handles inverted drag', () => {
+    expect(normalizeRectFromDrag(10, 20, 0, 0)).toEqual({ x: 0, y: 0, w: 10, h: 20 })
+  })
+
+  it('isTinyBox / isTinyLine thresholds', () => {
+    expect(isTinyBox(1, 1)).toBe(true)
+    expect(isTinyBox(10, 0)).toBe(false)
+    expect(isTinyLine(0, 0, 0.5, 0)).toBe(true)
+    expect(isTinyLine(0, 0, 10, 0)).toBe(false)
   })
 })

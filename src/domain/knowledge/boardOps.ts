@@ -283,3 +283,64 @@ export function arrowHeadPoints(
   const py = ux * (L / 2)
   return `${x2},${y2} ${bx + px},${by + py} ${bx - px},${by - py}`
 }
+
+// ─── Defaults + text contract (LKD text; PR-2) ─────────────────────────────
+
+export const BOARD_DEFAULT_FILL = '#ffffff'
+export const BOARD_DEFAULT_STROKE = '#111111'
+export const BOARD_DEFAULT_STROKE_WIDTH = 2
+export const BOARD_DEFAULT_CORNER_RADIUS = 0
+/** Padding around text content (edit / hit / export). */
+export const BOARD_TEXT_PADDING = 4
+export const BOARD_TEXT_DEFAULT_W = 160
+export const BOARD_TEXT_DEFAULT_FONT_SIZE = 16 as const
+export const BOARD_TEXT_LINE_HEIGHT_FACTOR = 1.25
+/** Discard create-drag if both dimensions (or line length) stay under this. */
+export const BOARD_MIN_SHAPE_SIZE = 2
+
+export type BoardTool = 'select' | 'rect' | 'ellipse' | 'line' | 'arrow' | 'text'
+
+export function textLineHeight(fontSize: number): number {
+  return fontSize * BOARD_TEXT_LINE_HEIGHT_FACTOR
+}
+
+/**
+ * Text height from explicit `\n` lines only (no soft-wrap).
+ * Empty string → 1 line. Formula: max(minH, padding*2 + lines * lineHeight).
+ */
+export function measureTextHeight(text: string, fontSize: number): number {
+  const lines = Math.max(1, String(text).split('\n').length)
+  const lh = textLineHeight(fontSize)
+  const minH = BOARD_TEXT_PADDING * 2 + lh
+  return Math.max(minH, BOARD_TEXT_PADDING * 2 + lines * lh)
+}
+
+/** Normalize drag corners into a non-negative AABB. */
+export function normalizeRectFromDrag(
+  x0: number,
+  y0: number,
+  x1: number,
+  y1: number,
+): WorldAabb {
+  return {
+    x: Math.min(x0, x1),
+    y: Math.min(y0, y1),
+    w: Math.abs(x1 - x0),
+    h: Math.abs(y1 - y0),
+  }
+}
+
+/** True if rect/ellipse create-drag is too small to commit. */
+export function isTinyBox(w: number, h: number): boolean {
+  return w < BOARD_MIN_SHAPE_SIZE && h < BOARD_MIN_SHAPE_SIZE
+}
+
+/** True if line/arrow create-drag is too short to commit. */
+export function isTinyLine(
+  x: number,
+  y: number,
+  x2: number,
+  y2: number,
+): boolean {
+  return Math.hypot(x2 - x, y2 - y) < BOARD_MIN_SHAPE_SIZE
+}

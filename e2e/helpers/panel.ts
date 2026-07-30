@@ -1,15 +1,23 @@
 /**
- * Open / select ArtifactPanel tabs via the title-bar PanelToggle (Radix DropdownMenu).
- * Mirrors surface.ts openNewSessionMenu: focus + Enter first, then pointer-event fallback.
- * Titlebar drag regions swallow naive clicks under Tauri WDIO.
+ * Open / select ArtifactPanel tabs.
+ *
+ * When the right rail is open, tabs are a second-row strip (`panel-tab-bar`).
+ * When collapsed, open via the toolbar PanelToggle Radix DropdownMenu
+ * (focus + Enter first, then pointer-event fallback — titlebar drag regions
+ * swallow naive clicks under Tauri WDIO).
  */
+
+async function panelTabBarOpen(): Promise<boolean> {
+  const bar = await browser.$('[data-testid="panel-tab-bar"]')
+  return bar.isExisting()
+}
 
 async function panelMenuOpen(): Promise<boolean> {
   const menu = await browser.$('[data-testid="panel-tab-menu"]')
   return menu.isExisting()
 }
 
-/** Open the panel tab dropdown; no-op if already open. */
+/** Open the panel tab dropdown (collapsed toolbar); no-op if already open. */
 export async function openPanelMenu(): Promise<void> {
   if (await panelMenuOpen()) return
 
@@ -85,7 +93,7 @@ export async function openPanelMenu(): Promise<void> {
   throw new Error('panel-tab-menu did not open after retries (toggle-panel Radix dropdown)')
 }
 
-/** Close menu if open (Escape). */
+/** Close menu if open (Escape). No-op when using the always-visible tab bar. */
 export async function closePanelMenu(): Promise<void> {
   if (!(await panelMenuOpen())) return
   await browser.keys('Escape')
@@ -96,12 +104,31 @@ export async function closePanelMenu(): Promise<void> {
 }
 
 /**
- * Open panel menu and select a tab (files | agents | terminal | …).
- * Opens the right panel via setSession*PanelOpen as PanelToggle does.
+ * Select a panel tab (files | agents | terminal | …).
+ * Uses the second-row tab bar when the rail is open; otherwise the toolbar menu
+ * (which also opens the panel via setSession*PanelOpen).
  */
 export async function selectPanelTab(tab: string): Promise<void> {
-  await openPanelMenu()
   const testid = `panel-tab-${tab}`
+
+  if (await panelTabBarOpen()) {
+    const item = await browser.$(`[data-testid="panel-tab-bar"] [data-testid="${testid}"]`)
+    try {
+      await item.waitForExist({ timeout: 5000 })
+    } catch {
+      const labels = await browser.execute(() =>
+        Array.from(document.querySelectorAll('[data-testid="panel-tab-bar"] [data-testid^="panel-tab-"]'))
+          .map((el) => el.getAttribute('data-testid'))
+          .filter(Boolean),
+      )
+      throw new Error(`${testid} not found on panel-tab-bar; tabs: ${JSON.stringify(labels)}`)
+    }
+    await browser.execute((el: HTMLElement) => el.click(), item)
+    await browser.$(`[data-testid="panel-view-${tab}"]`).waitForExist({ timeout: 15000 })
+    return
+  }
+
+  await openPanelMenu()
   const item = await browser.$(`[data-testid="${testid}"]`)
   try {
     await item.waitForExist({ timeout: 5000 })
@@ -114,14 +141,21 @@ export async function selectPanelTab(tab: string): Promise<void> {
     throw new Error(`${testid} not found; menu items: ${JSON.stringify(labels)}`)
   }
   await browser.execute((el: HTMLElement) => el.click(), item)
-  // Menu should close after select; wait for panel view.
-  await browser
-    .$(`[data-testid="panel-view-${tab}"]`)
-    .waitForExist({ timeout: 15000 })
+  await browser.$(`[data-testid="panel-view-${tab}"]`).waitForExist({ timeout: 15000 })
 }
 
-/** List data-testid values currently in the open panel menu (for assertions). */
+/**
+ * List available panel tab data-testid values.
+ * Prefers the open tab bar; falls back to the collapsed toolbar menu.
+ */
 export async function listPanelMenuTabs(): Promise<string[]> {
+  if (await panelTabBarOpen()) {
+    return browser.execute(() =>
+      Array.from(document.querySelectorAll('[data-testid="panel-tab-bar"] [data-testid^="panel-tab-"]'))
+        .map((el) => el.getAttribute('data-testid') ?? '')
+        .filter(Boolean),
+    )
+  }
   await openPanelMenu()
   return browser.execute(() =>
     Array.from(document.querySelectorAll('[data-testid="panel-tab-menu"] [data-testid^="panel-tab-"]'))

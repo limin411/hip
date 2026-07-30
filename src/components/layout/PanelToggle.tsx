@@ -1,5 +1,5 @@
 import { useTranslation } from 'react-i18next'
-import { Check, ChevronDown, PanelRight, PanelRightClose } from 'lucide-react'
+import { Check, PanelRight, PanelRightClose } from 'lucide-react'
 import { useActiveSessionId } from '@/domain'
 import type { ArtifactTab, ChatTab } from '@/store/uiStore'
 import { useUiStore } from '@/store/uiStore'
@@ -53,12 +53,12 @@ export function useRightPanelOpen(): boolean {
 }
 
 /**
- * Right-rail open/close + tab picker.
+ * Right-rail open/close + tab picker (collapsed toolbar only).
  *
  * Mirrors left sidebar chrome: when the rail is closed the control lives in the
- * main toolbar; when open it relocates to the panel header (former X slot) and
- * collapses on click. Multi-tab surfaces keep a dropdown for switching tabs;
- * re-selecting the active tab also collapses.
+ * main toolbar with a dropdown to open a specific tab; when open it relocates
+ * to the panel header as a one-click collapse. In-panel tab switching is the
+ * second-row {@link PanelTabBar}, not a dropdown.
  */
 export function PanelToggle({ slot = 'toolbar' }: { slot?: PanelToggleSlot }) {
   const { t } = useTranslation()
@@ -248,11 +248,7 @@ export function PanelToggle({ slot = 'toolbar' }: { slot?: PanelToggleSlot }) {
   const currentTab = isCode ? activeTab : chatActiveTab
 
   const onSelect = (value: ArtifactTab | ChatTab) => {
-    // Re-selecting the active tab while open collapses (same control toggles off).
-    if (panelOpen && currentTab === value) {
-      collapse()
-      return
-    }
+    // Collapsed toolbar only — panel is closed; open onto the chosen tab.
     if (isCode) {
       setTab(value as ArtifactTab)
       setSessionCodePanelOpen(activeSessionId, true)
@@ -262,53 +258,21 @@ export function PanelToggle({ slot = 'toolbar' }: { slot?: PanelToggleSlot }) {
     }
   }
 
-  // Expanded multi-tab: the fold control relocates to the former X slot (one-click
-  // collapse). Tab switching stays available via a compact chevron menu so e2e and
-  // in-panel view changes keep working without a toolbar control.
+  // Expanded multi-tab: one-click collapse only. Tabs live on PanelTabBar (second row).
   if (panelOpen) {
     return (
-      <div className="flex items-center gap-0.5" data-tauri-drag-region="false" data-no-drag>
-        <DropdownMenu modal={false}>
-          <DropdownMenuTrigger asChild>
-            <Button
-              variant="ghost"
-              size="icon"
-              title={t('chat.togglePanel')}
-              data-testid="toggle-panel"
-              aria-expanded={true}
-            >
-              <ChevronDown size={16} strokeWidth={1.75} />
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" data-testid="panel-tab-menu">
-            {tabs.map((tab) => {
-              const selected = currentTab === tab.value
-              return (
-                <DropdownMenuItem
-                  key={tab.value}
-                  onSelect={() => onSelect(tab.value as ArtifactTab | ChatTab)}
-                  data-testid={`panel-tab-${tab.value}`}
-                >
-                  <span className="flex w-4 shrink-0 items-center justify-center">
-                    {selected ? <Check size={14} className="text-accent" /> : null}
-                  </span>
-                  {tab.label}
-                </DropdownMenuItem>
-              )
-            })}
-          </DropdownMenuContent>
-        </DropdownMenu>
-        <Button
-          variant="ghost"
-          size="icon"
-          title={triggerTitle}
-          onClick={collapse}
-          data-testid="panel-collapse"
-          aria-expanded={true}
-        >
-          <PanelRightClose size={17} strokeWidth={1.75} />
-        </Button>
-      </div>
+      <Button
+        variant="ghost"
+        size="icon"
+        title={triggerTitle}
+        onClick={collapse}
+        data-tauri-drag-region="false"
+        data-no-drag
+        data-testid="panel-collapse"
+        aria-expanded={true}
+      >
+        <PanelRightClose size={17} strokeWidth={1.75} />
+      </Button>
     )
   }
 

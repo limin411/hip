@@ -15,6 +15,7 @@ import { CODE_TERMINAL } from './terminalFeature'
 import { useDomainStore } from '@/domain/sessionStore'
 import { useDiffStore } from '@/store/diffStore'
 import { PanelToggle } from '@/components/layout/PanelToggle'
+import { PanelTabBar } from './PanelTabBar'
 const GIT_GATED: ReadonlySet<ArtifactTab> = new Set(['timeline', 'changes'])
 
 function tabLabel(
@@ -74,6 +75,8 @@ export function ArtifactPanel() {
           <PanelToggle slot="panel" />
         </div>
       </div>
+
+      <PanelTabBar surface="code" />
 
       <div className="min-h-0 flex-1 overflow-hidden" data-testid={`panel-view-${effectiveTab}`}>
         {effectiveTab === 'outline' && <ConversationOutline />}

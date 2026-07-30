@@ -13,6 +13,7 @@ import { SearchSourcesPanel } from './SearchSourcesPanel'
 import { AgentsRuntimeSplit } from './AgentsRuntimeSplit'
 import { Button } from '@/components/ui/Button'
 import { PanelToggle } from '@/components/layout/PanelToggle'
+import { PanelTabBar } from './PanelTabBar'
 import { cn } from '@/lib/utils'
 
 /** Decode a base64 string to bytes (for downloading image/pdf artifacts). */
@@ -89,6 +90,8 @@ export function PreviewPanel() {
         {/* Relocated from main toolbar when open — same toggle collapses the rail. */}
         <PanelToggle slot="panel" />
       </div>
+
+      <PanelTabBar surface="chat" />
 
       <div className="min-h-0 flex-1 overflow-hidden" data-testid={`panel-view-${chatActiveTab}`}>
         {chatActiveTab === 'outline' && <ConversationOutline />}

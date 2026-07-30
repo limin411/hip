@@ -13,7 +13,6 @@ vi.mock('react-i18next', () => ({
 
 vi.mock('lucide-react', () => ({
   Check: () => React.createElement('span', { 'data-testid': 'icon-check' }),
-  ChevronDown: () => React.createElement('span', { 'data-testid': 'icon-chevron-down' }),
   PanelRight: () => React.createElement('span', { 'data-testid': 'icon-panel-right' }),
   PanelRightClose: () => React.createElement('span', { 'data-testid': 'icon-panel-right-close' }),
 }))
@@ -170,11 +169,13 @@ describe('PanelToggle', () => {
     expect(screen.queryByTestId('toggle-panel')).not.toBeInTheDocument()
   })
 
-  it('shows panel-slot collapse control when rail is open', () => {
+  it('shows panel-slot collapse control when rail is open (no tab dropdown)', () => {
     mockChatPanelOpen = true
     render(<PanelToggle slot="panel" />)
     expect(screen.getByTestId('panel-collapse')).toBeInTheDocument()
-    expect(screen.getByTestId('toggle-panel')).toBeInTheDocument()
+    // In-panel tab switching is PanelTabBar, not a chevron menu on the header.
+    expect(screen.queryByTestId('toggle-panel')).not.toBeInTheDocument()
+    expect(screen.queryByTestId('panel-tab-menu')).not.toBeInTheDocument()
     fireEvent.click(screen.getByTestId('panel-collapse'))
     expect(dismissPanelThisTurn).toHaveBeenCalled()
     expect(setSessionChatPanelOpen).toHaveBeenCalledWith('s1', false)

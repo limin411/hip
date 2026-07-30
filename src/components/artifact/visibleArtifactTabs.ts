@@ -16,8 +16,7 @@ export type VisibleTabDef = {
 }
 
 /**
- * Shared tab set for ArtifactPanel in-panel chrome and PanelToggle.
- * @see docs/design/visual-craft-upgrade-spec.md Phase 5
+ * Shared tab set for PanelTabBar (in-panel second row) and collapsed PanelToggle menu.
  */
 export function visibleArtifactTabs(args: {
   surface: 'code' | 'chat'

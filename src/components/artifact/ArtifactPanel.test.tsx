@@ -26,6 +26,10 @@ vi.mock('@/components/layout/PanelToggle', () => ({
   PanelToggle: () => React.createElement('button', { 'data-testid': 'close-btn', type: 'button' }, 'collapse'),
 }))
 
+vi.mock('./PanelTabBar', () => ({
+  PanelTabBar: () => React.createElement('div', { 'data-testid': 'panel-tab-bar', role: 'tablist' }),
+}))
+
 vi.mock('react-resizable-panels', () => ({
   Panel: ({ children }: { children: React.ReactNode }) =>
     React.createElement('div', { 'data-testid': 'resizable-panel' }, children),
@@ -107,10 +111,10 @@ describe('ArtifactPanel', () => {
     cleanup()
   })
 
-  it('shows the active view title (no in-panel tab bar)', () => {
+  it('shows the active view title and second-row tab bar', () => {
     render(<ArtifactPanel />)
     expect(screen.getByTestId('panel-title')).toHaveTextContent('Files')
-    expect(screen.queryByTestId('tabs-list')).toBeNull()
+    expect(screen.getByTestId('panel-tab-bar')).toBeInTheDocument()
   })
 
   it('falls back to files when a git-gated tab is active outside a git repo', () => {

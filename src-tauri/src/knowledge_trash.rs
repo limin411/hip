@@ -9,7 +9,8 @@ use std::time::{SystemTime, UNIX_EPOCH};
 use tauri::AppHandle;
 
 use crate::knowledge::{
-    is_knowledge_id, KnowledgeNode, KnowledgeSpace, KnowledgeTreeFile,
+    board_path_primary, board_paths_for_trash_move, is_knowledge_id, KnowledgeNode,
+    KnowledgeSpace, KnowledgeTreeFile,
 };
 use crate::paths;
 use crate::skills::safe_join;
@@ -461,14 +462,11 @@ pub(crate) fn soft_delete_nodes_at(
                 }
             }
             if n.id.starts_with("brd_") {
-                let src_board = space_dir
-                    .join("boards")
-                    .join(format!("{}.excalidraw", n.id));
-                if src_board.exists() {
-                    let _ = fs::rename(
-                        &src_board,
-                        dest.join("boards").join(format!("{}.excalidraw", n.id)),
-                    );
+                // Dual-ext: move both `.board.json` and `.excalidraw` when present (LKD-6b).
+                if let Ok(pairs) = board_paths_for_trash_move(kroot, space_id, &n.id) {
+                    for (src_board, dest_name) in pairs {
+                        let _ = fs::rename(&src_board, dest.join("boards").join(dest_name));
+                    }
                 }
             }
         }
@@ -686,14 +684,24 @@ pub(crate) fn restore_trash_entry_at(
                     }
                 }
                 if n.id.starts_with("brd_") {
-                    let src = payload.join("boards").join(format!("{}.excalidraw", n.id));
-                    if src.exists() {
-                        fs::create_dir_all(space_dir.join("boards")).map_err(|e| e.to_string())?;
-                        fs::rename(
-                            &src,
-                            space_dir.join("boards").join(format!("{}.excalidraw", n.id)),
-                        )
-                        .map_err(|e| e.to_string())?;
+                    // R3: always restore to primary `boards/{id}.board.json`.
+                    // Prefer primary payload if both exist; else promote legacy body.
+                    let payload_boards = payload.join("boards");
+                    let src_primary = payload_boards.join(format!("{}.board.json", n.id));
+                    let src_legacy = payload_boards.join(format!("{}.excalidraw", n.id));
+                    let dest = board_path_primary(kroot, &entry.space_id, &n.id)?;
+                    if src_primary.exists() {
+                        if let Some(parent) = dest.parent() {
+                            fs::create_dir_all(parent).map_err(|e| e.to_string())?;
+                        }
+                        fs::rename(&src_primary, &dest).map_err(|e| e.to_string())?;
+                        // Discard leftover legacy copy in payload (both-exist matrix).
+                        let _ = fs::remove_file(&src_legacy);
+                    } else if src_legacy.exists() {
+                        if let Some(parent) = dest.parent() {
+                            fs::create_dir_all(parent).map_err(|e| e.to_string())?;
+                        }
+                        fs::rename(&src_legacy, &dest).map_err(|e| e.to_string())?;
                     }
                     // Missing board file: still restore tree node (open yields empty scene).
                 }
@@ -1090,6 +1098,7 @@ mod tests {
                 space_id,
                 vec![node(board_id, "board", "Sketch", None, 0)],
             );
+            // Legacy-only seed: soft-delete → restore must not lose content (LKD-6b).
             fs::write(
                 space.join("boards").join(format!("{board_id}.excalidraw")),
                 body,
@@ -1112,11 +1121,19 @@ mod tests {
             assert_eq!(item.kind, TrashEntityKind::Board);
             assert_eq!(item.entity_id, board_id);
 
+            // R3: restore always lands on primary `.board.json` (body may still be excalidraw).
             let restored = fs::read_to_string(
-                space.join("boards").join(format!("{board_id}.excalidraw")),
+                space.join("boards").join(format!("{board_id}.board.json")),
             )
             .unwrap();
             assert!(restored.contains("stroke1"));
+            assert!(
+                !space
+                    .join("boards")
+                    .join(format!("{board_id}.excalidraw"))
+                    .exists(),
+                "must not restore back to legacy extension"
+            );
 
             let tree: KnowledgeTreeFile =
                 serde_json::from_str(&fs::read_to_string(space.join("tree.json")).unwrap())
@@ -1128,6 +1145,94 @@ mod tests {
             // Manifest entry removed
             let m = load_manifest(trash).unwrap();
             assert!(m.entries.iter().all(|e| e.id != entry_ids[0]));
+        });
+    }
+
+    #[test]
+    fn soft_delete_restore_board_json_primary_fixture() {
+        // Pre-seeded `.board.json` → soft-delete → restore → file at primary path.
+        with_temp_roots(|kroot, trash| {
+            let space_id = "spc_trashbjrest1";
+            let board_id = "brd_boardjson01";
+            let body = r#"{"type":"hip-board","version":1,"source":"hip","hip":{"schemaVersion":1},"elements":[{"id":"rect1","type":"rect"}],"files":{}}"#;
+            let space = write_space_with_tree(
+                kroot,
+                space_id,
+                vec![node(board_id, "board", "HipSketch", None, 0)],
+            );
+            let live_primary = space.join("boards").join(format!("{board_id}.board.json"));
+            fs::write(&live_primary, body).unwrap();
+
+            let entry_ids = soft_delete_nodes_at(
+                kroot,
+                trash,
+                space_id,
+                &[board_id.to_string()],
+            )
+            .unwrap();
+            assert!(!live_primary.exists());
+
+            let m = load_manifest(trash).unwrap();
+            let e = m.entries.iter().find(|e| e.id == entry_ids[0]).unwrap();
+            let payload_board = trash
+                .join(&e.payload_rel)
+                .join("boards")
+                .join(format!("{board_id}.board.json"));
+            assert!(payload_board.is_file());
+
+            restore_trash_entry_at(kroot, trash, &entry_ids[0]).unwrap();
+            assert!(live_primary.is_file());
+            let restored = fs::read_to_string(&live_primary).unwrap();
+            assert!(restored.contains("rect1"));
+            assert!(restored.contains("hip-board"));
+        });
+    }
+
+    #[test]
+    fn soft_delete_board_moves_both_extensions_when_present() {
+        with_temp_roots(|kroot, trash| {
+            let space_id = "spc_trashboth001";
+            let board_id = "brd_boardboth01";
+            let space = write_space_with_tree(
+                kroot,
+                space_id,
+                vec![node(board_id, "board", "Both", None, 0)],
+            );
+            let primary = space.join("boards").join(format!("{board_id}.board.json"));
+            let legacy = space.join("boards").join(format!("{board_id}.excalidraw"));
+            fs::write(&primary, r#"{"type":"hip-board","elements":[{"id":"p1"}],"files":{}}"#)
+                .unwrap();
+            fs::write(
+                &legacy,
+                r#"{"type":"excalidraw","elements":[{"id":"leg1"}],"files":{}}"#,
+            )
+            .unwrap();
+
+            let entry_ids = soft_delete_nodes_at(
+                kroot,
+                trash,
+                space_id,
+                &[board_id.to_string()],
+            )
+            .unwrap();
+            assert!(!primary.exists());
+            assert!(!legacy.exists());
+
+            let m = load_manifest(trash).unwrap();
+            let e = m.entries.iter().find(|e| e.id == entry_ids[0]).unwrap();
+            let payload = trash.join(&e.payload_rel).join("boards");
+            assert!(payload
+                .join(format!("{board_id}.board.json"))
+                .is_file());
+            assert!(payload
+                .join(format!("{board_id}.excalidraw"))
+                .is_file());
+
+            // Restore prefers primary payload → live primary only.
+            restore_trash_entry_at(kroot, trash, &entry_ids[0]).unwrap();
+            let restored = fs::read_to_string(&primary).unwrap();
+            assert!(restored.contains("p1"));
+            assert!(!legacy.exists());
         });
     }
 
@@ -1233,8 +1338,9 @@ mod tests {
                 fs::read_to_string(space.join("docs").join(format!("{doc_id}.md"))).unwrap(),
                 doc_body
             );
+            // R3: restored board file is always primary extension.
             let restored_board = fs::read_to_string(
-                space.join("boards").join(format!("{board_id}.excalidraw")),
+                space.join("boards").join(format!("{board_id}.board.json")),
             )
             .unwrap();
             assert!(restored_board.contains("folder-stroke"));
@@ -1254,10 +1360,14 @@ mod tests {
                 space_id,
                 vec![node(board_id, "board", "OrphanTree", None, 0)],
             );
-            // Intentionally do not write live boards/{id}.excalidraw
+            // Intentionally do not write live boards/{id}.* files
             assert!(!space
                 .join("boards")
                 .join(format!("{board_id}.excalidraw"))
+                .exists());
+            assert!(!space
+                .join("boards")
+                .join(format!("{board_id}.board.json"))
                 .exists());
 
             let entry_ids = soft_delete_nodes_at(
@@ -1282,6 +1392,9 @@ mod tests {
             assert!(!payload_boards
                 .join(format!("{board_id}.excalidraw"))
                 .exists());
+            assert!(!payload_boards
+                .join(format!("{board_id}.board.json"))
+                .exists());
 
             // Restore re-inserts tree node even when board file was never present.
             let item = restore_trash_entry_at(kroot, trash, &entry_ids[0]).unwrap();
@@ -1295,6 +1408,10 @@ mod tests {
             assert!(!space
                 .join("boards")
                 .join(format!("{board_id}.excalidraw"))
+                .exists());
+            assert!(!space
+                .join("boards")
+                .join(format!("{board_id}.board.json"))
                 .exists());
         });
     }

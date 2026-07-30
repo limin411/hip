@@ -168,6 +168,29 @@ describe('HipBoardCanvas shell', () => {
     expect(screen.getByTestId('hip-board-world').children).toHaveLength(0)
   })
 
+  it('resumeEditing re-enables input after leave freeze', () => {
+    const ref = createRef<HipBoardCanvasHandle>()
+    const onDraft = vi.fn()
+    render(
+      <HipBoardCanvas
+        ref={ref}
+        boardId="brd_resume00001"
+        spaceId="spc_1"
+        initialJson={EMPTY_HIP_BOARD_SCENE_JSON}
+        onDraftBody={onDraft}
+      />,
+    )
+    expect(ref.current?.isReady()).toBe(true)
+    act(() => {
+      ref.current?.flushToStore({ mode: 'leave' })
+    })
+    expect(ref.current?.isReady()).toBe(false)
+    act(() => {
+      ref.current?.resumeEditing()
+    })
+    expect(ref.current?.isReady()).toBe(true)
+  })
+
   it('excalidraw initialJson seeds empty hip (no silent migrate)', () => {
     const excal = JSON.stringify({
       type: 'excalidraw',

@@ -14,6 +14,7 @@ import {
 import { toast } from 'sonner'
 import {
   registerBeforeOpenDocFlush,
+  registerOnBoardFlushAbort,
   setExpandPersistSuspended,
   syncActiveEditorToDraft,
   useKnowledgeStore,
@@ -672,7 +673,15 @@ export function KnowledgeWorkspace() {
         })
       }
     })
-    return () => registerBeforeOpenDocFlush(null)
+    // Leave freeze must reverse when flushSave / openDoc aborts (unsupported cancel).
+    registerOnBoardFlushAbort(() => {
+      const h = boardCanvasRef.current as HipBoardCanvasHandle | null
+      h?.resumeEditing?.()
+    })
+    return () => {
+      registerBeforeOpenDocFlush(null)
+      registerOnBoardFlushAbort(null)
+    }
   }, [])
 
   const openDoc = openDocStore
@@ -883,12 +892,17 @@ export function KnowledgeWorkspace() {
                     return
                   }
                   if (node.kind === 'board') {
-                    // Prefer primary `.board.json` (PR-C+); dual-resolve lives in read/write.
+                    // Dual-resolve reveal: primary first, then legacy `.excalidraw`.
                     void knowledgeRevealPath(
                       activeSpaceId,
                       `boards/${node.id}.board.json`,
-                    ).catch((e) => {
-                      toast.error(knowledgeErrorMessage(e))
+                    ).catch(() => {
+                      void knowledgeRevealPath(
+                        activeSpaceId,
+                        `boards/${node.id}.excalidraw`,
+                      ).catch((e) => {
+                        toast.error(knowledgeErrorMessage(e))
+                      })
                     })
                   }
                 }}

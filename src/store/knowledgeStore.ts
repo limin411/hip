@@ -25,6 +25,7 @@ import {
 } from '@/domain/knowledge/knowledgePerf'
 import {
   assertNoDataUrlInBoardJson,
+  EMPTY_BOARD_SCENE,
   EMPTY_BOARD_SCENE_JSON,
   parseBoardScene,
   stableSerializeBoard,
@@ -638,6 +639,34 @@ export function __pendingUpgradeRetryHasForTests(boardId: string): boolean {
   return pendingUpgradeRetry.has(boardId)
 }
 
+/** Test helper: supersede in-flight openDoc / open-upgrade guards. */
+export function __bumpOpenDocGenerationForTests(): number {
+  return ++openDocGeneration
+}
+
+/**
+ * Stamp `hip.boardId` on a hip-board JSON body so canvas leave serialize
+ * (which always includes boardId) does not false-dirty empty scenes.
+ */
+function ensureHipBoardIdInBody(raw: string, boardId: string): string {
+  try {
+    const scene = parseBoardScene(raw)
+    if (scene.type === 'hip-board') {
+      if (scene.hip?.boardId === boardId) return stableSerializeBoard(scene)
+      return stableSerializeBoard({
+        ...scene,
+        hip: { schemaVersion: 1, boardId },
+      })
+    }
+  } catch {
+    /* fall through to empty */
+  }
+  return stableSerializeBoard({
+    ...EMPTY_BOARD_SCENE,
+    hip: { schemaVersion: 1, boardId },
+  })
+}
+
 /**
  * Options for {@link syncActiveEditorToDraft} / Workspace dispatcher.
  * `leaveActiveLeaf` drives board flushToStore mode: leave vs snapshot (KD-13).
@@ -673,6 +702,25 @@ export function syncActiveEditorToDraft(opts?: SyncActiveEditorOpts): void {
     beforeOpenDocFlush?.(opts)
   } catch {
     // never block structural ops on UI flush errors
+  }
+}
+
+/**
+ * When leave-flush freezes the board canvas but openDoc aborts (flush false),
+ * Workspace re-activates via this hook so the user is not stuck on a dead canvas.
+ */
+let onBoardFlushAbort: (() => void) | null = null
+
+/** Register (or clear with null) canvas resume after failed board flush. */
+export function registerOnBoardFlushAbort(fn: (() => void) | null): void {
+  onBoardFlushAbort = fn
+}
+
+function notifyBoardFlushAbort(): void {
+  try {
+    onBoardFlushAbort?.()
+  } catch {
+    /* never block */
   }
 }
 
@@ -1714,15 +1762,23 @@ export const useKnowledgeStore = create<KnowledgeState>((set, get) => ({
     }
 
     // Sync in-editor buffer → draftBody while activeDocId is still the old leaf.
-    // leave: active leaf will change (KD-13/14).
+    // leave: active leaf will change (KD-13/14). If flush aborts, resume canvas via
+    // registerOnBoardFlushAbort (leave freezes HipBoardCanvas activeRef).
     syncActiveEditorToDraft({ leaveActiveLeaf: true })
 
-    // Only await a disk write when dirty. Clean switches must NOT wait on saveChain
-    // (prior link-index / daily version IPC would freeze tree clicks).
+    // Only await a disk write when dirty or upgrade-retry pending. Clean switches
+    // must NOT wait on saveChain (prior link-index / daily version IPC would freeze tree clicks).
     const cur = get()
-    if (cur.activeDocId && cur.draftBody !== cur.docBody) {
+    const leaveNeedsWrite =
+      !!cur.activeDocId &&
+      (cur.draftBody !== cur.docBody || pendingUpgradeRetry.has(cur.activeDocId))
+    if (leaveNeedsWrite) {
       const ok = await get().flushSave({ phase: 'write' })
-      if (!ok) return // stay on current activeDocId; saveState error + retry chrome
+      if (!ok) {
+        // stay on current activeDocId; unfreeze board canvas after leave-mode freeze
+        notifyBoardFlushAbort()
+        return
+      }
     }
 
     const spaceId = get().activeSpaceId
@@ -1784,7 +1840,7 @@ export const useKnowledgeStore = create<KnowledgeState>((set, get) => ({
         // LKD-8: dual-parse; migrate excalidraw → hip-board; open upgrade write.
         let finalBody = body
         let upgradePayload: {
-          json: string
+          /** Migrated body at open (may be superseded by user draft before write). */
           skipped: number
         } | null = null
         // Clear per-open flags for this board; re-set when re-detecting unsupported.
@@ -1796,17 +1852,20 @@ export const useKnowledgeStore = create<KnowledgeState>((set, get) => ({
             if (mig.unsupported) {
               toast.warning(i18n.t('knowledge.board.legacyUnsupported'))
               legacyPreserveRaw.add(id)
-              finalBody = EMPTY_BOARD_SCENE_JSON
+              // EMPTY hip with boardId stamp so leave serialize is not false-dirty.
+              finalBody = ensureHipBoardIdInBody(EMPTY_BOARD_SCENE_JSON, id)
               // DO NOT write disk; DO NOT delete .excalidraw
             } else {
-              finalBody = stableSerializeBoard(mig.scene)
-              upgradePayload = { json: finalBody, skipped: mig.skipped }
+              finalBody = ensureHipBoardIdInBody(stableSerializeBoard(mig.scene), id)
+              upgradePayload = { skipped: mig.skipped }
             }
+          } else {
+            // hip-board: stamp boardId so canvas buildDiskJson matches store draft.
+            finalBody = ensureHipBoardIdInBody(body, id)
           }
-          // hip-board: use as-is
         } catch {
           toast.error(i18n.t('knowledge.board.loadFailed'))
-          finalBody = EMPTY_BOARD_SCENE_JSON
+          finalBody = ensureHipBoardIdInBody(EMPTY_BOARD_SCENE_JSON, id)
           // invalid: EMPTY in memory; no write
         }
 
@@ -1837,25 +1896,59 @@ export const useKnowledgeStore = create<KnowledgeState>((set, get) => ({
         kbPerfOpenStore(finalBody.length, get().editorMode)
         schedulePersistExpand(spaceId, get)
 
-        // OPEN UPGRADE (async, generation-guarded). Write primary + del legacy on success.
+        // OPEN UPGRADE on saveChain (never race flushSave). Write *current* draft, not a
+        // captured migrate snapshot, so concurrent strokes are not clobbered (LKD-8).
         if (upgradePayload) {
-          const upgradeJson = upgradePayload.json
           const skipped = upgradePayload.skipped
           const upgradeBoardId = id
           const upgradeSpaceId = spaceId
           const upgradeGen = gen
-          void (async () => {
+          const runUpgrade = async (prev: boolean): Promise<boolean> => {
             // Guard before write: gen miss → silent skip, no write/delete/toast.
-            if (upgradeGen !== openDocGeneration) return
-            if (get().activeDocId !== upgradeBoardId) return
-            if (get().activeSpaceId !== upgradeSpaceId) return
+            if (upgradeGen !== openDocGeneration) return prev
+            if (get().activeDocId !== upgradeBoardId) return prev
+            if (get().activeSpaceId !== upgradeSpaceId) return prev
+
+            const writeCurrentDraft = async (): Promise<string | null> => {
+              if (upgradeGen !== openDocGeneration) return null
+              if (get().activeDocId !== upgradeBoardId) return null
+              if (get().activeSpaceId !== upgradeSpaceId) return null
+              const toWrite = get().draftBody
+              if (!toWrite) return null
+              assertNoDataUrlInBoardJson(toWrite)
+              await knowledgeWriteBoard(upgradeSpaceId, upgradeBoardId, toWrite)
+              return toWrite
+            }
+
             try {
-              await knowledgeWriteBoard(upgradeSpaceId, upgradeBoardId, upgradeJson)
-              // Success: clear retry flag. Toast only if still the same open.
+              let written = await writeCurrentDraft()
+              if (written == null) return prev
+              // If user edited during await, write again so disk is not stale migrate body.
+              if (
+                get().activeDocId === upgradeBoardId &&
+                get().activeSpaceId === upgradeSpaceId &&
+                get().draftBody !== written
+              ) {
+                const again = await writeCurrentDraft()
+                if (again == null) {
+                  // Left board mid-retry; primary may have first write. Flag retry if still needed.
+                  pendingUpgradeRetry.add(upgradeBoardId)
+                  return prev
+                }
+                written = again
+              }
               pendingUpgradeRetry.delete(upgradeBoardId)
-              if (upgradeGen !== openDocGeneration) return
-              if (get().activeDocId !== upgradeBoardId) return
-              if (get().activeSpaceId !== upgradeSpaceId) return
+              if (
+                get().activeDocId === upgradeBoardId &&
+                get().activeSpaceId === upgradeSpaceId &&
+                get().draftBody === written
+              ) {
+                set({ docBody: written })
+              }
+              // Toast only if still the same open.
+              if (upgradeGen !== openDocGeneration) return prev
+              if (get().activeDocId !== upgradeBoardId) return prev
+              if (get().activeSpaceId !== upgradeSpaceId) return prev
               if (skipped > 0) {
                 toast.message(i18n.t('knowledge.board.legacyPartial', { count: skipped }))
               } else {
@@ -1864,11 +1957,13 @@ export const useKnowledgeStore = create<KnowledgeState>((set, get) => ({
             } catch {
               // Keep memory hip; do not delete legacy (write failed → no primary or atomic).
               pendingUpgradeRetry.add(upgradeBoardId)
-              if (upgradeGen !== openDocGeneration) return
-              if (get().activeDocId !== upgradeBoardId) return
+              if (upgradeGen !== openDocGeneration) return prev
+              if (get().activeDocId !== upgradeBoardId) return prev
               toast.error(i18n.t('knowledge.board.legacyUpgradeFailed'))
             }
-          })()
+            return prev
+          }
+          saveChain = saveChain.then(runUpgrade, () => runUpgrade(true))
         }
         return
       }
@@ -2025,6 +2120,7 @@ export const useKnowledgeStore = create<KnowledgeState>((set, get) => ({
             if (!confirmed) {
               toast.message(i18n.t('knowledge.board.legacyWriteBlocked'))
               set({ saveState: 'idle' })
+              notifyBoardFlushAbort()
               resolveWrite?.(false)
               return false
             }
@@ -2083,6 +2179,8 @@ export const useKnowledgeStore = create<KnowledgeState>((set, get) => ({
         const msg = knowledgeErrorMessage(e)
         set({ saveState: 'error' })
         toast.error(msg)
+        // Leave-mode freeze must be reversed when we stay on the board after failure.
+        if (isBoard) notifyBoardFlushAbort()
         return false
       }
     }

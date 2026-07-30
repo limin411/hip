@@ -87,6 +87,11 @@ export type HipBoardCanvasHandle = KnowledgeBoardCanvasHandle & {
   selectAndScrollTo: (ids: string[]) => void
   applyStylePatch: (ids: string[], patch: StylePatch) => void
   updateText: (id: string, text: string) => void
+  /**
+   * Re-enable input after leave-mode freeze when openDoc/flush aborts
+   * (unsupported confirm cancel / write error). Unmount still freezes for real leave.
+   */
+  resumeEditing: () => void
   /** Test / debug: current session camera (not on disk). */
   getCamera: () => HipBoardCamera
   /** Test / debug: current tool. */
@@ -278,14 +283,24 @@ export const HipBoardCanvas = forwardRef<HipBoardCanvasHandle, HipBoardCanvasPro
       try {
         const parsed = parseBoardScene(initialJson || EMPTY_HIP_BOARD_SCENE_JSON)
         if (parsed.type === 'hip-board') {
-          scene = parsed
+          // Stamp boardId so leave buildDiskJson matches store draft (no false dirty).
+          scene = {
+            ...parsed,
+            hip: { schemaVersion: 1, boardId: parsed.hip?.boardId ?? boardId },
+          }
         } else {
           // openDoc migrates excalidraw → hip before mount; if we still see
           // excalidraw JSON, fall back to empty hip (do not feed legacy shapes).
-          scene = EMPTY_HIP_BOARD_SCENE
+          scene = {
+            ...EMPTY_HIP_BOARD_SCENE,
+            hip: { schemaVersion: 1, boardId },
+          }
         }
       } catch {
-        scene = EMPTY_HIP_BOARD_SCENE
+        scene = {
+          ...EMPTY_HIP_BOARD_SCENE,
+          hip: { schemaVersion: 1, boardId },
+        }
       }
 
       elementsRef.current = scene.elements
@@ -726,12 +741,19 @@ export const HipBoardCanvas = forwardRef<HipBoardCanvasHandle, HipBoardCanvasPro
       setSelection(ids.filter((id) => next.some((e) => e.id === id)))
     }, [commitHistory, setElementsBoth, setSelection, snapshotHistory])
 
+    const resumeEditing = useCallback(() => {
+      // After leave-mode freeze when flush/open aborts; unmount still freezes for real leave.
+      activeRef.current = true
+      readyRef.current = true
+    }, [])
+
     useImperativeHandle(
       ref,
       () => ({
         flushToStore,
         exportPngBlob: async () => null,
         isReady: () => readyRef.current && activeRef.current,
+        resumeEditing,
         selectAndScrollTo: (ids: string[]) => {
           if (!activeRef.current) return
           if (textEditRef.current) commitTextEdit()
@@ -755,6 +777,7 @@ export const HipBoardCanvas = forwardRef<HipBoardCanvasHandle, HipBoardCanvasPro
         commitTextEdit,
         flushToStore,
         redo,
+        resumeEditing,
         setSelection,
         undo,
         updateText,

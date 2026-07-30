@@ -70,27 +70,11 @@ vi.mock('./HipBoardCanvas', async () => {
       props: { boardId: string; spaceId: string; initialJson: string },
       ref: React.ForwardedRef<HipBoardCanvasHandle>,
     ) {
-      useImperativeHandle(ref, () => ({
+      const handle: HipBoardCanvasHandle = {
         flushToStore: (opts) => boardFlushToStore(opts),
         exportPngBlob: async () => null,
         isReady: () => true,
-        selectAndScrollTo: () => {},
-        applyStylePatch: () => {},
-        updateText: () => {},
-        getCamera: () => ({ x: 0, y: 0, zoom: 1 }),
-        getTool: () => 'select' as const,
-        getSelectedIds: () => [],
-        getElements: () => [],
-        getFilesRel: () => ({}),
-        getHistoryPastLength: () => 0,
-        undo: () => {},
-        redo: () => {},
-      }))
-      // Keep a side-channel for assertions if needed
-      ;(boardCanvasHandleRef as { current: HipBoardCanvasHandle | null }).current = {
-        flushToStore: (opts) => boardFlushToStore(opts),
-        exportPngBlob: async () => null,
-        isReady: () => true,
+        resumeEditing: () => {},
         selectAndScrollTo: () => {},
         applyStylePatch: () => {},
         updateText: () => {},
@@ -103,6 +87,9 @@ vi.mock('./HipBoardCanvas', async () => {
         undo: () => {},
         redo: () => {},
       }
+      useImperativeHandle(ref, () => handle)
+      // Keep a side-channel for assertions if needed
+      ;(boardCanvasHandleRef as { current: HipBoardCanvasHandle | null }).current = handle
       return (
         <div
           data-testid="knowledge-board-canvas"
@@ -225,7 +212,7 @@ describe('KnowledgeWorkspace board route shell', () => {
     localStorage.removeItem(KNOWLEDGE_LIVE_FLAG_KEY)
   })
 
-  it('mounts KnowledgeBoardCanvas for board leaf and does not mount Milkdown', () => {
+  it('mounts HipBoardCanvas for board leaf and does not mount Milkdown', () => {
     seedBoardWorkspace()
     render(<KnowledgeWorkspace />)
     expect(screen.getByTestId('knowledge-board-canvas')).toBeInTheDocument()

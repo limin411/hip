@@ -88,12 +88,14 @@ import {
 import {
   listKnowledgeDocsForWiki,
   registerBeforeOpenDocFlush,
+  registerOnBoardFlushAbort,
   setExpandPersistSuspended,
   syncActiveEditorToDraft,
   useKnowledgeStore,
   __resetBoardSessionFlagsForTests,
   __legacyPreserveRawHasForTests,
   __pendingUpgradeRetryHasForTests,
+  __bumpOpenDocGenerationForTests,
 } from './knowledgeStore'
 
 describe('knowledgeStore openDoc editorMode default', () => {
@@ -2073,8 +2075,10 @@ describe('knowledgeStore board shell (PR-C hip cutover)', () => {
     expect(knowledgeReadBoard).toHaveBeenCalledWith('spc_1', boardId)
     const s = useKnowledgeStore.getState()
     expect(s.activeDocId).toBe(boardId)
-    expect(s.docBody).toBe(emptyScene)
-    expect(s.draftBody).toBe(emptyScene)
+    // open stamps hip.boardId so leave serialize is not false-dirty
+    expect(s.docBody).toContain('"type":"hip-board"')
+    expect(s.docBody).toContain(String(boardId))
+    expect(s.draftBody).toBe(s.docBody)
     expect(s.spaceDocCounts.spc_1).toBe(1) // Option B: unchanged
     expect(s.nodes.some((n) => n.id === boardId && n.kind === 'board')).toBe(true)
     expect(knowledgeLinkIndexUpsert).not.toHaveBeenCalled()
@@ -2089,13 +2093,15 @@ describe('knowledgeStore board shell (PR-C hip cutover)', () => {
     expect(knowledgeReadBoard).toHaveBeenCalledWith('spc_1', 'brd_board000001')
     expect(knowledgeReadDoc).not.toHaveBeenCalled()
     expect(s.activeDocId).toBe('brd_board000001')
-    expect(s.docBody).toBe(huge)
-    expect(s.draftBody).toBe(huge)
+    // boardId stamped on open for dirty-check alignment with canvas
+    expect(s.docBody).toContain('"type":"hip-board"')
+    expect(s.docBody).toContain('brd_board000001')
+    expect(s.draftBody).toBe(s.docBody)
     // editorMode left unchanged for boards
     expect(s.editorMode).toBe('source')
     expect(s.backlinks).toEqual([])
     expect(s.linkPanelStatus).toBe('idle')
-    expect(toast.message).not.toHaveBeenCalled()
+    expect(toast.message).not.toHaveBeenCalledWith('knowledge.doc.largeDocForceSource')
     expect(knowledgeLinkIndexUpsert).not.toHaveBeenCalled()
     expect(s.recent[0]?.docId).toBe('brd_board000001')
   })
@@ -2193,22 +2199,26 @@ describe('knowledgeStore board shell (PR-C hip cutover)', () => {
       files: {},
     })
     knowledgeReadBoard.mockResolvedValueOnce(legacy)
-    knowledgeWriteBoard.mockClear()
+    knowledgeWriteBoard.mockReset()
+    knowledgeWriteBoard.mockResolvedValue(undefined)
+    vi.mocked(toast.message).mockClear()
     await useKnowledgeStore.getState().openDoc('brd_board000001')
     const s = useKnowledgeStore.getState()
     expect(s.activeDocId).toBe('brd_board000001')
     expect(s.docBody).toContain('"type":"hip-board"')
     expect(s.draftBody).toContain('"type":"hip-board"')
     expect(s.docBody).toContain('"type":"rect"')
-    // open upgrade write
+    // open upgrade write on saveChain
     await vi.waitFor(() => {
-      expect(knowledgeWriteBoard).toHaveBeenCalled()
+      expect(
+        knowledgeWriteBoard.mock.calls.some(
+          (c) => c[1] === 'brd_board000001' && String(c[2]).includes('hip-board'),
+        ),
+      ).toBe(true)
     })
-    const upgradeCall = knowledgeWriteBoard.mock.calls.find(
-      (c) => c[1] === 'brd_board000001' && String(c[2]).includes('hip-board'),
-    )
-    expect(upgradeCall).toBeTruthy()
-    expect(toast.message).toHaveBeenCalledWith('knowledge.board.legacyImported')
+    await vi.waitFor(() => {
+      expect(toast.message).toHaveBeenCalledWith('knowledge.board.legacyImported')
+    })
     expect(__legacyPreserveRawHasForTests('brd_board000001')).toBe(false)
     expect(__pendingUpgradeRetryHasForTests('brd_board000001')).toBe(false)
   })
@@ -2273,8 +2283,12 @@ describe('knowledgeStore board shell (PR-C hip cutover)', () => {
     await useKnowledgeStore.getState().openDoc('brd_board000001')
     expect(toast.warning).toHaveBeenCalledWith('knowledge.board.legacyUnsupported')
     expect(__legacyPreserveRawHasForTests('brd_board000001')).toBe(true)
-    // Memory is empty hip; disk not written on open
-    expect(useKnowledgeStore.getState().docBody).toBe(emptyScene)
+    // Memory is empty hip with boardId stamp; disk not written on open
+    const opened = useKnowledgeStore.getState().docBody
+    expect(opened).toContain('"type":"hip-board"')
+    expect(opened).toContain('brd_board000001')
+    expect(opened).toContain('"elements":[]')
+    expect(useKnowledgeStore.getState().draftBody).toBe(opened)
     // No upgrade write on unsupported
     expect(
       knowledgeWriteBoard.mock.calls.every((c) => c[1] !== 'brd_board000001'),
@@ -2285,7 +2299,7 @@ describe('knowledgeStore board shell (PR-C hip cutover)', () => {
       type: 'hip-board',
       version: 1,
       source: 'hip',
-      hip: { schemaVersion: 1 },
+      hip: { schemaVersion: 1, boardId: 'brd_board000001' },
       elements: [
         {
           id: 'r1',
@@ -2305,6 +2319,8 @@ describe('knowledgeStore board shell (PR-C hip cutover)', () => {
     })
     useKnowledgeStore.setState({ draftBody: dirty })
 
+    const resume = vi.fn()
+    registerOnBoardFlushAbort(resume)
     const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(false)
     knowledgeWriteBoard.mockClear()
     const blocked = await useKnowledgeStore.getState().flushSave()
@@ -2312,6 +2328,7 @@ describe('knowledgeStore board shell (PR-C hip cutover)', () => {
     expect(knowledgeWriteBoard).not.toHaveBeenCalled()
     expect(toast.message).toHaveBeenCalledWith('knowledge.board.legacyWriteBlocked')
     expect(__legacyPreserveRawHasForTests('brd_board000001')).toBe(true)
+    expect(resume).toHaveBeenCalled()
 
     confirmSpy.mockReturnValue(true)
     const allowed = await useKnowledgeStore.getState().flushSave()
@@ -2319,6 +2336,192 @@ describe('knowledgeStore board shell (PR-C hip cutover)', () => {
     expect(knowledgeWriteBoard).toHaveBeenCalledWith('spc_1', 'brd_board000001', dirty)
     expect(__legacyPreserveRawHasForTests('brd_board000001')).toBe(false)
     confirmSpy.mockRestore()
+    registerOnBoardFlushAbort(null)
+  })
+
+  it('unsupported leave with no edits does not confirm or write', async () => {
+    const unsupported = JSON.stringify({
+      type: 'excalidraw',
+      version: 2,
+      source: 'hip',
+      elements: [{ id: 'd1', type: 'diamond', x: 0, y: 0, width: 10, height: 10 }],
+      appState: { viewBackgroundColor: '#ffffff' },
+      files: {},
+    })
+    knowledgeReadBoard.mockResolvedValueOnce(unsupported)
+    await useKnowledgeStore.getState().openDoc('brd_board000001')
+    expect(__legacyPreserveRawHasForTests('brd_board000001')).toBe(true)
+    const s = useKnowledgeStore.getState()
+    expect(s.draftBody).toBe(s.docBody)
+
+    const confirmSpy = vi.spyOn(window, 'confirm')
+    knowledgeWriteBoard.mockClear()
+    knowledgeReadDoc.mockResolvedValueOnce('# note')
+    // leave flush uses leaveActiveLeaf; register a sync that does not change draft
+    registerBeforeOpenDocFlush(() => {
+      /* canvas would stamp boardId; store already stamped on open */
+    })
+    await useKnowledgeStore.getState().openDoc('doc_doc00000001')
+    expect(confirmSpy).not.toHaveBeenCalled()
+    expect(knowledgeWriteBoard).not.toHaveBeenCalled()
+    expect(useKnowledgeStore.getState().activeDocId).toBe('doc_doc00000001')
+    confirmSpy.mockRestore()
+    registerBeforeOpenDocFlush(null)
+  })
+
+  it('open upgrade writes current draft after concurrent edit (not stale migrate body)', async () => {
+    const legacy = JSON.stringify({
+      type: 'excalidraw',
+      version: 2,
+      source: 'hip',
+      elements: [
+        {
+          id: 'r1',
+          type: 'rectangle',
+          x: 0,
+          y: 0,
+          width: 10,
+          height: 10,
+          backgroundColor: '#fff',
+          strokeColor: '#000',
+          strokeWidth: 1,
+        },
+      ],
+      appState: { viewBackgroundColor: '#ffffff' },
+      files: {},
+    })
+    let releaseWrite!: (v?: unknown) => void
+    const hold = new Promise<void>((res) => {
+      releaseWrite = () => res()
+    })
+    const writtenBodies: string[] = []
+    knowledgeReadBoard.mockResolvedValueOnce(legacy)
+    knowledgeWriteBoard.mockImplementation(async (_s: string, _id: string, body: string) => {
+      writtenBodies.push(body)
+      await hold
+    })
+
+    const openP = useKnowledgeStore.getState().openDoc('brd_board000001')
+    await openP
+    await vi.waitFor(() => {
+      expect(useKnowledgeStore.getState().activeDocId).toBe('brd_board000001')
+    })
+    // Wait until upgrade write is in-flight (saveChain started knowledgeWriteBoard)
+    await vi.waitFor(() => {
+      expect(writtenBodies.length).toBeGreaterThanOrEqual(1)
+    })
+    const firstAttempt = writtenBodies[0]
+    expect(firstAttempt).toContain('"type":"rect"')
+
+    // Concurrent edit while upgrade write is held
+    const dirtier = stableSerializeBoard({
+      type: 'hip-board',
+      version: 1,
+      source: 'hip',
+      hip: { schemaVersion: 1, boardId: 'brd_board000001' },
+      elements: [
+        {
+          id: 'r1',
+          type: 'rect',
+          x: 0,
+          y: 0,
+          w: 10,
+          h: 10,
+          fill: '#fff',
+          stroke: '#000',
+          strokeWidth: 1,
+          cornerRadius: 0,
+        },
+        {
+          id: 'r2',
+          type: 'rect',
+          x: 20,
+          y: 20,
+          w: 30,
+          h: 30,
+          fill: '#eee',
+          stroke: '#111',
+          strokeWidth: 2,
+          cornerRadius: 0,
+        },
+      ],
+      appState: { viewBackgroundColor: '#ffffff' },
+      files: {},
+    })
+    useKnowledgeStore.getState().setDraftBody(dirtier, {
+      docId: 'brd_board000001',
+      persist: 'none',
+    })
+    releaseWrite()
+    await vi.waitFor(() => {
+      expect(writtenBodies.some((b) => b.includes('r2'))).toBe(true)
+    })
+    // Must not leave disk as only the first stale body without user strokes.
+    const last = writtenBodies[writtenBodies.length - 1]
+    expect(last).toContain('r2')
+    expect(last).not.toBe(firstAttempt)
+    knowledgeWriteBoard.mockReset()
+    knowledgeWriteBoard.mockResolvedValue(undefined)
+  })
+
+  it('open upgrade gen miss skips write silently', async () => {
+    const legacy = JSON.stringify({
+      type: 'excalidraw',
+      version: 2,
+      source: 'hip',
+      elements: [
+        {
+          id: 'r1',
+          type: 'rectangle',
+          x: 0,
+          y: 0,
+          width: 10,
+          height: 10,
+          backgroundColor: '#fff',
+          strokeColor: '#000',
+          strokeWidth: 1,
+        },
+      ],
+      appState: { viewBackgroundColor: '#ffffff' },
+      files: {},
+    })
+    // Hold saveChain after disk write (link-index) so open-upgrade stays queued behind it.
+    let releaseLink!: () => void
+    const linkHold = new Promise<void>((res) => {
+      releaseLink = () => res()
+    })
+    knowledgeLinkIndexUpsert.mockImplementationOnce(async () => {
+      await linkHold
+    })
+    useKnowledgeStore.setState({
+      activeDocId: 'doc_doc00000001',
+      docBody: 'a',
+      draftBody: 'b',
+      nodes: [boardNode, docNode],
+    })
+    // phase write returns after knowledgeWriteDoc; run stays on chain in link-index hold.
+    const flushP = useKnowledgeStore.getState().flushSave({ phase: 'write' })
+    await flushP
+
+    knowledgeReadBoard.mockResolvedValueOnce(legacy)
+    knowledgeWriteBoard.mockClear()
+    vi.mocked(toast.message).mockClear()
+    // openDoc: no dirty wait (doc flush already wrote). Opens board and enqueues upgrade
+    // after the still-held flush run on saveChain.
+    await useKnowledgeStore.getState().openDoc('brd_board000001')
+    expect(useKnowledgeStore.getState().activeDocId).toBe('brd_board000001')
+    // Supersede before upgrade runs.
+    __bumpOpenDocGenerationForTests()
+    useKnowledgeStore.setState({
+      activeDocId: 'doc_doc00000001',
+      docBody: 'b',
+      draftBody: 'b',
+    })
+    releaseLink()
+    await new Promise((r) => setTimeout(r, 30))
+    expect(knowledgeWriteBoard).not.toHaveBeenCalled()
+    expect(toast.message).not.toHaveBeenCalledWith('knowledge.board.legacyImported')
+    knowledgeLinkIndexUpsert.mockResolvedValue(undefined)
   })
 
   it('setDraftBody docId guard ignores cross-leaf board write', () => {

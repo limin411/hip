@@ -338,15 +338,16 @@ export const useUiStore = create<UiState>()(
       previousView: null,
       setActiveView: (v) =>
         set((s) => {
-          // Full-page Settings must not stack under History/Trash shells (PR3).
-          const clearOverlay = v === 'settings' && s.overlay != null
-          if (s.activeView === v && !clearOverlay) return s
+          if (s.activeView === v) return s
           const isSpecial = (view: ActiveView) =>
             view === 'settings' ||
             view === 'history' ||
             view === 'trash'
           const enteringSpecial = isSpecial(v) && !isSpecial(s.activeView)
           const leavingSpecial = isSpecial(s.activeView) && !isSpecial(v)
+          // PR4: Settings is shown via overlay only. Residual setActiveView('settings')
+          // still updates activeView for legacy/tests but does NOT clear overlay
+          // (reversed from PR3 full-page path). Production openers use openSettingsOverlay.
           return {
             activeView: v,
             previousView: enteringSpecial
@@ -354,7 +355,6 @@ export const useUiStore = create<UiState>()(
               : leavingSpecial
                 ? null
                 : s.previousView,
-            ...(clearOverlay ? { overlay: null as AppOverlay | null } : {}),
           }
         }),
 

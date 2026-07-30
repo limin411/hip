@@ -1,17 +1,16 @@
 import { toast } from 'sonner'
 import i18n from '@/i18n'
+import { openSettingsOverlay } from '@/components/layout/sidebarActions'
 import { sessionService } from '../sessionService'
 import { useDomainStore } from '../sessionStore'
-import { useUiStore, type SettingsPageId } from '@/store/uiStore'
+import type { SettingsPageId } from '@/store/uiStore'
 
 export function openMemorySettings(): void {
-  useUiStore.getState().setSettingsPage('memory')
-  useUiStore.getState().setActiveView('settings')
+  openSettingsOverlay('memory')
 }
 
 export function goSettingsPage(page: SettingsPageId): void {
-  useUiStore.getState().setSettingsPage(page)
-  useUiStore.getState().setActiveView('settings')
+  openSettingsOverlay(page)
 }
 
 export function setUseMemories(sessionId: string, on: boolean): void {

@@ -275,22 +275,24 @@ describe('buildGlobalCommandGroups', () => {
     expect(ctx.selectSession).toHaveBeenCalledWith('abc')
   })
 
-  it('runs setActiveView for navigation items', () => {
-    const ctx = makeCtx()
+  it('nav-settings uses openSettingsFromChrome when provided', () => {
+    const openSettingsFromChrome = vi.fn()
+    const ctx = makeCtx({ openSettingsFromChrome })
     const groups = buildGlobalCommandGroups(ctx)
     const settings = groups.flatMap((g) => g.items).find((i) => i.id === 'nav-settings')!
     settings.run?.()
-    expect(ctx.setSettingsPage).toHaveBeenCalledWith('general')
-    expect(ctx.setActiveView).toHaveBeenCalledWith('settings')
+    expect(openSettingsFromChrome).toHaveBeenCalled()
+    expect(ctx.setActiveView).not.toHaveBeenCalled()
   })
 
-  it('settings deep-link sets page and view', () => {
-    const ctx = makeCtx()
+  it('settings deep-link uses openSettingsOverlay(page)', () => {
+    const openSettingsOverlay = vi.fn()
+    const ctx = makeCtx({ openSettingsOverlay })
     const groups = buildGlobalCommandGroups(ctx)
-    const memory = groups.flatMap((g) => g.items).find((i) => i.id === 'settings-model')!
-    memory.run?.()
-    expect(ctx.setSettingsPage).toHaveBeenCalledWith('model')
-    expect(ctx.setActiveView).toHaveBeenCalledWith('settings')
+    const model = groups.flatMap((g) => g.items).find((i) => i.id === 'settings-model')!
+    model.run?.()
+    expect(openSettingsOverlay).toHaveBeenCalledWith('model')
+    expect(ctx.setActiveView).not.toHaveBeenCalled()
   })
 
   it('includes all settings pages when searching', () => {

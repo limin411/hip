@@ -1,11 +1,14 @@
 import { SettingsPanel } from './SettingsPanel'
 
 /**
- * 设置页内容容器 —— 标题在 MainToolbar；本组件仍不渲染头行。
+ * Settings body — shell Modal owns the title when shown as overlay.
  */
 export function SettingsPage() {
   return (
-    <div className="flex h-full min-h-0 flex-1 flex-col bg-surface">
+    <div
+      className="flex h-full min-h-0 flex-1 flex-col bg-surface"
+      data-testid="settings-page"
+    >
       <SettingsPanel />
     </div>
   )

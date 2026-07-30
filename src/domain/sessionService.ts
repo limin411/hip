@@ -1224,10 +1224,9 @@ export class SessionService {
    * Prefer this over account-menu + Radix nav when residual suite state is flaky.
    */
   openSettingsPageForE2e(page = 'general'): void {
-    // Clear utility shells before full-page Settings (same rule as chrome openers).
-    useUiStore.getState().setOverlay(null)
+    // Same store path as openSettingsOverlay (page always wins).
     useUiStore.getState().setSettingsPage(page as import('@/store/uiStore').SettingsPageId)
-    useUiStore.getState().setActiveView('settings')
+    useUiStore.getState().setOverlay('settings')
   }
 
   /** E2E: open Session History overlay shell. */

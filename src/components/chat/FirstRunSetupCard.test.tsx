@@ -64,12 +64,12 @@ describe('FirstRunSetupCard', () => {
     expect(screen.getByTestId('first-run-pick-folder')).toBeInTheDocument()
   })
 
-  it('open models CTA switches settings page', () => {
-    const setSettingsPage = vi.spyOn(uiStore.useUiStore.getState(), 'setSettingsPage')
-    const setActiveView = vi.spyOn(uiStore.useUiStore.getState(), 'setActiveView')
+  it('open models CTA opens settings overlay on model page', () => {
+    uiStore.useUiStore.setState({ settingsPage: 'general', overlay: null, activeView: 'chat' })
     render(<FirstRunSetupCard surface="chat" />)
     fireEvent.click(screen.getByTestId('first-run-add-key'))
-    expect(setSettingsPage).toHaveBeenCalledWith('model')
-    expect(setActiveView).toHaveBeenCalledWith('settings')
+    expect(uiStore.useUiStore.getState().settingsPage).toBe('model')
+    expect(uiStore.useUiStore.getState().overlay).toBe('settings')
+    expect(uiStore.useUiStore.getState().activeView).toBe('chat')
   })
 })

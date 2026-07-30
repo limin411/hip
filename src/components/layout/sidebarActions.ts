@@ -11,6 +11,7 @@ import { useWorkItemStore } from '@/store/workItemStore'
 import {
   useUiStore,
   type PlaceholderSidebarSection,
+  type SettingsPageId,
   type SidebarSection,
 } from '@/store/uiStore'
 import { recordNavEntry } from './navHistory'
@@ -247,23 +248,41 @@ export async function openSpaceFromSidebar(spaceId: string): Promise<void> {
   recordNavEntry()
 }
 
-export async function openSettingsFromChrome(): Promise<void> {
-  // Dismiss History/Trash shell before full-page Settings (no double-booking).
-  useUiStore.getState().setOverlay(null)
-  const view = useUiStore.getState().activeView
-  if (view === 'knowledge') {
-    await leaveKnowledge()
-    // Keep knowledge section so the rail does not snap to chats/projects.
-  } else if (view === 'tasks') {
-    await leaveWorkItems()
-    // Keep tasks section — same as opening Settings from chats/projects.
-    // Trash/history still reassign (interactive filters must not
-    // stay paired with those special mains).
+/**
+ * Canonical Settings open. All product entry points must call this (or a thin wrapper).
+ * Never setActiveView('settings').
+ *
+ * Param semantics (page always wins when provided):
+ * - If `page` is defined → setSettingsPage(page)
+ * - Else if opts?.resetToGeneral !== false → setSettingsPage('general')
+ * - Else → leave current settingsPage unchanged
+ *
+ * Intentional: do NOT leaveKnowledge / leaveWorkItems / recordNavEntry.
+ */
+export function openSettingsOverlay(
+  page?: SettingsPageId,
+  opts?: { resetToGeneral?: boolean },
+): void {
+  const ui = useUiStore.getState()
+  if (page != null) {
+    ui.setSettingsPage(page)
+  } else if (opts?.resetToGeneral !== false) {
+    ui.setSettingsPage('general')
   }
-  // Always land on General when opening Settings from chrome (not last-visited page).
-  useUiStore.getState().setSettingsPage('general')
-  useUiStore.getState().setActiveView('settings')
-  recordNavEntry()
+  ui.setOverlay('settings')
+}
+
+/**
+ * Footer / chrome toggle for Settings (re-click closes). Lands on General when opening.
+ * No leave-flush, no recordNavEntry.
+ */
+export function openSettingsFromChrome(): void {
+  const ui = useUiStore.getState()
+  if (ui.overlay === 'settings') {
+    ui.setOverlay(null)
+    return
+  }
+  openSettingsOverlay() // no page → General
 }
 
 /**

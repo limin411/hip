@@ -98,12 +98,18 @@ export async function applyNavEntry(entry: NavEntry): Promise<void> {
       await flushWorkItemsIfNeeded(true)
     }
 
-    // Legacy special-view frames: history/trash reopen as overlays over coerced surface.
-    // Settings stays full-page activeView until PR4.
-    if (entry.activeView === 'history' || entry.activeView === 'trash') {
+    // Legacy special-view frames: settings/history/trash reopen as overlays over coerced surface.
+    if (
+      entry.activeView === 'history' ||
+      entry.activeView === 'trash' ||
+      entry.activeView === 'settings'
+    ) {
       const surface = coerceUnderlyingFromEntry(entry)
       useUiStore.getState().setSidebarSection(surface.section)
       useUiStore.getState().setActiveView(surface.view)
+      if (entry.activeView === 'settings') {
+        useUiStore.getState().setSettingsPage(entry.settingsPage)
+      }
       if (entry.sessionId) {
         const exists = useDomainStore.getState().sessions.some((s) => s.id === entry.sessionId)
         if (exists) sessionService.selectSession(entry.sessionId)
@@ -118,10 +124,6 @@ export async function applyNavEntry(entry: NavEntry): Promise<void> {
     if (entry.activeView === 'knowledge') {
       await restoreKnowledge(entry.knowledgeSpaceId)
       return
-    }
-
-    if (entry.activeView === 'settings') {
-      useUiStore.getState().setSettingsPage(entry.settingsPage)
     }
 
     useUiStore.getState().setSidebarSection(entry.sidebarSection)

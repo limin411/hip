@@ -23,6 +23,7 @@ import {
   enterAutomationsSection,
   openHistoryFromChrome,
   openSettingsFromChrome,
+  openSettingsOverlay,
   openTrashFromChrome,
 } from '@/components/layout/sidebarActions'
 import { TERMINAL_MANAGEMENT } from '@/components/terminals/feature'
@@ -239,6 +240,7 @@ export function GlobalCommandPalette() {
       openHistoryFromChrome: () => void openHistoryFromChrome(),
       openTrashFromChrome: () => void openTrashFromChrome(),
       openSettingsFromChrome: () => void openSettingsFromChrome(),
+      openSettingsOverlay: (page) => openSettingsOverlay(page),
       enterKnowledge: () => void enterKnowledge(),
       openKnowledgeView: () => {
         openKnowledgeView()

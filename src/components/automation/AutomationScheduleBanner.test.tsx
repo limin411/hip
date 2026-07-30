@@ -16,12 +16,9 @@ vi.mock('@/store/hipConfigStore', () => {
   return { useHipConfigStore }
 })
 
-const setSettingsPage = vi.fn()
-const setActiveView = vi.fn()
-vi.mock('@/store/uiStore', () => ({
-  useUiStore: {
-    getState: () => ({ setSettingsPage, setActiveView }),
-  },
+const openSettingsOverlay = vi.fn()
+vi.mock('@/components/layout/sidebarActions', () => ({
+  openSettingsOverlay: (...args: unknown[]) => openSettingsOverlay(...args),
 }))
 
 import { AutomationScheduleBanner } from './AutomationScheduleBanner'
@@ -52,8 +49,7 @@ function manualAuto(): Automation {
 
 describe('AutomationScheduleBanner', () => {
   beforeEach(() => {
-    setSettingsPage.mockClear()
-    setActiveView.mockClear()
+    openSettingsOverlay.mockClear()
     windowCfg = { closeAction: 'quit', trayEnabled: false }
   })
 
@@ -81,11 +77,10 @@ describe('AutomationScheduleBanner', () => {
     expect(screen.queryByTestId('automation-schedule-banner')).not.toBeInTheDocument()
   })
 
-  it('open settings deep-links to window page', () => {
+  it('open settings deep-links to window page via overlay', () => {
     render(<AutomationScheduleBanner automations={[dailyAuto(true)]} />)
     fireEvent.click(screen.getByTestId('automation-banner-open-settings'))
-    expect(setSettingsPage).toHaveBeenCalledWith('window')
-    expect(setActiveView).toHaveBeenCalledWith('settings')
+    expect(openSettingsOverlay).toHaveBeenCalledWith('window')
   })
 
   it('uses needTrayDescWithLogin when launchAtLogin is off', () => {

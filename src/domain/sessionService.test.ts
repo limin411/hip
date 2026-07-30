@@ -1260,13 +1260,14 @@ describe('workspace diff', () => {
     expect(useCommandPaletteStore.getState().open).toBe(false)
   })
 
-  it('openSettingsPageForE2e sets activeView settings and settingsPage', () => {
-    useUiStore.setState({ activeView: 'chat', settingsPage: 'general' })
+  it('openSettingsPageForE2e sets overlay settings and settingsPage', () => {
+    useUiStore.setState({ activeView: 'chat', settingsPage: 'general', overlay: null })
     const t = new FakeTransport()
     const svc = new SessionService(t)
     svc.openSettingsPageForE2e('memory')
-    expect(useUiStore.getState().activeView).toBe('settings')
+    expect(useUiStore.getState().overlay).toBe('settings')
     expect(useUiStore.getState().settingsPage).toBe('memory')
+    expect(useUiStore.getState().activeView).toBe('chat')
   })
 
   it('openHistoryPageForE2e sets overlay history without activeView change', () => {

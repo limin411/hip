@@ -284,10 +284,10 @@ export function RecycleBinPage({
           className="text-accent-strong underline-offset-2 hover:underline"
           data-testid="recycle-bin-memory-settings-link"
           onClick={() => {
-            // Never leave trash overlay + settings main double-booked.
-            useUiStore.getState().setOverlay(null)
-            useUiStore.getState().setSettingsPage('memory')
-            useUiStore.getState().setActiveView('settings')
+            // Replace trash shell with settings overlay (memory page).
+            void import('@/components/layout/sidebarActions').then(
+              ({ openSettingsOverlay }) => openSettingsOverlay('memory'),
+            )
           }}
         >
           {t('trash.openMemorySettings')}

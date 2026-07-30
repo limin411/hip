@@ -1,7 +1,7 @@
 import { useTranslation } from 'react-i18next'
 import { KeyRound, FolderOpen, MessageSquare, CheckCircle2 } from 'lucide-react'
+import { openSettingsOverlay } from '@/components/layout/sidebarActions'
 import { useProvidersStore } from '@/store/providersStore'
-import { useUiStore } from '@/store/uiStore'
 import { Button } from '@/components/ui/Button'
 import { pickDirectory } from '@/ipc/dialog'
 import { useDraftStore } from '@/store/draftStore'
@@ -21,8 +21,7 @@ export function FirstRunSetupCard({ surface }: { surface: 'chat' | 'code' }) {
   if (!loaded || hasKey) return null
 
   const openModels = () => {
-    useUiStore.getState().setSettingsPage('model')
-    useUiStore.getState().setActiveView('settings')
+    openSettingsOverlay('model')
   }
 
   const pickFolder = async () => {

@@ -33,18 +33,15 @@ export function MainToolbar() {
   const isMac = isMacPlatform()
 
   // Terminals keeps MainToolbar panel chrome (right-rail toggle) like chat/code/knowledge.
-  // tasks / automation / settings stay chrome-light. History/trash are overlays (not special mains).
+  // tasks / automation stay chrome-light. Settings/history/trash are overlays (not special mains).
   const isSpecial =
-    activeView === 'settings' ||
     activeView === 'automation' ||
     activeView === 'tasks'
   const showPanelChrome = !isSpecial
   const showSidebarExpand = !sidebarOpen
 
   let title = ''
-  if (activeView === 'settings') {
-    title = t('settings.title')
-  } else if (activeView === 'automation') {
+  if (activeView === 'automation') {
     title = t('sidebar.nav.automation')
   } else if (activeView === 'terminals') {
     title = t('sidebar.nav.terminals')

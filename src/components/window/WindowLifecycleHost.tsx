@@ -18,6 +18,7 @@ import {
   windowExitHideInstead,
   windowForceQuit,
 } from '@/ipc/windowPolicy'
+import { openSettingsOverlay } from '@/components/layout/sidebarActions'
 import { useUiStore } from '@/store/uiStore'
 import { Modal } from '@/components/ui/Modal'
 import { Button } from '@/components/ui/Button'
@@ -66,7 +67,7 @@ export function WindowLifecycleHost() {
         })
         const u4 = await listenOpenSettings(() => {
           if (cancelled) return
-          useUiStore.getState().setActiveView('settings')
+          openSettingsOverlay() // tray/menu → General
         })
         if (cancelled) {
           u1()

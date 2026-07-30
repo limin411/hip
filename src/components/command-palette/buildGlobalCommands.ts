@@ -119,6 +119,8 @@ export type GlobalCommandContext = {
   openHistoryFromChrome?: () => void | Promise<void>
   openTrashFromChrome?: () => void | Promise<void>
   openSettingsFromChrome?: () => void | Promise<void>
+  /** Canonical Settings overlay open (page wins when provided). */
+  openSettingsOverlay?: (page?: SettingsPageId) => void
   enterKnowledge?: () => void | Promise<void>
   /** Open knowledge surface (chip + activeView). Fallback when enterKnowledge missing. */
   openKnowledgeView?: () => void
@@ -260,8 +262,15 @@ function buildSettingsCommands(
     ],
     group: 'workspace' as const,
     run: () => {
-      ctx.setSettingsPage(page)
-      ctx.setActiveView('settings')
+      if (ctx.openSettingsOverlay) {
+        ctx.openSettingsOverlay(page)
+      } else {
+        // Fallback without chrome helper: same store path as openSettingsOverlay.
+        void import('@/store/uiStore').then(({ useUiStore }) => {
+          useUiStore.getState().setSettingsPage(page)
+          useUiStore.getState().setOverlay('settings')
+        })
+      }
     },
   }))
 }
@@ -395,13 +404,12 @@ export function buildGlobalCommandGroups(
       group: 'navigation',
       run: () => {
         if (ctx.openSettingsFromChrome) void ctx.openSettingsFromChrome()
+        else if (ctx.openSettingsOverlay) ctx.openSettingsOverlay()
         else {
-          // Full-page Settings: dismiss any History/Trash shell first.
           void import('@/store/uiStore').then(({ useUiStore }) => {
-            useUiStore.getState().setOverlay(null)
+            useUiStore.getState().setSettingsPage('general')
+            useUiStore.getState().setOverlay('settings')
           })
-          ctx.setSettingsPage('general')
-          ctx.setActiveView('settings')
         }
       },
     },

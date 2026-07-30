@@ -75,7 +75,7 @@ describe('MainToolbar', () => {
     expect(screen.getByTestId('main-toolbar-title')).toHaveTextContent('My Session')
   })
 
-  it('settings: no back, shows title, hides connection and panel', () => {
+  it('settings residual activeView is not special toolbar chrome', () => {
     useUiStore.setState({
       activeView: 'settings',
       previousView: 'chat',
@@ -83,19 +83,15 @@ describe('MainToolbar', () => {
     })
     render(<MainToolbar />)
     expect(screen.queryByTestId('main-toolbar-back')).not.toBeInTheDocument()
-    expect(screen.getByTestId('main-toolbar-title')).toBeInTheDocument()
-    expect(screen.queryByTestId('connection-status')).not.toBeInTheDocument()
-    expect(screen.queryByTestId('toggle-panel')).not.toBeInTheDocument()
+    expect(screen.getByTestId('connection-status')).toBeInTheDocument()
   })
 
-  it('history/trash are no longer special toolbar chrome (overlays own title)', () => {
-    // Residual activeView history is not treated as special; work-surface chrome shows.
+  it('history residual activeView is not special toolbar chrome', () => {
     useUiStore.setState({
       activeView: 'history',
       previousView: 'chat',
     })
     render(<MainToolbar />)
-    expect(screen.queryByTestId('main-toolbar-back')).not.toBeInTheDocument()
     // Falls through to new-conversation title path (no active session).
     expect(screen.getByTestId('connection-status')).toBeInTheDocument()
   })

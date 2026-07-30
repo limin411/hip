@@ -93,11 +93,20 @@ describe('AppLayout', () => {
     expect(screen.getByTestId('knowledge-page')).toBeInTheDocument()
   })
 
-  it('renders settings view with main toolbar', () => {
-    useUiStore.setState({ activeView: 'settings' })
+  it('does not render settings as main content when activeView is settings', () => {
+    // Settings is an overlay shell; residual activeView settings is not a main branch.
+    useUiStore.setState({ activeView: 'settings', overlay: null })
+    render(<AppLayout />, { wrapper: MemoryRouter })
+    expect(screen.queryByTestId('settings-page')).not.toBeInTheDocument()
+    expect(screen.getByTestId('main-toolbar')).toBeInTheDocument()
+  })
+
+  it('renders settings via OverlayShellHost when overlay is settings', () => {
+    useUiStore.setState({ activeView: 'chat', overlay: 'settings' })
     render(<AppLayout />, { wrapper: MemoryRouter })
     expect(screen.getByTestId('settings-page')).toBeInTheDocument()
-    expect(screen.getByTestId('main-toolbar')).toBeInTheDocument()
+    // Underlying work surface stays chat
+    expect(screen.getByTestId('new-conversation')).toBeInTheDocument()
   })
 
 

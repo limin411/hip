@@ -1,11 +1,12 @@
 /**
- * L1 host for History / Trash (and later Settings) overlay shells.
+ * L1 host for History / Trash / Settings overlay shells.
  * Mounted in AppLayout next to SessionMenuDialogHost.
  */
 import { useTranslation } from 'react-i18next'
 import { Modal } from '@/components/ui/Modal'
 import { SessionHistory } from '@/components/history/SessionHistory'
 import { RecycleBinPage } from '@/components/history/RecycleBinPage'
+import { SettingsPage } from '@/components/account/SettingsPage'
 import { FLOOR, shellSize } from '@/lib/shellViewport'
 import { useUiStore } from '@/store/uiStore'
 
@@ -13,7 +14,9 @@ export function OverlayShellHost() {
   const overlay = useUiStore((s) => s.overlay)
   const { t } = useTranslation()
 
-  if (overlay !== 'history' && overlay !== 'trash') return null
+  if (overlay !== 'history' && overlay !== 'trash' && overlay !== 'settings') {
+    return null
+  }
 
   const onOpenChange = (open: boolean) => {
     if (!open) useUiStore.getState().setOverlay(null)
@@ -50,22 +53,45 @@ export function OverlayShellHost() {
     )
   }
 
+  if (overlay === 'trash') {
+    return (
+      <Modal
+        variant="shell"
+        open
+        onOpenChange={onOpenChange}
+        title={t('trash.title')}
+        resizable
+        defaultSize={defaultSize}
+        minSize={minSize}
+        storageKey="overlay-shell-trash"
+      >
+        <div
+          data-testid="overlay-shell-trash"
+          className="flex min-h-0 flex-1 flex-col"
+        >
+          <RecycleBinPage embeddedInShell />
+        </div>
+      </Modal>
+    )
+  }
+
+  // settings — scrim dismiss allowed (onOpenChange false)
   return (
     <Modal
       variant="shell"
       open
       onOpenChange={onOpenChange}
-      title={t('trash.title')}
+      title={t('settings.title')}
       resizable
       defaultSize={defaultSize}
       minSize={minSize}
-      storageKey="overlay-shell-trash"
+      storageKey="overlay-shell-settings"
     >
       <div
-        data-testid="overlay-shell-trash"
+        data-testid="overlay-shell-settings"
         className="flex min-h-0 flex-1 flex-col"
       >
-        <RecycleBinPage embeddedInShell />
+        <SettingsPage />
       </div>
     </Modal>
   )

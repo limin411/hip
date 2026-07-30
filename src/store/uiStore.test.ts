@@ -212,11 +212,12 @@ describe('uiStore - overlay', () => {
     expect(useUiStore.getState().activeView).toBe('chat')
   })
 
-  it('setActiveView(settings) clears any open utility overlay', () => {
+  it('setActiveView(settings) does not clear overlay (settings is overlay-only path)', () => {
+    // Residual setActiveView('settings') no longer dismisses utility shells (PR4).
     useUiStore.setState({ activeView: 'chat', overlay: 'trash' })
     useUiStore.getState().setActiveView('settings')
     expect(useUiStore.getState().activeView).toBe('settings')
-    expect(useUiStore.getState().overlay).toBeNull()
+    expect(useUiStore.getState().overlay).toBe('trash')
   })
 })
 

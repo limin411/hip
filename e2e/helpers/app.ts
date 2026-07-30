@@ -70,12 +70,14 @@ export async function leaveSpecialViewsIfOpen(): Promise<void> {
     const trashPage = await browser.$('[data-testid="recycle-bin-page"]')
     const historyShell = await browser.$('[data-testid="overlay-shell-history"]')
     const trashShell = await browser.$('[data-testid="overlay-shell-trash"]')
+    const settingsShell = await browser.$('[data-testid="overlay-shell-settings"]')
     if (
       !(await settingsPage.isExisting()) &&
       !(await historyPage.isExisting()) &&
       !(await trashPage.isExisting()) &&
       !(await historyShell.isExisting()) &&
-      !(await trashShell.isExisting())
+      !(await trashShell.isExisting()) &&
+      !(await settingsShell.isExisting())
     ) {
       break
     }
@@ -103,12 +105,14 @@ export async function leaveSpecialViewsIfOpen(): Promise<void> {
       const trashPage = await browser.$('[data-testid="recycle-bin-page"]')
       const historyShell = await browser.$('[data-testid="overlay-shell-history"]')
       const trashShell = await browser.$('[data-testid="overlay-shell-trash"]')
+      const settingsShell = await browser.$('[data-testid="overlay-shell-settings"]')
       return (
         !(await settingsPage.isExisting()) &&
         !(await historyPage.isExisting()) &&
         !(await trashPage.isExisting()) &&
         !(await historyShell.isExisting()) &&
-        !(await trashShell.isExisting())
+        !(await trashShell.isExisting()) &&
+        !(await settingsShell.isExisting())
       )
     },
     { timeout: 10000, interval: 200, timeoutMsg: 'still on settings/history/trash after leaveSpecialViewsIfOpen' },

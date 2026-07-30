@@ -2,8 +2,8 @@ import { useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { ActionBanner } from '@/components/ui/ActionBanner'
 import { Button } from '@/components/ui/Button'
+import { openSettingsOverlay } from '@/components/layout/sidebarActions'
 import { useHipConfigStore } from '@/store/hipConfigStore'
-import { useUiStore } from '@/store/uiStore'
 import {
   resolveCloseAction,
   resolveTrayEnabled,
@@ -42,8 +42,7 @@ export function AutomationScheduleBanner({ automations }: AutomationScheduleBann
   if (dismissed || !hasScheduledEnabled || !unfavorable) return null
 
   const openWindowSettings = () => {
-    useUiStore.getState().setSettingsPage('window')
-    useUiStore.getState().setActiveView('settings')
+    openSettingsOverlay('window')
   }
 
   // Prefer the fuller copy when login-at-start is also off (common default).

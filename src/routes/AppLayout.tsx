@@ -17,7 +17,6 @@ import { PreviewPanel } from '@/components/artifact/PreviewPanel'
 import { AppSidebar } from '@/components/layout/AppSidebar'
 import { MainToolbar } from '@/components/layout/MainToolbar'
 import { PlaceholderPage } from '@/components/layout/PlaceholderPage'
-import { SettingsPage } from '@/components/account/SettingsPage'
 import { KnowledgePage } from '@/components/knowledge/KnowledgePage'
 import { OverlayShellHost } from '@/components/layout/OverlayShellHost'
 import { KnowledgeOutlinePanel } from '@/components/knowledge/KnowledgeOutlinePanel'
@@ -169,8 +168,7 @@ export function AppLayout() {
   }
 
   const renderMainContent = () => {
-    // History / Trash are overlay shells (OverlayShellHost); not main column.
-    if (activeView === 'settings') return <SettingsPage />
+    // Settings / History / Trash are overlay shells (OverlayShellHost); not main column.
     if (activeView === 'knowledge') return <KnowledgePage />
     if (activeView === 'terminals') {
       if (TERMINAL_MANAGEMENT) {

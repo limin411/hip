@@ -88,8 +88,9 @@ describe('navHistory helpers', () => {
     selectSpy.mockRestore()
   })
 
-  it('applyNavEntry sets settings without selecting a session', async () => {
+  it('applyNavEntry legacy settings frame reopens as overlay over work surface', async () => {
     const selectSpy = vi.spyOn(sessionService, 'selectSession').mockImplementation(() => {})
+    useUiStore.setState({ activeView: 'chat', sidebarSection: 'chats', overlay: null })
     const entry: NavEntry = {
       ...captureNavEntry(),
       activeView: 'settings',
@@ -98,8 +99,10 @@ describe('navHistory helpers', () => {
       sessionId: null,
     }
     await applyNavEntry(entry)
-    expect(useUiStore.getState().activeView).toBe('settings')
+    expect(useUiStore.getState().overlay).toBe('settings')
     expect(useUiStore.getState().settingsPage).toBe('model')
+    // Work surface under overlay — not activeView settings
+    expect(useUiStore.getState().activeView).toBe('chat')
     expect(selectSpy).not.toHaveBeenCalled()
     expect(useNavHistoryStore.getState().applying).toBe(false)
     selectSpy.mockRestore()

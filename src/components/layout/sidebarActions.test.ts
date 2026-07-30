@@ -75,6 +75,7 @@ import {
   openHistoryFromChrome,
   openHistoryOverlay,
   openSettingsFromChrome,
+  openSettingsOverlay,
   openTrashFromChrome,
   openTrashOverlay,
   selectSessionFromSidebar,
@@ -240,7 +241,7 @@ describe('sidebarActions', () => {
     expect(useUiStore.getState().sidebarSection).toBe('automation')
   })
 
-  it('openSettingsFromChrome flushes knowledge and keeps knowledge section', async () => {
+  it('openSettingsFromChrome opens overlay on General without leave-flush', () => {
     useDomainStore.setState({
       sessions: [
         {
@@ -260,14 +261,34 @@ describe('sidebarActions', () => {
       activeView: 'knowledge',
       sidebarSection: 'knowledge',
       settingsPage: 'model',
+      overlay: null,
     })
-    await openSettingsFromChrome()
-    expect(flushSave).toHaveBeenCalled()
-    expect(useUiStore.getState().activeView).toBe('settings')
+    openSettingsFromChrome()
+    expect(flushSave).not.toHaveBeenCalled()
+    expect(useUiStore.getState().activeView).toBe('knowledge')
     expect(useUiStore.getState().settingsPage).toBe('general')
-    expect(useUiStore.getState().previousView).toBe('knowledge')
-    // Settings preserves content section (unlike trash/history).
+    expect(useUiStore.getState().overlay).toBe('settings')
+    // Settings preserves content section (work surface stays mounted).
     expect(useUiStore.getState().sidebarSection).toBe('knowledge')
+  })
+
+  it('openSettingsOverlay(page) sets page and opens settings overlay', () => {
+    useUiStore.setState({
+      activeView: 'chat',
+      settingsPage: 'general',
+      overlay: null,
+    })
+    openSettingsOverlay('memory')
+    expect(useUiStore.getState().settingsPage).toBe('memory')
+    expect(useUiStore.getState().overlay).toBe('settings')
+    expect(useUiStore.getState().activeView).toBe('chat')
+  })
+
+  it('openSettingsOverlay() without page resets to general', () => {
+    useUiStore.setState({ settingsPage: 'model', overlay: null })
+    openSettingsOverlay()
+    expect(useUiStore.getState().settingsPage).toBe('general')
+    expect(useUiStore.getState().overlay).toBe('settings')
   })
 
   it('openHistoryOverlay does not leave knowledge / change activeView', () => {
@@ -364,25 +385,32 @@ describe('sidebarActions', () => {
     expect(useWorkItemViewStore.getState().viewMode).toBe('calendar')
   })
 
-  it('openSettingsFromChrome flushes work items and keeps tasks section', async () => {
-    useUiStore.setState({ activeView: 'tasks', sidebarSection: 'tasks' })
-    await openSettingsFromChrome()
-    expect(workItemFlushSave).toHaveBeenCalled()
-    expect(useUiStore.getState().activeView).toBe('settings')
+  it('openSettingsFromChrome does not flush work items; keeps tasks section', () => {
+    useUiStore.setState({ activeView: 'tasks', sidebarSection: 'tasks', overlay: null })
+    openSettingsFromChrome()
+    expect(workItemFlushSave).not.toHaveBeenCalled()
+    expect(useUiStore.getState().activeView).toBe('tasks')
+    expect(useUiStore.getState().overlay).toBe('settings')
     // Keep tasks rail highlight; do not snap to chats/projects.
     expect(useUiStore.getState().sidebarSection).toBe('tasks')
   })
 
-  it('openSettingsFromChrome clears trash/history overlay before full-page settings', async () => {
+  it('openSettingsFromChrome replaces trash/history overlay with settings', () => {
     useUiStore.setState({
       activeView: 'chat',
       sidebarSection: 'chats',
       overlay: 'trash',
     })
-    await openSettingsFromChrome()
-    expect(useUiStore.getState().overlay).toBeNull()
-    expect(useUiStore.getState().activeView).toBe('settings')
+    openSettingsFromChrome()
+    expect(useUiStore.getState().overlay).toBe('settings')
+    expect(useUiStore.getState().activeView).toBe('chat')
     expect(useUiStore.getState().settingsPage).toBe('general')
+  })
+
+  it('openSettingsFromChrome toggles closed when settings already open', () => {
+    useUiStore.setState({ overlay: 'settings', activeView: 'chat' })
+    openSettingsFromChrome()
+    expect(useUiStore.getState().overlay).toBeNull()
   })
 
   it('enterWorkItemsSection restores tasks view from trash', async () => {

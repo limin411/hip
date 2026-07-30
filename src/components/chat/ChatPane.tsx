@@ -63,7 +63,6 @@ export function ChatPane() {
     planSlice.planApprovalPending,
     interrupt,
   )
-  const setActiveView = useUiStore((s) => s.setActiveView)
   const scrollTargetMessageId = useUiStore((s) => s.scrollTargetMessageId)
   const setScrollTarget = useUiStore((s) => s.setScrollTarget)
   const bottomRef = useRef<HTMLDivElement>(null)
@@ -546,7 +545,11 @@ export function ChatPane() {
                   <Button
                     variant="primary"
                     size="sm"
-                    onClick={() => setActiveView('settings')}
+                    onClick={() => {
+                      void import('@/components/layout/sidebarActions').then(
+                        ({ openSettingsOverlay: open }) => open('model'),
+                      )
+                    }}
                   >
                     {t('chat.openSettings')}
                   </Button>

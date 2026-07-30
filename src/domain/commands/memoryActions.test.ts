@@ -25,10 +25,11 @@ describe('memoryActions', () => {
     useDomainStore.setState({ sessions: [], activeSessionId: null })
   })
 
-  it('openMemorySettings switches settings page and view', () => {
+  it('openMemorySettings opens settings overlay on memory page', () => {
     openMemorySettings()
     expect(useUiStore.getState().settingsPage).toBe('memory')
-    expect(useUiStore.getState().activeView).toBe('settings')
+    expect(useUiStore.getState().overlay).toBe('settings')
+    expect(useUiStore.getState().activeView).toBe('chat')
   })
 
   it('setUseMemories forwards to sessionService', () => {

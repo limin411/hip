@@ -2454,11 +2454,12 @@ export const ko = {
     },
     "board": {
       "untitled": "제목 없는 화이트보드",
+      "titleLabel": "화이트보드 제목",
       "loading": "화이트보드 로딩 중…",
       "loadFailed": "화이트보드를 불러올 수 없습니다",
       "pendingImageDropped": "이미지 가져오기가 진행 중이어서 저장되지 않았습니다.",
       "placeholderTitle": "화이트보드",
-      "placeholderHint": "화이트보드는 다음 PR에서 로드됩니다"
+      "placeholderHint": "그리기 캔버스는 향후 업데이트에서 제공됩니다."
     },
     "export": {
       "doc": "문서 내보내기…",
@@ -2534,14 +2535,15 @@ export const ko = {
     },
     "workspace": {
       "new": "새로 만들기",
-      "noDocTitle": "선택된 문서 없음",
-      "noDocHint": "트리에서 문서를 선택하거나 새 문서를 만드세요."
+      "noDocTitle": "선택된 페이지 없음",
+      "noDocHint": "트리에서 문서나 화이트보드를 선택하거나 새로 만드세요."
     },
     "outline": {
       "title": "개요",
       "empty": "이 문서에 제목이 없습니다",
       "untitled": "제목 없는 제목",
       "noDoc": "문서를 선택하면 개요를 볼 수 있습니다",
+        "noBoard": "화이트보드에는 개요가 없습니다",
       "count": "제목 {{count}}개",
       "count_one": "제목 {{count}}개",
       "sectionOutline": "개요",
@@ -2891,6 +2893,7 @@ export const ko = {
     "navKnowledge": "지식 베이스",
     "knowledgeHome": "지식 홈",
     "knowledgeNewDoc": "새 지식 문서",
+    "knowledgeNewBoard": "새 지식 화이트보드",
     "knowledgeIndexing": "검색 색인 구축 중…",
     "knowledgeNeedSpace": "먼저 지식 공간을 열어주세요",
     "actions": {

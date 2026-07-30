@@ -15,6 +15,13 @@ export interface EmptyStateProps {
   action?: {
     label: string
     onClick: () => void
+    'data-testid'?: string
+  }
+  /** Optional second CTA under the primary action (e.g. New Whiteboard). */
+  secondaryAction?: {
+    label: string
+    onClick: () => void
+    'data-testid'?: string
   }
   /**
    * Call-site brand media (e.g. `<HipLogo size={32} decorative />`).
@@ -31,6 +38,7 @@ export function EmptyState({
   title,
   description,
   action,
+  secondaryAction,
   children,
   className,
   'data-testid': testId,
@@ -50,10 +58,29 @@ export function EmptyState({
       {description && (
         <div className="mt-1.5 max-w-xs text-meta leading-relaxed text-ink-secondary">{description}</div>
       )}
-      {action && (
-        <Button variant="secondary" size="sm" className="mt-5" onClick={action.onClick}>
-          {action.label}
-        </Button>
+      {(action || secondaryAction) && (
+        <div className="mt-5 flex flex-col items-center gap-2">
+          {action && (
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={action.onClick}
+              data-testid={action['data-testid']}
+            >
+              {action.label}
+            </Button>
+          )}
+          {secondaryAction && (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={secondaryAction.onClick}
+              data-testid={secondaryAction['data-testid']}
+            >
+              {secondaryAction.label}
+            </Button>
+          )}
+        </div>
       )}
     </div>
   )

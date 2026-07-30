@@ -41,6 +41,32 @@ describe('KnowledgeOutlinePanel', () => {
     expect(screen.getByTestId('knowledge-doc-outline-no-doc')).toBeInTheDocument()
   })
 
+  it('shows whiteboard empty state and skips markdown outline parse for boards', () => {
+    useKnowledgeStore.setState({
+      activeDocId: 'brd_board000001',
+      nodes: [
+        {
+          id: 'brd_board000001',
+          parentId: null,
+          kind: 'board',
+          title: 'Arch',
+          order: 0,
+          createdAt: 1,
+          updatedAt: 1,
+        },
+      ],
+      draftBody: '{"type":"excalidraw","elements":[]}',
+      docBody: '{"type":"excalidraw","elements":[]}',
+      backlinks: [],
+      outboundLinks: [],
+      linkPanelStatus: 'idle',
+    })
+    render(<KnowledgeOutlinePanel />)
+    expect(screen.getByTestId('knowledge-outline-board-empty')).toBeInTheDocument()
+    expect(screen.queryByTestId('knowledge-outline-section')).toBeNull()
+    expect(screen.queryByTestId('knowledge-doc-outline')).toBeNull()
+  })
+
   it('renders outline items and requests jump on click', () => {
     const requestOutlineJump = vi.fn()
     useKnowledgeStore.setState({

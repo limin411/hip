@@ -2496,6 +2496,7 @@ export const zhCN = {
       },
       board: {
         untitled: '未命名画板',
+        titleLabel: '画板标题',
         loading: '正在加载画板…',
         loadFailed: '无法加载画板',
         pendingImageDropped: '有图片仍在导入，未能保存。',
@@ -2576,14 +2577,15 @@ export const zhCN = {
       },
       workspace: {
         new: '新建',
-        noDocTitle: '未选择文档',
-        noDocHint: '在左侧树中选择文档，或新建一篇。',
+        noDocTitle: '未选择页面',
+        noDocHint: '在左侧树中选择文档或画板，或新建一篇。',
       },
       outline: {
         title: '目录',
         empty: '本文档暂无标题',
         untitled: '未命名标题',
         noDoc: '选择文档以查看目录',
+        noBoard: '画板没有大纲',
         count: '{{count}} 个标题',
         count_one: '{{count}} 个标题',
         sectionOutline: '大纲',
@@ -2934,6 +2936,7 @@ export const zhCN = {
       navKnowledge: '知识库',
       knowledgeHome: '知识库首页',
       knowledgeNewDoc: '新建知识库文档',
+      knowledgeNewBoard: '新建知识库画板',
       knowledgeIndexing: '搜索索引构建中…',
       knowledgeNeedSpace: '请先打开一个知识空间',
       actions: {

@@ -2556,11 +2556,12 @@ export const en = {
       },
       board: {
         untitled: 'Untitled whiteboard',
+        titleLabel: 'Whiteboard title',
         loading: 'Loading whiteboard…',
         loadFailed: 'Could not load whiteboard',
         pendingImageDropped: 'An image was still importing and was not saved.',
         placeholderTitle: 'Whiteboard',
-        placeholderHint: 'Whiteboard loading in next PR',
+        placeholderHint: 'Drawing canvas arrives in an upcoming update.',
       },
       export: {
         doc: 'Export document…',
@@ -2637,14 +2638,15 @@ export const en = {
       },
       workspace: {
         new: 'New',
-        noDocTitle: 'No document selected',
-        noDocHint: 'Choose a document in the tree, or create a new one.',
+        noDocTitle: 'No page selected',
+        noDocHint: 'Choose a document or whiteboard in the tree, or create a new one.',
       },
       outline: {
         title: 'Outline',
         empty: 'No headings in this document',
         untitled: 'Untitled heading',
         noDoc: 'Select a document to see its outline',
+        noBoard: 'No outline for whiteboards',
         count: '{{count}} headings',
         count_one: '{{count}} heading',
         sectionOutline: 'Outline',
@@ -3001,6 +3003,7 @@ export const en = {
       navKnowledge: 'Knowledge base',
       knowledgeHome: 'Knowledge home',
       knowledgeNewDoc: 'New knowledge document',
+      knowledgeNewBoard: 'New knowledge whiteboard',
       knowledgeIndexing: 'Search index is building…',
       knowledgeNeedSpace: 'Open a knowledge space first',
       actions: {

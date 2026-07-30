@@ -9,7 +9,6 @@ import {
   History,
   MoreHorizontal,
   Network,
-  PencilRuler,
   Search,
 } from 'lucide-react'
 import { toast } from 'sonner'
@@ -211,12 +210,19 @@ export function KnowledgeWorkspace() {
   }, [treeFilter, visibleIds, nodes, filterExpandSnapshot])
 
   // Best-effort scroll-to-match after opening a search hit (`pendingReveal`).
+  // Boards are title-only in search — never run Milkdown/CM reveal (Issue 18).
   useEffect(() => {
     if (!activeDocId || !activeSpaceId) return
     const pending = useKnowledgeStore.getState().pendingReveal
     if (!pending?.query) return
-    // Only reveal when the pending target is still the active doc.
+    // Only reveal when the pending target is still the active leaf.
     if (pending.spaceId !== activeSpaceId || pending.docId !== activeDocId) return
+
+    const leaf = useKnowledgeStore.getState().nodes.find((n) => n.id === activeDocId)
+    if (leaf?.kind === 'board') {
+      useKnowledgeStore.getState().clearPendingReveal()
+      return
+    }
 
     let cancelled = false
     let attempts = 0
@@ -277,19 +283,24 @@ export function KnowledgeWorkspace() {
       cancelled = true
       if (timeoutId != null) clearTimeout(timeoutId)
     }
-  }, [activeDocId, activeSpaceId, editorMode, docBody])
+  }, [activeDocId, activeSpaceId, editorMode, docBody, nodes])
 
   // Ensure expand-persist is not left suspended if the workspace unmounts mid-filter.
   useEffect(() => {
     return () => setExpandPersistSuspended(false)
   }, [])
 
-  // Outline (AppLayout right rail) → scroll Live / Source.
+  // Outline (AppLayout right rail) → scroll Live / Source (docs only).
   const pendingOutlineJump = useKnowledgeStore((s) => s.pendingOutlineJump)
   useEffect(() => {
     if (!pendingOutlineJump || !activeDocId) return
-    const item = pendingOutlineJump
     const clear = () => useKnowledgeStore.getState().clearPendingOutlineJump()
+    const leaf = useKnowledgeStore.getState().nodes.find((n) => n.id === activeDocId)
+    if (leaf?.kind === 'board') {
+      clear()
+      return
+    }
+    const item = pendingOutlineJump
 
     if (editorMode === 'source') {
       const view = editorRef.current?.getView()
@@ -313,7 +324,7 @@ export function KnowledgeWorkspace() {
     }
     revealHeadingInRoot(liveRoot, item.text, occurrence)
     clear()
-  }, [pendingOutlineJump, activeDocId, editorMode])
+  }, [pendingOutlineJump, activeDocId, editorMode, nodes])
 
   const [nodeEdit, setNodeEdit] = useState<KnowledgeNode | null>(null)
   const [nodeTitle, setNodeTitle] = useState('')
@@ -812,8 +823,7 @@ export function KnowledgeWorkspace() {
                     return
                   }
                   if (node.kind === 'board') {
-                    // boards/ not yet in reveal_path allowlist as dedicated command;
-                    // reveal via space-relative path when IPC supports boards (PR-1 shell).
+                    // knowledge_reveal_path allows boards/ (same commit as UI shell).
                     void knowledgeRevealPath(
                       activeSpaceId,
                       `boards/${node.id}.excalidraw`,
@@ -1005,7 +1015,7 @@ export function KnowledgeWorkspace() {
           )}
         </div>
         {!activeDocId ? (
-          <div className="flex min-h-0 flex-1 flex-col items-center justify-center px-8 py-6">
+          <div className="flex min-h-0 flex-1 items-center justify-center px-8 py-6">
             <EmptyState
               tier="friendly"
               title={t('knowledge.workspace.noDocTitle')}
@@ -1015,20 +1025,14 @@ export function KnowledgeWorkspace() {
                 label: t('knowledge.tree.newDoc'),
                 onClick: () => newDoc(null),
               }}
+              secondaryAction={{
+                label: t('knowledge.tree.newBoard'),
+                onClick: () => newBoard(null),
+                'data-testid': 'knowledge-empty-new-board',
+              }}
             >
               <HipLogo size={32} decorative />
             </EmptyState>
-            <Button
-              type="button"
-              variant="ghost"
-              size="sm"
-              className="-mt-8"
-              data-testid="knowledge-empty-new-board"
-              onClick={() => newBoard(null)}
-            >
-              <PencilRuler size={14} className="mr-1.5" />
-              {t('knowledge.tree.newBoard')}
-            </Button>
           </div>
         ) : isBoard ? (
           <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
@@ -1037,26 +1041,18 @@ export function KnowledgeWorkspace() {
                 docId={activeDocId}
                 title={activeNode?.title ?? t('knowledge.board.untitled')}
                 onCommit={(title) => void renameNode(activeDocId, title)}
+                ariaLabel={t('knowledge.board.titleLabel')}
+                placeholder={t('knowledge.board.untitled')}
+                className="pt-1 pb-1 sm:pt-1 text-title"
               />
             </div>
-            <Suspense
-              fallback={
-                <div
-                  className="flex flex-1 items-center justify-center text-meta text-ink-tertiary"
-                  data-testid="knowledge-board-loading"
-                >
-                  {t('knowledge.board.loading')}
-                </div>
-              }
-            >
-              <KnowledgeBoardCanvas
-                ref={boardCanvasRef}
-                key={activeDocId}
-                boardId={activeDocId}
-                spaceId={activeSpaceId!}
-                initialJson={mountBoardJson}
-              />
-            </Suspense>
+            <KnowledgeBoardCanvas
+              ref={boardCanvasRef}
+              key={activeDocId}
+              boardId={activeDocId}
+              spaceId={activeSpaceId!}
+              initialJson={mountBoardJson}
+            />
           </div>
         ) : showLiveEditor ? (
           <div className="flex min-h-0 flex-1 flex-col overflow-hidden">

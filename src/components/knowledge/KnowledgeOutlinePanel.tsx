@@ -19,19 +19,23 @@ export function KnowledgeOutlinePanel() {
   const docBody = useKnowledgeStore((s) => s.docBody)
   const activeDocId = useKnowledgeStore((s) => s.activeDocId)
   const activeSpaceId = useKnowledgeStore((s) => s.activeSpaceId)
+  const nodes = useKnowledgeStore((s) => s.nodes)
   const backlinks = useKnowledgeStore((s) => s.backlinks)
   const outboundLinks = useKnowledgeStore((s) => s.outboundLinks)
   const linkPanelStatus = useKnowledgeStore((s) => s.linkPanelStatus)
   const requestOutlineJump = useKnowledgeStore((s) => s.requestOutlineJump)
   const openDoc = useKnowledgeStore((s) => s.openDoc)
 
+  const activeNode = activeDocId ? nodes.find((n) => n.id === activeDocId) : undefined
+  const isBoard = activeNode?.kind === 'board'
+
   const liveContent = draftBody || docBody
   const [content, setContent] = useState(liveContent)
   const prevDocIdRef = useRef(activeDocId)
   useEffect(() => {
-    if (!activeDocId) {
+    if (!activeDocId || isBoard) {
       setContent('')
-      prevDocIdRef.current = null
+      prevDocIdRef.current = isBoard ? activeDocId : null
       return
     }
     // Doc switch: paint outline immediately.
@@ -42,7 +46,7 @@ export function KnowledgeOutlinePanel() {
     }
     const id = window.setTimeout(() => setContent(liveContent), OUTLINE_BODY_DEBOUNCE_MS)
     return () => window.clearTimeout(id)
-  }, [liveContent, activeDocId])
+  }, [liveContent, activeDocId, isBoard])
 
   const openBacklink = async (fromDocId: string, fragment: string | null) => {
     await openDoc(fromDocId)
@@ -91,6 +95,14 @@ export function KnowledgeOutlinePanel() {
             role="status"
           >
             <p className="text-meta text-ink-tertiary">{t('knowledge.outline.noDoc')}</p>
+          </div>
+        ) : isBoard ? (
+          <div
+            className="flex h-full items-center justify-center px-4 py-8 text-center"
+            data-testid="knowledge-outline-board-empty"
+            role="status"
+          >
+            <p className="text-meta text-ink-tertiary">{t('knowledge.outline.noBoard')}</p>
           </div>
         ) : (
           <div className="flex flex-col gap-4 p-2 pb-6">

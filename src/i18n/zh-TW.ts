@@ -2461,11 +2461,12 @@ export const zhTW = {
     },
     "board": {
       "untitled": "未命名畫板",
+      "titleLabel": "畫板標題",
       "loading": "正在載入畫板…",
       "loadFailed": "無法載入畫板",
       "pendingImageDropped": "有圖片仍在匯入，未能儲存。",
       "placeholderTitle": "畫板",
-      "placeholderHint": "畫板將在後續版本載入"
+      "placeholderHint": "繪圖畫布將於後續版本提供。"
     },
     "export": {
       "doc": "匯出文件…",
@@ -2541,14 +2542,15 @@ export const zhTW = {
     },
     "workspace": {
       "new": "新增",
-      "noDocTitle": "未選擇文件",
-      "noDocHint": "在左側樹中選擇文件，或新增一篇。"
+      "noDocTitle": "未選擇頁面",
+      "noDocHint": "在左側樹中選擇文件或畫板，或新增一篇。"
     },
     "outline": {
       "title": "目錄",
       "empty": "此文件暫無標題",
       "untitled": "未命名標題",
       "noDoc": "選擇文件以查看目錄",
+        "noBoard": "畫板沒有大綱",
       "count": "{{count}} 個標題",
       "count_one": "{{count}} 個標題",
       "sectionOutline": "大綱",
@@ -2898,6 +2900,7 @@ export const zhTW = {
     "navKnowledge": "知識庫",
     "knowledgeHome": "知識庫首頁",
     "knowledgeNewDoc": "新增知識庫文件",
+    "knowledgeNewBoard": "新增知識庫畫板",
     "knowledgeIndexing": "搜尋索引建立中…",
     "knowledgeNeedSpace": "請先開啟一個知識空間",
     "actions": {

@@ -27,6 +27,7 @@ const labels: GlobalCommandLabels = {
   navKnowledge: 'Knowledge base',
   knowledgeHome: 'Knowledge home',
   knowledgeNewDoc: 'New knowledge document',
+  knowledgeNewBoard: 'New knowledge whiteboard',
   knowledgeIndexing: 'Search index is building…',
   knowledgeNeedSpace: 'Open a knowledge space first',
   actionNewConversation: 'New conversation',

@@ -2454,11 +2454,12 @@ export const ja = {
     },
     "board": {
       "untitled": "無題のホワイトボード",
+      "titleLabel": "ホワイトボードのタイトル",
       "loading": "ホワイトボードを読み込み中…",
       "loadFailed": "ホワイトボードを読み込めませんでした",
       "pendingImageDropped": "画像のインポート中のため保存されませんでした。",
       "placeholderTitle": "ホワイトボード",
-      "placeholderHint": "ホワイトボードは次のPRで読み込まれます"
+      "placeholderHint": "描画キャンバスは今後のアップデートで利用できます。"
     },
     "export": {
       "doc": "ドキュメントをエクスポート…",
@@ -2534,14 +2535,15 @@ export const ja = {
     },
     "workspace": {
       "new": "新規",
-      "noDocTitle": "ドキュメント未選択",
-      "noDocHint": "ツリーからドキュメントを選択するか、新規作成してください。"
+      "noDocTitle": "ページ未選択",
+      "noDocHint": "ツリーからドキュメントまたはホワイトボードを選択するか、新規作成してください。"
     },
     "outline": {
       "title": "アウトライン",
       "empty": "このドキュメントに見出しはありません",
       "untitled": "無題の見出し",
       "noDoc": "ドキュメントを選択するとアウトラインが表示されます",
+        "noBoard": "ホワイトボードにアウトラインはありません",
       "count": "{{count}} 見出し",
       "count_one": "{{count}} 見出し",
       "sectionOutline": "アウトライン",
@@ -2891,6 +2893,7 @@ export const ja = {
     "navKnowledge": "ナレッジベース",
     "knowledgeHome": "ナレッジホーム",
     "knowledgeNewDoc": "新しいナレッジ文書",
+    "knowledgeNewBoard": "新しいナレッジホワイトボード",
     "knowledgeIndexing": "検索インデックスを構築中…",
     "knowledgeNeedSpace": "先にナレッジスペースを開いてください",
     "actions": {

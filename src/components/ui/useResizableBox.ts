@@ -19,12 +19,29 @@ const DIR_SIGN: Record<ResizeDir, { sx: number; sy: number }> = {
 }
 
 function clampToViewport(s: Size, min: Size): Size {
+  if (typeof window === 'undefined') return s
   const maxW = Math.max(min.width, Math.round(window.innerWidth * 0.96))
   const maxH = Math.max(min.height, Math.round(window.innerHeight * 0.92))
   return {
     width: Math.max(min.width, Math.min(s.width, maxW)),
     height: Math.max(min.height, Math.min(s.height, maxH)),
   }
+}
+
+function readStoredSize(storageKey: string | undefined, defaultSize: Size, minSize: Size): Size {
+  let initial = defaultSize
+  if (storageKey && typeof window !== 'undefined') {
+    try {
+      const raw = localStorage.getItem(storageKey)
+      const parsed = raw ? JSON.parse(raw) : null
+      if (typeof parsed?.width === 'number' && typeof parsed?.height === 'number') {
+        initial = { width: parsed.width, height: parsed.height }
+      }
+    } catch {
+      /* ignore malformed storage */
+    }
+  }
+  return clampToViewport(initial, minSize)
 }
 
 interface Options {
@@ -35,8 +52,11 @@ interface Options {
 }
 
 export function useResizableBox({ enabled, defaultSize, minSize, storageKey }: Options) {
-  const [size, setSize] = useState<Size>(defaultSize)
-  const latest = useRef<Size>(defaultSize)
+  // Read storage + clamp on first paint so open does not flash defaultSize then jump.
+  const [size, setSize] = useState<Size>(() =>
+    enabled ? readStoredSize(storageKey, defaultSize, minSize) : defaultSize,
+  )
+  const latest = useRef<Size>(size)
   const drag = useRef<{ dir: ResizeDir; x: number; y: number; w: number; h: number } | null>(null)
   // Tear-down for an in-flight drag; held in a ref so the unmount effect can run it.
   const teardown = useRef<(() => void) | null>(null)
@@ -46,21 +66,10 @@ export function useResizableBox({ enabled, defaultSize, minSize, storageKey }: O
     setSize(s)
   }, [])
 
+  // Re-clamp when the box becomes enabled (e.g. window already resized since last open).
   useEffect(() => {
     if (!enabled) return
-    let initial = defaultSize
-    if (storageKey) {
-      try {
-        const raw = localStorage.getItem(storageKey)
-        const parsed = raw ? JSON.parse(raw) : null
-        if (typeof parsed?.width === 'number' && typeof parsed?.height === 'number') {
-          initial = { width: parsed.width, height: parsed.height }
-        }
-      } catch {
-        /* ignore malformed storage */
-      }
-    }
-    apply(clampToViewport(initial, minSize))
+    apply(readStoredSize(storageKey, defaultSize, minSize))
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [enabled])
 

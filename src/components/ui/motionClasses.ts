@@ -7,7 +7,11 @@
 export const overlayMotion =
   'data-[state=open]:animate-overlay-in data-[state=closed]:animate-overlay-out'
 
-/** Centered modal / dialog panel — scale + fade (no translate; safe with any centering). */
+/**
+ * Centered modal / dialog panel — scale + fade.
+ * Prefer inset + m-auto centering on the panel (not left/top 50% + -translate-*),
+ * so enter/exit scale never fights transform-based centering.
+ */
 export const modalMotion =
   'data-[state=open]:animate-modal-in data-[state=closed]:animate-modal-out'
 

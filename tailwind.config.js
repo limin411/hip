@@ -142,7 +142,8 @@ export default {
           from: { opacity: '1', translate: '0 0', scale: '1' },
           to: { opacity: '0', translate: '0 -4px', scale: '0.97' },
         },
-        // Modal: scale-only (safe with any centering technique).
+        // Modal: scale-only. Still pair with inset + m-auto centering (not -translate-*),
+        // so transform composition never flashes the panel off-center on open.
         'modal-in': {
           from: { opacity: '0', scale: '0.96' },
           to: { opacity: '1', scale: '1' },

@@ -87,14 +87,18 @@ export function Modal({
           )}
         />
         {/*
-          Content must NOT be full-viewport. A full-screen Content at z-50 sits above
-          portaled Popovers (wrapper often has z-index:auto) and steals day/today clicks
-          in DateField. Center the panel itself instead.
-          modalMotion uses scale (not translate) so -translate-x/y centering is preserved.
+          Content must NOT be full-viewport hit-target. A full-screen Content at z-50 sits
+          above portaled Popovers (wrapper often has z-index:auto) and steals day/today
+          clicks in DateField — keep the panel sized to its width/height (or h-fit).
+
+          Center with inset + m-auto, not left/top 50% + -translate-*. modalMotion animates
+          the individual `scale` property; combining that with transform-based centering
+          still flashes the panel to the bottom-right before snapping to center (same
+          class of bug as the command palette — see GlobalCommandPalette).
         */}
         <DialogPrimitive.Content
           className={cn(
-            'fixed left-1/2 top-1/2 z-50 flex max-h-[85vh] w-[calc(100vw-2rem)] -translate-x-1/2 -translate-y-1/2 flex-col overflow-hidden rounded-xl border border-border bg-surface shadow-overlay outline-none',
+            'fixed inset-0 z-50 m-auto flex h-fit max-h-[85vh] w-[calc(100vw-2rem)] flex-col overflow-hidden rounded-xl border border-border bg-surface shadow-overlay outline-none',
             modalMotion,
             !resizable && 'max-w-lg',
             className,

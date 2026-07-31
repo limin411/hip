@@ -15,8 +15,8 @@
     "windows": [
       {
         "title": "hip",
-        "width": 1450,
-        "height": 1000,
+        "width": 1600,
+        "height": 1100,
         "maximized": false,
         "acceptFirstMouse": true,
         "titleBarStyle": "Overlay",

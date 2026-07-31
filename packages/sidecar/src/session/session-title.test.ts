@@ -1,10 +1,15 @@
-import { describe, it, expect, beforeEach } from 'vitest'
+import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { AIMessage, type BaseMessage } from '@langchain/core/messages'
 import type { ServerMessage } from '@hip/protocol'
 import { Session, sanitizeTitle } from './session.js'
 import type { ModelRunner, ModelRunOptions } from './model-runner.js'
 import { openDatabase } from '../persistence/open.js'
 import { SessionStore } from '../persistence/store.js'
+import {
+  buildTitleSystemPrompt,
+  titleLanguageLabel,
+  type TitleGenerator,
+} from './title-generator.js'
 
 const cfg = { llmProvider: 'deepseek' as const, model: 'deepseek-chat', tools: [] }
 function store() { const { db, ftsEnabled } = openDatabase(':memory:'); return new SessionStore(db, ftsEnabled) }
@@ -35,6 +40,35 @@ describe('Session auto-title', () => {
     expect(st.getSession('s1')!.title).toBe('重命名与自动标题')
   })
 
+  it('passes session config language into the title generator', async () => {
+    st.insertSession({
+      id: 's-lang',
+      title: '新对话',
+      config: JSON.stringify({ ...cfg, language: 'ja' as const }),
+      createdAt: 1,
+      updatedAt: 1,
+    })
+    const gen = vi.fn<TitleGenerator>(async () => 'タイトル')
+    const sent: ServerMessage[] = []
+    await new Session(
+      's-lang',
+      { ...cfg, language: 'ja' },
+      undefined,
+      st,
+      gen,
+      undefined,
+      textRunner('reply'),
+    ).sendMessage('hello world', (m) => sent.push(m), 'u-1')
+    expect(gen).toHaveBeenCalledWith(
+      expect.objectContaining({
+        firstUserMessage: 'hello world',
+        language: 'ja',
+      }),
+    )
+    const titles = sent.filter((m) => m.type === 'session:title') as Extract<ServerMessage, { type: 'session:title' }>[]
+    expect(titles.at(-1)!.title).toBe('タイトル')
+  })
+
   it('does not overwrite a user-pinned title', async () => {
     st.setCustomTitle('s1', '我的标题')
     const sent: ServerMessage[] = []
@@ -50,3 +84,26 @@ describe('Session auto-title', () => {
     expect(sanitizeTitle('x'.repeat(50))).toHaveLength(40)
   })
 })
+
+describe('title language prompt', () => {
+  it('labels each app language', () => {
+    expect(titleLanguageLabel('en')).toContain('English')
+    expect(titleLanguageLabel('zh-CN')).toContain('Simplified Chinese')
+    expect(titleLanguageLabel('zh-TW')).toContain('Traditional Chinese')
+    expect(titleLanguageLabel('ja')).toContain('Japanese')
+    expect(titleLanguageLabel('ko')).toContain('Korean')
+  })
+
+  it('instructs the model to use app UI language, not message language', () => {
+    const p = buildTitleSystemPrompt('ko')
+    expect(p).toContain('Korean (ko)')
+    expect(p).toContain('ko')
+    expect(p).toMatch(/app UI language/i)
+    expect(p).not.toMatch(/same language as the user/i)
+  })
+
+  it('defaults prompt language to English', () => {
+    expect(buildTitleSystemPrompt()).toContain('English (en)')
+  })
+})
+

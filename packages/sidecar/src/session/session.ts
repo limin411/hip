@@ -305,6 +305,7 @@ export class Session {
         firstUserMessage: input.content,
         firstReply: replyText,
         sessionId: this.id,
+        language: this._config.language,
       }))
       if (refined && this.store.updateTitleIfAuto(this.id, refined) === 1) {
         _send({ type: 'session:title', sessionId: this.id, title: refined })

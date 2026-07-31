@@ -5,6 +5,8 @@ import { buildChatModel } from './model-factory.js'
 
 const TITLE_LEN = 40
 
+type AppLanguage = NonNullable<SessionConfig['language']>
+
 function deriveTitle(content: string): string {
   const oneLine = content.replace(/\s+/g, ' ').trim()
   return oneLine.length > TITLE_LEN ? oneLine.slice(0, TITLE_LEN) + '…' : oneLine || '新对话'
@@ -27,20 +29,41 @@ export type TitleGenerator = (input: {
   firstReply: string
   /** Kept for call-site compatibility; title LLM is not traced. */
   sessionId?: string
+  /** App UI language for this generation (from SessionConfig.language). */
+  language?: SessionConfig['language']
 }) => Promise<string>
 
-const TITLE_SYSTEM_PROMPT =
-  'You generate a very short title (at most 6 words, or about 16 Chinese characters) for a chat conversation. ' +
-  'Use the same language as the user. Reply with ONLY the title — no quotes, no trailing punctuation.'
+/** Human-readable language label for the title LLM prompt. */
+export function titleLanguageLabel(lang: AppLanguage): string {
+  if (lang === 'zh-CN') return 'Simplified Chinese (zh-CN)'
+  if (lang === 'zh-TW') return 'Traditional Chinese (zh-TW)'
+  if (lang === 'ja') return 'Japanese (ja)'
+  if (lang === 'ko') return 'Korean (ko)'
+  return 'English (en)'
+}
+
+/**
+ * System prompt for session auto-title.
+ * Language follows the app UI setting (SessionConfig.language), not the user's message language.
+ */
+export function buildTitleSystemPrompt(language: AppLanguage = 'en'): string {
+  const label = titleLanguageLabel(language)
+  return (
+    'You generate a very short title (at most 6 words, or about 16 Chinese characters) for a chat conversation. ' +
+    `Write the title in ${label}. Match the app UI language (${language}), not necessarily the user's message language. ` +
+    'Reply with ONLY the title — no quotes, no trailing punctuation.'
+  )
+}
 
 /** Production title generator: one cheap completion. Not used when a model is injected (tests). */
-export function buildDefaultTitleGenerator(_config: SessionConfig): TitleGenerator {
-  return async ({ firstUserMessage, firstReply }) => {
+export function buildDefaultTitleGenerator(config: SessionConfig): TitleGenerator {
+  return async ({ firstUserMessage, firstReply, language }) => {
+    const lang: AppLanguage = language ?? config.language ?? 'en'
     const { providerID, modelID, baseURL } = getActiveModel()
     const model = buildChatModel({ providerID, modelID: cheapModelFor(providerID, modelID), baseURL })
     // Title refine is a product side-effect, not part of the agent turn graph.
     const res = await model.invoke([
-      new SystemMessage(TITLE_SYSTEM_PROMPT),
+      new SystemMessage(buildTitleSystemPrompt(lang)),
       new HumanMessage(`${firstUserMessage}\n\n[assistant reply]: ${firstReply.slice(0, 200)}`),
     ])
     return typeof res.content === 'string' ? res.content : ''

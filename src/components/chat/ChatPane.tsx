@@ -446,7 +446,7 @@ export function ChatPane() {
         data-testid="chat-transcript-scroll"
         data-transcript-virtual={virtualize ? 'true' : undefined}
       >
-        {/* Centered reading column (max-w-4xl); composer dock uses max-w-2xl. */}
+        {/* Centered reading column (max-w-4xl); composer dock matches. */}
         <div
           className={cn('flex flex-col px-4 py-4', CHAT_COLUMN_CLASS)}
           style={{

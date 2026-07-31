@@ -104,7 +104,7 @@ describe('MessageBubble', () => {
     expect(screen.getByText('你')).toBeInTheDocument()
   })
 
-  it('wraps user message content in a right-aligned bubble', () => {
+  it('wraps user message content in a left-aligned bubble', () => {
     render(
       <MessageBubble
         message={{
@@ -120,7 +120,8 @@ describe('MessageBubble', () => {
     expect(bubble).toHaveTextContent('hello bubble')
     expect(bubble).toHaveClass('rounded-2xl', 'bg-surface-muted')
     const shell = screen.getByTestId('message-context-menu')
-    expect(shell).toHaveClass('items-end')
+    expect(shell).not.toHaveClass('items-end')
+    expect(shell.className).not.toMatch(/justify-end/)
   })
 
   it('does not wrap assistant message content in a user bubble', () => {

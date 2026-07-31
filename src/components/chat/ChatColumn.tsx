@@ -8,11 +8,10 @@ import { cn } from '@/lib/utils'
 export const CHAT_COLUMN_CLASS = 'mx-auto w-full min-w-0 max-w-4xl'
 
 /**
- * Composer / input dock width — narrower than the transcript column
- * so the input card does not span the full reading width on large screens.
+ * Composer / input dock width — same reading width as the transcript column.
  * Use for InputBar, NewConversation composer, and sticky chrome above the dock.
  */
-export const COMPOSER_COLUMN_CLASS = 'mx-auto w-full min-w-0 max-w-2xl'
+export const COMPOSER_COLUMN_CLASS = CHAT_COLUMN_CLASS
 
 /**
  * Centered reading column for transcript and composer chrome.

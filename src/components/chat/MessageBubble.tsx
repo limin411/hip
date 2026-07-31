@@ -144,15 +144,12 @@ function MessageBubbleImpl({ message, streaming, isLastAssistant, hidePlan }: Me
         isLastAssistant: !!isLastAssistant,
         sessionId,
       }}
-      className={cn('min-w-0 w-full', isUser && 'flex flex-col items-end')}
+      className="min-w-0 w-full"
       data-testid="message-context-menu"
     >
-      {/* CLI-style: role + time on one quiet meta line (user: right-aligned with bubble) */}
+      {/* CLI-style: role + time on one quiet meta line (user and assistant both left-aligned). */}
       <div
-        className={cn(
-          'mb-1.5 flex min-h-[var(--trail-min-h)] items-center gap-[var(--meta-gap)] text-meta leading-5 text-ink-tertiary',
-          isUser && 'justify-end',
-        )}
+        className="mb-1.5 flex min-h-[var(--trail-min-h)] items-center gap-[var(--meta-gap)] text-meta leading-5 text-ink-tertiary"
       >
         <span className="font-medium text-ink-secondary" data-testid="message-role">
           {isUser ? t('chat.you') : 'hip'}
@@ -171,7 +168,7 @@ function MessageBubbleImpl({ message, streaming, isLastAssistant, hidePlan }: Me
           </span>
         )}
       </div>
-      <div className={cn('min-w-0', isUser && 'flex w-full max-w-[min(100%,36rem)] flex-col items-end')}>
+      <div className="min-w-0">
         {/* Process trail (tools / timeline) stays above the answer; live stage is TurnStatusLine below. */}
         {message.role === 'assistant' && hasProcess && (
           // O3: when interleaved, do not force text-meta/tertiary on the whole process
@@ -220,7 +217,7 @@ function MessageBubbleImpl({ message, streaming, isLastAssistant, hidePlan }: Me
             </ActivityBar>
           </div>
         )}
-        {/* User turns: right-aligned soft bubble; assistant stays full-bleed CLI. */}
+        {/* User turns: left-aligned soft bubble; assistant stays full-bleed CLI. */}
         {isUser ? (
           <div
             className="w-fit max-w-full rounded-2xl bg-surface-muted px-3.5 py-2"
@@ -232,7 +229,7 @@ function MessageBubbleImpl({ message, streaming, isLastAssistant, hidePlan }: Me
               </div>
             )}
             {message.attachments && message.attachments.length > 0 && (
-              <div className={cn('flex flex-wrap justify-end gap-2', displayContent.trim() && 'mt-2')}>
+              <div className={cn('flex flex-wrap gap-2', displayContent.trim() && 'mt-2')}>
                 {message.attachments.map((a) => (
                   <div
                     key={a.id}
@@ -285,10 +282,7 @@ function MessageBubbleImpl({ message, streaming, isLastAssistant, hidePlan }: Me
       )}
       {!streaming && (
         <div
-          className={cn(
-            'mt-1 flex min-h-[var(--trail-min-h)] items-center gap-[var(--meta-gap)] text-meta leading-5',
-            isUser && 'justify-end',
-          )}
+          className="mt-1 flex min-h-[var(--trail-min-h)] items-center gap-[var(--meta-gap)] text-meta leading-5"
         >
           <MessageActions message={message} isLastAssistant={!!isLastAssistant} />
           {message.role === 'assistant' && message.memoryCitations && message.memoryCitations.length > 0 && (

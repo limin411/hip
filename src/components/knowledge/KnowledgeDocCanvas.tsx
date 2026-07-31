@@ -5,7 +5,7 @@ import { cn } from '@/lib/utils'
  * Full-page document body chrome (no elevated card).
  * Mode overflow is parent-owned via paperClassName — not part of this constant.
  */
-export const DOC_PAGE_SHELL = 'w-full min-h-0 flex-1 flex flex-col bg-surface'
+export const DOC_PAGE_SHELL = 'w-full min-h-0 flex-1 flex flex-col bg-surface-content'
 
 /** @deprecated Use DOC_PAGE_SHELL — kept as alias for any residual imports. */
 export const DOC_PAPER_SHELL = DOC_PAGE_SHELL

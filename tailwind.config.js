@@ -13,6 +13,7 @@ export default {
           DEFAULT: 'var(--bg-app)',
           subtle: 'var(--bg-subtle)',
           muted: 'var(--bg-muted)',
+          content: 'var(--bg-content)',
         },
         ink: {
           DEFAULT: 'var(--text-primary)',

@@ -12,7 +12,7 @@ afterEach(() => cleanup())
 
 describe('KnowledgeDocCanvas', () => {
   it('locks full-page shell contract (no card chrome)', () => {
-    expect(DOC_PAGE_SHELL).toContain('bg-surface')
+    expect(DOC_PAGE_SHELL).toContain('bg-surface-content')
     expect(DOC_PAGE_SHELL).toContain('w-full')
     expect(DOC_PAGE_SHELL).toContain('flex-1')
     // Must not reintroduce floating paper card.

@@ -30,7 +30,7 @@ export function SettingsPage() {
 
   return (
     <div
-      className="flex h-full min-h-0 flex-1 flex-col bg-surface"
+      className="flex h-full min-h-0 flex-1 flex-col bg-surface-content"
       data-testid="settings-page"
     >
       <SettingsPanel />

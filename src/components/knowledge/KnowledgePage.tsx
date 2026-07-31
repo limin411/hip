@@ -40,7 +40,7 @@ export function KnowledgePage() {
         <KnowledgeWorkspace />
       ) : !loaded ? (
         <div
-          className="flex min-h-0 flex-1 flex-col items-center justify-center bg-surface px-8"
+          className="flex min-h-0 flex-1 flex-col items-center justify-center bg-surface-content px-8"
           data-testid="knowledge-loading"
         >
           <div className="w-full max-w-sm space-y-3">
@@ -50,7 +50,7 @@ export function KnowledgePage() {
         </div>
       ) : (
         <div
-          className="flex min-h-0 flex-1 flex-col items-center justify-center bg-surface px-8"
+          className="flex min-h-0 flex-1 flex-col items-center justify-center bg-surface-content px-8"
           data-testid="knowledge-empty"
         >
           <EmptyState

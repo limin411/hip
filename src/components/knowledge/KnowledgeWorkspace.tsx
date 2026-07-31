@@ -919,7 +919,7 @@ export function KnowledgeWorkspace() {
         </div>
       </aside>
 
-      <main className="flex min-w-0 flex-1 flex-col bg-surface">
+      <main className="flex min-w-0 flex-1 flex-col bg-surface-content">
         {activeView ? (
           <>
             <div className="flex h-12 shrink-0 items-center gap-2.5 border-b border-border px-5">

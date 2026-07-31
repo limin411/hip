@@ -241,7 +241,8 @@ export function AppLayout() {
       {AUTOMATION_PAGE ? <AutomationRunHost /> : null}
       {sidebarOpen ? <AppSidebar /> : null}
       <PanelGroup direction="horizontal" className="min-w-0 flex-1 bg-surface">
-        <Panel minSize={34} className="flex min-w-0 flex-col bg-surface">
+        {/* Main column only: warm paper; left AppSidebar + right drawer stay neutral surface. */}
+        <Panel minSize={34} className="flex min-w-0 flex-col bg-surface-content">
           <MainToolbar />
           <div
             key={overlay === 'settings' ? 'settings' : activeView}

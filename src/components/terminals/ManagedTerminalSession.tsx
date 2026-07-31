@@ -97,7 +97,7 @@ export function ManagedTerminalSession({ terminalId }: { terminalId: string }) {
       : cwd
 
   return (
-    <div className="flex h-full min-h-0 flex-col bg-surface" data-testid="managed-terminal-session">
+    <div className="flex h-full min-h-0 flex-col bg-surface-content" data-testid="managed-terminal-session">
       <DeclarativeContextMenu
         kind="managedTerminal"
         payload={{ terminalId, kind, title: term.title }}

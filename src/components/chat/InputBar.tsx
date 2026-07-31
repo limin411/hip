@@ -270,7 +270,7 @@ export function InputBar() {
   return (
     // Floating rounded card under the transcript. Top edge is a drag handle to resize height.
     <div
-      className="relative shrink-0 bg-surface"
+      className="relative shrink-0 bg-surface-content"
       data-testid="input-bar"
     >
       <div

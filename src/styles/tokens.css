@@ -25,10 +25,12 @@
   /*
    * 单色 chrome —— 纯中性灰阶（无暖/冷色偏）。
    * 精修原则：边框更轻、表面阶差更细、文字对比够用即可，避免「网格感」与过曝。
+   * 主列内容区另用 --bg-content（淡黄纸感），左右边栏仍走 --bg-app / --bg-subtle。
    */
   --bg-app: #ffffff;
   --bg-subtle: #f6f6f6;
   --bg-muted: #eeeeee;
+  --bg-content: #fffefb; /* 仅主内容列：淡暖黄 / 奶油纸（略深于极淡） */
   --border: #d4d4d4;
   --border-strong: #bdbdbd; /* 需要明确分隔时（输入框、卡片外框） */
   --text-primary: #111111;
@@ -130,6 +132,7 @@ html[data-platform="linux"] {
   --bg-app: #0f0f0f;
   --bg-subtle: #171717;
   --bg-muted: #222222;
+  --bg-content: #0f0f0f; /* 暗色主列与 chrome 同底，不单独偏黄 */
   --border: #3a3a3a;
   --border-strong: #4a4a4a;
   --text-primary: #f0f0f0;

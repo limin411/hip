@@ -7,6 +7,7 @@ import { sessionService } from '@/domain/sessionService'
 import { useDiffStore, EMPTY_DIFF } from '@/store/diffStore'
 import { Modal } from '@/components/ui/Modal'
 import { Button } from '@/components/ui/Button'
+import { ComposerChip } from '@/components/chat/ComposerChip'
 import {
   DropdownMenu,
   DropdownMenuTrigger,
@@ -74,16 +75,15 @@ export function BranchSwitcher() {
           closes (whole app unclickable). Same fix/pattern as AgentCard.tsx. */}
       <DropdownMenu modal={false} open={menuOpen} onOpenChange={onMenuOpenChange}>
         <DropdownMenuTrigger asChild>
-          <button
+          <ComposerChip
             type="button"
             data-testid="branch-chip"
-            className="flex items-center gap-1.5 rounded-md border border-border px-2 py-0.5 text-caption text-ink-secondary transition-colors duration-chrome hover:bg-state-hover hover:text-ink"
             title={t('artifact.branch.current')}
           >
-            <GitBranch size={12} strokeWidth={1.75} className="shrink-0" />
+            <GitBranch size={13} strokeWidth={1.75} className="shrink-0" />
             <span className="max-w-[120px] truncate">{current ?? t('artifact.branch.noBranch')}</span>
-            <ChevronDown size={12} strokeWidth={1.75} className="shrink-0 opacity-60" />
-          </button>
+            <ChevronDown size={13} strokeWidth={1.75} className="shrink-0 opacity-60" />
+          </ComposerChip>
         </DropdownMenuTrigger>
         <DropdownMenuContent
           align="end"

@@ -15,6 +15,7 @@ export type ControlId =
   | 'plan'
   | 'guidance'
   | 'worktree'
+  | 'branch'
   | 'attach'
 
 export interface ComposerControlFlags {
@@ -64,6 +65,8 @@ function isAvailable(id: ControlId, flags: ComposerControlFlags): boolean {
       return flags.surface === 'code' && flags.sessionBound
     case 'worktree':
       return flags.surface === 'code' && flags.sessionBound
+    case 'branch':
+      return flags.surface === 'code' && flags.sessionBound
     case 'agent':
     case 'attach':
       return true
@@ -78,9 +81,9 @@ function primaryIds(flags: ComposerControlFlags): ControlId[] {
   }
   // code
   if (flags.externalPrimary) {
-    return ['agent', 'attach']
+    return ['agent', 'branch', 'attach']
   }
-  return ['agent', 'model', 'attach']
+  return ['agent', 'model', 'branch', 'attach']
 }
 
 function pinIds(flags: ComposerControlFlags): ControlId[] {

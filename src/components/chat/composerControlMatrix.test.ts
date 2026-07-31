@@ -29,9 +29,9 @@ function expectDisjoint(flags: ComposerControlFlags) {
 }
 
 describe('resolveComposerControls', () => {
-  it('code default: primary agent/model/attach; effort+permission+plan+guidance+worktree in overflow', () => {
+  it('code default: primary agent/model/branch/attach; effort+permission+plan+guidance+worktree in overflow', () => {
     const r = expectDisjoint(base())
-    expect(r.primary).toEqual(['agent', 'model', 'attach'])
+    expect(r.primary).toEqual(['agent', 'model', 'branch', 'attach'])
     expect(r.pinned).toEqual([])
     expect(r.overflow).toEqual(['effort', 'permission', 'plan', 'guidance', 'worktree'])
   })
@@ -92,7 +92,7 @@ describe('resolveComposerControls', () => {
     expect(r.overflow).toEqual([])
   })
 
-  it('code external primary: no model/effort/plan; agent+attach primary', () => {
+  it('code external primary: no model/effort/plan; agent+branch+attach primary', () => {
     const r = expectDisjoint(
       base({
         externalPrimary: true,
@@ -101,19 +101,20 @@ describe('resolveComposerControls', () => {
         hasEffortLevels: true,
       }),
     )
-    expect(r.primary).toEqual(['agent', 'attach'])
+    expect(r.primary).toEqual(['agent', 'branch', 'attach'])
     expect(r.pinned).toEqual([])
     expect(r.overflow).toEqual(['permission', 'guidance', 'worktree'])
     expect(r.overflow).not.toContain('effort')
     expect(r.overflow).not.toContain('plan')
   })
 
-  it('NewConversation code (sessionBound false): no guidance/worktree', () => {
+  it('NewConversation code (sessionBound false): no guidance/worktree/branch', () => {
     const r = expectDisjoint(base({ sessionBound: false }))
     expect(r.primary).toEqual(['agent', 'model', 'attach'])
     expect(r.overflow).toEqual(['effort', 'permission', 'plan'])
     expect(r.overflow).not.toContain('guidance')
     expect(r.overflow).not.toContain('worktree')
+    expect(r.overflow).not.toContain('branch')
   })
 
   it('available.guidance false removes guidance from overflow', () => {

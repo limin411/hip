@@ -7,7 +7,6 @@ import { ConversationOutline } from './ConversationOutline'
 import { TimelineView } from './TimelineView'
 import { ChangesView } from './ChangesView'
 import { GitInitBanner } from './GitInitBanner'
-import { BranchSwitcher } from './BranchSwitcher'
 import { TerminalView } from './TerminalView'
 import { AgentsRuntimeSplit } from './AgentsRuntimeSplit'
 import { CODE_TERMINAL } from './terminalFeature'
@@ -41,7 +40,6 @@ export function ArtifactPanel() {
       >
         <PanelTabBar surface="code" />
         <div className="flex shrink-0 items-center gap-1" data-tauri-drag-region="false">
-          {isGitRepo && <BranchSwitcher />}
           {/* Relocated from main toolbar when open — same toggle collapses the rail. */}
           <PanelToggle slot="panel" />
         </div>

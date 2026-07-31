@@ -60,9 +60,6 @@ vi.mock('./ChangesView', () => ({
 vi.mock('./GitInitBanner', () => ({
   GitInitBanner: () => React.createElement('div', { 'data-testid': 'git-init-banner' }),
 }))
-vi.mock('./BranchSwitcher', () => ({
-  BranchSwitcher: () => React.createElement('div', { 'data-testid': 'branch-switcher' }),
-}))
 vi.mock('./TerminalView', () => ({
   TerminalView: () => React.createElement('div', { 'data-testid': 'terminal-view' }),
 }))
@@ -155,12 +152,6 @@ describe('ArtifactPanel', () => {
   it('shows GitInitBanner in files tab when not in a git repo', () => {
     render(<ArtifactPanel />)
     expect(screen.getByTestId('git-init-banner')).toBeInTheDocument()
-  })
-
-  it('shows BranchSwitcher when in a git repo', () => {
-    mockDiffState = { bySession: { 'sess-1': { isGitRepo: true } } }
-    render(<ArtifactPanel />)
-    expect(screen.getByTestId('branch-switcher')).toBeInTheDocument()
   })
 
   it('renders close button', () => {

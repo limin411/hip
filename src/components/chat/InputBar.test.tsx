@@ -479,12 +479,15 @@ describe('InputBar', () => {
       preview: '',
       messages: [],
     } as any)
+    useDomainStore.setState({ activeSessionId: 's1' })
 
     render(<InputBar />)
     expect(screen.getByTestId('permission-chip')).toBeInTheDocument()
     expect(screen.queryByTestId('plan-mode-chip')).not.toBeInTheDocument()
     expect(screen.queryByTestId('execution-mode-chip')).not.toBeInTheDocument()
     expect(screen.queryByTestId('model-chip')).not.toBeInTheDocument()
+    // Branch switcher moved from the panel titlebar into the code composer.
+    expect(screen.getByTestId('branch-chip')).toBeInTheDocument()
   })
 
   it('blocks this session composer while a permission request is pending', () => {

@@ -7,6 +7,7 @@ import { ExecutionModePicker } from './ExecutionModePicker'
 import { ProjectGuidanceChip } from './ProjectGuidanceChip'
 import { AttachmentButton } from './AttachmentButton'
 import { WorktreeControl } from './WorktreeControl/WorktreeControl'
+import { BranchSwitcher } from '@/components/artifact/BranchSwitcher'
 import { ComposerControlRow } from './ComposerControlRow'
 import { COMPOSER_OVERFLOW } from './craftFeature'
 import {
@@ -50,6 +51,8 @@ function mountId(id: ControlId, onAttach: (add: LocalAttachment[]) => void): Rea
       return <ProjectGuidanceChip key="guidance" />
     case 'worktree':
       return <WorktreeControl key="worktree" />
+    case 'branch':
+      return <BranchSwitcher key="branch" />
     case 'attach':
       return <AttachmentButton key="attach" onAttach={onAttach} />
     default:
@@ -167,6 +170,7 @@ export function ComposerLeftSlot({
           {!externalPrimary && <ExecutionModePicker />}
           {sessionBound && <ProjectGuidanceChip />}
           {sessionBound && <WorktreeControl />}
+          {sessionBound && <BranchSwitcher />}
           <AttachmentButton onAttach={onAttach} />
         </>
       )

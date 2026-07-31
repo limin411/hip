@@ -264,70 +264,74 @@ export function AppLayout() {
       <WindowLifecycleHost />
       {AUTOMATION_PAGE ? <AutomationRunHost /> : null}
       {sidebarOpen ? <AppSidebar /> : null}
-      <PanelGroup ref={groupRef} direction="horizontal" className="min-w-0 flex-1 bg-surface">
-        {/* Main column only: warm paper; left AppSidebar + right drawer stay neutral surface. */}
-        <Panel minSize={34} className="flex min-w-0 flex-col bg-surface-content">
-          <MainToolbar />
-          <div
-            key={overlay === 'settings' ? 'settings' : activeView}
-            className="flex min-h-0 min-w-0 flex-1 flex-col animate-view-enter"
-          >
-            {renderMainContent()}
-          </div>
-        </Panel>
-
-        {/* Overlap neighbors (w-2 -mx-1) so the divider is only a 1px line — no layout gap. */}
-        <PanelResizeHandle
-          className={
-            rightOpen
-              ? 'group relative z-10 w-2 -mx-1 bg-transparent outline-none focus-visible:ring-1 focus-visible:ring-ink/20'
-              : 'w-0'
-          }
-          disabled={!rightOpen}
-        >
-          {rightOpen ? (
+      {/* Measure the group width via a plain div — PanelGroup's own ref is an
+          ImperativePanelGroupHandle, not the DOM node. */}
+      <div ref={groupRef} className="flex min-w-0 flex-1 flex-col bg-surface">
+        <PanelGroup direction="horizontal" className="min-h-0 min-w-0 flex-1">
+          {/* Main column only: warm paper; left AppSidebar + right drawer stay neutral surface. */}
+          <Panel minSize={34} className="flex min-w-0 flex-col bg-surface-content">
+            <MainToolbar />
             <div
-              className="mx-auto h-full w-px bg-border transition-colors group-hover:bg-accent group-data-[resize-handle-state=drag]:bg-accent group-focus-visible:bg-accent"
-              aria-hidden
-              data-testid="right-panel-resize-grip"
-            />
-          ) : null}
-        </PanelResizeHandle>
-
-        <Panel
-          ref={rightPanelRef}
-          defaultSize={26}
-          minSize={railMinPct}
-          maxSize={65}
-          collapsible
-          collapsedSize={0}
-          onCollapse={handleCollapse}
-          onExpand={handleExpand}
-          className="min-w-0"
-        >
-          {rightOpen ? (
-            <div
-              className="flex h-full min-h-0 flex-col bg-surface-subtle animate-panel-in"
-              data-testid="right-panel-drawer"
+              key={overlay === 'settings' ? 'settings' : activeView}
+              className="flex min-h-0 min-w-0 flex-1 flex-col animate-view-enter"
             >
-              {codeOpen ? (
-                <ArtifactPanel />
-              ) : knowledgeOpen ? (
-                <KnowledgeOutlinePanel />
-              ) : terminalsOpen && focusedManaged ? (
-                <TerminalFilesPanel
-                  terminalId={focusedManaged.id}
-                  backend={focusedManaged.kind === 'local' ? 'local' : 'sftp'}
-                  localRoot={focusedManaged.cwd}
-                  remotePath={focusedManaged.remotePath}
-                />
-              ) : (
-                <PreviewPanel />
-              )}
+              {renderMainContent()}
             </div>
-          ) : null}
-        </Panel>
-      </PanelGroup>
+          </Panel>
+
+          {/* Overlap neighbors (w-2 -mx-1) so the divider is only a 1px line — no layout gap. */}
+          <PanelResizeHandle
+            className={
+              rightOpen
+                ? 'group relative z-10 w-2 -mx-1 bg-transparent outline-none focus-visible:ring-1 focus-visible:ring-ink/20'
+                : 'w-0'
+            }
+            disabled={!rightOpen}
+          >
+            {rightOpen ? (
+              <div
+                className="mx-auto h-full w-px bg-border transition-colors group-hover:bg-accent group-data-[resize-handle-state=drag]:bg-accent group-focus-visible:bg-accent"
+                aria-hidden
+                data-testid="right-panel-resize-grip"
+              />
+            ) : null}
+          </PanelResizeHandle>
+
+          <Panel
+            ref={rightPanelRef}
+            defaultSize={26}
+            minSize={railMinPct}
+            maxSize={65}
+            collapsible
+            collapsedSize={0}
+            onCollapse={handleCollapse}
+            onExpand={handleExpand}
+            className="min-w-0"
+          >
+            {rightOpen ? (
+              <div
+                className="flex h-full min-h-0 flex-col bg-surface-subtle animate-panel-in"
+                data-testid="right-panel-drawer"
+              >
+                {codeOpen ? (
+                  <ArtifactPanel />
+                ) : knowledgeOpen ? (
+                  <KnowledgeOutlinePanel />
+                ) : terminalsOpen && focusedManaged ? (
+                  <TerminalFilesPanel
+                    terminalId={focusedManaged.id}
+                    backend={focusedManaged.kind === 'local' ? 'local' : 'sftp'}
+                    localRoot={focusedManaged.cwd}
+                    remotePath={focusedManaged.remotePath}
+                  />
+                ) : (
+                  <PreviewPanel />
+                )}
+              </div>
+            ) : null}
+          </Panel>
+        </PanelGroup>
+      </div>
 
       <GlobalCommandPalette />
       <GlobalHotkeysBinder />

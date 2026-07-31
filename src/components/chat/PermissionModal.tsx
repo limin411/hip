@@ -5,7 +5,7 @@ import { useDomainStore } from '@/domain/sessionStore'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/Button'
 import { resolvePermissionOptionLabel } from '@/lib/worktreeHitlLabels'
-import { CHAT_COLUMN_CLASS } from './ChatColumn'
+import { COMPOSER_COLUMN_CLASS } from './ChatColumn'
 
 const REJECT_PREFIX = 'reject'
 
@@ -44,7 +44,7 @@ export function PermissionModal() {
       className="shrink-0 bg-surface py-3"
       data-testid="permission-prompt-slot"
     >
-      <div className={cn('px-4', CHAT_COLUMN_CLASS)}>
+      <div className={cn('px-4', COMPOSER_COLUMN_CLASS)}>
         <div
           className="flex flex-col gap-3 rounded-lg border border-accent/30 bg-accent-subtle px-4 py-3 animate-view-enter"
           data-testid="permission-modal"

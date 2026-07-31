@@ -3,7 +3,7 @@ import { useActiveSessionId } from '@/domain'
 import { cn } from '@/lib/utils'
 import { useUiStore } from '@/store/uiStore'
 import { useDomainStore } from '@/domain/sessionStore'
-import { CHAT_COLUMN_CLASS } from './ChatColumn'
+import { COMPOSER_COLUMN_CLASS } from './ChatColumn'
 
 /** Composer-adjacent chip when background runtime work is still running. */
 export function StillRunningChip() {
@@ -16,7 +16,7 @@ export function StillRunningChip() {
   if (!label) return null
 
   return (
-    <div className={cn('mb-1 px-4', CHAT_COLUMN_CLASS)}>
+    <div className={cn('mb-1 px-4', COMPOSER_COLUMN_CLASS)}>
       <button
         type="button"
         data-testid="still-running-chip"

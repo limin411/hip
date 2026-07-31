@@ -16,7 +16,7 @@ import { resolveSearchRoot } from '@/lib/resolveSearchRoot'
 import { isMultimodalAttachmentMime } from '@/lib/attachmentAllowlist'
 import { readSkillFile } from '@/ipc/skills'
 import { ComposerLeftSlot } from './ComposerLeftSlot'
-import { CHAT_COLUMN_CLASS } from './ChatColumn'
+import { COMPOSER_COLUMN_CLASS } from './ChatColumn'
 import { sessionService, useActiveSession, useActiveSessionId, useActiveSessionStatus, useActivePendingPermission, useConnectionStatus } from '@/domain'
 import { formatDiffAnnotationsForComposer, useDiffAnnotationStore } from '@/store/diffAnnotationStore'
 import { isProjectPathBlocked } from '@/lib/projectPathGate'
@@ -274,7 +274,7 @@ export function InputBar() {
       data-testid="input-bar"
     >
       <div
-        className={cn('relative px-4 pb-3 pt-2', CHAT_COLUMN_CLASS)}
+        className={cn('relative px-4 pb-3 pt-2', COMPOSER_COLUMN_CLASS)}
         data-testid="chat-column"
       >
         {/* Invisible hit target on the top edge — drag still resizes; no visible grip chrome. */}

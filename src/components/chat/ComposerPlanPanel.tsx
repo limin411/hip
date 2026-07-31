@@ -3,7 +3,7 @@ import { sessionService, useActiveSession, useActiveMessages, useActiveSessionSt
 import { cn } from '@/lib/utils'
 import { selectLivePlan } from '@/lib/todos'
 import { PlanProgressPanel } from './PlanProgressPanel'
-import { CHAT_COLUMN_CLASS } from './ChatColumn'
+import { COMPOSER_COLUMN_CLASS } from './ChatColumn'
 
 /**
  * Sticky plan/todo checklist above the composer (InputBar).
@@ -35,7 +35,7 @@ export function ComposerPlanPanel() {
 
   return (
     <div className="shrink-0 bg-surface py-1.5" data-testid="composer-plan-slot">
-      <div className={cn('px-4', CHAT_COLUMN_CLASS)}>
+      <div className={cn('px-4', COMPOSER_COLUMN_CLASS)}>
         <PlanProgressPanel
           view={livePlan}
           onApprove={() => sessionService.respondPlan('approve')}

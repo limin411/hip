@@ -67,7 +67,7 @@ export function MainToolbar() {
       aria-label={t('mainToolbar.aria')}
       className={cn(
         titlebarRowClass,
-        'gap-2 bg-surface',
+        'gap-2 border-b-0 bg-surface',
         showSidebarExpand ? 'pr-3' : 'px-3',
       )}
     >

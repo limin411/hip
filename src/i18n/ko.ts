@@ -752,7 +752,10 @@ export const ko = {
       "switchConfirmAction": "전환",
       "switching": "전환 중…",
       "switchFailed": "브랜치를 전환할 수 없음",
-      "switchRetry": "재시도"
+      "switchRetry": "재시도",
+      "inWorktree": "워크트리",
+      "switchBlockedRunning": "이 워크스페이스에서 세션이 실행 중이라 브랜치를 전환할 수 없습니다",
+      "switchCheckedOut": "이 브랜치는 다른 워크스페이스에서 이미 체크아웃되어 있습니다: {{path}}"
     },
     "changesView": {
       "uncommitted": "커밋되지 않은 변경사항",

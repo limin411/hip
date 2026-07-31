@@ -752,7 +752,10 @@ export const ja = {
       "switchConfirmAction": "切り替え",
       "switching": "切り替え中…",
       "switchFailed": "ブランチを切り替えられませんでした",
-      "switchRetry": "再試行"
+      "switchRetry": "再試行",
+      "inWorktree": "ワークツリー",
+      "switchBlockedRunning": "このワークスペースでセッションが実行中のため、ブランチを切り替えられません",
+      "switchCheckedOut": "このブランチは別のワークスペースでチェックアウト済みです：{{path}}"
     },
     "changesView": {
       "uncommitted": "未コミットの変更",

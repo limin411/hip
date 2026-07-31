@@ -5,6 +5,11 @@ import { cn } from '@/lib/utils'
 import { useDomainStore } from '@/domain/sessionStore'
 import { sessionService } from '@/domain/sessionService'
 import { useDiffStore, EMPTY_DIFF } from '@/store/diffStore'
+import { useParallelStore } from '@/store/parallelStore'
+import { useWorktreeStore } from '@/store/worktreeStore'
+import { resolveWorktreeHostContext } from '@/lib/worktreeHostContext'
+import { pathKey } from '@/lib/worktreeNesting'
+import { parseCheckedOutPath } from '@/lib/branchSwitchError'
 import { Modal } from '@/components/ui/Modal'
 import { Button } from '@/components/ui/Button'
 import { ComposerChip } from '@/components/chat/ComposerChip'
@@ -20,7 +25,45 @@ import {
 export function BranchSwitcher() {
   const { t } = useTranslation()
   const sessionId = useDomainStore((s) => s.activeSessionId)
+  const sessions = useDomainStore((s) => s.sessions)
+  const active = sessions.find((s) => s.id === sessionId)
+  const activeCwd = active?.config.cwd
   const diff = useDiffStore((s) => (sessionId ? s.bySession[sessionId] : undefined)) ?? EMPTY_DIFF
+
+  // C1: a session (this one or a parallel slot) is running in the same checkout —
+  // `git switch` would rewrite files under it, so block the confirm.
+  const runningInCheckout = useMemo(() => {
+    if (!sessionId || !activeCwd) return false
+    return sessions.some(
+      (s) =>
+        s.status === 'running' &&
+        s.config.cwd &&
+        pathKey(s.config.cwd) === pathKey(activeCwd),
+    )
+  }, [sessions, sessionId, activeCwd])
+
+  // C3: inside an isolated worktree the chip's git ops act on that checkout —
+  // label it so the scope is explicit (same host resolution as WorktreeControl).
+  const runs = useParallelStore((s) => s.runs)
+  const catalogById = useWorktreeStore((s) => s.byId)
+  const hostCtx = useMemo(
+    () =>
+      resolveWorktreeHostContext({
+        activeSession: active
+          ? { id: active.id, config: { cwd: active.config.cwd, surface: active.config.surface } }
+          : null,
+        sessions: sessions.map((s) => ({
+          id: s.id,
+          title: s.title,
+          config: { cwd: s.config.cwd },
+        })),
+        runs,
+        catalog: Object.values(catalogById),
+      }),
+    [active, sessions, runs, catalogById],
+  )
+  const isIsolated = hostCtx.isOnIsolated
+
   const [pending, setPending] = useState<string | null>(null) // branch awaiting confirm
   const [switching, setSwitching] = useState(false)
   const [query, setQuery] = useState('')
@@ -67,6 +110,7 @@ export function BranchSwitcher() {
 
   if (!sessionId) return null
   const current = diff.currentBranch
+  const checkedOutPath = diff.switchError ? parseCheckedOutPath(diff.switchError) : null
 
   return (
     <>
@@ -81,7 +125,10 @@ export function BranchSwitcher() {
             title={t('artifact.branch.current')}
           >
             <GitBranch size={13} strokeWidth={1.75} className="shrink-0" />
-            <span className="max-w-[120px] truncate">{current ?? t('artifact.branch.noBranch')}</span>
+            <span className="max-w-[120px] truncate">
+              {current ?? t('artifact.branch.noBranch')}
+              {isIsolated ? ` · ${t('artifact.branch.inWorktree')}` : ''}
+            </span>
             <ChevronDown size={13} strokeWidth={1.75} className="shrink-0 opacity-60" />
           </ComposerChip>
         </DropdownMenuTrigger>
@@ -164,9 +211,26 @@ export function BranchSwitcher() {
               className="flex items-start gap-2 rounded border border-danger/40 bg-danger/10 p-2 text-meta text-ink"
             >
               <AlertTriangle size={14} className="mt-0.5 shrink-0 text-danger" />
+              {checkedOutPath ? (
+                <span className="min-w-0 break-words">
+                  {t('artifact.branch.switchCheckedOut', { path: checkedOutPath })}
+                </span>
+              ) : (
+                <span className="min-w-0 break-words">
+                  {t('artifact.branch.switchFailed')}
+                  {diff.switchError ? `: ${diff.switchError}` : ''}
+                </span>
+              )}
+            </div>
+          )}
+          {runningInCheckout && (
+            <div
+              data-testid="branch-switch-running-warning"
+              className="flex items-start gap-2 rounded border border-warning/40 bg-warning/10 p-2 text-meta text-ink"
+            >
+              <AlertTriangle size={14} className="mt-0.5 shrink-0 text-warning" />
               <span className="min-w-0 break-words">
-                {t('artifact.branch.switchFailed')}
-                {diff.switchError ? `: ${diff.switchError}` : ''}
+                {t('artifact.branch.switchBlockedRunning')}
               </span>
             </div>
           )}
@@ -177,7 +241,7 @@ export function BranchSwitcher() {
             </Button>
             <Button
               size="sm"
-              disabled={switching}
+              disabled={switching || runningInCheckout}
               data-testid="branch-switch-confirm"
               onClick={() => {
                 if (pending) {

@@ -725,6 +725,9 @@ export const zhCN = {
         switching: '切换中…',
         switchFailed: '切换分支失败',
         switchRetry: '重试',
+        inWorktree: '工作区',
+        switchBlockedRunning: '该工作区有会话正在运行，无法切换分支',
+        switchCheckedOut: '该分支已在另一个工作区检出：{{path}}',
       },
       changesView: {
         uncommitted: '未提交的改动',

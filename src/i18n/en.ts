@@ -737,6 +737,9 @@ export const en = {
         switching: 'Switching…',
         switchFailed: 'Could not switch branch',
         switchRetry: 'Retry',
+        inWorktree: 'worktree',
+        switchBlockedRunning: 'Cannot switch branches while a session is running in this workspace',
+        switchCheckedOut: 'This branch is already checked out in another workspace: {{path}}',
       },
       changesView: {
         uncommitted: 'Uncommitted changes',

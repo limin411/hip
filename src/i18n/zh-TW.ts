@@ -760,7 +760,10 @@ export const zhTW = {
       "switchConfirmAction": "切換",
       "switching": "切換中…",
       "switchFailed": "切換分支失敗",
-      "switchRetry": "重試"
+      "switchRetry": "重試",
+      "inWorktree": "工作區",
+      "switchBlockedRunning": "該工作區有工作階段正在執行，無法切換分支",
+      "switchCheckedOut": "該分支已在另一個工作區檢出：{{path}}"
     },
     "changesView": {
       "uncommitted": "未提交的改動",

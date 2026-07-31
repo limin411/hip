@@ -1,7 +1,7 @@
 // @vitest-environment happy-dom
 import '@testing-library/jest-dom/vitest'
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen, fireEvent, cleanup } from '@testing-library/react'
+import { render, screen, fireEvent, cleanup, within } from '@testing-library/react'
 import '@/i18n'
 import { Composer } from './Composer'
 
@@ -108,6 +108,29 @@ describe('Composer', () => {
     const ta = screen.getByPlaceholderText(/Message hip/)
     expect(ta.className).toContain('bg-transparent')
     expect(ta.className).toContain('rounded-none')
+  })
+
+  it('renders footer row below the controls when footer prop is set', () => {
+    render(
+      <Composer
+        value=""
+        onChange={vi.fn()}
+        onSubmit={vi.fn()}
+        variant="card"
+        footer={<div data-testid="footer-item">worktree</div>}
+      />,
+    )
+    const footer = screen.getByTestId('composer-footer')
+    expect(footer).toBeInTheDocument()
+    expect(within(footer).getByTestId('footer-item')).toHaveTextContent('worktree')
+    // Footer sits below the toolbar row (send button stays in the toolbar).
+    expect(within(footer).queryByTestId('composer-send')).not.toBeInTheDocument()
+    expect(screen.getByTestId('composer-send')).toBeInTheDocument()
+  })
+
+  it('renders footer row below the controls when footer prop is set (flat variant)', () => {
+    render(<Composer value="" onChange={vi.fn()} onSubmit={vi.fn()} footer={<span />} />)
+    expect(screen.getByTestId('composer-footer')).toBeInTheDocument()
   })
 
   it('flat variant has no rounded card shell', () => {

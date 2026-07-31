@@ -1,7 +1,7 @@
 // @vitest-environment happy-dom
 import '@testing-library/jest-dom/vitest'
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen, fireEvent, cleanup } from '@testing-library/react'
+import { render, screen, fireEvent, cleanup, within } from '@testing-library/react'
 import { InputBar } from './InputBar'
 import * as providersStore from '@/store/providersStore'
 import * as hipConfigStore from '@/store/hipConfigStore'
@@ -488,6 +488,35 @@ describe('InputBar', () => {
     expect(screen.queryByTestId('model-chip')).not.toBeInTheDocument()
     // Branch switcher moved from the panel titlebar into the code composer.
     expect(screen.getByTestId('branch-chip')).toBeInTheDocument()
+  })
+
+  it('code session renders worktree + branch in the footer row below the input', () => {
+    baseMocks()
+    vi.spyOn(domain, 'useActiveSession').mockReturnValue({
+      id: 's1',
+      config: {
+        llmProvider: 'openai',
+        model: 'gpt-4o',
+        tools: [],
+        surface: 'code' as const,
+        cwd: '/tmp/p',
+      },
+      title: '',
+      preview: '',
+      messages: [],
+    } as any)
+    useDomainStore.setState({ activeSessionId: 's1' })
+
+    render(<InputBar />)
+    const footer = screen.getByTestId('composer-footer')
+    // Worktree + branch live in the footer strip, mounted exactly once (not in the toolbar).
+    expect(within(footer).getByTestId('worktree-control-chip')).toBeInTheDocument()
+    expect(within(footer).getByTestId('branch-chip')).toBeInTheDocument()
+    expect(screen.getAllByTestId('worktree-control-chip')).toHaveLength(1)
+    expect(screen.getAllByTestId('branch-chip')).toHaveLength(1)
+    // Other controls stay in the toolbar (sibling of the footer, not inside it).
+    expect(within(footer).queryByTestId('session-agent-chip-active')).not.toBeInTheDocument()
+    expect(screen.getByTestId('session-agent-chip-active')).toBeInTheDocument()
   })
 
   it('blocks this session composer while a permission request is pending', () => {

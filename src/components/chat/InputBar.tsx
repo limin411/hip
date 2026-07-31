@@ -16,6 +16,7 @@ import { resolveSearchRoot } from '@/lib/resolveSearchRoot'
 import { isMultimodalAttachmentMime } from '@/lib/attachmentAllowlist'
 import { readSkillFile } from '@/ipc/skills'
 import { ComposerLeftSlot } from './ComposerLeftSlot'
+import { CodeComposerFooter } from './CodeComposerFooter'
 import { COMPOSER_COLUMN_CLASS } from './ChatColumn'
 import { sessionService, useActiveSession, useActiveSessionId, useActiveSessionStatus, useActivePendingPermission, useConnectionStatus } from '@/domain'
 import { formatDiffAnnotationsForComposer, useDiffAnnotationStore } from '@/store/diffAnnotationStore'
@@ -355,6 +356,7 @@ export function InputBar() {
               onAnnotationClear={() => {
                 if (activeId) useDiffAnnotationStore.getState().clear(activeId)
               }}
+              footer={isCode ? <CodeComposerFooter /> : undefined}
             />
             {selectedSkill && (
               <SkillArgInput

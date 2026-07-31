@@ -36,6 +36,7 @@ export function Composer({
   inputRef,
   variant = 'flat',
   textareaHeight,
+  footer,
 }: {
   value: string
   onChange: (v: string) => void
@@ -65,6 +66,12 @@ export function Composer({
   variant?: ComposerVariant
   /** Fixed textarea height in px (session InputBar resize). When set, overrides rows. */
   textareaHeight?: number
+  /**
+   * Footer row below the input (Copilot / Cursor style status strip): rendered at the
+   * bottom of the card, separated by a hairline from the toolbar row. Code surface
+   * uses it for worktree + branch. Optional — hidden when absent.
+   */
+  footer?: React.ReactNode
 }) {
   const { t } = useTranslation()
   const hasQuote = !!quoteText?.trim()
@@ -229,6 +236,17 @@ export function Composer({
           )}
         </div>
       </div>
+      {footer ? (
+        <div
+          className={cn(
+            'mt-2 flex flex-wrap items-center gap-0.5 border-t border-border/60 pt-1.5',
+            isCard && 'px-0.5',
+          )}
+          data-testid="composer-footer"
+        >
+          {footer}
+        </div>
+      ) : null}
     </div>
   )
 }

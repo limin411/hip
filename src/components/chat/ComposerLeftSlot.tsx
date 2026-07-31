@@ -157,6 +157,9 @@ export function ComposerLeftSlot({
   }
 
   const resolved = resolveComposerControls(flags)
+  // Worktree + branch moved to the composer footer row below the input (Code surface,
+  // Copilot/Cursor style) — keep them out of the toolbar regardless of placement rules.
+  const toolbarIds = (ids: ControlId[]) => ids.filter((id) => id !== 'worktree' && id !== 'branch')
 
   // Flag off: preserve legacy flat order (existing product behavior).
   if (!COMPOSER_OVERFLOW) {
@@ -169,8 +172,6 @@ export function ComposerLeftSlot({
           <PermissionModePicker />
           {!externalPrimary && <ExecutionModePicker />}
           {sessionBound && <ProjectGuidanceChip />}
-          {sessionBound && <WorktreeControl />}
-          {sessionBound && <BranchSwitcher />}
           <AttachmentButton onAttach={onAttach} />
         </>
       )
@@ -187,12 +188,14 @@ export function ComposerLeftSlot({
 
   return (
     <ComposerControlRow
-      primary={mountList(resolved.primary, onAttach)}
+      primary={mountList(toolbarIds(resolved.primary), onAttach)}
       pinnedSecondary={
-        resolved.pinned.length > 0 ? mountList(resolved.pinned, onAttach) : undefined
+        resolved.pinned.length > 0
+          ? mountList(toolbarIds(resolved.pinned), onAttach)
+          : undefined
       }
       secondary={
-        resolved.overflow.length > 0 ? mountList(resolved.overflow, onAttach) : undefined
+        resolved.overflow.length > 0 ? mountList(toolbarIds(resolved.overflow), onAttach) : undefined
       }
     />
   )

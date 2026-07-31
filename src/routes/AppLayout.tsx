@@ -19,6 +19,7 @@ import { MainToolbar } from '@/components/layout/MainToolbar'
 import { PlaceholderPage } from '@/components/layout/PlaceholderPage'
 import { KnowledgePage } from '@/components/knowledge/KnowledgePage'
 import { OverlayShellHost } from '@/components/layout/OverlayShellHost'
+import { SettingsPage } from '@/components/account/SettingsPage'
 import { KnowledgeOutlinePanel } from '@/components/knowledge/KnowledgeOutlinePanel'
 import { useKnowledgeStore } from '@/store/knowledgeStore'
 import {
@@ -52,6 +53,7 @@ export function AppLayout() {
   const activeSession = useActiveSession()
   const activeSessionId = activeSession?.id ?? null
   const activeView = useUiStore((s) => s.activeView)
+  const overlay = useUiStore((s) => s.overlay)
   const activeCwd = activeSession?.config.cwd
 
   useEffect(() => {
@@ -111,13 +113,21 @@ export function AppLayout() {
   const focusedManaged = useManagedTerminalStore((s) =>
     s.focusedId ? s.terminals.find((t) => t.id === s.focusedId) : undefined,
   )
-  const codeOpen = activeView === 'code' && activeSession?.codePanelOpen === true
-  const chatOpen = activeView === 'chat' && activeSession?.chatPanelOpen === true
+  const settingsOpen = overlay === 'settings'
+  // Settings owns the main column; suppress work-surface right rails while open.
+  const codeOpen =
+    !settingsOpen && activeView === 'code' && activeSession?.codePanelOpen === true
+  const chatOpen =
+    !settingsOpen && activeView === 'chat' && activeSession?.chatPanelOpen === true
   // Only in a space workspace — home has no doc outline.
   const knowledgeOpen =
-    activeView === 'knowledge' && knowledgeMode === 'workspace' && knowledgePanelOpen
+    !settingsOpen &&
+    activeView === 'knowledge' &&
+    knowledgeMode === 'workspace' &&
+    knowledgePanelOpen
   // Terminal files rail: focused managed session + toolbar toggle (like KB outline).
   const terminalsOpen =
+    !settingsOpen &&
     TERMINAL_MANAGEMENT &&
     activeView === 'terminals' &&
     !!focusedManagedId &&
@@ -168,7 +178,9 @@ export function AppLayout() {
   }
 
   const renderMainContent = () => {
-    // Settings / History / Trash are overlay shells (OverlayShellHost); not main column.
+    // Settings: sidebar category rail + main column body (not a modal shell).
+    if (overlay === 'settings') return <SettingsPage />
+    // History / Trash remain modal shells (OverlayShellHost).
     if (activeView === 'knowledge') return <KnowledgePage />
     if (activeView === 'terminals') {
       if (TERMINAL_MANAGEMENT) {
@@ -232,7 +244,7 @@ export function AppLayout() {
         <Panel minSize={34} className="flex min-w-0 flex-col bg-surface">
           <MainToolbar />
           <div
-            key={activeView}
+            key={overlay === 'settings' ? 'settings' : activeView}
             className="flex min-h-0 min-w-0 flex-1 flex-col animate-view-enter"
           >
             {renderMainContent()}

@@ -53,6 +53,13 @@ async function leaveActiveSurfaceIfNeeded(): Promise<void> {
   else if (view === 'tasks') await leaveWorkItems()
 }
 
+/** Leave Settings main-column mode when navigating to a work surface. */
+function dismissSettingsIfOpen(): void {
+  if (useUiStore.getState().overlay === 'settings') {
+    useUiStore.getState().setOverlay(null)
+  }
+}
+
 /**
  * After leaving knowledge/tasks for history/trash:
  * restore sidebar list to chats/projects so those special views are not paired
@@ -95,6 +102,7 @@ export async function enterKnowledge(): Promise<void> {
   if (useUiStore.getState().activeView === 'tasks') {
     await leaveWorkItems()
   }
+  dismissSettingsIfOpen()
   useUiStore.getState().openKnowledgeView()
   useUiStore.getState().setSidebarSection('knowledge')
   await useKnowledgeStore.getState().loadSpaces()
@@ -117,6 +125,7 @@ export async function enterKnowledge(): Promise<void> {
 export async function enterSection(section: 'projects' | 'chats'): Promise<void> {
   // Only await when leaving knowledge/tasks so other callers stay sync (palette tests / click handlers).
   await leaveActiveSurfaceIfNeeded()
+  dismissSettingsIfOpen()
   useUiStore.getState().setSidebarSection(section)
   sessionService.setSurface(section === 'projects' ? 'code' : 'chat')
   recordNavEntry()
@@ -125,6 +134,7 @@ export async function enterSection(section: 'projects' | 'chats'): Promise<void>
 /** Enter a primary-nav placeholder (tasks / automation; terminals when flag off). */
 export async function enterPlaceholderSection(section: PlaceholderSidebarSection): Promise<void> {
   await leaveActiveSurfaceIfNeeded()
+  dismissSettingsIfOpen()
   useUiStore.getState().setSidebarSection(section)
   useUiStore.getState().setActiveView(section)
   recordNavEntry()
@@ -142,6 +152,7 @@ export async function enterTerminalsSection(opts?: {
   library?: boolean
 }): Promise<void> {
   await leaveActiveSurfaceIfNeeded()
+  dismissSettingsIfOpen()
   if (opts?.library) {
     useManagedTerminalStore.getState().focus(null)
   }
@@ -162,6 +173,7 @@ export async function enterWorkItemsSection(): Promise<void> {
   if (view === 'knowledge') {
     await leaveKnowledge()
   }
+  dismissSettingsIfOpen()
   // Product default: every entry into 事项追踪 opens month calendar (D24).
   // Resets even when already on tasks so sidebar re-click and e2e re-entry match.
   const { useWorkItemViewStore } = await import('@/store/workItemViewStore')
@@ -193,6 +205,7 @@ export async function enterAutomationsSection(): Promise<void> {
   } else if (view === 'tasks') {
     await leaveWorkItems()
   }
+  dismissSettingsIfOpen()
   if (view === 'automation') {
     useUiStore.getState().setSidebarSection('automation')
     return
@@ -209,15 +222,14 @@ export async function enterAutomationsSection(): Promise<void> {
 /**
  * Select a session from sidebar / History (row or context-menu Open).
  * Leaves knowledge/tasks if needed, selects session, records nav.
- * Dismisses history/trash overlay so the work surface is visible.
- * Does **not** dismiss settings overlay.
+ * Dismisses history/trash/settings so the work surface is visible.
  */
 export async function selectSessionFromSidebar(id: string): Promise<void> {
   await leaveActiveSurfaceIfNeeded()
   sessionService.selectSession(id)
   recordNavEntry()
   const o = useUiStore.getState().overlay
-  if (o === 'history' || o === 'trash') {
+  if (o === 'history' || o === 'trash' || o === 'settings') {
     useUiStore.getState().setOverlay(null)
   }
 }
@@ -227,6 +239,7 @@ export const openSessionFromHistory = selectSessionFromSidebar
 
 export async function newConversationFromSidebar(surface: 'chat' | 'code'): Promise<void> {
   await leaveActiveSurfaceIfNeeded()
+  dismissSettingsIfOpen()
   sessionService.newConversation(surface)
   useUiStore.getState().setSidebarSection(surface === 'code' ? 'projects' : 'chats')
   recordNavEntry()
@@ -238,6 +251,7 @@ export async function openSpaceFromSidebar(spaceId: string): Promise<void> {
   if (useUiStore.getState().activeView === 'tasks') {
     await leaveWorkItems()
   }
+  dismissSettingsIfOpen()
   useUiStore.getState().openKnowledgeView()
   useUiStore.getState().setSidebarSection('knowledge')
   const kb = useKnowledgeStore.getState()
@@ -250,7 +264,8 @@ export async function openSpaceFromSidebar(spaceId: string): Promise<void> {
 
 /**
  * Canonical Settings open. All product entry points must call this (or a thin wrapper).
- * Never assign settings as activeView — overlays own that destination.
+ * Never assign settings as activeView — overlay === 'settings' owns the destination
+ * (sidebar category rail + main-column body).
  *
  * Param semantics (page always wins when provided):
  * - If `page` is defined → setSettingsPage(page)
@@ -271,6 +286,8 @@ export function openSettingsOverlay(
   }
   // Always land on category page (pop any leftover L2 editor).
   ui.setSettingsShellRoute({ type: 'page' })
+  // Settings needs the left rail for category nav.
+  if (!ui.sidebarOpen) ui.setSidebarOpen(true)
   ui.setOverlay('settings')
 }
 

@@ -85,6 +85,7 @@ import {
 import { SIDEBAR_ACTIVE_RAIL } from './sidebarActiveRail'
 import { sidebarFooterActive } from './sidebarFooterActive'
 import { SidebarAccountFooter } from './SidebarAccountFooter'
+import { SettingsSidebarContent } from './SettingsSidebarContent'
 import { goNavBack, goNavForward } from './navHistory'
 import { useNavHistoryStore } from '@/store/navHistoryStore'
 import { titlebarIconBtnClass, titlebarIconProps, titlebarRowClass } from './titlebarChrome'
@@ -321,12 +322,14 @@ export function AppSidebar() {
 
   const isChatDateGroupExpanded = (bucketId: string) => chatDateGroupCollapsed[bucketId] !== true
 
+  const settingsOpen = overlay === 'settings'
+
   return (
     <aside
       className="relative flex h-full shrink-0 flex-col border-r border-border bg-surface"
       style={{ width: sidebarWidth }}
       data-testid="app-sidebar"
-      aria-label={t('sidebar.aria')}
+      aria-label={settingsOpen ? t('settings.title') : t('sidebar.aria')}
     >
       <div
         data-tauri-drag-region
@@ -367,33 +370,41 @@ export function AppSidebar() {
           >
             <PanelLeftClose {...titlebarIconProps} />
           </button>
-          <button
-            type="button"
-            data-testid="sidebar-nav-back"
-            data-no-drag
-            title={t('sidebar.navBack')}
-            aria-label={t('sidebar.navBackAria')}
-            disabled={!canGoBack}
-            onClick={() => void goNavBack()}
-            className={titlebarNavBtnClass}
-          >
-            <ChevronLeft {...titlebarIconProps} />
-          </button>
-          <button
-            type="button"
-            data-testid="sidebar-nav-forward"
-            data-no-drag
-            title={t('sidebar.navForward')}
-            aria-label={t('sidebar.navForwardAria')}
-            disabled={!canGoForward}
-            onClick={() => void goNavForward()}
-            className={titlebarNavBtnClass}
-          >
-            <ChevronRight {...titlebarIconProps} />
-          </button>
+          {!settingsOpen ? (
+            <>
+              <button
+                type="button"
+                data-testid="sidebar-nav-back"
+                data-no-drag
+                title={t('sidebar.navBack')}
+                aria-label={t('sidebar.navBackAria')}
+                disabled={!canGoBack}
+                onClick={() => void goNavBack()}
+                className={titlebarNavBtnClass}
+              >
+                <ChevronLeft {...titlebarIconProps} />
+              </button>
+              <button
+                type="button"
+                data-testid="sidebar-nav-forward"
+                data-no-drag
+                title={t('sidebar.navForward')}
+                aria-label={t('sidebar.navForwardAria')}
+                disabled={!canGoForward}
+                onClick={() => void goNavForward()}
+                className={titlebarNavBtnClass}
+              >
+                <ChevronRight {...titlebarIconProps} />
+              </button>
+            </>
+          ) : null}
         </div>
       </div>
 
+      {settingsOpen ? (
+        <SettingsSidebarContent />
+      ) : (
+        <>
       <div
         className="px-3 pb-1.5 pt-0 text-caption tabular-nums tracking-wide text-ink-tertiary"
         data-testid="sidebar-app-version"
@@ -874,6 +885,16 @@ export function AppSidebar() {
         )}
       </div>
 
+      <SidebarAccountFooter
+        active={sidebarFooterActive({ overlay })}
+        historyCount={historyCount}
+        onOpenTrash={() => toggleTrashOverlay()}
+        onOpenHistory={() => toggleHistoryOverlay()}
+        onOpenSettings={() => void openSettingsFromChrome()}
+      />
+        </>
+      )}
+
       {/* Edge resize — overlaps the border so the hit target is easy without a layout gap. */}
       <div
         role="separator"
@@ -898,14 +919,6 @@ export function AppSidebar() {
           aria-hidden
         />
       </div>
-
-      <SidebarAccountFooter
-        active={sidebarFooterActive({ overlay })}
-        historyCount={historyCount}
-        onOpenTrash={() => toggleTrashOverlay()}
-        onOpenHistory={() => toggleHistoryOverlay()}
-        onOpenSettings={() => void openSettingsFromChrome()}
-      />
     </aside>
   )
 }

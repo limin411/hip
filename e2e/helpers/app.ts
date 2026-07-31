@@ -70,19 +70,23 @@ export async function leaveSpecialViewsIfOpen(): Promise<void> {
     const trashPage = await browser.$('[data-testid="recycle-bin-page"]')
     const historyShell = await browser.$('[data-testid="overlay-shell-history"]')
     const trashShell = await browser.$('[data-testid="overlay-shell-trash"]')
-    const settingsShell = await browser.$('[data-testid="overlay-shell-settings"]')
     if (
       !(await settingsPage.isExisting()) &&
       !(await historyPage.isExisting()) &&
       !(await trashPage.isExisting()) &&
       !(await historyShell.isExisting()) &&
-      !(await trashShell.isExisting()) &&
-      !(await settingsShell.isExisting())
+      !(await trashShell.isExisting())
     ) {
       break
     }
 
-    // Overlay still open: try modal-close then footer.
+    // Settings: leave via sidebar back. History/trash: modal-close.
+    const settingsBack = await browser.$('[data-testid="settings-sidebar-back"]')
+    if (await settingsBack.isExisting()) {
+      await browser.execute((el: HTMLElement) => el.click(), settingsBack)
+      await browser.pause(200)
+      continue
+    }
     const modalClose = await browser.$('[data-testid="modal-close"]')
     if (await modalClose.isExisting()) {
       await browser.execute((el: HTMLElement) => el.click(), modalClose)
@@ -105,14 +109,12 @@ export async function leaveSpecialViewsIfOpen(): Promise<void> {
       const trashPage = await browser.$('[data-testid="recycle-bin-page"]')
       const historyShell = await browser.$('[data-testid="overlay-shell-history"]')
       const trashShell = await browser.$('[data-testid="overlay-shell-trash"]')
-      const settingsShell = await browser.$('[data-testid="overlay-shell-settings"]')
       return (
         !(await settingsPage.isExisting()) &&
         !(await historyPage.isExisting()) &&
         !(await trashPage.isExisting()) &&
         !(await historyShell.isExisting()) &&
-        !(await trashShell.isExisting()) &&
-        !(await settingsShell.isExisting())
+        !(await trashShell.isExisting())
       )
     },
     { timeout: 10000, interval: 200, timeoutMsg: 'still on settings/history/trash after leaveSpecialViewsIfOpen' },

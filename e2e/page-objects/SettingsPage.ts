@@ -1,6 +1,7 @@
 export class SettingsPage {
   get settingsButton() { return browser.$('[data-testid="account-settings-button"]') }
-  get shell() { return browser.$('[data-testid="overlay-shell-settings"]') }
+  /** Settings main-column body (replaces former overlay shell). */
+  get shell() { return browser.$('[data-testid="settings-page"]') }
   nav(
     page:
       | 'general'
@@ -20,7 +21,7 @@ export class SettingsPage {
   ) {
     return browser.$(`[data-testid="settings-nav-${page}"]`)
   }
-  /** Prefer shell modal-close; legacy titlebar-back may be absent. */
-  get backButton() { return browser.$('[data-testid="modal-close"]') }
+  /** Leave Settings via sidebar back control. */
+  get backButton() { return browser.$('[data-testid="settings-sidebar-back"]') }
   get activeTabPanel() { return browser.$('[role="tabpanel"][data-state="active"]') }
 }

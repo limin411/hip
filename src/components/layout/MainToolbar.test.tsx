@@ -75,15 +75,17 @@ describe('MainToolbar', () => {
     expect(screen.getByTestId('main-toolbar-title')).toHaveTextContent('My Session')
   })
 
-  it('under settings overlay still shows work-surface chrome', () => {
+  it('under settings mode shows settings title without panel chrome', () => {
     useUiStore.setState({
       activeView: 'chat',
       overlay: 'settings',
+      settingsPage: 'general',
       sidebarSection: 'chats',
     })
     render(<MainToolbar />)
     expect(screen.queryByTestId('main-toolbar-back')).not.toBeInTheDocument()
-    expect(screen.getByTestId('connection-status')).toBeInTheDocument()
+    expect(screen.queryByTestId('connection-status')).not.toBeInTheDocument()
+    expect(screen.getByTestId('main-toolbar-title')).toBeInTheDocument()
   })
 
   it('under history overlay still shows work-surface chrome', () => {

@@ -13,7 +13,11 @@ import {
 
 export type ArtifactTab = 'files' | 'agents' | 'tasks' | 'outline' | 'timeline' | 'changes' | 'terminal'
 
-/** Footer utility shells (ephemeral — not persisted). */
+/**
+ * Ephemeral app mode flags (not persisted).
+ * - history / trash: modal shells (OverlayShellHost)
+ * - settings: left-rail category nav + main-column body (not a modal)
+ */
 export type AppOverlay = 'history' | 'trash' | 'settings'
 
 /**
@@ -36,7 +40,7 @@ export type SettingsShellRoute =
 
 export const SETTINGS_SHELL_PAGE: SettingsShellRoute = { type: 'page' }
 
-/** Work-surface main column only. History / Trash / Settings are AppOverlay. */
+/** Work-surface main column only. History / Trash / Settings use AppOverlay. */
 export type ActiveView =
   | 'chat'
   | 'code'

@@ -12,7 +12,7 @@ export async function openSettings(): Promise<void> {
     await waitForHipE2E(5000)
     await openSettingsPageForE2e('general')
     await browser
-      .$('[data-testid="overlay-shell-settings"], [data-testid="settings-nav-general"]')
+      .$('[data-testid="settings-page"], [data-testid="settings-nav-general"]')
       .waitForExist({ timeout: 10000 })
     return
   } catch {
@@ -22,19 +22,17 @@ export async function openSettings(): Promise<void> {
   await button.waitForExist({ timeout: 10000 })
   await button.click()
   await browser
-    .$('[data-testid="overlay-shell-settings"], [data-testid="settings-nav-general"]')
+    .$('[data-testid="settings-page"], [data-testid="settings-nav-general"]')
     .waitForExist({ timeout: 10000 })
 }
 
 /**
- * Close Settings overlay shell.
- * Prefer closeOverlayForE2e; fallback modal-close / footer re-click.
- * Do not rely on missing titlebar-back / settings-back.
+ * Close Settings (sidebar + main column mode).
+ * Prefer closeOverlayForE2e; fallback settings-sidebar-back.
  */
 export async function closeSettings(): Promise<void> {
-  const shell = await browser.$('[data-testid="overlay-shell-settings"]')
   const page = await browser.$('[data-testid="settings-page"]')
-  if (!(await shell.isExisting()) && !(await page.isExisting())) return
+  if (!(await page.isExisting())) return
 
   await waitForHipE2E()
   try {
@@ -43,13 +41,10 @@ export async function closeSettings(): Promise<void> {
     // fall through
   }
 
-  if (
-    (await (await browser.$('[data-testid="overlay-shell-settings"]')).isExisting()) ||
-    (await (await browser.$('[data-testid="settings-page"]')).isExisting())
-  ) {
-    const modalClose = await browser.$('[data-testid="modal-close"]')
-    if (await modalClose.isExisting()) {
-      await browser.execute((el: HTMLElement) => el.click(), modalClose)
+  if (await (await browser.$('[data-testid="settings-page"]')).isExisting()) {
+    const back = await browser.$('[data-testid="settings-sidebar-back"]')
+    if (await back.isExisting()) {
+      await browser.execute((el: HTMLElement) => el.click(), back)
     } else {
       const footer = await browser.$('[data-testid="account-settings-button"]')
       if (await footer.isExisting()) {
@@ -59,9 +54,7 @@ export async function closeSettings(): Promise<void> {
   }
 
   await browser.waitUntil(
-    async () =>
-      !(await (await browser.$('[data-testid="overlay-shell-settings"]')).isExisting()) &&
-      !(await (await browser.$('[data-testid="settings-page"]')).isExisting()),
+    async () => !(await (await browser.$('[data-testid="settings-page"]')).isExisting()),
     { timeout: 10000, interval: 200 },
   )
 }

@@ -4,13 +4,57 @@ import { useActiveSession } from '@/domain'
 import { isMacPlatform } from '@/lib/platform'
 import { useCommandPaletteStore } from '@/store/commandPaletteStore'
 import { useKnowledgeStore } from '@/store/knowledgeStore'
-import { useUiStore } from '@/store/uiStore'
+import { useUiStore, type SettingsPageId } from '@/store/uiStore'
 import { useWindowDrag } from '@/lib/useWindowDrag'
 import { cn } from '@/lib/utils'
 import { ConnectionStatus } from './ConnectionStatus'
 import { PanelToggle } from './PanelToggle'
 import { titlebarIconBtnClass, titlebarIconProps, titlebarRowClass } from './titlebarChrome'
 import { useCaptionTitleDoubleClick, WindowCaptionButtons } from './WindowCaptionButtons'
+
+/** i18n key for the active settings category in the main toolbar title. */
+function settingsPageTitleKey(
+  page: SettingsPageId,
+):
+  | 'settings.general'
+  | 'settings.voicePage'
+  | 'settings.window'
+  | 'settings.model'
+  | 'settings.agentsLabel'
+  | 'settings.mcpLabel'
+  | 'settings.connectorsLabel'
+  | 'settings.skillLabel'
+  | 'settings.pluginsLabel'
+  | 'settings.hooksLabel'
+  | 'settings.memoryLabel'
+  | null {
+  switch (page) {
+    case 'general':
+      return 'settings.general'
+    case 'voice':
+      return 'settings.voicePage'
+    case 'window':
+      return 'settings.window'
+    case 'model':
+      return 'settings.model'
+    case 'agents':
+      return 'settings.agentsLabel'
+    case 'mcp':
+      return 'settings.mcpLabel'
+    case 'connectors':
+      return 'settings.connectorsLabel'
+    case 'skill':
+      return 'settings.skillLabel'
+    case 'plugins':
+      return 'settings.pluginsLabel'
+    case 'hooks':
+      return 'settings.hooksLabel'
+    case 'memory':
+      return 'settings.memoryLabel'
+    default:
+      return null
+  }
+}
 
 /**
  * Main-column context bar (not a window titlebar).
@@ -25,6 +69,8 @@ export function MainToolbar() {
   const handlePointerDown = useWindowDrag()
   const handleTitleDblClick = useCaptionTitleDoubleClick()
   const activeView = useUiStore((s) => s.activeView)
+  const overlay = useUiStore((s) => s.overlay)
+  const settingsPage = useUiStore((s) => s.settingsPage)
   const sidebarOpen = useUiStore((s) => s.sidebarOpen)
   const activeSession = useActiveSession()
   const kbMode = useKnowledgeStore((s) => s.mode)
@@ -33,15 +79,20 @@ export function MainToolbar() {
   const isMac = isMacPlatform()
 
   // Terminals keeps MainToolbar panel chrome (right-rail toggle) like chat/code/knowledge.
-  // tasks / automation stay chrome-light. Settings/history/trash are overlays (not special mains).
+  // tasks / automation / settings stay chrome-light. History/trash remain modal shells.
+  const settingsOpen = overlay === 'settings'
   const isSpecial =
-    activeView === 'automation' ||
-    activeView === 'tasks'
+    settingsOpen || activeView === 'automation' || activeView === 'tasks'
   const showPanelChrome = !isSpecial
   const showSidebarExpand = !sidebarOpen
 
   let title = ''
-  if (activeView === 'automation') {
+  if (settingsOpen) {
+    title = t('settings.title')
+    // Prefer the active category label when available.
+    const pageKey = settingsPageTitleKey(settingsPage)
+    if (pageKey) title = t(pageKey)
+  } else if (activeView === 'automation') {
     title = t('sidebar.nav.automation')
   } else if (activeView === 'terminals') {
     title = t('sidebar.nav.terminals')

@@ -2,10 +2,13 @@ import { describe, expect, it } from 'vitest'
 import { sidebarFooterActive } from './sidebarFooterActive'
 
 describe('sidebarFooterActive', () => {
-  it('returns overlay when set', () => {
+  it('returns history/trash overlay when set', () => {
     expect(sidebarFooterActive({ overlay: 'history' })).toBe('history')
     expect(sidebarFooterActive({ overlay: 'trash' })).toBe('trash')
-    expect(sidebarFooterActive({ overlay: 'settings' })).toBe('settings')
+  })
+
+  it('returns null for settings (footer replaced by settings rail)', () => {
+    expect(sidebarFooterActive({ overlay: 'settings' })).toBeNull()
   })
 
   it('returns null when no overlay', () => {

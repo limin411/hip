@@ -194,6 +194,9 @@ export const en = {
         chipAria: 'Toggle roundtable mode for the first message',
         chipHint: 'hip chairs multi-round debate when the topic needs it',
         disabledHint: 'Unavailable while a skill or slash command is active',
+        /** Mode dropdown placeholder — not shipped yet. */
+        discussion: 'Discussion mode',
+        comingSoon: 'Coming soon',
         helper:
           'Simple questions stay normal chat. Complex topics: advisors debate over multiple rounds; hip sets round count, stage conclusions, and the final decision.',
         badge: 'Roundtable',

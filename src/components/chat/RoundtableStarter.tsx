@@ -1,8 +1,15 @@
 import { useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Users } from 'lucide-react'
+import { Check, ChevronDown, MessagesSquare, Users } from 'lucide-react'
 import { useDraftStore } from '@/store/draftStore'
-import { ROUNDTABLE_PERSONAS } from '@/lib/roundtable'
+import { ComposerChip } from './ComposerChip'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/DropdownMenu'
 import { cn } from '@/lib/utils'
 
 interface RoundtableStarterProps {
@@ -11,7 +18,10 @@ interface RoundtableStarterProps {
 }
 
 /**
- * Chat empty-state one-shot starter for roundtable framing.
+ * Chat empty-state one-shot starter for roundtable framing, rendered as a mode
+ * dropdown in the composer footer strip:
+ * - Roundtable: toggleable now (arms the first-message framing).
+ * - Discussion mode: placeholder item, disabled until shipped.
  * Visibility: parent only mounts on chat NewConversation when ROUNDTABLE_STARTER.
  */
 export function RoundtableStarter({ disabled = false }: RoundtableStarterProps) {
@@ -25,51 +35,65 @@ export function RoundtableStarter({ disabled = false }: RoundtableStarterProps) 
   }, [disabled, active, setRoundtable])
 
   return (
-    <div
-      className="flex w-full flex-col items-center animate-greeting-enter"
-      data-testid="roundtable-starter"
-    >
-      <button
-        type="button"
-        data-testid="roundtable-chip"
-        aria-pressed={active}
-        aria-label={t('chat.roundtable.chipAria')}
-        disabled={disabled}
-        title={disabled ? t('chat.roundtable.disabledHint') : t('chat.roundtable.chipHint')}
-        onClick={() => {
-          if (disabled) return
-          setRoundtable(!active)
-        }}
-        className={cn(
-          'inline-flex h-8 items-center gap-1.5 rounded-full border px-3 text-meta font-medium',
-          'transition-colors duration-chrome focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink/20',
-          'disabled:cursor-not-allowed disabled:opacity-50',
-          active
-            ? 'border-effort-max bg-state-hover text-ink shadow-sm'
-            : 'border-border bg-surface text-ink-secondary hover:bg-state-hover hover:text-ink',
-        )}
-      >
-        <Users size={14} className={cn(active && 'text-effort-max')} aria-hidden />
-        <span className={cn(active && 'effort-max-text')}>{t('chat.roundtable.chip')}</span>
-      </button>
-
-      {active && !disabled && (
-        <div
-          className="mt-2.5 flex w-full max-w-full flex-wrap items-center justify-center gap-1.5"
-          data-testid="roundtable-panel"
+    <div className="flex min-w-0 items-center" data-testid="roundtable-starter">
+      <DropdownMenu modal={false}>
+        <DropdownMenuTrigger asChild>
+          <ComposerChip
+            type="button"
+            disabled={disabled}
+            active={active}
+            data-testid="roundtable-chip"
+            title={disabled ? t('chat.roundtable.disabledHint') : t('chat.roundtable.chipHint')}
+            aria-haspopup="menu"
+            className={cn(
+              active && 'border border-effort-max bg-state-active text-ink shadow-sm',
+            )}
+          >
+            <Users size={13} strokeWidth={1.75} className={cn('shrink-0', active && 'text-effort-max')} aria-hidden />
+            <span className="max-w-[120px] truncate">{t('chat.roundtable.chip')}</span>
+            <ChevronDown size={13} strokeWidth={1.75} className="shrink-0 opacity-60" aria-hidden />
+          </ComposerChip>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent
+          align="start"
+          data-testid="roundtable-menu"
+          onCloseAutoFocus={(e) => e.preventDefault()}
         >
-          {ROUNDTABLE_PERSONAS.map((id, i) => (
-            <span
-              key={id}
-              data-testid={`roundtable-seat-${id}`}
-              className="animate-roundtable-seat inline-flex items-center rounded-md border border-border bg-surface px-2 py-1 text-caption text-ink-secondary"
-              style={{ animationDelay: `${i * 80}ms` }}
-            >
-              {t(`chat.roundtable.personas.${id}`)}
+          <DropdownMenuItem
+            data-testid="roundtable-option"
+            onSelect={() => setRoundtable(!active)}
+            className="justify-between"
+          >
+            <span className="flex items-center gap-2.5">
+              <Users size={14} className="shrink-0 text-ink-tertiary" aria-hidden />
+              {t('chat.roundtable.chip')}
             </span>
-          ))}
-        </div>
-      )}
+            <Check
+              size={14}
+              className={cn('shrink-0 text-accent', active ? 'opacity-100' : 'opacity-0')}
+              aria-hidden
+            />
+          </DropdownMenuItem>
+          <DropdownMenuSeparator />
+          <DropdownMenuItem
+            disabled
+            data-testid="discussion-option"
+            title={t('chat.roundtable.comingSoon')}
+            className="justify-between"
+          >
+            <span className="flex items-center gap-2.5">
+              <MessagesSquare size={14} className="shrink-0 text-ink-tertiary" aria-hidden />
+              {t('chat.roundtable.discussion')}
+            </span>
+            <span
+              className="rounded bg-surface-muted px-1.5 py-px text-caption font-medium text-ink-tertiary"
+              data-testid="discussion-coming-soon"
+            >
+              {t('chat.roundtable.comingSoon')}
+            </span>
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
     </div>
   )
 }

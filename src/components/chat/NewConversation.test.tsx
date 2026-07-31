@@ -18,6 +18,48 @@ vi.mock('@/ipc/dialog', () => ({
   pickAttachmentFiles: vi.fn(),
 }))
 
+// RoundtableStarter renders a mode dropdown (Roundtable / Discussion placeholder).
+// Mock Radix so menu content is always mounted and items fire onSelect on click.
+vi.mock('@/components/ui/DropdownMenu', async () => {
+  const R = await import('react')
+  return {
+    DropdownMenu: ({ children }: { children: React.ReactNode }) =>
+      R.createElement(R.Fragment, null, children),
+    DropdownMenuTrigger: ({ children }: { children: React.ReactNode }) =>
+      R.createElement(R.Fragment, null, children),
+    DropdownMenuContent: ({
+      children,
+      ...rest
+    }: {
+      children: React.ReactNode
+      'data-testid'?: string
+    }) => R.createElement('div', { 'data-testid': rest['data-testid'] }, children),
+    DropdownMenuLabel: ({ children }: { children: React.ReactNode }) =>
+      R.createElement('div', null, children),
+    DropdownMenuSeparator: () => R.createElement('hr', null),
+    DropdownMenuItem: ({
+      children,
+      onSelect,
+      disabled,
+      ...rest
+    }: {
+      children: React.ReactNode
+      onSelect?: () => void
+      disabled?: boolean
+      'data-testid'?: string
+    }) =>
+      R.createElement(
+        'div',
+        {
+          'data-testid': rest['data-testid'],
+          'aria-disabled': disabled ? 'true' : undefined,
+          onClick: () => onSelect?.(),
+        },
+        children,
+      ),
+  }
+})
+
 const toastMessage = vi.fn()
 vi.mock('sonner', () => ({
   toast: { message: (...args: unknown[]) => toastMessage(...args) },
@@ -116,22 +158,25 @@ describe('NewConversation', () => {
     useSkillsStore.setState({ skills: [], enabled: {}, loaded: false })
   })
 
-  it('shows roundtable starter on chat empty state and toggles draft flag', () => {
+  it('roundtable starter is a mode dropdown in the composer footer: toggles roundtable, discussion is a disabled placeholder', () => {
     setDraftModel('openai/gpt-4o')
     render(<NewConversation />)
-    expect(screen.getByTestId('roundtable-starter')).toBeInTheDocument()
     // Roundtable lives in the composer footer strip below the input.
     expect(
       within(screen.getByTestId('composer-footer')).getByTestId('roundtable-starter'),
     ).toBeInTheDocument()
-    const chip = screen.getByTestId('roundtable-chip')
-    expect(chip).toHaveAttribute('aria-pressed', 'false')
-    fireEvent.click(chip)
+    // Mode dropdown: roundtable toggle + discussion placeholder.
+    expect(screen.getByTestId('roundtable-menu')).toBeInTheDocument()
+    const discussion = screen.getByTestId('discussion-option')
+    expect(discussion).toHaveAttribute('aria-disabled', 'true')
+    expect(within(discussion).getByTestId('discussion-coming-soon')).toHaveTextContent(
+      'Coming soon',
+    )
+    // Roundtable item toggles the draft flag.
+    expect(useDraftStore.getState().draft?.roundtable).toBeUndefined()
+    fireEvent.click(screen.getByTestId('roundtable-option'))
     expect(useDraftStore.getState().draft?.roundtable).toBe(true)
-    expect(chip).toHaveAttribute('aria-pressed', 'true')
-    expect(screen.getByTestId('roundtable-panel')).toBeInTheDocument()
-    expect(screen.getByTestId('roundtable-seat-strategist')).toBeInTheDocument()
-    fireEvent.click(chip)
+    fireEvent.click(screen.getByTestId('roundtable-option'))
     expect(useDraftStore.getState().draft?.roundtable).toBeUndefined()
   })
 

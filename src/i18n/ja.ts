@@ -175,6 +175,8 @@ export const ja = {
       "chipAria": "最初のメッセージの円卓モードを切り替え",
       "chipHint": "必要なら hip が複数ラウンドの議論を進行し決定します",
       "disabledHint": "スキルまたはスラッシュコマンド使用中は利用できません",
+      "discussion": "ディスカッションモード",
+      "comingSoon": "近日公開",
       "helper": "簡単な質問は通常の会話のまま。複雑な議題では顧問が複数ラウンドで議論し、hip がラウンド数・段階結論・最終決定を担います。",
       "badge": "円卓",
       "metaRounds": "ラウンド {{ran}}/{{planned}}",

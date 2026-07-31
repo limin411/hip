@@ -183,6 +183,8 @@ export const zhTW = {
       "chipAria": "開關首則訊息的圓桌會議模式",
       "chipHint": "議題需要時，hip 主持多輪討論並拍板",
       "disabledHint": "使用技能或斜線命令時不可用",
+      "discussion": "討論模式",
+      "comingSoon": "待開發",
       "helper": "簡單問題仍以普通對話回答。複雜議題：顧問多輪交鋒；hip 決定討論回合數、給出階段性結論並拍板終案。",
       "badge": "圓桌",
       "metaRounds": "回合 {{ran}}/{{planned}}",

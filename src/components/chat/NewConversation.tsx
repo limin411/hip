@@ -390,6 +390,8 @@ export function NewConversation() {
                     </span>
                   )}
                 </div>
+              ) : ROUNDTABLE_STARTER ? (
+                <RoundtableStarter disabled={query !== null || !!selectedSkill} />
               ) : undefined
             }
           />
@@ -401,9 +403,6 @@ export function NewConversation() {
             />
           )}
         </div>
-        {surface === 'chat' && ROUNDTABLE_STARTER && (
-          <RoundtableStarter disabled={query !== null || !!selectedSkill} />
-        )}
       </div>
     </div>
   )

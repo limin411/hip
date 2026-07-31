@@ -120,6 +120,10 @@ describe('NewConversation', () => {
     setDraftModel('openai/gpt-4o')
     render(<NewConversation />)
     expect(screen.getByTestId('roundtable-starter')).toBeInTheDocument()
+    // Roundtable lives in the composer footer strip below the input.
+    expect(
+      within(screen.getByTestId('composer-footer')).getByTestId('roundtable-starter'),
+    ).toBeInTheDocument()
     const chip = screen.getByTestId('roundtable-chip')
     expect(chip).toHaveAttribute('aria-pressed', 'false')
     fireEvent.click(chip)

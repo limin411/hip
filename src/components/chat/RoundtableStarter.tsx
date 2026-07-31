@@ -26,7 +26,7 @@ export function RoundtableStarter({ disabled = false }: RoundtableStarterProps) 
 
   return (
     <div
-      className="mt-3 flex w-full flex-col items-center animate-greeting-enter"
+      className="flex w-full flex-col items-center animate-greeting-enter"
       data-testid="roundtable-starter"
     >
       <button

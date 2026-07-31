@@ -9,8 +9,8 @@ import { cn } from '@/lib/utils'
 import { focusChrome } from '@/components/ui/focusClasses'
 
 /**
- * Second-row tab strip for the shell right rail (code ArtifactPanel / chat PreviewPanel).
- * Replaces in-panel dropdown switching with always-visible tabs.
+ * Tab strip for the shell right rail titlebar (code ArtifactPanel / chat PreviewPanel).
+ * Sits in the first row beside collapse / branch controls; selected tab uses a rounded wash.
  */
 export function PanelTabBar({ surface }: { surface: 'code' | 'chat' }) {
   const { t } = useTranslation()
@@ -49,7 +49,8 @@ export function PanelTabBar({ surface }: { surface: 'code' | 'chat' }) {
       role="tablist"
       aria-label={t('chat.togglePanel')}
       data-testid="panel-tab-bar"
-      className="flex h-9 shrink-0 items-center gap-0.5 overflow-x-auto border-b border-border px-2"
+      data-tauri-drag-region="false"
+      className="flex min-w-0 flex-1 items-center gap-0.5 overflow-x-auto"
     >
       {tabs.map((tab) => {
         const selected = current === tab.value
@@ -63,12 +64,11 @@ export function PanelTabBar({ surface }: { surface: 'code' | 'chat' }) {
             data-testid={`panel-tab-${tab.value}`}
             onClick={() => onSelect(tab.value)}
             className={cn(
-              'relative inline-flex h-full shrink-0 items-center px-2.5 text-meta font-medium transition-colors duration-chrome',
+              'inline-flex h-7 shrink-0 items-center rounded-md px-2.5 text-meta font-medium transition-colors duration-chrome',
               focusChrome,
-              selected ? 'text-ink' : 'text-ink-tertiary hover:text-ink-secondary',
-              // Active underline (matches TabsTrigger dialect).
-              'after:absolute after:inset-x-1.5 after:bottom-0 after:h-0.5 after:rounded-full after:bg-accent after:opacity-0 after:transition-opacity after:duration-chrome',
-              selected && 'after:opacity-100',
+              selected
+                ? 'bg-state-active text-ink'
+                : 'text-ink-tertiary hover:bg-state-hover hover:text-ink-secondary',
             )}
           >
             {label}

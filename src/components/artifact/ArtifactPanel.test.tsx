@@ -111,16 +111,15 @@ describe('ArtifactPanel', () => {
     cleanup()
   })
 
-  it('shows the active view title and second-row tab bar', () => {
+  it('shows the titlebar tab bar without a panel title', () => {
     render(<ArtifactPanel />)
-    expect(screen.getByTestId('panel-title')).toHaveTextContent('Files')
     expect(screen.getByTestId('panel-tab-bar')).toBeInTheDocument()
+    expect(screen.queryByTestId('panel-title')).toBeNull()
   })
 
   it('falls back to files when a git-gated tab is active outside a git repo', () => {
     mockUiState = { activeTab: 'timeline' }
     render(<ArtifactPanel />)
-    expect(screen.getByTestId('panel-title')).toHaveTextContent('Files')
     expect(screen.getByTestId('panel-view-files')).toBeInTheDocument()
     expect(screen.queryByTestId('timeline-view')).toBeNull()
   })
@@ -129,7 +128,7 @@ describe('ArtifactPanel', () => {
     mockUiState = { activeTab: 'timeline' }
     mockDiffState = { bySession: { 'sess-1': { isGitRepo: true } } }
     render(<ArtifactPanel />)
-    expect(screen.getByTestId('panel-title')).toHaveTextContent('Timeline')
+    expect(screen.getByTestId('panel-view-timeline')).toBeInTheDocument()
     expect(screen.getByTestId('timeline-view')).toBeInTheDocument()
   })
 
@@ -142,14 +141,14 @@ describe('ArtifactPanel', () => {
   it('renders AgentsRuntimeSplit when agents tab is active', () => {
     mockUiState = { activeTab: 'agents' }
     render(<ArtifactPanel />)
-    expect(screen.getByTestId('panel-title')).toHaveTextContent('Agents')
+    expect(screen.getByTestId('panel-view-agents')).toBeInTheDocument()
     expect(screen.getByTestId('agents-runtime-split')).toBeInTheDocument()
   })
 
   it('maps legacy tasks tab to AgentsRuntimeSplit', () => {
     mockUiState = { activeTab: 'tasks' }
     render(<ArtifactPanel />)
-    expect(screen.getByTestId('panel-title')).toHaveTextContent('Agents')
+    expect(screen.getByTestId('panel-view-agents')).toBeInTheDocument()
     expect(screen.getByTestId('agents-runtime-split')).toBeInTheDocument()
   })
 
@@ -174,7 +173,6 @@ describe('ArtifactPanel', () => {
     mockUiState = { activeTab: 'terminal' }
     mockCodeTerminal = false
     render(<ArtifactPanel />)
-    expect(screen.getByTestId('panel-title')).toHaveTextContent('Files')
     expect(screen.getByTestId('panel-view-files')).toBeInTheDocument()
     expect(screen.queryByTestId('terminal-view')).toBeNull()
   })
@@ -184,7 +182,6 @@ describe('ArtifactPanel', () => {
     mockUiState = { activeTab: 'terminal' }
     mockCodeTerminal = true
     render(<ArtifactPanel />)
-    expect(screen.getByTestId('panel-title')).toHaveTextContent('Terminal')
     expect(screen.getByTestId('panel-view-terminal')).toBeInTheDocument()
     expect(screen.getByTestId('terminal-view')).toBeInTheDocument()
   })

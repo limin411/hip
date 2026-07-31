@@ -1,5 +1,4 @@
 import { Panel, PanelGroup, PanelResizeHandle } from 'react-resizable-panels'
-import { useTranslation } from 'react-i18next'
 import type { ArtifactTab } from '@/store/uiStore'
 import { useUiStore } from '@/store/uiStore'
 import { FileTree } from './FileTree'
@@ -18,27 +17,6 @@ import { PanelToggle } from '@/components/layout/PanelToggle'
 import { PanelTabBar } from './PanelTabBar'
 const GIT_GATED: ReadonlySet<ArtifactTab> = new Set(['timeline', 'changes'])
 
-function tabLabel(
-  tab: ArtifactTab,
-  t: (
-    key:
-      | 'artifact.files'
-      | 'artifact.agents'
-      | 'artifact.outline'
-      | 'artifact.timeline'
-      | 'artifact.changes'
-      | 'artifact.terminal',
-  ) => string,
-): string {
-  if (tab === 'files') return t('artifact.files')
-  // agents + tasks share the combined Agents/Runtime page
-  if (tab === 'agents' || tab === 'tasks') return t('artifact.agents')
-  if (tab === 'outline') return t('artifact.outline')
-  if (tab === 'timeline') return t('artifact.timeline')
-  if (tab === 'changes') return t('artifact.changes')
-  return t('artifact.terminal')
-}
-
 function resolveEffectiveTab(activeTab: ArtifactTab, isGitRepo: boolean): ArtifactTab {
   if (GIT_GATED.has(activeTab) && !isGitRepo) return 'files'
   // Flag-off leftover: treat like gated tab fallback.
@@ -49,7 +27,6 @@ function resolveEffectiveTab(activeTab: ArtifactTab, isGitRepo: boolean): Artifa
 }
 
 export function ArtifactPanel() {
-  const { t } = useTranslation()
   const activeTab = useUiStore((s) => s.activeTab)
   const sid = useDomainStore((s) => s.activeSessionId)
   const isGitRepo = useDiffStore((s) => (sid ? s.bySession[sid]?.isGitRepo : false)) ?? false
@@ -60,23 +37,15 @@ export function ArtifactPanel() {
     <div className="flex h-full min-h-0 flex-col border-l border-border bg-surface">
       <div
         data-tauri-drag-region
-        className="flex h-[var(--titlebar-height)] shrink-0 items-center justify-between border-b border-border px-2"
+        className="flex h-[var(--titlebar-height)] shrink-0 items-center gap-1 border-b border-border px-2"
       >
-        <span
-          className="truncate px-1.5 text-body font-medium tracking-tight text-ink"
-          data-tauri-drag-region="false"
-          data-testid="panel-title"
-        >
-          {tabLabel(effectiveTab, t)}
-        </span>
-        <div className="flex items-center gap-1" data-tauri-drag-region="false">
+        <PanelTabBar surface="code" />
+        <div className="flex shrink-0 items-center gap-1" data-tauri-drag-region="false">
           {isGitRepo && <BranchSwitcher />}
           {/* Relocated from main toolbar when open — same toggle collapses the rail. */}
           <PanelToggle slot="panel" />
         </div>
       </div>
-
-      <PanelTabBar surface="code" />
 
       <div className="min-h-0 flex-1 overflow-hidden" data-testid={`panel-view-${effectiveTab}`}>
         {effectiveTab === 'outline' && <ConversationOutline />}

@@ -57,8 +57,8 @@ export function useRightPanelOpen(): boolean {
  *
  * Mirrors left sidebar chrome: when the rail is closed the control lives in the
  * main toolbar with a dropdown to open a specific tab; when open it relocates
- * to the panel header as a one-click collapse. In-panel tab switching is the
- * second-row {@link PanelTabBar}, not a dropdown.
+ * to the panel titlebar as a one-click collapse. In-panel tab switching is the
+ * titlebar {@link PanelTabBar}, not a dropdown.
  */
 export function PanelToggle({ slot = 'toolbar' }: { slot?: PanelToggleSlot }) {
   const { t } = useTranslation()

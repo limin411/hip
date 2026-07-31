@@ -1,7 +1,7 @@
 /**
  * Open / select ArtifactPanel tabs.
  *
- * When the right rail is open, tabs are a second-row strip (`panel-tab-bar`).
+ * When the right rail is open, tabs live in the panel titlebar (`panel-tab-bar`).
  * When collapsed, open via the toolbar PanelToggle Radix DropdownMenu
  * (focus + Enter first, then pointer-event fallback — titlebar drag regions
  * swallow naive clicks under Tauri WDIO).
@@ -105,7 +105,7 @@ export async function closePanelMenu(): Promise<void> {
 
 /**
  * Select a panel tab (files | agents | terminal | …).
- * Uses the second-row tab bar when the rail is open; otherwise the toolbar menu
+ * Uses the titlebar tab bar when the rail is open; otherwise the toolbar menu
  * (which also opens the panel via setSession*PanelOpen).
  */
 export async function selectPanelTab(tab: string): Promise<void> {

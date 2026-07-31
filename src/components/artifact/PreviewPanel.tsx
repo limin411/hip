@@ -24,19 +24,6 @@ function base64ToBytes(b64: string): Uint8Array {
   return out
 }
 
-function tabLabel(
-  tab: ChatTab,
-  t: (
-    key: 'artifact.files' | 'artifact.agents' | 'artifact.outline' | 'artifact.sources',
-  ) => string,
-): string {
-  // agents + tasks share the combined Agents/Runtime page
-  if (tab === 'agents' || tab === 'tasks') return t('artifact.agents')
-  if (tab === 'outline') return t('artifact.outline')
-  if (tab === 'sources') return t('artifact.sources')
-  return t('artifact.files')
-}
-
 function effectiveChatTab(tab: ChatTab): ChatTab {
   return tab === 'tasks' ? 'agents' : tab
 }
@@ -78,20 +65,14 @@ export function PreviewPanel() {
     <div className="flex h-full min-h-0 flex-col border-l border-border bg-surface">
       <div
         data-tauri-drag-region
-        className="flex h-[var(--titlebar-height)] shrink-0 items-center justify-between border-b border-border px-2"
+        className="flex h-[var(--titlebar-height)] shrink-0 items-center gap-1 border-b border-border px-2"
       >
-        <span
-          className="truncate px-1.5 text-body font-medium tracking-tight text-ink"
-          data-tauri-drag-region="false"
-          data-testid="panel-title"
-        >
-          {tabLabel(chatActiveTab, t)}
-        </span>
+        <PanelTabBar surface="chat" />
         {/* Relocated from main toolbar when open — same toggle collapses the rail. */}
-        <PanelToggle slot="panel" />
+        <div className="shrink-0" data-tauri-drag-region="false">
+          <PanelToggle slot="panel" />
+        </div>
       </div>
-
-      <PanelTabBar surface="chat" />
 
       <div className="min-h-0 flex-1 overflow-hidden" data-testid={`panel-view-${chatActiveTab}`}>
         {chatActiveTab === 'outline' && <ConversationOutline />}

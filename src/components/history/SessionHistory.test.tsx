@@ -26,6 +26,7 @@ vi.mock('react-i18next', () => ({
       if (params) return `${key}:${JSON.stringify(params)}`
       return key
     },
+    i18n: { language: 'en' },
   }),
 }))
 
@@ -71,8 +72,8 @@ describe('SessionHistory', () => {
   it('renders first page of sessions', () => {
     render(<SessionHistory />)
     expect(screen.getByText('Session 1')).toBeInTheDocument()
-    expect(screen.getByText('Session 20')).toBeInTheDocument()
-    expect(screen.queryByText('Session 21')).not.toBeInTheDocument()
+    expect(screen.getByText('Session 10')).toBeInTheDocument()
+    expect(screen.queryByText('Session 11')).not.toBeInTheDocument()
   })
 
   it('filters sessions by search query', () => {
@@ -103,16 +104,16 @@ describe('SessionHistory', () => {
 
   it('paginates to the next page', () => {
     render(<SessionHistory />)
-    expect(screen.queryByText('Session 21')).not.toBeInTheDocument()
+    expect(screen.queryByText('Session 11')).not.toBeInTheDocument()
     fireEvent.click(screen.getByText('2'))
-    expect(screen.getByText('Session 21')).toBeInTheDocument()
+    expect(screen.getByText('Session 11')).toBeInTheDocument()
     expect(screen.queryByText('Session 1')).not.toBeInTheDocument()
   })
 
   it('resets to page 1 when filter changes', () => {
     render(<SessionHistory />)
     fireEvent.click(screen.getByText('2'))
-    expect(screen.getByText('Session 21')).toBeInTheDocument()
+    expect(screen.getByText('Session 11')).toBeInTheDocument()
     fireEvent.click(screen.getByText('history.filterCode'))
     expect(screen.queryByText('Session 1')).not.toBeInTheDocument()
     expect(screen.queryByText('Session 41')).not.toBeInTheDocument()
@@ -126,17 +127,19 @@ describe('SessionHistory', () => {
     expect(selectSessionFromSidebar).toHaveBeenCalledWith('s5')
   })
 
-  it('shows empty state when filtered results are empty', () => {
+  it('shows empty-filtered state when search matches nothing', () => {
     render(<SessionHistory />)
     fireEvent.change(screen.getByPlaceholderText('history.searchPlaceholder'), {
       target: { value: 'nonexistent' },
     })
-    expect(screen.getByText('history.empty')).toBeInTheDocument()
+    expect(screen.getByText('history.emptyFiltered')).toBeInTheDocument()
+    expect(screen.getByTestId('session-history-clear-filters')).toBeInTheDocument()
   })
 
   it('renders pageInfo with current and total pages', () => {
     render(<SessionHistory />)
-    expect(screen.getByText('Page 1 of 3')).toBeInTheDocument()
+    // 45 sessions / PAGE_SIZE 10 → 5 pages
+    expect(screen.getByText('Page 1 of 5')).toBeInTheDocument()
   })
 
   it('renders pagination in the same toolbar row as surface tabs', () => {
@@ -144,46 +147,60 @@ describe('SessionHistory', () => {
     const toolbar = screen.getByTestId('session-history-toolbar')
     expect(toolbar).toContainElement(screen.getByRole('navigation'))
     expect(toolbar).toContainElement(screen.getByText('history.filterAll'))
-    expect(toolbar).toContainElement(screen.getByText('Page 1 of 3'))
+    expect(toolbar).toContainElement(screen.getByText('Page 1 of 5'))
+  })
+
+  it('shows pagination when total exceeds page size (10)', () => {
+    mockSessions = createMockSessions().slice(0, 11)
+    render(<SessionHistory />)
+    expect(screen.getByRole('navigation')).toBeInTheDocument()
+    expect(screen.getByText('Page 1 of 2')).toBeInTheDocument()
+  })
+
+  it('hides pagination when total is within one page (≤10)', () => {
+    mockSessions = createMockSessions().slice(0, 10)
+    render(<SessionHistory />)
+    expect(screen.queryByRole('navigation')).not.toBeInTheDocument()
   })
 
   it('resets to page 1 when search query changes after navigating', () => {
     render(<SessionHistory />)
     fireEvent.click(screen.getByText('2'))
-    expect(screen.getByText('Session 21')).toBeInTheDocument()
-    expect(screen.getByText('Page 2 of 3')).toBeInTheDocument()
+    expect(screen.getByText('Session 11')).toBeInTheDocument()
+    expect(screen.getByText('Page 2 of 5')).toBeInTheDocument()
 
     fireEvent.change(screen.getByPlaceholderText('history.searchPlaceholder'), {
       target: { value: 'Session' },
     })
     expect(screen.getByText('Session 1')).toBeInTheDocument()
-    expect(screen.getByText('Page 1 of 3')).toBeInTheDocument()
+    expect(screen.getByText('Page 1 of 5')).toBeInTheDocument()
   })
 
   it('clamps to page 1 when the filtered list shrinks while on a later page', () => {
     const { rerender } = render(<SessionHistory />)
     fireEvent.click(screen.getByText('2'))
-    expect(screen.getByText('Session 21')).toBeInTheDocument()
-    expect(screen.getByText('Page 2 of 3')).toBeInTheDocument()
+    expect(screen.getByText('Session 11')).toBeInTheDocument()
+    expect(screen.getByText('Page 2 of 5')).toBeInTheDocument()
 
-    // Shrink the session list so only one page remains.
-    mockSessions = createMockSessions().slice(0, 20)
+    // Shrink the session list so only one page remains (≤ PAGE_SIZE).
+    mockSessions = createMockSessions().slice(0, 10)
     rerender(<SessionHistory />)
 
-    expect(screen.queryByText('Session 21')).not.toBeInTheDocument()
+    expect(screen.queryByText('Session 11')).not.toBeInTheDocument()
     expect(screen.getByText('Session 1')).toBeInTheDocument()
+    expect(screen.queryByRole('navigation')).not.toBeInTheDocument()
   })
 
   it('renders a delete button for each session', () => {
     render(<SessionHistory />)
-    expect(screen.getAllByLabelText('history.deleteSession')).toHaveLength(20)
+    expect(screen.getAllByLabelText('history.deleteSession')).toHaveLength(10)
   })
 
   it('renders delete buttons on page 2', () => {
     render(<SessionHistory />)
     fireEvent.click(screen.getByText('2'))
-    expect(screen.getAllByLabelText('history.deleteSession')).toHaveLength(20)
-    expect(screen.getByText('Session 21')).toBeInTheDocument()
+    expect(screen.getAllByLabelText('history.deleteSession')).toHaveLength(10)
+    expect(screen.getByText('Session 11')).toBeInTheDocument()
   })
 
   it('renders clear-all button when sessions exist', () => {

@@ -9,6 +9,7 @@ import {
   RotateCcw,
   Trash2,
   Search,
+  SearchX,
 } from 'lucide-react'
 import { sessionService } from '@/domain'
 import { Button } from '@/components/ui/Button'
@@ -21,6 +22,8 @@ import * as DialogPrimitive from '@radix-ui/react-dialog'
 import { useTrashListStore } from '@/store/trashListStore'
 import { useHipConfigStore } from '@/store/hipConfigStore'
 import { daysLeftInTrash, resolveTrashRetentionDays } from '@/lib/trashRetention'
+import { formatAbsolute, formatRelativeTime } from '@/lib/datetime'
+import { cn } from '@/lib/utils'
 import { useTrashBadgeStore } from '@/store/trashBadgeStore'
 import {
   knowledgeEmptyTrash,
@@ -51,7 +54,8 @@ import { useUiStore } from '@/store/uiStore'
 import { toast } from 'sonner'
 import { DeclarativeContextMenu } from '@/components/context-menu'
 
-const PAGE_SIZE = 20
+/** Show pagination when total items exceed one page. */
+const PAGE_SIZE = 10
 
 type KindFilter = 'all' | 'chat' | 'code' | 'knowledge' | 'workItems' | 'automations'
 
@@ -98,7 +102,7 @@ export function RecycleBinPage({
   /** When true, suppress page-level h2 (shell Modal already shows title). */
   embeddedInShell?: boolean
 } = {}) {
-  const { t } = useTranslation()
+  const { t, i18n } = useTranslation()
   const overlay = useUiStore((s) => s.overlay)
   const confirmNested = overlay != null
   const sessions = useTrashListStore((s) => s.sessions)
@@ -107,6 +111,7 @@ export function RecycleBinPage({
   const loadHip = useHipConfigStore((s) => s.load)
   const hipLoaded = useHipConfigStore((s) => s.loaded)
   const retentionDays = resolveTrashRetentionDays(retentionRaw)
+  const locale = i18n.language || 'en'
 
   const [knowledge, setKnowledge] = useState<KnowledgeTrashItem[]>([])
   const [knowledgeLoaded, setKnowledgeLoaded] = useState(false)
@@ -260,42 +265,45 @@ export function RecycleBinPage({
     ? filtered.find((r) => r.key === hardDeleteKey) ?? rows.find((r) => r.key === hardDeleteKey) ?? null
     : null
 
+  const hasActiveFilters = kindFilter !== 'all' || query.trim().length > 0
+  const clearFilters = () => {
+    setKindFilter('all')
+    setQuery('')
+    setPage(1)
+  }
+
   return (
     <div className="flex flex-1 flex-col overflow-y-auto px-6 py-5" data-testid="recycle-bin-page">
-      <div className="mb-1 flex items-center justify-between">
-        {embeddedInShell ? (
-          <span className="sr-only">{t('trash.title')}</span>
-        ) : (
-          <h2 className="text-display font-semibold text-ink">{t('trash.title')}</h2>
-        )}
+      <div className="mb-4 flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          {embeddedInShell ? (
+            <span className="sr-only">{t('trash.title')}</span>
+          ) : (
+            <h2 className="text-display font-semibold text-ink">{t('trash.title')}</h2>
+          )}
+          <p className={cn('text-meta text-ink-tertiary', !embeddedInShell && 'mt-1')}>
+            {t('trash.subtitle', { retentionDays })}
+          </p>
+        </div>
         {rows.length > 0 && (
-          <Button variant="danger" size="sm" onClick={() => setEmptyOpen(true)}>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="shrink-0 text-ink-secondary hover:text-danger"
+            onClick={() => setEmptyOpen(true)}
+          >
+            <Trash2 size={14} className="mr-1.5" aria-hidden />
             {t('trash.empty')}
           </Button>
         )}
       </div>
-      <p className="mb-4 text-meta text-ink-tertiary">
-        {t('trash.subtitle', { retentionDays })}
-      </p>
-      <p className="mb-4 text-meta text-ink-tertiary">
-        {t('trash.memoryTrashNote')}{' '}
-        <button
-          type="button"
-          className="text-accent-strong underline-offset-2 hover:underline"
-          data-testid="recycle-bin-memory-settings-link"
-          onClick={() => {
-            // Replace trash shell with settings overlay (memory page).
-            void import('@/components/layout/sidebarActions').then(
-              ({ openSettingsOverlay }) => openSettingsOverlay('memory'),
-            )
-          }}
-        >
-          {t('trash.openMemorySettings')}
-        </button>
-      </p>
 
-      <div className="relative mb-5 max-w-md">
-        <Search size={16} strokeWidth={1.75} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-ink-tertiary" />
+      <div className="relative mb-4 max-w-md">
+        <Search
+          size={16}
+          strokeWidth={1.75}
+          className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-ink-tertiary"
+        />
         <input
           type="text"
           value={query}
@@ -308,7 +316,10 @@ export function RecycleBinPage({
         />
       </div>
 
-      <div className="mb-4" data-testid="recycle-bin-toolbar">
+      <div
+        className="mb-4 flex flex-wrap items-center justify-between gap-x-4 gap-y-2"
+        data-testid="recycle-bin-toolbar"
+      >
         <Tabs
           value={kindFilter}
           onValueChange={(v) => {
@@ -316,32 +327,32 @@ export function RecycleBinPage({
             setPage(1)
           }}
         >
-          <TabsList className="h-9 gap-2">
-            <TabsTrigger className="px-4" value="all" data-testid="recycle-bin-filter-all">
+          <TabsList className="h-9 max-w-full flex-wrap gap-1">
+            <TabsTrigger className="px-2.5" value="all" data-testid="recycle-bin-filter-all">
               {t('trash.filterAll')}
             </TabsTrigger>
-            <TabsTrigger className="px-4" value="chat" data-testid="recycle-bin-filter-chat">
+            <TabsTrigger className="px-2.5" value="chat" data-testid="recycle-bin-filter-chat">
               {t('trash.filterChat')}
             </TabsTrigger>
-            <TabsTrigger className="px-4" value="code" data-testid="recycle-bin-filter-code">
+            <TabsTrigger className="px-2.5" value="code" data-testid="recycle-bin-filter-code">
               {t('trash.filterCode')}
             </TabsTrigger>
             <TabsTrigger
-              className="px-4"
+              className="px-2.5"
               value="knowledge"
               data-testid="recycle-bin-filter-knowledge"
             >
               {t('trash.filterKnowledge')}
             </TabsTrigger>
             <TabsTrigger
-              className="px-4"
+              className="px-2.5"
               value="workItems"
               data-testid="recycle-bin-filter-work-items"
             >
               {t('trash.filterWorkItems')}
             </TabsTrigger>
             <TabsTrigger
-              className="px-4"
+              className="px-2.5"
               value="automations"
               data-testid="recycle-bin-filter-automations"
             >
@@ -349,171 +360,255 @@ export function RecycleBinPage({
             </TabsTrigger>
           </TabsList>
         </Tabs>
+
+        <div className="flex shrink-0 items-center gap-3">
+          {loaded && filtered.length > 0 && (
+            <span className="text-caption text-ink-secondary">
+              {t('trash.itemCount', { count: filtered.length })}
+            </span>
+          )}
+          {totalPages > 1 && (
+            <>
+              <Pagination
+                currentPage={safePage}
+                totalPages={totalPages}
+                onChange={setPage}
+                previousLabel={t('trash.previous')}
+                nextLabel={t('trash.next')}
+              />
+              <span className="hidden text-caption text-ink-secondary sm:inline">
+                {t('trash.pageInfo', { page: safePage, total: totalPages })}
+              </span>
+            </>
+          )}
+        </div>
       </div>
 
       {!loaded ? (
-        <div className="space-y-3 py-4" data-testid="recycle-bin-loading">
-          <Skeleton className="h-10 w-full rounded-lg" />
-          <Skeleton className="h-10 w-full rounded-lg" />
-          <Skeleton className="h-10 w-4/5 rounded-lg" />
+        <div className="space-y-2 py-2" data-testid="recycle-bin-loading">
+          <Skeleton className="h-12 w-full rounded-lg" />
+          <Skeleton className="h-12 w-full rounded-lg" />
+          <Skeleton className="h-12 w-4/5 rounded-lg" />
         </div>
       ) : filtered.length === 0 ? (
-        <EmptyState
-          icon={Trash2}
-          tier="professional"
-          title={t('trash.emptyState')}
-          data-testid="recycle-bin-empty"
-        />
+        rows.length === 0 ? (
+          <EmptyState
+            icon={Trash2}
+            tier="professional"
+            title={t('trash.emptyState')}
+            description={t('trash.emptyStateDesc')}
+            className="flex-1"
+            data-testid="recycle-bin-empty"
+          />
+        ) : (
+          <EmptyState
+            icon={SearchX}
+            tier="professional"
+            title={t('trash.emptyFiltered')}
+            description={t('trash.emptyFilteredDesc')}
+            className="flex-1"
+            data-testid="recycle-bin-empty-filtered"
+            action={
+              hasActiveFilters
+                ? {
+                    label: t('trash.clearFilters'),
+                    onClick: clearFilters,
+                    'data-testid': 'recycle-bin-clear-filters',
+                  }
+                : undefined
+            }
+          />
+        )
       ) : (
-        <>
-          <div className="divide-y divide-border/80 overflow-hidden rounded-lg border border-border/80 bg-surface">
-            {paged.map((row) => {
-              const left = daysLeftInTrash(row.deletedAt, retentionDays)
-              const Icon =
-                row.source === 'knowledge'
-                  ? BookOpen
+        <div className="flex flex-col gap-1.5">
+          {paged.map((row) => {
+            const left = daysLeftInTrash(row.deletedAt, retentionDays)
+            const Icon =
+              row.source === 'knowledge'
+                ? BookOpen
+                : row.source === 'workItem'
+                  ? ListTodo
+                  : row.source === 'automation'
+                    ? Zap
+                    : row.surface === 'chat'
+                      ? MessageSquare
+                      : Code2
+            const kindLabel =
+              row.source === 'knowledge'
+                ? t(`trash.kind.${row.entityKind}`, { defaultValue: row.entityKind })
+                : row.source === 'workItem'
+                  ? t('trash.kind.workItem')
+                  : row.source === 'automation'
+                    ? t('trash.kind.automation')
+                    : t(`nav.${row.surface}`)
+            const secondary =
+              row.source === 'session'
+                ? row.preview
+                : row.source === 'knowledge'
+                  ? row.spaceName
                   : row.source === 'workItem'
-                    ? ListTodo
-                    : row.source === 'automation'
-                      ? Zap
-                      : row.surface === 'chat'
-                        ? MessageSquare
-                        : Code2
-              const kindLabel =
-                row.source === 'knowledge'
-                  ? t(`trash.kind.${row.entityKind}`, { defaultValue: row.entityKind })
-                  : row.source === 'workItem'
-                    ? t('trash.kind.workItem')
-                    : row.source === 'automation'
-                      ? t('trash.kind.automation')
-                      : t(`nav.${row.surface}`)
-              const restoreRow = () => {
-                if (row.source === 'session') {
-                  sessionService.restoreSession(row.id)
-                  useTrashListStore.getState().removeSession(row.id)
-                  useTrashBadgeStore.getState().adjustSessions(-1)
-                } else if (row.source === 'knowledge') {
-                  void knowledgeRestoreTrashEntry(row.id)
-                    .then(async () => {
-                      setKnowledge((k) => k.filter((x) => x.id !== row.id))
-                      useTrashBadgeStore.getState().adjustKnowledge(-1)
-                      toast.success(t('trash.restoredToast'))
-                      await useKnowledgeStore.getState().loadSpaces()
-                    })
-                    .catch((e) => {
-                      const msg = e instanceof Error ? e.message : String(e)
-                      if (msg.includes('parent_missing')) {
-                        toast.error(t('trash.parentMissing'))
-                      } else {
-                        toast.error(msg)
-                      }
-                    })
-                } else if (row.source === 'workItem') {
-                  void useWorkItemStore
-                    .getState()
-                    .restoreTrashEntry(row.id)
-                    .then(() => {
-                      setWorkItems((w) => w.filter((x) => x.id !== row.id))
-                      toast.success(t('trash.restoredToast'))
-                    })
-                    .catch((e) => {
-                      toast.error(e instanceof Error ? e.message : String(e))
-                    })
-                } else {
-                  void useAutomationStore
-                    .getState()
-                    .restoreTrashEntry(row.id)
-                    .then(() => {
-                      setAutomations((a) => a.filter((x) => x.id !== row.id))
-                      toast.success(t('trash.restoredToast'))
-                    })
-                    .catch((e) => {
-                      toast.error(e instanceof Error ? e.message : String(e))
-                    })
-                }
+                    ? t(`workItems.status.${row.status as 'todo'}`, {
+                        defaultValue: row.status,
+                      })
+                    : t(`automation.trigger.${row.triggerKind as 'manual'}`, {
+                        defaultValue: row.triggerKind,
+                      })
+            const deletedWhen = formatRelativeTime(row.deletedAt, locale)
+            const deletedAbs = formatAbsolute(row.deletedAt, locale)
+            const restoreRow = () => {
+              if (row.source === 'session') {
+                sessionService.restoreSession(row.id)
+                useTrashListStore.getState().removeSession(row.id)
+                useTrashBadgeStore.getState().adjustSessions(-1)
+              } else if (row.source === 'knowledge') {
+                void knowledgeRestoreTrashEntry(row.id)
+                  .then(async () => {
+                    setKnowledge((k) => k.filter((x) => x.id !== row.id))
+                    useTrashBadgeStore.getState().adjustKnowledge(-1)
+                    toast.success(t('trash.restoredToast'))
+                    await useKnowledgeStore.getState().loadSpaces()
+                  })
+                  .catch((e) => {
+                    const msg = e instanceof Error ? e.message : String(e)
+                    if (msg.includes('parent_missing')) {
+                      toast.error(t('trash.parentMissing'))
+                    } else {
+                      toast.error(msg)
+                    }
+                  })
+              } else if (row.source === 'workItem') {
+                void useWorkItemStore
+                  .getState()
+                  .restoreTrashEntry(row.id)
+                  .then(() => {
+                    setWorkItems((w) => w.filter((x) => x.id !== row.id))
+                    toast.success(t('trash.restoredToast'))
+                  })
+                  .catch((e) => {
+                    toast.error(e instanceof Error ? e.message : String(e))
+                  })
+              } else {
+                void useAutomationStore
+                  .getState()
+                  .restoreTrashEntry(row.id)
+                  .then(() => {
+                    setAutomations((a) => a.filter((x) => x.id !== row.id))
+                    toast.success(t('trash.restoredToast'))
+                  })
+                  .catch((e) => {
+                    toast.error(e instanceof Error ? e.message : String(e))
+                  })
               }
-              return (
-                <div
-                  key={row.key}
-                  data-testid="recycle-bin-row"
-                  data-row-key={row.key}
-                  data-row-source={row.source}
+            }
+            return (
+              <div
+                key={row.key}
+                data-testid="recycle-bin-row"
+                data-row-key={row.key}
+                data-row-source={row.source}
+                className="group rounded-lg border border-border/80 bg-surface transition-colors duration-chrome hover:bg-state-hover/50"
+              >
+                <DeclarativeContextMenu
+                  kind="trashEntry"
+                  payload={{
+                    key: row.key,
+                    source: row.source,
+                    id: row.id,
+                    title: row.title,
+                    onRestore: restoreRow,
+                    onHardDelete: () => setHardDeleteKey(row.key),
+                  }}
+                  className="flex items-center gap-3 px-3 py-2.5"
                 >
-                  <DeclarativeContextMenu
-                    kind="trashEntry"
-                    payload={{
-                      key: row.key,
-                      source: row.source,
-                      id: row.id,
-                      title: row.title,
-                      onRestore: restoreRow,
-                      onHardDelete: () => setHardDeleteKey(row.key),
-                    }}
-                    className="flex items-center gap-3 px-4 py-3 transition-colors duration-chrome hover:bg-state-hover/60"
+                  <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-surface-muted text-ink-tertiary">
+                    <Icon size={15} strokeWidth={1.75} aria-hidden />
+                  </span>
+                  <div className="flex min-w-0 flex-1 items-center gap-2 overflow-hidden">
+                    <span className="min-w-0 truncate text-body font-medium text-ink">
+                      {row.title}
+                    </span>
+                    <span className="shrink-0 rounded-md bg-surface-muted px-1.5 py-0.5 text-caption font-medium text-ink-secondary">
+                      {kindLabel}
+                    </span>
+                    {secondary ? (
+                      <span className="min-w-0 max-w-[12rem] truncate text-meta text-ink-tertiary">
+                        {secondary}
+                      </span>
+                    ) : null}
+                  </div>
+                  <div
+                    className="flex shrink-0 items-center gap-2 text-meta text-ink-tertiary"
+                    title={deletedAbs}
                   >
-                    <Icon size={16} strokeWidth={1.75} className="shrink-0 text-ink-tertiary" aria-hidden />
-                    <div className="min-w-0 flex-1">
-                      <div className="truncate text-body font-medium text-ink">{row.title}</div>
-                      <div className="mt-0.5 flex flex-wrap items-center gap-2 text-meta text-ink-tertiary">
-                        <span className="rounded-md bg-surface-muted px-1.5 py-0.5 text-caption font-medium text-ink-secondary">
-                          {kindLabel}
-                        </span>
-                        <span>{t('trash.daysLeft', { days: left })}</span>
-                        {row.source === 'session' && row.preview ? (
-                          <span className="truncate">{row.preview}</span>
-                        ) : null}
-                        {row.source === 'knowledge' && row.spaceName ? (
-                          <span className="truncate">{row.spaceName}</span>
-                        ) : null}
-                        {row.source === 'workItem' ? (
-                          <span className="truncate">
-                            {t(`workItems.status.${row.status as 'todo'}`, {
-                              defaultValue: row.status,
-                            })}
-                          </span>
-                        ) : null}
-                        {row.source === 'automation' ? (
-                          <span className="truncate">
-                            {t(
-                              `automation.trigger.${row.triggerKind as 'manual'}`,
-                              { defaultValue: row.triggerKind },
-                            )}
-                          </span>
-                        ) : null}
-                      </div>
-                    </div>
-                    <div className="flex shrink-0 items-center gap-1">
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        data-testid="recycle-bin-restore"
-                        onClick={restoreRow}
-                      >
-                        <RotateCcw size={14} className="mr-1" />
-                        {t('trash.restore')}
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="text-ink-secondary hover:text-danger"
-                        title={t('trash.deleteForever')}
-                        aria-label={t('trash.deleteForever')}
-                        onClick={() => setHardDeleteKey(row.key)}
-                      >
-                        <Trash2 size={16} />
-                      </Button>
-                    </div>
-                  </DeclarativeContextMenu>
-                </div>
+                    <span className="hidden max-w-[9rem] truncate md:inline">
+                      {t('trash.deletedAt', { when: deletedWhen })}
+                    </span>
+                    <span className="hidden text-ink-tertiary/50 md:inline" aria-hidden>
+                      ·
+                    </span>
+                    <span
+                      className={cn(
+                        'tabular-nums',
+                        left <= 3
+                          ? 'font-medium text-danger'
+                          : left <= 7
+                            ? 'text-warning'
+                            : 'text-ink-tertiary',
+                      )}
+                    >
+                      {t('trash.daysLeft', { days: left })}
+                    </span>
+                  </div>
+                  <div
+                    className={cn(
+                      'flex shrink-0 items-center gap-0.5',
+                      'opacity-100 transition-opacity',
+                      'sm:opacity-0 sm:group-hover:opacity-100 sm:group-focus-within:opacity-100',
+                    )}
+                  >
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      data-testid="recycle-bin-restore"
+                      onClick={restoreRow}
+                    >
+                      <RotateCcw size={14} className="mr-1" aria-hidden />
+                      {t('trash.restore')}
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="text-ink-secondary hover:text-danger"
+                      title={t('trash.deleteForever')}
+                      aria-label={t('trash.deleteForever')}
+                      onClick={() => setHardDeleteKey(row.key)}
+                    >
+                      <Trash2 size={16} />
+                    </Button>
+                  </div>
+                </DeclarativeContextMenu>
+              </div>
+            )
+          })}
+        </div>
+      )}
+
+      {rows.length > 0 && (
+        <p className="mt-auto pt-5 text-caption leading-relaxed text-ink-tertiary">
+          {t('trash.memoryTrashNote')}{' '}
+          <button
+            type="button"
+            className="text-accent-strong underline-offset-2 hover:underline"
+            data-testid="recycle-bin-memory-settings-link"
+            onClick={() => {
+              void import('@/components/layout/sidebarActions').then(
+                ({ openSettingsOverlay }) => openSettingsOverlay('memory'),
               )
-            })}
-          </div>
-          {totalPages > 1 && (
-            <div className="mt-4">
-              <Pagination currentPage={safePage} totalPages={totalPages} onChange={setPage} />
-            </div>
-          )}
-        </>
+            }}
+          >
+            {t('trash.openMemorySettings')}
+          </button>
+        </p>
       )}
 
       {hardTarget && (

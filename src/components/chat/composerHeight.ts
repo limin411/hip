@@ -1,7 +1,7 @@
 /** Persisted height (px) of the session composer textarea. */
 export const COMPOSER_HEIGHT_KEY = 'hip.composerTextareaHeight'
 
-export const COMPOSER_HEIGHT_DEFAULT = 56
+export const COMPOSER_HEIGHT_DEFAULT = 40
 export const COMPOSER_HEIGHT_MIN = 40
 /** Upper bound as a fraction of the viewport height. */
 export const COMPOSER_HEIGHT_MAX_RATIO = 0.45

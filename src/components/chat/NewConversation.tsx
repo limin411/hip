@@ -377,6 +377,21 @@ export function NewConversation() {
             }
             attachments={attachments}
             onAttachmentsChange={setAttachments}
+            footer={
+              surface === 'code' ? (
+                <div
+                  className="flex min-w-0 flex-wrap items-center gap-2"
+                  data-testid="composer-footer-row"
+                >
+                  <FolderPill />
+                  {!hasFolder && (
+                    <span className="text-caption text-ink-tertiary">
+                      {t('chat.codeNeedFolder')}
+                    </span>
+                  )}
+                </div>
+              ) : undefined
+            }
           />
           {selectedSkill && (
             <SkillArgInput
@@ -388,12 +403,6 @@ export function NewConversation() {
         </div>
         {surface === 'chat' && ROUNDTABLE_STARTER && (
           <RoundtableStarter disabled={query !== null || !!selectedSkill} />
-        )}
-        {surface === 'code' && (
-          <div className="mt-2 flex flex-col items-center gap-1">
-            <FolderPill />
-            {!hasFolder && <span className="text-meta text-ink-tertiary">{t('chat.codeNeedFolder')}</span>}
-          </div>
         )}
       </div>
     </div>

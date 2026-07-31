@@ -1,7 +1,7 @@
 // @vitest-environment happy-dom
 import '@testing-library/jest-dom/vitest'
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen, fireEvent, cleanup } from '@testing-library/react'
+import { render, screen, fireEvent, cleanup, within } from '@testing-library/react'
 import { NewConversation } from './NewConversation'
 import * as domain from '@/domain'
 import { useDomainStore } from '@/domain'
@@ -217,6 +217,22 @@ describe('NewConversation', () => {
     expect(screen.queryByTestId('plan-mode-chip')).not.toBeInTheDocument()
     expect(screen.queryByTestId('execution-mode-chip')).not.toBeInTheDocument()
     expect(screen.queryByTestId('model-chip')).not.toBeInTheDocument()
+  })
+
+  it('code surface renders folder picker + quick dirs inside the composer footer', () => {
+    mockActiveView = 'code'
+    useDraftStore.setState({
+      draft: { tempId: 'draft-1', mode: 'chat', text: '' },
+    })
+    render(<NewConversation />)
+    const footer = screen.getByTestId('composer-footer')
+    // Folder picker (and quick-directory trigger when open projects exist) live
+    // below the input in the footer strip, not as a separate centered block.
+    expect(within(footer).getByTestId('folder-pill-row')).toBeInTheDocument()
+    expect(within(footer).getByTestId('pick-folder')).toBeInTheDocument()
+    expect(screen.getByTestId('composer-footer-row')).toBeInTheDocument()
+    // Hint text travels with the picker into the footer.
+    expect(within(footer).getByText('Choose a project folder to start coding')).toBeInTheDocument()
   })
 
   it('clears existing attachments when the draft model loses attachment support', async () => {

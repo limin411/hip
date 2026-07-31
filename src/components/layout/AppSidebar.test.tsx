@@ -167,10 +167,10 @@ describe('AppSidebar', () => {
     expect(buttons[3]).toBe(forward)
   })
 
-  it('active nav uses sage rail without hairline ring', () => {
+  it('active nav uses surface wash without left rail or hairline ring', () => {
     render(<AppSidebar />)
     const chats = screen.getByTestId('sidebar-nav-chats')
-    expect(chats).toHaveClass('before:bg-accent')
+    expect(chats).not.toHaveClass('before:bg-accent')
     expect(chats).toHaveClass('bg-state-hover')
     expect(chats.className).not.toMatch(/shadow-\[0_0_0_1px/)
     const projects = screen.getByTestId('sidebar-nav-projects')
@@ -178,11 +178,11 @@ describe('AppSidebar', () => {
     expect(projects).toHaveClass('hover:bg-state-hover')
   })
 
-  it('active session row uses sage rail without hairline ring', () => {
+  it('active session row uses surface wash without left rail or hairline ring', () => {
     render(<AppSidebar />)
     const sessionBtn = screen.getByTestId('sidebar-session-chat-1')
     const row = sessionBtn.closest('div')
-    expect(row).toHaveClass('before:bg-accent')
+    expect(row).not.toHaveClass('before:bg-accent')
     expect(row).toHaveClass('bg-state-hover')
     expect(row?.className).not.toMatch(/shadow-\[0_0_0_1px/)
   })
@@ -304,13 +304,13 @@ describe('AppSidebar', () => {
     expect(screen.getByTestId('sidebar-new-remote-host')).toBeInTheDocument()
   })
 
-  it('active knowledge space uses sage rail without hairline ring', () => {
+  it('active knowledge space uses surface wash without left rail or hairline ring', () => {
     knowledgeState.spaces = [{ id: 'space-1', name: 'Notes' }]
     knowledgeState.activeSpaceId = 'space-1'
     useUiStore.setState({ sidebarSection: 'knowledge', activeView: 'knowledge' })
     render(<AppSidebar />)
     const space = screen.getByTestId('sidebar-space-space-1')
-    expect(space).toHaveClass('before:bg-accent')
+    expect(space).not.toHaveClass('before:bg-accent')
     expect(space).toHaveClass('bg-state-hover')
     expect(space.className).not.toMatch(/shadow-\[0_0_0_1px/)
   })
@@ -440,7 +440,7 @@ describe('AppSidebar', () => {
     expect(screen.queryByTestId('sidebar-session-worktrees-code-1')).not.toBeInTheDocument()
   })
 
-  it('active worktree slot uses sage rail without hairline ring', () => {
+  it('active worktree slot uses surface wash without left rail or hairline ring', () => {
     useUiStore.setState({ sidebarSection: 'projects', activeView: 'code' })
     useDomainStore.setState({
       sessions: [
@@ -495,7 +495,7 @@ describe('AppSidebar', () => {
     })
     render(<AppSidebar />)
     const slot = screen.getByTestId('sidebar-parallel-slot-slot-1')
-    expect(slot).toHaveClass('before:bg-accent')
+    expect(slot).not.toHaveClass('before:bg-accent')
     expect(slot).toHaveClass('bg-state-hover')
     expect(slot.className).not.toMatch(/shadow-\[0_0_0_1px/)
   })

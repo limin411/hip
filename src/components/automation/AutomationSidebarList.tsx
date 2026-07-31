@@ -177,19 +177,15 @@ export function AutomationSidebarList() {
                   active ? SIDEBAR_ACTIVE_RAIL : 'hover:bg-state-hover',
                 )}
               >
-                <span
-                  className={cn(
-                    'mt-1.5 size-1.5 shrink-0 rounded-full',
-                    running
-                      ? 'bg-accent'
-                      : failed
-                        ? 'bg-danger'
-                        : active
-                          ? 'bg-accent'
-                          : 'bg-transparent',
-                  )}
-                  aria-hidden
-                />
+                {running || failed ? (
+                  <span
+                    className={cn(
+                      'mt-1.5 size-1.5 shrink-0 rounded-full',
+                      running ? 'bg-accent' : 'bg-danger',
+                    )}
+                    aria-hidden
+                  />
+                ) : null}
                 <Zap
                   size={14}
                   className={cn(

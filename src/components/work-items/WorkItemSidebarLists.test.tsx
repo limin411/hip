@@ -64,7 +64,8 @@ describe('WorkItemSidebarLists', () => {
       'done',
       'archived',
     ])
-    expect(screen.getByTestId('sidebar-work-item-filter-todo')).toHaveClass('before:bg-accent')
+    expect(screen.getByTestId('sidebar-work-item-filter-todo')).not.toHaveClass('before:bg-accent')
+    expect(screen.getByTestId('sidebar-work-item-filter-todo')).toHaveClass('bg-state-hover')
     expect(screen.getByTestId('sidebar-work-item-filter-todo')).toHaveAttribute(
       'aria-current',
       'true',

@@ -601,13 +601,6 @@ export function AppSidebar() {
                           active ? SIDEBAR_ACTIVE_RAIL : 'hover:bg-state-hover',
                         )}
                       >
-                        <span
-                          className={cn(
-                            'mt-1.5 size-1.5 shrink-0 rounded-full',
-                            active ? 'bg-accent' : 'bg-transparent',
-                          )}
-                          aria-hidden
-                        />
                         <Terminal
                           size={14}
                           className="mt-0.5 shrink-0 text-ink-tertiary"
@@ -670,13 +663,6 @@ export function AppSidebar() {
                           active ? SIDEBAR_ACTIVE_RAIL : 'hover:bg-state-hover',
                         )}
                       >
-                        <span
-                          className={cn(
-                            'mt-1.5 size-1.5 shrink-0 rounded-full',
-                            active ? 'bg-accent' : 'bg-transparent',
-                          )}
-                          aria-hidden
-                        />
                         {sp.icon ? (
                           <span
                             className="mt-0.5 shrink-0 text-body leading-none"
@@ -1035,15 +1021,7 @@ function SidebarSessionRow({
                 title={t('sidebar.status.running')}
                 aria-hidden
               />
-            ) : (
-              <span
-                className={cn(
-                  'size-1.5 shrink-0 rounded-full',
-                  active ? 'bg-accent' : 'bg-transparent',
-                )}
-                aria-hidden
-              />
-            )}
+            ) : null}
             <span className="flex min-w-0 flex-1 items-center gap-1">
               <span className="block min-w-0 truncate text-body font-medium text-ink" aria-hidden>
                 {session.title}

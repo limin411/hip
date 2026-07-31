@@ -72,9 +72,8 @@ describe('SidebarAccountFooter', () => {
     render(<SidebarAccountFooter {...footerProps} active="settings" />)
     const settings = screen.getByTestId('account-settings-button')
     expect(settings).not.toHaveClass('before:bg-accent')
-    expect(settings).toHaveClass('bg-state-hover')
+    expect(settings).toHaveClass('bg-state-active')
     expect(settings.className).not.toMatch(/shadow-\[0_0_0_1px/)
-    expect(settings).not.toHaveClass('bg-state-active')
 
     const history = screen.getByTestId('account-history-button')
     expect(history).not.toHaveClass('before:bg-accent')

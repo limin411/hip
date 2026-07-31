@@ -235,7 +235,7 @@ export function AppLayout() {
 
   return (
     // Final shell: AppSidebar | (MainToolbar + main | edge drawer)
-    // AppSidebar is solid bg-surface (same as Settings); main column stays opaque.
+    // AppSidebar is solid bg-surface-subtle (light gray chrome); main column stays opaque.
     <div className="flex h-dvh w-screen flex-row overflow-hidden bg-transparent">
       <WindowLifecycleHost />
       {AUTOMATION_PAGE ? <AutomationRunHost /> : null}

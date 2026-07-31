@@ -104,6 +104,10 @@ describe('Composer', () => {
     expect(root).toHaveAttribute('data-variant', 'card')
     expect(root.className).toContain('rounded-xl')
     expect(root.className).toContain('border')
+    expect(root.className).toContain('bg-surface-subtle')
+    const ta = screen.getByPlaceholderText(/Message hip/)
+    expect(ta.className).toContain('bg-transparent')
+    expect(ta.className).toContain('rounded-none')
   })
 
   it('flat variant has no rounded card shell', () => {

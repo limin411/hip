@@ -20,7 +20,6 @@ import {
   GitBranch,
   MessageSquare,
   PanelLeftClose,
-  Search,
   Terminal,
   Zap,
 } from 'lucide-react'
@@ -32,7 +31,6 @@ import { groupSessionsByProjectPath, projectPathKey } from '@/lib/sessionProject
 import { groupSessionsByDate } from '@/lib/sessionDateGroups'
 import { cn } from '@/lib/utils'
 import { useWindowDrag } from '@/lib/useWindowDrag'
-import { useCommandPaletteStore } from '@/store/commandPaletteStore'
 import { useKnowledgeStore } from '@/store/knowledgeStore'
 import { useProjectPathStore } from '@/store/projectPathStore'
 import {
@@ -326,7 +324,7 @@ export function AppSidebar() {
 
   return (
     <aside
-      className="relative flex h-full shrink-0 flex-col border-r border-border bg-surface"
+      className="relative flex h-full shrink-0 flex-col border-r border-border bg-surface-subtle"
       style={{ width: sidebarWidth }}
       data-testid="app-sidebar"
       aria-label={settingsOpen ? t('settings.title') : t('sidebar.aria')}
@@ -347,17 +345,6 @@ export function AppSidebar() {
           <div className="h-full w-2 shrink-0" aria-hidden />
         )}
         <div className="flex h-full shrink-0 items-center gap-0.5 pr-2">
-          <button
-            type="button"
-            data-testid="sidebar-search"
-            data-no-drag
-            title={t('commandPalette.openTrigger')}
-            aria-label={t('commandPalette.openTriggerAria')}
-            onClick={() => useCommandPaletteStore.getState().setOpen(true)}
-            className={titlebarIconBtnClass}
-          >
-            <Search {...titlebarIconProps} />
-          </button>
           <button
             type="button"
             data-testid="sidebar-toggle"

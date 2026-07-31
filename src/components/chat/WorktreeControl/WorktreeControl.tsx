@@ -358,7 +358,7 @@ export function WorktreeControl() {
             aria-expanded={popoverOpen}
             data-testid="worktree-control-chip"
             data-worktree-control-chip=""
-            className={cn(popoverOpen && 'bg-state-hover text-ink')}
+            className={cn(popoverOpen && 'bg-state-active text-ink')}
           >
             <Folders size={13} strokeWidth={1.75} className="shrink-0 opacity-80" aria-hidden />
             <span className="max-w-[120px] truncate">{chipLabel}</span>

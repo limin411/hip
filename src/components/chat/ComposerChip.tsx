@@ -21,7 +21,7 @@ export const ComposerChip = forwardRef<HTMLButtonElement, ComposerChipProps>(
           'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink/20',
           'disabled:cursor-not-allowed disabled:opacity-50',
           active
-            ? 'bg-state-hover text-ink'
+            ? 'bg-state-active text-ink'
             : 'text-ink-tertiary hover:bg-state-hover hover:text-ink-secondary',
           className,
         )}

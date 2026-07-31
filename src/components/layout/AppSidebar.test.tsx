@@ -132,13 +132,12 @@ describe('AppSidebar', () => {
     cleanup()
   })
 
-  it('renders search icon, nav, and chat sessions for chats section', () => {
+  it('renders nav and chat sessions for chats section', () => {
     render(<AppSidebar />)
     expect(screen.getByTestId('app-sidebar')).toBeInTheDocument()
     expect(screen.getByTestId('sidebar-nav-back')).toBeInTheDocument()
     expect(screen.getByTestId('sidebar-nav-forward')).toBeInTheDocument()
-    expect(screen.getByTestId('sidebar-search')).toBeInTheDocument()
-    expect(screen.getByTestId('sidebar-search').tagName).toBe('BUTTON')
+    expect(screen.queryByTestId('sidebar-search')).not.toBeInTheDocument()
     expect(screen.getByTestId('sidebar-toggle')).toBeInTheDocument()
     expect(screen.getByTestId('sidebar-app-version')).toHaveTextContent(/^HIP \d+\.\d+\.\d+/)
     expect(screen.getByTestId('sidebar-nav-terminals')).toBeInTheDocument()
@@ -153,25 +152,23 @@ describe('AppSidebar', () => {
     render(<AppSidebar />)
     const back = screen.getByTestId('sidebar-nav-back')
     const forward = screen.getByTestId('sidebar-nav-forward')
-    const search = screen.getByTestId('sidebar-search')
     const toggle = screen.getByTestId('sidebar-toggle')
     expect(back).toBeDisabled()
     expect(forward).toBeDisabled()
-    // DOM order: search, toggle, back, forward
-    const parent = search.parentElement
+    // DOM order: toggle, back, forward
+    const parent = toggle.parentElement
     expect(parent).toBeTruthy()
     const buttons = within(parent!).getAllByRole('button')
-    expect(buttons[0]).toBe(search)
-    expect(buttons[1]).toBe(toggle)
-    expect(buttons[2]).toBe(back)
-    expect(buttons[3]).toBe(forward)
+    expect(buttons[0]).toBe(toggle)
+    expect(buttons[1]).toBe(back)
+    expect(buttons[2]).toBe(forward)
   })
 
   it('active nav uses surface wash without left rail or hairline ring', () => {
     render(<AppSidebar />)
     const chats = screen.getByTestId('sidebar-nav-chats')
     expect(chats).not.toHaveClass('before:bg-accent')
-    expect(chats).toHaveClass('bg-state-hover')
+    expect(chats).toHaveClass('bg-state-active')
     expect(chats.className).not.toMatch(/shadow-\[0_0_0_1px/)
     const projects = screen.getByTestId('sidebar-nav-projects')
     expect(projects).not.toHaveClass('before:bg-accent')
@@ -183,7 +180,7 @@ describe('AppSidebar', () => {
     const sessionBtn = screen.getByTestId('sidebar-session-chat-1')
     const row = sessionBtn.closest('div')
     expect(row).not.toHaveClass('before:bg-accent')
-    expect(row).toHaveClass('bg-state-hover')
+    expect(row).toHaveClass('bg-state-active')
     expect(row?.className).not.toMatch(/shadow-\[0_0_0_1px/)
   })
 
@@ -191,14 +188,6 @@ describe('AppSidebar', () => {
     render(<AppSidebar />)
     expect(screen.getByTestId('sidebar-nav-chats')).toHaveTextContent('1')
     expect(screen.getByTestId('sidebar-nav-projects')).toHaveTextContent('1')
-  })
-
-  it('search icon opens command palette', async () => {
-    const { useCommandPaletteStore } = await import('@/store/commandPaletteStore')
-    useCommandPaletteStore.setState({ open: false })
-    render(<AppSidebar />)
-    fireEvent.click(screen.getByTestId('sidebar-search'))
-    expect(useCommandPaletteStore.getState().open).toBe(true)
   })
 
   it('toggle button collapses the sidebar', () => {
@@ -311,7 +300,7 @@ describe('AppSidebar', () => {
     render(<AppSidebar />)
     const space = screen.getByTestId('sidebar-space-space-1')
     expect(space).not.toHaveClass('before:bg-accent')
-    expect(space).toHaveClass('bg-state-hover')
+    expect(space).toHaveClass('bg-state-active')
     expect(space.className).not.toMatch(/shadow-\[0_0_0_1px/)
   })
 
@@ -496,7 +485,7 @@ describe('AppSidebar', () => {
     render(<AppSidebar />)
     const slot = screen.getByTestId('sidebar-parallel-slot-slot-1')
     expect(slot).not.toHaveClass('before:bg-accent')
-    expect(slot).toHaveClass('bg-state-hover')
+    expect(slot).toHaveClass('bg-state-active')
     expect(slot.className).not.toMatch(/shadow-\[0_0_0_1px/)
   })
 

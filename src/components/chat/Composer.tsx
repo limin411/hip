@@ -75,9 +75,9 @@ export function Composer({
     <div
       className={cn(
         isCard
-          ? 'rounded-xl border border-border bg-surface p-2.5'
+          ? 'rounded-xl border border-border bg-surface-subtle p-2.5'
           // Flat dock: no focus chrome — InputBar already draws the top rule.
-          : 'bg-surface',
+          : 'bg-surface-subtle',
       )}
       data-testid="composer"
       data-variant={variant}
@@ -175,7 +175,8 @@ export function Composer({
         placeholder={placeholder ?? t('chat.inputPlaceholder')}
         style={textareaHeight != null ? { height: textareaHeight } : undefined}
         className={cn(
-          'border-0 focus-visible:ring-0',
+          // Textarea defaults (bg-surface + rounded-md) would stack a white inset over the shell.
+          'border-0 bg-transparent rounded-none focus-visible:ring-0',
           isCard ? 'px-2 py-1' : 'px-0 py-1',
           textareaHeight != null && 'min-h-0 overflow-y-auto',
           locked && 'cursor-not-allowed opacity-60',

@@ -1,7 +1,8 @@
 /**
  * Open / select ArtifactPanel tabs.
  *
- * When the right rail is open, tabs live in the panel titlebar (`panel-tab-bar`).
+ * When the right rail is open, tabs live in a right-edge dropdown
+ * (`panel-tab-trigger` → portaled `panel-tab-dropdown`).
  * When collapsed, open via the toolbar PanelToggle Radix DropdownMenu
  * (focus + Enter first, then pointer-event fallback — titlebar drag regions
  * swallow naive clicks under Tauri WDIO).
@@ -17,11 +18,20 @@ async function panelMenuOpen(): Promise<boolean> {
   return menu.isExisting()
 }
 
-/** Open the panel tab dropdown (collapsed toolbar); no-op if already open. */
-export async function openPanelMenu(): Promise<void> {
-  if (await panelMenuOpen()) return
+async function panelDropdownOpen(): Promise<boolean> {
+  const menu = await browser.$('[data-testid="panel-tab-dropdown"]')
+  return menu.isExisting()
+}
 
-  const toggle = await browser.$('[data-testid="toggle-panel"]')
+/** Open a dropdown by focusing its trigger and synthesizing open gestures. */
+async function openDropdownFromTrigger(
+  triggerTestId: string,
+  menuTestId: string,
+  label: string,
+): Promise<void> {
+  if (await browser.$(`[data-testid="${menuTestId}"]`).isExisting()) return
+
+  const toggle = await browser.$(`[data-testid="${triggerTestId}"]`)
   await toggle.waitForExist({ timeout: 30000 })
 
   for (let attempt = 0; attempt < 4; attempt++) {
@@ -34,7 +44,7 @@ export async function openPanelMenu(): Promise<void> {
     await browser.keys('Enter')
 
     try {
-      await (await browser.$('[data-testid="panel-tab-menu"]')).waitForExist({ timeout: 1200 })
+      await (await browser.$(`[data-testid="${menuTestId}"]`)).waitForExist({ timeout: 1200 })
       return
     } catch {
       // Fall through to pointer synthesis.
@@ -75,14 +85,14 @@ export async function openPanelMenu(): Promise<void> {
           }),
         )
       }, toggle)
-      await (await browser.$('[data-testid="panel-tab-menu"]')).waitForExist({ timeout: 1200 })
+      await (await browser.$(`[data-testid="${menuTestId}"]`)).waitForExist({ timeout: 1200 })
       return
     } catch {
       // Space as second keyboard attempt (some hosts map Enter poorly).
       await browser.execute((el: HTMLElement) => el.focus(), toggle)
       await browser.keys(' ')
       try {
-        await (await browser.$('[data-testid="panel-tab-menu"]')).waitForExist({ timeout: 800 })
+        await (await browser.$(`[data-testid="${menuTestId}"]`)).waitForExist({ timeout: 800 })
         return
       } catch {
         // Next outer retry.
@@ -90,38 +100,59 @@ export async function openPanelMenu(): Promise<void> {
     }
   }
 
-  throw new Error('panel-tab-menu did not open after retries (toggle-panel Radix dropdown)')
+  throw new Error(`${menuTestId} did not open after retries (${label})`)
 }
 
-/** Close menu if open (Escape). No-op when using the always-visible tab bar. */
+/** Open the panel tab dropdown (collapsed toolbar); no-op if already open. */
+export async function openPanelMenu(): Promise<void> {
+  await openDropdownFromTrigger('toggle-panel', 'panel-tab-menu', 'toggle-panel Radix dropdown')
+}
+
+/** Open the in-panel right-edge tab dropdown; no-op if already open. */
+export async function openPanelTabDropdown(): Promise<void> {
+  await openDropdownFromTrigger(
+    'panel-tab-trigger',
+    'panel-tab-dropdown',
+    'panel-tab-trigger Radix dropdown',
+  )
+}
+
+/** Close menu if open (Escape). */
 export async function closePanelMenu(): Promise<void> {
-  if (!(await panelMenuOpen())) return
+  const open = (await panelMenuOpen()) || (await panelDropdownOpen())
+  if (!open) return
   await browser.keys('Escape')
-  await browser.waitUntil(async () => !(await panelMenuOpen()), {
-    timeout: 3000,
-    interval: 100,
-  })
+  await browser.waitUntil(
+    async () => !(await panelMenuOpen()) && !(await panelDropdownOpen()),
+    {
+      timeout: 3000,
+      interval: 100,
+    },
+  )
 }
 
 /**
  * Select a panel tab (files | agents | terminal | …).
- * Uses the titlebar tab bar when the rail is open; otherwise the toolbar menu
+ * Uses the titlebar dropdown when the rail is open; otherwise the toolbar menu
  * (which also opens the panel via setSession*PanelOpen).
  */
 export async function selectPanelTab(tab: string): Promise<void> {
   const testid = `panel-tab-${tab}`
 
   if (await panelTabBarOpen()) {
-    const item = await browser.$(`[data-testid="panel-tab-bar"] [data-testid="${testid}"]`)
+    await openPanelTabDropdown()
+    const item = await browser.$(`[data-testid="panel-tab-dropdown"] [data-testid="${testid}"]`)
     try {
       await item.waitForExist({ timeout: 5000 })
     } catch {
       const labels = await browser.execute(() =>
-        Array.from(document.querySelectorAll('[data-testid="panel-tab-bar"] [data-testid^="panel-tab-"]'))
+        Array.from(
+          document.querySelectorAll('[data-testid="panel-tab-dropdown"] [data-testid^="panel-tab-"]'),
+        )
           .map((el) => el.getAttribute('data-testid'))
           .filter(Boolean),
       )
-      throw new Error(`${testid} not found on panel-tab-bar; tabs: ${JSON.stringify(labels)}`)
+      throw new Error(`${testid} not found on panel-tab-dropdown; tabs: ${JSON.stringify(labels)}`)
     }
     await browser.execute((el: HTMLElement) => el.click(), item)
     await browser.$(`[data-testid="panel-view-${tab}"]`).waitForExist({ timeout: 15000 })
@@ -146,12 +177,15 @@ export async function selectPanelTab(tab: string): Promise<void> {
 
 /**
  * List available panel tab data-testid values.
- * Prefers the open tab bar; falls back to the collapsed toolbar menu.
+ * Prefers the open-panel dropdown; falls back to the collapsed toolbar menu.
  */
 export async function listPanelMenuTabs(): Promise<string[]> {
   if (await panelTabBarOpen()) {
+    await openPanelTabDropdown()
     return browser.execute(() =>
-      Array.from(document.querySelectorAll('[data-testid="panel-tab-bar"] [data-testid^="panel-tab-"]'))
+      Array.from(
+        document.querySelectorAll('[data-testid="panel-tab-dropdown"] [data-testid^="panel-tab-"]'),
+      )
         .map((el) => el.getAttribute('data-testid') ?? '')
         .filter(Boolean),
     )

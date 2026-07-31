@@ -58,7 +58,7 @@ export function useRightPanelOpen(): boolean {
  * Mirrors left sidebar chrome: when the rail is closed the control lives in the
  * main toolbar with a dropdown to open a specific tab; when open it relocates
  * to the panel titlebar as a one-click collapse. In-panel tab switching is the
- * titlebar {@link PanelTabBar}, not a dropdown.
+ * titlebar {@link PanelTabBar} dropdown on the right edge.
  */
 export function PanelToggle({ slot = 'toolbar' }: { slot?: PanelToggleSlot }) {
   const { t } = useTranslation()
@@ -258,7 +258,7 @@ export function PanelToggle({ slot = 'toolbar' }: { slot?: PanelToggleSlot }) {
     }
   }
 
-  // Expanded multi-tab: one-click collapse only. Tabs live on PanelTabBar (second row).
+  // Expanded multi-tab: one-click collapse only. Tabs live on PanelTabBar (right dropdown).
   if (panelOpen) {
     return (
       <Button

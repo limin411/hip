@@ -16,7 +16,7 @@ export type VisibleTabDef = {
 }
 
 /**
- * Shared tab set for PanelTabBar (in-panel second row) and collapsed PanelToggle menu.
+ * Shared tab set for PanelTabBar (in-panel dropdown) and collapsed PanelToggle menu.
  */
 export function visibleArtifactTabs(args: {
   surface: 'code' | 'chat'

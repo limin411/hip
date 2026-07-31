@@ -14,7 +14,6 @@ vi.mock('react-i18next', () => ({
         'artifact.timeline': 'Timeline',
         'artifact.changes': 'Changes',
         'artifact.terminal': 'Terminal',
-        'artifact.moreTabs': 'More tabs',
         'chat.togglePanel': 'Panel',
       }
       return map[key] ?? key
@@ -109,9 +108,11 @@ describe('PanelTabBar', () => {
     cleanup()
   })
 
-  it('renders chat tabs and switches chatActiveTab', () => {
+  it('renders a right-edge dropdown with chat tabs and switches chatActiveTab', () => {
     render(<PanelTabBar surface="chat" />)
     expect(screen.getByTestId('panel-tab-bar')).toBeInTheDocument()
+    expect(screen.getByTestId('panel-tab-trigger')).toHaveTextContent('Files')
+    expect(screen.getByTestId('panel-tab-dropdown')).toBeInTheDocument()
     expect(screen.getByTestId('panel-tab-outline')).toBeInTheDocument()
     expect(screen.getByTestId('panel-tab-files')).toBeInTheDocument()
     expect(screen.getByTestId('panel-tab-sources')).toBeInTheDocument()
@@ -151,55 +152,9 @@ describe('PanelTabBar', () => {
     expect(setTab).toHaveBeenCalledWith('terminal')
   })
 
-  it('marks the active tab selected', () => {
+  it('shows the active tab label on the trigger', () => {
     mockUiState = { ...mockUiState, activeTab: 'agents' }
     render(<PanelTabBar surface="code" />)
-    expect(screen.getByTestId('panel-tab-agents')).toHaveAttribute('aria-selected', 'true')
-    expect(screen.getByTestId('panel-tab-files')).toHaveAttribute('aria-selected', 'false')
-  })
-
-  it('shows the ⋯ overflow menu when tabs do not fit and jumps from it', () => {
-    const { container, rerender } = render(<PanelTabBar surface="code" />)
-    expect(screen.queryByTestId('panel-tabs-overflow')).not.toBeInTheDocument()
-
-    // Fake a narrow strip, then change the tab set so the layout effect re-measures.
-    const strip = container.querySelector('[data-testid="panel-tab-strip"]')!
-    Object.defineProperty(strip, 'clientWidth', { value: 80, configurable: true })
-    Object.defineProperty(strip, 'scrollWidth', { value: 600, configurable: true })
-    mockDiffState = { bySession: { 'sess-1': { isGitRepo: true } } }
-    rerender(<PanelTabBar surface="code" />)
-
-    expect(screen.getByTestId('panel-tabs-overflow')).toBeInTheDocument()
-    expect(screen.getByTestId('panel-tab-overflow-menu')).toBeInTheDocument()
-    expect(screen.getByTestId('panel-tab-overflow-timeline')).toBeInTheDocument()
-
-    fireEvent.click(screen.getByTestId('panel-tab-overflow-timeline'))
-    expect(setTab).toHaveBeenCalledWith('timeline')
-  })
-
-  it('hides the ⋯ overflow menu when all tabs fit', () => {
-    const { container, rerender } = render(<PanelTabBar surface="chat" />)
-    const strip = container.querySelector('[data-testid="panel-tab-strip"]')!
-    Object.defineProperty(strip, 'clientWidth', { value: 800, configurable: true })
-    Object.defineProperty(strip, 'scrollWidth', { value: 300, configurable: true })
-    rerender(<PanelTabBar surface="code" />) // surface switch re-runs the measure
-
-    expect(screen.queryByTestId('panel-tabs-overflow')).not.toBeInTheDocument()
-  })
-
-  it('scrolls the active tab into view once the strip starts clipping', () => {
-    const scrollIntoView = vi
-      .spyOn(HTMLElement.prototype, 'scrollIntoView')
-      .mockImplementation(() => {})
-    const { container, rerender } = render(<PanelTabBar surface="code" />)
-
-    const strip = container.querySelector('[data-testid="panel-tab-strip"]')!
-    Object.defineProperty(strip, 'clientWidth', { value: 80, configurable: true })
-    Object.defineProperty(strip, 'scrollWidth', { value: 600, configurable: true })
-    mockDiffState = { bySession: { 'sess-1': { isGitRepo: true } } }
-    rerender(<PanelTabBar surface="code" />)
-
-    expect(scrollIntoView).toHaveBeenCalled()
-    scrollIntoView.mockRestore()
+    expect(screen.getByTestId('panel-tab-trigger')).toHaveTextContent('Agents')
   })
 })

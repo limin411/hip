@@ -65,11 +65,12 @@ export function PreviewPanel() {
     <div className="flex h-full min-h-0 flex-col border-l border-border bg-surface">
       <div
         data-tauri-drag-region
-        className="flex h-[var(--titlebar-height)] shrink-0 items-center gap-1 border-b border-border px-2"
+        className="flex h-[var(--titlebar-height)] shrink-0 items-center gap-1 px-2"
       >
-        <PanelTabBar surface="chat" />
-        {/* Relocated from main toolbar when open — same toggle collapses the rail. */}
-        <div className="shrink-0" data-tauri-drag-region="false">
+        <div className="min-w-0 flex-1" />
+        <div className="flex shrink-0 items-center gap-0.5" data-tauri-drag-region="false">
+          {/* Tab pages as a right-edge dropdown; collapse control stays beside it. */}
+          <PanelTabBar surface="chat" />
           <PanelToggle slot="panel" />
         </div>
       </div>

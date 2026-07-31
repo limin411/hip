@@ -173,7 +173,7 @@ describe('PanelToggle', () => {
     mockChatPanelOpen = true
     render(<PanelToggle slot="panel" />)
     expect(screen.getByTestId('panel-collapse')).toBeInTheDocument()
-    // In-panel tab switching is PanelTabBar, not a chevron menu on the header.
+    // In-panel tab switching is PanelTabBar dropdown; collapse is one-click here.
     expect(screen.queryByTestId('toggle-panel')).not.toBeInTheDocument()
     expect(screen.queryByTestId('panel-tab-menu')).not.toBeInTheDocument()
     fireEvent.click(screen.getByTestId('panel-collapse'))

@@ -1,6 +1,5 @@
-import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Check, MoreHorizontal } from 'lucide-react'
+import { Check, ChevronDown } from 'lucide-react'
 import type { ArtifactTab, ChatTab } from '@/store/uiStore'
 import { useUiStore } from '@/store/uiStore'
 import { useDomainStore } from '@/domain/sessionStore'
@@ -17,12 +16,9 @@ import {
 } from '@/components/ui/DropdownMenu'
 
 /**
- * Tab strip for the shell right rail titlebar (code ArtifactPanel / chat PreviewPanel).
- * Sits in the first row beside collapse / branch controls; selected tab uses a rounded wash.
- *
- * Narrow rail: tabs are shrink-0, so when the strip clips we surface a right-edge fade
- * plus a "⋯" jump menu — otherwise clipped tabs silently disappear (macOS overlay
- * scrollbars stay hidden until you scroll). The active tab is auto-scrolled into view.
+ * Right-rail titlebar tab switcher (code ArtifactPanel / chat PreviewPanel).
+ * Compact dropdown on the right edge — current page label + chevron, full list in menu.
+ * Avoids a horizontal strip that clips on a narrow rail.
  */
 export function PanelTabBar({ surface }: { surface: 'code' | 'chat' }) {
   const { t } = useTranslation()
@@ -48,6 +44,9 @@ export function PanelTabBar({ surface }: { surface: 'code' | 'chat' }) {
         ? 'agents'
         : chatActiveTab
 
+  const currentDef = tabs.find((tab) => tab.value === current) ?? tabs[0]
+  const currentLabel = currentDef ? t(currentDef.labelKey) : ''
+
   const onSelect = (value: PanelTabValue) => {
     if (surface === 'code') {
       setTab(value as ArtifactTab)
@@ -56,118 +55,48 @@ export function PanelTabBar({ surface }: { surface: 'code' | 'chat' }) {
     }
   }
 
-  // --- Narrow-rail overflow chrome -------------------------------------------
-  // Re-measure on tab-set changes (git state / terminal flag / surface) and on
-  // container resizes; scroll position drives whether the edge fade is shown.
-  const stripRef = useRef<HTMLDivElement>(null)
-  const activeTabRef = useRef<HTMLButtonElement>(null)
-  const [overflowing, setOverflowing] = useState(false)
-  const [atEnd, setAtEnd] = useState(false)
-  const tabKey = tabs.map((tab) => tab.value).join(',')
-
-  useLayoutEffect(() => {
-    const el = stripRef.current
-    if (!el) return
-    const measure = () => {
-      setOverflowing(el.scrollWidth > el.clientWidth + 1)
-      setAtEnd(el.scrollLeft + el.clientWidth >= el.scrollWidth - 2)
-    }
-    measure()
-    const ro = new ResizeObserver(measure)
-    ro.observe(el)
-    return () => ro.disconnect()
-  }, [tabKey])
-
-  // Keep the selected tab in view when it changes or the strip starts clipping.
-  useEffect(() => {
-    if (overflowing) {
-      activeTabRef.current?.scrollIntoView({ block: 'nearest', inline: 'nearest' })
-    }
-  }, [current, overflowing])
-
   return (
     <div
-      role="tablist"
+      role="navigation"
       aria-label={t('chat.togglePanel')}
       data-testid="panel-tab-bar"
       data-tauri-drag-region="false"
-      className="flex min-w-0 flex-1 items-center gap-0.5"
+      className="shrink-0"
     >
-      <div
-        ref={stripRef}
-        data-testid="panel-tab-strip"
-        className="relative flex min-w-0 flex-1 items-center gap-0.5 overflow-x-auto"
-        onScroll={() => {
-          const el = stripRef.current
-          if (el) setAtEnd(el.scrollLeft + el.clientWidth >= el.scrollWidth - 2)
-        }}
-      >
-        {tabs.map((tab) => {
-          const selected = current === tab.value
-          const label = t(tab.labelKey)
-          return (
-            <button
-              key={tab.value}
-              ref={selected ? activeTabRef : undefined}
-              type="button"
-              role="tab"
-              aria-selected={selected}
-              data-testid={`panel-tab-${tab.value}`}
-              onClick={() => onSelect(tab.value)}
-              className={cn(
-                'inline-flex h-7 shrink-0 items-center rounded-md px-2.5 text-meta font-medium transition-colors duration-chrome',
-                focusChrome,
-                selected
-                  ? 'bg-state-active text-ink'
-                  : 'text-ink-tertiary hover:bg-state-hover hover:text-ink-secondary',
-              )}
-            >
-              {label}
-            </button>
-          )
-        })}
-        {overflowing && !atEnd ? (
-          <div
-            aria-hidden
-            className="pointer-events-none absolute inset-y-0 right-0 w-6 bg-gradient-to-l from-surface to-transparent"
-          />
-        ) : null}
-      </div>
-      {overflowing ? (
-        <DropdownMenu modal={false}>
-          <DropdownMenuTrigger asChild>
-            <button
-              type="button"
-              title={t('artifact.moreTabs')}
-              aria-label={t('artifact.moreTabs')}
-              data-testid="panel-tabs-overflow"
-              className={cn(
-                'inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-ink-tertiary transition-colors duration-chrome hover:bg-state-hover hover:text-ink-secondary',
-                focusChrome,
-              )}
-            >
-              <MoreHorizontal size={16} strokeWidth={1.75} />
-            </button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" data-testid="panel-tab-overflow-menu">
-            {tabs.map((tab) => {
-              const selected = current === tab.value
-              return (
-                <DropdownMenuItem
-                  key={tab.value}
-                  onSelect={() => onSelect(tab.value)}
-                  data-testid={`panel-tab-overflow-${tab.value}`}
-                >
-                  <span className="flex w-4 shrink-0 items-center justify-center">
-                    {selected ? <Check size={14} className="text-accent" /> : null}
-                  </span>
-                  {t(tab.labelKey)}
-                </DropdownMenuItem>
-              )
-            })}
-          </DropdownMenuContent>
-        </DropdownMenu>
-      ) : null}
+      <DropdownMenu modal={false}>
+        <DropdownMenuTrigger asChild>
+          <button
+            type="button"
+            title={currentLabel}
+            aria-label={currentLabel}
+            data-testid="panel-tab-trigger"
+            className={cn(
+              'inline-flex h-7 max-w-[10rem] items-center gap-1 rounded-md px-2 text-meta font-medium text-ink transition-colors duration-chrome hover:bg-state-hover',
+              focusChrome,
+            )}
+          >
+            <span className="truncate">{currentLabel}</span>
+            <ChevronDown size={14} strokeWidth={1.75} className="shrink-0 text-ink-tertiary" />
+          </button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end" data-testid="panel-tab-dropdown">
+          {tabs.map((tab) => {
+            const selected = current === tab.value
+            return (
+              <DropdownMenuItem
+                key={tab.value}
+                onSelect={() => onSelect(tab.value)}
+                data-testid={`panel-tab-${tab.value}`}
+              >
+                <span className="flex w-4 shrink-0 items-center justify-center">
+                  {selected ? <Check size={14} className="text-accent" /> : null}
+                </span>
+                {t(tab.labelKey)}
+              </DropdownMenuItem>
+            )
+          })}
+        </DropdownMenuContent>
+      </DropdownMenu>
     </div>
   )
 }

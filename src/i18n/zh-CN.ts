@@ -648,6 +648,7 @@ export const zhCN = {
       sourcesQuery: '「{{query}}」',
       terminal: '终端',
       closePanel: '关闭面板',
+      moreTabs: '更多标签页',
       collaborationStructure: '协作结构',
       subAgentCount: '{{count}} 个子代理',
       subAgentCount_one: '{{count}} 个子代理',

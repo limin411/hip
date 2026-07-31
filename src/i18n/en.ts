@@ -660,6 +660,7 @@ export const en = {
       sourcesQuery: '“{{query}}”',
       terminal: 'Terminal',
       closePanel: 'Close Panel',
+      moreTabs: 'More tabs',
       collaborationStructure: 'Collaboration',
       subAgentCount: '{{count}} sub-agents',
       subAgentCount_one: '{{count}} sub-agent',

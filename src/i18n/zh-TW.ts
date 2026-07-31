@@ -684,6 +684,7 @@ export const zhTW = {
     "sourcesQuery": "「{{query}}」",
     "terminal": "終端",
     "closePanel": "關閉面板",
+    "moreTabs": "更多分頁",
     "collaborationStructure": "協作結構",
     "subAgentCount": "{{count}} 個子代理",
     "subAgentCount_one": "{{count}} 個子代理",

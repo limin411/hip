@@ -676,6 +676,7 @@ export const ja = {
     "sourcesQuery": "「{{query}}」",
     "terminal": "ターミナル",
     "closePanel": "パネルを閉じる",
+    "moreTabs": "その他のタブ",
     "collaborationStructure": "コラボレーション",
     "subAgentCount": "{{count}} サブエージェント",
     "subAgentCount_one": "{{count}} サブエージェント",

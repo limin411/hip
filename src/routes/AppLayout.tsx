@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState, type RefObject } from 'react'
 import { Panel, PanelGroup, PanelResizeHandle, type ImperativePanelHandle } from 'react-resizable-panels'
 import { useProvidersStore } from '@/store/providersStore'
 import { sessionService, useActiveSession, useDomainStore } from '@/domain'
@@ -48,8 +48,32 @@ import { useFocusStore } from '@/store/focusStore'
 import { seedNavHistoryIfEmpty } from '@/components/layout/navHistory'
 import { WindowLifecycleHost } from '@/components/window/WindowLifecycleHost'
 
+/** Right rail must stay wide enough that the titlebar chrome + content breathe (~280px).
+ *  react-resizable-panels minSize is group-relative %, so convert the pixel floor against the
+ *  measured group width (clamped so tiny windows still leave room for the main pane). */
+const RIGHT_RAIL_MIN_PX = 280
+
+function useRailMinPct(groupRef: RefObject<HTMLDivElement | null>): number {
+  const [minPct, setMinPct] = useState(18)
+  useEffect(() => {
+    const el = groupRef.current
+    if (!el) return
+    const compute = () => {
+      const w = el.clientWidth
+      if (w > 0) setMinPct(Math.min(45, Math.max(15, Math.round((RIGHT_RAIL_MIN_PX / w) * 100))))
+    }
+    compute()
+    const ro = new ResizeObserver(compute)
+    ro.observe(el)
+    return () => ro.disconnect()
+  }, [groupRef])
+  return minPct
+}
+
 export function AppLayout() {
   const rightPanelRef = useRef<ImperativePanelHandle>(null)
+  const groupRef = useRef<HTMLDivElement>(null)
+  const railMinPct = useRailMinPct(groupRef)
   const activeSession = useActiveSession()
   const activeSessionId = activeSession?.id ?? null
   const activeView = useUiStore((s) => s.activeView)
@@ -240,7 +264,7 @@ export function AppLayout() {
       <WindowLifecycleHost />
       {AUTOMATION_PAGE ? <AutomationRunHost /> : null}
       {sidebarOpen ? <AppSidebar /> : null}
-      <PanelGroup direction="horizontal" className="min-w-0 flex-1 bg-surface">
+      <PanelGroup ref={groupRef} direction="horizontal" className="min-w-0 flex-1 bg-surface">
         {/* Main column only: warm paper; left AppSidebar + right drawer stay neutral surface. */}
         <Panel minSize={34} className="flex min-w-0 flex-col bg-surface-content">
           <MainToolbar />
@@ -273,7 +297,7 @@ export function AppLayout() {
         <Panel
           ref={rightPanelRef}
           defaultSize={26}
-          minSize={18}
+          minSize={railMinPct}
           maxSize={65}
           collapsible
           collapsedSize={0}

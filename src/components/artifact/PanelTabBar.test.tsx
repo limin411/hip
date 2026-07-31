@@ -14,12 +14,46 @@ vi.mock('react-i18next', () => ({
         'artifact.timeline': 'Timeline',
         'artifact.changes': 'Changes',
         'artifact.terminal': 'Terminal',
+        'artifact.moreTabs': 'More tabs',
         'chat.togglePanel': 'Panel',
       }
       return map[key] ?? key
     },
   }),
 }))
+
+// Radix portals don't interact well with happy-dom clicks — render inline like the
+// other dropdown tests in this repo (PermissionModePicker / SessionAgentPicker).
+vi.mock('@/components/ui/DropdownMenu', async () => {
+  const React = await import('react')
+  return {
+    DropdownMenu: ({ children }: { children: React.ReactNode }) =>
+      React.createElement(React.Fragment, null, children),
+    DropdownMenuTrigger: ({ children }: { children: React.ReactNode }) =>
+      React.createElement(React.Fragment, null, children),
+    DropdownMenuContent: ({
+      children,
+      ...rest
+    }: {
+      children: React.ReactNode
+      'data-testid'?: string
+    }) => React.createElement('div', { 'data-testid': rest['data-testid'] }, children),
+    DropdownMenuItem: ({
+      children,
+      onSelect,
+      ...rest
+    }: {
+      children: React.ReactNode
+      onSelect?: () => void
+      'data-testid'?: string
+    }) =>
+      React.createElement(
+        'div',
+        { 'data-testid': rest['data-testid'], onClick: () => onSelect?.() },
+        children,
+      ),
+  }
+})
 
 const setTab = vi.fn()
 const setChatActiveTab = vi.fn()
@@ -122,5 +156,50 @@ describe('PanelTabBar', () => {
     render(<PanelTabBar surface="code" />)
     expect(screen.getByTestId('panel-tab-agents')).toHaveAttribute('aria-selected', 'true')
     expect(screen.getByTestId('panel-tab-files')).toHaveAttribute('aria-selected', 'false')
+  })
+
+  it('shows the ⋯ overflow menu when tabs do not fit and jumps from it', () => {
+    const { container, rerender } = render(<PanelTabBar surface="code" />)
+    expect(screen.queryByTestId('panel-tabs-overflow')).not.toBeInTheDocument()
+
+    // Fake a narrow strip, then change the tab set so the layout effect re-measures.
+    const strip = container.querySelector('[data-testid="panel-tab-strip"]')!
+    Object.defineProperty(strip, 'clientWidth', { value: 80, configurable: true })
+    Object.defineProperty(strip, 'scrollWidth', { value: 600, configurable: true })
+    mockDiffState = { bySession: { 'sess-1': { isGitRepo: true } } }
+    rerender(<PanelTabBar surface="code" />)
+
+    expect(screen.getByTestId('panel-tabs-overflow')).toBeInTheDocument()
+    expect(screen.getByTestId('panel-tab-overflow-menu')).toBeInTheDocument()
+    expect(screen.getByTestId('panel-tab-overflow-timeline')).toBeInTheDocument()
+
+    fireEvent.click(screen.getByTestId('panel-tab-overflow-timeline'))
+    expect(setTab).toHaveBeenCalledWith('timeline')
+  })
+
+  it('hides the ⋯ overflow menu when all tabs fit', () => {
+    const { container, rerender } = render(<PanelTabBar surface="chat" />)
+    const strip = container.querySelector('[data-testid="panel-tab-strip"]')!
+    Object.defineProperty(strip, 'clientWidth', { value: 800, configurable: true })
+    Object.defineProperty(strip, 'scrollWidth', { value: 300, configurable: true })
+    rerender(<PanelTabBar surface="code" />) // surface switch re-runs the measure
+
+    expect(screen.queryByTestId('panel-tabs-overflow')).not.toBeInTheDocument()
+  })
+
+  it('scrolls the active tab into view once the strip starts clipping', () => {
+    const scrollIntoView = vi
+      .spyOn(HTMLElement.prototype, 'scrollIntoView')
+      .mockImplementation(() => {})
+    const { container, rerender } = render(<PanelTabBar surface="code" />)
+
+    const strip = container.querySelector('[data-testid="panel-tab-strip"]')!
+    Object.defineProperty(strip, 'clientWidth', { value: 80, configurable: true })
+    Object.defineProperty(strip, 'scrollWidth', { value: 600, configurable: true })
+    mockDiffState = { bySession: { 'sess-1': { isGitRepo: true } } }
+    rerender(<PanelTabBar surface="code" />)
+
+    expect(scrollIntoView).toHaveBeenCalled()
+    scrollIntoView.mockRestore()
   })
 })

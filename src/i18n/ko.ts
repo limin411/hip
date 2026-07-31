@@ -676,6 +676,7 @@ export const ko = {
     "sourcesQuery": "「{{query}}」",
     "terminal": "터미널",
     "closePanel": "패널 닫기",
+    "moreTabs": "탭 더 보기",
     "collaborationStructure": "협업",
     "subAgentCount": "하위 에이전트 {{count}}개",
     "subAgentCount_one": "하위 에이전트 {{count}}개",

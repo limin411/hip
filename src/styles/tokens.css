@@ -30,7 +30,7 @@
   --bg-app: #ffffff;
   --bg-subtle: #f6f6f6;
   --bg-muted: #eeeeee;
-  --bg-content: #fffefb; /* 仅主内容列：淡暖黄 / 奶油纸（略深于极淡） */
+  --bg-content: #ffffff; /* 仅主内容列：淡暖黄 / 奶油纸（略深于极淡） */
   --border: #d4d4d4;
   --border-strong: #bdbdbd; /* 需要明确分隔时（输入框、卡片外框） */
   --text-primary: #111111;
@@ -139,7 +139,7 @@ html[data-platform="linux"] {
   --text-secondary: #a3a3a3;
   --text-tertiary: #7a7a7a;
   /* 品牌强调色：更亮的暖橙（贴 logo #FF9800），保证在暗底上可识别 */
-  --accent: #ff9800;
+  --accent: #ffb300;
   --accent-hover: #ffb300; /* ≠ dark --warning #ffb74d */
   --accent-strong: #ffcc80;
   --accent-subtle: #222222; /* 暗色中性 hover/头像/chip 底 */

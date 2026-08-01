@@ -216,11 +216,17 @@ describe('NewConversation', () => {
     expect(screen.getByTestId('control-permission-mode-desc')).toHaveTextContent(
       'Full machine access (high-risk)',
     )
+    // Armed control permission tints the composer input card red.
+    expect(screen.getByTestId('composer').className).toContain('border-danger/60')
+    expect(screen.getByTestId('composer').className).not.toContain('border-border')
     // Radio semantics: arming roundtable clears control permission.
     fireEvent.click(screen.getByTestId('roundtable-option'))
     expect(useDraftStore.getState().draft?.roundtable).toBe(true)
     expect(useDraftStore.getState().draft?.controlPermission).toBeUndefined()
     expect(screen.queryByTestId('control-permission-mode-desc')).not.toBeInTheDocument()
+    // Border returns to default once control permission is cleared.
+    expect(screen.getByTestId('composer').className).toContain('border-border')
+    expect(screen.getByTestId('composer').className).not.toContain('border-danger')
     // Re-selecting the armed mode deselects it.
     fireEvent.click(screen.getByTestId('roundtable-option'))
     expect(useDraftStore.getState().draft?.roundtable).toBeUndefined()

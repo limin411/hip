@@ -110,6 +110,18 @@ describe('Composer', () => {
     expect(ta.className).toContain('rounded-none')
   })
 
+  it('danger tone swaps the card border to danger red', () => {
+    const { rerender } = render(
+      <Composer variant="card" value="" onChange={vi.fn()} onSubmit={vi.fn()} danger />,
+    )
+    const root = screen.getByTestId('composer')
+    expect(root.className).toContain('border-danger/60')
+    expect(root.className).not.toContain('border-border')
+    rerender(<Composer variant="card" value="" onChange={vi.fn()} onSubmit={vi.fn()} />)
+    expect(root.className).toContain('border-border')
+    expect(root.className).not.toContain('border-danger')
+  })
+
   it('renders footer row below the controls when footer prop is set', () => {
     render(
       <Composer

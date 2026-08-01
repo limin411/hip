@@ -37,6 +37,7 @@ export function Composer({
   variant = 'flat',
   textareaHeight,
   footer,
+  danger = false,
 }: {
   value: string
   onChange: (v: string) => void
@@ -72,6 +73,11 @@ export function Composer({
    * uses it for worktree + branch. Optional — hidden when absent.
    */
   footer?: React.ReactNode
+  /**
+   * Danger tone: swaps the card border to danger red (armed control-permission
+   * mode). Only affects the `card` variant.
+   */
+  danger?: boolean
 }) {
   const { t } = useTranslation()
   const hasQuote = !!quoteText?.trim()
@@ -82,7 +88,10 @@ export function Composer({
     <div
       className={cn(
         isCard
-          ? 'rounded-lg border border-border bg-surface-subtle p-2.5'
+          ? cn(
+              'rounded-lg border bg-surface-subtle p-2.5',
+              danger ? 'border-danger/60' : 'border-border',
+            )
           // Flat dock: no focus chrome — InputBar already draws the top rule.
           : 'bg-surface-subtle',
       )}

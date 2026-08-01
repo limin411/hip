@@ -364,6 +364,7 @@ export function NewConversation() {
             autoFocus
             submitDisabled={!canSend}
             inputRef={inputRef}
+            danger={draft?.controlPermission === true}
             leftSlot={
               <ComposerLeftSlot
                 surface={surface}

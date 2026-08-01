@@ -85,7 +85,23 @@ export function PreviewPanel() {
             </div>
           ) : (
             <div className="flex h-full min-h-0">
-              <ul className="w-40 shrink-0 overflow-y-auto border-r border-border py-1">
+              {/* Column flex so FilePreview (h-full iframe/img) gets a definite remaining height. */}
+              <div className="flex min-h-0 min-w-0 flex-1 flex-col">
+                {ready && (
+                  <div className="flex shrink-0 items-center gap-1 border-b border-border px-2 py-1">
+                    <Button variant="ghost" size="icon" onClick={copy} title={t('artifact.copyArtifact')} disabled={!ready || preview?.encoding === 'base64'}>
+                      <Copy size={15} />
+                    </Button>
+                    <Button variant="ghost" size="icon" onClick={download} title={t('artifact.downloadArtifact')} disabled={!ready}>
+                      <Download size={15} />
+                    </Button>
+                  </div>
+                )}
+                <div className="min-h-0 flex-1">
+                  <FilePreview />
+                </div>
+              </div>
+              <ul className="w-40 shrink-0 overflow-y-auto border-l border-border py-1">
                 {artifacts.map((a) => {
                   const Icon = iconFor(a.kind)
                   return (
@@ -106,22 +122,6 @@ export function PreviewPanel() {
                   )
                 })}
               </ul>
-              {/* Column flex so FilePreview (h-full iframe/img) gets a definite remaining height. */}
-              <div className="flex min-h-0 min-w-0 flex-1 flex-col">
-                {ready && (
-                  <div className="flex shrink-0 items-center gap-1 border-b border-border px-2 py-1">
-                    <Button variant="ghost" size="icon" onClick={copy} title={t('artifact.copyArtifact')} disabled={!ready || preview?.encoding === 'base64'}>
-                      <Copy size={15} />
-                    </Button>
-                    <Button variant="ghost" size="icon" onClick={download} title={t('artifact.downloadArtifact')} disabled={!ready}>
-                      <Download size={15} />
-                    </Button>
-                  </div>
-                )}
-                <div className="min-h-0 flex-1">
-                  <FilePreview />
-                </div>
-              </div>
             </div>
           )
         )}

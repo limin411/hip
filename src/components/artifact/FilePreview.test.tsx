@@ -238,6 +238,23 @@ describe('FilePreview', () => {
     })
   })
 
+  it('resolves root-relative HTML paths (write_file style) against cwd for open-in-browser', async () => {
+    setPreview({
+      status: 'ready',
+      path: '/index.html',
+      content: '<p>hi</p>',
+      mimeType: 'text/html',
+      encoding: 'utf8',
+    })
+    render(<FilePreview />)
+    const btn = screen.getByTestId('preview-html-open-browser')
+    expect(btn).not.toBeDisabled()
+    fireEvent.click(btn)
+    expect(openWithDefaultApp).toHaveBeenCalledWith('/tmp/index.html', {
+      cwd: '/tmp',
+    })
+  })
+
   it('opens sibling HTML report files via postMessage from srcDoc iframe', async () => {
     setPreview({
       status: 'ready',

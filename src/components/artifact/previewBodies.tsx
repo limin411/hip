@@ -461,7 +461,12 @@ export function HtmlPreviewBody({
   const [mode, setMode] = useState<'render' | 'source'>(() => (large ? 'source' : 'render'))
   const [iframeReady, setIframeReady] = useState(false)
   // Resolve relative deliverables (e.g. roundtable-report.html) against session cwd.
-  const absolutePath = resolvePathUnderCwd(cwd, path) ?? (path.startsWith('/') || /^[A-Za-z]:[\\/]/.test(path) ? path : null)
+  // Root-relative forms (`/index.html`, the documented write_file style) are jailed under
+  // cwd by the sidecar's path resolver, so resolve them the same way before trusting.
+  const absolutePath =
+    resolvePathUnderCwd(cwd, path) ??
+    resolvePathUnderCwd(cwd, path.replace(/^[/\\]+/, '')) ??
+    (path.startsWith('/') || /^[A-Za-z]:[\\/]/.test(path) ? path : null)
   const canOpenBrowser = Boolean(cwd && absolutePath)
 
   // Reset mode when the selected file changes.

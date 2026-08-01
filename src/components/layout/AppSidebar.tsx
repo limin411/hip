@@ -1111,6 +1111,7 @@ function CatalogWorktreeRow({
   const label = row.label || row.branch || pathLabel
   // After PR7 source wire: humanize known enums; never leak raw WorktreeSource strings (D18).
   const sourceLabel = resolveWorktreeSourceLabel(row.source, t)
+  const meta = [pathLabel !== label ? pathLabel : null, sourceLabel].filter(Boolean).join(' · ')
   const openTarget = resolveWorktreeOpenTarget({
     path: row.path,
     hostSessionId,
@@ -1164,20 +1165,17 @@ function CatalogWorktreeRow({
               t: (key, opts) => String(opts ? t(key as never, opts as never) : t(key as never)),
             })
           }
-          title={row.path}
+          title={[row.path, sourceLabel].filter(Boolean).join(' · ')}
           className={cn(
-            'flex w-full items-start gap-2 rounded-lg py-1.5 pl-3 pr-2 text-left transition-colors',
+            'flex w-full items-center gap-2 rounded-lg py-[var(--row-pad-y-session)] pl-3 pr-2 text-left transition-colors',
             'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink/20',
             active ? SIDEBAR_ACTIVE_RAIL : 'hover:bg-state-hover',
           )}
         >
-          <GitBranch size={12} strokeWidth={1.75} className="mt-0.5 shrink-0 text-ink-tertiary" aria-hidden />
-          <span className="min-w-0 flex-1">
-            <span className="block truncate text-meta font-medium text-ink">{label}</span>
-            <span className="mt-0.5 block truncate text-caption text-ink-tertiary" title={row.path}>
-              {pathLabel}
-              {sourceLabel ? ` · ${sourceLabel}` : ''}
-            </span>
+          <GitBranch size={12} strokeWidth={1.75} className="shrink-0 text-ink-tertiary" aria-hidden />
+          <span className="flex min-w-0 flex-1 items-center gap-1.5">
+            <span className="min-w-0 truncate text-meta font-medium text-ink">{label}</span>
+            {meta ? <span className="min-w-0 truncate text-caption text-ink-tertiary">{meta}</span> : null}
           </span>
         </button>
       </DeclarativeContextMenu>
@@ -1232,6 +1230,13 @@ function WorktreeSlotRow({
   const pathLabel = shortWorktreeLabel(slot.worktreePath, slot.branch)
   const label = session?.title || slot.branch || `P${slot.index}`
   const running = session?.status === 'running'
+  const meta = [
+    pathLabel !== label ? pathLabel : null,
+    slot.taskId || null,
+    isWinner ? t('sidebar.parallel.winner') : null,
+  ]
+    .filter(Boolean)
+    .join(' · ')
 
   const rowButton = (
     <button
@@ -1261,11 +1266,16 @@ function WorktreeSlotRow({
         if (slot.sessionId) sessionService.selectParallelWinner(run.id, slot.sessionId)
       }}
       title={
-        isAgentSlot ? t('sidebar.parallel.agentSlotHint') : t('sidebar.parallel.slotHint')
+        [
+          slot.worktreePath || undefined,
+          isAgentSlot ? t('sidebar.parallel.agentSlotHint') : t('sidebar.parallel.slotHint'),
+        ]
+          .filter(Boolean)
+          .join(' · ')
       }
       className={cn(
         // Craft PR-7: stronger indent for nested worktree slots vs primary session rows.
-        'flex w-full items-start gap-2 rounded-lg border-l-2 border-transparent py-1 pl-4 pr-2 text-left transition-colors',
+        'flex w-full items-center gap-2 rounded-lg border-l-2 border-transparent py-[var(--row-pad-y-session)] pl-4 pr-2 text-left transition-colors',
         'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink/20',
         active ? SIDEBAR_ACTIVE_RAIL : 'hover:bg-state-hover',
       )}
@@ -1273,28 +1283,22 @@ function WorktreeSlotRow({
       <GitBranch
         size={12}
         className={cn(
-          'mt-0.5 shrink-0',
+          'shrink-0',
           slot.status === 'error' ? 'text-danger' : 'text-ink-tertiary',
         )}
         aria-hidden
       />
-      <span className="min-w-0 flex-1">
-        <span className="flex min-w-0 items-center gap-1.5">
-          {running ? (
-            <span
-              className="size-1.5 shrink-0 animate-pulse rounded-full bg-accent"
-              data-testid={`sidebar-session-running-${slot.sessionId}`}
-              title={t('sidebar.status.running')}
-              aria-hidden
-            />
-          ) : null}
-          <span className="block min-w-0 truncate text-meta font-medium text-ink-secondary">{label}</span>
-        </span>
-        <span className="mt-0.5 block truncate text-caption text-ink-tertiary" title={slot.worktreePath}>
-          {pathLabel}
-          {slot.taskId ? ` · ${slot.taskId}` : ''}
-          {isWinner ? ` · ${t('sidebar.parallel.winner')}` : ''}
-        </span>
+      <span className="flex min-w-0 flex-1 items-center gap-1.5">
+        {running ? (
+          <span
+            className="size-1.5 shrink-0 animate-pulse rounded-full bg-accent"
+            data-testid={`sidebar-session-running-${slot.sessionId}`}
+            title={t('sidebar.status.running')}
+            aria-hidden
+          />
+        ) : null}
+        <span className="min-w-0 truncate text-meta font-medium text-ink-secondary">{label}</span>
+        {meta ? <span className="min-w-0 truncate text-caption text-ink-tertiary">{meta}</span> : null}
       </span>
     </button>
   )

@@ -1,7 +1,7 @@
 // @vitest-environment happy-dom
 import '@testing-library/jest-dom/vitest'
-import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen, fireEvent, cleanup } from '@testing-library/react'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+import { render, screen, fireEvent, cleanup, act } from '@testing-library/react'
 import { FileTree } from './FileTree'
 import { useFsStore } from '@/store/fsStore'
 
@@ -123,5 +123,57 @@ describe('FileTree', () => {
     expect(icons[0].getAttribute('class')).toMatch(/sky/)
     expect(icons[1].getAttribute('class')).toMatch(/blue/)
     expect(icons[2].getAttribute('class')).toMatch(/slate/)
+  })
+
+  describe('committed session chrome', () => {
+    beforeEach(() => {
+      vi.useFakeTimers()
+    })
+    afterEach(() => {
+      vi.useRealTimers()
+    })
+
+    it('hides the header row (root name / refresh button) for committed sessions', () => {
+      useFsStore.setState({
+        bySession: {
+          s1: {
+            cwd: '/project',
+            entriesByDir: { '/project': [{ path: '/project/README.md', name: 'README.md', isDir: false }] },
+            expanded: {},
+            activePath: null,
+          },
+        },
+      } as any)
+
+      render(<FileTree />)
+      expect(screen.getByText('README.md')).toBeInTheDocument()
+      expect(screen.queryByTestId('refresh-tree')).not.toBeInTheDocument()
+      expect(screen.queryByTestId('tree-back-to-chat')).not.toBeInTheDocument()
+    })
+
+    it('polls the root and expanded dirs instead of a manual refresh', () => {
+      useFsStore.setState({
+        bySession: {
+          s1: {
+            cwd: '/project',
+            entriesByDir: {
+              '/project': [{ path: '/project/src', name: 'src', isDir: true }],
+              '/project/src': [{ path: '/project/src/a.ts', name: 'a.ts', isDir: false }],
+            },
+            expanded: { '/project/src': true },
+            activePath: null,
+          },
+        },
+      } as any)
+
+      render(<FileTree />)
+      // Entries are already cached — mount does not list again.
+      expect(lsDir).not.toHaveBeenCalled()
+
+      act(() => { vi.advanceTimersByTime(5000) })
+      expect(lsDir).toHaveBeenCalledWith('s1', '/project')
+      expect(lsDir).toHaveBeenCalledWith('s1', '/project/src')
+      expect(lsDir).toHaveBeenCalledTimes(2)
+    })
   })
 })

@@ -1,4 +1,4 @@
-import { useEffect } from 'react'
+import { useEffect, useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
 import { ChevronRight, ChevronDown, Folder, FolderOpen, FolderGit2, RefreshCw, MessageSquare } from 'lucide-react'
 import type { FsEntry } from '@hip/protocol'
@@ -126,6 +126,29 @@ export function FileTree() {
     }
   }, [scopeId, rootPath, isDraft, rootEntries])
 
+  // Committed sessions have no header refresh button, so keep the listing fresh
+  // by polling the root and every expanded directory.
+  const POLL_MS = 5000
+  const expanded = useFsStore((s) => (scopeId ? s.bySession[scopeId]?.expanded : undefined))
+  const polledDirs = useMemo(() => {
+    if (!scopeId || !rootPath) return []
+    const dirs = [rootPath]
+    if (expanded) {
+      for (const [dir, open] of Object.entries(expanded)) {
+        if (open && dir.startsWith(rootPath)) dirs.push(dir)
+      }
+    }
+    return dirs
+  }, [scopeId, rootPath, expanded])
+
+  useEffect(() => {
+    if (isDraft || !scopeId || polledDirs.length === 0) return
+    const id = window.setInterval(() => {
+      for (const dir of polledDirs) sessionService.lsDir(scopeId, dir)
+    }, POLL_MS)
+    return () => window.clearInterval(id)
+  }, [isDraft, scopeId, polledDirs])
+
   const choose = async () => {
     const dir = await pickDirectory()
     if (!dir) return
@@ -167,13 +190,15 @@ export function FileTree() {
 
   return (
     <div className="flex h-full flex-col" data-testid="file-tree">
-      <div className="flex h-8 shrink-0 items-center justify-between border-b border-border/80 px-2">
-        <span className="flex items-center gap-1.5 truncate text-caption font-medium text-ink-tertiary" title={rootPath}>
-          <FolderGit2 size={13} strokeWidth={1.75} className="shrink-0" />
-          <span className="truncate text-ink-secondary">{basename(rootPath)}</span>
-        </span>
-        <div className="flex items-center gap-0.5">
-          {isDraft && (
+      {/* Header (root name / refresh / change folder) is draft-only — committed
+          sessions refresh their listing on a poll interval instead. */}
+      {isDraft && (
+        <div className="flex h-8 shrink-0 items-center justify-between border-b border-border/80 px-2">
+          <span className="flex items-center gap-1.5 truncate text-caption font-medium text-ink-tertiary" title={rootPath}>
+            <FolderGit2 size={13} strokeWidth={1.75} className="shrink-0" />
+            <span className="truncate text-ink-secondary">{basename(rootPath)}</span>
+          </span>
+          <div className="flex items-center gap-0.5">
             <button
               title={t('artifact.backToChat')}
               aria-label={t('artifact.backToChat')}
@@ -183,18 +208,14 @@ export function FileTree() {
             >
               <MessageSquare size={13} strokeWidth={1.75} />
             </button>
-          )}
-          <button
-            title={t('artifact.refresh')}
-            data-testid="refresh-tree"
-            onClick={() => scopeId && (isDraft ? sessionService.lsDraft(scopeId, rootPath) : sessionService.lsDir(scopeId, rootPath))}
-            className="rounded-md p-1 text-ink-tertiary transition-colors duration-chrome hover:bg-state-hover hover:text-ink"
-          >
-            <RefreshCw size={13} strokeWidth={1.75} />
-          </button>
-          {/* Change-folder (directory picker) is draft/sandbox-only — committed project
-              sessions keep the folder bound at creation. */}
-          {isDraft && (
+            <button
+              title={t('artifact.refresh')}
+              data-testid="refresh-tree"
+              onClick={() => scopeId && sessionService.lsDraft(scopeId, rootPath)}
+              className="rounded-md p-1 text-ink-tertiary transition-colors duration-chrome hover:bg-state-hover hover:text-ink"
+            >
+              <RefreshCw size={13} strokeWidth={1.75} />
+            </button>
             <button
               title={t('artifact.changeFolder')}
               onClick={choose}
@@ -202,9 +223,9 @@ export function FileTree() {
             >
               <Folder size={13} strokeWidth={1.75} />
             </button>
-          )}
+          </div>
         </div>
-      </div>
+      )}
       <div className="flex-1 overflow-auto py-1">
         {scopeId && rootEntries?.map((e) => (
           <Node key={e.path} entry={e} scopeId={scopeId} isDraft={isDraft} depth={0} cwd={rootPath} />

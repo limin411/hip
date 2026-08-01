@@ -1,13 +1,10 @@
 /**
  * Native window vibrancy (desktop wallpaper / DWM material under transparent regions).
  *
- * Modes written to `html[data-vibrancy]`:
- * - mac-sidebar — NSVisualEffect Sidebar
- * - win-mica — Windows 11 Mica
- * - win-acrylic — Acrylic fallback (thick tint; no CSS blur on top)
- * - solid — opaque host (Linux, failures, reduced transparency)
- *
- * Never leave semi-transparent `.glass-surface` without a real material underneath.
+ * Flat design (see docs/flat-design-spec.md §4.5): translucent materials are removed.
+ * `data-vibrancy` is always `solid`; `setTheme` still syncs window chrome to the
+ * app theme. Legacy modes (`mac-sidebar` / `win-mica` / `win-acrylic`) are still
+ * readable by getVibrancyMode but never written by this module.
  */
 
 import { detectHipPlatform, type HipPlatform } from './platform'
@@ -56,6 +53,7 @@ export function getVibrancyMode(): VibrancyMode | null {
 
 /**
  * Apply platform window effects. Safe outside Tauri (marks solid / clears, returns false).
+ * Flat design: no translucency — always solid; only the window theme is synced.
  * Idempotent enough to re-run when app theme changes.
  */
 export async function enableNativeVibrancy(): Promise<boolean> {
@@ -67,45 +65,19 @@ export async function enableNativeVibrancy(): Promise<boolean> {
   }
 
   try {
-    const { getCurrentWindow, Effect, EffectState } = await import('@tauri-apps/api/window')
+    const { getCurrentWindow } = await import('@tauri-apps/api/window')
     const win = getCurrentWindow()
     const dark = isDarkDocument()
 
     await win.setTheme(dark ? 'dark' : 'light').catch(() => {
-      /* setTheme not available / denied — effects still useful */
+      /* setTheme not available / denied — chrome color sync is optional */
     })
-
-    if (platform === 'mac') {
-      await win.setEffects({
-        effects: [Effect.Sidebar],
-        state: EffectState.FollowsWindowActiveState,
-      })
-      markVibrancyMode('mac-sidebar')
-      return true
-    }
-
-    // Windows: Mica (Win11) → Acrylic (Win10) → solid (never treat Blur as glass success)
-    try {
-      await win.setEffects({ effects: [Effect.Mica] })
-      markVibrancyMode('win-mica')
-      return true
-    } catch {
-      try {
-        await win.setEffects({
-          effects: [Effect.Acrylic],
-          color: dark ? [26, 26, 26, 220] : [245, 245, 245, 220],
-        })
-        markVibrancyMode('win-acrylic')
-        return true
-      } catch {
-        markVibrancyMode('solid')
-        return false
-      }
-    }
   } catch {
-    markVibrancyMode('solid')
-    return false
+    /* not in Tauri — solid anyway */
   }
+
+  markVibrancyMode('solid')
+  return false
 }
 
 /** Re-apply after theme toggle (window theme + acrylic tint). */

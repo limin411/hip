@@ -63,13 +63,9 @@
    * lights (tauri.conf trafficLightPosition y=26). Win/Linux stay 40px.
    */
   --titlebar-height: 40px;
-  /* 毛玻璃：CSS 回退（Linux / 浏览器）；原生材质见 data-vibrancy=mac-sidebar|win-mica|… */
-  --glass-bg: color-mix(in srgb, var(--bg-subtle) 78%, transparent);
-  --glass-border: rgba(0, 0, 0, 0.05);
-  --glass-backdrop: blur(24px) saturate(180%);
-  /* 标题栏默认背景（非 macOS 平台使用纯色） */
-  --titlebar-bg: var(--glass-bg);
-  --titlebar-backdrop: var(--glass-backdrop);
+  /* 扁平化：无半透明材质 —— 标题栏恒为实色（原生 vibrancy 已拆除，见 windowVibrancy.ts） */
+  --titlebar-bg: var(--bg-app);
+  --titlebar-backdrop: none;
   /* 右侧浮动 panel 阴影（与 menu/overlay 并列的第三档）—— 扁平化：面板改实底 + 1px 边框 */
   --shadow-panel: none;
   /* 浮层遮罩（Modal / 全屏 palette） */
@@ -158,12 +154,8 @@ html[data-platform="linux"] {
   --role-coder: #5dc96c;
   --role-reviewer: #ffab40;
   --role-worker: #2ee6e6;
-  /* 毛玻璃：暗色 CSS 回退；原生材质见 data-vibrancy 模式 */
-  --glass-bg: color-mix(in srgb, var(--bg-subtle) 78%, transparent);
-  --glass-border: rgba(255, 255, 255, 0.05);
-  --glass-backdrop: blur(24px) saturate(180%);
-  --titlebar-bg: var(--glass-bg);
-  --titlebar-backdrop: var(--glass-backdrop);
+  --titlebar-bg: var(--bg-app);
+  --titlebar-backdrop: none;
   --shadow-panel: none;
   --overlay-scrim: rgba(0, 0, 0, 0.48);
   /* Nested confirm/task over a shell — light, no blur */
@@ -192,47 +184,8 @@ html.dark[data-platform="linux"] {
   --titlebar-backdrop: none;
 }
 
-/* Explicit solid host (Win material fail, Linux, reduced transparency).
-   Sidebar must be opaque — never half-transparent without native material. */
-html[data-vibrancy="solid"] {
-  --glass-bg: var(--bg-subtle);
-  --glass-backdrop: none;
-  --titlebar-bg: var(--bg-app);
-  --titlebar-backdrop: none;
-}
-
-/* Native material: system backdrop under chrome; tint only — no CSS blur on top.
-   Modes: mac-sidebar | win-mica | win-acrylic (legacy: native → treat like mac-sidebar in JS). */
-html[data-vibrancy="mac-sidebar"],
-html[data-vibrancy="win-mica"],
-html[data-vibrancy="win-acrylic"],
-html[data-vibrancy="native"] {
-  --glass-bg: color-mix(in srgb, var(--bg-subtle) 70%, transparent);
-  --glass-backdrop: none;
-  --titlebar-bg: var(--glass-bg);
-  --titlebar-backdrop: none;
-}
-
-html.dark[data-vibrancy="mac-sidebar"],
-html.dark[data-vibrancy="win-mica"],
-html.dark[data-vibrancy="native"] {
-  --glass-bg: color-mix(in srgb, var(--bg-subtle) 86%, transparent);
-  --glass-backdrop: none;
-  --titlebar-bg: var(--glass-bg);
-  --titlebar-backdrop: none;
-}
-
-/* Acrylic needs a thicker tint (often muddier blur under the hood). */
-html[data-vibrancy="win-acrylic"] {
-  --glass-bg: color-mix(in srgb, var(--bg-subtle) 82%, transparent);
-}
-
-html.dark[data-vibrancy="win-acrylic"] {
-  --glass-bg: color-mix(in srgb, var(--bg-subtle) 92%, transparent);
-  --glass-backdrop: none;
-  --titlebar-bg: var(--glass-bg);
-  --titlebar-backdrop: none;
-}
+/* 扁平化：无半透明材质。data-vibrancy 恒为 solid（见 windowVibrancy.ts），
+   历史分支（mac-sidebar / win-mica / win-acrylic / native）已全部拆除。 */
 
 html {
   color-scheme: light;
@@ -277,16 +230,9 @@ html[data-platform="windows"] body {
   text-rendering: auto;
 }
 
-/* Solid / browser / pre-init: opaque page. Material hosts keep transparent body. */
-html:not([data-vibrancy="mac-sidebar"]):not([data-vibrancy="win-mica"]):not([data-vibrancy="win-acrylic"]):not([data-vibrancy="native"]) body {
+/* 扁平化：无原生材质，body 恒为不透明页面底色。 */
+body {
   background: var(--bg-app);
-}
-
-html[data-vibrancy="mac-sidebar"] body,
-html[data-vibrancy="win-mica"] body,
-html[data-vibrancy="win-acrylic"] body,
-html[data-vibrancy="native"] body {
-  background: transparent;
 }
 
 * {
@@ -354,21 +300,6 @@ a:hover {
   .scrollbar-hide::-webkit-scrollbar {
     display: none;
   }
-
-  /* 毛玻璃材质：半透明底 + 高斯模糊（侧栏等） */
-  .glass-surface {
-    background-color: var(--glass-bg);
-    backdrop-filter: var(--glass-backdrop);
-    -webkit-backdrop-filter: var(--glass-backdrop);
-  }
-}
-
-/* Window unfocused: slightly quiet chrome only (sidebar glass / titlebar), not transcript. */
-html[data-window-focus='false'] .glass-surface {
-  opacity: 0.92;
-}
-html[data-window-focus='false'] [data-tauri-drag-region] {
-  opacity: 0.94;
 }
 
 /* ── Greeting text fade-in (triggered by key change on animName) ── */

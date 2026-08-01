@@ -2977,12 +2977,6 @@ describe('knowledgeStore board companion rail (PR-4)', () => {
     createdAt: 1,
     updatedAt: 1,
   }
-  const emptySel = {
-    boardId: 'brd_board000001',
-    ids: [] as string[],
-    items: [] as [],
-    style: {},
-  }
   const selWithRect = {
     boardId: 'brd_board000001',
     ids: ['r1'],

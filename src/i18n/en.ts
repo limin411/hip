@@ -2627,10 +2627,6 @@ export const en = {
         docDone: 'Document exported',
         htmlDone: 'HTML exported (open in browser; use Print → PDF if needed)',
         spaceDone: 'Space exported (portable layout with assets)',
-        boardJson: 'Export whiteboard (JSON)…',
-        boardPng: 'Export whiteboard (PNG)…',
-        boardJsonDone: 'Whiteboard exported',
-        boardPngDone: 'Whiteboard PNG exported',
       },
       import: {
         folder: 'Import folder…',

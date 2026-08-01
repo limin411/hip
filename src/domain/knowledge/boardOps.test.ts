@@ -247,7 +247,7 @@ describe('boardOps resize + handles (PR-3)', () => {
   })
 
   it('line endpoint move + hit', () => {
-    const line: Extract<HipBoardElement, { type: 'line' }> = {
+    const line: Extract<HipBoardElement, { type: 'line' | 'arrow' }> = {
       id: 'l',
       type: 'line',
       x: 0,

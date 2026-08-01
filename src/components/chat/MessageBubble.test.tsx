@@ -118,7 +118,7 @@ describe('MessageBubble', () => {
     const bubble = screen.getByTestId('user-message-bubble')
     expect(bubble).toBeInTheDocument()
     expect(bubble).toHaveTextContent('hello bubble')
-    expect(bubble).toHaveClass('rounded-2xl', 'bg-surface-muted')
+    expect(bubble).toHaveClass('rounded-lg', 'bg-surface-muted')
     const shell = screen.getByTestId('message-context-menu')
     expect(shell).not.toHaveClass('items-end')
     expect(shell.className).not.toMatch(/justify-end/)

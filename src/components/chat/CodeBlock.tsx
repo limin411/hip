@@ -208,7 +208,7 @@ export function CodeBlock({
             data-testid="code-copy"
             title={t('chat.copyCode')}
             aria-label={t('chat.copyCode')}
-            className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md text-ink-tertiary transition-colors duration-chrome hover:bg-state-hover hover:text-ink"
+            className="flex h-6 w-6 shrink-0 items-center justify-center rounded-sm text-ink-tertiary transition-colors duration-chrome hover:bg-state-hover hover:text-ink"
           >
             {copied ? <Check size={13} strokeWidth={1.75} /> : <Copy size={13} strokeWidth={1.75} />}
           </button>

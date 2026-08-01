@@ -159,7 +159,7 @@ export function ModelPicker() {
             <label htmlFor={searchId} className="sr-only">
               {t('chat.searchModels')}
             </label>
-            <div className="flex h-8 items-center gap-1.5 rounded-md border border-border bg-surface px-2">
+            <div className="flex h-8 items-center gap-1.5 rounded-sm border border-border bg-surface px-2">
               <Search size={13} className="shrink-0 text-ink-tertiary" aria-hidden />
               <input
                 id={searchId}

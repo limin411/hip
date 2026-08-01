@@ -163,7 +163,7 @@ function FieldLabel({
 
 /** Compact chip used in the prompt toolbar (agent / project-style controls). */
 const chipClassName = cn(
-  'inline-flex h-7 max-w-[11rem] items-center gap-1 rounded-md px-2 text-meta font-medium transition-colors duration-chrome',
+  'inline-flex h-7 max-w-[11rem] items-center gap-1 rounded-sm px-2 text-meta font-medium transition-colors duration-chrome',
   'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink/20',
   'text-ink-tertiary hover:bg-state-hover hover:text-ink-secondary',
   'disabled:cursor-not-allowed disabled:opacity-50',
@@ -626,7 +626,7 @@ export function AutomationEditorModal({
           </FieldLabel>
           <div
             className={cn(
-              'flex flex-col rounded-xl border bg-surface transition-[border-color,box-shadow] duration-chrome',
+              'flex flex-col rounded-lg border bg-surface transition-[border-color,box-shadow] duration-chrome',
               promptError
                 ? 'border-danger/50'
                 : 'border-border focus-within:border-border-strong',
@@ -765,7 +765,7 @@ export function AutomationEditorModal({
                     onKeyDown={(e) => e.stopPropagation()}
                     onPointerDown={(e) => e.stopPropagation()}
                   >
-                    <div className="flex h-8 items-center gap-1.5 rounded-md border border-border bg-surface px-2">
+                    <div className="flex h-8 items-center gap-1.5 rounded-sm border border-border bg-surface px-2">
                       <Search
                         size={13}
                         className="shrink-0 text-ink-tertiary"
@@ -887,7 +887,7 @@ export function AutomationEditorModal({
             {draft.projectPath ? (
               <div
                 className={cn(
-                  'inline-flex h-8 max-w-full items-center gap-1.5 rounded-md border border-border bg-surface-subtle/60 px-2 text-meta text-ink',
+                  'inline-flex h-8 max-w-full items-center gap-1.5 rounded-sm border border-border bg-surface-subtle/60 px-2 text-meta text-ink',
                 )}
               >
                 <Folder
@@ -916,7 +916,7 @@ export function AutomationEditorModal({
               ref={projectPickRef}
               type="button"
               className={cn(
-                'inline-flex h-8 items-center gap-1.5 rounded-md border border-border bg-surface px-2.5 text-meta font-medium text-ink-secondary transition-colors duration-chrome',
+                'inline-flex h-8 items-center gap-1.5 rounded-sm border border-border bg-surface px-2.5 text-meta font-medium text-ink-secondary transition-colors duration-chrome',
                 'hover:bg-state-hover hover:text-ink',
                 'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink/20',
               )}

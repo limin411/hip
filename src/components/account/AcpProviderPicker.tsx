@@ -72,7 +72,7 @@ export function AcpProviderPicker({
         </button>
       </div>
 
-      <ul className="divide-y divide-border overflow-hidden rounded-xl border border-border bg-surface">
+      <ul className="divide-y divide-border overflow-hidden rounded-lg border border-border bg-surface">
         {ACP_PRESETS.map((preset) => {
           const Icon = ICONS[preset.icon]
           const agentOk = presetAgentInstalled(preset, installed)

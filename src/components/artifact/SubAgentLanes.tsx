@@ -77,7 +77,7 @@ export function SubAgentLanes({
               onClick={() => setSelectedAgentId(a.agentId)}
               onKeyDown={(e) => onKeyDown(e, i)}
               className={cn(
-                'inline-flex max-w-[10rem] items-center gap-1.5 rounded-md px-2 py-1 text-meta transition-colors duration-chrome',
+                'inline-flex max-w-[10rem] items-center gap-1.5 rounded-sm px-2 py-1 text-meta transition-colors duration-chrome',
                 selectedLane
                   ? 'bg-state-hover text-ink'
                   : 'text-ink-tertiary hover:bg-state-hover hover:text-ink-secondary',

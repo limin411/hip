@@ -84,7 +84,7 @@ export function McpRegistrySourceModal({
         </p>
 
         <div
-          className="space-y-3 rounded-xl border border-border bg-surface-subtle/60 p-4"
+          className="space-y-3 rounded-lg border border-border bg-surface-subtle/60 p-4"
           data-testid="mcp-registry-source-add"
         >
           <div>
@@ -134,7 +134,7 @@ export function McpRegistrySourceModal({
 
         <div className="space-y-3">
           {sources.length === 0 ? (
-            <div className="rounded-xl border border-dashed border-border bg-surface-subtle/40 px-4 py-10 text-center text-body text-ink-tertiary">
+            <div className="rounded-lg border border-dashed border-border bg-surface-subtle/40 px-4 py-10 text-center text-body text-ink-tertiary">
               {t('settings.mcp.sourcesEmpty')}
             </div>
           ) : (
@@ -144,7 +144,7 @@ export function McpRegistrySourceModal({
               return (
                 <div
                   key={src.id}
-                  className="rounded-xl border border-border bg-surface p-4"
+                  className="rounded-lg border border-border bg-surface p-4"
                   data-testid={`mcp-registry-source-${src.id}`}
                 >
                   <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">

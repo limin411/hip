@@ -112,7 +112,7 @@ export function WorkItemListView({
   return (
     <div
       className={cn(
-        'flex min-h-0 flex-1 flex-col overflow-hidden rounded-xl border border-border bg-surface',
+        'flex min-h-0 flex-1 flex-col overflow-hidden rounded-lg border border-border bg-surface',
         className,
       )}
       data-testid="work-item-list-view"
@@ -129,7 +129,7 @@ export function WorkItemListView({
             <button
               type="button"
               data-testid="work-item-search-clear"
-              className="h-7 shrink-0 rounded-md px-2 text-meta font-medium text-ink-secondary transition-colors hover:bg-state-hover hover:text-ink"
+              className="h-7 shrink-0 rounded-sm px-2 text-meta font-medium text-ink-secondary transition-colors hover:bg-state-hover hover:text-ink"
               onClick={() => setSearch('')}
             >
               {t('workItems.clearSearch')}
@@ -138,7 +138,7 @@ export function WorkItemListView({
           <input
             type="search"
             data-testid="work-item-search"
-            className="h-7 w-48 max-w-[40vw] rounded-md border border-border bg-surface px-2 text-body text-ink placeholder:text-ink-tertiary"
+            className="h-7 w-48 max-w-[40vw] rounded-sm border border-border bg-surface px-2 text-body text-ink placeholder:text-ink-tertiary"
             placeholder={t('workItems.searchPlaceholder')}
             value={search}
             onChange={(e) => setSearch(e.target.value)}

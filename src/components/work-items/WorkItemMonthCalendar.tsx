@@ -57,7 +57,7 @@ export function WorkItemMonthCalendar({
 
   return (
     <div
-      className="grid min-h-0 flex-1 grid-cols-7 overflow-hidden rounded-xl border border-border bg-surface"
+      className="grid min-h-0 flex-1 grid-cols-7 overflow-hidden rounded-lg border border-border bg-surface"
       role="grid"
       aria-label={t('workItems.calendar.aria')}
       data-testid="work-item-month-calendar"

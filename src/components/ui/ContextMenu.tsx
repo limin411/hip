@@ -16,7 +16,7 @@ export const ContextMenuContent = forwardRef<
     <ContextMenuPrimitive.Content
       ref={ref}
       className={cn(
-        'z-50 min-w-[160px] rounded-lg border border-border bg-surface p-1 shadow-menu',
+        'z-50 min-w-[160px] rounded-xl border border-border bg-surface p-1 shadow-menu',
         'origin-[var(--radix-context-menu-content-transform-origin)]',
         menuMotion,
         className,

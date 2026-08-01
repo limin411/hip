@@ -308,7 +308,7 @@ export function SpaceTree({
         className="flex flex-col items-center gap-2.5 px-3 py-10 text-center"
         data-testid="knowledge-tree-empty"
       >
-        <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-surface-muted text-ink-tertiary">
+        <span className="flex h-11 w-11 items-center justify-center rounded-lg bg-surface-muted text-ink-tertiary">
           <Library size={18} strokeWidth={1.75} />
         </span>
         <p className="max-w-[11rem] text-meta leading-relaxed text-ink-tertiary">
@@ -476,7 +476,7 @@ export function SpaceTree({
           onPointerDown={(e) => onGripPointerDown(node.id, e)}
           style={{ left: depth * DEPTH_STEP + 1 }}
           className={cn(
-            'absolute top-1/2 z-[1] flex h-6 w-3.5 -translate-y-1/2 cursor-grab items-center justify-center rounded-md text-ink-tertiary/80 transition-[opacity,background-color,color] touch-none active:cursor-grabbing',
+            'absolute top-1/2 z-[1] flex h-6 w-3.5 -translate-y-1/2 cursor-grab items-center justify-center rounded-sm text-ink-tertiary/80 transition-[opacity,background-color,color] touch-none active:cursor-grabbing',
             'hover:bg-state-hover hover:text-ink-secondary',
             'disabled:pointer-events-none disabled:opacity-40',
             // Invisible at rest and not hit-target so chevron/title keep full row.

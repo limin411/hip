@@ -143,7 +143,7 @@ export function SessionHistory({
           value={query}
           onChange={(e) => handleQueryChange(e.target.value)}
           placeholder={t('history.searchPlaceholder')}
-          className="h-9 w-full rounded-md border border-border bg-surface py-2 pl-9 pr-3 text-body text-ink transition-[border-color,box-shadow] duration-chrome placeholder:text-ink-tertiary focus-visible:border-accent focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-accent/10"
+          className="h-9 w-full rounded-sm border border-border bg-surface py-2 pl-9 pr-3 text-body text-ink transition-[border-color,box-shadow] duration-chrome placeholder:text-ink-tertiary focus-visible:border-accent focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-accent/10"
         />
       </div>
 

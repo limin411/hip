@@ -230,7 +230,7 @@ export function SlashCommandPalette({
       role="listbox"
       aria-label={t('chat.slash.listLabel')}
       data-testid="slash-palette"
-      className="absolute bottom-full left-0 right-0 z-50 mb-2 max-h-48 animate-menu-in overflow-y-auto rounded-lg border border-border bg-surface shadow-overlay"
+      className="absolute bottom-full left-0 right-0 z-50 mb-2 max-h-48 animate-menu-in overflow-y-auto rounded-xl border border-border bg-surface shadow-overlay"
     >
       {filtered.length === 0 ? (
         <div

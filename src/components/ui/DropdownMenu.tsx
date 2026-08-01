@@ -19,7 +19,7 @@ export const DropdownMenuContent = forwardRef<
       // Above Modal (z-50). Inline style is more reliable than class alone on portaled layers.
       style={{ zIndex: 100, ...style }}
       className={cn(
-        'z-[100] min-w-[200px] rounded-lg border border-border bg-surface p-1 shadow-menu',
+        'z-[100] min-w-[200px] rounded-xl border border-border bg-surface p-1 shadow-menu',
         'origin-[var(--radix-dropdown-menu-content-transform-origin)]',
         menuMotion,
         className,

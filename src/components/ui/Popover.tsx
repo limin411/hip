@@ -22,7 +22,7 @@ export const PopoverContent = forwardRef<
       // Caller may raise further (e.g. ModelSelectField uses 100).
       style={{ zIndex: 60, ...style }}
       className={cn(
-        'z-[60] w-[min(360px,calc(100vw-2rem))] rounded-lg border border-border bg-surface p-0 shadow-menu outline-none',
+        'z-[60] w-[min(360px,calc(100vw-2rem))] rounded-xl border border-border bg-surface p-0 shadow-menu outline-none',
         'origin-[var(--radix-popover-content-transform-origin)]',
         menuMotion,
         className,

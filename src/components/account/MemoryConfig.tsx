@@ -532,7 +532,7 @@ export function MemoryConfig() {
           <h2 className="text-title font-semibold text-ink">{t('settings.memory.title')}</h2>
           <p className="mt-2 text-body text-ink-secondary">{t('settings.memory.loading')}</p>
         </div>
-        <Skeleton className="h-24 w-full rounded-xl" />
+        <Skeleton className="h-24 w-full rounded-lg" />
         <SkeletonText lines={4} />
         <div className="space-y-2">
           <Skeleton className="h-12 w-full rounded-lg" />
@@ -549,7 +549,7 @@ export function MemoryConfig() {
     return (
       <div className={rootCls} data-testid="memory-config-empty">
         <div className="flex items-start gap-3">
-          <span className="mt-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-accent/10 text-accent">
+          <span className="mt-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-accent/10 text-accent">
             <Brain size={20} />
           </span>
           <div>
@@ -559,7 +559,7 @@ export function MemoryConfig() {
         </div>
 
         <div
-          className="rounded-xl border border-border bg-surface-muted/40 px-4 py-4"
+          className="rounded-lg border border-border bg-surface-muted/40 px-4 py-4"
           data-testid="memory-howto-empty"
         >
           <div className="mb-2 flex items-center gap-2 text-prose font-medium text-ink">
@@ -747,7 +747,7 @@ export function MemoryConfig() {
     <div className={rootCls} data-testid="memory-config">
       {/* Header */}
       <div className="flex items-start gap-3">
-        <span className="mt-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-accent/10 text-accent">
+        <span className="mt-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-accent/10 text-accent">
           <Brain size={20} />
         </span>
         <div className="min-w-0 flex-1">
@@ -758,7 +758,7 @@ export function MemoryConfig() {
 
       {/* How to use (collapsible) */}
       <section
-        className="rounded-xl border border-border bg-surface-muted/30"
+        className="rounded-lg border border-border bg-surface-muted/30"
         data-testid="memory-howto"
       >
         <button
@@ -796,7 +796,7 @@ export function MemoryConfig() {
       {/* Health / status in plain language */}
       {pipelineStatus && (
         <section
-          className="rounded-xl border border-border bg-surface px-4 py-3"
+          className="rounded-lg border border-border bg-surface px-4 py-3"
           data-testid="memory-status-strip"
         >
           <div className="text-meta font-medium text-ink">{t('settings.memory.healthTitle')}</div>
@@ -841,7 +841,7 @@ export function MemoryConfig() {
       )}
 
       {/* Core switches */}
-      <section className="divide-y divide-border rounded-xl border border-border">
+      <section className="divide-y divide-border rounded-lg border border-border">
         <div className="flex items-center justify-between gap-4 px-4 py-4">
           <div className="min-w-0 flex-1">
             <div className="text-prose font-medium text-ink">{t('settings.memory.useMemories')}</div>
@@ -987,7 +987,7 @@ export function MemoryConfig() {
 
         {items.length === 0 ? (
           <div
-            className="mt-3 rounded-xl border border-dashed border-border bg-surface-muted/20 px-4 py-6 text-center"
+            className="mt-3 rounded-lg border border-dashed border-border bg-surface-muted/20 px-4 py-6 text-center"
             data-testid="memory-list-empty"
           >
             <p className="text-body text-ink-secondary">
@@ -1007,14 +1007,14 @@ export function MemoryConfig() {
           </div>
         ) : filteredItems.length === 0 ? (
           <div
-            className="mt-3 rounded-xl border border-dashed border-border px-4 py-5 text-center"
+            className="mt-3 rounded-lg border border-dashed border-border px-4 py-5 text-center"
             data-testid="memory-list-no-match"
           >
             <p className="text-body text-ink-secondary">{t('settings.memory.listNoMatch')}</p>
           </div>
         ) : (
           <div
-            className="mt-3 overflow-hidden rounded-xl border border-border"
+            className="mt-3 overflow-hidden rounded-lg border border-border"
             data-testid="memory-list-frame"
           >
             <ul
@@ -1197,7 +1197,7 @@ export function MemoryConfig() {
       )}
 
       {/* Advanced — collapsed by default */}
-      <section className="rounded-xl border border-border" data-testid="memory-advanced-section">
+      <section className="rounded-lg border border-border" data-testid="memory-advanced-section">
         <button
           type="button"
           className="flex w-full items-center gap-2 px-4 py-3 text-left text-prose font-medium text-ink"

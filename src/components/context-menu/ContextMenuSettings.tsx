@@ -272,7 +272,7 @@ export function ContextMenuSettings() {
                           <button
                             type="button"
                             className={cn(
-                              'inline-flex h-7 w-7 items-center justify-center rounded-md text-ink-tertiary',
+                              'inline-flex h-7 w-7 items-center justify-center rounded-sm text-ink-tertiary',
                               'hover:bg-state-hover hover:text-ink',
                               'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink/20',
                               'disabled:pointer-events-none disabled:opacity-30',
@@ -287,7 +287,7 @@ export function ContextMenuSettings() {
                           <button
                             type="button"
                             className={cn(
-                              'inline-flex h-7 w-7 items-center justify-center rounded-md text-ink-tertiary',
+                              'inline-flex h-7 w-7 items-center justify-center rounded-sm text-ink-tertiary',
                               'hover:bg-state-hover hover:text-ink',
                               'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink/20',
                               'disabled:pointer-events-none disabled:opacity-30',

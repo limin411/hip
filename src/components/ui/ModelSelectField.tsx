@@ -187,7 +187,7 @@ export function ModelSelectField({
             className={cn(
               isChip
                 ? cn(
-                    'inline-flex h-7 max-w-[11rem] items-center gap-1 rounded-md px-2 text-meta font-medium transition-colors duration-chrome',
+                    'inline-flex h-7 max-w-[11rem] items-center gap-1 rounded-sm px-2 text-meta font-medium transition-colors duration-chrome',
                     'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink/20',
                     open
                       ? 'bg-state-hover text-ink'

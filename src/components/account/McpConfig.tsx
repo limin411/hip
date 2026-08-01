@@ -653,7 +653,7 @@ export function McpConfig() {
                     {servers.length === 0 ? (
                       <button
                         onClick={() => setSettingsShellRoute({ type: 'mcp-edit' })}
-                        className="col-span-full flex w-full flex-col items-center justify-center gap-2 rounded-xl border border-dashed border-border py-8 text-body font-medium text-accent-strong transition-colors hover:bg-state-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink/20"
+                        className="col-span-full flex w-full flex-col items-center justify-center gap-2 rounded-lg border border-dashed border-border py-8 text-body font-medium text-accent-strong transition-colors hover:bg-state-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink/20"
                       >
                         <Plug size={24} />
                         <span>{t('settings.mcp.empty')}</span>
@@ -723,9 +723,9 @@ export function McpConfig() {
               <div className="space-y-3" data-testid="mcp-registry-loading">
                 <p className="text-body text-ink-tertiary">{t('settings.mcp.loading')}</p>
                 <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
-                  <Skeleton className="h-28 rounded-xl" />
-                  <Skeleton className="h-28 rounded-xl" />
-                  <Skeleton className="h-28 rounded-xl" />
+                  <Skeleton className="h-28 rounded-lg" />
+                  <Skeleton className="h-28 rounded-lg" />
+                  <Skeleton className="h-28 rounded-lg" />
                 </div>
               </div>
             ) : marketEntries.length === 0 ? (
@@ -1186,7 +1186,7 @@ function McpToolTogglePanel({
 
   return (
     <div
-      className="flex min-h-0 flex-col overflow-hidden rounded-xl border border-border bg-surface"
+      className="flex min-h-0 flex-col overflow-hidden rounded-lg border border-border bg-surface"
       data-testid="mcp-tool-toggle-panel"
     >
       <div className="shrink-0 space-y-2 border-b border-border bg-surface-subtle/50 px-3 py-2.5">

@@ -34,7 +34,7 @@ export function SegmentedControl<T extends string>({
       data-testid={dataTestId}
       className={cn(
         // Soft track only — no outer border (avoids double-box with selected segment).
-        'inline-flex items-center rounded-md bg-surface-muted p-0.5',
+        'inline-flex items-center rounded-sm bg-surface-muted p-0.5',
         className,
       )}
     >

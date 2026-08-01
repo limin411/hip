@@ -349,9 +349,9 @@ export function PluginConfigView({
               <div className="space-y-3" data-testid="plugin-market-loading">
                 <p className="text-body text-ink-tertiary">{t('settings.plugins.loading')}</p>
                 <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
-                  <Skeleton className="h-28 rounded-xl" />
-                  <Skeleton className="h-28 rounded-xl" />
-                  <Skeleton className="h-28 rounded-xl" />
+                  <Skeleton className="h-28 rounded-lg" />
+                  <Skeleton className="h-28 rounded-lg" />
+                  <Skeleton className="h-28 rounded-lg" />
                 </div>
               </div>
             ) : tab === 'custom' ? (

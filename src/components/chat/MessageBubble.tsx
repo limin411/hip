@@ -220,7 +220,7 @@ function MessageBubbleImpl({ message, streaming, isLastAssistant, hidePlan }: Me
         {/* User turns: left-aligned soft bubble; assistant stays full-bleed CLI. */}
         {isUser ? (
           <div
-            className="w-fit max-w-full rounded-2xl bg-surface-muted px-3.5 py-2"
+            className="w-fit max-w-full rounded-lg bg-surface-muted px-3.5 py-2"
             data-testid="user-message-bubble"
           >
             {!hideAnswerBody && (
@@ -291,7 +291,7 @@ function MessageBubbleImpl({ message, streaming, isLastAssistant, hidePlan }: Me
                 <button
                   type="button"
                   data-testid="memory-citations-chip"
-                  className="rounded-md bg-accent/10 px-1.5 py-0.5 text-meta leading-5 text-accent outline-none transition-colors hover:bg-accent/15 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink/20"
+                  className="rounded-sm bg-accent/10 px-1.5 py-0.5 text-meta leading-5 text-accent outline-none transition-colors hover:bg-accent/15 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink/20"
                 >
                   {t('settings.memory.citationsChip', { count: message.memoryCitations.length })}
                 </button>

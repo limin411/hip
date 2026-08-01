@@ -20,7 +20,7 @@ import {
 } from '@/components/ui/DropdownMenu'
 
 const selectTriggerCls =
-  'flex h-8 cursor-pointer items-center justify-between gap-6 rounded-md border border-border bg-surface py-1.5 pl-2.5 pr-2 text-body text-ink-secondary transition-colors duration-chrome hover:bg-state-hover hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink/20'
+  'flex h-8 cursor-pointer items-center justify-between gap-6 rounded-sm border border-border bg-surface py-1.5 pl-2.5 pr-2 text-body text-ink-secondary transition-colors duration-chrome hover:bg-state-hover hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink/20'
 
 /** Settings → Basic → Window & background (standalone page). */
 export function WindowSettings() {

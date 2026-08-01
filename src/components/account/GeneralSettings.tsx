@@ -43,7 +43,7 @@ function shellOptionsForPlatform(): TerminalShellPref[] {
 }
 
 const selectTriggerCls =
-  'flex h-8 cursor-pointer items-center justify-between gap-6 rounded-md border border-border bg-surface py-1.5 pl-2.5 pr-2 text-body text-ink-secondary transition-colors duration-chrome hover:bg-state-hover hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink/20'
+  'flex h-8 cursor-pointer items-center justify-between gap-6 rounded-sm border border-border bg-surface py-1.5 pl-2.5 pr-2 text-body text-ink-secondary transition-colors duration-chrome hover:bg-state-hover hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink/20'
 
 export function GeneralSettings() {
   const { t } = useTranslation()
@@ -293,7 +293,7 @@ export function GeneralSettings() {
                 e.currentTarget.blur()
               }
             }}
-            className="h-8 w-20 rounded-md border border-border bg-surface px-2 text-left text-body tabular-nums text-ink transition-[border-color,box-shadow] duration-chrome focus-visible:border-accent focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-accent/10"
+            className="h-8 w-20 rounded-sm border border-border bg-surface px-2 text-left text-body tabular-nums text-ink transition-[border-color,box-shadow] duration-chrome focus-visible:border-accent focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-accent/10"
           />
           <span className="text-meta text-ink-tertiary">
             {t('settings.trashRetentionUnit', { defaultValue: 'days' })}
@@ -330,7 +330,7 @@ export function GeneralSettings() {
                 spellCheck={false}
                 onChange={(e) => setProxyHttp(e.target.value)}
                 onBlur={() => commitProxyField('http', proxyHttp)}
-                className="h-8 rounded-md border border-border bg-surface px-2 text-body text-ink transition-[border-color,box-shadow] duration-chrome focus-visible:border-accent focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-accent/10"
+                className="h-8 rounded-sm border border-border bg-surface px-2 text-body text-ink transition-[border-color,box-shadow] duration-chrome focus-visible:border-accent focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-accent/10"
               />
             </label>
             <label className="flex min-w-0 flex-col gap-1">
@@ -343,7 +343,7 @@ export function GeneralSettings() {
                 spellCheck={false}
                 onChange={(e) => setProxyHttps(e.target.value)}
                 onBlur={() => commitProxyField('https', proxyHttps)}
-                className="h-8 rounded-md border border-border bg-surface px-2 text-body text-ink transition-[border-color,box-shadow] duration-chrome focus-visible:border-accent focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-accent/10"
+                className="h-8 rounded-sm border border-border bg-surface px-2 text-body text-ink transition-[border-color,box-shadow] duration-chrome focus-visible:border-accent focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-accent/10"
               />
             </label>
             <label className="flex min-w-0 flex-col gap-1">
@@ -356,7 +356,7 @@ export function GeneralSettings() {
                 spellCheck={false}
                 onChange={(e) => setProxyAll(e.target.value)}
                 onBlur={() => commitProxyField('all', proxyAll)}
-                className="h-8 rounded-md border border-border bg-surface px-2 text-body text-ink transition-[border-color,box-shadow] duration-chrome focus-visible:border-accent focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-accent/10"
+                className="h-8 rounded-sm border border-border bg-surface px-2 text-body text-ink transition-[border-color,box-shadow] duration-chrome focus-visible:border-accent focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-accent/10"
               />
             </label>
             <label className="flex min-w-0 flex-col gap-1">
@@ -369,7 +369,7 @@ export function GeneralSettings() {
                 spellCheck={false}
                 onChange={(e) => setProxyNoProxy(e.target.value)}
                 onBlur={() => commitProxyField('noProxy', proxyNoProxy)}
-                className="h-8 rounded-md border border-border bg-surface px-2 text-body text-ink transition-[border-color,box-shadow] duration-chrome focus-visible:border-accent focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-accent/10"
+                className="h-8 rounded-sm border border-border bg-surface px-2 text-body text-ink transition-[border-color,box-shadow] duration-chrome focus-visible:border-accent focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-accent/10"
               />
             </label>
             <p className="text-caption leading-relaxed text-ink-tertiary sm:col-span-2">

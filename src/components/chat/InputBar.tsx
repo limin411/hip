@@ -291,7 +291,7 @@ export function InputBar() {
         )}
         {sessionActionBlocked ? (
           <div
-            className="rounded-xl border border-border bg-surface-muted/50 px-3 py-3 text-left text-meta text-ink-secondary"
+            className="rounded-lg border border-border bg-surface-muted/50 px-3 py-3 text-left text-meta text-ink-secondary"
             data-testid="input-bar-blocked"
             role="status"
           >

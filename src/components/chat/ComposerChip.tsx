@@ -19,7 +19,7 @@ export const ComposerChip = forwardRef<HTMLButtonElement, ComposerChipProps>(
         ref={ref}
         type={type}
         className={cn(
-          'inline-flex h-7 items-center gap-1.5 rounded-md px-2 text-meta font-medium transition-colors duration-chrome',
+          'inline-flex h-7 items-center gap-1.5 rounded-sm px-2 text-meta font-medium transition-colors duration-chrome',
           size === 'sm' && 'h-5 gap-1 px-1 text-caption',
           'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink/20',
           'disabled:cursor-not-allowed disabled:opacity-50',

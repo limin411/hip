@@ -41,7 +41,7 @@ export function VoiceMicButton({
       variant={recording ? 'primary' : 'ghost'}
       size="icon"
       className={cn(
-        'h-7 w-7 shrink-0 rounded-md',
+        'h-7 w-7 shrink-0 rounded-sm',
         recording && 'animate-pulse',
       )}
       onClick={() => toggle()}

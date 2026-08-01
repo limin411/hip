@@ -71,7 +71,7 @@ export function PanelTabBar({ surface }: { surface: 'code' | 'chat' }) {
             aria-label={currentLabel}
             data-testid="panel-tab-trigger"
             className={cn(
-              'inline-flex h-7 max-w-[10rem] items-center gap-1 rounded-md px-2 text-meta font-medium text-ink transition-colors duration-chrome hover:bg-state-hover',
+              'inline-flex h-7 max-w-[10rem] items-center gap-1 rounded-sm px-2 text-meta font-medium text-ink transition-colors duration-chrome hover:bg-state-hover',
               focusChrome,
             )}
           >

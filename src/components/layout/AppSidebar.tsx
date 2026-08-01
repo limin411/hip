@@ -433,7 +433,7 @@ export function AppSidebar() {
               data-testid="sidebar-new-space"
               data-no-drag
               onClick={() => openCreateKnowledgeSpaceDialog()}
-              className="rounded-md px-1.5 py-0.5 text-caption text-ink-tertiary transition-colors duration-chrome hover:bg-state-hover hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink/20"
+              className="rounded-sm px-1.5 py-0.5 text-caption text-ink-tertiary transition-colors duration-chrome hover:bg-state-hover hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink/20"
             >
               {t('sidebar.newSpace')}
             </button>
@@ -444,7 +444,7 @@ export function AppSidebar() {
               data-new-session="code"
               data-no-drag
               onClick={() => void newConversationFromSidebar('code')}
-              className="rounded-md px-1.5 py-0.5 text-caption text-ink-tertiary transition-colors duration-chrome hover:bg-state-hover hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink/20"
+              className="rounded-sm px-1.5 py-0.5 text-caption text-ink-tertiary transition-colors duration-chrome hover:bg-state-hover hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink/20"
             >
               {t('sidebar.newTask')}
             </button>
@@ -455,7 +455,7 @@ export function AppSidebar() {
               data-new-session="chat"
               data-no-drag
               onClick={() => void newConversationFromSidebar('chat')}
-              className="rounded-md px-1.5 py-0.5 text-caption text-ink-tertiary transition-colors duration-chrome hover:bg-state-hover hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink/20"
+              className="rounded-sm px-1.5 py-0.5 text-caption text-ink-tertiary transition-colors duration-chrome hover:bg-state-hover hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink/20"
             >
               {t('sidebar.newChat')}
             </button>
@@ -475,7 +475,7 @@ export function AppSidebar() {
                   useWorkItemViewStore.getState().requestCreate()
                 })()
               }}
-              className="rounded-md px-1.5 py-0.5 text-caption text-ink-tertiary transition-colors duration-chrome hover:bg-state-hover hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink/20"
+              className="rounded-sm px-1.5 py-0.5 text-caption text-ink-tertiary transition-colors duration-chrome hover:bg-state-hover hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink/20"
             >
               {t('sidebar.newWorkItem')}
             </button>
@@ -493,7 +493,7 @@ export function AppSidebar() {
                   useAutomationStore.getState().requestCreate()
                 })()
               }}
-              className="rounded-md px-1.5 py-0.5 text-caption text-ink-tertiary transition-colors duration-chrome hover:bg-state-hover hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink/20"
+              className="rounded-sm px-1.5 py-0.5 text-caption text-ink-tertiary transition-colors duration-chrome hover:bg-state-hover hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink/20"
             >
               {t('sidebar.newAutomation')}
             </button>

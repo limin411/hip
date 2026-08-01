@@ -165,7 +165,7 @@ export function AutomationList({
             onChange={(e) => setSort(e.target.value as AutomationSort)}
             data-testid="automation-list-sort"
             aria-label={t('automation.list.sortAria')}
-            className="h-8 rounded-md border border-border bg-surface px-2 text-meta text-ink"
+            className="h-8 rounded-sm border border-border bg-surface px-2 text-meta text-ink"
           >
             <option value="nextRun">{t('automation.list.sortNextRun')}</option>
             <option value="recent">{t('automation.list.sortRecent')}</option>

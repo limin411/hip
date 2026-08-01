@@ -117,7 +117,7 @@ export function DateField({
         aria-hidden
         data-testid={testId ? `${testId}-trigger` : undefined}
         className={cn(
-          'pointer-events-none flex h-9 w-full items-center gap-2 rounded-md border border-border bg-surface px-3 text-left text-body text-ink',
+          'pointer-events-none flex h-9 w-full items-center gap-2 rounded-sm border border-border bg-surface px-3 text-left text-body text-ink',
           'transition-[border-color,box-shadow,background-color] duration-chrome',
           focusField,
           disabled && 'opacity-40',

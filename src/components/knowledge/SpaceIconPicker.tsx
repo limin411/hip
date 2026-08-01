@@ -27,7 +27,7 @@ export function SpaceIconPicker({
       <span className="text-body text-ink-secondary">{t('knowledge.space.iconLabel')}</span>
       <div className="flex items-center gap-2">
         <span
-          className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-surface-muted text-lg leading-none"
+          className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-surface-muted text-lg leading-none"
           data-testid={`${testIdPrefix}-preview`}
           aria-hidden
         >

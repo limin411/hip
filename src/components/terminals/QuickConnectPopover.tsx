@@ -147,7 +147,7 @@ export function QuickConnectPopover() {
           data-no-drag
           title={t('sidebar.newTerminal')}
           className={cn(
-            'rounded-md px-1.5 py-0.5 text-caption text-ink-tertiary transition-colors duration-chrome',
+            'rounded-sm px-1.5 py-0.5 text-caption text-ink-tertiary transition-colors duration-chrome',
             'hover:bg-state-hover hover:text-ink',
             'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink/20',
             open && 'bg-state-hover text-ink',

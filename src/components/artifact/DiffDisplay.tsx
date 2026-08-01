@@ -196,7 +196,7 @@ function FileDiff({
                       type="button"
                       data-testid="diff-show-full"
                       onClick={() => onShowFull(file.path)}
-                      className="rounded-md px-2 py-0.5 transition-colors duration-chrome hover:bg-state-hover hover:text-ink"
+                      className="rounded-sm px-2 py-0.5 transition-colors duration-chrome hover:bg-state-hover hover:text-ink"
                     >
                       {t('artifact.diffView.showFull')}
                     </button>
@@ -206,7 +206,7 @@ function FileDiff({
                       type="button"
                       data-testid="diff-collapse-full"
                       onClick={() => onCollapseFull(file.path)}
-                      className="rounded-md px-2 py-0.5 transition-colors duration-chrome hover:bg-state-hover hover:text-ink"
+                      className="rounded-sm px-2 py-0.5 transition-colors duration-chrome hover:bg-state-hover hover:text-ink"
                     >
                       {t('artifact.diffView.collapseFull')}
                     </button>

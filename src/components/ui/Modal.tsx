@@ -209,7 +209,7 @@ export function Modal({
             <DialogPrimitive.Close
               disabled={closeDisabled}
               className={cn(
-                'flex h-7 w-7 items-center justify-center rounded-md text-ink-tertiary transition-[background-color,color] duration-chrome ease-out hover:bg-state-hover hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink/20',
+                'flex h-7 w-7 items-center justify-center rounded-sm text-ink-tertiary transition-[background-color,color] duration-chrome ease-out hover:bg-state-hover hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink/20',
                 closeDisabled && 'pointer-events-none opacity-40',
               )}
               title={t('common.close')}

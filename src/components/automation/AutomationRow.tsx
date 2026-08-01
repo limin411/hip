@@ -175,7 +175,7 @@ export function AutomationRow({
           : undefined
       }
       className={cn(
-        'group relative flex min-h-[168px] flex-col gap-3 rounded-xl border bg-surface p-4',
+        'group relative flex min-h-[168px] flex-col gap-3 rounded-lg border bg-surface p-4',
         'transition-[border-color,background-color,box-shadow] duration-chrome',
         selected
           ? 'border-ink bg-state-active'

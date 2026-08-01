@@ -82,7 +82,7 @@ export function Composer({
     <div
       className={cn(
         isCard
-          ? 'rounded-xl border border-border bg-surface-subtle p-2.5'
+          ? 'rounded-lg border border-border bg-surface-subtle p-2.5'
           // Flat dock: no focus chrome — InputBar already draws the top rule.
           : 'bg-surface-subtle',
       )}
@@ -212,7 +212,7 @@ export function Composer({
                 type="button"
                 variant="primary"
                 size="icon"
-                className={cn('h-7 w-7 shrink-0 rounded-md')}
+                className={cn('h-7 w-7 shrink-0 rounded-sm')}
                 onClick={onStop}
                 disabled={reconnecting}
                 data-testid="composer-stop"
@@ -225,7 +225,7 @@ export function Composer({
             <Button
               variant="primary"
               size="icon"
-              className={cn('h-7 w-7 shrink-0 rounded-md')}
+              className={cn('h-7 w-7 shrink-0 rounded-sm')}
               onClick={onSubmit}
               disabled={locked || (!value.trim() && attachments.length === 0) || submitDisabled}
               data-testid="composer-send"

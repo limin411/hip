@@ -149,7 +149,7 @@ export function AgentEditor({
       )}
 
       {isNewAcp && selectedPreset && (
-        <div className="flex items-center gap-3 rounded-xl border border-border bg-surface-subtle/80 px-3.5 py-3">
+        <div className="flex items-center gap-3 rounded-lg border border-border bg-surface-subtle/80 px-3.5 py-3">
           <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-accent-subtle text-accent-strong">
             <Terminal size={16} />
           </span>
@@ -256,7 +256,7 @@ export function AgentEditor({
           </Section>
 
           {adapterPkg && (
-            <div className="flex gap-2.5 rounded-xl border border-border bg-surface-subtle/60 px-3.5 py-2.5">
+            <div className="flex gap-2.5 rounded-lg border border-border bg-surface-subtle/60 px-3.5 py-2.5">
               <Plug size={14} className="mt-0.5 shrink-0 text-ink-tertiary" />
               <p className="text-caption leading-relaxed text-ink-secondary">
                 {t('settings.agents.acpAdapterNote', { pkg: adapterPkg })}
@@ -425,7 +425,7 @@ function GrantPanel({
   }
 
   return (
-    <div className="flex min-h-0 flex-col overflow-hidden rounded-xl border border-border bg-surface">
+    <div className="flex min-h-0 flex-col overflow-hidden rounded-lg border border-border bg-surface">
       <div className="shrink-0 space-y-2 border-b border-border bg-surface-subtle/50 px-3 py-2.5">
         <div className="flex items-start justify-between gap-2">
           <div className="min-w-0">
@@ -452,7 +452,7 @@ function GrantPanel({
                   onChange={(e) => setQuery(e.target.value)}
                   placeholder={t('settings.agents.toolGrantSearch')}
                   className={cn(
-                    'h-7 w-full rounded-md border border-border bg-surface pl-7 pr-2 text-caption text-ink',
+                    'h-7 w-full rounded-sm border border-border bg-surface pl-7 pr-2 text-caption text-ink',
                     'placeholder:text-ink-tertiary focus-visible:outline-none focus-visible:border-accent focus-visible:ring-[3px] focus-visible:ring-accent/10',
                   )}
                 />
@@ -464,7 +464,7 @@ function GrantPanel({
                 disabled={allFilteredSelected || filtered.length === 0}
                 onClick={selectFiltered}
                 className={cn(
-                  'rounded-md px-1.5 py-1 text-caption font-medium text-accent-strong transition-colors',
+                  'rounded-sm px-1.5 py-1 text-caption font-medium text-accent-strong transition-colors',
                   'hover:bg-state-hover disabled:pointer-events-none disabled:opacity-40',
                   'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink/20',
                 )}
@@ -477,7 +477,7 @@ function GrantPanel({
                 disabled={noneFilteredSelected}
                 onClick={clearFiltered}
                 className={cn(
-                  'rounded-md px-1.5 py-1 text-caption font-medium text-ink-secondary transition-colors',
+                  'rounded-sm px-1.5 py-1 text-caption font-medium text-ink-secondary transition-colors',
                   'hover:bg-state-hover hover:text-ink disabled:pointer-events-none disabled:opacity-40',
                   'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink/20',
                 )}

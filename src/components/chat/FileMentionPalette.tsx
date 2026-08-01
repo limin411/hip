@@ -189,7 +189,7 @@ export function FileMentionPalette({
       role="listbox"
       aria-label={t('chat.fileMention.listLabel')}
       data-testid="file-mention-palette"
-      className="absolute bottom-full left-0 right-0 z-50 mb-2 max-h-48 animate-menu-in overflow-y-auto rounded-lg border border-border bg-surface shadow-overlay"
+      className="absolute bottom-full left-0 right-0 z-50 mb-2 max-h-48 animate-menu-in overflow-y-auto rounded-xl border border-border bg-surface shadow-overlay"
     >
       {body}
     </div>

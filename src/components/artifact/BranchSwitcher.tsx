@@ -158,7 +158,7 @@ export function BranchSwitcher() {
                 data-testid="branch-search"
                 // Keep focus in the field; don't let menu keyboard nav steal every keystroke.
                 onKeyDown={(e) => e.stopPropagation()}
-                className="h-8 w-full rounded-md border border-border bg-surface py-1 pl-7 pr-2 text-meta text-ink outline-none transition-[border-color,box-shadow] duration-chrome placeholder:text-ink-tertiary focus-visible:border-accent focus-visible:ring-[3px] focus-visible:ring-accent/10"
+                className="h-8 w-full rounded-sm border border-border bg-surface py-1 pl-7 pr-2 text-meta text-ink outline-none transition-[border-color,box-shadow] duration-chrome placeholder:text-ink-tertiary focus-visible:border-accent focus-visible:ring-[3px] focus-visible:ring-accent/10"
               />
             </div>
           </div>

@@ -75,7 +75,7 @@ export function FirstRunSetupCard({ surface }: { surface: 'chat' | 'code' }) {
 
   return (
     <div
-      className="mb-6 rounded-xl border border-border bg-surface-muted/40 px-4 py-4"
+      className="mb-6 rounded-lg border border-border bg-surface-muted/40 px-4 py-4"
       data-testid="first-run-setup"
       data-variant="no-key"
       role="region"

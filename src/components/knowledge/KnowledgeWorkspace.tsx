@@ -722,7 +722,7 @@ export function KnowledgeWorkspace() {
           <div className="flex items-start gap-1">
             <div className="min-w-0 flex-1 pt-0.5">
               <div className="flex items-center gap-2.5">
-                <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-surface-muted">
+                <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-surface-muted">
                   {space?.icon ? (
                     <span className="text-base leading-none">{space.icon}</span>
                   ) : (
@@ -747,7 +747,7 @@ export function KnowledgeWorkspace() {
                   <button
                     type="button"
                     data-testid="knowledge-space-menu"
-                    className="flex h-8 w-8 items-center justify-center rounded-lg text-ink-tertiary transition-colors hover:bg-state-hover hover:text-ink"
+                    className="flex h-8 w-8 items-center justify-center rounded-sm text-ink-tertiary transition-colors hover:bg-state-hover hover:text-ink"
                     aria-label={t('knowledge.space.menu')}
                   >
                     <MoreHorizontal size={16} strokeWidth={1.75} />
@@ -808,7 +808,7 @@ export function KnowledgeWorkspace() {
               value={treeFilter}
               onChange={(e) => setTreeFilter(e.target.value)}
               placeholder={t('knowledge.tree.filterPlaceholder')}
-              className="h-8 rounded-lg border border-border bg-surface pl-8 text-meta shadow-none placeholder:text-ink-tertiary focus-visible:outline-none focus-visible:border-accent focus-visible:bg-surface focus-visible:ring-[3px] focus-visible:ring-accent/10"
+              className="h-8 rounded-sm border border-border bg-surface pl-8 text-meta shadow-none placeholder:text-ink-tertiary focus-visible:outline-none focus-visible:border-accent focus-visible:bg-surface focus-visible:ring-[3px] focus-visible:ring-accent/10"
             />
           </div>
         </div>
@@ -820,7 +820,7 @@ export function KnowledgeWorkspace() {
               type="button"
               data-testid="knowledge-view-docs"
               className={cn(
-                'rounded-md px-2 py-0.5 text-caption font-medium transition-colors duration-chrome',
+                'rounded-sm px-2 py-0.5 text-caption font-medium transition-colors duration-chrome',
                 activeViewId == null
                   ? 'bg-state-hover text-ink'
                   : 'text-ink-tertiary hover:bg-state-hover hover:text-ink',
@@ -835,7 +835,7 @@ export function KnowledgeWorkspace() {
                 type="button"
                 data-testid={`knowledge-view-tab-${v.id}`}
                 className={cn(
-                  'rounded-md px-2 py-0.5 text-caption font-medium transition-colors duration-chrome',
+                  'rounded-sm px-2 py-0.5 text-caption font-medium transition-colors duration-chrome',
                   activeViewId === v.id
                     ? 'bg-state-hover text-ink'
                     : 'text-ink-tertiary hover:bg-state-hover hover:text-ink',
@@ -984,7 +984,7 @@ export function KnowledgeWorkspace() {
                     {!isLast ? (
                       <button
                         type="button"
-                        className="truncate rounded-md px-1 py-0.5 text-ink-secondary transition-colors hover:bg-state-hover hover:text-ink"
+                        className="truncate rounded-sm px-1 py-0.5 text-ink-secondary transition-colors hover:bg-state-hover hover:text-ink"
                         onClick={() => onCrumbClick(n)}
                       >
                         {n.title}
@@ -1017,7 +1017,7 @@ export function KnowledgeWorkspace() {
               <DropdownMenuTrigger asChild>
                 <button
                   type="button"
-                  className="rounded-md p-1.5 text-ink-tertiary hover:bg-state-hover hover:text-ink"
+                  className="rounded-sm p-1.5 text-ink-tertiary hover:bg-state-hover hover:text-ink"
                   aria-label={t('knowledge.space.menu')}
                   data-testid="knowledge-board-menu"
                 >
@@ -1049,7 +1049,7 @@ export function KnowledgeWorkspace() {
               <DropdownMenuTrigger asChild>
                 <button
                   type="button"
-                  className="rounded-md p-1.5 text-ink-tertiary hover:bg-state-hover hover:text-ink"
+                  className="rounded-sm p-1.5 text-ink-tertiary hover:bg-state-hover hover:text-ink"
                   aria-label={t('knowledge.space.menu')}
                   data-testid="knowledge-doc-menu"
                 >

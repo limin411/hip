@@ -39,10 +39,10 @@ import {
 import { toast } from 'sonner'
 
 const selectTriggerCls =
-  'flex h-8 cursor-pointer items-center justify-between gap-6 rounded-md border border-border bg-surface py-1.5 pl-2.5 pr-2 text-body text-ink-secondary transition-colors duration-chrome hover:bg-state-hover hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink/20'
+  'flex h-8 cursor-pointer items-center justify-between gap-6 rounded-sm border border-border bg-surface py-1.5 pl-2.5 pr-2 text-body text-ink-secondary transition-colors duration-chrome hover:bg-state-hover hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink/20'
 
 const btnCls =
-  'h-8 rounded-md border border-border px-2.5 text-meta text-ink-secondary transition-colors hover:bg-state-hover disabled:cursor-not-allowed disabled:opacity-50'
+  'h-8 rounded-sm border border-border px-2.5 text-meta text-ink-secondary transition-colors hover:bg-state-hover disabled:cursor-not-allowed disabled:opacity-50'
 
 function formatBytes(n?: number): string {
   if (n == null || !Number.isFinite(n) || n <= 0) return '—'
@@ -618,7 +618,7 @@ export function VoiceSettingsSection({
             <div className="flex shrink-0 items-center gap-2">
               <button
                 type="button"
-                className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-border text-ink-secondary hover:bg-state-hover"
+                className="inline-flex h-8 w-8 items-center justify-center rounded-sm border border-border text-ink-secondary hover:bg-state-hover"
                 onClick={() => void refreshDevicesWithPermission()}
                 data-testid="settings-voice-refresh-devices"
                 title={t('settings.voice.refresh')}
@@ -1068,7 +1068,7 @@ export function VoiceSettingsSection({
                     </div>
                     <input
                       type="url"
-                      className="h-8 min-w-0 flex-1 rounded-md border border-border bg-surface px-2 text-meta text-ink transition-[border-color,box-shadow] duration-chrome focus-visible:border-accent focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-accent/10"
+                      className="h-8 min-w-0 flex-1 rounded-sm border border-border bg-surface px-2 text-meta text-ink transition-[border-color,box-shadow] duration-chrome focus-visible:border-accent focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-accent/10"
                       value={current}
                       data-testid={`settings-voice-model-url-input-${id}`}
                       spellCheck={false}

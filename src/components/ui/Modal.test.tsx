@@ -15,17 +15,17 @@ describe('Modal variants', () => {
     cleanup()
   })
 
-  it('legacy (no variant) keeps full scrim + blur and omits data-confirm-dialog', () => {
+  it('legacy (no variant) keeps full scrim (no blur) and omits data-confirm-dialog', () => {
     render(
       <Modal open onOpenChange={() => {}} title="Legacy">
         <div>body</div>
       </Modal>,
     )
-    // Overlay: full strength + blur (legacy). Radix portals to document.body.
+    // Overlay: full strength scrim, no backdrop blur (flat design).
     const overlays = document.querySelectorAll('.bg-overlay')
     expect(overlays.length).toBeGreaterThan(0)
     const hasBlur = Array.from(document.querySelectorAll('[class*="backdrop-blur"]')).length > 0
-    expect(hasBlur).toBe(true)
+    expect(hasBlur).toBe(false)
     expect(document.querySelector('[data-confirm-dialog]')).toBeNull()
     expect(screen.getByText('Legacy')).toBeInTheDocument()
   })

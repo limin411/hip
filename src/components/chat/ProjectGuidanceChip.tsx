@@ -47,7 +47,7 @@ export function ProjectGuidanceChip() {
       <button
         type="button"
         className={cn(
-          'inline-flex items-center gap-1 rounded-full border border-border bg-surface-muted px-2 py-0.5 text-caption text-ink-secondary hover:bg-border/60',
+          'inline-flex items-center gap-1 rounded-md border border-border bg-surface-muted px-2 py-0.5 text-caption text-ink-secondary hover:bg-border/60',
         )}
         title={t('chat.projectGuidanceLoaded', { name: guidance })}
         onClick={() => {
@@ -59,7 +59,7 @@ export function ProjectGuidanceChip() {
         {t('chat.projectGuidanceChip', { name: guidance })}
       </button>
       {open && (
-        <div className="absolute left-0 top-full z-20 mt-1 w-72 rounded-md border border-border bg-surface p-2 text-meta text-ink-secondary shadow-md">
+        <div className="absolute left-0 top-full z-20 mt-1 w-72 rounded-md border border-border bg-surface p-2 text-meta text-ink-secondary">
           <div className="font-medium text-ink">{guidance}</div>
           <p className="mt-1 text-ink-tertiary">{t('chat.projectGuidanceHint')}</p>
           {previewReady ? (

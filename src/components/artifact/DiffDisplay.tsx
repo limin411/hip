@@ -145,7 +145,7 @@ function FileDiff({
         kind="diffFile"
         payload={{ path: file.path, status: file.status, sessionId, cwd }}
         className={cn(
-          'sticky top-0 z-[1] flex h-8 items-center justify-between gap-2 bg-surface-subtle/95 px-3 backdrop-blur-[2px]',
+          'sticky top-0 z-[1] flex h-8 items-center justify-between gap-2 bg-surface-subtle px-3',
           // Expanded: hairline under sticky bar. Collapsed: shell border-b alone (no double).
           !isCollapsed && 'border-b border-border/70',
         )}

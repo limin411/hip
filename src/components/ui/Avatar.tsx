@@ -5,7 +5,7 @@ interface AvatarProps {
   src?: string
   size?: number
   shape?: 'circle' | 'square'
-  /** Apply brand accent gradient background to initials fallback (no effect when src is set). */
+  /** Apply brand accent background to initials fallback (no effect when src is set). */
   gradient?: boolean
   /** Apply hover ring border for clickable affordance. */
   ring?: boolean
@@ -32,7 +32,7 @@ export function Avatar({ name, src, size = 32, shape = 'circle', gradient, ring,
       )}
       style={
         hasGradient
-          ? { width: size, height: size, background: 'linear-gradient(135deg, var(--accent), var(--accent-hover))' }
+          ? { width: size, height: size, background: 'var(--accent)' }
           : { width: size, height: size }
       }
     >

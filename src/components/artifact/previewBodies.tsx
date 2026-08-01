@@ -87,7 +87,7 @@ function ModeToggle({
           className={cn(
             'rounded px-2 py-0.5 text-caption transition-colors',
             value === m.id
-              ? 'bg-surface text-ink shadow-sm'
+              ? 'bg-surface text-ink'
               : 'text-ink-tertiary hover:text-ink',
           )}
           onClick={() => onChange(m.id)}

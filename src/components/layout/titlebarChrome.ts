@@ -11,7 +11,7 @@ export const titlebarIconBtnClass =
 
 export const titlebarIconProps = {
   size: 16 as const,
-  strokeWidth: 1.75,
+  strokeWidth: 1.5,
   className: 'block',
   'aria-hidden': true as const,
 }

@@ -55,7 +55,7 @@ export function BoardToolbar({
   return (
     <div
       className={cn(
-        'pointer-events-auto absolute left-1/2 top-2 z-10 flex -translate-x-1/2 items-center gap-0.5 rounded-lg border border-border bg-surface/95 px-1 py-0.5 shadow-sm backdrop-blur-sm',
+        'pointer-events-auto absolute left-1/2 top-2 z-10 flex -translate-x-1/2 items-center gap-0.5 rounded-lg border border-border bg-surface px-1 py-0.5',
         className,
       )}
       role="toolbar"

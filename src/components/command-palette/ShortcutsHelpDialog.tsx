@@ -18,7 +18,7 @@ export function ShortcutsHelpDialog({
       <Dialog.Portal>
         <Dialog.Overlay
           className={cn(
-            'fixed inset-0 z-[220] bg-overlay backdrop-blur-[2px] motion-reduce:backdrop-blur-none',
+            'fixed inset-0 z-[220] bg-overlay',
             'data-[state=open]:animate-overlay-in data-[state=closed]:animate-overlay-out',
           )}
         />

@@ -465,7 +465,7 @@ export function GlobalCommandPalette() {
         <Dialog.Portal>
           <Dialog.Overlay
             className={cn(
-              'fixed inset-0 z-[200] bg-overlay backdrop-blur-[2px] motion-reduce:backdrop-blur-none',
+              'fixed inset-0 z-[200] bg-overlay',
               'data-[state=open]:animate-overlay-in data-[state=closed]:animate-overlay-out',
             )}
           />

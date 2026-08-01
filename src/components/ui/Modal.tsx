@@ -125,7 +125,7 @@ export function Modal({
             'fixed inset-0 z-50',
             useLightScrim
               ? 'bg-overlay-light'
-              : 'bg-overlay backdrop-blur-[2px]',
+              : 'bg-overlay',
             overlayMotion,
           )}
         />

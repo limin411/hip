@@ -16,13 +16,6 @@ export function SettingsSidebarContent() {
 
   return (
     <div className="flex min-h-0 flex-1 flex-col" data-testid="settings-sidebar">
-      <div
-        className="px-3 pb-1.5 pt-0 text-caption font-medium tracking-wide text-ink-tertiary"
-        data-testid="settings-sidebar-heading"
-      >
-        {t('settings.title')}
-      </div>
-
       <nav
         className="min-h-0 flex-1 overflow-y-auto px-2 pb-2"
         aria-label={t('settings.title')}

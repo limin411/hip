@@ -194,9 +194,6 @@ export const en = {
         chipAria: 'Toggle roundtable mode for the first message',
         chipHint: 'hip chairs multi-round debate when the topic needs it',
         disabledHint: 'Unavailable while a skill or slash command is active',
-        /** Mode dropdown placeholder — not shipped yet. */
-        discussion: 'Discussion mode',
-        comingSoon: 'Coming soon',
         /** High-risk: lifts the chat sandbox to full machine access. */
         controlPermission: 'Control permission',
         controlPermissionHint:

@@ -180,20 +180,15 @@ describe('NewConversation', () => {
     useSkillsStore.setState({ skills: [], enabled: {}, loaded: false })
   })
 
-  it('roundtable starter is a mode dropdown in the composer footer: toggles roundtable, discussion is a disabled placeholder', () => {
+  it('roundtable starter is a mode radio dropdown in the composer footer: toggles roundtable', () => {
     setDraftModel('openai/gpt-4o')
     render(<NewConversation />)
     // Roundtable lives in the composer footer strip below the input.
     expect(
       within(screen.getByTestId('composer-footer')).getByTestId('roundtable-starter'),
     ).toBeInTheDocument()
-    // Mode dropdown: roundtable toggle + discussion placeholder.
+    // Mode radio dropdown.
     expect(screen.getByTestId('roundtable-menu')).toBeInTheDocument()
-    const discussion = screen.getByTestId('discussion-option')
-    expect(discussion).toHaveAttribute('aria-disabled', 'true')
-    expect(within(discussion).getByTestId('discussion-coming-soon')).toHaveTextContent(
-      'Coming soon',
-    )
     // Roundtable item toggles the draft flag.
     expect(useDraftStore.getState().draft?.roundtable).toBeUndefined()
     fireEvent.click(screen.getByTestId('roundtable-option'))

@@ -175,8 +175,6 @@ export const ko = {
       "chipAria": "첫 메시지의 원탁 모드 전환",
       "chipHint": "필요할 때 hip이 다라운드 토론을 진행하고 결정합니다",
       "disabledHint": "스킬 또는 슬래시 명령 사용 중에는 사용할 수 없습니다",
-      "discussion": "토론 모드",
-      "comingSoon": "준비 중",
       "controlPermission": "제어 권한",
       "controlPermissionHint": "고위험 권한: 활성화하면 에이전트가 현재 폴더에 국한되지 않고 컴퓨터 전체를 조작할 수 있습니다",
       "helper": "간단한 질문은 일반 대화로 답합니다. 복잡한 안건에서는 고문들이 여러 라운드 토론하고, hip이 라운드 수·단계 결론·최종 결정을 합니다.",

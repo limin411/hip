@@ -1,6 +1,6 @@
 import { useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
-import { ChevronDown, MessagesSquare, ShieldAlert, Users } from 'lucide-react'
+import { ChevronDown, ShieldAlert, Users } from 'lucide-react'
 import { useDraftStore } from '@/store/draftStore'
 import { ComposerChip } from './ComposerChip'
 import {
@@ -21,7 +21,6 @@ interface RoundtableStarterProps {
  * Chat empty-state one-shot starter for roundtable framing, rendered as a mode
  * radio dropdown in the composer footer strip (single-select, one mode at a time):
  * - Roundtable: selectable now (arms the first-message framing).
- * - Discussion mode: placeholder item, disabled until shipped.
  * - Control permission: selectable now (high-risk — lifts the chat sandbox to
  *   full machine access for the first committed session).
  * Re-selecting the armed mode deselects it. Visibility: parent only mounts on
@@ -94,28 +93,6 @@ export function RoundtableStarter({ disabled = false }: RoundtableStarterProps) 
                 </span>
                 <Users size={14} className="shrink-0 text-ink-tertiary" aria-hidden />
                 {t('chat.roundtable.chip')}
-              </span>
-            </DropdownMenuRadioItem>
-            <DropdownMenuRadioItem
-              value="discussion"
-              disabled
-              data-testid="discussion-option"
-              title={t('chat.roundtable.comingSoon')}
-              className="justify-between"
-            >
-              <span className="flex min-w-0 items-center gap-2.5">
-                <span
-                  aria-hidden
-                  className="flex h-3.5 w-3.5 shrink-0 items-center justify-center rounded-full border border-ink-tertiary"
-                />
-                <MessagesSquare size={14} className="shrink-0 text-ink-tertiary" aria-hidden />
-                {t('chat.roundtable.discussion')}
-              </span>
-              <span
-                className="rounded bg-surface-muted px-1.5 py-px text-caption font-medium text-ink-tertiary"
-                data-testid="discussion-coming-soon"
-              >
-                {t('chat.roundtable.comingSoon')}
               </span>
             </DropdownMenuRadioItem>
             <DropdownMenuRadioItem

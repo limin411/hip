@@ -470,6 +470,16 @@ export interface BuildToolsOpts {
    * Wire from session-turn-runner like onParallelRunStarted → send.
    */
   onWorktreeChanged?: import('../worktree-service.js').WorktreeChangedNotify
+  /**
+   * Session checkpoint list for git_checkpoint_list (hip shadow refs are invisible
+   * to plain git). When absent, checkpoint tools are not registered.
+   */
+  onCheckpointList?: () => Promise<import('@hip/protocol').Checkpoint[]>
+  /**
+   * Exact safe revert for git_checkpoint_revert (safety checkpoint + worktree-only,
+   * same path as the removed Timeline panel revert). When absent, not registered.
+   */
+  onCheckpointRevert?: (checkpointId: string) => Promise<{ ok: boolean; safetyCheckpointId?: string; error?: string }>
   /** TaskRuntime for background shells / monitor / wait_tasks. */
   taskRuntime?: import('../background-manager.js').BackgroundManager
   /** Cron manager for scheduler tools (when not registered separately). */

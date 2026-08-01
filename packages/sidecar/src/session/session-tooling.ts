@@ -1,5 +1,5 @@
 import type { StructuredToolInterface } from '@langchain/core/tools'
-import type { PermissionMode, SkillMeta, McpServerConfig, AgentConfig } from '@hip/protocol'
+import type { PermissionMode, SkillMeta, McpServerConfig, AgentConfig, Checkpoint } from '@hip/protocol'
 import { ToolRegistry, createScope } from './tool-registry.js'
 import { mcpManager, DEFAULT_LAZY_THRESHOLD } from './mcp/manager.js'
 import { buildTools, SELF_GATED_TOOLS, type ApprovalFn, type DispatchSpec } from './tools.js'
@@ -48,6 +48,9 @@ export interface BuildSessionToolingInput {
   spawnInWorktree?: ParallelSlotSpawnFn
   onParallelRunStarted?: import('./tools/helpers.js').BuildToolsOpts['onParallelRunStarted']
   onWorktreeChanged?: import('./tools/helpers.js').BuildToolsOpts['onWorktreeChanged']
+  /** Agent checkpoint tools (git_checkpoint_list / git_checkpoint_revert). */
+  onCheckpointList?: () => Promise<Checkpoint[]>
+  onCheckpointRevert?: (checkpointId: string) => Promise<{ ok: boolean; safetyCheckpointId?: string; error?: string }>
   allowedTools?: string[]
   blockedTools?: string[]
   usesEnvModel: boolean
@@ -104,6 +107,8 @@ export async function buildSessionTooling(input: BuildSessionToolingInput): Prom
       spawnInWorktree: input.spawnInWorktree,
       onParallelRunStarted: input.onParallelRunStarted,
       onWorktreeChanged: input.onWorktreeChanged,
+      onCheckpointList: input.onCheckpointList,
+      onCheckpointRevert: input.onCheckpointRevert,
       taskRuntime: input.taskRuntime,
       cronManager: input.cronManager,
       onActivity: input.onActivity,

@@ -10,7 +10,6 @@ import type {
 import { loadPrefs } from './prefs'
 import { groupRank } from './groupOrder'
 import { agentConfigProvider } from './providers/agentConfig'
-import { checkpointProvider } from './providers/checkpoint'
 import { codeBlockProvider } from './providers/codeBlock'
 import { commitProvider } from './providers/commit'
 import { diffFileProvider } from './providers/diffFile'
@@ -40,7 +39,6 @@ import { trashEntryProvider } from './providers/trashEntry'
  */
 const BUILTIN_PROVIDERS: ContextProvider[] = [
   agentConfigProvider,
-  checkpointProvider,
   codeBlockProvider,
   commitProvider,
   diffFileProvider,

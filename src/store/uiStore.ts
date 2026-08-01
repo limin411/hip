@@ -1,6 +1,6 @@
 import { create } from 'zustand'
 import { persist, createJSONStorage, type StateStorage } from 'zustand/middleware'
-import type { AgentConfig, CheckpointMode, McpServerConfig } from '@hip/protocol'
+import type { AgentConfig, McpServerConfig } from '@hip/protocol'
 import { TERMINAL_MANAGEMENT } from '@/components/terminals/feature'
 import { WORK_ITEM_TRACKING } from '@/components/work-items/feature'
 import { AUTOMATION_PAGE } from '@/components/automation/feature'
@@ -16,7 +16,6 @@ export type ArtifactTab =
   | 'agents'
   | 'tasks'
   | 'outline'
-  | 'timeline'
   | 'changes'
   | 'terminal'
 
@@ -178,7 +177,6 @@ export type UiPersistedState = {
   density: UiDensity
   settingsPage: SettingsPageId
   diffViewMode: 'unified' | 'split'
-  checkpointMode: CheckpointMode
   /** Left nav rail open; default true when missing from older storage. */
   sidebarOpen: boolean
   /** Left sidebar width in px; clamped on write / rehydrate. */
@@ -205,6 +203,7 @@ export function mergeUiPersistedState<
     sidebarSection?: SidebarSection
     openSessionIds?: string[]
     settingsNavCollapsed?: boolean
+    checkpointMode?: unknown
   }
   // Drop legacy / non-persisted fields that must not rehydrate into shell state.
   const {
@@ -213,6 +212,7 @@ export function mergeUiPersistedState<
     sidebarSection: _legacySection,
     openSessionIds: _legacyTabs,
     settingsNavCollapsed: _legacySettingsNav,
+    checkpointMode: _legacyCheckpointMode,
     workbenchShowScene: _legacyWbScene,
     workbenchReduceMotion: _legacyWbMotion,
     workbenchShowCartoon: _legacyWbCartoon,
@@ -243,7 +243,7 @@ interface UiState {
   scrollTargetMessageId: string | null
   setScrollTarget: (id: string | null) => void
 
-  // Code surface: ArtifactPanel tabs (files/agents/timeline/changes/terminal).
+  // Code surface: ArtifactPanel tabs (files/agents/changes/terminal).
   activeTab: ArtifactTab
   setTab: (t: ArtifactTab) => void
 
@@ -313,9 +313,6 @@ interface UiState {
 
   diffViewMode: 'unified' | 'split'
   setDiffViewMode: (m: 'unified' | 'split') => void
-
-  checkpointMode: CheckpointMode
-  setCheckpointMode: (m: CheckpointMode) => void
 
   theme: Theme
   setTheme: (t: Theme) => void
@@ -457,9 +454,6 @@ export const useUiStore = create<UiState>()(
       diffViewMode: 'unified',
       setDiffViewMode: (m) => set({ diffViewMode: m }),
 
-      checkpointMode: 'this-turn',
-      setCheckpointMode: (m) => set({ checkpointMode: m }),
-
       theme: 'system',
       setTheme: (t) => set((s) => (s.theme === t ? s : { theme: t })),
 
@@ -482,7 +476,6 @@ export const useUiStore = create<UiState>()(
         density: s.density,
         settingsPage: s.settingsPage,
         diffViewMode: s.diffViewMode,
-        checkpointMode: s.checkpointMode,
         sidebarOpen: s.sidebarOpen,
         sidebarWidth: s.sidebarWidth,
       }),

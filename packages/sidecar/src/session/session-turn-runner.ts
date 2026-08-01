@@ -228,6 +228,8 @@ export interface SessionTurnHost {
   toolPolicy: ToolPolicy
   hooks: HookRegistry
   store?: SessionStore
+  /** Git checkpoint operations (capture/list/revert) for the agent checkpoint tools. */
+  git: import('./git-operations.js').GitOperations
   app: ReturnType<typeof buildGraph>
   scratchRoot: string
   idleTimeoutMs: number
@@ -1297,6 +1299,10 @@ export async function runTurn(host: SessionTurnHost, rawSend: SendFn, base?: {
           ...(ev.reveal !== undefined ? { reveal: ev.reveal } : {}),
         })
       },
+      // Agent checkpoint tools: list from the store; revert through GitOperations so
+      // the safety checkpoint + store insert + checkpoint:created emit stay intact.
+      onCheckpointList: async () => (host.store ? host.store.listCheckpoints(host.id) : []),
+      onCheckpointRevert: (checkpointId) => host.git.revertCheckpoint(cwd, checkpointId, send),
       allowedTools: activeProfile.allowedTools,
       blockedTools: activeProfile.blockedTools,
       usesEnvModel: host.usesEnvModel,

@@ -4,7 +4,6 @@ import { useUiStore } from '@/store/uiStore'
 import { FileTree } from './FileTree'
 import { FilePreview } from './FilePreview'
 import { ConversationOutline } from './ConversationOutline'
-import { TimelineView } from './TimelineView'
 import { ChangesView } from './ChangesView'
 import { GitInitBanner } from './GitInitBanner'
 import { TerminalView } from './TerminalView'
@@ -14,7 +13,7 @@ import { useDomainStore } from '@/domain/sessionStore'
 import { useDiffStore } from '@/store/diffStore'
 import { PanelToggle } from '@/components/layout/PanelToggle'
 import { PanelTabBar } from './PanelTabBar'
-const GIT_GATED: ReadonlySet<ArtifactTab> = new Set(['timeline', 'changes'])
+const GIT_GATED: ReadonlySet<ArtifactTab> = new Set(['changes'])
 
 function resolveEffectiveTab(activeTab: ArtifactTab, isGitRepo: boolean): ArtifactTab {
   if (GIT_GATED.has(activeTab) && !isGitRepo) return 'files'
@@ -65,7 +64,6 @@ export function ArtifactPanel() {
             <AgentsRuntimeSplit />
           </div>
         )}
-        {effectiveTab === 'timeline' && isGitRepo && <TimelineView />}
         {effectiveTab === 'changes' && isGitRepo && <ChangesView />}
         {effectiveTab === 'terminal' && CODE_TERMINAL && <TerminalView />}
       </div>

@@ -231,7 +231,6 @@ export function PanelToggle({ slot = 'toolbar' }: { slot?: PanelToggleSlot }) {
     { value: 'outline', label: t('artifact.outline') },
     { value: 'files', label: t('artifact.files') },
     { value: 'agents', label: t('artifact.agents') },
-    { value: 'timeline', label: t('artifact.timeline'), gated: true },
     { value: 'changes', label: t('artifact.changes'), gated: true },
     ...(CODE_TERMINAL
       ? [{ value: 'terminal' as const, label: t('artifact.terminal') }]

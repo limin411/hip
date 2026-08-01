@@ -723,28 +723,8 @@ export const ja = {
       "viewUnified": "統合表示",
       "viewSplit": "分割表示"
     },
-    "timeline": "タイムライン",
+    "turn": "ターン {{n}}",
     "changes": "変更",
-    "timelineView": {
-      "empty": "チェックポイントはまだありません",
-      "emptyDesc": "エージェントがターンを完了するたびに、自動的にチェックポイントが作成されます",
-      "sessionStart": "セッション開始",
-      "modeThisTurn": "このターン",
-      "modeSinceThen": "それ以降",
-      "modeSinceStart": "開始から",
-      "noChange": "このチェックポイントに変更はありません",
-      "turn": "ターン {{n}}",
-      "revert": "ここに戻す",
-      "revertConfirmTitle": "このチェックポイントに戻しますか？",
-      "revertConfirmBody": "ワーキングツリーはこの時点の状態に正確に復元されます。最初に安全のためのチェックポイントが自動的に作成されるため、この操作自体も元に戻せます。",
-      "revertConfirmAction": "戻す",
-      "reverting": "戻しています…",
-      "revertFailed": "戻すのに失敗しました",
-      "revertRetry": "再試行",
-      "revertSuccess": "戻しました。元に戻せるよう、安全のためのチェックポイントが作成されました。",
-      "revertBlockedRunning": "チェックポイントに戻す前に、現在の実行を停止してください。",
-      "crossBranchWarn": "このチェックポイントはブランチ「{{branch}}」で作成されましたが、現在のブランチと異なります。"
-    },
     "branch": {
       "current": "現在のブランチ",
       "noBranch": "（ブランチなし）",
@@ -1038,7 +1018,6 @@ export const ja = {
         "subAgent": "サブエージェント",
         "diffFile": "差分ファイル",
         "diffHunk": "差分ハンク",
-        "checkpoint": "チェックポイント",
         "commit": "コミット",
         "terminal": "ターミナル",
         "managedTerminal": "管理ターミナル",
@@ -2842,10 +2821,6 @@ export const ja = {
       "annotate": "エージェント用に注釈",
       "quoteToComposer": "コンポーザーに引用",
       "needSession": "先にセッションを開いてください"
-    },
-    "checkpoint": {
-      "copyId": "チェックポイントIDをコピー",
-      "revert": "ここに戻す…"
     },
     "commit": {
       "copySha": "コミットSHAをコピー",

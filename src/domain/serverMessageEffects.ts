@@ -236,8 +236,7 @@ export function applyServerMessageEffects(msg: ServerMessage, deps: ServerMessag
       if (msg.ok) {
         deps.requestDiff(msg.sessionId)
         deps.requestCheckpoints(msg.sessionId)
-        toast.success(i18n.t('chat.init.success'))
-      } else {
+        toast.success(i18n.t('chat.init.success'))      } else {
         useDiffStore.getState().setResult(msg.sessionId, {
           state: 'not_a_repo',
           base: 'head',
@@ -254,19 +253,7 @@ export function applyServerMessageEffects(msg: ServerMessage, deps: ServerMessag
       return
 
     case 'git:checkpoint:list:result':
-      useDiffStore.getState().setCheckpoints(msg.sessionId, msg.checkpoints, msg.isGitRepo, msg.currentBranch)
-      return
-
-    case 'checkpoint:created':
-      useDiffStore.getState().addCheckpoint(msg.sessionId, msg.checkpoint)
-      return
-
-    case 'git:checkpoint:diff:result':
-      useDiffStore.getState().setCheckpointDiffResult(
-        msg.sessionId,
-        `${msg.checkpointId}|${msg.mode}`,
-        { state: msg.state, files: msg.files, summary: msg.summary, error: msg.error },
-      )
+      useDiffStore.getState().setGitState(msg.sessionId, msg.isGitRepo, msg.currentBranch)
       return
 
     case 'git:commitLog:result':
@@ -288,30 +275,11 @@ export function applyServerMessageEffects(msg: ServerMessage, deps: ServerMessag
           useDiffStore.getState().bySession[msg.sessionId]?.branches ?? [],
           msg.currentBranch,
         )
-        useDiffStore.getState().clearCheckpointDiffCache(msg.sessionId)
         deps.send({ type: 'git:branch:list', sessionId: msg.sessionId })
-        deps.send({ type: 'git:checkpoint:list', sessionId: msg.sessionId })
         const base = useDiffStore.getState().bySession[msg.sessionId]?.base ?? 'session-start'
         deps.send({ type: 'fs:diffSummary', sessionId: msg.sessionId, base })
       } else {
         useDiffStore.getState().setSwitchError(msg.sessionId, msg.error ?? 'switch_failed')
-      }
-      return
-
-    case 'git:revert:result':
-      useDiffStore.getState().setLastRevertResult(msg.sessionId, {
-        checkpointId: msg.checkpointId,
-        ok: msg.ok,
-        safetyCheckpointId: msg.safetyCheckpointId,
-      })
-      if (msg.ok) {
-        useDiffStore.getState().setRevertError(msg.sessionId, null)
-        useDiffStore.getState().clearCheckpointDiffCache(msg.sessionId)
-        deps.send({ type: 'git:checkpoint:list', sessionId: msg.sessionId })
-        const base = useDiffStore.getState().bySession[msg.sessionId]?.base ?? 'session-start'
-        deps.send({ type: 'fs:diffSummary', sessionId: msg.sessionId, base })
-      } else {
-        useDiffStore.getState().setRevertError(msg.sessionId, msg.error ?? 'revert_failed')
       }
       return
 
@@ -459,7 +427,6 @@ export function applyServerMessageEffects(msg: ServerMessage, deps: ServerMessag
           deps.send({ type: 'fs:read', sessionId: msg.sessionId, path: fsState.activePath })
         }
       }
-      useDiffStore.getState().clearCheckpointDiffCache(msg.sessionId)
       const base = useDiffStore.getState().bySession[msg.sessionId]?.base ?? 'session-start'
       deps.send({ type: 'fs:diffSummary', sessionId: msg.sessionId, base })
       deps.send({ type: 'git:checkpoint:list', sessionId: msg.sessionId })

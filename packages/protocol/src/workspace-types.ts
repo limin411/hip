@@ -68,9 +68,6 @@ export interface CommitLogEntry {
   timestamp: number                           // committer time, ms
 }
 
-/** The three timeline diff modes — each maps to a base→head tree pair. */
-export type CheckpointMode = 'this-turn' | 'since-then' | 'since-start'
-
 /** One branch in the repo, with a flag for the checked-out one. */
 export interface Branch { name: string; current: boolean }
 

@@ -219,7 +219,6 @@ describe('PanelToggle', () => {
     mockActiveView = 'code'
     mockIsGitRepo = true
     render(<PanelToggle />)
-    expect(screen.getByTestId('panel-tab-timeline')).toBeInTheDocument()
     expect(screen.getByTestId('panel-tab-changes')).toBeInTheDocument()
   })
 

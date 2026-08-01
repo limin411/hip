@@ -3,10 +3,8 @@ import type {
   ServerMessage,
   SessionConfig,
   DiffBase,
-  CheckpointMode,
   PermissionMode,
   OrchestrationMode,
-  Checkpoint,
   MemoryFileConfig,
   MemoryItem,
   MemoryScope,
@@ -119,12 +117,6 @@ export class SessionService {
   private readonly unsubStatus: () => void
   private readonly streamCoalescer: StreamCoalescer
   private waiters: ServerMessageWaiter[] = []
-  /** E2E: when set, checkpoint list requests/results for this session re-apply the seed. */
-  private e2eCheckpointSeed: {
-    sessionId: string
-    checkpoints: Checkpoint[]
-    branch: string
-  } | null = null
   /** E2E: last user content passed to sendMessage (annotation inject assertions). */
   private lastOutboundUserContent: string | null = null
   /**
@@ -400,15 +392,6 @@ export class SessionService {
         .catch(() => {
           /* automation store optional at boot */
         })
-    }
-    // E2E seed wins over empty/real sidecar list:result for the seeded session.
-    if (
-      msg.type === 'git:checkpoint:list:result' &&
-      this.e2eCheckpointSeed &&
-      msg.sessionId === this.e2eCheckpointSeed.sessionId
-    ) {
-      const seed = this.e2eCheckpointSeed
-      useDiffStore.getState().setCheckpoints(seed.sessionId, seed.checkpoints, true, seed.branch)
     }
     this.fulfillWaiters(msg)
   }
@@ -1171,44 +1154,6 @@ export class SessionService {
 
   /** Matches packages/sidecar `SUBAGENT_PAUSE_MARKER` (Track B). */
   static readonly SUBAGENT_PAUSE_MARKER = '[hip:subagent_paused]' as const
-
-  /**
-   * E2E P4: seed checkpoint list + isGitRepo so Timeline tab is gated open
-   * without a real git repo on disk.
-   *
-   * Pins seed on this service so TimelineView's requestCheckpoints + late
-   * `git:checkpoint:list:result` cannot wipe rows with an empty sidecar list.
-   */
-  seedCheckpoints(sessionId: string): { count: number } {
-    const now = Date.now()
-    const checkpoints = [
-      {
-        id: `${sessionId}:t1`,
-        sessionId,
-        turnId: 't1',
-        kind: 'turn' as const,
-        label: 'e2e turn',
-        treeSha: 'tree1',
-        commitSha: 'commit1',
-        branch: 'main',
-        createdAt: now,
-      },
-      {
-        id: `${sessionId}:start`,
-        sessionId,
-        turnId: null,
-        kind: 'start' as const,
-        label: null,
-        treeSha: 'tree0',
-        commitSha: 'commit0',
-        branch: 'main',
-        createdAt: now - 1000,
-      },
-    ]
-    this.e2eCheckpointSeed = { sessionId, checkpoints, branch: 'main' }
-    useDiffStore.getState().setCheckpoints(sessionId, checkpoints, true, 'main')
-    return { count: checkpoints.length }
-  }
 
   /** E2E S5: open global command palette (⌘K) without OS key routing. */
   openCommandPaletteForE2e(): void {
@@ -2187,20 +2132,9 @@ export class SessionService {
     this.transport.send({ type: 'fs:gitInit', sessionId })
   }
 
-  /** Pull the checkpoint list (+ isGitRepo / current branch) for the timeline tab + tab gating. */
+  /** Pull the checkpoint list result meta (isGitRepo / current branch) for the Changes tab gating. */
   requestCheckpoints(sessionId: string): void {
-    if (this.e2eCheckpointSeed?.sessionId === sessionId) {
-      const seed = this.e2eCheckpointSeed
-      useDiffStore.getState().setCheckpoints(seed.sessionId, seed.checkpoints, true, seed.branch)
-      return
-    }
     this.transport.send({ type: 'git:checkpoint:list', sessionId })
-  }
-
-  /** Pull a checkpoint's diff in a given mode. Caches by `${id}|${mode}`; re-request always allowed. */
-  requestCheckpointDiff(sessionId: string, checkpointId: string, mode: CheckpointMode): void {
-    useDiffStore.getState().setCheckpointDiffLoading(sessionId, `${checkpointId}|${mode}`)
-    this.transport.send({ type: 'git:checkpoint:diff', sessionId, checkpointId, mode })
   }
 
   /** Pull the session-start..HEAD commit log for the 更改 tab. */
@@ -2214,30 +2148,9 @@ export class SessionService {
     this.transport.send({ type: 'git:branch:list', sessionId })
   }
 
-  /** Switch the checkout to a branch. The :result re-pulls branches + checkpoints + diff. */
+  /** Switch the checkout to a branch. The :result re-pulls branches + diff. */
   switchBranch(sessionId: string, branch: string): void {
     this.transport.send({ type: 'git:branch:switch', sessionId, branch })
-  }
-
-  /**
-   * Revert the worktree to a checkpoint (worktree-only; a safety checkpoint is written first).
-   * When `seedCheckpoints` is pinned for this session (E2E), auto-succeed without real git so
-   * Timeline revert confirm can close deterministically (H8).
-   */
-  revertCheckpoint(sessionId: string, checkpointId: string): void {
-    if (this.e2eCheckpointSeed?.sessionId === sessionId) {
-      queueMicrotask(() => {
-        this.receive({
-          type: 'git:revert:result',
-          sessionId,
-          checkpointId,
-          ok: true,
-          safetyCheckpointId: `${checkpointId}:e2e-safety`,
-        })
-      })
-      return
-    }
-    this.transport.send({ type: 'git:revert', sessionId, checkpointId })
   }
 
   lsDir(sessionId: string, path: string): void {
@@ -2556,7 +2469,6 @@ export type HipE2EHooks = {
   seedRoundtableCouncil: (sessionId: string) => { turnId: string }
   getSessionDebugBundleJson: () => string | null
   simulatePermissionRequest: (sessionId: string) => { turnId: string; requestId: string }
-  seedCheckpoints: (sessionId: string) => { count: number }
   openCommandPaletteForE2e: () => void
   closeCommandPaletteForE2e: () => void
   /** E2E: open Settings on a nav page via store (avoids Radix menu flakes). */
@@ -2713,7 +2625,6 @@ function installE2eHooks(svc: SessionService): void {
     seedRoundtableCouncil: (sessionId) => svc.seedRoundtableCouncil(sessionId),
     getSessionDebugBundleJson: () => svc.getSessionDebugBundleJson(),
     simulatePermissionRequest: (sessionId) => svc.simulatePermissionRequest(sessionId),
-    seedCheckpoints: (sessionId) => svc.seedCheckpoints(sessionId),
     openCommandPaletteForE2e: () => svc.openCommandPaletteForE2e(),
     closeCommandPaletteForE2e: () => svc.closeCommandPaletteForE2e(),
     openSettingsPageForE2e: (page) => svc.openSettingsPageForE2e(page),

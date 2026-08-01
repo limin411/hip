@@ -36,7 +36,7 @@ describe('terminal gating matrix', () => {
   it('G2: ChatTab values exclude terminal; ArtifactTab includes it', () => {
     const chatTabs: ChatTab[] = ['files', 'agents', 'outline', 'sources']
     expect(chatTabs).not.toContain('terminal' as ChatTab)
-    const codeTabs: ArtifactTab[] = ['files', 'agents', 'timeline', 'changes', 'terminal']
+    const codeTabs: ArtifactTab[] = ['files', 'agents', 'changes', 'terminal']
     expect(codeTabs).toContain('terminal')
   })
 

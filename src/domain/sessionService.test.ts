@@ -1206,49 +1206,6 @@ describe('workspace diff', () => {
     expect(sess.error).toMatchObject({ code: 'INVALID_WORKFLOW', message: 'tool nodes rejected' })
   })
 
-  it('seedCheckpoints folds isGitRepo and rows into diffStore', () => {
-    const t = new FakeTransport()
-    const svc = new SessionService(t)
-    const { count } = svc.seedCheckpoints('s1')
-    expect(count).toBe(2)
-    const slice = useDiffStore.getState().bySession['s1']
-    expect(slice.isGitRepo).toBe(true)
-    expect(slice.checkpoints).toHaveLength(2)
-    expect(slice.currentBranch).toBe('main')
-  })
-
-  it('seedCheckpoints survives requestCheckpoints and empty list:result', () => {
-    const t = new FakeTransport()
-    const svc = new SessionService(t)
-    svc.seedCheckpoints('s1')
-    svc.requestCheckpoints('s1')
-    expect(t.sent.filter((m) => m.type === 'git:checkpoint:list')).toHaveLength(0)
-    expect(useDiffStore.getState().bySession['s1'].checkpoints).toHaveLength(2)
-    t.push({
-      type: 'git:checkpoint:list:result',
-      sessionId: 's1',
-      checkpoints: [],
-      isGitRepo: true,
-      currentBranch: 'main',
-    })
-    expect(useDiffStore.getState().bySession['s1'].checkpoints).toHaveLength(2)
-  })
-
-  it('revertCheckpoint auto-succeeds when e2e checkpoint seed is pinned', async () => {
-    const t = new FakeTransport()
-    const svc = new SessionService(t)
-    svc.seedCheckpoints('s1')
-    svc.revertCheckpoint('s1', 's1:t1')
-    expect(t.sent.filter((m) => m.type === 'git:revert')).toHaveLength(0)
-    await Promise.resolve() // flush queueMicrotask
-    const slice = useDiffStore.getState().bySession['s1']
-    expect(slice.lastRevertResult).toMatchObject({
-      checkpointId: 's1:t1',
-      ok: true,
-      safetyCheckpointId: 's1:t1:e2e-safety',
-    })
-  })
-
   it('openCommandPaletteForE2e toggles command palette store', async () => {
     const { useCommandPaletteStore } = await import('@/store/commandPaletteStore')
     useCommandPaletteStore.setState({ open: false, page: null })
@@ -1423,31 +1380,13 @@ describe('checkpoints + commit log', () => {
     expect(t.sent.at(-1)).toMatchObject({ type: 'git:checkpoint:list', sessionId: 's1' })
   })
 
-  it('git:checkpoint:list:result folds checkpoints + isGitRepo into diffStore', () => {
+  it('git:checkpoint:list:result folds isGitRepo + currentBranch into diffStore', () => {
     const t = new FakeTransport(); new SessionService(t)
     const checkpoint = { id: 's1:t1', sessionId: 's1', turnId: 't1', kind: 'turn' as const, label: 'x', treeSha: 'tr', commitSha: 'c', branch: 'main', createdAt: 1 }
     t.push({ type: 'git:checkpoint:list:result', sessionId: 's1', checkpoints: [checkpoint], isGitRepo: true, currentBranch: 'main' })
     const s = useDiffStore.getState().bySession['s1']
     expect(s.isGitRepo).toBe(true)
     expect(s.currentBranch).toBe('main')
-    expect(s.checkpoints).toHaveLength(1)
-  })
-
-  it('checkpoint:created prepends a checkpoint (dedupe by id)', () => {
-    const t = new FakeTransport(); new SessionService(t)
-    const checkpoint = { id: 's1:t1', sessionId: 's1', turnId: 't1', kind: 'turn' as const, label: 'x', treeSha: 'tr', commitSha: 'c', branch: 'main', createdAt: 1 }
-    t.push({ type: 'checkpoint:created', sessionId: 's1', checkpoint })
-    t.push({ type: 'checkpoint:created', sessionId: 's1', checkpoint }) // duplicate id
-    expect(useDiffStore.getState().bySession['s1'].checkpoints).toHaveLength(1)
-  })
-
-  it('requestCheckpointDiff sets loading and sends git:checkpoint:diff; result caches by key', () => {
-    const t = new FakeTransport(); const svc = new SessionService(t)
-    svc.requestCheckpointDiff('s1', 's1:t1', 'this-turn')
-    expect(t.sent.at(-1)).toMatchObject({ type: 'git:checkpoint:diff', sessionId: 's1', checkpointId: 's1:t1', mode: 'this-turn' })
-    expect(useDiffStore.getState().bySession['s1'].checkpointDiff['s1:t1|this-turn'].status).toBe('loading')
-    t.push({ type: 'git:checkpoint:diff:result', sessionId: 's1', checkpointId: 's1:t1', mode: 'this-turn', state: 'ok', files: [] })
-    expect(useDiffStore.getState().bySession['s1'].checkpointDiff['s1:t1|this-turn']).toMatchObject({ status: 'ready', state: 'ok' })
   })
 
   it('requestCommitLog sends git:commitLog; result folds into the store', () => {
@@ -1487,7 +1426,7 @@ describe('checkpoints + commit log', () => {
   })
 })
 
-describe('branches + revert', () => {
+describe('branches', () => {
   it('requestBranches sends git:branch:list', () => {
     const t = new FakeTransport(); const svc = new SessionService(t)
     svc.requestBranches('s1')
@@ -1508,30 +1447,12 @@ describe('branches + revert', () => {
     expect(t.sent.at(-1)).toMatchObject({ type: 'git:branch:switch', sessionId: 's1', branch: 'feature' })
   })
 
-  it('git:branch:switch:result on ok updates currentBranch and re-requests branches + checkpoints', () => {
+  it('git:branch:switch:result on ok updates currentBranch and re-requests branches + diff summary', () => {
     const t = new FakeTransport(); new SessionService(t)
     t.push({ type: 'git:branch:switch:result', sessionId: 's1', branch: 'feature', ok: true, currentBranch: 'feature' })
     expect(useDiffStore.getState().bySession['s1'].currentBranch).toBe('feature')
     expect(t.sent.some((m) => m.type === 'git:branch:list' && m.sessionId === 's1')).toBe(true)
-    expect(t.sent.some((m) => m.type === 'git:checkpoint:list' && m.sessionId === 's1')).toBe(true)
-  })
-
-  it('revertCheckpoint sends git:revert', () => {
-    const t = new FakeTransport(); const svc = new SessionService(t)
-    svc.revertCheckpoint('s1', 's1:t1')
-    expect(t.sent.at(-1)).toMatchObject({ type: 'git:revert', sessionId: 's1', checkpointId: 's1:t1' })
-  })
-
-  it('git:revert:result on ok re-requests the checkpoint list + diff summary', () => {
-    const t = new FakeTransport(); new SessionService(t)
-    t.push({ type: 'git:revert:result', sessionId: 's1', checkpointId: 's1:t1', ok: true, safetyCheckpointId: 's1:pre-revert-1' })
-    expect(t.sent.some((m) => m.type === 'git:checkpoint:list' && m.sessionId === 's1')).toBe(true)
     expect(t.sent.some((m) => m.type === 'fs:diffSummary' && m.sessionId === 's1')).toBe(true)
-    expect(useDiffStore.getState().bySession['s1'].lastRevertResult).toMatchObject({
-      checkpointId: 's1:t1',
-      ok: true,
-      safetyCheckpointId: 's1:pre-revert-1',
-    })
   })
 
   it('git:branch:switch:result on FAILURE records switchError so the confirm modal can recover', () => {
@@ -1549,18 +1470,6 @@ describe('branches + revert', () => {
     t.push({ type: 'git:branch:switch:result', sessionId: 's1', branch: 'feature', ok: false, currentBranch: 'main', error: 'dirty tree' })
     t.push({ type: 'git:branch:list:result', sessionId: 's1', branches: [{ name: 'main', current: true }], currentBranch: 'main' })
     expect(useDiffStore.getState().bySession['s1'].switchError).toBeNull()
-  })
-
-  it('git:revert:result on FAILURE records revertError so the confirm modal can recover', () => {
-    const t = new FakeTransport(); new SessionService(t)
-    t.push({ type: 'git:revert:result', sessionId: 's1', checkpointId: 's1:t1', ok: false, error: 'safety checkpoint failed' })
-    expect(useDiffStore.getState().bySession['s1'].revertError).toBe('safety checkpoint failed')
-    expect(useDiffStore.getState().bySession['s1'].lastRevertResult).toMatchObject({
-      checkpointId: 's1:t1',
-      ok: false,
-    })
-    // no refresh requests fire on a failed revert
-    expect(t.sent.some((m) => m.type === 'git:checkpoint:list' && m.sessionId === 's1')).toBe(false)
   })
 
   describe('testProvider', () => {

@@ -1,4 +1,4 @@
-import type { ServerMessage, DiffBase, DiffState, DiffFile, Checkpoint, CommitLogEntry, CheckpointMode, Branch } from '@hip/protocol'
+import type { ServerMessage, DiffBase, DiffState, DiffFile, Checkpoint, CommitLogEntry, Branch } from '@hip/protocol'
 import type { SessionStore } from '../persistence/store.js'
 import * as workspaceGit from './workspace-git.js'
 
@@ -114,26 +114,6 @@ export class GitOperations {
   }
 
   /** Diff for a timeline checkpoint in one of the three modes. */
-  async checkpointDiff(cwd: string | undefined, checkpointId: string, mode: CheckpointMode): Promise<workspaceGit.WorkspaceDiff> {
-    if (!cwd) return { state: 'no_cwd' }
-    const all = this.store?.listCheckpoints(this.sessionId) ?? []
-    const cp = all.find((c) => c.id === checkpointId)
-    if (!cp) return { state: 'error', error: 'checkpoint not found' }
-    const startCp = all.find((c) => c.kind === 'start')
-    if (mode === 'since-then') {
-      return workspaceGit.collectWorkspaceDiff(cwd, { base: 'session-start', baseSha: cp.treeSha })
-    }
-    if (mode === 'since-start') {
-      const baseSha = startCp?.treeSha ?? this._diffBaseSha
-      return workspaceGit.collectWorkspaceDiff(cwd, { base: 'session-start', baseSha })
-    }
-    const idx = all.findIndex((c) => c.id === cp.id)
-    const prev = all[idx + 1]
-    const baseSha = prev?.treeSha ?? startCp?.treeSha ?? this._diffBaseSha
-    return workspaceGit.collectWorkspaceDiff(cwd, { base: 'session-start', baseSha, headSha: cp.treeSha })
-  }
-
-  /** Commit log session-start..HEAD. */
   async commitLog(cwd: string | undefined): Promise<{ state: DiffState; commits?: CommitLogEntry[]; error?: string }> {
     if (!cwd) return { state: 'no_cwd' }
     const start = null

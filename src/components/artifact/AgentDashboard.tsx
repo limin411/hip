@@ -82,7 +82,7 @@ export function AgentDashboard() {
   const childCount = children.length
 
   const turnMeta = [
-    t('artifact.timelineView.turn', { n: latest.turnIndex }),
+    t('artifact.turn', { n: latest.turnIndex }),
     formatClockTime(latest.timestamp, locale),
     childCount > 0 ? t('artifact.subAgentCount', { count: childCount }) : null,
     liveRunning

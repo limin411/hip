@@ -12,7 +12,6 @@ vi.mock('react-i18next', () => ({
       const map: Record<string, string> = {
         'artifact.files': 'Files',
         'artifact.agents': 'Agents',
-        'artifact.timeline': 'Timeline',
         'artifact.changes': 'Changes',
         'artifact.terminal': 'Terminal',
         'artifact.closePanel': 'Close panel',
@@ -50,9 +49,6 @@ vi.mock('./AgentDashboard', () => ({
 }))
 vi.mock('./AgentsRuntimeSplit', () => ({
   AgentsRuntimeSplit: () => React.createElement('div', { 'data-testid': 'agents-runtime-split' }),
-}))
-vi.mock('./TimelineView', () => ({
-  TimelineView: () => React.createElement('div', { 'data-testid': 'timeline-view' }),
 }))
 vi.mock('./ChangesView', () => ({
   ChangesView: () => React.createElement('div', { 'data-testid': 'changes-view' }),
@@ -115,18 +111,16 @@ describe('ArtifactPanel', () => {
   })
 
   it('falls back to files when a git-gated tab is active outside a git repo', () => {
-    mockUiState = { activeTab: 'timeline' }
+    mockUiState = { activeTab: 'changes' }
     render(<ArtifactPanel />)
     expect(screen.getByTestId('panel-view-files')).toBeInTheDocument()
-    expect(screen.queryByTestId('timeline-view')).toBeNull()
   })
 
-  it('renders TimelineView when timeline is active in a git repo', () => {
-    mockUiState = { activeTab: 'timeline' }
+  it('renders ChangesView when changes is active in a git repo', () => {
+    mockUiState = { activeTab: 'changes' }
     mockDiffState = { bySession: { 'sess-1': { isGitRepo: true } } }
     render(<ArtifactPanel />)
-    expect(screen.getByTestId('panel-view-timeline')).toBeInTheDocument()
-    expect(screen.getByTestId('timeline-view')).toBeInTheDocument()
+    expect(screen.getByTestId('panel-view-changes')).toBeInTheDocument()
   })
 
   it('renders FileTree and FilePreview when files tab is active', () => {

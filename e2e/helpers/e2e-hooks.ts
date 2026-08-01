@@ -38,7 +38,6 @@ type HipE2E = {
   seedRoundtableCouncil?: (s: string) => { turnId: string }
   getSessionDebugBundleJson: () => string | null
   simulatePermissionRequest: (s: string) => { turnId: string; requestId: string }
-  seedCheckpoints: (s: string) => { count: number }
   openCommandPaletteForE2e: () => void
   closeCommandPaletteForE2e: () => void
   openSettingsPageForE2e?: (page?: string) => void
@@ -206,14 +205,6 @@ export async function simulatePermissionRequest(sessionId: string): Promise<{ tu
     const hooks = (window as unknown as { __hipE2E?: HipE2E }).__hipE2E
     if (!hooks) throw new Error('__hipE2E missing')
     return hooks.simulatePermissionRequest(id)
-  }, sessionId)
-}
-
-export async function seedCheckpoints(sessionId: string): Promise<{ count: number }> {
-  return browser.execute((id: string) => {
-    const hooks = (window as unknown as { __hipE2E?: HipE2E }).__hipE2E
-    if (!hooks) throw new Error('__hipE2E missing')
-    return hooks.seedCheckpoints(id)
   }, sessionId)
 }
 

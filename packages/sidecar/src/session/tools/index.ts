@@ -4,6 +4,7 @@ import type { PlanMode } from '../plan-mode.js'
 import { buildFileTools } from './file.js'
 import { buildPlanningTools } from './planning.js'
 import { buildGitTools } from './git.js'
+import { buildCheckpointTools } from './checkpoint.js'
 import { buildSkillTools } from './skill.js'
 import { buildWebTools } from './web.js'
 import { buildSubagentTools, buildTaskBatchTools } from './subagent.js'
@@ -86,6 +87,15 @@ export function buildAllTools(
       ...buildGitTools(cwd, {
         sessionId: opts.sessionId,
         onWorktreeChanged: opts.onWorktreeChanged,
+      }),
+    )
+    // Hip shadow checkpoints (invisible to plain git) — list/revert for the agent.
+    base.push(
+      ...buildCheckpointTools({
+        cwd,
+        sessionId: opts.sessionId,
+        list: opts.onCheckpointList,
+        revert: opts.onCheckpointRevert,
       }),
     )
   }

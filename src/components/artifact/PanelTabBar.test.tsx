@@ -136,7 +136,6 @@ describe('PanelTabBar', () => {
   it('shows git-gated code tabs in a git repo and switches activeTab', () => {
     mockDiffState = { bySession: { 'sess-1': { isGitRepo: true } } }
     render(<PanelTabBar surface="code" />)
-    expect(screen.getByTestId('panel-tab-timeline')).toBeInTheDocument()
     expect(screen.getByTestId('panel-tab-changes')).toBeInTheDocument()
 
     fireEvent.click(screen.getByTestId('panel-tab-changes'))

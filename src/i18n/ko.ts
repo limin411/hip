@@ -723,28 +723,8 @@ export const ko = {
       "viewUnified": "통합",
       "viewSplit": "분할"
     },
-    "timeline": "타임라인",
+    "turn": "턴 {{n}}",
     "changes": "변경 사항",
-    "timelineView": {
-      "empty": "아직 체크포인트가 없습니다",
-      "emptyDesc": "에이전트가 각 턴을 완료한 후 자동으로 체크포인트가 생성됩니다",
-      "sessionStart": "세션 시작",
-      "modeThisTurn": "이번 턴",
-      "modeSinceThen": "그 이후",
-      "modeSinceStart": "시작 이후",
-      "noChange": "이 체크포인트에 변경사항 없음",
-      "turn": "턴 {{n}}",
-      "revert": "여기로 되돌리기",
-      "revertConfirmTitle": "이 체크포인트로 되돌릴까요?",
-      "revertConfirmBody": "작업 트리가 정확히 이 시점으로 복원됩니다. 먼저 안전 체크포인트가 자동 생성되므로, 이 작업 자체도 되돌릴 수 있습니다.",
-      "revertConfirmAction": "되돌리기",
-      "reverting": "되돌리는 중…",
-      "revertFailed": "되돌리기 실패",
-      "revertRetry": "재시도",
-      "revertSuccess": "되돌리기 완료. 안전 체크포인트가 생성되어 이 작업을 취소할 수 있습니다.",
-      "revertBlockedRunning": "체크포인트로 되돌리기 전에 현재 실행을 중지하세요.",
-      "crossBranchWarn": "이 체크포인트는 현재 브랜치와 다른 \"{{branch}}\" 브랜치에서 생성되었습니다."
-    },
     "branch": {
       "current": "현재 브랜치",
       "noBranch": "(브랜치 없음)",
@@ -1038,7 +1018,6 @@ export const ko = {
         "subAgent": "서브 에이전트",
         "diffFile": "Diff 파일",
         "diffHunk": "Diff 청크",
-        "checkpoint": "체크포인트",
         "commit": "커밋",
         "terminal": "터미널",
         "managedTerminal": "관리 터미널",
@@ -2842,10 +2821,6 @@ export const ko = {
       "annotate": "에이전트용 주석 추가",
       "quoteToComposer": "컴포저에 인용",
       "needSession": "먼저 세션을 열어주세요"
-    },
-    "checkpoint": {
-      "copyId": "체크포인트 ID 복사",
-      "revert": "여기로 되돌리기…"
     },
     "commit": {
       "copySha": "커밋 SHA 복사",

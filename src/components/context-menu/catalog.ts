@@ -150,20 +150,6 @@ const STATIC_CATALOG: ContextMenuItemMeta[] = [
     group: 'agent',
   },
   {
-    id: 'checkpoint.copyId',
-    labelKey: 'contextMenu.checkpoint.copyId',
-    kind: 'checkpoint',
-    group: 'clipboard',
-  },
-  {
-    id: 'checkpoint.revert',
-    labelKey: 'contextMenu.checkpoint.revert',
-    kind: 'checkpoint',
-    group: 'danger',
-    danger: true,
-    icon: 'history',
-  },
-  {
     id: 'commit.copySha',
     labelKey: 'contextMenu.commit.copySha',
     kind: 'commit',

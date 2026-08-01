@@ -19,7 +19,6 @@ import type {
   DiffFile,
   DiffSummary,
   Checkpoint,
-  CheckpointMode,
   CommitLogEntry,
   Branch,
   WorktreeInfo,
@@ -135,11 +134,9 @@ export type ClientMessage =
   | { type: 'fs:diffFile'; sessionId: string; path: string; base?: DiffBase; context?: number | 'full' }
   | { type: 'fs:gitInit'; sessionId: string }
   | { type: 'git:checkpoint:list'; sessionId: string }
-  | { type: 'git:checkpoint:diff'; sessionId: string; checkpointId: string; mode: CheckpointMode }
   | { type: 'git:commitLog'; sessionId: string }
   | { type: 'git:branch:list'; sessionId: string }
   | { type: 'git:branch:switch'; sessionId: string; branch: string }
-  | { type: 'git:revert'; sessionId: string; checkpointId: string }
   | { type: 'permission:respond'; sessionId: string; requestId: string; optionId?: string; cancelled?: boolean }
   | { type: 'agent:setConfigOption'; sessionId: string; configId: string; value: string }
   | {
@@ -383,12 +380,10 @@ export type ServerMessage =
   | { type: 'fs:diffFile:result'; sessionId: string; path: string; base: DiffBase; state: DiffState; file?: DiffFile; error?: string }
   | { type: 'fs:gitInit:result'; sessionId: string; ok: boolean; error?: string }
   | { type: 'git:checkpoint:list:result'; sessionId: string; checkpoints: Checkpoint[]; isGitRepo: boolean; currentBranch: string | null }
-  | { type: 'git:checkpoint:diff:result'; sessionId: string; checkpointId: string; mode: CheckpointMode; state: DiffState; files?: DiffFile[]; summary?: DiffSummary; error?: string }
   | { type: 'git:commitLog:result'; sessionId: string; commits: CommitLogEntry[]; state: DiffState; error?: string }
   | { type: 'checkpoint:created'; sessionId: string; checkpoint: Checkpoint }
   | { type: 'git:branch:list:result'; sessionId: string; branches: Branch[]; currentBranch: string | null }
   | { type: 'git:branch:switch:result'; sessionId: string; branch: string; ok: boolean; currentBranch: string | null; error?: string }
-  | { type: 'git:revert:result'; sessionId: string; checkpointId: string; ok: boolean; safetyCheckpointId?: string; error?: string }
   | { type: 'permission:request'; sessionId: string; turnId: string; requestId: string; tool: PermissionRequestPayload; options: PermissionOption[]; agentFrame?: AgentFrame }
   /** Multi-client: first accepted permission:respond wins; broadcast so other clients clear UI. */
   | { type: 'permission:resolved'; sessionId: string; requestId: string; source: 'gui' | 'cli' | 'unknown' }

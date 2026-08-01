@@ -123,12 +123,6 @@ describe('Session with extracted modules', () => {
     expect(r.isGitRepo).toBe(false)
   })
 
-  it('checkpointDiff delegates to git module', async () => {
-    const s = new Session('test-21', makeConfig({ cwd: undefined }))
-    const r = await s.checkpointDiff('nonexistent', 'this-turn')
-    expect(r.state).toBe('no_cwd')
-  })
-
   it('commitLog delegates to git module', async () => {
     const s = new Session('test-22', makeConfig({ cwd: undefined }))
     const r = await s.commitLog()
@@ -144,13 +138,6 @@ describe('Session with extracted modules', () => {
   it('switchBranch delegates to git module', async () => {
     const s = new Session('test-24', makeConfig({ cwd: undefined }))
     const r = await s.switchBranch('main')
-    expect(r.ok).toBe(false)
-    expect(r.error).toBe('no_workspace')
-  })
-
-  it('revertCheckpoint delegates to git module', async () => {
-    const s = new Session('test-25', makeConfig({ cwd: undefined }))
-    const r = await s.revertCheckpoint('nonexistent', vi.fn())
     expect(r.ok).toBe(false)
     expect(r.error).toBe('no_workspace')
   })

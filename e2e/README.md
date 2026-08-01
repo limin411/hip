@@ -212,7 +212,6 @@ Non-production frontend installs `window.__hipE2E` (see `sessionService.installE
 - `simulateSessionError` / `getSessionDebugBundleJson` — copy-debug (H4)
 - `simulatePermissionRequest` — HITL modal (H5)
 - `seedAgentCollaboration` — Agents panel (H6) + chat delegation (H7)
-- `seedCheckpoints` — Timeline rows (P4); also makes `revertCheckpoint` auto-succeed (H8)
 - `openCommandPaletteForE2e` / `closeCommandPaletteForE2e` — S5
 - `simulatePluginInstallError` — T2 (after Settings form submit)
 - `getWorkflowSession` — read workflow store slice after inject (no product DAG shell)
@@ -274,7 +273,7 @@ Failure PNGs upload as Actions artifacts (`e2e-*-screenshots`, 7-day retention).
 | Recycle bin / trash | `recycle-bin`, `context-menu-trash` | yes |
 | Plugins / extensions | `plugin-install-error`, `extension-registry`, `skill-plugin-dialogue` | yes |
 | Agents / plan / cancel | `harness-*`, `smooth-p*` | yes |
-| Timeline / roundtable | `timeline-*`, `roundtable-council` | yes |
+| Roundtable | `roundtable-council` | yes |
 | Token usage chip | `token-usage-chip` | yes |
 | Eval UI smoke | `eval-ui-smoke`, `eval-ui-visual-capture` | yes (`@eval @smoke`) |
 | Live LLM / coding eval | `live-*`, `eval-*-hard/orch/adv` | **no** (paid) |

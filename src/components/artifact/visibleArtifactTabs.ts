@@ -9,7 +9,6 @@ export type VisibleTabDef = {
     | 'artifact.agents'
     | 'artifact.outline'
     | 'artifact.sources'
-    | 'artifact.timeline'
     | 'artifact.changes'
     | 'artifact.terminal'
   gated?: boolean
@@ -37,15 +36,9 @@ export function visibleArtifactTabs(args: {
     { value: 'agents', labelKey: 'artifact.agents' },
   ]
   if (args.isGitRepo) {
-    tabs.push(
-      { value: 'timeline', labelKey: 'artifact.timeline' },
-      { value: 'changes', labelKey: 'artifact.changes' },
-    )
+    tabs.push({ value: 'changes', labelKey: 'artifact.changes' })
   } else {
-    tabs.push(
-      { value: 'timeline', labelKey: 'artifact.timeline', gated: true },
-      { value: 'changes', labelKey: 'artifact.changes', gated: true },
-    )
+    tabs.push({ value: 'changes', labelKey: 'artifact.changes', gated: true })
   }
   if (args.codeTerminal) {
     tabs.push({ value: 'terminal', labelKey: 'artifact.terminal' })

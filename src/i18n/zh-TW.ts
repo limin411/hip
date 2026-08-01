@@ -730,28 +730,8 @@ export const zhTW = {
       "viewUnified": "統一檢視",
       "viewSplit": "並排檢視"
     },
-    "timeline": "時間線",
+    "turn": "第 {{n}} 輪",
     "changes": "更改",
-    "timelineView": {
-      "empty": "暫無檢查點",
-      "emptyDesc": "智慧體每完成一輪就會自動建立一個檢查點",
-      "sessionStart": "會話起點",
-      "modeThisTurn": "本輪",
-      "modeSinceThen": "自此至今",
-      "modeSinceStart": "起點至今",
-      "noChange": "本檢查點無改動",
-      "turn": "第 {{n}} 輪",
-      "revert": "回退到此處",
-      "revertConfirmTitle": "回退到此檢查點？",
-      "revertConfirmBody": "工作區將精確恢復到這一刻的狀態。回退前會自動建立一個安全檢查點，因此此操作本身可被撤銷。",
-      "revertConfirmAction": "回退",
-      "reverting": "回退中…",
-      "revertFailed": "回退失敗",
-      "revertRetry": "重試",
-      "revertSuccess": "已回退。已自動建立安全檢查點，因此此操作可撤銷。",
-      "revertBlockedRunning": "請先停止當前執行，再回退到檢查點。",
-      "crossBranchWarn": "此檢查點是在分支「{{branch}}」上建立的，與當前分支不同。"
-    },
     "branch": {
       "current": "當前分支",
       "noBranch": "（無分支）",
@@ -1042,7 +1022,6 @@ export const zhTW = {
         "subAgent": "子智慧體",
         "diffFile": "差異檔案",
         "diffHunk": "差異片段",
-        "checkpoint": "檢查點",
         "commit": "提交",
         "terminal": "終端",
         "managedTerminal": "託管終端",
@@ -2842,10 +2821,6 @@ export const zhTW = {
       "annotate": "批註給 Agent",
       "quoteToComposer": "引用到輸入框",
       "needSession": "請先開啟工作階段"
-    },
-    "checkpoint": {
-      "copyId": "複製檢查點 ID",
-      "revert": "還原到此處…"
     },
     "commit": {
       "copySha": "複製提交 SHA",

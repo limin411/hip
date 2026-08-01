@@ -15,7 +15,6 @@ export type ContextKind =
   | 'subAgent'
   | 'diffFile'
   | 'diffHunk'
-  | 'checkpoint'
   | 'commit'
   | 'terminal'
   /** Sidebar / chrome managed terminal (tm_* local or SSH). */
@@ -79,7 +78,6 @@ export type ContextPayloadMap = {
   subAgent: { agent: TurnAgent }
   diffFile: { path: string; status: string; sessionId: string; cwd: string | null }
   diffHunk: { path: string; header?: string; text: string }
-  checkpoint: { checkpointId: string; sessionId: string }
   commit: { sha: string; shortSha: string; message: string; sessionId: string }
   /** `target` distinguishes chrome vs xterm canvas (ControlledContextMenu). */
   terminal: { sessionId: string; status: string; target?: 'chrome' | 'canvas' }

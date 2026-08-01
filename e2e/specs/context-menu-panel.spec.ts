@@ -1,4 +1,4 @@
-// Context menu L3 panel: file tree, diff, checkpoint, terminal, message/code nesting.
+// Context menu L3 panel: file tree, diff, terminal, message/code nesting.
 import { expect } from 'expect-webdriverio'
 import * as fs from 'node:fs'
 import * as os from 'node:os'
@@ -18,12 +18,11 @@ import {
   createChatSessionForE2e,
   createCodeSessionForE2e,
   injectServerMessage,
-  seedCheckpoints,
   simulateAgentWriteFinished,
   waitForHipE2E,
 } from '../helpers/e2e-hooks.js'
 import { diffFileTexts, initGitAndOpenChanges } from '../helpers/git-workspace.js'
-import { closePanelMenu, listPanelMenuTabs, selectPanelTab } from '../helpers/panel.js'
+import { selectPanelTab } from '../helpers/panel.js'
 import { switchToChatSurface, switchToCodeSurface } from '../helpers/surface.js'
 import { CodePage } from '../page-objects/CodePage.js'
 
@@ -50,7 +49,6 @@ async function ensureCodeSession(cwd: string): Promise<string> {
 
 describe('context menu panel @context-menu @panel', () => {
   let writeDir: string
-  let timelineDir: string
 
   before(async () => {
     await waitForAppReady()
@@ -60,14 +58,10 @@ describe('context menu panel @context-menu @panel', () => {
 
     writeDir = fs.mkdtempSync(path.join(os.tmpdir(), 'hip-e2e-cm-diff-'))
     fs.writeFileSync(path.join(writeDir, 'hello.txt'), 'hello\n')
-
-    timelineDir = fs.mkdtempSync(path.join(os.tmpdir(), 'hip-e2e-cm-timeline-'))
-    fs.writeFileSync(path.join(timelineDir, 'hello.txt'), 'hello\n')
   })
 
   after(() => {
     if (writeDir) fs.rmSync(writeDir, { recursive: true, force: true })
-    if (timelineDir) fs.rmSync(timelineDir, { recursive: true, force: true })
   })
 
   afterEach(async () => {
@@ -160,39 +154,6 @@ describe('context menu panel @context-menu @panel', () => {
     expect(ids).toContain('diffFile.toggleCollapse')
     await closeContextMenu()
   })
-
-  it('CM-P5: checkpoint menu has copyId and revert', async () => {
-    const sessionId = await ensureCodeSession(timelineDir)
-    await browser.waitUntil(
-      async () => {
-        await seedCheckpoints(sessionId)
-        const tabs = await listPanelMenuTabs()
-        await closePanelMenu()
-        return tabs.includes('panel-tab-timeline')
-      },
-      {
-        timeout: 20000,
-        interval: 500,
-        timeoutMsg: 'timeline tab never available after seedCheckpoints',
-      },
-    )
-
-    await selectPanelTab('timeline')
-    await browser.waitUntil(
-      async () => {
-        await seedCheckpoints(sessionId)
-        return (await (await browser.$$('[data-testid="timeline-row"]')).length) >= 1
-      },
-      { timeout: 20000, interval: 400, timeoutMsg: 'expected seeded timeline rows' },
-    )
-
-    const rowSel = '[data-testid="timeline-row"]'
-    await openContextMenu(rowSel)
-    await expectContextMenuItems(['checkpoint.copyId', 'checkpoint.revert'])
-    await closeContextMenu()
-  })
-
-  // ── T9: terminal ──────────────────────────────────────────────────────────
 
   it('CM-P6: terminal chrome menu has restart and copyCwd', async () => {
     await ensureCodeSession(FIXTURE)

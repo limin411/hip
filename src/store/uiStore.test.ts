@@ -25,7 +25,6 @@ beforeEach(() => {
     activeView: 'chat',
     settingsPage: 'general',
     diffViewMode: 'unified',
-    checkpointMode: 'this-turn',
     overlay: null,
     settingsShellRoute: { type: 'page' },
   })
@@ -153,7 +152,6 @@ describe('uiStore - overlay', () => {
       density: s.density,
       settingsPage: s.settingsPage,
       diffViewMode: s.diffViewMode,
-      checkpointMode: s.checkpointMode,
       sidebarOpen: s.sidebarOpen,
       sidebarWidth: s.sidebarWidth,
     }
@@ -229,8 +227,8 @@ describe('uiStore - chatActiveTab (Chat panel tabs)', () => {
   })
 
   it('chatActiveTab is independent of code panel activeTab', () => {
-    useUiStore.getState().setTab('timeline')
-    expect(useUiStore.getState().activeTab).toBe('timeline')
+    useUiStore.getState().setTab('changes')
+    expect(useUiStore.getState().activeTab).toBe('changes')
     expect(useUiStore.getState().chatActiveTab).toBe('files')
   })
 })
@@ -351,7 +349,6 @@ describe('uiStore persistence partialize', () => {
       density: 'compact',
       settingsPage: 'model',
       diffViewMode: 'split',
-      checkpointMode: 'since-start',
       activeTab: 'terminal',
       scrollTargetMessageId: 'm1',
       selectedArtifactPath: '/x',
@@ -365,7 +362,6 @@ describe('uiStore persistence partialize', () => {
       density: s.density,
       settingsPage: s.settingsPage,
       diffViewMode: s.diffViewMode,
-      checkpointMode: s.checkpointMode,
       sidebarOpen: s.sidebarOpen,
       sidebarWidth: s.sidebarWidth,
     }
@@ -377,7 +373,6 @@ describe('uiStore persistence partialize', () => {
       density: 'compact',
       settingsPage: 'model',
       diffViewMode: 'split',
-      checkpointMode: 'since-start',
       sidebarOpen: s.sidebarOpen,
       sidebarWidth: s.sidebarWidth,
     })

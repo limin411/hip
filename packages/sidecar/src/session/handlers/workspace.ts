@@ -14,11 +14,9 @@ export const WORKSPACE_MESSAGE_TYPES = new Set([
   'fs:diffFile',
   'fs:gitInit',
   'git:checkpoint:list',
-  'git:checkpoint:diff',
   'git:commitLog',
   'git:branch:list',
   'git:branch:switch',
-  'git:revert',
   'git:worktree:create',
   'git:worktree:list',
   'git:worktree:remove',
@@ -89,11 +87,6 @@ export async function handleWorkspaceMessage(
       send({ type: 'git:checkpoint:list:result', sessionId: msg.sessionId, checkpoints: r.checkpoints, isGitRepo: r.isGitRepo, currentBranch: r.currentBranch })
       return
     }
-    case 'git:checkpoint:diff': {
-      const r = await ctx.ensureSession(msg.sessionId, send).checkpointDiff(msg.checkpointId, msg.mode)
-      send({ type: 'git:checkpoint:diff:result', sessionId: msg.sessionId, checkpointId: msg.checkpointId, mode: msg.mode, state: r.state, files: r.files, summary: r.summary, error: r.error })
-      return
-    }
     case 'git:commitLog': {
       const r = await ctx.ensureSession(msg.sessionId, send).commitLog()
       send({ type: 'git:commitLog:result', sessionId: msg.sessionId, commits: r.commits ?? [], state: r.state, error: r.error })
@@ -107,11 +100,6 @@ export async function handleWorkspaceMessage(
     case 'git:branch:switch': {
       const r = await ctx.ensureSession(msg.sessionId, send).switchBranch(msg.branch)
       send({ type: 'git:branch:switch:result', sessionId: msg.sessionId, branch: msg.branch, ok: r.ok, currentBranch: r.currentBranch, ...(r.error ? { error: r.error } : {}) })
-      return
-    }
-    case 'git:revert': {
-      const r = await ctx.ensureSession(msg.sessionId, send).revertCheckpoint(msg.checkpointId, send)
-      send({ type: 'git:revert:result', sessionId: msg.sessionId, checkpointId: msg.checkpointId, ok: r.ok, ...(r.safetyCheckpointId ? { safetyCheckpointId: r.safetyCheckpointId } : {}), ...(r.error ? { error: r.error } : {}) })
       return
     }
     case 'git:worktree:create': {

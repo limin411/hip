@@ -163,6 +163,7 @@ export function MainToolbar() {
       </div>
 
       <div className="flex h-full shrink-0 items-center gap-0.5">
+        {showPanelChrome ? <ConnectionStatus /> : null}
         <button
           type="button"
           data-testid="main-toolbar-command-palette"
@@ -175,12 +176,7 @@ export function MainToolbar() {
         >
           <Command {...titlebarIconProps} />
         </button>
-        {showPanelChrome ? (
-          <>
-            <ConnectionStatus />
-            <PanelToggle />
-          </>
-        ) : null}
+        {showPanelChrome ? <PanelToggle /> : null}
       </div>
       <WindowCaptionButtons />
     </header>

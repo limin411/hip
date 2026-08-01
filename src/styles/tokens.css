@@ -302,22 +302,22 @@ a:hover {
   }
 }
 
-/* ── Greeting text fade-in (triggered by key change on animName) ── */
+/* ── Greeting text fade-in (triggered by key change on animName) — fade only ── */
 @keyframes greeting-enter {
-  from { opacity: 0; transform: translateY(8px); }
-  to   { opacity: 1; transform: translateY(0); }
+  from { opacity: 0; }
+  to   { opacity: 1; }
 }
 .animate-greeting-enter {
-  animation: greeting-enter var(--duration-celebrate, 450ms) var(--ease-out, cubic-bezier(0.16, 1, 0.3, 1)) both;
+  animation: greeting-enter var(--duration-celebrate, 200ms) var(--ease-out, cubic-bezier(0.2, 0, 0, 1)) both;
 }
 
 /* Roundtable seat strip (Chat empty-state starter; stagger via animation-delay) */
 @keyframes roundtable-seat-enter {
-  from { opacity: 0; transform: translateY(6px) scale(0.96); }
-  to   { opacity: 1; transform: translateY(0) scale(1); }
+  from { opacity: 0; }
+  to   { opacity: 1; }
 }
 .animate-roundtable-seat {
-  animation: roundtable-seat-enter 320ms var(--ease-out, cubic-bezier(0.16, 1, 0.3, 1)) both;
+  animation: roundtable-seat-enter 200ms var(--ease-out, cubic-bezier(0.2, 0, 0, 1)) both;
 }
 
 /*

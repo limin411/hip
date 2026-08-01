@@ -212,7 +212,7 @@ export function Composer({
                 type="button"
                 variant="primary"
                 size="icon"
-                className={cn('h-7 w-7 shrink-0 rounded-full')}
+                className={cn('h-7 w-7 shrink-0 rounded-md')}
                 onClick={onStop}
                 disabled={reconnecting}
                 data-testid="composer-stop"
@@ -225,7 +225,7 @@ export function Composer({
             <Button
               variant="primary"
               size="icon"
-              className={cn('h-7 w-7 shrink-0 rounded-full')}
+              className={cn('h-7 w-7 shrink-0 rounded-md')}
               onClick={onSubmit}
               disabled={locked || (!value.trim() && attachments.length === 0) || submitDisabled}
               data-testid="composer-send"

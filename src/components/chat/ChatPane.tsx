@@ -588,7 +588,7 @@ export function ChatPane() {
           }}
           data-testid="jump-to-latest"
           title={t('chat.jumpToLatest')}
-          className="absolute bottom-4 left-1/2 flex -translate-x-1/2 items-center gap-1 rounded-full border border-border bg-surface px-3 py-1.5 text-meta text-ink-secondary shadow-menu animate-menu-in transition-[background-color,color,transform] duration-chrome ease-out hover:bg-state-hover active:scale-[0.98]"
+          className="absolute bottom-4 left-1/2 flex -translate-x-1/2 items-center gap-1 rounded-md border border-border bg-surface px-3 py-1.5 text-meta text-ink-secondary shadow-menu animate-menu-in transition-[background-color,color] duration-chrome ease-out hover:bg-state-hover"
         >
           <ChevronDown size={14} strokeWidth={1.75} />
           {t('chat.jumpToLatest')}

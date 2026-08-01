@@ -51,7 +51,7 @@ export function SegmentedControl<T extends string>({
             data-testid={dataTestId ? `${dataTestId}-${opt.value}` : undefined}
             onClick={() => onChange(opt.value)}
             className={cn(
-              'inline-flex items-center justify-center gap-1 rounded font-medium transition-[background-color,color,transform] duration-chrome ease-out active:scale-[0.98]',
+              'inline-flex items-center justify-center gap-1 rounded font-medium transition-[background-color,color] duration-chrome ease-out',
               focusChrome,
               size === 'sm' ? 'h-7 px-2.5 text-meta' : 'h-8 px-3 text-body',
               selected

@@ -98,19 +98,20 @@ export default {
         // Not for section headers, cards, stats, or chrome.
         page: ['28px', { lineHeight: '1.25', letterSpacing: '-0.02em' }],
       },
+      // 扁平化：直角优先。按钮/输入 2px，卡片 4px，浮层 6px；full 仅保留给状态点/开关/avatar。
       borderRadius: {
         none: '0',
-        sm: '4px',
-        DEFAULT: '6px',
-        md: '6px',
-        lg: '8px',
-        xl: '12px',
-        '2xl': '12px',
-        '3xl': '12px',
+        sm: '2px',
+        DEFAULT: '4px',
+        md: '4px',
+        lg: '4px',
+        xl: '6px',
+        '2xl': '6px',
+        '3xl': '6px',
         full: '9999px',
       },
       // 扁平化：界面主体不用阴影。
-      // 例外三档：panel（右栏浮动卡）、menu（下拉）、overlay（Modal）。
+      // 唯一例外：overlay（Modal）一档极轻投影；浮层分层改由实底 + 1px 边框 + scrim。
       boxShadow: {
         none: 'none',
         sm: 'none',
@@ -123,38 +124,35 @@ export default {
         pop: 'none',
         float: 'none',
         panel: 'var(--shadow-panel)',
-        // 浮层阴影：更轻、更弥散 —— 高级感来自柔和而非浓重
-        menu: '0 8px 24px -8px rgba(17, 17, 17, 0.12), 0 2px 8px -4px rgba(17, 17, 17, 0.06)',
-        overlay: '0 20px 56px -16px rgba(17, 17, 17, 0.18), 0 8px 20px -10px rgba(17, 17, 17, 0.08)',
+        menu: 'none',
+        overlay: '0 12px 32px -12px rgba(17, 17, 17, 0.12)',
         'card-hover': 'none',
         'sticky-top': 'none',
       },
       keyframes: {
         blink: { '0%,100%': { opacity: '1' }, '50%': { opacity: '0' } },
         pulse: { '0%,100%': { opacity: '1' }, '50%': { opacity: '0.4' } },
-        // Individual transform props (translate/scale) so they compose with Tailwind
-        // translate utilities (e.g. -translate-x-1/2 is not wiped mid-animation).
+        // 扁平化：入场一律纯 opacity，无位移/缩放（Fade-only Motion）。
         'message-enter': {
-          from: { opacity: '0', translate: '0 8px' },
-          to: { opacity: '1', translate: '0 0' },
+          from: { opacity: '0' },
+          to: { opacity: '1' },
         },
         'menu-in': {
-          from: { opacity: '0', translate: '0 -6px', scale: '0.96' },
-          to: { opacity: '1', translate: '0 0', scale: '1' },
+          from: { opacity: '0' },
+          to: { opacity: '1' },
         },
         'menu-out': {
-          from: { opacity: '1', translate: '0 0', scale: '1' },
-          to: { opacity: '0', translate: '0 -4px', scale: '0.97' },
+          from: { opacity: '1' },
+          to: { opacity: '0' },
         },
-        // Modal: scale-only. Still pair with inset + m-auto centering (not -translate-*),
-        // so transform composition never flashes the panel off-center on open.
+        // Modal: 纯 fade。保持 inset + m-auto 居中，transform 不再参与。
         'modal-in': {
-          from: { opacity: '0', scale: '0.96' },
-          to: { opacity: '1', scale: '1' },
+          from: { opacity: '0' },
+          to: { opacity: '1' },
         },
         'modal-out': {
-          from: { opacity: '1', scale: '1' },
-          to: { opacity: '0', scale: '0.97' },
+          from: { opacity: '1' },
+          to: { opacity: '0' },
         },
         'overlay-in': {
           from: { opacity: '0' },
@@ -165,24 +163,24 @@ export default {
           to: { opacity: '0' },
         },
         'panel-in': {
-          from: { opacity: '0', translate: '10px 0' },
-          to: { opacity: '1', translate: '0 0' },
+          from: { opacity: '0' },
+          to: { opacity: '1' },
         },
         'view-enter': {
-          from: { opacity: '0', translate: '0 6px' },
-          to: { opacity: '1', translate: '0 0' },
+          from: { opacity: '0' },
+          to: { opacity: '1' },
         },
         'dot-bounce': {
-          '0%,60%,100%': { opacity: '0.3', translate: '0 0' },
-          '30%': { opacity: '1', translate: '0 -2px' },
+          '0%,60%,100%': { opacity: '0.3' },
+          '30%': { opacity: '1' },
         },
         'msg-enter-right': {
-          from: { opacity: '0', translate: '12px 0' },
-          to: { opacity: '1', translate: '0 0' },
+          from: { opacity: '0' },
+          to: { opacity: '1' },
         },
         'msg-enter-left': {
-          from: { opacity: '0', translate: '-12px 0' },
-          to: { opacity: '1', translate: '0 0' },
+          from: { opacity: '0' },
+          to: { opacity: '1' },
         },
       },
       // ease-out token = springy decelerate (see --ease-out in tokens.css)

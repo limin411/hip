@@ -28,11 +28,11 @@
    * 主列内容区另用 --bg-content（淡黄纸感），左右边栏仍走 --bg-app / --bg-subtle。
    */
   --bg-app: #ffffff;
-  --bg-subtle: #ffffff;
-  --bg-muted: #f2f2f2;
+  --bg-subtle: #fafafa;
+  --bg-muted: #f1f1f1;
   --bg-content: #ffffff; /* 仅主内容列：淡暖黄 / 奶油纸（略深于极淡） */
-  --border: #bdbdbd;
-  --border-strong: #a0a0a0; /* 需要明确分隔时（输入框、卡片外框） */
+  --border: #e0e0e0;
+  --border-strong: #c9c9c9; /* 需要明确分隔时（输入框、卡片外框） */
   --text-primary: #111111;
   --text-secondary: #5e5e5e;
   --text-tertiary: #757575; /* AA ~4.4:1 on bg-app —— 时间戳/占位符/元数据可读 */
@@ -70,8 +70,8 @@
   /* 标题栏默认背景（非 macOS 平台使用纯色） */
   --titlebar-bg: var(--glass-bg);
   --titlebar-backdrop: var(--glass-backdrop);
-  /* 右侧浮动 panel 阴影（与 menu/overlay 并列的第三档）—— 更轻、更弥散 */
-  --shadow-panel: 0 2px 14px -4px rgba(17, 17, 17, 0.1), 0 1px 3px rgba(17, 17, 17, 0.04);
+  /* 右侧浮动 panel 阴影（与 menu/overlay 并列的第三档）—— 扁平化：面板改实底 + 1px 边框 */
+  --shadow-panel: none;
   /* 浮层遮罩（Modal / 全屏 palette） */
   --overlay-scrim: rgba(17, 17, 17, 0.28);
   /* Nested confirm/task over a shell — light, no blur (see Modal variant=confirm nested) */
@@ -91,11 +91,11 @@
   --btn-primary: #3a3a3a;
   --btn-primary-hover: #2e2e2e;
   --on-btn-primary: #fafafa;
-  /* Motion tiers — chrome / content / celebrate (see visual-design-upgrade) */
-  --duration-chrome: 140ms;
-  --duration-content: 240ms;
-  --duration-celebrate: 450ms;
-  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  /* Motion tiers — chrome / content / celebrate. 扁平化：时长收敛、无弹性 */
+  --duration-chrome: 100ms;
+  --duration-content: 120ms;
+  --duration-celebrate: 200ms;
+  --ease-out: var(--ease-standard);
   --ease-standard: cubic-bezier(0.2, 0, 0, 1);
   /* Density defaults — FOUC-safe before data-density exists (comfortable) */
   --row-h-sidebar: 34px;
@@ -132,12 +132,12 @@ html[data-platform="linux"] {
 
 .dark {
   /* 单色 chrome —— 压低背景亮度、边框更轻、文字对比够用 */
-  --bg-app: #0f0f0f;
-  --bg-subtle: #171717;
-  --bg-muted: #222222;
-  --bg-content: #0f0f0f; /* 暗色主列与 chrome 同底，不单独偏黄 */
-  --border: #3a3a3a;
-  --border-strong: #4a4a4a;
+  --bg-app: #121212;
+  --bg-subtle: #181818;
+  --bg-muted: #1f1f1f;
+  --bg-content: #121212; /* 暗色主列与 chrome 同底，不单独偏黄 */
+  --border: #2e2e2e;
+  --border-strong: #3e3e3e;
   --text-primary: #f0f0f0;
   --text-secondary: #a3a3a3;
   --text-tertiary: #7a7a7a;
@@ -164,7 +164,7 @@ html[data-platform="linux"] {
   --glass-backdrop: blur(24px) saturate(180%);
   --titlebar-bg: var(--glass-bg);
   --titlebar-backdrop: var(--glass-backdrop);
-  --shadow-panel: 0 2px 14px -4px rgba(0, 0, 0, 0.5), 0 1px 3px rgba(0, 0, 0, 0.28);
+  --shadow-panel: none;
   --overlay-scrim: rgba(0, 0, 0, 0.48);
   /* Nested confirm/task over a shell — light, no blur */
   --overlay-scrim-light: rgba(0, 0, 0, 0.28);

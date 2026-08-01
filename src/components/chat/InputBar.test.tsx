@@ -86,7 +86,7 @@ describe('InputBar', () => {
 
     render(<InputBar />)
     const root = screen.getByTestId('composer')
-    expect(root.className).toContain('border-danger/60')
+    expect(root.className).toContain('border-danger-soft')
     expect(root.className).not.toContain('border-border')
   })
 

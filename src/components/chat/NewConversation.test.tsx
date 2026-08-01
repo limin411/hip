@@ -217,7 +217,7 @@ describe('NewConversation', () => {
       'Full machine access (high-risk)',
     )
     // Armed control permission tints the composer input card red.
-    expect(screen.getByTestId('composer').className).toContain('border-danger/60')
+    expect(screen.getByTestId('composer').className).toContain('border-danger-soft')
     expect(screen.getByTestId('composer').className).not.toContain('border-border')
     // Radio semantics: arming roundtable clears control permission.
     fireEvent.click(screen.getByTestId('roundtable-option'))

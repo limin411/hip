@@ -115,7 +115,7 @@ describe('Composer', () => {
       <Composer variant="card" value="" onChange={vi.fn()} onSubmit={vi.fn()} danger />,
     )
     const root = screen.getByTestId('composer')
-    expect(root.className).toContain('border-danger/60')
+    expect(root.className).toContain('border-danger-soft')
     expect(root.className).not.toContain('border-border')
     rerender(<Composer variant="card" value="" onChange={vi.fn()} onSubmit={vi.fn()} />)
     expect(root.className).toContain('border-border')

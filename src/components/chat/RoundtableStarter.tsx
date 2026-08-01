@@ -65,7 +65,7 @@ export function RoundtableStarter({ disabled = false }: RoundtableStarterProps) 
             title={disabled ? t('chat.roundtable.disabledHint') : danger ? t('chat.roundtable.controlPermissionHint') : t('chat.roundtable.chipHint')}
             aria-haspopup="menu"
             className={cn(
-              danger && 'border border-danger/60 bg-danger/10 text-danger',
+              danger && 'border border-danger-soft bg-danger-soft text-danger',
               active && !danger && 'border border-effort-max bg-state-active text-ink',
             )}
           >

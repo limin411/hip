@@ -90,7 +90,7 @@ export function Composer({
         isCard
           ? cn(
               'rounded-lg border bg-surface-subtle p-2.5',
-              danger ? 'border-danger/60' : 'border-border',
+              danger ? 'border-danger-soft' : 'border-border',
             )
           // Flat dock: no focus chrome — InputBar already draws the top rule.
           : 'bg-surface-subtle',

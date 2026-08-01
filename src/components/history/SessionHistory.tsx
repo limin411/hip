@@ -11,7 +11,6 @@ import {
 } from '@/lib/worktreeNesting'
 import { useParallelStore } from '@/store/parallelStore'
 import { useWorktreeStore } from '@/store/worktreeStore'
-import { cn } from '@/lib/utils'
 import { formatAbsolute, formatRelativeTime } from '@/lib/datetime'
 import { Button } from '@/components/ui/Button'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/Tabs'
@@ -275,13 +274,7 @@ export function SessionHistory({
                       </span>
                     </button>
                   </DeclarativeContextMenu>
-                  <div
-                    className={cn(
-                      'flex shrink-0 items-center',
-                      'opacity-100 transition-opacity',
-                      'sm:opacity-0 sm:group-hover:opacity-100 sm:group-focus-within:opacity-100',
-                    )}
-                  >
+                  <div className="flex shrink-0 items-center">
                     <Button
                       variant="ghost"
                       size="icon"

@@ -560,11 +560,7 @@ export function RecycleBinPage({
                     </span>
                   </div>
                   <div
-                    className={cn(
-                      'flex shrink-0 items-center gap-0.5',
-                      'opacity-100 transition-opacity',
-                      'sm:opacity-0 sm:group-hover:opacity-100 sm:group-focus-within:opacity-100',
-                    )}
+                    className={cn('flex shrink-0 items-center gap-0.5')}
                   >
                     <Button
                       variant="ghost"

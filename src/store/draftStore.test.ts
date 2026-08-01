@@ -73,6 +73,22 @@ describe('draftStore', () => {
     useDraftStore.getState().setControlPermission(true)
     expect(useDraftStore.getState().draft?.controlPermission).toBeUndefined()
   })
+  it('setRoundtable(true) clears controlPermission (mode radio group)', () => {
+    useDraftStore.getState().ensureDraft('chat')
+    useDraftStore.getState().setControlPermission(true)
+    expect(useDraftStore.getState().draft?.controlPermission).toBe(true)
+    useDraftStore.getState().setRoundtable(true)
+    expect(useDraftStore.getState().draft?.roundtable).toBe(true)
+    expect(useDraftStore.getState().draft?.controlPermission).toBeUndefined()
+  })
+  it('setControlPermission(true) clears roundtable (mode radio group)', () => {
+    useDraftStore.getState().ensureDraft('chat')
+    useDraftStore.getState().setRoundtable(true)
+    expect(useDraftStore.getState().draft?.roundtable).toBe(true)
+    useDraftStore.getState().setControlPermission(true)
+    expect(useDraftStore.getState().draft?.controlPermission).toBe(true)
+    expect(useDraftStore.getState().draft?.roundtable).toBeUndefined()
+  })
 })
 
 describe('draftStore agentId', () => {

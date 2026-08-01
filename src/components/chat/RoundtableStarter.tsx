@@ -1,13 +1,13 @@
 import { useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Check, ChevronDown, MessagesSquare, ShieldAlert, Users } from 'lucide-react'
+import { ChevronDown, MessagesSquare, ShieldAlert, Users } from 'lucide-react'
 import { useDraftStore } from '@/store/draftStore'
 import { ComposerChip } from './ComposerChip'
 import {
   DropdownMenu,
   DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem,
   DropdownMenuTrigger,
 } from '@/components/ui/DropdownMenu'
 import { cn } from '@/lib/utils'
@@ -19,12 +19,13 @@ interface RoundtableStarterProps {
 
 /**
  * Chat empty-state one-shot starter for roundtable framing, rendered as a mode
- * dropdown in the composer footer strip:
- * - Roundtable: toggleable now (arms the first-message framing).
+ * radio dropdown in the composer footer strip (single-select, one mode at a time):
+ * - Roundtable: selectable now (arms the first-message framing).
  * - Discussion mode: placeholder item, disabled until shipped.
- * - Control permission: toggleable now (high-risk — lifts the chat sandbox to
+ * - Control permission: selectable now (high-risk — lifts the chat sandbox to
  *   full machine access for the first committed session).
- * Visibility: parent only mounts on chat NewConversation when ROUNDTABLE_STARTER.
+ * Re-selecting the armed mode deselects it. Visibility: parent only mounts on
+ * chat NewConversation when ROUNDTABLE_STARTER.
  */
 export function RoundtableStarter({ disabled = false }: RoundtableStarterProps) {
   const { t } = useTranslation()
@@ -44,6 +45,7 @@ export function RoundtableStarter({ disabled = false }: RoundtableStarterProps) 
   // High-risk mode wins the chip face when armed.
   const danger = controlPermission
   const chipLabel = danger ? t('chat.roundtable.controlPermission') : t('chat.roundtable.chip')
+  const radioValue = danger ? 'controlPermission' : active ? 'roundtable' : ''
 
   return (
     <div className="flex min-w-0 items-center" data-testid="roundtable-starter">
@@ -76,59 +78,69 @@ export function RoundtableStarter({ disabled = false }: RoundtableStarterProps) 
           data-testid="roundtable-menu"
           onCloseAutoFocus={(e) => e.preventDefault()}
         >
-          <DropdownMenuItem
-            data-testid="roundtable-option"
-            onSelect={() => setRoundtable(!active)}
-            className="justify-between"
-          >
-            <span className="flex items-center gap-2.5">
-              <Users size={14} className="shrink-0 text-ink-tertiary" aria-hidden />
-              {t('chat.roundtable.chip')}
-            </span>
-            <Check
-              size={14}
-              className={cn('shrink-0 text-accent', active ? 'opacity-100' : 'opacity-0')}
-              aria-hidden
-            />
-          </DropdownMenuItem>
-          <DropdownMenuSeparator />
-          <DropdownMenuItem
-            disabled
-            data-testid="discussion-option"
-            title={t('chat.roundtable.comingSoon')}
-            className="justify-between"
-          >
-            <span className="flex items-center gap-2.5">
-              <MessagesSquare size={14} className="shrink-0 text-ink-tertiary" aria-hidden />
-              {t('chat.roundtable.discussion')}
-            </span>
-            <span
-              className="rounded bg-surface-muted px-1.5 py-px text-caption font-medium text-ink-tertiary"
-              data-testid="discussion-coming-soon"
+          <DropdownMenuRadioGroup value={radioValue}>
+            <DropdownMenuRadioItem
+              value="roundtable"
+              data-testid="roundtable-option"
+              onSelect={() => setRoundtable(!active)}
+              className="justify-between"
             >
-              {t('chat.roundtable.comingSoon')}
-            </span>
-          </DropdownMenuItem>
-          <DropdownMenuItem
-            data-testid="control-permission-option"
-            onSelect={() => setControlPermission(!controlPermission)}
-            title={t('chat.roundtable.controlPermissionHint')}
-            className="justify-between"
-          >
-            <span className="flex items-center gap-2.5">
-              <ShieldAlert
-                size={14}
-                className={cn('shrink-0', controlPermission ? 'text-danger' : 'text-ink-tertiary')}
-                aria-hidden
-              />
-              {t('chat.roundtable.controlPermission')}
-            </span>
-            <Check
-              size={14}
-              className={cn('shrink-0 text-danger', controlPermission ? 'opacity-100' : 'opacity-0')}
-              aria-hidden
-            />
-          </DropdownMenuItem>
+              <span className="flex min-w-0 items-center gap-2.5">
+                <span
+                  aria-hidden
+                  className="flex h-3.5 w-3.5 shrink-0 items-center justify-center rounded-full border border-ink-tertiary transition-colors group-data-[state=checked]:border-accent"
+                >
+                  <span className="h-1.5 w-1.5 rounded-full bg-transparent transition-colors group-data-[state=checked]:bg-accent" />
+                </span>
+                <Users size={14} className="shrink-0 text-ink-tertiary" aria-hidden />
+                {t('chat.roundtable.chip')}
+              </span>
+            </DropdownMenuRadioItem>
+            <DropdownMenuRadioItem
+              value="discussion"
+              disabled
+              data-testid="discussion-option"
+              title={t('chat.roundtable.comingSoon')}
+              className="justify-between"
+            >
+              <span className="flex min-w-0 items-center gap-2.5">
+                <span
+                  aria-hidden
+                  className="flex h-3.5 w-3.5 shrink-0 items-center justify-center rounded-full border border-ink-tertiary"
+                />
+                <MessagesSquare size={14} className="shrink-0 text-ink-tertiary" aria-hidden />
+                {t('chat.roundtable.discussion')}
+              </span>
+              <span
+                className="rounded bg-surface-muted px-1.5 py-px text-caption font-medium text-ink-tertiary"
+                data-testid="discussion-coming-soon"
+              >
+                {t('chat.roundtable.comingSoon')}
+              </span>
+            </DropdownMenuRadioItem>
+            <DropdownMenuRadioItem
+              value="controlPermission"
+              data-testid="control-permission-option"
+              onSelect={() => setControlPermission(!controlPermission)}
+              title={t('chat.roundtable.controlPermissionHint')}
+              className="justify-between"
+            >
+              <span className="flex min-w-0 items-center gap-2.5">
+                <span
+                  aria-hidden
+                  className="flex h-3.5 w-3.5 shrink-0 items-center justify-center rounded-full border border-ink-tertiary transition-colors group-data-[state=checked]:border-danger"
+                >
+                  <span className="h-1.5 w-1.5 rounded-full bg-transparent transition-colors group-data-[state=checked]:bg-danger" />
+                </span>
+                <ShieldAlert
+                  size={14}
+                  className={cn('shrink-0', controlPermission ? 'text-danger' : 'text-ink-tertiary')}
+                  aria-hidden
+                />
+                {t('chat.roundtable.controlPermission')}
+              </span>
+            </DropdownMenuRadioItem>
+          </DropdownMenuRadioGroup>
         </DropdownMenuContent>
       </DropdownMenu>
     </div>

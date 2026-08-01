@@ -7,6 +7,8 @@ export const DropdownMenu = DropdownPrimitive.Root
 export const DropdownMenuTrigger = DropdownPrimitive.Trigger
 /** Groups label+items so Radix roving-focus keeps keyboard nav within/between groups. */
 export const DropdownMenuGroup = DropdownPrimitive.Group
+/** Radio select group — exactly one item checked; value/onValueChange like a form radio. */
+export const DropdownMenuRadioGroup = DropdownPrimitive.RadioGroup
 
 export const DropdownMenuContent = forwardRef<
   React.ElementRef<typeof DropdownPrimitive.Content>,
@@ -45,6 +47,23 @@ export const DropdownMenuItem = forwardRef<
   />
 ))
 DropdownMenuItem.displayName = 'DropdownMenuItem'
+
+export const DropdownMenuRadioItem = forwardRef<
+  React.ElementRef<typeof DropdownPrimitive.RadioItem>,
+  React.ComponentPropsWithoutRef<typeof DropdownPrimitive.RadioItem>
+>(({ className, ...props }, ref) => (
+  <DropdownPrimitive.RadioItem
+    ref={ref}
+    role="menuitemradio"
+    className={cn(
+      'group flex cursor-pointer items-center gap-2.5 rounded-md px-2.5 py-1.5 text-body text-ink outline-none transition-[background-color,color] duration-chrome ease-out',
+      'focus:bg-state-hover data-[disabled]:opacity-50',
+      className,
+    )}
+    {...props}
+  />
+))
+DropdownMenuRadioItem.displayName = 'DropdownMenuRadioItem'
 
 export const DropdownMenuSeparator = forwardRef<
   React.ElementRef<typeof DropdownPrimitive.Separator>,

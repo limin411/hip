@@ -28,12 +28,14 @@ export interface Draft {
   /**
    * Chat empty-state one-shot: first message gets roundtable framing.
    * Cleared on draft reset after session commit. Ignored for project/code drafts.
+   * Mode radio group: mutually exclusive with controlPermission.
    */
   roundtable?: boolean
   /**
    * Chat empty-state one-shot: grants full machine access (permissionMode 'full')
    * for the committed chat session — high-risk. Cleared on draft reset after
    * session commit. Ignored for project/code drafts.
+   * Mode radio group: mutually exclusive with roundtable.
    */
   controlPermission?: boolean
 }
@@ -166,7 +168,9 @@ export const useDraftStore = create<DraftStore>()(
           if (base.mode === 'project') {
             return { draft: { ...base, roundtable: undefined } }
           }
-          return { draft: { ...base, roundtable: true } }
+          // Mode radio group: arming roundtable clears controlPermission.
+          const { controlPermission: _c, ...rest } = base
+          return { draft: { ...rest, roundtable: true } }
         }),
       setControlPermission: (controlPermission) =>
         set((s) => {
@@ -180,7 +184,9 @@ export const useDraftStore = create<DraftStore>()(
           if (base.mode === 'project') {
             return { draft: { ...base, controlPermission: undefined } }
           }
-          return { draft: { ...base, controlPermission: true } }
+          // Mode radio group: arming controlPermission clears roundtable.
+          const { roundtable: _r, ...rest } = base
+          return { draft: { ...rest, controlPermission: true } }
         }),
       reset: () => set({ draft: null }),
     }),

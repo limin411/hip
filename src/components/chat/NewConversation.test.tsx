@@ -57,6 +57,28 @@ vi.mock('@/components/ui/DropdownMenu', async () => {
         },
         children,
       ),
+    DropdownMenuRadioGroup: ({ children }: { children: React.ReactNode }) =>
+      R.createElement(R.Fragment, null, children),
+    DropdownMenuRadioItem: ({
+      children,
+      onSelect,
+      disabled,
+      ...rest
+    }: {
+      children: React.ReactNode
+      onSelect?: () => void
+      disabled?: boolean
+      'data-testid'?: string
+    }) =>
+      R.createElement(
+        'div',
+        {
+          'data-testid': rest['data-testid'],
+          'aria-disabled': disabled ? 'true' : undefined,
+          onClick: () => onSelect?.(),
+        },
+        children,
+      ),
   }
 })
 
@@ -180,16 +202,21 @@ describe('NewConversation', () => {
     expect(useDraftStore.getState().draft?.roundtable).toBeUndefined()
   })
 
-  it('control permission mode in the mode dropdown arms full machine access for the first chat', () => {
+  it('control permission mode is a radio option: arms full machine access and clears roundtable', () => {
     setDraftModel('openai/gpt-4o')
     render(<NewConversation />)
-    // Listed below the discussion placeholder; toggles the draft flag.
+    // Listed below the discussion placeholder; single-select radio for the first chat.
     expect(screen.getByTestId('control-permission-option')).toBeInTheDocument()
     expect(useDraftStore.getState().draft?.controlPermission).toBeUndefined()
     fireEvent.click(screen.getByTestId('control-permission-option'))
     expect(useDraftStore.getState().draft?.controlPermission).toBe(true)
-    fireEvent.click(screen.getByTestId('control-permission-option'))
+    // Radio semantics: arming roundtable clears control permission.
+    fireEvent.click(screen.getByTestId('roundtable-option'))
+    expect(useDraftStore.getState().draft?.roundtable).toBe(true)
     expect(useDraftStore.getState().draft?.controlPermission).toBeUndefined()
+    // Re-selecting the armed mode deselects it.
+    fireEvent.click(screen.getByTestId('roundtable-option'))
+    expect(useDraftStore.getState().draft?.roundtable).toBeUndefined()
   })
 
   it('hides roundtable starter on code surface', () => {

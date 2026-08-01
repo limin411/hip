@@ -239,7 +239,7 @@ export function Composer({
       {footer ? (
         <div
           className={cn(
-            'mt-2 flex flex-wrap items-center gap-0.5 border-t border-border/60 pt-1.5',
+            'mt-1 flex flex-wrap items-center gap-0.5 border-t border-border/60 pt-1',
             isCard && 'px-0.5',
           )}
           data-testid="composer-footer"

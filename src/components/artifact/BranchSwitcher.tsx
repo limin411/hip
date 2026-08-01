@@ -123,13 +123,14 @@ export function BranchSwitcher() {
             type="button"
             data-testid="branch-chip"
             title={t('artifact.branch.current')}
+            size="sm"
           >
-            <GitBranch size={13} strokeWidth={1.75} className="shrink-0" />
+            <GitBranch size={11} strokeWidth={1.75} className="shrink-0" />
             <span className="max-w-[120px] truncate">
               {current ?? t('artifact.branch.noBranch')}
               {isIsolated ? ` · ${t('artifact.branch.inWorktree')}` : ''}
             </span>
-            <ChevronDown size={13} strokeWidth={1.75} className="shrink-0 opacity-60" />
+            <ChevronDown size={11} strokeWidth={1.75} className="shrink-0 opacity-60" />
           </ComposerChip>
         </DropdownMenuTrigger>
         <DropdownMenuContent

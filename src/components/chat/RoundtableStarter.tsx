@@ -42,6 +42,7 @@ export function RoundtableStarter({ disabled = false }: RoundtableStarterProps) 
             type="button"
             disabled={disabled}
             active={active}
+            size="sm"
             data-testid="roundtable-chip"
             title={disabled ? t('chat.roundtable.disabledHint') : t('chat.roundtable.chipHint')}
             aria-haspopup="menu"
@@ -49,9 +50,9 @@ export function RoundtableStarter({ disabled = false }: RoundtableStarterProps) 
               active && 'border border-effort-max bg-state-active text-ink shadow-sm',
             )}
           >
-            <Users size={13} strokeWidth={1.75} className={cn('shrink-0', active && 'text-effort-max')} aria-hidden />
+            <Users size={11} strokeWidth={1.75} className={cn('shrink-0', active && 'text-effort-max')} aria-hidden />
             <span className="max-w-[120px] truncate">{t('chat.roundtable.chip')}</span>
-            <ChevronDown size={13} strokeWidth={1.75} className="shrink-0 opacity-60" aria-hidden />
+            <ChevronDown size={11} strokeWidth={1.75} className="shrink-0 opacity-60" aria-hidden />
           </ComposerChip>
         </DropdownMenuTrigger>
         <DropdownMenuContent

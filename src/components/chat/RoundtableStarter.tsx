@@ -47,7 +47,7 @@ export function RoundtableStarter({ disabled = false }: RoundtableStarterProps) 
             title={disabled ? t('chat.roundtable.disabledHint') : t('chat.roundtable.chipHint')}
             aria-haspopup="menu"
             className={cn(
-              active && 'border border-effort-max bg-state-active text-ink shadow-sm',
+              active && 'border border-effort-max bg-state-active text-ink',
             )}
           >
             <Users size={11} strokeWidth={1.75} className={cn('shrink-0', active && 'text-effort-max')} aria-hidden />

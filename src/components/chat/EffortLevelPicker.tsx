@@ -81,7 +81,7 @@ export function EffortIntensityMeter({
               n <= 2 && i === 1 && 'h-2.5',
               on
                 ? maxBudget && isTopTick
-                  ? 'bg-effort-max-node shadow-[0_0_4px_rgba(168,85,247,0.55)]'
+                  ? 'bg-effort-max-node'
                   : maxBudget
                     ? 'bg-effort-max-node opacity-80'
                     : 'bg-ink'

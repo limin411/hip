@@ -89,7 +89,7 @@ function RoundtableSectionBlock({
           isStage &&
             'rounded-lg border-l-4 border-l-effort-max border border-border/80 bg-surface-muted/50 px-3 py-2',
           isDecision &&
-            'rounded-lg border border-effort-max/40 bg-surface-muted/40 px-3 py-2 shadow-sm',
+            'rounded-lg border border-effort-max/40 bg-surface-muted/40 px-3 py-2',
         )}
       >
         {section.title ? (

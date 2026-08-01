@@ -47,6 +47,7 @@ import { useManagedTerminalStore } from '@/store/managedTerminalStore'
 import { useFocusStore } from '@/store/focusStore'
 import { seedNavHistoryIfEmpty } from '@/components/layout/navHistory'
 import { WindowLifecycleHost } from '@/components/window/WindowLifecycleHost'
+import { widenWindowForRightPanel } from '@/lib/rightPanelWidth'
 
 /** Right rail must stay wide enough that the titlebar chrome + content breathe (~280px).
  *  react-resizable-panels minSize is group-relative %, so convert the pixel floor against the
@@ -159,14 +160,26 @@ export function AppLayout() {
     terminalPanelOpen
   const rightOpen = codeOpen || chatOpen || knowledgeOpen || terminalsOpen
 
+  // Sync the collapsible rail with rightOpen. When opening, widen the window first
+  // so the main content area can host the rail (falls back when the screen is too small).
   useEffect(() => {
     const p = rightPanelRef.current
     if (!p) return
-    const t = setTimeout(() => {
-      if (rightOpen && p.isCollapsed()) p.expand()
-      if (!rightOpen && !p.isCollapsed()) p.collapse()
-    }, 0)
-    return () => clearTimeout(t)
+    let cancelled = false
+    const run = async () => {
+      if (rightOpen) {
+        const { sidebarOpen, sidebarWidth } = useUiStore.getState()
+        await widenWindowForRightPanel(sidebarOpen, sidebarWidth)
+        if (cancelled) return
+        if (p.isCollapsed()) p.expand()
+      } else if (!p.isCollapsed()) {
+        p.collapse()
+      }
+    }
+    void run()
+    return () => {
+      cancelled = true
+    }
   }, [rightOpen])
 
   const handleCollapse = () => {
@@ -266,7 +279,7 @@ export function AppLayout() {
       {sidebarOpen ? <AppSidebar /> : null}
       {/* Measure the group width via a plain div — PanelGroup's own ref is an
           ImperativePanelGroupHandle, not the DOM node. */}
-      <div ref={groupRef} className="flex min-w-0 flex-1 flex-col bg-surface">
+      <div ref={groupRef} data-main-content-group className="flex min-w-0 flex-1 flex-col bg-surface">
         <PanelGroup direction="horizontal" className="min-h-0 min-w-0 flex-1">
           {/* Main column only: warm paper; left AppSidebar + right drawer stay neutral surface. */}
           <Panel minSize={34} className="flex min-w-0 flex-col bg-surface-content">

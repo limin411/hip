@@ -3,7 +3,7 @@ import { worktreeProvider } from './worktree'
 import type { ContextMenuBuildContext } from '../types'
 
 const openWorktreeDeleteDialog = vi.fn()
-const selectSessionFromSidebar = vi.fn()
+const openWorktreeSession = vi.fn()
 const toastSuccess = vi.fn()
 const toastError = vi.fn()
 
@@ -11,8 +11,8 @@ vi.mock('@/components/chat/WorktreeControl/worktreeDeleteDialogStore', () => ({
   openWorktreeDeleteDialog: (...a: unknown[]) => openWorktreeDeleteDialog(...a),
 }))
 
-vi.mock('@/components/layout/sidebarActions', () => ({
-  selectSessionFromSidebar: (...a: unknown[]) => selectSessionFromSidebar(...a),
+vi.mock('@/lib/worktreeOpenAction', () => ({
+  openWorktreeSession: (...a: unknown[]) => openWorktreeSession(...a),
 }))
 
 vi.mock('sonner', () => ({
@@ -38,7 +38,7 @@ function makeCtx(): ContextMenuBuildContext {
 describe('worktreeProvider', () => {
   beforeEach(() => {
     openWorktreeDeleteDialog.mockReset()
-    selectSessionFromSidebar.mockReset()
+    openWorktreeSession.mockReset()
     toastSuccess.mockReset()
     toastError.mockReset()
   })
@@ -88,7 +88,7 @@ describe('worktreeProvider', () => {
     })
   })
 
-  it('open selects slot when present', () => {
+  it('open resolves worktree session via openWorktreeSession', () => {
     const items = worktreeProvider(
       {
         kind: 'worktree',
@@ -102,6 +102,12 @@ describe('worktreeProvider', () => {
       makeCtx(),
     )
     items.find((i) => i.id === 'worktree.openHost')!.run()
-    expect(selectSessionFromSidebar).toHaveBeenCalledWith('slot-1')
+    expect(openWorktreeSession).toHaveBeenCalledWith(
+      expect.objectContaining({
+        path: '/wt/a',
+        hostSessionId: 'host',
+        slotSessionId: 'slot-1',
+      }),
+    )
   })
 })

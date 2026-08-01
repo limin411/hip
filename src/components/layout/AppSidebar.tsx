@@ -51,6 +51,8 @@ import {
   nestableCatalogPaths,
 } from '@/lib/worktreeNesting'
 import { resolveWorktreeSourceLabel } from '@/lib/worktreeHitlLabels'
+import { openWorktreeSession } from '@/lib/worktreeOpenAction'
+import { resolveWorktreeOpenTarget } from '@/lib/worktreeOpenTarget'
 import {
   isPlaceholderSidebarSection,
   useUiStore,
@@ -1102,10 +1104,36 @@ function CatalogWorktreeRow({
   hostSessionId: string
 }) {
   const { t } = useTranslation()
+  const sessions = useSessions()
+  const activeSessionId = useActiveSessionId()
+  const activeView = useUiStore((s) => s.activeView)
   const pathLabel = shortWorktreeLabel(row.path, row.branch)
   const label = row.label || row.branch || pathLabel
   // After PR7 source wire: humanize known enums; never leak raw WorktreeSource strings (D18).
   const sourceLabel = resolveWorktreeSourceLabel(row.source, t)
+  const openTarget = resolveWorktreeOpenTarget({
+    path: row.path,
+    hostSessionId,
+    isPrimary: row.isPrimary,
+    sessions: sessions.map((s) => ({
+      id: s.id,
+      title: s.title,
+      config: { cwd: s.config.cwd },
+      status: s.status,
+      updatedAtMs: s.updatedAtMs,
+    })),
+    // Prefer any cwd match; full nest ranking is applied again in openWorktreeSession.
+    nestedSessionIds: new Set(
+      sessions
+        .filter((s) => s.id !== hostSessionId)
+        .map((s) => s.id),
+    ),
+  })
+  const active =
+    openTarget.kind === 'select' &&
+    openTarget.sessionId === activeSessionId &&
+    (activeView === 'chat' || activeView === 'code')
+
   return (
     <li>
       <DeclarativeContextMenu
@@ -1116,6 +1144,10 @@ function CatalogWorktreeRow({
           label,
           branch: row.branch || undefined,
           worktreeId: row.id,
+          slotSessionId:
+            openTarget.kind === 'select' && openTarget.sessionId !== hostSessionId
+              ? openTarget.sessionId
+              : undefined,
         }}
         className="mb-0.5 block w-full"
       >
@@ -1123,12 +1155,20 @@ function CatalogWorktreeRow({
           type="button"
           data-testid={`sidebar-catalog-wt-${row.id}`}
           data-no-drag
-          onClick={() => void selectSessionFromSidebar(hostSessionId)}
+          aria-current={active ? 'true' : undefined}
+          onClick={() =>
+            void openWorktreeSession({
+              path: row.path,
+              hostSessionId,
+              isPrimary: row.isPrimary,
+              t: (key, opts) => String(opts ? t(key as never, opts as never) : t(key as never)),
+            })
+          }
           title={row.path}
           className={cn(
             'flex w-full items-start gap-2 rounded-lg py-1.5 pl-3 pr-2 text-left transition-colors',
             'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink/20',
-            'hover:bg-state-hover',
+            active ? SIDEBAR_ACTIVE_RAIL : 'hover:bg-state-hover',
           )}
         >
           <GitBranch size={12} strokeWidth={1.75} className="mt-0.5 shrink-0 text-ink-tertiary" aria-hidden />
@@ -1158,12 +1198,35 @@ function WorktreeSlotRow({
 }) {
   const { t } = useTranslation()
   const sessions = useSessions()
-  const session = slot.sessionId ? sessions.find((s) => s.id === slot.sessionId) : undefined
+  const openTarget = resolveWorktreeOpenTarget({
+    path: slot.worktreePath,
+    hostSessionId: run.hostSessionId ?? '',
+    slotSessionId: slot.sessionId || undefined,
+    slotTaskId: slot.taskId || undefined,
+    sessions: sessions.map((s) => ({
+      id: s.id,
+      title: s.title,
+      config: { cwd: s.config.cwd },
+      status: s.status,
+      updatedAtMs: s.updatedAtMs,
+    })),
+    nestedSessionIds: new Set(
+      sessions
+        .filter((s) => s.id !== run.hostSessionId)
+        .map((s) => s.id),
+    ),
+  })
+  const boundSessionId = openTarget.kind === 'select' ? openTarget.sessionId : undefined
+  const session = boundSessionId
+    ? sessions.find((s) => s.id === boundSessionId)
+    : slot.sessionId
+      ? sessions.find((s) => s.id === slot.sessionId)
+      : undefined
   const active =
-    !!slot.sessionId &&
-    slot.sessionId === activeSessionId &&
+    !!boundSessionId &&
+    boundSessionId === activeSessionId &&
     (activeView === 'chat' || activeView === 'code')
-  const isWinner = !!slot.sessionId && run.selectedSessionId === slot.sessionId
+  const isWinner = !!boundSessionId && run.selectedSessionId === boundSessionId
   const key = slot.sessionId || slot.taskId || `${run.id}-${slot.index}`
   const isAgentSlot = run.source === 'agent' || (!!slot.taskId && !slot.sessionId)
   const pathLabel = shortWorktreeLabel(slot.worktreePath, slot.branch)
@@ -1179,8 +1242,20 @@ function WorktreeSlotRow({
       aria-current={active ? 'true' : undefined}
       aria-busy={running || undefined}
       onClick={() => {
-        if (slot.sessionId) void selectSessionFromSidebar(slot.sessionId)
-        else if (run.hostSessionId) void selectSessionFromSidebar(run.hostSessionId)
+        if (!run.hostSessionId) return
+        // Still creating — no path to resolve yet.
+        if (!slot.worktreePath) {
+          if (slot.sessionId) void selectSessionFromSidebar(slot.sessionId)
+          else void selectSessionFromSidebar(run.hostSessionId)
+          return
+        }
+        void openWorktreeSession({
+          path: slot.worktreePath,
+          hostSessionId: run.hostSessionId,
+          slotSessionId: slot.sessionId || undefined,
+          slotTaskId: slot.taskId || undefined,
+          t: (key, opts) => String(opts ? t(key as never, opts as never) : t(key as never)),
+        })
       }}
       onDoubleClick={() => {
         if (slot.sessionId) sessionService.selectParallelWinner(run.id, slot.sessionId)

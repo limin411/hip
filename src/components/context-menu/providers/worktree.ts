@@ -1,6 +1,6 @@
 import { toast } from 'sonner'
 import { openWorktreeDeleteDialog } from '@/components/chat/WorktreeControl/worktreeDeleteDialogStore'
-import { selectSessionFromSidebar } from '@/components/layout/sidebarActions'
+import { openWorktreeSession } from '@/lib/worktreeOpenAction'
 import type { ContextMenuItemDef, ContextProvider } from '../types'
 
 /** Nested worktree row: open host/slot, copy path, delete (confirm Modal + dirty progressive force). */
@@ -17,7 +17,12 @@ export const worktreeProvider: ContextProvider = (req, ctx) => {
       label: t('contextMenu.worktree.openHost'),
       group: 'primary',
       run: () => {
-        void selectSessionFromSidebar(slotSessionId || hostSessionId)
+        void openWorktreeSession({
+          path: worktreePath,
+          hostSessionId,
+          slotSessionId,
+          t,
+        })
       },
     },
     {

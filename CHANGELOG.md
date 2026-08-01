@@ -7,6 +7,23 @@ and this project aims to follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Changed
+
+- **Flat design visual overhaul** (`docs/flat-design-spec.md`):
+  - Surfaces are solid — native window vibrancy (macOS Sidebar / Win11 Mica /
+    Win10 Acrylic) removed; window theme sync kept. `data-vibrancy` is always `solid`.
+  - Hierarchy via 1px borders and value steps instead of shadows/translucency:
+    radii 2–6px (buttons/inputs 2px, cards 4px, overlays 6px), `shadow-panel` /
+    `shadow-menu` removed, overlay shadow weakened to one light tier.
+  - Effort-max holographic chrome flattened to solid purple (no shimmer/glow/pulse).
+  - Motion is fade-only and fast: durations 100/120/200ms, no translate/scale,
+    no springy easing; `active:scale-*` removed; send/stop and jump-to-latest
+    buttons are square (rounded-md) instead of round.
+  - Scrims are plain (no backdrop blur); avatar gradient replaced with solid accent.
+- Fixed pre-existing issues blocking `yarn tsc`: duplicated whiteboard export keys
+  in en/ja/ko/zh-CN i18n, unused `emptySel` in knowledgeStore tests, and a `never`
+  type in boardOps tests.
+
 ### Added
 
 - **Composer voice dictation** (local [whisper.cpp](https://github.com/ggml-org/whisper.cpp)):

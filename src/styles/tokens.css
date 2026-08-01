@@ -28,11 +28,11 @@
    * 主列内容区另用 --bg-content（淡黄纸感），左右边栏仍走 --bg-app / --bg-subtle。
    */
   --bg-app: #ffffff;
-  --bg-subtle: #f6f6f6;
-  --bg-muted: #eeeeee;
+  --bg-subtle: #ffffff;
+  --bg-muted: #f2f2f2;
   --bg-content: #ffffff; /* 仅主内容列：淡暖黄 / 奶油纸（略深于极淡） */
-  --border: #d4d4d4;
-  --border-strong: #bdbdbd; /* 需要明确分隔时（输入框、卡片外框） */
+  --border: #bdbdbd;
+  --border-strong: #a0a0a0; /* 需要明确分隔时（输入框、卡片外框） */
   --text-primary: #111111;
   --text-secondary: #5e5e5e;
   --text-tertiary: #757575; /* AA ~4.4:1 on bg-app —— 时间戳/占位符/元数据可读 */

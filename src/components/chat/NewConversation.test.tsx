@@ -189,6 +189,8 @@ describe('NewConversation', () => {
     ).toBeInTheDocument()
     // Mode radio dropdown.
     expect(screen.getByTestId('roundtable-menu')).toBeInTheDocument()
+    // Unarmed chip reads "Mode selection".
+    expect(screen.getByTestId('roundtable-chip')).toHaveTextContent('Mode selection')
     // Roundtable item toggles the draft flag.
     expect(useDraftStore.getState().draft?.roundtable).toBeUndefined()
     fireEvent.click(screen.getByTestId('roundtable-option'))

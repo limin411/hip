@@ -1,6 +1,6 @@
 import { useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
-import { ChevronDown, ShieldAlert, Users } from 'lucide-react'
+import { Check, ChevronDown, ShieldAlert, SlidersHorizontal, Users } from 'lucide-react'
 import { useDraftStore } from '@/store/draftStore'
 import { ComposerChip } from './ComposerChip'
 import {
@@ -23,8 +23,9 @@ interface RoundtableStarterProps {
  * - Roundtable: selectable now (arms the first-message framing).
  * - Control permission: selectable now (high-risk — lifts the chat sandbox to
  *   full machine access for the first committed session).
- * Re-selecting the armed mode deselects it. Visibility: parent only mounts on
- * chat NewConversation when ROUNDTABLE_STARTER.
+ * Re-selecting the armed mode deselects it; the chip falls back to a neutral
+ * "Mode selection" label. Visibility: parent only mounts on chat NewConversation
+ * when ROUNDTABLE_STARTER.
  */
 export function RoundtableStarter({ disabled = false }: RoundtableStarterProps) {
   const { t } = useTranslation()
@@ -43,7 +44,11 @@ export function RoundtableStarter({ disabled = false }: RoundtableStarterProps) 
 
   // High-risk mode wins the chip face when armed.
   const danger = controlPermission
-  const chipLabel = danger ? t('chat.roundtable.controlPermission') : t('chat.roundtable.chip')
+  const chipLabel = danger
+    ? t('chat.roundtable.controlPermission')
+    : active
+      ? t('chat.roundtable.chip')
+      : t('chat.roundtable.modeSelect')
   const radioValue = danger ? 'controlPermission' : active ? 'roundtable' : ''
 
   return (
@@ -65,8 +70,10 @@ export function RoundtableStarter({ disabled = false }: RoundtableStarterProps) 
           >
             {danger ? (
               <ShieldAlert size={11} strokeWidth={1.75} className="shrink-0" aria-hidden />
+            ) : active ? (
+              <Users size={11} strokeWidth={1.75} className="shrink-0 text-effort-max" aria-hidden />
             ) : (
-              <Users size={11} strokeWidth={1.75} className={cn('shrink-0', active && 'text-effort-max')} aria-hidden />
+              <SlidersHorizontal size={11} strokeWidth={1.75} className="shrink-0 opacity-70" aria-hidden />
             )}
             <span className="max-w-[120px] truncate">{chipLabel}</span>
             <ChevronDown size={11} strokeWidth={1.75} className="shrink-0 opacity-60" aria-hidden />
@@ -82,33 +89,30 @@ export function RoundtableStarter({ disabled = false }: RoundtableStarterProps) 
               value="roundtable"
               data-testid="roundtable-option"
               onSelect={() => setRoundtable(!active)}
-              className="justify-between"
+              className="justify-between data-[state=checked]:bg-accent/10"
             >
               <span className="flex min-w-0 items-center gap-2.5">
-                <span
+                <Users
+                  size={14}
+                  className={cn('shrink-0', active ? 'text-accent' : 'text-ink-tertiary')}
                   aria-hidden
-                  className="flex h-3.5 w-3.5 shrink-0 items-center justify-center rounded-full border border-ink-tertiary transition-colors group-data-[state=checked]:border-accent"
-                >
-                  <span className="h-1.5 w-1.5 rounded-full bg-transparent transition-colors group-data-[state=checked]:bg-accent" />
-                </span>
-                <Users size={14} className="shrink-0 text-ink-tertiary" aria-hidden />
+                />
                 {t('chat.roundtable.chip')}
               </span>
+              <Check
+                size={14}
+                className={cn('shrink-0 text-accent', active ? 'opacity-100' : 'opacity-0')}
+                aria-hidden
+              />
             </DropdownMenuRadioItem>
             <DropdownMenuRadioItem
               value="controlPermission"
               data-testid="control-permission-option"
               onSelect={() => setControlPermission(!controlPermission)}
               title={t('chat.roundtable.controlPermissionHint')}
-              className="justify-between"
+              className="justify-between data-[state=checked]:bg-danger/10"
             >
               <span className="flex min-w-0 items-center gap-2.5">
-                <span
-                  aria-hidden
-                  className="flex h-3.5 w-3.5 shrink-0 items-center justify-center rounded-full border border-ink-tertiary transition-colors group-data-[state=checked]:border-danger"
-                >
-                  <span className="h-1.5 w-1.5 rounded-full bg-transparent transition-colors group-data-[state=checked]:bg-danger" />
-                </span>
                 <ShieldAlert
                   size={14}
                   className={cn('shrink-0', controlPermission ? 'text-danger' : 'text-ink-tertiary')}
@@ -116,6 +120,11 @@ export function RoundtableStarter({ disabled = false }: RoundtableStarterProps) 
                 />
                 {t('chat.roundtable.controlPermission')}
               </span>
+              <Check
+                size={14}
+                className={cn('shrink-0 text-danger', controlPermission ? 'opacity-100' : 'opacity-0')}
+                aria-hidden
+              />
             </DropdownMenuRadioItem>
           </DropdownMenuRadioGroup>
         </DropdownMenuContent>

@@ -116,8 +116,12 @@ export function FilePreview() {
       cwd,
       undefined,
       preview.mimeType,
-      <div className="h-full overflow-auto p-4" data-testid="preview-image">
-        <img alt={preview.path} src={`data:${preview.mimeType};base64,${preview.content}`} className="max-w-full" />
+      <div className="relative h-full min-h-0 overflow-hidden bg-surface-muted" data-testid="preview-image">
+        <img
+          alt={preview.path}
+          src={`data:${preview.mimeType};base64,${preview.content}`}
+          className="absolute inset-0 h-full w-full object-contain"
+        />
       </div>,
     )
   }

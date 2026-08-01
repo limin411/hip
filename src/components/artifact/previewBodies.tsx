@@ -599,7 +599,9 @@ export function HtmlPreviewBody({
               // allow-scripts: in-page TOC jump (srcDoc hash nav blanks WebView).
               // No allow-same-origin → script cannot touch parent app.
               sandbox="allow-scripts"
-              className="absolute inset-0 h-full w-full border-0 bg-white"
+              // Transparent: parent supplies page bg; avoids white gutter beside dark srcDoc scrollbars.
+              className="absolute inset-0 h-full w-full border-0 bg-transparent"
+              style={{ colorScheme: 'light dark' }}
               srcDoc={srcDoc}
             />
           )}

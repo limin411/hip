@@ -19,9 +19,17 @@ describe('shouldAutoRenderHtml', () => {
 })
 
 describe('htmlForIframe', () => {
-  it('passes through under the hard cap', () => {
-    const r = htmlForIframe('<html></html>')
-    expect(r).toEqual({ srcDoc: '<html></html>', hardTruncated: false })
+  it('injects thin scrollbar chrome under the hard cap', () => {
+    const r = htmlForIframe('<html><head></head><body>x</body></html>')
+    expect(r.hardTruncated).toBe(false)
+    expect(r.srcDoc).toContain('data-hip-preview-chrome')
+    expect(r.srcDoc).toContain('::-webkit-scrollbar')
+    expect(r.srcDoc).toContain('<body>x</body>')
+  })
+  it('is idempotent when chrome is already present', () => {
+    const once = htmlForIframe('<html><head></head></html>').srcDoc
+    const twice = htmlForIframe(once).srcDoc
+    expect(twice.match(/data-hip-preview-chrome/g)).toHaveLength(1)
   })
   it('hard-truncates oversized content within the hard cap', () => {
     const big = 'a'.repeat(HTML_IFRAME_HARD_MAX_CHARS + 50)
@@ -29,7 +37,8 @@ describe('htmlForIframe', () => {
     expect(r.hardTruncated).toBe(true)
     expect(r.srcDoc.length).toBeLessThanOrEqual(HTML_IFRAME_HARD_MAX_CHARS)
     expect(r.srcDoc.length).toBeLessThan(big.length)
-    expect(r.srcDoc.startsWith('a'.repeat(100))).toBe(true)
+    expect(r.srcDoc).toContain('a'.repeat(100))
     expect(r.srcDoc).toContain('truncated for performance')
+    expect(r.srcDoc).toContain('data-hip-preview-chrome')
   })
 })

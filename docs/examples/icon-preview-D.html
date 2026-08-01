@@ -1,0 +1,683 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="light" data-size="16" data-stroke="1.6" data-layers="hierarchical">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>hip 菜单图标系统 方案D（Hierarchical）— 视觉预览</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
+      "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei UI", sans-serif;
+    font-size: 13px; line-height: 1.6; -webkit-font-smoothing: antialiased;
+    background: #e9e7ee; color: #333; min-width: 900px;
+  }
+  html[data-theme="dark"] body { background: #14131a; color: #d6d6d6; }
+
+  .topbar {
+    position: sticky; top: 0; z-index: 50;
+    display: flex; align-items: center; justify-content: space-between; gap: 16px;
+    padding: 10px 22px; background: rgba(255,255,255,.92); border-bottom: 1px solid #e2e0e8;
+  }
+  html[data-theme="dark"] .topbar { background: rgba(24,23,31,.92); border-color: #2c2b33; }
+  .topbar h1 { font-size: 14px; font-weight: 650; display: flex; align-items: center; gap: 10px; }
+  .badge { font-size: 10.5px; font-weight: 600; color: #0d8a8a; border: 1px solid #a8d9d9; background: #e8f6f6; padding: 1px 7px; border-radius: 3px; }
+  html[data-theme="dark"] .badge { color: #2ee6e6; border-color: #1a5555; background: #0f2a2a; }
+  .badge.alt { color: #8a8792; border-color: #ddd; background: #f3f2f6; }
+  html[data-theme="dark"] .badge.alt { color: #8d8a97; border-color: #3a3944; background: #24232c; }
+  .controls { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+  .ctl { font-size: 12px; color: #777; }
+  html[data-theme="dark"] .ctl { color: #999; }
+  .btn {
+    appearance: none; border: 1px solid #ddd; cursor: pointer; font: inherit; font-size: 12px;
+    background: #fff; color: #444; padding: 4px 11px; border-radius: 3px;
+  }
+  .btn.on { background: #0d8a8a; border-color: #0d8a8a; color: #fff; }
+  html[data-theme="dark"] .btn { background: #24232c; border-color: #3a3944; color: #bbb; }
+  html[data-theme="dark"] .btn.on { background: #2ee6e6; border-color: #2ee6e6; color: #0a1a1a; }
+  .btn.ghost { background: transparent; border-color: transparent; color: #0d8a8a; text-decoration: underline; }
+  html[data-theme="dark"] .btn.ghost { color: #2ee6e6; }
+  input[type=range] { width: 120px; accent-color: #0d8a8a; }
+
+  .wrap { max-width: 1280px; margin: 0 auto; padding: 0 24px 60px; }
+  .hero { padding: 28px; margin-top: 22px; background: #fff; border: 1px solid #e2e0e8; border-radius: 6px; }
+  html[data-theme="dark"] .hero { background: #1c1b23; border-color: #2c2b33; }
+  .hero h2 { font-size: 19px; font-weight: 650; margin-bottom: 6px; }
+  .hero .lead { font-size: 13px; color: #666; max-width: 900px; }
+  html[data-theme="dark"] .hero .lead { color: #9c9aa5; }
+  .principles { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 14px; }
+  .principle { font-size: 12px; color: #555; border: 1px solid #e5e3ea; background: #faf9fc; padding: 3px 10px; border-radius: 3px; }
+  html[data-theme="dark"] .principle { color: #b8b6c2; border-color: #373640; background: #23222b; }
+  .principle b { color: #0d8a8a; }
+  html[data-theme="dark"] .principle b { color: #2ee6e6; }
+
+  .cases { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 12px; margin-top: 16px; }
+  .case { border: 1px solid #e5e3ea; border-radius: 5px; padding: 12px 14px; background: #faf9fc; }
+  html[data-theme="dark"] .case { background: #1f1e27; border-color: #2f2e38; }
+  .case h5 { font-size: 12px; font-weight: 650; margin-bottom: 4px; }
+  .case .src { font-size: 10px; color: #a09dab; font-weight: 500; }
+  .case p { font-size: 12px; color: #666; }
+  html[data-theme="dark"] .case p { color: #9c9aa5; }
+  .case code { font-family: ui-monospace, monospace; font-size: 10.5px; background: #f0eef4; padding: 0 4px; border-radius: 3px; }
+  html[data-theme="dark"] .case code { background: #2a2932; }
+
+  section.block { margin-top: 26px; }
+  .block-head { display: flex; align-items: baseline; gap: 12px; margin-bottom: 14px; }
+  .block-head h3 { font-size: 15px; font-weight: 650; }
+  .block-head .sub { font-size: 12px; color: #888; }
+  .card { background: #fff; border: 1px solid #e2e0e8; border-radius: 6px; overflow: hidden; }
+  html[data-theme="dark"] .card { background: #1c1b23; border-color: #2c2b33; }
+
+  .stage { display: flex; gap: 22px; flex-wrap: wrap; }
+  .stage-col { flex: 1 1 360px; min-width: 320px; }
+  .tag { font-size: 11px; padding: 1px 7px; border-radius: 3px; font-weight: 500; }
+  .tag-old { background: #f1f0f5; color: #666; }
+  html[data-theme="dark"] .tag-old { background: #2a2932; color: #999; }
+  .tag-new { background: #e8f6f6; color: #0d8a8a; }
+  html[data-theme="dark"] .tag-new { background: #0f2a2a; color: #2ee6e6; }
+  .stage-title { margin-bottom: 10px; font-size: 12.5px; font-weight: 600; }
+
+  .sidebar {
+    width: 264px; border: 1px solid #e2e0e8; border-radius: 6px; overflow: hidden; background: #faf9fc; display: inline-block;
+  }
+  html[data-theme="dark"] .sidebar { background: #18171e; border-color: #2c2b33; }
+  .sb-ver { padding: 8px 12px 4px; font-size: 10.5px; color: #9a98a4; letter-spacing: .05em; }
+  .sb-nav { padding: 4px 8px 10px; display: flex; flex-direction: column; gap: 2px; }
+  .nav-row {
+    display: flex; align-items: center; gap: 9px; height: 30px; padding: 0 9px;
+    border-radius: 3px; color: #4c4a55; font-size: 13px;
+  }
+  html[data-theme="dark"] .nav-row { color: #a6a4b0; }
+  .nav-row .icon { display: flex; width: 16px; justify-content: center; }
+  .nav-row:hover { background: #efedf3; }
+  html[data-theme="dark"] .nav-row:hover { background: #24232c; }
+  .nav-row.active { background: #e6e4eb; color: #16141d; font-weight: 600; }
+  html[data-theme="dark"] .nav-row.active { background: #2d2b36; color: #eee; }
+  .sb-foot { border-top: 1px solid #e9e7ee; padding: 6px 8px; display: flex; flex-direction: column; gap: 2px; }
+  html[data-theme="dark"] .sb-foot { border-color: #26252e; }
+
+  .group-tab { display: flex; gap: 6px; margin-bottom: 14px; flex-wrap: wrap; }
+  .tab { appearance: none; border: 1px solid #ddd; background: #fff; color: #555; cursor: pointer; font: inherit; font-size: 12px; padding: 4px 12px; border-radius: 3px; }
+  .tab.on { background: #0d8a8a; border-color: #0d8a8a; color: #fff; }
+  html[data-theme="dark"] .tab { background: #24232c; border-color: #3a3944; color: #bbb; }
+  html[data-theme="dark"] .tab.on { background: #2ee6e6; border-color: #2ee6e6; color: #0a1a1a; }
+
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 10px; }
+  .cell { display: flex; align-items: center; gap: 12px; padding: 10px 12px; background: #fff; border: 1px solid #e9e7ee; border-radius: 5px; }
+  html[data-theme="dark"] .cell { background: #1c1b23; border-color: #2c2b33; }
+  .cell .big { display: flex; gap: 8px; align-items: flex-end; }
+  .cell .col { display: flex; flex-direction: column; align-items: center; gap: 2px; }
+  .cell .cap { font-size: 9.5px; color: #aaa; }
+  .cell .name { font-weight: 600; font-size: 12.5px; display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
+  .cell .note { font-size: 11px; color: #999; }
+  .chip { font-size: 10px; font-weight: 600; padding: 0 6px; border-radius: 3px; border: 1px solid transparent; }
+  .chip.hi { color: #0d8a8a; background: #e8f6f6; border-color: #a8d9d9; }
+  html[data-theme="dark"] .chip.hi { color: #2ee6e6; background: #0f2a2a; border-color: #1a5555; }
+  .lu { font-family: ui-monospace, monospace; font-size: 10.5px; color: #b0adb8; }
+
+  .spec-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 16px; }
+  .spec-card { background: #fff; border: 1px solid #e2e0e8; border-radius: 6px; padding: 18px; }
+  html[data-theme="dark"] .spec-card { background: #1c1b23; border-color: #2c2b33; }
+  .spec-card h4 { font-size: 13px; font-weight: 650; margin-bottom: 10px; }
+  .dense { font-size: 12px; color: #666; }
+  html[data-theme="dark"] .dense { color: #9c9aa5; }
+  .dense li { margin: 3px 0 3px 16px; }
+  .dense code { font-family: ui-monospace, monospace; font-size: 11px; background: #f3f1f6; padding: 1px 5px; border-radius: 3px; }
+  html[data-theme="dark"] .dense code { background: #2a2932; }
+
+  .layer-demo { display: flex; gap: 18px; flex-wrap: wrap; align-items: flex-end; }
+  .layer-col { display: flex; flex-direction: column; align-items: center; gap: 6px; font-size: 11px; color: #777; }
+  .layer-tile { padding: 12px 16px; border-radius: 5px; background: #e6e4eb; }
+  html[data-theme="dark"] .layer-tile { background: #2d2b36; }
+  .layer-tile.active-row { background: #e6e4eb; }
+  html[data-theme="dark"] .layer-tile.active-row { background: #2d2b36; }
+
+  .prim-row { display: flex; gap: 14px; flex-wrap: wrap; align-items: center; }
+  .prim { display: flex; flex-direction: column; align-items: center; gap: 4px; font-size: 10.5px; color: #888; }
+
+  table.ab { width: 100%; border-collapse: collapse; font-size: 12px; }
+  table.ab th, table.ab td { text-align: left; padding: 7px 10px; border-bottom: 1px solid #f0eef4; }
+  html[data-theme="dark"] table.ab th, html[data-theme="dark"] table.ab td { border-color: #26252e; }
+  table.ab th { font-size: 11px; color: #888; }
+  table.ab .win { color: #0d8a8a; font-weight: 650; }
+  html[data-theme="dark"] table.ab .win { color: #2ee6e6; }
+
+  table.map { width: 100%; border-collapse: collapse; font-size: 12px; }
+  table.map th, table.map td { text-align: left; padding: 7px 12px; border-bottom: 1px solid #f0eef4; }
+  html[data-theme="dark"] table.map th, html[data-theme="dark"] table.map td { border-color: #26252e; }
+  table.map th { font-size: 11px; color: #888; }
+  table.map code { font-family: ui-monospace, monospace; font-size: 11px; }
+  .stage-chip { font-size: 10.5px; color: #fff; padding: 1px 7px; border-radius: 3px; font-weight: 600; background: #0d8a8a; }
+  html[data-theme="dark"] .stage-chip { background: #2ee6e6; color: #0a1a1a; }
+  .p3 { background: #1a8cd8; color: #fff; }
+  .p4 { background: #8a8792; color: #fff; }
+
+  .checklist { list-style: none; }
+  .checklist li { display: flex; gap: 9px; padding: 5px 0; font-size: 12.5px; color: #555; }
+  html[data-theme="dark"] .checklist li { color: #a6a4b0; }
+  .checklist .box { width: 13px; height: 13px; border: 1.5px solid #c9c6d0; border-radius: 3px; flex: 0 0 auto; margin-top: 2px; }
+
+  .foot { text-align: center; color: #9a98a4; font-size: 11.5px; padding: 30px 0 10px; }
+</style>
+</head>
+<body>
+
+<header class="topbar">
+  <h1>hip 菜单图标系统 <span class="badge">方案 D · Hierarchical</span><span class="badge alt">第四备选</span></h1>
+  <div class="controls">
+    <span class="ctl">主题</span>
+    <button class="btn on" data-theme-btn="light">亮</button>
+    <button class="btn" data-theme-btn="dark">暗</button>
+    <span class="ctl">尺寸</span>
+    <input type="range" id="sizeRange" min="12" max="28" step="1" value="16">
+    <span class="ctl" id="sizeVal">16px</span>
+    <span class="ctl">图层</span>
+    <button class="btn on" data-layers-btn="hierarchical">分层</button>
+    <button class="btn" data-layers-btn="mono">单层</button>
+    <a class="btn ghost" href="icon-preview.html">A</a>
+    <a class="btn ghost" href="icon-preview-B.html">B</a>
+    <a class="btn ghost" href="icon-preview-C.html">C</a>
+  </div>
+</header>
+
+<div class="wrap">
+
+<section class="hero">
+  <h2>方案 D：分层单色（Hierarchical）+ 模块几何原语</h2>
+  <p class="lead">
+    与 A（双色实底点缀）、B（中性填充 active）、C（整图标品牌橙 active）都不同：
+    D 把每枚图标拆成 <b>primary / secondary</b> 两层，常态用 <b>100% / 40% 透明度</b> 做深度（SF Symbols hierarchical）；
+    active 时 <b>仅主层变品牌橙</b>，次层保持中性 —— 选中「点亮结构」而非整图标染色。
+    构造上强制 <b>几何原语白名单</b>（Bauhaus / Block），保证整套像同一只手画的。
+  </p>
+  <div class="principles">
+    <span class="principle"><b>分层透明度</b> · 主 100% / 次 40%</span>
+    <span class="principle"><b>active 仅主层橙</b> · 克制上色</span>
+    <span class="principle"><b>20px 设计网格</b> · 工具栏 1:1</span>
+    <span class="principle"><b>原语白名单</b> · 圆/方/线/弧</span>
+    <span class="principle"><b>右键 mono</b> · 14px 压单层</span>
+  </div>
+  <div class="cases">
+    <div class="case">
+      <h5>SF Symbols Hierarchical <span class="src">Apple WWDC</span></h5>
+      <p>单色 + 主/次/三级透明度做深度；Control Center 系统控件同款。Palette 模式可主次分色。Variable Color 只表进度不表深度。</p>
+    </div>
+    <div class="case">
+      <h5>Streamline Block <span class="src">Bauhaus</span></h5>
+      <p>基础几何形搭整套图标；模块化 —— 少量原语拼出大量变体；像 logo 一样有骨架。</p>
+    </div>
+    <div class="case">
+      <h5>totakit / Core <span class="src">一份定义多风格</span></h5>
+      <p>几何规范 + 光学补偿；Micro 档简化细节。D 的 mono 模式 = 小尺寸时压掉次层。</p>
+    </div>
+    <div class="case">
+      <h5>空位 <span class="src">相对 A/B/C</span></h5>
+      <p>A 双色实底 · B 中性填充 · C 全橙 active —— <b>无人用永久分层透明度做菜单深度</b>。D 占此位。</p>
+    </div>
+  </div>
+</section>
+
+<section class="block">
+  <div class="block-head">
+    <h3>一、对比舞台</h3>
+    <span class="sub">右侧「会话」active = 主层橙、次层（三点）仍中性。顶栏可切「分层 / 单层」。</span>
+  </div>
+  <div class="stage">
+    <div class="stage-col">
+      <div class="stage-title"><span class="tag tag-old">现状 · lucide</span></div>
+      <div class="sidebar" id="sb-old"></div>
+    </div>
+    <div class="stage-col">
+      <div class="stage-title"><span class="tag tag-new">方案 D · hierarchical</span></div>
+      <div class="sidebar" id="sb-new"></div>
+    </div>
+  </div>
+</section>
+
+<section class="block">
+  <div class="block-head">
+    <h3>二、图标总表</h3>
+    <span class="sub">每格：分层 · active（主层橙）· lucide。共 <b id="countAll">0</b> 个。20px 源网格。</span>
+  </div>
+  <div class="group-tab" id="groupTabs"></div>
+  <div class="grid" id="iconGrid"></div>
+</section>
+
+<section class="block">
+  <div class="block-head"><h3>三、规范细节</h3></div>
+  <div class="spec-grid">
+    <div class="spec-card">
+      <h4>3.1 图层：常态分层 vs active 主层橙</h4>
+      <div class="layer-demo" id="layerDemo"></div>
+      <div class="dense" style="margin-top:10px">
+        <ul>
+          <li>primary 100% · secondary 40% · 同色 <code>currentColor</code></li>
+          <li>active：primary = <code>--accent</code>，secondary 仍中性 40%</li>
+          <li>区别于 C：C 是整图标橙实底；D 是「点亮结构」</li>
+        </ul>
+      </div>
+    </div>
+    <div class="spec-card">
+      <h4>3.2 模块几何原语（白名单）</h4>
+      <div class="prim-row" id="primDemo"></div>
+      <div class="dense" style="margin-top:10px">新图标只能用：圆 / 圆角方 rx2 / 水平垂直 45° 线 / 90·180·270° 弧 / 等腰三角。禁止自由贝塞尔与透视体。</div>
+    </div>
+    <div class="spec-card">
+      <h4>3.3 网格 20px · 描边 1.6 / 1.4</h4>
+      <div class="dense">
+        <ul>
+          <li>设计网格 <code>20×20</code>；菜单 16 缩放；工具栏 <b>20 1:1</b></li>
+          <li>primary 描边 1.6px · secondary 1.4px（次层略细）</li>
+          <li>右键 14px 强制 <code>layers=mono</code>（压掉次层防糊）</li>
+        </ul>
+      </div>
+      <div id="sizeRow" style="display:flex;gap:20px;margin-top:12px;align-items:flex-end"></div>
+    </div>
+    <div class="spec-card">
+      <h4>3.4 四案决策速查</h4>
+      <table class="ab">
+        <tr><th></th><th>A</th><th>B</th><th>C</th><th>D</th></tr>
+        <tr><td>深度</td><td>双色点缀</td><td>—</td><td>—</td><td class="win">分层透明度</td></tr>
+        <tr><td>active 品牌</td><td>弱</td><td>无</td><td class="win">整图标橙</td><td>仅主层橙</td></tr>
+        <tr><td>状态徽标</td><td>—</td><td>—</td><td class="win">有</td><td>—</td></tr>
+        <tr><td>构造纪律</td><td>中</td><td>中</td><td>中</td><td class="win">原语白名单</td></tr>
+        <tr><td>气质</td><td>安静</td><td>极客</td><td>温暖</td><td class="win">系统控件</td></tr>
+      </table>
+    </div>
+  </div>
+</section>
+
+<section class="block">
+  <div class="block-head"><h3>四、迁移映射</h3></div>
+  <div class="card"><table class="map">
+    <thead><tr><th>位置</th><th>lucide</th><th>hip-D</th><th>primary / secondary</th><th>阶段</th></tr></thead>
+    <tbody id="mapBody"></tbody>
+  </table></div>
+</section>
+
+<section class="block">
+  <div class="block-head"><h3>五、验收清单</h3></div>
+  <div class="card" style="padding:16px 20px"><ul class="checklist" id="checklist"></ul></div>
+</section>
+
+<div class="foot">方案 D · docs/icon-system-spec-D.md · 对比 A/B/C 见顶栏 · lucide-react v0.460.0 (ISC)</div>
+</div>
+
+<script src="icon-data.js"></script>
+<script>
+/* HIPD: 20×20 grid, layers primary/secondary */
+const HIPD = {
+  sessions: {
+    label: '会话', lu: 'MessageSquare', group: '主导航',
+    note: '外轮廓 primary · 三点 secondary',
+    p: [['p','M3 5.5A2.5 2.5 0 0 1 5.5 3h9A2.5 2.5 0 0 1 17 5.5v6A2.5 2.5 0 0 1 14.5 14H9.2l-3.2 2.6a.55.55 0 0 1-.9-.45V14H5.5A2.5 2.5 0 0 1 3 11.5z']],
+    s: [['Fc',7,8.5,1.1],['Fc',10,8.5,1.1],['Fc',13,8.5,1.1]],
+  },
+  projects: {
+    label: '项目', lu: 'Code2', group: '主导航',
+    note: '尖括号 primary · 斜杠 secondary',
+    p: [['p','M6.5 6L3.5 10l3 4'],['p','M13.5 6l3 4-3 4']],
+    s: [['p','M11.2 4l-2.4 12']],
+  },
+  knowledge: {
+    label: '知识库', lu: 'BookOpen', group: '主导航',
+    note: '书轮廓 primary · 中缝 secondary',
+    p: [['p','M2.5 14.5V3.5h3a3 3 0 0 1 3 2.8 3 3 0 0 1 3-2.8h3.5V14.5a1.2 1.2 0 0 1-1.2 1.2H11a2 2 0 0 0-1 .4 2 2 0 0 0-1-.4H3.7A1.2 1.2 0 0 1 2.5 14.5z']],
+    s: [['p','M10 5v10.5']],
+  },
+  terminal: {
+    label: '终端', lu: 'Terminal', group: '主导航',
+    note: '窗口 primary · 提示符 secondary',
+    p: [['r',2.5,3.5,15,12,2]],
+    s: [['p','M5.5 8l2.2 1.8-2.2 1.8'],['p','M10.5 12h2.5']],
+  },
+  tasks: {
+    label: '任务', lu: 'CheckSquare', group: '主导航',
+    note: '框 primary · 勾与线 secondary',
+    p: [['r',2.5,3.5,4.5,4.5,1.5],['r',2.5,12,4.5,4.5,1.5]],
+    s: [['p','M4 5.8l1 1 1.5-1.8'],['p','M4 14.3l1 1 1.5-1.8'],['p','M9 5.8h7.5'],['p','M9 10.5h5'],['p','M9 14.3h7.5']],
+  },
+  automation: {
+    label: '自动化', lu: 'Zap', group: '主导航',
+    note: '闪电体 primary · 内高光 secondary',
+    p: [['p','M11 2.5 4.5 11h4.2l-1 5.5 6.5-8.5H10z']],
+    s: [['p','M9.2 7.5h2.2']],
+  },
+  trash: {
+    label: '回收站', lu: 'Trash2', group: 'Footer',
+    note: '桶身 primary · 竖线 secondary',
+    p: [
+      ['p','M3.5 5.5h13'],
+      ['p','M7 5.5V4.2A1.2 1.2 0 0 1 8.2 3h3.6A1.2 1.2 0 0 1 13 4.2v1.3'],
+      ['p','M5 5.5l.6 10.5a1.5 1.5 0 0 0 1.5 1.4h6.8a1.5 1.5 0 0 0 1.5-1.4L15.5 5.5'],
+    ],
+    s: [['p','M8.5 8.5v5'],['p','M11.5 8.5v5']],
+  },
+  history: {
+    label: '历史', lu: 'History', group: 'Footer',
+    note: '圆 primary · 指针与箭头 secondary',
+    p: [['c',10,10,7]],
+    s: [['p','M3.5 3.5v3.5h3.5'],['p','M10 6.5v3.5l3 1.5']],
+  },
+  settings: {
+    label: '设置', lu: 'Settings', group: 'Footer',
+    note: '齿圈 primary · 中心孔 secondary',
+    p: [['p', (function(){
+      const r2=4.6,r3=6.8,half=0.12,step=2*Math.PI/8,cx=10,cy=10;
+      const pt=(a,r)=>(r*Math.cos(a)+cx).toFixed(2)+' '+(r*Math.sin(a)+cy).toFixed(2);
+      let d='M '+pt(-half,r3);
+      for(let i=0;i<8;i++){const a=i*step;d+=' A '+r3+' '+r3+' 0 0 1 '+pt(a+half,r3)+' L '+pt(a+half,r2)+' A '+r2+' '+r2+' 0 0 1 '+pt(a+step-half,r2)+' L '+pt(a+step-half,r3);}
+      return d+' Z';
+    })()]],
+    s: [['c',10,10,2.2]],
+  },
+  general: {
+    label: '通用', lu: 'SlidersHorizontal', group: '设置',
+    note: '横线 primary · 滑块 secondary',
+    p: [['p','M2.5 5h15'],['p','M2.5 10h10'],['p','M2.5 15h15']],
+    s: [['p','M11 3.2v3.6'],['p','M8 8.2v3.6'],['p','M12.5 13.2v3.6']],
+  },
+  voice: {
+    label: '语音', lu: 'Mic', group: '设置',
+    note: '麦体 primary · 弧与支架 secondary',
+    p: [['r',7.5,2.5,5,9.5,2.5]],
+    s: [['p','M4.5 9a5.5 5.5 0 0 0 11 0'],['p','M10 14.5v3'],['p','M7.5 17.5h5']],
+  },
+  window: {
+    label: '窗口', lu: 'AppWindow', group: '设置',
+    note: '外框 primary · 标题条与灯 secondary',
+    p: [['r',2.5,3.5,15,12,2]],
+    s: [['p','M2.5 7h15'],['Fc',5.2,5.2,0.9],['Fc',7.8,5.2,0.9]],
+  },
+  model: {
+    label: '模型', lu: 'Cpu', group: '设置',
+    note: '芯片外框 primary · 内核与脚 secondary',
+    p: [['r',5,5,10,10,2]],
+    s: [['r',7.5,7.5,5,5,1],['p','M7.5 5V3'],['p','M12.5 5V3'],['p','M7.5 17v-2'],['p','M12.5 17v-2'],['p','M5 7.5H3'],['p','M5 12.5H3'],['p','M17 7.5h-2'],['p','M17 12.5h-2']],
+  },
+  agents: {
+    label: '智能体', lu: 'Bot', group: '设置',
+    note: '头框 primary · 眼与天线 secondary',
+    p: [['r',3.5,7,13,9,2]],
+    s: [['p','M10 4v3'],['Fc',7.5,11.5,1],['Fc',12.5,11.5,1],['p','M8 14h4']],
+  },
+  skill: {
+    label: '技能', lu: 'Sparkles', group: '设置',
+    note: '大星 primary · 小星 secondary',
+    p: [['p','M10 3l1.2 3.5 3.5 1.2-3.5 1.2L10 12.4 8.8 8.9 5.3 7.7l3.5-1.2z']],
+    s: [['p','M15.5 13.5l.5 1.5 1.5.5-1.5.5-.5 1.5-.5-1.5-1.5-.5 1.5-.5z'],['p','M4.5 13v2.5'],['p','M3.2 14.2h2.6']],
+  },
+  plugins: {
+    label: '插件', lu: 'Package', group: '设置',
+    note: '立方轮廓 primary · 中缝 secondary',
+    p: [['p','M3.5 7L10 3.5 16.5 7v6L10 16.5 3.5 13z']],
+    s: [['p','M3.5 7L10 10.5 16.5 7'],['p','M10 10.5v6']],
+  },
+  plus: { label:'新建', lu:'Plus', group:'右键', note:'十字 primary', p:[['p','M10 4v12'],['p','M4 10h12']], s:[] },
+  sun: {
+    label:'亮色', lu:'Sun', group:'右键',
+    note:'圆 primary · 射线 secondary',
+    p:[['c',10,10,3.2]],
+    s:[['p','M10 2.5v1.8'],['p','M10 15.7v1.8'],['p','M2.5 10h1.8'],['p','M15.7 10h1.8'],['p','M4.5 4.5l1.3 1.3'],['p','M14.2 14.2l1.3 1.3'],['p','M15.5 4.5l-1.3 1.3'],['p','M5.8 14.2l-1.3 1.3']],
+  },
+  moon: { label:'暗色', lu:'Moon', group:'右键', note:'月 primary', p:[['p','M16.5 12a7 7 0 1 1-8.5-8.5 5.5 5.5 0 0 0 8.5 8.5z']], s:[] },
+  monitor: {
+    label:'跟随系统', lu:'Monitor', group:'右键',
+    note:'屏 primary · 底座 secondary',
+    p:[['r',2.5,3,15,9,1.5]],
+    s:[['p','M7 16.5h6'],['p','M10 12v4.5']],
+  },
+  check: { label:'确认', lu:'Check', group:'状态', note:'勾 primary', p:[['p','M4 10.5l3.5 3.5 8-8.5']], s:[] },
+  circleCheck: {
+    label:'成功', lu:'CheckCircle2', group:'状态',
+    note:'圆 primary · 勾 secondary',
+    p:[['c',10,10,7]],
+    s:[['p','M7 10.2l2 2 4-4.2']],
+  },
+  circleX: {
+    label:'失败', lu:'XCircle', group:'状态',
+    note:'圆 primary · X secondary',
+    p:[['c',10,10,7]],
+    s:[['p','M7.5 7.5l5 5'],['p','M12.5 7.5l-5 5']],
+  },
+  alert: {
+    label:'警告', lu:'AlertTriangle', group:'状态',
+    note:'三角 primary · 叹号 secondary',
+    p:[['p','M10 3.5l6.5 11a1 1 0 0 1-.9 1.5H4.4a1 1 0 0 1-.9-1.5z']],
+    s:[['p','M10 8v3.2'],['Fc',10,14,0.9]],
+  },
+  loader: {
+    label:'加载', lu:'Loader2', group:'状态',
+    note:'弧 primary（可 variable）',
+    p:[['p','M16.5 10a6.5 6.5 0 1 1-4.5-6.2']],
+    s:[],
+  },
+  search: {
+    label:'搜索', lu:'Search', group:'通用',
+    note:'圆 primary · 柄 secondary',
+    p:[['c',9,9,5.5]],
+    s:[['p','M13 13l4 4']],
+  },
+  folder: {
+    label:'文件夹', lu:'Folder', group:'通用',
+    note:'夹 primary',
+    p:[['p','M2.5 5.5A1.5 1.5 0 0 1 4 4h3.5l1.2 1.5h6.3a1.5 1.5 0 0 1 1.5 1.5v7a1.5 1.5 0 0 1-1.5 1.5H4a1.5 1.5 0 0 1-1.5-1.5z']],
+    s:[],
+  },
+  copy: {
+    label:'复制', lu:'Copy', group:'通用',
+    note:'前层 primary · 后层 secondary',
+    p:[['r',7,7,10,10,1.5]],
+    s:[['r',3,3,10,10,1.5]],
+  },
+  ellipsis: {
+    label:'更多', lu:'MoreHorizontal', group:'通用',
+    note:'三点 primary',
+    p:[['Fc',4,10,1.2],['Fc',10,10,1.2],['Fc',16,10,1.2]],
+    s:[],
+  },
+};
+
+const ACCENT = { light: '#c2410c', dark: '#ffb300' };
+
+function lucideEls(name) {
+  const arr = (window.LUCIDE || {})[name];
+  if (!arr) return [];
+  return arr.map(el => {
+    if (el[0] === 'path') return ['p', el[1].d];
+    if (el[0] === 'circle') return ['c', +el[1].cx, +el[1].cy, +el[1].r];
+    if (el[0] === 'rect') return ['r', +el[1].x, +el[1].y, +el[1].width, +el[1].height, +(el[1].rx || 0)];
+    return null;
+  }).filter(Boolean);
+}
+
+function drawEls(els, stroke, opacity, color) {
+  let h = '';
+  const op = opacity < 1 ? ' opacity="' + opacity + '"' : '';
+  const col = color ? ' stroke="' + color + '" fill="' + (els.some(e => e[0]==='Fc') ? color : 'none') + '"' : '';
+  els.forEach(e => {
+    if (e[0] === 'p') h += '<path d="' + e[1] + '" fill="none"' + op + (color ? ' stroke="' + color + '"' : '') + '></path>';
+    else if (e[0] === 'c') h += '<circle cx="' + e[1] + '" cy="' + e[2] + '" r="' + e[3] + '" fill="none"' + op + (color ? ' stroke="' + color + '"' : '') + '></circle>';
+    else if (e[0] === 'Fc') h += '<circle cx="' + e[1] + '" cy="' + e[2] + '" r="' + e[3] + '" fill="' + (color || 'currentColor') + '" stroke="none"' + op + '></circle>';
+    else if (e[0] === 'r') h += '<rect x="' + e[1] + '" y="' + e[2] + '" width="' + e[3] + '" height="' + e[4] + '" rx="' + (e[5]||0) + '" fill="none"' + op + (color ? ' stroke="' + color + '"' : '') + '></rect>';
+  });
+  return h;
+}
+
+function svgD(icon, size, opts) {
+  const o = opts || {};
+  const layers = o.layers || document.documentElement.dataset.layers || 'hierarchical';
+  const active = !!o.active;
+  const useLucide = !!o.lucide;
+  const stroke = o.stroke || document.documentElement.dataset.stroke || '1.6';
+  const theme = document.documentElement.dataset.theme || 'light';
+  const accent = ACCENT[theme];
+
+  if (useLucide) {
+    let inner = '';
+    lucideEls(icon.lu || '').forEach(e => {
+      if (e[0] === 'p') inner += '<path d="' + e[1] + '" fill="none"></path>';
+      else if (e[0] === 'c') inner += '<circle cx="' + e[1] + '" cy="' + e[2] + '" r="' + e[3] + '" fill="none"></circle>';
+      else if (e[0] === 'r') inner += '<rect x="' + e[1] + '" y="' + e[2] + '" width="' + e[3] + '" height="' + e[4] + '" rx="' + (e[5]||0) + '" fill="none"></rect>';
+    });
+    return '<svg viewBox="0 0 24 24" width="' + size + '" height="' + size + '" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' + inner + '</svg>';
+  }
+
+  const pStroke = stroke;
+  const sStroke = (parseFloat(stroke) - 0.2).toFixed(1);
+  let inner = '';
+  // primary
+  const pColor = active ? accent : null;
+  inner += '<g stroke-width="' + pStroke + '"' + (pColor ? ' stroke="' + pColor + '"' : '') + '>' + drawEls(icon.p || [], pStroke, 1, pColor) + '</g>';
+  // secondary
+  if (layers === 'hierarchical' && icon.s && icon.s.length) {
+    inner += '<g stroke-width="' + sStroke + '" opacity="0.4">' + drawEls(icon.s, sStroke, 1, null) + '</g>';
+  } else if (layers === 'mono' && icon.s && icon.s.length) {
+    // mono: merge secondary at full opacity same as primary color
+    inner += '<g stroke-width="' + pStroke + '"' + (pColor ? ' stroke="' + pColor + '"' : '') + '>' + drawEls(icon.s, pStroke, 1, pColor) + '</g>';
+  }
+
+  return '<svg viewBox="0 0 20 20" width="' + size + '" height="' + size + '" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' + inner + '</svg>';
+}
+
+function iconD(name, size, opts) {
+  const icon = HIPD[name];
+  if (!icon) return '';
+  return svgD(icon, size || 16, opts);
+}
+
+const NAV = [['sessions','会话'],['projects','项目'],['knowledge','知识库'],['terminal','终端'],['tasks','任务'],['automation','自动化']];
+const FOOT = [['trash','回收站'],['history','历史'],['settings','设置']];
+
+function sidebar(id, lucide) {
+  const c = document.getElementById(id);
+  let h = '<div class="sb-ver">HIP v0.9.4</div><div class="sb-nav">';
+  NAV.forEach(([n, label]) => {
+    const active = n === 'sessions' && !lucide;
+    h += '<div class="nav-row' + (active ? ' active' : '') + '"><span class="icon">' +
+      iconD(n, 16, { lucide, active }) + '</span>' + label + '</div>';
+  });
+  h += '</div><div class="sb-foot">';
+  FOOT.forEach(([n, label]) => {
+    h += '<div class="nav-row"><span class="icon">' + iconD(n, 16, { lucide }) + '</span>' + label + '</div>';
+  });
+  h += '</div>';
+  c.innerHTML = h;
+}
+
+const GROUPS = ['主导航','Footer','设置','右键','状态','通用'];
+let activeGroup = '主导航';
+
+function renderGrid() {
+  const size = parseInt(document.documentElement.dataset.size, 10);
+  const grid = document.getElementById('iconGrid');
+  let h = '';
+  Object.entries(HIPD).forEach(([name, def]) => {
+    if (def.group !== activeGroup) return;
+    h += '<div class="cell"><div class="big">' +
+      '<div class="col">' + iconD(name, size) + '<span class="cap">分层</span></div>' +
+      '<div class="col">' + iconD(name, Math.max(12, size - 2), { active: true }) + '<span class="cap">active</span></div>' +
+      '<div class="col">' + iconD(name, Math.max(12, size - 2), { lucide: true }) + '<span class="cap">lucide</span></div>' +
+      '</div><div class="meta"><div class="name">' + def.label + '<span class="chip hi">hierarchical</span></div>' +
+      '<div class="note">' + def.note + '</div><div class="lu">← ' + def.lu + '</div></div></div>';
+  });
+  grid.innerHTML = h;
+  document.getElementById('countAll').textContent = Object.keys(HIPD).length;
+}
+
+function renderTabs() {
+  const tabs = document.getElementById('groupTabs');
+  tabs.innerHTML = GROUPS.map(g => '<button class="tab' + (g === activeGroup ? ' on' : '') + '" data-group="' + g + '">' + g + '</button>').join('');
+  tabs.querySelectorAll('.tab').forEach(t => t.addEventListener('click', () => {
+    activeGroup = t.dataset.group; renderTabs(); renderGrid();
+  }));
+}
+
+function renderSpec() {
+  const demo = document.getElementById('layerDemo');
+  demo.innerHTML =
+    '<div class="layer-col"><div class="layer-tile">' + iconD('sessions', 36) + '</div>分层常态</div>' +
+    '<div class="layer-col"><div class="layer-tile">' + iconD('sessions', 36, { active: true }) + '</div>active 主层橙</div>' +
+    '<div class="layer-col"><div class="layer-tile">' + iconD('sessions', 36, { layers: 'mono' }) + '</div>mono 单层</div>' +
+    '<div class="layer-col"><div class="layer-tile">' + iconD('terminal', 36) + '</div>终端分层</div>' +
+    '<div class="layer-col"><div class="layer-tile">' + iconD('tasks', 36, { active: true }) + '</div>任务 active</div>';
+
+  // primitives
+  const prim = document.getElementById('primDemo');
+  const prims = [
+    ['圆', '<circle cx="10" cy="10" r="5.5" fill="none" stroke="currentColor" stroke-width="1.6"/>'],
+    ['方', '<rect x="4" y="4" width="12" height="12" rx="2" fill="none" stroke="currentColor" stroke-width="1.6"/>'],
+    ['线', '<path d="M4 10h12" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>'],
+    ['弧', '<path d="M4 12a6 6 0 0 1 12 0" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>'],
+    ['45°', '<path d="M5 15L15 5" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>'],
+  ];
+  prim.innerHTML = prims.map(([n, i]) =>
+    '<div class="prim"><svg viewBox="0 0 20 20" width="28" height="28">' + i + '</svg>' + n + '</div>').join('');
+
+  const sizeRow = document.getElementById('sizeRow');
+  sizeRow.innerHTML = [['16 菜单',16],['20 1:1',20],['28 空状态',28]].map(([l,s]) =>
+    '<div style="display:flex;flex-direction:column;align-items:center;gap:4px;font-size:10.5px;color:#888">' +
+    iconD('sessions', s) + l + '</div>').join('');
+}
+
+const MAP = [
+  ['主侧栏','MessageSquare','sessions','轮廓 / 三点','P2'],
+  ['主侧栏','Code2','projects','括号 / 斜杠','P2'],
+  ['主侧栏','BookOpen','knowledge','书 / 中缝','P2'],
+  ['主侧栏','Terminal','terminal','窗 / 提示符','P2'],
+  ['主侧栏','CheckSquare','tasks','框 / 勾+线','P2'],
+  ['主侧栏','Zap','automation','闪电 / 高光','P2'],
+  ['Footer','Trash2/History/Settings','trash/history/settings','见 note','P2'],
+  ['设置','…','general/voice/…','分层标注','P3'],
+  ['右键/状态/通用','…','plus/check/…','mono@14px','P3–P4'],
+];
+
+function renderMap() {
+  document.getElementById('mapBody').innerHTML = MAP.map(([a,b,c,d,e]) =>
+    '<tr><td>'+a+'</td><td><code>'+b+'</code></td><td><code>'+c+'</code></td><td>'+d+'</td><td><span class="stage-chip '+(e==='P2'?'':e==='P3'||e.startsWith('P3')?'p3':'p4')+'">'+e+'</span></td></tr>').join('');
+}
+
+const CHECKS = [
+  '常态 hierarchical：主 100% / 次 40%，亮暗可辨',
+  'active：仅 primary 为 accent，secondary 仍中性',
+  '14px 右键 mono 模式无糊层',
+  '20px 工具栏 1:1 无缩放模糊',
+  '新图标通过原语白名单审查',
+  'loader variable color 不用于主导航',
+  'AA：accent primary 与底色对比',
+  '无 lucide 残留',
+];
+function renderChecks() {
+  document.getElementById('checklist').innerHTML = CHECKS.map(c => '<li><span class="box"></span>'+c+'</li>').join('');
+}
+
+function reRender() {
+  sidebar('sb-old', true);
+  sidebar('sb-new', false);
+  renderGrid();
+  renderSpec();
+  document.getElementById('sizeVal').textContent = document.documentElement.dataset.size + 'px';
+}
+
+document.querySelectorAll('[data-theme-btn]').forEach(b => b.addEventListener('click', () => {
+  document.documentElement.dataset.theme = b.dataset.themeBtn;
+  document.querySelectorAll('[data-theme-btn]').forEach(x => x.classList.toggle('on', x === b));
+  reRender();
+}));
+document.querySelectorAll('[data-layers-btn]').forEach(b => b.addEventListener('click', () => {
+  document.documentElement.dataset.layers = b.dataset.layersBtn;
+  document.querySelectorAll('[data-layers-btn]').forEach(x => x.classList.toggle('on', x === b));
+  reRender();
+}));
+document.getElementById('sizeRange').addEventListener('input', e => {
+  document.documentElement.dataset.size = e.target.value;
+  reRender();
+});
+
+renderTabs();
+renderMap();
+renderChecks();
+reRender();
+</script>
+</body>
+</html>

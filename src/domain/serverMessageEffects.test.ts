@@ -923,5 +923,117 @@ describe('applyServerMessageEffects', () => {
       expect(useWorktreeStore.getState().byId['live']).toBeDefined()
       expect(useParallelStore.getState().runs[0]!.slots.map((s) => s.worktreePath)).toEqual(['/wt/live'])
     })
+
+    it('git:worktree:list:result from nested worktree session keeps catalog on project host', () => {
+      useDomainStore.setState({
+        sessions: [
+          {
+            id: 'host-proj',
+            config: {
+              llmProvider: 'deepseek',
+              model: '',
+              tools: [],
+              surface: 'code',
+              cwd: '/repo',
+            },
+            title: 'Host',
+            preview: '',
+            updatedAtMs: 0,
+            loaded: true,
+            messages: [],
+            status: 'idle',
+            error: null,
+            codePanelOpen: false,
+            chatPanelOpen: false,
+          },
+          {
+            id: 'wt-sess',
+            config: {
+              llmProvider: 'deepseek',
+              model: '',
+              tools: [],
+              surface: 'code',
+              cwd: '/Users/x/.hip/worktrees/repo-p1',
+            },
+            title: 'P1',
+            preview: '',
+            updatedAtMs: 1,
+            loaded: true,
+            messages: [],
+            status: 'idle',
+            error: null,
+            codePanelOpen: false,
+            chatPanelOpen: false,
+          },
+        ],
+        activeSessionId: 'wt-sess',
+        connection: 'connected',
+        searching: false,
+        pluginInstall: null,
+      })
+      useWorktreeStore.getState().upsertFromList(
+        [
+          {
+            id: 'primary',
+            path: '/repo',
+            branch: 'main',
+            head: 'h',
+            managed: false,
+            isPrimary: true,
+            source: 'primary',
+            repoKey: 'rk',
+          },
+          {
+            id: 'slot-wt',
+            path: '/Users/x/.hip/worktrees/repo-p1',
+            branch: 'hip-p-1',
+            head: 'h',
+            managed: true,
+            isPrimary: false,
+            source: 'host_fanout',
+            repoKey: 'rk',
+          },
+        ],
+        'host-proj',
+      )
+
+      applyServerMessageEffects(
+        {
+          type: 'git:worktree:list:result',
+          // selectSession(worktree) requests list with the nested session id
+          sessionId: 'wt-sess',
+          worktrees: [
+            {
+              id: 'primary',
+              path: '/repo',
+              branch: 'main',
+              head: 'h',
+              managed: false,
+              isPrimary: true,
+              source: 'primary',
+              repoKey: 'rk',
+            },
+            {
+              id: 'slot-wt',
+              path: '/Users/x/.hip/worktrees/repo-p1',
+              branch: 'hip-p-1',
+              head: 'h',
+              managed: true,
+              isPrimary: false,
+              source: 'host_fanout',
+              repoKey: 'rk',
+            },
+          ],
+        },
+        makeDeps(),
+      )
+
+      const byId = useWorktreeStore.getState().byId
+      expect(byId['slot-wt']?.hostSessionId).toBe('host-proj')
+      expect(byId['primary']?.hostSessionId).toBe('host-proj')
+      // Host sidebar tree still sees the managed worktree.
+      const hostCatalog = useWorktreeStore.getState().catalogForHost('host-proj')
+      expect(hostCatalog.some((r) => r.id === 'slot-wt')).toBe(true)
+    })
   })
 })

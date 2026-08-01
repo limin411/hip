@@ -23,6 +23,7 @@ import {
 } from '@/lib/writeFollow'
 import { useFocusStore } from '@/store/focusStore'
 import { useGoalStore } from '@/store/goalStore'
+import { resolveWorktreeListCatalogHost } from '@/lib/worktreeHostContext'
 import { collectWorktreeCascadeDeleteIds } from '@/lib/worktreeNesting'
 import { auditSessionDelete, debugSessionDelete } from '@/lib/sessionDelete'
 import { useTaskRuntimeStore } from '@/store/taskRuntimeStore'
@@ -687,10 +688,31 @@ export function applyServerMessageEffects(msg: ServerMessage, deps: ServerMessag
 
     case 'git:worktree:list:result': {
       // Authoritative snapshot: upsert + prune catalog, then reconcile parallel slots for this host.
-      useWorktreeStore.getState().upsertFromList(msg.worktrees, msg.sessionId)
+      // Resolve nested/slot requester → project host so catalog rows stay under the host tree
+      // (selectSession on a worktree slot also requests list and must not steal host binding).
+      const sessions = useDomainStore.getState().sessions
+      const requester = sessions.find((s) => s.id === msg.sessionId)
+      const catalogHostId = resolveWorktreeListCatalogHost({
+        sessionId: msg.sessionId,
+        worktrees: msg.worktrees,
+        activeSession: requester
+          ? {
+              id: requester.id,
+              config: { cwd: requester.config.cwd, surface: requester.config.surface },
+            }
+          : { id: msg.sessionId, config: {} },
+        sessions: sessions.map((s) => ({
+          id: s.id,
+          title: s.title,
+          config: { cwd: s.config.cwd },
+        })),
+        runs: useParallelStore.getState().runs,
+        catalog: Object.values(useWorktreeStore.getState().byId),
+      })
+      useWorktreeStore.getState().upsertFromList(msg.worktrees, catalogHostId)
       useParallelStore.getState().reconcileToLivePaths(
         msg.worktrees.map((w) => w.path),
-        msg.sessionId,
+        catalogHostId,
       )
       return
     }

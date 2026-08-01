@@ -236,7 +236,9 @@ export function resolveWorktreeHostContext(input: {
   // 4. Catalog / path: cwd matches a non-primary catalog path
   const cwdRow = catalogRowByPath(catalog, activeCwd)
   if (cwdRow && !cwdRow.isPrimary) {
-    if (cwdRow.hostSessionId) {
+    // Prefer an explicit host binding, but never treat the isolated session itself as host
+    // (list:result used to stamp nested session ids and sticky-steal the sidebar tree).
+    if (cwdRow.hostSessionId && cwdRow.hostSessionId !== activeSession.id) {
       return finalize(
         {
           hostSessionId: cwdRow.hostSessionId,
@@ -251,7 +253,7 @@ export function resolveWorktreeHostContext(input: {
     const primaryPath = primaryCatalogPath(catalog, cwdRow.repoKey)
     if (primaryPath) {
       const primarySession = sessionWithCwd(sessions, primaryPath)
-      if (primarySession) {
+      if (primarySession && primarySession.id !== activeSession.id) {
         return finalize(
           {
             hostSessionId: primarySession.id,
@@ -344,4 +346,72 @@ export function resolveWorktreeHostContext(input: {
     unresolved: true,
     unresolvedReason: 'no_host',
   }
+}
+
+/**
+ * Host id to stamp on catalog rows after `git:worktree:list:result`.
+ *
+ * Selecting a nested worktree session still requests a list (sessionService.selectSession).
+ * Tagging that nested id as catalog host steals rows from the project host — sidebar
+ * worktree tree under the host collapses and nested sessions have nowhere to render.
+ */
+export function resolveWorktreeListCatalogHost(input: {
+  /** sessionId from the list result (requester). */
+  sessionId: string
+  /** Snapshot paths from git (used when catalog host binding is still empty). */
+  worktrees: Array<{ path: string; isPrimary?: boolean }>
+  activeSession: ActiveSession
+  sessions: SessionLike[]
+  runs: ParallelRun[]
+  catalog: CatalogWorktree[]
+}): string {
+  const ctx = resolveWorktreeHostContext({
+    activeSession: input.activeSession,
+    sessions: input.sessions,
+    runs: input.runs,
+    catalog: input.catalog,
+  })
+
+  const primaryPath =
+    input.worktrees.find((w) => w.isPrimary)?.path ??
+    input.catalog.find((c) => c.isPrimary)?.path
+  const requesterCwd = input.activeSession?.config.cwd
+  const requesterIsIsolated =
+    !!requesterCwd &&
+    (isManagedWorktreePath(requesterCwd) ||
+      (!!primaryPath && pathKey(requesterCwd) !== pathKey(primaryPath)))
+
+  // Trust context host unless it collapsed to the nested requester itself.
+  if (ctx.hostSessionId && !(requesterIsIsolated && ctx.hostSessionId === input.sessionId)) {
+    return ctx.hostSessionId
+  }
+
+  if (primaryPath) {
+    const primaryKey = pathKey(primaryPath)
+    const anchored = input.sessions.find(
+      (s) =>
+        s.id !== input.sessionId && s.config.cwd && pathKey(s.config.cwd) === primaryKey,
+    )
+    if (anchored) return anchored.id
+  }
+
+  // Keep a prior project-host binding rather than rebinding to the nested requester.
+  const prevHost = input.catalog.find(
+    (r) => r.hostSessionId && r.hostSessionId !== input.sessionId,
+  )?.hostSessionId
+  if (prevHost) return prevHost
+
+  // Isolated requester with no recoverable host: leave prior stamps alone by returning
+  // sessionId only when it is not isolated (host path).
+  if (requesterIsIsolated) {
+    // Prefer any non-isolated code session id already present as a catalog host stamp.
+    const stamped = input.catalog.find((r) => {
+      if (!r.hostSessionId || r.hostSessionId === input.sessionId) return false
+      const host = input.sessions.find((s) => s.id === r.hostSessionId)
+      return !!host && !isManagedWorktreePath(host.config.cwd)
+    })?.hostSessionId
+    if (stamped) return stamped
+  }
+
+  return input.sessionId
 }

@@ -1,5 +1,8 @@
 import { describe, expect, it } from 'vitest'
-import { resolveWorktreeHostContext } from './worktreeHostContext'
+import {
+  resolveWorktreeHostContext,
+  resolveWorktreeListCatalogHost,
+} from './worktreeHostContext'
 import type { ParallelRun } from '@/store/parallelStore'
 import type { CatalogWorktree } from '@/store/worktreeStore'
 
@@ -325,5 +328,110 @@ describe('resolveWorktreeHostContext', () => {
     expect(ctx.isOnIsolated).toBe(false)
     expect(ctx.activeWorktreePath).toBeUndefined()
     expect(ctx.primaryPath).toBe('/repo')
+  })
+})
+
+describe('resolveWorktreeListCatalogHost', () => {
+  const worktrees = [
+    { path: '/repo', isPrimary: true },
+    { path: '/Users/x/.hip/worktrees/forgejo-p1', isPrimary: false },
+  ]
+
+  it('keeps project host when list is requested from a nested worktree session', () => {
+    const hostId = resolveWorktreeListCatalogHost({
+      sessionId: 'wt-sess',
+      worktrees,
+      activeSession: {
+        id: 'wt-sess',
+        config: { cwd: '/Users/x/.hip/worktrees/forgejo-p1', surface: 'code' },
+      },
+      sessions: [
+        { id: 'host', title: 'Host', config: { cwd: '/repo' } },
+        {
+          id: 'wt-sess',
+          title: 'P1',
+          config: { cwd: '/Users/x/.hip/worktrees/forgejo-p1' },
+        },
+      ],
+      runs: [],
+      catalog: catalog([
+        { id: 'p', path: '/repo', isPrimary: true, hostSessionId: 'host' },
+        {
+          id: 'w1',
+          path: '/Users/x/.hip/worktrees/forgejo-p1',
+          managed: true,
+          hostSessionId: 'host',
+        },
+      ]),
+    })
+    expect(hostId).toBe('host')
+  })
+
+  it('falls back to primary-cwd session when catalog host is empty', () => {
+    const hostId = resolveWorktreeListCatalogHost({
+      sessionId: 'wt-sess',
+      worktrees,
+      activeSession: {
+        id: 'wt-sess',
+        config: { cwd: '/Users/x/.hip/worktrees/forgejo-p1', surface: 'code' },
+      },
+      sessions: [
+        { id: 'host', title: 'Host', config: { cwd: '/repo' } },
+        {
+          id: 'wt-sess',
+          title: 'P1',
+          config: { cwd: '/Users/x/.hip/worktrees/forgejo-p1' },
+        },
+      ],
+      runs: [],
+      catalog: catalog([
+        { id: 'p', path: '/repo', isPrimary: true },
+        { id: 'w1', path: '/Users/x/.hip/worktrees/forgejo-p1', managed: true },
+      ]),
+    })
+    expect(hostId).toBe('host')
+  })
+
+  it('uses requester when it is already the project host', () => {
+    const hostId = resolveWorktreeListCatalogHost({
+      sessionId: 'host',
+      worktrees,
+      activeSession: { id: 'host', config: { cwd: '/repo', surface: 'code' } },
+      sessions: [{ id: 'host', title: 'Host', config: { cwd: '/repo' } }],
+      runs: [],
+      catalog: catalog([{ id: 'p', path: '/repo', isPrimary: true, hostSessionId: 'host' }]),
+    })
+    expect(hostId).toBe('host')
+  })
+
+  it('recovers when catalog was already wrongly stamped with nested session id', () => {
+    const hostId = resolveWorktreeListCatalogHost({
+      sessionId: 'wt-sess',
+      worktrees,
+      activeSession: {
+        id: 'wt-sess',
+        config: { cwd: '/Users/x/.hip/worktrees/forgejo-p1', surface: 'code' },
+      },
+      sessions: [
+        { id: 'host', title: 'Host', config: { cwd: '/repo' } },
+        {
+          id: 'wt-sess',
+          title: 'P1',
+          config: { cwd: '/Users/x/.hip/worktrees/forgejo-p1' },
+        },
+      ],
+      runs: [],
+      // Previous buggy list:result rebound everything to wt-sess.
+      catalog: catalog([
+        { id: 'p', path: '/repo', isPrimary: true, hostSessionId: 'wt-sess' },
+        {
+          id: 'w1',
+          path: '/Users/x/.hip/worktrees/forgejo-p1',
+          managed: true,
+          hostSessionId: 'wt-sess',
+        },
+      ]),
+    })
+    expect(hostId).toBe('host')
   })
 })

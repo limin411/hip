@@ -23,11 +23,13 @@ describe('worktreeNesting', () => {
     expect(isParallelSlotTitle('项目前后端架构并行分析')).toBe(false)
   })
 
-  it('collects nested ids from slots, paths, managed cwd, and titles', () => {
+  it('nests only explicit slots and sessions on known worktree paths', () => {
     const nested = collectNestedWorktreeSessionIds({
       sessions: [
         { id: 'host', title: 'Host project', config: { cwd: '/repo' } },
+        // Title looks like a slot but no live binding and cwd is primary — stay top-level.
         { id: 'slot-a', title: 'P1/2 · run1', config: { cwd: '/repo' } },
+        // Managed path orphan with no catalog/parallel path — stay top-level (reachable).
         {
           id: 'slot-b',
           title: 'orphan managed',
@@ -46,9 +48,23 @@ describe('worktreeNesting', () => {
     expect(nested.has('host')).toBe(false)
     expect(nested.has('normal')).toBe(false)
     expect(nested.has('explicit-slot')).toBe(true)
-    expect(nested.has('slot-a')).toBe(true)
-    expect(nested.has('slot-b')).toBe(true)
+    expect(nested.has('slot-a')).toBe(false)
+    expect(nested.has('slot-b')).toBe(false)
     expect(nested.has('slot-c')).toBe(true)
+  })
+
+  it('does not hide managed-path orphans when worktreePaths is empty', () => {
+    const nested = collectNestedWorktreeSessionIds({
+      sessions: [
+        {
+          id: 'orphan',
+          title: 'P1/2 · deadrun',
+          config: { cwd: '/Users/x/.hip/worktrees/h1/orphan' },
+        },
+      ],
+      worktreePaths: [],
+    })
+    expect(nested.has('orphan')).toBe(false)
   })
 
   it('nestableCatalogPaths drops primary main-repo paths', () => {

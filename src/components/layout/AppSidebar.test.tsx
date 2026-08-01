@@ -495,7 +495,8 @@ describe('AppSidebar', () => {
     expect(slot.className).not.toMatch(/shadow-\[0_0_0_1px/)
   })
 
-  it('does not promote worktree slot sessions to top-level project rows', () => {
+  it('keeps orphan worktree sessions top-level when no host tree can render them', () => {
+    // Without catalog/parallel binding, nesting would make the session unreachable.
     useUiStore.setState({ sidebarSection: 'projects', activeView: 'code' })
     useDomainStore.setState((st) => ({
       ...st,
@@ -519,7 +520,68 @@ describe('AppSidebar', () => {
     }) as never)
     render(<AppSidebar />)
     expect(screen.getByTestId('sidebar-session-code-1')).toBeInTheDocument()
-    expect(screen.queryByTestId('sidebar-session-slot-orphan')).not.toBeInTheDocument()
+    expect(screen.getByTestId('sidebar-session-slot-orphan')).toBeInTheDocument()
+  })
+
+  it('nests worktree sessions under host when catalog path is known (not top-level)', () => {
+    const hostCwd = '/Users/x/data/hip'
+    const wtPath = '/Users/x/.hip/worktrees/h1/slot-bound'
+    useUiStore.setState({ sidebarSection: 'projects', activeView: 'code' })
+    useDomainStore.setState((st) => ({
+      ...st,
+      sessions: [
+        {
+          id: 'code-1',
+          title: 'Host',
+          preview: 'repo',
+          updatedAtMs: Date.now(),
+          config: { ...DEFAULT_CONFIG, surface: 'code', cwd: hostCwd },
+          messages: [],
+          status: 'idle',
+          loaded: true,
+        },
+        {
+          id: 'slot-bound',
+          title: 'Bound slot',
+          preview: 'slot',
+          updatedAtMs: Date.now(),
+          config: { ...DEFAULT_CONFIG, surface: 'code', cwd: wtPath },
+          messages: [],
+          status: 'idle',
+          loaded: true,
+        },
+      ],
+      activeSessionId: 'code-1',
+    }) as never)
+    useWorktreeStore.getState().upsertFromList(
+      [
+        {
+          id: 'primary',
+          path: hostCwd,
+          branch: 'main',
+          head: 'abc',
+          managed: false,
+          isPrimary: true,
+          source: 'primary',
+          repoKey: 'rk',
+        },
+        {
+          id: 'wt-1',
+          path: wtPath,
+          branch: 'hip-p-1',
+          head: 'def',
+          managed: true,
+          isPrimary: false,
+          source: 'host_fanout',
+          repoKey: 'rk',
+        },
+      ],
+      'code-1',
+    )
+    render(<AppSidebar />)
+    expect(screen.getByTestId('sidebar-session-code-1')).toBeInTheDocument()
+    expect(screen.queryByTestId('sidebar-session-slot-bound')).not.toBeInTheDocument()
+    expect(screen.getByTestId('sidebar-catalog-wt-wt-1')).toBeInTheDocument()
   })
 
   it('keeps host project visible after primary worktree catalog hydrate (click regression)', () => {

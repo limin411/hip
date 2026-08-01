@@ -34,8 +34,14 @@ export interface NestedSessionInputs {
 
 /**
  * Session ids that must not appear as top-level conversations.
- * Union of: explicit slot ids, cwd on a known *non-primary* worktree path,
- * managed-root cwd, slot title pattern.
+ *
+ * Only nest when the sidebar/history UI can still reach the session under a host:
+ * - explicit parallel `slotSessionIds` (rendered as WorktreeSlotRow)
+ * - cwd on a known *non-primary* worktree path from catalog/parallel (`worktreePaths`)
+ *
+ * Do NOT nest solely because cwd is under `~/.hip/worktrees` or the title looks like
+ * `P1/2 · …`. Those orphans have no host tree row and would vanish from the UI
+ * ("missing records").
  *
  * Callers must NOT pass primary (main-repo) catalog paths into `worktreePaths`.
  * Selecting a Code session hydrates `git:worktree:list`, which always includes
@@ -52,19 +58,13 @@ export function collectNestedWorktreeSessionIds(input: NestedSessionInputs): Set
   for (const p of input.worktreePaths ?? []) {
     if (p) wtPaths.add(pathKey(p))
   }
+  if (wtPaths.size === 0) return nested
 
   for (const s of input.sessions) {
     if (nested.has(s.id)) continue
-    if (isParallelSlotTitle(s.title)) {
-      nested.add(s.id)
-      continue
-    }
     const cwd = s.config.cwd
     if (!cwd) continue
-    const key = pathKey(cwd)
-    if (wtPaths.has(key) || isManagedWorktreePath(cwd)) {
-      nested.add(s.id)
-    }
+    if (wtPaths.has(pathKey(cwd))) nested.add(s.id)
   }
   return nested
 }

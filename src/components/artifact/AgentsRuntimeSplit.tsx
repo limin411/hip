@@ -36,14 +36,8 @@ export function AgentsRuntimeSplit() {
     isCouncilLiveAgents(latest?.agents ?? [], latestMsg?.roundtable) ||
     latestMsg?.roundtable?.engine === 'council'
 
-  const agentsOnly = (label: string, fullTestId?: string) => (
+  const agentsOnly = (fullTestId: string) => (
     <div className="flex h-full min-h-0 flex-col" data-testid="agents-runtime-split">
-      <div
-        className="flex h-7 shrink-0 items-center border-b border-border px-2.5 text-caption font-medium text-ink-tertiary"
-        data-testid="agents-runtime-agents-label"
-      >
-        {label}
-      </div>
       <div className="min-h-0 flex-1 overflow-hidden" data-testid={fullTestId}>
         <AgentDashboard />
       </div>
@@ -51,11 +45,11 @@ export function AgentsRuntimeSplit() {
   )
 
   if (council) {
-    return agentsOnly(t('chat.roundtable.councilLabel'), 'agents-runtime-council-full')
+    return agentsOnly('agents-runtime-council-full')
   }
 
   if (taskCount === 0) {
-    return agentsOnly(t('artifact.agents'), 'agents-runtime-agents-full')
+    return agentsOnly('agents-runtime-agents-full')
   }
 
   return (

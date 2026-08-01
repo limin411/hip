@@ -51,6 +51,7 @@ describe('AgentsRuntimeSplit', () => {
     expect(screen.getByTestId('agents-runtime-split')).toBeInTheDocument()
     expect(screen.getByTestId('agents-runtime-agents-full')).toBeInTheDocument()
     expect(screen.getByTestId('agent-dashboard')).toBeInTheDocument()
+    expect(screen.queryByTestId('agents-runtime-agents-label')).not.toBeInTheDocument()
     expect(screen.queryByTestId('agents-runtime-runtime-label')).not.toBeInTheDocument()
     expect(screen.queryByTestId('tasks-panel')).not.toBeInTheDocument()
   })

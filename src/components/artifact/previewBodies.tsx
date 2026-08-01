@@ -557,26 +557,30 @@ export function HtmlPreviewBody({
           </span>
         </button>
       </div>
-      <div className="flex min-h-0 flex-1 flex-col p-3">
-        {truncated && <TruncBanner text={truncatedLabel} />}
-        {large && (
-          <div
-            className="mb-2 shrink-0 rounded-md bg-amber-500/10 px-2.5 py-1.5 text-meta text-amber-900 dark:text-amber-100"
-            data-testid="preview-html-large-warn"
-          >
-            {t('artifact.previewHtmlLarge')}
-          </div>
-        )}
-        {hardTruncated && mode === 'render' && (
-          <div className="mb-2 shrink-0 rounded-md bg-surface-muted/80 px-2.5 py-1 text-meta text-ink-tertiary">
-            {t('artifact.previewHtmlHardTruncated')}
+      <div className="flex min-h-0 flex-1 flex-col">
+        {(truncated || large || (hardTruncated && mode === 'render')) && (
+          <div className="shrink-0 space-y-2 px-3 pt-3 pb-2">
+            {truncated && <TruncBanner text={truncatedLabel} />}
+            {large && (
+              <div
+                className="rounded-md bg-amber-500/10 px-2.5 py-1.5 text-meta text-amber-900 dark:text-amber-100"
+                data-testid="preview-html-large-warn"
+              >
+                {t('artifact.previewHtmlLarge')}
+              </div>
+            )}
+            {hardTruncated && mode === 'render' && (
+              <div className="rounded-md bg-surface-muted/80 px-2.5 py-1 text-meta text-ink-tertiary">
+                {t('artifact.previewHtmlHardTruncated')}
+              </div>
+            )}
           </div>
         )}
         {/*
           Outer must NOT scroll — a full-height iframe inside overflow-auto leaves a
           dead outer scrollbar. Give the iframe a bounded box and let its document scroll.
         */}
-        <div className="relative min-h-0 flex-1 overflow-hidden rounded-md border border-border/50 bg-white dark:bg-surface">
+        <div className="relative min-h-0 flex-1 overflow-hidden bg-white dark:bg-surface">
           {mode === 'source' ? (
             <div className="h-full overflow-auto">
               <PlainPre content={content} testid="preview-html-source" />

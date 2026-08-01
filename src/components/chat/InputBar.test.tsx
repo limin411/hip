@@ -74,6 +74,38 @@ describe('InputBar', () => {
     draftStore.useDraftStore.setState({ draft: null })
   })
 
+  it('chat composer keeps a red border when control permission is armed (full permission)', () => {
+    baseMocks()
+    vi.spyOn(domain, 'useActiveSession').mockReturnValue({
+      id: 's1',
+      config: { llmProvider: 'openai', model: 'gpt-4o', tools: [], surface: 'chat' as const, permissionMode: 'full' },
+      title: '',
+      preview: '',
+      messages: [],
+    } as any)
+
+    render(<InputBar />)
+    const root = screen.getByTestId('composer')
+    expect(root.className).toContain('border-danger/60')
+    expect(root.className).not.toContain('border-border')
+  })
+
+  it('chat composer keeps the default border without control permission', () => {
+    baseMocks()
+    vi.spyOn(domain, 'useActiveSession').mockReturnValue({
+      id: 's1',
+      config: { llmProvider: 'openai', model: 'gpt-4o', tools: [], surface: 'chat' as const },
+      title: '',
+      preview: '',
+      messages: [],
+    } as any)
+
+    render(<InputBar />)
+    const root = screen.getByTestId('composer')
+    expect(root.className).toContain('border-border')
+    expect(root.className).not.toContain('border-danger')
+  })
+
   it('insertComposerText preserves existing draft (does not replace)', async () => {
     baseMocks()
     vi.spyOn(domain, 'useActiveSession').mockReturnValue({

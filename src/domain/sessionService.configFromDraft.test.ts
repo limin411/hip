@@ -173,6 +173,23 @@ describe('configFromDraft', () => {
     // Must not adopt draft's 'full'; DEFAULT_CONFIG may still set default mode.
     expect(cfg.permissionMode).not.toBe('full')
   })
+  it('chat draft carries full permission when controlPermission is armed', () => {
+    const cfg = configFromDraft({ tempId: 't', mode: 'chat', text: '', controlPermission: true })
+    expect(cfg.permissionMode).toBe('full')
+  })
+  it('chat draft stays sandboxed without controlPermission', () => {
+    expect(configFromDraft({ tempId: 't', mode: 'chat', text: '' }).permissionMode).not.toBe('full')
+  })
+  it('project draft ignores controlPermission', () => {
+    const cfg = configFromDraft({
+      tempId: 't',
+      mode: 'project',
+      cwd: '/p',
+      text: '',
+      controlPermission: true,
+    })
+    expect(cfg.permissionMode).not.toBe('full')
+  })
   it('project draft carries forcePlan and clears disablePlan', () => {
     const cfg = configFromDraft({ tempId: 't', mode: 'project', cwd: '/p', text: '', forcePlan: true })
     expect(cfg.forcePlan).toBe(true)

@@ -177,6 +177,8 @@ export const ja = {
       "disabledHint": "スキルまたはスラッシュコマンド使用中は利用できません",
       "discussion": "ディスカッションモード",
       "comingSoon": "近日公開",
+      "controlPermission": "操作権限",
+      "controlPermissionHint": "高リスク権限：有効にするとエージェントは現在のフォルダーに限らず、マシン全体を操作できます",
       "helper": "簡単な質問は通常の会話のまま。複雑な議題では顧問が複数ラウンドで議論し、hip がラウンド数・段階結論・最終決定を担います。",
       "badge": "円卓",
       "metaRounds": "ラウンド {{ran}}/{{planned}}",

@@ -61,6 +61,18 @@ describe('draftStore', () => {
     useDraftStore.getState().setRoundtable(true)
     expect(useDraftStore.getState().draft?.roundtable).toBeUndefined()
   })
+  it('setControlPermission arms chat drafts and clears with false', () => {
+    useDraftStore.getState().ensureDraft('chat')
+    useDraftStore.getState().setControlPermission(true)
+    expect(useDraftStore.getState().draft?.controlPermission).toBe(true)
+    useDraftStore.getState().setControlPermission(false)
+    expect(useDraftStore.getState().draft?.controlPermission).toBeUndefined()
+  })
+  it('setControlPermission(true) does not stick on project drafts', () => {
+    useDraftStore.getState().ensureDraft('code')
+    useDraftStore.getState().setControlPermission(true)
+    expect(useDraftStore.getState().draft?.controlPermission).toBeUndefined()
+  })
 })
 
 describe('draftStore agentId', () => {

@@ -189,6 +189,9 @@ export const zhCN = {
         /** 模式下拉占位项——尚未上线。 */
         discussion: '讨论模式',
         comingSoon: '待开发',
+        /** 高危权限：解除对话沙箱，允许操作整个本机。 */
+        controlPermission: '控制权限',
+        controlPermissionHint: '高危权限：开启后智能体可操作整个本机，不再限于当前目录',
         helper:
           '简单问题仍按普通对话回答。复杂议题：顾问多轮交锋；hip 决定讨论回合数、给出阶段性结论并拍板终案。',
         badge: '圆桌',

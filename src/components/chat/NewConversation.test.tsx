@@ -180,6 +180,18 @@ describe('NewConversation', () => {
     expect(useDraftStore.getState().draft?.roundtable).toBeUndefined()
   })
 
+  it('control permission mode in the mode dropdown arms full machine access for the first chat', () => {
+    setDraftModel('openai/gpt-4o')
+    render(<NewConversation />)
+    // Listed below the discussion placeholder; toggles the draft flag.
+    expect(screen.getByTestId('control-permission-option')).toBeInTheDocument()
+    expect(useDraftStore.getState().draft?.controlPermission).toBeUndefined()
+    fireEvent.click(screen.getByTestId('control-permission-option'))
+    expect(useDraftStore.getState().draft?.controlPermission).toBe(true)
+    fireEvent.click(screen.getByTestId('control-permission-option'))
+    expect(useDraftStore.getState().draft?.controlPermission).toBeUndefined()
+  })
+
   it('hides roundtable starter on code surface', () => {
     mockActiveView = 'code'
     setDraftModel('openai/gpt-4o')

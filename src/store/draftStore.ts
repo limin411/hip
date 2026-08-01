@@ -30,6 +30,12 @@ export interface Draft {
    * Cleared on draft reset after session commit. Ignored for project/code drafts.
    */
   roundtable?: boolean
+  /**
+   * Chat empty-state one-shot: grants full machine access (permissionMode 'full')
+   * for the committed chat session — high-risk. Cleared on draft reset after
+   * session commit. Ignored for project/code drafts.
+   */
+  controlPermission?: boolean
 }
 
 interface DraftStore {
@@ -45,6 +51,7 @@ interface DraftStore {
   setExecutionMode: (executionMode: ExecutionMode) => boolean
   setEffort: (effort: string | undefined) => void
   setRoundtable: (roundtable: boolean) => void
+  setControlPermission: (controlPermission: boolean) => void
   reset: () => void
 }
 
@@ -160,6 +167,20 @@ export const useDraftStore = create<DraftStore>()(
             return { draft: { ...base, roundtable: undefined } }
           }
           return { draft: { ...base, roundtable: true } }
+        }),
+      setControlPermission: (controlPermission) =>
+        set((s) => {
+          const base: Draft = s.draft ?? { tempId: nanoid(), mode: 'chat', text: '' }
+          if (!controlPermission) {
+            if (!base.controlPermission) return s
+            const { controlPermission: _c, ...rest } = base
+            return { draft: rest }
+          }
+          // Chat-only product surface; keep flag off project drafts.
+          if (base.mode === 'project') {
+            return { draft: { ...base, controlPermission: undefined } }
+          }
+          return { draft: { ...base, controlPermission: true } }
         }),
       reset: () => set({ draft: null }),
     }),

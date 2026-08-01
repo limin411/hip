@@ -197,6 +197,10 @@ export const en = {
         /** Mode dropdown placeholder — not shipped yet. */
         discussion: 'Discussion mode',
         comingSoon: 'Coming soon',
+        /** High-risk: lifts the chat sandbox to full machine access. */
+        controlPermission: 'Control permission',
+        controlPermissionHint:
+          'High-risk: the agent can operate anywhere on this machine, no longer limited to the current folder',
         helper:
           'Simple questions stay normal chat. Complex topics: advisors debate over multiple rounds; hip sets round count, stage conclusions, and the final decision.',
         badge: 'Roundtable',

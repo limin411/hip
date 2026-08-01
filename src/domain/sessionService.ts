@@ -2485,7 +2485,8 @@ export class SessionService {
 /** Build the committed SessionConfig from the current draft. Surface is derived from the draft
  *  mode — a project draft (folder picked) is a Code conversation; a chat draft is a sandboxed
  *  Chat conversation. The Chat new-conversation view keeps chat drafts in chat mode, so the chat
- *  branch never carries a cwd/permissionMode (Chat is picker-less). */
+ *  branch never carries a cwd (Chat is picker-less); the only chat permission override is
+ *  controlPermission, which lifts the sandbox to full machine access ('full'). */
 export function configFromDraft(draft: Draft | null): SessionConfig {
   const surface: 'chat' | 'code' = draft?.mode === 'project' ? 'code' : 'chat'
   const agents = useHipConfigStore.getState().config.agents ?? []
@@ -2496,7 +2497,11 @@ export function configFromDraft(draft: Draft | null): SessionConfig {
       ? { ...DEFAULT_CONFIG, surface, cwd: draft.cwd }
       : { ...DEFAULT_CONFIG, surface }
   const withMode: SessionConfig =
-    surface === 'code' && draft?.permissionMode ? { ...base, permissionMode: draft.permissionMode } : base
+    surface === 'code' && draft?.permissionMode
+      ? { ...base, permissionMode: draft.permissionMode }
+      : surface === 'chat' && draft?.controlPermission
+        ? { ...base, permissionMode: 'full' }
+        : base
   // executionMode / forcePlan are hip-graph only — skip when ACP primary.
   let withPlan: SessionConfig = withMode
   if (surface === 'code' && !externalAgentId) {

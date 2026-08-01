@@ -24,8 +24,9 @@ interface RoundtableStarterProps {
  * - Control permission: selectable now (high-risk — lifts the chat sandbox to
  *   full machine access for the first committed session).
  * Re-selecting the armed mode deselects it; the chip falls back to a neutral
- * "Mode selection" label. Visibility: parent only mounts on chat NewConversation
- * when ROUNDTABLE_STARTER.
+ * "Mode selection" label. The armed mode's short description is shown next to
+ * the chip in the footer strip. Visibility: parent only mounts on chat
+ * NewConversation when ROUNDTABLE_STARTER.
  */
 export function RoundtableStarter({ disabled = false }: RoundtableStarterProps) {
   const { t } = useTranslation()
@@ -52,7 +53,7 @@ export function RoundtableStarter({ disabled = false }: RoundtableStarterProps) 
   const radioValue = danger ? 'controlPermission' : active ? 'roundtable' : ''
 
   return (
-    <div className="flex min-w-0 items-center" data-testid="roundtable-starter">
+    <div className="flex min-w-0 items-center gap-2" data-testid="roundtable-starter">
       <DropdownMenu modal={false}>
         <DropdownMenuTrigger asChild>
           <ComposerChip
@@ -99,18 +100,11 @@ export function RoundtableStarter({ disabled = false }: RoundtableStarterProps) 
                 />
                 {t('chat.roundtable.chip')}
               </span>
-              <span className="flex min-w-0 items-center gap-2">
-                {active && (
-                  <span className="truncate text-caption text-ink-tertiary" data-testid="roundtable-option-desc">
-                    {t('chat.roundtable.roundtableDesc')}
-                  </span>
-                )}
-                <Check
-                  size={14}
-                  className={cn('shrink-0 text-accent', active ? 'opacity-100' : 'opacity-0')}
-                  aria-hidden
-                />
-              </span>
+              <Check
+                size={14}
+                className={cn('shrink-0 text-accent', active ? 'opacity-100' : 'opacity-0')}
+                aria-hidden
+              />
             </DropdownMenuRadioItem>
             <DropdownMenuRadioItem
               value="controlPermission"
@@ -127,25 +121,25 @@ export function RoundtableStarter({ disabled = false }: RoundtableStarterProps) 
                 />
                 {t('chat.roundtable.controlPermission')}
               </span>
-              <span className="flex min-w-0 items-center gap-2">
-                {controlPermission && (
-                  <span
-                    className="truncate text-caption text-ink-tertiary"
-                    data-testid="control-permission-option-desc"
-                  >
-                    {t('chat.roundtable.controlPermissionDesc')}
-                  </span>
-                )}
-                <Check
-                  size={14}
-                  className={cn('shrink-0 text-danger', controlPermission ? 'opacity-100' : 'opacity-0')}
-                  aria-hidden
-                />
-              </span>
+              <Check
+                size={14}
+                className={cn('shrink-0 text-danger', controlPermission ? 'opacity-100' : 'opacity-0')}
+                aria-hidden
+              />
             </DropdownMenuRadioItem>
           </DropdownMenuRadioGroup>
         </DropdownMenuContent>
       </DropdownMenu>
+      {/* Mode description sits next to the chip in the footer strip when armed. */}
+      {danger ? (
+        <span className="max-w-[200px] truncate text-caption text-danger" data-testid="control-permission-mode-desc">
+          {t('chat.roundtable.controlPermissionDesc')}
+        </span>
+      ) : active ? (
+        <span className="max-w-[200px] truncate text-caption text-ink-tertiary" data-testid="roundtable-mode-desc">
+          {t('chat.roundtable.roundtableDesc')}
+        </span>
+      ) : null}
     </div>
   )
 }

@@ -195,13 +195,13 @@ describe('NewConversation', () => {
     expect(useDraftStore.getState().draft?.roundtable).toBeUndefined()
     fireEvent.click(screen.getByTestId('roundtable-option'))
     expect(useDraftStore.getState().draft?.roundtable).toBe(true)
-    // Armed mode row shows its description on the right.
-    expect(screen.getByTestId('roundtable-option-desc')).toHaveTextContent(
+    // Armed mode shows its description next to the chip in the footer strip.
+    expect(screen.getByTestId('roundtable-mode-desc')).toHaveTextContent(
       'Multi-round debate, hip decides',
     )
     fireEvent.click(screen.getByTestId('roundtable-option'))
     expect(useDraftStore.getState().draft?.roundtable).toBeUndefined()
-    expect(screen.queryByTestId('roundtable-option-desc')).not.toBeInTheDocument()
+    expect(screen.queryByTestId('roundtable-mode-desc')).not.toBeInTheDocument()
   })
 
   it('control permission mode is a radio option: arms full machine access and clears roundtable', () => {
@@ -212,15 +212,15 @@ describe('NewConversation', () => {
     expect(useDraftStore.getState().draft?.controlPermission).toBeUndefined()
     fireEvent.click(screen.getByTestId('control-permission-option'))
     expect(useDraftStore.getState().draft?.controlPermission).toBe(true)
-    // Armed mode row shows its description on the right.
-    expect(screen.getByTestId('control-permission-option-desc')).toHaveTextContent(
+    // Armed mode shows its description next to the chip in the footer strip.
+    expect(screen.getByTestId('control-permission-mode-desc')).toHaveTextContent(
       'Full machine access (high-risk)',
     )
     // Radio semantics: arming roundtable clears control permission.
     fireEvent.click(screen.getByTestId('roundtable-option'))
     expect(useDraftStore.getState().draft?.roundtable).toBe(true)
     expect(useDraftStore.getState().draft?.controlPermission).toBeUndefined()
-    expect(screen.queryByTestId('control-permission-option-desc')).not.toBeInTheDocument()
+    expect(screen.queryByTestId('control-permission-mode-desc')).not.toBeInTheDocument()
     // Re-selecting the armed mode deselects it.
     fireEvent.click(screen.getByTestId('roundtable-option'))
     expect(useDraftStore.getState().draft?.roundtable).toBeUndefined()

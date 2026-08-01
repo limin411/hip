@@ -176,6 +176,8 @@ export const ja = {
       "chipHint": "必要なら hip が複数ラウンドの議論を進行し決定します",
       "disabledHint": "スキルまたはスラッシュコマンド使用中は利用できません",
       "modeSelect": "モード選択",
+      "roundtableDesc": "複数ラウンドで議論し、hip が決定",
+      "controlPermissionDesc": "マシン全体を操作（高リスク）",
       "controlPermission": "操作権限",
       "controlPermissionHint": "高リスク権限：有効にするとエージェントは現在のフォルダーに限らず、マシン全体を操作できます",
       "helper": "簡単な質問は通常の会話のまま。複雑な議題では顧問が複数ラウンドで議論し、hip がラウンド数・段階結論・最終決定を担います。",

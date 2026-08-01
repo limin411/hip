@@ -99,11 +99,18 @@ export function RoundtableStarter({ disabled = false }: RoundtableStarterProps) 
                 />
                 {t('chat.roundtable.chip')}
               </span>
-              <Check
-                size={14}
-                className={cn('shrink-0 text-accent', active ? 'opacity-100' : 'opacity-0')}
-                aria-hidden
-              />
+              <span className="flex min-w-0 items-center gap-2">
+                {active && (
+                  <span className="truncate text-caption text-ink-tertiary" data-testid="roundtable-option-desc">
+                    {t('chat.roundtable.roundtableDesc')}
+                  </span>
+                )}
+                <Check
+                  size={14}
+                  className={cn('shrink-0 text-accent', active ? 'opacity-100' : 'opacity-0')}
+                  aria-hidden
+                />
+              </span>
             </DropdownMenuRadioItem>
             <DropdownMenuRadioItem
               value="controlPermission"
@@ -120,11 +127,21 @@ export function RoundtableStarter({ disabled = false }: RoundtableStarterProps) 
                 />
                 {t('chat.roundtable.controlPermission')}
               </span>
-              <Check
-                size={14}
-                className={cn('shrink-0 text-danger', controlPermission ? 'opacity-100' : 'opacity-0')}
-                aria-hidden
-              />
+              <span className="flex min-w-0 items-center gap-2">
+                {controlPermission && (
+                  <span
+                    className="truncate text-caption text-ink-tertiary"
+                    data-testid="control-permission-option-desc"
+                  >
+                    {t('chat.roundtable.controlPermissionDesc')}
+                  </span>
+                )}
+                <Check
+                  size={14}
+                  className={cn('shrink-0 text-danger', controlPermission ? 'opacity-100' : 'opacity-0')}
+                  aria-hidden
+                />
+              </span>
             </DropdownMenuRadioItem>
           </DropdownMenuRadioGroup>
         </DropdownMenuContent>

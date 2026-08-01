@@ -188,6 +188,9 @@ export const zhCN = {
         disabledHint: '使用技能或斜杠命令时不可用',
         /** 模式下拉占位——未选中任何模式时的默认文案。 */
         modeSelect: '模式选择',
+        /** 选中模式的右侧描述文字。 */
+        roundtableDesc: '多轮交锋，hip 拍板',
+        controlPermissionDesc: '操作整个本机（高危）',
         /** 高危权限：解除对话沙箱，允许操作整个本机。 */
         controlPermission: '控制权限',
         controlPermissionHint: '高危权限：开启后智能体可操作整个本机，不再限于当前目录',

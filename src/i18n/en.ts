@@ -196,6 +196,9 @@ export const en = {
         disabledHint: 'Unavailable while a skill or slash command is active',
         /** Mode dropdown placeholder — label shown while no mode is armed. */
         modeSelect: 'Mode selection',
+        /** Short description shown on the right of the armed mode row. */
+        roundtableDesc: 'Multi-round debate, hip decides',
+        controlPermissionDesc: 'Full machine access (high-risk)',
         /** High-risk: lifts the chat sandbox to full machine access. */
         controlPermission: 'Control permission',
         controlPermissionHint:

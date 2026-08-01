@@ -611,7 +611,7 @@ export function applyServerMessageEffects(msg: ServerMessage, deps: ServerMessag
     }
 
     case 'worktree:changed': {
-      useWorktreeStore.getState().applyChanged(msg.worktree, msg.kind, msg.reveal)
+      useWorktreeStore.getState().applyChanged(msg.worktree, msg.kind)
       // Dual-store consistency: parallel sidebar slots are a live projection of worktrees.
       // Domain event is the fast path; list snapshot (below) is the safety net.
       if (msg.kind === 'removed') {

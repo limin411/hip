@@ -28,6 +28,7 @@ vi.mock('@/domain', async () => {
 vi.mock('@/components/layout/sidebarActions', () => ({
   selectSessionFromSidebar: vi.fn(),
 }))
+import { selectSessionFromSidebar } from '@/components/layout/sidebarActions'
 
 vi.mock('@/ipc/clipboard', () => ({
   copyText: vi.fn(async () => true),
@@ -69,7 +70,6 @@ function seedHostSession() {
         hostSessionId: 'host1',
       },
     },
-    pendingRevealPath: undefined,
   })
   useParallelStore.setState({ runs: [] })
   useProjectPathStore.getState().markOk('/repo')
@@ -128,5 +128,88 @@ describe('WorktreeControl non-git wiring (PR4 / D24)', () => {
       expect(screen.getByTestId('worktree-control-non-git')).toBeInTheDocument()
     })
     expect(screen.getByTestId('worktree-control-create-single')).toBeDisabled()
+  })
+
+  it('lists Main workspace as a row and switches back from an isolation', async () => {
+    // Active session is on an isolated worktree; catalog holds primary + the isolation.
+    useDomainStore.setState({
+      sessions: [
+        {
+          id: 'iso1',
+          config: {
+            ...DEFAULT_CONFIG,
+            surface: 'code',
+            cwd: '/repo/.hip/worktrees/iso1',
+            permissionMode: 'edit',
+          },
+          title: 'Iso',
+          preview: '',
+          updatedAtMs: 2,
+          loaded: true,
+          messages: [],
+          status: 'idle',
+          error: null,
+        },
+        {
+          id: 'host1',
+          config: {
+            ...DEFAULT_CONFIG,
+            surface: 'code',
+            cwd: '/repo',
+            permissionMode: 'edit',
+          },
+          title: 'Host',
+          preview: '',
+          updatedAtMs: 1,
+          loaded: true,
+          messages: [],
+          status: 'idle',
+          error: null,
+        },
+      ],
+      activeSessionId: 'iso1',
+      connection: 'disconnected',
+    })
+    useWorktreeStore.setState({
+      byId: {
+        primary: {
+          id: 'primary',
+          path: '/repo',
+          branch: 'main',
+          head: 'abc',
+          repoKey: 'repo',
+          isPrimary: true,
+          managed: false,
+          hostSessionId: 'host1',
+        },
+        iso1: {
+          id: 'iso1',
+          path: '/repo/.hip/worktrees/iso1',
+          branch: 'hip-iso-abc123',
+          head: 'abc',
+          repoKey: 'repo',
+          isPrimary: false,
+          managed: true,
+          hostSessionId: 'host1',
+        },
+      },
+    })
+    useParallelStore.setState({ runs: [] })
+    useProjectPathStore.getState().markOk('/repo')
+    useProjectPathStore.getState().markOk('/repo/.hip/worktrees/iso1')
+
+    render(<WorktreeControl />)
+    fireEvent.click(screen.getByTestId('worktree-control-chip'))
+    await waitFor(() => {
+      expect(screen.getByTestId('worktree-control-row-primary')).toBeInTheDocument()
+    })
+    expect(screen.getByText('Main workspace')).toBeInTheDocument()
+    // Badge counts the isolation, not the main workspace.
+    expect(screen.getByTestId('worktree-control-badge')).toHaveTextContent('1')
+
+    fireEvent.click(screen.getByTestId('worktree-control-row-primary'))
+    await waitFor(() => {
+      expect(selectSessionFromSidebar).toHaveBeenCalledWith('host1')
+    })
   })
 })

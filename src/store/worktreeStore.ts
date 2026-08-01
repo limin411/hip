@@ -21,17 +21,14 @@ interface WorktreeCatalogState {
   byId: Record<string, CatalogWorktree>
   /** Last repoKey seen (for filtering) */
   lastRepoKey?: string
-  /** Path to expand/scroll after create */
-  pendingRevealPath?: string
   /**
    * Apply an authoritative git worktree list snapshot (delta upsert + prune).
    * Rows for repoKeys covered by the list but absent from it are removed.
    */
   upsertFromList: (worktrees: WorktreeInfo[], hostSessionId?: string) => void
-  applyChanged: (record: WorktreeRecord, kind: string, reveal?: boolean) => void
+  applyChanged: (record: WorktreeRecord, kind: string) => void
   removeByPath: (path: string) => void
   clear: () => void
-  setPendingReveal: (path?: string) => void
   /** Managed non-ephemeral + primary for a host session (or all if no host filter). */
   catalogForHost: (hostSessionId?: string) => CatalogWorktree[]
 }
@@ -126,7 +123,7 @@ export const useWorktreeStore = create<WorktreeCatalogState>()((set, get) => ({
     })
   },
 
-  applyChanged: (record, kind, reveal) => {
+  applyChanged: (record, kind) => {
     set((st) => {
       const next = { ...st.byId }
       if (kind === 'removed') {
@@ -134,10 +131,7 @@ export const useWorktreeStore = create<WorktreeCatalogState>()((set, get) => ({
         for (const [id, row] of Object.entries(next)) {
           if (pathKey(row.path) === pathKey(record.path)) delete next[id]
         }
-        return {
-          byId: next,
-          pendingRevealPath: reveal ? undefined : st.pendingRevealPath,
-        }
+        return { byId: next }
       }
       const row = fromRecord(record)
       if (!isCatalogVisible(row) && !row.isPrimary) {
@@ -148,7 +142,6 @@ export const useWorktreeStore = create<WorktreeCatalogState>()((set, get) => ({
       return {
         byId: next,
         lastRepoKey: row.repoKey || st.lastRepoKey,
-        pendingRevealPath: reveal ? row.path : st.pendingRevealPath,
       }
     })
   },
@@ -164,9 +157,7 @@ export const useWorktreeStore = create<WorktreeCatalogState>()((set, get) => ({
     })
   },
 
-  clear: () => set({ byId: {}, lastRepoKey: undefined, pendingRevealPath: undefined }),
-
-  setPendingReveal: (path) => set({ pendingRevealPath: path }),
+  clear: () => set({ byId: {}, lastRepoKey: undefined }),
 
   catalogForHost: (hostSessionId) => {
     const rows = Object.values(get().byId).filter(isCatalogVisible)

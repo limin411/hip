@@ -56,7 +56,7 @@ export const zhCN = {
         createSingleCreating: '创建中…',
         createSingleFailed: '无法创建隔离工作区',
         nonGitBanner: '当前文件夹不是 git 仓库，已禁用创建。',
-        footerHint: '在侧栏中管理 · 后台临时隔离不会出现在此列表',
+        footerHint: '后台临时隔离不会出现在此列表',
         unresolvedBanner: '无法确定主工作区，创建/删除已禁用',
         openChat: '打开对话',
         copyPath: '复制路径',
@@ -1007,7 +1007,6 @@ export const zhCN = {
           codeBlock: '代码块',
           sessionTab: '会话标签',
           sessionHistory: '历史记录',
-          worktree: 'Worktree',
           fileEntry: '文件树',
           filePreview: '文件预览',
           toolCall: '工具调用',
@@ -2438,17 +2437,6 @@ export const zhCN = {
         expand: '展开 {{name}}',
         collapse: '收起 {{name}}',
       },
-      parallel: {
-        group: '并行 · {{id}}',
-        winner: '已选用',
-        slotHint: '单击打开 · 双击标记为选用方案',
-        agentSlotHint: '智能体并行槽位 — 打开宿主会话；worker 在后台运行',
-        expandWorktrees: '展开 worktree',
-        collapseWorktrees: '收起 worktree',
-        worktreeTree: '{{title}} 的 worktree',
-        slotCount: '{{count}} 个 worktree',
-        catalogGroup: 'Worktree',
-      },
     },
     dropdown: {
       newChat: '新建办公对话',
@@ -2863,14 +2851,6 @@ export const zhCN = {
       sessionHistory: {
         open: '打开',
         rename: '重命名…',
-      },
-      worktree: {
-        openHost: '打开',
-        copyPath: '复制路径',
-        pathCopied: '路径已复制',
-        copyFailed: '无法复制路径',
-        /** 打开 WorktreeDeleteDialog（始终确认；强制删除在对话框内渐进）。 */
-        remove: '删除…',
       },
       renameSession: {
         title: '重命名会话',

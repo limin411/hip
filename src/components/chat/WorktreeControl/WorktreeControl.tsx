@@ -44,7 +44,6 @@ export function WorktreeControl() {
   const sessions = useSessions()
   const runs = useParallelStore((s) => s.runs)
   const catalogById = useWorktreeStore((s) => s.byId)
-  const setPendingReveal = useWorktreeStore((s) => s.setPendingReveal)
   const pathStatus = useProjectPathStore((s) => s.statusOf(active?.config.cwd))
 
   const [popoverOpen, setPopoverOpen] = useState(false)
@@ -130,7 +129,7 @@ export function WorktreeControl() {
     return catalogMinusParallelPaths(
       useWorktreeStore.getState().catalogForHost(hostSessionId),
       parallelPaths,
-    ).filter((c) => !c.isPrimary)
+    )
   }, [hostSessionId, parallelPaths, catalogById])
 
   const activeCwd = active?.config.cwd
@@ -163,15 +162,20 @@ export function WorktreeControl() {
       key: row.id,
       path: row.path,
       branch: row.branch,
-      label: row.label || row.branch || shortWorktreeLabel(row.path, row.branch),
+      label: row.isPrimary
+        ? t('chat.worktreeControl.mainWorkspace')
+        : row.label || row.branch || shortWorktreeLabel(row.path, row.branch),
       worktreeId: row.id,
       isActive: pathKey(row.path) === activeCwdKey,
       row,
     }))
     return [...slotRows, ...catRows]
-  }, [slots, catalogRows, sessions, activeCwd])
+  }, [slots, catalogRows, sessions, activeCwd, t])
 
-  const isolationCount = listRows.length
+  // Badge / empty state count real isolations; the primary row never counts.
+  const isolationCount = listRows.filter(
+    (r) => !(r.kind === 'catalog' && r.row.isPrimary),
+  ).length
   const empty = listHydrated && !listLoading && isolationCount === 0
 
   const chipLabel = useMemo(() => {
@@ -242,7 +246,7 @@ export function WorktreeControl() {
       const target = resolveWorktreeOpenTarget({
         path: row.path,
         hostSessionId,
-        isPrimary: false,
+        isPrimary: row.kind === 'catalog' ? row.row.isPrimary : false,
         slotSessionId: row.kind === 'slot' ? row.sessionId : undefined,
         slotTaskId: row.kind === 'slot' ? row.taskId : undefined,
         sessions: sessions.map((s) => ({
@@ -255,8 +259,6 @@ export function WorktreeControl() {
         nestedSessionIds,
       })
 
-      // pendingRevealPath: written for future sidebar expand/scroll (not consumed yet).
-      setPendingReveal(row.path)
       setPopoverOpen(false)
 
       if (target.kind === 'select') {
@@ -282,7 +284,7 @@ export function WorktreeControl() {
         },
       })
     },
-    [active, hostSessionId, sessions, nestedSessionIds, setPendingReveal, t],
+    [active, hostSessionId, sessions, nestedSessionIds, t],
   )
 
   const handleCopyPath = useCallback(

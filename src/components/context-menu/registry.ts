@@ -21,7 +21,6 @@ import { mcpServerProvider } from './providers/mcpServer'
 import { messageProvider } from './providers/message'
 import { pluginProvider } from './providers/plugin'
 import { sessionHistoryProvider } from './providers/sessionHistory'
-import { worktreeProvider } from './providers/worktree'
 import { skillConfigProvider } from './providers/skillConfig'
 import { knowledgeNodeProvider } from './providers/knowledgeNode'
 import { knowledgeSpaceProvider } from './providers/knowledgeSpace'
@@ -52,7 +51,6 @@ const BUILTIN_PROVIDERS: ContextProvider[] = [
   messageProvider,
   pluginProvider,
   sessionHistoryProvider,
-  worktreeProvider,
   skillConfigProvider,
   knowledgeNodeProvider,
   knowledgeSpaceProvider,

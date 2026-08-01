@@ -49,7 +49,7 @@ export const ko = {
       "createSingleCreating": "생성 중…",
       "createSingleFailed": "격리된 작업공간을 생성할 수 없습니다",
       "nonGitBanner": "이 폴더는 git 저장소가 아닙니다. 생성이 비활성화되었습니다.",
-      "footerHint": "사이드바에서 관리 · 백그라운드 임시 격리 항목은 여기에 표시되지 않습니다",
+      "footerHint": "백그라운드 임시 격리 항목은 여기에 표시되지 않습니다",
       "unresolvedBanner": "메인 작업공간을 확인할 수 없습니다. 생성 및 삭제가 비활성화되었습니다.",
       "openChat": "채팅 열기",
       "copyPath": "경로 복사",
@@ -1029,7 +1029,6 @@ export const ko = {
         "codeBlock": "코드 블록",
         "sessionTab": "세션 탭",
         "sessionHistory": "히스토리",
-        "worktree": "작업 트리",
         "fileEntry": "파일 트리",
         "filePreview": "파일 미리보기",
         "toolCall": "도구 호출",
@@ -2397,15 +2396,6 @@ export const ko = {
       "collapse": "{{name}} 접기"
     },
     "parallel": {
-      "group": "병렬 · {{id}}",
-      "winner": "선택됨",
-      "slotHint": "클릭하여 열기 · 더블클릭하여 선택된 솔루션으로 표시",
-      "agentSlotHint": "에이전트 구동 슬롯 — 호스트 세션을 열고, 워커는 백그라운드에서 실행됩니다",
-      "expandWorktrees": "워크트리 보기",
-      "collapseWorktrees": "워크트리 숨기기",
-      "worktreeTree": "{{title}}의 워크트리",
-      "slotCount": "워크트리 {{count}}개",
-      "catalogGroup": "워크트리"
     }
   },
   "dropdown": {
@@ -2816,13 +2806,6 @@ export const ko = {
     "sessionHistory": {
       "open": "열기",
       "rename": "이름 바꾸기…"
-    },
-    "worktree": {
-      "openHost": "열기",
-      "copyPath": "경로 복사",
-      "pathCopied": "경로가 복사되었습니다",
-      "copyFailed": "경로를 복사할 수 없습니다",
-      "remove": "삭제…"
     },
     "renameSession": {
       "title": "대화 이름 바꾸기",

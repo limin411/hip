@@ -57,26 +57,6 @@ const STATIC_CATALOG: ContextMenuItemMeta[] = [
     danger: true,
   },
   {
-    id: 'worktree.openHost',
-    labelKey: 'contextMenu.worktree.openHost',
-    kind: 'worktree',
-    group: 'primary',
-  },
-  {
-    id: 'worktree.copyPath',
-    labelKey: 'contextMenu.worktree.copyPath',
-    kind: 'worktree',
-    group: 'clipboard',
-  },
-  {
-    id: 'worktree.remove',
-    labelKey: 'contextMenu.worktree.remove',
-    kind: 'worktree',
-    group: 'danger',
-    danger: true,
-  },
-  // Force remove is progressive inside WorktreeDeleteDialog (dirty path) — not a sibling menu item (D6).
-  {
     id: 'file.open',
     labelKey: 'contextMenu.file.open',
     kind: 'fileEntry',

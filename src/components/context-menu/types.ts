@@ -33,7 +33,6 @@ export type ContextKind =
   | 'knowledgeNode'
   | 'knowledgeSpace'
   | 'knowledgeTree'
-  | 'worktree'
   /** Work-item list row / calendar bar / day-more row. */
   | 'workItem'
   /** Calendar day blank / list empty create. */
@@ -66,16 +65,6 @@ export type ContextPayloadMap = {
   }
   codeBlock: { code: string; language?: string }
   sessionHistory: { sessionId: string; title: string; surface: 'chat' | 'code' }
-  /** Nested worktree row under a host project (not a top-level conversation). */
-  worktree: {
-    hostSessionId: string
-    worktreePath: string
-    label: string
-    /** Git branch when known (shown in delete confirm Modal). */
-    branch?: string
-    slotSessionId?: string
-    worktreeId?: string
-  }
   fileEntry: {
     path: string
     name: string

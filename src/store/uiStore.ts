@@ -11,7 +11,14 @@ import {
 // Lazy helpers used only inside closeKnowledgeView to avoid circular init issues
 // are imported dynamically in that method.
 
-export type ArtifactTab = 'files' | 'agents' | 'tasks' | 'outline' | 'timeline' | 'changes' | 'terminal'
+export type ArtifactTab =
+  | 'files'
+  | 'agents'
+  | 'tasks'
+  | 'outline'
+  | 'timeline'
+  | 'changes'
+  | 'terminal'
 
 /**
  * Ephemeral app mode flags (not persisted).

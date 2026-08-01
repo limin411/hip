@@ -49,7 +49,7 @@ export const ja = {
       "createSingleCreating": "作成中…",
       "createSingleFailed": "隔離ワークスペースを作成できませんでした",
       "nonGitBanner": "このフォルダーはGitリポジトリではありません。作成は無効です。",
-      "footerHint": "サイドバーで管理 · バックグラウンドの一時的な隔離はここに表示されません",
+      "footerHint": "バックグラウンドの一時的な隔離はここに表示されません",
       "unresolvedBanner": "メインワークスペースを特定できませんでした。作成と削除は無効です。",
       "openChat": "チャットを開く",
       "copyPath": "パスをコピー",
@@ -1029,7 +1029,6 @@ export const ja = {
         "codeBlock": "コードブロック",
         "sessionTab": "セッションタブ",
         "sessionHistory": "履歴",
-        "worktree": "ワークツリー",
         "fileEntry": "ファイルツリー",
         "filePreview": "ファイルプレビュー",
         "toolCall": "ツール呼び出し",
@@ -2397,15 +2396,6 @@ export const ja = {
       "collapse": "{{name}} を折りたたむ"
     },
     "parallel": {
-      "group": "並列 · {{id}}",
-      "winner": "選択済み",
-      "slotHint": "クリックで開く · ダブルクリックで選択ソリューションとしてマーク",
-      "agentSlotHint": "エージェント駆動スロット — ホストセッションを開きます。ワーカーはバックグラウンドで実行されます",
-      "expandWorktrees": "ワークツリーを表示",
-      "collapseWorktrees": "ワークツリーを非表示",
-      "worktreeTree": "{{title}} のワークツリー",
-      "slotCount": "{{count}} 個のワークツリー",
-      "catalogGroup": "ワークツリー"
     }
   },
   "dropdown": {
@@ -2816,13 +2806,6 @@ export const ja = {
     "sessionHistory": {
       "open": "開く",
       "rename": "名前を変更…"
-    },
-    "worktree": {
-      "openHost": "開く",
-      "copyPath": "パスをコピー",
-      "pathCopied": "パスをコピーしました",
-      "copyFailed": "パスをコピーできませんでした",
-      "remove": "削除…"
     },
     "renameSession": {
       "title": "会話の名前を変更",

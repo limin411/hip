@@ -100,6 +100,8 @@
   /* Density defaults — FOUC-safe before data-density exists (comfortable) */
   --row-h-sidebar: 34px;
   --row-pad-y-session: 0.5rem; /* py-2 */
+  /* 树形嵌套行（worktree 等）比主行紧凑，突出层级密度 */
+  --row-pad-y-worktree: 0.25rem; /* py-1 */
   --trail-min-h: 1.25rem; /* 20px = min-h-5 */
   --meta-gap: 0.375rem; /* 6px = gap-1.5 */
 }
@@ -108,6 +110,7 @@
 html[data-density="compact"] {
   --row-h-sidebar: 28px;
   --row-pad-y-session: 0.25rem; /* py-1 */
+  --row-pad-y-worktree: 0.125rem; /* py-0.5 */
   --trail-min-h: 1.125rem; /* 18px */
   --meta-gap: 0.25rem;
 }

@@ -2,7 +2,6 @@
 import '@testing-library/jest-dom/vitest'
 import { cleanup, fireEvent, render, screen, within } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import i18n from '@/i18n'
 import { useUiStore } from '@/store/uiStore'
 import { useDomainStore } from '@/domain'
 import { DEFAULT_CONFIG } from '@/domain/sessionStore'
@@ -24,7 +23,6 @@ const toggleHistoryOverlay = vi.fn(() => {})
 const toggleTrashOverlay = vi.fn(() => {})
 const newConversationFromSidebar = vi.fn(async (_surface: 'chat' | 'code') => {})
 const selectSessionFromSidebar = vi.fn(async (_id: string) => {})
-const openWorktreeSession = vi.fn(async (_input: unknown) => {})
 
 vi.mock('./sidebarActions', () => ({
   enterKnowledge: () => enterKnowledge(),
@@ -46,10 +44,6 @@ vi.mock('./sidebarActions', () => ({
   openSpaceFromSidebar: vi.fn(),
   selectSessionFromSidebar: (id: string) => selectSessionFromSidebar(id),
   newConversationFromSidebar: (surface: 'chat' | 'code') => newConversationFromSidebar(surface),
-}))
-
-vi.mock('@/lib/worktreeOpenAction', () => ({
-  openWorktreeSession: (input: unknown) => openWorktreeSession(input),
 }))
 
 vi.mock('@/components/knowledge/knowledgeSpaceDialogStore', () => ({
@@ -94,7 +88,6 @@ describe('AppSidebar', () => {
     toggleTrashOverlay.mockClear()
     newConversationFromSidebar.mockClear()
     selectSessionFromSidebar.mockClear()
-    openWorktreeSession.mockClear()
     knowledgeState.spaces = []
     knowledgeState.activeSpaceId = null
     useNavHistoryStore.setState({ stack: [], index: -1, applying: false })
@@ -385,7 +378,7 @@ describe('AppSidebar', () => {
     expect(screen.getByTestId('sidebar-session-chat-1')).not.toHaveAttribute('aria-busy')
   })
 
-  it('shows expandable worktree tree under host project session', () => {
+  it('does not render worktree tree rows or badges in the sidebar (managed in composer)', () => {
     useUiStore.setState({ sidebarSection: 'projects', activeView: 'code' })
     useParallelStore.setState({
       runs: [
@@ -419,81 +412,12 @@ describe('AppSidebar', () => {
     })
     render(<AppSidebar />)
     expect(screen.getByTestId('sidebar-session-code-1')).toBeInTheDocument()
-    expect(screen.getByTestId('sidebar-session-expand-code-1')).toHaveAttribute(
-      'aria-expanded',
-      'true',
-    )
-    expect(screen.getByTestId('sidebar-session-worktrees-code-1')).toBeInTheDocument()
-    expect(screen.getByTestId('sidebar-session-wt-badge-code-1')).toHaveTextContent('2')
-    expect(screen.getByTestId('sidebar-parallel-slot-pwt-1')).toBeInTheDocument()
-
-    fireEvent.click(screen.getByTestId('sidebar-session-expand-code-1'))
-    expect(screen.getByTestId('sidebar-session-expand-code-1')).toHaveAttribute(
-      'aria-expanded',
-      'false',
-    )
+    // Tree rows and the count badge no longer render in the sidebar.
     expect(screen.queryByTestId('sidebar-session-worktrees-code-1')).not.toBeInTheDocument()
+    expect(screen.queryByTestId('sidebar-session-expand-code-1')).not.toBeInTheDocument()
+    expect(screen.queryByTestId('sidebar-session-wt-badge-code-1')).not.toBeInTheDocument()
   })
 
-  it('active worktree slot uses surface wash without left rail or hairline ring', () => {
-    useUiStore.setState({ sidebarSection: 'projects', activeView: 'code' })
-    useDomainStore.setState({
-      sessions: [
-        {
-          id: 'code-1',
-          title: 'Code project',
-          preview: 'repo work',
-          updatedAtMs: Date.now(),
-          config: { ...DEFAULT_CONFIG, surface: 'code' },
-          messages: [],
-          status: 'idle',
-          loaded: true,
-        },
-        {
-          id: 'slot-1',
-          title: 'P1 slot',
-          preview: 'slot',
-          updatedAtMs: Date.now(),
-          config: {
-            ...DEFAULT_CONFIG,
-            surface: 'code',
-            cwd: '/tmp/wt/run-abc/hip-p-1',
-          },
-          messages: [],
-          status: 'idle',
-          loaded: true,
-        },
-      ],
-      activeSessionId: 'slot-1',
-    } as never)
-    useParallelStore.setState({
-      runs: [
-        {
-          id: 'run-abc',
-          baseCwd: '/tmp/repo',
-          prompt: 'parallel fix',
-          hostSessionId: 'code-1',
-          source: 'agent',
-          createdAt: Date.now(),
-          slots: [
-            {
-              index: 1,
-              sessionId: 'slot-1',
-              taskId: 'pwt-1',
-              worktreePath: '/tmp/wt/run-abc/hip-p-1',
-              branch: 'hip-p-1',
-              status: 'ready',
-            },
-          ],
-        },
-      ],
-    })
-    render(<AppSidebar />)
-    const slot = screen.getByTestId('sidebar-parallel-slot-slot-1')
-    expect(slot).not.toHaveClass('before:bg-accent')
-    expect(slot).toHaveClass('bg-state-active')
-    expect(slot.className).not.toMatch(/shadow-\[0_0_0_1px/)
-  })
 
   it('keeps orphan worktree sessions top-level when no host tree can render them', () => {
     // Without catalog/parallel binding, nesting would make the session unreachable.
@@ -581,7 +505,6 @@ describe('AppSidebar', () => {
     render(<AppSidebar />)
     expect(screen.getByTestId('sidebar-session-code-1')).toBeInTheDocument()
     expect(screen.queryByTestId('sidebar-session-slot-bound')).not.toBeInTheDocument()
-    expect(screen.getByTestId('sidebar-catalog-wt-wt-1')).toBeInTheDocument()
   })
 
   it('keeps host project visible after primary worktree catalog hydrate (click regression)', () => {
@@ -634,179 +557,8 @@ describe('AppSidebar', () => {
     expect(screen.getByTestId('sidebar-session-code-1')).toBeInTheDocument()
   })
 
-  it('catalog worktree row opens bound session via openWorktreeSession (not host)', () => {
-    const hostCwd = '/Users/x/data/code-repository/project-go/forgejo'
-    const wtPath = '/Users/x/.hip/worktrees/forgejo-p1'
-    useUiStore.setState({ sidebarSection: 'projects', activeView: 'code' })
-    useDomainStore.setState((st) => ({
-      ...st,
-      sessions: [
-        {
-          id: 'code-1',
-          title: 'Forgejo',
-          preview: 'repo',
-          updatedAtMs: Date.now(),
-          config: { ...DEFAULT_CONFIG, surface: 'code', cwd: hostCwd },
-          messages: [],
-          status: 'idle',
-          loaded: true,
-        },
-        {
-          id: 'wt-sess',
-          title: 'P1',
-          preview: 'slot',
-          updatedAtMs: Date.now(),
-          config: { ...DEFAULT_CONFIG, surface: 'code', cwd: wtPath },
-          messages: [],
-          status: 'idle',
-          loaded: true,
-        },
-      ],
-      activeSessionId: 'code-1',
-    }) as never)
-    useWorktreeStore.getState().upsertFromList(
-      [
-        {
-          id: 'primary',
-          path: hostCwd,
-          branch: 'main',
-          head: 'abc',
-          managed: false,
-          isPrimary: true,
-          source: 'primary',
-          repoKey: 'rk',
-        },
-        {
-          id: 'slot-wt',
-          path: wtPath,
-          branch: 'hip-p-1',
-          head: 'def',
-          managed: true,
-          isPrimary: false,
-          source: 'host_fanout',
-          repoKey: 'rk',
-        },
-      ],
-      'code-1',
-    )
-    render(<AppSidebar />)
-    fireEvent.click(screen.getByTestId('sidebar-catalog-wt-slot-wt'))
-    expect(openWorktreeSession).toHaveBeenCalledWith(
-      expect.objectContaining({
-        path: wtPath,
-        hostSessionId: 'code-1',
-      }),
-    )
-    // Must not fall back to selecting the host project session directly.
-    expect(selectSessionFromSidebar).not.toHaveBeenCalledWith('code-1')
-  })
 
-  it('parallel slot row opens worktree session via openWorktreeSession', () => {
-    useUiStore.setState({ sidebarSection: 'projects', activeView: 'code' })
-    useDomainStore.setState((st) => ({
-      ...st,
-      sessions: [
-        ...(st.sessions as never[]),
-        {
-          id: 'slot-1',
-          title: 'P1 slot',
-          preview: 'slot',
-          updatedAtMs: Date.now(),
-          config: {
-            ...DEFAULT_CONFIG,
-            surface: 'code',
-            cwd: '/tmp/wt/run-abc/hip-p-1',
-          },
-          messages: [],
-          status: 'idle',
-          loaded: true,
-        },
-      ],
-      activeSessionId: 'code-1',
-    }) as never)
-    useParallelStore.setState({
-      runs: [
-        {
-          id: 'run-abc',
-          baseCwd: '/tmp/repo',
-          prompt: 'parallel fix',
-          hostSessionId: 'code-1',
-          source: 'host',
-          createdAt: Date.now(),
-          slots: [
-            {
-              index: 1,
-              sessionId: 'slot-1',
-              worktreePath: '/tmp/wt/run-abc/hip-p-1',
-              branch: 'hip-p-1',
-              status: 'ready',
-            },
-          ],
-        },
-      ],
-    })
-    render(<AppSidebar />)
-    fireEvent.click(screen.getByTestId('sidebar-parallel-slot-slot-1'))
-    expect(openWorktreeSession).toHaveBeenCalledWith(
-      expect.objectContaining({
-        path: '/tmp/wt/run-abc/hip-p-1',
-        hostSessionId: 'code-1',
-        slotSessionId: 'slot-1',
-      }),
-    )
-  })
 
-  it('humanizes catalog worktree source subtitle (no raw enum leak)', async () => {
-    await i18n.changeLanguage('en')
-    const hostCwd = '/Users/x/data/code-repository/project-go/forgejo'
-    useUiStore.setState({ sidebarSection: 'projects', activeView: 'code' })
-    useDomainStore.setState((st) => ({
-      ...st,
-      sessions: [
-        {
-          id: 'code-1',
-          title: 'Forgejo',
-          preview: 'repo',
-          updatedAtMs: Date.now(),
-          config: { ...DEFAULT_CONFIG, surface: 'code', cwd: hostCwd },
-          messages: [],
-          status: 'idle',
-          loaded: true,
-        },
-      ],
-      activeSessionId: 'code-1',
-    }) as never)
-    useWorktreeStore.getState().upsertFromList(
-      [
-        {
-          id: 'primary',
-          path: hostCwd,
-          branch: 'main',
-          head: 'abc',
-          managed: false,
-          isPrimary: true,
-          source: 'primary',
-          repoKey: 'rk',
-        },
-        {
-          id: 'slot-wt',
-          path: '/Users/x/.hip/worktrees/forgejo-p1',
-          branch: 'hip-p-1',
-          head: 'def',
-          managed: true,
-          isPrimary: false,
-          source: 'host_fanout',
-          repoKey: 'rk',
-        },
-      ],
-      'code-1',
-    )
-    render(<AppSidebar />)
-    const row = screen.getByTestId('sidebar-catalog-wt-slot-wt')
-    // Label comes from chat.worktreeControl.source.host_fanout (en: Batch create).
-    expect(row).toHaveTextContent('Batch create')
-    expect(row).not.toHaveTextContent('host_fanout')
-  })
 
   it('marks project group when path is missing on disk', () => {
     useUiStore.setState({ sidebarSection: 'projects', activeView: 'code' })

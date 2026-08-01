@@ -61,7 +61,7 @@ export const en = {
         createSingleFailed: 'Could not create isolated workspace',
         /** D24: only after create/op error — never from empty list alone. */
         nonGitBanner: 'This folder is not a git repository. Create is disabled.',
-        footerHint: 'Manage in the sidebar · Background temporary isolates do not appear here',
+        footerHint: 'Background temporary isolates do not appear here',
         unresolvedBanner: 'Could not determine the main workspace. Create and delete are disabled.',
         openChat: 'Open chat',
         copyPath: 'Copy path',
@@ -1029,7 +1029,6 @@ export const en = {
           codeBlock: 'Code blocks',
           sessionTab: 'Session tabs',
           sessionHistory: 'History',
-          worktree: 'Worktrees',
           fileEntry: 'File tree',
           filePreview: 'File preview',
           toolCall: 'Tool calls',
@@ -2498,17 +2497,6 @@ export const en = {
         expand: 'Expand {{name}}',
         collapse: 'Collapse {{name}}',
       },
-      parallel: {
-        group: 'Parallel · {{id}}',
-        winner: 'selected',
-        slotHint: 'Click to open · double-click to mark as selected solution',
-        agentSlotHint: 'Agent-driven slot — opens the host session; workers run in background',
-        expandWorktrees: 'Show worktrees',
-        collapseWorktrees: 'Hide worktrees',
-        worktreeTree: 'Worktrees for {{title}}',
-        slotCount: '{{count}} worktrees',
-        catalogGroup: 'Worktrees',
-      },
     },
     dropdown: {
       newChat: 'New Work Chat',
@@ -2931,14 +2919,6 @@ export const en = {
       sessionHistory: {
         open: 'Open',
         rename: 'Rename…',
-      },
-      worktree: {
-        openHost: 'Open',
-        copyPath: 'Copy path',
-        pathCopied: 'Path copied',
-        copyFailed: 'Could not copy path',
-        /** Opens WorktreeDeleteDialog (confirm always; force progressive inside dialog). */
-        remove: 'Delete…',
       },
       renameSession: {
         title: 'Rename conversation',

@@ -257,8 +257,14 @@ export function SessionHistory({
                         <span className="min-w-0 truncate text-body font-medium text-ink">
                           {session.title}
                         </span>
-                        <span className="shrink-0 rounded-md bg-surface-muted px-1.5 py-0.5 text-caption font-medium text-ink-secondary">
-                          {t(`nav.${surface}`)}
+                        <span
+                          className={
+                            surface === 'code'
+                              ? 'shrink-0 rounded-md px-1.5 py-0.5 text-caption font-medium text-success'
+                              : 'shrink-0 rounded-md px-1.5 py-0.5 text-caption font-medium text-accent'
+                          }
+                        >
+                          {surface === 'chat' ? t('sidebar.nav.chats') : t('sidebar.nav.projects')}
                         </span>
                         {session.preview ? (
                           <span className="min-w-0 max-w-[14rem] truncate text-meta text-ink-tertiary">

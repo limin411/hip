@@ -440,7 +440,9 @@ export function RecycleBinPage({
                   ? t('trash.kind.workItem')
                   : row.source === 'automation'
                     ? t('trash.kind.automation')
-                    : t(`nav.${row.surface}`)
+                    : row.surface === 'chat'
+                      ? t('sidebar.nav.chats')
+                      : t('sidebar.nav.projects')
             const secondary =
               row.source === 'session'
                 ? row.preview
@@ -527,7 +529,15 @@ export function RecycleBinPage({
                     <span className="min-w-0 truncate text-body font-medium text-ink">
                       {row.title}
                     </span>
-                    <span className="shrink-0 rounded-md bg-surface-muted px-1.5 py-0.5 text-caption font-medium text-ink-secondary">
+                    <span
+                      className={
+                        row.source === 'session'
+                          ? row.surface === 'code'
+                            ? 'shrink-0 rounded-md px-1.5 py-0.5 text-caption font-medium text-success'
+                            : 'shrink-0 rounded-md px-1.5 py-0.5 text-caption font-medium text-accent'
+                          : 'shrink-0 rounded-md bg-surface-muted px-1.5 py-0.5 text-caption font-medium text-ink-secondary'
+                      }
+                    >
                       {kindLabel}
                     </span>
                     {secondary ? (

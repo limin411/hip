@@ -919,9 +919,7 @@ function SidebarSessionRow({
             <span
               className={cn(
                 'shrink-0 rounded-md px-1.5 py-px text-caption',
-                surface === 'code'
-                  ? 'bg-success/10 text-success'
-                  : 'bg-surface-muted text-ink-tertiary',
+                surface === 'code' ? 'text-success' : 'text-accent',
               )}
               aria-hidden
             >

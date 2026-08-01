@@ -192,13 +192,17 @@ export function FileTree() {
           >
             <RefreshCw size={13} strokeWidth={1.75} />
           </button>
-          <button
-            title={t('artifact.changeFolder')}
-            onClick={choose}
-            className="rounded-md p-1 text-ink-tertiary transition-colors duration-chrome hover:bg-state-hover hover:text-ink"
-          >
-            <Folder size={13} strokeWidth={1.75} />
-          </button>
+          {/* Change-folder (directory picker) is draft/sandbox-only — committed project
+              sessions keep the folder bound at creation. */}
+          {isDraft && (
+            <button
+              title={t('artifact.changeFolder')}
+              onClick={choose}
+              className="rounded-md p-1 text-ink-tertiary transition-colors duration-chrome hover:bg-state-hover hover:text-ink"
+            >
+              <Folder size={13} strokeWidth={1.75} />
+            </button>
+          )}
         </div>
       </div>
       <div className="flex-1 overflow-auto py-1">

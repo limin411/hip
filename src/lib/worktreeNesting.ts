@@ -12,12 +12,14 @@ const SLOT_TITLE_RE = /^P\d+\/\d+ · /
 
 /**
  * Paths under hip's managed worktree roots (default ~/.hip/worktrees, eval runs).
- * HIP_WORKTREES_DIR can relocate the root; callers should also pass explicit known paths.
+ * Roots are always named `worktrees` — default ~/.hip/worktrees, and relocations via
+ * HIP_DATA_DIR (<dir>/worktrees) or HIP_WORKTREES_DIR — so match any `worktrees`
+ * path segment regardless of where the root lives.
  */
 export function isManagedWorktreePath(cwd: string | undefined | null): boolean {
   if (!cwd) return false
   const p = pathKey(cwd)
-  return /\/\.hip\/worktrees(\/|$)/i.test(p) || /\/\.hip\/eval-runs\/worktrees(\/|$)/i.test(p)
+  return /(^|\/)worktrees(\/|$)/i.test(p)
 }
 
 export function isParallelSlotTitle(title: string | undefined | null): boolean {

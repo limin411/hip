@@ -18,6 +18,12 @@ describe('worktreeNesting', () => {
   it('detects managed worktree paths and slot titles', () => {
     expect(isManagedWorktreePath('/Users/x/.hip/worktrees/run/slot')).toBe(true)
     expect(isManagedWorktreePath('/Users/x/.hip/eval-runs/worktrees/x')).toBe(true)
+    // Relocated root via HIP_DATA_DIR / HIP_WORKTREES_DIR (e.g. e2e temp dir).
+    expect(
+      isManagedWorktreePath(
+        '/var/folders/gn/xyz/T/hip-e2e-data-abc/worktrees/run/hip-parallel-0',
+      ),
+    ).toBe(true)
     expect(isManagedWorktreePath('/Users/x/code/repo')).toBe(false)
     expect(isParallelSlotTitle('P1/2 · abcdef')).toBe(true)
     expect(isParallelSlotTitle('项目前后端架构并行分析')).toBe(false)

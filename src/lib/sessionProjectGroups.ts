@@ -3,6 +3,7 @@
  */
 
 import { surfaceOf } from './sessions'
+import { isManagedWorktreePath } from './worktreeNesting'
 
 export function projectPathKey(cwd: string | undefined | null): string {
   if (!cwd?.trim()) return ''
@@ -34,7 +35,10 @@ export function listOpenProjectFolders(
     config: Parameters<typeof surfaceOf>[0]
   }>,
 ): Array<{ pathKey: string; cwd: string; label: string }> {
-  const code = sessions.filter((s) => surfaceOf(s.config) === 'code')
+  const code = sessions.filter(
+    (s) =>
+      surfaceOf(s.config) === 'code' && !isManagedWorktreePath(s.config.cwd),
+  )
   return groupSessionsByProjectPath(code)
     .filter((g) => Boolean(g.pathKey && g.cwd))
     .map((g) => ({ pathKey: g.pathKey, cwd: g.cwd as string, label: g.label }))

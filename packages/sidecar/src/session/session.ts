@@ -171,6 +171,8 @@ export class Session {
   } | null = null
   private readonly injectedSummarizer?: Summarizer
   private modelDirty = false
+  /** Terminal context pushed by the UI (ring tail / D11 switch note), terminal surface. */
+  private terminalContext?: { note?: string; ringTail?: string }
   private turnSeq = 0
   private stopContinued = false
   private goalContinued = false
@@ -663,6 +665,14 @@ export class Session {
   }
 
   setAgentProfile(id: string): boolean { return this.profileMgr.setActiveProfile(id, this.getFixedAgents()) }
+
+  setTerminalContext(payload: { note?: string; ringTail?: string }): void {
+    this.terminalContext = payload
+  }
+
+  getTerminalContext(): { note?: string; ringTail?: string } | undefined {
+    return this.terminalContext
+  }
   getActiveProfile(): AgentProfile { return this.profileMgr.getActiveProfile(this.getFixedAgents()) }
   listProfiles(): AgentProfile[] { return this.profileMgr.listProfiles(this._config.cwd, this.getFixedAgents()) }
 

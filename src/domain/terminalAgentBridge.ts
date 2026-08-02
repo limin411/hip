@@ -56,6 +56,16 @@ export function isInteractiveTuiCommand(command: string): boolean {
   return TUI_PATTERNS.some((re) => re.test(command))
 }
 
+/** Opt-in exit-code wrapper (P1): prints a machine-readable marker after the command. */
+export function wrapForEc(command: string): string {
+  return `${command}; printf '\\n__HIP_EC_EXIT=%s\\n' "$?"`
+}
+
+export function extractExitCode(output: string): number | null {
+  const m = /__HIP_EC_EXIT=(\d+)/.exec(output)
+  return m ? Number(m[1]) : null
+}
+
 function sleep(ms: number): Promise<void> {
   return new Promise((r) => setTimeout(r, ms))
 }
@@ -89,6 +99,7 @@ async function runExec(
   send: (m: ClientMessage) => void,
 ): Promise<void> {
   const { sessionId, callId, command, waitMs } = msg
+  const wrapEc = msg.wrapEc === true
   const tmId = terminalIdForSession(sessionId)
   if (!tmId) {
     send({ type: 'session:uiToolResult', sessionId, callId, ok: false, status: 'error', error: 'terminal session not bound' })
@@ -161,6 +172,7 @@ async function runExec(
     flightAborters.delete(tmId)
     useTerminalAgentStore.getState().setExecFlight(tmId, null)
     const { output } = useTerminalStore.getState().getRingSince(tmId, startCursor)
+    const exitCode = extractExitCode(output)
     send({
       type: 'session:uiToolResult',
       sessionId,
@@ -171,6 +183,7 @@ async function runExec(
         ? { output: clipExecOutput(opts.output ?? output) }
         : {}),
       ...(opts.mayStillRun !== undefined ? { mayStillRun: opts.mayStillRun } : {}),
+      ...(exitCode !== null ? { exitCode } : {}),
       ...(opts.error ? { error: opts.error } : {}),
     })
   }
@@ -185,7 +198,7 @@ async function runExec(
       finish('rejected', { mayStillRun: false, error: 'dangerous command rejected by user' })
       return
     }
-    await sshWrite(tmId, `${command}\n`)
+    await sshWrite(tmId, `${wrapEc ? wrapForEc(command) : command}\n`)
   } catch (err) {
     finish('error', { mayStillRun: false, error: errorMessage(err) })
     return

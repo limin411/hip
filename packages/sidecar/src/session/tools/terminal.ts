@@ -139,6 +139,7 @@ export function buildTerminalTools(opts: TerminalToolOpts): StructuredToolInterf
         command,
         waitMs,
         poll: input.poll !== false,
+        ...(input.wrapEc === true ? { wrapEc: true } : {}),
       })
       const raw = await pending
       if (raw.type === 'session:uiToolRead:result') {

@@ -34,6 +34,14 @@ export interface InjectorState {
   openFilePath?: string
   /** Optional short excerpt of the open file. */
   openFileExcerpt?: string
+  /** Terminal surface: host/record metadata for the §5.5 context block. */
+  terminalMeta?: {
+    managedTerminalId?: string
+    hostId?: string
+    remotePathHint?: string
+  }
+  /** Terminal surface: UI-pushed ring tail + multi-session switch note (D11). */
+  terminalContext?: { note?: string; ringTail?: string }
 }
 
 // ── Result ─────────────────────────────────────────────────────────────────────
@@ -129,6 +137,27 @@ export class PermissionModeInjector implements ContextInjector {
       cwd: state.cwd,
     })
     return { systemMessages: [narrative] }
+  }
+}
+
+/** Terminal surface: injects the UI-pushed ring tail + D11 note (§5.5 / P1). */
+export class TerminalContextInjector implements ContextInjector {
+  readonly id = 'terminal-context'
+
+  async inject(state: InjectorState): Promise<InjectResult> {
+    if (state.surface !== 'terminal') return { systemMessages: [] }
+    const meta = state.terminalMeta
+    const ctx = state.terminalContext
+    if (!meta && !ctx?.note && !ctx?.ringTail?.trim()) return { systemMessages: [] }
+    const lines = ['## Terminal context']
+    if (meta?.managedTerminalId) lines.push(`Terminal id: ${meta.managedTerminalId}`)
+    if (meta?.hostId) lines.push(`Host id: ${meta.hostId}`)
+    if (meta?.remotePathHint) lines.push(`Remote path hint: ${meta.remotePathHint}`)
+    if (ctx?.note) lines.push(`Note: ${ctx.note}`)
+    if (ctx?.ringTail?.trim()) {
+      lines.push('Recent terminal output (may be truncated):', '```', ctx.ringTail, '```')
+    }
+    return { systemMessages: [lines.join('\n')] }
   }
 }
 

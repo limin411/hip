@@ -115,6 +115,7 @@ describe('AppSidebar', () => {
           messages: [],
           status: 'idle',
           loaded: true,
+          error: null,
         },
         {
           id: 'code-1',
@@ -125,6 +126,7 @@ describe('AppSidebar', () => {
           messages: [],
           status: 'idle',
           loaded: true,
+          error: null,
         },
       ],
       activeSessionId: 'chat-1',
@@ -341,6 +343,7 @@ describe('AppSidebar', () => {
           messages: [],
           status: 'idle',
           loaded: true,
+          error: null,
         },
       ],
     }))

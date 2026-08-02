@@ -406,6 +406,8 @@ export type ServerMessage =
       command: string
       waitMs: number
       poll: boolean
+      /** Opt-in __HIP_EC exit-code wrapper (P1). */
+      wrapEc?: boolean
     }
   /**
    * Read-only tool bridge request (terminal_read / sftp_read). No HITL — the UI

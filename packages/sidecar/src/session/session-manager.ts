@@ -209,8 +209,11 @@ export class SessionManager {
       },
       setTerminalContext: (sessionId, payload) => {
         this.terminalContexts.set(sessionId, payload)
+        this.sessions.get(sessionId)?.setTerminalContext(payload)
       },
-      getTerminalContext: (sessionId) => this.terminalContexts.get(sessionId),
+      getTerminalContext: (sessionId) =>
+        this.sessions.get(sessionId)?.getTerminalContext() ??
+        this.terminalContexts.get(sessionId),
       destroySession: (id) => this.destroySession(id),
       getSession: (id) => this.sessions.get(id),
       deleteSessionSync: (id, send, opts) => this.hardDeleteSessionSync(id, send, opts),

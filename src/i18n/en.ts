@@ -1930,6 +1930,13 @@ export const en = {
         execError: 'Command failed',
         execAborted: 'Execution wait aborted',
         userInterleaved: 'You typed while the command was running; results may be mixed.',
+        sendCtrlC: 'Send Ctrl-C',
+        continueWatching: 'Keep watching',
+        continueWatchingPrompt:
+          'Keep watching the terminal: poll terminal_read and report what happened.',
+        askUser: 'Ask the user',
+        askUserPrompt:
+          'Ask me whether the previous command finished before drawing conclusions.',
         sessionsGroup: 'Agent chats for {{title}}',
         deleteTitle: 'Delete agent chat?',
         deleteBody:

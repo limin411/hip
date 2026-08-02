@@ -2047,6 +2047,18 @@ export class SessionService {
     }
   }
 
+  /** Push the current ring tail (P1 TerminalContextInjector) for a terminal session. */
+  sendTerminalContext(sessionId: string): void {
+    const sess = useDomainStore.getState().sessions.find((s) => s.id === sessionId)
+    if (!sess || !isTerminalSession(sess.config) || !sess.config.managedTerminalId) return
+    const tmId = sess.config.managedTerminalId
+    const ring = useTerminalStore.getState().getSession(tmId)
+    if (!ring) return
+    const tailStart = Math.max(0, ring.trimOffset + ring.ring.length - 4096)
+    const { output } = useTerminalStore.getState().getRingSince(tmId, tailStart)
+    this.transport.send({ type: 'session:terminalContext', sessionId, ringTail: output })
+  }
+
   getLastOutboundUserContent(): string | null {
     return this.lastOutboundUserContent
   }

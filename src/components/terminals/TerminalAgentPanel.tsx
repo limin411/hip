@@ -1,13 +1,14 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import type { TFunction } from 'i18next'
-import { Loader2, Plus, Send, TerminalSquare } from 'lucide-react'
+import { Loader2, Plus, Send, TerminalSquare, XCircle } from 'lucide-react'
 import { sessionService } from '@/domain'
 import { useDomainStore } from '@/domain/sessionStore'
 import { useManagedTerminalStore } from '@/store/managedTerminalStore'
 import { useTerminalAgentStore } from '@/store/terminalAgentStore'
 import { useTerminalHostStore } from '@/store/terminalHostStore'
 import { useAgents } from '@/store/hipConfigStore'
+import { sshWrite } from '@/ipc/ssh'
 import { terminalSessionsFor } from '@/store/terminalAgentStore'
 import { isTerminalSession } from '@/lib/sessions'
 import { MarkdownBody } from '@/components/chat/MarkdownBody'
@@ -16,7 +17,17 @@ import { cn } from '@/lib/utils'
 import type { Message, ToolCall } from '@hip/protocol'
 import { startTerminalAgentChat } from './terminalAgentSession'
 
-function ToolCard({ tool, t }: { tool: ToolCall; t: TFunction }) {
+function ToolCard({
+  tool,
+  t,
+  terminalId,
+  sessionId,
+}: {
+  tool: ToolCall
+  t: TFunction
+  terminalId: string
+  sessionId: string
+}) {
   let inputText = ''
   try {
     inputText = typeof tool.input === 'string' ? tool.input : JSON.stringify(tool.input, null, 2)
@@ -24,6 +35,7 @@ function ToolCard({ tool, t }: { tool: ToolCall; t: TFunction }) {
     inputText = String(tool.input ?? '')
   }
   const isExec = tool.name === 'terminal_exec'
+  const timedOut = isExec && /status: timed_out/.test(tool.output ?? '')
   const statusLabel =
     tool.status === 'error'
       ? t('terminals.agent.execError')
@@ -59,11 +71,59 @@ function ToolCard({ tool, t }: { tool: ToolCall; t: TFunction }) {
       {tool.error ? (
         <p className="mt-1 text-caption text-danger">{tool.error}</p>
       ) : null}
+      {timedOut ? (
+        <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
+          <span className="text-caption text-warning">
+            {t('terminals.agent.execTimedOut')}
+          </span>
+          <button
+            type="button"
+            onClick={() => void sshWrite(terminalId, '\x03')}
+            className="rounded-sm border border-border bg-surface px-1.5 py-0.5 text-caption text-ink-secondary hover:bg-state-hover"
+            data-testid="terminal-tool-send-ctrl-c"
+          >
+            {t('terminals.agent.sendCtrlC')}
+          </button>
+          <button
+            type="button"
+            onClick={() =>
+              sessionService.sendMessageToSession(
+                sessionId,
+                t('terminals.agent.continueWatchingPrompt'),
+              )
+            }
+            className="rounded-sm border border-border bg-surface px-1.5 py-0.5 text-caption text-ink-secondary hover:bg-state-hover"
+            data-testid="terminal-tool-continue-watching"
+          >
+            {t('terminals.agent.continueWatching')}
+          </button>
+          <button
+            type="button"
+            onClick={() =>
+              sessionService.sendMessageToSession(sessionId, t('terminals.agent.askUserPrompt'))
+            }
+            className="rounded-sm border border-border bg-surface px-1.5 py-0.5 text-caption text-ink-secondary hover:bg-state-hover"
+            data-testid="terminal-tool-ask-user"
+          >
+            {t('terminals.agent.askUser')}
+          </button>
+        </div>
+      ) : null}
     </div>
   )
 }
 
-function MessageRow({ message, t }: { message: Message; t: TFunction }) {
+function MessageRow({
+  message,
+  t,
+  terminalId,
+  sessionId,
+}: {
+  message: Message
+  t: TFunction
+  terminalId: string
+  sessionId: string
+}) {
   const isUser = message.role === 'user'
   if (message.role === 'notice') {
     return (
@@ -94,7 +154,7 @@ function MessageRow({ message, t }: { message: Message; t: TFunction }) {
       {message.toolCalls && message.toolCalls.length > 0 ? (
         <div className="flex w-full flex-col gap-1">
           {message.toolCalls.map((tc) => (
-          <ToolCard key={tc.callId} tool={tc} t={t} />
+            <ToolCard key={tc.callId} tool={tc} t={t} terminalId={terminalId} sessionId={sessionId} />
           ))}
         </div>
       ) : null}
@@ -166,6 +226,7 @@ function CompactComposer({
   const send = () => {
     const value = text.trim()
     if (!value || disabled) return
+    sessionService.sendTerminalContext(sessionId)
     sessionService.sendMessageToSession(sessionId, value)
     setText('')
   }
@@ -249,6 +310,12 @@ export function TerminalAgentPanel({ terminalId }: { terminalId: string }) {
       activeSessionId ? s.sessions.find((x) => x.id === activeSessionId) : undefined,
     ) ?? sessionsForTerminal[0]
 
+  const activeAgentKind = active?.config.agentId
+    ? agents.find((a) => a.id === active.config.agentId)?.kind
+    : undefined
+  const acpLimited =
+    activeAgentKind === 'acp' || activeAgentKind === 'opencode'
+
   useEffect(() => {
     if (active && !active.loaded) {
       sessionService.loadSessionMessages(active.id)
@@ -307,9 +374,27 @@ export function TerminalAgentPanel({ terminalId }: { terminalId: string }) {
                 <p className="text-caption text-ink-tertiary">{t('terminals.agent.emptyBody')}</p>
               </div>
             ) : (
-              active.messages.map((m) => <MessageRow key={m.id} message={m} t={t} />)
+              active.messages.map((m) => (
+                <MessageRow
+                  key={m.id}
+                  message={m}
+                  t={t}
+                  terminalId={terminalId}
+                  sessionId={active.id}
+                />
+              ))
             )}
           </div>
+
+          {acpLimited ? (
+            <div
+              className="flex shrink-0 items-start gap-1.5 border-t border-border px-2 py-1.5 text-caption text-ink-secondary"
+              data-testid="terminal-acp-limited"
+            >
+              <XCircle size={12} className="mt-0.5 shrink-0 text-ink-tertiary" />
+              {t('terminals.agent.acpLimited')}
+            </div>
+          ) : null}
 
           {active.pendingPermission ? (
             <div className="shrink-0 px-2 pb-2">

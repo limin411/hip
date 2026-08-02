@@ -77,6 +77,7 @@ import {
   SystemPromptInjector,
   CurrentTimeInjector,
   PermissionModeInjector,
+  TerminalContextInjector,
   TokenBudgetInjector,
   SubagentStatusInjector,
 } from './context-injector.js'
@@ -208,6 +209,8 @@ export interface SessionTurnHost {
   turnSeq: number
   stopContinued: boolean
   goalContinued: boolean
+  /** Terminal context pushed by the UI (ring tail / D11 note). */
+  getTerminalContext: () => { note?: string; ringTail?: string } | undefined
   usesEnvModel: boolean
   planMode: PlanMode
   backgroundManager: BackgroundManager
@@ -1176,6 +1179,16 @@ export async function runTurn(host: SessionTurnHost, rawSend: SendFn, base?: {
       mcpCatalog: mcpManager.toolCatalog() || undefined,
       tokenBudgetPercent,
       surface: resolvedSurface,
+      ...(resolvedSurface === 'terminal'
+        ? {
+            terminalMeta: {
+              managedTerminalId: host._config.managedTerminalId,
+              hostId: host._config.hostId,
+              remotePathHint: host._config.remotePathHint,
+            },
+            terminalContext: host.getTerminalContext(),
+          }
+        : {}),
       pendingSubagents: host.backgroundManager.runningCount > 0
         ? host.backgroundManager.runningEntries()
         : undefined,
@@ -1199,6 +1212,9 @@ export async function runTurn(host: SessionTurnHost, rawSend: SendFn, base?: {
     injectorRegistry.register(new ProjectAgentsMdInjector())
     // Skills already embedded by SystemPromptInjector / buildSystemPrompt — skip SkillsListInjector.
     injectorRegistry.register(new PermissionModeInjector())
+    if (resolvedSurface === 'terminal') {
+      injectorRegistry.register(new TerminalContextInjector())
+    }
     injectorRegistry.register(new TokenBudgetInjector())
     injectorRegistry.register(new SubagentStatusInjector())
     injectorRegistry.register(new OpenFileContextInjector())

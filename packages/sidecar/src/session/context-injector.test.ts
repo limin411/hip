@@ -7,6 +7,7 @@ import {
   PermissionModeInjector,
   TokenBudgetInjector,
   SubagentStatusInjector,
+  TerminalContextInjector,
   type InjectorState,
 } from './context-injector.js'
 
@@ -257,5 +258,26 @@ describe('SubagentStatusInjector', () => {
     expect(result.systemMessages[0]).toContain('Pending background tasks')
     expect(result.systemMessages[1]).toContain('Completed background tasks')
     expect(result.systemMessages[1]).toContain('failed')
+  })
+
+  it('TerminalContextInjector injects ring tail + D11 note only on terminal surface', async () => {
+    const injector = new TerminalContextInjector()
+    const nonTerminal = await injector.inject({ ...baseState, surface: 'code' })
+    expect(nonTerminal.systemMessages).toHaveLength(0)
+    const result = await injector.inject({
+      ...baseState,
+      surface: 'terminal',
+      terminalMeta: { managedTerminalId: 'tm_1', hostId: 'hst_1', remotePathHint: '/var/www' },
+      terminalContext: {
+        note: 'state may have changed',
+        ringTail: '$ whoami\nroot\n$ ',
+      },
+    })
+    expect(result.systemMessages).toHaveLength(1)
+    expect(result.systemMessages[0]).toContain('tm_1')
+    expect(result.systemMessages[0]).toContain('hst_1')
+    expect(result.systemMessages[0]).toContain('/var/www')
+    expect(result.systemMessages[0]).toContain('state may have changed')
+    expect(result.systemMessages[0]).toContain('whoami')
   })
 })

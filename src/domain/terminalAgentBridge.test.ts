@@ -1,9 +1,11 @@
 import { describe, it, expect } from 'vitest'
 import {
   clipExecOutput,
+  extractExitCode,
   hasPromptTail,
   isDangerousCommand,
   isInteractiveTuiCommand,
+  wrapForEc,
   EXEC_OUTPUT_CAP,
 } from './terminalAgentBridge'
 
@@ -41,5 +43,15 @@ describe('danger/TUI guards', () => {
     expect(isInteractiveTuiCommand('passwd')).toBe(true)
     expect(isInteractiveTuiCommand('ssh prod-box')).toBe(true)
     expect(isInteractiveTuiCommand('df -h')).toBe(false)
+  })
+})
+
+describe('__HIP_EC wrapper (P1)', () => {
+  it('appends an exit-code marker and parses it back', () => {
+    const wrapped = wrapForEc('df -h')
+    expect(wrapped).toContain('df -h')
+    expect(wrapped).toContain('__HIP_EC_EXIT')
+    expect(extractExitCode('out\n__HIP_EC_EXIT=3\n')).toBe(3)
+    expect(extractExitCode('no marker')).toBeNull()
   })
 })

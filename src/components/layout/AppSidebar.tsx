@@ -512,6 +512,12 @@ export function AppSidebar() {
                         data-testid={`sidebar-managed-terminal-${mt.id}`}
                         data-no-drag
                         aria-current={active ? 'true' : undefined}
+                        aria-busy={ptyStatus === 'running' || undefined}
+                        title={
+                          mt.kind === 'local'
+                            ? mt.cwd || t('terminals.kindLocal')
+                            : t('terminals.kindSsh')
+                        }
                         onClick={() => {
                           useManagedTerminalStore.getState().focus(mt.id)
                           if (activeView !== 'terminals') {
@@ -519,32 +525,48 @@ export function AppSidebar() {
                           }
                         }}
                         className={cn(
-                          'flex w-full items-start gap-2 rounded-lg px-2.5 py-[var(--row-pad-y-session)] text-left transition-colors',
+                          'flex w-full items-center gap-2 rounded-lg px-2.5 py-[var(--row-pad-y-session)] text-left transition-colors',
                           'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink/20',
                           active ? SIDEBAR_ACTIVE_RAIL : 'hover:bg-state-hover',
                         )}
                       >
-                        <Terminal
-                          size={14}
-                          className="mt-0.5 shrink-0 text-ink-tertiary"
-                          aria-hidden
-                        />
-                        <span className="min-w-0 flex-1">
-                          <span className="block truncate text-body font-medium text-ink">
-                            {mt.title}
-                          </span>
-                          <span className="block truncate text-caption text-ink-tertiary">
-                            {mt.kind === 'local'
-                              ? mt.cwd || t('terminals.kindLocal')
-                              : t('terminals.kindSsh')}
-                            {ptyStatus === 'running'
-                              ? ` · ${t('sidebar.status.running')}`
+                        {ptyStatus === 'running' ? (
+                          <span
+                            className="size-1.5 shrink-0 animate-pulse rounded-full bg-accent"
+                            data-testid={`sidebar-managed-terminal-running-${mt.id}`}
+                            title={t('sidebar.status.running')}
+                            aria-hidden
+                          />
+                        ) : (
+                          <Terminal
+                            size={14}
+                            className="shrink-0 text-ink-tertiary"
+                            aria-hidden
+                          />
+                        )}
+                        <span className="min-w-0 flex-1 truncate text-body font-medium text-ink">
+                          {mt.title}
+                        </span>
+                        <span
+                          className={cn(
+                            'shrink-0 text-caption',
+                            ptyStatus === 'error'
+                              ? 'text-danger'
                               : ptyStatus === 'exited'
-                                ? ` · ${t('terminals.statusExited')}`
-                                : ptyStatus === 'error'
-                                  ? ` · ${t('terminals.statusError')}`
-                                  : ''}
-                          </span>
+                                ? 'text-ink-tertiary'
+                                : mt.kind === 'ssh'
+                                  ? 'text-accent'
+                                  : 'text-ink-tertiary',
+                          )}
+                          aria-hidden
+                        >
+                          {ptyStatus === 'error'
+                            ? t('terminals.statusError')
+                            : ptyStatus === 'exited'
+                              ? t('terminals.statusExited')
+                              : mt.kind === 'local'
+                                ? t('terminals.kindLocal')
+                                : t('terminals.kindSsh')}
                         </span>
                       </button>
                     </DeclarativeContextMenu>

@@ -8,9 +8,6 @@ import { sanitizeDisplayText } from '@/lib/sanitizeDisplayText'
 import { MarkdownBody } from '@/components/chat/MarkdownBody'
 import { ThinkingDisclosure, TRAIL_ROW } from '@/components/chat/TurnTimeline'
 import { ROLE_COLOR, agentDisplayName } from '@/lib/roleColor'
-import { useFocusStore } from '@/store/focusStore'
-import { useUiStore } from '@/store/uiStore'
-import { useDomainStore } from '@/domain/sessionStore'
 import { cn } from '@/lib/utils'
 
 /** Split grouped agents into flat (supervisor) vs nested (dispatched sub-agents). */
@@ -83,14 +80,6 @@ export function SubAgentCard({
   const [manualOpen, setManualOpen] = useState<boolean | null>(null)
   const bodyOpen = manualOpen ?? false
 
-  const openInAgents = (e: React.MouseEvent) => {
-    e.stopPropagation()
-    useFocusStore.getState().setFocusedAgentId(agent.agentId)
-    useUiStore.getState().setTab('agents')
-    const sid = useDomainStore.getState().activeSessionId
-    if (sid) useDomainStore.getState().setSessionCodePanelOpen(sid, true)
-  }
-
   return (
     <DeclarativeContextMenu kind="subAgent" payload={{ agent }}>
       <div
@@ -148,21 +137,6 @@ export function SubAgentCard({
           {elapsedSec != null && (
             <span className="shrink-0 text-ink-tertiary">{elapsedSec}s</span>
           )}
-          <span
-            role="link"
-            tabIndex={0}
-            className="shrink-0 text-accent hover:underline"
-            data-testid="subagent-open-agents"
-            onClick={openInAgents}
-            onKeyDown={(ev) => {
-              if (ev.key === 'Enter' || ev.key === ' ') {
-                ev.preventDefault()
-                openInAgents(ev as unknown as React.MouseEvent)
-              }
-            }}
-          >
-            Agents
-          </span>
         </button>
         {bodyOpen && (
           <div className="mt-0.5 flex flex-col gap-0.5" data-testid="subagent-card-body">

@@ -5,7 +5,6 @@ describe('focusStore (P3 U10)', () => {
   beforeEach(() => {
     useFocusStore.setState({
       focusedCallId: null,
-      focusedAgentId: null,
       focusedPath: null,
       followPaused: false,
       panelDismissedThisTurn: false,

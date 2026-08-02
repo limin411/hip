@@ -27,16 +27,16 @@ describe('terminal gating matrix', () => {
   beforeEach(() => {
     useUiStore.setState({
       activeView: 'chat',
-      activeTab: 'agents',
+      activeTab: 'files',
       chatActiveTab: 'files',
     })
   })
 
   // G2: ChatTab type surface never includes terminal
   it('G2: ChatTab values exclude terminal; ArtifactTab includes it', () => {
-    const chatTabs: ChatTab[] = ['files', 'agents', 'outline', 'sources']
+    const chatTabs: ChatTab[] = ['files', 'outline', 'sources']
     expect(chatTabs).not.toContain('terminal' as ChatTab)
-    const codeTabs: ArtifactTab[] = ['files', 'agents', 'changes', 'terminal']
+    const codeTabs: ArtifactTab[] = ['files', 'outline', 'changes', 'terminal']
     expect(codeTabs).toContain('terminal')
   })
 
@@ -138,8 +138,8 @@ describe('terminal gating matrix', () => {
     useUiStore.getState().setTab('terminal')
     expect(useUiStore.getState().activeTab).toBe('terminal')
     // chatActiveTab cannot hold terminal at type level — assign only ChatTab
-    useUiStore.getState().setChatActiveTab('agents')
-    expect(useUiStore.getState().chatActiveTab).toBe('agents')
+    useUiStore.getState().setChatActiveTab('sources')
+    expect(useUiStore.getState().chatActiveTab).toBe('sources')
   })
 
   it('activeTab is not persisted (leftover terminal is in-memory only)', () => {

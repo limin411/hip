@@ -13,7 +13,6 @@ import {
   seedSubagentPause,
   waitForHipE2E,
 } from '../helpers/e2e-hooks.js'
-import { selectPanelTab } from '../helpers/panel.js'
 import { switchToCodeSurface } from '../helpers/surface.js'
 
 const FIXTURE = path.resolve('e2e/fixtures/sample-project')
@@ -87,17 +86,5 @@ describe('harness subagent pause @harness @core', () => {
     const delegation = await browser.$('[data-testid="delegation-row"]')
     await delegation.waitForExist({ timeout: 10000 })
     expect((await delegation.getText()).toLowerCase()).toContain('e2e implement feature')
-
-    // Agents panel: supervisor + coder cards.
-    await selectPanelTab('agents')
-    await (await browser.$('[data-testid="panel-view-agents"]')).waitForExist({ timeout: 15000 })
-    await browser.waitUntil(
-      async () => (await (await browser.$$('[data-testid="agent-card"]')).length) >= 2,
-      {
-        timeout: 15000,
-        interval: 300,
-        timeoutMsg: 'expected supervisor + coder agent cards',
-      },
-    )
   })
 })

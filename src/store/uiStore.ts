@@ -13,8 +13,6 @@ import {
 
 export type ArtifactTab =
   | 'files'
-  | 'agents'
-  | 'tasks'
   | 'outline'
   | 'changes'
   | 'terminal'
@@ -55,7 +53,7 @@ export type ActiveView =
   | 'tasks'
   | 'automation'
 export type Surface = 'chat' | 'code'
-export type ChatTab = 'files' | 'agents' | 'tasks' | 'outline' | 'sources'
+export type ChatTab = 'files' | 'outline' | 'sources'
 export type Theme = 'light' | 'dark' | 'system'
 export type AppLanguage = 'zh-CN' | 'zh-TW' | 'en' | 'ja' | 'ko'
 export type UiDensity = 'comfortable' | 'compact'
@@ -243,7 +241,7 @@ interface UiState {
   scrollTargetMessageId: string | null
   setScrollTarget: (id: string | null) => void
 
-  // Code surface: ArtifactPanel tabs (files/agents/changes/terminal).
+  // Code surface: ArtifactPanel tabs (files/outline/changes/terminal).
   activeTab: ArtifactTab
   setTab: (t: ArtifactTab) => void
 
@@ -370,7 +368,7 @@ export const useUiStore = create<UiState>()(
       scrollTargetMessageId: null,
       setScrollTarget: (id) => set((s) => (s.scrollTargetMessageId === id ? s : { scrollTargetMessageId: id })),
 
-      activeTab: 'agents',
+      activeTab: 'files',
       setTab: (t) => set({ activeTab: t }),
 
       chatActiveTab: 'files',

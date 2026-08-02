@@ -16,7 +16,7 @@ import {
 
 beforeEach(() => {
   useUiStore.setState({
-    activeTab: 'agents',
+    activeTab: 'files',
     theme: 'system',
     language: 'zh-CN',
     density: 'comfortable',
@@ -198,13 +198,13 @@ describe('uiStore - chatActiveTab (Chat panel tabs)', () => {
     expect(useUiStore.getState().chatActiveTab).toBe('files')
   })
 
-  it('setChatActiveTab switches to agents', () => {
-    useUiStore.getState().setChatActiveTab('agents')
-    expect(useUiStore.getState().chatActiveTab).toBe('agents')
+  it('setChatActiveTab switches to sources', () => {
+    useUiStore.getState().setChatActiveTab('sources')
+    expect(useUiStore.getState().chatActiveTab).toBe('sources')
   })
 
   it('resetChatActiveTab restores files', () => {
-    useUiStore.getState().setChatActiveTab('agents')
+    useUiStore.getState().setChatActiveTab('sources')
     useUiStore.getState().resetChatActiveTab()
     expect(useUiStore.getState().chatActiveTab).toBe('files')
   })

@@ -72,7 +72,6 @@ describe('applyServerMessageEffects', () => {
       deferredWriteFollow: null,
       focusedPath: null,
       focusedCallId: null,
-      focusedAgentId: null,
     })
   })
 
@@ -253,7 +252,7 @@ describe('applyServerMessageEffects', () => {
       vi.useRealTimers()
     })
 
-    it('workflow:started projects into store and focuses Agents tab for code surface', () => {
+    it('workflow:started projects into store without switching tabs (Agents tab removed)', () => {
       const deps = makeDeps()
       applyServerMessageEffects({
         type: 'workflow:started',
@@ -266,8 +265,8 @@ describe('applyServerMessageEffects', () => {
       expect(slice.activeWorkflow).toEqual(mockDef)
       expect(slice.runId).toBe('r1')
       expect(slice.runState?.status).toBe('pending')
-      expect(useDomainStore.getState().sessions.find((s) => s.id === 's1')!.codePanelOpen).toBe(true)
-      expect(useUiStore.getState().activeTab).toBe('agents')
+      expect(useDomainStore.getState().sessions.find((s) => s.id === 's1')!.codePanelOpen).toBe(false)
+      expect(useUiStore.getState().activeTab).toBe('files')
     })
 
     it('workflow:started does not open DAG for chat surface', () => {
@@ -419,7 +418,7 @@ describe('applyServerMessageEffects', () => {
       seedSession('chat')
       useUiStore.setState({
         activeView: 'chat',
-        chatActiveTab: 'agents',
+        chatActiveTab: 'files',
         selectedArtifactPath: null,
       })
       const deps = makeDeps()
@@ -458,7 +457,7 @@ describe('applyServerMessageEffects', () => {
       seedSession('chat')
       useUiStore.setState({
         activeView: 'chat',
-        chatActiveTab: 'agents',
+        chatActiveTab: 'files',
         selectedArtifactPath: null,
       })
       applyServerMessageEffects(
@@ -492,7 +491,7 @@ describe('applyServerMessageEffects', () => {
 
     it('message:complete prefers durable files over Sources when both exist', () => {
       seedSession('chat')
-      useUiStore.setState({ activeView: 'chat', chatActiveTab: 'agents' })
+      useUiStore.setState({ activeView: 'chat', chatActiveTab: 'files' })
       applyServerMessageEffects(
         {
           type: 'message:complete',
@@ -630,7 +629,7 @@ describe('applyServerMessageEffects', () => {
       useFocusStore.setState({ panelDismissedThisTurn: true })
       useUiStore.setState({
         activeView: 'chat',
-        chatActiveTab: 'agents',
+        chatActiveTab: 'files',
         selectedArtifactPath: null,
       })
       const deps = makeDeps()

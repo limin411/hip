@@ -1,5 +1,5 @@
 /**
- * Session-scoped TaskRuntime UI state (right-panel Runtime tab + still-running chip).
+ * Session-scoped TaskRuntime UI state (composer runtime task strip).
  */
 import { create } from 'zustand'
 import type {
@@ -158,20 +158,6 @@ export const useTaskRuntimeStore = create<TaskRuntimeStore>((set) => ({
     })
   },
 }))
-
-export function totalRunning(counts: TaskRunningCounts): number {
-  return counts.shell + counts.agent + counts.monitor + counts.schedule
-}
-
-export function formatRunningChip(counts: TaskRunningCounts): string | null {
-  const parts: string[] = []
-  if (counts.shell) parts.push(`${counts.shell} shell`)
-  if (counts.agent) parts.push(`${counts.agent} agent`)
-  if (counts.monitor) parts.push(`${counts.monitor} monitor`)
-  if (counts.schedule) parts.push(`${counts.schedule} schedule`)
-  if (parts.length === 0) return null
-  return `◎ ${parts.join(' · ')} still running`
-}
 
 /** Kind filter helper for unknown future kinds. */
 export function isKnownTaskKind(k: string): k is TaskKind {

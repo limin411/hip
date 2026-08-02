@@ -7,7 +7,6 @@ import { ConversationOutline } from './ConversationOutline'
 import { ChangesView } from './ChangesView'
 import { GitInitBanner } from './GitInitBanner'
 import { TerminalView } from './TerminalView'
-import { AgentsRuntimeSplit } from './AgentsRuntimeSplit'
 import { CODE_TERMINAL } from './terminalFeature'
 import { useDomainStore } from '@/domain/sessionStore'
 import { useDiffStore } from '@/store/diffStore'
@@ -19,8 +18,6 @@ function resolveEffectiveTab(activeTab: ArtifactTab, isGitRepo: boolean): Artifa
   if (GIT_GATED.has(activeTab) && !isGitRepo) return 'files'
   // Flag-off leftover: treat like gated tab fallback.
   if (activeTab === 'terminal' && !CODE_TERMINAL) return 'files'
-  // Legacy 'tasks' tab id opens the combined agents+runtime page.
-  if (activeTab === 'tasks') return 'agents'
   return activeTab
 }
 
@@ -57,11 +54,6 @@ export function ArtifactPanel() {
               </PanelResizeHandle>
               <Panel defaultSize={42} minSize={24}><FileTree /></Panel>
             </PanelGroup>
-          </div>
-        )}
-        {effectiveTab === 'agents' && (
-          <div className="h-full min-h-0 overflow-hidden">
-            <AgentsRuntimeSplit />
           </div>
         )}
         {effectiveTab === 'changes' && isGitRepo && <ChangesView />}

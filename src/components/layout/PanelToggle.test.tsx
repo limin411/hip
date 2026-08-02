@@ -125,7 +125,7 @@ vi.mock('@/components/artifact/terminalFeature', () => ({
 
 let mockActiveSessionId: string | null = 's1'
 let mockActiveView = 'chat'
-let mockActiveTab = 'agents'
+let mockActiveTab = 'files'
 let mockChatActiveTab = 'files'
 let mockIsGitRepo = false
 let mockCodeTerminal = false
@@ -141,7 +141,7 @@ describe('PanelToggle', () => {
   beforeEach(() => {
     mockActiveSessionId = 's1'
     mockActiveView = 'chat'
-    mockActiveTab = 'agents'
+    mockActiveTab = 'files'
     mockChatActiveTab = 'files'
     mockIsGitRepo = false
     mockCodeTerminal = false
@@ -188,18 +188,19 @@ describe('PanelToggle', () => {
     expect(screen.queryByTestId('toggle-panel')).not.toBeInTheDocument()
   })
 
-  it('shows chat panel tabs (files, agents)', () => {
+  it('shows chat panel tabs (files, sources, outline)', () => {
     render(<PanelToggle />)
     expect(screen.getByTestId('panel-tab-files')).toBeInTheDocument()
-    expect(screen.getByTestId('panel-tab-agents')).toBeInTheDocument()
+    expect(screen.getByTestId('panel-tab-sources')).toBeInTheDocument()
     expect(screen.queryByTestId('panel-tab-dag')).not.toBeInTheDocument()
     expect(screen.queryByTestId('panel-tab-timeline')).not.toBeInTheDocument()
+    expect(screen.queryByTestId('panel-tab-agents')).not.toBeInTheDocument()
   })
 
   it('opens chat panel and switches tab when a chat tab is selected', () => {
     render(<PanelToggle />)
-    fireEvent.click(screen.getByTestId('panel-tab-agents'))
-    expect(setChatActiveTab).toHaveBeenCalledWith('agents')
+    fireEvent.click(screen.getByTestId('panel-tab-sources'))
+    expect(setChatActiveTab).toHaveBeenCalledWith('sources')
     expect(setSessionChatPanelOpen).toHaveBeenCalledWith('s1', true)
     expect(setSessionCodePanelOpen).not.toHaveBeenCalled()
     expect(setTab).not.toHaveBeenCalled()
@@ -209,10 +210,10 @@ describe('PanelToggle', () => {
     mockActiveView = 'code'
     render(<PanelToggle />)
     expect(screen.getByTestId('panel-tab-files')).toBeInTheDocument()
-    expect(screen.getByTestId('panel-tab-agents')).toBeInTheDocument()
     expect(screen.queryByTestId('panel-tab-dag')).not.toBeInTheDocument()
     expect(screen.queryByTestId('panel-tab-timeline')).not.toBeInTheDocument()
     expect(screen.queryByTestId('panel-tab-changes')).not.toBeInTheDocument()
+    expect(screen.queryByTestId('panel-tab-agents')).not.toBeInTheDocument()
   })
 
   it('shows git-gated code tabs when session is a git repo', () => {
@@ -239,7 +240,6 @@ describe('PanelToggle', () => {
     render(<PanelToggle />)
     expect(screen.queryByTestId('panel-tab-terminal')).not.toBeInTheDocument()
     expect(screen.getByTestId('panel-tab-files')).toBeInTheDocument()
-    expect(screen.getByTestId('panel-tab-agents')).toBeInTheDocument()
   })
 
   // G4 (flag off): code menu has no terminal entry under dark launch.

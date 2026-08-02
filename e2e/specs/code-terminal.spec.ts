@@ -62,7 +62,7 @@ describe('code terminal panel @panel @core', () => {
     const tabs = await listPanelMenuTabs()
     expect(tabs).toContain('panel-tab-terminal')
     expect(tabs).toContain('panel-tab-files')
-    expect(tabs).toContain('panel-tab-agents')
+    expect(tabs).not.toContain('panel-tab-agents')
     await closePanelMenu()
   })
 
@@ -123,9 +123,7 @@ describe('code terminal panel @panel @core', () => {
 
     const tabs = await listPanelMenuTabs()
     expect(tabs).not.toContain('panel-tab-terminal')
-    expect(tabs.every((t) => t === 'panel-tab-files' || t === 'panel-tab-agents' || t === 'panel-tab-menu')).toBe(
-      true,
-    )
+    expect(tabs.every((t) => t === 'panel-tab-files' || t === 'panel-tab-menu')).toBe(true)
     await closePanelMenu()
   })
 })

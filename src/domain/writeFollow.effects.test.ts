@@ -122,7 +122,6 @@ describe('write-follow effects (P1 C1)', () => {
       deferredWriteFollow: null,
       focusedPath: null,
       focusedCallId: null,
-      focusedAgentId: null,
     })
   })
 
@@ -143,7 +142,7 @@ describe('write-follow effects (P1 C1)', () => {
         sess.id === 's1' ? { ...sess, codePanelOpen: true } : sess,
       ),
     }))
-    useUiStore.setState({ activeTab: 'agents' })
+    useUiStore.setState({ activeTab: 'files' })
     const deps = makeDeps()
     finishTool('c1', deps)
     expect(useDomainStore.getState().sessions[0].codePanelOpen).toBe(true)

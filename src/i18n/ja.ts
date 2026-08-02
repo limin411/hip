@@ -123,25 +123,6 @@ export const ja = {
         "stage": "円卓 · 段階結論…",
         "deciding": "円卓 · hip が決定中…",
         "done": "円卓 · 完了"
-      },
-      "councilLabel": "評議会",
-      "councilSeats": "評議会席",
-      "councilProgress": "{{spoken}}/{{total}} 席",
-      "councilRound": "ラウンド {{n}}",
-      "councilRoundOf": "ラウンド {{n}}/{{total}}",
-      "councilRoundPlanned": "予定 {{total}} ラウンド",
-      "seatWaiting": "発言待ち",
-      "liveStage": "発言中（{{count}}人）",
-      "edgesTitle": "議論の関係",
-      "edgeRebut": "反論",
-      "edgeSupport": "支持",
-      "edgeQuestion": "質問",
-      "personas": {
-        "strategist": "戦略家",
-        "skeptic": "懐疑派",
-        "creative": "クリエイティブ",
-        "operator": "実行者",
-        "audience": "オーディエンス"
       }
     },
     "greeting": {
@@ -590,14 +571,7 @@ export const ja = {
   },
   "artifact": {
     "files": "ファイル",
-    "agents": "エージェント",
-    "agentsEmpty": "エージェントのアクティビティはまだありません",
-    "agentsEmptyDesc": "エージェントがツールを実行したり作業を委任したりすると、最新のターンがここに表示されます",
-      "runtime": "ランタイム",
-      "runtimeEmpty": "バックグラウンド作業はありません",
-      "runtimeEmptyDesc": "エージェントが開始したシェル・モニター・スケジュールがここに表示されます。",
-      "runtimeFilterAll": "すべて",
-      "runtimeStop": "停止",
+    "runtimeStop": "停止",
     "outline": "アウトライン",
     "outlineEmpty": "送信したメッセージがジャンプリストとしてここに表示されます",
     "outlineCount": "{{count}} ターン",
@@ -611,10 +585,6 @@ export const ja = {
     "terminal": "ターミナル",
     "closePanel": "パネルを閉じる",
     "moreTabs": "その他のタブ",
-    "collaborationStructure": "コラボレーション",
-    "subAgentCount": "{{count}} サブエージェント",
-    "subAgentCount_one": "{{count}} サブエージェント",
-    "statusRunning": "実行中",
     "noArtifacts": "生成されたドキュメントや画像がここに表示されます",
     "copyArtifact": "コピー",
     "downloadArtifact": "ダウンロード",
@@ -652,7 +622,6 @@ export const ja = {
       "viewUnified": "統合表示",
       "viewSplit": "分割表示"
     },
-    "turn": "ターン {{n}}",
     "changes": "変更",
     "branch": {
       "current": "現在のブランチ",
@@ -681,8 +650,6 @@ export const ja = {
       "desc": "このフォルダを git リポジトリにして、ターンごとの変更を追跡、比較、元に戻せるようにします",
       "button": "Gitリポジトリを初期化"
     },
-    "waiting": "待機中…",
-    "subAgents": "サブエージェント",
     "roles": {
       "supervisor": "スーパーバイザー",
       "planner": "プランナー",
@@ -699,7 +666,6 @@ export const ja = {
     "truncated": "省略",
     "noTools": "ツール呼び出しなし",
     "tokens": "{{count}}トークン",
-    "jumpToTurn": "メッセージにジャンプ",
     "selectFolder": "プロジェクトフォルダを選択",
     "selectFolderDesc": "エージェントが読み書きするフォルダを選び、ここで参照できます",
     "terminalView": {

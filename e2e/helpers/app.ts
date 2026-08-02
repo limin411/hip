@@ -81,9 +81,9 @@ export async function leaveSpecialViewsIfOpen(): Promise<void> {
     }
 
     // Settings: leave via sidebar back. History/trash: modal-close.
-    const settingsBack = await browser.$('[data-testid="settings-sidebar-back"]')
-    if (await settingsBack.isExisting()) {
-      await browser.execute((el: HTMLElement) => el.click(), settingsBack)
+    const settingsSidebarBack = await browser.$('[data-testid="settings-sidebar-back"]')
+    if (await settingsSidebarBack.isExisting()) {
+      await browser.execute((el: HTMLElement) => el.click(), settingsSidebarBack)
       await browser.pause(200)
       continue
     }

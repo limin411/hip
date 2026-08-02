@@ -29,7 +29,6 @@ type HipE2E = {
   simulateTurnCancelled: (s: string) => void
   simulateSessionError: (s: string, code?: string, message?: string) => void
   seedAgentCollaboration: (s: string) => { turnId: string; callId: string }
-  seedRoundtableCouncil?: (s: string) => { turnId: string }
   getSessionDebugBundleJson: () => string | null
   simulatePermissionRequest: (s: string) => { turnId: string; requestId: string }
   openCommandPaletteForE2e: () => void
@@ -85,6 +84,14 @@ type HipE2E = {
     agentId: string
     taskId: string
   }
+  seedRuntimeTask?: (
+    sessionId: string,
+    opts?: {
+      kind?: 'shell' | 'agent' | 'monitor' | 'schedule'
+      status?: 'running' | 'scheduled' | 'completed'
+      description?: string
+    },
+  ) => { taskId: string }
   simulateInvalidWorkflowError?: (sessionId: string, reason?: string) => void
   getLastAssistantText?: (sessionId: string) => string | null
   getPendingInterrupt?: (sessionId: string) => { turnId: string; question: string } | null
@@ -175,15 +182,6 @@ export async function seedAgentCollaboration(sessionId: string): Promise<{ turnI
     const hooks = (window as unknown as { __hipE2E?: HipE2E }).__hipE2E
     if (!hooks) throw new Error('__hipE2E missing')
     return hooks.seedAgentCollaboration(id)
-  }, sessionId)
-}
-
-/** Seed completed council roundtable turn (5 seats + edges) for Agents panel e2e. */
-export async function seedRoundtableCouncil(sessionId: string): Promise<{ turnId: string }> {
-  return browser.execute((id: string) => {
-    const hooks = (window as unknown as { __hipE2E?: HipE2E }).__hipE2E
-    if (!hooks?.seedRoundtableCouncil) throw new Error('__hipE2E.seedRoundtableCouncil missing')
-    return hooks.seedRoundtableCouncil(id)
   }, sessionId)
 }
 
@@ -342,6 +340,22 @@ export async function seedBackgroundTaskKilled(
     if (!hooks?.seedBackgroundTaskKilled) throw new Error('__hipE2E.seedBackgroundTaskKilled missing')
     return hooks.seedBackgroundTaskKilled(id)
   }, sessionId)
+}
+
+/** Seed a running/scheduled Runtime task so the composer runtime strip shows it. */
+export async function seedRuntimeTask(
+  sessionId: string,
+  opts?: {
+    kind?: 'shell' | 'agent' | 'monitor' | 'schedule'
+    status?: 'running' | 'scheduled' | 'completed'
+    description?: string
+  },
+): Promise<{ taskId: string }> {
+  return browser.execute((id: string, o: typeof opts) => {
+    const hooks = (window as unknown as { __hipE2E?: HipE2E }).__hipE2E
+    if (!hooks?.seedRuntimeTask) throw new Error('__hipE2E.seedRuntimeTask missing')
+    return hooks.seedRuntimeTask(id, o)
+  }, sessionId, opts)
 }
 
 export async function simulateInvalidWorkflowError(sessionId: string, reason?: string): Promise<void> {

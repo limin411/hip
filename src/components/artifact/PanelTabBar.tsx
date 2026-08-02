@@ -35,14 +35,7 @@ export function PanelTabBar({ surface }: { surface: 'code' | 'chat' }) {
     codeTerminal: CODE_TERMINAL,
   }).filter((tab) => !tab.gated)
 
-  const current: PanelTabValue =
-    surface === 'code'
-      ? activeTab === 'tasks'
-        ? 'agents'
-        : activeTab
-      : chatActiveTab === 'tasks'
-        ? 'agents'
-        : chatActiveTab
+  const current: PanelTabValue = surface === 'code' ? activeTab : chatActiveTab
 
   const currentDef = tabs.find((tab) => tab.value === current) ?? tabs[0]
   const currentLabel = currentDef ? t(currentDef.labelKey) : ''

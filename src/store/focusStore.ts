@@ -10,7 +10,6 @@ export interface DeferredWriteFollow {
 /** Shared focus across transcript ↔ workbench (spec U10). */
 interface FocusState {
   focusedCallId: string | null
-  focusedAgentId: string | null
   focusedPath: string | null
   /** When true, auto-follow writes is paused for the current turn. */
   followPaused: boolean
@@ -26,7 +25,6 @@ interface FocusState {
    */
   deferredWriteFollow: DeferredWriteFollow | null
   setFocusedCallId: (id: string | null) => void
-  setFocusedAgentId: (id: string | null) => void
   setFocusedPath: (path: string | null, opts?: { userInitiated?: boolean }) => void
   setAutoFollowEdits: (v: boolean) => void
   /** User closed code/chat right panel — suppress auto-open for the rest of the turn. */
@@ -40,7 +38,6 @@ interface FocusState {
 
 export const useFocusStore = create<FocusState>((set) => ({
   focusedCallId: null,
-  focusedAgentId: null,
   focusedPath: null,
   followPaused: false,
   panelDismissedThisTurn: false,
@@ -48,7 +45,6 @@ export const useFocusStore = create<FocusState>((set) => ({
   deferredWriteFollow: null,
 
   setFocusedCallId: (id) => set({ focusedCallId: id }),
-  setFocusedAgentId: (id) => set({ focusedAgentId: id }),
   setFocusedPath: (path, opts) =>
     set((s) => ({
       focusedPath: path,
@@ -63,7 +59,6 @@ export const useFocusStore = create<FocusState>((set) => ({
   clearFocus: () =>
     set({
       focusedCallId: null,
-      focusedAgentId: null,
       focusedPath: null,
       followPaused: false,
       panelDismissedThisTurn: false,

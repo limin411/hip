@@ -131,25 +131,6 @@ export const zhTW = {
         "stage": "圓桌 · 階段性結論…",
         "deciding": "圓桌 · hip 拍板中…",
         "done": "圓桌 · 已結束"
-      },
-      "councilLabel": "議會",
-      "councilSeats": "議會席位",
-      "councilProgress": "{{spoken}}/{{total}} 席",
-      "councilRound": "第 {{n}} 輪",
-      "councilRoundOf": "第 {{n}}/{{total}} 輪",
-      "councilRoundPlanned": "共 {{total}} 輪",
-      "seatWaiting": "等待發言",
-      "liveStage": "正在發言（{{count}} 人）",
-      "edgesTitle": "交鋒關係",
-      "edgeRebut": "反駁",
-      "edgeSupport": "附議",
-      "edgeQuestion": "提問",
-      "personas": {
-        "strategist": "戰略家",
-        "skeptic": "懷疑論者",
-        "creative": "創意者",
-        "operator": "執行者",
-        "audience": "受眾"
       }
     },
     "greeting": {
@@ -597,13 +578,6 @@ export const zhTW = {
   },
   "artifact": {
     "files": "檔案",
-    "agents": "智慧體",
-    "agentsEmpty": "暫無智慧體活動",
-    "agentsEmptyDesc": "當智慧體呼叫工具或委派任務時，最近一輪會顯示在這裡",
-    "runtime": "執行時",
-    "runtimeEmpty": "暫無背景工作",
-    "runtimeEmptyDesc": "智能體啟動的 Shell、監視器與排程會顯示在這裡。",
-    "runtimeFilterAll": "全部",
     "runtimeStop": "停止",
     "outline": "對話目錄",
     "outlineEmpty": "你發出的訊息會按目錄列在這裡，點選可跳轉",
@@ -618,10 +592,6 @@ export const zhTW = {
     "terminal": "終端",
     "closePanel": "關閉面板",
     "moreTabs": "更多分頁",
-    "collaborationStructure": "協作結構",
-    "subAgentCount": "{{count}} 個子代理",
-    "subAgentCount_one": "{{count}} 個子代理",
-    "statusRunning": "執行中",
     "noArtifacts": "智慧體生成的文件與圖片會顯示在這裡",
     "copyArtifact": "複製",
     "downloadArtifact": "下載",
@@ -659,10 +629,8 @@ export const zhTW = {
       "viewUnified": "統一檢視",
       "viewSplit": "並排檢視"
     },
-    "turn": "第 {{n}} 輪",
     "changes": "更改",
-    "branch": {
-      "current": "當前分支",
+    "branch": {      "current": "當前分支",
       "noBranch": "（無分支）",
       "switchTitle": "切換分支",
       "searchPlaceholder": "搜尋分支…",
@@ -688,8 +656,6 @@ export const zhTW = {
       "desc": "將此資料夾變成 git 倉庫後，即可按輪追蹤、對比與回退改動",
       "button": "初始化 git 倉庫"
     },
-    "waiting": "等待中…",
-    "subAgents": "子智慧體",
     "roles": {
       "supervisor": "主管",
       "planner": "規劃員",
@@ -706,7 +672,6 @@ export const zhTW = {
     "truncated": "已截斷",
     "noTools": "暫無工具呼叫",
     "tokens": "{{count}} tok",
-    "jumpToTurn": "跳轉到訊息",
     "selectFolder": "選擇專案資料夾",
     "selectFolderDesc": "選擇一個資料夾，供智慧體讀寫，並在此瀏覽",
     "terminalView": {

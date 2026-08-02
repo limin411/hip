@@ -11,7 +11,6 @@ vi.mock('react-i18next', () => ({
     t: (key: string) => {
       const map: Record<string, string> = {
         'artifact.files': 'Files',
-        'artifact.agents': 'Agents',
         'artifact.changes': 'Changes',
         'artifact.terminal': 'Terminal',
         'artifact.closePanel': 'Close panel',
@@ -43,12 +42,6 @@ vi.mock('./FileTree', () => ({
 }))
 vi.mock('./FilePreview', () => ({
   FilePreview: () => React.createElement('div', { 'data-testid': 'file-preview' }),
-}))
-vi.mock('./AgentDashboard', () => ({
-  AgentDashboard: () => React.createElement('div', { 'data-testid': 'agent-dashboard' }),
-}))
-vi.mock('./AgentsRuntimeSplit', () => ({
-  AgentsRuntimeSplit: () => React.createElement('div', { 'data-testid': 'agents-runtime-split' }),
 }))
 vi.mock('./ChangesView', () => ({
   ChangesView: () => React.createElement('div', { 'data-testid': 'changes-view' }),
@@ -127,20 +120,6 @@ describe('ArtifactPanel', () => {
     render(<ArtifactPanel />)
     expect(screen.getByTestId('file-tree')).toBeInTheDocument()
     expect(screen.getByTestId('file-preview')).toBeInTheDocument()
-  })
-
-  it('renders AgentsRuntimeSplit when agents tab is active', () => {
-    mockUiState = { activeTab: 'agents' }
-    render(<ArtifactPanel />)
-    expect(screen.getByTestId('panel-view-agents')).toBeInTheDocument()
-    expect(screen.getByTestId('agents-runtime-split')).toBeInTheDocument()
-  })
-
-  it('maps legacy tasks tab to AgentsRuntimeSplit', () => {
-    mockUiState = { activeTab: 'tasks' }
-    render(<ArtifactPanel />)
-    expect(screen.getByTestId('panel-view-agents')).toBeInTheDocument()
-    expect(screen.getByTestId('agents-runtime-split')).toBeInTheDocument()
   })
 
   it('shows GitInitBanner in files tab when not in a git repo', () => {

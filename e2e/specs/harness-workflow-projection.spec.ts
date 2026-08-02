@@ -1,6 +1,6 @@
 // Workflow message projection via inject (no paid LLM, no host-destructive tools).
 // Product path has no dedicated DAG shell; workflow:getActive was removed.
-// Cover: store projection + code-surface Agents tab focus + event/snapshot/clear.
+// Cover: store projection + event/snapshot/clear.
 import { expect } from 'expect-webdriverio'
 import * as path from 'node:path'
 import { waitForAppReady, waitForMainApp } from '../helpers/app.js'
@@ -32,7 +32,7 @@ describe('harness workflow projection @harness @core', () => {
     await waitForHipE2E()
   })
 
-  it('workflow:started projects store and focuses Agents on code surface', async () => {
+  it('workflow:started projects store on code surface', async () => {
     await switchToCodeSurface()
     const sessionId = await createCodeSessionForE2e(FIXTURE)
     expect(sessionId).toBeTruthy()
@@ -63,9 +63,7 @@ describe('harness workflow projection @harness @core', () => {
       },
     )
 
-    // Product effect: open code panel + Agents tab for active code session.
-    await (await browser.$('[data-testid="panel-view-agents"]')).waitForExist({ timeout: 15000 })
-
+    // No right-panel Agents tab exists anymore — workflow UI is store-only.
     // Multi-step orchestrator events on the same run.
     await injectServerMessage({
       type: 'workflow:event',
@@ -145,7 +143,7 @@ describe('harness workflow projection @harness @core', () => {
     )
   })
 
-  it('workflow:started on chat projects store without forcing Agents panel', async () => {
+  it('workflow:started on chat projects store without opening a panel', async () => {
     await switchToChatSurface()
     const sessionId = await createChatSessionForE2e()
     expect(sessionId).toBeTruthy()
@@ -169,18 +167,10 @@ describe('harness workflow projection @harness @core', () => {
       },
     )
 
-    // Chat surface must not auto-open the code Agents panel for workflow.
-    const agentsPanel = await browser.$('[data-testid="panel-view-agents"]')
-    // If panel exists from a prior code session, it is acceptable only if we did not
-    // switch tab solely for this chat inject — store projection is the contract.
+    // Chat surface must not auto-open any panel for workflow — store projection is the contract.
     const snap = await getWorkflowSession(sessionId)
     expect(snap.activeWorkflow?.name).toBe('E2E Workflow')
-    // Soft UI check: panel-view-agents should not newly appear as the only open panel
-    // when we were on chat landing; prefer store-only success if panel leftovers remain.
-    if (await agentsPanel.isExisting()) {
-      // Residual from earlier code suite is ok; store still holds chat session slice.
-      expect(snap.runStatus).toBe('pending')
-    }
+    expect(snap.runStatus).toBe('pending')
   })
 
   it('multi-node failed run projects failed statuses', async () => {

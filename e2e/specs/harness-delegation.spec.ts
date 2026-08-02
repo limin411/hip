@@ -1,4 +1,4 @@
-// Phase 3 H7: delegation-row in chat + agent-jump-turn from Agents panel (no LLM).
+// Phase 3 H7: delegation-row in chat (no LLM).
 import { expect } from 'expect-webdriverio'
 import * as path from 'node:path'
 import { waitForAppReady, waitForMainApp } from '../helpers/app.js'
@@ -8,12 +8,11 @@ import {
   seedAgentCollaboration,
   waitForHipE2E,
 } from '../helpers/e2e-hooks.js'
-import { selectPanelTab } from '../helpers/panel.js'
 import { switchToCodeSurface } from '../helpers/surface.js'
 
 const FIXTURE = path.resolve('e2e/fixtures/sample-project')
 
-describe('harness delegation jump @harness @panel', () => {
+describe('harness delegation @harness @core', () => {
   before(async () => {
     await waitForAppReady()
     await skipLoginIfPresent()
@@ -22,7 +21,7 @@ describe('harness delegation jump @harness @panel', () => {
     await switchToCodeSurface()
   })
 
-  it('shows delegation-row and jumps to turn from agent card', async () => {
+  it('shows delegation-row in the chat activity trail', async () => {
     const sessionId = await createCodeSessionForE2e(FIXTURE)
     expect(sessionId).toBeTruthy()
 
@@ -51,36 +50,5 @@ describe('harness delegation jump @harness @panel', () => {
     expect(await delegation.isExisting()).toBe(true)
     const delText = await delegation.getText()
     expect(delText.toLowerCase()).toContain('e2e implement feature')
-
-    // Agents panel: jump-to-turn control on a card with messageId.
-    await selectPanelTab('agents')
-    await (await browser.$('[data-testid="panel-view-agents"]')).waitForExist({ timeout: 15000 })
-
-    await browser.waitUntil(
-      async () => (await (await browser.$$('[data-testid="agent-jump-turn"]')).length) >= 1,
-      {
-        timeout: 15000,
-        interval: 300,
-        timeoutMsg: 'expected agent-jump-turn on expanded agent cards',
-      },
-    )
-
-    const jump = (await browser.$$('[data-testid="agent-jump-turn"]'))[0]
-    await browser.execute((el: HTMLElement) => el.click(), jump)
-
-    const turnEl = await browser.$(`[data-message-id="${turnId}"]`)
-    await turnEl.waitForExist({ timeout: 10000 })
-    // ChatPane flashes ring highlight for ~2s after scroll target is applied.
-    await browser.waitUntil(
-      async () => {
-        const cls = (await turnEl.getAttribute('class')) ?? ''
-        return cls.includes('ring-') || cls.includes('accent')
-      },
-      {
-        timeout: 3000,
-        interval: 100,
-        timeoutMsg: `turn ${turnId} not highlighted after agent-jump-turn`,
-      },
-    )
   })
 })

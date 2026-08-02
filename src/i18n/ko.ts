@@ -123,25 +123,6 @@ export const ko = {
         "stage": "원탁 · 단계 결론…",
         "deciding": "원탁 · hip 결정 중…",
         "done": "원탁 · 완료"
-      },
-      "councilLabel": "의회",
-      "councilSeats": "의회 좌석",
-      "councilProgress": "{{spoken}}/{{total}} 석",
-      "councilRound": "라운드 {{n}}",
-      "councilRoundOf": "라운드 {{n}}/{{total}}",
-      "councilRoundPlanned": "총 {{total}} 라운드",
-      "seatWaiting": "발언 대기",
-      "liveStage": "발언 중 ({{count}}명)",
-      "edgesTitle": "토론 관계",
-      "edgeRebut": "반박",
-      "edgeSupport": "지지",
-      "edgeQuestion": "질문",
-      "personas": {
-        "strategist": "전략가",
-        "skeptic": "회의론자",
-        "creative": "크리에이티브",
-        "operator": "실행자",
-        "audience": "청중"
       }
     },
     "greeting": {
@@ -590,14 +571,7 @@ export const ko = {
   },
   "artifact": {
     "files": "파일",
-    "agents": "에이전트",
-    "agentsEmpty": "아직 에이전트 활동 없음",
-    "agentsEmptyDesc": "에이전트가 도구를 실행하거나 작업을 위임하면 최신 턴이 여기에 표시됩니다",
-      "runtime": "런타임",
-      "runtimeEmpty": "백그라운드 작업 없음",
-      "runtimeEmptyDesc": "에이전트가 시작한 셸, 모니터, 스케줄이 여기에 표시됩니다.",
-      "runtimeFilterAll": "전체",
-      "runtimeStop": "중지",
+    "runtimeStop": "중지",
     "outline": "개요",
     "outlineEmpty": "보낸 메시지가 점프 목록으로 여기에 표시됩니다",
     "outlineCount": "{{count}}턴",
@@ -611,10 +585,6 @@ export const ko = {
     "terminal": "터미널",
     "closePanel": "패널 닫기",
     "moreTabs": "탭 더 보기",
-    "collaborationStructure": "협업",
-    "subAgentCount": "하위 에이전트 {{count}}개",
-    "subAgentCount_one": "하위 에이전트 {{count}}개",
-    "statusRunning": "실행 중",
     "noArtifacts": "생성된 문서와 이미지가 여기에 표시됩니다",
     "copyArtifact": "복사",
     "downloadArtifact": "다운로드",
@@ -652,7 +622,6 @@ export const ko = {
       "viewUnified": "통합",
       "viewSplit": "분할"
     },
-    "turn": "턴 {{n}}",
     "changes": "변경 사항",
     "branch": {
       "current": "현재 브랜치",
@@ -677,12 +646,10 @@ export const ko = {
       "commitLogError": "커밋 로그를 읽을 수 없음"
     },
     "gitInitBanner": {
-      "title": "체크포인트를 활성화하려면 git 초기화",
-      "desc": "이 폴더를 git 저장소로 전환하여 턴별 변경사항을 추적, 비교, 되돌리기",
+      "title": "Git 저장소 초기화",
+      "desc": "이 폴더를 git 저장소로 만들어 턴별 변경 사항을 추적, 비교, 되돌릴 수 있습니다",
       "button": "Git 저장소 초기화"
     },
-    "waiting": "대기 중…",
-    "subAgents": "하위 에이전트",
     "roles": {
       "supervisor": "감독자",
       "planner": "계획자",
@@ -699,7 +666,6 @@ export const ko = {
     "truncated": "잘림",
     "noTools": "도구 호출 없음",
     "tokens": "{{count}}토큰",
-    "jumpToTurn": "메시지로 이동",
     "selectFolder": "프로젝트 폴더 선택",
     "selectFolderDesc": "에이전트가 읽고 쓸 폴더를 선택하고 여기서 탐색하세요",
     "terminalView": {

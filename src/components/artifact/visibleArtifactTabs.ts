@@ -6,7 +6,6 @@ export type VisibleTabDef = {
   value: PanelTabValue
   labelKey:
     | 'artifact.files'
-    | 'artifact.agents'
     | 'artifact.outline'
     | 'artifact.sources'
     | 'artifact.changes'
@@ -27,13 +26,11 @@ export function visibleArtifactTabs(args: {
       { value: 'outline', labelKey: 'artifact.outline' },
       { value: 'files', labelKey: 'artifact.files' },
       { value: 'sources', labelKey: 'artifact.sources' },
-      { value: 'agents', labelKey: 'artifact.agents' },
     ]
   }
   const tabs: VisibleTabDef[] = [
     { value: 'outline', labelKey: 'artifact.outline' },
     { value: 'files', labelKey: 'artifact.files' },
-    { value: 'agents', labelKey: 'artifact.agents' },
   ]
   if (args.isGitRepo) {
     tabs.push({ value: 'changes', labelKey: 'artifact.changes' })

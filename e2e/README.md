@@ -88,7 +88,7 @@ E2E_GREP=@live E2E_INVERT=1 yarn test:e2e
 | `@smoke` | Launch, shell, settings entry | yes |
 | `@core` | Session + Code workspace + Changes | yes |
 | `@harness` | Inject bridge (write/cancel/debug/agents) | yes |
-| `@panel` | Terminal / Agents panels | yes (in gate) |
+| `@panel` | Right-panel / terminal panels | yes (in gate) |
 | `@settings` | Settings smoke, usage chip | yes (in gate) |
 | `@memory` | Memory settings / slash / citations harness (no paid LLM) | yes (in gate) |
 | `@voice` | Composer voice dictation (Settings + mic; use `HIP_VOICE_MOCK=1`) | yes (in gate) |
@@ -211,7 +211,7 @@ Non-production frontend installs `window.__hipE2E` (see `sessionService.installE
 - `simulateTurnRunning` / `simulateTurnCancelled` — cancel UI (H2/H3)
 - `simulateSessionError` / `getSessionDebugBundleJson` — copy-debug (H4)
 - `simulatePermissionRequest` — HITL modal (H5)
-- `seedAgentCollaboration` — Agents panel (H6) + chat delegation (H7)
+- `seedAgentCollaboration` — chat delegation (H6/H7)
 - `openCommandPaletteForE2e` / `closeCommandPaletteForE2e` — S5
 - `simulatePluginInstallError` — T2 (after Settings form submit)
 - `getWorkflowSession` — read workflow store slice after inject (no product DAG shell)
@@ -222,7 +222,7 @@ Non-production frontend installs `window.__hipE2E` (see `sessionService.installE
 Complex harness (safe inject chains, no paid LLM):
 
 - `harness-complex-agent-loop.spec.ts` — multi-step tool / multi-agent / permission / cancel
-- `harness-workflow-projection.spec.ts` — `workflow:*` messages → store + Agents tab on code; failed / cancelled / stale runId
+- `harness-workflow-projection.spec.ts` — `workflow:*` messages → store; failed / cancelled / stale runId
 - `harness-subagent-pause.spec.ts` — `[hip:subagent_paused]` marker + delegation (not `Error: sub-agent paused`)
 - `harness-agent-interrupt.spec.ts` — `agent:interrupt` banner + resume clears interrupt
 - `harness-plan-approval.spec.ts` — plan approval card + approve (+ plan-progress-panel)
@@ -273,7 +273,6 @@ Failure PNGs upload as Actions artifacts (`e2e-*-screenshots`, 7-day retention).
 | Recycle bin / trash | `recycle-bin`, `context-menu-trash` | yes |
 | Plugins / extensions | `plugin-install-error`, `extension-registry`, `skill-plugin-dialogue` | yes |
 | Agents / plan / cancel | `harness-*`, `smooth-p*` | yes |
-| Roundtable | `roundtable-council` | yes |
 | Token usage chip | `token-usage-chip` | yes |
 | Eval UI smoke | `eval-ui-smoke`, `eval-ui-visual-capture` | yes (`@eval @smoke`) |
 | Live LLM / coding eval | `live-*`, `eval-*-hard/orch/adv` | **no** (paid) |

@@ -136,28 +136,7 @@ export function applyServerMessageEffects(msg: ServerMessage, deps: ServerMessag
       return
 
     case 'agent:started': {
-      // Roundtable council: open Chat Agents panel so multi-agent speech is visible live.
-      // Respect user panel-dismiss for this turn (same as write-follow auto-open).
-      if (
-        typeof msg.agentId === 'string' &&
-        msg.agentId.startsWith('roundtable:') &&
-        msg.role === 'subagent'
-      ) {
-        const domain = useDomainStore.getState()
-        const focus = useFocusStore.getState()
-        const sess = domain.sessions.find((s) => s.id === msg.sessionId)
-        if (
-          sess &&
-          surfaceOf(sess.config) === 'chat' &&
-          domain.activeSessionId === msg.sessionId &&
-          !focus.panelDismissedThisTurn
-        ) {
-          const ui = useUiStore.getState()
-          ui.setChatActiveTab('agents')
-          domain.setSessionChatPanelOpen(msg.sessionId, true)
-          focus.setFocusedAgentId(msg.agentId)
-        }
-      }
+      // No right-panel Agents tab anymore — the main transcript shows agent work.
       return
     }
 
@@ -478,15 +457,6 @@ export function applyServerMessageEffects(msg: ServerMessage, deps: ServerMessag
 
     case 'workflow:started': {
       useWorkflowStore.getState().setActiveWorkflow(msg.sessionId, msg.def, msg.runId)
-      // Focus Agents panel (DAG tab removed — collaboration lives under Agents).
-      const domain = useDomainStore.getState()
-      if (domain.activeSessionId === msg.sessionId) {
-        const session = domain.sessions.find((s) => s.id === msg.sessionId)
-        if (session?.config.surface !== 'chat') {
-          domain.setSessionCodePanelOpen(msg.sessionId, true)
-          useUiStore.getState().setTab('agents')
-        }
-      }
       return
     }
     case 'workflow:event':

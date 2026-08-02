@@ -10,6 +10,7 @@ import { useDiffStore } from '@/store/diffStore'
 import { useProvidersStore } from '@/store/providersStore'
 import { useHipConfigStore } from '@/store/hipConfigStore'
 import { useProjectPathStore } from '@/store/projectPathStore'
+import { useTaskRuntimeStore } from '@/store/taskRuntimeStore'
 import type { ConnectionStatus, Transport } from './transport'
 
 class FakeTransport implements Transport {
@@ -66,7 +67,7 @@ beforeEach(() => {
   useFsStore.setState({ bySession: {} })
   useDraftStore.setState({ draft: null })
   useDiffStore.setState({ bySession: {} })
-  useUiStore.setState({ scrollTargetMessageId: null, activeTab: 'agents' })
+  useUiStore.setState({ scrollTargetMessageId: null, activeTab: 'files' })
   useProvidersStore.setState({ catalog: multimodalCatalog, config: textActiveConfig, keyConfigured: {}, loaded: true })
   useHipConfigStore.setState({ config: { version: 1, agents: [visionAgent] }, loaded: true, error: null })
 })
@@ -923,35 +924,6 @@ describe('workspace diff', () => {
     expect(json).toContain('AGENT_ERROR')
   })
 
-  it('seedRoundtableCouncil adds five council seats and edges meta', () => {
-    const t = new FakeTransport()
-    const svc = new SessionService(t)
-    useDomainStore.setState({
-      sessions: [
-        {
-          id: 's1',
-          config: { ...DEFAULT_CONFIG, surface: 'chat' },
-          title: 't',
-          preview: '',
-          updatedAtMs: 0,
-          loaded: true,
-          messages: [],
-          status: 'idle',
-          error: null,
-        },
-      ],
-      activeSessionId: 's1',
-    })
-    const { turnId } = svc.seedRoundtableCouncil('s1')
-    const sess = useDomainStore.getState().sessions.find((s) => s.id === 's1')!
-    const msg = sess.messages.find((m) => m.id === turnId)
-    expect(msg?.roundtable?.engine).toBe('council')
-    expect(msg?.roundtable?.edges?.length).toBeGreaterThanOrEqual(1)
-    const runs = msg?.agentRuns ?? []
-    expect(runs.some((r) => r.agentId === 'roundtable:strategist')).toBe(true)
-    expect(runs.filter((r) => r.agentId.startsWith('roundtable:')).length).toBe(5)
-  })
-
   it('seedAgentCollaboration adds supervisor and coder runs with tool', () => {
     const t = new FakeTransport()
     const svc = new SessionService(t)
@@ -1194,6 +1166,16 @@ describe('workspace diff', () => {
     expect(msg?.content).toContain('e2e background job')
     expect(msg?.id).toMatch(new RegExp(`^notif-${taskId}-killed-`))
     expect(turnId).toBe(msg?.id)
+  })
+
+  it('seedRuntimeTask publishes a task:snapshot the runtime strip can show', () => {
+    const t = new FakeTransport()
+    const svc = new SessionService(t)
+    const { taskId } = svc.seedRuntimeTask('s1', { kind: 'shell', description: 'e2e shell job' })
+    expect(taskId).toMatch(/^e2e-rt-/)
+
+    const task = useTaskRuntimeStore.getState().bySession['s1']?.tasks[taskId]
+    expect(task).toMatchObject({ kind: 'shell', status: 'running', description: 'e2e shell job' })
   })
 
   it('simulateInvalidWorkflowError sets INVALID_WORKFLOW error', () => {

@@ -8,7 +8,6 @@ vi.mock('react-i18next', () => ({
     t: (key: string) => {
       const map: Record<string, string> = {
         'artifact.files': 'Files',
-        'artifact.agents': 'Agents',
         'artifact.outline': 'Outline',
         'artifact.sources': 'Sources',
         'artifact.timeline': 'Timeline',
@@ -116,19 +115,19 @@ describe('PanelTabBar', () => {
     expect(screen.getByTestId('panel-tab-outline')).toBeInTheDocument()
     expect(screen.getByTestId('panel-tab-files')).toBeInTheDocument()
     expect(screen.getByTestId('panel-tab-sources')).toBeInTheDocument()
-    expect(screen.getByTestId('panel-tab-agents')).toBeInTheDocument()
+    expect(screen.queryByTestId('panel-tab-agents')).not.toBeInTheDocument()
     expect(screen.queryByTestId('panel-tab-timeline')).not.toBeInTheDocument()
     expect(screen.queryByTestId('panel-tab-terminal')).not.toBeInTheDocument()
 
-    fireEvent.click(screen.getByTestId('panel-tab-agents'))
-    expect(setChatActiveTab).toHaveBeenCalledWith('agents')
+    fireEvent.click(screen.getByTestId('panel-tab-sources'))
+    expect(setChatActiveTab).toHaveBeenCalledWith('sources')
     expect(setTab).not.toHaveBeenCalled()
   })
 
   it('hides git-gated code tabs when not a git repo', () => {
     render(<PanelTabBar surface="code" />)
     expect(screen.getByTestId('panel-tab-files')).toBeInTheDocument()
-    expect(screen.getByTestId('panel-tab-agents')).toBeInTheDocument()
+    expect(screen.queryByTestId('panel-tab-agents')).not.toBeInTheDocument()
     expect(screen.queryByTestId('panel-tab-timeline')).not.toBeInTheDocument()
     expect(screen.queryByTestId('panel-tab-changes')).not.toBeInTheDocument()
   })
@@ -152,8 +151,9 @@ describe('PanelTabBar', () => {
   })
 
   it('shows the active tab label on the trigger', () => {
-    mockUiState = { ...mockUiState, activeTab: 'agents' }
+    mockDiffState = { bySession: { 'sess-1': { isGitRepo: true } } }
+    mockUiState = { ...mockUiState, activeTab: 'changes' }
     render(<PanelTabBar surface="code" />)
-    expect(screen.getByTestId('panel-tab-trigger')).toHaveTextContent('Agents')
+    expect(screen.getByTestId('panel-tab-trigger')).toHaveTextContent('Changes')
   })
 })

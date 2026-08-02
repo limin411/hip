@@ -13,7 +13,6 @@ import {
   simulateTurnRunning,
   waitForHipE2E,
 } from '../helpers/e2e-hooks.js'
-import { selectPanelTab } from '../helpers/panel.js'
 import { switchToCodeSurface } from '../helpers/surface.js'
 import { ChatPage } from '../page-objects/ChatPage.js'
 
@@ -94,19 +93,7 @@ describe('harness complex agent loop @harness @core', () => {
     const collab = await seedAgentCollaboration(sessionId)
     expect(collab.turnId).toMatch(/^e2e-turn-/)
 
-    await selectPanelTab('agents')
-    await (await browser.$('[data-testid="panel-view-agents"]')).waitForExist({ timeout: 15000 })
-    await browser.waitUntil(
-      async () => (await (await browser.$$('[data-testid="agent-card"]')).length) >= 2,
-      {
-        timeout: 15000,
-        interval: 300,
-        timeoutMsg: 'expected supervisor + coder agent cards',
-      },
-    )
-
-    // Delegation row lives under expanded ActivityBar for the collab turn (optional soft check).
-    // Agents panel cards above are the hard multi-agent assertion.
+    // Delegation row lives under expanded ActivityBar for the collab turn.
     const activityBars = await browser.$$('[data-testid="activity-bar"]')
     if (activityBars.length > 0) {
       const lastBar = activityBars[activityBars.length - 1]

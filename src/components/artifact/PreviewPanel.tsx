@@ -1,6 +1,5 @@
 import { useTranslation } from 'react-i18next'
 import { Check, ChevronDown, Copy, Download } from 'lucide-react'
-import type { ChatTab } from '@/store/uiStore'
 import { useUiStore } from '@/store/uiStore'
 import { useFsScope } from '@/store/useFsScope'
 import { useFsStore } from '@/store/fsStore'
@@ -10,7 +9,6 @@ import { iconFor } from './ArtifactCard'
 import { FilePreview } from './FilePreview'
 import { ConversationOutline } from './ConversationOutline'
 import { SearchSourcesPanel } from './SearchSourcesPanel'
-import { AgentsRuntimeSplit } from './AgentsRuntimeSplit'
 import { PanelToggle } from '@/components/layout/PanelToggle'
 import { PanelTabBar } from './PanelTabBar'
 import { titlebarIconBtnClass } from '@/components/layout/titlebarChrome'
@@ -31,18 +29,13 @@ function base64ToBytes(b64: string): Uint8Array {
   return out
 }
 
-function effectiveChatTab(tab: ChatTab): ChatTab {
-  return tab === 'tasks' ? 'agents' : tab
-}
-
 export function PreviewPanel() {
   const { t } = useTranslation()
   const { scopeId, isDraft } = useFsScope()
   const messages = useActiveMessages()
   const artifacts = collectConversationArtifacts(messages)
   const selected = useUiStore((s) => s.selectedArtifactPath)
-  const chatActiveTabRaw = useUiStore((s) => s.chatActiveTab)
-  const chatActiveTab = effectiveChatTab(chatActiveTabRaw)
+  const chatActiveTab = useUiStore((s) => s.chatActiveTab)
   const preview = useFsStore((s) => (scopeId ? s.bySession[scopeId]?.preview : undefined))
 
   const select = (path: string) => {
@@ -177,11 +170,6 @@ export function PreviewPanel() {
               <FilePreview />
             </div>
           )
-        )}
-        {chatActiveTab === 'agents' && (
-          <div className="h-full min-h-0 overflow-hidden">
-            <AgentsRuntimeSplit />
-          </div>
         )}
       </div>
     </div>

@@ -230,7 +230,6 @@ export function PanelToggle({ slot = 'toolbar' }: { slot?: PanelToggleSlot }) {
   const codeTabs: PanelTabOption[] = [
     { value: 'outline', label: t('artifact.outline') },
     { value: 'files', label: t('artifact.files') },
-    { value: 'agents', label: t('artifact.agents') },
     { value: 'changes', label: t('artifact.changes'), gated: true },
     ...(CODE_TERMINAL
       ? [{ value: 'terminal' as const, label: t('artifact.terminal') }]
@@ -240,7 +239,6 @@ export function PanelToggle({ slot = 'toolbar' }: { slot?: PanelToggleSlot }) {
     { value: 'outline', label: t('artifact.outline') },
     { value: 'files', label: t('artifact.files') },
     { value: 'sources', label: t('artifact.sources') },
-    { value: 'agents', label: t('artifact.agents') },
   ]
 
   const tabs = (isCode ? codeTabs : chatTabs).filter((tab) => !tab.gated || isGitRepo)

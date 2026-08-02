@@ -24,7 +24,7 @@ async function panelDropdownOpen(): Promise<boolean> {
 }
 
 /** Open a dropdown by focusing its trigger and synthesizing open gestures. */
-async function openDropdownFromTrigger(
+export async function openDropdownFromTrigger(
   triggerTestId: string,
   menuTestId: string,
   label: string,

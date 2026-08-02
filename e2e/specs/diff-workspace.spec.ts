@@ -11,7 +11,7 @@ import {
   initGitAndOpenChanges,
   reopenChangesTab,
 } from '../helpers/git-workspace.js'
-import { selectPanelTab } from '../helpers/panel.js'
+import { openDropdownFromTrigger, selectPanelTab } from '../helpers/panel.js'
 import { switchToCodeSurface } from '../helpers/surface.js'
 import { CodePage } from '../page-objects/CodePage.js'
 
@@ -44,7 +44,7 @@ describe('workspace git diff @core', () => {
 
   it('shows the not-a-repo state with an init button on the Files tab', async () => {
     // The Changes tab is git-gated and hidden before init.
-    expect(await (await browser.$('[data-testid="tab-changes"]')).isExisting()).toBe(false)
+    expect(await (await browser.$('[data-testid="panel-tab-changes"]')).isExisting()).toBe(false)
     await (await codePage.gitInitButton).waitForExist({ timeout: 30000 })
   })
 
@@ -75,16 +75,26 @@ describe('workspace git diff @core', () => {
     })
   })
 
-  it('split view toggle is present and switches to two-column layout', async () => {
-    const viewToggle = await browser.$('[data-testid="diff-view-toggle"]')
-    await viewToggle.waitForExist({ timeout: 10000 })
-    const splitBtn = await viewToggle.$('button:nth-child(2)')
-    await splitBtn.click()
+  it('split view is reachable from the toolbar menu and switches back to unified', async () => {
+    await openDropdownFromTrigger(
+      'changes-toolbar-menu',
+      'changes-toolbar-menu-content',
+      'changes toolbar menu',
+    )
+    const split = await browser.$('[data-testid="changes-menu-split"]')
+    await split.waitForExist({ timeout: 5000 })
+    await split.click()
     const changesView = await browser.$('[data-testid="changes-view"]')
     await changesView.waitForExist({ timeout: 5000 })
     expect(await changesView.isExisting()).toBe(true)
-    const unifiedBtn = await viewToggle.$('button:nth-child(1)')
-    await unifiedBtn.click()
+    await openDropdownFromTrigger(
+      'changes-toolbar-menu',
+      'changes-toolbar-menu-content',
+      'changes toolbar menu',
+    )
+    const unified = await browser.$('[data-testid="changes-menu-unified"]')
+    await unified.waitForExist({ timeout: 5000 })
+    await unified.click()
   })
 
   it('show-full button is present on a modified file', async () => {
@@ -104,13 +114,14 @@ describe('workspace git diff @core', () => {
     await (await browser.$('[data-testid="diff-show-full"]')).waitForExist({ timeout: 10000 })
   })
 
-  it('changed-files jump list is absent for a single-file diff', async () => {
-    const jumpList = await browser.$('[data-testid="diff-file-list"]')
-    expect(await jumpList.isExisting()).toBe(false)
+  it('single-file diff renders one accordion row (no jump list)', async () => {
+    const rows = await browser.$$('[data-testid="diff-file"]')
+    expect(rows.length).toBeGreaterThanOrEqual(1)
+    expect(await (await browser.$('[data-testid="diff-file-list"]')).isExisting()).toBe(false)
   })
 
-  // C7: multi-file jump list
-  it('shows jump list when two files are changed', async () => {
+  // v2 accordion: ≤3 files all expand by default — no jump list duplication.
+  it('two changed files render as two expanded accordion rows', async () => {
     fs.writeFileSync(path.join(dir, 'second.txt'), 'second file\n')
     await reopenChangesTab()
 
@@ -122,9 +133,12 @@ describe('workspace git diff @core', () => {
       { timeout: 30000, interval: 500, timeoutMsg: 'expected two diff files' },
     )
 
-    const jumpList = await browser.$('[data-testid="diff-file-list"]')
-    await jumpList.waitForExist({ timeout: 15000 })
-    const jumps = await browser.$$('[data-testid="diff-file-jump"]')
-    expect(jumps.length).toBeGreaterThanOrEqual(2)
+    const rows = await browser.$$('[data-testid="diff-file"]')
+    expect(rows.length).toBeGreaterThanOrEqual(2)
+    const expandedHeaders = await browser.$$(
+      '[data-testid="diff-file-header"] [data-expanded="true"]',
+    )
+    expect(expandedHeaders.length).toBeGreaterThanOrEqual(2)
+    expect(await (await browser.$('[data-testid="diff-file-list"]')).isExisting()).toBe(false)
   })
 })

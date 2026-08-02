@@ -16,6 +16,12 @@ interface HostLibraryUiState {
   /** Clear the one-shot; returns whether a request was pending. */
   consumeCreateHostRequest: () => boolean
 
+  /** One-shot "new group" from sidebar popover / external entry. */
+  pendingCreateGroup: boolean
+  requestCreateGroup: () => void
+  /** Clear the one-shot; returns whether a request was pending. */
+  consumeCreateGroupRequest: () => boolean
+
   /** Monotonic tick — sidebar 新建终端 popover watches and opens. */
   quickConnectOpenTick: number
   requestOpenQuickConnect: () => void
@@ -27,6 +33,14 @@ export const useHostLibraryUi = create<HostLibraryUiState>((set, get) => ({
   consumeCreateHostRequest: () => {
     if (!get().pendingCreateHost) return false
     set({ pendingCreateHost: false })
+    return true
+  },
+
+  pendingCreateGroup: false,
+  requestCreateGroup: () => set({ pendingCreateGroup: true }),
+  consumeCreateGroupRequest: () => {
+    if (!get().pendingCreateGroup) return false
+    set({ pendingCreateGroup: false })
     return true
   },
 

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
-import { FolderOpen, History, Loader2, Plus, Terminal } from 'lucide-react'
+import { FolderOpen, FolderPlus, History, Loader2, Plus, Terminal } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { isDirectory } from '@/ipc/pathExists'
 import { pickDirectory } from '@/ipc/dialog'
@@ -105,6 +105,16 @@ export function QuickConnectPopover() {
     })()
   }, [])
 
+  const onNewGroup = useCallback(() => {
+    void (async () => {
+      // Unfocus any session so HostLibrary mounts and can open the group dialog.
+      useManagedTerminalStore.getState().focus(null)
+      await enterTerminalsSection()
+      useHostLibraryUi.getState().requestCreateGroup()
+      setOpen(false)
+    })()
+  }, [])
+
   const onPickLocal = useCallback(
     async (r: Extract<RecentLaunch, { type: 'local' }>) => {
       if (missingLocal[r.cwd]) return
@@ -166,6 +176,20 @@ export function QuickConnectPopover() {
       >
         {/* Create actions */}
         <ul className="m-0 list-none p-1" role="list">
+          <li>
+            <button
+              type="button"
+              data-testid="sidebar-new-group"
+              onClick={onNewGroup}
+              className={cn(
+                'flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left transition-colors',
+                'hover:bg-state-hover',
+              )}
+            >
+              <FolderPlus size={14} className="shrink-0 text-ink-tertiary" aria-hidden />
+              <span className="text-body font-medium text-ink">{t('terminals.newGroup')}</span>
+            </button>
+          </li>
           <li>
             <button
               type="button"

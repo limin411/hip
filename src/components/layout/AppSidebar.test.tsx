@@ -1,6 +1,13 @@
 // @vitest-environment happy-dom
 import '@testing-library/jest-dom/vitest'
-import { cleanup, fireEvent, render, screen, within } from '@testing-library/react'
+import {
+  cleanup,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+  within,
+} from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { useUiStore } from '@/store/uiStore'
 import { useDomainStore } from '@/domain'
@@ -280,12 +287,25 @@ describe('AppSidebar', () => {
     render(<AppSidebar />)
     // One trailing action (like chat / code / knowledge) — not multiple inline buttons.
     expect(screen.getByTestId('sidebar-new-terminal')).toBeInTheDocument()
+    expect(screen.queryByTestId('sidebar-new-group')).not.toBeInTheDocument()
     expect(screen.queryByTestId('sidebar-new-local-terminal')).not.toBeInTheDocument()
     expect(screen.queryByTestId('sidebar-new-remote-host')).not.toBeInTheDocument()
     fireEvent.click(screen.getByTestId('sidebar-new-terminal'))
     expect(screen.getByTestId('terminals-new-popover')).toBeInTheDocument()
+    expect(screen.getByTestId('sidebar-new-group')).toBeInTheDocument()
     expect(screen.getByTestId('sidebar-new-local-terminal')).toBeInTheDocument()
     expect(screen.getByTestId('sidebar-new-remote-host')).toBeInTheDocument()
+  })
+
+  it('terminals new group requests group creation from the host library', async () => {
+    useUiStore.setState({ sidebarSection: 'terminals', activeView: 'terminals' })
+    render(<AppSidebar />)
+    fireEvent.click(screen.getByTestId('sidebar-new-terminal'))
+    fireEvent.click(screen.getByTestId('sidebar-new-group'))
+    const { useHostLibraryUi } = await import('@/components/terminals/hostLibraryUi')
+    await waitFor(() => {
+      expect(useHostLibraryUi.getState().pendingCreateGroup).toBe(true)
+    })
   })
 
   it('active knowledge space uses surface wash without left rail or hairline ring', () => {

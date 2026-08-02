@@ -187,4 +187,20 @@ describe('HostLibrary', () => {
     // Stale request already consumed — form stays closed on remount.
     expect(screen.queryByTestId('host-form-dialog')).not.toBeInTheDocument()
   })
+
+  it('consumes pendingCreateGroup once — remount does not re-open dialog', async () => {
+    const { useHostLibraryUi } = await import('./hostLibraryUi')
+    useHostLibraryUi.setState({ pendingCreateGroup: true })
+
+    const { unmount } = render(<HostLibrary />)
+    await waitFor(() => {
+      expect(screen.getByTestId('host-group-dialog')).toBeInTheDocument()
+    })
+    expect(useHostLibraryUi.getState().pendingCreateGroup).toBe(false)
+
+    unmount()
+    render(<HostLibrary />)
+    // Stale request already consumed — dialog stays closed on remount.
+    expect(screen.queryByTestId('host-group-dialog')).not.toBeInTheDocument()
+  })
 })

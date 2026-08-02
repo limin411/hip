@@ -32,6 +32,7 @@ export function HostLibrary() {
   const removeHost = useTerminalHostStore((s) => s.removeHost)
 
   const pendingCreateHost = useHostLibraryUi((s) => s.pendingCreateHost)
+  const pendingCreateGroup = useHostLibraryUi((s) => s.pendingCreateGroup)
 
   const [formMode, setFormMode] = useState<HostFormMode | null>(null)
   const [formOpen, setFormOpen] = useState(false)
@@ -62,6 +63,15 @@ export function HostLibrary() {
     setFormMode({ mode: 'create', groupId: null })
     setFormOpen(true)
   }, [pendingCreateHost])
+
+  // Sidebar / external "new group" — one-shot consume so remount does not re-open.
+  useEffect(() => {
+    if (!pendingCreateGroup) return
+    if (!useHostLibraryUi.getState().consumeCreateGroupRequest()) return
+    setGroupName('')
+    setGroupError(null)
+    setGroupDialog({ mode: 'create' })
+  }, [pendingCreateGroup])
 
   const openCreate = useCallback((groupId?: string | null) => {
     setFormMode({ mode: 'create', groupId: groupId ?? null })

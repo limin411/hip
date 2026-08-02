@@ -122,7 +122,7 @@ describe('DiffDisplay class polish', () => {
     expect(screen.queryAllByTestId('diff-file')).toHaveLength(2)
   })
 
-  it('renders hover row actions and wires open-in-files + discard confirm', () => {
+  it('renders always-visible row actions and wires open-in-files + discard confirm', () => {
     const onOpen = vi.fn()
     const onConfirm = vi.fn()
     render(
@@ -143,6 +143,9 @@ describe('DiffDisplay class polish', () => {
     expect(screen.getByTestId('diff-discard')).toBeInTheDocument()
     expect(screen.getByTestId('diff-open-files')).toBeInTheDocument()
     expect(screen.getByTestId('diff-file-menu')).toBeInTheDocument()
+    const actionBar = screen.getByTestId('diff-discard').parentElement
+    expect(actionBar).not.toHaveClass('opacity-0')
+    expect(actionBar).not.toHaveClass('group-hover:opacity-100')
     fireEvent.click(screen.getByTestId('diff-open-files'))
     expect(onOpen).toHaveBeenCalledWith('src/a.ts')
     expect(screen.getByTestId('diff-discard-popover')).toBeInTheDocument()

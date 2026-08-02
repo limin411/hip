@@ -262,7 +262,7 @@ function FileDiff({
           {file.truncated && <span className="text-ink-tertiary">{t('artifact.truncated')}</span>}
           <span className="text-success">+{file.additions}</span>
           <span className="text-danger">−{file.deletions}</span>
-          <span className="flex items-center gap-0.5 opacity-0 transition-opacity duration-chrome group-hover:opacity-100">
+          <span className="flex items-center gap-0.5">
             <Popover
               open={discardOpenPath === file.path}
               onOpenChange={(open) => onDiscardOpen(open ? file.path : null)}

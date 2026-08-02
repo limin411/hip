@@ -9,13 +9,22 @@ import { useDomainStore } from '@/domain/sessionStore'
 import { useDiffStore, EMPTY_DIFF } from '@/store/diffStore'
 import { useUiStore } from '@/store/uiStore'
 import { sessionService } from '@/domain/sessionService'
+import { insertComposerText } from '@/components/command-palette/composerBridge'
 import '@/i18n'
 
 vi.mock('react-i18next', async (importOriginal) => {
   const actual = await importOriginal<typeof import('react-i18next')>()
   return {
     ...actual,
-    useTranslation: () => ({ t: (key: string) => key, i18n: { language: 'en' } }),
+    useTranslation: () => ({
+      t: (key: string, opts?: Record<string, unknown>) => {
+        if (key === 'artifact.changesView.reviewPrompt') {
+          return `REVIEW ${String(opts?.files ?? '')} @ ${String(opts?.base ?? '')}`
+        }
+        return key
+      },
+      i18n: { language: 'en' },
+    }),
   }
 })
 
@@ -195,5 +204,43 @@ describe('ChangesView v2', () => {
     fireEvent.click(screen.getByText('artifact.changesView.ignoreWhitespace'))
     expect(useUiStore.getState().ignoreWhitespace).toBe(true)
     expect(sessionService.requestDiff).toHaveBeenLastCalledWith('s1', undefined, true)
+  })
+
+  it('running session disables discard and the review CTA', () => {
+    useDomainStore.setState((st) => ({
+      ...st,
+      sessions: st.sessions.map((s) => (s.id === 's1' ? { ...s, status: 'running' } : s)),
+    }))
+    useDiffStore.setState({
+      bySession: {
+        s1: { ...EMPTY_DIFF, status: 'ready', state: 'ok', hasSessionStart: true, files: [file], commitLog: { status: 'ready', state: 'ok', commits: [] } },
+      },
+    })
+    render(<ChangesView />)
+    expect(screen.getByTestId('diff-discard')).toBeDisabled()
+    expect(screen.getByTestId('changes-review')).toBeDisabled()
+  })
+
+  it('discard confirm sends git:discard through sessionService', async () => {
+    useDiffStore.setState({
+      bySession: {
+        s1: { ...EMPTY_DIFF, status: 'ready', state: 'ok', hasSessionStart: true, files: [file], commitLog: { status: 'ready', state: 'ok', commits: [] } },
+      },
+    })
+    render(<ChangesView />)
+    fireEvent.click(screen.getByTestId('diff-discard'))
+    fireEvent.click(await screen.findByTestId('diff-discard-confirm'))
+    expect(sessionService.discardFile).toHaveBeenCalledWith('s1', 'src/a.ts', 'modified', undefined)
+  })
+
+  it('review CTA injects a prompt with the file list into the composer', () => {
+    useDiffStore.setState({
+      bySession: {
+        s1: { ...EMPTY_DIFF, status: 'ready', state: 'ok', hasSessionStart: true, files: [file], commitLog: { status: 'ready', state: 'ok', commits: [] } },
+      },
+    })
+    render(<ChangesView />)
+    fireEvent.click(screen.getByTestId('changes-review'))
+    expect(insertComposerText).toHaveBeenCalledWith(expect.stringContaining('src/a.ts'))
   })
 })

@@ -1,10 +1,18 @@
 // @vitest-environment happy-dom
 import '@testing-library/jest-dom/vitest'
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { render, screen, cleanup } from '@testing-library/react'
+import { render, screen, fireEvent, cleanup } from '@testing-library/react'
 import type { DiffFile } from '@hip/protocol'
 import { DiffDisplay } from './DiffDisplay'
 import { clearContextProviders } from '@/components/context-menu'
+import { copyText } from '@/ipc/clipboard'
+import { useDiffAnnotationStore } from '@/store/diffAnnotationStore'
+import { setComposerQuote } from '@/components/command-palette/composerBridge'
+
+vi.mock('@/ipc/clipboard', () => ({ copyText: vi.fn(async () => true) }))
+vi.mock('@/components/command-palette/composerBridge', () => ({
+  setComposerQuote: vi.fn(() => true),
+}))
 
 vi.mock('react-i18next', async (importOriginal) => {
   const actual = await importOriginal<typeof import('react-i18next')>()
@@ -38,6 +46,7 @@ describe('DiffDisplay class polish', () => {
   beforeEach(() => {
     cleanup()
     clearContextProviders()
+    useDiffAnnotationStore.setState({ bySession: {} })
   })
 
   afterEach(() => {
@@ -111,6 +120,51 @@ describe('DiffDisplay class polish', () => {
     )
     expect(screen.queryByTestId('diff-file-list')).toBeNull()
     expect(screen.queryAllByTestId('diff-file')).toHaveLength(2)
+  })
+
+  it('renders hover row actions and wires open-in-files + discard confirm', () => {
+    const onOpen = vi.fn()
+    const onConfirm = vi.fn()
+    render(
+      <DiffDisplay
+        files={[file]}
+        viewMode="unified"
+        sessionId="s1"
+        onToggleCollapse={() => {}}
+        onOpenInFiles={onOpen}
+        onDiscardOpen={() => {}}
+        onDiscardConfirm={onConfirm}
+        discardOpenPath="src/a.ts"
+        running={false}
+        onReviewFile={() => {}}
+        onCopyPath={() => {}}
+      />,
+    )
+    expect(screen.getByTestId('diff-discard')).toBeInTheDocument()
+    expect(screen.getByTestId('diff-open-files')).toBeInTheDocument()
+    expect(screen.getByTestId('diff-file-menu')).toBeInTheDocument()
+    fireEvent.click(screen.getByTestId('diff-open-files'))
+    expect(onOpen).toHaveBeenCalledWith('src/a.ts')
+    expect(screen.getByTestId('diff-discard-popover')).toBeInTheDocument()
+    fireEvent.click(screen.getByTestId('diff-discard-confirm'))
+    expect(onConfirm).toHaveBeenCalledWith('src/a.ts', file)
+  })
+
+  it('hunk hover actions copy, annotate, and quote the hunk', () => {
+    render(
+      <DiffDisplay
+        files={[file]}
+        viewMode="unified"
+        sessionId="s1"
+        onToggleCollapse={() => {}}
+      />,
+    )
+    fireEvent.click(screen.getByTestId('diff-hunk-copy'))
+    expect(copyText).toHaveBeenCalledWith(expect.stringContaining('@@ -1,1 +1,1 @@'))
+    fireEvent.click(screen.getByTestId('diff-hunk-annotate'))
+    expect(useDiffAnnotationStore.getState().list('s1')).toHaveLength(1)
+    fireEvent.click(screen.getByTestId('diff-hunk-quote'))
+    expect(setComposerQuote).toHaveBeenCalledWith(expect.stringContaining('src/a.ts'))
   })
 
   it('drops sticky header border when collapsed to avoid double hairline', () => {

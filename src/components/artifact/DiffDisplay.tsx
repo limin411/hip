@@ -1,13 +1,24 @@
 import { useLayoutEffect, useRef, type ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
-import { ChevronDown, ChevronRight } from 'lucide-react'
+import { ChevronDown, ChevronRight, FolderOpen, MoreHorizontal, Trash2 } from 'lucide-react'
 import type { DiffFile, DiffHunk, DiffLine, DiffLineType, DiffFileStatus, DiffSummary } from '@hip/protocol'
 import { cn } from '@/lib/utils'
 import { fileIconForName } from '@/lib/fileIcon'
 import { computeHunkWordDiffs } from '@/lib/wordDiff'
 import { buildSplitRows } from '@/lib/diffSplit'
+import { copyText } from '@/ipc/clipboard'
+import { useDiffAnnotationStore } from '@/store/diffAnnotationStore'
+import { setComposerQuote } from '@/components/command-palette/composerBridge'
 import { DeclarativeContextMenu } from '@/components/context-menu'
 import { EmptyState } from '@/components/ui/EmptyState'
+import { Popover, PopoverContent, PopoverTrigger, PopoverClose } from '@/components/ui/Popover'
+import { Button } from '@/components/ui/Button'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/DropdownMenu'
 
 export const STATUS_CHIP = {
   added: { cls: 'bg-success/10 text-success', key: 'artifact.diffView.statusAdded', letter: 'A' },
@@ -44,10 +55,12 @@ function HunkLines({
   hunk,
   viewMode,
   path,
+  sessionId,
 }: {
   hunk: DiffHunk
   viewMode: 'unified' | 'split'
   path: string
+  sessionId: string
 }) {
   const { t } = useTranslation()
   const hunkText = formatHunkText(hunk)
@@ -55,11 +68,37 @@ function HunkLines({
     <DeclarativeContextMenu
       kind="diffHunk"
       payload={{ path, header: hunk.header, text: hunkText }}
-      className="flex border-y border-border/50 bg-surface-subtle py-0.5 text-caption text-ink-tertiary"
+      className="group/hunk flex border-y border-border/50 bg-surface-subtle py-0.5 text-caption text-ink-tertiary"
       data-testid="diff-hunk-header"
     >
       <span className="shrink-0 select-none px-2 font-mono tabular-nums text-ink-tertiary">@@ -{hunk.oldStart},{hunk.oldLines} +{hunk.newStart},{hunk.newLines} @@</span>
       {hunk.header && <span className="truncate px-1 text-ink-tertiary/80">{hunk.header}</span>}
+      <span className="ml-auto flex shrink-0 items-center gap-0.5 pr-1 opacity-0 transition-opacity duration-chrome group-hover/hunk:opacity-100">
+        <button
+          type="button"
+          onClick={() => void copyText(hunkText)}
+          className="rounded-sm px-1.5 py-0.5 text-ink-tertiary transition-colors duration-chrome hover:bg-state-hover hover:text-ink"
+          data-testid="diff-hunk-copy"
+        >
+          {t('contextMenu.diffHunk.copy')}
+        </button>
+        <button
+          type="button"
+          onClick={() => useDiffAnnotationStore.getState().add(sessionId, { path: path || '(unknown)', body: hunkText })}
+          className="rounded-sm px-1.5 py-0.5 text-ink-tertiary transition-colors duration-chrome hover:bg-state-hover hover:text-ink"
+          data-testid="diff-hunk-annotate"
+        >
+          {t('contextMenu.diffHunk.annotate')}
+        </button>
+        <button
+          type="button"
+          onClick={() => setComposerQuote(`${path}\n${hunkText}`)}
+          className="rounded-sm px-1.5 py-0.5 text-ink-tertiary transition-colors duration-chrome hover:bg-state-hover hover:text-ink"
+          data-testid="diff-hunk-quote"
+        >
+          {t('contextMenu.diffHunk.quoteToComposer')}
+        </button>
+      </span>
     </DeclarativeContextMenu>
   )
 
@@ -122,6 +161,14 @@ function FileDiff({
   cwd,
   showFileIcons,
   focusedPath,
+  running,
+  discardOpenPath,
+  discardPending,
+  onDiscardOpen,
+  onDiscardConfirm,
+  onOpenInFiles,
+  onReviewFile,
+  onCopyPath,
   onToggleCollapse,
   onShowFull,
   onCollapseFull,
@@ -134,6 +181,14 @@ function FileDiff({
   cwd: string | null
   showFileIcons: boolean
   focusedPath?: string | null
+  running: boolean
+  discardOpenPath: string | null
+  discardPending?: Record<string, boolean>
+  onDiscardOpen: (path: string | null) => void
+  onDiscardConfirm: (path: string, file: DiffFile) => void
+  onOpenInFiles: (path: string) => void
+  onReviewFile: (path: string) => void
+  onCopyPath: (path: string) => void
   onToggleCollapse: (path: string, multi: boolean) => void
   onShowFull?: (path: string) => void
   onCollapseFull?: (path: string) => void
@@ -151,7 +206,7 @@ function FileDiff({
         className={cn(
           // Only expanded rows stick; offsets are assigned by DiffDisplay's layout effect
           // so multiple open rows stack instead of overlapping.
-          'relative flex h-8 items-center justify-between gap-2 bg-surface-subtle px-3',
+          'group relative flex h-8 items-center justify-between gap-2 bg-surface-subtle px-3',
           !isCollapsed && 'sticky top-0 z-[1]',
           // Expanded: hairline under sticky bar. Collapsed: shell border-b alone (no double).
           !isCollapsed && 'border-b border-border/70',
@@ -188,6 +243,75 @@ function FileDiff({
           {file.truncated && <span className="text-ink-tertiary">{t('artifact.truncated')}</span>}
           <span className="text-success">+{file.additions}</span>
           <span className="text-danger">−{file.deletions}</span>
+          <span className="flex items-center gap-0.5 opacity-0 transition-opacity duration-chrome group-hover:opacity-100">
+            <Popover
+              open={discardOpenPath === file.path}
+              onOpenChange={(open) => onDiscardOpen(open ? file.path : null)}
+            >
+              <PopoverTrigger asChild>
+                <button
+                  type="button"
+                  disabled={running || discardPending?.[file.path]}
+                  title={running ? t('artifact.changesView.discardRunningDisabled') : t('artifact.changesView.discard')}
+                  className="inline-flex size-5 items-center justify-center rounded text-ink-tertiary transition-colors duration-chrome hover:bg-danger/10 hover:text-danger disabled:pointer-events-none disabled:opacity-40"
+                  data-testid="diff-discard"
+                >
+                  <Trash2 size={13} strokeWidth={1.75} />
+                </button>
+              </PopoverTrigger>
+              <PopoverContent align="end" data-testid="diff-discard-popover">
+                <div className="space-y-2 p-3">
+                  <p className="text-body font-medium text-ink">{t('artifact.changesView.discardConfirmTitle')}</p>
+                  <p className="text-meta text-ink-tertiary">{t('artifact.changesView.discardConfirmBody')}</p>
+                  <div className="flex justify-end gap-2 pt-1">
+                    <PopoverClose asChild>
+                      <Button size="sm" variant="ghost">{t('artifact.changesView.discardCancel')}</Button>
+                    </PopoverClose>
+                    <Button
+                      size="sm"
+                      variant="danger"
+                      onClick={() => onDiscardConfirm(file.path, file)}
+                      data-testid="diff-discard-confirm"
+                    >
+                      {t('artifact.changesView.discardConfirmAction')}
+                    </Button>
+                  </div>
+                </div>
+              </PopoverContent>
+            </Popover>
+            <button
+              type="button"
+              title={t('artifact.changesView.openInFiles')}
+              onClick={() => onOpenInFiles(file.path)}
+              className="inline-flex size-5 items-center justify-center rounded text-ink-tertiary transition-colors duration-chrome hover:bg-state-hover hover:text-ink"
+              data-testid="diff-open-files"
+            >
+              <FolderOpen size={13} strokeWidth={1.75} />
+            </button>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button
+                  type="button"
+                  aria-label={t('artifact.changesView.fileActions')}
+                  className="inline-flex size-5 items-center justify-center rounded text-ink-tertiary transition-colors duration-chrome hover:bg-state-hover hover:text-ink"
+                  data-testid="diff-file-menu"
+                >
+                  <MoreHorizontal size={13} strokeWidth={1.75} />
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" data-testid="diff-file-menu-content">
+                <DropdownMenuItem onClick={() => onCopyPath(file.path)} data-testid="diff-file-copy-path">
+                  {t('contextMenu.diffFile.copyPath')}
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => onOpenInFiles(file.path)} data-testid="diff-file-menu-open">
+                  {t('contextMenu.diffFile.openInFiles')}
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => onReviewFile(file.path)} data-testid="diff-file-menu-review">
+                  {t('artifact.changesView.reviewFile')}
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </span>
         </span>
       </DeclarativeContextMenu>
       {!isCollapsed && (shown.binary ? (
@@ -198,7 +322,7 @@ function FileDiff({
         <>
           <div className="overflow-x-auto font-mono text-meta">
             {shown.hunks.map((h, i) => (
-              <HunkLines key={i} hunk={h} viewMode={viewMode} path={file.path} />
+              <HunkLines key={i} hunk={h} viewMode={viewMode} path={file.path} sessionId={sessionId} />
             ))}
           </div>
           {(onShowFull || onCollapseFull) && (
@@ -281,6 +405,14 @@ export function DiffDisplay({
   cwd = null,
   showFileIcons = true,
   focusedPath = null,
+  running = false,
+  discardOpenPath = null,
+  discardPending,
+  onDiscardOpen = () => {},
+  onDiscardConfirm = () => {},
+  onOpenInFiles = () => {},
+  onReviewFile = () => {},
+  onCopyPath = () => {},
   onToggleCollapse,
   onShowFull,
   onCollapseFull,
@@ -297,6 +429,14 @@ export function DiffDisplay({
   showFileIcons?: boolean
   /** Keyboard-focused file row (j/k); highlighted with an accent rail. */
   focusedPath?: string | null
+  running?: boolean
+  discardOpenPath?: string | null
+  discardPending?: Record<string, boolean>
+  onDiscardOpen?: (path: string | null) => void
+  onDiscardConfirm?: (path: string, file: DiffFile) => void
+  onOpenInFiles?: (path: string) => void
+  onReviewFile?: (path: string) => void
+  onCopyPath?: (path: string) => void
   onToggleCollapse: (path: string, multi: boolean) => void
   onShowFull?: (path: string) => void
   onCollapseFull?: (path: string) => void
@@ -336,6 +476,14 @@ export function DiffDisplay({
           cwd={cwd}
           showFileIcons={showFileIcons}
           focusedPath={focusedPath}
+          running={running}
+          discardOpenPath={discardOpenPath}
+          discardPending={discardPending}
+          onDiscardOpen={onDiscardOpen}
+          onDiscardConfirm={onDiscardConfirm}
+          onOpenInFiles={onOpenInFiles}
+          onReviewFile={onReviewFile}
+          onCopyPath={onCopyPath}
           onToggleCollapse={onToggleCollapse}
           onShowFull={onShowFull}
           onCollapseFull={onCollapseFull}

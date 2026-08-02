@@ -1,12 +1,16 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Check, ChevronDown, ChevronRight, GitBranch, GitCommit, Loader2, MoreHorizontal } from 'lucide-react'
-import type { DiffBase } from '@hip/protocol'
+import { Check, ChevronDown, ChevronRight, GitBranch, GitCommit, Loader2, MoreHorizontal, Sparkles } from 'lucide-react'
+import type { DiffBase, DiffFile } from '@hip/protocol'
 import { useDomainStore } from '@/domain/sessionStore'
 import { sessionService } from '@/domain/sessionService'
 import { useDiffStore, EMPTY_DIFF } from '@/store/diffStore'
+import { useFsStore } from '@/store/fsStore'
 import { useUiStore } from '@/store/uiStore'
 import { formatRelativeTime } from '@/lib/datetime'
+import { resolvePathUnderCwd } from '@/lib/pathScope'
+import { copyText } from '@/ipc/clipboard'
+import { toast } from 'sonner'
 import { DiffDisplay, Empty } from './DiffDisplay'
 import { DeclarativeContextMenu } from '@/components/context-menu'
 import { insertComposerText } from '@/components/command-palette/composerBridge'
@@ -45,7 +49,12 @@ export function ChangesView() {
   const rootRef = useRef<HTMLDivElement>(null)
   const [focusedPath, setFocusedPath] = useState<string | null>(null)
   const [menuOpen, setMenuOpen] = useState(false)
+  const [discardPath, setDiscardPath] = useState<string | null>(null)
   const [narrow, setNarrow] = useState(false)
+  const running = useDomainStore((s) => {
+    if (!s.activeSessionId) return false
+    return s.sessions.find((x) => x.id === s.activeSessionId)?.status === 'running'
+  })
 
   // Refresh diff + commit log when the tab becomes active (Radix may keep the
   // component mounted while hidden) or when the session changes.
@@ -79,9 +88,39 @@ export function ChangesView() {
     sessionService.requestDiff(sessionId, base)
   }
 
-  const startReview = () => {
-    // Phase C wires the actual prompt injection; keyboard CTA is reserved here.
-    void insertComposerText('')
+  const reviewFiles = (paths: string[]) => {
+    const baseLabel =
+      diff.base === 'session-start'
+        ? t('artifact.diffView.baseSession')
+        : t('artifact.diffView.baseHead')
+    const prompt = t('artifact.changesView.reviewPrompt', {
+      files: paths.join('\n'),
+      base: baseLabel,
+    })
+    if (insertComposerText(prompt)) {
+      toast.success(t('artifact.changesView.reviewInjected'))
+    } else {
+      toast.error(t('artifact.changesView.reviewNoComposer'))
+    }
+  }
+
+  const confirmDiscard = (path: string, file: DiffFile) => {
+    setDiscardPath(null)
+    if (!sessionId) return
+    sessionService.discardFile(sessionId, path, file.status, file.oldPath)
+  }
+
+  const openInFiles = (path: string) => {
+    if (!sessionId) return
+    const abs = resolvePathUnderCwd(cwd, path)
+    if (!abs) return
+    useUiStore.getState().setTab('files')
+    useFsStore.getState().setActive(sessionId, abs)
+    sessionService.readFile(sessionId, abs)
+  }
+
+  const copyPath = (path: string) => {
+    void copyText(path)
   }
 
   const toggleIgnoreWhitespace = () => {
@@ -104,10 +143,14 @@ export function ChangesView() {
       }
       if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
         e.preventDefault()
-        startReview()
+        reviewFiles(diff.files.map((f) => f.path))
         return
       }
       if (e.key === 'Escape') {
+        if (discardPath) {
+          setDiscardPath(null)
+          return
+        }
         if (menuOpen) {
           setMenuOpen(false)
           return
@@ -313,6 +356,23 @@ export function ChangesView() {
               )
             })}
           </div>
+          <Button
+            variant="primary"
+            size="sm"
+            disabled={running || !hasUncommitted}
+            title={
+              running
+                ? t('artifact.changesView.reviewRunningDisabled')
+                : !hasUncommitted
+                  ? t('artifact.diffView.clean')
+                  : undefined
+            }
+            onClick={() => reviewFiles(diff.files.map((f) => f.path))}
+            data-testid="changes-review"
+          >
+            <Sparkles size={13} />
+            {t('artifact.changesView.review')}
+          </Button>
           <DropdownMenu open={menuOpen} onOpenChange={setMenuOpen}>
           <DropdownMenuTrigger asChild>
             <Button
@@ -390,6 +450,14 @@ export function ChangesView() {
               sessionId={sessionId}
               cwd={cwd}
               showFileIcons={!narrow}
+              running={running}
+              discardOpenPath={discardPath}
+              discardPending={diff.discardPending}
+              onDiscardOpen={setDiscardPath}
+              onDiscardConfirm={confirmDiscard}
+              onOpenInFiles={openInFiles}
+              onReviewFile={(p) => reviewFiles([p])}
+              onCopyPath={copyPath}
               onToggleCollapse={(p, multi) => toggleFile(p, multi)}
               onShowFull={(p) => sessionService.requestDiffFile(sessionId, p, 'full')}
               onCollapseFull={(p) => useDiffStore.getState().collapseFile(sessionId, p)}

@@ -664,7 +664,21 @@ export const zhTW = {
       "backToUncommitted": "返回未提交",
       "commitDiffError": "無法載入提交改動",
       "discardSuccess": "已將 {{path}} 恢復到 HEAD（副本已放入資源回收筒）",
-      "discardFailed": "丟棄 {{path}} 失敗：{{error}}"
+      "discardFailed": "丟棄 {{path}} 失敗：{{error}}",
+      "review": "審查",
+      "reviewRunningDisabled": "工作階段執行中，請結束後再審查",
+      "reviewInjected": "審查提示已填入輸入框",
+      "reviewNoComposer": "暫無輸入框可用，請先開啟對話",
+      "reviewFile": "請 agent 審查此檔案",
+      "discard": "捨棄改動（恢復到 HEAD）",
+      "discardConfirmTitle": "捨棄這些改動？",
+      "discardConfirmBody": "將恢復到 HEAD，目前狀態的副本會放入資源回收筒。",
+      "discardCancel": "取消",
+      "discardConfirmAction": "捨棄",
+      "discardRunningDisabled": "工作階段執行中，無法捨棄",
+      "openInFiles": "在 Files 開啟",
+      "fileActions": "檔案操作",
+      "reviewPrompt": "請審查以下改動（基線：{{base}}）。\n\n檔案清單：\n{{files}}\n\n審查要點（紅牌清單）：\n1. CI 是否被弱化（跳過測試、放寬校驗）？\n2. 是否存在程式碼重用盲區（重複實作、繞過既有抽象）？\n3. 是否有幻覺正確性（看似正確但未驗證）？\n4. 邊界條件是否涵蓋（空值、並發、極端輸入）？\n5. 安全邊界是否完整（權限、注入、敏感資料）？\n6. 測試證據是否充分？\n\n報告結構：總覽（規模與風險面）、按影響分組（High/Medium/Low）、逐檔案要點、建議動作。"
     },
     "gitInitBanner": {
       "title": "初始化 git 以啟用檢查點",

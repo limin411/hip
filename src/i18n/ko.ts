@@ -658,7 +658,21 @@ export const ko = {
       "backToUncommitted": "커밋되지 않은 변경으로 돌아가기",
       "commitDiffError": "커밋 변경사항을 불러올 수 없음",
       "discardSuccess": "{{path}}를 HEAD로 복원함 (사본은 휴지통에 보관)",
-      "discardFailed": "{{path}} 폐기 실패: {{error}}"
+      "discardFailed": "{{path}} 폐기 실패: {{error}}",
+      "review": "검토",
+      "reviewRunningDisabled": "세션 실행 중에는 검토할 수 없습니다",
+      "reviewInjected": "검토 프롬프트를 입력란에 추가했습니다",
+      "reviewNoComposer": "입력란을 사용할 수 없습니다. 먼저 대화를 여세요",
+      "reviewFile": "이 파일 검토를 에이전트에 요청",
+      "discard": "변경사항 폐기 (HEAD로 복원)",
+      "discardConfirmTitle": "이 변경사항을 폐기할까요?",
+      "discardConfirmBody": "HEAD로 복원되며 현재 상태의 사본은 휴지통에 보관됩니다.",
+      "discardCancel": "취소",
+      "discardConfirmAction": "폐기",
+      "discardRunningDisabled": "세션 실행 중에는 폐기할 수 없습니다",
+      "openInFiles": "Files에서 열기",
+      "fileActions": "파일 작업",
+      "reviewPrompt": "다음 변경사항을 검토해 주세요 (기준: {{base}}).\n\n파일 목록:\n{{files}}\n\n체크리스트 (레드 플래그):\n1. CI 약화 여부 (테스트 건너뛰기, 검증 완화)\n2. 코드 재사용 사각지대 (중복 구현, 기존 추상화 우회)\n3. 환상적 정확성 (맞아 보이지만 검증되지 않음)\n4. 경계 조건 (null, 동시성, 극단적 입력)\n5. 보안 경계 (권한, 인젝션, 민감 데이터)\n6. 테스트 증거 충분 여부\n\n보고 구조: 개요(규모·위험), 영향도별(High/Medium/Low), 파일별 요점, 권장 조치."
     },
     "gitInitBanner": {
       "title": "Git 저장소 초기화",

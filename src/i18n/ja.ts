@@ -658,7 +658,21 @@ export const ja = {
       "backToUncommitted": "未コミットに戻る",
       "commitDiffError": "コミットの差分を読み込めませんでした",
       "discardSuccess": "{{path}} を HEAD に復元しました（コピーはゴミ箱に保存）",
-      "discardFailed": "{{path}} を破棄できませんでした：{{error}}"
+      "discardFailed": "{{path}} を破棄できませんでした：{{error}}",
+      "review": "レビュー",
+      "reviewRunningDisabled": "セッション実行中はレビューできません",
+      "reviewInjected": "レビュー用プロンプトを入力欄に追加しました",
+      "reviewNoComposer": "入力欄がありません。先に会話を開いてください",
+      "reviewFile": "このファイルのレビューをエージェントに依頼",
+      "discard": "変更を破棄（HEAD に復元）",
+      "discardConfirmTitle": "この変更を破棄しますか？",
+      "discardConfirmBody": "HEAD に復元します。現在の状態のコピーはゴミ箱に保存されます。",
+      "discardCancel": "キャンセル",
+      "discardConfirmAction": "破棄",
+      "discardRunningDisabled": "セッション実行中は破棄できません",
+      "openInFiles": "Files で開く",
+      "fileActions": "ファイル操作",
+      "reviewPrompt": "以下の変更をレビューしてください（ベース: {{base}}）。\n\nファイル一覧：\n{{files}}\n\nチェックリスト（レッドフラグ）：\n1. CI が弱体化していないか（テストスキップ、検証の緩和）\n2. コード再利用の盲点（重複実装、既存抽象の迂回）\n3. 幻想的な正しさ（正しく見えるが未検証）\n4. エッジケースの網羅（null、並行処理、極端な入力）\n5. セキュリティ境界（権限、インジェクション、機密データ）\n6. テストの証拠が十分か\n\n報告構成：概要（規模・リスク面）、影響度別（High/Medium/Low）、ファイル別の要点、推奨アクション。"
     },
     "gitInitBanner": {
       "title": "チェックポイントを有効にするには git を初期化してください",

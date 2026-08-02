@@ -52,7 +52,6 @@ function makeDeps(): ServerMessageEffectDeps & { send: ReturnType<typeof vi.fn> 
     send: vi.fn(),
     requestDiff: vi.fn(),
     requestCheckpoints: vi.fn(),
-    requestCommitLog: vi.fn(),
     resyncActiveIfRunning: vi.fn(),
   }
 }

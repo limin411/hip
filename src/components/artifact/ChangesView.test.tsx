@@ -1,7 +1,7 @@
 // @vitest-environment happy-dom
 import '@testing-library/jest-dom/vitest'
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { render, screen, fireEvent, cleanup, waitFor } from '@testing-library/react'
+import { render, screen, fireEvent, cleanup } from '@testing-library/react'
 import type { ReactNode } from 'react'
 import type { DiffFile } from '@hip/protocol'
 import { ChangesView } from './ChangesView'
@@ -32,6 +32,16 @@ vi.mock('react-i18next', async (importOriginal) => {
         if (key === 'artifact.changesView.reviewPrompt') {
           return `REVIEW ${String(opts?.files ?? '')} @ ${String(opts?.base ?? '')}`
         }
+        if (key === 'artifact.changesView.commitPrompt') {
+          return 'COMMIT branch={{branch}} message={{message}} filesNote={{filesNote}} files={{files}}'
+        }
+        if (key === 'artifact.changesView.commitMessageByAgent') return '(msg-agent)'
+        if (key === 'artifact.changesView.commitFilesByAgent') return '(files-agent)'
+        if (key === 'artifact.changesView.commitBranchUnknown') return '(unknown-branch)'
+        if (key === 'artifact.changesView.commitFilesHint') return `hint:${opts?.count}`
+        if (key === 'artifact.changesView.pushPrompt') {
+          return `PUSH branch=${String(opts?.branch ?? '')}`
+        }
         return key
       },
       i18n: { language: 'en' },
@@ -42,12 +52,33 @@ vi.mock('react-i18next', async (importOriginal) => {
 vi.mock('@/domain/sessionService', () => ({
   sessionService: {
     requestDiff: vi.fn(),
-    requestCommitLog: vi.fn(),
-    requestCommitDiff: vi.fn(),
     requestDiffFile: vi.fn(),
+    requestCheckpoints: vi.fn(),
     discardFile: vi.fn(),
     gitInitWorkspace: vi.fn(),
+    sendMessage: vi.fn(),
   },
+}))
+
+vi.mock('@/components/ui/Modal', () => ({
+  Modal: ({
+    open,
+    title,
+    children,
+    footer,
+  }: {
+    open: boolean
+    title: string
+    children: ReactNode
+    footer?: ReactNode
+  }) =>
+    open ? (
+      <div data-testid="commit-modal">
+        <h1>{title}</h1>
+        {children}
+        {footer}
+      </div>
+    ) : null,
 }))
 
 vi.mock('@/components/command-palette/composerBridge', () => ({
@@ -125,8 +156,6 @@ beforeEach(() => {
     activeTab: 'changes',
     diffViewMode: 'unified',
     ignoreWhitespace: false,
-    changesCommitExpanded: false,
-    changesCommitHeight: 168,
   })
   vi.stubGlobal('ResizeObserver', ROStub)
 })
@@ -140,7 +169,7 @@ describe('ChangesView v2', () => {
   it('disables the session-start baseline without a checkpoint and keeps HEAD enabled', () => {
     useDiffStore.setState({
       bySession: {
-        s1: { ...EMPTY_DIFF, status: 'ready', state: 'ok', hasSessionStart: false, files: [file], commitLog: { status: 'ready', state: 'ok', commits: [] } },
+        s1: { ...EMPTY_DIFF, status: 'ready', state: 'ok', hasSessionStart: false, files: [file] },
       },
     })
     renderChanges()
@@ -150,7 +179,7 @@ describe('ChangesView v2', () => {
     expect(headBase).toBeEnabled()
   })
 
-  it('collapses the commit section to 36px when uncommitted changes exist', () => {
+  it('does not render a recent-commits section', () => {
     useDiffStore.setState({
       bySession: {
         s1: {
@@ -159,108 +188,18 @@ describe('ChangesView v2', () => {
           state: 'ok',
           hasSessionStart: true,
           files: [file],
-          commitLog: {
-            status: 'ready',
-            state: 'ok',
-            commits: [{ sha: 'abc1234', shortSha: 'abc1234', message: 'm', author: 'me', timestamp: 0 }],
-          },
         },
       },
     })
     renderChanges()
-    const section = screen.getByTestId('changes-commit-section')
-    expect(section).toHaveStyle({ height: '36px' })
-    expect(screen.queryByTestId('commit-row-button')).toBeNull()
-  })
-
-  it('labels the commit section as recent commits even when a session start exists', () => {
-    useDiffStore.setState({
-      bySession: {
-        s1: {
-          ...EMPTY_DIFF,
-          status: 'ready',
-          state: 'ok',
-          hasSessionStart: true,
-          files: [file],
-          commitLog: {
-            status: 'ready',
-            state: 'ok',
-            commits: [{ sha: 'abc1234', shortSha: 'abc1234', message: 'm', author: 'me', timestamp: 0 }],
-          },
-        },
-      },
-    })
-    renderChanges()
-    expect(screen.getByText('artifact.changesView.recentCommits')).toBeInTheDocument()
-  })
-
-  it('drag on the divider resizes the commit section', () => {
-    useDiffStore.setState({
-      bySession: {
-        s1: {
-          ...EMPTY_DIFF,
-          status: 'ready',
-          state: 'ok',
-          hasSessionStart: true,
-          files: [file],
-          commitLog: {
-            status: 'ready',
-            state: 'ok',
-            commits: [{ sha: 'abc1234', shortSha: 'abc1234', message: 'm', author: 'me', timestamp: 0 }],
-          },
-        },
-      },
-    })
-    renderChanges()
-    const root = screen.getByTestId('changes-view')
-    vi.spyOn(root, 'getBoundingClientRect').mockReturnValue({
-      bottom: 400, top: 0, left: 0, right: 100, width: 100, height: 400,
-      x: 0, y: 0, toJSON: () => ({}),
-    } as DOMRect)
-    const divider = screen.getByTestId('changes-commit-divider')
-    fireEvent.pointerDown(divider, { button: 0, clientY: 300 })
-    fireEvent.pointerMove(window, { clientY: 200 })
-    fireEvent.pointerUp(window, { button: 0 })
-    expect(useUiStore.getState().changesCommitHeight).toBe(200)
-    expect(screen.getByTestId('changes-commit-section')).toHaveStyle({ height: '200px' })
-  })
-
-  it('commit click loads the commit diff and the back bar returns to uncommitted', async () => {
-    useDiffStore.setState({
-      bySession: {
-        s1: {
-          ...EMPTY_DIFF,
-          status: 'ready',
-          state: 'ok',
-          hasSessionStart: true,
-          files: [file],
-          commitLog: {
-            status: 'ready',
-            state: 'ok',
-            commits: [{ sha: 'abc1234', shortSha: 'abc1234', message: 'm', author: 'me', timestamp: 0 }],
-          },
-        },
-      },
-    })
-    renderChanges()
-    fireEvent.click(screen.getByTestId('changes-commit-title'))
-    fireEvent.click(await screen.findByTestId('commit-row-button'))
-    expect(sessionService.requestCommitDiff).toHaveBeenCalledWith('s1', 'abc1234')
-
-    // Simulate the sidecar round-trip the mocked service would otherwise drive.
-    useDiffStore.getState().setViewingCommit('s1', 'abc1234')
-    useDiffStore.getState().setCommitDiffResult('s1', { state: 'ok', files: [file] })
-    const back = await screen.findByTestId('changes-back-uncommitted')
-    expect(back).toBeInTheDocument()
-    fireEvent.click(back)
-    await waitFor(() => expect(useDiffStore.getState().bySession['s1'].viewingCommitSha).toBeNull())
-    await waitFor(() => expect(screen.queryByTestId('changes-back-uncommitted')).toBeNull())
+    expect(screen.queryByTestId('changes-commit-section')).toBeNull()
+    expect(screen.queryByText('artifact.changesView.recentCommits')).toBeNull()
   })
 
   it('ignore-whitespace toggle re-pulls the diff', () => {
     useDiffStore.setState({
       bySession: {
-        s1: { ...EMPTY_DIFF, status: 'ready', state: 'ok', hasSessionStart: true, files: [file], commitLog: { status: 'ready', state: 'ok', commits: [] } },
+        s1: { ...EMPTY_DIFF, status: 'ready', state: 'ok', hasSessionStart: true, files: [file] },
       },
     })
     renderChanges()
@@ -269,25 +208,73 @@ describe('ChangesView v2', () => {
     expect(sessionService.requestDiff).toHaveBeenLastCalledWith('s1', undefined, true)
   })
 
-  it('running session disables discard and the review CTA', () => {
+  it('running session disables discard, review, commit, and push CTAs', () => {
     useDomainStore.setState((st) => ({
       ...st,
       sessions: st.sessions.map((s) => (s.id === 's1' ? { ...s, status: 'running' } : s)),
     }))
     useDiffStore.setState({
       bySession: {
-        s1: { ...EMPTY_DIFF, status: 'ready', state: 'ok', hasSessionStart: true, files: [file], commitLog: { status: 'ready', state: 'ok', commits: [] } },
+        s1: { ...EMPTY_DIFF, status: 'ready', state: 'ok', hasSessionStart: true, files: [file] },
       },
     })
     renderChanges()
     expect(screen.getByTestId('diff-discard')).toBeDisabled()
     expect(screen.getByTestId('changes-review')).toBeDisabled()
+    expect(screen.getByTestId('changes-commit')).toBeDisabled()
+    expect(screen.getByTestId('changes-push')).toBeDisabled()
+  })
+
+  it('push button sends a push prompt to the agent even when clean', () => {
+    useDiffStore.setState({
+      bySession: {
+        s1: {
+          ...EMPTY_DIFF,
+          status: 'ready',
+          state: 'ok',
+          hasSessionStart: true,
+          currentBranch: 'main',
+          files: [],
+        },
+      },
+    })
+    renderChanges()
+    expect(screen.getByTestId('changes-push')).toBeEnabled()
+    fireEvent.click(screen.getByTestId('changes-push'))
+    expect(sessionService.sendMessage).toHaveBeenCalledWith('PUSH branch=main')
+  })
+
+  it('commit button opens dialog and confirm sends the prompt to the agent', () => {
+    useDiffStore.setState({
+      bySession: {
+        s1: {
+          ...EMPTY_DIFF,
+          status: 'ready',
+          state: 'ok',
+          hasSessionStart: true,
+          currentBranch: 'main',
+          files: [file],
+        },
+      },
+    })
+    renderChanges()
+    fireEvent.click(screen.getByTestId('changes-commit'))
+    expect(sessionService.requestCheckpoints).toHaveBeenCalledWith('s1')
+    expect(screen.getByTestId('changes-commit-branch')).toHaveTextContent('main')
+    fireEvent.change(screen.getByTestId('changes-commit-message'), {
+      target: { value: 'feat: x' },
+    })
+    fireEvent.click(screen.getByTestId('changes-commit-confirm'))
+    expect(sessionService.sendMessage).toHaveBeenCalledWith(expect.stringContaining('branch=main'))
+    expect(sessionService.sendMessage).toHaveBeenCalledWith(expect.stringContaining('message=feat: x'))
+    expect(sessionService.sendMessage).toHaveBeenCalledWith(expect.stringContaining('files=src/a.ts'))
+    expect(insertComposerText).not.toHaveBeenCalled()
   })
 
   it('discard confirm sends git:discard through sessionService', async () => {
     useDiffStore.setState({
       bySession: {
-        s1: { ...EMPTY_DIFF, status: 'ready', state: 'ok', hasSessionStart: true, files: [file], commitLog: { status: 'ready', state: 'ok', commits: [] } },
+        s1: { ...EMPTY_DIFF, status: 'ready', state: 'ok', hasSessionStart: true, files: [file] },
       },
     })
     renderChanges()
@@ -299,7 +286,7 @@ describe('ChangesView v2', () => {
   it('review CTA injects a prompt with the file list into the composer', () => {
     useDiffStore.setState({
       bySession: {
-        s1: { ...EMPTY_DIFF, status: 'ready', state: 'ok', hasSessionStart: true, files: [file], commitLog: { status: 'ready', state: 'ok', commits: [] } },
+        s1: { ...EMPTY_DIFF, status: 'ready', state: 'ok', hasSessionStart: true, files: [file] },
       },
     })
     renderChanges()

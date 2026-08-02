@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Check, MoreHorizontal, Sparkles } from 'lucide-react'
+import { ArrowUpFromLine, Check, GitCommitHorizontal, MoreHorizontal, Sparkles } from 'lucide-react'
 import type { DiffBase } from '@hip/protocol'
 import { useDomainStore } from '@/domain/sessionStore'
 import { sessionService } from '@/domain/sessionService'
@@ -19,7 +19,8 @@ import {
 } from '@/components/ui/DropdownMenu'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
-import { shortSha, sumDiffStats } from './panelContextSlotModel'
+import { sumDiffStats } from './panelContextSlotModel'
+import { ChangesCommitDialog } from './ChangesCommitDialog'
 
 /**
  * Changes tab titlebar chrome: identity + baseline + Review + ⋯.
@@ -38,6 +39,7 @@ export function ChangesTitlebarActions() {
     return s.sessions.find((x) => x.id === s.activeSessionId)?.status === 'running'
   })
   const [menuOpen, setMenuOpen] = useState(false)
+  const [commitOpen, setCommitOpen] = useState(false)
   const rootRef = useRef<HTMLDivElement>(null)
   const [narrow, setNarrow] = useState(false)
 
@@ -54,7 +56,6 @@ export function ChangesTitlebarActions() {
 
   const stats = sumDiffStats(diff.files)
   const hasUncommitted = stats.fileCount > 0
-  const viewing = diff.viewingCommitSha
 
   const setBase = (base: DiffBase) => {
     if (!sessionId) return
@@ -95,27 +96,28 @@ export function ChangesTitlebarActions() {
   const refresh = () => {
     if (!sessionId) return
     sessionService.requestDiff(sessionId)
-    sessionService.requestCommitLog(sessionId)
   }
 
-  if (viewing) {
-    return (
-      <div
-        ref={rootRef}
-        className="flex min-w-0 flex-1 items-center gap-0.5"
-        data-tauri-drag-region="false"
-        data-testid="panel-context-slot"
-      >
-        <span
-          className="min-w-0 max-w-[10rem] truncate px-1.5 font-mono text-caption text-ink-secondary sm:max-w-[14rem]"
-          title={viewing}
-          data-testid="slot-changes-identity"
-        >
-          {t('artifact.panelSlot.commit', { sha: shortSha(viewing) })}
-        </span>
-        <div className="min-h-full min-w-2 flex-1" data-tauri-drag-region />
-      </div>
-    )
+  const openCommit = () => {
+    if (!sessionId || running || !hasUncommitted) return
+    sessionService.requestCheckpoints(sessionId)
+    setCommitOpen(true)
+  }
+
+  const confirmCommit = (prompt: string) => {
+    setCommitOpen(false)
+    sessionService.sendMessage(prompt)
+    toast.success(t('artifact.changesView.commitStarted'))
+  }
+
+  const pushBranch = () => {
+    if (!sessionId || running) return
+    sessionService.requestCheckpoints(sessionId)
+    const branch =
+      diff.currentBranch?.trim() || t('artifact.changesView.commitBranchUnknown')
+    const prompt = t('artifact.changesView.pushPrompt', { branch })
+    sessionService.sendMessage(prompt)
+    toast.success(t('artifact.changesView.pushStarted'))
   }
 
   const label =
@@ -208,6 +210,62 @@ export function ChangesTitlebarActions() {
         <Sparkles size={12} strokeWidth={1.75} />
         {!narrow && t('artifact.changesView.review')}
       </button>
+
+      <button
+        type="button"
+        className={cn(
+          'inline-flex h-7 shrink-0 items-center gap-1 rounded-sm border border-border px-2 text-meta font-medium',
+          'bg-surface text-ink transition-colors duration-chrome',
+          'hover:bg-state-hover',
+          'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink/20',
+          'disabled:pointer-events-none disabled:opacity-40',
+          narrow && 'size-7 justify-center px-0',
+        )}
+        disabled={running || !hasUncommitted}
+        title={
+          running
+            ? t('artifact.changesView.commitRunningDisabled')
+            : !hasUncommitted
+              ? t('artifact.diffView.clean')
+              : t('artifact.changesView.commit')
+        }
+        onClick={openCommit}
+        data-testid="changes-commit"
+      >
+        <GitCommitHorizontal size={12} strokeWidth={1.75} />
+        {!narrow && t('artifact.changesView.commit')}
+      </button>
+
+      <button
+        type="button"
+        className={cn(
+          'inline-flex h-7 shrink-0 items-center gap-1 rounded-sm border border-border px-2 text-meta font-medium',
+          'bg-surface text-ink transition-colors duration-chrome',
+          'hover:bg-state-hover',
+          'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink/20',
+          'disabled:pointer-events-none disabled:opacity-40',
+          narrow && 'size-7 justify-center px-0',
+        )}
+        disabled={running}
+        title={
+          running
+            ? t('artifact.changesView.pushRunningDisabled')
+            : t('artifact.changesView.push')
+        }
+        onClick={pushBranch}
+        data-testid="changes-push"
+      >
+        <ArrowUpFromLine size={12} strokeWidth={1.75} />
+        {!narrow && t('artifact.changesView.push')}
+      </button>
+
+      <ChangesCommitDialog
+        open={commitOpen}
+        branch={diff.currentBranch}
+        uncommittedPaths={diff.files.map((f) => f.path)}
+        onOpenChange={setCommitOpen}
+        onConfirm={confirmCommit}
+      />
 
       <DropdownMenu open={menuOpen} onOpenChange={setMenuOpen}>
         <DropdownMenuTrigger asChild>

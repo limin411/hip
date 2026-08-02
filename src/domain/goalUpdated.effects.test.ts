@@ -6,7 +6,6 @@ const deps: ServerMessageEffectDeps = {
   send: vi.fn(),
   requestDiff: vi.fn(),
   requestCheckpoints: vi.fn(),
-  requestCommitLog: vi.fn(),
   resyncActiveIfRunning: vi.fn(),
 }
 

@@ -58,7 +58,6 @@ export interface ServerMessageEffectDeps {
   send(msg: ClientMessage): void
   requestDiff(sessionId: string): void
   requestCheckpoints(sessionId: string): void
-  requestCommitLog(sessionId: string): void
   resyncActiveIfRunning(): void
 }
 
@@ -250,7 +249,6 @@ export function applyServerMessageEffects(msg: ServerMessage, deps: ServerMessag
       useDiffStore.getState().setDiscardPending(msg.sessionId, msg.path, false)
       if (msg.ok) {
         deps.requestDiff(msg.sessionId)
-        deps.requestCommitLog(msg.sessionId)
         toast.success(i18n.t('artifact.changesView.discardSuccess', { path: msg.path }))
       } else {
         toast.error(i18n.t('artifact.changesView.discardFailed', { path: msg.path, error: msg.error ?? 'unknown' }))
@@ -428,7 +426,6 @@ export function applyServerMessageEffects(msg: ServerMessage, deps: ServerMessag
       // Code surface: always refresh full diff after a turn so Changes stays honest after cancel/complete.
       if (tab === 'changes' || view === 'code') {
         deps.requestDiff(msg.sessionId)
-        if (tab === 'changes') deps.requestCommitLog(msg.sessionId)
       }
       return
     }

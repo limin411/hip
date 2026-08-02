@@ -31,7 +31,6 @@ function makeDeps(overrides: Partial<ServerMessageEffectDeps> = {}): ServerMessa
     send: (msg) => { sent.push(msg) },
     requestDiff: vi.fn(),
     requestCheckpoints: vi.fn(),
-    requestCommitLog: vi.fn(),
     resyncActiveIfRunning: vi.fn(),
     ...overrides,
   }
@@ -691,7 +690,6 @@ describe('applyServerMessageEffects', () => {
       )
       expect(useDiffStore.getState().bySession['s1'].discardPending['a.ts']).toBe(false)
       expect(deps.requestDiff).toHaveBeenCalledWith('s1')
-      expect(deps.requestCommitLog).toHaveBeenCalledWith('s1')
       expect(toastSuccess).toHaveBeenCalled()
     })
 

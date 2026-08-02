@@ -352,7 +352,6 @@ export class SessionService {
       send: (m) => this.transport.send(m),
       requestDiff: (sessionId) => this.requestDiff(sessionId),
       requestCheckpoints: (sessionId) => this.requestCheckpoints(sessionId),
-      requestCommitLog: (sessionId) => this.requestCommitLog(sessionId),
       resyncActiveIfRunning: () => this.resyncActiveIfRunning(),
     })
     // After the session catalog lands (or re-lands on reconnect), re-attach open title-bar

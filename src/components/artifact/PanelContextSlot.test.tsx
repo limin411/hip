@@ -33,6 +33,9 @@ vi.mock('lucide-react', () => ({
   RotateCcw: () => React.createElement('span'),
   Power: () => React.createElement('span'),
   Sparkles: () => React.createElement('span'),
+  GitCommitHorizontal: () => React.createElement('span'),
+  GitBranch: () => React.createElement('span'),
+  ArrowUpFromLine: () => React.createElement('span'),
   MoreHorizontal: () => React.createElement('span'),
 }))
 
@@ -125,8 +128,13 @@ vi.mock('@/store/diffStore', () => ({
 vi.mock('@/domain/sessionService', () => ({
   sessionService: {
     requestDiff: vi.fn(),
-    requestCommitLog: vi.fn(),
+    requestCheckpoints: vi.fn(),
   },
+}))
+
+vi.mock('@/components/ui/Modal', () => ({
+  Modal: ({ open, children }: { open: boolean; children: React.ReactNode }) =>
+    open ? <div data-testid="commit-modal">{children}</div> : null,
 }))
 
 vi.mock('@/components/command-palette/composerBridge', () => ({

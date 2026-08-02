@@ -33,6 +33,7 @@ export const SESSION_MESSAGE_TYPES = new Set([
   'permission:respond',
   'session:uiToolResult',
   'session:uiToolRead:result',
+  'session:uiToolWrite:result',
   'session:terminalContext',
   'session:list',
   'session:load',
@@ -246,7 +247,8 @@ export function handleSessionMessage(
       return
     }
     case 'session:uiToolResult':
-    case 'session:uiToolRead:result': {
+    case 'session:uiToolRead:result':
+    case 'session:uiToolWrite:result': {
       const session = ctx.getSession(msg.sessionId)
       session?.permissions.respondUiTool(msg.callId, msg)
       return

@@ -1,4 +1,4 @@
-import { useLayoutEffect, useRef, type ReactNode } from 'react'
+import { Fragment, useLayoutEffect, useRef, type ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
 import { ChevronDown, ChevronRight, FolderOpen, MoreHorizontal, Trash2 } from 'lucide-react'
 import type { DiffFile, DiffHunk, DiffLine, DiffLineType, DiffFileStatus, DiffSummary } from '@hip/protocol'
@@ -51,20 +51,11 @@ function formatHunkText(hunk: DiffHunk): string {
   return `${header}\n${body}`
 }
 
-function HunkLines({
-  hunk,
-  viewMode,
-  path,
-  sessionId,
-}: {
-  hunk: DiffHunk
-  viewMode: 'unified' | 'split'
-  path: string
-  sessionId: string
-}) {
+/** Hunk 标题行：始终整行横贯，split 模式下位于左右两栏上方。 */
+function HunkHeader({ hunk, path, sessionId }: { hunk: DiffHunk; path: string; sessionId: string }) {
   const { t } = useTranslation()
   const hunkText = formatHunkText(hunk)
-  const headerRow = (
+  return (
     <DeclarativeContextMenu
       kind="diffHunk"
       payload={{ path, header: hunk.header, text: hunkText }}
@@ -101,42 +92,22 @@ function HunkLines({
       </span>
     </DeclarativeContextMenu>
   )
+}
 
-  if (viewMode === 'split') {
-    const splitRows = buildSplitRows(hunk.lines)
-    return (
-      <>
-        {headerRow}
-        {splitRows.map((row, i) => (
-          <div key={i} className="flex leading-[1.55]">
-            <div className={cn('flex min-w-0 flex-1', row.left ? lineStyle(row.left.type) : 'bg-surface-subtle/50')}>
-              {row.left ? (
-                <>
-                  <span className="w-9 shrink-0 select-none px-1 text-right font-mono tabular-nums text-caption text-ink-tertiary/80">{row.left.oldNo ?? ''}</span>
-                  <span className={cn('w-3.5 shrink-0 select-none text-center text-caption', row.left.type === 'del' && 'text-danger')}>{sign(row.left.type)}</span>
-                  <span className="min-w-0 flex-1 whitespace-pre px-1.5 text-ink">{row.left.content}</span>
-                </>
-              ) : (<span className="w-full" />)}
-            </div>
-            <div className="w-px shrink-0 bg-border/70" />
-            <div className={cn('flex min-w-0 flex-1', row.right ? lineStyle(row.right.type) : 'bg-surface-subtle/50')}>
-              {row.right ? (
-                <>
-                  <span className="w-9 shrink-0 select-none px-1 text-right font-mono tabular-nums text-caption text-ink-tertiary/80">{row.right.newNo ?? ''}</span>
-                  <span className={cn('w-3.5 shrink-0 select-none text-center text-caption', row.right.type === 'add' && 'text-success')}>{sign(row.right.type)}</span>
-                  <span className="min-w-0 flex-1 whitespace-pre px-1.5 text-ink">{row.right.content}</span>
-                </>
-              ) : (<span className="w-full" />)}
-            </div>
-          </div>
-        ))}
-      </>
-    )
-  }
+function HunkLines({
+  hunk,
+  path,
+  sessionId,
+}: {
+  hunk: DiffHunk
+  path: string
+  sessionId: string
+}) {
+  const { t } = useTranslation()
   const spans = computeHunkWordDiffs(hunk.lines)
   return (
     <>
-      {headerRow}
+      <HunkHeader hunk={hunk} path={path} sessionId={sessionId} />
       {hunk.lines.map((line: DiffLine, i) => (
         <div key={i} className={cn('flex leading-[1.55]', lineStyle(line.type))}>
           <span className="w-9 shrink-0 select-none px-1 text-right font-mono tabular-nums text-caption text-ink-tertiary/80">{line.oldNo ?? ''}</span>
@@ -147,6 +118,54 @@ function HunkLines({
             : <span className="min-w-0 flex-1 whitespace-pre px-1.5 text-ink">{line.content}</span>}
           {line.noNewline && <span className="select-none px-1 text-ink-tertiary" title={t('artifact.diffView.noNewline')}>&#8626;&#824;</span>}
         </div>
+      ))}
+    </>
+  )
+}
+
+/** split 模式单侧单元格：整行按内容宽度扩展，背景至少铺满整栏。 */
+function SplitCell({ line, side }: { line: DiffLine | null; side: 'left' | 'right' }) {
+  if (!line) {
+    return <div className="flex w-max min-w-full leading-[1.55] bg-surface-subtle/50"><span className="w-full" /></div>
+  }
+  return (
+    <div className={cn('flex w-max min-w-full leading-[1.55]', lineStyle(line.type))}>
+      <span className="w-9 shrink-0 select-none px-1 text-right font-mono tabular-nums text-caption text-ink-tertiary/80">
+        {side === 'left' ? line.oldNo ?? '' : line.newNo ?? ''}
+      </span>
+      <span className={cn(
+        'w-3.5 shrink-0 select-none text-center text-caption',
+        side === 'left' && line.type === 'del' && 'text-danger',
+        side === 'right' && line.type === 'add' && 'text-success',
+      )}>
+        {sign(line.type)}
+      </span>
+      <span className="min-w-0 flex-1 whitespace-pre px-1.5 text-ink">{line.content}</span>
+    </div>
+  )
+}
+
+/** split 模式：每个 hunk 标题行横贯整宽，下方左右两栏各自横向滚动，超长行只在本栏内滚动。 */
+function SplitHunks({ hunks, path, sessionId }: { hunks: DiffHunk[]; path: string; sessionId: string }) {
+  return (
+    <>
+      {hunks.map((h, i) => (
+        <Fragment key={i}>
+          <HunkHeader hunk={h} path={path} sessionId={sessionId} />
+          <div className="flex">
+            <div className="min-w-0 flex-1 overflow-x-auto">
+              {buildSplitRows(h.lines).map((row, j) => (
+                <SplitCell key={j} line={row.left} side="left" />
+              ))}
+            </div>
+            <div className="w-px shrink-0 bg-border/70" />
+            <div className="min-w-0 flex-1 overflow-x-auto">
+              {buildSplitRows(h.lines).map((row, j) => (
+                <SplitCell key={j} line={row.right} side="right" />
+              ))}
+            </div>
+          </div>
+        </Fragment>
       ))}
     </>
   )
@@ -320,10 +339,14 @@ function FileDiff({
         <div className="px-3 py-2.5 text-meta text-ink-tertiary">{t('artifact.diffView.modeOnly')}</div>
       ) : (
         <>
-          <div className="overflow-x-auto font-mono text-meta">
-            {shown.hunks.map((h, i) => (
-              <HunkLines key={i} hunk={h} viewMode={viewMode} path={file.path} sessionId={sessionId} />
-            ))}
+          <div className={cn('font-mono text-meta', viewMode === 'unified' && 'overflow-x-auto')}>
+            {viewMode === 'split' ? (
+              <SplitHunks hunks={shown.hunks} path={file.path} sessionId={sessionId} />
+            ) : (
+              shown.hunks.map((h, i) => (
+                <HunkLines key={i} hunk={h} path={file.path} sessionId={sessionId} />
+              ))
+            )}
           </div>
           {(onShowFull || onCollapseFull) && (
             <div className="flex justify-center gap-3 border-t border-border/70 py-1.5 text-caption text-ink-tertiary">

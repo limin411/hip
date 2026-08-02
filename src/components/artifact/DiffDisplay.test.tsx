@@ -215,4 +215,22 @@ describe('DiffDisplay class polish', () => {
     expect(document.querySelector('.bg-success\\/30')).toBeNull()
     expect(document.querySelector('.bg-danger\\/30')).toBeNull()
   })
+
+  it('split view gives each column its own horizontal scroll pane', () => {
+    render(
+      <DiffDisplay
+        files={[{ ...file, hunks: [{ ...file.hunks[0], lines: [{ type: 'ctx', content: 'x'.repeat(400), oldNo: 1, newNo: 1 }] }] }]}
+        viewMode="split"
+        sessionId="s1"
+        onToggleCollapse={() => {}}
+      />,
+    )
+    // 左右两栏各自是横向滚动容器；行保持内容宽度，超长行只在所属栏内滚动。
+    const panes = document.querySelectorAll('div.overflow-x-auto')
+    expect(panes).toHaveLength(2)
+    expect(document.querySelectorAll('.w-max.min-w-full').length).toBeGreaterThan(0)
+    // hunk 标题行（含“复制片段”操作）整行渲染一次，横贯在双栏上方，而不是只出现在某一栏。
+    expect(screen.getAllByTestId('diff-hunk-header')).toHaveLength(1)
+    expect(screen.getByTestId('diff-hunk-copy')).toBeInTheDocument()
+  })
 })

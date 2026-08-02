@@ -167,6 +167,20 @@ describe('DiffDisplay class polish', () => {
     expect(setComposerQuote).toHaveBeenCalledWith(expect.stringContaining('src/a.ts'))
   })
 
+  it('hunk header actions are always visible instead of hover-only', () => {
+    render(
+      <DiffDisplay
+        files={[file]}
+        viewMode="unified"
+        sessionId="s1"
+        onToggleCollapse={() => {}}
+      />,
+    )
+    const actionBar = screen.getByTestId('diff-hunk-copy').parentElement
+    expect(actionBar).not.toHaveClass('opacity-0')
+    expect(actionBar).not.toHaveClass('group-hover/hunk:opacity-100')
+  })
+
   it('drops sticky header border when collapsed to avoid double hairline', () => {
     render(
       <DiffDisplay

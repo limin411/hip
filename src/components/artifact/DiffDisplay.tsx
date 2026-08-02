@@ -64,7 +64,7 @@ function HunkHeader({ hunk, path, sessionId }: { hunk: DiffHunk; path: string; s
     >
       <span className="shrink-0 select-none px-2 font-mono tabular-nums text-ink-tertiary">@@ -{hunk.oldStart},{hunk.oldLines} +{hunk.newStart},{hunk.newLines} @@</span>
       {hunk.header && <span className="truncate px-1 text-ink-tertiary/80">{hunk.header}</span>}
-      <span className="ml-auto flex shrink-0 items-center gap-0.5 pr-1 opacity-0 transition-opacity duration-chrome group-hover/hunk:opacity-100">
+      <span className="ml-auto flex shrink-0 items-center gap-0.5 pr-1">
         <button
           type="button"
           onClick={() => void copyText(hunkText)}

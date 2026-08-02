@@ -59,6 +59,60 @@ describe('DiffDisplay class polish', () => {
     expect(header.className).toMatch(/border-border/)
   })
 
+  it('status chip shows a single letter with the full label in title', () => {
+    render(
+      <DiffDisplay
+        files={[file]}
+        viewMode="unified"
+        sessionId="s1"
+        onToggleCollapse={() => {}}
+      />,
+    )
+    const chip = screen.getByTestId('diff-status')
+    expect(chip).toHaveTextContent('M')
+    expect(chip).toHaveAttribute('title', 'artifact.diffView.statusModified')
+    expect(chip).toHaveAttribute('aria-label', 'artifact.diffView.statusModified')
+  })
+
+  it('expanded header is sticky with data-expanded; collapsed header loses stickiness', () => {
+    const { unmount } = render(
+      <DiffDisplay
+        files={[file]}
+        viewMode="unified"
+        sessionId="s1"
+        onToggleCollapse={() => {}}
+      />,
+    )
+    const expandedHeader = screen.getByTestId('diff-file-header')
+    expect(expandedHeader.className).toMatch(/sticky/)
+    unmount()
+    render(
+      <DiffDisplay
+        files={[file]}
+        viewMode="unified"
+        collapsed={{ [file.path]: true }}
+        sessionId="s1"
+        onToggleCollapse={() => {}}
+      />,
+    )
+    const collapsedHeader = screen.getByTestId('diff-file-header')
+    expect(collapsedHeader).not.toHaveClass('sticky')
+    expect(collapsedHeader.querySelector('[data-expanded]')).toHaveAttribute('data-expanded', 'false')
+  })
+
+  it('renders no jump-list for multiple files', () => {
+    render(
+      <DiffDisplay
+        files={[file, { ...file, path: 'src/b.ts' }]}
+        viewMode="unified"
+        sessionId="s1"
+        onToggleCollapse={() => {}}
+      />,
+    )
+    expect(screen.queryByTestId('diff-file-list')).toBeNull()
+    expect(screen.queryAllByTestId('diff-file')).toHaveLength(2)
+  })
+
   it('drops sticky header border when collapsed to avoid double hairline', () => {
     render(
       <DiffDisplay

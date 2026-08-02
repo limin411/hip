@@ -1,4 +1,4 @@
-import { type ReactNode } from 'react'
+import { useLayoutEffect, useRef, type ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
 import { ChevronDown, ChevronRight } from 'lucide-react'
 import type { DiffFile, DiffHunk, DiffLine, DiffLineType, DiffFileStatus, DiffSummary } from '@hip/protocol'
@@ -10,11 +10,11 @@ import { DeclarativeContextMenu } from '@/components/context-menu'
 import { EmptyState } from '@/components/ui/EmptyState'
 
 export const STATUS_CHIP = {
-  added: { cls: 'bg-success/10 text-success', key: 'artifact.diffView.statusAdded' },
-  modified: { cls: 'bg-warning/10 text-warning', key: 'artifact.diffView.statusModified' },
-  deleted: { cls: 'bg-danger/10 text-danger', key: 'artifact.diffView.statusDeleted' },
-  renamed: { cls: 'bg-surface-muted text-ink-secondary', key: 'artifact.diffView.statusRenamed' },
-} as const satisfies Record<DiffFileStatus, { cls: string; key: string }>
+  added: { cls: 'bg-success/10 text-success', key: 'artifact.diffView.statusAdded', letter: 'A' },
+  modified: { cls: 'bg-warning/10 text-warning', key: 'artifact.diffView.statusModified', letter: 'M' },
+  deleted: { cls: 'bg-danger/10 text-danger', key: 'artifact.diffView.statusDeleted', letter: 'D' },
+  renamed: { cls: 'bg-surface-muted text-ink-secondary', key: 'artifact.diffView.statusRenamed', letter: 'R' },
+} as const satisfies Record<DiffFileStatus, { cls: string; key: string; letter: string }>
 
 function DiffFileTypeIcon({ path, size = 14 }: { path: string; size?: number }) {
   const { Icon, className } = fileIconForName(path)
@@ -120,6 +120,7 @@ function FileDiff({
   viewMode,
   sessionId,
   cwd,
+  showFileIcons,
   onToggleCollapse,
   onShowFull,
   onCollapseFull,
@@ -130,7 +131,8 @@ function FileDiff({
   viewMode: 'unified' | 'split'
   sessionId: string
   cwd: string | null
-  onToggleCollapse: (path: string) => void
+  showFileIcons: boolean
+  onToggleCollapse: (path: string, multi: boolean) => void
   onShowFull?: (path: string) => void
   onCollapseFull?: (path: string) => void
 }) {
@@ -145,16 +147,22 @@ function FileDiff({
         kind="diffFile"
         payload={{ path: file.path, status: file.status, sessionId, cwd }}
         className={cn(
-          'sticky top-0 z-[1] flex h-8 items-center justify-between gap-2 bg-surface-subtle px-3',
+          // Only expanded rows stick; offsets are assigned by DiffDisplay's layout effect
+          // so multiple open rows stack instead of overlapping.
+          !isCollapsed && 'sticky top-0 z-[1]',
+          'flex h-8 items-center justify-between gap-2 bg-surface-subtle px-3',
           // Expanded: hairline under sticky bar. Collapsed: shell border-b alone (no double).
           !isCollapsed && 'border-b border-border/70',
         )}
         data-testid="diff-file-header"
       >
-        <span className="flex min-w-0 flex-1 items-center gap-1.5 text-meta leading-none">
+        <span
+          className="flex min-w-0 flex-1 items-center gap-1.5 text-meta leading-none"
+          data-expanded={isCollapsed ? 'false' : 'true'}
+        >
           <button
             aria-label={isCollapsed ? t('artifact.diffView.expand') : t('artifact.diffView.collapse')}
-            onClick={() => onToggleCollapse(file.path)}
+            onClick={(e) => onToggleCollapse(file.path, e.metaKey || e.ctrlKey)}
             className="inline-flex size-5 shrink-0 items-center justify-center rounded text-ink-tertiary transition-colors duration-chrome hover:bg-state-hover hover:text-ink"
             data-testid="diff-file-collapse-toggle"
           >
@@ -162,11 +170,13 @@ function FileDiff({
           </button>
           <span
             className={cn('shrink-0 rounded-md px-1.5 py-px text-caption font-medium', chip.cls)}
+            title={t(chip.key)}
+            aria-label={t(chip.key)}
             data-testid="diff-status"
           >
-            {t(chip.key)}
+            {chip.letter}
           </span>
-          <DiffFileTypeIcon path={file.path} size={14} />
+          {showFileIcons && <DiffFileTypeIcon path={file.path} size={14} />}
           <span className="min-w-0 truncate font-mono text-ink">
             {file.oldPath && <span className="text-ink-tertiary">{file.oldPath} → </span>}{file.path}
           </span>
@@ -254,7 +264,10 @@ export function Empty({
   )
 }
 
-/** Pure, props-driven diff list (file jump-list + per-file hunks). Shared by Diff / Timeline / Changes. */
+/**
+ * Pure, props-driven diff list (single accordion; no jump-list). Shared by
+ * Diff / Timeline / Changes. Only expanded rows stick, stacked in open order.
+ */
 export function DiffDisplay({
   files,
   summary,
@@ -263,6 +276,7 @@ export function DiffDisplay({
   collapsed,
   sessionId,
   cwd = null,
+  showFileIcons = true,
   onToggleCollapse,
   onShowFull,
   onCollapseFull,
@@ -275,57 +289,56 @@ export function DiffDisplay({
   /** Required for context-menu path / collapse actions. */
   sessionId: string
   cwd?: string | null
-  onToggleCollapse: (path: string) => void
+  /** Narrow panels hide file-type icons to reclaim horizontal space. */
+  showFileIcons?: boolean
+  onToggleCollapse: (path: string, multi: boolean) => void
   onShowFull?: (path: string) => void
   onCollapseFull?: (path: string) => void
 }) {
   const { t } = useTranslation()
+  const scrollRef = useRef<HTMLDivElement>(null)
+
+  // Stack sticky headers in expansion order: each expanded header's top offset
+  // is the cumulative height of the expanded headers before it. Collapsed rows
+  // lose stickiness entirely (no offset, no sticky class).
+  useLayoutEffect(() => {
+    const root = scrollRef.current
+    if (!root) return
+    const headers = root.querySelectorAll<HTMLElement>('[data-testid="diff-file-header"]')
+    let acc = 0
+    for (const h of headers) {
+      const flag = h.querySelector<HTMLElement>('[data-expanded]')
+      if (flag?.dataset.expanded === 'true') {
+        h.style.top = `${acc}px`
+        acc += h.offsetHeight
+      } else {
+        h.style.top = ''
+      }
+    }
+  })
+
   return (
-    <>
-      {files.length > 1 && (
-        <div className="shrink-0 border-b border-border/80 bg-surface" data-testid="diff-file-list">
-          {files.map((file) => (
-            <button
-              key={file.path}
-              type="button"
-              data-testid="diff-file-jump"
-              onClick={() => document.getElementById(`diff-file-${file.path}`)?.scrollIntoView({ block: 'start' })}
-              className="flex w-full items-center justify-between gap-2 px-3 py-1.5 text-meta leading-none transition-colors duration-chrome hover:bg-state-hover"
-            >
-              <span className="flex min-w-0 flex-1 items-center gap-1.5 truncate text-left">
-                <span className={cn('shrink-0 rounded-md px-1.5 py-px text-caption font-medium', STATUS_CHIP[file.status].cls)}>{t(STATUS_CHIP[file.status].key)}</span>
-                <DiffFileTypeIcon path={file.path} size={13} />
-                <span className="min-w-0 truncate font-mono text-ink-secondary">{file.path}</span>
-              </span>
-              <span className="shrink-0 font-mono text-caption tabular-nums">
-                <span className="text-success">+{file.additions}</span>{' '}
-                <span className="text-danger">−{file.deletions}</span>
-              </span>
-            </button>
-          ))}
+    <div ref={scrollRef} className="min-h-0 flex-1 overflow-y-auto">
+      {files.map((file, i) => (
+        <FileDiff
+          key={`${file.path}-${i}`}
+          file={file}
+          expanded={expanded?.[file.path]}
+          collapsed={collapsed?.[file.path]}
+          viewMode={viewMode}
+          sessionId={sessionId}
+          cwd={cwd}
+          showFileIcons={showFileIcons}
+          onToggleCollapse={onToggleCollapse}
+          onShowFull={onShowFull}
+          onCollapseFull={onCollapseFull}
+        />
+      ))}
+      {(summary?.totalFiles ?? 0) > files.length && (
+        <div className="px-3 py-2 text-meta text-ink-tertiary">
+          {t('artifact.diffView.moreFiles', { count: (summary!.totalFiles) - files.length })}
         </div>
       )}
-      <div className="min-h-0 flex-1 overflow-y-auto">
-        {files.map((file, i) => (
-          <FileDiff
-            key={`${file.path}-${i}`}
-            file={file}
-            expanded={expanded?.[file.path]}
-            collapsed={collapsed?.[file.path]}
-            viewMode={viewMode}
-            sessionId={sessionId}
-            cwd={cwd}
-            onToggleCollapse={onToggleCollapse}
-            onShowFull={onShowFull}
-            onCollapseFull={onCollapseFull}
-          />
-        ))}
-        {(summary?.totalFiles ?? 0) > files.length && (
-          <div className="px-3 py-2 text-meta text-ink-tertiary">
-            {t('artifact.diffView.moreFiles', { count: (summary!.totalFiles) - files.length })}
-          </div>
-        )}
-      </div>
-    </>
+    </div>
   )
 }

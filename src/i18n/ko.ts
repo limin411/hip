@@ -643,7 +643,14 @@ export const ko = {
       "uncommitted": "커밋되지 않은 변경사항",
       "commitLog": "커밋",
       "noCommits": "이 세션 시작 이후 커밋 없음",
-      "commitLogError": "커밋 로그를 읽을 수 없음"
+      "commitLogError": "커밋 로그를 읽을 수 없음",
+      "toolbarMenu": "변경사항 도구 모음 메뉴",
+      "sessionCommits": "이 세션 커밋",
+      "recentCommits": "최근 커밋",
+      "collapseAll": "모두 접기",
+      "expandAll": "모두 펼치기",
+      "refresh": "새로고침",
+      "resizeCommits": "커밋 목록 높이 조절"
     },
     "gitInitBanner": {
       "title": "Git 저장소 초기화",

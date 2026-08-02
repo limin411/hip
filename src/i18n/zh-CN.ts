@@ -610,6 +610,13 @@ export const zhCN = {
         commitLog: '提交记录',
         noCommits: '本会话开始以来暂无提交',
         commitLogError: '无法读取提交记录',
+        toolbarMenu: '更改工具栏菜单',
+        sessionCommits: '本会话提交',
+        recentCommits: '最近提交',
+        collapseAll: '全部折叠',
+        expandAll: '全部展开',
+        refresh: '刷新',
+        resizeCommits: '调整提交列表高度',
       },
       gitInitBanner: {
         title: '初始化 git 以启用检查点',

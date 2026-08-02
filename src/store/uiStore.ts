@@ -175,10 +175,27 @@ export type UiPersistedState = {
   density: UiDensity
   settingsPage: SettingsPageId
   diffViewMode: 'unified' | 'split'
+  /** Ignore whitespace-only changes in the Changes diff (git -w). */
+  ignoreWhitespace: boolean
+  /** Session-commits section expanded (only effective when there are uncommitted changes). */
+  changesCommitExpanded: boolean
+  /** Session-commits section height in px when expanded (clamped 96–320). */
+  changesCommitHeight: number
   /** Left nav rail open; default true when missing from older storage. */
   sidebarOpen: boolean
   /** Left sidebar width in px; clamped on write / rehydrate. */
   sidebarWidth: number
+}
+
+export const CHANGES_COMMIT_HEIGHT_MIN = 96
+export const CHANGES_COMMIT_HEIGHT_MAX = 320
+const CHANGES_COMMIT_HEIGHT_DEFAULT = 168
+
+/** Clamp a persisted / runtime commit-section height into the valid range. */
+export function clampChangesCommitHeight(v: unknown): number {
+  return typeof v === 'number' && Number.isFinite(v)
+    ? Math.min(CHANGES_COMMIT_HEIGHT_MAX, Math.max(CHANGES_COMMIT_HEIGHT_MIN, Math.round(v)))
+    : CHANGES_COMMIT_HEIGHT_DEFAULT
 }
 
 /** Non-chat/code work surfaces are session-ephemeral; cold launch always lands on chats. */
@@ -230,6 +247,9 @@ export function mergeUiPersistedState<
     // Drop removed pages (e.g. legacy 'help') so tabs stay valid.
     settingsPage: normalizeSettingsPage((rest as { settingsPage?: unknown }).settingsPage),
     sidebarWidth: clampSidebarWidth((rest as { sidebarWidth?: unknown }).sidebarWidth),
+    changesCommitHeight: clampChangesCommitHeight(
+      (rest as { changesCommitHeight?: unknown }).changesCommitHeight,
+    ),
   }
 }
 
@@ -311,6 +331,13 @@ interface UiState {
 
   diffViewMode: 'unified' | 'split'
   setDiffViewMode: (m: 'unified' | 'split') => void
+
+  ignoreWhitespace: boolean
+  setIgnoreWhitespace: (v: boolean) => void
+  changesCommitExpanded: boolean
+  setChangesCommitExpanded: (v: boolean) => void
+  changesCommitHeight: number
+  setChangesCommitHeight: (v: number) => void
 
   theme: Theme
   setTheme: (t: Theme) => void
@@ -452,6 +479,18 @@ export const useUiStore = create<UiState>()(
       diffViewMode: 'unified',
       setDiffViewMode: (m) => set({ diffViewMode: m }),
 
+      ignoreWhitespace: false,
+      setIgnoreWhitespace: (v) => set((s) => (s.ignoreWhitespace === v ? s : { ignoreWhitespace: v })),
+      changesCommitExpanded: false,
+      setChangesCommitExpanded: (v) =>
+        set((s) => (s.changesCommitExpanded === v ? s : { changesCommitExpanded: v })),
+      changesCommitHeight: CHANGES_COMMIT_HEIGHT_DEFAULT,
+      setChangesCommitHeight: (v) =>
+        set((s) => {
+          const next = clampChangesCommitHeight(v)
+          return s.changesCommitHeight === next ? s : { changesCommitHeight: next }
+        }),
+
       theme: 'system',
       setTheme: (t) => set((s) => (s.theme === t ? s : { theme: t })),
 
@@ -474,6 +513,9 @@ export const useUiStore = create<UiState>()(
         density: s.density,
         settingsPage: s.settingsPage,
         diffViewMode: s.diffViewMode,
+        ignoreWhitespace: s.ignoreWhitespace,
+        changesCommitExpanded: s.changesCommitExpanded,
+        changesCommitHeight: s.changesCommitHeight,
         sidebarOpen: s.sidebarOpen,
         sidebarWidth: s.sidebarWidth,
       }),

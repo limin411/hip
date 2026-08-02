@@ -11,6 +11,9 @@ import {
   isPlaceholderSidebarSection,
   mergeUiPersistedState,
   applyColdLaunchShell,
+  clampChangesCommitHeight,
+  CHANGES_COMMIT_HEIGHT_MIN,
+  CHANGES_COMMIT_HEIGHT_MAX,
   type UiPersistedState,
 } from './uiStore'
 
@@ -25,6 +28,9 @@ beforeEach(() => {
     activeView: 'chat',
     settingsPage: 'general',
     diffViewMode: 'unified',
+    ignoreWhitespace: false,
+    changesCommitExpanded: false,
+    changesCommitHeight: 168,
     overlay: null,
     settingsShellRoute: { type: 'page' },
   })
@@ -55,6 +61,54 @@ describe('uiStore - diffViewMode', () => {
 
     useUiStore.getState().setDiffViewMode('unified')
     expect(useUiStore.getState().diffViewMode).toBe('unified')
+  })
+})
+
+describe('uiStore - changes panel prefs', () => {
+  it('ignoreWhitespace defaults false and toggles', () => {
+    expect(useUiStore.getState().ignoreWhitespace).toBe(false)
+    useUiStore.getState().setIgnoreWhitespace(true)
+    expect(useUiStore.getState().ignoreWhitespace).toBe(true)
+    useUiStore.getState().setIgnoreWhitespace(false)
+    expect(useUiStore.getState().ignoreWhitespace).toBe(false)
+  })
+
+  it('changesCommitExpanded defaults false and toggles', () => {
+    expect(useUiStore.getState().changesCommitExpanded).toBe(false)
+    useUiStore.getState().setChangesCommitExpanded(true)
+    expect(useUiStore.getState().changesCommitExpanded).toBe(true)
+    useUiStore.getState().setChangesCommitExpanded(false)
+    expect(useUiStore.getState().changesCommitExpanded).toBe(false)
+  })
+
+  it('changesCommitHeight defaults 168 and clamps on write', () => {
+    expect(useUiStore.getState().changesCommitHeight).toBe(168)
+    useUiStore.getState().setChangesCommitHeight(10)
+    expect(useUiStore.getState().changesCommitHeight).toBe(CHANGES_COMMIT_HEIGHT_MIN)
+    useUiStore.getState().setChangesCommitHeight(999)
+    expect(useUiStore.getState().changesCommitHeight).toBe(CHANGES_COMMIT_HEIGHT_MAX)
+    useUiStore.getState().setChangesCommitHeight(200)
+    expect(useUiStore.getState().changesCommitHeight).toBe(200)
+  })
+
+  it('clampChangesCommitHeight normalizes invalid persisted values', () => {
+    expect(clampChangesCommitHeight(undefined)).toBe(168)
+    expect(clampChangesCommitHeight('wide')).toBe(168)
+    expect(clampChangesCommitHeight(NaN)).toBe(168)
+    expect(clampChangesCommitHeight(50)).toBe(CHANGES_COMMIT_HEIGHT_MIN)
+    expect(clampChangesCommitHeight(300)).toBe(300)
+  })
+
+  it('merge clamps a persisted changesCommitHeight', () => {
+    const current = {
+      activeView: 'chat' as const,
+      sidebarSection: 'chats' as const,
+      changesCommitHeight: 168,
+    }
+    expect(mergeUiPersistedState({ changesCommitHeight: 9999 }, current).changesCommitHeight).toBe(
+      CHANGES_COMMIT_HEIGHT_MAX,
+    )
+    expect(mergeUiPersistedState({ changesCommitHeight: 120 }, current).changesCommitHeight).toBe(120)
   })
 })
 
@@ -152,6 +206,9 @@ describe('uiStore - overlay', () => {
       density: s.density,
       settingsPage: s.settingsPage,
       diffViewMode: s.diffViewMode,
+      ignoreWhitespace: s.ignoreWhitespace,
+      changesCommitExpanded: s.changesCommitExpanded,
+      changesCommitHeight: s.changesCommitHeight,
       sidebarOpen: s.sidebarOpen,
       sidebarWidth: s.sidebarWidth,
     }
@@ -352,6 +409,9 @@ describe('uiStore persistence partialize', () => {
       activeTab: 'terminal',
       scrollTargetMessageId: 'm1',
       selectedArtifactPath: '/x',
+      ignoreWhitespace: true,
+      changesCommitExpanded: true,
+      changesCommitHeight: 240,
     })
     const s = useUiStore.getState()
     const persisted: UiPersistedState = {
@@ -362,6 +422,9 @@ describe('uiStore persistence partialize', () => {
       density: s.density,
       settingsPage: s.settingsPage,
       diffViewMode: s.diffViewMode,
+      ignoreWhitespace: s.ignoreWhitespace,
+      changesCommitExpanded: s.changesCommitExpanded,
+      changesCommitHeight: s.changesCommitHeight,
       sidebarOpen: s.sidebarOpen,
       sidebarWidth: s.sidebarWidth,
     }
@@ -373,6 +436,9 @@ describe('uiStore persistence partialize', () => {
       density: 'compact',
       settingsPage: 'model',
       diffViewMode: 'split',
+      ignoreWhitespace: true,
+      changesCommitExpanded: true,
+      changesCommitHeight: 240,
       sidebarOpen: s.sidebarOpen,
       sidebarWidth: s.sidebarWidth,
     })

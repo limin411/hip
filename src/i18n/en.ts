@@ -617,6 +617,13 @@ export const en = {
         commitLog: 'Commits',
         noCommits: 'No commits since this session started',
         commitLogError: 'Could not read the commit log',
+        toolbarMenu: 'Changes toolbar menu',
+        sessionCommits: 'Session commits',
+        recentCommits: 'Recent commits',
+        collapseAll: 'Collapse all',
+        expandAll: 'Expand all',
+        refresh: 'Refresh',
+        resizeCommits: 'Resize commit list',
       },
       gitInitBanner: {
         title: 'Initialize git to enable checkpoints',

@@ -643,7 +643,14 @@ export const ja = {
       "uncommitted": "未コミットの変更",
       "commitLog": "コミット",
       "noCommits": "このセッション開始以降、コミットはありません",
-      "commitLogError": "コミットログを読み取れませんでした"
+      "commitLogError": "コミットログを読み取れませんでした",
+      "toolbarMenu": "変更ツールバーメニュー",
+      "sessionCommits": "このセッションのコミット",
+      "recentCommits": "最近のコミット",
+      "collapseAll": "すべて折りたたむ",
+      "expandAll": "すべて展開",
+      "refresh": "更新",
+      "resizeCommits": "コミットリストの高さを調整"
     },
     "gitInitBanner": {
       "title": "チェックポイントを有効にするには git を初期化してください",

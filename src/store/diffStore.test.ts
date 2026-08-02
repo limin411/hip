@@ -76,6 +76,7 @@ describe('diffStore', () => {
   it('EMPTY_DIFF defaults the git fields', () => {
     expect(EMPTY_DIFF).toMatchObject({
       isGitRepo: false, currentBranch: null, commitLog: { status: 'idle', commits: [] },
+      viewingCommitSha: null, commitDiff: { status: 'idle', files: [] }, discardPending: {},
     })
   })
   it('setGitState stores isGitRepo + currentBranch', () => {
@@ -99,5 +100,34 @@ describe('diffStore', () => {
     useDiffStore.getState().setCommitLogLoading('s1')
     useDiffStore.getState().clearSession('s1')
     expect(useDiffStore.getState().bySession['s1']).toEqual(EMPTY_DIFF)
+  })
+
+  it('setCollapsed replaces the whole collapsed map', () => {
+    useDiffStore.getState().setResult('s1', { state: 'ok', files: [file], summary, base: 'head', hasSessionStart: false })
+    useDiffStore.getState().setCollapsed('s1', { 'a.ts': true, 'b.ts': false })
+    expect(useDiffStore.getState().bySession['s1'].collapsed).toEqual({ 'a.ts': true, 'b.ts': false })
+  })
+
+  it('viewingCommit + commitDiff loading→ready round-trip', () => {
+    useDiffStore.getState().setViewingCommit('s1', 'abc1234')
+    expect(useDiffStore.getState().bySession['s1'].viewingCommitSha).toBe('abc1234')
+    useDiffStore.getState().setCommitDiffLoading('s1')
+    expect(useDiffStore.getState().bySession['s1'].commitDiff.status).toBe('loading')
+    useDiffStore.getState().setCommitDiffResult('s1', { state: 'ok', files: [file] })
+    expect(useDiffStore.getState().bySession['s1'].commitDiff).toEqual({ status: 'ready', state: 'ok', files: [file], error: undefined })
+    useDiffStore.getState().setViewingCommit('s1', null)
+    expect(useDiffStore.getState().bySession['s1'].viewingCommitSha).toBeNull()
+  })
+
+  it('setCommitDiffResult carries an error', () => {
+    useDiffStore.getState().setCommitDiffResult('s1', { state: 'error', error: 'nope' })
+    expect(useDiffStore.getState().bySession['s1'].commitDiff).toEqual({ status: 'ready', state: 'error', files: [], error: 'nope' })
+  })
+
+  it('setDiscardPending flips per-path flags', () => {
+    useDiffStore.getState().setDiscardPending('s1', 'a.ts', true)
+    expect(useDiffStore.getState().bySession['s1'].discardPending['a.ts']).toBe(true)
+    useDiffStore.getState().setDiscardPending('s1', 'a.ts', false)
+    expect(useDiffStore.getState().bySession['s1'].discardPending['a.ts']).toBe(false)
   })
 })

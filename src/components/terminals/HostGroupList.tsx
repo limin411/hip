@@ -129,100 +129,105 @@ export function HostGroupList({
       </div>
 
       <aside
-        className="flex w-52 shrink-0 flex-col border-l border-border bg-surface-subtle/40"
+        className="flex w-52 shrink-0 flex-col p-2"
         data-testid="host-group-nav"
       >
-        <nav
-          className="flex min-h-0 flex-1 flex-col gap-0.5 overflow-y-auto p-2"
-          aria-label={t('terminals.groupsNavAria')}
+        <div
+          className="flex min-h-0 flex-1 flex-col overflow-y-auto rounded-lg border border-border bg-surface-muted/30"
+          data-testid="host-group-nav-box"
         >
-          {sortedGroups.map((group) => {
-            const count = (hostsByGroup.get(group.id) ?? []).length
-            const selected = selectedKey === group.id
-            return (
+          <nav
+            className="flex flex-col gap-0.5 p-1.5"
+            aria-label={t('terminals.groupsNavAria')}
+          >
+            {sortedGroups.map((group) => {
+              const count = (hostsByGroup.get(group.id) ?? []).length
+              const selected = selectedKey === group.id
+              return (
+                <div
+                  key={group.id}
+                  data-testid={`host-group-${group.id}`}
+                  className={cn(
+                    'group/nav flex items-center gap-0.5 rounded-lg pr-0.5',
+                    selected && 'bg-state-active',
+                  )}
+                >
+                  <button
+                    type="button"
+                    role="tab"
+                    aria-selected={selected}
+                    data-testid={`host-group-select-${group.id}`}
+                    onClick={() => setSelectedKey(group.id)}
+                    className={cn(
+                      'flex h-[var(--row-h-sidebar)] min-w-0 flex-1 items-center gap-2 rounded-lg px-2.5 text-left text-meta font-medium transition-colors',
+                      'text-ink-secondary hover:bg-state-hover hover:text-ink',
+                      selected && 'text-ink',
+                    )}
+                  >
+                    <Folder size={15} strokeWidth={1.75} className="shrink-0 opacity-70" aria-hidden />
+                    <span className="min-w-0 flex-1 truncate">{group.name}</span>
+                    <span className="shrink-0 tabular-nums text-caption text-ink-tertiary">
+                      {count}
+                    </span>
+                  </button>
+                  <div className="flex shrink-0 items-center opacity-60 transition-opacity group-hover/nav:opacity-100 group-focus-within/nav:opacity-100">
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      className="h-7 w-7"
+                      data-testid={`host-group-rename-${group.id}`}
+                      title={t('terminals.renameGroup')}
+                      onClick={() => onRenameGroup(group)}
+                    >
+                      <Pencil size={13} aria-hidden />
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      className="h-7 w-7"
+                      data-testid={`host-group-delete-${group.id}`}
+                      title={t('terminals.deleteGroup')}
+                      onClick={() => onDeleteGroup(group)}
+                    >
+                      <Trash2 size={13} aria-hidden />
+                    </Button>
+                  </div>
+                </div>
+              )
+            })}
+
+            {showUngrouped ? (
               <div
-                key={group.id}
-                data-testid={`host-group-${group.id}`}
+                data-testid="host-group-ungrouped"
                 className={cn(
-                  'group/nav flex items-center gap-0.5 rounded-lg pr-0.5',
-                  selected && 'bg-state-active',
+                  'flex items-center rounded-lg',
+                  selectedKey === UNGROUPED_KEY && 'bg-state-active',
                 )}
               >
                 <button
                   type="button"
                   role="tab"
-                  aria-selected={selected}
-                  data-testid={`host-group-select-${group.id}`}
-                  onClick={() => setSelectedKey(group.id)}
+                  aria-selected={selectedKey === UNGROUPED_KEY}
+                  data-testid="host-group-select-ungrouped"
+                  onClick={() => setSelectedKey(UNGROUPED_KEY)}
                   className={cn(
                     'flex h-[var(--row-h-sidebar)] min-w-0 flex-1 items-center gap-2 rounded-lg px-2.5 text-left text-meta font-medium transition-colors',
                     'text-ink-secondary hover:bg-state-hover hover:text-ink',
-                    selected && 'text-ink',
+                    selectedKey === UNGROUPED_KEY && 'text-ink',
                   )}
                 >
-                  <Folder size={15} strokeWidth={1.75} className="shrink-0 opacity-70" aria-hidden />
-                  <span className="min-w-0 flex-1 truncate">{group.name}</span>
+                  <Server size={15} strokeWidth={1.75} className="shrink-0 opacity-70" aria-hidden />
+                  <span className="min-w-0 flex-1 truncate">{t('terminals.ungrouped')}</span>
                   <span className="shrink-0 tabular-nums text-caption text-ink-tertiary">
-                    {count}
+                    {ungrouped.length}
                   </span>
                 </button>
-                <div className="flex shrink-0 items-center opacity-60 transition-opacity group-hover/nav:opacity-100 group-focus-within/nav:opacity-100">
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="icon"
-                    className="h-7 w-7"
-                    data-testid={`host-group-rename-${group.id}`}
-                    title={t('terminals.renameGroup')}
-                    onClick={() => onRenameGroup(group)}
-                  >
-                    <Pencil size={13} aria-hidden />
-                  </Button>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="icon"
-                    className="h-7 w-7"
-                    data-testid={`host-group-delete-${group.id}`}
-                    title={t('terminals.deleteGroup')}
-                    onClick={() => onDeleteGroup(group)}
-                  >
-                    <Trash2 size={13} aria-hidden />
-                  </Button>
-                </div>
               </div>
-            )
-          })}
-
-          {showUngrouped ? (
-            <div
-              data-testid="host-group-ungrouped"
-              className={cn(
-                'flex items-center rounded-lg',
-                selectedKey === UNGROUPED_KEY && 'bg-state-active',
-              )}
-            >
-              <button
-                type="button"
-                role="tab"
-                aria-selected={selectedKey === UNGROUPED_KEY}
-                data-testid="host-group-select-ungrouped"
-                onClick={() => setSelectedKey(UNGROUPED_KEY)}
-                className={cn(
-                  'flex h-[var(--row-h-sidebar)] min-w-0 flex-1 items-center gap-2 rounded-lg px-2.5 text-left text-meta font-medium transition-colors',
-                  'text-ink-secondary hover:bg-state-hover hover:text-ink',
-                  selectedKey === UNGROUPED_KEY && 'text-ink',
-                )}
-              >
-                <Server size={15} strokeWidth={1.75} className="shrink-0 opacity-70" aria-hidden />
-                <span className="min-w-0 flex-1 truncate">{t('terminals.ungrouped')}</span>
-                <span className="shrink-0 tabular-nums text-caption text-ink-tertiary">
-                  {ungrouped.length}
-                </span>
-              </button>
-            </div>
-          ) : null}
-        </nav>
+            ) : null}
+          </nav>
+        </div>
       </aside>
     </div>
   )

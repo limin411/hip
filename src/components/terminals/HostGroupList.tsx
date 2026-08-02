@@ -131,12 +131,12 @@ export function HostGroupList({
                         data-testid={`host-add-${h.id}`}
                         onClick={() => onAddHost(selectedGroupIdForAdd)}
                         className={cn(
-                          'flex items-center gap-1 self-end rounded px-1.5 py-0.5 text-caption font-medium text-ink-tertiary transition-colors',
-                          'hover:bg-state-hover hover:text-ink',
+                          'flex w-full items-center justify-center gap-1.5 rounded-lg border border-dashed border-border bg-surface-muted/20 px-3 py-[var(--row-pad-y-session)] text-body font-medium text-ink-tertiary transition-colors',
+                          'hover:border-strong hover:bg-state-hover hover:text-ink',
                           'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink/20',
                         )}
                       >
-                        <Plus size={12} strokeWidth={2} aria-hidden />
+                        <Plus size={15} strokeWidth={2} aria-hidden />
                         {t('terminals.newRemote')}
                       </button>
                     ) : null}

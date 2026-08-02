@@ -271,15 +271,15 @@ export function HostLibrary() {
         </div>
       </header>
 
-      <div className="min-h-0 flex-1 overflow-y-auto px-5 py-4">
+      <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
         {error ? (
-          <p className="mb-3 rounded-md border border-danger/30 bg-danger/5 px-3 py-2 text-meta text-danger">
+          <p className="mx-5 mt-3 shrink-0 rounded-md border border-danger/30 bg-danger/5 px-3 py-2 text-meta text-danger">
             {error}
           </p>
         ) : null}
         {connectError ? (
           <p
-            className="mb-3 rounded-md border border-danger/30 bg-danger/5 px-3 py-2 text-meta text-danger"
+            className="mx-5 mt-3 shrink-0 rounded-md border border-danger/30 bg-danger/5 px-3 py-2 text-meta text-danger"
             role="alert"
             data-testid="host-library-connect-error"
           >
@@ -288,7 +288,7 @@ export function HostLibrary() {
         ) : null}
 
         {isEmpty ? (
-          <div className="flex flex-col items-center py-8" data-testid="host-library-empty">
+          <div className="flex flex-1 flex-col items-center justify-center py-8" data-testid="host-library-empty">
             <EmptyState
               icon={Server}
               tier="friendly"

@@ -1914,6 +1914,7 @@ export const en = {
       errorDelete: 'Could not delete this host. Try again.',
       errorConnect: 'Could not connect. Check host settings and credentials.',
       ungrouped: 'Ungrouped',
+      groupsNavAria: 'Host groups',
       groupEmpty: 'No hosts in this group',
       hostsCount: '{{count}} hosts',
       hostsCount_one: '{{count}} host',

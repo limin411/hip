@@ -51,7 +51,7 @@ const hosts: TerminalHost[] = [
 
 const noop = vi.fn()
 
-describe('HostGroupList collapse', () => {
+describe('HostGroupList master-detail', () => {
   afterEach(() => cleanup())
 
   it('orders groups by name ascending (Dev before Prod)', () => {
@@ -72,7 +72,7 @@ describe('HostGroupList collapse', () => {
     ])
   })
 
-  it('starts expanded and can collapse / expand a group', () => {
+  it('selects first group by default and shows only its hosts', () => {
     render(
       <HostGroupList
         groups={groups}
@@ -83,24 +83,21 @@ describe('HostGroupList collapse', () => {
         onDeleteGroup={noop}
       />,
     )
+    // Dev first → only its hosts (none) — wait, Dev has no hosts
+    // First nav is Dev (g2) which has 0 hosts
+    expect(screen.getByTestId('host-group-select-g2')).toHaveAttribute('aria-selected', 'true')
+    expect(screen.queryByTestId('host-row-h1')).not.toBeInTheDocument()
+    expect(screen.queryByTestId('host-row-h3')).not.toBeInTheDocument()
+    expect(screen.getByTestId('host-group-empty')).toBeInTheDocument()
+
+    fireEvent.click(screen.getByTestId('host-group-select-g1'))
+    expect(screen.getByTestId('host-group-select-g1')).toHaveAttribute('aria-selected', 'true')
     expect(screen.getByTestId('host-row-h1')).toBeInTheDocument()
     expect(screen.getByTestId('host-row-h2')).toBeInTheDocument()
-
-    const toggle = screen.getByTestId('host-group-toggle-g1')
-    expect(toggle).toHaveAttribute('aria-expanded', 'true')
-    fireEvent.click(toggle)
-    expect(toggle).toHaveAttribute('aria-expanded', 'false')
-    expect(screen.queryByTestId('host-row-h1')).not.toBeInTheDocument()
-    expect(screen.queryByTestId('host-row-h2')).not.toBeInTheDocument()
-    // Other groups / ungrouped stay visible
-    expect(screen.getByTestId('host-row-h3')).toBeInTheDocument()
-
-    fireEvent.click(toggle)
-    expect(toggle).toHaveAttribute('aria-expanded', 'true')
-    expect(screen.getByTestId('host-row-h1')).toBeInTheDocument()
+    expect(screen.queryByTestId('host-row-h3')).not.toBeInTheDocument()
   })
 
-  it('collapses ungrouped section independently', () => {
+  it('selecting ungrouped shows only ungrouped hosts', () => {
     render(
       <HostGroupList
         groups={groups}
@@ -111,12 +108,12 @@ describe('HostGroupList collapse', () => {
         onDeleteGroup={noop}
       />,
     )
-    fireEvent.click(screen.getByTestId('host-group-toggle-ungrouped'))
-    expect(screen.queryByTestId('host-row-h3')).not.toBeInTheDocument()
-    expect(screen.getByTestId('host-row-h1')).toBeInTheDocument()
+    fireEvent.click(screen.getByTestId('host-group-select-ungrouped'))
+    expect(screen.getByTestId('host-row-h3')).toBeInTheDocument()
+    expect(screen.queryByTestId('host-row-h1')).not.toBeInTheDocument()
   })
 
-  it('rename / delete stay clickable without toggling', () => {
+  it('rename / delete stay clickable without changing selection hosts incorrectly', () => {
     const onRename = vi.fn()
     const onDelete = vi.fn()
     render(
@@ -129,15 +126,15 @@ describe('HostGroupList collapse', () => {
         onDeleteGroup={onDelete}
       />,
     )
+    fireEvent.click(screen.getByTestId('host-group-select-g1'))
     fireEvent.click(screen.getByTestId('host-group-rename-g1'))
     expect(onRename).toHaveBeenCalledWith(groups[0])
     fireEvent.click(screen.getByTestId('host-group-delete-g1'))
     expect(onDelete).toHaveBeenCalledWith(groups[0])
-    // Still expanded after rename/delete clicks
     expect(screen.getByTestId('host-row-h1')).toBeInTheDocument()
   })
 
-  it('renders add cards per group and ungrouped; add calls onAddHost with group id', () => {
+  it('add button uses selected group id', () => {
     const onAddHost = vi.fn()
     render(
       <HostGroupList
@@ -150,17 +147,16 @@ describe('HostGroupList collapse', () => {
         onAddHost={onAddHost}
       />,
     )
-    expect(screen.getByTestId('host-add-g1')).toBeInTheDocument()
-    expect(screen.getByTestId('host-add-g2')).toBeInTheDocument()
-    expect(screen.getByTestId('host-add-ungrouped')).toBeInTheDocument()
-
+    fireEvent.click(screen.getByTestId('host-group-select-g1'))
     fireEvent.click(screen.getByTestId('host-add-g1'))
     expect(onAddHost).toHaveBeenCalledWith('g1')
+
+    fireEvent.click(screen.getByTestId('host-group-select-ungrouped'))
     fireEvent.click(screen.getByTestId('host-add-ungrouped'))
     expect(onAddHost).toHaveBeenCalledWith(null)
   })
 
-  it('card body click connects host; edit does not', () => {
+  it('row body click connects host; edit does not', () => {
     const onConnect = vi.fn()
     const onEdit = vi.fn()
     render(
@@ -174,6 +170,7 @@ describe('HostGroupList collapse', () => {
         onConnectHost={onConnect}
       />,
     )
+    fireEvent.click(screen.getByTestId('host-group-select-g1'))
     fireEvent.click(screen.getByTestId('host-row-h1'))
     expect(onConnect).toHaveBeenCalledWith(expect.objectContaining({ id: 'h1' }))
 
@@ -183,7 +180,7 @@ describe('HostGroupList collapse', () => {
     expect(onConnect).not.toHaveBeenCalled()
   })
 
-  it('empty group still shows add card (no empty placeholder)', () => {
+  it('empty group shows empty placeholder and add', () => {
     const onAddHost = vi.fn()
     render(
       <HostGroupList
@@ -196,7 +193,37 @@ describe('HostGroupList collapse', () => {
         onAddHost={onAddHost}
       />,
     )
-    expect(screen.getByTestId('host-add-g-empty')).toBeInTheDocument()
-    expect(screen.queryByText('terminals.groupEmpty')).not.toBeInTheDocument()
+    expect(screen.getByTestId('host-group-empty')).toBeInTheDocument()
+    expect(screen.getByText('terminals.groupEmpty')).toBeInTheDocument()
+    fireEvent.click(screen.getByTestId('host-add-g-empty'))
+    expect(onAddHost).toHaveBeenCalledWith('g-empty')
+  })
+
+  it('falls back selection when selected group is removed', () => {
+    const { rerender } = render(
+      <HostGroupList
+        groups={groups}
+        hosts={hosts}
+        onEditHost={noop}
+        onDeleteHost={noop}
+        onRenameGroup={noop}
+        onDeleteGroup={noop}
+      />,
+    )
+    fireEvent.click(screen.getByTestId('host-group-select-g1'))
+    expect(screen.getByTestId('host-row-h1')).toBeInTheDocument()
+
+    rerender(
+      <HostGroupList
+        groups={[{ id: 'g2', name: 'Dev', sort: 1 }]}
+        hosts={hosts.filter((h) => h.groupId !== 'g1')}
+        onEditHost={noop}
+        onDeleteHost={noop}
+        onRenameGroup={noop}
+        onDeleteGroup={noop}
+      />,
+    )
+    expect(screen.getByTestId('host-group-select-g2')).toHaveAttribute('aria-selected', 'true')
+    expect(screen.queryByTestId('host-row-h1')).not.toBeInTheDocument()
   })
 })

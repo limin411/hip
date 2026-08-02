@@ -1845,6 +1845,7 @@ export const ja = {
     "errorDelete": "削除に失敗しました。もう一度お試しください。",
     "errorConnect": "接続に失敗しました。ホスト設定と認証情報を確認してください。",
     "ungrouped": "未分類",
+    "groupsNavAria": "ホストグループ",
     "groupEmpty": "このグループにホストはありません",
     "hostsCount": "{{count}} 台のホスト",
     "hostsCount_one": "{{count}} 台のホスト",

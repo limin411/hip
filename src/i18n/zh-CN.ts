@@ -1869,6 +1869,7 @@ export const zhCN = {
       errorDelete: '删除失败，请重试。',
       errorConnect: '连接失败。请检查主机设置与凭据。',
       ungrouped: '未分组',
+      groupsNavAria: '主机分组',
       groupEmpty: '该分组下暂无主机',
       hostsCount: '{{count}} 台主机',
       hostsCount_one: '{{count}} 台主机',

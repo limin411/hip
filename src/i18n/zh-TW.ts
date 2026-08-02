@@ -1847,6 +1847,7 @@ export const zhTW = {
     "errorDelete": "刪除失敗，請重試。",
     "errorConnect": "連線失敗。請檢查主機設定與憑證。",
     "ungrouped": "未分組",
+    "groupsNavAria": "主機分組",
     "groupEmpty": "該分組下暫無主機",
     "hostsCount": "{{count}} 台主機",
     "hostsCount_one": "{{count}} 台主機",

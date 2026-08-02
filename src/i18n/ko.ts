@@ -1845,6 +1845,7 @@ export const ko = {
     "errorDelete": "삭제에 실패했습니다. 다시 시도하세요.",
     "errorConnect": "연결에 실패했습니다. 호스트 설정과 자격 증명을 확인하세요.",
     "ungrouped": "그룹 없음",
+    "groupsNavAria": "호스트 그룹",
     "groupEmpty": "이 그룹에 호스트가 없습니다",
     "hostsCount": "호스트 {{count}}개",
     "hostsCount_one": "호스트 {{count}}개",

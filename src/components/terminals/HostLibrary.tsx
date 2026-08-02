@@ -235,7 +235,6 @@ export function HostLibrary() {
           <h1 className="text-body font-semibold tracking-tight text-ink">
             {t('terminals.libraryTitle')}
           </h1>
-          <p className="text-meta text-ink-tertiary">{t('terminals.librarySubtitle')}</p>
         </div>
         <div className="flex flex-wrap items-center gap-1.5">
           <Button

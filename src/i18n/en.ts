@@ -1903,7 +1903,6 @@ export const en = {
       softCap:
         'Too many terminals open (max 8, including code-panel terminals). Close one first.',
       libraryTitle: 'Connections',
-      librarySubtitle: 'Saved SSH hosts and groups',
       emptyLibrary: 'No saved connections yet',
       emptyLibraryHint: 'Save a remote host for later, or open a local terminal now.',
       connect: 'Connect',

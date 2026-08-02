@@ -3,6 +3,7 @@ import { DEFAULT_CONFIG } from '@/domain/sessionStore'
 import { useUiStore } from '@/store/uiStore'
 import { useManagedTerminalStore } from '@/store/managedTerminalStore'
 import { useTerminalAgentStore } from '@/store/terminalAgentStore'
+import { useHipConfigStore } from '@/store/hipConfigStore'
 
 /**
  * Create a terminal agent session under `terminalId` (spec §3.5.5) and make it the
@@ -17,8 +18,17 @@ export async function startTerminalAgentChat(
   const { sessionService } = await import('@/domain')
   const term = useManagedTerminalStore.getState().getTerminal(terminalId)
   if (!term || term.kind !== 'ssh') return null
+  // New terminal chats use the user's active model (falls back to defaults).
+  const activeModel = useHipConfigStore.getState().config.activeModel
   const config: SessionConfig = {
     ...DEFAULT_CONFIG,
+    ...(activeModel
+      ? {
+          llmProvider: activeModel.providerID,
+          model: activeModel.modelID,
+          ...(activeModel.baseURL ? { baseURL: activeModel.baseURL } : {}),
+        }
+      : {}),
     surface: 'terminal',
     managedTerminalId: terminalId,
     hostId: term.hostId,

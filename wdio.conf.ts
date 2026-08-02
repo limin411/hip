@@ -161,6 +161,42 @@ function readUserPluginPaths(userConfigDir: string): string[] {
   return []
 }
 
+/**
+ * Merge the user's real `[active_model]` (+ its `[[providers]]` entry) into the
+ * staged e2e hip.toml. Without this, live-LLM e2e runs fall back to the builtin
+ * DeepSeek default while the real auth.json usually tombstones it → NO_API_KEY.
+ * No-op when the real config has no active_model (CI / fresh machines).
+ */
+function mergeRealActiveModelIntoStagedConfig(dataDir: string): void {
+  const realPath = path.join(USER_CONFIG_DIR, 'hip.toml')
+  const stagedPath = path.join(dataDir, 'config', 'hip.toml')
+  let real: string
+  try {
+    real = fs.readFileSync(realPath, 'utf8')
+  } catch {
+    return
+  }
+
+  const activeBlock = real.match(/\[active_model\]\n(?:[^\[]|\n(?!\[))*/)
+  if (!activeBlock) return
+  const activeText = activeBlock[0]
+  const providerId = activeText.match(/provider_id\s*=\s*"([^"]+)"/)?.[1]
+  if (!providerId) return
+
+  // Find the matching [[providers]] block (stop at the next [[ or [ header).
+  const providerMatch = real.match(
+    new RegExp(`(\\[\\[providers\\]\\]\\n(?:[^\\[]|\\n(?!\\[))*?)id\\s*=\\s*"${providerId}"[\\s\\S]*?(?=\\n\\[\\[|\\n\\[|$)`),
+  )
+  const providerBlock = providerMatch?.[0]
+  if (!providerBlock) return
+
+  const existing = fs.existsSync(stagedPath) ? fs.readFileSync(stagedPath, 'utf8') : ''
+  if (existing.includes('[active_model]')) return
+  const merged = `${existing.trimEnd()}\n\n${providerBlock.trimEnd()}\n\n${activeText.trimEnd()}\n`
+  fs.writeFileSync(stagedPath, merged)
+  console.log(`[e2e] merged real activeModel (${providerId}) into ${stagedPath}`)
+}
+
 export const config: Options.Testrunner = {
   runner: 'local',
   specs: ['./e2e/**/*.spec.ts'],
@@ -234,6 +270,7 @@ export const config: Options.Testrunner = {
     console.log(`[e2e] HIP_DATA_DIR=${e2eDataDir}`)
 
     stageE2eData(e2eDataDir)
+    mergeRealActiveModelIntoStagedConfig(e2eDataDir)
 
     if (await isHipViteReady()) {
       console.log(`[e2e] reusing hip Vite already running on :${VITE_PORT}`)

@@ -77,6 +77,12 @@ export const ALL_BUILTIN_TOOLS: string[] = [
   'goal_create',
   'goal_status',
   'goal_update',
+  // Terminal surface tools (spec §5.1): surface-scoped via buildAllTools.
+  'terminal_exec',
+  'terminal_read',
+  'terminal_send_keys',
+  'sftp_read',
+  'sftp_write',
 ]
 
 export const BUILTIN_PROFILES: AgentProfile[] = [

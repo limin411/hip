@@ -6,6 +6,7 @@ import {
   buildMonthMatrix,
   colorHexForItem,
   placeBarsForMonth,
+  statusTintStyle,
   type DayBar,
   type WorkItem,
 } from '@/domain/work-items'
@@ -170,12 +171,13 @@ function BarChip({
     bar.kind === 'mid' && 'rounded-none text-transparent',
     bar.kind === 'end' && 'rounded-l-none text-transparent',
   )
+  const tint = statusTintStyle(hex, 'bar')
   const style = {
     ['--bar-color' as string]: hex,
-    background: `color-mix(in srgb, ${hex} 22%, white)`,
+    background: tint.background,
     boxShadow:
       bar.kind === 'mid' || bar.kind === 'end' ? 'none' : `inset 3px 0 0 ${hex}`,
-    color: '#0f172a',
+    color: tint.color,
   } as CSSProperties
 
   const itemTitle = item?.title.trim() || bar.title || ''

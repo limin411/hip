@@ -5,6 +5,30 @@
     <link rel="icon" type="image/svg+xml" href="/icon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>hip</title>
+    <!-- Apply dark class before paint to avoid light FOUC (zustand hip-ui). -->
+    <script>
+      (function () {
+        try {
+          var raw = localStorage.getItem('hip-ui')
+          if (!raw) {
+            if (window.matchMedia('(prefers-color-scheme: dark)').matches) {
+              document.documentElement.classList.add('dark')
+            }
+            return
+          }
+          var parsed = JSON.parse(raw)
+          var theme =
+            (parsed && parsed.state && parsed.state.theme) ||
+            (parsed && parsed.theme) ||
+            'system'
+          var dark =
+            theme === 'dark' ||
+            (theme !== 'light' &&
+              window.matchMedia('(prefers-color-scheme: dark)').matches)
+          if (dark) document.documentElement.classList.add('dark')
+        } catch (_) {}
+      })()
+    </script>
   </head>
 
   <body>

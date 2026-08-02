@@ -174,7 +174,7 @@ function Node({
       {withEntryMenu(backend, terminalId, entry, rootCwd, row)}
       {entry.isDir && open && dirError ? (
         <p
-          className="truncate px-2 py-0.5 text-caption text-red-500/90"
+          className="truncate px-2 py-0.5 text-caption text-danger/90"
           style={{ paddingLeft: (depth + 1) * 12 + 4 }}
           data-testid={backend === 'local' ? 'term-fs-dir-error' : 'sftp-dir-error'}
           title={dirError}

@@ -98,6 +98,13 @@
   --row-pad-y-session: 0.5rem; /* py-2 */
   --trail-min-h: 1.25rem; /* 20px = min-h-5 */
   --meta-gap: 0.375rem; /* 6px = gap-1.5 */
+  /* Work-item status chip/bar tints (dynamic hex via color-mix) */
+  --status-tint-base: #ffffff;
+  --status-tint-fg: #0f172a;
+  --status-chip-bg-pct: 16%;
+  --status-chip-fg-pct: 70%;
+  --status-bar-bg-pct: 22%;
+  --status-bar-fg-pct: 0%; /* pure --status-tint-fg on light */
 }
 
 /* Compact density overrides — consumers use var(--row-h-*) / var(--trail-min-h) */
@@ -124,54 +131,61 @@ html[data-platform="linux"] {
 }
 
 .dark {
-  /* 单色 chrome —— 压低背景亮度、边框更轻、文字对比够用 */
-  --bg-app: #121212;
-  --bg-subtle: #181818;
-  --bg-muted: #1f1f1f;
-  --bg-content: #121212; /* 暗色主列与 chrome 同底，不单独偏黄 */
-  --border: #2e2e2e;
-  --border-strong: #3e3e3e;
+  /*
+   * 暗色 chrome —— 相对亮色拉开表面阶差（侧栏更沉、主列略抬）、边框可读，
+   * accent 有 hover，warning 与 accent 色相分离，语义色可读但不霓虹。
+   */
+  --bg-app: #0f0f0f;
+  --bg-subtle: #161616; /* 侧栏 / 次级区更沉 */
+  --bg-muted: #1e1e1e;
+  --bg-content: #141414; /* 主列略抬，与 chrome 分区 */
+  --border: #333333;
+  --border-strong: #454545;
   --text-primary: #f0f0f0;
-  --text-secondary: #a3a3a3;
-  --text-tertiary: #7a7a7a;
-  /* 品牌强调色：更亮的暖橙（贴 logo #FF9800），保证在暗底上可识别 */
+  --text-secondary: #b3b3b3;
+  --text-tertiary: #8a8a8a; /* 小字元数据仍过 AA */
+  /* 品牌强调：亮琥珀可读；hover 略提亮；subtle 带淡橙 tint */
   --accent: #ffb300;
-  --accent-hover: #ffb300; /* ≠ dark --warning #ffb74d */
+  --accent-hover: #ffc233;
   --accent-strong: #ffcc80;
-  --accent-subtle: #222222; /* 暗色中性 hover/头像/chip 底 */
-  --accent-active: #2e2e2e; /* 暗色选中底 */
-  --on-accent: #111111; /* 浅 accent 填充上的近黑字，保证暗色对比 */
-  /* 功能状态色 —— 提升亮度以在暗底保持可读 */
-  --success: #4caf50;
-  --danger: #ff5252;
-  --warning: #ffb74d;
-  /* 智能体角色色 —— 更饱和的亮色变体 */
-  --role-supervisor: #7c7cf0;
-  --role-planner: #4db8ff;
-  --role-coder: #5dc96c;
-  --role-reviewer: #ffab40;
-  --role-worker: #2ee6e6;
+  --accent-subtle: color-mix(in srgb, #ffb300 12%, #0f0f0f);
+  --accent-active: color-mix(in srgb, #ffb300 18%, #0f0f0f);
+  --on-accent: #111111; /* 浅 accent 填充上的近黑字 */
+  /* 功能状态色 —— 暗底可读，略降饱和避免抢内容 */
+  --success: #5aad5e;
+  --danger: #e85a5a;
+  --warning: #e6a23c; /* 偏黄褐，避开 accent 琥珀 */
+  /* 智能体角色色 —— 亮一档但不过荧 */
+  --role-supervisor: #8b8bf0;
+  --role-planner: #5bb8f0;
+  --role-coder: #5cb86a;
+  --role-reviewer: #e09a40;
+  --role-worker: #3dcccc;
   --titlebar-bg: var(--bg-app);
   --titlebar-backdrop: none;
   --shadow-panel: none;
-  --overlay-scrim: rgba(0, 0, 0, 0.48);
-  /* Nested confirm/task over a shell — light, no blur */
-  --overlay-scrim-light: rgba(0, 0, 0, 0.28);
-  /* 公共交互状态 —— 复用暗色令牌 */
+  --overlay-scrim: rgba(0, 0, 0, 0.52);
+  --overlay-scrim-light: rgba(0, 0, 0, 0.32);
   --state-hover: var(--accent-subtle);
   --state-active: var(--accent-active);
   --state-disabled: var(--text-tertiary);
   --focus-ring: var(--accent);
-  /* 兼容别名 —— 随主题转发到暗色真相源 */
   --surface: var(--bg-app);
   --surface-muted: var(--bg-muted);
   --ink: var(--text-primary);
   --ink-secondary: var(--text-secondary);
   --ink-tertiary: var(--text-tertiary);
-  /* Dark solid inverse — soft off-white fill (not pure paper white) */
-  --btn-primary: #d4d4d4;
-  --btn-primary-hover: #e0e0e0;
+  /* 主 CTA：略提亮 + 与 surface 拉开 */
+  --btn-primary: #e0e0e0;
+  --btn-primary-hover: #ececec;
   --on-btn-primary: #141414;
+  /* Status chip/bar — mix toward dark surface, lighten ink */
+  --status-tint-base: #0f0f0f;
+  --status-tint-fg: #f0f0f0;
+  --status-chip-bg-pct: 22%;
+  --status-chip-fg-pct: 42%;
+  --status-bar-bg-pct: 28%;
+  --status-bar-fg-pct: 42%;
 }
 
 html.dark[data-platform="windows"],

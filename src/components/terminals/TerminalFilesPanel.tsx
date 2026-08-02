@@ -153,11 +153,11 @@ export function TerminalFilesPanel({
                     className={cn(
                       'h-full rounded-full transition-all',
                       tr.phase === 'error'
-                        ? 'bg-red-500/80'
+                        ? 'bg-danger/80'
                         : tr.phase === 'cancelled'
                           ? 'bg-ink-tertiary/40'
                           : tr.phase === 'completed'
-                            ? 'bg-emerald-500/80'
+                            ? 'bg-success/80'
                             : 'bg-accent',
                     )}
                     style={{ width: pct != null ? `${pct}%` : active ? '30%' : '100%' }}

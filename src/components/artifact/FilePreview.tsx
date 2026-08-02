@@ -133,7 +133,7 @@ export function FilePreview() {
       undefined,
       preview.mimeType,
       <IframePreviewChrome path={preview.path} testid="preview-pdf-shell">
-        <iframe data-testid="preview-pdf" title="preview" className="h-full w-full border-0 bg-white" src={`data:${preview.mimeType};base64,${preview.content}`} />
+        <iframe data-testid="preview-pdf" title="preview" className="h-full w-full border-0 bg-surface" src={`data:${preview.mimeType};base64,${preview.content}`} />
       </IframePreviewChrome>,
     )
   }

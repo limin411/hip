@@ -5,6 +5,7 @@ import {
   colorHexForItem,
   ensureScheduleDates,
   localTodayYmd,
+  statusTintStyle,
   type WorkItem,
 } from '@/domain/work-items'
 import { useWorkItemStore } from '@/store/workItemStore'
@@ -280,10 +281,7 @@ export function WorkItemListView({
                   </span>
                   <span
                     className="rounded-full px-2 py-0.5 text-caption font-medium"
-                    style={{
-                      background: `color-mix(in srgb, ${hex} 16%, white)`,
-                      color: `color-mix(in srgb, ${hex} 70%, #0f172a)`,
-                    }}
+                    style={statusTintStyle(hex, 'chip')}
                   >
                     {item.archivedAt != null
                       ? t('workItems.filters.archived')

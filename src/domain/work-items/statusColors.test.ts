@@ -6,6 +6,7 @@ import {
   DEFAULT_STATUS_COLORS,
   normalizeStatusColors,
   normalizeWorkItemUiPrefs,
+  statusTintStyle,
 } from './statusColors'
 
 describe('colorKeyForItem', () => {
@@ -64,5 +65,24 @@ describe('normalizeWorkItemUiPrefs', () => {
     expect(normalizeWorkItemUiPrefs({}).statusColors.todo).toBe(
       DEFAULT_STATUS_COLORS.todo,
     )
+  })
+})
+
+describe('statusTintStyle', () => {
+  const hex = '#3b82f6'
+
+  it('chip uses status CSS vars (theme-flip without re-render)', () => {
+    const s = statusTintStyle(hex, 'chip')
+    expect(s.background).toContain(hex)
+    expect(s.background).toContain('var(--status-chip-bg-pct)')
+    expect(s.background).toContain('var(--status-tint-base)')
+    expect(s.color).toContain('var(--status-chip-fg-pct)')
+    expect(s.color).toContain('var(--status-tint-fg)')
+  })
+
+  it('bar uses bar-specific mix tokens', () => {
+    const s = statusTintStyle(hex, 'bar')
+    expect(s.background).toContain('var(--status-bar-bg-pct)')
+    expect(s.color).toContain('var(--status-bar-fg-pct)')
   })
 })

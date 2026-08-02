@@ -5,12 +5,35 @@ export type WorkItemStatusColorKey = 'todo' | 'in_progress' | 'done' | 'archived
 
 export type WorkItemColorMap = Record<WorkItemStatusColorKey, string>
 
-/** Mockup defaults — high contrast on light surface. */
+/** Mockup defaults — solid dots; chip/bar tints via statusTintStyle. */
 export const DEFAULT_STATUS_COLORS: WorkItemColorMap = {
   todo: '#3b82f6',
   in_progress: '#f59e0b',
   done: '#22c55e',
   archived: '#94a3b8',
+}
+
+export type StatusTintVariant = 'chip' | 'bar'
+
+/**
+ * Background + foreground for status chips/bars.
+ * Percentages and mix bases come from CSS vars (--status-*) so theme
+ * toggles apply without a React re-render.
+ */
+export function statusTintStyle(
+  hex: string,
+  variant: StatusTintVariant = 'chip',
+): { background: string; color: string } {
+  if (variant === 'bar') {
+    return {
+      background: `color-mix(in srgb, ${hex} var(--status-bar-bg-pct), var(--status-tint-base))`,
+      color: `color-mix(in srgb, ${hex} var(--status-bar-fg-pct), var(--status-tint-fg))`,
+    }
+  }
+  return {
+    background: `color-mix(in srgb, ${hex} var(--status-chip-bg-pct), var(--status-tint-base))`,
+    color: `color-mix(in srgb, ${hex} var(--status-chip-fg-pct), var(--status-tint-fg))`,
+  }
 }
 
 /** Cancelled is fixed (not user-recolorable); distinct from archived. */

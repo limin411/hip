@@ -71,15 +71,15 @@
 /* ── Status overlays ── */
 .dag-node.status-succeeded {
   border-color: var(--success);
-  box-shadow: 0 0 0 1.5px var(--success/30), 0 1px 3px rgba(0, 0, 0, 0.08);
+  box-shadow: 0 0 0 1.5px color-mix(in srgb, var(--success) 30%, transparent), 0 1px 3px rgba(0, 0, 0, 0.08);
 }
 .dag-node.status-running {
   border-color: var(--accent);
-  box-shadow: 0 0 0 1.5px var(--accent/30), 0 1px 3px rgba(0, 0, 0, 0.08);
+  box-shadow: 0 0 0 1.5px color-mix(in srgb, var(--accent) 30%, transparent), 0 1px 3px rgba(0, 0, 0, 0.08);
 }
 .dag-node.status-failed {
   border-color: var(--danger);
-  box-shadow: 0 0 0 1.5px var(--danger/30), 0 1px 3px rgba(0, 0, 0, 0.08);
+  box-shadow: 0 0 0 1.5px color-mix(in srgb, var(--danger) 30%, transparent), 0 1px 3px rgba(0, 0, 0, 0.08);
 }
 .dag-node.status-pending {
   opacity: 0.7;
@@ -101,7 +101,7 @@
   border-bottom: 1px solid var(--border);
 }
 .dag-node-header.agent   { background: color-mix(in srgb, var(--accent) 12%, transparent); color: var(--accent); }
-.dag-node-header.tool    { background: color-mix(in srgb, var(--warning) 15%, transparent); color: oklch(0.65 0.14 60); }
+.dag-node-header.tool    { background: color-mix(in srgb, var(--warning) 15%, transparent); color: var(--warning); }
 .dag-node-header.gate    { background: color-mix(in srgb, var(--danger) 10%, transparent); color: var(--danger); }
 .dag-node-header.parallel { background: color-mix(in srgb, var(--accent) 8%, transparent); color: var(--ink-secondary); }
 .dag-node-header.human   { background: color-mix(in srgb, var(--success) 10%, transparent); color: var(--success); }

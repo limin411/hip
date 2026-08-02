@@ -1866,6 +1866,7 @@ export const ja = {
       "continueWatchingPrompt": "ターミナルを監視し続け、terminal_read でポーリングして結果を報告してください。",
       "askUser": "ユーザーに確認",
       "askUserPrompt": "結論を出す前に、前のコマンドが完了したかユーザーに確認してください。",
+      "explainPrompt": "このターミナル選択範囲を説明してください：",
       "sessionsGroup": "{{title}} のエージェントチャット",
       "deleteTitle": "エージェントチャットを削除しますか？",
       "deleteBody": "この会話を削除します。SSH ターミナルは開いたままです。",
@@ -2820,6 +2821,8 @@ export const ja = {
       "copySelection": "コピー",
       "copySelectionDisabled": "コピーする選択範囲がありません",
       "sendSelectionToChat": "選択範囲をチャットに送信",
+      "explainInAgent": "ターミナルエージェントで説明",
+      "explainInAgentDisabled": "SSH 管理ターミナルでのみ利用できます",
       "paste": "貼り付け"
     },
     "managedTerminal": {

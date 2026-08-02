@@ -43,6 +43,7 @@ import { TerminalRightPanel } from '@/components/terminals/TerminalRightPanel'
 import { startTerminalBridge } from '@/ipc/pty'
 import { useProjectPathStore } from '@/store/projectPathStore'
 import { useManagedTerminalStore } from '@/store/managedTerminalStore'
+import { useTerminalHostStore } from '@/store/terminalHostStore'
 import { useFocusStore } from '@/store/focusStore'
 import { seedNavHistoryIfEmpty } from '@/components/layout/navHistory'
 import { WindowLifecycleHost } from '@/components/window/WindowLifecycleHost'
@@ -138,6 +139,8 @@ export function AppLayout() {
   const focusedManaged = useManagedTerminalStore((s) =>
     s.focusedId ? s.terminals.find((t) => t.id === s.focusedId) : undefined,
   )
+  const hostCatalogLoaded = useTerminalHostStore((s) => s.loaded)
+  const persistedTerminalRecords = useTerminalHostStore((s) => s.terminalRecords)
   const settingsOpen = overlay === 'settings'
   // Settings owns the main column; suppress work-surface right rails while open.
   const codeOpen =
@@ -159,6 +162,12 @@ export function AppLayout() {
     !!focusedManaged &&
     terminalPanelOpen
   const rightOpen = codeOpen || chatOpen || knowledgeOpen || terminalsOpen
+
+  // P2: restore persisted disconnected `tm_*` records after the host catalog loads.
+  useEffect(() => {
+    if (!hostCatalogLoaded || persistedTerminalRecords.length === 0) return
+    useManagedTerminalStore.getState().restorePersisted(persistedTerminalRecords)
+  }, [hostCatalogLoaded, persistedTerminalRecords])
 
   // Sync the collapsible rail with rightOpen. When opening, widen the window first
   // so the main content area can host the rail (falls back when the screen is too small).

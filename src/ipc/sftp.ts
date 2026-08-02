@@ -58,6 +58,21 @@ export function sftpReadFile(
   })
 }
 
+/** Write a remote text file via SFTP (approved path; P2). */
+export function sftpWriteFile(
+  terminalId: string,
+  path: string,
+  content: string,
+  force: boolean,
+): Promise<void> {
+  return invoke<void>('sftp_write_file', {
+    terminalId,
+    path,
+    content,
+    force,
+  })
+}
+
 export function sftpRemove(terminalId: string, path: string, isDir: boolean): Promise<void> {
   return invoke('sftp_remove', { terminalId, path, isDir })
 }

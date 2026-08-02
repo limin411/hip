@@ -118,6 +118,7 @@ describe('terminalProvider', () => {
     expect(items.map((i) => i.id)).toEqual([
       'terminal.copySelection',
       'terminal.sendSelectionToChat',
+      'terminal.explainInAgent',
       'terminal.paste',
       'terminal.restart',
     ])
@@ -165,6 +166,7 @@ describe('terminalProvider', () => {
       'terminal.paste',
       'terminal.restart',
       'terminal.sendSelectionToChat',
+      'terminal.explainInAgent',
     ])
     expect(items[0]!.separatorBefore).toBeFalsy()
     expect(items.find((i) => i.id === 'terminal.restart')!.separatorBefore).toBe(true)

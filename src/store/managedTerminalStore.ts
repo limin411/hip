@@ -4,7 +4,7 @@ import { homeDir } from '@tauri-apps/api/path'
 import { ptyKill } from '@/ipc/pty'
 import { interactiveTerminalList, sshClose } from '@/ipc/ssh'
 import { sftpCancel } from '@/ipc/sftp'
-import type { TerminalHost } from '@/ipc/terminalHosts'
+import type { TerminalHost, TerminalRecord } from '@/ipc/terminalHosts'
 import { useTerminalStore } from '@/store/terminalStore'
 import { useTerminalHostStore } from '@/store/terminalHostStore'
 import { useTerminalFsStore } from '@/store/terminalFsStore'
@@ -115,6 +115,8 @@ interface ManagedTerminalStore {
   setStatus: (id: string, status: ManagedTerminalStatus) => void
   /** Remove a record entirely (explicit record delete / Host cascade). */
   removeRecord: (id: string) => void
+  /** Restore persisted disconnected records after startup (P2). */
+  restorePersisted: (records: TerminalRecord[]) => void
   /** Reopen a closed SSH terminal reusing the same `tm_*` record (new generation). */
   reconnect: (id: string) => Promise<void>
   /** Bumped on reconnect so ManagedTerminalSession remounts XtermSurface. */
@@ -251,6 +253,7 @@ export const useManagedTerminalStore = create<ManagedTerminalStore>((set, get) =
     set((s) => {
       if (term.kind === 'ssh') {
         // D12: keep the record + child sessions (read-only); mark disconnected.
+        persistSshRecord({ ...term, status: 'disconnected' })
         return {
           terminals: s.terminals.map((t) =>
             t.id === id ? { ...t, status: 'disconnected' as const } : t,
@@ -271,25 +274,51 @@ export const useManagedTerminalStore = create<ManagedTerminalStore>((set, get) =
   setTitle: (id, title) => {
     const next = title.trim()
     if (!next) return
-    set((s) => ({
-      terminals: s.terminals.map((t) => (t.id === id ? { ...t, title: next } : t)),
-    }))
+    set((s) => {
+      const terminals = s.terminals.map((t) => (t.id === id ? { ...t, title: next } : t))
+      const term = terminals.find((t) => t.id === id)
+      if (term?.kind === 'ssh') persistSshRecord(term)
+      return { terminals }
+    })
   },
 
   reconnectNonce: {},
+
+  restorePersisted: (records) => {
+    if (!records?.length) return
+    const existing = new Set(get().terminals.map((t) => t.id))
+    const additions = records
+      .filter((r) => !existing.has(r.id))
+      .map((r) => ({
+        id: r.id,
+        kind: 'ssh' as const,
+        title: r.title,
+        hostId: r.hostId,
+        remotePath: r.remotePath,
+        status: 'disconnected' as const,
+        createdAt: r.createdAt,
+      }))
+    if (additions.length === 0) return
+    set((s) => ({ terminals: [...s.terminals, ...additions] }))
+  },
+
   setStatus: (id, status) =>
-    set((s) => ({
-      terminals: s.terminals.map((t) => (t.id === id ? { ...t, status } : t)),
-    })),
+    set((s) => {
+      const terminals = s.terminals.map((t) => (t.id === id ? { ...t, status } : t))
+      const term = terminals.find((t) => t.id === id)
+      if (term?.kind === 'ssh') persistSshRecord(term)
+      return { terminals }
+    }),
 
   removeRecord: (id) =>
     set((s) => {
       const terminals = s.terminals.filter((t) => t.id !== id)
       useTerminalStore.getState().clearSession(id)
       useTerminalFsStore.getState().clearTerminal(id)
-      useTerminalAgentStore.getState().setExecFlight(id, null)
-      useTerminalAgentStore.getState().setActiveSession(id, null)
-      let focusedId = s.focusedId
+    useTerminalAgentStore.getState().setExecFlight(id, null)
+    useTerminalAgentStore.getState().setActiveSession(id, null)
+    void useTerminalHostStore.getState().removeTerminalRecord?.(id).catch(() => {})
+    let focusedId = s.focusedId
       if (s.focusedId === id) {
         focusedId = terminals[0]?.id ?? null
       }
@@ -317,3 +346,21 @@ export const useManagedTerminalStore = create<ManagedTerminalStore>((set, get) =
     }))
   },
 }))
+
+/** Persist an SSH record to the host catalog (live status is never persisted). */
+function persistSshRecord(term: ManagedTerminal): void {
+  if (term.kind !== 'ssh' || !term.hostId) return
+  void useTerminalHostStore
+    .getState()
+    .upsertTerminalRecord?.({
+      id: term.id,
+      hostId: term.hostId,
+      title: term.title,
+      remotePath: term.remotePath,
+      status: 'disconnected',
+      createdAt: term.createdAt,
+    })
+    .catch(() => {
+      /* catalog write failures must not break terminal runtime */
+    })
+}

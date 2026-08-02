@@ -5,6 +5,7 @@ import {
   type HostGroup,
   type RecentLaunch,
   type TerminalHost,
+  type TerminalRecord,
   type TerminalHostsCatalog,
 } from '@/ipc/terminalHosts'
 import { deleteSecretRaw, sshPassphraseKey, sshPasswordKey } from '@/ipc/secrets'
@@ -47,6 +48,7 @@ interface TerminalHostStore {
   groups: HostGroup[]
   hosts: TerminalHost[]
   recents: RecentLaunch[]
+  terminalRecords: TerminalRecord[]
   loaded: boolean
   error: string | null
 
@@ -67,18 +69,23 @@ interface TerminalHostStore {
   removeHost: (id: string) => Promise<void>
   /** Push a successful launch into recents and persist (K11). */
   pushRecent: (entry: RecentLaunch) => Promise<void>
+  /** Persist a managed-terminal record (P2: `tm_*` survives restarts). */
+  upsertTerminalRecord: (record: TerminalRecord) => Promise<void>
+  removeTerminalRecord: (id: string) => Promise<void>
 }
 
 function toCatalog(s: {
   groups: HostGroup[]
   hosts: TerminalHost[]
   recents: RecentLaunch[]
+  terminalRecords: TerminalRecord[]
 }): TerminalHostsCatalog {
   return {
     version: 1,
     groups: s.groups,
     hosts: s.hosts,
     recents: s.recents,
+    terminalRecords: s.terminalRecords,
   }
 }
 
@@ -104,6 +111,7 @@ export const useTerminalHostStore = create<TerminalHostStore>((set, get) => ({
   groups: [],
   hosts: [],
   recents: [],
+  terminalRecords: [],
   loaded: false,
   error: null,
 
@@ -117,6 +125,7 @@ export const useTerminalHostStore = create<TerminalHostStore>((set, get) => ({
         groups: catalog.groups,
         hosts: catalog.hosts,
         recents,
+        terminalRecords: catalog.terminalRecords ?? [],
         loaded: true,
         error: null,
       })
@@ -148,6 +157,7 @@ export const useTerminalHostStore = create<TerminalHostStore>((set, get) => ({
       groups: catalog.groups,
       hosts: catalog.hosts,
       recents,
+      terminalRecords: catalog.terminalRecords ?? [],
       error: null,
     })
     if (opts?.persist !== false) {
@@ -229,6 +239,26 @@ export const useTerminalHostStore = create<TerminalHostStore>((set, get) => ({
   pushRecent: async (entry) => {
     set((s) => ({
       recents: pushRecentEntry(s.recents, entry),
+      error: null,
+    }))
+    await get().save()
+  },
+
+  upsertTerminalRecord: async (record) => {
+    set((s) => {
+      const idx = s.terminalRecords.findIndex((r) => r.id === record.id)
+      const terminalRecords =
+        idx >= 0
+          ? s.terminalRecords.map((r, i) => (i === idx ? record : r))
+          : [...s.terminalRecords, record]
+      return { terminalRecords, error: null }
+    })
+    await get().save()
+  },
+
+  removeTerminalRecord: async (id) => {
+    set((s) => ({
+      terminalRecords: s.terminalRecords.filter((r) => r.id !== id),
       error: null,
     }))
     await get().save()

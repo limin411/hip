@@ -1890,6 +1890,7 @@ export const zhCN = {
         continueWatchingPrompt: '请继续观察终端输出：用 terminal_read 轮询并汇报结果。',
         askUser: '询问用户',
         askUserPrompt: '请先询问我上一条命令是否已完成，再下结论。',
+        explainPrompt: '请解释这段终端选区：',
         sessionsGroup: '{{title}} 的智能体对话',
         deleteTitle: '删除智能体对话？',
         deleteBody: '将删除该对话。SSH 终端保持打开。',
@@ -2863,6 +2864,8 @@ export const zhCN = {
         copySelection: '复制',
         copySelectionDisabled: '没有可复制的选区',
         sendSelectionToChat: '发送选区到对话',
+        explainInAgent: '在终端智能体中解释',
+        explainInAgentDisabled: '仅 SSH 托管终端可用',
         paste: '粘贴',
       },
       managedTerminal: {

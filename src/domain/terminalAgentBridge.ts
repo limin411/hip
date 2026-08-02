@@ -12,7 +12,7 @@ import { useManagedTerminalStore } from '@/store/managedTerminalStore'
 import { useTerminalStore } from '@/store/terminalStore'
 import { useTerminalAgentStore, type TerminalExecFlight } from '@/store/terminalAgentStore'
 import { sshWrite } from '@/ipc/ssh'
-import { sftpReadFile } from '@/ipc/sftp'
+import { sftpReadFile, sftpWriteFile } from '@/ipc/sftp'
 import { isTerminalSession } from '@/lib/sessions'
 
 export const EXEC_OUTPUT_CAP = 64 * 1024
@@ -275,6 +275,55 @@ async function runRead(
   }
 }
 
+async function runWrite(
+  msg: Extract<ServerMessage, { type: 'session:uiToolWrite:request' }>,
+  send: (m: ClientMessage) => void,
+): Promise<void> {
+  const { sessionId, callId, path, content, force } = msg
+  const tmId = terminalIdForSession(sessionId)
+  if (!tmId) {
+    send({ type: 'session:uiToolWrite:result', sessionId, callId, ok: false, error: 'terminal session not bound' })
+    return
+  }
+  const term = useManagedTerminalStore.getState().getTerminal(tmId)
+  if (!term || term.status !== 'connected') {
+    send({
+      type: 'session:uiToolWrite:result',
+      sessionId,
+      callId,
+      ok: false,
+      error: `terminal is ${term?.status ?? 'missing'}; reconnect to write files`,
+    })
+    return
+  }
+  if (!force) {
+    // Overwrite of an existing path needs a UI second confirmation (§6 / P2).
+    let exists = false
+    try {
+      await sftpReadFile(tmId, path, 1)
+      exists = true
+    } catch {
+      exists = false
+    }
+    if (exists && !window.confirm(`Overwrite remote file?\n\n${path}`)) {
+      send({ type: 'session:uiToolWrite:result', sessionId, callId, ok: false, error: 'overwrite rejected by user' })
+      return
+    }
+  }
+  try {
+    await sftpWriteFile(tmId, path, content, force)
+    send({ type: 'session:uiToolWrite:result', sessionId, callId, ok: true })
+  } catch (err) {
+    send({
+      type: 'session:uiToolWrite:result',
+      sessionId,
+      callId,
+      ok: false,
+      error: errorMessage(err),
+    })
+  }
+}
+
 /**
  * Route sidecar bridge requests. Returns true when the message was consumed
  * (the caller must not treat it as a regular store message).
@@ -289,6 +338,10 @@ export function handleTerminalBridgeMessage(
   }
   if (msg.type === 'session:uiToolRead:request') {
     void runRead(msg, send)
+    return true
+  }
+  if (msg.type === 'session:uiToolWrite:request') {
+    void runWrite(msg, send)
     return true
   }
   return false

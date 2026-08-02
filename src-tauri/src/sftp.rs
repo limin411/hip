@@ -336,6 +336,42 @@ pub async fn sftp_read_file(
     Ok(format!("{text}{note}"))
 }
 
+/// Write a remote text file via SFTP (P2; HITL + overwrite confirm handled in the UI).
+#[tauri::command]
+pub async fn sftp_write_file(
+    manager: State<'_, SshManager>,
+    terminal_id: String,
+    path: String,
+    content: String,
+    force: bool,
+) -> Result<(), String> {
+    if content.len() > 1024 * 1024 {
+        return Err("sftp_write content exceeds 1MB cap".into());
+    }
+    let (_sess, sftp) = require_sftp(&manager, &terminal_id).await?;
+    let remote = normalize_remote_path(&sftp, &path).await?;
+    let exists = sftp
+        .metadata(&remote)
+        .await
+        .map(|m| !m.is_dir())
+        .unwrap_or(false);
+    if exists && !force {
+        return Err("AlreadyExists".into());
+    }
+
+    let mut file = sftp
+        .open_with_flags(
+            &remote,
+            OpenFlags::CREATE | OpenFlags::TRUNCATE | OpenFlags::WRITE,
+        )
+        .await
+        .map_err(|e| format!("SFTP create remote failed: {e}"))?;
+    file.write_all(content.as_bytes())
+        .await
+        .map_err(|e| format!("SFTP write failed: {e}"))?;
+    file.shutdown().await.map_err(|e| format!("SFTP close failed: {e}"))
+}
+
 #[tauri::command]
 pub async fn sftp_remove(
     manager: State<'_, SshManager>,

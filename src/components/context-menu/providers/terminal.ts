@@ -10,6 +10,8 @@ import { setComposerQuote } from '@/components/command-palette/composerBridge'
 import { useDomainStore } from '@/domain/sessionStore'
 import { sessionService } from '@/domain/sessionService'
 import { useUiStore } from '@/store/uiStore'
+import { useManagedTerminalStore } from '@/store/managedTerminalStore'
+import { startTerminalAgentChat } from '@/components/terminals/terminalAgentSession'
 import type { ContextMenuItemDef, ContextProvider } from '../types'
 
 /**
@@ -33,6 +35,7 @@ function canvasItems(
   ctx: Parameters<ContextProvider>[1],
 ): ContextMenuItemDef[] {
   const hasSel = terminalCanvasHasSelection(sessionId)
+  const isSshManaged = useManagedTerminalStore.getState().getTerminal(sessionId)?.kind === 'ssh'
   // Single group so mergeByGroup preserves copy → paste → restart (not primary-first).
   // Manual separatorBefore on restart stays meaningful within the group.
   return [
@@ -58,6 +61,29 @@ function canvasItems(
         const text = getTerminalCanvasSelection(sessionId)
         if (!text) return
         setComposerQuote(text)
+      },
+    },
+    {
+      id: 'terminal.explainInAgent',
+      label: ctx.t('contextMenu.terminal.explainInAgent'),
+      group: 'agent',
+      disabled: !hasSel || !isSshManaged,
+      disabledReason: hasSel
+        ? isSshManaged
+          ? undefined
+          : ctx.t('contextMenu.terminal.explainInAgentDisabled')
+        : ctx.t('contextMenu.terminal.copySelectionDisabled'),
+      run: () => {
+        const text = getTerminalCanvasSelection(sessionId)
+        if (!text) return
+        void startTerminalAgentChat(sessionId).then((agentSessionId) => {
+          if (agentSessionId) {
+            sessionService.sendMessageToSession(
+              agentSessionId,
+              `${ctx.t('terminals.agent.explainPrompt')}\n\n${text}`,
+            )
+          }
+        })
       },
     },
     {

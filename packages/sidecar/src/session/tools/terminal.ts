@@ -12,6 +12,7 @@ import type {
   ServerMessage,
   UiToolReadResultPayload,
   UiToolResultPayload,
+  UiToolWriteResultPayload,
 } from '@hip/protocol'
 import { z } from 'zod'
 import { clipText, isApproved } from './helpers.js'
@@ -24,7 +25,15 @@ export const SFTP_READ_CAP = 256 * 1024
 
 export interface TerminalUiBridge {
   send: (msg: ServerMessage) => void
-  pendingUiTool: Map<string, (result: UiToolResultPayload | UiToolReadResultPayload) => void>
+  pendingUiTool: Map<
+    string,
+    (
+      result:
+        | UiToolResultPayload
+        | UiToolReadResultPayload
+        | UiToolWriteResultPayload,
+    ) => void
+  >
 }
 
 export interface TerminalToolOpts {
@@ -44,7 +53,7 @@ function waitForUi(
   bridge: TerminalUiBridge,
   callId: string,
   signal?: AbortSignal,
-): Promise<UiToolResultPayload | UiToolReadResultPayload> {
+): Promise<UiToolResultPayload | UiToolReadResultPayload | UiToolWriteResultPayload> {
   return new Promise((resolve) => {
     const onAbort = () => {
       bridge.pendingUiTool.delete(callId)
@@ -232,5 +241,54 @@ export function buildTerminalTools(opts: TerminalToolOpts): StructuredToolInterf
     },
   )
 
-  return [execTool, readTool, sftpReadTool]
+  const sftpWriteTool = tool(
+    async (input: { path: string; content: string; force?: boolean; reason?: string }) => {
+      if (!bridge) return 'Error: terminal bridge is not available for this session'
+      if (!requestApproval) return 'Error: sftp_write is not permitted in this permission mode'
+      if (!input.path.trim()) return 'Error: path is required'
+      const decision = await requestApproval({
+        title: 'Write remote file (SFTP)',
+        toolName: 'sftp_write',
+        kind: 'write',
+        content: input.reason
+          ? `${input.path}\n\n# ${input.reason}`
+          : input.path,
+        meta: { callId: `sftp-write-${randomUUID().slice(0, 8)}` },
+      })
+      if (!isApproved(decision)) {
+        return 'sftp_write rejected by the user; nothing was written.'
+      }
+      const callId = `sftp-write-${randomUUID().slice(0, 8)}`
+      const pending = waitForUi(bridge, callId, signal)
+      bridge.send({
+        type: 'session:uiToolWrite:request',
+        sessionId,
+        callId,
+        path: input.path,
+        content: input.content,
+        force: input.force === true,
+      })
+      const raw = await pending
+      if (raw.type === 'session:uiToolResult' || raw.type === 'session:uiToolRead:result') {
+        return `Error: unexpected bridge answer for sftp_write: ${raw.type}`
+      }
+      return raw.ok
+        ? `Wrote ${input.path} via SFTP.`
+        : `sftp_write failed: ${raw.error ?? 'unknown error'}`
+    },
+    {
+      name: 'sftp_write',
+      description:
+        'Write a text file to the remote SSH host via SFTP (HITL-approved, P2). ' +
+        'Requires approval; overwriting an existing file asks for a second confirmation in the UI.',
+      schema: z.object({
+        path: z.string().describe('absolute remote file path'),
+        content: z.string().describe('file content to write'),
+        force: z.boolean().optional().describe('skip the overwrite confirmation when true'),
+        reason: z.string().optional().describe('why this write is needed (approval prompt)'),
+      }),
+    },
+  )
+
+  return [execTool, readTool, sftpReadTool, sftpWriteTool]
 }

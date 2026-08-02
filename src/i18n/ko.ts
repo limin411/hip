@@ -1866,6 +1866,7 @@ export const ko = {
       "continueWatchingPrompt": "터미널을 계속 관찰하고 terminal_read로 폴링하여 결과를 보고하세요.",
       "askUser": "사용자에게 확인",
       "askUserPrompt": "결론을 내리기 전에 이전 명령이 완료되었는지 사용자에게 물어보세요.",
+      "explainPrompt": "이 터미널 선택 영역을 설명하세요:",
       "sessionsGroup": "{{title}}의 에이전트 채팅",
       "deleteTitle": "에이전트 채팅을 삭제할까요?",
       "deleteBody": "이 대화를 삭제합니다. SSH 터미널은 열린 상태로 유지됩니다.",
@@ -2820,6 +2821,8 @@ export const ko = {
       "copySelection": "복사",
       "copySelectionDisabled": "복사할 선택 항목 없음",
       "sendSelectionToChat": "선택 항목을 채팅으로 보내기",
+      "explainInAgent": "터미널 에이전트에서 설명",
+      "explainInAgentDisabled": "SSH 관리 터미널에서만 사용할 수 있습니다",
       "paste": "붙여넣기"
     },
     "managedTerminal": {

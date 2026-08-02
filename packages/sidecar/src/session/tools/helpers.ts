@@ -445,7 +445,8 @@ export interface BuildToolsOpts {
       (
         result:
           | import('@hip/protocol').UiToolResultPayload
-          | import('@hip/protocol').UiToolReadResultPayload,
+          | import('@hip/protocol').UiToolReadResultPayload
+          | import('@hip/protocol').UiToolWriteResultPayload,
       ) => void
     >
   }

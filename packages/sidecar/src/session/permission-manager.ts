@@ -4,6 +4,7 @@ import type {
   PermissionOption,
   UiToolReadResultPayload,
   UiToolResultPayload,
+  UiToolWriteResultPayload,
 } from '@hip/protocol'
 import type { ApprovalFn, ApprovalDecision } from './tools.js'
 import type { ApprovalCache } from './tool-runner/approval-cache.js'
@@ -34,7 +35,12 @@ export class PermissionManager {
    *  session:uiToolRead:result. */
   readonly pendingUiTools = new Map<
     string,
-    (result: UiToolResultPayload | UiToolReadResultPayload) => void
+    (
+      result:
+        | UiToolResultPayload
+        | UiToolReadResultPayload
+        | UiToolWriteResultPayload,
+    ) => void
   >()
 
   /** Session-level approval cache (shared with ToolRunner). Set via setApprovalCache. */
@@ -69,7 +75,10 @@ export class PermissionManager {
   }
 
   /** Resolve a pending UI-mediated tool (terminal bridge). No-op when unknown. */
-  respondUiTool(callId: string, result: UiToolResultPayload | UiToolReadResultPayload): void {
+  respondUiTool(
+    callId: string,
+    result: UiToolResultPayload | UiToolReadResultPayload | UiToolWriteResultPayload,
+  ): void {
     const resolve = this.pendingUiTools.get(callId)
     if (resolve) {
       this.pendingUiTools.delete(callId)

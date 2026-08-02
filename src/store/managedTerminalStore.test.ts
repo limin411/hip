@@ -214,4 +214,34 @@ describe('managedTerminalStore', () => {
       at: expect.any(Number),
     })
   })
+
+  it('restorePersisted brings back disconnected ssh records (P2)', () => {
+    useManagedTerminalStore.setState({ terminals: [], focusedId: null })
+    useManagedTerminalStore.getState().restorePersisted([
+      {
+        id: 'tm_p1',
+        hostId: 'hst_1',
+        title: 'prod-box',
+        remotePath: '/srv',
+        status: 'disconnected',
+        createdAt: 5,
+      },
+    ])
+    const term = useManagedTerminalStore.getState().getTerminal('tm_p1')
+    expect(term?.kind).toBe('ssh')
+    expect(term?.status).toBe('disconnected')
+    expect(term?.hostId).toBe('hst_1')
+    expect(term?.remotePath).toBe('/srv')
+    // Idempotent: the same id is not duplicated.
+    useManagedTerminalStore.getState().restorePersisted([
+      {
+        id: 'tm_p1',
+        hostId: 'hst_1',
+        title: 'prod-box',
+        status: 'disconnected',
+        createdAt: 5,
+      },
+    ])
+    expect(useManagedTerminalStore.getState().terminals).toHaveLength(1)
+  })
 })

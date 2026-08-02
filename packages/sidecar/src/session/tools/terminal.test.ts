@@ -1,12 +1,19 @@
 import { describe, it, expect, vi } from 'vitest'
-import type { ServerMessage, UiToolReadResultPayload, UiToolResultPayload } from '@hip/protocol'
+import type {
+  ServerMessage,
+  UiToolReadResultPayload,
+  UiToolResultPayload,
+  UiToolWriteResultPayload,
+} from '@hip/protocol'
 import { buildTerminalTools, TERMINAL_EXEC_DEFAULT_WAIT_MS } from './terminal.js'
 import type { ApprovalDecision } from './helpers.js'
 
 function makeBridge() {
   const pendingUiTool = new Map<
     string,
-    (result: UiToolResultPayload | UiToolReadResultPayload) => void
+    (
+      result: UiToolResultPayload | UiToolReadResultPayload | UiToolWriteResultPayload,
+    ) => void
   >()
   const sent: ServerMessage[] = []
   return {
@@ -98,7 +105,9 @@ describe('terminal tools', () => {
   it('timed_out results warn the model not to claim success', async () => {
     const pendingUiTool = new Map<
       string,
-      (result: UiToolResultPayload | UiToolReadResultPayload) => void
+      (
+        result: UiToolResultPayload | UiToolReadResultPayload | UiToolWriteResultPayload,
+      ) => void
     >()
     const sent: ServerMessage[] = []
     const bridge = {
@@ -153,5 +162,39 @@ describe('terminal tools', () => {
     }
     expect(req2.waitMs).toBeGreaterThanOrEqual(1000)
     expect(TERMINAL_EXEC_DEFAULT_WAIT_MS).toBe(15000)
+  })
+
+  it('sftp_write sends the write request after approval and reports success', async () => {
+    const pendingUiTool = new Map<
+      string,
+      (result: UiToolResultPayload | UiToolReadResultPayload | UiToolWriteResultPayload) => void
+    >()
+    const sent: ServerMessage[] = []
+    const bridge = {
+      send: (m: ServerMessage) => {
+        sent.push(m)
+        if (m.type === 'session:uiToolWrite:request') {
+          queueMicrotask(() => {
+            pendingUiTool.get(m.callId)?.({
+              type: 'session:uiToolWrite:result',
+              sessionId: m.sessionId,
+              callId: m.callId,
+              ok: true,
+            })
+          })
+        }
+      },
+      pendingUiTool,
+    }
+    const requestApproval = approval({ kind: 'allow_once' })
+    const [,,, write] = buildTerminalTools({ sessionId: 's1', requestApproval, bridge })
+    const out = await write.invoke({ path: '/etc/hosts', content: '127.0.0.1 localhost' })
+    const req = sent.find((m) => m.type === 'session:uiToolWrite:request')
+    expect(req).toMatchObject({
+      type: 'session:uiToolWrite:request',
+      path: '/etc/hosts',
+      force: false,
+    })
+    expect(out).toMatch(/Wrote \/etc\/hosts/)
   })
 })

@@ -255,6 +255,17 @@ export type ClientMessage =
       cursor?: number
       error?: string
     }
+  /**
+   * UI answer for the write bridge (sftp_write). Writes always flow through
+   * approval + overwrite confirmation in the UI.
+   */
+  | {
+      type: 'session:uiToolWrite:result'
+      sessionId: string
+      callId: string
+      ok: boolean
+      error?: string
+    }
   /** UI pushes ring tail / switch-context note into the sidecar context (D11). */
   | { type: 'session:terminalContext'; sessionId: string; note?: string; ringTail?: string }
 
@@ -263,6 +274,9 @@ export type UiToolResultPayload = Extract<ClientMessage, { type: 'session:uiTool
 
 /** UI answer for a read-only bridge request (see session:uiToolRead:result). */
 export type UiToolReadResultPayload = Extract<ClientMessage, { type: 'session:uiToolRead:result' }>
+
+/** UI answer for a write bridge request (see session:uiToolWrite:result). */
+export type UiToolWriteResultPayload = Extract<ClientMessage, { type: 'session:uiToolWrite:result' }>
 
 /** Context for LLM empty-state title/sub generation (UI chrome only). */
 export interface EmptyGreetingGenerateContext {
@@ -421,6 +435,18 @@ export type ServerMessage =
       cursor?: number
       path?: string
       maxBytes?: number
+    }
+  /**
+   * SFTP write request (P2). The UI confirms overwrite of an existing path,
+   * writes via the native SFTP channel, then answers session:uiToolWrite:result.
+   */
+  | {
+      type: 'session:uiToolWrite:request'
+      sessionId: string
+      callId: string
+      path: string
+      content: string
+      force: boolean
     }
   /** Multi-client: first accepted permission:respond wins; broadcast so other clients clear UI. */
   | { type: 'permission:resolved'; sessionId: string; requestId: string; source: 'gui' | 'cli' | 'unknown' }

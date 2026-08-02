@@ -1937,6 +1937,7 @@ export const en = {
         askUser: 'Ask the user',
         askUserPrompt:
           'Ask me whether the previous command finished before drawing conclusions.',
+        explainPrompt: 'Explain this terminal selection:',
         sessionsGroup: 'Agent chats for {{title}}',
         deleteTitle: 'Delete agent chat?',
         deleteBody:
@@ -2933,6 +2934,8 @@ export const en = {
         copySelection: 'Copy',
         copySelectionDisabled: 'No selection to copy',
         sendSelectionToChat: 'Send selection to chat',
+        explainInAgent: 'Explain in terminal agent',
+        explainInAgentDisabled: 'Only available for SSH managed terminals',
         paste: 'Paste',
       },
       managedTerminal: {

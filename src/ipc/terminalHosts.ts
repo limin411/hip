@@ -29,16 +29,27 @@ export type RecentLaunch =
   | { type: 'local'; cwd: string; label?: string; at: number }
   | { type: 'ssh'; hostId: string; label: string; at: number }
 
+/** Persisted managed-terminal record (P2; live status stays in memory). */
+export interface TerminalRecord {
+  id: string
+  hostId: string
+  title: string
+  remotePath?: string
+  status: 'disconnected'
+  createdAt: number
+}
+
 export interface TerminalHostsCatalog {
   version: number
   groups: HostGroup[]
   hosts: TerminalHost[]
   recents: RecentLaunch[]
+  terminalRecords: TerminalRecord[]
 }
 
 /** Fresh empty catalog (new arrays every call — safe to mutate). */
 export function emptyTerminalHostsCatalog(): TerminalHostsCatalog {
-  return { version: 1, groups: [], hosts: [], recents: [] }
+  return { version: 1, groups: [], hosts: [], recents: [], terminalRecords: [] }
 }
 
 /**
@@ -50,6 +61,7 @@ export const EMPTY_TERMINAL_HOSTS_CATALOG: TerminalHostsCatalog = Object.freeze(
   groups: Object.freeze([]) as unknown as HostGroup[],
   hosts: Object.freeze([]) as unknown as TerminalHost[],
   recents: Object.freeze([]) as unknown as RecentLaunch[],
+  terminalRecords: Object.freeze([]) as unknown as TerminalRecord[],
 })
 
 function isAuthMethod(v: unknown): v is HostAuthMethod {
@@ -76,6 +88,27 @@ function normalizeRecent(raw: unknown): RecentLaunch | null {
     return { type: 'ssh', hostId: r.hostId, label: r.label, at: r.at }
   }
   return null
+}
+
+function normalizeTerminalRecord(raw: unknown): TerminalRecord | null {
+  if (!raw || typeof raw !== 'object') return null
+  const r = raw as Record<string, unknown>
+  if (
+    typeof r.id !== 'string' ||
+    typeof r.hostId !== 'string' ||
+    typeof r.title !== 'string' ||
+    typeof r.createdAt !== 'number'
+  ) {
+    return null
+  }
+  return {
+    id: r.id,
+    hostId: r.hostId,
+    title: r.title,
+    remotePath: typeof r.remotePath === 'string' ? r.remotePath : undefined,
+    status: 'disconnected',
+    createdAt: r.createdAt,
+  }
 }
 
 function normalizeHost(raw: unknown): TerminalHost | null {
@@ -128,11 +161,17 @@ export function normalizeCatalog(raw: unknown): TerminalHostsCatalog {
   const recents = Array.isArray(c.recents)
     ? c.recents.map(normalizeRecent).filter((r): r is RecentLaunch => r != null)
     : []
+  const terminalRecords = Array.isArray(c.terminalRecords)
+    ? c.terminalRecords
+        .map(normalizeTerminalRecord)
+        .filter((r): r is TerminalRecord => r != null)
+    : []
   return {
     version: typeof c.version === 'number' && c.version > 0 ? c.version : 1,
     groups,
     hosts,
     recents,
+    terminalRecords,
   }
 }
 

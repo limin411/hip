@@ -189,6 +189,12 @@ const STATIC_CATALOG: ContextMenuItemMeta[] = [
     icon: 'code',
   },
   {
+    id: 'terminal.explainInAgent',
+    labelKey: 'contextMenu.terminal.explainInAgent',
+    kind: 'terminal',
+    group: 'agent',
+  },
+  {
     id: 'managedTerminal.rename',
     labelKey: 'contextMenu.managedTerminal.rename',
     kind: 'managedTerminal',

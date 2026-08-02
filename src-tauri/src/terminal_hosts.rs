@@ -58,6 +58,21 @@ pub enum RecentLaunch {
     },
 }
 
+/// Persisted managed-terminal record (P2: `tm_*` survives app restarts, D8/D12).
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct TerminalRecord {
+    pub id: String,
+    #[serde(rename = "hostId")]
+    pub host_id: String,
+    pub title: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub remote_path: Option<String>,
+    /// Persisted value is always `disconnected`; live states stay in memory.
+    pub status: String,
+    pub created_at: i64,
+}
+
 /// Full on-disk catalog document.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
@@ -69,6 +84,8 @@ pub struct TerminalHostsCatalog {
     pub hosts: Vec<TerminalHost>,
     #[serde(default)]
     pub recents: Vec<RecentLaunch>,
+    #[serde(default)]
+    pub terminal_records: Vec<TerminalRecord>,
 }
 
 impl Default for TerminalHostsCatalog {
@@ -78,6 +95,7 @@ impl Default for TerminalHostsCatalog {
             groups: Vec::new(),
             hosts: Vec::new(),
             recents: Vec::new(),
+            terminal_records: Vec::new(),
         }
     }
 }
@@ -98,6 +116,9 @@ pub fn sanitize_recents(catalog: &mut TerminalHostsCatalog) {
         RecentLaunch::Local { .. } => true,
         RecentLaunch::Ssh { host_id, .. } => host_ids.contains(host_id.as_str()),
     });
+    catalog
+        .terminal_records
+        .retain(|r| host_ids.contains(r.host_id.as_str()));
 }
 
 /// Persist catalog via shared atomic 0o600 helper (see `atomic_write`).

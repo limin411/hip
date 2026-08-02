@@ -1868,6 +1868,7 @@ export const zhTW = {
       "continueWatchingPrompt": "請繼續觀察終端輸出：用 terminal_read 輪詢並回報結果。",
       "askUser": "詢問使用者",
       "askUserPrompt": "請先詢問我上一條指令是否已完成，再下結論。",
+      "explainPrompt": "請解釋這段終端選區：",
       "sessionsGroup": "{{title}} 的智能體對話",
       "deleteTitle": "刪除智能體對話？",
       "deleteBody": "將刪除該對話。SSH 終端保持開啟。",
@@ -2821,6 +2822,8 @@ export const zhTW = {
       "copySelection": "複製",
       "copySelectionDisabled": "沒有可複製的選區",
       "sendSelectionToChat": "傳送選區到對話",
+      "explainInAgent": "在終端智能體中解釋",
+      "explainInAgentDisabled": "僅 SSH 託管終端可用",
       "paste": "貼上"
     },
     "managedTerminal": {

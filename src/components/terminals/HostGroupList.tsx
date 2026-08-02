@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Folder, Pencil, Plus, Server, Trash2, Plug } from 'lucide-react'
+import { Panel, PanelGroup, PanelResizeHandle } from 'react-resizable-panels'
 import type { HostGroup, TerminalHost } from '@/ipc/terminalHosts'
 import { useManagedTerminalStore } from '@/store/managedTerminalStore'
 import { sortGroupsByName } from '@/lib/hostGroupUi'
@@ -85,165 +86,174 @@ export function HostGroupList({
     selectedKey === UNGROUPED_KEY ? null : selectedKey
 
   return (
-    <div
-      className="flex h-full min-h-0 flex-1 overflow-hidden"
+    <PanelGroup
+      direction="horizontal"
+      className="min-h-0 flex-1"
       data-testid="host-group-list"
     >
-      <div className="flex min-h-0 min-w-0 flex-1 flex-col" data-testid="host-group-detail">
-        <div className="min-h-0 flex-1 overflow-y-auto p-3">
-          {selectedHosts.length === 0 ? (
-            <EmptyState
-              icon={Folder}
-              tier="professional"
-              title={t('terminals.groupEmpty')}
-              className="py-10"
-              data-testid="host-group-empty"
-              action={
-                onAddHost
-                  ? {
-                      label: t('terminals.addHost'),
-                      onClick: () => onAddHost(selectedGroupIdForAdd),
-                      'data-testid':
-                        selectedKey === UNGROUPED_KEY
-                          ? 'host-add-ungrouped-empty'
-                          : `host-add-${selectedKey}-empty`,
-                    }
-                  : undefined
-              }
-            />
-          ) : (
-            <ul className="flex flex-col gap-1" data-testid="host-list">
-              {selectedHosts.map((h) => (
-                <li key={h.id}>
-                  <HostRow
-                    host={h}
-                    onEdit={onEditHost}
-                    onDelete={onDeleteHost}
-                    onConnect={onConnectHost}
-                    connectBusy={connectBusy}
-                  />
-                </li>
-              ))}
-            </ul>
-          )}
+      <Panel defaultSize={76} minSize={30} className="min-h-0">
+        <div className="flex h-full min-h-0 flex-col" data-testid="host-group-detail">
+          <div className="min-h-0 flex-1 overflow-y-auto p-3">
+            {selectedHosts.length === 0 ? (
+              <EmptyState
+                icon={Folder}
+                tier="professional"
+                title={t('terminals.groupEmpty')}
+                className="py-10"
+                data-testid="host-group-empty"
+                action={
+                  onAddHost
+                    ? {
+                        label: t('terminals.addHost'),
+                        onClick: () => onAddHost(selectedGroupIdForAdd),
+                        'data-testid':
+                          selectedKey === UNGROUPED_KEY
+                            ? 'host-add-ungrouped-empty'
+                            : `host-add-${selectedKey}-empty`,
+                      }
+                    : undefined
+                }
+              />
+            ) : (
+              <ul className="flex flex-col gap-1" data-testid="host-list">
+                {selectedHosts.map((h) => (
+                  <li key={h.id}>
+                    <HostRow
+                      host={h}
+                      onEdit={onEditHost}
+                      onDelete={onDeleteHost}
+                      onConnect={onConnectHost}
+                      connectBusy={connectBusy}
+                    />
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
         </div>
-      </div>
+      </Panel>
 
-      <aside
-        className="flex w-52 shrink-0 flex-col p-2"
-        data-testid="host-group-nav"
-      >
+      <PanelResizeHandle className="group relative z-10 w-2 shrink-0 bg-transparent">
+        <div className="mx-auto h-full w-px bg-transparent transition-colors group-hover:bg-accent/50 group-data-[resize-handle-state=drag]:bg-accent" />
+      </PanelResizeHandle>
+
+      <Panel defaultSize={24} minSize={18} className="min-h-0">
         <div
-          className="flex min-h-0 flex-1 flex-col overflow-y-auto rounded-lg border border-border bg-surface-muted/30"
-          data-testid="host-group-nav-box"
+          className="box-border h-full min-h-0 overflow-hidden py-2 pr-2"
+          data-testid="host-group-nav"
         >
-          <nav
-            className="flex flex-col gap-0.5 p-1.5"
-            aria-label={t('terminals.groupsNavAria')}
+          <div
+            className="max-h-full overflow-y-auto rounded-lg border border-border bg-surface-muted/30"
+            data-testid="host-group-nav-box"
           >
-            {onCreateGroup ? (
-              <button
-                type="button"
-                data-testid="host-group-create"
-                onClick={onCreateGroup}
-                className={cn(
-                  'flex h-[var(--row-h-sidebar)] min-w-0 items-center gap-2 rounded-lg border border-dashed border-border px-2.5 text-left text-meta font-medium transition-colors',
-                  'text-ink-secondary hover:bg-state-hover hover:text-ink',
-                )}
-              >
-                <Plus size={15} strokeWidth={1.75} className="shrink-0 opacity-70" aria-hidden />
-                <span className="min-w-0 flex-1 truncate">{t('terminals.newGroup')}</span>
-              </button>
-            ) : null}
-
-            <div
-              data-testid="host-group-ungrouped"
-              className={cn(
-                'flex items-center rounded-lg',
-                selectedKey === UNGROUPED_KEY && 'bg-state-active',
-              )}
+            <nav
+              className="flex flex-col gap-0.5 p-1.5"
+              aria-label={t('terminals.groupsNavAria')}
             >
-              <button
-                type="button"
-                role="tab"
-                aria-selected={selectedKey === UNGROUPED_KEY}
-                data-testid="host-group-select-ungrouped"
-                onClick={() => setSelectedKey(UNGROUPED_KEY)}
-                className={cn(
-                  'flex h-[var(--row-h-sidebar)] min-w-0 flex-1 items-center gap-2 rounded-lg px-2.5 text-left text-meta font-medium transition-colors',
-                  'text-ink-secondary hover:bg-state-hover hover:text-ink',
-                  selectedKey === UNGROUPED_KEY && 'text-ink',
-                )}
-              >
-                <Server size={15} strokeWidth={1.75} className="shrink-0 opacity-70" aria-hidden />
-                <span className="min-w-0 flex-1 truncate">{t('terminals.ungrouped')}</span>
-                <span className="shrink-0 tabular-nums text-caption text-ink-tertiary">
-                  {ungrouped.length}
-                </span>
-              </button>
-            </div>
-
-            {sortedGroups.map((group) => {
-              const count = (hostsByGroup.get(group.id) ?? []).length
-              const selected = selectedKey === group.id
-              return (
-                <div
-                  key={group.id}
-                  data-testid={`host-group-${group.id}`}
+              {onCreateGroup ? (
+                <button
+                  type="button"
+                  data-testid="host-group-create"
+                  onClick={onCreateGroup}
                   className={cn(
-                    'group/nav flex items-center gap-0.5 rounded-lg pr-0.5',
-                    selected && 'bg-state-active',
+                    'flex h-[var(--row-h-sidebar)] min-w-0 items-center gap-2 rounded-lg border border-dashed border-border px-2.5 text-left text-meta font-medium transition-colors',
+                    'text-ink-secondary hover:bg-state-hover hover:text-ink',
                   )}
                 >
-                  <button
-                    type="button"
-                    role="tab"
-                    aria-selected={selected}
-                    data-testid={`host-group-select-${group.id}`}
-                    onClick={() => setSelectedKey(group.id)}
+                  <Plus size={15} strokeWidth={1.75} className="shrink-0 opacity-70" aria-hidden />
+                  <span className="min-w-0 flex-1 truncate">{t('terminals.newGroup')}</span>
+                </button>
+              ) : null}
+
+              <div
+                data-testid="host-group-ungrouped"
+                className={cn(
+                  'flex items-center rounded-lg',
+                  selectedKey === UNGROUPED_KEY && 'bg-state-active',
+                )}
+              >
+                <button
+                  type="button"
+                  role="tab"
+                  aria-selected={selectedKey === UNGROUPED_KEY}
+                  data-testid="host-group-select-ungrouped"
+                  onClick={() => setSelectedKey(UNGROUPED_KEY)}
+                  className={cn(
+                    'flex h-[var(--row-h-sidebar)] min-w-0 flex-1 items-center gap-2 rounded-lg px-2.5 text-left text-meta font-medium transition-colors',
+                    'text-ink-secondary hover:bg-state-hover hover:text-ink',
+                    selectedKey === UNGROUPED_KEY && 'text-ink',
+                  )}
+                >
+                  <Server size={15} strokeWidth={1.75} className="shrink-0 opacity-70" aria-hidden />
+                  <span className="min-w-0 flex-1 truncate">{t('terminals.ungrouped')}</span>
+                  <span className="shrink-0 tabular-nums text-caption text-ink-tertiary">
+                    {ungrouped.length}
+                  </span>
+                </button>
+              </div>
+
+              {sortedGroups.map((group) => {
+                const count = (hostsByGroup.get(group.id) ?? []).length
+                const selected = selectedKey === group.id
+                return (
+                  <div
+                    key={group.id}
+                    data-testid={`host-group-${group.id}`}
                     className={cn(
-                      'flex h-[var(--row-h-sidebar)] min-w-0 flex-1 items-center gap-2 rounded-lg px-2.5 text-left text-meta font-medium transition-colors',
-                      'text-ink-secondary hover:bg-state-hover hover:text-ink',
-                      selected && 'text-ink',
+                      'group/nav flex items-center gap-0.5 rounded-lg pr-0.5',
+                      selected && 'bg-state-active',
                     )}
                   >
-                    <Folder size={15} strokeWidth={1.75} className="shrink-0 opacity-70" aria-hidden />
-                    <span className="min-w-0 flex-1 truncate">{group.name}</span>
-                    <span className="shrink-0 tabular-nums text-caption text-ink-tertiary">
-                      {count}
-                    </span>
-                  </button>
-                  <div className="flex shrink-0 items-center opacity-60 transition-opacity group-hover/nav:opacity-100 group-focus-within/nav:opacity-100">
-                    <Button
+                    <button
                       type="button"
-                      variant="ghost"
-                      size="icon"
-                      className="h-7 w-7"
-                      data-testid={`host-group-rename-${group.id}`}
-                      title={t('terminals.renameGroup')}
-                      onClick={() => onRenameGroup(group)}
+                      role="tab"
+                      aria-selected={selected}
+                      data-testid={`host-group-select-${group.id}`}
+                      onClick={() => setSelectedKey(group.id)}
+                      className={cn(
+                        'flex h-[var(--row-h-sidebar)] min-w-0 flex-1 items-center gap-2 rounded-lg px-2.5 text-left text-meta font-medium transition-colors',
+                        'text-ink-secondary hover:bg-state-hover hover:text-ink',
+                        selected && 'text-ink',
+                      )}
                     >
-                      <Pencil size={13} aria-hidden />
-                    </Button>
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="icon"
-                      className="h-7 w-7"
-                      data-testid={`host-group-delete-${group.id}`}
-                      title={t('terminals.deleteGroup')}
-                      onClick={() => onDeleteGroup(group)}
-                    >
-                      <Trash2 size={13} aria-hidden />
-                    </Button>
+                      <Folder size={15} strokeWidth={1.75} className="shrink-0 opacity-70" aria-hidden />
+                      <span className="min-w-0 flex-1 truncate">{group.name}</span>
+                      <span className="shrink-0 tabular-nums text-caption text-ink-tertiary">
+                        {count}
+                      </span>
+                    </button>
+                    <div className="flex shrink-0 items-center opacity-60 transition-opacity group-hover/nav:opacity-100 group-focus-within/nav:opacity-100">
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        className="h-7 w-7"
+                        data-testid={`host-group-rename-${group.id}`}
+                        title={t('terminals.renameGroup')}
+                        onClick={() => onRenameGroup(group)}
+                      >
+                        <Pencil size={13} aria-hidden />
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        className="h-7 w-7"
+                        data-testid={`host-group-delete-${group.id}`}
+                        title={t('terminals.deleteGroup')}
+                        onClick={() => onDeleteGroup(group)}
+                      >
+                        <Trash2 size={13} aria-hidden />
+                      </Button>
+                    </div>
                   </div>
-                </div>
-              )
-            })}
-          </nav>
+                )
+              })}
+            </nav>
+          </div>
         </div>
-      </aside>
-    </div>
+      </Panel>
+    </PanelGroup>
   )
 }
 

@@ -2,8 +2,17 @@
 import '@testing-library/jest-dom/vitest'
 import { describe, it, expect, vi, afterEach } from 'vitest'
 import { render, screen, fireEvent, within, cleanup } from '@testing-library/react'
+import React from 'react'
 import type { HostGroup, TerminalHost } from '@/ipc/terminalHosts'
 import { HostGroupList } from './HostGroupList'
+
+vi.mock('react-resizable-panels', () => ({
+  Panel: ({ children }: { children: React.ReactNode }) =>
+    React.createElement('div', { 'data-testid': 'resizable-panel' }, children),
+  PanelGroup: ({ children }: { children: React.ReactNode }) =>
+    React.createElement('div', { 'data-testid': 'panel-group' }, children),
+  PanelResizeHandle: () => React.createElement('div', { 'data-testid': 'resize-handle' }),
+}))
 
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({

@@ -93,8 +93,73 @@ export function HostGroupList({
       className="flex h-full min-h-0 flex-1 overflow-hidden"
       data-testid="host-group-list"
     >
+      <div className="flex min-h-0 min-w-0 flex-1 flex-col" data-testid="host-group-detail">
+        <div className="flex shrink-0 items-center gap-2 border-b border-border px-4 py-2.5">
+          <h3 className="min-w-0 flex-1 truncate text-body font-medium text-ink">
+            {selectedGroup ? selectedGroup.name : t('terminals.ungrouped')}
+          </h3>
+          <span className="shrink-0 text-caption text-ink-tertiary">
+            {t('terminals.hostsCount', { count: selectedHosts.length })}
+          </span>
+          {onAddHost ? (
+            <Button
+              type="button"
+              variant="secondary"
+              size="sm"
+              data-testid={
+                selectedKey === UNGROUPED_KEY
+                  ? 'host-add-ungrouped'
+                  : `host-add-${selectedKey}`
+              }
+              onClick={() => onAddHost(selectedGroupIdForAdd)}
+            >
+              <Plus size={14} aria-hidden />
+              {t('terminals.addHost')}
+            </Button>
+          ) : null}
+        </div>
+
+        <div className="min-h-0 flex-1 overflow-y-auto p-3">
+          {selectedHosts.length === 0 ? (
+            <EmptyState
+              icon={Folder}
+              tier="professional"
+              title={t('terminals.groupEmpty')}
+              className="py-10"
+              data-testid="host-group-empty"
+              action={
+                onAddHost
+                  ? {
+                      label: t('terminals.addHost'),
+                      onClick: () => onAddHost(selectedGroupIdForAdd),
+                      'data-testid':
+                        selectedKey === UNGROUPED_KEY
+                          ? 'host-add-ungrouped-empty'
+                          : `host-add-${selectedKey}-empty`,
+                    }
+                  : undefined
+              }
+            />
+          ) : (
+            <ul className="flex flex-col gap-1" data-testid="host-list">
+              {selectedHosts.map((h) => (
+                <li key={h.id}>
+                  <HostRow
+                    host={h}
+                    onEdit={onEditHost}
+                    onDelete={onDeleteHost}
+                    onConnect={onConnectHost}
+                    connectBusy={connectBusy}
+                  />
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      </div>
+
       <aside
-        className="flex w-52 shrink-0 flex-col border-r border-border bg-surface-subtle"
+        className="flex w-52 shrink-0 flex-col border-l border-border bg-surface-subtle/40"
         data-testid="host-group-nav"
       >
         <nav
@@ -189,71 +254,6 @@ export function HostGroupList({
           ) : null}
         </nav>
       </aside>
-
-      <div className="flex min-h-0 min-w-0 flex-1 flex-col" data-testid="host-group-detail">
-        <div className="flex shrink-0 items-center gap-2 border-b border-border px-4 py-2.5">
-          <h3 className="min-w-0 flex-1 truncate text-body font-medium text-ink">
-            {selectedGroup ? selectedGroup.name : t('terminals.ungrouped')}
-          </h3>
-          <span className="shrink-0 text-caption text-ink-tertiary">
-            {t('terminals.hostsCount', { count: selectedHosts.length })}
-          </span>
-          {onAddHost ? (
-            <Button
-              type="button"
-              variant="secondary"
-              size="sm"
-              data-testid={
-                selectedKey === UNGROUPED_KEY
-                  ? 'host-add-ungrouped'
-                  : `host-add-${selectedKey}`
-              }
-              onClick={() => onAddHost(selectedGroupIdForAdd)}
-            >
-              <Plus size={14} aria-hidden />
-              {t('terminals.addHost')}
-            </Button>
-          ) : null}
-        </div>
-
-        <div className="min-h-0 flex-1 overflow-y-auto p-3">
-          {selectedHosts.length === 0 ? (
-            <EmptyState
-              icon={Folder}
-              tier="professional"
-              title={t('terminals.groupEmpty')}
-              className="py-10"
-              data-testid="host-group-empty"
-              action={
-                onAddHost
-                  ? {
-                      label: t('terminals.addHost'),
-                      onClick: () => onAddHost(selectedGroupIdForAdd),
-                      'data-testid':
-                        selectedKey === UNGROUPED_KEY
-                          ? 'host-add-ungrouped-empty'
-                          : `host-add-${selectedKey}-empty`,
-                    }
-                  : undefined
-              }
-            />
-          ) : (
-            <ul className="flex flex-col gap-1" data-testid="host-list">
-              {selectedHosts.map((h) => (
-                <li key={h.id}>
-                  <HostRow
-                    host={h}
-                    onEdit={onEditHost}
-                    onDelete={onDeleteHost}
-                    onConnect={onConnectHost}
-                    connectBusy={connectBusy}
-                  />
-                </li>
-              ))}
-            </ul>
-          )}
-        </div>
-      </div>
     </div>
   )
 }

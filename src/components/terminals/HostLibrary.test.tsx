@@ -52,7 +52,6 @@ vi.mock('@/store/managedTerminalStore', () => {
 })
 
 vi.mock('@/ipc/dialog', () => ({
-  pickDirectory: vi.fn().mockResolvedValue(null),
   pickPrivateKeyFile: vi.fn().mockResolvedValue(null),
 }))
 
@@ -150,18 +149,19 @@ describe('HostLibrary', () => {
     )
   })
 
-  it('opens create form from toolbar', async () => {
+  it('opens create form from empty state', async () => {
     render(<HostLibrary />)
-    fireEvent.click(screen.getByTestId('host-library-new-remote'))
+    fireEvent.click(screen.getByTestId('host-library-empty-new-remote'))
     await waitFor(() => {
       expect(screen.getByTestId('host-form-dialog')).toBeInTheDocument()
     })
   })
 
   it('rejects duplicate group names (case-insensitive)', async () => {
+    const { useHostLibraryUi } = await import('./hostLibraryUi')
+    useHostLibraryUi.setState({ pendingCreateGroup: true })
     groups = [{ id: 'g1', name: 'Prod', sort: 0 }]
     render(<HostLibrary />)
-    fireEvent.click(screen.getByTestId('host-library-new-group'))
     await waitFor(() => {
       expect(screen.getByTestId('host-group-dialog')).toBeInTheDocument()
     })

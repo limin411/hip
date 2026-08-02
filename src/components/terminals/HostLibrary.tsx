@@ -1,9 +1,8 @@
 import { useCallback, useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { FolderOpen, FolderPlus, Loader2, Plus, Server, Terminal } from 'lucide-react'
+import { Loader2, Plus, Server, Terminal } from 'lucide-react'
 import { nanoid } from 'nanoid'
 import type { HostGroup, TerminalHost } from '@/ipc/terminalHosts'
-import { pickDirectory } from '@/ipc/dialog'
 import { useManagedTerminalStore } from '@/store/managedTerminalStore'
 import { useTerminalHostStore } from '@/store/terminalHostStore'
 import { mintGroupId } from '@/lib/hostFormDraft'
@@ -96,16 +95,6 @@ export function HostLibrary() {
     }
   }, [])
 
-  const openLocalPick = useCallback(async () => {
-    const dir = await pickDirectory()
-    if (!dir) return
-    try {
-      await useManagedTerminalStore.getState().openLocal({ cwd: dir })
-    } catch (e) {
-      console.error('[hip] open local terminal failed:', e)
-    }
-  }, [])
-
   const connectHost = useCallback(async (host: TerminalHost) => {
     setConnectBusy(true)
     setConnectError(null)
@@ -149,12 +138,6 @@ export function HostLibrary() {
       setDeleteBusy(false)
     }
   }, [deletingHost, removeHost, t])
-
-  const openCreateGroup = useCallback(() => {
-    setGroupName('')
-    setGroupError(null)
-    setGroupDialog({ mode: 'create' })
-  }, [])
 
   const openRenameGroup = useCallback((group: HostGroup) => {
     setGroupName(group.name)
@@ -230,51 +213,6 @@ export function HostLibrary() {
       className="flex h-full min-h-0 flex-1 flex-col overflow-hidden"
       data-testid="host-library"
     >
-      <header className="flex shrink-0 flex-wrap items-center justify-end gap-2 border-b border-border px-4 py-2.5">
-        <div className="flex flex-wrap items-center gap-1.5">
-          <Button
-            type="button"
-            variant="ghost"
-            size="sm"
-            data-testid="host-library-new-group"
-            onClick={openCreateGroup}
-          >
-            <FolderPlus size={14} aria-hidden />
-            {t('terminals.newGroup')}
-          </Button>
-          <Button
-            type="button"
-            variant="secondary"
-            size="sm"
-            data-testid="host-library-new-local"
-            onClick={() => void openLocalHome()}
-          >
-            <Terminal size={14} aria-hidden />
-            {t('terminals.newLocal')}
-          </Button>
-          <Button
-            type="button"
-            variant="secondary"
-            size="sm"
-            data-testid="host-library-new-local-folder"
-            onClick={() => void openLocalPick()}
-          >
-            <FolderOpen size={14} aria-hidden />
-            {t('terminals.newLocalFolder')}
-          </Button>
-          <Button
-            type="button"
-            variant="primary"
-            size="sm"
-            data-testid="host-library-new-remote"
-            onClick={() => openCreate()}
-          >
-            <Plus size={14} aria-hidden />
-            {t('terminals.newRemote')}
-          </Button>
-        </div>
-      </header>
-
       <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
         {error ? (
           <p className="mx-4 mt-3 shrink-0 rounded-md border border-danger-soft bg-danger-soft px-3 py-2 text-meta text-danger">

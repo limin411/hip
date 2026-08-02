@@ -140,10 +140,11 @@ Related permissions often needed for window chrome tests: `allow-start-dragging`
 Source of truth: `src/lib/rightPanelWidth.ts` + open sync in `src/routes/AppLayout.tsx`.
 
 - **Main content width** = `[data-main-content-group]` `clientWidth`, else `innerWidth − sidebar`.
-- Target constants: `RIGHT_PANEL_MAIN_TARGET` / `RIGHT_PANEL_SCREEN_MIN` (currently **1600**).
+- Target constant: `RIGHT_PANEL_MAIN_TARGET` (**1200**). No `SCREEN_MIN` gate.
 - On `rightOpen → true`: **await widen**, then `panel.expand()`.
-- If `screen.availWidth < SCREEN_MIN`, skip widen (original open only).
-- Clamp target to `availWidth`; never shrink the window.
+- Clamp target to `availWidth`; if already at/above avail or main content ≥ target, skip widen (open still proceeds).
+- Never shrink the window. OS floor: `WINDOW_MIN_WIDTH/HEIGHT` (880×560) in conf + `windowMinSize.ts`.
+- Right rail layout floor: `RIGHT_RAIL_MIN_PX = 350` in `AppLayout`.
 
 **Wire widen in AppLayout (or every open path), not only PanelToggle** — auto-open / store setters bypass the toolbar dropdown.
 

@@ -2,7 +2,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import {
   RIGHT_PANEL_MAIN_TARGET,
-  RIGHT_PANEL_SCREEN_MIN,
   mainContentWidth,
   widenWindowForRightPanel,
 } from './rightPanelWidth'
@@ -74,28 +73,38 @@ describe('widenWindowForRightPanel', () => {
     expect(setSize).not.toHaveBeenCalled()
   })
 
-  it('falls back when the screen resolution is insufficient', async () => {
-    Object.defineProperty(window, 'innerWidth', { value: 1200, configurable: true, writable: true })
+  it('clamps to availWidth when the screen is between inner and desired', async () => {
+    Object.defineProperty(window, 'innerWidth', { value: 1000, configurable: true, writable: true })
     Object.defineProperty(window.screen, 'availWidth', { value: 1366, configurable: true, writable: true })
-    expect(RIGHT_PANEL_SCREEN_MIN).toBe(RIGHT_PANEL_MAIN_TARGET)
-    const widened = await widenWindowForRightPanel(false, 300)
-    expect(widened).toBe(false)
-    expect(setSize).not.toHaveBeenCalled()
+    const widened = await widenWindowForRightPanel(true, 300)
+    expect(widened).toBe(true)
+    expect(setSize).toHaveBeenCalledWith(
+      expect.objectContaining({ type: 'Logical', width: 1366, height: 900 }),
+    )
   })
 
   it('clamps the window width to the screen so it never goes off-screen', async () => {
     Object.defineProperty(window, 'innerWidth', { value: 1000, configurable: true, writable: true })
-    Object.defineProperty(window.screen, 'availWidth', { value: 1800, configurable: true, writable: true })
+    Object.defineProperty(window.screen, 'availWidth', { value: 1400, configurable: true, writable: true })
     const widened = await widenWindowForRightPanel(true, 300)
     expect(widened).toBe(true)
+    // desired = 1200 + 300 = 1500, avail = 1400 → 1400
     expect(setSize).toHaveBeenCalledWith(
-      expect.objectContaining({ type: 'Logical', width: 1800, height: 900 }),
+      expect.objectContaining({ type: 'Logical', width: 1400, height: 900 }),
     )
+  })
+
+  it('is a no-op when avail cannot grow past the current window', async () => {
+    Object.defineProperty(window, 'innerWidth', { value: 1400, configurable: true, writable: true })
+    Object.defineProperty(window.screen, 'availWidth', { value: 1366, configurable: true, writable: true })
+    const widened = await widenWindowForRightPanel(true, 300)
+    expect(widened).toBe(false)
+    expect(setSize).not.toHaveBeenCalled()
   })
 
   it('falls back when the resize fails', async () => {
     setSize.mockRejectedValueOnce(new Error('no tauri'))
-    Object.defineProperty(window, 'innerWidth', { value: 1200, configurable: true, writable: true })
+    Object.defineProperty(window, 'innerWidth', { value: 1000, configurable: true, writable: true })
     const widened = await widenWindowForRightPanel(false, 300)
     expect(widened).toBe(false)
   })

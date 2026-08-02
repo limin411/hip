@@ -15,7 +15,7 @@
 | P2 | 各 surface 左槽策略不一致 | Code 空；Chat Files 有动作；KB/TM 静态标题 | 用户无法形成「左=上下文、右=页切换/折叠」心智 |
 | P3 | 子 chrome 重复占高 | Terminal cwd 行、HTML path 条、Changes 内 toolbar、draft FileTree header 各占 ~32px | titlebar 空着，下面又多一行夹层 |
 | P4 | Chat 非 Files tab 左槽仍空 | Outline / Sources 无左槽内容 | 与 Files 体验割裂 |
-| P5 | 窄栏（≥280px）放不下长路径/多按钮 | 无统一截断与溢出规则 | 若直接塞内容会挤爆右缘控件 |
+| P5 | 窄栏（≥350px min）放不下长路径/多按钮 | 无统一截断与溢出规则 | 若直接塞内容会挤爆右缘控件 |
 
 **已有正解（应对齐，不推倒）**：
 
@@ -33,7 +33,7 @@
 2. **按 tab 填上下文**：左槽展示「当前页在看什么 + 最高频 1–2 个动作」，而不是再贴一层静态「面板名」（tab 名已在右缘 trigger 上）。  
 3. **消夹层**：能上提到 titlebar 的路径/cwd/统计，优先上提并删掉（或收薄）子 chrome 行。  
 4. **保留拖拽**：交互控件 `data-tauri-drag-region="false"`；剩余空白仍可拖窗口。  
-5. **窄栏优先**：280px 可用；溢出截断 / 进 ⋯，titlebar **永不换行**。
+5. **窄栏优先**：350px min 可用；溢出截断 / 进 ⋯，titlebar **永不换行**。
 
 ### 2.2 非目标
 
@@ -193,12 +193,12 @@ Context Slot 根:   data-tauri-drag-region="false"（内含按钮）
 
 与 `PreviewPanel` 现实现一致。
 
-### 5.2 窄栏（280–420px）
+### 5.2 窄栏（350–420px）
 
 | 宽度 | 行为 |
 |------|------|
 | ≥ 420 | identity 最大约 `max-w` 到剩余空间；统计全显 |
-| 280–419 | 隐藏次要统计；identity `max-w-[8rem]`～`10rem` truncate；第二 action 进 ⋯（若有） |
+| 350–419 | 隐藏次要统计；identity `max-w-[8rem]`～`10rem` truncate；第二 action 进 ⋯（若有） |
 | 任何 | Tab▾ + Collapse **永不**被挤没（`shrink-0`） |
 
 测量：复用 Changes 的 `rootRef` + ResizeObserver 模式，或 titlebar 级一次观测下发 `narrow`。
@@ -323,7 +323,7 @@ src/components/artifact/
 2. Chat Outline/Sources：同 1。  
 3. Chat Files：copy/download/switcher 行为与现网一致。  
 4. Terminal tab：无第二行 cwd chrome；重启/关闭仍可用。  
-5. 280px 宽：Tab▾ + 折叠可见可点；无横向滚动条出现在 titlebar。  
+5. 350px 宽：Tab▾ + 折叠可见可点；无横向滚动条出现在 titlebar。  
 6. macOS：titlebar 高度与 traffic light 对齐不变；拖窗口仍可用。  
 7. 单测覆盖 Slot 矩阵；相关旧测已更新。
 

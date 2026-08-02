@@ -17,6 +17,8 @@
         "title": "hip",
         "width": 1600,
         "height": 1100,
+        "minWidth": 880,
+        "minHeight": 560,
         "maximized": false,
         "acceptFirstMouse": true,
         "titleBarStyle": "Overlay",

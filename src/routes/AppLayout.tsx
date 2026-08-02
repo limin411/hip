@@ -48,10 +48,11 @@ import { seedNavHistoryIfEmpty } from '@/components/layout/navHistory'
 import { WindowLifecycleHost } from '@/components/window/WindowLifecycleHost'
 import { widenWindowForRightPanel } from '@/lib/rightPanelWidth'
 
-/** Right rail must stay wide enough that the titlebar chrome + content breathe (~280px).
+/** Right rail must stay wide enough that the titlebar chrome + content breathe (~350px).
  *  react-resizable-panels minSize is group-relative %, so convert the pixel floor against the
- *  measured group width (clamped so tiny windows still leave room for the main pane). */
-const RIGHT_RAIL_MIN_PX = 280
+ *  measured group width (clamped so tiny windows still leave room for the main pane).
+ *  See docs/design/window-min-size-spec.md. */
+const RIGHT_RAIL_MIN_PX = 350
 
 function useRailMinPct(groupRef: RefObject<HTMLDivElement | null>): number {
   const [minPct, setMinPct] = useState(18)

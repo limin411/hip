@@ -1,13 +1,12 @@
 /**
  * Right-rail open sizing: before expanding the right panel, widen the app window
  * so the main content area (window width minus the left sidebar) reaches a
- * minimum width — unless the display is too small to host it.
+ * comfort target when the display allows. Never shrinks; never blocks open.
+ * See docs/design/window-min-size-spec.md.
  */
 
-/** Minimum main-content width (px) required before opening the right rail. */
-export const RIGHT_PANEL_MAIN_TARGET = 1600
-/** Screens narrower than this cannot host the target; fall back to original behavior. */
-export const RIGHT_PANEL_SCREEN_MIN = 1600
+/** Comfort main-content width (px) sought before opening the right rail. */
+export const RIGHT_PANEL_MAIN_TARGET = 1200
 
 function isTauriRuntime(): boolean {
   return typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window
@@ -24,8 +23,8 @@ export function mainContentWidth(sidebarOpen: boolean, sidebarWidth: number): nu
 /**
  * Widen the window so the main content area reaches RIGHT_PANEL_MAIN_TARGET
  * before the right panel opens. Returns true when a resize was issued; false
- * (caller falls back to the original open flow) when already wide enough, the
- * screen resolution is insufficient, or the resize failed.
+ * when already wide enough, the screen cannot grow further, or the resize failed.
+ * Caller always continues with expand — widen is best-effort only.
  */
 export async function widenWindowForRightPanel(sidebarOpen: boolean, sidebarWidth: number): Promise<boolean> {
   if (typeof window === 'undefined') return false
@@ -35,8 +34,6 @@ export async function widenWindowForRightPanel(sidebarOpen: boolean, sidebarWidt
   if (current >= RIGHT_PANEL_MAIN_TARGET) return false
 
   const avail = window.screen?.availWidth ?? 0
-  if (avail < RIGHT_PANEL_SCREEN_MIN) return false
-
   // Target window inner width so that (window − sidebar) ≈ MAIN_TARGET.
   // Clamp to the screen so we never push the frame off-display.
   const sidebarPx = sidebarOpen ? sidebarWidth : 0

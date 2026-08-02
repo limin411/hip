@@ -1897,6 +1897,7 @@ export const en = {
       noCwd: 'No working directory',
       kindLocal: 'Local',
       kindSsh: 'SSH',
+      connected: 'Connected',
       statusExited: 'Exited',
       statusError: 'Error',
       softCap:

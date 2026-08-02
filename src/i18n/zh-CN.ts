@@ -1854,6 +1854,7 @@ export const zhCN = {
       noCwd: '无工作目录',
       kindLocal: '本地',
       kindSsh: 'SSH',
+      connected: '已连接',
       statusExited: '已退出',
       statusError: '错误',
       softCap: '打开的终端过多（最多 8 个，含代码面板终端）。请先关闭一个。',

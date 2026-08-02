@@ -1832,6 +1832,7 @@ export const zhTW = {
     "noCwd": "無工作目錄",
     "kindLocal": "本機",
     "kindSsh": "SSH",
+    "connected": "已連接",
     "statusExited": "已退出",
     "statusError": "錯誤",
     "softCap": "開啟的終端過多（最多 8 個，含程式碼面板終端）。請先關閉一個。",

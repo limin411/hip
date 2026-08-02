@@ -1830,6 +1830,7 @@ export const ko = {
     "noCwd": "작업 디렉터리 없음",
     "kindLocal": "로컬",
     "kindSsh": "SSH",
+    "connected": "연결됨",
     "statusExited": "종료됨",
     "statusError": "오류",
     "softCap": "너무 많은 터미널이 열려 있습니다(최대 8개, 코드 패널 터미널 포함). 먼저 하나를 닫으세요.",

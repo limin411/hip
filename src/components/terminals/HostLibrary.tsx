@@ -220,9 +220,9 @@ export function HostLibrary() {
       className="flex h-full min-h-0 flex-1 flex-col overflow-hidden"
       data-testid="host-library"
     >
-      <header className="flex shrink-0 flex-wrap items-center gap-2 border-b border-border px-5 py-3">
+      <header className="flex shrink-0 flex-wrap items-center gap-2 border-b border-border px-4 py-2.5">
         <div className="min-w-0 flex-1">
-          <h1 className="text-title font-semibold tracking-tight text-ink">
+          <h1 className="text-body font-semibold tracking-tight text-ink">
             {t('terminals.libraryTitle')}
           </h1>
           <p className="text-meta text-ink-tertiary">{t('terminals.librarySubtitle')}</p>
@@ -273,13 +273,13 @@ export function HostLibrary() {
 
       <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
         {error ? (
-          <p className="mx-5 mt-3 shrink-0 rounded-md border border-danger/30 bg-danger/5 px-3 py-2 text-meta text-danger">
+          <p className="mx-4 mt-3 shrink-0 rounded-md border border-danger-soft bg-danger-soft px-3 py-2 text-meta text-danger">
             {error}
           </p>
         ) : null}
         {connectError ? (
           <p
-            className="mx-5 mt-3 shrink-0 rounded-md border border-danger/30 bg-danger/5 px-3 py-2 text-meta text-danger"
+            className="mx-4 mt-3 shrink-0 rounded-md border border-danger-soft bg-danger-soft px-3 py-2 text-meta text-danger"
             role="alert"
             data-testid="host-library-connect-error"
           >

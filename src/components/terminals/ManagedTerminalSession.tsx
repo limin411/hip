@@ -101,7 +101,7 @@ export function ManagedTerminalSession({ terminalId }: { terminalId: string }) {
       <DeclarativeContextMenu
         kind="managedTerminal"
         payload={{ terminalId, kind, title: term.title }}
-        className="flex h-8 shrink-0 items-center justify-between gap-2 border-b border-border/80 px-2"
+        className="flex h-8 shrink-0 items-center justify-between gap-2 border-b border-border bg-surface-subtle px-2"
         data-testid="managed-terminal-chrome"
       >
         <div
@@ -109,18 +109,33 @@ export function ManagedTerminalSession({ terminalId }: { terminalId: string }) {
           data-tauri-drag-region="false"
         >
           <span
-            className="min-w-0 flex-1 truncate font-mono text-meta text-ink-tertiary"
+            className="flex min-w-0 flex-1 items-center gap-2"
             title={`${term.title} — ${subtitle ?? ''}`}
-            data-testid="managed-terminal-title"
             data-cwd={cwd}
           >
-            <span className="font-sans font-medium text-ink">{term.title}</span>
+            <span
+              className="shrink-0 rounded-sm border border-border bg-surface-muted px-1.5 py-0.5 text-caption font-medium text-ink-secondary"
+              data-testid="managed-terminal-kind"
+            >
+              {kind === 'ssh' ? t('terminals.kindSsh') : t('terminals.kindLocal')}
+            </span>
+            <span
+              className="min-w-0 truncate text-body font-medium text-ink"
+              data-testid="managed-terminal-title"
+            >
+              {term.title}
+            </span>
             {subtitle ? (
               <>
-                <span className="mx-1.5 text-ink-tertiary/60" aria-hidden>
+                <span className="mx-1 text-ink-tertiary" aria-hidden>
                   ·
                 </span>
-                <span data-testid="managed-terminal-cwd">{subtitle}</span>
+                <span
+                  className="min-w-0 truncate font-mono text-meta text-ink-tertiary"
+                  data-testid="managed-terminal-cwd"
+                >
+                  {subtitle}
+                </span>
               </>
             ) : null}
           </span>

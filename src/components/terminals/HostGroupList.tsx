@@ -2,7 +2,9 @@ import { useEffect, useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Folder, Pencil, Plus, Server, Trash2, Plug } from 'lucide-react'
 import type { HostGroup, TerminalHost } from '@/ipc/terminalHosts'
+import { useManagedTerminalStore } from '@/store/managedTerminalStore'
 import { sortGroupsByName } from '@/lib/hostGroupUi'
+import { EmptyState } from '@/components/ui/EmptyState'
 import { Button } from '@/components/ui/Button'
 import { cn } from '@/lib/utils'
 
@@ -92,7 +94,7 @@ export function HostGroupList({
       data-testid="host-group-list"
     >
       <aside
-        className="flex w-52 shrink-0 flex-col border-r border-border bg-surface-subtle/40"
+        className="flex w-52 shrink-0 flex-col border-r border-border bg-surface-subtle"
         data-testid="host-group-nav"
       >
         <nav
@@ -108,7 +110,7 @@ export function HostGroupList({
                 data-testid={`host-group-${group.id}`}
                 className={cn(
                   'group/nav flex items-center gap-0.5 rounded-lg pr-0.5',
-                  selected && 'bg-state-hover',
+                  selected && 'bg-state-active',
                 )}
               >
                 <button
@@ -118,10 +120,9 @@ export function HostGroupList({
                   data-testid={`host-group-select-${group.id}`}
                   onClick={() => setSelectedKey(group.id)}
                   className={cn(
-                    'relative flex h-9 min-w-0 flex-1 items-center gap-2 rounded-lg px-2.5 text-left text-meta font-medium transition-colors',
+                    'flex h-[var(--row-h-sidebar)] min-w-0 flex-1 items-center gap-2 rounded-lg px-2.5 text-left text-meta font-medium transition-colors',
                     'text-ink-secondary hover:bg-state-hover hover:text-ink',
-                    'before:absolute before:inset-y-1.5 before:left-0 before:w-[2px] before:rounded-full before:bg-accent before:opacity-0',
-                    selected && 'text-ink before:opacity-100',
+                    selected && 'text-ink',
                   )}
                 >
                   <Folder size={15} strokeWidth={1.75} className="shrink-0 opacity-70" aria-hidden />
@@ -162,8 +163,8 @@ export function HostGroupList({
             <div
               data-testid="host-group-ungrouped"
               className={cn(
-                'relative flex items-center rounded-lg',
-                selectedKey === UNGROUPED_KEY && 'bg-state-hover',
+                'flex items-center rounded-lg',
+                selectedKey === UNGROUPED_KEY && 'bg-state-active',
               )}
             >
               <button
@@ -173,10 +174,9 @@ export function HostGroupList({
                 data-testid="host-group-select-ungrouped"
                 onClick={() => setSelectedKey(UNGROUPED_KEY)}
                 className={cn(
-                  'relative flex h-9 min-w-0 flex-1 items-center gap-2 rounded-lg px-2.5 text-left text-meta font-medium transition-colors',
+                  'flex h-[var(--row-h-sidebar)] min-w-0 flex-1 items-center gap-2 rounded-lg px-2.5 text-left text-meta font-medium transition-colors',
                   'text-ink-secondary hover:bg-state-hover hover:text-ink',
-                  'before:absolute before:inset-y-1.5 before:left-0 before:w-[2px] before:rounded-full before:bg-accent before:opacity-0',
-                  selectedKey === UNGROUPED_KEY && 'text-ink before:opacity-100',
+                  selectedKey === UNGROUPED_KEY && 'text-ink',
                 )}
               >
                 <Server size={15} strokeWidth={1.75} className="shrink-0 opacity-70" aria-hidden />
@@ -218,28 +218,25 @@ export function HostGroupList({
 
         <div className="min-h-0 flex-1 overflow-y-auto p-3">
           {selectedHosts.length === 0 ? (
-            <div
-              className="flex flex-col items-center justify-center gap-3 py-12 text-center"
+            <EmptyState
+              icon={Folder}
+              tier="professional"
+              title={t('terminals.groupEmpty')}
+              className="py-10"
               data-testid="host-group-empty"
-            >
-              <p className="text-meta text-ink-tertiary">{t('terminals.groupEmpty')}</p>
-              {onAddHost ? (
-                <Button
-                  type="button"
-                  variant="secondary"
-                  size="sm"
-                  data-testid={
-                    selectedKey === UNGROUPED_KEY
-                      ? 'host-add-ungrouped-empty'
-                      : `host-add-${selectedKey}-empty`
-                  }
-                  onClick={() => onAddHost(selectedGroupIdForAdd)}
-                >
-                  <Plus size={14} aria-hidden />
-                  {t('terminals.addHost')}
-                </Button>
-              ) : null}
-            </div>
+              action={
+                onAddHost
+                  ? {
+                      label: t('terminals.addHost'),
+                      onClick: () => onAddHost(selectedGroupIdForAdd),
+                      'data-testid':
+                        selectedKey === UNGROUPED_KEY
+                          ? 'host-add-ungrouped-empty'
+                          : `host-add-${selectedKey}-empty`,
+                    }
+                  : undefined
+              }
+            />
           ) : (
             <ul className="flex flex-col gap-1" data-testid="host-list">
               {selectedHosts.map((h) => (
@@ -277,6 +274,9 @@ function HostRow({
   const { t } = useTranslation()
   const subtitle = `${host.username}@${host.hostname}:${host.port}`
   const canConnect = Boolean(onConnect) && !connectBusy
+  const activeSessions = useManagedTerminalStore((s) =>
+    s.terminals.some((mt) => mt.hostId === host.id),
+  )
 
   return (
     <div
@@ -294,17 +294,26 @@ function HostRow({
         }
       }}
       className={cn(
-        'group flex items-center gap-3 rounded-lg border border-border bg-surface px-3 py-2.5',
-        'transition-colors hover:bg-surface-subtle',
+        'group flex items-center gap-3 rounded-lg border border-border bg-surface px-3 py-[var(--row-pad-y-session)]',
+        'transition-colors hover:border-strong hover:bg-surface-subtle',
         canConnect &&
           'cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink/20',
       )}
     >
-      <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-surface-subtle text-ink-tertiary">
-        <Server size={16} aria-hidden />
-      </div>
+      <Server size={16} strokeWidth={1.75} className="shrink-0 text-ink-tertiary" aria-hidden />
       <div className="min-w-0 flex-1">
-        <div className="truncate text-body font-medium text-ink">{host.label}</div>
+        <div className="flex min-w-0 items-center gap-1.5">
+          {activeSessions ? (
+            <span
+              className="h-1.5 w-1.5 shrink-0 rounded-full bg-success"
+              role="img"
+              title={t('terminals.connected')}
+              aria-label={t('terminals.connected')}
+              data-testid={`host-connected-${host.id}`}
+            />
+          ) : null}
+          <span className="truncate text-body font-medium text-ink">{host.label}</span>
+        </div>
         <div className="truncate font-mono text-caption text-ink-tertiary">{subtitle}</div>
       </div>
       <div className="flex shrink-0 items-center gap-0.5">

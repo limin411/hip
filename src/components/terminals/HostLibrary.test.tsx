@@ -36,15 +36,18 @@ vi.mock('@/store/terminalHostStore', () => {
 })
 
 vi.mock('@/store/managedTerminalStore', () => {
-  const store = {
-    getState: () => ({
-      openLocal,
-      openSsh,
-      close,
-      terminals: [{ id: 'tm_ssh1', kind: 'ssh', hostId: 'hst_1', title: 'ops', createdAt: 1 }],
-      focus: vi.fn(),
-    }),
-  }
+  const terminals = [
+    { id: 'tm_ssh1', kind: 'ssh', hostId: 'hst_1', title: 'ops', createdAt: 1 },
+  ]
+  const store = (sel: (s: Record<string, unknown>) => unknown) =>
+    sel({ terminals, focus: vi.fn() })
+  store.getState = () => ({
+    openLocal,
+    openSsh,
+    close,
+    terminals,
+    focus: vi.fn(),
+  })
   return { useManagedTerminalStore: store }
 })
 

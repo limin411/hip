@@ -1830,6 +1830,7 @@ export const ja = {
     "noCwd": "作業ディレクトリがありません",
     "kindLocal": "ローカル",
     "kindSsh": "SSH",
+    "connected": "接続済み",
     "statusExited": "終了",
     "statusError": "エラー",
     "softCap": "開いているターミナルが多すぎます（最大8個、コードパネル端末を含む）。先に1つ閉じてください。",

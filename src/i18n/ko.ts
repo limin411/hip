@@ -1848,8 +1848,6 @@ export const ko = {
     "ungrouped": "그룹 없음",
     "groupsNavAria": "호스트 그룹",
     "groupEmpty": "이 그룹에 호스트가 없습니다",
-    "hostsCount": "호스트 {{count}}개",
-    "hostsCount_one": "호스트 {{count}}개",
     "groupCreateTitle": "새 그룹",
     "groupRenameTitle": "그룹 이름 변경",
     "deleteGroupTitle": "그룹 “{{name}}”을(를) 삭제할까요?",

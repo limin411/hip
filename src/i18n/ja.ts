@@ -1848,8 +1848,6 @@ export const ja = {
     "ungrouped": "未分類",
     "groupsNavAria": "ホストグループ",
     "groupEmpty": "このグループにホストはありません",
-    "hostsCount": "{{count}} 台のホスト",
-    "hostsCount_one": "{{count}} 台のホスト",
     "groupCreateTitle": "新しいグループ",
     "groupRenameTitle": "グループ名を変更",
     "deleteGroupTitle": "グループ「{{name}}」を削除しますか？",

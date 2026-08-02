@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Folder, Pencil, Plus, Server, Trash2, Plug } from 'lucide-react'
+import { Folder, Pencil, Server, Trash2, Plug } from 'lucide-react'
 import type { HostGroup, TerminalHost } from '@/ipc/terminalHosts'
 import { useManagedTerminalStore } from '@/store/managedTerminalStore'
 import { sortGroupsByName } from '@/lib/hostGroupUi'
@@ -75,11 +75,6 @@ export function HostGroupList({
     }
   }, [navKeys, selectedKey])
 
-  const selectedGroup =
-    selectedKey === UNGROUPED_KEY
-      ? null
-      : (sortedGroups.find((g) => g.id === selectedKey) ?? null)
-
   const selectedHosts =
     selectedKey === UNGROUPED_KEY
       ? ungrouped
@@ -94,31 +89,6 @@ export function HostGroupList({
       data-testid="host-group-list"
     >
       <div className="flex min-h-0 min-w-0 flex-1 flex-col" data-testid="host-group-detail">
-        <div className="flex shrink-0 items-center gap-2 border-b border-border px-4 py-2.5">
-          <h3 className="min-w-0 flex-1 truncate text-body font-medium text-ink">
-            {selectedGroup ? selectedGroup.name : t('terminals.ungrouped')}
-          </h3>
-          <span className="shrink-0 text-caption text-ink-tertiary">
-            {t('terminals.hostsCount', { count: selectedHosts.length })}
-          </span>
-          {onAddHost ? (
-            <Button
-              type="button"
-              variant="secondary"
-              size="sm"
-              data-testid={
-                selectedKey === UNGROUPED_KEY
-                  ? 'host-add-ungrouped'
-                  : `host-add-${selectedKey}`
-              }
-              onClick={() => onAddHost(selectedGroupIdForAdd)}
-            >
-              <Plus size={14} aria-hidden />
-              {t('terminals.addHost')}
-            </Button>
-          ) : null}
-        </div>
-
         <div className="min-h-0 flex-1 overflow-y-auto p-3">
           {selectedHosts.length === 0 ? (
             <EmptyState

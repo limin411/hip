@@ -1872,8 +1872,6 @@ export const zhCN = {
       ungrouped: '未分组',
       groupsNavAria: '主机分组',
       groupEmpty: '该分组下暂无主机',
-      hostsCount: '{{count}} 台主机',
-      hostsCount_one: '{{count}} 台主机',
       groupCreateTitle: '新建分组',
       groupRenameTitle: '重命名分组',
       deleteGroupTitle: '删除分组「{{name}}」？',

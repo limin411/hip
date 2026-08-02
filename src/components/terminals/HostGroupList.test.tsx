@@ -1,7 +1,7 @@
 // @vitest-environment happy-dom
 import '@testing-library/jest-dom/vitest'
 import { describe, it, expect, vi, afterEach } from 'vitest'
-import { render, screen, fireEvent, cleanup } from '@testing-library/react'
+import { render, screen, fireEvent, within, cleanup } from '@testing-library/react'
 import type { HostGroup, TerminalHost } from '@/ipc/terminalHosts'
 import { HostGroupList } from './HostGroupList'
 
@@ -134,28 +134,6 @@ describe('HostGroupList master-detail', () => {
     expect(screen.getByTestId('host-row-h1')).toBeInTheDocument()
   })
 
-  it('add button uses selected group id', () => {
-    const onAddHost = vi.fn()
-    render(
-      <HostGroupList
-        groups={groups}
-        hosts={hosts}
-        onEditHost={noop}
-        onDeleteHost={noop}
-        onRenameGroup={noop}
-        onDeleteGroup={noop}
-        onAddHost={onAddHost}
-      />,
-    )
-    fireEvent.click(screen.getByTestId('host-group-select-g1'))
-    fireEvent.click(screen.getByTestId('host-add-g1'))
-    expect(onAddHost).toHaveBeenCalledWith('g1')
-
-    fireEvent.click(screen.getByTestId('host-group-select-ungrouped'))
-    fireEvent.click(screen.getByTestId('host-add-ungrouped'))
-    expect(onAddHost).toHaveBeenCalledWith(null)
-  })
-
   it('row body click connects host; edit does not', () => {
     const onConnect = vi.fn()
     const onEdit = vi.fn()
@@ -195,7 +173,7 @@ describe('HostGroupList master-detail', () => {
     )
     expect(screen.getByTestId('host-group-empty')).toBeInTheDocument()
     expect(screen.getByText('terminals.groupEmpty')).toBeInTheDocument()
-    fireEvent.click(screen.getByTestId('host-add-g-empty'))
+    fireEvent.click(within(screen.getByTestId('host-group-empty')).getByRole('button'))
     expect(onAddHost).toHaveBeenCalledWith('g-empty')
   })
 

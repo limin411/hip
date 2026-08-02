@@ -1850,8 +1850,6 @@ export const zhTW = {
     "ungrouped": "未分組",
     "groupsNavAria": "主機分組",
     "groupEmpty": "該分組下暫無主機",
-    "hostsCount": "{{count}} 台主機",
-    "hostsCount_one": "{{count}} 台主機",
     "groupCreateTitle": "新建分組",
     "groupRenameTitle": "重新命名分組",
     "deleteGroupTitle": "刪除分組「{{name}}」？",

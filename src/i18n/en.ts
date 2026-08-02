@@ -1917,8 +1917,6 @@ export const en = {
       ungrouped: 'Ungrouped',
       groupsNavAria: 'Host groups',
       groupEmpty: 'No hosts in this group',
-      hostsCount: '{{count}} hosts',
-      hostsCount_one: '{{count}} host',
       groupCreateTitle: 'New group',
       groupRenameTitle: 'Rename group',
       deleteGroupTitle: 'Delete group “{{name}}”?',

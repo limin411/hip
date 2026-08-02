@@ -1858,7 +1858,6 @@ export const zhCN = {
       statusExited: '已退出',
       statusError: '错误',
       softCap: '打开的终端过多（最多 8 个，含代码面板终端）。请先关闭一个。',
-      libraryTitle: '连接库',
       emptyLibrary: '还没有保存的连接',
       emptyLibraryHint: '保存远程主机以便稍后连接，或立即打开本地终端。',
       connect: '连接',

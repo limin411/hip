@@ -1834,7 +1834,6 @@ export const ja = {
     "statusExited": "終了",
     "statusError": "エラー",
     "softCap": "開いているターミナルが多すぎます（最大8個、コードパネル端末を含む）。先に1つ閉じてください。",
-    "libraryTitle": "接続一覧",
     "emptyLibrary": "保存済みの接続はまだありません",
     "emptyLibraryHint": "あとでつなぐリモートホストを保存するか、今すぐローカル端末を開いてください。",
     "connect": "接続",

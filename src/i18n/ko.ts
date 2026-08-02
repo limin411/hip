@@ -1834,7 +1834,6 @@ export const ko = {
     "statusExited": "종료됨",
     "statusError": "오류",
     "softCap": "너무 많은 터미널이 열려 있습니다(최대 8개, 코드 패널 터미널 포함). 먼저 하나를 닫으세요.",
-    "libraryTitle": "연결 목록",
     "emptyLibrary": "저장된 연결이 없습니다",
     "emptyLibraryHint": "나중에 연결할 원격 호스트를 저장하거나 지금 로컬 터미널을 여세요.",
     "connect": "연결",

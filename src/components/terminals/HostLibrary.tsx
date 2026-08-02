@@ -230,12 +230,7 @@ export function HostLibrary() {
       className="flex h-full min-h-0 flex-1 flex-col overflow-hidden"
       data-testid="host-library"
     >
-      <header className="flex shrink-0 flex-wrap items-center gap-2 border-b border-border px-4 py-2.5">
-        <div className="min-w-0 flex-1">
-          <h1 className="text-body font-semibold tracking-tight text-ink">
-            {t('terminals.libraryTitle')}
-          </h1>
-        </div>
+      <header className="flex shrink-0 flex-wrap items-center justify-end gap-2 border-b border-border px-4 py-2.5">
         <div className="flex flex-wrap items-center gap-1.5">
           <Button
             type="button"

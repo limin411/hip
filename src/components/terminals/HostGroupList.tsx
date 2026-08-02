@@ -117,7 +117,7 @@ export function HostGroupList({
             ) : (
               <ul className="flex flex-col gap-1" data-testid="host-list">
                 {selectedHosts.map((h) => (
-                  <li key={h.id}>
+                  <li key={h.id} className="flex flex-col gap-0.5">
                     <HostRow
                       host={h}
                       onEdit={onEditHost}
@@ -125,6 +125,21 @@ export function HostGroupList({
                       onConnect={onConnectHost}
                       connectBusy={connectBusy}
                     />
+                    {onAddHost ? (
+                      <button
+                        type="button"
+                        data-testid={`host-add-${h.id}`}
+                        onClick={() => onAddHost(selectedGroupIdForAdd)}
+                        className={cn(
+                          'flex items-center gap-1 self-end rounded px-1.5 py-0.5 text-caption font-medium text-ink-tertiary transition-colors',
+                          'hover:bg-state-hover hover:text-ink',
+                          'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink/20',
+                        )}
+                      >
+                        <Plus size={12} strokeWidth={2} aria-hidden />
+                        {t('terminals.newRemote')}
+                      </button>
+                    ) : null}
                   </li>
                 ))}
               </ul>

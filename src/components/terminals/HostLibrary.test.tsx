@@ -212,4 +212,26 @@ describe('HostLibrary', () => {
       expect(screen.getByTestId('host-group-dialog')).toBeInTheDocument()
     })
   })
+
+  it('opens new connection from host row with current group preselected', async () => {
+    groups = [{ id: 'g1', name: 'Prod', sort: 0 }]
+    hosts = [
+      {
+        id: 'hst_1',
+        label: 'ops-1',
+        groupId: 'g1',
+        hostname: '10.0.0.1',
+        port: 22,
+        username: 'root',
+        authMethod: 'password',
+        updatedAt: 1,
+      },
+    ]
+    render(<HostLibrary />)
+    fireEvent.click(screen.getByTestId('host-add-hst_1'))
+    await waitFor(() => {
+      expect(screen.getByTestId('host-form-dialog')).toBeInTheDocument()
+    })
+    expect(screen.getByTestId('host-form-group')).toHaveValue('g1')
+  })
 })

@@ -243,6 +243,28 @@ describe('HostGroupList master-detail', () => {
     expect(onAddHost).toHaveBeenCalledWith('g-empty')
   })
 
+  it('new connection below a host uses the current group', () => {
+    const onAddHost = vi.fn()
+    render(
+      <HostGroupList
+        groups={groups}
+        hosts={hosts}
+        onEditHost={noop}
+        onDeleteHost={noop}
+        onRenameGroup={noop}
+        onDeleteGroup={noop}
+        onAddHost={onAddHost}
+      />,
+    )
+    fireEvent.click(screen.getByTestId('host-group-select-g1'))
+    fireEvent.click(screen.getByTestId('host-add-h1'))
+    expect(onAddHost).toHaveBeenCalledWith('g1')
+
+    fireEvent.click(screen.getByTestId('host-group-select-ungrouped'))
+    fireEvent.click(screen.getByTestId('host-add-h3'))
+    expect(onAddHost).toHaveBeenLastCalledWith(null)
+  })
+
   it('falls back selection when selected group is removed', () => {
     const { rerender } = render(
       <HostGroupList

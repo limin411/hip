@@ -1829,7 +1829,7 @@ export class SessionService {
     this.transport.send({ type: 'git:checkpoint:list', sessionId })
   }
 
-  /** Pull the session-start..HEAD commit log for the 更改 tab. */
+  /** Pull the recent repo commit log (capped) for the 更改 tab. */
   requestCommitLog(sessionId: string): void {
     useDiffStore.getState().setCommitLogLoading(sessionId)
     this.transport.send({ type: 'git:commitLog', sessionId })

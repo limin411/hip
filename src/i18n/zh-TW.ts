@@ -651,7 +651,6 @@ export const zhTW = {
       "noCommits": "暫無提交",
       "commitLogError": "無法讀取提交記錄",
       "toolbarMenu": "更改工具列選單",
-      "sessionCommits": "本會話提交",
       "recentCommits": "最近提交",
       "collapseAll": "全部摺疊",
       "expandAll": "全部展開",

@@ -15,7 +15,7 @@
 | P3 | 定位夹在「只读 diff」与「完整 SCM」之间 | 用户预期可提交/丢弃，实际不能 |
 | P4 | 主操作藏在右键 | 审阅 → 下一步 路径过长 |
 | P5 | 对比基线（session-start / HEAD）无 UI | store 已有，能力不可发现 |
-| P6 | 提交记录不可点、混入无关历史 | 与「本会话」心智脱节 |
+| P6 | 提交记录不可点 | 查看历史提交 diff 需外部工具 |
 | P7 | 窄栏下并排视图几乎不可用却占一级入口 | 控件噪音 |
 
 ---
@@ -50,8 +50,8 @@
 │       ├── hover/选中：丢弃 · 打开 · ⋯
 │       └── expanded → unified hunks（默认）
 │           └── hunk 右键：复制 / 标注给 agent / 引用到输入框
-└── Session commits（可折叠，默认可拖分隔）
-    ├── 标题：本会话提交 · K
+└── Commits（可折叠，默认可拖分隔）
+    ├── 标题：最近提交 · K
     └── Commit row → 点击加载该 commit diff（替换或叠在列表区）
 ```
 
@@ -117,9 +117,9 @@
 - 无 session-start checkpoint 时：禁用「会话起点」并 tooltip 说明，自动落在 HEAD
 - 切换后重新拉 diff，折叠状态可重置为默认
 
-### 5.5 本会话提交
+### 5.5 最近提交
 
-- 数据范围不变：session-start..HEAD（无 start 则最近 N 条，标题改为「最近提交」）
+- 数据范围：仓库最近历史（`HEAD` 起最多 100 条），不按 session-start 过滤
 - **单击 commit**：在未提交区位置展示该 commit 的 diff（toolbar 出现「← 返回未提交」）
 - 右键保留：复制 SHA、复制 message
 - 行展示：`shortSha` + message（truncate）+ 相对时间；author 放 tooltip，减噪
@@ -128,7 +128,7 @@
 
 | 状态 | UI |
 |------|-----|
-| clean | 简洁空状态 +「工作区干净」；若有本会话提交，下方提交区自动展开 |
+| clean | 简洁空状态 +「工作区干净」；若有提交记录，下方提交区自动展开 |
 | not_a_repo | 保持 Init 按钮 |
 | git_missing / no_cwd | 保持现文案 |
 | 加载中 | 文件行骨架，勿整页闪烁 |
@@ -171,7 +171,7 @@ h ≈ 32px | px-3
 | `uiStore.ts` | `changesCommitSectionHeight` / `changesCommitExpanded`；窄屏隐藏 split |
 | context menus | 丢弃、审查文件；commit → 查看 diff |
 | sidecar `workspace-git` | `git checkout -- path` / discard；`git show sha` diff（若尚无） |
-| i18n | 基线、丢弃确认、返回未提交、本会话提交、审查 CTA |
+| i18n | 基线、丢弃确认、返回未提交、最近提交、审查 CTA |
 
 ---
 
@@ -191,7 +191,7 @@ h ≈ 32px | px-3
 
 - [ ] 基线切换 UI
 - [ ] 点击 commit 查看 diff + 返回
-- [ ] 提交区标题区分「本会话」/「最近」
+- [ ] 提交区展示仓库最近提交（上限 100 条）
 
 ### Phase C — 主路径动作
 

@@ -645,7 +645,6 @@ export const ko = {
       "noCommits": "아직 커밋 없음",
       "commitLogError": "커밋 로그를 읽을 수 없음",
       "toolbarMenu": "변경사항 도구 모음 메뉴",
-      "sessionCommits": "이 세션 커밋",
       "recentCommits": "최근 커밋",
       "collapseAll": "모두 접기",
       "expandAll": "모두 펼치기",

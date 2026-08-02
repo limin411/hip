@@ -618,7 +618,6 @@ export const en = {
         noCommits: 'No commits yet',
         commitLogError: 'Could not read the commit log',
         toolbarMenu: 'Changes toolbar menu',
-        sessionCommits: 'Session commits',
         recentCommits: 'Recent commits',
         collapseAll: 'Collapse all',
         expandAll: 'Expand all',

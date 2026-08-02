@@ -9,7 +9,7 @@
 
 ## 0. v2 修订摘要
 
-v2 在 v1 基础上修正 8 处，全部来自评审发现或外部案例对照：
+v2 在 v1 基础上修正 9 处，全部来自评审发现或外部案例对照：
 
 | # | 修订 | 来源 |
 |---|------|------|
@@ -21,6 +21,7 @@ v2 在 v1 基础上修正 8 处，全部来自评审发现或外部案例对照�
 | R6 | 最小键盘集：`j/k`、`space`、`⌘+Enter`、`Esc` | Zed Git 面板 |
 | R7 | 窄栏同时压缩 toolbar（隐藏统计、并排入口置灰），toolbar 不换行 | v1 遗漏 |
 | R8 | 新增「忽略空白」开关 | GitHub Desktop / Linear |
+| R9 | 提交区数据范围改为仓库最近历史（`HEAD` 起最多 100 条），标题固定「最近提交」，不再按 session-start 过滤 | 用户反馈：git 项目应展示历史提交记录 |
 
 ## 1. 问题摘要
 
@@ -55,8 +56,8 @@ v1 的 P1–P7（jump-list 重复、3:2 固定比例、定位夹层、主操作�
 │       ├── hover/选中：丢弃 · 打开 · ⋯
 │       └── expanded → unified hunks（默认）
 │           └── hunk 行 hover：复制 / 标注给 agent / 引用到输入框（右键保留全量）
-└── Session commits（默认收起标题条，可拖分隔）
-    ├── 标题：本会话提交 · K
+└── Commits（默认收起标题条，可拖分隔）
+    ├── 标题：最近提交 · K
     └── Commit row → 点击加载该 commit diff（替换或叠在列表区）
 ```
 
@@ -117,13 +118,13 @@ v1 的 P1–P7（jump-list 重复、3:2 固定比例、定位夹层、主操作�
 
 同 v1：分段控件 `会话起点 | HEAD`；无 session-start checkpoint 时禁用「会话起点」+ tooltip；切换后重新拉 diff。
 
-### 5.5 本会话提交
+### 5.5 最近提交
 
-同 v1：可折叠标题条；单击 commit 查看 diff +「← 返回未提交」；右键复制 SHA / message；行展示 shortSha + message + 相对时间。
+数据范围：仓库最近历史（`HEAD` 起最多 100 条），不按 session-start 过滤（R9）。其余同 v1：可折叠标题条；单击 commit 查看 diff +「← 返回未提交」；右键复制 SHA / message；行展示 shortSha + message + 相对时间。
 
 ### 5.6 空 / 错误态
 
-同 v1：clean 空状态；有本会话提交时提交区自动展开；not_a_repo / git_missing / no_cwd 保持现文案；加载中文件行骨架。
+同 v1：clean 空状态；有提交记录时提交区自动展开；not_a_repo / git_missing / no_cwd 保持现文案；加载中文件行骨架。
 
 ### 5.7 刷新
 

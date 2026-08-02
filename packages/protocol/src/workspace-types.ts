@@ -59,7 +59,7 @@ export interface Checkpoint {
   createdAt: number
 }
 
-/** One row of the session-start..HEAD commit log (更改 tab). */
+/** One row of the recent repo commit log (更改 tab). */
 export interface CommitLogEntry {
   sha: string
   shortSha: string

@@ -611,7 +611,6 @@ export const zhCN = {
         noCommits: '暂无提交',
         commitLogError: '无法读取提交记录',
         toolbarMenu: '更改工具栏菜单',
-        sessionCommits: '本会话提交',
         recentCommits: '最近提交',
         collapseAll: '全部折叠',
         expandAll: '全部展开',

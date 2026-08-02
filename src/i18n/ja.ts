@@ -645,7 +645,6 @@ export const ja = {
       "noCommits": "コミットはまだありません",
       "commitLogError": "コミットログを読み取れませんでした",
       "toolbarMenu": "変更ツールバーメニュー",
-      "sessionCommits": "このセッションのコミット",
       "recentCommits": "最近のコミット",
       "collapseAll": "すべて折りたたむ",
       "expandAll": "すべて展開",

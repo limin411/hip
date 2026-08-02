@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Folder, Pencil, Server, Trash2, Plug } from 'lucide-react'
+import { Folder, Pencil, Plus, Server, Trash2, Plug } from 'lucide-react'
 import type { HostGroup, TerminalHost } from '@/ipc/terminalHosts'
 import { useManagedTerminalStore } from '@/store/managedTerminalStore'
 import { sortGroupsByName } from '@/lib/hostGroupUi'
@@ -18,6 +18,8 @@ export interface HostGroupListProps {
   onConnectHost?: (host: TerminalHost) => void
   /** Create host; `groupId` null = ungrouped. */
   onAddHost?: (groupId: string | null) => void
+  /** Create a new group (opens the group dialog in the host library). */
+  onCreateGroup?: () => void
   connectBusy?: boolean
 }
 
@@ -33,6 +35,7 @@ export function HostGroupList({
   onDeleteGroup,
   onConnectHost,
   onAddHost,
+  onCreateGroup,
   connectBusy,
 }: HostGroupListProps) {
   const { t } = useTranslation()
@@ -57,13 +60,13 @@ export function HostGroupList({
   }, [hosts, sortedGroups])
 
   const ungrouped = hostsByGroup.get(null) ?? []
-  const showUngrouped = ungrouped.length > 0 || sortedGroups.length === 0
 
   const navKeys = useMemo(() => {
     const keys = sortedGroups.map((g) => g.id)
-    if (showUngrouped) keys.push(UNGROUPED_KEY)
+    // 未分组 always stays in the rail, even with no hosts in it.
+    keys.push(UNGROUPED_KEY)
     return keys
-  }, [sortedGroups, showUngrouped])
+  }, [sortedGroups])
 
   const [selectedKey, setSelectedKey] = useState<string>(() => navKeys[0] ?? UNGROUPED_KEY)
 
@@ -198,34 +201,47 @@ export function HostGroupList({
               )
             })}
 
-            {showUngrouped ? (
-              <div
-                data-testid="host-group-ungrouped"
+            {onCreateGroup ? (
+              <button
+                type="button"
+                data-testid="host-group-create"
+                onClick={onCreateGroup}
                 className={cn(
-                  'flex items-center rounded-lg',
-                  selectedKey === UNGROUPED_KEY && 'bg-state-active',
+                  'flex h-[var(--row-h-sidebar)] min-w-0 items-center gap-2 rounded-lg border border-dashed border-border px-2.5 text-left text-meta font-medium transition-colors',
+                  'text-ink-secondary hover:bg-state-hover hover:text-ink',
                 )}
               >
-                <button
-                  type="button"
-                  role="tab"
-                  aria-selected={selectedKey === UNGROUPED_KEY}
-                  data-testid="host-group-select-ungrouped"
-                  onClick={() => setSelectedKey(UNGROUPED_KEY)}
-                  className={cn(
-                    'flex h-[var(--row-h-sidebar)] min-w-0 flex-1 items-center gap-2 rounded-lg px-2.5 text-left text-meta font-medium transition-colors',
-                    'text-ink-secondary hover:bg-state-hover hover:text-ink',
-                    selectedKey === UNGROUPED_KEY && 'text-ink',
-                  )}
-                >
-                  <Server size={15} strokeWidth={1.75} className="shrink-0 opacity-70" aria-hidden />
-                  <span className="min-w-0 flex-1 truncate">{t('terminals.ungrouped')}</span>
-                  <span className="shrink-0 tabular-nums text-caption text-ink-tertiary">
-                    {ungrouped.length}
-                  </span>
-                </button>
-              </div>
+                <Plus size={15} strokeWidth={1.75} className="shrink-0 opacity-70" aria-hidden />
+                <span className="min-w-0 flex-1 truncate">{t('terminals.newGroup')}</span>
+              </button>
             ) : null}
+
+            <div
+              data-testid="host-group-ungrouped"
+              className={cn(
+                'flex items-center rounded-lg',
+                selectedKey === UNGROUPED_KEY && 'bg-state-active',
+              )}
+            >
+              <button
+                type="button"
+                role="tab"
+                aria-selected={selectedKey === UNGROUPED_KEY}
+                data-testid="host-group-select-ungrouped"
+                onClick={() => setSelectedKey(UNGROUPED_KEY)}
+                className={cn(
+                  'flex h-[var(--row-h-sidebar)] min-w-0 flex-1 items-center gap-2 rounded-lg px-2.5 text-left text-meta font-medium transition-colors',
+                  'text-ink-secondary hover:bg-state-hover hover:text-ink',
+                  selectedKey === UNGROUPED_KEY && 'text-ink',
+                )}
+              >
+                <Server size={15} strokeWidth={1.75} className="shrink-0 opacity-70" aria-hidden />
+                <span className="min-w-0 flex-1 truncate">{t('terminals.ungrouped')}</span>
+                <span className="shrink-0 tabular-nums text-caption text-ink-tertiary">
+                  {ungrouped.length}
+                </span>
+              </button>
+            </div>
           </nav>
         </div>
       </aside>

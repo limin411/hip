@@ -63,19 +63,23 @@ export function HostLibrary() {
     setFormOpen(true)
   }, [pendingCreateHost])
 
-  // Sidebar / external "new group" — one-shot consume so remount does not re-open.
-  useEffect(() => {
-    if (!pendingCreateGroup) return
-    if (!useHostLibraryUi.getState().consumeCreateGroupRequest()) return
-    setGroupName('')
-    setGroupError(null)
-    setGroupDialog({ mode: 'create' })
-  }, [pendingCreateGroup])
-
   const openCreate = useCallback((groupId?: string | null) => {
     setFormMode({ mode: 'create', groupId: groupId ?? null })
     setFormOpen(true)
   }, [])
+
+  const openCreateGroup = useCallback(() => {
+    setGroupName('')
+    setGroupError(null)
+    setGroupDialog({ mode: 'create' })
+  }, [])
+
+  // Sidebar / external "new group" — one-shot consume so remount does not re-open.
+  useEffect(() => {
+    if (!pendingCreateGroup) return
+    if (!useHostLibraryUi.getState().consumeCreateGroupRequest()) return
+    openCreateGroup()
+  }, [pendingCreateGroup, openCreateGroup])
 
   const openEdit = useCallback((host: TerminalHost) => {
     setFormMode({ mode: 'edit', host })
@@ -271,6 +275,7 @@ export function HostLibrary() {
             onDeleteGroup={setDeletingGroup}
             onConnectHost={(h) => void connectHost(h)}
             onAddHost={(groupId) => openCreate(groupId)}
+            onCreateGroup={openCreateGroup}
             connectBusy={connectBusy}
           />
         )}

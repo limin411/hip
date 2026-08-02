@@ -203,4 +203,13 @@ describe('HostLibrary', () => {
     // Stale request already consumed — dialog stays closed on remount.
     expect(screen.queryByTestId('host-group-dialog')).not.toBeInTheDocument()
   })
+
+  it('opens group dialog from rail new group button', async () => {
+    groups = [{ id: 'g1', name: 'Prod', sort: 0 }]
+    render(<HostLibrary />)
+    fireEvent.click(screen.getByTestId('host-group-create'))
+    await waitFor(() => {
+      expect(screen.getByTestId('host-group-dialog')).toBeInTheDocument()
+    })
+  })
 })

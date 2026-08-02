@@ -113,6 +113,57 @@ describe('HostGroupList master-detail', () => {
     expect(screen.queryByTestId('host-row-h1')).not.toBeInTheDocument()
   })
 
+  it('keeps ungrouped in the rail even with no ungrouped hosts', () => {
+    render(
+      <HostGroupList
+        groups={groups}
+        hosts={hosts.filter((h) => h.groupId != null)}
+        onEditHost={noop}
+        onDeleteHost={noop}
+        onRenameGroup={noop}
+        onDeleteGroup={noop}
+      />,
+    )
+    expect(screen.getByTestId('host-group-select-ungrouped')).toBeInTheDocument()
+    fireEvent.click(screen.getByTestId('host-group-select-ungrouped'))
+    expect(screen.getByTestId('host-group-empty')).toBeInTheDocument()
+  })
+
+  it('renders new group button above ungrouped and calls back', () => {
+    const onCreateGroup = vi.fn()
+    render(
+      <HostGroupList
+        groups={groups}
+        hosts={hosts}
+        onEditHost={noop}
+        onDeleteHost={noop}
+        onRenameGroup={noop}
+        onDeleteGroup={noop}
+        onCreateGroup={onCreateGroup}
+      />,
+    )
+    const button = screen.getByTestId('host-group-create')
+    expect(button).toBeInTheDocument()
+    expect(button.compareDocumentPosition(screen.getByTestId('host-group-ungrouped')) &
+      Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    fireEvent.click(button)
+    expect(onCreateGroup).toHaveBeenCalledOnce()
+  })
+
+  it('hides new group button when no callback is provided', () => {
+    render(
+      <HostGroupList
+        groups={groups}
+        hosts={hosts}
+        onEditHost={noop}
+        onDeleteHost={noop}
+        onRenameGroup={noop}
+        onDeleteGroup={noop}
+      />,
+    )
+    expect(screen.queryByTestId('host-group-create')).not.toBeInTheDocument()
+  })
+
   it('rename / delete stay clickable without changing selection hosts incorrectly', () => {
     const onRename = vi.fn()
     const onDelete = vi.fn()

@@ -1,10 +1,12 @@
 import type { Message } from '@hip/protocol'
+import { stripRoundtableFrame } from '@/lib/roundtable'
 
 const LABEL_MAX = 72
 
 /** First-line snippet for a user turn in the right-panel outline. */
 export function userTurnLabel(message: Pick<Message, 'content' | 'attachments'>, index: number): string {
-  const text = (message.content ?? '').trim()
+  // Wire content may include roundtable frame; outline must match bubble text.
+  const text = stripRoundtableFrame(message.content ?? '').trim()
   if (text) {
     const first = text.split(/\r?\n/).find((l) => l.trim())?.trim() ?? text
     if (first.length > LABEL_MAX) return `${first.slice(0, LABEL_MAX)}…`

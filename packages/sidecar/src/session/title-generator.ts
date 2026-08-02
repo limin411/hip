@@ -2,13 +2,14 @@ import type { SessionConfig } from '@hip/protocol'
 import { HumanMessage, SystemMessage } from '@langchain/core/messages'
 import { getActiveModel, cheapModelFor } from '../config/providers.js'
 import { buildChatModel } from './model-factory.js'
+import { stripRoundtableFrame } from './roundtable/detect.js'
 
 const TITLE_LEN = 40
 
 type AppLanguage = NonNullable<SessionConfig['language']>
 
 function deriveTitle(content: string): string {
-  const oneLine = content.replace(/\s+/g, ' ').trim()
+  const oneLine = stripRoundtableFrame(content).replace(/\s+/g, ' ').trim()
   return oneLine.length > TITLE_LEN ? oneLine.slice(0, TITLE_LEN) + '…' : oneLine || '新对话'
 }
 

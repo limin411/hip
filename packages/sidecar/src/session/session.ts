@@ -62,6 +62,7 @@ import { PermissionManager } from './permission-manager.js'
 import { AgentProviderManager } from './agent-provider.js'
 import { ConfigManager } from './config-manager.js'
 import { deriveTitle, sanitizeTitle, buildDefaultTitleGenerator, type TitleGenerator } from './title-generator.js'
+import { stripRoundtableFrame } from './roundtable/detect.js'
 import { runWorkflowTurn as runWorkflowTurnFn, type WorkflowRunDeps } from './workflow-runner.js'
 import { shouldPlan } from './plan.js'
 import { AgentProfileManager } from './agent-profile-manager.js'
@@ -301,7 +302,7 @@ export class Session {
     if (!this.titleGenerator || !replyText || !this.store) return
     try {
       const refined = sanitizeTitle(await this.titleGenerator({
-        firstUserMessage: input.content,
+        firstUserMessage: stripRoundtableFrame(input.content),
         firstReply: replyText,
         sessionId: this.id,
         language: this._config.language,

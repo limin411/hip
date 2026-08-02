@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { collectUserTurns, userTurnLabel } from './conversationOutline'
+import { buildRoundtableOutbound } from '@/lib/roundtable'
 import type { Message } from '@hip/protocol'
 
 function msg(partial: Partial<Message> & Pick<Message, 'id' | 'role'>): Message {
@@ -22,6 +23,11 @@ describe('userTurnLabel', () => {
       userTurnLabel({ content: '', attachments: [{ id: 'a', name: 'a.png', mimeType: 'image/png' }] }, 0),
     ).toBe('a.png')
     expect(userTurnLabel({ content: '  ' }, 2)).toBe('Turn 3')
+  })
+
+  it('strips roundtable wire frame so label is the user text', () => {
+    const wire = buildRoundtableOutbound('Should we rewrite the API?', 'en')
+    expect(userTurnLabel({ content: wire }, 0)).toBe('Should we rewrite the API?')
   })
 })
 

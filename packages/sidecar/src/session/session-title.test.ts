@@ -7,15 +7,24 @@ import { openDatabase } from '../persistence/open.js'
 import { SessionStore } from '../persistence/store.js'
 import {
   buildTitleSystemPrompt,
+  deriveTitle,
   titleLanguageLabel,
   type TitleGenerator,
 } from './title-generator.js'
+import { ROUNDTABLE_MARKER, ROUNDTABLE_SEP } from './roundtable/constants.js'
 
 const cfg = { llmProvider: 'deepseek' as const, model: 'deepseek-chat', tools: [] }
 function store() { const { db, ftsEnabled } = openDatabase(':memory:'); return new SessionStore(db, ftsEnabled) }
 function textRunner(text: string): ModelRunner {
   return { async run(_m: BaseMessage[], o: ModelRunOptions) { o.onText(text); return new AIMessage(text) } }
 }
+
+describe('deriveTitle', () => {
+  it('strips roundtable wire frame', () => {
+    const wire = `${ROUNDTABLE_MARKER}\nframe${ROUNDTABLE_SEP}Should we rewrite the API?`
+    expect(deriveTitle(wire)).toBe('Should we rewrite the API?')
+  })
+})
 
 describe('Session auto-title', () => {
   let st: SessionStore

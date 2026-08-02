@@ -1347,6 +1347,34 @@ describe('workspace diff', () => {
     expect(t.sent).toContainEqual({ type: 'fs:diff', sessionId: 's1', base: 'head' })
   })
 
+  it('requestDiff omits ignoreWhitespace when off and sends it when on', () => {
+    const t = new FakeTransport(); const svc = new SessionService(t)
+    useUiStore.getState().setIgnoreWhitespace(false)
+    svc.requestDiff('s1')
+    const sent = t.sent.filter((m) => m.type === 'fs:diff')
+    expect(sent[0]).not.toHaveProperty('ignoreWhitespace')
+    t.push({ type: 'fs:diff:result', sessionId: 's1', state: 'ok', files: [], base: 'head', hasSessionStart: false })
+    svc.requestDiff('s1', undefined, true)
+    expect(t.sent.filter((m) => m.type === 'fs:diff').at(-1)).toMatchObject({ ignoreWhitespace: true })
+  })
+
+  it('requestCommitDiff enters commit mode and sends git:commitDiff', () => {
+    const t = new FakeTransport(); const svc = new SessionService(t)
+    svc.requestCommitDiff('s1', 'abc1234')
+    expect(t.sent.at(-1)).toMatchObject({ type: 'git:commitDiff', sessionId: 's1', sha: 'abc1234' })
+    expect(useDiffStore.getState().bySession['s1'].viewingCommitSha).toBe('abc1234')
+    expect(useDiffStore.getState().bySession['s1'].commitDiff.status).toBe('loading')
+  })
+
+  it('discardFile marks the path pending and sends git:discard', () => {
+    const t = new FakeTransport(); const svc = new SessionService(t)
+    svc.discardFile('s1', 'a.ts', 'modified')
+    expect(t.sent.at(-1)).toMatchObject({ type: 'git:discard', sessionId: 's1', path: 'a.ts', status: 'modified' })
+    expect(useDiffStore.getState().bySession['s1'].discardPending['a.ts']).toBe(true)
+    svc.discardFile('s1', 'b.ts', 'renamed', 'a.ts')
+    expect(t.sent.at(-1)).toMatchObject({ type: 'git:discard', sessionId: 's1', path: 'b.ts', status: 'renamed', oldPath: 'a.ts' })
+  })
+
   it('selectSession refreshes the Diff badge via fs:diffSummary', () => {
     const t = new FakeTransport(); const svc = new SessionService(t)
     svc.selectSession('s1')

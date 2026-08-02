@@ -17,6 +17,7 @@ import type {
   DiffBase,
   DiffState,
   DiffFile,
+  DiffFileStatus,
   DiffSummary,
   Checkpoint,
   CommitLogEntry,
@@ -125,12 +126,14 @@ export type ClientMessage =
   | { type: 'fs:read'; sessionId: string; path: string }
   | { type: 'fs:lsCwd'; cwd: string; path: string }
   | { type: 'fs:readCwd'; cwd: string; path: string }
-  | { type: 'fs:diff'; sessionId: string; base?: DiffBase }
+  | { type: 'fs:diff'; sessionId: string; base?: DiffBase; ignoreWhitespace?: boolean }
   | { type: 'fs:diffSummary'; sessionId: string; base?: DiffBase }
   | { type: 'fs:diffFile'; sessionId: string; path: string; base?: DiffBase; context?: number | 'full' }
   | { type: 'fs:gitInit'; sessionId: string }
   | { type: 'git:checkpoint:list'; sessionId: string }
   | { type: 'git:commitLog'; sessionId: string }
+  | { type: 'git:commitDiff'; sessionId: string; sha: string }
+  | { type: 'git:discard'; sessionId: string; path: string; status: DiffFileStatus; oldPath?: string }
   | { type: 'git:branch:list'; sessionId: string }
   | { type: 'git:branch:switch'; sessionId: string; branch: string }
   | { type: 'permission:respond'; sessionId: string; requestId: string; optionId?: string; cancelled?: boolean }
@@ -348,6 +351,8 @@ export type ServerMessage =
   | { type: 'fs:gitInit:result'; sessionId: string; ok: boolean; error?: string }
   | { type: 'git:checkpoint:list:result'; sessionId: string; checkpoints: Checkpoint[]; isGitRepo: boolean; currentBranch: string | null }
   | { type: 'git:commitLog:result'; sessionId: string; commits: CommitLogEntry[]; state: DiffState; error?: string }
+  | { type: 'git:commitDiff:result'; sessionId: string; sha: string; state: DiffState; files?: DiffFile[]; error?: string }
+  | { type: 'git:discard:result'; sessionId: string; path: string; ok: boolean; error?: string }
   | { type: 'checkpoint:created'; sessionId: string; checkpoint: Checkpoint }
   | { type: 'git:branch:list:result'; sessionId: string; branches: Branch[]; currentBranch: string | null }
   | { type: 'git:branch:switch:result'; sessionId: string; branch: string; ok: boolean; currentBranch: string | null; error?: string }
@@ -610,4 +615,3 @@ export type KeyProbeCode =
   | 'PROBE_DISABLED'
   | 'INVALID_RESPONSE'
   | 'INTERNAL'
-

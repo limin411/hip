@@ -3,6 +3,7 @@ import type {
   ServerMessage,
   SessionConfig,
   DiffBase,
+  DiffFileStatus,
   PermissionMode,
   OrchestrationMode,
   MemoryFileConfig,
@@ -1801,12 +1802,13 @@ export class SessionService {
    * Pull the workspace diff.
    * In-flight dedupe: a second request while loading is dropped (`'deduped'`).
    */
-  requestDiff(sessionId: string, base?: DiffBase): 'sent' | 'deduped' {
+  requestDiff(sessionId: string, base?: DiffBase, ignoreWhitespace?: boolean): 'sent' | 'deduped' {
     const cur = useDiffStore.getState().bySession[sessionId]
     if (cur?.status === 'loading') return 'deduped'
     const b = base ?? cur?.base ?? 'session-start'
+    const ig = ignoreWhitespace ?? useUiStore.getState().ignoreWhitespace
     useDiffStore.getState().setLoading(sessionId)
-    this.transport.send({ type: 'fs:diff', sessionId, base: b })
+    this.transport.send({ type: 'fs:diff', sessionId, base: b, ...(ig ? { ignoreWhitespace: true } : {}) })
     return 'sent'
   }
 
@@ -1831,6 +1833,25 @@ export class SessionService {
   requestCommitLog(sessionId: string): void {
     useDiffStore.getState().setCommitLogLoading(sessionId)
     this.transport.send({ type: 'git:commitLog', sessionId })
+  }
+
+  /** Load the diff introduced by one commit; the Changes panel swaps into commit mode. */
+  requestCommitDiff(sessionId: string, sha: string): void {
+    useDiffStore.getState().setViewingCommit(sessionId, sha)
+    useDiffStore.getState().setCommitDiffLoading(sessionId)
+    this.transport.send({ type: 'git:commitDiff', sessionId, sha })
+  }
+
+  /** Discard one working-tree change (restore to HEAD; sidecar keeps a trash copy). */
+  discardFile(sessionId: string, path: string, status: DiffFileStatus, oldPath?: string): void {
+    useDiffStore.getState().setDiscardPending(sessionId, path, true)
+    this.transport.send({
+      type: 'git:discard',
+      sessionId,
+      path,
+      status,
+      ...(oldPath ? { oldPath } : {}),
+    })
   }
 
   /** Pull the branch list (+ current) for the BranchSwitcher. */

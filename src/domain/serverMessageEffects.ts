@@ -238,6 +238,25 @@ export function applyServerMessageEffects(msg: ServerMessage, deps: ServerMessag
       })
       return
 
+    case 'git:commitDiff:result':
+      useDiffStore.getState().setCommitDiffResult(msg.sessionId, {
+        state: msg.state,
+        files: msg.files,
+        error: msg.error,
+      })
+      return
+
+    case 'git:discard:result':
+      useDiffStore.getState().setDiscardPending(msg.sessionId, msg.path, false)
+      if (msg.ok) {
+        deps.requestDiff(msg.sessionId)
+        deps.requestCommitLog(msg.sessionId)
+        toast.success(i18n.t('artifact.changesView.discardSuccess', { path: msg.path }))
+      } else {
+        toast.error(i18n.t('artifact.changesView.discardFailed', { path: msg.path, error: msg.error ?? 'unknown' }))
+      }
+      return
+
     case 'git:branch:list:result':
       useDiffStore.getState().setBranches(msg.sessionId, msg.branches, msg.currentBranch)
       return

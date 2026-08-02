@@ -660,4 +660,51 @@ describe('applyServerMessageEffects', () => {
       expect(useDomainStore.getState().sessions.find((s) => s.id === 's1')!.chatPanelOpen).toBe(false)
     })
   })
+
+  describe('changes panel git results', () => {
+    it('git:commitDiff:result folds files into the store commit diff', () => {
+      const deps = makeDeps()
+      applyServerMessageEffects(
+        {
+          type: 'git:commitDiff:result',
+          sessionId: 's1',
+          sha: 'abc1234',
+          state: 'ok',
+          files: [{ path: 'a.ts', status: 'modified', additions: 1, deletions: 0, hunks: [] }],
+        },
+        deps,
+      )
+      expect(useDiffStore.getState().bySession['s1'].commitDiff).toMatchObject({
+        status: 'ready',
+        state: 'ok',
+        files: [{ path: 'a.ts' }],
+      })
+    })
+
+    it('git:discard:result clears pending, refreshes diff + log, and toasts success', () => {
+      const deps = makeDeps()
+      useDiffStore.getState().setDiscardPending('s1', 'a.ts', true)
+      toastSuccess.mockClear()
+      applyServerMessageEffects(
+        { type: 'git:discard:result', sessionId: 's1', path: 'a.ts', ok: true },
+        deps,
+      )
+      expect(useDiffStore.getState().bySession['s1'].discardPending['a.ts']).toBe(false)
+      expect(deps.requestDiff).toHaveBeenCalledWith('s1')
+      expect(deps.requestCommitLog).toHaveBeenCalledWith('s1')
+      expect(toastSuccess).toHaveBeenCalled()
+    })
+
+    it('git:discard:result toasts an error when the discard fails', () => {
+      const deps = makeDeps()
+      toastError.mockClear()
+      applyServerMessageEffects(
+        { type: 'git:discard:result', sessionId: 's1', path: 'a.ts', ok: false, error: 'boom' },
+        deps,
+      )
+      expect(useDiffStore.getState().bySession['s1'].discardPending['a.ts']).toBe(false)
+      expect(deps.requestDiff).not.toHaveBeenCalled()
+      expect(toastError).toHaveBeenCalled()
+    })
+  })
 })

@@ -650,7 +650,15 @@ export const ja = {
       "collapseAll": "すべて折りたたむ",
       "expandAll": "すべて展開",
       "refresh": "更新",
-      "resizeCommits": "コミットリストの高さを調整"
+      "resizeCommits": "コミットリストの高さを調整",
+      "baseLabel": "比較ベース",
+      "noSessionStart": "セッション開始スナップショットがまだありません",
+      "ignoreWhitespace": "空白の変更を無視",
+      "panelTooNarrow": "パネルが狭く分割表示できません",
+      "backToUncommitted": "未コミットに戻る",
+      "commitDiffError": "コミットの差分を読み込めませんでした",
+      "discardSuccess": "{{path}} を HEAD に復元しました（コピーはゴミ箱に保存）",
+      "discardFailed": "{{path}} を破棄できませんでした：{{error}}"
     },
     "gitInitBanner": {
       "title": "チェックポイントを有効にするには git を初期化してください",

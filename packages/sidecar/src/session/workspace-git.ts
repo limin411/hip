@@ -17,7 +17,7 @@ const GIT_INIT_TIMEOUT_MS = 60_000 // user-triggered baseline commit may walk a 
 const GIT_MAX_BUFFER = 32 * 1024 * 1024
 
 export interface WorkspaceDiff { state: DiffState; files?: DiffFile[]; summary?: DiffSummary; error?: string }
-export interface WorkspaceDiffOptions { gitBin?: string; base?: DiffBase; baseSha?: string | null; indexFile?: string; headSha?: string }
+export interface WorkspaceDiffOptions { gitBin?: string; base?: DiffBase; baseSha?: string | null; indexFile?: string; headSha?: string; ignoreWhitespace?: boolean }
 export interface CaptureCheckpointOptions { sessionId: string; turnId: string; label: string | null; prevCommit: string | null; gitBin?: string }
 export interface CaptureResult { ok: boolean; skipped?: boolean; treeSha?: string; commitSha?: string; branch?: string | null; error?: string }
 export interface RevertOptions { sessionId: string; targetTree: string; prevCommit: string | null; gitBin?: string }
@@ -190,7 +190,9 @@ export async function collectWorkspaceDiff(cwd: string, opts: WorkspaceDiffOptio
     const p = await prepareTrees(cwd, opts)
     if (!p.ok) return p.r
     const { realCwd, repoRoot, nowTree, baseTree } = p.v
-    const out = (await runGit(cwd, ['-c', 'core.quotepath=false', 'diff', '--no-color', '--find-renames', baseTree, nowTree, '--', '.'], gitBin)).stdout
+    const diffArgs = ['-c', 'core.quotepath=false', 'diff', '--no-color', '--find-renames']
+    if (opts.ignoreWhitespace) diffArgs.push('-w')
+    const out = (await runGit(cwd, [...diffArgs, baseTree, nowTree, '--', '.'], gitBin)).stdout
     const rel = (q: string) => path.relative(realCwd, path.join(repoRoot, q))
     const files = parseUnifiedDiff(out)
       .map((f) => ({ ...f, path: rel(f.path), ...(f.oldPath ? { oldPath: rel(f.oldPath) } : {}) }))
@@ -338,6 +340,111 @@ export async function collectCommitLog(cwd: string, startCommit: string | null, 
     }
     return { state: 'ok', commits }
   } catch (e) { return { state: 'error', error: (e instanceof Error ? e.message : String(e)).slice(0, 500) } }
+}
+
+/** SHA guard for `git show` paths (never accept refs / flags / pathspecs). */
+const COMMIT_SHA_RE = /^[0-9a-f]{7,40}$/i
+
+/** Diff introduced by one commit (`git show <sha>`), cwd-relative paths. Never throws. */
+export async function collectCommitDiff(
+  cwd: string,
+  sha: string,
+  gitBin = 'git',
+): Promise<{ state: DiffState; files?: DiffFile[]; error?: string }> {
+  if (!COMMIT_SHA_RE.test(sha)) return { state: 'error', error: 'invalid commit sha' }
+  try {
+    await fs.stat(cwd)
+    await runGit(cwd, ['rev-parse', '--is-inside-work-tree'], gitBin)
+  } catch (e) {
+    return { state: (e as NodeJS.ErrnoException).code === 'ENOENT' ? 'git_missing' : 'not_a_repo' }
+  }
+  try {
+    const realCwd = await fs.realpath(cwd)
+    const repoRoot = (await runGit(cwd, ['rev-parse', '--show-toplevel'], gitBin)).stdout.trim()
+    const out = (
+      await runGit(
+        cwd,
+        ['-c', 'core.quotepath=false', 'show', '--no-color', '--find-renames', '--format=', sha, '--', '.'],
+        gitBin,
+      )
+    ).stdout
+    const rel = (q: string) => path.relative(realCwd, path.join(repoRoot, q))
+    const files = parseUnifiedDiff(out)
+      .map((f) => ({ ...f, path: rel(f.path), ...(f.oldPath ? { oldPath: rel(f.oldPath) } : {}) }))
+      .sort((a, b) => (a.path < b.path ? -1 : a.path > b.path ? 1 : 0))
+    return { state: 'ok', files }
+  } catch (e) {
+    return { state: 'error', error: (e instanceof Error ? e.message : String(e)).slice(0, 500) }
+  }
+}
+
+export interface DiscardFileOptions {
+  oldPath?: string
+  gitBin?: string
+  /** Trash root (default ~/.hip/trash/changes); injectable for hermetic tests. */
+  trashRoot?: string
+}
+
+/** Discard one working-tree change: copy the pre-discard state into the hip trash,
+ *  then restore the file to HEAD (added/renamed files are deleted instead). Never throws. */
+export async function discardFile(
+  cwd: string,
+  filePath: string,
+  status: DiffFileStatus,
+  opts: DiscardFileOptions = {},
+): Promise<{ ok: boolean; error?: string }> {
+  const gitBin = opts.gitBin ?? 'git'
+  const oldPath = opts.oldPath
+  try {
+    await fs.stat(cwd)
+    await runGit(cwd, ['rev-parse', '--is-inside-work-tree'], gitBin)
+  } catch (e) {
+    return { ok: false, error: (e as NodeJS.ErrnoException).code === 'ENOENT' ? 'git_missing' : 'not_a_repo' }
+  }
+  try {
+    const realCwd = await fs.realpath(cwd)
+    const repoRoot = (await runGit(cwd, ['rev-parse', '--show-toplevel'], gitBin)).stdout.trim()
+    const abs = path.resolve(realCwd, filePath)
+    // Path guard: the resolved target must stay inside both the workspace cwd and the repo root.
+    const under = (root: string, target: string) =>
+      target === root || target.startsWith(root.endsWith(path.sep) ? root : `${root}${path.sep}`)
+    if (!under(realCwd, abs) || !under(path.resolve(repoRoot), abs)) {
+      return { ok: false, error: 'path escapes workspace' }
+    }
+
+    const rel = path.relative(realCwd, abs)
+
+    // 1) Safety copy into ~/.hip/trash/changes/<date>/<epochMs>-<basename>.
+    const date = new Date().toISOString().slice(0, 10)
+    const trashDir = path.join(opts.trashRoot ?? path.join(os.homedir(), '.hip', 'trash', 'changes'), date)
+    await fs.mkdir(trashDir, { recursive: true })
+    const stamp = `${Date.now()}`
+    const trashPath = path.join(trashDir, `${stamp}-${path.basename(abs)}`)
+    try {
+      await fs.copyFile(abs, trashPath)
+    } catch {
+      // Deleted file: no worktree copy — save the HEAD revision instead.
+      const head = (await runGit(cwd, ['show', `HEAD:${rel}`], gitBin)).stdout
+      await fs.writeFile(trashPath, head)
+    }
+
+    // 2) Restore: added/renamed files are removed, everything else is checked
+    // out from HEAD (renames also restore the old path).
+    if (status === 'added' || status === 'renamed') {
+      await fs.rm(abs, { force: true }).catch(() => {})
+    }
+    if (status === 'renamed' && oldPath) {
+      const oldAbs = path.resolve(realCwd, oldPath)
+      if (!under(realCwd, oldAbs)) return { ok: false, error: 'old path escapes workspace' }
+      const oldRel = path.relative(realCwd, oldAbs)
+      await runGit(cwd, ['checkout', '--', oldRel], gitBin)
+    } else if (status !== 'added') {
+      await runGit(cwd, ['checkout', '--', rel], gitBin)
+    }
+    return { ok: true }
+  } catch (e) {
+    return { ok: false, error: (e instanceof Error ? e.message : String(e)).slice(0, 500) }
+  }
 }
 
 /** 单文件 diff，自定义上下文行数（'full' = 看全文）。用于按需展开。 */

@@ -98,4 +98,36 @@ describe('session-manager diff', () => {
     // Only the post-create file should appear
     expect(msg.files!.map((f: { path: string }) => f.path)).toEqual(['agent.txt'])
   })
+
+  it('git:commitDiff returns the diff of one commit with cwd-relative paths', async () => {
+    const { mgr, sent, send } = setup()
+    await mgr.handleAsync({ type: 'fs:gitInit', sessionId: 's1' }, send)
+    await fs.writeFile(path.join(root, 'README.md'), '# Changed\n')
+    await git(root, 'add', '-A')
+    await git(root, '-c', 'user.name=t', '-c', 'user.email=t@t', 'commit', '-m', 'second')
+    const sha = (await git(root, 'rev-parse', 'HEAD')).stdout.trim()
+    await mgr.handleAsync({ type: 'git:commitDiff', sessionId: 's1', sha }, send)
+    const r = last(sent, 'git:commitDiff:result')
+    expect(r).toMatchObject({ sessionId: 's1', sha, state: 'ok' })
+    expect(r.files![0]).toMatchObject({ path: 'README.md', status: 'modified' })
+  })
+
+  it('git:commitDiff rejects a non-hex sha', async () => {
+    const { mgr, sent, send } = setup()
+    await mgr.handleAsync({ type: 'fs:gitInit', sessionId: 's1' }, send)
+    await mgr.handleAsync({ type: 'git:commitDiff', sessionId: 's1', sha: 'HEAD' }, send)
+    expect(last(sent, 'git:commitDiff:result')).toMatchObject({ sessionId: 's1', state: 'error' })
+  })
+
+  it('git:discard restores a modified file to HEAD', async () => {
+    const { mgr, sent, send } = setup()
+    await mgr.handleAsync({ type: 'fs:gitInit', sessionId: 's1' }, send)
+    await fs.writeFile(path.join(root, 'README.md'), '# Changed\n')
+    await mgr.handleAsync(
+      { type: 'git:discard', sessionId: 's1', path: 'README.md', status: 'modified' },
+      send,
+    )
+    expect(last(sent, 'git:discard:result')).toMatchObject({ sessionId: 's1', path: 'README.md', ok: true })
+    expect(await fs.readFile(path.join(root, 'README.md'), 'utf8')).toBe('# Hi\n')
+  })
 })

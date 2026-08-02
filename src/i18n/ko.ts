@@ -650,7 +650,15 @@ export const ko = {
       "collapseAll": "모두 접기",
       "expandAll": "모두 펼치기",
       "refresh": "새로고침",
-      "resizeCommits": "커밋 목록 높이 조절"
+      "resizeCommits": "커밋 목록 높이 조절",
+      "baseLabel": "비교 기준",
+      "noSessionStart": "세션 시작 스냅샷이 아직 없습니다",
+      "ignoreWhitespace": "공백 변경 무시",
+      "panelTooNarrow": "패널이 너무 좁아 분할 보기 불가",
+      "backToUncommitted": "커밋되지 않은 변경으로 돌아가기",
+      "commitDiffError": "커밋 변경사항을 불러올 수 없음",
+      "discardSuccess": "{{path}}를 HEAD로 복원함 (사본은 휴지통에 보관)",
+      "discardFailed": "{{path}} 폐기 실패: {{error}}"
     },
     "gitInitBanner": {
       "title": "Git 저장소 초기화",

@@ -13,6 +13,8 @@ export const WORKSPACE_MESSAGE_TYPES = new Set([
   'fs:gitInit',
   'git:checkpoint:list',
   'git:commitLog',
+  'git:commitDiff',
+  'git:discard',
   'git:branch:list',
   'git:branch:switch',
 ])
@@ -58,7 +60,7 @@ export async function handleWorkspaceMessage(
       return
     }
     case 'fs:diff': {
-      const r = await ctx.ensureSession(msg.sessionId, send).workspaceDiff(msg.base ?? 'session-start')
+      const r = await ctx.ensureSession(msg.sessionId, send).workspaceDiff(msg.base ?? 'session-start', msg.ignoreWhitespace ?? false)
       send({ type: 'fs:diff:result', sessionId: msg.sessionId, ...r })
       return
     }
@@ -85,6 +87,16 @@ export async function handleWorkspaceMessage(
     case 'git:commitLog': {
       const r = await ctx.ensureSession(msg.sessionId, send).commitLog()
       send({ type: 'git:commitLog:result', sessionId: msg.sessionId, commits: r.commits ?? [], state: r.state, error: r.error })
+      return
+    }
+    case 'git:commitDiff': {
+      const r = await ctx.ensureSession(msg.sessionId, send).commitDiff(msg.sha)
+      send({ type: 'git:commitDiff:result', sessionId: msg.sessionId, sha: msg.sha, state: r.state, files: r.files, error: r.error })
+      return
+    }
+    case 'git:discard': {
+      const r = await ctx.ensureSession(msg.sessionId, send).discardFile(msg.path, msg.status, msg.oldPath)
+      send({ type: 'git:discard:result', sessionId: msg.sessionId, path: msg.path, ok: r.ok, ...(r.error ? { error: r.error } : {}) })
       return
     }
     case 'git:branch:list': {

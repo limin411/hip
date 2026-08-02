@@ -121,6 +121,7 @@ function FileDiff({
   sessionId,
   cwd,
   showFileIcons,
+  focusedPath,
   onToggleCollapse,
   onShowFull,
   onCollapseFull,
@@ -132,6 +133,7 @@ function FileDiff({
   sessionId: string
   cwd: string | null
   showFileIcons: boolean
+  focusedPath?: string | null
   onToggleCollapse: (path: string, multi: boolean) => void
   onShowFull?: (path: string) => void
   onCollapseFull?: (path: string) => void
@@ -149,13 +151,14 @@ function FileDiff({
         className={cn(
           // Only expanded rows stick; offsets are assigned by DiffDisplay's layout effect
           // so multiple open rows stack instead of overlapping.
+          'relative flex h-8 items-center justify-between gap-2 bg-surface-subtle px-3',
           !isCollapsed && 'sticky top-0 z-[1]',
-          'flex h-8 items-center justify-between gap-2 bg-surface-subtle px-3',
           // Expanded: hairline under sticky bar. Collapsed: shell border-b alone (no double).
           !isCollapsed && 'border-b border-border/70',
         )}
         data-testid="diff-file-header"
       >
+        {focusedPath === file.path && <div className="pointer-events-none absolute inset-y-1 left-0 w-0.5 rounded-r bg-accent" />}
         <span
           className="flex min-w-0 flex-1 items-center gap-1.5 text-meta leading-none"
           data-expanded={isCollapsed ? 'false' : 'true'}
@@ -277,6 +280,7 @@ export function DiffDisplay({
   sessionId,
   cwd = null,
   showFileIcons = true,
+  focusedPath = null,
   onToggleCollapse,
   onShowFull,
   onCollapseFull,
@@ -291,6 +295,8 @@ export function DiffDisplay({
   cwd?: string | null
   /** Narrow panels hide file-type icons to reclaim horizontal space. */
   showFileIcons?: boolean
+  /** Keyboard-focused file row (j/k); highlighted with an accent rail. */
+  focusedPath?: string | null
   onToggleCollapse: (path: string, multi: boolean) => void
   onShowFull?: (path: string) => void
   onCollapseFull?: (path: string) => void
@@ -329,6 +335,7 @@ export function DiffDisplay({
           sessionId={sessionId}
           cwd={cwd}
           showFileIcons={showFileIcons}
+          focusedPath={focusedPath}
           onToggleCollapse={onToggleCollapse}
           onShowFull={onShowFull}
           onCollapseFull={onCollapseFull}

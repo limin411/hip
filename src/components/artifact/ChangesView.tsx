@@ -1,6 +1,7 @@
-import { useEffect, useMemo, useRef } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { ChevronDown, ChevronRight, GitBranch, GitCommit, Loader2, MoreHorizontal } from 'lucide-react'
+import { Check, ChevronDown, ChevronRight, GitBranch, GitCommit, Loader2, MoreHorizontal } from 'lucide-react'
+import type { DiffBase } from '@hip/protocol'
 import { useDomainStore } from '@/domain/sessionStore'
 import { sessionService } from '@/domain/sessionService'
 import { useDiffStore, EMPTY_DIFF } from '@/store/diffStore'
@@ -8,6 +9,7 @@ import { useUiStore } from '@/store/uiStore'
 import { formatRelativeTime } from '@/lib/datetime'
 import { DiffDisplay, Empty } from './DiffDisplay'
 import { DeclarativeContextMenu } from '@/components/context-menu'
+import { insertComposerText } from '@/components/command-palette/composerBridge'
 import { Button } from '@/components/ui/Button'
 import { Skeleton } from '@/components/ui/Skeleton'
 import {
@@ -37,8 +39,13 @@ export function ChangesView() {
   const setChangesCommitExpanded = useUiStore((s) => s.setChangesCommitExpanded)
   const changesCommitHeight = useUiStore((s) => s.changesCommitHeight)
   const setChangesCommitHeight = useUiStore((s) => s.setChangesCommitHeight)
+  const ignoreWhitespace = useUiStore((s) => s.ignoreWhitespace)
+  const setIgnoreWhitespace = useUiStore((s) => s.setIgnoreWhitespace)
   const activeTab = useUiStore((s) => s.activeTab)
   const rootRef = useRef<HTMLDivElement>(null)
+  const [focusedPath, setFocusedPath] = useState<string | null>(null)
+  const [menuOpen, setMenuOpen] = useState(false)
+  const [narrow, setNarrow] = useState(false)
 
   // Refresh diff + commit log when the tab becomes active (Radix may keep the
   // component mounted while hidden) or when the session changes.
@@ -47,6 +54,90 @@ export function ChangesView() {
     sessionService.requestDiff(sessionId)
     sessionService.requestCommitLog(sessionId)
   }, [sessionId, activeTab])
+
+  // Narrow right column (<420px): hide stats / file icons, keep the toolbar on one line.
+  useEffect(() => {
+    const el = rootRef.current
+    if (!el) return
+    const measure = () => setNarrow(el.getBoundingClientRect().width < 420)
+    measure()
+    const ro = new ResizeObserver(measure)
+    ro.observe(el)
+    return () => ro.disconnect()
+  }, [])
+
+  // Keep the keyboard-focused row visible.
+  useEffect(() => {
+    if (!focusedPath) return
+    document.getElementById(`diff-file-${focusedPath}`)?.scrollIntoView({ block: 'nearest' })
+  }, [focusedPath])
+
+  const setBase = (base: DiffBase) => {
+    if (!sessionId) return
+    if (base === 'session-start' && !diff.hasSessionStart) return
+    useDiffStore.getState().setBase(sessionId, base)
+    sessionService.requestDiff(sessionId, base)
+  }
+
+  const startReview = () => {
+    // Phase C wires the actual prompt injection; keyboard CTA is reserved here.
+    void insertComposerText('')
+  }
+
+  const toggleIgnoreWhitespace = () => {
+    const next = !ignoreWhitespace
+    setIgnoreWhitespace(next)
+    if (sessionId) sessionService.requestDiff(sessionId, undefined, next)
+  }
+
+  // Minimal keyboard set while the panel is mounted (ignores form fields):
+  // j/k move the file row, space toggles it, ⌘/Ctrl+Enter reviews, Esc closes
+  // the menu or returns from a commit diff.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      const target = e.target as HTMLElement | null
+      if (
+        target &&
+        (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable)
+      ) {
+        return
+      }
+      if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
+        e.preventDefault()
+        startReview()
+        return
+      }
+      if (e.key === 'Escape') {
+        if (menuOpen) {
+          setMenuOpen(false)
+          return
+        }
+        if (diff.viewingCommitSha && sessionId) {
+          useDiffStore.getState().setViewingCommit(sessionId, null)
+        }
+        return
+      }
+      if (diff.viewingCommitSha) return
+      if (e.key === 'j' || e.key === 'ArrowDown') {
+        e.preventDefault()
+        const idx = diff.files.findIndex((f) => f.path === focusedPath)
+        setFocusedPath(diff.files[Math.min(diff.files.length - 1, Math.max(0, idx + 1))]?.path ?? null)
+        return
+      }
+      if (e.key === 'k' || e.key === 'ArrowUp') {
+        e.preventDefault()
+        const idx = diff.files.findIndex((f) => f.path === focusedPath)
+        setFocusedPath(diff.files[Math.max(0, idx - 1)]?.path ?? null)
+        return
+      }
+      if (e.key === ' ' && focusedPath) {
+        e.preventDefault()
+        toggleFile(focusedPath, false)
+      }
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  })
 
   // Accordion defaults: ≤3 files all open; otherwise only the first opens.
   // Store-level `collapsed` (user clicks) wins over the computed default.
@@ -129,13 +220,54 @@ export function ChangesView() {
   const totalAdd = diff.files.reduce((n, f) => n + f.additions, 0)
   const totalDel = diff.files.reduce((n, f) => n + f.deletions, 0)
 
+  if (diff.viewingCommitSha) {
+    const sha = diff.viewingCommitSha
+    return (
+      <div className="flex h-full flex-col" data-testid="changes-view">
+        <div className="flex h-8 shrink-0 items-center gap-2 border-b border-border/80 px-3">
+          <button
+            type="button"
+            onClick={() => useDiffStore.getState().setViewingCommit(sessionId, null)}
+            className="flex shrink-0 items-center gap-1 rounded-sm px-1.5 py-0.5 text-caption text-ink-secondary transition-colors duration-chrome hover:bg-state-hover hover:text-ink"
+            data-testid="changes-back-uncommitted"
+          >
+            ← {t('artifact.changesView.backToUncommitted')}
+          </button>
+          <span className="min-w-0 truncate font-mono text-caption text-ink-tertiary">{sha}</span>
+        </div>
+        <div className="min-h-0 flex-1 overflow-y-auto">
+          {diff.commitDiff.status === 'loading' ? (
+            <div className="space-y-2 p-3" data-testid="changes-commit-diff-loading">
+              <Skeleton className="h-8 w-full rounded-md" />
+              <Skeleton className="h-8 w-full rounded-md" />
+              <Skeleton className="h-8 w-3/4 rounded-md" />
+            </div>
+          ) : diff.commitDiff.state && diff.commitDiff.state !== 'ok' ? (
+            <Empty title={t('artifact.changesView.commitDiffError')} desc={diff.commitDiff.error} />
+          ) : diff.commitDiff.files.length === 0 ? (
+            <Empty title={t('artifact.diffView.clean')} desc={t('artifact.diffView.cleanDesc')} />
+          ) : (
+            <DiffDisplay
+              files={diff.commitDiff.files}
+              viewMode={diffViewMode}
+              sessionId={sessionId}
+              cwd={cwd}
+              showFileIcons={!narrow}
+              onToggleCollapse={() => {}}
+            />
+          )}
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div ref={rootRef} className="flex h-full flex-col" data-testid="changes-view">
       {/* Single toolbar row — no extra hairline under the label (avoids sandwiching the toggle). */}
       <div className="flex h-8 shrink-0 items-center justify-between gap-2 px-3">
         <span className="flex min-w-0 items-center gap-1.5 text-caption font-medium text-ink-tertiary">
           <span className="truncate">{t('artifact.changesView.uncommitted')}</span>
-          {hasUncommitted && (
+          {hasUncommitted && !narrow && (
             <span className="shrink-0 tabular-nums text-ink-secondary">
               {diff.files.length}
               <span className="text-success"> +{totalAdd}</span>
@@ -143,7 +275,45 @@ export function ChangesView() {
             </span>
           )}
         </span>
-        <DropdownMenu>
+        <span className="flex shrink-0 items-center gap-1.5">
+          <div
+            role="tablist"
+            aria-label={t('artifact.changesView.baseLabel')}
+            data-testid="changes-base-toggle"
+            className="inline-flex items-center rounded-md border border-border/70 p-px"
+          >
+            {(
+              [
+                ['session-start', t('artifact.diffView.baseSession')],
+                ['head', t('artifact.diffView.baseHead')],
+              ] as const
+            ).map(([base, label]) => {
+              const selected = diff.base === base
+              const disabled = base === 'session-start' && !diff.hasSessionStart
+              return (
+                <button
+                  key={base}
+                  type="button"
+                  role="tab"
+                  aria-selected={selected}
+                  disabled={disabled}
+                  title={disabled ? t('artifact.changesView.noSessionStart') : undefined}
+                  data-base={base}
+                  data-testid={`changes-base-${base}`}
+                  onClick={() => setBase(base)}
+                  className={cn(
+                    'rounded-[3px] px-2 py-0.5 text-caption font-medium transition-colors duration-chrome',
+                    'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink/20',
+                    'disabled:cursor-not-allowed disabled:opacity-40',
+                    selected ? 'bg-surface bg-surface-subtle text-ink' : 'text-ink-tertiary hover:text-ink-secondary',
+                  )}
+                >
+                  {label}
+                </button>
+              )
+            })}
+          </div>
+          <DropdownMenu open={menuOpen} onOpenChange={setMenuOpen}>
           <DropdownMenuTrigger asChild>
             <Button
               variant="ghost"
@@ -155,6 +325,15 @@ export function ChangesView() {
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" data-testid="changes-toolbar-menu-content">
+            <DropdownMenuItem
+              onClick={toggleIgnoreWhitespace}
+              data-testid="changes-menu-ignore-ws"
+            >
+              <span className="inline-flex w-4 shrink-0 items-center justify-center">
+                {ignoreWhitespace && <Check size={13} />}
+              </span>
+              {t('artifact.changesView.ignoreWhitespace')}
+            </DropdownMenuItem>
             <DropdownMenuRadioGroup
               value={diffViewMode}
               onValueChange={(v) => setDiffViewMode(v as 'unified' | 'split')}
@@ -162,7 +341,12 @@ export function ChangesView() {
               <DropdownMenuRadioItem value="unified" data-testid="changes-menu-unified">
                 {t('artifact.diffView.viewUnified')}
               </DropdownMenuRadioItem>
-              <DropdownMenuRadioItem value="split" data-testid="changes-menu-split">
+              <DropdownMenuRadioItem
+                value="split"
+                data-testid="changes-menu-split"
+                disabled={narrow}
+                title={narrow ? t('artifact.changesView.panelTooNarrow') : undefined}
+              >
                 {t('artifact.diffView.viewSplit')}
               </DropdownMenuRadioItem>
             </DropdownMenuRadioGroup>
@@ -178,7 +362,8 @@ export function ChangesView() {
               {t('artifact.changesView.refresh')}
             </DropdownMenuItem>
           </DropdownMenuContent>
-        </DropdownMenu>
+          </DropdownMenu>
+        </span>
       </div>
 
       <div className="flex min-h-0 flex-1 flex-col">
@@ -201,8 +386,10 @@ export function ChangesView() {
               viewMode={diffViewMode}
               expanded={diff.expanded}
               collapsed={collapsed}
+              focusedPath={focusedPath}
               sessionId={sessionId}
               cwd={cwd}
+              showFileIcons={!narrow}
               onToggleCollapse={(p, multi) => toggleFile(p, multi)}
               onShowFull={(p) => sessionService.requestDiffFile(sessionId, p, 'full')}
               onCollapseFull={(p) => useDiffStore.getState().collapseFile(sessionId, p)}
@@ -265,13 +452,20 @@ export function ChangesView() {
                           <DeclarativeContextMenu
                             kind="commit"
                             payload={{ sha: c.sha, shortSha: c.shortSha, message: c.message, sessionId }}
-                            className="flex items-center justify-between gap-2 px-3 py-2 text-meta transition-colors duration-chrome hover:bg-state-hover"
+                            className="px-3 py-0.5"
                           >
-                            <span className="flex min-w-0 items-center gap-2">
-                              <span className="shrink-0 font-mono text-caption tabular-nums text-ink-tertiary">{c.shortSha}</span>
-                              <span className="min-w-0 truncate text-ink">{c.message}</span>
-                            </span>
-                            <span className="shrink-0 text-caption text-ink-tertiary">{c.author} · {formatRelativeTime(c.timestamp, i18n.language)}</span>
+                            <button
+                              type="button"
+                              onClick={() => sessionService.requestCommitDiff(sessionId, c.sha)}
+                              className="flex w-full items-center justify-between gap-2 py-2 text-meta transition-colors duration-chrome hover:bg-state-hover"
+                              data-testid="commit-row-button"
+                            >
+                              <span className="flex min-w-0 items-center gap-2">
+                                <span className="shrink-0 font-mono text-caption tabular-nums text-ink-tertiary">{c.shortSha}</span>
+                                <span className="min-w-0 truncate text-ink">{c.message}</span>
+                              </span>
+                              <span className="shrink-0 text-caption text-ink-tertiary">{c.author} · {formatRelativeTime(c.timestamp, i18n.language)}</span>
+                            </button>
                           </DeclarativeContextMenu>
                         </li>
                       ))}

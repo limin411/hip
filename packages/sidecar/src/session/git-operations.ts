@@ -1,4 +1,4 @@
-import type { ServerMessage, DiffBase, DiffState, DiffFile, Checkpoint, CommitLogEntry, Branch } from '@hip/protocol'
+import type { ServerMessage, DiffBase, DiffState, DiffFile, DiffFileStatus, Checkpoint, CommitLogEntry, Branch } from '@hip/protocol'
 import type { SessionStore } from '../persistence/store.js'
 import * as workspaceGit from './workspace-git.js'
 
@@ -64,10 +64,10 @@ export class GitOperations {
   }
 
   /** Worktree-vs-HEAD diff of the bound cwd subtree. Never throws. */
-  async workspaceDiff(cwd: string | undefined, base: DiffBase = 'head'): Promise<workspaceGit.WorkspaceDiff & { base: DiffBase; hasSessionStart: boolean }> {
+  async workspaceDiff(cwd: string | undefined, base: DiffBase = 'head', ignoreWhitespace = false): Promise<workspaceGit.WorkspaceDiff & { base: DiffBase; hasSessionStart: boolean }> {
     if (!cwd) return { state: 'no_cwd', base: 'head', hasSessionStart: false }
     const b = this.resolveBase(cwd, base)
-    const r = await workspaceGit.collectWorkspaceDiff(cwd, { base: b.base, baseSha: b.baseSha })
+    const r = await workspaceGit.collectWorkspaceDiff(cwd, { base: b.base, baseSha: b.baseSha, ignoreWhitespace })
     return { ...r, base: b.base, hasSessionStart: b.hasSessionStart }
   }
 
@@ -116,8 +116,20 @@ export class GitOperations {
   /** Diff for a timeline checkpoint in one of the three modes. */
   async commitLog(cwd: string | undefined): Promise<{ state: DiffState; commits?: CommitLogEntry[]; error?: string }> {
     if (!cwd) return { state: 'no_cwd' }
-    const start = null
+    const start = this.store?.getSessionGitMeta(this.sessionId).sessionStartCommit ?? null
     return workspaceGit.collectCommitLog(cwd, start)
+  }
+
+  /** Diff introduced by one commit (`git show sha`), cwd-relative. Never throws. */
+  async commitDiff(cwd: string | undefined, sha: string): Promise<{ state: DiffState; files?: DiffFile[]; error?: string }> {
+    if (!cwd) return { state: 'no_cwd' }
+    return workspaceGit.collectCommitDiff(cwd, sha)
+  }
+
+  /** Discard one working-tree change (HEAD semantics + hip trash safety copy). Never throws. */
+  async discardFile(cwd: string | undefined, filePath: string, status: DiffFileStatus, oldPath?: string): Promise<{ ok: boolean; error?: string }> {
+    if (!cwd) return { ok: false, error: 'no_workspace' }
+    return workspaceGit.discardFile(cwd, filePath, status, oldPath ? { oldPath } : {})
   }
 
   /** Revert the worktree to a checkpoint's tree (worktree-only; HEAD untouched). */

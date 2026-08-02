@@ -4,7 +4,7 @@ import { promisify } from 'node:util'
 import { promises as fs } from 'node:fs'
 import * as os from 'node:os'
 import * as path from 'node:path'
-import { parseUnifiedDiff, collectWorkspaceDiff, collectWorkspaceDiffSummary, collectWorkspaceDiffFile, gitInit, captureSessionSnapshot, sanitizeRefComponent, isSafeBranchName, getCurrentBranch, listCheckpointRefs, deleteCheckpointRefs, captureCheckpoint, collectCommitLog, listBranches, switchBranch, gitCommit, gitCreateBranch, gitSwitchBranch, revertToCheckpoint, checkpointRefMeta, MAX_DIFF_LINES_PER_FILE, MAX_DIFF_FILES } from './workspace-git.js'
+import { parseUnifiedDiff, collectWorkspaceDiff, collectWorkspaceDiffSummary, collectWorkspaceDiffFile, gitInit, captureSessionSnapshot, sanitizeRefComponent, isSafeBranchName, getCurrentBranch, listCheckpointRefs, deleteCheckpointRefs, captureCheckpoint, collectCommitLog, collectCommitDiff, discardFile, listBranches, switchBranch, gitCommit, gitCreateBranch, gitSwitchBranch, revertToCheckpoint, checkpointRefMeta, MAX_DIFF_LINES_PER_FILE, MAX_DIFF_FILES } from './workspace-git.js'
 
 const execFileP = promisify(execFile)
 const git = (cwd: string, ...args: string[]) => execFileP('git', args, { cwd })
@@ -15,10 +15,15 @@ async function makeRepo(dir: string): Promise<void> {
 }
 
 let root: string
+let trashRoot: string
 beforeEach(async () => {
   root = await fs.mkdtemp(path.join(os.tmpdir(), 'hip-wsgit-'))
+  trashRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'hip-wsgit-trash-'))
 })
-afterEach(async () => { await fs.rm(root, { recursive: true, force: true }) })
+afterEach(async () => {
+  await fs.rm(root, { recursive: true, force: true })
+  await fs.rm(trashRoot, { recursive: true, force: true })
+})
 
 const MODIFY = `diff --git a/src/app.ts b/src/app.ts
 index 1234567..89abcde 100644
@@ -283,6 +288,114 @@ describe('collectWorkspaceDiffSummary', () => {
   })
   it('reports not_a_repo for a plain folder', async () => {
     expect((await collectWorkspaceDiffSummary(root)).state).toBe('not_a_repo')
+  })
+})
+
+describe('collectWorkspaceDiff ignoreWhitespace', () => {
+  it('drops whitespace-only changes with -w and recomputes stats', async () => {
+    await fs.writeFile(path.join(root, 'a.txt'), 'one\n  indented\n'); await makeRepo(root)
+    await fs.writeFile(path.join(root, 'a.txt'), 'one\nindented\n')
+    const normal = await collectWorkspaceDiff(root)
+    expect(normal.files![0]).toMatchObject({ path: 'a.txt', additions: 1, deletions: 1 })
+    const ignored = await collectWorkspaceDiff(root, { ignoreWhitespace: true })
+    expect(ignored.files).toEqual([])
+    expect(ignored.summary).toEqual({ totalFiles: 0, totalAdditions: 0, totalDeletions: 0 })
+  })
+})
+
+describe('collectCommitDiff', () => {
+  it('rejects non-hex shas before touching git', async () => {
+    await makeRepo(root)
+    expect((await collectCommitDiff(root, 'HEAD')).state).toBe('error')
+    expect((await collectCommitDiff(root, '../etc/passwd')).state).toBe('error')
+  })
+
+  it('returns files changed by one commit with cwd-relative paths', async () => {
+    await fs.writeFile(path.join(root, 'a.txt'), 'one\n'); await makeRepo(root)
+    await fs.writeFile(path.join(root, 'a.txt'), 'two\n')
+    await fs.writeFile(path.join(root, 'new.txt'), 'x\n')
+    await git(root, 'add', '-A')
+    await git(root, '-c', 'user.name=t', '-c', 'user.email=t@t', 'commit', '-m', 'change')
+    const sha = (await git(root, 'rev-parse', 'HEAD')).stdout.trim()
+    const r = await collectCommitDiff(root, sha)
+    expect(r.state).toBe('ok')
+    expect(r.files!.map((f) => f.path).sort()).toEqual(['a.txt', 'new.txt'])
+    expect(r.files!.find((f) => f.path === 'new.txt')).toMatchObject({ status: 'added', additions: 1 })
+    expect(r.files!.find((f) => f.path === 'a.txt')).toMatchObject({ status: 'modified', additions: 1, deletions: 1 })
+  })
+
+  it('scopes paths to the cwd subtree', async () => {
+    await fs.mkdir(path.join(root, 'sub'))
+    await fs.writeFile(path.join(root, 'sub', 'inner.txt'), 'a\n')
+    await fs.writeFile(path.join(root, 'top.txt'), 't\n'); await makeRepo(root)
+    await fs.writeFile(path.join(root, 'sub', 'inner.txt'), 'b\n')
+    await git(root, 'add', '-A')
+    await git(root, '-c', 'user.name=t', '-c', 'user.email=t@t', 'commit', '-m', 'c2')
+    const sha = (await git(root, 'rev-parse', 'HEAD')).stdout.trim()
+    const r = await collectCommitDiff(path.join(root, 'sub'), sha)
+    expect(r.state).toBe('ok')
+    expect(r.files!.map((f) => f.path)).toEqual(['inner.txt'])
+  })
+})
+
+describe('discardFile', () => {
+  it('restores a modified file to HEAD and keeps a trash copy of the dirty state', async () => {
+    await fs.writeFile(path.join(root, 'a.txt'), 'one\n'); await makeRepo(root)
+    await fs.writeFile(path.join(root, 'a.txt'), 'two\n')
+    const r = await discardFile(root, 'a.txt', 'modified', { trashRoot })
+    expect(r.ok).toBe(true)
+    expect(await fs.readFile(path.join(root, 'a.txt'), 'utf8')).toBe('one\n')
+    const date = new Date().toISOString().slice(0, 10)
+    const files = await fs.readdir(path.join(trashRoot, date))
+    expect(files).toHaveLength(1)
+    expect(await fs.readFile(path.join(trashRoot, date, files[0]!), 'utf8')).toBe('two\n')
+  })
+
+  it('deletes an untracked file (added) after copying it to trash', async () => {
+    await makeRepo(root)
+    await fs.writeFile(path.join(root, 'new.txt'), 'x\n')
+    const r = await discardFile(root, 'new.txt', 'added', { trashRoot })
+    expect(r.ok).toBe(true)
+    await expect(fs.access(path.join(root, 'new.txt'))).rejects.toThrow()
+    const date = new Date().toISOString().slice(0, 10)
+    const files = await fs.readdir(path.join(trashRoot, date))
+    expect(await fs.readFile(path.join(trashRoot, date, files[0]!), 'utf8')).toBe('x\n')
+  })
+
+  it('restores a deleted file from HEAD and trashes the HEAD revision', async () => {
+    await fs.writeFile(path.join(root, 'gone.txt'), 'bye\n'); await makeRepo(root)
+    await fs.rm(path.join(root, 'gone.txt'))
+    const r = await discardFile(root, 'gone.txt', 'deleted', { trashRoot })
+    expect(r.ok).toBe(true)
+    expect(await fs.readFile(path.join(root, 'gone.txt'), 'utf8')).toBe('bye\n')
+    const date = new Date().toISOString().slice(0, 10)
+    const files = await fs.readdir(path.join(trashRoot, date))
+    expect(await fs.readFile(path.join(trashRoot, date, files[0]!), 'utf8')).toBe('bye\n')
+  })
+
+  it('restores a renamed file: new path removed, old path checked out', async () => {
+    await fs.writeFile(path.join(root, 'old.txt'), 'keep\n'); await makeRepo(root)
+    await fs.rename(path.join(root, 'old.txt'), path.join(root, 'new.txt'))
+    const r = await discardFile(root, 'new.txt', 'renamed', { oldPath: 'old.txt', trashRoot })
+    expect(r.ok).toBe(true)
+    await expect(fs.access(path.join(root, 'new.txt'))).rejects.toThrow()
+    expect(await fs.readFile(path.join(root, 'old.txt'), 'utf8')).toBe('keep\n')
+  })
+
+  it('rejects paths that escape the workspace', async () => {
+    await makeRepo(root)
+    const r = await discardFile(root, '../escape.txt', 'modified', { trashRoot })
+    expect(r.ok).toBe(false)
+    expect(r.error).toBe('path escapes workspace')
+  })
+
+  it('rejects absolute paths outside the workspace', async () => {
+    await makeRepo(root)
+    const outside = await fs.mkdtemp(path.join(os.tmpdir(), 'hip-wsgit-out-'))
+    try {
+      const r = await discardFile(root, outside, 'modified', { trashRoot })
+      expect(r.ok).toBe(false)
+    } finally { await fs.rm(outside, { recursive: true, force: true }) }
   })
 })
 

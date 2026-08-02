@@ -42,6 +42,8 @@ export const CLIENT_MESSAGE_TYPES = [
   'fs:gitInit',
   'git:checkpoint:list',
   'git:commitLog',
+  'git:commitDiff',
+  'git:discard',
   'git:branch:list',
   'git:branch:switch',
   'permission:respond',

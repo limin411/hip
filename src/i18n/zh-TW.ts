@@ -656,7 +656,15 @@ export const zhTW = {
       "collapseAll": "全部摺疊",
       "expandAll": "全部展開",
       "refresh": "重新整理",
-      "resizeCommits": "調整提交清單高度"
+      "resizeCommits": "調整提交清單高度",
+      "baseLabel": "對比基線",
+      "noSessionStart": "尚無工作階段起點快照",
+      "ignoreWhitespace": "忽略空白",
+      "panelTooNarrow": "面板過窄，無法並排顯示",
+      "backToUncommitted": "返回未提交",
+      "commitDiffError": "無法載入提交改動",
+      "discardSuccess": "已將 {{path}} 恢復到 HEAD（副本已放入資源回收筒）",
+      "discardFailed": "丟棄 {{path}} 失敗：{{error}}"
     },
     "gitInitBanner": {
       "title": "初始化 git 以啟用檢查點",

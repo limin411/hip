@@ -8,77 +8,6 @@ export const ko = {
     "sendMessage": "메시지를 보내 대화를 시작하세요",
     "inputPlaceholder": "hip에 메시지 보내기… (Enter 전송, Shift+Enter 줄바꿈)",
     "resizeInput": "드래그하여 입력창 크기 조정",
-    "parallel": {
-      "started": "병렬 트랙 {{count}}개 시작됨"
-    },
-    "worktreeControl": {
-      "hitlOption": {
-        "n1": "트랙 1개",
-        "n2": "트랙 2개",
-        "n3": "트랙 3개",
-        "n4": "트랙 4개",
-        "reject": "병렬화 안 함"
-      },
-      "source": {
-        "protocol": "수동",
-        "parallel": "에이전트 병렬",
-        "host_fanout": "일괄 생성",
-        "agent_tool": "에이전트 도구",
-        "background": "백그라운드",
-        "import": "가져옴",
-        "discovered": "발견됨",
-        "primary": "메인"
-      },
-      "chipAria": "격리 작업공간",
-      "chipPurpose": "격리 작업공간 찾기, 전환 또는 생성",
-      "mainWorkspace": "메인 작업공간",
-      "pathBlocked": "프로젝트 경로를 사용할 수 없음",
-      "current": "현재",
-      "listTitle": "격리 작업공간",
-      "refresh": "새로고침",
-      "emptyTitle": "아직 격리 작업공간이 없습니다",
-      "createSingle": "새 격리 작업공간…",
-      "createSingleTitle": "새 격리 작업공간",
-      "createSingleHint": "현재 메인 작업공간 HEAD에서 깨끗한 격리 작업공간을 하나 생성합니다. 브랜치 이름은 자동으로 할당됩니다.",
-      "createSingleBranch": "브랜치",
-      "createSingleBase": "기반",
-      "createSingleBaseHead": "HEAD (메인 작업공간)",
-      "createSingleOpenSession": "생성 후 새 채팅 열기",
-      "createSingleOpenSessionHint": "켜기: 새 경로에서 Code 채팅을 엽니다. 끄기: 디렉토리만 생성합니다.",
-      "createSingleConfirm": "생성",
-      "createSingleCreating": "생성 중…",
-      "createSingleFailed": "격리된 작업공간을 생성할 수 없습니다",
-      "nonGitBanner": "이 폴더는 git 저장소가 아닙니다. 생성이 비활성화되었습니다.",
-      "footerHint": "백그라운드 임시 격리 항목은 여기에 표시되지 않습니다",
-      "unresolvedBanner": "메인 작업공간을 확인할 수 없습니다. 생성 및 삭제가 비활성화되었습니다.",
-      "openChat": "채팅 열기",
-      "copyPath": "경로 복사",
-      "pathCopied": "경로가 복사되었습니다",
-      "copyFailed": "경로를 복사할 수 없습니다",
-      "rowMenu": "작업공간 작업",
-      "agentTaskOnly": "이 트랙은 백그라운드 작업으로 실행됩니다 — 사이드바에서 진행 상황을 확인하세요",
-      "noSessionToast": "아직 이 작업공간에 연결된 채팅이 없습니다",
-      "openHere": "여기에 채팅 열기",
-      "delete": {
-        "menuItem": "삭제…",
-        "title": "격리된 작업공간 “{{label}}”을(를) 삭제할까요?",
-        "pathLabel": "경로",
-        "path": "경로: {{path}}",
-        "branchLabel": "브랜치",
-        "branch": "브랜치: {{branch}}",
-        "cascadeNote": "연결된 격리 채팅도 함께 닫힐 수 있습니다 (시스템이 이 디렉토리에 바인딩된 대화를 정리합니다).",
-        "dirtyWarning": "커밋되지 않은 변경사항이 감지되었습니다. 강제 삭제 시 해당 변경사항이 영구적으로 삭제됩니다.",
-        "confirm": "삭제",
-        "forceConfirm": "강제 삭제 및 변경사항 폐기",
-        "deleting": "삭제 중…",
-        "removed": "격리된 작업공간 {{label}}이(가) 삭제되었습니다",
-        "removedForce": "격리된 작업공간 {{label}}이(가) 강제 삭제되었습니다",
-        "failed": "격리된 작업공간 {{label}}을(를) 삭제할 수 없습니다"
-      }
-    },
-    "worktree": {
-      "created": "작업공간 준비 완료: {{label}}"
-    },
     "goal": {
       "aria": "활성 목표"
     },
@@ -738,8 +667,7 @@ export const ko = {
       "switching": "전환 중…",
       "switchFailed": "브랜치를 전환할 수 없음",
       "switchRetry": "재시도",
-      "inWorktree": "워크트리",
-      "switchBlockedRunning": "이 워크스페이스에서 세션이 실행 중이라 브랜치를 전환할 수 없습니다",
+            "switchBlockedRunning": "이 워크스페이스에서 세션이 실행 중이라 브랜치를 전환할 수 없습니다",
       "switchCheckedOut": "이 브랜치는 다른 워크스페이스에서 이미 체크아웃되어 있습니다: {{path}}"
     },
     "changesView": {
@@ -2377,8 +2305,6 @@ export const ko = {
       "expand": "{{name}} 펼치기",
       "collapse": "{{name}} 접기"
     },
-    "parallel": {
-    }
   },
   "dropdown": {
     "newChat": "새 워크 채팅",

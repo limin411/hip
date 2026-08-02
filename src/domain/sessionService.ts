@@ -10,8 +10,6 @@ import type {
   MemoryScope,
   MemoryStatus,
   KeyProbeCode,
-  WorktreeSource,
-  WorktreeRemoveErrorCode,
   EmptyGreetingGenerateContext,
   ExecutionMode,
 } from '@hip/protocol'
@@ -46,10 +44,8 @@ import { useCommandPaletteStore } from '@/store/commandPaletteStore'
 import { useWorkflowStore } from '@/store/workflowStore'
 import { useFocusStore } from '@/store/focusStore'
 import { useGoalStore } from '@/store/goalStore'
-import { useParallelStore } from '@/store/parallelStore'
 import { useProjectPathStore } from '@/store/projectPathStore'
 import { isProjectPathBlocked } from '@/lib/projectPathGate'
-import { planParallelFanout } from '@/lib/parallelFanout'
 import { toast } from 'sonner'
 import {
   formatDiffAnnotationsForComposer,
@@ -1212,265 +1208,6 @@ export class SessionService {
     return id
   }
 
-  /**
-   * Shared host create wait (G9/D20): send `git:worktree:create` (incl. `reveal`/`source`/`label`)
-   * and await matching result. On success, hydrate the worktree catalog list.
-   * Single create: reveal true (default), source protocol. Parallel slots: reveal false, host_fanout (D23/D26).
-   */
-  async waitCreateWorktree(
-    hostSessionId: string,
-    params: {
-      branch: string
-      createBranch?: boolean
-      baseRef?: string
-      pathKey?: string
-      /** Default true for single create. Parallel slots: false. */
-      reveal?: boolean
-      /** Product source tag (PR7). Prefer explicit for product paths. */
-      source?: WorktreeSource
-      label?: string
-    },
-  ): Promise<{ ok: boolean; path?: string; id?: string; error?: string }> {
-    const resultP = this.waitForServerMessageWhere(
-      'git:worktree:create:result',
-      (m) => m.sessionId === hostSessionId,
-      45_000,
-    )
-    this.transport.send({
-      type: 'git:worktree:create',
-      sessionId: hostSessionId,
-      branch: params.branch,
-      ...(params.createBranch !== undefined ? { createBranch: params.createBranch } : {}),
-      ...(params.baseRef !== undefined ? { baseRef: params.baseRef } : {}),
-      ...(params.pathKey !== undefined ? { pathKey: params.pathKey } : {}),
-      ...(params.reveal !== undefined ? { reveal: params.reveal } : {}),
-      ...(params.source !== undefined ? { source: params.source } : {}),
-      ...(params.label !== undefined ? { label: params.label } : {}),
-    })
-    const created = await resultP
-    if (created.ok) {
-      // List hydrate after success (G9/4).
-      this.requestWorktreeList(hostSessionId)
-    }
-    return {
-      ok: created.ok,
-      ...(created.path ? { path: created.path } : {}),
-      ...(created.id ? { id: created.id } : {}),
-      ...(created.error ? { error: created.error } : {}),
-    }
-  }
-
-  /**
-   * Product single isolation create (D20/G9). Defaults reveal true — success toast is
-   * owned by serverMessageEffects (D23); this method never toasts success.
-   * Source defaults to `protocol` (PR7 / D26).
-   */
-  async createManagedWorktree(opts: {
-    hostSessionId: string
-    branch: string
-    createBranch?: boolean
-    baseRef?: string
-    pathKey?: string
-    label?: string
-    /** Default `protocol` for single isolation (PR7). */
-    source?: WorktreeSource
-    /** Default true: open a code session on the new worktree path. */
-    openSession?: boolean
-    /** Default true; effects toast when true. UI must not toast success when true. */
-    reveal?: boolean
-  }): Promise<{ ok: boolean; path?: string; id?: string; sessionId?: string; error?: string }> {
-    const reveal = opts.reveal ?? true
-    const created = await this.waitCreateWorktree(opts.hostSessionId, {
-      branch: opts.branch,
-      createBranch: opts.createBranch ?? true,
-      baseRef: opts.baseRef,
-      pathKey: opts.pathKey,
-      label: opts.label,
-      source: opts.source ?? 'protocol',
-      reveal,
-    })
-    if (!created.ok || !created.path) {
-      return { ok: false, error: created.error ?? 'worktree create failed' }
-    }
-
-    let sessionId: string | undefined
-    if (opts.openSession !== false) {
-      const host = useDomainStore.getState().sessions.find((s) => s.id === opts.hostSessionId)
-      const slotConfig: SessionConfig = normalizeSessionConfig({
-        ...DEFAULT_CONFIG,
-        surface: 'code',
-        cwd: created.path,
-        permissionMode: host?.config.permissionMode ?? 'edit',
-        language: currentLanguage(),
-      })
-      sessionId = this.createSession(slotConfig)
-      this.selectSession(sessionId)
-    }
-    return {
-      ok: true,
-      path: created.path,
-      ...(created.id ? { id: created.id } : {}),
-      ...(sessionId ? { sessionId } : {}),
-    }
-  }
-
-  /**
-   * Parallel Studio: fan out one prompt across N isolated git worktrees + sessions.
-   * Uses a host session on `baseCwd` for git:worktree ops; agent turns run on slot sessions.
-   * Per-slot create uses waitCreateWorktree({ reveal: false }); summary toast is Modal-owned (D23).
-   */
-  async startParallelRun(opts: {
-    prompt: string
-    baseCwd: string
-    count: number
-    permissionMode?: PermissionMode
-    /** Prefer an existing code session on baseCwd (avoids extra host + create race). */
-    hostSessionId?: string
-    /**
-     * When true, immediately message:send the prompt on each slot (starts N agent turns).
-     * Default false — fan-out only creates worktrees/sessions so the UI stays responsive.
-     */
-    autoSend?: boolean
-  }): Promise<{ runId: string; slotSessionIds: string[]; slotPaths: string[] }> {
-    const prompt = opts.prompt.trim()
-    if (!prompt) throw new Error('empty prompt')
-    const baseCwd = opts.baseCwd.trim()
-    if (!baseCwd) throw new Error('baseCwd required')
-    const autoSend = opts.autoSend === true
-    const { clampParallelCount, useParallelStore } = await import('@/store/parallelStore')
-    const { parallelHostTitle, parallelSlotTitle } = await import('@/lib/parallelFormat')
-    const { planParallelFanout, assertPrimaryNotInSlotPaths } = await import('@/lib/parallelFanout')
-    const n = clampParallelCount(opts.count)
-    const runId = nanoid(10)
-    const runShort = runId.slice(0, 6)
-    // Spec H1 / D26: branch hip-p-{runShort}-{i}, pathKey runId/branch (matches agent tool).
-    const fanout = planParallelFanout({ n, prompt, runId: runShort })
-
-    // Reuse caller's session when it is already bound to baseCwd.
-    let hostSessionId = opts.hostSessionId?.trim() || ''
-    if (hostSessionId) {
-      const host = useDomainStore.getState().sessions.find((s) => s.id === hostSessionId)
-      if (!host || host.config.cwd !== baseCwd) hostSessionId = ''
-    }
-    if (!hostSessionId) {
-      const hostConfig: SessionConfig = normalizeSessionConfig({
-        ...DEFAULT_CONFIG,
-        surface: 'code',
-        cwd: baseCwd,
-        permissionMode: opts.permissionMode ?? 'edit',
-        language: currentLanguage(),
-      })
-      hostSessionId = this.createSession(hostConfig)
-      this.renameSession(hostSessionId, parallelHostTitle(runShort))
-    }
-
-    useParallelStore.getState().addRun({
-      id: runId,
-      baseCwd,
-      prompt,
-      hostSessionId,
-      slots: [],
-      createdAt: Date.now(),
-      source: 'host',
-    })
-
-    const slotSessionIds: string[] = []
-    const slotPaths: string[] = []
-    for (const slotPlan of fanout.slots) {
-      const i = slotPlan.index + 1
-      const branch = slotPlan.branch
-      // D26: pathKey = {runId}/{branch} — same as agent parallel_worktrees.
-      const pathKey = `${runId}/${branch}`
-      try {
-        const created = await this.waitCreateWorktree(hostSessionId, {
-          branch,
-          createBranch: true,
-          pathKey,
-          reveal: false,
-          // PR7 / D26: host composer fan-out — distinct from agent tool `parallel`.
-          source: 'host_fanout',
-        })
-        if (!created.ok || !created.path) {
-          useParallelStore.getState().setSlot(runId, i, {
-            index: i,
-            sessionId: '',
-            worktreePath: '',
-            branch,
-            status: 'error',
-            error: created.error ?? 'worktree create failed',
-          })
-          continue
-        }
-
-        const slotConfig: SessionConfig = normalizeSessionConfig({
-          ...DEFAULT_CONFIG,
-          surface: 'code',
-          cwd: created.path,
-          permissionMode: opts.permissionMode ?? 'edit',
-          language: currentLanguage(),
-        })
-        const slotId = this.createSession(slotConfig)
-        this.renameSession(slotId, parallelSlotTitle(runShort, i, n))
-
-        useParallelStore.getState().setSlot(runId, i, {
-          index: i,
-          sessionId: slotId,
-          worktreePath: created.path,
-          branch,
-          status: 'ready',
-        })
-
-        // Optional: kick agent turns. Product UI leaves this off so click never
-        // freezes the shell under dual LLM / sidecar load.
-        if (autoSend) {
-          const msgId = nanoid()
-          useDomainStore.getState().appendUserMessage(slotId, msgId, prompt, [])
-          this.transport.send({
-            type: 'message:send',
-            sessionId: slotId,
-            id: msgId,
-            content: prompt,
-            role: 'user',
-          })
-        }
-        slotSessionIds.push(slotId)
-        slotPaths.push(created.path)
-      } catch (err) {
-        const error = err instanceof Error ? err.message : String(err)
-        useParallelStore.getState().setSlot(runId, i, {
-          index: i,
-          sessionId: '',
-          worktreePath: '',
-          branch,
-          status: 'error',
-          error,
-        })
-      }
-    }
-
-    // H5: product path must not place slot worktrees on the primary cwd itself.
-    const primaryCheck = assertPrimaryNotInSlotPaths(baseCwd, slotPaths)
-    if (!primaryCheck.ok) {
-      useParallelStore.getState().updateRun(runId, {
-        error: `slot path collides with primary: ${primaryCheck.conflict}`,
-      })
-    }
-
-    if (slotSessionIds.length > 0) {
-      this.selectSession(slotSessionIds[0]!)
-      useUiStore.getState().setSidebarSection('projects')
-    }
-    return { runId, slotSessionIds, slotPaths }
-  }
-
-  /** Mark a parallel slot as the winner and focus it. */
-  selectParallelWinner(runId: string, sessionId: string): void {
-    void import('@/store/parallelStore').then(({ useParallelStore }) => {
-      useParallelStore.getState().selectWinner(runId, sessionId)
-    })
-    this.selectSession(sessionId)
-  }
-
   selectSession(id: string, messageId?: string): void {
     useDomainStore.getState().selectSession(id)
     useUiStore.getState().setSelectedArtifactPath(null)
@@ -1489,8 +1226,6 @@ export class SessionService {
     this.transport.send({ type: 'fs:diffSummary', sessionId: id, base })
     // Pull the checkpoint list (cheap; also tells the panel whether the cwd is a git repo → tab gating).
     this.transport.send({ type: 'git:checkpoint:list', sessionId: id })
-    // Hydrate managed worktree catalog (CLI creates / external; AC2 list hydrate).
-    this.requestWorktreeList(id)
     // Carry a clicked search hit's message into the scroll target; a plain select clears any stale one.
     useUiStore.getState().setScrollTarget(messageId ?? null)
     // Shell back/forward stack (ChatGPT-style). Skip while applying history.
@@ -1500,11 +1235,6 @@ export class SessionService {
         recordNavEntry()
       })
     }
-  }
-
-  /** Request porcelain+meta worktree list for Studio catalog (git:worktree:list → store). */
-  requestWorktreeList(sessionId: string): void {
-    this.transport.send({ type: 'git:worktree:list', sessionId })
   }
 
   /** Remember the currently-open conversation for the active surface (so returning restores it,
@@ -2287,37 +2017,6 @@ export class SessionService {
     return this.lastOutboundUserContent
   }
 
-  /** Product path: remove worktree (preflight when force=false). PR7: structured errorCode/dirtySummary. */
-  async removeWorktree(
-    sessionId: string,
-    worktreePath: string,
-    force = false,
-  ): Promise<{
-    ok: boolean
-    error?: string
-    errorCode?: WorktreeRemoveErrorCode
-    dirtySummary?: string
-  }> {
-    const resultP = this.waitForServerMessageWhere(
-      'git:worktree:remove:result',
-      (m) => m.sessionId === sessionId,
-      60_000,
-    )
-    this.transport.send({
-      type: 'git:worktree:remove',
-      sessionId,
-      worktreePath,
-      force,
-    })
-    const res = await resultP
-    return {
-      ok: res.ok,
-      ...(res.error ? { error: res.error } : {}),
-      ...(res.errorCode ? { errorCode: res.errorCode } : {}),
-      ...(res.dirtySummary ? { dirtySummary: res.dirtySummary } : {}),
-    }
-  }
-
   /** Answer a paused turn's question: append the reply to the transcript (clears the interrupt) and
    *  send it as message:resume so the sidecar continues the loop. */
   resume(content: string, attachments: LocalAttachment[] = []): void {
@@ -2549,33 +2248,8 @@ export type HipE2EHooks = {
     sessionId: string,
     goal: { id?: string; description: string; status: 'active' | 'paused' | 'blocked' | 'completed'; turns?: number; maxTurns?: number },
   ) => void
-  seedParallelRun: (opts: {
-    hostSessionId: string
-    n?: number
-    baseCwd: string
-    prompt?: string
-  }) => { runId: string; slotCount: number }
-  /** Product path: host fan-out N worktrees + sessions. */
-  startParallelRun: (opts: {
-    prompt: string
-    baseCwd: string
-    count: number
-    hostSessionId?: string
-    autoSend?: boolean
-  }) => Promise<{ runId: string; slotSessionIds: string[]; slotPaths: string[] }>
   /** Last user message content sent via sendMessage (e2e annotation inject). */
   getLastOutboundUserContent: () => string | null
-  /** Assert worktree dirty preflight via product remove path. */
-  removeWorktree: (
-    sessionId: string,
-    worktreePath: string,
-    force?: boolean,
-  ) => Promise<{
-    ok: boolean
-    error?: string
-    errorCode?: WorktreeRemoveErrorCode
-    dirtySummary?: string
-  }>
   /** Seed pending diff annotations (InputBar product inject path). */
   seedDiffAnnotation: (
     sessionId: string,
@@ -2710,37 +2384,7 @@ function installE2eHooks(svc: SessionService): void {
         maxTurns: goal.maxTurns,
       })
     },
-    seedParallelRun: (opts) => {
-      // Deprecated for P5 e2e — prefer startParallelRun (real product path).
-      const n = opts.n ?? 2
-      const runId = `e2e-prun-${Date.now().toString(36)}`
-      const plan = planParallelFanout({
-        n,
-        prompt: opts.prompt ?? 'e2e parallel',
-        runId,
-      })
-      useParallelStore.getState().addRun({
-        id: runId,
-        baseCwd: opts.baseCwd,
-        prompt: plan.prompt,
-        hostSessionId: opts.hostSessionId,
-        source: 'host',
-        createdAt: Date.now(),
-        // pathKey on the plan is branch segment only; product layout is {runId}/{branch}.
-        slots: plan.slots.map((s) => ({
-          index: s.index,
-          sessionId: `slot-sess-${s.index}`,
-          worktreePath: `${opts.baseCwd}/.hip-wt/${runId}/${s.branch}`,
-          branch: s.branch,
-          status: 'ready' as const,
-        })),
-      })
-      return { runId, slotCount: plan.slots.length }
-    },
-    startParallelRun: (opts) => svc.startParallelRun(opts),
     getLastOutboundUserContent: () => svc.getLastOutboundUserContent(),
-    removeWorktree: (sessionId, worktreePath, force) =>
-      svc.removeWorktree(sessionId, worktreePath, force),
     seedDiffAnnotation: (sessionId, ann) =>
       useDiffAnnotationStore.getState().add(sessionId, ann),
     sendWithPendingAnnotations: (sessionId, text) => {

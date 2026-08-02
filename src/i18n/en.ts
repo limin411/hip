@@ -8,92 +8,6 @@ export const en = {
       sendMessage: 'Send a message to start the conversation',
       inputPlaceholder: 'Message hip… (Enter to send, Shift+Enter for newline)',
       resizeInput: 'Drag to resize input',
-      /**
-       * Agent HITL parallel:started toast only (serverMessageEffects).
-       * Host UI uses chat.worktreeControl.* — do not reintroduce agent-worded host keys.
-       */
-      parallel: {
-        started: 'Started {{count}} parallel track(s)',
-      },
-      /** WorktreeControl: browse / single create / delete (host parallel explore UI removed). */
-      worktreeControl: {
-        /** HITL optionId → labels for agent parallel_worktrees (PermissionModal maps by optionId). */
-        hitlOption: {
-          n1: '1 track',
-          n2: '2 tracks',
-          n3: '3 tracks',
-          n4: '4 tracks',
-          reject: "Don't parallelize",
-        },
-        /** Humanized WorktreeSource subtitles for catalog rows. */
-        source: {
-          protocol: 'Manual',
-          parallel: 'Agent parallel',
-          host_fanout: 'Batch create',
-          agent_tool: 'Agent tool',
-          background: 'Background',
-          import: 'Imported',
-          discovered: 'Discovered',
-          primary: 'Main',
-        },
-        /** Browse popover */
-        chipAria: 'Isolated workspaces',
-        chipPurpose: 'Browse, switch, or create isolated workspaces',
-        mainWorkspace: 'Main workspace',
-        pathBlocked: 'Project path unavailable',
-        current: 'Current',
-        listTitle: 'Isolated workspaces',
-        refresh: 'Refresh',
-        emptyTitle: 'No isolated workspaces yet',
-        createSingle: 'New isolated workspace…',
-        /** Single isolation create Modal */
-        createSingleTitle: 'New isolated workspace',
-        createSingleHint:
-          'Creates one clean isolated workspace from the current main workspace HEAD. Branch name is assigned automatically.',
-        createSingleBranch: 'Branch',
-        createSingleBase: 'Based on',
-        createSingleBaseHead: 'HEAD (main workspace)',
-        createSingleOpenSession: 'Open new chat after create',
-        createSingleOpenSessionHint:
-          'On: open a Code chat at the new path. Off: create the directory only.',
-        createSingleConfirm: 'Create',
-        createSingleCreating: 'Creating…',
-        createSingleFailed: 'Could not create isolated workspace',
-        /** D24: only after create/op error — never from empty list alone. */
-        nonGitBanner: 'This folder is not a git repository. Create is disabled.',
-        footerHint: 'Background temporary isolates do not appear here',
-        unresolvedBanner: 'Could not determine the main workspace. Create and delete are disabled.',
-        openChat: 'Open chat',
-        copyPath: 'Copy path',
-        pathCopied: 'Path copied',
-        copyFailed: 'Could not copy path',
-        rowMenu: 'Workspace actions',
-        agentTaskOnly: 'This track runs as a background task — check progress in the sidebar',
-        noSessionToast: 'No chat bound to this workspace yet',
-        openHere: 'Open chat here',
-        /** Delete confirm Modal (PR6 / D6 / D15) */
-        delete: {
-          menuItem: 'Delete…',
-          title: 'Delete isolated workspace “{{label}}”?',
-          pathLabel: 'Path',
-          path: 'Path: {{path}}',
-          branchLabel: 'Branch',
-          branch: 'Branch: {{branch}}',
-          cascadeNote:
-            'Linked isolated chats may also close (the system cleans up conversations bound to this directory).',
-          dirtyWarning:
-            'Uncommitted changes detected. Force delete will permanently discard those changes.',
-          confirm: 'Delete',
-          forceConfirm: 'Force delete and discard changes',
-          deleting: 'Deleting…',
-          removed: 'Deleted isolated workspace {{label}}',
-          removedForce: 'Force-deleted isolated workspace {{label}}',
-          failed: 'Could not delete isolated workspace {{label}}',
-        },
-      },
-      worktree: {
-        created: 'Worktree ready: {{label}}',
-      },
       goal: {
         aria: 'Active goal',
       },
@@ -726,7 +640,6 @@ export const en = {
         switching: 'Switching…',
         switchFailed: 'Could not switch branch',
         switchRetry: 'Retry',
-        inWorktree: 'worktree',
         switchBlockedRunning: 'Cannot switch branches while a session is running in this workspace',
         switchCheckedOut: 'This branch is already checked out in another workspace: {{path}}',
       },

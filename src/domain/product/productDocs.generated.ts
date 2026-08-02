@@ -4,7 +4,7 @@
  * Regenerate: yarn product:content
  * Check:      yarn product:content:check
  *
- * contentHash=34ffdbb4d612da97 skillVersion=3 productVersion=1.0.1
+ * contentHash=c41f03e640aaf37b skillVersion=3 productVersion=1.0.1
  */
 
 export type ProductHelpSectionId = 'overview' | 'memory' | 'config' | 'troubleshooting' | 'agents'
@@ -210,7 +210,7 @@ Managed sub-agents may get read-only core injection; external ACP agents default
 | \`~/.hip/plugins/\` | Installed plugins |
 | \`~/.hip/memories/\` | Memory markdown mirrors |
 | \`~/.hip/builtin-skills/\` | Built-in progressive product skills (e.g. this \`hip\` skill) |
-| \`~/.hip/scratch/\`, worktrees | Scratch / parallel worktree helpers |
+| \`~/.hip/scratch/\` | Scratch helpers |
 | \`~/.hip/trash/\` | Product recycle bin (knowledge FS quarantine; sessions soft-delete via SQLite) |
 
 ### Recycle bin & soft-delete
@@ -727,7 +727,7 @@ Managed sub-agents may get read-only core injection; external ACP agents default
 | \`~/.hip/plugins/\` | Installed plugins |
 | \`~/.hip/memories/\` | Memory markdown mirrors |
 | \`~/.hip/builtin-skills/\` | Built-in progressive product skills (e.g. this \`hip\` skill) |
-| \`~/.hip/scratch/\`, worktrees | Scratch / parallel worktree helpers |
+| \`~/.hip/scratch/\` | Scratch helpers |
 | \`~/.hip/trash/\` | Product recycle bin (knowledge FS quarantine; sessions soft-delete via SQLite) |
 
 ### Recycle bin & soft-delete
@@ -1242,7 +1242,7 @@ SQLite（\`memory_items\`）中的结构化条目：偏好、约定、教训、�
 | \`~/.hip/plugins/\` | 已安装插件 |
 | \`~/.hip/memories/\` | 记忆 Markdown 镜像 |
 | \`~/.hip/builtin-skills/\` | 内置渐进产品技能（如 \`hip\`） |
-| \`~/.hip/scratch/\`、worktrees | 临时区 / 并行 worktree |
+| | \`~/.hip/scratch/\` | 临时区助手 |
 
 项目覆盖常在 \`<project>/.hip/\`（如 \`.hip/skills/\`、\`.hip/hip.toml\`）。
 
@@ -1996,7 +1996,7 @@ SQLite（\`memory_items\`）内の構造化アイテム：設定、慣習、教�
 | \`~/.hip/plugins/\` | インストール済みプラグイン |
 | \`~/.hip/memories/\` | メモリマークダウンミラー |
 | \`~/.hip/builtin-skills/\` | 組み込みプログレッシブ製品スキル (例: この \`hip\` スキル) |
-| \`~/.hip/scratch/\`, worktrees | スクラッチ / 並列ワークツリーヘルパー |
+| | \`~/.hip/scratch/\` | スクラッチヘルパー |
 | \`~/.hip/trash/\` | 製品ごみ箱 (知識FS隔離; セッションはSQLite経由でソフトデリート) |
 
 ### ごみ箱とソフトデリート

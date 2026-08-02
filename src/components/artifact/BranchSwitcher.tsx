@@ -5,10 +5,6 @@ import { cn } from '@/lib/utils'
 import { useDomainStore } from '@/domain/sessionStore'
 import { sessionService } from '@/domain/sessionService'
 import { useDiffStore, EMPTY_DIFF } from '@/store/diffStore'
-import { useParallelStore } from '@/store/parallelStore'
-import { useWorktreeStore } from '@/store/worktreeStore'
-import { resolveWorktreeHostContext } from '@/lib/worktreeHostContext'
-import { pathKey } from '@/lib/worktreeNesting'
 import { parseCheckedOutPath } from '@/lib/branchSwitchError'
 import { Modal } from '@/components/ui/Modal'
 import { Button } from '@/components/ui/Button'
@@ -20,6 +16,10 @@ import {
   DropdownMenuItem,
   DropdownMenuLabel,
 } from '@/components/ui/DropdownMenu'
+
+function pathKey(p: string): string {
+  return p.replace(/\\/g, '/').replace(/\/+$/, '')
+}
 
 /** Panel-header current-branch chip + branch dropdown + a switch-confirm modal. */
 export function BranchSwitcher() {
@@ -41,28 +41,6 @@ export function BranchSwitcher() {
         pathKey(s.config.cwd) === pathKey(activeCwd),
     )
   }, [sessions, sessionId, activeCwd])
-
-  // C3: inside an isolated worktree the chip's git ops act on that checkout —
-  // label it so the scope is explicit (same host resolution as WorktreeControl).
-  const runs = useParallelStore((s) => s.runs)
-  const catalogById = useWorktreeStore((s) => s.byId)
-  const hostCtx = useMemo(
-    () =>
-      resolveWorktreeHostContext({
-        activeSession: active
-          ? { id: active.id, config: { cwd: active.config.cwd, surface: active.config.surface } }
-          : null,
-        sessions: sessions.map((s) => ({
-          id: s.id,
-          title: s.title,
-          config: { cwd: s.config.cwd },
-        })),
-        runs,
-        catalog: Object.values(catalogById),
-      }),
-    [active, sessions, runs, catalogById],
-  )
-  const isIsolated = hostCtx.isOnIsolated
 
   const [pending, setPending] = useState<string | null>(null) // branch awaiting confirm
   const [switching, setSwitching] = useState(false)
@@ -128,7 +106,6 @@ export function BranchSwitcher() {
             <GitBranch size={11} strokeWidth={1.75} className="shrink-0" />
             <span className="max-w-[120px] truncate">
               {current ?? t('artifact.branch.noBranch')}
-              {isIsolated ? ` · ${t('artifact.branch.inWorktree')}` : ''}
             </span>
             <ChevronDown size={11} strokeWidth={1.75} className="shrink-0 opacity-60" />
           </ComposerChip>

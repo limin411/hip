@@ -239,9 +239,8 @@ export class Session {
     description: string,
     signal: AbortSignal,
     send: SendFn,
-    opts?: import('./session-background.js').BackgroundSubagentOpts,
   ): Promise<void> {
-    return runBackgroundSubagent(this as unknown as SessionTurnHost, taskId, description, signal, send, opts)
+    return runBackgroundSubagent(this as unknown as SessionTurnHost, taskId, description, signal, send)
   }
 
 

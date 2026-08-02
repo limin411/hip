@@ -1,4 +1,4 @@
-/** Background subagent helpers (Phase 3b / Phase 4 worktree isolation). */
+/** Background subagent helpers. */
 import type { PermissionMode } from '@hip/protocol'
 import { HumanMessage, AIMessage, type BaseMessage } from '@langchain/core/messages'
 import { runSubagent } from './subagent.js'
@@ -6,14 +6,6 @@ import { childMaxStepsForAgent } from './loop-control.js'
 import { GuardianReviewer } from './guardian.js'
 import { safeErrorMessage } from './error.js'
 import type { SessionTurnHost, SendFn } from './session-turn-runner.js'
-import { acquireBackgroundWorktree } from './background-worktree.js'
-
-export type BackgroundSubagentOpts = {
-  /** Force root (e.g. a pre-created parallel worktree). Skips acquireBackgroundWorktree. */
-  root?: string
-  /** When true with a forced root, do not remove the worktree after the task ends. */
-  keepWorktree?: boolean
-}
 
 export async function runBackgroundSubagent(
   host: SessionTurnHost,
@@ -21,7 +13,6 @@ export async function runBackgroundSubagent(
   description: string,
   signal: AbortSignal,
   send: SendFn,
-  opts: BackgroundSubagentOpts = {},
 ): Promise<void> {
   const cwd = host._config.cwd ?? process.cwd()
   const runner = host.modelRunner()
@@ -38,38 +29,15 @@ export async function runBackgroundSubagent(
   let status: 'completed' | 'failed' = 'completed'
   let error: string | undefined
 
-  // Prefer an isolated git worktree so background agents do not thrash the main tree.
-  // Callers may pass a pre-created root (parallel_worktrees) and keep it after completion.
-  const wt =
-    opts.root
-      ? {
-          root: opts.root,
-          isolated: true,
-          cleanup: async () => {
-            if (opts.keepWorktree) return
-          },
-        }
-      : await acquireBackgroundWorktree(cwd, host.id, taskId)
-  if (wt.isolated) {
-    send({
-      type: 'agent:notification',
-      sessionId: host.id,
-      taskId,
-      description: `Background task isolated in worktree: ${wt.root}`,
-      status: 'completed',
-      result: wt.root,
-    })
-  }
-
   try {
     result = await runSubagent({
       runner,
-      root: wt.root,
+      root: cwd,
       summarizer,
       emit: { token: () => {}, reasoning: () => {}, toolStarted: () => {}, toolFinished: () => {}, usage: () => {}, planDelta: () => {}, compaction: () => {} },
       signal,
       description,
-      childMaxSteps: childMaxStepsForAgent('worker', wt.root),
+      childMaxSteps: childMaxStepsForAgent('worker', cwd),
       permissionMode: mode,
       requestApproval,
       mode: 'background',
@@ -87,8 +55,6 @@ export async function runBackgroundSubagent(
     result = `Error: ${msg}`
     status = 'failed'
     error = msg
-  } finally {
-    await wt.cleanup()
   }
 
   host.backgroundManager.completeTask(taskId, status, error === undefined ? result : undefined, error)

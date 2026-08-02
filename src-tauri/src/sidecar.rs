@@ -142,10 +142,6 @@ pub async fn spawn_sidecar(app: &AppHandle) -> Result<u16, String> {
     if let Some(p) = crate::paths::skills_dir(app) {
         cmd = cmd.env("HIP_SKILLS_DIR", p.to_string_lossy().into_owned());
     }
-    // Tell the sidecar where agent worktrees live (centralised isolation dir).
-    if let Some(p) = crate::paths::worktrees_dir(app) {
-        cmd = cmd.env("HIP_WORKTREES_DIR", p.to_string_lossy().into_owned());
-    }
     // Tell the sidecar where to persist sessions. paths::db_dir creates the dir; if it's
     // unavailable the sidecar falls back to an in-memory DB rather than failing to start.
     if let Some(dir) = crate::paths::db_dir(app) {

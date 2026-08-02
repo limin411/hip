@@ -426,7 +426,7 @@ export interface BuildToolsOpts {
    *  run_script is dropped in chat mode (it would let a read-only agent mutate the project). */
   permissionMode?: PermissionMode
   /**
-   * Product surface. Chat further clamps git/plugin/worktree tools even when permissionMode
+   * Product surface. Chat further clamps git/plugin tools even when permissionMode
    * allows writes (artifact writes stay; project mutation tools do not).
    */
   surface?: 'chat' | 'code' | 'knowledge'
@@ -448,28 +448,6 @@ export interface BuildToolsOpts {
   mediaEnabled?: boolean
   /** PlanMode instance for Enter/Exit plan-mode tools. */
   planMode?: import('../plan-mode.js').PlanMode
-  /**
-   * HITL multi-choice for tools like parallel_worktrees (resolves raw optionId).
-   * When absent, parallel_worktrees is not registered.
-   */
-  requestChoice?: import('./parallel-worktree.js').ParallelChoiceFn
-  /**
-   * Start a background worker forced into a pre-created worktree root (no auto-delete).
-   * When absent, parallel_worktrees is not registered.
-   */
-  spawnInWorktree?: import('./parallel-worktree.js').ParallelSlotSpawnFn
-  /** Optional UI/protocol hook when parallel slots are created. */
-  onParallelRunStarted?: (payload: {
-    runId: string
-    baseCwd: string
-    goal: string
-    slots: Array<{ index: number; branch: string; path: string; taskId: string; worktreeId?: string }>
-  }) => void
-  /**
-   * Emit worktree:changed for agent git worktree tools (PR3).
-   * Wire from session-turn-runner like onParallelRunStarted → send.
-   */
-  onWorktreeChanged?: import('../worktree-service.js').WorktreeChangedNotify
   /**
    * Session checkpoint list for git_checkpoint_list (hip shadow refs are invisible
    * to plain git). When absent, checkpoint tools are not registered.
@@ -510,5 +488,4 @@ export const SELF_GATED_TOOLS: Set<string> = new Set([
   'run_script',
   'monitor',
   'EnterPlanMode',
-  'parallel_worktrees',
 ])

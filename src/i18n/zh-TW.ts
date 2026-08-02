@@ -16,77 +16,6 @@ export const zhTW = {
     "sendMessage": "發送一條消息開始對話",
     "inputPlaceholder": "給 hip 發消息…（Enter 發送，Shift+Enter 換行）",
     "resizeInput": "拖曳調整輸入框高度",
-    "parallel": {
-      "started": "已啟動 {{count}} 路並行"
-    },
-    "worktreeControl": {
-      "hitlOption": {
-        "n1": "1 路",
-        "n2": "2 路",
-        "n3": "3 路",
-        "n4": "4 路",
-        "reject": "不要並行"
-      },
-      "source": {
-        "protocol": "手動建立",
-        "parallel": "智慧體並行",
-        "host_fanout": "批次建立",
-        "agent_tool": "智慧體工具",
-        "background": "背景",
-        "import": "匯入",
-        "discovered": "已發現",
-        "primary": "主工作區"
-      },
-      "chipAria": "隔離工作區",
-      "chipPurpose": "瀏覽、切換或新建隔離工作區",
-      "mainWorkspace": "主工作區",
-      "pathBlocked": "專案路徑不可用",
-      "current": "目前",
-      "listTitle": "隔離工作區",
-      "refresh": "重新整理",
-      "emptyTitle": "還沒有隔離工作區",
-      "createSingle": "新建隔離工作區…",
-      "createSingleTitle": "新建隔離工作區",
-      "createSingleHint": "從主工作區目前 HEAD 建立一路乾淨的隔離工作區。分支名由系統自動分配。",
-      "createSingleBranch": "分支",
-      "createSingleBase": "基於",
-      "createSingleBaseHead": "HEAD（主工作區）",
-      "createSingleOpenSession": "建立後開啟新對話",
-      "createSingleOpenSessionHint": "開：在新路徑開啟 Code 對話。關：僅建立目錄。",
-      "createSingleConfirm": "建立",
-      "createSingleCreating": "建立中…",
-      "createSingleFailed": "無法建立隔離工作區",
-      "nonGitBanner": "目前資料夾不是 git 倉庫，已停用建立。",
-      "footerHint": "背景臨時隔離不會出現在此列表",
-      "unresolvedBanner": "無法確定主工作區，建立/刪除已停用",
-      "openChat": "開啟對話",
-      "copyPath": "複製路徑",
-      "pathCopied": "路徑已複製",
-      "copyFailed": "無法複製路徑",
-      "rowMenu": "工作區操作",
-      "agentTaskOnly": "該方案由背景任務執行，請從側欄查看進度",
-      "noSessionToast": "此工作區尚未綁定對話",
-      "openHere": "在此工作區開啟對話",
-      "delete": {
-        "menuItem": "刪除…",
-        "title": "刪除隔離工作區「{{label}}」？",
-        "pathLabel": "路徑",
-        "path": "路徑：{{path}}",
-        "branchLabel": "分支",
-        "branch": "分支：{{branch}}",
-        "cascadeNote": "關聯的隔離對話可能會一併關閉（系統會自動清理綁定到該目錄的對話）。",
-        "dirtyWarning": "偵測到未提交變更。強制刪除將永久丟棄這些變更。",
-        "confirm": "刪除",
-        "forceConfirm": "強制刪除並丟棄變更",
-        "deleting": "刪除中…",
-        "removed": "已刪除隔離工作區 {{label}}",
-        "removedForce": "已強制刪除隔離工作區 {{label}}",
-        "failed": "無法刪除隔離工作區 {{label}}"
-      }
-    },
-    "worktree": {
-      "created": "Worktree 已就緒：{{label}}"
-    },
     "goal": {
       "aria": "目前目標"
     },
@@ -745,7 +674,6 @@ export const zhTW = {
       "switching": "切換中…",
       "switchFailed": "切換分支失敗",
       "switchRetry": "重試",
-      "inWorktree": "工作區",
       "switchBlockedRunning": "該工作區有工作階段正在執行，無法切換分支",
       "switchCheckedOut": "該分支已在另一個工作區檢出：{{path}}"
     },

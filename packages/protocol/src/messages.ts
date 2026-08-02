@@ -21,10 +21,6 @@ import type {
   Checkpoint,
   CommitLogEntry,
   Branch,
-  WorktreeInfo,
-  WorktreeRecord,
-  WorktreeSource,
-  WorktreeRemoveErrorCode,
   FsEntry,
 } from './workspace-types.js'
 import type { McpServerConfig } from './mcp-config.js'
@@ -69,7 +65,7 @@ export type ClientMessage =
   /**
    * Permanent session delete (HARD only).
    * UI soft-delete uses `session:softDelete`. CLI and recycle-bin "Delete forever" use this.
-   * `reason` is an audit tag (user / clearAll / worktree-cascade / worktree-menu / cli / trash-empty / trash-retention / …).
+   * `reason` is an audit tag (user / clearAll / cli / trash-empty / trash-retention / …).
    */
   | {
       type: 'session:delete'
@@ -172,35 +168,6 @@ export type ClientMessage =
       pluginDir?: string
       pluginId?: string
     }
-  | {
-      type: 'git:worktree:create'
-      sessionId: string
-      branch: string
-      /** When true, create branch from baseRef (or HEAD) before worktree add. */
-      createBranch?: boolean
-      /** Start point for createBranch (ref/commit). Defaults to HEAD. */
-      baseRef?: string
-      /**
-       * Relative key under managed worktrees dir (e.g. `runId/branch`).
-       * Segments are sanitized; default is `branch`.
-       */
-      pathKey?: string
-      /**
-       * When false, suppress UI reveal / per-create success toast (parallel slots).
-       * Omit or true → WorktreeService default true (single product create).
-       */
-      reveal?: boolean
-      /**
-       * Product source tag (D7/D18/D26). Handler defaults to `protocol` when omitted.
-       * Callers should set explicitly: single → protocol, host parallel → host_fanout,
-       * agent tool → parallel (in-process, not this RPC).
-       */
-      source?: WorktreeSource
-      /** Optional display label stored in meta (durable once wired). */
-      label?: string
-    }
-  | { type: 'git:worktree:list'; sessionId: string }
-  | { type: 'git:worktree:remove'; sessionId: string; worktreePath: string; force?: boolean }
   | { type: 'workflow:run'; sessionId: string; def: WorkflowDef; runInputs?: { text: string; data?: unknown } }
   | { type: 'workflow:getActive'; sessionId: string }
   | { type: 'mcp:listResources'; serverId: string }
@@ -400,40 +367,6 @@ export type ServerMessage =
   /** Emitted by the Guardian hook when a tool invocation exceeds the risk threshold. */
   | { type: 'guardian:risk'; sessionId: string; turnId: string; toolName: string; risk: 'low' | 'medium' | 'high'; category: string; reason: string }
   | { type: 'plugin:list:result'; plugins: PluginManifest[] }
-  | { type: 'git:worktree:create:result'; sessionId: string; ok: boolean; path?: string; id?: string; error?: string }
-  | { type: 'git:worktree:list:result'; sessionId: string; worktrees: WorktreeInfo[] }
-  | {
-      type: 'git:worktree:remove:result'
-      sessionId: string
-      ok: boolean
-      error?: string
-      /** Structured remove failure (PR7); prefer over string-match on `error`. */
-      errorCode?: WorktreeRemoveErrorCode
-      /** Optional porcelain summary when errorCode is WORKTREE_DIRTY (file-count copy later). */
-      dirtySummary?: string
-    }
-  /**
-   * Product worktree catalog change on the same WS as the creating client (KD5).
-   * Server-only — not a client RPC; message-guard unchanged.
-   */
-  | {
-      type: 'worktree:changed'
-      sessionId?: string
-      repoKey: string
-      kind: 'created' | 'updated' | 'removed' | 'discovered' | 'imported'
-      worktree: WorktreeRecord
-      /** When true, UI should expand host and scroll to this worktree. */
-      reveal?: boolean
-    }
-  /** Agent-driven parallel worktree run started (after user HITL). */
-  | {
-      type: 'parallel:started'
-      sessionId: string
-      runId: string
-      baseCwd: string
-      goal: string
-      slots: Array<{ index: number; branch: string; path: string; taskId: string; worktreeId?: string }>
-    }
   | { type: 'mcp:listResources:result'; serverId: string; resources: McpResource[]; resourceTemplates?: McpResourceTemplate[]; error?: string }
   | { type: 'mcp:readResource:result'; serverId: string; uri: string; contents: McpResourceContent[]; error?: string }
   | { type: 'mcp:listPrompts:result'; serverId: string; prompts: McpPrompt[]; error?: string }

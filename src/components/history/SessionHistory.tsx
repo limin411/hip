@@ -4,13 +4,6 @@ import { Search, MessageSquare, Code2, Trash2, Inbox, SearchX } from 'lucide-rea
 import { useSessions, sessionService } from '@/domain'
 import { selectSessionFromSidebar } from '@/components/layout/sidebarActions'
 import { surfaceOf } from '@/lib/sessions'
-import {
-  collectNestedWorktreeSessionIds,
-  extractParallelNestingHints,
-  nestableCatalogPaths,
-} from '@/lib/worktreeNesting'
-import { useParallelStore } from '@/store/parallelStore'
-import { useWorktreeStore } from '@/store/worktreeStore'
 import { formatAbsolute, formatRelativeTime } from '@/lib/datetime'
 import { Button } from '@/components/ui/Button'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/Tabs'
@@ -35,36 +28,21 @@ export function SessionHistory({
   const { t, i18n } = useTranslation()
   const locale = i18n.language || 'en'
   const sessions = useSessions()
-  const parallelRuns = useParallelStore((s) => s.runs)
-  const catalogById = useWorktreeStore((s) => s.byId)
   const [query, setQuery] = useState('')
   const [surfaceFilter, setSurfaceFilter] = useState<SurfaceFilter>('all')
   const [page, setPage] = useState(1)
   const [deletingSessionId, setDeletingSessionId] = useState<string | null>(null)
   const [clearAllOpen, setClearAllOpen] = useState(false)
 
-  const nestedWorktreeSessionIds = useMemo(() => {
-    const hints = extractParallelNestingHints(parallelRuns)
-    // Primary catalog path === host project cwd; never use it for nesting.
-    const catalogPaths = nestableCatalogPaths(Object.values(catalogById))
-    return collectNestedWorktreeSessionIds({
-      sessions: sessions.map((s) => ({ id: s.id, title: s.title, config: { cwd: s.config.cwd } })),
-      slotSessionIds: hints.slotSessionIds,
-      worktreePaths: [...hints.worktreePaths, ...catalogPaths],
-    })
-  }, [sessions, parallelRuns, catalogById])
-
   const deletingSession = useMemo(
     () => sessions.find((s) => s.id === deletingSessionId) ?? null,
     [sessions, deletingSessionId],
   )
 
-  /** Visible history universe (worktree slots excluded). */
+  /** Visible history universe. */
   const listBase = useMemo(() => {
-    return [...sessions]
-      .filter((s) => !nestedWorktreeSessionIds.has(s.id))
-      .sort((a, b) => b.updatedAtMs - a.updatedAtMs)
-  }, [sessions, nestedWorktreeSessionIds])
+    return [...sessions].sort((a, b) => b.updatedAtMs - a.updatedAtMs)
+  }, [sessions])
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase()

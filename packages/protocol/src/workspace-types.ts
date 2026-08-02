@@ -1,4 +1,4 @@
-/** Filesystem, git diff, checkpoint, and worktree types. */
+/** Filesystem, git diff, and checkpoint types. */
 /** One immediate child of a directory. `path` is a real absolute host path. */
 export interface FsEntry {
   name: string
@@ -70,83 +70,5 @@ export interface CommitLogEntry {
 
 /** One branch in the repo, with a flag for the checked-out one. */
 export interface Branch { name: string; current: boolean }
-
-/**
- * Stable for a given path across process restarts.
- * NOT stable across path moves/relocations.
- * @see docs/design/2026-07-17-worktree-studio-orca-alignment.md KD15
- */
-export type WorktreeId = string
-
-export type WorktreeSource =
-  | 'agent_tool' // git_worktree_create
-  | 'protocol' // git:worktree:create / CLI / single isolation
-  | 'parallel' // parallel_worktrees agent HITL tool
-  | 'host_fanout' // sessionService.startParallelRun (host composer parallel)
-  | 'background' // durable only when keepWorktree via pre-created root
-  | 'import' // external inbox accept (P1)
-  | 'discovered' // listed from git, not yet claimed
-  | 'primary' // main tree
-
-/** Structured codes on `git:worktree:remove:result` (PR7 additive). */
-export type WorktreeRemoveErrorCode =
-  | 'WORKTREE_DIRTY'
-  | 'NOT_MANAGED'
-  | 'NOT_FOUND'
-  | 'UNKNOWN'
-
-/** First-class worktree product object (events + meta). */
-export interface WorktreeRecord {
-  id: WorktreeId
-  path: string // absolute, realpath preferred
-  branch: string // '' if detached
-  head: string
-  repoKey: string // stable: hash of primary realpath
-  isPrimary: boolean
-  managed: boolean // path under current getWorktreesDir() only (v1)
-  /** When true, excluded from Studio catalog (disposable bg isolate). */
-  ephemeral?: boolean
-  source: WorktreeSource
-  label?: string // display name; default branch or last path segment
-  pathKey?: string // relative key under managed root used at create
-  createdAt?: number
-  hostSessionId?: string // session whose cwd was used for create
-  boundSessionId?: string // session whose cwd === this.path (if any)
-  taskId?: string
-  parallelRunId?: string
-  dirty?: boolean
-  lastSeenAt?: number
-}
-
-/** On-disk meta file under ~/.hip/worktrees/.meta/<repoKey>.json */
-export interface WorktreeMetaFile {
-  version: 1
-  repoKey: string
-  primaryPath: string
-  records: Record<WorktreeId, Omit<WorktreeRecord, 'branch' | 'head' | 'dirty'>>
-  /** Paths user dismissed from external inbox */
-  dismissedExternalPaths?: string[]
-  /** Paths user imported */
-  importedExternalPaths?: string[]
-}
-
-export type WorktreeChangeKind = 'created' | 'updated' | 'removed' | 'discovered' | 'imported'
-
-/**
- * Porcelain worktree row + optional Studio enrichment (KD13).
- * List RPC stays `git:worktree:list`; fields are additive.
- */
-export interface WorktreeInfo {
-  path: string
-  branch: string
-  head: string
-  id?: WorktreeId
-  managed?: boolean
-  isPrimary?: boolean
-  ephemeral?: boolean
-  source?: WorktreeSource
-  label?: string
-  repoKey?: string
-}
 
 export type SubagentMode = 'foreground' | 'background'

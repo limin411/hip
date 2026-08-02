@@ -12,8 +12,6 @@ import { extractAutoOpenArtifacts } from '@/lib/renderedArtifacts'
 import { extractSearchSources } from '@/lib/searchSources'
 import { surfaceOf } from '@/lib/sessions'
 import { consumeUserDiffRequest } from '@/domain/commands/diffFeedback'
-import { useParallelStore } from '@/store/parallelStore'
-import { useWorktreeStore } from '@/store/worktreeStore'
 import {
   commandFromRunScriptInput,
   pathFromToolInput,
@@ -23,9 +21,6 @@ import {
 } from '@/lib/writeFollow'
 import { useFocusStore } from '@/store/focusStore'
 import { useGoalStore } from '@/store/goalStore'
-import { resolveWorktreeListCatalogHost } from '@/lib/worktreeHostContext'
-import { collectWorktreeCascadeDeleteIds } from '@/lib/worktreeNesting'
-import { auditSessionDelete, debugSessionDelete } from '@/lib/sessionDelete'
 import { useTaskRuntimeStore } from '@/store/taskRuntimeStore'
 
 /** Must match sidecar KEEP_RECENT_TURNS — used only in no-op copy. */
@@ -538,30 +533,6 @@ export function applyServerMessageEffects(msg: ServerMessage, deps: ServerMessag
       }
       return
 
-    case 'parallel:started': {
-      useParallelStore.getState().addRun({
-        id: msg.runId,
-        baseCwd: msg.baseCwd,
-        prompt: msg.goal,
-        hostSessionId: msg.sessionId,
-        source: 'agent',
-        createdAt: Date.now(),
-        slots: msg.slots.map((s) => ({
-          index: s.index,
-          sessionId: '',
-          taskId: s.taskId,
-          worktreeId: s.worktreeId,
-          worktreePath: s.path,
-          branch: s.branch,
-          status: 'ready' as const,
-        })),
-      })
-      toast.success(
-        i18n.t('chat.parallel.started', { count: msg.slots.length }),
-      )
-      return
-    }
-
     case 'goal:updated': {
       if (!msg.goal) {
         useGoalStore.getState().setGoal(msg.sessionId, null)
@@ -574,113 +545,6 @@ export function applyServerMessageEffects(msg: ServerMessage, deps: ServerMessag
         turns: msg.goal.turns,
         maxTurns: msg.goal.maxTurns,
       })
-      return
-    }
-
-    case 'worktree:changed': {
-      useWorktreeStore.getState().applyChanged(msg.worktree, msg.kind)
-      // Dual-store consistency: parallel sidebar slots are a live projection of worktrees.
-      // Domain event is the fast path; list snapshot (below) is the safety net.
-      if (msg.kind === 'removed') {
-        const removedPath = msg.worktree.path
-        const runs = useParallelStore.getState().runs
-        const sessions = useDomainStore.getState().sessions
-        const cascade = collectWorktreeCascadeDeleteIds({
-          removedPath,
-          removedWorktreeId: msg.worktree.id,
-          runs,
-          sessions: sessions.map((s) => ({
-            id: s.id,
-            title: s.title,
-            config: { cwd: s.config.cwd },
-          })),
-        })
-        debugSessionDelete('worktree:changed removed — cascade plan', {
-          removedPath,
-          removedWorktreeId: msg.worktree.id,
-          hostSessionId: msg.sessionId,
-          toDelete: cascade.toDelete,
-          skipped: cascade.skipped,
-          candidatesFromSlots: cascade.candidatesFromSlots,
-          candidatesFromCwd: cascade.candidatesFromCwd,
-          parallelRunCount: runs.length,
-          sessionCount: sessions.length,
-        })
-        for (const s of cascade.skipped) {
-          auditSessionDelete('skip', {
-            sessionId: s.id,
-            reason: 'worktree-cascade',
-            why: s.why,
-            removedPath,
-            removedWorktreeId: msg.worktree.id,
-          })
-        }
-        useParallelStore.getState().pruneSlotsMatching({
-          paths: removedPath ? [removedPath] : [],
-          worktreeIds: msg.worktree.id ? [msg.worktree.id] : [],
-        })
-        if (cascade.toDelete.length > 0) {
-          auditSessionDelete('batch-start', {
-            reason: 'worktree-cascade',
-            count: cascade.toDelete.length,
-            ids: cascade.toDelete,
-            removedPath,
-          })
-          // Lazy import avoids circular graph: sessionService → effects → sessionService.
-          void import('./sessionService').then(({ sessionService }) => {
-            for (const id of cascade.toDelete) {
-              sessionService.deleteSession(id, {
-                reason: 'worktree-cascade',
-                meta: { removedPath, removedWorktreeId: msg.worktree.id },
-              })
-            }
-            auditSessionDelete('batch-done', {
-              reason: 'worktree-cascade',
-              count: cascade.toDelete.length,
-            })
-          })
-        }
-      }
-      // Same-process only toast (not CLI spawn).
-      if (msg.kind === 'created' && msg.reveal) {
-        toast.success(
-          i18n.t('chat.worktree.created', {
-            defaultValue: 'Worktree ready: {{label}}',
-            label: msg.worktree.label || msg.worktree.branch || msg.worktree.path,
-          }),
-        )
-      }
-      return
-    }
-
-    case 'git:worktree:list:result': {
-      // Authoritative snapshot: upsert + prune catalog, then reconcile parallel slots for this host.
-      // Resolve nested/slot requester → project host so catalog rows stay under the host tree
-      // (selectSession on a worktree slot also requests list and must not steal host binding).
-      const sessions = useDomainStore.getState().sessions
-      const requester = sessions.find((s) => s.id === msg.sessionId)
-      const catalogHostId = resolveWorktreeListCatalogHost({
-        sessionId: msg.sessionId,
-        worktrees: msg.worktrees,
-        activeSession: requester
-          ? {
-              id: requester.id,
-              config: { cwd: requester.config.cwd, surface: requester.config.surface },
-            }
-          : { id: msg.sessionId, config: {} },
-        sessions: sessions.map((s) => ({
-          id: s.id,
-          title: s.title,
-          config: { cwd: s.config.cwd },
-        })),
-        runs: useParallelStore.getState().runs,
-        catalog: Object.values(useWorktreeStore.getState().byId),
-      })
-      useWorktreeStore.getState().upsertFromList(msg.worktrees, catalogHostId)
-      useParallelStore.getState().reconcileToLivePaths(
-        msg.worktrees.map((w) => w.path),
-        catalogHostId,
-      )
       return
     }
 

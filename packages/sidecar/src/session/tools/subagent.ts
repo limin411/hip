@@ -216,7 +216,7 @@ export function buildTaskBatchTools(
         'Each task runs independently — one failing does not abort the others. ' +
         'Returns results grouped by task index prefixed with [<index>].' +
         rosterHint +
-        ' For concurrent write/edit work on the same tree prefer parallel_worktrees or serial tasks.',
+        ' For concurrent write/edit work on the same tree prefer serial tasks.',
       schema: z.object({
         tasks: z.array(
           z.object({

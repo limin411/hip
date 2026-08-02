@@ -4,7 +4,7 @@
  * Regenerate: yarn product:content
  * Check:      yarn product:content:check
  *
- * contentHash=34ffdbb4d612da97 skillVersion=3 productVersion=1.0.1
+ * contentHash=c41f03e640aaf37b skillVersion=3 productVersion=1.0.1
  */
 
 /** Schema / materialization version for builtin skill files (from packages/product-content/meta.json). */
@@ -177,7 +177,7 @@ export const CONFIG_REFERENCE_MD = `# hip config & local data (Level 3)
 | \`~/.hip/plugins/\` | Installed plugins |
 | \`~/.hip/memories/\` | Memory markdown mirrors |
 | \`~/.hip/builtin-skills/\` | Built-in progressive product skills (e.g. this \`hip\` skill) |
-| \`~/.hip/scratch/\`, worktrees | Scratch / parallel worktree helpers |
+| \`~/.hip/scratch/\` | Scratch helpers |
 | \`~/.hip/trash/\` | Product recycle bin (knowledge FS quarantine; sessions soft-delete via SQLite) |
 
 ### Recycle bin & soft-delete

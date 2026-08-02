@@ -14,7 +14,6 @@ function base(over: Partial<ComposerControlFlags> = {}): ComposerControlFlags {
     forcePlan: false,
     effortIsDefault: true,
     hasEffortLevels: true,
-    pinWorktree: false,
     sessionBound: true,
     ...over,
   }
@@ -29,18 +28,18 @@ function expectDisjoint(flags: ComposerControlFlags) {
 }
 
 describe('resolveComposerControls', () => {
-  it('code default: primary agent/model/branch/attach; effort+permission+plan+guidance+worktree in overflow', () => {
+  it('code default: primary agent/model/branch/attach; effort+permission+plan+guidance in overflow', () => {
     const r = expectDisjoint(base())
     expect(r.primary).toEqual(['agent', 'model', 'branch', 'attach'])
     expect(r.pinned).toEqual([])
-    expect(r.overflow).toEqual(['effort', 'permission', 'plan', 'guidance', 'worktree'])
+    expect(r.overflow).toEqual(['effort', 'permission', 'plan', 'guidance'])
   })
 
   it('code pins permission when mode is not edit', () => {
     const r = expectDisjoint(base({ permissionMode: 'full' }))
     expect(r.pinned).toContain('permission')
     expect(r.overflow).not.toContain('permission')
-    expect(r.overflow).toEqual(['effort', 'plan', 'guidance', 'worktree'])
+    expect(r.overflow).toEqual(['effort', 'plan', 'guidance'])
   })
 
   it('code pins plan when forcePlan', () => {
@@ -53,12 +52,6 @@ describe('resolveComposerControls', () => {
     const r = expectDisjoint(base({ effortIsDefault: false }))
     expect(r.pinned).toContain('effort')
     expect(r.overflow).not.toContain('effort')
-  })
-
-  it('code pins worktree when pinWorktree', () => {
-    const r = expectDisjoint(base({ pinWorktree: true }))
-    expect(r.pinned).toContain('worktree')
-    expect(r.overflow).not.toContain('worktree')
   })
 
   it('hides effort entirely when hasEffortLevels is false', () => {
@@ -103,17 +96,16 @@ describe('resolveComposerControls', () => {
     )
     expect(r.primary).toEqual(['agent', 'branch', 'attach'])
     expect(r.pinned).toEqual([])
-    expect(r.overflow).toEqual(['permission', 'guidance', 'worktree'])
+    expect(r.overflow).toEqual(['permission', 'guidance'])
     expect(r.overflow).not.toContain('effort')
     expect(r.overflow).not.toContain('plan')
   })
 
-  it('NewConversation code (sessionBound false): no guidance/worktree/branch', () => {
+  it('NewConversation code (sessionBound false): no guidance/branch', () => {
     const r = expectDisjoint(base({ sessionBound: false }))
     expect(r.primary).toEqual(['agent', 'model', 'attach'])
     expect(r.overflow).toEqual(['effort', 'permission', 'plan'])
     expect(r.overflow).not.toContain('guidance')
-    expect(r.overflow).not.toContain('worktree')
     expect(r.overflow).not.toContain('branch')
   })
 
@@ -124,24 +116,12 @@ describe('resolveComposerControls', () => {
       }),
     )
     expect(r.overflow).not.toContain('guidance')
-    expect(r.overflow).toContain('worktree')
-  })
-
-  it('available.worktree false removes worktree even if pinWorktree', () => {
-    const r = expectDisjoint(
-      base({
-        pinWorktree: true,
-        available: { worktree: false },
-      }),
-    )
-    expect(r.pinned).not.toContain('worktree')
-    expect(r.overflow).not.toContain('worktree')
   })
 
   it('every ControlId appears at most once across buckets', () => {
     const combos: ComposerControlFlags[] = [
       base(),
-      base({ permissionMode: 'chat', forcePlan: true, effortIsDefault: false, pinWorktree: true }),
+      base({ permissionMode: 'chat', forcePlan: true, effortIsDefault: false }),
       base({ surface: 'chat', effortIsDefault: false }),
       base({ externalPrimary: true, permissionMode: 'full' }),
       base({ sessionBound: false, forcePlan: true }),

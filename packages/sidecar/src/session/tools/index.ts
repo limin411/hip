@@ -11,7 +11,6 @@ import { buildSubagentTools, buildTaskBatchTools } from './subagent.js'
 import { buildScriptTools } from './script.js'
 import { buildPluginInstallTool } from './plugin.js'
 import { buildMediaTools } from './media.js'
-import { buildParallelWorktreeTools } from './parallel-worktree.js'
 import { buildTaskRuntimeExtraTools } from './task-runtime-tools.js'
 import { EnterPlanModeTool } from './enter-plan-mode.js'
 import { ExitPlanModeTool } from './exit-plan-mode.js'
@@ -83,12 +82,7 @@ export function buildAllTools(
 
   // ── Git tools (only for a real on-disk cwd; dropped on Chat / read-only) ───────
   if (profile.toolPolicy.allowGit) {
-    base.push(
-      ...buildGitTools(cwd, {
-        sessionId: opts.sessionId,
-        onWorktreeChanged: opts.onWorktreeChanged,
-      }),
-    )
+    base.push(...buildGitTools(cwd))
     // Hip shadow checkpoints (invisible to plain git) — list/revert for the agent.
     base.push(
       ...buildCheckpointTools({
@@ -165,28 +159,6 @@ export function buildAllTools(
 
   // Media tools (read_media)
   extras.push(...buildMediaTools({ enabled: opts.mediaEnabled }))
-
-  // parallel_worktrees — agent proposes N isolated worktrees; user confirms count via HITL
-  // (optionIds n1–n4 / reject). UI localizes option labels client-side by optionId (PR8 / D19);
-  // create path stays unified with host fan-out via WorktreeService (D26) — do not re-split.
-  if (
-    profile.toolPolicy.allowParallelWorktrees &&
-    cwd &&
-    opts.sessionId &&
-    opts.requestChoice &&
-    opts.spawnInWorktree
-  ) {
-    extras.push(
-      ...buildParallelWorktreeTools({
-        cwd,
-        sessionId: opts.sessionId,
-        requestChoice: opts.requestChoice,
-        spawnInWorktree: opts.spawnInWorktree,
-        onRunStarted: opts.onParallelRunStarted,
-        onWorktreeChanged: opts.onWorktreeChanged,
-      }),
-    )
-  }
 
   // ── Assemble result ────────────────────────────────────────────────────────────
   // Pass dispatch so task_batch can route per-task agent ids (explore/plan/coder).

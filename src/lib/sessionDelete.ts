@@ -6,8 +6,6 @@
 export type SessionDeleteReason =
   | 'user'
   | 'clearAll'
-  | 'worktree-cascade'
-  | 'worktree-menu'
   | 'cli'
   | 'unknown'
 

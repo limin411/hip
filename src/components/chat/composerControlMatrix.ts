@@ -14,7 +14,6 @@ export type ControlId =
   | 'permission'
   | 'plan'
   | 'guidance'
-  | 'worktree'
   | 'branch'
   | 'attach'
 
@@ -25,16 +24,13 @@ export interface ComposerControlFlags {
   forcePlan: boolean
   effortIsDefault: boolean
   hasEffortLevels: boolean
-  /** True when worktree control should pin (active non-primary worktree context). */
-  pinWorktree: boolean
-  /** False on NewConversation empty draft (no guidance / worktree). */
+  /** False on NewConversation empty draft (no guidance). */
   sessionBound: boolean
   /**
    * Runtime availability after picker self-null rules.
    * Call site computes from the same predicates as components:
    * - effort: hasEffortLevels (also applied structurally below)
    * - guidance: sessionBound && code && cwd && guidance text present
-   * - worktree: sessionBound && worktree UI applicable
    * Missing key ⇒ treat as true for always-mounted controls (agent/model/attach/permission/plan)
    * after structural filters.
    */
@@ -62,8 +58,6 @@ function isAvailable(id: ControlId, flags: ComposerControlFlags): boolean {
     case 'plan':
       return flags.surface === 'code' && !flags.externalPrimary
     case 'guidance':
-      return flags.surface === 'code' && flags.sessionBound
-    case 'worktree':
       return flags.surface === 'code' && flags.sessionBound
     case 'branch':
       return flags.surface === 'code' && flags.sessionBound
@@ -102,10 +96,6 @@ function pinIds(flags: ComposerControlFlags): ControlId[] {
   if (!flags.externalPrimary && flags.hasEffortLevels && !flags.effortIsDefault) {
     out.push('effort')
   }
-  // pinWorktree = isCode && sessionBound && pinWorktree flag
-  if (isCode && flags.sessionBound && flags.pinWorktree) {
-    out.push('worktree')
-  }
   return out
 }
 
@@ -116,17 +106,17 @@ function overflowPool(flags: ComposerControlFlags): ControlId[] {
   }
   // code
   if (flags.externalPrimary) {
-    // NewConversation (sessionBound=false): no guidance/worktree in pool
+    // NewConversation (sessionBound=false): no guidance in pool
     if (!flags.sessionBound) {
       return ['permission']
     }
-    return ['permission', 'guidance', 'worktree']
+    return ['permission', 'guidance']
   }
   if (!flags.sessionBound) {
     // NewConversation code: effort, permission, plan
     return ['effort', 'permission', 'plan']
   }
-  return ['effort', 'permission', 'plan', 'guidance', 'worktree']
+  return ['effort', 'permission', 'plan', 'guidance']
 }
 
 /**

@@ -16,7 +16,7 @@
 | `~/.hip/plugins/` | 已安装插件 |
 | `~/.hip/memories/` | 记忆 Markdown 镜像 |
 | `~/.hip/builtin-skills/` | 内置渐进产品技能（如 `hip`） |
-| `~/.hip/scratch/`、worktrees | 临时区 / 并行 worktree |
+| | `~/.hip/scratch/` | 临时区助手 |
 
 项目覆盖常在 `<project>/.hip/`（如 `.hip/skills/`、`.hip/hip.toml`）。
 

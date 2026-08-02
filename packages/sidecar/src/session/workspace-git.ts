@@ -3,9 +3,7 @@ import { promisify } from 'node:util'
 import { promises as fs } from 'node:fs'
 import * as path from 'node:path'
 import * as os from 'node:os'
-import type { DiffFile, DiffHunk, DiffFileStatus, DiffState, DiffSummary, DiffBase, CommitLogEntry, Branch, WorktreeInfo } from '@hip/protocol'
-import { getWorktreesDir } from './worktree-config.js'
-import { computeManagedWorktreePath } from './worktree-paths.js'
+import type { DiffFile, DiffHunk, DiffFileStatus, DiffState, DiffSummary, DiffBase, CommitLogEntry, Branch } from '@hip/protocol'
 import { sanitizeRefComponent } from './ref-sanitize.js'
 
 export { sanitizeRefComponent } from './ref-sanitize.js'
@@ -405,132 +403,6 @@ export async function switchBranch(cwd: string, name: string, gitBin = 'git'): P
   catch (e) { return { ok: false, error: (e instanceof Error ? e.message : String(e)).slice(0, 500) } }
 }
 
-/** Create a linked worktree at `worktreePath` for `branch`. The branch must exist unless
- *  `git worktree add -b` semantics are desired — callers that want a new branch should use
- *  `gitCreateBranch` first and then pass the resulting name here. Validates the branch name
- *  via `isSafeBranchName` before execution. Never throws → { ok, path?, error? }. */
-export async function createWorktree(cwd: string, branch: string, worktreePath: string, gitBin = 'git'): Promise<{ ok: boolean; path?: string; error?: string }> {
-  if (!isSafeBranchName(branch)) return { ok: false, error: `unsafe branch name: ${branch}` }
-  try {
-    await runGit(cwd, ['rev-parse', '--is-inside-work-tree'], gitBin)
-  } catch (e) {
-    if ((e as NodeJS.ErrnoException).code === 'ENOENT') return { ok: false, error: 'git not found' }
-    return { ok: false, error: 'not_a_repo' }
-  }
-  try { await fs.mkdir(path.dirname(worktreePath), { recursive: true }) } catch { /* noop */ }
-  try {
-    await runGit(cwd, ['worktree', 'add', worktreePath, branch], gitBin)
-    return { ok: true, path: worktreePath }
-  } catch (e) {
-    const err = e as NodeJS.ErrnoException
-    if (err.code === 'ENOENT') return { ok: false, error: 'git not found' }
-    const msg = (err.message ?? String(e)).toLowerCase()
-    if (msg.includes('already exists') || msg.includes('already checked out')) return { ok: false, error: 'worktree already exists' }
-    return { ok: false, error: (e instanceof Error ? e.message : String(e)).slice(0, 500) }
-  }
-}
-
-/** List all linked worktrees via `git worktree list --porcelain`. Parses the porcelain format
- *  into WorktreeInfo[] (path, branch, head). Handles detached-HEAD worktrees (branch = '').
- *  Never throws → { ok, worktrees?, error? }. */
-export async function listWorktrees(cwd: string, gitBin = 'git'): Promise<{ ok: boolean; worktrees?: WorktreeInfo[]; error?: string }> {
-  try {
-    await fs.stat(cwd)
-    await runGit(cwd, ['rev-parse', '--is-inside-work-tree'], gitBin)
-  } catch (e) {
-    if ((e as NodeJS.ErrnoException).code === 'ENOENT') return { ok: false, error: 'git not found' }
-    return { ok: false, error: 'not_a_repo' }
-  }
-  try {
-    const out = (await runGit(cwd, ['worktree', 'list', '--porcelain'], gitBin)).stdout
-    const worktrees: WorktreeInfo[] = []
-    let cur: Partial<WorktreeInfo> = {}
-    for (const line of out.split('\n')) {
-      if (line.startsWith('worktree ')) {
-        if (cur.path) worktrees.push({ path: cur.path, branch: cur.branch ?? '', head: cur.head ?? '' })
-        cur = { path: line.slice('worktree '.length) }
-      } else if (line.startsWith('HEAD ')) {
-        cur.head = line.slice('HEAD '.length)
-      } else if (line.startsWith('branch ')) {
-        cur.branch = line.slice('branch '.length).replace('refs/heads/', '')
-      } else if (line === 'detached') {
-      }
-    }
-    if (cur.path) worktrees.push({ path: cur.path, branch: cur.branch ?? '', head: cur.head ?? '' })
-    return { ok: true, worktrees }
-  } catch (e) {
-    return { ok: false, error: (e instanceof Error ? e.message : String(e)).slice(0, 500) }
-  }
-}
-
-/** Remove a linked worktree via `git worktree remove --force`. Safety gate: only removes
- *  worktrees located inside HIP_WORKTREES_DIR (centralized dir, outside the project).
- *  Never throws → { ok, error? }. */
-/**
- * Remove a managed worktree.
- * @param force when false (product default), refuse dirty/untracked trees (`WORKTREE_DIRTY`).
- *   when true, `git worktree remove --force` (bg cleanup / explicit force).
- */
-export async function removeWorktree(
-  cwd: string,
-  worktreePath: string,
-  gitBin = 'git',
-  force = true,
-): Promise<{ ok: boolean; error?: string }> {
-  const worktreesDir = getWorktreesDir()
-  // Prefer realpath so symlink escapes outside managed dir are rejected (PR6).
-  // On macOS, TMPDIR may be /var/... while realpath is /private/var/... — for
-  // non-existent targets, rewrite under realpath(managedDir) using the same
-  // relative suffix so we do not false-reject paths still under the managed root.
-  const resolvedDirRaw = path.resolve(worktreesDir)
-  let resolvedDir = resolvedDirRaw
-  try {
-    resolvedDir = await fs.realpath(worktreesDir)
-  } catch {
-    /* keep resolve */
-  }
-  const resolvedRaw = path.resolve(worktreePath)
-  let resolved = resolvedRaw
-  try {
-    resolved = await fs.realpath(worktreePath)
-  } catch {
-    if (resolvedRaw === resolvedDirRaw || resolvedRaw.startsWith(resolvedDirRaw + path.sep)) {
-      resolved = path.join(resolvedDir, path.relative(resolvedDirRaw, resolvedRaw))
-    }
-  }
-  if (!resolved.startsWith(resolvedDir + path.sep) && resolved !== resolvedDir) {
-    return { ok: false, error: 'worktree path outside managed directory' }
-  }
-  try {
-    await fs.stat(cwd)
-    await runGit(cwd, ['rev-parse', '--is-inside-work-tree'], gitBin)
-  } catch (e) {
-    if ((e as NodeJS.ErrnoException).code === 'ENOENT') return { ok: false, error: 'git not found' }
-    return { ok: false, error: 'not_a_repo' }
-  }
-  if (!force) {
-    try {
-      const status = await runGit(resolved, ['status', '--porcelain', '--untracked-files=all'], gitBin)
-      if (status.stdout.trim().length > 0) {
-        return { ok: false, error: 'WORKTREE_DIRTY: worktree has uncommitted or untracked changes; use force to remove' }
-      }
-    } catch (e) {
-      return { ok: false, error: (e instanceof Error ? e.message : String(e)).slice(0, 500) }
-    }
-  }
-  try {
-    const args = force
-      ? ['worktree', 'remove', worktreePath, '--force']
-      : ['worktree', 'remove', worktreePath]
-    await runGit(cwd, args, gitBin)
-    return { ok: true }
-  } catch (e) {
-    const msg = (e instanceof Error ? e.message : String(e)).toLowerCase()
-    if (msg.includes('not a working tree') || msg.includes('no such')) return { ok: false, error: 'worktree not found' }
-    return { ok: false, error: (e instanceof Error ? e.message : String(e)).slice(0, 500) }
-  }
-}
-
 /** Read the user's *effective* git identity value (e.g. user.name), merging system/global/local
  *  scopes — i.e. who the developer actually is, which is normally a --global identity. Returns ''
  *  only when the key is unset in every scope, in which case gitCommit falls back to the synthetic
@@ -588,22 +460,6 @@ export async function gitCreateBranch(
   }
 }
 
-/**
- * Build a managed worktree path under getWorktreesDir() from an optional pathKey.
- * Always nestByRepo=false (flat / pathKey layout) so live creates are unchanged.
- * HIP_WORKTREES_NEST is reserved for WorktreeService (PR2+) and is not read here.
- */
-export function resolveManagedWorktreePath(pathKey: string | undefined, branch: string): string {
-  return computeManagedWorktreePath({
-    worktreesDir: getWorktreesDir(),
-    pathKey,
-    branch,
-    nestByRepo: false,
-  })
-}
-
-/** Switch to an existing branch (agent tool path). Thin alias over switchBranch (which guards the
- *  name) so the tool and the panel share one implementation. */
 export async function gitSwitchBranch(cwd: string, name: string, gitBin = 'git'): Promise<{ ok: boolean; error?: string }> {
   return switchBranch(cwd, name, gitBin)
 }

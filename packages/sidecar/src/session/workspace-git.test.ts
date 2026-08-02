@@ -4,8 +4,7 @@ import { promisify } from 'node:util'
 import { promises as fs } from 'node:fs'
 import * as os from 'node:os'
 import * as path from 'node:path'
-import { parseUnifiedDiff, collectWorkspaceDiff, collectWorkspaceDiffSummary, collectWorkspaceDiffFile, gitInit, captureSessionSnapshot, sanitizeRefComponent, isSafeBranchName, getCurrentBranch, listCheckpointRefs, deleteCheckpointRefs, captureCheckpoint, collectCommitLog, listBranches, switchBranch, createWorktree, listWorktrees, removeWorktree, gitCommit, gitCreateBranch, gitSwitchBranch, revertToCheckpoint, checkpointRefMeta, resolveManagedWorktreePath, MAX_DIFF_LINES_PER_FILE, MAX_DIFF_FILES } from './workspace-git.js'
-import { getWorktreesDir } from './worktree-config.js'
+import { parseUnifiedDiff, collectWorkspaceDiff, collectWorkspaceDiffSummary, collectWorkspaceDiffFile, gitInit, captureSessionSnapshot, sanitizeRefComponent, isSafeBranchName, getCurrentBranch, listCheckpointRefs, deleteCheckpointRefs, captureCheckpoint, collectCommitLog, listBranches, switchBranch, gitCommit, gitCreateBranch, gitSwitchBranch, revertToCheckpoint, checkpointRefMeta, MAX_DIFF_LINES_PER_FILE, MAX_DIFF_FILES } from './workspace-git.js'
 
 const execFileP = promisify(execFile)
 const git = (cwd: string, ...args: string[]) => execFileP('git', args, { cwd })
@@ -569,140 +568,11 @@ describe('isSafeBranchName', () => {
   })
 })
 
-describe('resolveManagedWorktreePath', () => {
-  it('joins sanitized pathKey under managed worktrees dir', () => {
-    const p = resolveManagedWorktreePath('run-abc/slot-1', 'hip-p-x-1')
-    expect(p.startsWith(getWorktreesDir())).toBe(true)
-    expect(p).toContain('run-abc')
-    expect(p).toContain('slot-1')
-  })
-  it('falls back to branch when pathKey empty', () => {
-    const p = resolveManagedWorktreePath(undefined, 'feature')
-    expect(p).toBe(path.join(getWorktreesDir(), 'feature'))
-  })
-})
-
 describe('gitCreateBranch with startPoint', () => {
   it('creates a branch from HEAD by default', async () => {
     await fs.writeFile(path.join(root, 'a.txt'), 'one\n'); await makeRepo(root)
     const r = await gitCreateBranch(root, 'from-head')
     expect(r.ok).toBe(true)
-  })
-})
-
-describe('createWorktree', () => {
-  it('creates a linked worktree for a valid branch and returns its path', async () => {
-    await fs.writeFile(path.join(root, 'a.txt'), 'one\n'); await makeRepo(root)
-    await git(root, 'branch', 'feature')
-    const wtPath = path.join(root, '..', 'wt-feature')
-    const r = await createWorktree(root, 'feature', wtPath)
-    expect(r.ok).toBe(true)
-    expect(r.path).toBe(wtPath)
-    // verify it's a worktree (has .git file, not .git dir)
-    const gitFile = await fs.readFile(path.join(wtPath, '.git'), 'utf8')
-    expect(gitFile).toContain('gitdir:')
-    await fs.rm(wtPath, { recursive: true, force: true })
-  })
-
-  it('rejects unsafe branch names without touching git', async () => {
-    await fs.writeFile(path.join(root, 'a.txt'), 'one\n'); await makeRepo(root)
-    for (const bad of ['../escape', '-f', '.']) {
-      const r = await createWorktree(root, bad, path.join(root, '..', 'wt-bad'))
-      expect(r.ok).toBe(false)
-      expect(r.error).toContain('unsafe branch name')
-    }
-  })
-
-  it('returns ok:false for a duplicate worktree path', async () => {
-    await fs.writeFile(path.join(root, 'a.txt'), 'one\n'); await makeRepo(root)
-    await git(root, 'branch', 'feature')
-    const wtPath = path.join(root, '..', 'wt-dup')
-    const r1 = await createWorktree(root, 'feature', wtPath)
-    expect(r1.ok).toBe(true)
-    // second call with same path should fail
-    const r2 = await createWorktree(root, 'feature', wtPath)
-    expect(r2.ok).toBe(false)
-    expect(r2.error).toContain('already exists')
-    await fs.rm(wtPath, { recursive: true, force: true })
-  })
-
-  it('returns ok:false for a missing git binary', async () => {
-    await fs.writeFile(path.join(root, 'a.txt'), 'one\n'); await makeRepo(root)
-    await git(root, 'branch', 'feature')
-    const r = await createWorktree(root, 'feature', path.join(root, '..', 'wt-missing-git'), 'hip-missing-git')
-    expect(r.ok).toBe(false)
-    expect(r.error).toBe('git not found')
-  })
-})
-
-describe('listWorktrees + removeWorktree', () => {
-  it('returns at least the main working tree for a repo with no linked worktrees', async () => {
-    await fs.writeFile(path.join(root, 'a.txt'), 'one\n'); await makeRepo(root)
-    const r = await listWorktrees(root)
-    expect(r.ok).toBe(true)
-    expect(r.worktrees!.length).toBeGreaterThanOrEqual(1)
-    expect(r.worktrees![0].head).toMatch(/^[0-9a-f]{40}$/)
-  })
-
-  it('returns the created worktree identified by branch name', async () => {
-    await fs.writeFile(path.join(root, 'a.txt'), 'one\n'); await makeRepo(root)
-    await git(root, 'branch', 'feature')
-    const wtPath = path.join(root, '..', 'wt-list')
-    const created = await createWorktree(root, 'feature', wtPath)
-    expect(created.ok).toBe(true)
-    try {
-      const r = await listWorktrees(root)
-      expect(r.ok).toBe(true)
-      const wt = r.worktrees!.find((w) => w.branch === 'feature')
-      expect(wt).toBeTruthy()
-      expect(wt!.head).toMatch(/^[0-9a-f]{40}$/)
-    } finally {
-      await fs.rm(wtPath, { recursive: true, force: true })
-    }
-  })
-
-  it('removes a worktree inside HIP_WORKTREES_DIR and it disappears from the list', async () => {
-    await fs.writeFile(path.join(root, 'a.txt'), 'one\n'); await makeRepo(root)
-    await git(root, 'branch', 'to-remove')
-    const worktreesDir = await fs.mkdtemp(path.join(os.tmpdir(), 'hip-wtdir-'))
-    const saved = process.env.HIP_WORKTREES_DIR
-    process.env.HIP_WORKTREES_DIR = worktreesDir
-    try {
-      const wtPath = path.join(worktreesDir, 'wt-to-remove')
-      const created = await createWorktree(root, 'to-remove', wtPath)
-      expect(created.ok).toBe(true)
-      const before = await listWorktrees(root)
-      expect(before.worktrees!.some((w) => w.branch === 'to-remove')).toBe(true)
-      const removed = await removeWorktree(root, wtPath)
-      expect(removed.ok).toBe(true)
-      const after = await listWorktrees(root)
-      expect(after.worktrees!.some((w) => w.branch === 'to-remove')).toBe(false)
-    } finally {
-      if (saved === undefined) delete process.env.HIP_WORKTREES_DIR
-      else process.env.HIP_WORKTREES_DIR = saved
-      await fs.rm(worktreesDir, { recursive: true, force: true })
-    }
-  })
-
-  it('rejects removeWorktree when path is outside HIP_WORKTREES_DIR', async () => {
-    await fs.writeFile(path.join(root, 'a.txt'), 'one\n'); await makeRepo(root)
-    await git(root, 'branch', 'outside-branch')
-    const wtPath = path.join(root, '..', 'wt-outside')
-    const created = await createWorktree(root, 'outside-branch', wtPath)
-    expect(created.ok).toBe(true)
-    try {
-      const r = await removeWorktree(root, wtPath)
-      expect(r.ok).toBe(false)
-      expect(r.error).toContain('outside managed directory')
-    } finally {
-      await git(root, 'worktree', 'remove', wtPath, '--force').catch(() => {})
-    }
-  })
-
-  it('returns ok:false for a non-repo folder', async () => {
-    const r = await listWorktrees(root)
-    expect(r.ok).toBe(false)
-    expect(r.error).toBe('not_a_repo')
   })
 })
 

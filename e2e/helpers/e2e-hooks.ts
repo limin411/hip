@@ -23,12 +23,6 @@ type HipE2E = {
     s: string,
     g: { id?: string; description: string; status: 'active' | 'paused' | 'blocked' | 'completed'; turns?: number; maxTurns?: number },
   ) => void
-  seedParallelRun?: (o: {
-    hostSessionId: string
-    n?: number
-    baseCwd: string
-    prompt?: string
-  }) => { runId: string; slotCount: number }
   createChatSessionForE2e: () => string
   createCodeSessionForE2e: (cwd: string) => string
   simulateTurnRunning: (s: string) => { turnId: string; callId: string }

@@ -129,12 +129,12 @@ describe('Composer', () => {
         onChange={vi.fn()}
         onSubmit={vi.fn()}
         variant="card"
-        footer={<div data-testid="footer-item">worktree</div>}
+        footer={<div data-testid="footer-item">branch</div>}
       />,
     )
     const footer = screen.getByTestId('composer-footer')
     expect(footer).toBeInTheDocument()
-    expect(within(footer).getByTestId('footer-item')).toHaveTextContent('worktree')
+    expect(within(footer).getByTestId('footer-item')).toHaveTextContent('branch')
     // Footer sits below the toolbar row (send button stays in the toolbar).
     expect(within(footer).queryByTestId('composer-send')).not.toBeInTheDocument()
     expect(screen.getByTestId('composer-send')).toBeInTheDocument()

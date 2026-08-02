@@ -43,7 +43,6 @@ const NON_WEB_TOOLS = new Set([
   'exit_plan_mode',
   'generate_agent',
   'mcp_search',
-  'parallel_worktrees',
   'git_status',
   'git_diff',
   'git_log',

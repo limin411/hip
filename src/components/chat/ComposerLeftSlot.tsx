@@ -6,7 +6,6 @@ import { PermissionModePicker, resolvePermissionMode } from './PermissionModePic
 import { ExecutionModePicker } from './ExecutionModePicker'
 import { ProjectGuidanceChip } from './ProjectGuidanceChip'
 import { AttachmentButton } from './AttachmentButton'
-import { WorktreeControl } from './WorktreeControl/WorktreeControl'
 import { BranchSwitcher } from '@/components/artifact/BranchSwitcher'
 import { ComposerControlRow } from './ComposerControlRow'
 import { COMPOSER_OVERFLOW } from './craftFeature'
@@ -20,8 +19,6 @@ import { isExternalPrimary } from '@/lib/sessionAgent'
 import { useActiveSession, useActiveSessionId } from '@/domain'
 import { useDraftStore } from '@/store/draftStore'
 import { useProvidersStore } from '@/store/providersStore'
-import { useParallelStore } from '@/store/parallelStore'
-import { useWorktreeStore } from '@/store/worktreeStore'
 import { activeModelKey } from '@/lib/modelKey'
 import { defaultEffort, effortLevelsForKey, resolveEffort } from '@/lib/modelEffort'
 import { pickProjectGuidanceName } from '@/lib/projectGuidance'
@@ -49,8 +46,6 @@ function mountId(id: ControlId, onAttach: (add: LocalAttachment[]) => void): Rea
       return <ExecutionModePicker key="plan" />
     case 'guidance':
       return <ProjectGuidanceChip key="guidance" />
-    case 'worktree':
-      return <WorktreeControl key="worktree" />
     case 'branch':
       return <BranchSwitcher key="branch" />
     case 'attach':
@@ -78,8 +73,6 @@ export function ComposerLeftSlot({
   const config = useProvidersStore((s) => s.config)
   const activeId = useActiveSessionId()
   const session = useActiveSession()
-  const parallelRuns = useParallelStore((s) => s.runs)
-  const worktreeById = useWorktreeStore((s) => s.byId)
 
   const agentId = sessionBound && session ? session.config.agentId : draft?.agentId
   const externalPrimary = isExternalPrimary(agentId)
@@ -112,24 +105,6 @@ export function ComposerLeftSlot({
   const effortIsDefault =
     !levels || levels.length === 0 || resolvedEffort === defaultEffort(levels)
 
-  const pinWorktree = useMemo(() => {
-    if (!sessionBound || !session?.config.cwd) return false
-    const cwd = session.config.cwd
-    for (const run of parallelRuns) {
-      if (run.hostSessionId !== session.id) continue
-      for (const slot of run.slots) {
-        if (slot.worktreePath && (cwd === slot.worktreePath || cwd.startsWith(`${slot.worktreePath}/`))) {
-          return true
-        }
-      }
-    }
-    for (const wt of Object.values(worktreeById)) {
-      if (wt.isPrimary) continue
-      if (wt.path && (cwd === wt.path || cwd.startsWith(`${wt.path}/`))) return true
-    }
-    return false
-  }, [sessionBound, session?.id, session?.config.cwd, parallelRuns, worktreeById])
-
   const entries = useFsStore((s) =>
     activeId ? s.bySession[activeId]?.entriesByDir['/'] : undefined,
   )
@@ -139,8 +114,6 @@ export function ComposerLeftSlot({
     return !!pickProjectGuidanceName(names)
   }, [sessionBound, surface, session?.config.cwd, entries])
 
-  const worktreeAvailable = sessionBound && surface === 'code'
-
   const flags: ComposerControlFlags = {
     surface,
     externalPrimary,
@@ -148,18 +121,16 @@ export function ComposerLeftSlot({
     forcePlan,
     effortIsDefault,
     hasEffortLevels: !!levels && levels.length > 0,
-    pinWorktree,
     sessionBound,
     available: {
       guidance: guidanceAvailable,
-      worktree: worktreeAvailable,
     },
   }
 
   const resolved = resolveComposerControls(flags)
-  // Worktree + branch moved to the composer footer row below the input (Code surface,
-  // Copilot/Cursor style) — keep them out of the toolbar regardless of placement rules.
-  const toolbarIds = (ids: ControlId[]) => ids.filter((id) => id !== 'worktree' && id !== 'branch')
+  // Branch moved to the composer footer row below the input (Code surface,
+  // Copilot/Cursor style) — keep it out of the toolbar regardless of placement rules.
+  const toolbarIds = (ids: ControlId[]) => ids.filter((id) => id !== 'branch')
 
   // Flag off: preserve legacy flat order (existing product behavior).
   if (!COMPOSER_OVERFLOW) {

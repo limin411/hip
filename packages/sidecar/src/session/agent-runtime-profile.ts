@@ -34,7 +34,6 @@ export interface AgentRuntimeProfile {
     allowGit: boolean
     allowRunScript: boolean
     allowPluginInstall: boolean
-    allowParallelWorktrees: boolean
     pathJail: 'sandbox' | 'none' | 'n/a'
   }
 }
@@ -158,7 +157,6 @@ export function resolveAgentRuntimeProfile(input: ResolveAgentRuntimeProfileInpu
         // Equivalent to !readOnly && permissionMode !== 'chat' (readOnly ⇔ chat).
         allowRunScript: !readOnly,
         allowPluginInstall: false,
-        allowParallelWorktrees: false,
         pathJail: permissionMode === 'full' ? 'none' : 'sandbox',
       },
     }
@@ -182,7 +180,6 @@ export function resolveAgentRuntimeProfile(input: ResolveAgentRuntimeProfileInpu
         allowGit: false,
         allowRunScript: false,
         allowPluginInstall: false,
-        allowParallelWorktrees: false,
         pathJail: 'sandbox',
       },
     }
@@ -207,7 +204,6 @@ export function resolveAgentRuntimeProfile(input: ResolveAgentRuntimeProfileInpu
       allowGit: !readOnly,
       allowRunScript: !readOnly,
       allowPluginInstall: !readOnly,
-      allowParallelWorktrees: !readOnly,
       pathJail: full ? 'none' : 'sandbox',
     },
   }

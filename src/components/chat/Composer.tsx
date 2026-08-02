@@ -70,7 +70,7 @@ export function Composer({
   /**
    * Footer row below the input (Copilot / Cursor style status strip): rendered at the
    * bottom of the card, separated by a hairline from the toolbar row. Code surface
-   * uses it for worktree + branch. Optional — hidden when absent.
+   * uses it for the branch switcher. Optional — hidden when absent.
    */
   footer?: React.ReactNode
   /**

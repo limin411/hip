@@ -28,7 +28,6 @@ import {
 } from '@/components/command-palette'
 import { SessionMenuDialogHost } from '@/components/history/SessionMenuDialogHost'
 import { ManagedTerminalDialogHost } from '@/components/terminals/ManagedTerminalDialogHost'
-import { WorktreeDeleteDialogHost } from '@/components/chat/WorktreeControl/WorktreeDeleteDialogHost'
 import { KnowledgeSpaceDialogHost } from '@/components/knowledge/KnowledgeSpaceDialogHost'
 import { LegacyBoardReplaceConfirmHost } from '@/components/knowledge/LegacyBoardReplaceConfirmHost'
 import { CODE_TERMINAL } from '@/components/artifact/terminalFeature'
@@ -351,7 +350,6 @@ export function AppLayout() {
       <OverlayShellHost />
       <SessionMenuDialogHost />
       <ManagedTerminalDialogHost />
-      <WorktreeDeleteDialogHost />
       <KnowledgeSpaceDialogHost />
       <LegacyBoardReplaceConfirmHost />
     </div>

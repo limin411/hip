@@ -249,22 +249,6 @@ fn set_plugins_config(app: tauri::AppHandle, json: String) -> Result<(), String>
 }
 
 #[tauri::command]
-fn list_worktrees(app: tauri::AppHandle) -> Result<String, String> {
-    let dir = paths::worktrees_dir(&app).ok_or("no worktrees dir")?;
-    let mut entries: Vec<String> = Vec::new();
-    if let Ok(read) = std::fs::read_dir(&dir) {
-        for entry in read.flatten() {
-            if entry.file_type().map(|t| t.is_dir()).unwrap_or(false) {
-                if let Some(name) = entry.file_name().to_str() {
-                    entries.push(name.to_string());
-                }
-            }
-        }
-    }
-    serde_json::to_string(&entries).map_err(|e| e.to_string())
-}
-
-#[tauri::command]
 fn list_plugins(app: tauri::AppHandle) -> Result<String, String> {
     let dir = paths::plugins_dir(&app).ok_or("no plugins dir")?;
     let config = paths::plugins_config_path(&app);
@@ -923,7 +907,6 @@ pub fn run() {
             list_mcp_registry_servers,
             add_mcp_registry_source,
             remove_mcp_registry_source,
-            list_worktrees,
             path_tools::which_binaries,
             path_tools::path_is_dir,
             workspace_file_search::workspace_file_search,

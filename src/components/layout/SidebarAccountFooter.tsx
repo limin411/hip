@@ -10,7 +10,7 @@ interface SidebarAccountFooterProps {
   onOpenSettings: () => void
   /** Which footer destination is currently active. */
   active?: 'trash' | 'history' | 'settings' | null
-  /** Active session catalog size (history badge; excludes nested worktrees when provided). */
+  /** Active session catalog size (history badge). */
   historyCount?: number
 }
 

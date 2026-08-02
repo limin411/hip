@@ -8,77 +8,6 @@ export const ja = {
     "sendMessage": "メッセージを送信して会話を開始",
     "inputPlaceholder": "hipにメッセージ…（Enterで送信、Shift+Enterで改行）",
     "resizeInput": "ドラッグして入力欄のサイズを変更",
-    "parallel": {
-      "started": "{{count}}件の並列トラックを開始しました"
-    },
-    "worktreeControl": {
-      "hitlOption": {
-        "n1": "1トラック",
-        "n2": "2トラック",
-        "n3": "3トラック",
-        "n4": "4トラック",
-        "reject": "並列化しない"
-      },
-      "source": {
-        "protocol": "手動",
-        "parallel": "エージェント並列",
-        "host_fanout": "一括作成",
-        "agent_tool": "エージェントツール",
-        "background": "バックグラウンド",
-        "import": "インポート済み",
-        "discovered": "検出済み",
-        "primary": "メイン"
-      },
-      "chipAria": "隔離ワークスペース",
-      "chipPurpose": "隔離ワークスペースの参照、切り替え、作成",
-      "mainWorkspace": "メインワークスペース",
-      "pathBlocked": "プロジェクトパスが利用不可",
-      "current": "現在",
-      "listTitle": "隔離ワークスペース",
-      "refresh": "更新",
-      "emptyTitle": "まだ隔離ワークスペースがありません",
-      "createSingle": "新しい隔離ワークスペース…",
-      "createSingleTitle": "新しい隔離ワークスペース",
-      "createSingleHint": "現在のメインワークスペースのHEADから、クリーンな隔離ワークスペースを1つ作成します。ブランチ名は自動的に割り当てられます。",
-      "createSingleBranch": "ブランチ",
-      "createSingleBase": "ベース",
-      "createSingleBaseHead": "HEAD（メインワークスペース）",
-      "createSingleOpenSession": "作成後に新しいチャットを開く",
-      "createSingleOpenSessionHint": "オン: 新しいパスでCodeチャットを開きます。オフ: ディレクトリのみ作成します。",
-      "createSingleConfirm": "作成",
-      "createSingleCreating": "作成中…",
-      "createSingleFailed": "隔離ワークスペースを作成できませんでした",
-      "nonGitBanner": "このフォルダーはGitリポジトリではありません。作成は無効です。",
-      "footerHint": "バックグラウンドの一時的な隔離はここに表示されません",
-      "unresolvedBanner": "メインワークスペースを特定できませんでした。作成と削除は無効です。",
-      "openChat": "チャットを開く",
-      "copyPath": "パスをコピー",
-      "pathCopied": "パスをコピーしました",
-      "copyFailed": "パスをコピーできませんでした",
-      "rowMenu": "ワークスペース操作",
-      "agentTaskOnly": "このトラックはバックグラウンドタスクとして実行されます — サイドバーで進行状況を確認してください",
-      "noSessionToast": "このワークスペースにバインドされたチャットはまだありません",
-      "openHere": "ここでチャットを開く",
-      "delete": {
-        "menuItem": "削除…",
-        "title": "隔離ワークスペース「{{label}}」を削除しますか？",
-        "pathLabel": "パス",
-        "path": "パス: {{path}}",
-        "branchLabel": "ブランチ",
-        "branch": "ブランチ: {{branch}}",
-        "cascadeNote": "リンクされた隔離チャットも閉じられる場合があります（システムがこのディレクトリにバインドされた会話をクリーンアップします）。",
-        "dirtyWarning": "未コミットの変更が検出されました。強制削除すると、それらの変更は完全に破棄されます。",
-        "confirm": "削除",
-        "forceConfirm": "強制削除して変更を破棄",
-        "deleting": "削除中…",
-        "removed": "隔離ワークスペース {{label}} を削除しました",
-        "removedForce": "隔離ワークスペース {{label}} を強制削除しました",
-        "failed": "隔離ワークスペース {{label}} を削除できませんでした"
-      }
-    },
-    "worktree": {
-      "created": "ワークツリー準備完了: {{label}}"
-    },
     "goal": {
       "aria": "アクティブな目標"
     },
@@ -738,8 +667,7 @@ export const ja = {
       "switching": "切り替え中…",
       "switchFailed": "ブランチを切り替えられませんでした",
       "switchRetry": "再試行",
-      "inWorktree": "ワークツリー",
-      "switchBlockedRunning": "このワークスペースでセッションが実行中のため、ブランチを切り替えられません",
+            "switchBlockedRunning": "このワークスペースでセッションが実行中のため、ブランチを切り替えられません",
       "switchCheckedOut": "このブランチは別のワークスペースでチェックアウト済みです：{{path}}"
     },
     "changesView": {
@@ -2377,8 +2305,6 @@ export const ja = {
       "expand": "{{name}} を展開",
       "collapse": "{{name}} を折りたたむ"
     },
-    "parallel": {
-    }
   },
   "dropdown": {
     "newChat": "新しいワークチャット",

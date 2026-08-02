@@ -174,7 +174,7 @@ export class PermissionManager {
 
   /**
    * Generic HITL with arbitrary options; resolves the raw optionId (or cancelled).
-   * Used by tools that need multi-way choices (e.g. parallel worktree slot count).
+   * Used by tools that need multi-way choices (e.g. plan-mode actions).
    */
   requestChoice(
     send: SendFn,

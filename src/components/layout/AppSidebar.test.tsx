@@ -5,8 +5,6 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { useUiStore } from '@/store/uiStore'
 import { useDomainStore } from '@/domain'
 import { DEFAULT_CONFIG } from '@/domain/sessionStore'
-import { useParallelStore } from '@/store/parallelStore'
-import { useWorktreeStore } from '@/store/worktreeStore'
 import { useProjectPathStore } from '@/store/projectPathStore'
 import { useNavHistoryStore } from '@/store/navHistoryStore'
 
@@ -125,8 +123,6 @@ describe('AppSidebar', () => {
   })
 
   afterEach(() => {
-    useParallelStore.setState({ runs: [] })
-    useWorktreeStore.getState().clear()
     useProjectPathStore.setState({ byKey: {} })
     cleanup()
   })
@@ -377,188 +373,6 @@ describe('AppSidebar', () => {
     )
     expect(screen.getByTestId('sidebar-session-chat-1')).not.toHaveAttribute('aria-busy')
   })
-
-  it('does not render worktree tree rows or badges in the sidebar (managed in composer)', () => {
-    useUiStore.setState({ sidebarSection: 'projects', activeView: 'code' })
-    useParallelStore.setState({
-      runs: [
-        {
-          id: 'run-abc',
-          baseCwd: '/tmp/repo',
-          prompt: 'parallel fix',
-          hostSessionId: 'code-1',
-          source: 'agent',
-          createdAt: Date.now(),
-          slots: [
-            {
-              index: 1,
-              sessionId: '',
-              taskId: 'pwt-1',
-              worktreePath: '/tmp/wt/run-abc/hip-p-1',
-              branch: 'hip-p-1',
-              status: 'ready',
-            },
-            {
-              index: 2,
-              sessionId: '',
-              taskId: 'pwt-2',
-              worktreePath: '/tmp/wt/run-abc/hip-p-2',
-              branch: 'hip-p-2',
-              status: 'ready',
-            },
-          ],
-        },
-      ],
-    })
-    render(<AppSidebar />)
-    expect(screen.getByTestId('sidebar-session-code-1')).toBeInTheDocument()
-    // Tree rows and the count badge no longer render in the sidebar.
-    expect(screen.queryByTestId('sidebar-session-worktrees-code-1')).not.toBeInTheDocument()
-    expect(screen.queryByTestId('sidebar-session-expand-code-1')).not.toBeInTheDocument()
-    expect(screen.queryByTestId('sidebar-session-wt-badge-code-1')).not.toBeInTheDocument()
-  })
-
-
-  it('keeps orphan worktree sessions top-level when no host tree can render them', () => {
-    // Without catalog/parallel binding, nesting would make the session unreachable.
-    useUiStore.setState({ sidebarSection: 'projects', activeView: 'code' })
-    useDomainStore.setState((st) => ({
-      ...st,
-      sessions: [
-        ...(st.sessions as never[]),
-        {
-          id: 'slot-orphan',
-          title: 'P1/2 · deadrun',
-          preview: 'slot',
-          updatedAtMs: Date.now(),
-          config: {
-            ...DEFAULT_CONFIG,
-            surface: 'code',
-            cwd: '/Users/x/.hip/worktrees/h1/slot-orphan',
-          },
-          messages: [],
-          status: 'idle',
-          loaded: true,
-        },
-      ],
-    }) as never)
-    render(<AppSidebar />)
-    expect(screen.getByTestId('sidebar-session-code-1')).toBeInTheDocument()
-    expect(screen.getByTestId('sidebar-session-slot-orphan')).toBeInTheDocument()
-  })
-
-  it('nests worktree sessions under host when catalog path is known (not top-level)', () => {
-    const hostCwd = '/Users/x/data/hip'
-    const wtPath = '/Users/x/.hip/worktrees/h1/slot-bound'
-    useUiStore.setState({ sidebarSection: 'projects', activeView: 'code' })
-    useDomainStore.setState((st) => ({
-      ...st,
-      sessions: [
-        {
-          id: 'code-1',
-          title: 'Host',
-          preview: 'repo',
-          updatedAtMs: Date.now(),
-          config: { ...DEFAULT_CONFIG, surface: 'code', cwd: hostCwd },
-          messages: [],
-          status: 'idle',
-          loaded: true,
-        },
-        {
-          id: 'slot-bound',
-          title: 'Bound slot',
-          preview: 'slot',
-          updatedAtMs: Date.now(),
-          config: { ...DEFAULT_CONFIG, surface: 'code', cwd: wtPath },
-          messages: [],
-          status: 'idle',
-          loaded: true,
-        },
-      ],
-      activeSessionId: 'code-1',
-    }) as never)
-    useWorktreeStore.getState().upsertFromList(
-      [
-        {
-          id: 'primary',
-          path: hostCwd,
-          branch: 'main',
-          head: 'abc',
-          managed: false,
-          isPrimary: true,
-          source: 'primary',
-          repoKey: 'rk',
-        },
-        {
-          id: 'wt-1',
-          path: wtPath,
-          branch: 'hip-p-1',
-          head: 'def',
-          managed: true,
-          isPrimary: false,
-          source: 'host_fanout',
-          repoKey: 'rk',
-        },
-      ],
-      'code-1',
-    )
-    render(<AppSidebar />)
-    expect(screen.getByTestId('sidebar-session-code-1')).toBeInTheDocument()
-    expect(screen.queryByTestId('sidebar-session-slot-bound')).not.toBeInTheDocument()
-  })
-
-  it('keeps host project visible after primary worktree catalog hydrate (click regression)', () => {
-    // selectSession → git:worktree:list:result upserts primary path === session.cwd.
-    // That must not nest/hide the host row.
-    const hostCwd = '/Users/x/data/code-repository/project-go/forgejo'
-    useUiStore.setState({ sidebarSection: 'projects', activeView: 'code' })
-    useDomainStore.setState((st) => ({
-      ...st,
-      sessions: [
-        {
-          id: 'code-1',
-          title: 'Forgejo 项目介绍',
-          preview: 'repo',
-          updatedAtMs: Date.now(),
-          config: { ...DEFAULT_CONFIG, surface: 'code', cwd: hostCwd },
-          messages: [],
-          status: 'idle',
-          loaded: true,
-        },
-      ],
-      activeSessionId: 'code-1',
-    }) as never)
-    useWorktreeStore.getState().upsertFromList(
-      [
-        {
-          id: 'primary',
-          path: hostCwd,
-          branch: 'main',
-          head: 'abc',
-          managed: false,
-          isPrimary: true,
-          source: 'primary',
-          repoKey: 'rk',
-        },
-        {
-          id: 'slot-wt',
-          path: '/Users/x/.hip/worktrees/forgejo-p1',
-          branch: 'hip-p-1',
-          head: 'def',
-          managed: true,
-          isPrimary: false,
-          source: 'parallel',
-          repoKey: 'rk',
-        },
-      ],
-      'code-1',
-    )
-    render(<AppSidebar />)
-    expect(screen.getByTestId('sidebar-session-code-1')).toBeInTheDocument()
-  })
-
-
-
 
   it('marks project group when path is missing on disk', () => {
     useUiStore.setState({ sidebarSection: 'projects', activeView: 'code' })

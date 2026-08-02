@@ -50,7 +50,6 @@ export function bootstrapIsolation(opts: IsolationOpts = {}): IsolationResult {
   mkdirSync(join(root, 'db'), { recursive: true })
   mkdirSync(join(root, 'plugins'), { recursive: true })
   mkdirSync(join(root, 'scratch'), { recursive: true })
-  mkdirSync(join(root, 'worktrees'), { recursive: true })
   if (setHome) {
     mkdirSync(join(root, '.hip', 'logs'), { recursive: true })
     mkdirSync(join(root, '.hip', 'plans'), { recursive: true })
@@ -86,7 +85,6 @@ export function bootstrapIsolation(opts: IsolationOpts = {}): IsolationResult {
     HIP_PLUGINS_PATH: pluginsJson,
     HIP_PLUGINS_DIR: join(root, 'plugins'),
     HIP_SCRATCH_ROOT: join(root, 'scratch'),
-    HIP_WORKTREES_DIR: join(root, 'worktrees'),
   }
 
   if (setHome) {

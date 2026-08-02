@@ -112,9 +112,6 @@ describe('defaultToolPolicy', () => {
       'git_commit',
       'git_create_branch',
       'git_switch_branch',
-      'git_worktree_create',
-      'git_worktree_list',
-      'git_worktree_remove',
     ]
 
     for (const toolName of gitTools) {

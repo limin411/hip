@@ -4,8 +4,6 @@ import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { useDomainStore } from '@/domain/sessionStore'
 import { useDiffStore } from '@/store/diffStore'
-import { useWorktreeStore } from '@/store/worktreeStore'
-import { useParallelStore } from '@/store/parallelStore'
 import { BranchSwitcher } from './BranchSwitcher'
 
 // BranchSwitcher → sessionService → @/i18n bootstrap fails in happy-dom; the component
@@ -33,7 +31,6 @@ vi.mock('react-i18next', () => ({
         'artifact.branch.switching': 'Switching…',
         'artifact.branch.switchFailed': 'Could not switch branch',
         'artifact.branch.switchRetry': 'Retry',
-        'artifact.branch.inWorktree': 'worktree',
         'artifact.branch.switchBlockedRunning':
           'Cannot switch branches while a session is running in this workspace',
         'artifact.branch.switchCheckedOut':
@@ -132,8 +129,6 @@ describe('BranchSwitcher', () => {
   beforeEach(() => {
     useDomainStore.setState({ sessions: [], activeSessionId: null } as never)
     useDiffStore.setState({ bySession: {} } as never)
-    useWorktreeStore.setState({ byId: {} } as never)
-    useParallelStore.setState({ runs: [] } as never)
   })
 
   afterEach(() => {
@@ -150,36 +145,6 @@ describe('BranchSwitcher', () => {
     seedDiff({ currentBranch: 'feature-x' })
     render(<BranchSwitcher />)
     expect(screen.getByTestId('branch-chip')).toHaveTextContent('feature-x')
-  })
-
-  // C3: isolated worktree → the chip labels the scope so branch ops are unambiguous.
-  it('appends a worktree suffix when the session is inside an isolated worktree', () => {
-    seedSession({ config: { surface: 'code', cwd: '/wt' } })
-    seedDiff({ currentBranch: 'feature-x' })
-    useWorktreeStore.setState({
-      byId: {
-        wt1: {
-          id: 'wt1',
-          path: '/wt',
-          branch: 'feature-x',
-          head: 'abc123',
-          repoKey: 'r',
-          isPrimary: false,
-          managed: true,
-          hostSessionId: 'host',
-        },
-      },
-    } as never)
-    render(<BranchSwitcher />)
-    expect(screen.getByTestId('branch-chip')).toHaveTextContent('feature-x · worktree')
-  })
-
-  it('keeps the plain label on the primary checkout', () => {
-    seedSession({ config: { surface: 'code', cwd: '/main' } })
-    seedDiff({ currentBranch: 'main' })
-    render(<BranchSwitcher />)
-    expect(screen.getByTestId('branch-chip')).toHaveTextContent('main')
-    expect(screen.getByTestId('branch-chip')).not.toHaveTextContent('worktree')
   })
 
   // C1: switching would rewrite files under a running agent in the same checkout.

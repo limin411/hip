@@ -33,9 +33,6 @@ const GIT_TOOLS = new Set([
   'git_commit',
   'git_create_branch',
   'git_switch_branch',
-  'git_worktree_create',
-  'git_worktree_list',
-  'git_worktree_remove',
 ])
 
 /** Tools that spawn or orchestrate sub-agents (medium risk; may run concurrently). */

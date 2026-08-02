@@ -90,21 +90,4 @@ describe('listOpenProjectFolders', () => {
     ])
     expect(folders).toEqual([{ pathKey: '/work/a', cwd: '/work/a', label: 'a' }])
   })
-
-  it('skips managed worktree dirs (parallel slots / background worktrees)', () => {
-    const folders = listOpenProjectFolders([
-      { updatedAtMs: 99, config: { surface: 'code', cwd: '/Users/x/.hip/worktrees/run/slot' } },
-      { updatedAtMs: 50, config: { surface: 'code', cwd: '/Users/x/.hip/eval-runs/worktrees/slot' } },
-      { updatedAtMs: 40, config: { surface: 'code', cwd: '/Users/x/real-proj' } },
-      // Relocated worktrees root (HIP_DATA_DIR under macOS temp, e2e leftovers).
-      {
-        updatedAtMs: 10,
-        config: {
-          surface: 'code',
-          cwd: '/var/folders/gn/xyz/T/hip-e2e-data-abc/worktrees/run/hip-parallel-0',
-        },
-      },
-    ])
-    expect(folders.map((f) => f.pathKey)).toEqual(['/Users/x/real-proj'])
-  })
 })

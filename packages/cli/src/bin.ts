@@ -5,7 +5,6 @@ import { runDoctor } from './commands/doctor.js'
 import { runCommand } from './commands/run.js'
 import { printAuthStatus } from './commands/config.js'
 import { sessionCreate, sessionDelete, sessionList, sessionSend, sessionShow } from './commands/session.js'
-import { worktreeCreate, worktreeList, worktreeRemove } from './commands/worktree.js'
 import { runRepl } from './commands/repl.js'
 import { extensionInspect } from './commands/extension.js'
 import type { HipRunOptions, HitlMode, PermissionModeCli, PresetName, SidecarMode, StreamMode } from './types.js'
@@ -177,77 +176,6 @@ async function main(): Promise<void> {
       process.exitCode = await sessionDelete(id, {
         yes: flags.yes === true,
         deleteDerivedMemories: flags.deleteDerivedMemories === true,
-        json: flags.json === true,
-        useUserHip: flags.isolate !== true,
-        port: flags.port as number | undefined,
-        token: flags.token as string | undefined,
-        sidecarLog: flags.sidecarLog as string | undefined,
-      })
-    })
-
-  const worktree = program.command('worktree').description('Git worktree ops (managed under ~/.hip/worktrees)')
-  worktree
-    .command('create')
-    .description('Create a managed worktree from a session cwd')
-    .requiredOption('-s, --session <id>', 'Host session id (must have git cwd)')
-    .requiredOption('-b, --branch <name>', 'Branch name')
-    .option('--create-branch', 'Create branch before worktree add')
-    .option('--base-ref <ref>', 'Start point for --create-branch')
-    .option('--path-key <key>', 'Relative path under managed worktrees dir')
-    .option('--json', 'Emit JSON result')
-    .option('--isolate', 'Use temp isolation DB')
-    .option('--port <n>', 'Attach port', (v) => Number(v))
-    .option('--token <t>', 'Attach token')
-    .option('--sidecar-log <path>', 'Attach via handshake log')
-    .action(async (flags: Record<string, unknown>) => {
-      process.exitCode = await worktreeCreate({
-        sessionId: flags.session as string,
-        branch: flags.branch as string,
-        createBranch: flags.createBranch === true,
-        baseRef: flags.baseRef as string | undefined,
-        pathKey: flags.pathKey as string | undefined,
-        json: flags.json === true,
-        useUserHip: flags.isolate !== true,
-        port: flags.port as number | undefined,
-        token: flags.token as string | undefined,
-        sidecarLog: flags.sidecarLog as string | undefined,
-      })
-    })
-  worktree
-    .command('list')
-    .description('List worktrees for the repo bound to a session')
-    .requiredOption('-s, --session <id>', 'Session id with git cwd')
-    .option('--json', 'Emit JSON')
-    .option('--isolate', 'Use temp isolation DB')
-    .option('--port <n>', 'Attach port', (v) => Number(v))
-    .option('--token <t>', 'Attach token')
-    .option('--sidecar-log <path>', 'Attach via handshake log')
-    .action(async (flags: Record<string, unknown>) => {
-      process.exitCode = await worktreeList({
-        sessionId: flags.session as string,
-        json: flags.json === true,
-        useUserHip: flags.isolate !== true,
-        port: flags.port as number | undefined,
-        token: flags.token as string | undefined,
-        sidecarLog: flags.sidecarLog as string | undefined,
-      })
-    })
-  worktree
-    .command('remove')
-    .description('Remove a managed worktree path')
-    .requiredOption('-s, --session <id>', 'Session id with git cwd')
-    .requiredOption('-p, --path <path>', 'Absolute worktree path under managed dir')
-    .option('--force', 'Force-remove dirty/untracked worktree')
-    .option('--json', 'Emit JSON')
-    .option('--isolate', 'Use temp isolation DB')
-    .option('--port <n>', 'Attach port', (v) => Number(v))
-    .option('--token <t>', 'Attach token')
-    .option('--sidecar-log <path>', 'Attach via handshake log')
-    .action(async (flags: Record<string, unknown>) => {
-      process.exitCode = await worktreeRemove({
-        sessionId: flags.session as string,
-        worktreePath: flags.path as string,
-        force: flags.force === true,
         json: flags.json === true,
         useUserHip: flags.isolate !== true,
         port: flags.port as number | undefined,

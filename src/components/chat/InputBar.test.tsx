@@ -522,7 +522,7 @@ describe('InputBar', () => {
     expect(screen.getByTestId('branch-chip')).toBeInTheDocument()
   })
 
-  it('code session renders worktree + branch in the footer row below the input', () => {
+  it('code session renders branch in the footer row below the input', () => {
     baseMocks()
     vi.spyOn(domain, 'useActiveSession').mockReturnValue({
       id: 's1',
@@ -541,10 +541,8 @@ describe('InputBar', () => {
 
     render(<InputBar />)
     const footer = screen.getByTestId('composer-footer')
-    // Worktree + branch live in the footer strip, mounted exactly once (not in the toolbar).
-    expect(within(footer).getByTestId('worktree-control-chip')).toBeInTheDocument()
+    // Branch lives in the footer strip, mounted exactly once (not in the toolbar).
     expect(within(footer).getByTestId('branch-chip')).toBeInTheDocument()
-    expect(screen.getAllByTestId('worktree-control-chip')).toHaveLength(1)
     expect(screen.getAllByTestId('branch-chip')).toHaveLength(1)
     // Other controls stay in the toolbar (sibling of the footer, not inside it).
     expect(within(footer).queryByTestId('session-agent-chip-active')).not.toBeInTheDocument()

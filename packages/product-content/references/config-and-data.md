@@ -16,7 +16,7 @@
 | `~/.hip/plugins/` | Installed plugins |
 | `~/.hip/memories/` | Memory markdown mirrors |
 | `~/.hip/builtin-skills/` | Built-in progressive product skills (e.g. this `hip` skill) |
-| `~/.hip/scratch/`, worktrees | Scratch / parallel worktree helpers |
+| `~/.hip/scratch/` | Scratch helpers |
 | `~/.hip/trash/` | Product recycle bin (knowledge FS quarantine; sessions soft-delete via SQLite) |
 
 ### Recycle bin & soft-delete

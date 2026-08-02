@@ -3,7 +3,6 @@ import type { PermissionMode, SkillMeta, McpServerConfig, AgentConfig, Checkpoin
 import { ToolRegistry, createScope } from './tool-registry.js'
 import { mcpManager, DEFAULT_LAZY_THRESHOLD } from './mcp/manager.js'
 import { buildTools, SELF_GATED_TOOLS, type ApprovalFn, type DispatchSpec } from './tools.js'
-import type { ParallelChoiceFn, ParallelSlotSpawnFn } from './tools/parallel-worktree.js'
 import { ToolRunner } from './tool-runner/tool-runner.js'
 import { defaultToolPolicy } from './tool-runner/tool-policy.js'
 import { SessionApprovalCache } from './tool-runner/approval-cache.js'
@@ -42,12 +41,6 @@ export interface BuildSessionToolingInput {
   hooks: HookRegistry
   approvalCache: SessionApprovalCache
   requestApproval?: ApprovalFn
-  /** Multi-choice HITL (parallel_worktrees). */
-  requestChoice?: ParallelChoiceFn
-  /** Background worker forced into a pre-created worktree. */
-  spawnInWorktree?: ParallelSlotSpawnFn
-  onParallelRunStarted?: import('./tools/helpers.js').BuildToolsOpts['onParallelRunStarted']
-  onWorktreeChanged?: import('./tools/helpers.js').BuildToolsOpts['onWorktreeChanged']
   /** Agent checkpoint tools (git_checkpoint_list / git_checkpoint_revert). */
   onCheckpointList?: () => Promise<Checkpoint[]>
   onCheckpointRevert?: (checkpointId: string) => Promise<{ ok: boolean; safetyCheckpointId?: string; error?: string }>
@@ -103,10 +96,6 @@ export async function buildSessionTooling(input: BuildSessionToolingInput): Prom
       allowedTools: input.allowedTools,
       blockedTools: input.blockedTools,
       networkPolicy: input.networkPolicy,
-      requestChoice: input.requestChoice,
-      spawnInWorktree: input.spawnInWorktree,
-      onParallelRunStarted: input.onParallelRunStarted,
-      onWorktreeChanged: input.onWorktreeChanged,
       onCheckpointList: input.onCheckpointList,
       onCheckpointRevert: input.onCheckpointRevert,
       taskRuntime: input.taskRuntime,

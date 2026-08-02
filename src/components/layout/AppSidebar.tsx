@@ -32,13 +32,6 @@ import { cn } from '@/lib/utils'
 import { useWindowDrag } from '@/lib/useWindowDrag'
 import { useKnowledgeStore } from '@/store/knowledgeStore'
 import { useProjectPathStore } from '@/store/projectPathStore'
-import { useParallelStore } from '@/store/parallelStore'
-import { useWorktreeStore } from '@/store/worktreeStore'
-import {
-  collectNestedWorktreeSessionIds,
-  extractParallelNestingHints,
-  nestableCatalogPaths,
-} from '@/lib/worktreeNesting'
 import {
   isPlaceholderSidebarSection,
   useUiStore,
@@ -104,8 +97,6 @@ export function AppSidebar() {
   const activeSessionId = useActiveSessionId()
   const spaces = useKnowledgeStore((s) => s.spaces)
   const activeSpaceId = useKnowledgeStore((s) => s.activeSpaceId)
-  const parallelRuns = useParallelStore((s) => s.runs)
-  const catalogById = useWorktreeStore((s) => s.byId)
   const managedTerminals = useManagedTerminalStore((s) => s.terminals)
   const focusedManagedId = useManagedTerminalStore((s) => s.focusedId)
   /** Ring status map — re-renders sidebar rows when PTY status changes. */
@@ -180,27 +171,13 @@ export function AppSidebar() {
     }
   }
 
-  /** Nested worktree / parallel-slot sessions — never top-level first-class rows. */
-  const nestedWorktreeSessionIds = useMemo(() => {
-    const hints = extractParallelNestingHints(parallelRuns)
-    // Exclude primary (main-repo) catalog paths — host cwd === primary path after list hydrate.
-    const catalogPaths = nestableCatalogPaths(Object.values(catalogById))
-    return collectNestedWorktreeSessionIds({
-      sessions: sessions.map((s) => ({ id: s.id, title: s.title, config: { cwd: s.config.cwd } })),
-      slotSessionIds: hints.slotSessionIds,
-      worktreePaths: [...hints.worktreePaths, ...catalogPaths],
-    })
-  }, [parallelRuns, catalogById, sessions])
-
   const filteredSessions = useMemo(() => {
     const surface = sidebarSection === 'projects' ? 'code' : 'chat'
     if (sidebarSection !== 'projects' && sidebarSection !== 'chats') return []
     return sessions
       .filter((s) => surfaceOf(s.config) === surface)
-      // Worktree-bound / slot sessions only appear nested under the host expand tree.
-      .filter((s) => !nestedWorktreeSessionIds.has(s.id))
       .sort((a, b) => b.updatedAtMs - a.updatedAtMs)
-  }, [sessions, sidebarSection, nestedWorktreeSessionIds])
+  }, [sessions, sidebarSection])
 
   /** Project sessions only: group top-level rows by workspace path. */
   const projectSessionGroups = useMemo(() => {
@@ -214,11 +191,8 @@ export function AppSidebar() {
     return groupSessionsByDate(filteredSessions)
   }, [sidebarSection, filteredSessions])
 
-  /** History footer badge: first-class sessions only (no nested worktree slots). */
-  const historyCount = useMemo(
-    () => sessions.filter((s) => !nestedWorktreeSessionIds.has(s.id)).length,
-    [sessions, nestedWorktreeSessionIds],
-  )
+  /** History footer badge: first-class sessions only. */
+  const historyCount = useMemo(() => sessions.length, [sessions])
 
   const pathStatusByKey = useProjectPathStore((s) => s.byKey)
 
@@ -237,11 +211,8 @@ export function AppSidebar() {
   }, [spaces, sidebarSection])
 
   const projectCount = useMemo(
-    () =>
-      sessions.filter(
-        (s) => surfaceOf(s.config) === 'code' && !nestedWorktreeSessionIds.has(s.id),
-      ).length,
-    [sessions, nestedWorktreeSessionIds],
+    () => sessions.filter((s) => surfaceOf(s.config) === 'code').length,
+    [sessions],
   )
   const chatCount = useMemo(
     () => sessions.filter((s) => surfaceOf(s.config) === 'chat').length,

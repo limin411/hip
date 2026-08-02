@@ -1,7 +1,5 @@
 import type { ClientMessage } from '@hip/protocol'
 import * as workspaceGit from '../workspace-git.js'
-import { createManagedProductWorktree } from '../worktree-product-create.js'
-import { createWorktreeService } from '../worktree-service.js'
 import type { SendFn, SessionManagerContext } from './types.js'
 
 export const WORKSPACE_MESSAGE_TYPES = new Set([
@@ -17,9 +15,6 @@ export const WORKSPACE_MESSAGE_TYPES = new Set([
   'git:commitLog',
   'git:branch:list',
   'git:branch:switch',
-  'git:worktree:create',
-  'git:worktree:list',
-  'git:worktree:remove',
 ])
 
 /** True when msg.type is handled by handleWorkspaceMessage (sync check — do not await first). */
@@ -100,77 +95,6 @@ export async function handleWorkspaceMessage(
     case 'git:branch:switch': {
       const r = await ctx.ensureSession(msg.sessionId, send).switchBranch(msg.branch)
       send({ type: 'git:branch:switch:result', sessionId: msg.sessionId, branch: msg.branch, ok: r.ok, currentBranch: r.currentBranch, ...(r.error ? { error: r.error } : {}) })
-      return
-    }
-    case 'git:worktree:create': {
-      const s = ctx.ensureSession(msg.sessionId, send)
-      const cwd = s.config.cwd
-      if (!cwd) { send({ type: 'git:worktree:create:result', sessionId: msg.sessionId, ok: false, error: 'no cwd' }); return }
-      // createBranch stays in handler (branch must exist before service.create worktree add).
-      if (msg.createBranch) {
-        const br = await workspaceGit.gitCreateBranch(cwd, msg.branch, 'git', msg.baseRef)
-        if (!br.ok) {
-          const err = (br.error ?? '').toLowerCase()
-          // Branch may already exist from a prior slot attempt — continue to worktree add.
-          if (!err.includes('already exists') && !err.includes('already exist')) {
-            send({ type: 'git:worktree:create:result', sessionId: msg.sessionId, ok: false, error: br.error ?? 'create branch failed' })
-            return
-          }
-        }
-      }
-      const svc = createWorktreeService({
-        notify: (ev) => send({ type: 'worktree:changed', ...ev }),
-      })
-      // D23: reveal pass-through. D7/D26: source/label pass-through (default protocol).
-      const r = await createManagedProductWorktree(svc, {
-        cwd,
-        branch: msg.branch,
-        pathKey: msg.pathKey,
-        source: msg.source ?? 'protocol',
-        hostSessionId: msg.sessionId,
-        ...(msg.label !== undefined ? { label: msg.label } : {}),
-        ...(msg.reveal !== undefined ? { reveal: msg.reveal } : {}),
-      })
-      send({
-        type: 'git:worktree:create:result',
-        sessionId: msg.sessionId,
-        ok: r.ok,
-        ...(r.path ? { path: r.path } : {}),
-        ...(r.worktree?.id ? { id: r.worktree.id } : {}),
-        ...(r.error ? { error: r.error } : {}),
-      })
-      return
-    }
-    case 'git:worktree:list': {
-      const s = ctx.ensureSession(msg.sessionId, send)
-      const cwd = s.config.cwd
-      if (!cwd) { send({ type: 'git:worktree:list:result', sessionId: msg.sessionId, worktrees: [] }); return }
-      const svc = createWorktreeService()
-      const r = await svc.list({ cwd, managedOnly: true })
-      send({ type: 'git:worktree:list:result', sessionId: msg.sessionId, worktrees: r.worktrees })
-      return
-    }
-    case 'git:worktree:remove': {
-      const s = ctx.ensureSession(msg.sessionId, send)
-      const cwd = s.config.cwd
-      if (!cwd) { send({ type: 'git:worktree:remove:result', sessionId: msg.sessionId, ok: false, error: 'no cwd' }); return }
-      const svc = createWorktreeService({
-        notify: (ev) => send({ type: 'worktree:changed', ...ev }),
-      })
-      const r = await svc.remove({
-        cwd,
-        worktreePath: msg.worktreePath,
-        force: msg.force === true,
-        hostSessionId: msg.sessionId,
-      })
-      send({
-        type: 'git:worktree:remove:result',
-        sessionId: msg.sessionId,
-        ok: r.ok,
-        ...(r.error ? { error: r.error } : {}),
-        ...(r.errorCode ? { errorCode: r.errorCode } : {}),
-        ...(r.dirtySummary ? { dirtySummary: r.dirtySummary } : {}),
-      })
       return
     }
     default:

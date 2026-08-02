@@ -56,14 +56,11 @@ describe('buildTools permissionMode — registration', () => {
     expect(names).not.toContain('run_script')
   })
 
-  it("chat mode omits git mutation tools (commit/branch/worktree)", () => {
+  it("chat mode omits git mutation tools (commit/branch)", () => {
     const names = buildTools(root, undefined, root, undefined, { permissionMode: 'chat' }).map((t) => t.name)
     expect(names).not.toContain('git_commit')
     expect(names).not.toContain('git_create_branch')
     expect(names).not.toContain('git_switch_branch')
-    expect(names).not.toContain('git_worktree_create')
-    expect(names).not.toContain('git_worktree_list')
-    expect(names).not.toContain('git_worktree_remove')
   })
 
   it("edit mode registers git tools when cwd is set", () => {
@@ -71,9 +68,6 @@ describe('buildTools permissionMode — registration', () => {
     expect(names).toContain('git_commit')
     expect(names).toContain('git_create_branch')
     expect(names).toContain('git_switch_branch')
-    expect(names).toContain('git_worktree_create')
-    expect(names).toContain('git_worktree_list')
-    expect(names).toContain('git_worktree_remove')
   })
 
   it('Chat surface + edit permission keeps writes but drops git/plugin tools', () => {

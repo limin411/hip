@@ -17,7 +17,7 @@ describe('PermissionManager.requestChoice', () => {
       's1',
       't1',
       () => 1,
-      { title: 'Parallel', kind: 'parallel_worktrees', content: 'why' },
+      { title: 'Choose', kind: 'multi_choice', content: 'why' },
       [
         { optionId: 'n2', name: '2', kind: 'allow_once' },
         { optionId: 'reject', name: 'No', kind: 'reject_once' },
@@ -26,7 +26,7 @@ describe('PermissionManager.requestChoice', () => {
     expect(send).toHaveBeenCalledWith(
       expect.objectContaining({
         type: 'permission:request',
-        tool: expect.objectContaining({ kind: 'parallel_worktrees' }),
+        tool: expect.objectContaining({ kind: 'multi_choice' }),
       }),
     )
     const requestId = (send.mock.calls[0]![0] as { requestId: string }).requestId

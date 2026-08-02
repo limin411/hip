@@ -116,8 +116,9 @@ export class GitOperations {
   /** Diff for a timeline checkpoint in one of the three modes. */
   async commitLog(cwd: string | undefined): Promise<{ state: DiffState; commits?: CommitLogEntry[]; error?: string }> {
     if (!cwd) return { state: 'no_cwd' }
-    const start = this.store?.getSessionGitMeta(this.sessionId).sessionStartCommit ?? null
-    return workspaceGit.collectCommitLog(cwd, start)
+    // The Changes tab shows the repo's recent history (capped by collectCommitLog),
+    // not only commits made since this session started.
+    return workspaceGit.collectCommitLog(cwd, null)
   }
 
   /** Diff introduced by one commit (`git show sha`), cwd-relative. Never throws. */

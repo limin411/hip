@@ -648,7 +648,7 @@ export const zhTW = {
     "changesView": {
       "uncommitted": "未提交的改動",
       "commitLog": "提交記錄",
-      "noCommits": "本會話開始以來暫無提交",
+      "noCommits": "暫無提交",
       "commitLogError": "無法讀取提交記錄",
       "toolbarMenu": "更改工具列選單",
       "sessionCommits": "本會話提交",

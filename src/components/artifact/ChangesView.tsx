@@ -47,6 +47,7 @@ export function ChangesView() {
   const setIgnoreWhitespace = useUiStore((s) => s.setIgnoreWhitespace)
   const activeTab = useUiStore((s) => s.activeTab)
   const rootRef = useRef<HTMLDivElement>(null)
+  const dragTeardownRef = useRef<(() => void) | null>(null)
   const [focusedPath, setFocusedPath] = useState<string | null>(null)
   const [menuOpen, setMenuOpen] = useState(false)
   const [discardPath, setDiscardPath] = useState<string | null>(null)
@@ -228,7 +229,9 @@ export function ChangesView() {
   const showCommitSection = hasUncommitted || hasCommits || log.status !== 'idle'
 
   const startCommitResize = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (e.button !== 0 || dragTeardownRef.current) return
     e.preventDefault()
+    e.stopPropagation()
     const root = rootRef.current
     if (!root) return
     setChangesCommitExpanded(true)
@@ -236,13 +239,29 @@ export function ChangesView() {
       const rect = root.getBoundingClientRect()
       setChangesCommitHeight(rect.bottom - ev.clientY)
     }
-    const up = () => {
+    const finish = () => {
+      dragTeardownRef.current = null
       window.removeEventListener('pointermove', move)
       window.removeEventListener('pointerup', up)
+      window.removeEventListener('pointercancel', cancel)
+      document.body.style.userSelect = ''
+      document.body.style.cursor = ''
     }
+    const up = (ev: PointerEvent) => {
+      if (ev.button !== 0) return
+      finish()
+    }
+    const cancel = () => finish()
+
+    dragTeardownRef.current = finish
+    document.body.style.userSelect = 'none'
+    document.body.style.cursor = 'row-resize'
     window.addEventListener('pointermove', move)
     window.addEventListener('pointerup', up)
+    window.addEventListener('pointercancel', cancel)
   }
+
+  useEffect(() => () => dragTeardownRef.current?.(), [])
 
   if (!sessionId) return <Empty title={t('artifact.diffView.noSession')} desc={t('artifact.diffView.noSessionDesc')} />
 
@@ -473,7 +492,7 @@ export function ChangesView() {
               aria-label={t('artifact.changesView.resizeCommits')}
               title={t('artifact.changesView.resizeCommits')}
               onPointerDown={startCommitResize}
-              className="h-1.5 shrink-0 cursor-row-resize touch-none bg-transparent transition-colors hover:bg-accent/40"
+              className="relative z-10 h-2 shrink-0 cursor-row-resize touch-none bg-transparent transition-colors hover:bg-accent/40"
               data-testid="changes-commit-divider"
             />
             {/* commit log (bottom) */}
@@ -497,7 +516,7 @@ export function ChangesView() {
                   {commitExpanded ? <ChevronDown size={14} strokeWidth={1.75} /> : <ChevronRight size={14} strokeWidth={1.75} />}
                 </span>
                 <span className="truncate">
-                  {diff.hasSessionStart ? t('artifact.changesView.sessionCommits') : t('artifact.changesView.recentCommits')}
+                  {t('artifact.changesView.recentCommits')}
                 </span>
                 <span className="shrink-0 tabular-nums">{log.commits.length}</span>
               </button>

@@ -162,6 +162,58 @@ describe('ChangesView v2', () => {
     expect(screen.queryByTestId('commit-row-button')).toBeNull()
   })
 
+  it('labels the commit section as recent commits even when a session start exists', () => {
+    useDiffStore.setState({
+      bySession: {
+        s1: {
+          ...EMPTY_DIFF,
+          status: 'ready',
+          state: 'ok',
+          hasSessionStart: true,
+          files: [file],
+          commitLog: {
+            status: 'ready',
+            state: 'ok',
+            commits: [{ sha: 'abc1234', shortSha: 'abc1234', message: 'm', author: 'me', timestamp: 0 }],
+          },
+        },
+      },
+    })
+    render(<ChangesView />)
+    expect(screen.getByText('artifact.changesView.recentCommits')).toBeInTheDocument()
+  })
+
+  it('drag on the divider resizes the commit section', () => {
+    useDiffStore.setState({
+      bySession: {
+        s1: {
+          ...EMPTY_DIFF,
+          status: 'ready',
+          state: 'ok',
+          hasSessionStart: true,
+          files: [file],
+          commitLog: {
+            status: 'ready',
+            state: 'ok',
+            commits: [{ sha: 'abc1234', shortSha: 'abc1234', message: 'm', author: 'me', timestamp: 0 }],
+          },
+        },
+      },
+    })
+    render(<ChangesView />)
+    const root = screen.getByTestId('changes-view')
+    vi.spyOn(root, 'getBoundingClientRect').mockReturnValue({
+      bottom: 400, top: 0, left: 0, right: 100, width: 100, height: 400,
+      x: 0, y: 0, toJSON: () => ({}),
+    } as DOMRect)
+    const divider = screen.getByTestId('changes-commit-divider')
+    fireEvent.pointerDown(divider, { button: 0, clientY: 300 })
+    fireEvent.pointerMove(window, { clientY: 200 })
+    fireEvent.pointerUp(window, { button: 0 })
+    expect(useUiStore.getState().changesCommitHeight).toBe(200)
+    expect(screen.getByTestId('changes-commit-section')).toHaveStyle({ height: '200px' })
+  })
+
   it('commit click loads the commit diff and the back bar returns to uncommitted', async () => {
     useDiffStore.setState({
       bySession: {

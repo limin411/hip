@@ -12,6 +12,7 @@ const execFileP = promisify(execFile)
 
 export const MAX_DIFF_LINES_PER_FILE = 2000
 export const MAX_DIFF_FILES = 200
+export const MAX_COMMIT_LOG = 100
 const GIT_TIMEOUT_MS = 10_000
 const GIT_INIT_TIMEOUT_MS = 60_000 // user-triggered baseline commit may walk a big tree
 const GIT_MAX_BUFFER = 32 * 1024 * 1024
@@ -326,7 +327,7 @@ export async function collectCommitLog(cwd: string, startCommit: string | null, 
     const FMT = '--format=%H%x1f%h%x1f%an%x1f%ct%x1f%s%x1e'
     const range = startCommit ? `${startCommit}..HEAD` : 'HEAD'
     const args = ['log', FMT, range]
-    if (startCommit === null) args.push('--max-count=100')
+    if (startCommit === null) args.push(`--max-count=${MAX_COMMIT_LOG}`)
     const out = (await runGit(cwd, args, gitBin)).stdout
     const commits: CommitLogEntry[] = []
     for (const rec of out.split('\x1e')) {

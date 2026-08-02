@@ -642,7 +642,7 @@ export const ja = {
     "changesView": {
       "uncommitted": "未コミットの変更",
       "commitLog": "コミット",
-      "noCommits": "このセッション開始以降、コミットはありません",
+      "noCommits": "コミットはまだありません",
       "commitLogError": "コミットログを読み取れませんでした",
       "toolbarMenu": "変更ツールバーメニュー",
       "sessionCommits": "このセッションのコミット",

@@ -615,7 +615,7 @@ export const en = {
       changesView: {
         uncommitted: 'Uncommitted changes',
         commitLog: 'Commits',
-        noCommits: 'No commits since this session started',
+        noCommits: 'No commits yet',
         commitLogError: 'Could not read the commit log',
         toolbarMenu: 'Changes toolbar menu',
         sessionCommits: 'Session commits',

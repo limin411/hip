@@ -642,7 +642,7 @@ export const ko = {
     "changesView": {
       "uncommitted": "커밋되지 않은 변경사항",
       "commitLog": "커밋",
-      "noCommits": "이 세션 시작 이후 커밋 없음",
+      "noCommits": "아직 커밋 없음",
       "commitLogError": "커밋 로그를 읽을 수 없음",
       "toolbarMenu": "변경사항 도구 모음 메뉴",
       "sessionCommits": "이 세션 커밋",

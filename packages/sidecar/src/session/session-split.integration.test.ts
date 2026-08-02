@@ -1,7 +1,15 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { HumanMessage, AIMessage, SystemMessage } from '@langchain/core/messages'
+import { execFile } from 'node:child_process'
+import { promises as fs } from 'node:fs'
+import * as os from 'node:os'
+import * as path from 'node:path'
+import { promisify } from 'node:util'
 import { Session } from './session.js'
 import type { SessionConfig } from '@hip/protocol'
+
+const execFileP = promisify(execFile)
+const git = (cwd: string, ...args: string[]) => execFileP('git', args, { cwd })
 
 function makeConfig(overrides: Partial<SessionConfig> = {}): SessionConfig {
   return { llmProvider: 'test', model: 'test-model', tools: [], cwd: '/tmp/test-cwd', ...overrides }
@@ -127,6 +135,25 @@ describe('Session with extracted modules', () => {
     const s = new Session('test-22', makeConfig({ cwd: undefined }))
     const r = await s.commitLog()
     expect(r.state).toBe('no_cwd')
+  })
+
+  it('commitLog returns repo history (not only session-scoped commits)', async () => {
+    const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'hip-session-commitlog-'))
+    try {
+      await fs.writeFile(path.join(dir, 'a.txt'), 'one\n')
+      await git(dir, 'init')
+      await git(dir, 'add', '-A')
+      await git(dir, '-c', 'user.name=t', '-c', 'user.email=t@t', 'commit', '-m', 'pre-session', '--allow-empty')
+      await fs.writeFile(path.join(dir, 'a.txt'), 'two\n')
+      await git(dir, 'add', '-A')
+      await git(dir, '-c', 'user.name=t', '-c', 'user.email=t@t', 'commit', '-m', 'in-session')
+      const s = new Session('test-commitlog', makeConfig({ cwd: dir }))
+      const r = await s.commitLog()
+      expect(r.state).toBe('ok')
+      expect(r.commits!.map((c) => c.message)).toEqual(['in-session', 'pre-session'])
+    } finally {
+      await fs.rm(dir, { recursive: true, force: true })
+    }
   })
 
   it('listBranches delegates to git module', async () => {

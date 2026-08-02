@@ -608,7 +608,7 @@ export const zhCN = {
       changesView: {
         uncommitted: '未提交的改动',
         commitLog: '提交记录',
-        noCommits: '本会话开始以来暂无提交',
+        noCommits: '暂无提交',
         commitLogError: '无法读取提交记录',
         toolbarMenu: '更改工具栏菜单',
         sessionCommits: '本会话提交',

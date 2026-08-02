@@ -219,6 +219,7 @@ mod tests {
                     at: 1_720_000_002_000,
                 },
             ],
+            terminal_records: vec![],
         };
         save_catalog(&p, &cat).unwrap();
         let loaded = load_catalog(&p);
@@ -259,6 +260,7 @@ mod tests {
                     at: 4,
                 },
             ],
+            terminal_records: vec![],
         };
         sanitize_recents(&mut cat);
         assert_eq!(cat.recents.len(), 2);
@@ -297,6 +299,7 @@ mod tests {
                 groups: vec![],
                 hosts: vec![],
                 recents: vec![],
+                terminal_records: vec![],
             },
         )
         .unwrap();
@@ -330,6 +333,7 @@ mod tests {
                 label: "ops-1".into(),
                 at: 1_720_000_001_000,
             }],
+            terminal_records: vec![],
         };
         let v: serde_json::Value = serde_json::to_value(&cat).unwrap();
         assert_eq!(v["groups"][0]["id"], "grp_1");

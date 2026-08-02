@@ -149,6 +149,28 @@ export function XtermSurface({
       termRef.current = term
       fitRef.current = fit
 
+      // Native viewport scrollbar: WKWebView paints an opaque light gutter, and
+      // xterm re-measures with `width || 15` so a hidden bar still reserves 15px.
+      // Hide chrome and pin scrollBarWidth to 0 for the lifetime of this surface.
+      const viewport = el.querySelector('.xterm-viewport')
+      if (viewport instanceof HTMLElement) {
+        viewport.classList.add('scrollbar-hide')
+        viewport.style.scrollbarWidth = 'none'
+      }
+      const coreViewport = (
+        term as unknown as { _core?: { viewport?: { scrollBarWidth: number } } }
+      )._core?.viewport
+      if (coreViewport) {
+        Object.defineProperty(coreViewport, 'scrollBarWidth', {
+          configurable: true,
+          enumerable: true,
+          get: () => 0,
+          set: () => {
+            /* ignore xterm || 15 fallback */
+          },
+        })
+      }
+
       // Canvas menu bridge: copy selection / paste into live xterm (keyed by terminalId).
       bindTerminalCanvas(terminalId, {
         getSelection: () => term?.getSelection() ?? '',

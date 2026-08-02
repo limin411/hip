@@ -97,7 +97,7 @@ export function ManagedTerminalSession({ terminalId }: { terminalId: string }) {
       : cwd
 
   return (
-    <div className="flex h-full min-h-0 flex-col bg-surface-content" data-testid="managed-terminal-session">
+    <div className="flex h-full min-h-0 flex-col" data-testid="managed-terminal-session">
       <DeclarativeContextMenu
         kind="managedTerminal"
         payload={{ terminalId, kind, title: term.title }}
@@ -171,7 +171,7 @@ export function ManagedTerminalSession({ terminalId }: { terminalId: string }) {
       </DeclarativeContextMenu>
 
       {/* Files tree lives in the shell right rail (MainToolbar PanelToggle), like chat/code/KB. */}
-      <div className="min-h-0 min-w-0 flex-1">
+      <div className="min-h-0 min-w-0 flex-1 overflow-hidden">
         {kind === 'local' && cwd ? (
           <XtermSurface
             key={bootKey}

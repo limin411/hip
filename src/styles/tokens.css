@@ -293,9 +293,17 @@ a:hover {
 ::-webkit-scrollbar {
   width: 5px;
   height: 5px;
+  /* WebKit defaults the scrollbar chrome itself to an opaque light fill when
+     only width/height are set — shows as a white strip on dark panes
+     (notably xterm's always-on overflow-y:scroll viewport gutter). */
+  background: transparent;
 }
 
 ::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-corner {
   background: transparent;
 }
 
@@ -312,6 +320,35 @@ a:hover {
 *:hover::-webkit-scrollbar-thumb:hover,
 *.is-scrolling::-webkit-scrollbar-thumb:hover {
   background: var(--text-tertiary);
+}
+
+/*
+ * xterm .xterm-viewport uses overflow-y:scroll (always-on gutter). On macOS
+ * WKWebView the native scrollbar chrome paints an opaque light strip that our
+ * global thin/transparent rules cannot fully restyle. Hide the native bar;
+ * wheel/trackpad scrolling still works. Parent shell paints terminalBg.
+ */
+.xterm {
+  width: 100%;
+  height: 100%;
+}
+.xterm .xterm-viewport {
+  scrollbar-width: none !important;
+  -ms-overflow-style: none !important;
+  /* Let the host shell's terminalBg show through any reserved gutter. */
+  background-color: transparent !important;
+}
+.xterm .xterm-viewport::-webkit-scrollbar {
+  display: none !important;
+  width: 0 !important;
+  height: 0 !important;
+  background: transparent !important;
+}
+.xterm .xterm-viewport::-webkit-scrollbar-track,
+.xterm .xterm-viewport::-webkit-scrollbar-corner,
+.xterm .xterm-viewport::-webkit-scrollbar-thumb {
+  display: none !important;
+  background: transparent !important;
 }
 
 

@@ -182,6 +182,8 @@ export function Composer({
             e.preventDefault()
             return
           }
+          // IME: Enter confirms composition (pinyin etc.) — must not send.
+          if (e.nativeEvent.isComposing || e.key === 'Process') return
           if (e.key === 'Enter' && !e.shiftKey) {
             e.preventDefault()
             if (!running && !submitDisabled) onSubmit()

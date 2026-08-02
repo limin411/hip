@@ -84,6 +84,8 @@ export function FileMentionPalette({
   // Always attach while mounted so empty-state Enter cannot fall through to Composer submit.
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
+      // IME: do not steal composition commit keys (pinyin Enter etc.).
+      if (e.isComposing || e.key === 'Process') return
       if (e.key === 'ArrowDown') {
         e.preventDefault()
         e.stopImmediatePropagation()

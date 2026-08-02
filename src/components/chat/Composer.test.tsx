@@ -43,6 +43,24 @@ describe('Composer', () => {
     expect(onSubmit).not.toHaveBeenCalled()
   })
 
+  it('does not submit on Enter while IME is composing', () => {
+    const onSubmit = vi.fn()
+    render(<Composer value="nihao" onChange={vi.fn()} onSubmit={onSubmit} />)
+    fireEvent.keyDown(screen.getByPlaceholderText(/Message hip/), {
+      key: 'Enter',
+      shiftKey: false,
+      isComposing: true,
+    })
+    expect(onSubmit).not.toHaveBeenCalled()
+  })
+
+  it('does not submit on IME Process key', () => {
+    const onSubmit = vi.fn()
+    render(<Composer value="nihao" onChange={vi.fn()} onSubmit={onSubmit} />)
+    fireEvent.keyDown(screen.getByPlaceholderText(/Message hip/), { key: 'Process' })
+    expect(onSubmit).not.toHaveBeenCalled()
+  })
+
   it('renders attachment chips and removes them', () => {
     const onAttachmentsChange = vi.fn()
     const attachments = [{ id: 'a1', name: 'file.png', mimeType: 'image/png', path: '/tmp/file.png' }]

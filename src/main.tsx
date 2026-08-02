@@ -10,10 +10,12 @@ import { ToasterHost } from './components/ui/ToasterHost'
 import { applyPlatformDataset } from './lib/platform'
 import { applyPlatformWindowChrome } from './lib/windowChrome'
 import { enableNativeVibrancy } from './lib/windowVibrancy'
+import { installScrollReveal } from './lib/scrollReveal'
 
 // data-platform → CSS; Win frameless caption; then native material / solid.
 if (typeof document !== 'undefined') {
   applyPlatformDataset()
+  installScrollReveal()
   void (async () => {
     await applyPlatformWindowChrome()
     await enableNativeVibrancy()

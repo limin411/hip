@@ -52,10 +52,17 @@ export function ArtifactPanel() {
               {!isGitRepo && <GitInitBanner />}
               <PanelGroup direction="horizontal" className="min-h-0 flex-1">
                 <Panel minSize={30}><FilePreview /></Panel>
-                <PanelResizeHandle className="group relative z-10 w-2 -mx-1 bg-transparent">
-                  <div className="mx-auto h-full w-px bg-border transition-colors group-hover:bg-accent group-data-[resize-handle-state=drag]:bg-accent" />
+                <PanelResizeHandle className="group relative z-10 w-2 shrink-0 bg-transparent">
+                  <div className="mx-auto h-full w-px bg-transparent transition-colors group-hover:bg-accent/50 group-data-[resize-handle-state=drag]:bg-accent" />
                 </PanelResizeHandle>
-                <Panel defaultSize={42} minSize={24}><FileTree /></Panel>
+                <Panel defaultSize={42} minSize={24}>
+                  <div className="box-border h-full min-h-0 overflow-hidden py-2 pr-2">
+                    {/* max-h only: box grows with tree content, caps at pane height then scrolls */}
+                    <div className="max-h-full overflow-y-auto rounded-lg border border-border bg-surface-muted/30">
+                      <FileTree />
+                    </div>
+                  </div>
+                </Panel>
               </PanelGroup>
             </div>
           )}

@@ -171,14 +171,14 @@ export function FileTree() {
   if (!rootPath) {
     if (chatDraft) {
       return (
-        <div className="flex h-full flex-col items-center justify-center gap-3 p-6 text-center text-ink-tertiary" data-testid="file-tree">
+        <div className="flex flex-col items-center justify-center gap-3 p-6 text-center text-ink-tertiary" data-testid="file-tree">
           <Folder size={32} className="opacity-40" />
           <div className="max-w-[220px] text-body">{t('artifact.sandboxPending')}</div>
         </div>
       )
     }
     return (
-      <div className="flex h-full flex-col items-center justify-center gap-3 p-6 text-center text-ink-tertiary" data-testid="file-tree">
+      <div className="flex flex-col items-center justify-center gap-3 p-6 text-center text-ink-tertiary" data-testid="file-tree">
         <Folder size={32} className="opacity-40" />
         <div className="max-w-[200px] text-body">{t('artifact.selectFolderDesc')}</div>
         <Button data-testid="select-folder" onClick={choose} variant="primary" size="sm">
@@ -189,11 +189,11 @@ export function FileTree() {
   }
 
   return (
-    <div className="flex h-full flex-col" data-testid="file-tree">
+    <div data-testid="file-tree">
       {/* Header (root name / refresh / change folder) is draft-only — committed
           sessions refresh their listing on a poll interval instead. */}
       {isDraft && (
-        <div className="flex h-8 shrink-0 items-center justify-between border-b border-border/80 px-2">
+        <div className="sticky top-0 z-10 flex h-8 items-center justify-between border-b border-border/80 bg-surface-muted/30 px-2">
           <span className="flex items-center gap-1.5 truncate text-caption font-medium text-ink-tertiary" title={rootPath}>
             <FolderGit2 size={13} strokeWidth={1.75} className="shrink-0" />
             <span className="truncate text-ink-secondary">{basename(rootPath)}</span>
@@ -226,7 +226,7 @@ export function FileTree() {
           </div>
         </div>
       )}
-      <div className="flex-1 overflow-auto py-1">
+      <div className="py-1">
         {scopeId && rootEntries?.map((e) => (
           <Node key={e.path} entry={e} scopeId={scopeId} isDraft={isDraft} depth={0} cwd={rootPath} />
         ))}

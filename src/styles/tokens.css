@@ -275,12 +275,18 @@ a:hover {
 }
 
 
-/* —— 滚动条美化 —— */
+/* —— 滚动条：默认隐藏，悬停或滚动时显示 —— */
 /* width = vertical bar; height = horizontal bar (code blocks with long lines).
-   Without height, WebKit keeps the ~15px system default and covers content below. */
+   Without height, WebKit keeps the ~15px system default and covers content below.
+   `.is-scrolling` is toggled by src/lib/scrollReveal.ts while a pane scrolls. */
 
 * {
   scrollbar-width: thin;
+  scrollbar-color: transparent transparent;
+}
+
+*:hover,
+*.is-scrolling {
   scrollbar-color: var(--border) transparent;
 }
 
@@ -294,11 +300,17 @@ a:hover {
 }
 
 ::-webkit-scrollbar-thumb {
-  background: var(--border);
+  background: transparent;
   border-radius: 3px;
 }
 
-::-webkit-scrollbar-thumb:hover {
+*:hover::-webkit-scrollbar-thumb,
+*.is-scrolling::-webkit-scrollbar-thumb {
+  background: var(--border);
+}
+
+*:hover::-webkit-scrollbar-thumb:hover,
+*.is-scrolling::-webkit-scrollbar-thumb:hover {
   background: var(--text-tertiary);
 }
 
@@ -310,6 +322,9 @@ a:hover {
   }
   .scrollbar-hide::-webkit-scrollbar {
     display: none;
+  }
+  .scrollbar-hide.is-scrolling {
+    scrollbar-width: none;
   }
 }
 

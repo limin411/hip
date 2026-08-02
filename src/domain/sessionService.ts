@@ -37,7 +37,7 @@ import { clampEffortForKey } from '@/lib/modelEffort'
 import { useProvidersStore } from '@/store/providersStore'
 import { useHipConfigStore } from '@/store/hipConfigStore'
 import { resolveValidAcpAgentId } from '@/lib/sessionAgent'
-import { surfaceOf } from '@/lib/sessions'
+import { isTerminalSession, surfaceOf } from '@/lib/sessions'
 import type { LocalAttachment } from '@/components/chat/attachmentTypes'
 import { applyServerMessageEffects } from './serverMessageEffects'
 import { sessionDebugBundleJson } from '@/lib/sessionDebugBundle'
@@ -55,8 +55,11 @@ import {
 import { auditSessionDelete, debugSessionDelete } from '@/lib/sessionDelete'
 import { StreamCoalescer, type CoalesceBucket, type StreamKind } from '@/lib/streamCoalesce'
 import { useKnowledgeStore } from '@/store/knowledgeStore'
+import { useTerminalAgentStore } from '@/store/terminalAgentStore'
+import { useManagedTerminalStore } from '@/store/managedTerminalStore'
 import { KNOWLEDGE_LIVE_FLAG_KEY } from '@/domain/knowledge/editorMode'
 import { buildRoundtableOutbound } from '@/lib/roundtable'
+import { handleTerminalBridgeMessage } from './terminalAgentBridge'
 
 /**
  * Map the current i18next language to a SessionConfig-supported value.
@@ -322,6 +325,11 @@ export class SessionService {
   }
 
   private receive(msg: ServerMessage): void {
+    // Terminal shared-PTY bridge requests are consumed by the UI-side bridge
+    // (they must never reach the regular session store/effects pipeline).
+    if (handleTerminalBridgeMessage(msg, (m) => this.transport.send(m))) {
+      return
+    }
     // PR-3: coalesce token:stream only. reasoning:delta applies immediately (no merge).
     if (msg.type === 'token:stream') {
       const extras = tokenStreamExtras(msg)
@@ -1169,12 +1177,26 @@ export class SessionService {
   }
 
   selectSession(id: string, messageId?: string): void {
+    // Terminal agent conversations are owned by the terminal session tree (§7.3 rule 1):
+    // never steal the chat/code active pointer and never switch the work surface away
+    // from terminals. The right-rail Agent tab + sidebar child rows are the entry points.
+    const terminalCandidate = useDomainStore.getState().sessions.find((x) => x.id === id)
+    if (terminalCandidate && isTerminalSession(terminalCandidate.config)) {
+      const tmId = terminalCandidate.config.managedTerminalId
+      if (tmId) {
+        this.focusTerminalAgentSession(tmId, id)
+        if (!terminalCandidate.loaded) {
+          this.transport.send({ type: 'session:load', sessionId: id })
+        }
+      }
+      return
+    }
     useDomainStore.getState().selectSession(id)
     useUiStore.getState().setSelectedArtifactPath(null)
     const s = useDomainStore.getState().sessions.find((x) => x.id === id)
     if (s) {
       const surface = surfaceOf(s.config)
-      useUiStore.getState().setActiveView(surface)
+      useUiStore.getState().setActiveView(surface === 'code' ? 'code' : 'chat')
       useUiStore.getState().setSidebarSection(surface === 'code' ? 'projects' : 'chats')
       this.rememberActiveForSurface(id)
     }
@@ -1193,6 +1215,30 @@ export class SessionService {
     if (!useNavHistoryStore.getState().applying) {
       void import('@/components/layout/navHistory').then(({ recordNavEntry }) => {
         recordNavEntry()
+      })
+    }
+  }
+
+  /**
+   * Dual-track focus for a terminal agent session (spec §3.5.4 / §7.3):
+   * focus the parent `tm_*`, keep `activeView === 'terminals'`, open the right rail
+   * on the agent tab, set the per-terminal active session, and note the context switch (D11).
+   */
+  focusTerminalAgentSession(terminalId: string, sessionId: string): void {
+    const ui = useUiStore.getState()
+    const prevActive = useTerminalAgentStore.getState().getActiveSession(terminalId)
+    useManagedTerminalStore.getState().focus(terminalId)
+    ui.setActiveView('terminals')
+    ui.setSidebarSection('terminals')
+    ui.setTerminalPanelOpen(true)
+    ui.setTerminalPanelTab(terminalId, 'agent')
+    useTerminalAgentStore.getState().setActiveSession(terminalId, sessionId)
+    if (prevActive && prevActive !== sessionId) {
+      // D11: terminal state may have changed since the previous conversation.
+      this.transport.send({
+        type: 'session:terminalContext',
+        sessionId,
+        note: 'Terminal state may have changed since the last message; recent output may belong to another conversation on this terminal. Check current terminal output before acting.',
       })
     }
   }
@@ -1993,6 +2039,14 @@ export class SessionService {
     })
   }
 
+  /** Fetch history for a session without focusing it (terminal agent panel). */
+  loadSessionMessages(sessionId: string): void {
+    const s = useDomainStore.getState().sessions.find((x) => x.id === sessionId)
+    if (s && !s.loaded) {
+      this.transport.send({ type: 'session:load', sessionId })
+    }
+  }
+
   getLastOutboundUserContent(): string | null {
     return this.lastOutboundUserContent
   }
@@ -2042,6 +2096,11 @@ export class SessionService {
   cancel(): void {
     const { activeSessionId } = useDomainStore.getState()
     if (activeSessionId) this.transport.send({ type: 'message:cancel', sessionId: activeSessionId })
+  }
+
+  /** Cancel a turn for an explicit session (terminal agent panel Stop turn). */
+  cancelSessionTurn(sessionId: string): void {
+    this.transport.send({ type: 'message:cancel', sessionId })
   }
 
   regenerate(): void {

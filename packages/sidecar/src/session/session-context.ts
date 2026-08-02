@@ -19,7 +19,7 @@ export interface SessionContextState {
   mcpCatalog?: string
   tokenBudgetPercent: number
   /** Product surface — owns persona/body; permissionMode owns tool gates. */
-  surface?: 'chat' | 'code' | 'knowledge'
+  surface?: 'chat' | 'code' | 'knowledge' | 'terminal'
   pendingSubagents?: Array<{
     id: string
     description: string

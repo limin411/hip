@@ -15,7 +15,7 @@ export interface InjectorState {
   skills: SkillMeta[]
   tokenBudgetPercent: number
   /** Product surface — owns persona/body; permissionMode owns tool gates. */
-  surface?: 'chat' | 'code' | 'knowledge'
+  surface?: 'chat' | 'code' | 'knowledge' | 'terminal'
   pendingSubagents?: { id: string; description: string; status: string }[]
   completedSubagents?: { id: string; description: string; status: string }[]
   /** Session id for memory prefetch + surface inference + skill filtering. */

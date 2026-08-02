@@ -76,6 +76,12 @@ function identityForSurface(surface: ProductSurface): string {
       'You are the Knowledge assistant for the user\'s notes spaces.'
     )
   }
+  if (surface === 'terminal') {
+    return (
+      `${IDENTITY_CORE} ` +
+      'You are the Terminal Ops assistant for an SSH managed terminal (shared visible PTY).'
+    )
+  }
   return (
     `${IDENTITY_CORE} ` +
     'You are the Code workbench agent that works directly in the user\'s project.'
@@ -250,7 +256,7 @@ export interface SystemPromptInput {
   permissionMode?: PermissionMode
   mcpCatalog?: string
   /** Product surface owns persona/body; permissionMode owns tool gates only. */
-  surface?: 'chat' | 'code' | 'knowledge'
+  surface?: 'chat' | 'code' | 'knowledge' | 'terminal'
 }
 
 const BASE_CHAT =
@@ -269,6 +275,26 @@ const BASE_KNOWLEDGE =
   'Do not claim to be a coding agent editing a software project. ' +
   'For simple questions, answer directly without tools or sub-agents.'
 
+/** §5.5 Terminal Ops body: shared-PTY rules + uncertainty + multi-session notes.
+ *  Host metadata / ring tail are injected per turn by TerminalContextInjector (P1). */
+const BASE_TERMINAL_OPS =
+  'You are assisting on an SSH managed terminal inside hip. ' +
+  'You operate on the SAME terminal the user is looking at — never a hidden local shell. ' +
+  'Rules:\n' +
+  '- Execute commands only via terminal_exec (shared PTY the user sees), after approval.\n' +
+  '- When the terminal is disconnected, terminal_exec is unavailable; read history only.\n' +
+  '- A timed_out result means the command MAY STILL BE RUNNING. Never claim success. ' +
+  'Poll terminal_read or ask the user if uncertain.\n' +
+  '- User input may appear between your command and its output; treat results cautiously ' +
+  '(user_interleaved lowers confidence — confirm with the user).\n' +
+  '- Remote file reading: use sftp_read with an absolute remote path; never assume local paths.\n' +
+  '- Prefer non-interactive flags (-y, --noconfirm, DEBIAN_FRONTEND=noninteractive).\n' +
+  '- If a command may be destructive, explain the risk in reason and wait for approval.\n' +
+  '- One terminal_exec per call: send a single command. For long-running work, start it with ' +
+  'nohup/tmux and poll with terminal_read.\n' +
+  '- Multiple conversations may share this terminal. Recent output may belong to another ' +
+  'conversation — check the current terminal state before acting.'
+
 /** Assemble the single-agent system prompt: base + cwd convention + anti-phantom (+ optional skills, user instructions, MCP catalog). */
 export function buildSystemPrompt({ cwd, userInstructions, skills, permissionMode, mcpCatalog, surface }: SystemPromptInput): string {
   // Surface owns persona/body; permissionMode owns tool/cwd jail wording only.
@@ -279,16 +305,21 @@ export function buildSystemPrompt({ cwd, userInstructions, skills, permissionMod
       ? BASE_CHAT
       : profile.promptBody === 'knowledge'
         ? BASE_KNOWLEDGE
-        : BASE
+        : profile.promptBody === 'terminal'
+          ? BASE_TERMINAL_OPS
+          : BASE
   const skillsForPrompt = filterSkillsForProfile(skills, profile)
   const hipAvailable = isHipProductSkillAvailable(skillsForPrompt)
   const capabilityMap = productCapabilityMapForSurface(profile.surface)
   // L0: identity + surface-filtered capability map + conditional product help.
   const l0 =
     `${identityForSurface(profile.surface)}\n\n${capabilityMap}\n\n${productHelpBlock(hipAvailable)}`
-  let base = profile.includeGitGuidance
-    ? `${l0}\n\n${body}\n\n${cwdBlock(cwd, profile.permissionMode)}\n\n${GIT_GUIDANCE}\n\n${ANTI_PHANTOM}`
-    : `${l0}\n\n${body}\n\n${cwdBlock(cwd, profile.permissionMode)}\n\n${ANTI_PHANTOM}`
+  let base =
+    profile.promptBody === 'terminal'
+      ? `${l0}\n\n${body}\n\n${ANTI_PHANTOM}`
+      : profile.includeGitGuidance
+        ? `${l0}\n\n${body}\n\n${cwdBlock(cwd, profile.permissionMode)}\n\n${GIT_GUIDANCE}\n\n${ANTI_PHANTOM}`
+        : `${l0}\n\n${body}\n\n${cwdBlock(cwd, profile.permissionMode)}\n\n${ANTI_PHANTOM}`
   if (skillsForPrompt.length > 0) {
     // Tighter skill budget on chat to save context (Sprint B). Pin per profile policy.
     const block = skillsBlock(skillsForPrompt, cwd, {

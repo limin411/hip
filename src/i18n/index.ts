@@ -1,5 +1,4 @@
 import i18n from 'i18next'
-import { initReactI18next } from 'react-i18next'
 import LanguageDetector from 'i18next-browser-languagedetector'
 import { zhCN } from './zh-CN'
 import { zhTW } from './zh-TW'
@@ -7,10 +6,19 @@ import { en } from './en'
 import { ja } from './ja'
 import { ko } from './ko'
 
-i18n
-  .use(LanguageDetector)
-  .use(initReactI18next)
-  .init({
+// Tests that partially mock react-i18next may not provide initReactI18next;
+// the i18n instance itself must still load so domain code can read language.
+const i18nChain = i18n.use(LanguageDetector)
+try {
+  const reactI18next = await import('react-i18next')
+  const reactBinding = (reactI18next as { initReactI18next?: unknown }).initReactI18next
+  if (typeof reactBinding !== 'undefined') {
+    i18nChain.use(reactBinding as never)
+  }
+} catch {
+  /* core i18n works without the React binding */
+}
+i18nChain.init({
     resources: {
       'zh-CN': zhCN,
       'zh-TW': zhTW,

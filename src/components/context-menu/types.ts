@@ -19,6 +19,8 @@ export type ContextKind =
   | 'terminal'
   /** Sidebar / chrome managed terminal (tm_* local or SSH). */
   | 'managedTerminal'
+  /** Terminal agent session row under an SSH managed terminal (D7). */
+  | 'terminalAgentSession'
   /** Remote SFTP tree entry in managed SSH files panel. */
   | 'sftpEntry'
   /** Local managed-terminal tree entry (term_fs_ls, launch cwd root). */
@@ -85,6 +87,12 @@ export type ContextPayloadMap = {
   managedTerminal: {
     terminalId: string
     kind: 'local' | 'ssh'
+    title: string
+  }
+  terminalAgentSession: {
+    sessionId: string
+    terminalId: string
+    hostId?: string
     title: string
   }
   /** Remote SFTP tree entry (managed SSH files panel). */

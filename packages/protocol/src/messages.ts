@@ -226,6 +226,43 @@ export type ClientMessage =
   | { type: 'task:stop'; sessionId: string; taskId: string; reason?: string }
   /** Fetch output for a runtime task (optional byte offset for tail/resume). */
   | { type: 'task:getOutput'; sessionId: string; taskId: string; offsetBytes?: number }
+  /**
+   * UI-mediated shared-PTY execution result (terminal surface). The sidecar's
+   * `terminal_exec` tool resolves its pending promise with this payload.
+   */
+  | {
+      type: 'session:uiToolResult'
+      sessionId: string
+      callId: string
+      ok: boolean
+      status: 'completed' | 'timed_out' | 'user_interleaved' | 'rejected' | 'error' | 'aborted'
+      output?: string
+      /** True when the command may still be running (timed_out/user_interleaved). */
+      mayStillRun?: boolean
+      exitCode?: number | null
+      error?: string
+    }
+  /**
+   * UI answer for the read-only short path (terminal_read / sftp_read).
+   * Read requests never require HITL.
+   */
+  | {
+      type: 'session:uiToolRead:result'
+      sessionId: string
+      callId: string
+      ok: boolean
+      output?: string
+      cursor?: number
+      error?: string
+    }
+  /** UI pushes ring tail / switch-context note into the sidecar context (D11). */
+  | { type: 'session:terminalContext'; sessionId: string; note?: string; ringTail?: string }
+
+/** UI answer for a `terminal_exec` bridge request (see session:uiToolResult). */
+export type UiToolResultPayload = Extract<ClientMessage, { type: 'session:uiToolResult' }>
+
+/** UI answer for a read-only bridge request (see session:uiToolRead:result). */
+export type UiToolReadResultPayload = Extract<ClientMessage, { type: 'session:uiToolRead:result' }>
 
 /** Context for LLM empty-state title/sub generation (UI chrome only). */
 export interface EmptyGreetingGenerateContext {
@@ -357,6 +394,32 @@ export type ServerMessage =
   | { type: 'git:branch:list:result'; sessionId: string; branches: Branch[]; currentBranch: string | null }
   | { type: 'git:branch:switch:result'; sessionId: string; branch: string; ok: boolean; currentBranch: string | null; error?: string }
   | { type: 'permission:request'; sessionId: string; turnId: string; requestId: string; tool: PermissionRequestPayload; options: PermissionOption[]; agentFrame?: AgentFrame }
+  /**
+   * Shared-PTY execution request (terminal surface). The UI must assert the
+   * terminal is connected, write `command + "\n"` to the visible PTY, watch the
+   * ring, and answer with `session:uiToolResult` (same callId).
+   */
+  | {
+      type: 'session:terminalExec:request'
+      sessionId: string
+      callId: string
+      command: string
+      waitMs: number
+      poll: boolean
+    }
+  /**
+   * Read-only tool bridge request (terminal_read / sftp_read). No HITL — the UI
+   * answers with `session:uiToolRead:result` (same callId).
+   */
+  | {
+      type: 'session:uiToolRead:request'
+      sessionId: string
+      callId: string
+      kind: 'terminal_read' | 'sftp_read'
+      cursor?: number
+      path?: string
+      maxBytes?: number
+    }
   /** Multi-client: first accepted permission:respond wins; broadcast so other clients clear UI. */
   | { type: 'permission:resolved'; sessionId: string; requestId: string; source: 'gui' | 'cli' | 'unknown' }
   /** Multi-client: plan/interrupt pause cleared (response accepted or turn abandoned). */

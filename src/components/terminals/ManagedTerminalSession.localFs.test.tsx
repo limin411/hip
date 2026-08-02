@@ -44,6 +44,7 @@ describe('ManagedTerminalSession layout', () => {
           kind: 'local',
           title: 'proj',
           cwd: '/tmp/proj',
+          status: 'connecting',
           createdAt: 1,
         },
         {
@@ -52,6 +53,7 @@ describe('ManagedTerminalSession layout', () => {
           title: 'ops',
           hostId: 'hst_1',
           remotePath: '/var/www',
+          status: 'connecting',
           createdAt: 2,
         },
       ],

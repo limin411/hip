@@ -65,7 +65,7 @@ type UnifiedRow =
       source: 'session'
       id: string
       title: string
-      surface: 'chat' | 'code'
+      surface: 'chat' | 'code' | 'terminal'
       deletedAt: number
       preview?: string
       deleteDerivedMemories: boolean

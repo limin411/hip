@@ -1217,6 +1217,10 @@ export async function runTurn(host: SessionTurnHost, rawSend: SendFn, base?: {
       sessionId: host.id,
       mode,
       surface: resolvedSurface,
+      terminalUiBridge: {
+        send,
+        pendingUiTool: host.permissions.pendingUiTools,
+      },
       skills,
       mcpConfigs: host.configMgr.mcpConfigs,
       enabledAgents,

@@ -13,6 +13,9 @@ describe('surfaceOf', () => {
   it('honors an explicit surface field', () => {
     expect(surfaceOf({ surface: 'chat', cwd: '/Users/me/project' }, 's1', root)).toBe('chat')
     expect(surfaceOf({ surface: 'code', cwd: scratchDirFor('s1', root) }, 's1', root)).toBe('code')
+    expect(surfaceOf({ surface: 'terminal', cwd: scratchDirFor('s1', root) }, 's1', root)).toBe(
+      'terminal',
+    )
   })
   it('infers chat from a scratch cwd when the field is absent (legacy row)', () => {
     expect(surfaceOf({ cwd: scratchDirFor('s1', root) }, 's1', root)).toBe('chat')

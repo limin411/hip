@@ -5,6 +5,7 @@ import { goSettingsPage } from '@/domain/commands'
 import { buildContextFromSlashCatalog } from './catalog'
 import { matchesWhen } from './matchesWhen'
 import type { GlobalCommand, PaletteGroup, PalettePageId } from './types'
+import { isTerminalSession } from '@/lib/sessions'
 
 export type { GlobalCommand, PaletteGroup, PalettePageId } from './types'
 export { matchesWhen, resolvePaletteSurface } from './matchesWhen'
@@ -206,7 +207,8 @@ export function pickRecentSessions(
   sessions: SessionVM[],
   limit = RECENT_SESSION_LIMIT,
 ): SessionVM[] {
-  return [...sessions]
+  return sessions
+    .filter((s) => !isTerminalSession(s.config))
     .sort((a, b) => b.updatedAtMs - a.updatedAtMs)
     .slice(0, limit)
 }

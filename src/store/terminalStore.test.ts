@@ -142,3 +142,39 @@ describe('terminalStore ring', () => {
     expect(s.ring.length).toBeGreaterThan(0)
   })
 })
+
+describe('getRingSince cursor slices (exec bridge)', () => {
+  it('returns output from an absolute cursor', () => {
+    useTerminalStore.setState({ bySession: {} })
+    const store = useTerminalStore.getState()
+    store.ensureSession('tm_1')
+    store.appendRing('tm_1', 'a')
+    store.appendRing('tm_1', 'b')
+    const slice = useTerminalStore.getState().getRingSince('tm_1', 0)
+    expect(slice.output).toBe('ab')
+    expect(slice.cursor).toBe(2)
+    expect(slice.truncated).toBe(false)
+    expect(useTerminalStore.getState().getRingSince('tm_1', 1).output).toBe('b')
+  })
+
+  it('marks truncated when the cursor was trimmed away and returns retained ring', () => {
+    useTerminalStore.setState({ bySession: {} })
+    const store = useTerminalStore.getState()
+    store.ensureSession('tm_1')
+    for (let i = 0; i < 8; i++) store.appendRing('tm_1', 'x'.repeat(300 * 1024))
+    store.appendRing('tm_1', 'tail')
+    const sess = useTerminalStore.getState().getSession('tm_1')!
+    expect(sess.trimOffset).toBeGreaterThan(0)
+    const slice = useTerminalStore.getState().getRingSince('tm_1', 0)
+    expect(slice.truncated).toBe(true)
+    expect(slice.output.length).toBeGreaterThan(0)
+    expect(slice.cursor).toBe(sess.trimOffset + sess.ring.length)
+  })
+
+  it('tracks and consumes user interleaving flag', () => {
+    useTerminalStore.getState().ensureSession('tm_1')
+    useTerminalStore.getState().noteUserInput('tm_1')
+    expect(useTerminalStore.getState().consumeUserInterleaved('tm_1')).toBe(true)
+    expect(useTerminalStore.getState().consumeUserInterleaved('tm_1')).toBe(false)
+  })
+})

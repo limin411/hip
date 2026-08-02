@@ -1,6 +1,7 @@
 import { invoke } from '@tauri-apps/api/core'
 import { listen, type UnlistenFn } from '@tauri-apps/api/event'
 import { useTerminalStore } from '@/store/terminalStore'
+import { useManagedTerminalStore } from '@/store/managedTerminalStore'
 
 export interface PtyOpenResult {
   reused: boolean
@@ -20,6 +21,7 @@ export interface PtyExitPayload {
   terminalId?: string
   code: number | null
   generation?: number
+  message?: string
 }
 
 /**
@@ -107,6 +109,7 @@ function handleExit(
   terminalId: string,
   code: number | null,
   generation?: number,
+  message?: string,
 ): void {
   const dec = decoders.get(terminalId)
   if (dec) {
@@ -115,6 +118,18 @@ function handleExit(
     decoders.delete(terminalId)
   }
   useTerminalStore.getState().setExit(terminalId, code, generation)
+  // D12: managed terminal records survive; sync status so the sidebar shows
+  // disconnected/error and the bridge disables terminal_exec.
+  const managed = useManagedTerminalStore.getState().getTerminal(terminalId)
+  if (managed) {
+    const sess = useTerminalStore.getState().getSession(terminalId)
+    if (generation !== undefined && sess && sess.generation !== 0 && generation !== sess.generation) {
+      return // stale exit from a replaced session
+    }
+    useManagedTerminalStore
+      .getState()
+      .setStatus(terminalId, message ? 'error' : 'disconnected')
+  }
 }
 
 /**
@@ -134,7 +149,7 @@ export async function startTerminalBridge(): Promise<() => void> {
   const u2: UnlistenFn = await listen<PtyExitPayload>('pty:exit', (e) => {
     const terminalId = normalizeTerminalId(e.payload)
     if (!terminalId) return
-    handleExit(decoders, terminalId, e.payload.code, e.payload.generation)
+    handleExit(decoders, terminalId, e.payload.code, e.payload.generation, e.payload.message)
   })
   const u3: UnlistenFn = await listen<PtyDataPayload>('ssh:data', (e) => {
     const terminalId = normalizeTerminalId(e.payload)
@@ -144,7 +159,7 @@ export async function startTerminalBridge(): Promise<() => void> {
   const u4: UnlistenFn = await listen<PtyExitPayload>('ssh:exit', (e) => {
     const terminalId = normalizeTerminalId(e.payload)
     if (!terminalId) return
-    handleExit(decoders, terminalId, e.payload.code ?? null, e.payload.generation)
+    handleExit(decoders, terminalId, e.payload.code ?? null, e.payload.generation, e.payload.message)
   })
   return () => {
     u1()

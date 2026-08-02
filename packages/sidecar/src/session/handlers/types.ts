@@ -38,6 +38,9 @@ export interface SessionLifecycleContext extends SessionManagerContext {
   connectionId?: string | null
   /** Multi-client client role for HITL resolve source. */
   connectionRole?: 'gui' | 'cli' | 'unknown' | null
+  /** Terminal-context notes/ring tail pushed by the UI (D11); consumed by injectors. */
+  setTerminalContext(sessionId: string, payload: { note?: string; ringTail?: string }): void
+  getTerminalContext(sessionId: string): { note?: string; ringTail?: string } | undefined
   createSession(id: string, config: SessionConfig, send: SendFn): void
   destroySession(id: string): Promise<void>
   getSession(id: string): Session | undefined

@@ -1,4 +1,10 @@
-import type { ServerMessage, PermissionMode, PermissionOption } from '@hip/protocol'
+import type {
+  ServerMessage,
+  PermissionMode,
+  PermissionOption,
+  UiToolReadResultPayload,
+  UiToolResultPayload,
+} from '@hip/protocol'
 import type { ApprovalFn, ApprovalDecision } from './tools.js'
 import type { ApprovalCache } from './tool-runner/approval-cache.js'
 import type { HookRegistry } from './hooks/registry.js'
@@ -22,6 +28,14 @@ export interface PermissionManagerOptions {
 export class PermissionManager {
   /** Pending HITL permission requests from the external agent, keyed by requestId. */
   readonly pendingPermissions = new Map<string, (c: { optionId: string } | { cancelled: true }) => void>()
+
+  /** Pending UI-mediated tool calls (terminal_exec / terminal_read / sftp_read),
+   *  keyed by callId. The UI resolves them via session:uiToolResult /
+   *  session:uiToolRead:result. */
+  readonly pendingUiTools = new Map<
+    string,
+    (result: UiToolResultPayload | UiToolReadResultPayload) => void
+  >()
 
   /** Session-level approval cache (shared with ToolRunner). Set via setApprovalCache. */
   private approvalCache?: ApprovalCache
@@ -54,6 +68,15 @@ export class PermissionManager {
     if (resolve) { this.pendingPermissions.delete(requestId); resolve(choice) }
   }
 
+  /** Resolve a pending UI-mediated tool (terminal bridge). No-op when unknown. */
+  respondUiTool(callId: string, result: UiToolResultPayload | UiToolReadResultPayload): void {
+    const resolve = this.pendingUiTools.get(callId)
+    if (resolve) {
+      this.pendingUiTools.delete(callId)
+      resolve(result)
+    }
+  }
+
   /** Clear sticky 'approve' grants (called on new session). */
   clearApprovedGrants(): void {
     this.approvalCache?.clear()
@@ -79,6 +102,19 @@ export class PermissionManager {
     if (this.pendingPermissions.size) {
       for (const resolve of this.pendingPermissions.values()) resolve({ cancelled: true })
       this.pendingPermissions.clear()
+    }
+    if (this.pendingUiTools.size) {
+      for (const resolve of this.pendingUiTools.values()) {
+        resolve({
+          type: 'session:uiToolResult',
+          sessionId: '',
+          callId: '',
+          ok: false,
+          status: 'aborted',
+          error: 'aborted',
+        })
+      }
+      this.pendingUiTools.clear()
     }
   }
 
@@ -144,7 +180,12 @@ export class PermissionManager {
             sessionId,
             turnId,
             requestId,
-            tool: { title: req.title, kind: req.kind, content: req.content },
+            tool: {
+              title: req.title,
+              kind: req.kind,
+              ...(req.content !== undefined ? { content: req.content } : {}),
+              ...(req.meta ? { meta: req.meta } : {}),
+            },
             options,
           })
         }).catch((err) => {
@@ -208,4 +249,3 @@ export class PermissionManager {
   }
 
 }
-

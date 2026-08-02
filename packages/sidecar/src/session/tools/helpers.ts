@@ -405,7 +405,14 @@ export type ApprovalDecision = { kind: string } | { cancelled: true }
  *  permission and resolves on the user's choice (as an ApprovalDecision); tests supply a fake.
  *  `toolName` is the canonical tool identifier (e.g. 'run_script') for hook matching; `title` is the
  *  user-facing prompt title. */
-export type ApprovalFn = (req: { title: string; toolName?: string; kind: string; content?: string }) => Promise<ApprovalDecision>
+export type ApprovalFn = (req: {
+  title: string
+  toolName?: string
+  kind: string
+  content?: string
+  /** Extra bridge metadata (e.g. terminal_exec waitMs / callId). */
+  meta?: Record<string, unknown>
+}) => Promise<ApprovalDecision>
 
 export interface DispatchSpec {
   agents: Array<{ id: string; name: string; description?: string }>
@@ -429,7 +436,19 @@ export interface BuildToolsOpts {
    * Product surface. Chat further clamps git/plugin tools even when permissionMode
    * allows writes (artifact writes stay; project mutation tools do not).
    */
-  surface?: 'chat' | 'code' | 'knowledge'
+  surface?: 'chat' | 'code' | 'knowledge' | 'terminal'
+  /** Terminal shared-PTY bridge (terminal surface only). */
+  terminalUiBridge?: {
+    send: (msg: import('@hip/protocol').ServerMessage) => void
+    pendingUiTool: Map<
+      string,
+      (
+        result:
+          | import('@hip/protocol').UiToolResultPayload
+          | import('@hip/protocol').UiToolReadResultPayload,
+      ) => void
+    >
+  }
   /** Enable web_search and web_fetch tools. web_search uses Exa MCP (free tier, no key required)
    *  with DDG Instant Answer fallback. Set HIP_EXA_API_KEY for higher Exa rate limits. */
   webSearchEnabled?: boolean
@@ -486,6 +505,7 @@ export function isApproved(d: ApprovalDecision): boolean {
  *  respects the answer. */
 export const SELF_GATED_TOOLS: Set<string> = new Set([
   'run_script',
+  'terminal_exec',
   'monitor',
   'EnterPlanMode',
 ])

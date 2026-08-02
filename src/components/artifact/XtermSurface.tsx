@@ -4,6 +4,8 @@ import { useTranslation } from 'react-i18next'
 import type { Terminal as XTerm } from '@xterm/xterm'
 import type { FitAddon as FitAddonType } from '@xterm/addon-fit'
 import { attachDrainWrites, ringIndexForCursor, useTerminalStore } from '@/store/terminalStore'
+import { useTerminalAgentStore } from '@/store/terminalAgentStore'
+import { useManagedTerminalStore } from '@/store/managedTerminalStore'
 import { useUiStore } from '@/store/uiStore'
 import { useHipConfigStore } from '@/store/hipConfigStore'
 import {
@@ -237,6 +239,11 @@ export function XtermSurface({
         const opened = await openRef.current(cols, rows)
         openGen = opened.generation ?? 0
         useTerminalStore.getState().setGeneration(terminalId, openGen)
+        // D12: managed terminal records track connection status (SSH reconnect reuses tm_*).
+        const managed = useManagedTerminalStore.getState().getTerminal(terminalId)
+        if (managed) {
+          useManagedTerminalStore.getState().setStatus(terminalId, 'connected')
+        }
       } catch (e) {
         if (disposed) return
         // Tauri invoke may throw a string, Error, or plain { message } object.
@@ -249,6 +256,10 @@ export function XtermSurface({
                 ? String((e as { message: unknown }).message)
                 : String(e ?? 'terminal open failed')
         useTerminalStore.getState().setError(terminalId, msg)
+        const managed = useManagedTerminalStore.getState().getTerminal(terminalId)
+        if (managed) {
+          useManagedTerminalStore.getState().setStatus(terminalId, 'error')
+        }
         setStarting(false)
         return
       }
@@ -305,6 +316,13 @@ export function XtermSurface({
       }
 
       dataDisp = term.onData((data) => {
+        // D10: user typing during a terminal-exec flight marks user_interleaved.
+        if (
+          useTerminalAgentStore.getState().execFlightByTerminal[terminalId] &&
+          useManagedTerminalStore.getState().getTerminal(terminalId)
+        ) {
+          useTerminalStore.getState().noteUserInput(terminalId)
+        }
         void writeRef.current(data).catch(() => {})
       })
 

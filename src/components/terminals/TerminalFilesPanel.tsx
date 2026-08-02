@@ -23,12 +23,15 @@ export function TerminalFilesPanel({
   remotePath,
   backend = 'sftp',
   localRoot,
+  embedded = false,
 }: {
   terminalId: string
   remotePath?: string
   backend?: TerminalFileTreeBackend
   /** Launch cwd for local tree root label / open-folder. */
   localRoot?: string
+  /** When embedded in TerminalRightPanel, the shared titlebar is already rendered. */
+  embedded?: boolean
 }) {
   const { t } = useTranslation()
   // Select the stable store array, then filter in useMemo. Returning a fresh
@@ -85,21 +88,22 @@ export function TerminalFilesPanel({
       data-testid="managed-terminal-files"
       data-backend={backend}
     >
-      {/* Same titlebar chrome as ArtifactPanel / KnowledgeOutlinePanel / PreviewPanel */}
-      <div
-        data-tauri-drag-region
-        className="flex h-[var(--titlebar-height)] shrink-0 items-center justify-between border-b border-border px-2"
-      >
-        <span
-          className="truncate px-1.5 text-body font-medium tracking-tight text-ink"
-          data-tauri-drag-region="false"
-          data-testid="panel-title"
+      {!embedded && (
+        <div
+          data-tauri-drag-region
+          className="flex h-[var(--titlebar-height)] shrink-0 items-center justify-between border-b border-border px-2"
         >
-          {panelTitle}
-        </span>
-        {/* Relocated from main toolbar when open — same toggle collapses the rail. */}
-        <PanelToggle slot="panel" />
-      </div>
+          <span
+            className="truncate px-1.5 text-body font-medium tracking-tight text-ink"
+            data-tauri-drag-region="false"
+            data-testid="panel-title"
+          >
+            {panelTitle}
+          </span>
+          {/* Relocated from main toolbar when open — same toggle collapses the rail. */}
+          <PanelToggle slot="panel" />
+        </div>
+      )}
 
       <div className="min-h-0 flex-1 overflow-hidden">
         <TerminalFileTree

@@ -1,5 +1,9 @@
 import { openRenameManagedTerminalDialog } from '@/components/terminals/managedTerminalDialogStore'
 import { useManagedTerminalStore } from '@/store/managedTerminalStore'
+import { startTerminalAgentChat } from '@/components/terminals/terminalAgentSession'
+import { deleteTerminalRecord } from '@/components/terminals/terminalRecordActions'
+import { terminalSessionsFor } from '@/store/terminalAgentStore'
+import { useDomainStore } from '@/domain/sessionStore'
 import type { ContextMenuItemDef, ContextProvider } from '../types'
 
 /**
@@ -9,10 +13,30 @@ import type { ContextMenuItemDef, ContextProvider } from '../types'
  */
 export const managedTerminalProvider: ContextProvider = (req, ctx) => {
   if (req.kind !== 'managedTerminal') return []
-  const { terminalId, title } = req.payload
+  const { terminalId, kind, title } = req.payload
   if (!terminalId) return []
 
   const items: ContextMenuItemDef[] = [
+    ...(kind === 'ssh'
+      ? [
+          {
+            id: 'managedTerminal.newAgentChat',
+            label: ctx.t('contextMenu.managedTerminal.newAgentChat'),
+            group: 'primary' as const,
+            run: () => {
+              void startTerminalAgentChat(terminalId)
+            },
+          },
+          {
+            id: 'managedTerminal.reconnect',
+            label: ctx.t('contextMenu.managedTerminal.reconnect'),
+            group: 'navigation' as const,
+            run: () => {
+              void useManagedTerminalStore.getState().reconnect(terminalId)
+            },
+          },
+        ]
+      : []),
     {
       id: 'managedTerminal.rename',
       label: ctx.t('contextMenu.managedTerminal.rename'),
@@ -44,6 +68,31 @@ export const managedTerminalProvider: ContextProvider = (req, ctx) => {
         void useManagedTerminalStore.getState().close(terminalId)
       },
     },
+    ...(kind === 'ssh'
+      ? [
+          {
+            id: 'managedTerminal.deleteRecord',
+            label: ctx.t('contextMenu.managedTerminal.deleteRecord'),
+            group: 'danger' as const,
+            danger: true,
+            separatorBefore: true,
+            run: () => {
+              const live = useManagedTerminalStore.getState().getTerminal(terminalId)
+              if (!live) return
+              const count = terminalSessionsFor(
+                useDomainStore.getState().sessions,
+                terminalId,
+              ).length
+              const ok = window.confirm(
+                `${ctx.t('contextMenu.managedTerminal.deleteRecordTitle', { label: live.title })} ` +
+                  `${ctx.t('contextMenu.managedTerminal.deleteRecordBody')} ` +
+                  `(${ctx.t('terminals.agent.sessionsGroup', { title: live.title })}: ${count})`,
+              )
+              if (ok) void deleteTerminalRecord(live)
+            },
+          },
+        ]
+      : []),
   ]
 
   return items

@@ -60,6 +60,8 @@ function idleTimeoutForConfig(cfg: SessionConfig): number {
 
 export class SessionManager {
   private readonly sessions = new Map<string, Session>()
+  /** UI-pushed terminal context (ring tail / D11 switch notes), keyed by sessionId. */
+  private readonly terminalContexts = new Map<string, { note?: string; ringTail?: string }>()
   private memoryService?: MemoryService
   private trashRetentionTimer?: ReturnType<typeof setInterval>
   private trashRetentionStarted = false
@@ -205,6 +207,10 @@ export class SessionManager {
         const s = this.sessions.get(id)
         if (s && connectionId) s.currentConnectionId = connectionId
       },
+      setTerminalContext: (sessionId, payload) => {
+        this.terminalContexts.set(sessionId, payload)
+      },
+      getTerminalContext: (sessionId) => this.terminalContexts.get(sessionId),
       destroySession: (id) => this.destroySession(id),
       getSession: (id) => this.sessions.get(id),
       deleteSessionSync: (id, send, opts) => this.hardDeleteSessionSync(id, send, opts),
@@ -347,6 +353,7 @@ export class SessionManager {
     send: SendFn,
     opts?: { deleteDerivedMemories?: boolean; reason?: string },
   ): void {
+    this.terminalContexts.delete(id)
     const reason = opts?.reason ?? 'unknown'
     const delCwd = this.resolveSessionCwd(id)
     let title: string | undefined
@@ -502,6 +509,7 @@ export class SessionManager {
     send: SendFn,
     opts?: { deleteDerivedMemories?: boolean; reason?: string },
   ): void {
+    this.terminalContexts.delete(id)
     // Resolve cwd BEFORE the row is gone, then delete SYNCHRONOUSLY (clients + tests rely on the
     // store delete + session:deleted being immediate — no await before them). The shadow-ref
     // cleanup is best-effort and must not block or defer deletion, so fire it and forget.
@@ -567,6 +575,7 @@ export class SessionManager {
   }
 
   private async destroySession(id: string): Promise<void> {
+    this.terminalContexts.delete(id)
     await this.sessions.get(id)?.destroy()
     this.sessions.delete(id)
   }

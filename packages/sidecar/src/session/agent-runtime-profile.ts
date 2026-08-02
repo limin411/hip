@@ -10,7 +10,7 @@ import { CODING_SKILL_ID } from './ops/content.js'
 import { HIP_PRODUCT_VERSION, HIP_SKILL_ID, PRODUCT_CAPABILITY_MAP } from './product/content.js'
 import { surfaceOf } from './surface.js'
 
-export type ProductSurface = 'chat' | 'code' | 'knowledge'
+export type ProductSurface = 'chat' | 'code' | 'knowledge' | 'terminal'
 
 export interface AgentRuntimeProfile {
   surface: ProductSurface
@@ -22,7 +22,7 @@ export interface AgentRuntimeProfile {
    */
   capabilityNarrative: string
   /** Which always-on body `buildSystemPrompt` should use. */
-  promptBody: 'chat' | 'code' | 'knowledge'
+  promptBody: 'chat' | 'code' | 'knowledge' | 'terminal'
   includeGitGuidance: boolean
   includeMcpCatalog: boolean
   skillPolicy: {
@@ -39,7 +39,7 @@ export interface AgentRuntimeProfile {
 }
 
 export interface ResolveAgentRuntimeProfileInput {
-  surface?: 'chat' | 'code' | 'knowledge'
+  surface?: 'chat' | 'code' | 'knowledge' | 'terminal'
   permissionMode?: PermissionMode
   sessionId?: string
   cwd?: string
@@ -53,6 +53,7 @@ function normalizePermissionMode(mode: PermissionMode | undefined): PermissionMo
 
 function resolveSurface(input: ResolveAgentRuntimeProfileInput): ProductSurface {
   if (input.surface === 'knowledge') return 'knowledge'
+  if (input.surface === 'terminal') return 'terminal'
   if (input.surface === 'chat' || input.surface === 'code') return input.surface
   // Legacy / missing: infer chat from scratch cwd when sessionId known; else code.
   if (input.sessionId) {
@@ -67,6 +68,18 @@ function resolveSurface(input: ResolveAgentRuntimeProfileInput): ProductSurface 
 
 /** Surface-filtered L0 product facts (avoids unqualified "edit = default" on Chat). */
 export function productCapabilityMapForSurface(surface: ProductSurface): string {
+  if (surface === 'terminal') {
+    return (
+      'Product facts (hip):\n' +
+      `- Version: ${HIP_PRODUCT_VERSION}.\n` +
+      '- You are the **Terminal Ops assistant** on an SSH managed terminal: you read the shared ' +
+      'terminal ring and, after approval, type commands into the SAME visible terminal the user sees.\n' +
+      '- You are **not** a Code workbench agent and must not claim to edit local files or run local scripts.\n' +
+      '- Remote file reading: use sftp_read with an absolute remote path; never assume local paths.\n' +
+      '- API keys: ~/.hip/config/auth.json (0600 plaintext by design).\n' +
+      '- Local data: ~/.hip/ (config, db, skills, plugins, logs).'
+    )
+  }
   if (surface === 'chat') {
     return (
       'Product facts (hip):\n' +
@@ -95,6 +108,14 @@ export function productCapabilityMapForSurface(surface: ProductSurface): string 
 }
 
 function capabilityNarrative(surface: ProductSurface, permissionMode: PermissionMode): string {
+  if (surface === 'terminal') {
+    return (
+      'You are the **Terminal Ops assistant** on an SSH managed terminal. ' +
+      'You may read the terminal ring (terminal_read) and read remote files (sftp_read) without approval. ' +
+      'You may run commands in the shared visible terminal via terminal_exec — each command requires user ' +
+      'approval (or is auto-approved only under full permission). You never run commands on the local machine.'
+    )
+  }
   if (surface === 'chat') {
     return (
       'You are in **Chat**: a private sandbox workspace. ' +
@@ -185,6 +206,28 @@ export function resolveAgentRuntimeProfile(input: ResolveAgentRuntimeProfileInpu
     }
   }
 
+  if (surface === 'terminal') {
+    return {
+      surface: 'terminal',
+      permissionMode,
+      capabilityNarrative: capabilityNarrative('terminal', permissionMode),
+      promptBody: 'terminal',
+      includeGitGuidance: false,
+      includeMcpCatalog: true,
+      skillPolicy: {
+        pinIds: [HIP_SKILL_ID],
+        excludeIds: [CODING_SKILL_ID],
+      },
+      toolPolicy: {
+        allowWrites: false,
+        allowGit: false,
+        allowRunScript: false,
+        allowPluginInstall: false,
+        pathJail: 'n/a',
+      },
+    }
+  }
+
   // Code
   const readOnly = permissionMode === 'chat'
   const full = permissionMode === 'full'
@@ -219,7 +262,7 @@ export function filterSkillsForProfile(skills: SkillMeta[] | undefined, profile:
 
 /** Model-facing capability reminder (injector / fragment). */
 export function renderCapabilityNarrative(input: {
-  surface?: 'chat' | 'code' | 'knowledge'
+  surface?: 'chat' | 'code' | 'knowledge' | 'terminal'
   permissionMode?: PermissionMode
   sessionId?: string
   cwd?: string

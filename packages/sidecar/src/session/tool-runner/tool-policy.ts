@@ -19,6 +19,8 @@ export const READ_TOOLS = new Set([
   'glob',
   'grep',
   'use_skill',
+  'terminal_read',
+  'sftp_read',
   'web_search',
   'web_fetch',
 ])

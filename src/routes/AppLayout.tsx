@@ -39,7 +39,7 @@ import { AUTOMATION_PAGE } from '@/components/automation/feature'
 import { AutomationsPage } from '@/components/automation/AutomationsPage'
 import { AutomationRunHost } from '@/components/automation/AutomationRunHost'
 
-import { TerminalFilesPanel } from '@/components/terminals/TerminalFilesPanel'
+import { TerminalRightPanel } from '@/components/terminals/TerminalRightPanel'
 import { startTerminalBridge } from '@/ipc/pty'
 import { useProjectPathStore } from '@/store/projectPathStore'
 import { useManagedTerminalStore } from '@/store/managedTerminalStore'
@@ -332,7 +332,7 @@ export function AppLayout() {
                 ) : knowledgeOpen ? (
                   <KnowledgeOutlinePanel />
                 ) : terminalsOpen && focusedManaged ? (
-                  <TerminalFilesPanel
+                  <TerminalRightPanel
                     terminalId={focusedManaged.id}
                     backend={focusedManaged.kind === 'local' ? 'local' : 'sftp'}
                     localRoot={focusedManaged.cwd}

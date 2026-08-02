@@ -14,6 +14,7 @@ import { buildMediaTools } from './media.js'
 import { buildTaskRuntimeExtraTools } from './task-runtime-tools.js'
 import { EnterPlanModeTool } from './enter-plan-mode.js'
 import { ExitPlanModeTool } from './exit-plan-mode.js'
+import { buildTerminalTools } from './terminal.js'
 import { real, realInSkill, resolveFull } from './helpers.js'
 import type { BuildToolsOpts, DispatchSpec } from './helpers.js'
 import {
@@ -49,6 +50,32 @@ export function buildAllTools(
     cwd: cwd ?? root,
   })
   const skills = filterSkillsForProfile(opts.skills, profile)
+
+  // ── Terminal surface: narrow tool set (spec §5.1) ───────────────────────
+  // Only terminal_exec / terminal_read / sftp_read + use_skill + MCP (per grants).
+  // No file/git/script/plan-mode/task/subagent/plugin/media tools.
+  if (profile.surface === 'terminal') {
+    let result: StructuredToolInterface[] = [
+      ...buildTerminalTools({
+        sessionId: opts.sessionId ?? '',
+        requestApproval: opts.requestApproval,
+        bridge: opts.terminalUiBridge,
+        signal: opts.signal,
+      }),
+      ...buildSkillTools(skills, opts.sessionId),
+      ...(opts.mcpTools ?? []),
+    ]
+    if (opts.allowedTools && opts.allowedTools.length > 0) {
+      const allowed = new Set(opts.allowedTools)
+      result = result.filter((t) => allowed.has(t.name) || t.name.startsWith('mcp__'))
+    }
+    if (opts.blockedTools && opts.blockedTools.length > 0) {
+      const blocked = new Set(opts.blockedTools)
+      result = result.filter((t) => !blocked.has(t.name))
+    }
+    return result
+  }
+
   // Enabled-skill dirs (~/.hip/skills/<id>), DISJOINT from the project root. read_file may ALSO reach
   // bundled reference files under these (read-only); every other path stays jailed to `root` via real().
   const skillDirs = skills.map((s) => s.dir)

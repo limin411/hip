@@ -36,7 +36,13 @@ export interface SessionConfigLike {
   executionMode?: import('./execution-mode.js').ExecutionMode
   forcePlan?: boolean
   disablePlan?: boolean
-  surface?: 'chat' | 'code'
+  surface?: 'chat' | 'code' | 'terminal'
+  /** Bound managed SSH terminal id (`tm_*`); required when surface === 'terminal'. */
+  managedTerminalId?: string
+  /** Persistent SSH host catalog id (D8); required when surface === 'terminal'. */
+  hostId?: string
+  /** Display/context remote-path hint only — never used as a local cwd. */
+  remotePathHint?: string
   workspaceMode?: 'sandbox' | 'project'
   useEventSource?: boolean
   /** @deprecated Ignored for turn routing; retained for config JSON compatibility. */

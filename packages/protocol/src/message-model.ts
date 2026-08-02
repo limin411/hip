@@ -92,6 +92,12 @@ export interface PermissionRequestPayload {
   kind: string                      // read|edit|delete|execute|fetch|other
   diff?: { path: string; oldText: string; newText: string }
   content?: string
+  /** Terminal-exec bridge metadata (terminal surface only). */
+  meta?: {
+    managedTerminalId?: string
+    waitMs?: number
+    callId?: string
+  }
 }
 
 /** Identifies a dispatched sub-agent when its work surfaces in a parent's turn (nested HITL, frames). */
@@ -184,7 +190,7 @@ export interface SessionSummary {
   preview: string
   updatedAt: number
   messageCount: number
-  surface: 'chat' | 'code'
+  surface: 'chat' | 'code' | 'terminal'
   /** Absolute project root when bound; omitted for sandbox / unbound code sessions. */
   cwd?: string
 }

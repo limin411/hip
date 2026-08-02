@@ -61,6 +61,16 @@ pub async fn sftp_mkdir(
 }
 
 #[tauri::command]
+pub async fn sftp_read_file(
+    _manager: State<'_, SshManager>,
+    _terminal_id: String,
+    _path: String,
+    _max_bytes: Option<usize>,
+) -> Result<String, String> {
+    Err(unavailable())
+}
+
+#[tauri::command]
 pub async fn sftp_remove(
     _manager: State<'_, SshManager>,
     _terminal_id: String,

@@ -93,6 +93,7 @@ describe('local terminal open (no update-depth loop)', () => {
           kind: 'local',
           title: 'home',
           cwd: '/Users/test',
+          status: 'connecting',
           createdAt: 1,
         },
       ],

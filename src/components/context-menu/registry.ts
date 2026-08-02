@@ -27,6 +27,7 @@ import { knowledgeTreeProvider } from './providers/knowledgeTree'
 import { subAgentProvider } from './providers/subAgent'
 import { terminalProvider } from './providers/terminal'
 import { managedTerminalProvider } from './providers/managedTerminal'
+import { terminalAgentSessionProvider } from './providers/terminalAgentSession'
 import { sftpEntryProvider } from './providers/sftpEntry'
 import { termFsEntryProvider } from './providers/termFsEntry'
 import { toolCallProvider } from './providers/toolCall'
@@ -56,6 +57,7 @@ const BUILTIN_PROVIDERS: ContextProvider[] = [
   subAgentProvider,
   terminalProvider,
   managedTerminalProvider,
+  terminalAgentSessionProvider,
   sftpEntryProvider,
   termFsEntryProvider,
   toolCallProvider,

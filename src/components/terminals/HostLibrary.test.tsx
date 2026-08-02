@@ -9,6 +9,7 @@ const load = vi.fn().mockResolvedValue(undefined)
 const openLocal = vi.fn().mockResolvedValue('tm_x')
 const openSsh = vi.fn().mockResolvedValue('tm_ssh')
 const close = vi.fn().mockResolvedValue(undefined)
+const removeRecord = vi.fn()
 
 let hosts: TerminalHost[] = []
 let groups: { id: string; name: string; sort: number }[] = []
@@ -37,7 +38,14 @@ vi.mock('@/store/terminalHostStore', () => {
 
 vi.mock('@/store/managedTerminalStore', () => {
   const terminals = [
-    { id: 'tm_ssh1', kind: 'ssh', hostId: 'hst_1', title: 'ops', createdAt: 1 },
+    {
+      id: 'tm_ssh1',
+      kind: 'ssh',
+      hostId: 'hst_1',
+      title: 'ops',
+      status: 'connected',
+      createdAt: 1,
+    },
   ]
   const store = (sel: (s: Record<string, unknown>) => unknown) =>
     sel({ terminals, focus: vi.fn() })
@@ -47,6 +55,7 @@ vi.mock('@/store/managedTerminalStore', () => {
     close,
     terminals,
     focus: vi.fn(),
+    removeRecord,
   })
   return { useManagedTerminalStore: store }
 })
@@ -84,6 +93,7 @@ describe('HostLibrary', () => {
     groups = []
     removeHost.mockClear().mockResolvedValue(undefined)
     close.mockClear().mockResolvedValue(undefined)
+    removeRecord.mockClear()
     openLocal.mockClear().mockResolvedValue('tm_x')
     openSsh.mockClear().mockResolvedValue('tm_ssh')
   })
@@ -123,7 +133,7 @@ describe('HostLibrary', () => {
     })
   })
 
-  it('delete confirm force-closes sessions then removeHost', async () => {
+  it('delete confirm cascades: close records, remove records, then removeHost', async () => {
     hosts = [
       {
         id: 'hst_1',
@@ -142,6 +152,7 @@ describe('HostLibrary', () => {
 
     await waitFor(() => {
       expect(close).toHaveBeenCalledWith('tm_ssh1')
+      expect(removeRecord).toHaveBeenCalledWith('tm_ssh1')
       expect(removeHost).toHaveBeenCalledWith('hst_1')
     })
     expect(close.mock.invocationCallOrder[0]!).toBeLessThan(

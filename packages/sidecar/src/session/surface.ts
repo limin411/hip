@@ -7,7 +7,9 @@ export function surfaceOf(
   config: Pick<SessionConfig, 'surface' | 'cwd'>,
   sessionId: string,
   root?: string,
-): 'chat' | 'code' {
-  if (config.surface === 'chat' || config.surface === 'code') return config.surface
+): 'chat' | 'code' | 'terminal' {
+  if (config.surface === 'chat' || config.surface === 'code' || config.surface === 'terminal') {
+    return config.surface
+  }
   return isScratchCwd(config.cwd, sessionId, root) ? 'chat' : 'code'
 }

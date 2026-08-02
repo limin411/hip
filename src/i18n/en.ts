@@ -1900,6 +1900,47 @@ export const en = {
       connected: 'Connected',
       statusExited: 'Exited',
       statusError: 'Error',
+      disconnected: 'Disconnected',
+      panel: {
+        tab: {
+          files: 'Files',
+          agent: 'Agent',
+        },
+      },
+      agent: {
+        emptyTitle: 'Ops assistant',
+        emptyBody:
+          'Ask about this server. Approved commands run in the terminal you see.',
+        needSsh: 'Connect SSH to use the agent.',
+        newChat: 'New agent chat',
+        start: 'Start',
+        send: 'Send',
+        placeholder: 'Ask about this server…',
+        running: 'Running',
+        stop: 'Stop turn',
+        reconnect: 'Reconnect',
+        ptyDead: 'Terminal disconnected. Reconnect to run commands.',
+        acpLimited:
+          'This agent\u2019s built-in shell does not drive the SSH session.',
+        execTitle: 'Run in SSH terminal',
+        execHint: 'This will be typed into the shared session.',
+        execTimedOut: 'Command may still be running',
+        execPartial: 'Partial output captured; verify before continuing',
+        execRejected: 'Command rejected — nothing was written.',
+        execError: 'Command failed',
+        execAborted: 'Execution wait aborted',
+        userInterleaved: 'You typed while the command was running; results may be mixed.',
+        sessionsGroup: 'Agent chats for {{title}}',
+        deleteTitle: 'Delete agent chat?',
+        deleteBody:
+          'Removes this conversation. The SSH terminal stays open.',
+        contextChanged:
+          'Terminal state may have changed since the last message',
+        permissionTitle: 'Command approval',
+        approve: 'Approve',
+        reject: 'Reject',
+        connectFirst: 'Connect first',
+      },
       softCap:
         'Too many terminals open (max 8, including code-panel terminals). Close one first.',
       emptyLibrary: 'No saved connections yet',
@@ -1910,6 +1951,8 @@ export const en = {
       deleteHostTitle: 'Delete “{{label}}”?',
       deleteHostBody:
         'Saved credentials for this host will be removed. Any open sessions for this host will be closed.',
+      deleteHostCascade:
+        'This removes {{records}} connection record(s) and moves {{sessions}} agent chat(s) to the recycle bin.',
       errorDelete: 'Could not delete this host. Try again.',
       errorConnect: 'Could not connect. Check host settings and credentials.',
       ungrouped: 'Ungrouped',
@@ -2889,11 +2932,22 @@ export const en = {
         close: 'Close terminal',
         copyTitle: 'Copy title',
         rename: 'Rename',
+        newAgentChat: 'New agent chat',
+        reconnect: 'Reconnect',
+        deleteRecord: 'Delete record…',
+        deleteRecordTitle: 'Delete “{{label}}”?',
+        deleteRecordBody:
+          'This removes the connection record and moves its agent chats to the recycle bin. The SSH session is closed first.',
         renameTitle: 'Rename terminal',
         renameDescription:
           'Changes the display name for this run only so you can tell similar terminals apart. Does not edit saved connections.',
         renameLabel: 'Display name',
         renameSave: 'Save',
+      },
+      terminalAgentSession: {
+        open: 'Open',
+        rename: 'Rename',
+        delete: 'Delete',
       },
       sftp: {
         download: 'Download…',

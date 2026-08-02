@@ -72,6 +72,7 @@ export function PanelToggle({ slot = 'toolbar' }: { slot?: PanelToggleSlot }) {
   const setKnowledgePanelOpen = useUiStore((s) => s.setKnowledgePanelOpen)
   const terminalPanelOpen = useUiStore((s) => s.terminalPanelOpen)
   const setTerminalPanelOpen = useUiStore((s) => s.setTerminalPanelOpen)
+  const setTerminalPanelTab = useUiStore((s) => s.setTerminalPanelTab)
   const setSessionCodePanelOpen = useDomainStore((s) => s.setSessionCodePanelOpen)
   const setSessionChatPanelOpen = useDomainStore((s) => s.setSessionChatPanelOpen)
   const resetChatActiveTab = useUiStore((s) => s.resetChatActiveTab)
@@ -79,6 +80,12 @@ export function PanelToggle({ slot = 'toolbar' }: { slot?: PanelToggleSlot }) {
   const kbActiveDocId = useKnowledgeStore((s) => s.activeDocId)
   const kbNodes = useKnowledgeStore((s) => s.nodes)
   const focusedManagedId = useManagedTerminalStore((s) => s.focusedId)
+  const focusedManagedKind = useManagedTerminalStore((s) =>
+    s.focusedId ? s.terminals.find((t) => t.id === s.focusedId)?.kind : undefined,
+  )
+  const terminalTab = useUiStore((s) =>
+    focusedManagedId ? (s.activeTerminalPanelTab ?? {})[focusedManagedId] ?? 'files' : 'files',
+  )
   const isGitRepo =
     useDiffStore((s) => (activeSessionId ? s.bySession[activeSessionId]?.isGitRepo : false)) ?? false
   const panelOpen = useRightPanelOpen()
@@ -217,6 +224,22 @@ export function PanelToggle({ slot = 'toolbar' }: { slot?: PanelToggleSlot }) {
             </span>
             {t('terminals.filesPanel')}
           </DropdownMenuItem>
+          {focusedManagedKind === 'ssh' ? (
+            <DropdownMenuItem
+              onSelect={() => {
+                if (focusedManagedId) setTerminalPanelTab(focusedManagedId, 'agent')
+                setTerminalPanelOpen(true)
+              }}
+              data-testid="panel-tab-terminal-agent"
+            >
+              <span className="flex w-4 shrink-0 items-center justify-center">
+                {terminalTab === 'agent' ? (
+                  <Check size={14} className="text-accent" />
+                ) : null}
+              </span>
+              {t('terminals.agent.emptyTitle')}
+            </DropdownMenuItem>
+          ) : null}
         </DropdownMenuContent>
       </DropdownMenu>
     )

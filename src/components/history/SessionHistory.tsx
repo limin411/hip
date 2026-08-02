@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next'
 import { Search, MessageSquare, Code2, Trash2, Inbox, SearchX } from 'lucide-react'
 import { useSessions, sessionService } from '@/domain'
 import { selectSessionFromSidebar } from '@/components/layout/sidebarActions'
-import { surfaceOf } from '@/lib/sessions'
+import { isTerminalSession, surfaceOf } from '@/lib/sessions'
 import { formatAbsolute, formatRelativeTime } from '@/lib/datetime'
 import { Button } from '@/components/ui/Button'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/Tabs'
@@ -41,7 +41,9 @@ export function SessionHistory({
 
   /** Visible history universe. */
   const listBase = useMemo(() => {
-    return [...sessions].sort((a, b) => b.updatedAtMs - a.updatedAtMs)
+    return sessions
+      .filter((s) => !isTerminalSession(s.config))
+      .sort((a, b) => b.updatedAtMs - a.updatedAtMs)
   }, [sessions])
 
   const filtered = useMemo(() => {
@@ -219,7 +221,7 @@ export function SessionHistory({
                     payload={{
                       sessionId: session.id,
                       title: session.title,
-                      surface,
+                      surface: surface === 'terminal' ? 'chat' : surface,
                     }}
                     className="flex min-w-0 flex-1 items-center gap-3"
                   >

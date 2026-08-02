@@ -10,8 +10,10 @@ import {
 } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { useUiStore } from '@/store/uiStore'
-import { useDomainStore } from '@/domain'
+import { sessionService, useDomainStore } from '@/domain'
 import { DEFAULT_CONFIG } from '@/domain/sessionStore'
+import { useManagedTerminalStore } from '@/store/managedTerminalStore'
+import { useTerminalAgentStore } from '@/store/terminalAgentStore'
 import { useProjectPathStore } from '@/store/projectPathStore'
 import { useNavHistoryStore } from '@/store/navHistoryStore'
 
@@ -295,6 +297,63 @@ describe('AppSidebar', () => {
     expect(screen.getByTestId('sidebar-new-group')).toBeInTheDocument()
     expect(screen.getByTestId('sidebar-new-local-terminal')).toBeInTheDocument()
     expect(screen.getByTestId('sidebar-new-remote-host')).toBeInTheDocument()
+  })
+
+  it('ssh terminal row expands into agent session children; local has none', async () => {
+    useUiStore.setState({ sidebarSection: 'terminals', activeView: 'terminals' })
+    useManagedTerminalStore.setState({
+      terminals: [
+        {
+          id: 'tm_ssh1',
+          kind: 'ssh',
+          title: 'ops',
+          hostId: 'hst_1',
+          remotePath: '/var/www',
+          status: 'connected',
+          createdAt: 1,
+        },
+        {
+          id: 'tm_local1',
+          kind: 'local',
+          title: 'home',
+          cwd: '/tmp',
+          status: 'connected',
+          createdAt: 2,
+        },
+      ],
+      focusedId: null,
+    })
+    useTerminalAgentStore.setState({ sidebarExpanded: {}, activeSessionByTerminal: {} })
+    useDomainStore.setState((s) => ({
+      sessions: [
+        ...s.sessions.filter((x) => x.id !== 'chat-1' && x.id !== 'code-1'),
+        {
+          id: 'ta_1',
+          title: 'disk check',
+          preview: '',
+          updatedAtMs: 10,
+          config: {
+            ...DEFAULT_CONFIG,
+            surface: 'terminal',
+            managedTerminalId: 'tm_ssh1',
+            hostId: 'hst_1',
+          },
+          messages: [],
+          status: 'idle',
+          loaded: true,
+        },
+      ],
+    }))
+    const focusSpy = vi
+      .spyOn(sessionService, 'focusTerminalAgentSession')
+      .mockImplementation(() => {})
+    render(<AppSidebar />)
+    expect(screen.getByTestId('sidebar-managed-terminal-tm_ssh1')).toBeInTheDocument()
+    expect(screen.getByTestId('sidebar-terminal-session-ta_1')).toBeInTheDocument()
+    expect(screen.queryByTestId('sidebar-terminal-sessions-tm_local1')).not.toBeInTheDocument()
+    fireEvent.click(screen.getByTestId('sidebar-terminal-session-ta_1'))
+    expect(focusSpy).toHaveBeenCalledWith('tm_ssh1', 'ta_1')
+    focusSpy.mockRestore()
   })
 
   it('terminals new group requests group creation from the host library', async () => {

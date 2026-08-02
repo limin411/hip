@@ -58,6 +58,28 @@ describe('resolveAgentRuntimeProfile', () => {
     expect(p.capabilityNarrative).toMatch(/read-only/i)
   })
 
+  it('Terminal: terminal ops body, no local tool policy, excludes coding skill', () => {
+    const p = resolveAgentRuntimeProfile({ surface: 'terminal', permissionMode: 'edit' })
+    expect(p.surface).toBe('terminal')
+    expect(p.promptBody).toBe('terminal')
+    expect(p.includeGitGuidance).toBe(false)
+    expect(p.toolPolicy.allowWrites).toBe(false)
+    expect(p.toolPolicy.allowGit).toBe(false)
+    expect(p.toolPolicy.allowRunScript).toBe(false)
+    expect(p.toolPolicy.allowPluginInstall).toBe(false)
+    expect(p.toolPolicy.pathJail).toBe('n/a')
+    expect(p.skillPolicy.pinIds).toContain(HIP_SKILL_ID)
+    expect(p.skillPolicy.excludeIds).toContain(CODING_SKILL_ID)
+    expect(p.capabilityNarrative).toMatch(/SSH managed terminal/i)
+  })
+
+  it('Terminal capability map never claims local file editing', () => {
+    const m = productCapabilityMapForSurface('terminal')
+    expect(m).toMatch(/Terminal Ops/i)
+    expect(m).not.toMatch(/You are the Code workbench agent/)
+    expect(m).toMatch(/must not claim to edit local files/)
+  })
+
   it('Code + full: un-jailed narrative', () => {
     const p = resolveAgentRuntimeProfile({ surface: 'code', permissionMode: 'full' })
     expect(p.toolPolicy.pathJail).toBe('none')

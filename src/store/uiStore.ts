@@ -53,6 +53,8 @@ export type ActiveView =
   | 'tasks'
   | 'automation'
 export type Surface = 'chat' | 'code'
+/** Managed-terminal right-rail tabs (spec §3.2). */
+export type TerminalPanelTab = 'files' | 'agent'
 export type ChatTab = 'files' | 'outline' | 'sources'
 export type Theme = 'light' | 'dark' | 'system'
 export type AppLanguage = 'zh-CN' | 'zh-TW' | 'en' | 'ja' | 'ko'
@@ -315,6 +317,10 @@ interface UiState {
   terminalPanelOpen: boolean
   setTerminalPanelOpen: (open: boolean) => void
 
+  /** Right-rail tab per managed terminal (`tm_*`), remembered across focus switches. */
+  activeTerminalPanelTab: Record<string, TerminalPanelTab>
+  setTerminalPanelTab: (terminalId: string, tab: TerminalPanelTab) => void
+
   diffViewMode: 'unified' | 'split'
   setDiffViewMode: (m: 'unified' | 'split') => void
 
@@ -457,6 +463,19 @@ export const useUiStore = create<UiState>()(
       terminalPanelOpen: true,
       setTerminalPanelOpen: (open) =>
         set((s) => (s.terminalPanelOpen === open ? s : { terminalPanelOpen: open })),
+
+      activeTerminalPanelTab: {},
+      setTerminalPanelTab: (terminalId, tab) =>
+        set((s) =>
+          s.activeTerminalPanelTab[terminalId] === tab
+            ? s
+            : {
+                activeTerminalPanelTab: {
+                  ...s.activeTerminalPanelTab,
+                  [terminalId]: tab,
+                },
+              },
+        ),
 
       diffViewMode: 'unified',
       setDiffViewMode: (m) => set({ diffViewMode: m }),

@@ -13,7 +13,7 @@ export interface PermissionSourcePayload {
 
 export interface PermissionSourceInput {
   readonly permissionMode?: PermissionMode
-  readonly surface?: 'chat' | 'code' | 'knowledge'
+  readonly surface?: 'chat' | 'code' | 'knowledge' | 'terminal'
   readonly sessionId?: string
   readonly cwd?: string
 }
@@ -36,7 +36,7 @@ function permissionMode(j: JsonValue): PermissionMode {
 
 function renderPermissionText(
   mode: PermissionMode,
-  surface?: 'chat' | 'code' | 'knowledge',
+  surface?: 'chat' | 'code' | 'knowledge' | 'terminal',
   sessionId?: string,
   cwd?: string,
 ): string {

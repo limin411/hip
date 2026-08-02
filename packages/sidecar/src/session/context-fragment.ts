@@ -22,7 +22,7 @@ export interface FragmentState {
   /** Per-conversation user instructions injected into the system message. */
   customSystemPrompt?: string
   /** Session surface for prompt sizing. */
-  surface?: 'chat' | 'code'
+  surface?: 'chat' | 'code' | 'knowledge' | 'terminal'
 }
 
 // ── Fragment ─────────────────────────────────────────────────────────────────

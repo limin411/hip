@@ -293,6 +293,49 @@ pub async fn sftp_mkdir(
         .map_err(|e| format!("SFTP mkdir failed: {e}"))
 }
 
+/// Read a remote text file via SFTP (read-only; cap 256KB default). P0 D9.
+#[tauri::command]
+pub async fn sftp_read_file(
+    manager: State<'_, SshManager>,
+    terminal_id: String,
+    path: String,
+    max_bytes: Option<usize>,
+) -> Result<String, String> {
+    let (_sess, sftp) = require_sftp(&manager, &terminal_id).await?;
+    let remote = normalize_remote_path(&sftp, &path).await?;
+    let cap = max_bytes
+        .unwrap_or(256 * 1024)
+        .clamp(1024, 256 * 1024);
+
+    let mut file = sftp
+        .open(&remote)
+        .await
+        .map_err(|e| format!("SFTP open failed: {e}"))?;
+    let mut buf = vec![0u8; cap + 1];
+    let mut n = 0usize;
+    while n < buf.len() {
+        let read = file
+            .read(&mut buf[n..])
+            .await
+            .map_err(|e| format!("SFTP read failed: {e}"))?;
+        if read == 0 {
+            break;
+        }
+        n += read;
+    }
+    let _ = file.shutdown().await;
+
+    let truncated = n > cap;
+    let bytes = if truncated { &buf[..cap] } else { &buf[..n] };
+    let text = String::from_utf8_lossy(bytes).into_owned();
+    let note = if truncated {
+        format!("\n…(file truncated to {cap} bytes)")
+    } else {
+        String::new()
+    };
+    Ok(format!("{text}{note}"))
+}
+
 #[tauri::command]
 pub async fn sftp_remove(
     manager: State<'_, SshManager>,

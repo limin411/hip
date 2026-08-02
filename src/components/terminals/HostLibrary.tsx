@@ -4,6 +4,7 @@ import { Loader2, Plus, Server, Terminal } from 'lucide-react'
 import { nanoid } from 'nanoid'
 import type { HostGroup, TerminalHost } from '@/ipc/terminalHosts'
 import { useManagedTerminalStore } from '@/store/managedTerminalStore'
+import { deleteHostWithCascade, hostDeleteCounts } from './terminalRecordActions'
 import { useTerminalHostStore } from '@/store/terminalHostStore'
 import { mintGroupId } from '@/lib/hostFormDraft'
 import { isDuplicateGroupName } from '@/lib/hostGroupUi'
@@ -28,7 +29,6 @@ export function HostLibrary() {
   const error = useTerminalHostStore((s) => s.error)
   const upsertGroup = useTerminalHostStore((s) => s.upsertGroup)
   const removeGroup = useTerminalHostStore((s) => s.removeGroup)
-  const removeHost = useTerminalHostStore((s) => s.removeHost)
 
   const pendingCreateHost = useHostLibraryUi((s) => s.pendingCreateHost)
   const pendingCreateGroup = useHostLibraryUi((s) => s.pendingCreateGroup)
@@ -36,6 +36,9 @@ export function HostLibrary() {
   const [formMode, setFormMode] = useState<HostFormMode | null>(null)
   const [formOpen, setFormOpen] = useState(false)
   const [deletingHost, setDeletingHost] = useState<TerminalHost | null>(null)
+  const [deleteCounts, setDeleteCounts] = useState<{ records: number; sessions: number } | null>(
+    null,
+  )
   const [deleteBusy, setDeleteBusy] = useState(false)
   const [deleteError, setDeleteError] = useState<string | null>(null)
   const [connectBusy, setConnectBusy] = useState(false)
@@ -122,26 +125,17 @@ export function HostLibrary() {
     setDeleteBusy(true)
     setDeleteError(null)
     try {
-      // K21: force-close any open managed sessions for this host.
-      const open = useManagedTerminalStore
-        .getState()
-        .terminals.filter((mt) => mt.hostId === deletingHost.id)
-      for (const mt of open) {
-        try {
-          await useManagedTerminalStore.getState().close(mt.id)
-        } catch {
-          /* best-effort */
-        }
-      }
-      await removeHost(deletingHost.id)
+      // D14: cascade-close online records + soft-delete related agent chats (recycle bin).
+      await deleteHostWithCascade(deletingHost.id)
       setDeletingHost(null)
+      setDeleteCounts(null)
     } catch (e) {
       console.error('[hip] delete host failed:', e)
       setDeleteError(t('terminals.errorDelete'))
     } finally {
       setDeleteBusy(false)
     }
-  }, [deletingHost, removeHost, t])
+  }, [deletingHost, t])
 
   const openRenameGroup = useCallback((group: HostGroup) => {
     setGroupName(group.name)
@@ -270,7 +264,10 @@ export function HostLibrary() {
             groups={groups}
             hosts={hosts}
             onEditHost={openEdit}
-            onDeleteHost={setDeletingHost}
+            onDeleteHost={(host) => {
+              setDeleteCounts(hostDeleteCounts(host.id))
+              setDeletingHost(host)
+            }}
             onRenameGroup={openRenameGroup}
             onDeleteGroup={setDeletingGroup}
             onConnectHost={(h) => void connectHost(h)}
@@ -291,18 +288,26 @@ export function HostLibrary() {
       {deletingHost ? (
         <Modal
           open
-          onOpenChange={(o) => {
-            if (!o && !deleteBusy) {
-              setDeletingHost(null)
-              setDeleteError(null)
-            }
-          }}
+            onOpenChange={(o) => {
+              if (!o && !deleteBusy) {
+                setDeletingHost(null)
+                setDeleteError(null)
+              }
+            }}
           title={t('terminals.deleteHostTitle', { label: deletingHost.label })}
           className="max-w-sm"
           closeDisabled={deleteBusy}
         >
           <div className="p-5" data-testid="host-delete-dialog">
             <p className="text-body text-ink-secondary">{t('terminals.deleteHostBody')}</p>
+            {deleteCounts ? (
+              <p className="mt-2 text-caption text-ink-tertiary" data-testid="host-delete-counts">
+                {t('terminals.deleteHostCascade', {
+                  records: deleteCounts.records,
+                  sessions: deleteCounts.sessions,
+                })}
+              </p>
+            ) : null}
             {deleteError ? (
               <p className="mt-3 text-meta text-danger" role="alert">
                 {deleteError}

@@ -927,6 +927,7 @@ pub fn run() {
             ssh_session::ssh_list,
             sftp::sftp_ls,
             sftp::sftp_mkdir,
+            sftp::sftp_read_file,
             sftp::sftp_remove,
             sftp::sftp_download,
             sftp::sftp_upload,

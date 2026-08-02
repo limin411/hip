@@ -41,7 +41,7 @@ export function coerceWorkSurfaceFromUi(s: {
   if (sess) {
     const surface = surfaceOf(sess.config)
     return {
-      view: surface,
+      view: surface === 'terminal' ? 'terminals' : surface,
       section: surface === 'code' ? 'projects' : 'chats',
     }
   }
@@ -55,7 +55,7 @@ export function coerceUnderlyingFromEntry(entry: NavEntry): WorkSurface {
     if (sess) {
       const surface = surfaceOf(sess.config)
       return {
-        view: surface,
+        view: surface === 'terminal' ? 'terminals' : surface,
         section: surface === 'code' ? 'projects' : 'chats',
       }
     }

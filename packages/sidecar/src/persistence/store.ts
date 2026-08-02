@@ -394,7 +394,7 @@ export class SessionStore {
     preview: string | null
     messageCount: number
   }): SessionSummary {
-    let surface: 'chat' | 'code' = 'code'
+    let surface: SessionSummary['surface'] = 'code'
     let cwd: string | undefined
     try {
       const cfg = JSON.parse(r.config) as SessionConfig

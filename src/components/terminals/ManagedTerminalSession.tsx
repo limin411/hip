@@ -31,6 +31,7 @@ export function ManagedTerminalSession({ terminalId }: { terminalId: string }) {
   const term = useManagedTerminalStore((s) => s.terminals.find((x) => x.id === terminalId))
   const [bootKey, setBootKey] = useState(0)
   const [hostKeyError, setHostKeyError] = useState<HostKeyMismatchError | null>(null)
+  const reconnectNonce = useManagedTerminalStore((s) => s.reconnectNonce[terminalId] ?? 0)
 
   const cwd = term?.cwd
   const kind = term?.kind ?? 'local'
@@ -95,6 +96,8 @@ export function ManagedTerminalSession({ terminalId }: { terminalId: string }) {
         ? `${host.username}@${host.hostname}:${host.port}`
         : hostId
       : cwd
+
+  const disconnected = kind === 'ssh' && (term.status === 'disconnected' || term.status === 'error')
 
   return (
     <div className="flex h-full min-h-0 flex-col" data-testid="managed-terminal-session">
@@ -174,7 +177,7 @@ export function ManagedTerminalSession({ terminalId }: { terminalId: string }) {
       <div className="min-h-0 min-w-0 flex-1 overflow-hidden">
         {kind === 'local' && cwd ? (
           <XtermSurface
-            key={bootKey}
+            key={`local-${bootKey}`}
             terminalId={terminalId}
             backend="pty"
             cwd={cwd}
@@ -193,9 +196,9 @@ export function ManagedTerminalSession({ terminalId }: { terminalId: string }) {
             resize={(cols, rows) => ptyResize(terminalId, cols, rows)}
             onRestart={restart}
           />
-        ) : kind === 'ssh' && hostId ? (
+        ) : kind === 'ssh' && hostId && !disconnected ? (
           <XtermSurface
-            key={bootKey}
+            key={`ssh-${bootKey}-${reconnectNonce}`}
             terminalId={terminalId}
             backend="ssh"
             open={async (cols, rows) => {
@@ -221,6 +224,22 @@ export function ManagedTerminalSession({ terminalId }: { terminalId: string }) {
             resize={(cols, rows) => sshResize(terminalId, cols, rows)}
             onRestart={restart}
           />
+        ) : kind === 'ssh' && hostId && disconnected ? (
+          <div
+            className="flex h-full flex-col items-center justify-center gap-3 px-6 text-center"
+            data-testid="managed-terminal-disconnected"
+          >
+            <p className="text-body font-medium text-ink">{t('terminals.agent.ptyDead')}</p>
+            <button
+              type="button"
+              onClick={() => void useManagedTerminalStore.getState().reconnect(terminalId)}
+              className="inline-flex items-center gap-1.5 rounded-md bg-accent px-3 py-1.5 text-body font-medium text-white transition-colors hover:bg-accent/90"
+              data-testid="managed-terminal-reconnect"
+            >
+              <RotateCcw size={14} />
+              {t('terminals.agent.reconnect')}
+            </button>
+          </div>
         ) : null}
       </div>
 

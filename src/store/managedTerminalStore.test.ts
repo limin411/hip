@@ -169,7 +169,7 @@ describe('managedTerminalStore', () => {
     expect(useManagedTerminalStore.getState().terminals).toHaveLength(0)
   })
 
-  it('close of ssh calls sshClose', async () => {
+  it('close of ssh calls sshClose and keeps the record as disconnected (D12)', async () => {
     const id = await useManagedTerminalStore.getState().openSsh({
       id: 'hst_1',
       label: 'ops',
@@ -182,6 +182,27 @@ describe('managedTerminalStore', () => {
     await useManagedTerminalStore.getState().close(id)
     expect(sshClose).toHaveBeenCalledWith(id)
     expect(ptyKill).not.toHaveBeenCalled()
+    const term = useManagedTerminalStore.getState().getTerminal(id)
+    expect(term).toBeDefined()
+    expect(term?.status).toBe('disconnected')
+  })
+
+  it('reconnect reuses the same tm_* record (new generation)', async () => {
+    const id = await useManagedTerminalStore.getState().openSsh({
+      id: 'hst_1',
+      label: 'ops',
+      hostname: '10.0.0.1',
+      port: 22,
+      username: 'root',
+      authMethod: 'password',
+      updatedAt: 1,
+    })
+    await useManagedTerminalStore.getState().close(id)
+    expect(useManagedTerminalStore.getState().getTerminal(id)?.status).toBe('disconnected')
+    await useManagedTerminalStore.getState().reconnect(id)
+    expect(useManagedTerminalStore.getState().getTerminal(id)?.id).toBe(id)
+    expect(useManagedTerminalStore.getState().getTerminal(id)?.status).toBe('connecting')
+    expect(useManagedTerminalStore.getState().reconnectNonce[id]).toBe(1)
   })
 
   it('recordSuccessfulSshLaunch pushes recent', async () => {

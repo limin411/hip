@@ -8,6 +8,7 @@ import type { TerminalHost } from '@/ipc/terminalHosts'
 import { useTerminalStore } from '@/store/terminalStore'
 import { useTerminalHostStore } from '@/store/terminalHostStore'
 import { useTerminalFsStore } from '@/store/terminalFsStore'
+import { useTerminalAgentStore } from '@/store/terminalAgentStore'
 
 /** Cancel in-flight SFTP transfers for a terminal before tearing down SSH (Issue 8). */
 async function cancelSftpTransfers(terminalId: string): Promise<void> {
@@ -47,6 +48,7 @@ async function assertSoftCapRoom(): Promise<void> {
 }
 
 export type ManagedTerminalKind = 'local' | 'ssh'
+export type ManagedTerminalStatus = 'connecting' | 'connected' | 'disconnected' | 'error'
 
 export interface ManagedTerminal {
   /** Always `tm_<nanoid>` (K1). */
@@ -58,6 +60,8 @@ export interface ManagedTerminal {
   /** Launch cwd / tree root (local). */
   cwd?: string
   remotePath?: string
+  /** Connection status (D12: records survive close; status marks disconnect). */
+  status: ManagedTerminalStatus
   createdAt: number
 }
 
@@ -107,6 +111,14 @@ interface ManagedTerminalStore {
 
   /** Update title (e.g. after rename / label). */
   setTitle: (id: string, title: string) => void
+
+  setStatus: (id: string, status: ManagedTerminalStatus) => void
+  /** Remove a record entirely (explicit record delete / Host cascade). */
+  removeRecord: (id: string) => void
+  /** Reopen a closed SSH terminal reusing the same `tm_*` record (new generation). */
+  reconnect: (id: string) => Promise<void>
+  /** Bumped on reconnect so ManagedTerminalSession remounts XtermSurface. */
+  reconnectNonce: Record<string, number>
 }
 
 /**
@@ -161,6 +173,7 @@ export const useManagedTerminalStore = create<ManagedTerminalStore>((set, get) =
       kind: 'local',
       title,
       cwd,
+      status: 'connecting',
       createdAt: Date.now(),
     }
 
@@ -182,6 +195,7 @@ export const useManagedTerminalStore = create<ManagedTerminalStore>((set, get) =
       title: host.label?.trim() || `${host.username}@${host.hostname}`,
       hostId: host.id,
       remotePath: host.remotePath,
+      status: 'connecting',
       createdAt: Date.now(),
     }
     useTerminalStore.getState().ensureSession(id)
@@ -215,6 +229,7 @@ export const useManagedTerminalStore = create<ManagedTerminalStore>((set, get) =
     }
 
     if (term.kind === 'local') {
+      // Local close keeps current behavior: kill backend + remove record.
       try {
         await ptyKill(id)
       } catch {
@@ -231,14 +246,22 @@ export const useManagedTerminalStore = create<ManagedTerminalStore>((set, get) =
 
     useTerminalStore.getState().clearSession(id)
     useTerminalFsStore.getState().clearTerminal(id)
+    useTerminalAgentStore.getState().setExecFlight(id, null)
+    useTerminalAgentStore.getState().setActiveSession(id, null)
     set((s) => {
+      if (term.kind === 'ssh') {
+        // D12: keep the record + child sessions (read-only); mark disconnected.
+        return {
+          terminals: s.terminals.map((t) =>
+            t.id === id ? { ...t, status: 'disconnected' as const } : t,
+          ),
+        }
+      }
       const terminals = s.terminals.filter((t) => t.id !== id)
       let focusedId = s.focusedId
       if (s.focusedId === id) {
-        // Prefer nearest neighbor (previous index), else next, else null.
         const idx = s.terminals.findIndex((t) => t.id === id)
-        const neighbor =
-          terminals[Math.max(0, idx - 1)] ?? terminals[0] ?? null
+        const neighbor = terminals[Math.max(0, idx - 1)] ?? terminals[0] ?? null
         focusedId = neighbor?.id ?? null
       }
       return { terminals, focusedId }
@@ -250,6 +273,47 @@ export const useManagedTerminalStore = create<ManagedTerminalStore>((set, get) =
     if (!next) return
     set((s) => ({
       terminals: s.terminals.map((t) => (t.id === id ? { ...t, title: next } : t)),
+    }))
+  },
+
+  reconnectNonce: {},
+  setStatus: (id, status) =>
+    set((s) => ({
+      terminals: s.terminals.map((t) => (t.id === id ? { ...t, status } : t)),
+    })),
+
+  removeRecord: (id) =>
+    set((s) => {
+      const terminals = s.terminals.filter((t) => t.id !== id)
+      useTerminalStore.getState().clearSession(id)
+      useTerminalFsStore.getState().clearTerminal(id)
+      useTerminalAgentStore.getState().setExecFlight(id, null)
+      useTerminalAgentStore.getState().setActiveSession(id, null)
+      let focusedId = s.focusedId
+      if (s.focusedId === id) {
+        focusedId = terminals[0]?.id ?? null
+      }
+      return { terminals, focusedId }
+    }),
+
+  reconnect: async (id) => {
+    const term = get().getTerminal(id)
+    if (!term || term.kind !== 'ssh') return
+    try {
+      await sshClose(id)
+    } catch {
+      /* already dead */
+    }
+    useTerminalStore.getState().clearSession(id)
+    useTerminalStore.getState().ensureSession(id)
+    useTerminalFsStore.getState().clearTerminal(id)
+    useTerminalAgentStore.getState().setExecFlight(id, null)
+    get().setStatus(id, 'connecting')
+    set((s) => ({
+      reconnectNonce: {
+        ...s.reconnectNonce,
+        [id]: (s.reconnectNonce[id] ?? 0) + 1,
+      },
     }))
   },
 }))

@@ -54,9 +54,17 @@ export interface SessionConfig {
   /** When true, never run the plan/execute/verify loop (always fast path). Overrides forcePlan. */
   disablePlan?: boolean
   /** Which top-level surface owns this conversation. 'chat' = sandboxed conversation-only;
-   *  'code' = conversation + directory tree + git. undefined on a legacy row ⇒ inferred from
-   *  the cwd (a scratch cwd ⇒ 'chat', else 'code'); see surfaceOf in the sidecar. */
-  surface?: 'chat' | 'code'
+   *  'code' = conversation + directory tree + git. 'terminal' = SSH managed-terminal agent
+   *  conversation (excluded from Chats/Projects lists; owned by the terminal session tree).
+   *  undefined on a legacy row ⇒ inferred from the cwd (a scratch cwd ⇒ 'chat', else 'code');
+   *  see surfaceOf in the sidecar. */
+  surface?: 'chat' | 'code' | 'terminal'
+  /** Bound managed SSH terminal id (`tm_*`); required when surface === 'terminal'. */
+  managedTerminalId?: string
+  /** Persistent SSH host catalog id (D8); required when surface === 'terminal'. */
+  hostId?: string
+  /** Display/context remote-path hint only — never used as a local cwd. */
+  remotePathHint?: string
   /**
    * Product workspace mode (smoothness spec §3.1). Prefer this over `surface` when present.
    * 'sandbox' ⇔ chat surface; 'project' ⇔ code surface. undefined ⇒ derive from surface/cwd.
@@ -78,4 +86,3 @@ export interface SessionConfig {
   /** When true, skip memory inject/extract for this session. */
   incognito?: boolean
 }
-

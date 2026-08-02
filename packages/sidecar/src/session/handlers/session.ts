@@ -31,6 +31,9 @@ export const SESSION_MESSAGE_TYPES = new Set([
   'agent:setConfigOption',
   'agent:setProfile',
   'permission:respond',
+  'session:uiToolResult',
+  'session:uiToolRead:result',
+  'session:terminalContext',
   'session:list',
   'session:load',
   'session:search',
@@ -242,6 +245,15 @@ export function handleSessionMessage(
       }
       return
     }
+    case 'session:uiToolResult':
+    case 'session:uiToolRead:result': {
+      const session = ctx.getSession(msg.sessionId)
+      session?.permissions.respondUiTool(msg.callId, msg)
+      return
+    }
+    case 'session:terminalContext':
+      ctx.setTerminalContext(msg.sessionId, { ...(msg.note ? { note: msg.note } : {}), ...(msg.ringTail ? { ringTail: msg.ringTail } : {}) })
+      return
     case 'session:list': {
       const sessions = ctx.listSessions()
       // Always-on audit: how many sessions the UI is about to see (wipe forensics).

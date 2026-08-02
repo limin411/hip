@@ -8,7 +8,7 @@ import type { ProjectPathStatus } from '@/store/projectPathStore'
 export function resolveSearchRoot(opts: {
   /** Active session config when present */
   sessionConfig?: {
-    surface?: 'chat' | 'code'
+    surface?: 'chat' | 'code' | 'terminal'
     workspaceMode?: 'sandbox' | 'project'
     cwd?: string
   } | null

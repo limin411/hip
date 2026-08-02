@@ -548,6 +548,21 @@ describe('SessionStore listSessions surface', () => {
     expect(list.find((s) => s.id === 'lc')!.surface).toBe('chat')
     expect(list.find((s) => s.id === 'ld')!.surface).toBe('code')
   })
+
+  it('returns terminal surface for managed-terminal conversations', () => {
+    const terminalCfg = JSON.stringify({
+      llmProvider: 'd',
+      model: 'm',
+      tools: [],
+      surface: 'terminal',
+      managedTerminalId: 'tm_1',
+      hostId: 'hst_1',
+      remotePathHint: '/var/www',
+    })
+    store.insertSession({ id: 't1', title: 't', config: terminalCfg, createdAt: 1, updatedAt: 1 })
+    const list = store.listSessions()
+    expect(list.find((s) => s.id === 't1')!.surface).toBe('terminal')
+  })
 })
 
 describe('SessionStore soft-delete / trash', () => {

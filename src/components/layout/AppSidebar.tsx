@@ -22,10 +22,10 @@ import {
   Terminal,
   Zap,
 } from 'lucide-react'
-import { useActiveSessionId, useSessions, type SessionVM } from '@/domain'
+import { sessionService, useActiveSessionId, useSessions, type SessionVM } from '@/domain'
 import { HIP_PRODUCT_VERSION } from '@/domain/product'
 import { isMacPlatform } from '@/lib/platform'
-import { surfaceOf } from '@/lib/sessions'
+import { isTerminalSession, surfaceOf } from '@/lib/sessions'
 import { groupSessionsByProjectPath, projectPathKey } from '@/lib/sessionProjectGroups'
 import { groupSessionsByDate } from '@/lib/sessionDateGroups'
 import { cn } from '@/lib/utils'
@@ -39,6 +39,7 @@ import {
 } from '@/store/uiStore'
 import { useManagedTerminalStore } from '@/store/managedTerminalStore'
 import { useTerminalStore } from '@/store/terminalStore'
+import { terminalSessionsFor, useTerminalAgentStore } from '@/store/terminalAgentStore'
 import { DeclarativeContextMenu } from '@/components/context-menu'
 import { openCreateKnowledgeSpaceDialog } from '@/components/knowledge/knowledgeSpaceDialogStore'
 import { TERMINAL_MANAGEMENT } from '@/components/terminals/feature'
@@ -99,6 +100,11 @@ export function AppSidebar() {
   const activeSpaceId = useKnowledgeStore((s) => s.activeSpaceId)
   const managedTerminals = useManagedTerminalStore((s) => s.terminals)
   const focusedManagedId = useManagedTerminalStore((s) => s.focusedId)
+  const sidebarExpanded = useTerminalAgentStore((s) => s.sidebarExpanded)
+  const activeAgentSessionByTerminal = useTerminalAgentStore(
+    (s) => s.activeSessionByTerminal,
+  )
+  const activeTerminalTabByTerminal = useUiStore((s) => s.activeTerminalPanelTab)
   /** Ring status map — re-renders sidebar rows when PTY status changes. */
   const terminalBySession = useTerminalStore((s) => s.bySession)
   const isMac = isMacPlatform()
@@ -175,7 +181,7 @@ export function AppSidebar() {
     const surface = sidebarSection === 'projects' ? 'code' : 'chat'
     if (sidebarSection !== 'projects' && sidebarSection !== 'chats') return []
     return sessions
-      .filter((s) => surfaceOf(s.config) === surface)
+      .filter((s) => !isTerminalSession(s.config) && surfaceOf(s.config) === surface)
       .sort((a, b) => b.updatedAtMs - a.updatedAtMs)
   }, [sessions, sidebarSection])
 
@@ -192,7 +198,10 @@ export function AppSidebar() {
   }, [sidebarSection, filteredSessions])
 
   /** History footer badge: first-class sessions only. */
-  const historyCount = useMemo(() => sessions.length, [sessions])
+  const historyCount = useMemo(
+    () => sessions.filter((s) => !isTerminalSession(s.config)).length,
+    [sessions],
+  )
 
   const pathStatusByKey = useProjectPathStore((s) => s.byKey)
 
@@ -211,11 +220,13 @@ export function AppSidebar() {
   }, [spaces, sidebarSection])
 
   const projectCount = useMemo(
-    () => sessions.filter((s) => surfaceOf(s.config) === 'code').length,
+    () =>
+      sessions.filter((s) => !isTerminalSession(s.config) && surfaceOf(s.config) === 'code').length,
     [sessions],
   )
   const chatCount = useMemo(
-    () => sessions.filter((s) => surfaceOf(s.config) === 'chat').length,
+    () =>
+      sessions.filter((s) => !isTerminalSession(s.config) && surfaceOf(s.config) === 'chat').length,
     [sessions],
   )
 
@@ -496,6 +507,27 @@ export function AppSidebar() {
               {managedTerminals.map((mt) => {
                 const active = focusedManagedId === mt.id && activeView === 'terminals'
                 const ptyStatus = terminalBySession[mt.id]?.status ?? 'idle'
+                const terminalSessions = terminalSessionsFor(sessions, mt.id)
+                const hasChildren = mt.kind === 'ssh' && terminalSessions.length > 0
+                const expanded =
+                  hasChildren && sidebarExpanded[mt.id] !== false
+                const activeAgentSession = activeAgentSessionByTerminal[mt.id] ?? null
+                const activeAgentTab =
+                  focusedManagedId === mt.id
+                    ? (activeTerminalTabByTerminal ?? {})[mt.id] ?? 'files'
+                    : 'files'
+                const statusLabel =
+                  mt.kind === 'ssh'
+                    ? mt.status === 'connected'
+                      ? t('terminals.connected')
+                      : mt.status === 'error'
+                        ? t('terminals.statusError')
+                        : mt.status === 'disconnected'
+                          ? t('terminals.disconnected')
+                          : t('terminals.connecting')
+                    : ptyStatus === 'exited'
+                      ? t('terminals.statusExited')
+                      : t('terminals.kindLocal')
                 return (
                   <li key={mt.id}>
                     <DeclarativeContextMenu
@@ -512,6 +544,7 @@ export function AppSidebar() {
                         data-testid={`sidebar-managed-terminal-${mt.id}`}
                         data-no-drag
                         aria-current={active ? 'true' : undefined}
+                        aria-expanded={hasChildren ? expanded : undefined}
                         aria-busy={ptyStatus === 'running' || undefined}
                         title={
                           mt.kind === 'local'
@@ -530,6 +563,30 @@ export function AppSidebar() {
                           active ? SIDEBAR_ACTIVE_RAIL : 'hover:bg-state-hover',
                         )}
                       >
+                        {hasChildren ? (
+                          <button
+                            type="button"
+                            aria-label={
+                              expanded
+                                ? t('terminals.collapseGroup')
+                                : t('terminals.expandGroup')
+                            }
+                            data-testid={`sidebar-managed-terminal-chevron-${mt.id}`}
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              useTerminalAgentStore.getState().toggleSidebarExpanded(mt.id)
+                            }}
+                            className="flex h-4 w-4 shrink-0 items-center justify-center rounded-sm text-ink-tertiary hover:bg-state-hover"
+                          >
+                            {expanded ? (
+                              <ChevronDown size={12} aria-hidden />
+                            ) : (
+                              <ChevronRight size={12} aria-hidden />
+                            )}
+                          </button>
+                        ) : (
+                          <span className="w-4 shrink-0" aria-hidden />
+                        )}
                         {ptyStatus === 'running' ? (
                           <span
                             className="size-1.5 shrink-0 animate-pulse rounded-full bg-accent"
@@ -550,9 +607,9 @@ export function AppSidebar() {
                         <span
                           className={cn(
                             'shrink-0 text-caption',
-                            ptyStatus === 'error'
+                            mt.kind === 'ssh' && mt.status === 'error'
                               ? 'text-danger'
-                              : ptyStatus === 'exited'
+                              : mt.kind === 'ssh' && mt.status !== 'connected'
                                 ? 'text-ink-tertiary'
                                 : mt.kind === 'ssh'
                                   ? 'text-accent'
@@ -560,16 +617,67 @@ export function AppSidebar() {
                           )}
                           aria-hidden
                         >
-                          {ptyStatus === 'error'
-                            ? t('terminals.statusError')
-                            : ptyStatus === 'exited'
-                              ? t('terminals.statusExited')
-                              : mt.kind === 'local'
-                                ? t('terminals.kindLocal')
-                                : t('terminals.kindSsh')}
+                          {statusLabel}
                         </span>
                       </button>
                     </DeclarativeContextMenu>
+                    {hasChildren && expanded ? (
+                      <ul
+                        role="group"
+                        aria-label={t('terminals.agent.sessionsGroup', { title: mt.title })}
+                        className="m-0 mb-0.5 list-none p-0 pl-[34px]"
+                        data-testid={`sidebar-terminal-sessions-${mt.id}`}
+                      >
+                        {terminalSessions.map((ts) => {
+                          const childActive =
+                            active &&
+                            activeAgentSession === ts.id &&
+                            activeAgentTab === 'agent'
+                          return (
+                            <li key={ts.id}>
+                              <DeclarativeContextMenu
+                                kind="terminalAgentSession"
+                                payload={{
+                                  sessionId: ts.id,
+                                  terminalId: mt.id,
+                                  hostId: mt.hostId,
+                                  title: ts.title,
+                                }}
+                                className="mb-0.5 block w-full"
+                              >
+                                <button
+                                  type="button"
+                                  data-testid={`sidebar-terminal-session-${ts.id}`}
+                                  aria-current={childActive ? 'true' : undefined}
+                                  onClick={() =>
+                                    sessionService.focusTerminalAgentSession(mt.id, ts.id)
+                                  }
+                                  className={cn(
+                                    'flex w-full items-center gap-1.5 rounded-lg px-2 py-[var(--row-pad-y-session)] text-left transition-colors',
+                                    'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink/20',
+                                    childActive ? SIDEBAR_ACTIVE_RAIL : 'hover:bg-state-hover',
+                                  )}
+                                >
+                                  <MessageSquare
+                                    size={12}
+                                    className="shrink-0 text-ink-tertiary"
+                                    aria-hidden
+                                  />
+                                  <span className="min-w-0 flex-1 truncate text-body text-ink">
+                                    {ts.title}
+                                  </span>
+                                  {ts.config.agentId && ts.config.agentId !== 'builtin' ? (
+                                    <span className="shrink-0 text-caption text-ink-tertiary">
+                                      {ts.config.agentId}
+                                    </span>
+                                  ) : null}
+                                </button>
+                              </DeclarativeContextMenu>
+                            </li>
+                          )
+                        })}
+                      </ul>
+                    ) : null}
                   </li>
                 )
               })}
@@ -867,7 +975,7 @@ function SidebarSessionRow({
         payload={{
           sessionId: session.id,
           title: session.title,
-          surface,
+          surface: surface === 'terminal' ? 'chat' : surface,
         }}
         className="mb-0.5 block w-full"
       >

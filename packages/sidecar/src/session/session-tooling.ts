@@ -18,6 +18,7 @@ import type { BackgroundManager } from './background-manager.js'
 import type { PlanMode } from './plan-mode.js'
 import type { MemoryService } from '../memory/service.js'
 import { buildMemoryTools } from '../memory/tools.js'
+import type { TerminalUiBridge } from './tools/terminal.js'
 export interface SessionTooling {
   tools: StructuredToolInterface[]
   toolRunner: ToolRunner
@@ -29,7 +30,9 @@ export interface BuildSessionToolingInput {
   sessionId: string
   mode: PermissionMode
   /** Product surface for tool clamps + skill filtering (Chat vs Code). */
-  surface?: 'chat' | 'code' | 'knowledge'
+  surface?: 'chat' | 'code' | 'knowledge' | 'terminal'
+  /** Terminal shared-PTY bridge (terminal surface only). */
+  terminalUiBridge?: TerminalUiBridge
   skills: SkillMeta[]
   mcpConfigs: McpServerConfig[]
   enabledAgents: AgentConfig[]
@@ -90,6 +93,7 @@ export async function buildSessionTooling(input: BuildSessionToolingInput): Prom
       requestApproval: input.requestApproval,
       permissionMode: input.mode,
       surface: input.surface,
+      terminalUiBridge: input.terminalUiBridge,
       webSearchEnabled: true,
       generateAgentEnabled: true,
       sessionId: input.sessionId,

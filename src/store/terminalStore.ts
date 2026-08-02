@@ -22,6 +22,8 @@ export interface SessionPtyUi {
 
 interface TerminalState {
   bySession: Record<string, SessionPtyUi>
+  /** True when the user typed while a terminal-exec flight was active (D10). */
+  userInterleaved: Record<string, boolean>
   /**
    * Which terminal id's XtermSurface is currently the single xterm writer (D6a).
    * Keys any string id (domain sessionId or managed `tm_*`).
@@ -44,6 +46,11 @@ interface TerminalState {
   clearSession: (sessionId: string) => void
   getRing: (sessionId: string) => string[]
   getSession: (sessionId: string) => SessionPtyUi | undefined
+  /** Slice the ring from an absolute cursor; marks truncated when the cursor was trimmed. */
+  getRingSince: (sessionId: string, cursor: number) => { output: string; cursor: number; truncated: boolean }
+  /** Mark user input interleaving for a terminal (cleared by the bridge after reporting). */
+  noteUserInput: (sessionId: string) => void
+  consumeUserInterleaved: (sessionId: string) => boolean
 }
 
 function emptySession(): SessionPtyUi {
@@ -92,6 +99,7 @@ export function attachDrainWrites(
 
 export const useTerminalStore = create<TerminalState>((set, get) => ({
   bySession: {},
+  userInterleaved: {},
   attachedSessionId: null,
   attachedTerminalId: null,
 
@@ -183,6 +191,7 @@ export const useTerminalStore = create<TerminalState>((set, get) => ({
           : (st.attachedTerminalId ?? st.attachedSessionId)
       return {
         bySession: rest,
+        userInterleaved: { ...st.userInterleaved, [sessionId]: false },
         attachedSessionId: stillAttached,
         attachedTerminalId: stillAttached,
       }
@@ -191,4 +200,34 @@ export const useTerminalStore = create<TerminalState>((set, get) => ({
 
   getRing: (sessionId) => get().bySession[sessionId]?.ring ?? [],
   getSession: (sessionId) => get().bySession[sessionId],
+
+  getRingSince: (sessionId, cursor) => {
+    const s = get().bySession[sessionId]
+    if (!s) return { output: '', cursor: 0, truncated: false }
+    const idx = ringIndexForCursor(cursor, s.trimOffset)
+    if (idx < 0) {
+      // Cursor was trimmed away — return the retained ring and mark the gap.
+      return {
+        output: s.ring.join(''),
+        cursor: s.trimOffset + s.ring.length,
+        truncated: true,
+      }
+    }
+    return {
+      output: s.ring.slice(idx).join(''),
+      cursor: s.trimOffset + s.ring.length,
+      truncated: false,
+    }
+  },
+
+  noteUserInput: (sessionId) =>
+    set((st) => ({ userInterleaved: { ...st.userInterleaved, [sessionId]: true } })),
+
+  consumeUserInterleaved: (sessionId) => {
+    const flagged = get().userInterleaved[sessionId] === true
+    if (flagged) {
+      set((st) => ({ userInterleaved: { ...st.userInterleaved, [sessionId]: false } }))
+    }
+    return flagged
+  },
 }))

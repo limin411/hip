@@ -45,6 +45,19 @@ export function sftpMkdir(terminalId: string, path: string): Promise<void> {
   return invoke('sftp_mkdir', { terminalId, path })
 }
 
+/** Read a remote text file via SFTP (read-only, capped; spec §5.1 sftp_read). */
+export function sftpReadFile(
+  terminalId: string,
+  path: string,
+  maxBytes?: number,
+): Promise<string> {
+  return invoke<string>('sftp_read_file', {
+    terminalId,
+    path,
+    maxBytes: maxBytes ?? 256 * 1024,
+  })
+}
+
 export function sftpRemove(terminalId: string, path: string, isDir: boolean): Promise<void> {
   return invoke('sftp_remove', { terminalId, path, isDir })
 }

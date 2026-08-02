@@ -587,6 +587,11 @@ export const ko = {
     "moreTabs": "탭 더 보기",
     "noArtifacts": "생성된 문서와 이미지가 여기에 표시됩니다",
     "copyArtifact": "복사",
+    "panelSlot": {
+      "uncommitted": "미커밋 · {{count}}",
+      "uncommittedEmpty": "미커밋",
+      "commit": "커밋 · {{sha}}"
+    },
     "downloadArtifact": "다운로드",
     "diffView": {
       "noSession": "활성 대화 없음",

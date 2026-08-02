@@ -554,6 +554,11 @@ export const zhCN = {
       noArtifacts: '智能体生成的文档与图片会显示在这里',
       copyArtifact: '复制',
       downloadArtifact: '下载',
+      panelSlot: {
+        uncommitted: '未提交 · {{count}}',
+        uncommittedEmpty: '未提交',
+        commit: '提交 · {{sha}}',
+      },
       diffView: {
         noSession: '没有进行中的对话',
         noSessionDesc: '打开一个对话以查看其工作区改动',

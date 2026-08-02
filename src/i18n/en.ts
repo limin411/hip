@@ -561,6 +561,11 @@ export const en = {
       noArtifacts: 'Generated documents and images will appear here',
       copyArtifact: 'Copy',
       downloadArtifact: 'Download',
+      panelSlot: {
+        uncommitted: 'Uncommitted · {{count}}',
+        uncommittedEmpty: 'Uncommitted',
+        commit: 'Commit · {{sha}}',
+      },
       diffView: {
         noSession: 'No active conversation',
         noSessionDesc: 'Open a conversation to see its workspace changes',

@@ -20,6 +20,7 @@ vi.mock('lucide-react', () => ({
   Folder: () => React.createElement('span', { 'data-testid': 'icon-folder' }),
   RotateCcw: () => React.createElement('span', { 'data-testid': 'icon-restart' }),
   X: () => React.createElement('span', { 'data-testid': 'icon-close' }),
+  Power: () => React.createElement('span', { 'data-testid': 'icon-power' }),
   Loader2: () => React.createElement('span', { 'data-testid': 'icon-loader' }),
   AlertCircle: () => React.createElement('span', { 'data-testid': 'icon-alert' }),
 }))

@@ -595,6 +595,11 @@ export const zhTW = {
     "noArtifacts": "智慧體生成的文件與圖片會顯示在這裡",
     "copyArtifact": "複製",
     "downloadArtifact": "下載",
+    "panelSlot": {
+      "uncommitted": "未提交 · {{count}}",
+      "uncommittedEmpty": "未提交",
+      "commit": "提交 · {{sha}}"
+    },
     "diffView": {
       "noSession": "沒有進行中的對話",
       "noSessionDesc": "開啟一個對話以檢視其工作區改動",

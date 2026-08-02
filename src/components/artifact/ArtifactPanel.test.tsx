@@ -28,6 +28,15 @@ vi.mock('./PanelTabBar', () => ({
   PanelTabBar: () => React.createElement('div', { 'data-testid': 'panel-tab-bar', role: 'tablist' }),
 }))
 
+vi.mock('./PanelContextSlot', () => ({
+  PanelContextSlot: () => React.createElement('div', { 'data-testid': 'panel-context-slot' }),
+}))
+
+vi.mock('./codeTerminalController', () => ({
+  CodeTerminalProvider: ({ children }: { children: React.ReactNode }) => children,
+  useCodeTerminalControllerOptional: () => null,
+}))
+
 vi.mock('react-resizable-panels', () => ({
   Panel: ({ children }: { children: React.ReactNode }) =>
     React.createElement('div', { 'data-testid': 'resizable-panel' }, children),
@@ -97,8 +106,9 @@ describe('ArtifactPanel', () => {
     cleanup()
   })
 
-  it('shows the titlebar tab bar without a panel title', () => {
+  it('shows the titlebar context slot and tab bar without a static panel title', () => {
     render(<ArtifactPanel />)
+    expect(screen.getByTestId('panel-context-slot')).toBeInTheDocument()
     expect(screen.getByTestId('panel-tab-bar')).toBeInTheDocument()
     expect(screen.queryByTestId('panel-title')).toBeNull()
   })

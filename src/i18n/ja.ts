@@ -587,6 +587,11 @@ export const ja = {
     "moreTabs": "その他のタブ",
     "noArtifacts": "生成されたドキュメントや画像がここに表示されます",
     "copyArtifact": "コピー",
+    "panelSlot": {
+      "uncommitted": "未コミット · {{count}}",
+      "uncommittedEmpty": "未コミット",
+      "commit": "コミット · {{sha}}"
+    },
     "downloadArtifact": "ダウンロード",
     "diffView": {
       "noSession": "アクティブな会話がありません",

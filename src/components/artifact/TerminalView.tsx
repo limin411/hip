@@ -1,69 +1,26 @@
-import { useCallback, useEffect, useState } from 'react'
-import { Folder, RotateCcw, X } from 'lucide-react'
+import { Folder, Power, RotateCcw } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
-import { useActiveSession, useActiveSessionId, sessionService } from '@/domain'
-import { pickDirectory } from '@/ipc/dialog'
-import { ptyKill, ptyOpen, ptyResize, ptyWrite } from '@/ipc/pty'
-import { useTerminalStore } from '@/store/terminalStore'
+import { ptyOpen, ptyResize, ptyWrite } from '@/ipc/pty'
 import { DeclarativeContextMenu } from '@/components/context-menu'
 import { Button } from '@/components/ui/Button'
 import { cn } from '@/lib/utils'
 import { XtermSurface } from './XtermSurface'
+import {
+  CodeTerminalProvider,
+  useCodeTerminalController,
+  useCodeTerminalControllerOptional,
+} from './codeTerminalController'
 
 /**
- * Code-panel Terminal tab: domain session + cwd chrome around shared XtermSurface.
- * Live output: store subscription only (D6a single-writer). Bridge never touches Terminal.
- * xterm is lazy-loaded inside XtermSurface to keep the main chat bundle smaller.
- *
- * Chrome mirrors ManagedTerminalSession: Restart + Close.
- * Close kills the PTY and clears the ring without auto-reopen (frees soft-cap slots).
- * Restart after close re-opens a fresh shell.
+ * Code-panel Terminal tab body.
+ * When mounted under ArtifactPanel + CodeTerminalProvider, titlebar chrome
+ * (cwd / restart / close) lives in PanelContextSlot — no second row here.
+ * Standalone (tests / fallback) keeps a local chrome row.
  */
-export function TerminalView() {
+function TerminalViewBody({ showChrome }: { showChrome: boolean }) {
   const { t } = useTranslation()
-  const sessionId = useActiveSessionId()
-  const cwd = useActiveSession()?.config.cwd
-  const status = useTerminalStore((s) =>
-    sessionId ? s.bySession[sessionId]?.status ?? 'idle' : 'idle',
-  )
-
-  const [bootKey, setBootKey] = useState(0)
-  /** Explicit user close — unmount surface so we do not keep-alive / re-open. */
-  const [closed, setClosed] = useState(false)
-
-  useEffect(() => {
-    setClosed(false)
-  }, [sessionId])
-
-  const chooseFolder = useCallback(async () => {
-    if (!sessionId) return
-    const dir = await pickDirectory()
-    if (!dir) return
-    sessionService.setProjectDir(sessionId, dir)
-  }, [sessionId])
-
-  const restart = useCallback(async () => {
-    if (!sessionId) return
-    try {
-      await ptyKill(sessionId)
-    } catch {
-      /* ok if already dead */
-    }
-    useTerminalStore.getState().clearSession(sessionId)
-    setClosed(false)
-    setBootKey((k) => k + 1)
-  }, [sessionId])
-
-  const close = useCallback(async () => {
-    if (!sessionId) return
-    try {
-      await ptyKill(sessionId)
-    } catch {
-      /* ok if already dead */
-    }
-    useTerminalStore.getState().clearSession(sessionId)
-    setClosed(true)
-  }, [sessionId])
+  const { sessionId, cwd, status, closed, bootKey, restart, close, chooseFolder } =
+    useCodeTerminalController()
 
   if (!sessionId) return null
 
@@ -93,55 +50,57 @@ export function TerminalView() {
 
   return (
     <div className="flex h-full min-h-0 flex-col bg-surface" data-testid="terminal-view">
-      <DeclarativeContextMenu
-        kind="terminal"
-        payload={{ sessionId, status: closed ? 'idle' : status }}
-        className="flex h-8 shrink-0 items-center justify-between gap-2 border-b border-border/80 px-2.5"
-        data-testid="terminal-chrome"
-      >
-        <div
-          className="flex min-w-0 flex-1 items-center justify-between gap-2"
-          data-tauri-drag-region="false"
+      {showChrome && (
+        <DeclarativeContextMenu
+          kind="terminal"
+          payload={{ sessionId, status: closed ? 'idle' : status }}
+          className="flex h-8 shrink-0 items-center justify-between gap-2 border-b border-border/80 px-2.5"
+          data-testid="terminal-chrome"
         >
-          <span
-            className="min-w-0 truncate font-mono text-meta text-ink-tertiary"
-            title={cwd}
-            data-testid="terminal-cwd"
+          <div
+            className="flex min-w-0 flex-1 items-center justify-between gap-2"
+            data-tauri-drag-region="false"
           >
-            {cwd}
-          </span>
-          <div className="flex shrink-0 items-center gap-0.5">
-            <button
-              type="button"
-              data-testid="terminal-restart"
-              onClick={() => void restart()}
-              title={t('artifact.terminalView.restart')}
-              className={cn(
-                'inline-flex items-center gap-1 rounded-sm px-2 py-1 text-meta font-medium',
-                'text-ink-secondary transition-colors hover:bg-state-hover hover:text-ink',
-              )}
+            <span
+              className="min-w-0 truncate font-mono text-meta text-ink-tertiary"
+              title={cwd}
+              data-testid="terminal-cwd"
             >
-              <RotateCcw size={13} />
-              {t('artifact.terminalView.restart')}
-            </button>
-            <button
-              type="button"
-              data-testid="terminal-close"
-              onClick={() => void close()}
-              disabled={closed}
-              title={t('artifact.terminalView.close')}
-              className={cn(
-                'inline-flex items-center gap-1 rounded-sm px-2 py-1 text-meta font-medium',
-                'text-ink-secondary transition-colors hover:bg-state-hover hover:text-ink',
-                'disabled:pointer-events-none disabled:opacity-40',
-              )}
-            >
-              <X size={13} />
-              {t('artifact.terminalView.close')}
-            </button>
+              {cwd}
+            </span>
+            <div className="flex shrink-0 items-center gap-0.5">
+              <button
+                type="button"
+                data-testid="terminal-restart"
+                onClick={() => void restart()}
+                title={t('artifact.terminalView.restart')}
+                className={cn(
+                  'inline-flex items-center gap-1 rounded-sm px-2 py-1 text-meta font-medium',
+                  'text-ink-secondary transition-colors hover:bg-state-hover hover:text-ink',
+                )}
+              >
+                <RotateCcw size={13} />
+                {t('artifact.terminalView.restart')}
+              </button>
+              <button
+                type="button"
+                data-testid="terminal-close"
+                onClick={() => void close()}
+                disabled={closed}
+                title={t('artifact.terminalView.close')}
+                className={cn(
+                  'inline-flex items-center gap-1 rounded-sm px-2 py-1 text-meta font-medium',
+                  'text-ink-secondary transition-colors hover:bg-state-hover hover:text-ink',
+                  'disabled:pointer-events-none disabled:opacity-40',
+                )}
+              >
+                <Power size={13} />
+                {t('artifact.terminalView.close')}
+              </button>
+            </div>
           </div>
-        </div>
-      </DeclarativeContextMenu>
+        </DeclarativeContextMenu>
+      )}
 
       {closed ? (
         <div
@@ -166,17 +125,33 @@ export function TerminalView() {
           </Button>
         </div>
       ) : (
-        <XtermSurface
-          key={bootKey}
-          terminalId={sessionId}
-          backend="pty"
-          cwd={cwd}
-          open={(cols, rows) => ptyOpen(sessionId, cwd, cols, rows)}
-          write={(data) => ptyWrite(sessionId, data)}
-          resize={(cols, rows) => ptyResize(sessionId, cols, rows)}
-          onRestart={restart}
-        />
+        <DeclarativeContextMenu
+          kind="terminal"
+          payload={{ sessionId, status }}
+          className="flex min-h-0 flex-1 flex-col"
+        >
+          <XtermSurface
+            key={bootKey}
+            terminalId={sessionId}
+            backend="pty"
+            cwd={cwd}
+            open={(cols, rows) => ptyOpen(sessionId, cwd, cols, rows)}
+            write={(data) => ptyWrite(sessionId, data)}
+            resize={(cols, rows) => ptyResize(sessionId, cols, rows)}
+            onRestart={restart}
+          />
+        </DeclarativeContextMenu>
       )}
     </div>
+  )
+}
+
+export function TerminalView() {
+  const existing = useCodeTerminalControllerOptional()
+  if (existing) return <TerminalViewBody showChrome={false} />
+  return (
+    <CodeTerminalProvider>
+      <TerminalViewBody showChrome />
+    </CodeTerminalProvider>
   )
 }

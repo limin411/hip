@@ -5,12 +5,23 @@ import { render, screen, fireEvent, cleanup, waitFor } from '@testing-library/re
 import type { ReactNode } from 'react'
 import type { DiffFile } from '@hip/protocol'
 import { ChangesView } from './ChangesView'
+import { ChangesTitlebarActions } from './ChangesTitlebarActions'
 import { useDomainStore } from '@/domain/sessionStore'
 import { useDiffStore, EMPTY_DIFF } from '@/store/diffStore'
 import { useUiStore } from '@/store/uiStore'
 import { sessionService } from '@/domain/sessionService'
 import { insertComposerText } from '@/components/command-palette/composerBridge'
 import '@/i18n'
+
+/** Body + titlebar chrome (actions live in PanelContextSlot in the real shell). */
+function renderChanges() {
+  return render(
+    <>
+      <ChangesTitlebarActions />
+      <ChangesView />
+    </>,
+  )
+}
 
 vi.mock('react-i18next', async (importOriginal) => {
   const actual = await importOriginal<typeof import('react-i18next')>()
@@ -132,7 +143,7 @@ describe('ChangesView v2', () => {
         s1: { ...EMPTY_DIFF, status: 'ready', state: 'ok', hasSessionStart: false, files: [file], commitLog: { status: 'ready', state: 'ok', commits: [] } },
       },
     })
-    render(<ChangesView />)
+    renderChanges()
     const sessionBase = screen.getByTestId('changes-base-session-start')
     const headBase = screen.getByTestId('changes-base-head')
     expect(sessionBase).toBeDisabled()
@@ -156,7 +167,7 @@ describe('ChangesView v2', () => {
         },
       },
     })
-    render(<ChangesView />)
+    renderChanges()
     const section = screen.getByTestId('changes-commit-section')
     expect(section).toHaveStyle({ height: '36px' })
     expect(screen.queryByTestId('commit-row-button')).toBeNull()
@@ -179,7 +190,7 @@ describe('ChangesView v2', () => {
         },
       },
     })
-    render(<ChangesView />)
+    renderChanges()
     expect(screen.getByText('artifact.changesView.recentCommits')).toBeInTheDocument()
   })
 
@@ -200,7 +211,7 @@ describe('ChangesView v2', () => {
         },
       },
     })
-    render(<ChangesView />)
+    renderChanges()
     const root = screen.getByTestId('changes-view')
     vi.spyOn(root, 'getBoundingClientRect').mockReturnValue({
       bottom: 400, top: 0, left: 0, right: 100, width: 100, height: 400,
@@ -231,7 +242,7 @@ describe('ChangesView v2', () => {
         },
       },
     })
-    render(<ChangesView />)
+    renderChanges()
     fireEvent.click(screen.getByTestId('changes-commit-title'))
     fireEvent.click(await screen.findByTestId('commit-row-button'))
     expect(sessionService.requestCommitDiff).toHaveBeenCalledWith('s1', 'abc1234')
@@ -252,7 +263,7 @@ describe('ChangesView v2', () => {
         s1: { ...EMPTY_DIFF, status: 'ready', state: 'ok', hasSessionStart: true, files: [file], commitLog: { status: 'ready', state: 'ok', commits: [] } },
       },
     })
-    render(<ChangesView />)
+    renderChanges()
     fireEvent.click(screen.getByText('artifact.changesView.ignoreWhitespace'))
     expect(useUiStore.getState().ignoreWhitespace).toBe(true)
     expect(sessionService.requestDiff).toHaveBeenLastCalledWith('s1', undefined, true)
@@ -268,7 +279,7 @@ describe('ChangesView v2', () => {
         s1: { ...EMPTY_DIFF, status: 'ready', state: 'ok', hasSessionStart: true, files: [file], commitLog: { status: 'ready', state: 'ok', commits: [] } },
       },
     })
-    render(<ChangesView />)
+    renderChanges()
     expect(screen.getByTestId('diff-discard')).toBeDisabled()
     expect(screen.getByTestId('changes-review')).toBeDisabled()
   })
@@ -279,7 +290,7 @@ describe('ChangesView v2', () => {
         s1: { ...EMPTY_DIFF, status: 'ready', state: 'ok', hasSessionStart: true, files: [file], commitLog: { status: 'ready', state: 'ok', commits: [] } },
       },
     })
-    render(<ChangesView />)
+    renderChanges()
     fireEvent.click(screen.getByTestId('diff-discard'))
     fireEvent.click(await screen.findByTestId('diff-discard-confirm'))
     expect(sessionService.discardFile).toHaveBeenCalledWith('s1', 'src/a.ts', 'modified', undefined)
@@ -291,7 +302,7 @@ describe('ChangesView v2', () => {
         s1: { ...EMPTY_DIFF, status: 'ready', state: 'ok', hasSessionStart: true, files: [file], commitLog: { status: 'ready', state: 'ok', commits: [] } },
       },
     })
-    render(<ChangesView />)
+    renderChanges()
     fireEvent.click(screen.getByTestId('changes-review'))
     expect(insertComposerText).toHaveBeenCalledWith(expect.stringContaining('src/a.ts'))
   })

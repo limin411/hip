@@ -62,21 +62,19 @@ export function HostGroupList({
   const ungrouped = hostsByGroup.get(null) ?? []
 
   const navKeys = useMemo(() => {
-    const keys = sortedGroups.map((g) => g.id)
     // 未分组 always stays in the rail, even with no hosts in it.
-    keys.push(UNGROUPED_KEY)
-    return keys
+    return [UNGROUPED_KEY, ...sortedGroups.map((g) => g.id)]
   }, [sortedGroups])
 
-  const [selectedKey, setSelectedKey] = useState<string>(() => navKeys[0] ?? UNGROUPED_KEY)
+  const [selectedKey, setSelectedKey] = useState<string>(() => sortedGroups[0]?.id ?? UNGROUPED_KEY)
 
   // Keep selection valid when groups/hosts change.
   useEffect(() => {
     if (navKeys.length === 0) return
     if (!navKeys.includes(selectedKey)) {
-      setSelectedKey(navKeys[0])
+      setSelectedKey(sortedGroups[0]?.id ?? UNGROUPED_KEY)
     }
-  }, [navKeys, selectedKey])
+  }, [navKeys, selectedKey, sortedGroups])
 
   const selectedHosts =
     selectedKey === UNGROUPED_KEY
@@ -143,6 +141,48 @@ export function HostGroupList({
             className="flex flex-col gap-0.5 p-1.5"
             aria-label={t('terminals.groupsNavAria')}
           >
+            {onCreateGroup ? (
+              <button
+                type="button"
+                data-testid="host-group-create"
+                onClick={onCreateGroup}
+                className={cn(
+                  'flex h-[var(--row-h-sidebar)] min-w-0 items-center gap-2 rounded-lg border border-dashed border-border px-2.5 text-left text-meta font-medium transition-colors',
+                  'text-ink-secondary hover:bg-state-hover hover:text-ink',
+                )}
+              >
+                <Plus size={15} strokeWidth={1.75} className="shrink-0 opacity-70" aria-hidden />
+                <span className="min-w-0 flex-1 truncate">{t('terminals.newGroup')}</span>
+              </button>
+            ) : null}
+
+            <div
+              data-testid="host-group-ungrouped"
+              className={cn(
+                'flex items-center rounded-lg',
+                selectedKey === UNGROUPED_KEY && 'bg-state-active',
+              )}
+            >
+              <button
+                type="button"
+                role="tab"
+                aria-selected={selectedKey === UNGROUPED_KEY}
+                data-testid="host-group-select-ungrouped"
+                onClick={() => setSelectedKey(UNGROUPED_KEY)}
+                className={cn(
+                  'flex h-[var(--row-h-sidebar)] min-w-0 flex-1 items-center gap-2 rounded-lg px-2.5 text-left text-meta font-medium transition-colors',
+                  'text-ink-secondary hover:bg-state-hover hover:text-ink',
+                  selectedKey === UNGROUPED_KEY && 'text-ink',
+                )}
+              >
+                <Server size={15} strokeWidth={1.75} className="shrink-0 opacity-70" aria-hidden />
+                <span className="min-w-0 flex-1 truncate">{t('terminals.ungrouped')}</span>
+                <span className="shrink-0 tabular-nums text-caption text-ink-tertiary">
+                  {ungrouped.length}
+                </span>
+              </button>
+            </div>
+
             {sortedGroups.map((group) => {
               const count = (hostsByGroup.get(group.id) ?? []).length
               const selected = selectedKey === group.id
@@ -200,48 +240,6 @@ export function HostGroupList({
                 </div>
               )
             })}
-
-            {onCreateGroup ? (
-              <button
-                type="button"
-                data-testid="host-group-create"
-                onClick={onCreateGroup}
-                className={cn(
-                  'flex h-[var(--row-h-sidebar)] min-w-0 items-center gap-2 rounded-lg border border-dashed border-border px-2.5 text-left text-meta font-medium transition-colors',
-                  'text-ink-secondary hover:bg-state-hover hover:text-ink',
-                )}
-              >
-                <Plus size={15} strokeWidth={1.75} className="shrink-0 opacity-70" aria-hidden />
-                <span className="min-w-0 flex-1 truncate">{t('terminals.newGroup')}</span>
-              </button>
-            ) : null}
-
-            <div
-              data-testid="host-group-ungrouped"
-              className={cn(
-                'flex items-center rounded-lg',
-                selectedKey === UNGROUPED_KEY && 'bg-state-active',
-              )}
-            >
-              <button
-                type="button"
-                role="tab"
-                aria-selected={selectedKey === UNGROUPED_KEY}
-                data-testid="host-group-select-ungrouped"
-                onClick={() => setSelectedKey(UNGROUPED_KEY)}
-                className={cn(
-                  'flex h-[var(--row-h-sidebar)] min-w-0 flex-1 items-center gap-2 rounded-lg px-2.5 text-left text-meta font-medium transition-colors',
-                  'text-ink-secondary hover:bg-state-hover hover:text-ink',
-                  selectedKey === UNGROUPED_KEY && 'text-ink',
-                )}
-              >
-                <Server size={15} strokeWidth={1.75} className="shrink-0 opacity-70" aria-hidden />
-                <span className="min-w-0 flex-1 truncate">{t('terminals.ungrouped')}</span>
-                <span className="shrink-0 tabular-nums text-caption text-ink-tertiary">
-                  {ungrouped.length}
-                </span>
-              </button>
-            </div>
           </nav>
         </div>
       </aside>

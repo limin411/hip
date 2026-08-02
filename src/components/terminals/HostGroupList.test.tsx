@@ -54,7 +54,7 @@ const noop = vi.fn()
 describe('HostGroupList master-detail', () => {
   afterEach(() => cleanup())
 
-  it('orders groups by name ascending (Dev before Prod)', () => {
+  it('keeps create + ungrouped fixed on top, groups below sorted by name', () => {
     render(
       <HostGroupList
         groups={groups}
@@ -63,13 +63,19 @@ describe('HostGroupList master-detail', () => {
         onDeleteHost={noop}
         onRenameGroup={noop}
         onDeleteGroup={noop}
+        onCreateGroup={noop}
       />,
     )
+    const create = screen.getByTestId('host-group-create')
+    const ungrouped = screen.getByTestId('host-group-ungrouped')
+    expect(create.compareDocumentPosition(ungrouped) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
     const sections = screen.getAllByTestId(/^host-group-g/)
     expect(sections.map((el) => el.getAttribute('data-testid'))).toEqual([
       'host-group-g2', // Dev
       'host-group-g1', // Prod
     ])
+    expect(ungrouped.compareDocumentPosition(sections[0]!) & Node.DOCUMENT_POSITION_FOLLOWING)
+      .toBeTruthy()
   })
 
   it('selects first group by default and shows only its hosts', () => {

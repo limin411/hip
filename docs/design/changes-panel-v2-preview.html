@@ -1,0 +1,1187 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>hip · 更改面板改版预览 v2</title>
+  <style>
+    :root {
+      --bg-app: #ffffff;
+      --bg-subtle: #fafafa;
+      --bg-muted: #f1f1f1;
+      --bg-content: #ffffff;
+      --border: #e0e0e0;
+      --border-strong: #c9c9c9;
+      --text-primary: #111111;
+      --text-secondary: #5e5e5e;
+      --text-tertiary: #757575;
+      --accent: #c2410c;
+      --accent-subtle: #f0f0f0;
+      --accent-active: #e6e6e6;
+      --state-hover: #f0f0f0;
+      --success: #2f7d40;
+      --danger: #c63b3b;
+      --warning: #9a5d10;
+      --btn-primary: #3a3a3a;
+      --on-btn-primary: #fafafa;
+      --font: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Noto Sans SC", sans-serif;
+      --mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: var(--font);
+      background: #e8e8e8;
+      color: var(--text-primary);
+      min-height: 100vh;
+      padding: 24px;
+    }
+    h1 { font-size: 15px; font-weight: 600; margin-bottom: 4px; }
+    .sub { font-size: 12px; color: var(--text-tertiary); margin-bottom: 16px; }
+    .controls {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      align-items: center;
+      margin-bottom: 16px;
+    }
+    .seg {
+      display: inline-flex;
+      border: 1px solid var(--border-strong);
+      border-radius: 4px;
+      overflow: hidden;
+      background: var(--bg-app);
+    }
+    .seg button {
+      border: 0;
+      background: transparent;
+      padding: 6px 12px;
+      font-size: 12px;
+      font-weight: 500;
+      color: var(--text-tertiary);
+      cursor: pointer;
+      font-family: inherit;
+    }
+    .seg button.on { background: var(--accent-active); color: var(--text-primary); }
+    .seg button:hover:not(.on) { background: var(--state-hover); }
+    .check {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 12px;
+      color: var(--text-secondary);
+      background: var(--bg-app);
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      padding: 6px 10px;
+      cursor: pointer;
+      user-select: none;
+    }
+    .hint { font-size: 11px; color: var(--text-tertiary); margin-left: 4px; }
+    .stage { display: flex; gap: 16px; align-items: stretch; justify-content: center; }
+    /* Fake app chrome */
+    .app {
+      width: 1120px;
+      height: 640px;
+      background: var(--bg-app);
+      border: 1px solid var(--border-strong);
+      border-radius: 8px;
+      display: grid;
+      grid-template-columns: 200px 1fr 440px;
+      overflow: hidden;
+      box-shadow: 0 1px 0 rgba(0,0,0,.04);
+    }
+    .sidebar {
+      background: var(--bg-subtle);
+      border-right: 1px solid var(--border);
+      padding: 12px 10px;
+      font-size: 12px;
+    }
+    .sidebar .brand { font-size: 11px; color: var(--text-tertiary); margin-bottom: 12px; padding: 0 6px; }
+    .nav-item { padding: 6px 8px; border-radius: 4px; color: var(--text-secondary); margin-bottom: 2px; }
+    .nav-item.active { background: var(--accent-active); color: var(--text-primary); font-weight: 500; }
+    .session { margin-top: 16px; padding: 6px 8px; background: var(--accent-active); border-radius: 4px; font-size: 12px; }
+    .session .tag { color: var(--success); font-size: 11px; float: right; }
+    .main {
+      display: flex;
+      flex-direction: column;
+      background: var(--bg-content);
+      border-right: 1px solid var(--border);
+      min-width: 0;
+    }
+    .main-head {
+      height: 40px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      padding: 0 14px;
+      font-size: 13px;
+      font-weight: 500;
+      gap: 8px;
+    }
+    .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--success); }
+    .chat {
+      flex: 1;
+      padding: 16px;
+      overflow: auto;
+      font-size: 13px;
+      line-height: 1.55;
+      color: var(--text-secondary);
+    }
+    .bubble {
+      display: inline-block;
+      background: var(--bg-muted);
+      padding: 6px 10px;
+      border-radius: 4px;
+      color: var(--text-primary);
+      margin-bottom: 12px;
+      font-size: 13px;
+    }
+    .ai { font-size: 12.5px; color: var(--text-primary); max-width: 100%; margin-bottom: 10px; }
+    .ai strong { font-weight: 600; }
+    .ai .meta { color: var(--text-tertiary); font-size: 11px; }
+    .review-result {
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      padding: 10px 12px;
+      font-size: 12px;
+      color: var(--text-primary);
+      margin-bottom: 12px;
+    }
+    .review-result .rr-head { font-weight: 600; font-size: 12.5px; margin-bottom: 6px; }
+    .review-result .rr-total { color: var(--text-tertiary); font-size: 11px; margin-bottom: 6px; }
+    .review-result ul { padding-left: 16px; line-height: 1.7; }
+    .review-result li b.high { color: var(--danger); }
+    .review-result li b.medium { color: var(--warning); }
+    .review-result li b.low { color: var(--text-secondary); }
+    .review-result .rr-act {
+      margin-top: 6px;
+      padding-top: 6px;
+      border-top: 1px solid var(--border);
+      color: var(--text-secondary);
+      font-size: 11.5px;
+    }
+    .composer {
+      margin: 12px;
+      border: 1px solid var(--border-strong);
+      border-radius: 6px;
+      padding: 8px 10px;
+      color: var(--text-tertiary);
+      font-size: 12px;
+      min-height: 64px;
+    }
+    .composer .chips { display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 6px; min-height: 0; }
+    .chip-mini {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      background: var(--accent-subtle);
+      border: 1px solid var(--border);
+      border-radius: 3px;
+      padding: 2px 7px;
+      font-size: 11px;
+      color: var(--text-secondary);
+    }
+    /* ========== Panel ========== */
+    .panel {
+      display: flex;
+      flex-direction: column;
+      min-width: 0;
+      background: var(--bg-app);
+      position: relative;
+    }
+    .panel-tabs {
+      height: 36px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 10px;
+      font-size: 12px;
+      flex-shrink: 0;
+    }
+    .panel-tabs .title { font-weight: 500; }
+    .panel-tabs .meta { color: var(--text-tertiary); font-size: 11px; }
+
+    /* ========== AFTER v2 ========== */
+    .after .toolbar {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 6px 10px;
+      border-bottom: 1px solid var(--border);
+      flex-shrink: 0;
+      position: relative;
+    }
+    .after .tb-title { font-size: 11px; font-weight: 500; color: var(--text-tertiary); white-space: nowrap; }
+    .after .tb-title b { color: var(--text-primary); font-weight: 600; }
+    .after .tb-stats { font-family: var(--mono); font-size: 11px; margin-right: auto; }
+    .after .tb-stats .a { color: var(--success); }
+    .after .tb-stats .d { color: var(--danger); }
+    .base-seg {
+      display: inline-flex;
+      background: var(--bg-muted);
+      border-radius: 4px;
+      padding: 2px;
+      gap: 1px;
+      flex-shrink: 0;
+    }
+    .base-seg button {
+      border: 0;
+      background: transparent;
+      font-size: 10.5px;
+      font-weight: 500;
+      padding: 3px 7px;
+      border-radius: 3px;
+      color: var(--text-tertiary);
+      cursor: pointer;
+      font-family: inherit;
+    }
+    .base-seg button.on { background: var(--bg-app); color: var(--text-primary); box-shadow: 0 0 0 1px var(--border); }
+    .base-seg button:disabled { opacity: .45; cursor: not-allowed; }
+    .btn {
+      border: 1px solid var(--border-strong);
+      background: var(--bg-app);
+      border-radius: 2px;
+      font-size: 11px;
+      font-weight: 500;
+      padding: 3px 8px;
+      cursor: pointer;
+      font-family: inherit;
+      color: var(--text-primary);
+    }
+    .btn:hover { background: var(--state-hover); }
+    .btn-ghost { border-color: transparent; color: var(--text-secondary); padding: 3px 6px; }
+    .btn-primary { background: var(--btn-primary); color: var(--on-btn-primary); border-color: var(--btn-primary); }
+    .btn-primary:hover { background: #2e2e2e; }
+    .btn-danger { background: var(--danger); color: #fff; border-color: var(--danger); }
+    .btn-danger:hover { background: #a83232; }
+    .btn:disabled { opacity: .4; cursor: not-allowed; }
+
+    /* Overflow menu */
+    .more-menu {
+      position: absolute;
+      top: 34px;
+      right: 8px;
+      z-index: 30;
+      min-width: 168px;
+      background: var(--bg-app);
+      border: 1px solid var(--border-strong);
+      border-radius: 4px;
+      padding: 4px;
+      display: none;
+      font-size: 12px;
+      box-shadow: 0 8px 24px -14px rgba(17,17,17,.16);
+    }
+    .more-menu.show { display: block; }
+    .more-menu button {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      width: 100%;
+      border: 0;
+      background: transparent;
+      padding: 5px 8px;
+      border-radius: 2px;
+      font-size: 12px;
+      font-family: inherit;
+      color: var(--text-primary);
+      cursor: pointer;
+      text-align: left;
+    }
+    .more-menu button:hover { background: var(--state-hover); }
+    .more-menu button:disabled { opacity: .4; cursor: not-allowed; }
+    .more-menu .sep { height: 1px; background: var(--border); margin: 4px 2px; }
+    .more-menu .kbd { margin-left: auto; font-size: 10px; color: var(--text-tertiary); }
+    .check-mark { width: 14px; color: var(--accent); flex-shrink: 0; font-weight: 700; }
+
+    .badge-back {
+      display: none;
+      align-items: center;
+      gap: 6px;
+      padding: 6px 10px;
+      font-size: 11px;
+      border-bottom: 1px solid var(--border);
+      background: var(--bg-subtle);
+      flex-shrink: 0;
+    }
+    .badge-back.show { display: flex; }
+
+    .after .files {
+      flex: 1;
+      min-height: 0;
+      overflow: auto;
+      position: relative;
+    }
+    .file { border-bottom: 1px solid var(--border); }
+    .file-row {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      height: 32px;
+      padding: 0 10px;
+      font-size: 12px;
+      cursor: pointer;
+      background: var(--bg-app);
+    }
+    .file.open .file-row {
+      position: sticky;
+      top: 0;
+      z-index: 2;
+      background: var(--bg-subtle);
+      border-bottom: 1px solid var(--border);
+    }
+    .file-row:hover { background: var(--state-hover); }
+    .file.open .file-row:hover { background: var(--bg-subtle); }
+    .file.active-row .file-row { box-shadow: inset 2px 0 0 var(--accent); }
+    .chev { width: 14px; color: var(--text-tertiary); font-size: 10px; flex-shrink: 0; text-align: center; }
+    .st { font-family: var(--mono); font-size: 11px; font-weight: 600; width: 14px; flex-shrink: 0; text-align: center; }
+    .st.M { color: var(--warning); }
+    .st.A { color: var(--success); }
+    .st.D { color: var(--danger); }
+    .st.R { color: var(--text-secondary); }
+    .ficon {
+      width: 14px;
+      height: 14px;
+      border-radius: 2px;
+      background: var(--bg-muted);
+      flex-shrink: 0;
+      font-size: 9px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--text-tertiary);
+    }
+    .file-row .path { flex: 1; color: var(--text-primary); min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .stats { font-family: var(--mono); font-size: 11px; flex-shrink: 0; }
+    .stats .a { color: var(--success); }
+    .stats .d { color: var(--danger); }
+    .row-actions { display: none; align-items: center; gap: 2px; flex-shrink: 0; }
+    .file-row:hover .row-actions,
+    .file.open .file-row .row-actions { display: flex; }
+    .icon-btn {
+      width: 22px;
+      height: 22px;
+      border: 0;
+      background: transparent;
+      border-radius: 2px;
+      color: var(--text-tertiary);
+      cursor: pointer;
+      font-size: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-family: inherit;
+    }
+    .icon-btn:hover { background: var(--accent-active); color: var(--text-primary); }
+    .icon-btn.danger:hover { color: var(--danger); background: rgba(198,59,59,.08); }
+
+    .diff-block { font-family: var(--mono); font-size: 11px; line-height: 1.55; }
+    .hunk { position: relative; }
+    .hunk-h {
+      background: var(--bg-subtle);
+      color: var(--text-tertiary);
+      padding: 2px 8px;
+      border-top: 1px solid rgba(224,224,224,.7);
+      border-bottom: 1px solid rgba(224,224,224,.7);
+    }
+    .hunk-actions {
+      position: absolute;
+      top: 1px;
+      right: 8px;
+      display: none;
+      align-items: center;
+      gap: 2px;
+      background: var(--bg-subtle);
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      padding: 1px;
+    }
+    .hunk:hover .hunk-actions { display: flex; }
+    .hunk-actions button {
+      border: 0;
+      background: transparent;
+      border-radius: 2px;
+      font-size: 10.5px;
+      font-family: inherit;
+      color: var(--text-secondary);
+      padding: 2px 7px;
+      cursor: pointer;
+      white-space: nowrap;
+    }
+    .hunk-actions button:hover { background: var(--accent-active); color: var(--text-primary); }
+    .ln { display: flex; }
+    .ln .n { width: 28px; text-align: right; color: rgba(117,117,117,.8); padding: 0 4px; flex-shrink: 0; user-select: none; }
+    .ln .sg { width: 14px; text-align: center; flex-shrink: 0; user-select: none; }
+    .ln .tx { flex: 1; padding: 0 6px; white-space: pre; overflow: hidden; }
+    .ln.add { background: rgba(47, 125, 64, 0.07); }
+    .ln.add .sg { color: var(--success); }
+    .ln.del { background: rgba(198, 59, 59, 0.07); }
+    .ln.del .sg { color: var(--danger); }
+    .ln.ws-dim { opacity: .35; color: var(--text-tertiary); }
+    .diff-foot {
+      display: flex;
+      justify-content: center;
+      padding: 6px;
+      font-size: 11px;
+      color: var(--text-tertiary);
+      border-top: 1px solid var(--border);
+    }
+
+    .split {
+      height: 5px;
+      cursor: row-resize;
+      background: var(--bg-app);
+      border-top: 1px solid var(--border);
+      border-bottom: 1px solid var(--border);
+      position: relative;
+      flex-shrink: 0;
+    }
+    .split::after {
+      content: "";
+      position: absolute;
+      left: 50%;
+      top: 50%;
+      width: 28px;
+      height: 2px;
+      margin: -1px 0 0 -14px;
+      background: var(--border-strong);
+      border-radius: 1px;
+    }
+    .after .commits {
+      flex-shrink: 0;
+      display: flex;
+      flex-direction: column;
+      background: var(--bg-app);
+    }
+    .after .commits.collapsed { height: 36px; overflow: hidden; }
+    .after .commits.expanded { height: 168px; }
+    .c-head {
+      height: 36px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 0 10px;
+      font-size: 11px;
+      font-weight: 500;
+      color: var(--text-tertiary);
+      cursor: pointer;
+      user-select: none;
+      flex-shrink: 0;
+    }
+    .c-head:hover { background: var(--state-hover); }
+    .c-head b { color: var(--text-secondary); font-weight: 600; }
+    .c-head .scope { margin-left: auto; font-weight: 400; font-size: 10.5px; }
+    .c-list { overflow: auto; flex: 1; min-height: 0; }
+    .crow { display: flex; justify-content: space-between; gap: 8px; padding: 7px 10px; font-size: 12px; cursor: pointer; }
+    .crow:hover { background: var(--state-hover); }
+    .crow .sha { font-family: var(--mono); font-size: 11px; color: var(--text-tertiary); flex-shrink: 0; }
+    .crow .msg { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+    .crow .when { color: var(--text-tertiary); font-size: 11px; flex-shrink: 0; white-space: nowrap; }
+    .crow.active { background: var(--accent-active); }
+
+    /* Confirm popover */
+    .panel-scrim {
+      position: absolute;
+      inset: 36px 0 0 0;
+      background: rgba(17,17,17,.10);
+      z-index: 15;
+      display: none;
+    }
+    .panel-scrim.show { display: block; }
+    .confirm-pop {
+      position: absolute;
+      z-index: 20;
+      width: 240px;
+      background: var(--bg-app);
+      border: 1px solid var(--border-strong);
+      border-radius: 6px;
+      padding: 10px 12px;
+      font-size: 12px;
+      display: none;
+      box-shadow: 0 12px 32px -16px rgba(17,17,17,.18);
+    }
+    .confirm-pop.show { display: block; }
+    .confirm-pop .cp-title { font-weight: 600; font-size: 12.5px; margin-bottom: 4px; }
+    .confirm-pop .cp-path { font-family: var(--mono); font-size: 11px; color: var(--text-secondary); margin-bottom: 6px; word-break: break-all; }
+    .confirm-pop .cp-note { font-size: 11px; color: var(--text-tertiary); line-height: 1.5; margin-bottom: 10px; }
+    .confirm-pop .btns { display: flex; justify-content: flex-end; gap: 6px; }
+
+    .toast {
+      position: fixed;
+      bottom: 24px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: var(--btn-primary);
+      color: var(--on-btn-primary);
+      font-size: 12px;
+      padding: 8px 14px;
+      border-radius: 4px;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 120ms;
+      z-index: 50;
+    }
+    .toast.show { opacity: 1; }
+
+    /* Narrow panel */
+    .panel.narrow .tb-stats { display: none; }
+    .panel.narrow .ficon { display: none; }
+    .panel.narrow .file-row { padding: 0 8px; gap: 4px; }
+    .panel.narrow .file-row .path { font-size: 11.5px; }
+    .panel.narrow .row-actions .icon-btn { width: 20px; height: 20px; }
+
+    .legend {
+      max-width: 1120px;
+      margin: 20px auto 0;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+      font-size: 12px;
+      color: var(--text-secondary);
+    }
+    .legend section {
+      background: var(--bg-app);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 12px 14px;
+    }
+    .legend h3 { font-size: 12px; font-weight: 600; color: var(--text-primary); margin-bottom: 8px; }
+    .legend ul { padding-left: 16px; line-height: 1.7; }
+    .legend li::marker { color: var(--text-tertiary); }
+    .callout { border-left: 2px solid var(--accent); padding-left: 8px; margin-top: 6px; color: var(--text-primary); font-size: 11.5px; }
+    .hidden { display: none !important; }
+  </style>
+</head>
+<body>
+  <h1>更改面板 · 改版预览 v2</h1>
+  <p class="sub">评审修订稿 · 堆叠吸顶 · 回收站丢弃 · hunk hover 操作 · 审查落点 · 键盘 · 忽略空白 · 窄栏</p>
+
+  <div class="controls">
+    <div class="seg" role="group" id="width-seg">
+      <button type="button" data-w="520">宽 520</button>
+      <button type="button" class="on" data-w="440">中 440</button>
+      <button type="button" data-w="340">窄 340</button>
+    </div>
+    <label class="check">
+      <input type="checkbox" id="no-checkpoint" />
+      无会话起点（演示禁用态）
+    </label>
+    <span class="hint" id="mode-hint">右栏 440px · 提交区默认收起 · 单开吸顶</span>
+  </div>
+
+  <div class="stage">
+    <div class="app" id="app">
+      <aside class="sidebar">
+        <div class="brand">HIP 1.0.1</div>
+        <div class="nav-item">对话</div>
+        <div class="nav-item active">项目</div>
+        <div class="nav-item">知识库</div>
+        <div class="nav-item">终端管理</div>
+        <div style="margin-top:20px;font-size:11px;color:var(--text-tertiary);padding:0 8px;">项目会话</div>
+        <div class="session">介绍 Bytebase 项目 <span class="tag">编码</span></div>
+      </aside>
+
+      <section class="main">
+        <div class="main-head"><span class="dot"></span> 介绍 Bytebase 项目 <span style="margin-left:auto;font-size:11px;color:var(--text-tertiary);font-weight:400;">已连接</span></div>
+        <div class="chat" id="chat">
+          <div class="bubble">介绍这个项目</div>
+          <div class="ai">
+            这是 <strong>Bytebase 3.16.1</strong> — 开源的数据库 CI/CD 工具…<br />
+            <span class="meta">已完成 · 22s</span>
+          </div>
+        </div>
+        <div class="composer">
+          <div class="chips" id="composer-chips"></div>
+          <span id="composer-placeholder">给 hip 发消息…</span>
+        </div>
+      </section>
+
+      <!-- ========== PANEL (v2) ========== -->
+      <aside class="panel" id="panel">
+        <div class="panel-tabs">
+          <span class="title">更改 ▾</span>
+          <span class="meta">v2 预览</span>
+        </div>
+
+        <div class="after panel-body" id="view-after" style="display:flex;flex:1;min-height:0;flex-direction:column;">
+          <div class="toolbar">
+            <span class="tb-title">未提交 · <b id="tb-count">4</b></span>
+            <span class="tb-stats"><span class="a" id="tb-add">+10</span> <span class="d" id="tb-del">−1</span></span>
+            <div class="base-seg" title="对比基线">
+              <button type="button" class="on" data-base="session" id="base-session">会话起点</button>
+              <button type="button" data-base="head" id="base-head">HEAD</button>
+            </div>
+            <button type="button" class="btn btn-primary" id="btn-review" title="注入审查意图到对话（⌘/Ctrl+Enter）">审查</button>
+            <button type="button" class="btn btn-ghost" id="btn-more" title="更多">⋯</button>
+            <div class="more-menu" id="more-menu"></div>
+          </div>
+
+          <div class="badge-back" id="commit-banner">
+            <button type="button" class="btn" id="btn-back-uncommitted">← 未提交</button>
+            <span style="color:var(--text-secondary);font-family:var(--mono);font-size:11px;" id="commit-banner-text">17c3df2 · init</span>
+          </div>
+
+          <div class="files" id="file-list"></div>
+
+          <div class="split" id="splitter" title="拖拽调整高度"></div>
+
+          <div class="commits collapsed" id="commit-section">
+            <div class="c-head" id="commit-toggle">
+              <span class="chev" id="commit-chev">▸</span>
+              <span>本会话提交 · <b>2</b></span>
+              <span class="scope">session-start..HEAD</span>
+            </div>
+            <div class="c-list" id="commit-list">
+              <div class="crow" data-sha="17c3df2" data-msg="init">
+                <span style="display:flex;gap:8px;min-width:0;"><span class="sha">17c3df2</span><span class="msg">init</span></span>
+                <span class="when">16天前</span>
+              </div>
+              <div class="crow" data-sha="ac80613" data-msg="hip baseline">
+                <span style="display:flex;gap:8px;min-width:0;"><span class="sha">ac80613</span><span class="msg">hip baseline</span></span>
+                <span class="when">21天前</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="panel-scrim" id="panel-scrim"></div>
+        <div class="confirm-pop" id="confirm-pop"></div>
+      </aside>
+    </div>
+  </div>
+
+  <div class="legend">
+    <section>
+      <h3>v2 关键改动（对照 v1）</h3>
+      <ul>
+        <li>提交区默认收起 36px，有改动时未提交区优先</li>
+        <li>仅展开行吸顶，多开时按顺序堆叠（⌘/Ctrl+Click 多开试试）</li>
+        <li>丢弃 = 副本入回收站 + 恢复到 HEAD（Popover 确认）</li>
+        <li>hunk 头部 hover 浮出：复制 / 标注给 agent / 引用到输入框</li>
+        <li>「审查」注入 composer，结构化报告回对话</li>
+        <li>⋯ 菜单：统一/并排 · 忽略空白 · 全部折叠/展开 · 刷新</li>
+      </ul>
+    </section>
+    <section>
+      <h3>交互演示</h3>
+      <ul>
+        <li>点击行展开/收起；<b>⌘/Ctrl+Click</b> 多开文件</li>
+        <li>hover 行尾：↺ 丢弃（弹确认）· ↗ 打开 · ⋯</li>
+        <li>hover hunk 头部右侧浮出操作按钮</li>
+        <li>点击提交行查看该 commit diff，点「← 未提交」返回</li>
+        <li>拖拽分隔条调整提交区高度</li>
+        <li>切换 宽/中/窄 演示窄栏压缩；勾选「无会话起点」看基线禁用态</li>
+        <li>键盘：<b>j/k</b> 移动 · <b>space</b> 展开 · <b>⌘/Ctrl+Enter</b> 审查 · <b>Esc</b> 关闭/返回 · <b>?</b> 提示</li>
+      </ul>
+      <p class="callout">完整方案见 <code>changes-panel-v2-spec.md</code>；v1 材料保持原样。</p>
+    </section>
+  </div>
+
+  <div class="toast" id="toast"></div>
+
+  <script>
+    const FILES = [
+      {
+        path: 'AGENTS.md', status: 'M', add: 2, del: 0, open: true, full: false,
+        hunks: [
+          { h: '@@ -1,6 +1,8 @@', lines: [
+            { t: 'ctx', o: 1, n: 1, c: '# AGENTS.md' },
+            { t: 'add', o: '', n: 2, c: 'General agent behavioral guidelines for this repository.' },
+            { t: 'add', o: '', n: 3, c: '   ' },
+            { t: 'add', o: '', n: 4, c: 'For project-specific context — see CLAUDE.md.' },
+            { t: 'ctx', o: 2, n: 5, c: '' },
+            { t: 'ctx', o: 3, n: 6, c: '## 1. Think Before Coding' },
+          ]},
+        ],
+        more: [
+          { t: 'ctx', o: 4, n: 7, c: "Don't assume. Don't hide confusion. Surface tradeoffs." },
+          { t: 'ctx', o: 5, n: 8, c: 'Before implementing:' },
+          { t: 'ctx', o: 6, n: 9, c: '- State your assumptions explicitly. If uncertain, ask.' },
+          { t: 'ctx', o: 7, n: 10, c: '- If multiple interpretations exist, present them.' },
+        ],
+      },
+      {
+        path: 'GEMINI.md', status: 'M', add: 4, del: 1, open: false, full: false,
+        hunks: [
+          { h: '@@ -10,7 +10,10 @@', lines: [
+            { t: 'ctx', o: 10, n: 10, c: '## Stack' },
+            { t: 'del', o: 11, n: '', c: '- Frontend: React' },
+            { t: 'add', o: '', n: 11, c: '- Frontend: React 18 + TypeScript' },
+            { t: 'add', o: '', n: 12, c: '- Desktop: Tauri v2' },
+            { t: 'add', o: '', n: 13, c: '- Sidecar: Node.js' },
+            { t: 'add', o: '', n: 14, c: '- Tests: Vitest / cargo' },
+          ]},
+        ],
+        more: [],
+      },
+      {
+        path: 'README.md', status: 'M', add: 3, del: 0, open: false, full: false,
+        hunks: [
+          { h: '@@ -1,3 +1,6 @@', lines: [
+            { t: 'add', o: '', n: 1, c: '# hip' },
+            { t: 'add', o: '', n: 2, c: '' },
+            { t: 'add', o: '', n: 3, c: 'Tauri-based AI workbench.' },
+            { t: 'ctx', o: 1, n: 4, c: '## Install' },
+          ]},
+        ],
+        more: [],
+      },
+      {
+        path: 'docs/index.yaml', status: 'M', add: 1, del: 0, open: false, full: false,
+        hunks: [
+          { h: '@@ -4,6 +4,7 @@', lines: [
+            { t: 'ctx', o: 4, n: 4, c: 'nav:' },
+            { t: 'ctx', o: 5, n: 5, c: '  - Home: index.md' },
+            { t: 'add', o: '', n: 6, c: '  - Agents: agents.md' },
+          ]},
+        ],
+        more: [],
+      },
+    ]
+
+    const COMMIT_DIFF = {
+      h: '@@ -0,0 +1,3 @@',
+      lines: [
+        { t: 'add', o: '', n: 1, c: '# baseline' },
+        { t: 'add', o: '', n: 2, c: 'initial import' },
+        { t: 'add', o: '', n: 3, c: '' },
+      ],
+    }
+
+    let viewingCommit = null
+    let ignoreWs = false
+    let active = 0
+    let sessionDisabled = false
+    let menuOpen = false
+    let confirmTarget = null
+    let base = 'session'
+
+    const $ = (id) => document.getElementById(id)
+
+    function toast(msg) {
+      const el = $('toast')
+      el.textContent = msg
+      el.classList.add('show')
+      clearTimeout(toast._t)
+      toast._t = setTimeout(() => el.classList.remove('show'), 1700)
+    }
+
+    function escapeHtml(s) {
+      return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    }
+
+    function renderLine(line) {
+      const cls = line.t === 'add' ? 'add' : line.t === 'del' ? 'del' : ''
+      const ws = ignoreWs && line.t !== 'ctx' && /^\s+$/.test(line.c) ? ' ws-dim' : ''
+      const sg = line.t === 'add' ? '+' : line.t === 'del' ? '−' : ' '
+      return `<div class="ln ${cls}${ws}"><span class="n">${line.o}</span><span class="n">${line.n}</span><span class="sg">${sg}</span><span class="tx">${escapeHtml(line.c)}</span></div>`
+    }
+
+    function renderHunk(h, fi) {
+      return `
+        <div class="hunk" data-hunk="${fi}">
+          <div class="hunk-h">${escapeHtml(h.h)}</div>
+          <div class="hunk-actions">
+            <button type="button" data-hcopy="${fi}" title="复制 hunk">复制</button>
+            <button type="button" data-hmark="${fi}" title="标注给 agent">标注给 agent</button>
+            <button type="button" data-hcite="${fi}" title="引用到输入框">引用</button>
+          </div>
+          ${h.lines.map(renderLine).join('')}
+        </div>`
+    }
+
+    function renderFiles() {
+      const root = $('file-list')
+      const banner = $('commit-banner')
+
+      if (viewingCommit) {
+        banner.classList.add('show')
+        $('commit-banner-text').textContent = `${viewingCommit.sha} · ${viewingCommit.msg}`
+        root.innerHTML = `
+          <div class="file open">
+            <div class="file-row">
+              <span class="chev">▾</span>
+              <span class="st A">A</span>
+              <span class="ficon">·</span>
+              <span class="path">${escapeHtml(viewingCommit.sha.slice(0, 7))} (tree)</span>
+              <span class="stats"><span class="a">+3</span> <span class="d">−0</span></span>
+            </div>
+            <div class="diff-block">
+              <div class="hunk-h">${COMMIT_DIFF.h}</div>
+              ${COMMIT_DIFF.lines.map(renderLine).join('')}
+            </div>
+          </div>`
+        updateSticky()
+        return
+      }
+
+      banner.classList.remove('show')
+      root.innerHTML = FILES.map((f, i) => {
+        const diff = f.open ? `
+          <div class="diff-block">
+            ${f.hunks.map((h) => renderHunk(h, i)).join('')}
+            ${f.full && f.more.length ? f.more.map(renderLine).join('') : ''}
+            <div class="diff-foot">
+              <button type="button" class="btn btn-ghost" data-full="${i}">${f.full ? '收起' : '显示全文'}</button>
+            </div>
+          </div>` : ''
+        return `
+          <div class="file ${f.open ? 'open' : ''}" data-i="${i}">
+            <div class="file-row" data-toggle="${i}">
+              <span class="chev">${f.open ? '▾' : '▸'}</span>
+              <span class="st ${f.status}">${f.status}</span>
+              <span class="ficon">${f.path.split('.').pop()?.slice(0, 2) || '·'}</span>
+              <span class="path" title="${escapeHtml(f.path)}">${escapeHtml(f.path)}</span>
+              <span class="stats"><span class="a">+${f.add}</span> <span class="d">−${f.del}</span></span>
+              <span class="row-actions">
+                <button type="button" class="icon-btn danger" title="丢弃更改（副本入回收站）" data-discard="${i}">↺</button>
+                <button type="button" class="icon-btn" title="在 Files 打开" data-open="${i}">↗</button>
+                <button type="button" class="icon-btn" title="更多" data-menu="${i}">⋯</button>
+              </span>
+            </div>
+            ${diff}
+          </div>`
+      }).join('')
+
+      updateSticky()
+      const rows = root.querySelectorAll('.file')
+      if (rows[active]) rows[active].classList.add('active-row')
+      $('tb-count').textContent = FILES.length
+      const a = FILES.reduce((s, f) => s + f.add, 0)
+      const d = FILES.reduce((s, f) => s + f.del, 0)
+      $('tb-add').textContent = `+${a}`
+      $('tb-del').textContent = `−${d}`
+    }
+
+    function updateSticky() {
+      const rows = $('file-list').querySelectorAll('.file.open .file-row')
+      let acc = 0
+      rows.forEach((r) => {
+        r.style.top = acc + 'px'
+        acc += r.offsetHeight
+      })
+    }
+
+    function toggleSingle(i) {
+      FILES.forEach((f, j) => { if (j !== i) f.open = false })
+      FILES[i].open = !FILES[i].open
+      active = i
+      renderFiles()
+    }
+
+    function move(d) {
+      if (viewingCommit || !FILES.length) return
+      const old = active
+      active = Math.max(0, Math.min(FILES.length - 1, active + d))
+      const rows = $('file-list').querySelectorAll('.file')
+      if (rows[old]) rows[old].classList.remove('active-row')
+      if (rows[active]) {
+        rows[active].classList.add('active-row')
+        rows[active].scrollIntoView({ block: 'nearest' })
+      }
+    }
+
+    // Confirm popover (discard)
+    function openConfirm(i) {
+      confirmTarget = i
+      const pop = $('confirm-pop')
+      const panelRect = $('panel').getBoundingClientRect()
+      const row = $('file-list').querySelector(`[data-i="${i}"] .file-row`)
+      const rr = row.getBoundingClientRect()
+      const W = 240
+      let left = rr.left - panelRect.left
+      let top = rr.bottom - panelRect.top + 6
+      left = Math.max(8, Math.min(left, panelRect.width - W - 8))
+      pop.innerHTML = `
+        <div class="cp-title">丢弃更改</div>
+        <div class="cp-path">${escapeHtml(FILES[i].path)}</div>
+        <div class="cp-note">丢弃 = 恢复到最近提交（HEAD）。更改副本将移入回收站，可恢复。</div>
+        <div class="btns">
+          <button type="button" class="btn" id="cp-cancel">取消</button>
+          <button type="button" class="btn btn-danger" id="cp-ok">丢弃</button>
+        </div>`
+      pop.style.left = left + 'px'
+      pop.style.top = top + 'px'
+      pop.classList.add('show')
+      $('panel-scrim').classList.add('show')
+      $('cp-cancel').onclick = closeConfirm
+      $('cp-ok').onclick = () => {
+        const f = FILES.splice(confirmTarget, 1)
+        closeConfirm()
+        active = Math.min(active, Math.max(0, FILES.length - 1))
+        renderFiles()
+        toast(`已丢弃 ${f[0].path}（副本已存回收站 · 预览）`)
+      }
+      $('panel-scrim').onclick = closeConfirm
+    }
+
+    function closeConfirm() {
+      confirmTarget = null
+      $('confirm-pop').classList.remove('show')
+      $('panel-scrim').classList.remove('show')
+    }
+
+    // Overflow menu
+    function renderMenu() {
+      const narrow = $('panel').classList.contains('narrow')
+      const items = `
+        <button type="button" data-menu-item="unified"><span class="check-mark">✓</span>统一视图</button>
+        <button type="button" data-menu-item="split" ${narrow ? 'disabled title="面板过窄，并排不可用"' : ''}><span class="check-mark"></span>并排视图</button>
+        <div class="sep"></div>
+        <button type="button" data-menu-item="ws"><span class="check-mark">${ignoreWs ? '✓' : ''}</span>忽略空白</button>
+        <button type="button" data-menu-item="fold"><span class="check-mark"></span>全部折叠</button>
+        <button type="button" data-menu-item="expand"><span class="check-mark"></span>全部展开</button>
+        <div class="sep"></div>
+        <button type="button" data-menu-item="refresh"><span class="check-mark"></span>刷新<span class="kbd">⌘R</span></button>`
+      $('more-menu').innerHTML = items
+    }
+
+    function toggleMenu(force) {
+      menuOpen = force !== undefined ? force : !menuOpen
+      if (menuOpen) renderMenu()
+      $('more-menu').classList.toggle('show', menuOpen)
+    }
+
+    $('more-menu').addEventListener('click', (e) => {
+      const t = e.target.closest('[data-menu-item]')
+      if (!t || t.disabled) return
+      const k = t.dataset.menuItem
+      if (k === 'unified') toast('统一视图（预览）')
+      if (k === 'split') toast('并排视图（预览）')
+      if (k === 'ws') {
+        ignoreWs = !ignoreWs
+        renderFiles()
+        toast(ignoreWs ? '已忽略空白变化' : '已显示空白变化')
+      }
+      if (k === 'fold') { FILES.forEach((f) => { f.open = false }); renderFiles(); toast('已全部折叠') }
+      if (k === 'expand') { FILES.forEach((f) => { f.open = true }); renderFiles(); toast('已全部展开') }
+      if (k === 'refresh') toast('已刷新（预览）')
+      toggleMenu(false)
+    })
+
+    // File list interactions
+    $('file-list').addEventListener('click', (e) => {
+      const t = e.target.closest('[data-toggle],[data-discard],[data-open],[data-menu],[data-full],[data-hcopy],[data-hmark],[data-hcite]')
+      if (!t) return
+      if (t.dataset.toggle != null) {
+        const i = +t.dataset.toggle
+        if (e.metaKey || e.ctrlKey) {
+          FILES[i].open = !FILES[i].open
+          active = i
+          renderFiles()
+        } else {
+          toggleSingle(i)
+        }
+        return
+      }
+      if (t.dataset.discard != null) {
+        openConfirm(+t.dataset.discard)
+        return
+      }
+      if (t.dataset.open != null) {
+        toast(`打开 Files → ${FILES[+t.dataset.open].path}（预览）`)
+        return
+      }
+      if (t.dataset.menu != null) {
+        toast('菜单：复制路径 · 请 agent 审查此文件（预览）')
+        return
+      }
+      if (t.dataset.full != null) {
+        const i = +t.dataset.full
+        FILES[i].full = !FILES[i].full
+        renderFiles()
+        return
+      }
+      if (t.dataset.hcopy != null) {
+        const i = +t.dataset.hcopy
+        const h = FILES[i].hunks[0].h
+        navigator.clipboard && navigator.clipboard.writeText(h).catch(() => {})
+        toast(`已复制 hunk ${h}`)
+        return
+      }
+      if (t.dataset.hmark != null) {
+        const i = +t.dataset.hmark
+        addChip(`标注给 agent：${FILES[i].path}`)
+        toast('已标注 hunk → composer（预览）')
+        return
+      }
+      if (t.dataset.hcite != null) {
+        const i = +t.dataset.hcite
+        addChip(`引用：${FILES[i].path} ${FILES[i].hunks[0].h}`)
+        toast('已引用 hunk 到输入框（预览）')
+      }
+    })
+
+    // Baseline
+    function updateBaseline() {
+      $('base-session').disabled = sessionDisabled
+      $('base-session').title = sessionDisabled ? '无 session-start checkpoint，自动落在 HEAD' : ''
+      $('base-session').classList.toggle('on', base === 'session')
+      $('base-head').classList.toggle('on', base === 'head')
+    }
+
+    document.querySelectorAll('.base-seg button').forEach((b) => {
+      b.addEventListener('click', () => {
+        if (b.disabled) {
+          toast('会话起点不可用：本会话无 checkpoint')
+          return
+        }
+        base = b.dataset.base
+        updateBaseline()
+        toast(`对比基线 → ${base === 'session' ? '会话起点' : 'HEAD'}（已重拉 diff）`)
+      })
+    })
+
+    // Review CTA
+    function startReview() {
+      if (viewingCommit) {
+        toast('请先返回未提交视图')
+        return
+      }
+      addChip(`审查 ${FILES.length} 个文件 · ${base === 'session' ? '会话起点' : 'HEAD'}`)
+      toast('已注入审查意图（含红牌清单）到 composer')
+      appendReviewResult()
+    }
+
+    function addChip(label) {
+      const el = document.createElement('span')
+      el.className = 'chip-mini'
+      el.textContent = label
+      $('composer-chips').appendChild(el)
+    }
+
+    function appendReviewResult() {
+      const chat = $('chat')
+      const box = document.createElement('div')
+      box.className = 'review-result'
+      box.innerHTML = `
+        <div class="rr-head">审查完成（预览示例）· 基线：会话起点</div>
+        <div class="rr-total">4 个文件 · +10 −1 · 总体风险：低</div>
+        <ul>
+          <li><b class="high">High</b> — GEMINI.md：栈描述与仓库实际依赖不一致，建议让 agent 核对</li>
+          <li><b class="medium">Medium</b> — AGENTS.md：新增指引与 CLAUDE.md 存在表述重复，可考虑合并</li>
+          <li><b class="low">Low</b> — README.md / docs/index.yaml：无问题</li>
+        </ul>
+        <div class="rr-act">建议动作：核对 GEMINI.md 后由 agent 提交（约 1 分钟）</div>`
+      chat.appendChild(box)
+      box.scrollIntoView({ block: 'nearest' })
+    }
+
+    $('btn-review').onclick = startReview
+    $('btn-more').onclick = (e) => {
+      e.stopPropagation()
+      toggleMenu()
+    }
+
+    // Commit section
+    const section = $('commit-section')
+    $('commit-toggle').onclick = () => {
+      const exp = section.classList.contains('expanded')
+      section.classList.toggle('expanded', !exp)
+      section.classList.toggle('collapsed', exp)
+      $('commit-chev').textContent = exp ? '▸' : '▾'
+      toast(exp ? '已收起提交区' : '已展开提交区')
+    }
+
+    $('commit-list').addEventListener('click', (e) => {
+      const row = e.target.closest('.crow')
+      if (!row) return
+      document.querySelectorAll('#commit-list .crow').forEach((r) => r.classList.remove('active'))
+      row.classList.add('active')
+      viewingCommit = { sha: row.dataset.sha, msg: row.dataset.msg }
+      renderFiles()
+      toast(`查看提交 ${row.dataset.sha}（diff 预览）`)
+    })
+
+    $('btn-back-uncommitted').onclick = () => {
+      viewingCommit = null
+      document.querySelectorAll('#commit-list .crow').forEach((r) => r.classList.remove('active'))
+      renderFiles()
+    }
+
+    // Splitter
+    ;(() => {
+      const split = $('splitter')
+      split.addEventListener('mousedown', (e) => {
+        e.preventDefault()
+        section.classList.add('expanded')
+        section.classList.remove('collapsed')
+        $('commit-chev').textContent = '▾'
+        const startY = e.clientY
+        const startH = section.getBoundingClientRect().height
+        const move = (ev) => {
+          const h = Math.min(280, Math.max(36, startH + startY - ev.clientY))
+          section.style.height = h + 'px'
+          section.classList.toggle('collapsed', h <= 40)
+        }
+        const up = () => {
+          window.removeEventListener('mousemove', move)
+          window.removeEventListener('mouseup', up)
+        }
+        window.addEventListener('mousemove', move)
+        window.addEventListener('mouseup', up)
+      })
+    })()
+
+    // Width / narrow demo
+    document.querySelectorAll('#width-seg button').forEach((b) => {
+      b.addEventListener('click', () => {
+        document.querySelectorAll('#width-seg button').forEach((x) => x.classList.remove('on'))
+        b.classList.add('on')
+        const w = +b.dataset.w
+        $('app').style.gridTemplateColumns = `200px 1fr ${w}px`
+        const narrow = w < 420
+        $('panel').classList.toggle('narrow', narrow)
+        $('mode-hint').textContent = `右栏 ${w}px · ${narrow ? '窄栏模式：统计隐藏 · 并排置灰' : '宽栏模式'} · 提交区默认收起`
+        if (menuOpen) renderMenu()
+        renderFiles()
+      })
+    })
+
+    $('no-checkpoint').addEventListener('change', (e) => {
+      sessionDisabled = e.target.checked
+      if (sessionDisabled && base === 'session') {
+        base = 'head'
+      }
+      updateBaseline()
+      toast(sessionDisabled ? '会话起点已禁用（演示）' : '会话起点已启用（演示）')
+    })
+
+    // Keyboard
+    document.addEventListener('keydown', (e) => {
+      const tag = (e.target.tagName || '').toLowerCase()
+      if (tag === 'input' || tag === 'textarea' || tag === 'select') return
+      if (e.key === 'Escape') {
+        if (confirmTarget != null) { closeConfirm(); return }
+        if (menuOpen) { toggleMenu(false); return }
+        if (viewingCommit) { $('btn-back-uncommitted').click(); return }
+        return
+      }
+      if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
+        e.preventDefault()
+        startReview()
+        return
+      }
+      if (e.key === 'j' || e.key === 'ArrowDown') { e.preventDefault(); move(1); return }
+      if (e.key === 'k' || e.key === 'ArrowUp') { e.preventDefault(); move(-1); return }
+      if (e.key === ' ') {
+        e.preventDefault()
+        if (!viewingCommit && FILES.length) toggleSingle(active)
+        return
+      }
+      if (e.key === '?') {
+        toast('j/k 移动 · space 展开/收起 · ⌘/Ctrl+Enter 审查 · Esc 关闭/返回')
+      }
+    })
+
+    document.addEventListener('click', (e) => {
+      if (menuOpen && !e.target.closest('#more-menu') && !e.target.closest('#btn-more')) {
+        toggleMenu(false)
+      }
+    })
+
+    updateBaseline()
+    renderFiles()
+  </script>
+</body>
+</html>

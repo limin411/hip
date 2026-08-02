@@ -90,6 +90,10 @@ export const CLIENT_MESSAGE_TYPES = [
   'task:list',
   'task:stop',
   'task:getOutput',
+  'session:uiToolResult',
+  'session:uiToolRead:result',
+  'session:uiToolWrite:result',
+  'session:terminalContext',
 ] as const
 
 export type ClientMessageType = (typeof CLIENT_MESSAGE_TYPES)[number]

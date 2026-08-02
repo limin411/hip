@@ -251,7 +251,14 @@ function summaryToVM(s: SessionSummary): SessionVM {
   const cwd = typeof s.cwd === 'string' && s.cwd.trim() ? s.cwd.trim() : undefined
   return {
     id: s.id,
-    config: { ...DEFAULT_CONFIG, surface: s.surface, ...(cwd ? { cwd } : {}) },
+    config: {
+      ...DEFAULT_CONFIG,
+      surface: s.surface,
+      ...(s.managedTerminalId ? { managedTerminalId: s.managedTerminalId } : {}),
+      ...(s.hostId ? { hostId: s.hostId } : {}),
+      ...(s.remotePathHint ? { remotePathHint: s.remotePathHint } : {}),
+      ...(cwd ? { cwd } : {}),
+    },
     title: s.title,
     preview: s.preview,
     updatedAtMs: s.updatedAt,
@@ -627,7 +634,14 @@ export function applyServerMessage(
       for (const vm of incoming) {
         const prev = byId.get(vm.id)
         if (prev?.loaded) {
-          const nextConfig = { ...prev.config, surface: vm.config.surface ?? prev.config.surface }
+          const nextConfig = {
+            ...prev.config,
+            surface: vm.config.surface ?? prev.config.surface,
+            managedTerminalId:
+              vm.config.managedTerminalId ?? prev.config.managedTerminalId,
+            hostId: vm.config.hostId ?? prev.config.hostId,
+            remotePathHint: vm.config.remotePathHint ?? prev.config.remotePathHint,
+          }
           if (vm.config.cwd?.trim()) nextConfig.cwd = vm.config.cwd.trim()
           else delete nextConfig.cwd
           byId.set(vm.id, {

@@ -396,11 +396,17 @@ export class SessionStore {
   }): SessionSummary {
     let surface: SessionSummary['surface'] = 'code'
     let cwd: string | undefined
+    let managedTerminalId: string | undefined
+    let hostId: string | undefined
+    let remotePathHint: string | undefined
     try {
       const cfg = JSON.parse(r.config) as SessionConfig
       surface = surfaceOf(cfg, r.id)
       const raw = typeof cfg.cwd === 'string' ? cfg.cwd.trim() : ''
       if (raw) cwd = raw
+      if (typeof cfg.managedTerminalId === 'string') managedTerminalId = cfg.managedTerminalId
+      if (typeof cfg.hostId === 'string') hostId = cfg.hostId
+      if (typeof cfg.remotePathHint === 'string') remotePathHint = cfg.remotePathHint
     } catch {
       surface = 'code'
     }
@@ -411,6 +417,9 @@ export class SessionStore {
       updatedAt: r.updatedAt,
       messageCount: r.messageCount,
       preview: (r.preview ?? '').slice(0, PREVIEW_LEN),
+      ...(managedTerminalId ? { managedTerminalId } : {}),
+      ...(hostId ? { hostId } : {}),
+      ...(remotePathHint ? { remotePathHint } : {}),
       ...(cwd ? { cwd } : {}),
     }
   }

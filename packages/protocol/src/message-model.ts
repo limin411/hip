@@ -191,6 +191,12 @@ export interface SessionSummary {
   updatedAt: number
   messageCount: number
   surface: 'chat' | 'code' | 'terminal'
+  /** Terminal binding (D8); present for `surface === 'terminal'` summaries. */
+  managedTerminalId?: string
+  /** Persistent SSH host catalog id (D8). */
+  hostId?: string
+  /** Display/context remote-path hint only. */
+  remotePathHint?: string
   /** Absolute project root when bound; omitted for sandbox / unbound code sessions. */
   cwd?: string
 }

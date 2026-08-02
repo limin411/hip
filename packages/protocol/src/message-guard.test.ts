@@ -1,5 +1,17 @@
 import { describe, it, expect } from 'vitest'
 import { parseClientMessage, isClientMessageType, CLIENT_MESSAGE_TYPES } from './message-guard.js'
+import type { ClientMessage } from './messages.js'
+
+/** Compile-time: the guard catalog must cover every ClientMessage discriminator. */
+type Equal<X, Y> = (<T>() => T extends X ? 1 : 2) extends <T>() => T extends Y ? 1 : 2
+  ? true
+  : false
+const _catalogCoversClientMessage: Equal<
+  ClientMessage['type'],
+  (typeof CLIENT_MESSAGE_TYPES)[number]
+> extends true
+  ? true
+  : never = true
 
 describe('message-guard', () => {
   it('accepts a known client message shape', () => {
@@ -129,5 +141,37 @@ describe('message-guard', () => {
     })
     expect(msg?.type).toBe('config:testProvider')
     expect(msg!.requestId).toBe('r1')
+  })
+
+  it('accepts terminal bridge client messages (uiToolResult/uiToolRead/uiToolWrite/terminalContext)', () => {
+    expect(
+      parseClientMessage({
+        type: 'session:uiToolResult',
+        sessionId: 's1',
+        callId: 'c1',
+        ok: true,
+        status: 'completed',
+      })?.type,
+    ).toBe('session:uiToolResult')
+    expect(
+      parseClientMessage({
+        type: 'session:uiToolRead:result',
+        sessionId: 's1',
+        callId: 'c1',
+        ok: true,
+        output: 'x',
+      })?.type,
+    ).toBe('session:uiToolRead:result')
+    expect(
+      parseClientMessage({
+        type: 'session:uiToolWrite:result',
+        sessionId: 's1',
+        callId: 'c1',
+        ok: true,
+      })?.type,
+    ).toBe('session:uiToolWrite:result')
+    expect(parseClientMessage({ type: 'session:terminalContext', sessionId: 's1' })?.type).toBe(
+      'session:terminalContext',
+    )
   })
 })

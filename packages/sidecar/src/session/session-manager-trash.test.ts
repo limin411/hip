@@ -1,23 +1,30 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest'
 import { FakeListChatModel } from '@langchain/core/utils/testing'
-import { mkdtempSync, rmSync, existsSync } from 'node:fs'
+import { mkdtempSync, rmSync, existsSync, mkdirSync, writeFileSync } from 'node:fs'
 import * as os from 'node:os'
 import * as path from 'node:path'
 import type { ServerMessage } from '@hip/protocol'
 import { openDatabase } from '../persistence/open.js'
 import { SessionStore } from '../persistence/store.js'
 import { SessionManager } from './session-manager.js'
+import { planMarkdownPath, taskOutputDirFor, toolOutputDirFor } from './session-artifacts.js'
+import { approvedPlanJsonPath } from './plan-persistence.js'
 
 const cfg = { llmProvider: 'deepseek' as const, model: 'm', tools: [] as string[] }
 
 describe('SessionManager soft-delete / trash', () => {
   let scratchRoot: string
+  let fakeHome: string
+  let prevHome: string | undefined
   let store: SessionStore
   let mgr: SessionManager
   let sent: ServerMessage[]
 
   beforeEach(() => {
     scratchRoot = mkdtempSync(path.join(os.tmpdir(), 'hip-trash-'))
+    fakeHome = mkdtempSync(path.join(os.tmpdir(), 'hip-home-'))
+    prevHome = process.env.HOME
+    process.env.HOME = fakeHome
     const { db, ftsEnabled } = openDatabase(':memory:')
     store = new SessionStore(db, ftsEnabled)
     mgr = new SessionManager(store, () => new FakeListChatModel({ responses: ['ok'] }), scratchRoot)
@@ -27,7 +34,31 @@ describe('SessionManager soft-delete / trash', () => {
   afterEach(() => {
     mgr.stopTrashRetentionHousekeeping()
     rmSync(scratchRoot, { recursive: true, force: true })
+    rmSync(fakeHome, { recursive: true, force: true })
+    if (prevHome === undefined) delete process.env.HOME
+    else process.env.HOME = prevHome
   })
+
+  function seedSessionArtifacts(sessionId: string) {
+    mkdirSync(path.join(fakeHome, '.hip', 'plans'), { recursive: true })
+    writeFileSync(planMarkdownPath(sessionId, fakeHome), '# plan')
+    writeFileSync(approvedPlanJsonPath(sessionId, fakeHome), '{}')
+    const taskDir = taskOutputDirFor(sessionId, path.join(fakeHome, '.hip', 'task-output'))
+    mkdirSync(path.join(taskDir, 't1'), { recursive: true })
+    writeFileSync(path.join(taskDir, 't1', 'output.log'), 'log')
+    const toolDir = toolOutputDirFor(sessionId, path.join(fakeHome, '.hip', 'data', 'tool-output'))
+    mkdirSync(toolDir, { recursive: true })
+    writeFileSync(path.join(toolDir, 'tool_x'), 'spill')
+  }
+
+  function artifactsExist(sessionId: string): boolean {
+    return (
+      existsSync(planMarkdownPath(sessionId, fakeHome)) ||
+      existsSync(approvedPlanJsonPath(sessionId, fakeHome)) ||
+      existsSync(taskOutputDirFor(sessionId, path.join(fakeHome, '.hip', 'task-output'))) ||
+      existsSync(toolOutputDirFor(sessionId, path.join(fakeHome, '.hip', 'data', 'tool-output')))
+    )
+  }
 
   function send(m: ServerMessage) {
     sent.push(m)
@@ -44,12 +75,24 @@ describe('SessionManager soft-delete / trash', () => {
     expect(existsSync(path.join(scratchRoot, 's1'))).toBe(true) // soft keeps scratch
   })
 
-  it('session:delete (hard) still removes scratch', () => {
+  it('session:delete (hard) still removes scratch and session artifacts', () => {
     mgr.handle({ type: 'session:create', id: 's1', config: cfg }, send)
+    seedSessionArtifacts('s1')
     expect(existsSync(path.join(scratchRoot, 's1'))).toBe(true)
+    expect(artifactsExist('s1')).toBe(true)
     mgr.handle({ type: 'session:delete', sessionId: 's1' }, send)
     expect(existsSync(path.join(scratchRoot, 's1'))).toBe(false)
+    expect(artifactsExist('s1')).toBe(false)
     expect(store.getSession('s1')).toBeUndefined()
+  })
+
+  it('soft-delete keeps session artifacts; empty trash removes them', () => {
+    mgr.handle({ type: 'session:create', id: 's1', config: cfg }, send)
+    seedSessionArtifacts('s1')
+    mgr.handle({ type: 'session:softDelete', sessionId: 's1' }, send)
+    expect(artifactsExist('s1')).toBe(true)
+    mgr.handle({ type: 'session:trash:empty' }, send)
+    expect(artifactsExist('s1')).toBe(false)
   })
 
   it('session:restore returns session:restored and list includes session', () => {

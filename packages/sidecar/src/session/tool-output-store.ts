@@ -1,4 +1,5 @@
-import { mkdir, writeFile, readdir, stat, unlink } from 'node:fs/promises'
+import { mkdir, writeFile, readdir, stat, unlink, rm } from 'node:fs/promises'
+import { rmSync } from 'node:fs'
 import * as os from 'node:os'
 import * as path from 'node:path'
 
@@ -8,7 +9,7 @@ const DEFAULT_MAX_LINES = 2000
 /**
  * Default max tool-result bytes kept inline for the model.
  * 40 KB ≈ 10k tokens (aligned with grok-build DEFAULT_TOOL_OUTPUT_BYTES).
- * Full content still spills to ~/.hip/data/tool-output/ when over limit.
+ * Full content still spills to ~/.hip/data/tool-output/<sessionId>/ when over limit.
  * Overridable via hip.toml `[context].toolOutputMaxBytes` / HIP_TOOL_OUTPUT_MAX_BYTES
  * when constructing the store (session wiring).
  */
@@ -21,6 +22,10 @@ const WX_RETRY_LIMIT = 10
 
 function defaultOutputDir(): string {
   return path.join(os.homedir(), '.hip', 'data', 'tool-output')
+}
+
+function isSafeSessionSegment(sessionId: string): boolean {
+  return !!sessionId && !sessionId.includes('/') && !sessionId.includes('\\') && !sessionId.includes('..')
 }
 
 // ── Types ────────────────────────────────────────────────────────────────────
@@ -49,14 +54,15 @@ export interface ToolOutputStoreOptions {
 /**
  * Bounds tool outputs to dual thresholds (line count + byte count).
  *
- * Oversized content is written to a managed file under `~/.hip/data/tool-output/`;
+ * Oversized content is written under `~/.hip/data/tool-output/<sessionId>/`;
  * a bounded preview (head lines + truncation marker + tail lines) is returned for
  * the LLM context. If the preview itself exceeds the byte budget, head and tail are
  * trimmed to fit (UTF-8 safe — a partial multi-byte sequence at the cut becomes
  * U+FFFD, acceptable for a preview).
  *
- * Cleanup: an hourly interval scans the managed-files directory and deletes files
- * older than 7 days. The timer is `unref()`ed so it never keeps the process alive.
+ * Cleanup: an hourly interval scans managed files (session subdirs + legacy flat
+ * `tool_*` at root) and deletes files older than 7 days. Hard session delete removes
+ * the whole session subdir via {@link removeSession}.
  *
  * Bounding happens at the ToolRunner level, NOT in individual tool definitions.
  */
@@ -100,7 +106,7 @@ export class ToolOutputStore {
 
     let filePath: string
     try {
-      filePath = await this.writeManagedFile(output)
+      filePath = await this.writeManagedFile(output, input.sessionId)
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err)
       console.warn(
@@ -111,6 +117,16 @@ export class ToolOutputStore {
 
     const preview = this.buildPreview(lines, lineCount, filePath)
     return { output: preview, truncated: true, outputPaths: [filePath] }
+  }
+
+  /** Best-effort remove of this session's spill directory (hard-delete path). */
+  removeSession(sessionId: string): void {
+    if (!isSafeSessionSegment(sessionId)) return
+    try {
+      rmSync(path.join(this.outputDir, sessionId), { recursive: true, force: true })
+    } catch {
+      /* best-effort */
+    }
   }
 
   /** Start the hourly cleanup interval (idempotent). */
@@ -131,9 +147,9 @@ export class ToolOutputStore {
   }
 
   /**
-   * Scan the managed-files directory once and delete files whose mtime is older
-   * than the 7-day retention window. Best-effort: all errors are swallowed
-   * (cleanup is non-critical and must never crash the agent loop).
+   * Scan managed-files once and delete entries older than 7 days.
+   * Handles legacy flat `tool_*` at root and files under session subdirs.
+   * Best-effort: all errors are swallowed.
    */
   async cleanupOnce(): Promise<void> {
     let entries: string[]
@@ -145,12 +161,17 @@ export class ToolOutputStore {
     const now = Date.now()
     await Promise.all(
       entries.map(async (name) => {
-        if (!name.startsWith(FILE_PREFIX)) return
-        const filePath = path.join(this.outputDir, name)
+        const entryPath = path.join(this.outputDir, name)
         try {
-          const s = await stat(filePath)
+          const s = await stat(entryPath)
+          if (s.isDirectory()) {
+            await this.cleanupSessionDir(entryPath, now)
+            return
+          }
+          // Legacy flat layout: tool_* at root
+          if (!name.startsWith(FILE_PREFIX)) return
           if (now - s.mtimeMs > CLEANUP_RETENTION_MS) {
-            await unlink(filePath)
+            await unlink(entryPath)
           }
         } catch {
           // best-effort — file may have been removed concurrently
@@ -161,16 +182,51 @@ export class ToolOutputStore {
 
   // ── Internals ───────────────────────────────────────────────────────────
 
+  private async cleanupSessionDir(dirPath: string, now: number): Promise<void> {
+    let children: string[]
+    try {
+      children = await readdir(dirPath)
+    } catch {
+      return
+    }
+    let remaining = 0
+    for (const name of children) {
+      if (!name.startsWith(FILE_PREFIX)) {
+        remaining++
+        continue
+      }
+      const filePath = path.join(dirPath, name)
+      try {
+        const s = await stat(filePath)
+        if (now - s.mtimeMs > CLEANUP_RETENTION_MS) {
+          await unlink(filePath)
+        } else {
+          remaining++
+        }
+      } catch {
+        /* best-effort */
+      }
+    }
+    if (remaining === 0) {
+      try {
+        await rm(dirPath, { recursive: true, force: true })
+      } catch {
+        /* best-effort */
+      }
+    }
+  }
+
   /**
-   * Write the full content to a managed file. Uses `flag: 'wx'` (exclusive) to
-   * detect collisions; on EEXIST, retries with a fresh ID (up to
-   * {@link WX_RETRY_LIMIT} times).
+   * Write the full content under outputDir/<sessionId>/tool_<id>.
+   * Uses `flag: 'wx'` (exclusive) to detect collisions; on EEXIST, retries.
    */
-  private async writeManagedFile(content: string): Promise<string> {
-    await mkdir(this.outputDir, { recursive: true })
+  private async writeManagedFile(content: string, sessionId: string): Promise<string> {
+    const segment = isSafeSessionSegment(sessionId) ? sessionId : '_unknown'
+    const sessionDir = path.join(this.outputDir, segment)
+    await mkdir(sessionDir, { recursive: true })
     for (let attempt = 0; attempt < WX_RETRY_LIMIT; attempt++) {
       const id = this.generateId()
-      const filePath = path.join(this.outputDir, `${FILE_PREFIX}${id}`)
+      const filePath = path.join(sessionDir, `${FILE_PREFIX}${id}`)
       try {
         await writeFile(filePath, content, { flag: 'wx' })
         return filePath

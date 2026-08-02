@@ -8,6 +8,7 @@ import { resolveIdleTimeoutMs } from './idle-timeout.js'
 import { readHipConfig } from '../config/hip-config.js'
 import type { SessionStore } from '../persistence/store.js'
 import { ensureScratchDir, removeScratchDir, defaultScratchRoot } from './scratch.js'
+import { removeSessionArtifacts } from './session-artifacts.js'
 import * as workspaceFs from './workspace-fs.js'
 import * as workspaceGit from './workspace-git.js'
 import { setActiveModel } from '../config/providers.js'
@@ -545,6 +546,7 @@ export class SessionManager {
     this.store?.deleteSession(id, { deleteDerivedMemories: deleteDerived })
     this.sessions.delete(id)
     removeScratchDir(id, this.scratchRoot)
+    removeSessionArtifacts(id)
     if (delCwd) void workspaceGit.deleteCheckpointRefs(delCwd, id).catch(() => {})
     send({ type: 'session:deleted', sessionId: id })
     logDebug('session-delete', 'hardDeleteSessionSync done', { sessionId: id, reason })

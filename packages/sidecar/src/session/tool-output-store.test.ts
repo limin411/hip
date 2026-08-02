@@ -108,13 +108,23 @@ describe('ToolOutputStore', () => {
     expect(fileContent).toBe(output)
   })
 
-  it('outputPaths file is under the configured outputDir and prefixed tool_', async () => {
+  it('outputPaths file is under outputDir/<sessionId>/ and prefixed tool_', async () => {
     const store = makeStore()
     const output = 'x'.repeat(120 * 1024) // above default 100KB byte threshold
     const r = await store.bound({ sessionId: 's1', toolCallId: 't1', output })
     expect(r.outputPaths).toHaveLength(1)
-    expect(r.outputPaths[0].startsWith(tmpDir)).toBe(true)
+    expect(r.outputPaths[0].startsWith(path.join(tmpDir, 's1'))).toBe(true)
     expect(path.basename(r.outputPaths[0]).startsWith('tool_')).toBe(true)
+  })
+
+  it('removeSession deletes only that session spill dir', async () => {
+    const store = makeStore({ maxBytes: 10 })
+    await store.bound({ sessionId: 's1', toolCallId: 't1', output: 'x'.repeat(100) })
+    await store.bound({ sessionId: 's2', toolCallId: 't2', output: 'y'.repeat(100) })
+    expect(await fs.access(path.join(tmpDir, 's1')).then(() => true).catch(() => false)).toBe(true)
+    store.removeSession('s1')
+    await expect(fs.access(path.join(tmpDir, 's1'))).rejects.toThrow()
+    await expect(fs.access(path.join(tmpDir, 's2'))).resolves.toBeUndefined()
   })
 
   // ── Byte threshold bounding ────────────────────────────────────────────
@@ -135,23 +145,29 @@ describe('ToolOutputStore', () => {
 
   // ── Cleanup ───────────────────────────────────────────────────────────
 
-  it('cleanup deletes files older than 7 days and keeps newer ones', async () => {
+  it('cleanup deletes files older than 7 days and keeps newer ones (legacy flat + session dir)', async () => {
     const store = makeStore()
 
-    // Old file: 8 days ago — past retention.
+    // Legacy flat: old + new
     const oldFile = path.join(tmpDir, 'tool_old')
     await fs.writeFile(oldFile, 'old')
     const old = new Date(Date.now() - 8 * 24 * 60 * 60 * 1000)
     await fs.utimes(oldFile, old, old)
-
-    // New file: just created — within retention.
     const newFile = path.join(tmpDir, 'tool_new')
     await fs.writeFile(newFile, 'new')
+
+    // Session subdir: old file only → dir removed after cleanup
+    const sessDir = path.join(tmpDir, 's-old')
+    await fs.mkdir(sessDir)
+    const sessOld = path.join(sessDir, 'tool_old')
+    await fs.writeFile(sessOld, 'old')
+    await fs.utimes(sessOld, old, old)
 
     await store.cleanupOnce()
 
     await expect(fs.access(oldFile)).rejects.toThrow()
     await expect(fs.access(newFile)).resolves.toBeUndefined()
+    await expect(fs.access(sessDir)).rejects.toThrow()
   })
 
   it('cleanup leaves non-tool_ files alone', async () => {
@@ -201,8 +217,10 @@ describe('ToolOutputStore', () => {
     let n = 0
     const store = makeStore({ generateId: () => `fixed-${n++}` })
 
-    // Pre-create the first file the store will try (tool_fixed-0).
-    await fs.writeFile(path.join(tmpDir, 'tool_fixed-0'), 'stale')
+    // Pre-create the first file the store will try (s1/tool_fixed-0).
+    const sessDir = path.join(tmpDir, 's1')
+    await fs.mkdir(sessDir, { recursive: true })
+    await fs.writeFile(path.join(sessDir, 'tool_fixed-0'), 'stale')
 
     const output = Array.from({ length: 3000 }, (_, i) => `l-${i}`).join('\n')
     const r = await store.bound({ sessionId: 's1', toolCallId: 't1', output })
@@ -212,7 +230,7 @@ describe('ToolOutputStore', () => {
     expect(r.outputPaths[0]).toContain('tool_fixed-1')
 
     // The original stale file must still be untouched.
-    const stale = await fs.readFile(path.join(tmpDir, 'tool_fixed-0'), 'utf-8')
+    const stale = await fs.readFile(path.join(sessDir, 'tool_fixed-0'), 'utf-8')
     expect(stale).toBe('stale')
 
     // The new file MUST contain the full content (not just exist).

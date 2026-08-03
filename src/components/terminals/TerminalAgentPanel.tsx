@@ -4,6 +4,7 @@ import type { TFunction } from 'i18next'
 import {
   ArrowUp,
   Bot,
+  Check,
   ChevronDown,
   ChevronRight,
   KeyRound,
@@ -23,6 +24,13 @@ import { sshWrite } from '@/ipc/ssh'
 import { isTerminalSession } from '@/lib/sessions'
 import { formatAbsolute, formatClockTime } from '@/lib/datetime'
 import { MarkdownBody } from '@/components/chat/MarkdownBody'
+import { ComposerChip } from '@/components/chat/ComposerChip'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/DropdownMenu'
 import { Button } from '@/components/ui/Button'
 import { cn } from '@/lib/utils'
 import type { Message, ToolCall } from '@hip/protocol'
@@ -352,43 +360,81 @@ function PermissionCard({
   )
 }
 
-function ModeChip({
+function DropdownChip({
   icon,
-  value,
-  onChange,
-  options,
   label,
+  active,
+  disabled,
+  title,
   testid,
+  menuTestid,
+  children,
 }: {
   icon: ReactNode
-  value: string
-  onChange: (v: string) => void
-  options: Array<{ value: string; label: string }>
   label: string
+  active: boolean
+  disabled?: boolean
+  title: string
   testid: string
+  menuTestid: string
+  children: ReactNode
 }) {
   return (
-    <label
-      className="flex h-6 max-w-[10rem] cursor-pointer items-center gap-1 rounded-md bg-surface-muted px-1.5 text-meta text-ink-secondary transition-colors hover:bg-state-hover"
-      title={label}
-    >
-      <span className="shrink-0 text-ink-tertiary" aria-hidden>
-        {icon}
-      </span>
-      <select
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        className="min-w-0 cursor-pointer appearance-none border-0 bg-transparent text-meta font-medium text-ink-secondary outline-none"
-        data-testid={testid}
-        aria-label={label}
+    <DropdownMenu modal={false}>
+      <DropdownMenuTrigger asChild>
+        <ComposerChip
+          active={active}
+          disabled={disabled}
+          data-testid={testid}
+          title={title}
+          aria-label={title}
+        >
+          <span className="shrink-0" aria-hidden>
+            {icon}
+          </span>
+          <span className="max-w-[7rem] truncate">{label}</span>
+        </ComposerChip>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent
+        align="start"
+        side="top"
+        className="min-w-[10rem]"
+        data-testid={menuTestid}
       >
-        {options.map((o) => (
-          <option key={o.value} value={o.value}>
-            {o.label}
-          </option>
-        ))}
-      </select>
-    </label>
+        {children}
+      </DropdownMenuContent>
+    </DropdownMenu>
+  )
+}
+
+function DropdownCheckItem({
+  selected,
+  testid,
+  onSelect,
+  children,
+}: {
+  selected: boolean
+  testid: string
+  onSelect: () => void
+  children: ReactNode
+}) {
+  return (
+    <DropdownMenuItem
+      onSelect={onSelect}
+      data-testid={testid}
+      data-selected={selected ? 'true' : 'false'}
+      className="gap-2 py-1"
+    >
+      <Check
+        size={13}
+        strokeWidth={1.75}
+        className={cn('shrink-0', selected ? 'opacity-100' : 'opacity-0')}
+        aria-hidden
+      />
+      <span className={cn('min-w-0 flex-1 truncate text-meta', selected && 'font-medium')}>
+        {children}
+      </span>
+    </DropdownMenuItem>
   )
 }
 
@@ -412,6 +458,12 @@ function CompactComposer({
 }) {
   const { t } = useTranslation()
   const [text, setText] = useState('')
+  // Optimistic local selection: apply immediately, reconcile when the sidecar
+  // echoes the config change (session:agentChanged / session:permissionMode).
+  const [agent, setAgent] = useState(selectedAgentId)
+  const [mode, setMode] = useState(permissionMode)
+  useEffect(() => setAgent(selectedAgentId), [selectedAgentId])
+  useEffect(() => setMode(permissionMode), [permissionMode])
   const send = () => {
     const value = text.trim()
     if (!value || disabled) return
@@ -439,29 +491,66 @@ function CompactComposer({
         />
         <div className="mt-1 flex items-center justify-between gap-2 border-t border-border/60 pt-1.5">
           <div className="flex min-w-0 items-center gap-1.5">
-            <ModeChip
-              icon={<Bot size={11} strokeWidth={1.75} />}
-              value={selectedAgentId}
-              onChange={(v) => onSelectAgent(v)}
-              options={[
-                { value: 'builtin', label: t('terminals.agent.emptyTitle') },
-                ...agents.map((a) => ({ value: a.id, label: a.name })),
-              ]}
-              label={t('terminals.agent.emptyTitle')}
+            <DropdownChip
+              icon={<Bot size={13} strokeWidth={1.75} />}
+              label={
+                agent === 'builtin'
+                  ? t('terminals.agent.emptyTitle')
+                  : (agents.find((a) => a.id === agent)?.name ?? agent)
+              }
+              active={agent !== 'builtin'}
+              disabled={disabled}
+              title={t('terminals.agent.emptyTitle')}
               testid="terminal-agent-picker"
-            />
-            <ModeChip
-              icon={<KeyRound size={11} strokeWidth={1.75} />}
-              value={permissionMode}
-              onChange={(v) => onSelectPermissionMode(v as 'chat' | 'edit' | 'full')}
-              options={[
-                { value: 'chat', label: 'chat' },
-                { value: 'edit', label: 'edit' },
-                { value: 'full', label: 'full' },
-              ]}
-              label="permission mode"
+              menuTestid="terminal-agent-picker-menu"
+            >
+              <DropdownCheckItem
+                selected={agent === 'builtin'}
+                testid="terminal-agent-option-builtin"
+                onSelect={() => {
+                  setAgent('builtin')
+                  onSelectAgent('builtin')
+                }}
+              >
+                {t('terminals.agent.emptyTitle')}
+              </DropdownCheckItem>
+              {agents.map((a) => (
+                <DropdownCheckItem
+                  key={a.id}
+                  selected={agent === a.id}
+                  testid={`terminal-agent-option-${a.id}`}
+                  onSelect={() => {
+                    setAgent(a.id)
+                    onSelectAgent(a.id)
+                  }}
+                >
+                  {a.name}
+                </DropdownCheckItem>
+              ))}
+            </DropdownChip>
+            <DropdownChip
+              icon={<KeyRound size={13} strokeWidth={1.75} />}
+              label={mode}
+              active={mode !== 'edit'}
+              disabled={disabled}
+              title="permission mode"
               testid="terminal-permission-mode"
-            />
+              menuTestid="terminal-permission-mode-menu"
+            >
+              {(['chat', 'edit', 'full'] as const).map((m) => (
+                <DropdownCheckItem
+                  key={m}
+                  selected={mode === m}
+                  testid={`terminal-permission-option-${m}`}
+                  onSelect={() => {
+                    setMode(m)
+                    onSelectPermissionMode(m)
+                  }}
+                >
+                  {m}
+                </DropdownCheckItem>
+              ))}
+            </DropdownChip>
           </div>
           <Button
             variant="primary"

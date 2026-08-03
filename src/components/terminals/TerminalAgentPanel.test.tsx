@@ -9,6 +9,15 @@ import { useTerminalAgentStore } from '@/store/terminalAgentStore'
 import { useTerminalHostStore } from '@/store/terminalHostStore'
 import { TerminalAgentPanel } from './TerminalAgentPanel'
 
+const mocks = vi.hoisted(() => ({
+  agents: [] as Array<{
+    id: string
+    name: string
+    kind: string
+    enabled: boolean
+  }>,
+}))
+
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({
     t: (key: string) => key,
@@ -17,8 +26,33 @@ vi.mock('react-i18next', () => ({
 }))
 
 vi.mock('@/store/hipConfigStore', () => ({
-  useAgents: () => [],
+  useAgents: () => mocks.agents,
 }))
+
+vi.mock('@/components/ui/DropdownMenu', async () => {
+  const React = await import('react')
+  return {
+    DropdownMenu: ({ children }: { children: React.ReactNode }) =>
+      React.createElement(React.Fragment, null, children),
+    DropdownMenuTrigger: ({ children }: { children: React.ReactNode }) =>
+      React.createElement(React.Fragment, null, children),
+    DropdownMenuContent: ({
+      children,
+      'data-testid': testid,
+    }: {
+      children: React.ReactNode
+      'data-testid'?: string
+    }) => React.createElement('div', { 'data-testid': testid ?? 'dropdown-content' }, children),
+    DropdownMenuItem: ({
+      children,
+      onSelect,
+      ...rest
+    }: {
+      children: React.ReactNode
+      onSelect?: () => void
+    }) => React.createElement('div', { ...rest, onClick: () => onSelect?.() }, children),
+  }
+})
 
 function baseConfig(overrides: Record<string, unknown> = {}) {
   return {
@@ -32,6 +66,9 @@ function baseConfig(overrides: Record<string, unknown> = {}) {
 
 describe('TerminalAgentPanel tool card collapsing', () => {
   beforeEach(() => {
+    mocks.agents = [
+      { id: 'a1', name: 'Ops-Agent', kind: 'internal', enabled: true },
+    ]
     useManagedTerminalStore.setState({
       terminals: [
         {
@@ -145,6 +182,41 @@ describe('TerminalAgentPanel tool card collapsing', () => {
 
     fireEvent.click(jump)
     expect(screen.queryByTestId('jump-to-latest')).not.toBeInTheDocument()
+    unmount()
+  })
+
+  it('agent picker and permission mode use chat-style dropdown options', () => {
+    const { unmount } = render(<TerminalAgentPanel terminalId="tm_1" />)
+
+    // Agent picker: builtin selected by default, dropdown lists builtin + agent.
+    const agentChip = screen.getByTestId('terminal-agent-picker')
+    expect(agentChip).toHaveTextContent('terminals.agent.emptyTitle')
+    expect(screen.getByTestId('terminal-agent-option-builtin')).toHaveAttribute(
+      'data-selected',
+      'true',
+    )
+    expect(screen.getByTestId('terminal-agent-option-a1')).toHaveAttribute(
+      'data-selected',
+      'false',
+    )
+
+    // Select the external agent → label updates.
+    fireEvent.click(screen.getByTestId('terminal-agent-option-a1'))
+    expect(agentChip).toHaveTextContent('Ops-Agent')
+
+    // Permission mode: edit default; pick full → label + selection update.
+    const modeChip = screen.getByTestId('terminal-permission-mode')
+    expect(modeChip).toHaveTextContent('edit')
+    expect(screen.getByTestId('terminal-permission-option-edit')).toHaveAttribute(
+      'data-selected',
+      'true',
+    )
+    fireEvent.click(screen.getByTestId('terminal-permission-option-full'))
+    expect(modeChip).toHaveTextContent('full')
+    expect(screen.getByTestId('terminal-permission-option-full')).toHaveAttribute(
+      'data-selected',
+      'true',
+    )
     unmount()
   })
 })

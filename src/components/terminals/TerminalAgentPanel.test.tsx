@@ -313,4 +313,25 @@ describe('TerminalAgentPanel tool card collapsing', () => {
     useTerminalAgentStore.setState({ execFlightByTerminal: {} })
     unmount()
   })
+
+  it('shows a stop button during plain agent output (no flight) and only cancels the turn', () => {
+    useDomainStore.setState((s) => ({
+      sessions: s.sessions.map((x) => (x.id === 'ta_1' ? { ...x, status: 'running' } : x)),
+    }))
+    const cancelSpy = vi
+      .spyOn(sessionService, 'cancelSessionTurn')
+      .mockImplementation(() => {})
+    mocks.sshWrite.mockClear()
+    const { unmount } = render(<TerminalAgentPanel terminalId="tm_1" />)
+
+    expect(screen.getByTestId('terminal-composer-stop')).toBeInTheDocument()
+    expect(screen.queryByTestId('terminal-composer-send')).not.toBeInTheDocument()
+
+    fireEvent.click(screen.getByTestId('terminal-composer-stop'))
+    expect(cancelSpy).toHaveBeenCalledWith('ta_1')
+    expect(mocks.sshWrite).not.toHaveBeenCalled()
+
+    cancelSpy.mockRestore()
+    unmount()
+  })
 })

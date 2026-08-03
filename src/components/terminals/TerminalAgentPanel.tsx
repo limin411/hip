@@ -791,6 +791,7 @@ export function TerminalAgentPanel({ terminalId }: { terminalId: string }) {
   }
 
   const connected = term?.kind === 'ssh' && term.status === 'connected'
+  const turnRunning = active?.status === 'running' || !!flight
   const statusText = connected
     ? host
       ? `${host.username}@${host.hostname}:${host.port}`
@@ -919,12 +920,14 @@ export function TerminalAgentPanel({ terminalId }: { terminalId: string }) {
           <CompactComposer
             sessionId={active.id}
             disabled={!!flight}
-            running={!!flight}
+            running={turnRunning}
             onStop={() => {
-              // 打断长命令：先结束 UI 桥的等待（aborted），向共享 PTY 发送 Ctrl-C，
-              // 再取消本轮 LLM turn（与主对话 Stop 对齐）。
-              abortExecFlight(terminalId)
-              void sshWrite(terminalId, '\x03').catch(() => {})
+              // 打断输出：若有 exec flight，先结束桥接等待并向共享 PTY 发送 Ctrl-C；
+              // 任何 running 状态都取消本轮 LLM turn（与主对话 Stop 对齐）。
+              if (flight) {
+                abortExecFlight(terminalId)
+                void sshWrite(terminalId, '\x03').catch(() => {})
+              }
               sessionService.cancelSessionTurn(active.id)
             }}
             agents={agents.map((a) => ({ id: a.id, name: a.name }))}

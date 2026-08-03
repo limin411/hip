@@ -1,21 +1,85 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
 import type { TFunction } from 'i18next'
-import { Loader2, Plus, Send, TerminalSquare, XCircle } from 'lucide-react'
+import {
+  ArrowUp,
+  Bot,
+  KeyRound,
+  Loader2,
+  Plus,
+  ShieldCheck,
+  TerminalSquare,
+  TriangleAlert,
+} from 'lucide-react'
 import { sessionService } from '@/domain'
 import { useDomainStore } from '@/domain/sessionStore'
-import { useManagedTerminalStore } from '@/store/managedTerminalStore'
-import { useTerminalAgentStore } from '@/store/terminalAgentStore'
+import { useManagedTerminalStore, type ManagedTerminalStatus } from '@/store/managedTerminalStore'
+import { useTerminalAgentStore, terminalSessionsFor } from '@/store/terminalAgentStore'
 import { useTerminalHostStore } from '@/store/terminalHostStore'
 import { useAgents } from '@/store/hipConfigStore'
 import { sshWrite } from '@/ipc/ssh'
-import { terminalSessionsFor } from '@/store/terminalAgentStore'
 import { isTerminalSession } from '@/lib/sessions'
+import { formatAbsolute, formatClockTime } from '@/lib/datetime'
 import { MarkdownBody } from '@/components/chat/MarkdownBody'
 import { Button } from '@/components/ui/Button'
 import { cn } from '@/lib/utils'
 import type { Message, ToolCall } from '@hip/protocol'
 import { startTerminalAgentChat } from './terminalAgentSession'
+
+const STATUS_DOT: Record<ManagedTerminalStatus, string> = {
+  connecting: 'bg-warning animate-pulse',
+  connected: 'bg-success',
+  disconnected: 'bg-ink-tertiary/40',
+  error: 'bg-danger',
+}
+
+function MetaLine({ role, timestamp }: { role: string; timestamp?: number }) {
+  const { i18n } = useTranslation()
+  const locale = i18n.resolvedLanguage ?? i18n.language ?? 'en'
+  return (
+    <div className="mb-1.5 flex min-h-4 items-center gap-2 text-meta leading-4 text-ink-tertiary">
+      <span className="font-medium text-ink-secondary">{role}</span>
+      {timestamp ? (
+        <span
+          className="font-normal tabular-nums"
+          title={formatAbsolute(timestamp, locale)}
+        >
+          {formatClockTime(timestamp, locale)}
+        </span>
+      ) : null}
+    </div>
+  )
+}
+
+function ToolStatusChip({ tool, timedOut, t }: { tool: ToolCall; timedOut: boolean; t: TFunction }) {
+  const running = tool.status === 'running'
+  const error = tool.status === 'error'
+  const label = error
+    ? t('terminals.agent.execError')
+    : running
+      ? t('terminals.agent.running')
+      : timedOut
+        ? t('terminals.agent.execTimedOut')
+        : 'completed'
+  return (
+    <span
+      className={cn(
+        'inline-flex shrink-0 items-center gap-1 rounded-md px-1.5 py-0.5 text-caption font-medium',
+        error
+          ? 'bg-danger/10 text-danger'
+          : running
+            ? 'bg-accent/10 text-accent'
+            : timedOut
+              ? 'bg-warning/10 text-warning'
+              : 'bg-surface-muted text-ink-tertiary',
+      )}
+      data-testid="terminal-tool-status"
+    >
+      {running ? <Loader2 size={10} className="animate-spin" aria-hidden /> : null}
+      {label}
+    </span>
+  )
+}
 
 function ToolCard({
   tool,
@@ -36,50 +100,69 @@ function ToolCard({
   }
   const isExec = tool.name === 'terminal_exec'
   const timedOut = isExec && /status: timed_out/.test(tool.output ?? '')
-  const statusLabel =
-    tool.status === 'error'
-      ? t('terminals.agent.execError')
-      : tool.status === 'running'
-        ? t('terminals.agent.running')
-        : tool.status === 'finished'
-          ? 'completed'
-          : tool.status
+  const command = isExec ? inputText.split('\n')[0]?.slice(0, 200) ?? inputText : inputText
+  const title = isExec ? t('terminals.agent.execTitle') : tool.name
+
   return (
     <div
-      className="rounded-md border border-border bg-surface-muted/60 px-2 py-1.5"
+      className="overflow-hidden rounded-lg border border-border bg-surface-subtle/70"
       data-testid="terminal-tool-card"
       data-tool={tool.name}
       data-status={tool.status}
     >
-      <div className="flex items-center justify-between gap-2">
-        <span className="truncate font-mono text-caption font-medium text-ink">
-          {isExec ? t('terminals.agent.execTitle') : tool.name}
+      {/* Header: icon + title + status (ActivityBar-like compact row). */}
+      <div className="flex items-center gap-2 px-2.5 py-1.5">
+        <span
+          className={cn(
+            'flex h-5 w-5 shrink-0 items-center justify-center rounded-md',
+            tool.status === 'error'
+              ? 'bg-danger/10 text-danger'
+              : tool.status === 'running'
+                ? 'bg-accent/10 text-accent'
+                : 'bg-surface-muted text-ink-tertiary',
+          )}
+          aria-hidden
+        >
+          <TerminalSquare size={12} strokeWidth={1.75} />
         </span>
-        <span className="shrink-0 text-caption text-ink-tertiary">{statusLabel}</span>
+        <span className="min-w-0 flex-1 truncate font-mono text-caption font-medium text-ink">
+          {title}
+        </span>
+        <ToolStatusChip tool={tool} timedOut={timedOut} t={t} />
       </div>
-      {isExec ? (
-        <p className="mt-1 truncate font-mono text-caption text-ink-secondary" title={inputText}>
-          {inputText}
-        </p>
+
+      {isExec && command ? (
+        <div className="border-t border-border/60 px-2.5 py-1.5">
+          <p
+            className="truncate font-mono text-caption text-ink-secondary"
+            title={inputText}
+          >
+            {command}
+          </p>
+        </div>
       ) : null}
+
       {tool.output ? (
-        <pre className="mt-1 max-h-32 overflow-auto whitespace-pre-wrap break-words font-mono text-caption text-ink-tertiary">
+        <pre className="max-h-40 overflow-auto whitespace-pre-wrap break-words border-t border-border/60 bg-surface-muted/40 px-2.5 py-2 font-mono text-caption leading-relaxed text-ink-secondary">
           {tool.output.slice(0, 2000)}
           {tool.output.length > 2000 ? '\n…' : ''}
         </pre>
       ) : null}
+
       {tool.error ? (
-        <p className="mt-1 text-caption text-danger">{tool.error}</p>
+        <p className="border-t border-border/60 px-2.5 py-1.5 text-caption text-danger">
+          {tool.error}
+        </p>
       ) : null}
+
       {timedOut ? (
-        <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
-          <span className="text-caption text-warning">
-            {t('terminals.agent.execTimedOut')}
-          </span>
+        <div className="flex flex-wrap items-center gap-1.5 border-t border-border/60 bg-warning/5 px-2.5 py-1.5">
+          <TriangleAlert size={12} className="shrink-0 text-warning" aria-hidden />
+          <span className="text-caption text-warning">{t('terminals.agent.execTimedOut')}</span>
           <button
             type="button"
             onClick={() => void sshWrite(terminalId, '\x03')}
-            className="rounded-sm border border-border bg-surface px-1.5 py-0.5 text-caption text-ink-secondary hover:bg-state-hover"
+            className="ml-auto rounded-sm border border-border bg-surface px-1.5 py-0.5 text-caption text-ink-secondary transition-colors hover:bg-state-hover"
             data-testid="terminal-tool-send-ctrl-c"
           >
             {t('terminals.agent.sendCtrlC')}
@@ -92,7 +175,7 @@ function ToolCard({
                 t('terminals.agent.continueWatchingPrompt'),
               )
             }
-            className="rounded-sm border border-border bg-surface px-1.5 py-0.5 text-caption text-ink-secondary hover:bg-state-hover"
+            className="rounded-sm border border-border bg-surface px-1.5 py-0.5 text-caption text-ink-secondary transition-colors hover:bg-state-hover"
             data-testid="terminal-tool-continue-watching"
           >
             {t('terminals.agent.continueWatching')}
@@ -102,7 +185,7 @@ function ToolCard({
             onClick={() =>
               sessionService.sendMessageToSession(sessionId, t('terminals.agent.askUserPrompt'))
             }
-            className="rounded-sm border border-border bg-surface px-1.5 py-0.5 text-caption text-ink-secondary hover:bg-state-hover"
+            className="rounded-sm border border-border bg-surface px-1.5 py-0.5 text-caption text-ink-secondary transition-colors hover:bg-state-hover"
             data-testid="terminal-tool-ask-user"
           >
             {t('terminals.agent.askUser')}
@@ -124,45 +207,57 @@ function MessageRow({
   terminalId: string
   sessionId: string
 }) {
+  const { t: translate } = useTranslation()
   const isUser = message.role === 'user'
-  if (message.role === 'notice') {
+  const isNotice = message.role === 'notice'
+
+  if (isNotice) {
     return (
-      <div className="px-2 py-1 text-center text-meta text-ink-tertiary" data-testid="terminal-notice">
+      <div
+        className="my-1 w-fit bg-surface-muted px-2 py-0.5 text-meta text-ink-tertiary"
+        data-testid="terminal-notice"
+      >
         {message.content}
       </div>
     )
   }
+
   return (
-    <div
-      className={cn('flex flex-col gap-1', isUser ? 'items-end' : 'items-start')}
-      data-testid={`terminal-msg-${message.role}`}
-    >
-      <div
-        className={cn(
-          'max-w-[92%] rounded-lg px-2.5 py-1.5 text-body',
-          isUser
-            ? 'rounded-br-sm bg-accent/10 text-ink'
-            : 'rounded-bl-sm border border-border bg-surface',
-        )}
-      >
+    <div className="min-w-0 w-full" data-testid={`terminal-msg-${message.role}`}>
+      <MetaLine
+        role={isUser ? translate('chat.you') : 'hip'}
+        timestamp={message.timestamp || undefined}
+      />
+      <div className="min-w-0">
         {isUser ? (
-          <p className="whitespace-pre-wrap break-words">{message.content}</p>
+          <div
+            className="w-fit max-w-full rounded-lg bg-surface-muted px-3.5 py-2"
+            data-testid="terminal-user-bubble"
+          >
+            <MarkdownBody content={message.content} />
+          </div>
         ) : (
           <MarkdownBody content={message.content} />
         )}
+        {message.toolCalls && message.toolCalls.length > 0 ? (
+          <div className="mt-2 space-y-1.5">
+            {message.toolCalls.map((tc) => (
+              <ToolCard
+                key={tc.callId}
+                tool={tc}
+                t={t}
+                terminalId={terminalId}
+                sessionId={sessionId}
+              />
+            ))}
+          </div>
+        ) : null}
       </div>
-      {message.toolCalls && message.toolCalls.length > 0 ? (
-        <div className="flex w-full flex-col gap-1">
-          {message.toolCalls.map((tc) => (
-            <ToolCard key={tc.callId} tool={tc} t={t} terminalId={terminalId} sessionId={sessionId} />
-          ))}
-        </div>
-      ) : null}
     </div>
   )
 }
 
-/** Session-scoped HITL approval card (not the global active session modal). */
+/** Session-scoped HITL approval card styled like the chat interrupt card. */
 function PermissionCard({
   sessionId,
   requestId,
@@ -178,12 +273,18 @@ function PermissionCard({
 }) {
   return (
     <div
-      className="rounded-md border border-accent/30 bg-accent/5 px-2.5 py-2"
+      className="rounded-lg border border-accent/30 bg-accent-subtle px-3 py-2.5"
       data-testid="terminal-permission-card"
     >
-      <p className="text-caption font-medium text-ink">{t('terminals.agent.permissionTitle')}</p>
-      <p className="mt-0.5 font-mono text-caption text-ink-secondary">{tool.content ?? tool.title}</p>
-      <div className="mt-1.5 flex flex-wrap gap-1.5">
+      <p className="flex items-center gap-1.5 text-caption font-medium text-ink">
+        <ShieldCheck size={13} className="shrink-0 text-accent" aria-hidden />
+        {t('terminals.agent.permissionTitle')}
+      </p>
+      <div className="mt-1.5 max-h-40 overflow-auto whitespace-pre-wrap break-words rounded-md bg-surface/80 px-2 py-1.5 font-mono text-caption leading-relaxed text-ink-secondary">
+        {tool.content ?? tool.title}
+      </div>
+      <p className="mt-1 text-meta text-ink-tertiary">{t('terminals.agent.execHint')}</p>
+      <div className="mt-2.5 flex flex-wrap gap-1.5">
         {options.map((opt) => (
           <Button
             key={opt.optionId}
@@ -203,7 +304,47 @@ function PermissionCard({
   )
 }
 
-/** Compact terminal agent composer (≥350px rail). Explicit sessionId — no active-session coupling. */
+function ModeChip({
+  icon,
+  value,
+  onChange,
+  options,
+  label,
+  testid,
+}: {
+  icon: ReactNode
+  value: string
+  onChange: (v: string) => void
+  options: Array<{ value: string; label: string }>
+  label: string
+  testid: string
+}) {
+  return (
+    <label
+      className="flex h-6 max-w-[10rem] cursor-pointer items-center gap-1 rounded-md bg-surface-muted px-1.5 text-meta text-ink-secondary transition-colors hover:bg-state-hover"
+      title={label}
+    >
+      <span className="shrink-0 text-ink-tertiary" aria-hidden>
+        {icon}
+      </span>
+      <select
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        className="min-w-0 cursor-pointer appearance-none border-0 bg-transparent text-meta font-medium text-ink-secondary outline-none"
+        data-testid={testid}
+        aria-label={label}
+      >
+        {options.map((o) => (
+          <option key={o.value} value={o.value}>
+            {o.label}
+          </option>
+        ))}
+      </select>
+    </label>
+  )
+}
+
+/** Compact card composer mirroring the chat Composer (`variant="card"`). */
 function CompactComposer({
   sessionId,
   disabled,
@@ -231,35 +372,8 @@ function CompactComposer({
     setText('')
   }
   return (
-    <div className="shrink-0 border-t border-border bg-surface-subtle px-2 py-2" data-testid="terminal-composer">
-      <div className="mb-1.5 flex items-center gap-1.5">
-        <select
-          value={selectedAgentId}
-          onChange={(e) => onSelectAgent(e.target.value)}
-          className="h-6 max-w-[9rem] truncate rounded-sm border border-border bg-surface px-1 text-caption text-ink"
-          data-testid="terminal-agent-picker"
-          aria-label={t('terminals.agent.emptyTitle')}
-        >
-          <option value="builtin">{t('terminals.agent.emptyTitle')}</option>
-          {agents.map((a) => (
-            <option key={a.id} value={a.id}>
-              {a.name}
-            </option>
-          ))}
-        </select>
-        <select
-          value={permissionMode}
-          onChange={(e) => onSelectPermissionMode(e.target.value as 'chat' | 'edit' | 'full')}
-          className="h-6 rounded-sm border border-border bg-surface px-1 text-caption text-ink"
-          data-testid="terminal-permission-mode"
-          aria-label="permission mode"
-        >
-          <option value="chat">chat</option>
-          <option value="edit">edit</option>
-          <option value="full">full</option>
-        </select>
-      </div>
-      <div className="flex items-end gap-1.5">
+    <div className="shrink-0 px-3 pb-3 pt-1.5" data-testid="terminal-composer">
+      <div className="rounded-lg border border-border bg-surface-subtle p-2.5 transition-colors duration-chrome focus-within:border-accent/40">
         <textarea
           value={text}
           onChange={(e) => setText(e.target.value)}
@@ -272,21 +386,55 @@ function CompactComposer({
           rows={2}
           placeholder={t('terminals.agent.placeholder')}
           disabled={disabled}
-          className="min-h-10 flex-1 resize-none rounded-sm border border-border bg-surface px-2 py-1.5 text-body text-ink outline-none placeholder:text-ink-tertiary focus-visible:border-accent focus-visible:ring-2 focus-visible:ring-accent/10 disabled:opacity-50"
+          className="min-h-10 w-full resize-none border-0 bg-transparent px-0.5 py-1 text-body leading-relaxed text-ink outline-none placeholder:text-ink-tertiary disabled:opacity-50"
           data-testid="terminal-composer-input"
         />
-        <Button size="sm" onClick={send} disabled={disabled || !text.trim()} data-testid="terminal-composer-send">
-          <Send size={14} className="mr-1" />
-          {t('terminals.agent.send')}
-        </Button>
+        <div className="mt-1 flex items-center justify-between gap-2 border-t border-border/60 pt-1.5">
+          <div className="flex min-w-0 items-center gap-1.5">
+            <ModeChip
+              icon={<Bot size={11} strokeWidth={1.75} />}
+              value={selectedAgentId}
+              onChange={(v) => onSelectAgent(v)}
+              options={[
+                { value: 'builtin', label: t('terminals.agent.emptyTitle') },
+                ...agents.map((a) => ({ value: a.id, label: a.name })),
+              ]}
+              label={t('terminals.agent.emptyTitle')}
+              testid="terminal-agent-picker"
+            />
+            <ModeChip
+              icon={<KeyRound size={11} strokeWidth={1.75} />}
+              value={permissionMode}
+              onChange={(v) => onSelectPermissionMode(v as 'chat' | 'edit' | 'full')}
+              options={[
+                { value: 'chat', label: 'chat' },
+                { value: 'edit', label: 'edit' },
+                { value: 'full', label: 'full' },
+              ]}
+              label="permission mode"
+              testid="terminal-permission-mode"
+            />
+          </div>
+          <Button
+            variant="primary"
+            size="icon"
+            className="h-7 w-7 shrink-0 rounded-sm"
+            onClick={send}
+            disabled={disabled || !text.trim()}
+            data-testid="terminal-composer-send"
+            title={t('terminals.agent.send')}
+          >
+            <ArrowUp size={15} strokeWidth={1.75} />
+          </Button>
+        </div>
       </div>
     </div>
   )
 }
 
 /**
- * Terminal Ops agent panel (spec §3.4): status strip + session-scoped message list
- * + compact composer + HITL. Never mounted for local terminals.
+ * Terminal Ops agent panel (spec §3.4) — visual language aligned with the main
+ * Chat surface (CLI-style meta rows, soft user bubbles, card composer).
  */
 export function TerminalAgentPanel({ terminalId }: { terminalId: string }) {
   const { t } = useTranslation()
@@ -304,6 +452,7 @@ export function TerminalAgentPanel({ terminalId }: { terminalId: string }) {
   const agents = useAgents().filter((a) => a.enabled)
   const [pickedAgent, setPickedAgent] = useState('builtin')
   const [pickedMode, setPickedMode] = useState<'chat' | 'edit' | 'full'>('edit')
+  const bottomRef = useRef<HTMLDivElement>(null)
 
   const active =
     useDomainStore((s) =>
@@ -322,6 +471,11 @@ export function TerminalAgentPanel({ terminalId }: { terminalId: string }) {
     }
   }, [active?.id, active?.loaded])
 
+  // Follow the transcript like ChatPane (new messages / session switch).
+  useEffect(() => {
+    bottomRef.current?.scrollIntoView({ block: 'end' })
+  }, [active?.id, active?.messages.length])
+
   const startChat = () => {
     if (!term) return
     void startTerminalAgentChat(terminalId, { agentId: pickedAgent, permissionMode: pickedMode })
@@ -335,6 +489,7 @@ export function TerminalAgentPanel({ terminalId }: { terminalId: string }) {
     : term?.status === 'disconnected' || term?.status === 'error'
       ? t('terminals.agent.ptyDead')
       : t('terminals.connecting')
+  const statusDot = term?.kind === 'ssh' ? STATUS_DOT[term.status] : STATUS_DOT.disconnected
 
   return (
     <div
@@ -343,21 +498,24 @@ export function TerminalAgentPanel({ terminalId }: { terminalId: string }) {
     >
       {/* Status strip */}
       <div
-        className="flex shrink-0 items-center justify-between gap-2 border-b border-border px-2 py-1.5"
+        className="flex shrink-0 items-center justify-between gap-2 border-b border-border bg-surface-subtle/70 px-3 py-1.5"
         data-testid="terminal-agent-status"
       >
-        <span className="flex min-w-0 items-center gap-1.5 text-caption text-ink-secondary">
-          <TerminalSquare size={12} className="shrink-0 text-ink-tertiary" />
-          <span className="truncate">{statusText}</span>
-          {!connected ? <span className="size-1.5 shrink-0 rounded-full bg-ink-tertiary/50" aria-hidden /> : null}
+        <span className="flex min-w-0 items-center gap-2 text-caption text-ink-secondary">
+          <span
+            className={cn('size-1.5 shrink-0 rounded-full', connected ? 'bg-success' : statusDot)}
+            aria-hidden
+          />
+          <TerminalSquare size={12} className="shrink-0 text-ink-tertiary" aria-hidden />
+          <span className="truncate font-mono">{statusText}</span>
+          {connected ? (
+            <span className="shrink-0 rounded-md bg-success/10 px-1.5 py-0.5 text-caption font-medium text-success">
+              {t('terminals.connected')}
+            </span>
+          ) : null}
         </span>
         {sessionsForTerminal.length > 0 ? (
-          <Button
-            size="sm"
-            variant="ghost"
-            onClick={startChat}
-            data-testid="terminal-agent-new-chat"
-          >
+          <Button size="sm" variant="ghost" onClick={startChat} data-testid="terminal-agent-new-chat">
             <Plus size={12} className="mr-0.5" />
             {t('terminals.agent.newChat')}
           </Button>
@@ -366,12 +524,22 @@ export function TerminalAgentPanel({ terminalId }: { terminalId: string }) {
 
       {active && isTerminalSession(active.config) ? (
         <>
-          {/* Message list */}
-          <div className="min-h-0 flex-1 space-y-2 overflow-y-auto px-2 py-2" data-testid="terminal-message-list">
+          {/* Message list (chat transcript rhythm: px-3 py-4, soft gaps). */}
+          <div
+            className="min-h-0 flex-1 space-y-4 overflow-y-auto px-3 py-4"
+            data-testid="terminal-message-list"
+          >
             {active.messages.length === 0 ? (
-              <div className="flex h-full flex-col items-center justify-center gap-1 px-4 text-center">
-                <p className="text-body font-medium text-ink">{t('terminals.agent.emptyTitle')}</p>
-                <p className="text-caption text-ink-tertiary">{t('terminals.agent.emptyBody')}</p>
+              <div className="flex h-full flex-col items-center justify-center gap-3 px-6 text-center">
+                <span className="flex h-12 w-12 items-center justify-center rounded-full bg-accent/10 text-accent">
+                  <TerminalSquare size={22} strokeWidth={1.5} aria-hidden />
+                </span>
+                <div>
+                  <p className="text-body font-semibold text-ink">{t('terminals.agent.emptyTitle')}</p>
+                  <p className="mt-1 text-meta leading-relaxed text-ink-tertiary">
+                    {t('terminals.agent.emptyBody')}
+                  </p>
+                </div>
               </div>
             ) : (
               active.messages.map((m) => (
@@ -384,20 +552,21 @@ export function TerminalAgentPanel({ terminalId }: { terminalId: string }) {
                 />
               ))
             )}
+            <div ref={bottomRef} data-testid="terminal-transcript-end" />
           </div>
 
           {acpLimited ? (
             <div
-              className="flex shrink-0 items-start gap-1.5 border-t border-border px-2 py-1.5 text-caption text-ink-secondary"
+              className="mx-3 mb-2 flex shrink-0 items-start gap-1.5 rounded-md border border-warning/30 bg-warning/5 px-2.5 py-1.5 text-caption text-ink-secondary"
               data-testid="terminal-acp-limited"
             >
-              <XCircle size={12} className="mt-0.5 shrink-0 text-ink-tertiary" />
+              <TriangleAlert size={12} className="mt-0.5 shrink-0 text-warning" aria-hidden />
               {t('terminals.agent.acpLimited')}
             </div>
           ) : null}
 
           {active.pendingPermission ? (
-            <div className="shrink-0 px-2 pb-2">
+            <div className="shrink-0 px-3 pb-2">
               <PermissionCard
                 sessionId={active.id}
                 requestId={active.pendingPermission.requestId}
@@ -410,11 +579,12 @@ export function TerminalAgentPanel({ terminalId }: { terminalId: string }) {
 
           {flight ? (
             <div
-              className="flex shrink-0 items-center gap-1.5 border-t border-border px-2 py-1.5 text-caption text-ink-secondary"
+              className="flex shrink-0 items-center gap-2 border-t border-accent/20 bg-accent/5 px-3 py-1.5 text-meta text-ink-secondary"
               data-testid="terminal-exec-flight"
             >
-              <Loader2 size={12} className="animate-spin" />
-              {t('terminals.agent.running')}… {flight.command}
+              <Loader2 size={12} className="shrink-0 animate-spin text-accent" aria-hidden />
+              <span className="min-w-0 flex-1 truncate font-mono text-caption">{flight.command}</span>
+              <span className="shrink-0">{t('terminals.agent.running')}…</span>
             </div>
           ) : null}
 
@@ -436,14 +606,25 @@ export function TerminalAgentPanel({ terminalId }: { terminalId: string }) {
         </>
       ) : (
         <div
-          className="flex min-h-0 flex-1 flex-col items-center justify-center gap-2 px-6 text-center"
+          className="flex min-h-0 flex-1 flex-col items-center justify-center gap-3 px-6 text-center"
           data-testid="terminal-agent-empty"
         >
-          <p className="text-body font-medium text-ink">{t('terminals.agent.emptyTitle')}</p>
-          <p className="text-caption leading-relaxed text-ink-tertiary">
-            {connected ? t('terminals.agent.emptyBody') : t('terminals.agent.needSsh')}
-          </p>
-          <Button onClick={startChat} data-testid="terminal-agent-start" disabled={!term}>
+          <span className="flex h-14 w-14 items-center justify-center rounded-full bg-accent/10 text-accent">
+            <TerminalSquare size={26} strokeWidth={1.5} aria-hidden />
+          </span>
+          <div>
+            <p className="text-body font-semibold text-ink">{t('terminals.agent.emptyTitle')}</p>
+            <p className="mt-1 text-meta leading-relaxed text-ink-tertiary">
+              {connected ? t('terminals.agent.emptyBody') : t('terminals.agent.needSsh')}
+            </p>
+          </div>
+          <Button
+            variant="primary"
+            size="sm"
+            onClick={startChat}
+            disabled={!term}
+            data-testid="terminal-agent-start"
+          >
             {t('terminals.agent.start')}
           </Button>
         </div>

@@ -11,6 +11,7 @@ import {
   Loader2,
   Plus,
   ShieldCheck,
+  Square,
   TerminalSquare,
   TriangleAlert,
 } from 'lucide-react'
@@ -23,6 +24,7 @@ import { useTerminalHostStore } from '@/store/terminalHostStore'
 import { useAgents } from '@/store/hipConfigStore'
 import { sshWrite } from '@/ipc/ssh'
 import { isTerminalSession } from '@/lib/sessions'
+import { abortExecFlight } from '@/domain/terminalAgentBridge'
 import { formatAbsolute, formatClockTime } from '@/lib/datetime'
 import { formatTokensCompact } from '@/lib/formatTokens'
 import { formatUsd } from '@/lib/usageCost'
@@ -550,6 +552,8 @@ function SessionUsageChip({ meter, t }: { meter: SessionTokenMeter; t: TFunction
 function CompactComposer({
   sessionId,
   disabled,
+  running,
+  onStop,
   agents,
   selectedAgentId,
   onSelectAgent,
@@ -558,6 +562,8 @@ function CompactComposer({
 }: {
   sessionId: string
   disabled: boolean
+  running: boolean
+  onStop: () => void
   agents: Array<{ id: string; name: string }>
   selectedAgentId: string
   onSelectAgent: (id: string) => void
@@ -688,17 +694,31 @@ function CompactComposer({
           </div>
           <div className="flex shrink-0 items-center gap-1.5">
             {meter ? <SessionUsageChip meter={meter} t={t} /> : null}
-            <Button
-              variant="primary"
-              size="icon"
-              className="h-7 w-7 shrink-0 rounded-sm"
-              onClick={send}
-              disabled={disabled || !text.trim()}
-              data-testid="terminal-composer-send"
-              title={t('terminals.agent.send')}
-            >
-              <ArrowUp size={15} strokeWidth={1.75} />
-            </Button>
+            {running ? (
+              <Button
+                type="button"
+                variant="primary"
+                size="icon"
+                className="h-7 w-7 shrink-0 rounded-sm"
+                onClick={onStop}
+                data-testid="terminal-composer-stop"
+                title={t('chat.stop')}
+              >
+                <Square size={12} strokeWidth={1.75} />
+              </Button>
+            ) : (
+              <Button
+                variant="primary"
+                size="icon"
+                className="h-7 w-7 shrink-0 rounded-sm"
+                onClick={send}
+                disabled={disabled || !text.trim()}
+                data-testid="terminal-composer-send"
+                title={t('terminals.agent.send')}
+              >
+                <ArrowUp size={15} strokeWidth={1.75} />
+              </Button>
+            )}
           </div>
         </div>
       </div>
@@ -899,6 +919,14 @@ export function TerminalAgentPanel({ terminalId }: { terminalId: string }) {
           <CompactComposer
             sessionId={active.id}
             disabled={!!flight}
+            running={!!flight}
+            onStop={() => {
+              // 打断长命令：先结束 UI 桥的等待（aborted），向共享 PTY 发送 Ctrl-C，
+              // 再取消本轮 LLM turn（与主对话 Stop 对齐）。
+              abortExecFlight(terminalId)
+              void sshWrite(terminalId, '\x03').catch(() => {})
+              sessionService.cancelSessionTurn(active.id)
+            }}
             agents={agents.map((a) => ({ id: a.id, name: a.name }))}
             selectedAgentId={active.config.agentId ?? 'builtin'}
             onSelectAgent={(id) => {

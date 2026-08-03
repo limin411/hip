@@ -17,6 +17,7 @@ const mocks = vi.hoisted(() => ({
     kind: string
     enabled: boolean
   }>,
+  sshWrite: vi.fn(async (_terminalId: string, _data: string) => {}),
 }))
 
 vi.mock('react-i18next', () => ({
@@ -28,6 +29,10 @@ vi.mock('react-i18next', () => ({
 
 vi.mock('@/store/hipConfigStore', () => ({
   useAgents: () => mocks.agents,
+}))
+
+vi.mock('@/ipc/ssh', () => ({
+  sshWrite: (terminalId: string, data: string) => mocks.sshWrite(terminalId, data),
 }))
 
 vi.mock('@/components/ui/DropdownMenu', async () => {
@@ -277,6 +282,35 @@ describe('TerminalAgentPanel tool card collapsing', () => {
     })
     expect(screen.getByTestId('terminal-session-usage-popover')).toBeInTheDocument()
     vi.useRealTimers()
+    unmount()
+  })
+
+  it('shows a stop button during an exec flight that interrupts the command', () => {
+    useTerminalAgentStore.setState({
+      execFlightByTerminal: {
+        tm_1: {
+          callId: 'c1',
+          sessionId: 'ta_1',
+          command: 'tail -f /var/log/x.log',
+          startedAt: 1,
+          deadline: Date.now() + 15000,
+        },
+      },
+    })
+    const cancelSpy = vi
+      .spyOn(sessionService, 'cancelSessionTurn')
+      .mockImplementation(() => {})
+    const { unmount } = render(<TerminalAgentPanel terminalId="tm_1" />)
+
+    expect(screen.getByTestId('terminal-composer-stop')).toBeInTheDocument()
+    expect(screen.queryByTestId('terminal-composer-send')).not.toBeInTheDocument()
+
+    fireEvent.click(screen.getByTestId('terminal-composer-stop'))
+    expect(mocks.sshWrite).toHaveBeenCalledWith('tm_1', '\x03')
+    expect(cancelSpy).toHaveBeenCalledWith('ta_1')
+
+    cancelSpy.mockRestore()
+    useTerminalAgentStore.setState({ execFlightByTerminal: {} })
     unmount()
   })
 })

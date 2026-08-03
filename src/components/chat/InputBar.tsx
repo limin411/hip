@@ -310,6 +310,7 @@ export function InputBar() {
                 skillsEnabled={skillsEnabled}
                 onSelect={handleCommandSelect}
                 onDismiss={handleDismiss}
+                enterFallsThroughOnEmpty
               />
             )}
             {query === null && atQuery !== null && searchRoot && (

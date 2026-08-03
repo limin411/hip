@@ -448,15 +448,9 @@ export function applyServerMessageEffects(msg: ServerMessage, deps: ServerMessag
       if (msg.ok && msg.applied && msg.replacedMessageIds?.length) {
         useDomainStore.getState().removeSessionMessages(msg.sessionId, msg.replacedMessageIds)
       }
-      // Terminal agent sessions: keep the concise applied line but skip the
-      // model-generated summary blob (it is stored server-side, not needed in
-      // the narrow ops-assistant transcript).
-      const terminalSession = useDomainStore
-        .getState()
-        .sessions.find((x) => x.id === msg.sessionId)
-      const content = formatCompactResultMessage(msg, {
-        omitSummary: terminalSession?.config.surface === 'terminal',
-      })
+      // Keep the concise applied line; the model-generated summary blob stays
+      // server-side (it was dumping large JSON into every transcript).
+      const content = formatCompactResultMessage(msg, { omitSummary: true })
       if (msg.ok && msg.applied) {
         useDomainStore.getState().appendMessage(msg.sessionId, {
           id: nanoid(),

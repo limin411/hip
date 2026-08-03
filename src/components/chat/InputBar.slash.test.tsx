@@ -398,6 +398,24 @@ describe('InputBar slash commands', () => {
     expect(sendSpy).toHaveBeenCalledWith('hello world', [])
   })
 
+  it('unknown slash text (e.g. /compcat typo) falls through and is sent as a message', async () => {
+    baseMocks()
+    vi.spyOn(domain, 'useActiveSession').mockReturnValue(stubSession('code'))
+    const sendSpy = vi.spyOn(sessionService, 'sendMessage').mockReturnValue(undefined)
+
+    render(<InputBar />)
+    const textarea = screen.getByPlaceholderText(
+      'Message hip… (Enter to send, Shift+Enter for newline)',
+    )
+
+    fireEvent.change(textarea, { target: { value: '/compcat' } })
+    expect(screen.getByTestId('slash-palette')).toBeInTheDocument()
+    expect(screen.getByTestId('slash-palette-empty')).toBeInTheDocument()
+
+    fireEvent.keyDown(textarea, { key: 'Enter', shiftKey: false })
+    expect(sendSpy).toHaveBeenCalledWith('/compcat', [])
+  })
+
   it('unix-path-looking text starting with slash passes through to sendMessage', async () => {
     baseMocks()
     vi.spyOn(domain, 'useActiveSession').mockReturnValue(stubSession('code'))
@@ -615,7 +633,7 @@ describe('InputBar slash commands', () => {
     })
   })
 
-  it('shows empty state for unmatched slash query and Enter does not sendMessage', async () => {
+  it('shows empty state for unmatched slash query and Enter falls through to send', async () => {
     baseMocks()
     vi.spyOn(domain, 'useActiveSession').mockReturnValue(stubSession('code'))
     const sendSpy = vi.spyOn(sessionService, 'sendMessage').mockReturnValue(undefined)
@@ -626,9 +644,8 @@ describe('InputBar slash commands', () => {
     fireEvent.change(textarea, { target: { value: '/zzz' } })
 
     expect(screen.getByTestId('slash-palette-empty')).toBeInTheDocument()
-    fireEvent.keyDown(document, { key: 'Enter' })
+    fireEvent.keyDown(textarea, { key: 'Enter', shiftKey: false })
 
-    expect(sendSpy).not.toHaveBeenCalled()
-    expect(textarea).toHaveValue('/zzz')
+    expect(sendSpy).toHaveBeenCalledWith('/zzz', [])
   })
 })

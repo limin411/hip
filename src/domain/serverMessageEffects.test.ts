@@ -120,7 +120,7 @@ describe('applyServerMessageEffects', () => {
     expect(toastError).not.toHaveBeenCalled()
   })
 
-  it('compact:result applied appends counts and optional summary', () => {
+  it('compact:result applied appends counts but keeps the summary blob server-side', () => {
     const deps = makeDeps()
     applyServerMessageEffects({
       type: 'compact:result',
@@ -137,7 +137,7 @@ describe('applyServerMessageEffects', () => {
     expect(msgs).toHaveLength(1)
     expect(msgs[0].content).toContain('10')
     expect(msgs[0].content).toContain('4')
-    expect(msgs[0].content).toContain('[对话摘要] done')
+    expect(msgs[0].content).not.toContain('[对话摘要] done')
   })
 
   it('compact:result noop does not claim success as compacted', () => {

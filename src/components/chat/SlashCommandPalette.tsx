@@ -16,7 +16,7 @@ export interface SlashCommand {
   name: string
   description: string
   kind: 'builtin' | 'skill' | 'mcp-prompt'
-  availableIn: ('chat' | 'code')[]
+  availableIn: ComposerSurface[]
   requiresSession?: boolean
   onSelect?: () => void
 }

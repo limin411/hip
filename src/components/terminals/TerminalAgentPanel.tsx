@@ -7,7 +7,6 @@ import {
   Check,
   ChevronDown,
   ChevronRight,
-  Shrink,
   KeyRound,
   Loader2,
   Plus,
@@ -29,6 +28,11 @@ import { formatTokensCompact } from '@/lib/formatTokens'
 import { formatUsd } from '@/lib/usageCost'
 import { MarkdownBody } from '@/components/chat/MarkdownBody'
 import { ComposerChip } from '@/components/chat/ComposerChip'
+import {
+  applyCommand,
+  extractSlashQuery,
+  SlashCommandPalette,
+} from '@/components/chat/SlashCommandPalette'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -451,17 +455,37 @@ const USAGE_ZONE_CLASS: Record<string, string> = {
 
 /** Session-scoped token / cost chip next to send (Chat composer parity). */
 function SessionUsageChip({ meter, t }: { meter: SessionTokenMeter; t: TFunction }) {
+  const [open, setOpen] = useState(false)
+  const openTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const closeTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const clearTimers = () => {
+    if (openTimer.current) clearTimeout(openTimer.current)
+    if (closeTimer.current) clearTimeout(closeTimer.current)
+  }
+  const scheduleOpen = () => {
+    clearTimers()
+    openTimer.current = setTimeout(() => setOpen(true), 180)
+  }
+  const scheduleClose = () => {
+    clearTimers()
+    closeTimer.current = setTimeout(() => setOpen(false), 120)
+  }
   const primary =
     meter.percent !== null
       ? t('chat.usage.percentage', { percent: meter.percent })
       : formatTokensCompact(meter.contextTokens)
   const zoneClass = meter.zone ? USAGE_ZONE_CLASS[meter.zone] : 'text-ink-tertiary'
   return (
-    <Popover>
+    <Popover open={open} onOpenChange={setOpen}>
       <PopoverAnchor asChild>
         <span
           data-testid="terminal-session-usage"
           data-zone={meter.zone ?? undefined}
+          onMouseEnter={scheduleOpen}
+          onMouseLeave={scheduleClose}
+          onFocus={scheduleOpen}
+          onBlur={scheduleClose}
+          tabIndex={0}
           className={cn(
             'hidden shrink-0 cursor-default select-none rounded-full bg-surface-muted px-1.5 py-0.5 text-caption tabular-nums sm:inline-block',
             zoneClass,
@@ -476,6 +500,9 @@ function SessionUsageChip({ meter, t }: { meter: SessionTokenMeter; t: TFunction
         sideOffset={8}
         className="w-[min(240px,calc(100vw-2rem))] p-3"
         data-testid="terminal-session-usage-popover"
+        onMouseEnter={scheduleOpen}
+        onMouseLeave={scheduleClose}
+        onOpenAutoFocus={(e) => e.preventDefault()}
       >
         <div className="space-y-2">
           <div className="flex items-baseline justify-between gap-2">
@@ -563,20 +590,23 @@ function CompactComposer({
     sessionService.sendMessageToSession(sessionId, value)
     setText('')
   }
-  const compactHint = /^\/compact(\s|$)/.test(text)
+  const slashQuery = extractSlashQuery(text)
   return (
     <div className="shrink-0 px-3 pb-3 pt-1.5" data-testid="terminal-composer">
-      <div className="rounded-lg border border-border bg-surface-subtle p-2.5 transition-colors duration-chrome focus-within:border-accent/40">
-        {compactHint ? (
-          <button
-            type="button"
-            onClick={() => runCompact(text.trim().replace(/^\/compact\s*/, '') || undefined)}
-            className="mb-1 flex items-center gap-1 rounded-md bg-surface-muted px-1.5 py-0.5 text-caption text-ink-secondary transition-colors hover:bg-state-hover"
-            data-testid="terminal-compact-hint"
-          >
-            <Shrink size={11} strokeWidth={1.75} aria-hidden />
-            {t('chat.slash.cmd.compact')}
-          </button>
+      <div className="relative rounded-lg border border-border bg-surface-subtle p-2.5 transition-colors duration-chrome focus-within:border-accent/40">
+        {slashQuery !== null ? (
+          <SlashCommandPalette
+            value={text}
+            surface="terminal"
+            sessionId={sessionId}
+            onSelect={(cmd) => {
+              // 终端面只提供 /compact：选中后填入命令文本，回车再执行（与对话一致）。
+              if (cmd.id === 'compact') {
+                setText(applyCommand(cmd, text))
+              }
+            }}
+            onDismiss={() => {}}
+          />
         ) : null}
         <textarea
           value={text}

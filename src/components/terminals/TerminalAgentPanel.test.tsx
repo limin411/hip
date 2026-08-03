@@ -1,7 +1,7 @@
 // @vitest-environment happy-dom
 import '@testing-library/jest-dom/vitest'
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen, fireEvent } from '@testing-library/react'
+import { render, screen, fireEvent, act } from '@testing-library/react'
 import type { Message } from '@hip/protocol'
 import { useDomainStore } from '@/domain/sessionStore'
 import { useManagedTerminalStore } from '@/store/managedTerminalStore'
@@ -221,14 +221,23 @@ describe('TerminalAgentPanel tool card collapsing', () => {
     unmount()
   })
 
-  it('runs /compact instead of sending a prompt', () => {
+  it('shows the slash palette for /compact and runs it instead of sending a prompt', () => {
     const compactSpy = vi.spyOn(sessionService, 'compactSession').mockImplementation(() => {})
     const sendSpy = vi.spyOn(sessionService, 'sendMessageToSession').mockImplementation(() => {})
     const { unmount } = render(<TerminalAgentPanel terminalId="tm_1" />)
     const input = screen.getByTestId('terminal-composer-input')
 
+    // Typing "/" opens the chat-style slash palette listing /compact.
+    fireEvent.change(input, { target: { value: '/comp' } })
+    expect(screen.getByTestId('slash-palette')).toBeInTheDocument()
+    expect(screen.getByTestId('slash-cmd-compact')).toBeInTheDocument()
+
+    // Enter selects /compact from the palette and fills the command text.
+    fireEvent.keyDown(input, { key: 'Enter' })
+    expect(input).toHaveValue('/compact ')
+
+    // Add a focus and submit — runs compaction, never sends a prompt.
     fireEvent.change(input, { target: { value: '/compact auth flow' } })
-    expect(screen.getByTestId('terminal-compact-hint')).toBeInTheDocument()
     fireEvent.keyDown(input, { key: 'Enter' })
 
     expect(compactSpy).toHaveBeenCalledWith('ta_1', 'auth flow')
@@ -259,6 +268,15 @@ describe('TerminalAgentPanel tool card collapsing', () => {
     const chip = screen.getByTestId('terminal-session-usage')
     expect(chip).toBeInTheDocument()
     expect(chip.textContent?.length ?? 0).toBeGreaterThan(0)
+
+    // Hovering the chip opens the usage/cost popover (chat TokenUsageChip parity).
+    vi.useFakeTimers()
+    fireEvent.mouseEnter(chip)
+    act(() => {
+      vi.advanceTimersByTime(200)
+    })
+    expect(screen.getByTestId('terminal-session-usage-popover')).toBeInTheDocument()
+    vi.useRealTimers()
     unmount()
   })
 })

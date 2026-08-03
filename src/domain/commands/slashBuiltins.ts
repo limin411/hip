@@ -7,7 +7,7 @@
  * fallback for pure/unit contexts that do not pass a translator.
  */
 
-export type ComposerSurface = 'chat' | 'code'
+export type ComposerSurface = 'chat' | 'code' | 'terminal'
 
 export interface SlashBuiltinDef {
   id: string
@@ -52,7 +52,7 @@ export const SLASH_BUILTIN_COMMANDS: SlashBuiltinDef[] = [
     name: 'compact',
     description: 'Summarize conversation to save context (optional: /compact focus…)',
     kind: 'builtin',
-    availableIn: ['chat', 'code'],
+    availableIn: ['chat', 'code', 'terminal'],
     requiresSession: true,
   },
   {

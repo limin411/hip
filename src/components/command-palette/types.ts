@@ -56,7 +56,7 @@ export interface CommandWhen {
   /** Restrict command visibility to these shell views (see ActiveView). */
   views?: import('@/store/uiStore').ActiveView[]
   requiresSession?: boolean
-  surfaces?: Array<'chat' | 'code'>
+  surfaces?: Array<'chat' | 'code' | 'terminal'>
   enabled?: boolean
 }
 

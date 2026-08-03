@@ -428,6 +428,79 @@ describe('SlashCommandPalette keyboard navigation', () => {
     expect(onSelect).not.toHaveBeenCalled()
   })
 
+  it('Tab completes the highlighted command without running it', () => {
+    const onSelect = vi.fn()
+    const onComplete = vi.fn()
+    render(
+      <SlashCommandPalette
+        value="/"
+        surface="code"
+        sessionId="s1"
+        onSelect={onSelect}
+        onDismiss={vi.fn()}
+        onComplete={onComplete}
+      />,
+    )
+    fireEvent.keyDown(document, { key: 'Tab' })
+    expect(onComplete).toHaveBeenCalledTimes(1)
+    expect(onComplete).toHaveBeenCalledWith(
+      expect.objectContaining({ id: BUILTIN_COMMANDS[0].id }),
+    )
+    expect(onSelect).not.toHaveBeenCalled()
+  })
+
+  it('Tab completes the highlighted item after ArrowDown navigation', () => {
+    const onComplete = vi.fn()
+    render(
+      <SlashCommandPalette
+        value="/"
+        surface="code"
+        sessionId="s1"
+        onSelect={vi.fn()}
+        onDismiss={vi.fn()}
+        onComplete={onComplete}
+      />,
+    )
+    fireEvent.keyDown(document, { key: 'ArrowDown' })
+    fireEvent.keyDown(document, { key: 'Tab' })
+    expect(onComplete).toHaveBeenCalledWith(
+      expect.objectContaining({ id: BUILTIN_COMMANDS[1].id }),
+    )
+  })
+
+  it('Tab on empty state does not complete or select', () => {
+    const onSelect = vi.fn()
+    const onComplete = vi.fn()
+    render(
+      <SlashCommandPalette
+        value="/zzz"
+        surface="code"
+        sessionId="s1"
+        onSelect={onSelect}
+        onDismiss={vi.fn()}
+        onComplete={onComplete}
+      />,
+    )
+    fireEvent.keyDown(document, { key: 'Tab' })
+    expect(onComplete).not.toHaveBeenCalled()
+    expect(onSelect).not.toHaveBeenCalled()
+  })
+
+  it('Tab without onComplete does not fall back to selecting', () => {
+    const onSelect = vi.fn()
+    render(
+      <SlashCommandPalette
+        value="/"
+        surface="code"
+        sessionId="s1"
+        onSelect={onSelect}
+        onDismiss={vi.fn()}
+      />,
+    )
+    fireEvent.keyDown(document, { key: 'Tab' })
+    expect(onSelect).not.toHaveBeenCalled()
+  })
+
   it('returns null when no slash query is present', () => {
     const { container } = render(
       <SlashCommandPalette

@@ -253,6 +253,27 @@ describe('TerminalAgentPanel tool card collapsing', () => {
     unmount()
   })
 
+  it('Tab completes /compact in the composer without running it', () => {
+    const compactSpy = vi.spyOn(sessionService, 'compactSession').mockImplementation(() => {})
+    const sendSpy = vi.spyOn(sessionService, 'sendMessageToSession').mockImplementation(() => {})
+    const { unmount } = render(<TerminalAgentPanel terminalId="tm_1" />)
+    const input = screen.getByTestId('terminal-composer-input')
+
+    // Typing "/comp" opens the slash palette with /compact highlighted.
+    fireEvent.change(input, { target: { value: '/comp' } })
+    expect(screen.getByTestId('slash-cmd-compact')).toBeInTheDocument()
+
+    // Tab fills the command text; compaction must NOT run yet.
+    fireEvent.keyDown(document, { key: 'Tab' })
+    expect(input).toHaveValue('/compact ')
+    expect(compactSpy).not.toHaveBeenCalled()
+    expect(sendSpy).not.toHaveBeenCalled()
+
+    compactSpy.mockRestore()
+    sendSpy.mockRestore()
+    unmount()
+  })
+
   it('shows the session token usage chip once a turn reports usage', () => {
     useDomainStore.setState((s) => ({
       sessions: s.sessions.map((x) =>

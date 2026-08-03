@@ -128,6 +128,11 @@ interface SlashCommandPaletteProps {
   onSelect: (command: SlashCommand) => void
   onDismiss?: () => void
   /**
+   * Tab completion: fills the highlighted command into the composer WITHOUT
+   * running it. Omit to let Tab keep its default focus behavior.
+   */
+  onComplete?: (command: SlashCommand) => void
+  /**
    * When true, Enter with NO matching command is NOT swallowed: the palette
    * dismisses and the event falls through to the composer, so unknown slash
    * text (e.g. a `/compcat` typo) is sent as a normal message instead of
@@ -149,6 +154,7 @@ export function SlashCommandPalette({
   skillsEnabled,
   onSelect,
   onDismiss,
+  onComplete,
   enterFallsThroughOnEmpty = false,
 }: SlashCommandPaletteProps) {
   const { t } = useTranslation()
@@ -233,10 +239,19 @@ export function SlashCommandPalette({
         onDismiss?.()
         return
       }
+      if (e.key === 'Tab' && !e.shiftKey) {
+        // Complete the highlighted command into the composer without executing
+        // it. No match (or no handler) → let the browser move focus normally.
+        if (filtered.length === 0 || !onComplete) return
+        e.preventDefault()
+        e.stopImmediatePropagation()
+        onComplete(filtered[safeIndex])
+        return
+      }
     }
     document.addEventListener('keydown', handler, true)
     return () => document.removeEventListener('keydown', handler, true)
-  }, [safeIndex, filtered, onSelect, onDismiss, enterFallsThroughOnEmpty])
+  }, [safeIndex, filtered, onSelect, onDismiss, onComplete, enterFallsThroughOnEmpty])
 
   if (query === null) return null
 

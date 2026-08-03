@@ -262,5 +262,14 @@ export function useSlashCommandHandler(
     onDismiss?.()
   }, [value, setText, focusInput, onDismiss])
 
-  return { handleCommandSelect, handleDismiss }
+  /** Tab completion: insert `/name ` text only — never runs the command. */
+  const handleCommandComplete = useCallback(
+    (cmd: SlashCommand) => {
+      setText(applyCommand(cmd, value))
+      focusInput()
+    },
+    [value, setText, focusInput],
+  )
+
+  return { handleCommandSelect, handleDismiss, handleCommandComplete }
 }

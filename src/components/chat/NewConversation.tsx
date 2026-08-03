@@ -271,13 +271,14 @@ export function NewConversation() {
 
   const inputRef = useRef<HTMLTextAreaElement>(null)
 
-  const { handleCommandSelect, handleDismiss } = useSlashCommandHandler(surface, {
-    sessionId: activeId,
-    skills,
-    value: text,
-    setText,
-    inputRef,
-  })
+  const { handleCommandSelect, handleDismiss, handleCommandComplete } =
+    useSlashCommandHandler(surface, {
+      sessionId: activeId,
+      skills,
+      value: text,
+      setText,
+      inputRef,
+    })
 
   const pathStatus = useProjectPathStore((s) => s.statusOf(draft?.cwd))
   const searchRoot = useMemo(
@@ -346,7 +347,7 @@ export function NewConversation() {
         <AcpCapabilityCliffBanner />
         <div className="relative">
           {query !== null && (
-            <SlashCommandPalette value={text} surface={surface} sessionId={activeId} skills={skills} onSelect={handleCommandSelect} onDismiss={handleDismiss} />
+            <SlashCommandPalette value={text} surface={surface} sessionId={activeId} skills={skills} onSelect={handleCommandSelect} onDismiss={handleDismiss} onComplete={handleCommandComplete} />
           )}
           {query === null && atQuery !== null && searchRoot && (
             <FileMentionPalette

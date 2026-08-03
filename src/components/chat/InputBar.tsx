@@ -182,14 +182,15 @@ export function InputBar() {
     return () => { cancelled = true }
   }, [selectedSkill])
 
-  const { handleCommandSelect, handleDismiss } = useSlashCommandHandler(surface, {
-    sessionId: activeId,
-    skills,
-    skillsEnabled,
-    value,
-    setText: setValue,
-    inputRef,
-  })
+  const { handleCommandSelect, handleDismiss, handleCommandComplete } =
+    useSlashCommandHandler(surface, {
+      sessionId: activeId,
+      skills,
+      skillsEnabled,
+      value,
+      setText: setValue,
+      inputRef,
+    })
 
   const draft = useDraftStore((s) => s.draft)
   const catalog = useProvidersStore((s) => s.catalog)
@@ -310,6 +311,7 @@ export function InputBar() {
                 skillsEnabled={skillsEnabled}
                 onSelect={handleCommandSelect}
                 onDismiss={handleDismiss}
+                onComplete={handleCommandComplete}
                 enterFallsThroughOnEmpty
               />
             )}

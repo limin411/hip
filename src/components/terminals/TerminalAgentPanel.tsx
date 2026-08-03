@@ -611,6 +611,11 @@ function CompactComposer({
                 setText(applyCommand(cmd, text))
               }
             }}
+            onComplete={(cmd) => {
+              if (cmd.id === 'compact') {
+                setText(applyCommand(cmd, text))
+              }
+            }}
             onDismiss={() => {}}
             enterFallsThroughOnEmpty
           />

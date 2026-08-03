@@ -525,6 +525,29 @@ describe('InputBar slash commands', () => {
     expect(sendSpy).not.toHaveBeenCalled()
   })
 
+  it('Tab completes the highlighted slash command without running it', async () => {
+    baseMocks()
+    vi.spyOn(domain, 'useActiveSession').mockReturnValue(stubSession('code'))
+    const compactSpy = vi.spyOn(sessionService, 'compactSession').mockReturnValue(undefined)
+    const sendSpy = vi.spyOn(sessionService, 'sendMessage').mockReturnValue(undefined)
+
+    render(<InputBar />)
+
+    const textarea = screen.getByPlaceholderText(
+      'Message hip… (Enter to send, Shift+Enter for newline)',
+    )
+
+    // Type /comp — palette filters down to /compact
+    fireEvent.change(textarea, { target: { value: '/comp' } })
+    expect(screen.getByText('/compact')).toBeInTheDocument()
+
+    // Tab fills the highlighted command text; neither compact nor send runs.
+    fireEvent.keyDown(document, { key: 'Tab' })
+    expect(textarea).toHaveValue('/compact ')
+    expect(compactSpy).not.toHaveBeenCalled()
+    expect(sendSpy).not.toHaveBeenCalled()
+  })
+
   // ── Regression guards: /clear (must not break when new branches added) ──
 
   it('regression: selecting /clear still calls cancel() and newConversation() and clears input', async () => {

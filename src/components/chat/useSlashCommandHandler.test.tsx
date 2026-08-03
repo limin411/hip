@@ -456,4 +456,15 @@ describe('useSlashCommandHandler', () => {
     expect(setText).not.toHaveBeenCalled()
     expect(onDismiss).toHaveBeenCalled()
   })
+
+  it('handleCommandComplete inserts /name text without running the command', () => {
+    const compactSpy = vi.spyOn(sessionService, 'compactSession').mockReturnValue(undefined)
+    const { result, setText, inputRef } = setup('chat', 's1', { value: '/comp' })
+
+    result.current.handleCommandComplete(compactCmd)
+
+    expect(setText).toHaveBeenCalledWith('/compact ')
+    expect(inputRef.current.value).toBe('/comp')
+    expect(compactSpy).not.toHaveBeenCalled()
+  })
 })

@@ -500,7 +500,9 @@ export function TerminalAgentPanel({ terminalId }: { terminalId: string }) {
   const agents = useAgents().filter((a) => a.enabled)
   const [pickedAgent, setPickedAgent] = useState('builtin')
   const [pickedMode, setPickedMode] = useState<'chat' | 'edit' | 'full'>('edit')
+  const scrollRef = useRef<HTMLDivElement>(null)
   const bottomRef = useRef<HTMLDivElement>(null)
+  const [atBottom, setAtBottom] = useState(true)
 
   const active =
     useDomainStore((s) =>
@@ -519,10 +521,23 @@ export function TerminalAgentPanel({ terminalId }: { terminalId: string }) {
     }
   }, [active?.id, active?.loaded])
 
-  // Follow the transcript like ChatPane (new messages / session switch).
+  // Reset the bottom-pin when switching sessions (ChatPane parity).
   useEffect(() => {
+    setAtBottom(true)
+  }, [active?.id])
+
+  // Follow the transcript like ChatPane: only autoscroll while pinned to bottom.
+  useEffect(() => {
+    if (!atBottom) return
     bottomRef.current?.scrollIntoView({ block: 'end' })
-  }, [active?.id, active?.messages.length])
+  }, [active?.id, active?.messages.length, atBottom])
+
+  const onScroll = () => {
+    const el = scrollRef.current
+    if (!el) return
+    const nearBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 80
+    setAtBottom(nearBottom)
+  }
 
   const startChat = () => {
     if (!term) return
@@ -573,34 +588,53 @@ export function TerminalAgentPanel({ terminalId }: { terminalId: string }) {
       {active && isTerminalSession(active.config) ? (
         <>
           {/* Message list (chat transcript rhythm: px-3 py-4, soft gaps). */}
-          <div
-            className="min-h-0 flex-1 space-y-4 overflow-y-auto px-3 py-4"
-            data-testid="terminal-message-list"
-          >
-            {active.messages.length === 0 ? (
-              <div className="flex h-full flex-col items-center justify-center gap-3 px-6 text-center">
-                <span className="flex h-12 w-12 items-center justify-center rounded-full bg-accent/10 text-accent">
-                  <TerminalSquare size={22} strokeWidth={1.5} aria-hidden />
-                </span>
-                <div>
-                  <p className="text-body font-semibold text-ink">{t('terminals.agent.emptyTitle')}</p>
-                  <p className="mt-1 text-meta leading-relaxed text-ink-tertiary">
-                    {t('terminals.agent.emptyBody')}
-                  </p>
+          <div className="relative min-h-0 flex-1">
+            <div
+              ref={scrollRef}
+              onScroll={onScroll}
+              className="h-full min-h-0 space-y-4 overflow-y-auto px-3 py-4"
+              data-testid="terminal-message-list"
+            >
+              {active.messages.length === 0 ? (
+                <div className="flex h-full flex-col items-center justify-center gap-3 px-6 text-center">
+                  <span className="flex h-12 w-12 items-center justify-center rounded-full bg-accent/10 text-accent">
+                    <TerminalSquare size={22} strokeWidth={1.5} aria-hidden />
+                  </span>
+                  <div>
+                    <p className="text-body font-semibold text-ink">{t('terminals.agent.emptyTitle')}</p>
+                    <p className="mt-1 text-meta leading-relaxed text-ink-tertiary">
+                      {t('terminals.agent.emptyBody')}
+                    </p>
+                  </div>
                 </div>
-              </div>
-            ) : (
-              active.messages.map((m) => (
-                <MessageRow
-                  key={m.id}
-                  message={m}
-                  t={t}
-                  terminalId={terminalId}
-                  sessionId={active.id}
-                />
-              ))
-            )}
-            <div ref={bottomRef} data-testid="terminal-transcript-end" />
+              ) : (
+                active.messages.map((m) => (
+                  <MessageRow
+                    key={m.id}
+                    message={m}
+                    t={t}
+                    terminalId={terminalId}
+                    sessionId={active.id}
+                  />
+                ))
+              )}
+              <div ref={bottomRef} data-testid="terminal-transcript-end" />
+            </div>
+            {!atBottom && active.messages.length > 0 ? (
+              <button
+                type="button"
+                onClick={() => {
+                  setAtBottom(true)
+                  bottomRef.current?.scrollIntoView({ block: 'end' })
+                }}
+                data-testid="jump-to-latest"
+                title={t('chat.jumpToLatest')}
+                className="absolute bottom-4 left-1/2 flex -translate-x-1/2 items-center gap-1 rounded-sm border border-border bg-surface px-3 py-1.5 text-meta text-ink-secondary shadow-menu animate-menu-in transition-[background-color,color] duration-chrome ease-out hover:bg-state-hover"
+              >
+                <ChevronDown size={14} strokeWidth={1.75} />
+                {t('chat.jumpToLatest')}
+              </button>
+            ) : null}
           </div>
 
           {acpLimited ? (

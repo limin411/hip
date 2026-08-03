@@ -126,4 +126,25 @@ describe('TerminalAgentPanel tool card collapsing', () => {
     expect(screen.getByText(/Filesystem/)).toBeInTheDocument()
     unmount()
   })
+
+  it('shows jump-to-latest when scrolled away from the bottom and hides on click', () => {
+    Object.defineProperty(Element.prototype, 'scrollIntoView', {
+      value: () => {},
+      configurable: true,
+      writable: true,
+    })
+    const { unmount } = render(<TerminalAgentPanel terminalId="tm_1" />)
+    const list = screen.getByTestId('terminal-message-list')
+    Object.defineProperty(list, 'scrollHeight', { value: 2000, configurable: true })
+    Object.defineProperty(list, 'clientHeight', { value: 500, configurable: true })
+    Object.defineProperty(list, 'scrollTop', { value: 100, configurable: true })
+
+    fireEvent.scroll(list)
+    const jump = screen.getByTestId('jump-to-latest')
+    expect(jump).toBeInTheDocument()
+
+    fireEvent.click(jump)
+    expect(screen.queryByTestId('jump-to-latest')).not.toBeInTheDocument()
+    unmount()
+  })
 })

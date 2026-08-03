@@ -334,4 +334,22 @@ describe('TerminalAgentPanel tool card collapsing', () => {
     cancelSpy.mockRestore()
     unmount()
   })
+
+  it('sends unknown slash text (e.g. /compcat typo) as a normal message', () => {
+    const sendSpy = vi.spyOn(sessionService, 'sendMessageToSession').mockImplementation(() => {})
+    const { unmount } = render(<TerminalAgentPanel terminalId="tm_1" />)
+    const input = screen.getByTestId('terminal-composer-input')
+
+    fireEvent.change(input, { target: { value: '/compcat' } })
+    expect(screen.getByTestId('slash-palette')).toBeInTheDocument()
+    expect(screen.getByTestId('slash-palette-empty')).toBeInTheDocument()
+
+    // Enter with no matching command falls through to the composer and sends
+    // the raw text instead of being silently swallowed.
+    fireEvent.keyDown(input, { key: 'Enter' })
+    expect(sendSpy).toHaveBeenCalledWith('ta_1', '/compcat')
+
+    sendSpy.mockRestore()
+    unmount()
+  })
 })

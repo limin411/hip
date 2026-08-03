@@ -36,7 +36,7 @@ function makeDeps(overrides: Partial<ServerMessageEffectDeps> = {}): ServerMessa
   }
 }
 
-function seedSession(surface: 'chat' | 'code' = 'code') {
+function seedSession(surface: 'chat' | 'code' | 'terminal' = 'code') {
   useDomainStore.setState({
     sessions: [{
       id: 's1',
@@ -157,6 +157,26 @@ describe('applyServerMessageEffects', () => {
     expect(msgs).toHaveLength(1)
     expect(msgs[0].content.toLowerCase()).toContain('nothing to compact')
     expect(msgs[0].content).not.toMatch(/compacted:\s*7/i)
+  })
+
+  it('compact:result omits the summary blob for terminal sessions', () => {
+    seedSession('terminal')
+    const deps = makeDeps()
+    applyServerMessageEffects({
+      type: 'compact:result',
+      sessionId: 's1',
+      ok: true,
+      applied: true,
+      tokensBefore: 1098,
+      tokensAfter: 829,
+      messagesBefore: 13,
+      messagesAfter: 10,
+      summary: '[对话摘要] ```json {"Goal":"install opencode"}```',
+    }, deps)
+    const msgs = useDomainStore.getState().sessions.find((s) => s.id === 's1')!.messages
+    expect(msgs).toHaveLength(1)
+    expect(msgs[0].content).toContain('1098')
+    expect(msgs[0].content).not.toContain('[对话摘要]')
   })
 
   it('fs:gitInit:result ok toasts success and refreshes diff', () => {

@@ -127,6 +127,13 @@ interface SlashCommandPaletteProps {
   skillsEnabled?: Record<string, boolean>
   onSelect: (command: SlashCommand) => void
   onDismiss?: () => void
+  /**
+   * When true, Enter with NO matching command is NOT swallowed: the palette
+   * dismisses and the event falls through to the composer, so unknown slash
+   * text (e.g. a `/compcat` typo) is sent as a normal message instead of
+   * silently doing nothing. Chat keeps the default blocking behavior.
+   */
+  enterFallsThroughOnEmpty?: boolean
 }
 
 /**
@@ -142,6 +149,7 @@ export function SlashCommandPalette({
   skillsEnabled,
   onSelect,
   onDismiss,
+  enterFallsThroughOnEmpty = false,
 }: SlashCommandPaletteProps) {
   const { t } = useTranslation()
   const query = useMemo(() => extractSlashQuery(value), [value])
@@ -209,6 +217,11 @@ export function SlashCommandPalette({
         return
       }
       if (e.key === 'Enter' && !e.shiftKey) {
+        if (filtered.length === 0 && enterFallsThroughOnEmpty) {
+          // No match: let the composer handle Enter (send as plain text).
+          onDismiss?.()
+          return
+        }
         e.preventDefault()
         e.stopImmediatePropagation()
         if (filtered[safeIndex]) onSelect(filtered[safeIndex])
@@ -223,7 +236,7 @@ export function SlashCommandPalette({
     }
     document.addEventListener('keydown', handler, true)
     return () => document.removeEventListener('keydown', handler, true)
-  }, [safeIndex, filtered, onSelect, onDismiss])
+  }, [safeIndex, filtered, onSelect, onDismiss, enterFallsThroughOnEmpty])
 
   if (query === null) return null
 

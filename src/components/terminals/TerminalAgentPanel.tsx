@@ -612,6 +612,7 @@ function CompactComposer({
               }
             }}
             onDismiss={() => {}}
+            enterFallsThroughOnEmpty
           />
         ) : null}
         <textarea

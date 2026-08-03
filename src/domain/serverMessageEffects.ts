@@ -29,6 +29,7 @@ const COMPACT_KEEP_RECENT_TURNS = 3
 /** Build user-facing compact result body (transcript + toast). */
 export function formatCompactResultMessage(
   msg: Extract<ServerMessage, { type: 'compact:result' }>,
+  opts?: { omitSummary?: boolean },
 ): string {
   if (!msg.ok) {
     if (msg.reason === 'session_busy') {
@@ -47,7 +48,7 @@ export function formatCompactResultMessage(
       tokensAfter: msg.tokensAfter,
     }),
   ]
-  if (msg.summary?.trim()) {
+  if (msg.summary?.trim() && !opts?.omitSummary) {
     lines.push('', msg.summary.trim())
   }
   return lines.join('\n')
@@ -442,7 +443,15 @@ export function applyServerMessageEffects(msg: ServerMessage, deps: ServerMessag
       return
 
     case 'compact:result': {
-      const content = formatCompactResultMessage(msg)
+      // Terminal agent sessions: keep the concise applied line but skip the
+      // model-generated summary blob (it is stored server-side, not needed in
+      // the narrow ops-assistant transcript).
+      const terminalSession = useDomainStore
+        .getState()
+        .sessions.find((x) => x.id === msg.sessionId)
+      const content = formatCompactResultMessage(msg, {
+        omitSummary: terminalSession?.config.surface === 'terminal',
+      })
       if (msg.ok && msg.applied) {
         useDomainStore.getState().appendMessage(msg.sessionId, {
           id: nanoid(),

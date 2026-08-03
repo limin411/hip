@@ -446,6 +446,7 @@ export class Session {
     messagesBefore: number
     messagesAfter: number
     summary?: string
+    replacedMessageIds?: string[]
     error?: string
   }> {
     if (this.running) {
@@ -528,6 +529,7 @@ export class Session {
       messagesBefore: before,
       messagesAfter: after,
       summary: summaryText,
+      replacedMessageIds: result.replacedIds,
     }
   }
 

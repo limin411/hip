@@ -443,6 +443,11 @@ export function applyServerMessageEffects(msg: ServerMessage, deps: ServerMessag
       return
 
     case 'compact:result': {
+      // Trim messages collapsed into the summary so the transcript and token
+      // meters reflect the compacted context (chat/code/terminal alike).
+      if (msg.ok && msg.applied && msg.replacedMessageIds?.length) {
+        useDomainStore.getState().removeSessionMessages(msg.sessionId, msg.replacedMessageIds)
+      }
       // Terminal agent sessions: keep the concise applied line but skip the
       // model-generated summary blob (it is stored server-side, not needed in
       // the narrow ops-assistant transcript).

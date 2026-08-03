@@ -588,6 +588,9 @@ export type ServerMessage =
       messagesAfter: number
       /** Present when applied — for UI status strip. */
       summary?: string
+      /** Message ids collapsed into the summary (applied only) — lets the UI
+       *  trim its transcript so token meters reflect the compacted context. */
+      replacedMessageIds?: string[]
       error?: string
     }
   | { type: 'workflow:started'; sessionId: string; runId: string; def: WorkflowDef }

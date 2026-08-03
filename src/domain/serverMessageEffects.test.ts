@@ -179,6 +179,39 @@ describe('applyServerMessageEffects', () => {
     expect(msgs[0].content).not.toContain('[对话摘要]')
   })
 
+  it('compact:result applied trims replaced messages so token meters update', () => {
+    seedSession('terminal')
+    useDomainStore.setState((s) => ({
+      sessions: s.sessions.map((x) =>
+        x.id === 's1'
+          ? {
+              ...x,
+              messages: [
+                { id: 'm1', role: 'user', content: 'a', timestamp: 1 },
+                { id: 'm2', role: 'assistant', content: 'b', timestamp: 2 },
+                { id: 'm3', role: 'user', content: 'c', timestamp: 3 },
+              ],
+            }
+          : x,
+      ),
+    }))
+    const deps = makeDeps()
+    applyServerMessageEffects({
+      type: 'compact:result',
+      sessionId: 's1',
+      ok: true,
+      applied: true,
+      tokensBefore: 100,
+      tokensAfter: 40,
+      messagesBefore: 3,
+      messagesAfter: 2,
+      replacedMessageIds: ['m2'],
+    }, deps)
+    const msgs = useDomainStore.getState().sessions.find((s) => s.id === 's1')!.messages
+    expect(msgs.map((m) => m.id)).toEqual(['m1', 'm3', expect.any(String)])
+    expect(msgs[2].content).toContain('40')
+  })
+
   it('fs:gitInit:result ok toasts success and refreshes diff', () => {
     toastSuccess.mockClear()
     const deps = makeDeps()

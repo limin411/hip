@@ -847,6 +847,8 @@ interface DomainStore {
   renameSession: (id: string, title: string) => void
   appendUserMessage: (sessionId: string, id: string, content: string, attachments?: LocalAttachment[]) => void
   appendMessage: (sessionId: string, message: { id: string; role: 'user' | 'assistant'; content: string; timestamp: number }) => void
+  /** Drop messages collapsed into a compaction summary (keeps meters honest). */
+  removeSessionMessages: (sessionId: string, ids: string[]) => void
   /**
    * Optimistic plan HITL response: drop PlanApprovalCard immediately.
    * approve/amend → running; reject → idle (sidecar may still send PLAN_REJECTED).
@@ -941,6 +943,18 @@ export const useDomainStore = create<DomainStore>((set) => ({
         sess.id !== sessionId ? sess : { ...sess, messages: [...sess.messages, message], updatedAtMs: Date.now() },
       ),
     })),
+
+  removeSessionMessages: (sessionId, ids) =>
+    set((s) => {
+      const remove = new Set(ids)
+      return {
+        sessions: s.sessions.map((sess) =>
+          sess.id === sessionId
+            ? { ...sess, messages: sess.messages.filter((m) => !remove.has(m.id)) }
+            : sess,
+        ),
+      }
+    }),
 
   respondPlanOptimistic: (sessionId, action) =>
     set((s) => ({

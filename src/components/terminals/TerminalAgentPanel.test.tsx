@@ -115,6 +115,11 @@ describe('TerminalAgentPanel tool card collapsing', () => {
     // Collapsed: command summary visible, output hidden.
     expect(screen.getByText('df -h')).toBeInTheDocument()
     expect(screen.queryByText(/Filesystem/)).not.toBeInTheDocument()
+    // Order: the tool card (execution) renders BEFORE the assistant answer text.
+    const answer = screen.getByText(/root partition usage/)
+    expect(
+      card.compareDocumentPosition(answer) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy()
 
     fireEvent.click(screen.getByTestId('terminal-tool-header'))
     expect(card.getAttribute('data-expanded')).toBe('true')

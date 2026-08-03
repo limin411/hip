@@ -281,21 +281,25 @@ function MessageRow({
             <MarkdownBody content={message.content} />
           </div>
         ) : (
-          <MarkdownBody content={message.content} />
+          <>
+            {/* Process first: tool execution happened before the final answer
+                (same order as the main Chat process trail → answer). */}
+            {message.toolCalls && message.toolCalls.length > 0 ? (
+              <div className="mb-2 space-y-1.5">
+                {message.toolCalls.map((tc) => (
+                  <ToolCard
+                    key={tc.callId}
+                    tool={tc}
+                    t={t}
+                    terminalId={terminalId}
+                    sessionId={sessionId}
+                  />
+                ))}
+              </div>
+            ) : null}
+            <MarkdownBody content={message.content} />
+          </>
         )}
-        {message.toolCalls && message.toolCalls.length > 0 ? (
-          <div className="mt-2 space-y-1.5">
-            {message.toolCalls.map((tc) => (
-              <ToolCard
-                key={tc.callId}
-                tool={tc}
-                t={t}
-                terminalId={terminalId}
-                sessionId={sessionId}
-              />
-            ))}
-          </div>
-        ) : null}
       </div>
     </div>
   )

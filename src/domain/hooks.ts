@@ -181,6 +181,44 @@ export function useSessionTokenMeter(): SessionTokenMeter | null {
   return { contextTokens, contextWindow, percent, zone, cumulative, costUsd }
 }
 
+/** Session-scoped token meter for an EXPLICIT session (terminal agent panel etc.).
+ *  Mirrors useSessionTokenMeter but never touches the domain active pointer. */
+export function useSessionTokenMeterFor(
+  sessionId: string | null | undefined,
+): SessionTokenMeter | null {
+  const session = useDomainStore((s) =>
+    sessionId ? s.sessions.find((x) => x.id === sessionId) : undefined,
+  )
+  const catalog = useProvidersStore((s) => s.catalog)
+  const config = useProvidersStore((s) => s.config)
+  if (!session) return null
+  if (!session.messages.some((m) => m.usage)) return null
+
+  const fill = contextFillTokens(session.messages)
+  const contextTokens = fill != null && fill > 0 ? fill : 0
+  let any = false
+  const cumulative: TurnUsage = { inputTokens: 0, outputTokens: 0, totalTokens: 0 }
+  for (const m of session.messages) {
+    if (!m.usage) continue
+    any = true
+    cumulative.inputTokens += m.usage.inputTokens ?? 0
+    cumulative.outputTokens += m.usage.outputTokens ?? 0
+    cumulative.totalTokens += m.usage.totalTokens ?? 0
+  }
+  if (!any) return null
+
+  const currentKey = session.config.model
+    ? `${session.config.llmProvider}/${session.config.model}`
+    : activeModelKey(config)
+  const { providerID, modelID } = parseModelKey(currentKey)
+  const model = catalog[providerID]?.models[modelID]
+  const contextWindow = model?.limit?.context
+  const percent = computePercentage(contextTokens, contextWindow)
+  const zone = zoneForPercent(percent)
+  const costUsd = computeCost(cumulative, model?.cost)
+  return { contextTokens, contextWindow, percent, zone, cumulative, costUsd }
+}
+
 /**
  * @deprecated Prefer `useSessionTokenMeter`. Kept for callers that only need
  * context-fill percent fields. `usedTokens` is last-turn context fill (not cumulative).

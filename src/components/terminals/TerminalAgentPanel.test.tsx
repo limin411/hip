@@ -7,6 +7,7 @@ import { useDomainStore } from '@/domain/sessionStore'
 import { useManagedTerminalStore } from '@/store/managedTerminalStore'
 import { useTerminalAgentStore } from '@/store/terminalAgentStore'
 import { useTerminalHostStore } from '@/store/terminalHostStore'
+import { sessionService } from '@/domain'
 import { TerminalAgentPanel } from './TerminalAgentPanel'
 
 const mocks = vi.hoisted(() => ({
@@ -217,6 +218,47 @@ describe('TerminalAgentPanel tool card collapsing', () => {
       'data-selected',
       'true',
     )
+    unmount()
+  })
+
+  it('runs /compact instead of sending a prompt', () => {
+    const compactSpy = vi.spyOn(sessionService, 'compactSession').mockImplementation(() => {})
+    const sendSpy = vi.spyOn(sessionService, 'sendMessageToSession').mockImplementation(() => {})
+    const { unmount } = render(<TerminalAgentPanel terminalId="tm_1" />)
+    const input = screen.getByTestId('terminal-composer-input')
+
+    fireEvent.change(input, { target: { value: '/compact auth flow' } })
+    expect(screen.getByTestId('terminal-compact-hint')).toBeInTheDocument()
+    fireEvent.keyDown(input, { key: 'Enter' })
+
+    expect(compactSpy).toHaveBeenCalledWith('ta_1', 'auth flow')
+    expect(sendSpy).not.toHaveBeenCalled()
+    expect(input).toHaveValue('')
+    compactSpy.mockRestore()
+    sendSpy.mockRestore()
+    unmount()
+  })
+
+  it('shows the session token usage chip once a turn reports usage', () => {
+    useDomainStore.setState((s) => ({
+      sessions: s.sessions.map((x) =>
+        x.id === 'ta_1' && x.messages[0]
+          ? {
+              ...x,
+              messages: [
+                {
+                  ...x.messages[0],
+                  usage: { inputTokens: 1000, outputTokens: 500, totalTokens: 1500 },
+                },
+              ],
+            }
+          : x,
+      ),
+    }))
+    const { unmount } = render(<TerminalAgentPanel terminalId="tm_1" />)
+    const chip = screen.getByTestId('terminal-session-usage')
+    expect(chip).toBeInTheDocument()
+    expect(chip.textContent?.length ?? 0).toBeGreaterThan(0)
     unmount()
   })
 })

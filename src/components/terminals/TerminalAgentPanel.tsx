@@ -7,6 +7,7 @@ import {
   Check,
   ChevronDown,
   ChevronRight,
+  Shrink,
   KeyRound,
   Loader2,
   Plus,
@@ -15,6 +16,7 @@ import {
   TriangleAlert,
 } from 'lucide-react'
 import { sessionService } from '@/domain'
+import { useSessionTokenMeterFor, type SessionTokenMeter } from '@/domain'
 import { useDomainStore } from '@/domain/sessionStore'
 import { useManagedTerminalStore, type ManagedTerminalStatus } from '@/store/managedTerminalStore'
 import { useTerminalAgentStore, terminalSessionsFor } from '@/store/terminalAgentStore'
@@ -23,6 +25,8 @@ import { useAgents } from '@/store/hipConfigStore'
 import { sshWrite } from '@/ipc/ssh'
 import { isTerminalSession } from '@/lib/sessions'
 import { formatAbsolute, formatClockTime } from '@/lib/datetime'
+import { formatTokensCompact } from '@/lib/formatTokens'
+import { formatUsd } from '@/lib/usageCost'
 import { MarkdownBody } from '@/components/chat/MarkdownBody'
 import { ComposerChip } from '@/components/chat/ComposerChip'
 import {
@@ -32,6 +36,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/DropdownMenu'
 import { Button } from '@/components/ui/Button'
+import { Popover, PopoverAnchor, PopoverContent } from '@/components/ui/Popover'
 import { cn } from '@/lib/utils'
 import type { Message, ToolCall } from '@hip/protocol'
 import { startTerminalAgentChat } from './terminalAgentSession'
@@ -438,6 +443,82 @@ function DropdownCheckItem({
   )
 }
 
+const USAGE_ZONE_CLASS: Record<string, string> = {
+  success: 'text-success',
+  warning: 'text-warning',
+  danger: 'text-danger',
+}
+
+/** Session-scoped token / cost chip next to send (Chat composer parity). */
+function SessionUsageChip({ meter, t }: { meter: SessionTokenMeter; t: TFunction }) {
+  const primary =
+    meter.percent !== null
+      ? t('chat.usage.percentage', { percent: meter.percent })
+      : formatTokensCompact(meter.contextTokens)
+  const zoneClass = meter.zone ? USAGE_ZONE_CLASS[meter.zone] : 'text-ink-tertiary'
+  return (
+    <Popover>
+      <PopoverAnchor asChild>
+        <span
+          data-testid="terminal-session-usage"
+          data-zone={meter.zone ?? undefined}
+          className={cn(
+            'hidden shrink-0 cursor-default select-none rounded-full bg-surface-muted px-1.5 py-0.5 text-caption tabular-nums sm:inline-block',
+            zoneClass,
+          )}
+        >
+          {primary}
+        </span>
+      </PopoverAnchor>
+      <PopoverContent
+        side="top"
+        align="end"
+        sideOffset={8}
+        className="w-[min(240px,calc(100vw-2rem))] p-3"
+        data-testid="terminal-session-usage-popover"
+      >
+        <div className="space-y-2">
+          <div className="flex items-baseline justify-between gap-2">
+            <span className="text-caption font-medium text-ink">{t('chat.usage.contextTitle')}</span>
+            <span className="text-meta text-ink-tertiary">
+              {t('chat.usage.percentage', { percent: meter.percent ?? 0 })}
+            </span>
+          </div>
+          {meter.contextWindow ? (
+            <p className="text-meta text-ink-tertiary">
+              {t('chat.usage.percentageTooltip', {
+                used: meter.contextTokens.toLocaleString(),
+                total: meter.contextWindow.toLocaleString(),
+                percent: meter.percent ?? 0,
+              })}
+            </p>
+          ) : null}
+          <div className="space-y-1 border-t border-border pt-2 text-meta text-ink-secondary">
+            <div className="flex justify-between gap-3">
+              <span>
+                {t('chat.usage.io', {
+                  input: meter.cumulative.inputTokens,
+                  output: meter.cumulative.outputTokens,
+                })}
+              </span>
+            </div>
+            <div className="flex justify-between gap-3">
+              <span>{t('chat.usage.sessionTotal')}</span>
+              <span className="tabular-nums">{meter.cumulative.totalTokens.toLocaleString()}</span>
+            </div>
+            {meter.costUsd != null ? (
+              <div className="flex justify-between gap-3">
+                <span>{t('chat.usage.costLabel')}</span>
+                <span className="tabular-nums">{formatUsd(meter.costUsd)}</span>
+              </div>
+            ) : null}
+          </div>
+        </div>
+      </PopoverContent>
+    </Popover>
+  )
+}
+
 /** Compact card composer mirroring the chat Composer (`variant="card"`). */
 function CompactComposer({
   sessionId,
@@ -458,22 +539,45 @@ function CompactComposer({
 }) {
   const { t } = useTranslation()
   const [text, setText] = useState('')
+  const meter = useSessionTokenMeterFor(sessionId)
   // Optimistic local selection: apply immediately, reconcile when the sidecar
   // echoes the config change (session:agentChanged / session:permissionMode).
   const [agent, setAgent] = useState(selectedAgentId)
   const [mode, setMode] = useState(permissionMode)
   useEffect(() => setAgent(selectedAgentId), [selectedAgentId])
   useEffect(() => setMode(permissionMode), [permissionMode])
+  const runCompact = (focus?: string) => {
+    sessionService.compactSession(sessionId, focus)
+    setText('')
+  }
   const send = () => {
     const value = text.trim()
     if (!value || disabled) return
+    // /compact — summarize the conversation locally (never sent as a prompt).
+    const compactMatch = value.match(/^\/compact(?:\s+(.*))?$/)
+    if (compactMatch) {
+      runCompact(compactMatch[1]?.trim() || undefined)
+      return
+    }
     sessionService.sendTerminalContext(sessionId)
     sessionService.sendMessageToSession(sessionId, value)
     setText('')
   }
+  const compactHint = /^\/compact(\s|$)/.test(text)
   return (
     <div className="shrink-0 px-3 pb-3 pt-1.5" data-testid="terminal-composer">
       <div className="rounded-lg border border-border bg-surface-subtle p-2.5 transition-colors duration-chrome focus-within:border-accent/40">
+        {compactHint ? (
+          <button
+            type="button"
+            onClick={() => runCompact(text.trim().replace(/^\/compact\s*/, '') || undefined)}
+            className="mb-1 flex items-center gap-1 rounded-md bg-surface-muted px-1.5 py-0.5 text-caption text-ink-secondary transition-colors hover:bg-state-hover"
+            data-testid="terminal-compact-hint"
+          >
+            <Shrink size={11} strokeWidth={1.75} aria-hidden />
+            {t('chat.slash.cmd.compact')}
+          </button>
+        ) : null}
         <textarea
           value={text}
           onChange={(e) => setText(e.target.value)}
@@ -552,17 +656,20 @@ function CompactComposer({
               ))}
             </DropdownChip>
           </div>
-          <Button
-            variant="primary"
-            size="icon"
-            className="h-7 w-7 shrink-0 rounded-sm"
-            onClick={send}
-            disabled={disabled || !text.trim()}
-            data-testid="terminal-composer-send"
-            title={t('terminals.agent.send')}
-          >
-            <ArrowUp size={15} strokeWidth={1.75} />
-          </Button>
+          <div className="flex shrink-0 items-center gap-1.5">
+            {meter ? <SessionUsageChip meter={meter} t={t} /> : null}
+            <Button
+              variant="primary"
+              size="icon"
+              className="h-7 w-7 shrink-0 rounded-sm"
+              onClick={send}
+              disabled={disabled || !text.trim()}
+              data-testid="terminal-composer-send"
+              title={t('terminals.agent.send')}
+            >
+              <ArrowUp size={15} strokeWidth={1.75} />
+            </Button>
+          </div>
         </div>
       </div>
     </div>

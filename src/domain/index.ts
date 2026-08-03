@@ -19,6 +19,7 @@ export {
   useActiveUsageTotal,
   useTokenUsage,
   useSessionTokenMeter,
+  useSessionTokenMeterFor,
   useMcpStatuses,
   selectUsageTotal,
   selectContextTokens,

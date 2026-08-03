@@ -4,6 +4,8 @@ import type { TFunction } from 'i18next'
 import {
   ArrowUp,
   Bot,
+  ChevronDown,
+  ChevronRight,
   KeyRound,
   Loader2,
   Plus,
@@ -92,6 +94,7 @@ function ToolCard({
   terminalId: string
   sessionId: string
 }) {
+  const [expanded, setExpanded] = useState(false)
   let inputText = ''
   try {
     inputText = typeof tool.input === 'string' ? tool.input : JSON.stringify(tool.input, null, 2)
@@ -100,8 +103,23 @@ function ToolCard({
   }
   const isExec = tool.name === 'terminal_exec'
   const timedOut = isExec && /status: timed_out/.test(tool.output ?? '')
-  const command = isExec ? inputText.split('\n')[0]?.slice(0, 200) ?? inputText : inputText
+  let parsedInput: unknown = null
+  try {
+    parsedInput = JSON.parse(inputText)
+  } catch {
+    parsedInput = null
+  }
+  const command = isExec
+    ? parsedInput &&
+      typeof parsedInput === 'object' &&
+      'command' in parsedInput &&
+      typeof (parsedInput as { command?: unknown }).command === 'string'
+      ? ((parsedInput as { command: string }).command as string).slice(0, 200)
+      : (inputText.split('\n')[0]?.slice(0, 200) ?? inputText)
+    : inputText
   const title = isExec ? t('terminals.agent.execTitle') : tool.name
+  // 终端执行卡片默认折叠（只占一行）；其他工具卡保持展开。
+  const showBody = !isExec || expanded
 
   return (
     <div
@@ -109,9 +127,26 @@ function ToolCard({
       data-testid="terminal-tool-card"
       data-tool={tool.name}
       data-status={tool.status}
+      data-expanded={showBody ? 'true' : 'false'}
     >
-      {/* Header: icon + title + status (ActivityBar-like compact row). */}
-      <div className="flex items-center gap-2 px-2.5 py-1.5">
+      {/* Header: icon + title + status (ActivityBar-like compact row). Click to expand. */}
+      <button
+        type="button"
+        onClick={() => setExpanded((v) => !v)}
+        aria-expanded={showBody}
+        aria-label={title}
+        className="flex w-full items-center gap-2 px-2.5 py-1.5 text-left transition-colors hover:bg-state-hover/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink/20"
+        data-testid="terminal-tool-header"
+      >
+        {isExec ? (
+          <span className="shrink-0 text-ink-tertiary" aria-hidden>
+            {showBody ? (
+              <ChevronDown size={12} strokeWidth={1.75} />
+            ) : (
+              <ChevronRight size={12} strokeWidth={1.75} />
+            )}
+          </span>
+        ) : null}
         <span
           className={cn(
             'flex h-5 w-5 shrink-0 items-center justify-center rounded-md',
@@ -125,13 +160,22 @@ function ToolCard({
         >
           <TerminalSquare size={12} strokeWidth={1.75} />
         </span>
-        <span className="min-w-0 flex-1 truncate font-mono text-caption font-medium text-ink">
-          {title}
-        </span>
+        {isExec && !showBody ? (
+          <span
+            className="min-w-0 flex-1 truncate font-mono text-caption font-medium text-ink"
+            title={inputText}
+          >
+            {command}
+          </span>
+        ) : (
+          <span className="min-w-0 flex-1 truncate font-mono text-caption font-medium text-ink">
+            {title}
+          </span>
+        )}
         <ToolStatusChip tool={tool} timedOut={timedOut} t={t} />
-      </div>
+      </button>
 
-      {isExec && command ? (
+      {showBody && isExec && command ? (
         <div className="border-t border-border/60 px-2.5 py-1.5">
           <p
             className="truncate font-mono text-caption text-ink-secondary"
@@ -142,20 +186,20 @@ function ToolCard({
         </div>
       ) : null}
 
-      {tool.output ? (
+      {showBody && tool.output ? (
         <pre className="max-h-40 overflow-auto whitespace-pre-wrap break-words border-t border-border/60 bg-surface-muted/40 px-2.5 py-2 font-mono text-caption leading-relaxed text-ink-secondary">
           {tool.output.slice(0, 2000)}
           {tool.output.length > 2000 ? '\n…' : ''}
         </pre>
       ) : null}
 
-      {tool.error ? (
+      {showBody && tool.error ? (
         <p className="border-t border-border/60 px-2.5 py-1.5 text-caption text-danger">
           {tool.error}
         </p>
       ) : null}
 
-      {timedOut ? (
+      {showBody && timedOut ? (
         <div className="flex flex-wrap items-center gap-1.5 border-t border-border/60 bg-warning/5 px-2.5 py-1.5">
           <TriangleAlert size={12} className="shrink-0 text-warning" aria-hidden />
           <span className="text-caption text-warning">{t('terminals.agent.execTimedOut')}</span>

@@ -117,20 +117,35 @@ describe('terminal agent over real SSH @terminal-ssh', function () {
       },
     )
 
-    // The terminal_exec tool card must show the captured df output.
+    // The terminal_exec tool card renders collapsed by default; expand it first,
+    // then the captured df output must be visible.
     await browser.waitUntil(
       async () => {
         const card = await browser.$(
           '[data-testid="terminal-tool-card"][data-tool="terminal_exec"]',
         )
-        if (!(await card.isExisting())) return false
-        const text = await card.getText()
-        return text.includes('Filesystem')
+        return card.isExisting()
       },
       {
         timeout: 60000,
         interval: 1000,
-        timeoutMsg: 'terminal_exec tool card did not capture df output',
+        timeoutMsg: 'terminal_exec tool card did not appear',
+      },
+    )
+    const execCard = await browser.$(
+      '[data-testid="terminal-tool-card"][data-tool="terminal_exec"]',
+    )
+    await browser.execute((el: HTMLElement) => el.click(), execCard)
+    await browser.waitUntil(
+      async () => (await execCard.getAttribute('data-expanded')) === 'true',
+      { timeout: 10000, interval: 200, timeoutMsg: 'terminal_exec card did not expand' },
+    )
+    await browser.waitUntil(
+      async () => (await execCard.getText()).includes('Filesystem'),
+      {
+        timeout: 10000,
+        interval: 200,
+        timeoutMsg: 'expanded terminal_exec card lacks df output',
       },
     )
 

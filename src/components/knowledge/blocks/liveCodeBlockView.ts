@@ -234,6 +234,7 @@ class LiveCodeBlockNodeView implements NodeView {
     this.langEl.style.color = chrome?.headerText ?? ''
     this.copyBtn.style.color = chrome?.headerText ?? ''
     this.editPre.style.color = chrome?.text ?? ''
+    this.editPre.style.backgroundColor = chrome?.background ?? ''
     this.previewEl.style.color = chrome?.text ?? ''
     this.previewEl.style.backgroundColor = chrome?.background ?? ''
   }

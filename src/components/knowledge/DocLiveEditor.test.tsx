@@ -27,6 +27,7 @@ import {
   liveAllowsBlockSlash,
 } from '@/domain/knowledge/slashMenu'
 import { KnowledgeSlashMenu } from './KnowledgeSlashMenu'
+import { useHipConfigStore } from '@/store/hipConfigStore'
 
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({
@@ -52,6 +53,7 @@ vi.mock('@/ipc/clipboard', () => ({
 
 afterEach(() => {
   cleanup()
+  useHipConfigStore.setState({ config: { version: 1 } })
   vi.mocked(importAssetFromClipboardItems).mockReset()
   vi.mocked(importAssetFromFile).mockReset()
 })
@@ -313,6 +315,29 @@ describe('DocLiveEditor', () => {
     expect(block.textContent ?? '').toContain('const x = 1')
     await waitFor(() => {
       expect(screen.getByTestId('knowledge-live-code-copy')).toBeInTheDocument()
+    })
+  }, 25_000)
+
+  it('keeps forced dark chrome while editing code block', async () => {
+    useHipConfigStore.setState({
+      config: { version: 1, codeBlock: { colorTheme: 'dark' } },
+    })
+    render(
+      <DocLiveEditor
+        docId="d-code-dark"
+        initialMarkdown={'```ts\nconst x = 1\n```\n'}
+        onDraftChange={() => {}}
+      />,
+    )
+    await waitForProseMirror()
+    await waitFor(() => {
+      expect(screen.getByTestId('knowledge-live-code-block')).toBeInTheDocument()
+    })
+    await waitFor(() => {
+      expect(screen.getByTestId('knowledge-live-code-edit')).toHaveStyle({
+        backgroundColor: '#0d1117',
+        color: '#e6edf3',
+      })
     })
   }, 25_000)
 

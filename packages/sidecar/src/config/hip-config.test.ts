@@ -346,6 +346,57 @@ colorTheme = "one-dark"
     expect(cfg.terminal).toEqual({ shell: 'bash', colorTheme: 'one-dark' })
   })
 
+  it('parses [code_block] color_theme (snake_case)', () => {
+    const dir = tmpDir()
+    const p = writeToml(
+      dir,
+      'code-block-color.toml',
+      `version = 1
+[code_block]
+color_theme = "dark"
+`,
+    )
+    process.env.HIP_CONFIG_PATH = p
+    const cfg = readHipConfig()
+    expect(cfg.codeBlock).toEqual({ colorTheme: 'dark' })
+  })
+
+  it('parses [code_block] colorTheme (camelCase alias)', () => {
+    const dir = tmpDir()
+    const p = writeToml(
+      dir,
+      'code-block-color-camel.toml',
+      `version = 1
+[codeBlock]
+colorTheme = "light"
+`,
+    )
+    process.env.HIP_CONFIG_PATH = p
+    const cfg = readHipConfig()
+    expect(cfg.codeBlock).toEqual({ colorTheme: 'light' })
+  })
+
+  it('drops unknown code_block color_theme values', () => {
+    const dir = tmpDir()
+    const p = writeToml(
+      dir,
+      'code-block-color-bad.toml',
+      `version = 1
+[code_block]
+color_theme = "not-a-theme"
+`,
+    )
+    process.env.HIP_CONFIG_PATH = p
+    expect(readHipConfig().codeBlock).toEqual({})
+  })
+
+  it('omits codeBlock when section is absent', () => {
+    const dir = tmpDir()
+    const p = writeToml(dir, 'hip.toml', 'version = 1\n')
+    process.env.HIP_CONFIG_PATH = p
+    expect(readHipConfig().codeBlock).toBeUndefined()
+  })
+
   it('ignores unknown terminal.color_theme values', () => {
     const dir = tmpDir()
     const p = writeToml(
@@ -688,6 +739,24 @@ doomLoopStrategy = "pause_immediately"
 
     const cfg = resolveEffectiveConfig(root)
     expect(cfg.agentLoop?.doomLoopStrategy).toBe('pause_immediately')
+  })
+
+  it('project codeBlock replaces global codeBlock wholesale', () => {
+    const dir = tmpDir()
+    const globalFile = writeToml(dir, 'global.toml', `version = 1
+[code_block]
+color_theme = "dark"
+`)
+    process.env.HIP_CONFIG_PATH = globalFile
+
+    const { root } = setupProjectDir()
+    writeToml(join(root, '.hip'), 'hip.toml', `version = 1
+[code_block]
+color_theme = "light"
+`)
+
+    const cfg = resolveEffectiveConfig(root)
+    expect(cfg.codeBlock).toEqual({ colorTheme: 'light' })
   })
 })
 

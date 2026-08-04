@@ -12,6 +12,11 @@ import { sessionService } from '@/domain'
 import { useFsScope } from '@/store/useFsScope'
 import { useFsStore } from '@/store/fsStore'
 import { useUiStore } from '@/store/uiStore'
+import { useHipConfigStore } from '@/store/hipConfigStore'
+import {
+  CODE_BLOCK_CHROME,
+  normalizeCodeBlockThemeId,
+} from '@/domain/knowledge/codeBlockTheme'
 import { highlightLangFromPath } from './previewLang'
 import {
   CSV_PREVIEW_MAX_ROWS,
@@ -99,9 +104,18 @@ function ModeToggle({
   )
 }
 
-function PlainPre({ content, testid }: { content: string; testid?: string }) {
+function PlainPre({
+  content,
+  testid,
+  color,
+}: {
+  content: string
+  testid?: string
+  color?: string
+}) {
   return (
     <pre
+      style={color ? { color } : undefined}
       className="whitespace-pre-wrap break-words font-mono text-meta text-ink"
       data-testid={testid}
     >
@@ -125,6 +139,10 @@ export function CodePreviewBody({
 }) {
   const lang = highlightLangFromPath(path)
   const isDark = useIsDark(true)
+  const codeBlockTheme = useHipConfigStore((s) =>
+    normalizeCodeBlockThemeId(s.config.codeBlock?.colorTheme),
+  )
+  const chrome = codeBlockTheme !== 'follow' ? CODE_BLOCK_CHROME[codeBlockTheme] : null
   const [html, setHtml] = useState<string | null>(null)
 
   useEffect(() => {
@@ -134,7 +152,7 @@ export function CodePreviewBody({
     }
     let cancelled = false
     void import('@/lib/shikiLazy')
-      .then(({ highlightCode }) => highlightCode(content, lang, isDark))
+      .then(({ highlightCode }) => highlightCode(content, lang, codeBlockTheme, isDark))
       .then((h) => {
         if (!cancelled) setHtml(h)
       })
@@ -144,20 +162,29 @@ export function CodePreviewBody({
     return () => {
       cancelled = true
     }
-  }, [content, lang, isDark])
+  }, [content, lang, isDark, codeBlockTheme])
 
   return (
-    <div className="h-full overflow-auto p-4" data-testid="preview-code">
+    <div
+      className="h-full overflow-auto p-4"
+      data-testid="preview-code"
+      style={
+        chrome
+          ? { backgroundColor: chrome.background, borderColor: chrome.border, color: chrome.text }
+          : undefined
+      }
+    >
       {truncated && <TruncBanner text={truncatedLabel} />}
       {html ? (
         <pre
+          style={chrome ? { color: chrome.text } : undefined}
           className="whitespace-pre-wrap break-words font-mono text-meta text-ink [&_.line]:whitespace-pre-wrap"
           data-testid="preview-code-highlighted"
           // Shiki token HTML only (same trust model as knowledge CodeBlock).
           dangerouslySetInnerHTML={{ __html: html }}
         />
       ) : (
-        <PlainPre content={content} testid="preview-code-plain" />
+        <PlainPre content={content} testid="preview-code-plain" color={chrome?.text} />
       )}
     </div>
   )

@@ -816,6 +816,13 @@ export const zhTW = {
       "dark": "深色",
       "system": "跟隨系統"
     },
+    "codeBlockColor": "程式碼區塊顏色",
+    "codeBlockColorDesc": "程式碼區塊整體配色，與應用主題相互獨立。修改後立即生效。",
+    "codeBlockColors": {
+      "follow": "跟隨應用主題",
+      "light": "淺色",
+      "dark": "深色"
+    },
     "density": "密度",
     "densityDesc": "控制側邊欄與活動行的間距。",
     "densities": {

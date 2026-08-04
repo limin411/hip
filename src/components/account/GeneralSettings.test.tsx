@@ -12,6 +12,7 @@ const hipConfigState = {
   config: {
     version: 1 as const,
     terminal: { shell: 'default' as const, colorTheme: 'follow' as const },
+    codeBlock: { colorTheme: 'follow' as const },
     window: { closeAction: 'quit' as const, trayEnabled: false },
   },
   loaded: true,
@@ -79,6 +80,7 @@ describe('GeneralSettings terminal shell', () => {
     updateSection.mockClear()
     load.mockClear()
     hipConfigState.config.terminal = { shell: 'default', colorTheme: 'follow' }
+    hipConfigState.config.codeBlock = { colorTheme: 'follow' }
   })
   afterEach(() => {
     cleanup()
@@ -107,6 +109,38 @@ describe('GeneralSettings terminal shell', () => {
       shell: 'powershell',
       colorTheme: 'dracula',
     })
+  })
+})
+
+describe('GeneralSettings code block color', () => {
+  beforeEach(() => {
+    updateSection.mockClear()
+    load.mockClear()
+    hipConfigState.config.codeBlock = { colorTheme: 'follow' }
+  })
+  afterEach(() => {
+    cleanup()
+  })
+
+  it('renders code block color control', () => {
+    render(<GeneralSettings />)
+    const row = screen.getByTestId('settings-code-block-color')
+    expect(row).toBeInTheDocument()
+    expect(within(row).getByTestId('settings-code-block-color-trigger')).toHaveTextContent(
+      'settings.codeBlockColors.follow',
+    )
+  })
+
+  it('persists colorTheme via functional merge', async () => {
+    render(<GeneralSettings />)
+    fireEvent.click(screen.getByTestId('settings-code-block-color-dark'))
+    await waitFor(() => {
+      expect(updateSection).toHaveBeenCalledWith('codeBlock', expect.any(Function))
+    })
+    const updater = updateSection.mock.calls[0][1] as (prev: {
+      colorTheme?: string
+    }) => { colorTheme?: string }
+    expect(updater({ colorTheme: 'follow' })).toEqual({ colorTheme: 'dark' })
   })
 })
 
@@ -145,4 +179,3 @@ describe('GeneralSettings terminal color', () => {
     })
   })
 })
-

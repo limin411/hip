@@ -810,6 +810,13 @@ export const ja = {
       "dark": "ダーク",
       "system": "システム"
     },
+    "codeBlockColor": "コードブロックの色",
+    "codeBlockColorDesc": "コードブロックの配色です。アプリのテーマとは独立しており、すぐに適用されます。",
+    "codeBlockColors": {
+      "follow": "アプリのテーマに従う",
+      "light": "ライト",
+      "dark": "ダーク"
+    },
     "density": "密度",
     "densityDesc": "サイドバーとアクティビティ行の間隔を制御します。",
     "densities": {

@@ -4,6 +4,8 @@ import { Check, ChevronDown } from 'lucide-react'
 import {
   type TerminalShellPref,
   type TerminalColorThemeId,
+  type CodeBlockColorThemeId,
+  CODE_BLOCK_COLOR_THEME_IDS,
   TERMINAL_COLOR_THEME_IDS,
 } from '@hip/protocol'
 import { cn } from '@/lib/utils'
@@ -26,6 +28,7 @@ import { CONTEXT_MENUS } from '@/components/context-menu/feature'
 import { CODE_TERMINAL } from '@/components/artifact/terminalFeature'
 import { TERMINAL_MANAGEMENT } from '@/components/terminals/feature'
 import { normalizeTerminalColorThemeId } from '@/components/artifact/terminalTheme'
+import { normalizeCodeBlockThemeId } from '@/domain/knowledge/codeBlockTheme'
 import { Switch } from '@/components/ui/Switch'
 
 const LANGUAGE_KEYS: AppLanguage[] = ['zh-CN', 'zh-TW', 'en', 'ja', 'ko']
@@ -54,6 +57,9 @@ export function GeneralSettings() {
   const density = useUiStore((s) => s.density)
   const setDensity = useUiStore((s) => s.setDensity)
 
+  const codeBlockTheme = useHipConfigStore((s) =>
+    normalizeCodeBlockThemeId(s.config.codeBlock?.colorTheme),
+  )
   const terminalShell = useHipConfigStore((s) => s.config.terminal?.shell ?? 'default')
   const terminalColor = useHipConfigStore((s) =>
     normalizeTerminalColorThemeId(s.config.terminal?.colorTheme),
@@ -90,6 +96,9 @@ export function GeneralSettings() {
   const showTerminalColor = CODE_TERMINAL || TERMINAL_MANAGEMENT
   const setTerminalShell = (shell: TerminalShellPref) => {
     void updateSection('terminal', (prev) => ({ ...(prev ?? {}), shell }))
+  }
+  const setCodeBlockTheme = (colorTheme: CodeBlockColorThemeId) => {
+    void updateSection('codeBlock', (prev) => ({ ...(prev ?? {}), colorTheme }))
   }
   const setTerminalColor = (colorTheme: TerminalColorThemeId) => {
     void updateSection('terminal', (prev) => ({ ...(prev ?? {}), colorTheme }))
@@ -163,6 +172,49 @@ export function GeneralSettings() {
                 <DropdownMenuItem key={themeKey} onSelect={() => setTheme(themeKey)}>
                   <Check size={14} className={cn('shrink-0', theme === themeKey ? 'opacity-100' : 'opacity-0')} />
                   <span>{t(`settings.themes.${themeKey}`)}</span>
+                </DropdownMenuItem>
+              ))}
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
+      </div>
+      <div
+        className="flex items-center justify-between gap-6 px-8 py-4"
+        data-testid="settings-code-block-color"
+      >
+        <div className="min-w-0 flex-1">
+          <div className="text-body font-medium text-ink">{t('settings.codeBlockColor')}</div>
+          <div className="mt-0.5 text-meta leading-relaxed text-ink-tertiary">
+            {t('settings.codeBlockColorDesc')}
+          </div>
+        </div>
+        <div className="relative shrink-0">
+          <DropdownMenu modal={false}>
+            <DropdownMenuTrigger asChild>
+              <button
+                type="button"
+                className={selectTriggerCls}
+                data-testid="settings-code-block-color-trigger"
+              >
+                <span>{t(`settings.codeBlockColors.${codeBlockTheme}`)}</span>
+                <ChevronDown size={14} strokeWidth={1.75} className="shrink-0 text-ink-tertiary" />
+              </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              {CODE_BLOCK_COLOR_THEME_IDS.map((themeId) => (
+                <DropdownMenuItem
+                  key={themeId}
+                  data-testid={`settings-code-block-color-${themeId}`}
+                  onSelect={() => setCodeBlockTheme(themeId)}
+                >
+                  <Check
+                    size={14}
+                    className={cn(
+                      'shrink-0',
+                      codeBlockTheme === themeId ? 'opacity-100' : 'opacity-0',
+                    )}
+                  />
+                  <span>{t(`settings.codeBlockColors.${themeId}`)}</span>
                 </DropdownMenuItem>
               ))}
             </DropdownMenuContent>

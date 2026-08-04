@@ -12,6 +12,11 @@ import { copyText } from '@/ipc/clipboard'
 import { cn } from '@/lib/utils'
 import { normalizeHighlightLang } from '@/domain/knowledge/codeHighlight'
 import {
+  CODE_BLOCK_CHROME,
+  normalizeCodeBlockThemeId,
+} from '@/domain/knowledge/codeBlockTheme'
+import { useHipConfigStore } from '@/store/hipConfigStore'
+import {
   CODEBLOCK_LAZY_HIGHLIGHT,
   CODEBLOCK_STRUCTURE_CRAFT,
 } from './craftFeature'
@@ -96,6 +101,9 @@ export function CodeBlock({
   const [expanded, setExpanded] = useState(false)
   const [inView, setInView] = useState(false)
   const hostRef = useRef<HTMLDivElement>(null)
+  const codeBlockTheme = useHipConfigStore((s) =>
+    normalizeCodeBlockThemeId(s.config.codeBlock?.colorTheme),
+  )
   const code = codeTextOf(children)
   const language = languageOf(children)
   const lines = code ? code.split('\n') : []
@@ -117,6 +125,7 @@ export function CodeBlock({
     (CODEBLOCK_LAZY_HIGHLIGHT && !isStreaming && inView && code.length <= MAX_HIGHLIGHT_CODE_UNITS)
 
   const isDark = useIsDark(wantHighlight)
+  const chrome = codeBlockTheme !== 'follow' ? CODE_BLOCK_CHROME[codeBlockTheme] : null
   const [highlightedHtml, setHighlightedHtml] = useState<string | null>(null)
 
   // IntersectionObserver for lazy highlight (only when craft flag on and not parent-forced).
@@ -158,7 +167,7 @@ export function CodeBlock({
     }
     let cancelled = false
     void import('@/lib/shikiLazy')
-      .then(({ highlightCode }) => highlightCode(code, canonical, isDark))
+      .then(({ highlightCode }) => highlightCode(code, canonical, codeBlockTheme, isDark))
       .then((html) => {
         if (!cancelled) setHighlightedHtml(html)
       })
@@ -168,7 +177,7 @@ export function CodeBlock({
     return () => {
       cancelled = true
     }
-  }, [wantHighlight, syntaxHighlight, code, language, isDark])
+  }, [wantHighlight, syntaxHighlight, code, language, isDark, codeBlockTheme])
 
   const onCopy = async () => {
     // Copy always uses full text (even when folded).
@@ -189,16 +198,34 @@ export function CodeBlock({
     >
       <div
         ref={hostRef}
+        style={
+          chrome
+            ? { backgroundColor: chrome.background, borderColor: chrome.border }
+            : undefined
+        }
         className="overflow-hidden rounded-lg border border-border bg-surface-muted/80"
         data-testid="code-block"
         data-folded={folded ? 'true' : undefined}
       >
-        <div className="flex h-7 items-center justify-between gap-2 border-b border-border/80 px-2.5">
+        <div
+          style={
+            chrome
+              ? {
+                  backgroundColor: chrome.headerBackground,
+                  borderColor: chrome.border,
+                  color: chrome.headerText,
+                }
+              : undefined
+          }
+          className="flex h-7 items-center justify-between gap-2 border-b border-border/80 px-2.5"
+        >
           <span
             className={cn(
               'min-w-0 truncate text-caption font-medium text-ink-tertiary',
-              structureOn && language && 'rounded bg-surface-muted px-1.5 py-px',
+              structureOn && language && 'rounded px-1.5 py-px',
+              chrome ? 'bg-transparent' : 'bg-surface-muted',
             )}
+            style={chrome ? { color: chrome.headerText } : undefined}
           >
             {headerLabel}
           </span>
@@ -209,12 +236,14 @@ export function CodeBlock({
             title={t('chat.copyCode')}
             aria-label={t('chat.copyCode')}
             className="flex h-6 w-6 shrink-0 items-center justify-center rounded-sm text-ink-tertiary transition-colors duration-chrome hover:bg-state-hover hover:text-ink"
+            style={chrome ? { color: chrome.headerText } : undefined}
           >
             {copied ? <Check size={13} strokeWidth={1.75} /> : <Copy size={13} strokeWidth={1.75} />}
           </button>
         </div>
         <pre
           {...props}
+          style={chrome ? { color: chrome.text } : undefined}
           className={cn(
             'm-0 overflow-auto bg-transparent p-3 font-mono text-meta text-ink',
             props.className,

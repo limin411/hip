@@ -11,6 +11,11 @@ import { createHighlighterCore, type HighlighterCore } from 'shiki/core'
 import { createJavaScriptRegexEngine } from 'shiki/engine/javascript'
 import { normalizeHighlightLang } from '@/domain/knowledge/codeHighlight'
 import {
+  normalizeCodeBlockThemeId,
+  resolveShikiTheme,
+  type CodeBlockThemeId,
+} from '@/domain/knowledge/codeBlockTheme'
+import {
   isKnowledgePerfEnabled,
   kbPerfShiki,
 } from '@/domain/knowledge/knowledgePerf'
@@ -51,9 +56,6 @@ const LANG_LOADERS: Record<string, LangLoader> = {
   less: () => import('@shikijs/langs/less'),
   ini: () => import('@shikijs/langs/ini'),
 }
-
-const THEME_LIGHT = 'github-light'
-const THEME_DARK = 'github-dark'
 
 let highlighterPromise: Promise<HighlighterCore> | null = null
 const loadedLangs = new Set<string>()
@@ -151,6 +153,7 @@ async function ensureLang(hl: HighlighterCore, lang: string): Promise<boolean> {
 export async function highlightCode(
   code: string,
   lang: string | undefined | null,
+  themeId: CodeBlockThemeId,
   isDark: boolean,
 ): Promise<string | null> {
   if (!code) return null
@@ -159,7 +162,7 @@ export async function highlightCode(
   const canonical = normalizeHighlightLang(lang)
   if (!canonical) return null
 
-  const theme = isDark ? THEME_DARK : THEME_LIGHT
+  const theme = resolveShikiTheme(normalizeCodeBlockThemeId(themeId), isDark)
   const key = cacheKey(canonical, theme, code)
   const cached = cacheGet(key)
   if (cached !== undefined) {

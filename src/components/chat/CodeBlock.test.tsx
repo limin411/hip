@@ -130,6 +130,7 @@ describe('CodeBlock', () => {
     expect(highlightCode).toHaveBeenCalledWith(
       'const x = 1',
       'typescript',
+      'follow',
       expect.any(Boolean),
     )
     await waitFor(() => {
@@ -163,6 +164,7 @@ describe('CodeBlock', () => {
     expect(highlightCode).toHaveBeenCalledWith(
       'var x = 1;',
       'csharp',
+      'follow',
       expect.any(Boolean),
     )
     cleanup()
@@ -176,6 +178,7 @@ describe('CodeBlock', () => {
     expect(highlightCode).toHaveBeenCalledWith(
       'int x = 1;',
       'cpp',
+      'follow',
       expect.any(Boolean),
     )
   })

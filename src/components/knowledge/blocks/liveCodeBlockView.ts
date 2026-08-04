@@ -22,9 +22,15 @@ import {
   KNOWLEDGE_HIGHLIGHT_LANGS,
   normalizeHighlightLang,
 } from '@/domain/knowledge/codeHighlight'
+import {
+  CODE_BLOCK_CHROME,
+  normalizeCodeBlockThemeId,
+  type CodeBlockThemeId,
+} from '@/domain/knowledge/codeBlockTheme'
 import { isDocDark, subscribeDocTheme } from '@/lib/docTheme'
 import { highlightCode } from '@/lib/shikiLazy'
 import { copyText } from '@/ipc/clipboard'
+import { useHipConfigStore } from '@/store/hipConfigStore'
 import { kbPerfNodeViewMount } from '@/domain/knowledge/knowledgePerf'
 import {
   isMermaidLang,
@@ -49,10 +55,14 @@ class LiveCodeBlockNodeView implements NodeView {
   private previewEl: HTMLElement
   private editPre: HTMLElement
   private langEl: HTMLSelectElement
+  private headerEl: HTMLElement
+  private copyBtn: HTMLButtonElement
   private editing = true
   private highlightGen = 0
   private destroyed = false
   private unsubTheme: (() => void) | null = null
+  private unsubConfig: (() => void) | null = null
+  private codeBlockTheme: CodeBlockThemeId = 'follow'
 
   /** Selection plugin fast-path: skip full walk when no block is in edit mode. */
   get isEditing(): boolean {
@@ -67,6 +77,9 @@ class LiveCodeBlockNodeView implements NodeView {
     this.node = node
     this.view = view
     this.getPos = getPos
+    this.codeBlockTheme = normalizeCodeBlockThemeId(
+      useHipConfigStore.getState().config.codeBlock?.colorTheme,
+    )
 
     this.dom = document.createElement('div')
     this.dom.className =
@@ -82,6 +95,7 @@ class LiveCodeBlockNodeView implements NodeView {
     header.className =
       'flex h-7 items-center justify-between gap-2 border-b border-border/80 px-2.5'
     header.contentEditable = 'false'
+    this.headerEl = header
 
     this.langEl = document.createElement('select')
     this.langEl.className =
@@ -123,6 +137,7 @@ class LiveCodeBlockNodeView implements NodeView {
     })
 
     const copyBtn = document.createElement('button')
+    this.copyBtn = copyBtn
     copyBtn.type = 'button'
     copyBtn.setAttribute('data-testid', 'knowledge-live-code-copy')
     copyBtn.className =
@@ -181,6 +196,7 @@ class LiveCodeBlockNodeView implements NodeView {
 
     body.append(this.editPre, this.previewEl)
     this.dom.append(header, body)
+    this.applyChrome()
 
     // Start in edit mode so initial contentDOM mapping works; selection
     // plugin may switch to preview once the cursor leaves.
@@ -192,8 +208,34 @@ class LiveCodeBlockNodeView implements NodeView {
       if (this.destroyed || this.editing || !this.canPreview()) return
       void this.refreshPreview()
     })
+    this.unsubConfig = useHipConfigStore.subscribe((state) => {
+      if (this.destroyed) return
+      const next = normalizeCodeBlockThemeId(state.config.codeBlock?.colorTheme)
+      if (next === this.codeBlockTheme) return
+      this.codeBlockTheme = next
+      this.applyChrome()
+      if (!this.editing && this.canPreview()) {
+        void this.refreshPreview()
+      }
+    })
 
     void this.refreshPreview()
+  }
+
+  /** Apply forced light/dark chrome; `follow` resets to app design tokens. */
+  private applyChrome() {
+    const chrome =
+      this.codeBlockTheme !== 'follow' ? CODE_BLOCK_CHROME[this.codeBlockTheme] : null
+    this.dom.style.backgroundColor = chrome?.background ?? ''
+    this.dom.style.borderColor = chrome?.border ?? ''
+    this.headerEl.style.backgroundColor = chrome?.headerBackground ?? ''
+    this.headerEl.style.borderColor = chrome?.border ?? ''
+    this.headerEl.style.color = chrome?.headerText ?? ''
+    this.langEl.style.color = chrome?.headerText ?? ''
+    this.copyBtn.style.color = chrome?.headerText ?? ''
+    this.editPre.style.color = chrome?.text ?? ''
+    this.previewEl.style.color = chrome?.text ?? ''
+    this.previewEl.style.backgroundColor = chrome?.background ?? ''
   }
 
   private langRaw(): string {
@@ -259,7 +301,7 @@ class LiveCodeBlockNodeView implements NodeView {
       return
     }
 
-    const html = await highlightCode(code, lang, isDocDark())
+    const html = await highlightCode(code, lang, this.codeBlockTheme, isDocDark())
     if (this.destroyed || gen !== this.highlightGen) return
     if (html) {
       this.previewEl.replaceChildren()
@@ -369,6 +411,8 @@ class LiveCodeBlockNodeView implements NodeView {
     liveViews.delete(this)
     this.unsubTheme?.()
     this.unsubTheme = null
+    this.unsubConfig?.()
+    this.unsubConfig = null
   }
 }
 

@@ -776,6 +776,13 @@ export const zhCN = {
         dark: '深色',
         system: '跟随系统',
       },
+      codeBlockColor: '代码块颜色',
+      codeBlockColorDesc: '代码块整体配色，与应用主题相互独立。修改后立即生效。',
+      codeBlockColors: {
+        follow: '跟随应用主题',
+        light: '浅色',
+        dark: '深色',
+      },
       density: '密度',
       densityDesc: '控制侧边栏与活动行的间距。',
       densities: {

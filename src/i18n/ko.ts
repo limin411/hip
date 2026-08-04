@@ -810,6 +810,13 @@ export const ko = {
       "dark": "다크",
       "system": "시스템"
     },
+    "codeBlockColor": "코드 블록 색상",
+    "codeBlockColorDesc": "코드 블록 전체 색상 구성표로, 앱 테마와 독립적이며 즉시 적용됩니다.",
+    "codeBlockColors": {
+      "follow": "앱 테마 따르기",
+      "light": "라이트",
+      "dark": "다크"
+    },
     "density": "밀도",
     "densityDesc": "사이드바 및 활동 행 간격을 제어합니다.",
     "densities": {

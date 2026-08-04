@@ -15,6 +15,7 @@ import type {
   ContextConfig,
   TerminalConfig,
   TerminalShellPref,
+  CodeBlockConfig,
   TrashConfig,
   WindowConfig,
   WindowCloseAction,
@@ -22,7 +23,11 @@ import type {
   PlanConfig,
   ProxyConfig,
 } from '@hip/protocol'
-import { isTerminalColorThemeId, isWindowCloseAction } from '@hip/protocol'
+import {
+  isCodeBlockColorThemeId,
+  isTerminalColorThemeId,
+  isWindowCloseAction,
+} from '@hip/protocol'
 import { parseDoomLoopStrategy } from '../session/doom-loop.js'
 
 const DEFAULT_CONFIG: HipConfig = { version: 1 }
@@ -298,6 +303,18 @@ function normalizeTerminal(raw: Record<string, unknown>): TerminalConfig {
   return out
 }
 
+function normalizeCodeBlock(raw: Record<string, unknown>): CodeBlockConfig {
+  const out: CodeBlockConfig = {}
+  const ct = raw.colorTheme ?? raw.color_theme
+  if (typeof ct === 'string') {
+    const id = ct.trim().toLowerCase()
+    if (isCodeBlockColorThemeId(id)) {
+      out.colorTheme = id
+    }
+  }
+  return out
+}
+
 function normalizeTrash(raw: Record<string, unknown>): TrashConfig {
   const out: TrashConfig = {}
   const days = raw.retentionDays ?? raw.retention_days
@@ -437,6 +454,11 @@ function validateConfig(parsed: unknown, filePath: string): HipConfig {
     config.terminal = normalizeTerminal(terminal as Record<string, unknown>)
   }
 
+  const codeBlock = obj.codeBlock ?? obj.code_block
+  if (codeBlock && typeof codeBlock === 'object' && !Array.isArray(codeBlock)) {
+    config.codeBlock = normalizeCodeBlock(codeBlock as Record<string, unknown>)
+  }
+
   const trash = obj.trash
   if (trash && typeof trash === 'object' && !Array.isArray(trash)) {
     config.trash = normalizeTrash(trash as Record<string, unknown>)
@@ -530,6 +552,10 @@ function deepMergeConfig(global: HipConfig, project: HipConfig): HipConfig {
   // Project context replaces global wholesale.
   if (project.context !== undefined) {
     merged.context = project.context
+  }
+  // Project codeBlock replaces global wholesale (same as agentLoop / acp).
+  if (project.codeBlock !== undefined) {
+    merged.codeBlock = project.codeBlock
   }
   // Project acp replaces global wholesale (same as agentLoop).
   if (project.acp !== undefined) {

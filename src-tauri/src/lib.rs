@@ -124,6 +124,7 @@ fn get_hip_config(app: tauri::AppHandle) -> Result<String, String> {
                 permissions: None,
                 agent_loop: None,
                 terminal: None,
+                code_block: None,
                 window: None,
                 acp: None,
                 plan: None,
@@ -1142,6 +1143,7 @@ mod tests {
             }),
             agent_loop: None,
             terminal: None,
+            code_block: None,
             window: None,
             acp: None,
             plan: None,
@@ -1334,6 +1336,7 @@ mod tests {
             }),
             agent_loop: None,
             terminal: None,
+            code_block: None,
             window: None,
             acp: None,
             plan: None,
@@ -1516,6 +1519,7 @@ mod tests {
             }),
             agent_loop: None,
             terminal: None,
+            code_block: None,
             window: None,
             acp: None,
             plan: None,
@@ -1635,6 +1639,7 @@ mod tests {
             permissions: None,
             agent_loop: None,
             terminal: None,
+            code_block: None,
             window: None,
             acp: None,
             plan: None,
@@ -1675,6 +1680,7 @@ mod tests {
                 doom_loop_strategy: Some("pause_immediately".into()),
             }),
             terminal: None,
+            code_block: None,
             window: None,
             acp: None,
             plan: None,
@@ -1753,6 +1759,7 @@ doomLoopStrategy = "auto_continue"
                 shell: Some("cmd".into()),
                 color_theme: Some("dracula".into()),
             }),
+            code_block: None,
             window: None,
             acp: None,
             plan: None,
@@ -1837,6 +1844,78 @@ colorTheme = "one-dark"
     }
 
     #[test]
+    fn code_block_survives_json_toml_roundtrip() {
+        // set_hip_config rewrites hip.toml from typed HipConfig; [code_block] must not be stripped.
+        let cfg = super::HipConfig {
+            version: 1,
+            providers: vec![],
+            active_model: None,
+            mcp_servers: vec![],
+            skills: vec![],
+            agents: vec![],
+            fixed_agents: None,
+            permissions: None,
+            agent_loop: None,
+            terminal: None,
+            code_block: Some(super::hip_config::CodeBlockConfig {
+                color_theme: Some("dark".into()),
+            }),
+            window: None,
+            acp: None,
+            plan: None,
+            voice: None,
+            proxy: None,
+        };
+
+        let json = serde_json::to_string(&cfg).unwrap();
+        assert!(json.contains("\"codeBlock\""), "JSON must emit codeBlock: {json}");
+        assert!(json.contains("\"colorTheme\""), "JSON must emit colorTheme: {json}");
+        let from_json: super::HipConfig = serde_json::from_str(&json).unwrap();
+        let toml_cfg: super::TomlHipConfig = from_json.into();
+        let toml_str = toml::to_string_pretty(&toml_cfg).unwrap();
+        assert!(
+            toml_str.contains("[code_block]") || toml_str.contains("code_block"),
+            "TOML should contain code_block: {toml_str}"
+        );
+        assert!(
+            toml_str.contains("color_theme") || toml_str.contains("dark"),
+            "TOML should emit color_theme: {toml_str}"
+        );
+        let from_toml: super::TomlHipConfig = toml::from_str(&toml_str).unwrap();
+        let back: super::HipConfig = from_toml.into();
+        assert_eq!(
+            back.code_block.as_ref().and_then(|c| c.color_theme.as_deref()),
+            Some("dark")
+        );
+
+        // Raw TOML snake_case fixture
+        let snake = r#"
+version = 1
+[code_block]
+color_theme = "light"
+"#;
+        let snake_cfg: super::TomlHipConfig = toml::from_str(snake).unwrap();
+        let snake_hip: super::HipConfig = snake_cfg.into();
+        assert_eq!(
+            snake_hip.code_block.as_ref().and_then(|c| c.color_theme.as_deref()),
+            Some("light")
+        );
+
+        // Raw TOML camelCase alias fixture
+        let camel = r#"
+version = 1
+[codeBlock]
+colorTheme = "follow"
+"#;
+        let camel_cfg: super::TomlHipConfig = toml::from_str(camel).unwrap();
+        let camel_hip: super::HipConfig = camel_cfg.into();
+        assert_eq!(
+            camel_hip.code_block.as_ref().and_then(|c| c.color_theme.as_deref()),
+            Some("follow")
+        );
+    }
+
+    #[test]
     fn window_survives_json_toml_roundtrip() {
         // set_hip_config rewrites hip.toml from typed HipConfig; [window] must not be stripped.
         let cfg = super::HipConfig {
@@ -1850,6 +1929,7 @@ colorTheme = "one-dark"
             permissions: None,
             agent_loop: None,
             terminal: None,
+            code_block: None,
             window: Some(super::hip_config::WindowConfig {
                 close_action: Some("hide".into()),
                 tray_enabled: Some(true),
@@ -1953,6 +2033,7 @@ trayEnabled = true
             permissions: None,
             agent_loop: None,
             terminal: None,
+            code_block: None,
             window: None,
             acp: Some(super::hip_config::AcpHostConfig {
                 fs_bridge: Some(true),
@@ -2028,6 +2109,7 @@ fsReadMaxBytes = 2000000
             permissions: None,
             agent_loop: None,
             terminal: None,
+            code_block: None,
             window: None,
             acp: None,
             plan: Some(super::hip_config::PlanConfig {

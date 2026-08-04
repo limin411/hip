@@ -155,6 +155,38 @@ export interface TerminalConfig {
 }
 
 /**
+ * Code-block color preference for syntax-highlighted fenced code blocks.
+ * Independent of the app chrome theme (`uiStore.theme`).
+ * - `follow`: match document dark class (current default behavior)
+ * - `light` / `dark`: fixed GitHub Light / GitHub Dark palettes, including
+ *   code-block background / border / text so contrast holds on either app theme
+ */
+export const CODE_BLOCK_COLOR_THEME_IDS = ['follow', 'light', 'dark'] as const
+
+export type CodeBlockColorThemeId = (typeof CODE_BLOCK_COLOR_THEME_IDS)[number]
+
+/** Runtime membership (FE normalize + sidecar normalize). */
+export function isCodeBlockColorThemeId(v: string): v is CodeBlockColorThemeId {
+  return (CODE_BLOCK_COLOR_THEME_IDS as readonly string[]).includes(v)
+}
+
+/**
+ * Optional `[code_block]` section in hip.toml.
+ *
+ * ```toml
+ * [code_block]
+ * color_theme = "dark"   # or colorTheme
+ * ```
+ */
+export interface CodeBlockConfig {
+  /**
+   * Code-block color scheme id. Omitted / unknown → `follow`.
+   * JSON/TS: `colorTheme`. TOML: `color_theme` (camelCase alias accepted).
+   */
+  colorTheme?: CodeBlockColorThemeId
+}
+
+/**
  * Optional `[trash]` section in hip.toml — product recycle-bin retention.
  *
  * ```toml
@@ -428,6 +460,8 @@ export interface HipConfig {
   taskRuntime?: TaskRuntimeConfig
   /** Optional interactive Terminal defaults. */
   terminal?: TerminalConfig
+  /** Optional code-block color preference. */
+  codeBlock?: CodeBlockConfig
   /** Optional product recycle-bin retention. */
   trash?: TrashConfig
   /** Optional main-window close behavior & system tray. */

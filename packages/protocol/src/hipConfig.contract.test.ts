@@ -18,7 +18,12 @@ import type {
   ServerMessage,
   ActiveModel,
 } from './index.js'
-import { TERMINAL_COLOR_THEME_IDS, isTerminalColorThemeId } from './hip-config.js'
+import {
+  CODE_BLOCK_COLOR_THEME_IDS,
+  TERMINAL_COLOR_THEME_IDS,
+  isCodeBlockColorThemeId,
+  isTerminalColorThemeId,
+} from './hip-config.js'
 
 // ──────────────────────────────────────────────────────────────────
 // TYPE GUARDS (checked only by tsc, NOT by vitest)
@@ -861,6 +866,23 @@ describe('protocol: McpServerConfig extended fields (Todo 1)', () => {
     expect(round.terminal).toEqual({ shell: 'cmd', colorTheme: 'dracula' })
   })
 
+  it('round-trips codeBlock on HipConfig through JSON', () => {
+    const cfg: HipConfig = {
+      version: 1,
+      codeBlock: { colorTheme: 'dark' },
+    }
+    const round = JSON.parse(JSON.stringify(cfg)) as HipConfig
+    expect(round.codeBlock).toEqual({ colorTheme: 'dark' })
+  })
+
+  it('CODE_BLOCK_COLOR_THEME_IDS includes follow and is non-empty', () => {
+    expect(CODE_BLOCK_COLOR_THEME_IDS.length).toBeGreaterThan(0)
+    expect(CODE_BLOCK_COLOR_THEME_IDS).toContain('follow')
+    expect(isCodeBlockColorThemeId('light')).toBe(true)
+    expect(isCodeBlockColorThemeId('dark')).toBe(true)
+    expect(isCodeBlockColorThemeId('not-a-theme')).toBe(false)
+  })
+
   it('round-trips window on HipConfig through JSON', () => {
     const cfg: HipConfig = {
       version: 1,
@@ -898,4 +920,3 @@ describe('protocol: McpServerConfig extended fields (Todo 1)', () => {
     const round = JSON.parse(JSON.stringify(cfg)) as HipConfig
     expect(round.voice).toEqual(voice)
   })
-

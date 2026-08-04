@@ -784,6 +784,14 @@ export const en = {
         dark: 'Dark',
         system: 'System',
       },
+      codeBlockColor: 'Code block color',
+      codeBlockColorDesc:
+        'Color scheme for code blocks, independent of the app theme. Applies immediately.',
+      codeBlockColors: {
+        follow: 'Match app theme',
+        light: 'Light',
+        dark: 'Dark',
+      },
       density: 'Density',
       densityDesc: 'Control sidebar and activity row spacing.',
       densities: {

@@ -2528,11 +2528,40 @@ export const ja = {
       "paragraph": "本文",
       "linkApply": "適用",
       "linkRemove": "リンクを削除",
-      "linkHref": "URL"
+      "linkHref": "URL",
+      "clearMarks": "書式をクリア",
+      "linkSearch": "ドキュメントを検索…"
+    },
+    "block": {
+      "grip": "ドラッグまたはブロックメニュー",
+      "delete": "削除",
+      "duplicate": "複製",
+      "insertAbove": "上に挿入",
+      "insertBelow": "下に挿入",
+      "turnInto": "変換"
+    },
+    "blockHandle": {
+      "add": "下にブロックを追加"
+    },
+    "table": {
+      "addRow": "行を追加",
+      "addCol": "列を追加",
+      "delRow": "行を削除",
+      "delCol": "列を削除"
+    },
+    "image": {
+      "alt": "代替テキスト",
+      "delete": "削除"
     },
     "slash": {
       "listLabel": "ブロックを挿入",
       "noMatch": "一致する挿入項目がありません",
+      "group": {
+        "basic": "基本",
+        "list": "リスト",
+        "media": "メディア",
+        "advanced": "高度"
+      },
       "h1": "見出し1",
       "h2": "見出し2",
       "h3": "見出し3",
@@ -2652,6 +2681,7 @@ export const ja = {
       "done": "完了",
       "placeholder": "書き始めてください…",
       "emptySlashHint": "「/」でコマンドを入力",
+      "icon": "ページアイコン",
       "viewSource": "ソースを表示",
       "viewLive": "ビジュアル編集",
       "untitled": "無題",

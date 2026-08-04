@@ -57,6 +57,8 @@ export type KnowledgeDocMeta = {
   /** ISO date `YYYY-MM-DD` or free string. */
   date: string | null
   priority: string | null
+  /** Optional page emoji icon (R5 Gate C). */
+  icon: string | null
   /** Custom keys not mapped to built-ins. */
   props: Record<string, PropValue>
 }
@@ -74,6 +76,7 @@ export const EMPTY_DOC_META: KnowledgeDocMeta = {
   aliases: [],
   date: null,
   priority: null,
+  icon: null,
   props: {},
 }
 
@@ -84,6 +87,7 @@ const KNOWN_FM_KEYS = new Set([
   'aliases',
   'date',
   'priority',
+  'icon',
 ])
 
 /** Strip a leading `--- … ---` block and parse known property keys. */
@@ -144,6 +148,7 @@ export function cloneDocMeta(meta: KnowledgeDocMeta): KnowledgeDocMeta {
     aliases: [...meta.aliases],
     date: meta.date,
     priority: meta.priority,
+    icon: meta.icon,
     props: { ...meta.props },
   }
 }
@@ -197,12 +202,12 @@ export function compareWikiDocs(
 
 // ─── internal line parser ───────────────────────────────────────────────────
 
-function normalizeKnownKey(
-  raw: string,
-): 'tags' | 'status' | 'aliases' | 'date' | 'priority' | null {
+type KnownFmKey = 'tags' | 'status' | 'aliases' | 'date' | 'priority' | 'icon'
+
+function normalizeKnownKey(raw: string): KnownFmKey | null {
   const k = raw.toLowerCase()
   if (KNOWN_FM_KEYS.has(k)) {
-    return k as 'tags' | 'status' | 'aliases' | 'date' | 'priority'
+    return k as KnownFmKey
   }
   return null
 }
@@ -217,6 +222,7 @@ function parseMetaLines(lines: string[]): {
     aliases: [],
     date: null,
     priority: null,
+    icon: null,
     props: {},
   }
   let foundKnownKey = false
@@ -263,10 +269,16 @@ function parseMetaLines(lines: string[]): {
       const rawVal = inline[2].trim()
       if (known) {
         foundKnownKey = true
-        if (known === 'status' || known === 'date' || known === 'priority') {
+        if (
+          known === 'status' ||
+          known === 'date' ||
+          known === 'priority' ||
+          known === 'icon'
+        ) {
           const scalar = unquote(rawVal) || null
           if (known === 'status') meta.status = scalar
           else if (known === 'date') meta.date = scalar
+          else if (known === 'icon') meta.icon = scalar
           else meta.priority = scalar
         } else {
           assignListKey(meta, known, parseInlineList(rawVal))
@@ -304,7 +316,7 @@ function parseMetaLines(lines: string[]): {
 
 function assignListKey(
   meta: KnowledgeDocMeta,
-  key: 'tags' | 'status' | 'aliases' | 'date' | 'priority',
+  key: KnownFmKey,
   items: string[],
 ): void {
   if (key === 'status') {
@@ -317,6 +329,10 @@ function assignListKey(
   }
   if (key === 'priority') {
     meta.priority = items[0] ?? null
+    return
+  }
+  if (key === 'icon') {
+    meta.icon = items[0] ?? null
     return
   }
   if (key === 'tags') meta.tags = items

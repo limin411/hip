@@ -44,7 +44,15 @@ import {
 import { livePlaceholderPlugins } from './blocks/livePlaceholderPlugin'
 import { liveListItemPlugins } from './blocks/liveListItemView'
 import { liveCalloutPlugins } from './blocks/liveCalloutView'
-import { createLiveBlockHandlePlugin } from './blocks/liveBlockHandle'
+import { createLiveBlockGutterPlugin } from './blocks/liveBlockGutter'
+import { liveTablePlugins } from './blocks/liveTableChrome'
+import { liveImagePlugins } from './blocks/liveImageChrome'
+import { createListExitPlugin } from '@/domain/knowledge/listKeymap'
+import {
+  wrapInHeadingCommand,
+  wrapInBlockquoteCommand,
+} from '@milkdown/kit/preset/commonmark'
+import { commandsCtx } from '@milkdown/kit/core'
 import {
   isKnowledgePerfEnabled,
   kbPerfLiveCreateEnd,
@@ -278,11 +286,15 @@ export const DocLiveEditor = forwardRef<DocLiveEditorHandle, DocLiveEditorProps>
     slashRef.current = slash
     const pickerRef = useRef<WikiPickerState | null>(null)
     pickerRef.current = picker
-    /** Shared with bubble shouldShow — true when slash or wiki menu is open. */
+    /** Shared with bubble shouldShow — true when slash / wiki / block menu open. */
     const menusOpenRef = useRef({ current: false })
-    menusOpenRef.current.current = slash != null || picker != null
+    const blockMenuOpenRef = useRef(false)
+    menusOpenRef.current.current =
+      slash != null || picker != null || blockMenuOpenRef.current
     const bubbleHandleRef = useRef<BubbleProviderHandle | null>(null)
     const syncPickersRef = useRef<() => void>(() => {})
+    const wikiNodesForBubbleRef = useRef(wikiNodes ?? [])
+    wikiNodesForBubbleRef.current = wikiNodes ?? []
 
     const insertMarkdown = useCallback((md: string): boolean => {
       const ed = editorRef.current
@@ -559,11 +571,36 @@ export const DocLiveEditor = forwardRef<DocLiveEditorHandle, DocLiveEditorProps>
           }),
       )
 
-      const blockHandlePlugin = createLiveBlockHandlePlugin({
-        onOpened: () => {
+      const blockGutterPlugin = createLiveBlockGutterPlugin({
+        onOpenedSlash: () => {
           requestAnimationFrame(() => syncPickersRef.current())
         },
+        menusOpenRef: menusOpenRef.current,
+        onBlockMenuOpenChange: (open) => {
+          blockMenuOpenRef.current = open
+          menusOpenRef.current.current =
+            slashRef.current != null ||
+            pickerRef.current != null ||
+            open
+        },
+        getTurnCmds: () => {
+          const ed = editorRef.current
+          if (!ed) return null
+          try {
+            const commands = ed.ctx.get(commandsCtx)
+            return {
+              wrapHeading: (level: number) =>
+                commands.call(wrapInHeadingCommand.key, level),
+              wrapBlockquote: () =>
+                commands.call(wrapInBlockquoteCommand.key),
+            }
+          } catch {
+            return null
+          }
+        },
       })
+
+      const listExitPlugin = createListExitPlugin()
 
       ;(async () => {
         try {
@@ -572,12 +609,13 @@ export const DocLiveEditor = forwardRef<DocLiveEditorHandle, DocLiveEditorProps>
             .config((ctx) => {
               ctx.set(rootCtx, root)
               ctx.set(defaultValueCtx, body)
-              // Bubble needs root for floating-ui; menusOpenRef tracks slash/wiki.
+              // Bubble needs root for floating-ui; menusOpenRef tracks slash/wiki/block.
               configureKnowledgeBubble(
                 ctx,
                 rootRef.current ?? root,
                 menusOpenRef.current,
                 bubbleHandleRef,
+                wikiNodesForBubbleRef,
               )
             })
             .use(commonmark)
@@ -588,7 +626,10 @@ export const DocLiveEditor = forwardRef<DocLiveEditorHandle, DocLiveEditorProps>
             .use(liveListItemPlugins)
             .use(liveCalloutPlugins)
             .use(liveCodeBlockPlugins)
-            .use(blockHandlePlugin)
+            .use(blockGutterPlugin)
+            .use(listExitPlugin)
+            .use(liveTablePlugins)
+            .use(liveImagePlugins)
             .use(draftSyncPlugin)
             .create()
 

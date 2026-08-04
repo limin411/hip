@@ -145,6 +145,7 @@ x
         aliases: ['X', 'Y'],
         date: null,
         priority: null,
+        icon: null,
         props: {},
       }),
     ).toEqual({ tags: 'a b', status: 'draft', aliases: 'X Y' })

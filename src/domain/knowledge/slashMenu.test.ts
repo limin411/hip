@@ -14,9 +14,9 @@ import {
 } from './slashMenu'
 
 describe('slashMenu', () => {
-  it('exposes required insert kinds (P1.2)', () => {
-    const ids = KNOWLEDGE_SLASH_ITEMS.map((i) => i.id)
-    expect(ids).toEqual([
+  it('exposes required insert kinds (P1.2 + R5 groups)', () => {
+    const ids = new Set(KNOWLEDGE_SLASH_ITEMS.map((i) => i.id))
+    for (const id of [
       'h1',
       'h2',
       'h3',
@@ -34,7 +34,21 @@ describe('slashMenu', () => {
       'mermaid',
       'svg',
       'image',
-    ])
+    ]) {
+      expect(ids.has(id as never)).toBe(true)
+    }
+    expect(KNOWLEDGE_SLASH_ITEMS.every((i) => i.group && i.icon && i.keywordsZh)).toBe(
+      true,
+    )
+  })
+
+  it('filters Chinese keywords (R5)', () => {
+    const hits = filterSlashItems(KNOWLEDGE_SLASH_ITEMS, '标题')
+    expect(hits.some((i) => i.id === 'h1' || i.id === 'h2')).toBe(true)
+    const table = filterSlashItems(KNOWLEDGE_SLASH_ITEMS, '表格')
+    expect(table.some((i) => i.id === 'table')).toBe(true)
+    const task = filterSlashItems(KNOWLEDGE_SLASH_ITEMS, '待办')
+    expect(task.some((i) => i.id === 'task')).toBe(true)
   })
 
   it('svg and image are block slash items with expected inserts', () => {

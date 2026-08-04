@@ -2528,11 +2528,40 @@ export const ko = {
       "paragraph": "본문",
       "linkApply": "적용",
       "linkRemove": "링크 제거",
-      "linkHref": "URL"
+      "linkHref": "URL",
+      "clearMarks": "서식 지우기",
+      "linkSearch": "문서 검색…"
+    },
+    "block": {
+      "grip": "드래그 또는 블록 메뉴",
+      "delete": "삭제",
+      "duplicate": "복제",
+      "insertAbove": "위에 삽입",
+      "insertBelow": "아래에 삽입",
+      "turnInto": "변환"
+    },
+    "blockHandle": {
+      "add": "아래에 블록 추가"
+    },
+    "table": {
+      "addRow": "행 추가",
+      "addCol": "열 추가",
+      "delRow": "행 삭제",
+      "delCol": "열 삭제"
+    },
+    "image": {
+      "alt": "대체 텍스트",
+      "delete": "삭제"
     },
     "slash": {
       "listLabel": "블록 삽입",
       "noMatch": "일치하는 항목이 없습니다",
+      "group": {
+        "basic": "기본",
+        "list": "목록",
+        "media": "미디어",
+        "advanced": "고급"
+      },
       "h1": "제목 1",
       "h2": "제목 2",
       "h3": "제목 3",
@@ -2652,6 +2681,7 @@ export const ko = {
       "done": "완료",
       "placeholder": "작성 시작…",
       "emptySlashHint": "'/'를 입력해 명령 열기",
+      "icon": "페이지 아이콘",
       "viewSource": "소스 보기",
       "viewLive": "시각 편집",
       "untitled": "제목 없음",

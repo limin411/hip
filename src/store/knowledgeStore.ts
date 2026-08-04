@@ -1419,6 +1419,7 @@ export const useKnowledgeStore = create<KnowledgeState>((set, get) => ({
         aliases: entry.aliases,
         date: entry.date ?? null,
         priority: entry.priority ?? null,
+        icon: entry.icon ?? null,
         props: entry.props ? { ...entry.props } : {},
       })
     }

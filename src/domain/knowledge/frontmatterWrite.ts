@@ -28,6 +28,7 @@ export function formatFrontmatterFence(meta: KnowledgeDocMeta): string {
   if (meta.aliases.length) lines.push(...writeList('aliases', meta.aliases))
   if (meta.date) lines.push(`date: ${quoteIfNeeded(meta.date)}`)
   if (meta.priority) lines.push(`priority: ${quoteIfNeeded(meta.priority)}`)
+  if (meta.icon) lines.push(`icon: ${quoteIfNeeded(meta.icon)}`)
 
   const propKeys = Object.keys(meta.props).sort()
   for (const k of propKeys) {

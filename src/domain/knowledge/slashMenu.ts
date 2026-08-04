@@ -25,12 +25,28 @@ export type KnowledgeSlashId =
   | 'svg'
   | 'image'
 
+/** Slash menu section (R5). */
+export type KnowledgeSlashGroup = 'basic' | 'list' | 'media' | 'advanced'
+
+export const SLASH_GROUP_ORDER: readonly KnowledgeSlashGroup[] = [
+  'basic',
+  'list',
+  'media',
+  'advanced',
+] as const
+
 export interface KnowledgeSlashItem {
   id: KnowledgeSlashId
   /** Filter token after `/` (e.g. `h1`, `table`). */
   name: string
   /** Extra aliases for filter (not shown as the primary token). */
   keywords: string[]
+  /** Chinese aliases (R5) — first-class in filterSlashItems. */
+  keywordsZh: string[]
+  /** Menu section. */
+  group: KnowledgeSlashGroup
+  /** Short icon glyph for menu (emoji or 1–2 char). */
+  icon: string
   /** English fallback label; UI prefers i18n via `slashItemLabelKey`. */
   label: string
   /** Markdown snippet that replaces the `/query` token. */
@@ -42,6 +58,11 @@ export interface KnowledgeSlashItem {
 /** i18n key for a slash item label (`knowledge.slash.<id>`). */
 export function slashItemLabelKey(id: KnowledgeSlashId | string): string {
   return `knowledge.slash.${id}`
+}
+
+/** i18n key for group header (`knowledge.slash.group.<id>`). */
+export function slashGroupLabelKey(group: KnowledgeSlashGroup): string {
+  return `knowledge.slash.group.${group}`
 }
 
 /**
@@ -80,6 +101,9 @@ export const KNOWLEDGE_SLASH_ITEMS: KnowledgeSlashItem[] = [
     id: 'h1',
     name: 'h1',
     keywords: ['heading', 'title', 'heading1'],
+    keywordsZh: ['标题', '一级标题', '标题1'],
+    group: 'basic',
+    icon: 'H1',
     label: 'Heading 1',
     insert: '# ',
     cursorOffset: 2,
@@ -88,6 +112,9 @@ export const KNOWLEDGE_SLASH_ITEMS: KnowledgeSlashItem[] = [
     id: 'h2',
     name: 'h2',
     keywords: ['heading', 'heading2'],
+    keywordsZh: ['标题', '二级标题', '标题2'],
+    group: 'basic',
+    icon: 'H2',
     label: 'Heading 2',
     insert: '## ',
     cursorOffset: 3,
@@ -96,46 +123,20 @@ export const KNOWLEDGE_SLASH_ITEMS: KnowledgeSlashItem[] = [
     id: 'h3',
     name: 'h3',
     keywords: ['heading', 'heading3'],
+    keywordsZh: ['标题', '三级标题', '标题3'],
+    group: 'basic',
+    icon: 'H3',
     label: 'Heading 3',
     insert: '### ',
-    cursorOffset: 4,
-  },
-  {
-    id: 'bullet',
-    name: 'bullet',
-    keywords: ['ul', 'list', 'unordered'],
-    label: 'Bullet list',
-    insert: '- ',
-    cursorOffset: 2,
-  },
-  {
-    id: 'ordered',
-    name: 'ordered',
-    keywords: ['ol', 'numbered', 'number'],
-    label: 'Numbered list',
-    insert: '1. ',
-    cursorOffset: 3,
-  },
-  {
-    id: 'task',
-    name: 'task',
-    keywords: ['todo', 'checkbox', 'check'],
-    label: 'Task list',
-    insert: '- [ ] ',
-    cursorOffset: 6,
-  },
-  {
-    id: 'fence',
-    name: 'fence',
-    keywords: ['code', 'codeblock', 'pre'],
-    label: 'Code block',
-    insert: '```\n\n```',
     cursorOffset: 4,
   },
   {
     id: 'quote',
     name: 'quote',
     keywords: ['blockquote', 'bq'],
+    keywordsZh: ['引用', '引述'],
+    group: 'basic',
+    icon: '❝',
     label: 'Quote',
     insert: '> ',
     cursorOffset: 2,
@@ -144,55 +145,98 @@ export const KNOWLEDGE_SLASH_ITEMS: KnowledgeSlashItem[] = [
     id: 'hr',
     name: 'hr',
     keywords: ['divider', 'rule', 'line', 'thematic'],
+    keywordsZh: ['分割线', '分隔线', '横线'],
+    group: 'basic',
+    icon: '—',
     label: 'Horizontal rule',
     insert: '---\n',
     cursorOffset: 4,
   },
   {
-    id: 'table',
-    name: 'table',
-    keywords: ['grid'],
-    label: 'Table',
-    insert: TABLE_SKELETON_3X2,
-    // first header cell after leading `| `
-    cursorOffset: 2,
-  },
-  {
-    id: 'wiki',
-    name: 'wiki',
-    keywords: ['link', 'wikilink', 'page'],
-    label: 'Wiki link',
-    insert: '[[]]',
-    cursorOffset: 2,
-  },
-  {
-    id: 'embed',
-    name: 'embed',
-    keywords: ['transclude', 'include', 'ref'],
-    label: 'Embed document',
-    insert: '![[]]',
-    cursorOffset: 3,
-  },
-  {
     id: 'callout',
     name: 'callout',
     keywords: ['note', 'tip', 'warning', 'admonition'],
+    keywordsZh: ['高亮', '提示', '注意', '警告'],
+    group: 'basic',
+    icon: '💡',
     label: 'Callout',
     insert: '> [!note] Title\n> ',
     cursorOffset: 10,
   },
   {
-    id: 'math',
-    name: 'math',
-    keywords: ['latex', 'formula', 'equation', 'katex'],
-    label: 'Math block',
-    insert: '$$\n\n$$',
+    id: 'bullet',
+    name: 'bullet',
+    keywords: ['ul', 'list', 'unordered'],
+    keywordsZh: ['列表', '无序', '项目符号'],
+    group: 'list',
+    icon: '•',
+    label: 'Bullet list',
+    insert: '- ',
+    cursorOffset: 2,
+  },
+  {
+    id: 'ordered',
+    name: 'ordered',
+    keywords: ['ol', 'numbered', 'number'],
+    keywordsZh: ['列表', '有序', '数字列表', '编号'],
+    group: 'list',
+    icon: '1.',
+    label: 'Numbered list',
+    insert: '1. ',
     cursorOffset: 3,
+  },
+  {
+    id: 'task',
+    name: 'task',
+    keywords: ['todo', 'checkbox', 'check'],
+    keywordsZh: ['待办', '任务', '清单', '复选'],
+    group: 'list',
+    icon: '☑',
+    label: 'Task list',
+    insert: '- [ ] ',
+    cursorOffset: 6,
+  },
+  {
+    id: 'image',
+    name: 'image',
+    keywords: ['img', 'picture', 'photo', 'asset', 'attach'],
+    keywordsZh: ['图片', '图像', '照片', '附件'],
+    group: 'media',
+    icon: '🖼',
+    label: 'Image',
+    /** Skeleton when no spaceId; with spaceId Live host opens attach (K10). */
+    insert: '![](assets/)',
+    cursorOffset: 11,
+  },
+  {
+    id: 'table',
+    name: 'table',
+    keywords: ['grid'],
+    keywordsZh: ['表格', '表'],
+    group: 'media',
+    icon: '▦',
+    label: 'Table',
+    insert: TABLE_SKELETON_3X2,
+    cursorOffset: 2,
+  },
+  {
+    id: 'fence',
+    name: 'fence',
+    keywords: ['code', 'codeblock', 'pre'],
+    keywordsZh: ['代码', '代码块'],
+    group: 'media',
+    icon: '{ }',
+    label: 'Code block',
+    insert: '```\n\n```',
+    cursorOffset: 4,
   },
   {
     id: 'mermaid',
     name: 'mermaid',
     keywords: ['diagram', 'flowchart', 'chart'],
+    keywordsZh: ['图表', '流程图', 'mermaid'],
+    group: 'media',
+    icon: '↗',
     label: 'Mermaid diagram',
     insert: '```mermaid\nflowchart LR\n  A --> B\n```',
     cursorOffset: 12,
@@ -201,18 +245,45 @@ export const KNOWLEDGE_SLASH_ITEMS: KnowledgeSlashItem[] = [
     id: 'svg',
     name: 'svg',
     keywords: ['vector', 'drawing', 'illustration'],
+    keywordsZh: ['矢量', '绘图'],
+    group: 'media',
+    icon: '◇',
     label: 'SVG',
     insert: '```svg\n\n```',
     cursorOffset: 7,
   },
   {
-    id: 'image',
-    name: 'image',
-    keywords: ['img', 'picture', 'photo', 'asset', 'attach'],
-    label: 'Image',
-    /** Skeleton when no spaceId; with spaceId Live host opens attach (K10). */
-    insert: '![](assets/)',
-    cursorOffset: 11,
+    id: 'math',
+    name: 'math',
+    keywords: ['latex', 'formula', 'equation', 'katex'],
+    keywordsZh: ['公式', '数学', '方程'],
+    group: 'media',
+    icon: '∑',
+    label: 'Math block',
+    insert: '$$\n\n$$',
+    cursorOffset: 3,
+  },
+  {
+    id: 'wiki',
+    name: 'wiki',
+    keywords: ['link', 'wikilink', 'page'],
+    keywordsZh: ['链接', '双链', '页面'],
+    group: 'advanced',
+    icon: '[[',
+    label: 'Wiki link',
+    insert: '[[]]',
+    cursorOffset: 2,
+  },
+  {
+    id: 'embed',
+    name: 'embed',
+    keywords: ['transclude', 'include', 'ref'],
+    keywordsZh: ['嵌入', '引用文档', '内嵌'],
+    group: 'advanced',
+    icon: '![[',
+    label: 'Embed document',
+    insert: '![[]]',
+    cursorOffset: 3,
   },
 ]
 
@@ -260,34 +331,67 @@ export function extractSlashQueryAt(
   }
 }
 
-/** Filter slash items by query (name prefix > name includes > keyword > label). */
+/** Filter slash items by query (name prefix > name includes > keyword/zh > label). */
 export function filterSlashItems(
   items: KnowledgeSlashItem[],
   query: string,
 ): KnowledgeSlashItem[] {
-  const q = query.toLowerCase().trim()
-  if (!q) return items
+  const raw = query.trim()
+  const q = raw.toLowerCase()
+  if (!q) {
+    // Stable group order when showing full catalog
+    return [...items].sort(
+      (a, b) =>
+        SLASH_GROUP_ORDER.indexOf(a.group) - SLASH_GROUP_ORDER.indexOf(b.group) ||
+        a.name.localeCompare(b.name),
+    )
+  }
 
   const scored = items.map((item) => {
     const name = item.name.toLowerCase()
     const label = item.label.toLowerCase()
     const kws = item.keywords.map((k) => k.toLowerCase())
-    let score = 5
+    const zh = item.keywordsZh ?? []
+    let score = 6
     if (name === q) score = 0
     else if (name.startsWith(q)) score = 1
+    else if (zh.some((k) => k === raw || k.toLowerCase() === q)) score = 1
     // Substring name match only for multi-char queries (avoid "h" → math).
     else if (q.length >= 2 && name.includes(q)) score = 2
+    else if (zh.some((k) => k.startsWith(raw) || k.includes(raw))) score = 2
     else if (kws.some((k) => k.startsWith(q) || k === q)) score = 3
     // Substring keyword/label match only for multi-char queries (avoid "h" → check/task).
     else if (q.length >= 2 && (label.includes(q) || kws.some((k) => k.includes(q))))
       score = 4
+    else if (q.length >= 2 && zh.some((k) => k.includes(raw))) score = 4
     return { item, score }
   })
 
   return scored
-    .filter((s) => s.score < 5)
-    .sort((a, b) => a.score - b.score || a.item.name.localeCompare(b.item.name))
+    .filter((s) => s.score < 6)
+    .sort(
+      (a, b) =>
+        a.score - b.score ||
+        SLASH_GROUP_ORDER.indexOf(a.item.group) - SLASH_GROUP_ORDER.indexOf(b.item.group) ||
+        a.item.name.localeCompare(b.item.name),
+    )
     .map((s) => s.item)
+}
+
+/** Group filtered items for menu headers (preserves filter order within group). */
+export function groupSlashItems(
+  items: KnowledgeSlashItem[],
+): { group: KnowledgeSlashGroup; items: KnowledgeSlashItem[] }[] {
+  const map = new Map<KnowledgeSlashGroup, KnowledgeSlashItem[]>()
+  for (const g of SLASH_GROUP_ORDER) map.set(g, [])
+  for (const item of items) {
+    const list = map.get(item.group) ?? []
+    list.push(item)
+    map.set(item.group, list)
+  }
+  return SLASH_GROUP_ORDER
+    .map((group) => ({ group, items: map.get(group) ?? [] }))
+    .filter((g) => g.items.length > 0)
 }
 
 /**

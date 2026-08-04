@@ -152,6 +152,7 @@ export type KnowledgeDocMetaEntry = {
   aliases: string[]
   date: string | null
   priority: string | null
+  icon: string | null
   props: KnowledgeDocMeta['props']
 }
 
@@ -244,6 +245,7 @@ export function upsertSearchDoc(
       aliases: full.aliasList,
       date: prepared.meta.date,
       priority: prepared.meta.priority,
+      icon: prepared.meta.icon,
       props: { ...prepared.meta.props },
     })
   }

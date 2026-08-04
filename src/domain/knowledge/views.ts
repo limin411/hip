@@ -136,6 +136,7 @@ export function collectDocRows(
       aliases: [],
       date: null,
       priority: null,
+      icon: null,
       props: {},
     },
   }))
@@ -268,6 +269,8 @@ export function patchMetaField(
     next.date = typeof value === 'string' && value ? value : null
   } else if (key === 'priority') {
     next.priority = typeof value === 'string' && value ? value : null
+  } else if (key === 'icon') {
+    next.icon = typeof value === 'string' && value ? value : null
   } else if (key === 'tags') {
     const list = Array.isArray(value) ? value : value ? [value] : []
     next.tags = list.slice(0, KNOWLEDGE_TAGS_MAX)

@@ -2428,3 +2428,280 @@ export async function seedWikiLinkSource(
   await openTreeDocByTitle(targetTitle)
   await waitForKnowledgeWritableSurface(15000)
 }
+
+// ---------------------------------------------------------------------------
+// R5 Live block OS helpers (gutter / menu / drag / table / icon)
+// ---------------------------------------------------------------------------
+
+/** Live ProseMirror contenteditable host. */
+export async function knowledgeLivePmHost() {
+  const host = await browser.$(
+    '[data-testid="knowledge-doc-live-editor"] .ProseMirror, [data-testid="knowledge-doc-live-editor"] [contenteditable="true"]',
+  )
+  await host.waitForExist({ timeout: 15000 })
+  return host
+}
+
+/**
+ * Hover left edge of Live editor so block gutter (grip + plus) appears.
+ * Returns true if grip is visible.
+ */
+export async function revealKnowledgeLiveBlockGutter(): Promise<boolean> {
+  await ensureKnowledgeLive()
+  const host = await knowledgeLivePmHost()
+  await browser.execute((el: HTMLElement) => {
+    el.focus()
+    const rect = el.getBoundingClientRect()
+    const x = rect.left + 8
+    const y = rect.top + Math.min(40, rect.height / 3)
+    el.dispatchEvent(
+      new MouseEvent('mousemove', {
+        bubbles: true,
+        clientX: x,
+        clientY: y,
+        view: window,
+      }),
+    )
+  }, host)
+  await browser.pause(200)
+  const grip = await browser.$('[data-testid="knowledge-live-block-grip"]')
+  try {
+    await grip.waitForExist({ timeout: 5000 })
+    const opacity = await browser.execute((g: HTMLElement) => {
+      const p = g.closest('[data-testid="knowledge-live-block-gutter"]') as HTMLElement | null
+      return p ? getComputedStyle(p).opacity : getComputedStyle(g).opacity
+    }, grip)
+    return opacity !== '0'
+  } catch {
+    return false
+  }
+}
+
+/**
+ * Click block `+` after revealing gutter; waits for slash menu.
+ * Falls back to typed `/` path if plus click does not open the menu.
+ */
+export async function openSlashViaBlockPlus(): Promise<'plus' | 'typed'> {
+  const ok = await revealKnowledgeLiveBlockGutter()
+  if (ok) {
+    const plus = await browser.$('[data-testid="knowledge-live-block-plus"]')
+    await plus.waitForExist({ timeout: 5000 })
+    // Force opacity so hit-testing works even if CSS transition lags
+    await browser.execute((el: HTMLElement) => {
+      const g = el.closest('[data-testid="knowledge-live-block-gutter"]') as HTMLElement | null
+      if (g) g.style.opacity = '1'
+      el.style.opacity = '1'
+      el.focus?.()
+      el.dispatchEvent(
+        new MouseEvent('mousedown', { bubbles: true, cancelable: true, view: window }),
+      )
+      el.dispatchEvent(new MouseEvent('mouseup', { bubbles: true, cancelable: true, view: window }))
+      el.click()
+    }, plus)
+    await browser.pause(350)
+    const menu = await browser.$('[data-testid="knowledge-slash-menu"]')
+    if (await menu.isExisting()) return 'plus'
+  }
+  // Typed path A (same as applySlashMenuItemLive open)
+  const host = await knowledgeLivePmHost()
+  await browser.execute((el: HTMLElement) => {
+    el.focus()
+    const sel = window.getSelection()
+    const range = document.createRange()
+    range.selectNodeContents(el)
+    range.collapse(false)
+    sel?.removeAllRanges()
+    sel?.addRange(range)
+    document.execCommand('insertText', false, '\n/')
+  }, host)
+  await browser.pause(300)
+  await (
+    await browser.$('[data-testid="knowledge-slash-menu"]')
+  ).waitForExist({ timeout: 12000, timeoutMsg: 'slash menu (plus or typed /)' })
+  return 'typed'
+}
+
+/** Open block menu via grip click (no drag). */
+export async function openKnowledgeLiveBlockMenu(): Promise<void> {
+  const ok = await revealKnowledgeLiveBlockGutter()
+  if (!ok) throw new Error('block gutter did not appear')
+  const grip = await browser.$('[data-testid="knowledge-live-block-grip"]')
+  await browser.execute((el: HTMLElement) => {
+    // mousedown + pointerup without move → menu (drag threshold 4px)
+    const rect = el.getBoundingClientRect()
+    const x = rect.left + rect.width / 2
+    const y = rect.top + rect.height / 2
+    el.dispatchEvent(
+      new PointerEvent('mousedown', {
+        bubbles: true,
+        cancelable: true,
+        clientX: x,
+        clientY: y,
+        pointerType: 'mouse',
+        button: 0,
+      }),
+    )
+    el.dispatchEvent(
+      new PointerEvent('pointerup', {
+        bubbles: true,
+        cancelable: true,
+        clientX: x,
+        clientY: y,
+        pointerType: 'mouse',
+        button: 0,
+      }),
+    )
+    // Some paths listen on window pointerup after mousedown on grip
+    window.dispatchEvent(
+      new PointerEvent('pointerup', {
+        bubbles: true,
+        cancelable: true,
+        clientX: x,
+        clientY: y,
+        pointerType: 'mouse',
+        button: 0,
+      }),
+    )
+  }, grip)
+  await (
+    await browser.$('[data-testid="knowledge-live-block-menu"]')
+  ).waitForExist({ timeout: 8000, timeoutMsg: 'block menu did not open' })
+}
+
+/** Click a block menu item by test id suffix (e.g. knowledge-live-block-delete). */
+export async function clickKnowledgeLiveBlockMenuItem(testId: string): Promise<void> {
+  const item = await browser.$(`[data-testid="${testId}"]`)
+  await item.waitForExist({ timeout: 5000 })
+  await browser.execute((el: HTMLElement) => el.click(), item)
+  await browser.pause(300)
+}
+
+/**
+ * Drag top-level block via grip from first block toward below second.
+ * Best-effort; callers should assert disk order.
+ */
+export async function dragKnowledgeLiveFirstBlockDown(): Promise<boolean> {
+  const ok = await revealKnowledgeLiveBlockGutter()
+  if (!ok) return false
+  const grip = await browser.$('[data-testid="knowledge-live-block-grip"]')
+  return browser.execute((el: HTMLElement) => {
+    const rect = el.getBoundingClientRect()
+    const x = rect.left + rect.width / 2
+    const y0 = rect.top + rect.height / 2
+    const y1 = y0 + 80
+    el.dispatchEvent(
+      new PointerEvent('mousedown', {
+        bubbles: true,
+        cancelable: true,
+        clientX: x,
+        clientY: y0,
+        pointerType: 'mouse',
+        button: 0,
+      }),
+    )
+    window.dispatchEvent(
+      new PointerEvent('pointermove', {
+        bubbles: true,
+        clientX: x,
+        clientY: y0 + 10,
+        pointerType: 'mouse',
+      }),
+    )
+    window.dispatchEvent(
+      new PointerEvent('pointermove', {
+        bubbles: true,
+        clientX: x,
+        clientY: y1,
+        pointerType: 'mouse',
+      }),
+    )
+    window.dispatchEvent(
+      new PointerEvent('pointerup', {
+        bubbles: true,
+        clientX: x,
+        clientY: y1,
+        pointerType: 'mouse',
+        button: 0,
+      }),
+    )
+    return true
+  }, grip)
+}
+
+/**
+ * Open Live slash and type a filter query (e.g. Chinese「表格」).
+ * Asserts matching slash item exists.
+ */
+export async function openLiveSlashAndFilter(query: string): Promise<void> {
+  await ensureKnowledgeLive()
+  const host = await knowledgeLivePmHost()
+  await browser.execute((el: HTMLElement) => {
+    el.focus()
+    const sel = window.getSelection()
+    const range = document.createRange()
+    range.selectNodeContents(el)
+    range.collapse(false)
+    sel?.removeAllRanges()
+    sel?.addRange(range)
+    document.execCommand('insertText', false, '\n/')
+  }, host)
+  await browser.pause(200)
+  let menu = await browser.$('[data-testid="knowledge-slash-menu"]')
+  if (!(await menu.isExisting())) {
+    await browser.keys('/')
+    await browser.pause(250)
+    menu = await browser.$('[data-testid="knowledge-slash-menu"]')
+  }
+  await menu.waitForExist({ timeout: 10000 })
+  if (query) {
+    await browser.keys(query)
+    await browser.pause(250)
+  }
+}
+
+/** Wait for slash group header (basic|list|media|advanced). */
+export async function waitForSlashGroup(
+  group: 'basic' | 'list' | 'media' | 'advanced',
+  timeoutMs = 8000,
+): Promise<void> {
+  await (
+    await browser.$(`[data-testid="knowledge-slash-group-${group}"]`)
+  ).waitForExist({ timeout: timeoutMs })
+}
+
+/** Focus a table cell in Live and wait for table chrome. */
+export async function waitForKnowledgeLiveTableChrome(timeoutMs = 12000): Promise<void> {
+  await ensureKnowledgeLive()
+  // Click into first table cell if present
+  await browser.execute(() => {
+    const cell = document.querySelector(
+      '[data-testid="knowledge-doc-live-editor"] table td, [data-testid="knowledge-doc-live-editor"] table th',
+    ) as HTMLElement | null
+    if (cell) {
+      cell.focus?.()
+      cell.click()
+    }
+  })
+  await (
+    await browser.$('[data-testid="knowledge-live-table-chrome"]')
+  ).waitForExist({ timeout: timeoutMs })
+}
+
+/** Set page icon via properties row input. */
+export async function setKnowledgeDocIcon(icon: string): Promise<void> {
+  const input = await browser.$('[data-testid="knowledge-doc-icon-input"]')
+  await input.waitForExist({ timeout: 10000 })
+  await browser.execute(
+    (el: HTMLInputElement, v: string) => {
+      el.focus()
+      const proto = window.HTMLInputElement.prototype
+      const desc = Object.getOwnPropertyDescriptor(proto, 'value')
+      desc?.set?.call(el, v)
+      el.dispatchEvent(new Event('input', { bubbles: true }))
+      el.dispatchEvent(new Event('change', { bubbles: true }))
+    },
+    input,
+    icon,
+  )
+  await browser.pause(200)
+}

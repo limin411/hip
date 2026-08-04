@@ -2529,11 +2529,40 @@ export const zhTW = {
       "paragraph": "正文",
       "linkApply": "套用",
       "linkRemove": "移除連結",
-      "linkHref": "連結網址"
+      "linkHref": "連結網址",
+      "clearMarks": "清除格式",
+      "linkSearch": "搜尋文件…"
+    },
+    "block": {
+      "grip": "拖曳或開啟區塊選單",
+      "delete": "刪除",
+      "duplicate": "複製",
+      "insertAbove": "在上方插入",
+      "insertBelow": "在下方插入",
+      "turnInto": "轉換為"
+    },
+    "blockHandle": {
+      "add": "在下方新增區塊"
+    },
+    "table": {
+      "addRow": "新增列",
+      "addCol": "新增欄",
+      "delRow": "刪除列",
+      "delCol": "刪除欄"
+    },
+    "image": {
+      "alt": "替代文字",
+      "delete": "刪除"
     },
     "slash": {
       "listLabel": "插入區塊",
       "noMatch": "沒有符合的插入項",
+      "group": {
+        "basic": "基礎",
+        "list": "清單",
+        "media": "媒體",
+        "advanced": "進階"
+      },
       "h1": "一級標題",
       "h2": "二級標題",
       "h3": "三級標題",
@@ -2653,6 +2682,7 @@ export const zhTW = {
       "done": "完成",
       "placeholder": "開始寫作…",
       "emptySlashHint": "輸入 / 開啟命令",
+      "icon": "頁面圖示",
       "viewSource": "檢視原始碼",
       "viewLive": "視覺化編輯",
       "untitled": "未命名",

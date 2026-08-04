@@ -47,6 +47,7 @@ export function DocPropertiesRow({
     meta.status ||
     meta.date ||
     meta.priority ||
+    meta.icon ||
     editable
 
   if (!hasAnything) return null
@@ -56,6 +57,26 @@ export function DocPropertiesRow({
       className="mt-1 flex flex-wrap items-center gap-1.5"
       data-testid="knowledge-doc-properties"
     >
+      {/* Page icon (R5 Gate C) */}
+      {editable ? (
+        <input
+          type="text"
+          className="h-7 w-12 rounded-full border border-border bg-surface-muted px-2 text-center text-body"
+          data-testid="knowledge-doc-icon-input"
+          value={meta.icon ?? ''}
+          maxLength={8}
+          placeholder="📄"
+          title={t('knowledge.doc.icon', 'Page icon')}
+          onChange={(e) => {
+            commit(patchMetaField(meta, 'icon', e.target.value.trim() || null))
+          }}
+        />
+      ) : meta.icon ? (
+        <span className="text-title" data-testid="knowledge-doc-icon">
+          {meta.icon}
+        </span>
+      ) : null}
+
       {/* Status */}
       {editable ? (
         <select

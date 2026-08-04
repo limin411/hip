@@ -8,6 +8,7 @@ import { clearContextProviders } from '@/components/context-menu'
 import { copyText } from '@/ipc/clipboard'
 import { useDiffAnnotationStore } from '@/store/diffAnnotationStore'
 import { setComposerQuote } from '@/components/command-palette/composerBridge'
+import { useHipConfigStore } from '@/store/hipConfigStore'
 
 vi.mock('@/ipc/clipboard', () => ({ copyText: vi.fn(async () => true) }))
 vi.mock('@/components/command-palette/composerBridge', () => ({
@@ -47,6 +48,7 @@ describe('DiffDisplay class polish', () => {
     cleanup()
     clearContextProviders()
     useDiffAnnotationStore.setState({ bySession: {} })
+    useHipConfigStore.setState({ config: { version: 1 } })
   })
 
   afterEach(() => {
@@ -249,5 +251,25 @@ describe('DiffDisplay class polish', () => {
     // hunk 标题行（含“复制片段”操作）整行渲染一次，横贯在双栏上方，而不是只出现在某一栏。
     expect(screen.getAllByTestId('diff-hunk-header')).toHaveLength(1)
     expect(screen.getByTestId('diff-hunk-copy')).toBeInTheDocument()
+  })
+
+  it('applies code block color to diff code area', () => {
+    useHipConfigStore.setState({
+      config: { version: 1, codeBlock: { colorTheme: 'dark' } },
+    })
+    render(
+      <DiffDisplay
+        files={[file]}
+        viewMode="unified"
+        sessionId="s1"
+        onToggleCollapse={() => {}}
+      />,
+    )
+    const area = screen.getByTestId('diff-code-area')
+    expect(area).toHaveStyle({
+      backgroundColor: '#0d1117',
+      color: '#e6edf3',
+    })
+    expect(area.querySelector('span[style*="#e6edf3"]')).toBeTruthy()
   })
 })

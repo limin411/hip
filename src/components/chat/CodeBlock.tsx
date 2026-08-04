@@ -127,6 +127,7 @@ export function CodeBlock({
   const isDark = useIsDark(wantHighlight)
   const chrome = codeBlockTheme !== 'follow' ? CODE_BLOCK_CHROME[codeBlockTheme] : null
   const [highlightedHtml, setHighlightedHtml] = useState<string | null>(null)
+  const [highlightedFor, setHighlightedFor] = useState('')
 
   // IntersectionObserver for lazy highlight (only when craft flag on and not parent-forced).
   useEffect(() => {
@@ -161,23 +162,30 @@ export function CodeBlock({
       return
     }
     const canonical = normalizeHighlightLang(language)
-    if (!canonical || !code) {
+    if (!canonical || !displayCode) {
       setHighlightedHtml(null)
+      setHighlightedFor('')
       return
     }
     let cancelled = false
     void import('@/lib/shikiLazy')
-      .then(({ highlightCode }) => highlightCode(code, canonical, codeBlockTheme, isDark))
+      .then(({ highlightCode }) => highlightCode(displayCode, canonical, codeBlockTheme, isDark))
       .then((html) => {
-        if (!cancelled) setHighlightedHtml(html)
+        if (!cancelled) {
+          setHighlightedHtml(html)
+          setHighlightedFor(displayCode)
+        }
       })
       .catch(() => {
-        if (!cancelled) setHighlightedHtml(null)
+        if (!cancelled) {
+          setHighlightedHtml(null)
+          setHighlightedFor('')
+        }
       })
     return () => {
       cancelled = true
     }
-  }, [wantHighlight, syntaxHighlight, code, language, isDark, codeBlockTheme])
+  }, [wantHighlight, syntaxHighlight, displayCode, language, isDark, codeBlockTheme])
 
   const onCopy = async () => {
     // Copy always uses full text (even when folded).
@@ -249,18 +257,13 @@ export function CodeBlock({
             props.className,
           )}
         >
-          {highlightedHtml && !folded ? (
+          {highlightedHtml && highlightedFor === displayCode ? (
             <code
               className={language ? `language-${language}` : undefined}
               dangerouslySetInnerHTML={{ __html: highlightedHtml }}
             />
           ) : folded ? (
             <code className={language ? `language-${language}` : undefined}>{displayCode}</code>
-          ) : highlightedHtml ? (
-            <code
-              className={language ? `language-${language}` : undefined}
-              dangerouslySetInnerHTML={{ __html: highlightedHtml }}
-            />
           ) : (
             children
           )}

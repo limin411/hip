@@ -1,11 +1,12 @@
 // @vitest-environment happy-dom
 import '@testing-library/jest-dom/vitest'
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen, fireEvent, waitFor, cleanup } from '@testing-library/react'
 import { CodeBlock } from './CodeBlock'
 import { markdownProseClassName } from './MarkdownBody'
 import { copyText } from '@/ipc/clipboard'
 import { highlightCode } from '@/lib/shikiLazy'
+import { useHipConfigStore } from '@/store/hipConfigStore'
 
 vi.mock('@/ipc/clipboard', () => ({ copyText: vi.fn() }))
 vi.mock('@/lib/shikiLazy', () => ({
@@ -16,6 +17,11 @@ describe('CodeBlock', () => {
   beforeEach(() => {
     cleanup()
     vi.mocked(highlightCode).mockClear()
+    useHipConfigStore.setState({ config: { version: 1 } })
+  })
+
+  afterEach(() => {
+    useHipConfigStore.setState({ config: { version: 1 } })
   })
 
   it('renders code and copy button', () => {
@@ -190,6 +196,25 @@ describe('CodeBlock', () => {
       </CodeBlock>,
     )
     expect(screen.getByText('c#')).toBeInTheDocument()
+  })
+
+  it('keeps syntax-highlighted text in folded preview for forced dark theme', async () => {
+    vi.mocked(highlightCode).mockResolvedValue('<span style="color:#F97583">const</span>')
+    useHipConfigStore.setState({
+      config: { version: 1, codeBlock: { colorTheme: 'dark' } },
+    })
+    const longCode = Array.from({ length: 30 }, (_, i) => `const x = ${i}`).join('\n')
+    render(
+      <CodeBlock syntaxHighlight>
+        <code className="language-ts">{longCode}</code>
+      </CodeBlock>,
+    )
+    const host = screen.getByTestId('code-block')
+    expect(host).toHaveAttribute('data-folded', 'true')
+    await waitFor(() => {
+      expect(host.querySelector('code')?.innerHTML).toContain('style="color:#F97583"')
+    })
+    expect(host.querySelector('pre')).toHaveStyle({ color: '#e6edf3' })
   })
 })
 

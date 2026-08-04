@@ -7,7 +7,13 @@ import { fileIconForName } from '@/lib/fileIcon'
 import { computeHunkWordDiffs } from '@/lib/wordDiff'
 import { buildSplitRows } from '@/lib/diffSplit'
 import { copyText } from '@/ipc/clipboard'
+import {
+  CODE_BLOCK_CHROME,
+  normalizeCodeBlockThemeId,
+  type CodeBlockChromePalette,
+} from '@/domain/knowledge/codeBlockTheme'
 import { useDiffAnnotationStore } from '@/store/diffAnnotationStore'
+import { useHipConfigStore } from '@/store/hipConfigStore'
 import { setComposerQuote } from '@/components/command-palette/composerBridge'
 import { DeclarativeContextMenu } from '@/components/context-menu'
 import { EmptyState } from '@/components/ui/EmptyState'
@@ -52,44 +58,82 @@ function formatHunkText(hunk: DiffHunk): string {
 }
 
 /** Hunk 标题行：始终整行横贯，split 模式下位于左右两栏上方。 */
-function HunkHeader({ hunk, path, sessionId }: { hunk: DiffHunk; path: string; sessionId: string }) {
+function HunkHeader({
+  hunk,
+  path,
+  sessionId,
+  chrome,
+}: {
+  hunk: DiffHunk
+  path: string
+  sessionId: string
+  chrome: CodeBlockChromePalette | null
+}) {
   const { t } = useTranslation()
   const hunkText = formatHunkText(hunk)
   return (
     <DeclarativeContextMenu
       kind="diffHunk"
       payload={{ path, header: hunk.header, text: hunkText }}
-      className="group/hunk flex border-y border-border/50 bg-surface-subtle py-0.5 text-caption text-ink-tertiary"
+      className="group/hunk border-y border-border/50"
       data-testid="diff-hunk-header"
     >
-      <span className="shrink-0 select-none px-2 font-mono tabular-nums text-ink-tertiary">@@ -{hunk.oldStart},{hunk.oldLines} +{hunk.newStart},{hunk.newLines} @@</span>
-      {hunk.header && <span className="truncate px-1 text-ink-tertiary/80">{hunk.header}</span>}
-      <span className="ml-auto flex shrink-0 items-center gap-0.5 pr-1">
-        <button
-          type="button"
-          onClick={() => void copyText(hunkText)}
-          className="rounded-sm px-1.5 py-0.5 text-ink-tertiary transition-colors duration-chrome hover:bg-state-hover hover:text-ink"
-          data-testid="diff-hunk-copy"
+      <div
+        className="flex items-center bg-surface-subtle py-0.5 text-caption text-ink-tertiary"
+        style={
+          chrome
+            ? {
+                backgroundColor: chrome.headerBackground,
+                borderColor: chrome.border,
+                color: chrome.headerText,
+              }
+            : undefined
+        }
+      >
+        <span
+          className="shrink-0 select-none px-2 font-mono tabular-nums text-ink-tertiary"
+          style={chrome ? { color: chrome.headerText } : undefined}
         >
-          {t('contextMenu.diffHunk.copy')}
-        </button>
-        <button
-          type="button"
-          onClick={() => useDiffAnnotationStore.getState().add(sessionId, { path: path || '(unknown)', body: hunkText })}
-          className="rounded-sm px-1.5 py-0.5 text-ink-tertiary transition-colors duration-chrome hover:bg-state-hover hover:text-ink"
-          data-testid="diff-hunk-annotate"
-        >
-          {t('contextMenu.diffHunk.annotate')}
-        </button>
-        <button
-          type="button"
-          onClick={() => setComposerQuote(`${path}\n${hunkText}`)}
-          className="rounded-sm px-1.5 py-0.5 text-ink-tertiary transition-colors duration-chrome hover:bg-state-hover hover:text-ink"
-          data-testid="diff-hunk-quote"
-        >
-          {t('contextMenu.diffHunk.quoteToComposer')}
-        </button>
-      </span>
+          @@ -{hunk.oldStart},{hunk.oldLines} +{hunk.newStart},{hunk.newLines} @@
+        </span>
+        {hunk.header && (
+          <span
+            className="truncate px-1 text-ink-tertiary/80"
+            style={chrome ? { color: chrome.headerText } : undefined}
+          >
+            {hunk.header}
+          </span>
+        )}
+        <span className="ml-auto flex shrink-0 items-center gap-0.5 pr-1">
+          <button
+            type="button"
+            onClick={() => void copyText(hunkText)}
+            className="rounded-sm px-1.5 py-0.5 text-ink-tertiary transition-colors duration-chrome hover:bg-state-hover hover:text-ink"
+            data-testid="diff-hunk-copy"
+            style={chrome ? { color: chrome.headerText } : undefined}
+          >
+            {t('contextMenu.diffHunk.copy')}
+          </button>
+          <button
+            type="button"
+            onClick={() => useDiffAnnotationStore.getState().add(sessionId, { path: path || '(unknown)', body: hunkText })}
+            className="rounded-sm px-1.5 py-0.5 text-ink-tertiary transition-colors duration-chrome hover:bg-state-hover hover:text-ink"
+            data-testid="diff-hunk-annotate"
+            style={chrome ? { color: chrome.headerText } : undefined}
+          >
+            {t('contextMenu.diffHunk.annotate')}
+          </button>
+          <button
+            type="button"
+            onClick={() => setComposerQuote(`${path}\n${hunkText}`)}
+            className="rounded-sm px-1.5 py-0.5 text-ink-tertiary transition-colors duration-chrome hover:bg-state-hover hover:text-ink"
+            data-testid="diff-hunk-quote"
+            style={chrome ? { color: chrome.headerText } : undefined}
+          >
+            {t('contextMenu.diffHunk.quoteToComposer')}
+          </button>
+        </span>
+      </div>
     </DeclarativeContextMenu>
   )
 }
@@ -98,25 +142,45 @@ function HunkLines({
   hunk,
   path,
   sessionId,
+  chrome,
 }: {
   hunk: DiffHunk
   path: string
   sessionId: string
+  chrome: CodeBlockChromePalette | null
 }) {
   const { t } = useTranslation()
   const spans = computeHunkWordDiffs(hunk.lines)
   return (
     <>
-      <HunkHeader hunk={hunk} path={path} sessionId={sessionId} />
+      <HunkHeader hunk={hunk} path={path} sessionId={sessionId} chrome={chrome} />
       {hunk.lines.map((line: DiffLine, i) => (
         <div key={i} className={cn('flex leading-[1.55]', lineStyle(line.type))}>
-          <span className="w-9 shrink-0 select-none px-1 text-right font-mono tabular-nums text-caption text-ink-tertiary/80">{line.oldNo ?? ''}</span>
-          <span className="w-9 shrink-0 select-none px-1 text-right font-mono tabular-nums text-caption text-ink-tertiary/80">{line.newNo ?? ''}</span>
+          <span
+            className="w-9 shrink-0 select-none px-1 text-right font-mono tabular-nums text-caption text-ink-tertiary/80"
+            style={chrome ? { color: chrome.headerText } : undefined}
+          >
+            {line.oldNo ?? ''}
+          </span>
+          <span
+            className="w-9 shrink-0 select-none px-1 text-right font-mono tabular-nums text-caption text-ink-tertiary/80"
+            style={chrome ? { color: chrome.headerText } : undefined}
+          >
+            {line.newNo ?? ''}
+          </span>
           <span className={cn('w-3.5 shrink-0 select-none text-center text-caption', line.type === 'add' && 'text-success', line.type === 'del' && 'text-danger')}>{sign(line.type)}</span>
           {spans[i]
-            ? <span className="min-w-0 flex-1 whitespace-pre px-1.5 text-ink">{spans[i]!.map((sp, k) => <span key={k} className={cn(sp.changed && (line.type === 'add' ? 'bg-success/25' : 'bg-danger/25'))}>{sp.text}</span>)}</span>
-            : <span className="min-w-0 flex-1 whitespace-pre px-1.5 text-ink">{line.content}</span>}
-          {line.noNewline && <span className="select-none px-1 text-ink-tertiary" title={t('artifact.diffView.noNewline')}>&#8626;&#824;</span>}
+            ? <span style={chrome ? { color: chrome.text } : undefined} className="min-w-0 flex-1 whitespace-pre px-1.5 text-ink">{spans[i]!.map((sp, k) => <span key={k} className={cn(sp.changed && (line.type === 'add' ? 'bg-success/25' : 'bg-danger/25'))}>{sp.text}</span>)}</span>
+            : <span style={chrome ? { color: chrome.text } : undefined} className="min-w-0 flex-1 whitespace-pre px-1.5 text-ink">{line.content}</span>}
+          {line.noNewline && (
+            <span
+              className="select-none px-1 text-ink-tertiary"
+              style={chrome ? { color: chrome.headerText } : undefined}
+              title={t('artifact.diffView.noNewline')}
+            >
+              &#8626;&#824;
+            </span>
+          )}
         </div>
       ))}
     </>
@@ -124,13 +188,31 @@ function HunkLines({
 }
 
 /** split 模式单侧单元格：整行按内容宽度扩展，背景至少铺满整栏。 */
-function SplitCell({ line, side }: { line: DiffLine | null; side: 'left' | 'right' }) {
+function SplitCell({
+  line,
+  side,
+  chrome,
+}: {
+  line: DiffLine | null
+  side: 'left' | 'right'
+  chrome: CodeBlockChromePalette | null
+}) {
   if (!line) {
-    return <div className="flex w-max min-w-full leading-[1.55] bg-surface-subtle/50"><span className="w-full" /></div>
+    return (
+      <div
+        className="flex w-max min-w-full leading-[1.55] bg-surface-subtle/50"
+        style={chrome ? { backgroundColor: chrome.background, color: chrome.text } : undefined}
+      >
+        <span className="w-full" />
+      </div>
+    )
   }
   return (
     <div className={cn('flex w-max min-w-full leading-[1.55]', lineStyle(line.type))}>
-      <span className="w-9 shrink-0 select-none px-1 text-right font-mono tabular-nums text-caption text-ink-tertiary/80">
+      <span
+        className="w-9 shrink-0 select-none px-1 text-right font-mono tabular-nums text-caption text-ink-tertiary/80"
+        style={chrome ? { color: chrome.headerText } : undefined}
+      >
         {side === 'left' ? line.oldNo ?? '' : line.newNo ?? ''}
       </span>
       <span className={cn(
@@ -140,28 +222,43 @@ function SplitCell({ line, side }: { line: DiffLine | null; side: 'left' | 'righ
       )}>
         {sign(line.type)}
       </span>
-      <span className="min-w-0 flex-1 whitespace-pre px-1.5 text-ink">{line.content}</span>
+      <span
+        className="min-w-0 flex-1 whitespace-pre px-1.5 text-ink"
+        style={chrome ? { color: chrome.text } : undefined}
+      >
+        {line.content}
+      </span>
     </div>
   )
 }
 
 /** split 模式：每个 hunk 标题行横贯整宽，下方左右两栏各自横向滚动，超长行只在本栏内滚动。 */
-function SplitHunks({ hunks, path, sessionId }: { hunks: DiffHunk[]; path: string; sessionId: string }) {
+function SplitHunks({
+  hunks,
+  path,
+  sessionId,
+  chrome,
+}: {
+  hunks: DiffHunk[]
+  path: string
+  sessionId: string
+  chrome: CodeBlockChromePalette | null
+}) {
   return (
     <>
       {hunks.map((h, i) => (
         <Fragment key={i}>
-          <HunkHeader hunk={h} path={path} sessionId={sessionId} />
+          <HunkHeader hunk={h} path={path} sessionId={sessionId} chrome={chrome} />
           <div className="flex">
             <div className="min-w-0 flex-1 overflow-x-auto">
               {buildSplitRows(h.lines).map((row, j) => (
-                <SplitCell key={j} line={row.left} side="left" />
+                <SplitCell key={j} line={row.left} side="left" chrome={chrome} />
               ))}
             </div>
             <div className="w-px shrink-0 bg-border/70" />
             <div className="min-w-0 flex-1 overflow-x-auto">
               {buildSplitRows(h.lines).map((row, j) => (
-                <SplitCell key={j} line={row.right} side="right" />
+                <SplitCell key={j} line={row.right} side="right" chrome={chrome} />
               ))}
             </div>
           </div>
@@ -191,6 +288,7 @@ function FileDiff({
   onToggleCollapse,
   onShowFull,
   onCollapseFull,
+  chrome,
 }: {
   file: DiffFile
   expanded?: DiffFile
@@ -211,6 +309,7 @@ function FileDiff({
   onToggleCollapse: (path: string, multi: boolean) => void
   onShowFull?: (path: string) => void
   onCollapseFull?: (path: string) => void
+  chrome: CodeBlockChromePalette | null
 }) {
   const { t } = useTranslation()
   const chip = STATUS_CHIP[file.status]
@@ -339,12 +438,20 @@ function FileDiff({
         <div className="px-3 py-2.5 text-meta text-ink-tertiary">{t('artifact.diffView.modeOnly')}</div>
       ) : (
         <>
-          <div className={cn('font-mono text-meta', viewMode === 'unified' && 'overflow-x-auto')}>
+          <div
+            className={cn('font-mono text-meta', viewMode === 'unified' && 'overflow-x-auto')}
+            data-testid="diff-code-area"
+            style={
+              chrome
+                ? { backgroundColor: chrome.background, borderColor: chrome.border, color: chrome.text }
+                : undefined
+            }
+          >
             {viewMode === 'split' ? (
-              <SplitHunks hunks={shown.hunks} path={file.path} sessionId={sessionId} />
+              <SplitHunks hunks={shown.hunks} path={file.path} sessionId={sessionId} chrome={chrome} />
             ) : (
               shown.hunks.map((h, i) => (
-                <HunkLines key={i} hunk={h} path={file.path} sessionId={sessionId} />
+                <HunkLines key={i} hunk={h} path={file.path} sessionId={sessionId} chrome={chrome} />
               ))
             )}
           </div>
@@ -466,6 +573,10 @@ export function DiffDisplay({
 }) {
   const { t } = useTranslation()
   const scrollRef = useRef<HTMLDivElement>(null)
+  const codeBlockTheme = useHipConfigStore((s) =>
+    normalizeCodeBlockThemeId(s.config.codeBlock?.colorTheme),
+  )
+  const chrome = codeBlockTheme !== 'follow' ? CODE_BLOCK_CHROME[codeBlockTheme] : null
 
   // Stack sticky headers in expansion order: each expanded header's top offset
   // is the cumulative height of the expanded headers before it. Collapsed rows
@@ -510,6 +621,7 @@ export function DiffDisplay({
           onToggleCollapse={onToggleCollapse}
           onShowFull={onShowFull}
           onCollapseFull={onCollapseFull}
+          chrome={chrome}
         />
       ))}
       {(summary?.totalFiles ?? 0) > files.length && (

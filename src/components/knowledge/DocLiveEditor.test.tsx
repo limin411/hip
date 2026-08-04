@@ -334,10 +334,12 @@ describe('DocLiveEditor', () => {
       expect(screen.getByTestId('knowledge-live-code-block')).toBeInTheDocument()
     })
     await waitFor(() => {
-      expect(screen.getByTestId('knowledge-live-code-edit')).toHaveStyle({
+      const edit = screen.getByTestId('knowledge-live-code-edit')
+      expect(edit).toHaveStyle({
         backgroundColor: '#0d1117',
         color: '#e6edf3',
       })
+      expect(edit.querySelector('code')).toHaveStyle({ backgroundColor: '#0d1117' })
     })
   }, 25_000)
 

@@ -82,15 +82,19 @@ export function KnowledgeSlashMenu({
         if (filtered.length === 0) return
         setActiveIndex((i) => {
           const cur = Math.min(i, filtered.length - 1)
-          return Math.min(cur + 1, filtered.length - 1)
+          // Wrap from the bottom back to the first item.
+          return cur + 1 >= filtered.length ? 0 : cur + 1
         })
         return
       }
       if (e.key === 'ArrowUp') {
         e.preventDefault()
         e.stopImmediatePropagation()
-        if (filtered.length === 0 || safeIndex <= 0) {
+        if (filtered.length === 0) {
           onDismiss()
+        } else if (safeIndex <= 0) {
+          // Wrap from the top back to the last item instead of dismissing.
+          setActiveIndex(filtered.length - 1)
         } else {
           setActiveIndex(safeIndex - 1)
         }

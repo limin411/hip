@@ -77,13 +77,48 @@ describe('KnowledgeSlashMenu', () => {
     expect(onSelect).toHaveBeenCalledWith(expect.objectContaining({ id: 'h2' }))
   })
 
-  it('ArrowUp at top dismisses', () => {
+  it('ArrowDown at the last item wraps to the first item', () => {
     const onDismiss = vi.fn()
     render(
-      <KnowledgeSlashMenu query="h1" onSelect={() => {}} onDismiss={onDismiss} />,
+      <KnowledgeSlashMenu query="h" onSelect={() => {}} onDismiss={onDismiss} />,
+    )
+    // h → h1, h2, h3, hr — move to hr
+    fireEvent.keyDown(document, { key: 'ArrowDown' })
+    fireEvent.keyDown(document, { key: 'ArrowDown' })
+    fireEvent.keyDown(document, { key: 'ArrowDown' })
+    expect(screen.getByTestId('knowledge-slash-hr')).toHaveAttribute(
+      'aria-selected',
+      'true',
+    )
+    // Wrap back to h1
+    fireEvent.keyDown(document, { key: 'ArrowDown' })
+    expect(screen.getByTestId('knowledge-slash-h1')).toHaveAttribute(
+      'aria-selected',
+      'true',
+    )
+    expect(screen.getByTestId('knowledge-slash-hr')).toHaveAttribute(
+      'aria-selected',
+      'false',
+    )
+    expect(onDismiss).not.toHaveBeenCalled()
+  })
+
+  it('ArrowUp at top wraps to the last item', () => {
+    const onDismiss = vi.fn()
+    render(
+      <KnowledgeSlashMenu query="h" onSelect={() => {}} onDismiss={onDismiss} />,
     )
     fireEvent.keyDown(document, { key: 'ArrowUp' })
-    expect(onDismiss).toHaveBeenCalled()
+    // h → h1, h2, h3, hr — start on h1, wrap to hr
+    expect(screen.getByTestId('knowledge-slash-hr')).toHaveAttribute(
+      'aria-selected',
+      'true',
+    )
+    expect(screen.getByTestId('knowledge-slash-h1')).toHaveAttribute(
+      'aria-selected',
+      'false',
+    )
+    expect(onDismiss).not.toHaveBeenCalled()
   })
 
   it('ignores keys while IME is composing (M1)', () => {

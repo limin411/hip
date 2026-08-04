@@ -292,7 +292,7 @@ describe('SlashCommandPalette keyboard navigation', () => {
     expect(options[0]).toHaveAttribute('aria-selected', 'false')
   })
 
-  it('ArrowDown stops at the last item', () => {
+  it('ArrowDown at the last item wraps to the first item', () => {
     render(
       <SlashCommandPalette
         value="/"
@@ -303,12 +303,14 @@ describe('SlashCommandPalette keyboard navigation', () => {
       />,
     )
     const lastIndex = BUILTIN_COMMANDS.length - 1
-    // Press ArrowDown many times — should cap at lastIndex
-    for (let i = 0; i < lastIndex + 5; i++) {
+    for (let i = 0; i < lastIndex; i++) {
       fireEvent.keyDown(document, { key: 'ArrowDown' })
     }
     const options = screen.getAllByRole('option')
     expect(options[lastIndex]).toHaveAttribute('aria-selected', 'true')
+    fireEvent.keyDown(document, { key: 'ArrowDown' })
+    expect(options[0]).toHaveAttribute('aria-selected', 'true')
+    expect(options[lastIndex]).toHaveAttribute('aria-selected', 'false')
   })
 
   it('ArrowUp moves activeIndex up', () => {
@@ -330,7 +332,7 @@ describe('SlashCommandPalette keyboard navigation', () => {
     expect(options[1]).toHaveAttribute('aria-selected', 'true')
   })
 
-  it('ArrowUp at first item calls onDismiss', () => {
+  it('ArrowUp at first item wraps to the last item', () => {
     const onDismiss = vi.fn()
     render(
       <SlashCommandPalette
@@ -342,7 +344,13 @@ describe('SlashCommandPalette keyboard navigation', () => {
       />,
     )
     fireEvent.keyDown(document, { key: 'ArrowUp' })
-    expect(onDismiss).toHaveBeenCalledTimes(1)
+    const options = screen.getAllByRole('option')
+    expect(options[BUILTIN_COMMANDS.length - 1]).toHaveAttribute(
+      'aria-selected',
+      'true',
+    )
+    expect(options[0]).toHaveAttribute('aria-selected', 'false')
+    expect(onDismiss).not.toHaveBeenCalled()
   })
 
   it('Escape calls onDismiss', () => {
@@ -601,7 +609,7 @@ describe('SlashCommandPalette keyboard navigation', () => {
       />,
     )
     // Move to last item
-    for (let i = 0; i < BUILTIN_COMMANDS.length; i++) {
+    for (let i = 0; i < BUILTIN_COMMANDS.length - 1; i++) {
       fireEvent.keyDown(document, { key: 'ArrowDown' })
     }
     // Narrow to a single match so previous index would be OOB without clamp

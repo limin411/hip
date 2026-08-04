@@ -80,14 +80,16 @@ function mockScrollerGeometry(container: HTMLElement, messageIds: string[]) {
   let scrollTop = 0
   Object.defineProperty(scroll, 'clientHeight', { value: 200, configurable: true })
   Object.defineProperty(scroll, 'scrollHeight', {
-    get: () => 40 * messageIds.length + 200,
+    // Live DOM count so follow-bottom tests see the content grow with new rows.
+    get: () => 40 * document.querySelectorAll('[data-message-id]').length + 200,
     configurable: true,
+  })
+  const setScrollTop = vi.fn((v: number) => {
+    scrollTop = Math.max(0, Number(v) || 0)
   })
   Object.defineProperty(scroll, 'scrollTop', {
     get: () => scrollTop,
-    set: (v: number) => {
-      scrollTop = v
-    },
+    set: setScrollTop,
     configurable: true,
   })
   scroll.getBoundingClientRect = () =>
@@ -112,7 +114,7 @@ function mockScrollerGeometry(container: HTMLElement, messageIds: string[]) {
       } as DOMRect
     }
   }
-  return { scroll, getScrollTop: () => scrollTop }
+  return { scroll, getScrollTop: () => scrollTop, setScrollTop }
 }
 
 describe('ChatPane windowed transcript (PR-7b)', () => {
@@ -188,10 +190,15 @@ describe('ChatPane windowed transcript (PR-7b)', () => {
     const msgs = makeMessages(5)
     seedSession(msgs)
     const { container } = render(<ChatPane />)
-    const { scroll } = mockScrollerGeometry(container, msgs.map((m) => m.id))
-    const intoView = vi.fn()
-    const sentinel = screen.getByTestId('transcript-end-sentinel') as HTMLElement
-    sentinel.scrollIntoView = intoView
+    const { scroll, getScrollTop, setScrollTop } = mockScrollerGeometry(
+      container,
+      msgs.map((m) => m.id),
+    )
+    // Simulate the user pinned at the bottom (5 rows → max scrollTop 200).
+    act(() => {
+      scroll.scrollTop = 200
+    })
+    setScrollTop.mockClear()
 
     // Simulate new assistant content while at bottom
     act(() => {
@@ -216,10 +223,61 @@ describe('ChatPane windowed transcript (PR-7b)', () => {
     })
     await act(async () => {})
 
-    // followBottom defaults true on mount (atBottom true)
-    expect(intoView).toHaveBeenCalled()
-    // scroller still present
-    expect(scroll).toBeTruthy()
+    // 6 mounted rows → scrollHeight 440, clientHeight 200 → pinned to 240
+    expect(setScrollTop).toHaveBeenCalledWith(240)
+    expect(getScrollTop()).toBe(240)
+  })
+
+  it('does not autoscroll when at bottom and activity changes without height growth', async () => {
+    const msgs = makeMessages(5)
+    seedSession(msgs)
+    const { container } = render(<ChatPane />)
+    const { scroll, getScrollTop, setScrollTop } = mockScrollerGeometry(
+      container,
+      msgs.map((m) => m.id),
+    )
+    act(() => {
+      scroll.scrollTop = 200
+    })
+    setScrollTop.mockClear()
+
+    // lastActivity changes (timeline grows) but no new row mounts → scrollHeight unchanged.
+    act(() => {
+      useDomainStore.setState({
+        sessions: [
+          {
+            id: 's1',
+            title: 'T',
+            preview: '',
+            updatedAtMs: Date.now(),
+            config: { ...DEFAULT_CONFIG, surface: 'chat' },
+            messages: msgs.map((m) =>
+              m.id === 'm3'
+                ? {
+                    ...m,
+                    timeline: [
+                      {
+                        kind: 'reasoning',
+                        stepSeq: 1,
+                        agentId: 'a1',
+                        role: 'assistant',
+                        content: 'thinking',
+                      },
+                    ],
+                  }
+                : m,
+            ),
+            status: 'running',
+            loaded: true,
+          },
+        ],
+        activeSessionId: 's1',
+      } as never)
+    })
+    await act(async () => {})
+
+    expect(setScrollTop).not.toHaveBeenCalled()
+    expect(getScrollTop()).toBe(200)
   })
 })
 

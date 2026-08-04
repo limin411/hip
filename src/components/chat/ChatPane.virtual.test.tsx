@@ -109,16 +109,17 @@ function mockScrollerGeometry(container: HTMLElement) {
     get: () => 8000,
     configurable: true,
   })
+  const setScrollTop = vi.fn((v: number) => {
+    const next = Math.max(0, Number(v) || 0)
+    if (next === scrollTop) return
+    scrollTop = next
+    // TanStack Virtual updates scrollOffset via the scroll observer — happy-dom does not
+    // always emit 'scroll' on programmatic assignment; dispatch so scrollToIndex remounts rows.
+    scroll.dispatchEvent(new Event('scroll'))
+  })
   Object.defineProperty(scroll, 'scrollTop', {
     get: () => scrollTop,
-    set: (v: number) => {
-      const next = Math.max(0, Number(v) || 0)
-      if (next === scrollTop) return
-      scrollTop = next
-      // TanStack Virtual updates scrollOffset via the scroll observer — happy-dom does not
-      // always emit 'scroll' on programmatic assignment; dispatch so scrollToIndex remounts rows.
-      scroll.dispatchEvent(new Event('scroll'))
-    },
+    set: setScrollTop,
     configurable: true,
   })
   scroll.getBoundingClientRect = () =>
@@ -149,7 +150,7 @@ function mockScrollerGeometry(container: HTMLElement) {
         toJSON: () => ({}),
       }) as DOMRect
   }
-  return { scroll, getScrollTop: () => scrollTop }
+  return { scroll, getScrollTop: () => scrollTop, setScrollTop }
 }
 
 describe('ChatPane virtualized transcript (PR-7c)', () => {
@@ -279,16 +280,19 @@ describe('ChatPane virtualized transcript (PR-7c)', () => {
     expect(useUiStore.getState().scrollTargetMessageId).toBeNull()
   })
 
-  it('follow-bottom still uses end sentinel when pinned', async () => {
+  it('follow-bottom scrolls pinned transcript to bottom when activity changes', async () => {
     const msgs = makeMessages(5)
     seedSession(msgs)
     const { container } = render(<ChatPane />)
-    mockScrollerGeometry(container)
-    const intoView = vi.fn()
-    const sentinel = screen.getByTestId('transcript-end-sentinel') as HTMLElement
-    sentinel.scrollIntoView = intoView
+    const { scroll, setScrollTop } = mockScrollerGeometry(container)
+    setScrollTop.mockClear()
 
     act(() => {
+      // Content grows past the mounted viewport (8000 → 9000).
+      Object.defineProperty(scroll, 'scrollHeight', {
+        get: () => 9000,
+        configurable: true,
+      })
       useDomainStore.setState({
         sessions: [
           {
@@ -310,7 +314,7 @@ describe('ChatPane virtualized transcript (PR-7c)', () => {
     })
     await act(async () => {})
 
-    expect(intoView).toHaveBeenCalled()
+    expect(setScrollTop).toHaveBeenCalledWith(8800)
   })
 
   it('flag off keeps non-virtual path (regression smoke)', () => {

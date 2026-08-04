@@ -188,9 +188,17 @@ export function ChatPane() {
 
   useEffect(() => {
     if (!followBottomRef.current || !atBottom || scrollTargetMessageId) return
+    const el = scrollRef.current
+    if (!el) return
     // Spec A4: pinned-to-bottom uses instant scroll — smooth + high-frequency tokens fights.
-    // End sentinel (bottomRef) stays mounted outside the window slice and virtual range.
-    bottomRef.current?.scrollIntoView({ behavior: 'auto' })
+    // Set scrollTop directly (nested scrollIntoView is unreliable in WKWebView — see
+    // transcriptJump) and only when content actually outran the viewport, so activity
+    // changes that do not grow the transcript do not fire scroll events and re-trigger
+    // the scrollbar reveal (flicker).
+    const maxScrollTop = el.scrollHeight - el.clientHeight
+    if (el.scrollTop < maxScrollTop - 1) {
+      el.scrollTop = maxScrollTop
+    }
   }, [messages.length, error, lastActivity, atBottom, scrollTargetMessageId])
 
   // After "Load earlier" prepends DOM, restore viewport so content does not jump.
@@ -575,7 +583,7 @@ export function ChatPane() {
               </div>
             </div>
           )}
-          {/* End sentinel always outside virtual range — follow-bottom anchor (D3b). */}
+          {/* End sentinel always outside virtual range — structural end anchor (D3b). */}
           <div ref={bottomRef} data-testid="transcript-end-sentinel" />
         </div>
       </div>
@@ -584,7 +592,8 @@ export function ChatPane() {
           onClick={() => {
             followBottomRef.current = true
             setAtBottom(true)
-            bottomRef.current?.scrollIntoView({ behavior: 'auto' })
+            const el = scrollRef.current
+            if (el) el.scrollTop = el.scrollHeight
           }}
           data-testid="jump-to-latest"
           title={t('chat.jumpToLatest')}

@@ -15,6 +15,9 @@ import i18n from '@/i18n'
 const mockSetActiveView = vi.fn()
 const mockSetTab = vi.fn()
 const mockSetSettingsPage = vi.fn()
+const mockSetSettingsShellRoute = vi.fn()
+const mockSetSidebarOpen = vi.fn()
+const mockSetOverlay = vi.fn()
 const toastMessage = vi.fn()
 
 vi.mock('sonner', () => ({
@@ -28,18 +31,30 @@ vi.mock('@/store/uiStore', () => ({
       setActiveView: typeof mockSetActiveView
       setTab: typeof mockSetTab
       setSettingsPage: typeof mockSetSettingsPage
+      setSettingsShellRoute: typeof mockSetSettingsShellRoute
+      setSidebarOpen: typeof mockSetSidebarOpen
+      setOverlay: typeof mockSetOverlay
+      sidebarOpen: boolean
     }) => unknown) => {
       if (typeof selector === 'function') {
         return selector({
           setActiveView: mockSetActiveView,
           setTab: mockSetTab,
           setSettingsPage: mockSetSettingsPage,
+          setSettingsShellRoute: mockSetSettingsShellRoute,
+          setSidebarOpen: mockSetSidebarOpen,
+          setOverlay: mockSetOverlay,
+          sidebarOpen: false,
         })
       }
       return {
         setActiveView: mockSetActiveView,
         setTab: mockSetTab,
         setSettingsPage: mockSetSettingsPage,
+        setSettingsShellRoute: mockSetSettingsShellRoute,
+        setSidebarOpen: mockSetSidebarOpen,
+        setOverlay: mockSetOverlay,
+        sidebarOpen: false,
       }
     },
     {
@@ -47,6 +62,10 @@ vi.mock('@/store/uiStore', () => ({
         setActiveView: mockSetActiveView,
         setTab: mockSetTab,
         setSettingsPage: mockSetSettingsPage,
+        setSettingsShellRoute: mockSetSettingsShellRoute,
+        setSidebarOpen: mockSetSidebarOpen,
+        setOverlay: mockSetOverlay,
+        sidebarOpen: false,
       }),
     },
   ),
@@ -98,6 +117,9 @@ describe('useSlashCommandHandler', () => {
     mockSetActiveView.mockClear()
     mockSetTab.mockClear()
     mockSetSettingsPage.mockClear()
+    mockSetSettingsShellRoute.mockClear()
+    mockSetSidebarOpen.mockClear()
+    mockSetOverlay.mockClear()
     toastMessage.mockClear()
     useDomainStore.setState({ sessions: [], activeSessionId: null, connection: 'disconnected' })
     await i18n.changeLanguage('en')
@@ -245,7 +267,11 @@ describe('useSlashCommandHandler', () => {
     result.current.handleCommandSelect(builtin('memory'))
 
     expect(mockSetSettingsPage).toHaveBeenCalledWith('memory')
-    expect(mockSetActiveView).toHaveBeenCalledWith('settings')
+    expect(mockSetSettingsShellRoute).toHaveBeenCalledWith({ type: 'page' })
+    expect(mockSetSidebarOpen).toHaveBeenCalledWith(true)
+    expect(mockSetOverlay).toHaveBeenCalledWith('settings')
+    // Settings is an overlay now — it must not be assigned as the main active view.
+    expect(mockSetActiveView).not.toHaveBeenCalled()
     expect(setText).toHaveBeenCalledWith('')
   })
 

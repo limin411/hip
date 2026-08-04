@@ -13,6 +13,22 @@ export default defineConfig(async () => ({
       "@hip/protocol": resolve(__dirname, "packages/protocol/src/index.ts"),
       "@": resolve(__dirname, "src"),
     },
+    // BlockNote (TipTap) + Milkdown must share one prosemirror-view; two copies
+    // break DecorationSet.locals (iterDeco crash on Live mount).
+    dedupe: [
+      "prosemirror-model",
+      "prosemirror-state",
+      "prosemirror-view",
+      "prosemirror-transform",
+      "prosemirror-tables",
+      "prosemirror-keymap",
+      "prosemirror-commands",
+      "prosemirror-schema-list",
+      "prosemirror-history",
+      "prosemirror-gapcursor",
+      "prosemirror-dropcursor",
+      "prosemirror-inputrules",
+    ],
   },
 
   // Vite options tailored for Tauri development and only applied in `tauri dev` or `tauri build`

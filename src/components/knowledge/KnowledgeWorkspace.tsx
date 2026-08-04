@@ -14,7 +14,6 @@ import {
 import { toast } from 'sonner'
 import {
   registerBeforeOpenDocFlush,
-  registerOnBoardFlushAbort,
   setExpandPersistSuspended,
   syncActiveEditorToDraft,
   useKnowledgeStore,
@@ -36,6 +35,7 @@ import { Button } from '@/components/ui/Button'
 import { Modal } from '@/components/ui/Modal'
 import { Input } from '@/components/ui/Input'
 import { EmptyState } from '@/components/ui/EmptyState'
+import { Skeleton } from '@/components/ui/Skeleton'
 import { HipLogo } from '@/components/login/HipLogo'
 import {
   DropdownMenu,
@@ -47,18 +47,13 @@ import {
 import { pickAttachmentFiles, pickSavePath } from '@/ipc/dialog'
 import {
   knowledgeErrorMessage,
-  knowledgeExportBoard,
-  knowledgeExportBytes,
   knowledgeExportDoc,
   knowledgeExportText,
   knowledgeExportSpaceZip,
   knowledgeReadVersion,
   knowledgeRevealDoc,
-  knowledgeRevealPath,
 } from '@/ipc/knowledge'
-import { blobToBase64 } from '@/domain/knowledge/assetUrl'
 import { buildDocHtmlDocument } from '@/domain/knowledge/htmlExport'
-import { collectionViewDisplayName } from '@/domain/knowledge/propDisplay'
 import { diffLines } from '@/domain/knowledge/textDiff'
 import {
   revealHeadingInRoot,
@@ -70,46 +65,18 @@ import { extractDocOutline } from '@/domain/knowledge/mdPreview'
 import { DeclarativeContextMenu } from '@/components/context-menu'
 import { SpaceTree } from './SpaceTree'
 import { DocEditor, type DocEditorHandle } from './DocEditor'
-import type { DocLiveEditorHandle } from './DocLiveEditor'
-import {
-  HipBoardCanvas,
-  type HipBoardCanvasHandle,
-} from './HipBoardCanvas'
+import type { DocLiveEditorHandle } from './DocBlockNoteEditor'
 import { InlineDocTitle } from './InlineDocTitle'
-import { DocPropertiesRow } from './DocPropertiesRow'
 import { MarkdownToolbar } from './MarkdownToolbar'
 import { KnowledgeDocCanvas } from './KnowledgeDocCanvas'
 import { WikiCreateModal } from './WikiCreateModal'
 import { KnowledgeGraphModal } from './KnowledgeGraphModal'
-import { KnowledgeCollectionView } from './KnowledgeCollectionView'
 
-/** Lazy so Source-only sessions pay 0 for Milkdown kit. */
+/** Lazy so Source-only sessions pay 0 for BlockNote chunk. */
 const DocLiveEditor = lazy(() =>
-  import('./DocLiveEditor').then((m) => ({ default: m.DocLiveEditor })),
+  import('./DocBlockNoteEditor').then((m) => ({ default: m.DocBlockNoteEditor })),
 )
 import { TemplatePickerModal } from './TemplatePickerModal'
-import type { SpaceSchemaV1 } from '@/domain/knowledge/schema'
-
-/**
- * Isolated draftBody subscriber so Live typing does not re-render the whole workspace.
- */
-function DocPropertiesConnected({ schema }: { schema: SpaceSchemaV1 }) {
-  const draftBody = useKnowledgeStore((s) => s.draftBody)
-  const setDraftBody = useKnowledgeStore((s) => s.setDraftBody)
-  const activeDocId = useKnowledgeStore((s) => s.activeDocId)
-  return (
-    <DocPropertiesRow
-      body={draftBody}
-      schema={schema}
-      onBodyChange={(next) =>
-        setDraftBody(next, {
-          persist: 'auto',
-          ...(activeDocId ? { docId: activeDocId } : {}),
-        })
-      }
-    />
-  )
-}
 
 export function KnowledgeWorkspace() {
   const { t, i18n } = useTranslation()
@@ -126,7 +93,6 @@ export function KnowledgeWorkspace() {
   const busy = useKnowledgeStore((s) => s.busy)
   const saveState = useKnowledgeStore((s) => s.saveState)
   const requestCreateDoc = useKnowledgeStore((s) => s.requestCreateDoc)
-  const createBoard = useKnowledgeStore((s) => s.createBoard)
   const createFolder = useKnowledgeStore((s) => s.createFolder)
   const renameNode = useKnowledgeStore((s) => s.renameNode)
   const rewriteWikiLinksAfterRename = useKnowledgeStore((s) => s.rewriteWikiLinksAfterRename)
@@ -140,22 +106,8 @@ export function KnowledgeWorkspace() {
   const saveVersionManual = useKnowledgeStore((s) => s.saveVersionManual)
   const listVersions = useKnowledgeStore((s) => s.listVersions)
   const restoreVersion = useKnowledgeStore((s) => s.restoreVersion)
-  const spaceViews = useKnowledgeStore((s) => s.spaceViews)
-  const spaceSchema = useKnowledgeStore((s) => s.spaceSchema)
-  const activeViewId = useKnowledgeStore((s) => s.activeViewId)
-  const setActiveViewId = useKnowledgeStore((s) => s.setActiveViewId)
-  const patchDocField = useKnowledgeStore((s) => s.patchDocField)
-  const getDocMetaMap = useKnowledgeStore((s) => s.getDocMetaMap)
 
   const space = spaces.find((s) => s.id === activeSpaceId)
-  const activeView = spaceViews.views.find((v) => v.id === activeViewId) ?? null
-  const docMetaMap = useMemo(() => {
-    // Collection views: prefer saved body ticks, not per-keystroke draft.
-    void docBody
-    void nodes
-    void activeDocId
-    return getDocMetaMap()
-  }, [docBody, nodes, activeDocId, getDocMetaMap, activeViewId])
   const activeNode = nodes.find((n) => n.id === activeDocId)
   const pathNodes = useMemo(
     () => (activeDocId ? getPath(nodes, activeDocId) : []),
@@ -165,8 +117,6 @@ export function KnowledgeWorkspace() {
   const editorRef = useRef<DocEditorHandle>(null)
   /** Live host handle for attach/paste (PR-2); wired now for insertMarkdown. */
   const liveEditorRef = useRef<DocLiveEditorHandle>(null)
-  /** Board canvas handle — Workspace-only beforeOpenDocFlush (KD-9); sync flushToStore (KD-13). */
-  const boardCanvasRef = useRef<HipBoardCanvasHandle>(null)
   const [treeFilter, setTreeFilter] = useState('')
   const [filterExpandSnapshot, setFilterExpandSnapshot] = useState<Record<
     string,
@@ -175,8 +125,13 @@ export function KnowledgeWorkspace() {
   /** Only re-expand ancestors when the filter *string* changes (not on nodes ticks). */
   const lastFilterExpandQuery = useRef('')
 
+  /** Docs + folders only (boards hidden from tree). */
+  const treeNodes = useMemo(
+    () => nodes.filter((n) => n.kind !== 'board'),
+    [nodes],
+  )
   const visibleIds = useMemo(
-    () => filterTreeVisible(nodes, treeFilter),
+    () => filterTreeVisible(treeNodes, treeFilter),
     [nodes, treeFilter],
   )
 
@@ -384,10 +339,7 @@ export function KnowledgeWorkspace() {
   const newDoc = (parentId: string | null) => {
     void requestCreateDoc(parentId, t('knowledge.doc.untitled'))
   }
-  const newBoard = (parentId: string | null) => {
-    void createBoard(parentId, t('knowledge.board.untitled'))
-  }
-
+  // Boards / collection views removed — docs + folders only.
   const isBoard = activeNode?.kind === 'board'
 
   // Single-canvas Live (Notion/Feishu). Source only as silent fallback:
@@ -428,8 +380,6 @@ export function KnowledgeWorkspace() {
   const showSourceEditor = !isBoard && !showLiveEditor
   /** Body for editor mount (mode/doc switch); not a per-keystroke subscription. */
   const mountMarkdown = useKnowledgeStore.getState().draftBody || docBody
-  /** Dehydrated board JSON for canvas mount (read once; not a draft subscription). */
-  const mountBoardJson = useKnowledgeStore.getState().draftBody || docBody
 
   const onLiveParseError = () => {
     toast.error(t('knowledge.doc.liveParseFailed'))
@@ -477,54 +427,6 @@ export function KnowledgeWorkspace() {
     }
   }
 
-  /** KD-10 / LKD-15: export dehydrated hip-board JSON (same as on-disk). */
-  const exportActiveBoardJson = async () => {
-    if (!activeSpaceId || !activeDocId) return
-    // Flush canvas strokes into draft then disk before export.
-    boardCanvasRef.current?.flushToStore({ mode: 'snapshot' })
-    await flushSave()
-    const title = activeNode?.title ?? t('knowledge.board.untitled')
-    const safe = sanitizeExportName(title, 'whiteboard')
-    const dest = await pickSavePath({
-      defaultPath: `${safe}.board.json`,
-      title: t('knowledge.export.boardJson'),
-      filters: [{ name: 'Whiteboard', extensions: ['json'] }],
-    })
-    if (!dest) return
-    try {
-      await knowledgeExportBoard(activeSpaceId, activeDocId, dest)
-      toast.success(t('knowledge.export.boardJsonDone'))
-    } catch (e) {
-      toast.error(knowledgeErrorMessage(e))
-    }
-  }
-
-  /** KD-10: PNG via canvas exportToBlob → knowledge_export_bytes (≤25MB). */
-  const exportActiveBoardPng = async () => {
-    if (!activeSpaceId || !activeDocId) return
-    boardCanvasRef.current?.flushToStore({ mode: 'snapshot' })
-    await flushSave()
-    const title = activeNode?.title ?? t('knowledge.board.untitled')
-    const safe = sanitizeExportName(title, 'whiteboard')
-    const dest = await pickSavePath({
-      defaultPath: `${safe}.png`,
-      title: t('knowledge.export.boardPng'),
-      filters: [{ name: 'PNG', extensions: ['png'] }],
-    })
-    if (!dest) return
-    try {
-      const blob = await boardCanvasRef.current?.exportPngBlob()
-      if (!blob) {
-        toast.error(t('knowledge.board.loadFailed'))
-        return
-      }
-      const base64 = await blobToBase64(blob)
-      await knowledgeExportBytes(dest, base64, 'image/png')
-      toast.success(t('knowledge.export.boardPngDone'))
-    } catch (e) {
-      toast.error(knowledgeErrorMessage(e))
-    }
-  }
 
   const openVersionDiff = async (versionId: string) => {
     if (!activeSpaceId || !activeDocId) return
@@ -646,24 +548,15 @@ export function KnowledgeWorkspace() {
     }
   }
 
-  // KD-9: single Workspace registration. Board → flushToStore(mode);
-  // Live → flushDraft; Source → CM getView. leaveActiveLeaf drives KD-13 mode.
-  // HipBoardCanvas must NOT call registerBeforeOpenDocFlush itself.
+  // Flush Live/Source draft before openDoc / leaf switch.
   useEffect(() => {
-    registerBeforeOpenDocFlush((opts) => {
+    registerBeforeOpenDocFlush(() => {
       const st = useKnowledgeStore.getState()
       const currentId = st.activeDocId
       if (!currentId) return
       const node = st.nodes.find((n) => n.id === currentId)
-      if (node?.kind === 'board') {
-        boardCanvasRef.current?.flushToStore({
-          mode: opts?.leaveActiveLeaf ? 'leave' : 'snapshot',
-        })
-        return
-      }
-      // Live — production API name (do not rename)
+      if (node?.kind === 'board') return
       liveEditorRef.current?.flushDraft()
-      // Source — getView + setDraftBody (unchanged by snapshot/leave)
       const view = editorRef.current?.getView()
       if (view) {
         st.setDraftBody(view.state.doc.toString(), {
@@ -672,14 +565,8 @@ export function KnowledgeWorkspace() {
         })
       }
     })
-    // Leave freeze must reverse when flushSave / openDoc aborts (unsupported cancel).
-    registerOnBoardFlushAbort(() => {
-      const h = boardCanvasRef.current as HipBoardCanvasHandle | null
-      h?.resumeEditing?.()
-    })
     return () => {
       registerBeforeOpenDocFlush(null)
-      registerOnBoardFlushAbort(null)
     }
   }, [])
 
@@ -813,40 +700,9 @@ export function KnowledgeWorkspace() {
           </div>
         </div>
 
-        {/* Views + Tree section */}
+        {/* Tree section */}
         <div className="flex min-h-0 flex-1 flex-col">
-          <div className="flex shrink-0 flex-wrap items-center gap-1 px-3.5 pb-1 pt-2">
-            <button
-              type="button"
-              data-testid="knowledge-view-docs"
-              className={cn(
-                'rounded-sm px-2 py-0.5 text-caption font-medium transition-colors duration-chrome',
-                activeViewId == null
-                  ? 'bg-state-hover text-ink'
-                  : 'text-ink-tertiary hover:bg-state-hover hover:text-ink',
-              )}
-              onClick={() => setActiveViewId(null)}
-            >
-              {t('knowledge.views.docs')}
-            </button>
-            {spaceViews.views.map((v) => (
-              <button
-                key={v.id}
-                type="button"
-                data-testid={`knowledge-view-tab-${v.id}`}
-                className={cn(
-                  'rounded-sm px-2 py-0.5 text-caption font-medium transition-colors duration-chrome',
-                  activeViewId === v.id
-                    ? 'bg-state-hover text-ink'
-                    : 'text-ink-tertiary hover:bg-state-hover hover:text-ink',
-                )}
-                onClick={() => setActiveViewId(v.id)}
-              >
-                {collectionViewDisplayName(t, v)}
-              </button>
-            ))}
-          </div>
-          <div className="flex shrink-0 items-center justify-between px-3.5 pb-1.5 pt-1">
+          <div className="flex shrink-0 items-center justify-between px-3.5 pb-1.5 pt-2">
             <span className="text-caption font-medium text-ink-tertiary">
               {t('knowledge.tree.sectionLabel')}
             </span>
@@ -863,7 +719,6 @@ export function KnowledgeWorkspace() {
             data-testid="knowledge-tree-pane"
             payload={{
               onNewDoc: () => newDoc(null),
-              onNewBoard: () => newBoard(null),
               onNewFolder: () =>
                 void createFolder(null, t('knowledge.folder.untitled')),
             }}
@@ -878,7 +733,6 @@ export function KnowledgeWorkspace() {
                 }}
                 onDelete={(node) => setNodeDelete(node)}
                 onNewDoc={(parentId) => newDoc(parentId)}
-                onNewBoard={(parentId) => newBoard(parentId)}
                 onNewFolder={(parentId) =>
                   void createFolder(parentId, t('knowledge.folder.untitled'))
                 }
@@ -887,21 +741,6 @@ export function KnowledgeWorkspace() {
                   if (node.kind === 'doc') {
                     void knowledgeRevealDoc(activeSpaceId, node.id).catch((e) => {
                       toast.error(knowledgeErrorMessage(e))
-                    })
-                    return
-                  }
-                  if (node.kind === 'board') {
-                    // Dual-resolve reveal: primary first, then legacy `.excalidraw`.
-                    void knowledgeRevealPath(
-                      activeSpaceId,
-                      `boards/${node.id}.board.json`,
-                    ).catch(() => {
-                      void knowledgeRevealPath(
-                        activeSpaceId,
-                        `boards/${node.id}.excalidraw`,
-                      ).catch((e) => {
-                        toast.error(knowledgeErrorMessage(e))
-                      })
                     })
                   }
                 }}
@@ -920,34 +759,6 @@ export function KnowledgeWorkspace() {
       </aside>
 
       <main className="flex min-w-0 flex-1 flex-col bg-surface-content">
-        {activeView ? (
-          <>
-            <div className="flex h-12 shrink-0 items-center gap-2.5 border-b border-border px-5">
-              <span className="text-body font-medium text-ink">
-                {collectionViewDisplayName(t, activeView)}
-              </span>
-              <span className="text-meta text-ink-tertiary">
-                {activeView.layout === 'board'
-                  ? t('knowledge.views.layoutBoard')
-                  : t('knowledge.views.layoutTable')}
-              </span>
-            </div>
-            <KnowledgeCollectionView
-              view={activeView}
-              nodes={nodes}
-              metaByDocId={docMetaMap}
-              schema={spaceSchema}
-              onOpenDoc={(id) => {
-                setActiveViewId(null)
-                void openDoc(id)
-              }}
-              onPatchField={(docId, key, value) => {
-                void patchDocField(docId, key, value)
-              }}
-            />
-          </>
-        ) : (
-          <>
         <div className="flex h-12 shrink-0 items-center gap-2.5 border-b border-border px-5">
           <div className="flex min-w-0 flex-1 items-center gap-1 truncate text-meta">
             {pathNodes.length === 0 ? (
@@ -1011,36 +822,6 @@ export function KnowledgeWorkspace() {
               />
               {saveState === 'saving' ? t('knowledge.doc.saving') : t('knowledge.doc.saved')}
             </span>
-          )}
-          {activeDocId && isBoard && (
-            <DropdownMenu modal={false}>
-              <DropdownMenuTrigger asChild>
-                <button
-                  type="button"
-                  className="rounded-sm p-1.5 text-ink-tertiary hover:bg-state-hover hover:text-ink"
-                  aria-label={t('knowledge.space.menu')}
-                  data-testid="knowledge-board-menu"
-                >
-                  <MoreHorizontal size={16} />
-                </button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                <DropdownMenuItem
-                  data-testid="knowledge-export-board-json"
-                  onClick={() => void exportActiveBoardJson()}
-                >
-                  <Download size={14} />
-                  {t('knowledge.export.boardJson')}
-                </DropdownMenuItem>
-                <DropdownMenuItem
-                  data-testid="knowledge-export-board-png"
-                  onClick={() => void exportActiveBoardPng()}
-                >
-                  <Download size={14} />
-                  {t('knowledge.export.boardPng')}
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
           )}
           {activeDocId && !isBoard && (
             /* modal={false}: modal menu + version-history / save-as-template Modal both lock
@@ -1128,45 +909,27 @@ export function KnowledgeWorkspace() {
                 label: t('knowledge.tree.newDoc'),
                 onClick: () => newDoc(null),
               }}
-              secondaryAction={{
-                label: t('knowledge.tree.newBoard'),
-                onClick: () => newBoard(null),
-                'data-testid': 'knowledge-empty-new-board',
-              }}
             >
               <HipLogo size={32} decorative />
             </EmptyState>
           </div>
-        ) : isBoard && activeSpaceId ? (
-          <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
-            <div className="shrink-0 border-b border-border/60 px-5 py-2">
-              <InlineDocTitle
-                docId={activeDocId}
-                title={activeNode?.title ?? t('knowledge.board.untitled')}
-                onCommit={(title) => void renameNode(activeDocId, title)}
-                ariaLabel={t('knowledge.board.titleLabel')}
-                placeholder={t('knowledge.board.untitled')}
-                className="pt-1 pb-1 sm:pt-1 text-title"
-              />
-            </div>
-            <Suspense
-              fallback={
-                <div
-                  className="flex flex-1 items-center justify-center text-meta text-ink-tertiary"
-                  data-testid="knowledge-board-suspense"
-                >
-                  {t('knowledge.board.loading')}
-                </div>
-              }
+        ) : isBoard ? (
+          <div
+            className="flex min-h-0 flex-1 items-center justify-center px-8 py-6"
+            data-testid="knowledge-board-removed"
+          >
+            <EmptyState
+              tier="friendly"
+              title={t('knowledge.workspace.noDocTitle')}
+              description={t('knowledge.workspace.noDocHint')}
+              className="w-full max-w-md border-0 py-16"
+              action={{
+                label: t('knowledge.tree.newDoc'),
+                onClick: () => newDoc(null),
+              }}
             >
-              <HipBoardCanvas
-                ref={boardCanvasRef}
-                key={activeDocId}
-                boardId={activeDocId}
-                spaceId={activeSpaceId}
-                initialJson={mountBoardJson}
-              />
-            </Suspense>
+              <HipLogo size={32} decorative />
+            </EmptyState>
           </div>
         ) : showLiveEditor ? (
           <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
@@ -1182,14 +945,21 @@ export function KnowledgeWorkspace() {
                   liveEditorRef.current?.focus({ at: 'start' })
                 }}
               />
-              <DocPropertiesConnected schema={spaceSchema} />
               <Suspense
                 fallback={
                   <div
-                    className="flex flex-1 items-center justify-center text-meta text-ink-tertiary"
+                    className="flex min-h-0 flex-1 flex-col gap-3 pt-2"
                     data-testid="knowledge-doc-live-loading"
+                    aria-busy="true"
+                    aria-label={t('knowledge.doc.liveLoading')}
                   >
-                    {t('knowledge.doc.liveLoading')}
+                    <Skeleton className="h-4 w-2/5 rounded" />
+                    <Skeleton className="h-4 w-full rounded" />
+                    <Skeleton className="h-4 w-11/12 rounded" />
+                    <Skeleton className="h-4 w-4/5 rounded" />
+                    <Skeleton className="mt-2 h-4 w-3/5 rounded" />
+                    <Skeleton className="h-4 w-full rounded" />
+                    <Skeleton className="h-4 w-2/3 rounded" />
                   </div>
                 }
               >
@@ -1209,6 +979,13 @@ export function KnowledgeWorkspace() {
                   onRequestAttach={() => void attachFiles()}
                   placeholder={t('knowledge.doc.placeholder')}
                   wikiNodes={nodes}
+                  onWikiNavigate={({ title, nodeId, broken }) => {
+                    if (broken || !nodeId) {
+                      setWikiCreateTitle(title)
+                      return
+                    }
+                    void openDoc(nodeId)
+                  }}
                 />
               </Suspense>
             </KnowledgeDocCanvas>
@@ -1224,7 +1001,15 @@ export function KnowledgeWorkspace() {
                 title={activeNode?.title ?? t('knowledge.doc.untitled')}
                 onCommit={(title) => void renameNode(activeDocId, title)}
               />
-              <DocPropertiesConnected schema={spaceSchema} />
+              {liveSuppressed ? (
+                <div
+                  className="mt-2 rounded-md border border-border bg-surface-muted/80 px-3 py-2 text-meta text-ink-secondary"
+                  data-testid="knowledge-large-doc-banner"
+                  role="status"
+                >
+                  {t('knowledge.doc.largeDocForceSource')}
+                </div>
+              ) : null}
               <div className="mt-3 mb-2 flex shrink-0 items-center gap-0.5 rounded-lg border border-border/80 bg-surface-muted/60 px-1 py-0.5">
                 <MarkdownToolbar
                   className="mb-0 border-0 bg-transparent p-0 opacity-100"
@@ -1265,8 +1050,6 @@ export function KnowledgeWorkspace() {
             </KnowledgeDocCanvas>
           </div>
         ) : null}
-          </>
-        )}
       </main>
 
       <Modal

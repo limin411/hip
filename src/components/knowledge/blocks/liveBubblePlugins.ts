@@ -30,6 +30,18 @@ import {
 } from '@/domain/knowledge/turnInto'
 import i18n from '@/i18n'
 import type { KnowledgeNode } from '@/domain/knowledge/types'
+import {
+  iconBold,
+  iconCheck,
+  iconClearMarks,
+  iconHeading,
+  iconInlineCode,
+  iconItalic,
+  iconLink,
+  iconStrike,
+  iconTurnInto,
+  iconX,
+} from './liveChromeIcons'
 
 export type BubbleMenusFlag = { current: boolean }
 
@@ -92,15 +104,13 @@ function tLabels(): Labels {
   }
 }
 
-const BTN =
-  'flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-ink-secondary hover:bg-state-hover hover:text-ink disabled:opacity-40'
-const BTN_ACTIVE = 'bg-state-hover text-ink'
+const BTN = 'knowledge-live-bubble-btn'
 
 function iconBtn(
   label: string,
   testId: string,
   onClick: () => void,
-  text: string,
+  icon: SVGSVGElement,
 ): HTMLButtonElement {
   const b = document.createElement('button')
   b.type = 'button'
@@ -108,7 +118,8 @@ function iconBtn(
   b.title = label
   b.setAttribute('aria-label', label)
   b.setAttribute('data-testid', testId)
-  b.textContent = text
+  b.setAttribute('data-active', 'false')
+  b.append(icon)
   b.addEventListener('mousedown', (e) => {
     e.preventDefault()
     e.stopPropagation()
@@ -172,8 +183,7 @@ export function createKnowledgeBubble(
 ): BubbleProviderHandle {
   const labels = tLabels()
   const content = document.createElement('div')
-  content.className =
-    'knowledge-live-bubble z-[60] flex flex-wrap items-center gap-0.5 rounded-lg border border-border bg-surface px-1 py-0.5 shadow-overlay'
+  content.className = 'knowledge-live-bubble'
   content.setAttribute('role', 'toolbar')
   content.setAttribute('aria-label', labels.toolbar)
   content.setAttribute('data-testid', 'knowledge-live-bubble')
@@ -181,7 +191,6 @@ export function createKnowledgeBubble(
   content.style.zIndex = '60'
   // TooltipProvider toggles dataset.show
   content.dataset.show = 'false'
-  content.style.display = 'none'
 
   let linkPanelOpen = false
   let turnMenuOpen = false
@@ -238,18 +247,14 @@ export function createKnowledgeBubble(
         e.stopPropagation()
       })
       b.addEventListener('click', () => {
-        // Insert wiki-style markdown link target as md link to # or use [[ via text
-        const href = sanitizeKnowledgeLinkHref(`[[${n.title}]]`) || `wiki://${encodeURIComponent(n.title)}`
-        // Prefer plain URL-like title path for md: use relative wiki token as text link
-        const existing = selectionLinkHref(view)
+        // Prefer in-doc hash target; Phase C replaces with wiki chip serialize.
         const finalHref = `#${encodeURIComponent(n.title)}`
+        const existing = selectionLinkHref(view)
         if (existing != null) {
           call(ctx, updateLinkCommand, { href: finalHref })
         } else {
           call(ctx, toggleLinkCommand, { href: finalHref })
         }
-        // Also try inserting wiki if selection empty handled by toggle
-        void href
         linkPanelOpen = false
         linkPanel.hidden = true
         view.focus()
@@ -285,8 +290,8 @@ export function createKnowledgeBubble(
 
   linkRow.append(
     hrefInput,
-    iconBtn(labels.linkApply, 'knowledge-live-bubble-link-apply', applyLink, '✓'),
-    iconBtn(labels.linkRemove, 'knowledge-live-bubble-link-remove', removeLink, '×'),
+    iconBtn(labels.linkApply, 'knowledge-live-bubble-link-apply', applyLink, iconCheck()),
+    iconBtn(labels.linkRemove, 'knowledge-live-bubble-link-remove', removeLink, iconX()),
   )
   linkPanel.append(linkRow, docHits)
 
@@ -302,37 +307,37 @@ export function createKnowledgeBubble(
   mainRow.append(
     iconBtn(labels.bold, 'knowledge-live-bubble-bold', () => {
       runMark(() => call(ctx, toggleStrongCommand))
-    }, 'B'),
+    }, iconBold()),
     iconBtn(labels.italic, 'knowledge-live-bubble-italic', () => {
       runMark(() => call(ctx, toggleEmphasisCommand))
-    }, 'I'),
+    }, iconItalic()),
     iconBtn(labels.strike, 'knowledge-live-bubble-strike', () => {
       runMark(() => call(ctx, toggleStrikethroughCommand))
-    }, 'S'),
+    }, iconStrike()),
     iconBtn(labels.code, 'knowledge-live-bubble-code', () => {
       runMark(() => call(ctx, toggleInlineCodeCommand))
-    }, '</>'),
+    }, iconInlineCode()),
   )
 
   const sep = document.createElement('span')
-  sep.className = 'mx-0.5 h-4 w-px bg-border'
+  sep.className = 'knowledge-live-bubble-sep'
   sep.setAttribute('aria-hidden', 'true')
   mainRow.append(sep)
 
   mainRow.append(
     iconBtn(labels.h1, 'knowledge-live-bubble-h1', () => {
       runMark(() => call(ctx, wrapInHeadingCommand, 1))
-    }, 'H1'),
+    }, iconHeading(1)),
     iconBtn(labels.h2, 'knowledge-live-bubble-h2', () => {
       runMark(() => call(ctx, wrapInHeadingCommand, 2))
-    }, 'H2'),
+    }, iconHeading(2)),
     iconBtn(labels.h3, 'knowledge-live-bubble-h3', () => {
       runMark(() => call(ctx, wrapInHeadingCommand, 3))
-    }, 'H3'),
+    }, iconHeading(3)),
   )
 
   const sep2 = document.createElement('span')
-  sep2.className = 'mx-0.5 h-4 w-px bg-border'
+  sep2.className = 'knowledge-live-bubble-sep'
   sep2.setAttribute('aria-hidden', 'true')
   mainRow.append(sep2)
 
@@ -346,7 +351,7 @@ export function createKnowledgeBubble(
         hrefInput.value = selectionLinkHref(view) ?? ''
         hrefInput.focus()
       }
-    }, '🔗'),
+    }, iconLink()),
   )
 
   const turnBtn = iconBtn(labels.turnInto, 'knowledge-live-bubble-turn', () => {
@@ -354,7 +359,7 @@ export function createKnowledgeBubble(
     linkPanelOpen = false
     linkPanel.hidden = true
     turnMenu.hidden = !turnMenuOpen
-  }, '↕')
+  }, iconTurnInto())
   mainRow.append(turnBtn)
 
   mainRow.append(
@@ -376,7 +381,7 @@ export function createKnowledgeBubble(
         }
         return false
       })
-    }, 'Tₓ'),
+    }, iconClearMarks()),
   )
 
   const turnTargets: { id: TurnIntoTarget; label: string; testId: string }[] = [
@@ -448,7 +453,7 @@ export function createKnowledgeBubble(
           const setActive = (testId: string, on: boolean) => {
             const el = content.querySelector(`[data-testid="${testId}"]`)
             if (el instanceof HTMLElement) {
-              el.className = on ? `${BTN} ${BTN_ACTIVE}` : BTN
+              el.setAttribute('data-active', on ? 'true' : 'false')
             }
           }
           setActive('knowledge-live-bubble-bold', has('strong'))

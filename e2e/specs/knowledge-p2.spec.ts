@@ -107,7 +107,7 @@ describe('knowledge P2 product surfaces @knowledge', function () {
     })
   })
 
-  it('KP2-V: collection table + board views show docs and open a row', async () => {
+  it.skip('KP2-V: collection table + board views removed', async () => {
     await selectKnowledgeDocsTab()
     const body = [
       '---',

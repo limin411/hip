@@ -84,7 +84,6 @@ describe('SpaceTree selection visuals', () => {
         onRename={noop}
         onDelete={noop}
         onNewDoc={noop}
-        onNewBoard={noop}
         onNewFolder={noop}
       />,
     )
@@ -108,7 +107,6 @@ describe('SpaceTree selection visuals', () => {
         onRename={noop}
         onDelete={noop}
         onNewDoc={noop}
-        onNewBoard={noop}
         onNewFolder={noop}
       />,
     )
@@ -119,42 +117,7 @@ describe('SpaceTree selection visuals', () => {
     expect(row.className).toContain('hover:bg-state-hover')
   })
 
-  it('renders board rows with board testid and opens via openDoc', () => {
-    const openDoc = vi.fn()
-    seedTree(null, {
-      nodes: [
-        {
-          id: 'brd_board000001',
-          parentId: null,
-          kind: 'board',
-          title: 'Arch',
-          order: 0,
-          createdAt: 1,
-          updatedAt: 1,
-        },
-      ],
-      activeDocId: 'brd_board000001',
-      treeFocusId: 'brd_board000001',
-    })
-    // Patch openDoc after seed
-    useKnowledgeStore.setState({ openDoc: openDoc as never })
-
-    render(
-      <SpaceTree
-        onRename={noop}
-        onDelete={noop}
-        onNewDoc={noop}
-        onNewBoard={noop}
-        onNewFolder={noop}
-      />,
-    )
-
-    const row = screen.getByTestId('knowledge-tree-board-brd_board000001')
-    expect(row).toBeInTheDocument()
-    expect(row.className).toContain('bg-accent/10')
-    fireEvent.click(row.querySelector('[role="presentation"]')!)
-    expect(openDoc).toHaveBeenCalledWith('brd_board000001')
-  })
+  it.skip('renders board rows — boards removed from tree', () => {})
 })
 
 describe('listVisibleTreeNodes', () => {
@@ -249,7 +212,6 @@ describe('SpaceTree keyboard navigation', () => {
         onRename={noop}
         onDelete={noop}
         onNewDoc={noop}
-        onNewBoard={noop}
         onNewFolder={noop}
       />,
     )
@@ -266,7 +228,6 @@ describe('SpaceTree keyboard navigation', () => {
         onRename={noop}
         onDelete={noop}
         onNewDoc={noop}
-        onNewBoard={noop}
         onNewFolder={noop}
       />,
     )
@@ -283,7 +244,6 @@ describe('SpaceTree keyboard navigation', () => {
         onRename={noop}
         onDelete={noop}
         onNewDoc={noop}
-        onNewBoard={noop}
         onNewFolder={noop}
       />,
     )
@@ -299,7 +259,6 @@ describe('SpaceTree keyboard navigation', () => {
         onRename={noop}
         onDelete={noop}
         onNewDoc={noop}
-        onNewBoard={noop}
         onNewFolder={noop}
       />,
     )
@@ -320,7 +279,6 @@ describe('SpaceTree keyboard navigation', () => {
         onRename={noop}
         onDelete={noop}
         onNewDoc={noop}
-        onNewBoard={noop}
         onNewFolder={noop}
       />,
     )
@@ -339,7 +297,6 @@ describe('SpaceTree keyboard navigation', () => {
         onRename={noop}
         onDelete={noop}
         onNewDoc={noop}
-        onNewBoard={noop}
         onNewFolder={noop}
       />,
     )
@@ -363,7 +320,6 @@ describe('SpaceTree keyboard navigation', () => {
         onRename={noop}
         onDelete={noop}
         onNewDoc={noop}
-        onNewBoard={noop}
         onNewFolder={noop}
         visibleIds={visibleIds}
       />,
@@ -534,7 +490,6 @@ describe('SpaceTree drag and drop (pointer)', () => {
         onRename={noop}
         onDelete={noop}
         onNewDoc={noop}
-        onNewBoard={noop}
         onNewFolder={noop}
       />,
     )
@@ -549,7 +504,6 @@ describe('SpaceTree drag and drop (pointer)', () => {
         onRename={noop}
         onDelete={noop}
         onNewDoc={noop}
-        onNewBoard={noop}
         onNewFolder={noop}
       />,
     )
@@ -566,7 +520,6 @@ describe('SpaceTree drag and drop (pointer)', () => {
         onRename={noop}
         onDelete={noop}
         onNewDoc={noop}
-        onNewBoard={noop}
         onNewFolder={noop}
       />,
     )
@@ -598,7 +551,6 @@ describe('SpaceTree drag and drop (pointer)', () => {
         onRename={noop}
         onDelete={noop}
         onNewDoc={noop}
-        onNewBoard={noop}
         onNewFolder={noop}
       />,
     )

@@ -55,7 +55,7 @@ export async function knowledgeSoftDeleteNodes(
   })
 }
 
-export type KnowledgeTrashKind = 'space' | 'doc' | 'folder' | 'board'
+export type KnowledgeTrashKind = 'space' | 'doc' | 'folder'
 
 export interface KnowledgeTrashItem {
   id: string
@@ -128,41 +128,13 @@ export async function knowledgeDeleteDocFile(spaceId: string, docId: string): Pr
   await invoke('knowledge_delete_doc_file', { args: { spaceId, docId } })
 }
 
-export async function knowledgeReadBoard(spaceId: string, boardId: string): Promise<string> {
-  return invoke<string>('knowledge_read_board', { args: { spaceId, boardId } })
-}
 
 /**
  * Write board body (dehydrated JSON). Shares `__hipKnowledgeWriteFail` with docs
  * (boolean true, or a function that returns true for this write).
  */
-export async function knowledgeWriteBoard(
-  spaceId: string,
-  boardId: string,
-  body: string,
-): Promise<void> {
-  const fail = (globalThis as unknown as {
-    __hipKnowledgeWriteFail?: boolean | ((spaceId: string, boardId: string) => boolean)
-  }).__hipKnowledgeWriteFail
-  const shouldFail = typeof fail === 'function' ? fail(spaceId, boardId) : fail === true
-  if (shouldFail) {
-    throw new Error('e2e knowledge write fail')
-  }
-  await invoke('knowledge_write_board', { args: { spaceId, boardId, body } })
-}
 
-export async function knowledgeDeleteBoardFile(spaceId: string, boardId: string): Promise<void> {
-  await invoke('knowledge_delete_board_file', { args: { spaceId, boardId } })
-}
 
-/** Export dehydrated hip board JSON (same as on-disk) to an absolute path. */
-export async function knowledgeExportBoard(
-  spaceId: string,
-  boardId: string,
-  destPath: string,
-): Promise<void> {
-  await invoke('knowledge_export_board', { args: { spaceId, boardId, destPath } })
-}
 
 /**
  * Write binary export payload (v1: image/png only, raw ≤ 25MB) to an absolute path.
@@ -433,18 +405,6 @@ export async function knowledgeLinkIndexGraph(
 }
 
 /** Raw JSON string or null when file missing. */
-export async function knowledgeGetSchema(spaceId: string): Promise<string | null> {
-  return invoke<string | null>('knowledge_get_schema', { args: { spaceId } })
-}
 
-export async function knowledgeSetSchema(spaceId: string, json: string): Promise<void> {
-  await invoke('knowledge_set_schema', { args: { spaceId, json } })
-}
 
-export async function knowledgeGetViews(spaceId: string): Promise<string | null> {
-  return invoke<string | null>('knowledge_get_views', { args: { spaceId } })
-}
 
-export async function knowledgeSetViews(spaceId: string, json: string): Promise<void> {
-  await invoke('knowledge_set_views', { args: { spaceId, json } })
-}

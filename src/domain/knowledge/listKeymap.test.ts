@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { Schema } from '@milkdown/kit/prose/model'
 import { EditorState, TextSelection } from '@milkdown/kit/prose/state'
-import { exitEmptyListItem } from './listKeymap'
+import { exitEmptyListItem, indentListItem, outdentListItem } from './listKeymap'
 
 const schema = new Schema({
   nodes: {
@@ -68,5 +68,18 @@ describe('listKeymap exitEmptyListItem', () => {
     const names: string[] = []
     state.doc.forEach((n) => names.push(n.type.name))
     expect(names).toContain('paragraph')
+  })
+
+  it('indent/outdent return false outside list', () => {
+    const doc = schema.node('doc', null, [
+      schema.node('paragraph', null, schema.text('x')),
+    ])
+    const state = EditorState.create({
+      doc,
+      schema,
+      selection: TextSelection.create(doc, 1),
+    })
+    expect(indentListItem(state)).toBe(false)
+    expect(outdentListItem(state)).toBe(false)
   })
 })

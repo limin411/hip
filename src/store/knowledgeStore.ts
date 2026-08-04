@@ -8,7 +8,7 @@ import type {
   KnowledgeTemplate,
   KnowledgeVersionEntry,
 } from '@/domain/knowledge/types'
-import { newBoardId, newDocId, newFolderId } from '@/domain/knowledge/ids'
+import { newDocId, newFolderId } from '@/domain/knowledge/ids'
 import {
   KNOWLEDGE_INDEX_YIELD_EVERY,
   KNOWLEDGE_LARGE_DOC_CHARS,
@@ -24,22 +24,6 @@ import {
   kbPerfOpenStore,
 } from '@/domain/knowledge/knowledgePerf'
 import {
-  assertNoDataUrlInBoardJson,
-  EMPTY_BOARD_SCENE,
-  EMPTY_BOARD_SCENE_JSON,
-  parseBoardScene,
-  stableSerializeBoard,
-} from '@/domain/knowledge/boardScene'
-import { migrateExcalidrawToHipBoard } from '@/domain/knowledge/boardMigrate'
-import { requestLegacyBoardReplaceConfirm } from '@/components/knowledge/legacyBoardReplaceDialogStore'
-import {
-  boardOutlinePublishSignature,
-  selectionPublishSignature,
-  type BoardOutline,
-  type BoardSelectionSnapshot,
-} from '@/domain/knowledge/boardOutline'
-import {
-  collectBoardIdsInSubtree,
   collectDocIdsInSubtree,
   getPathTitles,
   insertNode,
@@ -80,7 +64,6 @@ import {
   knowledgeListSpaces,
   knowledgeListTemplates,
   knowledgeReadDoc,
-  knowledgeReadBoard,
   knowledgeSaveTemplate,
   knowledgeListVersions,
   knowledgeRestoreVersion,
@@ -88,34 +71,16 @@ import {
   knowledgeSaveVersion,
   knowledgeUpdateSpace,
   knowledgeWriteDoc,
-  knowledgeWriteBoard,
   knowledgeLinkIndexUpsert,
   knowledgeLinkIndexRemoveDoc,
   knowledgeLinkIndexReplaceAll,
   knowledgeLinkIndexBacklinks,
   knowledgeLinkIndexOutbound,
   knowledgeLinkIndexDocCount,
-  knowledgeGetSchema,
-  knowledgeSetSchema,
-  knowledgeGetViews,
-  knowledgeSetViews,
   type KnowledgeLinkBacklink,
   type KnowledgeLinkOutboundRow,
 } from '@/ipc/knowledge'
 import { buildDocIndexPayload } from '@/domain/knowledge/linkIndex'
-import {
-  DEFAULT_SPACE_SCHEMA,
-  normalizeSpaceSchema,
-  type SpaceSchemaV1,
-} from '@/domain/knowledge/schema'
-import {
-  DEFAULT_VIEWS,
-  normalizeViewsFile,
-  patchMetaField,
-  type ViewsFileV1,
-} from '@/domain/knowledge/views'
-import { parseFrontmatter, type KnowledgeDocMeta } from '@/domain/knowledge/frontmatter'
-import { applyMetaToDocument } from '@/domain/knowledge/frontmatterWrite'
 import {
   applyWikiRewrites,
   planWikiTitleRewrites,
@@ -325,22 +290,6 @@ export type KnowledgePendingOutlineJump = {
   nonce: number
 }
 
-/** Right-rail structure click → HipBoardCanvas selectAndScrollTo (LKD-20/25). */
-export type KnowledgePendingBoardFocus = {
-  ids: string[]
-  nonce: number
-  scroll: boolean
-  /** Ignore if activeDocId diverges (LKD-27). */
-  boardId: string
-}
-
-/** Cleared on every activeDocId change (LKD-24). */
-const CLEARED_BOARD_PANEL = {
-  boardOutline: null,
-  boardSelection: null,
-  pendingBoardFocus: null,
-} as const
-
 /** Yield so React can paint index progress (and avoid long freezes). */
 function yieldToUi(): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, 0))
@@ -375,28 +324,10 @@ interface KnowledgeState {
   pendingReveal: KnowledgePendingReveal | null
   /** Outline (TOC) click — consumed by KnowledgeWorkspace for mode-aware scroll. */
   pendingOutlineJump: KnowledgePendingOutlineJump | null
-  /**
-   * Whiteboard companion (LKD-20): structure list from canvas elements.
-   * Null when not on a board / after clearBoardPanelState.
-   */
-  boardOutline: BoardOutline | null
-  /**
-   * Whiteboard companion selection + style snapshot (LKD-10/20).
-   * Null when empty clear or after leaf change.
-   */
-  boardSelection: BoardSelectionSnapshot | null
-  /** Structure click → canvas selectAndScrollTo; held until isReady (LKD-25). */
-  pendingBoardFocus: KnowledgePendingBoardFocus | null
   /** SQLite link-index panel (active doc). */
   backlinks: KnowledgeLinkBacklink[]
   outboundLinks: KnowledgeLinkOutboundRow[]
   linkPanelStatus: 'idle' | 'loading' | 'ready' | 'error'
-  /** Active space property schema (defaults if missing on disk). */
-  spaceSchema: SpaceSchemaV1
-  /** Active space collection views. */
-  spaceViews: ViewsFileV1
-  /** null = document canvas; else collection view id. */
-  activeViewId: string | null
   /**
    * Doc counts per space. Tree-derived counts land as soon as trees load during
    * index rebuild (before body reads); finalized when indexStatus is ready.
@@ -441,36 +372,10 @@ interface KnowledgeState {
     line: number
   }) => void
   clearPendingOutlineJump: () => void
-  /**
-   * Canvas → store structure publish. Ignores boardId !== activeDocId (LKD-27).
-   * Equality no-op when publish signature unchanged.
-   */
-  setBoardOutline: (outline: BoardOutline | null) => void
-  /**
-   * Canvas → store selection + style snapshot. Ignores boardId mismatch.
-   * Equality on selectionPublishSignature (ids + style) — LKD-23.
-   */
-  setBoardSelection: (sel: BoardSelectionSnapshot | null) => void
-  /** Structure row click; canvas holds until isReady (LKD-25). */
-  requestBoardFocus: (ids: string[], opts?: { scroll?: boolean }) => void
-  clearPendingBoardFocus: () => void
-  /** Clear outline / selection / pending focus (LKD-24). */
-  clearBoardPanelState: () => void
   /** Refresh backlinks + outbound for the active doc (or given id). */
   refreshLinkPanel: (docId?: string) => Promise<void>
   /** Full rebuild of space link index from disk docs. */
   rebuildSpaceLinkIndex: (spaceId?: string) => Promise<void>
-  /** Load schema + views for a space (defaults when missing). */
-  loadSpaceConfig: (spaceId: string) => Promise<void>
-  setActiveViewId: (viewId: string | null) => void
-  /** Patch a frontmatter field on a doc (collection board/table or properties row). */
-  patchDocField: (
-    docId: string,
-    key: string,
-    value: string | string[] | null,
-  ) => Promise<boolean>
-  /** Snapshot of meta for active space docs (for collection views). */
-  getDocMetaMap: () => Map<string, KnowledgeDocMeta>
   /**
    * After rename: rewrite `[[oldTitle]]` / embeds in all other docs to newTitle.
    * Returns number of files changed.
@@ -490,11 +395,6 @@ interface KnowledgeState {
     title: string,
     opts?: { body?: string },
   ) => Promise<void>
-  /**
-   * Create a whiteboard (board) node and open it.
-   * Does not change spaceDocCounts (Option B: doc-only counts).
-   */
-  createBoard: (parentId: string | null, title: string) => Promise<void>
   /**
    * If the space has templates, open the picker (no node yet). Otherwise create empty.
    * Cancel on the picker leaves no orphan empty doc.
@@ -659,83 +559,21 @@ function applySearchFilters(hits: KnowledgeSearchHit[]): KnowledgeSearchHit[] {
 let saveTimer: ReturnType<typeof setTimeout> | null = null
 let saveChain: Promise<boolean> = Promise.resolve(true)
 /**
- * Monotonic token for openDoc. After `await knowledgeReadDoc` / `knowledgeReadBoard`,
+ * Monotonic token for openDoc. After `await knowledgeReadDoc`,
  * only apply state if this open is still the latest — otherwise rapid tree clicks
  * write the wrong body into the active buffer (data cross-talk).
  */
 let openDocGeneration = 0
 
-/**
- * LKD-8 session flags (not persisted).
- * - legacyPreserveRaw: unsupported excalidraw open — block write until user confirms replace.
- * - pendingUpgradeRetry: open upgrade write failed — force next flush to write primary.
- */
-const legacyPreserveRaw = new Set<string>()
-const pendingUpgradeRetry = new Set<string>()
-
-/** Test helper: clear LKD-8 session flags between cases. */
-export function __resetBoardSessionFlagsForTests(): void {
-  legacyPreserveRaw.clear()
-  pendingUpgradeRetry.clear()
-}
-
-/** Test helper: inspect unsupported gate state. */
-export function __legacyPreserveRawHasForTests(boardId: string): boolean {
-  return legacyPreserveRaw.has(boardId)
-}
-
-/** Test helper: inspect upgrade-retry flag. */
-export function __pendingUpgradeRetryHasForTests(boardId: string): boolean {
-  return pendingUpgradeRetry.has(boardId)
-}
-
-/** Test helper: supersede in-flight openDoc / open-upgrade guards. */
-export function __bumpOpenDocGenerationForTests(): number {
-  return ++openDocGeneration
-}
-
-/**
- * Stamp `hip.boardId` on a hip-board JSON body so canvas leave serialize
- * (which always includes boardId) does not false-dirty empty scenes.
- */
-function ensureHipBoardIdInBody(raw: string, boardId: string): string {
-  try {
-    const scene = parseBoardScene(raw)
-    if (scene.type === 'hip-board') {
-      if (scene.hip?.boardId === boardId) return stableSerializeBoard(scene)
-      return stableSerializeBoard({
-        ...scene,
-        hip: { schemaVersion: 1, boardId },
-      })
-    }
-  } catch {
-    /* fall through to empty */
-  }
-  return stableSerializeBoard({
-    ...EMPTY_BOARD_SCENE,
-    hip: { schemaVersion: 1, boardId },
-  })
-}
-
-/**
- * Options for {@link syncActiveEditorToDraft} / Workspace dispatcher.
- * `leaveActiveLeaf` drives board flushToStore mode: leave vs snapshot (KD-13).
- */
+/** Options for {@link syncActiveEditorToDraft} / Workspace dispatcher. */
 export type SyncActiveEditorOpts = {
-  /**
-   * true → active leaf will change or be destroyed after the following flushSave
-   *        (board flushToStore mode = 'leave').
-   * false/omit → snapshot: keep pending board imports.
-   */
+  /** true when active leaf will change after the following flushSave. */
   leaveActiveLeaf?: boolean
 }
 
 type BeforeOpenDocFlush = (opts?: SyncActiveEditorOpts) => void
 
-/**
- * Optional UI hook: push Live/Source/board editor buffer into draftBody *before*
- * any structural flushSave. Registered by KnowledgeWorkspace (KD-9).
- */
+/** Optional UI hook: push Live/Source editor buffer into draftBody before flushSave. */
 let beforeOpenDocFlush: BeforeOpenDocFlush | null = null
 
 /** Register (or clear with null) the pre-flush editor sync callback. */
@@ -743,10 +581,7 @@ export function registerBeforeOpenDocFlush(fn: BeforeOpenDocFlush | null): void 
   beforeOpenDocFlush = fn
 }
 
-/**
- * Call before any flushSave that may leave or structurally change the tree/space
- * (KD-14). Never throws into callers.
- */
+/** Call before flushSave that may leave or change the tree/space. Never throws. */
 export function syncActiveEditorToDraft(opts?: SyncActiveEditorOpts): void {
   try {
     beforeOpenDocFlush?.(opts)
@@ -755,85 +590,9 @@ export function syncActiveEditorToDraft(opts?: SyncActiveEditorOpts): void {
   }
 }
 
-/**
- * Board companion style editors → canvas (LKD-10).
- * Module registry (not Workspace canvasRef): Outline lives under AppLayout.
- * Intentional — panel must never JSON.parse(draftBody) for style edits.
- */
-export type BoardCanvasStyleApi = {
-  applyStylePatch: (
-    ids: string[],
-    patch: Partial<{
-      fill: string
-      stroke: string
-      strokeWidth: number
-      fontSize: 12 | 16 | 24
-      cornerRadius: number
-    }>,
-  ) => void
-  updateText: (id: string, text: string) => void
-}
-
-let boardCanvasStyleApi: BoardCanvasStyleApi | null = null
-
-/** Register (or clear with null) the live board canvas style API. */
-export function registerBoardCanvasStyleApi(api: BoardCanvasStyleApi | null): void {
-  boardCanvasStyleApi = api
-}
-
-/** Panel → canvas style / text edits. */
-export function getBoardCanvasStyleApi(): BoardCanvasStyleApi | null {
-  return boardCanvasStyleApi
-}
-
-/**
- * When leave-flush freezes the board canvas but openDoc aborts (flush false),
- * Workspace re-activates via this hook so the user is not stuck on a dead canvas.
- */
-let onBoardFlushAbort: (() => void) | null = null
-
-/** Register (or clear with null) canvas resume after failed board flush. */
-export function registerOnBoardFlushAbort(fn: (() => void) | null): void {
-  onBoardFlushAbort = fn
-}
-
-function notifyBoardFlushAbort(): void {
-  try {
-    onBoardFlushAbort?.()
-  } catch {
-    /* never block */
-  }
-}
-
-/** Default title for new / empty-renamed whiteboards (KD-12). */
-const DEFAULT_BOARD_TITLE = 'Untitled whiteboard'
-
-/** Title-only MiniSearch upsert for boards (no body / frontmatter). */
-function indexBoardTitle(
-  spaceId: string,
-  boardId: string,
-  title: string,
-  spaceName: string,
-  nodes: KnowledgeNode[],
-) {
-  const path = getPathTitles(nodes, boardId).join(' / ') || title
-  const order = nodes.find((n) => n.id === boardId)?.order ?? Number.MAX_SAFE_INTEGER
-  upsertSearchDoc(kbIndex, {
-    id: docKey(spaceId, boardId),
-    spaceId,
-    docId: boardId,
-    title,
-    body: '',
-    spaceName,
-    path,
-    order,
-    metaSink: kbMeta,
-  })
-}
-
-/** True when node is a board leaf (kind ⇔ prefix). */
-function isBoardNode(node: KnowledgeNode | undefined, id: string): boolean {
-  return node?.kind === 'board' && id.startsWith('brd_')
+/** Test helper: supersede in-flight openDoc guards. */
+export function __bumpOpenDocGenerationForTests(): number {
+  return ++openDocGeneration
 }
 
 function cancelScheduledSave() {
@@ -867,15 +626,9 @@ export const useKnowledgeStore = create<KnowledgeState>((set, get) => ({
   indexProgress: null,
   pendingReveal: null,
   pendingOutlineJump: null,
-  boardOutline: null,
-  boardSelection: null,
-  pendingBoardFocus: null,
   backlinks: [],
   outboundLinks: [],
   linkPanelStatus: 'idle',
-  spaceSchema: structuredClone(DEFAULT_SPACE_SCHEMA),
-  spaceViews: structuredClone(DEFAULT_VIEWS),
-  activeViewId: null,
   spaceDocCounts: {},
   availableTags: [],
   availableStatuses: [],
@@ -952,22 +705,6 @@ export const useKnowledgeStore = create<KnowledgeState>((set, get) => ({
         if (gen !== indexBuildGen) return
         for (const node of nodes) {
           if (gen !== indexBuildGen) return
-          if (node.kind === 'board') {
-            // Title-only; do not read board scene JSON for search (KD Option B / search design).
-            const path = getPathTitles(nodes, node.id).join(' / ') || node.title
-            upsertSearchDoc(next, {
-              id: docKey(space.id, node.id),
-              spaceId: space.id,
-              docId: node.id,
-              title: node.title,
-              body: '',
-              spaceName: space.name,
-              path,
-              order: node.order,
-              metaSink: nextMeta,
-            })
-            continue
-          }
           if (node.kind !== 'doc') continue
           let body = ''
           try {
@@ -1136,7 +873,6 @@ export const useKnowledgeStore = create<KnowledgeState>((set, get) => ({
           templatePicker: null,
           saveState: 'idle',
           pendingReveal: null,
-          ...CLEARED_BOARD_PANEL,
         })
       }
       await knowledgeSoftDeleteSpace(id)
@@ -1192,11 +928,7 @@ export const useKnowledgeStore = create<KnowledgeState>((set, get) => ({
         backlinks: [],
         outboundLinks: [],
         linkPanelStatus: 'idle',
-        activeViewId: null,
-        spaceSchema: structuredClone(DEFAULT_SPACE_SCHEMA),
-        spaceViews: structuredClone(DEFAULT_VIEWS),
       })
-      void get().loadSpaceConfig(id)
       // Ensure SQLite link index exists (rebuild when empty / first open).
       void (async () => {
         try {
@@ -1218,7 +950,6 @@ export const useKnowledgeStore = create<KnowledgeState>((set, get) => ({
           draftBody: '',
           editorMode: 'live',
           pendingReveal: null,
-          ...CLEARED_BOARD_PANEL,
         })
       }
     } catch (e) {
@@ -1262,56 +993,6 @@ export const useKnowledgeStore = create<KnowledgeState>((set, get) => ({
     })),
   clearPendingOutlineJump: () => set({ pendingOutlineJump: null }),
 
-  setBoardOutline: (outline) => {
-    if (outline != null) {
-      if (get().activeDocId !== outline.boardId) return
-      const prev = get().boardOutline
-      if (
-        prev != null &&
-        boardOutlinePublishSignature(prev) === boardOutlinePublishSignature(outline)
-      ) {
-        return
-      }
-    } else if (get().boardOutline == null) {
-      return
-    }
-    set({ boardOutline: outline })
-  },
-
-  setBoardSelection: (sel) => {
-    if (sel != null) {
-      if (get().activeDocId !== sel.boardId) return
-      const prev = get().boardSelection
-      if (
-        prev != null &&
-        selectionPublishSignature(prev.ids, prev.style) ===
-          selectionPublishSignature(sel.ids, sel.style)
-      ) {
-        return
-      }
-    } else if (get().boardSelection == null) {
-      return
-    }
-    set({ boardSelection: sel })
-  },
-
-  requestBoardFocus: (ids, opts) => {
-    const boardId = get().activeDocId
-    if (!boardId || !boardId.startsWith('brd_')) return
-    const sorted = [...ids].sort()
-    set((s) => ({
-      pendingBoardFocus: {
-        ids: sorted,
-        scroll: opts?.scroll !== false,
-        boardId,
-        nonce: (s.pendingBoardFocus?.nonce ?? 0) + 1,
-      },
-    }))
-  },
-
-  clearPendingBoardFocus: () => set({ pendingBoardFocus: null }),
-
-  clearBoardPanelState: () => set({ ...CLEARED_BOARD_PANEL }),
 
   refreshLinkPanel: async (docId) => {
     const spaceId = get().activeSpaceId
@@ -1366,103 +1047,8 @@ export const useKnowledgeStore = create<KnowledgeState>((set, get) => ({
     }
   },
 
-  loadSpaceConfig: async (spaceId) => {
-    try {
-      const [schemaRaw, viewsRaw] = await Promise.all([
-        knowledgeGetSchema(spaceId),
-        knowledgeGetViews(spaceId),
-      ])
-      let schema = normalizeSpaceSchema(
-        schemaRaw ? JSON.parse(schemaRaw) : null,
-      )
-      let views = normalizeViewsFile(viewsRaw ? JSON.parse(viewsRaw) : null)
-      // Persist defaults once so git-friendly files exist
-      if (!schemaRaw) {
-        try {
-          await knowledgeSetSchema(spaceId, JSON.stringify(schema, null, 2))
-        } catch {
-          /* ignore */
-        }
-      }
-      if (!viewsRaw) {
-        try {
-          await knowledgeSetViews(spaceId, JSON.stringify(views, null, 2))
-        } catch {
-          /* ignore */
-        }
-      }
-      if (get().activeSpaceId === spaceId) {
-        set({ spaceSchema: schema, spaceViews: views })
-      }
-    } catch (e) {
-      console.warn('loadSpaceConfig failed', e)
-      if (get().activeSpaceId === spaceId) {
-        set({
-          spaceSchema: structuredClone(DEFAULT_SPACE_SCHEMA),
-          spaceViews: structuredClone(DEFAULT_VIEWS),
-        })
-      }
-    }
-  },
 
-  setActiveViewId: (viewId) => set({ activeViewId: viewId }),
 
-  getDocMetaMap: () => {
-    const spaceId = get().activeSpaceId
-    const map = new Map<string, KnowledgeDocMeta>()
-    if (!spaceId) return map
-    for (const entry of kbMeta.values()) {
-      if (entry.spaceId !== spaceId) continue
-      map.set(entry.docId, {
-        tags: entry.tags,
-        status: entry.status,
-        aliases: entry.aliases,
-        date: entry.date ?? null,
-        priority: entry.priority ?? null,
-        icon: entry.icon ?? null,
-        props: entry.props ? { ...entry.props } : {},
-      })
-    }
-    // Prefer live draft for active doc
-    const activeId = get().activeDocId
-    if (activeId) {
-      const live = parseFrontmatter(get().draftBody || get().docBody).meta
-      map.set(activeId, live)
-    }
-    return map
-  },
-
-  patchDocField: async (docId, key, value) => {
-    const spaceId = get().activeSpaceId
-    if (!spaceId) return false
-    try {
-      let body: string
-      if (get().activeDocId === docId) {
-        const ok = await get().flushSave()
-        if (!ok) return false
-        body = get().docBody
-      } else {
-        body = await knowledgeReadDoc(spaceId, docId)
-      }
-      const meta = parseFrontmatter(body).meta
-      const nextMeta = patchMetaField(meta, key, value)
-      const nextBody = applyMetaToDocument(body, nextMeta)
-      await knowledgeWriteDoc(spaceId, docId, nextBody)
-      const title = get().nodes.find((n) => n.id === docId)?.title ?? ''
-      const spaceName = get().spaces.find((s) => s.id === spaceId)?.name ?? ''
-      indexCurrentDoc(spaceId, docId, title, nextBody, spaceName, get().nodes)
-      void upsertLinkIndexDoc(spaceId, docId, title, nextBody, get().nodes)
-      if (get().activeDocId === docId) {
-        set({ docBody: nextBody, draftBody: nextBody })
-      }
-      syncFacetsToState(set)
-      get().runSearch(get().searchQuery)
-      return true
-    } catch (e) {
-      toast.error(knowledgeErrorMessage(e))
-      return false
-    }
-  },
 
   rewriteWikiLinksAfterRename: async (oldTitle, newTitle) => {
     const spaceId = get().activeSpaceId
@@ -1518,8 +1104,6 @@ export const useKnowledgeStore = create<KnowledgeState>((set, get) => ({
       filterStatus: null,
       expandedFolderIds: {},
       templatePicker: null,
-      activeViewId: null,
-      ...CLEARED_BOARD_PANEL,
     })
     get().runSearch(get().searchQuery)
   },
@@ -1604,46 +1188,6 @@ export const useKnowledgeStore = create<KnowledgeState>((set, get) => ({
     }
   },
 
-  createBoard: async (parentId, title) => {
-    const spaceId = get().activeSpaceId
-    if (!spaceId || get().busy) return
-    // Pre-flush of *current* leaf — user still on it until openDoc(new) (snapshot).
-    syncActiveEditorToDraft({ leaveActiveLeaf: false })
-    const flushed = await get().flushSave()
-    if (!flushed) return
-    set({ busy: true })
-    try {
-      const now = Date.now()
-      const id = newBoardId()
-      await knowledgeWriteBoard(spaceId, id, EMPTY_BOARD_SCENE_JSON)
-      const node = {
-        id,
-        parentId,
-        kind: 'board' as const,
-        title: title || DEFAULT_BOARD_TITLE,
-        order: nextOrder(get().nodes, parentId),
-        createdAt: now,
-        updatedAt: now,
-      }
-      const nodes = insertNode(get().nodes, node)
-      await knowledgeSaveTree(spaceId, { version: 1, nodes })
-      const spaceName = get().spaces.find((s) => s.id === spaceId)?.name ?? ''
-      indexBoardTitle(spaceId, id, node.title, spaceName, nodes)
-      // Option B: do NOT increment spaceDocCounts for boards.
-      set({ nodes, busy: false })
-      if (parentId) {
-        set((s) => ({ expandedFolderIds: { ...s.expandedFolderIds, [parentId]: true } }))
-        schedulePersistExpand(spaceId, get)
-      }
-      get().runSearch(get().searchQuery)
-      // openDoc(id≠current) → leaveActiveLeaf true then open board path.
-      await get().openDoc(id)
-    } catch (e) {
-      const msg = knowledgeErrorMessage(e)
-      set({ busy: false, error: msg })
-      toast.error(msg)
-    }
-  },
 
   requestCreateDoc: async (parentId, defaultTitle) => {
     const spaceId = get().activeSpaceId
@@ -1728,10 +1272,7 @@ export const useKnowledgeStore = create<KnowledgeState>((set, get) => ({
     if (!spaceId || get().busy) return
     set({ busy: true })
     try {
-      const existing = get().nodes.find((n) => n.id === id)
-      const fallbackTitle =
-        existing?.kind === 'board' ? DEFAULT_BOARD_TITLE : 'Untitled'
-      const nextTitle = title.trim() || fallbackTitle
+      const nextTitle = title.trim() || 'Untitled'
       const nodes = renameNode(get().nodes, id, nextTitle)
       await knowledgeSaveTree(spaceId, { version: 1, nodes })
       set({ nodes, busy: false })
@@ -1747,13 +1288,8 @@ export const useKnowledgeStore = create<KnowledgeState>((set, get) => ({
         indexCurrentDoc(spaceId, id, renamed.title, body, spaceName, nodes)
         void upsertLinkIndexDoc(spaceId, id, renamed.title, body, nodes)
         // Title change may re-resolve other docs' wiki targets — rebuild space links.
-        void get().rebuildSpaceLinkIndex(spaceId)
+         void get().rebuildSpaceLinkIndex(spaceId)
         syncFacetsToState(set)
-        get().runSearch(get().searchQuery)
-      } else if (renamed?.kind === 'board') {
-        // Title-only search; no link-index / wiki rewrite for boards.
-        const spaceName = get().spaces.find((s) => s.id === spaceId)?.name ?? ''
-        indexBoardTitle(spaceId, id, renamed.title, spaceName, nodes)
         get().runSearch(get().searchQuery)
       }
       // update recent title if needed
@@ -1798,11 +1334,7 @@ export const useKnowledgeStore = create<KnowledgeState>((set, get) => ({
         }
         indexCurrentDoc(spaceId, docId, title, body, spaceName, nodes)
       }
-      // Boards: path titles may change — title-only reindex.
-      for (const boardId of collectBoardIdsInSubtree(nodes, id)) {
-        const title = nodes.find((n) => n.id === boardId)?.title ?? ''
-        indexBoardTitle(spaceId, boardId, title, spaceName, nodes)
-      }
+
       syncFacetsToState(set)
       get().runSearch(get().searchQuery)
     } catch (e) {
@@ -1870,8 +1402,7 @@ export const useKnowledgeStore = create<KnowledgeState>((set, get) => ({
                 backlinks: [],
                 outboundLinks: [],
                 linkPanelStatus: 'idle' as const,
-                ...CLEARED_BOARD_PANEL,
-              }
+                    }
             : pendingTargetsRemoved
               ? { pendingReveal: null }
               : {}),
@@ -1902,34 +1433,26 @@ export const useKnowledgeStore = create<KnowledgeState>((set, get) => ({
     }
 
     // Sync in-editor buffer → draftBody while activeDocId is still the old leaf.
-    // leave: active leaf will change (KD-13/14). If flush aborts, resume canvas via
-    // registerOnBoardFlushAbort (leave freezes HipBoardCanvas activeRef).
     syncActiveEditorToDraft({ leaveActiveLeaf: true })
 
     // Only await a disk write when dirty or upgrade-retry pending. Clean switches
     // must NOT wait on saveChain (prior link-index / daily version IPC would freeze tree clicks).
     const cur = get()
     const leaveNeedsWrite =
-      !!cur.activeDocId &&
-      (cur.draftBody !== cur.docBody || pendingUpgradeRetry.has(cur.activeDocId))
+      !!cur.activeDocId && cur.draftBody !== cur.docBody
     if (leaveNeedsWrite) {
       const ok = await get().flushSave({ phase: 'write' })
-      if (!ok) {
-        // stay on current activeDocId; unfreeze board canvas after leave-mode freeze
-        notifyBoardFlushAbort()
-        return
-      }
+      if (!ok) return
     }
 
     const spaceId = get().activeSpaceId
     const node = get().nodes.find((n) => n.id === id)
     const isDoc = node?.kind === 'doc' && id.startsWith('doc_')
-    const isBoard = node?.kind === 'board' && id.startsWith('brd_')
-    if (!spaceId || !node || (!isDoc && !isBoard)) {
+    if (!spaceId || !node || !isDoc) {
       toast.error(
         id.startsWith('brd_') || node?.kind === 'board'
-          ? 'Could not load whiteboard'
-          : 'Could not load document',
+          ? i18n.t('knowledge.doc.loadFailed')
+          : i18n.t('knowledge.doc.loadFailed'),
       )
       get().dropRecent(spaceId, id)
       set({
@@ -1942,7 +1465,6 @@ export const useKnowledgeStore = create<KnowledgeState>((set, get) => ({
         backlinks: [],
         outboundLinks: [],
         linkPanelStatus: 'idle',
-        ...CLEARED_BOARD_PANEL,
       })
       return
     }
@@ -1951,9 +1473,7 @@ export const useKnowledgeStore = create<KnowledgeState>((set, get) => ({
     try {
       kbPerfOpenStart()
       const ipcT0 = isKnowledgePerfEnabled() ? performance.now() : 0
-      const body = isBoard
-        ? await knowledgeReadBoard(spaceId, id)
-        : await knowledgeReadDoc(spaceId, id)
+      const body = await knowledgeReadDoc(spaceId, id)
       if (isKnowledgePerfEnabled()) {
         kbPerfOpenIpc(performance.now() - ipcT0)
       }
@@ -1977,138 +1497,6 @@ export const useKnowledgeStore = create<KnowledgeState>((set, get) => ({
         at: Date.now(),
       }
 
-      if (isBoard) {
-        // LKD-8: dual-parse; migrate excalidraw → hip-board; open upgrade write.
-        let finalBody = body
-        let upgradePayload: {
-          /** Migrated body at open (may be superseded by user draft before write). */
-          skipped: number
-        } | null = null
-        // Clear per-open flags for this board; re-set when re-detecting unsupported.
-        legacyPreserveRaw.delete(id)
-        try {
-          const parsed = parseBoardScene(body)
-          if (parsed.type === 'excalidraw') {
-            const mig = migrateExcalidrawToHipBoard(parsed, { boardId: id })
-            if (mig.unsupported) {
-              toast.warning(i18n.t('knowledge.board.legacyUnsupported'))
-              legacyPreserveRaw.add(id)
-              // EMPTY hip with boardId stamp so leave serialize is not false-dirty.
-              finalBody = ensureHipBoardIdInBody(EMPTY_BOARD_SCENE_JSON, id)
-              // DO NOT write disk; DO NOT delete .excalidraw
-            } else {
-              finalBody = ensureHipBoardIdInBody(stableSerializeBoard(mig.scene), id)
-              upgradePayload = { skipped: mig.skipped }
-            }
-          } else {
-            // hip-board: stamp boardId so canvas buildDiskJson matches store draft.
-            finalBody = ensureHipBoardIdInBody(body, id)
-          }
-        } catch {
-          toast.error(i18n.t('knowledge.board.loadFailed'))
-          finalBody = ensureHipBoardIdInBody(EMPTY_BOARD_SCENE_JSON, id)
-          // invalid: EMPTY in memory; no write
-        }
-
-        // Board: dehydrated JSON; do NOT change editorMode; no large-doc / link panel.
-        set((s) => {
-          const rest = s.recent.filter(
-            (r) => !(r.spaceId === item.spaceId && r.docId === item.docId),
-          )
-          const recent = [item, ...rest].slice(0, RECENT_CAP)
-          persistRecent(recent)
-          return {
-            activeDocId: id,
-            docBody: finalBody,
-            draftBody: finalBody,
-            // editorMode: OMIT — leave previous
-            saveState: 'idle' as const,
-            treeFocusId: id,
-            expandedFolderIds,
-            backlinks: [],
-            outboundLinks: [],
-            linkPanelStatus: 'idle' as const,
-            recent,
-            ...CLEARED_BOARD_PANEL,
-            ...(revealMatches ? {} : { pendingReveal: null }),
-          }
-        })
-        // Title-only search upsert on open (optional for docs; required path for boards).
-        indexBoardTitle(spaceId, id, node.title, spaceName, get().nodes)
-        kbPerfOpenStore(finalBody.length, get().editorMode)
-        schedulePersistExpand(spaceId, get)
-
-        // OPEN UPGRADE on saveChain (never race flushSave). Write *current* draft, not a
-        // captured migrate snapshot, so concurrent strokes are not clobbered (LKD-8).
-        if (upgradePayload) {
-          const skipped = upgradePayload.skipped
-          const upgradeBoardId = id
-          const upgradeSpaceId = spaceId
-          const upgradeGen = gen
-          const runUpgrade = async (prev: boolean): Promise<boolean> => {
-            // Guard before write: gen miss → silent skip, no write/delete/toast.
-            if (upgradeGen !== openDocGeneration) return prev
-            if (get().activeDocId !== upgradeBoardId) return prev
-            if (get().activeSpaceId !== upgradeSpaceId) return prev
-
-            const writeCurrentDraft = async (): Promise<string | null> => {
-              if (upgradeGen !== openDocGeneration) return null
-              if (get().activeDocId !== upgradeBoardId) return null
-              if (get().activeSpaceId !== upgradeSpaceId) return null
-              const toWrite = get().draftBody
-              if (!toWrite) return null
-              assertNoDataUrlInBoardJson(toWrite)
-              await knowledgeWriteBoard(upgradeSpaceId, upgradeBoardId, toWrite)
-              return toWrite
-            }
-
-            try {
-              let written = await writeCurrentDraft()
-              if (written == null) return prev
-              // If user edited during await, write again so disk is not stale migrate body.
-              if (
-                get().activeDocId === upgradeBoardId &&
-                get().activeSpaceId === upgradeSpaceId &&
-                get().draftBody !== written
-              ) {
-                const again = await writeCurrentDraft()
-                if (again == null) {
-                  // Left board mid-retry; primary may have first write. Flag retry if still needed.
-                  pendingUpgradeRetry.add(upgradeBoardId)
-                  return prev
-                }
-                written = again
-              }
-              pendingUpgradeRetry.delete(upgradeBoardId)
-              if (
-                get().activeDocId === upgradeBoardId &&
-                get().activeSpaceId === upgradeSpaceId &&
-                get().draftBody === written
-              ) {
-                set({ docBody: written })
-              }
-              // Toast only if still the same open.
-              if (upgradeGen !== openDocGeneration) return prev
-              if (get().activeDocId !== upgradeBoardId) return prev
-              if (get().activeSpaceId !== upgradeSpaceId) return prev
-              if (skipped > 0) {
-                toast.warning(i18n.t('knowledge.board.legacyPartial', { count: skipped }))
-              } else {
-                toast.success(i18n.t('knowledge.board.legacyImported'))
-              }
-            } catch {
-              // Keep memory hip; do not delete legacy (write failed → no primary or atomic).
-              pendingUpgradeRetry.add(upgradeBoardId)
-              if (upgradeGen !== openDocGeneration) return prev
-              if (get().activeDocId !== upgradeBoardId) return prev
-              toast.error(i18n.t('knowledge.board.legacyUpgradeFailed'))
-            }
-            return prev
-          }
-          saveChain = saveChain.then(runUpgrade, () => runUpgrade(true))
-        }
-        return
-      }
 
       // Doc path: Always real-time (Live). Source only when Live is off or doc is too large.
       // Do not restore a prior Source preference — product is Notion/Feishu-style.
@@ -2137,7 +1525,6 @@ export const useKnowledgeStore = create<KnowledgeState>((set, get) => ({
           outboundLinks: [],
           linkPanelStatus: 'loading' as const,
           recent,
-          ...CLEARED_BOARD_PANEL,
           ...(revealMatches ? {} : { pendingReveal: null }),
         }
       })
@@ -2165,19 +1552,11 @@ export const useKnowledgeStore = create<KnowledgeState>((set, get) => ({
         backlinks: [],
         outboundLinks: [],
         linkPanelStatus: 'idle',
-        ...CLEARED_BOARD_PANEL,
       })
     }
   },
 
   setEditorMode: async (mode) => {
-    // Boards do not participate in Live/Source/Preview (openDoc omits editorMode).
-    const activeId = get().activeDocId
-    const activeNode = activeId
-      ? get().nodes.find((n) => n.id === activeId)
-      : undefined
-    if (isBoardNode(activeNode, activeId ?? '')) return
-
     let next = resolveEditorMode(mode)
     if (next === 'live') {
       const len = Math.max(get().draftBody.length, get().docBody.length)
@@ -2243,58 +1622,19 @@ export const useKnowledgeStore = create<KnowledgeState>((set, get) => ({
       }
       const spaceName = s.spaces.find((sp) => sp.id === spaceId)?.name ?? ''
       const nodesSnap = s.nodes
-      const isBoard = isBoardNode(node, docId)
-      // Upgrade-failure retry: force write even when draft===doc (both already hip in mem).
-      const needsUpgradeRetry = isBoard && pendingUpgradeRetry.has(docId)
-      if (s.draftBody === s.docBody && !needsUpgradeRetry) {
+      if (node.kind !== 'doc' || !docId.startsWith('doc_')) {
+        resolveWrite?.(true)
+        return true
+      }
+      if (s.draftBody === s.docBody) {
         resolveWrite?.(true)
         return true
       }
 
-      // LKD-8 unsupported gate (PR-C must-pass; PR-M uses design-system Modal).
-      // Confirm *before* saveState=saving so the Modal is not under a saving chrome.
-      if (isBoard && legacyPreserveRaw.has(docId)) {
-        const confirmed = await requestLegacyBoardReplaceConfirm(docId)
-        if (!confirmed) {
-          toast.message(i18n.t('knowledge.board.legacyWriteBlocked'))
-          notifyBoardFlushAbort()
-          resolveWrite?.(false)
-          return false
-        }
-        // User may have navigated away while the Modal was open.
-        if (get().activeDocId !== docId || get().activeSpaceId !== spaceId) {
-          notifyBoardFlushAbort()
-          resolveWrite?.(false)
-          return false
-        }
-        legacyPreserveRaw.delete(docId)
-      }
-
-      // Re-read body after possible Modal wait (user may have edited).
       const body = get().draftBody
 
       set({ saveState: 'saving' })
       try {
-        if (isBoard) {
-          // Prerequisite: caller already ran syncActiveEditorToDraft when structural.
-          assertNoDataUrlInBoardJson(body)
-          await knowledgeWriteBoard(spaceId, docId, body)
-          // Successful write upgrades primary + deletes legacy (Rust write_board_file).
-          pendingUpgradeRetry.delete(docId)
-          if (get().activeDocId === docId && get().activeSpaceId === spaceId) {
-            set({ docBody: body, saveState: 'saved' })
-          } else if (get().saveState === 'saving') {
-            set({ saveState: 'idle' })
-          }
-          resolveWrite?.(true)
-          resolveWrite = null
-          // Skip link-index, daily version, frontmatter facets (board v1).
-          setTimeout(() => {
-            if (get().saveState === 'saved') set({ saveState: 'idle' })
-          }, 1500)
-          return true
-        }
-
         await knowledgeWriteDoc(spaceId, docId, body)
         // Prefer not to clobber a newer doc's docBody if the user already switched.
         if (get().activeDocId === docId && get().activeSpaceId === spaceId) {
@@ -2329,8 +1669,6 @@ export const useKnowledgeStore = create<KnowledgeState>((set, get) => ({
         const msg = knowledgeErrorMessage(e)
         set({ saveState: 'error' })
         toast.error(msg)
-        // Leave-mode freeze must be reversed when we stay on the board after failure.
-        if (isBoard) notifyBoardFlushAbort()
         return false
       }
     }
@@ -2342,9 +1680,7 @@ export const useKnowledgeStore = create<KnowledgeState>((set, get) => ({
     const spaceId = get().activeSpaceId
     const id = docId ?? get().activeDocId
     if (!spaceId || !id) return null
-    // Board v1 has no version history.
-    const target = get().nodes.find((n) => n.id === id)
-    if (isBoardNode(target, id) || id.startsWith('brd_')) return null
+    if (id.startsWith('brd_')) return null
     const ok = await get().flushSave()
     if (!ok) return null
     // Serialize on saveChain so manual never RMW-races a concurrent daily.
@@ -2372,9 +1708,7 @@ export const useKnowledgeStore = create<KnowledgeState>((set, get) => ({
     const spaceId = get().activeSpaceId
     const id = docId ?? get().activeDocId
     if (!spaceId || !id) return []
-    // Board v1 has no version history.
-    const target = get().nodes.find((n) => n.id === id)
-    if (isBoardNode(target, id) || id.startsWith('brd_')) return []
+    if (id.startsWith('brd_')) return []
     try {
       return await knowledgeListVersions(spaceId, id)
     } catch (e) {
@@ -2387,9 +1721,7 @@ export const useKnowledgeStore = create<KnowledgeState>((set, get) => ({
     const spaceId = get().activeSpaceId
     const id = docId ?? get().activeDocId
     if (!spaceId || !id) return false
-    // Board v1 has no version history — never restore into a board leaf.
-    const target = get().nodes.find((n) => n.id === id)
-    if (isBoardNode(target, id) || id.startsWith('brd_')) return false
+    if (id.startsWith('brd_')) return false
     // Flush current dirty buffer first so we don't silently drop it.
     const ok = await get().flushSave()
     if (!ok) return false

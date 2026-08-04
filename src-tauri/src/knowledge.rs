@@ -16,13 +16,8 @@ use crate::skills::safe_join;
 const KNOWLEDGE_ASSET_MAX_BYTES: u64 = 25 * 1024 * 1024;
 /// Max raw bytes for base64 IPC (`read_asset_data`, `import_asset_bytes`).
 const KNOWLEDGE_ASSET_INLINE_MAX_BYTES: u64 = 1_500_000;
-/// Max board scene JSON size for `knowledge_write_board` (v1).
-const KNOWLEDGE_BOARD_MAX_BYTES: usize = 25 * 1024 * 1024;
 /// Max decoded payload for `knowledge_export_bytes` (PNG etc.).
 const KNOWLEDGE_EXPORT_BYTES_MAX: usize = 25 * 1024 * 1024;
-
-/// Empty dehydrated hip-board scene returned when board file is missing (PR-C+).
-pub(crate) const EMPTY_BOARD_SCENE_JSON: &str = r##"{"type":"hip-board","version":1,"source":"hip","hip":{"schemaVersion":1},"elements":[],"appState":{"viewBackgroundColor":"#ffffff"},"files":{}}"##;
 
 /// Same rule as TS `KNOWLEDGE_ID_RE`.
 pub(crate) fn is_knowledge_id(id: &str) -> bool {
@@ -30,6 +25,7 @@ pub(crate) fn is_knowledge_id(id: &str) -> bool {
         Some(p) => p,
         None => return false,
     };
+    // `brd_` kept only so legacy tree/trash ids still validate during cleanup.
     if prefix != "spc" && prefix != "nod" && prefix != "doc" && prefix != "brd" {
         return false;
     }
@@ -86,168 +82,11 @@ fn doc_path(root: &Path, space_id: &str, doc_id: &str) -> Result<PathBuf, String
     safe_join(&docs, &file).ok_or_else(|| "illegal doc path".to_string())
 }
 
-/// Primary on-disk board scene: `boards/<brd_*>.board.json` (hip-board after PR-C).
-pub(crate) fn board_path_primary(
-    root: &Path,
-    space_id: &str,
-    board_id: &str,
-) -> Result<PathBuf, String> {
-    board_path_with_ext(root, space_id, board_id, "board.json")
-}
-
-/// Legacy Excalidraw board scene: `boards/<brd_*>.excalidraw`.
-pub(crate) fn board_path_legacy(
-    root: &Path,
-    space_id: &str,
-    board_id: &str,
-) -> Result<PathBuf, String> {
-    board_path_with_ext(root, space_id, board_id, "excalidraw")
-}
-
-/// Default create-path board file (primary `.board.json` as of PR-C).
-/// Prefer `board_path_for_write` / `write_board_file` for dual-extension writes.
-pub(crate) fn board_path(root: &Path, space_id: &str, board_id: &str) -> Result<PathBuf, String> {
-    board_path_primary(root, space_id, board_id)
-}
-
-fn board_path_with_ext(
-    root: &Path,
-    space_id: &str,
-    board_id: &str,
-    ext: &str,
-) -> Result<PathBuf, String> {
-    require_id(space_id, "spaceId")?;
-    require_id(board_id, "boardId")?;
-    if !board_id.starts_with("brd_") {
-        return Err(format!("boardId must start with brd_: {board_id}"));
-    }
-    let space = space_dir(root, space_id)?;
-    let boards = safe_join(&space, "boards").ok_or_else(|| "illegal boards path".to_string())?;
-    let file = format!("{board_id}.{ext}");
-    safe_join(&boards, &file).ok_or_else(|| "illegal board path".to_string())
-}
-
-/// Prefer existing primary (`.board.json`), else legacy (`.excalidraw`), else primary
-/// (for read/export miss → caller decides EMPTY; do not use for create writes).
-pub(crate) fn resolve_board_path(
-    root: &Path,
-    space_id: &str,
-    board_id: &str,
-) -> Result<PathBuf, String> {
-    let primary = board_path_primary(root, space_id, board_id)?;
-    if primary.exists() {
-        return Ok(primary);
-    }
-    let legacy = board_path_legacy(root, space_id, board_id)?;
-    if legacy.exists() {
-        return Ok(legacy);
-    }
-    Ok(primary)
-}
-
-/// Write destination (PR-C+): always primary `.board.json`.
-pub(crate) fn board_path_for_write(
-    root: &Path,
-    space_id: &str,
-    board_id: &str,
-) -> Result<PathBuf, String> {
-    board_path_primary(root, space_id, board_id)
-}
-
-/// Write board body to primary `.board.json` and remove a leftover legacy sibling
-/// so both-exist cannot hide newer edits (LKD-6 both-exist matrix; PR-C+).
-pub(crate) fn write_board_file(
-    root: &Path,
-    space_id: &str,
-    board_id: &str,
-    body: &str,
-) -> Result<(), String> {
-    let primary = board_path_primary(root, space_id, board_id)?;
-    let legacy = board_path_legacy(root, space_id, board_id)?;
-    atomic_write_str(&primary, body)?;
-    if legacy.exists() {
-        let _ = fs::remove_file(&legacy);
-    }
-    Ok(())
-}
-
-/// Both candidate board paths (primary then legacy) for dual-extension delete.
-pub(crate) fn board_paths_for_delete(
-    root: &Path,
-    space_id: &str,
-    board_id: &str,
-) -> Result<[PathBuf; 2], String> {
-    Ok([
-        board_path_primary(root, space_id, board_id)?,
-        board_path_legacy(root, space_id, board_id)?,
-    ])
-}
-
-/// Existing live board files to soft-delete: `(absolute src, payload basename)`.
-/// Moves both extensions when both exist (LKD-6b both-exist matrix).
-pub(crate) fn board_paths_for_trash_move(
-    root: &Path,
-    space_id: &str,
-    board_id: &str,
-) -> Result<Vec<(PathBuf, String)>, String> {
-    let mut out = Vec::new();
-    let primary = board_path_primary(root, space_id, board_id)?;
-    if primary.exists() {
-        out.push((primary, format!("{board_id}.board.json")));
-    }
-    let legacy = board_path_legacy(root, space_id, board_id)?;
-    if legacy.exists() {
-        out.push((legacy, format!("{board_id}.excalidraw")));
-    }
-    Ok(out)
-}
-
-/// Prefer `boards/{id}.board.json` in a source dir, else `boards/{id}.excalidraw`.
-pub(crate) fn resolve_board_source_in_dir(boards_dir: &Path, board_id: &str) -> PathBuf {
-    let primary = boards_dir.join(format!("{board_id}.board.json"));
-    if primary.is_file() {
-        return primary;
-    }
-    boards_dir.join(format!("{board_id}.excalidraw"))
-}
-
-/// Field-level reject: any `files[*]` object that has a `dataURL` key is illegal.
-/// Element text containing the substring `dataURL` is allowed.
-pub(crate) fn assert_no_data_url_in_board_json(raw: &str) -> Result<(), String> {
-    let scene: serde_json::Value =
-        serde_json::from_str(raw).map_err(|e| format!("invalid board JSON: {e}"))?;
-    let Some(files) = scene.get("files") else {
-        return Ok(());
-    };
-    let Some(obj) = files.as_object() else {
-        return Ok(());
-    };
-    for (id, f) in obj {
-        if let Some(map) = f.as_object() {
-            if map.contains_key("dataURL") {
-                return Err(format!("board file {id} must not contain dataURL"));
-            }
-        }
-    }
-    Ok(())
-}
-
-fn validate_board_write_body(body: &str) -> Result<(), String> {
-    if body.len() > KNOWLEDGE_BOARD_MAX_BYTES {
-        return Err(format!(
-            "board body exceeds {} bytes",
-            KNOWLEDGE_BOARD_MAX_BYTES
-        ));
-    }
-    assert_no_data_url_in_board_json(body)
-}
-
 /// kind ⇔ id prefix (Issue 13). Used by save_tree validation.
 fn kind_prefix_ok(kind: &str, id: &str) -> bool {
     match kind {
         "folder" => id.starts_with("nod_"),
         "doc" => id.starts_with("doc_"),
-        "board" => id.starts_with("brd_"),
         _ => false,
     }
 }
@@ -732,81 +571,6 @@ pub fn knowledge_delete_doc_file(app: AppHandle, args: DocArgs) -> Result<(), St
     Ok(())
 }
 
-// ── Board files (Excalidraw dehydrated JSON under boards/) ────────────────
-
-#[derive(Debug, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct BoardArgs {
-    pub space_id: String,
-    pub board_id: String,
-}
-
-#[derive(Debug, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct WriteBoardArgs {
-    pub space_id: String,
-    pub board_id: String,
-    pub body: String,
-}
-
-#[tauri::command]
-pub fn knowledge_read_board(app: AppHandle, args: BoardArgs) -> Result<String, String> {
-    let root = knowledge_root(&app)?;
-    let path = resolve_board_path(&root, &args.space_id, &args.board_id)?;
-    if !path.exists() {
-        return Ok(EMPTY_BOARD_SCENE_JSON.to_string());
-    }
-    fs::read_to_string(&path).map_err(|e| e.to_string())
-}
-
-#[tauri::command]
-pub fn knowledge_write_board(app: AppHandle, args: WriteBoardArgs) -> Result<(), String> {
-    validate_board_write_body(&args.body)?;
-    let root = knowledge_root(&app)?;
-    // PR-C+: always write primary `.board.json` and delete leftover legacy sibling.
-    write_board_file(&root, &args.space_id, &args.board_id, &args.body)
-}
-
-#[tauri::command]
-pub fn knowledge_delete_board_file(app: AppHandle, args: BoardArgs) -> Result<(), String> {
-    let root = knowledge_root(&app)?;
-    let paths = board_paths_for_delete(&root, &args.space_id, &args.board_id)?;
-    for path in paths {
-        if path.exists() {
-            fs::remove_file(&path).map_err(|e| e.to_string())?;
-        }
-    }
-    Ok(())
-}
-
-#[derive(Debug, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct ExportBoardArgs {
-    pub space_id: String,
-    pub board_id: String,
-    pub dest_path: String,
-}
-
-/// Export dehydrated hip board JSON (same as on-disk) to an absolute path.
-#[tauri::command]
-pub fn knowledge_export_board(app: AppHandle, args: ExportBoardArgs) -> Result<(), String> {
-    let root = knowledge_root(&app)?;
-    let src = resolve_board_path(&root, &args.space_id, &args.board_id)?;
-    let body = if src.exists() {
-        fs::read_to_string(&src).map_err(|e| e.to_string())?
-    } else {
-        EMPTY_BOARD_SCENE_JSON.to_string()
-    };
-    let dest = PathBuf::from(&args.dest_path);
-    if !dest.is_absolute() {
-        return Err("destPath must be absolute".into());
-    }
-    if let Some(parent) = dest.parent() {
-        fs::create_dir_all(parent).map_err(|e| e.to_string())?;
-    }
-    atomic_write_str(&dest, &body)
-}
-
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ExportBytesArgs {
@@ -1249,8 +1013,7 @@ pub struct ExportSpaceZipArgs {
     pub dest_path: String,
 }
 
-/// Portable hip layout (K17): meta.json + tree.json + docs/ + boards/ + assets/.
-/// Space-root-relative `assets/…` links in MD / board hipAssetRel survive re-import.
+/// Portable hip layout: meta.json + tree.json + docs/ + assets/.
 #[tauri::command]
 pub fn knowledge_export_space_zip(app: AppHandle, args: ExportSpaceZipArgs) -> Result<(), String> {
     use std::io::Write as _;
@@ -1282,12 +1045,12 @@ pub fn knowledge_export_space_zip(app: AppHandle, args: ExportSpaceZipArgs) -> R
     // Leaf cap: docs + boards combined (v1 aligns with prior 5000 doc spirit).
     let mut leaf_count = 0usize;
     for n in &tree.nodes {
-        if n.kind == "doc" || n.kind == "board" {
+        if n.kind == "doc" {
             leaf_count += 1;
         }
     }
     if leaf_count > 5000 {
-        return Err("space has too many documents/boards to export (max 5000)".into());
+        return Err("space has too many documents to export (max 5000)".into());
     }
 
     let file = fs::File::create(&dest).map_err(|e| e.to_string())?;
@@ -1336,27 +1099,6 @@ pub fn knowledge_export_space_zip(app: AppHandle, args: ExportSpaceZipArgs) -> R
         zip.write_all(&body).map_err(|e| e.to_string())?;
     }
 
-    // boards/* (KD-10 / PR-5 / LKD-6): dual-resolve body; zip entry always `.board.json`.
-    for n in &tree.nodes {
-        if n.kind != "board" {
-            continue;
-        }
-        if !n.id.starts_with("brd_") || !is_knowledge_id(&n.id) {
-            continue;
-        }
-        let entry_name = format!("boards/{}.board.json", n.id);
-        if !is_safe_zip_entry(&entry_name) {
-            return Err("illegal export path".into());
-        }
-        let body = match resolve_board_path(&root, &args.space_id, &n.id) {
-            Ok(p) if p.exists() => fs::read(&p).map_err(|e| e.to_string())?,
-            Ok(_) => EMPTY_BOARD_SCENE_JSON.as_bytes().to_vec(),
-            Err(_) => continue,
-        };
-        zip.start_file(entry_name, opts)
-            .map_err(|e| e.to_string())?;
-        zip.write_all(&body).map_err(|e| e.to_string())?;
-    }
 
     // assets/** (nested dirs; skip symlinks)
     let assets_dir = dir.join("assets");
@@ -1605,8 +1347,8 @@ pub fn knowledge_reveal_path(app: AppHandle, args: AssetRelArgs) -> Result<(), S
     }
     // Only allow docs/…, assets/…, or boards/… under space.
     let first = trimmed.split(['/', '\\']).next().unwrap_or("");
-    if first != "docs" && first != "assets" && first != "boards" {
-        return Err("path must be under docs/, assets/, or boards/".into());
+    if first != "docs" && first != "assets" {
+        return Err("path must be under docs/ or assets/".into());
     }
     let path = safe_join(&space, trimmed).ok_or_else(|| "illegal path".to_string())?;
     // Ensure resolved path stays under space (safe_join already rejects ..).
@@ -1639,18 +1381,15 @@ pub struct ImportFolderResult {
 
 /// Portable hip export/import: `tree.json` plus at least one of meta/docs/boards.
 /// Boards-only packages (no docs/) must still detect as portable so re-import
-/// restores whiteboards (PR-5 review #1).
 fn is_hip_portable_layout(source: &Path) -> bool {
     if !source.join("tree.json").is_file() {
         return false;
     }
     source.join("meta.json").is_file()
         || source.join("docs").is_dir()
-        || source.join("boards").is_dir()
 }
 
-/// Import a portable hip layout folder (meta/tree/docs/boards/assets) into a new space.
-/// Invalid board nodes are omitted from the saved tree (PR-5); missing board files → EMPTY scene.
+/// Import a portable hip layout folder (meta/tree/docs/assets) into a new space.
 fn import_hip_portable_folder(
     app: &AppHandle,
     source: &Path,
@@ -1702,86 +1441,11 @@ fn import_hip_portable_folder(
 
     let mut imported = 0u32;
     let mut out_nodes: Vec<KnowledgeNode> = Vec::with_capacity(tree.nodes.len());
-    let mut skipped_boards = 0u32;
     let docs_src = source.join("docs");
-    let boards_src = source.join("boards");
 
     for n in &tree.nodes {
-        if n.kind == "board" {
-            // PR-5: omit invalid board tree nodes (do not fail whole import).
-            if !is_valid_import_board_node(n) {
-                skipped_boards += 1;
-                eprintln!(
-                    "knowledge import: skipping invalid board node id={} kind={}",
-                    n.id, n.kind
-                );
-                continue;
-            }
-            // Accept either extension from portable packages; prefer `.board.json`.
-            let src_board = resolve_board_source_in_dir(&boards_src, &n.id);
-            let mut body = EMPTY_BOARD_SCENE_JSON.to_string();
-            if src_board.is_file() {
-                let meta = match fs::symlink_metadata(&src_board) {
-                    Ok(m) => m,
-                    Err(e) => {
-                        let _ = knowledge_delete_space(
-                            app.clone(),
-                            DeleteSpaceArgs {
-                                id: space.id.clone(),
-                            },
-                        );
-                        return Err(e.to_string());
-                    }
-                };
-                if !meta.file_type().is_symlink() {
-                    let mut ok = true;
-                    if let Ok(canon) = src_board.canonicalize() {
-                        if !canon.starts_with(source_canon) {
-                            ok = false;
-                        }
-                    }
-                    if ok {
-                        body = fs::read_to_string(&src_board).unwrap_or_else(|_| {
-                            EMPTY_BOARD_SCENE_JSON.to_string()
-                        });
-                    }
-                }
-            }
-            // Missing or unreadable file → EMPTY scene; keep tree node.
-            // Present body must pass the same size/dataURL gates as knowledge_write_board
-            // (PR-5 review #2 — no import backdoor past KD-6).
-            if let Err(e) = validate_board_write_body(&body) {
-                let _ = knowledge_delete_space(
-                    app.clone(),
-                    DeleteSpaceArgs {
-                        id: space.id.clone(),
-                    },
-                );
-                return Err(format!("invalid board {}: {e}", n.id));
-            }
-            // Import always writes primary path (R3 / LKD-6 zip import).
-            let dest = match board_path_primary(&root, &space.id, &n.id) {
-                Ok(p) => p,
-                Err(e) => {
-                    let _ = knowledge_delete_space(
-                        app.clone(),
-                        DeleteSpaceArgs {
-                            id: space.id.clone(),
-                        },
-                    );
-                    return Err(e);
-                }
-            };
-            if let Err(e) = atomic_write_str(&dest, &body) {
-                let _ = knowledge_delete_space(
-                    app.clone(),
-                    DeleteSpaceArgs {
-                        id: space.id.clone(),
-                    },
-                );
-                return Err(e);
-            }
-            out_nodes.push(n.clone());
+        // Boards removed from product — never import board nodes or files.
+        if n.kind == "board" || n.id.starts_with("brd_") {
             continue;
         }
 
@@ -1805,7 +1469,6 @@ fn import_hip_portable_folder(
                 return Err(format!("invalid doc id in tree: {}", n.id));
             }
             let src_doc = docs_src.join(format!("{}.md", n.id));
-            // Skip symlink escape
             if src_doc.exists() {
                 let meta = fs::symlink_metadata(&src_doc).map_err(|e| e.to_string());
                 let meta = match meta {
@@ -1821,8 +1484,6 @@ fn import_hip_portable_folder(
                     }
                 };
                 if meta.file_type().is_symlink() {
-                    // Still keep tree node? Existing code continued without writing.
-                    // Preserve prior behavior: skip file write but keep node via out_nodes.
                     out_nodes.push(n.clone());
                     imported += 1;
                     continue;
@@ -1866,14 +1527,10 @@ fn import_hip_portable_folder(
             continue;
         }
 
-        // folder or other kinds: keep tree node as-is (existing behavior).
-        out_nodes.push(n.clone());
-    }
-
-    if skipped_boards > 0 {
-        eprintln!(
-            "knowledge import: omitted {skipped_boards} invalid board node(s) from tree"
-        );
+        // folder or other kinds: keep tree node as-is (drop unknown board-like).
+        if n.kind == "folder" {
+            out_nodes.push(n.clone());
+        }
     }
 
     // Copy assets (flat files only)
@@ -1953,29 +1610,6 @@ fn import_hip_portable_folder(
         space_id: space.id,
         imported_docs: imported,
     })
-}
-
-/// Pure helper: whether a tree node is a valid portable-import board (kind+prefix).
-fn is_valid_import_board_node(n: &KnowledgeNode) -> bool {
-    n.kind == "board" && n.id.starts_with("brd_") && is_knowledge_id(&n.id)
-}
-
-/// Pure helper used by tests: filter tree nodes for portable import (omit invalid boards).
-fn filter_portable_import_nodes(nodes: &[KnowledgeNode]) -> (Vec<KnowledgeNode>, u32) {
-    let mut out = Vec::with_capacity(nodes.len());
-    let mut skipped = 0u32;
-    for n in nodes {
-        if n.kind == "board" {
-            if is_valid_import_board_node(n) {
-                out.push(n.clone());
-            } else {
-                skipped += 1;
-            }
-            continue;
-        }
-        out.push(n.clone());
-    }
-    (out, skipped)
 }
 
 #[tauri::command]
@@ -2459,8 +2093,6 @@ mod tests {
         assert!(is_knowledge_id("spc_xYzAbCdEfGhI"));
         assert!(is_knowledge_id("doc_abc123def456"));
         assert!(is_knowledge_id("nod_folder001"));
-        assert!(is_knowledge_id("brd_board0001ab"));
-        assert!(!is_knowledge_id("brd_ab")); // too short
     }
 
     #[test]
@@ -2557,268 +2189,16 @@ mod tests {
         assert!(doc_path(root, "spc_oktoken1", "doc_abc123def456").is_ok());
     }
 
-    #[test]
-    fn board_path_rejects_bad_ids() {
-        let root = Path::new("/tmp/kb");
-        assert!(board_path(root, "bad", "brd_abc123def456").is_err());
-        assert!(board_path(root, "spc_oktoken1", "doc_notaboard1").is_err());
-        assert!(board_path(root, "spc_oktoken1", "nod_notaboard1").is_err());
-        // PR-C+: board_path is primary `.board.json`.
-        let ok = board_path(root, "spc_oktoken1", "brd_abc123def456").unwrap();
-        assert!(
-            ok.ends_with("boards/brd_abc123def456.board.json")
-                || ok.ends_with("boards\\brd_abc123def456.board.json")
-        );
-        let primary = board_path_primary(root, "spc_oktoken1", "brd_abc123def456").unwrap();
-        assert_eq!(ok, primary);
-        let legacy = board_path_legacy(root, "spc_oktoken1", "brd_abc123def456").unwrap();
-        assert!(
-            legacy.ends_with("boards/brd_abc123def456.excalidraw")
-                || legacy.ends_with("boards\\brd_abc123def456.excalidraw")
-        );
-        // No files → write dest is primary (createBoard).
-        let for_write = board_path_for_write(root, "spc_oktoken1", "brd_abc123def456").unwrap();
-        assert_eq!(for_write, primary);
-    }
 
-    #[test]
-    fn resolve_board_path_prefers_primary_then_legacy() {
-        with_temp_root(|base| {
-            let root = base.join("knowledge");
-            let space_id = "spc_resolvepath1";
-            let board_id = "brd_resolvepath1";
-            let dir = space_dir(&root, space_id).unwrap();
-            fs::create_dir_all(dir.join("boards")).unwrap();
 
-            // Neither exists → primary path for read (caller returns EMPTY).
-            let resolved = resolve_board_path(&root, space_id, board_id).unwrap();
-            assert_eq!(
-                resolved,
-                board_path_primary(&root, space_id, board_id).unwrap()
-            );
 
-            // Legacy only → legacy.
-            let legacy = board_path_legacy(&root, space_id, board_id).unwrap();
-            fs::write(&legacy, r#"{"type":"excalidraw","elements":[],"files":{}}"#).unwrap();
-            let resolved = resolve_board_path(&root, space_id, board_id).unwrap();
-            assert_eq!(resolved, legacy);
 
-            // Both exist → primary wins.
-            let primary = board_path_primary(&root, space_id, board_id).unwrap();
-            fs::write(&primary, r#"{"type":"hip-board","elements":[],"files":{}}"#).unwrap();
-            let resolved = resolve_board_path(&root, space_id, board_id).unwrap();
-            assert_eq!(resolved, primary);
-        });
-    }
 
-    #[test]
-    fn write_board_file_always_primary_deletes_legacy() {
-        with_temp_root(|base| {
-            let root = base.join("knowledge");
-            let space_id = "spc_writedual01";
-            let board_id = "brd_writedual01";
-            fs::create_dir_all(space_dir(&root, space_id).unwrap().join("boards")).unwrap();
-            let primary = board_path_primary(&root, space_id, board_id).unwrap();
-            let legacy = board_path_legacy(&root, space_id, board_id).unwrap();
 
-            // Neither exists → create primary (createBoard path, PR-C+).
-            let create_body = r#"{"type":"hip-board","version":1,"source":"hip","elements":[{"id":"c1"}],"files":{}}"#;
-            write_board_file(&root, space_id, board_id, create_body).unwrap();
-            assert!(primary.is_file());
-            assert!(!legacy.exists());
-            assert!(fs::read_to_string(&primary).unwrap().contains("c1"));
 
-            // Legacy sibling present → write primary + delete legacy.
-            fs::write(
-                &legacy,
-                r#"{"type":"excalidraw","version":2,"source":"hip","elements":[{"id":"leg2"}],"files":{}}"#,
-            )
-            .unwrap();
-            let new_body =
-                r#"{"type":"hip-board","version":1,"source":"hip","elements":[{"id":"new"}],"files":{}}"#;
-            write_board_file(&root, space_id, board_id, new_body).unwrap();
-            assert!(primary.is_file());
-            assert!(!legacy.exists(), "stale legacy sibling must be removed");
-            let read_path = resolve_board_path(&root, space_id, board_id).unwrap();
-            assert_eq!(read_path, primary);
-            assert!(fs::read_to_string(&primary).unwrap().contains("new"));
-            assert!(!fs::read_to_string(&primary).unwrap().contains("c1"));
-        });
-    }
 
-    #[test]
-    fn write_after_primary_import_roundtrip_read() {
-        // Import-to-primary → write → resolve read shows new body (no divergent sibling).
-        with_temp_root(|base| {
-            let root = base.join("knowledge");
-            let space_id = "spc_impwrite01";
-            let board_id = "brd_impwrite01";
-            fs::create_dir_all(space_dir(&root, space_id).unwrap().join("boards")).unwrap();
-            let primary = board_path_primary(&root, space_id, board_id).unwrap();
-            atomic_write_str(
-                &primary,
-                r#"{"type":"excalidraw","elements":[{"id":"imported"}],"files":{}}"#,
-            )
-            .unwrap();
 
-            let edited =
-                r#"{"type":"excalidraw","version":2,"source":"hip","elements":[{"id":"edited"}],"files":{}}"#;
-            write_board_file(&root, space_id, board_id, edited).unwrap();
 
-            let path = resolve_board_path(&root, space_id, board_id).unwrap();
-            assert_eq!(path, primary);
-            let body = fs::read_to_string(&path).unwrap();
-            assert!(body.contains("edited"));
-            assert!(!body.contains("imported"));
-            assert!(!board_path_legacy(&root, space_id, board_id)
-                .unwrap()
-                .exists());
-        });
-    }
-
-    #[test]
-    fn board_paths_for_delete_returns_both_extensions() {
-        let root = Path::new("/tmp/kb");
-        let paths = board_paths_for_delete(root, "spc_oktoken1", "brd_abc123def456").unwrap();
-        assert!(
-            paths[0].ends_with("boards/brd_abc123def456.board.json")
-                || paths[0].ends_with("boards\\brd_abc123def456.board.json")
-        );
-        assert!(
-            paths[1].ends_with("boards/brd_abc123def456.excalidraw")
-                || paths[1].ends_with("boards\\brd_abc123def456.excalidraw")
-        );
-    }
-
-    #[test]
-    fn board_paths_for_trash_move_lists_existing_only() {
-        with_temp_root(|base| {
-            let root = base.join("knowledge");
-            let space_id = "spc_trashmovep1";
-            let board_id = "brd_trashmovep1";
-            let dir = space_dir(&root, space_id).unwrap();
-            fs::create_dir_all(dir.join("boards")).unwrap();
-
-            assert!(board_paths_for_trash_move(&root, space_id, board_id)
-                .unwrap()
-                .is_empty());
-
-            let legacy = board_path_legacy(&root, space_id, board_id).unwrap();
-            fs::write(&legacy, "{}").unwrap();
-            let pairs = board_paths_for_trash_move(&root, space_id, board_id).unwrap();
-            assert_eq!(pairs.len(), 1);
-            assert_eq!(pairs[0].1, format!("{board_id}.excalidraw"));
-
-            let primary = board_path_primary(&root, space_id, board_id).unwrap();
-            fs::write(&primary, "{}").unwrap();
-            let pairs = board_paths_for_trash_move(&root, space_id, board_id).unwrap();
-            assert_eq!(pairs.len(), 2);
-            assert_eq!(pairs[0].1, format!("{board_id}.board.json"));
-            assert_eq!(pairs[1].1, format!("{board_id}.excalidraw"));
-        });
-    }
-
-    #[test]
-    fn resolve_board_source_in_dir_prefers_board_json() {
-        with_temp_root(|base| {
-            let boards = base.join("boards");
-            fs::create_dir_all(&boards).unwrap();
-            let board_id = "brd_srcdual0001";
-            let legacy = boards.join(format!("{board_id}.excalidraw"));
-            fs::write(&legacy, "legacy").unwrap();
-            assert_eq!(
-                resolve_board_source_in_dir(&boards, board_id),
-                legacy
-            );
-            let primary = boards.join(format!("{board_id}.board.json"));
-            fs::write(&primary, "primary").unwrap();
-            assert_eq!(
-                resolve_board_source_in_dir(&boards, board_id),
-                primary
-            );
-        });
-    }
-
-    #[test]
-    fn board_write_rejects_dataurl_field_allows_text_substring() {
-        // files.*.dataURL key → reject
-        let bad = r#"{"type":"excalidraw","files":{"f1":{"id":"f1","mimeType":"image/png","dataURL":"data:image/png;base64,xx"}}}"#;
-        assert!(assert_no_data_url_in_board_json(bad)
-            .unwrap_err()
-            .contains("dataURL"));
-
-        // element text containing substring dataURL → allow
-        let ok = r#"{"type":"excalidraw","elements":[{"type":"text","text":"see dataURL docs"}],"files":{"f1":{"id":"f1","mimeType":"image/png","hipAssetRel":"assets/ast_x.png"}}}"#;
-        assert!(assert_no_data_url_in_board_json(ok).is_ok());
-
-        // hipAssetRel only → allow
-        let ok2 = r#"{"type":"excalidraw","files":{"f1":{"id":"f1","hipAssetRel":"assets/a.png"}}}"#;
-        assert!(assert_no_data_url_in_board_json(ok2).is_ok());
-    }
-
-    #[test]
-    fn board_write_rejects_oversize_body() {
-        let over = "x".repeat(KNOWLEDGE_BOARD_MAX_BYTES + 1);
-        let err = validate_board_write_body(&over).unwrap_err();
-        assert!(err.contains("exceeds"), "{err}");
-    }
-
-    #[test]
-    fn board_read_write_helpers_roundtrip() {
-        with_temp_root(|base| {
-            let root = base.join("knowledge");
-            let space_id = "spc_boardtest01";
-            let board_id = "brd_boardtest01";
-            let dir = space_dir(&root, space_id).unwrap();
-            fs::create_dir_all(dir.join("boards")).unwrap();
-            let path = board_path(&root, space_id, board_id).unwrap();
-            let body = EMPTY_BOARD_SCENE_JSON;
-            validate_board_write_body(body).unwrap();
-            atomic_write_str(&path, body).unwrap();
-            assert!(path.is_file());
-            assert!(
-                path.ends_with("board.json") || path.to_string_lossy().ends_with("board.json")
-            );
-            let read = fs::read_to_string(&path).unwrap();
-            assert!(read.contains("hip-board"));
-            assert!(read.contains("\"source\":\"hip\""));
-        });
-    }
-
-    #[test]
-    fn validate_tree_nodes_kind_prefix() {
-        let ok = vec![
-            KnowledgeNode {
-                id: "nod_folder001".into(),
-                parent_id: None,
-                kind: "folder".into(),
-                title: "F".into(),
-                order: 0,
-                created_at: 1,
-                updated_at: 1,
-            },
-            KnowledgeNode {
-                id: "brd_board0001".into(),
-                parent_id: Some("nod_folder001".into()),
-                kind: "board".into(),
-                title: "B".into(),
-                order: 0,
-                created_at: 1,
-                updated_at: 1,
-            },
-        ];
-        assert!(validate_tree_nodes(&ok).is_ok());
-        let bad = vec![KnowledgeNode {
-            id: "doc_wrongboard1".into(),
-            parent_id: None,
-            kind: "board".into(),
-            title: "B".into(),
-            order: 0,
-            created_at: 1,
-            updated_at: 1,
-        }];
-        assert!(validate_tree_nodes(&bad).unwrap_err().contains("prefix"));
-    }
 
     #[test]
     fn asset_path_rejects_traversal_allows_nested() {
@@ -2878,305 +2258,8 @@ mod tests {
         });
     }
 
-    #[test]
-    fn portable_zip_layout_structure() {
-        with_temp_root(|base| {
-            use std::io::Read;
-            use zip::ZipArchive;
 
-            let root = base.join("knowledge");
-            let space_id = "spc_ziptest01";
-            let dir = space_dir(&root, space_id).unwrap();
-            fs::create_dir_all(dir.join("docs")).unwrap();
-            fs::create_dir_all(dir.join("boards")).unwrap();
-            fs::create_dir_all(dir.join("assets")).unwrap();
-            let space = KnowledgeSpace {
-                id: space_id.to_string(),
-                name: "ZipTest".into(),
-                icon: None,
-                created_at: 1,
-                updated_at: 1,
-            };
-            write_json_file(&dir.join("meta.json"), &space).unwrap();
-            let doc_id = "doc_ziptest01";
-            let board_id = "brd_ziptest01";
-            let tree = KnowledgeTreeFile {
-                version: 1,
-                nodes: vec![
-                    KnowledgeNode {
-                        id: doc_id.into(),
-                        parent_id: None,
-                        kind: "doc".into(),
-                        title: "Hello".into(),
-                        order: 0,
-                        created_at: 1,
-                        updated_at: 1,
-                    },
-                    KnowledgeNode {
-                        id: board_id.into(),
-                        parent_id: None,
-                        kind: "board".into(),
-                        title: "Sketch".into(),
-                        order: 1,
-                        created_at: 1,
-                        updated_at: 1,
-                    },
-                ],
-            };
-            write_json_file(&dir.join("tree.json"), &tree).unwrap();
-            atomic_write_str(
-                &doc_path(&root, space_id, doc_id).unwrap(),
-                "![x](assets/ast_ziptest01_a.png)\n",
-            )
-            .unwrap();
-            let board_scene = r##"{"type":"excalidraw","version":2,"source":"hip","hip":{"schemaVersion":1},"elements":[{"type":"rectangle","id":"e1"}],"appState":{"viewBackgroundColor":"#ffffff"},"files":{"f1":{"id":"f1","mimeType":"image/png","created":1,"hipAssetRel":"assets/ast_ziptest01_a.png"}}}"##;
-            atomic_write_str(
-                &board_path(&root, space_id, board_id).unwrap(),
-                board_scene,
-            )
-            .unwrap();
-            atomic_write(
-                &asset_path(&root, space_id, "assets/ast_ziptest01_a.png").unwrap(),
-                b"fakepng",
-            )
-            .unwrap();
-            save_index(
-                &root,
-                &KnowledgeIndex {
-                    version: 1,
-                    spaces: vec![space],
-                },
-            )
-            .unwrap();
 
-            // Build portable zip without AppHandle (inline the same layout rules as export).
-            let dest = base.join("out.zip");
-            {
-                use std::io::Write as _;
-                use zip::write::SimpleFileOptions;
-                use zip::ZipWriter;
-                let file = fs::File::create(&dest).unwrap();
-                let mut zip = ZipWriter::new(file);
-                let opts =
-                    SimpleFileOptions::default().compression_method(zip::CompressionMethod::Deflated);
-                let meta_bytes = fs::read(dir.join("meta.json")).unwrap();
-                zip.start_file("meta.json", opts).unwrap();
-                zip.write_all(&meta_bytes).unwrap();
-                let tree_bytes = fs::read(dir.join("tree.json")).unwrap();
-                zip.start_file("tree.json", opts).unwrap();
-                zip.write_all(&tree_bytes).unwrap();
-                zip.start_file(format!("docs/{doc_id}.md"), opts).unwrap();
-                zip.write_all(b"![x](assets/ast_ziptest01_a.png)\n")
-                    .unwrap();
-                // boards/ entry always uses primary name (LKD-6 zip export).
-                zip.start_file(format!("boards/{board_id}.board.json"), opts)
-                    .unwrap();
-                zip.write_all(board_scene.as_bytes()).unwrap();
-                zip.start_file("assets/ast_ziptest01_a.png", opts).unwrap();
-                zip.write_all(b"fakepng").unwrap();
-                zip.finish().unwrap();
-            }
-
-            let f = fs::File::open(&dest).unwrap();
-            let mut archive = ZipArchive::new(f).unwrap();
-            let mut names: Vec<String> = (0..archive.len())
-                .map(|i| archive.by_index(i).unwrap().name().to_string())
-                .collect();
-            names.sort();
-            assert!(names.iter().any(|n| n == "meta.json"));
-            assert!(names.iter().any(|n| n == "tree.json"));
-            assert!(names.iter().any(|n| n == &format!("docs/{doc_id}.md")));
-            assert!(names
-                .iter()
-                .any(|n| n == &format!("boards/{board_id}.board.json")));
-            assert!(names.iter().any(|n| n == "assets/ast_ziptest01_a.png"));
-            // Not the old human-readable title paths
-            assert!(!names.iter().any(|n| n == "Hello.md"));
-
-            let mut body = String::new();
-            archive
-                .by_name(&format!("docs/{doc_id}.md"))
-                .unwrap()
-                .read_to_string(&mut body)
-                .unwrap();
-            assert!(body.contains("assets/ast_ziptest01_a.png"));
-
-            let mut board_body = String::new();
-            archive
-                .by_name(&format!("boards/{board_id}.board.json"))
-                .unwrap()
-                .read_to_string(&mut board_body)
-                .unwrap();
-            assert!(board_body.contains("hipAssetRel"));
-            assert!(board_body.contains("excalidraw"));
-        });
-    }
-
-    #[test]
-    fn portable_import_dual_ext_source_writes_primary() {
-        // Import accepts `.excalidraw` or `.board.json` source; dest is always primary.
-        with_temp_root(|base| {
-            let root = base.join("knowledge");
-            let space_id = "spc_importdual1";
-            let board_legacy_id = "brd_impolegacy1";
-            let board_primary_id = "brd_impoprimary";
-            let source = base.join("portable_src");
-            fs::create_dir_all(source.join("boards")).unwrap();
-
-            let legacy_body =
-                r#"{"type":"excalidraw","version":2,"source":"hip","elements":[{"id":"leg"}],"files":{}}"#;
-            let primary_body =
-                r#"{"type":"hip-board","version":1,"source":"hip","elements":[{"id":"pri"}],"files":{}}"#;
-            fs::write(
-                source
-                    .join("boards")
-                    .join(format!("{board_legacy_id}.excalidraw")),
-                legacy_body,
-            )
-            .unwrap();
-            fs::write(
-                source
-                    .join("boards")
-                    .join(format!("{board_primary_id}.board.json")),
-                primary_body,
-            )
-            .unwrap();
-            // Both extensions present for one board → prefer primary body.
-            let both_id = "brd_impoboth0001";
-            fs::write(
-                source
-                    .join("boards")
-                    .join(format!("{both_id}.excalidraw")),
-                r#"{"type":"excalidraw","elements":[{"id":"ignored"}],"files":{}}"#,
-            )
-            .unwrap();
-            fs::write(
-                source
-                    .join("boards")
-                    .join(format!("{both_id}.board.json")),
-                r#"{"type":"hip-board","elements":[{"id":"kept"}],"files":{}}"#,
-            )
-            .unwrap();
-
-            fs::create_dir_all(space_dir(&root, space_id).unwrap().join("boards")).unwrap();
-            for board_id in [board_legacy_id, board_primary_id, both_id] {
-                let src = resolve_board_source_in_dir(&source.join("boards"), board_id);
-                let body = if src.is_file() {
-                    fs::read_to_string(&src).unwrap()
-                } else {
-                    EMPTY_BOARD_SCENE_JSON.to_string()
-                };
-                validate_board_write_body(&body).unwrap();
-                atomic_write_str(
-                    &board_path_primary(&root, space_id, board_id).unwrap(),
-                    &body,
-                )
-                .unwrap();
-            }
-
-            let leg_live = fs::read_to_string(
-                board_path_primary(&root, space_id, board_legacy_id).unwrap(),
-            )
-            .unwrap();
-            assert!(leg_live.contains("\"id\":\"leg\""));
-            let pri_live = fs::read_to_string(
-                board_path_primary(&root, space_id, board_primary_id).unwrap(),
-            )
-            .unwrap();
-            assert!(pri_live.contains("\"id\":\"pri\""));
-            let both_live =
-                fs::read_to_string(board_path_primary(&root, space_id, both_id).unwrap()).unwrap();
-            assert!(both_live.contains("\"id\":\"kept\""));
-            assert!(!both_live.contains("ignored"));
-        });
-    }
-
-    #[test]
-    fn portable_import_omits_invalid_board_keeps_valid_missing_file_empty() {
-        // Pure filter: invalid board id/prefix omitted; valid kept.
-        let nodes = vec![
-            KnowledgeNode {
-                id: "doc_importok01".into(),
-                parent_id: None,
-                kind: "doc".into(),
-                title: "D".into(),
-                order: 0,
-                created_at: 1,
-                updated_at: 1,
-            },
-            KnowledgeNode {
-                id: "brd_importok01".into(),
-                parent_id: None,
-                kind: "board".into(),
-                title: "Good".into(),
-                order: 1,
-                created_at: 1,
-                updated_at: 1,
-            },
-            KnowledgeNode {
-                id: "doc_notaboard1".into(),
-                parent_id: None,
-                kind: "board".into(),
-                title: "Bad prefix".into(),
-                order: 2,
-                created_at: 1,
-                updated_at: 1,
-            },
-            KnowledgeNode {
-                id: "brd_x".into(), // too short rest
-                parent_id: None,
-                kind: "board".into(),
-                title: "Bad id".into(),
-                order: 3,
-                created_at: 1,
-                updated_at: 1,
-            },
-            KnowledgeNode {
-                id: "nod_folder001".into(),
-                parent_id: None,
-                kind: "folder".into(),
-                title: "F".into(),
-                order: 4,
-                created_at: 1,
-                updated_at: 1,
-            },
-        ];
-        let (out, skipped) = filter_portable_import_nodes(&nodes);
-        assert_eq!(skipped, 2);
-        assert_eq!(out.len(), 3);
-        assert!(out.iter().any(|n| n.id == "brd_importok01"));
-        assert!(out.iter().any(|n| n.id == "doc_importok01"));
-        assert!(out.iter().any(|n| n.id == "nod_folder001"));
-        assert!(!out.iter().any(|n| n.id == "doc_notaboard1"));
-        assert!(!out.iter().any(|n| n.id == "brd_x"));
-
-        // Missing board file → write EMPTY scene (round-trip layout without AppHandle).
-        with_temp_root(|base| {
-            let root = base.join("knowledge");
-            let space_id = "spc_importbrd1";
-            let board_id = "brd_importok01";
-            let dir = space_dir(&root, space_id).unwrap();
-            fs::create_dir_all(dir.join("boards")).unwrap();
-            // No boards/{id}.* on source → EMPTY written to primary (import dest).
-            let dest = board_path_primary(&root, space_id, board_id).unwrap();
-            atomic_write_str(&dest, EMPTY_BOARD_SCENE_JSON).unwrap();
-            let read = fs::read_to_string(&dest).unwrap();
-            assert!(read.contains("\"source\":\"hip\""));
-            assert!(read.contains("\"elements\":[]"));
-            assert!(
-                dest.ends_with(".board.json") || dest.to_string_lossy().ends_with(".board.json")
-            );
-            assert!(is_valid_import_board_node(&KnowledgeNode {
-                id: board_id.into(),
-                parent_id: None,
-                kind: "board".into(),
-                title: "G".into(),
-                order: 0,
-                created_at: 1,
-                updated_at: 1,
-            }));
-        });
-    }
 
     #[test]
     fn export_bytes_size_cap_and_mime() {
@@ -3196,130 +2279,6 @@ mod tests {
         assert!(err.contains("too large"), "{err}");
     }
 
-    #[test]
-    fn portable_zip_mixed_doc_board_roundtrip_layout() {
-        // Source folder with doc + board + asset → dest tree + files (helper-level RT).
-        with_temp_root(|base| {
-            let source = base.join("portable_src");
-            fs::create_dir_all(source.join("docs")).unwrap();
-            fs::create_dir_all(source.join("boards")).unwrap();
-            fs::create_dir_all(source.join("assets")).unwrap();
-
-            let doc_id = "doc_mixrt0001";
-            let board_id = "brd_mixrt0001";
-            let bad_board = "nod_notboard1";
-            let tree = KnowledgeTreeFile {
-                version: 1,
-                nodes: vec![
-                    KnowledgeNode {
-                        id: doc_id.into(),
-                        parent_id: None,
-                        kind: "doc".into(),
-                        title: "Note".into(),
-                        order: 0,
-                        created_at: 1,
-                        updated_at: 1,
-                    },
-                    KnowledgeNode {
-                        id: board_id.into(),
-                        parent_id: None,
-                        kind: "board".into(),
-                        title: "Sketch".into(),
-                        order: 1,
-                        created_at: 1,
-                        updated_at: 1,
-                    },
-                    KnowledgeNode {
-                        id: bad_board.into(),
-                        parent_id: None,
-                        kind: "board".into(),
-                        title: "Invalid".into(),
-                        order: 2,
-                        created_at: 1,
-                        updated_at: 1,
-                    },
-                ],
-            };
-            write_json_file(&source.join("tree.json"), &tree).unwrap();
-            fs::write(source.join("docs").join(format!("{doc_id}.md")), "# hi\n").unwrap();
-            // valid board present
-            fs::write(
-                source
-                    .join("boards")
-                    .join(format!("{board_id}.excalidraw")),
-                r#"{"type":"excalidraw","version":2,"source":"hip","elements":[{"id":"r1"}],"appState":{},"files":{}}"#,
-            )
-            .unwrap();
-            // no file for bad board (would be omitted from tree anyway)
-            fs::write(source.join("assets").join("ast_mix_a.png"), b"pngdata").unwrap();
-
-            let (filtered, skipped) = filter_portable_import_nodes(&tree.nodes);
-            assert_eq!(skipped, 1);
-            assert_eq!(filtered.len(), 2);
-            assert!(filtered.iter().any(|n| n.id == board_id));
-            assert!(!filtered.iter().any(|n| n.id == bad_board));
-
-            // Simulate import write of boards into a new space layout
-            let root = base.join("knowledge");
-            let space_id = "spc_miximport1";
-            let dir = space_dir(&root, space_id).unwrap();
-            fs::create_dir_all(dir.join("docs")).unwrap();
-            fs::create_dir_all(dir.join("boards")).unwrap();
-            fs::create_dir_all(dir.join("assets")).unwrap();
-
-            for n in &filtered {
-                if n.kind == "doc" {
-                    let body = fs::read_to_string(
-                        source.join("docs").join(format!("{}.md", n.id)),
-                    )
-                    .unwrap_or_default();
-                    atomic_write_str(&doc_path(&root, space_id, &n.id).unwrap(), &body).unwrap();
-                } else if n.kind == "board" {
-                    // Mirror production import: dual-resolve source, write primary.
-                    let src = resolve_board_source_in_dir(&source.join("boards"), &n.id);
-                    let body = if src.is_file() {
-                        fs::read_to_string(&src).unwrap()
-                    } else {
-                        EMPTY_BOARD_SCENE_JSON.to_string()
-                    };
-                    atomic_write_str(
-                        &board_path_primary(&root, space_id, &n.id).unwrap(),
-                        &body,
-                    )
-                    .unwrap();
-                }
-            }
-            // board missing file case → EMPTY on primary
-            let missing_id = "brd_missing0001";
-            assert!(is_valid_import_board_node(&KnowledgeNode {
-                id: missing_id.into(),
-                parent_id: None,
-                kind: "board".into(),
-                title: "M".into(),
-                order: 0,
-                created_at: 1,
-                updated_at: 1,
-            }));
-            atomic_write_str(
-                &board_path_primary(&root, space_id, missing_id).unwrap(),
-                EMPTY_BOARD_SCENE_JSON,
-            )
-            .unwrap();
-
-            let board_live = fs::read_to_string(
-                board_path_primary(&root, space_id, board_id).unwrap(),
-            )
-            .unwrap();
-            assert!(board_live.contains("\"id\":\"r1\""));
-            let missing_live = fs::read_to_string(
-                board_path_primary(&root, space_id, missing_id).unwrap(),
-            )
-            .unwrap();
-            assert!(missing_live.contains("\"elements\":[]"));
-            let doc_live = fs::read_to_string(doc_path(&root, space_id, doc_id).unwrap()).unwrap();
-            assert!(doc_live.contains("# hi"));
-        });
-    }
 
     #[test]
     fn is_hip_portable_layout_detects_tree_and_docs() {
@@ -3333,110 +2292,7 @@ mod tests {
         });
     }
 
-    #[test]
-    fn is_hip_portable_layout_accepts_boards_only_or_meta() {
-        with_temp_root(|base| {
-            // boards-only (no docs/) — whiteboard-first space export
-            fs::write(base.join("tree.json"), "{}").unwrap();
-            fs::create_dir_all(base.join("boards")).unwrap();
-            assert!(is_hip_portable_layout(base));
-        });
-        with_temp_root(|base| {
-            // meta.json + tree without docs/ or boards/
-            fs::write(base.join("tree.json"), "{}").unwrap();
-            fs::write(base.join("meta.json"), r#"{"id":"spc_x","name":"S"}"#).unwrap();
-            assert!(is_hip_portable_layout(base));
-        });
-        with_temp_root(|base| {
-            // docs alone still works
-            fs::write(base.join("tree.json"), "{}").unwrap();
-            fs::create_dir_all(base.join("docs")).unwrap();
-            assert!(is_hip_portable_layout(base));
-        });
-    }
 
-    #[test]
-    fn boards_only_portable_layout_roundtrip_helpers() {
-        // Boards-only package: detect portable + import validation path + EMPTY on missing.
-        with_temp_root(|base| {
-            let source = base.join("portable_boards_only");
-            fs::create_dir_all(source.join("boards")).unwrap();
-            let board_id = "brd_boardsonly1";
-            let tree = KnowledgeTreeFile {
-                version: 1,
-                nodes: vec![KnowledgeNode {
-                    id: board_id.into(),
-                    parent_id: None,
-                    kind: "board".into(),
-                    title: "OnlyBoard".into(),
-                    order: 0,
-                    created_at: 1,
-                    updated_at: 1,
-                }],
-            };
-            write_json_file(&source.join("tree.json"), &tree).unwrap();
-            write_json_file(
-                &source.join("meta.json"),
-                &KnowledgeSpace {
-                    id: "spc_exportsrc1".into(),
-                    name: "WB".into(),
-                    icon: None,
-                    created_at: 1,
-                    updated_at: 1,
-                },
-            )
-            .unwrap();
-            let scene = r##"{"type":"excalidraw","version":2,"source":"hip","elements":[{"id":"e1"}],"appState":{},"files":{}}"##;
-            fs::write(
-                source
-                    .join("boards")
-                    .join(format!("{board_id}.excalidraw")),
-                scene,
-            )
-            .unwrap();
-
-            assert!(is_hip_portable_layout(&source));
-            assert!(!source.join("docs").is_dir()); // no docs/ — must still detect
-
-            let (filtered, skipped) = filter_portable_import_nodes(&tree.nodes);
-            assert_eq!(skipped, 0);
-            assert_eq!(filtered.len(), 1);
-            assert_eq!(filtered[0].id, board_id);
-
-            // validate_board_write_body accepts clean scene
-            validate_board_write_body(scene).unwrap();
-
-            // dataURL body rejected (import must use this gate)
-            let hostile = r##"{"type":"excalidraw","files":{"f1":{"id":"f1","mimeType":"image/png","dataURL":"data:image/png;base64,xx"}}}"##;
-            assert!(validate_board_write_body(hostile)
-                .unwrap_err()
-                .contains("dataURL"));
-
-            // Simulate import write into new space (dest = primary, source dual).
-            let root = base.join("knowledge");
-            let space_id = "spc_boardsonly1";
-            fs::create_dir_all(space_dir(&root, space_id).unwrap().join("boards")).unwrap();
-            for n in &filtered {
-                let src = resolve_board_source_in_dir(&source.join("boards"), &n.id);
-                let body = if src.is_file() {
-                    fs::read_to_string(&src).unwrap()
-                } else {
-                    EMPTY_BOARD_SCENE_JSON.to_string()
-                };
-                validate_board_write_body(&body).unwrap();
-                atomic_write_str(
-                    &board_path_primary(&root, space_id, &n.id).unwrap(),
-                    &body,
-                )
-                .unwrap();
-            }
-            let live = fs::read_to_string(
-                board_path_primary(&root, space_id, board_id).unwrap(),
-            )
-            .unwrap();
-            assert!(live.contains("\"id\":\"e1\""));
-        });
-    }
 
     #[test]
     fn template_id_validation() {

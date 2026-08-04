@@ -47,63 +47,7 @@ describe('knowledge IPC', () => {
     delete w.__hipKnowledgeWriteFail
   })
 
-  it('board IPC wrappers pass camelCase args', async () => {
-    const {
-      knowledgeReadBoard,
-      knowledgeWriteBoard,
-      knowledgeDeleteBoardFile,
-      knowledgeExportBoard,
-      knowledgeExportBytes,
-    } = await import('./knowledge.js')
 
-    invoke.mockResolvedValueOnce('{"type":"excalidraw"}')
-    const body = await knowledgeReadBoard('spc_1', 'brd_abc123def456')
-    expect(body).toContain('excalidraw')
-    expect(invoke).toHaveBeenCalledWith('knowledge_read_board', {
-      args: { spaceId: 'spc_1', boardId: 'brd_abc123def456' },
-    })
-
-    invoke.mockResolvedValueOnce(undefined)
-    await knowledgeWriteBoard('spc_1', 'brd_abc123def456', '{"files":{}}')
-    expect(invoke).toHaveBeenCalledWith('knowledge_write_board', {
-      args: { spaceId: 'spc_1', boardId: 'brd_abc123def456', body: '{"files":{}}' },
-    })
-
-    invoke.mockResolvedValueOnce(undefined)
-    await knowledgeDeleteBoardFile('spc_1', 'brd_abc123def456')
-    expect(invoke).toHaveBeenCalledWith('knowledge_delete_board_file', {
-      args: { spaceId: 'spc_1', boardId: 'brd_abc123def456' },
-    })
-
-    invoke.mockResolvedValueOnce(undefined)
-    await knowledgeExportBoard('spc_1', 'brd_abc123def456', '/tmp/board.excalidraw')
-    expect(invoke).toHaveBeenCalledWith('knowledge_export_board', {
-      args: {
-        spaceId: 'spc_1',
-        boardId: 'brd_abc123def456',
-        destPath: '/tmp/board.excalidraw',
-      },
-    })
-
-    invoke.mockResolvedValueOnce(undefined)
-    await knowledgeExportBytes('/tmp/board.png', 'aGVsbG8=', 'image/png')
-    expect(invoke).toHaveBeenCalledWith('knowledge_export_bytes', {
-      args: { destPath: '/tmp/board.png', base64: 'aGVsbG8=', mime: 'image/png' },
-    })
-  })
-
-  it('knowledgeWriteBoard shares e2e write-fail seam with docs', async () => {
-    const { knowledgeWriteBoard } = await import('./knowledge.js')
-    const w = globalThis as unknown as {
-      __hipKnowledgeWriteFail?: boolean | ((s: string, id: string) => boolean)
-    }
-    w.__hipKnowledgeWriteFail = true
-    await expect(
-      knowledgeWriteBoard('spc_1', 'brd_1', '{}'),
-    ).rejects.toThrow(/e2e knowledge write fail/)
-    expect(invoke).not.toHaveBeenCalled()
-    delete w.__hipKnowledgeWriteFail
-  })
 
   it('asset IPC wrappers pass camelCase args and never echo bytes on import', async () => {
     const {

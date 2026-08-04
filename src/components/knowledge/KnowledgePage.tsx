@@ -19,6 +19,19 @@ export function KnowledgePage() {
     if (!loaded) void loadSpaces()
   }, [loaded, loadSpaces])
 
+  // Prefetch Live (BlockNote) chunk while on knowledge surface (idle).
+  useEffect(() => {
+    const run = () => {
+      void import('./DocBlockNoteEditor').catch(() => {})
+    }
+    if (typeof requestIdleCallback === 'function') {
+      const id = requestIdleCallback(run, { timeout: 2000 })
+      return () => cancelIdleCallback(id)
+    }
+    const t = window.setTimeout(run, 200)
+    return () => window.clearTimeout(t)
+  }, [])
+
   // Tier B: best-effort flush when leaving knowledge surface entirely.
   useEffect(() => {
     return () => {

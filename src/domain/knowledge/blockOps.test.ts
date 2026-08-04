@@ -4,11 +4,14 @@ import { Schema } from '@milkdown/kit/prose/model'
 import { EditorState } from '@milkdown/kit/prose/state'
 import { EditorView } from '@milkdown/kit/prose/view'
 import {
+  blockAt,
   blockPlainText,
   deleteTopLevelBlock,
+  deleteTopLevelRange,
   duplicateTopLevelBlock,
   insertEmptyParagraphNear,
   topLevelBlockAt,
+  topLevelIndexRange,
 } from './blockOps'
 
 const schema = new Schema({
@@ -31,6 +34,18 @@ const schema = new Schema({
       ],
     },
     text: { group: 'inline' },
+    list_item: {
+      content: 'paragraph block*',
+      defining: true,
+      toDOM: () => ['li', 0],
+      parseDOM: [{ tag: 'li' }],
+    },
+    bullet_list: {
+      group: 'block',
+      content: 'list_item+',
+      toDOM: () => ['ul', 0],
+      parseDOM: [{ tag: 'ul' }],
+    },
   },
 })
 
@@ -87,5 +102,36 @@ describe('blockOps', () => {
   it('blockPlainText for heading', () => {
     const h = schema.node('heading', { level: 2 }, schema.text('Title'))
     expect(blockPlainText(h)).toBe('## Title')
+  })
+
+  it('blockAt prefer list_item when nested', () => {
+    const li = schema.node('list_item', null, [
+      schema.node('paragraph', null, schema.text('item')),
+    ])
+    const ul = schema.node('bullet_list', null, [li])
+    const view = makeView([ul])
+    // pos inside list item text
+    const inside = 3
+    const nested = blockAt(view.state.doc, inside, { prefer: 'list_item' })
+    expect(nested?.node.type.name).toBe('list_item')
+    expect(nested?.depth).toBeGreaterThan(1)
+    const top = blockAt(view.state.doc, inside, { prefer: 'top' })
+    expect(top?.node.type.name).toBe('bullet_list')
+    expect(top?.depth).toBe(1)
+    view.destroy()
+  })
+
+  it('deleteTopLevelRange and topLevelIndexRange', () => {
+    const view = makeView([
+      schema.node('paragraph', null, schema.text('a')),
+      schema.node('paragraph', null, schema.text('b')),
+      schema.node('paragraph', null, schema.text('c')),
+    ])
+    const r = topLevelIndexRange(view.state.doc, 1, 5)
+    expect(r).toEqual({ fromIndex: 0, toIndex: 1 })
+    expect(deleteTopLevelRange(view, 0, 1)).toBe(true)
+    expect(view.state.doc.childCount).toBe(1)
+    expect(view.state.doc.firstChild?.textContent).toBe('c')
+    view.destroy()
   })
 })

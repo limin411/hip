@@ -8,7 +8,6 @@ import {
   FolderOpen,
   GripVertical,
   Library,
-  PencilRuler,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import type { KnowledgeNode } from '@/domain/knowledge/types'
@@ -20,7 +19,6 @@ interface SpaceTreeProps {
   onRename: (node: KnowledgeNode) => void
   onDelete: (node: KnowledgeNode) => void
   onNewDoc: (parentId: string | null) => void
-  onNewBoard: (parentId: string | null) => void
   onNewFolder: (parentId: string | null) => void
   onReveal?: (node: KnowledgeNode) => void
   /** When set, only render nodes in this set (matches ∪ ancestors). */
@@ -128,13 +126,14 @@ export function SpaceTree({
   onRename,
   onDelete,
   onNewDoc,
-  onNewBoard,
   onNewFolder,
   onReveal,
   visibleIds,
 }: SpaceTreeProps) {
   const { t } = useTranslation()
-  const nodes = useKnowledgeStore((s) => s.nodes)
+  const rawNodes = useKnowledgeStore((s) => s.nodes)
+  /** Primitive tree: docs + folders only. */
+  const nodes = rawNodes.filter((n) => n.kind !== 'board')
   const activeDocId = useKnowledgeStore((s) => s.activeDocId)
   const treeFocusId = useKnowledgeStore((s) => s.treeFocusId)
   const activeSpaceId = useKnowledgeStore((s) => s.activeSpaceId)
@@ -407,21 +406,18 @@ export function SpaceTree({
 
     const spaceId = activeSpaceId ?? ''
     const parentForNew = node.kind === 'folder' ? node.id : node.parentId
-    const isLeaf = node.kind === 'doc' || node.kind === 'board'
+    const isLeaf = node.kind === 'doc'
     const isActiveLeaf = isLeaf && activeDocId === node.id
     const isFocused = treeFocusId === node.id
     // Roving target: focused visible row, or first root when focus is missing/hidden.
     const isRovingTarget =
       (focusInVisible && isFocused) || (!focusInVisible && node === roots[0])
     const isFolder = node.kind === 'folder'
-    const isBoard = node.kind === 'board'
     const isOpen = isFolder && expanded[node.id] === true
     const treeTestId =
       node.kind === 'doc'
         ? `knowledge-tree-doc-${node.id}`
-        : node.kind === 'board'
-          ? `knowledge-tree-board-${node.id}`
-          : `knowledge-tree-folder-${node.id}`
+        : `knowledge-tree-folder-${node.id}`
 
     const row = (
       <div
@@ -547,11 +543,7 @@ export function SpaceTree({
                   : 'text-ink-tertiary group-hover:text-ink-secondary',
               )}
             >
-              {isBoard ? (
-                <PencilRuler size={14} strokeWidth={1.75} />
-              ) : (
-                <FileText size={14} strokeWidth={1.75} />
-              )}
+              <FileText size={14} strokeWidth={1.75} />
             </span>
             <span
               className={cn(
@@ -576,14 +568,11 @@ export function SpaceTree({
           kind: node.kind,
           spaceId,
           onNewDoc: () => onNewDoc(parentForNew),
-          onNewBoard: () => onNewBoard(parentForNew),
           onNewFolder: () => onNewFolder(parentForNew),
           onRename: () => onRename(node),
           onDelete: () => onDelete(node),
           onReveal:
-            (node.kind === 'doc' || node.kind === 'board') && onReveal
-              ? () => onReveal(node)
-              : undefined,
+            node.kind === 'doc' && onReveal ? () => onReveal(node) : undefined,
         }}
       >
         {row}

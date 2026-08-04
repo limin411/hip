@@ -1,5 +1,5 @@
 //! Knowledge recycle-bin: FS quarantine under `~/.hip/trash/knowledge/`.
-//! Soft-delete spaces and doc/folder/board nodes with durable manifest status machine.
+//! Soft-delete spaces and doc/folder nodes with durable manifest status machine.
 
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
@@ -8,10 +8,7 @@ use std::path::{Path, PathBuf};
 use std::time::{SystemTime, UNIX_EPOCH};
 use tauri::AppHandle;
 
-use crate::knowledge::{
-    board_path_legacy, board_path_primary, board_paths_for_trash_move, is_knowledge_id,
-    resolve_board_path, write_board_file, KnowledgeNode, KnowledgeSpace, KnowledgeTreeFile,
-};
+use crate::knowledge::{is_knowledge_id, KnowledgeNode, KnowledgeSpace, KnowledgeTreeFile};
 use crate::paths;
 use crate::skills::safe_join;
 
@@ -32,7 +29,6 @@ pub enum TrashEntityKind {
     Space,
     Doc,
     Folder,
-    Board,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -286,7 +282,7 @@ pub fn knowledge_soft_delete_space(app: AppHandle, args: SoftDeleteSpaceArgs) ->
     Ok(())
 }
 
-// ── Soft-delete nodes (doc / folder / board subtree) ────────────────────────
+// ── Soft-delete nodes (doc / folder subtree) ────────────────────────
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -322,13 +318,13 @@ fn collect_subtree(nodes: &[KnowledgeNode], root_id: &str) -> Vec<KnowledgeNode>
     out
 }
 
-/// Classify soft-delete root. NEVER map kind=="board" to Doc.
+/// Classify soft-delete root (doc or folder only; boards removed from product).
 fn classify_trash_root(root: &KnowledgeNode) -> Result<TrashEntityKind, String> {
     match root.kind.as_str() {
         "folder" => Ok(TrashEntityKind::Folder),
-        "board" => Ok(TrashEntityKind::Board),
         "doc" => Ok(TrashEntityKind::Doc),
-        _ if root.id.starts_with("brd_") => Ok(TrashEntityKind::Board),
+        "board" => Err("boards are no longer supported".into()),
+        _ if root.id.starts_with("brd_") => Err("boards are no longer supported".into()),
         _ if root.id.starts_with("doc_") => Ok(TrashEntityKind::Doc),
         _ if root.id.starts_with("nod_") => Ok(TrashEntityKind::Folder),
         _ => Err(format!(
@@ -337,9 +333,6 @@ fn classify_trash_root(root: &KnowledgeNode) -> Result<TrashEntityKind, String> 
         )),
     }
 }
-
-/// File moves always key off id prefix (`doc_` / `brd_`), not kind alone.
-/// Kind is used for trash entry classification; on-disk paths use prefixes only.
 
 /// Path-based soft-delete (testable without AppHandle).
 pub(crate) fn soft_delete_nodes_at(
@@ -389,6 +382,36 @@ pub(crate) fn soft_delete_nodes_at(
             continue;
         }
         let root = subtree.iter().find(|n| n.id == *root_id).cloned().unwrap();
+        // Drop board nodes from trash payloads (product no longer supports boards).
+        // Permanently remove leftover board scene files when present.
+        let boards_dir = space_dir.join("boards");
+        for n in &subtree {
+            if n.id.starts_with("brd_") || n.kind == "board" {
+                let _ = fs::remove_file(boards_dir.join(format!("{}.board.json", n.id)));
+                let _ = fs::remove_file(boards_dir.join(format!("{}.excalidraw", n.id)));
+            }
+        }
+        let (board_ids, subtree): (Vec<String>, Vec<KnowledgeNode>) = {
+            let mut boards = Vec::new();
+            let mut rest = Vec::new();
+            for n in subtree {
+                if n.kind == "board" || n.id.starts_with("brd_") {
+                    boards.push(n.id);
+                } else {
+                    rest.push(n);
+                }
+            }
+            (boards, rest)
+        };
+        for bid in &board_ids {
+            removed_ids.insert(bid.clone());
+        }
+        if subtree.is_empty() {
+            // Root was board-only (or folder of only boards) — files deleted; strip from tree.
+            removed_ids.insert(root_id.clone());
+            continue;
+        }
+        let root = subtree.iter().find(|n| n.id == *root_id).cloned().unwrap_or(root);
         let kind = classify_trash_root(&root)?;
         let entry_id = gen_entry_id();
         let payload_rel = format!("docs/{entry_id}");
@@ -412,6 +435,23 @@ pub(crate) fn soft_delete_nodes_at(
     }
 
     if fragments.is_empty() {
+        // May still have purged board-only nodes from the tree.
+        if !removed_ids.is_empty() {
+            let new_nodes: Vec<KnowledgeNode> = tree
+                .nodes
+                .into_iter()
+                .filter(|n| !removed_ids.contains(&n.id))
+                .collect();
+            let new_tree = KnowledgeTreeFile {
+                version: 1,
+                nodes: new_nodes,
+            };
+            fs::write(
+                &tree_path,
+                serde_json::to_string_pretty(&new_tree).map_err(|e| e.to_string())?,
+            )
+            .map_err(|e| e.to_string())?;
+        }
         let _ = fs::remove_file(&bak);
         return Ok(vec![]);
     }
@@ -422,11 +462,10 @@ pub(crate) fn soft_delete_nodes_at(
     }
     save_manifest(trash, &manifest)?;
 
-    // Move payloads (docs + boards)
+    // Move payloads (docs)
     for (entry, subtree) in &fragments {
         let dest = trash.join(&entry.payload_rel);
         fs::create_dir_all(dest.join("docs")).map_err(|e| e.to_string())?;
-        fs::create_dir_all(dest.join("boards")).map_err(|e| e.to_string())?;
         fs::create_dir_all(dest.join("versions")).map_err(|e| e.to_string())?;
 
         let meta = NodePayloadMeta {
@@ -461,14 +500,7 @@ pub(crate) fn soft_delete_nodes_at(
                     let _ = fs::rename(&src_ver, dest.join("versions").join(&n.id));
                 }
             }
-            if n.id.starts_with("brd_") {
-                // Dual-ext: move both `.board.json` and `.excalidraw` when present (LKD-6b).
-                if let Ok(pairs) = board_paths_for_trash_move(kroot, space_id, &n.id) {
-                    for (src_board, dest_name) in pairs {
-                        let _ = fs::rename(&src_board, dest.join("boards").join(dest_name));
-                    }
-                }
-            }
+            // Legacy board files (if any) are left on disk / ignored — product no longer supports boards.
         }
     }
 
@@ -631,7 +663,7 @@ pub(crate) fn restore_trash_entry_at(
             index.spaces.push(space);
             save_index_spaces(kroot, index.spaces)?;
         }
-        TrashEntityKind::Doc | TrashEntityKind::Folder | TrashEntityKind::Board => {
+        TrashEntityKind::Doc | TrashEntityKind::Folder => {
             let space_dir = space_live_dir(kroot, &entry.space_id)?;
             if !space_dir.exists() {
                 return Err("parent space missing; restore the space first".into());
@@ -666,7 +698,11 @@ pub(crate) fn restore_trash_entry_at(
                 }
             }
 
-            // Move docs + boards back (file paths key off id prefix only).
+            // Move docs back (boards no longer restored).
+            let fragment: Vec<KnowledgeNode> = fragment
+                .into_iter()
+                .filter(|n| n.kind != "board" && !n.id.starts_with("brd_"))
+                .collect();
             for n in &fragment {
                 if n.id.starts_with("doc_") {
                     let src = payload.join("docs").join(format!("{}.md", n.id));
@@ -682,28 +718,6 @@ pub(crate) fn restore_trash_entry_at(
                         fs::rename(&src_ver, space_dir.join("versions").join(&n.id))
                             .map_err(|e| e.to_string())?;
                     }
-                }
-                if n.id.starts_with("brd_") {
-                    // R3: always restore to primary `boards/{id}.board.json`.
-                    // Prefer primary payload if both exist; else promote legacy body.
-                    let payload_boards = payload.join("boards");
-                    let src_primary = payload_boards.join(format!("{}.board.json", n.id));
-                    let src_legacy = payload_boards.join(format!("{}.excalidraw", n.id));
-                    let dest = board_path_primary(kroot, &entry.space_id, &n.id)?;
-                    if src_primary.exists() {
-                        if let Some(parent) = dest.parent() {
-                            fs::create_dir_all(parent).map_err(|e| e.to_string())?;
-                        }
-                        fs::rename(&src_primary, &dest).map_err(|e| e.to_string())?;
-                        // Discard leftover legacy copy in payload (both-exist matrix).
-                        let _ = fs::remove_file(&src_legacy);
-                    } else if src_legacy.exists() {
-                        if let Some(parent) = dest.parent() {
-                            fs::create_dir_all(parent).map_err(|e| e.to_string())?;
-                        }
-                        fs::rename(&src_legacy, &dest).map_err(|e| e.to_string())?;
-                    }
-                    // Missing board file: still restore tree node (open yields empty scene).
                 }
             }
 
@@ -915,7 +929,6 @@ pub fn knowledge_reconcile_trash(app: AppHandle) -> Result<u32, String> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::knowledge::EMPTY_BOARD_SCENE_JSON;
     use std::sync::Mutex;
 
     static ENV_LOCK: Mutex<()> = Mutex::new(());
@@ -944,7 +957,6 @@ mod tests {
     ) -> PathBuf {
         let space = space_live_dir(kroot, space_id).unwrap();
         fs::create_dir_all(space.join("docs")).unwrap();
-        fs::create_dir_all(space.join("boards")).unwrap();
         let tree = KnowledgeTreeFile {
             version: 1,
             nodes,
@@ -976,454 +988,47 @@ mod tests {
     }
 
     #[test]
-    fn classify_never_maps_board_to_doc() {
-        let board = node("brd_board0001ab", "board", "W", None, 0);
-        assert_eq!(classify_trash_root(&board).unwrap(), TrashEntityKind::Board);
-        let by_prefix = node("brd_board0002cd", "unknown", "W", None, 0);
-        assert_eq!(
-            classify_trash_root(&by_prefix).unwrap(),
-            TrashEntityKind::Board
-        );
-        let doc = node("doc_doc00000001", "doc", "D", None, 0);
-        assert_eq!(classify_trash_root(&doc).unwrap(), TrashEntityKind::Doc);
-        let folder = node("nod_folder001xx", "folder", "F", None, 0);
-        assert_eq!(
-            classify_trash_root(&folder).unwrap(),
-            TrashEntityKind::Folder
-        );
-    }
-
-    #[test]
-    fn soft_delete_board_moves_legacy_only_payload() {
+    fn soft_delete_doc_moves_payload_and_strips_tree() {
         with_temp_roots(|kroot, trash| {
-            let space_id = "spc_trashboard01";
-            let board_id = "brd_boardonly01";
+            let space_id = "spc_trashdoc0001";
+            let doc_id = "doc_trashdoc0001";
             let space = write_space_with_tree(
                 kroot,
                 space_id,
-                vec![node(board_id, "board", "Sketch", None, 0)],
+                vec![node(doc_id, "doc", "Note", None, 0)],
             );
-            let live_board = space.join("boards").join(format!("{board_id}.excalidraw"));
-            fs::write(&live_board, EMPTY_BOARD_SCENE_JSON).unwrap();
-
-            let entry_ids = soft_delete_nodes_at(
-                kroot,
-                trash,
-                space_id,
-                &[board_id.to_string()],
-            )
-            .unwrap();
-            assert_eq!(entry_ids.len(), 1);
-
-            // Live board gone
-            assert!(!live_board.exists());
-            // Tree empty
-            let tree: KnowledgeTreeFile =
-                serde_json::from_str(&fs::read_to_string(space.join("tree.json")).unwrap())
-                    .unwrap();
-            assert!(tree.nodes.is_empty());
-
-            let m = load_manifest(trash).unwrap();
-            let e = m.entries.iter().find(|e| e.id == entry_ids[0]).unwrap();
-            assert_eq!(e.kind, TrashEntityKind::Board);
-            assert_eq!(e.status, TrashEntryStatus::Ready);
-            let payload_board = trash
-                .join(&e.payload_rel)
-                .join("boards")
-                .join(format!("{board_id}.excalidraw"));
-            assert!(payload_board.is_file(), "payload should have board file");
-        });
-    }
-
-    #[test]
-    fn soft_delete_folder_moves_doc_and_board() {
-        with_temp_roots(|kroot, trash| {
-            let space_id = "spc_trashmixed01";
-            let folder_id = "nod_folder001xx";
-            let doc_id = "doc_doc00000001";
-            let board_id = "brd_boardmix001";
-            let space = write_space_with_tree(
-                kroot,
-                space_id,
-                vec![
-                    node(folder_id, "folder", "Folder", None, 0),
-                    node(doc_id, "doc", "Doc", Some(folder_id), 0),
-                    node(board_id, "board", "Board", Some(folder_id), 1),
-                ],
-            );
-            fs::write(
-                space.join("docs").join(format!("{doc_id}.md")),
-                "# hello",
-            )
-            .unwrap();
-            fs::write(
-                space.join("boards").join(format!("{board_id}.excalidraw")),
-                EMPTY_BOARD_SCENE_JSON,
-            )
-            .unwrap();
-
-            let entry_ids = soft_delete_nodes_at(
-                kroot,
-                trash,
-                space_id,
-                &[folder_id.to_string()],
-            )
-            .unwrap();
-            assert_eq!(entry_ids.len(), 1);
-            let m = load_manifest(trash).unwrap();
-            let e = m.entries.iter().find(|e| e.id == entry_ids[0]).unwrap();
-            assert_eq!(e.kind, TrashEntityKind::Folder);
-            let payload = trash.join(&e.payload_rel);
-            assert!(payload.join("docs").join(format!("{doc_id}.md")).is_file());
-            assert!(payload
-                .join("boards")
-                .join(format!("{board_id}.excalidraw"))
-                .is_file());
+            fs::write(space.join("docs").join(format!("{doc_id}.md")), "# hi").unwrap();
+            let ids = soft_delete_nodes_at(kroot, trash, space_id, &[doc_id.to_string()]).unwrap();
+            assert_eq!(ids.len(), 1);
             assert!(!space.join("docs").join(format!("{doc_id}.md")).exists());
-            assert!(!space
-                .join("boards")
-                .join(format!("{board_id}.excalidraw"))
-                .exists());
-        });
-    }
-
-    #[test]
-    fn restore_board_round_trip() {
-        with_temp_roots(|kroot, trash| {
-            let space_id = "spc_trashrestore1";
-            let board_id = "brd_boardrest01";
-            let body = r#"{"type":"excalidraw","version":2,"source":"hip","elements":[{"id":"stroke1"}],"files":{}}"#;
-            let space = write_space_with_tree(
-                kroot,
-                space_id,
-                vec![node(board_id, "board", "Sketch", None, 0)],
-            );
-            // Legacy-only seed: soft-delete → restore must not lose content (LKD-6b).
-            fs::write(
-                space.join("boards").join(format!("{board_id}.excalidraw")),
-                body,
-            )
-            .unwrap();
-
-            let entry_ids = soft_delete_nodes_at(
-                kroot,
-                trash,
-                space_id,
-                &[board_id.to_string()],
-            )
-            .unwrap();
-            assert!(!space
-                .join("boards")
-                .join(format!("{board_id}.excalidraw"))
-                .exists());
-
-            let item = restore_trash_entry_at(kroot, trash, &entry_ids[0]).unwrap();
-            assert_eq!(item.kind, TrashEntityKind::Board);
-            assert_eq!(item.entity_id, board_id);
-
-            // R3: restore always lands on primary `.board.json` (body may still be excalidraw).
-            let restored = fs::read_to_string(
-                space.join("boards").join(format!("{board_id}.board.json")),
-            )
-            .unwrap();
-            assert!(restored.contains("stroke1"));
-            assert!(
-                !space
-                    .join("boards")
-                    .join(format!("{board_id}.excalidraw"))
-                    .exists(),
-                "must not restore back to legacy extension"
-            );
-
             let tree: KnowledgeTreeFile =
-                serde_json::from_str(&fs::read_to_string(space.join("tree.json")).unwrap())
-                    .unwrap();
-            assert_eq!(tree.nodes.len(), 1);
-            assert_eq!(tree.nodes[0].id, board_id);
-            assert_eq!(tree.nodes[0].kind, "board");
-
-            // Manifest entry removed
-            let m = load_manifest(trash).unwrap();
-            assert!(m.entries.iter().all(|e| e.id != entry_ids[0]));
-
-            // Post-restore write must update primary (not orphan edits on legacy).
-            let edited =
-                r#"{"type":"excalidraw","version":2,"source":"hip","elements":[{"id":"after-restore"}],"files":{}}"#;
-            write_board_file(kroot, space_id, board_id, edited).unwrap();
-            let read_path = resolve_board_path(kroot, space_id, board_id).unwrap();
-            assert_eq!(
-                read_path,
-                board_path_primary(kroot, space_id, board_id).unwrap()
-            );
-            let after = fs::read_to_string(&read_path).unwrap();
-            assert!(after.contains("after-restore"));
-            assert!(!board_path_legacy(kroot, space_id, board_id)
-                .unwrap()
-                .exists());
-        });
-    }
-
-    #[test]
-    fn soft_delete_restore_board_json_primary_fixture() {
-        // Pre-seeded `.board.json` → soft-delete → restore → file at primary path.
-        with_temp_roots(|kroot, trash| {
-            let space_id = "spc_trashbjrest1";
-            let board_id = "brd_boardjson01";
-            let body = r#"{"type":"hip-board","version":1,"source":"hip","hip":{"schemaVersion":1},"elements":[{"id":"rect1","type":"rect"}],"files":{}}"#;
-            let space = write_space_with_tree(
-                kroot,
-                space_id,
-                vec![node(board_id, "board", "HipSketch", None, 0)],
-            );
-            let live_primary = space.join("boards").join(format!("{board_id}.board.json"));
-            fs::write(&live_primary, body).unwrap();
-
-            let entry_ids = soft_delete_nodes_at(
-                kroot,
-                trash,
-                space_id,
-                &[board_id.to_string()],
-            )
-            .unwrap();
-            assert!(!live_primary.exists());
-
-            let m = load_manifest(trash).unwrap();
-            let e = m.entries.iter().find(|e| e.id == entry_ids[0]).unwrap();
-            let payload_board = trash
-                .join(&e.payload_rel)
-                .join("boards")
-                .join(format!("{board_id}.board.json"));
-            assert!(payload_board.is_file());
-
-            restore_trash_entry_at(kroot, trash, &entry_ids[0]).unwrap();
-            assert!(live_primary.is_file());
-            let restored = fs::read_to_string(&live_primary).unwrap();
-            assert!(restored.contains("rect1"));
-            assert!(restored.contains("hip-board"));
-        });
-    }
-
-    #[test]
-    fn soft_delete_board_moves_both_extensions_when_present() {
-        with_temp_roots(|kroot, trash| {
-            let space_id = "spc_trashboth001";
-            let board_id = "brd_boardboth01";
-            let space = write_space_with_tree(
-                kroot,
-                space_id,
-                vec![node(board_id, "board", "Both", None, 0)],
-            );
-            let primary = space.join("boards").join(format!("{board_id}.board.json"));
-            let legacy = space.join("boards").join(format!("{board_id}.excalidraw"));
-            fs::write(&primary, r#"{"type":"hip-board","elements":[{"id":"p1"}],"files":{}}"#)
-                .unwrap();
-            fs::write(
-                &legacy,
-                r#"{"type":"excalidraw","elements":[{"id":"leg1"}],"files":{}}"#,
-            )
-            .unwrap();
-
-            let entry_ids = soft_delete_nodes_at(
-                kroot,
-                trash,
-                space_id,
-                &[board_id.to_string()],
-            )
-            .unwrap();
-            assert!(!primary.exists());
-            assert!(!legacy.exists());
-
-            let m = load_manifest(trash).unwrap();
-            let e = m.entries.iter().find(|e| e.id == entry_ids[0]).unwrap();
-            let payload = trash.join(&e.payload_rel).join("boards");
-            assert!(payload
-                .join(format!("{board_id}.board.json"))
-                .is_file());
-            assert!(payload
-                .join(format!("{board_id}.excalidraw"))
-                .is_file());
-
-            // Restore prefers primary payload → live primary only.
-            restore_trash_entry_at(kroot, trash, &entry_ids[0]).unwrap();
-            let restored = fs::read_to_string(&primary).unwrap();
-            assert!(restored.contains("p1"));
-            assert!(!legacy.exists());
-        });
-    }
-
-    #[test]
-    fn hard_delete_removes_board_payload() {
-        with_temp_roots(|kroot, trash| {
-            let space_id = "spc_trashhard001";
-            let board_id = "brd_boardhard001";
-            let space = write_space_with_tree(
-                kroot,
-                space_id,
-                vec![node(board_id, "board", "Sketch", None, 0)],
-            );
-            fs::write(
-                space.join("boards").join(format!("{board_id}.excalidraw")),
-                EMPTY_BOARD_SCENE_JSON,
-            )
-            .unwrap();
-
-            let entry_ids = soft_delete_nodes_at(
-                kroot,
-                trash,
-                space_id,
-                &[board_id.to_string()],
-            )
-            .unwrap();
-            let m = load_manifest(trash).unwrap();
-            let payload = trash.join(
-                &m.entries
-                    .iter()
-                    .find(|e| e.id == entry_ids[0])
-                    .unwrap()
-                    .payload_rel,
-            );
-            assert!(payload.exists());
-
-            hard_delete_trash_entry_at(trash, &entry_ids[0]).unwrap();
-            assert!(!payload.exists());
-            let m2 = load_manifest(trash).unwrap();
-            assert!(m2.entries.iter().all(|e| e.id != entry_ids[0]));
-        });
-    }
-
-    #[test]
-    fn restore_folder_with_doc_and_board_round_trip() {
-        with_temp_roots(|kroot, trash| {
-            let space_id = "spc_trashfldrt01";
-            let folder_id = "nod_folderrt0001";
-            let doc_id = "doc_docrt000001";
-            let board_id = "brd_boardrt0001";
-            let doc_body = "# restored doc";
-            let board_body = r#"{"type":"excalidraw","elements":[{"id":"folder-stroke"}],"files":{}}"#;
-            let space = write_space_with_tree(
-                kroot,
-                space_id,
-                vec![
-                    node(folder_id, "folder", "Folder", None, 0),
-                    node(doc_id, "doc", "Doc", Some(folder_id), 0),
-                    node(board_id, "board", "Board", Some(folder_id), 1),
-                ],
-            );
-            fs::write(space.join("docs").join(format!("{doc_id}.md")), doc_body).unwrap();
-            fs::write(
-                space.join("boards").join(format!("{board_id}.excalidraw")),
-                board_body,
-            )
-            .unwrap();
-
-            let entry_ids = soft_delete_nodes_at(
-                kroot,
-                trash,
-                space_id,
-                &[folder_id.to_string()],
-            )
-            .unwrap();
-            assert_eq!(entry_ids.len(), 1);
-
-            // Live tree cleared for the subtree
-            let tree_after: KnowledgeTreeFile =
-                serde_json::from_str(&fs::read_to_string(space.join("tree.json")).unwrap())
-                    .unwrap();
-            assert!(tree_after.nodes.is_empty());
-            assert!(!space.join("docs").join(format!("{doc_id}.md")).exists());
-            assert!(!space
-                .join("boards")
-                .join(format!("{board_id}.excalidraw"))
-                .exists());
-
-            let item = restore_trash_entry_at(kroot, trash, &entry_ids[0]).unwrap();
-            assert_eq!(item.kind, TrashEntityKind::Folder);
-            assert_eq!(item.entity_id, folder_id);
-
-            let tree: KnowledgeTreeFile =
-                serde_json::from_str(&fs::read_to_string(space.join("tree.json")).unwrap())
-                    .unwrap();
-            let ids: Vec<_> = tree.nodes.iter().map(|n| n.id.as_str()).collect();
-            assert!(ids.contains(&folder_id));
-            assert!(ids.contains(&doc_id));
-            assert!(ids.contains(&board_id));
-            assert_eq!(tree.nodes.len(), 3);
-
-            assert_eq!(
-                fs::read_to_string(space.join("docs").join(format!("{doc_id}.md"))).unwrap(),
-                doc_body
-            );
-            // R3: restored board file is always primary extension.
-            let restored_board = fs::read_to_string(
-                space.join("boards").join(format!("{board_id}.board.json")),
-            )
-            .unwrap();
-            assert!(restored_board.contains("folder-stroke"));
-
-            let m = load_manifest(trash).unwrap();
-            assert!(m.entries.iter().all(|e| e.id != entry_ids[0]));
-        });
-    }
-
-    #[test]
-    fn soft_delete_board_missing_file_still_classifies_and_restores_tree() {
-        with_temp_roots(|kroot, trash| {
-            let space_id = "spc_trashmiss001";
-            let board_id = "brd_boardmiss001";
-            let space = write_space_with_tree(
-                kroot,
-                space_id,
-                vec![node(board_id, "board", "OrphanTree", None, 0)],
-            );
-            // Intentionally do not write live boards/{id}.* files
-            assert!(!space
-                .join("boards")
-                .join(format!("{board_id}.excalidraw"))
-                .exists());
-            assert!(!space
-                .join("boards")
-                .join(format!("{board_id}.board.json"))
-                .exists());
-
-            let entry_ids = soft_delete_nodes_at(
-                kroot,
-                trash,
-                space_id,
-                &[board_id.to_string()],
-            )
-            .unwrap();
-            assert_eq!(entry_ids.len(), 1);
-
-            let tree: KnowledgeTreeFile =
-                serde_json::from_str(&fs::read_to_string(space.join("tree.json")).unwrap())
-                    .unwrap();
+                serde_json::from_str(&fs::read_to_string(space.join("tree.json")).unwrap()).unwrap();
             assert!(tree.nodes.is_empty());
+        });
+    }
 
-            let m = load_manifest(trash).unwrap();
-            let e = m.entries.iter().find(|x| x.id == entry_ids[0]).unwrap();
-            assert_eq!(e.kind, TrashEntityKind::Board);
-            let payload_boards = trash.join(&e.payload_rel).join("boards");
-            assert!(payload_boards.is_dir());
-            assert!(!payload_boards
-                .join(format!("{board_id}.excalidraw"))
-                .exists());
-            assert!(!payload_boards
-                .join(format!("{board_id}.board.json"))
-                .exists());
-
-            // Restore re-inserts tree node even when board file was never present.
-            let item = restore_trash_entry_at(kroot, trash, &entry_ids[0]).unwrap();
-            assert_eq!(item.kind, TrashEntityKind::Board);
-            let tree2: KnowledgeTreeFile =
-                serde_json::from_str(&fs::read_to_string(space.join("tree.json")).unwrap())
-                    .unwrap();
-            assert_eq!(tree2.nodes.len(), 1);
-            assert_eq!(tree2.nodes[0].id, board_id);
-            assert_eq!(tree2.nodes[0].kind, "board");
-            assert!(!space
-                .join("boards")
-                .join(format!("{board_id}.excalidraw"))
-                .exists());
+    #[test]
+    fn soft_delete_board_root_purges_without_trash_entry() {
+        with_temp_roots(|kroot, trash| {
+            let space_id = "spc_trashbrd0001";
+            let board_id = "brd_trashbrd0001";
+            let space = write_space_with_tree(
+                kroot,
+                space_id,
+                vec![node(board_id, "board", "Old", None, 0)],
+            );
+            fs::create_dir_all(space.join("boards")).unwrap();
+            fs::write(
+                space.join("boards").join(format!("{board_id}.board.json")),
+                "{}",
+            )
+            .unwrap();
+            let ids =
+                soft_delete_nodes_at(kroot, trash, space_id, &[board_id.to_string()]).unwrap();
+            assert!(ids.is_empty());
+            let tree: KnowledgeTreeFile =
+                serde_json::from_str(&fs::read_to_string(space.join("tree.json")).unwrap()).unwrap();
+            assert!(tree.nodes.is_empty());
             assert!(!space
                 .join("boards")
                 .join(format!("{board_id}.board.json"))

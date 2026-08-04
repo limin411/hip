@@ -30,7 +30,6 @@ export type GlobalCommandLabels = {
   navKnowledge: string
   knowledgeHome: string
   knowledgeNewDoc: string
-  knowledgeNewBoard: string
   knowledgeIndexing: string
   knowledgeNeedSpace: string
   actionNewConversation: string
@@ -133,7 +132,6 @@ export type GlobalCommandContext = {
   }) => void
   knowledgeOpenHome?: () => void
   knowledgeCreateDoc?: () => void
-  knowledgeCreateBoard?: () => void
   searchKnowledgeDocs?: (q: string) => KnowledgeDocHit[]
   knowledgeIndexReady?: boolean
   /** Terminal management (K17). */
@@ -446,26 +444,6 @@ export function buildGlobalCommandGroups(
       when: { views: ['knowledge'] },
       run: () => {
         ctx.knowledgeCreateDoc?.()
-      },
-    },
-    {
-      id: 'knowledge-new-board',
-      label: labels.knowledgeNewBoard,
-      icon: 'plus',
-      keywords: [
-        'knowledge',
-        'new',
-        'whiteboard',
-        'board',
-        '画板',
-        '畫板',
-        'ホワイトボード',
-        '화이트보드',
-      ],
-      group: 'actions',
-      when: { views: ['knowledge'] },
-      run: () => {
-        ctx.knowledgeCreateBoard?.()
       },
     },
   ]

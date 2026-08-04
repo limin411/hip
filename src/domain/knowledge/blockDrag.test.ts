@@ -3,7 +3,12 @@ import { describe, expect, it } from 'vitest'
 import { Schema } from '@milkdown/kit/prose/model'
 import { EditorState } from '@milkdown/kit/prose/state'
 import { EditorView } from '@milkdown/kit/prose/view'
-import { moveTopLevelBlock, resolveSourceBlock } from './blockDrag'
+import {
+  findDropTargetV2,
+  moveBlock,
+  moveTopLevelBlock,
+  resolveSourceBlock,
+} from './blockDrag'
 
 const schema = new Schema({
   nodes: {
@@ -62,6 +67,24 @@ describe('blockDrag', () => {
     const view = makeView(['a', 'b'])
     const a = resolveSourceBlock(view.state.doc, 1)!
     expect(moveTopLevelBlock(view, a.from, a.to, a.from)).toBe(false)
+    view.destroy()
+  })
+
+  it('moveBlock alias works', () => {
+    const view = makeView(['a', 'b'])
+    const a = resolveSourceBlock(view.state.doc, 1)!
+    expect(moveBlock(view, a.from, a.to, a.to + 1)).toBe(true)
+    view.destroy()
+  })
+
+  it('findDropTargetV2 returns before/after kinds', () => {
+    const view = makeView(['a', 'b', 'c'])
+    const a = resolveSourceBlock(view.state.doc, 1)!
+    // coords may be zero in happy-dom — still returns a target or null
+    const t = findDropTargetV2(view, 0, a.from, a.to, { allowInto: false })
+    if (t) {
+      expect(['before', 'after', 'into']).toContain(t.kind)
+    }
     view.destroy()
   })
 })

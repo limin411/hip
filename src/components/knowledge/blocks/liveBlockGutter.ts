@@ -1,6 +1,6 @@
 /**
- * Live top-level block gutter: ⋮⋮ grip (menu / drag) + `+` slash (R5 Gate A).
- * Evolves R4 path-A `+` handle; keeps openSlashAtTopLevelBlock.
+ * Live top-level block gutter: grip (menu / drag) + plus slash.
+ * Phase A: slot layout, SVG icons, hover, ghost, drop line, edge scroll.
  */
 import { Plugin, PluginKey, TextSelection } from '@milkdown/kit/prose/state'
 import type { EditorView } from '@milkdown/kit/prose/view'
@@ -13,23 +13,36 @@ import {
 import {
   blockPlainText,
   deleteTopLevelBlock,
+  deleteTopLevelRange,
   duplicateTopLevelBlock,
   insertEmptyParagraphNear,
   selectTopLevelBlock,
   topLevelBlockAt,
+  topLevelIndexRange,
 } from '@/domain/knowledge/blockOps'
 import {
-  findDropTarget,
+  findDropTargetV2,
   moveTopLevelBlock,
+  moveTopLevelRange,
   resolveSourceBlock,
+  type DropTarget,
 } from '@/domain/knowledge/blockDrag'
 import i18n from '@/i18n'
 import { openSlashAtTopLevelBlock } from './liveBlockHandle'
+import {
+  iconGripVertical,
+  iconPlus,
+  setButtonIcon,
+} from './liveChromeIcons'
 
 export { openSlashAtTopLevelBlock }
 
 const key = new PluginKey('knowledge-live-block-gutter')
 const DRAG_THRESHOLD_PX = 4
+/** Matches --knowledge-live-gutter-slot in knowledge-live.css */
+export const GUTTER_SLOT_PX = 32
+const EDGE_SCROLL_PX = 48
+const EDGE_SCROLL_STEP = 14
 
 type MenusFlag = { current: boolean }
 
@@ -49,7 +62,7 @@ function topLevelBlockRange(
   const pm = view.dom
   const rect = pm.getBoundingClientRect()
   if (clientY < rect.top || clientY > rect.bottom) return null
-  const x = rect.left + 24
+  const x = rect.left + GUTTER_SLOT_PX + 8
   const pos = view.posAtCoords({ left: x, top: clientY })
   if (pos == null) return null
   try {
@@ -66,31 +79,65 @@ function topLevelBlockRange(
   }
 }
 
+function clearBlockHover(root: HTMLElement) {
+  root.querySelectorAll('.knowledge-live-block-hover').forEach((el) => {
+    el.classList.remove('knowledge-live-block-hover')
+  })
+}
+
 function clearBlockHighlight(root: HTMLElement) {
   root.querySelectorAll('.knowledge-live-block-selected').forEach((el) => {
     el.classList.remove('knowledge-live-block-selected')
   })
 }
 
-function highlightBlockDom(view: EditorView, from: number, root: HTMLElement) {
-  clearBlockHighlight(root)
+function highlightBlockDom(
+  view: EditorView,
+  from: number,
+  root: HTMLElement,
+  mode: 'hover' | 'selected',
+) {
+  if (mode === 'hover') clearBlockHover(root)
+  else clearBlockHighlight(root)
   try {
     const dom = view.nodeDOM(from)
     if (dom instanceof HTMLElement) {
-      dom.classList.add('knowledge-live-block-selected')
+      dom.classList.add(
+        mode === 'hover'
+          ? 'knowledge-live-block-hover'
+          : 'knowledge-live-block-selected',
+      )
     }
   } catch {
     // ignore
   }
 }
 
+function findScrollParent(el: HTMLElement | null): HTMLElement | null {
+  let cur: HTMLElement | null = el
+  while (cur) {
+    if (cur.classList.contains('knowledge-live-editor')) return cur
+    const { overflowY } = getComputedStyle(cur)
+    if (overflowY === 'auto' || overflowY === 'scroll') return cur
+    cur = cur.parentElement
+  }
+  return null
+}
+
+function edgeScroll(scroller: HTMLElement | null, clientY: number) {
+  if (!scroller) return
+  const rect = scroller.getBoundingClientRect()
+  if (clientY < rect.top + EDGE_SCROLL_PX) {
+    scroller.scrollTop -= EDGE_SCROLL_STEP
+  } else if (clientY > rect.bottom - EDGE_SCROLL_PX) {
+    scroller.scrollTop += EDGE_SCROLL_STEP
+  }
+}
+
 export type BlockGutterOptions = {
   onOpenedSlash?: () => void
-  /** menusOpen for bubble shouldShow */
   menusOpenRef?: MenusFlag
-  /** Optional turn-into command runners (Milkdown). */
   getTurnCmds?: () => TurnCmds | null
-  /** Notify host that block menu visibility changed. */
   onBlockMenuOpenChange?: (open: boolean) => void
 }
 
@@ -106,11 +153,17 @@ export function createLiveBlockGutterPlugin(
     let plus: HTMLButtonElement | null = null
     let menu: HTMLDivElement | null = null
     let dropLine: HTMLDivElement | null = null
+    let dropInto: HTMLDivElement | null = null
+    let ghost: HTMLDivElement | null = null
     let root: HTMLElement | null = null
     let lastFrom = -1
     let menuOpen = false
+    let hoverFrom = -1
+    /** Multi-select: continuous top-level index range, or null. */
+    let multiFromIndex: number | null = null
+    let multiToIndex: number | null = null
+    let multiAnchorFrom = -1
 
-    // drag state
     let dragActive = false
     let dragPending = false
     let dragStartX = 0
@@ -118,12 +171,40 @@ export function createLiveBlockGutterPlugin(
     let dragSourceFrom = -1
     let dragSourceTo = -1
     let dragSourceDom: HTMLElement | null = null
+    let scroller: HTMLElement | null = null
+
+    const clearMulti = (view?: EditorView) => {
+      multiFromIndex = null
+      multiToIndex = null
+      multiAnchorFrom = -1
+      if (root) clearBlockHighlight(root)
+      if (view && root) {
+        // keep hover if any
+      }
+    }
+
+    const paintMulti = (view: EditorView) => {
+      if (!root || multiFromIndex == null || multiToIndex == null) return
+      clearBlockHighlight(root)
+      let pos = 0
+      for (let i = 0; i < view.state.doc.childCount; i++) {
+        const child = view.state.doc.child(i)
+        if (i >= multiFromIndex && i <= multiToIndex) {
+          try {
+            const dom = view.nodeDOM(pos)
+            if (dom instanceof HTMLElement) {
+              dom.classList.add('knowledge-live-block-selected')
+            }
+          } catch {
+            // ignore
+          }
+        }
+        pos += child.nodeSize
+      }
+    }
 
     const setMenusFlag = (open: boolean) => {
       menuOpen = open
-      if (opts.menusOpenRef) {
-        // only force true while menu open; host ORs with slash/wiki
-      }
       opts.onBlockMenuOpenChange?.(open)
     }
 
@@ -135,26 +216,69 @@ export function createLiveBlockGutterPlugin(
     const ensureDropLine = () => {
       if (dropLine || !root) return dropLine
       dropLine = document.createElement('div')
-      dropLine.className =
-        'knowledge-live-drop-line pointer-events-none absolute left-0 right-0 z-50 h-0.5 bg-accent'
-      dropLine.style.display = 'none'
+      dropLine.className = 'knowledge-live-drop-line'
       dropLine.setAttribute('data-testid', 'knowledge-live-drop-line')
+      dropLine.setAttribute('data-visible', 'false')
       root.appendChild(dropLine)
       return dropLine
     }
 
     const hideDropLine = () => {
-      if (dropLine) dropLine.style.display = 'none'
+      if (dropLine) dropLine.setAttribute('data-visible', 'false')
+      if (dropInto) dropInto.setAttribute('data-visible', 'false')
     }
 
-    const showDropLineAt = (clientY: number) => {
-      const line = ensureDropLine()
-      if (!line || !root) return
+    const ensureDropInto = () => {
+      if (dropInto || !root) return dropInto
+      dropInto = document.createElement('div')
+      dropInto.className = 'knowledge-live-drop-into'
+      dropInto.setAttribute('data-testid', 'knowledge-live-drop-into')
+      dropInto.setAttribute('data-visible', 'false')
+      root.appendChild(dropInto)
+      return dropInto
+    }
+
+    const showDropTarget = (target: DropTarget) => {
+      if (!root) return
       const rootRect = root.getBoundingClientRect()
-      line.style.display = 'block'
-      line.style.top = `${clientY - rootRect.top + root.scrollTop}px`
-      line.style.left = '0px'
-      line.style.width = '100%'
+      if (target.kind === 'into') {
+        if (dropLine) dropLine.setAttribute('data-visible', 'false')
+        const bar = ensureDropInto()
+        if (!bar) return
+        bar.setAttribute('data-visible', 'true')
+        bar.style.left = `${(target.clientX ?? rootRect.left + GUTTER_SLOT_PX) - rootRect.left + root.scrollLeft}px`
+        bar.style.top = `${target.clientY - rootRect.top + root.scrollTop - (target.intoHeight ?? 24) / 2}px`
+        bar.style.height = `${target.intoHeight ?? 24}px`
+        return
+      }
+      if (dropInto) dropInto.setAttribute('data-visible', 'false')
+      const line = ensureDropLine()
+      if (!line) return
+      line.setAttribute('data-visible', 'true')
+      line.style.top = `${target.clientY - rootRect.top + root.scrollTop - 1}px`
+    }
+
+    const removeGhost = () => {
+      ghost?.remove()
+      ghost = null
+    }
+
+    const ensureGhost = (sourceDom: HTMLElement, clientX: number, clientY: number) => {
+      removeGhost()
+      ghost = document.createElement('div')
+      ghost.className = 'knowledge-live-drag-ghost'
+      ghost.setAttribute('data-testid', 'knowledge-live-drag-ghost')
+      const text = (sourceDom.textContent ?? '').trim().slice(0, 120)
+      ghost.textContent = text || '…'
+      ghost.style.left = `${clientX + 12}px`
+      ghost.style.top = `${clientY + 8}px`
+      document.body.appendChild(ghost)
+    }
+
+    const moveGhost = (clientX: number, clientY: number) => {
+      if (!ghost) return
+      ghost.style.left = `${clientX + 12}px`
+      ghost.style.top = `${clientY + 8}px`
     }
 
     const buildMenu = (view: EditorView) => {
@@ -204,7 +328,10 @@ export function createLiveBlockGutterPlugin(
       menu.append(
         item(t('knowledge.block.delete', 'Delete'), 'knowledge-live-block-delete', () => {
           if (lastFrom >= 0) deleteTopLevelBlock(view, lastFrom)
-          if (root) clearBlockHighlight(root)
+          if (root) {
+            clearBlockHighlight(root)
+            clearBlockHover(root)
+          }
         }, true),
         item(t('knowledge.block.duplicate', 'Duplicate'), 'knowledge-live-block-duplicate', () => {
           if (lastFrom < 0) return
@@ -245,13 +372,15 @@ export function createLiveBlockGutterPlugin(
         { id: 'h2', label: t('knowledge.toolbar.h2', 'Heading 2'), testId: 'knowledge-live-block-turn-h2' },
         { id: 'h3', label: t('knowledge.toolbar.h3', 'Heading 3'), testId: 'knowledge-live-block-turn-h3' },
         { id: 'quote', label: t('knowledge.toolbar.quote', 'Quote'), testId: 'knowledge-live-block-turn-quote' },
+        { id: 'bullet', label: t('knowledge.toolbar.bullet', 'Bullet list'), testId: 'knowledge-live-block-turn-bullet' },
+        { id: 'ordered', label: t('knowledge.toolbar.ordered', 'Numbered list'), testId: 'knowledge-live-block-turn-ordered' },
+        { id: 'task', label: t('knowledge.slash.task', 'Task list'), testId: 'knowledge-live-block-turn-task' },
+        { id: 'code', label: t('knowledge.toolbar.fence', 'Code block'), testId: 'knowledge-live-block-turn-code' },
       ]
       for (const trn of turns) {
         menu.append(
           item(trn.label, trn.testId, () => {
-            if (!canTurnIntoNarrow(view.state) && trn.id !== 'paragraph') {
-              // still try after select
-            }
+            void canTurnIntoNarrow(view.state)
             runTurn(trn.id)
           }),
         )
@@ -272,7 +401,7 @@ export function createLiveBlockGutterPlugin(
       setMenusFlag(true)
       if (lastFrom >= 0) {
         selectTopLevelBlock(view, lastFrom)
-        highlightBlockDom(view, lastFrom, root)
+        highlightBlockDom(view, lastFrom, root, 'selected')
       }
     }
 
@@ -283,27 +412,26 @@ export function createLiveBlockGutterPlugin(
       if (getComputedStyle(root).position === 'static') {
         root.style.position = 'relative'
       }
+      scroller = findScrollParent(view.dom)
 
       gutter = document.createElement('div')
-      gutter.className =
-        'knowledge-live-block-gutter absolute z-40 flex items-center gap-0.5 opacity-0 transition-opacity'
+      gutter.className = 'knowledge-live-block-gutter'
       gutter.style.left = '0px'
       gutter.setAttribute('data-testid', 'knowledge-live-block-gutter')
+      gutter.setAttribute('data-visible', 'false')
 
       grip = document.createElement('button')
       grip.type = 'button'
-      grip.textContent = '⋮⋮'
-      grip.className =
-        'knowledge-live-block-grip flex h-6 w-6 cursor-grab items-center justify-center rounded-md border border-border bg-surface text-[10px] leading-none text-ink-tertiary shadow-sm hover:bg-state-hover hover:text-ink active:cursor-grabbing'
+      setButtonIcon(grip, iconGripVertical())
+      grip.className = 'knowledge-live-block-grip'
       grip.setAttribute('data-testid', 'knowledge-live-block-grip')
       grip.setAttribute('aria-label', t('knowledge.block.grip', 'Drag or open block menu'))
       grip.tabIndex = -1
 
       plus = document.createElement('button')
       plus.type = 'button'
-      plus.textContent = '+'
-      plus.className =
-        'knowledge-live-block-plus flex h-6 w-6 items-center justify-center rounded-md border border-border bg-surface text-meta text-ink-tertiary shadow-sm hover:bg-state-hover hover:text-ink'
+      setButtonIcon(plus, iconPlus())
+      plus.className = 'knowledge-live-block-plus'
       plus.setAttribute('data-testid', 'knowledge-live-block-plus')
       plus.setAttribute('aria-label', t('knowledge.blockHandle.add', 'Add block below'))
       plus.tabIndex = -1
@@ -326,6 +454,25 @@ export function createLiveBlockGutterPlugin(
         e.preventDefault()
         e.stopPropagation()
         if (lastFrom < 0 || !view.editable) return
+
+        // Shift+click: extend multi-select range among top-level blocks
+        if (e.shiftKey) {
+          const cur = topLevelBlockAt(view.state.doc, lastFrom)
+          if (!cur) return
+          if (multiAnchorFrom < 0) multiAnchorFrom = lastFrom
+          const range = topLevelIndexRange(
+            view.state.doc,
+            multiAnchorFrom,
+            lastFrom,
+          )
+          if (range) {
+            multiFromIndex = range.fromIndex
+            multiToIndex = range.toIndex
+            paintMulti(view)
+          }
+          return
+        }
+
         dragPending = true
         dragActive = false
         dragStartX = e.clientX
@@ -335,8 +482,33 @@ export function createLiveBlockGutterPlugin(
           dragPending = false
           return
         }
-        dragSourceFrom = src.from
-        dragSourceTo = src.to
+        // If multi-select includes this block, drag whole range
+        const curBlock = topLevelBlockAt(view.state.doc, lastFrom)
+        let rangeDrag = false
+        if (
+          curBlock &&
+          multiFromIndex != null &&
+          multiToIndex != null &&
+          curBlock.index >= multiFromIndex &&
+          curBlock.index <= multiToIndex
+        ) {
+          rangeDrag = true
+          let from = 0
+          for (let i = 0; i < multiFromIndex; i++) {
+            from += view.state.doc.child(i).nodeSize
+          }
+          let to = from
+          for (let i = multiFromIndex; i <= multiToIndex; i++) {
+            to += view.state.doc.child(i).nodeSize
+          }
+          dragSourceFrom = from
+          dragSourceTo = to
+        } else {
+          clearMulti()
+          multiAnchorFrom = lastFrom
+          dragSourceFrom = src.from
+          dragSourceTo = src.to
+        }
         try {
           const dom = view.nodeDOM(src.from)
           dragSourceDom = dom instanceof HTMLElement ? dom : null
@@ -351,11 +523,22 @@ export function createLiveBlockGutterPlugin(
           if (!dragActive && Math.hypot(dx, dy) >= DRAG_THRESHOLD_PX) {
             dragActive = true
             hideMenu()
-            if (dragSourceDom) dragSourceDom.style.opacity = '0.4'
+            if (dragSourceDom) {
+              dragSourceDom.style.opacity = '0.35'
+              ensureGhost(dragSourceDom, ev.clientX, ev.clientY)
+            }
           }
           if (!dragActive) return
-          const target = findDropTarget(view, ev.clientY, dragSourceFrom, dragSourceTo)
-          if (target) showDropLineAt(target.clientY)
+          moveGhost(ev.clientX, ev.clientY)
+          edgeScroll(scroller, ev.clientY)
+          const target = findDropTargetV2(
+            view,
+            ev.clientY,
+            dragSourceFrom,
+            dragSourceTo,
+            { allowInto: !rangeDrag, clientX: ev.clientX },
+          )
+          if (target) showDropTarget(target)
           else hideDropLine()
         }
 
@@ -366,30 +549,48 @@ export function createLiveBlockGutterPlugin(
           dragPending = false
           dragActive = false
           hideDropLine()
+          removeGhost()
           if (dragSourceDom) {
             dragSourceDom.style.opacity = ''
             dragSourceDom = null
           }
           if (wasDrag) {
-            const target = findDropTarget(
+            const target = findDropTargetV2(
               view,
               ev.clientY,
               dragSourceFrom,
               dragSourceTo,
+              { allowInto: !rangeDrag, clientX: ev.clientX },
             )
             if (target) {
-              moveTopLevelBlock(
-                view,
-                dragSourceFrom,
-                dragSourceTo,
-                target.insertPos,
-              )
+              if (
+                rangeDrag &&
+                multiFromIndex != null &&
+                multiToIndex != null
+              ) {
+                moveTopLevelRange(
+                  view,
+                  multiFromIndex,
+                  multiToIndex,
+                  target.insertPos,
+                )
+                clearMulti()
+              } else {
+                moveTopLevelBlock(
+                  view,
+                  dragSourceFrom,
+                  dragSourceTo,
+                  target.insertPos,
+                )
+              }
             }
             dragSourceFrom = -1
             dragSourceTo = -1
             return
           }
-          // click → menu
+          // plain click: single select + menu
+          clearMulti()
+          multiAnchorFrom = lastFrom
           showMenu(view)
         }
 
@@ -403,7 +604,11 @@ export function createLiveBlockGutterPlugin(
     }
 
     const hideGutter = () => {
-      if (gutter) gutter.style.opacity = '0'
+      if (gutter) gutter.setAttribute('data-visible', 'false')
+      if (root && !menuOpen) {
+        clearBlockHover(root)
+        hoverFrom = -1
+      }
       if (!menuOpen) {
         lastFrom = -1
       }
@@ -415,16 +620,39 @@ export function createLiveBlockGutterPlugin(
       lastFrom = from
       g.style.top = `${Math.max(0, top - 2)}px`
       g.style.left = '0px'
-      g.style.opacity = '1'
+      g.setAttribute('data-visible', 'true')
+      if (hoverFrom !== from && !menuOpen) {
+        hoverFrom = from
+        highlightBlockDom(view, from, root, 'hover')
+      }
     }
 
     return new Plugin({
       key,
       props: {
         handleKeyDown(view, event) {
-          if (event.key === 'Escape' && menuOpen) {
-            hideMenu()
-            if (root) clearBlockHighlight(root)
+          if (event.key === 'Escape') {
+            if (menuOpen) {
+              hideMenu()
+              if (root) {
+                clearBlockHighlight(root)
+                clearBlockHover(root)
+              }
+              return true
+            }
+            if (multiFromIndex != null) {
+              clearMulti()
+              return true
+            }
+          }
+          if (
+            (event.key === 'Backspace' || event.key === 'Delete') &&
+            multiFromIndex != null &&
+            multiToIndex != null
+          ) {
+            event.preventDefault()
+            deleteTopLevelRange(view, multiFromIndex, multiToIndex)
+            clearMulti()
             return true
           }
           if (
@@ -432,6 +660,15 @@ export function createLiveBlockGutterPlugin(
             view.state.selection instanceof TextSelection === false
           ) {
             // NodeSelection delete handled by PM default
+          }
+          // Typing cancels multi-select
+          if (
+            multiFromIndex != null &&
+            event.key.length === 1 &&
+            !event.metaKey &&
+            !event.ctrlKey
+          ) {
+            clearMulti()
           }
           return false
         },
@@ -445,7 +682,10 @@ export function createLiveBlockGutterPlugin(
           const t = e.target as Node
           if (menu.contains(t) || grip?.contains(t)) return
           hideMenu()
-          if (root) clearBlockHighlight(root)
+          if (root) {
+            clearBlockHighlight(root)
+            clearBlockHover(root)
+          }
         }
         document.addEventListener('mousedown', onDocClick, true)
 
@@ -459,10 +699,11 @@ export function createLiveBlockGutterPlugin(
             return
           }
           const pmRect = view.dom.getBoundingClientRect()
-          // Keep visible when over gutter
           if (gutter && gutter.contains(e.target as Node)) return
           if (menu && menu.contains(e.target as Node)) return
-          if (e.clientX > pmRect.left + 56) {
+          // Hot zone: gutter slot + left content margin
+          const hotRight = pmRect.left + GUTTER_SLOT_PX + 48
+          if (e.clientX > hotRight) {
             if (!menuOpen) hideGutter()
             return
           }
@@ -494,23 +735,6 @@ export function createLiveBlockGutterPlugin(
         view.dom.addEventListener('mousemove', onMove)
         view.dom.addEventListener('mouseleave', onLeave)
 
-        // selected block accent via CSS injected once
-        if (root || view.dom.parentElement) {
-          const r = view.dom.parentElement
-          if (r && !r.querySelector('style[data-knowledge-block-gutter]')) {
-            const style = document.createElement('style')
-            style.setAttribute('data-knowledge-block-gutter', '1')
-            style.textContent = `
-              .knowledge-live-block-selected {
-                box-shadow: inset 2px 0 0 var(--accent, #c2410c);
-                background: color-mix(in srgb, var(--accent, #c2410c) 6%, transparent);
-                border-radius: 2px;
-              }
-            `
-            r.appendChild(style)
-          }
-        }
-
         return {
           destroy() {
             document.removeEventListener('mousedown', onDocClick, true)
@@ -519,14 +743,17 @@ export function createLiveBlockGutterPlugin(
             if (moveRaf) cancelAnimationFrame(moveRaf)
             hideMenu()
             hideDropLine()
+            removeGhost()
             gutter?.remove()
             menu?.remove()
             dropLine?.remove()
+            dropInto?.remove()
             gutter = null
             grip = null
             plus = null
             menu = null
             dropLine = null
+            dropInto = null
             root = null
           },
         }
@@ -534,4 +761,3 @@ export function createLiveBlockGutterPlugin(
     })
   })
 }
-

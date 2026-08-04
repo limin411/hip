@@ -48,6 +48,7 @@ import { createLiveBlockGutterPlugin } from './blocks/liveBlockGutter'
 import { liveTablePlugins } from './blocks/liveTableChrome'
 import { liveImagePlugins } from './blocks/liveImageChrome'
 import { createListExitPlugin } from '@/domain/knowledge/listKeymap'
+import { createLiveWikiDecorationPlugin } from './blocks/liveWikiDecorations'
 import {
   wrapInHeadingCommand,
   wrapInBlockquoteCommand,
@@ -63,6 +64,7 @@ import i18n from '@/i18n'
 
 import '@milkdown/kit/prose/view/style/prosemirror.css'
 import '@milkdown/kit/prose/tables/style/tables.css'
+import './knowledge-live.css'
 
 export type DocLiveEditorHandle = {
   /** Structured MD insert via Milkdown `insert` (never multi-line tr.insertText). */
@@ -112,6 +114,14 @@ export interface DocLiveEditorProps {
    * (same attach path as the toolbar). Without spaceId, slash inserts skeleton.
    */
   onRequestAttach?: () => void
+  /**
+   * Wiki chip click (Phase C). Parent opens doc or broken-link create modal.
+   */
+  onWikiNavigate?: (payload: {
+    title: string
+    nodeId: string | null
+    broken: boolean
+  }) => void
 }
 
 type WikiPickerState = {
@@ -247,6 +257,7 @@ export const DocLiveEditor = forwardRef<DocLiveEditorHandle, DocLiveEditorProps>
       onAssetImportError,
       onAssetImported,
       onRequestAttach,
+      onWikiNavigate,
     },
     ref,
   ) {
@@ -269,6 +280,8 @@ export const DocLiveEditor = forwardRef<DocLiveEditorHandle, DocLiveEditorProps>
     onParseErrorRef.current = onParseError
     const wikiNodesRef = useRef(wikiNodes ?? [])
     wikiNodesRef.current = wikiNodes ?? []
+    const onWikiNavigateRef = useRef(onWikiNavigate)
+    onWikiNavigateRef.current = onWikiNavigate
     const spaceIdRef = useRef(spaceId)
     spaceIdRef.current = spaceId
     const onAssetImportErrorRef = useRef(onAssetImportError)
@@ -601,6 +614,10 @@ export const DocLiveEditor = forwardRef<DocLiveEditorHandle, DocLiveEditorProps>
       })
 
       const listExitPlugin = createListExitPlugin()
+      const wikiDecoPlugin = createLiveWikiDecorationPlugin({
+        getNodes: () => wikiNodesRef.current,
+        onWikiNavigate: (payload) => onWikiNavigateRef.current?.(payload),
+      })
 
       ;(async () => {
         try {
@@ -630,6 +647,7 @@ export const DocLiveEditor = forwardRef<DocLiveEditorHandle, DocLiveEditorProps>
             .use(listExitPlugin)
             .use(liveTablePlugins)
             .use(liveImagePlugins)
+            .use(wikiDecoPlugin)
             .use(draftSyncPlugin)
             .create()
 
@@ -835,7 +853,7 @@ export const DocLiveEditor = forwardRef<DocLiveEditorHandle, DocLiveEditorProps>
       >
         <div
           ref={hostRef}
-          className="knowledge-live-editor min-h-0 flex-1 overflow-y-auto px-0.5 pb-24 text-prose text-ink outline-none [&_.ProseMirror]:min-h-full [&_.ProseMirror]:outline-none [&_.ProseMirror]:leading-[1.7] [&_.ProseMirror_p]:my-2 [&_.ProseMirror_h1]:mb-3 [&_.ProseMirror_h1]:mt-4 [&_.ProseMirror_h1]:text-xl [&_.ProseMirror_h1]:font-semibold [&_.ProseMirror_h2]:mb-2 [&_.ProseMirror_h2]:mt-3 [&_.ProseMirror_h2]:text-lg [&_.ProseMirror_h2]:font-semibold [&_.ProseMirror_h3]:mb-2 [&_.ProseMirror_h3]:mt-3 [&_.ProseMirror_h3]:text-base [&_.ProseMirror_h3]:font-semibold [&_.ProseMirror_blockquote]:border-l-2 [&_.ProseMirror_blockquote]:border-border [&_.ProseMirror_blockquote]:pl-3 [&_.ProseMirror_blockquote]:text-ink-secondary [&_.ProseMirror_:not(pre)>code]:rounded [&_.ProseMirror_:not(pre)>code]:bg-surface-subtle [&_.ProseMirror_:not(pre)>code]:px-1 [&_.ProseMirror_pre]:overflow-x-auto [&_.ProseMirror_pre]:rounded-md [&_.ProseMirror_pre]:bg-surface-subtle [&_.ProseMirror_pre]:p-3 [&_.ProseMirror_table]:border-collapse [&_.ProseMirror_td]:border [&_.ProseMirror_td]:border-border [&_.ProseMirror_td]:px-2 [&_.ProseMirror_td]:py-1 [&_.ProseMirror_th]:border [&_.ProseMirror_th]:border-border [&_.ProseMirror_th]:px-2 [&_.ProseMirror_th]:py-1 [&_.ProseMirror_th]:font-semibold [&_.ProseMirror_ul]:my-2 [&_.ProseMirror_ul]:list-disc [&_.ProseMirror_ul]:pl-6 [&_.ProseMirror_ol]:my-2 [&_.ProseMirror_ol]:list-decimal [&_.ProseMirror_ol]:pl-6 [&_p.knowledge-pm-empty]:before:pointer-events-none [&_p.knowledge-pm-empty]:before:float-left [&_p.knowledge-pm-empty]:before:h-0 [&_p.knowledge-pm-empty]:before:text-ink-tertiary [&_p.knowledge-pm-empty]:before:content-[var(--knowledge-pm-placeholder)]"
+          className="knowledge-live-editor min-h-0 flex-1 overflow-y-auto pb-24 text-prose text-ink outline-none"
           data-placeholder={placeholder}
         />
         {slash ? (

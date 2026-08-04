@@ -34,21 +34,23 @@ vi.mock('./DocEditor', async () => {
 
 const liveEditorProps = vi.fn()
 
-vi.mock('./DocLiveEditor', async () => {
+vi.mock('./DocBlockNoteEditor', async () => {
   const { forwardRef, useImperativeHandle } = await import('react')
+  const Mock = forwardRef(function MockDocBlockNoteEditor(
+    props: Record<string, unknown>,
+    ref: React.ForwardedRef<{ insertMarkdown: (md: string) => boolean }>,
+  ) {
+    liveEditorProps(props)
+    useImperativeHandle(ref, () => ({
+      insertMarkdown: () => true,
+      focus: () => true,
+      flushDraft: () => {},
+    }))
+    return <div data-testid="knowledge-doc-live-editor" />
+  })
   return {
-    DocLiveEditor: forwardRef(function MockDocLiveEditor(
-      props: Record<string, unknown>,
-      ref: React.ForwardedRef<{ insertMarkdown: (md: string) => boolean }>,
-    ) {
-      liveEditorProps(props)
-      useImperativeHandle(ref, () => ({
-        insertMarkdown: () => true,
-        focus: () => true,
-        flushDraft: () => {},
-      }))
-      return <div data-testid="knowledge-doc-live-editor" />
-    }),
+    DocBlockNoteEditor: Mock,
+    default: Mock,
   }
 })
 

@@ -135,7 +135,6 @@ export function GlobalCommandPalette() {
       navKnowledge: t('commandPalette.navKnowledge'),
       knowledgeHome: t('commandPalette.knowledgeHome'),
       knowledgeNewDoc: t('commandPalette.knowledgeNewDoc'),
-      knowledgeNewBoard: t('commandPalette.knowledgeNewBoard'),
       knowledgeIndexing: t('commandPalette.knowledgeIndexing'),
       knowledgeNeedSpace: t('commandPalette.knowledgeNeedSpace'),
       actionNewConversation: t('commandPalette.actions.newConversation'),
@@ -274,19 +273,6 @@ export function GlobalCommandPalette() {
           nodes: st.nodes,
         })
         void st.requestCreateDoc(parentId, t('knowledge.doc.untitled'))
-      },
-      knowledgeCreateBoard: () => {
-        const st = useKnowledgeStore.getState()
-        if (!st.activeSpaceId || st.mode !== 'workspace') {
-          toast.message(t('commandPalette.knowledgeNeedSpace'))
-          return
-        }
-        const parentId = resolveParentForNew({
-          treeFocusId: st.treeFocusId,
-          activeDocId: st.activeDocId,
-          nodes: st.nodes,
-        })
-        void st.createBoard(parentId, t('knowledge.board.untitled'))
       },
       searchKnowledgeDocs: (q: string) => searchKnowledgeDocs(q),
       knowledgeIndexReady: knowledgeIndexStatus === 'ready' || isKnowledgeIndexReady(),

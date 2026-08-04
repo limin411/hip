@@ -2,10 +2,7 @@
 import '@testing-library/jest-dom/vitest'
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen, cleanup, fireEvent } from '@testing-library/react'
-import {
-  registerBoardCanvasStyleApi,
-  useKnowledgeStore,
-} from '@/store/knowledgeStore'
+import { useKnowledgeStore } from '@/store/knowledgeStore'
 import { useUiStore } from '@/store/uiStore'
 import { KnowledgeOutlinePanel } from './KnowledgeOutlinePanel'
 
@@ -26,6 +23,7 @@ describe('KnowledgeOutlinePanel', () => {
     useKnowledgeStore.setState({
       mode: 'workspace',
       activeDocId: null,
+      nodes: [],
       draftBody: '',
       docBody: '',
       backlinks: [],
@@ -44,128 +42,21 @@ describe('KnowledgeOutlinePanel', () => {
     expect(screen.getByTestId('knowledge-doc-outline-no-doc')).toBeInTheDocument()
   })
 
-  it('shows board companion rail (structure + selection + stats), not empty placeholder', () => {
-    useKnowledgeStore.setState({
-      activeDocId: 'brd_board000001',
-      nodes: [
-        {
-          id: 'brd_board000001',
-          parentId: null,
-          kind: 'board',
-          title: 'Arch',
-          order: 0,
-          createdAt: 1,
-          updatedAt: 1,
-        },
-      ],
-      draftBody:
-        '{"type":"hip-board","version":1,"source":"hip","elements":[],"appState":{"viewBackgroundColor":"#ffffff"},"files":{}}',
-      docBody:
-        '{"type":"hip-board","version":1,"source":"hip","elements":[],"appState":{"viewBackgroundColor":"#ffffff"},"files":{}}',
-      backlinks: [],
-      outboundLinks: [],
-      linkPanelStatus: 'idle',
-      boardOutline: {
-        boardId: 'brd_board000001',
-        items: [
-          {
-            id: 'r1',
-            type: 'rect',
-            label: 'rect r1',
-            depth: 0,
-            locked: false,
-            order: 0,
-          },
-        ],
-        totalElements: 1,
-        truncated: false,
-        imageCount: 0,
-      },
-      boardSelection: {
-        boardId: 'brd_board000001',
-        ids: [],
-        items: [],
-        style: {},
-      },
-    })
-    render(<KnowledgeOutlinePanel />)
-    expect(screen.queryByTestId('knowledge-outline-board-empty')).toBeNull()
-    expect(screen.getByTestId('knowledge-board-companion')).toBeInTheDocument()
-    expect(screen.getByTestId('knowledge-board-canvas-meta')).toBeInTheDocument()
-    expect(screen.getByTestId('knowledge-board-meta-title').textContent).toBe('Arch')
-    expect(screen.getByTestId('knowledge-board-meta-elements').textContent).toBe('1')
-    expect(screen.getByTestId('knowledge-board-structure-list')).toBeInTheDocument()
-    expect(screen.getByTestId('knowledge-board-selection-empty')).toBeInTheDocument()
-    expect(screen.getByTestId('knowledge-board-stats')).toBeInTheDocument()
-    expect(screen.queryByTestId('knowledge-outline-section')).toBeNull()
-    expect(screen.queryByTestId('knowledge-doc-outline')).toBeNull()
-    expect(screen.getByTestId('panel-title').textContent).toBe('knowledge.board.panelTitle')
-  })
-
-  it('structure click requests board focus', () => {
-    const requestBoardFocus = vi.fn()
-    useKnowledgeStore.setState({
-      activeDocId: 'brd_board000001',
-      nodes: [
-        {
-          id: 'brd_board000001',
-          parentId: null,
-          kind: 'board',
-          title: 'Arch',
-          order: 0,
-          createdAt: 1,
-          updatedAt: 1,
-        },
-      ],
-      draftBody: '',
-      docBody: '',
-      boardOutline: {
-        boardId: 'brd_board000001',
-        items: [
-          {
-            id: 'r1',
-            type: 'rect',
-            label: 'rect r1',
-            depth: 0,
-            locked: false,
-            order: 0,
-          },
-        ],
-        totalElements: 1,
-        truncated: false,
-        imageCount: 0,
-      },
-      boardSelection: {
-        boardId: 'brd_board000001',
-        ids: ['r1'],
-        items: [
-          {
-            id: 'r1',
-            type: 'rect',
-            label: 'rect r1',
-            depth: 0,
-            locked: false,
-            order: 0,
-          },
-        ],
-        style: { fill: '#ffffff', stroke: '#111111', strokeWidth: 2 },
-      },
-      requestBoardFocus,
-    })
-    render(<KnowledgeOutlinePanel />)
-    fireEvent.click(screen.getByTestId('knowledge-board-structure-item-r1'))
-    expect(requestBoardFocus).toHaveBeenCalledWith(['r1'], { scroll: true })
-    expect(screen.getByTestId('knowledge-board-structure-item-r1')).toHaveAttribute(
-      'aria-current',
-      'true',
-    )
-    expect(screen.getByTestId('knowledge-board-style-fill')).toBeInTheDocument()
-  })
-
   it('renders outline items and requests jump on click', () => {
     const requestOutlineJump = vi.fn()
     useKnowledgeStore.setState({
       activeDocId: 'doc_1',
+      nodes: [
+        {
+          id: 'doc_1',
+          parentId: null,
+          kind: 'doc',
+          title: 'Hello',
+          order: 0,
+          createdAt: 0,
+          updatedAt: 0,
+        },
+      ],
       draftBody: '# Hello\n\n## Nested\n',
       docBody: '# Hello\n\n## Nested\n',
       backlinks: [],
@@ -186,6 +77,17 @@ describe('KnowledgeOutlinePanel', () => {
     const openDoc = vi.fn().mockResolvedValue(undefined)
     useKnowledgeStore.setState({
       activeDocId: 'doc_1',
+      nodes: [
+        {
+          id: 'doc_1',
+          parentId: null,
+          kind: 'doc',
+          title: 'Hello',
+          order: 0,
+          createdAt: 0,
+          updatedAt: 0,
+        },
+      ],
       draftBody: '# Hello\n',
       docBody: '# Hello\n',
       backlinks: [
@@ -210,74 +112,5 @@ describe('KnowledgeOutlinePanel', () => {
     render(<KnowledgeOutlinePanel />)
     fireEvent.click(screen.getByTestId('knowledge-outline-panel-close'))
     expect(useUiStore.getState().knowledgePanelOpen).toBe(false)
-  })
-
-  it('style fill change goes through canvas API, not draftBody (LKD-10)', () => {
-    const applyStylePatch = vi.fn()
-    const updateText = vi.fn()
-    registerBoardCanvasStyleApi({ applyStylePatch, updateText })
-    const draftBefore =
-      '{"type":"hip-board","version":1,"source":"hip","elements":[],"appState":{"viewBackgroundColor":"#ffffff"},"files":{}}'
-    useKnowledgeStore.setState({
-      activeDocId: 'brd_board000001',
-      nodes: [
-        {
-          id: 'brd_board000001',
-          parentId: null,
-          kind: 'board',
-          title: 'Arch',
-          order: 0,
-          createdAt: 1,
-          updatedAt: 1,
-        },
-      ],
-      draftBody: draftBefore,
-      docBody: draftBefore,
-      boardOutline: {
-        boardId: 'brd_board000001',
-        items: [
-          {
-            id: 'r1',
-            type: 'rect',
-            label: 'rect r1',
-            depth: 0,
-            locked: false,
-            order: 0,
-          },
-        ],
-        totalElements: 1,
-        truncated: false,
-        imageCount: 0,
-      },
-      boardSelection: {
-        boardId: 'brd_board000001',
-        ids: ['r1'],
-        items: [
-          {
-            id: 'r1',
-            type: 'rect',
-            label: 'rect r1',
-            depth: 0,
-            locked: false,
-            order: 0,
-          },
-        ],
-        style: { fill: '#ffffff', stroke: '#111111', strokeWidth: 2 },
-      },
-    })
-    render(<KnowledgeOutlinePanel />)
-    fireEvent.change(screen.getByTestId('knowledge-board-style-fill'), {
-      target: { value: '#ff0000' },
-    })
-    expect(applyStylePatch).toHaveBeenCalledWith(['r1'], { fill: '#ff0000' })
-    expect(useKnowledgeStore.getState().draftBody).toBe(draftBefore)
-    // strokeWidth: keystrokes do not patch until blur
-    fireEvent.change(screen.getByTestId('knowledge-board-style-stroke-width'), {
-      target: { value: '5' },
-    })
-    expect(applyStylePatch).toHaveBeenCalledTimes(1)
-    fireEvent.blur(screen.getByTestId('knowledge-board-style-stroke-width'))
-    expect(applyStylePatch).toHaveBeenCalledWith(['r1'], { strokeWidth: 5 })
-    registerBoardCanvasStyleApi(null)
   })
 })

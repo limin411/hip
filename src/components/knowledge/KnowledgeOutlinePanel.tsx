@@ -3,8 +3,6 @@ import { useTranslation } from 'react-i18next'
 import { useKnowledgeStore } from '@/store/knowledgeStore'
 import { PanelToggle } from '@/components/layout/PanelToggle'
 import { DocOutline } from './DocOutline'
-import { BoardStructureList } from './BoardStructureList'
-import { BoardSelectionPanel } from './BoardSelectionPanel'
 import { cn } from '@/lib/utils'
 import { extractDocOutline, slugifyHeading } from '@/domain/knowledge/mdPreview'
 
@@ -12,13 +10,10 @@ import { extractDocOutline, slugifyHeading } from '@/domain/knowledge/mdPreview'
 const OUTLINE_BODY_DEBOUNCE_MS = 200
 
 /**
- * Knowledge right-rail: Outline + Backlinks + Outbound (docs),
- * or Canvas companion: metadata + selection + elements (boards, LKD-20…32).
- * Boards have no document outline — panel title is "Canvas", not "Outline".
- * Same chrome as ArtifactPanel / PreviewPanel — hosted in AppLayout's resizable drawer.
+ * Knowledge right-rail: Outline + Backlinks + Outbound (docs only).
  */
 export function KnowledgeOutlinePanel() {
-  const { t, i18n } = useTranslation()
+  const { t } = useTranslation()
   const draftBody = useKnowledgeStore((s) => s.draftBody)
   const docBody = useKnowledgeStore((s) => s.docBody)
   const activeDocId = useKnowledgeStore((s) => s.activeDocId)
@@ -29,25 +24,23 @@ export function KnowledgeOutlinePanel() {
   const linkPanelStatus = useKnowledgeStore((s) => s.linkPanelStatus)
   const requestOutlineJump = useKnowledgeStore((s) => s.requestOutlineJump)
   const openDoc = useKnowledgeStore((s) => s.openDoc)
-  const boardOutline = useKnowledgeStore((s) => s.boardOutline)
-  const boardSelection = useKnowledgeStore((s) => s.boardSelection)
 
   const activeNode = activeDocId ? nodes.find((n) => n.id === activeDocId) : undefined
-  // Prefer kind; brd_* fallback so rail does not flash doc-outline chrome.
-  const isBoard =
-    activeNode?.kind === 'board' ||
-    (activeDocId != null && activeDocId.startsWith('brd_'))
+  // Docs only; boards hidden. Unknown node id still treated as doc (open path).
+  const isDoc =
+    activeDocId != null &&
+    activeNode?.kind !== 'board' &&
+    !(activeDocId.startsWith('brd_') && activeNode == null)
 
   const liveContent = draftBody || docBody
   const [content, setContent] = useState(liveContent)
   const prevDocIdRef = useRef(activeDocId)
   useEffect(() => {
-    if (!activeDocId || isBoard) {
+    if (!activeDocId || !isDoc) {
       setContent('')
-      prevDocIdRef.current = isBoard ? activeDocId : null
+      prevDocIdRef.current = null
       return
     }
-    // Doc switch: paint outline immediately.
     if (prevDocIdRef.current !== activeDocId) {
       prevDocIdRef.current = activeDocId
       setContent(liveContent)
@@ -55,13 +48,13 @@ export function KnowledgeOutlinePanel() {
     }
     const id = window.setTimeout(() => setContent(liveContent), OUTLINE_BODY_DEBOUNCE_MS)
     return () => window.clearTimeout(id)
-  }, [liveContent, activeDocId, isBoard])
+  }, [liveContent, activeDocId, isDoc])
 
   const openBacklink = async (fromDocId: string, fragment: string | null) => {
     await openDoc(fromDocId)
     if (fragment) {
-      // Jump after open — best-effort match heading text or slug
-      const body = useKnowledgeStore.getState().draftBody || useKnowledgeStore.getState().docBody
+      const body =
+        useKnowledgeStore.getState().draftBody || useKnowledgeStore.getState().docBody
       const outline = extractDocOutline(body)
       const hit =
         outline.find((o) => o.text === fragment) ||
@@ -73,28 +66,6 @@ export function KnowledgeOutlinePanel() {
       }
     }
   }
-
-  // LKD-27: only show outline/selection stamped for the active board.
-  const outlineForBoard =
-    isBoard && boardOutline?.boardId === activeDocId ? boardOutline : null
-  const selectionForBoard =
-    isBoard && boardSelection?.boardId === activeDocId ? boardSelection : null
-  const selectedIdSet = new Set(selectionForBoard?.ids ?? [])
-  const hasBoardSelection = (selectionForBoard?.ids.length ?? 0) > 0
-  const boardTitle =
-    activeNode?.title?.trim() || t('knowledge.board.untitled')
-  const boardUpdatedLabel = (() => {
-    const at = activeNode?.updatedAt
-    if (at == null || !Number.isFinite(at)) return null
-    try {
-      return new Intl.DateTimeFormat(i18n.language || undefined, {
-        dateStyle: 'medium',
-        timeStyle: 'short',
-      }).format(new Date(at))
-    } catch {
-      return null
-    }
-  })()
 
   return (
     <div
@@ -110,116 +81,21 @@ export function KnowledgeOutlinePanel() {
           data-tauri-drag-region="false"
           data-testid="panel-title"
         >
-          {isBoard ? t('knowledge.board.panelTitle') : t('knowledge.outline.title')}
+          {t('knowledge.outline.title')}
         </span>
         <div className="flex items-center gap-2" data-tauri-drag-region="false">
-          {/* Relocated from main toolbar when open — same toggle collapses the rail. */}
           <PanelToggle slot="panel" />
         </div>
       </div>
 
       <div className="min-h-0 flex-1 overflow-y-auto">
-        {!activeDocId ? (
+        {!activeDocId || !isDoc ? (
           <div
             className="flex h-full items-center justify-center px-4 py-8 text-center"
             data-testid="knowledge-doc-outline-no-doc"
             role="status"
           >
             <p className="text-meta text-ink-tertiary">{t('knowledge.outline.noDoc')}</p>
-          </div>
-        ) : isBoard ? (
-          <div
-            className="flex flex-col gap-4 p-2 pb-6"
-            data-testid="knowledge-board-companion"
-          >
-            {/* Canvas metadata — primary when nothing selected (no doc outline). */}
-            <section data-testid="knowledge-board-canvas-section">
-              <h3 className="px-1 pb-1 text-caption font-medium text-ink-tertiary">
-                {t('knowledge.board.sectionCanvas')}
-              </h3>
-              <dl
-                className="flex flex-col gap-1.5 px-1"
-                data-testid="knowledge-board-canvas-meta"
-              >
-                <div className="flex items-start justify-between gap-2">
-                  <dt className="shrink-0 text-meta text-ink-tertiary">
-                    {t('knowledge.board.metaTitle')}
-                  </dt>
-                  <dd
-                    className="min-w-0 truncate text-right text-meta text-ink"
-                    data-testid="knowledge-board-meta-title"
-                  >
-                    {boardTitle}
-                  </dd>
-                </div>
-                <div className="flex items-start justify-between gap-2">
-                  <dt className="shrink-0 text-meta text-ink-tertiary">
-                    {t('knowledge.board.metaElements')}
-                  </dt>
-                  <dd
-                    className="text-meta text-ink"
-                    data-testid="knowledge-board-meta-elements"
-                  >
-                    {outlineForBoard?.totalElements ?? 0}
-                  </dd>
-                </div>
-                <div className="flex items-start justify-between gap-2">
-                  <dt className="shrink-0 text-meta text-ink-tertiary">
-                    {t('knowledge.board.metaImages')}
-                  </dt>
-                  <dd
-                    className="text-meta text-ink"
-                    data-testid="knowledge-board-meta-images"
-                  >
-                    {outlineForBoard?.imageCount ?? 0}
-                  </dd>
-                </div>
-                {boardUpdatedLabel ? (
-                  <div className="flex items-start justify-between gap-2">
-                    <dt className="shrink-0 text-meta text-ink-tertiary">
-                      {t('knowledge.board.metaUpdated')}
-                    </dt>
-                    <dd
-                      className="min-w-0 text-right text-meta text-ink"
-                      data-testid="knowledge-board-meta-updated"
-                    >
-                      {boardUpdatedLabel}
-                    </dd>
-                  </div>
-                ) : null}
-                <p
-                  className="pt-0.5 text-caption text-ink-tertiary"
-                  data-testid="knowledge-board-stats"
-                >
-                  {t('knowledge.board.stats', {
-                    elements: outlineForBoard?.totalElements ?? 0,
-                    images: outlineForBoard?.imageCount ?? 0,
-                  })}
-                </p>
-              </dl>
-            </section>
-
-            {/* Selection inspector — only when something is selected. */}
-            <section data-testid="knowledge-board-selection-section">
-              <h3 className="px-1 pb-1 text-caption font-medium text-ink-tertiary">
-                {hasBoardSelection
-                  ? t('knowledge.board.sectionSelection')
-                  : t('knowledge.board.sectionSelectionIdle')}
-              </h3>
-              <BoardSelectionPanel selection={selectionForBoard} />
-            </section>
-
-            <section data-testid="knowledge-board-structure-section">
-              <h3 className="px-1 pb-1 text-caption font-medium text-ink-tertiary">
-                {t('knowledge.board.sectionStructure')}
-              </h3>
-              <BoardStructureList
-                items={outlineForBoard?.items ?? []}
-                selectedIds={selectedIdSet}
-                truncated={outlineForBoard?.truncated ?? false}
-                totalElements={outlineForBoard?.totalElements ?? 0}
-              />
-            </section>
           </div>
         ) : (
           <div className="flex flex-col gap-4 p-2 pb-6">
@@ -251,21 +127,21 @@ export function KnowledgeOutlinePanel() {
               ) : (
                 <ul className="flex flex-col gap-0.5" data-testid="knowledge-backlinks-list">
                   {backlinks.map((b, i) => (
-                      <li key={`${b.fromDocId}-${i}-${b.raw}`}>
-                        <button
-                          type="button"
-                          className={cn(
-                            'w-full rounded-md px-2 py-1.5 text-left text-meta',
-                            'text-ink hover:bg-surface-hover',
-                          )}
-                          data-testid="knowledge-backlink-item"
-                          onClick={() => void openBacklink(b.fromDocId, b.fragment)}
-                        >
-                          <span className="font-medium">{b.fromTitle}</span>
-                          <span className="mt-0.5 block truncate text-ink-tertiary">{b.raw}</span>
-                        </button>
-                      </li>
-                    ))}
+                    <li key={`${b.fromDocId}-${i}-${b.raw}`}>
+                      <button
+                        type="button"
+                        className={cn(
+                          'w-full rounded-md px-2 py-1.5 text-left text-meta',
+                          'text-ink hover:bg-surface-hover',
+                        )}
+                        data-testid="knowledge-backlink-item"
+                        onClick={() => void openBacklink(b.fromDocId, b.fragment)}
+                      >
+                        <span className="font-medium">{b.fromTitle}</span>
+                        <span className="mt-0.5 block truncate text-ink-tertiary">{b.raw}</span>
+                      </button>
+                    </li>
+                  ))}
                 </ul>
               )}
             </section>

@@ -1,9 +1,9 @@
 import type { ContextMenuItemDef, ContextProvider } from '../types'
 
-/** Knowledge tree blank area: create doc/whiteboard/folder at root. */
+/** Knowledge tree blank area: create doc/folder at root. */
 export const knowledgeTreeProvider: ContextProvider = (req, ctx) => {
   if (req.kind !== 'knowledgeTree') return []
-  const { onNewDoc, onNewBoard, onNewFolder } = req.payload
+  const { onNewDoc, onNewFolder } = req.payload
 
   const items: ContextMenuItemDef[] = [
     {
@@ -12,14 +12,6 @@ export const knowledgeTreeProvider: ContextProvider = (req, ctx) => {
       group: 'primary',
       run: () => {
         onNewDoc()
-      },
-    },
-    {
-      id: 'knowledgeTree.newBoard',
-      label: ctx.t('knowledge.tree.newBoard'),
-      group: 'primary',
-      run: () => {
-        onNewBoard()
       },
     },
     {

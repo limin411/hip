@@ -1,0 +1,26 @@
+/**
+ * BlockNote Live host — fit hip paper / theme.
+ */
+.knowledge-blocknote-editor {
+  min-height: 0;
+  flex: 1 1 auto;
+}
+
+.knowledge-blocknote-editor .bn-container {
+  --bn-colors-editor-background: transparent;
+  background: transparent !important;
+  height: 100%;
+}
+
+.knowledge-blocknote-editor .bn-editor {
+  background: transparent !important;
+  padding-inline: 0.25rem;
+  min-height: 12rem;
+  font-family: inherit;
+}
+
+/* Reduce Mantine surface clash with hip paper */
+.knowledge-blocknote-editor .mantine-Menu-dropdown,
+.knowledge-blocknote-editor .mantine-Popover-dropdown {
+  z-index: 80;
+}

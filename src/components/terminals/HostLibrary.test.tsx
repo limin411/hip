@@ -239,7 +239,7 @@ describe('HostLibrary', () => {
       },
     ]
     render(<HostLibrary />)
-    fireEvent.click(screen.getByTestId('host-add-hst_1'))
+    fireEvent.click(screen.getByTestId('host-add'))
     await waitFor(() => {
       expect(screen.getByTestId('host-form-dialog')).toBeInTheDocument()
     })

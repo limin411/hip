@@ -117,7 +117,7 @@ export function HostGroupList({
             ) : (
               <ul className="flex flex-col gap-1" data-testid="host-list">
                 {selectedHosts.map((h) => (
-                  <li key={h.id} className="flex flex-col gap-0.5">
+                  <li key={h.id}>
                     <HostRow
                       host={h}
                       onEdit={onEditHost}
@@ -125,23 +125,25 @@ export function HostGroupList({
                       onConnect={onConnectHost}
                       connectBusy={connectBusy}
                     />
-                    {onAddHost ? (
-                      <button
-                        type="button"
-                        data-testid={`host-add-${h.id}`}
-                        onClick={() => onAddHost(selectedGroupIdForAdd)}
-                        className={cn(
-                          'flex w-full items-center justify-center gap-1.5 rounded-lg border border-dashed border-border bg-surface-muted/20 px-3 py-[var(--row-pad-y-session)] text-body font-medium text-ink-tertiary transition-colors',
-                          'hover:border-strong hover:bg-state-hover hover:text-ink',
-                          'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink/20',
-                        )}
-                      >
-                        <Plus size={15} strokeWidth={2} aria-hidden />
-                        {t('terminals.newRemote')}
-                      </button>
-                    ) : null}
                   </li>
                 ))}
+                {onAddHost ? (
+                  <li>
+                    <button
+                      type="button"
+                      data-testid="host-add"
+                      onClick={() => onAddHost(selectedGroupIdForAdd)}
+                      className={cn(
+                        'flex w-full items-center justify-center gap-1.5 rounded-lg border border-dashed border-border bg-surface-muted/20 px-3 py-[var(--row-pad-y-session)] text-body font-medium text-ink-tertiary transition-colors',
+                        'hover:border-strong hover:bg-state-hover hover:text-ink',
+                        'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink/20',
+                      )}
+                    >
+                      <Plus size={15} strokeWidth={2} aria-hidden />
+                      {t('terminals.newRemote')}
+                    </button>
+                  </li>
+                ) : null}
               </ul>
             )}
           </div>

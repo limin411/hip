@@ -243,7 +243,7 @@ describe('HostGroupList master-detail', () => {
     expect(onAddHost).toHaveBeenCalledWith('g-empty')
   })
 
-  it('new connection below a host uses the current group', () => {
+  it('new connection at list bottom uses the current group', () => {
     const onAddHost = vi.fn()
     render(
       <HostGroupList
@@ -257,11 +257,11 @@ describe('HostGroupList master-detail', () => {
       />,
     )
     fireEvent.click(screen.getByTestId('host-group-select-g1'))
-    fireEvent.click(screen.getByTestId('host-add-h1'))
+    fireEvent.click(screen.getByTestId('host-add'))
     expect(onAddHost).toHaveBeenCalledWith('g1')
 
     fireEvent.click(screen.getByTestId('host-group-select-ungrouped'))
-    fireEvent.click(screen.getByTestId('host-add-h3'))
+    fireEvent.click(screen.getByTestId('host-add'))
     expect(onAddHost).toHaveBeenLastCalledWith(null)
   })
 

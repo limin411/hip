@@ -1,0 +1,33 @@
+{
+  "schemaVersion": 1,
+  "id": "msm-add-kind-filter",
+  "name": "Add list_sources_by_kind filter API + tests",
+  "level": "L2",
+  "difficulty": "hard",
+  "tags": ["add_feature", "unit-test", "msm", "worktree"],
+  "prompt": "You are working in make-stock-money (Tauri 2 + rusqlite backend + Leptos CSR UI).\n\n## Goal\nAdd a backend API to filter data sources by `kind`, with tests and a minimal IPC surface.\n\n## Requirements\n1. In `src-tauri/src/db.rs`, add:\n   `pub fn list_by_kind(conn: &Connection, kind: &str) -> Result<Vec<DataSource>, String>`\n   - Trim `kind`; empty kind → return Err with prefix `参数错误:`\n   - Match exact `kind` column equality\n   - Same ORDER BY as `list` (priority ASC, id ASC)\n2. Expose Tauri command `list_sources_by_kind(kind: String)` in `src-tauri/src/lib.rs` (register in invoke handler).\n3. Add integration tests in `src-tauri/tests/crud_e2e.rs` covering: empty kind error, match/no-match, ordering among matches.\n4. Do NOT break existing tests. Do not commit or push. Frontend UI wiring is optional for this task.\n\n## Verify\n```\ncargo test --manifest-path src-tauri/Cargo.toml -- --test-threads=1\n```\n\nUse goal/todos if available; keep working until tests pass.",
+  "workspace": {
+    "setup": { "kind": "none" }
+  },
+  "ui": {
+    "timeout_ms": 1500000,
+    "plan_mode": "allow",
+    "expect": {
+      "changes_paths_regex": ["src-tauri/"],
+      "no_permission_modal_stuck": true
+    }
+  },
+  "verify": {
+    "soft": [
+      { "kind": "change_nonempty" },
+      { "kind": "paths_touched_regex", "pattern": "src-tauri/" },
+      { "kind": "min_paths", "count": 2 }
+    ]
+  },
+  "rubric": { "axes": ["add_feature", "msm_dogfood"], "pass_policy": "verify_all" },
+  "scoring": { "pass_requires": "verify_all" },
+  "metadata": {
+    "pack": "make-stock-money",
+    "new_api": "list_by_kind / list_sources_by_kind"
+  }
+}

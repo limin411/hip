@@ -1,0 +1,13 @@
+diff --git a/src-tauri/src/db.rs b/src-tauri/src/db.rs
+index 3ea5483..d2cb0a2 100644
+--- a/src-tauri/src/db.rs
++++ b/src-tauri/src/db.rs
+@@ -102,7 +102,7 @@ fn row_to_source(row: &rusqlite::Row<'_>) -> rusqlite::Result<DataSource> {
+ pub fn list(conn: &Connection) -> Result<Vec<DataSource>, String> {
+     let mut stmt = conn
+         .prepare(&format!(
+-            "SELECT {SELECT_COLUMNS} FROM data_sources ORDER BY priority ASC, id ASC"
++            "SELECT {SELECT_COLUMNS} FROM data_sources ORDER BY priority DESC, id ASC"
+         ))
+         .map_err(|e| e.to_string())?;
+     let rows = stmt

@@ -1,0 +1,31 @@
+{
+  "schemaVersion": 1,
+  "id": "msm-fix-validation",
+  "name": "Fix DataSource priority validation 1..=5",
+  "level": "L1",
+  "difficulty": "easy",
+  "tags": ["edit_single", "unit-test", "msm", "worktree"],
+  "prompt": "In this make-stock-money checkout, `invalid_input_is_rejected` (and related validation tests) fail. Priority must be an integer in 1..=5 with the original Chinese error message. Fix src-tauri/src/db.rs only. Do not weaken tests. Do not commit. Verify with `cargo test --manifest-path src-tauri/Cargo.toml -- --test-threads=1`.",
+  "workspace": {
+    "setup": { "kind": "patch", "path": "fixtures/break-validation.patch" }
+  },
+  "ui": {
+    "timeout_ms": 900000,
+    "expect": {
+      "changes_paths_regex": ["src-tauri/src/db\\.rs"],
+      "no_permission_modal_stuck": true
+    }
+  },
+  "verify": {
+    "soft": [
+      { "kind": "change_nonempty" },
+      { "kind": "paths_touched_regex", "pattern": "src-tauri/src/db\\.rs" }
+    ]
+  },
+  "rubric": { "axes": ["edit_single", "msm_dogfood"], "pass_policy": "verify_all" },
+  "scoring": { "pass_requires": "verify_all" },
+  "metadata": {
+    "pack": "make-stock-money",
+    "bug": "priority range widened to 1..=10"
+  }
+}

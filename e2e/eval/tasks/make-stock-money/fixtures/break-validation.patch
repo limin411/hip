@@ -1,0 +1,15 @@
+diff --git a/src-tauri/src/db.rs b/src-tauri/src/db.rs
+index 3ea5483..d0753ca 100644
+--- a/src-tauri/src/db.rs
++++ b/src-tauri/src/db.rs
+@@ -74,8 +74,8 @@ fn clean_input(mut input: DataSourceInput) -> Result<DataSourceInput, String> {
+     if input.endpoint.is_empty() {
+         return Err("参数错误: 接入点不能为空".into());
+     }
+-    if !(1..=5).contains(&input.priority) {
+-        return Err("参数错误: 优先级必须是 1~5 之间的整数".into());
++    if !(1..=10).contains(&input.priority) {
++        return Err("参数错误: 优先级必须是 1~10 之间的整数".into());
+     }
+     Ok(input)
+ }

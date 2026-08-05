@@ -41,6 +41,12 @@ yarn tauri build
 - `packages/sidecar/` — Node.js sidecar that runs agents / tools
 - `packages/protocol/` — shared types between UI and sidecar
 
+## Long-task dogfood target
+
+- Repo: `/Users/lijiamin/data/code-repository/project-rust/make-stock-money` (`HIP_EVAL_MSM_PATH`)
+- Pack: `e2e/eval/tasks/make-stock-money/` · journal: `docs/design/msm-dogfood-journal.md`
+- `eval "$(scripts/hip-eval-bootstrap-msm.sh)"` then `yarn dogfood:msm -- --list` or bind folder in desktop Code surface
+
 ## Project-specific gotchas
 
 - API keys are stored as plaintext `~/.hip/config/auth.json` (0600) by design; do not “fix” this back to a keychain.

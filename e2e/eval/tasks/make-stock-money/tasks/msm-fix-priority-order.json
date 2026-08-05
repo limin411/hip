@@ -1,0 +1,32 @@
+{
+  "schemaVersion": 1,
+  "id": "msm-fix-priority-order",
+  "name": "Fix data_sources list priority order",
+  "level": "L1",
+  "difficulty": "easy",
+  "tags": ["edit_single", "unit-test", "msm", "worktree"],
+  "prompt": "This is a Tauri + Leptos stock data-source app (Rust backend in src-tauri/). Unit tests under src-tauri/tests/crud_e2e.rs are failing: list should order by priority ASC then id ASC. Find and fix the bug in src-tauri/src/db.rs. Do not weaken or delete tests. Do not commit or push. Run `cargo test --manifest-path src-tauri/Cargo.toml -- --test-threads=1` until green.",
+  "workspace": {
+    "setup": { "kind": "patch", "path": "fixtures/break-priority-order.patch" }
+  },
+  "ui": {
+    "timeout_ms": 900000,
+    "expect": {
+      "changes_paths_regex": ["src-tauri/src/db\\.rs"],
+      "changes_avoid_regex": ["^src/app\\.rs$", "^styles\\.css$"],
+      "no_permission_modal_stuck": true
+    }
+  },
+  "verify": {
+    "soft": [
+      { "kind": "change_nonempty" },
+      { "kind": "paths_touched_regex", "pattern": "src-tauri/src/db\\.rs" }
+    ]
+  },
+  "rubric": { "axes": ["edit_single", "msm_dogfood"], "pass_policy": "verify_all" },
+  "scoring": { "pass_requires": "verify_all" },
+  "metadata": {
+    "pack": "make-stock-money",
+    "bug": "list ORDER BY priority DESC instead of ASC"
+  }
+}

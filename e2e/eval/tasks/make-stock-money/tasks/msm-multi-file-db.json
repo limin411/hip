@@ -1,0 +1,32 @@
+{
+  "schemaVersion": 1,
+  "id": "msm-multi-file-db",
+  "name": "Multi-bug fix in db list + validation",
+  "level": "L2",
+  "difficulty": "medium",
+  "tags": ["multi_file", "unit-test", "msm", "worktree"],
+  "prompt": "src-tauri CRUD / validation tests are failing for more than one reason in src-tauri/src/db.rs (list ordering AND priority validation). Fix all production bugs so the full backend test suite is green. Do not delete or weaken tests. Prefer a TDD loop: run failing tests first, fix, re-run. Do not commit or push.\n\nVerify:\n  cargo test --manifest-path src-tauri/Cargo.toml -- --test-threads=1",
+  "workspace": {
+    "setup": { "kind": "patch", "path": "fixtures/break-multi-file-db.patch" }
+  },
+  "ui": {
+    "timeout_ms": 1200000,
+    "auto_resume_interrupt": 4,
+    "expect": {
+      "changes_paths_regex": ["src-tauri/src/db\\.rs"],
+      "no_permission_modal_stuck": true
+    }
+  },
+  "verify": {
+    "soft": [
+      { "kind": "change_nonempty" },
+      { "kind": "paths_touched_regex", "pattern": "src-tauri/src/db\\.rs" }
+    ]
+  },
+  "rubric": { "axes": ["multi_file", "test_loop", "msm_dogfood"], "pass_policy": "verify_all" },
+  "scoring": { "pass_requires": "verify_all" },
+  "metadata": {
+    "pack": "make-stock-money",
+    "bugs": ["list ORDER BY", "priority 1..=5"]
+  }
+}

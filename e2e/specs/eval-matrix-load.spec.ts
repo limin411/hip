@@ -33,6 +33,20 @@ describe('eval matrix pack load @eval @smoke', () => {
     expect(mini.pack.id).toBe('mini-go')
     expect(mini.tasks.map((t) => t.id)).toEqual(['mini-fix-greet'])
     expect(mini.pack.defaults?.workspace?.repo_path_env).toBe('HIP_EVAL_MINI_GO_PATH')
+
+    const msm = loadPack(path.resolve('e2e/eval/tasks/make-stock-money'))
+    expect(msm.pack.id).toBe('make-stock-money')
+    expect(msm.pack.defaults?.workspace?.repo_path_env).toBe('HIP_EVAL_MSM_PATH')
+    expect(msm.tasks.map((t) => t.id).sort()).toEqual(
+      [
+        'msm-add-kind-filter',
+        'msm-fix-priority-order',
+        'msm-fix-validation',
+        'msm-longrun-watchlist',
+        'msm-multi-file-db',
+      ].sort(),
+    )
+    expect(msm.tasks.every((t) => (t.rubric?.axes?.length ?? 0) > 0)).toBe(true)
   })
 
   it('buildAxisCluster handles empty input', () => {

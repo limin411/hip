@@ -1,0 +1,46 @@
+{
+  "schemaVersion": 1,
+  "id": "msm-longrun-watchlist",
+  "name": "Long-run: watchlist domain slice (multi-phase)",
+  "level": "L5",
+  "difficulty": "hard",
+  "tags": ["longrun", "multi_phase", "add_feature", "msm", "worktree", "goal_drive"],
+  "prompt": "You are doing a LONG multi-phase engineering task on make-stock-money (Tauri 2 + rusqlite + Leptos).\n\n## Product goal\nIntroduce a first-class **Watchlist** domain so users can group stock symbols, without breaking existing DataSource CRUD.\n\n## Success criteria (all required)\n1. New migration `0003_watchlist.sql` applied via `src-tauri/src/migrations.rs` (checksum table).\n2. Tables: `watchlists (id, name, note, created_at, updated_at)` and `watchlist_items (id, watchlist_id, symbol, name, created_at)` with FK + unique(watchlist_id, symbol).\n3. Rust module `src-tauri/src/watchlist.rs` with create/list/get/delete watchlist and add/remove/list items; validation errors use `参数错误:` prefix.\n4. Tauri commands registered and wired in `lib.rs`.\n5. Integration tests in `src-tauri/tests/watchlist_e2e.rs` covering happy path + duplicate symbol rejection + cascade or explicit cleanup on watchlist delete.\n6. `cargo test --manifest-path src-tauri/Cargo.toml -- --test-threads=1` is green.\n7. Existing DataSource behavior and tests remain green.\n8. Brief `docs/watchlist.md` (in repo) describing schema + commands.\n\n## Process constraints (exercise long-task runtime)\n- Start with a short plan (phases). Prefer plan mode if ambiguous, then implement.\n- Use todos / goal tracking; update status as you go.\n- After substantial edits, re-run tests; do not claim done while tests fail.\n- Prefer small commits only if the user asks — default: do NOT commit.\n- Do not push. Do not touch unrelated UI polish unless needed for compile.\n- Frontend Leptos UI for watchlist is **optional**; backend + tests + docs are mandatory.\n\n## Hints\n- Follow patterns in `db.rs`, `migrations.rs`, `tests/crud_e2e.rs`.\n- Keep SQL migrations pure and checksum-stable once written.\n\nWork until every success criterion is met. If blocked, leave a clear summary of remaining work.",
+  "workspace": {
+    "setup": { "kind": "none" }
+  },
+  "ui": {
+    "timeout_ms": 3600000,
+    "auto_resume_interrupt": 6,
+    "plan_mode": "prefer",
+    "expect": {
+      "changes_paths_regex": ["src-tauri/"],
+      "no_permission_modal_stuck": true
+    }
+  },
+  "verify": {
+    "timeout_sec": 600,
+    "soft": [
+      { "kind": "change_nonempty" },
+      { "kind": "paths_touched_regex", "pattern": "src-tauri/" },
+      { "kind": "min_paths", "count": 3 },
+      { "kind": "paths_touched_regex", "pattern": "watchlist" }
+    ]
+  },
+  "rubric": {
+    "axes": ["longrun", "multi_phase", "add_feature", "test_loop", "msm_dogfood"],
+    "pass_policy": "verify_all"
+  },
+  "scoring": { "pass_requires": "verify_all" },
+  "metadata": {
+    "pack": "make-stock-money",
+    "dogfood": "long_engineering_task",
+    "expected_wall_min": 30,
+    "exercises": [
+      "compaction under multi-file work",
+      "goal/todo continuity",
+      "verification loop",
+      "plan mode optional"
+    ]
+  }
+}

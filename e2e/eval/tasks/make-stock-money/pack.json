@@ -1,0 +1,36 @@
+{
+  "schemaVersion": 1,
+  "id": "make-stock-money",
+  "name": "make-stock-money long-task dogfood (Tauri + Leptos + SQLite)",
+  "description": "Primary long-engineering-task dogfood target: Rust desktop stock-data-source app. Worktree isolation + primary-guard. Free-form scenarios under scenarios/.",
+  "defaults": {
+    "workspace": {
+      "strategy": "worktree",
+      "repo_path_env": "HIP_EVAL_MSM_PATH",
+      "base_sha": "ac6bc9d146c4337ba367ac54336e36726403ca06"
+    },
+    "ui": {
+      "surface": "code",
+      "permission_mode": "edit",
+      "timeout_ms": 1800000,
+      "auto_approve_permissions": true,
+      "auto_resume_interrupt": 4
+    },
+    "verify": {
+      "timeout_sec": 300,
+      "commands": [
+        {
+          "cmd": ["cargo", "test", "--manifest-path", "src-tauri/Cargo.toml", "--", "--test-threads=1"]
+        }
+      ]
+    },
+    "rubric": { "pass_policy": "verify_all" }
+  },
+  "tasks": [
+    "tasks/msm-fix-priority-order.json",
+    "tasks/msm-fix-validation.json",
+    "tasks/msm-multi-file-db.json",
+    "tasks/msm-add-kind-filter.json",
+    "tasks/msm-longrun-watchlist.json"
+  ]
+}

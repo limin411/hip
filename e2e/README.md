@@ -97,7 +97,23 @@ E2E_GREP=@live E2E_INVERT=1 yarn test:e2e
 | `@hard` | L2 multi-file / TDD / feature (`bytebase-hard`) | **no** (live opt-in) |
 | `@orch` | L3 plan / delegate / hitl (`bytebase-orch`) | **no** |
 | `@adv` | L4 noisy / safety (`bytebase-adv`) | **no** |
+| `@msm` | make-stock-money long-task dogfood pack | **no** (live; needs `HIP_EVAL_MSM_PATH`) |
+| `@longrun` | multi-phase long engineering tasks (subset of `@msm`) | **no** |
 | `@context-menu` | Right-click menus (see plan) | smoke/core cases also tagged `@smoke`/`@core` → in gate |
+
+### make-stock-money dogfood
+
+```bash
+eval "$(scripts/hip-eval-bootstrap-msm.sh)"
+# unpaid pack load is in eval-matrix-load (@eval @smoke)
+# live UI:
+yarn test:e2e:eval-msm
+# headless CLI:
+yarn dogfood:msm -- --list
+yarn dogfood:msm -- --task msm-multi-file-db
+yarn dogfood:msm -- --scenario watchlist
+# manual desktop: bind Code session to $HIP_EVAL_MSM_PATH, paste e2e/eval/tasks/make-stock-money/scenarios/*
+```
 | `@knowledge` | Knowledge base full business flows | main path also `@core` → in gate |
 | `@knowledge-perf` | Knowledge open/type usability budgets + unusable hard lines | **no** (nightly / `test:e2e:full`) |
 | `@work-items` | Work item tracking (事项追踪) full business flows | smoke/core cases also tagged → in gate |

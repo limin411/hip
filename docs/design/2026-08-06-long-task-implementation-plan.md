@@ -2,7 +2,7 @@
 
 | Field | Value |
 |-------|-------|
-| Status | Ready |
+| Status | Implemented (M1–M4 core; M5 ongoing) |
 | Date | 2026-08-06 |
 | Spec | [2026-08-05-long-engineering-task-spec.md](./2026-08-05-long-engineering-task-spec.md) |
 | Dogfood | `make-stock-money` · pack `e2e/eval/tasks/make-stock-money/` |
@@ -267,8 +267,8 @@ M5 Session 消肿（并行薄切片）+ longrun e2e gate          ← 持续
 | 本实施 Plan | ✅ 本文 |
 | msm eval pack + dogfood 脚本 | ✅ 已落地 |
 | msm journal | ✅ `msm-dogfood-journal.md`（持续填） |
-| M1–M3 代码 | ⬜ 按 §4–6 |
-| Nightly longrun gate | ⬜ M5 |
+| M1–M4 代码 | ✅ Goal 持久化 / verification / isolation / revert_paths / metrics |
+| Nightly longrun gate | ⬜ 可选 CI；本地 `yarn dogfood:msm` |
 
 ---
 

@@ -11,7 +11,13 @@ export interface SubagentTools {
 }
 
 export function buildSubagentTools(
-  spawnSubagent?: (description: string, mode?: 'foreground' | 'background') => Promise<string>,
+  spawnSubagent?: (
+    description: string,
+    mode?: 'foreground' | 'background',
+    taskId?: string,
+    signal?: AbortSignal,
+    isolate?: boolean,
+  ) => Promise<string>,
   dispatch?: DispatchSpec,
   retrySubagent?: (agentId: string) => Promise<string>,
   stopBackgroundTask?: (taskId: string, reason?: string) => string,
@@ -22,8 +28,8 @@ export function buildSubagentTools(
   }
 
   const task = tool(
-    async ({ description, mode }) => {
-      const result = await spawnSubagent(description, mode)
+    async ({ description, mode, isolate }) => {
+      const result = await spawnSubagent(description, mode, undefined, undefined, isolate)
       // Pause is a distinct outcome — pass through; do not rewrite as empty-success error.
       if (isSubagentPausedText(result)) return result
       if (isUselessSubagentText(result)) {
@@ -40,10 +46,12 @@ export function buildSubagentTools(
         'Delegate ONE focused sub-task to a generic sub-agent (blocking unless mode is background). ' +
         'Foreground mode waits for the full result. Prefer task_batch when you have 2+ independent sub-tasks. ' +
         'Set mode to "background" only for fire-and-forget (max 10 concurrent); use task_output/task_stop to follow up. ' +
+        'Set isolate=true to run in a git worktree under ~/.hip/isolation (parallel-safe). ' +
         'Do not use for simple single-step requests (greetings, list one directory, read one file).',
       schema: z.object({
         description: z.string(),
         mode: z.enum(['foreground', 'background']).optional(),
+        isolate: z.boolean().optional().describe('Run in an isolated git worktree'),
       }),
     },
   )
@@ -166,7 +174,13 @@ export function buildSubagentTools(
  * aggregate ToolMessage. Multi-task pause on a non-first segment still needs per-segment scan (B4).
  */
 export function buildTaskBatchTools(
-  spawnSubagent?: (description: string, mode?: 'foreground' | 'background', taskId?: string, signal?: AbortSignal) => Promise<string>,
+  spawnSubagent?: (
+    description: string,
+    mode?: 'foreground' | 'background',
+    taskId?: string,
+    signal?: AbortSignal,
+    isolate?: boolean,
+  ) => Promise<string>,
   dispatch?: DispatchSpec,
 ): StructuredToolInterface[] {
   if (!spawnSubagent) return []
@@ -179,7 +193,7 @@ export function buildTaskBatchTools(
       : ' Tasks use generic workers (no specialized roster).'
 
   const taskBatch = tool(
-    async ({ tasks: batchTasks }) => {
+    async ({ tasks: batchTasks, isolate }) => {
       const runner: BatchRunSubagentFn = async (task, signal) => {
         const agent = task.agent?.trim()
         if (agent && dispatch) {
@@ -188,7 +202,7 @@ export function buildTaskBatchTools(
           }
           return dispatch.run(agent, task.prompt, signal)
         }
-        return spawnSubagent(task.prompt, undefined, undefined, signal)
+        return spawnSubagent(task.prompt, undefined, undefined, signal, isolate === true)
       }
       const batch = new SubagentBatch(runner)
       const results = await batch.run(
@@ -216,8 +230,10 @@ export function buildTaskBatchTools(
         'Each task runs independently — one failing does not abort the others. ' +
         'Returns results grouped by task index prefixed with [<index>].' +
         rosterHint +
-        ' For concurrent write/edit work on the same tree prefer serial tasks.',
+        ' Set isolate=true so each generic worker gets its own git worktree. ' +
+        ' For concurrent write/edit work on the same tree prefer serial tasks or isolate=true.',
       schema: z.object({
+        isolate: z.boolean().optional().describe('Isolate each generic worker in a git worktree'),
         tasks: z.array(
           z.object({
             description: z.string().describe('short label for the sub-task'),

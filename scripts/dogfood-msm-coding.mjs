@@ -275,6 +275,15 @@ try {
 
   report.ok = Boolean(verifyOk && !report.primaryMutated && report.changeNonempty)
 
+  // Long-run metrics (plan M4)
+  report.metrics = {
+    wallMs: Date.now() - Date.parse(report.startedAt),
+    verifyPass: verifyOk,
+    primaryMutated: report.primaryMutated,
+    changeNonempty: report.changeNonempty,
+    cliStatus: run.status,
+  }
+
   if (!report.ok) {
     report.error = [
       !verifyOk ? 'verify_failed' : null,

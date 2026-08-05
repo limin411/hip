@@ -71,6 +71,8 @@ export interface CompactOptions {
   focus?: string
   /** Session id (optional context for the summarizer path). */
   sessionId?: string
+  /** Goal/todos/verify block forced into the summary carrier (long-task M1). */
+  protectedStructures?: string
   /**
    * Tool-rounds kept at the tail when falling back to tool-round mode
    * (single-Human ReAct / explore). Defaults to KEEP_RECENT_TOOL_ROUNDS.
@@ -188,6 +190,18 @@ export function formatCompactSummaryMessage(headId: string, body: string): Syste
 }
 
 /**
+ * Append protected long-task structures (goal / todos / verify) so compaction
+ * cannot drop them from the summary carrier.
+ */
+export function appendProtectedStructures(summaryBody: string, protectedBlock: string | undefined | null): string {
+  const block = (protectedBlock ?? '').trim()
+  if (!block) return summaryBody
+  const marker = '## Active goal (do not drop)'
+  if (summaryBody.includes(marker)) return summaryBody
+  return `${summaryBody.trim()}\n\n${block}`
+}
+
+/**
  * Build pass-2 summarizer input: NOTE₁ + optional delta messages (two-pass prefire).
  * When delta is empty, the caller can use note1 directly without another LLM call.
  */
@@ -249,7 +263,8 @@ async function summarizeMiddle(
   if (middle.length === 0) return null
   const headId = middle[0].id
   if (!headId) return null
-  const text = await summarizeWithQualityGate(middle, opts)
+  let text = await summarizeWithQualityGate(middle, opts)
+  text = appendProtectedStructures(text, opts.protectedStructures)
   const removeIds = middle.slice(1).map((m) => m.id).filter((id): id is string => !!id)
   return {
     summary: formatCompactSummaryMessage(headId, text),

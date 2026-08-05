@@ -33,7 +33,13 @@ export { substituteSkillBody, SELF_GATED_TOOLS, isApproved } from './helpers.js'
  */
 export function buildAllTools(
   root: string,
-  spawnSubagent?: (description: string, mode?: 'foreground' | 'background', taskId?: string, signal?: AbortSignal) => Promise<string>,
+  spawnSubagent?: (
+    description: string,
+    mode?: 'foreground' | 'background',
+    taskId?: string,
+    signal?: AbortSignal,
+    isolate?: boolean,
+  ) => Promise<string>,
   cwd?: string,
   dispatch?: DispatchSpec,
   opts: BuildToolsOpts = {},
@@ -91,7 +97,7 @@ export function buildAllTools(
   const fileTools = buildFileTools(resolvePath, root, skillDirs, isFull, pathRoot)
 
   // ── Planning tool ───────────────────────────────────────────────────────────────
-  const planningTools = buildPlanningTools()
+  const planningTools = buildPlanningTools(opts.onWriteTodos)
 
   // ── Assemble base (profile.toolPolicy filters write/edit) ───────────────────────
   const base: StructuredToolInterface[] = !profile.toolPolicy.allowWrites

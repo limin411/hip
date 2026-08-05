@@ -208,6 +208,15 @@ describe('compactToolRounds', () => {
   })
 })
 
+describe('appendProtectedStructures', () => {
+  it('keeps goal block on summary body', async () => {
+    const { appendProtectedStructures } = await import('./compaction.js')
+    const out = appendProtectedStructures('note', '## Active goal (do not drop)\nid: g')
+    expect(out).toContain('note')
+    expect(out).toContain('Active goal')
+  })
+})
+
 describe('applyCompactResult', () => {
   it('replaces middle head in place and removes the rest of the middle', async () => {
     const messages: BaseMessage[] = [

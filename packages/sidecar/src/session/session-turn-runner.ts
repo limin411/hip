@@ -41,6 +41,9 @@ import { synthesizeSubagentResult } from './subagent-result.js'
 import { recursionLimit, childMaxStepsForAgent, maxStepsForSession } from './loop-control.js'
 import type { Activity, ActivityTracker } from './activity.js'
 import type { GoalManager } from './goal.js'
+import { goalToWire } from './goal-types.js'
+import { runGoalVerification } from './verification.js'
+import { createIsolation } from './isolation.js'
 import { addUsage, sumUsage } from './usage.js'
 import { estimatePromptTokens, type Summarizer } from './compaction.js'
 import {
@@ -949,10 +952,34 @@ export async function runTurn(host: SessionTurnHost, rawSend: SendFn, base?: {
   })
   const emit = makeEmit('supervisor', 'supervisor')
   let subagentSeq = 0
-  const spawnSubagent = async (description: string, subagentMode: 'foreground' | 'background' = 'foreground', taskId?: string, signal?: AbortSignal): Promise<string> => {
+  const spawnSubagent = async (
+    description: string,
+    subagentMode: 'foreground' | 'background' = 'foreground',
+    taskId?: string,
+    signal?: AbortSignal,
+    isolate?: boolean,
+  ): Promise<string> => {
     const childId = taskId ?? `worker-${++subagentSeq}`
     host.spawnedSubagentIds.add(childId)
     host.subagentInstances.set(childId, { description })
+    let workerRoot = cwd
+    let isolationNote = ''
+    if (isolate && cwd) {
+      try {
+        const iso = createIsolation({ repoPath: cwd, sessionId: host.id })
+        if (iso.ok && iso.worktree) {
+          workerRoot = iso.worktree.path
+          isolationNote = `\n[isolation ${iso.worktree.id}] ${iso.worktree.path}`
+          send({
+            type: 'isolation:updated',
+            sessionId: host.id,
+            worktrees: [{ id: iso.worktree.id, path: iso.worktree.path, branch: iso.worktree.branch }],
+          })
+        }
+      } catch {
+        /* fall back to shared cwd */
+      }
+    }
     if (subagentMode === 'background') {
       const result = host.backgroundManager.spawn(
         childId,
@@ -963,7 +990,7 @@ export async function runTurn(host: SessionTurnHost, rawSend: SendFn, base?: {
         { originConnectionId: host.currentConnectionId ?? host.ownerConnectionId ?? null },
       )
       if (result !== childId) return result
-      return `Background task started: ${childId}`
+      return `Background task started: ${childId}${isolationNote}`
     }
     if (taskId && host.backgroundTasks.has(taskId)) return `Error: subagent ${taskId} is already running`
     const existingMessages = taskId ? host.loadSubagentMessages(taskId) : undefined
@@ -978,7 +1005,7 @@ export async function runTurn(host: SessionTurnHost, rawSend: SendFn, base?: {
     }
     try {
       const text = await runSubagent({
-        runner, root: cwd, summarizer, emit: makeEmit(childId, 'worker'),
+        runner, root: workerRoot, summarizer, emit: makeEmit(childId, 'worker'),
         signal: signal ?? host.abortController!.signal, description, childMaxSteps: childMaxStepsForAgent('worker', cwd),
         permissionMode: mode, requestApproval, sessionId: host.id,
         title: host.store?.getSession(host.id)?.title,
@@ -990,7 +1017,7 @@ export async function runTurn(host: SessionTurnHost, rawSend: SendFn, base?: {
       const run = trajectory.get(childId)
       const tools = toolsOf()
       // Prefer invoker text; fall back to tee'd stream (empty lastAiText but tokens streamed).
-      const result = synthesizeSubagentResult(text || run?.output, tools)
+      const result = synthesizeSubagentResult(text || run?.output, tools) + isolationNote
       ensureFinished(childId, result)
       return result
     } catch (err) {
@@ -1001,11 +1028,11 @@ export async function runTurn(host: SessionTurnHost, rawSend: SendFn, base?: {
       // Preserve partial research when the model dies mid-loop (e.g. provider 404).
       const partial = synthesizeSubagentResult(run?.output, tools)
       const result =
-        partial && !partial.startsWith('Error:')
+        (partial && !partial.startsWith('Error:')
           ? `${partial}\n\nError: sub-agent stopped early: ${msg}`
           : tools.length > 0
             ? `${synthesizeSubagentResult('', tools)}\n\nError: sub-agent stopped early: ${msg}`
-            : `Error: ${msg}`
+            : `Error: ${msg}`) + isolationNote
       ensureFinished(childId, result)
       return result
     }
@@ -1286,18 +1313,17 @@ export async function runTurn(host: SessionTurnHost, rawSend: SendFn, base?: {
         send({
           type: 'goal:updated',
           sessionId: host.id,
-          goal: goal
-            ? {
-                id: goal.id,
-                description: goal.description,
-                status: goal.status as 'active' | 'paused' | 'blocked' | 'completed',
-                turns: goal.usage.turns,
-                maxTurns: goal.budget.maxTurns,
-                tokens: goal.usage.tokens,
-                maxTokens: goal.budget.maxTokens,
-              }
-            : null,
+          goal: goalToWire(goal),
         })
+      },
+      runVerification: async () => {
+        const r = await runGoalVerification(host.goalManager, cwd)
+        send({ type: 'verification:result', sessionId: host.id, ok: r.ok, detail: r.detail })
+        return r
+      },
+      onWriteTodos: (todos) => {
+        host.goalManager.setTodosFromPlan(todos)
+        send({ type: 'goal:updated', sessionId: host.id, goal: goalToWire(host.goalManager.getStatus()) })
       },
       cronManager: host.cronManager,
       planMode,
@@ -1326,6 +1352,7 @@ export async function runTurn(host: SessionTurnHost, rawSend: SendFn, base?: {
     compactThresholdPercent: contextPolicy.autoCompactPercent,
     contextPolicy,
     lastPromptTokens: host.lastPromptTokens,
+    protectedStructures: host.goalManager.protectedBlock() || undefined,
     // Prefire cache is created lazily inside the graph when two-pass is enabled.
     beforeLlmCompact: async () => {
       if (!contextPolicy.memoryFlushBeforeCompact) return

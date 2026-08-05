@@ -504,12 +504,29 @@ export type ServerMessage =
       goal: null | {
         id: string
         description: string
-        status: 'active' | 'paused' | 'blocked' | 'completed'
+        status: 'active' | 'paused' | 'blocked' | 'completed' | 'failed'
         turns: number
         maxTurns: number
         tokens: number
         maxTokens: number
+        successCriteria?: string[]
+        activePhaseTitle?: string
+        openTodoCount?: number
+        criteriaDone?: number
+        criteriaTotal?: number
+        lastVerifyOk?: boolean
       }
+    }
+  | {
+      type: 'isolation:updated'
+      sessionId: string
+      worktrees: Array<{ id: string; path: string; branch: string }>
+    }
+  | {
+      type: 'verification:result'
+      sessionId: string
+      ok: boolean
+      detail: string
     }
   | { type: 'agent:profiles'; sessionId: string; profiles: AgentProfileInfo[] }
   | { type: 'agent:notification'; sessionId: string; taskId: string; description: string; status: 'completed' | 'failed' | 'killed'; result?: string; error?: string }

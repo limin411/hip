@@ -491,6 +491,8 @@ export interface BuildToolsOpts {
   shellBackgroundEnabled?: boolean
   monitorEnabled?: boolean
   schedulerWakeEnabled?: boolean
+  /** Bind write_todos into active goal phase (long-task M1). */
+  onWriteTodos?: (todos: Array<{ content: string; status: string }>) => void
 }
 
 /** True for an allow decision (run_script may execute). Keys off the decision's SEMANTIC `kind`

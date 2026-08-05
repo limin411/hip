@@ -538,6 +538,11 @@ export function applyServerMessageEffects(msg: ServerMessage, deps: ServerMessag
         status: msg.goal.status,
         turns: msg.goal.turns,
         maxTurns: msg.goal.maxTurns,
+        activePhaseTitle: msg.goal.activePhaseTitle,
+        openTodoCount: msg.goal.openTodoCount,
+        criteriaDone: msg.goal.criteriaDone,
+        criteriaTotal: msg.goal.criteriaTotal,
+        lastVerifyOk: msg.goal.lastVerifyOk,
       })
       return
     }

@@ -37,7 +37,13 @@ export interface BuildSessionToolingInput {
   mcpConfigs: McpServerConfig[]
   enabledAgents: AgentConfig[]
   dispatch?: DispatchSpec
-  spawnSubagent: (description: string, mode?: 'foreground' | 'background', taskId?: string, signal?: AbortSignal) => Promise<string>
+  spawnSubagent: (
+    description: string,
+    mode?: 'foreground' | 'background',
+    taskId?: string,
+    signal?: AbortSignal,
+    isolate?: boolean,
+  ) => Promise<string>
   retrySubagent?: (agentId: string) => Promise<string>
   stopBackgroundTask?: (taskId: string, reason?: string) => string
   getBackgroundTaskOutput?: (taskId: string, timeoutMs?: number) => string | Promise<string>
@@ -60,6 +66,8 @@ export interface BuildSessionToolingInput {
   goalManager?: GoalManager
   /** Emit goal:updated to the UI when goal tools change state. */
   onGoalUpdated?: (goal: import('./goal.js').Goal | null) => void
+  runVerification?: () => Promise<{ ok: boolean; detail: string }>
+  onWriteTodos?: (todos: Array<{ content: string; status: string }>) => void
   cronManager?: CronManager
   /** TaskRuntime (shell bg / monitor / wait). */
   taskRuntime?: BackgroundManager
@@ -110,6 +118,7 @@ export async function buildSessionTooling(input: BuildSessionToolingInput): Prom
       shellBackgroundEnabled: input.shellBackgroundEnabled,
       monitorEnabled: input.monitorEnabled,
       schedulerWakeEnabled: input.schedulerWakeEnabled,
+      onWriteTodos: input.onWriteTodos,
     },
     input.retrySubagent,
     input.stopBackgroundTask,
@@ -120,8 +129,17 @@ export async function buildSessionTooling(input: BuildSessionToolingInput): Prom
     registry.register(t)
   }
   if (input.goalManager) {
-    const goalTools = buildGoalTools(input.goalManager, input.onGoalUpdated)
+    const goalTools = buildGoalTools(input.goalManager, input.onGoalUpdated, input.runVerification)
     for (const t of goalTools) {
+      registry.register(t)
+    }
+  }
+  {
+    const { buildIsolationTools } = await import('./tools/isolation.js')
+    for (const t of buildIsolationTools({
+      repoPath: input.cwd,
+      sessionId: input.sessionId,
+    })) {
       registry.register(t)
     }
   }

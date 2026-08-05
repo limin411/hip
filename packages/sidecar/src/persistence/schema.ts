@@ -597,6 +597,24 @@ export function migrate(db: DatabaseSync): void {
       throw e
     }
   }
+  if (version < 25) {
+    db.exec('BEGIN')
+    try {
+      // Durable long-task goal (one active row per session; JSON payload).
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS session_goals (
+          session_id TEXT PRIMARY KEY REFERENCES sessions(id) ON DELETE CASCADE,
+          goal_json TEXT NOT NULL,
+          updated_at INTEGER NOT NULL
+        );
+      `)
+      db.exec('PRAGMA user_version = 25')
+      db.exec('COMMIT')
+    } catch (e) {
+      db.exec('ROLLBACK')
+      throw e
+    }
+  }
 }
 
 /** Try to create the FTS5 objects. Returns true if FTS is available. */

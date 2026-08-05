@@ -242,7 +242,7 @@ describe('buildGoalTools', () => {
     expect(result).toContain('active')
     expect(result).toContain('3 turns')
     expect(result).toContain('5,000 tokens')
-    expect(result).toContain('1 turns used')
+    expect(result).toMatch(/1\/3 turns/)
   })
 
   it('goal_status tool returns no-goal message when none exists', async () => {

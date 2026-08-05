@@ -32,6 +32,13 @@ export function GoalStatusChip() {
         {goal.turns != null && goal.maxTurns != null
           ? ` · ${goal.turns}/${goal.maxTurns}`
           : ''}
+        {goal.criteriaTotal != null && goal.criteriaTotal > 0
+          ? ` · ✓${goal.criteriaDone ?? 0}/${goal.criteriaTotal}`
+          : ''}
+        {goal.openTodoCount != null && goal.openTodoCount > 0
+          ? ` · ${goal.openTodoCount} open`
+          : ''}
+        {goal.lastVerifyOk === true ? ' · verify✓' : goal.lastVerifyOk === false ? ' · verify✗' : ''}
       </span>
       <span className="sr-only">{t('chat.goal.aria', { defaultValue: 'Active goal' })}</span>
     </div>

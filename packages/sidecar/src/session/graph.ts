@@ -206,6 +206,8 @@ export interface GraphCtx {
    * contextWindowTokens × TARGET_THRESHOLD_PERCENT minus system/tools overhead.
    */
   targetKeepTokens?: number
+  /** Goal/todos/verify block forced into LLM compact summaries. */
+  protectedStructures?: string
   /**
    * Best-effort hook before LLM history compaction (e.g. memory flush).
    * Must not throw; errors are swallowed by the compact node.
@@ -624,6 +626,7 @@ export function buildGraph(maxSteps: number = MAX_STEPS, compactBudget: number =
       sessionId: ctx.sessionId,
       ...(targetKeep != null ? { targetKeepTokens: targetKeep } : {}),
       ...(prefire ? { prefire } : {}),
+      ...(ctx.protectedStructures ? { protectedStructures: ctx.protectedStructures } : {}),
     })
     // Consumed NOTE₁ — clear so the next cycle does not reuse a stale note.
     prefire?.clear()
@@ -821,6 +824,7 @@ export function buildGraph(maxSteps: number = MAX_STEPS, compactBudget: number =
           sessionId: ctx.sessionId,
           ...(targetKeep != null ? { targetKeepTokens: targetKeep } : {}),
           ...(prefire ? { prefire } : {}),
+          ...(ctx.protectedStructures ? { protectedStructures: ctx.protectedStructures } : {}),
         })
         prefire?.clear()
         if (!result) return null

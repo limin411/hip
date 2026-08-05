@@ -26,6 +26,8 @@ import { runSubagent } from './subagent.js'
 import { maxStepsForSession } from './loop-control.js'
 import { Activity, ActivityTracker } from './activity.js'
 import { GoalManager } from './goal.js'
+import type { Goal } from './goal-types.js'
+import { goalToWire } from './goal-types.js'
 import { addUsage, sumUsage } from './usage.js'
 import { compactMessages, applyCompactResult, estimateTokens, KEEP_RECENT_TURNS, type Summarizer } from './compaction.js'
 import {
@@ -161,6 +163,12 @@ export class Session {
   currentConnectionId: string | null = null
   private readonly inputQueue: SessionInput[] = []
   private steerAbortFlag = false
+  /**
+   * Steer while running: `abort` interrupts the turn (legacy/default for HITL feel).
+   * `boundary` waits for tool settlement (OpenCode-style). Override via HIP_STEER_MODE=boundary.
+   */
+  steerMode: 'boundary' | 'abort' =
+    process.env.HIP_STEER_MODE === 'boundary' ? 'boundary' : 'abort'
   private paused: {
     messages: BaseMessage[]
     steps: number
@@ -358,6 +366,30 @@ export class Session {
       this.inputQueue.push(...this.inputQueueStore.restore())
     }
 
+    if (store) {
+      this.goalManager.setPersist((goal) => {
+        try {
+          store.saveSessionGoal(id, goal ? JSON.stringify(goal) : null)
+        } catch (e) {
+          logInfo('session', 'goal:persist-failed', {
+            sessionId: id,
+            error: e instanceof Error ? e.message : String(e),
+          })
+        }
+      })
+      try {
+        const raw = store.loadSessionGoal(id)
+        if (raw) {
+          const parsed = JSON.parse(raw) as Goal
+          if (parsed && typeof parsed.id === 'string' && typeof parsed.description === 'string') {
+            this.goalManager.hydrate(parsed)
+          }
+        }
+      } catch {
+        /* ignore corrupt goal */
+      }
+    }
+
     this.git = new GitOperations(id, store)
     this.permissions = new PermissionManager(
       () => this._config.permissionMode ?? 'edit',
@@ -472,6 +504,7 @@ export class Session {
       result = await compactMessages(this.messages, {
         keepRecentTurns: KEEP_RECENT_TURNS,
         summarizer: this.summarizer(),
+        protectedStructures: this.goalManager.protectedBlock(),
         ...(opts?.focus ? { focus: opts.focus } : {}),
       })
     } catch (e) {
@@ -917,9 +950,22 @@ export class Session {
     if (id && !input.messageId) input.messageId = id
     this.inputQueue.push(input)
     if (input.type === 'steer' && this.running && this.abortController) {
-      this.steerAbortFlag = true
-      this.abortController.abort()
+      if (this.steerMode === 'abort') {
+        this.steerAbortFlag = true
+        this.abortController.abort()
+      }
+      // boundary: leave running turn alone; promoteSteer after tools settle
     }
+  }
+
+  /** Emit goal chrome to a connected client (resume / hydrate). */
+  emitGoalUpdated(send: SendFn): void {
+    const goal = this.goalManager.getStatus()
+    send({
+      type: 'goal:updated',
+      sessionId: this.id,
+      goal: goalToWire(goal),
+    })
   }
 
   promoteSteerInput(): SessionInput | undefined {

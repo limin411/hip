@@ -1,6 +1,6 @@
 import { create } from 'zustand'
 
-export type GoalUiStatus = 'active' | 'paused' | 'blocked' | 'completed'
+export type GoalUiStatus = 'active' | 'paused' | 'blocked' | 'completed' | 'failed'
 
 export interface SessionGoal {
   id: string
@@ -8,6 +8,11 @@ export interface SessionGoal {
   status: GoalUiStatus
   turns?: number
   maxTurns?: number
+  activePhaseTitle?: string
+  openTodoCount?: number
+  criteriaDone?: number
+  criteriaTotal?: number
+  lastVerifyOk?: boolean
 }
 
 interface GoalState {

@@ -702,6 +702,28 @@ export class SessionStore {
   }
 
   /** Admit a pending input into the durable queue. */
+  // ── Durable goals (long-task M1) ──────────────────────────────────────────
+
+  saveSessionGoal(sessionId: string, goalJson: string | null): void {
+    if (goalJson == null) {
+      this.db.prepare(`DELETE FROM session_goals WHERE session_id=?`).run(sessionId)
+      return
+    }
+    this.db
+      .prepare(
+        `INSERT INTO session_goals(session_id, goal_json, updated_at) VALUES(?,?,?)
+         ON CONFLICT(session_id) DO UPDATE SET goal_json=excluded.goal_json, updated_at=excluded.updated_at`,
+      )
+      .run(sessionId, goalJson, Date.now())
+  }
+
+  loadSessionGoal(sessionId: string): string | null {
+    const row = this.db
+      .prepare(`SELECT goal_json FROM session_goals WHERE session_id=?`)
+      .get(sessionId) as { goal_json: string } | undefined
+    return row?.goal_json ?? null
+  }
+
   admitSessionInput(r: { id: string; sessionId: string; prompt: string; delivery: 'steer' | 'queue'; timeCreated: number }): void {
     const seq = this.nextInputSeq(r.sessionId)
     this.db.prepare(

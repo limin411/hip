@@ -117,7 +117,50 @@ describe('SpaceTree selection visuals', () => {
     expect(row.className).toContain('hover:bg-state-hover')
   })
 
-  it.skip('renders board rows — boards removed from tree', () => {})
+  it('hides board nodes from the tree (legacy disk boards stay off UI)', () => {
+    seedTree('doc_1', {
+      nodes: [
+        {
+          id: 'doc_1',
+          parentId: null,
+          kind: 'doc',
+          title: 'Active Note',
+          order: 0,
+          createdAt: 1,
+          updatedAt: 1,
+        },
+        {
+          id: 'brd_legacy',
+          parentId: null,
+          kind: 'board',
+          title: 'Legacy Board Title',
+          order: 1,
+          createdAt: 1,
+          updatedAt: 1,
+        },
+        {
+          id: 'fld_1',
+          parentId: null,
+          kind: 'folder',
+          title: 'Folder',
+          order: 2,
+          createdAt: 1,
+          updatedAt: 1,
+        },
+      ],
+    })
+    render(
+      <SpaceTree
+        onRename={noop}
+        onDelete={noop}
+        onNewDoc={noop}
+        onNewFolder={noop}
+      />,
+    )
+    expect(screen.getByTestId('knowledge-tree-doc-doc_1')).toBeInTheDocument()
+    expect(screen.queryByText('Legacy Board Title')).not.toBeInTheDocument()
+    expect(screen.queryByTestId('knowledge-tree-board-brd_legacy')).not.toBeInTheDocument()
+  })
 })
 
 describe('listVisibleTreeNodes', () => {

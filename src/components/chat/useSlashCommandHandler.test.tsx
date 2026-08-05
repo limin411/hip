@@ -3,6 +3,7 @@ import '@testing-library/jest-dom/vitest'
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { renderHook } from '@testing-library/react'
 import {
+  extractCompactFocus,
   formatHelpMessageBody,
   formatHelpToastBody,
   useSlashCommandHandler,
@@ -101,7 +102,14 @@ const codeOnly = (id: string): SlashCommand =>
   ({ id, name: id, description: id, kind: 'builtin', availableIn: ['code'] } as SlashCommand)
 
 const diffCmd = codeOnly('diff')
-const compactCmd: SlashCommand = { id: 'compact', name: 'compact', description: 'compact', kind: 'builtin', availableIn: ['chat', 'code'], requiresSession: true }
+const compactCmd: SlashCommand = {
+  id: 'compact',
+  name: 'compact',
+  description: 'compact',
+  kind: 'builtin',
+  availableIn: ['chat', 'code', 'terminal'],
+  requiresSession: true,
+}
 const initCmd: SlashCommand = {
   id: 'init',
   name: 'init',
@@ -110,6 +118,22 @@ const initCmd: SlashCommand = {
   availableIn: ['code'],
   requiresSession: true,
 }
+
+describe('extractCompactFocus', () => {
+  it('returns undefined without a focus suffix', () => {
+    expect(extractCompactFocus('/compact')).toBeUndefined()
+    expect(extractCompactFocus('/compact   ')).toBeUndefined()
+    expect(extractCompactFocus('/compacted')).toBeUndefined()
+    expect(extractCompactFocus('not a command')).toBeUndefined()
+  })
+
+  it('captures trailing focus text (case-insensitive command)', () => {
+    expect(extractCompactFocus('/compact auth')).toBe('auth')
+    expect(extractCompactFocus('/compact  auth  next ')).toBe('auth  next')
+    expect(extractCompactFocus('/COMPACT Foo')).toBe('Foo')
+    expect(extractCompactFocus('please /compact x')).toBe('x')
+  })
+})
 
 describe('useSlashCommandHandler', () => {
   beforeEach(async () => {

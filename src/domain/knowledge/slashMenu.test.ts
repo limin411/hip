@@ -2,14 +2,17 @@ import { describe, expect, it } from 'vitest'
 import {
   BLOCK_SLASH_IDS,
   KNOWLEDGE_SLASH_ITEMS,
+  SLASH_GROUP_ORDER,
   TABLE_SKELETON_3X2,
   applySlashInsertText,
   extractSlashQueryAt,
   filterSlashItems,
   filterSlashItemsForLive,
+  groupSlashItems,
   liveAllowsBlockSlash,
   prepareSlashInsert,
   sameSlashMatch,
+  slashGroupLabelKey,
   slashItemLabelKey,
 } from './slashMenu'
 
@@ -75,6 +78,38 @@ describe('slashMenu', () => {
   it('slashItemLabelKey nests under knowledge.slash', () => {
     expect(slashItemLabelKey('h1')).toBe('knowledge.slash.h1')
     expect(slashItemLabelKey('table')).toBe('knowledge.slash.table')
+  })
+
+  it('slashGroupLabelKey nests under knowledge.slash.group', () => {
+    expect(slashGroupLabelKey('basic')).toBe('knowledge.slash.group.basic')
+    expect(slashGroupLabelKey('list')).toBe('knowledge.slash.group.list')
+    expect(slashGroupLabelKey('media')).toBe('knowledge.slash.group.media')
+    expect(slashGroupLabelKey('advanced')).toBe('knowledge.slash.group.advanced')
+  })
+
+  describe('groupSlashItems', () => {
+    it('orders groups by SLASH_GROUP_ORDER and omits empty groups', () => {
+      const groups = groupSlashItems(KNOWLEDGE_SLASH_ITEMS)
+      expect(groups.map((g) => g.group)).toEqual([...SLASH_GROUP_ORDER])
+      expect(groups.every((g) => g.items.length > 0)).toBe(true)
+      const byGroup = Object.fromEntries(groups.map((g) => [g.group, g.items.map((i) => i.id)]))
+      expect(byGroup.basic).toEqual(expect.arrayContaining(['h1', 'quote']))
+      expect(byGroup.list).toEqual(expect.arrayContaining(['task']))
+      expect(byGroup.media).toEqual(expect.arrayContaining(['table', 'fence']))
+      expect(byGroup.advanced).toEqual(expect.arrayContaining(['wiki', 'embed']))
+    })
+
+    it('keeps filter order within a group and drops empty sections', () => {
+      const filtered = filterSlashItems(KNOWLEDGE_SLASH_ITEMS, 'wiki')
+      const groups = groupSlashItems(filtered)
+      expect(groups).toHaveLength(1)
+      expect(groups[0].group).toBe('advanced')
+      expect(groups[0].items.some((i) => i.id === 'wiki')).toBe(true)
+    })
+
+    it('returns empty for empty input', () => {
+      expect(groupSlashItems([])).toEqual([])
+    })
   })
 
   describe('extractSlashQueryAt', () => {

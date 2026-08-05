@@ -43,7 +43,6 @@ vi.mock('@/ipc/knowledge', () => ({
   knowledgeReadDoc: (...a: unknown[]) => knowledgeReadDoc(...a),
   knowledgeWriteDoc: (...a: unknown[]) => knowledgeWriteDoc(...a),
   knowledgeDeleteDocFile: vi.fn(),
-  knowledgeDeleteBoardFile: vi.fn(),
   knowledgeListTemplates: (...a: unknown[]) => knowledgeListTemplates(...a),
   knowledgeSaveTemplate: (...a: unknown[]) => knowledgeSaveTemplate(...a),
   knowledgeDeleteTemplate: (...a: unknown[]) => knowledgeDeleteTemplate(...a),
@@ -1960,6 +1959,97 @@ describe('knowledgeStore version snapshots', () => {
     const list = await useKnowledgeStore.getState().listVersions()
     expect(list).toHaveLength(1)
     expect(knowledgeListVersions).toHaveBeenCalledWith('spc_1', 'doc_1')
+  })
+})
+
+describe('knowledgeStore rejects boards / non-docs', () => {
+  beforeEach(() => {
+    knowledgeReadDoc.mockReset()
+    knowledgeSaveVersion.mockReset()
+    knowledgeListVersions.mockReset()
+    knowledgeRestoreVersion.mockReset()
+    vi.mocked(toast.error).mockClear()
+    useKnowledgeStore.setState({
+      loaded: true,
+      spaces: [{ id: 'spc_1', name: 'S', createdAt: 1, updatedAt: 1 }],
+      activeSpaceId: 'spc_1',
+      nodes: [
+        {
+          id: 'doc_1',
+          parentId: null,
+          kind: 'doc',
+          title: 'Note',
+          order: 0,
+          createdAt: 1,
+          updatedAt: 1,
+        },
+        {
+          id: 'brd_legacy',
+          parentId: null,
+          kind: 'board',
+          title: 'Old Board',
+          order: 1,
+          createdAt: 1,
+          updatedAt: 1,
+        },
+        {
+          id: 'fld_1',
+          parentId: null,
+          kind: 'folder',
+          title: 'Folder',
+          order: 2,
+          createdAt: 1,
+          updatedAt: 1,
+        },
+      ],
+      activeDocId: 'doc_1',
+      treeFocusId: 'doc_1',
+      docBody: '# ok',
+      draftBody: '# ok',
+      editorMode: 'live',
+      mode: 'workspace',
+      searchQuery: '',
+      searchHits: [],
+      indexStatus: 'idle',
+      spaceDocCounts: { spc_1: 1 },
+      recent: [],
+      expandedFolderIds: {},
+      busy: false,
+      error: null,
+      saveState: 'idle',
+      backlinks: [],
+      outboundLinks: [],
+      linkPanelStatus: 'idle',
+      pendingReveal: null,
+    })
+  })
+
+  it('openDoc rejects board ids without reading disk', async () => {
+    await useKnowledgeStore.getState().openDoc('brd_legacy')
+    expect(knowledgeReadDoc).not.toHaveBeenCalled()
+    const s = useKnowledgeStore.getState()
+    expect(s.activeDocId).toBeNull()
+    expect(s.treeFocusId).toBeNull()
+    expect(s.docBody).toBe('')
+    expect(s.draftBody).toBe('')
+    expect(toast.error).toHaveBeenCalledWith('knowledge.doc.loadFailed')
+  })
+
+  it('openDoc rejects folder ids', async () => {
+    await useKnowledgeStore.getState().openDoc('fld_1')
+    expect(knowledgeReadDoc).not.toHaveBeenCalled()
+    expect(useKnowledgeStore.getState().activeDocId).toBeNull()
+    expect(toast.error).toHaveBeenCalled()
+  })
+
+  it('version APIs no-op for brd_ ids without IPC', async () => {
+    useKnowledgeStore.setState({ activeDocId: 'brd_legacy' })
+    await expect(useKnowledgeStore.getState().saveVersionManual()).resolves.toBeNull()
+    await expect(useKnowledgeStore.getState().listVersions()).resolves.toEqual([])
+    await expect(useKnowledgeStore.getState().restoreVersion('v1')).resolves.toBe(false)
+    expect(knowledgeSaveVersion).not.toHaveBeenCalled()
+    expect(knowledgeListVersions).not.toHaveBeenCalled()
+    expect(knowledgeRestoreVersion).not.toHaveBeenCalled()
   })
 })
 

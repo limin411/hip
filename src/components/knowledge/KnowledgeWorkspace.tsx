@@ -214,7 +214,7 @@ export function KnowledgeWorkspace() {
       } else {
         const liveRoot =
           document.querySelector('[data-testid="knowledge-doc-live-editor"]') ??
-          document.querySelector('.knowledge-live-editor')
+          document.querySelector('.knowledge-blocknote-editor')
         if (liveRoot instanceof HTMLElement) {
           revealInPreviewRoot(liveRoot, still.query)
           useKnowledgeStore.getState().clearPendingReveal()
@@ -271,10 +271,10 @@ export function KnowledgeWorkspace() {
       // If CM not mounted yet, leave pending — effect re-runs when mode/body settles.
       return
     }
-    // Live: Milkdown headings lack stable ids — match by text (nth occurrence).
+    // Live (BlockNote): headings lack stable ids — match by text (nth occurrence).
     const liveRoot =
       document.querySelector('[data-testid="knowledge-doc-live-editor"]') ??
-      document.querySelector('.knowledge-live-editor')
+      document.querySelector('.knowledge-blocknote-editor')
     if (!(liveRoot instanceof HTMLElement)) return
     const body = useKnowledgeStore.getState().draftBody || useKnowledgeStore.getState().docBody
     let occurrence = 0

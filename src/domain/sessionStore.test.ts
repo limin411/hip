@@ -29,6 +29,51 @@ function baseSession(over: Partial<SessionVM> = {}): SessionVM {
   }
 }
 
+describe('removeSessionMessages', () => {
+  beforeEach(() => {
+    useDomainStore.setState({
+      sessions: [
+        baseSession({
+          id: 's1',
+          messages: [
+            { id: 'm1', role: 'user', content: 'a', timestamp: 1 },
+            { id: 'm2', role: 'assistant', content: 'b', timestamp: 2 },
+            { id: 'm3', role: 'user', content: 'c', timestamp: 3 },
+          ],
+        }),
+        baseSession({
+          id: 's2',
+          messages: [{ id: 'x1', role: 'user', content: 'keep', timestamp: 1 }],
+        }),
+      ],
+      activeSessionId: 's1',
+    })
+  })
+
+  it('removes a subset and preserves survivor order', () => {
+    useDomainStore.getState().removeSessionMessages('s1', ['m2'])
+    expect(useDomainStore.getState().sessions.find((s) => s.id === 's1')!.messages.map((m) => m.id)).toEqual([
+      'm1',
+      'm3',
+    ])
+  })
+
+  it('ignores unknown ids and empty lists', () => {
+    useDomainStore.getState().removeSessionMessages('s1', ['nope'])
+    expect(useDomainStore.getState().sessions.find((s) => s.id === 's1')!.messages).toHaveLength(3)
+    useDomainStore.getState().removeSessionMessages('s1', [])
+    expect(useDomainStore.getState().sessions.find((s) => s.id === 's1')!.messages).toHaveLength(3)
+  })
+
+  it('does not touch other sessions and can clear all ids', () => {
+    useDomainStore.getState().removeSessionMessages('s1', ['m1', 'm2', 'm3'])
+    expect(useDomainStore.getState().sessions.find((s) => s.id === 's1')!.messages).toEqual([])
+    expect(useDomainStore.getState().sessions.find((s) => s.id === 's2')!.messages.map((m) => m.id)).toEqual([
+      'x1',
+    ])
+  })
+})
+
 describe('applyServerMessage', () => {
   it('token:stream from a supervisor streams into the answer body', () => {
     const s0 = { sessions: [baseSession({ messages: [

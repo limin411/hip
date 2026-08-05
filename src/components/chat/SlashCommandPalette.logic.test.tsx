@@ -582,6 +582,43 @@ describe('SlashCommandPalette keyboard navigation', () => {
     expect(onSelect).not.toHaveBeenCalled()
   })
 
+  it('enterFallsThroughOnEmpty dismisses without selecting so composer can send', () => {
+    const onSelect = vi.fn()
+    const onDismiss = vi.fn()
+    render(
+      <SlashCommandPalette
+        value="/zzz"
+        surface="chat"
+        sessionId="s1"
+        onSelect={onSelect}
+        onDismiss={onDismiss}
+        enterFallsThroughOnEmpty
+      />,
+    )
+    fireEvent.keyDown(document, { key: 'Enter' })
+    expect(onSelect).not.toHaveBeenCalled()
+    expect(onDismiss).toHaveBeenCalledTimes(1)
+  })
+
+  it('enterFallsThroughOnEmpty still selects when a match exists', () => {
+    const onSelect = vi.fn()
+    const onDismiss = vi.fn()
+    render(
+      <SlashCommandPalette
+        value="/help"
+        surface="chat"
+        sessionId="s1"
+        onSelect={onSelect}
+        onDismiss={onDismiss}
+        enterFallsThroughOnEmpty
+      />,
+    )
+    fireEvent.keyDown(document, { key: 'Enter' })
+    expect(onSelect).toHaveBeenCalledTimes(1)
+    expect(onSelect.mock.calls[0][0].name).toBe('help')
+    expect(onDismiss).not.toHaveBeenCalled()
+  })
+
   it('ArrowDown on empty state is a no-op', () => {
     const onDismiss = vi.fn()
     render(
@@ -741,6 +778,32 @@ describe('buildCommandList surface filtering', () => {
     // /init needs a session (sends AGENTS.md generation prompt); /compact same.
     expect(list.map((c) => c.name)).not.toContain('init')
     expect(list.map((c) => c.name)).not.toContain('compact')
+  })
+
+  it('terminal surface only exposes /compact among builtins (session-gated)', () => {
+    const withSession = buildCommandList(
+      [
+        {
+          id: 's1',
+          name: 'greet',
+          description: 'hi',
+          scope: 'global',
+          autoInvoke: false,
+          dir: '/tmp/s1',
+          hasScripts: false,
+        },
+      ],
+      { surface: 'terminal', sessionId: 't1' },
+    )
+    const builtins = withSession.filter((c) => c.kind === 'builtin')
+    expect(builtins.map((c) => c.name)).toEqual(['compact'])
+    expect(builtins[0].availableIn).toContain('terminal')
+    // Skills still list after builtins when the host passes them.
+    expect(withSession.map((c) => c.name)).toContain('greet')
+
+    const noSession = buildCommandList(undefined, { surface: 'terminal', sessionId: null })
+    expect(noSession.map((c) => c.name)).not.toContain('compact')
+    expect(noSession.every((c) => c.kind !== 'builtin' || c.name !== 'compact')).toBe(true)
   })
 })
 

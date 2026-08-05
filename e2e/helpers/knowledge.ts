@@ -1262,3 +1262,1021 @@ export async function createNewDocFromMenu(): Promise<void> {
   await waitForKnowledgeWritableSurface(20000)
   await browser.pause(200)
 }
+// ── Phase 1 + Live helpers (Batch E–F) ────────────────────────────────────
+
+/** Attachment file picker seam (`pickAttachmentFiles`). */
+export async function installPickAttachmentFilesSeam(paths: string[]): Promise<void> {
+  await browser.execute((ps: string[]) => {
+    ;(
+      window as unknown as { __hipPickAttachmentFiles?: () => Promise<string[] | null> }
+    ).__hipPickAttachmentFiles = async () => ps
+  }, paths)
+}
+
+export async function clearPickAttachmentFilesSeam(): Promise<void> {
+  await browser.execute(() => {
+    delete (window as unknown as { __hipPickAttachmentFiles?: unknown })
+      .__hipPickAttachmentFiles
+  })
+}
+
+/** Live editor flag (product-on by default; pass false to opt out). Re-read on next React render. */
+export async function setKnowledgeLiveFlag(enabled: boolean): Promise<void> {
+  await browser.execute((on: boolean) => {
+    try {
+      if (on) localStorage.setItem('hip-knowledge-live', 'true')
+      else localStorage.setItem('hip-knowledge-live', 'false')
+    } catch {
+      // ignore
+    }
+  }, enabled)
+  // Nudge a re-render by toggling a harmless UI interaction if needed.
+  await browser.pause(100)
+}
+
+export async function clearKnowledgeLiveFlag(): Promise<void> {
+  await browser.execute(() => {
+    try {
+      localStorage.removeItem('hip-knowledge-live')
+      localStorage.removeItem('hip-knowledge-editor-mode')
+    } catch {
+      // ignore
+    }
+  })
+}
+
+/** Ensure Live product canvas (default writing path). */
+export async function ensureKnowledgeLive(): Promise<void> {
+  if (await (await browser.$('[data-testid="knowledge-doc-live-editor"]')).isExisting()) {
+    return
+  }
+  const viaHook = await browser.execute(async () => {
+    const hooks = (
+      window as unknown as {
+        __hipE2E?: { knowledgeSetEditorMode?: (m: 'live' | 'source') => Promise<void> }
+      }
+    ).__hipE2E
+    if (!hooks?.knowledgeSetEditorMode) return false
+    await hooks.knowledgeSetEditorMode('live')
+    return true
+  })
+  if (!viaHook) {
+    await setKnowledgeLiveFlag(true)
+    await browser.pause(100)
+    await reopenActiveKnowledgeDoc()
+  }
+  await (await browser.$('[data-testid="knowledge-doc-live-editor"]')).waitForExist({
+    timeout: 20000,
+    timeoutMsg: 'knowledge-doc-live-editor not mounted after knowledgeSetEditorMode(live)',
+  })
+}
+
+/** @deprecated Milkdown NodeView; Live is BlockNote — wait for host + marker instead. */
+export async function waitForKnowledgeLiveMermaid(timeoutMs = 15000): Promise<void> {
+  await (
+    await browser.$('[data-testid="knowledge-doc-live-editor"]')
+  ).waitForExist({ timeout: timeoutMs })
+}
+
+/** Wait for a code-like block inside BlockNote Live (pre / BN codeBlock). */
+export async function waitForKnowledgeLiveCodeBlock(timeoutMs = 15000): Promise<void> {
+  await browser.waitUntil(
+    async () => {
+      const c = await countLiveBlockNodeViews()
+      return c.code > 0
+    },
+    {
+      timeout: timeoutMs,
+      interval: 200,
+      timeoutMsg: 'no code block in BlockNote Live host',
+    },
+  )
+}
+
+/** @deprecated Milkdown NodeView; Live is BlockNote — wait for host instead. */
+export async function waitForKnowledgeLiveSvg(timeoutMs = 15000): Promise<void> {
+  await (
+    await browser.$('[data-testid="knowledge-doc-live-editor"]')
+  ).waitForExist({ timeout: timeoutMs })
+}
+
+/** Type into Live ProseMirror host (best-effort). */
+export async function typeInKnowledgeLiveEditor(text: string): Promise<void> {
+  const host = await browser.$(
+    '[data-testid="knowledge-doc-live-editor"] .ProseMirror, [data-testid="knowledge-doc-live-editor"] [contenteditable="true"]',
+  )
+  await host.waitForExist({ timeout: 15000 })
+  await browser.execute(
+    (el: HTMLElement, t: string) => {
+      el.focus()
+      const sel = window.getSelection()
+      const range = document.createRange()
+      range.selectNodeContents(el)
+      range.collapse(false)
+      sel?.removeAllRanges()
+      sel?.addRange(range)
+      const ok = document.execCommand('insertText', false, t)
+      if (!ok) {
+        el.dispatchEvent(
+          new InputEvent('beforeinput', {
+            bubbles: true,
+            cancelable: true,
+            inputType: 'insertText',
+            data: t,
+          }),
+        )
+      }
+    },
+    host,
+    text,
+  )
+  await browser.pause(200)
+}
+
+/** Save current doc as a space template via doc menu. */
+export async function saveDocAsTemplate(name: string): Promise<void> {
+  await clickMenuItem('knowledge-doc-menu', 'knowledge-save-as-template')
+  await setReactInputValue('knowledge-save-template-name', name)
+  const confirm = await browser.$('[data-testid="knowledge-save-template-confirm"]')
+  await confirm.waitForExist({ timeout: 10000 })
+  await browser.execute((el: HTMLElement) => el.click(), confirm)
+  await browser.pause(400)
+}
+
+/**
+ * Open new-doc via tree context menu; returns whether template picker appeared.
+ * Does **not** confirm — use pickTemplateEmpty / pickTemplateByName / cancelTemplatePicker.
+ */
+export async function openNewDocMaybePicker(): Promise<'picker' | 'editor'> {
+  await openContextMenu('[data-testid="knowledge-tree-pane"]')
+  await clickContextMenuItem('knowledgeTree.newDoc')
+  await browser.pause(300)
+  const picker = await browser.$('[data-testid="knowledge-template-picker"]')
+  if (await picker.isExisting()) return 'picker'
+  await waitForKnowledgeWritableSurface(15000)
+  return 'editor'
+}
+
+export async function cancelTemplatePicker(): Promise<void> {
+  const cancel = await browser.$('[data-testid="knowledge-template-pick-cancel"]')
+  await cancel.waitForExist({ timeout: 10000 })
+  await browser.execute((el: HTMLElement) => el.click(), cancel)
+  await browser.waitUntil(
+    async () =>
+      !(await (await browser.$('[data-testid="knowledge-template-picker"]')).isExisting()),
+    { timeout: 5000, interval: 100 },
+  )
+}
+
+export async function pickTemplateEmpty(): Promise<void> {
+  await clickTestId('knowledge-template-empty')
+  await waitForKnowledgeWritableSurface(15000)
+}
+
+/** Pick first template row whose label contains `name` substring. */
+export async function pickTemplateByName(name: string): Promise<void> {
+  await browser.waitUntil(
+    async () => {
+      const clicked = await browser.execute((n: string) => {
+        const buttons = Array.from(
+          document.querySelectorAll('[data-testid^="knowledge-template-item-"]'),
+        ) as HTMLElement[]
+        const btn = buttons.find((b) => (b.textContent ?? '').includes(n))
+        if (!btn) return false
+        btn.click()
+        return true
+      }, name)
+      return clicked
+    },
+    { timeout: 10000, interval: 200, timeoutMsg: `template not found: ${name}` },
+  )
+  await waitForKnowledgeWritableSurface(15000)
+}
+
+export async function saveVersionManual(): Promise<void> {
+  await clickMenuItem('knowledge-doc-menu', 'knowledge-save-version')
+  await browser.pause(500)
+}
+
+export async function openVersionHistory(): Promise<void> {
+  await clickMenuItem('knowledge-doc-menu', 'knowledge-version-history')
+  await (await browser.$('[data-testid="knowledge-versions-list"]')).waitForExist({
+    timeout: 10000,
+  })
+}
+
+/** Restore the first (newest) version row and confirm. */
+export async function restoreNewestVersion(): Promise<void> {
+  await openVersionHistory()
+  const restore = await browser.$('[data-testid="knowledge-version-restore"]')
+  await restore.waitForExist({ timeout: 10000 })
+  await browser.execute((el: HTMLElement) => el.click(), restore)
+  const confirm = await browser.$('[data-testid="knowledge-version-restore-confirm"]')
+  await confirm.waitForExist({ timeout: 10000 })
+  await browser.execute((el: HTMLElement) => el.click(), confirm)
+  await browser.pause(500)
+}
+
+export async function clickFilterTag(tag: string): Promise<void> {
+  await browser.waitUntil(
+    async () => {
+      return browser.execute((tg: string) => {
+        const buttons = Array.from(
+          document.querySelectorAll('[data-testid="knowledge-filter-tag"]'),
+        ) as HTMLElement[]
+        const btn = buttons.find((b) => (b.textContent ?? '').trim() === tg)
+        if (!btn) return false
+        btn.click()
+        return true
+      }, tag)
+    },
+    { timeout: 15000, interval: 300, timeoutMsg: `filter tag not found: ${tag}` },
+  )
+  await browser.pause(200)
+}
+
+export async function attachAssetFromPath(absPath: string): Promise<void> {
+  await ensureKnowledgeSource()
+  await installPickAttachmentFilesSeam([absPath])
+  await clickTestId('knowledge-attach-asset')
+  await browser.pause(600)
+  await clearPickAttachmentFilesSeam()
+  await waitForSaveStatusSaved(15000)
+}
+
+/** List entry paths inside a zip via system `unzip -l` (macOS/Linux e2e hosts). */
+export function listZipEntryNames(zipPath: string): string[] {
+  const out = execSync(`unzip -l ${JSON.stringify(zipPath)}`, {
+    encoding: 'utf8',
+    maxBuffer: 2 * 1024 * 1024,
+  })
+  // Lines look like: "        12  07-14-2026 12:00   docs/doc_x.md"
+  const names: string[] = []
+  for (const line of out.split('\n')) {
+    const m = line.match(/^\s*\d+\s+\d{2}-\d{2}-\d{4}\s+\d{2}:\d{2}\s+(.+)$/)
+    if (m?.[1]) {
+      const name = m[1].trim()
+      if (name && name !== 'Name' && !name.startsWith('---')) names.push(name)
+    }
+  }
+  return names
+}
+
+/** Open Source slash menu at line start and pick an item by slash name (e.g. `h1`). */
+export async function applySlashMenuItem(name: string): Promise<void> {
+  await ensureKnowledgeSource()
+  const content = await browser.$('[data-testid="knowledge-doc-editor"] .cm-content')
+  await content.waitForExist({ timeout: 10000 })
+  await browser.execute((el: HTMLElement) => {
+    el.focus()
+    const sel = window.getSelection()
+    const range = document.createRange()
+    range.selectNodeContents(el)
+    range.collapse(false)
+    sel?.removeAllRanges()
+    sel?.addRange(range)
+    document.execCommand('insertText', false, '\n/')
+  }, content)
+  await browser.pause(200)
+
+  let menu = await browser.$('[data-testid="knowledge-slash-menu"]')
+  if (!(await menu.isExisting())) {
+    await browser.execute((el: HTMLElement) => el.focus(), content)
+    await browser.keys('/')
+    await browser.pause(250)
+    menu = await browser.$('[data-testid="knowledge-slash-menu"]')
+  }
+  await menu.waitForExist({ timeout: 10000 })
+
+  let item = await browser.$(`[data-testid="knowledge-slash-${name}"]`)
+  if (!(await item.isExisting())) {
+    await browser.keys(name)
+    await browser.pause(200)
+    item = await browser.$(`[data-testid="knowledge-slash-${name}"]`)
+  }
+  await item.waitForExist({ timeout: 10000 })
+  await browser.execute((el: HTMLElement) => el.click(), item)
+  await browser.pause(200)
+}
+
+/**
+ * Open Live slash menu at end of doc (line-start `/` after newline) and pick item.
+ * Product R3 path — hard-assert menu + click.
+ */
+export async function applySlashMenuItemLive(name: string): Promise<void> {
+  await ensureKnowledgeLive()
+  const host = await browser.$(
+    '[data-testid="knowledge-doc-live-editor"] .ProseMirror, [data-testid="knowledge-doc-live-editor"] [contenteditable="true"]',
+  )
+  await host.waitForExist({ timeout: 15000 })
+
+  await browser.execute((el: HTMLElement) => {
+    el.focus()
+    const sel = window.getSelection()
+    const range = document.createRange()
+    range.selectNodeContents(el)
+    range.collapse(false)
+    sel?.removeAllRanges()
+    sel?.addRange(range)
+    // New paragraph then `/` so block slash is allowed (line-start).
+    document.execCommand('insertText', false, '\n/')
+  }, host)
+  await browser.pause(250)
+
+  let menu = await browser.$('[data-testid="knowledge-slash-menu"]')
+  if (!(await menu.isExisting())) {
+    await browser.execute((el: HTMLElement) => el.focus(), host)
+    await browser.keys('/')
+    await browser.pause(300)
+    menu = await browser.$('[data-testid="knowledge-slash-menu"]')
+  }
+  await menu.waitForExist({
+    timeout: 12000,
+    timeoutMsg: 'Live slash menu did not open',
+  })
+
+  let item = await browser.$(`[data-testid="knowledge-slash-${name}"]`)
+  if (!(await item.isExisting())) {
+    await browser.keys(name)
+    await browser.pause(200)
+    item = await browser.$(`[data-testid="knowledge-slash-${name}"]`)
+  }
+  await item.waitForExist({
+    timeout: 10000,
+    timeoutMsg: `Live slash item not found: ${name}`,
+  })
+  await browser.execute((el: HTMLElement) => el.click(), item)
+  await browser.pause(300)
+}
+
+/** Count tree docs currently visible. */
+export async function countTreeDocs(): Promise<number> {
+  return browser.execute(
+    () => document.querySelectorAll('[data-testid^="knowledge-tree-doc-"]').length,
+  )
+}
+
+// ---------------------------------------------------------------------------
+// Perf harness + fixture seeding (knowledge-perf / diagnosis)
+// ---------------------------------------------------------------------------
+
+/** Matches src/domain/knowledge/limits.ts KNOWLEDGE_LARGE_DOC_CHARS. */
+export const E2E_KNOWLEDGE_LARGE_DOC_CHARS = 512_000
+
+export type KnowledgePerfSnapshot = {
+  enabled: boolean
+  open: {
+    openStartMs: number | null
+    ipcMs: number | null
+    storeSetAt: number | null
+    liveCreateMs: number | null
+    firstEditableMs: number | null
+    bodyChars: number | null
+    editorMode: string | null
+  }
+  typing: {
+    lastSerializeMs: number | null
+    serializeSamples: number[]
+    serializeCount: number
+    draftSetCount: number
+  }
+  shiki: { calls: number; lastMs: number | null }
+  mermaid: { renders: number; lastMs: number | null }
+  nodeViews: { code: number; mermaid: number; svg: number }
+}
+
+/** Absolute path to `e2e/fixtures/knowledge/<name>`. */
+export function knowledgeFixturePath(name: string): string {
+  // helpers live at e2e/helpers → fixtures at e2e/fixtures/knowledge
+  const helpersDir = path.dirname(fileURLToPath(import.meta.url))
+  return path.join(helpersDir, '..', 'fixtures', 'knowledge', name)
+}
+
+export function readKnowledgeFixture(name: string): string {
+  const p = knowledgeFixturePath(name)
+  if (!fs.existsSync(p)) throw new Error(`knowledge fixture missing: ${p}`)
+  return fs.readFileSync(p, 'utf8')
+}
+
+/** Build a body larger than the Live→Source force threshold. */
+export function buildLargeSourceBody(
+  minChars = E2E_KNOWLEDGE_LARGE_DOC_CHARS + 2_048,
+): string {
+  const header = '# Large source fixture\n\nMarker: LARGE_SOURCE_MARKER_V1\n\n'
+  const line = 'Padding line for large-doc Source fallback path. '.repeat(8) + '\n'
+  let body = header
+  while (body.length < minChars) body += line
+  return body
+}
+
+/** Active tree doc id (`doc_…`) or null. */
+export async function getActiveDocId(): Promise<string | null> {
+  return browser.execute(() => {
+    const row = document.querySelector(
+      '[data-testid^="knowledge-tree-doc-"][aria-selected="true"]',
+    ) as HTMLElement | null
+    const tid = row?.getAttribute('data-testid')
+    if (!tid?.startsWith('knowledge-tree-doc-')) return null
+    return tid.slice('knowledge-tree-doc-'.length)
+  })
+}
+
+/** Resolve on-disk path for a doc id under HIP_DATA_DIR/knowledge. */
+export function findDocPathOnDisk(docId: string): string | null {
+  const root = knowledgeRootOnDisk()
+  if (!fs.existsSync(root)) return null
+  for (const ent of fs.readdirSync(root, { withFileTypes: true })) {
+    if (!ent.isDirectory() || !ent.name.startsWith('spc_')) continue
+    const candidate = path.join(root, ent.name, 'docs', `${docId}.md`)
+    if (fs.existsSync(candidate)) return candidate
+  }
+  return null
+}
+
+/**
+ * Write body into the currently active doc file on disk.
+ * Call only when draft is clean (e.g. right after create, before typing),
+ * then reopen so openDoc re-reads disk without flushSave overwriting.
+ */
+export function writeActiveDocBodyOnDisk(docId: string, body: string): string {
+  const p = findDocPathOnDisk(docId)
+  if (!p) throw new Error(`doc file not found on disk for ${docId}`)
+  fs.writeFileSync(p, body, 'utf8')
+  return p
+}
+
+/**
+ * Create a fresh doc, write body to disk, reopen so openDoc re-reads disk.
+ * Always creates a new tree node (does not reuse a dirty active doc).
+ * Prefers Live flag on so medium-rich exercises the product path.
+ */
+export async function seedActiveDocBodyAndReopen(
+  body: string,
+  opts?: { title?: string; preferLive?: boolean },
+): Promise<{ docId: string; path: string; chars: number }> {
+  // Prefer a clean empty doc so flushSave before reopen cannot clobber the seed.
+  if (await hasKnowledgeWritableSurface()) {
+    await createNewDocFromMenu()
+  } else {
+    await createDocAndExpectEditor()
+  }
+  await waitForKnowledgeWritableSurface(20_000)
+  if (opts?.title) await setKnowledgeDocTitle(opts.title)
+
+  const docId = await getActiveDocId()
+  if (!docId) throw new Error('no active knowledge doc to seed')
+
+  // Ensure draft is clean (empty body) so flushSave is a no-op, then plant fixture.
+  const diskPath = writeActiveDocBodyOnDisk(docId, body)
+
+  if (opts?.preferLive === false) {
+    await setKnowledgeLiveFlag(false)
+  } else {
+    await setKnowledgeLiveFlag(true)
+  }
+
+  await enableKnowledgePerf()
+  await resetKnowledgePerf()
+
+  await reopenActiveKnowledgeDoc()
+  await waitForKnowledgeWritableSurface(30_000)
+
+  return { docId, path: diskPath, chars: body.length }
+}
+
+export async function seedActiveDocFromFixture(
+  fixtureName: string,
+  opts?: { title?: string; preferLive?: boolean },
+): Promise<{ docId: string; path: string; chars: number; body: string }> {
+  const body = readKnowledgeFixture(fixtureName)
+  const seeded = await seedActiveDocBodyAndReopen(body, opts)
+  return { ...seeded, body }
+}
+
+/** Enable in-app knowledge perf collection (window.__hipKnowledgePerf). */
+export async function enableKnowledgePerf(): Promise<void> {
+  await browser.execute(() => {
+    const api = (
+      window as Window & {
+        __hipKnowledgePerf?: { enable: () => void }
+      }
+    ).__hipKnowledgePerf
+    if (api?.enable) {
+      api.enable()
+      return
+    }
+    try {
+      localStorage.setItem('hip-knowledge-perf', '1')
+    } catch {
+      // ignore
+    }
+  })
+}
+
+export async function resetKnowledgePerf(): Promise<void> {
+  await browser.execute(() => {
+    const api = (
+      window as Window & {
+        __hipKnowledgePerf?: { reset: () => void; enable: () => void }
+      }
+    ).__hipKnowledgePerf
+    api?.enable?.()
+    api?.reset?.()
+  })
+}
+
+export async function readKnowledgePerfSnapshot(): Promise<KnowledgePerfSnapshot | null> {
+  return browser.execute(() => {
+    const api = (
+      window as Window & {
+        __hipKnowledgePerf?: { snapshot: () => KnowledgePerfSnapshot }
+      }
+    ).__hipKnowledgePerf
+    return api?.snapshot?.() ?? null
+  })
+}
+
+/** p95 of a numeric sample list (empty → null). */
+export function p95(samples: number[]): number | null {
+  if (samples.length === 0) return null
+  const sorted = [...samples].sort((a, b) => a - b)
+  const idx = Math.min(sorted.length - 1, Math.ceil(sorted.length * 0.95) - 1)
+  return sorted[Math.max(0, idx)]
+}
+
+/**
+ * Count fenced-looking blocks in the Live (BlockNote) surface.
+ * Legacy Milkdown NodeView testids (`knowledge-live-code-block` etc.) are gone.
+ */
+export async function countLiveBlockNodeViews(): Promise<{
+  code: number
+  mermaid: number
+  svg: number
+}> {
+  return browser.execute(() => {
+    const root =
+      document.querySelector('[data-testid="knowledge-doc-live-editor"]') ??
+      document.querySelector('.knowledge-blocknote-editor')
+    if (!root) return { code: 0, mermaid: 0, svg: 0 }
+    const code = root.querySelectorAll(
+      'pre, [data-content-type="codeBlock"], .bn-block-content[data-content-type="codeBlock"]',
+    ).length
+    // Mermaid/svg fences may render as code blocks or custom nodes depending on BN schema.
+    const text = root.textContent ?? ''
+    const mermaid = (text.match(/flowchart|sequenceDiagram|graph\s/g) ?? []).length > 0 ? 1 : 0
+    const svg = root.querySelectorAll('svg').length
+    return { code, mermaid, svg }
+  })
+}
+
+/**
+ * Wall-clock open: reset perf → click tree title → wait writable.
+ * Returns elapsed ms + optional perf snapshot.
+ */
+export async function openDocByTitleWithTiming(
+  title: string,
+  timeoutMs = 30_000,
+): Promise<{ elapsedMs: number; snap: KnowledgePerfSnapshot | null }> {
+  await enableKnowledgePerf()
+  await resetKnowledgePerf()
+  const t0 = Date.now()
+  await openTreeDocByTitle(title)
+  await waitForKnowledgeWritableSurface(timeoutMs)
+  const elapsedMs = Date.now() - t0
+  const snap = await readKnowledgePerfSnapshot()
+  return { elapsedMs, snap }
+}
+
+// ---------------------------------------------------------------------------
+// P2 product surfaces: graph, collection views, outline, trash
+// ---------------------------------------------------------------------------
+
+/** Open knowledge graph modal from workspace space menu. */
+export async function openKnowledgeGraphModal(): Promise<void> {
+  await clickMenuItem('knowledge-space-menu', 'knowledge-space-graph')
+  // Loading or canvas/empty/error all prove the modal path.
+  await browser.waitUntil(
+    async () => {
+      for (const id of [
+        'knowledge-graph-loading',
+        'knowledge-graph-canvas-host',
+        'knowledge-graph-empty',
+        'knowledge-graph-error',
+      ]) {
+        if (await (await browser.$(`[data-testid="${id}"]`)).isExisting()) return true
+      }
+      return false
+    },
+    { timeout: 15000, interval: 200, timeoutMsg: 'knowledge graph modal not shown' },
+  )
+}
+
+/** Close graph modal via Escape (Modal). */
+export async function closeKnowledgeGraphModal(): Promise<void> {
+  await browser.keys('Escape')
+  await browser.pause(200)
+  await browser.waitUntil(
+    async () =>
+      !(await (await browser.$('[data-testid="knowledge-graph-canvas-host"]')).isExisting()) &&
+      !(await (await browser.$('[data-testid="knowledge-graph-loading"]')).isExisting()) &&
+      !(await (await browser.$('[data-testid="knowledge-graph-empty"]')).isExisting()),
+    { timeout: 8000, interval: 150, timeoutMsg: 'graph modal still open' },
+  ).catch(() => {
+    // Some modal chrome may keep host; Escape again
+    return browser.keys('Escape')
+  })
+}
+
+/** Switch collection view tab by view id (default: view_all_table / view_status_board). */
+export async function selectKnowledgeViewTab(viewId: string): Promise<void> {
+  const tab = await browser.$(`[data-testid="knowledge-view-tab-${viewId}"]`)
+  await tab.waitForExist({ timeout: 10000 })
+  await browser.execute((el: HTMLElement) => el.click(), tab)
+  await browser.pause(200)
+}
+
+/** Back to docs/tree tab. */
+export async function selectKnowledgeDocsTab(): Promise<void> {
+  const tab = await browser.$('[data-testid="knowledge-view-docs"]')
+  await tab.waitForExist({ timeout: 10000 })
+  await browser.execute((el: HTMLElement) => el.click(), tab)
+  await browser.pause(150)
+}
+
+/** Open right-rail outline panel (knowledge workspace). */
+export async function openKnowledgeOutlinePanel(): Promise<void> {
+  const panel = await browser.$('[data-testid="knowledge-outline-panel"]')
+  if (await panel.isExisting()) return
+
+  const toggle = await browser.$('[data-testid="toggle-panel"]')
+  await toggle.waitForExist({ timeout: 10000 })
+  await browser.execute((el: HTMLElement) => el.click(), toggle)
+  await browser.pause(150)
+  const item = await browser.$('[data-testid="panel-tab-knowledge-outline"]')
+  if (await item.isExisting()) {
+    await browser.execute((el: HTMLElement) => el.click(), item)
+  }
+  await (await browser.$('[data-testid="knowledge-outline-panel"]')).waitForExist({
+    timeout: 10000,
+  })
+}
+
+/** Click first outline heading item (if any). */
+export async function clickFirstOutlineItem(): Promise<boolean> {
+  const item = await browser.$('[data-testid^="knowledge-doc-outline-item-"]')
+  if (!(await item.isExisting())) return false
+  await browser.execute((el: HTMLElement) => el.click(), item)
+  await browser.pause(150)
+  return true
+}
+
+/**
+ * Soft-delete active (or given) tree doc and confirm.
+ * Returns the title used for later restore asserts.
+ */
+export async function softDeleteTreeDocByTitle(title: string): Promise<void> {
+  const tid = await browser.execute((t: string) => {
+    const rows = Array.from(
+      document.querySelectorAll('[data-testid^="knowledge-tree-doc-"]'),
+    ) as HTMLElement[]
+    const row = rows.find((r) => (r.textContent ?? '').includes(t))
+    return row?.getAttribute('data-testid') ?? null
+  }, title)
+  if (!tid) throw new Error(`tree doc not found for soft-delete: ${title}`)
+  await deleteTreeNodeByTestId(tid)
+}
+
+/** Filter recycle bin to knowledge and restore first row (or row containing title). */
+export async function restoreKnowledgeFromTrash(titleHint?: string): Promise<void> {
+  const filter = await browser.$('[data-testid="recycle-bin-filter-knowledge"]')
+  await filter.waitForExist({ timeout: 10000 })
+  await browser.execute((el: HTMLElement) => el.click(), filter)
+  await browser.pause(200)
+
+  await browser.waitUntil(
+    async () => {
+      const empty = await browser.$('[data-testid="recycle-bin-empty"]')
+      const row = await browser.$('[data-testid="recycle-bin-row"]')
+      return (await empty.isExisting()) || (await row.isExisting())
+    },
+    { timeout: 15000, interval: 300, timeoutMsg: 'trash knowledge filter never settled' },
+  )
+
+  if (titleHint) {
+    const clicked = await browser.execute((hint: string) => {
+      const rows = Array.from(
+        document.querySelectorAll('[data-testid="recycle-bin-row"]'),
+      ) as HTMLElement[]
+      const row = rows.find((r) => (r.textContent ?? '').includes(hint))
+      if (!row) return false
+      const btn = row.querySelector(
+        '[data-testid="recycle-bin-restore"]',
+      ) as HTMLElement | null
+      if (!btn) return false
+      btn.click()
+      return true
+    }, titleHint)
+    if (!clicked) throw new Error(`trash row not found for restore: ${titleHint}`)
+  } else {
+    const btn = await browser.$('[data-testid="recycle-bin-restore"]')
+    await btn.waitForExist({ timeout: 10000 })
+    await browser.execute((el: HTMLElement) => el.click(), btn)
+  }
+  await browser.pause(500)
+}
+
+/**
+ * Seed a second doc with wiki links to `targetTitle` (for backlinks e2e).
+ * Leaves the **target** doc active after linking.
+ */
+export async function seedWikiLinkSource(
+  sourceTitle: string,
+  targetTitle: string,
+  marker: string,
+): Promise<void> {
+  await createNewDocFromMenu()
+  await setKnowledgeDocTitle(sourceTitle)
+  await ensureKnowledgeSource()
+  await typeInKnowledgeEditor(`${marker} See [[${targetTitle}]].\n`)
+  await waitForSaveStatusSaved(15000)
+  await waitForDocBodyOnDisk(`[[${targetTitle}]]`, 15000)
+  await openTreeDocByTitle(targetTitle)
+  await waitForKnowledgeWritableSurface(15000)
+}
+
+// ---------------------------------------------------------------------------
+// R5 Live block OS helpers (gutter / menu / drag / table / icon)
+// ---------------------------------------------------------------------------
+
+/** Live ProseMirror contenteditable host. */
+export async function knowledgeLivePmHost() {
+  const host = await browser.$(
+    '[data-testid="knowledge-doc-live-editor"] .ProseMirror, [data-testid="knowledge-doc-live-editor"] [contenteditable="true"]',
+  )
+  await host.waitForExist({ timeout: 15000 })
+  return host
+}
+
+/**
+ * Hover left edge of Live editor so block gutter (grip + plus) appears.
+ * Returns true if grip is visible.
+ */
+export async function revealKnowledgeLiveBlockGutter(): Promise<boolean> {
+  await ensureKnowledgeLive()
+  const host = await knowledgeLivePmHost()
+  await browser.execute((el: HTMLElement) => {
+    el.focus()
+    const rect = el.getBoundingClientRect()
+    const x = rect.left + 8
+    const y = rect.top + Math.min(40, rect.height / 3)
+    el.dispatchEvent(
+      new MouseEvent('mousemove', {
+        bubbles: true,
+        clientX: x,
+        clientY: y,
+        view: window,
+      }),
+    )
+  }, host)
+  await browser.pause(200)
+  const grip = await browser.$('[data-testid="knowledge-live-block-grip"]')
+  try {
+    await grip.waitForExist({ timeout: 5000 })
+    const opacity = await browser.execute((g: HTMLElement) => {
+      const p = g.closest('[data-testid="knowledge-live-block-gutter"]') as HTMLElement | null
+      return p ? getComputedStyle(p).opacity : getComputedStyle(g).opacity
+    }, grip)
+    return opacity !== '0'
+  } catch {
+    return false
+  }
+}
+
+/**
+ * Click block `+` after revealing gutter; waits for slash menu.
+ * Falls back to typed `/` path if plus click does not open the menu.
+ */
+export async function openSlashViaBlockPlus(): Promise<'plus' | 'typed'> {
+  const ok = await revealKnowledgeLiveBlockGutter()
+  if (ok) {
+    const plus = await browser.$('[data-testid="knowledge-live-block-plus"]')
+    await plus.waitForExist({ timeout: 5000 })
+    // Force opacity so hit-testing works even if CSS transition lags
+    await browser.execute((el: HTMLElement) => {
+      const g = el.closest('[data-testid="knowledge-live-block-gutter"]') as HTMLElement | null
+      if (g) g.style.opacity = '1'
+      el.style.opacity = '1'
+      el.focus?.()
+      el.dispatchEvent(
+        new MouseEvent('mousedown', { bubbles: true, cancelable: true, view: window }),
+      )
+      el.dispatchEvent(new MouseEvent('mouseup', { bubbles: true, cancelable: true, view: window }))
+      el.click()
+    }, plus)
+    await browser.pause(350)
+    const menu = await browser.$('[data-testid="knowledge-slash-menu"]')
+    if (await menu.isExisting()) return 'plus'
+  }
+  // Typed path A (same as applySlashMenuItemLive open)
+  const host = await knowledgeLivePmHost()
+  await browser.execute((el: HTMLElement) => {
+    el.focus()
+    const sel = window.getSelection()
+    const range = document.createRange()
+    range.selectNodeContents(el)
+    range.collapse(false)
+    sel?.removeAllRanges()
+    sel?.addRange(range)
+    document.execCommand('insertText', false, '\n/')
+  }, host)
+  await browser.pause(300)
+  await (
+    await browser.$('[data-testid="knowledge-slash-menu"]')
+  ).waitForExist({ timeout: 12000, timeoutMsg: 'slash menu (plus or typed /)' })
+  return 'typed'
+}
+
+/** Open block menu via grip click (no drag). */
+export async function openKnowledgeLiveBlockMenu(): Promise<void> {
+  const ok = await revealKnowledgeLiveBlockGutter()
+  if (!ok) throw new Error('block gutter did not appear')
+  const grip = await browser.$('[data-testid="knowledge-live-block-grip"]')
+  await browser.execute((el: HTMLElement) => {
+    // mousedown + pointerup without move → menu (drag threshold 4px)
+    const rect = el.getBoundingClientRect()
+    const x = rect.left + rect.width / 2
+    const y = rect.top + rect.height / 2
+    el.dispatchEvent(
+      new PointerEvent('mousedown', {
+        bubbles: true,
+        cancelable: true,
+        clientX: x,
+        clientY: y,
+        pointerType: 'mouse',
+        button: 0,
+      }),
+    )
+    el.dispatchEvent(
+      new PointerEvent('pointerup', {
+        bubbles: true,
+        cancelable: true,
+        clientX: x,
+        clientY: y,
+        pointerType: 'mouse',
+        button: 0,
+      }),
+    )
+    // Some paths listen on window pointerup after mousedown on grip
+    window.dispatchEvent(
+      new PointerEvent('pointerup', {
+        bubbles: true,
+        cancelable: true,
+        clientX: x,
+        clientY: y,
+        pointerType: 'mouse',
+        button: 0,
+      }),
+    )
+  }, grip)
+  await (
+    await browser.$('[data-testid="knowledge-live-block-menu"]')
+  ).waitForExist({ timeout: 8000, timeoutMsg: 'block menu did not open' })
+}
+
+/** Click a block menu item by test id suffix (e.g. knowledge-live-block-delete). */
+export async function clickKnowledgeLiveBlockMenuItem(testId: string): Promise<void> {
+  const item = await browser.$(`[data-testid="${testId}"]`)
+  await item.waitForExist({ timeout: 5000 })
+  await browser.execute((el: HTMLElement) => el.click(), item)
+  await browser.pause(300)
+}
+
+/**
+ * Drag top-level block via grip from first block toward below second.
+ * Best-effort; callers should assert disk order.
+ */
+export async function dragKnowledgeLiveFirstBlockDown(): Promise<boolean> {
+  const ok = await revealKnowledgeLiveBlockGutter()
+  if (!ok) return false
+  const grip = await browser.$('[data-testid="knowledge-live-block-grip"]')
+  return browser.execute((el: HTMLElement) => {
+    const rect = el.getBoundingClientRect()
+    const x = rect.left + rect.width / 2
+    const y0 = rect.top + rect.height / 2
+    const y1 = y0 + 80
+    el.dispatchEvent(
+      new PointerEvent('mousedown', {
+        bubbles: true,
+        cancelable: true,
+        clientX: x,
+        clientY: y0,
+        pointerType: 'mouse',
+        button: 0,
+      }),
+    )
+    window.dispatchEvent(
+      new PointerEvent('pointermove', {
+        bubbles: true,
+        clientX: x,
+        clientY: y0 + 10,
+        pointerType: 'mouse',
+      }),
+    )
+    window.dispatchEvent(
+      new PointerEvent('pointermove', {
+        bubbles: true,
+        clientX: x,
+        clientY: y1,
+        pointerType: 'mouse',
+      }),
+    )
+    window.dispatchEvent(
+      new PointerEvent('pointerup', {
+        bubbles: true,
+        clientX: x,
+        clientY: y1,
+        pointerType: 'mouse',
+        button: 0,
+      }),
+    )
+    return true
+  }, grip)
+}
+
+/**
+ * Open Live slash and type a filter query (e.g. Chinese「表格」).
+ * Asserts matching slash item exists.
+ */
+export async function openLiveSlashAndFilter(query: string): Promise<void> {
+  await ensureKnowledgeLive()
+  const host = await knowledgeLivePmHost()
+  await browser.execute((el: HTMLElement) => {
+    el.focus()
+    const sel = window.getSelection()
+    const range = document.createRange()
+    range.selectNodeContents(el)
+    range.collapse(false)
+    sel?.removeAllRanges()
+    sel?.addRange(range)
+    document.execCommand('insertText', false, '\n/')
+  }, host)
+  await browser.pause(200)
+  let menu = await browser.$('[data-testid="knowledge-slash-menu"]')
+  if (!(await menu.isExisting())) {
+    await browser.keys('/')
+    await browser.pause(250)
+    menu = await browser.$('[data-testid="knowledge-slash-menu"]')
+  }
+  await menu.waitForExist({ timeout: 10000 })
+  if (query) {
+    await browser.keys(query)
+    await browser.pause(250)
+  }
+}
+
+/** Wait for slash group header (basic|list|media|advanced). */
+export async function waitForSlashGroup(
+  group: 'basic' | 'list' | 'media' | 'advanced',
+  timeoutMs = 8000,
+): Promise<void> {
+  await (
+    await browser.$(`[data-testid="knowledge-slash-group-${group}"]`)
+  ).waitForExist({ timeout: timeoutMs })
+}
+
+/** Focus a table cell in Live and wait for table chrome. */
+export async function waitForKnowledgeLiveTableChrome(timeoutMs = 12000): Promise<void> {
+  await ensureKnowledgeLive()
+  // Click into first table cell if present
+  await browser.execute(() => {
+    const cell = document.querySelector(
+      '[data-testid="knowledge-doc-live-editor"] table td, [data-testid="knowledge-doc-live-editor"] table th',
+    ) as HTMLElement | null
+    if (cell) {
+      cell.focus?.()
+      cell.click()
+    }
+  })
+  await (
+    await browser.$('[data-testid="knowledge-live-table-chrome"]')
+  ).waitForExist({ timeout: timeoutMs })
+}
+
+/** Set page icon via properties row input. */
+export async function setKnowledgeDocIcon(icon: string): Promise<void> {
+  const input = await browser.$('[data-testid="knowledge-doc-icon-input"]')
+  await input.waitForExist({ timeout: 10000 })
+  await browser.execute(
+    (el: HTMLInputElement, v: string) => {
+      el.focus()
+      const proto = window.HTMLInputElement.prototype
+      const desc = Object.getOwnPropertyDescriptor(proto, 'value')
+      desc?.set?.call(el, v)
+      el.dispatchEvent(new Event('input', { bubbles: true }))
+      el.dispatchEvent(new Event('change', { bubbles: true }))
+    },
+    input,
+    icon,
+  )
+  await browser.pause(200)
+}

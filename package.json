@@ -83,7 +83,6 @@
     "@hip/protocol": "*",
     "@mantine/core": "^8.3.11",
     "@mantine/hooks": "^8.3.11",
-    "@milkdown/kit": "7.21.3",
     "@radix-ui/react-context-menu": "^2.3.0",
     "@radix-ui/react-dialog": "^1",
     "@radix-ui/react-dropdown-menu": "^2",

@@ -1,11 +1,16 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
-import { applyServerMessageEffects, type ServerMessageEffectDeps } from './serverMessageEffects'
+import {
+  applyServerMessageEffects,
+  formatCompactResultMessage,
+  type ServerMessageEffectDeps,
+} from './serverMessageEffects'
 import { useDomainStore } from './sessionStore'
+import { selectUsageTotal } from './hooks'
 import { useDiffStore } from '@/store/diffStore'
 import { useWorkflowStore } from '@/store/workflowStore'
 import { useUiStore } from '@/store/uiStore'
 import { useFocusStore } from '@/store/focusStore'
-import type { WorkflowDef } from '@hip/protocol'
+import type { ServerMessage, WorkflowDef } from '@hip/protocol'
 import '@/i18n'
 
 const toastSuccess = vi.fn()
@@ -57,6 +62,65 @@ function seedSession(surface: 'chat' | 'code' | 'terminal' = 'code') {
     pluginInstall: null,
   })
 }
+
+describe('formatCompactResultMessage', () => {
+  type CompactResult = Extract<ServerMessage, { type: 'compact:result' }>
+
+  function msg(over: Partial<CompactResult> & Pick<CompactResult, 'ok'>): CompactResult {
+    return {
+      type: 'compact:result',
+      sessionId: 's1',
+      tokensBefore: 0,
+      tokensAfter: 0,
+      messagesBefore: 0,
+      messagesAfter: 0,
+      applied: false,
+      ...over,
+    } as CompactResult
+  }
+
+  it('maps busy and failed reasons', () => {
+    expect(formatCompactResultMessage(msg({ ok: false, reason: 'session_busy' }))).toMatch(
+      /turn is running|busy|运行中|占用/i,
+    )
+    expect(
+      formatCompactResultMessage(msg({ ok: false, error: 'boom', reason: 'error' })),
+    ).toContain('boom')
+  })
+
+  it('maps noop and applied counts; omitSummary drops the blob', () => {
+    expect(
+      formatCompactResultMessage(
+        msg({ ok: true, applied: false, reason: 'nothing_to_compact' }),
+      ),
+    ).toMatch(/nothing to compact|无需压缩|没有可压缩/i)
+
+    const applied = msg({
+      ok: true,
+      applied: true,
+      messagesBefore: 10,
+      messagesAfter: 4,
+      tokensBefore: 100,
+      tokensAfter: 40,
+      summary: 'SUMMARY_BLOB',
+    })
+    const withSummary = formatCompactResultMessage(applied)
+    expect(withSummary).toContain('10')
+    expect(withSummary).toContain('4')
+    expect(withSummary).toContain('SUMMARY_BLOB')
+
+    const omitted = formatCompactResultMessage(applied, { omitSummary: true })
+    expect(omitted).toContain('10')
+    expect(omitted).not.toContain('SUMMARY_BLOB')
+
+    expect(
+      formatCompactResultMessage(
+        msg({ ok: true, applied: true, messagesBefore: 2, messagesAfter: 1, summary: '   ' }),
+        { omitSummary: true },
+      ),
+    ).not.toMatch(/\n\n/)
+  })
+})
 
 describe('applyServerMessageEffects', () => {
   beforeEach(() => {
@@ -159,24 +223,26 @@ describe('applyServerMessageEffects', () => {
     expect(msgs[0].content).not.toMatch(/compacted:\s*7/i)
   })
 
-  it('compact:result omits the summary blob for terminal sessions', () => {
-    seedSession('terminal')
-    const deps = makeDeps()
-    applyServerMessageEffects({
-      type: 'compact:result',
-      sessionId: 's1',
-      ok: true,
-      applied: true,
-      tokensBefore: 1098,
-      tokensAfter: 829,
-      messagesBefore: 13,
-      messagesAfter: 10,
-      summary: '[对话摘要] ```json {"Goal":"install opencode"}```',
-    }, deps)
-    const msgs = useDomainStore.getState().sessions.find((s) => s.id === 's1')!.messages
-    expect(msgs).toHaveLength(1)
-    expect(msgs[0].content).toContain('1098')
-    expect(msgs[0].content).not.toContain('[对话摘要]')
+  it('compact:result always omits the summary blob (all surfaces)', () => {
+    for (const surface of ['chat', 'code', 'terminal'] as const) {
+      seedSession(surface)
+      const deps = makeDeps()
+      applyServerMessageEffects({
+        type: 'compact:result',
+        sessionId: 's1',
+        ok: true,
+        applied: true,
+        tokensBefore: 1098,
+        tokensAfter: 829,
+        messagesBefore: 13,
+        messagesAfter: 10,
+        summary: '[对话摘要] ```json {"Goal":"install opencode"}```',
+      }, deps)
+      const msgs = useDomainStore.getState().sessions.find((s) => s.id === 's1')!.messages
+      expect(msgs).toHaveLength(1)
+      expect(msgs[0].content).toContain('1098')
+      expect(msgs[0].content).not.toContain('[对话摘要]')
+    }
   })
 
   it('compact:result applied trims replaced messages so token meters update', () => {
@@ -187,14 +253,28 @@ describe('applyServerMessageEffects', () => {
           ? {
               ...x,
               messages: [
-                { id: 'm1', role: 'user', content: 'a', timestamp: 1 },
-                { id: 'm2', role: 'assistant', content: 'b', timestamp: 2 },
+                {
+                  id: 'm1',
+                  role: 'assistant',
+                  content: 'a',
+                  timestamp: 1,
+                  usage: { inputTokens: 10_000, outputTokens: 100, totalTokens: 10_100 },
+                },
+                {
+                  id: 'm2',
+                  role: 'assistant',
+                  content: 'b',
+                  timestamp: 2,
+                  usage: { inputTokens: 80_000, outputTokens: 200, totalTokens: 80_200 },
+                },
                 { id: 'm3', role: 'user', content: 'c', timestamp: 3 },
               ],
             }
           : x,
       ),
     }))
+    const before = selectUsageTotal(useDomainStore.getState())
+    expect(before?.totalTokens).toBe(90_300)
     const deps = makeDeps()
     applyServerMessageEffects({
       type: 'compact:result',
@@ -210,6 +290,9 @@ describe('applyServerMessageEffects', () => {
     const msgs = useDomainStore.getState().sessions.find((s) => s.id === 's1')!.messages
     expect(msgs.map((m) => m.id)).toEqual(['m1', 'm3', expect.any(String)])
     expect(msgs[2].content).toContain('40')
+    const after = selectUsageTotal(useDomainStore.getState())
+    expect(after?.totalTokens).toBe(10_100)
+    expect(after?.inputTokens).toBe(10_000)
   })
 
   it('fs:gitInit:result ok toasts success and refreshes diff', () => {

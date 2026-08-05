@@ -40,7 +40,9 @@ import {
   setKnowledgeDocIcon,
 } from '../helpers/knowledge.js'
 
-describe('knowledge Live R5 block OS @knowledge', () => {
+// Milkdown gutter / block menu / table chrome / doc-icon row removed with BlockNote Live.
+// Re-enable when BlockNote side-menu / slash / table contracts get stable testids.
+describe.skip('knowledge Live R5 block OS @knowledge — Milkdown chrome; Live is BlockNote', () => {
   const stamp = Date.now()
   const spaceName = `e2e-kb-r5-${stamp}`
 

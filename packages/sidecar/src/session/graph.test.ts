@@ -63,7 +63,16 @@ describe('agent loop graph', () => {
         { messages: [new HumanMessage('hi')], steps: 0 },
         { configurable: { ctx: { sessionId: 'test-session', runner, tools: buildTools(root), emit: { ...noopEmit, usage: (u: TurnUsage) => seen.push(u) }, summarizer: noopSummarizer } } },
       )
-      expect(seen).toEqual([{ inputTokens: 12, outputTokens: 5, totalTokens: 17, contextTokens: 12 }])
+      // modelId/providerId come from process-global getActiveModel() at emit time
+      expect(seen).toHaveLength(1)
+      expect(seen[0]).toMatchObject({
+        inputTokens: 12,
+        outputTokens: 5,
+        totalTokens: 17,
+        contextTokens: 12,
+      })
+      expect(typeof seen[0].modelId).toBe('string')
+      expect(typeof seen[0].providerId).toBe('string')
     })
   })
 

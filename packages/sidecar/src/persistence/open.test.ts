@@ -3,14 +3,14 @@ import { openDatabase } from './open.js'
 import { migrate } from './schema.js'
 
 describe('openDatabase', () => {
-  it('creates core tables and sets user_version = 23', () => {
+  it('creates core tables and sets user_version = 26', () => {
     const { db, ftsEnabled, memoriesVecEnabled } = openDatabase(':memory:')
     const tables = db.prepare(`SELECT name FROM sqlite_master WHERE type='table'`).all() as { name: string }[]
     const names = tables.map((t) => t.name)
     expect(names).toEqual(expect.arrayContaining(['sessions', 'messages', 'agent_runs', 'memory_embedding_rows']))
     const cols = (db.prepare(`PRAGMA table_info(messages)`).all() as { name: string }[]).map((c) => c.name)
     expect(cols).toContain('timeline')
-    expect((db.prepare('PRAGMA user_version').get() as { user_version: number }).user_version).toBe(23)
+    expect((db.prepare('PRAGMA user_version').get() as { user_version: number }).user_version).toBe(26)
     expect(ftsEnabled).toBe(true)
     // vec0 is best-effort; boolean is always defined
     expect(typeof memoriesVecEnabled).toBe('boolean')

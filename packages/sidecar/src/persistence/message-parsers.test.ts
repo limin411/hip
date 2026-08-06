@@ -95,6 +95,36 @@ describe('message-parsers: parseUsage', () => {
     })
   })
 
+  it('preserves contextTokens and extended optional fields', () => {
+    expect(parseUsage({
+      usage: {
+        inputTokens: 100,
+        outputTokens: 20,
+        totalTokens: 120,
+        contextTokens: 90,
+        cacheReadTokens: 40,
+        cacheWriteTokens: 5,
+        nonCachedInputTokens: 55,
+        reasoningTokens: 8,
+        modelId: 'gpt-4o',
+        providerId: 'openai',
+        incomplete: true,
+      },
+    })).toEqual({
+      inputTokens: 100,
+      outputTokens: 20,
+      totalTokens: 120,
+      contextTokens: 90,
+      cacheReadTokens: 40,
+      cacheWriteTokens: 5,
+      nonCachedInputTokens: 55,
+      reasoningTokens: 8,
+      modelId: 'gpt-4o',
+      providerId: 'openai',
+      incomplete: true,
+    })
+  })
+
   it('returns null when usage is absent', () => {
     expect(parseUsage({})).toBeNull()
   })

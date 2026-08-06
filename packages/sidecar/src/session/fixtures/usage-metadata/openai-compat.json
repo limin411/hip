@@ -1,0 +1,12 @@
+{
+  "_comment": "OpenAI-compat path — prompt_tokens_details.cached_tokens shape (synthetic fixture).",
+  "input_tokens": 5000,
+  "output_tokens": 200,
+  "total_tokens": 5200,
+  "prompt_tokens_details": {
+    "cached_tokens": 3000
+  },
+  "output_token_details": {
+    "reasoning_tokens": 50
+  }
+}

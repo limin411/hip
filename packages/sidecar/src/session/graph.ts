@@ -48,6 +48,7 @@ import {
   type CompactResult,
 } from './compaction.js'
 import { usageFromModelMetadata } from './usage.js'
+import { getActiveModel } from '../config/providers.js'
 import {
   AUTO_COMPACT_THRESHOLD_PERCENT,
   TARGET_THRESHOLD_PERCENT,
@@ -748,7 +749,11 @@ export function buildGraph(maxSteps: number = MAX_STEPS, compactBudget: number =
         messages: input,
         tools: tools.map((t) => ({ name: t.name, description: t.description })),
       })
-      const turnUsage = usageFromModelMetadata(msg.usage_metadata, estimated)
+      const active = getActiveModel()
+      const turnUsage = usageFromModelMetadata(msg.usage_metadata, estimated, {
+        modelId: active.modelID,
+        providerId: active.providerID,
+      })
       if (turnUsage) {
         emit.usage(turnUsage)
         // Keep gate honest for subsequent compactNode cycles in this invoke.

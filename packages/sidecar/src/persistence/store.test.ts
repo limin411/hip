@@ -362,6 +362,31 @@ describe('SessionStore', () => {
     })
   })
 
+  it('round-trips extended TurnUsage via usage_json (cache/modelId/incomplete)', () => {
+    store.insertSession({ id: 's1', title: 't', config: cfg, createdAt: 1, updatedAt: 1 })
+    store.insertMessage({ id: 'u1', sessionId: 's1', role: 'user', agentId: null, content: 'hi', timestamp: 1 })
+    const usage = {
+      inputTokens: 1000,
+      outputTokens: 50,
+      totalTokens: 1050,
+      contextTokens: 900,
+      cacheReadTokens: 400,
+      cacheWriteTokens: 100,
+      nonCachedInputTokens: 500,
+      reasoningTokens: 12,
+      modelId: 'claude-sonnet-4',
+      providerId: 'anthropic',
+      incomplete: true,
+    }
+    store.insertTurn(
+      { id: 'a1', sessionId: 's1', agentId: 'supervisor', content: 'done', timestamp: 2 },
+      's1',
+      [{ agentId: 'supervisor', role: 'supervisor', output: 'done', startedAt: 1, finishedAt: 2, seq: 0, usage }],
+    )
+    expect(store.loadAgentRuns('s1')[0].usage).toEqual(usage)
+    expect(store.loadMessagesWithRuns('s1').find((m) => m.id === 'a1')!.usage).toEqual(usage)
+  })
+
   it('omits usage for a run inserted without it (legacy/no-usage rows stay NULL)', () => {
     store.insertSession({ id: 's1', title: 't', config: cfg, createdAt: 1, updatedAt: 1 })
     store.insertMessage({ id: 'u1', sessionId: 's1', role: 'user', agentId: null, content: 'hi', timestamp: 1 })

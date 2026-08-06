@@ -66,5 +66,33 @@ export function parseUsage(data: Record<string, unknown>): ProjectedUsage | null
   ) {
     return null
   }
-  return { inputTokens, outputTokens, totalTokens }
+  const contextTokens = optPositiveInt(u['contextTokens'])
+  const cacheReadTokens = optNonNegInt(u['cacheReadTokens'])
+  const cacheWriteTokens = optNonNegInt(u['cacheWriteTokens'])
+  const nonCachedInputTokens = optNonNegInt(u['nonCachedInputTokens'])
+  const reasoningTokens = optNonNegInt(u['reasoningTokens'])
+  const modelId = typeof u['modelId'] === 'string' && u['modelId'] ? u['modelId'] : undefined
+  const providerId = typeof u['providerId'] === 'string' && u['providerId'] ? u['providerId'] : undefined
+  const incomplete = u['incomplete'] === true ? true : undefined
+  return {
+    inputTokens,
+    outputTokens,
+    totalTokens,
+    ...(contextTokens != null ? { contextTokens } : {}),
+    ...(cacheReadTokens != null ? { cacheReadTokens } : {}),
+    ...(cacheWriteTokens != null ? { cacheWriteTokens } : {}),
+    ...(nonCachedInputTokens != null ? { nonCachedInputTokens } : {}),
+    ...(reasoningTokens != null ? { reasoningTokens } : {}),
+    ...(modelId ? { modelId } : {}),
+    ...(providerId ? { providerId } : {}),
+    ...(incomplete ? { incomplete } : {}),
+  }
+}
+
+function optPositiveInt(n: unknown): number | undefined {
+  return typeof n === 'number' && Number.isFinite(n) && n > 0 ? Math.floor(n) : undefined
+}
+
+function optNonNegInt(n: unknown): number | undefined {
+  return typeof n === 'number' && Number.isFinite(n) && n >= 0 ? Math.floor(n) : undefined
 }

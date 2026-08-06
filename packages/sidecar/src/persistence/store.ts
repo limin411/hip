@@ -15,7 +15,7 @@ import type {
   ToolStatus,
   TurnUsage,
 } from '@hip/protocol'
-import { sumUsage } from '../session/usage.js'
+import { parseTurnUsageJson, serializeTurnUsage, sumUsage } from '../session/usage.js'
 import { surfaceOf } from '../session/surface.js'
 import { logInfo } from '../debug-logger.js'
 import { deleteEmbeddings } from '../memory/vec.js'
@@ -213,13 +213,31 @@ export class SessionStore {
       }
     }
     const runStmt = this.db.prepare(
-      `INSERT INTO agent_runs(session_id,message_id,seq,agent_id,role,output,started_at,finished_at,task_input,parent_agent_id,prompt_tokens,completion_tokens,total_tokens,context_tokens,name) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+      `INSERT INTO agent_runs(session_id,message_id,seq,agent_id,role,output,started_at,finished_at,task_input,parent_agent_id,prompt_tokens,completion_tokens,total_tokens,context_tokens,name,usage_json) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
     )
     const toolStmt = this.db.prepare(
       `INSERT INTO tool_calls(session_id,agent_run_id,call_id,agent_id,name,input,output,status,error,seq,truncated) VALUES(?,?,?,?,?,?,?,?,?,?,?)`,
     )
     for (const run of runs) {
-      const info = runStmt.run(sessionId, assistant?.id ?? null, run.seq, run.agentId, run.role, run.output, run.startedAt, run.finishedAt, run.taskInput ?? null, run.parentAgentId ?? null, run.usage?.inputTokens ?? null, run.usage?.outputTokens ?? null, run.usage?.totalTokens ?? null, run.usage?.contextTokens ?? null, run.name ?? null)
+      const usageJson = run.usage != null ? serializeTurnUsage(run.usage) : null
+      const info = runStmt.run(
+        sessionId,
+        assistant?.id ?? null,
+        run.seq,
+        run.agentId,
+        run.role,
+        run.output,
+        run.startedAt,
+        run.finishedAt,
+        run.taskInput ?? null,
+        run.parentAgentId ?? null,
+        run.usage?.inputTokens ?? null,
+        run.usage?.outputTokens ?? null,
+        run.usage?.totalTokens ?? null,
+        run.usage?.contextTokens ?? null,
+        run.name ?? null,
+        usageJson,
+      )
       const runId = info.lastInsertRowid
       for (const tc of run.toolCalls ?? []) {
         toolStmt.run(sessionId, runId, tc.callId, tc.agentId, tc.name, tc.input, tc.output ?? null, tc.status, tc.error ?? null, tc.seq, tc.truncated ? 1 : 0)
@@ -302,20 +320,23 @@ export class SessionStore {
   }
 
   loadAgentRuns(sessionId: string): AgentRun[] {
-    const rows = this.db.prepare(`SELECT id,message_id,agent_id,role,output,started_at,finished_at,seq,task_input,parent_agent_id,prompt_tokens,completion_tokens,total_tokens,context_tokens,name FROM agent_runs WHERE session_id=? ORDER BY seq`).all(sessionId) as
-      { id: number; message_id: string | null; agent_id: string; role: AgentRole; output: string; started_at: number; finished_at: number | null; seq: number; task_input: string | null; parent_agent_id: string | null; prompt_tokens: number | null; completion_tokens: number | null; total_tokens: number | null; context_tokens: number | null; name: string | null }[]
+    const rows = this.db.prepare(`SELECT id,message_id,agent_id,role,output,started_at,finished_at,seq,task_input,parent_agent_id,prompt_tokens,completion_tokens,total_tokens,context_tokens,name,usage_json FROM agent_runs WHERE session_id=? ORDER BY seq`).all(sessionId) as
+      { id: number; message_id: string | null; agent_id: string; role: AgentRole; output: string; started_at: number; finished_at: number | null; seq: number; task_input: string | null; parent_agent_id: string | null; prompt_tokens: number | null; completion_tokens: number | null; total_tokens: number | null; context_tokens: number | null; name: string | null; usage_json: string | null }[]
     const toolStmt = this.db.prepare(`SELECT call_id,agent_id,name,input,output,status,error,seq,truncated FROM tool_calls WHERE agent_run_id=? ORDER BY seq`)
     return rows.map((r) => {
       const tools = (toolStmt.all(r.id) as { call_id: string; agent_id: string; name: string; input: string; output: string | null; status: ToolStatus; error: string | null; seq: number; truncated: number }[])
         .map((t): ToolCall => ({ callId: t.call_id, agentId: t.agent_id, name: t.name, input: t.input, status: t.status, seq: t.seq, ...(t.output != null ? { output: t.output } : {}), ...(t.error != null ? { error: t.error } : {}), ...(t.truncated ? { truncated: true } : {}) }))
-      const usage: TurnUsage | undefined = r.total_tokens != null
-        ? {
-            inputTokens: r.prompt_tokens ?? 0,
-            outputTokens: r.completion_tokens ?? 0,
-            totalTokens: r.total_tokens,
-            ...(r.context_tokens != null && r.context_tokens > 0 ? { contextTokens: r.context_tokens } : {}),
-          }
-        : undefined
+      // Prefer full usage_json when present; fall back to legacy token columns.
+      const fromJson = parseTurnUsageJson(r.usage_json)
+      const usage: TurnUsage | undefined = fromJson
+        ?? (r.total_tokens != null
+          ? {
+              inputTokens: r.prompt_tokens ?? 0,
+              outputTokens: r.completion_tokens ?? 0,
+              totalTokens: r.total_tokens,
+              ...(r.context_tokens != null && r.context_tokens > 0 ? { contextTokens: r.context_tokens } : {}),
+            }
+          : undefined)
       return { agentId: r.agent_id, role: r.role, output: r.output, startedAt: r.started_at, finishedAt: r.finished_at, seq: r.seq, ...(r.message_id != null ? { messageId: r.message_id } : {}), ...(r.task_input != null ? { taskInput: r.task_input } : {}), ...(r.parent_agent_id != null ? { parentAgentId: r.parent_agent_id } : {}), ...(r.name != null ? { name: r.name } : {}), ...(usage ? { usage } : {}), toolCalls: tools }
     })
   }

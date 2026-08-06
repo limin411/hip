@@ -615,6 +615,19 @@ export function migrate(db: DatabaseSync): void {
       throw e
     }
   }
+  if (version < 26) {
+    db.exec('BEGIN')
+    try {
+      // Full TurnUsage JSON (cache/reasoning/modelId/incomplete/context) dual-written
+      // alongside prompt/completion/total/context_tokens columns.
+      db.exec(`ALTER TABLE agent_runs ADD COLUMN usage_json TEXT`)
+      db.exec('PRAGMA user_version = 26')
+      db.exec('COMMIT')
+    } catch (e) {
+      db.exec('ROLLBACK')
+      throw e
+    }
+  }
 }
 
 /** Try to create the FTS5 objects. Returns true if FTS is available. */

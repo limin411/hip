@@ -1,0 +1,15 @@
+{
+  "_comment": "Anthropic Messages via LangChain — cache keys present (synthetic fixture).",
+  "input_tokens": 12000,
+  "output_tokens": 400,
+  "total_tokens": 12400,
+  "input_token_details": {
+    "cache_read": 8000,
+    "cache_creation": 1500
+  },
+  "output_token_details": {
+    "reasoning": 120
+  },
+  "cache_read_input_tokens": 8000,
+  "cache_creation_input_tokens": 1500
+}

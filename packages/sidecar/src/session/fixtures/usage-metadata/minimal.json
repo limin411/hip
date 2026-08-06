@@ -1,0 +1,6 @@
+{
+  "_comment": "Minimal usage_metadata — only in/out/total; cache fields omitted, incomplete must stay unset.",
+  "input_tokens": 100,
+  "output_tokens": 20,
+  "total_tokens": 120
+}

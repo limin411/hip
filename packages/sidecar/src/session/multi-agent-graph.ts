@@ -40,6 +40,7 @@ import { buildGraph } from './graph.js'
 import { MAX_STEPS } from './loop-control.js'
 import { estimatePromptTokens } from './compaction.js'
 import { usageFromModelMetadata } from './usage.js'
+import { getActiveModel } from '../config/providers.js'
 import {
   HANDOFF_TOOL_PREFIX,
   ctxOf,
@@ -138,7 +139,12 @@ function makeAgentNode(profile: AgentProfile) {
       messages,
       tools: toolsForAgent.map((t) => ({ name: t.name, description: t.description })),
     })
-    const turnUsage = usageFromModelMetadata(msg.usage_metadata, estimated)
+    const binding = profile.modelBinding
+    const active = getActiveModel()
+    const turnUsage = usageFromModelMetadata(msg.usage_metadata, estimated, {
+      modelId: binding?.modelID ?? active.modelID,
+      providerId: binding?.providerID ?? active.providerID,
+    })
     if (turnUsage) ctx.emit.usage(turnUsage)
 
     // Re-assert this profile as the active agent so the post-tool router

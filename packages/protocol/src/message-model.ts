@@ -62,12 +62,19 @@ export interface Message {
   roundtable?: RoundtableMeta
 }
 
+/** One model-call or folded multi-step slice. StepUsage is an alias for the same shape. */
+export type StepUsage = TurnUsage
+
 /** Provider-reported token counts for a turn or a single agent's slice of it.
  *  Counts only — $ cost is computed in the renderer from the models.dev catalog price.
  *
  *  `inputTokens` / `outputTokens` / `totalTokens` are **sums** across multi-step LLM
  *  calls (billing). `contextTokens` is the best estimate of single-request context
  *  size for context-window fill % (last step input within an agent; max across agents).
+ *
+ *  Optional cache/reasoning/model fields round-trip via agent_runs.usage_json.
+ *  Missing cache fields = omit (not incomplete). `incomplete` marks fold/timeout/kill
+ *  or partial spend only.
  */
 export interface TurnUsage {
   inputTokens: number
@@ -75,6 +82,19 @@ export interface TurnUsage {
   totalTokens: number
   /** Single-request context size for fill %; omit on legacy rows. */
   contextTokens?: number
+
+  cacheReadTokens?: number
+  cacheWriteTokens?: number
+  /** When known: non-cached input. Prefer for cost. */
+  nonCachedInputTokens?: number
+  reasoningTokens?: number
+
+  /** Locked at capture — required for honest cost after reload. */
+  modelId?: string
+  providerId?: string
+
+  /** Fold/timeout/kill/missing nested spend — NOT "cache fields absent". */
+  incomplete?: boolean
 }
 
 /** One agent-advertised session config selector (model/mode/reasoning level). */

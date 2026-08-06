@@ -56,10 +56,19 @@ export interface ProjectedToolCall {
   readonly seq: number
 }
 
+/** Mirrors protocol TurnUsage for event projection (optional fields preserved). */
 export interface ProjectedUsage {
   readonly inputTokens: number
   readonly outputTokens: number
   readonly totalTokens: number
+  readonly contextTokens?: number
+  readonly cacheReadTokens?: number
+  readonly cacheWriteTokens?: number
+  readonly nonCachedInputTokens?: number
+  readonly reasoningTokens?: number
+  readonly modelId?: string
+  readonly providerId?: string
+  readonly incomplete?: boolean
 }
 
 // ── handled event types ──────────────────────────────────────────────────────

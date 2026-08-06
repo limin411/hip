@@ -23,6 +23,9 @@ const DEFAULT_GATE_MODE: ContextGateMode = 'percent'
 const DEFAULT_HYBRID_FILL = true
 const DEFAULT_COST_CACHE_READ_MULT = 0.1
 const DEFAULT_COST_CACHE_WRITE_MULT = 1.25
+const DEFAULT_SOFT_TRIM_ENABLED = false
+const DEFAULT_SOFT_TRIM_PERCENT = 50
+const DEFAULT_SOFT_TRIM_KEEP_LAST_N_TURNS = 3
 
 export interface ResolvedContextPolicy {
   autoCompactPercent: number
@@ -81,6 +84,9 @@ export const DEFAULT_CONTEXT_POLICY: ResolvedContextPolicy = {
   hybridFill: DEFAULT_HYBRID_FILL,
   costCacheReadMultiplier: DEFAULT_COST_CACHE_READ_MULT,
   costCacheWriteMultiplier: DEFAULT_COST_CACHE_WRITE_MULT,
+  softTrimEnabled: DEFAULT_SOFT_TRIM_ENABLED,
+  softTrimPercent: DEFAULT_SOFT_TRIM_PERCENT,
+  softTrimKeepLastNTurns: DEFAULT_SOFT_TRIM_KEEP_LAST_N_TURNS,
 }
 
 function clampPercent(n: number, fallback: number): number {

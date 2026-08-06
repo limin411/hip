@@ -265,6 +265,18 @@ function normalizeContext(raw: Record<string, unknown>): ContextConfig {
   if (typeof raw.pruneMinimumTokens === 'number' && Number.isFinite(raw.pruneMinimumTokens)) {
     out.pruneMinimumTokens = raw.pruneMinimumTokens
   }
+  if (typeof raw.softTrimEnabled === 'boolean') {
+    out.softTrimEnabled = raw.softTrimEnabled
+  }
+  if (typeof raw.softTrimPercent === 'number' && Number.isFinite(raw.softTrimPercent)) {
+    out.softTrimPercent = raw.softTrimPercent
+  }
+  if (
+    typeof raw.softTrimKeepLastNTurns === 'number' &&
+    Number.isFinite(raw.softTrimKeepLastNTurns)
+  ) {
+    out.softTrimKeepLastNTurns = raw.softTrimKeepLastNTurns
+  }
   if (
     typeof raw.slidingWindowMaxTokens === 'number' &&
     Number.isFinite(raw.slidingWindowMaxTokens)

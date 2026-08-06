@@ -1,6 +1,7 @@
 /** Unified TOML config types and network policy. */
 import type { ActiveModel, AgentConfig, ProviderApiKind } from './providers-agents.js'
 import type { McpServerConfig } from './mcp-config.js'
+import type { ContextGateMode } from './token-estimation/index.js'
 
 export type { ProviderApiKind }
 
@@ -295,10 +296,31 @@ export interface AcpHostConfig {
   fsReadMaxBytes?: number
 }
 
+export const CONTEXT_GATE_MODES: readonly ContextGateMode[] = [
+  'percent',
+  'usable',
+  'percent_minus_buffer',
+] as const
+
+export function isContextGateMode(v: unknown): v is ContextGateMode {
+  return typeof v === 'string' && (CONTEXT_GATE_MODES as readonly string[]).includes(v)
+}
+
+/**
+ * Parse a gate mode from config/env strings.
+ * Accepts exact literals and hyphenated aliases (`percent-minus-buffer`).
+ */
+export function parseContextGateMode(v: unknown): ContextGateMode | undefined {
+  if (typeof v !== 'string') return undefined
+  const normalized = v.trim().toLowerCase().replace(/-/g, '_')
+  return isContextGateMode(normalized) ? normalized : undefined
+}
+
 /**
  * Optional `[context]` section in hip.toml — compaction / token-budget policy.
  * All fields optional; omitted values keep sidecar defaults
- * (85% auto-compact, 70% subagent, 50% keep-tail, prefire lead 10, two-pass on).
+ * (85% auto-compact, 70% subagent, 50% keep-tail, prefire lead 10, two-pass on;
+ * buffer 0 / gateMode percent — KD-3).
  */
 export interface ContextConfig {
   /** Auto-compact trigger as % of model context window. Default 85. */
@@ -318,6 +340,36 @@ export interface ContextConfig {
   memoryFlushBeforeCompact?: boolean
   /** Max tool-result bytes kept inline for the model. Default 40960 (40KB). */
   toolOutputMaxBytes?: number
+  /**
+   * Absolute output headroom tokens for optional buffer gate modes.
+   * Default **0** (KD-3) — no double headroom on the 85% percent path.
+   * Env: `HIP_CONTEXT_OUTPUT_BUFFER_TOKENS`.
+   * Note: buffer ≥ window (or buffer dominating the % threshold) ⇒ gate always
+   * fires; keep 0 unless dogfooding usable / percent_minus_buffer.
+   */
+  outputBufferTokens?: number
+  /**
+   * How buffer interacts with percent gates. Default `percent`.
+   * Env: `HIP_CONTEXT_GATE_MODE`.
+   * Resolved and stored for compact wiring; product compact still uses
+   * percent-of-window via `exceedsThreshold` until a later PR switches to
+   * `exceedsGate` (see ResolvedContextPolicy).
+   */
+  gateMode?: ContextGateMode
+  /**
+   * Hybrid mid-turn pressure (max full estimate, lastProvider+delta).
+   * Default true; kill via `HIP_CONTEXT_HYBRID_FILL=0` (KD-19).
+   * Stored for later hybrid PR; not yet applied in compactNode.
+   */
+  hybridFill?: boolean
+  /** Soft-prune protect window tokens (later PR). Env: HIP_CONTEXT_PRUNE_PROTECT_TOKENS. */
+  pruneProtectTokens?: number
+  /** Soft-prune minimum release tokens (later PR). Env: HIP_CONTEXT_PRUNE_MINIMUM_TOKENS. */
+  pruneMinimumTokens?: number
+  /** Cache-read cost multiplier vs input. Default 0.1. Env: HIP_CONTEXT_COST_CACHE_READ_MULT. */
+  costCacheReadMultiplier?: number
+  /** Cache-write cost multiplier vs input. Default 1.25. Env: HIP_CONTEXT_COST_CACHE_WRITE_MULT. */
+  costCacheWriteMultiplier?: number
 }
 
 /**

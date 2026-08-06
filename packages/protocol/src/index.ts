@@ -22,6 +22,7 @@ export * from './messages.js'
 export * from './session-events.js'
 export * from './workflow-protocol.js'
 export * from './hip-config.js'
+export * from './token-estimation/index.js'
 export * from './task-runtime.js'
 
 export {

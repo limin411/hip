@@ -23,4 +23,8 @@ Template:
 
 ## Entries
 
-_(none yet)_
+### Baseline capture note (PR-3 / P0b)
+
+Before hybrid dogfood, freeze one row of msm counters from `loop.compact` / overflow recovery: `llm_compacts`, `prunes`, `overflow_recoveries`, `prefire` (hit|pass2|started), plus tags `hybrid` / `throttled`. Compare post-hybrid runs against that row.
+
+_(no run entries yet)_

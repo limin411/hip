@@ -362,9 +362,15 @@ export interface ContextConfig {
    * Stored for later hybrid PR; not yet applied in compactNode.
    */
   hybridFill?: boolean
-  /** Soft-prune protect window tokens (later PR). Env: HIP_CONTEXT_PRUNE_PROTECT_TOKENS. */
+  /**
+   * Soft-prune newest-tool protect window (tokens). Default 40_000 in sidecar.
+   * Env: HIP_CONTEXT_PRUNE_PROTECT_TOKENS.
+   */
   pruneProtectTokens?: number
-  /** Soft-prune minimum release tokens (later PR). Env: HIP_CONTEXT_PRUNE_MINIMUM_TOKENS. */
+  /**
+   * Soft-prune minimum release volume (tokens). Default 20_000 in sidecar.
+   * Env: HIP_CONTEXT_PRUNE_MINIMUM_TOKENS.
+   */
   pruneMinimumTokens?: number
   /** Cache-read cost multiplier vs input. Default 0.1. Env: HIP_CONTEXT_COST_CACHE_READ_MULT. */
   costCacheReadMultiplier?: number

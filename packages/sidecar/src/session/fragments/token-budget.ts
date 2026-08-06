@@ -27,9 +27,13 @@ const IDLE_PAYLOAD: TokenBudgetSourcePayload = {
 
 export interface TokenBudgetSourcePayload {
   readonly text: string
-  /** Stabilized remaining budget as a percentage (0–100), bucketed when active. */
+  /**
+   * Zone/bucket key for snapshot identity — not live remaining %.
+   * Idle ≥30 → 100; critical ≤10 → 10; warn 11–29 → 10% floor (10 or 20).
+   * Baseline rendering uses `text` only; do not use `budget` for metrics/UI.
+   */
   readonly budget: number
-  /** Already-used budget as a percentage (0–100), derived from stabilized budget. */
+  /** Derived as `100 - budget` for the stabilized zone key (not live used %). */
   readonly used: number
 }
 
@@ -74,20 +78,22 @@ export function renderTokenBudget(remaining: number): string {
  * Stabilize raw remaining % into a snapshot-friendly payload.
  * All values in the same zone/bucket share identical JSON encoding so
  * SystemContext.reconcile stays Unchanged across tiny drifts.
+ * Model-visible copy always comes from `renderTokenBudget` (single source of truth).
  */
 export function stabilizeTokenBudget(remaining: number): TokenBudgetSourcePayload {
   if (!shouldInjectTokenBudget(remaining)) {
     return IDLE_PAYLOAD
   }
+  const text = renderTokenBudget(remaining)
   if (remaining <= TOKEN_BUDGET_CRITICAL_AT) {
-    return { text: CRITICAL_TEXT, budget: TOKEN_BUDGET_CRITICAL_AT, used: 100 - TOKEN_BUDGET_CRITICAL_AT }
+    return {
+      text,
+      budget: TOKEN_BUDGET_CRITICAL_AT,
+      used: 100 - TOKEN_BUDGET_CRITICAL_AT,
+    }
   }
   const budget = bucketTokenBudgetPercent(remaining)
-  return {
-    text: `You have approximately ${budget}% of your token budget remaining.`,
-    budget,
-    used: 100 - budget,
-  }
+  return { text, budget, used: 100 - budget }
 }
 
 // ── Codec ─────────────────────────────────────────────────────────────────────

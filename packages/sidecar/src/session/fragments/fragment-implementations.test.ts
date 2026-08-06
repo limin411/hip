@@ -121,11 +121,20 @@ describe('fragment source: token-budget', () => {
     expect(payload.text).not.toContain('25%')
   })
 
-  it('stabilizes to identical payload when remaining is bucket-equal', async () => {
+  it('stabilizes to identical payload when remaining is bucket-equal (20% zone)', async () => {
     const a = (await createTokenBudgetSource({ tokenBudgetPercent: 21 }).load()) as TokenBudgetSourcePayload
     const b = (await createTokenBudgetSource({ tokenBudgetPercent: 29 }).load()) as TokenBudgetSourcePayload
     expect(a).toEqual(b)
     expect(a.text).toBe('You have approximately 20% of your token budget remaining.')
+  })
+
+  it('stabilizes 11–19% to approximately 10% warn copy (not critical)', async () => {
+    const a = (await createTokenBudgetSource({ tokenBudgetPercent: 11 }).load()) as TokenBudgetSourcePayload
+    const b = (await createTokenBudgetSource({ tokenBudgetPercent: 19 }).load()) as TokenBudgetSourcePayload
+    expect(a).toEqual(b)
+    expect(a.budget).toBe(10)
+    expect(a.text).toContain('approximately 10%')
+    expect(a.text).not.toContain('nearly exhausted')
   })
 
   it('stabilizes idle payloads across all remaining >= 30%', async () => {
@@ -140,6 +149,14 @@ describe('fragment source: token-budget', () => {
     const payload = (await source.load()) as TokenBudgetSourcePayload
     expect(payload.text).toContain('nearly exhausted')
     expect(payload.budget).toBe(10)
+  })
+
+  it('stabilizes critical payloads for all remaining <= 10%', async () => {
+    const a = (await createTokenBudgetSource({ tokenBudgetPercent: 0 }).load()) as TokenBudgetSourcePayload
+    const b = (await createTokenBudgetSource({ tokenBudgetPercent: 10 }).load()) as TokenBudgetSourcePayload
+    expect(a).toEqual(b)
+    expect(a.text).toContain('nearly exhausted')
+    expect(a.budget).toBe(10)
   })
 
   it('is Unavailable when percent is undefined', async () => {

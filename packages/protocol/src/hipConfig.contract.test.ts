@@ -148,6 +148,9 @@ describe('protocol: AgentLoopConfig', () => {
         costCacheWriteMultiplier: 1.25,
         pruneProtectTokens: 40_000,
         pruneMinimumTokens: 20_000,
+        softTrimEnabled: true,
+        softTrimPercent: 50,
+        softTrimKeepLastNTurns: 3,
       },
     }
     const round = JSON.parse(JSON.stringify(cfg)) as HipConfig

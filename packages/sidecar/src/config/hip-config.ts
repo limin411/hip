@@ -205,6 +205,15 @@ function normalizeContext(raw: Record<string, unknown>): ContextConfig {
   if (raw.prune_minimum_tokens !== undefined && raw.pruneMinimumTokens === undefined) {
     raw.pruneMinimumTokens = raw.prune_minimum_tokens
   }
+  if (raw.soft_trim_enabled !== undefined && raw.softTrimEnabled === undefined) {
+    raw.softTrimEnabled = raw.soft_trim_enabled
+  }
+  if (raw.soft_trim_percent !== undefined && raw.softTrimPercent === undefined) {
+    raw.softTrimPercent = raw.soft_trim_percent
+  }
+  if (raw.soft_trim_keep_last_n_turns !== undefined && raw.softTrimKeepLastNTurns === undefined) {
+    raw.softTrimKeepLastNTurns = raw.soft_trim_keep_last_n_turns
+  }
   if (raw.cost_cache_read_multiplier !== undefined && raw.costCacheReadMultiplier === undefined) {
     raw.costCacheReadMultiplier = raw.cost_cache_read_multiplier
   }
@@ -223,6 +232,9 @@ function normalizeContext(raw: Record<string, unknown>): ContextConfig {
   delete raw.hybrid_fill
   delete raw.prune_protect_tokens
   delete raw.prune_minimum_tokens
+  delete raw.soft_trim_enabled
+  delete raw.soft_trim_percent
+  delete raw.soft_trim_keep_last_n_turns
   delete raw.cost_cache_read_multiplier
   delete raw.cost_cache_write_multiplier
 
@@ -260,6 +272,18 @@ function normalizeContext(raw: Record<string, unknown>): ContextConfig {
   }
   if (typeof raw.pruneMinimumTokens === 'number' && Number.isFinite(raw.pruneMinimumTokens)) {
     out.pruneMinimumTokens = raw.pruneMinimumTokens
+  }
+  if (typeof raw.softTrimEnabled === 'boolean') {
+    out.softTrimEnabled = raw.softTrimEnabled
+  }
+  if (typeof raw.softTrimPercent === 'number' && Number.isFinite(raw.softTrimPercent)) {
+    out.softTrimPercent = raw.softTrimPercent
+  }
+  if (
+    typeof raw.softTrimKeepLastNTurns === 'number' &&
+    Number.isFinite(raw.softTrimKeepLastNTurns)
+  ) {
+    out.softTrimKeepLastNTurns = raw.softTrimKeepLastNTurns
   }
   if (
     typeof raw.costCacheReadMultiplier === 'number' &&

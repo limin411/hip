@@ -17,6 +17,9 @@ const DEFAULT_GATE_MODE: ContextGateMode = 'percent'
 const DEFAULT_HYBRID_FILL = true
 const DEFAULT_COST_CACHE_READ_MULT = 0.1
 const DEFAULT_COST_CACHE_WRITE_MULT = 1.25
+const DEFAULT_SOFT_TRIM_ENABLED = false
+const DEFAULT_SOFT_TRIM_PERCENT = 50
+const DEFAULT_SOFT_TRIM_KEEP_LAST_N_TURNS = 3
 
 export interface ResolvedContextPolicy {
   autoCompactPercent: number
@@ -49,6 +52,12 @@ export interface ResolvedContextPolicy {
   pruneProtectTokens?: number
   /** Optional soft-prune minimum release (later PR). */
   pruneMinimumTokens?: number
+  /** Request-side soft trim of old large tool bodies. Default false. */
+  softTrimEnabled: boolean
+  /** Fill % above which soft trim activates when enabled. Default 50. */
+  softTrimPercent: number
+  /** Keep last N human turns untrimmed. Default 3. */
+  softTrimKeepLastNTurns: number
 }
 
 export const DEFAULT_CONTEXT_POLICY: ResolvedContextPolicy = {
@@ -64,6 +73,9 @@ export const DEFAULT_CONTEXT_POLICY: ResolvedContextPolicy = {
   hybridFill: DEFAULT_HYBRID_FILL,
   costCacheReadMultiplier: DEFAULT_COST_CACHE_READ_MULT,
   costCacheWriteMultiplier: DEFAULT_COST_CACHE_WRITE_MULT,
+  softTrimEnabled: DEFAULT_SOFT_TRIM_ENABLED,
+  softTrimPercent: DEFAULT_SOFT_TRIM_PERCENT,
+  softTrimKeepLastNTurns: DEFAULT_SOFT_TRIM_KEEP_LAST_N_TURNS,
 }
 
 function clampPercent(n: number, fallback: number): number {
@@ -117,6 +129,9 @@ function envGateMode(name: string): ContextGateMode | undefined {
  * - HIP_CONTEXT_COST_CACHE_WRITE_MULT
  * - HIP_CONTEXT_PRUNE_PROTECT_TOKENS
  * - HIP_CONTEXT_PRUNE_MINIMUM_TOKENS
+ * - HIP_CONTEXT_SOFT_TRIM
+ * - HIP_CONTEXT_SOFT_TRIM_PERCENT
+ * - HIP_CONTEXT_SOFT_TRIM_KEEP_LAST_N_TURNS
  */
 export function resolveContextPolicy(partial?: ContextConfig | null): ResolvedContextPolicy {
   const base: ResolvedContextPolicy = { ...DEFAULT_CONTEXT_POLICY }
@@ -186,6 +201,19 @@ export function resolveContextPolicy(partial?: ContextConfig | null): ResolvedCo
     ) {
       base.pruneMinimumTokens = Math.floor(partial.pruneMinimumTokens)
     }
+    if (typeof partial.softTrimEnabled === 'boolean') {
+      base.softTrimEnabled = partial.softTrimEnabled
+    }
+    if (partial.softTrimPercent != null) {
+      base.softTrimPercent = clampPercent(partial.softTrimPercent, base.softTrimPercent)
+    }
+    if (
+      typeof partial.softTrimKeepLastNTurns === 'number' &&
+      Number.isFinite(partial.softTrimKeepLastNTurns) &&
+      partial.softTrimKeepLastNTurns >= 0
+    ) {
+      base.softTrimKeepLastNTurns = Math.floor(partial.softTrimKeepLastNTurns)
+    }
   }
 
   const twoPassEnv = envBool('HIP_TWO_PASS_COMPACT')
@@ -240,6 +268,19 @@ export function resolveContextPolicy(partial?: ContextConfig | null): ResolvedCo
   const pruneMinEnv = envInt('HIP_CONTEXT_PRUNE_MINIMUM_TOKENS')
   if (pruneMinEnv !== undefined && pruneMinEnv > 0) {
     base.pruneMinimumTokens = Math.floor(pruneMinEnv)
+  }
+
+  const softTrimEnv = envBool('HIP_CONTEXT_SOFT_TRIM')
+  if (softTrimEnv !== undefined) base.softTrimEnabled = softTrimEnv
+
+  const softTrimPctEnv = envInt('HIP_CONTEXT_SOFT_TRIM_PERCENT')
+  if (softTrimPctEnv !== undefined) {
+    base.softTrimPercent = clampPercent(softTrimPctEnv, base.softTrimPercent)
+  }
+
+  const softTrimKeepEnv = envInt('HIP_CONTEXT_SOFT_TRIM_KEEP_LAST_N_TURNS')
+  if (softTrimKeepEnv !== undefined && softTrimKeepEnv >= 0) {
+    base.softTrimKeepLastNTurns = Math.floor(softTrimKeepEnv)
   }
 
   return base

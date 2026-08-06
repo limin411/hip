@@ -75,6 +75,9 @@ cost_cache_read_multiplier = 0.05
 cost_cache_write_multiplier = 1.5
 prune_protect_tokens = 40000
 prune_minimum_tokens = 20000
+soft_trim_enabled = true
+soft_trim_percent = 55
+soft_trim_keep_last_n_turns = 4
 `,
       'utf8',
     )
@@ -93,6 +96,9 @@ prune_minimum_tokens = 20000
     expect(cfg.context?.costCacheWriteMultiplier).toBe(1.5)
     expect(cfg.context?.pruneProtectTokens).toBe(40_000)
     expect(cfg.context?.pruneMinimumTokens).toBe(20_000)
+    expect(cfg.context?.softTrimEnabled).toBe(true)
+    expect(cfg.context?.softTrimPercent).toBe(55)
+    expect(cfg.context?.softTrimKeepLastNTurns).toBe(4)
   })
 
   it('accepts hyphenated gate_mode aliases (parity with env)', () => {

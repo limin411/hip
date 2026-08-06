@@ -19,6 +19,9 @@ const ENV_KEYS = [
   'HIP_CONTEXT_COST_CACHE_WRITE_MULT',
   'HIP_CONTEXT_PRUNE_PROTECT_TOKENS',
   'HIP_CONTEXT_PRUNE_MINIMUM_TOKENS',
+  'HIP_CONTEXT_SOFT_TRIM',
+  'HIP_CONTEXT_SOFT_TRIM_PERCENT',
+  'HIP_CONTEXT_SOFT_TRIM_KEEP_LAST_N_TURNS',
 ] as const
 
 describe('resolveContextPolicy', () => {
@@ -53,6 +56,10 @@ describe('resolveContextPolicy', () => {
     expect(DEFAULT_CONTEXT_POLICY.hybridFill).toBe(true)
     expect(DEFAULT_CONTEXT_POLICY.costCacheReadMultiplier).toBe(0.1)
     expect(DEFAULT_CONTEXT_POLICY.costCacheWriteMultiplier).toBe(1.25)
+    // Soft trim default off
+    expect(DEFAULT_CONTEXT_POLICY.softTrimEnabled).toBe(false)
+    expect(DEFAULT_CONTEXT_POLICY.softTrimPercent).toBe(50)
+    expect(DEFAULT_CONTEXT_POLICY.softTrimKeepLastNTurns).toBe(3)
   })
 
   it('applies hip.toml-style partial', () => {
@@ -71,6 +78,9 @@ describe('resolveContextPolicy', () => {
       costCacheWriteMultiplier: 1.5,
       pruneProtectTokens: 40_000,
       pruneMinimumTokens: 20_000,
+      softTrimEnabled: true,
+      softTrimPercent: 55,
+      softTrimKeepLastNTurns: 4,
     })
     expect(p.autoCompactPercent).toBe(90)
     expect(p.subagentCompactPercent).toBe(60)
@@ -86,6 +96,9 @@ describe('resolveContextPolicy', () => {
     expect(p.costCacheWriteMultiplier).toBe(1.5)
     expect(p.pruneProtectTokens).toBe(40_000)
     expect(p.pruneMinimumTokens).toBe(20_000)
+    expect(p.softTrimEnabled).toBe(true)
+    expect(p.softTrimPercent).toBe(55)
+    expect(p.softTrimKeepLastNTurns).toBe(4)
   })
 
   it('clamps percent fields to 1..100', () => {
@@ -107,6 +120,9 @@ describe('resolveContextPolicy', () => {
     process.env.HIP_CONTEXT_HYBRID_FILL = '0'
     process.env.HIP_CONTEXT_COST_CACHE_READ_MULT = '0.2'
     process.env.HIP_CONTEXT_COST_CACHE_WRITE_MULT = '1.1'
+    process.env.HIP_CONTEXT_SOFT_TRIM = '1'
+    process.env.HIP_CONTEXT_SOFT_TRIM_PERCENT = '60'
+    process.env.HIP_CONTEXT_SOFT_TRIM_KEEP_LAST_N_TURNS = '5'
     const p = resolveContextPolicy({
       autoCompactPercent: 90,
       twoPass: true,
@@ -115,6 +131,9 @@ describe('resolveContextPolicy', () => {
       outputBufferTokens: 0,
       gateMode: 'percent',
       hybridFill: true,
+      softTrimEnabled: false,
+      softTrimPercent: 50,
+      softTrimKeepLastNTurns: 3,
     })
     expect(p.twoPass).toBe(false)
     expect(p.autoCompactPercent).toBe(80)
@@ -125,5 +144,8 @@ describe('resolveContextPolicy', () => {
     expect(p.hybridFill).toBe(false)
     expect(p.costCacheReadMultiplier).toBe(0.2)
     expect(p.costCacheWriteMultiplier).toBe(1.1)
+    expect(p.softTrimEnabled).toBe(true)
+    expect(p.softTrimPercent).toBe(60)
+    expect(p.softTrimKeepLastNTurns).toBe(5)
   })
 })

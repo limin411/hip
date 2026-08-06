@@ -71,6 +71,7 @@ import type { LoopCompactReason, LoopPrefireOutcome } from './loop-events.js'
 // note: SUBAGENT compact budget is applied by callers via GraphCtx or buildGraph(maxSteps, budget)
 import { applySlidingWindow } from './context/sliding-window.js'
 import { isMicroCompactionEnabled, MicroCompaction } from './micro-compaction.js'
+import { softTrimMessages } from './soft-trim.js'
 import type { HookRegistry } from './hooks/registry.js'
 import type { ToolOutputStore } from './tool-output-store.js'
 import type { GuardianReviewer } from './guardian.js'
@@ -711,7 +712,29 @@ export function buildGraph(maxSteps: number = MAX_STEPS, compactBudget: number =
     }
 
     function prepareMessages(list: BaseMessage[]): BaseMessage[] {
-      const next = [...list]
+      // Request-side soft trim (in-memory copy only — never mutates graph state).
+      // Micro-compaction hard-clear remains the durable prune path.
+      let workingList = list
+      const policy = policyOf(ctx)
+      if (policy.softTrimEnabled) {
+        let fillPercent: number | undefined
+        if (ctx.contextWindowTokens != null && ctx.contextWindowTokens > 0) {
+          const used = effectiveUsedTokens(
+            estimateMessagesTokens(list),
+            ctx.lastPromptTokens,
+          )
+          fillPercent = usageFillPercent(used, ctx.contextWindowTokens)
+        }
+        const { messages: trimmed } = softTrimMessages(list, {
+          enabled: true,
+          fillPercent,
+          softTrimPercent: policy.softTrimPercent,
+          keepLastNTurns: policy.softTrimKeepLastNTurns,
+        })
+        workingList = trimmed
+      }
+
+      const next = [...workingList]
       if (systemPrompt !== undefined) {
         if (next[0] instanceof SystemMessage) {
           next[0] = new SystemMessage(systemPrompt)

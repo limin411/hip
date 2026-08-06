@@ -56,6 +56,11 @@ import {
   slashItemLabelKey,
   type KnowledgeSlashId,
 } from '@/domain/knowledge/slashMenu'
+import {
+  CODE_BLOCK_CHROME,
+  normalizeCodeBlockThemeId,
+} from '@/domain/knowledge/codeBlockTheme'
+import { useHipConfigStore } from '@/store/hipConfigStore'
 import { WikiLinkPicker } from './WikiLinkPicker'
 
 import '@blocknote/mantine/style.css'
@@ -240,6 +245,28 @@ export const DocBlockNoteEditor = forwardRef<
   const rootRef = useRef<HTMLDivElement>(null)
   const skipNextChangeRef = useRef(true)
   const isDark = usePrefersDark()
+  const codeBlockThemePref = useHipConfigStore((s) =>
+    normalizeCodeBlockThemeId(s.config.codeBlock?.colorTheme),
+  )
+  /** Resolved chrome for Live code blocks (matches chat CodeBlock). */
+  const codeBlockChrome = useMemo(() => {
+    const mode =
+      codeBlockThemePref === 'follow'
+        ? isDark
+          ? 'dark'
+          : 'light'
+        : codeBlockThemePref
+    return CODE_BLOCK_CHROME[mode]
+  }, [codeBlockThemePref, isDark])
+  const codeBlockStyle = useMemo(
+    () =>
+      ({
+        ['--kb-code-bg' as string]: codeBlockChrome.background,
+        ['--kb-code-fg' as string]: codeBlockChrome.text,
+        ['--kb-code-border' as string]: codeBlockChrome.border,
+      }) as React.CSSProperties,
+    [codeBlockChrome],
+  )
 
   const [wikiPicker, setWikiPicker] = useState<{
     query: string
@@ -804,6 +831,8 @@ export const DocBlockNoteEditor = forwardRef<
       ref={rootRef}
       className="knowledge-blocknote-editor knowledge-doc-measure flex min-h-0 flex-1 flex-col overflow-y-auto"
       data-testid="knowledge-doc-live-editor"
+      data-code-block-theme={codeBlockThemePref}
+      style={codeBlockStyle}
     >
       <MantineProvider forceColorScheme={isDark ? 'dark' : 'light'}>
         <BlockNoteView

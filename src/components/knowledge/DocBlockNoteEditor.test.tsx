@@ -84,16 +84,40 @@ vi.mock('@/domain/knowledge/assetUrl', () => ({
   resolveAssetDataUrl: vi.fn().mockResolvedValue(null),
 }))
 
+let mockCodeBlockTheme = 'follow'
+vi.mock('@/store/hipConfigStore', () => ({
+  useHipConfigStore: (sel: (s: { config: { codeBlock?: { colorTheme?: string } } }) => unknown) =>
+    sel({ config: { codeBlock: { colorTheme: mockCodeBlockTheme } } }),
+}))
+
 describe('DocBlockNoteEditor', () => {
   beforeEach(() => {
     cleanup()
     vi.clearAllMocks()
+    mockCodeBlockTheme = 'follow'
     tryParseMarkdownToBlocks.mockImplementation((md: string) =>
       md.trim()
         ? [{ id: 'b1', type: 'paragraph', content: md, props: {}, children: [] }]
         : [],
     )
     blocksToMarkdownLossy.mockReturnValue('serialized body')
+  })
+
+  it('applies light code-block chrome CSS vars from settings', async () => {
+    mockCodeBlockTheme = 'light'
+    await act(async () => {
+      render(
+        <DocBlockNoteEditor
+          docId="doc_theme"
+          initialMarkdown="```\nx\n```"
+          onDraftChange={() => {}}
+        />,
+      )
+    })
+    const host = screen.getAllByTestId('knowledge-doc-live-editor')[0]
+    expect(host.getAttribute('data-code-block-theme')).toBe('light')
+    expect(host.style.getPropertyValue('--kb-code-bg')).toBe('#ffffff')
+    expect(host.style.getPropertyValue('--kb-code-fg')).toBe('#1f2328')
   })
 
   it('renders host testid and seeds markdown via replaceBlocks', async () => {

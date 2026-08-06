@@ -80,23 +80,59 @@
   background: var(--kb-selection);
 }
 
-.knowledge-blocknote-editor .bn-inline-content code,
-.knowledge-blocknote-editor .bn-editor code {
+/* Inline code only — do NOT match codeBlock internals (BN uses dark pre + light text). */
+.knowledge-blocknote-editor .bn-inline-content code {
   font-family: var(--kb-font-mono);
   font-size: 0.9em;
   padding: 0.1em 0.35em;
   border-radius: 0.25rem;
+  color: var(--text-primary, inherit);
   background: var(--surface-muted, rgba(0, 0, 0, 0.06));
 }
 
-.knowledge-blocknote-editor .bn-editor pre,
-.knowledge-blocknote-editor [data-content-type='codeBlock'] {
+/*
+ * Code blocks follow General Settings → code block color via host CSS vars
+ * (--kb-code-bg / --kb-code-fg / --kb-code-border) set on .knowledge-blocknote-editor.
+ * Defaults match CODE_BLOCK_CHROME.dark so contrast stays safe before JS hydrates.
+ */
+.knowledge-blocknote-editor {
+  --kb-code-bg: #0d1117;
+  --kb-code-fg: #e6edf3;
+  --kb-code-border: #30363d;
+}
+
+.knowledge-blocknote-editor .bn-block-content[data-content-type='codeBlock'] {
   font-family: var(--kb-font-mono);
   font-size: 0.875em;
   line-height: 1.55;
+  color: var(--kb-code-fg) !important;
+  background-color: var(--kb-code-bg) !important;
+  border: 1px solid var(--kb-code-border);
   border-radius: 0.5rem;
-  background: var(--surface-muted, rgba(0, 0, 0, 0.04)) !important;
-  border: 1px solid var(--border, transparent);
+}
+
+.knowledge-blocknote-editor
+  .bn-block-content[data-content-type='codeBlock']
+  > pre {
+  color: inherit !important;
+  background: transparent !important;
+}
+
+.knowledge-blocknote-editor
+  .bn-block-content[data-content-type='codeBlock']
+  code {
+  color: inherit !important;
+  background: transparent !important;
+  padding: 0;
+  font-size: inherit;
+  border-radius: 0;
+}
+
+.knowledge-blocknote-editor
+  .bn-block-content[data-content-type='codeBlock']
+  > div
+  > select {
+  color: var(--kb-code-fg);
 }
 
 .knowledge-blocknote-editor [data-content-type='quote'] {

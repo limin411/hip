@@ -168,11 +168,11 @@ function lastNonEmpty(prev: string | undefined, next: string | undefined): strin
   return undefined
 }
 
-/** Fold optional numeric token fields that sum under addUsage/sumUsage. */
+/** Fold optional fields that sum (cache/reasoning) + OR incomplete + last model ids.
+ *  nonCached is **not** summed — recompute via reconcileNonCached after billing totals. */
 function foldOptionalTokenSums(acc: TurnUsage | undefined, next: TurnUsage): Partial<TurnUsage> {
   const cacheReadTokens = sumOpt(acc?.cacheReadTokens, next.cacheReadTokens)
   const cacheWriteTokens = sumOpt(acc?.cacheWriteTokens, next.cacheWriteTokens)
-  const nonCachedInputTokens = sumOpt(acc?.nonCachedInputTokens, next.nonCachedInputTokens)
   const reasoningTokens = sumOpt(acc?.reasoningTokens, next.reasoningTokens)
   const incomplete = acc?.incomplete === true || next.incomplete === true ? true : undefined
   const modelId = lastNonEmpty(acc?.modelId, next.modelId)
@@ -180,12 +180,28 @@ function foldOptionalTokenSums(acc: TurnUsage | undefined, next: TurnUsage): Par
   return {
     ...(cacheReadTokens != null ? { cacheReadTokens } : {}),
     ...(cacheWriteTokens != null ? { cacheWriteTokens } : {}),
-    ...(nonCachedInputTokens != null ? { nonCachedInputTokens } : {}),
     ...(reasoningTokens != null ? { reasoningTokens } : {}),
     ...(incomplete ? { incomplete: true } : {}),
     ...(modelId ? { modelId } : {}),
     ...(providerId ? { providerId } : {}),
   }
+}
+
+/**
+ * Keep nonCached honest after folds: when any cache field is present, recompute
+ * nonCached = max(0, input − cacheRead − cacheWrite). When no cache breakdown,
+ * omit nonCached (do not leave a partial sum from mixed steps).
+ */
+function reconcileNonCached(u: TurnUsage): TurnUsage {
+  const hasCache = u.cacheReadTokens != null || u.cacheWriteTokens != null
+  if (hasCache) {
+    const cr = u.cacheReadTokens ?? 0
+    const cw = u.cacheWriteTokens ?? 0
+    return { ...u, nonCachedInputTokens: Math.max(0, u.inputTokens - cr - cw) }
+  }
+  if (u.nonCachedInputTokens == null) return u
+  const { nonCachedInputTokens: _drop, ...rest } = u
+  return rest
 }
 
 /** Fold one step's usage into an accumulator (immutable; undefined acc → seed).
@@ -195,15 +211,15 @@ export function addUsage(acc: TurnUsage | undefined, next: TurnUsage): TurnUsage
   const nextCtx = stepContextTokens(next)
   const opts = foldOptionalTokenSums(acc, next)
   if (!acc) {
-    return {
+    return reconcileNonCached({
       inputTokens: next.inputTokens,
       outputTokens: next.outputTokens,
       totalTokens: next.totalTokens,
       ...(nextCtx > 0 ? { contextTokens: nextCtx } : {}),
       ...opts,
-    }
+    })
   }
-  return {
+  return reconcileNonCached({
     inputTokens: acc.inputTokens + next.inputTokens,
     outputTokens: acc.outputTokens + next.outputTokens,
     totalTokens: acc.totalTokens + next.totalTokens,
@@ -213,7 +229,7 @@ export function addUsage(acc: TurnUsage | undefined, next: TurnUsage): TurnUsage
         ? { contextTokens: acc.contextTokens }
         : {}),
     ...opts,
-  }
+  })
 }
 
 /** Sum per-agent usages into the turn total. Returns undefined when nothing was reported.
@@ -225,24 +241,24 @@ export function sumUsage(parts: ReadonlyArray<TurnUsage | undefined>): TurnUsage
     if (!p) continue
     if (!out) {
       const ctx = stepContextTokens(p)
-      out = {
+      out = reconcileNonCached({
         inputTokens: p.inputTokens,
         outputTokens: p.outputTokens,
         totalTokens: p.totalTokens,
         ...(ctx > 0 ? { contextTokens: ctx } : {}),
         ...foldOptionalTokenSums(undefined, p),
-      }
+      })
       continue
     }
     const ctx = stepContextTokens(p)
     const prevCtx = out.contextTokens ?? 0
-    out = {
+    out = reconcileNonCached({
       inputTokens: out.inputTokens + p.inputTokens,
       outputTokens: out.outputTokens + p.outputTokens,
       totalTokens: out.totalTokens + p.totalTokens,
       ...(Math.max(prevCtx, ctx) > 0 ? { contextTokens: Math.max(prevCtx, ctx) } : {}),
       ...foldOptionalTokenSums(out, p),
-    }
+    })
   }
   return out
 }
@@ -264,7 +280,9 @@ export function parseTurnUsageJson(raw: string | null | undefined): TurnUsage | 
   return parseTurnUsageObject(parsed)
 }
 
-/** Coerce an unknown object into TurnUsage when core token fields are valid. */
+/** Coerce an unknown object into TurnUsage when core token fields are valid.
+ *  Optional token counts: non-negative ints. contextTokens: positive only.
+ *  Shared by store usage_json load and event parseUsage projection. */
 export function parseTurnUsageObject(raw: unknown): TurnUsage | undefined {
   if (raw == null || typeof raw !== 'object') return undefined
   const u = raw as Record<string, unknown>
@@ -283,17 +301,17 @@ export function parseTurnUsageObject(raw: unknown): TurnUsage | undefined {
     outputTokens,
     totalTokens,
   }
-  const ctx = optFiniteNumber(u['contextTokens'])
-  if (ctx != null && ctx > 0) out.contextTokens = Math.floor(ctx)
+  const ctx = optPositiveInt(u['contextTokens'])
+  if (ctx != null) out.contextTokens = ctx
 
-  const cacheRead = optFiniteNumber(u['cacheReadTokens'])
-  if (cacheRead != null) out.cacheReadTokens = Math.floor(cacheRead)
-  const cacheWrite = optFiniteNumber(u['cacheWriteTokens'])
-  if (cacheWrite != null) out.cacheWriteTokens = Math.floor(cacheWrite)
-  const nonCached = optFiniteNumber(u['nonCachedInputTokens'])
-  if (nonCached != null) out.nonCachedInputTokens = Math.floor(nonCached)
-  const reasoning = optFiniteNumber(u['reasoningTokens'])
-  if (reasoning != null) out.reasoningTokens = Math.floor(reasoning)
+  const cacheRead = optNonNegInt(u['cacheReadTokens'])
+  if (cacheRead != null) out.cacheReadTokens = cacheRead
+  const cacheWrite = optNonNegInt(u['cacheWriteTokens'])
+  if (cacheWrite != null) out.cacheWriteTokens = cacheWrite
+  const nonCached = optNonNegInt(u['nonCachedInputTokens'])
+  if (nonCached != null) out.nonCachedInputTokens = nonCached
+  const reasoning = optNonNegInt(u['reasoningTokens'])
+  if (reasoning != null) out.reasoningTokens = reasoning
 
   if (typeof u['modelId'] === 'string' && u['modelId']) out.modelId = u['modelId']
   if (typeof u['providerId'] === 'string' && u['providerId']) out.providerId = u['providerId']
@@ -302,6 +320,10 @@ export function parseTurnUsageObject(raw: unknown): TurnUsage | undefined {
   return out
 }
 
-function optFiniteNumber(n: unknown): number | undefined {
-  return typeof n === 'number' && Number.isFinite(n) ? n : undefined
+function optPositiveInt(n: unknown): number | undefined {
+  return typeof n === 'number' && Number.isFinite(n) && n > 0 ? Math.floor(n) : undefined
+}
+
+function optNonNegInt(n: unknown): number | undefined {
+  return typeof n === 'number' && Number.isFinite(n) && n >= 0 ? Math.floor(n) : undefined
 }

@@ -139,6 +139,22 @@ describe('message-parsers: parseUsage', () => {
     expect(parseUsage({ usage: { inputTokens: 10, outputTokens: 5, totalTokens: NaN } })).toBeNull()
     expect(parseUsage({ usage: { inputTokens: '10', outputTokens: 5, totalTokens: 15 } })).toBeNull()
   })
+
+  it('omits negative optional token fields (same rules as usage_json parse)', () => {
+    expect(parseUsage({
+      usage: {
+        inputTokens: 10,
+        outputTokens: 5,
+        totalTokens: 15,
+        cacheReadTokens: -3,
+        contextTokens: -1,
+      },
+    })).toEqual({
+      inputTokens: 10,
+      outputTokens: 5,
+      totalTokens: 15,
+    })
+  })
 })
 
 describe('message-parsers: optObjectArray', () => {

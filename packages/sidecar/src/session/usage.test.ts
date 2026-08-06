@@ -158,6 +158,7 @@ describe('usage helpers', () => {
       contextTokens: 50,
       cacheReadTokens: 50,
       cacheWriteTokens: 3,
+      nonCachedInputTokens: 97, // recomputed: 150 − 50 − 3
       reasoningTokens: 5,
       incomplete: true,
       modelId: 'm2',
@@ -200,9 +201,34 @@ describe('usage helpers', () => {
       contextTokens: 20,
       cacheReadTokens: 4,
       cacheWriteTokens: 1,
+      nonCachedInputTokens: 25, // recomputed: 30 − 4 − 1
       incomplete: true,
       modelId: 'x',
     })
+  })
+
+  it('addUsage recomputes nonCached when folding cache-aware with cache-unaware step', () => {
+    const a = addUsage(undefined, {
+      inputTokens: 100,
+      outputTokens: 10,
+      totalTokens: 110,
+      cacheReadTokens: 40,
+      cacheWriteTokens: 10,
+      nonCachedInputTokens: 50,
+    })
+    // Second step has no cache metadata (omit ≠ incomplete)
+    const b = addUsage(a, { inputTokens: 50, outputTokens: 5, totalTokens: 55 })
+    expect(b).toEqual({
+      inputTokens: 150,
+      outputTokens: 15,
+      totalTokens: 165,
+      contextTokens: 50,
+      cacheReadTokens: 40,
+      cacheWriteTokens: 10,
+      // Recomputed from folded totals: 150 − 40 − 10 (not partial nonCached sum 50)
+      nonCachedInputTokens: 100,
+    })
+    expect(b.incomplete).toBeUndefined()
   })
 
   it('serializeTurnUsage / parseTurnUsageJson round-trip extended fields', () => {
@@ -229,5 +255,20 @@ describe('usage helpers', () => {
     expect(parseTurnUsageJson('')).toBeUndefined()
     expect(parseTurnUsageJson('not-json')).toBeUndefined()
     expect(parseTurnUsageJson(JSON.stringify({ inputTokens: 1 }))).toBeUndefined()
+  })
+
+  it('parseTurnUsageObject rejects negative optional token fields', () => {
+    expect(parseTurnUsageObject({
+      inputTokens: 10,
+      outputTokens: 2,
+      totalTokens: 12,
+      cacheReadTokens: -1,
+      contextTokens: 0,
+      reasoningTokens: -5,
+    })).toEqual({
+      inputTokens: 10,
+      outputTokens: 2,
+      totalTokens: 12,
+    })
   })
 })

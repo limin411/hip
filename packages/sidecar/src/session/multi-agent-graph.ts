@@ -72,6 +72,12 @@ export interface MultiAgentCtx {
   defaultProfileId: string
   /** Per-agent step cap. Defaults to MAX_STEPS. */
   maxSteps?: number
+  /**
+   * Model the shared `runner` was built with. Stamped on usage (not per-profile
+   * modelBinding — the shared runner does not honor per-agent bindings yet).
+   */
+  modelId?: string
+  providerId?: string
 }
 
 /** Compiled multi-agent graph — the minimal shape callers depend on. */
@@ -139,11 +145,12 @@ function makeAgentNode(profile: AgentProfile) {
       messages,
       tools: toolsForAgent.map((t) => ({ name: t.name, description: t.description })),
     })
-    const binding = profile.modelBinding
+    // Stamp the shared runner's model only — per-profile modelBinding is not
+    // honored while all agents share ctx.runner (see MultiAgentCtx.modelId).
     const active = getActiveModel()
     const turnUsage = usageFromModelMetadata(msg.usage_metadata, estimated, {
-      modelId: binding?.modelID ?? active.modelID,
-      providerId: binding?.providerID ?? active.providerID,
+      modelId: ctx.modelId ?? active.modelID,
+      providerId: ctx.providerId ?? active.providerID,
     })
     if (turnUsage) ctx.emit.usage(turnUsage)
 

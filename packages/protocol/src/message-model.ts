@@ -147,7 +147,8 @@ export interface AgentRun {
   name?: string
   toolCalls?: ToolCall[]     // ordered by seq; hydrated from the tool_calls table
   messageId?: string         // turn this run belongs to (maps agent_runs.message_id; NULL → no assistant message)
-  usage?: TurnUsage          // this agent's token counts for the turn (hydrated from agent_runs.*_tokens)
+  /** This agent's token counts for the turn (prefer agent_runs.usage_json; else *_tokens columns). */
+  usage?: TurnUsage
 }
 
 export type ToolStatus = 'running' | 'finished' | 'error'

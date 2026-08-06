@@ -890,7 +890,10 @@ export async function runTurn(host: SessionTurnHost, rawSend: SendFn, base?: {
   const rawMode = host._config.permissionMode
   const mode: PermissionMode = rawMode === 'chat' || rawMode === 'full' ? rawMode : 'edit'
   const activeModel = getActiveModel()
-  const contextWindowTokens = resolveModelContextWindow(activeModel.providerID, activeModel.modelID)
+  // Same resolution as Session.modelRunner → buildModel (profile binding → session model → active).
+  // Must run before GraphCtx so usage.modelId matches the runner that spends tokens.
+  const modelChoice = resolveModelChoice(host._config, activeModel, host.getActiveProfile().modelBinding)
+  const contextWindowTokens = resolveModelContextWindow(modelChoice.providerID, modelChoice.modelID)
   const contextPolicy = resolveContextPolicy(resolveEffectiveConfig(cwd).context)
   // Remaining % for injectors: prefer last real prompt usage, else message estimate.
   // System/tools are added after prepare; gate in graph uses full estimate + usage.
@@ -1353,6 +1356,8 @@ export async function runTurn(host: SessionTurnHost, rawSend: SendFn, base?: {
     contextPolicy,
     lastPromptTokens: host.lastPromptTokens,
     protectedStructures: host.goalManager.protectedBlock() || undefined,
+    modelId: modelChoice.modelID,
+    providerId: modelChoice.providerID,
     // Prefire cache is created lazily inside the graph when two-pass is enabled.
     beforeLlmCompact: async () => {
       if (!contextPolicy.memoryFlushBeforeCompact) return

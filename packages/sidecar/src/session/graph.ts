@@ -238,6 +238,13 @@ export interface GraphCtx {
    * Created once per invoke if missing; not LangGraph state.
    */
   replanGuard?: TurnReplanGuard
+  /**
+   * Model used by `runner` for this invoke — must match `resolveModelChoice` /
+   * `buildModel` at construction time so usage.modelId is capture-honest.
+   * When omitted, capture falls back to process-global `getActiveModel()`.
+   */
+  modelId?: string
+  providerId?: string
 }
 
 /** sessionId + turnId fields shared by every LoopEvent (turnId may be unset on GraphCtx). */
@@ -749,10 +756,11 @@ export function buildGraph(maxSteps: number = MAX_STEPS, compactBudget: number =
         messages: input,
         tools: tools.map((t) => ({ name: t.name, description: t.description })),
       })
+      // Prefer GraphCtx stamp (same resolveModelChoice as buildModel); fallback active.
       const active = getActiveModel()
       const turnUsage = usageFromModelMetadata(msg.usage_metadata, estimated, {
-        modelId: active.modelID,
-        providerId: active.providerID,
+        modelId: ctx.modelId ?? active.modelID,
+        providerId: ctx.providerId ?? active.providerID,
       })
       if (turnUsage) {
         emit.usage(turnUsage)

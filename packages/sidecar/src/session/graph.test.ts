@@ -58,21 +58,56 @@ describe('agent loop graph', () => {
       const msg = new AIMessage('done')
       msg.usage_metadata = { input_tokens: 12, output_tokens: 5, total_tokens: 17 }
       const runner = fakeRunner([msg])
-      const seen: Array<{ inputTokens: number; outputTokens: number; totalTokens: number }> = []
+      const seen: TurnUsage[] = []
       await app.invoke(
         { messages: [new HumanMessage('hi')], steps: 0 },
         { configurable: { ctx: { sessionId: 'test-session', runner, tools: buildTools(root), emit: { ...noopEmit, usage: (u: TurnUsage) => seen.push(u) }, summarizer: noopSummarizer } } },
       )
-      // modelId/providerId come from process-global getActiveModel() at emit time
+      // Without GraphCtx stamp, modelId/providerId fall back to getActiveModel()
       expect(seen).toHaveLength(1)
       expect(seen[0]).toMatchObject({
         inputTokens: 12,
         outputTokens: 5,
         totalTokens: 17,
         contextTokens: 12,
+        modelId: 'gpt-4',
+        providerId: 'openai',
       })
-      expect(typeof seen[0].modelId).toBe('string')
-      expect(typeof seen[0].providerId).toBe('string')
+    })
+  })
+
+  it('stamps usage.modelId from GraphCtx even when global active model differs', async () => {
+    await withTmp(async (root) => {
+      const app = buildGraph()
+      const msg = new AIMessage('done')
+      msg.usage_metadata = { input_tokens: 3, output_tokens: 1, total_tokens: 4 }
+      const runner = fakeRunner([msg])
+      const seen: TurnUsage[] = []
+      // beforeAll set active to openai/gpt-4; GraphCtx pin must win (same as resolveModelChoice).
+      await app.invoke(
+        { messages: [new HumanMessage('hi')], steps: 0 },
+        {
+          configurable: {
+            ctx: {
+              sessionId: 'test-session',
+              runner,
+              tools: buildTools(root),
+              emit: { ...noopEmit, usage: (u: TurnUsage) => seen.push(u) },
+              summarizer: noopSummarizer,
+              modelId: 'claude-sonnet-4',
+              providerId: 'anthropic',
+            },
+          },
+        },
+      )
+      expect(seen).toEqual([{
+        inputTokens: 3,
+        outputTokens: 1,
+        totalTokens: 4,
+        contextTokens: 3,
+        modelId: 'claude-sonnet-4',
+        providerId: 'anthropic',
+      }])
     })
   })
 

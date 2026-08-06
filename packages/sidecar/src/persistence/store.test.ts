@@ -387,6 +387,42 @@ describe('SessionStore', () => {
     expect(store.loadMessagesWithRuns('s1').find((m) => m.id === 'a1')!.usage).toEqual(usage)
   })
 
+  it('loads legacy agent_runs rows (usage_json NULL) from token columns including contextTokens', () => {
+    store.insertSession({ id: 's1', title: 't', config: cfg, createdAt: 1, updatedAt: 1 })
+    store.insertMessage({ id: 'a1', sessionId: 's1', role: 'assistant', agentId: 'supervisor', content: 'done', timestamp: 2 })
+    store.getDb().prepare(
+      `INSERT INTO agent_runs(session_id,message_id,seq,agent_id,role,output,started_at,finished_at,prompt_tokens,completion_tokens,total_tokens,context_tokens,usage_json)
+       VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+    ).run('s1', 'a1', 0, 'supervisor', 'supervisor', 'done', 1, 2, 100, 20, 120, 70, null)
+    expect(store.loadAgentRuns('s1')[0].usage).toEqual({
+      inputTokens: 100,
+      outputTokens: 20,
+      totalTokens: 120,
+      contextTokens: 70,
+    })
+    expect(store.loadMessagesWithRuns('s1').find((m) => m.id === 'a1')!.usage).toEqual({
+      inputTokens: 100,
+      outputTokens: 20,
+      totalTokens: 120,
+      contextTokens: 70,
+    })
+  })
+
+  it('falls back to token columns when usage_json is corrupt', () => {
+    store.insertSession({ id: 's1', title: 't', config: cfg, createdAt: 1, updatedAt: 1 })
+    store.insertMessage({ id: 'a1', sessionId: 's1', role: 'assistant', agentId: 'supervisor', content: 'done', timestamp: 2 })
+    store.getDb().prepare(
+      `INSERT INTO agent_runs(session_id,message_id,seq,agent_id,role,output,started_at,finished_at,prompt_tokens,completion_tokens,total_tokens,context_tokens,usage_json)
+       VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+    ).run('s1', 'a1', 0, 'supervisor', 'supervisor', 'done', 1, 2, 50, 10, 60, 40, 'not-json{')
+    expect(store.loadAgentRuns('s1')[0].usage).toEqual({
+      inputTokens: 50,
+      outputTokens: 10,
+      totalTokens: 60,
+      contextTokens: 40,
+    })
+  })
+
   it('omits usage for a run inserted without it (legacy/no-usage rows stay NULL)', () => {
     store.insertSession({ id: 's1', title: 't', config: cfg, createdAt: 1, updatedAt: 1 })
     store.insertMessage({ id: 'u1', sessionId: 's1', role: 'user', agentId: null, content: 'hi', timestamp: 1 })

@@ -397,7 +397,7 @@ export async function retrySubagent(host: SessionTurnHost, agentId: string, send
 
   let result = ''
   try {
-    result = await runSubagent({
+    const run = await runSubagent({
       runner,
       root: cwd,
       summarizer,
@@ -417,6 +417,7 @@ export async function retrySubagent(host: SessionTurnHost, agentId: string, send
       parentAgentId: 'supervisor',
       ...(priorContext.length > 0 ? { existingMessages: priorContext } : {}),
     })
+    result = run.text
   } catch (err) {
     const msg = safeErrorMessage(err)
     result = `Error: ${msg}`
@@ -465,7 +466,7 @@ export async function resumeSubagent(host: SessionTurnHost, taskId: string, cont
   }
 
   try {
-    const text = await runSubagent({
+    const { text } = await runSubagent({
       runner, root: cwd, summarizer, emit, signal: ac.signal,
       description: content, childMaxSteps: childMaxStepsForAgent('worker', cwd),
       permissionMode: mode, requestApproval,

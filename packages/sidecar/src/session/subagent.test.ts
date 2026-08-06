@@ -77,7 +77,7 @@ beforeEach(() => {
 describe('runSubagent', () => {
   it('returns the child final assistant text', async () => {
     await withTmp(async (root) => {
-      const text = await runSubagent({
+      const { text } = await runSubagent({
         runner: fakeRunner([new AIMessage('调查完成：未发现问题')]),
         root, summarizer: noopSummarizer, emit: noopEmit,
         signal: new AbortController().signal, description: 'look into X', childMaxSteps: 15,
@@ -90,7 +90,7 @@ describe('runSubagent', () => {
     await withTmp(async (root) => {
       // At depth=MAX_DEPTH (3), delegation tools are stripped from the child's toolset.
       // The child asks for `task`; toolsNode returns an unknown-tool ToolMessage, then the child answers.
-      const text = await runSubagent({
+      const { text } = await runSubagent({
         runner: fakeRunner([
           new AIMessage({ content: '', tool_calls: [{ name: 'task', args: { description: 'recurse' }, id: 'c1' }] }),
           new AIMessage('无法继续委派，已直接处理'),
@@ -132,7 +132,7 @@ describe('runSubagent', () => {
     await withTmp(async (root) => {
       // Repeat the identical tool call enough to trip doom-loop → nudge → pause (see graph.test.ts).
       const loop = () => new AIMessage({ content: '部分进展', tool_calls: [{ name: 'ls', args: { path: '/' }, id: 'x' }] })
-      const text = await runSubagent({
+      const { text } = await runSubagent({
         runner: fakeRunner([loop(), loop(), loop(), loop(), loop()]),
         root, summarizer: noopSummarizer, emit: noopEmit,
         signal: new AbortController().signal, description: 'loops', childMaxSteps: 15,

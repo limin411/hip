@@ -95,7 +95,7 @@ describe('runSubagent continuation (existingMessages)', () => {
         new HumanMessage('what is 2+2'),
         new AIMessage('4'),
       ]
-      const text = await runSubagent({
+      const { text } = await runSubagent({
         runner: fakeRunner([new AIMessage('OK, continuing')]),
         root, summarizer: noopSummarizer, emit: noopEmit,
         signal: new AbortController().signal, description: 'continue the math', childMaxSteps: 15,

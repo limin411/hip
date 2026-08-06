@@ -245,6 +245,11 @@ export interface SessionTurnHost {
    * Used for remaining-budget % and auto-compact gates.
    */
   lastPromptTokens?: number
+  /**
+   * Single-writer fold of observed TurnUsage into SessionUsageAggregate (KD-11/12).
+   * Pass `incomplete: true` on kill/timeout/missing metadata; omit step to only mark incomplete.
+   */
+  foldSessionUsage(step: TurnUsage | undefined, opts?: { incomplete?: boolean; send?: SendFn }): void
 
   buildAgent(): void
   modelRunner(): ModelRunner
@@ -1007,7 +1012,7 @@ export async function runTurn(host: SessionTurnHost, rawSend: SendFn, base?: {
         : []
     }
     try {
-      const text = await runSubagent({
+      const { text } = await runSubagent({
         runner, root: workerRoot, summarizer, emit: makeEmit(childId, 'worker'),
         signal: signal ?? host.abortController!.signal, description, childMaxSteps: childMaxStepsForAgent('worker', cwd),
         permissionMode: mode, requestApproval, sessionId: host.id,

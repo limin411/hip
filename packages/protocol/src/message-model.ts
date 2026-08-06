@@ -97,6 +97,37 @@ export interface TurnUsage {
   incomplete?: boolean
 }
 
+/** Per-model slice of session-level billing (KD-11 byModel). */
+export interface SessionModelUsage {
+  inputTokens: number
+  outputTokens: number
+  totalTokens: number
+  cacheReadTokens?: number
+  cacheWriteTokens?: number
+  nonCachedInputTokens?: number
+  reasoningTokens?: number
+  providerId?: string
+}
+
+/**
+ * Session-level usage ledger (sessions.usage_json).
+ * Folded from turn/agent steps and background subagent returns (KD-11/12).
+ * `incomplete` is OR across folds (timeout/kill/missing metadata) — never invent tokens.
+ */
+export interface SessionUsageAggregate {
+  inputTokens: number
+  outputTokens: number
+  totalTokens: number
+  cacheReadTokens?: number
+  cacheWriteTokens?: number
+  nonCachedInputTokens?: number
+  reasoningTokens?: number
+  incomplete?: boolean
+  /** Per-step modelId buckets; missing modelId → `_unknown`. */
+  byModel: Record<string, SessionModelUsage>
+  updatedAt: number
+}
+
 /** One agent-advertised session config selector (model/mode/reasoning level). */
 export interface AcpConfigOption {
   id: string

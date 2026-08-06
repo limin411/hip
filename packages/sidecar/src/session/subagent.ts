@@ -1,5 +1,5 @@
 import { SystemMessage, HumanMessage, AIMessage, type BaseMessage } from '@langchain/core/messages'
-import type { PermissionMode } from '@hip/protocol'
+import type { PermissionMode, TurnUsage } from '@hip/protocol'
 import type { ModelRunner } from './model-runner.js'
 import { type Summarizer } from './compaction.js'
 import { resolveModelContextWindow } from './context-budget.js'
@@ -17,6 +17,7 @@ import { resolveDoomLoopStrategy } from './doom-loop.js'
 import { childSystemPrompt } from './system-prompt.js'
 import { formatPausedToolResult } from './subagent-result.js'
 import { linkSubagentParentObservation, type TraceObservation } from './trace-export.js'
+import { addUsage } from './usage.js'
 
 const NOOP_EMIT: GraphEmit = {
   token: () => {},
@@ -97,8 +98,14 @@ export function lastAiText(messages: BaseMessage[]): string {
   return ''
 }
 
+/** Result of a subagent run — text for tools + optional captured TurnUsage (KD-12). */
+export interface SubagentRunResult {
+  text: string
+  usage?: TurnUsage
+}
+
 /**
- * Run a sub-agent to completion and return its final assistant text.
+ * Run a sub-agent to completion and return its final assistant text + captured usage.
  *
  * - Shares the parent cwd (`root`) and the parent AbortSignal (cancel propagates into the child stream).
  * - Capped at `childMaxSteps` (independent of the parent MAX_STEPS).
@@ -106,8 +113,10 @@ export function lastAiText(messages: BaseMessage[]): string {
  *   returns first-line `[hip:subagent_paused] <question>` plus optional partial body (P3-D3).
  * - Depth-aware: when currentDepth < MAX_DEPTH, the child gets `task`/`task_batch` tools for
  *   recursive delegation. At depth >= MAX_DEPTH, those tools are filtered out.
+ * - Usage is always accumulated locally (even when `mode === 'background'` or emit.usage is noop)
+ *   and returned so callers can fold into SessionUsageAggregate without inventing tokens.
  */
-export async function runSubagent(args: RunSubagentArgs): Promise<string> {
+export async function runSubagent(args: RunSubagentArgs): Promise<SubagentRunResult> {
   const {
     runner, root, summarizer, emit, signal, description, childMaxSteps,
     permissionMode, requestApproval, existingMessages, mode, sessionId,
@@ -116,6 +125,7 @@ export async function runSubagent(args: RunSubagentArgs): Promise<string> {
   } = args
   const currentDepth = args.depth ?? 0
   const childAgentId = agentId ?? 'worker'
+  let capturedUsage: TurnUsage | undefined
 
   // E2: parent observation link (debug-logger + optional collector).
   // Spawn is a span with parentId = parentAgentId — not a LoopEvent (E0 frozen).
@@ -134,13 +144,29 @@ export async function runSubagent(args: RunSubagentArgs): Promise<string> {
     { collect: onObservation },
   )
 
+  // Forward all emit channels except when background (UI noise). Always capture usage.
+  const forward = mode === 'background' ? NOOP_EMIT : emit
+  const graphEmit: GraphEmit = {
+    token: forward.token,
+    reasoning: forward.reasoning,
+    toolStarted: forward.toolStarted,
+    toolFinished: forward.toolFinished,
+    planDelta: forward.planDelta,
+    compaction: forward.compaction,
+    usage: (u) => {
+      capturedUsage = addUsage(capturedUsage, u)
+      forward.usage(u)
+    },
+  }
+
   // Create a spawn function for recursive delegation that increments depth on each call.
   // Parent observation link: child.parentAgentId = this agent (not the grandparent).
   // Per-parent counter keeps sibling agentIds unique at the same depth.
+  // Nested usage is folded via return (emit.usage silenced) to avoid double-count.
   let nestSeq = 0
   const childSpawn = async (desc: string, submode?: 'foreground' | 'background'): Promise<string> => {
     const seq = nestSeq++
-    return runSubagent({
+    const nested = await runSubagent({
       ...args,
       depth: currentDepth + 1,
       description: desc,
@@ -149,8 +175,17 @@ export async function runSubagent(args: RunSubagentArgs): Promise<string> {
       parentAgentId: childAgentId,
       // unique per sibling: parent:d{depth}.{seq}
       agentId: `${childAgentId}:d${currentDepth + 1}.${seq}`,
-      // hooks / onObservation stay on ...args so children share the session registry
+      // Silence usage on nested emit; fold returned usage once into this run.
+      emit: {
+        ...graphEmit,
+        usage: () => {},
+      },
     })
+    if (nested.usage) {
+      capturedUsage = addUsage(capturedUsage, nested.usage)
+      forward.usage(nested.usage)
+    }
+    return nested.text
   }
 
   // Build tools WITH child spawn so delegation tools are available for the child.
@@ -175,7 +210,7 @@ export async function runSubagent(args: RunSubagentArgs): Promise<string> {
   const ctx: GraphCtx = {
     runner,
     tools,
-    emit: mode === 'background' ? NOOP_EMIT : emit,
+    emit: graphEmit,
     summarizer,
     sessionId: sessionId ?? 'subagent',
     hooks,
@@ -216,10 +251,12 @@ export async function runSubagent(args: RunSubagentArgs): Promise<string> {
       recursionLimit: recursionLimit(childMaxSteps),
     },
   )
-  const text = lastAiText(final.messages)
-  if (final.status === 'awaiting_user') {
-    const q = final.pendingQuestion
-    return q ? formatPausedToolResult(q, text) : text
+  const rawText = lastAiText(final.messages)
+  const text = final.status === 'awaiting_user'
+    ? (final.pendingQuestion ? formatPausedToolResult(final.pendingQuestion, rawText) : rawText)
+    : rawText
+  return {
+    text,
+    ...(capturedUsage ? { usage: capturedUsage } : {}),
   }
-  return text
 }

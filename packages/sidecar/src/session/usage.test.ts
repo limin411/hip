@@ -10,6 +10,12 @@ import {
   serializeTurnUsage,
   parseTurnUsageJson,
   parseTurnUsageObject,
+  emptySessionUsageAggregate,
+  foldTurnIntoSessionAggregate,
+  markSessionUsageIncomplete,
+  serializeSessionUsageAggregate,
+  parseSessionUsageAggregate,
+  SESSION_USAGE_UNKNOWN_MODEL,
   type LangChainUsageMetadata,
 } from './usage.js'
 import type { TurnUsage } from '@hip/protocol'
@@ -270,5 +276,72 @@ describe('usage helpers', () => {
       outputTokens: 2,
       totalTokens: 12,
     })
+  })
+})
+
+describe('SessionUsageAggregate fold (KD-11/12)', () => {
+  it('folds billing + byModel keyed by modelId', () => {
+    const a: TurnUsage = {
+      inputTokens: 100,
+      outputTokens: 20,
+      totalTokens: 120,
+      modelId: 'claude-sonnet-4',
+      providerId: 'anthropic',
+      cacheReadTokens: 40,
+    }
+    const b: TurnUsage = {
+      inputTokens: 50,
+      outputTokens: 10,
+      totalTokens: 60,
+      modelId: 'gpt-4o',
+      providerId: 'openai',
+    }
+    let agg = foldTurnIntoSessionAggregate(undefined, a, 1)
+    agg = foldTurnIntoSessionAggregate(agg, b, 2)
+    expect(agg.inputTokens).toBe(150)
+    expect(agg.outputTokens).toBe(30)
+    expect(agg.totalTokens).toBe(180)
+    expect(agg.byModel['claude-sonnet-4']?.inputTokens).toBe(100)
+    expect(agg.byModel['gpt-4o']?.inputTokens).toBe(50)
+    expect(agg.byModel['claude-sonnet-4']?.nonCachedInputTokens).toBe(60)
+    expect(agg.updatedAt).toBe(2)
+    expect(agg.incomplete).toBeUndefined()
+  })
+
+  it('buckets missing modelId under _unknown', () => {
+    const u: TurnUsage = { inputTokens: 1, outputTokens: 1, totalTokens: 2 }
+    const agg = foldTurnIntoSessionAggregate(undefined, u)
+    expect(agg.byModel[SESSION_USAGE_UNKNOWN_MODEL]?.totalTokens).toBe(2)
+  })
+
+  it('ORs incomplete without inventing tokens', () => {
+    const u: TurnUsage = { inputTokens: 10, outputTokens: 0, totalTokens: 10, incomplete: true }
+    const agg = foldTurnIntoSessionAggregate(undefined, u)
+    expect(agg.incomplete).toBe(true)
+    expect(agg.inputTokens).toBe(10)
+    const marked = markSessionUsageIncomplete(emptySessionUsageAggregate(0), 5)
+    expect(marked.incomplete).toBe(true)
+    expect(marked.inputTokens).toBe(0)
+    expect(marked.updatedAt).toBe(5)
+  })
+
+  it('round-trips serialize/parse', () => {
+    const u: TurnUsage = {
+      inputTokens: 3,
+      outputTokens: 4,
+      totalTokens: 7,
+      modelId: 'm',
+      incomplete: true,
+    }
+    const agg = foldTurnIntoSessionAggregate(undefined, u, 9)
+    const raw = serializeSessionUsageAggregate(agg)
+    const back = parseSessionUsageAggregate(raw)
+    expect(back).toEqual(agg)
+  })
+
+  it('parse rejects corrupt JSON', () => {
+    expect(parseSessionUsageAggregate('{')).toBeUndefined()
+    expect(parseSessionUsageAggregate('{"inputTokens":"x"}')).toBeUndefined()
+    expect(parseSessionUsageAggregate(null)).toBeUndefined()
   })
 })

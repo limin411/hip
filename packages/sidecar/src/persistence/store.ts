@@ -85,6 +85,19 @@ export class SessionStore {
     this.db.prepare(`UPDATE sessions SET config=? WHERE id=?`).run(config, id)
   }
 
+  /** Persist SessionUsageAggregate JSON (sessions.usage_json). NULL clears. */
+  setSessionUsageJson(id: string, usageJson: string | null): void {
+    this.db.prepare(`UPDATE sessions SET usage_json=? WHERE id=?`).run(usageJson, id)
+  }
+
+  /** Load sessions.usage_json TEXT (null when unset / missing row). */
+  getSessionUsageJson(id: string): string | null {
+    const row = this.db.prepare(`SELECT usage_json FROM sessions WHERE id=?`).get(id) as
+      | { usage_json: string | null }
+      | undefined
+    return row?.usage_json ?? null
+  }
+
   /** 写入会话起点快照树 SHA（null = 清除）。 */
   setDiffBaseSha(id: string, sha: string | null): void {
     this.db.prepare(`UPDATE sessions SET diff_base_sha=? WHERE id=?`).run(sha, id)

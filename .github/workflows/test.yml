@@ -84,6 +84,25 @@ jobs:
         working-directory: src-tauri
         run: cargo test
 
+  # Long-task unpaid gate: goal persist, compact protect, crash interrupt, isolation, msm pack load.
+  longrun-unit:
+    runs-on: ubuntu-latest
+    needs: [type-check]
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: yarn
+      - name: Enable Yarn (classic)
+        run: corepack enable && corepack prepare yarn@1.22.22 --activate
+      - run: yarn install --frozen-lockfile
+      - name: Long-run unit harness
+        run: yarn test:longrun-unit
+      - name: msm pack load smoke
+        run: yarn test:e2e:eval-smoke --spec e2e/specs/eval-matrix-load.spec.ts
+
   # Pre-merge desktop gate: smoke + core + harness + memory/panel/settings/voice.
   # No paid LLM (@live self-skips; gate grep does not select them).
   e2e-gate:

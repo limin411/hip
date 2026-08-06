@@ -45,7 +45,8 @@ yarn tauri build
 
 - Repo: `/Users/lijiamin/data/code-repository/project-rust/make-stock-money` (`HIP_EVAL_MSM_PATH`)
 - Pack: `e2e/eval/tasks/make-stock-money/` · journal: `docs/design/msm-dogfood-journal.md`
-- `eval "$(scripts/hip-eval-bootstrap-msm.sh)"` then `yarn dogfood:msm -- --list` or bind folder in desktop Code surface
+- Unpaid gate: `yarn test:longrun-unit` or `yarn test:longrun-gate`
+- Live: `eval "$(scripts/hip-eval-bootstrap-msm.sh)"` then `yarn dogfood:msm -- --list`
 
 ## Project-specific gotchas
 

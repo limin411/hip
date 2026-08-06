@@ -268,7 +268,8 @@ M5 Session 消肿（并行薄切片）+ longrun e2e gate          ← 持续
 | msm eval pack + dogfood 脚本 | ✅ 已落地 |
 | msm journal | ✅ `msm-dogfood-journal.md`（持续填） |
 | M1–M4 代码 | ✅ Goal 持久化 / verification / isolation / revert_paths / metrics |
-| Nightly longrun gate | ⬜ 可选 CI；本地 `yarn dogfood:msm` |
+| M5 消肿 + gate | ✅ session-crash / session-goal-facade 抽出；`yarn test:longrun-gate`；CI `longrun-unit` |
+| Live msm dogfood | 本地 `yarn dogfood:msm` / `HIP_LONGRUN_LIVE=1 yarn test:longrun-gate` |
 
 ---
 

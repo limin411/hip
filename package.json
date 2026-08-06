@@ -61,6 +61,8 @@
     "test:e2e:eval-msm": "E2E_LIVE_LLM=1 E2E_GREP='@eval @msm' wdio run wdio.conf.ts",
     "test:e2e:eval-msm-longrun": "E2E_LIVE_LLM=1 E2E_GREP='@eval @msm @longrun' wdio run wdio.conf.ts",
     "dogfood:msm": "node --import tsx scripts/dogfood-msm-coding.mjs",
+    "test:longrun-unit": "vitest run packages/sidecar/src/session/longrun-harness.test.ts packages/sidecar/src/session/goal-types.test.ts packages/sidecar/src/session/isolation.test.ts packages/sidecar/src/session/crash-recovery.test.ts",
+    "test:longrun-gate": "bash scripts/hip-longrun-gate.sh",
     "test:e2e:knowledge": "E2E_GREP=@knowledge wdio run wdio.conf.ts",
     "test:e2e:knowledge-perf": "E2E_GREP=@knowledge-perf wdio run wdio.conf.ts",
     "test:e2e:knowledge-perf-strict": "KNOWLEDGE_PERF_STRICT=1 E2E_GREP=@knowledge-perf wdio run wdio.conf.ts",

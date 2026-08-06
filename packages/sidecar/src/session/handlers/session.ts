@@ -291,6 +291,8 @@ export function handleSessionMessage(
       const { messages, config } = ctx.loadSession(msg.sessionId)
       const clientConfig = config ? stripPlanApprovalPause(config) : config
       send({ type: 'session:loaded', sessionId: msg.sessionId, messages, config: clientConfig })
+      // Restore durable goal chrome after history load.
+      live.emitGoalUpdated(send)
       // After FE clears pending on session:loaded, re-emit plan approval if still paused (D4c.1 / PR-PA1).
       return live.emitPlanApprovalResyncIfNeeded(send)
     }

@@ -26,8 +26,8 @@ import { runSubagent } from './subagent.js'
 import { maxStepsForSession } from './loop-control.js'
 import { Activity, ActivityTracker } from './activity.js'
 import { GoalManager } from './goal.js'
-import type { Goal } from './goal-types.js'
-import { goalToWire } from './goal-types.js'
+import { attachGoalPersistence, emitGoalUpdatedMessage } from './session-goal-facade.js'
+import { recoverSessionFromCrash } from './session-crash.js'
 import { addUsage, sumUsage } from './usage.js'
 import { compactMessages, applyCompactResult, estimateTokens, KEEP_RECENT_TURNS, type Summarizer } from './compaction.js'
 import {
@@ -367,27 +367,7 @@ export class Session {
     }
 
     if (store) {
-      this.goalManager.setPersist((goal) => {
-        try {
-          store.saveSessionGoal(id, goal ? JSON.stringify(goal) : null)
-        } catch (e) {
-          logInfo('session', 'goal:persist-failed', {
-            sessionId: id,
-            error: e instanceof Error ? e.message : String(e),
-          })
-        }
-      })
-      try {
-        const raw = store.loadSessionGoal(id)
-        if (raw) {
-          const parsed = JSON.parse(raw) as Goal
-          if (parsed && typeof parsed.id === 'string' && typeof parsed.description === 'string') {
-            this.goalManager.hydrate(parsed)
-          }
-        }
-      } catch {
-        /* ignore corrupt goal */
-      }
+      attachGoalPersistence(this.goalManager, store, id)
     }
 
     this.git = new GitOperations(id, store)
@@ -732,38 +712,14 @@ export class Session {
    * but never sends WebSocket messages — recovery must be invisible to the UI.
    */
   private recoverFromCrash(): void {
-    if (!this.store || !this.eventStore || !this.snapshotStore) return
-
-    const running = this.findRunningToolCalls()
-    for (const { callId, stepId } of running) {
-      this.emit(
-        { type: 'tool_failed', sessionId: this.id, callId, error: 'interrupted by sidecar crash', timestamp: Date.now() },
-        { stepId },
-      )
-    }
-
-    const snapshot = loadSessionSnapshot(this.snapshotStore, this.id)
-    if (
-      snapshot != null &&
-      snapshot.messages.length > 0 &&
-      hasValidToolCallPairing(snapshot.messages)
-    ) {
-      this.messages.length = 0
-      this.messages.push(...snapshot.messages)
-    }
-  }
-
-  private findRunningToolCalls(): Array<{ callId: string; stepId: string }> {
-    if (!this.store) return []
-    const rows = loadProjection(this.store.getDb(), this.id)
-    const running: Array<{ callId: string; stepId: string }> = []
-    for (const row of rows) {
-      if (!isAssistantStep(row.data)) continue
-      for (const tc of row.data.toolCalls) {
-        if (tc.status === 'running') running.push({ callId: tc.callId, stepId: row.data.stepId })
-      }
-    }
-    return running
+    recoverSessionFromCrash({
+      sessionId: this.id,
+      store: this.store,
+      eventStore: this.eventStore,
+      snapshotStore: this.snapshotStore,
+      messages: this.messages,
+      emit: (event, context) => this.emit(event, context),
+    })
   }
 
   /** Rebuild the in-memory message list for model context.
@@ -960,12 +916,7 @@ export class Session {
 
   /** Emit goal chrome to a connected client (resume / hydrate). */
   emitGoalUpdated(send: SendFn): void {
-    const goal = this.goalManager.getStatus()
-    send({
-      type: 'goal:updated',
-      sessionId: this.id,
-      goal: goalToWire(goal),
-    })
+    emitGoalUpdatedMessage(send, this.id, this.goalManager)
   }
 
   promoteSteerInput(): SessionInput | undefined {

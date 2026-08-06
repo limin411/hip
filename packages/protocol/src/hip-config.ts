@@ -382,6 +382,25 @@ export interface ContextConfig {
   costCacheReadMultiplier?: number
   /** Cache-write cost multiplier vs input. Default 1.25. Env: HIP_CONTEXT_COST_CACHE_WRITE_MULT. */
   costCacheWriteMultiplier?: number
+  /**
+   * Request-side soft trim of old large tool results. Default false.
+   * Env: HIP_CONTEXT_SOFT_TRIM.
+   */
+  softTrimEnabled?: boolean
+  /** Fill % threshold for soft trim when enabled. Default 50. Env: HIP_CONTEXT_SOFT_TRIM_PERCENT. */
+  softTrimPercent?: number
+  /** Keep last N human turns untrimmed. Default 3. Env: HIP_CONTEXT_SOFT_TRIM_KEEP_LAST_N_TURNS. */
+  softTrimKeepLastNTurns?: number
+  /**
+   * Provider cache breakpoint policy: auto | none (aliases: off/0/false).
+   * Default auto. Env: HIP_CONTEXT_CACHE_POLICY.
+   */
+  cachePolicy?: string
+  /**
+   * OpenAI prompt_cache_key mode (e.g. session). Default session.
+   * Env: HIP_CONTEXT_PROMPT_CACHE_KEY.
+   */
+  promptCacheKey?: string
 }
 
 /**

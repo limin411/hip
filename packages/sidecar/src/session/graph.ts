@@ -62,6 +62,9 @@ import {
   addPressureDelta,
   reducePressureDelta,
   hybridUsedTokens,
+  effectiveUsedTokens,
+  estimateMessagesTokens,
+  usageFillPercent,
   type ContextPressureState,
 } from './context-budget.js'
 import {
@@ -73,7 +76,6 @@ import {
   DEFAULT_CONTEXT_POLICY,
   type ResolvedContextPolicy,
 } from './context-policy.js'
-import { estimateMessagesTokens, usageFillPercent } from './context-budget.js'
 import type { LoopCompactReason, LoopPrefireOutcome } from './loop-events.js'
 // note: SUBAGENT compact budget is applied by callers via GraphCtx or buildGraph(maxSteps, budget)
 import { applySlidingWindow } from './context/sliding-window.js'

@@ -69,6 +69,16 @@ export interface ResolvedContextPolicy {
    * Undefined = message-count hard cap only.
    */
   slidingWindowMaxTokens?: number
+  /** Request-side soft trim of old large tool bodies. Default false. */
+  softTrimEnabled: boolean
+  /** Fill % above which soft trim activates when enabled. Default 50. */
+  softTrimPercent: number
+  /** Keep last N human turns untrimmed. Default 3. */
+  softTrimKeepLastNTurns: number
+  /** Provider cache breakpoints. Default auto. */
+  cachePolicy: CachePolicyMode
+  /** OpenAI prompt_cache_key source. Default session. */
+  promptCacheKey: PromptCacheKeyMode
 }
 
 export const DEFAULT_CONTEXT_POLICY: ResolvedContextPolicy = {
@@ -87,6 +97,8 @@ export const DEFAULT_CONTEXT_POLICY: ResolvedContextPolicy = {
   softTrimEnabled: DEFAULT_SOFT_TRIM_ENABLED,
   softTrimPercent: DEFAULT_SOFT_TRIM_PERCENT,
   softTrimKeepLastNTurns: DEFAULT_SOFT_TRIM_KEEP_LAST_N_TURNS,
+  cachePolicy: 'auto',
+  promptCacheKey: 'session',
 }
 
 function clampPercent(n: number, fallback: number): number {
@@ -217,6 +229,25 @@ export function resolveContextPolicy(partial?: ContextConfig | null): ResolvedCo
     ) {
       base.slidingWindowMaxTokens = Math.floor(partial.slidingWindowMaxTokens)
     }
+    if (typeof partial.softTrimEnabled === 'boolean') {
+      base.softTrimEnabled = partial.softTrimEnabled
+    }
+    if (partial.softTrimPercent != null) {
+      base.softTrimPercent = clampPercent(partial.softTrimPercent, base.softTrimPercent)
+    }
+    if (
+      typeof partial.softTrimKeepLastNTurns === 'number' &&
+      Number.isFinite(partial.softTrimKeepLastNTurns) &&
+      partial.softTrimKeepLastNTurns >= 0
+    ) {
+      base.softTrimKeepLastNTurns = Math.floor(partial.softTrimKeepLastNTurns)
+    }
+    if (partial.cachePolicy != null) {
+      base.cachePolicy = resolveCachePolicy(partial.cachePolicy)
+    }
+    if (partial.promptCacheKey != null) {
+      base.promptCacheKey = resolvePromptCacheKeyMode(partial.promptCacheKey)
+    }
   }
 
   const twoPassEnv = envBool('HIP_TWO_PASS_COMPACT')
@@ -276,6 +307,29 @@ export function resolveContextPolicy(partial?: ContextConfig | null): ResolvedCo
   const slidingWindowEnv = envInt('HIP_CONTEXT_SLIDING_WINDOW_MAX_TOKENS')
   if (slidingWindowEnv !== undefined && slidingWindowEnv > 0) {
     base.slidingWindowMaxTokens = Math.floor(slidingWindowEnv)
+  }
+
+  const softTrimEnv = envBool('HIP_CONTEXT_SOFT_TRIM')
+  if (softTrimEnv !== undefined) base.softTrimEnabled = softTrimEnv
+
+  const softTrimPctEnv = envInt('HIP_CONTEXT_SOFT_TRIM_PERCENT')
+  if (softTrimPctEnv !== undefined) {
+    base.softTrimPercent = clampPercent(softTrimPctEnv, base.softTrimPercent)
+  }
+
+  const softTrimKeepEnv = envInt('HIP_CONTEXT_SOFT_TRIM_KEEP_LAST_N_TURNS')
+  if (softTrimKeepEnv !== undefined && softTrimKeepEnv >= 0) {
+    base.softTrimKeepLastNTurns = Math.floor(softTrimKeepEnv)
+  }
+
+  const cachePolicyEnv = process.env.HIP_CONTEXT_CACHE_POLICY
+  if (cachePolicyEnv !== undefined && cachePolicyEnv.trim() !== '') {
+    base.cachePolicy = resolveCachePolicy(cachePolicyEnv)
+  }
+
+  const promptCacheKeyEnv = process.env.HIP_CONTEXT_PROMPT_CACHE_KEY
+  if (promptCacheKeyEnv !== undefined && promptCacheKeyEnv.trim() !== '') {
+    base.promptCacheKey = resolvePromptCacheKeyMode(promptCacheKeyEnv)
   }
 
   return base

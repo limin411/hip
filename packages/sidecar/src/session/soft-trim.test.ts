@@ -138,12 +138,14 @@ describe('softTrimMessages', () => {
     expect(out).not.toBe(messages)
 
     const t0 = out[2] as ToolMessage
-    expect(t0.content).toContain(SOFT_TRIM_MARKER)
-    expect(t0.content.length).toBeLessThan(oldBody.length)
-    expect(t0.content.startsWith('A'.repeat(50))).toBe(true)
+    const t0Text = typeof t0.content === 'string' ? t0.content : String(t0.content)
+    expect(t0Text).toContain(SOFT_TRIM_MARKER)
+    expect(t0Text.length).toBeLessThan(oldBody.length)
+    expect(t0Text.startsWith('A'.repeat(50))).toBe(true)
 
     const t1 = out[4] as ToolMessage
-    expect(t1.content).toContain(SOFT_TRIM_MARKER)
+    const t1Text = typeof t1.content === 'string' ? t1.content : String(t1.content)
+    expect(t1Text).toContain(SOFT_TRIM_MARKER)
 
     // Recent turns untouched
     expect((out[6] as ToolMessage).content).toBe(recentBody)

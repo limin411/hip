@@ -6,6 +6,7 @@ import {
   renderCapabilityNarrative,
   resolveAgentRuntimeProfile,
 } from './agent-runtime-profile.js'
+import { renderTokenBudget } from './fragments/token-budget.js'
 
 // ── State ──────────────────────────────────────────────────────────────────────
 
@@ -161,24 +162,16 @@ export class TerminalContextInjector implements ContextInjector {
   }
 }
 
-/** Adds a token-budget warning when remaining budget is below 30%. */
+/**
+ * Adds a token-budget warning when remaining budget is below 30%.
+ * Remaining % is bucketed (10% steps) so tiny drifts do not rewrite the prefix.
+ */
 export class TokenBudgetInjector implements ContextInjector {
   readonly id = 'token-budget'
 
   async inject(state: InjectorState): Promise<InjectResult> {
-    if (state.tokenBudgetPercent >= 30) return { systemMessages: [] }
-    if (state.tokenBudgetPercent <= 10) {
-      return {
-        systemMessages: [
-          'Your token budget is nearly exhausted. Finish quickly or compact the conversation.',
-        ],
-      }
-    }
-    return {
-      systemMessages: [
-        `You have approximately ${state.tokenBudgetPercent}% of your token budget remaining.`,
-      ],
-    }
+    const text = renderTokenBudget(state.tokenBudgetPercent)
+    return { systemMessages: text ? [text] : [] }
   }
 }
 

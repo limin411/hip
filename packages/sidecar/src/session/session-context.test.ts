@@ -55,11 +55,11 @@ describe('prepareSessionContext', () => {
 
     await prepareSessionContext('s1', 'supervisor', baseState, store)
 
-    // Advance time by changing the token budget; the time fragment will also
-    // have moved forward, so the epoch should detect a source change.
+    // Drop remaining below 30% so token-budget leaves the idle zone and
+    // ContextEpoch reconcile reports an Updated diff.
     const second = await prepareSessionContext('s1', 'supervisor', {
       ...baseState,
-      tokenBudgetPercent: 50,
+      tokenBudgetPercent: 25,
     }, store)
 
     expect(second.contextMessages.length).toBeGreaterThan(0)

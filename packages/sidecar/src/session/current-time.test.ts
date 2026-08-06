@@ -49,6 +49,13 @@ describe('formatCurrentTimeText', () => {
     expect(lines[1]).toBe('UTC: 2026-06-21 12:34:00.')
   })
 
+  it('is stable for any second within the same minute (no prefix churn)', () => {
+    const early = new Date('2026-06-21T12:34:00.000Z')
+    const late = new Date('2026-06-21T12:34:59.999Z')
+    expect(formatCurrentTimeText(early)).toBe(formatCurrentTimeText(late))
+    expect(currentTimeIsoMinute(early)).toBe(currentTimeIsoMinute(late))
+  })
+
   it('defaults to now when no date is passed', () => {
     const text = formatCurrentTimeText()
     expect(text).toMatch(/^Current local time: /)

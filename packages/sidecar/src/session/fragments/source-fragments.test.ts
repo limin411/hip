@@ -40,7 +40,8 @@ const fragmentState: FragmentState = {
   customSystemPrompt: 'Be concise.',
   skills: skillsFixture,
   permissionMode: 'edit',
-  tokenBudgetPercent: 30,
+  // Below 30% so token-budget is injected; 25% buckets to 20% for stable copy.
+  tokenBudgetPercent: 25,
   pendingSubagents: [{ id: 'bg_1', description: 'Search', status: 'running' }],
   completedSubagents: [{ id: 'bg_2', description: 'Done', status: 'completed' }],
 }
@@ -160,8 +161,8 @@ describe('fragment sources registered in SystemContextRegistry', () => {
     expect((decodedTime as TimeSourcePayload).now).toBe(currentTimeIsoMinute(fixedDate))
 
     const decodedBudget = ctx.getSources().find((s) => s.key === 'fragment:token-budget')!.codec.decode(gen.snapshot['fragment:token-budget'].value)
-    expect((decodedBudget as TokenBudgetSourcePayload).budget).toBe(30)
-    expect((decodedBudget as TokenBudgetSourcePayload).used).toBe(70)
+    expect((decodedBudget as TokenBudgetSourcePayload).budget).toBe(20)
+    expect((decodedBudget as TokenBudgetSourcePayload).used).toBe(80)
 
     const decodedSubagents = ctx.getSources().find((s) => s.key === 'fragment:subagents')!.codec.decode(gen.snapshot['fragment:subagents'].value)
     expect((decodedSubagents as SubagentSourcePayload).subagentIds).toEqual(['bg_1', 'bg_2'])
@@ -257,7 +258,7 @@ describe('FragmentRegistry.assemble()', () => {
     expect(assembled.text).toBe(generation.baseline)
     expect(assembled.text).toContain('hip')
     expect(assembled.text).toContain('test-skill')
-    expect(assembled.text).toContain('approximately 30%')
+    expect(assembled.text).toContain('approximately 20%')
     expect(assembled.text).toContain('Pending background tasks')
     expect(assembled.text).toMatch(/Current local time: \d{4}-\d{2}-\d{2} \d{2}:\d{2}:00/)
     expect(assembled.text).toMatch(/UTC: \d{4}-\d{2}-\d{2} \d{2}:\d{2}:00/)

@@ -36,20 +36,30 @@ export function isTwoPassPrefireEnabled(): boolean {
   return true
 }
 
+export interface ShouldStartPrefireOpts {
+  /**
+   * KD-16: when LLM compact is throttled by MIN_STEPS, still allow prefire
+   * even though used is already at/over the compact threshold.
+   */
+  allowOverBudget?: boolean
+}
+
 /**
- * True when fill is high enough to start background pass-1, but not yet at
- * the hard compact threshold (unless already over — then compact owns the work).
+ * True when fill is high enough to start background pass-1.
+ * Default: between (threshold − lead) and threshold exclusive of hard compact.
+ * With `allowOverBudget` (throttled LLM compact): also true at/over threshold.
  */
 export function shouldStartPrefire(
   usedTokens: number,
   contextWindow: number,
   compactThresholdPercent: number = AUTO_COMPACT_THRESHOLD_PERCENT,
   leadPercent: number = PREFIRE_LEAD_PERCENT,
+  opts?: ShouldStartPrefireOpts,
 ): boolean {
   if (contextWindow <= 0) return false
   if (exceedsThreshold(usedTokens, contextWindow, compactThresholdPercent)) {
-    // Already at compact threshold — let compact path consume or start pass1 inline.
-    return false
+    // At/over compact threshold: only prefire when LLM compact is throttled (KD-16).
+    return opts?.allowOverBudget === true
   }
   const prefirePct = Math.max(1, compactThresholdPercent - leadPercent)
   return exceedsThreshold(usedTokens, contextWindow, prefirePct)

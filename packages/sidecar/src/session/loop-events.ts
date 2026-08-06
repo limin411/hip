@@ -54,6 +54,10 @@ export type LoopEvent =
       prefire?: LoopPrefireOutcome
       tokensBefore?: number
       tokensAfter?: number
+      /** Whether hybrid mid-turn pressure contributed to `used` (PR-3 / KD-13). */
+      hybrid?: boolean
+      /** True when LLM compact was skipped due to MIN_STEPS throttle (KD-16). */
+      throttled?: boolean
     }
   | {
       type: 'loop.prefire'
@@ -63,6 +67,8 @@ export type LoopEvent =
       used?: number
       window?: number
       fillPercent?: number
+      /** Prefire started while over-budget but LLM compact throttled (KD-16). */
+      throttled?: boolean
     }
 
 /** Sync, best-effort sink. Implementations must not throw into the agent loop. */

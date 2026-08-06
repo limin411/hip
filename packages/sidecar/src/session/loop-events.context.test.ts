@@ -20,6 +20,7 @@ describe('loop.compact / loop.prefire events', () => {
       prefire: 'hit',
       tokensBefore: 50_000,
       tokensAfter: 20_000,
+      hybrid: true,
     })
     emitLoopSignal(sink, {
       type: 'loop.prefire',
@@ -37,11 +38,32 @@ describe('loop.compact / loop.prefire events', () => {
       reason: 'overflow_secondary',
       mode: 'tool-round',
     })
+    emitLoopSignal(sink, {
+      type: 'loop.compact',
+      sessionId: 's1',
+      turnId: 't1',
+      reason: 'budget',
+      used: 92_000,
+      window: 100_000,
+      hybrid: true,
+      throttled: true,
+    })
+    emitLoopSignal(sink, {
+      type: 'loop.prefire',
+      sessionId: 's1',
+      turnId: 't1',
+      outcome: 'started',
+      used: 92_000,
+      window: 100_000,
+      throttled: true,
+    })
 
-    expect(seen).toHaveLength(3)
-    expect(seen[0]).toMatchObject({ type: 'loop.compact', reason: 'budget', prefire: 'hit' })
+    expect(seen).toHaveLength(5)
+    expect(seen[0]).toMatchObject({ type: 'loop.compact', reason: 'budget', prefire: 'hit', hybrid: true })
     expect(seen[1]).toMatchObject({ type: 'loop.prefire', outcome: 'started' })
     expect(seen[2]).toMatchObject({ type: 'loop.compact', reason: 'overflow_secondary' })
+    expect(seen[3]).toMatchObject({ type: 'loop.compact', hybrid: true, throttled: true })
+    expect(seen[4]).toMatchObject({ type: 'loop.prefire', throttled: true })
   })
 
   it('emitLoopSignal swallows sink errors', () => {

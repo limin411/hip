@@ -32,6 +32,15 @@ describe('shouldStartPrefire', () => {
     expect(shouldStartPrefire(85_000, cw, 85, 10)).toBe(false)
   })
 
+  it('KD-16: allowOverBudget still starts prefire when over compact threshold', () => {
+    const cw = 100_000
+    expect(shouldStartPrefire(85_000, cw, 85, 10)).toBe(false)
+    expect(shouldStartPrefire(85_000, cw, 85, 10, { allowOverBudget: true })).toBe(true)
+    expect(shouldStartPrefire(99_000, cw, 85, 10, { allowOverBudget: true })).toBe(true)
+    // Still require prefire band when not over compact threshold and not allowOverBudget
+    expect(shouldStartPrefire(70_000, cw, 85, 10, { allowOverBudget: true })).toBe(false)
+  })
+
   it('PREFIRE_LEAD_PERCENT default is 10', () => {
     expect(PREFIRE_LEAD_PERCENT).toBe(10)
   })

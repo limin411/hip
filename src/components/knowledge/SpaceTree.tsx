@@ -434,8 +434,9 @@ export function SpaceTree({
         className={cn(
           'group relative flex w-full min-h-[32px] items-center gap-0.5 rounded-lg py-1 pr-1.5 text-body transition-[background-color,color,box-shadow,opacity] duration-100 outline-none select-none',
           isActiveLeaf ? TREE_ACTIVE_DOC : 'text-ink hover:bg-state-hover',
-          // Keyboard focus: fill only (Chrome ring omitted — row uses roving tabindex)
-          isFocused && !isActiveLeaf && 'bg-state-hover',
+          // Keyboard focus: subtle ring only — a fill would read as “selected” while
+          // openDoc is still loading the new body (selection must not outrun content).
+          isFocused && !isActiveLeaf && 'focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-accent/30',
           draggingId === node.id && 'opacity-45',
           dropHint?.targetId === node.id &&
             dropHint.mode === 'into' &&

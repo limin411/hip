@@ -117,6 +117,36 @@ describe('SpaceTree selection visuals', () => {
     expect(row.className).toContain('hover:bg-state-hover')
   })
 
+  it('focused-but-not-active row must not look selected while a new doc is loading', () => {
+    // Simulate the pending openDoc window: treeFocusId already moved to doc_2,
+    // but activeDocId/docBody still belong to doc_1.
+    seedTree('doc_1', { treeFocusId: 'doc_2' })
+    render(
+      <SpaceTree
+        onRename={noop}
+        onDelete={noop}
+        onNewDoc={noop}
+        onNewFolder={noop}
+      />,
+    )
+
+    const pending = screen.getByTestId('knowledge-tree-doc-doc_2')
+    const pendingTokens = pending.className.split(/\s+/)
+    // No selection wash / no focus fill that reads as selection.
+    expect(pendingTokens).not.toContain('bg-accent/10')
+    expect(pendingTokens).not.toContain('bg-state-hover')
+    expect(pending.getAttribute('aria-selected')).toBe('false')
+    // Keyboard roving focus still has a distinct affordance (ring, not fill).
+    expect(pendingTokens).toContain('focus-visible:ring-1')
+    expect(pendingTokens).toContain('focus-visible:ring-accent/30')
+
+    // The actually-active doc keeps the real selection style.
+    const active = screen.getByTestId('knowledge-tree-doc-doc_1')
+    for (const token of TREE_ACTIVE_DOC.split(/\s+/).filter(Boolean)) {
+      expect(active.className).toContain(token)
+    }
+  })
+
   it('hides board nodes from the tree (legacy disk boards stay off UI)', () => {
     seedTree('doc_1', {
       nodes: [

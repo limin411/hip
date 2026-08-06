@@ -128,6 +128,69 @@ export interface SessionUsageAggregate {
   updatedAt: number
 }
 
+/** Billing / provider token buckets for metrics tags and tooltips (PR-10). */
+export interface TokensByType {
+  input: number
+  output: number
+  /** Present only when provider reported a positive cache-read count. */
+  cacheRead?: number
+  /** Present only when provider reported a positive cache-write count. */
+  cacheWrite?: number
+  /** Present only when provider reported reasoning tokens. */
+  reasoning?: number
+}
+
+/**
+ * Aggregated loop.compact / loop.prefire counters for dogfood / journal (PR-10 / G16).
+ * Built from LoopEvent streams via sidecar `aggregateLoopMetrics`.
+ */
+export interface LoopMetricsCounters {
+  /** All `loop.compact` events (any reason). */
+  compactCount: number
+  /** `reason === overflow | overflow_secondary`. */
+  overflowRecoveries: number
+  /** LLM budget/prefire/manual/overflow compacts (not prune / sliding_window). */
+  llmCompacts: number
+  /** `reason === prune`. */
+  prunes: number
+  /** `reason === sliding_window`. */
+  slidingWindows: number
+  /** Prefire outcomes. */
+  prefireStarted: number
+  prefireHit: number
+  prefireMiss: number
+  /** Compacts/prefires tagged hybrid / throttled (PR-3 flags). */
+  hybridCompacts: number
+  throttledCompacts: number
+  throttledPrefires: number
+}
+
+/** One estimated context-composition segment (UI + `context:breakdown` event). */
+export interface ContextBreakdownSegmentPayload {
+  /** Fine: system|user|assistant|skills|tools|other · coarse: system|messages|skills|tools|other */
+  key: string
+  tokens: number
+  /** Share of inputBudget (0–100, one decimal). */
+  percent: number
+}
+
+/**
+ * Structured context / token snapshot for `context:breakdown` (PR-10 / G10).
+ * Segments optional when only provider buckets are known.
+ */
+export interface ContextBreakdownSnapshot {
+  /** Provider single-request context / input budget used for segment %. */
+  inputBudget: number
+  segments?: ContextBreakdownSegmentPayload[]
+  /** Coarse Grok-aligned categories (system/messages/skills/tools/other). */
+  coarseSegments?: ContextBreakdownSegmentPayload[]
+  tokensByType?: TokensByType
+  metrics?: LoopMetricsCounters
+  /** Hybrid pressure was active for the last compact gate (when known). */
+  hybrid?: boolean
+  turnId?: string
+}
+
 /** One agent-advertised session config selector (model/mode/reasoning level). */
 export interface AcpConfigOption {
   id: string

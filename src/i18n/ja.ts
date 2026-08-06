@@ -467,13 +467,15 @@ export const ja = {
       "estimated": "推定",
       "lastInput": "直近ターン入力 · {{tokens}} トークン",
       "segPercent": "{{percent}}%",
-      "breakdownNote": "内訳は表示中の会話から推定（約 4 文字 = 1 トークン）。「その他」はシステムプロンプト・メモリなど不可視の注入分です。",
+      "breakdownNote": "内訳は表示中の会話から推定（約 4 文字 = 1 トークン）。「システム」は既知のシステムプロンプト、「その他」はメモリなど不可視の注入分です。",
       "breakdown": {
+        "system": "システム",
         "user": "会話（あなた）",
         "assistant": "アシスタントと推論",
+        "messages": "メッセージ",
         "skills": "Skills",
         "tools": "ツール",
-        "other": "その他（システム / メモリ）"
+        "other": "その他（メモリ / 注入）"
       }
     },
     "composer": {

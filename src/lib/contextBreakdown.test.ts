@@ -7,6 +7,7 @@ import {
   countVisibleContextChars,
   selectLastUsage,
   inputBudgetFromUsage,
+  toCoarseContextBreakdown,
 } from './contextBreakdown'
 
 function user(id: string, content: string): Message {
@@ -84,6 +85,24 @@ describe('estimateContextBreakdown', () => {
     expect(other?.tokens).toBe(99)
   })
 
+  it('allocates system from systemPrompt (chars/4)', () => {
+    // "sys!" = 4 chars → 1 token
+    const segs = estimateContextBreakdown([user('u1', 'abcd')], 100, {
+      systemPrompt: 'sys!',
+    })
+    expect(segs.find((s) => s.key === 'system')?.tokens).toBe(1)
+    expect(segs.find((s) => s.key === 'user')?.tokens).toBe(1)
+    expect(segs.find((s) => s.key === 'other')?.tokens).toBe(98)
+  })
+
+  it('prefers systemTokens over systemPrompt length', () => {
+    const segs = estimateContextBreakdown([user('u1', 'abcd')], 100, {
+      systemPrompt: 'x'.repeat(400),
+      systemTokens: 3,
+    })
+    expect(segs.find((s) => s.key === 'system')?.tokens).toBe(3)
+  })
+
   it('scales down when estimate exceeds budget', () => {
     const long = 'x'.repeat(400) // 100 tokens
     const messages = [user('u1', long), assistant('a1', long)]
@@ -94,6 +113,26 @@ describe('estimateContextBreakdown', () => {
 
   it('returns empty for zero budget', () => {
     expect(estimateContextBreakdown([user('u1', 'hi')], 0)).toEqual([])
+  })
+})
+
+describe('toCoarseContextBreakdown', () => {
+  it('folds user+assistant into messages (Grok-aligned)', () => {
+    const fine = estimateContextBreakdown(
+      [user('u1', 'abcd'), assistant('a1', 'efgh')], // 1 + 1 tokens
+      100,
+      { systemPrompt: 'sys!' }, // 1 token
+    )
+    const coarse = toCoarseContextBreakdown(fine)
+    expect(coarse.find((s) => s.key === 'system')?.tokens).toBe(1)
+    expect(coarse.find((s) => s.key === 'messages')?.tokens).toBe(2)
+    expect(coarse.find((s) => s.key === 'user')).toBeUndefined()
+    expect(coarse.find((s) => s.key === 'assistant')).toBeUndefined()
+    expect(coarse.find((s) => s.key === 'other')?.tokens).toBe(97)
+  })
+
+  it('returns empty for empty input', () => {
+    expect(toCoarseContextBreakdown([])).toEqual([])
   })
 })
 

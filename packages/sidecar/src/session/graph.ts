@@ -48,6 +48,7 @@ import {
   type CompactResult,
 } from './compaction.js'
 import { usageFromModelMetadata } from './usage.js'
+import { tokensByType } from './token-metrics.js'
 import { getActiveModel } from '../config/providers.js'
 import {
   AUTO_COMPACT_THRESHOLD_PERCENT,
@@ -208,6 +209,11 @@ export interface GraphCtx {
    * When set, gates use max(estimate, lastPromptTokens) (and hybrid when on).
    */
   lastPromptTokens?: number
+  /**
+   * Last full provider TurnUsage (PR-10 by_type tags on loop.compact / prefire).
+   * Set when agentNode captures usage_metadata; never invented.
+   */
+  lastUsage?: TurnUsage
   /**
    * Mid-turn hybrid pressure (KD-13 / PR-3). Per graph invoke.
    * Seeded from lastPromptTokens; updated on usage + tool results.
@@ -441,6 +447,7 @@ function emitCompactObs(
   const fillPercent =
     used != null && window != null && window > 0 ? usageFillPercent(used, window) : undefined
   const hybrid = payload.hybrid ?? policyOf(ctx).hybridFill
+  const tokens = tokensByType(ctx.lastUsage)
   emitLoopSignal(ctx.emit.loopSignal, {
     type: 'loop.compact',
     ...loopIds(ctx),
@@ -454,6 +461,7 @@ function emitCompactObs(
     ...(payload.tokensAfter != null ? { tokensAfter: payload.tokensAfter } : {}),
     ...(hybrid ? { hybrid: true } : {}),
     ...(payload.throttled ? { throttled: true } : {}),
+    ...(tokens ? { tokens } : {}),
   })
 }
 
@@ -520,6 +528,7 @@ function maybeStartPrefire(
   })
   if (!plan) return
   const outcome = cache.startPass1(plan.middle, ctx.summarizer, { sessionId: ctx.sessionId })
+  const tokens = tokensByType(ctx.lastUsage)
   emitLoopSignal(ctx.emit.loopSignal, {
     type: 'loop.prefire',
     ...loopIds(ctx),
@@ -528,6 +537,8 @@ function maybeStartPrefire(
     window,
     fillPercent: usageFillPercent(used, window),
     ...(opts?.allowOverBudget ? { throttled: true } : {}),
+    ...(policyOf(ctx).hybridFill ? { hybrid: true } : {}),
+    ...(tokens ? { tokens } : {}),
   })
   if (outcome === 'started') {
     try {
@@ -853,6 +864,8 @@ export function buildGraph(maxSteps: number = MAX_STEPS, compactBudget: number =
       })
       if (turnUsage) {
         emit.usage(turnUsage)
+        // PR-10: keep full usage for by_type tags on subsequent compact/prefire.
+        ctx.lastUsage = turnUsage
         // Keep gate honest for subsequent compactNode cycles in this invoke.
         const prompt = turnUsage.contextTokens ?? turnUsage.inputTokens
         if (prompt > 0) {

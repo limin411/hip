@@ -474,13 +474,15 @@ export const zhTW = {
       "estimated": "估算",
       "lastInput": "最近一輪輸入 · {{tokens}} tokens",
       "segPercent": "{{percent}}%",
-      "breakdownNote": "分項由可見對話紀錄估算（約每 4 字元 1 token）。「其他」含系統提示、記憶與無法直接看到的注入內容。",
+      "breakdownNote": "分項由可見對話紀錄估算（約每 4 字元 1 token）。「系統」為已知系統提示；「其他」含記憶與無法直接看到的注入內容。",
       "breakdown": {
+        "system": "系統",
         "user": "會話（你）",
         "assistant": "助手與推理",
+        "messages": "訊息",
         "skills": "Skills",
         "tools": "工具",
-        "other": "其他（系統 / 記憶）"
+        "other": "其他（記憶 / 注入）"
       }
     },
     "composer": {

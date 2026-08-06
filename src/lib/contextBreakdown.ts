@@ -1,10 +1,25 @@
 import type { Message, ToolCall, TurnUsage } from '@hip/protocol'
 import { isSkillToolName as protocolIsSkillToolName } from '@hip/protocol'
 
-/** Estimated share of last-turn context (provider input), from visible transcript. */
+/**
+ * Fine-grained share of last-turn context (provider input), from visible transcript
+ * (+ optional system prompt estimate).
+ *
+ * PR-10: added `system` (when systemPrompt/systemTokens provided). User + assistant
+ * compose the Grok-aligned coarse `messages` bucket via `toCoarseContextBreakdown`.
+ */
 export type ContextBreakdownKey =
+  | 'system'
   | 'user'
   | 'assistant'
+  | 'skills'
+  | 'tools'
+  | 'other'
+
+/** Grok-aligned coarse categories (system / messages / skills / tools / other). */
+export type CoarseContextBreakdownKey =
+  | 'system'
+  | 'messages'
   | 'skills'
   | 'tools'
   | 'other'
@@ -16,6 +31,20 @@ export type ContextBreakdownSegment = {
   percent: number
   /** Flex width for stacked bar (0–100). */
   width: number
+}
+
+export type CoarseContextBreakdownSegment = {
+  key: CoarseContextBreakdownKey
+  tokens: number
+  percent: number
+  width: number
+}
+
+export type EstimateContextBreakdownOpts = {
+  /** System / epoch prompt text — estimated via chars/4 when systemTokens omitted. */
+  systemPrompt?: string
+  /** Pre-computed system tokens (preferred when available from sidecar). */
+  systemTokens?: number
 }
 
 /** ~chars/4 heuristic used by OpenCode and similar clients (not tiktoken). */
@@ -80,11 +109,29 @@ export function countVisibleContextChars(messages: Message[]): {
   return counts
 }
 
+function resolveSystemTokens(opts?: EstimateContextBreakdownOpts): number {
+  if (!opts) return 0
+  if (opts.systemTokens != null && opts.systemTokens > 0) {
+    return Math.floor(opts.systemTokens)
+  }
+  if (opts.systemPrompt) {
+    return estimateTokensFromChars(opts.systemPrompt.length)
+  }
+  return 0
+}
+
 function buildSegments(
   tokens: Record<ContextBreakdownKey, number>,
   budget: number,
 ): ContextBreakdownSegment[] {
-  const order: ContextBreakdownKey[] = ['user', 'assistant', 'skills', 'tools', 'other']
+  const order: ContextBreakdownKey[] = [
+    'system',
+    'user',
+    'assistant',
+    'skills',
+    'tools',
+    'other',
+  ]
   return order
     .filter((key) => tokens[key] > 0)
     .map((key) => {
@@ -100,22 +147,26 @@ function buildSegments(
  * Aligns with OpenCode: chars/4 estimate, remainder → `other`, scale down if over budget.
  *
  * @param inputBudget Provider-reported last-turn inputTokens (preferred). Must be > 0.
+ * @param opts Optional system prompt estimate so `system` is not folded into `other`.
  */
 export function estimateContextBreakdown(
   messages: Message[],
   inputBudget: number,
+  opts?: EstimateContextBreakdownOpts,
 ): ContextBreakdownSegment[] {
   if (!inputBudget || inputBudget <= 0) return []
 
   const chars = countVisibleContextChars(messages)
   const tokens = {
+    system: resolveSystemTokens(opts),
     user: estimateTokensFromChars(chars.user),
     assistant: estimateTokensFromChars(chars.assistant),
     skills: estimateTokensFromChars(chars.skills),
     tools: estimateTokensFromChars(chars.tools),
     other: 0,
   }
-  const estimated = tokens.user + tokens.assistant + tokens.skills + tokens.tools
+  const estimated =
+    tokens.system + tokens.user + tokens.assistant + tokens.skills + tokens.tools
 
   if (estimated <= inputBudget) {
     return buildSegments({ ...tokens, other: inputBudget - estimated }, inputBudget)
@@ -123,16 +174,61 @@ export function estimateContextBreakdown(
 
   const scale = inputBudget / estimated
   const scaled = {
+    system: Math.floor(tokens.system * scale),
     user: Math.floor(tokens.user * scale),
     assistant: Math.floor(tokens.assistant * scale),
     skills: Math.floor(tokens.skills * scale),
     tools: Math.floor(tokens.tools * scale),
   }
-  const total = scaled.user + scaled.assistant + scaled.skills + scaled.tools
+  const total =
+    scaled.system + scaled.user + scaled.assistant + scaled.skills + scaled.tools
   return buildSegments(
     { ...scaled, other: Math.max(0, inputBudget - total) },
     inputBudget,
   )
+}
+
+/**
+ * Collapse fine segments toward Grok-aligned categories:
+ * system / messages (user+assistant) / skills / tools / other.
+ */
+export function toCoarseContextBreakdown(
+  segments: ReadonlyArray<ContextBreakdownSegment>,
+): CoarseContextBreakdownSegment[] {
+  if (segments.length === 0) return []
+  const budget = segments.reduce((a, s) => a + s.tokens, 0)
+  if (budget <= 0) return []
+
+  const buckets: Record<CoarseContextBreakdownKey, number> = {
+    system: 0,
+    messages: 0,
+    skills: 0,
+    tools: 0,
+    other: 0,
+  }
+  for (const s of segments) {
+    if (s.key === 'user' || s.key === 'assistant') buckets.messages += s.tokens
+    else if (s.key === 'system') buckets.system += s.tokens
+    else if (s.key === 'skills') buckets.skills += s.tokens
+    else if (s.key === 'tools') buckets.tools += s.tokens
+    else buckets.other += s.tokens
+  }
+
+  const order: CoarseContextBreakdownKey[] = [
+    'system',
+    'messages',
+    'skills',
+    'tools',
+    'other',
+  ]
+  return order
+    .filter((key) => buckets[key] > 0)
+    .map((key) => {
+      const t = buckets[key]
+      const width = (t / budget) * 100
+      const percent = Math.round(width * 10) / 10
+      return { key, tokens: t, width, percent }
+    })
 }
 
 /** Last message with usage — for input budget + context fill. */

@@ -183,8 +183,34 @@ export function loopEventsToObservations(
     } else if (e.type === 'loop.budget') {
       meta.remaining = e.remaining
       meta.total = e.total
+      if (e.tokens) meta.tokens = e.tokens
     } else if (e.type === 'loop.end') {
       meta.reason = clipQ.text ?? e.reason
+      if (e.tokens) meta.tokens = e.tokens
+    } else if (e.type === 'loop.compact') {
+      meta.reason = e.reason
+      if (e.used != null) meta.used = e.used
+      if (e.window != null) meta.window = e.window
+      if (e.fillPercent != null) meta.fillPercent = e.fillPercent
+      if (e.mode) meta.mode = e.mode
+      if (e.prefire) meta.prefire = e.prefire
+      if (e.tokensBefore != null) meta.tokensBefore = e.tokensBefore
+      if (e.tokensAfter != null) meta.tokensAfter = e.tokensAfter
+      if (e.hybrid) meta.hybrid = true
+      if (e.throttled) meta.throttled = true
+      if (e.tokens) meta.tokens = e.tokens
+    } else if (e.type === 'loop.prefire') {
+      meta.outcome = e.outcome
+      if (e.used != null) meta.used = e.used
+      if (e.window != null) meta.window = e.window
+      if (e.fillPercent != null) meta.fillPercent = e.fillPercent
+      if (e.throttled) meta.throttled = true
+      if (e.hybrid) meta.hybrid = true
+      if (e.tokens) meta.tokens = e.tokens
+    } else if (e.type === 'loop.metrics') {
+      meta.metrics = e.metrics
+      if (e.tokens) meta.tokens = e.tokens
+      if (e.hybrid) meta.hybrid = true
     }
 
     return {

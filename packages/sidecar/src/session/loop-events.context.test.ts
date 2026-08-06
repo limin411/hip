@@ -21,6 +21,7 @@ describe('loop.compact / loop.prefire events', () => {
       tokensBefore: 50_000,
       tokensAfter: 20_000,
       hybrid: true,
+      tokens: { input: 80_000, output: 1_200, cacheRead: 10_000 },
     })
     emitLoopSignal(sink, {
       type: 'loop.prefire',
@@ -30,6 +31,7 @@ describe('loop.compact / loop.prefire events', () => {
       used: 76_000,
       window: 100_000,
       fillPercent: 76,
+      hybrid: true,
     })
     emitLoopSignal(sink, {
       type: 'loop.compact',
@@ -57,13 +59,39 @@ describe('loop.compact / loop.prefire events', () => {
       window: 100_000,
       throttled: true,
     })
+    emitLoopSignal(sink, {
+      type: 'loop.metrics',
+      sessionId: 's1',
+      turnId: 't1',
+      metrics: {
+        compactCount: 3,
+        overflowRecoveries: 1,
+        llmCompacts: 2,
+        prunes: 0,
+        slidingWindows: 0,
+        prefireStarted: 2,
+        prefireHit: 0,
+        prefireMiss: 0,
+        hybridCompacts: 2,
+        throttledCompacts: 1,
+        throttledPrefires: 1,
+      },
+      tokens: { input: 80_000, output: 1_200 },
+    })
 
-    expect(seen).toHaveLength(5)
-    expect(seen[0]).toMatchObject({ type: 'loop.compact', reason: 'budget', prefire: 'hit', hybrid: true })
-    expect(seen[1]).toMatchObject({ type: 'loop.prefire', outcome: 'started' })
+    expect(seen).toHaveLength(6)
+    expect(seen[0]).toMatchObject({
+      type: 'loop.compact',
+      reason: 'budget',
+      prefire: 'hit',
+      hybrid: true,
+      tokens: { input: 80_000, output: 1_200, cacheRead: 10_000 },
+    })
+    expect(seen[1]).toMatchObject({ type: 'loop.prefire', outcome: 'started', hybrid: true })
     expect(seen[2]).toMatchObject({ type: 'loop.compact', reason: 'overflow_secondary' })
     expect(seen[3]).toMatchObject({ type: 'loop.compact', hybrid: true, throttled: true })
     expect(seen[4]).toMatchObject({ type: 'loop.prefire', throttled: true })
+    expect(seen[5]).toMatchObject({ type: 'loop.metrics', metrics: { compactCount: 3, overflowRecoveries: 1 } })
   })
 
   it('emitLoopSignal swallows sink errors', () => {

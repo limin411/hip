@@ -173,6 +173,112 @@ describe('TokenUsageChip', () => {
     expect(screen.getByTestId('session-usage')).toHaveTextContent('1.2k')
   })
 
+  it('shows incomplete cost with * and tooltip (KD-15)', () => {
+    useDomainStore.setState({
+      activeSessionId: 's1',
+      sessions: [
+        session('s1', [
+          msg(
+            'a1',
+            {
+              inputTokens: 1_000_000,
+              outputTokens: 0,
+              totalTokens: 1_000_000,
+              incomplete: true,
+              modelId: 'deepseek-chat',
+              providerId: 'deepseek',
+            } as never,
+          ),
+        ]),
+      ],
+    } as never)
+    providersStore.useProvidersStore.setState({
+      catalog: {
+        deepseek: {
+          id: 'deepseek',
+          name: 'DeepSeek',
+          env: [],
+          models: {
+            'deepseek-chat': {
+              id: 'deepseek-chat',
+              name: 'DeepSeek Chat',
+              limit: { context: 128_000, output: 8_000 },
+              cost: { input: 0.27, output: 1.1 },
+            },
+          },
+        },
+      },
+      config: { providers: {} },
+      keyConfigured: {},
+      loaded: true,
+    })
+
+    render(<TokenUsageChip />)
+    fireEvent.mouseEnter(screen.getByTestId('session-usage'))
+    act(() => {
+      vi.advanceTimersByTime(250)
+    })
+    const costEl = screen.getByTestId('session-usage-cost')
+    expect(costEl.textContent).toMatch(/\*/)
+    expect(costEl.getAttribute('title') ?? '').toMatch(/incomplete|lower/i)
+  })
+
+  it('shows cache hit rate only in popover, not on primary chip (KD-21)', () => {
+    useDomainStore.setState({
+      activeSessionId: 's1',
+      sessions: [
+        session('s1', [
+          msg(
+            'a1',
+            {
+              inputTokens: 1000,
+              outputTokens: 10,
+              totalTokens: 1010,
+              nonCachedInputTokens: 200,
+              cacheReadTokens: 700,
+              cacheWriteTokens: 100,
+              modelId: 'deepseek-chat',
+              providerId: 'deepseek',
+            } as never,
+          ),
+        ]),
+      ],
+    } as never)
+    providersStore.useProvidersStore.setState({
+      catalog: {
+        deepseek: {
+          id: 'deepseek',
+          name: 'DeepSeek',
+          env: [],
+          models: {
+            'deepseek-chat': {
+              id: 'deepseek-chat',
+              name: 'DeepSeek Chat',
+              limit: { context: 128_000, output: 8_000 },
+              cost: { input: 0.27, output: 1.1 },
+            },
+          },
+        },
+      },
+      config: { providers: {} },
+      keyConfigured: {},
+      loaded: true,
+    })
+
+    render(<TokenUsageChip />)
+    const chip = screen.getByTestId('session-usage')
+    // Primary surface is fill % only — no cache hit % text.
+    expect(chip.textContent).not.toMatch(/70%/)
+    expect(screen.queryByTestId('session-usage-cache-hit')).not.toBeInTheDocument()
+
+    fireEvent.mouseEnter(chip)
+    act(() => {
+      vi.advanceTimersByTime(250)
+    })
+    expect(screen.getByTestId('session-usage-cache-hit')).toBeInTheDocument()
+    expect(screen.getByTestId('session-usage-cache-hit').textContent).toMatch(/70%/)
+  })
+
   it('does not stick at 0% when provider reports output-only usage (MiniMax)', () => {
     const long = 'context blob '.repeat(2000) // ~26k chars → ~6.5k tokens
     useDomainStore.setState({

@@ -148,6 +148,7 @@ describe('protocol: AgentLoopConfig', () => {
         costCacheWriteMultiplier: 1.25,
         pruneProtectTokens: 40_000,
         pruneMinimumTokens: 20_000,
+        slidingWindowMaxTokens: 80_000,
       },
     }
     const round = JSON.parse(JSON.stringify(cfg)) as HipConfig

@@ -55,6 +55,11 @@ export interface ResolvedContextPolicy {
    * default PRUNE_MINIMUM_TOKENS (20_000).
    */
   pruneMinimumTokens?: number
+  /**
+   * Optional sliding-window token budget (KD-8).
+   * Undefined = message-count hard cap only.
+   */
+  slidingWindowMaxTokens?: number
 }
 
 export const DEFAULT_CONTEXT_POLICY: ResolvedContextPolicy = {
@@ -123,6 +128,7 @@ function envGateMode(name: string): ContextGateMode | undefined {
  * - HIP_CONTEXT_COST_CACHE_WRITE_MULT
  * - HIP_CONTEXT_PRUNE_PROTECT_TOKENS
  * - HIP_CONTEXT_PRUNE_MINIMUM_TOKENS
+ * - HIP_CONTEXT_SLIDING_WINDOW_MAX_TOKENS
  */
 export function resolveContextPolicy(partial?: ContextConfig | null): ResolvedContextPolicy {
   const base: ResolvedContextPolicy = { ...DEFAULT_CONTEXT_POLICY }
@@ -192,6 +198,13 @@ export function resolveContextPolicy(partial?: ContextConfig | null): ResolvedCo
     ) {
       base.pruneMinimumTokens = Math.floor(partial.pruneMinimumTokens)
     }
+    if (
+      typeof partial.slidingWindowMaxTokens === 'number' &&
+      Number.isFinite(partial.slidingWindowMaxTokens) &&
+      partial.slidingWindowMaxTokens > 0
+    ) {
+      base.slidingWindowMaxTokens = Math.floor(partial.slidingWindowMaxTokens)
+    }
   }
 
   const twoPassEnv = envBool('HIP_TWO_PASS_COMPACT')
@@ -246,6 +259,11 @@ export function resolveContextPolicy(partial?: ContextConfig | null): ResolvedCo
   const pruneMinEnv = envInt('HIP_CONTEXT_PRUNE_MINIMUM_TOKENS')
   if (pruneMinEnv !== undefined && pruneMinEnv > 0) {
     base.pruneMinimumTokens = Math.floor(pruneMinEnv)
+  }
+
+  const slidingWindowEnv = envInt('HIP_CONTEXT_SLIDING_WINDOW_MAX_TOKENS')
+  if (slidingWindowEnv !== undefined && slidingWindowEnv > 0) {
+    base.slidingWindowMaxTokens = Math.floor(slidingWindowEnv)
   }
 
   return base

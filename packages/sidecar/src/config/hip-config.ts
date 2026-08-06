@@ -27,6 +27,7 @@ import {
   isCodeBlockColorThemeId,
   isTerminalColorThemeId,
   isWindowCloseAction,
+  parseContextGateMode,
 } from '@hip/protocol'
 import { parseDoomLoopStrategy } from '../session/doom-loop.js'
 
@@ -248,12 +249,10 @@ function normalizeContext(raw: Record<string, unknown>): ContextConfig {
   if (typeof raw.outputBufferTokens === 'number' && Number.isFinite(raw.outputBufferTokens)) {
     out.outputBufferTokens = raw.outputBufferTokens
   }
-  if (
-    raw.gateMode === 'percent' ||
-    raw.gateMode === 'usable' ||
-    raw.gateMode === 'percent_minus_buffer'
-  ) {
-    out.gateMode = raw.gateMode
+  // Hyphen aliases (percent-minus-buffer) accepted same as env HIP_CONTEXT_GATE_MODE.
+  {
+    const mode = parseContextGateMode(raw.gateMode)
+    if (mode !== undefined) out.gateMode = mode
   }
   if (typeof raw.hybridFill === 'boolean') out.hybridFill = raw.hybridFill
   if (typeof raw.pruneProtectTokens === 'number' && Number.isFinite(raw.pruneProtectTokens)) {

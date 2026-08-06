@@ -63,15 +63,17 @@ describe('estimateToolSchemaTokens', () => {
 })
 
 describe('estimateToolsTokens', () => {
-  it('sums name + description + schema overhead', () => {
-    const empty = estimateToolsTokens([])
-    expect(empty).toBe(0)
+  it('fixed-overhead path uses single aggregate ceil (zero delta vs pre-PR)', () => {
+    expect(estimateToolsTokens([])).toBe(0)
     expect(estimateToolsTokens(undefined)).toBe(0)
 
-    const one = estimateToolsTokens([{ name: 'read', description: 'file' }])
-    // name "read"=1, desc "file"=1, schema overhead 100
-    expect(one).toBe(102)
+    // name 'a' + desc 'b' + 400 = 402 → ceil(402/4) = 101 (not per-field 102)
+    expect(estimateToolsTokens([{ name: 'a', description: 'b' }])).toBe(101)
+    // name "read"(4) + desc "file"(4) + 400 = 408 → ceil = 102
+    expect(estimateToolsTokens([{ name: 'read', description: 'file' }])).toBe(102)
+  })
 
+  it('schemaJson path estimates name/desc/schema as text', () => {
     const withSchema = estimateToolsTokens([
       { name: 'a', description: '', schemaJson: 'xxxx' }, // schema 1 token
     ])
@@ -114,6 +116,12 @@ describe('exceedsThresholdWithBuffer (percent_minus_buffer)', () => {
 
   it('false for zero window', () => {
     expect(exceedsThresholdWithBuffer(100, 0, 85, 4_000)).toBe(false)
+  })
+
+  it('buffer dominating threshold clamps boundary → always over budget', () => {
+    // 1000*85 - 1_000_000*100 is negative → clamped to 0 → used*100 >= 0
+    expect(exceedsThresholdWithBuffer(0, 1000, 85, 1_000_000)).toBe(true)
+    expect(exceedsThresholdWithBuffer(1, 1000, 85, 1_000_000)).toBe(true)
   })
 })
 
@@ -180,6 +188,11 @@ describe('exceedsGate modes', () => {
   it('default mode is percent', () => {
     expect(exceedsGate(850, 1000, 85)).toBe(true)
     expect(exceedsGate(849, 1000, 85)).toBe(false)
+  })
+
+  it('usable with buffer >= window is always over budget', () => {
+    expect(exceedsGate(0, 10_000, 85, { gateMode: 'usable', bufferTokens: 50_000 })).toBe(true)
+    expect(exceedsGate(1, 10_000, 100, { gateMode: 'usable', bufferTokens: 10_000 })).toBe(true)
   })
 })
 

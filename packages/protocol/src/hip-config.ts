@@ -303,9 +303,17 @@ export const CONTEXT_GATE_MODES: readonly ContextGateMode[] = [
 ] as const
 
 export function isContextGateMode(v: unknown): v is ContextGateMode {
-  return (
-    v === 'percent' || v === 'usable' || v === 'percent_minus_buffer'
-  )
+  return typeof v === 'string' && (CONTEXT_GATE_MODES as readonly string[]).includes(v)
+}
+
+/**
+ * Parse a gate mode from config/env strings.
+ * Accepts exact literals and hyphenated aliases (`percent-minus-buffer`).
+ */
+export function parseContextGateMode(v: unknown): ContextGateMode | undefined {
+  if (typeof v !== 'string') return undefined
+  const normalized = v.trim().toLowerCase().replace(/-/g, '_')
+  return isContextGateMode(normalized) ? normalized : undefined
 }
 
 /**
@@ -336,16 +344,22 @@ export interface ContextConfig {
    * Absolute output headroom tokens for optional buffer gate modes.
    * Default **0** (KD-3) — no double headroom on the 85% percent path.
    * Env: `HIP_CONTEXT_OUTPUT_BUFFER_TOKENS`.
+   * Note: buffer ≥ window (or buffer dominating the % threshold) ⇒ gate always
+   * fires; keep 0 unless dogfooding usable / percent_minus_buffer.
    */
   outputBufferTokens?: number
   /**
    * How buffer interacts with percent gates. Default `percent`.
    * Env: `HIP_CONTEXT_GATE_MODE`.
+   * Resolved and stored for compact wiring; product compact still uses
+   * percent-of-window via `exceedsThreshold` until a later PR switches to
+   * `exceedsGate` (see ResolvedContextPolicy).
    */
   gateMode?: ContextGateMode
   /**
    * Hybrid mid-turn pressure (max full estimate, lastProvider+delta).
    * Default true; kill via `HIP_CONTEXT_HYBRID_FILL=0` (KD-19).
+   * Stored for later hybrid PR; not yet applied in compactNode.
    */
   hybridFill?: boolean
   /** Soft-prune protect window tokens (later PR). Env: HIP_CONTEXT_PRUNE_PROTECT_TOKENS. */

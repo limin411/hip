@@ -94,4 +94,20 @@ prune_minimum_tokens = 20000
     expect(cfg.context?.pruneProtectTokens).toBe(40_000)
     expect(cfg.context?.pruneMinimumTokens).toBe(20_000)
   })
+
+  it('accepts hyphenated gate_mode aliases (parity with env)', () => {
+    const p = join(dir, 'hip.toml')
+    writeFileSync(
+      p,
+      `
+version = 1
+
+[context]
+gate_mode = "percent-minus-buffer"
+`,
+      'utf8',
+    )
+    const cfg = readHipConfig(p)
+    expect(cfg.context?.gateMode).toBe('percent_minus_buffer')
+  })
 })

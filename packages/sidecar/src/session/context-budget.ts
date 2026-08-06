@@ -16,6 +16,7 @@ import {
   estimateTextTokens as protocolEstimateTextTokens,
   estimateImageTokens as protocolEstimateImageTokens,
   estimateToolSchemaTokens as protocolEstimateToolSchemaTokens,
+  estimateToolsTokens as protocolEstimateToolsTokens,
   exceedsThreshold as protocolExceedsThreshold,
   exceedsThresholdWithBuffer as protocolExceedsThresholdWithBuffer,
   exceedsGate as protocolExceedsGate,
@@ -23,6 +24,7 @@ import {
   usableContextTokensFromBuffer as protocolUsableContextTokensFromBuffer,
   freeTokens as protocolFreeTokens,
   usagePercentage as protocolUsagePercentage,
+  clampThresholdPercent,
   IMAGE_TOKEN_ESTIMATE,
   DEFAULT_OUTPUT_BUFFER_CAP,
   type ContextGateMode,
@@ -111,16 +113,7 @@ export function estimateMessagesTokens(messages: readonly BaseMessage[]): number
 
 /** Rough tool-definition cost: name + description + schema (JSON or fixed overhead). */
 export function estimateToolsTokens(tools: readonly ToolEstimateInput[] | undefined): number {
-  if (!tools?.length) return 0
-  let tokens = 0
-  for (const t of tools) {
-    tokens += protocolEstimateTextTokens(t.name ?? '')
-    tokens += protocolEstimateTextTokens(t.description ?? '')
-    tokens += protocolEstimateToolSchemaTokens(
-      t.schemaJson !== undefined ? t.schemaJson : TOOL_SCHEMA_OVERHEAD_CHARS,
-    )
-  }
-  return tokens
+  return protocolEstimateToolsTokens(tools)
 }
 
 /**
@@ -153,7 +146,8 @@ export function compactTriggerTokens(
   thresholdPercent: number = AUTO_COMPACT_THRESHOLD_PERCENT,
 ): number {
   if (contextWindow <= 0) return 0
-  const pct = Math.max(0, Math.min(100, thresholdPercent))
+  // Shared clamp (round into 0..100) so this agrees with exceedsThreshold / exceedsGate.
+  const pct = clampThresholdPercent(thresholdPercent)
   return Math.floor((contextWindow * pct) / 100)
 }
 

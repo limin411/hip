@@ -47,6 +47,22 @@ describe('estimatePromptTokens', () => {
     expect(withTools).toBeGreaterThan(estimateMessagesTokens(messages))
     expect(estimateToolsTokens([{ name: 'a', description: 'b' }])).toBeGreaterThan(0)
   })
+
+  it('fixed-overhead tools use aggregate ceil (pre-PR zero delta)', () => {
+    // name 'a' + desc 'b' + 400 = 402 → ceil(402/4) = 101
+    expect(estimateToolsTokens([{ name: 'a', description: 'b' }])).toBe(101)
+  })
+})
+
+describe('compactTriggerTokens clamp aligns with exceedsThreshold', () => {
+  it('rounds fractional percent the same way as the gate', () => {
+    // 85.4 → rounds to 85; both helpers must agree
+    const cw = 1000
+    const trigger = compactTriggerTokens(cw, 85.4)
+    expect(trigger).toBe(850)
+    expect(exceedsThreshold(trigger, cw, 85.4)).toBe(true)
+    expect(exceedsThreshold(trigger - 1, cw, 85.4)).toBe(false)
+  })
 })
 
 describe('exceedsThreshold', () => {

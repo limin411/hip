@@ -45,17 +45,28 @@ export interface ToolSchemaEstimateInput {
 
 /**
  * Rough tool-definition cost: name + description + schema (JSON or fixed overhead).
- * Pure counterpart of sidecar `estimateToolsTokens` without LangChain.
+ *
+ * Fixed-overhead path (no `schemaJson`): single aggregate ceil over
+ * `(name + description + TOOL_SCHEMA_OVERHEAD_CHARS)` — matches pre-PR sidecar
+ * so product pressure does not tick up by ~1–2 tokens per tool.
+ * With `schemaJson`: per-field text estimates for name/desc + schema string.
  */
 export function estimateToolsTokens(tools: readonly ToolSchemaEstimateInput[] | undefined): number {
   if (!tools?.length) return 0
   let tokens = 0
   for (const t of tools) {
-    tokens += estimateTextTokens(t.name ?? '')
-    tokens += estimateTextTokens(t.description ?? '')
-    tokens += estimateToolSchemaTokens(
-      t.schemaJson !== undefined ? t.schemaJson : TOOL_SCHEMA_OVERHEAD_CHARS,
-    )
+    const name = t.name ?? ''
+    const desc = t.description ?? ''
+    if (t.schemaJson !== undefined) {
+      tokens += estimateTextTokens(name)
+      tokens += estimateTextTokens(desc)
+      tokens += estimateTextTokens(t.schemaJson)
+    } else {
+      // Aggregate ceil — zero delta vs legacy sidecar fixed-overhead path.
+      tokens += Math.ceil(
+        (name.length + desc.length + TOOL_SCHEMA_OVERHEAD_CHARS) / CHARS_PER_TOKEN,
+      )
+    }
   }
   return tokens
 }

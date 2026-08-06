@@ -19,6 +19,7 @@ export {
 } from './estimate.js'
 
 export {
+  clampThresholdPercent,
   exceedsThreshold,
   exceedsThresholdWithBuffer,
   usableContextTokens,

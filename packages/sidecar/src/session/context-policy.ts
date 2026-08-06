@@ -2,7 +2,7 @@
  * Resolve effective context/compaction policy from hip.toml `[context]` + env.
  */
 import type { ContextConfig, ContextGateMode } from '@hip/protocol'
-import { isContextGateMode } from '@hip/protocol'
+import { isContextGateMode, parseContextGateMode } from '@hip/protocol'
 import {
   AUTO_COMPACT_THRESHOLD_PERCENT,
   SUBAGENT_COMPACT_THRESHOLD_PERCENT,
@@ -26,11 +26,22 @@ export interface ResolvedContextPolicy {
   twoPass: boolean
   memoryFlushBeforeCompact: boolean
   toolOutputMaxBytes: number
-  /** Absolute headroom tokens. Default 0 (KD-3). */
+  /**
+   * Absolute headroom tokens. Default 0 (KD-3).
+   * Stored for later compact wiring via `exceedsGate`; product compact still
+   * uses percent-of-window only (`exceedsThreshold`) until that PR.
+   */
   outputBufferTokens: number
-  /** percent | usable | percent_minus_buffer. Default percent. */
+  /**
+   * percent | usable | percent_minus_buffer. Default percent.
+   * Stored for later compact wiring; compact still uses `exceedsThreshold`
+   * (percent path). hip.toml / env `gateMode` is inert until then.
+   */
   gateMode: ContextGateMode
-  /** Hybrid mid-turn pressure. Default true (KD-19). */
+  /**
+   * Hybrid mid-turn pressure. Default true (KD-19).
+   * Stored for later hybrid PR; not yet applied in compactNode.
+   */
   hybridFill: boolean
   costCacheReadMultiplier: number
   costCacheWriteMultiplier: number
@@ -85,13 +96,7 @@ function envFloat(name: string): number | undefined {
 function envGateMode(name: string): ContextGateMode | undefined {
   const v = process.env[name]
   if (v === undefined || v.trim() === '') return undefined
-  const normalized = v.trim().toLowerCase().replace(/-/g, '_')
-  if (normalized === 'percent') return 'percent'
-  if (normalized === 'usable') return 'usable'
-  if (normalized === 'percent_minus_buffer' || normalized === 'percentminusbuffer') {
-    return 'percent_minus_buffer'
-  }
-  return undefined
+  return parseContextGateMode(v)
 }
 
 /**

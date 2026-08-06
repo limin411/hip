@@ -5,11 +5,25 @@
  * - percent (default): used*100 >= window*pct  — buffer ignored when 0 / unused
  * - percent_minus_buffer: used*100 >= window*pct - buffer*100  (NOT default)
  * - usable: used against (window - buffer) * pct/100  (OC-inspired)
+ *
+ * Misconfiguration note: when buffer ≥ window (or buffer*100 ≥ window*pct),
+ * the gate treats the context as always over budget (boundary clamped to 0 /
+ * usable width 0 → fire). Defaults keep buffer=0 so this only hits intentional
+ * or extreme small-window configs.
  */
 import { DEFAULT_OUTPUT_BUFFER_CAP } from './constants.js'
 
 /** Context pressure gate mode for auto-compact. Default product path: percent. */
 export type ContextGateMode = 'percent' | 'usable' | 'percent_minus_buffer'
+
+/**
+ * Clamp a threshold percent into [0, 100] with Math.round.
+ * Shared by gates and trigger-token helpers so fractional percents agree.
+ */
+export function clampThresholdPercent(n: number): number {
+  if (!Number.isFinite(n)) return 0
+  return Math.max(0, Math.min(100, Math.round(n)))
+}
 
 /**
  * True when `used >= contextWindow * thresholdPercent / 100`.
@@ -21,7 +35,7 @@ export function exceedsThreshold(
   thresholdPercent: number,
 ): boolean {
   if (contextWindow <= 0) return false
-  const pct = clampPercent(thresholdPercent)
+  const pct = clampThresholdPercent(thresholdPercent)
   return used * 100 >= contextWindow * pct
 }
 
@@ -29,7 +43,9 @@ export function exceedsThreshold(
  * GB headroom form: used*100 >= window*pct - buffer*100
  * (equivalent to used >= window*pct/100 - buffer).
  * When bufferTokens is 0, matches {@link exceedsThreshold}.
- * False when window <= 0. Saturates when buffer exceeds the scaled threshold.
+ * False when window <= 0.
+ * Boundary is clamped to ≥0: buffer dominating the threshold ⇒ always over budget
+ * (including used=0). Safe with default buffer=0.
  */
 export function exceedsThresholdWithBuffer(
   used: number,
@@ -38,9 +54,9 @@ export function exceedsThresholdWithBuffer(
   bufferTokens: number,
 ): boolean {
   if (contextWindow <= 0) return false
-  const pct = clampPercent(thresholdPercent)
+  const pct = clampThresholdPercent(thresholdPercent)
   const buffer = Math.max(0, Math.floor(bufferTokens) || 0)
-  const boundary = contextWindow * pct - buffer * 100
+  const boundary = Math.max(0, contextWindow * pct - buffer * 100)
   return used * 100 >= boundary
 }
 
@@ -97,6 +113,7 @@ export interface ExceedsGateOptions {
  * - usable: used against usable width (window − buffer) at thresholdPercent
  *   (integer: used*100 >= usable*pct). With buffer=0 matches percent when
  *   usable === window.
+ * - usable width 0 (buffer ≥ window) ⇒ always over budget.
  */
 export function exceedsGate(
   used: number,
@@ -114,8 +131,9 @@ export function exceedsGate(
   if (mode === 'usable') {
     if (contextWindow <= 0) return false
     const usable = usableContextTokensFromBuffer(contextWindow, buffer, opts?.maxOutput)
-    if (usable <= 0) return used >= 0 // empty usable → any non-negative used fires
-    const pct = clampPercent(thresholdPercent)
+    // buffer ≥ window ⇒ no usable headroom — always over budget (misconfig path).
+    if (usable <= 0) return true
+    const pct = clampThresholdPercent(thresholdPercent)
     return used * 100 >= usable * pct
   }
 
@@ -138,9 +156,4 @@ export function usagePercentage(used: number, total: number): number {
   if (!Number.isFinite(total) || total <= 0) return 0
   if (!Number.isFinite(used) || used <= 0) return 0
   return Math.min(100, (used / total) * 100)
-}
-
-function clampPercent(n: number): number {
-  if (!Number.isFinite(n)) return 0
-  return Math.max(0, Math.min(100, Math.round(n)))
 }

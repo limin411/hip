@@ -17,7 +17,13 @@ export interface CatalogModel {
   reasoning_options?: ReasoningOption[]
   tool_call?: boolean
   attachment?: boolean
-  cost?: { input: number; output: number }
+  /** USD per 1e6 tokens; models.dev may include cache_read / cache_write. */
+  cost?: {
+    input: number
+    output: number
+    cache_read?: number
+    cache_write?: number
+  }
   limit?: { context: number; output: number }
 }
 export interface CatalogProvider {

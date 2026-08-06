@@ -27,7 +27,7 @@ import { isTerminalSession } from '@/lib/sessions'
 import { abortExecFlight } from '@/domain/terminalAgentBridge'
 import { formatAbsolute, formatClockTime } from '@/lib/datetime'
 import { formatTokensCompact } from '@/lib/formatTokens'
-import { formatUsd } from '@/lib/usageCost'
+import { formatUsdMaybeIncomplete } from '@/lib/usageCost'
 import { MarkdownBody } from '@/components/chat/MarkdownBody'
 import { ComposerChip } from '@/components/chat/ComposerChip'
 import {
@@ -535,10 +535,26 @@ function SessionUsageChip({ meter, t }: { meter: SessionTokenMeter; t: TFunction
               <span>{t('chat.usage.sessionTotal')}</span>
               <span className="tabular-nums">{meter.cumulative.totalTokens.toLocaleString()}</span>
             </div>
+            {meter.cacheHitRate != null ? (
+              <div className="flex justify-between gap-3" data-testid="terminal-session-usage-cache-hit">
+                <span>{t('chat.usage.cacheHitLabel')}</span>
+                <span className="tabular-nums">
+                  {t('chat.usage.cacheHitRate', {
+                    percent: Math.round(meter.cacheHitRate * 100),
+                  })}
+                </span>
+              </div>
+            ) : null}
             {meter.costUsd != null ? (
               <div className="flex justify-between gap-3">
                 <span>{t('chat.usage.costLabel')}</span>
-                <span className="tabular-nums">{formatUsd(meter.costUsd)}</span>
+                <span
+                  className="tabular-nums"
+                  data-testid="terminal-session-usage-cost"
+                  title={meter.costIncomplete ? t('chat.usage.costIncompleteHint') : undefined}
+                >
+                  {formatUsdMaybeIncomplete(meter.costUsd, meter.costIncomplete)}
+                </span>
               </div>
             ) : null}
           </div>

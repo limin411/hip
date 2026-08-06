@@ -8,7 +8,7 @@ import {
   type ContextBreakdownKey,
 } from '@/lib/contextBreakdown'
 import { formatTokensCompact } from '@/lib/formatTokens'
-import { formatUsd } from '@/lib/usageCost'
+import { formatUsdMaybeIncomplete } from '@/lib/usageCost'
 import { cn } from '@/lib/utils'
 import { Popover, PopoverAnchor, PopoverContent } from '@/components/ui/Popover'
 
@@ -84,8 +84,18 @@ export function TokenUsageChip() {
 
   if (!meter) return null
 
-  const { contextTokens, contextWindow, percent, zone, cumulative, costUsd } = meter
+  const {
+    contextTokens,
+    contextWindow,
+    percent,
+    zone,
+    cumulative,
+    costUsd,
+    costIncomplete,
+    cacheHitRate,
+  } = meter
 
+  // Primary surface is fill % only — cache hit rate stays in the popover (KD-21).
   const primary =
     percent !== null
       ? t('chat.usage.percentage', { percent })
@@ -219,11 +229,25 @@ export function TokenUsageChip() {
                 })}
               </span>
             </div>
+            {cacheHitRate != null && (
+              <div className="flex justify-between gap-3 text-meta" data-testid="session-usage-cache-hit">
+                <span className="text-ink-secondary">{t('chat.usage.cacheHitLabel')}</span>
+                <span className="tabular-nums text-ink">
+                  {t('chat.usage.cacheHitRate', { percent: Math.round(cacheHitRate * 100) })}
+                </span>
+              </div>
+            )}
             {costUsd != null && (
               <div className="flex justify-between gap-3 text-meta">
                 <span className="text-ink-secondary">{t('chat.usage.costLabel')}</span>
-                <span className="tabular-nums text-ink">
-                  {t('chat.usage.cost', { cost: formatUsd(costUsd) })}
+                <span
+                  className="tabular-nums text-ink"
+                  data-testid="session-usage-cost"
+                  title={costIncomplete ? t('chat.usage.costIncompleteHint') : undefined}
+                >
+                  {t('chat.usage.cost', {
+                    cost: formatUsdMaybeIncomplete(costUsd, costIncomplete),
+                  })}
                 </span>
               </div>
             )}

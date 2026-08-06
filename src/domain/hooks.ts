@@ -4,9 +4,14 @@ import { useShallow } from 'zustand/react/shallow'
 import { useDomainStore, type PendingPermission, type SessionError, type SessionVM, type McpServerStatusVM } from './sessionStore'
 import { computePercentage, zoneForPercent } from '@/lib/tokenPercentage'
 import { contextFillTokens, reportedContextTokens } from '@/lib/contextBreakdown'
-import { computeCost } from '@/lib/usageCost'
+import {
+  cacheHitRate,
+  costRateFromCatalog,
+  sumUsagesCost,
+} from '@/lib/usageCost'
 import { activeModelKey, parseModelKey } from '@/lib/modelKey'
 import { useProvidersStore } from '@/store/providersStore'
+import type { Catalog } from '@/ipc/catalog'
 
 const EMPTY_MESSAGES: Message[] = []
 const EMPTY_CONFIG_OPTIONS: AcpConfigOption[] = []
@@ -103,22 +108,80 @@ export function tokensFromUsage(u: TurnUsage): number {
   return reportedContextTokens(u)
 }
 
+/** Collect per-run (or per-message) usage rows for honest per-model cost (KD-5). */
+export function collectUsagesForCost(messages: Message[]): TurnUsage[] {
+  const out: TurnUsage[] = []
+  for (const m of messages) {
+    const runUsages = m.agentRuns?.map((r) => r.usage).filter((u): u is TurnUsage => u != null) ?? []
+    if (runUsages.length > 0) {
+      out.push(...runUsages)
+    } else if (m.usage) {
+      out.push(m.usage)
+    }
+  }
+  return out
+}
+
+/** Fold optional numeric fields when summing TurnUsage rows. */
+function sumOpt(a: number | undefined, b: number | undefined): number | undefined {
+  if (a == null && b == null) return undefined
+  return (a ?? 0) + (b ?? 0)
+}
+
 /** Pure: sum `usage` across the active session's messages. Returns null when the active
  *  session is absent or no message carries usage. Exported for unit testing; the hook below
  *  is the thin reactive wrapper. */
 export function selectUsageTotal(state: { sessions: SessionVM[]; activeSessionId: string | null }): TurnUsage | null {
   const active = state.sessions.find((x) => x.id === state.activeSessionId)
   if (!active) return null
+  return sumMessageUsages(active.messages)
+}
+
+/** Sum message-level usage blobs (token totals for display). */
+export function sumMessageUsages(messages: Message[]): TurnUsage | null {
   let any = false
   const total: TurnUsage = { inputTokens: 0, outputTokens: 0, totalTokens: 0 }
-  for (const m of active.messages) {
+  for (const m of messages) {
     if (!m.usage) continue
     any = true
-    total.inputTokens += m.usage.inputTokens ?? 0
-    total.outputTokens += m.usage.outputTokens ?? 0
-    total.totalTokens += m.usage.totalTokens ?? 0
+    const u = m.usage
+    total.inputTokens += u.inputTokens ?? 0
+    total.outputTokens += u.outputTokens ?? 0
+    total.totalTokens += u.totalTokens ?? 0
+    const cacheRead = sumOpt(total.cacheReadTokens, u.cacheReadTokens)
+    if (cacheRead != null) total.cacheReadTokens = cacheRead
+    const cacheWrite = sumOpt(total.cacheWriteTokens, u.cacheWriteTokens)
+    if (cacheWrite != null) total.cacheWriteTokens = cacheWrite
+    const nonCached = sumOpt(total.nonCachedInputTokens, u.nonCachedInputTokens)
+    if (nonCached != null) total.nonCachedInputTokens = nonCached
+    const reasoning = sumOpt(total.reasoningTokens, u.reasoningTokens)
+    if (reasoning != null) total.reasoningTokens = reasoning
+    if (u.incomplete) total.incomplete = true
   }
   return any ? total : null
+}
+
+/**
+ * Honest session cost: each run/message priced at its capture-time modelId rates
+ * (KD-5 / KD-22). Legacy rows without modelId fall back to the current session model.
+ */
+export function computeSessionCostUsd(
+  messages: Message[],
+  catalog: Catalog,
+  fallbackProviderID: string,
+  fallbackModelID: string,
+): { costUsd: number | null; incomplete: boolean; cacheHitRate: number | null } {
+  const usages = collectUsagesForCost(messages)
+  const fallbackModel = catalog[fallbackProviderID]?.models[fallbackModelID]
+  const fallbackRate = costRateFromCatalog(fallbackModel?.cost)
+  const { costUsd, incomplete } = sumUsagesCost(usages, catalog, fallbackRate)
+  const cumulative = sumMessageUsages(messages)
+  const hit = cumulative ? cacheHitRate(cumulative) : null
+  return {
+    costUsd,
+    incomplete: incomplete || Boolean(cumulative?.incomplete),
+    cacheHitRate: hit,
+  }
 }
 
 /**
@@ -156,8 +219,15 @@ export type SessionTokenMeter = {
   zone: 'success' | 'warning' | 'danger' | null
   /** Sum of all message usage in the session. */
   cumulative: TurnUsage
-  /** Estimated USD from cumulative × catalog cost, or null when unpriced. */
+  /** Estimated USD from per-usage model rates, or null when unpriced. */
   costUsd: number | null
+  /** True when any usage is incomplete — show lower-bound $ with `*` (KD-15). */
+  costIncomplete: boolean
+  /**
+   * Cache hit rate 0–1 when cache tokens are known.
+   * For hover tooltip only — never on the chip primary surface (KD-21).
+   */
+  cacheHitRate: number | null
 }
 
 /** Token meter for the active session. Null when no session or no usage yet.
@@ -168,8 +238,8 @@ export function useSessionTokenMeter(): SessionTokenMeter | null {
   const catalog = useProvidersStore((s) => s.catalog)
   const config = useProvidersStore((s) => s.config)
   const active = useActiveSession()
-  if (!cumulative || contextTokens == null) return null
-  const currentKey = active?.config.model
+  if (!cumulative || contextTokens == null || !active) return null
+  const currentKey = active.config.model
     ? `${active.config.llmProvider}/${active.config.model}`
     : activeModelKey(config)
   const { providerID, modelID } = parseModelKey(currentKey)
@@ -177,8 +247,22 @@ export function useSessionTokenMeter(): SessionTokenMeter | null {
   const contextWindow = model?.limit?.context
   const percent = computePercentage(contextTokens, contextWindow)
   const zone = zoneForPercent(percent)
-  const costUsd = computeCost(cumulative, model?.cost)
-  return { contextTokens, contextWindow, percent, zone, cumulative, costUsd }
+  const { costUsd, incomplete, cacheHitRate: hit } = computeSessionCostUsd(
+    active.messages,
+    catalog,
+    providerID,
+    modelID,
+  )
+  return {
+    contextTokens,
+    contextWindow,
+    percent,
+    zone,
+    cumulative,
+    costUsd,
+    costIncomplete: incomplete,
+    cacheHitRate: hit,
+  }
 }
 
 /** Session-scoped token meter for an EXPLICIT session (terminal agent panel etc.).
@@ -196,16 +280,8 @@ export function useSessionTokenMeterFor(
 
   const fill = contextFillTokens(session.messages)
   const contextTokens = fill != null && fill > 0 ? fill : 0
-  let any = false
-  const cumulative: TurnUsage = { inputTokens: 0, outputTokens: 0, totalTokens: 0 }
-  for (const m of session.messages) {
-    if (!m.usage) continue
-    any = true
-    cumulative.inputTokens += m.usage.inputTokens ?? 0
-    cumulative.outputTokens += m.usage.outputTokens ?? 0
-    cumulative.totalTokens += m.usage.totalTokens ?? 0
-  }
-  if (!any) return null
+  const cumulative = sumMessageUsages(session.messages)
+  if (!cumulative) return null
 
   const currentKey = session.config.model
     ? `${session.config.llmProvider}/${session.config.model}`
@@ -215,8 +291,22 @@ export function useSessionTokenMeterFor(
   const contextWindow = model?.limit?.context
   const percent = computePercentage(contextTokens, contextWindow)
   const zone = zoneForPercent(percent)
-  const costUsd = computeCost(cumulative, model?.cost)
-  return { contextTokens, contextWindow, percent, zone, cumulative, costUsd }
+  const { costUsd, incomplete, cacheHitRate: hit } = computeSessionCostUsd(
+    session.messages,
+    catalog,
+    providerID,
+    modelID,
+  )
+  return {
+    contextTokens,
+    contextWindow,
+    percent,
+    zone,
+    cumulative,
+    costUsd,
+    costIncomplete: incomplete,
+    cacheHitRate: hit,
+  }
 }
 
 /**

@@ -1,7 +1,15 @@
 import { describe, it, expect } from 'vitest'
-import { selectUsageTotal, selectContextTokens, tokensFromUsage } from './hooks'
+import {
+  selectUsageTotal,
+  selectContextTokens,
+  tokensFromUsage,
+  collectUsagesForCost,
+  computeSessionCostUsd,
+  sumMessageUsages,
+} from './hooks'
 import type { SessionVM } from './sessionStore'
 import type { Message } from '@hip/protocol'
+import type { Catalog } from '@/ipc/catalog'
 
 function msg(
   id: string,
@@ -157,5 +165,157 @@ describe('selectUsageTotal', () => {
       ],
     }
     expect(selectUsageTotal(state)).toEqual({ inputTokens: 50, outputTokens: 70, totalTokens: 120 })
+  })
+
+  it('ORs incomplete and sums cache fields', () => {
+    const total = sumMessageUsages([
+      msg('a', {
+        inputTokens: 100,
+        outputTokens: 10,
+        totalTokens: 110,
+        cacheReadTokens: 40,
+        incomplete: true,
+      } as never),
+      msg('b', {
+        inputTokens: 50,
+        outputTokens: 5,
+        totalTokens: 55,
+        cacheReadTokens: 10,
+      } as never),
+    ])
+    expect(total).toMatchObject({
+      inputTokens: 150,
+      outputTokens: 15,
+      totalTokens: 165,
+      cacheReadTokens: 50,
+      incomplete: true,
+    })
+  })
+})
+
+describe('computeSessionCostUsd (per-usage model rates)', () => {
+  const catalog: Catalog = {
+    deepseek: {
+      id: 'deepseek',
+      name: 'DeepSeek',
+      env: [],
+      models: {
+        'deepseek-chat': {
+          id: 'deepseek-chat',
+          name: 'DeepSeek Chat',
+          cost: { input: 0.27, output: 1.1 },
+        },
+      },
+    },
+    anthropic: {
+      id: 'anthropic',
+      name: 'Anthropic',
+      env: [],
+      models: {
+        'claude-sonnet': {
+          id: 'claude-sonnet',
+          name: 'Claude Sonnet',
+          cost: { input: 3, output: 15, cache_read: 0.3, cache_write: 3.75 },
+        },
+      },
+    },
+  }
+
+  it('sums cost with each usage priced at its modelId (KD-5)', () => {
+    const messages: Message[] = [
+      msg('a', {
+        inputTokens: 1_000_000,
+        outputTokens: 0,
+        totalTokens: 1_000_000,
+        modelId: 'claude-sonnet',
+        providerId: 'anthropic',
+      } as never),
+      msg('b', {
+        inputTokens: 1_000_000,
+        outputTokens: 0,
+        totalTokens: 1_000_000,
+        modelId: 'deepseek-chat',
+        providerId: 'deepseek',
+      } as never),
+    ]
+    // Session is now on deepseek — claude row must still use claude rates (KD-22)
+    const { costUsd } = computeSessionCostUsd(messages, catalog, 'deepseek', 'deepseek-chat')
+    expect(costUsd).toBeCloseTo(3.27, 10)
+  })
+
+  it('prefers agent run usages over turn-level fold for cost', () => {
+    const messages: Message[] = [
+      {
+        id: 'a',
+        role: 'assistant',
+        content: 'x',
+        timestamp: 1,
+        // Turn blob would wrongly use last model only
+        usage: {
+          inputTokens: 2_000_000,
+          outputTokens: 0,
+          totalTokens: 2_000_000,
+          modelId: 'deepseek-chat',
+          providerId: 'deepseek',
+        },
+        agentRuns: [
+          {
+            agentId: 'supervisor',
+            role: 'supervisor',
+            output: '',
+            startedAt: 1,
+            finishedAt: 2,
+            seq: 0,
+            usage: {
+              inputTokens: 1_000_000,
+              outputTokens: 0,
+              totalTokens: 1_000_000,
+              modelId: 'claude-sonnet',
+              providerId: 'anthropic',
+            },
+          },
+          {
+            agentId: 'worker',
+            role: 'worker',
+            output: '',
+            startedAt: 1,
+            finishedAt: 2,
+            seq: 1,
+            usage: {
+              inputTokens: 1_000_000,
+              outputTokens: 0,
+              totalTokens: 1_000_000,
+              modelId: 'deepseek-chat',
+              providerId: 'deepseek',
+            },
+          },
+        ],
+      },
+    ]
+    expect(collectUsagesForCost(messages)).toHaveLength(2)
+    const { costUsd } = computeSessionCostUsd(messages, catalog, 'deepseek', 'deepseek-chat')
+    // 3 + 0.27, not 2 * 0.27
+    expect(costUsd).toBeCloseTo(3.27, 10)
+  })
+
+  it('flags incomplete lower-bound cost (KD-15)', () => {
+    const messages: Message[] = [
+      msg('a', {
+        inputTokens: 100_000,
+        outputTokens: 0,
+        totalTokens: 100_000,
+        incomplete: true,
+        modelId: 'deepseek-chat',
+        providerId: 'deepseek',
+      } as never),
+    ]
+    const { costUsd, incomplete } = computeSessionCostUsd(
+      messages,
+      catalog,
+      'deepseek',
+      'deepseek-chat',
+    )
+    expect(incomplete).toBe(true)
+    expect(costUsd).toBeCloseTo(0.027, 10)
   })
 })

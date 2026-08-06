@@ -126,8 +126,9 @@ describe('toCoarseContextBreakdown', () => {
     const coarse = toCoarseContextBreakdown(fine)
     expect(coarse.find((s) => s.key === 'system')?.tokens).toBe(1)
     expect(coarse.find((s) => s.key === 'messages')?.tokens).toBe(2)
-    expect(coarse.find((s) => s.key === 'user')).toBeUndefined()
-    expect(coarse.find((s) => s.key === 'assistant')).toBeUndefined()
+    // Coarse keys never include fine-only `user` / `assistant`.
+    expect(coarse.map((s) => s.key)).not.toContain('user')
+    expect(coarse.map((s) => s.key)).not.toContain('assistant')
     expect(coarse.find((s) => s.key === 'other')?.tokens).toBe(97)
   })
 

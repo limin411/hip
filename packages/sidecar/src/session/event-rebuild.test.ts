@@ -11,7 +11,15 @@ import { SessionStore } from '../persistence/store.js'
 import { EventStore } from '../persistence/event-store.js'
 import { projectEvent } from '../persistence/message-projector.js'
 
-const baseCfg: SessionConfig = { llmProvider: 'openai', model: 'gpt-4', tools: [], useEventSource: true }
+// Use a model without a tiny catalog context (gpt-4 is often 8k). Hip's system
+// prompt alone can exceed 85% of 8k and force extractive compact, which this
+// suite is not testing.
+const baseCfg: SessionConfig = {
+  llmProvider: 'openai',
+  model: 'gpt-4o',
+  tools: [],
+  useEventSource: true,
+}
 
 function makeStore() {
   const { db, ftsEnabled } = openDatabase(':memory:')

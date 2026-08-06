@@ -25,6 +25,8 @@ vi.mock('react-i18next', () => ({
     t: (key: string) => key,
     i18n: { resolvedLanguage: 'zh-CN', language: 'zh-CN' },
   }),
+  // sessionService → i18n/index.ts calls i18n.use(initReactI18next)
+  initReactI18next: { type: '3rdParty', init: () => {} },
 }))
 
 vi.mock('@/store/hipConfigStore', () => ({

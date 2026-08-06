@@ -208,6 +208,21 @@ function normalizeContext(raw: Record<string, unknown>): ContextConfig {
   if (raw.sliding_window_max_tokens !== undefined && raw.slidingWindowMaxTokens === undefined) {
     raw.slidingWindowMaxTokens = raw.sliding_window_max_tokens
   }
+  if (raw.soft_trim_enabled !== undefined && raw.softTrimEnabled === undefined) {
+    raw.softTrimEnabled = raw.soft_trim_enabled
+  }
+  if (raw.soft_trim_percent !== undefined && raw.softTrimPercent === undefined) {
+    raw.softTrimPercent = raw.soft_trim_percent
+  }
+  if (raw.soft_trim_keep_last_n_turns !== undefined && raw.softTrimKeepLastNTurns === undefined) {
+    raw.softTrimKeepLastNTurns = raw.soft_trim_keep_last_n_turns
+  }
+  if (raw.cache_policy !== undefined && raw.cachePolicy === undefined) {
+    raw.cachePolicy = raw.cache_policy
+  }
+  if (raw.prompt_cache_key !== undefined && raw.promptCacheKey === undefined) {
+    raw.promptCacheKey = raw.prompt_cache_key
+  }
   if (raw.cost_cache_read_multiplier !== undefined && raw.costCacheReadMultiplier === undefined) {
     raw.costCacheReadMultiplier = raw.cost_cache_read_multiplier
   }
@@ -227,6 +242,11 @@ function normalizeContext(raw: Record<string, unknown>): ContextConfig {
   delete raw.prune_protect_tokens
   delete raw.prune_minimum_tokens
   delete raw.sliding_window_max_tokens
+  delete raw.soft_trim_enabled
+  delete raw.soft_trim_percent
+  delete raw.soft_trim_keep_last_n_turns
+  delete raw.cache_policy
+  delete raw.prompt_cache_key
   delete raw.cost_cache_read_multiplier
   delete raw.cost_cache_write_multiplier
 
@@ -294,6 +314,12 @@ function normalizeContext(raw: Record<string, unknown>): ContextConfig {
     Number.isFinite(raw.costCacheWriteMultiplier)
   ) {
     out.costCacheWriteMultiplier = raw.costCacheWriteMultiplier
+  }
+  if (typeof raw.cachePolicy === 'string' && raw.cachePolicy.trim() !== '') {
+    out.cachePolicy = raw.cachePolicy.trim()
+  }
+  if (typeof raw.promptCacheKey === 'string' && raw.promptCacheKey.trim() !== '') {
+    out.promptCacheKey = raw.promptCacheKey.trim()
   }
   return out
 }

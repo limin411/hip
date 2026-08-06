@@ -8,6 +8,12 @@ import {
   SUBAGENT_COMPACT_THRESHOLD_PERCENT,
   TARGET_THRESHOLD_PERCENT,
 } from './context-budget.js'
+import {
+  resolveCachePolicy,
+  resolvePromptCacheKeyMode,
+  type CachePolicyMode,
+  type PromptCacheKeyMode,
+} from './cache-policy.js'
 
 /** Keep aligned with prefire.PREFIRE_LEAD_PERCENT (avoid circular import). */
 const DEFAULT_PREFIRE_LEAD_PERCENT = 10

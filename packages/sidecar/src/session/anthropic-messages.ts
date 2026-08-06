@@ -10,8 +10,16 @@
  *
  * Coalesce them so those hosts do not 400 with:
  * "System messages are only permitted as the first passed message."
+ *
+ * Also the serialization boundary for Anthropic cache_control breakpoints
+ * (see prepareAnthropicMessages / cache-policy.ts).
  */
 import { SystemMessage, type BaseMessage } from '@langchain/core/messages'
+import {
+  applyAnthropicMessageCacheBreakpoints,
+  resolveCachePolicy,
+  type CachePolicyInput,
+} from './cache-policy.js'
 
 function systemText(m: BaseMessage): string {
   const c = m.content
@@ -72,4 +80,21 @@ export function coalesceSystemMessages(messages: readonly BaseMessage[]): BaseMe
 
   if (systems.length === 0) return rest
   return [new SystemMessage(systems.join('\n\n')), ...rest]
+}
+
+/**
+ * Serialization-boundary prep for Anthropic Messages hosts:
+ * 1. Coalesce multi system → single leading system
+ * 2. Apply auto cache_control ephemeral breakpoints (last system + latest user)
+ *
+ * `cachePolicy` none/off → coalesce only (no breakpoints).
+ */
+export function prepareAnthropicMessages(
+  messages: readonly BaseMessage[],
+  opts?: { cachePolicy?: CachePolicyInput },
+): BaseMessage[] {
+  const coalesced = coalesceSystemMessages(messages)
+  const policy = resolveCachePolicy(opts?.cachePolicy)
+  if (policy === 'none') return coalesced
+  return applyAnthropicMessageCacheBreakpoints(coalesced, policy)
 }

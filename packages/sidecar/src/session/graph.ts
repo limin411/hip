@@ -795,6 +795,7 @@ export function buildGraph(maxSteps: number = MAX_STEPS, compactBudget: number =
     }
 
     async function runModel(input: BaseMessage[]): Promise<AIMessage> {
+      const cp = policyOf(ctx)
       return runner.run(input, {
         tools,
         bindTools: !capped,
@@ -806,6 +807,10 @@ export function buildGraph(maxSteps: number = MAX_STEPS, compactBudget: number =
         onText: (d) => emit.token(d),
         onReasoning: (d) => emit.reasoning(d),
         onActivity: () => emit.activity?.(),
+        // PR-7b: provider cache policy from [context] + env
+        cachePolicy: cp.cachePolicy,
+        promptCacheKeyMode: cp.promptCacheKey,
+        sessionId: ctx.sessionId,
       })
     }
 

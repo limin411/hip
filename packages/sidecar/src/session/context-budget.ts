@@ -5,9 +5,39 @@
  * - trigger at ~85% of model context window (70% for subagents)
  * - chars/4 heuristic when real usage is unavailable
  * - prefer last real prompt token count when present
+ *
+ * Pure estimation / gate math lives in `@hip/protocol` token-estimation (KD-4).
+ * This module re-exports / thin-wraps those helpers and keeps LangChain-aware APIs.
  */
 import type { BaseMessage } from '@langchain/core/messages'
+import {
+  CHARS_PER_TOKEN,
+  TOOL_SCHEMA_OVERHEAD_CHARS,
+  estimateTextTokens as protocolEstimateTextTokens,
+  estimateImageTokens as protocolEstimateImageTokens,
+  estimateToolSchemaTokens as protocolEstimateToolSchemaTokens,
+  exceedsThreshold as protocolExceedsThreshold,
+  exceedsThresholdWithBuffer as protocolExceedsThresholdWithBuffer,
+  exceedsGate as protocolExceedsGate,
+  usableContextTokens as protocolUsableContextTokens,
+  usableContextTokensFromBuffer as protocolUsableContextTokensFromBuffer,
+  freeTokens as protocolFreeTokens,
+  usagePercentage as protocolUsagePercentage,
+  IMAGE_TOKEN_ESTIMATE,
+  DEFAULT_OUTPUT_BUFFER_CAP,
+  type ContextGateMode,
+  type ExceedsGateOptions,
+} from '@hip/protocol'
 import { readCatalog } from '../config/catalog.js'
+
+export {
+  CHARS_PER_TOKEN,
+  TOOL_SCHEMA_OVERHEAD_CHARS,
+  IMAGE_TOKEN_ESTIMATE,
+  DEFAULT_OUTPUT_BUFFER_CAP,
+  type ContextGateMode,
+  type ExceedsGateOptions,
+}
 
 /** Fallback when catalog has no limit.context for the active model. */
 export const DEFAULT_CONTEXT_WINDOW = 128_000
@@ -31,18 +61,14 @@ export const MIN_KEEP_UNITS = 1
 /** Floor for target keep tokens so we never keep almost nothing useful. */
 export const MIN_TARGET_KEEP_TOKENS = 1_000
 
-/** Industry-standard heuristic (Codex / OpenCode / grok-build): ≈4 chars per token. */
-export const CHARS_PER_TOKEN = 4
-
-/** Fixed per-tool schema overhead when we cannot serialize Zod schemas cheaply. */
-export const TOOL_SCHEMA_OVERHEAD_CHARS = 400
-
 /** Summaries shorter than this after trim are treated as degenerate. */
 export const MIN_SUMMARY_SEED_CHARS = 80
 
 export interface ToolEstimateInput {
   name: string
   description?: string
+  /** Serialized schema JSON when available; else fixed overhead. */
+  schemaJson?: string
 }
 
 export interface PromptEstimateInput {
@@ -61,10 +87,19 @@ function textOf(m: BaseMessage): string {
   return ''
 }
 
-/** Bytes/chars ÷ 4 token estimate for a string. */
+/** Bytes/chars ÷ 4 token estimate for a string (delegates to @hip/protocol). */
 export function estimateTextTokens(text: string): number {
-  if (!text) return 0
-  return Math.ceil(text.length / CHARS_PER_TOKEN)
+  return protocolEstimateTextTokens(text)
+}
+
+/** Per-image token estimate (delegates to @hip/protocol). */
+export function estimateImageTokens(imageCount: number): number {
+  return protocolEstimateImageTokens(imageCount)
+}
+
+/** Schema / tool overhead tokens (delegates to @hip/protocol). */
+export function estimateToolSchemaTokens(schemaJsonOrOverhead?: string | number): number {
+  return protocolEstimateToolSchemaTokens(schemaJsonOrOverhead)
 }
 
 /** Message-body-only token estimate (no system/tools). */
@@ -74,14 +109,18 @@ export function estimateMessagesTokens(messages: readonly BaseMessage[]): number
   return Math.ceil(chars / CHARS_PER_TOKEN)
 }
 
-/** Rough tool-definition cost: name + description + fixed schema overhead. */
+/** Rough tool-definition cost: name + description + schema (JSON or fixed overhead). */
 export function estimateToolsTokens(tools: readonly ToolEstimateInput[] | undefined): number {
   if (!tools?.length) return 0
-  let chars = 0
+  let tokens = 0
   for (const t of tools) {
-    chars += (t.name?.length ?? 0) + (t.description?.length ?? 0) + TOOL_SCHEMA_OVERHEAD_CHARS
+    tokens += protocolEstimateTextTokens(t.name ?? '')
+    tokens += protocolEstimateTextTokens(t.description ?? '')
+    tokens += protocolEstimateToolSchemaTokens(
+      t.schemaJson !== undefined ? t.schemaJson : TOOL_SCHEMA_OVERHEAD_CHARS,
+    )
   }
-  return Math.ceil(chars / CHARS_PER_TOKEN)
+  return tokens
 }
 
 /**
@@ -121,15 +160,67 @@ export function compactTriggerTokens(
 /**
  * True when `used >= context_window * threshold_percent / 100`.
  * Integer arithmetic matches grok-build `exceeds_threshold` (>= boundary).
+ * Default threshold: AUTO_COMPACT_THRESHOLD_PERCENT (85).
  */
 export function exceedsThreshold(
   used: number,
   contextWindow: number,
   thresholdPercent: number = AUTO_COMPACT_THRESHOLD_PERCENT,
 ): boolean {
-  if (contextWindow <= 0) return false
-  const pct = Math.max(0, Math.min(100, thresholdPercent))
-  return used * 100 >= contextWindow * pct
+  return protocolExceedsThreshold(used, contextWindow, thresholdPercent)
+}
+
+/** GB headroom form: used*100 >= window*pct - buffer*100. */
+export function exceedsThresholdWithBuffer(
+  used: number,
+  contextWindow: number,
+  thresholdPercent: number = AUTO_COMPACT_THRESHOLD_PERCENT,
+  bufferTokens: number = 0,
+): boolean {
+  return protocolExceedsThresholdWithBuffer(
+    used,
+    contextWindow,
+    thresholdPercent,
+    bufferTokens,
+  )
+}
+
+/** OC-inspired usable width: window − min(bufferCap, maxOutput ?? bufferCap). */
+export function usableContextTokens(
+  contextWindow: number,
+  maxOutput?: number | null,
+  bufferCap: number = DEFAULT_OUTPUT_BUFFER_CAP,
+): number {
+  return protocolUsableContextTokens(contextWindow, maxOutput, bufferCap)
+}
+
+/** Usable width from configured outputBufferTokens (optionally capped by maxOutput). */
+export function usableContextTokensFromBuffer(
+  contextWindow: number,
+  bufferTokens: number,
+  maxOutput?: number | null,
+): number {
+  return protocolUsableContextTokensFromBuffer(contextWindow, bufferTokens, maxOutput)
+}
+
+/** Dispatch gate by gateMode (percent | usable | percent_minus_buffer). */
+export function exceedsGate(
+  used: number,
+  contextWindow: number,
+  thresholdPercent: number = AUTO_COMPACT_THRESHOLD_PERCENT,
+  opts?: ExceedsGateOptions,
+): boolean {
+  return protocolExceedsGate(used, contextWindow, thresholdPercent, opts)
+}
+
+/** total − used, saturating at 0. */
+export function freeTokens(total: number, used: number): number {
+  return protocolFreeTokens(total, used)
+}
+
+/** Usage percentage in [0, 100] (float display helper). */
+export function usagePercentage(used: number, total: number): number {
+  return protocolUsagePercentage(used, total)
 }
 
 /** Used fill percent [0, 100] of the context window. */

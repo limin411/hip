@@ -138,10 +138,29 @@ describe('protocol: AgentLoopConfig', () => {
         twoPass: false,
         memoryFlushBeforeCompact: true,
         toolOutputMaxBytes: 20_000,
+        outputBufferTokens: 0,
+        gateMode: 'percent',
+        hybridFill: true,
+        costCacheReadMultiplier: 0.1,
+        costCacheWriteMultiplier: 1.25,
+        pruneProtectTokens: 40_000,
+        pruneMinimumTokens: 20_000,
       },
     }
     const round = JSON.parse(JSON.stringify(cfg)) as HipConfig
     expect(round.context).toEqual(cfg.context)
+  })
+
+  it('models optional buffer/gateMode ContextConfig fields (KD-3)', () => {
+    const minimal: HipConfig = {
+      version: 1,
+      context: { gateMode: 'usable', outputBufferTokens: 20_000 },
+    }
+    expect(minimal.context?.gateMode).toBe('usable')
+    expect(minimal.context?.outputBufferTokens).toBe(20_000)
+    const empty: HipConfig = { version: 1, context: {} }
+    expect(empty.context?.gateMode).toBeUndefined()
+    expect(empty.context?.hybridFill).toBeUndefined()
   })
 })
 

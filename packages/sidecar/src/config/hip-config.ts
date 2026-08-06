@@ -189,6 +189,27 @@ function normalizeContext(raw: Record<string, unknown>): ContextConfig {
   if (raw.tool_output_max_bytes !== undefined && raw.toolOutputMaxBytes === undefined) {
     raw.toolOutputMaxBytes = raw.tool_output_max_bytes
   }
+  if (raw.output_buffer_tokens !== undefined && raw.outputBufferTokens === undefined) {
+    raw.outputBufferTokens = raw.output_buffer_tokens
+  }
+  if (raw.gate_mode !== undefined && raw.gateMode === undefined) {
+    raw.gateMode = raw.gate_mode
+  }
+  if (raw.hybrid_fill !== undefined && raw.hybridFill === undefined) {
+    raw.hybridFill = raw.hybrid_fill
+  }
+  if (raw.prune_protect_tokens !== undefined && raw.pruneProtectTokens === undefined) {
+    raw.pruneProtectTokens = raw.prune_protect_tokens
+  }
+  if (raw.prune_minimum_tokens !== undefined && raw.pruneMinimumTokens === undefined) {
+    raw.pruneMinimumTokens = raw.prune_minimum_tokens
+  }
+  if (raw.cost_cache_read_multiplier !== undefined && raw.costCacheReadMultiplier === undefined) {
+    raw.costCacheReadMultiplier = raw.cost_cache_read_multiplier
+  }
+  if (raw.cost_cache_write_multiplier !== undefined && raw.costCacheWriteMultiplier === undefined) {
+    raw.costCacheWriteMultiplier = raw.cost_cache_write_multiplier
+  }
   delete raw.auto_compact_percent
   delete raw.subagent_compact_percent
   delete raw.target_keep_percent
@@ -196,6 +217,13 @@ function normalizeContext(raw: Record<string, unknown>): ContextConfig {
   delete raw.two_pass
   delete raw.memory_flush_before_compact
   delete raw.tool_output_max_bytes
+  delete raw.output_buffer_tokens
+  delete raw.gate_mode
+  delete raw.hybrid_fill
+  delete raw.prune_protect_tokens
+  delete raw.prune_minimum_tokens
+  delete raw.cost_cache_read_multiplier
+  delete raw.cost_cache_write_multiplier
 
   const out: ContextConfig = {}
   if (typeof raw.autoCompactPercent === 'number' && Number.isFinite(raw.autoCompactPercent)) {
@@ -216,6 +244,35 @@ function normalizeContext(raw: Record<string, unknown>): ContextConfig {
   }
   if (typeof raw.toolOutputMaxBytes === 'number' && Number.isFinite(raw.toolOutputMaxBytes)) {
     out.toolOutputMaxBytes = raw.toolOutputMaxBytes
+  }
+  if (typeof raw.outputBufferTokens === 'number' && Number.isFinite(raw.outputBufferTokens)) {
+    out.outputBufferTokens = raw.outputBufferTokens
+  }
+  if (
+    raw.gateMode === 'percent' ||
+    raw.gateMode === 'usable' ||
+    raw.gateMode === 'percent_minus_buffer'
+  ) {
+    out.gateMode = raw.gateMode
+  }
+  if (typeof raw.hybridFill === 'boolean') out.hybridFill = raw.hybridFill
+  if (typeof raw.pruneProtectTokens === 'number' && Number.isFinite(raw.pruneProtectTokens)) {
+    out.pruneProtectTokens = raw.pruneProtectTokens
+  }
+  if (typeof raw.pruneMinimumTokens === 'number' && Number.isFinite(raw.pruneMinimumTokens)) {
+    out.pruneMinimumTokens = raw.pruneMinimumTokens
+  }
+  if (
+    typeof raw.costCacheReadMultiplier === 'number' &&
+    Number.isFinite(raw.costCacheReadMultiplier)
+  ) {
+    out.costCacheReadMultiplier = raw.costCacheReadMultiplier
+  }
+  if (
+    typeof raw.costCacheWriteMultiplier === 'number' &&
+    Number.isFinite(raw.costCacheWriteMultiplier)
+  ) {
+    out.costCacheWriteMultiplier = raw.costCacheWriteMultiplier
   }
   return out
 }

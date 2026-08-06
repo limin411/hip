@@ -1,6 +1,7 @@
 /** Unified TOML config types and network policy. */
 import type { ActiveModel, AgentConfig, ProviderApiKind } from './providers-agents.js'
 import type { McpServerConfig } from './mcp-config.js'
+import type { ContextGateMode } from './token-estimation/index.js'
 
 export type { ProviderApiKind }
 
@@ -295,10 +296,23 @@ export interface AcpHostConfig {
   fsReadMaxBytes?: number
 }
 
+export const CONTEXT_GATE_MODES: readonly ContextGateMode[] = [
+  'percent',
+  'usable',
+  'percent_minus_buffer',
+] as const
+
+export function isContextGateMode(v: unknown): v is ContextGateMode {
+  return (
+    v === 'percent' || v === 'usable' || v === 'percent_minus_buffer'
+  )
+}
+
 /**
  * Optional `[context]` section in hip.toml — compaction / token-budget policy.
  * All fields optional; omitted values keep sidecar defaults
- * (85% auto-compact, 70% subagent, 50% keep-tail, prefire lead 10, two-pass on).
+ * (85% auto-compact, 70% subagent, 50% keep-tail, prefire lead 10, two-pass on;
+ * buffer 0 / gateMode percent — KD-3).
  */
 export interface ContextConfig {
   /** Auto-compact trigger as % of model context window. Default 85. */
@@ -318,6 +332,30 @@ export interface ContextConfig {
   memoryFlushBeforeCompact?: boolean
   /** Max tool-result bytes kept inline for the model. Default 40960 (40KB). */
   toolOutputMaxBytes?: number
+  /**
+   * Absolute output headroom tokens for optional buffer gate modes.
+   * Default **0** (KD-3) — no double headroom on the 85% percent path.
+   * Env: `HIP_CONTEXT_OUTPUT_BUFFER_TOKENS`.
+   */
+  outputBufferTokens?: number
+  /**
+   * How buffer interacts with percent gates. Default `percent`.
+   * Env: `HIP_CONTEXT_GATE_MODE`.
+   */
+  gateMode?: ContextGateMode
+  /**
+   * Hybrid mid-turn pressure (max full estimate, lastProvider+delta).
+   * Default true; kill via `HIP_CONTEXT_HYBRID_FILL=0` (KD-19).
+   */
+  hybridFill?: boolean
+  /** Soft-prune protect window tokens (later PR). Env: HIP_CONTEXT_PRUNE_PROTECT_TOKENS. */
+  pruneProtectTokens?: number
+  /** Soft-prune minimum release tokens (later PR). Env: HIP_CONTEXT_PRUNE_MINIMUM_TOKENS. */
+  pruneMinimumTokens?: number
+  /** Cache-read cost multiplier vs input. Default 0.1. Env: HIP_CONTEXT_COST_CACHE_READ_MULT. */
+  costCacheReadMultiplier?: number
+  /** Cache-write cost multiplier vs input. Default 1.25. Env: HIP_CONTEXT_COST_CACHE_WRITE_MULT. */
+  costCacheWriteMultiplier?: number
 }
 
 /**

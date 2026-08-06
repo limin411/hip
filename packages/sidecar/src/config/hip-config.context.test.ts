@@ -28,6 +28,11 @@ prefireLeadPercent = 12
 twoPass = false
 memoryFlushBeforeCompact = false
 toolOutputMaxBytes = 20480
+outputBufferTokens = 0
+gateMode = "percent"
+hybridFill = true
+costCacheReadMultiplier = 0.1
+costCacheWriteMultiplier = 1.25
 `,
       'utf8',
     )
@@ -40,6 +45,11 @@ toolOutputMaxBytes = 20480
       twoPass: false,
       memoryFlushBeforeCompact: false,
       toolOutputMaxBytes: 20480,
+      outputBufferTokens: 0,
+      gateMode: 'percent',
+      hybridFill: true,
+      costCacheReadMultiplier: 0.1,
+      costCacheWriteMultiplier: 1.25,
     })
   })
 
@@ -58,6 +68,13 @@ prefire_lead_percent = 8
 two_pass = true
 memory_flush_before_compact = true
 tool_output_max_bytes = 40960
+output_buffer_tokens = 20000
+gate_mode = "usable"
+hybrid_fill = false
+cost_cache_read_multiplier = 0.05
+cost_cache_write_multiplier = 1.5
+prune_protect_tokens = 40000
+prune_minimum_tokens = 20000
 `,
       'utf8',
     )
@@ -69,5 +86,12 @@ tool_output_max_bytes = 40960
     expect(cfg.context?.twoPass).toBe(true)
     expect(cfg.context?.memoryFlushBeforeCompact).toBe(true)
     expect(cfg.context?.toolOutputMaxBytes).toBe(40960)
+    expect(cfg.context?.outputBufferTokens).toBe(20_000)
+    expect(cfg.context?.gateMode).toBe('usable')
+    expect(cfg.context?.hybridFill).toBe(false)
+    expect(cfg.context?.costCacheReadMultiplier).toBe(0.05)
+    expect(cfg.context?.costCacheWriteMultiplier).toBe(1.5)
+    expect(cfg.context?.pruneProtectTokens).toBe(40_000)
+    expect(cfg.context?.pruneMinimumTokens).toBe(20_000)
   })
 })

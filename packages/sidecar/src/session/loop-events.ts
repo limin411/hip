@@ -6,7 +6,12 @@
  *
  * Mapping vs SessionEvent: `loop.step` is optional enhancement and does **not** dual-write
  * `step_started` by default; LoopEvent focuses on nudge / replan / pause / budget / end.
+ *
+ * PR-10: compact/prefire carry optional `tokens` (by type) + hybrid/throttled tags;
+ * `loop.metrics` is an end-of-turn counter snapshot for dogfood / journal.
  */
+
+import type { LoopMetricsCounters, TokensByType } from '@hip/protocol'
 
 export type LoopNudgeReason = 'doom' | 'error_streak' | 'path_hit' | 'replan' | 'plan_exit'
 export type LoopPauseKind = 'doom' | 'plan' | 'subagent_pause'
@@ -39,8 +44,23 @@ export type LoopEvent =
   | { type: 'loop.nudge'; sessionId: string; turnId: string; reason: LoopNudgeReason }
   | { type: 'loop.replan'; sessionId: string; turnId: string; reason: string }
   | { type: 'loop.pause'; sessionId: string; turnId: string; question: string; kind?: LoopPauseKind }
-  | { type: 'loop.budget'; sessionId: string; turnId: string; remaining: number; total: number }
-  | { type: 'loop.end'; sessionId: string; turnId: string; reason: LoopEndReason }
+  | {
+      type: 'loop.budget'
+      sessionId: string
+      turnId: string
+      remaining: number
+      total: number
+      /** Optional last-known provider token buckets (PR-10). */
+      tokens?: TokensByType
+    }
+  | {
+      type: 'loop.end'
+      sessionId: string
+      turnId: string
+      reason: LoopEndReason
+      /** Optional turn token buckets at end (PR-10). */
+      tokens?: TokensByType
+    }
   /** Context fill snapshot and/or compaction lifecycle (Track context-budget). */
   | {
       type: 'loop.compact'
@@ -58,6 +78,8 @@ export type LoopEvent =
       hybrid?: boolean
       /** True when LLM compact was skipped due to MIN_STEPS throttle (KD-16). */
       throttled?: boolean
+      /** Last provider usage buckets when known (PR-10 by_type). */
+      tokens?: TokensByType
     }
   | {
       type: 'loop.prefire'
@@ -69,6 +91,22 @@ export type LoopEvent =
       fillPercent?: number
       /** Prefire started while over-budget but LLM compact throttled (KD-16). */
       throttled?: boolean
+      /** Hybrid pressure active when prefire was evaluated (PR-3/10). */
+      hybrid?: boolean
+      /** Last provider usage buckets when known (PR-10 by_type). */
+      tokens?: TokensByType
+    }
+  /**
+   * End-of-turn (or mid-turn) aggregated compact/prefire counters (PR-10).
+   * Built via `aggregateLoopMetrics`; does not replace individual loop.compact events.
+   */
+  | {
+      type: 'loop.metrics'
+      sessionId: string
+      turnId: string
+      metrics: LoopMetricsCounters
+      tokens?: TokensByType
+      hybrid?: boolean
     }
 
 /** Sync, best-effort sink. Implementations must not throw into the agent loop. */

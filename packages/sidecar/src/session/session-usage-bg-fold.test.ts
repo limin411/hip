@@ -73,6 +73,15 @@ describe('session usage aggregate + background fold (PR-8)', () => {
     const updated = events.filter((e) => e.type === 'usage:updated')
     expect(updated.length).toBeGreaterThanOrEqual(1)
     expect((updated[updated.length - 1] as Extract<ServerMessage, { type: 'usage:updated' }>).usage.totalTokens).toBe(140)
+
+    const breakdowns = events.filter((e) => e.type === 'context:breakdown')
+    expect(breakdowns.length).toBeGreaterThanOrEqual(1)
+    const bd = breakdowns[breakdowns.length - 1] as Extract<
+      ServerMessage,
+      { type: 'context:breakdown' }
+    >
+    expect(bd.breakdown.tokensByType).toMatchObject({ input: 100, output: 40 })
+    expect(bd.breakdown.inputBudget).toBeGreaterThan(0)
   })
 
   it('marks incomplete when bg completes with no usage metadata (no invented tokens)', async () => {

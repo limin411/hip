@@ -13,6 +13,7 @@ import type {
   TrashedSessionSummary,
   SearchHit,
   SessionUsageAggregate,
+  ContextBreakdownSnapshot,
 } from './message-model.js'
 import type {
   DiffBase,
@@ -384,6 +385,11 @@ export type ServerMessage =
   | { type: 'session:loaded'; sessionId: string; messages: Message[]; config?: SessionConfig }
   /** Session-level usage ledger after a turn or background fold (KD-11). */
   | { type: 'usage:updated'; sessionId: string; usage: SessionUsageAggregate }
+  /**
+   * Structured context composition + token-by-type snapshot (PR-10 / G10).
+   * Best-effort; UI may also compute breakdown locally from the transcript.
+   */
+  | { type: 'context:breakdown'; sessionId: string; breakdown: ContextBreakdownSnapshot }
   | { type: 'session:search:result'; query: string; hits: SearchHit[] }
   /** Hard delete only. */
   | { type: 'session:deleted'; sessionId: string }

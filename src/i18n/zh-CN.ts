@@ -433,13 +433,15 @@ export const zhCN = {
         lastInput: '最近一轮输入 · {{tokens}} tokens',
         segPercent: '{{percent}}%',
         breakdownNote:
-          '分项由可见对话记录估算（约每 4 字符 1 token）。「其他」含系统提示、记忆与无法直接看到的注入内容。',
+          '分项由可见对话记录估算（约每 4 字符 1 token）。「系统」为已知系统提示；「其他」含记忆与无法直接看到的注入内容。',
         breakdown: {
+          system: '系统',
           user: '会话（你）',
           assistant: '助手与推理',
+          messages: '消息',
           skills: 'Skills',
           tools: '工具',
-          other: '其他（系统 / 记忆）',
+          other: '其他（记忆 / 注入）',
         },
       },
       composer: {

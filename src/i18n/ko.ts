@@ -467,13 +467,15 @@ export const ko = {
       "estimated": "추정",
       "lastInput": "최근 턴 입력 · {{tokens}} 토큰",
       "segPercent": "{{percent}}%",
-      "breakdownNote": "항목은 보이는 대화 기록으로 추정합니다(약 문자 4개 = 1토큰). 「기타」는 시스템 프롬프트·메모리 등 보이지 않는 주입분입니다.",
+      "breakdownNote": "항목은 보이는 대화 기록으로 추정합니다(약 문자 4개 = 1토큰). 「시스템」은 알려진 시스템 프롬프트, 「기타」는 메모리 등 보이지 않는 주입분입니다.",
       "breakdown": {
+        "system": "시스템",
         "user": "대화(나)",
         "assistant": "어시스턴트·추론",
+        "messages": "메시지",
         "skills": "Skills",
         "tools": "도구",
-        "other": "기타(시스템 / 메모리)"
+        "other": "기타(메모리 / 주입)"
       }
     },
     "composer": {

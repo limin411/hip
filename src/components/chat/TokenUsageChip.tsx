@@ -24,6 +24,7 @@ export function tokenUsageZoneClass(
 
 /** Segment colors for the stacked context bar (quiet, semantic-ish). */
 const SEGMENT_BAR: Record<ContextBreakdownKey, string> = {
+  system: 'bg-ink-tertiary/60',
   user: 'bg-accent',
   assistant: 'bg-success',
   skills: 'bg-warning',
@@ -32,6 +33,7 @@ const SEGMENT_BAR: Record<ContextBreakdownKey, string> = {
 }
 
 const SEGMENT_DOT: Record<ContextBreakdownKey, string> = {
+  system: 'bg-ink-tertiary/60',
   user: 'bg-accent',
   assistant: 'bg-success',
   skills: 'bg-warning',

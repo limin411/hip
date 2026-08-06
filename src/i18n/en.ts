@@ -439,13 +439,15 @@ export const en = {
         lastInput: 'Last turn input · {{tokens}} tokens',
         segPercent: '{{percent}}%',
         breakdownNote:
-          'Breakdown is estimated from the visible transcript (≈ chars/4). “Other” covers system prompt, memory, and injects we cannot see.',
+          'Breakdown is estimated from the visible transcript (≈ chars/4). “System” is the prompt when known; “Other” covers memory and injects we cannot see.',
         breakdown: {
+          system: 'System',
           user: 'Conversation (you)',
           assistant: 'Assistant & reasoning',
+          messages: 'Messages',
           skills: 'Skills',
           tools: 'Tools',
-          other: 'Other (system / memory)',
+          other: 'Other (memory / injects)',
         },
       },
       composer: {

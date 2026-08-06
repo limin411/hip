@@ -36,6 +36,7 @@ import {
   serializeSessionUsageAggregate,
   parseSessionUsageAggregate,
 } from './usage.js'
+import { buildContextBreakdownSnapshot } from './token-metrics.js'
 import { compactMessages, applyCompactResult, estimateTokens, KEEP_RECENT_TURNS, type Summarizer } from './compaction.js'
 import {
   emitPlanApprovalResync,
@@ -297,6 +298,18 @@ export class Session {
         send({ type: 'usage:updated', sessionId: this.id, usage: this.sessionUsage })
       } catch {
         /* client disconnect */
+      }
+      // PR-10: structured token-by-type snapshot (segments optional; UI may refine).
+      if (step) {
+        try {
+          send({
+            type: 'context:breakdown',
+            sessionId: this.id,
+            breakdown: buildContextBreakdownSnapshot({ usage: step }),
+          })
+        } catch {
+          /* client disconnect */
+        }
       }
     }
   }

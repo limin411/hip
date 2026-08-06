@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest'
+import { SystemContext } from '../system-context.js'
 import { createSystemSource, type SystemSourcePayload } from './system.js'
 import { createSkillsSource, type SkillsSourcePayload } from './skills.js'
 import { createTimeSource, type TimeSourcePayload } from './time.js'
@@ -102,18 +103,43 @@ describe('fragment source: time', () => {
 })
 
 describe('fragment source: token-budget', () => {
-  it('renders budget text when percent is provided', async () => {
+  it('is idle (empty text, stable payload) when remaining is 30% or above', async () => {
     const source = createTokenBudgetSource({ tokenBudgetPercent: 30 })
     const payload = (await source.load()) as TokenBudgetSourcePayload
-    expect(payload.budget).toBe(30)
-    expect(payload.used).toBe(70)
-    expect(payload.text).toContain('30%')
+    expect(isUnavailable(payload)).toBe(false)
+    expect(payload.text).toBe('')
+    expect(payload.budget).toBe(100)
+    expect(payload.used).toBe(0)
+  })
+
+  it('renders bucketed budget text when remaining is below 30%', async () => {
+    const source = createTokenBudgetSource({ tokenBudgetPercent: 25 })
+    const payload = (await source.load()) as TokenBudgetSourcePayload
+    expect(payload.budget).toBe(20)
+    expect(payload.used).toBe(80)
+    expect(payload.text).toContain('20%')
+    expect(payload.text).not.toContain('25%')
+  })
+
+  it('stabilizes to identical payload when remaining is bucket-equal', async () => {
+    const a = (await createTokenBudgetSource({ tokenBudgetPercent: 21 }).load()) as TokenBudgetSourcePayload
+    const b = (await createTokenBudgetSource({ tokenBudgetPercent: 29 }).load()) as TokenBudgetSourcePayload
+    expect(a).toEqual(b)
+    expect(a.text).toBe('You have approximately 20% of your token budget remaining.')
+  })
+
+  it('stabilizes idle payloads across all remaining >= 30%', async () => {
+    const a = (await createTokenBudgetSource({ tokenBudgetPercent: 30 }).load()) as TokenBudgetSourcePayload
+    const b = (await createTokenBudgetSource({ tokenBudgetPercent: 99 }).load()) as TokenBudgetSourcePayload
+    expect(a).toEqual(b)
+    expect(a.text).toBe('')
   })
 
   it('warns when budget is low', async () => {
     const source = createTokenBudgetSource({ tokenBudgetPercent: 5 })
     const payload = (await source.load()) as TokenBudgetSourcePayload
     expect(payload.text).toContain('nearly exhausted')
+    expect(payload.budget).toBe(10)
   })
 
   it('is Unavailable when percent is undefined', async () => {
@@ -122,13 +148,30 @@ describe('fragment source: token-budget', () => {
     expect(isUnavailable(payload)).toBe(true)
   })
 
-  it('round-trips through codec', async () => {
-    const source = createTokenBudgetSource({ tokenBudgetPercent: 42 })
+  it('round-trips through codec with bucketed values', async () => {
+    const source = createTokenBudgetSource({ tokenBudgetPercent: 27 })
     const payload = (await source.load()) as TokenBudgetSourcePayload
     const encoded = source.codec.encode(payload)
     const decoded = source.codec.decode(encoded)
-    expect(decoded.budget).toBe(42)
-    expect(decoded.used).toBe(58)
+    expect(decoded.budget).toBe(20)
+    expect(decoded.used).toBe(80)
+    expect(decoded.text).toBe(payload.text)
+  })
+
+  it('SystemContext.reconcile stays Unchanged when remaining is bucket-equal', async () => {
+    const fixedNow = new Date('2026-06-21T12:34:56.789Z')
+    const ctxA = new SystemContext([
+      createTimeSource({ now: fixedNow }),
+      createTokenBudgetSource({ tokenBudgetPercent: 24 }),
+    ])
+    const gen = await ctxA.initialize()
+
+    const ctxB = new SystemContext([
+      createTimeSource({ now: new Date('2026-06-21T12:34:10.000Z') }),
+      createTokenBudgetSource({ tokenBudgetPercent: 28 }),
+    ])
+    const result = await ctxB.reconcile(gen.snapshot)
+    expect(result).toEqual({ _tag: 'Unchanged' })
   })
 })
 

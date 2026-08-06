@@ -94,12 +94,14 @@ describe('SkillsFragment', () => {
 // ── TokenBudgetFragment ───────────────────────────────────────────────────────
 
 describe('TokenBudgetFragment', () => {
-  it('isActive returns true when tokenBudgetPercent is defined and >= 0', () => {
+  it('isActive only when remaining is defined and below 30%', () => {
     const f = new TokenBudgetFragment()
     expect(f.isActive({})).toBe(false)
     expect(f.isActive({ tokenBudgetPercent: 0 })).toBe(true)
-    expect(f.isActive({ tokenBudgetPercent: 50 })).toBe(true)
-    expect(f.isActive({ tokenBudgetPercent: 100 })).toBe(true)
+    expect(f.isActive({ tokenBudgetPercent: 29 })).toBe(true)
+    expect(f.isActive({ tokenBudgetPercent: 30 })).toBe(false)
+    expect(f.isActive({ tokenBudgetPercent: 50 })).toBe(false)
+    expect(f.isActive({ tokenBudgetPercent: 100 })).toBe(false)
   })
 
   it('renders warning at 5%', () => {
@@ -114,17 +116,18 @@ describe('TokenBudgetFragment', () => {
     expect(text).toContain('nearly exhausted')
   })
 
-  it('renders normal text at 30%', () => {
+  it('renders empty at 30% or above (not injected)', () => {
     const f = new TokenBudgetFragment()
-    const text = f.render({ tokenBudgetPercent: 30 })
-    expect(text).toContain('approximately 30%')
-    expect(text).not.toContain('nearly exhausted')
+    expect(f.render({ tokenBudgetPercent: 30 })).toBe('')
+    expect(f.render({ tokenBudgetPercent: 100 })).toBe('')
   })
 
-  it('renders normal text at 100%', () => {
+  it('renders bucketed remaining for 11–29%', () => {
     const f = new TokenBudgetFragment()
-    const text = f.render({ tokenBudgetPercent: 100 })
-    expect(text).toContain('approximately 100%')
+    expect(f.render({ tokenBudgetPercent: 25 })).toBe(
+      'You have approximately 20% of your token budget remaining.',
+    )
+    expect(f.render({ tokenBudgetPercent: 21 })).toBe(f.render({ tokenBudgetPercent: 29 }))
   })
 
   it('estimatedTokens returns 20', () => {

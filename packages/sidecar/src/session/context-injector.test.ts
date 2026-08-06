@@ -178,11 +178,22 @@ describe('TokenBudgetInjector', () => {
     expect(result.systemMessages).toEqual([])
   })
 
-  it('produces a warning when budget is between 11% and 29%', async () => {
+  it('produces a bucketed warning when budget is between 11% and 29%', async () => {
     const injector = new TokenBudgetInjector()
     const result = await injector.inject({ ...baseState, tokenBudgetPercent: 25 })
+    // 25% floors to the 20% bucket — exact percent must not appear
     expect(result.systemMessages).toEqual([
-      'You have approximately 25% of your token budget remaining.',
+      'You have approximately 20% of your token budget remaining.',
+    ])
+  })
+
+  it('keeps identical copy for bucket-equal remaining percents', async () => {
+    const injector = new TokenBudgetInjector()
+    const a = await injector.inject({ ...baseState, tokenBudgetPercent: 21 })
+    const b = await injector.inject({ ...baseState, tokenBudgetPercent: 29 })
+    expect(a.systemMessages).toEqual(b.systemMessages)
+    expect(a.systemMessages).toEqual([
+      'You have approximately 20% of your token budget remaining.',
     ])
   })
 
@@ -200,6 +211,13 @@ describe('TokenBudgetInjector', () => {
     expect(result.systemMessages).toEqual([
       'Your token budget is nearly exhausted. Finish quickly or compact the conversation.',
     ])
+  })
+
+  it('keeps critical copy stable across all remaining <= 10%', async () => {
+    const injector = new TokenBudgetInjector()
+    const a = await injector.inject({ ...baseState, tokenBudgetPercent: 0 })
+    const b = await injector.inject({ ...baseState, tokenBudgetPercent: 10 })
+    expect(a.systemMessages).toEqual(b.systemMessages)
   })
 })
 

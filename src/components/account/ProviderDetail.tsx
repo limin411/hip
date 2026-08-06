@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/Button'
 import { Badge } from '@/components/ui/Badge'
 import { Switch } from '@/components/ui/Switch'
 import { inputClassName } from '@/components/ui/Input'
+import { ProviderLogo } from '@/components/ui/ProviderLogo'
 import { cn } from '@/lib/utils'
 import { sessionService } from '@/domain/sessionService'
 import { useDomainStore } from '@/domain/sessionStore'
@@ -267,9 +268,13 @@ export function ProviderDetail({
     <div className="flex min-w-0 flex-1 flex-col gap-4 overflow-y-auto">
       <section className="rounded-lg border border-border bg-surface p-4">
         <div className="mb-3 flex items-center gap-3">
-          <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-surface-muted text-body font-medium text-ink-secondary">
-            {provider.name.charAt(0).toUpperCase()}
-          </span>
+          <ProviderLogo
+            providerId={provider.id}
+            name={provider.name}
+            custom={provider.custom}
+            size={32}
+            className="bg-surface-muted text-ink-secondary text-body font-medium"
+          />
           <div className="min-w-0 flex-1">
             <div className="truncate text-body font-medium text-ink">{provider.name}</div>
             <div className="text-caption text-ink-tertiary">{provider.id}</div>

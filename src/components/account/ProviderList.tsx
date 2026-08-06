@@ -2,6 +2,7 @@ import { useTranslation } from 'react-i18next'
 import { Search, Plus, Ban, ChevronRight, X } from 'lucide-react'
 import { isCompatible, type CatalogProvider } from '@/ipc/catalog'
 import type { ProviderGroups } from '@/lib/providerGroups'
+import { ProviderLogo } from '@/components/ui/ProviderLogo'
 import { cn } from '@/lib/utils'
 
 /** Left master pane: searchable, grouped provider list + add-custom footer. */
@@ -46,14 +47,15 @@ export function ProviderList({
           isActive && 'bg-accent-active',
         )}
       >
-        <span
+        <ProviderLogo
+          providerId={p.id}
+          name={p.name}
+          custom={p.custom}
+          size={24}
           className={cn(
-            'flex h-6 w-6 shrink-0 items-center justify-center rounded-md text-caption',
             isActive ? 'bg-accent-subtle text-accent-strong' : 'bg-surface-muted text-ink-secondary',
           )}
-        >
-          {p.name.charAt(0).toUpperCase()}
-        </span>
+        />
         <span className={cn('truncate', isActive ? 'font-medium text-accent-strong' : 'text-ink-secondary')}>
           {p.name}
         </span>

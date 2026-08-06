@@ -1,4 +1,5 @@
 import type { Message, ToolCall, TurnUsage } from '@hip/protocol'
+import { isSkillToolName as protocolIsSkillToolName } from '@hip/protocol'
 
 /** Estimated share of last-turn context (provider input), from visible transcript. */
 export type ContextBreakdownKey =
@@ -23,9 +24,9 @@ export function estimateTokensFromChars(chars: number): number {
   return Math.ceil(chars / 4)
 }
 
+/** Re-export shared helper (protocol) so UI + sidecar stay aligned (KD-17). */
 export function isSkillToolName(name: string): boolean {
-  const n = name.toLowerCase()
-  return n === 'use_skill' || n === 'skill' || n.includes('skill')
+  return protocolIsSkillToolName(name)
 }
 
 function toolChars(tc: ToolCall): number {

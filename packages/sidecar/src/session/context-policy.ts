@@ -45,9 +45,15 @@ export interface ResolvedContextPolicy {
   hybridFill: boolean
   costCacheReadMultiplier: number
   costCacheWriteMultiplier: number
-  /** Optional soft-prune protect window (later PR; undefined = use code default). */
+  /**
+   * Soft-prune newest-tool protect window (tokens). Undefined → micro-compaction
+   * default PRUNE_PROTECT_TOKENS (40_000).
+   */
   pruneProtectTokens?: number
-  /** Optional soft-prune minimum release (later PR). */
+  /**
+   * Soft-prune minimum release volume (tokens). Undefined → micro-compaction
+   * default PRUNE_MINIMUM_TOKENS (20_000).
+   */
   pruneMinimumTokens?: number
 }
 

@@ -520,7 +520,11 @@ export function buildGraph(maxSteps: number = MAX_STEPS, compactBudget: number =
 
     // 1) Cheap prune of stale tool results (default on; not gated on state.compacted).
     if (isMicroCompactionEnabled()) {
-      const mc = new MicroCompaction()
+      const policy = policyOf(ctx)
+      const mc = new MicroCompaction({
+        pruneProtectTokens: policy.pruneProtectTokens,
+        pruneMinimumTokens: policy.pruneMinimumTokens,
+      })
       const { messages: mcMessages, truncated } = mc.compact(working)
       if (truncated > 0) {
         for (let i = 0; i < working.length; i++) {

@@ -5,7 +5,14 @@ import {
   ToolMessage,
   type BaseMessage,
 } from '@langchain/core/messages'
-import { MicroCompaction, isMicroCompactionEnabled } from './micro-compaction.js'
+import {
+  MicroCompaction,
+  isMicroCompactionEnabled,
+  isSkillToolName,
+  PRUNE_PROTECT_TOKENS,
+  PRUNE_MINIMUM_TOKENS,
+} from './micro-compaction.js'
+import { isSkillToolName as protocolIsSkillToolName } from '@hip/protocol'
 
 const STUB = '[Old tool result cleared]'
 
@@ -283,3 +290,216 @@ describe('MicroCompaction', () => {
     expect((result[11] as ToolMessage).content).toBe('recent result')
   })
 })
+
+// ── Token protect window + precedence (PR-5 / KD-7 / KD-17) ────────────
+
+/** Build a string that estimates to roughly `tokens` via chars/4. */
+function blob(tokens: number, tag = 'x'): string {
+  // ceil(len/4) === tokens ⇒ len in ((tokens-1)*4, tokens*4]
+  return tag.repeat(Math.max(1, tokens * 4))
+}
+
+describe('isSkillToolName (shared)', () => {
+  it('matches protocol helper', () => {
+    for (const n of ['use_skill', 'skill', 'SkillLoader', 'read_file', 'bash']) {
+      expect(isSkillToolName(n)).toBe(protocolIsSkillToolName(n))
+    }
+  })
+
+  it('detects skill tools case-insensitively', () => {
+    expect(isSkillToolName('use_skill')).toBe(true)
+    expect(isSkillToolName('Use_Skill')).toBe(true)
+    expect(isSkillToolName('skill')).toBe(true)
+    expect(isSkillToolName('my_skill_tool')).toBe(true)
+    expect(isSkillToolName('read_file')).toBe(false)
+  })
+})
+
+describe('MicroCompaction token window', () => {
+  it('exports OpenCode-aligned defaults', () => {
+    expect(PRUNE_PROTECT_TOKENS).toBe(40_000)
+    expect(PRUNE_MINIMUM_TOKENS).toBe(20_000)
+  })
+
+  it('protects newest tool results within pruneProtectTokens (newest→oldest)', () => {
+    // 3 tool results: oldest 30k tokens, mid 30k, newest 30k.
+    // protect=40k → newest (30k) protected; mid pushes total to 60k → candidate;
+    // oldest also candidate. Candidate volume = 60k > minimum 1 → prune mid+old.
+    const messages: BaseMessage[] = [
+      tm('old', blob(30_000, 'o'), { name: 'bash' }),
+      tm('mid', blob(30_000, 'm'), { name: 'bash' }),
+      tm('new', blob(30_000, 'n'), { name: 'bash' }),
+    ]
+
+    const mc = new MicroCompaction({
+      pruneProtectTokens: 40_000,
+      pruneMinimumTokens: 1,
+    })
+    const { messages: result, truncated } = mc.compact(messages)
+
+    expect(truncated).toBe(2)
+    expect(String((result[0] as ToolMessage).content).startsWith(STUB)).toBe(true)
+    expect(String((result[1] as ToolMessage).content).startsWith(STUB)).toBe(true)
+    expect((result[2] as ToolMessage).content).toBe(blob(30_000, 'n'))
+  })
+
+  it('skips prune when candidate volume ≤ pruneMinimumTokens', () => {
+    // Same layout as above but minimum larger than candidate release.
+    // protect=40k → candidates mid+old = 60k tokens; set minimum to 100k → no prune.
+    const messages: BaseMessage[] = [
+      tm('old', blob(30_000, 'o'), { name: 'bash' }),
+      tm('mid', blob(30_000, 'm'), { name: 'bash' }),
+      tm('new', blob(30_000, 'n'), { name: 'bash' }),
+    ]
+
+    const mc = new MicroCompaction({
+      pruneProtectTokens: 40_000,
+      pruneMinimumTokens: 100_000,
+    })
+    const { messages: result, truncated } = mc.compact(messages)
+
+    expect(truncated).toBe(0)
+    expect(result[0]).toBe(messages[0])
+    expect(result[1]).toBe(messages[1])
+    expect(result[2]).toBe(messages[2])
+  })
+
+  it('skips prune when candidate volume equals pruneMinimumTokens (strict >)', () => {
+    // protect=10 → newest 10 tokens protected; older 20 tokens is sole candidate.
+    // minimum=20 → 20 <= 20 → skip (OpenCode: pruned > PRUNE_MINIMUM).
+    const messages: BaseMessage[] = [
+      tm('old', blob(20, 'o'), { name: 'bash' }),
+      tm('new', blob(10, 'n'), { name: 'bash' }),
+    ]
+    const mc = new MicroCompaction({
+      pruneProtectTokens: 10,
+      pruneMinimumTokens: 20,
+    })
+    expect(mc.compact(messages).truncated).toBe(0)
+
+    const mc2 = new MicroCompaction({
+      pruneProtectTokens: 10,
+      pruneMinimumTokens: 19,
+    })
+    expect(mc2.compact(messages).truncated).toBe(1)
+  })
+
+  it('does not prune when all tool output fits in protect window', () => {
+    const messages: BaseMessage[] = [
+      tm('a', blob(100, 'a'), { name: 'bash' }),
+      tm('b', blob(100, 'b'), { name: 'bash' }),
+      hu('u', 'hi'),
+    ]
+    const mc = new MicroCompaction({
+      pruneProtectTokens: 40_000,
+      pruneMinimumTokens: 1,
+    })
+    expect(mc.compact(messages).truncated).toBe(0)
+  })
+})
+
+describe('MicroCompaction precedence (pair > skill > token window)', () => {
+  it('never prunes skill tools even outside the token protect window', () => {
+    // Newest non-skill fills protect budget; older skill must still be kept.
+    const messages: BaseMessage[] = [
+      tm('skill_old', blob(5_000, 's'), { name: 'use_skill', tool_call_id: 'tc_skill' }),
+      tm('old_bash', blob(30_000, 'o'), { name: 'bash', tool_call_id: 'tc_old' }),
+      tm('new_bash', blob(30_000, 'n'), { name: 'bash', tool_call_id: 'tc_new' }),
+    ]
+
+    const mc = new MicroCompaction({
+      pruneProtectTokens: 40_000,
+      pruneMinimumTokens: 1,
+    })
+    const { messages: result, truncated } = mc.compact(messages)
+
+    // new_bash (30k) protected; old_bash candidate; skill always protected.
+    expect(truncated).toBe(1)
+    expect((result[0] as ToolMessage).content).toBe(blob(5_000, 's'))
+    expect(String((result[1] as ToolMessage).content).startsWith(STUB)).toBe(true)
+    expect((result[2] as ToolMessage).content).toBe(blob(30_000, 'n'))
+  })
+
+  it('skill tools do not consume the protect token budget', () => {
+    // Newest is skill (ignored for budget); next non-skill should still be protected.
+    const messages: BaseMessage[] = [
+      tm('old', blob(50, 'o'), { name: 'bash' }),
+      tm('skill', blob(100, 's'), { name: 'use_skill' }),
+      tm('mid', blob(30, 'm'), { name: 'bash' }),
+    ]
+    // protect=40 → mid (30) protected; skill skipped in budget; old (50) pushes past → candidate.
+    const mc = new MicroCompaction({
+      pruneProtectTokens: 40,
+      pruneMinimumTokens: 1,
+    })
+    const { messages: result, truncated } = mc.compact(messages)
+    expect(truncated).toBe(1)
+    expect(String((result[0] as ToolMessage).content).startsWith(STUB)).toBe(true)
+    expect((result[1] as ToolMessage).content).toBe(blob(100, 's'))
+    expect((result[2] as ToolMessage).content).toBe(blob(30, 'm'))
+  })
+
+  it('unresolved tool-pair outranks token window (preserves span into protect zone)', () => {
+    // AIMessage + intermediate tool outside protect; matching result inside protect.
+    // Pair phase must preserve the intermediate tool even though it is outside the window.
+    const messages: BaseMessage[] = [
+      tm('noise', blob(50, 'z'), { name: 'bash', tool_call_id: 'tc_noise' }),
+      ai('ai_call', 'run', [{ id: 'tc_span', name: 'search', args: {} }]),
+      tm('mid_other', blob(50, 'm'), { name: 'bash', tool_call_id: 'tc_mid' }),
+      tm('span_result', blob(20, 'r'), { name: 'bash', tool_call_id: 'tc_span' }),
+    ]
+    // protect=20 → only span_result token-protected; noise+mid candidates by age,
+    // but mid is in pair-preserved range [ai_call, recentStart).
+    const mc = new MicroCompaction({
+      pruneProtectTokens: 20,
+      pruneMinimumTokens: 1,
+    })
+    const { messages: result, truncated } = mc.compact(messages)
+
+    expect(String((result[0] as ToolMessage).content).startsWith(STUB)).toBe(true)
+    expect((result[2] as ToolMessage).content).toBe(blob(50, 'm')) // pair-preserved
+    expect((result[3] as ToolMessage).content).toBe(blob(20, 'r')) // token-protected
+    expect(truncated).toBe(1)
+  })
+
+  it('pair reference from recent AIMessage protects stale tool result (phase 2)', () => {
+    const messages: BaseMessage[] = [
+      tm('stale', blob(50, 's'), { name: 'bash', tool_call_id: 'tc_ref' }),
+      tm('other', blob(50, 'o'), { name: 'bash', tool_call_id: 'tc_other' }),
+      tm('recent', blob(10, 'r'), { name: 'bash', tool_call_id: 'tc_r' }),
+      ai('ai', 'use', [{ id: 'tc_ref', name: 'lookup', args: {} }]),
+    ]
+    // protect=10 → only `recent` in token window; recentStart at that tool.
+    // AI after recentStart references tc_ref → stale preserved; other pruned.
+    const mc = new MicroCompaction({
+      pruneProtectTokens: 10,
+      pruneMinimumTokens: 1,
+    })
+    const { messages: result, truncated } = mc.compact(messages)
+    expect(truncated).toBe(1)
+    expect((result[0] as ToolMessage).content).toBe(blob(50, 's'))
+    expect(String((result[1] as ToolMessage).content).startsWith(STUB)).toBe(true)
+    expect((result[2] as ToolMessage).content).toBe(blob(10, 'r'))
+  })
+
+  it('honors config-sized protect/minimum from opts (ContextConfig wiring)', () => {
+    const messages: BaseMessage[] = [
+      tm('old', blob(100, 'o'), { name: 'bash' }),
+      tm('new', blob(40, 'n'), { name: 'bash' }),
+    ]
+    // Mimic resolveContextPolicy({ pruneProtectTokens: 40, pruneMinimumTokens: 50 })
+    const mc = new MicroCompaction({
+      pruneProtectTokens: 40,
+      pruneMinimumTokens: 50,
+    })
+    // candidate old=100 > 50 → prune
+    expect(mc.compact(messages).truncated).toBe(1)
+
+    const mcHighMin = new MicroCompaction({
+      pruneProtectTokens: 40,
+      pruneMinimumTokens: 200,
+    })
+    expect(mcHighMin.compact(messages).truncated).toBe(0)
+  })
+})
+

@@ -140,6 +140,85 @@ export function effectiveUsedTokens(
   return Math.max(estimated, real)
 }
 
+/**
+ * Mid-turn hybrid pressure (KD-13 / PR-3).
+ *
+ * Tracks provider-reported context after the last model response plus a delta
+ * of **new messages only** (tool results) so full re-estimate underestimates
+ * cannot stick gates to a stale lastPrompt floor.
+ *
+ * Owned per GraphCtx / graph invoke — do not share supervisor delta with subagents.
+ */
+export interface ContextPressureState {
+  /** Seed from host.lastPromptTokens / last provider context|input tokens. */
+  lastProviderContextTokens: number
+  /** Tokens from messages appended since last model response only. */
+  estimatedTokensSinceModel: number
+  /** Message-count watermark after last model response (or compact reset). */
+  lastModelMessageCount: number
+}
+
+export function createContextPressureState(
+  seed?: Partial<ContextPressureState>,
+): ContextPressureState {
+  return {
+    lastProviderContextTokens: Math.max(0, Math.floor(seed?.lastProviderContextTokens ?? 0)),
+    estimatedTokensSinceModel: Math.max(0, Math.floor(seed?.estimatedTokensSinceModel ?? 0)),
+    lastModelMessageCount: Math.max(0, Math.floor(seed?.lastModelMessageCount ?? 0)),
+  }
+}
+
+/** LLM usage: set provider baseline, clear mid-turn delta, update watermark. */
+export function resetPressureOnUsage(
+  pressure: ContextPressureState,
+  providerTokens: number,
+  messageCount: number,
+): void {
+  pressure.lastProviderContextTokens = Math.max(0, Math.floor(providerTokens))
+  pressure.estimatedTokensSinceModel = 0
+  pressure.lastModelMessageCount = Math.max(0, Math.floor(messageCount))
+}
+
+/** Append tokens from newly added messages (tool results / blocked stubs). */
+export function addPressureDelta(pressure: ContextPressureState, tokens: number): void {
+  if (!Number.isFinite(tokens) || tokens <= 0) return
+  pressure.estimatedTokensSinceModel += Math.floor(tokens)
+}
+
+/**
+ * Reduce delta when micro-prune stubs shrink a message body (clamp ≥ 0).
+ * Do **not** also re-add full messages into delta (no double-count).
+ */
+export function reducePressureDelta(pressure: ContextPressureState, freedTokens: number): void {
+  if (!Number.isFinite(freedTokens) || freedTokens <= 0) return
+  pressure.estimatedTokensSinceModel = Math.max(
+    0,
+    pressure.estimatedTokensSinceModel - Math.floor(freedTokens),
+  )
+}
+
+/**
+ * Hybrid used tokens for compact / prefire gates.
+ *
+ * - hybrid on: `max(fullEstimate, lastProvider + delta)` — never `full + delta`
+ * - hybrid off / no pressure: `effectiveUsedTokens(fullEstimate, lastPromptTokens)`
+ */
+export function hybridUsedTokens(
+  fullEstimate: number,
+  pressure: ContextPressureState | null | undefined,
+  hybridEnabled: boolean,
+  lastPromptTokens?: number | null,
+): number {
+  const est = Math.max(0, fullEstimate)
+  if (!hybridEnabled || !pressure) {
+    return effectiveUsedTokens(est, lastPromptTokens ?? pressure?.lastProviderContextTokens)
+  }
+  const providerFloor =
+    Math.max(0, pressure.lastProviderContextTokens) +
+    Math.max(0, pressure.estimatedTokensSinceModel)
+  return Math.max(est, providerFloor)
+}
+
 /** Absolute token count that triggers auto-compact for a window + percent. */
 export function compactTriggerTokens(
   contextWindow: number = DEFAULT_CONTEXT_WINDOW,

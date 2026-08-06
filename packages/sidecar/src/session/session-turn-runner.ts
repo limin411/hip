@@ -50,6 +50,7 @@ import {
   effectiveUsedTokens,
   remainingBudgetPercent,
   resolveModelContextWindow,
+  createContextPressureState,
 } from './context-budget.js'
 import { resolveContextPolicy } from './context-policy.js'
 import { emitLoopSignal } from './loop-events.js'
@@ -1355,6 +1356,10 @@ export async function runTurn(host: SessionTurnHost, rawSend: SendFn, base?: {
     compactThresholdPercent: contextPolicy.autoCompactPercent,
     contextPolicy,
     lastPromptTokens: host.lastPromptTokens,
+    // Hybrid mid-turn pressure seed (PR-3); graph updates on usage + tools.
+    contextPressure: createContextPressureState({
+      lastProviderContextTokens: host.lastPromptTokens ?? 0,
+    }),
     protectedStructures: host.goalManager.protectedBlock() || undefined,
     modelId: modelChoice.modelID,
     providerId: modelChoice.providerID,

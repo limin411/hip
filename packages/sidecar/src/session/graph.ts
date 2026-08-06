@@ -52,11 +52,16 @@ import { getActiveModel } from '../config/providers.js'
 import {
   AUTO_COMPACT_THRESHOLD_PERCENT,
   TARGET_THRESHOLD_PERCENT,
-  effectiveUsedTokens,
   exceedsThreshold,
   estimateTextTokens,
   estimateToolsTokens,
   messageKeepTokenBudget,
+  createContextPressureState,
+  resetPressureOnUsage,
+  addPressureDelta,
+  reducePressureDelta,
+  hybridUsedTokens,
+  type ContextPressureState,
 } from './context-budget.js'
 import {
   PrefireCache,
@@ -199,9 +204,14 @@ export interface GraphCtx {
   compactThresholdPercent?: number
   /**
    * Last model call's prompt / input token count (from provider usage).
-   * When set, gates use max(estimate, lastPromptTokens).
+   * When set, gates use max(estimate, lastPromptTokens) (and hybrid when on).
    */
   lastPromptTokens?: number
+  /**
+   * Mid-turn hybrid pressure (KD-13 / PR-3). Per graph invoke.
+   * Seeded from lastPromptTokens; updated on usage + tool results.
+   */
+  contextPressure?: ContextPressureState
   /**
    * Optional keep-tail token budget (message body). When omitted, derived from
    * contextWindowTokens × TARGET_THRESHOLD_PERCENT minus system/tools overhead.
@@ -349,22 +359,27 @@ function applyCompaction(stateMessages: BaseMessage[], result: CompactResult): B
   return applyCompactResult(stateMessages, result)
 }
 
+function policyOf(ctx: GraphCtx): ResolvedContextPolicy {
+  return ctx.contextPolicy ?? DEFAULT_CONTEXT_POLICY
+}
+
+/** Lazy-init hybrid pressure; seed from lastPromptTokens when first needed. */
+function ensurePressure(ctx: GraphCtx): ContextPressureState {
+  if (!ctx.contextPressure) {
+    ctx.contextPressure = createContextPressureState({
+      lastProviderContextTokens: ctx.lastPromptTokens ?? 0,
+    })
+  }
+  return ctx.contextPressure
+}
+
 /** Resolve whether the prompt is over the compact budget for this invoke. */
 function isOverCompactBudget(
   working: BaseMessage[],
   ctx: GraphCtx,
   fallbackAbsoluteBudget: number,
 ): boolean {
-  const tools = (ctx.tools ?? []).map((t) => ({
-    name: t.name,
-    description: typeof t.description === 'string' ? t.description : undefined,
-  }))
-  const estimated = estimatePromptTokens({
-    messages: working,
-    systemPrompt: ctx.systemPrompt,
-    tools,
-  })
-  const used = effectiveUsedTokens(estimated, ctx.lastPromptTokens)
+  const used = estimateUsedForGate(working, ctx)
 
   // Explicit absolute budget (tests, buildGraph second arg, forced overrides).
   if (ctx.compactBudgetTokens != null && ctx.compactBudgetTokens > 0) {
@@ -380,10 +395,6 @@ function isOverCompactBudget(
   }
   // Fallback: absolute budget from buildGraph(maxSteps, compactBudget).
   return used > fallbackAbsoluteBudget
-}
-
-function policyOf(ctx: GraphCtx): ResolvedContextPolicy {
-  return ctx.contextPolicy ?? DEFAULT_CONTEXT_POLICY
 }
 
 /** Derive message-tail keep budget for compactMessages (product path only). */
@@ -420,12 +431,15 @@ function emitCompactObs(
     prefire?: LoopPrefireOutcome
     tokensBefore?: number
     tokensAfter?: number
+    hybrid?: boolean
+    throttled?: boolean
   },
 ): void {
   const window = payload.window ?? ctx.contextWindowTokens
   const used = payload.used
   const fillPercent =
     used != null && window != null && window > 0 ? usageFillPercent(used, window) : undefined
+  const hybrid = payload.hybrid ?? policyOf(ctx).hybridFill
   emitLoopSignal(ctx.emit.loopSignal, {
     type: 'loop.compact',
     ...loopIds(ctx),
@@ -437,10 +451,12 @@ function emitCompactObs(
     ...(payload.prefire ? { prefire: payload.prefire } : {}),
     ...(payload.tokensBefore != null ? { tokensBefore: payload.tokensBefore } : {}),
     ...(payload.tokensAfter != null ? { tokensAfter: payload.tokensAfter } : {}),
+    ...(hybrid ? { hybrid: true } : {}),
+    ...(payload.throttled ? { throttled: true } : {}),
   })
 }
 
-/** Used-token estimate for prefire / compact gates (same inputs as isOverCompactBudget). */
+/** Used-token estimate for prefire / compact gates (hybrid when enabled). */
 function estimateUsedForGate(
   working: BaseMessage[],
   ctx: GraphCtx,
@@ -449,21 +465,25 @@ function estimateUsedForGate(
     name: t.name,
     description: typeof t.description === 'string' ? t.description : undefined,
   }))
-  return effectiveUsedTokens(
-    estimatePromptTokens({
-      messages: working,
-      systemPrompt: ctx.systemPrompt,
-      tools,
-    }),
+  const fullEstimate = estimatePromptTokens({
+    messages: working,
+    systemPrompt: ctx.systemPrompt,
+    tools,
+  })
+  return hybridUsedTokens(
+    fullEstimate,
+    ensurePressure(ctx),
+    policyOf(ctx).hybridFill,
     ctx.lastPromptTokens,
   )
 }
 
-/** Kick off background pass-1 when approaching the compact threshold. */
+/** Kick off background pass-1 when approaching the compact threshold (or throttled over-budget). */
 function maybeStartPrefire(
   working: BaseMessage[],
   ctx: GraphCtx,
   compactBudget: number,
+  opts?: { allowOverBudget?: boolean },
 ): void {
   const cache = ensurePrefire(ctx)
   if (!cache) return
@@ -484,7 +504,13 @@ function maybeStartPrefire(
     thresholdPct = 100
   }
 
-  if (!shouldStartPrefire(used, window, thresholdPct, lead)) return
+  if (
+    !shouldStartPrefire(used, window, thresholdPct, lead, {
+      allowOverBudget: opts?.allowOverBudget === true,
+    })
+  ) {
+    return
+  }
 
   const targetKeep = resolveTargetKeepTokens(ctx)
   const plan = selectCompactMiddle(working, {
@@ -500,6 +526,7 @@ function maybeStartPrefire(
     used,
     window,
     fillPercent: usageFillPercent(used, window),
+    ...(opts?.allowOverBudget ? { throttled: true } : {}),
   })
   if (outcome === 'started') {
     try {
@@ -531,13 +558,20 @@ export function buildGraph(maxSteps: number = MAX_STEPS, compactBudget: number =
       const mc = new MicroCompaction()
       const { messages: mcMessages, truncated } = mc.compact(working)
       if (truncated > 0) {
+        let freed = 0
         for (let i = 0; i < working.length; i++) {
           if (mcMessages[i] !== working[i]) {
             const orig = working[i]
+            freed += Math.max(
+              0,
+              estimateMessagesTokens([orig]) - estimateMessagesTokens([mcMessages[i]]),
+            )
             if (orig.id) out.push(new RemoveMessage({ id: orig.id }))
             out.push(mcMessages[i])
           }
         }
+        // Shrink mid-turn delta only — never re-add full messages into delta (KD-13).
+        if (freed > 0) reducePressureDelta(ensurePressure(ctx), freed)
         working = mcMessages
         try {
           ctx.emit.compaction(`Pruned ${truncated} stale tool result(s)`, { reason: 'prune' })
@@ -576,14 +610,19 @@ export function buildGraph(maxSteps: number = MAX_STEPS, compactBudget: number =
     // 3) Token-budget LLM compact (user-turn or tool-round). Throttled between LLM passes.
     const overBudget = isOverCompactBudget(working, ctx, compactBudget)
     const canLlmCompact = stepsSince >= MIN_STEPS_BETWEEN_LLM_COMPACT
+    const throttled = overBudget && !canLlmCompact
 
-    // Approaching threshold: start background pass-1 (NOTE₁) without blocking.
-    if (!overBudget) {
-      maybeStartPrefire(working, ctx, compactBudget)
+    // Prefire when approaching band, or when over-budget but LLM compact is throttled (KD-16).
+    // Skip only when we are about to run LLM compact on this visit.
+    if (!overBudget || !canLlmCompact) {
+      maybeStartPrefire(working, ctx, compactBudget, {
+        allowOverBudget: throttled,
+      })
     }
 
     if (!overBudget || !canLlmCompact) {
       // Always tick the counter so we eventually re-enable LLM compact after a prior one.
+      // Throttled over-budget is visible via loop.prefire { throttled: true } (KD-16).
       const nextSteps = stepsSince + 1
       if (out.length === 0) {
         return {
@@ -675,6 +714,21 @@ export function buildGraph(maxSteps: number = MAX_STEPS, compactBudget: number =
       tokensBefore,
       tokensAfter,
     })
+    // Post-compact: reset hybrid pressure from full re-estimate; clear delta (KD-13).
+    {
+      const kept = working.filter((m) => !result.replacedIds.includes(m.id ?? ''))
+      const afterMsgs = [result.summary, ...kept]
+      const afterEst = estimatePromptTokens({
+        messages: afterMsgs,
+        systemPrompt: ctx.systemPrompt,
+        tools: (ctx.tools ?? []).map((t) => ({
+          name: t.name,
+          description: typeof t.description === 'string' ? t.description : undefined,
+        })),
+      })
+      resetPressureOnUsage(ensurePressure(ctx), afterEst, afterMsgs.length)
+      ctx.lastPromptTokens = afterEst
+    }
     return {
       messages: [
         ...out,
@@ -766,7 +820,15 @@ export function buildGraph(maxSteps: number = MAX_STEPS, compactBudget: number =
         emit.usage(turnUsage)
         // Keep gate honest for subsequent compactNode cycles in this invoke.
         const prompt = turnUsage.contextTokens ?? turnUsage.inputTokens
-        if (prompt > 0) ctx.lastPromptTokens = prompt
+        if (prompt > 0) {
+          ctx.lastPromptTokens = prompt
+          // Provider baseline + clear mid-turn delta; watermark includes this AI message.
+          resetPressureOnUsage(
+            ensurePressure(ctx),
+            prompt,
+            (state.messages?.length ?? 0) + 1,
+          )
+        }
       }
       return { messages: [msg], steps: state.steps + 1 }
     }
@@ -854,6 +916,8 @@ export function buildGraph(maxSteps: number = MAX_STEPS, compactBudget: number =
           used: estimateUsedForGate(workingMsgs, ctx),
           window: ctx.contextWindowTokens,
           tokensBefore: estimateMessagesTokens(workingMsgs),
+          // Overflow recovery counter surface for baseline compare (PR-3 / P0b).
+          hybrid: policyOf(ctx).hybridFill,
         })
         return result
       }
@@ -1142,6 +1206,14 @@ export function buildGraph(maxSteps: number = MAX_STEPS, compactBudget: number =
     }
 
     const pathHitState = { pathHits: pathHits.slice(-50) }
+
+    // Hybrid mid-turn pressure: count only newly appended tool / blocked messages (KD-13).
+    {
+      const newMsgs: BaseMessage[] = [...blockedCalls, ...out]
+      let delta = 0
+      for (const m of newMsgs) delta += estimateMessagesTokens([m])
+      if (delta > 0) addPressureDelta(ensurePressure(ctx), delta)
+    }
 
     if (allResolved) {
       return {

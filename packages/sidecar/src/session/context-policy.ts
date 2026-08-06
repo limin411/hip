@@ -40,7 +40,7 @@ export interface ResolvedContextPolicy {
   gateMode: ContextGateMode
   /**
    * Hybrid mid-turn pressure. Default true (KD-19).
-   * Stored for later hybrid PR; not yet applied in compactNode.
+   * Kill switch: HIP_CONTEXT_HYBRID_FILL=0. Applied in compact/prefire gates.
    */
   hybridFill: boolean
   costCacheReadMultiplier: number

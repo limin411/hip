@@ -23,6 +23,11 @@ import {
   selectKeepUnitsByTokenBudget,
   targetKeepTokens,
   usageFillPercent,
+  createContextPressureState,
+  resetPressureOnUsage,
+  addPressureDelta,
+  reducePressureDelta,
+  hybridUsedTokens,
 } from './context-budget.js'
 
 describe('estimateTextTokens / estimateMessagesTokens', () => {
@@ -110,6 +115,59 @@ describe('effectiveUsedTokens', () => {
     expect(effectiveUsedTokens(100, 200)).toBe(200)
     expect(effectiveUsedTokens(100, null)).toBe(100)
     expect(effectiveUsedTokens(100, 0)).toBe(100)
+  })
+})
+
+describe('hybridUsedTokens / ContextPressureState (PR-3)', () => {
+  it('after tools add N tokens with lastProvider=P, used >= P+N even if full re-estimate is low', () => {
+    const P = 90_000
+    const N = 5_000
+    const pressure = createContextPressureState({ lastProviderContextTokens: P })
+    addPressureDelta(pressure, N)
+    // Full re-estimate systematically underestimates (biased low).
+    const lowEstimate = 10_000
+    const used = hybridUsedTokens(lowEstimate, pressure, true)
+    expect(used).toBeGreaterThanOrEqual(P + N)
+    expect(used).toBe(P + N)
+  })
+
+  it('never double-counts fullEstimate + delta', () => {
+    const pressure = createContextPressureState({
+      lastProviderContextTokens: 50_000,
+      estimatedTokensSinceModel: 2_000,
+    })
+    // fullEstimate already includes tool bodies; hybrid takes max, not sum.
+    expect(hybridUsedTokens(51_000, pressure, true)).toBe(52_000)
+    expect(hybridUsedTokens(60_000, pressure, true)).toBe(60_000)
+  })
+
+  it('hybrid off falls back to effectiveUsedTokens(estimate, lastPrompt)', () => {
+    const pressure = createContextPressureState({
+      lastProviderContextTokens: 90_000,
+      estimatedTokensSinceModel: 5_000,
+    })
+    expect(hybridUsedTokens(10_000, pressure, false, 80_000)).toBe(80_000)
+    expect(hybridUsedTokens(10_000, pressure, false, null)).toBe(90_000)
+  })
+
+  it('resetPressureOnUsage clears delta and sets watermark', () => {
+    const pressure = createContextPressureState({
+      lastProviderContextTokens: 10,
+      estimatedTokensSinceModel: 999,
+      lastModelMessageCount: 1,
+    })
+    resetPressureOnUsage(pressure, 42_000, 7)
+    expect(pressure.lastProviderContextTokens).toBe(42_000)
+    expect(pressure.estimatedTokensSinceModel).toBe(0)
+    expect(pressure.lastModelMessageCount).toBe(7)
+  })
+
+  it('reducePressureDelta clamps at 0', () => {
+    const pressure = createContextPressureState({ estimatedTokensSinceModel: 100 })
+    reducePressureDelta(pressure, 40)
+    expect(pressure.estimatedTokensSinceModel).toBe(60)
+    reducePressureDelta(pressure, 1000)
+    expect(pressure.estimatedTokensSinceModel).toBe(0)
   })
 })
 

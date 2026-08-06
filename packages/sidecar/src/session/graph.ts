@@ -541,7 +541,10 @@ export function buildGraph(maxSteps: number = MAX_STEPS, compactBudget: number =
     }
 
     // 2) Sliding window — multi-Human-turn conversations primarily.
-    const windowResult = applySlidingWindow(working)
+    // Token-aware when contextPolicy.slidingWindowMaxTokens is set (KD-8 / PR-6).
+    const windowResult = applySlidingWindow(working, {
+      maxTokens: policyOf(ctx).slidingWindowMaxTokens,
+    })
     if (windowResult.removed.length > 0) {
       const beforeTok = estimateMessagesTokens(windowResult.removed) + estimateMessagesTokens(windowResult.kept)
       const summary = await ctx.summarizer.summarize(windowResult.removed, { sessionId: ctx.sessionId })

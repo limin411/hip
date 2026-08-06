@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import { SystemMessage, HumanMessage, AIMessage, ToolMessage, type BaseMessage } from '@langchain/core/messages'
-import { applySlidingWindow } from './sliding-window.js'
+import { estimateMessagesTokens } from '../context-budget.js'
+import { applySlidingWindow, shouldApplySlidingWindow } from './sliding-window.js'
 
 describe('applySlidingWindow', () => {
   it('returns all messages when under maxMessages limit', () => {
@@ -149,5 +150,91 @@ describe('applySlidingWindow', () => {
 
     // Order in kept should be: h0, h2, a2
     expect(result.kept.map((m) => m.id)).toEqual(['h0', 'h2', 'a2'])
+  })
+
+  // ── PR-6 / KD-8: token-aware trigger vs message-count hard cap ────────────
+
+  it('does not trigger on tokens when maxTokens is omitted (message-count only)', () => {
+    // Few large messages — well under maxMessages=50, but huge tokens
+    const big = 'x'.repeat(40_000) // ~10k tokens
+    const msgs: BaseMessage[] = [
+      new HumanMessage({ id: 'h0', content: big }),
+      new AIMessage({ id: 'a0', content: big }),
+      new HumanMessage({ id: 'h1', content: big }),
+      new AIMessage({ id: 'a1', content: big }),
+    ]
+    expect(estimateMessagesTokens(msgs)).toBeGreaterThan(30_000)
+    expect(shouldApplySlidingWindow(msgs, { maxMessages: 50 })).toBe(false)
+    const result = applySlidingWindow(msgs, { maxMessages: 50 })
+    expect(result.removed).toHaveLength(0)
+    expect(result.kept).toHaveLength(4)
+  })
+
+  it('triggers on estimated tokens even when under maxMessages hard cap', () => {
+    const big = 'x'.repeat(4_000) // 1000 tokens each
+    const msgs: BaseMessage[] = [
+      new HumanMessage({ id: 'h0', content: big }),
+      new AIMessage({ id: 'a0', content: big }),
+      new HumanMessage({ id: 'h1', content: big }),
+      new AIMessage({ id: 'a1', content: big }),
+      new HumanMessage({ id: 'h2', content: big }),
+      new AIMessage({ id: 'a2', content: big }),
+    ]
+    // 6 messages << maxMessages=50, but tokens ≈ 6000
+    expect(msgs.length).toBeLessThan(50)
+    const tokens = estimateMessagesTokens(msgs)
+    expect(tokens).toBeGreaterThan(5000)
+
+    expect(shouldApplySlidingWindow(msgs, { maxMessages: 50, maxTokens: 1000 })).toBe(true)
+
+    const result = applySlidingWindow(msgs, {
+      maxMessages: 50,
+      maxTokens: 1000,
+      recentTurns: 1,
+    })
+    // First human + last turn kept; middle removed
+    expect(result.removed.length).toBeGreaterThan(0)
+    expect(result.kept[0].id).toBe('h0')
+    expect(result.kept.map((m) => m.id)).toEqual(['h0', 'h2', 'a2'])
+  })
+
+  it('message-count hard cap still fires when maxTokens is high / unset', () => {
+    const msgs: BaseMessage[] = []
+    for (let i = 0; i < 10; i++) {
+      msgs.push(new HumanMessage({ id: `h${i}`, content: `Q${i}` }))
+      msgs.push(new AIMessage({ id: `a${i}`, content: `A${i}` }))
+    }
+    // 20 msgs, tiny tokens — under maxTokens but over maxMessages=10
+    expect(estimateMessagesTokens(msgs)).toBeLessThan(1000)
+    expect(shouldApplySlidingWindow(msgs, { maxMessages: 10, maxTokens: 100_000 })).toBe(true)
+
+    const result = applySlidingWindow(msgs, {
+      maxMessages: 10,
+      maxTokens: 100_000,
+      recentTurns: 2,
+    })
+    expect(result.removed.length).toBeGreaterThan(0)
+    expect(result.kept[0].id).toBe('h0')
+  })
+
+  it('maxTokens <= 0 or non-finite is ignored (no token trigger)', () => {
+    const big = 'x'.repeat(40_000)
+    const msgs: BaseMessage[] = [
+      new HumanMessage({ id: 'h0', content: big }),
+      new AIMessage({ id: 'a0', content: big }),
+    ]
+    expect(shouldApplySlidingWindow(msgs, { maxMessages: 50, maxTokens: 0 })).toBe(false)
+    expect(shouldApplySlidingWindow(msgs, { maxMessages: 50, maxTokens: -1 })).toBe(false)
+    expect(shouldApplySlidingWindow(msgs, { maxMessages: 50, maxTokens: Number.NaN })).toBe(false)
+  })
+
+  it('under both message and token limits returns all messages', () => {
+    const msgs: BaseMessage[] = [
+      new HumanMessage({ id: 'h0', content: 'hi' }),
+      new AIMessage({ id: 'a0', content: 'hello' }),
+    ]
+    const result = applySlidingWindow(msgs, { maxMessages: 50, maxTokens: 10_000, recentTurns: 2 })
+    expect(result.kept).toHaveLength(2)
+    expect(result.removed).toHaveLength(0)
   })
 })

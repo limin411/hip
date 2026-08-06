@@ -366,6 +366,12 @@ export interface ContextConfig {
   pruneProtectTokens?: number
   /** Soft-prune minimum release tokens (later PR). Env: HIP_CONTEXT_PRUNE_MINIMUM_TOKENS. */
   pruneMinimumTokens?: number
+  /**
+   * Optional sliding-window token budget (KD-8 / PR-6).
+   * When set, `applySlidingWindow` also triggers if estimated message tokens exceed this
+   * (in addition to the maxMessages hard cap). Env: HIP_CONTEXT_SLIDING_WINDOW_MAX_TOKENS.
+   */
+  slidingWindowMaxTokens?: number
   /** Cache-read cost multiplier vs input. Default 0.1. Env: HIP_CONTEXT_COST_CACHE_READ_MULT. */
   costCacheReadMultiplier?: number
   /** Cache-write cost multiplier vs input. Default 1.25. Env: HIP_CONTEXT_COST_CACHE_WRITE_MULT. */

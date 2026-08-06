@@ -1,10 +1,17 @@
 import type { BaseMessage } from '@langchain/core/messages'
+import { estimateMessagesTokens } from '../context-budget.js'
 
 export interface SlidingWindowConfig {
   /** Max number of recent turns to keep fully intact. */
   recentTurns: number
-  /** Max total messages before the sliding window kicks in. */
+  /** Max total messages before the sliding window kicks in (hard cap). */
   maxMessages: number
+  /**
+   * Optional token budget. When set (>0), the window also triggers if
+   * `estimateMessagesTokens(messages) > maxTokens` — even under maxMessages.
+   * Uses protocol-backed estimateTextTokens / estimateMessagesTokens (KD-8 / PR-6).
+   */
+  maxTokens?: number
   /** When true, the first user message (task definition) is always preserved. */
   preserveFirstMessage: boolean
 }
@@ -16,17 +23,36 @@ const DEFAULT: SlidingWindowConfig = {
 }
 
 /**
+ * Whether the sliding window should fire for this message list.
+ * Triggers when over the message hard cap **or** (when configured) over maxTokens.
+ */
+export function shouldApplySlidingWindow(
+  messages: readonly BaseMessage[],
+  config: Partial<SlidingWindowConfig> = {},
+): boolean {
+  const cfg = { ...DEFAULT, ...config }
+  if (messages.length > cfg.maxMessages) return true
+  const maxTok = cfg.maxTokens
+  if (typeof maxTok === 'number' && Number.isFinite(maxTok) && maxTok > 0) {
+    // estimateMessagesTokens → protocol estimateTextTokens (ceil chars/4).
+    return estimateMessagesTokens(messages) > maxTok
+  }
+  return false
+}
+
+/**
  * Apply a sliding window to a message array.
  *
- * Strategy: when the message count exceeds `maxMessages`, keep the first user
- * message (the task definition) plus the last N turns intact, and return the
- * remaining "middle" messages as `removed` for summarization.
+ * Strategy: when the message count exceeds `maxMessages` **or** (when set)
+ * estimated tokens exceed `maxTokens`, keep the first user message (the task
+ * definition) plus the last N turns intact, and return the remaining "middle"
+ * messages as `removed` for summarization. `maxMessages` remains a hard cap.
  *
  * A "turn" starts with a HumanMessage and includes everything after it up to
  * (but not including) the next HumanMessage, or the end of the array.
  *
  * @returns `{ kept, removed }` — both are sub-arrays of the original `messages`.
- *          When under the limit, `kept` is a shallow copy of `messages` and
+ *          When under both limits, `kept` is a shallow copy of `messages` and
  *          `removed` is empty.
  */
 export function applySlidingWindow(
@@ -35,7 +61,7 @@ export function applySlidingWindow(
 ): { kept: BaseMessage[]; removed: BaseMessage[] } {
   const cfg = { ...DEFAULT, ...config }
 
-  if (messages.length <= cfg.maxMessages) {
+  if (!shouldApplySlidingWindow(messages, cfg)) {
     return { kept: [...messages], removed: [] }
   }
 

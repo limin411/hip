@@ -9,6 +9,7 @@ import {
 
 const replaceBlocks = vi.fn()
 const insertBlocks = vi.fn()
+const updateBlock = vi.fn()
 const tryParseMarkdownToBlocks = vi.fn((md: string) =>
   md.trim()
     ? [{ id: 'b1', type: 'paragraph', content: md, props: {}, children: [] }]
@@ -21,6 +22,10 @@ const getTextCursorPosition = vi.fn(() => ({
   block: { id: 'b0', type: 'paragraph', content: '', props: {}, children: [] },
 }))
 
+vi.mock('@blocknote/core', () => ({
+  insertOrUpdateBlockForSlashMenu: vi.fn(),
+}))
+
 vi.mock('@blocknote/react', () => ({
   useCreateBlockNote: () => ({
     document: [{ id: 'b0', type: 'paragraph', content: '', props: {}, children: [] }],
@@ -28,18 +33,32 @@ vi.mock('@blocknote/react', () => ({
     blocksToMarkdownLossy,
     replaceBlocks,
     insertBlocks,
+    updateBlock,
     focus,
     setTextCursorPosition,
     getTextCursorPosition,
+    _tiptapEditor: { isDestroyed: false },
   }),
+  SuggestionMenuController: () => null,
+  FormattingToolbarController: () => null,
+  FormattingToolbar: ({ children }: { children?: React.ReactNode }) => (
+    <div>{children}</div>
+  ),
+  BasicTextStyleButton: () => null,
+  BlockTypeSelect: () => null,
+  CreateLinkButton: () => null,
 }))
 
 vi.mock('@blocknote/mantine', () => ({
-  BlockNoteView: (props: { onChange?: () => void }) => (
+  BlockNoteView: (props: {
+    onChange?: () => void
+    children?: React.ReactNode
+  }) => (
     <div data-testid="blocknote-view">
       <button type="button" data-testid="bn-type" onClick={() => props.onChange?.()}>
         type
       </button>
+      {props.children}
     </div>
   ),
 }))
@@ -48,6 +67,12 @@ vi.mock('@mantine/core', () => ({
   MantineProvider: ({ children }: { children: React.ReactNode }) => (
     <div data-testid="mantine">{children}</div>
   ),
+}))
+
+vi.mock('react-i18next', () => ({
+  useTranslation: () => ({
+    t: (k: string, opts?: { defaultValue?: string }) => opts?.defaultValue ?? k,
+  }),
 }))
 
 vi.mock('@/domain/knowledge/importAsset', () => ({
@@ -105,7 +130,6 @@ Body`
         />,
       )
     })
-    // Clear seed skip flag
     await act(async () => {
       await new Promise((r) => setTimeout(r, 20))
     })

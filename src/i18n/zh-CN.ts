@@ -2746,9 +2746,12 @@ export const zhCN = {
         loadFailed: '无法加载文档',
         saving: '保存中…',
         saved: '已保存',
+        saveRetry: '重试',
         liveLoading: '正在加载实时编辑器…',
         liveParseFailed: '实时编辑器无法打开此文档，已切换到源码模式。',
         largeDocForceSource: '文档过大，实时编辑不可用，已切换到源码模式。',
+        largeDocHint:
+          '文档较大，为性能考虑当前使用源码模式编辑。你仍可完整编辑全文。',
       },
       wiki: {
         createTitle: '创建文档？',

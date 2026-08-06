@@ -2706,7 +2706,9 @@ export const zhTW = {
       "saved": "已儲存",
       "liveLoading": "正在載入即時編輯器…",
       "liveParseFailed": "即時編輯器無法開啟此文件，已切換到原始碼模式。",
-      "largeDocForceSource": "文件過大，即時編輯不可用，已切換到原始碼模式。"
+      "largeDocForceSource": "文件過大，即時編輯不可用，已切換到原始碼模式。",
+      "saveRetry": "重試",
+      "largeDocHint": "文件較大，為效能考慮目前使用原始碼模式編輯。你仍可完整編輯全文。"
     },
     "wiki": {
       "createTitle": "建立文件？",

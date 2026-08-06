@@ -2814,10 +2814,13 @@ export const en = {
         loadFailed: 'Could not load document',
         saving: 'Saving…',
         saved: 'Saved',
+        saveRetry: 'Retry',
         liveLoading: 'Loading live editor…',
         liveParseFailed: 'Live editor could not open this document. Switched to Source.',
         largeDocForceSource:
           'Document is too large for Live edit. Switched to Source.',
+        largeDocHint:
+          'This document is large, so editing uses Source mode for performance. You can still edit the full document.',
       },
       wiki: {
         createTitle: 'Create document?',

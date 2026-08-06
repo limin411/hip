@@ -22,11 +22,61 @@ export const KNOWLEDGE_LIVE_FLAG_KEY = 'hip-knowledge-live'
 export const KNOWLEDGE_EDITOR_MODE_PREF_KEY = 'hip-knowledge-editor-mode'
 
 /**
+ * localStorage: per-document mode map `{ [docId]: 'live' | 'source' }`.
+ * Spec P1.6 — remember Source choice per doc so open does not bounce users.
+ */
+export const KNOWLEDGE_EDITOR_MODE_BY_DOC_KEY = 'hip-knowledge-editor-mode-by-doc'
+
+/**
  * Autosave default when user types in a writable surface.
  * Legacy `preview` is treated as Live (writable) if still present in store.
  */
 export function shouldAutosave(mode: EditorMode): boolean {
   return mode === 'live' || mode === 'source' || mode === 'preview'
+}
+
+function readDocModeMap(): Record<string, WritableEditorMode> {
+  if (typeof localStorage === 'undefined') return {}
+  try {
+    const raw = localStorage.getItem(KNOWLEDGE_EDITOR_MODE_BY_DOC_KEY)
+    if (!raw) return {}
+    const parsed = JSON.parse(raw) as unknown
+    if (!parsed || typeof parsed !== 'object') return {}
+    const out: Record<string, WritableEditorMode> = {}
+    for (const [k, v] of Object.entries(parsed as Record<string, unknown>)) {
+      if (v === 'live' || v === 'source') out[k] = v
+    }
+    return out
+  } catch {
+    return {}
+  }
+}
+
+/** Per-doc mode if stored; otherwise null (caller defaults to live). */
+export function loadDocEditorMode(docId: string): WritableEditorMode | null {
+  if (!docId || !isKnowledgeLiveEnabled()) return null
+  return readDocModeMap()[docId] ?? null
+}
+
+/** Persist per-doc mode (also updates global last-writable pref). */
+export function persistDocEditorMode(
+  docId: string,
+  mode: WritableEditorMode,
+): void {
+  if (!docId || typeof localStorage === 'undefined') return
+  try {
+    const map = readDocModeMap()
+    map[docId] = mode
+    // Cap map size to avoid unbounded growth
+    const keys = Object.keys(map)
+    if (keys.length > 200) {
+      for (const k of keys.slice(0, keys.length - 200)) delete map[k]
+    }
+    localStorage.setItem(KNOWLEDGE_EDITOR_MODE_BY_DOC_KEY, JSON.stringify(map))
+    localStorage.setItem(KNOWLEDGE_EDITOR_MODE_PREF_KEY, mode)
+  } catch {
+    // ignore quota
+  }
 }
 
 /**

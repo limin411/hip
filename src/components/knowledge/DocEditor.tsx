@@ -57,29 +57,31 @@ export interface DocEditorProps {
 
 export type DocEditorHandle = {
   getView: () => EditorView | null
+  focus: () => boolean
 }
 
-/** Token-driven CM chrome — no stock light/dark skin (K26). */
+/** Token-driven CM chrome — shared `--kb-*` with Live (P0.1). */
 function buildProseTheme(isDark: boolean) {
   return EditorView.theme(
     {
       '&': {
-        fontSize: '14px',
+        fontSize: 'var(--kb-font-body, 15px)',
         height: '100%',
         color: 'var(--text-primary)',
         backgroundColor: 'transparent',
       },
       '.cm-scroller': {
-        fontFamily:
-          'ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif',
-        lineHeight: '1.7',
+        fontFamily: 'var(--kb-font-family, ui-sans-serif, system-ui, sans-serif)',
+        lineHeight: 'var(--kb-line-body, 1.7)',
         height: '100%',
       },
       '.cm-content': {
-        padding: '4px 2px 96px',
+        padding: '4px 2px var(--kb-pad-bottom, 8rem)',
         caretColor: 'var(--text-primary)',
         minHeight: '100%',
         color: 'var(--text-primary)',
+        maxWidth: 'var(--kb-measure, 46rem)',
+        marginInline: 'auto',
       },
       '.cm-line': {
         padding: '0 2px',
@@ -101,7 +103,8 @@ function buildProseTheme(isDark: boolean) {
         backgroundColor: 'color-mix(in srgb, var(--state-hover) 55%, transparent)',
       },
       '.cm-selectionBackground, &.cm-focused .cm-selectionBackground': {
-        backgroundColor: 'color-mix(in srgb, var(--accent) 22%, transparent) !important',
+        backgroundColor:
+          'var(--kb-selection, color-mix(in srgb, var(--accent) 22%, transparent)) !important',
       },
       '.cm-cursor, .cm-dropCursor': {
         borderLeftColor: 'var(--text-primary)',
@@ -258,6 +261,12 @@ export const DocEditor = forwardRef<DocEditorHandle, DocEditorProps>(function Do
 
   useImperativeHandle(ref, () => ({
     getView: () => viewRef.current,
+    focus: () => {
+      const view = viewRef.current
+      if (!view) return false
+      view.focus()
+      return true
+    },
   }))
 
   // Stable extensions; theme swaps via Compartment so keymap/state are not rebuilt.
@@ -343,6 +352,11 @@ export const DocEditor = forwardRef<DocEditorHandle, DocEditorProps>(function Do
 
     const slashTracker = EditorView.updateListener.of((update) => {
       if (!update.docChanged && !update.selectionSet) return
+      // IME: do not open/update slash menu while composing
+      if (update.view.composing) {
+        updateSlashMatch(null)
+        return
+      }
       updateSlashMatch(readSlashMatch(update.view))
     })
 

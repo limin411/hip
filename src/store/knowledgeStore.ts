@@ -47,6 +47,8 @@ import {
 import { isSpaceNameTaken, normalizeSpaceName } from '@/domain/knowledge/spaceName'
 import {
   type EditorMode,
+  loadDocEditorMode,
+  persistDocEditorMode,
   persistEditorModePref,
   resolveEditorMode,
   shouldAutosave,
@@ -1498,10 +1500,10 @@ export const useKnowledgeStore = create<KnowledgeState>((set, get) => ({
       }
 
 
-      // Doc path: Always real-time (Live). Source only when Live is off or doc is too large.
-      // Do not restore a prior Source preference — product is Notion/Feishu-style.
-      let editorMode = resolveEditorMode('live')
-      // Large docs force Source (Live / Milkdown cost); toast once per open.
+      // Prefer per-doc mode memory (P1.6); default Live when unset. Large docs force Source.
+      const remembered = loadDocEditorMode(id)
+      let editorMode = resolveEditorMode(remembered ?? 'live')
+      // Large docs force Source (Live cost); toast once per open.
       if (editorMode === 'live' && body.length > KNOWLEDGE_LARGE_DOC_CHARS) {
         editorMode = 'source'
         toast.message(i18n.t('knowledge.doc.largeDocForceSource'))
@@ -1575,6 +1577,8 @@ export const useKnowledgeStore = create<KnowledgeState>((set, get) => ({
     }
     if (next === 'live' || next === 'source') {
       persistEditorModePref(next)
+      const docId = get().activeDocId
+      if (docId) persistDocEditorMode(docId, next)
     }
   },
 

@@ -65,9 +65,9 @@ export function revealLineInCodeMirror(view: EditorView, lineNumber: number): bo
 }
 
 /**
- * Best-effort: scroll the nth heading (1-based among h1–h6, document order)
- * matching exact textContent under `root`. Used by Live editor TOC jumps
- * (Milkdown headings have no stable ids).
+ * Best-effort: scroll the nth heading (0-based occurrence among h1–h6)
+ * matching exact textContent under `root`. Used by Live TOC jumps when
+ * block-id scroll is unavailable.
  */
 export function revealHeadingInRoot(
   root: HTMLElement,

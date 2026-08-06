@@ -90,6 +90,7 @@ describe('knowledgeStore openDoc editorMode default', () => {
     knowledgeDeleteSpace.mockReset()
     localStorage.removeItem('hip-knowledge-live')
     localStorage.removeItem('hip-knowledge-editor-mode')
+    localStorage.removeItem('hip-knowledge-editor-mode-by-doc')
     useKnowledgeStore.setState({
       loaded: true,
       spaces: [{ id: 'spc_1', name: 'S', createdAt: 1, updatedAt: 1 }],
@@ -140,11 +141,21 @@ describe('knowledgeStore openDoc editorMode default', () => {
     expect(useKnowledgeStore.getState().editorMode).toBe('source')
   })
 
-  it('openDoc always opens Live even when a prior source pref is stored', async () => {
+  it('openDoc opens Live when only global source pref is stored (no per-doc memory)', async () => {
     localStorage.setItem('hip-knowledge-editor-mode', 'source')
     knowledgeReadDoc.mockResolvedValueOnce('# hello')
     await useKnowledgeStore.getState().openDoc('doc_1')
     expect(useKnowledgeStore.getState().editorMode).toBe('live')
+  })
+
+  it('openDoc restores per-doc Source memory', async () => {
+    localStorage.setItem(
+      'hip-knowledge-editor-mode-by-doc',
+      JSON.stringify({ doc_1: 'source' }),
+    )
+    knowledgeReadDoc.mockResolvedValueOnce('# hello')
+    await useKnowledgeStore.getState().openDoc('doc_1')
+    expect(useKnowledgeStore.getState().editorMode).toBe('source')
   })
 
   it('openDoc forces source when live on but body is large', async () => {

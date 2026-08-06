@@ -1,9 +1,9 @@
 /**
- * Knowledge slash `/` insert catalog (P1.2).
+ * Knowledge slash `/` insert catalog.
  *
- * Shared by Source (CodeMirror) and Live (Milkdown host when present).
- * Inserts are Markdown snippets — Live serializes via its own pipeline.
- * Live host should import these symbols (do not fork a Crepe slash plugin).
+ * Shared by Source (CodeMirror) and Live (BlockNote).
+ * Source inserts Markdown snippets; Live maps via `blockNoteSlash.ts`
+ * (native blocks + dialect-preserving carriers).
  */
 
 export type KnowledgeSlashId =

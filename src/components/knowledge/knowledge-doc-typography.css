@@ -1,0 +1,29 @@
+/**
+ * Shared knowledge doc type scale (Live + Source).
+ * Host: [data-testid="knowledge-doc-paper"]
+ */
+[data-testid='knowledge-doc-paper'] {
+  --kb-font-body: 15px;
+  --kb-line-body: 1.7;
+  --kb-font-family:
+    ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI',
+    'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', sans-serif;
+  --kb-font-mono:
+    ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono',
+    'Courier New', monospace;
+  --kb-h1-size: 1.75em;
+  --kb-h2-size: 1.375em;
+  --kb-h3-size: 1.15em;
+  --kb-heading-weight: 600;
+  --kb-block-gap: 0.2rem;
+  --kb-para-gap: 0.35em;
+  --kb-measure: min(100%, 46rem);
+  --kb-pad-bottom: max(8rem, 30vh);
+  --kb-selection: color-mix(in srgb, var(--accent, #3b82f6) 22%, transparent);
+}
+
+.knowledge-doc-measure {
+  width: 100%;
+  max-width: var(--kb-measure);
+  margin-inline: auto;
+}

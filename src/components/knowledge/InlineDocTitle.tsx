@@ -96,7 +96,7 @@ export function InlineDocTitle({
         commit()
       }}
       onKeyDown={(e) => {
-        if (e.key === 'Enter') {
+        if (e.key === 'Enter' || e.key === 'Tab') {
           e.preventDefault()
           skipBlurCommit.current = true
           commit()

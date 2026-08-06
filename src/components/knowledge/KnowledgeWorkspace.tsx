@@ -271,17 +271,21 @@ export function KnowledgeWorkspace() {
       // If CM not mounted yet, leave pending — effect re-runs when mode/body settles.
       return
     }
-    // Live (BlockNote): headings lack stable ids — match by text (nth occurrence).
-    const liveRoot =
-      document.querySelector('[data-testid="knowledge-doc-live-editor"]') ??
-      document.querySelector('.knowledge-blocknote-editor')
-    if (!(liveRoot instanceof HTMLElement)) return
+    // Live (BlockNote): prefer block id via scrollToHeading; fallback DOM text match.
     const body = useKnowledgeStore.getState().draftBody || useKnowledgeStore.getState().docBody
     let occurrence = 0
     for (const it of extractDocOutline(body)) {
       if (it.line === item.line) break
       if (it.text === item.text) occurrence += 1
     }
+    if (liveEditorRef.current?.scrollToHeading?.(item.text, occurrence)) {
+      clear()
+      return
+    }
+    const liveRoot =
+      document.querySelector('[data-testid="knowledge-doc-live-editor"]') ??
+      document.querySelector('.knowledge-blocknote-editor')
+    if (!(liveRoot instanceof HTMLElement)) return
     revealHeadingInRoot(liveRoot, item.text, occurrence)
     clear()
   }, [pendingOutlineJump, activeDocId, editorMode, nodes])
@@ -345,12 +349,12 @@ export function KnowledgeWorkspace() {
   // Single-canvas Live (Notion/Feishu). Source only as silent fallback:
   // flag off, large doc, parse fail, or explicit source. Never mount DocReader
   // as a writing mode; legacy `preview` normalizes to live for canvas selection.
-  // Board leaves never mount Milkdown / Source CM (Issue 6).
+  // Board leaves never mount Live / Source CM.
   const liveEnabled = isKnowledgeLiveEnabled()
   /**
    * Live parse-fail suppress: only blocks the *current* Live attempt token.
    * A later openDoc / setEditorMode('live') bumps the token so e2e and users
-   * can retry Milkdown instead of being stuck on Source for the session.
+   * can retry Live instead of being stuck on Source for the session.
    */
   const liveAttemptTokenRef = useRef(0)
   const [liveBlock, setLiveBlock] = useState<{ docId: string; token: number } | null>(
@@ -808,20 +812,93 @@ export function KnowledgeWorkspace() {
               })
             )}
           </div>
-          {(saveState === 'saving' || saveState === 'saved') && (
+          {(saveState === 'saving' ||
+            saveState === 'saved' ||
+            saveState === 'error') && (
             <span
-              className="flex shrink-0 items-center gap-1.5 text-meta text-ink-tertiary"
+              className={cn(
+                'flex shrink-0 items-center gap-1.5 text-meta',
+                saveState === 'error' ? 'text-danger' : 'text-ink-tertiary',
+              )}
               data-testid="knowledge-save-status"
             >
               <span
                 className={cn(
                   'h-1.5 w-1.5 rounded-full',
-                  saveState === 'saving' ? 'bg-warning animate-pulse' : 'bg-success',
+                  saveState === 'saving'
+                    ? 'bg-warning animate-pulse'
+                    : saveState === 'error'
+                      ? 'bg-danger'
+                      : 'bg-success',
                 )}
                 aria-hidden
               />
-              {saveState === 'saving' ? t('knowledge.doc.saving') : t('knowledge.doc.saved')}
+              {saveState === 'saving'
+                ? t('knowledge.doc.saving')
+                : saveState === 'error'
+                  ? t('knowledge.doc.saveFailed')
+                  : t('knowledge.doc.saved')}
+              {saveState === 'error' ? (
+                <button
+                  type="button"
+                  className="ml-1 rounded-sm px-1 text-meta font-medium text-accent-strong hover:underline"
+                  data-testid="knowledge-save-retry"
+                  onClick={() => void flushSave()}
+                >
+                  {t('knowledge.doc.saveRetry')}
+                </button>
+              ) : null}
             </span>
+          )}
+          {activeDocId && !isBoard && liveEnabled && !liveBlocked && (
+            <div
+              className="flex shrink-0 items-center rounded-md border border-border bg-surface-muted/70 p-0.5"
+              role="group"
+              aria-label={t('knowledge.doc.modeLabel')}
+              data-testid="knowledge-editor-mode-toggle"
+            >
+              <button
+                type="button"
+                data-testid="knowledge-view-live"
+                disabled={liveSuppressed && !showLiveEditor}
+                title={
+                  liveSuppressed && !showLiveEditor
+                    ? t('knowledge.doc.largeDocForceSource')
+                    : undefined
+                }
+                className={cn(
+                  'rounded-sm px-2 py-0.5 text-meta transition-colors',
+                  showLiveEditor
+                    ? 'bg-surface font-medium text-ink shadow-sm'
+                    : 'text-ink-secondary hover:text-ink',
+                  liveSuppressed && !showLiveEditor && 'opacity-40',
+                )}
+                onClick={() => {
+                  if (showLiveEditor) return
+                  liveEditorRef.current?.flushDraft()
+                  void setEditorMode('live')
+                }}
+              >
+                {t('knowledge.doc.live')}
+              </button>
+              <button
+                type="button"
+                data-testid="knowledge-view-source"
+                className={cn(
+                  'rounded-sm px-2 py-0.5 text-meta transition-colors',
+                  showSourceEditor
+                    ? 'bg-surface font-medium text-ink shadow-sm'
+                    : 'text-ink-secondary hover:text-ink',
+                )}
+                onClick={() => {
+                  if (showSourceEditor) return
+                  liveEditorRef.current?.flushDraft()
+                  void setEditorMode('source')
+                }}
+              >
+                {t('knowledge.doc.source')}
+              </button>
+            </div>
           )}
           {activeDocId && !isBoard && (
             /* modal={false}: modal menu + version-history / save-as-template Modal both lock
@@ -838,30 +915,6 @@ export function KnowledgeWorkspace() {
                 </button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
-                {showLiveEditor ? (
-                  <DropdownMenuItem
-                    data-testid="knowledge-view-source"
-                    onClick={() => void setEditorMode('source')}
-                  >
-                    {t('knowledge.doc.viewSource')}
-                  </DropdownMenuItem>
-                ) : showSourceEditor && liveEnabled && !liveSuppressed ? (
-                  <DropdownMenuItem
-                    data-testid="knowledge-view-live"
-                    onClick={() => void setEditorMode('live')}
-                  >
-                    {t('knowledge.doc.viewLive')}
-                  </DropdownMenuItem>
-                ) : showSourceEditor && liveEnabled && liveSuppressed ? (
-                  <DropdownMenuItem
-                    data-testid="knowledge-view-live"
-                    disabled
-                    title={t('knowledge.doc.largeDocForceSource')}
-                  >
-                    {t('knowledge.doc.viewLive')}
-                  </DropdownMenuItem>
-                ) : null}
-                {(showLiveEditor || showSourceEditor) && <DropdownMenuSeparator />}
                 <DropdownMenuItem
                   data-testid="knowledge-save-version"
                   onClick={() => void onSaveVersion()}
@@ -1000,6 +1053,9 @@ export function KnowledgeWorkspace() {
                 docId={activeDocId}
                 title={activeNode?.title ?? t('knowledge.doc.untitled')}
                 onCommit={(title) => void renameNode(activeDocId, title)}
+                onEnterCommit={() => {
+                  editorRef.current?.focus()
+                }}
               />
               {liveSuppressed ? (
                 <div
@@ -1007,7 +1063,7 @@ export function KnowledgeWorkspace() {
                   data-testid="knowledge-large-doc-banner"
                   role="status"
                 >
-                  {t('knowledge.doc.largeDocForceSource')}
+                  {t('knowledge.doc.largeDocHint')}
                 </div>
               ) : null}
               <div className="mt-3 mb-2 flex shrink-0 items-center gap-0.5 rounded-lg border border-border/80 bg-surface-muted/60 px-1 py-0.5">

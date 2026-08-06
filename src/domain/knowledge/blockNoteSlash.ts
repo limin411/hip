@@ -1,0 +1,230 @@
+/**
+ * Map hip KnowledgeSlash catalog → BlockNote slash menu actions.
+ * Single catalog: slashMenu.ts. Native blocks use BN API; dialects preserve MD.
+ */
+import { insertOrUpdateBlockForSlashMenu } from '@blocknote/core'
+import type { DefaultReactSuggestionItem } from '@blocknote/react'
+import {
+  filterSlashItems,
+  KNOWLEDGE_SLASH_ITEMS,
+  type KnowledgeSlashId,
+  type KnowledgeSlashItem,
+  SLASH_GROUP_ORDER,
+} from './slashMenu'
+
+/** Minimal BlockNote editor surface used by slash mapping (avoids deep generic coupling). */
+export type BlockNoteSlashEditor = {
+  getTextCursorPosition: () => { block: { id: string } }
+  updateBlock: (block: { id: string }, update: Record<string, unknown>) => unknown
+  insertBlocks: (
+    blocks: Record<string, unknown>[],
+    ref: { id: string },
+    placement: 'before' | 'after',
+  ) => unknown
+  setTextCursorPosition: (block: unknown, placement?: 'start' | 'end') => void
+  tryParseMarkdownToBlocks: (md: string) => Record<string, unknown>[]
+  focus: () => void
+}
+
+export type BlockNoteSlashHandlers = {
+  /** Open file attach for image slash when space is available. */
+  onRequestAttach?: () => void
+  /** After wiki skeleton insert — open picker. */
+  onWikiInsert?: () => void
+  /** Resolve i18n label for a slash id. */
+  labelFor: (id: KnowledgeSlashId, fallback: string) => string
+  /** Resolve i18n group label. */
+  groupLabelFor: (group: string, fallback: string) => string
+}
+
+const GROUP_FALLBACK: Record<string, string> = {
+  basic: 'Basic',
+  list: 'List',
+  media: 'Media',
+  advanced: 'Advanced',
+}
+
+function emptyTable3x2(): Record<string, unknown> {
+  return {
+    type: 'table',
+    content: {
+      type: 'tableContent',
+      rows: [
+        { cells: ['', '', ''] },
+        { cells: ['', '', ''] },
+        { cells: ['', '', ''] },
+      ],
+    },
+  }
+}
+
+function insertNative(
+  editor: BlockNoteSlashEditor,
+  block: Record<string, unknown>,
+): void {
+  insertOrUpdateBlockForSlashMenu(
+    editor as Parameters<typeof insertOrUpdateBlockForSlashMenu>[0],
+    block as Parameters<typeof insertOrUpdateBlockForSlashMenu>[1],
+  )
+}
+
+/** Insert MD snippet as blocks (dialect / fallback). */
+export function insertMarkdownBlocks(
+  editor: BlockNoteSlashEditor,
+  md: string,
+): boolean {
+  try {
+    const blocks = editor.tryParseMarkdownToBlocks(md)
+    if (!blocks.length) return false
+    const current = editor.getTextCursorPosition().block
+    insertOrUpdateBlockForSlashMenu(
+      editor as Parameters<typeof insertOrUpdateBlockForSlashMenu>[0],
+      blocks[0] as Parameters<typeof insertOrUpdateBlockForSlashMenu>[1],
+    )
+    if (blocks.length > 1) {
+      const after = editor.getTextCursorPosition().block
+      editor.insertBlocks(blocks.slice(1), after, 'after')
+    }
+    void current
+    return true
+  } catch {
+    return false
+  }
+}
+
+export function applyKnowledgeSlashItem(
+  editor: BlockNoteSlashEditor,
+  item: KnowledgeSlashItem,
+  handlers: Pick<BlockNoteSlashHandlers, 'onRequestAttach' | 'onWikiInsert'>,
+): void {
+  switch (item.id) {
+    case 'h1':
+      insertNative(editor, { type: 'heading', props: { level: 1 } })
+      return
+    case 'h2':
+      insertNative(editor, { type: 'heading', props: { level: 2 } })
+      return
+    case 'h3':
+      insertNative(editor, { type: 'heading', props: { level: 3 } })
+      return
+    case 'quote':
+      insertNative(editor, { type: 'quote' })
+      return
+    case 'hr':
+      insertNative(editor, { type: 'divider' })
+      return
+    case 'bullet':
+      insertNative(editor, { type: 'bulletListItem' })
+      return
+    case 'ordered':
+      insertNative(editor, { type: 'numberedListItem' })
+      return
+    case 'task':
+      insertNative(editor, { type: 'checkListItem' })
+      return
+    case 'fence':
+      insertNative(editor, { type: 'codeBlock', props: { language: '' } })
+      return
+    case 'table':
+      insertNative(editor, emptyTable3x2())
+      return
+    case 'image':
+      if (handlers.onRequestAttach) {
+        handlers.onRequestAttach()
+        return
+      }
+      insertMarkdownBlocks(editor, item.insert)
+      return
+    case 'mermaid':
+      insertNative(editor, {
+        type: 'codeBlock',
+        props: { language: 'mermaid' },
+        content: 'flowchart LR\n  A --> B',
+      })
+      return
+    case 'svg':
+      insertNative(editor, {
+        type: 'codeBlock',
+        props: { language: 'svg' },
+        content: '',
+      })
+      return
+    case 'math':
+      // Preserve $$ fence via MD parse so Source round-trip keeps math form when possible.
+      if (!insertMarkdownBlocks(editor, item.insert)) {
+        insertNative(editor, {
+          type: 'codeBlock',
+          props: { language: 'math' },
+          content: '',
+        })
+      }
+      return
+    case 'callout':
+      if (!insertMarkdownBlocks(editor, item.insert)) {
+        insertNative(editor, {
+          type: 'quote',
+          content: '[!note] Title',
+        })
+      }
+      return
+    case 'embed':
+      insertMarkdownBlocks(editor, item.insert)
+      return
+    case 'wiki':
+      insertMarkdownBlocks(editor, '[[]]')
+      handlers.onWikiInsert?.()
+      return
+    default:
+      insertMarkdownBlocks(editor, item.insert)
+  }
+}
+
+export function buildKnowledgeSlashItems(
+  editor: BlockNoteSlashEditor,
+  handlers: BlockNoteSlashHandlers,
+  query: string,
+): DefaultReactSuggestionItem[] {
+  const filtered = filterSlashItems(KNOWLEDGE_SLASH_ITEMS, query)
+  // Stable group order for empty query already in filterSlashItems
+  const ordered = [...filtered].sort(
+    (a, b) =>
+      SLASH_GROUP_ORDER.indexOf(a.group) - SLASH_GROUP_ORDER.indexOf(b.group) ||
+      a.name.localeCompare(b.name),
+  )
+
+  return ordered.map((item) => {
+    const aliases = [
+      item.name,
+      ...item.keywords,
+      ...item.keywordsZh,
+      item.id,
+    ]
+    return {
+      title: handlers.labelFor(item.id, item.label),
+      group: handlers.groupLabelFor(item.group, GROUP_FALLBACK[item.group] ?? item.group),
+      aliases,
+      subtext: item.name,
+      onItemClick: () => {
+        applyKnowledgeSlashItem(editor, item, handlers)
+        try {
+          editor.focus()
+        } catch {
+          // ignore
+        }
+      },
+    }
+  })
+}
+
+/** Dialect / advanced fence markers that must survive Live serialize when possible. */
+export const DIALECT_PRESERVE_MARKERS: ReadonlyArray<{
+  id: KnowledgeSlashId
+  probe: RegExp
+}> = [
+  { id: 'mermaid', probe: /```mermaid\b/i },
+  { id: 'svg', probe: /```svg\b/i },
+  { id: 'math', probe: /\$\$[\s\S]*?\$\$|```math\b/i },
+  { id: 'callout', probe: /\[!note\]|\[!tip\]|\[!warning\]|\[!important\]/i },
+  { id: 'embed', probe: /!\[\[[^\]]*\]\]/ },
+  { id: 'wiki', probe: /\[\[[^\]]+\]\]/ },
+]

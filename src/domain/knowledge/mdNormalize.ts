@@ -20,8 +20,8 @@ export function normalizeMd(s: string): string {
   out = out.replace(/^(\s*)[*+](\s+(?:\[[ xX]\]\s+)?)/gm, '$1-$2')
   // task checkbox letter → lowercase x
   out = out.replace(/^(\s*-\s+\[)X(\]\s+)/gm, '$1x$2')
-  // milkdown inserts blank lines between sibling items of the *same* list kind
-  // (ul↔ul or ol↔ol). Keep blank lines that separate different list blocks.
+  // Live/MD writers may insert blank lines between sibling items of the *same*
+  // list kind (ul↔ul or ol↔ol). Keep blank lines that separate different list blocks.
   out = out.replace(/(^|\n)([ \t]*[-*][^\n]*)\n\n(?=[ \t]*[-*])/g, '$1$2\n')
   out = out.replace(/(^|\n)([ \t]*\d+\.[^\n]*)\n\n(?=[ \t]*\d+\.)/g, '$1$2\n')
   // table separator: | - | --- | :---: | → | --- |

@@ -2705,7 +2705,9 @@ export const ko = {
       "saved": "저장됨",
       "liveLoading": "라이브 편집기 로딩 중…",
       "liveParseFailed": "라이브 편집기에서 이 문서를 열 수 없습니다. 소스 모드로 전환했습니다.",
-      "largeDocForceSource": "문서가 너무 커서 라이브 편집이 불가능합니다. 소스 모드로 전환했습니다."
+      "largeDocForceSource": "문서가 너무 커서 라이브 편집이 불가능합니다. 소스 모드로 전환했습니다.",
+      "saveRetry": "다시 시도",
+      "largeDocHint": "문서가 커서 성능상 소스 모드로 편집합니다. 전체 문서는 계속 편집할 수 있습니다."
     },
     "wiki": {
       "createTitle": "문서를 만들까요?",

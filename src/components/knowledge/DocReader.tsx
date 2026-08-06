@@ -1,3 +1,7 @@
+/**
+ * Read-only Markdown body (preview / embed / export paths).
+ * Not a writing surface — Live (BlockNote) and Source (CodeMirror) own editing.
+ */
 import { createElement, useCallback, useMemo, useRef, type ComponentType } from 'react'
 import type { Components, ExtraProps } from 'react-markdown'
 import type { AnchorHTMLAttributes, ClassAttributes } from 'react'

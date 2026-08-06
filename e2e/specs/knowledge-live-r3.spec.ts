@@ -62,6 +62,7 @@ describe('knowledge Live R3 hard contracts @knowledge @core', () => {
     const live = await browser.$('[data-testid="knowledge-doc-live-editor"]')
     await live.waitForExist({ timeout: 20000 })
 
+    // Legacy segmented Preview toggle must stay gone; Visual|Source is primary chrome.
     expect(
       await (await browser.$('[data-testid="knowledge-edit-toggle"]')).isExisting(),
     ).toBe(false)
@@ -69,14 +70,15 @@ describe('knowledge Live R3 hard contracts @knowledge @core', () => {
       await (await browser.$('[data-testid="knowledge-edit-toggle-preview"]')).isExisting(),
     ).toBe(false)
     expect(
-      await (await browser.$('[data-testid="knowledge-edit-toggle-live"]')).isExisting(),
-    ).toBe(false)
+      await (await browser.$('[data-testid="knowledge-editor-mode-toggle"]')).isExisting(),
+    ).toBe(true)
     expect(
       await (await browser.$('[data-testid="knowledge-doc-reader"]')).isExisting(),
     ).toBe(false)
   })
 
-  // Live slash was Milkdown `knowledge-slash-*`; BlockNote uses its own slash UI.
+  // Hip slash is wired via BlockNote SuggestionMenuController; keep soft until
+  // contenteditable slash e2e is stable on CI.
   it.skip('KR2: Live slash inserts heading — retarget to BlockNote slash UI', async () => {
     await setKnowledgeLiveFlag(true)
     await createNewDocFromMenu()

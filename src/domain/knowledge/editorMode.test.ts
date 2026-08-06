@@ -1,10 +1,13 @@
 // @vitest-environment happy-dom
 import { afterEach, describe, expect, it } from 'vitest'
 import {
+  KNOWLEDGE_EDITOR_MODE_BY_DOC_KEY,
   KNOWLEDGE_EDITOR_MODE_PREF_KEY,
   KNOWLEDGE_LIVE_FLAG_KEY,
   isKnowledgeLiveEnabled,
+  loadDocEditorMode,
   loadEditorModePref,
+  persistDocEditorMode,
   persistEditorModePref,
   resolveEditorMode,
   shouldAutosave,
@@ -25,6 +28,7 @@ describe('live flag + editor mode pref (product-on Live / 所见即所得)', () 
   afterEach(() => {
     localStorage.removeItem(KNOWLEDGE_LIVE_FLAG_KEY)
     localStorage.removeItem(KNOWLEDGE_EDITOR_MODE_PREF_KEY)
+    localStorage.removeItem(KNOWLEDGE_EDITOR_MODE_BY_DOC_KEY)
   })
 
   it('isKnowledgeLiveEnabled defaults true when key absent (WYSIWYG product default)', () => {
@@ -79,5 +83,14 @@ describe('live flag + editor mode pref (product-on Live / 所见即所得)', () 
 
   it('resolveEditorMode maps deprecated preview writing mode → live', () => {
     expect(resolveEditorMode('preview')).toBe('live')
+  })
+
+  it('persistDocEditorMode / loadDocEditorMode round-trip', () => {
+    expect(loadDocEditorMode('doc_a')).toBeNull()
+    persistDocEditorMode('doc_a', 'source')
+    expect(loadDocEditorMode('doc_a')).toBe('source')
+    expect(loadEditorModePref()).toBe('source')
+    persistDocEditorMode('doc_a', 'live')
+    expect(loadDocEditorMode('doc_a')).toBe('live')
   })
 })

@@ -7,6 +7,12 @@ import {
   SUBAGENT_COMPACT_THRESHOLD_PERCENT,
   TARGET_THRESHOLD_PERCENT,
 } from './context-budget.js'
+import {
+  resolveCachePolicy,
+  resolvePromptCacheKeyMode,
+  type CachePolicyMode,
+  type PromptCacheKeyMode,
+} from './cache-policy.js'
 
 /** Keep aligned with prefire.PREFIRE_LEAD_PERCENT (avoid circular import). */
 const DEFAULT_PREFIRE_LEAD_PERCENT = 10
@@ -20,6 +26,10 @@ export interface ResolvedContextPolicy {
   twoPass: boolean
   memoryFlushBeforeCompact: boolean
   toolOutputMaxBytes: number
+  /** Provider cache breakpoints. Default auto. */
+  cachePolicy: CachePolicyMode
+  /** OpenAI prompt_cache_key source. Default session. */
+  promptCacheKey: PromptCacheKeyMode
 }
 
 export const DEFAULT_CONTEXT_POLICY: ResolvedContextPolicy = {
@@ -30,6 +40,8 @@ export const DEFAULT_CONTEXT_POLICY: ResolvedContextPolicy = {
   twoPass: true,
   memoryFlushBeforeCompact: true,
   toolOutputMaxBytes: DEFAULT_TOOL_OUTPUT_MAX_BYTES,
+  cachePolicy: 'auto',
+  promptCacheKey: 'session',
 }
 
 function clampPercent(n: number, fallback: number): number {
@@ -63,6 +75,8 @@ function envInt(name: string): number | undefined {
  * - HIP_CONTEXT_PREFIRE_LEAD_PERCENT
  * - HIP_CONTEXT_MEMORY_FLUSH
  * - HIP_TOOL_OUTPUT_MAX_BYTES
+ * - HIP_CONTEXT_CACHE_POLICY
+ * - HIP_CONTEXT_PROMPT_CACHE_KEY
  */
 export function resolveContextPolicy(partial?: ContextConfig | null): ResolvedContextPolicy {
   const base: ResolvedContextPolicy = { ...DEFAULT_CONTEXT_POLICY }
@@ -93,6 +107,12 @@ export function resolveContextPolicy(partial?: ContextConfig | null): ResolvedCo
     ) {
       base.toolOutputMaxBytes = Math.floor(partial.toolOutputMaxBytes)
     }
+    if (partial.cachePolicy != null) {
+      base.cachePolicy = resolveCachePolicy(partial.cachePolicy)
+    }
+    if (partial.promptCacheKey != null) {
+      base.promptCacheKey = resolvePromptCacheKeyMode(partial.promptCacheKey)
+    }
   }
 
   const twoPassEnv = envBool('HIP_TWO_PASS_COMPACT')
@@ -117,6 +137,16 @@ export function resolveContextPolicy(partial?: ContextConfig | null): ResolvedCo
 
   const toolEnv = envInt('HIP_TOOL_OUTPUT_MAX_BYTES')
   if (toolEnv !== undefined && toolEnv > 0) base.toolOutputMaxBytes = Math.floor(toolEnv)
+
+  const cacheEnv = process.env.HIP_CONTEXT_CACHE_POLICY
+  if (cacheEnv !== undefined && cacheEnv.trim() !== '') {
+    base.cachePolicy = resolveCachePolicy(cacheEnv)
+  }
+
+  const promptCacheEnv = process.env.HIP_CONTEXT_PROMPT_CACHE_KEY
+  if (promptCacheEnv !== undefined && promptCacheEnv.trim() !== '') {
+    base.promptCacheKey = resolvePromptCacheKeyMode(promptCacheEnv)
+  }
 
   return base
 }

@@ -12,6 +12,8 @@ const ENV_KEYS = [
   'HIP_CONTEXT_PREFIRE_LEAD_PERCENT',
   'HIP_CONTEXT_MEMORY_FLUSH',
   'HIP_TOOL_OUTPUT_MAX_BYTES',
+  'HIP_CONTEXT_CACHE_POLICY',
+  'HIP_CONTEXT_PROMPT_CACHE_KEY',
 ] as const
 
 describe('resolveContextPolicy', () => {
@@ -40,6 +42,8 @@ describe('resolveContextPolicy', () => {
     expect(DEFAULT_CONTEXT_POLICY.twoPass).toBe(true)
     expect(DEFAULT_CONTEXT_POLICY.memoryFlushBeforeCompact).toBe(true)
     expect(DEFAULT_CONTEXT_POLICY.toolOutputMaxBytes).toBe(40 * 1024)
+    expect(DEFAULT_CONTEXT_POLICY.cachePolicy).toBe('auto')
+    expect(DEFAULT_CONTEXT_POLICY.promptCacheKey).toBe('session')
   })
 
   it('applies hip.toml-style partial', () => {
@@ -51,6 +55,8 @@ describe('resolveContextPolicy', () => {
       twoPass: false,
       memoryFlushBeforeCompact: false,
       toolOutputMaxBytes: 20_000,
+      cachePolicy: 'none',
+      promptCacheKey: 'none',
     })
     expect(p.autoCompactPercent).toBe(90)
     expect(p.subagentCompactPercent).toBe(60)
@@ -59,6 +65,12 @@ describe('resolveContextPolicy', () => {
     expect(p.twoPass).toBe(false)
     expect(p.memoryFlushBeforeCompact).toBe(false)
     expect(p.toolOutputMaxBytes).toBe(20_000)
+    expect(p.cachePolicy).toBe('none')
+    expect(p.promptCacheKey).toBe('none')
+  })
+
+  it('maps cachePolicy off → none', () => {
+    expect(resolveContextPolicy({ cachePolicy: 'off' }).cachePolicy).toBe('none')
   })
 
   it('clamps percent fields to 1..100', () => {
@@ -75,15 +87,21 @@ describe('resolveContextPolicy', () => {
     process.env.HIP_CONTEXT_AUTO_COMPACT_PERCENT = '80'
     process.env.HIP_CONTEXT_MEMORY_FLUSH = 'false'
     process.env.HIP_TOOL_OUTPUT_MAX_BYTES = '8192'
+    process.env.HIP_CONTEXT_CACHE_POLICY = 'off'
+    process.env.HIP_CONTEXT_PROMPT_CACHE_KEY = 'none'
     const p = resolveContextPolicy({
       autoCompactPercent: 90,
       twoPass: true,
       memoryFlushBeforeCompact: true,
       toolOutputMaxBytes: 40_000,
+      cachePolicy: 'auto',
+      promptCacheKey: 'session',
     })
     expect(p.twoPass).toBe(false)
     expect(p.autoCompactPercent).toBe(80)
     expect(p.memoryFlushBeforeCompact).toBe(false)
     expect(p.toolOutputMaxBytes).toBe(8192)
+    expect(p.cachePolicy).toBe('none')
+    expect(p.promptCacheKey).toBe('none')
   })
 })

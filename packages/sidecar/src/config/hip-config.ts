@@ -189,6 +189,12 @@ function normalizeContext(raw: Record<string, unknown>): ContextConfig {
   if (raw.tool_output_max_bytes !== undefined && raw.toolOutputMaxBytes === undefined) {
     raw.toolOutputMaxBytes = raw.tool_output_max_bytes
   }
+  if (raw.cache_policy !== undefined && raw.cachePolicy === undefined) {
+    raw.cachePolicy = raw.cache_policy
+  }
+  if (raw.prompt_cache_key !== undefined && raw.promptCacheKey === undefined) {
+    raw.promptCacheKey = raw.prompt_cache_key
+  }
   delete raw.auto_compact_percent
   delete raw.subagent_compact_percent
   delete raw.target_keep_percent
@@ -196,6 +202,8 @@ function normalizeContext(raw: Record<string, unknown>): ContextConfig {
   delete raw.two_pass
   delete raw.memory_flush_before_compact
   delete raw.tool_output_max_bytes
+  delete raw.cache_policy
+  delete raw.prompt_cache_key
 
   const out: ContextConfig = {}
   if (typeof raw.autoCompactPercent === 'number' && Number.isFinite(raw.autoCompactPercent)) {
@@ -216,6 +224,18 @@ function normalizeContext(raw: Record<string, unknown>): ContextConfig {
   }
   if (typeof raw.toolOutputMaxBytes === 'number' && Number.isFinite(raw.toolOutputMaxBytes)) {
     out.toolOutputMaxBytes = raw.toolOutputMaxBytes
+  }
+  if (typeof raw.cachePolicy === 'string') {
+    const cp = raw.cachePolicy.trim().toLowerCase()
+    if (cp === 'auto' || cp === 'none' || cp === 'off') {
+      out.cachePolicy = cp
+    }
+  }
+  if (typeof raw.promptCacheKey === 'string') {
+    const pk = raw.promptCacheKey.trim().toLowerCase()
+    if (pk === 'session' || pk === 'none') {
+      out.promptCacheKey = pk
+    }
   }
   return out
 }

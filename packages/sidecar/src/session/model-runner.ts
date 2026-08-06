@@ -9,7 +9,15 @@ import { withRetry, isRetryable, MAX_RETRIES } from './retry.js'
 import { logInfo, logDebug } from '../debug-logger.js'
 import { parseDsmlToolCalls, hasDsmlToolCalls } from './dsml.js'
 import { createThinkTagStreamSplitter } from './think-tags.js'
-import { coalesceSystemMessages } from './anthropic-messages.js'
+import { prepareAnthropicMessages } from './anthropic-messages.js'
+import {
+  applyAnthropicToolCacheBreakpoints,
+  resolveCachePolicy,
+  resolveOpenAiPromptCacheKey,
+  sessionIdFromMetadata,
+  type CachePolicyInput,
+  type PromptCacheKeyMode,
+} from './cache-policy.js'
 
 /** True when the chat client is (or wraps) ChatAnthropic — MiniMax-compatible Messages API. */
 export function isAnthropicChatModel(model: unknown): boolean {
@@ -40,6 +48,15 @@ export interface ModelRunOptions {
   metadata?: Record<string, unknown>
   tags?: string[]
   runName?: string
+  /**
+   * Provider cache policy (PR-7b). Default auto when omitted.
+   * Anthropic: ephemeral cache_control breakpoints; OpenAI: optional promptCacheKey.
+   */
+  cachePolicy?: CachePolicyInput
+  /** OpenAI prompt_cache_key mode. Default session (use sessionId when available). */
+  promptCacheKeyMode?: PromptCacheKeyMode | string
+  /** Session id for OpenAI prompt_cache_key (also read from metadata.sessionId). */
+  sessionId?: string
 }
 
 /**
@@ -202,12 +219,27 @@ export class RealModelRunner implements ModelRunner {
   constructor(private readonly model: BaseChatModel) {}
 
   async run(messages: BaseMessage[], opts: ModelRunOptions): Promise<AIMessage> {
-    const bound = opts.bindTools ? this.model.bindTools!(opts.tools) : this.model
+    const cachePolicy = resolveCachePolicy(
+      opts.cachePolicy ?? process.env.HIP_CONTEXT_CACHE_POLICY,
+    )
+    const isAnthropic = isAnthropicChatModel(this.model)
+    // Anthropic: mark last tool definition before bindTools formats them.
+    const toolsForBind =
+      isAnthropic && opts.bindTools
+        ? applyAnthropicToolCacheBreakpoints(opts.tools, cachePolicy)
+        : opts.tools
+    const bound = opts.bindTools ? this.model.bindTools!(toolsForBind) : this.model
     let input: BaseMessage[] = opts.bindTools ? messages : [...messages, new SystemMessage(MAX_STEPS_NOTE)]
-    // MiniMax (and strict Anthropic-compatible hosts): only one system message, and only first.
-    if (isAnthropicChatModel(this.model) || isAnthropicChatModel(bound)) {
-      input = coalesceSystemMessages(input)
+    // MiniMax / Anthropic-compatible: one leading system + cache_control breakpoints.
+    if (isAnthropic || isAnthropicChatModel(bound)) {
+      input = prepareAnthropicMessages(input, { cachePolicy })
     }
+    const promptCacheKey = resolveOpenAiPromptCacheKey({
+      model: this.model,
+      sessionId: opts.sessionId ?? sessionIdFromMetadata(opts.metadata),
+      cachePolicy,
+      promptCacheKeyMode: opts.promptCacheKeyMode ?? process.env.HIP_CONTEXT_PROMPT_CACHE_KEY,
+    })
     let emitted = false
     const attempt = async (): Promise<AIMessage> => {
       const t0 = Date.now()
@@ -218,6 +250,8 @@ export class RealModelRunner implements ModelRunner {
         ...(opts.metadata ? { metadata: opts.metadata } : {}),
         ...(opts.tags ? { tags: opts.tags } : {}),
         ...(opts.runName ? { runName: opts.runName } : {}),
+        // OpenAI-compat prompt cache key (feature-detected; ignored by unsupported clients).
+        ...(promptCacheKey ? { promptCacheKey } : {}),
       })
       let gathered: AIMessageChunk | undefined
       let firstToken = true

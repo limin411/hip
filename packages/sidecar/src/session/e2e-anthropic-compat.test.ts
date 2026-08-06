@@ -277,8 +277,23 @@ describe('E2E anthropic-compat: multi system coalesce on ChatAnthropic', () => {
     expect(types[0]).toBe('system')
     // Exactly one system at the front (merged)
     expect(types.filter((t) => t === 'system')).toHaveLength(1)
-    expect(String(anthropic.lastInput![0].content)).toContain('main system prompt')
-    expect(String(anthropic.lastInput![0].content)).toContain('session context delta')
+    // Content may be string or text-blocks (cache_control breakpoints, PR-7b).
+    const sysText = (() => {
+      const c = anthropic.lastInput![0].content
+      if (typeof c === 'string') return c
+      if (Array.isArray(c)) {
+        return c
+          .map((b) =>
+            b && typeof b === 'object' && (b as { type?: string }).type === 'text'
+              ? String((b as { text?: string }).text ?? '')
+              : '',
+          )
+          .join('')
+      }
+      return String(c)
+    })()
+    expect(sysText).toContain('main system prompt')
+    expect(sysText).toContain('session context delta')
     expect(types).toEqual(['system', 'human', 'ai', 'human'])
   })
 
@@ -337,7 +352,21 @@ describe('E2E anthropic-compat: multi system coalesce on ChatAnthropic', () => {
     const systems = anthropic.lastInput!.filter((m) => m.getType() === 'system')
     expect(systems.length).toBeLessThanOrEqual(1)
     if (systems.length === 1) {
-      expect(String(systems[0].content).length).toBeGreaterThan(0)
+      const c = systems[0].content
+      const len =
+        typeof c === 'string'
+          ? c.length
+          : Array.isArray(c)
+            ? c.reduce(
+                (n, b) =>
+                  n +
+                  (b && typeof b === 'object' && (b as { type?: string }).type === 'text'
+                    ? String((b as { text?: string }).text ?? '').length
+                    : 0),
+                0,
+              )
+            : String(c).length
+      expect(len).toBeGreaterThan(0)
     }
   })
 

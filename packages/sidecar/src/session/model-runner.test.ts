@@ -139,7 +139,7 @@ describe('RealModelRunner retry', () => {
     const model = new ChatAnthropic() as any
     await new RealModelRunner(model).run(
       [new SystemMessage('main'), new SystemMessage('ctx'), new HumanMessage('hi')],
-      { tools: [], bindTools: true, onText: () => {}, onReasoning: () => {} } as any,
+      { tools: [], bindTools: true, onText: () => {}, onReasoning: () => {}, cachePolicy: 'none' } as any,
     )
     const msgs = seen[0] as Array<{ getType: () => string; content: unknown }>
     expect(msgs).toHaveLength(2)
@@ -147,6 +147,119 @@ describe('RealModelRunner retry', () => {
     expect(String(msgs[0].content)).toContain('main')
     expect(String(msgs[0].content)).toContain('ctx')
     expect(msgs[1].getType()).toBe('human')
+  })
+
+  it('attaches Anthropic cache_control breakpoints on auto policy', async () => {
+    const seen: unknown[] = []
+    class ChatAnthropic {
+      bindTools(tools: unknown[]) {
+        seen.push({ tools })
+        return this
+      }
+      async stream(msgs: unknown[], opts?: unknown) {
+        seen.push({ msgs, opts })
+        return (async function* () {
+          yield new AIMessageChunk({ content: 'ok' })
+        })()
+      }
+    }
+    const model = new ChatAnthropic() as any
+    const tools = [
+      { name: 't1', description: 'd', schema: { type: 'object', properties: {} }, lc_namespace: ['t'] },
+      { name: 't2', description: 'd', schema: { type: 'object', properties: {} }, lc_namespace: ['t'] },
+    ]
+    await new RealModelRunner(model).run(
+      [new SystemMessage('sys'), new HumanMessage('first'), new HumanMessage('latest')],
+      {
+        tools,
+        bindTools: true,
+        onText: () => {},
+        onReasoning: () => {},
+        cachePolicy: 'auto',
+      } as any,
+    )
+    const bind = seen[0] as { tools: Array<{ name: string; extras?: { cache_control?: unknown } }> }
+    expect(bind.tools[1]!.extras?.cache_control).toEqual({ type: 'ephemeral' })
+    const stream = seen[1] as {
+      msgs: Array<{ getType: () => string; content: unknown }>
+    }
+    const sysContent = stream.msgs[0]!.content as Array<{ cache_control?: unknown; text?: string }>
+    expect(sysContent[0]?.cache_control).toEqual({ type: 'ephemeral' })
+    const latest = stream.msgs[stream.msgs.length - 1]!.content as Array<{
+      cache_control?: unknown
+      text?: string
+    }>
+    expect(latest[0]?.text).toBe('latest')
+    expect(latest[0]?.cache_control).toEqual({ type: 'ephemeral' })
+  })
+
+  it('OpenAI path passes promptCacheKey when client supports it', async () => {
+    const seenOpts: unknown[] = []
+    class ReasoningChatOpenAI {
+      promptCacheKey?: string
+      bindTools() { return this }
+      async stream(_msgs: unknown[], opts?: unknown) {
+        seenOpts.push(opts)
+        return (async function* () {
+          yield new AIMessageChunk({ content: 'ok' })
+        })()
+      }
+    }
+    const model = new ReasoningChatOpenAI() as any
+    await new RealModelRunner(model).run(
+      [new HumanMessage('hi')],
+      {
+        tools: [],
+        bindTools: true,
+        onText: () => {},
+        onReasoning: () => {},
+        cachePolicy: 'auto',
+        sessionId: 'sess-xyz',
+      } as any,
+    )
+    expect(seenOpts[0]).toMatchObject({ promptCacheKey: 'sess-xyz' })
+  })
+
+  it('unsupported OpenAI-shaped client without promptCacheKey field is still ok if named ChatOpenAI', async () => {
+    const seenOpts: unknown[] = []
+    class ChatOpenAI {
+      bindTools() { return this }
+      async stream(_msgs: unknown[], opts?: unknown) {
+        seenOpts.push(opts)
+        return (async function* () {
+          yield new AIMessageChunk({ content: 'ok' })
+        })()
+      }
+    }
+    await new RealModelRunner(new ChatOpenAI() as any).run([new HumanMessage('hi')], {
+      tools: [],
+      bindTools: true,
+      onText: () => {},
+      onReasoning: () => {},
+      sessionId: 's1',
+    } as any)
+    expect(seenOpts[0]).toMatchObject({ promptCacheKey: 's1' })
+  })
+
+  it('unknown model does not get promptCacheKey (unsupported no-op)', async () => {
+    const seenOpts: unknown[] = []
+    const model: any = {
+      bindTools() { return model },
+      async stream(_m: unknown[], opts?: unknown) {
+        seenOpts.push(opts)
+        return (async function* () {
+          yield new AIMessageChunk({ content: 'ok' })
+        })()
+      },
+    }
+    await new RealModelRunner(model).run([new HumanMessage('hi')], {
+      tools: [],
+      bindTools: true,
+      onText: () => {},
+      onReasoning: () => {},
+      sessionId: 's1',
+    } as any)
+    expect(seenOpts[0]).not.toHaveProperty('promptCacheKey')
   })
 
   it('splits MiniMax-style <think> tags into onReasoning vs onText (UI sinks)', async () => {

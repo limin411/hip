@@ -318,6 +318,18 @@ export interface ContextConfig {
   memoryFlushBeforeCompact?: boolean
   /** Max tool-result bytes kept inline for the model. Default 40960 (40KB). */
   toolOutputMaxBytes?: number
+  /**
+   * Provider cache breakpoints (PR-7b). Default `auto`.
+   * - auto: Anthropic ephemeral cache_control on last tool/system/latest user;
+   *   OpenAI prompt_cache_key when client supports it.
+   * - none (alias: off): no provider cache markers.
+   */
+  cachePolicy?: 'auto' | 'none' | 'off'
+  /**
+   * OpenAI-compat prompt_cache_key source. Default `session` (session id).
+   * `none` disables even when cachePolicy is auto.
+   */
+  promptCacheKey?: 'session' | 'none'
 }
 
 /**

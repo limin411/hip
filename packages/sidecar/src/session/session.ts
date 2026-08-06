@@ -1,4 +1,4 @@
-import type { ServerMessage, SessionConfig, AgentRole, Message, AgentRun, FsEntry, TurnUsage, DiffBase, DiffFile, DiffFileStatus, DiffState, DiffSummary, Checkpoint, CommitLogEntry, Branch, PermissionMode, WorkflowDef, Hook, SkillMeta, AgentConfig, McpServerConfig, PlanItem, SessionEvent, TimelineStep, Attachment, ContentPart, OrchestrationMode } from '@hip/protocol'
+import type { ServerMessage, SessionConfig, AgentRole, Message, AgentRun, FsEntry, TurnUsage, SessionUsageAggregate, DiffBase, DiffFile, DiffFileStatus, DiffState, DiffSummary, Checkpoint, CommitLogEntry, Branch, PermissionMode, WorkflowDef, Hook, SkillMeta, AgentConfig, McpServerConfig, PlanItem, SessionEvent, TimelineStep, Attachment, ContentPart, OrchestrationMode } from '@hip/protocol'
 import { FIXED_AGENTS, resolveExecutionMode, isAutopilot } from '@hip/protocol'
 import { mkdir, writeFile, rename } from 'node:fs/promises'
 import { join, dirname } from 'node:path'
@@ -22,13 +22,20 @@ import type { ApprovalFn } from './tools.js'
 import { SELF_GATED_TOOLS } from './tools.js'
 import { RealModelRunner, type ModelRunner } from './model-runner.js'
 import { buildChatModel, createSummarizer } from './model-factory.js'
-import { runSubagent } from './subagent.js'
 import { maxStepsForSession } from './loop-control.js'
 import { Activity, ActivityTracker } from './activity.js'
 import { GoalManager } from './goal.js'
 import { attachGoalPersistence, emitGoalUpdatedMessage } from './session-goal-facade.js'
 import { recoverSessionFromCrash } from './session-crash.js'
-import { addUsage, sumUsage } from './usage.js'
+import {
+  addUsage,
+  sumUsage,
+  emptySessionUsageAggregate,
+  foldTurnIntoSessionAggregate,
+  markSessionUsageIncomplete,
+  serializeSessionUsageAggregate,
+  parseSessionUsageAggregate,
+} from './usage.js'
 import { compactMessages, applyCompactResult, estimateTokens, KEEP_RECENT_TURNS, type Summarizer } from './compaction.js'
 import {
   emitPlanApprovalResync,
@@ -197,6 +204,11 @@ export class Session {
   wakeMode: WakeMode = 'auto'
   /** When true, schedule fires are frozen (chat mode). */
   scheduleFiresPaused = false
+  /**
+   * Session-level usage ledger (KD-11). Mutated only via foldSessionUsage (single-writer).
+   * Hydrated from sessions.usage_json when a store is present.
+   */
+  sessionUsage: SessionUsageAggregate = emptySessionUsageAggregate()
   /** @deprecated Use backgroundManager.tasks instead. Kept for test backward-compat. */
   get backgroundTasks(): Map<string, Promise<void>> { return this.backgroundManager.tasks }
   /** @deprecated Use backgroundManager.meta instead. Kept for internal backward-compat. */
@@ -252,6 +264,41 @@ export class Session {
     send: SendFn,
   ): Promise<void> {
     return runBackgroundSubagent(this as unknown as SessionTurnHost, taskId, description, signal, send)
+  }
+
+  /**
+   * Single-writer fold into sessionUsage + persist sessions.usage_json (KD-11/12).
+   * Sync RMW on the event loop — no await between read and write.
+   * Optional `send` emits `usage:updated` when provided (bg path / turn finalize).
+   */
+  foldSessionUsage(
+    step: TurnUsage | undefined,
+    opts?: { incomplete?: boolean; send?: SendFn },
+  ): void {
+    const now = Date.now()
+    if (step) {
+      this.sessionUsage = foldTurnIntoSessionAggregate(this.sessionUsage, step, now)
+    }
+    if (opts?.incomplete) {
+      this.sessionUsage = markSessionUsageIncomplete(this.sessionUsage, now)
+    }
+    if (!step && !opts?.incomplete) return
+    try {
+      this.store?.setSessionUsageJson(this.id, serializeSessionUsageAggregate(this.sessionUsage))
+    } catch (err) {
+      console.warn(
+        `Failed to persist session usage for ${this.id}:`,
+        err instanceof Error ? err.message : String(err),
+      )
+    }
+    const send = opts?.send ?? this.lastSend
+    if (send) {
+      try {
+        send({ type: 'usage:updated', sessionId: this.id, usage: this.sessionUsage })
+      } catch {
+        /* client disconnect */
+      }
+    }
   }
 
 
@@ -368,6 +415,9 @@ export class Session {
 
     if (store) {
       attachGoalPersistence(this.goalManager, store, id)
+      const rawUsage = store.getSessionUsageJson(id)
+      const loaded = parseSessionUsageAggregate(rawUsage)
+      if (loaded) this.sessionUsage = loaded
     }
 
     this.git = new GitOperations(id, store)
@@ -1068,7 +1118,7 @@ export class Session {
     targetMessages: BaseMessage[] = this.messages,
     extras?: { roundtable?: import('@hip/protocol').RoundtableMeta },
   ): string {
-    return finalizeAndPersistTurn(
+    const text = finalizeAndPersistTurn(
       this.persistDeps(),
       send,
       turnId,
@@ -1079,6 +1129,12 @@ export class Session {
       targetMessages,
       extras,
     )
+    // Fold turn spend into session aggregate (foreground path). BG folds separately.
+    const turnUsage = usageByAgent ? sumUsage([...usageByAgent.values()]) : undefined
+    if (turnUsage) {
+      this.foldSessionUsage(turnUsage, { send })
+    }
+    return text
   }
 
   async regenerate(send: SendFn): Promise<void> {

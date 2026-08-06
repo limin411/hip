@@ -61,7 +61,7 @@ beforeEach(() => {
 describe('runSubagent parent observation links (E2)', () => {
   it('propagates parentAgentId onto GraphCtx and collector span.parentId', async () => {
     const observed: TraceObservation[] = []
-    const text = await runSubagent({
+    const { text } = await runSubagent({
       runner: fakeRunner([new AIMessage('done')]),
       root: process.cwd(),
       summarizer: noopSummarizer,
@@ -112,7 +112,7 @@ describe('runSubagent parent observation links (E2)', () => {
   })
 
   it('does not require onObservation (default-preserving product path)', async () => {
-    const text = await runSubagent({
+    const { text } = await runSubagent({
       runner: fakeRunner([new AIMessage('plain')]),
       root: process.cwd(),
       summarizer: noopSummarizer,
@@ -208,7 +208,7 @@ describe('runSubagent parent observation links (E2)', () => {
     }
 
     const observed: TraceObservation[] = []
-    const text = await runSubagent({
+    const { text } = await runSubagent({
       runner,
       root: process.cwd(),
       summarizer: noopSummarizer,

@@ -50,7 +50,7 @@ describe('runSubagent plugin hooks', () => {
     }
 
     // Spy tool invoke by wrapping — ToolRunner will not invoke if denied; we assert via message path.
-    const text = await runSubagent({
+    const { text } = await runSubagent({
       runner,
       root: process.cwd(),
       summarizer: { async summarize() { return '' } },
@@ -80,7 +80,7 @@ describe('runSubagent plugin hooks', () => {
         return new AIMessage('ok')
       },
     }
-    const text = await runSubagent({
+    const { text } = await runSubagent({
       runner,
       root: process.cwd(),
       summarizer: { async summarize() { return '' } },

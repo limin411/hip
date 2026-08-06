@@ -1,5 +1,5 @@
 /** Background subagent helpers. */
-import type { PermissionMode } from '@hip/protocol'
+import type { PermissionMode, TurnUsage } from '@hip/protocol'
 import { HumanMessage, AIMessage, type BaseMessage } from '@langchain/core/messages'
 import { runSubagent } from './subagent.js'
 import { childMaxStepsForAgent } from './loop-control.js'
@@ -28,9 +28,12 @@ export async function runBackgroundSubagent(
   let result = ''
   let status: 'completed' | 'failed' = 'completed'
   let error: string | undefined
+  let usage: TurnUsage | undefined
+  let aborted = false
 
   try {
-    result = await runSubagent({
+    // Capture usage via return value (emit.usage is intentionally not the fold path for bg).
+    const run = await runSubagent({
       runner,
       root: cwd,
       summarizer,
@@ -49,8 +52,11 @@ export async function runBackgroundSubagent(
       agentId: taskId,
       parentAgentId: 'supervisor',
     })
+    result = run.text
+    usage = run.usage
   } catch (err) {
     const msg = safeErrorMessage(err)
+    aborted = signal.aborted || (err instanceof Error && err.name === 'AbortError')
     console.error(`Background task ${taskId} failed:`, err instanceof Error ? err.message : String(err))
     result = `Error: ${msg}`
     status = 'failed'
@@ -61,6 +67,17 @@ export async function runBackgroundSubagent(
 
   // stop() may have already marked the task killed; do not publish completed/failed over a kill
   const finalMeta = host.backgroundManager.meta.get(taskId)
+  const killed = finalMeta?.status === 'killed' || aborted
+
+  // KD-12: fold observed usage into session aggregate; incomplete on kill/timeout/missing metadata.
+  // Never invent tokens — only fold what was captured.
+  if (usage) {
+    host.foldSessionUsage(usage, { incomplete: killed, send })
+  } else {
+    // Missing metadata OR kill/abort without any step usage → incomplete only.
+    host.foldSessionUsage(undefined, { incomplete: true, send })
+  }
+
   if (finalMeta?.status === 'killed') {
     const killError = finalMeta.error ?? 'task was killed'
     send({

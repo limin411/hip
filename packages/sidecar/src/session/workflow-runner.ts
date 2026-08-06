@@ -248,7 +248,7 @@ export async function runWorkflowTurn(
       deps.invokerFactory,
       async (input: string, signal: AbortSignal, nodeId?: string): Promise<string> => {
         const agentId = nodeId ?? 'worker'
-        return runSubagent({
+        const { text } = await runSubagent({
           runner: deps.modelRunner(),
           root: deps.config.cwd ?? process.cwd(),
           summarizer: deps.summarizer(),
@@ -271,6 +271,7 @@ export async function runWorkflowTurn(
           agentId,
           parentAgentId: 'supervisor',
         })
+        return text
       },
       {
         emit: (nodeId) => makeEmit(nodeId, 'subagent'),
@@ -365,7 +366,7 @@ export async function runWorkflowTurn(
       const rawTexts = outputs.map((o) => o.text)
       const fallback = rawTexts.join('\n\n')
       try {
-        finalText = await runSubagent({
+        const agg = await runSubagent({
           runner: deps.modelRunner(),
           root: deps.config.cwd ?? process.cwd(),
           summarizer: deps.summarizer(),
@@ -384,7 +385,8 @@ export async function runWorkflowTurn(
           runId: turnId,
           agentId: 'aggregator',
           parentAgentId: 'supervisor',
-        }) || fallback
+        })
+        finalText = agg.text || fallback
       } catch {
         finalText = fallback
       }

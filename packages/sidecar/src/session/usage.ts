@@ -1,4 +1,4 @@
-import type { TurnUsage } from '@hip/protocol'
+import type { TurnUsage, SessionUsageAggregate, SessionModelUsage } from '@hip/protocol'
 
 /** Best single-request context size from a usage report.
  *  Only input / explicit contextTokens count — never billing `totalTokens`.
@@ -326,4 +326,187 @@ function optPositiveInt(n: unknown): number | undefined {
 
 function optNonNegInt(n: unknown): number | undefined {
   return typeof n === 'number' && Number.isFinite(n) && n >= 0 ? Math.floor(n) : undefined
+}
+
+// ── SessionUsageAggregate (KD-11 / KD-12) ───────────────────────────────────
+
+export const SESSION_USAGE_UNKNOWN_MODEL = '_unknown'
+
+/** Empty session ledger. */
+export function emptySessionUsageAggregate(now = Date.now()): SessionUsageAggregate {
+  return {
+    inputTokens: 0,
+    outputTokens: 0,
+    totalTokens: 0,
+    byModel: {},
+    updatedAt: now,
+  }
+}
+
+function modelKey(u: TurnUsage): string {
+  return u.modelId && u.modelId !== '' ? u.modelId : SESSION_USAGE_UNKNOWN_MODEL
+}
+
+function foldModelSlice(acc: SessionModelUsage | undefined, next: TurnUsage): SessionModelUsage {
+  if (!acc) {
+    return reconcileModelSlice({
+      inputTokens: next.inputTokens,
+      outputTokens: next.outputTokens,
+      totalTokens: next.totalTokens,
+      ...(next.cacheReadTokens != null ? { cacheReadTokens: next.cacheReadTokens } : {}),
+      ...(next.cacheWriteTokens != null ? { cacheWriteTokens: next.cacheWriteTokens } : {}),
+      ...(next.nonCachedInputTokens != null ? { nonCachedInputTokens: next.nonCachedInputTokens } : {}),
+      ...(next.reasoningTokens != null ? { reasoningTokens: next.reasoningTokens } : {}),
+      ...(next.providerId ? { providerId: next.providerId } : {}),
+    })
+  }
+  return reconcileModelSlice({
+    inputTokens: acc.inputTokens + next.inputTokens,
+    outputTokens: acc.outputTokens + next.outputTokens,
+    totalTokens: acc.totalTokens + next.totalTokens,
+    ...(sumOpt(acc.cacheReadTokens, next.cacheReadTokens) != null
+      ? { cacheReadTokens: sumOpt(acc.cacheReadTokens, next.cacheReadTokens) }
+      : {}),
+    ...(sumOpt(acc.cacheWriteTokens, next.cacheWriteTokens) != null
+      ? { cacheWriteTokens: sumOpt(acc.cacheWriteTokens, next.cacheWriteTokens) }
+      : {}),
+    ...(sumOpt(acc.reasoningTokens, next.reasoningTokens) != null
+      ? { reasoningTokens: sumOpt(acc.reasoningTokens, next.reasoningTokens) }
+      : {}),
+    ...(next.providerId || acc.providerId
+      ? { providerId: next.providerId || acc.providerId }
+      : {}),
+  })
+}
+
+function reconcileModelSlice(u: SessionModelUsage): SessionModelUsage {
+  const hasCache = u.cacheReadTokens != null || u.cacheWriteTokens != null
+  if (hasCache) {
+    const cr = u.cacheReadTokens ?? 0
+    const cw = u.cacheWriteTokens ?? 0
+    return { ...u, nonCachedInputTokens: Math.max(0, u.inputTokens - cr - cw) }
+  }
+  if (u.nonCachedInputTokens == null) return u
+  const { nonCachedInputTokens: _drop, ...rest } = u
+  return rest
+}
+
+/**
+ * Fold one TurnUsage (step/turn/bg return) into the session aggregate.
+ * Billing fields sum; incomplete OR; byModel keyed by step modelId.
+ * Does not invent tokens — caller passes only observed usage.
+ */
+export function foldTurnIntoSessionAggregate(
+  acc: SessionUsageAggregate | undefined,
+  next: TurnUsage,
+  now = Date.now(),
+): SessionUsageAggregate {
+  const base = acc ?? emptySessionUsageAggregate(now)
+  const key = modelKey(next)
+  const byModel = { ...base.byModel, [key]: foldModelSlice(base.byModel[key], next) }
+  const cacheReadTokens = sumOpt(base.cacheReadTokens, next.cacheReadTokens)
+  const cacheWriteTokens = sumOpt(base.cacheWriteTokens, next.cacheWriteTokens)
+  const reasoningTokens = sumOpt(base.reasoningTokens, next.reasoningTokens)
+  const incomplete = base.incomplete === true || next.incomplete === true ? true : undefined
+  const folded: SessionUsageAggregate = {
+    inputTokens: base.inputTokens + next.inputTokens,
+    outputTokens: base.outputTokens + next.outputTokens,
+    totalTokens: base.totalTokens + next.totalTokens,
+    ...(cacheReadTokens != null ? { cacheReadTokens } : {}),
+    ...(cacheWriteTokens != null ? { cacheWriteTokens } : {}),
+    ...(reasoningTokens != null ? { reasoningTokens } : {}),
+    ...(incomplete ? { incomplete: true } : {}),
+    byModel,
+    updatedAt: now,
+  }
+  const hasCache = folded.cacheReadTokens != null || folded.cacheWriteTokens != null
+  if (hasCache) {
+    const cr = folded.cacheReadTokens ?? 0
+    const cw = folded.cacheWriteTokens ?? 0
+    folded.nonCachedInputTokens = Math.max(0, folded.inputTokens - cr - cw)
+  }
+  return folded
+}
+
+/** Mark session aggregate incomplete without inventing token counts (KD-12). */
+export function markSessionUsageIncomplete(
+  acc: SessionUsageAggregate | undefined,
+  now = Date.now(),
+): SessionUsageAggregate {
+  const base = acc ?? emptySessionUsageAggregate(now)
+  return { ...base, incomplete: true, updatedAt: now }
+}
+
+export function serializeSessionUsageAggregate(u: SessionUsageAggregate): string {
+  return JSON.stringify(u)
+}
+
+export function parseSessionUsageAggregate(raw: string | null | undefined): SessionUsageAggregate | undefined {
+  if (raw == null || raw === '') return undefined
+  let parsed: unknown
+  try {
+    parsed = JSON.parse(raw)
+  } catch {
+    return undefined
+  }
+  if (parsed == null || typeof parsed !== 'object') return undefined
+  const o = parsed as Record<string, unknown>
+  const inputTokens = o['inputTokens']
+  const outputTokens = o['outputTokens']
+  const totalTokens = o['totalTokens']
+  if (
+    typeof inputTokens !== 'number' || !Number.isFinite(inputTokens) ||
+    typeof outputTokens !== 'number' || !Number.isFinite(outputTokens) ||
+    typeof totalTokens !== 'number' || !Number.isFinite(totalTokens)
+  ) {
+    return undefined
+  }
+  const byModelRaw = o['byModel']
+  const byModel: Record<string, SessionModelUsage> = {}
+  if (byModelRaw && typeof byModelRaw === 'object') {
+    for (const [k, v] of Object.entries(byModelRaw as Record<string, unknown>)) {
+      if (v == null || typeof v !== 'object') continue
+      const m = v as Record<string, unknown>
+      if (
+        typeof m['inputTokens'] !== 'number' || !Number.isFinite(m['inputTokens']) ||
+        typeof m['outputTokens'] !== 'number' || !Number.isFinite(m['outputTokens']) ||
+        typeof m['totalTokens'] !== 'number' || !Number.isFinite(m['totalTokens'])
+      ) continue
+      const slice: SessionModelUsage = {
+        inputTokens: m['inputTokens'] as number,
+        outputTokens: m['outputTokens'] as number,
+        totalTokens: m['totalTokens'] as number,
+      }
+      const cr = optNonNegInt(m['cacheReadTokens'])
+      if (cr != null) slice.cacheReadTokens = cr
+      const cw = optNonNegInt(m['cacheWriteTokens'])
+      if (cw != null) slice.cacheWriteTokens = cw
+      const nc = optNonNegInt(m['nonCachedInputTokens'])
+      if (nc != null) slice.nonCachedInputTokens = nc
+      const rt = optNonNegInt(m['reasoningTokens'])
+      if (rt != null) slice.reasoningTokens = rt
+      if (typeof m['providerId'] === 'string' && m['providerId']) slice.providerId = m['providerId']
+      byModel[k] = slice
+    }
+  }
+  const updatedAt = typeof o['updatedAt'] === 'number' && Number.isFinite(o['updatedAt'])
+    ? Math.floor(o['updatedAt'] as number)
+    : Date.now()
+  const out: SessionUsageAggregate = {
+    inputTokens,
+    outputTokens,
+    totalTokens,
+    byModel,
+    updatedAt,
+  }
+  const cr = optNonNegInt(o['cacheReadTokens'])
+  if (cr != null) out.cacheReadTokens = cr
+  const cw = optNonNegInt(o['cacheWriteTokens'])
+  if (cw != null) out.cacheWriteTokens = cw
+  const nc = optNonNegInt(o['nonCachedInputTokens'])
+  if (nc != null) out.nonCachedInputTokens = nc
+  const rt = optNonNegInt(o['reasoningTokens'])
+  if (rt != null) out.reasoningTokens = rt
+  if (o['incomplete'] === true) out.incomplete = true
+  return out
 }

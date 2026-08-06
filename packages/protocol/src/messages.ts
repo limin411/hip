@@ -12,6 +12,7 @@ import type {
   SessionSummary,
   TrashedSessionSummary,
   SearchHit,
+  SessionUsageAggregate,
 } from './message-model.js'
 import type {
   DiffBase,
@@ -381,6 +382,8 @@ export type ServerMessage =
     }
   | { type: 'session:list:result'; sessions: SessionSummary[] }
   | { type: 'session:loaded'; sessionId: string; messages: Message[]; config?: SessionConfig }
+  /** Session-level usage ledger after a turn or background fold (KD-11). */
+  | { type: 'usage:updated'; sessionId: string; usage: SessionUsageAggregate }
   | { type: 'session:search:result'; query: string; hits: SearchHit[] }
   /** Hard delete only. */
   | { type: 'session:deleted'; sessionId: string }

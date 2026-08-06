@@ -9,7 +9,9 @@ import {
   resolveChatApiKind,
 } from '../config/chat-api-kind.js'
 import { resolveApiKey, resolveProviderAuth } from '../config/auth-file.js'
-import { SUMMARY_OUTPUT_TOKENS, type Summarizer } from './compaction.js'
+import { SUMMARY_OUTPUT_TOKENS, SUMMARY_TEMPLATE, type Summarizer } from './compaction.js'
+
+export { SUMMARY_TEMPLATE }
 
 /** Thrown when buildChatModel is called without a configured API key (no sk-missing). */
 export class MissingApiKeyError extends Error {
@@ -202,39 +204,6 @@ export function buildChatModel(choice: BuildChatModelChoice): BaseChatModel {
       : {}),
   })
 }
-
-export const SUMMARY_TEMPLATE = `你是一个对话压缩器。你需要从较早的对话片段中提取结构化摘要，以便后续模型能够准确理解已发生的事情。严格按以下结构输出：
-
-## Goal
-用户原始任务目标和意图。
-
-## Constraints & Preferences
-会话中明确提到的约束、模式或偏好。
-
-## Progress
-### Done
-已完成的工作。
-### In Progress
-当前正在进行的工作。
-### Blocked
-被阻塞、等待反馈或搁置的事项。
-
-## Key Decisions
-对话中的重要决策和选择。
-
-## Next Steps
-仍需完成的后续步骤。
-
-## Critical Context
-必须原样保留的路径、命令、错误信息或事实。包含完整文本，不得截断。
-
-## Relevant Files
-对话中提及的文件路径。
-
-## Files Modified
-根据工具结果实际写入或编辑的文件。
-
-保留精确的路径、命令和错误消息原文。使用简洁的列表形式。只输出结构化摘要。`
 
 /** Production summarizer: one cheap completion over the middle span. Not used in injected-model tests. */
 class RealSummarizer implements Summarizer {

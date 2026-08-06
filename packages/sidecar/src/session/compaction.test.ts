@@ -10,6 +10,8 @@ import {
   resolveKeepRecentTurns,
   resolveKeepRecentToolRounds,
   COMPACT_SUMMARY_PREFIX,
+  COMPACT_SUMMARY_SECTIONS,
+  SUMMARY_TEMPLATE,
   KEEP_RECENT_TURNS,
   KEEP_RECENT_TOOL_ROUNDS,
   COMPACT_BUDGET_TOKENS,
@@ -17,7 +19,7 @@ import {
   type Summarizer,
 } from './compaction.js'
 import { DEFAULT_COMPACT_TRIGGER_TOKENS } from './context-budget.js'
-import { SUMMARY_TEMPLATE } from './model-factory.js'
+import { SUMMARY_TEMPLATE as SUMMARY_TEMPLATE_FROM_FACTORY } from './model-factory.js'
 
 const longSummary = '摘要内容：'.padEnd(100, '详')
 
@@ -322,23 +324,21 @@ describe('resolveKeepRecentToolRounds (token budget)', () => {
 })
 
 describe('SUMMARY_TEMPLATE', () => {
-  const requiredSections = [
-    '## Goal',
-    '## Constraints & Preferences',
-    '## Progress',
-    '### Done',
-    '### In Progress',
-    '### Blocked',
-    '## Key Decisions',
-    '## Next Steps',
-    '## Critical Context',
-    '## Relevant Files',
-    '## Files Modified',
-  ]
-
-  it('contains all 8 structured section headers', () => {
-    for (const section of requiredSections) {
+  it('contains Objective / Important Details / Work State / Next Move / Relevant Files headers', () => {
+    expect(COMPACT_SUMMARY_SECTIONS).toEqual([
+      '## Objective',
+      '## Important Details',
+      '## Work State',
+      '## Next Move',
+      '## Relevant Files',
+    ])
+    for (const section of COMPACT_SUMMARY_SECTIONS) {
       expect(SUMMARY_TEMPLATE, `missing section: ${section}`).toContain(section)
     }
+  })
+
+  it('mentions protected goal integration and is re-exported from model-factory', () => {
+    expect(SUMMARY_TEMPLATE).toContain('## Active goal (do not drop)')
+    expect(SUMMARY_TEMPLATE_FROM_FACTORY).toBe(SUMMARY_TEMPLATE)
   })
 })

@@ -50,6 +50,43 @@ export const SUMMARY_OUTPUT_TOKENS = 4096
 /** Structured summary carrier prefix (stable for post-compact re-assembly). */
 export const COMPACT_SUMMARY_PREFIX = '[对话摘要]'
 
+/**
+ * Required section headers for LLM compact summaries (OpenCode-style G14).
+ * Durable goal/todos/verify are appended separately via `appendProtectedStructures`
+ * (`## Active goal (do not drop)`); do not drop them if they appear in the span.
+ */
+export const COMPACT_SUMMARY_SECTIONS = [
+  '## Objective',
+  '## Important Details',
+  '## Work State',
+  '## Next Move',
+  '## Relevant Files',
+] as const
+
+/** Summarizer system prompt: structured sections + preserve critical facts. */
+export const SUMMARY_TEMPLATE = `你是一个对话压缩器。你需要从较早的对话片段中提取结构化摘要，以便后续模型能够准确理解已发生的事情并继续推进任务。严格按以下结构输出（英文 section 标题不可改写）：
+
+## Objective
+用户原始任务目标与意图。若对话中已有 durable goal / success criteria，原样保留关键表述。
+
+## Important Details
+必须保留的约束、偏好、关键决策、错误原文、命令、路径与不可丢的事实。包含完整文本，不得截断关键错误或路径。
+
+## Work State
+当前进度：已完成、进行中、阻塞/等待。用简洁列表。
+
+## Next Move
+仍需完成的下一步（可执行、具体）。
+
+## Relevant Files
+对话中提及或实际修改的文件路径（完整路径）。
+
+规则：
+- 只输出上述结构化摘要，不要前言/后记。
+- 使用简洁列表；保留精确路径、命令和错误消息原文。
+- 若片段中出现 \`## Active goal (do not drop)\`、todos 或 verification 块，完整保留其内容（或写入 Objective / Work State），不可丢弃。
+- 后续系统可能再追加 durable goal/todos/verify 保护块；摘要本身不要声称任务已完成 unless evidence 明确。`
+
 /** Summarizes a span of messages into a short note. Injected so compaction is unit-testable. */
 export interface Summarizer {
   summarize(messages: BaseMessage[], opts?: { focus?: string; sessionId?: string }): Promise<string>
@@ -435,9 +472,10 @@ async function summarizeMiddleWithPrefire(
       }
       // Reuse quality gate only when we had delta; pure NOTE₁ already gated in pass-1.
       if (hit.delta.length === 0 || text.trim()) {
+        text = appendProtectedStructures(text.trim() || hit.note1, opts.protectedStructures)
         const removeIds = middle.slice(1).map((m) => m.id).filter((id): id is string => !!id)
         return {
-          summary: formatCompactSummaryMessage(headId, text.trim() || hit.note1),
+          summary: formatCompactSummaryMessage(headId, text),
           removeIds,
           replacedIds: [headId, ...removeIds],
           mode,

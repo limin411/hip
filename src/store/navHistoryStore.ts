@@ -1,4 +1,5 @@
 import { create } from 'zustand'
+// store-dep(read-only): history reads overlay/view state to record nav entries
 import type { ActiveView, AppOverlay, SettingsPageId, SidebarSection } from '@/store/uiStore'
 
 /**

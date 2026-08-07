@@ -9,6 +9,7 @@ import {
 } from '@hip/protocol'
 import type { Surface } from './uiStore'
 import { clampEffortForKey } from '@/lib/modelEffort'
+// store-dep(read-only): draft reads active model to build a sendable SessionConfig
 import { useProvidersStore } from '@/store/providersStore'
 
 export interface Draft {

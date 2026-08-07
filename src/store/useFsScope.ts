@@ -1,5 +1,6 @@
 import type { SessionVM } from '@/domain'
 import { useActiveSession } from '@/domain'
+// store-dep(read-only): fs scope reads draft cwd for uncommitted drafts
 import { useDraftStore, type Draft } from '@/store/draftStore'
 
 /**

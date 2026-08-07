@@ -2,6 +2,7 @@
 import { create } from 'zustand'
 import type { ActiveModel, ProviderApiKind, ProviderEntry, ProvidersConfig } from '@hip/protocol'
 import { fetchCatalog, refreshCatalog, isCompatible, type Catalog, type CatalogProvider } from '@/ipc/catalog'
+// store-dep(read-only): provider catalog/config derived from hip config
 import { useHipConfigStore } from '@/store/hipConfigStore'
 import { areProviderKeysConfigured, saveProviderKey, clearProviderKey } from '@/ipc/secrets'
 import { sessionService } from '@/domain/sessionService'

@@ -1,6 +1,7 @@
 import { create } from 'zustand'
 import { nanoid } from 'nanoid'
 import type { AgentConfig } from '@hip/protocol'
+// store-dep(read-only): agents derive enabled/ACP capability from global config
 import { useHipConfigStore } from '@/store/hipConfigStore'
 
 interface AgentsStore {

@@ -76,7 +76,8 @@
     "product:content:check": "node scripts/generate-product-content.mjs --check && node scripts/generate-ops-content.mjs --check",
     "prompt:dogfood": "node --import tsx scripts/product-prompt-dogfood.mjs",
     "prompt:dogfood:live": "DOGFOOD_LIVE=1 node --import tsx scripts/product-prompt-dogfood.mjs",
-    "i18n:sync-zh-TW": "python3 scripts/sync-zh-TW-i18n.py"
+    "i18n:sync-zh-TW": "python3 scripts/sync-zh-TW-i18n.py",
+    "check:store-deps": "node scripts/check-store-deps.mjs"
   },
   "dependencies": {
     "@blocknote/core": "0.52.1",

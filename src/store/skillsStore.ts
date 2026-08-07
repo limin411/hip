@@ -5,6 +5,7 @@ import {
   installSkillZip,
   deleteSkill,
 } from '@/ipc/skills'
+// store-dep(read-only): skills read agent enablement from hip config
 import { useHipConfigStore } from '@/store/hipConfigStore'
 
 interface SkillsStore {

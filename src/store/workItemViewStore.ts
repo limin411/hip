@@ -4,6 +4,7 @@ import {
   localTodayYmd,
   type WorkItemStatus,
 } from '@/domain/work-items'
+// store-dep(read-only): work-item view reads item state for list filtering
 import { useWorkItemStore } from '@/store/workItemStore'
 
 export type CreateDefaults = {

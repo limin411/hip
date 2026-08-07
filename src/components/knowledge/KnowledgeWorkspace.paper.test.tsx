@@ -117,6 +117,7 @@ describe('KnowledgeWorkspace paper overflow contract', () => {
   afterEach(() => {
     cleanup()
     localStorage.removeItem(KNOWLEDGE_LIVE_FLAG_KEY)
+    useKnowledgeStore.setState({ sourceLayout: 'source' })
   })
 
   it('Source paper uses overflow-hidden', () => {
@@ -159,5 +160,33 @@ describe('KnowledgeWorkspace paper overflow contract', () => {
     }
     expect(props.spaceId).toBe('spc_1')
     expect(typeof props.onAssetImportError).toBe('function')
+  })
+
+  it('Source mode shows layout toggle; split mounts live preview pane', () => {
+    seedWorkspace('source')
+    render(<KnowledgeWorkspace />)
+    expect(screen.getByTestId('knowledge-layout-toggle')).toBeInTheDocument()
+    // Default single column: no preview pane, no split handle.
+    expect(screen.queryByTestId('knowledge-live-preview')).toBeNull()
+    expect(screen.queryByTestId('knowledge-split-handle')).toBeNull()
+  })
+
+  it('split layout mounts the real-time preview pane next to the editor', () => {
+    seedWorkspace('source')
+    useKnowledgeStore.setState({ sourceLayout: 'split' })
+    render(<KnowledgeWorkspace />)
+    expect(screen.getByTestId('knowledge-layout-toggle')).toBeInTheDocument()
+    const preview = screen.getByTestId('knowledge-live-preview')
+    expect(preview).toBeInTheDocument()
+    expect(screen.getByTestId('knowledge-split-handle')).toBeInTheDocument()
+    // Editor stays mounted in the left panel (no remount on layout switch).
+    expect(screen.getByTestId('knowledge-doc-editor')).toBeInTheDocument()
+  })
+
+  it('Live mode hides the Source-layout toggle (WYSIWYG is the preview)', () => {
+    seedWorkspace('live')
+    render(<KnowledgeWorkspace />)
+    expect(screen.queryByTestId('knowledge-layout-toggle')).toBeNull()
+    expect(screen.queryByTestId('knowledge-live-preview')).toBeNull()
   })
 })

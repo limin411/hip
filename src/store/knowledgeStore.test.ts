@@ -169,6 +169,34 @@ describe('knowledgeStore openDoc editorMode default', () => {
   })
 })
 
+describe('knowledgeStore sourceLayout (split live preview)', () => {
+  const LAYOUT_KEY = 'hip-knowledge-source-layout'
+
+  beforeEach(() => {
+    localStorage.removeItem(LAYOUT_KEY)
+    useKnowledgeStore.setState({ sourceLayout: 'source' })
+  })
+
+  it('defaults to source and persists split preference without touching draft', () => {
+    expect(useKnowledgeStore.getState().sourceLayout).toBe('source')
+    useKnowledgeStore.setState({ draftBody: 'keep' })
+    useKnowledgeStore.getState().setSourceLayout('split')
+    expect(useKnowledgeStore.getState().sourceLayout).toBe('split')
+    expect(useKnowledgeStore.getState().draftBody).toBe('keep')
+    expect(localStorage.getItem(LAYOUT_KEY)).toBe('split')
+  })
+
+  it('rejects invalid values and is a no-op when already set', () => {
+    useKnowledgeStore.getState().setSourceLayout('split')
+    // @ts-expect-error invalid layout value
+    useKnowledgeStore.getState().setSourceLayout('side-by-side')
+    expect(useKnowledgeStore.getState().sourceLayout).toBe('split')
+    expect(localStorage.getItem(LAYOUT_KEY)).toBe('split')
+    useKnowledgeStore.getState().setSourceLayout('split')
+    expect(localStorage.getItem(LAYOUT_KEY)).toBe('split')
+  })
+})
+
 describe('knowledgeStore deleteSpace', () => {
   beforeEach(() => {
     knowledgeWriteDoc.mockReset()

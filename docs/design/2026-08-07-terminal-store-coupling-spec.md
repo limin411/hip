@@ -185,3 +185,27 @@ export function removeHostTerminalRecord(id: string): Promise<void>
 1. **模块命名**：`terminalLifecycle.ts` vs `actions/terminalActions.ts`（推荐前者，无 transport/waiter 依赖）。
 2. **P3 范围**：组件层同序列清理是否本轮收口（推荐收口，防漂移）。
 3. **`disposeTerminal` 的 `keepAgentSession` 选项**：现状 `close` SSH 分支不调 agent store（225–226 行只有 2 调用），是否用选项参数表达（推荐：是，避免三个近似函数）。
+
+---
+
+## 11. 实施记录（2026-08-07）
+
+**决策**：`terminalLifecycle.ts`；P3 仅收口完全同构序列；`disposeTerminal` 选项为 `clearAgent?: boolean`（默认 true）。
+
+**调研修正（相对草案）**：
+
+- 实际跨 store 写共 **15 处**（草案 14）：新增 `persistSshRecord`（setTitle/setStatus 调用的模块私有函数）内的 `upsertTerminalRecord`。
+- `reconnect` 实际 4 个调用（clearSession → ensureSession → clearTerminal → setExecFlight(null)），**不含** setActiveSession；因此不能复用 dispose + ensure 组合（会多清 setActiveSession，行为变化），独立实现 `resetTerminalForReconnect`。
+- `close` 的 `!term` 分支只有 2 个调用且不清 agent 态 → `disposeTerminal(id, { clearAgent: false })`。
+- `cancelSftpTransfers` 对 `terminalFsStore.transfers` 是**只读**查询，不在 15 处写调用内；R3 取消后转为 R2 只读注释边（`// store-dep(read-only)`），store 层保持 0 条写边。
+
+**Phase 执行**：
+
+| Phase | 结果 |
+|---|---|
+| P1 | `src/domain/terminalLifecycle.ts`（6 函数）+ `terminalLifecycle.test.ts`（13 用例：顺序契约、clearAgent:false、可选链 undefined 不抛、launch 参数映射、reconnect 序列）✅ `feat(terminal-lifecycle)` |
+| P2 | managedTerminalStore 15 处替换为 lifecycle；4 个 store import 移除（留 1 条 R2 只读注释 import）；现有 49 个相关测试零改动全绿 ✅ `refactor(terminal-lifecycle)` |
+| P3 | 扫描结论：`terminalRecordActions.deleteTerminalRecord` 的未连接 else 分支（clearSession + clearTerminal）与 `disposeTerminal(id, { clearAgent: false })` **完全同构 → 已收口**。非同构保留并标注：`deleteHostWithCascade`（close → trashSession 交织 → removeRecord）、`ManagedTerminalSession.restart`（clearSession+ensureSession，无 fs/agent 清理）、`codeTerminalController` / `sessionActions`（单调用 teardown）。 |
+| P4 | `check-store-deps.mjs` ALLOWLIST 清空（注释"R3 已取消"）；`store-dependencies.md` R3 改已治理 + 豁免表删除 + R2 表增 1 条；`yarn check:store-deps` 全量通过 ✅ |
+
+**验收**：managedTerminalStore 跨 store 写调用 15 → 0；全库 0 条 store→store 写边；terminalLifecycle.test.ts 锁定清理顺序（ring → fs → agent）与 reconnect 重建语义；相关测试零行为改动。

@@ -5,10 +5,16 @@ import { ptyKill } from '@/ipc/pty'
 import { interactiveTerminalList, sshClose } from '@/ipc/ssh'
 import { sftpCancel } from '@/ipc/sftp'
 import type { TerminalHost, TerminalRecord } from '@/ipc/terminalHosts'
-import { useTerminalStore } from '@/store/terminalStore'
-import { useTerminalHostStore } from '@/store/terminalHostStore'
+// store-dep(read-only): reads in-flight SFTP transfers for SSH teardown
 import { useTerminalFsStore } from '@/store/terminalFsStore'
-import { useTerminalAgentStore } from '@/store/terminalAgentStore'
+import {
+  disposeTerminal,
+  ensureTerminalSession,
+  persistSshRecord,
+  recordTerminalLaunch,
+  removeHostTerminalRecord,
+  resetTerminalForReconnect,
+} from '@/domain/terminalLifecycle'
 
 /** Cancel in-flight SFTP transfers for a terminal before tearing down SSH (Issue 8). */
 async function cancelSftpTransfers(terminalId: string): Promise<void> {
@@ -128,22 +134,12 @@ interface ManagedTerminalStore {
  * Call from the session open path — not from form submit alone.
  */
 export async function recordSuccessfulLocalLaunch(cwd: string, label?: string): Promise<void> {
-  await useTerminalHostStore.getState().pushRecent({
-    type: 'local',
-    cwd,
-    label,
-    at: Date.now(),
-  })
+  await recordTerminalLaunch({ type: 'local', cwd, label })
 }
 
 /** After a successful `ssh_open`, record a recent SSH launch (K11). */
 export async function recordSuccessfulSshLaunch(hostId: string, label: string): Promise<void> {
-  await useTerminalHostStore.getState().pushRecent({
-    type: 'ssh',
-    hostId,
-    label,
-    at: Date.now(),
-  })
+  await recordTerminalLaunch({ type: 'ssh', hostId, label })
 }
 
 export const useManagedTerminalStore = create<ManagedTerminalStore>((set, get) => ({
@@ -179,7 +175,7 @@ export const useManagedTerminalStore = create<ManagedTerminalStore>((set, get) =
       createdAt: Date.now(),
     }
 
-    useTerminalStore.getState().ensureSession(id)
+    ensureTerminalSession(id)
     set((s) => ({
       terminals: [...s.terminals, entry],
       focusedId: id,
@@ -200,7 +196,7 @@ export const useManagedTerminalStore = create<ManagedTerminalStore>((set, get) =
       status: 'connecting',
       createdAt: Date.now(),
     }
-    useTerminalStore.getState().ensureSession(id)
+    ensureTerminalSession(id)
     set((s) => ({
       terminals: [...s.terminals, entry],
       focusedId: id,
@@ -222,8 +218,7 @@ export const useManagedTerminalStore = create<ManagedTerminalStore>((set, get) =
       } catch {
         /* already dead */
       }
-      useTerminalStore.getState().clearSession(id)
-      useTerminalFsStore.getState().clearTerminal(id)
+      disposeTerminal(id, { clearAgent: false })
       set((s) => ({
         focusedId: s.focusedId === id ? null : s.focusedId,
       }))
@@ -246,10 +241,7 @@ export const useManagedTerminalStore = create<ManagedTerminalStore>((set, get) =
       }
     }
 
-    useTerminalStore.getState().clearSession(id)
-    useTerminalFsStore.getState().clearTerminal(id)
-    useTerminalAgentStore.getState().setExecFlight(id, null)
-    useTerminalAgentStore.getState().setActiveSession(id, null)
+    disposeTerminal(id)
     set((s) => {
       if (term.kind === 'ssh') {
         // D12: keep the record + child sessions (read-only); mark disconnected.
@@ -313,12 +305,9 @@ export const useManagedTerminalStore = create<ManagedTerminalStore>((set, get) =
   removeRecord: (id) =>
     set((s) => {
       const terminals = s.terminals.filter((t) => t.id !== id)
-      useTerminalStore.getState().clearSession(id)
-      useTerminalFsStore.getState().clearTerminal(id)
-    useTerminalAgentStore.getState().setExecFlight(id, null)
-    useTerminalAgentStore.getState().setActiveSession(id, null)
-    void useTerminalHostStore.getState().removeTerminalRecord?.(id).catch(() => {})
-    let focusedId = s.focusedId
+      disposeTerminal(id)
+      void removeHostTerminalRecord(id)
+      let focusedId = s.focusedId
       if (s.focusedId === id) {
         focusedId = terminals[0]?.id ?? null
       }
@@ -333,10 +322,7 @@ export const useManagedTerminalStore = create<ManagedTerminalStore>((set, get) =
     } catch {
       /* already dead */
     }
-    useTerminalStore.getState().clearSession(id)
-    useTerminalStore.getState().ensureSession(id)
-    useTerminalFsStore.getState().clearTerminal(id)
-    useTerminalAgentStore.getState().setExecFlight(id, null)
+    resetTerminalForReconnect(id)
     get().setStatus(id, 'connecting')
     set((s) => ({
       reconnectNonce: {
@@ -346,21 +332,3 @@ export const useManagedTerminalStore = create<ManagedTerminalStore>((set, get) =
     }))
   },
 }))
-
-/** Persist an SSH record to the host catalog (live status is never persisted). */
-function persistSshRecord(term: ManagedTerminal): void {
-  if (term.kind !== 'ssh' || !term.hostId) return
-  void useTerminalHostStore
-    .getState()
-    .upsertTerminalRecord?.({
-      id: term.id,
-      hostId: term.hostId,
-      title: term.title,
-      remotePath: term.remotePath,
-      status: 'disconnected',
-      createdAt: term.createdAt,
-    })
-    .catch(() => {
-      /* catalog write failures must not break terminal runtime */
-    })
-}

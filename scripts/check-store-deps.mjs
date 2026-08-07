@@ -5,11 +5,9 @@
  * Rules:
  *  R1/R2 — any `src/store/*.ts` → `src/store/*.ts` import must carry a
  *          `store-dep(read-only): <reason>` comment on the import statement
- *          (read-only query dependencies only), or be on the explicit
- *          grandfathered write-coupling allowlist below.
- *  R3    — managedTerminalStore → terminal* family is grandfathered (write
- *          coupling). Do NOT add to the allowlist; the coupling is slated for
- *          separate remediation.
+ *          (read-only query dependencies only). No write coupling exists
+ *          anymore (R3 cancelled 2026-08 — terminal lifecycle writes moved to
+ *          `src/domain/terminalLifecycle.ts`).
  *  R4    — `src/domain/actions/*` modules must not import each other
  *          (shared logic goes to src/lib or the facade).
  */
@@ -22,13 +20,8 @@ const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 const storeDir = path.join(root, 'src', 'store')
 const actionsDir = path.join(root, 'src', 'domain', 'actions')
 
-/** Grandfathered write couplings (R3). Adding entries here is a spec violation. */
-const ALLOWLIST = new Set([
-  'managedTerminalStore->terminalAgentStore',
-  'managedTerminalStore->terminalFsStore',
-  'managedTerminalStore->terminalHostStore',
-  'managedTerminalStore->terminalStore',
-])
+/** Grandfathered write couplings (R3). R3 cancelled 2026-08 — do not re-add. */
+const ALLOWLIST = new Set([])
 
 function listTs(dir) {
   return execSync(`ls ${JSON.stringify(dir)}/*.ts 2>/dev/null || true`, { encoding: 'utf8' })

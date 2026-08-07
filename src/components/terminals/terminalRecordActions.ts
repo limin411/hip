@@ -2,8 +2,7 @@ import { useDomainStore } from '@/domain/sessionStore'
 import { useManagedTerminalStore, type ManagedTerminal } from '@/store/managedTerminalStore'
 import { terminalSessionsFor } from '@/store/terminalAgentStore'
 import { useTerminalHostStore } from '@/store/terminalHostStore'
-import { useTerminalStore } from '@/store/terminalStore'
-import { useTerminalFsStore } from '@/store/terminalFsStore'
+import { disposeTerminal } from '@/domain/terminalLifecycle'
 
 /**
  * Cascade delete for a managed terminal record (D12/Q7): close online SSH first,
@@ -21,8 +20,8 @@ export async function deleteTerminalRecord(term: ManagedTerminal): Promise<void>
       /* record removal below still proceeds */
     }
   } else {
-    useTerminalStore.getState().clearSession(term.id)
-    useTerminalFsStore.getState().clearTerminal(term.id)
+    // Isomorphic to the close !term sequence (ring → fs cache, no agent state).
+    disposeTerminal(term.id, { clearAgent: false })
   }
   for (const s of sessions) {
     sessionService.trashSession(s.id, { reason: 'terminal-record-delete' })

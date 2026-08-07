@@ -17,6 +17,7 @@ import { nanoid } from 'nanoid'
 import type { Transport } from './transport'
 import { MessageWaiter } from './messageWaiter'
 import { MemoryWire } from './actions/memoryWire'
+import { FsActions } from './actions/fsActions'
 import type {
   EmptyGreetingGenerateContext,
   MemoryFileConfig,
@@ -98,11 +99,14 @@ export class SessionService {
   private readonly e2e = new E2eHooks(this)
   /** Cross-session memory + provider probing wire actions (P2). */
   private readonly memoryWire: MemoryWire
+  /** Workspace diff / git / file-browsing wire actions (P3). */
+  private readonly fsActions: FsActions
   /** E2E: last user content passed to sendMessage (annotation inject assertions). */
   private lastOutboundUserContent: string | null = null
 
   constructor(transport: Transport) {
     this.memoryWire = new MemoryWire(transport, this.waiter)
+    this.fsActions = new FsActions(transport)
     this.transport = transport
     this.streamCoalescer = new StreamCoalescer((bucket) => this.applyCoalescedToken(bucket))
     this.unsubscribe = this.transport.onMessage((msg: ServerMessage) => this.receive(msg))
@@ -1023,77 +1027,59 @@ export class SessionService {
    * Pull the workspace diff.
    * In-flight dedupe: a second request while loading is dropped (`'deduped'`).
    */
-  requestDiff(sessionId: string, base?: DiffBase, ignoreWhitespace?: boolean): 'sent' | 'deduped' {
-    const cur = useDiffStore.getState().bySession[sessionId]
-    if (cur?.status === 'loading') return 'deduped'
-    const b = base ?? cur?.base ?? 'session-start'
-    const ig = ignoreWhitespace ?? useUiStore.getState().ignoreWhitespace
-    useDiffStore.getState().setLoading(sessionId)
-    this.transport.send({ type: 'fs:diff', sessionId, base: b, ...(ig ? { ignoreWhitespace: true } : {}) })
-    return 'sent'
+
+
+  requestDiff(sessionId: string, base?: DiffBase, ignoreWhitespace?: boolean) {
+    return this.fsActions.requestDiff(sessionId, base, ignoreWhitespace)
   }
 
-  /** Request a single file's full diff (for on-demand show-full). */
-  requestDiffFile(sessionId: string, p: string, context: number | 'full' = 'full'): void {
-    const base = useDiffStore.getState().bySession[sessionId]?.base ?? 'session-start'
-    this.transport.send({ type: 'fs:diffFile', sessionId, path: p, base, context })
+  requestDiffFile(sessionId: string, p: string, context: number | 'full' = 'full') {
+    return this.fsActions.requestDiffFile(sessionId, p, context)
   }
 
-  /** One-click `git init` for a non-repo cwd; a successful result chains a fresh diff. */
-  gitInitWorkspace(sessionId: string): void {
-    useDiffStore.getState().setInitPending(sessionId, true)
-    this.transport.send({ type: 'fs:gitInit', sessionId })
+  gitInitWorkspace(sessionId: string) {
+    return this.fsActions.gitInitWorkspace(sessionId)
   }
 
-  /** Pull the checkpoint list result meta (isGitRepo / current branch) for the Changes tab gating. */
-  requestCheckpoints(sessionId: string): void {
-    this.transport.send({ type: 'git:checkpoint:list', sessionId })
+  requestCheckpoints(sessionId: string) {
+    return this.fsActions.requestCheckpoints(sessionId)
   }
 
-  /** Pull the recent repo commit log (capped) for the 更改 tab. */
-  requestCommitLog(sessionId: string): void {
-    useDiffStore.getState().setCommitLogLoading(sessionId)
-    this.transport.send({ type: 'git:commitLog', sessionId })
+  requestCommitLog(sessionId: string) {
+    return this.fsActions.requestCommitLog(sessionId)
   }
 
-  /** Load the diff introduced by one commit; the Changes panel swaps into commit mode. */
-  requestCommitDiff(sessionId: string, sha: string): void {
-    useDiffStore.getState().setViewingCommit(sessionId, sha)
-    useDiffStore.getState().setCommitDiffLoading(sessionId)
-    this.transport.send({ type: 'git:commitDiff', sessionId, sha })
+  requestCommitDiff(sessionId: string, sha: string) {
+    return this.fsActions.requestCommitDiff(sessionId, sha)
   }
 
-  /** Discard one working-tree change (restore to HEAD; sidecar keeps a trash copy). */
-  discardFile(sessionId: string, path: string, status: DiffFileStatus, oldPath?: string): void {
-    useDiffStore.getState().setDiscardPending(sessionId, path, true)
-    this.transport.send({
-      type: 'git:discard',
-      sessionId,
-      path,
-      status,
-      ...(oldPath ? { oldPath } : {}),
-    })
+  discardFile(sessionId: string, path: string, status: DiffFileStatus, oldPath?: string) {
+    return this.fsActions.discardFile(sessionId, path, status, oldPath)
   }
 
-  /** Pull the branch list (+ current) for the BranchSwitcher. */
-  requestBranches(sessionId: string): void {
-    this.transport.send({ type: 'git:branch:list', sessionId })
+  requestBranches(sessionId: string) {
+    return this.fsActions.requestBranches(sessionId)
   }
 
-  /** Switch the checkout to a branch. The :result re-pulls branches + diff. */
-  switchBranch(sessionId: string, branch: string): void {
-    this.transport.send({ type: 'git:branch:switch', sessionId, branch })
+  switchBranch(sessionId: string, branch: string) {
+    return this.fsActions.switchBranch(sessionId, branch)
   }
 
-  lsDir(sessionId: string, path: string): void {
-    this.transport.send({ type: 'fs:ls', sessionId, path })
+  lsDir(sessionId: string, path: string) {
+    return this.fsActions.lsDir(sessionId, path)
   }
 
-  readFile(sessionId: string, path: string): void {
-    useFsStore.getState().setPreview(sessionId, { status: 'loading', path })
-    this.transport.send({ type: 'fs:read', sessionId, path })
+  readFile(sessionId: string, path: string) {
+    return this.fsActions.readFile(sessionId, path)
   }
 
+  lsDraft(cwd: string, path: string) {
+    return this.fsActions.lsDraft(cwd, path)
+  }
+
+  readDraftFile(cwd: string, path: string) {
+    return this.fsActions.readDraftFile(cwd, path)
+  }
   /** Start a fresh new-conversation draft (no committed session yet). */
   newConversation(surface?: Surface): void {
     useDraftStore.getState().ensureDraft(surface)
@@ -1111,18 +1097,6 @@ export class SessionService {
     }
   }
 
-  // Draft FS: fsStore is keyed by an arbitrary scope string — a committed session's
-  // nanoid id, or (for an un-committed draft) its absolute cwd. The two never collide.
-  /** List a directory for an un-committed draft (cwd-keyed, no session). */
-  lsDraft(cwd: string, path: string): void {
-    this.transport.send({ type: 'fs:lsCwd', cwd, path })
-  }
-
-  /** Read a file for an un-committed draft (cwd-keyed). Preview is keyed by cwd. */
-  readDraftFile(cwd: string, path: string): void {
-    useFsStore.getState().setPreview(cwd, { status: 'loading', path })
-    this.transport.send({ type: 'fs:readCwd', cwd, path })
-  }
 
   search(query: string): void {
     useDomainStore.getState().setSearching(query.trim().length > 0)

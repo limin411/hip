@@ -118,6 +118,24 @@ vi.mock('@codemirror/view', () => ({
     },
   },
   keymap: { of: () => ({}) },
+  // Minimal stubs for the Typora live-preview plugin (never mounted in tests).
+  Decoration: {
+    mark: () => ({ point: false }),
+    replace: () => ({ point: true }),
+    widget: () => ({ point: true }),
+    none: () => ({}),
+  },
+  ViewPlugin: {
+    fromClass: (cls: unknown) => cls,
+  },
+  WidgetType: class WidgetType {
+    eq(): boolean {
+      return false
+    }
+    toDOM(): HTMLElement {
+      return document.createElement('span')
+    }
+  },
 }))
 
 vi.mock('@codemirror/state', () => ({

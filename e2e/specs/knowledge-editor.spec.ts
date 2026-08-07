@@ -203,4 +203,16 @@ describe('knowledge editor ux @knowledge @core', () => {
       el.dispatchEvent(new Event('input', { bubbles: true }))
     }, filter)
   })
+
+  it('KE14: Typora live preview renders heading syntax in place', async () => {
+    await ensureKnowledgeSource()
+    await expectKnowledgeEditor()
+    await typeInKnowledgeEditor(`# ${marker}`)
+    const h1 = await browser.$('[data-testid="knowledge-doc-editor"] .kb-tp-h1')
+    await h1.waitForExist({ timeout: 10000 })
+    await browser.waitUntil(
+      async () => (await h1.getText()).includes(marker),
+      { timeout: 10000, interval: 200, timeoutMsg: 'live heading preview missing marker' },
+    )
+  })
 })

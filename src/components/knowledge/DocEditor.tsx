@@ -34,8 +34,11 @@ import {
   importAssetFromFile,
 } from '@/domain/knowledge/importAsset'
 import { wikiLinkAutocomplete } from '@/domain/knowledge/wikiCmCompletion'
+import { typoraLivePreview } from '@/domain/knowledge/typoraPreview'
+import { resolveAssetDataUrl } from '@/domain/knowledge/assetUrl'
 import type { KnowledgeNode } from '@/domain/knowledge/types'
 import { kbPerfSourceReady } from '@/domain/knowledge/knowledgePerf'
+import './knowledge-typora.css'
 
 export interface DocEditorProps {
   /** Remount key source — parent should also pass key={docId} */
@@ -433,6 +436,15 @@ export const DocEditor = forwardRef<DocEditorHandle, DocEditorProps>(function Do
       assetHandlers,
       highlightSelectionMatches(),
       wikiLinkAutocomplete(() => wikiNodesRef.current),
+      // Typora-style live preview: markdown renders in place, raw syntax
+      // reveals under the caret. Visual only — doc text stays raw markdown.
+      typoraLivePreview({
+        resolveAsset: (src) => {
+          const spaceId = spaceIdRef.current
+          if (!spaceId) return null
+          return resolveAssetDataUrl(spaceId, src).then((res) => res?.dataUrl ?? null)
+        },
+      }),
       Prec.highest(keymap.of([...knowledgeKeys, ...searchKeymap])),
     ]
   }, [themeCompartment, updateSlashMatch])

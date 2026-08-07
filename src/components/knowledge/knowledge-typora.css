@@ -1,0 +1,151 @@
+/**
+ * Typora-style live preview (WYSIWYM) — rendered markdown elements inside the
+ * knowledge Source editor (CodeMirror decorations emit these classes).
+ * Host tokens come from knowledge-doc-typography.css (`--kb-*`).
+ */
+
+/* Headings — size ladder follows the Live/Reader scale */
+.kb-tp-h1 {
+  font-size: var(--kb-h1-size, 1.75em);
+  font-weight: var(--kb-heading-weight, 600);
+  color: var(--text-primary);
+}
+.kb-tp-h2 {
+  font-size: var(--kb-h2-size, 1.375em);
+  font-weight: var(--kb-heading-weight, 600);
+  color: var(--text-primary);
+}
+.kb-tp-h3 {
+  font-size: var(--kb-h3-size, 1.15em);
+  font-weight: var(--kb-heading-weight, 600);
+  color: var(--text-primary);
+}
+.kb-tp-h4,
+.kb-tp-h5,
+.kb-tp-h6 {
+  font-weight: var(--kb-heading-weight, 600);
+  color: var(--text-primary);
+}
+
+/* Inline emphasis */
+.kb-tp-strong {
+  font-weight: 700;
+}
+.kb-tp-em {
+  font-style: italic;
+}
+.kb-tp-strike {
+  text-decoration: line-through;
+  text-decoration-color: var(--text-tertiary);
+}
+
+/* Inline code chip */
+.kb-tp-code {
+  font-family: var(--kb-font-mono, ui-monospace, monospace);
+  font-size: 0.875em;
+  background: color-mix(in srgb, var(--surface-muted) 80%, transparent);
+  border-radius: 3px;
+  padding: 0.05em 0.3em;
+  box-decoration-break: clone;
+  -webkit-box-decoration-break: clone;
+}
+
+/* Links + wiki links */
+.kb-tp-link {
+  color: var(--accent-strong);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.kb-tp-wiki {
+  color: var(--accent-strong);
+  border-radius: 3px;
+  background: color-mix(in srgb, var(--accent) 10%, transparent);
+  padding: 0 0.15em;
+}
+
+/* Blockquote — per-line rail via box-decoration-break */
+.kb-tp-quote {
+  color: var(--text-secondary);
+  border-left: 2px solid var(--border);
+  padding-left: 0.65em;
+  box-decoration-break: clone;
+  -webkit-box-decoration-break: clone;
+}
+
+/* Code fences — soft block behind the code text */
+.kb-tp-fence {
+  font-family: var(--kb-font-mono, ui-monospace, monospace);
+  font-size: 0.9em;
+  line-height: 1.55;
+  background: color-mix(in srgb, var(--surface-muted) 70%, transparent);
+  border-radius: 4px;
+  padding: 0.1em 0.7em;
+  box-decoration-break: clone;
+  -webkit-box-decoration-break: clone;
+}
+
+/* Widgets */
+.kb-tp-bullet {
+  display: inline-block;
+  width: 1.3em;
+  text-align: center;
+  color: var(--text-tertiary);
+  user-select: none;
+}
+.kb-tp-list-num {
+  display: inline-block;
+  min-width: 1.3em;
+  text-align: right;
+  padding-right: 0.35em;
+  color: var(--text-tertiary);
+  font-variant-numeric: tabular-nums;
+  user-select: none;
+}
+.kb-tp-task {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.05em;
+  height: 1.05em;
+  margin-right: 0.35em;
+  border: 1.5px solid var(--border);
+  border-radius: 3px;
+  font-size: 0.85em;
+  line-height: 1;
+  cursor: pointer;
+  vertical-align: -0.12em;
+  user-select: none;
+}
+.kb-tp-task-checked {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}
+.kb-tp-hr {
+  height: 1px;
+  background: var(--border);
+  margin: 0.55em 0;
+  border-radius: 1px;
+}
+.kb-tp-fence-label {
+  display: inline-block;
+  font-family: var(--kb-font-mono, ui-monospace, monospace);
+  font-size: 0.78em;
+  color: var(--text-tertiary);
+  background: color-mix(in srgb, var(--surface-muted) 80%, transparent);
+  border-radius: 3px;
+  padding: 0 0.45em;
+  margin-right: 0.4em;
+  user-select: none;
+}
+.kb-tp-img-wrap {
+  display: inline-block;
+  vertical-align: middle;
+}
+.kb-tp-img {
+  display: block;
+  max-width: 100%;
+  max-height: 360px;
+  border-radius: 4px;
+  margin: 0.25em 0;
+}

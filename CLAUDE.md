@@ -37,9 +37,18 @@ yarn tauri build
 ## Key directories
 
 - `src/` — React UI and domain logic
+  - `src/domain/` — session facade + wire actions（2026-08 重构后）
+    - `sessionService.ts` — 瘦 facade：传输 + 入站分发 + 方法转发
+    - `actions/sessionActions.ts` — 会话生命周期/配置/消息
+    - `actions/fsActions.ts` — diff/git/文件浏览
+    - `actions/memoryWire.ts` — 记忆/provider 探测
+    - `e2eHooks.ts` — dev-only E2E 模拟钩子
+    - `messageWaiter.ts` — ServerMessage 单次等待器
 - `src-tauri/` — Rust Tauri app and native commands
 - `packages/sidecar/` — Node.js sidecar that runs agents / tools
 - `packages/protocol/` — shared types between UI and sidecar
+
+Store 依赖纪律见 `docs/architecture/store-dependencies.md`（`yarn check:store-deps` 守护）。
 
 ## Long-task dogfood target
 

@@ -21,6 +21,7 @@ import {
 } from '@hip/protocol'
 import { nanoid } from 'nanoid'
 import type { Transport } from './transport'
+import { MessageWaiter } from './messageWaiter'
 import { WsTransport } from './wsTransport'
 import { useDomainStore, DEFAULT_CONFIG } from './sessionStore'
 import { useFsStore } from '@/store/fsStore'
@@ -85,15 +86,6 @@ function tokenStreamExtras(msg: ServerMessage & { type: 'token:stream' }): {
   }
 }
 
-type ServerMessageWaiter = {
-  type: ServerMessage['type']
-  /** When set, only messages matching both type and predicate fulfill this waiter. */
-  predicate?: (msg: ServerMessage) => boolean
-  resolve: (msg: ServerMessage) => void
-  reject: (err: Error) => void
-  timer: ReturnType<typeof setTimeout>
-}
-
 export type TestProviderRequest = {
   purpose: 'chat' | 'embedding' | 'rerank'
   providerID: string
@@ -116,7 +108,8 @@ export class SessionService {
   private readonly unsubscribe: () => void
   private readonly unsubStatus: () => void
   private readonly streamCoalescer: StreamCoalescer
-  private waiters: ServerMessageWaiter[] = []
+  /** One-shot ServerMessage waits (wait/waitWhere/waitFirst) shared with action modules. */
+  private readonly waiter = new MessageWaiter()
   /** E2E: last user content passed to sendMessage (annotation inject assertions). */
   private lastOutboundUserContent: string | null = null
   /**
@@ -137,11 +130,7 @@ export class SessionService {
     this.streamCoalescer.flushAll()
     this.unsubscribe()
     this.unsubStatus()
-    for (const w of this.waiters) {
-      clearTimeout(w.timer)
-      w.reject(new Error('SessionService disposed'))
-    }
-    this.waiters = []
+    this.waiter.dispose()
   }
 
   /** Flush coalesced token text into the store as a single token:stream apply. */
@@ -218,94 +207,6 @@ export class SessionService {
     }
   }
 
-  /** One-shot wait for the next inbound ServerMessage of a given type. */
-  private waitForServerMessage<T extends ServerMessage['type']>(
-    type: T,
-    timeoutMs = 5000,
-  ): Promise<Extract<ServerMessage, { type: T }>> {
-    return this.waitForServerMessageWhere(type, undefined, timeoutMs)
-  }
-
-  /**
-   * One-shot wait for the next inbound ServerMessage of `type` that also matches
-   * `predicate` (if provided). Non-matching messages of the same type leave this
-   * waiter intact so concurrent requestId RPCs do not cross-resolve.
-   */
-  private waitForServerMessageWhere<T extends ServerMessage['type']>(
-    type: T,
-    predicate: ((msg: Extract<ServerMessage, { type: T }>) => boolean) | undefined,
-    timeoutMs = 5000,
-  ): Promise<Extract<ServerMessage, { type: T }>> {
-    return new Promise((resolve, reject) => {
-      const entry: ServerMessageWaiter = {
-        type,
-        predicate: predicate
-          ? (msg) => msg.type === type && predicate(msg as Extract<ServerMessage, { type: T }>)
-          : undefined,
-        resolve: (msg) => resolve(msg as Extract<ServerMessage, { type: T }>),
-        reject,
-        timer: setTimeout(() => {
-          this.waiters = this.waiters.filter((w) => w !== entry)
-          reject(new Error(`Timeout waiting for ${type}`))
-        }, timeoutMs),
-      }
-      this.waiters.push(entry)
-    })
-  }
-
-  /**
-   * Wait for the first message whose type is in `types`. Cancels sibling waiters
-   * so a validation error does not leave a hung waiter.
-   */
-  private waitForFirstServerMessage<T extends ServerMessage['type']>(
-    types: T[],
-    timeoutMs = 5000,
-  ): Promise<Extract<ServerMessage, { type: T }>> {
-    return new Promise((resolve, reject) => {
-      const entries: ServerMessageWaiter[] = []
-      const cleanup = () => {
-        for (const e of entries) {
-          clearTimeout(e.timer)
-          this.waiters = this.waiters.filter((w) => w !== e)
-        }
-      }
-      const timer = setTimeout(() => {
-        cleanup()
-        reject(new Error(`Timeout waiting for ${types.join('|')}`))
-      }, timeoutMs)
-      for (const type of types) {
-        const entry: ServerMessageWaiter = {
-          type,
-          resolve: (msg) => {
-            cleanup()
-            clearTimeout(timer)
-            resolve(msg as Extract<ServerMessage, { type: T }>)
-          },
-          reject: (err) => {
-            cleanup()
-            clearTimeout(timer)
-            reject(err)
-          },
-          // Individual timers unused; outer timer owns the deadline.
-          timer: setTimeout(() => {}, timeoutMs),
-        }
-        clearTimeout(entry.timer)
-        entries.push(entry)
-        this.waiters.push(entry)
-      }
-    })
-  }
-
-  private fulfillWaiters(msg: ServerMessage): void {
-    const idx = this.waiters.findIndex(
-      (w) => w.type === msg.type && (!w.predicate || w.predicate(msg)),
-    )
-    if (idx < 0) return
-    const [w] = this.waiters.splice(idx, 1)
-    clearTimeout(w.timer)
-    w.resolve(msg)
-  }
-
   async connect(): Promise<void> {
     try {
       await this.transport.connect()
@@ -348,7 +249,7 @@ export class SessionService {
         ...(extras.role !== undefined ? { role: extras.role } : {}),
         delta: msg.delta,
       })
-      this.fulfillWaiters(msg)
+      this.waiter.fulfill(msg)
       return
     }
 
@@ -397,7 +298,7 @@ export class SessionService {
           /* automation store optional at boot */
         })
     }
-    this.fulfillWaiters(msg)
+    this.waiter.fulfill(msg)
   }
 
   /**
@@ -1406,7 +1307,7 @@ export class SessionService {
    */
   async testProvider(req: TestProviderRequest, timeoutMs = 20_000): Promise<TestProviderResult> {
     const requestId = nanoid()
-    const wait = this.waitForServerMessageWhere(
+    const wait = this.waiter.waitWhere(
       'config:testProvider:result',
       (m) => m.requestId === requestId,
       timeoutMs,
@@ -1432,7 +1333,7 @@ export class SessionService {
   }
 
   async getMemoryConfig(): Promise<MemoryFileConfig> {
-    const wait = this.waitForServerMessage('memory:config')
+    const wait = this.waiter.wait('memory:config')
     this.transport.send({ type: 'memory:getConfig' })
     const msg = await wait
     return msg.config
@@ -1440,7 +1341,7 @@ export class SessionService {
 
   async setMemoryConfig(config: Partial<MemoryFileConfig>): Promise<MemoryFileConfig> {
     // setConfig validation failures arrive as type:error (code MEMORY_CONFIG).
-    const wait = this.waitForFirstServerMessage(['memory:config', 'error'])
+    const wait = this.waiter.waitFirst(['memory:config', 'error'])
     this.transport.send({ type: 'memory:setConfig', config })
     const msg = await wait
     if (msg.type === 'error') {
@@ -1455,7 +1356,7 @@ export class SessionService {
     modelKey?: string
     vecEnabled?: boolean
   }> {
-    const wait = this.waitForServerMessage('memory:indexStatus:result')
+    const wait = this.waiter.wait('memory:indexStatus:result')
     this.transport.send({ type: 'memory:indexStatus' })
     const msg = await wait
     if (msg.error) throw new Error(msg.error)
@@ -1473,7 +1374,7 @@ export class SessionService {
     failed: number
     modelKey?: string
   }> {
-    const wait = this.waitForServerMessage('memory:reindex:result')
+    const wait = this.waiter.wait('memory:reindex:result')
     this.transport.send({ type: 'memory:reindex' })
     const msg = await wait
     if (msg.error) throw new Error(msg.error)
@@ -1493,7 +1394,7 @@ export class SessionService {
     limit?: number
     status?: MemoryStatus
   }): Promise<MemoryItem[]> {
-    const wait = this.waitForServerMessage('memory:list:result')
+    const wait = this.waiter.wait('memory:list:result')
     this.transport.send({ type: 'memory:list', ...filter })
     const msg = await wait
     if (msg.error) throw new Error(msg.error)
@@ -1503,7 +1404,7 @@ export class SessionService {
   async upsertMemory(
     item: Partial<MemoryItem> & Pick<MemoryItem, 'title' | 'content' | 'kind' | 'scope'>,
   ): Promise<MemoryItem> {
-    const wait = this.waitForServerMessage('memory:upsert:result')
+    const wait = this.waiter.wait('memory:upsert:result')
     this.transport.send({ type: 'memory:upsert', item })
     const msg = await wait
     if (msg.error || !msg.item) throw new Error(msg.error ?? 'upsert failed')
@@ -1511,7 +1412,7 @@ export class SessionService {
   }
 
   async deleteMemory(id: string, hard?: boolean): Promise<boolean> {
-    const wait = this.waitForServerMessage('memory:delete:result')
+    const wait = this.waiter.wait('memory:delete:result')
     this.transport.send({ type: 'memory:delete', id, ...(hard !== undefined ? { hard } : {}) })
     const msg = await wait
     if (msg.error) throw new Error(msg.error)
@@ -1519,7 +1420,7 @@ export class SessionService {
   }
 
   async deleteMemoriesBySourceSession(sessionId: string, soft?: boolean): Promise<number> {
-    const wait = this.waitForServerMessage('memory:deleteBySourceSession:result')
+    const wait = this.waiter.wait('memory:deleteBySourceSession:result')
     this.transport.send({
       type: 'memory:deleteBySourceSession',
       sessionId,
@@ -1531,7 +1432,7 @@ export class SessionService {
   }
 
   async restoreMemory(id: string): Promise<MemoryItem> {
-    const wait = this.waitForServerMessage('memory:restore:result')
+    const wait = this.waiter.wait('memory:restore:result')
     this.transport.send({ type: 'memory:restore', id })
     const msg = await wait
     if (msg.error || !msg.item) throw new Error(msg.error ?? 'restore failed')
@@ -1539,7 +1440,7 @@ export class SessionService {
   }
 
   async emptyMemoryTrash(): Promise<number> {
-    const wait = this.waitForServerMessage('memory:emptyTrash:result')
+    const wait = this.waiter.wait('memory:emptyTrash:result')
     this.transport.send({ type: 'memory:emptyTrash' })
     const msg = await wait
     if (msg.error) throw new Error(msg.error)
@@ -1547,7 +1448,7 @@ export class SessionService {
   }
 
   async exportMemories(format: 'jsonl' | 'markdown' = 'jsonl'): Promise<string> {
-    const wait = this.waitForServerMessage('memory:export:result')
+    const wait = this.waiter.wait('memory:export:result')
     this.transport.send({ type: 'memory:export', format })
     const msg = await wait
     if (msg.error) throw new Error(msg.error)
@@ -1555,7 +1456,7 @@ export class SessionService {
   }
 
   async importMemories(data: string): Promise<number> {
-    const wait = this.waitForServerMessage('memory:import:result')
+    const wait = this.waiter.wait('memory:import:result')
     this.transport.send({ type: 'memory:import', format: 'jsonl', data })
     const msg = await wait
     if (msg.error || !msg.ok) throw new Error(msg.error ?? 'import failed')
@@ -1570,7 +1471,7 @@ export class SessionService {
     status: 'succeeded' | 'failed' | 'noop'
     detail?: string
   }> {
-    const wait = this.waitForServerMessageWhere(
+    const wait = this.waiter.waitWhere(
       'memory:pipeline',
       (msg) =>
         msg.phase === 2 &&
@@ -1592,7 +1493,7 @@ export class SessionService {
     projectKeyHash?: string
     contextWindowTokens?: number
   }): Promise<import('@hip/protocol').MemoryPipelineStatus> {
-    const wait = this.waitForServerMessage('memory:status')
+    const wait = this.waiter.wait('memory:status')
     this.transport.send({
       type: 'memory:getStatus',
       ...(opts?.projectKeyHash ? { projectKeyHash: opts.projectKeyHash } : {}),
@@ -1606,7 +1507,7 @@ export class SessionService {
   }
 
   async rewriteMemoryMirrors(projectKeyHash?: string): Promise<string[]> {
-    const wait = this.waitForServerMessage('memory:rewriteMirrors:result')
+    const wait = this.waiter.wait('memory:rewriteMirrors:result')
     this.transport.send({
       type: 'memory:rewriteMirrors',
       ...(projectKeyHash ? { projectKeyHash } : {}),
@@ -1620,7 +1521,7 @@ export class SessionService {
     projectKeyHash?: string
     conflict?: 'keep' | 'overwrite'
   }): Promise<{ imported: number; skipped: number }> {
-    const wait = this.waitForServerMessage('memory:importMirror:result')
+    const wait = this.waiter.wait('memory:importMirror:result')
     this.transport.send({
       type: 'memory:importMirror',
       ...(opts?.projectKeyHash ? { projectKeyHash: opts.projectKeyHash } : {}),
@@ -1670,7 +1571,7 @@ export class SessionService {
   }): Promise<{ ok: true; title: string; sub: string } | { ok: false; error: string }> {
     const requestId = opts.requestId ?? nanoid()
     const timeoutMs = opts.timeoutMs ?? 4_000
-    const wait = this.waitForServerMessageWhere(
+    const wait = this.waiter.waitWhere(
       'ui:emptyGreeting:generate:result',
       (msg) => msg.requestId === requestId,
       timeoutMs,

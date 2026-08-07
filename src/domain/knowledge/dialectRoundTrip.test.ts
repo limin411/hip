@@ -22,6 +22,8 @@ function liveCarrierMarkdown(id: string): string {
       return '![[Other Doc]]\n'
     case 'wiki':
       return 'See [[Other Doc]] here.\n'
+    case 'toggle':
+      return '<details>\n<summary>Fold</summary>\n\nBody\n\n</details>\n'
     default:
       return ''
   }

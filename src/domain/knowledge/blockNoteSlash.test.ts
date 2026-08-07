@@ -88,8 +88,8 @@ describe('applyKnowledgeSlashItem', () => {
       type: string
       props?: { language?: string }
     }
-    expect(block.type).toBe('codeBlock')
-    expect(block.props?.language).toBe('mermaid')
+    expect(block.type).toBe('mermaid')
+    expect((block.props as { src?: string } | undefined)?.src).toMatch(/flowchart/i)
   })
 })
 

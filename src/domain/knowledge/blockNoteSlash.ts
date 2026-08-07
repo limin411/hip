@@ -1,6 +1,6 @@
 /**
  * Map hip KnowledgeSlash catalog → BlockNote slash menu actions.
- * Single catalog: slashMenu.ts. Native blocks use BN API; dialects preserve MD.
+ * Single catalog: slashMenu.ts. Native blocks use BN API; dialects use hip blocks.
  */
 import { insertOrUpdateBlockForSlashMenu } from '@blocknote/core'
 import type { DefaultReactSuggestionItem } from '@blocknote/react'
@@ -11,6 +11,8 @@ import {
   type KnowledgeSlashItem,
   SLASH_GROUP_ORDER,
 } from './slashMenu'
+import type { KnowledgeAiActionId } from './ai/knowledgeAiActions'
+import type { CalloutType } from './callout'
 
 /** Minimal BlockNote editor surface used by slash mapping (avoids deep generic coupling). */
 export type BlockNoteSlashEditor = {
@@ -31,6 +33,12 @@ export type BlockNoteSlashHandlers = {
   onRequestAttach?: () => void
   /** After wiki skeleton insert — open picker. */
   onWikiInsert?: () => void
+  /** AI slash actions. */
+  onAiAction?: (action: KnowledgeAiActionId) => void
+  /** Create subdoc under current parent + insert wiki. */
+  onCreateSubdoc?: () => void
+  /** Copy hip:// page link. */
+  onCopyPageLink?: () => void
   /** Resolve i18n label for a slash id. */
   labelFor: (id: KnowledgeSlashId, fallback: string) => string
   /** Resolve i18n group label. */
@@ -42,6 +50,7 @@ const GROUP_FALLBACK: Record<string, string> = {
   list: 'List',
   media: 'Media',
   advanced: 'Advanced',
+  ai: 'AI',
 }
 
 function emptyTable3x2(): Record<string, unknown> {
@@ -92,11 +101,39 @@ export function insertMarkdownBlocks(
   }
 }
 
+function insertCallout(editor: BlockNoteSlashEditor, type: CalloutType, title: string) {
+  insertNative(editor, {
+    type: 'callout',
+    props: { type, title, body: '' },
+  })
+}
+
+const AI_SLASH_MAP: Partial<Record<KnowledgeSlashId, KnowledgeAiActionId>> = {
+  aiContinue: 'continue',
+  aiSummarize: 'summarize',
+  aiToTasks: 'toTasks',
+  aiExplain: 'explain',
+  aiRewrite: 'rewrite',
+}
+
 export function applyKnowledgeSlashItem(
   editor: BlockNoteSlashEditor,
   item: KnowledgeSlashItem,
-  handlers: Pick<BlockNoteSlashHandlers, 'onRequestAttach' | 'onWikiInsert'>,
+  handlers: Pick<
+    BlockNoteSlashHandlers,
+    | 'onRequestAttach'
+    | 'onWikiInsert'
+    | 'onAiAction'
+    | 'onCreateSubdoc'
+    | 'onCopyPageLink'
+  >,
 ): void {
+  const ai = AI_SLASH_MAP[item.id]
+  if (ai) {
+    handlers.onAiAction?.(ai)
+    return
+  }
+
   switch (item.id) {
     case 'h1':
       insertNative(editor, { type: 'heading', props: { level: 1 } })
@@ -137,45 +174,67 @@ export function applyKnowledgeSlashItem(
       return
     case 'mermaid':
       insertNative(editor, {
-        type: 'codeBlock',
-        props: { language: 'mermaid' },
-        content: 'flowchart LR\n  A --> B',
+        type: 'mermaid',
+        props: { src: 'flowchart LR\n  A --> B' },
       })
       return
     case 'svg':
       insertNative(editor, {
-        type: 'codeBlock',
-        props: { language: 'svg' },
-        content: '',
+        type: 'svgBlock',
+        props: { src: '' },
       })
       return
     case 'math':
-      // Preserve $$ fence via MD parse so Source round-trip keeps math form when possible.
-      if (!insertMarkdownBlocks(editor, item.insert)) {
-        insertNative(editor, {
-          type: 'codeBlock',
-          props: { language: 'math' },
-          content: '',
-        })
-      }
+      insertNative(editor, {
+        type: 'math',
+        props: { src: '' },
+      })
       return
     case 'callout':
-      if (!insertMarkdownBlocks(editor, item.insert)) {
-        insertNative(editor, {
-          type: 'quote',
-          content: '[!note] Title',
-        })
-      }
+      insertCallout(editor, 'note', 'Title')
+      return
+    case 'calloutTip':
+      insertCallout(editor, 'tip', 'Tip')
+      return
+    case 'calloutNote':
+      insertCallout(editor, 'note', 'Note')
+      return
+    case 'calloutWarning':
+      insertCallout(editor, 'warning', 'Warning')
+      return
+    case 'calloutDanger':
+      insertCallout(editor, 'danger', 'Danger')
+      return
+    case 'calloutInfo':
+      insertCallout(editor, 'info', 'Info')
+      return
+    case 'calloutImportant':
+      insertCallout(editor, 'important', 'Important')
+      return
+    case 'toggle':
+      insertNative(editor, {
+        type: 'toggle',
+        props: { summary: 'Details', body: '' },
+      })
       return
     case 'embed':
-      insertMarkdownBlocks(editor, item.insert)
+      insertNative(editor, {
+        type: 'embed',
+        props: { title: '', fragment: '' },
+      })
       return
     case 'wiki':
       insertMarkdownBlocks(editor, '[[]]')
       handlers.onWikiInsert?.()
       return
+    case 'subdoc':
+      handlers.onCreateSubdoc?.()
+      return
+    case 'copyPageLink':
+      handlers.onCopyPageLink?.()
+      return
     default:
-      insertMarkdownBlocks(editor, item.insert)
+      if (item.insert) insertMarkdownBlocks(editor, item.insert)
   }
 }
 
@@ -185,7 +244,6 @@ export function buildKnowledgeSlashItems(
   query: string,
 ): DefaultReactSuggestionItem[] {
   const filtered = filterSlashItems(KNOWLEDGE_SLASH_ITEMS, query)
-  // Stable group order for empty query already in filterSlashItems
   const ordered = [...filtered].sort(
     (a, b) =>
       SLASH_GROUP_ORDER.indexOf(a.group) - SLASH_GROUP_ORDER.indexOf(b.group) ||
@@ -224,7 +282,8 @@ export const DIALECT_PRESERVE_MARKERS: ReadonlyArray<{
   { id: 'mermaid', probe: /```mermaid\b/i },
   { id: 'svg', probe: /```svg\b/i },
   { id: 'math', probe: /\$\$[\s\S]*?\$\$|```math\b/i },
-  { id: 'callout', probe: /\[!note\]|\[!tip\]|\[!warning\]|\[!important\]/i },
+  { id: 'callout', probe: /\[!note\]|\[!tip\]|\[!warning\]|\[!important\]|\[!danger\]|\[!info\]/i },
   { id: 'embed', probe: /!\[\[[^\]]*\]\]/ },
   { id: 'wiki', probe: /\[\[[^\]]+\]\]/ },
+  { id: 'toggle', probe: /<details[\s\S]*?<\/details>/i },
 ]

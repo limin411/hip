@@ -2572,7 +2572,8 @@ export const ja = {
         "basic": "基本",
         "list": "リスト",
         "media": "メディア",
-        "advanced": "高度"
+        "advanced": "高度",
+          "ai": "AI"
       },
       "h1": "見出し1",
       "h2": "見出し2",
@@ -2692,6 +2693,7 @@ export const ja = {
       "titleLabel": "ドキュメントタイトル",
       "done": "完了",
       "placeholder": "書き始めてください…",
+      "placeholderSlash": "文字を入力、または / でコマンド",
       "emptySlashHint": "「/」でコマンドを入力",
       "icon": "ページアイコン",
       "viewSource": "ソースを表示",
@@ -2707,7 +2709,27 @@ export const ja = {
       "liveParseFailed": "ライブエディタでこのドキュメントを開けませんでした。ソースモードに切り替えました。",
       "largeDocForceSource": "ドキュメントが大きすぎてライブ編集できません。ソースモードに切り替えました。",
       "saveRetry": "再試行",
-      "largeDocHint": "ドキュメントが大きいため、パフォーマンスのためにソースモードで編集します。全文の編集は可能です。"
+      "largeDocHint": "ドキュメントが大きいため、パフォーマンスのためにソースモードで編集します。全文の編集は可能です。",
+      "coverAdd": "カバーを追加",
+      "coverChange": "カバーを変更",
+      "coverRemove": "カバーを削除",
+      "propTags": "タグ",
+      "propStatus": "ステータス",
+      "propDate": "日付",
+      "propPriority": "優先度",
+      "propAliases": "エイリアス",
+      "findPlaceholder": "ドキュメント内を検索",
+      "findPrev": "前へ",
+      "findNext": "次へ",
+      "replacePlaceholder": "置換後の文字列",
+      "replace": "置換",
+      "replaceAll": "すべて置換",
+      "wordCount": "{{count}} 語",
+      "backlinkCount": "バックリンク {{count}} 件",
+      "dialectLoss": "一部の特殊ブロックはライブ編集後に簡略化される場合があります",
+      "aiStarted": "AI リクエストをチャットに送信しました",
+      "linkCopied": "ページリンクをコピーしました",
+      "linkCopyFailed": "ページリンクをコピーできませんでした"
     },
     "wiki": {
       "createTitle": "ドキュメントを作成しますか？",
@@ -2747,7 +2769,9 @@ export const ja = {
       "restored": "バージョンを復元しました",
       "largeHint": "このスナップショットは大きいです（{{kb}} KB）。",
       "diff": "差分",
-      "diffTitle": "現在との差分"
+      "diffTitle": "現在との差分",
+      "groupToday": "今日",
+      "groupEarlier": "以前"
     },
     "error": {
       "generic": "問題が発生しました"
@@ -2773,7 +2797,11 @@ export const ja = {
     "exitConfirmSessions": "セッション agent {{count}} 件",
     "exitConfirmTasks": "バックグラウンドタスク {{count}} 件",
     "exitConfirmHide": "トレイに隠す",
-    "exitConfirmQuit": "終了して停止"
+    "exitConfirmQuit": "終了して停止",
+      "unsavedTitle": "未保存の変更",
+      "unsavedBody": "ナレッジ文書に未保存の変更があります。閉じる前に保存しますか？",
+      "unsavedSave": "保存",
+      "unsavedDiscard": "保存しない"
   },
   "tray": {
     "showMain": "hip を表示",

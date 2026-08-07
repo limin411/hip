@@ -2064,3 +2064,47 @@ describe('knowledgeStore rejects boards / non-docs', () => {
   })
 })
 
+
+describe('knowledgeStore hasUnsavedChanges + updateActiveDocMeta', () => {
+  it('hasUnsavedChanges is false when clean', () => {
+    useKnowledgeStore.setState({
+      activeDocId: 'doc_1',
+      docBody: 'hello',
+      draftBody: 'hello',
+      saveState: 'idle',
+    })
+    expect(useKnowledgeStore.getState().hasUnsavedChanges()).toBe(false)
+  })
+
+  it('hasUnsavedChanges is true when draft differs', () => {
+    useKnowledgeStore.setState({
+      activeDocId: 'doc_1',
+      docBody: 'hello',
+      draftBody: 'hello world',
+      saveState: 'idle',
+    })
+    expect(useKnowledgeStore.getState().hasUnsavedChanges()).toBe(true)
+  })
+
+  it('updateActiveDocMeta writes icon/cover into FM without touching body', () => {
+    useKnowledgeStore.setState({
+      activeSpaceId: 'sp_1',
+      activeDocId: 'doc_1',
+      docBody: '# Body\n',
+      draftBody: '# Body\n',
+      saveState: 'idle',
+    })
+    useKnowledgeStore.getState().updateActiveDocMeta({
+      icon: '📄',
+      cover: 'assets/c.png',
+      coverY: 40,
+      tags: ['a'],
+    })
+    const draft = useKnowledgeStore.getState().draftBody
+    expect(draft).toMatch(/icon:/)
+    expect(draft).toMatch(/cover:/)
+    expect(draft).toMatch(/coverY:\s*40/)
+    expect(draft).toContain('# Body')
+    expect(useKnowledgeStore.getState().hasUnsavedChanges()).toBe(true)
+  })
+})

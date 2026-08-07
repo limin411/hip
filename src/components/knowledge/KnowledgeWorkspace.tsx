@@ -28,7 +28,6 @@ import { KNOWLEDGE_LARGE_DOC_CHARS } from '@/domain/knowledge/limits'
 import { insertTextAtCursor } from '@/domain/knowledge/mdEdit'
 import { importAssetFromPath } from '@/domain/knowledge/importAsset'
 import type { KnowledgeNode, KnowledgeVersionEntry } from '@/domain/knowledge/types'
-import { formatAbsolute } from '@/lib/datetime'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/Button'
 import { Modal } from '@/components/ui/Modal'
@@ -65,10 +64,15 @@ import { DeclarativeContextMenu } from '@/components/context-menu'
 import { SpaceTree } from './SpaceTree'
 import { DocEditor, type DocEditorHandle } from './DocEditor'
 import type { DocLiveEditorHandle } from './DocBlockNoteEditor'
-import { InlineDocTitle } from './InlineDocTitle'
 import { KnowledgeDocCanvas } from './KnowledgeDocCanvas'
 import { WikiCreateModal } from './WikiCreateModal'
 import { KnowledgeGraphModal } from './KnowledgeGraphModal'
+import { PageHeader } from './page/PageHeader'
+import { VersionTimeline } from './version/VersionTimeline'
+import { VersionDiffView } from './version/VersionDiffView'
+import { parseFrontmatter } from '@/domain/knowledge/frontmatter'
+import { knowledgeAiActions } from '@/domain/knowledge/ai/knowledgeAiActions'
+import type { KnowledgeAiActionId } from '@/domain/knowledge/ai/knowledgeAiActions'
 
 /** Lazy so Source-only sessions pay 0 for BlockNote chunk. */
 const DocLiveEditor = lazy(() =>
@@ -77,7 +81,7 @@ const DocLiveEditor = lazy(() =>
 import { TemplatePickerModal } from './TemplatePickerModal'
 
 export function KnowledgeWorkspace() {
-  const { t, i18n } = useTranslation()
+  const { t } = useTranslation()
   const spaces = useKnowledgeStore((s) => s.spaces)
   const activeSpaceId = useKnowledgeStore((s) => s.activeSpaceId)
   const nodes = useKnowledgeStore((s) => s.nodes)
@@ -98,6 +102,8 @@ export function KnowledgeWorkspace() {
   const setEditorMode = useKnowledgeStore((s) => s.setEditorMode)
   const setDraftBody = useKnowledgeStore((s) => s.setDraftBody)
   const flushSave = useKnowledgeStore((s) => s.flushSave)
+  const updateActiveDocMeta = useKnowledgeStore((s) => s.updateActiveDocMeta)
+  const backlinks = useKnowledgeStore((s) => s.backlinks)
   const toggleFolder = useKnowledgeStore((s) => s.toggleFolder)
   const openDocStore = useKnowledgeStore((s) => s.openDoc)
   const saveDocAsTemplate = useKnowledgeStore((s) => s.saveDocAsTemplate)
@@ -296,6 +302,7 @@ export function KnowledgeWorkspace() {
     versionId: string
     lines: ReturnType<typeof diffLines>
   } | null>(null)
+  const [versionSelectedId, setVersionSelectedId] = useState<string | null>(null)
   /** Broken wiki link → confirm create (K20). Never silent. */
   const [wikiCreateTitle, setWikiCreateTitle] = useState<string | null>(null)
   const [graphOpen, setGraphOpen] = useState(false)
@@ -382,6 +389,59 @@ export function KnowledgeWorkspace() {
   const showSourceEditor = !isBoard && !showLiveEditor
   /** Body for editor mount (mode/doc switch); not a per-keystroke subscription. */
   const mountMarkdown = useKnowledgeStore.getState().draftBody || docBody
+  const pageMeta = useMemo(
+    () => parseFrontmatter(mountMarkdown).meta,
+    // Recompute when doc switches or body is replaced (not per keystroke).
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [activeDocId, docBody],
+  )
+  const wordCount = useMemo(() => {
+    const body = parseFrontmatter(mountMarkdown).bodyWithoutFm
+    const words = body.trim().match(/\S+/g)
+    return words?.length ?? 0
+  }, [mountMarkdown])
+
+  const runAi = (action: KnowledgeAiActionId) => {
+    const title = activeNode?.title ?? ''
+    const raw = useKnowledgeStore.getState().draftBody || docBody
+    const body = parseFrontmatter(raw).bodyWithoutFm
+    const outline = extractDocOutline(body).map((h) => h.text)
+    const selection =
+      liveEditorRef.current?.getSelectionText?.() ??
+      window.getSelection()?.toString() ??
+      ''
+    knowledgeAiActions.run({
+      action,
+      docContext: {
+        title,
+        outline,
+        selection,
+        bodyWindow: body.slice(0, 8000),
+        backlinks: backlinks.map((b) => b.fromTitle),
+        spaceId: activeSpaceId,
+        docId: activeDocId,
+      },
+    })
+    toast.message(t('knowledge.doc.aiStarted'))
+  }
+
+  const copyPageLink = async () => {
+    if (!activeSpaceId || !activeDocId) return
+    const link = `hip://knowledge/${activeSpaceId}/${activeDocId}`
+    try {
+      await navigator.clipboard.writeText(link)
+      toast.success(t('knowledge.doc.linkCopied'))
+    } catch {
+      toast.error(t('knowledge.doc.linkCopyFailed'))
+    }
+  }
+
+  const createSubdoc = () => {
+    if (!activeDocId) return
+    const parentId =
+      activeNode?.kind === 'folder' ? activeDocId : activeNode?.parentId ?? null
+    void requestCreateDoc(parentId, t('knowledge.doc.untitled'))
+  }
 
   const onLiveParseError = () => {
     toast.error(t('knowledge.doc.liveParseFailed'))
@@ -815,8 +875,9 @@ export function KnowledgeWorkspace() {
             saveState === 'error') && (
             <span
               className={cn(
-                'flex shrink-0 items-center gap-1.5 text-meta',
+                'flex shrink-0 items-center gap-1.5 text-meta transition-opacity duration-500',
                 saveState === 'error' ? 'text-danger' : 'text-ink-tertiary',
+                saveState === 'saved' && 'opacity-70',
               )}
               data-testid="knowledge-save-status"
             >
@@ -988,13 +1049,16 @@ export function KnowledgeWorkspace() {
               className="min-h-0 flex-1"
               paperClassName="overflow-hidden"
             >
-              <InlineDocTitle
+              <PageHeader
                 docId={activeDocId}
                 title={activeNode?.title ?? t('knowledge.doc.untitled')}
-                onCommit={(title) => void renameNode(activeDocId, title)}
-                onEnterCommit={() => {
+                meta={pageMeta}
+                spaceId={activeSpaceId}
+                onTitleCommit={(title) => void renameNode(activeDocId, title)}
+                onTitleEnter={() => {
                   liveEditorRef.current?.focus({ at: 'start' })
                 }}
+                onMetaChange={(patch) => updateActiveDocMeta(patch)}
               />
               <Suspense
                 fallback={
@@ -1028,17 +1092,33 @@ export function KnowledgeWorkspace() {
                   onParseError={onLiveParseError}
                   onAssetImportError={toastAssetError}
                   onRequestAttach={() => void attachFiles()}
-                  placeholder={t('knowledge.doc.placeholder')}
+                  placeholder={t('knowledge.doc.placeholderSlash')}
                   wikiNodes={nodes}
                   onWikiNavigate={({ title, nodeId, broken }) => {
-                    if (broken || !nodeId) {
-                      setWikiCreateTitle(title)
+                    if (nodeId) {
+                      void openDoc(nodeId)
                       return
                     }
-                    void openDoc(nodeId)
+                    if (broken || !nodeId) {
+                      setWikiCreateTitle(title)
+                    }
                   }}
+                  onAiAction={runAi}
+                  onCreateSubdoc={createSubdoc}
+                  onCopyPageLink={() => void copyPageLink()}
                 />
               </Suspense>
+              <footer
+                className="knowledge-doc-measure flex shrink-0 items-center gap-3 pb-6 pt-2 text-meta text-ink-tertiary"
+                data-testid="knowledge-doc-footer"
+              >
+                <span data-testid="knowledge-doc-word-count">
+                  {t('knowledge.doc.wordCount', { count: wordCount })}
+                </span>
+                <span data-testid="knowledge-doc-backlink-count">
+                  {t('knowledge.doc.backlinkCount', { count: backlinks.length })}
+                </span>
+              </footer>
             </KnowledgeDocCanvas>
           </div>
         ) : showSourceEditor ? (
@@ -1047,13 +1127,16 @@ export function KnowledgeWorkspace() {
               className="min-h-0 flex-1"
               paperClassName="overflow-hidden"
             >
-              <InlineDocTitle
+              <PageHeader
                 docId={activeDocId}
                 title={activeNode?.title ?? t('knowledge.doc.untitled')}
-                onCommit={(title) => void renameNode(activeDocId, title)}
-                onEnterCommit={() => {
+                meta={pageMeta}
+                spaceId={activeSpaceId}
+                onTitleCommit={(title) => void renameNode(activeDocId, title)}
+                onTitleEnter={() => {
                   editorRef.current?.focus()
                 }}
+                onMetaChange={(patch) => updateActiveDocMeta(patch)}
               />
               {liveSuppressed ? (
                 <div
@@ -1078,6 +1161,17 @@ export function KnowledgeWorkspace() {
                 placeholder={t('knowledge.doc.placeholder')}
                 wikiNodes={nodes}
               />
+              <footer
+                className="knowledge-doc-measure flex shrink-0 items-center gap-3 pb-6 pt-2 text-meta text-ink-tertiary"
+                data-testid="knowledge-doc-footer"
+              >
+                <span>
+                  {t('knowledge.doc.wordCount', { count: wordCount })}
+                </span>
+                <span>
+                  {t('knowledge.doc.backlinkCount', { count: backlinks.length })}
+                </span>
+              </footer>
             </KnowledgeDocCanvas>
           </div>
         ) : null}
@@ -1214,55 +1308,15 @@ export function KnowledgeWorkspace() {
         }
       >
         <div className="flex flex-col gap-2 px-5 py-4" data-testid="knowledge-versions-list">
-          {versionsLoading ? (
-            <p className="text-meta text-ink-tertiary">{t('knowledge.doc.saving')}</p>
-          ) : versions.length === 0 ? (
-            <p className="text-body text-ink-secondary">{t('knowledge.versions.empty')}</p>
-          ) : (
-            versions.map((v) => {
-              const large = v.byteLength > KNOWLEDGE_LARGE_DOC_CHARS
-              return (
-                <div
-                  key={v.id}
-                  className="flex items-center gap-2 rounded-lg border border-border bg-surface px-3 py-2.5"
-                  data-testid="knowledge-version-row"
-                  data-version-id={v.id}
-                >
-                  <div className="min-w-0 flex-1">
-                    <div className="truncate text-body font-medium text-ink">
-                      {formatAbsolute(v.createdAt, i18n.language)}
-                    </div>
-                    <div className="text-meta text-ink-tertiary">
-                      {v.kind === 'daily'
-                        ? t('knowledge.versions.kindDaily')
-                        : t('knowledge.versions.kindManual')}
-                      {large
-                        ? ` · ${t('knowledge.versions.largeHint', {
-                            kb: Math.round(v.byteLength / 1024),
-                          })}`
-                        : null}
-                    </div>
-                  </div>
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    data-testid="knowledge-version-diff"
-                    onClick={() => void openVersionDiff(v.id)}
-                  >
-                    {t('knowledge.versions.diff')}
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="secondary"
-                    data-testid="knowledge-version-restore"
-                    onClick={() => setRestoreTarget(v)}
-                  >
-                    {t('knowledge.versions.restore')}
-                  </Button>
-                </div>
-              )
-            })
-          )}
+          <VersionTimeline
+            versions={versions}
+            loading={versionsLoading}
+            selectedId={versionSelectedId}
+            onSelect={(v) => setVersionSelectedId(v.id)}
+            onDiff={(v) => void openVersionDiff(v.id)}
+            onRestore={(v) => setRestoreTarget(v)}
+            largeByteThreshold={KNOWLEDGE_LARGE_DOC_CHARS}
+          />
         </div>
       </Modal>
 
@@ -1288,33 +1342,7 @@ export function KnowledgeWorkspace() {
           </div>
         }
       >
-        <div
-          className="max-h-[60vh] overflow-auto font-mono text-meta"
-          data-testid="knowledge-version-diff-body"
-        >
-          {versionDiff?.lines.map((line, i) => (
-            <div
-              key={i}
-              className={cn(
-                'flex whitespace-pre-wrap px-3 py-0.5',
-                line.type === 'add' && 'bg-success/10 text-success',
-                line.type === 'del' && 'bg-danger/10 text-danger',
-                line.type === 'same' && 'text-ink-secondary',
-              )}
-            >
-              <span className="w-10 shrink-0 select-none text-right opacity-50">
-                {line.oldNo ?? ''}
-              </span>
-              <span className="w-10 shrink-0 select-none text-right opacity-50">
-                {line.newNo ?? ''}
-              </span>
-              <span className="w-4 shrink-0 select-none">
-                {line.type === 'add' ? '+' : line.type === 'del' ? '-' : ' '}
-              </span>
-              <span className="min-w-0 flex-1 break-all">{line.text}</span>
-            </div>
-          ))}
-        </div>
+        {versionDiff ? <VersionDiffView lines={versionDiff.lines} /> : null}
       </Modal>
 
       <Modal

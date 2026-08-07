@@ -2572,7 +2572,8 @@ export const ko = {
         "basic": "기본",
         "list": "목록",
         "media": "미디어",
-        "advanced": "고급"
+        "advanced": "고급",
+          "ai": "AI"
       },
       "h1": "제목 1",
       "h2": "제목 2",
@@ -2692,6 +2693,7 @@ export const ko = {
       "titleLabel": "문서 제목",
       "done": "완료",
       "placeholder": "작성 시작…",
+      "placeholderSlash": "텍스트 입력, 또는 / 로 명령",
       "emptySlashHint": "'/'를 입력해 명령 열기",
       "icon": "페이지 아이콘",
       "viewSource": "소스 보기",
@@ -2707,7 +2709,27 @@ export const ko = {
       "liveParseFailed": "라이브 편집기에서 이 문서를 열 수 없습니다. 소스 모드로 전환했습니다.",
       "largeDocForceSource": "문서가 너무 커서 라이브 편집이 불가능합니다. 소스 모드로 전환했습니다.",
       "saveRetry": "다시 시도",
-      "largeDocHint": "문서가 커서 성능상 소스 모드로 편집합니다. 전체 문서는 계속 편집할 수 있습니다."
+      "largeDocHint": "문서가 커서 성능상 소스 모드로 편집합니다. 전체 문서는 계속 편집할 수 있습니다.",
+      "coverAdd": "커버 추가",
+      "coverChange": "커버 변경",
+      "coverRemove": "커버 제거",
+      "propTags": "태그",
+      "propStatus": "상태",
+      "propDate": "날짜",
+      "propPriority": "우선순위",
+      "propAliases": "별칭",
+      "findPlaceholder": "문서에서 찾기",
+      "findPrev": "이전",
+      "findNext": "다음",
+      "replacePlaceholder": "바꿀 내용",
+      "replace": "바꾸기",
+      "replaceAll": "모두 바꾸기",
+      "wordCount": "{{count}}단어",
+      "backlinkCount": "백링크 {{count}}개",
+      "dialectLoss": "일부 특수 블록이 라이브 편집 후 단순화될 수 있습니다",
+      "aiStarted": "AI 요청을 채팅으로 보냈습니다",
+      "linkCopied": "페이지 링크를 복사했습니다",
+      "linkCopyFailed": "페이지 링크를 복사할 수 없습니다"
     },
     "wiki": {
       "createTitle": "문서를 만들까요?",
@@ -2747,7 +2769,9 @@ export const ko = {
       "restored": "버전 복원됨",
       "largeHint": "이 스냅샷은 용량이 큽니다 ({{kb}} KB).",
       "diff": "차이",
-      "diffTitle": "현재와 차이 보기"
+      "diffTitle": "현재와 차이 보기",
+      "groupToday": "오늘",
+      "groupEarlier": "이전"
     },
     "error": {
       "generic": "문제가 발생했습니다"
@@ -2773,7 +2797,11 @@ export const ko = {
     "exitConfirmSessions": "세션 agent {{count}}개",
     "exitConfirmTasks": "백그라운드 작업 {{count}}개",
     "exitConfirmHide": "트레이로 숨기기",
-    "exitConfirmQuit": "종료하고 중지"
+    "exitConfirmQuit": "종료하고 중지",
+      "unsavedTitle": "저장되지 않은 변경사항",
+      "unsavedBody": "지식 문서에 저장되지 않은 변경사항이 있습니다. 닫기 전에 저장할까요?",
+      "unsavedSave": "저장",
+      "unsavedDiscard": "저장 안 함"
   },
   "tray": {
     "showMain": "hip 표시",

@@ -378,3 +378,241 @@
   background: var(--surface) !important;
   box-shadow: var(--shadow-overlay) !important;
 }
+
+/* ── Hip dialect blocks ─────────────────────────────────────────── */
+
+.kb-callout {
+  display: flex;
+  gap: 0;
+  margin: 0.5rem 0;
+  border-radius: 0.5rem;
+  border: 1px solid var(--border, rgba(0, 0, 0, 0.1));
+  background: var(--surface-muted, #f4f4f5);
+  overflow: hidden;
+  width: 100%;
+}
+.kb-callout-bar {
+  width: 4px;
+  flex-shrink: 0;
+  background: var(--accent, #3b82f6);
+}
+.kb-callout[data-callout='tip'] .kb-callout-bar { background: var(--success, #16a34a); }
+.kb-callout[data-callout='warning'] .kb-callout-bar,
+.kb-callout[data-callout='caution'] .kb-callout-bar { background: var(--warning, #d97706); }
+.kb-callout[data-callout='danger'] .kb-callout-bar { background: var(--danger, #dc2626); }
+.kb-callout[data-callout='info'] .kb-callout-bar { background: var(--accent, #3b82f6); }
+.kb-callout[data-callout='important'] .kb-callout-bar { background: #7c3aed; }
+.kb-callout-inner {
+  flex: 1;
+  min-width: 0;
+  padding: 0.6rem 0.75rem;
+}
+.kb-callout-head {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  position: relative;
+  margin-bottom: 0.35rem;
+}
+.kb-callout-type {
+  font-size: 0.7rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-secondary, #666);
+  border: 1px solid var(--border);
+  border-radius: 0.25rem;
+  padding: 0.1rem 0.35rem;
+  background: var(--surface);
+  cursor: pointer;
+}
+.kb-callout-menu {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  z-index: 20;
+  display: flex;
+  flex-direction: column;
+  min-width: 7rem;
+  border: 1px solid var(--border);
+  border-radius: 0.5rem;
+  background: var(--surface);
+  box-shadow: var(--shadow-overlay, 0 8px 24px rgba(0,0,0,0.12));
+  padding: 0.25rem;
+}
+.kb-callout-menu-item {
+  text-align: left;
+  padding: 0.35rem 0.5rem;
+  border-radius: 0.25rem;
+  font-size: 0.8rem;
+  color: var(--text-primary);
+}
+.kb-callout-menu-item:hover { background: var(--state-hover); }
+.kb-callout-title {
+  flex: 1;
+  min-width: 0;
+  border: 0;
+  background: transparent;
+  font-weight: 600;
+  font-size: 0.9rem;
+  color: var(--text-primary);
+  outline: none;
+}
+.kb-callout-text {
+  width: 100%;
+  border: 0;
+  background: transparent;
+  resize: vertical;
+  font: inherit;
+  color: var(--text-primary);
+  outline: none;
+  line-height: 1.5;
+}
+
+.kb-wiki-chip {
+  display: inline;
+  border-radius: 0.25rem;
+  padding: 0.05rem 0.3rem;
+  background: color-mix(in srgb, var(--accent, #3b82f6) 12%, transparent);
+  color: var(--accent-strong, var(--accent, #2563eb));
+  font-weight: 500;
+  cursor: text;
+  border-bottom: 1px solid color-mix(in srgb, var(--accent, #3b82f6) 40%, transparent);
+}
+.kb-wiki-chip-broken {
+  color: var(--danger, #dc2626);
+  background: color-mix(in srgb, var(--danger, #dc2626) 8%, transparent);
+  border-bottom: 1px dashed var(--danger, #dc2626);
+}
+
+.kb-math,
+.kb-mermaid,
+.kb-svg {
+  position: relative;
+  margin: 0.5rem 0;
+  border: 1px solid var(--border);
+  border-radius: 0.5rem;
+  background: var(--surface-muted);
+  padding: 0.75rem;
+}
+.kb-math-preview { overflow-x: auto; text-align: center; }
+.kb-math-error { color: var(--danger); font-family: ui-monospace, monospace; font-size: 0.8rem; white-space: pre-wrap; text-align: left; }
+.kb-math-src,
+.kb-fence-src {
+  width: 100%;
+  min-height: 4rem;
+  font-family: ui-monospace, monospace;
+  font-size: 0.85rem;
+  border: 1px solid var(--border);
+  border-radius: 0.375rem;
+  background: var(--surface);
+  color: var(--text-primary);
+  padding: 0.5rem;
+  resize: vertical;
+}
+.kb-math-done,
+.kb-fence-done,
+.kb-fence-edit-btn {
+  margin-top: 0.35rem;
+  font-size: 0.75rem;
+  padding: 0.2rem 0.5rem;
+  border-radius: 0.25rem;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+.kb-fence-edit-btn { position: absolute; top: 0.35rem; right: 0.35rem; }
+
+.kb-embed {
+  margin: 0.5rem 0;
+  border: 1px solid var(--border);
+  border-radius: 0.5rem;
+  background: var(--surface);
+  overflow: hidden;
+}
+.kb-embed-broken { border-color: color-mix(in srgb, var(--danger) 40%, var(--border)); }
+.kb-embed-head {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  width: 100%;
+  padding: 0.5rem 0.75rem;
+  text-align: left;
+  background: var(--surface-muted);
+  border: 0;
+  cursor: pointer;
+  color: var(--text-primary);
+}
+.kb-embed-head:disabled { cursor: default; opacity: 0.9; }
+.kb-embed-title { font-weight: 600; font-size: 0.875rem; }
+.kb-embed-preview {
+  margin: 0;
+  padding: 0.5rem 0.75rem;
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+  white-space: pre-wrap;
+  max-height: 6rem;
+  overflow: hidden;
+}
+.kb-embed-missing {
+  margin: 0;
+  padding: 0.5rem 0.75rem;
+  font-size: 0.75rem;
+  color: var(--danger);
+}
+
+.kb-toggle {
+  margin: 0.4rem 0;
+  border: 1px solid var(--border);
+  border-radius: 0.5rem;
+  background: var(--surface);
+}
+.kb-toggle-summary {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  width: 100%;
+  padding: 0.45rem 0.65rem;
+  border: 0;
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+  color: var(--text-primary);
+  font-weight: 500;
+}
+.kb-toggle-chevron { font-size: 0.65rem; color: var(--text-tertiary); width: 1rem; }
+.kb-toggle-summary-input {
+  flex: 1;
+  border: 0;
+  background: transparent;
+  font: inherit;
+  font-weight: 600;
+  color: inherit;
+  outline: none;
+}
+.kb-toggle-body {
+  display: block;
+  width: 100%;
+  border: 0;
+  border-top: 1px solid var(--border);
+  background: transparent;
+  padding: 0.5rem 0.65rem 0.65rem;
+  font: inherit;
+  color: var(--text-primary);
+  resize: vertical;
+  outline: none;
+}
+
+.kb-highlight,
+mark[data-hip-mark='highlight'] {
+  background: color-mix(in srgb, #fbbf24 45%, transparent);
+  color: inherit;
+  border-radius: 0.15rem;
+  padding: 0 0.1em;
+}
+
+/* Image width handle affordance */
+.knowledge-blocknote-editor .bn-visual-media-wrapper {
+  max-width: 100%;
+}

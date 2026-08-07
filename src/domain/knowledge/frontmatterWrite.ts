@@ -29,6 +29,10 @@ export function formatFrontmatterFence(meta: KnowledgeDocMeta): string {
   if (meta.date) lines.push(`date: ${quoteIfNeeded(meta.date)}`)
   if (meta.priority) lines.push(`priority: ${quoteIfNeeded(meta.priority)}`)
   if (meta.icon) lines.push(`icon: ${quoteIfNeeded(meta.icon)}`)
+  if (meta.cover) lines.push(`cover: ${quoteIfNeeded(meta.cover)}`)
+  if (meta.coverY != null && Number.isFinite(meta.coverY)) {
+    lines.push(`coverY: ${meta.coverY}`)
+  }
 
   const propKeys = Object.keys(meta.props).sort()
   for (const k of propKeys) {

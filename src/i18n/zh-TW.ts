@@ -640,7 +640,8 @@ export const zhTW = {
       "viewSplit": "並排檢視"
     },
     "changes": "更改",
-    "branch": {      "current": "當前分支",
+    "branch": {
+      "current": "當前分支",
       "noBranch": "（無分支）",
       "switchTitle": "切換分支",
       "searchPlaceholder": "搜尋分支…",
@@ -2378,7 +2379,7 @@ export const zhTW = {
       "older": "更早",
       "expand": "展開 {{name}}",
       "collapse": "收起 {{name}}"
-    },
+    }
   },
   "dropdown": {
     "newChat": "新增辦公對話",
@@ -2573,7 +2574,8 @@ export const zhTW = {
         "basic": "基礎",
         "list": "清單",
         "media": "媒體",
-        "advanced": "進階"
+        "advanced": "進階",
+        "ai": "AI"
       },
       "h1": "一級標題",
       "h2": "二級標題",
@@ -2588,10 +2590,24 @@ export const zhTW = {
       "wiki": "雙向連結",
       "embed": "嵌入文件",
       "callout": "醒目提示",
+      "calloutTip": "Tip callout",
+      "calloutNote": "Note callout",
+      "calloutWarning": "Warning callout",
+      "calloutDanger": "Danger callout",
+      "calloutInfo": "Info callout",
+      "calloutImportant": "Important callout",
+      "toggle": "Toggle",
       "math": "公式區塊",
       "mermaid": "Mermaid 圖",
       "svg": "SVG",
-      "image": "圖片"
+      "image": "圖片",
+      "subdoc": "Sub-document",
+      "copyPageLink": "Copy page link",
+      "aiContinue": "AI continue",
+      "aiSummarize": "AI summarize",
+      "aiToTasks": "AI to tasks",
+      "aiExplain": "AI explain",
+      "aiRewrite": "AI rewrite"
     },
     "workspace": {
       "new": "新增",
@@ -2693,6 +2709,7 @@ export const zhTW = {
       "titleLabel": "文件標題",
       "done": "完成",
       "placeholder": "開始寫作…",
+      "placeholderSlash": "輸入文字，或 / 喚起命令",
       "emptySlashHint": "輸入 / 開啟命令",
       "icon": "頁面圖示",
       "viewSource": "檢視原始碼",
@@ -2704,11 +2721,31 @@ export const zhTW = {
       "loadFailed": "無法載入文件",
       "saving": "儲存中…",
       "saved": "已儲存",
+      "saveRetry": "重試",
       "liveLoading": "正在載入即時編輯器…",
       "liveParseFailed": "即時編輯器無法開啟此文件，已切換到原始碼模式。",
       "largeDocForceSource": "文件過大，即時編輯不可用，已切換到原始碼模式。",
-      "saveRetry": "重試",
-      "largeDocHint": "文件較大，為效能考慮目前使用原始碼模式編輯。你仍可完整編輯全文。"
+      "largeDocHint": "文件較大，為效能考慮目前使用原始碼模式編輯。你仍可完整編輯全文。",
+      "coverAdd": "新增封面",
+      "coverChange": "更換封面",
+      "coverRemove": "移除封面",
+      "propTags": "標籤",
+      "propStatus": "狀態",
+      "propDate": "日期",
+      "propPriority": "優先順序",
+      "propAliases": "別名",
+      "findPlaceholder": "在文件中查詢",
+      "findPrev": "上一個",
+      "findNext": "下一個",
+      "replacePlaceholder": "替換為",
+      "replace": "替換",
+      "replaceAll": "全部替換",
+      "wordCount": "{{count}} 字詞",
+      "backlinkCount": "{{count}} 條反向連結",
+      "dialectLoss": "部分特殊塊在實時編輯後可能被簡化",
+      "aiStarted": "已向對話傳送 AI 請求",
+      "linkCopied": "頁面連結已複製",
+      "linkCopyFailed": "無法複製頁面連結"
     },
     "wiki": {
       "createTitle": "建立文件？",
@@ -2748,7 +2785,9 @@ export const zhTW = {
       "restored": "版本已還原",
       "largeHint": "此快照較大（{{kb}} KB）。",
       "diff": "比對",
-      "diffTitle": "與目前內容比對"
+      "diffTitle": "與目前內容比對",
+      "groupToday": "今天",
+      "groupEarlier": "更早"
     },
     "error": {
       "generic": "出了點問題"
@@ -2774,7 +2813,11 @@ export const zhTW = {
     "exitConfirmSessions": "{{count}} 個工作階段中的 agent",
     "exitConfirmTasks": "{{count}} 個背景工作",
     "exitConfirmHide": "隱藏到系統匣",
-    "exitConfirmQuit": "結束並中止"
+    "exitConfirmQuit": "結束並中止",
+    "unsavedTitle": "Unsaved changes",
+    "unsavedBody": "You have unsaved Knowledge document changes. Save before closing?",
+    "unsavedSave": "Save",
+    "unsavedDiscard": "Don't save"
   },
   "tray": {
     "showMain": "顯示 hip",

@@ -1,6 +1,6 @@
 /**
  * Live document editor on BlockNote (TipTap/ProseMirror).
- * Notion-class block UX (hip slash, side menu drag, slim bubble toolbar).
+ * Thin host: schema, find, keymap, wiki navigate, dialect bridge.
  * Storage: Markdown + YAML frontmatter (lossy MD round-trip — product-accepted).
  */
 import {
@@ -26,6 +26,7 @@ import {
 import { BlockNoteHipSlashMenu } from './BlockNoteHipSlashMenu'
 import { MantineProvider } from '@mantine/core'
 import { useTranslation } from 'react-i18next'
+import { toast } from 'sonner'
 import {
   joinYamlFrontmatter,
   splitYamlFrontmatter,
@@ -63,6 +64,22 @@ import {
 } from '@/domain/knowledge/codeBlockTheme'
 import { useHipConfigStore } from '@/store/hipConfigStore'
 import { WikiLinkPicker } from './WikiLinkPicker'
+import { DocFindBar } from './find/DocFindBar'
+import { knowledgeBlockSchema } from '@/domain/knowledge/blocks/schema'
+import {
+  KnowledgeEditorHostContext,
+  type KnowledgeEditorHost,
+} from '@/domain/knowledge/blocks/knowledgeEditorHostContext'
+import {
+  detectDialectLoss,
+  postSerializeMdFromLive,
+  preParseMdForLive,
+} from '@/domain/knowledge/blocks/dialectBridge'
+import {
+  handleBlockKeydown,
+  type BlockKeymapEditor,
+} from '@/domain/knowledge/blocks/blockKeymap'
+import type { KnowledgeAiActionId } from '@/domain/knowledge/ai/knowledgeAiActions'
 
 import '@blocknote/mantine/style.css'
 import '@mantine/core/styles.css'
@@ -75,6 +92,7 @@ export type DocLiveEditorHandle = {
   flushDraft: () => void
   /** Scroll to heading by outline text + occurrence (0-based). */
   scrollToHeading?: (text: string, occurrence?: number) => boolean
+  getSelectionText?: () => string
 }
 
 export type DocBlockNoteEditorHandle = DocLiveEditorHandle
@@ -99,15 +117,18 @@ export interface DocBlockNoteEditorProps {
     nodeId: string | null
     broken: boolean
   }) => void
+  onAiAction?: (action: KnowledgeAiActionId) => void
+  onCreateSubdoc?: () => void
+  onCopyPageLink?: () => void
+  /** Outline heading labels for AI context (optional). */
+  outlineHeadings?: string[]
 }
 
 const DRAFT_THROTTLE_MS = 120
 
 /**
  * TipTap EditorContent.componentWillUnmount calls `view.setProps({ nodeViews: {} })`,
- * which re-enters ProseMirror update/iterDeco. With BlockNote decorations that can throw
- * (`deco.locals` / localsInner) and surface as an uncaught error on Live unmount
- * (doc switch, Live→Source, StrictMode). Guard setProps/destroy for this view only.
+ * which re-enters ProseMirror update/iterDeco. Guard setProps/destroy for this view only.
  */
 function hardenTiptapViewTeardown(editor: {
   _tiptapEditor?: {
@@ -190,9 +211,53 @@ function blockPlainText(block: {
       if (part && typeof part === 'object' && 'text' in part) {
         return String((part as { text?: string }).text ?? '')
       }
+      if (part && typeof part === 'object' && 'type' in part) {
+        const p = part as { type?: string; props?: { title?: string; alias?: string } }
+        if (p.type === 'wikiLink') {
+          const alias = p.props?.alias?.trim()
+          const title = p.props?.title?.trim() ?? ''
+          return alias || title
+        }
+      }
       return ''
     })
     .join('')
+}
+
+function caretAnchor(): { top: number; left: number } {
+  try {
+    const sel = window.getSelection()
+    if (sel?.rangeCount) {
+      const rect = sel.getRangeAt(0).getBoundingClientRect()
+      if (rect && (rect.width || rect.height || rect.top || rect.left)) {
+        return { top: rect.bottom + 4, left: rect.left }
+      }
+    }
+  } catch {
+    // ignore
+  }
+  return { top: 120, left: 120 }
+}
+
+function coordsAtPos(editor: {
+  _tiptapEditor?: {
+    view?: {
+      coordsAtPos?: (pos: number) => { top: number; bottom: number; left: number }
+    }
+    state?: { selection?: { from: number } }
+  }
+}): { top: number; left: number } {
+  try {
+    const tt = editor._tiptapEditor
+    const pos = tt?.state?.selection?.from
+    if (typeof pos === 'number' && tt?.view?.coordsAtPos) {
+      const c = tt.view.coordsAtPos(pos)
+      return { top: c.bottom + 4, left: c.left }
+    }
+  } catch {
+    // ignore
+  }
+  return caretAnchor()
 }
 
 export const DocBlockNoteEditor = forwardRef<
@@ -213,6 +278,9 @@ export const DocBlockNoteEditor = forwardRef<
     onAssetImported,
     onRequestAttach,
     onWikiNavigate,
+    onAiAction,
+    onCreateSubdoc,
+    onCopyPageLink,
   },
   ref,
 ) {
@@ -238,8 +306,16 @@ export const DocBlockNoteEditor = forwardRef<
   onRequestAttachRef.current = onRequestAttach
   const onWikiNavigateRef = useRef(onWikiNavigate)
   onWikiNavigateRef.current = onWikiNavigate
+  const onAiActionRef = useRef(onAiAction)
+  onAiActionRef.current = onAiAction
+  const onCreateSubdocRef = useRef(onCreateSubdoc)
+  onCreateSubdocRef.current = onCreateSubdoc
+  const onCopyPageLinkRef = useRef(onCopyPageLink)
+  onCopyPageLinkRef.current = onCopyPageLink
   const wikiNodesRef = useRef(wikiNodes)
   wikiNodesRef.current = wikiNodes
+  const seedBodyRef = useRef('')
+  const lossToastShownRef = useRef(false)
 
   const draftTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const draftDirtyRef = useRef(false)
@@ -249,7 +325,6 @@ export const DocBlockNoteEditor = forwardRef<
   const codeBlockThemePref = useHipConfigStore((s) =>
     normalizeCodeBlockThemeId(s.config.codeBlock?.colorTheme),
   )
-  /** Resolved chrome for Live code blocks (matches chat CodeBlock). */
   const codeBlockChrome = useMemo(() => {
     const mode =
       codeBlockThemePref === 'follow'
@@ -275,6 +350,8 @@ export const DocBlockNoteEditor = forwardRef<
     to: number
     anchor: { top: number; left: number }
   } | null>(null)
+  const [findOpen, setFindOpen] = useState(false)
+  const [findReplace, setFindReplace] = useState(false)
 
   const { fmText, body } = useMemo(
     () => splitYamlFrontmatter(initialMarkdown),
@@ -283,12 +360,14 @@ export const DocBlockNoteEditor = forwardRef<
     [docId],
   )
   fmTextRef.current = fmText
+  seedBodyRef.current = body
 
   const resolvedPlaceholder =
-    placeholder ?? t('knowledge.doc.placeholder')
+    placeholder ?? t('knowledge.doc.placeholderSlash')
 
   const editor = useCreateBlockNote(
     {
+      schema: knowledgeBlockSchema,
       placeholders: {
         default: resolvedPlaceholder,
       },
@@ -335,6 +414,23 @@ export const DocBlockNoteEditor = forwardRef<
 
   const slashEditor = editor as unknown as BlockNoteSlashEditor
 
+  const hostValue = useMemo<KnowledgeEditorHost>(
+    () => ({
+      spaceId: spaceId ?? null,
+      nodes: wikiNodes ?? [],
+      onWikiNavigate,
+      onOpenDoc: (id, fragment) => {
+        onWikiNavigate?.({
+          title: '',
+          nodeId: id,
+          broken: false,
+        })
+        void fragment
+      },
+    }),
+    [spaceId, wikiNodes, onWikiNavigate],
+  )
+
   const aliveRef = useRef(true)
   useEffect(() => {
     aliveRef.current = true
@@ -359,7 +455,9 @@ export const DocBlockNoteEditor = forwardRef<
       try {
         if (draftDirtyRef.current) {
           draftDirtyRef.current = false
-          const bodyMd = editor.blocksToMarkdownLossy(editor.document)
+          const bodyMd = postSerializeMdFromLive(
+            editor.blocksToMarkdownLossy(editor.document),
+          )
           onDraftChangeRef.current(
             joinYamlFrontmatter(fmTextRef.current, bodyMd),
             { docId: boundDocIdRef.current },
@@ -372,12 +470,13 @@ export const DocBlockNoteEditor = forwardRef<
     }
   }, [editor])
 
-  // Initial markdown → blocks
+  // Initial markdown → blocks (via dialect pre-parse)
   useEffect(() => {
     kbPerfLiveCreateStart()
     try {
       skipNextChangeRef.current = true
-      const blocks = editor.tryParseMarkdownToBlocks(body || '')
+      const prepared = preParseMdForLive(body || '')
+      const blocks = editor.tryParseMarkdownToBlocks(prepared)
       const ids = editor.document.map((b) => b.id)
       if (blocks.length > 0) {
         editor.replaceBlocks(ids, blocks)
@@ -399,8 +498,21 @@ export const DocBlockNoteEditor = forwardRef<
     try {
       if (editor._tiptapEditor?.isDestroyed) return
       const t0 = isKnowledgePerfEnabled() ? performance.now() : 0
-      const bodyMd = editor.blocksToMarkdownLossy(editor.document)
+      const raw = editor.blocksToMarkdownLossy(editor.document)
+      const bodyMd = postSerializeMdFromLive(raw)
       if (isKnowledgePerfEnabled()) kbPerfSerialize(performance.now() - t0)
+
+      // Honesty toast once per editor instance if dialect markers lost
+      if (!lossToastShownRef.current) {
+        const lost = detectDialectLoss(seedBodyRef.current, bodyMd)
+        if (lost.length > 0) {
+          lossToastShownRef.current = true
+          toast.message(t('knowledge.doc.dialectLoss'), {
+            description: lost.map((l) => l.id).join(', '),
+          })
+        }
+      }
+
       onDraftChangeRef.current(
         joinYamlFrontmatter(fmTextRef.current, bodyMd),
         { docId: boundDocIdRef.current },
@@ -408,7 +520,7 @@ export const DocBlockNoteEditor = forwardRef<
     } catch {
       // keep last good draft
     }
-  }, [editor])
+  }, [editor, t])
 
   const flushDraft = useCallback(() => {
     if (draftTimerRef.current) {
@@ -430,42 +542,24 @@ export const DocBlockNoteEditor = forwardRef<
 
   const openWikiPickerNearCaret = useCallback(() => {
     try {
-      const md = editor.blocksToMarkdownLossy(editor.document)
-      // Approximate caret at end of current block text within full md is hard;
-      // use last open [[ in whole doc near selection via tiptap.
-      const tt = editor._tiptapEditor
-      const pos = tt?.state?.selection?.from ?? md.length
-      const q = wikiLinkQueryAt(md, Math.min(pos, md.length))
-      if (!q) {
-        // Fallback: empty query at end of first [[ skeleton
-        const idx = md.lastIndexOf('[[')
-        if (idx < 0) return
-        const from = idx + 2
-        const sel = window.getSelection()
-        const range = sel?.rangeCount ? sel.getRangeAt(0) : null
-        const rect = range?.getBoundingClientRect()
+      const block = editor.getTextCursorPosition().block
+      const local = blockPlainText(block)
+      const localQ = wikiLinkQueryAt(local, local.length)
+      const anchor = coordsAtPos(editor)
+      if (localQ) {
         setWikiPicker({
-          query: '',
-          from,
-          to: from,
-          anchor: {
-            top: (rect?.bottom ?? 120) + 4,
-            left: rect?.left ?? 120,
-          },
+          query: localQ.query,
+          from: localQ.from,
+          to: localQ.to,
+          anchor,
         })
         return
       }
-      const sel = window.getSelection()
-      const range = sel?.rangeCount ? sel.getRangeAt(0) : null
-      const rect = range?.getBoundingClientRect()
       setWikiPicker({
-        query: q.query,
-        from: q.from,
-        to: q.to,
-        anchor: {
-          top: (rect?.bottom ?? 120) + 4,
-          left: rect?.left ?? 120,
-        },
+        query: '',
+        from: local.length,
+        to: local.length,
+        anchor,
       })
     } catch {
       // ignore
@@ -474,16 +568,23 @@ export const DocBlockNoteEditor = forwardRef<
 
   const getSlashItems = useCallback(
     async (query: string): Promise<DefaultReactSuggestionItem[]> => {
-      return buildKnowledgeSlashItems(slashEditor, {
-        labelFor: (id, fallback) =>
-          t(slashItemLabelKey(id as KnowledgeSlashId), { defaultValue: fallback }),
-        groupLabelFor: (group, fallback) =>
-          t(slashGroupLabelKey(group as 'basic'), { defaultValue: fallback }),
-        onRequestAttach: () => onRequestAttachRef.current?.(),
-        onWikiInsert: () => {
-          window.setTimeout(() => openWikiPickerNearCaret(), 0)
+      return buildKnowledgeSlashItems(
+        slashEditor,
+        {
+          labelFor: (id, fallback) =>
+            t(slashItemLabelKey(id as KnowledgeSlashId), { defaultValue: fallback }),
+          groupLabelFor: (group, fallback) =>
+            t(slashGroupLabelKey(group as 'basic'), { defaultValue: fallback }),
+          onRequestAttach: () => onRequestAttachRef.current?.(),
+          onWikiInsert: () => {
+            window.setTimeout(() => openWikiPickerNearCaret(), 0)
+          },
+          onAiAction: (action) => onAiActionRef.current?.(action),
+          onCreateSubdoc: () => onCreateSubdocRef.current?.(),
+          onCopyPageLink: () => onCopyPageLinkRef.current?.(),
         },
-      }, query)
+        query,
+      )
     },
     [slashEditor, t, openWikiPickerNearCaret],
   )
@@ -511,7 +612,6 @@ export const DocBlockNoteEditor = forwardRef<
               }
               return true
             }
-            // Fallback: DOM query by text
             const root = rootRef.current
             if (root) {
               const headings = root.querySelectorAll('h1, h2, h3, h4, h5, h6')
@@ -540,12 +640,24 @@ export const DocBlockNoteEditor = forwardRef<
     [editor],
   )
 
+  const getSelectionText = useCallback((): string => {
+    try {
+      const sel = window.getSelection()?.toString() ?? ''
+      if (sel.trim()) return sel
+      const block = editor.getTextCursorPosition().block
+      return blockPlainText(block)
+    } catch {
+      return ''
+    }
+  }, [editor])
+
   useImperativeHandle(
     ref,
     () => ({
       insertMarkdown: (md: string) => {
         try {
-          const blocks = editor.tryParseMarkdownToBlocks(md)
+          const prepared = preParseMdForLive(md)
+          const blocks = editor.tryParseMarkdownToBlocks(prepared)
           if (blocks.length === 0) return false
           const cursor = editor.getTextCursorPosition()
           editor.insertBlocks(blocks, cursor.block, 'after')
@@ -572,11 +684,12 @@ export const DocBlockNoteEditor = forwardRef<
       },
       flushDraft,
       scrollToHeading,
+      getSelectionText,
     }),
-    [editor, flushDraft, scheduleDraft, scrollToHeading],
+    [editor, flushDraft, scheduleDraft, scrollToHeading, getSelectionText],
   )
 
-  // Keymap: save + Source-aligned shortcuts
+  // Keymap: save, find, block ops, headings
   useEffect(() => {
     const root = rootRef.current
     if (!root) return
@@ -595,12 +708,27 @@ export const DocBlockNoteEditor = forwardRef<
     const onKeyDown = (e: KeyboardEvent) => {
       if (e.isComposing) return
       const mod = e.metaKey || e.ctrlKey
+
+      if (mod && e.key.toLowerCase() === 'f') {
+        e.preventDefault()
+        setFindReplace(Boolean(e.altKey))
+        setFindOpen(true)
+        return
+      }
+
       if (mod && e.key === 's') {
         e.preventDefault()
         flushDraft()
         onSaveRef.current?.()
         return
       }
+
+      const keymapEditor = editor as unknown as BlockKeymapEditor
+      if (handleBlockKeydown(e, keymapEditor)) {
+        scheduleDraft()
+        return
+      }
+
       // Heading shortcuts Mod-Alt-1/2/3
       if (mod && e.altKey && !e.shiftKey) {
         const level =
@@ -625,7 +753,6 @@ export const DocBlockNoteEditor = forwardRef<
           }
         }
       }
-      // Lists / quote — match Source where possible
       if (mod && e.shiftKey) {
         const k = e.key.toLowerCase()
         try {
@@ -662,55 +789,24 @@ export const DocBlockNoteEditor = forwardRef<
     }
   }, [editor, flushDraft, scheduleDraft])
 
-  // Wiki [[ detection + click navigate
+  // Wiki [[ detection + Mod+Click navigate (inline range)
   useEffect(() => {
     const root = rootRef.current
     if (!root) return
 
     const syncWikiQuery = () => {
-      if (typeof document !== 'undefined' && document.activeElement) {
-        // skip during IME
-      }
       try {
-        const md = editor.blocksToMarkdownLossy(editor.document)
-        const tt = editor._tiptapEditor
-        const pos = tt?.state?.selection?.from
-        // Prefer block-local text for open [[
         const block = editor.getTextCursorPosition().block
         const local = blockPlainText(block)
         const localQ = wikiLinkQueryAt(local, local.length)
         if (localQ) {
-          const sel = window.getSelection()
-          const range = sel?.rangeCount ? sel.getRangeAt(0) : null
-          const rect = range?.getBoundingClientRect()
           setWikiPicker({
             query: localQ.query,
             from: localQ.from,
             to: localQ.to,
-            anchor: {
-              top: (rect?.bottom ?? 120) + 4,
-              left: rect?.left ?? 120,
-            },
+            anchor: coordsAtPos(editor),
           })
           return
-        }
-        if (typeof pos === 'number') {
-          const q = wikiLinkQueryAt(md, Math.min(pos, md.length))
-          if (q) {
-            const sel = window.getSelection()
-            const range = sel?.rangeCount ? sel.getRangeAt(0) : null
-            const rect = range?.getBoundingClientRect()
-            setWikiPicker({
-              query: q.query,
-              from: q.from,
-              to: q.to,
-              anchor: {
-                top: (rect?.bottom ?? 120) + 4,
-                left: rect?.left ?? 120,
-              },
-            })
-            return
-          }
         }
         setWikiPicker(null)
       } catch {
@@ -726,28 +822,58 @@ export const DocBlockNoteEditor = forwardRef<
     const onClick = (e: MouseEvent) => {
       const target = e.target as HTMLElement | null
       if (!target) return
-      // Walk text for [[title]] near click
-      const blockEl = target.closest('[data-id], [data-node-type], .bn-block-content')
-      const text = (blockEl?.textContent ?? target.textContent ?? '').trim()
-      const m = text.match(/\[\[([^\]|#]+)(?:\|[^\]]*)?\]\]/)
-      if (!m) return
-      const title = m[1].trim()
-      if (!title) return
-      // Only navigate when click is on a link-like span or double-click-ish intent:
-      // if user is editing, single click shouldn't always navigate — require meta/ctrl or existing wiki class
-      if (!(e.metaKey || e.ctrlKey || target.closest('a'))) {
-        // Allow plain click if the whole block is just the wiki link
-        if (text !== m[0] && !text.startsWith(m[0])) return
+
+      // Chip path
+      const chip = target.closest('[data-testid="knowledge-wiki-chip"]') as HTMLElement | null
+      if (chip) {
+        if (!(e.metaKey || e.ctrlKey)) return
+        const title = chip.getAttribute('data-wiki-title')?.trim() ?? ''
+        if (!title) return
+        e.preventDefault()
+        e.stopPropagation()
+        const docs = listDocsInTreeOrder(wikiNodesRef.current ?? [])
+        const resolved = resolveWikiTitle(title, docs)
+        onWikiNavigateRef.current?.({
+          title,
+          nodeId: resolved?.id ?? null,
+          broken: !resolved,
+        })
+        return
       }
-      e.preventDefault()
-      e.stopPropagation()
-      const docs = listDocsInTreeOrder(wikiNodesRef.current ?? [])
-      const resolved = resolveWikiTitle(title, docs)
-      onWikiNavigateRef.current?.({
-        title,
-        nodeId: resolved?.id ?? null,
-        broken: !resolved,
-      })
+
+      // Text range detection for plain [[title]]
+      if (!(e.metaKey || e.ctrlKey)) return
+      try {
+        const sel = document.caretRangeFromPoint?.(e.clientX, e.clientY)
+        const textNode = sel?.startContainer
+        const offset = sel?.startOffset ?? 0
+        const text =
+          textNode?.nodeType === Node.TEXT_NODE
+            ? textNode.textContent ?? ''
+            : (target.textContent ?? '')
+        // Find wiki token containing offset
+        const re = /\[\[([^\]|#]+)(?:\|[^\]]*)?\]\]/g
+        let m: RegExpExecArray | null
+        while ((m = re.exec(text))) {
+          const start = m.index
+          const end = start + m[0].length
+          if (offset >= start && offset <= end) {
+            const title = m[1]!.trim()
+            e.preventDefault()
+            e.stopPropagation()
+            const docs = listDocsInTreeOrder(wikiNodesRef.current ?? [])
+            const resolved = resolveWikiTitle(title, docs)
+            onWikiNavigateRef.current?.({
+              title,
+              nodeId: resolved?.id ?? null,
+              broken: !resolved,
+            })
+            return
+          }
+        }
+      } catch {
+        // ignore
+      }
     }
 
     root.addEventListener('keyup', onKeyUp)
@@ -776,7 +902,8 @@ export const DocBlockNoteEditor = forwardRef<
         event.preventDefault()
         onAssetImportedRef.current?.()
         try {
-          const blocks = editor.tryParseMarkdownToBlocks(res.markdown)
+          const prepared = preParseMdForLive(res.markdown)
+          const blocks = editor.tryParseMarkdownToBlocks(prepared)
           const cursor = editor.getTextCursorPosition()
           editor.insertBlocks(blocks, cursor.block, 'after')
           scheduleDraft()
@@ -802,15 +929,33 @@ export const DocBlockNoteEditor = forwardRef<
           const needsClose = !after.startsWith(']]')
           const insert = needsClose ? `${title}]]` : title
           const next = before + insert + after
-          // Content blocks only (paragraph/heading/list…); cast avoids table union.
-          editor.updateBlock(block, {
-            type: 'paragraph',
-            content: next,
-          } as never)
+          // Prefer wikiLink inline when block is empty-ish after insert
+          const onlyWiki = next.trim() === formatWikiLink(title)
+          if (onlyWiki) {
+            editor.updateBlock(block, {
+              type: 'paragraph',
+              content: [
+                {
+                  type: 'wikiLink',
+                  props: { title, alias: '' },
+                },
+              ],
+            } as never)
+          } else {
+            editor.updateBlock(block, {
+              type: 'paragraph',
+              content: next,
+            } as never)
+          }
         } else {
           editor.updateBlock(block, {
             type: 'paragraph',
-            content: formatWikiLink(title),
+            content: [
+              {
+                type: 'wikiLink',
+                props: { title, alias: '' },
+              },
+            ],
           } as never)
         }
         scheduleDraft()
@@ -828,60 +973,68 @@ export const DocBlockNoteEditor = forwardRef<
   )
 
   return (
-    <div
-      ref={rootRef}
-      className="knowledge-blocknote-editor knowledge-doc-measure flex min-h-0 flex-1 flex-col overflow-y-auto"
-      data-testid="knowledge-doc-live-editor"
-      data-code-block-theme={codeBlockThemePref}
-      style={codeBlockStyle}
-    >
-      <MantineProvider forceColorScheme={isDark ? 'dark' : 'light'}>
-        <BlockNoteView
-          editor={editor}
-          theme={isDark ? 'dark' : 'light'}
-          slashMenu={false}
-          formattingToolbar={false}
-          onChange={() => {
-            if (skipNextChangeRef.current) return
-            scheduleDraft()
-          }}
-        >
-          <SuggestionMenuController
-            triggerCharacter="/"
-            getItems={getSlashItems}
-            suggestionMenuComponent={BlockNoteHipSlashMenu}
-          />
-          <FormattingToolbarController
-            formattingToolbar={() => (
-              <FormattingToolbar>
-                <BlockTypeSelect key="blockTypeSelect" />
-                <BasicTextStyleButton basicTextStyle="bold" key="bold" />
-                <BasicTextStyleButton basicTextStyle="italic" key="italic" />
-                <BasicTextStyleButton
-                  basicTextStyle="underline"
-                  key="underline"
-                />
-                <BasicTextStyleButton
-                  basicTextStyle="strike"
-                  key="strike"
-                />
-                <BasicTextStyleButton basicTextStyle="code" key="code" />
-                <CreateLinkButton key="createLink" />
-              </FormattingToolbar>
-            )}
-          />
-        </BlockNoteView>
-      </MantineProvider>
-      {wikiPicker ? (
-        <WikiLinkPicker
-          query={wikiPicker.query}
-          nodes={wikiNodes ?? []}
-          anchor={wikiPicker.anchor}
-          onPick={onWikiPick}
-          onClose={() => setWikiPicker(null)}
+    <KnowledgeEditorHostContext.Provider value={hostValue}>
+      <div
+        ref={rootRef}
+        className="knowledge-blocknote-editor knowledge-doc-measure flex min-h-0 flex-1 flex-col overflow-y-auto"
+        data-testid="knowledge-doc-live-editor"
+        data-code-block-theme={codeBlockThemePref}
+        style={codeBlockStyle}
+      >
+        <DocFindBar
+          open={findOpen}
+          onClose={() => setFindOpen(false)}
+          root={rootRef.current}
+          enableReplace={findReplace}
         />
-      ) : null}
-    </div>
+        <MantineProvider forceColorScheme={isDark ? 'dark' : 'light'}>
+          <BlockNoteView
+            editor={editor}
+            theme={isDark ? 'dark' : 'light'}
+            slashMenu={false}
+            formattingToolbar={false}
+            onChange={() => {
+              if (skipNextChangeRef.current) return
+              scheduleDraft()
+            }}
+          >
+            <SuggestionMenuController
+              triggerCharacter="/"
+              getItems={getSlashItems}
+              suggestionMenuComponent={BlockNoteHipSlashMenu}
+            />
+            <FormattingToolbarController
+              formattingToolbar={() => (
+                <FormattingToolbar>
+                  <BlockTypeSelect key="blockTypeSelect" />
+                  <BasicTextStyleButton basicTextStyle="bold" key="bold" />
+                  <BasicTextStyleButton basicTextStyle="italic" key="italic" />
+                  <BasicTextStyleButton
+                    basicTextStyle="underline"
+                    key="underline"
+                  />
+                  <BasicTextStyleButton
+                    basicTextStyle="strike"
+                    key="strike"
+                  />
+                  <BasicTextStyleButton basicTextStyle="code" key="code" />
+                  <CreateLinkButton key="createLink" />
+                </FormattingToolbar>
+              )}
+            />
+          </BlockNoteView>
+        </MantineProvider>
+        {wikiPicker ? (
+          <WikiLinkPicker
+            query={wikiPicker.query}
+            nodes={wikiNodes ?? []}
+            anchor={wikiPicker.anchor}
+            onPick={onWikiPick}
+            onClose={() => setWikiPicker(null)}
+          />
+        ) : null}
+      </div>
+    </KnowledgeEditorHostContext.Provider>
   )
 })
 

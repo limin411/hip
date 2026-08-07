@@ -226,7 +226,16 @@ describe('slashMenu', () => {
         allowBlocks: false,
       })
       expect(out.every((i) => !BLOCK_SLASH_IDS.has(i.id))).toBe(true)
-      expect(out.map((i) => i.id)).toEqual(['wiki', 'embed'])
+      expect(out.map((i) => i.id)).toEqual([
+        'wiki',
+        'embed',
+        'copyPageLink',
+        'aiContinue',
+        'aiSummarize',
+        'aiToTasks',
+        'aiExplain',
+        'aiRewrite',
+      ])
     })
 
     it('chains after filterSlashItems for mid-line Live', () => {

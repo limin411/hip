@@ -24,6 +24,10 @@ const getTextCursorPosition = vi.fn(() => ({
 
 vi.mock('@blocknote/core', () => ({
   insertOrUpdateBlockForSlashMenu: vi.fn(),
+  BlockNoteSchema: { create: () => ({}) },
+  defaultBlockSpecs: {},
+  defaultInlineContentSpecs: {},
+  defaultStyleSpecs: {},
 }))
 
 vi.mock('@blocknote/react', () => ({
@@ -47,6 +51,17 @@ vi.mock('@blocknote/react', () => ({
   BasicTextStyleButton: () => null,
   BlockTypeSelect: () => null,
   CreateLinkButton: () => null,
+  createReactBlockSpec: () => () => ({}),
+  createReactInlineContentSpec: () => ({}),
+  createReactStyleSpec: () => ({}),
+}))
+
+vi.mock('@/domain/knowledge/blocks/schema', () => ({
+  knowledgeBlockSchema: {},
+}))
+
+vi.mock('sonner', () => ({
+  toast: { message: vi.fn(), error: vi.fn(), success: vi.fn() },
 }))
 
 vi.mock('@blocknote/mantine', () => ({

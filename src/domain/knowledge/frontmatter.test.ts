@@ -146,6 +146,8 @@ x
         date: null,
         priority: null,
         icon: null,
+        cover: null,
+        coverY: null,
         props: {},
       }),
     ).toEqual({ tags: 'a b', status: 'draft', aliases: 'X Y' })
@@ -248,5 +250,22 @@ describe('matchDocByTitleOrAlias', () => {
   it('returns null when nothing matches', () => {
     expect(matchDocByTitleOrAlias('zzz', docs)).toBeNull()
     expect(matchDocByTitleOrAlias('  ', docs)).toBeNull()
+  })
+})
+
+describe('cover + coverY frontmatter', () => {
+  it('parses cover path and coverY', () => {
+    const raw = `---
+icon: 📄
+cover: assets/hero.png
+coverY: 35
+---
+body
+`
+    const r = parseFrontmatter(raw)
+    expect(r.meta.icon).toBe('📄')
+    expect(r.meta.cover).toBe('assets/hero.png')
+    expect(r.meta.coverY).toBe(35)
+    expect(r.bodyWithoutFm).toContain('body')
   })
 })

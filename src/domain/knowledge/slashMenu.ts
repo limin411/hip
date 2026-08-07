@@ -20,19 +20,34 @@ export type KnowledgeSlashId =
   | 'wiki'
   | 'embed'
   | 'callout'
+  | 'calloutTip'
+  | 'calloutNote'
+  | 'calloutWarning'
+  | 'calloutDanger'
+  | 'calloutInfo'
+  | 'calloutImportant'
+  | 'toggle'
   | 'math'
   | 'mermaid'
   | 'svg'
   | 'image'
+  | 'aiContinue'
+  | 'aiSummarize'
+  | 'aiToTasks'
+  | 'aiExplain'
+  | 'aiRewrite'
+  | 'subdoc'
+  | 'copyPageLink'
 
-/** Slash menu section (R5). */
-export type KnowledgeSlashGroup = 'basic' | 'list' | 'media' | 'advanced'
+/** Slash menu section (R5 + AI). */
+export type KnowledgeSlashGroup = 'basic' | 'list' | 'media' | 'advanced' | 'ai'
 
 export const SLASH_GROUP_ORDER: readonly KnowledgeSlashGroup[] = [
   'basic',
   'list',
   'media',
   'advanced',
+  'ai',
 ] as const
 
 export interface KnowledgeSlashItem {
@@ -89,10 +104,18 @@ export const BLOCK_SLASH_IDS: ReadonlySet<KnowledgeSlashId> = new Set([
   'hr',
   'table',
   'callout',
+  'calloutTip',
+  'calloutNote',
+  'calloutWarning',
+  'calloutDanger',
+  'calloutInfo',
+  'calloutImportant',
+  'toggle',
   'math',
   'mermaid',
   'svg',
   'image',
+  'subdoc',
 ])
 
 /** Live/Source slash insert config — single source of truth. */
@@ -162,6 +185,83 @@ export const KNOWLEDGE_SLASH_ITEMS: KnowledgeSlashItem[] = [
     label: 'Callout',
     insert: '> [!note] Title\n> ',
     cursorOffset: 10,
+  },
+  {
+    id: 'calloutTip',
+    name: 'tip',
+    keywords: ['callout', 'tip'],
+    keywordsZh: ['提示'],
+    group: 'basic',
+    icon: '💡',
+    label: 'Tip callout',
+    insert: '> [!tip] Tip\n> ',
+    cursorOffset: 9,
+  },
+  {
+    id: 'calloutNote',
+    name: 'note',
+    keywords: ['callout', 'note'],
+    keywordsZh: ['笔记', '备注'],
+    group: 'basic',
+    icon: '📝',
+    label: 'Note callout',
+    insert: '> [!note] Note\n> ',
+    cursorOffset: 10,
+  },
+  {
+    id: 'calloutWarning',
+    name: 'warning',
+    keywords: ['callout', 'warn', 'warning'],
+    keywordsZh: ['警告'],
+    group: 'basic',
+    icon: '⚠',
+    label: 'Warning callout',
+    insert: '> [!warning] Warning\n> ',
+    cursorOffset: 13,
+  },
+  {
+    id: 'calloutDanger',
+    name: 'danger',
+    keywords: ['callout', 'danger', 'error'],
+    keywordsZh: ['危险', '错误'],
+    group: 'basic',
+    icon: '⛔',
+    label: 'Danger callout',
+    insert: '> [!danger] Danger\n> ',
+    cursorOffset: 12,
+  },
+  {
+    id: 'calloutInfo',
+    name: 'info',
+    keywords: ['callout', 'info'],
+    keywordsZh: ['信息'],
+    group: 'basic',
+    icon: 'ℹ',
+    label: 'Info callout',
+    insert: '> [!info] Info\n> ',
+    cursorOffset: 10,
+  },
+  {
+    id: 'calloutImportant',
+    name: 'important',
+    keywords: ['callout', 'important'],
+    keywordsZh: ['重要'],
+    group: 'basic',
+    icon: '❗',
+    label: 'Important callout',
+    insert: '> [!important] Important\n> ',
+    cursorOffset: 15,
+  },
+  {
+    id: 'toggle',
+    name: 'toggle',
+    keywords: ['fold', 'details', 'collapse'],
+    keywordsZh: ['折叠', '展开'],
+    group: 'basic',
+    icon: '▸',
+    label: 'Toggle',
+    insert: '<details>\n<summary>Details</summary>\n\n\n\n</details>\n',
+    cursorOffset: 19,
   },
   {
     id: 'bullet',
@@ -284,6 +384,83 @@ export const KNOWLEDGE_SLASH_ITEMS: KnowledgeSlashItem[] = [
     label: 'Embed document',
     insert: '![[]]',
     cursorOffset: 3,
+  },
+  {
+    id: 'subdoc',
+    name: 'subdoc',
+    keywords: ['child', 'page', 'subpage'],
+    keywordsZh: ['子文档', '子页面'],
+    group: 'advanced',
+    icon: '↳',
+    label: 'Sub-document',
+    insert: '[[]]',
+    cursorOffset: 2,
+  },
+  {
+    id: 'copyPageLink',
+    name: 'copylink',
+    keywords: ['copy', 'link', 'url', 'pagelink'],
+    keywordsZh: ['复制链接', '页面链接'],
+    group: 'advanced',
+    icon: '🔗',
+    label: 'Copy page link',
+    insert: '',
+    cursorOffset: 0,
+  },
+  {
+    id: 'aiContinue',
+    name: 'aicontinue',
+    keywords: ['ai', 'complete', 'continue'],
+    keywordsZh: ['续写', '继续写'],
+    group: 'ai',
+    icon: '✨',
+    label: 'AI continue',
+    insert: '',
+    cursorOffset: 0,
+  },
+  {
+    id: 'aiSummarize',
+    name: 'aisummarize',
+    keywords: ['ai', 'summary', 'tldr', 'summarize'],
+    keywordsZh: ['总结', '摘要'],
+    group: 'ai',
+    icon: '✨',
+    label: 'AI summarize',
+    insert: '',
+    cursorOffset: 0,
+  },
+  {
+    id: 'aiToTasks',
+    name: 'aitasks',
+    keywords: ['ai', 'extracttasks'],
+    keywordsZh: ['转任务', '待办'],
+    group: 'ai',
+    icon: '✨',
+    label: 'AI to tasks',
+    insert: '',
+    cursorOffset: 0,
+  },
+  {
+    id: 'aiExplain',
+    name: 'aiexplain',
+    keywords: ['ai', 'explain'],
+    keywordsZh: ['解释'],
+    group: 'ai',
+    icon: '✨',
+    label: 'AI explain',
+    insert: '',
+    cursorOffset: 0,
+  },
+  {
+    id: 'aiRewrite',
+    name: 'airewrite',
+    keywords: ['ai', 'rewrite', 'improve'],
+    keywordsZh: ['改写', '润色'],
+    group: 'ai',
+    icon: '✨',
+    label: 'AI rewrite',
+    insert: '',
+    cursorOffset: 0,
   },
 ]
 

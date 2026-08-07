@@ -87,6 +87,12 @@ import {
   applyWikiRewrites,
   planWikiTitleRewrites,
 } from '@/domain/knowledge/rewriteWikiTitles'
+import {
+  cloneDocMeta,
+  parseFrontmatter,
+  type KnowledgeDocMeta,
+} from '@/domain/knowledge/frontmatter'
+import { applyMetaToDocument } from '@/domain/knowledge/frontmatterWrite'
 
 export type { EditorMode }
 export { shouldAutosave }
@@ -427,6 +433,13 @@ interface KnowledgeState {
     v: string,
     opts?: { persist?: 'auto' | 'now' | 'none'; docId?: string },
   ) => void
+  /** True when draft differs from last-saved body (or saveState is error mid-edit). */
+  hasUnsavedChanges: () => boolean
+  /**
+   * Patch active doc frontmatter (icon/cover/tags/…) without renaming the tree title.
+   * Rewrites draft/doc body FM fence; schedules autosave.
+   */
+  updateActiveDocMeta: (patch: Partial<KnowledgeDocMeta>) => void
   /**
    * Persist dirty draft to disk.
    * - `phase: 'full'` (default): write + link-index + daily version (for delete/manual safety).
@@ -1597,6 +1610,32 @@ export const useKnowledgeStore = create<KnowledgeState>((set, get) => ({
     else cancelScheduledSave() // 'none': draft only; drop any pending autosave
   },
 
+  hasUnsavedChanges: () => {
+    const s = get()
+    if (!s.activeDocId) return false
+    if (s.saveState === 'saving' || s.saveState === 'error') return true
+    return s.draftBody !== s.docBody
+  },
+
+  updateActiveDocMeta: (patch) => {
+    const s = get()
+    if (!s.activeDocId || !s.activeSpaceId) return
+    const raw = s.draftBody || s.docBody
+    const { meta } = parseFrontmatter(raw)
+    const next = cloneDocMeta(meta)
+    if (patch.tags) next.tags = [...patch.tags]
+    if (patch.aliases) next.aliases = [...patch.aliases]
+    if ('status' in patch) next.status = patch.status ?? null
+    if ('date' in patch) next.date = patch.date ?? null
+    if ('priority' in patch) next.priority = patch.priority ?? null
+    if ('icon' in patch) next.icon = patch.icon ?? null
+    if ('cover' in patch) next.cover = patch.cover ?? null
+    if ('coverY' in patch) next.coverY = patch.coverY ?? null
+    if (patch.props) next.props = { ...next.props, ...patch.props }
+    const body = applyMetaToDocument(raw, next)
+    get().setDraftBody(body, { docId: s.activeDocId, persist: 'auto' })
+  },
+
   flushSave: (opts) => {
     cancelScheduledSave()
     const phase = opts?.phase ?? 'full'
@@ -1665,7 +1704,7 @@ export const useKnowledgeStore = create<KnowledgeState>((set, get) => ({
         }
         setTimeout(() => {
           if (get().saveState === 'saved') set({ saveState: 'idle' })
-        }, 1500)
+        }, 2000)
         return true
       } catch (e) {
         resolveWrite?.(false)

@@ -31,6 +31,13 @@ function headingText(el: Element): string {
   return (el.textContent ?? '').replace(/\s+/g, ' ').trim()
 }
 
+/** Best-effort snippet from link raw (±40 chars when longer context exists). */
+function formatBacklinkSnippet(raw: string): string {
+  const s = raw.replace(/\s+/g, ' ').trim()
+  if (s.length <= 80) return s
+  return `…${s.slice(0, 80)}…`
+}
+
 /**
  * Knowledge right-rail: Outline + Backlinks + Outbound (docs only).
  */
@@ -260,7 +267,13 @@ export function KnowledgeOutlinePanel() {
                         onClick={() => void openBacklink(b.fromDocId, b.fragment)}
                       >
                         <span className="font-medium">{b.fromTitle}</span>
-                        <span className="mt-0.5 block truncate text-ink-tertiary">{b.raw}</span>
+                        <span
+                          className="mt-0.5 block truncate text-ink-tertiary"
+                          data-testid="knowledge-backlink-snippet"
+                          title={b.raw}
+                        >
+                          {formatBacklinkSnippet(b.raw)}
+                        </span>
                       </button>
                     </li>
                   ))}

@@ -59,6 +59,10 @@ export type KnowledgeDocMeta = {
   priority: string | null
   /** Optional page emoji icon (R5 Gate C). */
   icon: string | null
+  /** Optional cover image path relative to space (assets/…). */
+  cover: string | null
+  /** Cover focal Y percent 0–100 (optional). */
+  coverY: number | null
   /** Custom keys not mapped to built-ins. */
   props: Record<string, PropValue>
 }
@@ -77,6 +81,8 @@ export const EMPTY_DOC_META: KnowledgeDocMeta = {
   date: null,
   priority: null,
   icon: null,
+  cover: null,
+  coverY: null,
   props: {},
 }
 
@@ -88,6 +94,8 @@ const KNOWN_FM_KEYS = new Set([
   'date',
   'priority',
   'icon',
+  'cover',
+  'covery',
 ])
 
 /** Strip a leading `--- … ---` block and parse known property keys. */
@@ -149,6 +157,8 @@ export function cloneDocMeta(meta: KnowledgeDocMeta): KnowledgeDocMeta {
     date: meta.date,
     priority: meta.priority,
     icon: meta.icon,
+    cover: meta.cover,
+    coverY: meta.coverY,
     props: { ...meta.props },
   }
 }
@@ -202,10 +212,20 @@ export function compareWikiDocs(
 
 // ─── internal line parser ───────────────────────────────────────────────────
 
-type KnownFmKey = 'tags' | 'status' | 'aliases' | 'date' | 'priority' | 'icon'
+type KnownFmKey =
+  | 'tags'
+  | 'status'
+  | 'aliases'
+  | 'date'
+  | 'priority'
+  | 'icon'
+  | 'cover'
+  | 'coverY'
 
 function normalizeKnownKey(raw: string): KnownFmKey | null {
   const k = raw.toLowerCase()
+  if (k === 'covery' || k === 'cover_y' || k === 'cover-y') return 'coverY'
+  if (k === 'cover') return 'cover'
   if (KNOWN_FM_KEYS.has(k)) {
     return k as KnownFmKey
   }
@@ -223,6 +243,8 @@ function parseMetaLines(lines: string[]): {
     date: null,
     priority: null,
     icon: null,
+    cover: null,
+    coverY: null,
     props: {},
   }
   let foundKnownKey = false
@@ -273,13 +295,18 @@ function parseMetaLines(lines: string[]): {
           known === 'status' ||
           known === 'date' ||
           known === 'priority' ||
-          known === 'icon'
+          known === 'icon' ||
+          known === 'cover'
         ) {
           const scalar = unquote(rawVal) || null
           if (known === 'status') meta.status = scalar
           else if (known === 'date') meta.date = scalar
           else if (known === 'icon') meta.icon = scalar
+          else if (known === 'cover') meta.cover = scalar
           else meta.priority = scalar
+        } else if (known === 'coverY') {
+          const n = Number(unquote(rawVal))
+          meta.coverY = Number.isFinite(n) ? n : null
         } else {
           assignListKey(meta, known, parseInlineList(rawVal))
         }
@@ -333,6 +360,15 @@ function assignListKey(
   }
   if (key === 'icon') {
     meta.icon = items[0] ?? null
+    return
+  }
+  if (key === 'cover') {
+    meta.cover = items[0] ?? null
+    return
+  }
+  if (key === 'coverY') {
+    const n = Number(items[0])
+    meta.coverY = Number.isFinite(n) ? n : null
     return
   }
   if (key === 'tags') meta.tags = items

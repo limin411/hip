@@ -435,15 +435,17 @@ describe('sidebarActions', () => {
     expect(useUiStore.getState().overlay).toBeNull()
   })
 
-  it('selectSessionFromSidebar dismisses history overlay but not settings', async () => {
+  it('selectSessionFromSidebar dismisses history and settings overlays', async () => {
     useUiStore.setState({ overlay: 'history', activeView: 'chat' })
     await selectSessionFromSidebar('s1')
     expect(selectSession).toHaveBeenCalledWith('s1')
     expect(useUiStore.getState().overlay).toBeNull()
 
+    // Settings is a sidebar+main-column surface since 0aa5f5b8: selecting a
+    // session must also dismiss it (same rules as history/trash).
     useUiStore.setState({ overlay: 'settings', activeView: 'chat' })
     await selectSessionFromSidebar('s1')
-    expect(useUiStore.getState().overlay).toBe('settings')
+    expect(useUiStore.getState().overlay).toBeNull()
   })
 
   it('selectSessionFromSidebar dismisses trash overlay', async () => {

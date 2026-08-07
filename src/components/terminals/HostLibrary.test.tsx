@@ -83,6 +83,15 @@ vi.mock('react-i18next', () => ({
   }),
 }))
 
+// deleteHostWithCascade dynamically imports '@/domain'; mock it so the real
+// sessionService (+ its i18n init chain) never loads inside this component test.
+vi.mock('@/domain', () => ({
+  sessionService: {
+    trashSession: vi.fn(),
+    selectSession: vi.fn(),
+  },
+}))
+
 vi.mock('nanoid', () => ({ nanoid: () => 'g1' }))
 
 import { HostLibrary } from './HostLibrary'

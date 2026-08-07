@@ -4,11 +4,11 @@ import { isPathUnderRoot, normalizeFsPath } from '@/lib/pathBoundary'
 import { previewKind } from '@/components/artifact/previewKind'
 import type { ContextMenuItemDef, ContextPayloadMap, ContextProvider } from '../types'
 
-/** True when preview content is plain text / markdown (not image/pdf/html binary). */
+/** True when preview content is plain text / markdown / source code (not image/pdf/html binary). */
 function canCopyContent(path: string, mimeType?: string, content?: string): boolean {
   if (content == null || content === '') return false
   const kind = previewKind(path, mimeType)
-  return kind === 'text' || kind === 'markdown'
+  return kind === 'text' || kind === 'markdown' || kind === 'code'
 }
 
 /**

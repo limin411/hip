@@ -6,12 +6,6 @@ import type {
   DiffFileStatus,
   PermissionMode,
   OrchestrationMode,
-  MemoryFileConfig,
-  MemoryItem,
-  MemoryScope,
-  MemoryStatus,
-  KeyProbeCode,
-  EmptyGreetingGenerateContext,
   ExecutionMode,
 } from '@hip/protocol'
 import {
@@ -22,6 +16,15 @@ import {
 import { nanoid } from 'nanoid'
 import type { Transport } from './transport'
 import { MessageWaiter } from './messageWaiter'
+import { MemoryWire } from './actions/memoryWire'
+import type {
+  EmptyGreetingGenerateContext,
+  MemoryFileConfig,
+  MemoryItem,
+  MemoryScope,
+  MemoryStatus,
+  TestProviderRequest,
+} from './actions/memoryWire'
 import {
   E2eHooks,
   installE2eHooks,
@@ -83,22 +86,6 @@ function tokenStreamExtras(msg: ServerMessage & { type: 'token:stream' }): {
   }
 }
 
-export type TestProviderRequest = {
-  purpose: 'chat' | 'embedding' | 'rerank'
-  providerID: string
-  baseURL?: string
-  modelID?: string
-  apiKey?: string
-}
-
-export type TestProviderResult = {
-  ok: boolean
-  code: KeyProbeCode
-  message: string
-  latencyMs?: number
-  checkedAt: number
-  cached?: boolean
-}
 
 export class SessionService {
   private readonly transport: Transport
@@ -109,10 +96,13 @@ export class SessionService {
   private readonly waiter = new MessageWaiter()
   /** E2E simulation hooks (dev-only); facade forwards its simulate and seed methods here. */
   private readonly e2e = new E2eHooks(this)
+  /** Cross-session memory + provider probing wire actions (P2). */
+  private readonly memoryWire: MemoryWire
   /** E2E: last user content passed to sendMessage (annotation inject assertions). */
   private lastOutboundUserContent: string | null = null
 
   constructor(transport: Transport) {
+    this.memoryWire = new MemoryWire(transport, this.waiter)
     this.transport = transport
     this.streamCoalescer = new StreamCoalescer((bucket) => this.applyCoalescedToken(bucket))
     this.unsubscribe = this.transport.onMessage((msg: ServerMessage) => this.receive(msg))
@@ -766,85 +756,26 @@ export class SessionService {
    * Probe whether a provider (or memory endpoint) API key works.
    * Product A: provider-key usability, not per-model entitlement.
    */
-  async testProvider(req: TestProviderRequest, timeoutMs = 20_000): Promise<TestProviderResult> {
-    const requestId = nanoid()
-    const wait = this.waiter.waitWhere(
-      'config:testProvider:result',
-      (m) => m.requestId === requestId,
-      timeoutMs,
-    )
-    this.transport.send({
-      type: 'config:testProvider',
-      requestId,
-      purpose: req.purpose,
-      providerID: req.providerID,
-      ...(req.baseURL !== undefined ? { baseURL: req.baseURL } : {}),
-      ...(req.modelID !== undefined ? { modelID: req.modelID } : {}),
-      ...(req.apiKey !== undefined ? { apiKey: req.apiKey } : {}),
-    })
-    const msg = await wait
-    return {
-      ok: msg.ok,
-      code: msg.code,
-      message: msg.message,
-      latencyMs: msg.latencyMs,
-      checkedAt: msg.checkedAt,
-      cached: msg.cached,
-    }
+
+
+  async testProvider(req: TestProviderRequest, timeoutMs = 20_000) {
+    return this.memoryWire.testProvider(req, timeoutMs)
   }
 
-  async getMemoryConfig(): Promise<MemoryFileConfig> {
-    const wait = this.waiter.wait('memory:config')
-    this.transport.send({ type: 'memory:getConfig' })
-    const msg = await wait
-    return msg.config
+  async getMemoryConfig() {
+    return this.memoryWire.getMemoryConfig()
   }
 
-  async setMemoryConfig(config: Partial<MemoryFileConfig>): Promise<MemoryFileConfig> {
-    // setConfig validation failures arrive as type:error (code MEMORY_CONFIG).
-    const wait = this.waiter.waitFirst(['memory:config', 'error'])
-    this.transport.send({ type: 'memory:setConfig', config })
-    const msg = await wait
-    if (msg.type === 'error') {
-      throw new Error(msg.message)
-    }
-    return msg.config
+  async setMemoryConfig(config: Partial<MemoryFileConfig>) {
+    return this.memoryWire.setMemoryConfig(config)
   }
 
-  async getMemoryIndexStatus(): Promise<{
-    embedded: number
-    total: number
-    modelKey?: string
-    vecEnabled?: boolean
-  }> {
-    const wait = this.waiter.wait('memory:indexStatus:result')
-    this.transport.send({ type: 'memory:indexStatus' })
-    const msg = await wait
-    if (msg.error) throw new Error(msg.error)
-    return {
-      embedded: msg.embedded,
-      total: msg.total,
-      modelKey: msg.modelKey,
-      vecEnabled: msg.vecEnabled,
-    }
+  async getMemoryIndexStatus() {
+    return this.memoryWire.getMemoryIndexStatus()
   }
 
-  async reindexMemories(): Promise<{
-    embedded: number
-    total: number
-    failed: number
-    modelKey?: string
-  }> {
-    const wait = this.waiter.wait('memory:reindex:result')
-    this.transport.send({ type: 'memory:reindex' })
-    const msg = await wait
-    if (msg.error) throw new Error(msg.error)
-    return {
-      embedded: msg.embedded,
-      total: msg.total,
-      failed: msg.failed ?? 0,
-      modelKey: msg.modelKey,
-    }
+  async reindexMemories() {
+    return this.memoryWire.reindexMemories()
   }
 
   async listMemories(filter?: {
@@ -854,206 +785,89 @@ export class SessionService {
     query?: string
     limit?: number
     status?: MemoryStatus
-  }): Promise<MemoryItem[]> {
-    const wait = this.waiter.wait('memory:list:result')
-    this.transport.send({ type: 'memory:list', ...filter })
-    const msg = await wait
-    if (msg.error) throw new Error(msg.error)
-    return msg.items
+  }) {
+    return this.memoryWire.listMemories(filter)
   }
 
   async upsertMemory(
     item: Partial<MemoryItem> & Pick<MemoryItem, 'title' | 'content' | 'kind' | 'scope'>,
-  ): Promise<MemoryItem> {
-    const wait = this.waiter.wait('memory:upsert:result')
-    this.transport.send({ type: 'memory:upsert', item })
-    const msg = await wait
-    if (msg.error || !msg.item) throw new Error(msg.error ?? 'upsert failed')
-    return msg.item
+  ) {
+    return this.memoryWire.upsertMemory(item)
   }
 
-  async deleteMemory(id: string, hard?: boolean): Promise<boolean> {
-    const wait = this.waiter.wait('memory:delete:result')
-    this.transport.send({ type: 'memory:delete', id, ...(hard !== undefined ? { hard } : {}) })
-    const msg = await wait
-    if (msg.error) throw new Error(msg.error)
-    return msg.ok
+  async deleteMemory(id: string, hard?: boolean) {
+    return this.memoryWire.deleteMemory(id, hard)
   }
 
-  async deleteMemoriesBySourceSession(sessionId: string, soft?: boolean): Promise<number> {
-    const wait = this.waiter.wait('memory:deleteBySourceSession:result')
-    this.transport.send({
-      type: 'memory:deleteBySourceSession',
-      sessionId,
-      ...(soft !== undefined ? { soft } : {}),
-    })
-    const msg = await wait
-    if (msg.error) throw new Error(msg.error)
-    return msg.deleted
+  async deleteMemoriesBySourceSession(sessionId: string, soft?: boolean) {
+    return this.memoryWire.deleteMemoriesBySourceSession(sessionId, soft)
   }
 
-  async restoreMemory(id: string): Promise<MemoryItem> {
-    const wait = this.waiter.wait('memory:restore:result')
-    this.transport.send({ type: 'memory:restore', id })
-    const msg = await wait
-    if (msg.error || !msg.item) throw new Error(msg.error ?? 'restore failed')
-    return msg.item
+  async restoreMemory(id: string) {
+    return this.memoryWire.restoreMemory(id)
   }
 
-  async emptyMemoryTrash(): Promise<number> {
-    const wait = this.waiter.wait('memory:emptyTrash:result')
-    this.transport.send({ type: 'memory:emptyTrash' })
-    const msg = await wait
-    if (msg.error) throw new Error(msg.error)
-    return msg.deleted
+  async emptyMemoryTrash() {
+    return this.memoryWire.emptyMemoryTrash()
   }
 
-  async exportMemories(format: 'jsonl' | 'markdown' = 'jsonl'): Promise<string> {
-    const wait = this.waiter.wait('memory:export:result')
-    this.transport.send({ type: 'memory:export', format })
-    const msg = await wait
-    if (msg.error) throw new Error(msg.error)
-    return msg.data
+  async exportMemories(format: 'jsonl' | 'markdown' = 'jsonl') {
+    return this.memoryWire.exportMemories(format)
   }
 
-  async importMemories(data: string): Promise<number> {
-    const wait = this.waiter.wait('memory:import:result')
-    this.transport.send({ type: 'memory:import', format: 'jsonl', data })
-    const msg = await wait
-    if (msg.error || !msg.ok) throw new Error(msg.error ?? 'import failed')
-    return msg.imported
+  async importMemories(data: string) {
+    return this.memoryWire.importMemories(data)
   }
 
-  /**
-   * Run Phase2 consolidate and wait for the terminal `memory:pipeline` event
-   * (succeeded | failed | noop). Phase "started" is ignored.
-   */
-  async consolidateMemories(projectKeyHash?: string): Promise<{
-    status: 'succeeded' | 'failed' | 'noop'
-    detail?: string
-  }> {
-    const wait = this.waiter.waitWhere(
-      'memory:pipeline',
-      (msg) =>
-        msg.phase === 2 &&
-        (msg.status === 'succeeded' || msg.status === 'failed' || msg.status === 'noop'),
-      180_000,
-    )
-    this.transport.send({
-      type: 'memory:consolidate',
-      ...(projectKeyHash ? { projectKeyHash } : {}),
-    })
-    const msg = await wait
-    return {
-      status: msg.status as 'succeeded' | 'failed' | 'noop',
-      detail: msg.detail,
-    }
+  async consolidateMemories(projectKeyHash?: string) {
+    return this.memoryWire.consolidateMemories(projectKeyHash)
   }
 
   async getMemoryStatus(opts?: {
     projectKeyHash?: string
     contextWindowTokens?: number
-  }): Promise<import('@hip/protocol').MemoryPipelineStatus> {
-    const wait = this.waiter.wait('memory:status')
-    this.transport.send({
-      type: 'memory:getStatus',
-      ...(opts?.projectKeyHash ? { projectKeyHash: opts.projectKeyHash } : {}),
-      ...(opts?.contextWindowTokens !== undefined
-        ? { contextWindowTokens: opts.contextWindowTokens }
-        : {}),
-    })
-    const msg = await wait
-    if (msg.error) throw new Error(msg.error)
-    return msg.status
+  }) {
+    return this.memoryWire.getMemoryStatus(opts)
   }
 
-  async rewriteMemoryMirrors(projectKeyHash?: string): Promise<string[]> {
-    const wait = this.waiter.wait('memory:rewriteMirrors:result')
-    this.transport.send({
-      type: 'memory:rewriteMirrors',
-      ...(projectKeyHash ? { projectKeyHash } : {}),
-    })
-    const msg = await wait
-    if (msg.error) throw new Error(msg.error)
-    return msg.written
+  async rewriteMemoryMirrors(projectKeyHash?: string) {
+    return this.memoryWire.rewriteMemoryMirrors(projectKeyHash)
   }
 
   async importMemoryMirror(opts?: {
     projectKeyHash?: string
     conflict?: 'keep' | 'overwrite'
-  }): Promise<{ imported: number; skipped: number }> {
-    const wait = this.waiter.wait('memory:importMirror:result')
-    this.transport.send({
-      type: 'memory:importMirror',
-      ...(opts?.projectKeyHash ? { projectKeyHash: opts.projectKeyHash } : {}),
-      ...(opts?.conflict ? { conflict: opts.conflict } : {}),
-    })
-    const msg = await wait
-    if (msg.error) throw new Error(msg.error)
-    return { imported: msg.imported, skipped: msg.skipped }
+  }) {
+    return this.memoryWire.importMemoryMirror(opts)
   }
 
-  /** Send a raw client message (TaskRuntime control plane). */
-  sendClient(msg: import('@hip/protocol').ClientMessage): void {
-    this.transport.send(msg)
+  listRuntimeTasks(sessionId: string) {
+    return this.memoryWire.listRuntimeTasks(sessionId)
   }
 
-  listRuntimeTasks(sessionId: string): void {
-    this.transport.send({ type: 'task:list', sessionId })
-  }
-
-  stopRuntimeTask(sessionId: string, taskId: string, reason?: string): void {
-    this.transport.send({ type: 'task:stop', sessionId, taskId, ...(reason ? { reason } : {}) })
+  stopRuntimeTask(sessionId: string, taskId: string, reason?: string) {
+    return this.memoryWire.stopRuntimeTask(sessionId, taskId, reason)
   }
 
   setMemoryFlags(
     sessionId: string,
     flags: { useMemories?: boolean; generateMemories?: boolean; incognito?: boolean },
-  ): void {
-    // Optimistic local merge; server echoes session:memoryFlags.
-    useDomainStore.getState().apply({
-      type: 'session:memoryFlags',
-      sessionId,
-      ...flags,
-    })
-    this.transport.send({ type: 'session:setMemoryFlags', sessionId, ...flags })
+  ) {
+    return this.memoryWire.setMemoryFlags(sessionId, flags)
   }
 
-  /**
-   * One-shot empty-state greeting via built-in model path (no ACP/tools/session).
-   * Uses last-used model when provided. Always-on product path; caller keeps rule-based fallback.
-   */
   async generateEmptyGreeting(opts: {
     requestId?: string
     providerID?: string
     modelID?: string
     context: EmptyGreetingGenerateContext
     timeoutMs?: number
-  }): Promise<{ ok: true; title: string; sub: string } | { ok: false; error: string }> {
-    const requestId = opts.requestId ?? nanoid()
-    const timeoutMs = opts.timeoutMs ?? 4_000
-    const wait = this.waiter.waitWhere(
-      'ui:emptyGreeting:generate:result',
-      (msg) => msg.requestId === requestId,
-      timeoutMs,
-    )
-    this.transport.send({
-      type: 'ui:emptyGreeting:generate',
-      requestId,
-      ...(opts.providerID ? { providerID: opts.providerID } : {}),
-      ...(opts.modelID ? { modelID: opts.modelID } : {}),
-      context: opts.context,
-    })
-    try {
-      const msg = await wait
-      if (!msg.ok || !msg.title || !msg.sub) {
-        return { ok: false, error: msg.error ?? 'empty greeting generation failed' }
-      }
-      return { ok: true, title: msg.title, sub: msg.sub }
-    } catch (err) {
-      const message = err instanceof Error ? err.message : String(err)
-      return { ok: false, error: message || 'timeout' }
-    }
+  }) {
+    return this.memoryWire.generateEmptyGreeting(opts)
+  }
+  /** Send a raw client message (TaskRuntime control plane). */
+  sendClient(msg: import('@hip/protocol').ClientMessage): void {
+    this.transport.send(msg)
   }
 
   renameSession(id: string, title: string): void {

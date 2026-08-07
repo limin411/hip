@@ -133,3 +133,19 @@ src/domain/sessionStore/
 1. **方案确认**：A（reducer 拆分，推荐）vs B（slices）。
 2. **`flow.ts` 与 `session.ts` 的边界**：`session:loaded` 需要同时重置回合状态——采用"`session.ts` 返回完整状态、`flow.ts` 只处理回合字段"的委托方式（推荐）还是 `flow.ts` 导出子 reducer 由聚合器组合。
 3. **薄转发文件的去留**：P1 后若旧路径无歧义，直接删；有歧义则保留 `sessionStore.ts` 转发并记录（推荐保留至 P4 验证后再删，稳妥）。
+
+---
+
+## 9. 实施记录（2026-08-07）
+
+**决策**：方案 A（单 store + reducer 分域）；边界"每消息只归属一个 reducer"，跨域字段写入由归属 reducer 完成并注释声明（`session:loaded` 全量重置在 session.ts；`agent:interrupt` 写 `planApprovalPending`、`error` 清 plan 字段在 flow.ts）；薄转发保留至 S-4 验证后删除。
+
+**Phase 执行**：
+
+| Phase | 结果 |
+|---|---|
+| S-1+S-2 | 目录化纯移动：`index/types/messageUtils/constants/store.ts` + `reducers/index.ts`（整块 applyServerMessage 原样）；旧 `sessionStore.ts` 改薄转发。body 与 `git show HEAD` 原文件逐字节 diff 验证（messageUtils 12 个私有 helper 加 export 供 reducer 使用；PluginInstallState 移至 types.ts；`clearPermission` 的 JSDoc 随函数归位 constants.ts；公共导出面不变）。`sessionStore.test.ts`（130）零改动全绿；全量消费方 790 测试绿。✅ |
+| S-3 | 4 域拆分：`helpers.ts`（SessionState + updateSession，原闭包 helper 加显式 state 参数）+ `flow.ts`（14 case）+ `session.ts`（18 case）+ `plan.ts`（6 case）+ `misc.ts`（2 case + default）。case body 按行号 sed 提取逐字搬运；分派器用 Set 白名单 + `session:` 前缀，未知类型落 misc default → state。`sessionStore.test.ts` 零改动全绿；domain+chat+layout+artifact 1675 测试绿。✅ |
+| S-4 | 删除薄转发（tsc 验证 `./sessionStore`、`../sessionStore`、`@/domain/sessionStore` 全部解析到目录 index，无歧义）；死代码检查（popForRegenerate 等私有符号归属确认，无孤儿）；CLAUDE.md 目录说明更新；本记录。✅ |
+
+**验收**：`src/domain/sessionStore.ts` 消失；目录内单文件 ≤ 400 行（store.ts 250、flow.ts 225、session.ts 216）；现有 import 面零改动；`sessionStore.test.ts` 零行为改动通过；40 个消息类型分派覆盖与现状等价；`yarn check:store-deps` 通过（未新增 store→store 边）。

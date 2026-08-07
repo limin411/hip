@@ -39,6 +39,8 @@ yarn tauri build
 - `src/` — React UI and domain logic
   - `src/domain/` — session facade + wire actions（2026-08 重构后）
     - `sessionService.ts` — 瘦 facade：传输 + 入站分发 + 方法转发
+    - `sessionStore/` — 会话视图模型目录（types/messageUtils/constants/store + reducers/ 四域分派，2026-08 拆分）
+    - `terminalLifecycle.ts` — 终端生命周期协调层（唯一跨 store 写入点，见 store-dependencies.md）
     - `actions/sessionActions.ts` — 会话生命周期/配置/消息
     - `actions/fsActions.ts` — diff/git/文件浏览
     - `actions/memoryWire.ts` — 记忆/provider 探测

@@ -14,19 +14,27 @@ import {
 } from 'react'
 import { BlockNoteView } from '@blocknote/mantine'
 import {
+  AddBlockButton,
   BasicTextStyleButton,
   BlockTypeSelect,
+  ColorStyleButton,
   CreateLinkButton,
+  DragHandleButton,
   FormattingToolbar,
   FormattingToolbarController,
+  SideMenuController,
   SuggestionMenuController,
+  useBlockNoteEditor,
   useCreateBlockNote,
+  useExtensionState,
   type DefaultReactSuggestionItem,
 } from '@blocknote/react'
+import { SideMenuExtension } from '@blocknote/core/extensions'
 import { BlockNoteHipSlashMenu } from './BlockNoteHipSlashMenu'
 import { MantineProvider } from '@mantine/core'
 import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
+import { Eraser, ListChecks } from 'lucide-react'
 import {
   joinYamlFrontmatter,
   splitYamlFrontmatter,
@@ -75,10 +83,16 @@ import {
   postSerializeMdFromLive,
   preParseMdForLive,
 } from '@/domain/knowledge/blocks/dialectBridge'
+import { wrapStyledInlineForExport } from '@/domain/knowledge/blocks/styleCarriers'
 import {
   handleBlockKeydown,
   type BlockKeymapEditor,
 } from '@/domain/knowledge/blocks/blockKeymap'
+import {
+  hasInlineMath,
+  splitInlineMath,
+  type InlineMathSegment,
+} from '@/domain/knowledge/blocks/mathInlineConvert'
 import type { KnowledgeAiActionId } from '@/domain/knowledge/ai/knowledgeAiActions'
 
 import '@blocknote/mantine/style.css'
@@ -201,6 +215,73 @@ function usePrefersDark(): boolean {
   return dark
 }
 
+/** Toolbar: one-click clear text/background/highlight styles on selection. */
+function ClearFormattingButton({ onClear }: { onClear: () => void }) {
+  const { t } = useTranslation()
+  return (
+    <button
+      type="button"
+      className="bn-button"
+      data-testid="kb-clear-format"
+      title={t('knowledge.doc.clearFormat')}
+      aria-label={t('knowledge.doc.clearFormat')}
+      onClick={onClear}
+    >
+      <Eraser size={16} />
+    </button>
+  )
+}
+
+/**
+ * Side-menu handle row: default add/drag buttons + a multi-select handle.
+ * Shift+click on the multi-select handle toggles the hovered block in the
+ * selection; a plain click clears the selection.
+ */
+function KnowledgeSideMenu({
+  selectedIds,
+  onToggleSelect,
+  onClearSelection,
+}: {
+  selectedIds: string[]
+  onToggleSelect: (id: string) => void
+  onClearSelection: () => void
+}) {
+  const { t } = useTranslation()
+  const editor = useBlockNoteEditor<any, any, any>()
+  const block = useExtensionState(SideMenuExtension, {
+    editor,
+    selector: (state) => state?.block,
+  })
+  if (!block) return null
+  const isSelected = selectedIds.includes(block.id)
+  return (
+    <div className="bn-side-menu" data-testid="kb-side-menu" data-block-id={block.id}>
+      <AddBlockButton />
+      <button
+        type="button"
+        className={isSelected ? 'kb-multiselect-handle kb-multiselect-active' : 'kb-multiselect-handle'}
+        data-testid="kb-multiselect-handle"
+        aria-pressed={isSelected}
+        title={t('knowledge.doc.multiSelectHint')}
+        aria-label={t('knowledge.doc.multiSelectHint')}
+        onMouseDown={(e) => {
+          if (!e.shiftKey) return
+          e.preventDefault()
+          e.stopPropagation()
+          onToggleSelect(block.id)
+        }}
+        onClick={(e) => {
+          if (e.shiftKey) return
+          onClearSelection()
+        }}
+      >
+        <ListChecks size={14} strokeWidth={1.75} />
+      </button>
+      <DragHandleButton />
+    </div>
+  )
+}
+
 function blockPlainText(block: {
   content?: unknown
 }): string {
@@ -212,11 +293,14 @@ function blockPlainText(block: {
         return String((part as { text?: string }).text ?? '')
       }
       if (part && typeof part === 'object' && 'type' in part) {
-        const p = part as { type?: string; props?: { title?: string; alias?: string } }
+        const p = part as { type?: string; props?: { title?: string; alias?: string; src?: string } }
         if (p.type === 'wikiLink') {
           const alias = p.props?.alias?.trim()
           const title = p.props?.title?.trim() ?? ''
           return alias || title
+        }
+        if (p.type === 'mathInline') {
+          return `$${p.props?.src ?? ''}$`
         }
       }
       return ''
@@ -316,6 +400,7 @@ export const DocBlockNoteEditor = forwardRef<
   wikiNodesRef.current = wikiNodes
   const seedBodyRef = useRef('')
   const lossToastShownRef = useRef(false)
+  const lossKeyRef = useRef('')
 
   const draftTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const draftDirtyRef = useRef(false)
@@ -352,6 +437,10 @@ export const DocBlockNoteEditor = forwardRef<
   } | null>(null)
   const [findOpen, setFindOpen] = useState(false)
   const [findReplace, setFindReplace] = useState(false)
+  /** Live↔Source fidelity losses still present in the current serialized draft. */
+  const [losses, setLosses] = useState<string[]>([])
+  /** Multi-selected block ids (Shift+click on side-menu handle). */
+  const [selectedIds, setSelectedIds] = useState<string[]>([])
 
   const { fmText, body } = useMemo(
     () => splitYamlFrontmatter(initialMarkdown),
@@ -498,19 +587,26 @@ export const DocBlockNoteEditor = forwardRef<
     try {
       if (editor._tiptapEditor?.isDestroyed) return
       const t0 = isKnowledgePerfEnabled() ? performance.now() : 0
-      const raw = editor.blocksToMarkdownLossy(editor.document)
+      const raw = editor.blocksToMarkdownLossy(
+        wrapStyledInlineForExport(editor.document) as never,
+      )
       const bodyMd = postSerializeMdFromLive(raw)
       if (isKnowledgePerfEnabled()) kbPerfSerialize(performance.now() - t0)
 
-      // Honesty toast once per editor instance if dialect markers lost
-      if (!lossToastShownRef.current) {
-        const lost = detectDialectLoss(seedBodyRef.current, bodyMd)
-        if (lost.length > 0) {
-          lossToastShownRef.current = true
-          toast.message(t('knowledge.doc.dialectLoss'), {
-            description: lost.map((l) => l.id).join(', '),
-          })
-        }
+      // Honesty: toast once per editor instance if dialect markers lost, and
+      // keep a persistent banner while the loss is still present in the draft.
+      const lost = detectDialectLoss(seedBodyRef.current, bodyMd)
+      const lossIds = lost.map((l) => l.id)
+      const lossKey = lossIds.join(',')
+      if (lossKey !== lossKeyRef.current) {
+        lossKeyRef.current = lossKey
+        setLosses(lossIds)
+      }
+      if (lost.length > 0 && !lossToastShownRef.current) {
+        lossToastShownRef.current = true
+        toast.message(t('knowledge.doc.dialectLoss'), {
+          description: lost.map((l) => l.id).join(', '),
+        })
       }
 
       onDraftChangeRef.current(
@@ -539,6 +635,66 @@ export const DocBlockNoteEditor = forwardRef<
       emitDraft()
     }, DRAFT_THROTTLE_MS)
   }, [emitDraft])
+
+
+  const clearSelection = useCallback(() => setSelectedIds([]), [])
+  const toggleSelect = useCallback((id: string) => {
+    setSelectedIds((prev) =>
+      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id],
+    )
+  }, [])
+
+  /** Batch ops on the multi-selection. */
+  const batchTransform = useCallback(
+    (update: { type: string; props?: Record<string, unknown> }) => {
+      const blocks = editor.document.filter((b) => selectedIds.includes(b.id))
+      if (blocks.length === 0) return
+      try {
+        for (const block of blocks) {
+          editor.updateBlock(block, update as never)
+        }
+        scheduleDraft()
+      } catch {
+        // ignore — some blocks may reject the transform
+      }
+      clearSelection()
+    },
+    [editor, selectedIds, scheduleDraft, clearSelection],
+  )
+  const batchDelete = useCallback(() => {
+    const blocks = editor.document.filter((b) => selectedIds.includes(b.id))
+    if (blocks.length === 0) return
+    try {
+      editor.removeBlocks(blocks)
+      scheduleDraft()
+    } catch {
+      // ignore
+    }
+    clearSelection()
+  }, [editor, selectedIds, scheduleDraft, clearSelection])
+
+  // Visual selection: reflect selected ids onto block DOM (class-based).
+  useEffect(() => {
+    const root = rootRef.current
+    if (!root) return
+    root
+      .querySelectorAll('.kb-multiselect')
+      .forEach((el) => el.classList.remove('kb-multiselect'))
+    for (const id of selectedIds) {
+      const el =
+        root.querySelector(`[data-id="${id}"]`) ??
+        root.querySelector(`#${CSS.escape(id)}`)
+      el?.classList.add('kb-multiselect')
+    }
+  }, [selectedIds])
+
+  // Stable refs for effects that must not re-register when selection changes.
+  const clearSelectionRef = useRef(clearSelection)
+  clearSelectionRef.current = clearSelection
+  const batchDeleteRef = useRef(batchDelete)
+  batchDeleteRef.current = batchDelete
+  const selectedIdsRef = useRef(selectedIds)
+  selectedIdsRef.current = selectedIds
 
   const openWikiPickerNearCaret = useCallback(() => {
     try {
@@ -705,9 +861,38 @@ export const DocBlockNoteEditor = forwardRef<
       }, 0)
     }
 
+    const onMouseDownOutside = (e: MouseEvent) => {
+      if (selectedIdsRef.current.length === 0) return
+      const target = e.target as Element | null
+      if (!target) return
+      if (
+        target.closest('.kb-multiselect') ||
+        target.closest('[data-testid="kb-multiselect-handle"]') ||
+        target.closest('[data-testid="kb-multiselect-bar"]')
+      ) {
+        return
+      }
+      clearSelectionRef.current()
+    }
+
     const onKeyDown = (e: KeyboardEvent) => {
       if (e.isComposing) return
       const mod = e.metaKey || e.ctrlKey
+
+      // Multi-select: Esc clears; Backspace/Delete batch-deletes.
+      const hasSelection = selectedIdsRef.current.length > 0
+      if (hasSelection) {
+        if (e.key === 'Escape') {
+          e.preventDefault()
+          clearSelectionRef.current()
+          return
+        }
+        if (e.key === 'Backspace' || e.key === 'Delete') {
+          e.preventDefault()
+          batchDeleteRef.current()
+          return
+        }
+      }
 
       if (mod && e.key.toLowerCase() === 'f') {
         e.preventDefault()
@@ -783,16 +968,50 @@ export const DocBlockNoteEditor = forwardRef<
 
     root.addEventListener('focusout', onFocusOut)
     root.addEventListener('keydown', onKeyDown)
+    root.addEventListener('mousedown', onMouseDownOutside)
     return () => {
       root.removeEventListener('focusout', onFocusOut)
       root.removeEventListener('keydown', onKeyDown)
+      root.removeEventListener('mousedown', onMouseDownOutside)
     }
   }, [editor, flushDraft, scheduleDraft])
 
   // Wiki [[ detection + Mod+Click navigate (inline range)
+  // + inline math $…$ auto-convert (keyup).
   useEffect(() => {
     const root = rootRef.current
     if (!root) return
+
+    const maybeConvertInlineMath = () => {
+      try {
+        const block = editor.getTextCursorPosition().block
+        const content = block.content as unknown
+        if (!Array.isArray(content)) return
+        if (
+          content.some(
+            (c) =>
+              typeof c === 'object' &&
+              c !== null &&
+              (c as { type?: string }).type === 'mathInline',
+          )
+        ) {
+          return
+        }
+        const text = blockPlainText(block)
+        if (!hasInlineMath(text)) return
+        const segments: InlineMathSegment[] = splitInlineMath(text)
+        if (!segments.some((s) => s.type === 'mathInline')) return
+        const rebuilt = segments.map((s) =>
+          s.type === 'text'
+            ? { type: 'text' as const, text: s.text, styles: {} }
+            : { type: 'mathInline' as const, props: { src: s.src } },
+        )
+        editor.updateBlock(block, { content: rebuilt })
+        scheduleDraft()
+      } catch {
+        // ignore — conversion is best-effort
+      }
+    }
 
     const syncWikiQuery = () => {
       try {
@@ -817,6 +1036,7 @@ export const DocBlockNoteEditor = forwardRef<
     const onKeyUp = (e: KeyboardEvent) => {
       if (e.isComposing) return
       syncWikiQuery()
+      maybeConvertInlineMath()
     }
 
     const onClick = (e: MouseEvent) => {
@@ -981,6 +1201,74 @@ export const DocBlockNoteEditor = forwardRef<
         data-code-block-theme={codeBlockThemePref}
         style={codeBlockStyle}
       >
+        {losses.length > 0 ? (
+          <div
+            className="shrink-0 border-b border-warning/30 bg-warning/10 px-3 py-1.5 text-meta text-ink-secondary"
+            data-testid="knowledge-doc-loss-banner"
+            role="status"
+          >
+            <span className="mr-1.5 font-medium">
+              {t('knowledge.doc.dialectLoss')}
+            </span>
+            <span className="font-mono">{losses.join(', ')}</span>
+            <span className="ml-1.5 text-ink-tertiary">
+              {t('knowledge.doc.dialectLossHint')}
+            </span>
+          </div>
+        ) : null}
+        {selectedIds.length > 0 ? (
+          <div
+            className="flex shrink-0 items-center gap-1 border-b border-border/70 bg-surface px-3 py-1.5 text-meta"
+            data-testid="kb-multiselect-bar"
+          >
+            <span className="mr-1 font-medium text-ink-secondary" data-testid="kb-multiselect-count">
+              {t('knowledge.doc.multiSelectCount', { count: selectedIds.length })}
+            </span>
+            <button
+              type="button"
+              className="rounded-sm px-2 py-0.5 text-ink hover:bg-state-hover"
+              data-testid="kb-multiselect-to-paragraph"
+              onClick={() => batchTransform({ type: 'paragraph' })}
+            >
+              {t('knowledge.doc.multiSelectParagraph')}
+            </button>
+            <button
+              type="button"
+              className="rounded-sm px-2 py-0.5 text-ink hover:bg-state-hover"
+              data-testid="kb-multiselect-to-heading"
+              onClick={() =>
+                batchTransform({ type: 'heading', props: { level: 2 } })
+              }
+            >
+              {t('knowledge.doc.multiSelectHeading')}
+            </button>
+            <button
+              type="button"
+              className="rounded-sm px-2 py-0.5 text-ink hover:bg-state-hover"
+              data-testid="kb-multiselect-to-quote"
+              onClick={() => batchTransform({ type: 'quote' })}
+            >
+              {t('knowledge.doc.multiSelectQuote')}
+            </button>
+            <button
+              type="button"
+              className="ml-auto rounded-sm px-2 py-0.5 text-danger hover:bg-danger/10"
+              data-testid="kb-multiselect-delete"
+              onClick={batchDelete}
+            >
+              {t('knowledge.doc.multiSelectDelete')}
+            </button>
+            <button
+              type="button"
+              className="rounded-sm px-1.5 py-0.5 text-ink-tertiary hover:bg-state-hover"
+              data-testid="kb-multiselect-clear"
+              aria-label={t('common.clear')}
+              onClick={clearSelection}
+            >
+              ✕
+            </button>
+          </div>
+        ) : null}
         <DocFindBar
           open={findOpen}
           onClose={() => setFindOpen(false)}
@@ -993,6 +1281,7 @@ export const DocBlockNoteEditor = forwardRef<
             theme={isDark ? 'dark' : 'light'}
             slashMenu={false}
             formattingToolbar={false}
+            sideMenu={false}
             onChange={() => {
               if (skipNextChangeRef.current) return
               scheduleDraft()
@@ -1002,6 +1291,15 @@ export const DocBlockNoteEditor = forwardRef<
               triggerCharacter="/"
               getItems={getSlashItems}
               suggestionMenuComponent={BlockNoteHipSlashMenu}
+            />
+            <SideMenuController
+              sideMenu={() => (
+                <KnowledgeSideMenu
+                  selectedIds={selectedIds}
+                  onToggleSelect={toggleSelect}
+                  onClearSelection={clearSelection}
+                />
+              )}
             />
             <FormattingToolbarController
               formattingToolbar={() => (
@@ -1019,6 +1317,27 @@ export const DocBlockNoteEditor = forwardRef<
                   />
                   <BasicTextStyleButton basicTextStyle="code" key="code" />
                   <CreateLinkButton key="createLink" />
+                  <ColorStyleButton key="color" />
+                  <ClearFormattingButton
+                    key="clearFormat"
+                    onClear={() => {
+                      try {
+                        editor.removeStyles({
+                          textColor: 'default',
+                          backgroundColor: 'default',
+                        })
+                        const active = editor.getActiveStyles() as {
+                          highlight?: boolean
+                        }
+                        if (active.highlight) {
+                          editor.toggleStyles({ highlight: false })
+                        }
+                        scheduleDraft()
+                      } catch {
+                        // ignore
+                      }
+                    }}
+                  />
                 </FormattingToolbar>
               )}
             />

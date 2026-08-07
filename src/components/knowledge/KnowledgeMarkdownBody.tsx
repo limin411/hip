@@ -11,6 +11,7 @@ import { CodeBlock } from '@/components/chat/CodeBlock'
 import { KnowledgeMermaid } from './KnowledgeMermaid'
 import { KnowledgeSvg } from './KnowledgeSvg'
 import { firstTextLine, parseCalloutHeader } from '@/domain/knowledge/callout'
+import { stripColorSpansForReader } from '@/domain/knowledge/blocks/carriers'
 import { calloutStyleClass } from './calloutStyles'
 import './knowledge-doc-typography.css'
 
@@ -102,7 +103,7 @@ export function KnowledgeMarkdownBody({
         rehypePlugins={[rehypeKatex]}
         components={merged}
       >
-        {content}
+        {stripColorSpansForReader(content)}
       </ReactMarkdown>
     </div>
   )

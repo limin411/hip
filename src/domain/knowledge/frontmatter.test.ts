@@ -1,12 +1,14 @@
 import { describe, expect, it } from 'vitest'
 import {
   EMPTY_DOC_META,
+  cloneDocMeta,
   joinYamlFrontmatter,
   matchDocByTitleOrAlias,
   metaToSearchFields,
   parseFrontmatter,
   splitYamlFrontmatter,
 } from './frontmatter'
+import { applyMetaToDocument } from './frontmatterWrite'
 
 describe('splitYamlFrontmatter / joinYamlFrontmatter', () => {
   it('returns empty fmText when no leading fence', () => {
@@ -148,6 +150,7 @@ x
         icon: null,
         cover: null,
         coverY: null,
+        starred: false,
         props: {},
       }),
     ).toEqual({ tags: 'a b', status: 'draft', aliases: 'X Y' })
@@ -267,5 +270,22 @@ body
     expect(r.meta.cover).toBe('assets/hero.png')
     expect(r.meta.coverY).toBe(35)
     expect(r.bodyWithoutFm).toContain('body')
+  })
+})
+
+describe('starred frontmatter', () => {
+  it('parses starred: true / false and defaults to false', () => {
+    expect(parseFrontmatter('---\nstarred: true\n---\nbody').meta.starred).toBe(true)
+    expect(parseFrontmatter('---\nstarred: false\n---\nbody').meta.starred).toBe(false)
+    expect(parseFrontmatter('---\nstarred: TRUE\n---\nbody').meta.starred).toBe(true)
+    expect(parseFrontmatter('plain body').meta.starred).toBe(false)
+  })
+
+  it('keeps starred through applyMetaToDocument round trip', () => {
+    const raw = '---\ntags: [a]\nstarred: true\n---\n\nbody\n'
+    const { meta } = parseFrontmatter(raw)
+    const next = applyMetaToDocument(raw, cloneDocMeta(meta))
+    expect(next).toContain('starred: true')
+    expect(parseFrontmatter(next).meta.starred).toBe(true)
   })
 })

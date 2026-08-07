@@ -172,6 +172,13 @@ export function applyKnowledgeSlashItem(
       }
       insertMarkdownBlocks(editor, item.insert)
       return
+    case 'file':
+      if (handlers.onRequestAttach) {
+        handlers.onRequestAttach()
+        return
+      }
+      insertMarkdownBlocks(editor, item.insert)
+      return
     case 'mermaid':
       insertNative(editor, {
         type: 'mermaid',
@@ -189,6 +196,10 @@ export function applyKnowledgeSlashItem(
         type: 'math',
         props: { src: '' },
       })
+      return
+    case 'mathInline':
+      // Insert a lone `$`; typing the closing `$` auto-converts (keyup hook).
+      insertMarkdownBlocks(editor, '$')
       return
     case 'callout':
       insertCallout(editor, 'note', 'Title')

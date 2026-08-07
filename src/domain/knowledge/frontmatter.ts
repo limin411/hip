@@ -63,6 +63,8 @@ export type KnowledgeDocMeta = {
   cover: string | null
   /** Cover focal Y percent 0–100 (optional). */
   coverY: number | null
+  /** Starred docs surface in the knowledge tree (file-is-truth). */
+  starred: boolean
   /** Custom keys not mapped to built-ins. */
   props: Record<string, PropValue>
 }
@@ -83,6 +85,7 @@ export const EMPTY_DOC_META: KnowledgeDocMeta = {
   icon: null,
   cover: null,
   coverY: null,
+  starred: false,
   props: {},
 }
 
@@ -96,6 +99,7 @@ const KNOWN_FM_KEYS = new Set([
   'icon',
   'cover',
   'covery',
+  'starred',
 ])
 
 /** Strip a leading `--- … ---` block and parse known property keys. */
@@ -159,6 +163,7 @@ export function cloneDocMeta(meta: KnowledgeDocMeta): KnowledgeDocMeta {
     icon: meta.icon,
     cover: meta.cover,
     coverY: meta.coverY,
+    starred: meta.starred,
     props: { ...meta.props },
   }
 }
@@ -221,6 +226,7 @@ type KnownFmKey =
   | 'icon'
   | 'cover'
   | 'coverY'
+  | 'starred'
 
 function normalizeKnownKey(raw: string): KnownFmKey | null {
   const k = raw.toLowerCase()
@@ -245,6 +251,7 @@ function parseMetaLines(lines: string[]): {
     icon: null,
     cover: null,
     coverY: null,
+    starred: false,
     props: {},
   }
   let foundKnownKey = false
@@ -307,6 +314,8 @@ function parseMetaLines(lines: string[]): {
         } else if (known === 'coverY') {
           const n = Number(unquote(rawVal))
           meta.coverY = Number.isFinite(n) ? n : null
+        } else if (known === 'starred') {
+          meta.starred = rawVal.toLowerCase() === 'true'
         } else {
           assignListKey(meta, known, parseInlineList(rawVal))
         }
@@ -369,6 +378,10 @@ function assignListKey(
   if (key === 'coverY') {
     const n = Number(items[0])
     meta.coverY = Number.isFinite(n) ? n : null
+    return
+  }
+  if (key === 'starred') {
+    meta.starred = items[0]?.toLowerCase() === 'true'
     return
   }
   if (key === 'tags') meta.tags = items

@@ -9,8 +9,10 @@ import {
 } from '@blocknote/core'
 import { calloutBlockSpec } from './calloutBlock'
 import { mathBlockSpec } from './mathBlock'
+import { mathInlineSpec } from './mathInline'
 import { mermaidBlockSpec, svgBlockSpec } from './mermaidBlock'
 import { embedBlockSpec } from './embedBlock'
+import { attachmentBlockSpec } from './attachmentBlock'
 import { toggleBlockSpec } from './toggleBlock'
 import { wikiLinkInlineSpec, highlightStyleSpec } from './wikiInline'
 
@@ -29,11 +31,13 @@ export const knowledgeBlockSchema = BlockNoteSchema.create({
     mermaid: mermaidBlockSpec(),
     svgBlock: svgBlockSpec(),
     embed: embedBlockSpec(),
+    attachment: attachmentBlockSpec(),
     toggle: toggleBlockSpec(),
   },
   inlineContentSpecs: {
     ...defaultInlineContentSpecs,
     wikiLink: wikiLinkInlineSpec,
+    mathInline: mathInlineSpec,
   },
   styleSpecs: {
     ...defaultStyleSpecs,

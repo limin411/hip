@@ -28,9 +28,11 @@ export type KnowledgeSlashId =
   | 'calloutImportant'
   | 'toggle'
   | 'math'
+  | 'mathInline'
   | 'mermaid'
   | 'svg'
   | 'image'
+  | 'file'
   | 'aiContinue'
   | 'aiSummarize'
   | 'aiToTasks'
@@ -115,6 +117,7 @@ export const BLOCK_SLASH_IDS: ReadonlySet<KnowledgeSlashId> = new Set([
   'mermaid',
   'svg',
   'image',
+  'file',
   'subdoc',
 ])
 
@@ -297,6 +300,17 @@ export const KNOWLEDGE_SLASH_ITEMS: KnowledgeSlashItem[] = [
     cursorOffset: 6,
   },
   {
+    id: 'file',
+    name: 'file',
+    keywords: ['attach', 'attachment', 'pdf', 'upload'],
+    keywordsZh: ['附件', '文件', '上传'],
+    group: 'media',
+    icon: '📎',
+    label: 'File attachment',
+    insert: '',
+    cursorOffset: 0,
+  },
+  {
     id: 'image',
     name: 'image',
     keywords: ['img', 'picture', 'photo', 'asset', 'attach'],
@@ -362,6 +376,17 @@ export const KNOWLEDGE_SLASH_ITEMS: KnowledgeSlashItem[] = [
     label: 'Math block',
     insert: '$$\n\n$$',
     cursorOffset: 3,
+  },
+  {
+    id: 'mathInline',
+    name: 'inlineformula',
+    keywords: ['latex', 'formula', 'equation', 'katex', 'inline'],
+    keywordsZh: ['行内公式', '公式', '数学', '方程'],
+    group: 'media',
+    icon: '∑',
+    label: 'Inline math',
+    insert: '$',
+    cursorOffset: 1,
   },
   {
     id: 'wiki',

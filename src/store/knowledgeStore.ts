@@ -325,6 +325,8 @@ interface KnowledgeState {
   mode: 'home' | 'workspace'
   searchQuery: string
   searchHits: KnowledgeSearchHit[]
+  /** Starred docs (FM `starred: true`) for the tree section — refreshed on index/save. */
+  starredDocs: KnowledgeSearchHit[]
   indexStatus: IndexStatus
   /** n/N progress while `indexStatus === 'building'`; null when idle/ready. */
   indexProgress: KnowledgeIndexProgress | null
@@ -546,6 +548,11 @@ async function removeLinkIndexDocs(spaceId: string, docIds: string[]): Promise<v
  * Refresh facet lists and drop stale filterTag/filterStatus that no longer exist
  * (avoids Home empty-results trap when last tagged doc is deleted).
  */
+/** Refresh the starred-docs tree section from the live meta map. */
+function refreshStarredDocs(set: (partial: Partial<KnowledgeState>) => void) {
+  set({ starredDocs: listDocsByMeta(kbMeta, { starred: true }) })
+}
+
 function syncFacetsToState(set: (partial: Partial<KnowledgeState>) => void) {
   const facets = collectSearchFacets(kbMeta)
   const { filterTag, filterStatus } = useKnowledgeStore.getState()
@@ -637,6 +644,7 @@ export const useKnowledgeStore = create<KnowledgeState>((set, get) => ({
   mode: 'home',
   searchQuery: '',
   searchHits: [],
+  starredDocs: [],
   indexStatus: 'idle',
   indexProgress: null,
   pendingReveal: null,
@@ -761,6 +769,7 @@ export const useKnowledgeStore = create<KnowledgeState>((set, get) => ({
       })
       // Also drops stale filterTag/filterStatus when facets no longer include them.
       syncFacetsToState(set)
+      refreshStarredDocs(set)
       get().runSearch(get().searchQuery)
     } catch {
       if (gen !== indexBuildGen) return
@@ -1377,6 +1386,7 @@ export const useKnowledgeStore = create<KnowledgeState>((set, get) => ({
       for (const leafId of removedLeafIds) {
         removeSearchDoc(kbIndex, docKey(spaceId, leafId), kbMeta)
       }
+      refreshStarredDocs(set)
       // Boards: no link-index; docs only.
       await removeLinkIndexDocs(spaceId, removedDocIds)
       void import('@/store/trashBadgeStore').then(({ useTrashBadgeStore }) => {
@@ -1631,6 +1641,7 @@ export const useKnowledgeStore = create<KnowledgeState>((set, get) => ({
     if ('icon' in patch) next.icon = patch.icon ?? null
     if ('cover' in patch) next.cover = patch.cover ?? null
     if ('coverY' in patch) next.coverY = patch.coverY ?? null
+    if ('starred' in patch) next.starred = patch.starred === true
     if (patch.props) next.props = { ...next.props, ...patch.props }
     const body = applyMetaToDocument(raw, next)
     get().setDraftBody(body, { docId: s.activeDocId, persist: 'auto' })
@@ -1693,6 +1704,7 @@ export const useKnowledgeStore = create<KnowledgeState>((set, get) => ({
         await upsertLinkIndexDoc(spaceId, docId, node.title, body, nodesSnap)
         if (get().activeDocId === docId && get().activeSpaceId === spaceId) {
           syncFacetsToState(set)
+          refreshStarredDocs(set)
           get().runSearch(get().searchQuery)
           void get().refreshLinkPanel(docId)
         }

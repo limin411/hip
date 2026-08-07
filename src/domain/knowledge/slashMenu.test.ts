@@ -227,6 +227,7 @@ describe('slashMenu', () => {
       })
       expect(out.every((i) => !BLOCK_SLASH_IDS.has(i.id))).toBe(true)
       expect(out.map((i) => i.id)).toEqual([
+        'mathInline',
         'wiki',
         'embed',
         'copyPageLink',

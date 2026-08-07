@@ -8,6 +8,7 @@ import {
   useState,
 } from 'react'
 import CodeMirror from '@uiw/react-codemirror'
+import { useTranslation } from 'react-i18next'
 import { markdown, markdownLanguage } from '@codemirror/lang-markdown'
 import { languages } from '@codemirror/language-data'
 import { keymap, EditorView, type KeyBinding } from '@codemirror/view'
@@ -36,6 +37,7 @@ import {
 import { wikiLinkAutocomplete } from '@/domain/knowledge/wikiCmCompletion'
 import { typoraLivePreview } from '@/domain/knowledge/typoraPreview'
 import { resolveAssetDataUrl } from '@/domain/knowledge/assetUrl'
+import { splitYamlFrontmatter } from '@/domain/knowledge/frontmatter'
 import type { KnowledgeNode } from '@/domain/knowledge/types'
 import { kbPerfSourceReady } from '@/domain/knowledge/knowledgePerf'
 import './knowledge-typora.css'
@@ -226,9 +228,11 @@ export const DocEditor = forwardRef<DocEditorHandle, DocEditorProps>(function Do
   ref,
 ) {
   const isDark = useIsDark()
+  const { t } = useTranslation()
   const [text, setText] = useState(initialValue)
   const [slashMatch, setSlashMatch] = useState<SlashQueryMatch | null>(null)
   const [menuPos, setMenuPos] = useState<MenuPos | null>(null)
+  const [cursor, setCursor] = useState<{ line: number; col: number } | null>(null)
   const viewRef = useRef<EditorView | null>(null)
   const rootRef = useRef<HTMLDivElement | null>(null)
   const themeCompartment = useMemo(() => new Compartment(), [])
@@ -368,6 +372,19 @@ export const DocEditor = forwardRef<DocEditorHandle, DocEditorProps>(function Do
       updateSlashMatch(readSlashMatch(update.view))
     })
 
+    // Status bar: cursor line/col (selection or caret head).
+    const cursorTracker = EditorView.updateListener.of((update) => {
+      if (!update.selectionSet && !update.docChanged) return
+      const head = update.state?.selection?.main?.head
+      if (typeof head !== 'number') return
+      try {
+        const line = update.state!.doc.lineAt(head)
+        setCursor({ line: line.number, col: head - line.from + 1 })
+      } catch {
+        // ignore — doc may be mid-transaction in tests
+      }
+    })
+
     const run =
       (fn: (view: EditorView) => boolean): KeyBinding['run'] =>
       (view) => {
@@ -433,6 +450,7 @@ export const DocEditor = forwardRef<DocEditorHandle, DocEditorProps>(function Do
       EditorView.lineWrapping,
       themeCompartment.of(buildProseTheme(false)),
       slashTracker,
+      cursorTracker,
       assetHandlers,
       highlightSelectionMatches(),
       wikiLinkAutocomplete(() => wikiNodesRef.current),
@@ -494,6 +512,13 @@ export const DocEditor = forwardRef<DocEditorHandle, DocEditorProps>(function Do
       window.removeEventListener('resize', onScrollOrResize)
     }
   }, [slashMatch])
+
+  /** Status-bar derived values (Source). */
+  const { fmOn, wordCount } = useMemo(() => {
+    const { fmText, body } = splitYamlFrontmatter(text)
+    const words = body.trim().match(/\S+/g)?.length ?? 0
+    return { fmOn: fmText !== '', wordCount: words }
+  }, [text])
 
   const onSlashSelect = useCallback(
     (item: KnowledgeSlashItem) => {
@@ -600,6 +625,28 @@ export const DocEditor = forwardRef<DocEditorHandle, DocEditorProps>(function Do
         }}
         className="flex min-h-0 flex-1 flex-col overflow-hidden text-prose [&_.cm-editor]:h-full"
       />
+      <footer
+        className="knowledge-doc-measure flex shrink-0 items-center justify-end gap-3 border-t border-border/70 px-3 py-1 text-meta text-ink-tertiary"
+        data-testid="knowledge-source-statusbar"
+      >
+        {fmOn ? (
+          <span
+            data-testid="kb-status-fm"
+            title={t('knowledge.doc.statusBar.fmTitle')}
+          >
+            FM
+          </span>
+        ) : null}
+        <span data-testid="kb-status-words">
+          {t('knowledge.doc.statusBar.words', { count: wordCount })}
+        </span>
+        <span data-testid="kb-status-cursor">
+          {t('knowledge.doc.statusBar.lineCol', {
+            line: cursor?.line ?? 1,
+            col: cursor?.col ?? 1,
+          })}
+        </span>
+      </footer>
     </div>
   )
 })

@@ -496,6 +496,106 @@
   padding: 0.75rem;
 }
 .kb-math-preview { overflow-x: auto; text-align: center; }
+.kb-math-inline {
+  display: inline-block;
+  padding: 0 0.15em;
+  border-radius: 0.25rem;
+  background: var(--surface-muted, #f6f6f4);
+  cursor: pointer;
+  vertical-align: baseline;
+}
+.kb-math-inline-error {
+  color: var(--danger);
+  font-family: ui-monospace, monospace;
+  font-size: 0.8rem;
+  white-space: pre-wrap;
+}
+.kb-attach-card {
+  display: flex;
+  align-items: center;
+  gap: 0.625rem;
+  margin: 0.5rem 0;
+  max-width: 24rem;
+  border: 1px solid var(--border);
+  border-radius: 0.5rem;
+  background: var(--surface-muted);
+  padding: 0.5rem 0.625rem;
+}
+.kb-attach-icon {
+  display: flex;
+  height: 2rem;
+  width: 2rem;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  border-radius: 0.375rem;
+  background: color-mix(in srgb, var(--accent-strong) 12%, transparent);
+  color: var(--accent-strong);
+}
+.kb-attach-meta {
+  display: flex;
+  min-width: 0;
+  flex: 1;
+  flex-direction: column;
+  gap: 0.125rem;
+}
+.kb-attach-name {
+  overflow: hidden;
+  font-weight: 500;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.kb-attach-path {
+  overflow: hidden;
+  color: var(--text-tertiary, #9ca3af);
+  font-family: ui-monospace, monospace;
+  font-size: 0.75rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.kb-attach-reveal {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  border-radius: 0.25rem;
+  padding: 0.25rem;
+  color: var(--text-tertiary, #9ca3af);
+  transition: color 0.1s;
+}
+.kb-attach-reveal:hover {
+  color: var(--accent-strong);
+  background: var(--state-hover);
+}
+.kb-attach-card + .kb-attach-card {
+  margin-top: 0;
+}
+
+/* ── Multi-select ─────────────────────────────────────────────────────── */
+.kb-multiselect {
+  border-radius: 0.375rem;
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+.kb-multiselect-handle {
+  display: flex;
+  height: 1.5rem;
+  width: 1.5rem;
+  align-items: center;
+  justify-content: center;
+  border-radius: 0.25rem;
+  color: var(--text-tertiary, #9ca3af);
+  transition: color 0.1s, background-color 0.1s;
+}
+.kb-multiselect-handle:hover {
+  background: var(--state-hover);
+  color: var(--accent-strong);
+}
+.kb-multiselect-active {
+  background: color-mix(in srgb, var(--accent) 15%, transparent);
+  color: var(--accent-strong);
+}
+
 .kb-math-error { color: var(--danger); font-family: ui-monospace, monospace; font-size: 0.8rem; white-space: pre-wrap; text-align: left; }
 .kb-math-src,
 .kb-fence-src {

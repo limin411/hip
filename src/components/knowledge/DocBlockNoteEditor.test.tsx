@@ -45,12 +45,18 @@ vi.mock('@blocknote/react', () => ({
   }),
   SuggestionMenuController: () => null,
   FormattingToolbarController: () => null,
+  SideMenuController: () => null,
   FormattingToolbar: ({ children }: { children?: React.ReactNode }) => (
     <div>{children}</div>
   ),
   BasicTextStyleButton: () => null,
   BlockTypeSelect: () => null,
   CreateLinkButton: () => null,
+  ColorStyleButton: () => null,
+  AddBlockButton: () => null,
+  DragHandleButton: () => null,
+  useBlockNoteEditor: () => ({}),
+  useExtensionState: () => undefined,
   createReactBlockSpec: () => () => ({}),
   createReactInlineContentSpec: () => ({}),
   createReactStyleSpec: () => ({}),

@@ -129,13 +129,18 @@ export function mimeFromFileName(name: string): string | null {
   }
 }
 
-/** Build markdown image (or link for non-image) for an imported asset. */
+/**
+ * Build markdown for an imported asset.
+ * Images use `![alt](rel)`; non-image assets (PDF) use the same image syntax so
+ * Live can render them as attachment cards (`![doc.pdf](assets/doc.pdf)` — the
+ * non-image extension disambiguates them from real images in pre-parse).
+ */
 export function assetMarkdown(relPath: string, fileName: string, mime: string): string {
   const alt = fileName.replace(/\.[^.]+$/, '') || 'asset'
   if (isImageMime(mime)) {
     return `![${alt}](${relPath})`
   }
-  return `[${fileName}](${relPath})`
+  return `![${fileName}](${relPath})`
 }
 
 /** Read a Blob/File as base64 (no data: prefix). */

@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { X } from 'lucide-react'
+import { Star, X } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import type { KnowledgeDocMeta } from '@/domain/knowledge/frontmatter'
 
@@ -54,6 +54,28 @@ export function PageProperties({
       )}
       data-testid="knowledge-page-properties"
     >
+      {/* starred */}
+      <button
+        type="button"
+        disabled={disabled}
+        aria-pressed={meta.starred}
+        data-testid="knowledge-prop-star"
+        title={t('knowledge.doc.propStar')}
+        onClick={() => onChange({ starred: !meta.starred })}
+        className={cn(
+          'inline-flex h-6 w-6 items-center justify-center rounded-sm transition-colors',
+          meta.starred
+            ? 'text-accent-strong hover:bg-accent/10'
+            : 'text-ink-tertiary hover:bg-state-hover hover:text-ink-secondary',
+          disabled && 'pointer-events-none opacity-50',
+        )}
+      >
+        <Star
+          size={14}
+          strokeWidth={1.75}
+          fill={meta.starred ? 'currentColor' : 'none'}
+        />
+      </button>
       {/* tags */}
       {meta.tags.map((tag) => (
         <span

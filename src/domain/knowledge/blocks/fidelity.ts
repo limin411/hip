@@ -37,6 +37,12 @@ export const FIDELITY_MATRIX: readonly FidelityEntry[] = [
     description: 'Display math $$...$$',
   },
   {
+    id: 'inline-math',
+    level: 'L3',
+    probe: /(?<!\$)\$[^\s$][^$\n]*\$(?![\d$])/,
+    description: 'Inline math $...$',
+  },
+  {
     id: 'mermaid',
     level: 'L3',
     probe: /```mermaid\b/i,
@@ -73,10 +79,28 @@ export const FIDELITY_MATRIX: readonly FidelityEntry[] = [
     description: 'Obsidian highlight ==text==',
   },
   {
+    id: 'textColor',
+    level: 'L2',
+    probe: /<span\b[^>]*data-hip-color=/i,
+    description: 'Text color <span data-hip-color> carrier',
+  },
+  {
+    id: 'backgroundColor',
+    level: 'L2',
+    probe: /<span\b[^>]*data-hip-bg-color=/i,
+    description: 'Background color <span data-hip-bg-color> carrier',
+  },
+  {
     id: 'image',
     level: 'L2',
     probe: /!\[[^\]]*\]\([^)]+\)/,
     description: 'Image with optional title caption',
+  },
+  {
+    id: 'attachment',
+    level: 'L2',
+    probe: /!\[[^\]]*\]\([^)]*\.(?:pdf|zip|docx?|xlsx?|pptx?|txt)\)/i,
+    description: 'Attachment card ![name](assets/file.pdf)',
   },
   {
     id: 'table',
@@ -89,9 +113,20 @@ export const FIDELITY_MATRIX: readonly FidelityEntry[] = [
 /** Markers that must not silently disappear after Live serialize (honesty toast). */
 export const DIALECT_PRESERVE_PROBES: ReadonlyArray<{ id: string; probe: RegExp }> =
   FIDELITY_MATRIX.filter((e) =>
-    ['callout', 'math', 'mermaid', 'svg', 'wiki', 'embed', 'toggle', 'highlight'].includes(
-      e.id,
-    ),
+    [
+      'callout',
+      'math',
+      'inline-math',
+      'mermaid',
+      'svg',
+      'wiki',
+      'embed',
+      'toggle',
+      'highlight',
+      'textColor',
+      'backgroundColor',
+      'attachment',
+    ].includes(e.id),
   ).map((e) => ({ id: e.id, probe: e.probe }))
 
 /** Golden MD fixtures used by blockRoundTrip tests. */
@@ -125,6 +160,10 @@ export const FIDELITY_GOLDENS: ReadonlyArray<{ id: string; md: string }> = [
     md: '$$\nx^2 + y^2 = z^2\n$$\n',
   },
   {
+    id: 'inline-math',
+    md: 'Inline $e^{i\\pi} + 1 = 0$ here.\n',
+  },
+  {
     id: 'mermaid',
     md: '```mermaid\nflowchart LR\n  A --> B\n```\n',
   },
@@ -149,7 +188,19 @@ export const FIDELITY_GOLDENS: ReadonlyArray<{ id: string; md: string }> = [
     md: 'This has ==highlighted== text.\n',
   },
   {
+    id: 'textColor',
+    md: 'Red <span data-hip-color="red">words</span> here.\n',
+  },
+  {
+    id: 'backgroundColor',
+    md: 'Note <span data-hip-bg-color="yellow">mark</span>.\n',
+  },
+  {
     id: 'image-caption',
     md: '![alt](assets/pic.png "A caption")\n',
+  },
+  {
+    id: 'attachment',
+    md: '![doc.pdf](assets/doc.pdf)\n',
   },
 ]

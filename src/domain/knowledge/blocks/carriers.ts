@@ -114,6 +114,34 @@ export function mathToHtmlCarrier(c: MathCarrier): string {
   return `<div data-hip-block="math">${escapeHtmlAttr(c.src)}</div>`
 }
 
+// ─── Inline math ──────────────────────────────────────────────────────────────
+
+/**
+ * Convert inline `$...$` runs to `<span data-hip-inline="math">` carriers.
+ * Heuristics (avoid currency / display-math false positives):
+ * - opening `$` preceded by start, whitespace or non-word (not `\` escape, not word char)
+ * - src does not start/end with whitespace and contains no `$` / newline
+ * - closing `$` followed by end, whitespace or punctuation (not digit — "$5 and $10" stays text)
+ */
+export function inlineMathMdToHtml(md: string): string {
+  return md.replace(
+    /(^|[^\\$\w])[$]([^\s$][^$\n]*?)[$](?=$|[\s.,;:!?)\]}>-])/g,
+    (_full, lead: string, src: string) => {
+      const clean = src.trim()
+      if (!clean) return _full
+      return `${lead}<span data-hip-inline="math">${escapeHtmlAttr(clean)}</span>`
+    },
+  )
+}
+
+/** Convert `<span data-hip-inline="math">…</span>` back to inline `$…$`. */
+export function htmlInlineMathToMd(md: string): string {
+  return md.replace(
+    /<span\b[^>]*data-hip-inline=["']math["'][^>]*>([\s\S]*?)<\/span>/gi,
+    (_full, inner: string) => `$${stripTags(inner).trim()}$`,
+  )
+}
+
 // ─── Mermaid / SVG fences ───────────────────────────────────────────────────
 
 export function serializeMermaid(c: MermaidCarrier): string {
@@ -233,6 +261,93 @@ export function highlightHtmlToMd(md: string): string {
   )
 }
 
+// ─── Color carriers ───────────────────────────────────────────────────────────
+
+/**
+ * Convert hip color spans (`data-hip-color` / `data-hip-bg-color`) in Source
+ * Markdown to BN-parseable style spans (`data-text-color` / `data-background-color`,
+ * BlockNote default textColor/backgroundColor styles).
+ */
+export function colorSpanMdToHtml(md: string): string {
+  let out = md
+  out = out.replace(
+    /<span\b[^>]*data-hip-color=["']([^"']*)["'][^>]*>([\s\S]*?)<\/span>/gi,
+    (_full, color: string, inner: string) =>
+      `<span data-text-color="${escapeHtmlAttr(color)}">${inner}</span>`,
+  )
+  out = out.replace(
+    /<span\b[^>]*data-hip-bg-color=["']([^"']*)["'][^>]*>([\s\S]*?)<\/span>/gi,
+    (_full, color: string, inner: string) =>
+      `<span data-background-color="${escapeHtmlAttr(color)}">${inner}</span>`,
+  )
+  return out
+}
+
+/** Reverse: BN style spans back to hip carriers. */
+export function colorSpanHtmlToMd(md: string): string {
+  let out = md
+  out = out.replace(
+    /<span\b[^>]*data-text-color=["']([^"']*)["'][^>]*>([\s\S]*?)<\/span>/gi,
+    (_full, color: string, inner: string) =>
+      `<span data-hip-color="${escapeHtmlAttr(color)}">${inner}</span>`,
+  )
+  out = out.replace(
+    /<span\b[^>]*data-background-color=["']([^"']*)["'][^>]*>([\s\S]*?)<\/span>/gi,
+    (_full, color: string, inner: string) =>
+      `<span data-hip-bg-color="${escapeHtmlAttr(color)}">${inner}</span>`,
+  )
+  return out
+}
+
+/**
+ * Reader-safe: strip hip color span tags, keep inner text.
+ * The Reader pipeline intentionally has no rehypeRaw (raw-HTML policy); Live is
+ * the color surface. Content is preserved — only the color cue is dropped.
+ */
+export function stripColorSpansForReader(md: string): string {
+  return md
+    .replace(
+      /<span\b[^>]*data-hip-color=["'][^"']*["'][^>]*>([\s\S]*?)<\/span>/gi,
+      (_full, inner: string) => stripTags(inner),
+    )
+    .replace(
+      /<span\b[^>]*data-hip-bg-color=["'][^"']*["'][^>]*>([\s\S]*?)<\/span>/gi,
+      (_full, inner: string) => stripTags(inner),
+    )
+}
+
+// ─── Attachment (file/PDF card) ───────────────────────────────────────────────
+
+/** Non-image extensions stay image-syntax `![name](path)` → attach card. */
+const IMAGE_EXT_RE = /\.(png|jpe?g|gif|webp|svg)$/i
+const ATTACH_SRC_RE = /!\[([^\]]*)\]\(([^)\s]+)(?:\s+"([^"]*)")?\)/
+
+export function serializeAttachment(c: { name: string; path: string }): string {
+  const name = c.name.trim() || 'file'
+  const path = c.path.trim()
+  if (!path) return ''
+  return `![${name}](${path})`
+}
+
+export function attachmentToHtmlCarrier(c: {
+  name: string
+  path: string
+}): string {
+  return `<div data-hip-block="attach" data-name="${escapeHtmlAttr(c.name)}" data-path="${escapeHtmlAttr(c.path)}"></div>`
+}
+
+/**
+ * Convert `![alt](relative-non-image-ext)` into an attach div carrier.
+ * Real images (image ext) and remote/data URLs are left for BN's image block.
+ */
+export function attachMdToHtmlCarriers(md: string): string {
+  return md.replace(ATTACH_SRC_RE, (full, alt: string, url: string) => {
+    if (/^(data:|https?:|blob:)/i.test(url)) return full
+    if (IMAGE_EXT_RE.test(url)) return full
+    return attachmentToHtmlCarrier({ name: alt.trim(), path: url })
+  })
+}
+
 // ─── Image caption ──────────────────────────────────────────────────────────
 
 export function serializeImage(parts: ImageCaptionParts): string {
@@ -337,7 +452,25 @@ export function htmlCarriersToDialect(md: string): string {
     },
   )
 
+  // Inline math spans → literal $…$
+  out = htmlInlineMathToMd(out)
+
+  // Attach div carriers → `![name](path)`
+  out = out.replace(
+    /<div\b[^>]*data-hip-block=["']attach["'][^>]*>?[\s\S]*?<\/div>/gi,
+    (full) => {
+      const nameM = full.match(/data-name=["']([^"']*)["']/i)
+      const pathM = full.match(/data-path=["']([^"']*)["']/i)
+      const name = unescapeHtmlAttr(nameM?.[1] ?? '')
+      const path = unescapeHtmlAttr(pathM?.[1] ?? '')
+      return path ? `![${name}](${path})` : ''
+    },
+  )
+
   out = highlightHtmlToMd(out)
+
+  // BN style spans → hip carriers
+  out = colorSpanHtmlToMd(out)
   return out
 }
 
@@ -354,6 +487,9 @@ export function dialectToHtmlCarriers(md: string): string {
       fragment: (frag ?? '').trim(),
     }).replace(/\n$/, '')
   })
+
+  // Attachment cards: `![name](relative-non-image-ext)` (before wiki/image steps).
+  out = attachMdToHtmlCarriers(out)
 
   // Wiki links (not already HTML)
   out = out.replace(/\[\[([^\]|#]+)(?:\|([^\]]+))?\]\]/g, (_full, title: string, alias?: string) => {
@@ -378,6 +514,9 @@ export function dialectToHtmlCarriers(md: string): string {
     (_full, src: string) => svgToHtmlCarrier({ src: src.replace(/\n$/, '') }),
   )
 
+  // Inline math — after display math + fences (both already replaced with divs).
+  out = inlineMathMdToHtml(out)
+
   // Callout blockquotes: consecutive > lines starting with [!type]
   out = out.replace(/(^|\n)((?:>.*(?:\n|$))+)/g, (full, lead: string, block: string) => {
     const parsed = parseCalloutMd(block)
@@ -398,6 +537,9 @@ export function dialectToHtmlCarriers(md: string): string {
   // Avoid transforming $...$ inside code fences: highlight only outside fences is hard;
   // apply highlight globally except we already replaced fences with divs.
   out = highlightMdToHtml(out)
+
+  // Color spans last (they contain plain text or already-converted marks).
+  out = colorSpanMdToHtml(out)
 
   return out
 }

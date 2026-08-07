@@ -153,6 +153,7 @@ export type KnowledgeDocMetaEntry = {
   date: string | null
   priority: string | null
   icon: string | null
+  starred: boolean
   props: KnowledgeDocMeta['props']
 }
 
@@ -246,6 +247,7 @@ export function upsertSearchDoc(
       date: prepared.meta.date,
       priority: prepared.meta.priority,
       icon: prepared.meta.icon,
+      starred: prepared.meta.starred,
       props: { ...prepared.meta.props },
     })
   }
@@ -305,18 +307,20 @@ export function filterHitsByMeta(
   })
 }
 
-/** List docs from the meta map that match tag/status filters (stable map iteration order). */
+/** List docs from the meta map that match tag/status/starred filters (stable map iteration order). */
 export function listDocsByMeta(
   meta: Map<string, KnowledgeDocMetaEntry>,
-  opts: { tag?: string | null; status?: string | null },
+  opts: { tag?: string | null; status?: string | null; starred?: boolean },
 ): KnowledgeSearchHit[] {
   const tag = opts.tag?.trim().toLowerCase() || null
   const status = opts.status?.trim().toLowerCase() || null
-  if (!tag && !status) return []
+  const starredOnly = opts.starred === true
+  if (!tag && !status && !starredOnly) return []
   const hits: KnowledgeSearchHit[] = []
   for (const entry of meta.values()) {
     if (tag && !entry.tags.some((t) => t.toLowerCase() === tag)) continue
     if (status && (entry.status?.toLowerCase() ?? '') !== status) continue
+    if (starredOnly && !entry.starred) continue
     hits.push({
       spaceId: entry.spaceId,
       docId: entry.docId,

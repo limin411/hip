@@ -33,6 +33,7 @@ export function formatFrontmatterFence(meta: KnowledgeDocMeta): string {
   if (meta.coverY != null && Number.isFinite(meta.coverY)) {
     lines.push(`coverY: ${meta.coverY}`)
   }
+  if (meta.starred) lines.push('starred: true')
 
   const propKeys = Object.keys(meta.props).sort()
   for (const k of propKeys) {

@@ -61,12 +61,13 @@ describe('resolveAssetDataUrl', () => {
 })
 
 describe('asset helpers', () => {
-  it('builds image vs link markdown', () => {
+  it('builds image vs attachment markdown', () => {
     expect(assetMarkdown('assets/a.png', 'photo.png', 'image/png')).toBe(
       '![photo](assets/a.png)',
     )
+    // Non-image assets use image syntax so Live renders an attachment card.
     expect(assetMarkdown('assets/a.pdf', 'doc.pdf', 'application/pdf')).toBe(
-      '[doc.pdf](assets/a.pdf)',
+      '![doc.pdf](assets/a.pdf)',
     )
   })
 

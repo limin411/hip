@@ -1,5 +1,6 @@
 /**
  * BlockNote Live host — hip paper / theme tokens.
+ * Goal: de-Mantine demosite feel (slash/handle/bubble/table).
  */
 @import './knowledge-doc-typography.css';
 
@@ -25,7 +26,10 @@
   --bn-colors-selected-text: var(--text-primary, inherit);
   --bn-colors-border: var(--border, rgba(0, 0, 0, 0.1));
   --bn-colors-side-menu: var(--text-tertiary, #999);
+  --bn-colors-tooltip-background: var(--surface, #fff);
+  --bn-colors-tooltip-text: var(--text-primary, inherit);
   --bn-colors-highlights-gray-background: var(--surface-muted, #f4f4f5);
+  --bn-border-radius: 0.5rem;
   background: transparent !important;
   height: 100%;
   font-family: var(--kb-font-family);
@@ -51,28 +55,37 @@
 
 .knowledge-blocknote-editor .bn-editor h1,
 .knowledge-blocknote-editor .bn-editor [data-content-type='heading'] h1,
-.knowledge-blocknote-editor .bn-editor .bn-block-content[data-content-type='heading'][data-level='1'] {
+.knowledge-blocknote-editor
+  .bn-editor
+  .bn-block-content[data-content-type='heading'][data-level='1'] {
   font-size: var(--kb-h1-size) !important;
   font-weight: var(--kb-heading-weight) !important;
   line-height: 1.25;
   letter-spacing: -0.02em;
+  margin-block: 1.1em 0.35em;
   scroll-margin-top: 4.5rem;
 }
 
 .knowledge-blocknote-editor .bn-editor h2,
-.knowledge-blocknote-editor .bn-editor .bn-block-content[data-content-type='heading'][data-level='2'] {
+.knowledge-blocknote-editor
+  .bn-editor
+  .bn-block-content[data-content-type='heading'][data-level='2'] {
   font-size: var(--kb-h2-size) !important;
   font-weight: var(--kb-heading-weight) !important;
   line-height: 1.3;
   letter-spacing: -0.015em;
+  margin-block: 0.95em 0.3em;
   scroll-margin-top: 4.5rem;
 }
 
 .knowledge-blocknote-editor .bn-editor h3,
-.knowledge-blocknote-editor .bn-editor .bn-block-content[data-content-type='heading'][data-level='3'] {
+.knowledge-blocknote-editor
+  .bn-editor
+  .bn-block-content[data-content-type='heading'][data-level='3'] {
   font-size: var(--kb-h3-size) !important;
   font-weight: var(--kb-heading-weight) !important;
   line-height: 1.35;
+  margin-block: 0.8em 0.25em;
   scroll-margin-top: 4.5rem;
 }
 
@@ -136,22 +149,25 @@
 }
 
 .knowledge-blocknote-editor [data-content-type='quote'] {
-  border-inline-start: 3px solid var(--border, #d4d4d8);
+  border-inline-start: 3px solid var(--border-strong, var(--border, #d4d4d8));
   padding-inline-start: 0.85rem;
+  padding-block: 0.15rem;
   color: var(--text-secondary, inherit);
 }
 
 .knowledge-blocknote-editor [data-content-type='divider'] hr {
-  margin-block: 1rem;
-  border-color: var(--border, #e4e4e7);
+  margin-block: 1.15rem;
+  border: 0;
+  border-top: 1px solid var(--border, #e4e4e7);
 }
 
-/* Tables */
+/* ── Tables (Feishu-leaning everyday polish) ───────────────────────── */
 .knowledge-blocknote-editor .bn-editor table,
 .knowledge-blocknote-editor [data-content-type='table'] table {
   width: max-content;
   min-width: 100%;
-  border-collapse: collapse;
+  border-collapse: separate;
+  border-spacing: 0;
   font-size: 0.95em;
 }
 
@@ -159,33 +175,180 @@
 .knowledge-blocknote-editor .tableWrapper {
   overflow-x: auto;
   max-width: 100%;
-  margin-block: 0.5rem;
+  margin-block: 0.65rem;
   border: 1px solid var(--border, #e4e4e7);
   border-radius: 0.5rem;
+  background: var(--surface, transparent);
 }
 
 .knowledge-blocknote-editor .bn-editor th,
 .knowledge-blocknote-editor .bn-editor td {
-  border: 1px solid var(--border, #e4e4e7);
-  padding: 0.45rem 0.65rem;
+  border-right: 1px solid var(--border, #e4e4e7);
+  border-bottom: 1px solid var(--border, #e4e4e7);
+  padding: 0.5rem 0.75rem;
   min-width: 3.5rem;
   vertical-align: top;
+  transition: background-color 120ms ease;
+}
+
+.knowledge-blocknote-editor .bn-editor th:last-child,
+.knowledge-blocknote-editor .bn-editor td:last-child {
+  border-right: 0;
+}
+
+.knowledge-blocknote-editor .bn-editor tr:last-child th,
+.knowledge-blocknote-editor .bn-editor tr:last-child td {
+  border-bottom: 0;
 }
 
 .knowledge-blocknote-editor .bn-editor th,
 .knowledge-blocknote-editor .bn-editor tr:first-child td {
   background: var(--surface-muted, rgba(0, 0, 0, 0.04));
   font-weight: 600;
+  color: var(--text-primary, inherit);
 }
 
-/* Side menu hit area */
+.knowledge-blocknote-editor .bn-editor td:hover,
+.knowledge-blocknote-editor .bn-editor th:hover {
+  background: color-mix(in srgb, var(--accent, #c2410c) 6%, transparent);
+}
+
+.knowledge-blocknote-editor .bn-editor td:focus-within,
+.knowledge-blocknote-editor .bn-editor th:focus-within {
+  background: color-mix(in srgb, var(--accent, #c2410c) 10%, transparent);
+  outline: 1px solid color-mix(in srgb, var(--accent, #c2410c) 35%, transparent);
+  outline-offset: -1px;
+}
+
+/* ── Side menu / drag handles ──────────────────────────────────────── */
 .knowledge-blocknote-editor .bn-side-menu {
-  min-width: 1.75rem;
+  min-width: 2rem;
+  gap: 0.15rem;
+  opacity: 0;
+  transition: opacity 120ms ease;
 }
 
+.knowledge-blocknote-editor .bn-block-outer:hover > .bn-side-menu,
+.knowledge-blocknote-editor .bn-side-menu:focus-within,
+.knowledge-blocknote-editor .bn-side-menu:hover {
+  opacity: 1;
+}
+
+.knowledge-blocknote-editor .bn-side-menu .bn-button,
 .knowledge-blocknote-editor .bn-side-menu button {
   min-width: 1.5rem;
   min-height: 1.5rem;
+  width: 1.5rem;
+  height: 1.5rem;
+  border-radius: 0.375rem !important;
+  color: var(--text-tertiary, #999) !important;
+  background: transparent !important;
+  border: 0 !important;
+  box-shadow: none !important;
+  transition:
+    background-color 120ms ease,
+    color 120ms ease;
+}
+
+.knowledge-blocknote-editor .bn-side-menu .bn-button:hover,
+.knowledge-blocknote-editor .bn-side-menu button:hover {
+  background: var(--state-hover, rgba(0, 0, 0, 0.06)) !important;
+  color: var(--text-primary, inherit) !important;
+}
+
+/*
+ * Bubble toolbar + menus often portal outside the editor host.
+ * BlockNote is knowledge-only, so global bn-* skins are safe.
+ */
+.bn-formatting-toolbar,
+.bn-toolbar.bn-formatting-toolbar {
+  display: flex !important;
+  align-items: center;
+  gap: 0.125rem;
+  padding: 0.25rem !important;
+  border-radius: 0.625rem !important;
+  border: 1px solid var(--border, rgba(0, 0, 0, 0.1)) !important;
+  background: var(--surface, #fff) !important;
+  box-shadow: var(--shadow-overlay, 0 8px 30px rgba(0, 0, 0, 0.12)) !important;
+  color: var(--text-primary, inherit) !important;
+}
+
+.bn-formatting-toolbar .bn-button,
+.bn-formatting-toolbar button {
+  min-width: 1.75rem;
+  min-height: 1.75rem;
+  border-radius: 0.375rem !important;
+  color: var(--text-secondary, inherit) !important;
+  background: transparent !important;
+  border: 0 !important;
+  box-shadow: none !important;
+}
+
+.bn-formatting-toolbar .bn-button:hover,
+.bn-formatting-toolbar button:hover {
+  background: var(--state-hover, rgba(0, 0, 0, 0.06)) !important;
+  color: var(--text-primary, inherit) !important;
+}
+
+.bn-formatting-toolbar .bn-button[data-selected='true'],
+.bn-formatting-toolbar button[aria-pressed='true'],
+.bn-formatting-toolbar .bn-button[data-active='true'] {
+  background: color-mix(in srgb, var(--accent, #c2410c) 14%, transparent) !important;
+  color: var(--accent-strong, var(--accent, #c2410c)) !important;
+}
+
+.bn-formatting-toolbar .bn-select {
+  border-radius: 0.375rem !important;
+  border: 0 !important;
+  background: transparent !important;
+  color: var(--text-primary, inherit) !important;
+  box-shadow: none !important;
+}
+
+/* Floating menus / popovers (handles, block type, table) */
+.bn-menu-dropdown,
+.bn-popover-content,
+.mantine-Menu-dropdown,
+.mantine-Popover-dropdown {
+  z-index: 80;
+  border-radius: 0.625rem !important;
+  border: 1px solid var(--border, rgba(0, 0, 0, 0.1)) !important;
+  background: var(--surface, #fff) !important;
+  color: var(--text-primary, inherit) !important;
+  box-shadow: var(--shadow-overlay, 0 8px 30px rgba(0, 0, 0, 0.12)) !important;
+  overflow: hidden;
+}
+
+.bn-menu-item {
+  border-radius: 0.375rem !important;
+  color: var(--text-primary, inherit) !important;
+}
+
+.bn-menu-item:hover {
+  background: var(--state-hover, rgba(0, 0, 0, 0.06)) !important;
+}
+
+/* Table handles also portal */
+.bn-table-handle,
+.bn-table-cell-handle,
+.bn-extend-button {
+  border-radius: 0.375rem !important;
+  border: 1px solid var(--border, rgba(0, 0, 0, 0.1)) !important;
+  background: var(--surface, #fff) !important;
+  color: var(--text-secondary, inherit) !important;
+  box-shadow: var(--shadow-overlay, 0 4px 14px rgba(0, 0, 0, 0.08));
+}
+
+.bn-table-handle:hover,
+.bn-table-cell-handle:hover,
+.bn-extend-button:hover {
+  background: var(--state-hover, rgba(0, 0, 0, 0.06)) !important;
+  color: var(--text-primary, inherit) !important;
+  border-color: color-mix(
+    in srgb,
+    var(--accent, #c2410c) 35%,
+    var(--border)
+  ) !important;
 }
 
 /* Images */
@@ -194,17 +357,24 @@
   border-radius: 0.375rem;
 }
 
-/* Mantine menus above hip chrome */
-.knowledge-blocknote-editor .mantine-Menu-dropdown,
-.knowledge-blocknote-editor .mantine-Popover-dropdown {
-  z-index: 80;
-  border-color: var(--border, rgba(0, 0, 0, 0.1));
-  box-shadow: var(--shadow-overlay, 0 8px 30px rgba(0, 0, 0, 0.12));
+.knowledge-blocknote-editor .bn-editor img:hover {
+  outline: 1px solid color-mix(in srgb, var(--accent, #c2410c) 28%, transparent);
+  outline-offset: 2px;
 }
 
 /* Checkboxes */
 .knowledge-blocknote-editor input[type='checkbox'] {
   width: 1rem;
   height: 1rem;
+  margin-inline-end: 0.4rem;
   accent-color: var(--accent, #3b82f6);
+  vertical-align: middle;
+}
+
+/* Hide default Mantine slash if any residual portal skins leak */
+.knowledge-blocknote-editor .bn-suggestion-menu:not([data-testid='knowledge-slash-menu']) {
+  border-radius: 0.75rem !important;
+  border: 1px solid var(--border) !important;
+  background: var(--surface) !important;
+  box-shadow: var(--shadow-overlay) !important;
 }

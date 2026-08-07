@@ -31,6 +31,8 @@ describe('DocOutline', () => {
       />,
     )
     expect(screen.getByTestId('knowledge-doc-outline')).toBeInTheDocument()
+    // No nested count header — section chrome lives on the panel.
+    expect(screen.queryByText(/knowledge\.outline\.count/)).not.toBeInTheDocument()
     const top = screen.getByTestId('knowledge-doc-outline-item-top')
     const nested = screen.getByTestId('knowledge-doc-outline-item-nested')
     const deep = screen.getByTestId('knowledge-doc-outline-item-deep')
@@ -41,6 +43,23 @@ describe('DocOutline', () => {
     fireEvent.click(nested)
     expect(onSelect).toHaveBeenCalledWith(
       expect.objectContaining({ id: 'nested', level: 2, text: 'Nested', line: 3 }),
+    )
+  })
+
+  it('marks active heading for scrollspy', () => {
+    render(
+      <DocOutline
+        content={'# Top\n\n## Nested\n'}
+        activeId="nested"
+        onSelect={() => {}}
+      />,
+    )
+    expect(screen.getByTestId('knowledge-doc-outline-item-nested')).toHaveAttribute(
+      'data-outline-active',
+      'true',
+    )
+    expect(screen.getByTestId('knowledge-doc-outline-item-top')).not.toHaveAttribute(
+      'data-outline-active',
     )
   })
 

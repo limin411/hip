@@ -7,12 +7,12 @@ import remarkMath from 'remark-math'
 import rehypeKatex from 'rehype-katex'
 import 'katex/dist/katex.min.css'
 import { cn } from '@/lib/utils'
-import { markdownProseClassName } from '@/components/chat/MarkdownBody'
 import { CodeBlock } from '@/components/chat/CodeBlock'
 import { KnowledgeMermaid } from './KnowledgeMermaid'
 import { KnowledgeSvg } from './KnowledgeSvg'
 import { firstTextLine, parseCalloutHeader } from '@/domain/knowledge/callout'
 import { calloutStyleClass } from './calloutStyles'
+import './knowledge-doc-typography.css'
 
 export interface KnowledgeMarkdownBodyProps {
   content: string
@@ -93,7 +93,10 @@ export function KnowledgeMarkdownBody({
   }, [components, t])
 
   return (
-    <div className={cn(markdownProseClassName, className)}>
+    <div
+      className={cn('knowledge-doc-prose', className)}
+      data-testid="knowledge-doc-prose"
+    >
       <ReactMarkdown
         remarkPlugins={[remarkGfm, remarkMath]}
         rehypePlugins={[rehypeKatex]}

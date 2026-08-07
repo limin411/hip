@@ -1057,7 +1057,7 @@ export function KnowledgeWorkspace() {
               />
               {liveSuppressed ? (
                 <div
-                  className="mt-2 rounded-md border border-border bg-surface-muted/80 px-3 py-2 text-meta text-ink-secondary"
+                  className="knowledge-doc-measure mt-2 rounded-md border border-border bg-surface-muted/80 px-3 py-2 text-meta text-ink-secondary"
                   data-testid="knowledge-large-doc-banner"
                   role="status"
                 >

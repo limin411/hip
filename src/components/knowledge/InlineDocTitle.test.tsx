@@ -34,9 +34,19 @@ describe('InlineDocTitle', () => {
     expect(screen.getByTestId('knowledge-doc-title').className).toContain('text-page')
   })
 
+  it('shares body measure column with Live/Source', () => {
+    render(<InlineDocTitle docId="d1" title="Note" onCommit={() => {}} />)
+    expect(screen.getByTestId('knowledge-doc-title').className).toContain(
+      'knowledge-doc-measure',
+    )
+  })
+
   it('readOnly title also uses text-page', () => {
     render(<InlineDocTitle docId="d1" title="Note" readOnly onCommit={() => {}} />)
     expect(screen.getByTestId('knowledge-doc-title').className).toContain('text-page')
+    expect(screen.getByTestId('knowledge-doc-title').className).toContain(
+      'knowledge-doc-measure',
+    )
   })
 
   it('does not commit empty title; restores previous', () => {

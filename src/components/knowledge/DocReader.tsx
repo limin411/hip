@@ -230,7 +230,11 @@ export function DocReader({
   const tree = nodes ?? []
 
   return (
-    <div ref={rootRef} data-testid="knowledge-doc-reader">
+    <div
+      ref={rootRef}
+      data-testid="knowledge-doc-reader"
+      className="knowledge-doc-measure w-full"
+    >
       {segments.map((seg, i) => {
         if (seg.type === 'md') {
           const text = seg.text

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useKnowledgeStore } from '@/store/knowledgeStore'
 import { PanelToggle } from '@/components/layout/PanelToggle'
@@ -8,6 +8,28 @@ import { extractDocOutline, slugifyHeading } from '@/domain/knowledge/mdPreview'
 
 /** Idle debounce so outline does not re-parse on every Live draft tick. */
 const OUTLINE_BODY_DEBOUNCE_MS = 200
+/** Scrollspy: treat headings within this offset from the scroller top as active. */
+const SCROLLSPY_TOP_OFFSET_PX = 72
+
+function findDocScroller(): HTMLElement | null {
+  if (typeof document === 'undefined') return null
+  const live = document.querySelector(
+    '[data-testid="knowledge-doc-live-editor"]',
+  ) as HTMLElement | null
+  if (live) return live
+  const cm = document.querySelector(
+    '[data-testid="knowledge-doc-editor"] .cm-scroller',
+  ) as HTMLElement | null
+  if (cm) return cm
+  const reader = document.querySelector(
+    '[data-testid="knowledge-doc-reader"]',
+  ) as HTMLElement | null
+  return reader
+}
+
+function headingText(el: Element): string {
+  return (el.textContent ?? '').replace(/\s+/g, ' ').trim()
+}
 
 /**
  * Knowledge right-rail: Outline + Backlinks + Outbound (docs only).
@@ -34,21 +56,112 @@ export function KnowledgeOutlinePanel() {
 
   const liveContent = draftBody || docBody
   const [content, setContent] = useState(liveContent)
+  const [activeOutlineId, setActiveOutlineId] = useState<string | null>(null)
   const prevDocIdRef = useRef(activeDocId)
   useEffect(() => {
     if (!activeDocId || !isDoc) {
       setContent('')
+      setActiveOutlineId(null)
       prevDocIdRef.current = null
       return
     }
     if (prevDocIdRef.current !== activeDocId) {
       prevDocIdRef.current = activeDocId
       setContent(liveContent)
+      setActiveOutlineId(null)
       return
     }
     const id = window.setTimeout(() => setContent(liveContent), OUTLINE_BODY_DEBOUNCE_MS)
     return () => window.clearTimeout(id)
   }, [liveContent, activeDocId, isDoc])
+
+  const outlineItems = useMemo(() => extractDocOutline(content), [content])
+
+  // TOC scrollspy — highlight the last heading that crossed the top band.
+  useEffect(() => {
+    if (!activeDocId || !isDoc || outlineItems.length === 0) {
+      setActiveOutlineId(null)
+      return
+    }
+
+    let raf = 0
+    const sync = () => {
+      raf = 0
+      const scroller = findDocScroller()
+      if (!scroller) return
+      const scrollerRect = scroller.getBoundingClientRect()
+      const band = scrollerRect.top + SCROLLSPY_TOP_OFFSET_PX
+      const nodes = scroller.querySelectorAll(
+        'h1, h2, h3, h4, h5, h6, [data-content-type="heading"]',
+      )
+      if (nodes.length === 0) return
+
+      let bestIdx = 0
+      for (let i = 0; i < nodes.length; i++) {
+        const top = nodes[i].getBoundingClientRect().top
+        if (top <= band) bestIdx = i
+        else break
+      }
+
+      const text = headingText(nodes[bestIdx])
+      if (!text) return
+      // Match outline by text (handles duplicate titles via first unused match order).
+      const seen = new Map<string, number>()
+      let hitId: string | null = null
+      for (const item of outlineItems) {
+        const key = item.text.trim()
+        const n = seen.get(key) ?? 0
+        seen.set(key, n + 1)
+        if (key !== text) continue
+        // Count how many DOM headings with this text appear before bestIdx
+        let domOcc = 0
+        for (let j = 0; j < bestIdx; j++) {
+          if (headingText(nodes[j]) === text) domOcc += 1
+        }
+        if (domOcc === n) {
+          hitId = item.id
+          break
+        }
+      }
+      if (!hitId) {
+        const loose = outlineItems.find((o) => o.text.trim() === text)
+        hitId = loose?.id ?? null
+      }
+      setActiveOutlineId((prev) => (prev === hitId ? prev : hitId))
+    }
+
+    const onScroll = () => {
+      if (raf) return
+      raf = window.requestAnimationFrame(sync)
+    }
+
+    const attach = () => {
+      const scroller = findDocScroller()
+      if (!scroller) return null
+      scroller.addEventListener('scroll', onScroll, { passive: true })
+      sync()
+      return scroller
+    }
+
+    let scroller = attach()
+    // Editor mounts async (Suspense Live) — retry briefly.
+    const retry = window.setInterval(() => {
+      if (scroller) {
+        window.clearInterval(retry)
+        return
+      }
+      scroller = attach()
+      if (scroller) window.clearInterval(retry)
+    }, 200)
+
+    window.addEventListener('resize', onScroll)
+    return () => {
+      window.clearInterval(retry)
+      if (raf) window.cancelAnimationFrame(raf)
+      scroller?.removeEventListener('scroll', onScroll)
+      window.removeEventListener('resize', onScroll)
+    }
+  }, [activeDocId, isDoc, outlineItems])
 
   const openBacklink = async (fromDocId: string, fragment: string | null) => {
     await openDoc(fromDocId)
@@ -102,8 +215,17 @@ export function KnowledgeOutlinePanel() {
             <section data-testid="knowledge-outline-section">
               <h3 className="px-1 pb-1 text-caption font-medium text-ink-tertiary">
                 {t('knowledge.outline.sectionOutline')}
+                {outlineItems.length > 0 ? (
+                  <span className="ml-1 font-normal normal-case text-ink-tertiary">
+                    ({outlineItems.length})
+                  </span>
+                ) : null}
               </h3>
-              <DocOutline content={content} onSelect={(item) => requestOutlineJump(item)} />
+              <DocOutline
+                content={content}
+                activeId={activeOutlineId}
+                onSelect={(item) => requestOutlineJump(item)}
+              />
             </section>
 
             <section data-testid="knowledge-backlinks-section">

@@ -23,6 +23,7 @@ import {
   useCreateBlockNote,
   type DefaultReactSuggestionItem,
 } from '@blocknote/react'
+import { BlockNoteHipSlashMenu } from './BlockNoteHipSlashMenu'
 import { MantineProvider } from '@mantine/core'
 import { useTranslation } from 'react-i18next'
 import {
@@ -848,6 +849,7 @@ export const DocBlockNoteEditor = forwardRef<
           <SuggestionMenuController
             triggerCharacter="/"
             getItems={getSlashItems}
+            suggestionMenuComponent={BlockNoteHipSlashMenu}
           />
           <FormattingToolbarController
             formattingToolbar={() => (

@@ -13,9 +13,10 @@ export const toggleBlockSpec = createReactBlockSpec(
   {
     parse: (el) => {
       if (el.getAttribute('data-hip-block') === 'toggle') {
+        const bodyAttr = el.getAttribute('data-body')
         return {
           summary: el.getAttribute('data-summary') ?? '',
-          body: el.textContent ?? '',
+          body: bodyAttr != null && bodyAttr !== '' ? bodyAttr : (el.textContent ?? ''),
         }
       }
       if (el.tagName === 'DETAILS') {
@@ -33,9 +34,8 @@ export const toggleBlockSpec = createReactBlockSpec(
       <div
         data-hip-block="toggle"
         data-summary={String(block.props.summary ?? '')}
-      >
-        {String(block.props.body ?? '')}
-      </div>
+        data-body={String(block.props.body ?? '')}
+      />
     ),
     render: ({ block, editor }) => {
       const summary = String(block.props.summary ?? '')

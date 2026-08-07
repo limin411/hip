@@ -83,7 +83,8 @@ export function parseCalloutMd(md: string): CalloutCarrier | null {
 
 export function calloutToHtmlCarrier(c: CalloutCarrier): string {
   const type = CALLOUT_TYPE_SET.has(c.type) ? c.type : 'note'
-  return `<div data-hip-block="callout" data-type="${escapeHtmlAttr(type)}" data-title="${escapeHtmlAttr(c.title)}">${escapeHtmlAttr(c.body)}</div>`
+  // Body in data-body: BN HTML whitespace normalize collapses text-node newlines.
+  return `<div data-hip-block="callout" data-type="${escapeHtmlAttr(type)}" data-title="${escapeHtmlAttr(c.title)}" data-body="${escapeHtmlAttr(c.body)}"></div>`
 }
 
 export function parseCalloutHtmlEl(el: HTMLElement): CalloutCarrier | null {
@@ -93,7 +94,7 @@ export function parseCalloutHtmlEl(el: HTMLElement): CalloutCarrier | null {
   return {
     type,
     title: el.getAttribute('data-title') ?? '',
-    body: el.textContent ?? '',
+    body: el.getAttribute('data-body') ?? el.textContent ?? '',
   }
 }
 
@@ -111,7 +112,8 @@ export function parseMathMd(md: string): MathCarrier | null {
 }
 
 export function mathToHtmlCarrier(c: MathCarrier): string {
-  return `<div data-hip-block="math">${escapeHtmlAttr(c.src)}</div>`
+  // data-src keeps multi-line LaTeX through BN whitespace normalize.
+  return `<div data-hip-block="math" data-src="${escapeHtmlAttr(c.src)}"></div>`
 }
 
 // ─── Inline math ──────────────────────────────────────────────────────────────
@@ -168,11 +170,13 @@ export function parseFenceMd(
 }
 
 export function mermaidToHtmlCarrier(c: MermaidCarrier): string {
-  return `<div data-hip-block="mermaid">${escapeHtmlAttr(c.src)}</div>`
+  // data-src is required: BN preprocessHTMLWhitespace collapses div text newlines,
+  // which breaks mermaid diagrams (and would corrupt SVG).
+  return `<div data-hip-block="mermaid" data-src="${escapeHtmlAttr(c.src)}"></div>`
 }
 
 export function svgToHtmlCarrier(c: SvgCarrier): string {
-  return `<div data-hip-block="svg">${escapeHtmlAttr(c.src)}</div>`
+  return `<div data-hip-block="svg" data-src="${escapeHtmlAttr(c.src)}"></div>`
 }
 
 // ─── Embed ──────────────────────────────────────────────────────────────────
@@ -238,7 +242,7 @@ export function parseToggleMd(md: string): ToggleCarrier | null {
 }
 
 export function toggleToHtmlCarrier(c: ToggleCarrier): string {
-  return `<div data-hip-block="toggle" data-summary="${escapeHtmlAttr(c.summary)}">${escapeHtmlAttr(c.body)}</div>`
+  return `<div data-hip-block="toggle" data-summary="${escapeHtmlAttr(c.summary)}" data-body="${escapeHtmlAttr(c.body)}"></div>`
 }
 
 // ─── Highlight ──────────────────────────────────────────────────────────────
@@ -286,6 +290,7 @@ export function colorSpanMdToHtml(md: string): string {
 /** Reverse: BN style spans back to hip carriers. */
 export function colorSpanHtmlToMd(md: string): string {
   let out = md
+  // Live import path (our carriers → BN parse attrs)
   out = out.replace(
     /<span\b[^>]*data-text-color=["']([^"']*)["'][^>]*>([\s\S]*?)<\/span>/gi,
     (_full, color: string, inner: string) =>
@@ -293,6 +298,27 @@ export function colorSpanHtmlToMd(md: string): string {
   )
   out = out.replace(
     /<span\b[^>]*data-background-color=["']([^"']*)["'][^>]*>([\s\S]*?)<\/span>/gi,
+    (_full, color: string, inner: string) =>
+      `<span data-hip-bg-color="${escapeHtmlAttr(color)}">${inner}</span>`,
+  )
+  // Live export path (BN external HTML uses data-style-type + data-value)
+  out = out.replace(
+    /<span\b[^>]*data-style-type=["']textColor["'][^>]*data-value=["']([^"']*)["'][^>]*>([\s\S]*?)<\/span>/gi,
+    (_full, color: string, inner: string) =>
+      `<span data-hip-color="${escapeHtmlAttr(color)}">${inner}</span>`,
+  )
+  out = out.replace(
+    /<span\b[^>]*data-value=["']([^"']*)["'][^>]*data-style-type=["']textColor["'][^>]*>([\s\S]*?)<\/span>/gi,
+    (_full, color: string, inner: string) =>
+      `<span data-hip-color="${escapeHtmlAttr(color)}">${inner}</span>`,
+  )
+  out = out.replace(
+    /<span\b[^>]*data-style-type=["']backgroundColor["'][^>]*data-value=["']([^"']*)["'][^>]*>([\s\S]*?)<\/span>/gi,
+    (_full, color: string, inner: string) =>
+      `<span data-hip-bg-color="${escapeHtmlAttr(color)}">${inner}</span>`,
+  )
+  out = out.replace(
+    /<span\b[^>]*data-value=["']([^"']*)["'][^>]*data-style-type=["']backgroundColor["'][^>]*>([\s\S]*?)<\/span>/gi,
     (_full, color: string, inner: string) =>
       `<span data-hip-bg-color="${escapeHtmlAttr(color)}">${inner}</span>`,
   )
@@ -385,35 +411,45 @@ function stripTags(s: string): string {
 export function htmlCarriersToDialect(md: string): string {
   let out = md.replace(/\r\n/g, '\n')
 
-  // Callout divs
+  // Callout divs (prefer data-body — text nodes lose newlines under BN normalize)
   out = out.replace(
-    /<div\b[^>]*data-hip-block=["']callout["'][^>]*>([\s\S]*?)<\/div>/gi,
-    (full, bodyHtml: string) => {
+    /<div\b[^>]*data-hip-block=["']callout["'][^>]*(?:\/>|>([\s\S]*?)<\/div>)/gi,
+    (full, bodyHtml?: string) => {
       const typeM = full.match(/data-type=["']([^"']*)["']/i)
       const titleM = full.match(/data-title=["']([^"']*)["']/i)
+      const bodyM = full.match(/data-body=["']([^"']*)["']/i)
       const type = unescapeHtmlAttr(typeM?.[1] ?? 'note') as CalloutType
       const title = unescapeHtmlAttr(titleM?.[1] ?? '')
-      const body = stripTags(bodyHtml)
+      const body = bodyM ? unescapeHtmlAttr(bodyM[1] ?? '') : stripTags(bodyHtml ?? '')
       return serializeCallout({ type, title, body }).replace(/\n$/, '')
     },
   )
 
   out = out.replace(
-    /<div\b[^>]*data-hip-block=["']math["'][^>]*>([\s\S]*?)<\/div>/gi,
-    (_full, bodyHtml: string) =>
-      serializeMath({ src: stripTags(bodyHtml) }).replace(/\n$/, ''),
+    /<div\b[^>]*data-hip-block=["']math["'][^>]*(?:\/>|>([\s\S]*?)<\/div>)/gi,
+    (full, bodyHtml?: string) => {
+      const srcM = full.match(/data-src=["']([^"']*)["']/i)
+      const src = srcM ? unescapeHtmlAttr(srcM[1] ?? '') : stripTags(bodyHtml ?? '')
+      return serializeMath({ src }).replace(/\n$/, '')
+    },
   )
 
   out = out.replace(
-    /<div\b[^>]*data-hip-block=["']mermaid["'][^>]*>([\s\S]*?)<\/div>/gi,
-    (_full, bodyHtml: string) =>
-      serializeMermaid({ src: stripTags(bodyHtml) }).replace(/\n$/, ''),
+    /<div\b[^>]*data-hip-block=["']mermaid["'][^>]*(?:\/>|>([\s\S]*?)<\/div>)/gi,
+    (full, bodyHtml?: string) => {
+      const srcM = full.match(/data-src=["']([^"']*)["']/i)
+      const src = srcM ? unescapeHtmlAttr(srcM[1] ?? '') : stripTags(bodyHtml ?? '')
+      return serializeMermaid({ src }).replace(/\n$/, '')
+    },
   )
 
   out = out.replace(
-    /<div\b[^>]*data-hip-block=["']svg["'][^>]*>([\s\S]*?)<\/div>/gi,
-    (_full, bodyHtml: string) =>
-      serializeSvg({ src: stripTags(bodyHtml) }).replace(/\n$/, ''),
+    /<div\b[^>]*data-hip-block=["']svg["'][^>]*(?:\/>|>([\s\S]*?)<\/div>)/gi,
+    (full, bodyHtml?: string) => {
+      const srcM = full.match(/data-src=["']([^"']*)["']/i)
+      const src = srcM ? unescapeHtmlAttr(srcM[1] ?? '') : stripTags(bodyHtml ?? '')
+      return serializeSvg({ src }).replace(/\n$/, '')
+    },
   )
 
   out = out.replace(
@@ -429,12 +465,13 @@ export function htmlCarriersToDialect(md: string): string {
   )
 
   out = out.replace(
-    /<div\b[^>]*data-hip-block=["']toggle["'][^>]*>([\s\S]*?)<\/div>/gi,
-    (full, bodyHtml: string) => {
+    /<div\b[^>]*data-hip-block=["']toggle["'][^>]*(?:\/>|>([\s\S]*?)<\/div>)/gi,
+    (full, bodyHtml?: string) => {
       const sumM = full.match(/data-summary=["']([^"']*)["']/i)
+      const bodyM = full.match(/data-body=["']([^"']*)["']/i)
       return serializeToggle({
         summary: unescapeHtmlAttr(sumM?.[1] ?? ''),
-        body: stripTags(bodyHtml),
+        body: bodyM ? unescapeHtmlAttr(bodyM[1] ?? '') : stripTags(bodyHtml ?? ''),
       }).replace(/\n$/, '')
     },
   )

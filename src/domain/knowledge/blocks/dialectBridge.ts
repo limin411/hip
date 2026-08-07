@@ -20,7 +20,7 @@ export function preParseMdForLive(body: string): string {
 }
 
 /**
- * Transform BN blocksToMarkdownLossy output back to hip disk dialect.
+ * Transform BN blocksToMarkdownLossy / external-HTML residue back to hip disk dialect.
  * Also normalizes image title captions when present as bare HTML figures.
  */
 export function postSerializeMdFromLive(md: string): string {
@@ -44,6 +44,102 @@ export function postSerializeMdFromLive(md: string): string {
   })
 
   return out
+}
+
+/**
+ * Minimal editor surface needed to serialize Live blocks to hip Markdown.
+ * BN's `blocksToMarkdownLossy` strips custom-block toExternalHTML (math/mermaid/…)
+ * down to bare text — so we export external HTML, protect hip carriers, then
+ * re-use BN only for the remaining standard blocks.
+ */
+export type LiveMarkdownEditor = {
+  // Parameter types are intentionally wide — BN's PartialBlock generics vary by schema.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  blocksToHTMLLossy: (blocks?: any) => string
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  tryParseHTMLToBlocks: (html: string) => any[]
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  blocksToMarkdownLossy: (blocks?: any) => string
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  document: any
+}
+
+const HIP_SLOT_RE = /%%HIP_SLOT_(\d+)%%/g
+
+/**
+ * Serialize the Live document to disk Markdown without losing hip dialect blocks.
+ *
+ * Probe-verified (BN 0.52.1):
+ * - `blocksToMarkdownLossy` dumps math/mermaid/callout as bare text (no fences)
+ * - `blocksToHTMLLossy` correctly emits `toExternalHTML` carriers
+ * - BN `preprocessHTMLWhitespace` collapses newlines inside plain div text nodes
+ *   (carriers therefore use data-src / data-body attributes)
+ */
+export function serializeLiveDocumentToMd(
+  editor: LiveMarkdownEditor,
+  blocks: unknown = editor.document,
+): string {
+  const html = editor.blocksToHTMLLossy(blocks)
+  // Convert BN external style spans + hip carriers → dialect fragments, but
+  // only for protected slots so the remaining HTML can still go through BN MD.
+  const slots: string[] = []
+  const protect = (fragment: string): string => {
+    const i = slots.length
+    // postSerialize also normalizes images; run full pipeline on each fragment.
+    slots.push(postSerializeMdFromLive(fragment).replace(/\n+$/, ''))
+    return `<p>%%HIP_SLOT_${i}%%</p>`
+  }
+
+  let protectedHtml = html
+
+  // Block carriers (div data-hip-block=…) — including empty/self-closing forms
+  protectedHtml = protectedHtml.replace(
+    /<div\b[^>]*data-hip-block=["'][^"']+["'][^>]*(?:\/>|>[\s\S]*?<\/div>)/gi,
+    (m) => protect(m),
+  )
+
+  // Inline wiki / math spans
+  protectedHtml = protectedHtml.replace(
+    /<span\b[^>]*data-hip-inline=["'][^"']+["'][^>]*>[\s\S]*?<\/span>/gi,
+    (m) => {
+      const i = slots.length
+      slots.push(postSerializeMdFromLive(m).replace(/\n+$/, ''))
+      // Inline placeholder must stay inline (not a block <p>)
+      return `%%HIP_SLOT_${i}%%`
+    },
+  )
+
+  // Highlight marks from BN external HTML
+  protectedHtml = protectedHtml.replace(
+    /<mark\b[^>]*data-hip-mark=["']highlight["'][^>]*>[\s\S]*?<\/mark>/gi,
+    (m) => {
+      const i = slots.length
+      slots.push(postSerializeMdFromLive(m).replace(/\n+$/, ''))
+      return `%%HIP_SLOT_${i}%%`
+    },
+  )
+
+  // BN style color / background spans (before they get stripped by MD export)
+  protectedHtml = protectedHtml.replace(
+    /<span\b[^>]*data-style-type=["'](?:textColor|backgroundColor)["'][^>]*>[\s\S]*?<\/span>/gi,
+    (m) => {
+      const i = slots.length
+      slots.push(postSerializeMdFromLive(m).replace(/\n+$/, ''))
+      return `%%HIP_SLOT_${i}%%`
+    },
+  )
+
+  // Remaining standard HTML → Markdown via BN
+  const restBlocks = editor.tryParseHTMLToBlocks(protectedHtml)
+  let md =
+    restBlocks.length > 0
+      ? editor.blocksToMarkdownLossy(restBlocks)
+      : ''
+
+  md = md.replace(HIP_SLOT_RE, (_full, n: string) => slots[Number(n)] ?? '')
+
+  // Safety: any leftover carriers (e.g. if protection missed a form)
+  return postSerializeMdFromLive(md)
 }
 
 export type DialectLoss = { id: string; probe: RegExp }

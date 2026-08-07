@@ -37,6 +37,11 @@ async function ensureMermaid(theme: MermaidTheme): Promise<MermaidApi> {
       startOnLoad: false,
       securityLevel: 'strict',
       theme,
+      // Transparent so the .kb-mermaid card chrome is the only background
+      // (avoids double-frame dark-on-dark / light-on-muted mismatch).
+      themeVariables: {
+        background: 'transparent',
+      },
     })
     appliedTheme = theme
   }

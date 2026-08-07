@@ -15,17 +15,21 @@ import { embedBlockSpec } from './embedBlock'
 import { attachmentBlockSpec } from './attachmentBlock'
 import { toggleBlockSpec } from './toggleBlock'
 import { wikiLinkInlineSpec, highlightStyleSpec } from './wikiInline'
+import { createKnowledgeCodeBlockSpec } from './codeBlockHighlight'
 
 const {
   // audio/video rarely used in knowledge notes — keep file/image
   audio: _audio,
   video: _video,
+  // Replace default codeBlock (no highlighter) with hip Shiki-wired one.
+  codeBlock: _defaultCodeBlock,
   ...restDefaultBlocks
 } = defaultBlockSpecs
 
 export const knowledgeBlockSchema = BlockNoteSchema.create({
   blockSpecs: {
     ...restDefaultBlocks,
+    codeBlock: createKnowledgeCodeBlockSpec(),
     callout: calloutBlockSpec(),
     math: mathBlockSpec(),
     mermaid: mermaidBlockSpec(),

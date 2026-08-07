@@ -13,10 +13,12 @@ export const mermaidBlockSpec = createReactBlockSpec(
   {
     parse: (el) => {
       if (el.getAttribute('data-hip-block') !== 'mermaid') return undefined
-      return { src: el.textContent ?? '' }
+      // Prefer data-src: BN whitespace normalize collapses text-node newlines.
+      const fromAttr = el.getAttribute('data-src')
+      return { src: fromAttr != null && fromAttr !== '' ? fromAttr : (el.textContent ?? '') }
     },
     toExternalHTML: ({ block }) => (
-      <div data-hip-block="mermaid">{String(block.props.src ?? '')}</div>
+      <div data-hip-block="mermaid" data-src={String(block.props.src ?? '')} />
     ),
     render: ({ block, editor }) => (
       <FencePreviewEdit
@@ -42,10 +44,11 @@ export const svgBlockSpec = createReactBlockSpec(
   {
     parse: (el) => {
       if (el.getAttribute('data-hip-block') !== 'svg') return undefined
-      return { src: el.textContent ?? '' }
+      const fromAttr = el.getAttribute('data-src')
+      return { src: fromAttr != null && fromAttr !== '' ? fromAttr : (el.textContent ?? '') }
     },
     toExternalHTML: ({ block }) => (
-      <div data-hip-block="svg">{String(block.props.src ?? '')}</div>
+      <div data-hip-block="svg" data-src={String(block.props.src ?? '')} />
     ),
     render: ({ block, editor }) => (
       <FencePreviewEdit

@@ -74,16 +74,16 @@ import { useHipConfigStore } from '@/store/hipConfigStore'
 import { WikiLinkPicker } from './WikiLinkPicker'
 import { DocFindBar } from './find/DocFindBar'
 import { knowledgeBlockSchema } from '@/domain/knowledge/blocks/schema'
+import { setLiveCodeBlockThemePref } from '@/domain/knowledge/blocks/codeBlockHighlight'
 import {
   KnowledgeEditorHostContext,
   type KnowledgeEditorHost,
 } from '@/domain/knowledge/blocks/knowledgeEditorHostContext'
 import {
   detectDialectLoss,
-  postSerializeMdFromLive,
+  serializeLiveDocumentToMd,
   preParseMdForLive,
 } from '@/domain/knowledge/blocks/dialectBridge'
-import { wrapStyledInlineForExport } from '@/domain/knowledge/blocks/styleCarriers'
 import {
   handleBlockKeydown,
   type BlockKeymapEditor,
@@ -501,6 +501,20 @@ export const DocBlockNoteEditor = forwardRef<
     [docId],
   )
 
+  // Re-run prosemirror-highlight when app/code-block theme flips so token
+  // colors match the chrome (plugin honors `prosemirror-highlight-refresh`).
+  useEffect(() => {
+    setLiveCodeBlockThemePref(codeBlockThemePref)
+    try {
+      const tt = editor._tiptapEditor
+      if (!tt || tt.isDestroyed) return
+      const { tr } = tt.state
+      tt.view.dispatch(tr.setMeta('prosemirror-highlight-refresh', true))
+    } catch {
+      // editor not mounted yet
+    }
+  }, [editor, isDark, codeBlockThemePref])
+
   const slashEditor = editor as unknown as BlockNoteSlashEditor
 
   const hostValue = useMemo<KnowledgeEditorHost>(
@@ -544,9 +558,7 @@ export const DocBlockNoteEditor = forwardRef<
       try {
         if (draftDirtyRef.current) {
           draftDirtyRef.current = false
-          const bodyMd = postSerializeMdFromLive(
-            editor.blocksToMarkdownLossy(editor.document),
-          )
+          const bodyMd = serializeLiveDocumentToMd(editor)
           onDraftChangeRef.current(
             joinYamlFrontmatter(fmTextRef.current, bodyMd),
             { docId: boundDocIdRef.current },
@@ -587,10 +599,7 @@ export const DocBlockNoteEditor = forwardRef<
     try {
       if (editor._tiptapEditor?.isDestroyed) return
       const t0 = isKnowledgePerfEnabled() ? performance.now() : 0
-      const raw = editor.blocksToMarkdownLossy(
-        wrapStyledInlineForExport(editor.document) as never,
-      )
-      const bodyMd = postSerializeMdFromLive(raw)
+      const bodyMd = serializeLiveDocumentToMd(editor)
       if (isKnowledgePerfEnabled()) kbPerfSerialize(performance.now() - t0)
 
       // Honesty: toast once per editor instance if dialect markers lost, and

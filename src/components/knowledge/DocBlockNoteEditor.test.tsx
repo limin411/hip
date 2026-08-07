@@ -16,6 +16,10 @@ const tryParseMarkdownToBlocks = vi.fn((md: string) =>
     : [],
 )
 const blocksToMarkdownLossy = vi.fn(() => 'serialized body')
+const blocksToHTMLLossy = vi.fn(() => '<p>serialized body</p>')
+const tryParseHTMLToBlocks = vi.fn(() => [
+  { id: 'b1', type: 'paragraph', content: 'serialized body', props: {}, children: [] },
+])
 const focus = vi.fn()
 const setTextCursorPosition = vi.fn()
 const getTextCursorPosition = vi.fn(() => ({
@@ -35,13 +39,23 @@ vi.mock('@blocknote/react', () => ({
     document: [{ id: 'b0', type: 'paragraph', content: '', props: {}, children: [] }],
     tryParseMarkdownToBlocks,
     blocksToMarkdownLossy,
+    blocksToHTMLLossy,
+    tryParseHTMLToBlocks,
     replaceBlocks,
     insertBlocks,
     updateBlock,
     focus,
     setTextCursorPosition,
     getTextCursorPosition,
-    _tiptapEditor: { isDestroyed: false },
+    _tiptapEditor: {
+      isDestroyed: false,
+      state: { tr: { setMeta: (k: string, v: unknown) => ({ meta: { [k]: v } }) } },
+      view: {
+        dispatch: vi.fn(),
+        setProps: vi.fn(),
+        destroy: vi.fn(),
+      },
+    },
   }),
   SuggestionMenuController: () => null,
   FormattingToolbarController: () => null,

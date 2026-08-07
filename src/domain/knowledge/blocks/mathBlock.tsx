@@ -14,10 +14,11 @@ export const mathBlockSpec = createReactBlockSpec(
   {
     parse: (el) => {
       if (el.getAttribute('data-hip-block') !== 'math') return undefined
-      return { src: el.textContent ?? '' }
+      const fromAttr = el.getAttribute('data-src')
+      return { src: fromAttr != null && fromAttr !== '' ? fromAttr : (el.textContent ?? '') }
     },
     toExternalHTML: ({ block }) => (
-      <div data-hip-block="math">{String(block.props.src ?? '')}</div>
+      <div data-hip-block="math" data-src={String(block.props.src ?? '')} />
     ),
     render: ({ block, editor }) => (
       <MathView

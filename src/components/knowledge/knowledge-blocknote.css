@@ -141,6 +141,7 @@
   border-radius: 0;
 }
 
+
 .knowledge-blocknote-editor
   .bn-block-content[data-content-type='codeBlock']
   > div
@@ -494,6 +495,19 @@
   border-radius: 0.5rem;
   background: var(--surface-muted);
   padding: 0.75rem;
+  color: var(--text-primary, inherit);
+}
+/* Mermaid SVG brings its own fills; don't inherit editor text color into labels. */
+.kb-mermaid [data-testid='knowledge-mermaid'] {
+  color: initial;
+  background: transparent;
+}
+.kb-mermaid [data-testid='knowledge-mermaid'] svg {
+  max-width: 100%;
+  height: auto;
+  display: block;
+  margin-inline: auto;
+  background: transparent !important;
 }
 .kb-math-preview { overflow-x: auto; text-align: center; }
 .kb-math-inline {

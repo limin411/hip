@@ -25,10 +25,11 @@ export const calloutBlockSpec = createReactBlockSpec(
   {
     parse: (el) => {
       if (el.getAttribute('data-hip-block') !== 'callout') return undefined
+      const bodyAttr = el.getAttribute('data-body')
       return {
         type: normalizeType(el.getAttribute('data-type') ?? 'note'),
         title: el.getAttribute('data-title') ?? '',
-        body: el.textContent ?? '',
+        body: bodyAttr != null && bodyAttr !== '' ? bodyAttr : (el.textContent ?? ''),
       }
     },
     toExternalHTML: ({ block }) => (
@@ -36,10 +37,9 @@ export const calloutBlockSpec = createReactBlockSpec(
         data-hip-block="callout"
         data-type={normalizeType(String(block.props.type ?? 'note'))}
         data-title={String(block.props.title ?? '')}
+        data-body={String(block.props.body ?? '')}
         data-callout={normalizeType(String(block.props.type ?? 'note'))}
-      >
-        {String(block.props.body ?? '')}
-      </div>
+      />
     ),
     render: ({ block, editor }) => (
       <CalloutView

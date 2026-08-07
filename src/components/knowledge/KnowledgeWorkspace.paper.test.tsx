@@ -54,10 +54,6 @@ vi.mock('./DocBlockNoteEditor', async () => {
   }
 })
 
-vi.mock('./MarkdownToolbar', () => ({
-  MarkdownToolbar: () => <div data-testid="knowledge-md-toolbar" />,
-}))
-
 vi.mock('@/ipc/dialog', () => ({
   pickAttachmentFiles: vi.fn(),
   pickSavePath: vi.fn(),

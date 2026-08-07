@@ -51,6 +51,8 @@ export interface DocEditorProps {
   /** Toast/surface import failures (too large, unsupported). */
   onAssetImportError?: (reason: 'too_large_paste' | 'too_large_disk' | 'unsupported' | 'error') => void
   onAssetImported?: () => void
+  /** Slash `/image` opens the OS attach picker (same as Live; K10). */
+  onRequestAttach?: () => void
   /** Current space nodes for `[[` wiki title completion (same space). */
   wikiNodes?: KnowledgeNode[]
 }
@@ -215,6 +217,7 @@ export const DocEditor = forwardRef<DocEditorHandle, DocEditorProps>(function Do
     spaceId,
     onAssetImportError,
     onAssetImported,
+    onRequestAttach,
     wikiNodes,
   },
   ref,
@@ -256,6 +259,8 @@ export const DocEditor = forwardRef<DocEditorHandle, DocEditorProps>(function Do
   onAssetImportErrorRef.current = onAssetImportError
   const onAssetImportedRef = useRef(onAssetImported)
   onAssetImportedRef.current = onAssetImported
+  const onRequestAttachRef = useRef(onRequestAttach)
+  onRequestAttachRef.current = onRequestAttach
   const wikiNodesRef = useRef(wikiNodes ?? [])
   wikiNodesRef.current = wikiNodes ?? []
 
@@ -483,6 +488,16 @@ export const DocEditor = forwardRef<DocEditorHandle, DocEditorProps>(function Do
       const view = viewRef.current
       const match = slashMatchRef.current
       if (!view || !match || view.composing) return
+      // Slash `/image` opens the OS attach picker (same as Live). CodeMirror has
+      // no native suggestion host, so consume the `/trigger` text before opening.
+      if (item.id === 'image' && onRequestAttachRef.current) {
+        applySlashInsert(view, match.from, match.to, '', 0)
+        pushDraftOnce(view.state.doc.toString())
+        updateSlashMatch(null)
+        view.focus()
+        window.setTimeout(() => onRequestAttachRef.current?.(), 0)
+        return
+      }
       const prepared = prepareSlashInsert(view.state.doc.toString(), match.from, item)
       if (
         applySlashInsert(

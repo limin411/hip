@@ -11,7 +11,6 @@ import {
   expectKnowledgeReader,
   closeKnowledgeChipIfOpen,
   setKnowledgeDocTitle,
-  clickKnowledgeBold,
   installSavePathSeam,
   clearSavePathSeam,
   exportActiveDocTo,
@@ -144,10 +143,10 @@ describe('knowledge editor ux @knowledge @core', () => {
     )
   })
 
-  it('KE11: markdown toolbar bold wraps selection', async () => {
+  it('KE11: Mod-b bold wraps selection (toolbar retired, slash/keyboard paths)', async () => {
     await expectKnowledgeEditor()
     const content = await browser.$('[data-testid="knowledge-doc-editor"] .cm-content')
-    // Select all then bold
+    // Select all then bold via the editor keymap (same semantics as the old toolbar).
     await browser.execute((el: HTMLElement) => {
       el.focus()
       const sel = window.getSelection()
@@ -156,7 +155,7 @@ describe('knowledge editor ux @knowledge @core', () => {
       sel?.removeAllRanges()
       sel?.addRange(range)
     }, content)
-    await clickKnowledgeBold()
+    await browser.keys(['Meta', 'b', 'Meta'])
     await browser.pause(200)
     const text = await content.getText()
     expect(text.includes('**') || text.includes(marker)).toBe(true)

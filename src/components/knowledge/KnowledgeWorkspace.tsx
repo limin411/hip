@@ -5,7 +5,6 @@ import {
   ChevronRight,
   Download,
   FilePlus,
-  ImagePlus,
   History,
   MoreHorizontal,
   Network,
@@ -67,7 +66,6 @@ import { SpaceTree } from './SpaceTree'
 import { DocEditor, type DocEditorHandle } from './DocEditor'
 import type { DocLiveEditorHandle } from './DocBlockNoteEditor'
 import { InlineDocTitle } from './InlineDocTitle'
-import { MarkdownToolbar } from './MarkdownToolbar'
 import { KnowledgeDocCanvas } from './KnowledgeDocCanvas'
 import { WikiCreateModal } from './WikiCreateModal'
 import { KnowledgeGraphModal } from './KnowledgeGraphModal'
@@ -1066,30 +1064,6 @@ export function KnowledgeWorkspace() {
                   {t('knowledge.doc.largeDocHint')}
                 </div>
               ) : null}
-              <div className="mt-3 mb-2 flex shrink-0 items-center gap-0.5 rounded-lg border border-border/80 bg-surface-muted/60 px-1 py-0.5">
-                <MarkdownToolbar
-                  className="mb-0 border-0 bg-transparent p-0 opacity-100"
-                  getView={() => editorRef.current?.getView() ?? null}
-                  onAfterEdit={(text) =>
-                    setDraftBody(text, { docId: activeDocId })
-                  }
-                />
-                <span className="mx-0.5 h-4 w-px bg-border" aria-hidden />
-                <Button
-                  type="button"
-                  size="icon"
-                  variant="ghost"
-                  className="h-7 w-7"
-                  title={t('knowledge.asset.attach')}
-                  aria-label={t('knowledge.asset.attach')}
-                  data-testid="knowledge-attach-asset"
-                  disabled={busy || !activeSpaceId}
-                  onMouseDown={(e) => e.preventDefault()}
-                  onClick={() => void attachFiles()}
-                >
-                  <ImagePlus size={14} />
-                </Button>
-              </div>
               <DocEditor
                 ref={editorRef}
                 key={`${activeDocId}-source`}
@@ -1100,6 +1074,7 @@ export function KnowledgeWorkspace() {
                 onBlur={() => void flushSave()}
                 onSave={() => void flushSave()}
                 onAssetImportError={toastAssetError}
+                onRequestAttach={() => void attachFiles()}
                 placeholder={t('knowledge.doc.placeholder')}
                 wikiNodes={nodes}
               />

@@ -346,11 +346,6 @@ export async function setKnowledgeDocTitle(title: string): Promise<void> {
 }
 
 /** Click markdown toolbar bold (Source toolbar). */
-export async function clickKnowledgeBold(): Promise<void> {
-  await ensureKnowledgeSource()
-  await clickTestId('knowledge-md-bold')
-}
-
 /** Install e2e save-dialog seam returning a fixed path. */
 export async function installSavePathSeam(path: string): Promise<void> {
   await browser.execute((p: string) => {
@@ -1498,7 +1493,10 @@ export async function clickFilterTag(tag: string): Promise<void> {
 export async function attachAssetFromPath(absPath: string): Promise<void> {
   await ensureKnowledgeSource()
   await installPickAttachmentFilesSeam([absPath])
-  await clickTestId('knowledge-attach-asset')
+  // Toolbar retired — attach via slash `/image` (same entry as Live).
+  await typeInKnowledgeEditor('/image')
+  await browser.pause(200)
+  await clickTestId('knowledge-slash-image')
   await browser.pause(600)
   await clearPickAttachmentFilesSeam()
   await waitForSaveStatusSaved(15000)

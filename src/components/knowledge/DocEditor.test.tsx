@@ -246,4 +246,46 @@ describe('DocEditor', () => {
     expect(onDraftChange).toHaveBeenCalledWith('# ')
     expect(screen.queryByTestId('knowledge-slash-menu')).not.toBeInTheDocument()
   })
+
+  it('slash /image consumes the trigger and opens the attach picker (K10)', async () => {
+    const onRequestAttach = vi.fn()
+    const onDraftChange = vi.fn()
+    render(
+      <DocEditor
+        docId="d1"
+        initialValue="/image"
+        onDraftChange={onDraftChange}
+        onRequestAttach={onRequestAttach}
+      />,
+    )
+    const trackerView = makeFakeView('/image', 6)
+    applySlashInsert.mockImplementation((v: unknown) => {
+      const view = v as { state: { doc: { toString: () => string } } }
+      Object.assign(view.state.doc, { toString: () => '' })
+      return true
+    })
+    act(() => {
+      updateListenerCb?.({
+        docChanged: true,
+        selectionSet: true,
+        view: trackerView,
+      })
+    })
+    expect(screen.getByTestId('knowledge-slash-menu')).toBeInTheDocument()
+    fireEvent.click(screen.getByTestId('knowledge-slash-image'))
+    // trigger text consumed (empty insert) + draft pushed, menu closed
+    expect(applySlashInsert).toHaveBeenCalledTimes(1)
+    const args = applySlashInsert.mock.calls[0]!
+    expect(args[1]).toBe(0)
+    expect(args[2]).toBe(6)
+    expect(args[3]).toBe('')
+    expect(args[4]).toBe(0)
+    expect(onDraftChange).toHaveBeenCalledWith('')
+    expect(screen.queryByTestId('knowledge-slash-menu')).not.toBeInTheDocument()
+    // picker opens on the deferred callback
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 10))
+    })
+    expect(onRequestAttach).toHaveBeenCalledTimes(1)
+  })
 })

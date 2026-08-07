@@ -3,6 +3,8 @@ import { normalizeSessionConfig } from '@hip/protocol'
 import type { SessionConfig } from '@hip/protocol'
 import type { SessionVM } from './types'
 
+/** Clear a session's pending permission request once the user has responded. Matches by
+ *  requestId so a stale/already-replaced request can't clobber a newer one. No-op if none match. */
 export function clearPermission(state: { sessions: SessionVM[] }, requestId: string): { sessions: SessionVM[] } {
   if (!state.sessions.some((s) => s.pendingPermission?.requestId === requestId)) return state
   return {

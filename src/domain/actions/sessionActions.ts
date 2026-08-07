@@ -14,6 +14,7 @@ import { nanoid } from 'nanoid'
 import type { Transport } from '../transport'
 import { useDomainStore, DEFAULT_CONFIG } from '../sessionStore'
 import { isFeOnlyPlanApproval, unmarkFeOnlyPlanApproval } from '../e2eHooks'
+import type { SessionService } from '../sessionService'
 import { ptyKill } from '@/ipc/pty'
 import type { LocalAttachment } from '@/components/chat/attachmentTypes'
 import { useDiffStore } from '@/store/diffStore'
@@ -99,6 +100,9 @@ export class SessionActions {
   constructor(
     private readonly transport: Transport,
     private readonly inject: (msg: ServerMessage) => void,
+    /** Facade reference: internal cross-calls (resume/respondPlan) go through the
+     *  facade forwards so tests spying on sessionService methods keep intercepting. */
+    private readonly svc: Pick<SessionService, 'resume' | 'respondPlan'>,
   ) {}
 
   /**
@@ -526,11 +530,11 @@ export class SessionActions {
     // Product CTA is sticky panel plan:respond; composer is blocked in InputBar.
     if (active?.planApprovalPending) {
       // Amend is text-only over plan:respond (attachments not on wire).
-      this.respondPlan('amend', text || undefined)
+      this.svc.respondPlan('amend', text || undefined)
       return
     }
     // Non-plan interrupt continues via message:resume.
-    if (active?.interrupt) { this.resume(text, attachments); return }
+    if (active?.interrupt) { this.svc.resume(text, attachments); return }
     let { activeSessionId } = st
     if (!activeSessionId) {
       // Commit the draft: create a real (persisted) session, then send.

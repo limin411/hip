@@ -70,7 +70,7 @@ export class SessionService {
   constructor(transport: Transport) {
     this.memoryWire = new MemoryWire(transport, this.waiter)
     this.fsActions = new FsActions(transport)
-    this.sessionActions = new SessionActions(transport, (msg) => this.receive(msg))
+    this.sessionActions = new SessionActions(transport, (msg) => this.receive(msg), this)
     this.transport = transport
     this.streamCoalescer = new StreamCoalescer((bucket) => this.applyCoalescedToken(bucket))
     this.unsubscribe = this.transport.onMessage((msg: ServerMessage) => this.receive(msg))

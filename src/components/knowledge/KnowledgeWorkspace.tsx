@@ -1,12 +1,6 @@
 import { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import {
-  Panel,
-  PanelGroup,
-  PanelResizeHandle,
-  type ImperativePanelHandle,
-} from 'react-resizable-panels'
-import {
   BookOpen,
   ChevronRight,
   Download,
@@ -38,7 +32,6 @@ import type { KnowledgeNode, KnowledgeVersionEntry } from '@/domain/knowledge/ty
 import { formatAbsolute } from '@/lib/datetime'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/Button'
-import { SegmentedControl } from '@/components/ui/SegmentedControl'
 import { Modal } from '@/components/ui/Modal'
 import { Input } from '@/components/ui/Input'
 import { EmptyState } from '@/components/ui/EmptyState'
@@ -75,7 +68,6 @@ import { DocEditor, type DocEditorHandle } from './DocEditor'
 import type { DocLiveEditorHandle } from './DocBlockNoteEditor'
 import { InlineDocTitle } from './InlineDocTitle'
 import { MarkdownToolbar } from './MarkdownToolbar'
-import { LiveMarkdownPreview } from './LiveMarkdownPreview'
 import { KnowledgeDocCanvas } from './KnowledgeDocCanvas'
 import { WikiCreateModal } from './WikiCreateModal'
 import { KnowledgeGraphModal } from './KnowledgeGraphModal'
@@ -98,7 +90,6 @@ export function KnowledgeWorkspace() {
   // the whole workspace (tree, chrome, toolbars). Editors keep local state; store
   // draft is read via getState() on mount / export / mode switch.
   const editorMode = useKnowledgeStore((s) => s.editorMode)
-  const sourceLayout = useKnowledgeStore((s) => s.sourceLayout)
   const busy = useKnowledgeStore((s) => s.busy)
   const saveState = useKnowledgeStore((s) => s.saveState)
   const requestCreateDoc = useKnowledgeStore((s) => s.requestCreateDoc)
@@ -107,7 +98,6 @@ export function KnowledgeWorkspace() {
   const rewriteWikiLinksAfterRename = useKnowledgeStore((s) => s.rewriteWikiLinksAfterRename)
   const deleteNode = useKnowledgeStore((s) => s.deleteNode)
   const setEditorMode = useKnowledgeStore((s) => s.setEditorMode)
-  const setSourceLayout = useKnowledgeStore((s) => s.setSourceLayout)
   const setDraftBody = useKnowledgeStore((s) => s.setDraftBody)
   const flushSave = useKnowledgeStore((s) => s.flushSave)
   const toggleFolder = useKnowledgeStore((s) => s.toggleFolder)
@@ -127,24 +117,6 @@ export function KnowledgeWorkspace() {
   const editorRef = useRef<DocEditorHandle>(null)
   /** Live host handle for attach/paste (PR-2); wired now for insertMarkdown. */
   const liveEditorRef = useRef<DocLiveEditorHandle>(null)
-  const editorPanelRef = useRef<ImperativePanelHandle>(null)
-  const previewPanelRef = useRef<ImperativePanelHandle>(null)
-  // Apply panel sizes when switching source ↔ split (defaultSize only applies on mount).
-  useEffect(() => {
-    if (!activeDocId) return
-    if (sourceLayout === 'split') {
-      // defer so preview panel is mounted
-      requestAnimationFrame(() => {
-        editorPanelRef.current?.resize(50)
-        previewPanelRef.current?.resize(50)
-      })
-    } else {
-      requestAnimationFrame(() => {
-        editorPanelRef.current?.resize(100)
-      })
-    }
-  }, [sourceLayout, activeDocId])
-
   const [treeFilter, setTreeFilter] = useState('')
   const [filterExpandSnapshot, setFilterExpandSnapshot] = useState<Record<
     string,
@@ -928,19 +900,6 @@ export function KnowledgeWorkspace() {
               </button>
             </div>
           )}
-          {activeDocId && !isBoard && showSourceEditor && (
-            <SegmentedControl
-              data-testid="knowledge-layout-toggle"
-              aria-label={t('knowledge.doc.layoutLabel')}
-              size="sm"
-              value={sourceLayout}
-              onChange={(v) => setSourceLayout(v)}
-              options={[
-                { value: 'source', label: t('knowledge.doc.layoutSource') },
-                { value: 'split', label: t('knowledge.doc.layoutSplit') },
-              ]}
-            />
-          )}
           {activeDocId && !isBoard && (
             /* modal={false}: modal menu + version-history / save-as-template Modal both lock
                 body pointer-events; stacking leaves the app unclickable after close. */
@@ -1088,116 +1047,62 @@ export function KnowledgeWorkspace() {
           <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
             <KnowledgeDocCanvas
               className="min-h-0 flex-1"
-              paperClassName={cn(
-                'overflow-hidden',
-                // Split preview: tighter horizontal padding so both panes breathe.
-                sourceLayout === 'split' && 'px-4 sm:px-4 lg:px-4',
-              )}
+              paperClassName="overflow-hidden"
             >
-              {/*
-                Stable PanelGroup shell so DocEditor is not remounted when
-                toggling source ↔ split (left Panel stays mounted).
-              */}
-              <PanelGroup direction="horizontal" className="min-h-0 flex-1">
-                <Panel
-                  ref={editorPanelRef}
-                  id="kb-editor"
-                  order={1}
-                  defaultSize={sourceLayout === 'split' ? 50 : 100}
-                  minSize={sourceLayout === 'split' ? 28 : 40}
-                  className="flex min-h-0 min-w-0 flex-col"
+              <InlineDocTitle
+                docId={activeDocId}
+                title={activeNode?.title ?? t('knowledge.doc.untitled')}
+                onCommit={(title) => void renameNode(activeDocId, title)}
+                onEnterCommit={() => {
+                  editorRef.current?.focus()
+                }}
+              />
+              {liveSuppressed ? (
+                <div
+                  className="mt-2 rounded-md border border-border bg-surface-muted/80 px-3 py-2 text-meta text-ink-secondary"
+                  data-testid="knowledge-large-doc-banner"
+                  role="status"
                 >
-                  <div className="flex h-full min-h-0 w-full flex-col">
-                    <InlineDocTitle
-                      docId={activeDocId}
-                      title={activeNode?.title ?? t('knowledge.doc.untitled')}
-                      onCommit={(title) => void renameNode(activeDocId, title)}
-                      onEnterCommit={() => {
-                        editorRef.current?.focus()
-                      }}
-                    />
-                    {liveSuppressed ? (
-                      <div
-                        className="mt-2 rounded-md border border-border bg-surface-muted/80 px-3 py-2 text-meta text-ink-secondary"
-                        data-testid="knowledge-large-doc-banner"
-                        role="status"
-                      >
-                        {t('knowledge.doc.largeDocHint')}
-                      </div>
-                    ) : null}
-                    <div className="mt-3 mb-2 flex shrink-0 items-center gap-0.5 rounded-lg border border-border/80 bg-surface-muted/60 px-1 py-0.5">
-                      <MarkdownToolbar
-                        className="mb-0 border-0 bg-transparent p-0 opacity-100"
-                        getView={() => editorRef.current?.getView() ?? null}
-                        onAfterEdit={(text) =>
-                          setDraftBody(text, { docId: activeDocId })
-                        }
-                      />
-                      <span className="mx-0.5 h-4 w-px bg-border" aria-hidden />
-                      <Button
-                        type="button"
-                        size="icon"
-                        variant="ghost"
-                        className="h-7 w-7"
-                        title={t('knowledge.asset.attach')}
-                        aria-label={t('knowledge.asset.attach')}
-                        data-testid="knowledge-attach-asset"
-                        disabled={busy || !activeSpaceId}
-                        onMouseDown={(e) => e.preventDefault()}
-                        onClick={() => void attachFiles()}
-                      >
-                        <ImagePlus size={14} />
-                      </Button>
-                    </div>
-                    <DocEditor
-                      ref={editorRef}
-                      key={`${activeDocId}-source`}
-                      docId={activeDocId}
-                      initialValue={mountMarkdown}
-                      spaceId={activeSpaceId}
-                      onDraftChange={(v) => setDraftBody(v, { docId: activeDocId })}
-                      onBlur={() => void flushSave()}
-                      onSave={() => void flushSave()}
-                      onAssetImportError={toastAssetError}
-                      placeholder={t('knowledge.doc.placeholder')}
-                      wikiNodes={nodes}
-                    />
-                  </div>
-                </Panel>
-                {sourceLayout === 'split' && (
-                  <>
-                    <PanelResizeHandle
-                      className="group relative z-10 flex w-3 items-center justify-center bg-transparent"
-                      data-testid="knowledge-split-handle"
-                    >
-                      <div
-                        className="absolute inset-y-0 left-1/2 w-px -translate-x-1/2 bg-transparent transition-colors group-hover:bg-accent/30 group-data-[resize-handle-state=drag]:bg-accent/50"
-                        aria-hidden
-                      />
-                      <div
-                        className="relative h-7 w-[3px] rounded-full bg-border transition-colors group-hover:bg-accent/70 group-data-[resize-handle-state=drag]:bg-accent"
-                        aria-hidden
-                      />
-                    </PanelResizeHandle>
-                    <Panel
-                      ref={previewPanelRef}
-                      id="kb-preview"
-                      order={2}
-                      defaultSize={50}
-                      minSize={25}
-                      className="min-h-0 min-w-0 border-l border-border bg-surface"
-                    >
-                      <LiveMarkdownPreview
-                        nodes={nodes}
-                        onWikiNavigate={(docId) => {
-                          if (docId) void openDoc(docId)
-                        }}
-                        onWikiBroken={(title) => setWikiCreateTitle(title)}
-                      />
-                    </Panel>
-                  </>
-                )}
-              </PanelGroup>
+                  {t('knowledge.doc.largeDocHint')}
+                </div>
+              ) : null}
+              <div className="mt-3 mb-2 flex shrink-0 items-center gap-0.5 rounded-lg border border-border/80 bg-surface-muted/60 px-1 py-0.5">
+                <MarkdownToolbar
+                  className="mb-0 border-0 bg-transparent p-0 opacity-100"
+                  getView={() => editorRef.current?.getView() ?? null}
+                  onAfterEdit={(text) =>
+                    setDraftBody(text, { docId: activeDocId })
+                  }
+                />
+                <span className="mx-0.5 h-4 w-px bg-border" aria-hidden />
+                <Button
+                  type="button"
+                  size="icon"
+                  variant="ghost"
+                  className="h-7 w-7"
+                  title={t('knowledge.asset.attach')}
+                  aria-label={t('knowledge.asset.attach')}
+                  data-testid="knowledge-attach-asset"
+                  disabled={busy || !activeSpaceId}
+                  onMouseDown={(e) => e.preventDefault()}
+                  onClick={() => void attachFiles()}
+                >
+                  <ImagePlus size={14} />
+                </Button>
+              </div>
+              <DocEditor
+                ref={editorRef}
+                key={`${activeDocId}-source`}
+                docId={activeDocId}
+                initialValue={mountMarkdown}
+                spaceId={activeSpaceId}
+                onDraftChange={(v) => setDraftBody(v, { docId: activeDocId })}
+                onBlur={() => void flushSave()}
+                onSave={() => void flushSave()}
+                onAssetImportError={toastAssetError}
+                placeholder={t('knowledge.doc.placeholder')}
+                wikiNodes={nodes}
+              />
             </KnowledgeDocCanvas>
           </div>
         ) : null}

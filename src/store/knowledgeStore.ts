@@ -113,29 +113,6 @@ const RECENT_KEY = 'hip-knowledge-recent'
 const RECENT_CAP = KNOWLEDGE_RECENT_CAP
 /** Per-space folder expand map: `Record<spaceId, Record<folderId, true>>`. */
 const EXPANDED_KEY = 'hip-knowledge-expanded-v1'
-/** Source-mode layout: single column vs split live preview (persisted). */
-const LAYOUT_KEY = 'hip-knowledge-source-layout'
-
-export type KnowledgeSourceLayout = 'source' | 'split'
-
-function loadSourceLayout(): KnowledgeSourceLayout {
-  if (typeof localStorage === 'undefined') return 'source'
-  try {
-    const v = localStorage.getItem(LAYOUT_KEY)
-    return v === 'split' ? 'split' : 'source'
-  } catch {
-    return 'source'
-  }
-}
-
-function persistSourceLayout(layout: KnowledgeSourceLayout) {
-  if (typeof localStorage === 'undefined') return
-  try {
-    localStorage.setItem(LAYOUT_KEY, layout)
-  } catch {
-    // ignore quota
-  }
-}
 
 function loadRecent(): KnowledgeRecentItem[] {
   if (typeof localStorage === 'undefined') return []
@@ -339,8 +316,6 @@ interface KnowledgeState {
   draftBody: string
   /** live | source | preview — Live is product-on; opt out via hip-knowledge-live=false. */
   editorMode: EditorMode
-  /** Source-mode layout: single column vs split live preview (persisted). */
-  sourceLayout: KnowledgeSourceLayout
   mode: 'home' | 'workspace'
   searchQuery: string
   searchHits: KnowledgeSearchHit[]
@@ -439,8 +414,6 @@ interface KnowledgeState {
   openDoc: (id: string) => Promise<void>
   /** Switch Live / Source / Preview. Live without flag clamps to Source. */
   setEditorMode: (mode: EditorMode) => Promise<void>
-  /** Switch Source layout between single-column and split live preview. */
-  setSourceLayout: (layout: KnowledgeSourceLayout) => void
   /**
    * Update draft body. Default persist mode: 'auto' when shouldAutosave(mode)
    * (live|source), 'none' in preview. Pass `persist: 'now'` for immediate flush
@@ -648,7 +621,6 @@ export const useKnowledgeStore = create<KnowledgeState>((set, get) => ({
   docBody: '',
   draftBody: '',
   editorMode: 'live',
-  sourceLayout: loadSourceLayout(),
   mode: 'home',
   searchQuery: '',
   searchHits: [],
@@ -1608,13 +1580,6 @@ export const useKnowledgeStore = create<KnowledgeState>((set, get) => ({
       const docId = get().activeDocId
       if (docId) persistDocEditorMode(docId, next)
     }
-  },
-
-  setSourceLayout: (layout) => {
-    if (layout !== 'source' && layout !== 'split') return
-    if (get().sourceLayout === layout) return
-    persistSourceLayout(layout)
-    set({ sourceLayout: layout })
   },
 
   setDraftBody: (v, opts) => {

@@ -263,25 +263,6 @@ export async function toggleKnowledgePreviewOrEdit(): Promise<void> {
   }
 }
 
-/**
- * Select the Source-mode layout on knowledge-layout-toggle (0=source, 1=split).
- * Requires the Source writing surface (split live preview only exists there).
- */
-export async function setKnowledgeLayout(layout: 'source' | 'split'): Promise<void> {
-  const toggle = await browser.$('[data-testid="knowledge-layout-toggle"]')
-  await toggle.waitForExist({ timeout: 10000 })
-  const idx = layout === 'split' ? 1 : 0
-  await browser.execute(
-    (root: HTMLElement, i: number) => {
-      const tabs = Array.from(root.querySelectorAll('[role="tab"]')) as HTMLElement[]
-      tabs[i]?.click()
-    },
-    toggle,
-    idx,
-  )
-  await browser.pause(150)
-}
-
 export async function expectKnowledgeEditor(): Promise<void> {
   await (await browser.$('[data-testid="knowledge-doc-editor"]')).waitForExist({
     timeout: 10000,

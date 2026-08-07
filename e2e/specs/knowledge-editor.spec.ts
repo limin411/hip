@@ -7,8 +7,6 @@ import {
   createDocAndExpectEditor,
   typeInKnowledgeEditor,
   toggleKnowledgePreviewOrEdit,
-  ensureKnowledgeSource,
-  setKnowledgeLayout,
   expectKnowledgeEditor,
   expectKnowledgeReader,
   closeKnowledgeChipIfOpen,
@@ -144,20 +142,6 @@ describe('knowledge editor ux @knowledge @core', () => {
       async () => (await tree.getText()).includes(renamedTitle),
       { timeout: 10000, interval: 200, timeoutMsg: 'tree missing renamed title' },
     )
-  })
-
-  it('KE10: split layout shows real-time preview with marker', async () => {
-    await ensureKnowledgeSource()
-    await expectKnowledgeEditor()
-    await setKnowledgeLayout('split')
-    const live = await browser.$('[data-testid="knowledge-live-preview"]')
-    await live.waitForExist({ timeout: 10000 })
-    await browser.waitUntil(
-      async () => (await live.getText()).includes(marker),
-      { timeout: 10000, interval: 200, timeoutMsg: 'live preview missing marker' },
-    )
-    // restore source for later tests
-    await setKnowledgeLayout('source')
   })
 
   it('KE11: markdown toolbar bold wraps selection', async () => {

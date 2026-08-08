@@ -47,9 +47,6 @@ import {
 import { isSpaceNameTaken, normalizeSpaceName } from '@/domain/knowledge/spaceName'
 import {
   type EditorMode,
-  loadDocEditorMode,
-  persistDocEditorMode,
-  persistEditorModePref,
   resolveEditorMode,
   shouldAutosave,
 } from '@/domain/knowledge/editorMode'
@@ -347,7 +344,7 @@ interface KnowledgeState {
   activeDocId: string | null
   docBody: string
   draftBody: string
-  /** live | source | preview — Live is product-on; opt out via hip-knowledge-live=false. */
+  /** V2-E0: 恒为 'live'（用户路径）；'source' 仅内部兜底；'preview' 仅历史兼容。 */
   editorMode: EditorMode
   mode: 'home' | 'workspace'
   /** 当前目录 id（null = 根目录）。文档管理 v2 单层级导航：侧边栏/主区只显示当前层级。 */
@@ -458,8 +455,8 @@ interface KnowledgeState {
   setEditorMode: (mode: EditorMode) => Promise<void>
   /**
    * Update draft body. Default persist mode: 'auto' when shouldAutosave(mode)
-   * (live|source), 'none' in preview. Pass `persist: 'now'` for immediate flush
-   * (e.g. preview task write-back).
+   * (V2-E0: live/source 均可写；preview 已无写入路径). Pass `persist: 'now'`
+   * for immediate flush.
    *
    * Pass `docId` from the editor instance that produced the draft. If it does
    * not match `activeDocId`, the update is ignored (prevents Live unmount after
@@ -1606,13 +1603,11 @@ export const useKnowledgeStore = create<KnowledgeState>((set, get) => ({
       }
 
 
-      // Prefer per-doc mode memory (P1.6); default Live when unset. Large docs force Source.
-      const remembered = loadDocEditorMode(id)
-      let editorMode = resolveEditorMode(remembered ?? 'live')
-      // Large docs force Source (Live cost); toast once per open.
+      // V2-E0: live 恒为唯一编辑表面；超大文档自动降级 source（内部兜底，无 toast——
+      // 非侵入提示由 KnowledgeWorkspace 的兼容视图 banner 负责）。
+      let editorMode = resolveEditorMode('live')
       if (editorMode === 'live' && body.length > KNOWLEDGE_LARGE_DOC_CHARS) {
         editorMode = 'source'
-        toast.message(i18n.t('knowledge.doc.largeDocForceSource'))
       }
       // Single set: body + selection + recent — avoid double React render on open.
       set((s) => {
@@ -1669,23 +1664,11 @@ export const useKnowledgeStore = create<KnowledgeState>((set, get) => ({
     if (next === 'live') {
       const len = Math.max(get().draftBody.length, get().docBody.length)
       if (len > KNOWLEDGE_LARGE_DOC_CHARS) {
-        toast.message(i18n.t('knowledge.doc.largeDocForceSource'))
         next = 'source'
       }
     }
     if (next === get().editorMode) return
-    // Leaving legacy preview (if still in state): reseed from last-saved body.
-    // live ↔ source: keep dirty draft — do not drop in-flight edits within the autosave window.
-    if (get().editorMode === 'preview') {
-      set({ editorMode: next, draftBody: get().docBody })
-    } else {
-      set({ editorMode: next })
-    }
-    if (next === 'live' || next === 'source') {
-      persistEditorModePref(next)
-      const docId = get().activeDocId
-      if (docId) persistDocEditorMode(docId, next)
-    }
+    set({ editorMode: next })
   },
 
   setDraftBody: (v, opts) => {

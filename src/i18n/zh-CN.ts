@@ -2786,6 +2786,8 @@ export const zhCN = {
         saveRetry: '重试',
         liveLoading: '正在加载实时编辑器…',
         liveParseFailed: '实时编辑器无法打开此文档，已切换到源码模式。',
+        compatView: '已进入兼容视图：文档较大或实时渲染失败，当前以纯文本方式编辑，内容仍完整可编辑。',
+        compatViewClose: '知道了',
         largeDocForceSource: '文档过大，实时编辑不可用，已切换到源码模式。',
         largeDocHint:
           '文档较大，为性能考虑当前使用源码模式编辑。你仍可完整编辑全文。',

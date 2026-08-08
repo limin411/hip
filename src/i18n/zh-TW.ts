@@ -2745,6 +2745,8 @@ export const zhTW = {
       "saveRetry": "重試",
       "liveLoading": "正在載入即時編輯器…",
       "liveParseFailed": "即時編輯器無法開啟此文件，已切換到原始碼模式。",
+      "compatView": "已進入相容檢視：文件較大或即時渲染失敗，目前以純文字方式編輯，內容仍完整可編輯。",
+      "compatViewClose": "知道了",
       "largeDocForceSource": "文件過大，即時編輯不可用，已切換到原始碼模式。",
       "largeDocHint": "文件較大，為效能考慮目前使用原始碼模式編輯。你仍可完整編輯全文。",
       "findPlaceholder": "在文件中查詢",

@@ -49,6 +49,10 @@ import {
   revealLineInCodeMirror,
 } from '@/domain/knowledge/searchReveal'
 import { extractDocOutline } from '@/domain/knowledge/mdPreview'
+import {
+  dismissCompatBanner,
+  isCompatDismissed,
+} from '@/domain/knowledge/editorMode'
 import { DocManagerBrowse } from './DocManagerBrowse'
 import { DocEditor, type DocEditorHandle } from './DocEditor'
 import type { DocLiveEditorHandle } from './DocBlockNoteEditor'
@@ -373,7 +377,7 @@ export function KnowledgeWorkspace() {
   }
 
   const onLiveParseError = () => {
-    toast.error(t('knowledge.doc.liveParseFailed'))
+    // V2-E0: 内部兜底（无 toast——非侵入提示由兼容视图 banner 负责）。
     if (activeDocId) {
       setLiveBlock({ docId: activeDocId, token: liveAttemptTokenRef.current })
     }
@@ -657,59 +661,10 @@ export function KnowledgeWorkspace() {
               ) : null}
             </span>
           )}
-          {activeDocId && !isBoard && liveEnabled && !liveBlocked && (
-            <div
-              className="flex shrink-0 items-center rounded-md border border-border bg-surface-muted/70 p-0.5"
-              role="group"
-              aria-label={t('knowledge.doc.modeLabel')}
-              data-testid="knowledge-editor-mode-toggle"
-            >
-              <button
-                type="button"
-                data-testid="knowledge-view-live"
-                disabled={liveSuppressed && !showLiveEditor}
-                title={
-                  liveSuppressed && !showLiveEditor
-                    ? t('knowledge.doc.largeDocForceSource')
-                    : undefined
-                }
-                className={cn(
-                  'rounded-sm px-2 py-0.5 text-meta transition-colors',
-                  showLiveEditor
-                    ? 'bg-surface font-medium text-ink shadow-sm'
-                    : 'text-ink-secondary hover:text-ink',
-                  liveSuppressed && !showLiveEditor && 'opacity-40',
-                )}
-                onClick={() => {
-                  if (showLiveEditor) return
-                  liveEditorRef.current?.flushDraft()
-                  void setEditorMode('live')
-                }}
-              >
-                {t('knowledge.doc.live')}
-              </button>
-              <button
-                type="button"
-                data-testid="knowledge-view-source"
-                className={cn(
-                  'rounded-sm px-2 py-0.5 text-meta transition-colors',
-                  showSourceEditor
-                    ? 'bg-surface font-medium text-ink shadow-sm'
-                    : 'text-ink-secondary hover:text-ink',
-                )}
-                onClick={() => {
-                  if (showSourceEditor) return
-                  liveEditorRef.current?.flushDraft()
-                  void setEditorMode('source')
-                }}
-              >
-                {t('knowledge.doc.source')}
-              </button>
-            </div>
-          )}
           {activeDocId && !isBoard && (
-            /* modal={false}: modal menu + version-history / save-as-template Modal both lock
-                body pointer-events; stacking leaves the app unclickable after close. */
+            /* V2-E0: 无源码模式切换 UI（live 唯一编辑表面；source 仅内部兜底）。
+               modal={false}: modal menu + version-history / save-as-template Modal both lock
+               body pointer-events; stacking leaves the app unclickable after close. */
             <DropdownMenu modal={false}>
               <DropdownMenuTrigger asChild>
                 <button
@@ -869,14 +824,33 @@ export function KnowledgeWorkspace() {
                   editorRef.current?.focus()
                 }}
               />
-              {liveSuppressed ? (
-                <div className="knowledge-doc-inline-pad mt-2" data-testid="knowledge-large-doc-banner-wrap">
+              {liveSuppressed && activeDocId && !isCompatDismissed(activeDocId) ? (
+                <div
+                  className="knowledge-doc-inline-pad mt-2"
+                  data-testid="knowledge-compat-banner-wrap"
+                >
                   <div
-                    className="knowledge-doc-measure rounded-md border border-border bg-surface-muted/80 px-3 py-2 text-meta text-ink-secondary"
-                    data-testid="knowledge-large-doc-banner"
+                    className="knowledge-doc-measure flex items-center gap-2 rounded-md border border-border bg-surface-muted/80 px-3 py-2 text-meta text-ink-secondary"
+                    data-testid="knowledge-compat-banner"
                     role="status"
                   >
-                    {t('knowledge.doc.largeDocHint')}
+                    <span className="min-w-0 flex-1">
+                      {t('knowledge.doc.compatView')}
+                    </span>
+                    <button
+                      type="button"
+                      data-no-drag
+                      data-testid="knowledge-compat-banner-close"
+                      onClick={() => {
+                        if (!activeDocId) return
+                        dismissCompatBanner(activeDocId)
+                        // 关闭 = 免打扰 24h + 重试 live（大文档会静默回到兼容视图）。
+                        void setEditorMode('live')
+                      }}
+                      className="shrink-0 rounded-sm px-1.5 py-0.5 text-caption font-medium text-accent-strong transition-colors hover:bg-state-hover"
+                    >
+                      {t('knowledge.doc.compatViewClose')}
+                    </button>
                   </div>
                 </div>
               ) : null}

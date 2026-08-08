@@ -135,38 +135,39 @@ describe('knowledgeStore openDoc editorMode default', () => {
     expect(knowledgeReadDoc).toHaveBeenCalledWith('spc_1', 'doc_1')
   })
 
-  it('openDoc sets editorMode source when live flag explicitly off', async () => {
+  it('V2-E0: residual hip-knowledge-live=false still opens live (flag retired)', async () => {
     localStorage.setItem('hip-knowledge-live', 'false')
     knowledgeReadDoc.mockResolvedValueOnce('# hello')
     await useKnowledgeStore.getState().openDoc('doc_1')
-    expect(useKnowledgeStore.getState().editorMode).toBe('source')
+    expect(useKnowledgeStore.getState().editorMode).toBe('live')
   })
 
-  it('openDoc opens Live when only global source pref is stored (no per-doc memory)', async () => {
+  it('V2-E0: global source pref is ignored — opens live', async () => {
     localStorage.setItem('hip-knowledge-editor-mode', 'source')
     knowledgeReadDoc.mockResolvedValueOnce('# hello')
     await useKnowledgeStore.getState().openDoc('doc_1')
     expect(useKnowledgeStore.getState().editorMode).toBe('live')
   })
 
-  it('openDoc restores per-doc Source memory', async () => {
+  it('V2-E0: per-doc Source memory is retired — opens live', async () => {
     localStorage.setItem(
       'hip-knowledge-editor-mode-by-doc',
       JSON.stringify({ doc_1: 'source' }),
     )
     knowledgeReadDoc.mockResolvedValueOnce('# hello')
     await useKnowledgeStore.getState().openDoc('doc_1')
-    expect(useKnowledgeStore.getState().editorMode).toBe('source')
+    expect(useKnowledgeStore.getState().editorMode).toBe('live')
   })
 
-  it('openDoc forces source when live on but body is large', async () => {
+  it('openDoc forces source when live on but body is large (internal fallback)', async () => {
     const { KNOWLEDGE_LARGE_DOC_CHARS } = await import('@/domain/knowledge/limits')
     const big = 'y'.repeat(KNOWLEDGE_LARGE_DOC_CHARS + 10)
     knowledgeReadDoc.mockResolvedValueOnce(big)
     await useKnowledgeStore.getState().openDoc('doc_1')
     expect(useKnowledgeStore.getState().editorMode).toBe('source')
     expect(useKnowledgeStore.getState().docBody.length).toBe(big.length)
-    expect(toast.message).toHaveBeenCalled()
+    // V2-E0: 非侵入提示由兼容视图 banner 负责，不再弹 toast。
+    expect(toast.message).not.toHaveBeenCalled()
   })
 })
 
@@ -811,9 +812,9 @@ describe('knowledgeStore setEditorMode', () => {
 
   it('setEditorMode preview normalizes to live (deprecated writing mode)', async () => {
     await useKnowledgeStore.getState().setEditorMode('preview')
-    // No flush-to-enter-preview path; preview is not a writing surface.
+    // V2-E0: preview 不是写入表面；归一为 live，且不再写任何模式偏好。
     expect(useKnowledgeStore.getState().editorMode).toBe('live')
-    expect(localStorage.getItem('hip-knowledge-editor-mode')).toBe('live')
+    expect(localStorage.getItem('hip-knowledge-editor-mode')).toBeNull()
   })
 
   it.skip('leaving legacy preview state reseeds draft from docBody', async () => {
@@ -825,19 +826,19 @@ describe('knowledgeStore setEditorMode', () => {
     await useKnowledgeStore.getState().setEditorMode('source')
     expect(useKnowledgeStore.getState().editorMode).toBe('source')
     expect(useKnowledgeStore.getState().draftBody).toBe('on-disk')
-    expect(localStorage.getItem('hip-knowledge-editor-mode')).toBe('source')
+    expect(localStorage.getItem('hip-knowledge-editor-mode')).toBeNull()
   })
 
-  it('clamps live to source when flag is explicitly off', async () => {
+  it('V2-E0: live flag false no longer clamps live to source', async () => {
     localStorage.setItem('hip-knowledge-live', 'false')
     await useKnowledgeStore.getState().setEditorMode('live')
-    expect(useKnowledgeStore.getState().editorMode).toBe('source')
+    expect(useKnowledgeStore.getState().editorMode).toBe('live')
   })
 
-  it('allows live when flag is on (product default)', async () => {
+  it('allows live by default and writes no mode preference', async () => {
     await useKnowledgeStore.getState().setEditorMode('live')
     expect(useKnowledgeStore.getState().editorMode).toBe('live')
-    expect(localStorage.getItem('hip-knowledge-editor-mode')).toBe('live')
+    expect(localStorage.getItem('hip-knowledge-editor-mode')).toBeNull()
   })
 
   it('live ↔ source keeps dirty draft (no silent reseed)', async () => {

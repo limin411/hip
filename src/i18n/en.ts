@@ -2854,6 +2854,9 @@ export const en = {
         saveRetry: 'Retry',
         liveLoading: 'Loading live editor…',
         liveParseFailed: 'Live editor could not open this document. Switched to Source.',
+        compatView:
+          'Compatibility view: the document is large or live rendering failed — editing in plain text, content remains fully editable.',
+        compatViewClose: 'Got it',
         largeDocForceSource:
           'Document is too large for Live edit. Switched to Source.',
         largeDocHint:

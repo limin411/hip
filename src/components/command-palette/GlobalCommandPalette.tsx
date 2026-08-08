@@ -51,7 +51,7 @@ import { detectIsMac } from './keys'
 import { filterGroupsByMode, parsePaletteQuery } from './queryPrefix'
 import { rankGroups } from './rankGlobalCommands'
 import { buildRecentGroup } from './recent'
-import { buildAllGroups } from './registry'
+import { buildAllGroups, buildKnowledgeRecentDocsGroup } from './registry'
 import { resolvePaletteSessionId } from './sessionResolve'
 import { ShortcutsHelpDialog } from './ShortcutsHelpDialog'
 import type { GlobalCommand, PalettePageId } from './types'
@@ -78,6 +78,7 @@ export function GlobalCommandPalette() {
   const setTheme = useUiStore((s) => s.setTheme)
   const setSettingsPage = useUiStore((s) => s.setSettingsPage)
   const knowledgeIndexStatus = useKnowledgeStore((s) => s.indexStatus)
+  const recentDocs = useKnowledgeStore((s) => s.recent)
   const draft = useDraftStore((s) => s.draft)
   const setDraftModelKey = useDraftStore((s) => s.setModelKey)
   const catalog = useProvidersStore((s) => s.catalog)
@@ -126,6 +127,8 @@ export function GlobalCommandPalette() {
       groupSkills: t('commandPalette.groups.skills'),
       groupFavorites: t('commandPalette.groups.favorites'),
       groupRecent: t('commandPalette.groups.recent'),
+      groupDocs: t('commandPalette.groups.docs'),
+      groupRecentDocs: t('commandPalette.groups.recentDocs'),
       groupKnowledge: t('commandPalette.groups.knowledge'),
       navChat: t('nav.chat'),
       navCode: t('nav.code'),
@@ -250,10 +253,21 @@ export function GlobalCommandPalette() {
         docId: string
         title: string
         spaceName: string
+        query?: string
       }) => {
+        if (item.query) {
+          useKnowledgeStore.getState().setPendingReveal({
+            query: item.query,
+            spaceId: item.spaceId,
+            docId: item.docId,
+          })
+        }
         openKnowledgeView()
         void useKnowledgeStore.getState().openRecent({
-          ...item,
+          spaceId: item.spaceId,
+          docId: item.docId,
+          title: item.title,
+          spaceName: item.spaceName,
           at: Date.now(),
         })
       },
@@ -276,6 +290,7 @@ export function GlobalCommandPalette() {
       },
       searchKnowledgeDocs: (q: string) => searchKnowledgeDocs(q),
       knowledgeIndexReady: knowledgeIndexStatus === 'ready' || isKnowledgeIndexReady(),
+      recentDocs,
       ...(TERMINAL_MANAGEMENT
         ? {
             enterTerminals: () => void enterTerminalsSection({ library: true }),
@@ -338,6 +353,7 @@ export function GlobalCommandPalette() {
       currentModelKey,
       setDraftModelKey,
       search,
+      recentDocs,
     ],
   )
 
@@ -367,6 +383,8 @@ export function GlobalCommandPalette() {
       const head: typeof built = []
       if (fav) head.push(fav)
       if (recent) head.push(recent)
+      const recentDocsGroup = buildKnowledgeRecentDocsGroup(ctx)
+      if (recentDocsGroup) head.push(recentDocsGroup)
       return head.length > 0 ? [...head, ...built] : built
     }
     return built
@@ -378,6 +396,7 @@ export function GlobalCommandPalette() {
     parsed.needle,
     labels.groupFavorites,
     labels.groupRecent,
+    labels.groupRecentDocs,
     favoriteIds,
     usage,
   ])

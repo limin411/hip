@@ -7,6 +7,10 @@ import { GlobalCommandPalette } from './GlobalCommandPalette'
 import { useCommandPaletteStore } from '@/store/commandPaletteStore'
 import { useUiStore } from '@/store/uiStore'
 import { useDomainStore } from '@/domain'
+import {
+  __seedKbIndexForTests,
+  useKnowledgeStore,
+} from '@/store/knowledgeStore'
 import { GLOBAL_COMMAND_PALETTE } from './feature'
 import * as domain from '@/domain'
 
@@ -177,5 +181,102 @@ describe('GlobalCommandPalette actions and sessions', () => {
     expect(useUiStore.getState().overlay).toBe('settings')
     expect(useUiStore.getState().activeView).toBe('chat')
     expect(useCommandPaletteStore.getState().open).toBe(false)
+  })
+})
+
+describe('GlobalCommandPalette knowledge search (V2-S1)', () => {
+  beforeEach(() => {
+    cleanup()
+    useCommandPaletteStore.setState({ open: false, page: null, previousSearch: '' })
+    useUiStore.setState({
+      activeView: 'chat',
+      theme: 'system',
+      chatSessionId: null,
+      codeSessionId: null,
+      settingsPage: 'general',
+    })
+    vi.restoreAllMocks()
+    __seedKbIndexForTests([
+      {
+        id: 'sp:d1',
+        spaceId: 'sp',
+        docId: 'd1',
+        title: 'Harness 报告',
+        spaceName: '产品手册',
+        path: '/指南',
+        body: 'harness 核心能力 评测与数据闭环 失败重试策略',
+      },
+      {
+        id: 'sp:d2',
+        spaceId: 'sp',
+        docId: 'd2',
+        title: '版本发布说明',
+        spaceName: '产品手册',
+        path: '/发布',
+        body: '2025-07-28 发布说明',
+      },
+    ])
+    useKnowledgeStore.setState({
+      indexStatus: 'ready',
+      recent: [
+        {
+          spaceId: 'sp',
+          docId: 'd2',
+          title: '版本发布说明',
+          spaceName: '产品手册',
+          at: Date.now() - 60_000,
+        },
+      ],
+    })
+  })
+
+  it('searching shows docs group with count and recent group; Enter reveals + opens', () => {
+    const setReveal = vi.spyOn(useKnowledgeStore.getState(), 'setPendingReveal')
+    const openRecent = vi
+      .spyOn(useKnowledgeStore.getState(), 'openRecent')
+      .mockResolvedValue(undefined)
+    useCommandPaletteStore.setState({ open: true })
+    render(<GlobalCommandPalette />)
+
+    fireEvent.change(screen.getByTestId('global-command-palette-input'), {
+      target: { value: 'harness' },
+    })
+    expect(screen.getByTestId('global-cmd-knowledge-doc-sp-d1')).toHaveTextContent(
+      'Harness 报告',
+    )
+    // Count badge on the docs group heading (mockup ②: 文档（N）).
+    expect(screen.getByText(/Docs \(1\)/)).toBeInTheDocument()
+
+    // Recent docs group (最近) with the second doc.
+    expect(screen.getByTestId('global-cmd-knowledge-recent-sp-d2')).toHaveTextContent(
+      '版本发布说明',
+    )
+
+    fireEvent.click(screen.getByTestId('global-cmd-knowledge-doc-sp-d1'))
+    expect(setReveal).toHaveBeenCalledWith({ query: 'harness', spaceId: 'sp', docId: 'd1' })
+    expect(openRecent).toHaveBeenCalledWith(
+      expect.objectContaining({ spaceId: 'sp', docId: 'd1', title: 'Harness 报告' }),
+    )
+    expect(useCommandPaletteStore.getState().open).toBe(false)
+  })
+
+  it('empty query shows recent docs group without full-library docs', () => {
+    useCommandPaletteStore.setState({ open: true })
+    render(<GlobalCommandPalette />)
+    // Recent docs visible on empty open.
+    expect(screen.getByTestId('global-cmd-knowledge-recent-sp-d2')).toBeInTheDocument()
+    // Full-library docs hidden.
+    expect(screen.queryByTestId('global-cmd-knowledge-doc-sp-d1')).not.toBeInTheDocument()
+  })
+
+  it('no-match query shows empty state without stale doc results', () => {
+    useCommandPaletteStore.setState({ open: true })
+    render(<GlobalCommandPalette />)
+    fireEvent.change(screen.getByTestId('global-command-palette-input'), {
+      target: { value: 'zzz-no-match' },
+    })
+    expect(screen.getByTestId('global-command-palette-empty')).toHaveTextContent('No results')
+    expect(screen.queryByTestId('global-cmd-knowledge-doc-sp-d1')).not.toBeInTheDocument()
+    expect(screen.queryByTestId('global-cmd-knowledge-recent-sp-d2')).not.toBeInTheDocument()
   })
 })

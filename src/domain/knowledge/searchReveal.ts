@@ -96,8 +96,16 @@ export function revealHeadingInRoot(
  * Preview markdown may reflow tokens; full-query match preferred.
  */
 export function revealInPreviewRoot(root: HTMLElement, query: string): boolean {
+  return findRevealElementInRoot(root, query) != null
+}
+
+/**
+ * Like `revealInPreviewRoot` but returns the matched element (for flash highlight),
+ * or null when no match. Caller should add/remove a temporary highlight class.
+ */
+export function findRevealElementInRoot(root: HTMLElement, query: string): HTMLElement | null {
   const q = query.trim()
-  if (!q) return false
+  if (!q) return null
   const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT)
   let node = walker.nextNode()
   while (node) {
@@ -105,7 +113,7 @@ export function revealInPreviewRoot(root: HTMLElement, query: string): boolean {
     const match = findRevealMatch(value, q)
     if (match && node.parentElement) {
       node.parentElement.scrollIntoView({ block: 'center', inline: 'nearest' })
-      return true
+      return node.parentElement
     }
     node = walker.nextNode()
   }
@@ -113,7 +121,7 @@ export function revealInPreviewRoot(root: HTMLElement, query: string): boolean {
   const all = root.textContent ?? ''
   if (findRevealMatch(all, q) != null) {
     root.scrollIntoView({ block: 'start', inline: 'nearest' })
-    return true
+    return root
   }
-  return false
+  return null
 }

@@ -2275,3 +2275,17 @@ describe('knowledgeStore 深目录（20+ 层）', () => {
     expect(useKnowledgeStore.getState().activeDocId).toBe('doc_deep')
   })
 })
+
+describe('knowledgeStore pendingReveal setter (V2-S1)', () => {
+  it('setPendingReveal stores the reveal target; clear removes it', () => {
+    const kb = useKnowledgeStore.getState()
+    kb.setPendingReveal({ query: 'harness', spaceId: 'sp', docId: 'd1' })
+    expect(useKnowledgeStore.getState().pendingReveal).toEqual({
+      query: 'harness',
+      spaceId: 'sp',
+      docId: 'd1',
+    })
+    kb.clearPendingReveal()
+    expect(useKnowledgeStore.getState().pendingReveal).toBeNull()
+  })
+})

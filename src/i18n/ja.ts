@@ -3019,6 +3019,9 @@ export const ja = {
       "skills": "Skills",
       "favorites": "お気に入り",
       "recent": "最近",
+      "docs": "ドキュメント",
+      "recentDocs": "最近",
+      "count": "{{group}}（{{count}}）",
       "knowledge": "ドキュメント"
     },
     "navKnowledge": "ドキュメント",

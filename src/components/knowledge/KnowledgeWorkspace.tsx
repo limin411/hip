@@ -45,7 +45,7 @@ import { diffLines } from '@/domain/knowledge/textDiff'
 import {
   revealHeadingInRoot,
   revealInCodeMirror,
-  revealInPreviewRoot,
+  findRevealElementInRoot,
   revealLineInCodeMirror,
 } from '@/domain/knowledge/searchReveal'
 import { extractDocOutline } from '@/domain/knowledge/mdPreview'
@@ -154,7 +154,13 @@ export function KnowledgeWorkspace() {
           document.querySelector('[data-testid="knowledge-doc-live-editor"]') ??
           document.querySelector('.knowledge-blocknote-editor')
         if (liveRoot instanceof HTMLElement) {
-          revealInPreviewRoot(liveRoot, still.query)
+          const el = findRevealElementInRoot(liveRoot, still.query)
+          if (el) {
+            // Flash the matched block ~1.2s (prototype `.flash` behavior).
+            const target = el.closest('.bn-block-outer') ?? el
+            target.classList.add('kb-reveal-flash')
+            setTimeout(() => target.classList.remove('kb-reveal-flash'), 1200)
+          }
           useKnowledgeStore.getState().clearPendingReveal()
           return
         }

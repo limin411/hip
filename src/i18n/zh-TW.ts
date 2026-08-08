@@ -3021,6 +3021,9 @@ export const zhTW = {
       "skills": "Skills",
       "favorites": "收藏",
       "recent": "最近使用",
+      "docs": "文檔",
+      "recentDocs": "最近",
+      "count": "{{group}}（{{count}}）",
       "knowledge": "文件管理"
     },
     "navKnowledge": "文件管理",

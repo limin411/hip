@@ -398,6 +398,8 @@ interface KnowledgeState {
   /** Open a search hit and request scroll-to-match via `pendingReveal`. */
   openSearchHit: (hit: KnowledgeSearchHit) => Promise<void>
   clearPendingReveal: () => void
+  /** Set a reveal target (⌘K doc hit) so the workspace scrolls + flashes on open. */
+  setPendingReveal: (pending: KnowledgePendingReveal | null) => void
   /**
    * Request scroll to an outline heading. Workspace applies based on editorMode
    * (source line / live text match).
@@ -642,6 +644,23 @@ export function syncActiveEditorToDraft(opts?: SyncActiveEditorOpts): void {
 /** Test helper: supersede in-flight openDoc guards. */
 export function __bumpOpenDocGenerationForTests(): number {
   return ++openDocGeneration
+}
+
+/**
+ * Test helper: replace the in-memory search index with the given docs
+ * (⌘K palette interaction tests). Not used in production paths.
+ */
+export function __seedKbIndexForTests(
+  docs: Array<
+    Omit<
+      Parameters<typeof upsertSearchDoc>[1],
+      'bodyPreview' | 'tags' | 'status' | 'aliases' | 'tagList' | 'statusValue' | 'aliasList'
+    > & { body: string }
+  >,
+): void {
+  kbIndex = createKnowledgeIndex()
+  kbMeta = new Map()
+  for (const d of docs) upsertSearchDoc(kbIndex, d)
 }
 
 function cancelScheduledSave() {
@@ -1041,6 +1060,9 @@ export const useKnowledgeStore = create<KnowledgeState>((set, get) => ({
   },
 
   clearPendingReveal: () => set({ pendingReveal: null }),
+
+  /** Set a reveal target (⌘K doc hit) so the workspace scrolls + flashes on open. */
+  setPendingReveal: (pending: KnowledgePendingReveal | null) => set({ pendingReveal: pending }),
 
   requestOutlineJump: (item) =>
     set((s) => ({

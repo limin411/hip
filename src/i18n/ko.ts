@@ -3019,6 +3019,9 @@ export const ko = {
       "skills": "Skills",
       "favorites": "즐겨찾기",
       "recent": "최근",
+      "docs": "문서",
+      "recentDocs": "최근",
+      "count": "{{group}}（{{count}}）",
       "knowledge": "문서"
     },
     "navKnowledge": "문서",

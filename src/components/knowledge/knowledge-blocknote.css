@@ -742,3 +742,11 @@ mark[data-hip-mark='highlight'] {
 .knowledge-blocknote-editor .bn-visual-media-wrapper {
   max-width: 100%;
 }
+
+/* ── ⌘K search reveal flash ──────────────────────────────────────────── */
+.kb-reveal-flash {
+  outline: 2px solid var(--accent, #6366f1);
+  outline-offset: 2px;
+  border-radius: 0.375rem;
+  transition: outline-color 0.2s ease-out;
+}

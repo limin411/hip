@@ -1,7 +1,6 @@
 import { useEffect, useRef, useState, type KeyboardEvent, type PointerEvent as ReactPointerEvent } from 'react'
 import { useTranslation } from 'react-i18next'
 import {
-  ChevronDown,
   ChevronRight,
   FileText,
   Folder,
@@ -499,11 +498,13 @@ export function SpaceTree({
             }}
           >
             <span className="flex h-5 w-4 shrink-0 items-center justify-center text-ink-tertiary">
-              {isOpen ? (
-                <ChevronDown size={14} strokeWidth={1.75} />
-              ) : (
-                <ChevronRight size={14} strokeWidth={1.75} />
-              )}
+              {/* Single chevron rotated on open — smooth 90° sweep instead of icon swap. */}
+              <ChevronRight
+                size={14}
+                strokeWidth={1.75}
+                aria-hidden
+                className={cn('transition-transform duration-150', isOpen && 'rotate-90')}
+              />
             </span>
             <span
               className={cn(

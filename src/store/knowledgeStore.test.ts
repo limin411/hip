@@ -2385,3 +2385,123 @@ describe('knowledgeStore recent list (V2-N1)', () => {
     expect(parsed.map((r) => r.docId)).toEqual(['doc_1'])
   })
 })
+
+describe('knowledgeStore broken-link repair (V2-L1 T5.3/T5.4)', () => {
+  beforeEach(() => {
+    knowledgeReadDoc.mockReset()
+    knowledgeWriteDoc.mockReset()
+    knowledgeSaveTree.mockReset()
+    knowledgeSaveTree.mockResolvedValue(undefined)
+    knowledgeWriteDoc.mockResolvedValue(undefined)
+    knowledgeGetTree.mockReset()
+    knowledgeEnsureRoot.mockReset()
+    knowledgeListSpaces.mockReset()
+    knowledgeLinkIndexUpsert.mockReset()
+    knowledgeLinkIndexUpsert.mockResolvedValue(undefined)
+    useKnowledgeStore.setState({
+      loaded: true,
+      spaces: [{ id: 'spc_1', name: 'S', createdAt: 1, updatedAt: 1 }],
+      activeSpaceId: 'spc_1',
+      nodes: [
+        {
+          id: 'doc_cur',
+          parentId: null,
+          kind: 'doc',
+          title: '当前',
+          order: 0,
+          createdAt: 1,
+          updatedAt: 1,
+        },
+      ],
+      activeDocId: 'doc_cur',
+      docBody: '',
+      draftBody: '',
+      editorMode: 'live',
+      mode: 'workspace',
+      searchQuery: '',
+      searchHits: [],
+      indexStatus: 'idle',
+      spaceDocCounts: { spc_1: 1 },
+      recent: [],
+      expandedFolderIds: {},
+      busy: false,
+      error: null,
+      saveState: 'idle',
+      backlinks: [],
+      outboundLinks: [],
+      brokenLinks: [],
+      linkPanelStatus: 'idle',
+    })
+  })
+
+  it('repairBrokenLink creates the doc, rewrites the raw link (alias), and reindexes', async () => {
+    knowledgeReadDoc.mockResolvedValue('see [[缺失文档|旧别名]] here')
+    const id = await useKnowledgeStore.getState().repairBrokenLink(
+      'doc_cur',
+      '[[缺失文档|旧别名]]',
+      '缺失文档',
+    )
+    expect(id).toBeTruthy()
+    // 新文档已写入树。
+    const nodes = useKnowledgeStore.getState().nodes
+    expect(nodes.some((n) => n.id === id)).toBe(true)
+    expect(nodes.find((n) => n.id === id)?.title).toBe('缺失文档')
+    // 引用方 raw（含别名）被改写为无别名的新标题链接。
+    const writeCalls = knowledgeWriteDoc.mock.calls.filter((c) => c[1] === 'doc_cur')
+    expect(writeCalls.length).toBeGreaterThan(0)
+    expect(writeCalls[0]![2]).toContain('[[缺失文档]]')
+    expect(writeCalls[0]![2]).not.toContain('旧别名')
+  })
+
+  it('repairBrokenLink appends (2) for duplicate titles', async () => {
+    knowledgeReadDoc.mockResolvedValue('x')
+    useKnowledgeStore.setState({
+      nodes: [
+        {
+          id: 'doc_cur',
+          parentId: null,
+          kind: 'doc',
+          title: '当前',
+          order: 0,
+          createdAt: 1,
+          updatedAt: 1,
+        },
+        {
+          id: 'doc_dup',
+          parentId: null,
+          kind: 'doc',
+          title: '缺失文档',
+          order: 1,
+          createdAt: 1,
+          updatedAt: 1,
+        },
+      ],
+    })
+    const id = await useKnowledgeStore.getState().repairBrokenLink('doc_cur', '[[缺失文档]]', '缺失文档')
+    expect(useKnowledgeStore.getState().nodes.find((n) => n.id === id)?.title).toBe(
+      '缺失文档 (2)',
+    )
+  })
+
+  it('repairBrokenLink returns null when the disk write fails (index untouched)', async () => {
+    knowledgeWriteDoc.mockRejectedValueOnce(new Error('disk full'))
+    const id = await useKnowledgeStore.getState().repairBrokenLink(
+      'doc_cur',
+      '[[缺失文档]]',
+      '缺失文档',
+    )
+    expect(id).toBeNull()
+    // 索引未被更新（最后写原则）。
+    expect(knowledgeLinkIndexUpsert).not.toHaveBeenCalled()
+  })
+
+  it('repointBrokenLink rewrites the link to the new target', async () => {
+    knowledgeReadDoc.mockResolvedValue('see [[旧目标]] here')
+    const ok = await useKnowledgeStore
+      .getState()
+      .repointBrokenLink('doc_cur', '[[旧目标]]', '新目标')
+    expect(ok).toBe(true)
+    const writeCalls = knowledgeWriteDoc.mock.calls.filter((c) => c[1] === 'doc_cur')
+    expect(writeCalls[0]![2]).toContain('[[新目标]]')
+  })
+})

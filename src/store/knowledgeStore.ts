@@ -75,9 +75,11 @@ import {
   knowledgeLinkIndexRemoveDoc,
   knowledgeLinkIndexReplaceAll,
   knowledgeLinkIndexBacklinks,
+  knowledgeLinkIndexBroken,
   knowledgeLinkIndexOutbound,
   knowledgeLinkIndexDocCount,
   type KnowledgeLinkBacklink,
+  type KnowledgeLinkBrokenRow,
   type KnowledgeLinkOutboundRow,
 } from '@/ipc/knowledge'
 import { buildDocIndexPayload } from '@/domain/knowledge/linkIndex'
@@ -105,6 +107,7 @@ const resetDocFields = {
   pendingReveal: null,
   backlinks: [] as KnowledgeLinkBacklink[],
   outboundLinks: [] as KnowledgeLinkOutboundRow[],
+  brokenLinks: [] as KnowledgeLinkBrokenRow[],
   linkPanelStatus: 'idle' as const,
 }
 
@@ -364,6 +367,8 @@ interface KnowledgeState {
   /** SQLite link-index panel (active doc). */
   backlinks: KnowledgeLinkBacklink[]
   outboundLinks: KnowledgeLinkOutboundRow[]
+  /** 断链（V2-L1 T5.1）：目标标题解析失败的外部/wiki 链接。 */
+  brokenLinks: KnowledgeLinkBrokenRow[]
   linkPanelStatus: 'idle' | 'loading' | 'ready' | 'error'
   /**
    * Doc counts per space. Tree-derived counts land as soon as trees load during
@@ -411,8 +416,18 @@ interface KnowledgeState {
     line: number
   }) => void
   clearPendingOutlineJump: () => void
-  /** Refresh backlinks + outbound for the active doc (or given id). */
+  /** Refresh backlinks + outbound + broken for the active doc (or given id). */
   refreshLinkPanel: (docId?: string) => Promise<void>
+  /**
+   * 断链一键创建（V2-L1 T5.3）：创建缺失文档（重名自动加序号），把引用方的
+   * `raw` 链接改写为新标题，最后重建索引（索引最后写——失败时索引不变）。
+   * 返回新文档 id；失败返回 null。
+   */
+  repairBrokenLink: (fromDocId: string, raw: string, targetTitle: string) => Promise<string | null>
+  /**
+   * 断链重新指向（V2-L1 T5.4）：把引用方 `raw` 链接改写为新的目标标题。
+   */
+  repointBrokenLink: (fromDocId: string, raw: string, newTargetTitle: string) => Promise<boolean>
   /** Full rebuild of space link index from disk docs. */
   rebuildSpaceLinkIndex: (spaceId?: string) => Promise<void>
   /**
@@ -697,6 +712,7 @@ export const useKnowledgeStore = create<KnowledgeState>((set, get) => ({
   pendingOutlineJump: null,
   backlinks: [],
   outboundLinks: [],
+  brokenLinks: [],
   linkPanelStatus: 'idle',
   spaceDocCounts: {},
   availableTags: [],
@@ -1081,23 +1097,112 @@ export const useKnowledgeStore = create<KnowledgeState>((set, get) => ({
     const spaceId = get().activeSpaceId
     const id = docId ?? get().activeDocId
     if (!spaceId || !id) {
-      set({ backlinks: [], outboundLinks: [], linkPanelStatus: 'idle' })
+      set({ backlinks: [], outboundLinks: [], brokenLinks: [], linkPanelStatus: 'idle' })
       return
     }
     set({ linkPanelStatus: 'loading' })
     try {
-      const [backlinks, outboundLinks] = await Promise.all([
+      const [backlinks, outboundLinks, brokenLinks] = await Promise.all([
         knowledgeLinkIndexBacklinks(spaceId, id),
         knowledgeLinkIndexOutbound(spaceId, id),
+        knowledgeLinkIndexBroken(spaceId).catch(() => []),
       ])
       // Stale guard
       if (get().activeSpaceId !== spaceId || get().activeDocId !== id) return
-      set({ backlinks, outboundLinks, linkPanelStatus: 'ready' })
+      // 断链按引用方过滤当前文档相关的条目。
+      set({
+        backlinks,
+        outboundLinks,
+        brokenLinks: brokenLinks.filter((b) => b.fromDocId === id),
+        linkPanelStatus: 'ready',
+      })
     } catch (e) {
       console.warn('refreshLinkPanel failed', e)
       if (get().activeSpaceId === spaceId && get().activeDocId === id) {
-        set({ backlinks: [], outboundLinks: [], linkPanelStatus: 'error' })
+        set({ backlinks: [], outboundLinks: [], brokenLinks: [], linkPanelStatus: 'error' })
       }
+    }
+  },
+
+  /** 标题去重：同名加 (2)/(3)…（V2-L1 T5.3）。 */
+  repairBrokenLink: async (fromDocId, raw, targetTitle) => {
+    const spaceId = get().activeSpaceId
+    const nodes = get().nodes
+    if (!spaceId || !fromDocId || !raw || !targetTitle) return null
+    const existing = new Set(
+      nodes.filter((n) => n.kind === 'doc').map((n) => n.title.toLowerCase()),
+    )
+    let title = targetTitle.trim()
+    let n = 2
+    while (existing.has(title.toLowerCase())) {
+      title = `${targetTitle.trim()} (${n})`
+      n += 1
+    }
+    try {
+      // 1) 创建新文档（磁盘写失败 → 中止，索引不动）。
+      const now = Date.now()
+      const id = newDocId()
+      await knowledgeWriteDoc(spaceId, id, '')
+      const node = {
+        id,
+        parentId: null,
+        kind: 'doc' as const,
+        title,
+        order: nextOrder(nodes, null),
+        createdAt: now,
+        updatedAt: now,
+      }
+      const nextNodes = insertNode(nodes, node)
+      await knowledgeSaveTree(spaceId, { version: 1, nodes: nextNodes })
+      // 2) 改写引用方文档中的 raw 链接。
+      let fromBody = ''
+      try {
+        fromBody = await knowledgeReadDoc(spaceId, fromDocId)
+      } catch {
+        fromBody = ''
+      }
+      const oldToken = raw.trim()
+      const newToken = oldToken.replace(/\[\[[^\]]+\]\]/, `[[${title}]]`)
+      const nextFromBody = fromBody.replace(oldToken, newToken)
+      if (nextFromBody !== fromBody) {
+        await knowledgeWriteDoc(spaceId, fromDocId, nextFromBody)
+      }
+      // 3) 索引最后写（失败回滚语义：前面任何一步失败都不会污染索引）。
+      const spaceName = get().spaces.find((s) => s.id === spaceId)?.name ?? ''
+      indexCurrentDoc(spaceId, id, title, '', spaceName, nextNodes)
+      void upsertLinkIndexDoc(spaceId, id, title, '', nextNodes)
+      if (nextFromBody !== fromBody) {
+        void upsertLinkIndexDoc(spaceId, fromDocId, get().nodes.find((x) => x.id === fromDocId)?.title ?? '', nextFromBody, nextNodes)
+      }
+      set({ nodes: nextNodes })
+      void get().refreshLinkPanel()
+      return id
+    } catch {
+      return null
+    }
+  },
+
+  repointBrokenLink: async (fromDocId, raw, newTargetTitle) => {
+    const spaceId = get().activeSpaceId
+    if (!spaceId || !fromDocId || !raw || !newTargetTitle) return false
+    try {
+      let fromBody = ''
+      try {
+        fromBody = await knowledgeReadDoc(spaceId, fromDocId)
+      } catch {
+        fromBody = ''
+      }
+      const oldToken = raw.trim()
+      const newToken = oldToken.replace(/\[\[[^\]]+\]\]/, `[[${newTargetTitle.trim()}]]`)
+      const nextFromBody = fromBody.replace(oldToken, newToken)
+      if (nextFromBody === fromBody) return false
+      await knowledgeWriteDoc(spaceId, fromDocId, nextFromBody)
+      const node = get().nodes.find((x) => x.id === fromDocId)
+      void upsertLinkIndexDoc(spaceId, fromDocId, node?.title ?? '', nextFromBody, get().nodes)
+      void get().refreshLinkPanel()
+      return true
+    } catch {
+      return false
     }
   },
 

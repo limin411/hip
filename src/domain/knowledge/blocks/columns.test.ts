@@ -13,6 +13,9 @@ import {
 import { carrierRoundTrip } from './dialectBridge'
 import { normalizeMd } from '../mdNormalize'
 
+void dialectToHtmlCarriers
+void htmlCarriersToDialect
+
 const simpleGuard = [
   '<!-- hip-columns:2 -->',
   'col one text',

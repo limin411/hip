@@ -2474,6 +2474,16 @@ export const zhCN = {
         iconNone: '无图标',
         iconCustomPlaceholder: '输入或粘贴 emoji…',
       },
+      blockRef: {
+        linkCopied: '块链接已复制',
+        noPreview: '暂无预览'
+      },
+      sync: {
+        pickSource: '选择源块…',
+        unlink: '解除同步（变为普通引用链接）',
+        selfRef: '不能嵌入自身',
+        sourceMissing: '源块已删除或不可读',
+      },
       tree: {
         newDoc: '文档',
         newBoard: '画板',
@@ -2663,6 +2673,7 @@ export const zhCN = {
         subdoc: '子文档',
         copyPageLink: '复制页面链接',
         columns: '分栏',
+        sync: '同步块',
         aiContinue: 'AI 续写',
         aiSummarize: 'AI 总结',
         aiToTasks: 'AI 转任务',

@@ -12,6 +12,7 @@ import {
   joinColumnsGuard,
   jsonToColumns,
 } from './columns'
+import { SYNC_GUARD_PROBE, joinSyncGuard } from './sync'
 
 const CALLOUT_TYPE_SET = new Set<string>(CALLOUT_TYPES)
 
@@ -25,7 +26,7 @@ export type MathCarrier = { src: string }
 export type MermaidCarrier = { src: string }
 export type SvgCarrier = { src: string }
 export type EmbedCarrier = { title: string; fragment: string }
-export type WikiCarrier = { title: string; alias: string }
+export type WikiCarrier = { title: string; alias: string; fragment?: string | null }
 export type ToggleCarrier = { summary: string; body: string }
 export type ImageCaptionParts = {
   alt: string
@@ -214,20 +215,28 @@ export function embedToHtmlCarrier(c: EmbedCarrier): string {
 
 export function serializeWiki(c: WikiCarrier): string {
   const title = c.title.trim()
+  const frag = (c.fragment ?? '').trim()
   const alias = c.alias.trim()
-  if (alias) return `[[${title}|${alias}]]`
-  return `[[${title}]]`
+  const body = frag ? `${title}#${frag}` : title
+  if (alias) return `[[${body}|${alias}]]`
+  return `[[${body}]]`
 }
 
 export function parseWikiToken(raw: string): WikiCarrier | null {
-  const m = raw.trim().match(/^\[\[([^\]|#]+)(?:\|([^\]]+))?\]\]$/)
+  const m = raw.trim().match(/^\[\[([^\]|#]+)(?:#([^\]|]*))?(?:\|([^\]]+))?\]\]$/)
   if (!m) return null
-  return { title: m[1]!.trim(), alias: (m[2] ?? '').trim() }
+  return {
+    title: m[1]!.trim(),
+    fragment: (m[2] ?? '').trim() || null,
+    alias: (m[3] ?? '').trim(),
+  }
 }
 
 export function wikiToHtmlCarrier(c: WikiCarrier): string {
   const display = c.alias.trim() || c.title.trim()
-  return `<span data-hip-inline="wiki" data-title="${escapeHtmlAttr(c.title)}" data-alias="${escapeHtmlAttr(c.alias)}">${escapeHtmlAttr(display)}</span>`
+  return `<span data-hip-inline="wiki" data-title="${escapeHtmlAttr(c.title)}" data-fragment="${escapeHtmlAttr(
+    (c.fragment ?? '').trim(),
+  )}" data-alias="${escapeHtmlAttr(c.alias)}">${escapeHtmlAttr(display)}</span>`
 }
 
 // ─── Toggle ─────────────────────────────────────────────────────────────────
@@ -419,6 +428,19 @@ function stripTags(s: string): string {
 export function htmlCarriersToDialect(md: string): string {
   let out = md.replace(/\r\n/g, '\n')
 
+  // Sync block div → `<!-- hip-sync:nodeId#anchor -->` guard.
+  out = out.replace(
+    /<div\b[^>]*data-hip-block=["']sync["'][^>]*(?:\/>|>([\s\S]*?)<\/div>)/gi,
+    (full) => {
+      const nodeM = full.match(/data-node-id=["']([^"']*)["']/i)
+      const anchorM = full.match(/data-anchor=["']([^"']*)["']/i)
+      const nodeId = unescapeHtmlAttr(nodeM?.[1] ?? '')
+      const anchor = unescapeHtmlAttr(anchorM?.[1] ?? '')
+      if (!nodeId || !anchor) return stripTags(full).replace(/\n+$/, '')
+      return joinSyncGuard(nodeId, anchor).replace(/\n+$/, '')
+    },
+  )
+
   // Columns guard first: the restored guard text exposes inner carriers to the
   // rules below (wiki spans / math / fences inside column md).
   out = out.replace(
@@ -513,9 +535,11 @@ export function htmlCarriersToDialect(md: string): string {
     /<span\b[^>]*data-hip-inline=["']wiki["'][^>]*>[\s\S]*?<\/span>/gi,
     (full) => {
       const titleM = full.match(/data-title=["']([^"']*)["']/i)
+      const fragM = full.match(/data-fragment=["']([^"']*)["']/i)
       const aliasM = full.match(/data-alias=["']([^"']*)["']/i)
       return serializeWiki({
         title: unescapeHtmlAttr(titleM?.[1] ?? ''),
+        fragment: fragM ? (unescapeHtmlAttr(fragM[1] ?? '') || null) : null,
         alias: unescapeHtmlAttr(aliasM?.[1] ?? ''),
       })
     },
@@ -574,13 +598,17 @@ export function dialectToHtmlCarriers(md: string): string {
   // Attachment cards: `![name](relative-non-image-ext)` (before wiki/image steps).
   out = attachMdToHtmlCarriers(out)
 
-  // Wiki links (not already HTML)
-  out = out.replace(/\[\[([^\]|#]+)(?:\|([^\]]+))?\]\]/g, (_full, title: string, alias?: string) => {
-    return wikiToHtmlCarrier({
-      title: title.trim(),
-      alias: (alias ?? '').trim(),
-    })
-  })
+  // Wiki links (not already HTML) — [[title#frag|alias]]
+  out = out.replace(
+    /\[\[([^\]|#]+)(?:#([^\]|]*))?(?:\|([^\]]+))?\]\]/g,
+    (_full, title: string, frag?: string, alias?: string) => {
+      return wikiToHtmlCarrier({
+        title: title.trim(),
+        fragment: (frag ?? '').trim() || null,
+        alias: (alias ?? '').trim(),
+      })
+    },
+  )
 
   // Display math $$...$$
   out = out.replace(/\$\$\n?([\s\S]*?)\n?\$\$/g, (_full, src: string) => {
@@ -631,6 +659,13 @@ export function dialectToHtmlCarriers(md: string): string {
     return `<div data-hip-block="columns" data-count="${g.count}" data-columns="${escapeHtmlAttr(
       JSON.stringify(g.columns),
     )}"></div>`
+  })
+
+  // Sync guard → carrier div.
+  out = out.replace(SYNC_GUARD_PROBE, (_full, nodeId: string, anchor: string) => {
+    return `<div data-hip-block="sync" data-node-id="${escapeHtmlAttr(
+      nodeId,
+    )}" data-anchor="${escapeHtmlAttr(anchor)}"></div>`
   })
   return out
 }

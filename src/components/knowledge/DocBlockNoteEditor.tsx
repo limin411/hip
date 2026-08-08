@@ -34,7 +34,7 @@ import { BlockNoteHipSlashMenu } from './BlockNoteHipSlashMenu'
 import { MantineProvider } from '@mantine/core'
 import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
-import { Eraser, ListChecks } from 'lucide-react'
+import { Eraser, Link2, ListChecks } from 'lucide-react'
 import {
   joinYamlFrontmatter,
   splitYamlFrontmatter,
@@ -130,6 +130,8 @@ export interface DocBlockNoteEditorProps {
     title: string
     nodeId: string | null
     broken: boolean
+    /** 块引用锚点（V2-E1）。 */
+    fragment?: string | null
   }) => void
   onAiAction?: (action: KnowledgeAiActionId) => void
   onCreateSubdoc?: () => void
@@ -241,10 +243,12 @@ function KnowledgeSideMenu({
   selectedIds,
   onToggleSelect,
   onClearSelection,
+  onCopyBlockLink,
 }: {
   selectedIds: string[]
   onToggleSelect: (id: string) => void
   onClearSelection: () => void
+  onCopyBlockLink: (blockId: string) => void
 }) {
   const { t } = useTranslation()
   const editor = useBlockNoteEditor<any, any, any>()
@@ -278,6 +282,19 @@ function KnowledgeSideMenu({
         <ListChecks size={14} strokeWidth={1.75} />
       </button>
       <DragHandleButton />
+      <button
+        type="button"
+        className="bn-side-menu-item"
+        data-testid="kb-copy-block-link"
+        title={undefined}
+        aria-label={undefined}
+        onClick={(e) => {
+          e.stopPropagation()
+          onCopyBlockLink(block.id)
+        }}
+      >
+        <Link2 size={14} strokeWidth={1.75} />
+      </button>
     </div>
   )
 }
@@ -527,8 +544,8 @@ export const DocBlockNoteEditor = forwardRef<
           title: '',
           nodeId: id,
           broken: false,
+          fragment: fragment ?? null,
         })
-        void fragment
       },
     }),
     [spaceId, wikiNodes, onWikiNavigate],
@@ -1119,6 +1136,36 @@ export const DocBlockNoteEditor = forwardRef<
     const onPaste = (event: ClipboardEvent) => {
       const sid = spaceIdRef.current
       if (!sid || !event.clipboardData) return
+      // V2-E1 块引用粘贴：`hip://doc/<nodeId>#<blockId>` → `[[title#blockId]]`。
+      const text = event.clipboardData.getData('text/plain')
+      if (text) {
+        const refs = [...text.matchAll(/hip:\/\/doc\/([A-Za-z0-9_-]+)#([A-Za-z0-9_-]+)/g)]
+        if (refs.length > 0) {
+          const nodes = wikiNodesRef.current ?? []
+          let converted = text
+          for (const m of refs) {
+            const node = nodes.find((n) => n.id === m[1])
+            if (!node) continue
+            converted = converted.replace(
+              m[0],
+              `[[${node.title}#${m[2]}]]`,
+            )
+          }
+          if (converted !== text) {
+            event.preventDefault()
+            try {
+              const prepared = preParseMdForLive(converted)
+              const blocks = editor.tryParseMarkdownToBlocks(prepared)
+              const cursor = editor.getTextCursorPosition()
+              editor.insertBlocks(blocks, cursor.block, 'after')
+              scheduleDraft()
+            } catch {
+              // ignore
+            }
+            return
+          }
+        }
+      }
       const items = event.clipboardData.items
       if (!items?.length) return
       void (async () => {
@@ -1307,6 +1354,14 @@ export const DocBlockNoteEditor = forwardRef<
                   selectedIds={selectedIds}
                   onToggleSelect={toggleSelect}
                   onClearSelection={clearSelection}
+                  onCopyBlockLink={(blockId) => {
+                    // V2-E1 块引用：`hip://doc/<nodeId>#<blockId>`（粘贴时还原为 wiki 引用）。
+                    const link = `hip://doc/${boundDocIdRef.current}#${blockId}`
+                    void navigator.clipboard
+                      .writeText(link)
+                      .then(() => toast.success(t('knowledge.blockRef.linkCopied')))
+                      .catch(() => {})
+                  }}
                 />
               )}
             />

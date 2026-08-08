@@ -15,6 +15,7 @@ import { embedBlockSpec } from './embedBlock'
 import { attachmentBlockSpec } from './attachmentBlock'
 import { toggleBlockSpec } from './toggleBlock'
 import { columnsBlockSpec } from './columnsBlock'
+import { syncBlockSpec } from './syncBlock'
 import { wikiLinkInlineSpec, highlightStyleSpec } from './wikiInline'
 import { createKnowledgeCodeBlockSpec } from './codeBlockHighlight'
 
@@ -39,6 +40,7 @@ export const knowledgeBlockSchema = BlockNoteSchema.create({
     attachment: attachmentBlockSpec(),
     toggle: toggleBlockSpec(),
     columns: columnsBlockSpec(),
+    sync: syncBlockSpec(),
   },
   inlineContentSpecs: {
     ...defaultInlineContentSpecs,

@@ -2435,7 +2435,17 @@ export const ko = {
       "iconNone": "아이콘 없음",
       "iconCustomPlaceholder": "이모지 또는 붙여넣기…"
     },
-    "tree": {
+          "blockRef": {
+        "linkCopied": "블록 링크가 복사되었습니다",
+      "noPreview": "미리보기 없음"
+      },
+      "sync": {
+        "pickSource": "소스 블록 선택…",
+        "unlink": "동기화 해제(일반 참조 링크가 됩니다)",
+        "selfRef": "자기 자신은 임베드할 수 없습니다",
+        "sourceMissing": "소스 블록이 삭제되었거나 읽을 수 없습니다"
+      },
+"tree": {
       "newDoc": "문서",
       "newBoard": "화이트보드",
       "newFolder": "폴더",
@@ -2624,6 +2634,7 @@ export const ko = {
       "subdoc": "하위 문서",
       "copyPageLink": "페이지 링크 복사",
       "columns": "컬럼",
+      "sync": "동기화 블록",
       "aiContinue": "AI 이어쓰기",
       "aiSummarize": "AI 요약",
       "aiToTasks": "AI 작업 추출",

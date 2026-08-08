@@ -45,6 +45,7 @@ import {
   type KnowledgeSearchHit,
 } from '@/domain/knowledge/search'
 import { isSpaceNameTaken, normalizeSpaceName } from '@/domain/knowledge/spaceName'
+import { expandTemplateVariables } from '@/domain/knowledge/templateVars'
 import {
   type EditorMode,
   resolveEditorMode,
@@ -309,6 +310,8 @@ export type KnowledgePendingReveal = {
   /** Only apply reveal when this space/doc is still active. */
   spaceId: string
   docId: string
+  /** 块引用锚点（V2-E1）：优先 BN 块 id，其次标题/文本匹配。 */
+  fragment?: string | null
 }
 
 /** Right-rail outline click → KnowledgeWorkspace scrolls Source / Live / Preview. */
@@ -1328,7 +1331,11 @@ export const useKnowledgeStore = create<KnowledgeState>((set, get) => ({
       await get().createDoc(picker.parentId, picker.defaultTitle)
       return
     }
-    await get().createDoc(picker.parentId, picker.defaultTitle, { body: tpl.body })
+    // V2-E1 T4.10: 模板变量替换（{{date}} / {{title}}；未知变量原样保留）。
+    const body = expandTemplateVariables(tpl.body, {
+      title: picker.defaultTitle,
+    })
+    await get().createDoc(picker.parentId, picker.defaultTitle, { body })
   },
 
   cancelTemplateCreate: () => {

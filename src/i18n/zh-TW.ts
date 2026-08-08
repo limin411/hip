@@ -2437,7 +2437,17 @@ export const zhTW = {
       "iconNone": "無圖示",
       "iconCustomPlaceholder": "輸入或貼上 emoji…"
     },
-    "tree": {
+          "blockRef": {
+        "linkCopied": "區塊連結已複製",
+      "noPreview": "暫無預覽"
+      },
+      "sync": {
+        "pickSource": "選擇來源區塊…",
+        "unlink": "解除同步（變為普通引用連結）",
+        "selfRef": "不能嵌入自身",
+        "sourceMissing": "來源區塊已刪除或無法讀取"
+      },
+"tree": {
       "newDoc": "文件",
       "newBoard": "畫板",
       "newFolder": "資料夾",
@@ -2626,6 +2636,7 @@ export const zhTW = {
       "subdoc": "Sub-document",
       "copyPageLink": "Copy page link",
       "columns": "Columns",
+      "sync": "Sync block",
       "aiContinue": "AI continue",
       "aiSummarize": "AI summarize",
       "aiToTasks": "AI to tasks",

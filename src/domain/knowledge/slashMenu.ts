@@ -41,6 +41,7 @@ export type KnowledgeSlashId =
   | 'subdoc'
   | 'copyPageLink'
   | 'columns'
+  | 'sync'
 
 /** Slash menu section (R5 + AI). */
 export type KnowledgeSlashGroup = 'basic' | 'list' | 'media' | 'advanced' | 'ai'
@@ -121,6 +122,7 @@ export const BLOCK_SLASH_IDS: ReadonlySet<KnowledgeSlashId> = new Set([
   'file',
   'subdoc',
   'columns',
+  'sync',
 ])
 
 /** Live/Source slash insert config — single source of truth. */
@@ -431,6 +433,17 @@ export const KNOWLEDGE_SLASH_ITEMS: KnowledgeSlashItem[] = [
     group: 'advanced',
     icon: '▦',
     label: 'Columns',
+    insert: '',
+    cursorOffset: 0,
+  },
+  {
+    id: 'sync',
+    name: 'sync',
+    keywords: ['mirror', 'embed-block', 'live'],
+    keywordsZh: ['同步', '镜像', '嵌入块', '跟随'],
+    group: 'advanced',
+    icon: '⇄',
+    label: 'Sync block',
     insert: '',
     cursorOffset: 0,
   },

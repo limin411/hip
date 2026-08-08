@@ -2537,6 +2537,16 @@ export const en = {
         iconNone: 'No icon',
         iconCustomPlaceholder: 'Emoji or paste…',
       },
+      blockRef: {
+        linkCopied: 'Block link copied',
+        noPreview: 'No preview'
+      },
+      sync: {
+        pickSource: 'Pick source block…',
+        unlink: 'Unlink (becomes a plain reference link)',
+        selfRef: 'Cannot embed itself',
+        sourceMissing: 'Source block deleted or unreadable',
+      },
       tree: {
         newDoc: 'Doc',
         newBoard: 'Whiteboard',
@@ -2733,6 +2743,7 @@ export const en = {
         subdoc: 'Sub-document',
         copyPageLink: 'Copy page link',
         columns: 'Columns',
+        sync: 'Sync block',
         aiContinue: 'AI continue',
         aiSummarize: 'AI summarize',
         aiToTasks: 'AI to tasks',

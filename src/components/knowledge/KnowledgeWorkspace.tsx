@@ -46,6 +46,7 @@ import {
   revealHeadingInRoot,
   revealInCodeMirror,
   findRevealElementInRoot,
+  revealBlockInRoot,
   revealLineInCodeMirror,
 } from '@/domain/knowledge/searchReveal'
 import { extractDocOutline } from '@/domain/knowledge/mdPreview'
@@ -158,7 +159,10 @@ export function KnowledgeWorkspace() {
           document.querySelector('[data-testid="knowledge-doc-live-editor"]') ??
           document.querySelector('.knowledge-blocknote-editor')
         if (liveRoot instanceof HTMLElement) {
-          const el = findRevealElementInRoot(liveRoot, still.query)
+          // V2-E1 块引用：优先块 id（data-id），其次标题/文本匹配。
+          const el = still.fragment
+            ? revealBlockInRoot(liveRoot, still.fragment, still.query)
+            : findRevealElementInRoot(liveRoot, still.query)
           if (el) {
             // Flash the matched block ~1.2s (prototype `.flash` behavior).
             const target = el.closest('.bn-block-outer') ?? el
@@ -781,8 +785,17 @@ export function KnowledgeWorkspace() {
                   onRequestAttach={() => void attachFiles()}
                   placeholder={t('knowledge.doc.placeholderSlash')}
                   wikiNodes={nodes}
-                  onWikiNavigate={({ title, nodeId, broken }) => {
+                  onWikiNavigate={({ title, nodeId, broken, fragment }) => {
                     if (nodeId) {
+                      if (fragment && activeSpaceId) {
+                        // 块引用：先登记 reveal 目标（块 id → 标题/文本回退），再打开文档。
+                        useKnowledgeStore.getState().setPendingReveal({
+                          query: fragment,
+                          spaceId: activeSpaceId,
+                          docId: nodeId,
+                          fragment,
+                        })
+                      }
                       void openDoc(nodeId)
                       return
                     }

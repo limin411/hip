@@ -4,6 +4,7 @@ import {
   findRevealElementInRoot,
   findRevealMatch,
   findRevealOffset,
+  revealBlockInRoot,
   revealHeadingInRoot,
   revealInPreviewRoot,
 } from './searchReveal'
@@ -104,5 +105,33 @@ describe('findRevealElementInRoot / revealInPreviewRoot', () => {
     const root = document.createElement('div')
     root.innerHTML = '<p>x</p>'
     expect(findRevealElementInRoot(root, '  ')).toBeNull()
+  })
+})
+
+describe('revealBlockInRoot (V2-E1 block refs)', () => {
+  it('scrolls the block with matching data-id and returns it', () => {
+    const root = document.createElement('div')
+    root.innerHTML =
+      '<p>intro</p><div data-id="bn-abc123" data-node-type="blockOuter"><p>target</p></div><p>tail</p>'
+    const target = root.querySelector('[data-id="bn-abc123"]') as HTMLElement
+    const scroll = vi.fn()
+    target.scrollIntoView = scroll
+    const el = revealBlockInRoot(root, 'bn-abc123')
+    expect(el).toBe(target)
+    expect(scroll).toHaveBeenCalled()
+  })
+
+  it('falls back to text match when block id is absent (reload)', () => {
+    const root = document.createElement('div')
+    root.innerHTML = '<p>nothing</p><h2>评测体系</h2>'
+    const el = revealBlockInRoot(root, 'bn-gone', '评测体系')
+    expect(el).not.toBeNull()
+    expect(el!.textContent).toBe('评测体系')
+  })
+
+  it('returns null when nothing matches', () => {
+    const root = document.createElement('div')
+    root.innerHTML = '<p>x</p>'
+    expect(revealBlockInRoot(root, 'bn-gone', 'zzz')).toBeNull()
   })
 })

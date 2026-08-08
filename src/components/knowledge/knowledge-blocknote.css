@@ -826,3 +826,66 @@ mark[data-hip-mark='highlight'] {
   opacity: 1;
   background: var(--accent, #6366f1);
 }
+
+/* ── Sync block (V2-E1) ─────────────────────────────────────────────────── */
+.knowledge-blocknote-editor .kb-sync {
+  border: 1px dashed var(--border, rgba(0, 0, 0, 0.2));
+  border-radius: 0.5rem;
+  padding: 0.4rem 0.6rem;
+  margin: 0.25rem 0;
+  background: color-mix(in srgb, var(--surface, #fff) 70%, transparent);
+}
+.knowledge-blocknote-editor .kb-sync-head {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin-bottom: 0.25rem;
+}
+.knowledge-blocknote-editor .kb-sync-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--accent-strong, #6366f1);
+  cursor: pointer;
+}
+.knowledge-blocknote-editor .kb-sync-title:hover {
+  text-decoration: underline;
+}
+.knowledge-blocknote-editor .kb-sync-external {
+  opacity: 0.6;
+}
+.knowledge-blocknote-editor .kb-sync-action {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  border-radius: 0.25rem;
+  padding: 0.15rem 0.4rem;
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+  background: transparent;
+  transition: background 0.12s;
+}
+.knowledge-blocknote-editor .kb-sync-action:hover {
+  background: var(--state-hover);
+}
+.knowledge-blocknote-editor .kb-sync-self {
+  font-size: 0.7rem;
+  color: var(--danger, #dc2626);
+}
+.knowledge-blocknote-editor .kb-sync-body {
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+}
+.knowledge-blocknote-editor .kb-sync-pre {
+  margin: 0;
+  white-space: pre-wrap;
+  word-break: break-word;
+  font-family: inherit;
+  font-size: inherit;
+}
+.knowledge-blocknote-editor .kb-sync-missing {
+  font-style: italic;
+  opacity: 0.7;
+}

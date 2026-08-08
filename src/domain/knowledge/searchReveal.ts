@@ -92,6 +92,29 @@ export function revealHeadingInRoot(
 }
 
 /**
+ * Scroll a BN block (by `data-id`) into view; returns the element for flash.
+ * Falls back to text-match reveal (fragment may be a heading/text anchor).
+ */
+export function revealBlockInRoot(
+  root: HTMLElement,
+  blockId: string,
+  fallbackQuery?: string,
+): HTMLElement | null {
+  const blockIdMatch = blockId.trim()
+  if (blockIdMatch) {
+    const el = root.querySelector(`[data-id="${CSS.escape(blockIdMatch)}"]`)
+    if (el instanceof HTMLElement) {
+      el.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'nearest' })
+      return el
+    }
+  }
+  if (fallbackQuery) {
+    return findRevealElementInRoot(root, fallbackQuery)
+  }
+  return null
+}
+
+/**
  * Best-effort: walk text nodes under `root` and scroll the first match into view.
  * Preview markdown may reflow tokens; full-query match preferred.
  */

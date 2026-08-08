@@ -2435,7 +2435,17 @@ export const ja = {
       "iconNone": "アイコンなし",
       "iconCustomPlaceholder": "絵文字または貼り付け…"
     },
-    "tree": {
+          "blockRef": {
+        "linkCopied": "ブロックリンクをコピーしました",
+      "noPreview": "プレビューなし"
+      },
+      "sync": {
+        "pickSource": "ソースブロックを選択…",
+        "unlink": "同期解除（通常の参照リンクになります）",
+        "selfRef": "自身は埋め込めません",
+        "sourceMissing": "ソースブロックが削除されたか読み取れません"
+      },
+"tree": {
       "newDoc": "ドキュメント",
       "newBoard": "ホワイトボード",
       "newFolder": "フォルダ",
@@ -2624,6 +2634,7 @@ export const ja = {
       "subdoc": "サブドキュメント",
       "copyPageLink": "ページリンクをコピー",
       "columns": "カラム",
+      "sync": "同期ブロック",
       "aiContinue": "AI 続きを書く",
       "aiSummarize": "AI 要約",
       "aiToTasks": "AI タスク化",

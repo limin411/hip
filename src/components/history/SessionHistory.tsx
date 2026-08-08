@@ -90,13 +90,28 @@ export function SessionHistory({
 
   return (
     <div className="flex flex-1 flex-col overflow-y-auto px-6 py-5" data-testid="session-history">
-      <div className="mb-4 flex items-start justify-between gap-3">
-        <div className="min-w-0">
-          {embeddedInShell ? (
-            <span className="sr-only">{t('history.title')}</span>
-          ) : (
-            <h2 className="text-display font-semibold text-ink">{t('history.title')}</h2>
-          )}
+      <div className="mb-2">
+        {embeddedInShell ? (
+          <span className="sr-only">{t('history.title')}</span>
+        ) : (
+          <h2 className="text-display font-semibold text-ink">{t('history.title')}</h2>
+        )}
+      </div>
+
+      <div className="mb-4 flex items-center justify-between gap-3">
+        <div className="relative max-w-md flex-1">
+          <Search
+            size={16}
+            strokeWidth={1.75}
+            className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-ink-tertiary"
+          />
+          <input
+            type="text"
+            value={query}
+            onChange={(e) => handleQueryChange(e.target.value)}
+            placeholder={t('history.searchPlaceholder')}
+            className="h-9 w-full rounded-sm border border-border bg-surface py-2 pl-9 pr-3 text-body text-ink transition-[border-color,box-shadow] duration-chrome placeholder:text-ink-tertiary focus-visible:border-accent focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-accent/10"
+          />
         </div>
         {filtered.length > 0 && (
           <Button
@@ -109,21 +124,6 @@ export function SessionHistory({
             {t('history.clearAll')}
           </Button>
         )}
-      </div>
-
-      <div className="relative mb-4 max-w-md">
-        <Search
-          size={16}
-          strokeWidth={1.75}
-          className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-ink-tertiary"
-        />
-        <input
-          type="text"
-          value={query}
-          onChange={(e) => handleQueryChange(e.target.value)}
-          placeholder={t('history.searchPlaceholder')}
-          className="h-9 w-full rounded-sm border border-border bg-surface py-2 pl-9 pr-3 text-body text-ink transition-[border-color,box-shadow] duration-chrome placeholder:text-ink-tertiary focus-visible:border-accent focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-accent/10"
-        />
       </div>
 
       <div

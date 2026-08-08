@@ -2754,7 +2754,6 @@ export const zhCN = {
         placeholder: '开始写作…',
         placeholderSlash: '输入文字，或 / 唤起命令',
         emptySlashHint: '输入 / 打开命令',
-        icon: '页面图标',
         viewSource: '查看源码',
         viewLive: '可视化编辑',
         untitled: '未命名',
@@ -2770,9 +2769,6 @@ export const zhCN = {
         largeDocForceSource: '文档过大，实时编辑不可用，已切换到源码模式。',
         largeDocHint:
           '文档较大，为性能考虑当前使用源码模式编辑。你仍可完整编辑全文。',
-        coverAdd: '添加封面',
-        coverChange: '更换封面',
-        coverRemove: '移除封面',
         findPlaceholder: '在文档中查找',
         findPrev: '上一个',
         findNext: '下一个',

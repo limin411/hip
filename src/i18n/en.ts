@@ -2822,7 +2822,6 @@ export const en = {
         placeholder: 'Start writing…',
         placeholderSlash: 'Type text, or / for commands',
         emptySlashHint: "Type '/' for commands",
-        icon: 'Page icon',
         viewSource: 'View source',
         viewLive: 'Visual edit',
         untitled: 'Untitled',
@@ -2839,9 +2838,6 @@ export const en = {
           'Document is too large for Live edit. Switched to Source.',
         largeDocHint:
           'This document is large, so editing uses Source mode for performance. You can still edit the full document.',
-        coverAdd: 'Add cover',
-        coverChange: 'Change cover',
-        coverRemove: 'Remove cover',
         findPlaceholder: 'Find in document',
         findPrev: 'Previous match',
         findNext: 'Next match',

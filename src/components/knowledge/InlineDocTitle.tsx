@@ -66,7 +66,7 @@ export function InlineDocTitle({
         data-testid="knowledge-doc-title"
         className={cn(
           // Same measure as body column (Notion-like page stack).
-          'knowledge-doc-measure shrink-0 px-0 pb-3 pt-10 sm:pt-12 text-page font-semibold tracking-tight text-ink',
+          'knowledge-doc-measure shrink-0 px-0 pb-2 pt-1.5 sm:pt-2 text-page font-semibold tracking-tight text-ink',
           className,
         )}
       >
@@ -82,7 +82,7 @@ export function InlineDocTitle({
       value={draft}
       aria-label={resolvedAria}
       className={cn(
-        'knowledge-doc-measure w-full shrink-0 border-0 bg-transparent px-0 pb-3 pt-10 sm:pt-12 text-page font-semibold tracking-tight text-ink',
+        'knowledge-doc-measure w-full shrink-0 border-0 bg-transparent px-0 pb-2 pt-1.5 sm:pt-2 text-page font-semibold tracking-tight text-ink',
         'placeholder:text-ink-tertiary focus:outline-none focus-visible:ring-0',
         className,
       )}

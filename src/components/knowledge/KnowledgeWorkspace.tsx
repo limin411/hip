@@ -102,7 +102,6 @@ export function KnowledgeWorkspace() {
   const setEditorMode = useKnowledgeStore((s) => s.setEditorMode)
   const setDraftBody = useKnowledgeStore((s) => s.setDraftBody)
   const flushSave = useKnowledgeStore((s) => s.flushSave)
-  const updateActiveDocMeta = useKnowledgeStore((s) => s.updateActiveDocMeta)
   const backlinks = useKnowledgeStore((s) => s.backlinks)
   const toggleFolder = useKnowledgeStore((s) => s.toggleFolder)
   const openDocStore = useKnowledgeStore((s) => s.openDoc)
@@ -389,12 +388,6 @@ export function KnowledgeWorkspace() {
   const showSourceEditor = !isBoard && !showLiveEditor
   /** Body for editor mount (mode/doc switch); not a per-keystroke subscription. */
   const mountMarkdown = useKnowledgeStore.getState().draftBody || docBody
-  const pageMeta = useMemo(
-    () => parseFrontmatter(mountMarkdown).meta,
-    // Recompute when doc switches or body is replaced (not per keystroke).
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [activeDocId, docBody],
-  )
   const wordCount = useMemo(() => {
     const body = parseFrontmatter(mountMarkdown).bodyWithoutFm
     const words = body.trim().match(/\S+/g)
@@ -1052,13 +1045,10 @@ export function KnowledgeWorkspace() {
               <PageHeader
                 docId={activeDocId}
                 title={activeNode?.title ?? t('knowledge.doc.untitled')}
-                meta={pageMeta}
-                spaceId={activeSpaceId}
                 onTitleCommit={(title) => void renameNode(activeDocId, title)}
                 onTitleEnter={() => {
                   liveEditorRef.current?.focus({ at: 'start' })
                 }}
-                onMetaChange={(patch) => updateActiveDocMeta(patch)}
               />
               <Suspense
                 fallback={
@@ -1132,13 +1122,10 @@ export function KnowledgeWorkspace() {
               <PageHeader
                 docId={activeDocId}
                 title={activeNode?.title ?? t('knowledge.doc.untitled')}
-                meta={pageMeta}
-                spaceId={activeSpaceId}
                 onTitleCommit={(title) => void renameNode(activeDocId, title)}
                 onTitleEnter={() => {
                   editorRef.current?.focus()
                 }}
-                onMetaChange={(patch) => updateActiveDocMeta(patch)}
               />
               {liveSuppressed ? (
                 <div className="knowledge-doc-inline-pad mt-2" data-testid="knowledge-large-doc-banner-wrap">

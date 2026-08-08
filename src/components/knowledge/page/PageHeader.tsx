@@ -1,6 +1,5 @@
 import { InlineDocTitle } from '../InlineDocTitle'
 import { PageIconButton } from './PageIconButton'
-import { PageProperties } from './PageProperties'
 import { PageCover } from './PageCover'
 import type { KnowledgeDocMeta } from '@/domain/knowledge/frontmatter'
 import { cn } from '@/lib/utils'
@@ -14,7 +13,6 @@ export interface PageHeaderProps {
   onTitleEnter?: () => void
   onMetaChange: (patch: Partial<KnowledgeDocMeta>) => void
   showCover?: boolean
-  showProperties?: boolean
   className?: string
 }
 
@@ -27,7 +25,6 @@ export function PageHeader({
   onTitleEnter,
   onMetaChange,
   showCover = true,
-  showProperties = true,
   className,
 }: PageHeaderProps) {
   return (
@@ -64,9 +61,6 @@ export function PageHeader({
           />
         </div>
       </div>
-      {showProperties ? (
-        <PageProperties meta={meta} onChange={onMetaChange} />
-      ) : null}
     </header>
   )
 }

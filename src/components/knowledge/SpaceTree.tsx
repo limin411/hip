@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type KeyboardEvent, type PointerEvent as ReactPointerEvent } from 'react'
+import { useEffect, useRef, useState, type KeyboardEvent, type PointerEvent as ReactPointerEvent } from 'react'
 import { useTranslation } from 'react-i18next'
 import {
   ChevronDown,
@@ -8,7 +8,6 @@ import {
   FolderOpen,
   GripVertical,
   Library,
-  Star,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import type { KnowledgeNode } from '@/domain/knowledge/types'
@@ -140,7 +139,6 @@ export function SpaceTree({
   const activeSpaceId = useKnowledgeStore((s) => s.activeSpaceId)
   const expanded = useKnowledgeStore((s) => s.expandedFolderIds)
   const busy = useKnowledgeStore((s) => s.busy)
-  const starredDocs = useKnowledgeStore((s) => s.starredDocs)
   const openDoc = useKnowledgeStore((s) => s.openDoc)
   const toggleFolder = useKnowledgeStore((s) => s.toggleFolder)
   const moveNode = useKnowledgeStore((s) => s.moveNode)
@@ -160,11 +158,6 @@ export function SpaceTree({
 
   const roots = listChildren(nodes, null)
   const visibleRows = listVisibleTreeNodes(nodes, expanded, visibleIds)
-  /** Starred docs in the ACTIVE space only (openDoc is space-scoped). */
-  const spaceStarred = useMemo(
-    () => starredDocs.filter((s) => s.spaceId === activeSpaceId),
-    [starredDocs, activeSpaceId],
-  )
 
   // Roving focus: move DOM focus onto the focused row when treeFocusId changes.
   useEffect(() => {
@@ -609,36 +602,6 @@ export function SpaceTree({
       className="flex flex-col gap-px"
       onKeyDown={onTreeKeyDown}
     >
-      {spaceStarred.length > 0 ? (
-        <div className="flex flex-col gap-px pb-1" data-testid="knowledge-tree-starred">
-          <div className="flex items-center gap-1.5 px-2 pb-0.5 pt-1 text-meta font-medium uppercase tracking-wide text-ink-tertiary">
-            <Star size={12} strokeWidth={1.75} className="text-accent-strong" />
-            <span>{t('knowledge.tree.starred')}</span>
-          </div>
-          {spaceStarred.map((hit) => (
-            <button
-              key={hit.docId}
-              type="button"
-              data-testid={`knowledge-tree-starred-${hit.docId}`}
-              className={cn(
-                'flex w-full min-h-[30px] items-center gap-1.5 rounded-lg py-1 pr-1.5 pl-5 text-left text-body outline-none select-none',
-                activeDocId === hit.docId
-                  ? TREE_ACTIVE_DOC
-                  : 'text-ink hover:bg-state-hover',
-              )}
-              onClick={() => {
-                setTreeFocusId(hit.docId)
-                void openDoc(hit.docId)
-              }}
-            >
-              <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-md text-ink-tertiary">
-                <FileText size={14} strokeWidth={1.75} />
-              </span>
-              <span className="truncate leading-snug tracking-tight">{hit.title}</span>
-            </button>
-          ))}
-        </div>
-      ) : null}
       {roots.map((n) => renderNode(n, 0))}
     </div>
   )

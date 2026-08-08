@@ -26,7 +26,7 @@ import { useKnowledgeStore } from '@/store/knowledgeStore'
 function sortLevel(a: KnowledgeNode, b: KnowledgeNode): number {
   if (a.kind === 'folder' && b.kind !== 'folder') return -1
   if (a.kind !== 'folder' && b.kind === 'folder') return 1
-  return b.updatedAt - a.updatedAt
+  return a.title.localeCompare(b.title)
 }
 
 const CRUMB_MAX = 3

@@ -22,11 +22,11 @@ import type { KnowledgeNode } from '@/domain/knowledge/types'
 import { cn } from '@/lib/utils'
 import { useKnowledgeStore } from '@/store/knowledgeStore'
 
-/** 当前层级排序：文件夹优先，其次按更新时间倒序（与视觉稿一致）。 */
+/** 当前层级排序：文件夹优先，其次按名称排序。 */
 function sortLevel(a: KnowledgeNode, b: KnowledgeNode): number {
   if (a.kind === 'folder' && b.kind !== 'folder') return -1
   if (a.kind !== 'folder' && b.kind === 'folder') return 1
-  return b.updatedAt - a.updatedAt
+  return a.title.localeCompare(b.title)
 }
 
 /** 迷你面包屑最多显示的祖先段数（超出折叠为 …）。 */

@@ -75,3 +75,48 @@ describe('DocOutline', () => {
     expect(screen.queryByTestId('knowledge-doc-outline-item-fake')).not.toBeInTheDocument()
   })
 })
+
+describe('DocOutline virtualization (V2-P1 T6.1)', () => {
+  it('virtualizes beyond 200 headings (renders a window, not all rows)', () => {
+    const many = Array.from({ length: 500 }, (_, i) => `## 标题 ${i}`).join('\n')
+    const { container } = render(
+      <DocOutline content={many} onSelect={() => {}} />,
+    )
+    expect(container.querySelector('[data-virtual="true"]')).not.toBeNull()
+    // 窗口渲染：远少于 500 行。
+    const rows = container.querySelectorAll('[data-testid^="knowledge-doc-outline-item-"]')
+    expect(rows.length).toBeLessThan(100)
+    // 顶部 spacer 存在。
+    expect(container.querySelector('li[aria-hidden]')).not.toBeNull()
+  })
+
+  it('renders all rows below the threshold (no behavior change)', () => {
+    const few = Array.from({ length: 50 }, (_, i) => `## 标题 ${i}`).join('\n')
+    const { container } = render(
+      <DocOutline content={few} onSelect={() => {}} />,
+    )
+    expect(container.querySelector('[data-virtual]')).toBeNull()
+    expect(
+      container.querySelectorAll('[data-testid^="knowledge-doc-outline-item-"]').length,
+    ).toBe(50)
+  })
+
+  it('scrolling reveals later headings', () => {
+    const many = Array.from({ length: 400 }, (_, i) => `## 标题 ${i}`).join('\n')
+    const { container } = render(
+      <DocOutline content={many} onSelect={() => {}} />,
+    )
+    const list = container.querySelector('ol')!
+    // 模拟滚动到第 300 行（标题索引；行号 = 2*i+1）。
+    Object.defineProperty(list, 'clientHeight', { value: 600, configurable: true })
+    Object.defineProperty(list, 'scrollTop', { value: 300 * 30, configurable: true, writable: true })
+    fireEvent.scroll(list)
+    const labels = Array.from(
+      container.querySelectorAll('[data-testid^="knowledge-doc-outline-item-"]'),
+    ).map((el) => Number(el.getAttribute('data-outline-line')))
+    // 窗口内标题行号 ≈ 289–312（标题索引 288–312）。
+    expect(labels.some((l) => l >= 289)).toBe(true)
+    expect(labels.every((l) => l > 100)).toBe(true)
+    expect(labels.length).toBeLessThan(100)
+  })
+})

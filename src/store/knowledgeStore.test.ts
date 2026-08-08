@@ -2505,3 +2505,80 @@ describe('knowledgeStore broken-link repair (V2-L1 T5.3/T5.4)', () => {
     expect(writeCalls[0]![2]).toContain('[[新目标]]')
   })
 })
+
+describe('knowledgeStore search index incremental update (V2-P1 T6.3)', () => {
+  beforeEach(() => {
+    knowledgeWriteDoc.mockReset()
+    knowledgeWriteDoc.mockResolvedValue(undefined)
+    knowledgeReadDoc.mockReset()
+    knowledgeReadDoc.mockResolvedValue('# old')
+    knowledgeGetTree.mockReset()
+    knowledgeEnsureRoot.mockReset()
+    knowledgeListSpaces.mockReset()
+    useKnowledgeStore.setState({
+      loaded: true,
+      spaces: [{ id: 'spc_1', name: 'S', createdAt: 1, updatedAt: 1 }],
+      activeSpaceId: 'spc_1',
+      nodes: [
+        { id: 'doc_a', parentId: null, kind: 'doc', title: 'Alpha', order: 0, createdAt: 1, updatedAt: 1 },
+        { id: 'doc_b', parentId: null, kind: 'doc', title: 'Beta', order: 1, createdAt: 1, updatedAt: 1 },
+      ],
+      activeDocId: 'doc_a',
+      treeFocusId: 'doc_a',
+      docBody: '# old',
+      draftBody: '# old',
+      editorMode: 'live',
+      mode: 'workspace',
+      searchQuery: '',
+      searchHits: [],
+      indexStatus: 'ready',
+      spaceDocCounts: { spc_1: 2 },
+      recent: [],
+      expandedFolderIds: {},
+      busy: false,
+      error: null,
+      saveState: 'idle',
+      backlinks: [],
+      outboundLinks: [],
+      brokenLinks: [],
+      linkPanelStatus: 'idle',
+    })
+  })
+
+  it('saving one doc updates only its index entry — no full rebuild', async () => {
+    const { __seedKbIndexForTests, searchKnowledgeDocs } = await import('./knowledgeStore')
+    __seedKbIndexForTests([
+      {
+        id: 'spc_1:doc_a',
+        spaceId: 'spc_1',
+        docId: 'doc_a',
+        title: 'Alpha',
+        spaceName: 'S',
+        path: 'Alpha',
+        body: '# old words',
+      },
+      {
+        id: 'spc_1:doc_b',
+        spaceId: 'spc_1',
+        docId: 'doc_b',
+        title: 'Beta',
+        spaceName: 'S',
+        path: 'Beta',
+        body: 'beta only',
+      },
+    ])
+    // 编辑 doc_a 并保存。
+    useKnowledgeStore.getState().setDraftBody('# brand new unique-token-alpha', {
+      docId: 'doc_a',
+      persist: 'now',
+    })
+    await vi.waitFor(() => {
+      expect(knowledgeWriteDoc).toHaveBeenCalled()
+    })
+    // 单文档变更不触发全量重建（indexStatus 保持 ready，无 building 阶段）。
+    expect(useKnowledgeStore.getState().indexStatus).toBe('ready')
+    // 增量路径：doc_a 新内容可检索，doc_b 内容不受影响。
+    expect(searchKnowledgeDocs('unique-token-alpha').map((h) => h.docId)).toContain('doc_a')
+    expect(searchKnowledgeDocs('beta only').map((h) => h.docId)).toContain('doc_b')
+  })
+})

@@ -33,7 +33,7 @@ export function KnowledgeDocCanvas({
     <div
       data-testid="knowledge-doc-canvas"
       className={cn(
-        // Full-bleed in main: stretch width/height; modest horizontal pad for prose.
+        // Full-bleed in main: stretch width/height (gutter lives on scrollports).
         'flex min-h-0 w-full flex-1 flex-col',
         className,
       )}
@@ -42,8 +42,9 @@ export function KnowledgeDocCanvas({
         data-testid="knowledge-doc-paper"
         className={cn(
           DOC_PAGE_SHELL,
-          // Side padding only — content uses the full stage, not a floating card.
-          'px-8 sm:px-12 lg:px-16',
+          // No horizontal pad on the paper host — scrollports own
+          // `.knowledge-doc-inline-pad` so the scrollbar can sit on the
+          // main panel's far right edge (content stays guttered).
           paperClassName,
         )}
       >

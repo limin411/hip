@@ -62,21 +62,23 @@ export function PageCover({
     return (
       <div
         className={cn(
-          'knowledge-doc-measure group relative mb-2 flex h-10 items-center',
+          'knowledge-doc-inline-pad group relative mb-2 flex h-10 items-center',
           className,
         )}
         data-testid="knowledge-page-cover-empty"
       >
-        <button
-          type="button"
-          disabled={disabled || !spaceId}
-          className="flex items-center gap-1.5 rounded-sm px-1.5 py-1 text-meta text-ink-tertiary opacity-0 transition-opacity hover:bg-state-hover hover:text-ink group-hover:opacity-100 focus-visible:opacity-100"
-          data-testid="knowledge-page-cover-add"
-          onClick={() => inputRef.current?.click()}
-        >
-          <ImagePlus size={14} />
-          {t('knowledge.doc.coverAdd')}
-        </button>
+        <div className="knowledge-doc-measure flex h-full w-full items-center">
+          <button
+            type="button"
+            disabled={disabled || !spaceId}
+            className="flex items-center gap-1.5 rounded-sm px-1.5 py-1 text-meta text-ink-tertiary opacity-0 transition-opacity hover:bg-state-hover hover:text-ink group-hover:opacity-100 focus-visible:opacity-100"
+            data-testid="knowledge-page-cover-add"
+            onClick={() => inputRef.current?.click()}
+          >
+            <ImagePlus size={14} />
+            {t('knowledge.doc.coverAdd')}
+          </button>
+        </div>
         <input
           ref={inputRef}
           type="file"

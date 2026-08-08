@@ -626,26 +626,28 @@ export const DocEditor = forwardRef<DocEditorHandle, DocEditorProps>(function Do
         className="flex min-h-0 flex-1 flex-col overflow-hidden text-prose [&_.cm-editor]:h-full"
       />
       <footer
-        className="knowledge-doc-measure flex shrink-0 items-center justify-end gap-3 border-t border-border/70 px-3 py-1 text-meta text-ink-tertiary"
+        className="knowledge-doc-inline-pad flex shrink-0 border-t border-border/70 py-1 text-meta text-ink-tertiary"
         data-testid="knowledge-source-statusbar"
       >
-        {fmOn ? (
-          <span
-            data-testid="kb-status-fm"
-            title={t('knowledge.doc.statusBar.fmTitle')}
-          >
-            FM
+        <div className="knowledge-doc-measure flex w-full items-center justify-end gap-3">
+          {fmOn ? (
+            <span
+              data-testid="kb-status-fm"
+              title={t('knowledge.doc.statusBar.fmTitle')}
+            >
+              FM
+            </span>
+          ) : null}
+          <span data-testid="kb-status-words">
+            {t('knowledge.doc.statusBar.words', { count: wordCount })}
           </span>
-        ) : null}
-        <span data-testid="kb-status-words">
-          {t('knowledge.doc.statusBar.words', { count: wordCount })}
-        </span>
-        <span data-testid="kb-status-cursor">
-          {t('knowledge.doc.statusBar.lineCol', {
-            line: cursor?.line ?? 1,
-            col: cursor?.col ?? 1,
-          })}
-        </span>
+          <span data-testid="kb-status-cursor">
+            {t('knowledge.doc.statusBar.lineCol', {
+              line: cursor?.line ?? 1,
+              col: cursor?.col ?? 1,
+            })}
+          </span>
+        </div>
       </footer>
     </div>
   )

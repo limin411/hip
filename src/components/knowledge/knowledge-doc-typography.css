@@ -29,6 +29,31 @@
 }
 
 /**
+ * Stage gutter for doc chrome + scrollports.
+ * Keep this off the paper host so overflow scrollbars can sit on the
+ * main panel's far right edge; content stays inset via this class.
+ * Source CM scroller is included so its bar aligns with Live.
+ */
+.knowledge-doc-inline-pad,
+[data-testid='knowledge-doc-editor'] .cm-scroller {
+  padding-inline: 2rem;
+}
+
+@media (min-width: 640px) {
+  .knowledge-doc-inline-pad,
+  [data-testid='knowledge-doc-editor'] .cm-scroller {
+    padding-inline: 3rem;
+  }
+}
+
+@media (min-width: 1024px) {
+  .knowledge-doc-inline-pad,
+  [data-testid='knowledge-doc-editor'] .cm-scroller {
+    padding-inline: 4rem;
+  }
+}
+
+/**
  * Reader / embed prose — same type scale as Live/Source (--kb-*).
  * Replaces chat `markdownProseClassName` (14px) on knowledge surfaces.
  * Fallbacks keep scale if host is outside [data-testid=knowledge-doc-paper].

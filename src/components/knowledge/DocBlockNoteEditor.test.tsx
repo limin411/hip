@@ -171,6 +171,24 @@ describe('DocBlockNoteEditor', () => {
     expect(replaceBlocks).toHaveBeenCalled()
   })
 
+  it('scrollport is full-width (measure stays off the overflow root)', async () => {
+    await act(async () => {
+      render(
+        <DocBlockNoteEditor
+          docId="doc_scroll"
+          initialMarkdown="# Hi"
+          onDraftChange={() => {}}
+        />,
+      )
+    })
+    const host = screen.getAllByTestId('knowledge-doc-live-editor')[0]
+    expect(host.className).toContain('overflow-y-auto')
+    expect(host.className).toContain('knowledge-doc-inline-pad')
+    expect(host.className).toContain('w-full')
+    // Measure on the scroller pinned the bar to the prose column; keep it off.
+    expect(host.className).not.toContain('knowledge-doc-measure')
+  })
+
   it('onChange + flushDraft emits markdown with frontmatter prefix', async () => {
     const onDraft = vi.fn()
     const ref = createRef<DocBlockNoteEditorHandle>()

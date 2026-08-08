@@ -1205,7 +1205,7 @@ export const DocBlockNoteEditor = forwardRef<
     <KnowledgeEditorHostContext.Provider value={hostValue}>
       <div
         ref={rootRef}
-        className="knowledge-blocknote-editor knowledge-doc-measure flex min-h-0 flex-1 flex-col overflow-y-auto"
+        className="knowledge-blocknote-editor knowledge-doc-inline-pad flex min-h-0 w-full flex-1 flex-col overflow-y-auto"
         data-testid="knowledge-doc-live-editor"
         data-code-block-theme={codeBlockThemePref}
         style={codeBlockStyle}

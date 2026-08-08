@@ -32,6 +32,9 @@
   --bn-border-radius: 0.5rem;
   background: transparent !important;
   height: 100%;
+  width: 100%;
+  max-width: var(--kb-measure, 46rem);
+  margin-inline: auto;
   font-family: var(--kb-font-family);
 }
 

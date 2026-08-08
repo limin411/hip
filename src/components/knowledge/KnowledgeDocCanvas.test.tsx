@@ -48,4 +48,17 @@ describe('KnowledgeDocCanvas', () => {
     expect(screen.getByTestId('knowledge-doc-canvas').className).toContain('min-h-0')
     expect(screen.getByTestId('knowledge-doc-paper').className).toContain('overflow-hidden')
   })
+
+  it('keeps horizontal gutter off the paper host (scrollbar can sit on panel edge)', () => {
+    render(
+      <KnowledgeDocCanvas>
+        <span>body</span>
+      </KnowledgeDocCanvas>,
+    )
+    const paper = screen.getByTestId('knowledge-doc-paper')
+    expect(paper.className).not.toMatch(/\bpx-8\b/)
+    expect(paper.className).not.toMatch(/\bsm:px-12\b/)
+    expect(paper.className).not.toMatch(/\blg:px-16\b/)
+    expect(paper.className).not.toContain('knowledge-doc-inline-pad')
+  })
 })

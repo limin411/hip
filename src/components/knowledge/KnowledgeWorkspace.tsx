@@ -1109,15 +1109,17 @@ export function KnowledgeWorkspace() {
                 />
               </Suspense>
               <footer
-                className="knowledge-doc-measure flex shrink-0 items-center gap-3 pb-6 pt-2 text-meta text-ink-tertiary"
+                className="knowledge-doc-inline-pad flex shrink-0 pb-6 pt-2 text-meta text-ink-tertiary"
                 data-testid="knowledge-doc-footer"
               >
-                <span data-testid="knowledge-doc-word-count">
-                  {t('knowledge.doc.wordCount', { count: wordCount })}
-                </span>
-                <span data-testid="knowledge-doc-backlink-count">
-                  {t('knowledge.doc.backlinkCount', { count: backlinks.length })}
-                </span>
+                <div className="knowledge-doc-measure flex items-center gap-3">
+                  <span data-testid="knowledge-doc-word-count">
+                    {t('knowledge.doc.wordCount', { count: wordCount })}
+                  </span>
+                  <span data-testid="knowledge-doc-backlink-count">
+                    {t('knowledge.doc.backlinkCount', { count: backlinks.length })}
+                  </span>
+                </div>
               </footer>
             </KnowledgeDocCanvas>
           </div>
@@ -1139,12 +1141,14 @@ export function KnowledgeWorkspace() {
                 onMetaChange={(patch) => updateActiveDocMeta(patch)}
               />
               {liveSuppressed ? (
-                <div
-                  className="knowledge-doc-measure mt-2 rounded-md border border-border bg-surface-muted/80 px-3 py-2 text-meta text-ink-secondary"
-                  data-testid="knowledge-large-doc-banner"
-                  role="status"
-                >
-                  {t('knowledge.doc.largeDocHint')}
+                <div className="knowledge-doc-inline-pad mt-2" data-testid="knowledge-large-doc-banner-wrap">
+                  <div
+                    className="knowledge-doc-measure rounded-md border border-border bg-surface-muted/80 px-3 py-2 text-meta text-ink-secondary"
+                    data-testid="knowledge-large-doc-banner"
+                    role="status"
+                  >
+                    {t('knowledge.doc.largeDocHint')}
+                  </div>
                 </div>
               ) : null}
               <DocEditor
@@ -1162,15 +1166,17 @@ export function KnowledgeWorkspace() {
                 wikiNodes={nodes}
               />
               <footer
-                className="knowledge-doc-measure flex shrink-0 items-center gap-3 pb-6 pt-2 text-meta text-ink-tertiary"
+                className="knowledge-doc-inline-pad flex shrink-0 pb-6 pt-2 text-meta text-ink-tertiary"
                 data-testid="knowledge-doc-footer"
               >
-                <span>
-                  {t('knowledge.doc.wordCount', { count: wordCount })}
-                </span>
-                <span>
-                  {t('knowledge.doc.backlinkCount', { count: backlinks.length })}
-                </span>
+                <div className="knowledge-doc-measure flex items-center gap-3">
+                  <span>
+                    {t('knowledge.doc.wordCount', { count: wordCount })}
+                  </span>
+                  <span>
+                    {t('knowledge.doc.backlinkCount', { count: backlinks.length })}
+                  </span>
+                </div>
               </footer>
             </KnowledgeDocCanvas>
           </div>

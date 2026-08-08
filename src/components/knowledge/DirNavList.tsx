@@ -39,7 +39,6 @@ export function DirNavList() {
   const activeSpaceId = useKnowledgeStore((s) => s.activeSpaceId)
   const busy = useKnowledgeStore((s) => s.busy)
 
-  const [query, setQuery] = useState('')
   const [newKind, setNewKind] = useState<'folder' | 'doc' | null>(null)
   const [newTitle, setNewTitle] = useState('')
   const [menuOpen, setMenuOpen] = useState(false)
@@ -70,10 +69,8 @@ export function DirNavList() {
 
   const level = useMemo(() => {
     const children = listChildren(nodes, currentFolderId)
-    const q = query.trim().toLowerCase()
-    if (!q) return [...children].sort(sortLevel)
-    return children.filter((n) => n.title.toLowerCase().includes(q)).sort(sortLevel)
-  }, [nodes, currentFolderId, query])
+    return [...children].sort(sortLevel)
+  }, [nodes, currentFolderId])
 
   const atRoot = currentFolderId == null
 
@@ -141,7 +138,6 @@ export function DirNavList() {
     node.kind === 'folder' ? node.id : node.parentId
 
   const noChildren = level.length === 0 && !newKind
-  const searchNoMatch = level.length === 0 && query.trim() !== ''
 
   return (
     <div className="flex min-h-0 flex-col" data-testid="dir-nav-list">
@@ -313,19 +309,6 @@ export function DirNavList() {
         </div>
       ) : null}
 
-      {/* 搜索：过滤当前层级 */}
-      <div className="mb-1 px-1">
-        <input
-          type="text"
-          data-testid="dir-nav-search"
-          data-no-drag
-          value={query}
-          placeholder={t('knowledge.tree.filterPlaceholder')}
-          onChange={(e) => setQuery(e.target.value)}
-          className="h-7 w-full rounded-md border border-border bg-surface px-2 text-caption text-ink outline-none transition-colors placeholder:text-ink-tertiary focus:border-accent/50 focus:ring-1 focus:ring-accent/30"
-        />
-      </div>
-
       {/* 当前层级列表 */}
       <div
         className="relative min-h-0 flex-1 overflow-y-auto"
@@ -467,15 +450,7 @@ export function DirNavList() {
           </ul>
 
           {/* 空态 */}
-          {searchNoMatch ? (
-            <p
-              className="px-2 py-3 text-center text-meta text-ink-tertiary"
-              role="status"
-              data-testid="dir-empty-search"
-            >
-              {t('sidebar.emptySearch')}
-            </p>
-          ) : noChildren ? (
+          {noChildren ? (
             <div
               className="flex flex-col items-center gap-1 px-2 py-4 text-center"
               role="status"

@@ -23,7 +23,6 @@ import {
   Zap,
 } from 'lucide-react'
 import { sessionService, useActiveSessionId, useSessions, type SessionVM } from '@/domain'
-import { HIP_PRODUCT_VERSION } from '@/domain/product'
 import { isMacPlatform } from '@/lib/platform'
 import { isTerminalSession, surfaceOf } from '@/lib/sessions'
 import { groupSessionsByProjectPath, projectPathKey } from '@/lib/sessionProjectGroups'
@@ -311,48 +310,41 @@ export function AppSidebar() {
           >
             <PanelLeftClose {...titlebarIconProps} />
           </button>
-          {!settingsOpen ? (
-            <>
-              <button
-                type="button"
-                data-testid="sidebar-nav-back"
-                data-no-drag
-                title={t('sidebar.navBack')}
-                aria-label={t('sidebar.navBackAria')}
-                disabled={!canGoBack}
-                onClick={() => void goNavBack()}
-                className={titlebarNavBtnClass}
-              >
-                <ChevronLeft {...titlebarIconProps} />
-              </button>
-              <button
-                type="button"
-                data-testid="sidebar-nav-forward"
-                data-no-drag
-                title={t('sidebar.navForward')}
-                aria-label={t('sidebar.navForwardAria')}
-                disabled={!canGoForward}
-                onClick={() => void goNavForward()}
-                className={titlebarNavBtnClass}
-              >
-                <ChevronRight {...titlebarIconProps} />
-              </button>
-            </>
-          ) : null}
         </div>
+        {!settingsOpen ? (
+          <div className="flex h-full flex-1 items-center justify-end gap-0.5 pr-2">
+            <button
+              type="button"
+              data-testid="sidebar-nav-back"
+              data-no-drag
+              title={t('sidebar.navBack')}
+              aria-label={t('sidebar.navBackAria')}
+              disabled={!canGoBack}
+              onClick={() => void goNavBack()}
+              className={titlebarNavBtnClass}
+            >
+              <ChevronLeft {...titlebarIconProps} />
+            </button>
+            <button
+              type="button"
+              data-testid="sidebar-nav-forward"
+              data-no-drag
+              title={t('sidebar.navForward')}
+              aria-label={t('sidebar.navForwardAria')}
+              disabled={!canGoForward}
+              onClick={() => void goNavForward()}
+              className={titlebarNavBtnClass}
+            >
+              <ChevronRight {...titlebarIconProps} />
+            </button>
+          </div>
+        ) : null}
       </div>
 
       {settingsOpen ? (
         <SettingsSidebarContent />
       ) : (
         <>
-      <div
-        className="px-3 pb-1.5 pt-0 text-caption tabular-nums tracking-wide text-ink-tertiary"
-        data-testid="sidebar-app-version"
-      >
-        HIP {HIP_PRODUCT_VERSION}
-      </div>
-
       <nav className="flex shrink-0 flex-col gap-0.5 px-2 pb-3" aria-label={t('sidebar.navAria')}>
         <NavItem
           section="chats"

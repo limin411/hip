@@ -157,7 +157,7 @@ describe('AppSidebar', () => {
     expect(screen.getByTestId('sidebar-nav-forward')).toBeInTheDocument()
     expect(screen.queryByTestId('sidebar-search')).not.toBeInTheDocument()
     expect(screen.getByTestId('sidebar-toggle')).toBeInTheDocument()
-    expect(screen.getByTestId('sidebar-app-version')).toHaveTextContent(/^HIP \d+\.\d+\.\d+/)
+    expect(screen.queryByTestId('sidebar-app-version')).not.toBeInTheDocument()
     expect(screen.getByTestId('sidebar-nav-terminals')).toBeInTheDocument()
     expect(screen.getByTestId('sidebar-nav-tasks')).toBeInTheDocument()
     expect(screen.getByTestId('sidebar-nav-automation')).toBeInTheDocument()
@@ -173,13 +173,18 @@ describe('AppSidebar', () => {
     const toggle = screen.getByTestId('sidebar-toggle')
     expect(back).toBeDisabled()
     expect(forward).toBeDisabled()
-    // DOM order: toggle, back, forward
+    // DOM order: toggle in its own container; back, forward right-aligned together
     const parent = toggle.parentElement
     expect(parent).toBeTruthy()
     const buttons = within(parent!).getAllByRole('button')
+    expect(buttons).toHaveLength(1)
     expect(buttons[0]).toBe(toggle)
-    expect(buttons[1]).toBe(back)
-    expect(buttons[2]).toBe(forward)
+    const navParent = back.parentElement
+    expect(navParent).toBe(forward.parentElement)
+    const navButtons = within(navParent!).getAllByRole('button')
+    expect(navButtons[0]).toBe(back)
+    expect(navButtons[1]).toBe(forward)
+    expect(navParent).toHaveClass('justify-end')
   })
 
   it('active nav uses surface wash without left rail or hairline ring', () => {

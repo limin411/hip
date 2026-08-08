@@ -2525,10 +2525,7 @@ export const zhCN = {
         backHome: '返回空间列表',
         dragHandle: '拖动以排序',
       },
-      recent: {
-        sidebarTitle: '最近',
-        remove: '从最近移除',
-      },
+      
       board: {
         untitled: '未命名画板',
         titleLabel: '画板标题',

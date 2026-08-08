@@ -2486,10 +2486,6 @@ export const ja = {
       "renameUpdateLinks": "古いタイトルを参照するWikiリンクも更新する",
       "renameLinksDone": "{{count}}件のドキュメントのWikiリンクを更新しました"
     },
-    "recent": {
-      "sidebarTitle": "最近",
-      "remove": "最近から削除"
-    },
     "board": {
       "untitled": "無題のホワイトボード",
       "titleLabel": "ホワイトボードのタイトル",

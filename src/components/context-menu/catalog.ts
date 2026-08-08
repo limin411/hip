@@ -434,13 +434,6 @@ const STATIC_CATALOG: ContextMenuItemMeta[] = [
     group: 'primary',
   },
   {
-    id: 'knowledgeRecent.remove',
-    labelKey: 'knowledge.recent.remove',
-    kind: 'knowledgeRecent',
-    group: 'danger',
-    danger: true,
-  },
-  {
     id: 'skillConfig.view',
     labelKey: 'settings.skill.view',
     kind: 'skillConfig',

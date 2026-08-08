@@ -2486,10 +2486,6 @@ export const ko = {
       "renameUpdateLinks": "이전 제목을 가리키는 위키 링크도 업데이트",
       "renameLinksDone": "{{count}}개 문서의 위키 링크를 업데이트했습니다"
     },
-    "recent": {
-      "sidebarTitle": "최근",
-      "remove": "최근에서 제거"
-    },
     "board": {
       "untitled": "제목 없는 화이트보드",
       "titleLabel": "화이트보드 제목",

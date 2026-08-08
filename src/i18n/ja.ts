@@ -2617,7 +2617,6 @@ export const ja = {
         "list": "リスト",
         "media": "メディア",
         "advanced": "高度",
-          "ai": "AI"
       },
       "h1": "見出し1",
       "h2": "見出し2",
@@ -2649,11 +2648,6 @@ export const ja = {
       "copyPageLink": "ページリンクをコピー",
       "columns": "カラム",
       "sync": "同期ブロック",
-      "aiContinue": "AI 続きを書く",
-      "aiSummarize": "AI 要約",
-      "aiToTasks": "AI タスク化",
-      "aiExplain": "AI 説明",
-      "aiRewrite": "AI 書き換え"
     },
     "workspace": {
       "new": "新規",
@@ -2790,7 +2784,6 @@ export const ja = {
       "multiSelectHeading": "見出しに変換",
       "multiSelectQuote": "引用に変換",
       "multiSelectDelete": "削除",
-      "aiStarted": "AI リクエストをチャットに送信しました",
       "linkCopied": "ページリンクをコピーしました",
       "linkCopyFailed": "ページリンクをコピーできませんでした"
     },

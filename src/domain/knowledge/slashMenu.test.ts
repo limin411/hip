@@ -231,11 +231,6 @@ describe('slashMenu', () => {
         'wiki',
         'embed',
         'copyPageLink',
-        'aiContinue',
-        'aiSummarize',
-        'aiToTasks',
-        'aiExplain',
-        'aiRewrite',
       ])
     })
 

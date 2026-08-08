@@ -2619,7 +2619,6 @@ export const zhTW = {
         "list": "清單",
         "media": "媒體",
         "advanced": "進階",
-        "ai": "AI"
       },
       "h1": "一級標題",
       "h2": "二級標題",
@@ -2651,11 +2650,6 @@ export const zhTW = {
       "copyPageLink": "Copy page link",
       "columns": "Columns",
       "sync": "Sync block",
-      "aiContinue": "AI continue",
-      "aiSummarize": "AI summarize",
-      "aiToTasks": "AI to tasks",
-      "aiExplain": "AI explain",
-      "aiRewrite": "AI rewrite"
     },
     "workspace": {
       "new": "新增",
@@ -2792,7 +2786,6 @@ export const zhTW = {
       "multiSelectHeading": "轉標題",
       "multiSelectQuote": "轉引用",
       "multiSelectDelete": "刪除",
-      "aiStarted": "已向對話傳送 AI 請求",
       "linkCopied": "頁面連結已複製",
       "linkCopyFailed": "無法複製頁面連結"
     },

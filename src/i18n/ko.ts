@@ -2617,7 +2617,6 @@ export const ko = {
         "list": "목록",
         "media": "미디어",
         "advanced": "고급",
-          "ai": "AI"
       },
       "h1": "제목 1",
       "h2": "제목 2",
@@ -2649,11 +2648,6 @@ export const ko = {
       "copyPageLink": "페이지 링크 복사",
       "columns": "컬럼",
       "sync": "동기화 블록",
-      "aiContinue": "AI 이어쓰기",
-      "aiSummarize": "AI 요약",
-      "aiToTasks": "AI 작업 추출",
-      "aiExplain": "AI 설명",
-      "aiRewrite": "AI 다시 쓰기"
     },
     "workspace": {
       "new": "새로 만들기",
@@ -2790,7 +2784,6 @@ export const ko = {
       "multiSelectHeading": "제목으로",
       "multiSelectQuote": "인용으로",
       "multiSelectDelete": "삭제",
-      "aiStarted": "AI 요청을 채팅으로 보냈습니다",
       "linkCopied": "페이지 링크를 복사했습니다",
       "linkCopyFailed": "페이지 링크를 복사할 수 없습니다"
     },

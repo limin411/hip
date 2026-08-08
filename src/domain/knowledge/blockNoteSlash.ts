@@ -11,7 +11,6 @@ import {
   type KnowledgeSlashItem,
   SLASH_GROUP_ORDER,
 } from './slashMenu'
-import type { KnowledgeAiActionId } from './ai/knowledgeAiActions'
 import type { CalloutType } from './callout'
 
 /** Minimal BlockNote editor surface used by slash mapping (avoids deep generic coupling). */
@@ -33,8 +32,6 @@ export type BlockNoteSlashHandlers = {
   onRequestAttach?: () => void
   /** After wiki skeleton insert — open picker. */
   onWikiInsert?: () => void
-  /** AI slash actions. */
-  onAiAction?: (action: KnowledgeAiActionId) => void
   /** Create subdoc under current parent + insert wiki. */
   onCreateSubdoc?: () => void
   /** Copy hip:// page link. */
@@ -108,14 +105,6 @@ function insertCallout(editor: BlockNoteSlashEditor, type: CalloutType, title: s
   })
 }
 
-const AI_SLASH_MAP: Partial<Record<KnowledgeSlashId, KnowledgeAiActionId>> = {
-  aiContinue: 'continue',
-  aiSummarize: 'summarize',
-  aiToTasks: 'toTasks',
-  aiExplain: 'explain',
-  aiRewrite: 'rewrite',
-}
-
 export function applyKnowledgeSlashItem(
   editor: BlockNoteSlashEditor,
   item: KnowledgeSlashItem,
@@ -123,17 +112,10 @@ export function applyKnowledgeSlashItem(
     BlockNoteSlashHandlers,
     | 'onRequestAttach'
     | 'onWikiInsert'
-    | 'onAiAction'
     | 'onCreateSubdoc'
     | 'onCopyPageLink'
   >,
 ): void {
-  const ai = AI_SLASH_MAP[item.id]
-  if (ai) {
-    handlers.onAiAction?.(ai)
-    return
-  }
-
   switch (item.id) {
     case 'h1':
       insertNative(editor, { type: 'heading', props: { level: 1 } })

@@ -113,7 +113,7 @@ MiniSearch 全文索引 + reveal 已就绪，但文档搜索与命令面板未�
 现有文件夹导入（MD）、HTML/文本/zip 导出已覆盖迁移主路径；PDF/Notion 导入器/剪藏暂缓（git 历史 v1.0 V2-I1/I2/I3）。
 
 ### 5.7 AI 能力（hip 4 vs Notion 4.5）——⛔ 本轮不做
-已有文档内 AI 动作（继续/总结/转任务/解释/重写）+ agent harness；不新增 AI 文档功能（git 历史 v1.0 V2-A1 归档）。
+已移除文档内 AI 动作（继续/总结/转任务/解释/重写——`knowledgeAiActions` + 斜杠菜单 AI 组 + `aiStarted` toast 全部删除）；不新增 AI 文档功能（git 历史 v1.0 V2-A1 归档）。
 
 ### 5.8 协作与评论（hip 1 vs Notion 5）——⛔ 本轮不做（含本地评论）
 实时协作/评论/分享与本地优先定位冲突；本地块评论（原 V2-C1）单用户价值低，一并砍掉。

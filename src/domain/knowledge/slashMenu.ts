@@ -33,25 +33,19 @@ export type KnowledgeSlashId =
   | 'svg'
   | 'image'
   | 'file'
-  | 'aiContinue'
-  | 'aiSummarize'
-  | 'aiToTasks'
-  | 'aiExplain'
-  | 'aiRewrite'
   | 'subdoc'
   | 'copyPageLink'
   | 'columns'
   | 'sync'
 
-/** Slash menu section (R5 + AI). */
-export type KnowledgeSlashGroup = 'basic' | 'list' | 'media' | 'advanced' | 'ai'
+/** Slash menu section (R5). */
+export type KnowledgeSlashGroup = 'basic' | 'list' | 'media' | 'advanced'
 
 export const SLASH_GROUP_ORDER: readonly KnowledgeSlashGroup[] = [
   'basic',
   'list',
   'media',
   'advanced',
-  'ai',
 ] as const
 
 export interface KnowledgeSlashItem {
@@ -455,61 +449,6 @@ export const KNOWLEDGE_SLASH_ITEMS: KnowledgeSlashItem[] = [
     group: 'advanced',
     icon: '🔗',
     label: 'Copy page link',
-    insert: '',
-    cursorOffset: 0,
-  },
-  {
-    id: 'aiContinue',
-    name: 'aicontinue',
-    keywords: ['ai', 'complete', 'continue'],
-    keywordsZh: ['续写', '继续写'],
-    group: 'ai',
-    icon: '✨',
-    label: 'AI continue',
-    insert: '',
-    cursorOffset: 0,
-  },
-  {
-    id: 'aiSummarize',
-    name: 'aisummarize',
-    keywords: ['ai', 'summary', 'tldr', 'summarize'],
-    keywordsZh: ['总结', '摘要'],
-    group: 'ai',
-    icon: '✨',
-    label: 'AI summarize',
-    insert: '',
-    cursorOffset: 0,
-  },
-  {
-    id: 'aiToTasks',
-    name: 'aitasks',
-    keywords: ['ai', 'extracttasks'],
-    keywordsZh: ['转任务', '待办'],
-    group: 'ai',
-    icon: '✨',
-    label: 'AI to tasks',
-    insert: '',
-    cursorOffset: 0,
-  },
-  {
-    id: 'aiExplain',
-    name: 'aiexplain',
-    keywords: ['ai', 'explain'],
-    keywordsZh: ['解释'],
-    group: 'ai',
-    icon: '✨',
-    label: 'AI explain',
-    insert: '',
-    cursorOffset: 0,
-  },
-  {
-    id: 'aiRewrite',
-    name: 'airewrite',
-    keywords: ['ai', 'rewrite', 'improve'],
-    keywordsZh: ['改写', '润色'],
-    group: 'ai',
-    icon: '✨',
-    label: 'AI rewrite',
     insert: '',
     cursorOffset: 0,
   },

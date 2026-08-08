@@ -93,7 +93,6 @@ import {
   splitInlineMath,
   type InlineMathSegment,
 } from '@/domain/knowledge/blocks/mathInlineConvert'
-import type { KnowledgeAiActionId } from '@/domain/knowledge/ai/knowledgeAiActions'
 
 import '@blocknote/mantine/style.css'
 import '@mantine/core/styles.css'
@@ -133,11 +132,8 @@ export interface DocBlockNoteEditorProps {
     /** 块引用锚点（V2-E1）。 */
     fragment?: string | null
   }) => void
-  onAiAction?: (action: KnowledgeAiActionId) => void
   onCreateSubdoc?: () => void
   onCopyPageLink?: () => void
-  /** Outline heading labels for AI context (optional). */
-  outlineHeadings?: string[]
 }
 
 const DRAFT_THROTTLE_MS = 120
@@ -379,7 +375,6 @@ export const DocBlockNoteEditor = forwardRef<
     onAssetImported,
     onRequestAttach,
     onWikiNavigate,
-    onAiAction,
     onCreateSubdoc,
     onCopyPageLink,
   },
@@ -407,8 +402,6 @@ export const DocBlockNoteEditor = forwardRef<
   onRequestAttachRef.current = onRequestAttach
   const onWikiNavigateRef = useRef(onWikiNavigate)
   onWikiNavigateRef.current = onWikiNavigate
-  const onAiActionRef = useRef(onAiAction)
-  onAiActionRef.current = onAiAction
   const onCreateSubdocRef = useRef(onCreateSubdoc)
   onCreateSubdocRef.current = onCreateSubdoc
   const onCopyPageLinkRef = useRef(onCopyPageLink)
@@ -761,7 +754,6 @@ export const DocBlockNoteEditor = forwardRef<
           onWikiInsert: () => {
             window.setTimeout(() => openWikiPickerNearCaret(), 0)
           },
-          onAiAction: (action) => onAiActionRef.current?.(action),
           onCreateSubdoc: () => onCreateSubdocRef.current?.(),
           onCopyPageLink: () => onCopyPageLinkRef.current?.(),
         },

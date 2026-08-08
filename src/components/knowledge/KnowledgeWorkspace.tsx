@@ -64,8 +64,6 @@ import { PageHeader } from './page/PageHeader'
 import { VersionTimeline } from './version/VersionTimeline'
 import { VersionDiffView } from './version/VersionDiffView'
 import { parseFrontmatter } from '@/domain/knowledge/frontmatter'
-import { knowledgeAiActions } from '@/domain/knowledge/ai/knowledgeAiActions'
-import type { KnowledgeAiActionId } from '@/domain/knowledge/ai/knowledgeAiActions'
 
 /** Lazy so Source-only sessions pay 0 for BlockNote chunk. */
 const DocLiveEditor = lazy(() =>
@@ -337,30 +335,6 @@ export function KnowledgeWorkspace() {
     const words = body.trim().match(/\S+/g)
     return words?.length ?? 0
   }, [mountMarkdown])
-
-  const runAi = (action: KnowledgeAiActionId) => {
-    const title = activeNode?.title ?? ''
-    const raw = useKnowledgeStore.getState().draftBody || docBody
-    const body = parseFrontmatter(raw).bodyWithoutFm
-    const outline = extractDocOutline(body).map((h) => h.text)
-    const selection =
-      liveEditorRef.current?.getSelectionText?.() ??
-      window.getSelection()?.toString() ??
-      ''
-    knowledgeAiActions.run({
-      action,
-      docContext: {
-        title,
-        outline,
-        selection,
-        bodyWindow: body.slice(0, 8000),
-        backlinks: backlinks.map((b) => b.fromTitle),
-        spaceId: activeSpaceId,
-        docId: activeDocId,
-      },
-    })
-    toast.message(t('knowledge.doc.aiStarted'))
-  }
 
   const copyPageLink = async () => {
     if (!activeSpaceId || !activeDocId) return
@@ -803,7 +777,6 @@ export function KnowledgeWorkspace() {
                       setWikiCreateTitle(title)
                     }
                   }}
-                  onAiAction={runAi}
                   onCreateSubdoc={createSubdoc}
                   onCopyPageLink={() => void copyPageLink()}
                 />

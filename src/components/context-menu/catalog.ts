@@ -422,19 +422,6 @@ const STATIC_CATALOG: ContextMenuItemMeta[] = [
     danger: true,
   },
   {
-    id: 'knowledgeSpace.rename',
-    labelKey: 'knowledge.tree.rename',
-    kind: 'knowledgeSpace',
-    group: 'edit',
-  },
-  {
-    id: 'knowledgeSpace.delete',
-    labelKey: 'knowledge.tree.delete',
-    kind: 'knowledgeSpace',
-    group: 'danger',
-    danger: true,
-  },
-  {
     id: 'knowledgeTree.newDoc',
     labelKey: 'knowledge.tree.newDoc',
     kind: 'knowledgeTree',

@@ -22,7 +22,6 @@ import { pluginProvider } from './providers/plugin'
 import { sessionHistoryProvider } from './providers/sessionHistory'
 import { skillConfigProvider } from './providers/skillConfig'
 import { knowledgeNodeProvider } from './providers/knowledgeNode'
-import { knowledgeSpaceProvider } from './providers/knowledgeSpace'
 import { knowledgeTreeProvider } from './providers/knowledgeTree'
 import { subAgentProvider } from './providers/subAgent'
 import { terminalProvider } from './providers/terminal'
@@ -52,7 +51,6 @@ const BUILTIN_PROVIDERS: ContextProvider[] = [
   sessionHistoryProvider,
   skillConfigProvider,
   knowledgeNodeProvider,
-  knowledgeSpaceProvider,
   knowledgeTreeProvider,
   subAgentProvider,
   terminalProvider,

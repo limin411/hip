@@ -18,7 +18,6 @@ import { useProjectPathStore } from '@/store/projectPathStore'
 import { useNavHistoryStore } from '@/store/navHistoryStore'
 
 const enterKnowledge = vi.fn(async () => {})
-const openCreateKnowledgeSpaceDialog = vi.fn()
 const enterSection = vi.fn(async (_section: 'projects' | 'chats') => {})
 const enterPlaceholderSection = vi.fn(
   async (_section: 'tasks' | 'automation') => {},
@@ -48,13 +47,8 @@ vi.mock('./sidebarActions', () => ({
   toggleTrashOverlay: () => toggleTrashOverlay(),
   leaveKnowledge: vi.fn(async () => {}),
   leaveWorkItems: vi.fn(async () => {}),
-  openSpaceFromSidebar: vi.fn(),
   selectSessionFromSidebar: (id: string) => selectSessionFromSidebar(id),
   newConversationFromSidebar: (surface: 'chat' | 'code') => newConversationFromSidebar(surface),
-}))
-
-vi.mock('@/components/knowledge/knowledgeSpaceDialogStore', () => ({
-  openCreateKnowledgeSpaceDialog: () => openCreateKnowledgeSpaceDialog(),
 }))
 
 vi.mock('./SidebarAccountFooter', () => ({
@@ -72,6 +66,18 @@ vi.mock('@/components/context-menu', () => ({
 const knowledgeState = {
   spaces: [] as { id: string; name: string }[],
   activeSpaceId: null as string | null,
+  nodes: [] as { id: string; parentId: string | null; kind: string; title: string }[],
+  currentFolderId: null as string | null,
+  activeDocId: null as string | null,
+  busy: false,
+  enterFolder: vi.fn(async () => {}),
+  goUp: vi.fn(async () => {}),
+  navigateTo: vi.fn(async () => {}),
+  openDoc: vi.fn(async () => {}),
+  createFolder: vi.fn(async () => {}),
+  requestCreateDoc: vi.fn(async () => {}),
+  renameNode: vi.fn(async () => {}),
+  deleteNode: vi.fn(async () => {}),
 }
 
 vi.mock('@/store/knowledgeStore', () => {
@@ -85,7 +91,6 @@ import { AppSidebar } from './AppSidebar'
 describe('AppSidebar', () => {
   beforeEach(() => {
     enterKnowledge.mockClear()
-    openCreateKnowledgeSpaceDialog.mockClear()
     enterSection.mockClear()
     enterPlaceholderSection.mockClear()
     enterTerminalsSection.mockClear()
@@ -97,6 +102,9 @@ describe('AppSidebar', () => {
     selectSessionFromSidebar.mockClear()
     knowledgeState.spaces = []
     knowledgeState.activeSpaceId = null
+    knowledgeState.nodes = []
+    knowledgeState.currentFolderId = null
+    knowledgeState.activeDocId = null
     useNavHistoryStore.setState({ stack: [], index: -1, applying: false })
     useUiStore.setState({
       activeView: 'chat',
@@ -279,11 +287,18 @@ describe('AppSidebar', () => {
     expect(newConversationFromSidebar).toHaveBeenCalledWith('code')
   })
 
-  it('new space button opens create dialog', () => {
-    useUiStore.setState({ sidebarSection: 'knowledge' })
+  it('knowledge section renders single-level dir nav (no space list)', () => {
+    useUiStore.setState({ sidebarSection: 'knowledge', activeView: 'knowledge' })
+    knowledgeState.nodes = [
+      { id: 'nod_a', parentId: null, kind: 'folder', title: 'A' },
+      { id: 'doc_1', parentId: null, kind: 'doc', title: 'D' },
+    ]
     render(<AppSidebar />)
-    fireEvent.click(screen.getByTestId('sidebar-new-space'))
-    expect(openCreateKnowledgeSpaceDialog).toHaveBeenCalled()
+    expect(screen.getByTestId('dir-nav-list')).toBeInTheDocument()
+    expect(screen.getByTestId('dir-row-nod_a')).toBeInTheDocument()
+    expect(screen.getByTestId('dir-row-doc_1')).toBeInTheDocument()
+    // 空间列表不再渲染
+    expect(screen.queryByTestId('sidebar-new-space')).not.toBeInTheDocument()
   })
 
   it('terminals section shows a single new button that opens a popover', () => {
@@ -370,32 +385,31 @@ describe('AppSidebar', () => {
     })
   })
 
-  it('active knowledge space uses surface wash without left rail or hairline ring', () => {
-    knowledgeState.spaces = [{ id: 'space-1', name: 'Notes' }]
-    knowledgeState.activeSpaceId = 'space-1'
-    useUiStore.setState({ sidebarSection: 'knowledge', activeView: 'knowledge' })
+  it('knowledge nav row shows top-level item count', () => {
+    knowledgeState.nodes = [
+      { id: 'nod_a', parentId: null, kind: 'folder', title: 'A' },
+      { id: 'nod_b', parentId: 'nod_a', kind: 'folder', title: 'B' },
+      { id: 'doc_1', parentId: null, kind: 'doc', title: 'D' },
+    ]
+    useUiStore.setState({ sidebarSection: 'chats', activeView: 'chat' })
     render(<AppSidebar />)
-    const space = screen.getByTestId('sidebar-space-space-1')
-    expect(space).not.toHaveClass('before:bg-accent')
-    expect(space).toHaveClass('bg-state-active')
-    expect(space.className).not.toMatch(/shadow-\[0_0_0_1px/)
+    const nav = screen.getByTestId('sidebar-nav-knowledge')
+    expect(nav.textContent).toContain('2')
   })
 
-  it('lists knowledge spaces sorted by name ascending', () => {
-    knowledgeState.spaces = [
-      { id: 'b', name: 'Zebra' },
-      { id: 'a', name: 'Alpha' },
-      { id: 'c', name: 'beta' },
+  it('lists current level rows only (single-level dir nav)', () => {
+    knowledgeState.nodes = [
+      { id: 'nod_root', parentId: null, kind: 'folder', title: 'Root' },
+      { id: 'nod_child', parentId: 'nod_root', kind: 'folder', title: 'Child' },
+      { id: 'doc_root', parentId: null, kind: 'doc', title: 'Top doc' },
     ]
     useUiStore.setState({ sidebarSection: 'knowledge', activeView: 'knowledge' })
     render(<AppSidebar />)
     const list = screen.getByTestId('sidebar-list')
-    const rows = within(list).getAllByTestId(/^sidebar-space-/)
-    expect(rows.map((el) => el.getAttribute('data-testid'))).toEqual([
-      'sidebar-space-a',
-      'sidebar-space-c',
-      'sidebar-space-b',
-    ])
+    expect(within(list).getByTestId('dir-row-nod_root')).toBeInTheDocument()
+    expect(within(list).getByTestId('dir-row-doc_root')).toBeInTheDocument()
+    // 子层条目不渲染（单层级）
+    expect(within(list).queryByTestId('dir-row-nod_child')).not.toBeInTheDocument()
   })
 
   it('session row calls selectSessionFromSidebar', () => {

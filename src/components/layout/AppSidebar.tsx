@@ -10,13 +10,13 @@ import {
 import { useTranslation } from 'react-i18next'
 import {
   AlertTriangle,
-  BookOpen,
   CheckSquare,
   ChevronDown,
   ChevronLeft,
   ChevronRight,
   Code2,
   Folder,
+  FolderTree,
   MessageSquare,
   PanelLeftClose,
   Terminal,
@@ -41,7 +41,7 @@ import { useManagedTerminalStore } from '@/store/managedTerminalStore'
 import { useTerminalStore } from '@/store/terminalStore'
 import { terminalSessionsFor, useTerminalAgentStore } from '@/store/terminalAgentStore'
 import { DeclarativeContextMenu } from '@/components/context-menu'
-import { openCreateKnowledgeSpaceDialog } from '@/components/knowledge/knowledgeSpaceDialogStore'
+import { DirNavList } from '@/components/knowledge/DirNavList'
 import { TERMINAL_MANAGEMENT } from '@/components/terminals/feature'
 import { QuickConnectPopover } from '@/components/terminals/QuickConnectPopover'
 import { WORK_ITEM_TRACKING } from '@/components/work-items/feature'
@@ -57,7 +57,6 @@ import {
   enterAutomationsSection,
   newConversationFromSidebar,
   openSettingsFromChrome,
-  openSpaceFromSidebar,
   selectSessionFromSidebar,
   toggleHistoryOverlay,
   toggleTrashOverlay,
@@ -97,7 +96,7 @@ export function AppSidebar() {
   const sessions = useSessions()
   const activeSessionId = useActiveSessionId()
   const spaces = useKnowledgeStore((s) => s.spaces)
-  const activeSpaceId = useKnowledgeStore((s) => s.activeSpaceId)
+  const kbNodes = useKnowledgeStore((s) => s.nodes)
   const managedTerminals = useManagedTerminalStore((s) => s.terminals)
   const focusedManagedId = useManagedTerminalStore((s) => s.focusedId)
   const sidebarExpanded = useTerminalAgentStore((s) => s.sidebarExpanded)
@@ -218,6 +217,7 @@ export function AppSidebar() {
     list.sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' }))
     return list
   }, [spaces, sidebarSection])
+  void filteredSpaces // v2: 侧边栏已改为单层级目录（DirNavList），空间列表不再展示
 
   const projectCount = useMemo(
     () =>
@@ -239,6 +239,13 @@ export function AppSidebar() {
     else if (isPlaceholderSidebarSection(section)) void enterPlaceholderSection(section)
     else if (section === 'projects' || section === 'chats') void enterSection(section)
   }
+
+  /** 文档管理：标题栏后退/前进作用于目录历史（与视觉稿一致）；其他视图走 shell 历史。 */
+  /** 导航徽标：顶层条目数（文件夹 + 文档）。 */
+  const topLevelCount = useMemo(
+    () => kbNodes.filter((n) => n.parentId === null).length,
+    [kbNodes],
+  )
 
   const listLabel =
     sidebarSection === 'knowledge'
@@ -367,8 +374,8 @@ export function AppSidebar() {
           section="knowledge"
           active={sidebarSection === 'knowledge'}
           label={t('sidebar.nav.knowledge')}
-          icon={<BookOpen size={16} strokeWidth={1.75} />}
-          count={spaces.length > 0 ? spaces.length : undefined}
+          icon={<FolderTree size={16} strokeWidth={1.75} />}
+          count={topLevelCount > 0 ? topLevelCount : undefined}
           onClick={() => onNav('knowledge')}
         />
         <NavItem
@@ -409,17 +416,7 @@ export function AppSidebar() {
           >
             {listLabel}
           </span>
-          {sidebarSection === 'knowledge' ? (
-            <button
-              type="button"
-              data-testid="sidebar-new-space"
-              data-no-drag
-              onClick={() => openCreateKnowledgeSpaceDialog()}
-              className="rounded-sm px-1.5 py-0.5 text-caption text-ink-tertiary transition-colors duration-chrome hover:bg-state-hover hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink/20"
-            >
-              {t('sidebar.newSpace')}
-            </button>
-          ) : sidebarSection === 'projects' ? (
+          {sidebarSection === 'knowledge' ? null : sidebarSection === 'projects' ? (
             <button
               type="button"
               data-testid="sidebar-new-task"
@@ -688,52 +685,7 @@ export function AppSidebar() {
             {t('placeholder.comingSoon')}
           </p>
         ) : sidebarSection === 'knowledge' ? (
-          filteredSpaces.length === 0 ? (
-            <p className="px-2 py-4 text-center text-meta text-ink-tertiary" role="status">
-              {t('sidebar.emptySpaces')}
-            </p>
-          ) : (
-            <ul className="m-0 list-none p-0" aria-labelledby="sidebar-list-heading">
-              {filteredSpaces.map((sp) => {
-                const active = activeView === 'knowledge' && activeSpaceId === sp.id
-                return (
-                  <li key={sp.id}>
-                    <DeclarativeContextMenu
-                      kind="knowledgeSpace"
-                      payload={{ spaceId: sp.id, name: sp.name, icon: sp.icon }}
-                      className="mb-0.5 block w-full"
-                    >
-                      <button
-                        type="button"
-                        data-testid={`sidebar-space-${sp.id}`}
-                        data-space-name={sp.name}
-                        data-no-drag
-                        aria-current={active ? 'true' : undefined}
-                        onClick={() => void openSpaceFromSidebar(sp.id)}
-                        className={cn(
-                          'flex w-full items-start gap-2 rounded-lg px-2.5 py-[var(--row-pad-y-session)] text-left transition-colors',
-                          'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink/20',
-                          active ? SIDEBAR_ACTIVE_RAIL : 'hover:bg-state-hover',
-                        )}
-                      >
-                        {sp.icon ? (
-                          <span
-                            className="mt-0.5 shrink-0 text-body leading-none"
-                            aria-hidden
-                          >
-                            {sp.icon}
-                          </span>
-                        ) : null}
-                        <span className="min-w-0 flex-1 truncate text-body font-medium text-ink">
-                          {sp.name}
-                        </span>
-                      </button>
-                    </DeclarativeContextMenu>
-                  </li>
-                )
-              })}
-            </ul>
-          )
+          <DirNavList />
         ) : filteredSessions.length === 0 ? (
           <p className="px-2 py-4 text-center text-meta text-ink-tertiary" role="status">
             {t('sidebar.emptySessions')}

@@ -32,7 +32,6 @@ export type ContextKind =
   | 'chatEmpty'
   | 'artifactChrome'
   | 'knowledgeNode'
-  | 'knowledgeSpace'
   | 'knowledgeTree'
   /** Work-item list row / calendar bar / day-more row. */
   | 'workItem'
@@ -159,12 +158,8 @@ export type ContextPayloadMap = {
     onRename: () => void
     onDelete: () => void
     onReveal?: () => void
-  }
-  /** Sidebar knowledge-space row — rename / delete via KnowledgeSpaceDialogHost. */
-  knowledgeSpace: {
-    spaceId: string
-    name: string
-    icon?: string
+    /** 复制标题路径（如 全部文档 / F1 / 文档），host 提供实现。 */
+    onCopyPath?: () => void
   }
   /**
    * Knowledge tree blank area (root). Hosts supply create callbacks so menus

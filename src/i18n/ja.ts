@@ -987,7 +987,6 @@ export const ja = {
         "mcpServer": "MCPサーバー",
         "plugin": "プラグイン",
         "knowledgeNode": "ナレッジツリー",
-        "knowledgeSpace": "ナレッジスペース",
         "knowledgeTree": "ナレッジ空白領域",
         "workItem": "ワークアイテム",
         "workItemBlank": "ワークアイテム空白",
@@ -1743,7 +1742,7 @@ export const ja = {
     "filterAll": "すべて",
     "filterChat": "チャット",
     "filterCode": "プロジェクト",
-    "filterKnowledge": "ナレッジ",
+    "filterKnowledge": "ドキュメント",
     "filterWorkItems": "ワークアイテム",
     "filterAutomations": "自動化",
     "kind": {
@@ -2306,13 +2305,13 @@ export const ja = {
     "closeTab": "タブを閉じる",
     "newSession": "新しいセッション",
     "tabList": "開いているセッション",
-    "knowledge": "ナレッジ",
-    "closeKnowledge": "ナレッジベースを閉じる"
+    "knowledge": "ドキュメント",
+    "closeKnowledge": "ドキュメントを閉じる"
   },
   "sidebar": {
     "aria": "ナビゲーションとセッション履歴",
     "navAria": "メインナビゲーション",
-    "searchPlaceholder": "セッション、ナレッジを検索…",
+    "searchPlaceholder": "セッション、ドキュメントを検索…",
     "collapse": "サイドバーを隠す",
     "collapseAria": "左サイドバーを隠す",
     "expand": "サイドバーを表示",
@@ -2323,7 +2322,7 @@ export const ja = {
     "navForward": "進む",
     "navForwardAria": "次の位置に進む",
     "nav": {
-      "knowledge": "ナレッジ",
+      "knowledge": "ドキュメント",
       "projects": "プロジェクト",
       "chats": "チャット",
       "terminals": "ターミナル",
@@ -2331,7 +2330,10 @@ export const ja = {
       "automation": "自動化"
     },
     "list": {
-      "spaces": "スペース",
+      "spaces": "現在のフォルダ",
+      "up": "上の階層へ",
+      "jump": "上位フォルダへ移動",
+      "folderEmpty": "このフォルダは空です",
       "projects": "プロジェクトセッション",
       "chats": "チャット履歴",
       "terminals": "ターミナル管理",
@@ -2351,7 +2353,7 @@ export const ja = {
       "running": "実行中"
     },
     "viewAll": "すべて表示",
-    "newSpace": "新しいナレッジベース",
+    "newSpace": "新規作成…",
     "newTask": "新しいタスク",
     "newWorkItem": "新規ワークアイテム",
     "newAutomation": "新しい自動化",
@@ -2360,7 +2362,7 @@ export const ja = {
     "newTerminal": "新しい端末",
     "emptySearch": "一致するものがありません",
     "emptySessions": "セッションはまだありません",
-    "emptySpaces": "スペースはまだありません",
+    "emptySpaces": "ドキュメントがまだありません。フォルダまたはドキュメントを作成してください",
     "emptyAutomations": "有効な自動化はありません",
     "projectGroup": {
       "unbound": "プロジェクトフォルダなし",
@@ -2382,26 +2384,36 @@ export const ja = {
   "dropdown": {
     "newChat": "新しいワークチャット",
     "newCode": "新しいコーディングタスク",
-    "newKnowledge": "ナレッジベース"
+    "newKnowledge": "新しいドキュメント"
   },
   "knowledge": {
-    "title": "ナレッジベース",
+    "title": "ドキュメント",
+    "browse": {
+      "viewLabel": "表示切り替え",
+      "viewGrid": "グリッド表示",
+      "viewList": "リスト表示",
+      "folderKind": "フォルダ",
+      "docKind": "ドキュメント",
+      "name": "名前",
+      "kind": "種類",
+      "modified": "更新日時"
+    },
     "empty": {
-      "selectTitle": "ナレッジベースを選択",
-      "selectHint": "サイドバーからスペースを選ぶか、新しく作成してください。"
+      "selectTitle": "フォルダまたはドキュメントを選択",
+      "selectHint": "サイドバーからフォルダまたはドキュメントを選ぶか、新しく作成してください。"
     },
     "home": {
-      "subtitle": "ローカルスペース · フォルダツリー · Markdown",
+      "subtitle": "ローカルファースト · フォルダツリー · Markdown",
       "searchPlaceholder": "タイトル、本文、タグ、パスを検索…",
-      "mySpaces": "マイスペース",
+      "mySpaces": "すべてのドキュメント",
       "recent": "最近",
       "docCount_one": "{{count}} ドキュメント",
       "docCount_other": "{{count}} ドキュメント",
       "docCount": "{{count}} ドキュメント",
       "docCountPending": "…",
-      "emptyTitle": "まだスペースがありません",
-      "emptyHint": "ナレッジベースを作成してドキュメントの整理を始めましょう。",
-      "createSpace": "新しいナレッジベース",
+      "emptyTitle": "ドキュメントがまだありません",
+      "emptyHint": "フォルダまたはドキュメントを作成して整理を始めましょう。",
+      "createSpace": "新しいフォルダ",
       "searchResults": "検索結果",
       "searchEmpty": "検索に一致するドキュメントはありません。",
       "searchIndexing": "検索インデックスを構築中…",
@@ -2438,6 +2450,8 @@ export const ja = {
       "filterPlaceholder": "ツリーをフィルタ…",
       "filterEmpty": "一致する項目がありません",
       "reveal": "Finderで表示",
+      "copyPath": "パスをコピー",
+      "pathCopied": "パスをコピーしました",
       "sectionLabel": "ページ",
       "backHome": "スペースに戻る",
       "dragHandle": "ドラッグして並べ替え",
@@ -2510,6 +2524,8 @@ export const ja = {
       "attach": "画像またはPDFを添付",
       "loading": "画像を読み込み中…",
       "reveal": "Finderで表示",
+      "copyPath": "パスをコピー",
+      "pathCopied": "パスをコピーしました",
       "tooLargePaste": "画像が大きすぎて貼り付けできません。ファイルを保存して添付してください（最大25 MB）。",
       "tooLargeDisk": "ファイルが25 MBの添付制限を超えています。",
       "unsupported": "サポートされていないファイル形式です。PNG、JPEG、GIF、WebP、またはPDFを使用してください。",
@@ -2878,6 +2894,7 @@ export const ja = {
     "file": {
       "open": "開く",
       "copyPath": "パスをコピー",
+      "pathCopied": "パスをコピーしました",
       "copyRelativePath": "相対パスをコピー",
       "copyName": "名前をコピー",
       "openContainingFolder": "フォルダを開く",
@@ -2888,6 +2905,7 @@ export const ja = {
     },
     "diffFile": {
       "copyPath": "パスをコピー",
+      "pathCopied": "パスをコピーしました",
       "copyAbsolutePath": "絶対パスをコピー",
       "openInFiles": "ファイルで開く",
       "collapse": "折りたたむ",
@@ -2945,12 +2963,14 @@ export const ja = {
     },
     "termFs": {
       "copyPath": "パスをコピー",
+      "pathCopied": "パスをコピーしました",
       "copyName": "名前をコピー",
       "refresh": "更新",
       "openContainingFolder": "親フォルダを開く"
     },
     "filePreview": {
       "copyPath": "パスをコピー",
+      "pathCopied": "パスをコピーしました",
       "copyContent": "内容をコピー",
       "contentNotText": "内容がテキストではありません",
       "openContainingFolder": "親フォルダを開く",
@@ -2999,12 +3019,12 @@ export const ja = {
       "skills": "Skills",
       "favorites": "お気に入り",
       "recent": "最近",
-      "knowledge": "ナレッジ"
+      "knowledge": "ドキュメント"
     },
-    "navKnowledge": "ナレッジベース",
-    "knowledgeHome": "ナレッジホーム",
-    "knowledgeNewDoc": "新しいナレッジ文書",
-    "knowledgeNewBoard": "新しいナレッジホワイトボード",
+    "navKnowledge": "ドキュメント",
+    "knowledgeHome": "ドキュメントホーム",
+    "knowledgeNewDoc": "新しいドキュメント",
+    "knowledgeNewBoard": "新しいホワイトボード",
     "knowledgeIndexing": "検索インデックスを構築中…",
     "knowledgeNeedSpace": "先にナレッジスペースを開いてください",
     "actions": {

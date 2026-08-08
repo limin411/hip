@@ -19,10 +19,6 @@ vi.mock('react-i18next', () => ({
   initReactI18next: { type: '3rdParty', init: () => {} },
 }))
 
-vi.mock('./SpaceTree', () => ({
-  SpaceTree: () => <div data-testid="mock-space-tree" />,
-}))
-
 vi.mock('./DocEditor', async () => {
   const { forwardRef } = await import('react')
   return {

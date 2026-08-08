@@ -245,22 +245,6 @@ export async function newConversationFromSidebar(surface: 'chat' | 'code'): Prom
   recordNavEntry()
 }
 
-export async function openSpaceFromSidebar(spaceId: string): Promise<void> {
-  // Don't go through enterKnowledge (which auto-opens first space) — open the
-  // requested id only. Still ensure view + spaces are ready.
-  if (useUiStore.getState().activeView === 'tasks') {
-    await leaveWorkItems()
-  }
-  dismissSettingsIfOpen()
-  useUiStore.getState().openKnowledgeView()
-  useUiStore.getState().setSidebarSection('knowledge')
-  const kb = useKnowledgeStore.getState()
-  if (!kb.loaded) {
-    await kb.loadSpaces()
-  }
-  await useKnowledgeStore.getState().openSpace(spaceId)
-  recordNavEntry()
-}
 
 /**
  * Canonical Settings open. All product entry points must call this (or a thin wrapper).

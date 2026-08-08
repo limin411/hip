@@ -97,6 +97,33 @@ import { applyMetaToDocument } from '@/domain/knowledge/frontmatterWrite'
 export type { EditorMode }
 export { shouldAutosave }
 
+/** 离开文档视图时清空的编辑器字段。 */
+const resetDocFields = {
+  activeDocId: null,
+  treeFocusId: null,
+  docBody: '',
+  draftBody: '',
+  editorMode: 'live' as const,
+  pendingReveal: null,
+  backlinks: [] as KnowledgeLinkBacklink[],
+  outboundLinks: [] as KnowledgeLinkOutboundRow[],
+  linkPanelStatus: 'idle' as const,
+}
+
+/** 应用到目录位置（离开文档时 flush + 重置编辑器字段）。 */
+async function applyFolderEntry(folderId: string | null): Promise<void> {
+  const s = useKnowledgeStore.getState()
+  if (s.activeDocId) {
+    syncActiveEditorToDraft({ leaveActiveLeaf: true })
+    const ok = await s.flushSave()
+    if (!ok) return
+  }
+  useKnowledgeStore.setState({
+    ...resetDocFields,
+    currentFolderId: folderId,
+  })
+}
+
 /** Module-level index (not serializable; not stored in zustand state). */
 let kbIndex = createKnowledgeIndex()
 /** Structured frontmatter meta parallel to MiniSearch (facets + wiki aliases). */
@@ -323,6 +350,8 @@ interface KnowledgeState {
   /** live | source | preview — Live is product-on; opt out via hip-knowledge-live=false. */
   editorMode: EditorMode
   mode: 'home' | 'workspace'
+  /** 当前目录 id（null = 根目录）。文档管理 v2 单层级导航：侧边栏/主区只显示当前层级。 */
+  currentFolderId: string | null
   searchQuery: string
   searchHits: KnowledgeSearchHit[]
   indexStatus: IndexStatus
@@ -393,6 +422,11 @@ interface KnowledgeState {
     newTitle: string,
   ) => Promise<number>
   openHome: () => Promise<void>
+  /** v2 目录导航：移动到指定目录/文档。 */
+  navigateTo: (folderId: string | null, docId?: string | null) => Promise<void>
+  enterFolder: (id: string) => Promise<void>
+  /** 返回上一层（根目录时 no-op）。 */
+  goUp: () => Promise<void>
   createFolder: (parentId: string | null, title: string) => Promise<void>
   /**
    * Create a doc node and open it. Prefer `requestCreateDoc` from UI so templates
@@ -635,6 +669,7 @@ export const useKnowledgeStore = create<KnowledgeState>((set, get) => ({
   draftBody: '',
   editorMode: 'live',
   mode: 'home',
+  currentFolderId: null,
   searchQuery: '',
   searchHits: [],
   indexStatus: 'idle',
@@ -674,6 +709,11 @@ export const useKnowledgeStore = create<KnowledgeState>((set, get) => ({
         // non-Tauri / trash unavailable
       }
       const spaces = await knowledgeListSpaces()
+      // v2 文档管理：存储层保持单空间；空库时自动创建唯一空间（根目录）。
+      if (spaces.length === 0) {
+        const created = await knowledgeCreateSpace('文档管理', '📁')
+        spaces.push(created)
+      }
       set({ spaces, loaded: true, recent: loadRecent() })
       void get().rebuildSearchIndex()
       // Refresh knowledge trash badge when list is available.
@@ -885,6 +925,7 @@ export const useKnowledgeStore = create<KnowledgeState>((set, get) => ({
           editorMode: 'live',
           nodes: [],
           expandedFolderIds: {},
+          currentFolderId: null,
           templatePicker: null,
           saveState: 'idle',
           pendingReveal: null,
@@ -938,6 +979,8 @@ export const useKnowledgeStore = create<KnowledgeState>((set, get) => ({
         mode: 'workspace',
         expandedFolderIds: expanded,
         treeFocusId: opts?.selectDocId ?? null,
+        // 文档管理 v2：打开即根目录
+        currentFolderId: null,
         // Drop stale picker: confirm must not write into a different space.
         templatePicker: null,
         backlinks: [],
@@ -957,6 +1000,9 @@ export const useKnowledgeStore = create<KnowledgeState>((set, get) => ({
         }
       })()
       if (opts?.selectDocId) {
+        // 文档管理 v2：打开文档时记录其所在目录，作为返回/历史上下文。
+        const parent = nodes.find((n) => n.id === opts.selectDocId)?.parentId ?? null
+        set({ currentFolderId: parent })
         await get().openDoc(opts.selectDocId)
       } else {
         set({
@@ -1114,6 +1160,7 @@ export const useKnowledgeStore = create<KnowledgeState>((set, get) => ({
       // keep activeSpaceId for chip? design: clear active doc; can keep space or clear
       activeSpaceId: null,
       nodes: [],
+      currentFolderId: null,
       pendingReveal: null,
       filterTag: null,
       filterStatus: null,
@@ -1121,6 +1168,30 @@ export const useKnowledgeStore = create<KnowledgeState>((set, get) => ({
       templatePicker: null,
     })
     get().runSearch(get().searchQuery)
+  },
+
+  navigateTo: async (folderId, docId) => {
+    const s = get()
+    const targetDoc = docId ?? null
+    // 同位置 no-op
+    if (s.currentFolderId === folderId && s.activeDocId === targetDoc) return
+    if (targetDoc) {
+      await get().openDoc(targetDoc)
+      return
+    }
+    await applyFolderEntry(folderId)
+  },
+
+  enterFolder: async (id) => {
+    await get().navigateTo(id, null)
+  },
+
+  goUp: async () => {
+    const s = get()
+    const node = s.currentFolderId
+      ? s.nodes.find((n) => n.id === s.currentFolderId)
+      : null
+    await get().navigateTo(node?.parentId ?? null, null)
   },
 
   createFolder: async (parentId, title) => {

@@ -1,0 +1,1519 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>文档管理 · 视觉稿（原：知识库）</title>
+<style>
+/* ============ tokens（对齐 hip styles/tokens.css） ============ */
+:root{
+  --bg-app:#ffffff; --bg-subtle:#F9F8F5; --bg-muted:#f1f1f1; --bg-content:#ffffff;
+  --border:#e0e0e0; --border-strong:#c9c9c9;
+  --text-primary:#111111; --text-secondary:#5e5e5e; --text-tertiary:#757575;
+  --accent:#c2410c; --accent-hover:#9a3412; --accent-strong:#7c2d12;
+  --accent-subtle:#f0f0f0; --accent-active:#e6e6e6; --on-accent:#fff;
+  --state-hover:#f0f0f0; --state-active:#e6e6e6; --state-disabled:#b5b5b5;
+  --success:#2f7d40; --danger:#c63b3b; --warning:#9a5d10;
+  --rail-width:72px; --titlebar-h:40px; --sidebar-w:280px;
+  --radius:8px;
+  --shadow-menu:0 8px 24px rgba(17,17,17,.14), 0 2px 6px rgba(17,17,17,.08);
+}
+*{box-sizing:border-box; margin:0; padding:0}
+html,body{height:100%; overflow:hidden}
+body{
+  font-family:-apple-system,BlinkMacSystemFont,"PingFang SC","Hiragino Sans GB","Microsoft YaHei",sans-serif;
+  font-size:13px; color:var(--text-primary); background:var(--bg-app);
+  -webkit-font-smoothing:antialiased;
+}
+button{font:inherit; color:inherit; background:none; border:none; cursor:pointer}
+input{font:inherit; color:inherit}
+::-webkit-scrollbar{width:10px; height:10px}
+::-webkit-scrollbar-thumb{background:#d8d8d8; border-radius:5px; border:2px solid transparent; background-clip:content-box}
+::-webkit-scrollbar-thumb:hover{background:#c5c5c5; border:2px solid transparent; background-clip:content-box}
+::-webkit-scrollbar-track{background:transparent}
+
+/* ============ 应用外壳（对齐产品 AppSidebar 结构） ============ */
+.chip-toggle{
+  display:inline-flex; align-items:center; gap:6px; height:26px; padding:0 10px;
+  border:1px solid var(--border); border-radius:999px; font-size:11.5px; color:var(--text-secondary);
+  background:var(--bg-app); transition:all var(--d,.12s) ease; cursor:pointer;
+}
+.chip-toggle:hover{border-color:var(--border-strong); color:var(--text-primary)}
+.chip-toggle.on{background:var(--accent); border-color:var(--accent); color:var(--on-accent)}
+.chip-toggle .dot{width:6px; height:6px; border-radius:50%; background:currentColor; opacity:.85}
+.app{display:flex; height:100vh}
+body.sidebar-collapsed .sidebar{display:none}
+
+/* 原型控制浮层（非产品 UI，仅评审用） */
+.proto-dock{
+  position:fixed; right:16px; bottom:16px; z-index:500; display:flex; gap:8px; align-items:center;
+  background:var(--bg-app); border:1px solid var(--border); border-radius:999px; box-shadow:var(--shadow-menu);
+  padding:5px 6px;
+}
+
+/* ============ 侧边栏 ============ */
+.sidebar{
+  width:300px; flex-shrink:0; background:var(--bg-subtle);
+  border-right:1px solid var(--border); display:flex; flex-direction:column; min-height:0;
+}
+/* 标题栏行：红绿灯留白 + 折叠 + 全局后退/前进（产品 titlebarRowClass） */
+.titlebar-row{
+  height:48px; flex-shrink:0; display:flex; align-items:center; gap:2px;
+  border-bottom:1px solid var(--border); padding-right:8px;
+}
+.traffic-inset{width:90px; height:100%; display:flex; align-items:center; padding-left:14px; flex-shrink:0}
+.traffic-dots{display:flex; gap:8px}
+.traffic-dots i{width:12px; height:12px; border-radius:50%; display:block}
+.traffic-dots i:nth-child(1){background:#ff5f57}
+.traffic-dots i:nth-child(2){background:#febc2e}
+.traffic-dots i:nth-child(3){background:#28c840}
+.titlebar-icon-btn{
+  width:28px; height:28px; border-radius:6px; display:inline-flex; align-items:center; justify-content:center;
+  color:var(--text-secondary); flex-shrink:0;
+}
+.titlebar-icon-btn:hover:not(:disabled){background:var(--state-hover); color:var(--text-primary)}
+.titlebar-icon-btn:disabled{color:var(--state-disabled); cursor:default}
+.titlebar-icon-btn svg{width:16px; height:16px}
+.version{
+  padding:6px 14px 8px; font-size:11px; color:var(--text-tertiary);
+  font-variant-numeric:tabular-nums; letter-spacing:.02em; flex-shrink:0;
+}
+/* 主导航（产品 NavItem：图标 + 名称 + 计数，激活 = 灰底） */
+.sb-nav-list{display:flex; flex-direction:column; gap:2px; padding:0 8px 10px; flex-shrink:0}
+.nav-row{
+  display:flex; align-items:center; gap:10px; height:34px; padding:0 10px; border-radius:8px;
+  font-size:13px; font-weight:500; color:var(--text-secondary); width:100%; text-align:left;
+}
+.nav-row:hover{background:var(--state-hover); color:var(--text-primary)}
+.nav-row.active{background:var(--state-active); color:var(--text-primary)}
+.nav-row .n-ic{width:16px; height:16px; display:inline-flex; align-items:center; justify-content:center; opacity:.7; flex-shrink:0}
+.nav-row .n-ic svg{width:16px; height:16px}
+.nav-row .n-label{flex:1; min-width:0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis}
+.nav-row .n-count{font-size:11px; color:var(--text-tertiary); font-variant-numeric:tabular-nums}
+.icon-btn{
+  width:26px; height:26px; border-radius:6px; display:inline-flex; align-items:center; justify-content:center;
+  color:var(--text-tertiary); transition:all .1s; position:relative;
+}
+.icon-btn:hover{background:var(--state-hover); color:var(--text-primary)}
+.icon-btn svg{width:15px; height:15px}
+/* 列表区：分区头（名称 + ↑/新建）→ 迷你面包屑 → 搜索 → 当前层级条目 */
+.list-head{
+  display:flex; align-items:center; justify-content:space-between; gap:8px;
+  padding:4px 6px 4px 10px; flex-shrink:0;
+}
+.lh-label{font-size:11px; font-weight:500; color:var(--text-tertiary); letter-spacing:.03em}
+.lh-actions{display:flex; align-items:center; gap:2px}
+.lh-btn{
+  width:24px; height:24px; border-radius:6px; display:inline-flex; align-items:center; justify-content:center;
+  color:var(--text-tertiary);
+}
+.lh-btn:hover:not(:disabled){background:var(--state-hover); color:var(--text-primary)}
+.lh-btn:disabled{color:var(--state-disabled); cursor:default}
+.lh-btn svg{width:13px; height:13px}
+.mc-row{padding:0 10px 6px; display:flex; flex-shrink:0}
+.sb-search{margin:0 10px 8px; position:relative; flex-shrink:0}
+.sb-search svg{position:absolute; left:8px; top:50%; transform:translateY(-50%); width:13px; height:13px; color:var(--text-tertiary); pointer-events:none}
+.sb-search input{
+  width:100%; height:28px; border:1px solid var(--border); border-radius:7px; background:var(--bg-app);
+  padding:0 8px 0 27px; font-size:12px; outline:none; color:var(--text-primary);
+  transition:border-color .12s, box-shadow .12s;
+}
+.sb-search input::placeholder{color:var(--text-tertiary)}
+.sb-search input:focus{border-color:var(--accent); box-shadow:0 0 0 3px rgba(194,65,12,.10)}
+.sb-list{flex:1; overflow-y:auto; padding:0 6px 12px; min-height:0}
+
+/* 迷你面包屑（产品无此元素——改造新增：当前位置 + 祖先跳转） */
+.mini-crumbs{
+  flex:1; min-width:0; display:flex; align-items:center; gap:1px; overflow:hidden; height:24px;
+  padding:0 3px; border-radius:6px;
+}
+.mini-crumbs:hover{background:var(--state-hover)}
+.mc-seg{
+  font-size:11.5px; color:var(--text-tertiary); white-space:nowrap; padding:0 4px; height:20px;
+  border-radius:4px; max-width:92px; overflow:hidden; text-overflow:ellipsis; flex-shrink:1;
+}
+.mc-seg:hover{color:var(--accent-strong)}
+.mc-seg.here{color:var(--text-primary); font-weight:600; flex-shrink:0}
+.mc-seg.more{color:var(--accent-strong); text-decoration:underline dotted; text-underline-offset:2px; flex-shrink:0}
+.mc-sep{color:#c9c9c9; font-size:10px; flex-shrink:0}
+
+/* 单层级目录条目 */
+.sb-item{display:flex; align-items:center; gap:7px; height:30px; padding:0 8px; border-radius:7px; cursor:pointer; position:relative; -webkit-user-select:none; user-select:none}
+.sb-item:hover{background:var(--state-hover)}
+.sb-item.current{background:rgba(194,65,12,.10)} /* 对齐产品 SpaceTree 选中态 bg-accent/10 */
+.sb-item.current .label{font-weight:600}
+.sb-item .ic{width:18px; height:18px; flex-shrink:0; display:inline-flex; align-items:center; justify-content:center}
+.sb-item .ic svg{width:16px; height:16px}
+.sb-item .label{flex:1; min-width:0; font-size:12.5px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis}
+.sb-item .label mark{background:#ffe0c2; color:var(--accent-strong); border-radius:2px; padding:0 1px}
+.sb-item .badge{font-size:10px; color:var(--text-tertiary); background:var(--bg-muted); border-radius:4px; padding:0 5px; line-height:16px; flex-shrink:0}
+.sb-item .row-actions{display:none; align-items:center; gap:2px; flex-shrink:0}
+.sb-item:hover .row-actions{display:inline-flex}
+.sb-item .row-actions button{width:20px; height:20px; border-radius:5px; display:inline-flex; align-items:center; justify-content:center; color:var(--text-tertiary)}
+.sb-item .row-actions button:hover{background:rgba(0,0,0,.06); color:var(--text-primary)}
+.sb-item .row-actions svg{width:12.5px; height:12.5px}
+
+/* 侧边栏底部（产品 SidebarAccountFooter：回收站 / 历史记录 / 设置） */
+.sidebar-footer{
+  flex-shrink:0; border-top:1px solid var(--border); padding:6px 8px;
+  display:flex; flex-direction:column; gap:2px;
+}
+.footer-row{
+  display:flex; align-items:center; gap:10px; height:32px; padding:0 10px; border-radius:8px;
+  font-size:13px; color:var(--text-secondary); width:100%; text-align:left;
+}
+.footer-row:hover{background:var(--state-hover); color:var(--text-primary)}
+.footer-row .f-ic{width:16px; height:16px; opacity:.7; display:inline-flex; align-items:center; justify-content:center; flex-shrink:0}
+.footer-row .f-ic svg{width:16px; height:16px}
+.footer-row .f-label{flex:1; min-width:0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis}
+.footer-row .f-badge{
+  font-size:10.5px; background:var(--bg-muted); border-radius:999px; padding:1px 7px;
+  color:var(--text-tertiary); font-variant-numeric:tabular-nums;
+}
+
+/* 主列顶部（产品 MainToolbar：视图标题 + 状态/右侧开关） */
+.main-toolbar{
+  height:48px; flex-shrink:0; display:flex; align-items:center; gap:10px; padding:0 14px;
+  border-bottom:1px solid var(--border); background:var(--bg-content);
+}
+.mt-title{font-size:13px; font-weight:600; min-width:0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis}
+.mt-right{margin-left:auto; display:flex; align-items:center; gap:10px}
+.mt-status{display:inline-flex; align-items:center; gap:6px; font-size:11px; color:var(--text-tertiary)}
+.mt-status i{width:7px; height:7px; border-radius:50%; background:var(--success)}
+
+.sb-empty{padding:26px 18px; text-align:center; color:var(--text-tertiary)}
+.sb-empty .big{margin-bottom:10px}
+.sb-empty p{font-size:12px; line-height:1.7}
+.sb-empty button{margin-top:10px; height:28px; padding:0 14px; border-radius:7px; background:var(--btn-primary,#3a3a3a); color:#fafafa; font-size:12px}
+.sb-empty button:hover{background:#2e2e2e}
+
+/* ============ 主区 ============ */
+.main{flex:1; min-width:0; background:var(--bg-content); display:flex; flex-direction:column; min-height:0}
+.toolbar{
+  height:48px; flex-shrink:0; display:flex; align-items:center; gap:10px; padding:0 14px;
+  border-bottom:1px solid var(--border); background:var(--bg-app);
+}
+.up-btn{
+  width:28px; height:28px; border-radius:7px; display:inline-flex; align-items:center; justify-content:center;
+  color:var(--text-secondary); border:1px solid transparent; flex-shrink:0;
+}
+.up-btn:hover{background:var(--state-hover); color:var(--text-primary); border-color:var(--border)}
+.up-btn:disabled{color:var(--state-disabled); cursor:default; background:none; border-color:transparent}
+.up-btn svg{width:15px; height:15px}
+.crumbs{display:flex; align-items:center; gap:2px; min-width:0; flex:1; overflow:hidden}
+.crumb{
+  display:inline-flex; align-items:center; gap:3px; height:26px; padding:0 7px; border-radius:6px;
+  font-size:12.5px; color:var(--text-tertiary); white-space:nowrap;
+}
+.crumb .ic{width:14px; height:14px; display:inline-flex}
+.crumb .ic svg{width:13px; height:13px}
+.crumb.clickable:hover{background:var(--state-hover); color:var(--accent-strong)}
+.crumb.here{color:var(--text-primary); font-weight:600}
+.crumb-sep{color:#c9c9c9; font-size:12px; flex-shrink:0}
+.tb-search{position:relative; flex-shrink:0}
+.tb-search svg{position:absolute; left:8px; top:50%; transform:translateY(-50%); width:13px; height:13px; color:var(--text-tertiary); pointer-events:none}
+.tb-search input{
+  width:190px; height:28px; border:1px solid var(--border); border-radius:7px; background:var(--bg-subtle);
+  padding:0 8px 0 27px; font-size:12px; outline:none;
+}
+.tb-search input:focus{border-color:var(--accent); background:var(--bg-app); box-shadow:0 0 0 3px rgba(194,65,12,.10)}
+.seg{
+  display:inline-flex; align-items:center; height:26px; border:1px solid var(--border); border-radius:7px;
+  overflow:hidden; flex-shrink:0;
+}
+.seg button{width:28px; height:100%; display:inline-flex; align-items:center; justify-content:center; color:var(--text-tertiary); background:var(--bg-app)}
+.seg button + button{border-left:1px solid var(--border)}
+.seg button:hover{background:var(--state-hover)}
+.seg button.on{background:var(--accent-active); color:var(--accent-strong)}
+.seg svg{width:14px; height:14px}
+.btn-primary{
+  height:28px; padding:0 12px; border-radius:7px; background:var(--btn-primary,#3a3a3a); color:#fafafa;
+  font-size:12px; display:inline-flex; align-items:center; gap:5px; flex-shrink:0;
+}
+.btn-primary:hover{background:#2e2e2e}
+.btn-primary svg{width:13px; height:13px}
+
+/* 浏览模式 */
+.content{flex:1; overflow-y:auto; min-height:0; padding:18px 22px 60px}
+.section-title{
+  font-size:11px; font-weight:600; letter-spacing:.05em; color:var(--text-tertiary);
+  margin:0 2px 10px; display:flex; align-items:center; gap:6px;
+}
+.section-title .count{color:#a8a8a8; font-weight:500}
+.section{margin-bottom:26px}
+
+/* 网格视图 */
+.grid{display:grid; grid-template-columns:repeat(auto-fill,minmax(158px,1fr)); gap:10px}
+.card{
+  border:1px solid var(--border); border-radius:10px; background:var(--bg-app); padding:14px 12px 12px;
+  cursor:pointer; transition:border-color .1s, box-shadow .1s, transform .05s; position:relative;
+}
+.card:hover{border-color:var(--border-strong); box-shadow:0 2px 10px rgba(17,17,17,.06); transform:translateY(-1px)}
+.card:active{transform:none}
+.card .c-ic{width:40px; height:40px; border-radius:9px; background:var(--accent-subtle); display:flex; align-items:center; justify-content:center; margin-bottom:10px}
+.card .c-ic.folder{background:rgba(194,65,12,.10)}
+.card .c-ic.board{background:rgba(91,91,214,.10)}
+.card .c-ic svg{width:22px; height:22px}
+.card .c-name{font-size:12.5px; font-weight:600; line-height:1.35; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; word-break:break-all}
+.card .c-meta{font-size:10.5px; color:var(--text-tertiary); margin-top:5px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis}
+
+/* 列表视图 */
+.rows{border:1px solid var(--border); border-radius:10px; background:var(--bg-app); overflow:hidden}
+.row-head, .row{
+  display:grid; grid-template-columns:minmax(0,1fr) 110px 74px 118px; align-items:center; gap:10px;
+  padding:0 14px; height:34px;
+}
+.row-head{height:30px; background:var(--bg-subtle); border-bottom:1px solid var(--border); font-size:10.5px; color:var(--text-tertiary); font-weight:600; letter-spacing:.03em}
+.row{border-top:1px solid #f0f0f0; cursor:pointer; position:relative; -webkit-user-select:none; user-select:none}
+.rows .row:first-of-type{border-top:none}
+.row:hover{background:var(--state-hover)}
+.row .r-name{display:flex; align-items:center; gap:9px; min-width:0}
+.row .r-name .ic{width:18px; height:18px; flex-shrink:0; display:inline-flex; align-items:center; justify-content:center}
+.row .r-name .ic svg{width:16px; height:16px}
+.row .r-name .t{font-size:12.5px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis}
+.row .r-type{font-size:11px; color:var(--text-secondary)}
+.row .r-size{font-size:11.5px; color:var(--text-tertiary); font-variant-numeric:tabular-nums}
+.row .r-date{font-size:11.5px; color:var(--text-tertiary); font-variant-numeric:tabular-nums}
+.row .row-menu{position:absolute; right:8px; display:none}
+.row:hover .row-menu{display:inline-flex}
+
+/* 内联新建 / 重命名 */
+.inline-new{
+  display:flex; align-items:center; gap:8px; height:34px; padding:0 14px; border:1px dashed var(--border-strong);
+  border-radius:8px; margin-bottom:8px; background:var(--bg-app);
+}
+.inline-new input{flex:1; border:none; outline:none; font-size:12.5px; background:transparent}
+.inline-new .hint{font-size:10.5px; color:var(--text-tertiary); white-space:nowrap}
+.inline-new .hint kbd{background:var(--bg-muted); border-radius:3px; padding:0 4px; font-size:10px}
+
+/* 空状态 */
+.empty{
+  padding:70px 20px; text-align:center; display:flex; flex-direction:column; align-items:center; gap:14px;
+  color:var(--text-tertiary);
+}
+.empty .e-ic{width:64px; height:64px; border-radius:18px; background:var(--bg-muted); display:flex; align-items:center; justify-content:center}
+.empty .e-ic svg{width:30px; height:30px; color:#a8a8a8}
+.empty h3{font-size:14px; color:var(--text-primary); font-weight:600}
+.empty p{font-size:12px; line-height:1.7; max-width:340px}
+
+/* 文档阅读视图 */
+.reader{flex:1; overflow-y:auto; min-height:0}
+.reader-inner{max-width:780px; margin:0 auto; padding:34px 48px 90px}
+.reader h1.doc-title{font-size:26px; font-weight:700; letter-spacing:-.01em; line-height:1.3; margin-bottom:14px}
+.doc-meta{display:flex; flex-wrap:wrap; gap:6px 16px; padding-bottom:16px; border-bottom:1px solid var(--border); margin-bottom:22px; font-size:11.5px; color:var(--text-tertiary)}
+.doc-meta .m{display:inline-flex; align-items:center; gap:5px}
+.doc-meta svg{width:12px; height:12px; opacity:.7}
+.doc-meta .tag{background:var(--bg-muted); border-radius:4px; padding:0 7px; line-height:18px}
+.reader-body{font-size:14px; line-height:1.8; color:#1f1f1f}
+.reader-body h2{font-size:17px; font-weight:650; margin:26px 0 10px; padding-bottom:6px; border-bottom:1px solid #f0f0f0}
+.reader-body h3{font-size:14.5px; font-weight:650; margin:20px 0 8px}
+.reader-body p{margin:10px 0}
+.reader-body ul,.reader-body ol{margin:10px 0; padding-left:22px}
+.reader-body li{margin:4px 0}
+.reader-body code{background:var(--bg-muted); border-radius:4px; padding:1px 5px; font-size:12.5px; font-family:"SF Mono",ui-monospace,Menlo,monospace; color:var(--accent-strong)}
+.reader-body pre{
+  background:#faf9f7; border:1px solid var(--border); border-radius:10px; padding:14px 16px; overflow-x:auto;
+  margin:14px 0; font-size:12.5px; line-height:1.7; font-family:"SF Mono",ui-monospace,Menlo,monospace;
+}
+.reader-body pre code{background:none; padding:0; color:#2e2e2e}
+.reader-body blockquote{border-left:3px solid var(--accent); background:rgba(194,65,12,.05); border-radius:0 8px 8px 0; padding:10px 14px; margin:12px 0; color:var(--text-secondary)}
+.reader-body strong{font-weight:650}
+.reader-body table{border-collapse:collapse; margin:14px 0; font-size:12.5px; width:100%}
+.reader-body th,.reader-body td{border:1px solid var(--border); padding:7px 12px; text-align:left}
+.reader-body th{background:var(--bg-subtle); font-weight:600}
+
+/* ============ 下拉菜单 ============ */
+.menu{
+  position:fixed; z-index:200; min-width:172px; background:var(--bg-app); border:1px solid var(--border);
+  border-radius:10px; box-shadow:var(--shadow-menu); padding:5px; display:none;
+}
+.menu.open{display:block; animation:pop .1s ease}
+@keyframes pop{from{opacity:0; transform:scale(.97) translateY(-2px)}to{opacity:1; transform:none}}
+.menu .mi{
+  display:flex; align-items:center; gap:9px; width:100%; height:30px; padding:0 9px; border-radius:6px;
+  font-size:12.5px; color:var(--text-primary); text-align:left;
+}
+.menu .mi:hover{background:var(--state-hover)}
+.menu .mi svg{width:14px; height:14px; color:var(--text-tertiary)}
+.menu .mi.danger{color:var(--danger)}
+.menu .mi.danger svg{color:var(--danger)}
+.menu .mi.disabled{color:var(--state-disabled); cursor:default}
+.menu .mi.disabled:hover{background:none}
+.menu .sep{height:1px; background:var(--border); margin:5px 4px}
+
+/* ============ 标注模式 ============ */
+.anno-chip{
+  position:absolute; z-index:60; width:20px; height:20px; border-radius:50%; background:var(--accent);
+  color:#fff; font-size:11px; font-weight:700; display:none; align-items:center; justify-content:center;
+  cursor:pointer; box-shadow:0 1px 4px rgba(194,65,12,.4); pointer-events:auto;
+}
+body.anno .anno-chip{display:inline-flex}
+body.anno [data-anno]{outline:1.5px dashed rgba(194,65,12,.35); outline-offset:2px; border-radius:6px}
+[data-anno]{position:relative}
+.anno-panel{
+  position:fixed; left:50%; bottom:16px; transform:translateX(-50%); z-index:250; display:none;
+  background:var(--bg-app); border:1px solid var(--border); border-radius:14px; box-shadow:var(--shadow-menu);
+  padding:14px 16px 10px; width:min(920px,calc(100vw - 60px));
+}
+body.anno .anno-panel{display:block}
+.anno-panel h4{font-size:12px; font-weight:650; margin-bottom:10px; display:flex; align-items:center; gap:8px}
+.anno-panel h4 .tag{font-size:10px; color:var(--text-tertiary); background:var(--bg-muted); border-radius:4px; padding:1px 6px; font-weight:500}
+.anno-grid{display:grid; grid-template-columns:repeat(auto-fit,minmax(250px,1fr)); gap:8px}
+.anno-card{
+  display:flex; gap:9px; padding:8px 10px; border-radius:9px; border:1px solid #eee; background:var(--bg-subtle);
+  cursor:pointer; transition:all .12s;
+}
+.anno-card:hover{border-color:var(--accent); background:#fff}
+.anno-card .n{
+  width:18px; height:18px; border-radius:50%; background:var(--accent); color:#fff; font-size:10.5px; font-weight:700;
+  display:flex; align-items:center; justify-content:center; flex-shrink:0; margin-top:1px;
+}
+.anno-card b{font-size:12px; display:block; margin-bottom:2px}
+.anno-card span{font-size:11px; color:var(--text-secondary); line-height:1.55; display:block}
+.anno-card .old{font-size:10.5px; color:var(--state-disabled); margin-top:3px; display:block}
+.anno-card .old b{display:inline; color:var(--state-disabled); font-weight:600; font-size:10.5px}
+
+/* 对比旧版浮层 */
+.compare{
+  position:fixed; inset:0; z-index:300; background:rgba(17,17,17,.34); display:none; align-items:center; justify-content:center;
+}
+.compare.open{display:flex}
+.compare-box{
+  background:var(--bg-app); border-radius:16px; box-shadow:var(--shadow-menu); width:min(880px,calc(100vw-80px));
+  max-height:calc(100vh - 100px); overflow-y:auto; padding:22px 26px 26px;
+}
+.compare-box h3{font-size:15px; font-weight:700; margin-bottom:4px}
+.compare-box .sub{font-size:12px; color:var(--text-tertiary); margin-bottom:18px}
+.compare-grid{display:grid; grid-template-columns:1fr 1fr; gap:14px}
+.compare-col{border:1px solid var(--border); border-radius:12px; overflow:hidden}
+.compare-col .cap{padding:9px 12px; font-size:11px; font-weight:650; letter-spacing:.04em; border-bottom:1px solid var(--border)}
+.compare-col.old .cap{background:#fafafa; color:var(--text-tertiary)}
+.compare-col.new .cap{background:rgba(194,65,12,.07); color:var(--accent-strong)}
+.compare-col .body{padding:10px 8px; background:var(--bg-app)}
+.c-node{display:flex; align-items:center; gap:7px; height:26px; padding:0 8px; border-radius:6px; font-size:12px; cursor:default}
+.c-node:hover{background:var(--state-hover)}
+.c-node .ic{width:15px; height:15px; display:inline-flex; align-items:center}
+.c-node .ic svg{width:14px; height:14px}
+.c-node .indent{width:14px; flex-shrink:0}
+.c-node .chev-sp{width:14px; flex-shrink:0}
+.c-node.space{color:var(--text-primary); font-weight:600}
+.c-badge{margin-left:auto; font-size:9.5px; background:var(--bg-muted); border-radius:4px; padding:0 5px; color:var(--text-tertiary)}
+.compare-note{margin-top:16px; padding:12px 14px; border-radius:10px; background:var(--bg-subtle); border:1px solid #eee; font-size:12px; color:var(--text-secondary); line-height:1.8}
+.compare-note b{color:var(--accent-strong)}
+.compare-box .close-row{display:flex; justify-content:flex-end; margin-top:14px}
+
+/* ============ toast ============ */
+.toast{
+  position:fixed; left:50%; bottom:24px; transform:translateX(-50%) translateY(8px); z-index:400;
+  background:#222; color:#fafafa; font-size:12px; padding:9px 16px; border-radius:9px; opacity:0;
+  transition:all .2s; pointer-events:none; box-shadow:0 6px 20px rgba(0,0,0,.2);
+}
+.toast.show{opacity:1; transform:translateX(-50%) translateY(0)}
+
+/* 滚动高亮 */
+.flash{animation:flash 1.6s ease 2}
+@keyframes flash{0%,100%{box-shadow:none}30%{box-shadow:0 0 0 3px rgba(194,65,12,.55)}}
+</style>
+</head>
+<body>
+
+<!-- ══════════ 原型控制浮层（评审用，非产品 UI） ══════════ -->
+<div class="proto-dock">
+  <button class="chip-toggle" id="btnAnno"><span class="dot"></span>标注模式</button>
+  <button class="chip-toggle" id="btnCompare">
+    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 5h7v14H4zM13 5h7v9h-7z"/></svg>
+    改造前对比
+  </button>
+</div>
+
+<div class="app">
+
+  <!-- ══════════ 侧边栏（对齐产品 AppSidebar 结构） ══════════ -->
+  <aside class="sidebar" id="appSidebar">
+    <!-- 标题栏行：红绿灯留白 + 折叠 + 全局后退/前进（复用 navBack/navForward 机制） -->
+    <div class="titlebar-row">
+      <div class="traffic-inset"><div class="traffic-dots"><i></i><i></i><i></i></div></div>
+      <button class="titlebar-icon-btn" id="btnCollapse" title="隐藏侧边栏">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M15 5 8 12l7 7"/></svg>
+      </button>
+      <button class="titlebar-icon-btn" id="btnHistBack" title="后退" disabled>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="m15 5-7 7 7 7"/></svg>
+      </button>
+      <button class="titlebar-icon-btn" id="btnHistFwd" title="前进" disabled>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="m9 5 7 7-7 7"/></svg>
+      </button>
+    </div>
+    <div class="version">HIP v2.0.0 · 文档管理原型</div>
+
+    <!-- 主导航：带名称的整行按钮（产品 NavItem），激活 = 灰底 -->
+    <nav class="sb-nav-list" aria-label="主导航">
+      <button class="nav-row" id="navChats">
+        <span class="n-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><path d="M21 12a8 8 0 0 1-8 8H4l2.3-2.9A8 8 0 1 1 21 12Z"/></svg></span>
+        <span class="n-label">对话</span><span class="n-count">12</span>
+      </button>
+      <button class="nav-row" id="navProjects">
+        <span class="n-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><path d="m8 7 4-4 4 4M12 3v9"/><path d="M4 21h16"/><path d="M6 21V10h12v11"/></svg></span>
+        <span class="n-label">项目</span><span class="n-count">8</span>
+      </button>
+      <button class="nav-row active" id="navDocs" data-anno="1">
+        <span class="n-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><path d="M10 4h4l6 6v10H4V4h6Z"/><path d="M10 4v6H4M14 4v6h6"/><path d="M8 14h8M8 17.5h5"/></svg></span>
+        <span class="n-label">文档管理</span><span class="n-count" id="navDocsCount"></span>
+      </button>
+      <button class="nav-row" id="navTerminals">
+        <span class="n-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><path d="m5 7 5 5-5 5M12 17h7"/></svg></span>
+        <span class="n-label">终端管理</span>
+      </button>
+      <button class="nav-row" id="navTasks">
+        <span class="n-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><rect x="4" y="4" width="16" height="16" rx="3"/><path d="m8.5 12.5 2.5 2.5 5-5.5"/></svg></span>
+        <span class="n-label">事项追踪</span>
+      </button>
+      <button class="nav-row" id="navAutomation">
+        <span class="n-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><path d="M13 3 4 14h6l-1 7 9-11h-6l1-7Z"/></svg></span>
+        <span class="n-label">自动化</span>
+      </button>
+    </nav>
+
+    <!-- 列表区：分区头 + 迷你面包屑 + 搜索 + 当前层级条目 -->
+    <div class="sb-list">
+      <div class="list-head" id="listHeadRow" data-anno="3">
+        <span class="lh-label">当前目录</span>
+        <span class="lh-actions">
+          <button class="lh-btn" id="btnSbUp" title="返回上一层" disabled>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 19V6M5.5 12.5 12 6l6.5 6.5"/></svg>
+          </button>
+          <button class="icon-btn" id="btnSbNew" title="新建…">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg>
+          </button>
+        </span>
+      </div>
+      <div class="mc-row" id="mcRow" data-anno="6"><div class="mini-crumbs" id="miniCrumbs"></div></div>
+      <div class="sb-search">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+        <input id="sbSearchInput" type="text" placeholder="搜索当前层级…" autocomplete="off">
+      </div>
+      <div id="sidebarList"></div>
+      <div class="sb-empty" id="sbEmpty" style="display:none">
+        <div class="big">📂</div>
+        <p id="sbEmptyTitle">此文件夹为空</p>
+        <button id="btnSbEmptyNew">新建文件夹</button>
+      </div>
+    </div>
+
+    <!-- 底部（产品 SidebarAccountFooter） -->
+    <div class="sidebar-footer">
+      <button class="footer-row" id="ftTrash">
+        <span class="f-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><path d="M9 3h6l1 3h4v2H4V6h4l1-3Z"/><path d="M6 8h12l-1 12H7L6 8Z"/></svg></span>
+        <span class="f-label">回收站</span><span class="f-badge">3</span>
+      </button>
+      <button class="footer-row" id="ftHistory">
+        <span class="f-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><path d="M4 12a8 8 0 1 0 3-6.2"/><path d="M4 4v4h4M12 8v4l3 2"/></svg></span>
+        <span class="f-label">历史记录</span>
+      </button>
+      <button class="footer-row" id="ftSettings">
+        <span class="f-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><circle cx="12" cy="12" r="3"/><path d="M12 3v3M12 18v3M3 12h3M18 12h3M5.6 5.6l2.1 2.1M16.3 16.3l2.1 2.1M18.4 5.6l-2.1 2.1M7.7 16.3l-2.1 2.1"/></svg></span>
+        <span class="f-label">设置</span>
+      </button>
+    </div>
+  </aside>
+
+  <!-- ══════════ 主列（产品：MainToolbar + 内容） ══════════ -->
+  <main class="main">
+    <header class="main-toolbar">
+      <button class="titlebar-icon-btn" id="btnExpand" title="显示侧边栏" style="display:none">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M9 5l7 7-7 7"/></svg>
+      </button>
+      <span class="mt-title" id="mtTitle">文档管理</span>
+      <span class="mt-right">
+        <span class="mt-status"><i></i>就绪</span>
+        <button class="titlebar-icon-btn" title="右侧面板" id="btnPanel">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M15 4v16"/></svg>
+        </button>
+      </span>
+    </header>
+    <div class="toolbar" data-anno="4">
+      <button class="up-btn" id="btnUp" title="返回上一层 (Alt+←)">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 19V6M5.5 12.5 12 6l6.5 6.5"/></svg>
+      </button>
+      <div class="crumbs" id="crumbs"></div>
+      <div class="tb-search">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+        <input id="tbSearchInput" type="text" placeholder="搜索当前层级" autocomplete="off">
+      </div>
+      <div class="seg" title="视图切换" data-anno="5">
+        <button id="viewGrid" class="on" title="网格视图">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="4" width="7" height="7" rx="1.5"/><rect x="13" y="4" width="7" height="7" rx="1.5"/><rect x="4" y="13" width="7" height="7" rx="1.5"/><rect x="13" y="13" width="7" height="7" rx="1.5"/></svg>
+        </button>
+        <button id="viewList" title="列表视图">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 6h16M4 12h16M4 18h16"/></svg>
+        </button>
+      </div>
+      <button class="btn-primary" id="btnMainNew">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M12 5v14M5 12h14"/></svg>
+        新建
+      </button>
+    </div>
+
+    <div class="content" id="browseView"></div>
+    <div class="reader" id="readerView" style="display:none"></div>
+  </main>
+</div>
+
+<!-- ══════════ 上下文菜单 ══════════ -->
+<div class="menu" id="ctxMenu"></div>
+<!-- ══════════ 新建菜单 ══════════ -->
+<div class="menu" id="newMenu">
+  <button class="mi" data-kind="folder">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 6a2 2 0 0 1 2-2h4l2 2.5h8a2 2 0 0 1 2 2V18a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6Z"/></svg>
+    新建文件夹
+  </button>
+  <button class="mi" data-kind="doc">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M14 3H7a1.5 1.5 0 0 0-1.5 1.5v15A1.5 1.5 0 0 0 7 21h10a1.5 1.5 0 0 0 1.5-1.5V8l-4.5-5Z"/><path d="M14 3v5h5"/><path d="M9 13h6M9 16.5h6"/></svg>
+    新建文档
+  </button>
+  <button class="mi" data-kind="board">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3.5" y="3.5" width="17" height="17" rx="2.5"/><path d="M3.5 9h17M9 3.5V21"/></svg>
+    新建画板
+  </button>
+  <div class="sep"></div>
+  <button class="mi disabled">导入 Markdown…（演示）</button>
+</div>
+
+<!-- ══════════ 标注面板 ══════════ -->
+<div class="anno-panel">
+  <h4>标注模式 <span class="tag">改造点速览</span> <span style="margin-left:auto;font-weight:400;color:var(--text-tertiary);font-size:11px">点击卡片定位对应区域</span></h4>
+  <div class="anno-grid">
+    <div class="anno-card" data-target="1"><span class="n">1</span><div><b>导航行改名：知识库 → 文档管理</b><span>侧边栏导航行（图标 + 名称）由 BookOpen「知识库」改为 FolderTree「文档管理」，徽标计数 = 顶层条目数；激活态沿用灰底（bg-state-active）。</span><span class="old">旧版：<b>知识库</b>（BookOpen），计数 = 空间数</span></div></div>
+    <div class="anno-card" data-target="2"><span class="n">2</span><div><b>侧边栏 = 单层级目录（像电脑文件夹）</b><span>每次只显示<b>当前层级</b>的文件夹与文档：点文件夹进入，↑ / 面包屑 / Alt+← 返回上一层。不再渲染递归整树，20 层深度一样流畅。</span><span class="old">旧版：仅列出「空间」，需进入主页面才能看到树</span></div></div>
+    <div class="anno-card" data-target="3"><span class="n">3</span><div><b>分区头：当前目录 + ↑ + 新建</b><span>列表头由「知识空间」改为「当前目录」；右侧为 ↑ 返回上一层（根目录置灰）与「+ 新建」下拉：文件夹 / 文档 / 画板，在当前层级就地命名。</span><span class="old">旧版：知识空间 + 新建知识库（空间级对话框）</span></div></div>
+    <div class="anno-card" data-target="4"><span class="n">4</span><div><b>↑ 返回上一层 + 面包屑</b><span>文件管理器式向上导航；点击面包屑任意层级直接跳回；根目录时按钮置灰。快捷键 Alt+←。</span><span class="old">旧版：只有树内面包屑，无向上入口</span></div></div>
+    <div class="anno-card" data-target="5"><span class="n">5</span><div><b>浏览模式（新增）</b><span>文件夹内容以「文件夹网格 + 文档列表」展示，支持网格/列表切换、排序（文件夹优先）。点击文档进入阅读/编辑。</span><span class="old">旧版：打开空间后固定左树右文，无内容概览</span></div></div>
+    <div class="anno-card" data-target="6"><span class="n">6</span><div><b>深目录：20 层体验</b><span>面包屑超 3 段折叠为「…」，点击弹出<b>祖先跳转菜单</b>直达任意层级；hover 显示完整路径。可试试点开「深度目录（20 层演示）」，再用「…」跳回根。</span><span class="old">旧版：整树递归展开，深层目录难用</span></div></div>
+  </div>
+</div>
+
+<!-- ══════════ 改造前对比浮层 ══════════ -->
+<div class="compare" id="compareModal">
+  <div class="compare-box">
+    <h3>改造前 ↔ 改造后</h3>
+    <div class="sub">侧边栏与主页面结构对照（视觉稿演示数据）</div>
+    <div class="compare-grid">
+      <div class="compare-col old">
+        <div class="cap">改造前 · 知识库</div>
+        <div class="body">
+          <div class="c-node space"><span class="chev-sp"></span><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="#c2410c" stroke-width="1.8"><path d="M4 5.5A1.5 1.5 0 0 1 5.5 4h5l2 2h6A1.5 1.5 0 0 1 20 7.5v11A1.5 1.5 0 0 1 18.5 20h-13A1.5 1.5 0 0 1 4 18.5v-13Z"/></svg></span>📕 产品知识库<span class="c-badge">空间</span></div>
+          <div class="c-node space"><span class="chev-sp"></span><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="#c2410c" stroke-width="1.8"><path d="M4 5.5A1.5 1.5 0 0 1 5.5 4h5l2 2h6A1.5 1.5 0 0 1 20 7.5v11A1.5 1.5 0 0 1 18.5 20h-13A1.5 1.5 0 0 1 4 18.5v-13Z"/></svg></span>📗 团队 Wiki<span class="c-badge">空间</span></div>
+          <div class="c-node space"><span class="chev-sp"></span><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="#c2410c" stroke-width="1.8"><path d="M4 5.5A1.5 1.5 0 0 1 5.5 4h5l2 2h6A1.5 1.5 0 0 1 20 7.5v11A1.5 1.5 0 0 1 18.5 20h-13A1.5 1.5 0 0 1 4 18.5v-13Z"/></svg></span>📘 技术文档<span class="c-badge">空间</span></div>
+          <div class="c-node" style="margin-top:6px;color:var(--text-tertiary);font-size:11px;padding-left:12px">＋ 新建知识库　·　目录树藏在主页面里</div>
+        </div>
+      </div>
+      <div class="compare-col new">
+        <div class="cap">改造后 · 文档管理</div>
+        <div class="body">
+          <div class="c-node"><span class="chev-sp"></span><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="#757575" stroke-width="1.75"><path d="m15 5-7 7 7 7"/></svg></span><span style="color:var(--text-tertiary);font-size:11px">标题栏行不变（后退/前进 = 全局 shell 历史，与目录无关）</span></div>
+          <div class="c-node"><span class="chev-sp"></span><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><path d="M10 4h4l6 6v10H4V4h6Z"/><path d="M10 4v6H4M14 4v6h6"/><path d="M8 14h8M8 17.5h5"/></svg></span>文档管理<span class="c-badge">导航行 · FolderTree</span></div>
+          <div class="c-node"><span class="chev-sp"></span><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="#757575" stroke-width="1.75"><path d="M12 19V6M5.5 12.5 12 6l6.5 6.5"/></svg></span><span style="color:var(--text-tertiary);font-size:11px">↑ 返回上一层　·　列表头「当前目录」</span></div>
+          <div class="c-node"><span class="chev-sp"></span><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="#c2410c" stroke-width="1.8"><path d="M3 6a2 2 0 0 1 2-2h4l2 2.5h8a2 2 0 0 1 2 2V18a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6Z"/></svg></span>用户指南<span class="c-badge">当前层级</span></div>
+          <div class="c-node"><span class="chev-sp"></span><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="#c2410c" stroke-width="1.8"><path d="M3 6a2 2 0 0 1 2-2h4l2 2.5h8a2 2 0 0 1 2 2V18a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6Z"/></svg></span>API 参考<span class="c-badge">当前层级</span></div>
+          <div class="c-node"><span class="chev-sp"></span><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="#757575" stroke-width="1.8"><path d="M14 3H7a1.5 1.5 0 0 0-1.5 1.5v15A1.5 1.5 0 0 0 7 21h10a1.5 1.5 0 0 0 1.5-1.5V8l-4.5-5Z"/><path d="M14 3v5h5"/><path d="M9 13h6M9 16.5h6"/></svg></span>版本发布说明.md<span class="c-badge">当前层级</span></div>
+          <div class="c-node" style="margin-top:6px;color:var(--text-tertiary);font-size:11px;padding-left:12px">只显示当前一层 · 迷你面包屑「…」跳转 · 20 层深度无压力 · 底部不变</div>
+        </div>
+      </div>
+    </div>
+    <div class="compare-note">
+      <b>迁移策略：</b>旧「空间」自动转为顶层文件夹（名称、图标保留），内容零丢失；空间级新建/重命名/删除 UI 全部移除，统一为文件夹操作。详见 <b>spec.md §3</b>。
+    </div>
+    <div class="close-row"><button class="btn-primary" id="btnCloseCompare">知道了</button></div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+/* ══════════════════════ 数据模型：单一目录树（v2：无空间层） ══════════════════════ */
+const F = 'folder', D = 'doc', B = 'board'
+const NOW = Date.now()
+const h = (n) => n * 3600e3, d = (n) => n * 24 * 3600e3
+const NODES = {}
+function nd(id, parentId, kind, title, extra = {}) {
+  const pid = parentId && typeof parentId === 'object' ? parentId.id : parentId
+  const node = Object.assign({
+    id, parentId: pid, kind, title,
+    createdAt: NOW - d(30), updatedAt: NOW - h(2),
+    size: kind === F ? null : (2 + (id.length % 5)) * 1.1e3,
+  }, extra)
+  NODES[id] = node
+  return node
+}
+const ROOT = nd('root', null, F, '文档管理')
+// 产品手册
+const p1 = nd('p1', ROOT, F, '产品手册')
+const p11 = nd('p11', p1, F, '用户指南')
+const p12 = nd('p12', p1, F, 'API 参考')
+nd('p1a', p11, D, '快速开始', { updatedAt: NOW - h(26), tags: ['新手', '入门'] })
+nd('p1b', p11, D, '安装部署', { updatedAt: NOW - d(3), tags: ['部署'] })
+nd('p1c', p11, D, '常见问题 FAQ', { updatedAt: NOW - d(8), tags: ['FAQ'] })
+nd('p1d', p12, D, '认证与鉴权', { updatedAt: NOW - d(2), tags: ['API'] })
+nd('p1e', p12, D, 'Webhook 事件', { updatedAt: NOW - d(6), tags: ['API'] })
+nd('p1f', p1, D, '版本发布说明', { updatedAt: NOW - d(12) })
+// 团队知识
+const p2 = nd('p2', ROOT, F, '团队知识')
+const p21 = nd('p21', p2, F, '会议纪要')
+nd('p2a', p21, D, '2025-Q3 规划评审', { updatedAt: NOW - h(5), tags: ['会议'] })
+nd('p2b', p21, D, '技术评审：目录树改造', { updatedAt: NOW - d(4), tags: ['会议', '评审'] })
+nd('p2c', p2, D, '新人入职指南', { updatedAt: NOW - d(9), tags: ['人事'] })
+// 技术文档
+const p3 = nd('p3', ROOT, F, '技术文档')
+nd('p3a', p3, D, '架构设计', { updatedAt: NOW - d(15), tags: ['架构'] })
+nd('p3b', p3, D, '数据库规范', { updatedAt: NOW - d(18), tags: ['规范'] })
+nd('p3c', p3, B, '视觉设计 tokens 说明', { updatedAt: NOW - d(20), tags: ['设计'] })
+nd('p3d', p3, B, '知识图谱演示画板', { updatedAt: NOW - d(21), tags: ['演示'] })
+// 个人笔记
+const p4 = nd('p4', ROOT, F, '个人笔记')
+nd('p4a', p4, D, '灵感收集', { updatedAt: NOW - h(40), tags: ['随笔'] })
+
+// 深目录演示：20 层嵌套（验证单层级导航 + 面包屑折叠 + 历史回溯）
+let deepPrev = nd('deep', ROOT, F, '深度目录（20 层演示）')
+for (let i = 1; i <= 20; i++) {
+  deepPrev = nd('deep' + i, deepPrev, F, '第 ' + i + ' 层')
+}
+nd('deepend', deepPrev, D, '藏在 20 层深处的文档', {
+  updatedAt: NOW - h(3),
+  tags: ['演示', '深目录'],
+  content: [
+    '# 藏在 20 层深处的文档',
+    '',
+    '这是一篇位于**第 20 层**目录下的文档，用于验证深目录体验。',
+    '',
+    '## 设计要点',
+    '',
+    '- **侧边栏单层级导航**：每次只渲染当前层级，进入 20 层只渲染 20 次单层列表',
+    '- **面包屑折叠**：超过 3 段自动折叠为「…」，点击弹出祖先跳转菜单',
+    '- **返回路径**：↑ 逐级返回上一层，或点面包屑任意段（`…` 弹出祖先跳转菜单）直达',
+    '',
+    '```ts',
+    '// 从第 20 层回到根目录：',
+    'goUp() × N                  // 逐级返回上一层，或',
+    'breadcrumb.jump("全部文档")  // 点面包屑「…」跳转任意祖先',
+    '```',
+    '',
+    '> 像本地电脑的文件夹一样：永远只看到当前一层，永远可以返回上一层。',
+  ].join('\n'),
+})
+
+const CONTENT = {
+  p1a: [
+    '# 快速开始',
+    '',
+    '欢迎使用**文档管理**。本文介绍如何在 5 分钟内创建你的第一篇文档。',
+    '',
+    '## 新建文档',
+    '',
+    '点击侧边栏或工具栏的 **+ 新建** →「新建文档」，输入标题后回车即可。新建的文档会出现在当前目录。',
+    '',
+    '## 目录结构',
+    '',
+    '- **文件夹**：组织文档，可无限嵌套，支持拖拽移动',
+    '- **文档**：Markdown 或 BlockNote 双模编辑',
+    '- **画板**：白板式自由排版',
+    '',
+    '> 提示：左侧目录树就是完整的文件系统，点任意祖先节点或面包屑即可返回上一层。',
+    '',
+    '## 示例代码',
+    '',
+    '```ts',
+    'const doc = await manager.create({',
+    '  title: "快速开始",',
+    '  parent: "用户指南",',
+    '})',
+    '```',
+  ],
+  p1b: [
+    '# 安装部署',
+    '',
+    '支持 macOS / Windows / Linux 三平台，安装包约 **120MB**。',
+    '',
+    '## 系统要求',
+    '',
+    '| 平台 | 版本 | 备注 |',
+    '| --- | --- | --- |',
+    '| macOS | 13.0+ | Apple Silicon / Intel |',
+    '| Windows | 10 22H2+ | x64 |',
+    '| Linux | glibc 2.31+ | AppImage / deb |',
+    '',
+    '## 升级',
+    '',
+    '1. 从官网下载新版安装包',
+    '2. 覆盖安装，本地数据自动保留',
+    '',
+    '> 注意：升级前建议先退出正在运行的应用。',
+  ],
+  p1c: [
+    '# 常见问题 FAQ',
+    '',
+    '## 文档存在哪里？',
+    '',
+    '所有文档均为本地 Markdown 文件，存放在应用数据目录下，随时可备份。',
+    '',
+    '## 如何找回误删的文档？',
+    '',
+    '删除的条目进入**回收站**，可在回收站中恢复。',
+  ],
+  p1d: [
+    '# 认证与鉴权',
+    '',
+    'API 使用 Bearer Token 认证。',
+    '',
+    '```bash',
+    'curl -H "Authorization: Bearer $TOKEN" \\',
+    '  https://api.example.com/v1/docs',
+    '```',
+    '',
+    '## 权限模型',
+    '',
+    '- 只读：`docs:read`',
+    '- 读写：`docs:write`',
+    '- 管理：`docs:admin`',
+  ],
+  p1e: [
+    '# Webhook 事件',
+    '',
+    '文档变更时会触发以下事件：',
+    '',
+    '| 事件 | 说明 |',
+    '| --- | --- | --- |',
+    '| `doc.created` | 新建文档 |',
+    '| `doc.updated` | 文档内容更新 |',
+    '| `doc.deleted` | 文档移入回收站 |',
+  ],
+  p1f: [
+    '# 版本发布说明',
+    '',
+    '## v2.0.0（2025-08-01）',
+    '',
+    '**新增**',
+    '',
+    '- 「知识库」升级为「文档管理」：删除空间层，全库统一目录树',
+    '- 侧边栏目录树：展开 / 折叠 / 拖拽移动',
+    '- 返回上一层（↑）+ 面包屑跳转',
+    '',
+    '**修复**',
+    '',
+    '- 深目录下面包屑溢出折叠',
+  ],
+  p2a: [
+    '# 2025-Q3 规划评审',
+    '',
+    '## 议题',
+    '',
+    '1. 文档管理改造进度同步',
+    '2. 侧边栏目录树交互确认',
+    '',
+    '## 结论',
+    '',
+    '- 通过：**删除空间层**，旧空间迁移为顶层文件夹',
+    '- 待办：补充迁移失败回滚方案',
+  ],
+  p2b: [
+    '# 技术评审：目录树改造',
+    '',
+    '## 方案要点',
+    '',
+    '- 索引 v1 → v2，`spaces` 数组移除',
+    '- `parentId: null` 表示根目录',
+    '- 迁移：旧空间 → 顶层文件夹，一次性执行，保留 v1 备份',
+    '',
+    '> 评审结论：通过，按 spec.md §3 执行。',
+  ],
+  p2c: [
+    '# 新人入职指南',
+    '',
+    '欢迎加入团队！以下是你需要知道的：',
+    '',
+    '## 第一天',
+    '',
+    '1. 阅读《快速开始》',
+    '2. 配置本地开发环境',
+    '3. 参加团队例会',
+  ],
+  p3a: [
+    '# 架构设计',
+    '',
+    '## 总体分层',
+    '',
+    '- **Shell**：Tauri + React，提供窗口与系统集成',
+    '- **UI**：对话 / 项目 / 文档管理 / 终端 / 事项',
+    '- **Store**：Zustand，单一状态源',
+    '',
+    '```ts',
+    '// 节点模型（v2：无空间层）',
+    'interface KnowledgeNode {',
+    '  id: string',
+    '  parentId: string | null  // null = 根目录',
+    '  kind: "folder" | "doc" | "board"',
+    '}',
+    '```',
+  ],
+  p3b: [
+    '# 数据库规范',
+    '',
+    '## 命名',
+    '',
+    '- 表名：snake_case，复数',
+    '- 主键：`id` 自增或 ULID',
+    '',
+    '## 索引',
+    '',
+    '- `parent_id + kind` 复合索引（目录树查询）',
+  ],
+  p3c: [
+    '# 视觉设计 tokens 说明',
+    '',
+    '画板文档：记录色彩与密度规范。',
+    '',
+    '| token | 值 | 用途 |',
+    '| --- | --- | --- |',
+    '| `--bg-subtle` | #F9F8F5 | 侧边栏底 |',
+    '| `--accent` | #c2410c | 品牌强调 |',
+  ],
+  p3d: [
+    '# 知识图谱演示画板',
+    '',
+    '画板内容：节点、连线与自由排版。',
+  ],
+  p4a: [
+    '# 灵感收集',
+    '',
+    '- 文件夹式的侧边栏体验非常直观，值得推广',
+    '- 面包屑 + 返回上一层是文件管理器的灵魂交互',
+  ],
+}
+for (const id in CONTENT) NODES[id].content = CONTENT[id].join('\n')
+
+/* ══════════════════════ 状态 ══════════════════════ */
+const state = {
+  path: [ROOT],                 // 当前路径栈（浏览/阅读定位）
+  docId: null,                  // 阅读视图打开的文档
+  view: 'grid',                 // grid | list
+  search: '',                   // 搜索（侧边栏与主区联动，同域）
+  inlineNew: null,              // {kind, parentId} 内联新建
+  inlineRename: null,           // {id, parentId, title}
+}
+let toastTimer = null
+
+/* ══════════════════════ 工具 ══════════════════════ */
+const $ = (s) => document.querySelector(s)
+const children = (id) => Object.values(NODES).filter(n => n.parentId === id)
+const FOLDER_SVG = '<svg viewBox="0 0 24 24" fill="none" stroke="#c2410c" stroke-width="1.8"><path d="M3 6a2 2 0 0 1 2-2h4l2 2.5h8a2 2 0 0 1 2 2V18a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6Z"/></svg>'
+const DOC_SVG = '<svg viewBox="0 0 24 24" fill="none" stroke="#757575" stroke-width="1.8"><path d="M14 3H7a1.5 1.5 0 0 0-1.5 1.5v15A1.5 1.5 0 0 0 7 21h10a1.5 1.5 0 0 0 1.5-1.5V8l-4.5-5Z"/><path d="M14 3v5h5"/><path d="M9 13h6M9 16.5h6"/></svg>'
+const BOARD_SVG = '<svg viewBox="0 0 24 24" fill="none" stroke="#5b5bd6" stroke-width="1.8"><rect x="3.5" y="3.5" width="17" height="17" rx="2.5"/><path d="M3.5 9h17M9 3.5V21"/></svg>'
+const CHEV_SVG = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m9 5 7 7-7 7"/></svg>' // 备用（旧树组件遗留）
+function iconFor(n, size) {
+  return n.kind === F ? FOLDER_SVG : n.kind === B ? BOARD_SVG : DOC_SVG
+}
+function fmtSize(n) {
+  if (n.kind === F) return '—'
+  if (n.kind === B) return '—'
+  if (n.size >= 1e6) return (n.size / 1e6).toFixed(1) + ' MB'
+  if (n.size >= 1e3) return (n.size / 1e3).toFixed(1) + ' KB'
+  return n.size + ' B'
+}
+function fmtDate(ts) {
+  const dt = new Date(ts), now = new Date()
+  const sameDay = dt.toDateString() === now.toDateString()
+  const p = (x) => String(x).padStart(2, '0')
+  if (sameDay) return '今天 ' + p(dt.getHours()) + ':' + p(dt.getMinutes())
+  if (dt.getFullYear() === now.getFullYear())
+    return p(dt.getMonth() + 1) + '-' + p(dt.getDate()) + ' ' + p(dt.getHours()) + ':' + p(dt.getMinutes())
+  return dt.getFullYear() + '-' + p(dt.getMonth() + 1) + '-' + p(dt.getDate())
+}
+function esc(s) {
+  return s.replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]))
+}
+function hl(s, q) {
+  if (!q) return esc(s)
+  const i = s.toLowerCase().indexOf(q.toLowerCase())
+  if (i < 0) return esc(s)
+  return esc(s.slice(0, i)) + '<mark>' + esc(s.slice(i, i + q.length)) + '</mark>' + esc(s.slice(i + q.length))
+}
+function toast(msg) {
+  const t = $('#toast'); t.textContent = msg; t.classList.add('show')
+  clearTimeout(toastTimer); toastTimer = setTimeout(() => t.classList.remove('show'), 2200)
+}
+function ancestors(id) {
+  const out = []; let cur = NODES[id]
+  while (cur) { out.unshift(cur); cur = cur.parentId ? NODES[cur.parentId] : null }
+  return out
+}
+function sortNodes(list) {
+  return [...list].sort((a, b) => {
+    if ((a.kind === F) !== (b.kind === F)) return a.kind === F ? -1 : 1
+    return b.updatedAt - a.updatedAt
+  })
+}
+function descendants(id) {
+  const out = []
+  const walk = (pid) => children(pid).forEach(c => { out.push(c); if (c.kind === F) walk(c.id) })
+  walk(id); return out
+}
+
+/* ══════════════════════ 导航（单层级 + 历史） ══════════════════════ */
+function currentFolderId() {
+  return state.docId ? NODES[state.docId].parentId : state.path[state.path.length - 1].id
+}
+function applyPath(ids) {
+  state.path = ids.map(id => NODES[id]).filter(Boolean)
+  if (!state.path.length) state.path = [ROOT]
+  state.docId = null; state.inlineNew = null; state.inlineRename = null
+  renderAll()
+}
+function navigateToFolder(id) {
+  const n = NODES[id]
+  if (!n || n.kind !== F) return
+  if (state.path[state.path.length - 1]?.id === id) return
+  state.path = ancestors(id); state.docId = null; state.inlineNew = null; state.inlineRename = null
+  renderAll()
+}
+function navigateToDoc(id) {
+  if (!NODES[id]) return
+  state.docId = id; state.path = ancestors(NODES[id].parentId)
+  renderAll()
+}
+
+/* ══════════════════════ 侧边栏：单层级目录导航 ══════════════════════ */
+const PLUS_SVG = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg>'
+const DOTS_SVG = '<svg viewBox="0 0 24 24" fill="currentColor"><circle cx="5" cy="12" r="1.7"/><circle cx="12" cy="12" r="1.7"/><circle cx="19" cy="12" r="1.7"/></svg>'
+/* 主导航分区（演示：仅「文档管理」为真实内容） */
+let section = 'docs'
+const SECTION_LABEL = { navChats: '对话历史', navProjects: '项目会话', navTerminals: '终端管理', navTasks: '事项', navAutomation: '自动化' }
+function setSection(id) {
+  section = id
+  const btnId = id === 'docs' ? 'navDocs' : id
+  document.querySelectorAll('.nav-row').forEach(b => b.classList.toggle('active', b.id === btnId))
+  state.search = ''
+  $('#sbSearchInput').value = ''
+  $('#tbSearchInput').value = ''
+  renderAll()
+}
+function renderSidebar() {
+  const box = $('#sidebarList'), q = state.search.trim()
+  $('#navDocsCount').textContent = children(ROOT.id).length
+  if (section !== 'docs') {
+    // 其他分区：占位（原型聚焦「文档管理」）
+    $('#listHeadRow').style.display = 'none'
+    $('#mcRow').style.display = 'none'
+    $('.sb-search').style.display = 'none'
+    $('#sbEmpty').style.display = 'none'
+    $('#btnSbUp').disabled = true
+    box.innerHTML = '<div class="sb-empty" style="display:block"><div class="big">🧩</div><p>原型聚焦「文档管理」<br>「' + (SECTION_LABEL[section] || '') + '」为占位区域。</p></div>'
+    return
+  }
+  $('#listHeadRow').style.display = ''
+  $('#mcRow').style.display = ''
+  $('.sb-search').style.display = ''
+  const folder = NODES[currentFolderId()]
+  const chain = ancestors(folder.id)
+  // 分区头 ↑ = 返回上一层；标题栏后退/前进为全局 shell 历史（与文档目录无关，常禁用演示）
+  $('#btnHistBack').disabled = true
+  $('#btnHistFwd').disabled = true
+  $('#btnSbUp').disabled = chain.length <= 1
+  renderMiniCrumbs(folder)
+  // 当前层级条目（文件夹优先，其次按修改时间）
+  const items = sortNodes(children(folder.id).filter(n => !q || n.title.toLowerCase().includes(q.toLowerCase())))
+  box.innerHTML = ''
+  $('#sbEmpty').style.display = items.length ? 'none' : 'block'
+  $('#sbEmptyTitle').textContent = q && items.length === 0
+    ? '没有匹配「' + q + '」的条目'
+    : (folder.id === ROOT.id ? '还没有任何文档' : '此文件夹为空')
+  const selId = state.docId || folder.id
+  items.forEach(n => {
+    const row = document.createElement('div')
+    row.className = 'sb-item' + (n.id === selId ? ' current' : '')
+    row.dataset.id = n.id
+    row.innerHTML =
+      '<span class="ic">' + iconFor(n) + '</span>' +
+      '<span class="label">' + hl(n.title, q) + '</span>' +
+      (n.kind === F ? '<span class="badge">' + children(n.id).length + '</span>' : '') +
+      '<span class="row-actions">' +
+        '<button data-act="new" title="在此新建">' + PLUS_SVG + '</button>' +
+        '<button data-act="menu" title="更多">' + DOTS_SVG + '</button>' +
+      '</span>'
+    row.addEventListener('click', () => {
+      if (n.kind === F) navigateToFolder(n.id)
+      else navigateToDoc(n.id)
+    })
+    row.addEventListener('contextmenu', (e) => { e.preventDefault(); e.stopPropagation(); openCtx(e.clientX, e.clientY, n) })
+    row.querySelector('[data-act="menu"]').addEventListener('click', (e) => {
+      e.stopPropagation(); const r = row.getBoundingClientRect()
+      openCtx(r.right - 8, r.top + 15, n)
+    })
+    row.querySelector('[data-act="new"]').addEventListener('click', (e) => {
+      e.stopPropagation(); startInlineNew(n.kind === F ? n.id : n.parentId)
+    })
+    box.appendChild(row)
+  })
+}
+
+/* 迷你面包屑（可点任意段跳转；>3 段折叠为「…」） */
+function renderMiniCrumbs(folder) {
+  const box = $('#miniCrumbs')
+  box.innerHTML = ''
+  const chain = ancestors(folder.id)
+  box.title = chain.map(n => n.title).join(' / ')
+  const showAll = chain.length <= 3
+  const visible = showAll ? chain : [chain[0], null, chain[chain.length - 1]]
+  visible.forEach((n, i) => {
+    if (n === null) {
+      const b = document.createElement('button')
+      b.className = 'mc-seg more'; b.textContent = '…'
+      b.title = '点击跳转到任意上级目录'
+      b.addEventListener('click', (e) => { e.stopPropagation(); openAncestorJump(chain, b) })
+      box.appendChild(b)
+      const sep = document.createElement('span'); sep.className = 'mc-sep'; sep.textContent = '›'; box.appendChild(sep)
+      return
+    }
+    const last = i === visible.length - 1
+    const b = document.createElement('button')
+    b.className = 'mc-seg' + (last ? ' here' : '')
+    b.textContent = n.title
+    b.title = n.title
+    if (!last) b.addEventListener('click', () => navigateToFolder(n.id))
+    box.appendChild(b)
+    if (!last) { const sep = document.createElement('span'); sep.className = 'mc-sep'; sep.textContent = '›'; box.appendChild(sep) }
+  })
+}
+
+/* 「…」→ 祖先跳转菜单（复用上下文菜单容器） */
+function openAncestorJump(chain, anchorEl) {
+  const r = anchorEl.getBoundingClientRect()
+  const items = chain.slice(0, -1).reverse().map((n, idx) =>
+    '<button class="mi" data-ctx="jump" data-jump-id="' + n.id + '">' +
+    '<span class="ic" style="display:inline-flex;width:14px;height:14px;align-items:center">' + iconFor(n) + '</span>' +
+    esc(n.title) + (idx === 0 ? '（上一级）' : '') +
+    '</button>'
+  ).join('')
+  menu.innerHTML =
+    '<div class="mi" style="cursor:default;color:var(--text-tertiary);font-size:11px;height:22px">跳转到上级目录</div>' +
+    items
+  menu.classList.add('open')
+  menu.style.left = Math.max(8, Math.min(r.left, window.innerWidth - 190)) + 'px'
+  menu.style.top = (r.bottom + 6) + 'px'
+}
+
+/* ══════════════════════ 面包屑 ══════════════════════ */
+function renderCrumbs() {
+  const box = $('#crumbs'); box.innerHTML = ''
+  const chain = ancestors(state.docId || state.path[state.path.length - 1].id)
+  const showAll = chain.length <= 3
+  const visible = showAll ? chain : [chain[0], null, chain[chain.length - 1]]
+  visible.forEach((n, i) => {
+    if (n === null) {
+      const b = document.createElement('button'); b.className = 'crumb clickable more'; b.textContent = '…'
+      b.title = '点击跳转到任意上级目录'
+      b.addEventListener('click', () => openAncestorJump(chain, b))
+      box.appendChild(b)
+      const sep = document.createElement('span'); sep.className = 'crumb-sep'; sep.textContent = '›'; box.appendChild(sep)
+      return
+    }
+    const last = i === visible.length - 1
+    const el = document.createElement('button')
+    el.className = 'crumb' + (last ? ' here' : ' clickable')
+    el.innerHTML = '<span class="ic">' + iconFor(n) + '</span>' + esc(n.title)
+    if (!last) el.addEventListener('click', () => navigateToFolder(n.id))
+    box.appendChild(el)
+    if (!last) { const sep = document.createElement('span'); sep.className = 'crumb-sep'; sep.textContent = '›'; box.appendChild(sep) }
+  })
+  $('#btnUp').disabled = chain.length <= 1
+}
+
+/* ══════════════════════ 浏览模式 ══════════════════════ */
+function renderBrowse() {
+  const box = $('#browseView'), q = state.search.trim()
+  box.style.display = ''; $('#readerView').style.display = 'none'
+  box.innerHTML = ''
+  const cur = state.path[state.path.length - 1]
+  const items = sortNodes(children(cur.id).filter(n => !q || n.title.toLowerCase().includes(q.toLowerCase())))
+
+  if (items.length === 0 && !state.inlineNew) {
+    if (q) {
+      box.innerHTML =
+        '<div class="empty">' +
+          '<div class="e-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg></div>' +
+          '<h3>没有匹配「' + esc(q) + '」的结果</h3>' +
+          '<p>当前目录下没有名称包含该关键词的文件夹或文档。</p>' +
+          '<button class="btn-primary" id="btnClearSearch">清除搜索</button>' +
+        '</div>'
+      $('#btnClearSearch').addEventListener('click', () => { state.search = ''; renderAll() })
+      return
+    }
+    box.innerHTML =
+      '<div class="empty">' +
+        '<div class="e-ic">' + FOLDER_SVG + '</div>' +
+        '<h3>' + (cur.id === ROOT.id ? '还没有任何文档' : '这个文件夹还是空的') + '</h3>' +
+        '<p>新建一个文件夹或文档，开始整理你的内容。<br>文档支持 Markdown 与画板两种形态。</p>' +
+        '<button class="btn-primary" id="btnEmptyNew"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M12 5v14M5 12h14"/></svg>新建文件夹</button>' +
+      '</div>'
+    $('#btnEmptyNew').addEventListener('click', () => startInlineNew(cur.id))
+    return
+  }
+
+  const folders = items.filter(n => n.kind === F)
+  const docs = items.filter(n => n.kind !== F)
+
+  // 内联新建 / 重命名行
+  const inline = state.inlineNew || state.inlineRename
+  if (inline) {
+    const row = document.createElement('div'); row.className = 'inline-new'
+    const isRename = !!state.inlineRename
+    const kind = isRename ? NODES[state.inlineRename.id].kind : state.inlineNew.kind
+    const hint = kind === F ? '文件夹' : kind === B ? '画板' : '文档'
+    const ic = kind === F ? FOLDER_SVG : kind === B ? BOARD_SVG : DOC_SVG
+    row.innerHTML = '<span class="ic" style="display:inline-flex">' + ic + '</span>' +
+      '<input id="inlineInput" type="text" placeholder="输入' + (isRename ? '新名称' : hint + '名称') + '…" autocomplete="off">' +
+      '<span class="hint"><kbd>Enter</kbd> 确认 · <kbd>Esc</kbd> 取消</span>'
+    box.appendChild(row)
+    const input = row.querySelector('input')
+    if (isRename) input.value = NODES[state.inlineRename.id].title
+    input.focus()
+    if (isRename) input.select()
+    const commit = () => {
+      const title = input.value.trim()
+      if (isRename) {
+        if (title) { NODES[state.inlineRename.id].title = title; toast('已重命名为「' + title + '」') }
+        state.inlineRename = null
+      } else {
+        if (title) {
+          const id = 'new_' + Math.random().toString(36).slice(2, 8)
+          const isF = kind === F
+          nd(id, state.inlineNew.parentId, kind, title,
+            isF ? {} : { updatedAt: Date.now(), content: '# ' + title + '\n\n开始书写…' })
+          toast('已创建' + (isF ? '文件夹' : kind === B ? '画板' : '文档') + '「' + title + '」')
+        }
+        state.inlineNew = null
+      }
+      renderAll()
+    }
+    input.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') commit()
+      if (e.key === 'Escape') { state.inlineNew = null; state.inlineRename = null; renderAll() }
+    })
+  }
+
+  const section = (title, count, html) =>
+    '<div class="section"><div class="section-title">' + title + ' <span class="count">' + count + '</span></div>' + html + '</div>'
+
+  if (state.view === 'grid') {
+    if (folders.length) {
+      box.insertAdjacentHTML('beforeend', section('文件夹', folders.length,
+        '<div class="grid">' + folders.map(n => cardHtml(n)).join('') + '</div>'))
+    }
+    if (docs.length) {
+      box.insertAdjacentHTML('beforeend', section('文档', docs.length,
+        '<div class="grid">' + docs.map(n => cardHtml(n)).join('') + '</div>'))
+    }
+  } else {
+    const rows = (list) => list.map(n => rowHtml(n)).join('')
+    if (folders.length) {
+      box.insertAdjacentHTML('beforeend', section('文件夹', folders.length,
+        '<div class="rows"><div class="row-head"><span>名称</span><span>类型</span><span>大小</span><span>修改时间</span></div>' + rows(folders) + '</div>'))
+    }
+    if (docs.length) {
+      box.insertAdjacentHTML('beforeend', section('文档', docs.length,
+        '<div class="rows"><div class="row-head"><span>名称</span><span>类型</span><span>大小</span><span>修改时间</span></div>' + rows(docs) + '</div>'))
+    }
+  }
+  // 绑定卡片/行事件
+  box.querySelectorAll('[data-id]').forEach(el => {
+    const n = NODES[el.dataset.id]
+    el.addEventListener('click', () => {
+      if (n.kind === F) { state.path = ancestors(n.id); state.docId = null; state.inlineNew = null; state.inlineRename = null; renderAll() }
+      else { state.docId = n.id; state.path = ancestors(n.parentId); renderAll(); $('#readerView').scrollTop = 0 }
+    })
+    el.addEventListener('contextmenu', (e) => { e.preventDefault(); openCtx(e.clientX, e.clientY, n) })
+  })
+  // 列表行「⋯」按钮 → 打开上下文菜单
+  box.querySelectorAll('[data-more]').forEach(btn => {
+    const n = NODES[btn.dataset.more]
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation()
+      const r = btn.getBoundingClientRect()
+      openCtx(r.right - 6, r.bottom + 4, n)
+    })
+  })
+}
+function cardHtml(n) {
+  return '<div class="card" data-id="' + n.id + '">' +
+    '<div class="c-ic ' + (n.kind === F ? 'folder' : n.kind === B ? 'board' : '') + '">' + iconFor(n) + '</div>' +
+    '<div class="c-name">' + esc(n.title) + '</div>' +
+    '<div class="c-meta">' + (n.kind === F ? '文件夹' : n.kind === B ? '画板' : 'Markdown') + ' · ' + fmtSize(n) + ' · ' + fmtDate(n.updatedAt) + '</div>' +
+  '</div>'
+}
+function rowHtml(n) {
+  return '<div class="row" data-id="' + n.id + '">' +
+    '<div class="r-name"><span class="ic">' + iconFor(n) + '</span><span class="t">' + esc(n.title) + '</span></div>' +
+    '<span class="r-type">' + (n.kind === F ? '文件夹' : n.kind === B ? '画板' : 'Markdown') + '</span>' +
+    '<span class="r-size">' + fmtSize(n) + '</span>' +
+    '<span class="r-date">' + fmtDate(n.updatedAt) + '</span>' +
+    '<span class="row-menu"><button class="icon-btn" style="width:22px;height:22px" data-more="' + n.id + '"><svg viewBox="0 0 24 24" fill="currentColor"><circle cx="5" cy="12" r="1.7"/><circle cx="12" cy="12" r="1.7"/><circle cx="19" cy="12" r="1.7"/></svg></button></span>' +
+  '</div>'
+}
+
+/* ══════════════════════ 阅读视图 ══════════════════════ */
+function renderMarkdown(md) {
+  const lines = md.split('\n')
+  let html = '', inCode = false, inList = false
+  const closeList = () => { if (inList) { html += '</ul>'; inList = false } }
+  const escInline = (s) => esc(s)
+    .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+    .replace(/`(.+?)`/g, '<code>$1</code>')
+    .replace(/\[(.+?)\]\((.+?)\)/g, '<a style="color:var(--accent-strong)">$1</a>')
+  for (const raw of lines) {
+    const line = raw.trimEnd()
+    if (line.startsWith('```')) {
+      if (inCode) { html += '</code></pre>'; inCode = false } else { closeList(); html += '<pre><code>'; inCode = true }
+      continue
+    }
+    if (inCode) { html += esc(line) + '\n'; continue }
+    if (line.startsWith('# ')) { closeList(); html += '<h1 style="display:none"></h1><p><strong style="font-size:15px">' + escInline(line.slice(2)) + '</strong></p>' }
+    else if (line.startsWith('## ')) { closeList(); html += '<h2>' + escInline(line.slice(3)) + '</h2>' }
+    else if (line.startsWith('### ')) { closeList(); html += '<h3>' + escInline(line.slice(4)) + '</h3>' }
+    else if (line.startsWith('> ')) { closeList(); html += '<blockquote>' + escInline(line.slice(2)) + '</blockquote>' }
+    else if (line.startsWith('- ') || line.startsWith('1. ') || /^\d+\. /.test(line)) {
+      if (!inList) { html += '<ul>'; inList = true }
+      html += '<li>' + escInline(line.replace(/^- |^\d+\. /, '')) + '</li>'
+    }
+    else if (line.startsWith('|')) {
+      closeList()
+      const cells = line.split('|').slice(1, -1).map(c => c.trim())
+      if (!html.includes('</table>') && !/<table>/.test(html)) html += '<table>'
+      const isSep = cells.every(c => /^:?-{2,}:?$/.test(c))
+      if (!isSep) {
+        if (!/<tr>/.test(html)) html += '<tr>' + cells.map(c => '<th>' + escInline(c) + '</th>').join('') + '</tr>'
+        else html += '<tr>' + cells.map(c => '<td>' + escInline(c) + '</td>').join('') + '</tr>'
+      }
+    }
+    else if (line === '') { closeList() }
+    else { closeList(); html += '<p>' + escInline(line) + '</p>' }
+  }
+  closeList()
+  if (html.includes('<table>') && !html.includes('</table>')) html += '</table>'
+  return html
+}
+function renderReader() {
+  const box = $('#readerView'), n = NODES[state.docId]
+  $('#browseView').style.display = 'none'; box.style.display = ''
+  const chain = ancestors(n.parentId)
+  const pathText = chain.map(c => c.title).join(' / ')
+  box.innerHTML =
+    '<div class="reader-inner">' +
+      '<h1 class="doc-title">' + esc(n.title) + '</h1>' +
+      '<div class="doc-meta">' +
+        '<span class="m">' + '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6a2 2 0 0 1 2-2h4l2 2.5h8a2 2 0 0 1 2 2V18a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6Z"/></svg>' + esc(pathText) + '</span>' +
+        '<span class="m">' + '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3.5 2"/></svg>' + fmtDate(n.updatedAt) + '</span>' +
+        '<span class="m">' + '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 3H7a1.5 1.5 0 0 0-1.5 1.5v15A1.5 1.5 0 0 0 7 21h10a1.5 1.5 0 0 0 1.5-1.5V8l-4.5-5Z"/><path d="M14 3v5h5"/></svg>' + fmtSize(n) + '</span>' +
+        (n.tags ? n.tags.map(t => '<span class="tag">#' + t + '</span>').join('') : '') +
+      '</div>' +
+      '<div class="reader-body" data-anno="6">' + renderMarkdown(n.content || '# ' + n.title) + '</div>' +
+    '</div>'
+}
+
+/* ══════════════════════ 渲染总入口 ══════════════════════ */
+function renderAll() {
+  renderSidebar(); renderCrumbs()
+  if (state.docId) renderReader()
+  else renderBrowse()
+  // 主列标题（产品 MainToolbar）：文档管理 = 当前文件夹 / 文档名；其他分区 = 分区名
+  if (section === 'docs') {
+    const cur = state.docId ? NODES[state.docId] : state.path[state.path.length - 1]
+    $('#mtTitle').textContent = cur ? cur.title : '文档管理'
+  } else {
+    $('#mtTitle').textContent = SECTION_LABEL[section] || ''
+  }
+  $('#tbSearchInput').value = state.search
+  $('#sbSearchInput').value = state.search
+  $('#viewGrid').classList.toggle('on', state.view === 'grid')
+  $('#viewList').classList.toggle('on', state.view === 'list')
+}
+
+/* ══════════════════════ 上下文菜单 ══════════════════════ */
+const menu = $('#ctxMenu')
+function openCtx(x, y, n) {
+  const isFolder = n.kind === F
+  menu.innerHTML =
+    '<button class="mi" data-ctx="open">' + (isFolder ? FOLDER_SVG.replace('#c2410c', '#757575') : DOC_SVG.replace('#757575', '#5e5e5e')) + (isFolder ? '打开文件夹' : '打开文档') + '</button>' +
+    '<button class="mi" data-ctx="new">' + '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 5v14M5 12h14"/></svg>在此新建</button>' +
+    '<button class="mi" data-ctx="rename">' + '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 20h4L19.5 8.5a2.1 2.1 0 0 0-3-3L5 17v3Z"/></svg>重命名</button>' +
+    '<button class="mi disabled">' + '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M9 3h6l1 3h4v2H4V6h4l1-3Z"/><path d="M6 8h12l-1 12H7L6 8Z"/></svg>移动…</button>' +
+    '<div class="sep"></div>' +
+    '<button class="mi danger" data-ctx="del">' + '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M9 3h6l1 3h4v2H4V6h4l1-3Z"/><path d="M6 8h12l-1 12H7L6 8Z"/></svg>删除</button>'
+  menu.classList.add('open')
+  const mw = menu.offsetWidth, mh = menu.offsetHeight
+  menu.style.left = Math.min(x, window.innerWidth - mw - 10) + 'px'
+  menu.style.top = Math.min(y, window.innerHeight - mh - 10) + 'px'
+  menu._node = n
+}
+menu.addEventListener('click', (e) => {
+  const n = menu._node; const act = e.target.closest('[data-ctx]')?.dataset.ctx
+  if (!act) return
+  menu.classList.remove('open')
+  if (act === 'jump') {
+    navigateToFolder(e.target.closest('[data-jump-id]').dataset.jumpId)
+  } else if (act === 'open') {
+    if (n.kind === F) navigateToFolder(n.id)
+    else navigateToDoc(n.id)
+  } else if (act === 'new') {
+    startInlineNew(n.kind === F ? n.id : n.parentId)
+  } else if (act === 'rename') {
+    startInlineRename(n)
+  } else if (act === 'del') {
+    const cnt = descendants(n.id).length + 1
+    deleteNode(n.id)
+    toast('已删除「' + n.title + '」（' + cnt + ' 项移入回收站）')
+  }
+})
+function deleteNode(id) {
+  descendants(id).forEach(n => delete NODES[n.id])
+  delete NODES[id]
+  if (state.docId && !NODES[state.docId]) { state.docId = null; state.path = [ROOT] }
+  const cur = state.path[state.path.length - 1]
+  if (!NODES[cur.id]) state.path = ancestors(cur.parentId || ROOT.id).length ? ancestors(cur.parentId || ROOT.id) : [ROOT]
+  renderAll()
+}
+function startInlineRename(n) {
+  state.inlineNew = null
+  state.inlineRename = { id: n.id, parentId: n.parentId }
+  // 确保浏览视图可见（重命名行渲染在当前目录内容区）
+  if (state.docId) { state.docId = null; state.path = ancestors(n.parentId) }
+  renderAll()
+}
+
+/* ══════════════════════ 内联新建（浏览视图） ══════════════════════ */
+function startInlineNew(parentId) {
+  state.docId = null
+  state.path = ancestors(parentId)
+  state.inlineNew = { kind: 'folder', parentId }
+  state.inlineRename = null
+  renderAll()
+}
+
+/* ══════════════════════ 返回上一层 / 历史 ══════════════════════ */
+function goUp() {
+  const cur = NODES[state.docId || state.path[state.path.length - 1].id]
+  const chain = ancestors(cur.id)
+  if (chain.length <= 1) return
+  navigateToFolder(chain[chain.length - 2].id)
+}
+
+/* ══════════════════════ 事件绑定 ══════════════════════ */
+$('#btnUp').addEventListener('click', goUp)
+$('#btnSbUp').addEventListener('click', goUp)
+// 主导航分区切换
+$('#navChats').addEventListener('click', () => setSection('navChats'))
+$('#navProjects').addEventListener('click', () => setSection('navProjects'))
+$('#navDocs').addEventListener('click', () => setSection('docs'))
+$('#navTerminals').addEventListener('click', () => setSection('navTerminals'))
+$('#navTasks').addEventListener('click', () => setSection('navTasks'))
+$('#navAutomation').addEventListener('click', () => setSection('navAutomation'))
+// 侧边栏折叠 / 展开（产品 setSidebarOpen）
+$('#btnCollapse').addEventListener('click', () => {
+  document.body.classList.add('sidebar-collapsed')
+  $('#btnExpand').style.display = ''
+})
+$('#btnExpand').addEventListener('click', () => {
+  document.body.classList.remove('sidebar-collapsed')
+  $('#btnExpand').style.display = 'none'
+})
+$('#btnPanel').addEventListener('click', () => toast('右侧面板（演示）'))
+// 底部：回收站 / 历史记录 / 设置（演示）
+$('#ftTrash').addEventListener('click', () => toast('回收站（演示）'))
+$('#ftHistory').addEventListener('click', () => toast('历史记录（演示）'))
+$('#ftSettings').addEventListener('click', () => toast('设置（演示）'))
+window.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape') { menu.classList.remove('open'); $('#newMenu').classList.remove('open') }
+})
+$('#btnSbNew').addEventListener('click', (e) => {
+  const r = e.currentTarget.getBoundingClientRect()
+  const m = $('#newMenu')
+  m.classList.toggle('open')
+  m.style.left = Math.max(8, Math.min(r.left, window.innerWidth - 190)) + 'px'
+  m.style.top = (r.bottom + 6) + 'px'
+})
+$('#btnMainNew').addEventListener('click', (e) => {
+  const r = e.currentTarget.getBoundingClientRect()
+  const m = $('#newMenu')
+  m.classList.toggle('open')
+  m.style.left = Math.min(r.right - 172, window.innerWidth - 190) + 'px'
+  m.style.top = (r.bottom + 6) + 'px'
+})
+$('#btnSbEmptyNew').addEventListener('click', () => startInlineNew(currentFolderId()))
+$('#newMenu').addEventListener('click', (e) => {
+  const kind = e.target.closest('[data-kind]')?.dataset.kind
+  if (!kind) return
+  $('#newMenu').classList.remove('open')
+  const parentId = currentFolderId()
+  state.docId = null; state.path = ancestors(parentId)
+  state.inlineNew = { kind, parentId }
+  renderAll()
+})
+$('#sbSearchInput').addEventListener('input', (e) => { state.search = e.target.value; renderAll() })
+$('#tbSearchInput').addEventListener('input', (e) => { state.search = e.target.value; renderAll() })
+$('#viewGrid').addEventListener('click', () => { state.view = 'grid'; renderAll() })
+$('#viewList').addEventListener('click', () => { state.view = 'list'; renderAll() })
+document.addEventListener('click', (e) => {
+  if (!e.target.closest('#newMenu') && !e.target.closest('#btnSbNew') && !e.target.closest('#btnMainNew'))
+    $('#newMenu').classList.remove('open')
+  if (!e.target.closest('#ctxMenu') && !e.target.closest('[data-act="menu"]')) menu.classList.remove('open')
+})
+
+/* ══════════════════════ 标注模式 ══════════════════════ */
+function annoEl(n) {
+  if (n === 1) return $('#navDocs')
+  if (n === 2) return $('#sidebarList')
+  if (n === 3) return $('.list-head')
+  if (n === 4) return $('.toolbar')
+  if (n === 5) return state.docId ? $('.reader-body') : $('#browseView')
+  if (n === 6) return $('#miniCrumbs') // 深目录：迷你面包屑 + 历史导航
+  return null
+}
+function placeAnnoChips() {
+  document.querySelectorAll('.anno-chip').forEach(c => c.remove())
+  for (let i = 1; i <= 6; i++) {
+    const el = annoEl(i)
+    if (!el) continue
+    const r = el.getBoundingClientRect()
+    if (r.width === 0) continue
+    const chip = document.createElement('div')
+    chip.className = 'anno-chip'; chip.textContent = i
+    chip.style.left = (r.right - 8) + 'px'; chip.style.top = (r.top + 6) + 'px'
+    chip.addEventListener('click', () => {
+      const card = document.querySelector('.anno-card[data-target="' + i + '"]')
+      card.scrollIntoView({ block: 'nearest' })
+      el.classList.add('flash'); setTimeout(() => el.classList.remove('flash'), 3600)
+    })
+    document.body.appendChild(chip)
+  }
+}
+$('#btnAnno').addEventListener('click', () => {
+  document.body.classList.toggle('anno')
+  $('#btnAnno').classList.toggle('on')
+  if (document.body.classList.contains('anno')) placeAnnoChips()
+  else document.querySelectorAll('.anno-chip').forEach(c => c.remove())
+})
+document.querySelectorAll('.anno-card').forEach(card => {
+  card.addEventListener('click', () => {
+    const n = +card.dataset.target
+    const el = annoEl(n)
+    if (el) { el.scrollIntoView({ behavior: 'smooth', block: 'center' }); el.classList.add('flash'); setTimeout(() => el.classList.remove('flash'), 3600) }
+  })
+})
+window.addEventListener('resize', () => { if (document.body.classList.contains('anno')) placeAnnoChips() })
+
+/* ══════════════════════ 对比浮层 ══════════════════════ */
+$('#btnCompare').addEventListener('click', () => $('#compareModal').classList.add('open'))
+$('#btnCloseCompare').addEventListener('click', () => $('#compareModal').classList.remove('open'))
+$('#compareModal').addEventListener('click', (e) => { if (e.target.id === 'compareModal') $('#compareModal').classList.remove('open') })
+
+/* ══════════════════════ 启动 ══════════════════════ */
+renderAll()
+</script>
+</body>
+</html>

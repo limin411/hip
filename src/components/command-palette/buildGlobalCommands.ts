@@ -417,7 +417,7 @@ export function buildGlobalCommandGroups(
       id: 'nav-knowledge',
       label: labels.navKnowledge,
       icon: 'package',
-      keywords: ['knowledge', 'notes', 'docs', '知识库', '知識庫', 'markdown'],
+      keywords: ['knowledge', 'notes', 'docs', '知识库', '知識庫', '文档管理', '文檔管理', 'markdown'],
       group: 'navigation',
       run: () => {
         if (ctx.enterKnowledge) void ctx.enterKnowledge()
@@ -428,7 +428,7 @@ export function buildGlobalCommandGroups(
       id: 'knowledge-go-home',
       label: labels.knowledgeHome,
       icon: 'package',
-      keywords: ['knowledge', 'home', 'spaces', '知识库首页', '知識庫首頁'],
+      keywords: ['knowledge', 'home', 'spaces', '知识库首页', '知識庫首頁', '文档管理首页', '文檔管理首頁'],
       group: 'navigation',
       when: { views: ['knowledge'] },
       run: () => {

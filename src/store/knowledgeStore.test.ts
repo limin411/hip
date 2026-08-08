@@ -1,5 +1,6 @@
 // @vitest-environment happy-dom
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import type { KnowledgeNode } from '@/domain/knowledge/types'
 
 const knowledgeReadDoc = vi.fn()
 const knowledgeWriteDoc = vi.fn()
@@ -2106,5 +2107,171 @@ describe('knowledgeStore hasUnsavedChanges + updateActiveDocMeta', () => {
     expect(draft).toMatch(/coverY:\s*40/)
     expect(draft).toContain('# Body')
     expect(useKnowledgeStore.getState().hasUnsavedChanges()).toBe(true)
+  })
+})
+
+describe('knowledgeStore 文档管理目录导航 (v2)', () => {
+  const F1 = { id: 'nod_f1', parentId: null, kind: 'folder' as const, title: 'F1', order: 0, createdAt: 1, updatedAt: 1 }
+  const F2 = { id: 'nod_f2', parentId: 'nod_f1', kind: 'folder' as const, title: 'F2', order: 0, createdAt: 2, updatedAt: 2 }
+  const D1 = { id: 'doc_1', parentId: null, kind: 'doc' as const, title: 'D1', order: 1, createdAt: 3, updatedAt: 3 }
+  const D2 = { id: 'doc_2', parentId: 'nod_f1', kind: 'doc' as const, title: 'D2', order: 0, createdAt: 4, updatedAt: 4 }
+  const NODES: KnowledgeNode[] = [F1, F2, D1, D2]
+
+  beforeEach(async () => {
+    useKnowledgeStore.setState({
+      loaded: true,
+      activeSpaceId: 'sp_1',
+      nodes: [...NODES],
+      mode: 'workspace',
+      currentFolderId: null,
+      activeDocId: null,
+      docBody: '',
+      draftBody: '',
+      saveState: 'idle',
+      pendingReveal: null,
+    })
+    knowledgeGetTree.mockResolvedValue({ version: 1, nodes: [...NODES] })
+    knowledgeReadDoc.mockResolvedValue('body')
+  })
+
+  it('enterFolder 更新 currentFolderId', async () => {
+    const kb = useKnowledgeStore.getState()
+    await kb.enterFolder('nod_f1')
+    const s = useKnowledgeStore.getState()
+    expect(s.currentFolderId).toBe('nod_f1')
+  })
+
+  it('goUp 返回父级', async () => {
+    const kb = useKnowledgeStore.getState()
+    await kb.enterFolder('nod_f1')
+    await kb.enterFolder('nod_f2')
+    await kb.goUp() // → nod_f1
+    expect(useKnowledgeStore.getState().currentFolderId).toBe('nod_f1')
+    await kb.goUp() // → root
+    expect(useKnowledgeStore.getState().currentFolderId).toBeNull()
+  })
+
+  it('根目录 goUp 为 no-op', async () => {
+    const kb = useKnowledgeStore.getState()
+    await kb.goUp()
+    expect(useKnowledgeStore.getState().currentFolderId).toBeNull()
+  })
+
+  it('openDoc 打开文档并保留目录上下文', async () => {
+    const kb = useKnowledgeStore.getState()
+    await kb.enterFolder('nod_f1')
+    await kb.openDoc('doc_2')
+    const s = useKnowledgeStore.getState()
+    expect(s.activeDocId).toBe('doc_2')
+    expect(s.currentFolderId).toBe('nod_f1')
+  })
+
+  it('openDoc 相同文档 no-op', async () => {
+    const kb = useKnowledgeStore.getState()
+    await kb.openDoc('doc_1')
+    await kb.openDoc('doc_1')
+    expect(useKnowledgeStore.getState().activeDocId).toBe('doc_1')
+  })
+
+  it('navigateTo 文档后回到目录需先回文档所在目录', async () => {
+    const kb = useKnowledgeStore.getState()
+    await kb.enterFolder('nod_f1')
+    await kb.navigateTo(null, 'doc_1') // 打开根文档
+    const s = useKnowledgeStore.getState()
+    expect(s.activeDocId).toBe('doc_1')
+    expect(s.currentFolderId).toBe('nod_f1') // 文档视图保留目录上下文
+  })
+})
+
+describe('knowledgeStore 深目录（20+ 层）', () => {
+  /** 生成 20 层链：nod_0(root folder) → … → nod_19 → doc_deep */
+  function deepChain(): KnowledgeNode[] {
+    const nodes: KnowledgeNode[] = []
+    for (let i = 0; i < 20; i++) {
+      nodes.push({
+        id: `nod_deep${i}`,
+        parentId: i === 0 ? null : `nod_deep${i - 1}`,
+        kind: 'folder',
+        title: `L${i + 1}`,
+        order: 0,
+        createdAt: i,
+        updatedAt: i,
+      })
+    }
+    nodes.push({
+      id: 'doc_deep',
+      parentId: 'nod_deep19',
+      kind: 'doc',
+      title: 'deepend',
+      order: 0,
+      createdAt: 99,
+      updatedAt: 99,
+    })
+    return nodes
+  }
+
+  beforeEach(async () => {
+    const NODES = deepChain()
+    useKnowledgeStore.setState({
+      loaded: true,
+      activeSpaceId: 'sp_1',
+      nodes: NODES,
+      mode: 'workspace',
+      currentFolderId: null,
+      activeDocId: null,
+      docBody: '',
+      draftBody: '',
+      saveState: 'idle',
+      pendingReveal: null,
+    })
+    knowledgeGetTree.mockResolvedValue({ version: 1, nodes: deepChain() })
+    knowledgeReadDoc.mockResolvedValue('body')
+  })
+
+  it('20 层逐层进入 + ↑ 逐级返回', async () => {
+    const kb = useKnowledgeStore.getState()
+    for (let i = 0; i < 20; i++) {
+      await kb.enterFolder(`nod_deep${i}`)
+    }
+    expect(useKnowledgeStore.getState().currentFolderId).toBe('nod_deep19')
+    for (let i = 18; i >= 1; i--) {
+      await kb.goUp()
+      expect(useKnowledgeStore.getState().currentFolderId).toBe(`nod_deep${i}`)
+    }
+    await kb.goUp()
+    expect(useKnowledgeStore.getState().currentFolderId).toBe('nod_deep0')
+    await kb.goUp()
+    expect(useKnowledgeStore.getState().currentFolderId).toBeNull()
+    expect(useKnowledgeStore.getState().currentFolderId).toBeNull()
+  })
+
+  it('20 层深处打开文档，返回目录需 goUp 逐级或面包屑跳转', async () => {
+    const kb = useKnowledgeStore.getState()
+    for (let i = 0; i < 20; i++) {
+      await kb.enterFolder(`nod_deep${i}`)
+    }
+    await kb.openDoc('doc_deep')
+    expect(useKnowledgeStore.getState().activeDocId).toBe('doc_deep')
+    expect(useKnowledgeStore.getState().currentFolderId).toBe('nod_deep19')
+    // 返回文档所在目录（导航回目录位置）
+    await kb.navigateTo('nod_deep19', null)
+    expect(useKnowledgeStore.getState().activeDocId).toBeNull()
+    expect(useKnowledgeStore.getState().currentFolderId).toBe('nod_deep19')
+  })
+
+  it('revealPath（navigateTo 目录）可从任意深度直达', async () => {
+    const kb = useKnowledgeStore.getState()
+    // 先进入深处，再直接跳回根
+    for (let i = 0; i < 20; i++) {
+      await kb.enterFolder(`nod_deep${i}`)
+    }
+    await kb.navigateTo(null, null)
+    expect(useKnowledgeStore.getState().currentFolderId).toBeNull()
+    // 直达第 15 层
+    await kb.navigateTo('nod_deep14', null)
+    expect(useKnowledgeStore.getState().currentFolderId).toBe('nod_deep14')
+    // 直达深处文档
+    await kb.navigateTo('nod_deep19', 'doc_deep')
+    expect(useKnowledgeStore.getState().activeDocId).toBe('doc_deep')
   })
 })

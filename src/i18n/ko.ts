@@ -987,7 +987,6 @@ export const ko = {
         "mcpServer": "MCP 서버",
         "plugin": "플러그인",
         "knowledgeNode": "지식 트리",
-        "knowledgeSpace": "지식 스페이스",
         "knowledgeTree": "지식 빈 영역",
         "workItem": "작업 항목",
         "workItemBlank": "작업 항목 빈 영역",
@@ -1743,7 +1742,7 @@ export const ko = {
     "filterAll": "전체",
     "filterChat": "채팅",
     "filterCode": "프로젝트",
-    "filterKnowledge": "지식",
+    "filterKnowledge": "문서",
     "filterWorkItems": "작업 항목",
     "filterAutomations": "자동화",
     "kind": {
@@ -2306,13 +2305,13 @@ export const ko = {
     "closeTab": "탭 닫기",
     "newSession": "새 세션",
     "tabList": "열린 세션",
-    "knowledge": "지식",
-    "closeKnowledge": "지식 베이스 닫기"
+    "knowledge": "문서",
+    "closeKnowledge": "문서 닫기"
   },
   "sidebar": {
     "aria": "탐색 및 세션 기록",
     "navAria": "주 탐색",
-    "searchPlaceholder": "세션, 지식 검색…",
+    "searchPlaceholder": "세션, 문서 검색…",
     "collapse": "사이드바 숨기기",
     "collapseAria": "왼쪽 사이드바 숨기기",
     "expand": "사이드바 보이기",
@@ -2323,7 +2322,7 @@ export const ko = {
     "navForward": "앞으로",
     "navForwardAria": "다음 위치로 이동",
     "nav": {
-      "knowledge": "지식",
+      "knowledge": "문서",
       "projects": "프로젝트",
       "chats": "채팅",
       "terminals": "터미널",
@@ -2331,7 +2330,10 @@ export const ko = {
       "automation": "자동화"
     },
     "list": {
-      "spaces": "공간",
+      "spaces": "현재 폴더",
+      "up": "위 폴더로",
+      "jump": "상위 폴더로 이동",
+      "folderEmpty": "이 폴더는 비어 있습니다",
       "projects": "프로젝트 세션",
       "chats": "채팅 기록",
       "terminals": "터미널 관리",
@@ -2351,7 +2353,7 @@ export const ko = {
       "running": "실행 중"
     },
     "viewAll": "모두 보기",
-    "newSpace": "새 지식 베이스",
+    "newSpace": "새로 만들기…",
     "newTask": "새 작업",
     "newWorkItem": "새 작업 항목",
     "newAutomation": "새 자동화",
@@ -2360,7 +2362,7 @@ export const ko = {
     "newTerminal": "새 터미널",
     "emptySearch": "일치 없음",
     "emptySessions": "아직 세션이 없습니다",
-    "emptySpaces": "아직 공간이 없습니다",
+    "emptySpaces": "아직 문서가 없습니다. 폴더나 문서를 만드세요",
     "emptyAutomations": "사용 중인 자동화 없음",
     "projectGroup": {
       "unbound": "프로젝트 폴더 없음",
@@ -2382,26 +2384,36 @@ export const ko = {
   "dropdown": {
     "newChat": "새 워크 채팅",
     "newCode": "새 코딩 작업",
-    "newKnowledge": "지식 베이스"
+    "newKnowledge": "새 문서"
   },
   "knowledge": {
-    "title": "지식 베이스",
+    "title": "문서",
+    "browse": {
+      "viewLabel": "보기 전환",
+      "viewGrid": "그리드 보기",
+      "viewList": "목록 보기",
+      "folderKind": "폴더",
+      "docKind": "문서",
+      "name": "이름",
+      "kind": "종류",
+      "modified": "수정 시간"
+    },
     "empty": {
-      "selectTitle": "지식 베이스 선택",
-      "selectHint": "사이드바에서 공간을 선택하거나 새로 만드세요."
+      "selectTitle": "폴더 또는 문서 선택",
+      "selectHint": "사이드바에서 폴더 또는 문서를 선택하거나 새로 만드세요."
     },
     "home": {
-      "subtitle": "로컬 공간 · 폴더 트리 · Markdown",
+      "subtitle": "로컬 우선 · 폴더 트리 · Markdown",
       "searchPlaceholder": "제목, 본문, 태그, 경로 검색…",
-      "mySpaces": "내 공간",
+      "mySpaces": "모든 문서",
       "recent": "최근",
       "docCount_one": "문서 {{count}}개",
       "docCount_other": "문서 {{count}}개",
       "docCount": "문서 {{count}}개",
       "docCountPending": "…",
-      "emptyTitle": "아직 공간이 없습니다",
-      "emptyHint": "지식 베이스를 만들어 문서를 정리해보세요.",
-      "createSpace": "새 지식 베이스",
+      "emptyTitle": "아직 문서가 없습니다",
+      "emptyHint": "폴더나 문서를 만들어 정리를 시작하세요.",
+      "createSpace": "새 폴더",
       "searchResults": "검색 결과",
       "searchEmpty": "검색어와 일치하는 문서가 없습니다.",
       "searchIndexing": "검색 인덱스 구축 중…",
@@ -2438,6 +2450,8 @@ export const ko = {
       "filterPlaceholder": "트리 필터…",
       "filterEmpty": "일치하는 항목 없음",
       "reveal": "Finder에서 보기",
+      "copyPath": "경로 복사",
+      "pathCopied": "경로가 복사되었습니다",
       "sectionLabel": "페이지",
       "backHome": "스페이스로 돌아가기",
       "dragHandle": "드래그하여 순서 변경",
@@ -2510,6 +2524,8 @@ export const ko = {
       "attach": "이미지 또는 PDF 첨부",
       "loading": "이미지 로딩 중…",
       "reveal": "Finder에서 보기",
+      "copyPath": "경로 복사",
+      "pathCopied": "경로가 복사되었습니다",
       "tooLargePaste": "이미지가 너무 커서 붙여넣을 수 없습니다. 파일을 저장한 후 첨부(최대 25MB)를 사용하세요.",
       "tooLargeDisk": "파일이 25MB 첨부 제한을 초과했습니다.",
       "unsupported": "지원되지 않는 파일 형식입니다. PNG, JPEG, GIF, WebP 또는 PDF를 사용하세요.",
@@ -2878,6 +2894,7 @@ export const ko = {
     "file": {
       "open": "열기",
       "copyPath": "경로 복사",
+      "pathCopied": "경로가 복사되었습니다",
       "copyRelativePath": "상대 경로 복사",
       "copyName": "이름 복사",
       "openContainingFolder": "폴더 열기",
@@ -2888,6 +2905,7 @@ export const ko = {
     },
     "diffFile": {
       "copyPath": "경로 복사",
+      "pathCopied": "경로가 복사되었습니다",
       "copyAbsolutePath": "절대 경로 복사",
       "openInFiles": "파일에서 열기",
       "collapse": "접기",
@@ -2945,12 +2963,14 @@ export const ko = {
     },
     "termFs": {
       "copyPath": "경로 복사",
+      "pathCopied": "경로가 복사되었습니다",
       "copyName": "이름 복사",
       "refresh": "새로 고침",
       "openContainingFolder": "포함 폴더 열기"
     },
     "filePreview": {
       "copyPath": "경로 복사",
+      "pathCopied": "경로가 복사되었습니다",
       "copyContent": "내용 복사",
       "contentNotText": "내용이 텍스트가 아닙니다",
       "openContainingFolder": "포함 폴더 열기",
@@ -2999,12 +3019,12 @@ export const ko = {
       "skills": "Skills",
       "favorites": "즐겨찾기",
       "recent": "최근",
-      "knowledge": "지식"
+      "knowledge": "문서"
     },
-    "navKnowledge": "지식 베이스",
-    "knowledgeHome": "지식 홈",
-    "knowledgeNewDoc": "새 지식 문서",
-    "knowledgeNewBoard": "새 지식 화이트보드",
+    "navKnowledge": "문서",
+    "knowledgeHome": "문서 홈",
+    "knowledgeNewDoc": "새 문서",
+    "knowledgeNewBoard": "새 화이트보드",
     "knowledgeIndexing": "검색 색인 구축 중…",
     "knowledgeNeedSpace": "먼저 지식 공간을 열어주세요",
     "actions": {

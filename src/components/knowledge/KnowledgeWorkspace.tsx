@@ -1,28 +1,19 @@
 import { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import {
-  BookOpen,
   ChevronRight,
   Download,
   FilePlus,
   History,
   MoreHorizontal,
-  Network,
-  Search,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import {
   registerBeforeOpenDocFlush,
-  setExpandPersistSuspended,
-  syncActiveEditorToDraft,
   useKnowledgeStore,
 } from '@/store/knowledgeStore'
-import { filterTreeVisible, getPath } from '@/domain/knowledge/tree'
+import { getPath } from '@/domain/knowledge/tree'
 import { resolveParentForNew } from '@/domain/knowledge/parentForNew'
-import {
-  openDeleteKnowledgeSpaceDialog,
-  openRenameKnowledgeSpaceDialog,
-} from './knowledgeSpaceDialogStore'
 import { isKnowledgeLiveEnabled } from '@/domain/knowledge/editorMode'
 import { KNOWLEDGE_LARGE_DOC_CHARS } from '@/domain/knowledge/limits'
 import { insertTextAtCursor } from '@/domain/knowledge/mdEdit'
@@ -47,9 +38,7 @@ import {
   knowledgeErrorMessage,
   knowledgeExportDoc,
   knowledgeExportText,
-  knowledgeExportSpaceZip,
   knowledgeReadVersion,
-  knowledgeRevealDoc,
 } from '@/ipc/knowledge'
 import { buildDocHtmlDocument } from '@/domain/knowledge/htmlExport'
 import { diffLines } from '@/domain/knowledge/textDiff'
@@ -60,8 +49,7 @@ import {
   revealLineInCodeMirror,
 } from '@/domain/knowledge/searchReveal'
 import { extractDocOutline } from '@/domain/knowledge/mdPreview'
-import { DeclarativeContextMenu } from '@/components/context-menu'
-import { SpaceTree } from './SpaceTree'
+import { DocManagerBrowse } from './DocManagerBrowse'
 import { DocEditor, type DocEditorHandle } from './DocEditor'
 import type { DocLiveEditorHandle } from './DocBlockNoteEditor'
 import { KnowledgeDocCanvas } from './KnowledgeDocCanvas'
@@ -95,7 +83,6 @@ export function KnowledgeWorkspace() {
   const busy = useKnowledgeStore((s) => s.busy)
   const saveState = useKnowledgeStore((s) => s.saveState)
   const requestCreateDoc = useKnowledgeStore((s) => s.requestCreateDoc)
-  const createFolder = useKnowledgeStore((s) => s.createFolder)
   const renameNode = useKnowledgeStore((s) => s.renameNode)
   const rewriteWikiLinksAfterRename = useKnowledgeStore((s) => s.rewriteWikiLinksAfterRename)
   const deleteNode = useKnowledgeStore((s) => s.deleteNode)
@@ -120,58 +107,6 @@ export function KnowledgeWorkspace() {
   const editorRef = useRef<DocEditorHandle>(null)
   /** Live host handle for attach/paste (PR-2); wired now for insertMarkdown. */
   const liveEditorRef = useRef<DocLiveEditorHandle>(null)
-  const [treeFilter, setTreeFilter] = useState('')
-  const [filterExpandSnapshot, setFilterExpandSnapshot] = useState<Record<
-    string,
-    boolean
-  > | null>(null)
-  /** Only re-expand ancestors when the filter *string* changes (not on nodes ticks). */
-  const lastFilterExpandQuery = useRef('')
-
-  /** Docs + folders only (boards hidden from tree). */
-  const treeNodes = useMemo(
-    () => nodes.filter((n) => n.kind !== 'board'),
-    [nodes],
-  )
-  const visibleIds = useMemo(
-    () => filterTreeVisible(treeNodes, treeFilter),
-    [nodes, treeFilter],
-  )
-
-  // Expand ancestors when filter query changes; restore snapshot on clear.
-  // Suspend expand LS writes while filter inflates expand (avoid polluting persist).
-  useEffect(() => {
-    const q = treeFilter.trim()
-    if (!q) {
-      lastFilterExpandQuery.current = ''
-      if (filterExpandSnapshot) {
-        useKnowledgeStore.setState({ expandedFolderIds: filterExpandSnapshot })
-        setFilterExpandSnapshot(null)
-      }
-      setExpandPersistSuspended(false)
-      return
-    }
-    setExpandPersistSuspended(true)
-    if (lastFilterExpandQuery.current === q || !visibleIds) return
-    lastFilterExpandQuery.current = q
-    if (!filterExpandSnapshot) {
-      setFilterExpandSnapshot(useKnowledgeStore.getState().expandedFolderIds)
-    }
-    const expand: Record<string, boolean> = {
-      ...useKnowledgeStore.getState().expandedFolderIds,
-    }
-    for (const id of visibleIds) {
-      const n = nodes.find((x) => x.id === id)
-      if (n?.kind === 'folder') expand[id] = true
-      let cur = n
-      while (cur?.parentId) {
-        expand[cur.parentId] = true
-        cur = nodes.find((x) => x.id === cur?.parentId)
-      }
-    }
-    useKnowledgeStore.setState({ expandedFolderIds: expand })
-  }, [treeFilter, visibleIds, nodes, filterExpandSnapshot])
-
   // Best-effort scroll-to-match after opening a search hit (`pendingReveal`).
   // Boards are title-only in search — never run Milkdown/CM reveal (Issue 18).
   useEffect(() => {
@@ -247,11 +182,6 @@ export function KnowledgeWorkspace() {
       if (timeoutId != null) clearTimeout(timeoutId)
     }
   }, [activeDocId, activeSpaceId, editorMode, docBody, nodes])
-
-  // Ensure expand-persist is not left suspended if the workspace unmounts mid-filter.
-  useEffect(() => {
-    return () => setExpandPersistSuspended(false)
-  }, [])
 
   // Outline (AppLayout right rail) → scroll Live / Source (docs only).
   const pendingOutlineJump = useKnowledgeStore((s) => s.pendingOutlineJump)
@@ -511,28 +441,6 @@ export function KnowledgeWorkspace() {
     }
   }
 
-  const exportSpaceZip = async () => {
-    if (!activeSpaceId) return
-    // Snapshot flush so open board strokes land in draft before pack (PR-5 review #3).
-    syncActiveEditorToDraft({ leaveActiveLeaf: false })
-    const ok = await flushSave()
-    if (!ok) return
-    const safe =
-      (space?.name ?? 'space').replace(/[<>:"/\\|?*]/g, '_').slice(0, 80) || 'space'
-    const dest = await pickSavePath({
-      defaultPath: `${safe}.zip`,
-      title: t('knowledge.export.spaceZip'),
-      filters: [{ name: 'ZIP', extensions: ['zip'] }],
-    })
-    if (!dest) return
-    try {
-      await knowledgeExportSpaceZip(activeSpaceId, dest)
-      toast.success(t('knowledge.export.spaceDone'))
-    } catch (e) {
-      toast.error(knowledgeErrorMessage(e))
-    }
-  }
-
   const toastAssetError = (
     reason: 'too_large_paste' | 'too_large_disk' | 'unsupported' | 'error',
   ) => {
@@ -650,168 +558,9 @@ export function KnowledgeWorkspace() {
     ]
   }, [pathNodes])
 
-  const docCount = useMemo(
-    () => nodes.reduce((n, node) => n + (node.kind === 'doc' ? 1 : 0), 0),
-    [nodes],
-  )
-
   return (
     <div className="flex min-h-0 flex-1" data-testid="knowledge-workspace">
-      {/* Sidebar bg-surface; border-r separates tree from full-page document stage. */}
-      <aside className="flex w-[280px] shrink-0 flex-col border-r border-border/70 bg-surface">
-        {/* Space identity + actions — no hard header rule */}
-        <div className="flex flex-col gap-3 px-3 pb-2 pt-3">
-          <div className="flex items-start gap-1">
-            <div className="min-w-0 flex-1 pt-0.5">
-              <div className="flex items-center gap-2.5">
-                <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-surface-muted">
-                  {space?.icon ? (
-                    <span className="text-base leading-none">{space.icon}</span>
-                  ) : (
-                    <BookOpen size={16} className="text-accent-strong" strokeWidth={1.75} />
-                  )}
-                </span>
-                <div className="min-w-0 flex-1">
-                  <div className="truncate text-body font-semibold leading-snug tracking-tight text-ink">
-                    {space?.name ?? t('tabs.knowledge')}
-                  </div>
-                  <div className="mt-0.5 truncate text-meta text-ink-tertiary">
-                    {t('knowledge.home.docCount', { count: docCount })}
-                  </div>
-                </div>
-              </div>
-            </div>
-            <div className="mt-0.5 flex shrink-0 items-center gap-0.5">
-              {/* modal={false}: menu + KnowledgeSpaceDialogHost Modal both lock body
-                  pointer-events; stacking leaves the app unclickable after close. */}
-              <DropdownMenu modal={false}>
-                <DropdownMenuTrigger asChild>
-                  <button
-                    type="button"
-                    data-testid="knowledge-space-menu"
-                    className="flex h-8 w-8 items-center justify-center rounded-sm text-ink-tertiary transition-colors hover:bg-state-hover hover:text-ink"
-                    aria-label={t('knowledge.space.menu')}
-                  >
-                    <MoreHorizontal size={16} strokeWidth={1.75} />
-                  </button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end">
-                  <DropdownMenuItem
-                    data-testid="knowledge-space-rename"
-                    onClick={() => {
-                      if (!activeSpaceId) return
-                      openRenameKnowledgeSpaceDialog(
-                        activeSpaceId,
-                        space?.name ?? '',
-                        space?.icon,
-                      )
-                    }}
-                  >
-                    {t('knowledge.tree.rename')}
-                  </DropdownMenuItem>
-                  <DropdownMenuItem
-                    data-testid="knowledge-space-export"
-                    onClick={() => void exportSpaceZip()}
-                  >
-                    {t('knowledge.export.spaceZip')}
-                  </DropdownMenuItem>
-                  <DropdownMenuItem
-                    data-testid="knowledge-space-graph"
-                    onClick={() => setGraphOpen(true)}
-                  >
-                    <Network size={14} />
-                    {t('knowledge.graph.open')}
-                  </DropdownMenuItem>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem
-                    data-testid="knowledge-space-delete"
-                    onClick={() => {
-                      if (!activeSpaceId) return
-                      openDeleteKnowledgeSpaceDialog(
-                        activeSpaceId,
-                        space?.name ?? '',
-                      )
-                    }}
-                  >
-                    {t('knowledge.tree.delete')}
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
-            </div>
-          </div>
-          <div className="relative">
-            <Search
-              size={14}
-              strokeWidth={1.75}
-              className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-ink-tertiary"
-            />
-            <Input
-              data-testid="knowledge-tree-filter"
-              value={treeFilter}
-              onChange={(e) => setTreeFilter(e.target.value)}
-              placeholder={t('knowledge.tree.filterPlaceholder')}
-              className="h-8 rounded-sm border border-border bg-surface pl-8 text-meta shadow-none placeholder:text-ink-tertiary focus-visible:outline-none focus-visible:border-accent focus-visible:bg-surface focus-visible:ring-[3px] focus-visible:ring-accent/10"
-            />
-          </div>
-        </div>
 
-        {/* Tree section */}
-        <div className="flex min-h-0 flex-1 flex-col">
-          <div className="flex shrink-0 items-center justify-between px-3.5 pb-1.5 pt-2">
-            <span className="text-caption font-medium text-ink-tertiary">
-              {t('knowledge.tree.sectionLabel')}
-            </span>
-            {docCount > 0 && (
-              <span className="tabular-nums text-caption text-ink-tertiary">
-                {docCount}
-              </span>
-            )}
-          </div>
-          {/* Blank-area right-click creates at root; node rows use knowledgeNode menu. */}
-          <DeclarativeContextMenu
-            kind="knowledgeTree"
-            className="min-h-0 flex-1 overflow-y-auto px-1.5 pb-3"
-            data-testid="knowledge-tree-pane"
-            payload={{
-              onNewDoc: () => newDoc(null),
-              onNewFolder: () =>
-                void createFolder(null, t('knowledge.folder.untitled')),
-            }}
-          >
-            <div className="min-h-full">
-              <SpaceTree
-                visibleIds={visibleIds}
-                onRename={(node) => {
-                  setNodeEdit(node)
-                  setNodeTitle(node.title)
-                  setRenameUpdateLinks(false)
-                }}
-                onDelete={(node) => setNodeDelete(node)}
-                onNewDoc={(parentId) => newDoc(parentId)}
-                onNewFolder={(parentId) =>
-                  void createFolder(parentId, t('knowledge.folder.untitled'))
-                }
-                onReveal={(node) => {
-                  if (!activeSpaceId) return
-                  if (node.kind === 'doc') {
-                    void knowledgeRevealDoc(activeSpaceId, node.id).catch((e) => {
-                      toast.error(knowledgeErrorMessage(e))
-                    })
-                  }
-                }}
-              />
-              {visibleIds && visibleIds.size === 0 && (
-                <div className="flex flex-col items-center gap-2 px-3 py-8 text-center">
-                  <Search size={16} className="text-ink-tertiary/60" strokeWidth={1.75} />
-                  <p className="text-meta text-ink-tertiary">
-                    {t('knowledge.tree.filterEmpty')}
-                  </p>
-                </div>
-              )}
-            </div>
-          </DeclarativeContextMenu>
-        </div>
-      </aside>
 
       <main className="flex min-w-0 flex-1 flex-col bg-surface-content">
         <div className="flex h-12 shrink-0 items-center gap-2.5 border-b border-border px-5">
@@ -1004,20 +753,7 @@ export function KnowledgeWorkspace() {
           )}
         </div>
         {!activeDocId ? (
-          <div className="flex min-h-0 flex-1 items-center justify-center px-8 py-6">
-            <EmptyState
-              tier="friendly"
-              title={t('knowledge.workspace.noDocTitle')}
-              description={t('knowledge.workspace.noDocHint')}
-              className="w-full max-w-md border-0 py-16"
-              action={{
-                label: t('knowledge.tree.newDoc'),
-                onClick: () => newDoc(null),
-              }}
-            >
-              <HipLogo size={32} decorative />
-            </EmptyState>
-          </div>
+          <DocManagerBrowse />
         ) : isBoard ? (
           <div
             className="flex min-h-0 flex-1 items-center justify-center px-8 py-6"

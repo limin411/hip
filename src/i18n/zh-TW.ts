@@ -991,7 +991,6 @@ export const zhTW = {
         "mcpServer": "MCP 伺服器",
         "plugin": "外掛",
         "knowledgeNode": "知識樹節點",
-        "knowledgeSpace": "知識空間",
         "knowledgeTree": "知識樹空白區",
         "workItem": "工作事項",
         "workItemBlank": "事項空白區",
@@ -1746,7 +1745,7 @@ export const zhTW = {
     "filterAll": "全部",
     "filterChat": "對話",
     "filterCode": "專案",
-    "filterKnowledge": "知識庫",
+    "filterKnowledge": "文件管理",
     "filterWorkItems": "事項",
     "filterAutomations": "自動化",
     "kind": {
@@ -2308,13 +2307,13 @@ export const zhTW = {
     "closeTab": "關閉標籤頁",
     "newSession": "新增工作階段",
     "tabList": "開啟的工作階段",
-    "knowledge": "知識庫",
-    "closeKnowledge": "關閉知識庫"
+    "knowledge": "文件管理",
+    "closeKnowledge": "關閉文件管理"
   },
   "sidebar": {
     "aria": "導航與歷史會話",
     "navAria": "主導航",
-    "searchPlaceholder": "搜尋會話、知識庫…",
+    "searchPlaceholder": "搜尋會話、文件…",
     "collapse": "隱藏側邊欄",
     "collapseAria": "隱藏左側邊欄",
     "expand": "顯示側邊欄",
@@ -2325,7 +2324,7 @@ export const zhTW = {
     "navForward": "前進",
     "navForwardAria": "前進到下一位置",
     "nav": {
-      "knowledge": "知識庫",
+      "knowledge": "文件管理",
       "projects": "專案",
       "chats": "對話",
       "terminals": "終端管理",
@@ -2333,7 +2332,10 @@ export const zhTW = {
       "automation": "自動化"
     },
     "list": {
-      "spaces": "知識空間",
+      "spaces": "目前目錄",
+      "up": "返回上一層",
+      "jump": "跳至上一層資料夾",
+      "folderEmpty": "此資料夾為空",
       "projects": "專案會話",
       "chats": "對話歷史",
       "terminals": "終端管理",
@@ -2353,7 +2355,7 @@ export const zhTW = {
       "running": "執行中"
     },
     "viewAll": "檢視全部",
-    "newSpace": "新建知識庫",
+    "newSpace": "新建…",
     "newTask": "新增任務",
     "newWorkItem": "新建事項",
     "newAutomation": "新建自動化",
@@ -2362,7 +2364,7 @@ export const zhTW = {
     "newTerminal": "新建終端",
     "emptySearch": "無符合項目",
     "emptySessions": "尚無會話",
-    "emptySpaces": "尚無知識空間",
+    "emptySpaces": "尚無文件，新建一個資料夾或文件",
     "emptyAutomations": "尚無已啟用的自動化",
     "projectGroup": {
       "unbound": "未綁定專案路徑",
@@ -2384,26 +2386,36 @@ export const zhTW = {
   "dropdown": {
     "newChat": "新增辦公對話",
     "newCode": "新增編碼任務",
-    "newKnowledge": "知識庫"
+    "newKnowledge": "新建文件"
   },
   "knowledge": {
-    "title": "知識庫",
+    "title": "文件管理",
+    "browse": {
+      "viewLabel": "檢視切換",
+      "viewGrid": "網格檢視",
+      "viewList": "列表檢視",
+      "folderKind": "資料夾",
+      "docKind": "文件",
+      "name": "名稱",
+      "kind": "類型",
+      "modified": "修改時間"
+    },
     "empty": {
-      "selectTitle": "選擇知識庫",
-      "selectHint": "在左側邊欄選擇一個知識庫，或新建一個。"
+      "selectTitle": "選擇資料夾或文件",
+      "selectHint": "在左側邊欄選擇資料夾或文件，或新建一個。"
     },
     "home": {
-      "subtitle": "本地優先 · 多空間 · 目錄樹 + Markdown",
+      "subtitle": "本地優先 · 目錄樹 + Markdown",
       "searchPlaceholder": "搜尋標題、正文、標籤與路徑…",
-      "mySpaces": "我的空間",
+      "mySpaces": "全部文件",
       "recent": "最近開啟",
       "docCount_one": "{{count}} 篇",
       "docCount_other": "{{count}} 篇",
       "docCount": "{{count}} 篇",
       "docCountPending": "…",
-      "emptyTitle": "尚無知識庫",
-      "emptyHint": "新建一個知識庫，開始整理文件。",
-      "createSpace": "新建知識庫",
+      "emptyTitle": "尚無文件",
+      "emptyHint": "新建一個資料夾或文件，開始整理。",
+      "createSpace": "新建資料夾",
       "searchResults": "搜尋結果",
       "searchEmpty": "沒有符合的文件。",
       "searchIndexing": "正在建立搜尋索引…",
@@ -2416,8 +2428,8 @@ export const zhTW = {
     "space": {
       "nameLabel": "名稱",
       "namePlaceholder": "例如：產品文件",
-      "nameEmpty": "請輸入知識庫名稱",
-      "nameDuplicate": "已存在同名知識庫「{{name}}」",
+      "nameEmpty": "請輸入名稱",
+      "nameDuplicate": "已存在同名「{{name}}」",
       "deleteTitle": "刪除「{{name}}」？",
       "deleteBody": "將永久刪除此空間及其全部文件，此操作無法復原。",
       "menu": "空間選單",
@@ -2440,6 +2452,8 @@ export const zhTW = {
       "filterPlaceholder": "過濾目錄…",
       "filterEmpty": "無符合項目",
       "reveal": "在 Finder 中顯示",
+      "copyPath": "複製路徑",
+      "pathCopied": "路徑已複製",
       "sectionLabel": "頁面",
       "backHome": "返回空間列表",
       "dragHandle": "拖曳以排序",
@@ -2512,6 +2526,8 @@ export const zhTW = {
       "attach": "插入圖片或 PDF",
       "loading": "圖片載入中…",
       "reveal": "在 Finder 中顯示",
+      "copyPath": "複製路徑",
+      "pathCopied": "路徑已複製",
       "tooLargePaste": "圖片過大，無法貼上；請先存成檔案再用「插入」（最大 25 MB）。",
       "tooLargeDisk": "檔案超過 25 MB 附件上限。",
       "unsupported": "不支援的檔案類型。請使用 PNG、JPEG、GIF、WebP 或 PDF。",
@@ -2880,6 +2896,7 @@ export const zhTW = {
     "file": {
       "open": "開啟",
       "copyPath": "複製路徑",
+      "pathCopied": "路徑已複製",
       "copyRelativePath": "複製相對路徑",
       "copyName": "複製名稱",
       "openContainingFolder": "開啟所在資料夾",
@@ -2890,6 +2907,7 @@ export const zhTW = {
     },
     "diffFile": {
       "copyPath": "複製路徑",
+      "pathCopied": "路徑已複製",
       "copyAbsolutePath": "複製絕對路徑",
       "openInFiles": "在檔案中開啟",
       "collapse": "摺疊",
@@ -2947,12 +2965,14 @@ export const zhTW = {
     },
     "termFs": {
       "copyPath": "複製路徑",
+      "pathCopied": "路徑已複製",
       "copyName": "複製名稱",
       "refresh": "重新整理",
       "openContainingFolder": "開啟所在資料夾"
     },
     "filePreview": {
       "copyPath": "複製路徑",
+      "pathCopied": "路徑已複製",
       "copyContent": "複製內容",
       "contentNotText": "內容不是文字",
       "openContainingFolder": "開啟所在資料夾",
@@ -3001,12 +3021,12 @@ export const zhTW = {
       "skills": "Skills",
       "favorites": "收藏",
       "recent": "最近使用",
-      "knowledge": "知識庫"
+      "knowledge": "文件管理"
     },
-    "navKnowledge": "知識庫",
-    "knowledgeHome": "知識庫首頁",
-    "knowledgeNewDoc": "新增知識庫文件",
-    "knowledgeNewBoard": "新增知識庫畫板",
+    "navKnowledge": "文件管理",
+    "knowledgeHome": "文件管理首頁",
+    "knowledgeNewDoc": "新增文件",
+    "knowledgeNewBoard": "新增畫板",
     "knowledgeIndexing": "搜尋索引建立中…",
     "knowledgeNeedSpace": "請先開啟一個知識空間",
     "actions": {

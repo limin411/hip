@@ -88,10 +88,11 @@ describe('catalogKinds', () => {
         'sftpEntry',
         'termFsEntry',
         'knowledgeNode',
-        'knowledgeSpace',
         'knowledgeTree',
       ]),
     )
+    // 文档管理 v2：空间级右键菜单已删除
+    expect(kinds).not.toContain('knowledgeSpace')
     // Section order: managedTerminal after terminal; knowledge kinds after plugin.
     expect(kinds.indexOf('managedTerminal')).toBeGreaterThan(kinds.indexOf('terminal'))
     expect(kinds.indexOf('knowledgeNode')).toBeGreaterThan(kinds.indexOf('plugin'))

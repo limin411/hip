@@ -34,7 +34,6 @@ vi.mock('./sidebarActions', () => ({
   toggleTrashOverlay: vi.fn(),
   leaveKnowledge: vi.fn(async () => {}),
   leaveWorkItems: vi.fn(async () => {}),
-  openSpaceFromSidebar: vi.fn(),
   selectSessionFromSidebar: vi.fn(),
   newConversationFromSidebar: vi.fn(),
 }))
@@ -56,7 +55,22 @@ vi.mock('@/components/context-menu', () => ({
 }))
 
 vi.mock('@/store/knowledgeStore', () => {
-  const state = { spaces: [], activeSpaceId: null }
+  const state = {
+    spaces: [],
+    activeSpaceId: null,
+    nodes: [],
+    currentFolderId: null,
+    activeDocId: null,
+    busy: false,
+    enterFolder: vi.fn(async () => {}),
+    goUp: vi.fn(async () => {}),
+    navigateTo: vi.fn(async () => {}),
+    openDoc: vi.fn(async () => {}),
+    createFolder: vi.fn(async () => {}),
+    requestCreateDoc: vi.fn(async () => {}),
+    renameNode: vi.fn(async () => {}),
+    deleteNode: vi.fn(async () => {}),
+  }
   const useKnowledgeStore = (sel: (s: typeof state) => unknown) => sel(state)
   useKnowledgeStore.getState = () => state
   return { useKnowledgeStore }

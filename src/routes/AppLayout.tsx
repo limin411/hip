@@ -28,7 +28,6 @@ import {
 } from '@/components/command-palette'
 import { SessionMenuDialogHost } from '@/components/history/SessionMenuDialogHost'
 import { ManagedTerminalDialogHost } from '@/components/terminals/ManagedTerminalDialogHost'
-import { KnowledgeSpaceDialogHost } from '@/components/knowledge/KnowledgeSpaceDialogHost'
 import { CODE_TERMINAL } from '@/components/artifact/terminalFeature'
 import { TERMINAL_MANAGEMENT } from '@/components/terminals/feature'
 import { TerminalManagementPage } from '@/components/terminals/TerminalManagementPage'
@@ -360,7 +359,6 @@ export function AppLayout() {
       <OverlayShellHost />
       <SessionMenuDialogHost />
       <ManagedTerminalDialogHost />
-      <KnowledgeSpaceDialogHost />
     </div>
   )
 }

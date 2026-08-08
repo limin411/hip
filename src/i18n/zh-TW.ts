@@ -2460,6 +2460,10 @@ export const zhTW = {
       "renameUpdateLinks": "同時更新指向舊標題的 wiki 連結",
       "renameLinksDone": "已在 {{count}} 篇文件中更新 wiki 連結"
     },
+    "recent": {
+      "sidebarTitle": "最近",
+      "remove": "從最近移除"
+    },
     "board": {
       "untitled": "未命名畫板",
       "titleLabel": "畫板標題",

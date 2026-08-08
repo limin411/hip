@@ -70,10 +70,13 @@ const knowledgeState = {
   currentFolderId: null as string | null,
   activeDocId: null as string | null,
   busy: false,
+  recent: [] as { spaceId: string; docId: string; title: string; spaceName: string; at: number }[],
   enterFolder: vi.fn(async () => {}),
   goUp: vi.fn(async () => {}),
   navigateTo: vi.fn(async () => {}),
   openDoc: vi.fn(async () => {}),
+  openRecent: vi.fn(async () => {}),
+  dropRecent: vi.fn(() => {}),
   createFolder: vi.fn(async () => {}),
   requestCreateDoc: vi.fn(async () => {}),
   renameNode: vi.fn(async () => {}),
@@ -105,6 +108,7 @@ describe('AppSidebar', () => {
     knowledgeState.nodes = []
     knowledgeState.currentFolderId = null
     knowledgeState.activeDocId = null
+    knowledgeState.recent = []
     useNavHistoryStore.setState({ stack: [], index: -1, applying: false })
     useUiStore.setState({
       activeView: 'chat',
@@ -299,6 +303,48 @@ describe('AppSidebar', () => {
     expect(screen.getByTestId('dir-row-doc_1')).toBeInTheDocument()
     // 空间列表不再渲染
     expect(screen.queryByTestId('sidebar-new-space')).not.toBeInTheDocument()
+  })
+
+  it('knowledge recent block is hidden when the recent list is empty (V2-N1)', () => {
+    useUiStore.setState({ sidebarSection: 'knowledge', activeView: 'knowledge' })
+    knowledgeState.recent = []
+    render(<AppSidebar />)
+    expect(screen.queryByTestId('sidebar-knowledge-recent')).not.toBeInTheDocument()
+  })
+
+  it('knowledge recent block lists recent docs; click opens via openRecent (V2-N1)', () => {
+    useUiStore.setState({ sidebarSection: 'knowledge', activeView: 'knowledge' })
+    knowledgeState.recent = [
+      {
+        spaceId: 'sp1',
+        docId: 'doc_recent',
+        title: '版本发布说明',
+        spaceName: '产品手册',
+        at: Date.now() - 60_000,
+      },
+    ]
+    render(<AppSidebar />)
+    const block = screen.getByTestId('sidebar-knowledge-recent')
+    expect(block).toBeInTheDocument()
+    const row = screen.getByTestId('sidebar-recent-doc_recent')
+    expect(row).toHaveTextContent('版本发布说明')
+    fireEvent.click(row)
+    expect(knowledgeState.openRecent).toHaveBeenCalledWith(
+      expect.objectContaining({ spaceId: 'sp1', docId: 'doc_recent' }),
+    )
+  })
+
+  it('knowledge recent caps the displayed rows at 8 (V2-N1)', () => {
+    useUiStore.setState({ sidebarSection: 'knowledge', activeView: 'knowledge' })
+    knowledgeState.recent = Array.from({ length: 12 }, (_, i) => ({
+      spaceId: 'sp1',
+      docId: `doc_${i}`,
+      title: `Doc ${i}`,
+      spaceName: '产品手册',
+      at: Date.now() - i * 60_000,
+    }))
+    render(<AppSidebar />)
+    expect(screen.getAllByTestId(/^sidebar-recent-/)).toHaveLength(8)
   })
 
   it('terminals section shows a single new button that opens a popover', () => {

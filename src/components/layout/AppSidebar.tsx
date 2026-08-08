@@ -42,6 +42,7 @@ import { useTerminalStore } from '@/store/terminalStore'
 import { terminalSessionsFor, useTerminalAgentStore } from '@/store/terminalAgentStore'
 import { DeclarativeContextMenu } from '@/components/context-menu'
 import { DirNavList } from '@/components/knowledge/DirNavList'
+import { KnowledgeRecentList } from '@/components/knowledge/KnowledgeRecentList'
 import { TERMINAL_MANAGEMENT } from '@/components/terminals/feature'
 import { QuickConnectPopover } from '@/components/terminals/QuickConnectPopover'
 import { WORK_ITEM_TRACKING } from '@/components/work-items/feature'
@@ -685,7 +686,10 @@ export function AppSidebar() {
             {t('placeholder.comingSoon')}
           </p>
         ) : sidebarSection === 'knowledge' ? (
-          <DirNavList />
+          <div className="flex min-h-0 flex-col">
+            <DirNavList />
+            <KnowledgeRecentList />
+          </div>
         ) : filteredSessions.length === 0 ? (
           <p className="px-2 py-4 text-center text-meta text-ink-tertiary" role="status">
             {t('sidebar.emptySessions')}

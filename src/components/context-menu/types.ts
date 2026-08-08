@@ -33,6 +33,8 @@ export type ContextKind =
   | 'artifactChrome'
   | 'knowledgeNode'
   | 'knowledgeTree'
+  /** Sidebar recent-doc row (V2-N1). */
+  | 'knowledgeRecent'
   /** Work-item list row / calendar bar / day-more row. */
   | 'workItem'
   /** Calendar day blank / list empty create. */
@@ -168,6 +170,12 @@ export type ContextPayloadMap = {
   knowledgeTree: {
     onNewDoc: () => void
     onNewFolder: () => void
+  }
+  /** Sidebar recent-doc row (V2-N1): identity + remove callback. */
+  knowledgeRecent: {
+    spaceId: string
+    docId: string
+    onRemove: () => void
   }
   /**
    * Work item row/bar. Identity-only payload; provider imports stores/dialogs

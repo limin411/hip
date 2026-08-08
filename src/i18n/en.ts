@@ -2560,6 +2560,10 @@ export const en = {
         renameUpdateLinks: 'Also update wiki links pointing at the old title',
         renameLinksDone: 'Updated wiki links in {{count}} documents',
       },
+      recent: {
+        sidebarTitle: 'Recent',
+        remove: 'Remove from recent',
+      },
       board: {
         untitled: 'Untitled whiteboard',
         titleLabel: 'Whiteboard title',

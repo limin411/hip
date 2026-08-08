@@ -2289,3 +2289,98 @@ describe('knowledgeStore pendingReveal setter (V2-S1)', () => {
     expect(useKnowledgeStore.getState().pendingReveal).toBeNull()
   })
 })
+
+describe('knowledgeStore recent list (V2-N1)', () => {
+  function nodes(count: number) {
+    return Array.from({ length: count }, (_, i) => ({
+      id: `doc_${i}`,
+      parentId: null,
+      kind: 'doc' as const,
+      title: `Doc ${i}`,
+      order: 0,
+      createdAt: i,
+      updatedAt: i,
+    }))
+  }
+
+  beforeEach(() => {
+    knowledgeReadDoc.mockReset()
+    knowledgeReadDoc.mockResolvedValue('# hello')
+    knowledgeGetTree.mockReset()
+    knowledgeEnsureRoot.mockReset()
+    knowledgeListSpaces.mockReset()
+    localStorage.removeItem('hip-knowledge-recent')
+    useKnowledgeStore.setState({
+      loaded: true,
+      spaces: [{ id: 'spc_1', name: 'S', createdAt: 1, updatedAt: 1 }],
+      activeSpaceId: 'spc_1',
+      nodes: nodes(3),
+      activeDocId: null,
+      docBody: '',
+      draftBody: '',
+      editorMode: 'live',
+      mode: 'workspace',
+      searchQuery: '',
+      searchHits: [],
+      indexStatus: 'idle',
+      spaceDocCounts: { spc_1: 3 },
+      recent: [],
+      expandedFolderIds: {},
+      busy: false,
+      error: null,
+      saveState: 'idle',
+    })
+  })
+
+  it('opening A → B → A dedupes A and moves it to the front', async () => {
+    const kb = useKnowledgeStore.getState()
+    await kb.openDoc('doc_0')
+    await kb.openDoc('doc_1')
+    await kb.openDoc('doc_0')
+    const recent = useKnowledgeStore.getState().recent
+    expect(recent.map((r) => r.docId)).toEqual(['doc_0', 'doc_1'])
+    expect(recent[0]?.title).toBe('Doc 0')
+    expect(recent[0]?.spaceName).toBe('S')
+  })
+
+  it('caps recent at RECENT_CAP and drops the oldest', async () => {
+    // Pre-seed the cap with older docs (all different ids).
+    const seeded = Array.from({ length: 16 }, (_, i) => ({
+      spaceId: 'spc_1',
+      docId: `old_${i}`,
+      title: `Old ${i}`,
+      spaceName: 'S',
+      at: 1_000 + i,
+    }))
+    useKnowledgeStore.setState({ recent: seeded })
+    await useKnowledgeStore.getState().openDoc('doc_0')
+    const recent = useKnowledgeStore.getState().recent
+    expect(recent).toHaveLength(16)
+    expect(recent[0]?.docId).toBe('doc_0')
+    expect(recent.some((r) => r.docId === 'old_15')).toBe(false)
+  })
+
+  it('persists to the legacy localStorage key hip-knowledge-recent', async () => {
+    await useKnowledgeStore.getState().openDoc('doc_0')
+    const raw = localStorage.getItem('hip-knowledge-recent')
+    expect(raw).toBeTruthy()
+    const parsed = JSON.parse(raw!) as Array<{ docId: string }>
+    expect(parsed[0]?.docId).toBe('doc_0')
+  })
+
+  it('dropRecent removes a single entry and persists', async () => {
+    useKnowledgeStore.setState({
+      recent: [
+        { spaceId: 'spc_1', docId: 'doc_0', title: 'A', spaceName: 'S', at: 1 },
+        { spaceId: 'spc_1', docId: 'doc_1', title: 'B', spaceName: 'S', at: 2 },
+      ],
+    })
+    useKnowledgeStore.getState().dropRecent('spc_1', 'doc_0')
+    const recent = useKnowledgeStore.getState().recent
+    expect(recent.map((r) => r.docId)).toEqual(['doc_1'])
+    const parsed = JSON.parse(localStorage.getItem('hip-knowledge-recent')!) as Array<{
+      docId: string
+    }>
+    expect(parsed.map((r) => r.docId)).toEqual(['doc_1'])
+  })
+})

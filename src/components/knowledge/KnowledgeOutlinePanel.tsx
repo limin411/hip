@@ -1,9 +1,11 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
+import { RefreshCw } from 'lucide-react'
 import { useKnowledgeStore } from '@/store/knowledgeStore'
 import { PanelToggle } from '@/components/layout/PanelToggle'
 import { DocOutline } from './DocOutline'
 import { extractDocOutline } from '@/domain/knowledge/mdPreview'
+import { parseFrontmatter } from '@/domain/knowledge/frontmatter'
 import { BacklinkPanel } from './BacklinkPanel'
 
 /** Idle debounce so outline does not re-parse on every Live draft tick. */
@@ -40,6 +42,7 @@ export function KnowledgeOutlinePanel() {
   const docBody = useKnowledgeStore((s) => s.docBody)
   const activeDocId = useKnowledgeStore((s) => s.activeDocId)
   const nodes = useKnowledgeStore((s) => s.nodes)
+  const backlinks = useKnowledgeStore((s) => s.backlinks)
   const requestOutlineJump = useKnowledgeStore((s) => s.requestOutlineJump)
 
   const activeNode = activeDocId ? nodes.find((n) => n.id === activeDocId) : undefined
@@ -71,6 +74,13 @@ export function KnowledgeOutlinePanel() {
   }, [liveContent, activeDocId, isDoc])
 
   const outlineItems = useMemo(() => extractDocOutline(content), [content])
+
+  // 文档统计（字词/反向链接），随内容防抖刷新。
+  const wordCount = useMemo(() => {
+    const body = parseFrontmatter(liveContent).bodyWithoutFm
+    const words = body.trim().match(/\S+/g)
+    return words?.length ?? 0
+  }, [liveContent])
 
   // TOC scrollspy — highlight the last heading that crossed the top band.
   useEffect(() => {
@@ -175,6 +185,17 @@ export function KnowledgeOutlinePanel() {
           {t('knowledge.outline.title')}
         </span>
         <div className="flex items-center gap-2" data-tauri-drag-region="false">
+          {activeDocId && isDoc ? (
+            <button
+              type="button"
+              className="rounded-md p-1 text-ink-tertiary transition-colors hover:bg-state-hover hover:text-ink"
+              aria-label={t('knowledge.backlinks.refresh')}
+              data-testid="knowledge-backlink-refresh"
+              onClick={() => void useKnowledgeStore.getState().refreshLinkPanel()}
+            >
+              <RefreshCw size={12} aria-hidden />
+            </button>
+          ) : null}
           <PanelToggle slot="panel" />
         </div>
       </div>
@@ -207,6 +228,18 @@ export function KnowledgeOutlinePanel() {
             </section>
 
             <BacklinkPanel />
+
+            <div
+              className="flex flex-col gap-1 px-1 pt-1 text-meta text-ink-tertiary"
+              data-testid="knowledge-panel-doc-stats"
+            >
+              <span data-testid="knowledge-doc-word-count">
+                {t('knowledge.doc.wordCount', { count: wordCount })}
+              </span>
+              <span data-testid="knowledge-doc-backlink-count">
+                {t('knowledge.doc.backlinkCount', { count: backlinks.length })}
+              </span>
+            </div>
           </div>
         )}
       </div>

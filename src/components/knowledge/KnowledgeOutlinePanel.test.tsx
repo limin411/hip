@@ -8,7 +8,8 @@ import { KnowledgeOutlinePanel } from './KnowledgeOutlinePanel'
 
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({
-    t: (key: string) => key,
+    t: (key: string, opts?: { count?: number }) =>
+      opts?.count != null ? `${key}:${opts.count}` : key,
     i18n: { language: 'en' },
   }),
   initReactI18next: { type: '3rdParty', init: () => {} },
@@ -120,6 +121,80 @@ describe('KnowledgeOutlinePanel', () => {
     expect(openRecent).toHaveBeenCalledWith(
       expect.objectContaining({ spaceId: 'spc_1', docId: 'doc_other' }),
     )
+  })
+
+  it('shows doc stats (words + backlinks) stacked below the broken-links section', () => {
+    useKnowledgeStore.setState({
+      activeDocId: 'doc_1',
+      nodes: [
+        {
+          id: 'doc_1',
+          parentId: null,
+          kind: 'doc',
+          title: 'Hello',
+          order: 0,
+          createdAt: 0,
+          updatedAt: 0,
+        },
+      ],
+      draftBody: 'a b c',
+      docBody: 'a b c',
+      backlinks: [
+        {
+          fromDocId: 'doc_a',
+          fromTitle: 'A',
+          raw: '[[Hello]]',
+          kind: 'wiki',
+          fragment: null,
+        },
+      ],
+      outboundLinks: [],
+      linkPanelStatus: 'ready',
+    })
+    render(<KnowledgeOutlinePanel />)
+    const footer = screen.getByTestId('knowledge-panel-doc-stats')
+    expect(footer).toBeInTheDocument()
+    // 正文 3 个词 + 1 条反向链接。
+    expect(screen.getByTestId('knowledge-doc-word-count')).toHaveTextContent(
+      'knowledge.doc.wordCount:3',
+    )
+    expect(screen.getByTestId('knowledge-doc-backlink-count')).toHaveTextContent(
+      'knowledge.doc.backlinkCount:1',
+    )
+  })
+
+  it('omits the stats and refresh when no doc is open', () => {
+    render(<KnowledgeOutlinePanel />)
+    expect(screen.queryByTestId('knowledge-panel-doc-stats')).not.toBeInTheDocument()
+    expect(screen.queryByTestId('knowledge-backlink-refresh')).not.toBeInTheDocument()
+  })
+
+  it('refreshes the link panel from the panel header', () => {
+    const refreshLinkPanel = vi
+      .spyOn(useKnowledgeStore.getState(), 'refreshLinkPanel')
+      .mockResolvedValue(undefined)
+    useKnowledgeStore.setState({
+      activeDocId: 'doc_1',
+      nodes: [
+        {
+          id: 'doc_1',
+          parentId: null,
+          kind: 'doc',
+          title: 'Hello',
+          order: 0,
+          createdAt: 0,
+          updatedAt: 0,
+        },
+      ],
+      draftBody: 'a',
+      docBody: 'a',
+      backlinks: [],
+      outboundLinks: [],
+      linkPanelStatus: 'ready',
+    })
+    render(<KnowledgeOutlinePanel />)
+    fireEvent.click(screen.getByTestId('knowledge-backlink-refresh'))
+    expect(refreshLinkPanel).toHaveBeenCalled()
   })
 
   it('close button collapses the knowledge panel', () => {

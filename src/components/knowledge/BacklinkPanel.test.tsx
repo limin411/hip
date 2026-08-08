@@ -45,26 +45,29 @@ describe('BacklinkPanel (V2-L1)', () => {
     cleanup()
   })
 
-  it('renders tab counts matching store data', () => {
+  it('renders section counts matching store data', () => {
     seedStore()
     render(<BacklinkPanel />)
     expect(screen.getByTestId('knowledge-backlink-count-inbound')).toHaveTextContent('1')
     expect(screen.getByTestId('knowledge-backlink-count-outbound')).toHaveTextContent('2')
     expect(screen.getByTestId('knowledge-backlink-count-broken')).toHaveTextContent('1')
-    // 入链行渲染
+    // 三组纵向堆叠，同时渲染
     expect(screen.getByTestId('knowledge-backlink-row-doc_a-[[当前]]')).toBeInTheDocument()
+    expect(screen.getByTestId('knowledge-backlink-row-[[文档 B]]-0')).toBeInTheDocument()
+    expect(screen.getByTestId('knowledge-backlink-row-doc_cur-[[缺失文档]]')).toBeInTheDocument()
   })
 
-  it('switches tabs and shows empty state', () => {
+  it('shows per-section empty states', () => {
     seedStore({ backlinks: [], outboundLinks: [] })
     render(<BacklinkPanel />)
-    // 空组计数 0 且不可点；当前激活的入链页签显示空态。
     expect(screen.getByTestId('knowledge-backlink-count-outbound')).toHaveTextContent('0')
-    expect(screen.getByTestId('knowledge-backlink-tab-outbound')).toBeDisabled()
-    expect(screen.getByTestId('knowledge-backlink-panel-empty')).toBeInTheDocument()
+    expect(screen.getByTestId('knowledge-backlink-empty-inbound')).toBeInTheDocument()
+    expect(screen.getByTestId('knowledge-backlink-empty-outbound')).toBeInTheDocument()
+    // 断链组不受影响
+    expect(screen.getByTestId('knowledge-backlink-row-doc_cur-[[缺失文档]]')).toBeInTheDocument()
   })
 
-  it('collapses long lists and expands', () => {
+  it('collapses long lists per section and expands', () => {
     const many = Array.from({ length: 8 }, (_, i) => ({
       fromDocId: `doc_${i}`,
       fromTitle: `入链 ${i}`,
@@ -74,9 +77,10 @@ describe('BacklinkPanel (V2-L1)', () => {
     }))
     seedStore({ backlinks: many })
     render(<BacklinkPanel />)
-    expect(screen.getAllByTestId(/^knowledge-backlink-row-doc_/)).toHaveLength(5)
-    fireEvent.click(screen.getByTestId('knowledge-backlink-expand'))
-    expect(screen.getAllByTestId(/^knowledge-backlink-row-doc_/)).toHaveLength(8)
+    const inboundRows = () => screen.getAllByTestId(/^knowledge-backlink-row-doc_\d-/)
+    expect(inboundRows()).toHaveLength(5)
+    fireEvent.click(screen.getByTestId('knowledge-backlink-expand-inbound'))
+    expect(inboundRows()).toHaveLength(8)
   })
 
   it('broken row create calls repairBrokenLink and opens the new doc', async () => {
@@ -88,7 +92,6 @@ describe('BacklinkPanel (V2-L1)', () => {
       .spyOn(useKnowledgeStore.getState(), 'openRecent')
       .mockResolvedValue(undefined)
     render(<BacklinkPanel />)
-    fireEvent.click(screen.getByTestId('knowledge-backlink-tab-broken'))
     fireEvent.click(screen.getByTestId('knowledge-backlink-create-doc_cur-[[缺失文档]]'))
     await vi.waitFor(() => {
       expect(repair).toHaveBeenCalledWith('doc_cur', '[[缺失文档]]', '缺失文档')

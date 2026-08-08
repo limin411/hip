@@ -63,7 +63,6 @@ import { KnowledgeGraphModal } from './KnowledgeGraphModal'
 import { PageHeader } from './page/PageHeader'
 import { VersionTimeline } from './version/VersionTimeline'
 import { VersionDiffView } from './version/VersionDiffView'
-import { parseFrontmatter } from '@/domain/knowledge/frontmatter'
 
 /** Lazy so Source-only sessions pay 0 for BlockNote chunk. */
 const DocLiveEditor = lazy(() =>
@@ -92,7 +91,6 @@ export function KnowledgeWorkspace() {
   const setEditorMode = useKnowledgeStore((s) => s.setEditorMode)
   const setDraftBody = useKnowledgeStore((s) => s.setDraftBody)
   const flushSave = useKnowledgeStore((s) => s.flushSave)
-  const backlinks = useKnowledgeStore((s) => s.backlinks)
   const toggleFolder = useKnowledgeStore((s) => s.toggleFolder)
   const openDocStore = useKnowledgeStore((s) => s.openDoc)
   const saveDocAsTemplate = useKnowledgeStore((s) => s.saveDocAsTemplate)
@@ -330,11 +328,6 @@ export function KnowledgeWorkspace() {
   const showSourceEditor = !isBoard && !showLiveEditor
   /** Body for editor mount (mode/doc switch); not a per-keystroke subscription. */
   const mountMarkdown = useKnowledgeStore.getState().draftBody || docBody
-  const wordCount = useMemo(() => {
-    const body = parseFrontmatter(mountMarkdown).bodyWithoutFm
-    const words = body.trim().match(/\S+/g)
-    return words?.length ?? 0
-  }, [mountMarkdown])
 
   const copyPageLink = async () => {
     if (!activeSpaceId || !activeDocId) return
@@ -781,19 +774,6 @@ export function KnowledgeWorkspace() {
                   onCopyPageLink={() => void copyPageLink()}
                 />
               </Suspense>
-              <footer
-                className="knowledge-doc-inline-pad flex shrink-0 pb-6 pt-2 text-meta text-ink-tertiary"
-                data-testid="knowledge-doc-footer"
-              >
-                <div className="knowledge-doc-measure flex items-center gap-3">
-                  <span data-testid="knowledge-doc-word-count">
-                    {t('knowledge.doc.wordCount', { count: wordCount })}
-                  </span>
-                  <span data-testid="knowledge-doc-backlink-count">
-                    {t('knowledge.doc.backlinkCount', { count: backlinks.length })}
-                  </span>
-                </div>
-              </footer>
             </KnowledgeDocCanvas>
           </div>
         ) : showSourceEditor ? (
@@ -854,19 +834,6 @@ export function KnowledgeWorkspace() {
                 placeholder={t('knowledge.doc.placeholder')}
                 wikiNodes={nodes}
               />
-              <footer
-                className="knowledge-doc-inline-pad flex shrink-0 pb-6 pt-2 text-meta text-ink-tertiary"
-                data-testid="knowledge-doc-footer"
-              >
-                <div className="knowledge-doc-measure flex items-center gap-3">
-                  <span>
-                    {t('knowledge.doc.wordCount', { count: wordCount })}
-                  </span>
-                  <span>
-                    {t('knowledge.doc.backlinkCount', { count: backlinks.length })}
-                  </span>
-                </div>
-              </footer>
             </KnowledgeDocCanvas>
           </div>
         ) : null}

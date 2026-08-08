@@ -1,0 +1,1184 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>文档管理 × Notion 对比与改进方案 · 视觉稿（V2）</title>
+<style>
+/* ============ tokens（对齐 hip styles/tokens.css 与 doc-manager mockup） ============ */
+:root{
+  --bg-app:#ffffff; --bg-subtle:#F9F8F5; --bg-muted:#f1f1f1; --bg-content:#ffffff;
+  --border:#e0e0e0; --border-strong:#c9c9c9;
+  --text-primary:#111111; --text-secondary:#5e5e5e; --text-tertiary:#757575;
+  --accent:#c2410c; --accent-hover:#9a3412; --accent-strong:#7c2d12;
+  --accent-subtle:#f0f0f0; --accent-active:#e6e6e6; --on-accent:#fff;
+  --state-hover:#f0f0f0; --state-active:#e6e6e6; --state-disabled:#b5b5b5;
+  --success:#2f7d40; --danger:#c63b3b; --warning:#9a5d10;
+  --notion:#37352f; --notion-soft:#e8e6e1;
+  --radius:8px;
+  --shadow-menu:0 8px 24px rgba(17,17,17,.14), 0 2px 6px rgba(17,17,17,.08);
+  --shadow-float:0 12px 32px rgba(17,17,17,.18), 0 3px 8px rgba(17,17,17,.10);
+}
+*{box-sizing:border-box; margin:0; padding:0}
+html{scroll-behavior:smooth}
+body{
+  font-family:-apple-system,BlinkMacSystemFont,"PingFang SC","Hiragino Sans GB","Microsoft YaHei",sans-serif;
+  font-size:13px; color:var(--text-primary); background:var(--bg-app);
+  -webkit-font-smoothing:antialiased; line-height:1.55;
+}
+button{font:inherit; color:inherit; background:none; border:none; cursor:pointer}
+input,select{font:inherit; color:inherit}
+::-webkit-scrollbar{width:10px; height:10px}
+::-webkit-scrollbar-thumb{background:#d8d8d8; border-radius:5px; border:2px solid transparent; background-clip:content-box}
+::-webkit-scrollbar-thumb:hover{background:#c5c5c5}
+::-webkit-scrollbar-track{background:transparent}
+
+/* ============ 页头 ============ */
+.hero{
+  background:linear-gradient(180deg,var(--bg-subtle),var(--bg-app));
+  border-bottom:1px solid var(--border); padding:34px 40px 26px; position:relative; overflow:hidden;
+}
+.hero .kicker{font-size:11px; font-weight:600; letter-spacing:.08em; color:var(--accent); text-transform:uppercase}
+.hero h1{font-size:26px; font-weight:700; margin:8px 0 6px; letter-spacing:-.01em}
+.hero .sub{color:var(--text-secondary); max-width:900px; font-size:13.5px}
+.hero .meta{display:flex; gap:8px; margin-top:14px; flex-wrap:wrap}
+.chip{
+  display:inline-flex; align-items:center; gap:6px; height:24px; padding:0 10px;
+  border:1px solid var(--border); border-radius:999px; font-size:11.5px; color:var(--text-secondary);
+  background:var(--bg-app);
+}
+.chip b{color:var(--text-primary); font-weight:600}
+.chip .dot{width:6px; height:6px; border-radius:50%; flex-shrink:0}
+.dot.hip{background:var(--accent)}
+.dot.notion{background:var(--notion)}
+.chip-toggle{
+  display:inline-flex; align-items:center; gap:6px; height:26px; padding:0 10px;
+  border:1px solid var(--border); border-radius:999px; font-size:11.5px; color:var(--text-secondary);
+  background:var(--bg-app); transition:all .12s ease;
+}
+.chip-toggle:hover{border-color:var(--border-strong); color:var(--text-primary)}
+.chip-toggle.on{background:var(--accent); border-color:var(--accent); color:var(--on-accent)}
+.chip-toggle .dot{width:6px; height:6px; border-radius:50%; background:currentColor; opacity:.85}
+
+/* ============ 标签页 ============ */
+.tabs{
+  position:sticky; top:0; z-index:100; display:flex; gap:4px; padding:10px 40px;
+  background:rgba(255,255,255,.92); backdrop-filter:blur(8px);
+  border-bottom:1px solid var(--border);
+}
+.tab{
+  height:32px; padding:0 16px; border-radius:8px; font-size:13px; font-weight:500; color:var(--text-secondary);
+  display:inline-flex; align-items:center; gap:7px;
+}
+.tab:hover{background:var(--state-hover); color:var(--text-primary)}
+.tab.active{background:var(--state-active); color:var(--text-primary)}
+.tab .cnt{
+  font-size:10.5px; min-width:17px; height:17px; padding:0 5px; border-radius:999px;
+  background:var(--bg-muted); display:inline-flex; align-items:center; justify-content:center; color:var(--text-tertiary);
+}
+.tab.active .cnt{background:var(--bg-app); color:var(--accent); font-weight:600}
+
+main{max-width:1180px; margin:0 auto; padding:26px 40px 60px}
+section{display:none}
+section.active{display:block}
+.sec-head{margin:26px 0 14px}
+.sec-head h2{font-size:17px; font-weight:700; display:flex; align-items:center; gap:9px}
+.sec-head h2 .no{
+  width:22px; height:22px; border-radius:6px; background:var(--accent); color:var(--on-accent);
+  font-size:12px; font-weight:700; display:inline-flex; align-items:center; justify-content:center; flex-shrink:0;
+}
+.sec-head p{color:var(--text-secondary); font-size:12.5px; margin-top:5px; max-width:860px}
+
+/* ============ 概览：定位卡片 ============ */
+.pos-grid{display:grid; grid-template-columns:1fr 1fr; gap:14px; margin-bottom:10px}
+.pos-card{border:1px solid var(--border); border-radius:12px; padding:16px 18px; background:var(--bg-content)}
+.pos-card h3{font-size:14px; font-weight:700; display:flex; align-items:center; gap:8px; margin-bottom:8px}
+.pos-card ul{list-style:none; display:flex; flex-direction:column; gap:5px}
+.pos-card li{font-size:12.5px; color:var(--text-secondary); display:flex; gap:8px}
+.pos-card li::before{content:""; width:5px; height:5px; border-radius:50%; flex-shrink:0; margin-top:6px}
+.pos-card.hip-card{border-color:#e8c4b2}
+.pos-card.hip-card h3{color:var(--accent)}
+.pos-card.hip-card li::before{background:var(--accent)}
+.pos-card.notion-card{border-color:#d4d1ca}
+.pos-card.notion-card h3{color:var(--notion)}
+.pos-card.notion-card li::before{background:var(--notion)}
+.takeaway{
+  border:1px solid var(--border); border-left:3px solid var(--accent); border-radius:10px;
+  background:var(--bg-subtle); padding:13px 16px; font-size:12.5px; color:var(--text-secondary); margin-bottom:22px;
+}
+.takeaway b{color:var(--text-primary)}
+
+/* ============ 得分对比条 ============ */
+.score-card{border:1px solid var(--border); border-radius:12px; overflow:hidden}
+.score-row{
+  display:grid; grid-template-columns:170px 1fr 1fr 84px; gap:12px; align-items:center;
+  padding:9px 16px; border-bottom:1px solid var(--border);
+}
+.score-row:last-child{border-bottom:none}
+.score-row:nth-child(even){background:var(--bg-subtle)}
+.score-name{font-weight:600; font-size:12.5px; display:flex; align-items:center; gap:6px}
+.score-name .star{color:var(--warning); font-size:10px}
+.bar-wrap{display:flex; align-items:center; gap:8px}
+.bar-track{flex:1; height:7px; border-radius:4px; background:var(--bg-muted); overflow:hidden}
+.bar-fill{height:100%; border-radius:4px; width:0; transition:width .9s cubic-bezier(.2,.7,.3,1)}
+.bar-fill.hip{background:var(--accent)}
+.bar-fill.notion{background:var(--notion); opacity:.78}
+.bar-val{font-size:11px; color:var(--text-tertiary); width:14px; text-align:right; font-variant-numeric:tabular-nums}
+.gap-badge{justify-self:end; font-size:10.5px; padding:3px 8px; border-radius:999px; font-weight:600; white-space:nowrap}
+.gap-badge.big{background:#fbe9e7; color:var(--danger)}
+.gap-badge.mid{background:#fdf0e2; color:var(--warning)}
+.gap-badge.small{background:#e8f3ea; color:var(--success)}
+.gap-badge.lead{background:#eef0f6; color:#3b4a7a}
+.gap-badge.skip{background:#f1f1f1; color:var(--text-tertiary)}
+.legend{display:flex; gap:16px; font-size:11.5px; color:var(--text-secondary); padding:10px 16px 12px; align-items:center}
+.legend i{width:18px; height:7px; border-radius:4px; display:inline-block; margin-right:6px; vertical-align:middle}
+.legend .h{background:var(--accent)} .legend .n{background:var(--notion); opacity:.78}
+
+/* ============ 差距矩阵表 ============ */
+.matrix-wrap{border:1px solid var(--border); border-radius:12px; overflow:auto; background:var(--bg-content)}
+table.matrix{width:100%; border-collapse:collapse; font-size:12px; min-width:940px}
+.matrix th{
+  text-align:left; padding:10px 12px; background:var(--bg-subtle); font-size:11px; letter-spacing:.04em;
+  color:var(--text-tertiary); border-bottom:1px solid var(--border); white-space:nowrap; font-weight:600;
+}
+.matrix td{padding:10px 12px; border-bottom:1px solid var(--border); vertical-align:top; color:var(--text-secondary)}
+.matrix tr:last-child td{border-bottom:none}
+.matrix tr:hover td{background:#fdfaf7}
+.matrix .dim{font-weight:600; color:var(--text-primary); white-space:nowrap}
+.matrix .score-tag{display:inline-block; min-width:44px; text-align:center; font-size:11px; padding:2px 6px; border-radius:6px; font-weight:700; font-variant-numeric:tabular-nums}
+.st-hip{background:var(--accent-subtle); color:var(--accent)}
+.st-notion{background:var(--notion-soft); color:var(--notion)}
+.matrix .prop{color:var(--accent); font-weight:600; white-space:nowrap}
+.matrix .p0{color:var(--success); font-weight:700}
+.matrix .p1{color:var(--accent); font-weight:700}
+.matrix .p2{color:var(--text-tertiary); font-weight:600}
+.matrix .note{font-size:11px; color:var(--text-tertiary); margin-top:2px}
+
+/* ============ 路线图 ============ */
+.road-grid{display:grid; grid-template-columns:repeat(3,1fr); gap:14px}
+.road-col{border:1px solid var(--border); border-radius:12px; background:var(--bg-content); overflow:hidden; display:flex; flex-direction:column}
+.road-head{padding:12px 16px; border-bottom:1px solid var(--border); display:flex; align-items:baseline; gap:8px}
+.road-head .phase{font-size:14px; font-weight:700}
+.road-head .est{font-size:11px; color:var(--text-tertiary)}
+.road-head.p0{background:#f0f7f1}.road-head.p0 .phase{color:var(--success)}
+.road-head.p1{background:#fdf0e2}.road-head.p1 .phase{color:var(--accent)}
+.road-head.p2{background:#eef0f6}.road-head.p2 .phase{color:#3b4a7a}
+.road-body{padding:10px 12px; display:flex; flex-direction:column; gap:8px; flex:1}
+.road-item{
+  border:1px solid var(--border); border-radius:9px; padding:9px 11px; background:var(--bg-content);
+  transition:box-shadow .12s ease;
+}
+.road-item:hover{box-shadow:var(--shadow-menu)}
+.road-item .t{font-size:12.5px; font-weight:600; display:flex; align-items:center; gap:6px}
+.road-item .t .id{
+  font-size:10px; font-weight:700; padding:1px 6px; border-radius:5px; background:var(--bg-muted); color:var(--text-tertiary);
+  font-variant-numeric:tabular-nums; letter-spacing:.02em;
+}
+.road-item .d{font-size:11.5px; color:var(--text-secondary); margin-top:3px}
+.road-item .m{font-size:10.5px; color:var(--text-tertiary); margin-top:5px; display:flex; gap:8px}
+.road-item .m b{color:var(--text-secondary); font-weight:600}
+.road-note{
+  margin-top:14px; border:1px dashed var(--border-strong); border-radius:10px; padding:12px 16px;
+  font-size:12px; color:var(--text-secondary); background:var(--bg-subtle);
+}
+.road-note b{color:var(--text-primary)}
+
+/* ============ 功能预览 ============ */
+.sub-tabs{display:flex; gap:6px; margin-bottom:14px; flex-wrap:wrap}
+.sub-tab{
+  height:28px; padding:0 13px; border-radius:999px; border:1px solid var(--border); font-size:12px;
+  color:var(--text-secondary); background:var(--bg-app); transition:all .12s;
+}
+.sub-tab:hover{border-color:var(--border-strong); color:var(--text-primary)}
+.sub-tab.active{background:var(--accent); border-color:var(--accent); color:var(--on-accent)}
+.panel{display:none}
+.panel.active{display:block}
+.panel-intro{font-size:12px; color:var(--text-secondary); margin-bottom:12px; max-width:900px}
+.panel-intro code{
+  background:var(--bg-muted); border-radius:4px; padding:1px 5px; font-size:11px; font-family:ui-monospace,Menlo,monospace;
+}
+
+/* ---- 应用窗口骨架（mockup 容器） ---- */
+.app-frame{
+  border:1px solid var(--border-strong); border-radius:12px; overflow:hidden; background:var(--bg-app);
+  box-shadow:var(--shadow-menu); margin-bottom:8px; position:relative;
+}
+.app-titlebar{
+  height:34px; display:flex; align-items:center; gap:8px; padding:0 12px;
+  background:var(--bg-subtle); border-bottom:1px solid var(--border);
+}
+.app-titlebar .dots{display:flex; gap:6px}
+.app-titlebar .dots i{width:10px; height:10px; border-radius:50%}
+.app-titlebar .dots i:nth-child(1){background:#ff5f57}
+.app-titlebar .dots i:nth-child(2){background:#febc2e}
+.app-titlebar .dots i:nth-child(3){background:#28c840}
+.app-titlebar .t{font-size:11px; color:var(--text-tertiary); margin-left:8px; flex:1; white-space:nowrap; overflow:hidden; text-overflow:ellipsis}
+.app-body{display:flex; height:420px; min-height:0}
+.app-sidebar{
+  width:210px; flex-shrink:0; background:var(--bg-subtle); border-right:1px solid var(--border);
+  display:flex; flex-direction:column; padding:8px 8px 10px; gap:2px; overflow:hidden;
+}
+.sb-nav{
+  display:flex; align-items:center; gap:8px; height:30px; padding:0 9px; border-radius:7px; font-size:12px;
+  font-weight:500; color:var(--text-primary); background:var(--state-active);
+}
+.sb-nav svg{width:14px; height:14px; opacity:.7}
+.sb-sec{font-size:10px; font-weight:600; letter-spacing:.06em; color:var(--text-tertiary); padding:8px 9px 3px}
+.sb-item{display:flex; align-items:center; gap:7px; height:26px; padding:0 9px; border-radius:6px; font-size:12px; color:var(--text-secondary)}
+.sb-item svg{width:13px; height:13px; opacity:.65; flex-shrink:0}
+.sb-item.active{background:var(--accent-active); color:var(--text-primary)}
+.sb-item.folder{color:var(--accent-hover); font-weight:500}
+.sb-item .cnt{margin-left:auto; font-size:10px; color:var(--text-tertiary)}
+.app-main{flex:1; min-width:0; display:flex; flex-direction:column; background:var(--bg-content)}
+
+/* 标注点（评审用，可开关） */
+.ann{
+  position:absolute; width:17px; height:17px; border-radius:50%; background:var(--accent); color:#fff;
+  font-size:10px; font-weight:700; display:inline-flex; align-items:center; justify-content:center;
+  z-index:40; box-shadow:0 1px 4px rgba(0,0,0,.25); line-height:1; font-style:normal;
+}
+body.no-ann .ann{display:none}
+.ann-label{display:none}
+body.no-ann .ann-label{display:block}
+
+/* 工具条 */
+.mtoolbar{height:42px; display:flex; align-items:center; gap:8px; padding:0 12px; border-bottom:1px solid var(--border); flex-shrink:0}
+.iconbtn{width:26px; height:26px; border-radius:6px; display:inline-flex; align-items:center; justify-content:center; color:var(--text-tertiary); position:relative}
+.iconbtn:hover{background:var(--state-hover); color:var(--text-primary)}
+.iconbtn svg{width:14px; height:14px}
+.iconbtn:disabled{color:var(--state-disabled); cursor:default}
+.iconbtn:disabled:hover{background:none}
+.bc{display:flex; align-items:center; gap:3px; font-size:12px; color:var(--text-tertiary); flex:1; min-width:0; overflow:hidden; white-space:nowrap}
+.bc b{color:var(--text-primary); font-weight:600}
+.bc .seg{color:var(--accent); cursor:pointer}
+.bc .sep{opacity:.5}
+.seg-more{border-bottom:1px dashed var(--text-tertiary); cursor:pointer}
+.vchip{
+  display:inline-flex; align-items:center; gap:5px; height:24px; padding:0 9px; border-radius:6px;
+  border:1px solid var(--border); font-size:11px; color:var(--text-secondary); background:var(--bg-app); position:relative;
+}
+.vchip:hover{border-color:var(--border-strong)}
+.vchip.on{background:var(--accent); border-color:var(--accent); color:var(--on-accent)}
+.vchip svg{width:12px; height:12px}
+.mini-btn{height:24px; padding:0 9px; border-radius:6px; border:1px solid var(--border); font-size:11px; color:var(--text-secondary); background:var(--bg-app); display:inline-flex; align-items:center; gap:5px}
+.mini-btn:hover{border-color:var(--border-strong); color:var(--text-primary)}
+.mini-btn.primary{background:var(--accent); border-color:var(--accent); color:var(--on-accent)}
+.mini-btn.primary:hover{background:var(--accent-hover)}
+.mtoolbar .spacer{flex:1}
+
+/* ---- Mockup 1：数据库视图 ---- */
+.kv-tool{display:flex; align-items:center; gap:6px; padding:8px 12px; border-bottom:1px solid var(--border); flex-shrink:0}
+.kv-filter{height:24px; padding:0 9px; border:1px solid var(--border); border-radius:6px; font-size:11px; background:var(--bg-app); color:var(--text-secondary); display:inline-flex; align-items:center; gap:5px}
+.kv-body{flex:1; overflow:auto}
+.db-table{width:100%; border-collapse:collapse; font-size:12px}
+.db-table th{
+  text-align:left; padding:7px 10px; background:var(--bg-subtle); border-bottom:1px solid var(--border);
+  font-size:10.5px; font-weight:600; color:var(--text-tertiary); letter-spacing:.03em; white-space:nowrap; position:relative;
+}
+.db-table td{padding:6px 10px; border-bottom:1px solid var(--border); white-space:nowrap; color:var(--text-secondary); position:relative}
+.db-table tr:hover td{background:#fdfaf7}
+.db-table .doc-cell{display:flex; align-items:center; gap:7px; color:var(--text-primary); font-weight:500}
+.db-table .doc-cell svg{width:13px; height:13px; opacity:.6}
+.db-table .doc-cell .f{color:var(--accent)}
+.db-table td .tag{
+  display:inline-flex; align-items:center; height:18px; padding:0 7px; border-radius:5px; font-size:10.5px; font-weight:500;
+}
+.tag.gray{background:#e9e9e9; color:#555}
+.tag.blue{background:#e3ecf7; color:#2b4f8f}
+.tag.green{background:#e5f2e6; color:#2f7d40}
+.tag.orange{background:#fbeadc; color:var(--accent)}
+.tag.red{background:#f9e4e2; color:var(--danger)}
+.db-table td .cell-edit{
+  background:var(--bg-app); border:1px solid var(--accent); border-radius:5px; box-shadow:0 0 0 2px rgba(194,65,12,.15);
+}
+.cell-inline{display:inline-flex; align-items:center; gap:5px; height:20px; padding:0 6px; border:1px solid transparent; border-radius:5px; cursor:default}
+.cell-inline:hover{border-color:var(--border); background:var(--bg-app)}
+.cell-inline .caret{width:8px; height:8px; opacity:.55}
+.db-table .pri{display:inline-flex; align-items:center; gap:4px}
+.pri i{width:8px; height:8px; border-radius:2px; display:inline-block}
+.db-table .empty{color:var(--state-disabled); font-style:normal}
+.kv-note{
+  position:absolute; right:14px; bottom:12px; z-index:30; display:flex; gap:6px; align-items:center;
+  background:rgba(249,248,245,.95); border:1px solid var(--border); border-radius:999px; padding:4px 12px;
+  font-size:10.5px; color:var(--text-tertiary); box-shadow:0 2px 8px rgba(0,0,0,.08);
+}
+.kv-note b{color:var(--accent); font-weight:600}
+
+/* 看板视图（同一数据） */
+.kanban{flex:1; display:flex; gap:10px; padding:12px; overflow:auto; background:var(--bg-subtle)}
+.kb-col{width:220px; flex-shrink:0; background:var(--bg-app); border:1px solid var(--border); border-radius:10px; display:flex; flex-direction:column; max-height:100%}
+.kb-head{display:flex; align-items:center; gap:7px; padding:9px 11px; border-bottom:1px solid var(--border); font-size:11.5px; font-weight:600}
+.kb-head .cnt{font-size:10px; color:var(--text-tertiary); font-weight:500}
+.kb-head .plus{margin-left:auto; color:var(--text-tertiary); font-size:13px; line-height:1}
+.kb-body{padding:8px; display:flex; flex-direction:column; gap:7px; overflow:auto}
+.kb-card{border:1px solid var(--border); border-radius:8px; padding:8px 10px; background:var(--bg-app); box-shadow:0 1px 2px rgba(0,0,0,.04)}
+.kb-card .t{font-size:11.5px; font-weight:600; color:var(--text-primary)}
+.kb-card .m{display:flex; align-items:center; gap:6px; margin-top:6px; font-size:10px; color:var(--text-tertiary)}
+.kb-card .m .tag{margin-left:auto}
+.kb-card.drag{box-shadow:var(--shadow-float); transform:rotate(1deg)}
+
+/* ---- Mockup 2：⌘K 全局搜索 ---- */
+.kcmd{position:relative}
+.kcmd-overlay{
+  position:absolute; inset:0; background:rgba(17,17,17,.32); z-index:200; display:flex; align-items:flex-start;
+  justify-content:center; padding-top:56px; backdrop-filter:blur(1px);
+}
+.kcmd-box{
+  width:560px; max-width:92%; background:var(--bg-app); border-radius:14px; box-shadow:var(--shadow-float);
+  overflow:hidden; animation:pop .14s ease;
+}
+@keyframes pop{from{transform:scale(.97); opacity:0}to{transform:scale(1); opacity:1}}
+.kcmd-input{display:flex; align-items:center; gap:10px; padding:13px 16px; border-bottom:1px solid var(--border)}
+.kcmd-input svg{width:16px; height:16px; color:var(--text-tertiary); flex-shrink:0}
+.kcmd-input input{flex:1; border:none; outline:none; font-size:14px; background:none}
+.kcmd-input input::placeholder{color:var(--state-disabled)}
+.kcmd-hint{margin-left:auto; display:flex; gap:5px; flex-shrink:0}
+.kbd{
+  font-size:10px; font-family:ui-monospace,Menlo,monospace; padding:2px 6px; border:1px solid var(--border);
+  border-bottom-width:2px; border-radius:5px; color:var(--text-tertiary); background:var(--bg-subtle);
+}
+.kcmd-body{max-height:320px; overflow:auto; padding:6px}
+.kcmd-group{font-size:10.5px; font-weight:600; letter-spacing:.05em; color:var(--text-tertiary); padding:8px 10px 4px}
+.kcmd-row{
+  display:flex; align-items:center; gap:10px; padding:7px 10px; border-radius:8px; font-size:12.5px; color:var(--text-secondary); position:relative;
+}
+.kcmd-row:hover{background:var(--state-hover)}
+.kcmd-row.sel{background:var(--accent-active); color:var(--text-primary)}
+.kcmd-row .ic{width:26px; height:26px; border-radius:7px; background:var(--bg-muted); display:inline-flex; align-items:center; justify-content:center; flex-shrink:0}
+.kcmd-row .ic svg{width:13px; height:13px; opacity:.7}
+.kcmd-row .body{flex:1; min-width:0}
+.kcmd-row .t{font-weight:600; color:var(--text-primary)}
+.kcmd-row .t mark{background:transparent; color:var(--accent); font-weight:700}
+.kcmd-row .p{font-size:11px; color:var(--text-tertiary); margin-top:1px; overflow:hidden; white-space:nowrap; text-overflow:ellipsis}
+.kcmd-row .r{font-size:10.5px; color:var(--text-tertiary); flex-shrink:0; display:flex; gap:4px; align-items:center}
+.kcmd-foot{display:flex; gap:14px; padding:9px 16px; border-top:1px solid var(--border); font-size:10.5px; color:var(--text-tertiary); align-items:center}
+.kcmd-foot .sp{flex:1}
+
+/* ---- Mockup 3：反向链接面板 ---- */
+.doc-layout{flex:1; display:flex; min-height:0}
+.doc-paper{flex:1; overflow:auto; padding:18px 26px 10px; position:relative}
+.doc-title-row{display:flex; align-items:center; gap:10px; font-size:20px; font-weight:700; color:var(--text-primary); margin-bottom:10px}
+.doc-title-row .fm{font-size:10px; color:var(--text-tertiary); font-weight:400; display:flex; gap:5px}
+.h2{margin:16px 0 8px; font-size:13.5px; font-weight:700; color:var(--text-primary)}
+.h3{margin:12px 0 6px; font-size:12.5px; font-weight:600; color:var(--text-primary)}
+.p{font-size:12px; color:var(--text-secondary); margin-bottom:8px}
+.p b{color:var(--text-primary); font-weight:600}
+.wlink{color:var(--accent); cursor:pointer; border-bottom:1px dashed #d9a58c; position:relative}
+.wlink::after{content:""; position:absolute; right:-3px; top:-2px; width:12px; height:12px; background:url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="%23c2410c" stroke-width="2.4"><path d="M7 17L17 7M9 7h8v8"/></svg>') no-repeat center/contain; opacity:.0; transition:opacity .12s}
+.wlink:hover::after{opacity:1}
+.wlink.sel{background:#fbeadc; border-radius:4px}
+.hover-card{
+  position:absolute; z-index:150; width:250px; background:var(--bg-app); border:1px solid var(--border-strong);
+  border-radius:10px; box-shadow:var(--shadow-float); padding:11px 13px; display:none;
+}
+.hover-card.show{display:block}
+.hover-card .t{font-size:12px; font-weight:700; color:var(--text-primary); display:flex; align-items:center; gap:6px}
+.hover-card .s{font-size:11px; color:var(--text-secondary); margin-top:4px; line-height:1.5}
+.hover-card .m{font-size:10px; color:var(--text-tertiary); margin-top:6px; display:flex; gap:8px}
+.backlink-panel{border-top:1px solid var(--border); margin-top:14px; padding-top:12px}
+.bl-tabs{display:flex; gap:16px; font-size:11.5px; color:var(--text-tertiary); border-bottom:1px solid var(--border); margin-bottom:9px}
+.bl-tabs .bt{padding-bottom:6px; border-bottom:2px solid transparent; font-weight:600; display:flex; align-items:center; gap:5px; cursor:pointer}
+.bl-tabs .bt.on{color:var(--accent); border-color:var(--accent)}
+.bl-tabs .bt .n{font-size:10px; background:var(--bg-muted); border-radius:999px; padding:0 6px; height:15px; display:inline-flex; align-items:center}
+.bl-list{display:flex; flex-direction:column; gap:6px}
+.bl-item{
+  display:flex; align-items:center; gap:8px; border:1px solid var(--border); border-radius:8px; padding:7px 10px; font-size:11.5px;
+  color:var(--text-secondary); background:var(--bg-app); position:relative;
+}
+.bl-item:hover{border-color:var(--border-strong)}
+.bl-item .t{font-weight:600; color:var(--text-primary); display:flex; align-items:center; gap:6px}
+.bl-item .p{font-size:10px; color:var(--text-tertiary); margin-left:auto; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:180px}
+.bl-item .fix{margin-left:8px; flex-shrink:0}
+.bl-item .fix:hover{color:var(--accent)}
+.bl-item.broken{border-style:dashed; opacity:.85}
+.bl-item.broken .t{color:var(--text-tertiary)}
+.bl-more{font-size:10.5px; color:var(--text-tertiary); padding:4px 2px; cursor:pointer}
+.bl-more:hover{color:var(--accent)}
+
+/* ---- 编辑器补齐 mockup ---- */
+.cols{display:grid; grid-template-columns:1fr 1fr; gap:12px; margin:12px 0}
+.col{border:1px dashed var(--border-strong); border-radius:10px; padding:10px 12px; position:relative; background:var(--bg-app)}
+.col-tag{
+  position:absolute; top:-8px; left:10px; font-size:9.5px; color:var(--text-tertiary); background:var(--bg-subtle);
+  padding:0 6px; border-radius:4px; border:1px solid var(--border); letter-spacing:.04em; line-height:14px;
+}
+.blkref{color:var(--accent); border-bottom:1px dashed #d9a58c; cursor:pointer}
+.sync-block{
+  border:1px dashed var(--accent); background:#fdf8f3; border-radius:8px; padding:8px 10px; font-size:11.5px;
+  color:var(--text-secondary); display:flex; gap:8px; align-items:flex-start; margin:8px 0;
+}
+.sync-block .ic{color:var(--accent); font-size:12px; flex-shrink:0; line-height:1.4}
+.sync-block .src{display:block; font-size:10px; color:var(--text-tertiary); margin-top:3px}
+.var-chip{
+  display:inline-flex; align-items:center; height:19px; padding:0 7px; border-radius:5px;
+  background:var(--bg-muted); border:1px solid var(--border); font-size:10px; color:var(--accent); font-weight:600;
+  font-family:ui-monospace,Menlo,monospace;
+}
+
+/* ---- 原型交互 ---- */
+.kcmd-trigger{
+  height:26px; min-width:200px; border:1px solid var(--border); border-radius:7px; background:var(--bg-app);
+  display:inline-flex; align-items:center; gap:7px; padding:0 10px; font-size:11.5px; color:var(--text-tertiary);
+}
+.kcmd-trigger:hover{border-color:var(--border-strong); color:var(--text-secondary)}
+.kcmd-trigger .kbd{margin-left:auto}
+.kcmd-empty{padding:20px; text-align:center; font-size:12px; color:var(--state-disabled); display:none}
+.toast{
+  position:absolute; left:50%; bottom:16px; transform:translateX(-50%) translateY(10px); background:var(--accent);
+  color:#fff; font-size:11px; padding:7px 14px; border-radius:999px; opacity:0; pointer-events:none;
+  transition:opacity .16s, transform .16s; z-index:300; box-shadow:var(--shadow-menu); white-space:nowrap;
+}
+.toast.show{opacity:1; transform:translateX(-50%) translateY(0)}
+.sync-block.unsynced{border-style:solid; border-color:var(--border-strong); background:var(--bg-subtle); color:var(--text-tertiary)}
+.bl-list .bl-item.more{display:none}
+
+/* ---- Mockup 4：属性面板 + AI 批量结构化 ---- */
+.split{display:flex; min-height:0; flex:1}
+.doc-main{flex:1; overflow:auto; padding:18px 24px 10px; position:relative}
+.prop-panel{
+  width:244px; flex-shrink:0; border-left:1px solid var(--border); background:var(--bg-subtle);
+  display:flex; flex-direction:column; overflow:auto;
+}
+.pp-head{padding:11px 14px; border-bottom:1px solid var(--border); font-size:11px; font-weight:600; color:var(--text-tertiary); letter-spacing:.04em; display:flex; align-items:center; gap:6px}
+.pp-head .ai{margin-left:auto; display:inline-flex; align-items:center; gap:4px; height:20px; padding:0 8px; border-radius:999px; background:var(--accent); color:#fff; font-size:10px; font-weight:600; letter-spacing:0}
+.pp-body{padding:10px 12px; display:flex; flex-direction:column; gap:9px}
+.pp-field label{display:block; font-size:10px; font-weight:600; color:var(--text-tertiary); letter-spacing:.04em; margin-bottom:3px}
+.pp-field input,.pp-field select{
+  width:100%; height:26px; border:1px solid var(--border); border-radius:6px; background:var(--bg-app);
+  padding:0 8px; font-size:11.5px; outline:none; color:var(--text-primary);
+}
+.pp-field input:focus,.pp-field select:focus{border-color:var(--accent)}
+.pp-tags{display:flex; flex-wrap:wrap; gap:4px}
+.pp-tag{
+  display:inline-flex; align-items:center; gap:4px; height:21px; padding:0 8px; border-radius:6px;
+  background:var(--bg-app); border:1px solid var(--border); font-size:10.5px; color:var(--text-secondary);
+}
+.pp-tag .x{color:var(--text-tertiary); font-size:11px; line-height:1; cursor:pointer}
+.pp-tag .x:hover{color:var(--danger)}
+.pp-add{height:21px; padding:0 8px; border-radius:6px; border:1px dashed var(--border-strong); font-size:10.5px; color:var(--text-tertiary); display:inline-flex; align-items:center; gap:4px; background:none; width:fit-content}
+.pp-add:hover{color:var(--accent); border-color:var(--accent)}
+.ai-diff{
+  border:1px solid #e8c4b2; border-radius:9px; background:#fdf6f1; padding:9px 11px; font-size:10.5px; color:var(--text-secondary);
+}
+.ai-diff .h{font-weight:700; color:var(--accent); font-size:10.5px; margin-bottom:5px; display:flex; align-items:center; gap:5px}
+.ai-diff .line{font-family:ui-monospace,Menlo,monospace; font-size:10px; line-height:1.7; white-space:pre-wrap}
+.ai-diff .add{color:var(--success)}
+.ai-diff .del{color:var(--danger); text-decoration:line-through; opacity:.7}
+.ai-diff .btns{display:flex; gap:6px; margin-top:7px}
+.ai-diff .mini-btn{height:21px; font-size:10px; padding:0 8px}
+
+/* 页脚 */
+.footer{border-top:1px solid var(--border); background:var(--bg-subtle); padding:18px 40px; font-size:11.5px; color:var(--text-tertiary); display:flex; gap:18px; flex-wrap:wrap}
+.footer b{color:var(--text-secondary)}
+.footer a{color:var(--accent); text-decoration:none}
+.footer a:hover{text-decoration:underline}
+
+@media (max-width:900px){
+  .pos-grid{grid-template-columns:1fr}
+  .road-grid{grid-template-columns:1fr}
+  .score-row{grid-template-columns:120px 1fr 1fr 70px}
+}
+</style>
+</head>
+<body class="no-ann">
+
+<!-- ================= 页头 ================= -->
+<header class="hero">
+  <div class="kicker">Document Management · V2 Roadmap</div>
+  <h1>文档管理 × Notion：对比与改进方案</h1>
+  <p class="sub">以 Notion 为参照系，从 10 个维度盘点 hip「文档管理」模块的差距（现状 v1.2：单层级目录导航 + BlockNote 编辑器 + 双链/图谱 + 版本/回收站），输出 V2 改进提案。基准验收样例：Notion 上的《智能体 Harness 工程研究报告》（长文 + Mermaid + 表格）。</p>
+  <div class="meta">
+    <span class="chip"><i class="dot hip"></i>hip 文档管理 · 本地优先</span>
+    <span class="chip"><i class="dot notion"></i>Notion · 云端协作</span>
+    <span class="chip">Spec：<b>docs/doc-manager-vs-notion/spec.md</b></span>
+    <span class="chip">样例文档：<b>智能体 Harness 工程研究报告</b></span>
+    <span class="chip">本轮不做：<b>数据库视图 · 导入导出 · AI · 云端 · 评论 · 备份 · 置顶</b></span>
+    <button class="chip-toggle on" id="annToggle"><span class="dot"></span>标注模式</button>
+  </div>
+</header>
+
+<!-- ================= 标签页 ================= -->
+<nav class="tabs" id="tabs">
+  <button class="tab active" data-sec="overview">概览与得分<span class="cnt">10 维度</span></button>
+  <button class="tab" data-sec="matrix">差距矩阵<span class="cnt">10 行</span></button>
+  <button class="tab" data-sec="roadmap">改进路线图<span class="cnt">P0/P1/P2</span></button>
+  <button class="tab" data-sec="preview">功能视觉稿<span class="cnt">3 个</span></button>
+</nav>
+
+<main>
+
+<!-- ================= 概览 ================= -->
+<section id="overview" class="active">
+  <div class="sec-head">
+    <h2><span class="no">1</span>定位声明与维度得分</h2>
+    <p>对比前提：hip 是「本地优先的单用户 AI 工作台文档模块」，Notion 是「云端多人协作 + 数据库的知识平台」。范围决策（v1.2）：<b style="color:var(--text-primary)">不做数据库视图、导入导出、AI 文档功能、云端能力、本地评论、自动备份、置顶</b>；V2 聚焦「把已有能力暴露出来 + 编辑器补齐 + 大文档性能」，不牺牲 Markdown 落盘与离线可用。</p>
+  </div>
+
+  <div class="pos-grid">
+    <div class="pos-card hip-card">
+      <h3><i class="dot hip" style="width:8px;height:8px;border-radius:50%"></i>hip 文档管理</h3>
+      <ul>
+        <li>存储 = Markdown + YAML frontmatter，用户拥有数据</li>
+        <li>单层级目录导航、深目录（20+ 层）、revealPath 直达</li>
+        <li>BlockNote 块编辑 + 双链/反链/图谱 + Mermaid/数学/代码高亮</li>
+        <li>每日/手动版本、回收站+保留期、模板、AI 文档动作</li>
+        <li>不可让渡：Markdown 可读 · 离线可用 · Agent 原生集成</li>
+      </ul>
+    </div>
+    <div class="pos-card notion-card">
+      <h3><i class="dot notion" style="width:8px;height:8px;border-radius:50%"></i>Notion</h3>
+      <ul>
+        <li>云端块存储（私有格式），随处访问、实时协作</li>
+        <li>数据库：属性 + 表格/看板/日历/时间线/画廊多视图</li>
+        <li>页面提及 + 反链面板 + 悬停预览 + 同步块/模板变量</li>
+        <li>Notion AI：问答 / 总结 / 数据库自动填充</li>
+        <li>护城河 = 结构化数据库 × 协作；弱项 = 深嵌套找回、离线、速度</li>
+      </ul>
+    </div>
+  </div>
+  <div class="takeaway">
+    <b>结论</b>：按范围收缩决策（v1.2），<b>数据库视图 / 导入导出 / AI 文档功能 / 云端能力 / 本地评论 / 自动备份 / 置顶本轮不做</b>，与 Notion 的差距（数据库 1.5 vs 5、协作 1 vs 5）作为<b>已接受差距</b>记录在案（spec §5），V3 再评估。V2 只剩两件事：① <b>把已有能力暴露出来</b>——⌘K 统一搜索、最近文档、反链面板（数据层全部就绪，纯 UI 组装）；② <b>编辑器补齐</b>——分栏 / 块引用 / 同步块 / 模板变量；另含大文档性能优化（P2）。
+  </div>
+
+  <div class="score-card">
+    <div id="scoreRows"></div>
+    <div class="legend">
+      <span><i class="h"></i>hip 现状（本地）</span>
+      <span><i class="n"></i>Notion</span>
+      <span style="margin-left:auto">差距：<b style="color:var(--danger)">大</b> · <b style="color:var(--warning)">中</b> · <b style="color:var(--success)">小</b> · <b style="color:#3b4a7a">hip 反超</b> · <b style="color:var(--text-tertiary)">本轮不做</b></span>
+    </div>
+  </div>
+</section>
+
+<!-- ================= 差距矩阵 ================= -->
+<section id="matrix">
+  <div class="sec-head">
+    <h2><span class="no">2</span>差距矩阵（现状 / Notion / 差距评级）</h2>
+    <p>每行对应一条提案（V2-*），评级与提案号对齐 spec.md §3。</p>
+  </div>
+  <div class="matrix-wrap">
+    <table class="matrix">
+      <thead>
+        <tr>
+          <th>维度</th><th>评分（hip / Notion）</th><th>hip 现状（已实现）</th><th>Notion 做法 / 差距点</th><th>改进提案</th><th>优先级</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td class="dim">1 编辑体验与块模型</td>
+          <td><span class="score-tag st-hip">4</span> / <span class="score-tag st-notion">5</span></td>
+          <td>BlockNote：标题/待办/折叠/提示/代码/数学/Mermaid/图片题注/表格/附件/嵌入/双链；斜杠菜单、拖拽手柄、Shift 多选、MD 往返<span class="note">DocBlockNoteEditor + blocks/ 模块</span></td>
+          <td>另有分栏、块引用、同步块、模板变量、块评论<span class="note">差距：分栏布局、块级引用、{{date}} 变量</span></td>
+          <td class="prop">V2-E1 编辑器补齐</td>
+          <td><span class="p1">P1</span></td>
+        </tr>
+        <tr>
+          <td class="dim">2 结构化数据（数据库）</td>
+          <td><span class="score-tag st-hip">1.5</span> / <span class="score-tag st-notion">5</span></td>
+          <td>仅表格块<span class="note">frontmatter 仅作存储层内部字段，不提供元数据 UI（v2.1）</span></td>
+          <td>数据库 = 属性集合 + 表格/看板/日历/画廊视图 + 关系/汇总/公式<span class="note">差距：Notion 核心护城河，hip 完全缺失</span></td>
+          <td class="prop" style="color:var(--text-tertiary)">—（本轮不做，见 spec §3.2）</td>
+          <td><span class="p2">非目标</span></td>
+        </tr>
+        <tr>
+          <td class="dim">3 导航与信息架构</td>
+          <td><span class="score-tag st-hip">4</span> / <span class="score-tag st-notion">3.5</span></td>
+          <td>单层级目录、↑ 返回、面包屑折叠+祖先跳转、浏览模式网格/列表、revealPath<span class="note">V1.2 成果，20 层深目录测试通过</span></td>
+          <td>无限嵌套页面，深嵌套找回难、无面包屑<span class="note">hip 反超；Notion 的页面拖拽排序不值得学</span></td>
+          <td class="prop">V2-N1 最近文档</td>
+          <td><span class="p0">P0</span></td>
+        </tr>
+        <tr>
+          <td class="dim">4 链接、引用与图谱</td>
+          <td><span class="score-tag st-hip">4</span> / <span class="score-tag st-notion">4</span></td>
+          <td>wiki 双链 + 输入补全、linkIndex（入/出/断链）、图谱视图、大纲<span class="note">数据层已完备（linkIndex.rs），UI 未充分暴露</span></td>
+          <td>@页面提及、文档底部反链区块、悬停预览、链接到块<span class="note">差距主要在 UI 与悬停预览</span></td>
+          <td class="prop">V2-L1 反链面板</td>
+          <td><span class="p1">P1</span></td>
+        </tr>
+        <tr>
+          <td class="dim">5 检索与全局命令</td>
+          <td><span class="score-tag st-hip">3.5</span> / <span class="score-tag st-notion">4.5</span></td>
+          <td>MiniSearch 全文索引（标题/正文）、命中 reveal、命令面板<span class="note">文档搜索与 ⌘K 命令面板未打通</span></td>
+          <td>全局 ⌘K：页面/数据库/块 + 最近 + AI 问答一条入口<span class="note">差距：统一入口、最近/收藏混排、结果预览</span></td>
+          <td class="prop">V2-S1 ⌘K 统一搜索</td>
+          <td><span class="p0">P0</span></td>
+        </tr>
+        <tr>
+          <td class="dim">6 导入导出与互操作</td>
+          <td><span class="score-tag st-hip">3.5</span> / <span class="score-tag st-notion">4.5</span></td>
+          <td>文件夹导入（MD）、HTML/文本/zip 导出、资产导入、Typora 预览<span class="note">htmlExport.ts + knowledgeExportSpaceZip</span></td>
+          <td>md/html/pdf/csv 导出、Web Clipper、30+ 嵌入、API<span class="note">差距：PDF、剪藏、Notion 导入、API</span></td>
+          <td class="prop" style="color:var(--text-tertiary)">—（本轮不做，见 spec §3.6）</td>
+          <td><span class="p2">非目标</span></td>
+        </tr>
+        <tr>
+          <td class="dim">7 AI 能力</td>
+          <td><span class="score-tag st-hip">4</span> / <span class="score-tag st-notion">4.5</span></td>
+          <td>文档内 AI 动作（继续/总结/转任务/解释/重写）+ 完整 agent harness<span class="note">knowledgeAiActions.ts；错位优势：能跑长任务</span></td>
+          <td>Notion AI：选中问答、数据库自动填充、跨库问答<span class="note">差距：就地问答、批量结构化、@文档</span></td>
+          <td class="prop" style="color:var(--text-tertiary)">—（本轮不做，见 spec §3.7）</td>
+          <td><span class="p2">非目标</span></td>
+        </tr>
+        <tr>
+          <td class="dim">8 协作与评论</td>
+          <td><span class="score-tag st-hip">1</span> / <span class="score-tag st-notion">5</span></td>
+          <td>单用户本地，无评论/分享<span class="note">云端协作/分享为已接受差距</span></td>
+          <td>实时多人、评论、@人、权限、公开分享<span class="note">本地评论/审阅已一并砍掉（v1.2）</span></td>
+          <td class="prop" style="color:var(--text-tertiary)">—（本轮不做，见 spec §3.8）</td>
+          <td><span class="p2">非目标</span></td>
+        </tr>
+        <tr>
+          <td class="dim">9 性能与规模</td>
+          <td><span class="score-tag st-hip">4.5</span> / <span class="score-tag st-notion">3</span></td>
+          <td>本地 IO、深目录 O(当前层)、内存索引<span class="note">Notion 的云端大库卡顿/离线不可用，hip 天然没有</span></td>
+          <td>云端渲染大库变慢、离线受限<span class="note">hip 反超；保持即可</span></td>
+          <td class="prop">V2-P1 大文档优化</td>
+          <td><span class="p2">P2</span></td>
+        </tr>
+        <tr>
+          <td class="dim">10 可靠性与数据安全</td>
+          <td><span class="score-tag st-hip">4.5</span> / <span class="score-tag st-notion">4</span></td>
+          <td>MD 落盘、每日/手动版本、回收站+保留期、zip 导出备份、无账号<span class="note">版本/回收站/zip 备份已覆盖核心数据安全</span></td>
+          <td>云端自动保存、付费版 30 天历史、导出<span class="note">hip 反超；自动快照/自愈按 v1.2 不做</span></td>
+          <td class="prop" style="color:var(--text-tertiary)">—（保持现状）</td>
+          <td><span class="p2">—</span></td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<!-- ================= 路线图 ================= -->
+<section id="roadmap">
+  <div class="sec-head">
+    <h2><span class="no">3</span>改进路线图（P0 → P1 → P2）</h2>
+    <p>P0 纯 UI 组装、低风险独立合入；P1 以「数据库 → 反链面板 → AI 结构化」为主链；P2 为延展能力。</p>
+  </div>
+  <div class="road-grid">
+    <div class="road-col">
+      <div class="road-head p0"><span class="phase">P0 · 快速见效</span><span class="est">1 周</span></div>
+      <div class="road-body">
+        <div class="road-item">
+          <div class="t"><span class="id">V2-S1</span>⌘K 统一全局搜索</div>
+          <div class="d">命令 + 文档 + 最近一条入口，回车 revealPath 直达（能力已齐，纯 UI 组装）</div>
+          <div class="m"><b>2–3 人日</b><span>依赖：无</span></div>
+        </div>
+        <div class="road-item">
+          <div class="t"><span class="id">V2-N1</span>最近文档列表</div>
+          <div class="d">侧边栏「最近」列表（`KnowledgeRecentItem` 已落盘，仅缺 UI）；置顶按 v1.2 决策不做</div>
+          <div class="m"><b>1 人日</b><span>依赖：无</span></div>
+        </div>
+      </div>
+    </div>
+    <div class="road-col">
+      <div class="road-head p1"><span class="phase">P1 · 核心差距</span><span class="est">2–3 周</span></div>
+      <div class="road-body">
+        <div class="road-item">
+          <div class="t"><span class="id">V2-E1</span>编辑器补齐</div>
+          <div class="d">分栏、块引用（悬停预览/跳转高亮）、同步块、模板变量 {{date}}/{{title}}</div>
+          <div class="m"><b>8–12 人日</b><span>依赖：无</span></div>
+        </div>
+        <div class="road-item">
+          <div class="t"><span class="id">V2-L1</span>反向链接面板</div>
+          <div class="d">文档底部入链/出链/断链分组 + 悬停预览卡片 + 断链一键创建</div>
+          <div class="m"><b>3–4 人日</b><span>依赖：linkIndex 数据已就绪</span></div>
+        </div>
+        <div class="road-item" style="border-style:dashed; background:var(--bg-subtle)">
+          <div class="t"><span class="id">已收缩</span>数据库视图 / 导入导出 / AI / 云端 / 评论 / 备份 / 置顶</div>
+          <div class="d">v1.2 范围决策移出本轮，差距记录见 spec.md §5</div>
+        </div>
+      </div>
+    </div>
+    <div class="road-col">
+      <div class="road-head p2"><span class="phase">P2 · 延展</span><span class="est">按需</span></div>
+      <div class="road-body">
+
+
+        <div class="road-item">
+          <div class="t"><span class="id">V2-P1</span>大文档性能优化</div>
+          <div class="d">&gt;500KB 文档编辑器分片 + 大纲懒渲染；搜索索引增量更新</div>
+          <div class="m"><b>3–5 人日</b><span>依赖：—</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="road-note">
+    <b>建议节奏</b>：P0 独立合入（低风险）。P1 两条线并行：<b>V2-E1 编辑器补齐</b>（分栏/块引用/同步块/模板变量）+ <b>V2-L1 反链面板</b>（数据已有，纯 UI 暴露）。P2 仅余大文档性能一项，可并入 P1 收尾。
+    <b>非目标（v1.2 决策）</b>：数据库视图（表格/看板/画廊）、导入导出（Notion 导入 / PDF / 剪藏 / HTML 分享）、AI 文档功能、云端能力（实时协作 / 分享 / 同步）、本地评论/审阅、自动备份快照/索引自愈、文档置顶；如需再开，见 spec.md §5 记录。
+  </div>
+</section>
+
+<!-- ================= 功能视觉稿 ================= -->
+<section id="preview">
+  <div class="sec-head">
+    <h2><span class="no">4</span>关键新功能视觉稿</h2>
+    <p>以下为提案的核心界面示意（非最终设计稿），标注点对应 spec.md 验收清单；<b style="color:var(--accent)">三个 mockup 均为可交互原型</b>：① 悬停块引用看预览 / 点击同步块切换；② ⌘K 输入过滤、↑↓ 选择、Enter 直达、Esc 关闭；③ 反链页签切换、wiki 链接悬停预览、断链一键创建。样例目录：<b>产品手册/</b>（内含 Harness 报告等 6 篇文档）。</p>
+  </div>
+  <div class="sub-tabs">
+    <button class="sub-tab active" data-panel="p-edit">① 编辑器补齐（分栏 / 块引用 / 同步块）</button>
+    <button class="sub-tab" data-panel="p-kcmd">② ⌘K 全局搜索</button>
+    <button class="sub-tab" data-panel="p-bl">③ 反向链接面板</button>
+  </div>
+
+  <!-- ======== ① 编辑器补齐 ======== -->
+  <div class="panel active" id="p-edit">
+    <div class="panel-intro">
+      <b style="color:var(--text-primary)">V2-E1</b> · BlockNote 扩展：分栏布局（2–4 列，栏内可嵌套任意块）、块引用（悬停预览 / 点击跳转高亮）、同步块（源块修改后镜像跟随）、模板变量（{{date}}/{{title}}/{{tags}}）。Markdown 往返沿用 <code>carriers.ts</code> 守卫手法。
+    </div>
+    <div class="app-frame">
+      <div class="app-titlebar"><div class="dots"><i></i><i></i><i></i></div><span class="t">hip · 编辑模式 — 智能体 Harness 工程研究报告（V2-E1 演示）</span></div>
+      <div class="app-body" style="height:430px">
+        <aside class="app-sidebar">
+          <div class="sb-nav">📁 文档管理</div>
+          <div class="sb-sec">当前目录</div>
+          <div class="sb-item folder">📁 产品手册</div>
+          <div class="sb-item active">📄 智能体 Harness 工程研究报告</div>
+          <div class="sb-item">📄 快速开始</div>
+          <div class="sb-sec">大纲</div>
+          <div class="sb-item" style="color:var(--accent-hover)">3 参考架构</div>
+          <div class="sb-item">4 关键工程技术点</div>
+          <div class="sb-item">5 评测体系设计</div>
+        </aside>
+        <div class="doc-layout">
+          <div class="doc-paper" style="position:relative">
+            <div class="doc-title-row" style="font-size:16px">智能体 Harness 工程研究报告</div>
+            <div class="cols">
+              <div class="col">
+                <span class="col-tag">分栏 · 左</span>
+                <div class="h3" style="margin-top:8px">摘要</div>
+                <div class="p">为智能体构建可复现、可评测、可观测、可治理、可持续迭代的工程化「试验台/基座」…</div>
+                <div class="p">关键护栏：权限最小化 · 注入防护 · 敏感信息策略 · 审计留痕 · 人工确认</div>
+              </div>
+              <div class="col">
+                <span class="col-tag">分栏 · 右</span>
+                <div class="h3" style="margin-top:8px">待办</div>
+                <div class="p">☑ 评测数据闭环（回放/对比）</div>
+                <div class="p">☑ 回归门禁 + 灰度上线</div>
+                <div class="p">☐ 安全护栏落地</div>
+              </div>
+            </div>
+            <div class="h3">3.3 “验证环”是 harness 的关键差异</div>
+            <div class="p">失败重试策略（换检索词 / 换工具 / 换模型 / 请求用户澄清）。详见 <span class="blkref" data-title="§5 评测体系设计（块引用）" data-s="评分器策略：规则评分器（稳定但覆盖有限）+ 模型评分器（多裁判/一致性投票，结合可验证信号）。" data-m="来自：本文档 §5.2">§5 评测体系设计</span> 的评分器策略与 <span class="blkref" data-title="§6 安全护栏（块引用）" data-s="权限最小化、提示注入防护、敏感信息防泄漏、审计留痕、高风险动作人工确认。" data-m="来自：本文档 §6.2">§6 安全护栏</span>。</div>
+            <div class="sync-block" id="syncBlock" title="点击切换：同步 ⇄ 解除">
+              <span class="ic">⧉</span>
+              <span class="txt"><b>同步块 · 镜像自「评测与数据闭环」§5.3</b>：线上采样 → 失败聚类 → 构造评测集 → 修复 → 回归门禁 → 灰度上线
+              <span class="src">点击可解除同步（原型交互）</span></span>
+            </div>
+            <div class="p" style="margin-top:10px">模板变量：以「技术报告」模板新建时自动替换 —— 标题 <span class="var-chip">{{title}}</span> · 日期 <span class="var-chip">{{date}} → 2025-08-08</span> · 标签 <span class="var-chip">{{tags}}</span></div>
+            <div class="hover-card" id="editHoverCard">
+              <div class="t"></div>
+              <div class="s"></div>
+              <div class="m"><span></span><span class="kbd">⏎ 跳转并高亮</span></div>
+            </div>
+            <div class="toast" id="editToast"></div>
+            <span class="ann" style="top:66px; left:36%">1</span>
+            <span class="ann" style="top:250px; left:44%">2</span>
+            <span class="ann" style="top:295px; left:36%">3</span>
+            <span class="ann" style="top:342px; left:40%">4</span>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="panel-intro" style="margin-top:10px">
+      <span class="ann-label" style="position:static; margin-right:6px">标注：</span>
+      <b>1</b> 分栏布局（2–4 列，宽度可拖拽，栏内可嵌套任意块） · <b>2</b> 块引用：复制块链接（#块id），悬停预览 + 点击跳转高亮 · <b>3</b> 同步块：源块变更镜像跟随，可解除 · <b>4</b> 模板变量：{{date}}/{{title}}/{{tags}} 新建时替换。<b style="color:var(--accent)">原型可交互：悬停两个块引用看预览卡；点击同步块切换「同步 ⇄ 解除」。</b>
+    </div>
+  </div>
+
+  <!-- ======== ② ⌘K 搜索 ======== -->
+  <div class="panel" id="p-kcmd">
+    <div class="panel-intro">
+      <b style="color:var(--text-primary)">V2-S1</b> · 命令面板与文档搜索打通：⌘K 一处可搜「命令 + 文档 + 最近」，结果分组展示路径与命中片段，回车 <code>revealPath</code> 直达任意深度。<b style="color:var(--accent)">原型可交互：点搜索框或按 ⌘K 打开；输入实时过滤；↑↓ 选择、Enter 直达（toast 反馈）、Esc 关闭。</b>
+    </div>
+    <div class="app-frame kcmd">
+      <div class="app-body" style="height:380px">
+        <aside class="app-sidebar">
+          <div class="sb-nav">📁 文档管理</div>
+          <div class="sb-sec">当前目录</div>
+          <div class="sb-item">📄 全部文档</div>
+          <div class="sb-item folder">📁 产品手册</div>
+          <div class="sb-item">📄 API 参考</div>
+          <div class="sb-sec">最近</div>
+          <div class="sb-item">📄 Harness 报告</div>
+        </aside>
+        <div class="app-main" style="position:relative">
+          <div class="mtoolbar">
+            <div class="bc" style="flex:1">全部文档 <span class="sep">›</span> 产品手册 <span class="sep">›</span> <b>用户指南</b></div>
+            <button class="kcmd-trigger" id="kcmdOpen">🔍 搜索文档与命令…<span class="kbd">⌘K</span></button>
+            <button class="vchip on">列表</button>
+          </div>
+          <div style="padding:14px 16px; font-size:12px; color:var(--text-secondary)">
+            <div class="h2" style="margin:0 0 6px">用户指南</div>
+            <div class="p">…本文从<b>定义与边界</b>出发，梳理 <b>harness</b> 的核心能力、参考架构、关键技术点、评测与数据闭环…</div>
+          </div>
+          <div class="kcmd-overlay" id="kcmdOverlay" style="display:none">
+            <div class="kcmd-box">
+              <div class="kcmd-input">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>
+                <input id="kcmdInput" placeholder="搜索命令与文档…" autocomplete="off">
+                <div class="kcmd-hint"><span class="kbd">esc</span><span class="kbd">↵</span></div>
+              </div>
+              <div class="kcmd-body" id="kcmdBody">
+                <div class="kcmd-group" data-g="docs">文档（3）</div>
+                <div class="kcmd-row" data-g="docs" data-k="智能体 harness 工程研究报告 产品手册 用户指南">
+                  <span class="ic">📄</span>
+                  <span class="body"><span class="t">智能体 Harness 工程研究报告</span><span class="p">产品手册 › 用户指南 · 命中「harness 的核心能力」「评测与数据闭环」…</span></span>
+                  <span class="r"><span class="kbd">⏎ 打开</span></span>
+                </div>
+                <div class="kcmd-row" data-g="docs" data-k="agent harness 落地路线图 api 参考 规划">
+                  <span class="ic">📄</span>
+                  <span class="body"><span class="t">Agent Harness 落地路线图</span><span class="p">API 参考 › 规划 · 阶段 0–3、风险对策</span></span>
+                  <span class="r"></span>
+                </div>
+                <div class="kcmd-row" data-g="docs" data-k="harness 评测体系设计 附录 指标框架 评分器策略">
+                  <span class="ic">📄</span>
+                  <span class="body"><span class="t">Harness 评测体系设计</span><span class="p">产品手册 › 附录 · 指标框架、评分器策略</span></span>
+                  <span class="r"></span>
+                </div>
+                <div class="kcmd-group" data-g="recent">最近</div>
+                <div class="kcmd-row" data-g="recent" data-k="版本发布说明 产品手册 2025-07-28">
+                  <span class="ic">🕘</span>
+                  <span class="body"><span class="t">版本发布说明</span><span class="p">产品手册 · 2025-07-28</span></span>
+                  <span class="r"><span class="kbd">⏎</span></span>
+                </div>
+                <div class="kcmd-group" data-g="cmd">命令（2）</div>
+                <div class="kcmd-row" data-g="cmd" data-k="文档管理 新建文档 markdown 快捷键">
+                  <span class="ic">⌘</span>
+                  <span class="body"><span class="t">文档管理：新建文档</span><span class="p">在当前目录创建 Markdown 文档</span></span>
+                  <span class="r"><span class="kbd">⌘N</span></span>
+                </div>
+                <div class="kcmd-row" data-g="cmd" data-k="文档管理 全库搜索 标签 检索">
+                  <span class="ic">⌘</span>
+                  <span class="body"><span class="t">文档管理：全库搜索</span><span class="p">按标题/正文/标签检索并直达</span></span>
+                  <span class="r"></span>
+                </div>
+              </div>
+              <div class="kcmd-empty" id="kcmdEmpty">无匹配结果（演示：试试输入「版本」）</div>
+              <div class="kcmd-foot"><span class="kbd">↑↓</span> 选择 <span class="kbd">⏎</span> 直达并高亮 <span class="kbd">⌘K</span> 重新打开 <span class="sp"></span><span>MiniSearch 索引 · 增量更新</span></div>
+            </div>
+          </div>
+          <div class="toast" id="kcmdToast"></div>
+          <span class="ann" style="top:50px; right:16px">1</span>
+          <span class="ann" style="top:100px; left:44%">2</span>
+          <span class="ann" style="top:230px; left:44%">3</span>
+        </div>
+      </div>
+    </div>
+    <div class="panel-intro" style="margin-top:10px">
+      <b>1</b> ⌘K 全局入口（命令面板改造，工具栏搜索框可点击） · <b>2</b> 分组：文档 / 最近 / 命令，路径 + 命中片段 · <b>3</b> 回车调用 <code>revealPath</code> 直达任意深度并高亮命中。<b style="color:var(--accent)">原型可交互：输入实时过滤；↑↓ 选择；Enter 直达（toast 反馈）；Esc 关闭。</b>
+    </div>
+  </div>
+
+  <!-- ======== ③ 反链面板 ======== -->
+  <div class="panel" id="p-bl">
+    <div class="panel-intro">
+      <b style="color:var(--text-primary)">V2-L1</b> · 文档底部「反向链接」面板：入链 / 出链 / 断链分组（数据来自 <code>linkIndex</code>，仅缺 UI）；wiki 链接悬停显示预览卡片；断链可一键创建缺失文档。
+    </div>
+    <div class="app-frame">
+      <div class="app-titlebar"><div class="dots"><i></i><i></i><i></i></div><span class="t">hip · 阅读模式 — 智能体 Harness 工程研究报告</span></div>
+      <div class="app-body" style="height:430px">
+        <aside class="app-sidebar">
+          <div class="sb-nav">📁 文档管理</div>
+          <div class="sb-sec">当前目录</div>
+          <div class="sb-item folder">📁 产品手册</div>
+          <div class="sb-item active">📄 智能体 Harness 工程研究报告</div>
+          <div class="sb-item">📄 快速开始</div>
+          <div class="sb-sec">大纲</div>
+          <div class="sb-item" style="color:var(--accent-hover)">1 背景与问题定义</div>
+          <div class="sb-item">2 核心能力地图</div>
+          <div class="sb-item">3 参考架构</div>
+          <div class="sb-item">4 关键工程技术点</div>
+          <div class="sb-item">5 评测体系设计</div>
+          <div class="sb-item">6 安全与风险</div>
+        </aside>
+        <div class="doc-layout">
+          <div class="doc-paper" style="position:relative">
+            <div class="doc-title-row">智能体 Harness 工程研究报告</div>
+            <div class="h3">3.3 “验证环”是 harness 的关键差异</div>
+            <div class="p">许多智能体失败不是“不会做”，而是“做了但没验证”。harness 应内置：输出自检（consistency check）、结果核对（与工具返回比对）、约束检查（格式、政策、权限）、失败重试策略。</div>
+            <div class="p">详见 <span class="wlink sel" data-title="📄 评估与数据闭环" data-s="线上采样 → 失败聚类 → 构造评测集 → 修复（提示/策略/工具/数据）→ 回归门禁 → 灰度上线。" data-m="↩ 3 个文档引用">评估与数据闭环</span> 与 <span class="wlink" data-title="📄 参考分层架构" data-s="分层架构：API/UI → Agent Harness → 模型 → 工具与数据 → 平台支撑。" data-m="↩ 2 个文档引用">参考分层架构</span>、<span class="wlink" style="border-bottom-style:dotted" data-title="📄 落地路线图" data-s="阶段 0 可用性验证 → 阶段 1 平台化雏形 → 阶段 2 规模化与治理 → 阶段 3 组织化运营。" data-m="↩ 1 个文档引用">落地路线图</span>。</div>
+            <div class="hover-card show" id="blHoverCard" style="left:150px; top:140px">
+              <div class="t">📄 评估与数据闭环</div>
+              <div class="s">线上采样 → 失败聚类 → 构造评测集 → 修复（提示/策略/工具/数据）→ 回归门禁 → 灰度上线。</div>
+              <div class="m"><span>↩ 3 个文档引用</span><span class="kbd">⏎ 打开</span></div>
+            </div>
+            <div class="toast" id="blToast"></div>
+            <div class="backlink-panel">
+              <div class="bl-tabs">
+                <span class="bt on" data-tab="in">入链 <span class="n" id="nIn">2</span></span>
+                <span class="bt" data-tab="out">出链 <span class="n" id="nOut">5</span></span>
+                <span class="bt" data-tab="broken">断链 <span class="n" id="nBroken">1</span></span>
+              </div>
+              <div class="bl-list" id="blIn">
+                <div class="bl-item">
+                  <span class="t">📄 Agent Harness 落地路线图</span>
+                  <span class="p">「以本报告 §7 阶段 0–3 为基线…」</span>
+                  <span class="fix">↗</span>
+                </div>
+                <div class="bl-item">
+                  <span class="t">📄 Harness 评测体系设计</span>
+                  <span class="p">「指标框架引自 §5.1…」</span>
+                  <span class="fix">↗</span>
+                </div>
+              </div>
+              <div class="bl-list" id="blOut" style="display:none">
+                <div class="bl-item">
+                  <span class="t">📄 参考分层架构</span>
+                  <span class="p">「架构图复用 §3.1…」</span>
+                  <span class="fix">↗</span>
+                </div>
+                <div class="bl-item">
+                  <span class="t">📄 常见失败模式清单</span>
+                  <span class="p">「§8 内容摘录…」</span>
+                  <span class="fix">↗</span>
+                </div>
+                <div class="bl-item">
+                  <span class="t">📄 评测门禁配置</span>
+                  <span class="p">「§5.3 数据闭环引用…」</span>
+                  <span class="fix">↗</span>
+                </div>
+                <div class="bl-item more">
+                  <span class="t">📄 灰度上线检查单</span>
+                  <span class="p">「§7 阶段 2…」</span>
+                  <span class="fix">↗</span>
+                </div>
+                <div class="bl-item more">
+                  <span class="t">📄 失败聚类看板</span>
+                  <span class="p">「§5.3 采样链路…」</span>
+                  <span class="fix">↗</span>
+                </div>
+              </div>
+              <div class="bl-list" id="blBroken" style="display:none">
+                <div class="bl-item broken" id="brokenItem">
+                  <span class="t">📄 风险登记表（缺失）</span>
+                  <span class="p">来自「常见失败模式」章节引用</span>
+                  <span class="fix" id="brokenFix" style="color:var(--accent)">＋ 创建</span>
+                </div>
+              </div>
+              <div class="bl-more" id="blMore" style="display:none">展开全部 ›</div>
+            </div>
+            <span class="ann" style="top:96px; left:180px">1</span>
+            <span class="ann" style="bottom:120px; left:44%">2</span>
+            <span class="ann" style="bottom:46px; left:44%">3</span>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="panel-intro" style="margin-top:10px">
+      <b>1</b> wiki 双链悬停 → 预览卡片（标题/摘要/入链数） · <b>2</b> 文档底部反链面板：入链/出链/断链分组 · <b>3</b> 断链一键「创建缺失文档」或「重新指向」。<b style="color:var(--accent)">原型可交互：切换入链/出链/断链页签；悬停正文中三个 wiki 链接看预览卡跟随；断链点「＋ 创建」；出链页签下「展开全部」。</b>
+    </div>
+  </div>
+</section>
+
+</main>
+
+<!-- ================= 页脚 ================= -->
+<footer class="footer">
+  <span><b>Spec</b>：docs/doc-manager-vs-notion/spec.md（v2.0：编辑模型重构 · 无源码模式）</span>
+  <span><b>真实原型</b>：<a href="./editor-prototype.html" style="color:var(--accent)">editor-prototype.html</a>（live 块编辑器，可直接编辑）</span>
+  <span><b>基线</b>：docs/doc-manager-redesign/（v1.2 已完成改造）</span>
+  <span><b>本轮不做</b>：数据库视图 · 导入导出 · AI · 云端 · 评论 · 备份 · 置顶 · 源码模式</span>
+  <span><b>样例</b>：《智能体 Harness 工程研究报告》— Notion 链接（3b689ae050d080aba5a6f7882f263293）</span>
+  <span style="margin-left:auto">hip · 文档管理 V2 视觉稿 · 2025-08</span>
+</footer>
+
+<script>
+/* ============ 得分数据（10 维度） ============ */
+const DIMS = [
+  { name:'1 编辑体验与块模型',     hip:4,   notion:5,  gap:'big',   prop:'V2-E1' },
+  { name:'2 结构化数据（数据库）', hip:1.5, notion:5,  gap:'skip',  prop:'非目标' },
+  { name:'3 导航与信息架构',       hip:4,   notion:3.5,gap:'lead',  prop:'V2-N1 最近' },
+  { name:'4 链接、引用与图谱',     hip:4,   notion:4,  gap:'small', prop:'V2-L1' },
+  { name:'5 检索与全局命令',       hip:3.5, notion:4.5,gap:'mid',   prop:'V2-S1' },
+  { name:'6 导入导出与互操作',     hip:3.5, notion:4.5,gap:'skip',  prop:'非目标' },
+  { name:'7 AI 能力',              hip:4,   notion:4.5,gap:'skip',  prop:'非目标' },
+  { name:'8 协作与评论',           hip:1,   notion:5,  gap:'skip',  prop:'非目标' },
+  { name:'9 性能与规模',           hip:4.5, notion:3,  gap:'lead',  prop:'V2-P1' },
+  { name:'10 可靠性与数据安全',    hip:4.5, notion:4,  gap:'lead',  prop:'保持现状' },
+];
+const GAP_LABEL = { big:'差距大', mid:'差距中', small:'差距小', lead:'hip 反超', skip:'本轮不做' };
+
+const rowsEl = document.getElementById('scoreRows');
+rowsEl.innerHTML = DIMS.map(d => `
+  <div class="score-row">
+    <div class="score-name">${d.name}${d.gap==='big'?'<span class="star">★</span>':''}</div>
+    <div class="bar-wrap"><div class="bar-track"><div class="bar-fill hip" data-w="${d.hip*20}"></div></div><span class="bar-val">${d.hip}</span></div>
+    <div class="bar-wrap"><div class="bar-track"><div class="bar-fill notion" data-w="${d.notion*20}"></div></div><span class="bar-val">${d.notion}</span></div>
+    <span class="gap-badge ${d.gap}">${GAP_LABEL[d.gap]}</span>
+  </div>`).join('');
+
+/* 动画：进入视口后填充条 */
+const io = new IntersectionObserver(entries => {
+  entries.forEach(e => { if (e.isIntersecting) {
+    e.target.querySelectorAll('.bar-fill').forEach(b => { b.style.width = b.dataset.w + '%'; });
+    io.unobserve(e.target);
+  }});
+}, { threshold:.15 });
+const sc = document.querySelector('.score-card');
+if (sc) io.observe(sc);
+
+/* ============ 顶层标签页 ============ */
+document.getElementById('tabs').addEventListener('click', e => {
+  const btn = e.target.closest('.tab'); if (!btn) return;
+  document.querySelectorAll('.tab').forEach(t => t.classList.toggle('active', t === btn));
+  document.querySelectorAll('main > section').forEach(s => s.classList.toggle('active', s.id === btn.dataset.sec));
+});
+
+/* ============ 功能预览子标签 ============ */
+document.querySelector('.sub-tabs').addEventListener('click', e => {
+  const btn = e.target.closest('.sub-tab'); if (!btn) return;
+  document.querySelectorAll('.sub-tab').forEach(t => t.classList.toggle('active', t === btn));
+  document.querySelectorAll('.panel').forEach(p => p.classList.toggle('active', p.id === btn.dataset.panel));
+});
+
+/* ============ 原型交互（V2 mockup） ============ */
+function toast(el, msg){
+  el.textContent = msg; el.classList.add('show');
+  clearTimeout(el._t); el._t = setTimeout(() => el.classList.remove('show'), 1600);
+}
+function placeCard(link, card){
+  const paper = link.closest('.doc-paper');
+  const pr = paper.getBoundingClientRect(), lr = link.getBoundingClientRect();
+  let left = lr.left - pr.left + 10, top = lr.bottom - pr.top + 10;
+  if (left + 264 > pr.width - 8) left = pr.width - 272;
+  card.style.left = left + 'px'; card.style.top = top + 'px';
+}
+function bindHover(links, card){
+  links.forEach(l => {
+    l.addEventListener('mouseenter', () => {
+      card.querySelector('.t').textContent = l.dataset.title;
+      card.querySelector('.s').textContent = l.dataset.s;
+      card.querySelector('.m span').textContent = l.dataset.m;
+      card.classList.add('show');
+      placeCard(l, card);
+    });
+    l.addEventListener('mouseleave', () => card.classList.remove('show'));
+  });
+}
+
+/* ① 编辑器补齐：块引用悬停 + 同步块切换 */
+bindHover([...document.querySelectorAll('#p-edit .blkref')], document.getElementById('editHoverCard'));
+const syncBlock = document.getElementById('syncBlock');
+if (syncBlock) syncBlock.addEventListener('click', () => {
+  const off = syncBlock.classList.toggle('unsynced');
+  syncBlock.querySelector('.txt').innerHTML = off
+    ? '<b>同步块 · 已解除</b>：源块「评测与数据闭环」§5.3 不再跟随，可点击恢复同步<span class="src">点击恢复同步（原型交互）</span>'
+    : '<b>同步块 · 镜像自「评测与数据闭环」§5.3</b>：线上采样 → 失败聚类 → 构造评测集 → 修复 → 回归门禁 → 灰度上线<span class="src">点击可解除同步（原型交互）</span>';
+  syncBlock.querySelector('.ic').textContent = off ? '⧇' : '⧉';
+  toast(document.getElementById('editToast'), off ? '已解除同步' : '已恢复同步');
+});
+
+/* ② ⌘K 全局搜索：输入过滤 / 键盘导航 / 直达反馈 */
+const kcmdOverlay = document.getElementById('kcmdOverlay');
+const kcmdInput = document.getElementById('kcmdInput');
+const kcmdOpen = document.getElementById('kcmdOpen');
+const kcmdEmpty = document.getElementById('kcmdEmpty');
+const kcmdToast = document.getElementById('kcmdToast');
+const kcmdRows = [...document.querySelectorAll('#kcmdBody .kcmd-row')];
+const kcmdGroups = [...document.querySelectorAll('#kcmdBody .kcmd-group')];
+let kcmdVisible = [];
+function kcmdShow(){
+  kcmdOverlay.style.display = 'flex';
+  kcmdInput.value = ''; kcmdFilter();
+  requestAnimationFrame(() => kcmdInput.focus());
+}
+function kcmdHide(){ kcmdOverlay.style.display = 'none'; }
+function kcmdFilter(){
+  const q = kcmdInput.value.trim().toLowerCase();
+  kcmdVisible = [];
+  kcmdRows.forEach(r => {
+    const hit = !q || (r.dataset.k || r.textContent).toLowerCase().includes(q);
+    r.style.display = hit ? '' : 'none';
+    r.classList.remove('sel');
+    if (hit) kcmdVisible.push(r);
+  });
+  kcmdGroups.forEach(g => {
+    const n = kcmdVisible.filter(r => r.dataset.g === g.dataset.g).length;
+    g.style.display = n ? '' : 'none';
+    if (g.dataset.g === 'docs') g.textContent = '文档（' + n + '）';
+    if (g.dataset.g === 'cmd') g.textContent = '命令（' + n + '）';
+  });
+  kcmdEmpty.style.display = kcmdVisible.length ? 'none' : 'block';
+  if (kcmdVisible.length) kcmdVisible[0].classList.add('sel');
+}
+function kcmdMove(d){
+  if (!kcmdVisible.length) return;
+  const cur = kcmdVisible.findIndex(r => r.classList.contains('sel'));
+  const next = (Math.max(cur, 0) + d + kcmdVisible.length) % kcmdVisible.length;
+  kcmdVisible.forEach(r => r.classList.remove('sel'));
+  kcmdVisible[next].classList.add('sel');
+  kcmdVisible[next].scrollIntoView({ block: 'nearest' });
+}
+function kcmdEnter(){
+  const r = kcmdVisible.find(x => x.classList.contains('sel')) || kcmdVisible[0];
+  if (!r) return;
+  const t = r.querySelector('.t').textContent.trim();
+  toast(kcmdToast, '已直达「' + t + '」并高亮命中（演示 revealPath）');
+}
+if (kcmdOpen) kcmdOpen.addEventListener('click', kcmdShow);
+if (kcmdInput) kcmdInput.addEventListener('input', kcmdFilter);
+if (kcmdOverlay) kcmdOverlay.addEventListener('click', e => { if (e.target === kcmdOverlay) kcmdHide(); });
+document.addEventListener('keydown', e => {
+  if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
+    e.preventDefault();
+    if (kcmdOverlay && kcmdOverlay.style.display === 'none') kcmdShow(); else kcmdHide();
+    return;
+  }
+  if (!kcmdOverlay || kcmdOverlay.style.display === 'none') return;
+  if (e.key === 'Escape') kcmdHide();
+  if (e.key === 'ArrowDown') { e.preventDefault(); kcmdMove(1); }
+  if (e.key === 'ArrowUp') { e.preventDefault(); kcmdMove(-1); }
+  if (e.key === 'Enter') { e.preventDefault(); kcmdEnter(); }
+});
+
+/* ③ 反向链接面板：页签 / 悬停预览 / 断链创建 / 展开全部 */
+const blTabs = [...document.querySelectorAll('#p-bl .bt')];
+const blLists = {
+  in: document.getElementById('blIn'),
+  out: document.getElementById('blOut'),
+  broken: document.getElementById('blBroken')
+};
+const blMore = document.getElementById('blMore');
+const blToast = document.getElementById('blToast');
+if (blTabs.length) blTabs.forEach(t => t.addEventListener('click', () => {
+  blTabs.forEach(x => x.classList.toggle('on', x === t));
+  Object.entries(blLists).forEach(([k, el]) => { el.style.display = k === t.dataset.tab ? '' : 'none'; });
+  const moreRows = blLists[t.dataset.tab].querySelectorAll('.more');
+  moreRows.forEach(r => { r.style.display = 'none'; });
+  blMore.style.display = moreRows.length ? '' : 'none';
+  blMore.dataset.expanded = '0';
+  blMore.textContent = '展开全部 ›';
+}));
+if (blMore) blMore.addEventListener('click', () => {
+  const active = blTabs.find(x => x.classList.contains('on'));
+  const rows = blLists[active.dataset.tab].querySelectorAll('.more');
+  if (!rows.length) { toast(blToast, '该分组无更多条目'); return; }
+  const expanded = blMore.dataset.expanded === '1';
+  rows.forEach(r => { r.style.display = expanded ? 'none' : ''; });
+  blMore.dataset.expanded = expanded ? '0' : '1';
+  blMore.textContent = expanded ? '展开全部 ›' : '收起';
+  toast(blToast, expanded ? '已收起' : '已展开全部 ' + rows.length + ' 条');
+});
+bindHover([...document.querySelectorAll('#p-bl .wlink')], document.getElementById('blHoverCard'));
+const brokenFix = document.getElementById('brokenFix');
+if (brokenFix) brokenFix.addEventListener('click', () => {
+  const item = document.getElementById('brokenItem');
+  item.classList.remove('broken');
+  item.querySelector('.t').innerHTML = '📄 风险登记表 <span class="tag green">已创建</span>';
+  brokenFix.textContent = '打开';
+  brokenFix.style.color = '';
+  document.getElementById('nBroken').textContent = '0';
+  document.getElementById('nIn').textContent = '3';
+  toast(blToast, '已创建缺失文档「风险登记表」并建立链接（演示）');
+});
+
+/* ============ 标注模式开关 ============ */
+const annToggle = document.getElementById('annToggle');
+annToggle.addEventListener('click', () => {
+  const on = document.body.classList.toggle('no-ann') === false;
+  annToggle.classList.toggle('on', on);
+});
+</script>
+</body>
+</html>

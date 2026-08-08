@@ -15,6 +15,9 @@ describe('knowledge ids', () => {
     expect(isKnowledgeId('doc_abc123def456')).toBe(true)
     expect(isKnowledgeId('nod_folder001')).toBe(true)
     expect(isKnowledgeId('spc_xYzAbCdEfGhI')).toBe(true)
+    // Imported/legacy spaces keep readable ids (may be shorter than 6 chars).
+    expect(isKnowledgeId('nod_agent')).toBe(true)
+    expect(isKnowledgeId('doc_abc')).toBe(true)
   })
 
   it('rejects illegal ids', () => {

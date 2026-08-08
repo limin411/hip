@@ -30,7 +30,8 @@ pub(crate) fn is_knowledge_id(id: &str) -> bool {
         return false;
     }
     let len = rest.len();
-    if len < 6 || len > 64 {
+    // Floor is 3: imported/legacy spaces keep readable ids (e.g. `nod_agent`).
+    if len < 3 || len > 64 {
         return false;
     }
     rest.chars()
@@ -2093,6 +2094,9 @@ mod tests {
         assert!(is_knowledge_id("spc_xYzAbCdEfGhI"));
         assert!(is_knowledge_id("doc_abc123def456"));
         assert!(is_knowledge_id("nod_folder001"));
+        // Imported/legacy spaces keep readable ids (may be shorter than 6 chars).
+        assert!(is_knowledge_id("nod_agent"));
+        assert!(is_knowledge_id("doc_abc"));
     }
 
     #[test]

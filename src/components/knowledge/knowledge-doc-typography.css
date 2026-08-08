@@ -20,6 +20,24 @@
   --kb-measure: min(100%, 46rem);
   --kb-pad-bottom: max(8rem, 30vh);
   --kb-selection: color-mix(in srgb, var(--accent, #3b82f6) 22%, transparent);
+
+  /* Doc open / mode-switch polish: soft fade + settle.
+     Replays on key-remount (doc switch, Live/Source toggle).
+     No fill-mode: transform returns to none so the host never becomes a
+     containing block for fixed-positioned editor menus.
+     Reduced-motion is globally clamped in tokens.css. */
+  animation: knowledge-doc-enter 140ms var(--ease-out, cubic-bezier(0.2, 0, 0, 1));
+}
+
+@keyframes knowledge-doc-enter {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
 }
 
 .knowledge-doc-measure {

@@ -105,3 +105,58 @@ describe('BN Live round-trip (real editor)', () => {
     expect(md).toContain('plain')
   })
 })
+
+describe('BN Live columns round-trip (V2-E1)', () => {
+  it('parses the guard into a columns block and serializes it back', () => {
+    const md = [
+      '<!-- hip-columns:2 -->',
+      'col A content',
+      '<!-- hip-col -->',
+      '- item one',
+      '- [ ] todo',
+      '<!-- /hip-columns -->',
+      '',
+    ].join('\n')
+    const editor = makeEditor()
+    const prepared = preParseMdForLive(md)
+    const blocks = editor.tryParseMarkdownToBlocks(prepared)
+    const columns = blocks.find((b) => b.type === 'columns')
+    expect(columns).toBeDefined()
+    expect(String((columns?.props as Record<string, unknown>)?.count ?? '')).toBe('2')
+    const back = serializeLiveDocumentToMd(editor, blocks)
+    expect(back).toContain('<!-- hip-columns:2 -->')
+    expect(back).toContain('col A content')
+    expect(back).toContain('- [ ] todo')
+    expect(back).toContain('<!-- /hip-columns -->')
+  })
+
+  it('columns with nested wiki survive the full live round-trip', () => {
+    const md = [
+      '<!-- hip-columns:2 -->',
+      'see [[Other Doc]] here',
+      '<!-- hip-col -->',
+      '```mermaid',
+      'flowchart LR',
+      '  A --> B',
+      '```',
+      '<!-- /hip-columns -->',
+      '',
+    ].join('\n')
+    const editor = makeEditor()
+    const blocks = editor.tryParseMarkdownToBlocks(preParseMdForLive(md))
+    const back = serializeLiveDocumentToMd(editor, blocks)
+    expect(back).toContain('[[Other Doc]]')
+    expect(back).toContain('```mermaid')
+    expect(back).toContain('A --> B')
+    expect(detectDialectLoss(md, back)).toEqual([])
+  })
+
+  it('no-columns document is unaffected', () => {
+    const md = '# Title\n\nplain paragraph\n'
+    const editor = makeEditor()
+    const blocks = editor.tryParseMarkdownToBlocks(preParseMdForLive(md))
+    const back = serializeLiveDocumentToMd(editor, blocks)
+    expect(back).toContain('# Title')
+    expect(back).toContain('plain paragraph')
+  })
+})

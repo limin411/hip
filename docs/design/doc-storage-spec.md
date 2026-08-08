@@ -57,6 +57,7 @@ props:                  # 自定义属性（类型化标量）
 | 图片 | `![alt](assets/x.png "题注")` | L2 | 题注可丢（登记 §5） |
 | 附件卡 | `![name](assets/file.pdf)` | L2 | |
 | 表格 | GFM `\|...\|` | L2 | 列宽不保（登记 §5） |
+| 分栏 | `<!-- hip-columns:N -->…<!-- /hip-columns -->` 注释守卫 | L2 | 每列一段 md；列宽不保（登记 §5） |
 
 ## 4. Round-trip 无损测试清单（硬门禁）
 
@@ -108,7 +109,7 @@ props:                  # 自定义属性（类型化标量）
 | L-5 | 高亮 / 颜色 carrier 依赖 `data-hip-*` HTML | `==x==`、文字颜色 | 已修（carriers 往返） | bnLiveRoundTrip #9、blockRoundTrip #16-18 |
 | L-6 | callout 图标/折叠 UI 态丢失（标签保留） | callout 块 | 已修（标签 carrier） | bnLiveRoundTrip #6、blockRoundTrip #12 |
 | L-7 | 手工编辑破坏 carrier 守卫 → 降级为普通内容 | 用户在外部编辑器改坏 `data-hip-*` / 方言 fence | 记录（容错解析，不崩溃） | 矩阵 probe 缺失即失败（#10/#11） |
-| L-8 | 分栏列宽（V2-E1 新增，规划中） | columns block 宽度属性 | **规划**：HTML 注释守卫（`<!-- hip-columns:2 -->`），宽度不进入 md；合入时登记 + 扩展 dialectRoundTrip | E1 合入后补用例 |
+| L-8 | 分栏列宽（V2-E1） | columns 块宽度属性（拖拽） | **记录**：宽度仅会话级，不进入 Markdown（`data-columns` JSON 内只存列 md）；往返后恢复默认 | `columns.test.ts` + `bnLiveRoundTrip` 列用例 |
 | L-9 | 同步块解除后内容冻结（V2-E1 新增，规划中） | sync block → 引用链接 fallback | **规划**：fallback 后不再跟随；合入时登记 | E1 合入后补用例 |
 
 ## 6. carrier 守卫约定（`blocks/carriers.ts` 手法）

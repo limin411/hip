@@ -40,6 +40,7 @@ export type KnowledgeSlashId =
   | 'aiRewrite'
   | 'subdoc'
   | 'copyPageLink'
+  | 'columns'
 
 /** Slash menu section (R5 + AI). */
 export type KnowledgeSlashGroup = 'basic' | 'list' | 'media' | 'advanced' | 'ai'
@@ -119,6 +120,7 @@ export const BLOCK_SLASH_IDS: ReadonlySet<KnowledgeSlashId> = new Set([
   'image',
   'file',
   'subdoc',
+  'columns',
 ])
 
 /** Live/Source slash insert config — single source of truth. */
@@ -420,6 +422,17 @@ export const KNOWLEDGE_SLASH_ITEMS: KnowledgeSlashItem[] = [
     label: 'Sub-document',
     insert: '[[]]',
     cursorOffset: 2,
+  },
+  {
+    id: 'columns',
+    name: 'columns',
+    keywords: ['column', 'layout', 'grid', 'two'],
+    keywordsZh: ['分栏', '列', '布局', '双栏', '多栏'],
+    group: 'advanced',
+    icon: '▦',
+    label: 'Columns',
+    insert: '',
+    cursorOffset: 0,
   },
   {
     id: 'copyPageLink',

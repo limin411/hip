@@ -108,6 +108,12 @@ export const FIDELITY_MATRIX: readonly FidelityEntry[] = [
     probe: /\|.+\|/,
     description: 'GFM table (column widths L2-droppable)',
   },
+  {
+    id: 'columns',
+    level: 'L2',
+    probe: /<!--\s*hip-columns:\d+\s*-->[\s\S]*?<!--\s*\/hip-columns\s*-->/i,
+    description: 'Columns via HTML comment guard (widths L2-droppable)',
+  },
 ] as const
 
 /** Markers that must not silently disappear after Live serialize (honesty toast). */
@@ -126,6 +132,7 @@ export const DIALECT_PRESERVE_PROBES: ReadonlyArray<{ id: string; probe: RegExp 
       'textColor',
       'backgroundColor',
       'attachment',
+      'columns',
     ].includes(e.id),
   ).map((e) => ({ id: e.id, probe: e.probe }))
 

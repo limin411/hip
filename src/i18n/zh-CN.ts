@@ -2662,6 +2662,7 @@ export const zhCN = {
         mathInline: '行内公式',
         subdoc: '子文档',
         copyPageLink: '复制页面链接',
+        columns: '分栏',
         aiContinue: 'AI 续写',
         aiSummarize: 'AI 总结',
         aiToTasks: 'AI 转任务',

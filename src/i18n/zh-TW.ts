@@ -2625,6 +2625,7 @@ export const zhTW = {
       "file": "附件",
       "subdoc": "Sub-document",
       "copyPageLink": "Copy page link",
+      "columns": "Columns",
       "aiContinue": "AI continue",
       "aiSummarize": "AI summarize",
       "aiToTasks": "AI to tasks",

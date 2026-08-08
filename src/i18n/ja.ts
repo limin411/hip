@@ -2623,6 +2623,7 @@ export const ja = {
       "toggle": "折りたたみ",
       "subdoc": "サブドキュメント",
       "copyPageLink": "ページリンクをコピー",
+      "columns": "カラム",
       "aiContinue": "AI 続きを書く",
       "aiSummarize": "AI 要約",
       "aiToTasks": "AI タスク化",

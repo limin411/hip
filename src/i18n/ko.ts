@@ -2623,6 +2623,7 @@ export const ko = {
       "toggle": "접기",
       "subdoc": "하위 문서",
       "copyPageLink": "페이지 링크 복사",
+      "columns": "컬럼",
       "aiContinue": "AI 이어쓰기",
       "aiSummarize": "AI 요약",
       "aiToTasks": "AI 작업 추출",

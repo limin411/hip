@@ -2732,6 +2732,7 @@ export const en = {
         file: 'File attachment',
         subdoc: 'Sub-document',
         copyPageLink: 'Copy page link',
+        columns: 'Columns',
         aiContinue: 'AI continue',
         aiSummarize: 'AI summarize',
         aiToTasks: 'AI to tasks',

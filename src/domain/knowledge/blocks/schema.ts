@@ -14,6 +14,7 @@ import { mermaidBlockSpec, svgBlockSpec } from './mermaidBlock'
 import { embedBlockSpec } from './embedBlock'
 import { attachmentBlockSpec } from './attachmentBlock'
 import { toggleBlockSpec } from './toggleBlock'
+import { columnsBlockSpec } from './columnsBlock'
 import { wikiLinkInlineSpec, highlightStyleSpec } from './wikiInline'
 import { createKnowledgeCodeBlockSpec } from './codeBlockHighlight'
 
@@ -37,6 +38,7 @@ export const knowledgeBlockSchema = BlockNoteSchema.create({
     embed: embedBlockSpec(),
     attachment: attachmentBlockSpec(),
     toggle: toggleBlockSpec(),
+    columns: columnsBlockSpec(),
   },
   inlineContentSpecs: {
     ...defaultInlineContentSpecs,

@@ -4,6 +4,14 @@
  */
 
 import { CALLOUT_TYPES, type CalloutType } from '../callout'
+import {
+  COLUMNS_GUARD_PROBE,
+  COLUMNS_MAX,
+  COLUMNS_MIN,
+  extractColumnsGuard,
+  joinColumnsGuard,
+  jsonToColumns,
+} from './columns'
 
 const CALLOUT_TYPE_SET = new Set<string>(CALLOUT_TYPES)
 
@@ -411,6 +419,30 @@ function stripTags(s: string): string {
 export function htmlCarriersToDialect(md: string): string {
   let out = md.replace(/\r\n/g, '\n')
 
+  // Columns guard first: the restored guard text exposes inner carriers to the
+  // rules below (wiki spans / math / fences inside column md).
+  out = out.replace(
+    /<div\b[^>]*data-hip-block=["']columns["'][^>]*(?:\/>|>([\s\S]*?)<\/div>)/gi,
+    (full, bodyHtml?: string) => {
+      const countM = full.match(/data-count=["']([^"']*)["']/i)
+      const colsM = full.match(/data-columns=["']([^"']*)["']/i)
+      const columns = colsM
+        ? jsonToColumns(unescapeHtmlAttr(colsM[1] ?? ''))
+        : stripTags(bodyHtml ?? '')
+          ? [stripTags(bodyHtml ?? '')]
+          : []
+      const count = Math.min(
+        COLUMNS_MAX,
+        Math.max(COLUMNS_MIN, Number(countM?.[1] ?? columns.length) || 2),
+      )
+      if (columns.length !== count || columns.some((c) => !c.trim())) {
+        // 破损 carrier：降级为原样文本，不崩溃。
+        return stripTags(full).replace(/\n+$/, '')
+      }
+      return joinColumnsGuard(count, columns).replace(/\n+$/, '')
+    },
+  )
+
   // Callout divs (prefer data-body — text nodes lose newlines under BN normalize)
   out = out.replace(
     /<div\b[^>]*data-hip-block=["']callout["'][^>]*(?:\/>|>([\s\S]*?)<\/div>)/gi,
@@ -514,8 +546,22 @@ export function htmlCarriersToDialect(md: string): string {
 /**
  * Convert dialect MD constructs into HTML carriers BN can parse into custom blocks.
  */
+const COLUMNS_HOLDER_RE = /%%HIP_COLUMNS_(\d+)%%/g
+
 export function dialectToHtmlCarriers(md: string): string {
   let out = md.replace(/\r\n/g, '\n')
+
+  // Columns guard first: extract the whole guard so inner column md stays RAW
+  // (BN re-serialization strips HTML tags from attribute values — carriers
+  // inside data-columns would be corrupted). Placeholder keeps inner content
+  // safe from the dialect rules below.
+  const columnGuards: string[] = []
+  out = out.replace(COLUMNS_GUARD_PROBE, (m) => {
+    const g = extractColumnsGuard(m)
+    if (!g) return m
+    columnGuards.push(m)
+    return `%%HIP_COLUMNS_${columnGuards.length - 1}%%`
+  })
 
   // Embeds first (before wiki)
   out = out.replace(/!\[\[([^\]|#]+)(?:#([^\]]+))?\]\]/g, (_full, title: string, frag?: string) => {
@@ -578,5 +624,13 @@ export function dialectToHtmlCarriers(md: string): string {
   // Color spans last (they contain plain text or already-converted marks).
   out = colorSpanMdToHtml(out)
 
+  // Restore columns guards (inner md kept raw — no carriers inside the JSON).
+  out = out.replace(COLUMNS_HOLDER_RE, (_full, n: string) => {
+    const g = extractColumnsGuard(columnGuards[Number(n)] ?? '')
+    if (!g) return ''
+    return `<div data-hip-block="columns" data-count="${g.count}" data-columns="${escapeHtmlAttr(
+      JSON.stringify(g.columns),
+    )}"></div>`
+  })
   return out
 }

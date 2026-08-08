@@ -2778,13 +2778,7 @@ export const en = {
         count: '{{count}} headings',
         count_one: '{{count}} heading',
         sectionOutline: 'Outline',
-        sectionBacklinks: 'Backlinks',
-        sectionOutbound: 'Outgoing',
-        backlinksEmpty:
-          'No backlinks yet. Link here with [[This title]] from another document.',
-        outboundEmpty: 'No wiki links in this document.',
         loading: 'Loading…',
-        broken: 'Unresolved',
       },
       embed: {
         openSource: 'Open source document',

@@ -58,7 +58,6 @@ import { DocManagerBrowse } from './DocManagerBrowse'
 import { DocEditor, type DocEditorHandle } from './DocEditor'
 import type { DocLiveEditorHandle } from './DocBlockNoteEditor'
 import { KnowledgeDocCanvas } from './KnowledgeDocCanvas'
-import { BacklinkPanel } from './BacklinkPanel'
 import { WikiCreateModal } from './WikiCreateModal'
 import { KnowledgeGraphModal } from './KnowledgeGraphModal'
 import { PageHeader } from './page/PageHeader'
@@ -898,7 +897,6 @@ export function KnowledgeWorkspace() {
             </KnowledgeDocCanvas>
           </div>
         ) : null}
-        {activeDocId && !isBoard ? <BacklinkPanel /> : null}
       </main>
 
       <Modal

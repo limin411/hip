@@ -2671,12 +2671,7 @@ export const zhTW = {
       "count": "{{count}} 個標題",
       "count_one": "{{count}} 個標題",
       "sectionOutline": "大綱",
-      "sectionBacklinks": "反向連結",
-      "sectionOutbound": "對外連結",
-      "backlinksEmpty": "尚無反向連結。在其他文件使用 [[本文標題]] 引用後會出現在這裡。",
-      "outboundEmpty": "此文件沒有 wiki 連結。",
       "loading": "載入中…",
-      "broken": "未解析"
     },
     "embed": {
       "openSource": "開啟來源文件",

@@ -3,8 +3,8 @@ import { useTranslation } from 'react-i18next'
 import { useKnowledgeStore } from '@/store/knowledgeStore'
 import { PanelToggle } from '@/components/layout/PanelToggle'
 import { DocOutline } from './DocOutline'
-import { cn } from '@/lib/utils'
-import { extractDocOutline, slugifyHeading } from '@/domain/knowledge/mdPreview'
+import { extractDocOutline } from '@/domain/knowledge/mdPreview'
+import { BacklinkPanel } from './BacklinkPanel'
 
 /** Idle debounce so outline does not re-parse on every Live draft tick. */
 const OUTLINE_BODY_DEBOUNCE_MS = 200
@@ -31,13 +31,6 @@ function headingText(el: Element): string {
   return (el.textContent ?? '').replace(/\s+/g, ' ').trim()
 }
 
-/** Best-effort snippet from link raw (±40 chars when longer context exists). */
-function formatBacklinkSnippet(raw: string): string {
-  const s = raw.replace(/\s+/g, ' ').trim()
-  if (s.length <= 80) return s
-  return `…${s.slice(0, 80)}…`
-}
-
 /**
  * Knowledge right-rail: Outline + Backlinks + Outbound (docs only).
  */
@@ -46,13 +39,8 @@ export function KnowledgeOutlinePanel() {
   const draftBody = useKnowledgeStore((s) => s.draftBody)
   const docBody = useKnowledgeStore((s) => s.docBody)
   const activeDocId = useKnowledgeStore((s) => s.activeDocId)
-  const activeSpaceId = useKnowledgeStore((s) => s.activeSpaceId)
   const nodes = useKnowledgeStore((s) => s.nodes)
-  const backlinks = useKnowledgeStore((s) => s.backlinks)
-  const outboundLinks = useKnowledgeStore((s) => s.outboundLinks)
-  const linkPanelStatus = useKnowledgeStore((s) => s.linkPanelStatus)
   const requestOutlineJump = useKnowledgeStore((s) => s.requestOutlineJump)
-  const openDoc = useKnowledgeStore((s) => s.openDoc)
 
   const activeNode = activeDocId ? nodes.find((n) => n.id === activeDocId) : undefined
   // Docs only; boards hidden. Unknown node id still treated as doc (open path).
@@ -170,23 +158,6 @@ export function KnowledgeOutlinePanel() {
     }
   }, [activeDocId, isDoc, outlineItems])
 
-  const openBacklink = async (fromDocId: string, fragment: string | null) => {
-    await openDoc(fromDocId)
-    if (fragment) {
-      const body =
-        useKnowledgeStore.getState().draftBody || useKnowledgeStore.getState().docBody
-      const outline = extractDocOutline(body)
-      const hit =
-        outline.find((o) => o.text === fragment) ||
-        outline.find((o) => o.text.toLowerCase() === fragment.toLowerCase()) ||
-        outline.find((o) => slugifyHeading(o.text) === slugifyHeading(fragment)) ||
-        outline.find((o) => o.id === slugifyHeading(fragment))
-      if (hit) {
-        useKnowledgeStore.getState().requestOutlineJump(hit)
-      }
-    }
-  }
-
   return (
     <div
       className="flex h-full min-h-0 flex-col border-l border-border bg-surface"
@@ -235,107 +206,7 @@ export function KnowledgeOutlinePanel() {
               />
             </section>
 
-            <section data-testid="knowledge-backlinks-section">
-              <h3 className="px-1 pb-1 text-caption font-medium text-ink-tertiary">
-                {t('knowledge.outline.sectionBacklinks')}
-                {backlinks.length > 0 ? (
-                  <span className="ml-1 font-normal normal-case text-ink-tertiary">
-                    ({backlinks.length})
-                  </span>
-                ) : null}
-              </h3>
-              {linkPanelStatus === 'loading' ? (
-                <p className="px-1 text-meta text-ink-tertiary">{t('knowledge.outline.loading')}</p>
-              ) : backlinks.length === 0 ? (
-                <p
-                  className="px-1 text-meta text-ink-tertiary"
-                  data-testid="knowledge-backlinks-empty"
-                >
-                  {t('knowledge.outline.backlinksEmpty')}
-                </p>
-              ) : (
-                <ul className="flex flex-col gap-0.5" data-testid="knowledge-backlinks-list">
-                  {backlinks.map((b, i) => (
-                    <li key={`${b.fromDocId}-${i}-${b.raw}`}>
-                      <button
-                        type="button"
-                        className={cn(
-                          'w-full rounded-md px-2 py-1.5 text-left text-meta',
-                          'text-ink hover:bg-surface-hover',
-                        )}
-                        data-testid="knowledge-backlink-item"
-                        onClick={() => void openBacklink(b.fromDocId, b.fragment)}
-                      >
-                        <span className="font-medium">{b.fromTitle}</span>
-                        <span
-                          className="mt-0.5 block truncate text-ink-tertiary"
-                          data-testid="knowledge-backlink-snippet"
-                          title={b.raw}
-                        >
-                          {formatBacklinkSnippet(b.raw)}
-                        </span>
-                      </button>
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </section>
-
-            <section data-testid="knowledge-outbound-section">
-              <h3 className="px-1 pb-1 text-caption font-medium text-ink-tertiary">
-                {t('knowledge.outline.sectionOutbound')}
-              </h3>
-              {outboundLinks.filter((l) => l.kind === 'wiki' || l.kind === 'embed').length ===
-              0 ? (
-                <p className="px-1 text-meta text-ink-tertiary" data-testid="knowledge-outbound-empty">
-                  {t('knowledge.outline.outboundEmpty')}
-                </p>
-              ) : (
-                <ul className="flex flex-col gap-0.5" data-testid="knowledge-outbound-list">
-                  {outboundLinks
-                    .filter((l) => l.kind === 'wiki' || l.kind === 'embed')
-                    .map((l, i) => {
-                      const broken = !l.targetDocId
-                      const sameDoc =
-                        l.targetDocId != null &&
-                        l.targetDocId === activeDocId &&
-                        activeSpaceId != null
-                      return (
-                        <li key={`${l.raw}-${i}`}>
-                          <button
-                            type="button"
-                            disabled={broken && !l.fragment}
-                            className={cn(
-                              'w-full rounded-md px-2 py-1.5 text-left text-meta',
-                              broken
-                                ? 'text-danger hover:bg-danger/10'
-                                : 'text-ink hover:bg-surface-hover',
-                              broken && !l.targetDocId ? 'opacity-90' : '',
-                            )}
-                            data-testid={
-                              broken ? 'knowledge-outbound-broken' : 'knowledge-outbound-item'
-                            }
-                            onClick={() => {
-                              if (l.targetDocId) {
-                                void openBacklink(l.targetDocId, l.fragment)
-                              } else if (sameDoc || (l.targetTitle === '' && l.fragment)) {
-                                void openBacklink(activeDocId!, l.fragment)
-                              }
-                            }}
-                          >
-                            <span className="truncate">{l.raw}</span>
-                            {broken ? (
-                              <span className="mt-0.5 block text-ink-tertiary">
-                                {t('knowledge.outline.broken')}
-                              </span>
-                            ) : null}
-                          </button>
-                        </li>
-                      )
-                    })}
-                </ul>
-              )}
-            </section>
+            <BacklinkPanel />
           </div>
         )}
       </div>

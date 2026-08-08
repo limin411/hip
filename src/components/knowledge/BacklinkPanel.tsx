@@ -1,5 +1,5 @@
 /**
- * 文档底部「反向链接」面板（V2-L1 T5.1）。
+ * 右侧面板「反向链接」区块（V2-L1 T5.1）。
  * 入链 / 出链 / 断链三组 + 计数 + 页签；长列表 >5 条折叠。
  * 断链操作：一键创建缺失文档 / 重新指向（复用 WikiLinkPicker）。
  * 编辑态只读（交互仅跳转）。
@@ -134,11 +134,10 @@ export function BacklinkPanel() {
 
   return (
     <section
-      className="knowledge-doc-inline-pad pb-8 pt-2"
+      className="flex min-h-0 flex-col gap-1"
       data-testid="knowledge-backlink-panel"
     >
-      <div className="knowledge-doc-measure rounded-lg border border-border bg-surface-muted/50">
-        <div className="flex items-center gap-1 border-b border-border px-2 py-1.5">
+      <div className="flex items-center gap-1 border-b border-border px-1 pb-1">
           <Link2 size={13} className="mr-1 text-ink-tertiary" aria-hidden />
           {tabs.map((tb) => (
             <button
@@ -178,7 +177,7 @@ export function BacklinkPanel() {
           </button>
         </div>
 
-        <div className="px-2 py-1.5">
+        <div className="px-1">
           {linkPanelStatus === 'loading' ? (
             <p className="py-2 text-meta text-ink-tertiary">{t('knowledge.outline.loading')}</p>
           ) : list.length === 0 ? (
@@ -251,7 +250,6 @@ export function BacklinkPanel() {
             </button>
           ) : null}
         </div>
-      </div>
 
       {repointFor ? (
         <WikiLinkPicker

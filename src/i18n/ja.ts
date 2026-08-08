@@ -2669,12 +2669,7 @@ export const ja = {
       "count": "{{count}} 見出し",
       "count_one": "{{count}} 見出し",
       "sectionOutline": "アウトライン",
-      "sectionBacklinks": "バックリンク",
-      "sectionOutbound": "外部リンク",
-      "backlinksEmpty": "まだバックリンクはありません。別のドキュメントから [[このタイトル]] でリンクしてください。",
-      "outboundEmpty": "このドキュメントにウィキリンクはありません。",
       "loading": "読み込み中…",
-      "broken": "未解決"
     },
     "embed": {
       "openSource": "ソースドキュメントを開く",

@@ -2713,12 +2713,7 @@ export const zhCN = {
         count: '{{count}} 个标题',
         count_one: '{{count}} 个标题',
         sectionOutline: '大纲',
-        sectionBacklinks: '反链',
-        sectionOutbound: '出链',
-        backlinksEmpty: '暂无反链。在其他文档中使用 [[本文标题]] 引用后会出现在这里。',
-        outboundEmpty: '本文档没有 wiki 链接。',
         loading: '加载中…',
-        broken: '未解析',
       },
       embed: {
         openSource: '打开源文档',

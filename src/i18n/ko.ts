@@ -2669,12 +2669,7 @@ export const ko = {
       "count": "제목 {{count}}개",
       "count_one": "제목 {{count}}개",
       "sectionOutline": "개요",
-      "sectionBacklinks": "역링크",
-      "sectionOutbound": "나가는 링크",
-      "backlinksEmpty": "아직 역링크가 없습니다. 다른 문서에서 [[이 제목]]으로 링크해 보세요.",
-      "outboundEmpty": "이 문서에 위키 링크가 없습니다.",
       "loading": "불러오는 중…",
-      "broken": "확인되지 않음"
     },
     "embed": {
       "openSource": "소스 문서 열기",

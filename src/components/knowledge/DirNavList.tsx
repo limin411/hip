@@ -12,7 +12,6 @@ import {
   ArrowUp,
   FileText,
   Folder,
-  MoreHorizontal,
   Plus,
 } from 'lucide-react'
 import { DeclarativeContextMenu } from '@/components/context-menu'
@@ -423,13 +422,7 @@ export function DirNavList() {
                           {node.title}
                         </span>
                       )}
-                      {node.kind === 'folder' && !editing ? (
-                        <MoreHorizontal
-                          size={12}
-                          className="shrink-0 text-ink-tertiary/50"
-                          aria-hidden
-                        />
-                      ) : null}
+
                     </button>
                   </DeclarativeContextMenu>
                 </li>

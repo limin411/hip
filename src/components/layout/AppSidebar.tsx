@@ -685,7 +685,9 @@ export function AppSidebar() {
             {t('placeholder.comingSoon')}
           </p>
         ) : sidebarSection === 'knowledge' ? (
-          <DirNavList />
+          <div className="flex min-h-0 flex-col">
+            <DirNavList />
+          </div>
         ) : filteredSessions.length === 0 ? (
           <p className="px-2 py-4 text-center text-meta text-ink-tertiary" role="status">
             {t('sidebar.emptySessions')}

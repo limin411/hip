@@ -2537,6 +2537,34 @@ export const en = {
         iconNone: 'No icon',
         iconCustomPlaceholder: 'Emoji or paste…',
       },
+      blockRef: {
+        linkCopied: 'Block link copied',
+        noPreview: 'No preview'
+      },
+      sync: {
+        pickSource: 'Pick source block…',
+        unlink: 'Unlink (becomes a plain reference link)',
+        selfRef: 'Cannot embed itself',
+        sourceMissing: 'Source block deleted or unreadable',
+      },
+      backlinks: {
+        inbound: 'Inbound',
+        outbound: 'Outbound',
+        broken: 'Broken',
+        emptyInbound: 'No inbound links',
+        emptyOutbound: 'No outbound links',
+        emptyBroken: 'No broken links 🎉',
+        expand: 'Show all ({{count}})',
+        collapse: 'Collapse',
+        createDoc: 'Create missing document',
+        repoint: 'Repoint',
+        repaired: 'Created “{{title}}” and linked',
+        repairFailed: 'Create failed',
+        repointed: 'Repointed',
+        repointFailed: 'Repoint failed',
+        repairNoTarget: 'Cannot resolve a target title from the link',
+        refresh: 'Refresh link panel',
+      },
       tree: {
         newDoc: 'Doc',
         newBoard: 'Whiteboard',
@@ -2728,6 +2756,8 @@ export const en = {
         file: 'File attachment',
         subdoc: 'Sub-document',
         copyPageLink: 'Copy page link',
+        columns: 'Columns',
+        sync: 'Sync block',
         aiContinue: 'AI continue',
         aiSummarize: 'AI summarize',
         aiToTasks: 'AI to tasks',
@@ -2748,13 +2778,7 @@ export const en = {
         count: '{{count}} headings',
         count_one: '{{count}} heading',
         sectionOutline: 'Outline',
-        sectionBacklinks: 'Backlinks',
-        sectionOutbound: 'Outgoing',
-        backlinksEmpty:
-          'No backlinks yet. Link here with [[This title]] from another document.',
-        outboundEmpty: 'No wiki links in this document.',
         loading: 'Loading…',
-        broken: 'Unresolved',
       },
       embed: {
         openSource: 'Open source document',
@@ -2850,6 +2874,9 @@ export const en = {
         saveRetry: 'Retry',
         liveLoading: 'Loading live editor…',
         liveParseFailed: 'Live editor could not open this document. Switched to Source.',
+        compatView:
+          'Compatibility view: the document is large or live rendering failed — editing in plain text, content remains fully editable.',
+        compatViewClose: 'Got it',
         largeDocForceSource:
           'Document is too large for Live edit. Switched to Source.',
         largeDocHint:
@@ -3136,6 +3163,9 @@ export const en = {
         skills: 'Skills',
         favorites: 'Favorites',
         recent: 'Recent',
+        docs: 'Docs',
+        recentDocs: 'Recent docs',
+        count: '{{group}} ({{count}})',
         knowledge: 'Documents',
       },
       navKnowledge: 'Documents',

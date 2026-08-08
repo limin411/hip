@@ -1,9 +1,12 @@
 // @vitest-environment happy-dom
 import { describe, it, expect, vi } from 'vitest'
 import {
+  findRevealElementInRoot,
   findRevealMatch,
   findRevealOffset,
+  revealBlockInRoot,
   revealHeadingInRoot,
+  revealInPreviewRoot,
 } from './searchReveal'
 
 describe('findRevealMatch', () => {
@@ -66,5 +69,69 @@ describe('revealHeadingInRoot', () => {
     const root = document.createElement('div')
     root.innerHTML = '<h1>Only</h1>'
     expect(revealHeadingInRoot(root, 'Missing')).toBe(false)
+  })
+})
+
+describe('findRevealElementInRoot / revealInPreviewRoot', () => {
+  it('scrolls the first matching text node parent and returns it', () => {
+    const root = document.createElement('div')
+    root.innerHTML = '<p>intro text</p><p>harness core ability</p><p>tail</p>'
+    const target = root.querySelectorAll('p')[1] as HTMLElement
+    const scroll = vi.fn()
+    target.scrollIntoView = scroll
+
+    const el = findRevealElementInRoot(root, 'harness')
+    expect(el).toBe(target)
+    expect(scroll).toHaveBeenCalled()
+    expect(revealInPreviewRoot(root, 'harness')).toBe(true)
+  })
+
+  it('falls back to token match (CJK single char) and returns the element', () => {
+    const root = document.createElement('div')
+    root.innerHTML = '<p>评测与数据闭环</p>'
+    const el = findRevealElementInRoot(root, '评测体系')
+    expect(el).not.toBeNull()
+    expect(el!.textContent).toBe('评测与数据闭环')
+  })
+
+  it('returns null when nothing matches', () => {
+    const root = document.createElement('div')
+    root.innerHTML = '<p>nothing here</p>'
+    expect(findRevealElementInRoot(root, 'zzz-missing')).toBeNull()
+    expect(revealInPreviewRoot(root, 'zzz-missing')).toBe(false)
+  })
+
+  it('returns null for empty query', () => {
+    const root = document.createElement('div')
+    root.innerHTML = '<p>x</p>'
+    expect(findRevealElementInRoot(root, '  ')).toBeNull()
+  })
+})
+
+describe('revealBlockInRoot (V2-E1 block refs)', () => {
+  it('scrolls the block with matching data-id and returns it', () => {
+    const root = document.createElement('div')
+    root.innerHTML =
+      '<p>intro</p><div data-id="bn-abc123" data-node-type="blockOuter"><p>target</p></div><p>tail</p>'
+    const target = root.querySelector('[data-id="bn-abc123"]') as HTMLElement
+    const scroll = vi.fn()
+    target.scrollIntoView = scroll
+    const el = revealBlockInRoot(root, 'bn-abc123')
+    expect(el).toBe(target)
+    expect(scroll).toHaveBeenCalled()
+  })
+
+  it('falls back to text match when block id is absent (reload)', () => {
+    const root = document.createElement('div')
+    root.innerHTML = '<p>nothing</p><h2>评测体系</h2>'
+    const el = revealBlockInRoot(root, 'bn-gone', '评测体系')
+    expect(el).not.toBeNull()
+    expect(el!.textContent).toBe('评测体系')
+  })
+
+  it('returns null when nothing matches', () => {
+    const root = document.createElement('div')
+    root.innerHTML = '<p>x</p>'
+    expect(revealBlockInRoot(root, 'bn-gone', 'zzz')).toBeNull()
   })
 })

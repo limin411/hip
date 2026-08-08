@@ -70,10 +70,13 @@ const knowledgeState = {
   currentFolderId: null as string | null,
   activeDocId: null as string | null,
   busy: false,
+  recent: [] as { spaceId: string; docId: string; title: string; spaceName: string; at: number }[],
   enterFolder: vi.fn(async () => {}),
   goUp: vi.fn(async () => {}),
   navigateTo: vi.fn(async () => {}),
   openDoc: vi.fn(async () => {}),
+  openRecent: vi.fn(async () => {}),
+  dropRecent: vi.fn(() => {}),
   createFolder: vi.fn(async () => {}),
   requestCreateDoc: vi.fn(async () => {}),
   renameNode: vi.fn(async () => {}),
@@ -105,6 +108,7 @@ describe('AppSidebar', () => {
     knowledgeState.nodes = []
     knowledgeState.currentFolderId = null
     knowledgeState.activeDocId = null
+    knowledgeState.recent = []
     useNavHistoryStore.setState({ stack: [], index: -1, applying: false })
     useUiStore.setState({
       activeView: 'chat',

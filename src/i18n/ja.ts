@@ -2435,7 +2435,35 @@ export const ja = {
       "iconNone": "アイコンなし",
       "iconCustomPlaceholder": "絵文字または貼り付け…"
     },
-    "tree": {
+          "blockRef": {
+        "linkCopied": "ブロックリンクをコピーしました",
+      "noPreview": "プレビューなし"
+      },
+      "sync": {
+        "pickSource": "ソースブロックを選択…",
+        "unlink": "同期解除（通常の参照リンクになります）",
+        "selfRef": "自身は埋め込めません",
+        "sourceMissing": "ソースブロックが削除されたか読み取れません"
+      },
+      "backlinks": {
+        "inbound": "被参照",
+        "outbound": "参照先",
+        "broken": "壊れたリンク",
+        "emptyInbound": "被参照リンクはありません",
+        "emptyOutbound": "参照先リンクはありません",
+        "emptyBroken": "壊れたリンクはありません 🎉",
+        "expand": "すべて表示（{{count}}）",
+        "collapse": "折りたたむ",
+        "createDoc": "欠落ドキュメントを作成",
+        "repoint": "再指定",
+        "repaired": "「{{title}}」を作成してリンクしました",
+        "repairFailed": "作成に失敗しました",
+        "repointed": "再指定しました",
+        "repointFailed": "再指定に失敗しました",
+        "repairNoTarget": "リンクからターゲットタイトルを解析できません",
+        "refresh": "リンクパネルを更新",
+      },
+"tree": {
       "newDoc": "ドキュメント",
       "newBoard": "ホワイトボード",
       "newFolder": "フォルダ",
@@ -2619,6 +2647,8 @@ export const ja = {
       "toggle": "折りたたみ",
       "subdoc": "サブドキュメント",
       "copyPageLink": "ページリンクをコピー",
+      "columns": "カラム",
+      "sync": "同期ブロック",
       "aiContinue": "AI 続きを書く",
       "aiSummarize": "AI 要約",
       "aiToTasks": "AI タスク化",
@@ -2639,12 +2669,7 @@ export const ja = {
       "count": "{{count}} 見出し",
       "count_one": "{{count}} 見出し",
       "sectionOutline": "アウトライン",
-      "sectionBacklinks": "バックリンク",
-      "sectionOutbound": "外部リンク",
-      "backlinksEmpty": "まだバックリンクはありません。別のドキュメントから [[このタイトル]] でリンクしてください。",
-      "outboundEmpty": "このドキュメントにウィキリンクはありません。",
       "loading": "読み込み中…",
-      "broken": "未解決"
     },
     "embed": {
       "openSource": "ソースドキュメントを開く",
@@ -2738,6 +2763,8 @@ export const ja = {
       "saved": "保存しました",
       "liveLoading": "ライブエディタを読み込み中…",
       "liveParseFailed": "ライブエディタでこのドキュメントを開けませんでした。ソースモードに切り替えました。",
+      "compatView": "互換ビューに入りました：ドキュメントが大きいかライブ描画に失敗したため、プレーンテキストで編集します。内容は引き続き完全に編集可能です。",
+      "compatViewClose": "了解",
       "largeDocForceSource": "ドキュメントが大きすぎてライブ編集できません。ソースモードに切り替えました。",
       "saveRetry": "再試行",
       "largeDocHint": "ドキュメントが大きいため、パフォーマンスのためにソースモードで編集します。全文の編集は可能です。",
@@ -3019,6 +3046,9 @@ export const ja = {
       "skills": "Skills",
       "favorites": "お気に入り",
       "recent": "最近",
+      "docs": "ドキュメント",
+      "recentDocs": "最近",
+      "count": "{{group}}（{{count}}）",
       "knowledge": "ドキュメント"
     },
     "navKnowledge": "ドキュメント",

@@ -45,11 +45,9 @@ import {
   type KnowledgeSearchHit,
 } from '@/domain/knowledge/search'
 import { isSpaceNameTaken, normalizeSpaceName } from '@/domain/knowledge/spaceName'
+import { expandTemplateVariables } from '@/domain/knowledge/templateVars'
 import {
   type EditorMode,
-  loadDocEditorMode,
-  persistDocEditorMode,
-  persistEditorModePref,
   resolveEditorMode,
   shouldAutosave,
 } from '@/domain/knowledge/editorMode'
@@ -77,9 +75,11 @@ import {
   knowledgeLinkIndexRemoveDoc,
   knowledgeLinkIndexReplaceAll,
   knowledgeLinkIndexBacklinks,
+  knowledgeLinkIndexBroken,
   knowledgeLinkIndexOutbound,
   knowledgeLinkIndexDocCount,
   type KnowledgeLinkBacklink,
+  type KnowledgeLinkBrokenRow,
   type KnowledgeLinkOutboundRow,
 } from '@/ipc/knowledge'
 import { buildDocIndexPayload } from '@/domain/knowledge/linkIndex'
@@ -107,6 +107,7 @@ const resetDocFields = {
   pendingReveal: null,
   backlinks: [] as KnowledgeLinkBacklink[],
   outboundLinks: [] as KnowledgeLinkOutboundRow[],
+  brokenLinks: [] as KnowledgeLinkBrokenRow[],
   linkPanelStatus: 'idle' as const,
 }
 
@@ -312,6 +313,8 @@ export type KnowledgePendingReveal = {
   /** Only apply reveal when this space/doc is still active. */
   spaceId: string
   docId: string
+  /** 块引用锚点（V2-E1）：优先 BN 块 id，其次标题/文本匹配。 */
+  fragment?: string | null
 }
 
 /** Right-rail outline click → KnowledgeWorkspace scrolls Source / Live / Preview. */
@@ -347,7 +350,7 @@ interface KnowledgeState {
   activeDocId: string | null
   docBody: string
   draftBody: string
-  /** live | source | preview — Live is product-on; opt out via hip-knowledge-live=false. */
+  /** V2-E0: 恒为 'live'（用户路径）；'source' 仅内部兜底；'preview' 仅历史兼容。 */
   editorMode: EditorMode
   mode: 'home' | 'workspace'
   /** 当前目录 id（null = 根目录）。文档管理 v2 单层级导航：侧边栏/主区只显示当前层级。 */
@@ -364,6 +367,8 @@ interface KnowledgeState {
   /** SQLite link-index panel (active doc). */
   backlinks: KnowledgeLinkBacklink[]
   outboundLinks: KnowledgeLinkOutboundRow[]
+  /** 断链（V2-L1 T5.1）：目标标题解析失败的外部/wiki 链接。 */
+  brokenLinks: KnowledgeLinkBrokenRow[]
   linkPanelStatus: 'idle' | 'loading' | 'ready' | 'error'
   /**
    * Doc counts per space. Tree-derived counts land as soon as trees load during
@@ -398,6 +403,8 @@ interface KnowledgeState {
   /** Open a search hit and request scroll-to-match via `pendingReveal`. */
   openSearchHit: (hit: KnowledgeSearchHit) => Promise<void>
   clearPendingReveal: () => void
+  /** Set a reveal target (⌘K doc hit) so the workspace scrolls + flashes on open. */
+  setPendingReveal: (pending: KnowledgePendingReveal | null) => void
   /**
    * Request scroll to an outline heading. Workspace applies based on editorMode
    * (source line / live text match).
@@ -409,8 +416,18 @@ interface KnowledgeState {
     line: number
   }) => void
   clearPendingOutlineJump: () => void
-  /** Refresh backlinks + outbound for the active doc (or given id). */
+  /** Refresh backlinks + outbound + broken for the active doc (or given id). */
   refreshLinkPanel: (docId?: string) => Promise<void>
+  /**
+   * 断链一键创建（V2-L1 T5.3）：创建缺失文档（重名自动加序号），把引用方的
+   * `raw` 链接改写为新标题，最后重建索引（索引最后写——失败时索引不变）。
+   * 返回新文档 id；失败返回 null。
+   */
+  repairBrokenLink: (fromDocId: string, raw: string, targetTitle: string) => Promise<string | null>
+  /**
+   * 断链重新指向（V2-L1 T5.4）：把引用方 `raw` 链接改写为新的目标标题。
+   */
+  repointBrokenLink: (fromDocId: string, raw: string, newTargetTitle: string) => Promise<boolean>
   /** Full rebuild of space link index from disk docs. */
   rebuildSpaceLinkIndex: (spaceId?: string) => Promise<void>
   /**
@@ -456,8 +473,8 @@ interface KnowledgeState {
   setEditorMode: (mode: EditorMode) => Promise<void>
   /**
    * Update draft body. Default persist mode: 'auto' when shouldAutosave(mode)
-   * (live|source), 'none' in preview. Pass `persist: 'now'` for immediate flush
-   * (e.g. preview task write-back).
+   * (V2-E0: live/source 均可写；preview 已无写入路径). Pass `persist: 'now'`
+   * for immediate flush.
    *
    * Pass `docId` from the editor instance that produced the draft. If it does
    * not match `activeDocId`, the update is ignored (prevents Live unmount after
@@ -644,6 +661,23 @@ export function __bumpOpenDocGenerationForTests(): number {
   return ++openDocGeneration
 }
 
+/**
+ * Test helper: replace the in-memory search index with the given docs
+ * (⌘K palette interaction tests). Not used in production paths.
+ */
+export function __seedKbIndexForTests(
+  docs: Array<
+    Omit<
+      Parameters<typeof upsertSearchDoc>[1],
+      'bodyPreview' | 'tags' | 'status' | 'aliases' | 'tagList' | 'statusValue' | 'aliasList'
+    > & { body: string }
+  >,
+): void {
+  kbIndex = createKnowledgeIndex()
+  kbMeta = new Map()
+  for (const d of docs) upsertSearchDoc(kbIndex, d)
+}
+
 function cancelScheduledSave() {
   if (saveTimer) {
     clearTimeout(saveTimer)
@@ -678,6 +712,7 @@ export const useKnowledgeStore = create<KnowledgeState>((set, get) => ({
   pendingOutlineJump: null,
   backlinks: [],
   outboundLinks: [],
+  brokenLinks: [],
   linkPanelStatus: 'idle',
   spaceDocCounts: {},
   availableTags: [],
@@ -1042,6 +1077,9 @@ export const useKnowledgeStore = create<KnowledgeState>((set, get) => ({
 
   clearPendingReveal: () => set({ pendingReveal: null }),
 
+  /** Set a reveal target (⌘K doc hit) so the workspace scrolls + flashes on open. */
+  setPendingReveal: (pending: KnowledgePendingReveal | null) => set({ pendingReveal: pending }),
+
   requestOutlineJump: (item) =>
     set((s) => ({
       pendingOutlineJump: {
@@ -1059,23 +1097,112 @@ export const useKnowledgeStore = create<KnowledgeState>((set, get) => ({
     const spaceId = get().activeSpaceId
     const id = docId ?? get().activeDocId
     if (!spaceId || !id) {
-      set({ backlinks: [], outboundLinks: [], linkPanelStatus: 'idle' })
+      set({ backlinks: [], outboundLinks: [], brokenLinks: [], linkPanelStatus: 'idle' })
       return
     }
     set({ linkPanelStatus: 'loading' })
     try {
-      const [backlinks, outboundLinks] = await Promise.all([
+      const [backlinks, outboundLinks, brokenLinks] = await Promise.all([
         knowledgeLinkIndexBacklinks(spaceId, id),
         knowledgeLinkIndexOutbound(spaceId, id),
+        knowledgeLinkIndexBroken(spaceId).catch(() => []),
       ])
       // Stale guard
       if (get().activeSpaceId !== spaceId || get().activeDocId !== id) return
-      set({ backlinks, outboundLinks, linkPanelStatus: 'ready' })
+      // 断链按引用方过滤当前文档相关的条目。
+      set({
+        backlinks,
+        outboundLinks,
+        brokenLinks: brokenLinks.filter((b) => b.fromDocId === id),
+        linkPanelStatus: 'ready',
+      })
     } catch (e) {
       console.warn('refreshLinkPanel failed', e)
       if (get().activeSpaceId === spaceId && get().activeDocId === id) {
-        set({ backlinks: [], outboundLinks: [], linkPanelStatus: 'error' })
+        set({ backlinks: [], outboundLinks: [], brokenLinks: [], linkPanelStatus: 'error' })
       }
+    }
+  },
+
+  /** 标题去重：同名加 (2)/(3)…（V2-L1 T5.3）。 */
+  repairBrokenLink: async (fromDocId, raw, targetTitle) => {
+    const spaceId = get().activeSpaceId
+    const nodes = get().nodes
+    if (!spaceId || !fromDocId || !raw || !targetTitle) return null
+    const existing = new Set(
+      nodes.filter((n) => n.kind === 'doc').map((n) => n.title.toLowerCase()),
+    )
+    let title = targetTitle.trim()
+    let n = 2
+    while (existing.has(title.toLowerCase())) {
+      title = `${targetTitle.trim()} (${n})`
+      n += 1
+    }
+    try {
+      // 1) 创建新文档（磁盘写失败 → 中止，索引不动）。
+      const now = Date.now()
+      const id = newDocId()
+      await knowledgeWriteDoc(spaceId, id, '')
+      const node = {
+        id,
+        parentId: null,
+        kind: 'doc' as const,
+        title,
+        order: nextOrder(nodes, null),
+        createdAt: now,
+        updatedAt: now,
+      }
+      const nextNodes = insertNode(nodes, node)
+      await knowledgeSaveTree(spaceId, { version: 1, nodes: nextNodes })
+      // 2) 改写引用方文档中的 raw 链接。
+      let fromBody = ''
+      try {
+        fromBody = await knowledgeReadDoc(spaceId, fromDocId)
+      } catch {
+        fromBody = ''
+      }
+      const oldToken = raw.trim()
+      const newToken = oldToken.replace(/\[\[[^\]]+\]\]/, `[[${title}]]`)
+      const nextFromBody = fromBody.replace(oldToken, newToken)
+      if (nextFromBody !== fromBody) {
+        await knowledgeWriteDoc(spaceId, fromDocId, nextFromBody)
+      }
+      // 3) 索引最后写（失败回滚语义：前面任何一步失败都不会污染索引）。
+      const spaceName = get().spaces.find((s) => s.id === spaceId)?.name ?? ''
+      indexCurrentDoc(spaceId, id, title, '', spaceName, nextNodes)
+      void upsertLinkIndexDoc(spaceId, id, title, '', nextNodes)
+      if (nextFromBody !== fromBody) {
+        void upsertLinkIndexDoc(spaceId, fromDocId, get().nodes.find((x) => x.id === fromDocId)?.title ?? '', nextFromBody, nextNodes)
+      }
+      set({ nodes: nextNodes })
+      void get().refreshLinkPanel()
+      return id
+    } catch {
+      return null
+    }
+  },
+
+  repointBrokenLink: async (fromDocId, raw, newTargetTitle) => {
+    const spaceId = get().activeSpaceId
+    if (!spaceId || !fromDocId || !raw || !newTargetTitle) return false
+    try {
+      let fromBody = ''
+      try {
+        fromBody = await knowledgeReadDoc(spaceId, fromDocId)
+      } catch {
+        fromBody = ''
+      }
+      const oldToken = raw.trim()
+      const newToken = oldToken.replace(/\[\[[^\]]+\]\]/, `[[${newTargetTitle.trim()}]]`)
+      const nextFromBody = fromBody.replace(oldToken, newToken)
+      if (nextFromBody === fromBody) return false
+      await knowledgeWriteDoc(spaceId, fromDocId, nextFromBody)
+      const node = get().nodes.find((x) => x.id === fromDocId)
+      void upsertLinkIndexDoc(spaceId, fromDocId, node?.title ?? '', nextFromBody, get().nodes)
+      void get().refreshLinkPanel()
+      return true
+    } catch {
+      return false
     }
   },
 
@@ -1309,7 +1436,11 @@ export const useKnowledgeStore = create<KnowledgeState>((set, get) => ({
       await get().createDoc(picker.parentId, picker.defaultTitle)
       return
     }
-    await get().createDoc(picker.parentId, picker.defaultTitle, { body: tpl.body })
+    // V2-E1 T4.10: 模板变量替换（{{date}} / {{title}}；未知变量原样保留）。
+    const body = expandTemplateVariables(tpl.body, {
+      title: picker.defaultTitle,
+    })
+    await get().createDoc(picker.parentId, picker.defaultTitle, { body })
   },
 
   cancelTemplateCreate: () => {
@@ -1584,13 +1715,11 @@ export const useKnowledgeStore = create<KnowledgeState>((set, get) => ({
       }
 
 
-      // Prefer per-doc mode memory (P1.6); default Live when unset. Large docs force Source.
-      const remembered = loadDocEditorMode(id)
-      let editorMode = resolveEditorMode(remembered ?? 'live')
-      // Large docs force Source (Live cost); toast once per open.
+      // V2-E0: live 恒为唯一编辑表面；超大文档自动降级 source（内部兜底，无 toast——
+      // 非侵入提示由 KnowledgeWorkspace 的兼容视图 banner 负责）。
+      let editorMode = resolveEditorMode('live')
       if (editorMode === 'live' && body.length > KNOWLEDGE_LARGE_DOC_CHARS) {
         editorMode = 'source'
-        toast.message(i18n.t('knowledge.doc.largeDocForceSource'))
       }
       // Single set: body + selection + recent — avoid double React render on open.
       set((s) => {
@@ -1647,23 +1776,11 @@ export const useKnowledgeStore = create<KnowledgeState>((set, get) => ({
     if (next === 'live') {
       const len = Math.max(get().draftBody.length, get().docBody.length)
       if (len > KNOWLEDGE_LARGE_DOC_CHARS) {
-        toast.message(i18n.t('knowledge.doc.largeDocForceSource'))
         next = 'source'
       }
     }
     if (next === get().editorMode) return
-    // Leaving legacy preview (if still in state): reseed from last-saved body.
-    // live ↔ source: keep dirty draft — do not drop in-flight edits within the autosave window.
-    if (get().editorMode === 'preview') {
-      set({ editorMode: next, draftBody: get().docBody })
-    } else {
-      set({ editorMode: next })
-    }
-    if (next === 'live' || next === 'source') {
-      persistEditorModePref(next)
-      const docId = get().activeDocId
-      if (docId) persistDocEditorMode(docId, next)
-    }
+    set({ editorMode: next })
   },
 
   setDraftBody: (v, opts) => {

@@ -82,4 +82,6 @@ export type PaletteGroup = {
   id?: CommandGroupId
   heading?: string
   items: GlobalCommand[]
+  /** Keep all items during search (no needle filtering) — recent docs group. */
+  matchless?: boolean
 }

@@ -742,3 +742,150 @@ mark[data-hip-mark='highlight'] {
 .knowledge-blocknote-editor .bn-visual-media-wrapper {
   max-width: 100%;
 }
+
+/* ── ⌘K search reveal flash ──────────────────────────────────────────── */
+.kb-reveal-flash {
+  outline: 2px solid var(--accent, #6366f1);
+  outline-offset: 2px;
+  border-radius: 0.375rem;
+  transition: outline-color 0.2s ease-out;
+}
+
+/* ── Columns block (V2-E1) ─────────────────────────────────────────────── */
+.knowledge-blocknote-editor .kb-columns {
+  display: grid;
+  gap: 0.75rem;
+  align-items: start;
+}
+.knowledge-blocknote-editor .kb-column {
+  position: relative;
+  min-width: 0;
+  border: 1px solid var(--border, rgba(0, 0, 0, 0.08));
+  border-radius: 0.5rem;
+  padding: 0.25rem 0.5rem;
+  background: color-mix(in srgb, var(--surface, #fff) 60%, transparent);
+}
+.knowledge-blocknote-editor .kb-column-resizer {
+  position: absolute;
+  top: 0;
+  right: -0.4375rem;
+  width: 0.375rem;
+  height: 100%;
+  cursor: col-resize;
+  border-radius: 0.25rem;
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+.knowledge-blocknote-editor .kb-column:hover > .kb-column-resizer,
+.knowledge-blocknote-editor .kb-column-resizer:hover {
+  opacity: 1;
+  background: var(--accent, #6366f1);
+}
+
+/* ── Columns block (V2-E1) ─────────────────────────────────────────────── */
+.knowledge-blocknote-editor .kb-columns {
+  display: flex;
+  gap: 0.75rem;
+  align-items: stretch;
+  margin: 0.25rem 0;
+}
+.knowledge-blocknote-editor .kb-column {
+  position: relative;
+  min-width: 0;
+  flex: 1 1 0%;
+  border: 1px solid var(--border, rgba(0, 0, 0, 0.08));
+  border-radius: 0.5rem;
+  padding: 0.25rem 0.5rem 0.5rem;
+  background: color-mix(in srgb, var(--surface, #fff) 60%, transparent);
+}
+.knowledge-blocknote-editor .kb-column-text {
+  width: 100%;
+  resize: vertical;
+  border: none;
+  outline: none;
+  background: transparent;
+  font: inherit;
+  color: inherit;
+  line-height: 1.6;
+  padding: 0.125rem;
+  min-height: 3rem;
+}
+.knowledge-blocknote-editor .kb-column-resizer {
+  position: absolute;
+  top: 0;
+  right: -0.4375rem;
+  width: 0.375rem;
+  height: 100%;
+  cursor: col-resize;
+  border-radius: 0.25rem;
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+.knowledge-blocknote-editor .kb-column:hover > .kb-column-resizer,
+.knowledge-blocknote-editor .kb-column-resizer:hover {
+  opacity: 1;
+  background: var(--accent, #6366f1);
+}
+
+/* ── Sync block (V2-E1) ─────────────────────────────────────────────────── */
+.knowledge-blocknote-editor .kb-sync {
+  border: 1px dashed var(--border, rgba(0, 0, 0, 0.2));
+  border-radius: 0.5rem;
+  padding: 0.4rem 0.6rem;
+  margin: 0.25rem 0;
+  background: color-mix(in srgb, var(--surface, #fff) 70%, transparent);
+}
+.knowledge-blocknote-editor .kb-sync-head {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin-bottom: 0.25rem;
+}
+.knowledge-blocknote-editor .kb-sync-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--accent-strong, #6366f1);
+  cursor: pointer;
+}
+.knowledge-blocknote-editor .kb-sync-title:hover {
+  text-decoration: underline;
+}
+.knowledge-blocknote-editor .kb-sync-external {
+  opacity: 0.6;
+}
+.knowledge-blocknote-editor .kb-sync-action {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  border-radius: 0.25rem;
+  padding: 0.15rem 0.4rem;
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+  background: transparent;
+  transition: background 0.12s;
+}
+.knowledge-blocknote-editor .kb-sync-action:hover {
+  background: var(--state-hover);
+}
+.knowledge-blocknote-editor .kb-sync-self {
+  font-size: 0.7rem;
+  color: var(--danger, #dc2626);
+}
+.knowledge-blocknote-editor .kb-sync-body {
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+}
+.knowledge-blocknote-editor .kb-sync-pre {
+  margin: 0;
+  white-space: pre-wrap;
+  word-break: break-word;
+  font-family: inherit;
+  font-size: inherit;
+}
+.knowledge-blocknote-editor .kb-sync-missing {
+  font-style: italic;
+  opacity: 0.7;
+}

@@ -16,6 +16,12 @@ export type RankableGroup<T extends RankableItem = RankableItem> = {
   heading?: string
   id?: string
   items: T[]
+  /**
+   * Keep all items during search without needle filtering (pinned after ranked
+   * groups). Used by the recent-docs ⌘K group (V2-S1) — rows are contextual,
+   * not query-filtered.
+   */
+  matchless?: boolean
 }
 
 export type RankOptions = {
@@ -80,6 +86,9 @@ export function rankGroups<T extends RankableItem>(
 
   return groups
     .map((group) => {
+      if (group.matchless) {
+        return { group, max: Number.NEGATIVE_INFINITY }
+      }
       const scored = group.items
         .map((item) => {
           const base = scoreItem(item, needle)
@@ -95,7 +104,7 @@ export function rankGroups<T extends RankableItem>(
         max: scored[0]?.score ?? 0,
       }
     })
-    .filter((e) => e.max > 0)
+    .filter((e) => e.max > 0 || (e.group.matchless && e.group.items.length > 0))
     .sort((a, b) => b.max - a.max)
     .map((e) => e.group)
 }

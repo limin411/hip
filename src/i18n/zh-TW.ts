@@ -2437,7 +2437,35 @@ export const zhTW = {
       "iconNone": "無圖示",
       "iconCustomPlaceholder": "輸入或貼上 emoji…"
     },
-    "tree": {
+          "blockRef": {
+        "linkCopied": "區塊連結已複製",
+      "noPreview": "暫無預覽"
+      },
+      "sync": {
+        "pickSource": "選擇來源區塊…",
+        "unlink": "解除同步（變為普通引用連結）",
+        "selfRef": "不能嵌入自身",
+        "sourceMissing": "來源區塊已刪除或無法讀取"
+      },
+      "backlinks": {
+        "inbound": "入鏈",
+        "outbound": "出鏈",
+        "broken": "斷鏈",
+        "emptyInbound": "暫無入鏈",
+        "emptyOutbound": "暫無出鏈",
+        "emptyBroken": "沒有斷鏈 🎉",
+        "expand": "展開全部（{{count}}）",
+        "collapse": "收起",
+        "createDoc": "建立缺失文件",
+        "repoint": "重新指向",
+        "repaired": "已建立「{{title}}」並建立連結",
+        "repairFailed": "建立失敗",
+        "repointed": "已重新指向",
+        "repointFailed": "重新指向失敗",
+        "repairNoTarget": "無法從連結解析目標標題",
+        "refresh": "重新整理連結面板",
+      },
+"tree": {
       "newDoc": "文件",
       "newBoard": "畫板",
       "newFolder": "資料夾",
@@ -2621,6 +2649,8 @@ export const zhTW = {
       "file": "附件",
       "subdoc": "Sub-document",
       "copyPageLink": "Copy page link",
+      "columns": "Columns",
+      "sync": "Sync block",
       "aiContinue": "AI continue",
       "aiSummarize": "AI summarize",
       "aiToTasks": "AI to tasks",
@@ -2641,12 +2671,7 @@ export const zhTW = {
       "count": "{{count}} 個標題",
       "count_one": "{{count}} 個標題",
       "sectionOutline": "大綱",
-      "sectionBacklinks": "反向連結",
-      "sectionOutbound": "對外連結",
-      "backlinksEmpty": "尚無反向連結。在其他文件使用 [[本文標題]] 引用後會出現在這裡。",
-      "outboundEmpty": "此文件沒有 wiki 連結。",
       "loading": "載入中…",
-      "broken": "未解析"
     },
     "embed": {
       "openSource": "開啟來源文件",
@@ -2741,6 +2766,8 @@ export const zhTW = {
       "saveRetry": "重試",
       "liveLoading": "正在載入即時編輯器…",
       "liveParseFailed": "即時編輯器無法開啟此文件，已切換到原始碼模式。",
+      "compatView": "已進入相容檢視：文件較大或即時渲染失敗，目前以純文字方式編輯，內容仍完整可編輯。",
+      "compatViewClose": "知道了",
       "largeDocForceSource": "文件過大，即時編輯不可用，已切換到原始碼模式。",
       "largeDocHint": "文件較大，為效能考慮目前使用原始碼模式編輯。你仍可完整編輯全文。",
       "findPlaceholder": "在文件中查詢",
@@ -3021,6 +3048,9 @@ export const zhTW = {
       "skills": "Skills",
       "favorites": "收藏",
       "recent": "最近使用",
+      "docs": "文檔",
+      "recentDocs": "最近",
+      "count": "{{group}}（{{count}}）",
       "knowledge": "文件管理"
     },
     "navKnowledge": "文件管理",

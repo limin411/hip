@@ -92,12 +92,43 @@ export function revealHeadingInRoot(
 }
 
 /**
+ * Scroll a BN block (by `data-id`) into view; returns the element for flash.
+ * Falls back to text-match reveal (fragment may be a heading/text anchor).
+ */
+export function revealBlockInRoot(
+  root: HTMLElement,
+  blockId: string,
+  fallbackQuery?: string,
+): HTMLElement | null {
+  const blockIdMatch = blockId.trim()
+  if (blockIdMatch) {
+    const el = root.querySelector(`[data-id="${CSS.escape(blockIdMatch)}"]`)
+    if (el instanceof HTMLElement) {
+      el.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'nearest' })
+      return el
+    }
+  }
+  if (fallbackQuery) {
+    return findRevealElementInRoot(root, fallbackQuery)
+  }
+  return null
+}
+
+/**
  * Best-effort: walk text nodes under `root` and scroll the first match into view.
  * Preview markdown may reflow tokens; full-query match preferred.
  */
 export function revealInPreviewRoot(root: HTMLElement, query: string): boolean {
+  return findRevealElementInRoot(root, query) != null
+}
+
+/**
+ * Like `revealInPreviewRoot` but returns the matched element (for flash highlight),
+ * or null when no match. Caller should add/remove a temporary highlight class.
+ */
+export function findRevealElementInRoot(root: HTMLElement, query: string): HTMLElement | null {
   const q = query.trim()
-  if (!q) return false
+  if (!q) return null
   const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT)
   let node = walker.nextNode()
   while (node) {
@@ -105,7 +136,7 @@ export function revealInPreviewRoot(root: HTMLElement, query: string): boolean {
     const match = findRevealMatch(value, q)
     if (match && node.parentElement) {
       node.parentElement.scrollIntoView({ block: 'center', inline: 'nearest' })
-      return true
+      return node.parentElement
     }
     node = walker.nextNode()
   }
@@ -113,7 +144,7 @@ export function revealInPreviewRoot(root: HTMLElement, query: string): boolean {
   const all = root.textContent ?? ''
   if (findRevealMatch(all, q) != null) {
     root.scrollIntoView({ block: 'start', inline: 'nearest' })
-    return true
+    return root
   }
-  return false
+  return null
 }

@@ -21,6 +21,10 @@ export type GlobalCommandLabels = {
   groupSkills: string
   groupFavorites: string
   groupKnowledge: string
+  /** 文档 group heading for search hits (V2-S1). */
+  groupDocs?: string
+  /** 最近 group heading for recent docs (V2-S1). */
+  groupRecentDocs?: string
   groupRecent?: string
   navChat: string
   navCode: string
@@ -87,6 +91,8 @@ export type KnowledgeDocHit = {
   spaceName: string
   path: string
   snippet?: string
+  /** MiniSearch score (descending) — unused by palette, kept for tests. */
+  score?: number
 }
 
 export type GlobalCommandContext = {
@@ -129,11 +135,15 @@ export type GlobalCommandContext = {
     docId: string
     title: string
     spaceName: string
+    /** ⌘K search query — workspace scrolls + flashes the match (V2-S1). */
+    query?: string
   }) => void
   knowledgeOpenHome?: () => void
   knowledgeCreateDoc?: () => void
   searchKnowledgeDocs?: (q: string) => KnowledgeDocHit[]
   knowledgeIndexReady?: boolean
+  /** Recently opened docs (V2-S1 recent group). */
+  recentDocs?: Array<{ spaceId: string; docId: string; title: string; spaceName: string; at: number }>
   /** Terminal management (K17). */
   enterTerminals?: () => void | Promise<void>
   openLocalTerminal?: () => void | Promise<void>

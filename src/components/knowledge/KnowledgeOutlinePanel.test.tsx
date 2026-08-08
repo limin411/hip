@@ -66,17 +66,19 @@ describe('KnowledgeOutlinePanel', () => {
     })
     render(<KnowledgeOutlinePanel />)
     expect(screen.getByTestId('knowledge-doc-outline')).toBeInTheDocument()
-    expect(screen.getByTestId('knowledge-backlinks-section')).toBeInTheDocument()
+    expect(screen.getByTestId('knowledge-backlink-panel')).toBeInTheDocument()
     fireEvent.click(screen.getByTestId('knowledge-doc-outline-item-nested'))
     expect(requestOutlineJump).toHaveBeenCalledWith(
       expect.objectContaining({ id: 'nested', level: 2, text: 'Nested', line: 3 }),
     )
   })
 
-  it('lists backlinks and opens source on click', () => {
-    const openDoc = vi.fn().mockResolvedValue(undefined)
+  it('lists backlinks in the tabbed panel and opens source on click', () => {
+    const openRecent = vi.fn().mockResolvedValue(undefined)
     useKnowledgeStore.setState({
       activeDocId: 'doc_1',
+      activeSpaceId: 'spc_1',
+      spaces: [{ id: 'spc_1', name: 'S', createdAt: 0, updatedAt: 0 }],
       nodes: [
         {
           id: 'doc_1',
@@ -84,6 +86,15 @@ describe('KnowledgeOutlinePanel', () => {
           kind: 'doc',
           title: 'Hello',
           order: 0,
+          createdAt: 0,
+          updatedAt: 0,
+        },
+        {
+          id: 'doc_other',
+          parentId: null,
+          kind: 'doc',
+          title: 'Other',
+          order: 1,
           createdAt: 0,
           updatedAt: 0,
         },
@@ -100,12 +111,15 @@ describe('KnowledgeOutlinePanel', () => {
         },
       ],
       outboundLinks: [],
+      brokenLinks: [],
       linkPanelStatus: 'ready',
-      openDoc,
+      openRecent,
     })
     render(<KnowledgeOutlinePanel />)
-    fireEvent.click(screen.getByTestId('knowledge-backlink-item'))
-    expect(openDoc).toHaveBeenCalledWith('doc_other')
+    fireEvent.click(screen.getByTestId('knowledge-backlink-row-doc_other-[[Hello]]'))
+    expect(openRecent).toHaveBeenCalledWith(
+      expect.objectContaining({ spaceId: 'spc_1', docId: 'doc_other' }),
+    )
   })
 
   it('close button collapses the knowledge panel', () => {

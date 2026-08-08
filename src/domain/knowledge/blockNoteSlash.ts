@@ -244,6 +244,15 @@ export function applyKnowledgeSlashItem(
     case 'copyPageLink':
       handlers.onCopyPageLink?.()
       return
+    case 'columns':
+      insertNative(editor, {
+        type: 'columns',
+        props: { count: '2', columns: '["",""]' },
+      })
+      return
+    case 'sync':
+      insertNative(editor, { type: 'sync', props: {} })
+      return
     default:
       if (item.insert) insertMarkdownBlocks(editor, item.insert)
   }

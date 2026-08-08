@@ -5,6 +5,7 @@ import type { SkillMeta } from '@hip/protocol'
 import { insertComposerText, insertComposerTextWhenReady } from './composerBridge'
 import { parsePaletteQuery, type PaletteQueryMode } from './queryPrefix'
 import i18n from '@/i18n'
+import { formatRelativeTime } from '@/lib/datetime'
 import { toast } from 'sonner'
 
 export type CommandProvider = (ctx: GlobalCommandContext) => PaletteGroup[]
@@ -113,63 +114,119 @@ export function skillsCommandProvider(
   ]
 }
 
+const KNOWLEDGE_DOC_GROUP = 'knowledge'
+const KNOWLEDGE_RECENT_GROUP = 'knowledge-recent'
+/** Display cap for the ⌘K recent-docs group (storage cap is RECENT_CAP). */
+export const KNOWLEDGE_RECENT_GROUP_LIMIT = 8
+
+function recentItemCommand(
+  r: NonNullable<GlobalCommandContext['recentDocs']>[number],
+  ctx: GlobalCommandContext,
+): GlobalCommand {
+  const at = r.at ?? 0
+  const when = at > 0 ? formatRelativeTime(at, i18n.language) : ''
+  return {
+    id: `knowledge-recent-${r.spaceId}-${r.docId}`,
+    label: r.title,
+    description: [r.spaceName, when].filter(Boolean).join(' · ') || undefined,
+    icon: 'history' as const,
+    keywords: [r.title, r.spaceName, 'knowledge', 'recent', '最近'],
+    group: KNOWLEDGE_RECENT_GROUP,
+    run: () => {
+      ctx.openKnowledgeDoc?.({
+        spaceId: r.spaceId,
+        docId: r.docId,
+        title: r.title,
+        spaceName: r.spaceName,
+      })
+    },
+  }
+}
+
+/** 最近 docs group (V2-S1). Empty when no recent docs. */
+export function buildKnowledgeRecentDocsGroup(
+  ctx: GlobalCommandContext,
+  limit = KNOWLEDGE_RECENT_GROUP_LIMIT,
+): PaletteGroup | null {
+  const recent = ctx.recentDocs ?? []
+  if (recent.length === 0 || !ctx.labels.groupRecentDocs) return null
+  const items = recent.slice(0, limit).map((r) => recentItemCommand(r, ctx))
+  return { id: KNOWLEDGE_RECENT_GROUP, heading: ctx.labels.groupRecentDocs, items, matchless: true }
+}
+
 /**
  * Knowledge docs appear when searching (search-only long tail).
  * Opens via openKnowledgeView + openRecent — never setActiveView alone.
+ * V2-S1: emits 最近 (recent docs) + 文档（N） groups; doc Enter carries the
+ * search query so the workspace reveals + flashes the match.
  */
 export function knowledgeCommandProvider(
   ctx: GlobalCommandContext,
   opts?: { force?: boolean },
 ): PaletteGroup[] {
   const search = (ctx.search ?? '').trim()
+  const groups: PaletteGroup[] = []
   if (!search && !opts?.force) return []
-  if (!ctx.searchKnowledgeDocs) return []
+
+  if (!search) return groups
+  if (!ctx.searchKnowledgeDocs) return groups
 
   if (ctx.knowledgeIndexReady === false) {
-    return [
-      {
-        id: 'knowledge',
-        heading: ctx.labels.groupKnowledge,
-        items: [
-          {
-            id: 'knowledge-indexing',
-            label: ctx.labels.knowledgeIndexing,
-            group: 'knowledge',
-            icon: 'package',
-            run: () => {},
-          },
-        ],
-      },
-    ]
+    groups.push({
+      id: KNOWLEDGE_DOC_GROUP,
+      heading: ctx.labels.groupKnowledge,
+      items: [
+        {
+          id: 'knowledge-indexing',
+          label: ctx.labels.knowledgeIndexing,
+          group: 'knowledge',
+          icon: 'package',
+          run: () => {},
+        },
+      ],
+    })
+    return groups
   }
 
+  if (!search) return groups
   const hits = ctx.searchKnowledgeDocs(search).slice(0, 12)
-  if (hits.length === 0) return []
+  if (hits.length === 0) return groups
+
+  // Recent docs group rides along only when docs hit (mockup ②: contextual).
+  const recentDocs = buildKnowledgeRecentDocsGroup(ctx)
+  if (recentDocs) groups.push(recentDocs)
 
   const items: GlobalCommand[] = hits.map((h) => ({
     id: `knowledge-doc-${h.spaceId}-${h.docId}`,
     label: h.title,
-    description: [h.spaceName, h.path, h.snippet].filter(Boolean).join(' · ') || undefined,
+    description:
+      [h.spaceName, h.path, h.snippet]
+        .filter(Boolean)
+        .join(' · ')
+        .replace(/\s+/g, ' ') || undefined,
     icon: 'package' as const,
     keywords: [h.title, h.spaceName, h.path, 'knowledge', '知识库', '知識庫'],
-    group: 'knowledge' as const,
+    group: KNOWLEDGE_DOC_GROUP,
     run: () => {
       ctx.openKnowledgeDoc?.({
         spaceId: h.spaceId,
         docId: h.docId,
         title: h.title,
         spaceName: h.spaceName,
+        query: search,
       })
     },
   }))
 
-  return [
-    {
-      id: 'knowledge',
-      heading: ctx.labels.groupKnowledge,
-      items,
-    },
-  ]
+  groups.push({
+    id: KNOWLEDGE_DOC_GROUP,
+    heading: i18n.t('commandPalette.groups.count', {
+      group: ctx.labels.groupDocs ?? ctx.labels.groupKnowledge,
+      count: items.length,
+    }),
+    items,
+  })
+  return groups
 }
 
 export type BuildAllGroupsOpts = {

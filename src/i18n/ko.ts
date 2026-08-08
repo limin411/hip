@@ -2435,7 +2435,35 @@ export const ko = {
       "iconNone": "아이콘 없음",
       "iconCustomPlaceholder": "이모지 또는 붙여넣기…"
     },
-    "tree": {
+          "blockRef": {
+        "linkCopied": "블록 링크가 복사되었습니다",
+      "noPreview": "미리보기 없음"
+      },
+      "sync": {
+        "pickSource": "소스 블록 선택…",
+        "unlink": "동기화 해제(일반 참조 링크가 됩니다)",
+        "selfRef": "자기 자신은 임베드할 수 없습니다",
+        "sourceMissing": "소스 블록이 삭제되었거나 읽을 수 없습니다"
+      },
+      "backlinks": {
+        "inbound": "들어오는 링크",
+        "outbound": "나가는 링크",
+        "broken": "끊긴 링크",
+        "emptyInbound": "들어오는 링크 없음",
+        "emptyOutbound": "나가는 링크 없음",
+        "emptyBroken": "끊긴 링크 없음 🎉",
+        "expand": "모두 표시({{count}})",
+        "collapse": "접기",
+        "createDoc": "누락된 문서 만들기",
+        "repoint": "다시 지정",
+        "repaired": "「{{title}}」을(를) 만들고 연결했습니다",
+        "repairFailed": "만들기 실패",
+        "repointed": "다시 지정했습니다",
+        "repointFailed": "다시 지정 실패",
+        "repairNoTarget": "링크에서 대상 제목을 해석할 수 없습니다",
+        "refresh": "링크 패널 새로고침",
+      },
+"tree": {
       "newDoc": "문서",
       "newBoard": "화이트보드",
       "newFolder": "폴더",
@@ -2619,6 +2647,8 @@ export const ko = {
       "toggle": "접기",
       "subdoc": "하위 문서",
       "copyPageLink": "페이지 링크 복사",
+      "columns": "컬럼",
+      "sync": "동기화 블록",
       "aiContinue": "AI 이어쓰기",
       "aiSummarize": "AI 요약",
       "aiToTasks": "AI 작업 추출",
@@ -2639,12 +2669,7 @@ export const ko = {
       "count": "제목 {{count}}개",
       "count_one": "제목 {{count}}개",
       "sectionOutline": "개요",
-      "sectionBacklinks": "역링크",
-      "sectionOutbound": "나가는 링크",
-      "backlinksEmpty": "아직 역링크가 없습니다. 다른 문서에서 [[이 제목]]으로 링크해 보세요.",
-      "outboundEmpty": "이 문서에 위키 링크가 없습니다.",
       "loading": "불러오는 중…",
-      "broken": "확인되지 않음"
     },
     "embed": {
       "openSource": "소스 문서 열기",
@@ -2738,6 +2763,8 @@ export const ko = {
       "saved": "저장됨",
       "liveLoading": "라이브 편집기 로딩 중…",
       "liveParseFailed": "라이브 편집기에서 이 문서를 열 수 없습니다. 소스 모드로 전환했습니다.",
+      "compatView": "호환 보기로 전환했습니다: 문서가 크거나 라이브 렌더링에 실패해 일반 텍스트로 편집합니다. 내용은 계속 완전히 편집할 수 있습니다.",
+      "compatViewClose": "확인",
       "largeDocForceSource": "문서가 너무 커서 라이브 편집이 불가능합니다. 소스 모드로 전환했습니다.",
       "saveRetry": "다시 시도",
       "largeDocHint": "문서가 커서 성능상 소스 모드로 편집합니다. 전체 문서는 계속 편집할 수 있습니다.",
@@ -3019,6 +3046,9 @@ export const ko = {
       "skills": "Skills",
       "favorites": "즐겨찾기",
       "recent": "최근",
+      "docs": "문서",
+      "recentDocs": "최근",
+      "count": "{{group}}（{{count}}）",
       "knowledge": "문서"
     },
     "navKnowledge": "문서",

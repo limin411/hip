@@ -68,7 +68,11 @@ describe('carrier pure serialize/parse', () => {
 
   it('wiki / embed / toggle / image caption', () => {
     expect(serializeWiki({ title: 'A', alias: '' })).toBe('[[A]]')
-    expect(parseWikiToken('[[A|B]]')).toEqual({ title: 'A', alias: 'B' })
+    expect(parseWikiToken('[[A|B]]')).toEqual({
+      title: 'A',
+      alias: 'B',
+      fragment: null,
+    })
     expect(parseEmbedToken('![[Doc#H]]')).toEqual({ title: 'Doc', fragment: 'H' })
     expect(serializeEmbed({ title: 'Doc', fragment: 'H' }).trim()).toBe('![[Doc#H]]')
     const tog = parseToggleMd(serializeToggle({ summary: 'S', body: 'hidden' }))
@@ -114,5 +118,32 @@ describe('dialect bridge carrier round-trip (L3 goldens)', () => {
       'See <span data-hip-inline="wiki" data-title="Other" data-alias="">Other</span>.',
     )
     expect(md).toContain('[[Other]]')
+  })
+})
+
+describe('wiki fragment carriers (V2-E1 block refs)', () => {
+  it('serializeWiki keeps [[title#frag|alias]] ordering', () => {
+    expect(serializeWiki({ title: 'A', fragment: 'h2', alias: '' })).toBe('[[A#h2]]')
+    expect(serializeWiki({ title: 'A', fragment: 'h2', alias: 'B' })).toBe('[[A#h2|B]]')
+    expect(serializeWiki({ title: 'A', fragment: null, alias: 'B' })).toBe('[[A|B]]')
+  })
+
+  it('parseWikiToken parses fragment before alias', () => {
+    expect(parseWikiToken('[[A#h2|B]]')).toEqual({
+      title: 'A',
+      fragment: 'h2',
+      alias: 'B',
+    })
+    expect(parseWikiToken('[[A#h2]]')).toEqual({
+      title: 'A',
+      fragment: 'h2',
+      alias: '',
+    })
+  })
+
+  it('wiki fragment survives the carrier round-trip', () => {
+    const back = carrierRoundTrip('see [[报告#评测体系]] here\n')
+    expect(back).toContain('[[报告#评测体系]]')
+    expect(back).not.toContain('data-hip-inline')
   })
 })

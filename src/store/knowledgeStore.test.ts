@@ -135,38 +135,39 @@ describe('knowledgeStore openDoc editorMode default', () => {
     expect(knowledgeReadDoc).toHaveBeenCalledWith('spc_1', 'doc_1')
   })
 
-  it('openDoc sets editorMode source when live flag explicitly off', async () => {
+  it('V2-E0: residual hip-knowledge-live=false still opens live (flag retired)', async () => {
     localStorage.setItem('hip-knowledge-live', 'false')
     knowledgeReadDoc.mockResolvedValueOnce('# hello')
     await useKnowledgeStore.getState().openDoc('doc_1')
-    expect(useKnowledgeStore.getState().editorMode).toBe('source')
+    expect(useKnowledgeStore.getState().editorMode).toBe('live')
   })
 
-  it('openDoc opens Live when only global source pref is stored (no per-doc memory)', async () => {
+  it('V2-E0: global source pref is ignored — opens live', async () => {
     localStorage.setItem('hip-knowledge-editor-mode', 'source')
     knowledgeReadDoc.mockResolvedValueOnce('# hello')
     await useKnowledgeStore.getState().openDoc('doc_1')
     expect(useKnowledgeStore.getState().editorMode).toBe('live')
   })
 
-  it('openDoc restores per-doc Source memory', async () => {
+  it('V2-E0: per-doc Source memory is retired — opens live', async () => {
     localStorage.setItem(
       'hip-knowledge-editor-mode-by-doc',
       JSON.stringify({ doc_1: 'source' }),
     )
     knowledgeReadDoc.mockResolvedValueOnce('# hello')
     await useKnowledgeStore.getState().openDoc('doc_1')
-    expect(useKnowledgeStore.getState().editorMode).toBe('source')
+    expect(useKnowledgeStore.getState().editorMode).toBe('live')
   })
 
-  it('openDoc forces source when live on but body is large', async () => {
+  it('openDoc forces source when live on but body is large (internal fallback)', async () => {
     const { KNOWLEDGE_LARGE_DOC_CHARS } = await import('@/domain/knowledge/limits')
     const big = 'y'.repeat(KNOWLEDGE_LARGE_DOC_CHARS + 10)
     knowledgeReadDoc.mockResolvedValueOnce(big)
     await useKnowledgeStore.getState().openDoc('doc_1')
     expect(useKnowledgeStore.getState().editorMode).toBe('source')
     expect(useKnowledgeStore.getState().docBody.length).toBe(big.length)
-    expect(toast.message).toHaveBeenCalled()
+    // V2-E0: 非侵入提示由兼容视图 banner 负责，不再弹 toast。
+    expect(toast.message).not.toHaveBeenCalled()
   })
 })
 
@@ -811,9 +812,9 @@ describe('knowledgeStore setEditorMode', () => {
 
   it('setEditorMode preview normalizes to live (deprecated writing mode)', async () => {
     await useKnowledgeStore.getState().setEditorMode('preview')
-    // No flush-to-enter-preview path; preview is not a writing surface.
+    // V2-E0: preview 不是写入表面；归一为 live，且不再写任何模式偏好。
     expect(useKnowledgeStore.getState().editorMode).toBe('live')
-    expect(localStorage.getItem('hip-knowledge-editor-mode')).toBe('live')
+    expect(localStorage.getItem('hip-knowledge-editor-mode')).toBeNull()
   })
 
   it.skip('leaving legacy preview state reseeds draft from docBody', async () => {
@@ -825,19 +826,19 @@ describe('knowledgeStore setEditorMode', () => {
     await useKnowledgeStore.getState().setEditorMode('source')
     expect(useKnowledgeStore.getState().editorMode).toBe('source')
     expect(useKnowledgeStore.getState().draftBody).toBe('on-disk')
-    expect(localStorage.getItem('hip-knowledge-editor-mode')).toBe('source')
+    expect(localStorage.getItem('hip-knowledge-editor-mode')).toBeNull()
   })
 
-  it('clamps live to source when flag is explicitly off', async () => {
+  it('V2-E0: live flag false no longer clamps live to source', async () => {
     localStorage.setItem('hip-knowledge-live', 'false')
     await useKnowledgeStore.getState().setEditorMode('live')
-    expect(useKnowledgeStore.getState().editorMode).toBe('source')
+    expect(useKnowledgeStore.getState().editorMode).toBe('live')
   })
 
-  it('allows live when flag is on (product default)', async () => {
+  it('allows live by default and writes no mode preference', async () => {
     await useKnowledgeStore.getState().setEditorMode('live')
     expect(useKnowledgeStore.getState().editorMode).toBe('live')
-    expect(localStorage.getItem('hip-knowledge-editor-mode')).toBe('live')
+    expect(localStorage.getItem('hip-knowledge-editor-mode')).toBeNull()
   })
 
   it('live ↔ source keeps dirty draft (no silent reseed)', async () => {
@@ -2273,5 +2274,311 @@ describe('knowledgeStore 深目录（20+ 层）', () => {
     // 直达深处文档
     await kb.navigateTo('nod_deep19', 'doc_deep')
     expect(useKnowledgeStore.getState().activeDocId).toBe('doc_deep')
+  })
+})
+
+describe('knowledgeStore pendingReveal setter (V2-S1)', () => {
+  it('setPendingReveal stores the reveal target; clear removes it', () => {
+    const kb = useKnowledgeStore.getState()
+    kb.setPendingReveal({ query: 'harness', spaceId: 'sp', docId: 'd1' })
+    expect(useKnowledgeStore.getState().pendingReveal).toEqual({
+      query: 'harness',
+      spaceId: 'sp',
+      docId: 'd1',
+    })
+    kb.clearPendingReveal()
+    expect(useKnowledgeStore.getState().pendingReveal).toBeNull()
+  })
+})
+
+describe('knowledgeStore recent list (V2-N1)', () => {
+  function nodes(count: number) {
+    return Array.from({ length: count }, (_, i) => ({
+      id: `doc_${i}`,
+      parentId: null,
+      kind: 'doc' as const,
+      title: `Doc ${i}`,
+      order: 0,
+      createdAt: i,
+      updatedAt: i,
+    }))
+  }
+
+  beforeEach(() => {
+    knowledgeReadDoc.mockReset()
+    knowledgeReadDoc.mockResolvedValue('# hello')
+    knowledgeGetTree.mockReset()
+    knowledgeEnsureRoot.mockReset()
+    knowledgeListSpaces.mockReset()
+    localStorage.removeItem('hip-knowledge-recent')
+    useKnowledgeStore.setState({
+      loaded: true,
+      spaces: [{ id: 'spc_1', name: 'S', createdAt: 1, updatedAt: 1 }],
+      activeSpaceId: 'spc_1',
+      nodes: nodes(3),
+      activeDocId: null,
+      docBody: '',
+      draftBody: '',
+      editorMode: 'live',
+      mode: 'workspace',
+      searchQuery: '',
+      searchHits: [],
+      indexStatus: 'idle',
+      spaceDocCounts: { spc_1: 3 },
+      recent: [],
+      expandedFolderIds: {},
+      busy: false,
+      error: null,
+      saveState: 'idle',
+    })
+  })
+
+  it('opening A → B → A dedupes A and moves it to the front', async () => {
+    const kb = useKnowledgeStore.getState()
+    await kb.openDoc('doc_0')
+    await kb.openDoc('doc_1')
+    await kb.openDoc('doc_0')
+    const recent = useKnowledgeStore.getState().recent
+    expect(recent.map((r) => r.docId)).toEqual(['doc_0', 'doc_1'])
+    expect(recent[0]?.title).toBe('Doc 0')
+    expect(recent[0]?.spaceName).toBe('S')
+  })
+
+  it('caps recent at RECENT_CAP and drops the oldest', async () => {
+    // Pre-seed the cap with older docs (all different ids).
+    const seeded = Array.from({ length: 16 }, (_, i) => ({
+      spaceId: 'spc_1',
+      docId: `old_${i}`,
+      title: `Old ${i}`,
+      spaceName: 'S',
+      at: 1_000 + i,
+    }))
+    useKnowledgeStore.setState({ recent: seeded })
+    await useKnowledgeStore.getState().openDoc('doc_0')
+    const recent = useKnowledgeStore.getState().recent
+    expect(recent).toHaveLength(16)
+    expect(recent[0]?.docId).toBe('doc_0')
+    expect(recent.some((r) => r.docId === 'old_15')).toBe(false)
+  })
+
+  it('persists to the legacy localStorage key hip-knowledge-recent', async () => {
+    await useKnowledgeStore.getState().openDoc('doc_0')
+    const raw = localStorage.getItem('hip-knowledge-recent')
+    expect(raw).toBeTruthy()
+    const parsed = JSON.parse(raw!) as Array<{ docId: string }>
+    expect(parsed[0]?.docId).toBe('doc_0')
+  })
+
+  it('dropRecent removes a single entry and persists', async () => {
+    useKnowledgeStore.setState({
+      recent: [
+        { spaceId: 'spc_1', docId: 'doc_0', title: 'A', spaceName: 'S', at: 1 },
+        { spaceId: 'spc_1', docId: 'doc_1', title: 'B', spaceName: 'S', at: 2 },
+      ],
+    })
+    useKnowledgeStore.getState().dropRecent('spc_1', 'doc_0')
+    const recent = useKnowledgeStore.getState().recent
+    expect(recent.map((r) => r.docId)).toEqual(['doc_1'])
+    const parsed = JSON.parse(localStorage.getItem('hip-knowledge-recent')!) as Array<{
+      docId: string
+    }>
+    expect(parsed.map((r) => r.docId)).toEqual(['doc_1'])
+  })
+})
+
+describe('knowledgeStore broken-link repair (V2-L1 T5.3/T5.4)', () => {
+  beforeEach(() => {
+    knowledgeReadDoc.mockReset()
+    knowledgeWriteDoc.mockReset()
+    knowledgeSaveTree.mockReset()
+    knowledgeSaveTree.mockResolvedValue(undefined)
+    knowledgeWriteDoc.mockResolvedValue(undefined)
+    knowledgeGetTree.mockReset()
+    knowledgeEnsureRoot.mockReset()
+    knowledgeListSpaces.mockReset()
+    knowledgeLinkIndexUpsert.mockReset()
+    knowledgeLinkIndexUpsert.mockResolvedValue(undefined)
+    useKnowledgeStore.setState({
+      loaded: true,
+      spaces: [{ id: 'spc_1', name: 'S', createdAt: 1, updatedAt: 1 }],
+      activeSpaceId: 'spc_1',
+      nodes: [
+        {
+          id: 'doc_cur',
+          parentId: null,
+          kind: 'doc',
+          title: '当前',
+          order: 0,
+          createdAt: 1,
+          updatedAt: 1,
+        },
+      ],
+      activeDocId: 'doc_cur',
+      docBody: '',
+      draftBody: '',
+      editorMode: 'live',
+      mode: 'workspace',
+      searchQuery: '',
+      searchHits: [],
+      indexStatus: 'idle',
+      spaceDocCounts: { spc_1: 1 },
+      recent: [],
+      expandedFolderIds: {},
+      busy: false,
+      error: null,
+      saveState: 'idle',
+      backlinks: [],
+      outboundLinks: [],
+      brokenLinks: [],
+      linkPanelStatus: 'idle',
+    })
+  })
+
+  it('repairBrokenLink creates the doc, rewrites the raw link (alias), and reindexes', async () => {
+    knowledgeReadDoc.mockResolvedValue('see [[缺失文档|旧别名]] here')
+    const id = await useKnowledgeStore.getState().repairBrokenLink(
+      'doc_cur',
+      '[[缺失文档|旧别名]]',
+      '缺失文档',
+    )
+    expect(id).toBeTruthy()
+    // 新文档已写入树。
+    const nodes = useKnowledgeStore.getState().nodes
+    expect(nodes.some((n) => n.id === id)).toBe(true)
+    expect(nodes.find((n) => n.id === id)?.title).toBe('缺失文档')
+    // 引用方 raw（含别名）被改写为无别名的新标题链接。
+    const writeCalls = knowledgeWriteDoc.mock.calls.filter((c) => c[1] === 'doc_cur')
+    expect(writeCalls.length).toBeGreaterThan(0)
+    expect(writeCalls[0]![2]).toContain('[[缺失文档]]')
+    expect(writeCalls[0]![2]).not.toContain('旧别名')
+  })
+
+  it('repairBrokenLink appends (2) for duplicate titles', async () => {
+    knowledgeReadDoc.mockResolvedValue('x')
+    useKnowledgeStore.setState({
+      nodes: [
+        {
+          id: 'doc_cur',
+          parentId: null,
+          kind: 'doc',
+          title: '当前',
+          order: 0,
+          createdAt: 1,
+          updatedAt: 1,
+        },
+        {
+          id: 'doc_dup',
+          parentId: null,
+          kind: 'doc',
+          title: '缺失文档',
+          order: 1,
+          createdAt: 1,
+          updatedAt: 1,
+        },
+      ],
+    })
+    const id = await useKnowledgeStore.getState().repairBrokenLink('doc_cur', '[[缺失文档]]', '缺失文档')
+    expect(useKnowledgeStore.getState().nodes.find((n) => n.id === id)?.title).toBe(
+      '缺失文档 (2)',
+    )
+  })
+
+  it('repairBrokenLink returns null when the disk write fails (index untouched)', async () => {
+    knowledgeWriteDoc.mockRejectedValueOnce(new Error('disk full'))
+    const id = await useKnowledgeStore.getState().repairBrokenLink(
+      'doc_cur',
+      '[[缺失文档]]',
+      '缺失文档',
+    )
+    expect(id).toBeNull()
+    // 索引未被更新（最后写原则）。
+    expect(knowledgeLinkIndexUpsert).not.toHaveBeenCalled()
+  })
+
+  it('repointBrokenLink rewrites the link to the new target', async () => {
+    knowledgeReadDoc.mockResolvedValue('see [[旧目标]] here')
+    const ok = await useKnowledgeStore
+      .getState()
+      .repointBrokenLink('doc_cur', '[[旧目标]]', '新目标')
+    expect(ok).toBe(true)
+    const writeCalls = knowledgeWriteDoc.mock.calls.filter((c) => c[1] === 'doc_cur')
+    expect(writeCalls[0]![2]).toContain('[[新目标]]')
+  })
+})
+
+describe('knowledgeStore search index incremental update (V2-P1 T6.3)', () => {
+  beforeEach(() => {
+    knowledgeWriteDoc.mockReset()
+    knowledgeWriteDoc.mockResolvedValue(undefined)
+    knowledgeReadDoc.mockReset()
+    knowledgeReadDoc.mockResolvedValue('# old')
+    knowledgeGetTree.mockReset()
+    knowledgeEnsureRoot.mockReset()
+    knowledgeListSpaces.mockReset()
+    useKnowledgeStore.setState({
+      loaded: true,
+      spaces: [{ id: 'spc_1', name: 'S', createdAt: 1, updatedAt: 1 }],
+      activeSpaceId: 'spc_1',
+      nodes: [
+        { id: 'doc_a', parentId: null, kind: 'doc', title: 'Alpha', order: 0, createdAt: 1, updatedAt: 1 },
+        { id: 'doc_b', parentId: null, kind: 'doc', title: 'Beta', order: 1, createdAt: 1, updatedAt: 1 },
+      ],
+      activeDocId: 'doc_a',
+      treeFocusId: 'doc_a',
+      docBody: '# old',
+      draftBody: '# old',
+      editorMode: 'live',
+      mode: 'workspace',
+      searchQuery: '',
+      searchHits: [],
+      indexStatus: 'ready',
+      spaceDocCounts: { spc_1: 2 },
+      recent: [],
+      expandedFolderIds: {},
+      busy: false,
+      error: null,
+      saveState: 'idle',
+      backlinks: [],
+      outboundLinks: [],
+      brokenLinks: [],
+      linkPanelStatus: 'idle',
+    })
+  })
+
+  it('saving one doc updates only its index entry — no full rebuild', async () => {
+    const { __seedKbIndexForTests, searchKnowledgeDocs } = await import('./knowledgeStore')
+    __seedKbIndexForTests([
+      {
+        id: 'spc_1:doc_a',
+        spaceId: 'spc_1',
+        docId: 'doc_a',
+        title: 'Alpha',
+        spaceName: 'S',
+        path: 'Alpha',
+        body: '# old words',
+      },
+      {
+        id: 'spc_1:doc_b',
+        spaceId: 'spc_1',
+        docId: 'doc_b',
+        title: 'Beta',
+        spaceName: 'S',
+        path: 'Beta',
+        body: 'beta only',
+      },
+    ])
+    // 编辑 doc_a 并保存。
+    useKnowledgeStore.getState().setDraftBody('# brand new unique-token-alpha', {
+      docId: 'doc_a',
+      persist: 'now',
+    })
+    await vi.waitFor(() => {
+      expect(knowledgeWriteDoc).toHaveBeenCalled()
+    })
+    // 单文档变更不触发全量重建（indexStatus 保持 ready，无 building 阶段）。
+    expect(useKnowledgeStore.getState().indexStatus).toBe('ready')
+    // 增量路径：doc_a 新内容可检索，doc_b 内容不受影响。
+    expect(searchKnowledgeDocs('unique-token-alpha').map((h) => h.docId)).toContain('doc_a')
+    expect(searchKnowledgeDocs('beta only').map((h) => h.docId)).toContain('doc_b')
   })
 })

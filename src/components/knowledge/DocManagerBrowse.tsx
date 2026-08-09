@@ -10,23 +10,14 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
-import { FileText, Folder, Grid3X3, List, MoreHorizontal, Plus } from 'lucide-react'
+import { FileText, Folder, Grid3X3, List, Plus } from 'lucide-react'
 import { DeclarativeContextMenu } from '@/components/context-menu'
-import { buildContextMenuItems } from '@/components/context-menu/registry'
-import { createContextMenuBuildContext } from '@/components/context-menu/buildContext'
-import type { ContextMenuItemDef, ContextRequest } from '@/components/context-menu/types'
-import {
-  DropdownMenu,
-  DropdownMenuTrigger,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-} from '@/components/ui/DropdownMenu'
 import { knowledgeRevealDoc } from '@/ipc/knowledge'
 import { getPath, listChildren } from '@/domain/knowledge/tree'
 import type { KnowledgeNode } from '@/domain/knowledge/types'
 import { cn } from '@/lib/utils'
 import { useKnowledgeStore } from '@/store/knowledgeStore'
+import { NodeRowMenu } from './NodeRowMenu'
 
 function sortLevel(a: KnowledgeNode, b: KnowledgeNode): number {
   if (a.kind === 'folder' && b.kind !== 'folder') return -1
@@ -44,74 +35,6 @@ function formatUpdated(ts: number): string {
   } catch {
     return ''
   }
-}
-
-/** 行尾 ⋯ 菜单：与右键菜单共用 knowledgeNode provider（单一数据源）。 */
-function NodeRowMenu({
-  node,
-  payload,
-}: {
-  node: KnowledgeNode
-  payload: {
-    nodeId: string
-    kind: KnowledgeNode['kind']
-    spaceId: string
-    onNewDoc: () => void
-    onNewFolder: () => void
-    onRename: () => void
-    onDelete: () => void
-    onReveal?: () => void
-    onCopyPath: () => void
-  }
-}) {
-  const { t } = useTranslation()
-  const [items, setItems] = useState<ContextMenuItemDef[]>([])
-  const [open, setOpen] = useState(false)
-  return (
-    <DropdownMenu
-      modal={false}
-      open={open}
-      onOpenChange={(next) => {
-        setOpen(next)
-        if (next) {
-          const ctx = createContextMenuBuildContext(t, {})
-          setItems(
-            buildContextMenuItems(
-              { kind: 'knowledgeNode', payload } as ContextRequest,
-              ctx,
-            ),
-          )
-        }
-      }}
-    >
-      <DropdownMenuTrigger asChild>
-        <button
-          type="button"
-          data-testid={`browse-row-menu-${node.id}`}
-          aria-label={t('knowledge.tree.rename')}
-          onClick={(e) => e.stopPropagation()}
-          className="flex h-6 w-6 items-center justify-center rounded-md text-ink-tertiary transition-colors hover:bg-state-hover hover:text-ink"
-        >
-          <MoreHorizontal size={14} aria-hidden />
-        </button>
-      </DropdownMenuTrigger>
-      <DropdownMenuContent align="end">
-        {items.map((item, i) => (
-          <div key={item.id}>
-            {i > 0 && items[i - 1].group !== item.group ? (
-              <DropdownMenuSeparator />
-            ) : null}
-            <DropdownMenuItem
-              className={item.danger ? 'text-danger' : undefined}
-              onSelect={() => item.run()}
-            >
-              {item.label}
-            </DropdownMenuItem>
-          </div>
-        ))}
-      </DropdownMenuContent>
-    </DropdownMenu>
-  )
 }
 
 export function DocManagerBrowse() {
@@ -495,7 +418,11 @@ export function DocManagerBrowse() {
                           <FileText size={20} className="text-ink-tertiary" strokeWidth={1.6} aria-hidden />
                         )}
                         <span className="absolute -right-1 -top-1 flex opacity-0 transition-opacity group-hover:opacity-100">
-                          <NodeRowMenu node={node} payload={rowMenuPayload(node)} />
+                          <NodeRowMenu
+                            nodeId={node.id}
+                            payload={rowMenuPayload(node)}
+                            className="flex h-6 w-6 items-center justify-center rounded-md text-ink-tertiary transition-colors hover:bg-state-hover hover:text-ink"
+                          />
                         </span>
                       </div>
                       {editing ? (
@@ -601,7 +528,11 @@ export function DocManagerBrowse() {
                           : formatUpdated(node.updatedAt)}
                       </span>
                       <span className="flex-none opacity-0 transition-opacity group-hover:opacity-100">
-                        <NodeRowMenu node={node} payload={rowMenuPayload(node)} />
+                        <NodeRowMenu
+                          nodeId={node.id}
+                          payload={rowMenuPayload(node)}
+                          className="flex h-6 w-6 items-center justify-center rounded-md text-ink-tertiary transition-colors hover:bg-state-hover hover:text-ink"
+                        />
                       </span>
                     </div>
                   </DeclarativeContextMenu>

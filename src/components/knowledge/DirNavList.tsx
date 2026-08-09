@@ -20,6 +20,7 @@ import { getPath, listChildren } from '@/domain/knowledge/tree'
 import type { KnowledgeNode } from '@/domain/knowledge/types'
 import { cn } from '@/lib/utils'
 import { useKnowledgeStore } from '@/store/knowledgeStore'
+import { NodeRowMenu } from './NodeRowMenu'
 
 /** 当前层级排序：文件夹优先，其次按名称排序。 */
 function sortLevel(a: KnowledgeNode, b: KnowledgeNode): number {
@@ -328,85 +329,110 @@ export function DirNavList() {
               const activeDoc = node.kind !== 'folder' && node.id === activeDocId
               const active = activeFolder || activeDoc
               const editing = editingId === node.id
+              const rowPayload = {
+                nodeId: node.id,
+                kind: node.kind,
+                spaceId: activeSpaceId ?? '',
+                onNewDoc: () => {
+                  const parent = newIn(node)
+                  void useKnowledgeStore
+                    .getState()
+                    .requestCreateDoc(parent, t('knowledge.doc.untitled'))
+                },
+                onNewFolder: () => {
+                  const parent = newIn(node)
+                  void useKnowledgeStore
+                    .getState()
+                    .createFolder(parent, t('knowledge.tree.newFolder'))
+                },
+                onRename: () => startRename(node),
+                onDelete: () => deleteNode(node),
+                onReveal: node.kind === 'doc' ? () => reveal(node) : undefined,
+                onCopyPath: () => copyPath(node),
+              }
               return (
                 <li key={node.id} className="mb-0.5">
                   <DeclarativeContextMenu
                     kind="knowledgeNode"
-                    payload={{
-                      nodeId: node.id,
-                      kind: node.kind,
-                      spaceId: activeSpaceId ?? '',
-                      onNewDoc: () => {
-                        const parent = newIn(node)
-                        void useKnowledgeStore
-                          .getState()
-                          .requestCreateDoc(parent, t('knowledge.doc.untitled'))
-                      },
-                      onNewFolder: () => {
-                        const parent = newIn(node)
-                        void useKnowledgeStore
-                          .getState()
-                          .createFolder(parent, t('knowledge.tree.newFolder'))
-                      },
-                      onRename: () => startRename(node),
-                      onDelete: () => deleteNode(node),
-                      onReveal: node.kind === 'doc' ? () => reveal(node) : undefined,
-                      onCopyPath: () => copyPath(node),
-                    }}
+                    payload={rowPayload}
                     className="block w-full"
                   >
-                    <button
-                      type="button"
-                      data-testid={`dir-row-${node.id}`}
-                      data-node-kind={node.kind}
-                      data-no-drag
-                      aria-current={active ? 'true' : undefined}
-                      onClick={() => {
-                        if (node.kind === 'folder') enterFolder(node.id)
-                        else void useKnowledgeStore.getState().openDoc(node.id)
-                      }}
-                      className={cn(
-                        'flex w-full items-center gap-2 rounded-lg px-2.5 py-[var(--row-pad-y-session)] text-left transition-colors',
-                        'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink/20',
-                        active
-                          ? 'relative bg-accent/10 font-medium text-ink before:absolute before:inset-y-1.5 before:left-0 before:w-0.5 before:rounded-full before:bg-accent'
-                          : 'hover:bg-state-hover',
-                      )}
-                    >
-                      {node.kind === 'folder' ? (
-                        <Folder size={14} className="shrink-0 text-accent" aria-hidden />
-                      ) : (
-                        <FileText size={14} className="shrink-0 text-ink-tertiary" aria-hidden />
-                      )}
-                      {editing ? (
-                        <input
-                          autoFocus
-                          data-testid={`dir-rename-${node.id}`}
-                          data-no-drag
-                          value={editTitle}
-                          placeholder={node.title}
-                          onFocus={(e) => e.target.select()}
-                          onChange={(e) => setEditTitle(e.target.value)}
-                          onKeyDown={(e) => {
-                            if (e.key === 'Enter') {
-                              e.stopPropagation()
-                              confirmRename(node)
-                            } else if (e.key === 'Escape') {
-                              e.stopPropagation()
-                              setEditingId(null)
-                            }
-                          }}
-                          onBlur={() => confirmRename(node)}
-                          onClick={(e) => e.stopPropagation()}
-                          className="min-w-0 flex-1 rounded-sm border border-accent/50 bg-surface px-1 py-0.5 text-body text-ink outline-none"
-                        />
-                      ) : (
-                        <span className="min-w-0 flex-1 truncate text-body text-ink">
-                          {node.title}
-                        </span>
-                      )}
+                    <div className="group relative">
+                      <button
+                        type="button"
+                        data-testid={`dir-row-${node.id}`}
+                        data-node-kind={node.kind}
+                        data-no-drag
+                        aria-current={active ? 'true' : undefined}
+                        onClick={() => {
+                          if (node.kind === 'folder') enterFolder(node.id)
+                          else void useKnowledgeStore.getState().openDoc(node.id)
+                        }}
+                        className={cn(
+                          'flex w-full items-center gap-2 rounded-lg px-2.5 py-[var(--row-pad-y-session)] pr-12 text-left transition-colors',
+                          'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink/20',
+                          active
+                            ? 'relative bg-state-hover font-medium text-ink before:absolute before:inset-y-1.5 before:left-0 before:w-0.5 before:rounded-full before:bg-border-strong'
+                            : 'hover:bg-state-hover',
+                        )}
+                      >
+                        {node.kind === 'folder' ? (
+                          <Folder size={14} className="shrink-0 text-accent" aria-hidden />
+                        ) : (
+                          <FileText size={14} className="shrink-0 text-ink-tertiary" aria-hidden />
+                        )}
+                        {editing ? (
+                          <input
+                            autoFocus
+                            data-testid={`dir-rename-${node.id}`}
+                            data-no-drag
+                            value={editTitle}
+                            placeholder={node.title}
+                            onFocus={(e) => e.target.select()}
+                            onChange={(e) => setEditTitle(e.target.value)}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter') {
+                                e.stopPropagation()
+                                confirmRename(node)
+                              } else if (e.key === 'Escape') {
+                                e.stopPropagation()
+                                setEditingId(null)
+                              }
+                            }}
+                            onBlur={() => confirmRename(node)}
+                            onClick={(e) => e.stopPropagation()}
+                            className="min-w-0 flex-1 rounded-sm border border-accent/50 bg-surface px-1 py-0.5 text-body text-ink outline-none"
+                          />
+                        ) : (
+                          <span className="min-w-0 flex-1 truncate text-body text-ink">
+                            {node.title}
+                          </span>
+                        )}
+                      </button>
 
-                    </button>
+                      {/* T12: hover 行尾 ＋（新建子项）与 ⋯（菜单，与右键同一 provider） */}
+                      <div className="absolute right-1 top-1/2 hidden -translate-y-1/2 items-center gap-0.5 group-hover:flex">
+                        <button
+                          type="button"
+                          data-testid={`dir-row-add-${node.id}`}
+                          aria-label={t('knowledge.tree.newDoc')}
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            void useKnowledgeStore
+                              .getState()
+                              .requestCreateDoc(newIn(node), t('knowledge.doc.untitled'))
+                          }}
+                          className="flex h-[18px] w-[18px] items-center justify-center rounded-[4px] text-ink-tertiary transition-colors hover:bg-bg-muted hover:text-ink"
+                        >
+                          <Plus size={12} aria-hidden />
+                        </button>
+                        <NodeRowMenu
+                          nodeId={node.id}
+                          payload={rowPayload}
+                          className="flex h-[18px] w-[18px] items-center justify-center rounded-[4px] text-ink-tertiary transition-colors hover:bg-bg-muted hover:text-ink"
+                        />
+                      </div>
+                    </div>
                   </DeclarativeContextMenu>
                 </li>
               )

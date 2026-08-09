@@ -112,7 +112,7 @@ describe('DirNavList 排序', () => {
   it('文件夹在前，目录与文件各自按名称升序', () => {
     render(<DirNavList />)
     const rows = screen
-      .getAllByTestId(/^dir-row-/)
+      .getAllByTestId(/^dir-row-(?!add-)/)
       .map((el) => el.getAttribute('data-testid'))
     expect(rows).toEqual([
       'dir-row-nod_a',

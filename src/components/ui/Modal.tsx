@@ -221,7 +221,7 @@ export function Modal({
           {/*
             Use flex-auto (1 1 auto), not flex-1 (1 1 0%). With h-fit / content-sized
             panels, flex-basis 0% + min-h-0 collapses the body to 0 height so only the
-            title bar remains (embedding/rerank endpoint dialogs, etc.).
+            title bar remains (large resizable dialogs, etc.).
             flex-auto keeps content height for non-resizable modals and still fills
             remaining space when height is fixed (resizable).
             Shell: flex column so large panels can fill height without outer scroll.

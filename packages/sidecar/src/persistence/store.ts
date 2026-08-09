@@ -18,7 +18,6 @@ import type {
 import { parseTurnUsageJson, serializeTurnUsage, sumUsage } from '../session/usage.js'
 import { surfaceOf } from '../session/surface.js'
 import { logInfo } from '../debug-logger.js'
-import { deleteEmbeddings } from '../memory/vec.js'
 
 const PREVIEW_LEN = 80
 
@@ -688,31 +687,6 @@ export class SessionStore {
       runIgnoreMissing(`DELETE FROM session_context_epoch WHERE session_id=?`, id)
       runIgnoreMissing(`DELETE FROM cron_tasks WHERE session_id=?`, id)
       // Memory tables (v16): may be missing on older fixtures / partial schemas.
-      // Collect ids before DELETE so embeddings (no FK) are not orphaned.
-      const memoryIdsToDrop: string[] = []
-      try {
-        const sessionScoped = this.db
-          .prepare(`SELECT id FROM memory_items WHERE scope='session' AND session_id=?`)
-          .all(id) as { id: string }[]
-        for (const r of sessionScoped) memoryIdsToDrop.push(r.id)
-        if (deleteDerived) {
-          const derived = this.db
-            .prepare(`SELECT id FROM memory_items WHERE source_session_id=?`)
-            .all(id) as { id: string }[]
-          for (const r of derived) memoryIdsToDrop.push(r.id)
-        }
-      } catch (e) {
-        const msg = e instanceof Error ? e.message : String(e)
-        if (!msg.includes('no such table')) throw e
-      }
-      if (memoryIdsToDrop.length > 0) {
-        try {
-          deleteEmbeddings(this.db, [...new Set(memoryIdsToDrop)])
-        } catch (e) {
-          const msg = e instanceof Error ? e.message : String(e)
-          if (!msg.includes('no such table')) throw e
-        }
-      }
       runIgnoreMissing(`DELETE FROM memory_items WHERE scope='session' AND session_id=?`, id)
       runIgnoreMissing(`DELETE FROM memory_stage1 WHERE session_id=?`, id)
       if (deleteDerived) {

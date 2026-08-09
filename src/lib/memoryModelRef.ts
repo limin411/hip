@@ -1,5 +1,4 @@
 import type { MemoryModelRef } from '@hip/protocol'
-import type { Catalog } from '@/ipc/catalog'
 import { parseModelKey } from '@/lib/modelKey'
 
 /** Stable select value for a role-model ref or legacy string. */
@@ -25,18 +24,3 @@ export function memoryModelRefFromKey(
   if (!providerID || !modelID) return undefined
   return baseURL ? { providerID, modelID, baseURL } : { providerID, modelID }
 }
-
-/**
- * Whether the active chat provider can use the one-click embedding recommendation
- * (`text-embedding-3-small` on that provider).
- */
-export function canRecommendEmbedding(providerID: string, catalog: Catalog): boolean {
-  if (providerID === 'openai') return true
-  const p = catalog[providerID]
-  if (!p) return false
-  if (p.custom) return true
-  if (p.npm === '@ai-sdk/openai' || p.npm === '@ai-sdk/openai-compatible') return true
-  return false
-}
-
-export const RECOMMENDED_EMBEDDING_MODEL_ID = 'text-embedding-3-small'

@@ -1,33 +1,14 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Pencil, Plus } from 'lucide-react'
-import { toast } from 'sonner'
-import type { MemoryFileConfig } from '@hip/protocol'
 import { useProvidersStore } from '@/store/providersStore'
 import { groupProviders } from '@/lib/providerGroups'
-import {
-  buildMemoryEndpointRef,
-  memoryEndpointKeyProviderId,
-  memoryEndpointProviderId,
-  resolveMemoryApiFormat,
-  type MemoryEndpointPurpose,
-} from '@/lib/memoryEndpoint'
-import type { EndpointDraft } from './EndpointModelDialog'
-import {
-  isProviderKeyConfigured,
-  saveProviderKey,
-  clearProviderKey,
-} from '@/ipc/secrets'
-import { sessionService } from '@/domain'
 import { Button } from '@/components/ui/Button'
 import { Badge } from '@/components/ui/Badge'
 import { Modal } from '@/components/ui/Modal'
 import { ProviderList } from './ProviderList'
 import { ProviderDetail } from './ProviderDetail'
 import { AddProviderDialog } from './AddProviderDialog'
-import { EndpointModelDialog } from './EndpointModelDialog'
-
-type DialogKind = 'base' | MemoryEndpointPurpose | null
 
 export function ModelConfig() {
   const { t } = useTranslation()
@@ -48,114 +29,21 @@ export function ModelConfig() {
   const [filter, setFilter] = useState('')
   const [addOpen, setAddOpen] = useState(false)
   const [showIncompatible, setShowIncompatible] = useState(false)
-  const [dialog, setDialog] = useState<DialogKind>(null)
-  const [memoryCfg, setMemoryCfg] = useState<MemoryFileConfig | null>(null)
-  const [memoryBusy, setMemoryBusy] = useState(false)
-  const [endpointKeyOk, setEndpointKeyOk] = useState<{
-    embedding: boolean
-    rerank: boolean
-    embeddingVirtual: boolean
-    rerankVirtual: boolean
-  }>({
-    embedding: false,
-    rerank: false,
-    embeddingVirtual: false,
-    rerankVirtual: false,
-  })
+  const [dialog, setDialog] = useState<'base' | null>(null)
 
   useEffect(() => {
     void load()
   }, [load])
 
-  const refreshMemory = useCallback(async () => {
-    try {
-      const cfg = await sessionService.getMemoryConfig()
-      setMemoryCfg(cfg)
-      const embId = memoryEndpointKeyProviderId('embedding', cfg.embeddingModel)
-      const rrId = memoryEndpointKeyProviderId('rerank', cfg.rerankModel)
-      const embSlot = memoryEndpointProviderId('embedding')
-      const rrSlot = memoryEndpointProviderId('rerank')
-      const [embOk, rrOk, embVirtual, rrVirtual] = await Promise.all([
-        isProviderKeyConfigured(embId),
-        isProviderKeyConfigured(rrId),
-        isProviderKeyConfigured(embSlot),
-        isProviderKeyConfigured(rrSlot),
-      ])
-      setEndpointKeyOk({
-        embedding: embOk,
-        rerank: rrOk,
-        embeddingVirtual: embVirtual,
-        rerankVirtual: rrVirtual,
-      })
-    } catch {
-      // optional UI
-    }
-  }, [])
-
-  useEffect(() => {
-    void refreshMemory()
-  }, [refreshMemory])
-
-  const applyMemory = async (partial: Partial<MemoryFileConfig>) => {
-    setMemoryBusy(true)
-    try {
-      const cfg = await sessionService.setMemoryConfig(partial)
-      setMemoryCfg(cfg)
-      return cfg
-    } catch (e) {
-      toast.error(e instanceof Error ? e.message : t('settings.modelConfig.error'))
-      throw e
-    } finally {
-      setMemoryBusy(false)
-    }
-  }
-
   const groups = groupProviders(catalog, filter, keyConfigured)
   const am = config.activeModel
-  const emb = memoryCfg?.embeddingModel
-  const rr = memoryCfg?.rerankModel
   const activeId =
     selected ?? am?.providerID ?? groups.configured[0]?.id ?? groups.available[0]?.id ?? null
   const active = activeId ? catalog[activeId] : undefined
 
-  const saveEndpoint = async (purpose: MemoryEndpointPurpose, draft: EndpointDraft) => {
-    const slot = memoryEndpointProviderId(purpose)
-    const ref = buildMemoryEndpointRef(purpose, draft.baseURL, draft.modelID, draft.apiFormat)
-    if (!ref) throw new Error(t('settings.modelConfig.error'))
-    if (draft.apiKey) {
-      // auth.json is read live by the sidecar — no restart required (BYOK hot path).
-      await saveProviderKey(slot, draft.apiKey)
-    } else {
-      const ok = await isProviderKeyConfigured(slot)
-      if (!ok) throw new Error(t('settings.modelConfig.testNoKey'))
-    }
-    const field = purpose === 'embedding' ? 'embeddingModel' : 'rerankModel'
-    await applyMemory({ [field]: ref })
-    await refreshMemory()
-  }
-
-  const protocolLabel = (purpose: MemoryEndpointPurpose, ref: typeof emb) => {
-    const fmt = resolveMemoryApiFormat(purpose, ref)
-    return t(`settings.modelConfig.apiFormat.${fmt}`)
-  }
-
-  const clearEndpoint = async (purpose: MemoryEndpointPurpose) => {
-    const slot = memoryEndpointProviderId(purpose)
-    try {
-      await clearProviderKey(slot)
-    } catch {
-      // ignore missing key
-    }
-    const field = purpose === 'embedding' ? 'embeddingModel' : 'rerankModel'
-    await applyMemory({ [field]: null } as unknown as Partial<MemoryFileConfig>)
-    await refreshMemory()
-  }
-
   if (!loaded) return <div className="p-6 text-meta text-ink-tertiary">…</div>
 
   const baseReady = !!(am && keyConfigured[am.providerID])
-  const embReady = !!(emb?.modelID && emb?.baseURL && endpointKeyOk.embedding)
-  const rrReady = !!(rr?.modelID && (rr.baseURL || rr.providerID) && endpointKeyOk.rerank)
 
   return (
     <div className="flex h-full flex-col p-6" data-testid="model-config-cards">
@@ -176,34 +64,6 @@ export function ModelConfig() {
           configured={!!am}
           onEdit={() => setDialog('base')}
           editLabel={am ? t('settings.modelConfig.edit') : t('settings.modelConfig.configure')}
-        />
-        <ModelPurposeCard
-          testId="model-card-embedding"
-          label={t('settings.modelConfig.tabs.embedding')}
-          title={emb?.modelID ?? t('settings.modelConfig.purpose.embedding.noModel')}
-          subtitle={
-            emb
-              ? `${protocolLabel('embedding', emb)} · ${emb.baseURL ?? emb.providerID}`
-              : t('settings.modelConfig.purpose.embedding.noModelHint')
-          }
-          ready={embReady}
-          configured={!!emb}
-          onEdit={() => setDialog('embedding')}
-          editLabel={emb ? t('settings.modelConfig.edit') : t('settings.modelConfig.configure')}
-        />
-        <ModelPurposeCard
-          testId="model-card-rerank"
-          label={t('settings.modelConfig.tabs.rerank')}
-          title={rr?.modelID ?? t('settings.modelConfig.purpose.rerank.noModel')}
-          subtitle={
-            rr
-              ? `${protocolLabel('rerank', rr)} · ${rr.baseURL ?? rr.providerID}`
-              : t('settings.modelConfig.purpose.rerank.noModelHint')
-          }
-          ready={rrReady}
-          configured={!!rr}
-          onEdit={() => setDialog('rerank')}
-          editLabel={rr ? t('settings.modelConfig.edit') : t('settings.modelConfig.configure')}
         />
       </div>
 
@@ -259,32 +119,6 @@ export function ModelConfig() {
             </div>
           </div>
         </Modal>
-      )}
-
-      {dialog === 'embedding' && (
-        <EndpointModelDialog
-          purpose="embedding"
-          open
-          existing={emb}
-          virtualKeyConfigured={endpointKeyOk.embeddingVirtual}
-          busy={memoryBusy}
-          onSave={(d) => saveEndpoint('embedding', d)}
-          onClear={() => clearEndpoint('embedding')}
-          onClose={() => setDialog(null)}
-        />
-      )}
-
-      {dialog === 'rerank' && (
-        <EndpointModelDialog
-          purpose="rerank"
-          open
-          existing={rr}
-          virtualKeyConfigured={endpointKeyOk.rerankVirtual}
-          busy={memoryBusy}
-          onSave={(d) => saveEndpoint('rerank', d)}
-          onClear={() => clearEndpoint('rerank')}
-          onClose={() => setDialog(null)}
-        />
       )}
 
       {addOpen && (

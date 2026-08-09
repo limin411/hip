@@ -1,5 +1,5 @@
 /**
- * Integration matrix A1.1–A1.9
+ * Integration matrix A1.1–A1.8
  * Cross-module paths only — unit details live in sibling *.test.ts files.
  */
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
@@ -25,15 +25,12 @@ import {
   processQueue,
 } from './pipeline/queue.js'
 
-function openMemDb(opts?: { vecEnabled?: boolean }) {
+function openMemDb() {
   const opened = openDatabase(':memory:')
-  const vec =
-    opts?.vecEnabled !== undefined ? opts.vecEnabled : opened.memoriesVecEnabled
   return {
     db: opened.db,
-    store: new MemoryStore(opened.db, opened.memoriesFtsEnabled, vec),
+    store: new MemoryStore(opened.db, opened.memoriesFtsEnabled),
     fts: opened.memoriesFtsEnabled,
-    vec,
   }
 }
 
@@ -70,7 +67,7 @@ function longTranscript(): Message[] {
   ]
 }
 
-describe('integration matrix A1.1–A1.9', () => {
+describe('integration matrix A1.1–A1.8', () => {
   let configDir: string
   let configPath: string
   let store: MemoryStore
@@ -327,70 +324,12 @@ describe('integration matrix A1.1–A1.9', () => {
     expect(svc.search('unique-matrix-trash-token-a17').map((i) => i.id)).toEqual([item.id])
   })
 
-  it('A1.8: hybrid mock semantic query returns expected id', async () => {
-    // Dedicated service with deterministic mock embeddings (no network).
+  it('A1.8: no embedding configured → FTS-only search still works', async () => {
+    // No embedding model configured — memory search is FTS-only.
     const opened = openMemDb()
-    const hybridSvc = new MemoryService(opened.store, {
-      configPath: join(configDir, 'memory-hybrid.json'),
-      createEmbeddingClient: () => ({
-        async embed(texts: string[]) {
-          return texts.map((t) => {
-            const s = t.trim()
-            if (s === 'package management' || s.startsWith('package management')) {
-              return [1, 0, 0]
-            }
-            if (s.includes('Yarn') || s.includes('yarn')) return [0.99, 0.01, 0]
-            return [0, 1, 0]
-          })
-        },
-      }),
-    })
-    hybridSvc.setConfig({
-      embeddingModel: { providerID: 'openai', modelID: 'text-embedding-3-small' },
-      hybridSearchEnabled: true,
-    })
-
-    const noise = hybridSvc.upsert({
-      id: 'noise-a18',
-      title: 'package package package noise',
-      content: 'package management package package filler',
-      kind: 'lesson',
-      scope: 'global',
-      confidence: 0.95,
-    })
-    const neighbor = hybridSvc.upsert({
-      id: 'neighbor-a18',
-      title: 'Yarn tip',
-      content: 'package management prefers yarn',
-      kind: 'lesson',
-      scope: 'global',
-      confidence: 0.4,
-    })
-    await hybridSvc.scheduleEmbed(noise.id)
-    await hybridSvc.scheduleEmbed(neighbor.id)
-
-    const hits = await hybridSvc.searchScoped('package management', { limit: 10 })
-    expect(hits[0]?.id).toBe('neighbor-a18')
-
-    const block = await hybridSvc.formatPrefetch('package management', undefined, undefined)
-    expect(block.ids[0]).toBe('neighbor-a18')
-    expect(block.text).toContain('Yarn tip')
-  })
-
-  it('A1.9: hybrid disabled / no embed / vec probe false → FTS still works', async () => {
-    // Force vec disabled (as if sqlite-vec probe failed); BLOB path unused here.
-    const opened = openMemDb({ vecEnabled: false })
-    expect(opened.store.isVecEnabled()).toBe(false)
     const ftsSvc = new MemoryService(opened.store, {
       configPath: join(configDir, 'memory-fts-only.json'),
     })
-    ftsSvc.setConfig({
-      hybridSearchEnabled: false,
-      // No embeddingModel — hybrid cannot engage.
-    })
-    expect(ftsSvc.getConfig().hybridSearchEnabled).toBe(false)
-    expect(ftsSvc.getConfig().embeddingModel).toBeUndefined()
-    expect(ftsSvc.getIndexStatus().vecEnabled).toBe(false)
 
     const item = ftsSvc.upsert({
       id: 'fts-a19',

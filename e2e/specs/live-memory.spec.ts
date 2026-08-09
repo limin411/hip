@@ -67,7 +67,6 @@ async function waitForAssistantReply(userPrompt: string, timeoutMs = 120000): Pr
       idleMinutes: 0,
       minExtractIntervalHours: 0,
       maxExtractsPerDay: 50,
-      hybridSearchEnabled: false,
     })
   })
 

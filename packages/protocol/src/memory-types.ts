@@ -37,24 +37,11 @@ export interface MemoryCitation {
   note?: string
 }
 
-/**
- * HTTP API shape for memory embedding / rerank endpoints.
- * - Embedding uses industry-standard OpenAI Embeddings (`POST …/embeddings`).
- * - Rerank has no OpenAI standard; industry de facto are Cohere and Jina
- *   (`POST …/rerank` / `…/v1/rerank` / `…/v2/rerank`).
- */
-export type MemoryEndpointApiFormat = 'openai' | 'cohere' | 'jina'
-
-/** Provider/model reference for memory role models (extract / embed / rerank). */
+/** Provider/model reference for memory role models (extract). */
 export interface MemoryModelRef {
   providerID: string
   modelID: string
   baseURL?: string
-  /**
-   * Wire protocol for this endpoint.
-   * Embedding: always `openai`. Rerank: `cohere` | `jina` (default `cohere` when omitted).
-   */
-  apiFormat?: MemoryEndpointApiFormat
 }
 
 /** Writable global memory flags (memory.json). */
@@ -90,12 +77,6 @@ export interface MemoryFileConfig {
   extractMaxTokens?: number
   onboardingTipDismissed?: boolean
   simpleExtract?: boolean
-  /** Embedding model for hybrid search (OpenAI Embeddings API format). */
-  embeddingModel?: MemoryModelRef
-  /** Optional rerank model (Cohere or Jina API format); unset skips rerank. */
-  rerankModel?: MemoryModelRef
-  /** Hybrid (vector + FTS) search. Default false. Requires embeddingModel when enabled. */
-  hybridSearchEnabled?: boolean
   /** Max Phase1 extract LLM calls per UTC day. Default 20. */
   maxExtractsPerDay?: number
   /** Soft-deleted memories hard-purged after this many days. Default 30. */
@@ -148,7 +129,6 @@ export const MEMORY_FILE_CONFIG_DEFAULTS: MemoryFileConfig = {
   decayFactor: 0.92,
   forgetConfidence: 0.15,
   simpleExtract: false,
-  hybridSearchEnabled: false,
   maxExtractsPerDay: 20,
   trashRetentionDays: 30,
   coreInjectionMode: 'rich',
@@ -203,7 +183,6 @@ export interface MemoryPipelineStatus {
   stage1Pending: number
   coreGeneration: number
   mirrorDesync?: boolean
-  index?: { embedded: number; total: number; modelKey?: string; vecEnabled: boolean }
   /** Only when client passed projectKeyHash (or cwd-resolved hash). */
   capacity?: { usedChars: number; budgetChars: number; percent: number }
 }
@@ -229,45 +208,11 @@ export function normalizeExtractModel(
   }
   if (typeof v === 'object' && typeof v.providerID === 'string' && typeof v.modelID === 'string') {
     if (!v.providerID.trim() || !v.modelID.trim()) return undefined
-    const apiFormat = normalizeMemoryApiFormat(v.apiFormat)
     return {
       providerID: v.providerID,
       modelID: v.modelID,
       ...(v.baseURL ? { baseURL: v.baseURL } : {}),
-      ...(apiFormat ? { apiFormat } : {}),
     }
   }
   return undefined
-}
-
-const MEMORY_API_FORMATS: ReadonlySet<string> = new Set(['openai', 'cohere', 'jina'])
-
-/** Keep only known endpoint formats; drop garbage from disk / UI. */
-export function normalizeMemoryApiFormat(
-  v: unknown,
-): MemoryEndpointApiFormat | undefined {
-  if (typeof v !== 'string') return undefined
-  const s = v.trim().toLowerCase()
-  return MEMORY_API_FORMATS.has(s) ? (s as MemoryEndpointApiFormat) : undefined
-}
-
-/** Default wire format for a memory endpoint purpose. */
-export function defaultMemoryApiFormat(
-  purpose: 'embedding' | 'rerank',
-): MemoryEndpointApiFormat {
-  return purpose === 'embedding' ? 'openai' : 'cohere'
-}
-
-/**
- * Resolve apiFormat on a ref for a purpose (defaults when omitted / invalid).
- * Embedding is always coerced to `openai`.
- */
-export function resolveMemoryApiFormat(
-  purpose: 'embedding' | 'rerank',
-  ref?: Pick<MemoryModelRef, 'apiFormat'> | null,
-): MemoryEndpointApiFormat {
-  if (purpose === 'embedding') return 'openai'
-  const f = normalizeMemoryApiFormat(ref?.apiFormat)
-  if (f === 'cohere' || f === 'jina') return f
-  return 'cohere'
 }

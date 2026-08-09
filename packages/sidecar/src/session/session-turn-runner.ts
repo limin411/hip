@@ -104,7 +104,7 @@ import {
   flushMemoryBeforeCompact,
 } from '../memory/index.js'
 import { MemoryInjector } from '../memory/inject.js'
-import { tryEnableMemoriesFts, tryEnableSqliteVec } from '../persistence/schema.js'
+import { tryEnableMemoriesFts } from '../persistence/schema.js'
 import { ContextEpoch } from './context-epoch.js'
 import { buildSessionTooling, type SessionTooling } from './session-tooling.js'
 import { safeErrorMessage } from './error.js'
@@ -1177,8 +1177,7 @@ export async function runTurn(host: SessionTurnHost, rawSend: SendFn, base?: {
     if (!host.memoryService && host.store) {
       const db = host.store.getDb()
       const memoriesFts = tryEnableMemoriesFts(db)
-      const memoriesVec = tryEnableSqliteVec(db)
-      host.memoryService = new MemoryService(new MemoryStore(db, memoriesFts, memoriesVec))
+      host.memoryService = new MemoryService(new MemoryStore(db, memoriesFts))
       host.memoryService.runStartupDecayOnce()
     }
     const flags = resolveSessionMemoryFlags(loadMemoryConfig(), host._config)
@@ -1423,8 +1422,7 @@ export async function runTurn(host: SessionTurnHost, rawSend: SendFn, base?: {
         if (mayInject && !host.memoryService && host.store) {
           const db = host.store.getDb()
           const memoriesFts = tryEnableMemoriesFts(db)
-          const memoriesVec = tryEnableSqliteVec(db)
-          host.memoryService = new MemoryService(new MemoryStore(db, memoriesFts, memoriesVec))
+          host.memoryService = new MemoryService(new MemoryStore(db, memoriesFts))
           host.memoryService.runStartupDecayOnce()
         }
         const memCfg = host.memoryService?.getConfig() ?? memCfgEarly

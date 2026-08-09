@@ -12,7 +12,7 @@ const CAP_I18N = {
   attachment: 'settings.modelConfig.vision',
 } as const satisfies Record<ModelCapKey, string>
 
-export type ModelPurpose = 'base' | 'embedding' | 'rerank'
+export type ModelPurpose = 'base'
 
 /** Hero card summarising the current (active) model. Renders an empty state when none is set. */
 export function CurrentModelHero({

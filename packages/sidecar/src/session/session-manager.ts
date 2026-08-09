@@ -27,7 +27,7 @@ import { handleExtensionMessage, isExtensionMessage } from './handlers/extension
 import { handleMemoryMessage, isMemoryMessage, type MemoryHandlerContext } from '../memory/handlers.js'
 import { MemoryService } from '../memory/service.js'
 import { MemoryStore } from '../memory/store.js'
-import { tryEnableMemoriesFts, tryEnableSqliteVec } from '../persistence/schema.js'
+import { tryEnableMemoriesFts } from '../persistence/schema.js'
 import { handleSessionMessage, isSessionMessage } from './handlers/session.js'
 import { handlePluginMessage, isPluginMessage, type PluginHandlerContext } from './handlers/plugin.js'
 import type { SendFn, SessionLifecycleContext } from './handlers/types.js'
@@ -167,8 +167,7 @@ export class SessionManager {
       }
       const db = this.store.getDb()
       const memoriesFts = tryEnableMemoriesFts(db)
-      const memoriesVec = tryEnableSqliteVec(db)
-      this.memoryService = new MemoryService(new MemoryStore(db, memoriesFts, memoriesVec))
+      this.memoryService = new MemoryService(new MemoryStore(db, memoriesFts))
       // Best-effort decay once when memory first becomes available.
       this.memoryService.runStartupDecayOnce()
     }

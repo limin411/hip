@@ -74,9 +74,9 @@ export function ProviderDetail({
   onSetEnabled: (value: boolean) => Promise<void>
   onSetApiKind?: (value: ProviderApiKind) => Promise<void>
   onSetCurrent: (modelID: string) => Promise<void>
-  /** Button label when a model is not current (e.g. "Set as embedding"). */
+  /** Button label when a model is not current (e.g. "Set as current"). */
   setCurrentLabel?: string
-  /** Button label when a model is current (e.g. "Current embedding"). */
+  /** Button label when a model is current (e.g. "Current"). */
   currentLabel?: string
   /** Optional role-specific actions rendered above the model list (Clear/Recommend). */
   roleActions?: ReactNode

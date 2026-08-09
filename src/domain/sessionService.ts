@@ -678,14 +678,6 @@ export class SessionService {
     return this.memoryWire.setMemoryConfig(config)
   }
 
-  async getMemoryIndexStatus() {
-    return this.memoryWire.getMemoryIndexStatus()
-  }
-
-  async reindexMemories() {
-    return this.memoryWire.reindexMemories()
-  }
-
   async listMemories(filter?: {
     scope?: MemoryScope
     projectKeyHash?: string

@@ -88,9 +88,8 @@ function openFileMemDb(dir: string) {
   return {
     dbPath,
     db: opened.db,
-    store: new MemoryStore(opened.db, opened.memoriesFtsEnabled, opened.memoriesVecEnabled),
+    store: new MemoryStore(opened.db, opened.memoriesFtsEnabled),
     fts: opened.memoriesFtsEnabled,
-    vec: opened.memoriesVecEnabled,
   }
 }
 
@@ -100,7 +99,6 @@ describe('memory process e2e (file-backed hip.db)', () => {
   let dbPath: string
   let store: MemoryStore
   let svc: MemoryService
-  let vecEnabled: boolean
   let sent: ServerMessage[]
   let sessions: Map<string, Session>
   let configBlobs: Map<string, string>
@@ -118,7 +116,6 @@ describe('memory process e2e (file-backed hip.db)', () => {
     const opened = openFileMemDb(dir)
     dbPath = opened.dbPath
     store = opened.store
-    vecEnabled = opened.vec
     svc = new MemoryService(store, { configPath })
     svc.setConfig({ useMemories: true, generateMemories: true })
     sent = []
@@ -447,71 +444,7 @@ describe('memory process e2e (file-backed hip.db)', () => {
     expect(llmSpy).not.toHaveBeenCalled()
   })
 
-  it('M1.10: hybrid mock semantic ranking when vec available', async () => {
-    const hybridSvc = new MemoryService(store, {
-      configPath: join(dir, 'memory-hybrid.json'),
-      createEmbeddingClient: () => ({
-        async embed(texts: string[]) {
-          return texts.map((t) => {
-            const s = t.trim()
-            if (s === 'package management' || s.startsWith('package management')) {
-              return [1, 0, 0]
-            }
-            if (s.includes('Yarn') || s.includes('yarn')) return [0.99, 0.01, 0]
-            return [0, 1, 0]
-          })
-        },
-      }),
-    })
-    hybridSvc.setConfig({
-      embeddingModel: { providerID: 'openai', modelID: 'text-embedding-3-small' },
-      hybridSearchEnabled: true,
-    })
-
-    const status = hybridSvc.getIndexStatus()
-    expect(typeof status.vecEnabled).toBe('boolean')
-
-    if (!vecEnabled) {
-      // File DB without sqlite-vec: hybrid must not crash; FTS path still works.
-      const item = hybridSvc.upsert({
-        id: 'fts-fallback-m10',
-        title: 'Yarn tip',
-        content: 'package management prefers yarn',
-        kind: 'lesson',
-        scope: 'global',
-      })
-      const hits = await hybridSvc.searchScoped('package management', { limit: 10 })
-      expect(hits.map((h) => h.id)).toContain(item.id)
-      return
-    }
-
-    const noise = hybridSvc.upsert({
-      id: 'noise-m10',
-      title: 'package package package noise',
-      content: 'package management package package filler',
-      kind: 'lesson',
-      scope: 'global',
-      confidence: 0.95,
-    })
-    const neighbor = hybridSvc.upsert({
-      id: 'neighbor-m10',
-      title: 'Yarn tip',
-      content: 'package management prefers yarn',
-      kind: 'lesson',
-      scope: 'global',
-      confidence: 0.4,
-    })
-    await hybridSvc.scheduleEmbed(noise.id)
-    await hybridSvc.scheduleEmbed(neighbor.id)
-
-    const hits = await hybridSvc.searchScoped('package management', { limit: 10 })
-    expect(hits[0]?.id).toBe('neighbor-m10')
-  })
-
-  it('M1.11: hybrid off / no embed → FTS still works on file db', async () => {
-    svc.setConfig({ hybridSearchEnabled: false })
-    expect(svc.getConfig().embeddingModel).toBeUndefined()
-
+  it('M1.10: no embedding configured → FTS still works on file db', async () => {
     const item = svc.upsert({
       id: 'fts-m11',
       title: 'Yarn workspaces tip',

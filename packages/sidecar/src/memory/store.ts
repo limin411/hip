@@ -1,7 +1,5 @@
 import type { MemoryItem, MemoryKind, MemoryScope, MemorySource, MemoryStatus } from '@hip/protocol'
 import type { DatabaseSync } from '../persistence/sqlite.js'
-import { deleteEmbedding, deleteEmbeddings } from './vec.js'
-
 export interface MemoryListFilter {
   scope?: string
   projectKeyHash?: string
@@ -165,16 +163,10 @@ export class MemoryStore {
   constructor(
     private readonly db: DatabaseSync,
     private readonly ftsEnabled: boolean,
-    /** True when sqlite-vec extension loaded (optional vec0 KNN mirror). */
-    private readonly vecEnabled: boolean = false,
   ) {}
 
   getDb(): DatabaseSync {
     return this.db
-  }
-
-  isVecEnabled(): boolean {
-    return this.vecEnabled
   }
 
   isFtsEnabled(): boolean {
@@ -311,19 +303,12 @@ export class MemoryStore {
   }
 
   hardDelete(id: string): boolean {
-    deleteEmbedding(this.db, id)
     const r = this.db.prepare(`DELETE FROM memory_items WHERE id=?`).run(id)
     return (r.changes ?? 0) > 0
   }
 
   /** Hard-delete soft-deleted items older than cutoff (updated_at < cutoffMs). */
   purgeDeletedOlderThan(cutoffMs: number): number {
-    const ids = (
-      this.db.prepare(
-        `SELECT id FROM memory_items WHERE status='deleted' AND updated_at < ?`,
-      ).all(cutoffMs) as { id: string }[]
-    ).map((r) => r.id)
-    deleteEmbeddings(this.db, ids)
     const r = this.db.prepare(
       `DELETE FROM memory_items WHERE status='deleted' AND updated_at < ?`,
     ).run(cutoffMs)
@@ -332,10 +317,6 @@ export class MemoryStore {
 
   /** Hard-delete all soft-deleted items (empty trash). */
   emptyTrash(): number {
-    const ids = (
-      this.db.prepare(`SELECT id FROM memory_items WHERE status='deleted'`).all() as { id: string }[]
-    ).map((r) => r.id)
-    deleteEmbeddings(this.db, ids)
     const r = this.db.prepare(`DELETE FROM memory_items WHERE status='deleted'`).run()
     return r.changes ?? 0
   }
@@ -352,12 +333,6 @@ export class MemoryStore {
       ).run(Date.now(), sessionId)
       n = r.changes ?? 0
     } else {
-      const ids = (
-        this.db.prepare(`SELECT id FROM memory_items WHERE source_session_id=?`).all(sessionId) as {
-          id: string
-        }[]
-      ).map((r) => r.id)
-      deleteEmbeddings(this.db, ids)
       const r = this.db.prepare(`DELETE FROM memory_items WHERE source_session_id=?`).run(sessionId)
       n = r.changes ?? 0
     }

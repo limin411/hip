@@ -14,7 +14,7 @@ import { anthropicMessagesBase, resolveChatApiKind } from './chat-api-kind.js'
 import { readHipConfig } from './hip-config.js'
 import { safeErrorMessage } from '../session/error.js'
 
-export type ProbePurpose = 'chat' | 'embedding' | 'rerank'
+export type ProbePurpose = 'chat'
 
 export interface ProviderProbeRequest {
   purpose: ProbePurpose
@@ -96,7 +96,7 @@ function isChatProviderDisabled(providerID: string): boolean {
   return entry?.enabled === false
 }
 
-/** Classify status for completion / messages / embeddings (not /models list). */
+/** Classify status for completion / messages (not /models list). */
 export function classifyCompletionStatus(status: number): KeyProbeCode {
   if (status === 401 || status === 403) return 'AUTH_FAILED'
   if (status === 404) return 'MODEL_NOT_FOUND'
@@ -255,49 +255,6 @@ async function probeAnthropicChat(
   })
 }
 
-async function probeEmbedding(
-  baseURL: string,
-  key: string,
-  modelID: string,
-): Promise<ProviderProbeResult> {
-  const started = Date.now()
-  let res: Response
-  try {
-    res = await fetchWithTimeout(joinUrl(baseURL, 'embeddings'), {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${key}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({ model: modelID, input: ['hip-key-probe'] }),
-    })
-  } catch (err) {
-    return networkFail(err)
-  }
-
-  if (!res.ok) {
-    const code = classifyCompletionStatus(res.status)
-    return fail(code === 'OK' ? 'PROVIDER_ERROR' : code, `Embeddings probe failed (${res.status})`, {
-      latencyMs: Date.now() - started,
-    })
-  }
-
-  try {
-    const json = (await res.json()) as { data?: Array<{ embedding?: number[] }> }
-    const emb = json.data?.[0]?.embedding
-    if (!Array.isArray(emb) || emb.length === 0) {
-      return fail('INVALID_RESPONSE', 'Embeddings response missing vector', {
-        latencyMs: Date.now() - started,
-      })
-    }
-    return okResult(Date.now() - started)
-  } catch (err) {
-    return fail('INVALID_RESPONSE', safeErrorMessage(err) || 'Invalid embeddings JSON', {
-      latencyMs: Date.now() - started,
-    })
-  }
-}
-
 function ttlFor(result: ProviderProbeResult): number {
   if (result.ok) return SUCCESS_TTL_MS
   if (result.code === 'AUTH_FAILED') return AUTH_FAIL_TTL_MS
@@ -320,40 +277,21 @@ export async function runProviderProbe(req: ProviderProbeRequest): Promise<Provi
     return fail('INTERNAL', 'providerID is required')
   }
 
-  // 2. Field / purpose prechecks
-  if (purpose === 'rerank') {
-    // Still require local fields for consistent UX; then honest unsupported.
-    const base = req.baseURL?.trim() ?? ''
-    const model = req.modelID?.trim() ?? ''
-    if (!base) return fail('MISSING_BASE_URL', 'Base URL is required')
-    if (!model) return fail('MISSING_MODEL', 'Model id is required')
-    const key = resolveProviderAuth(providerID, req.draftApiKey)?.apiKey
-    if (!key) return fail('MISSING_KEY', 'API key is missing')
-    return fail('PROBE_UNSUPPORTED', 'Rerank key probe is not supported yet')
-  }
-
   const baseURL = req.baseURL?.trim() ?? ''
-  const chatKind = purpose === 'chat' ? resolveChatApiKind(providerID, baseURL || undefined) : 'openai'
+  const chatKind = resolveChatApiKind(providerID, baseURL || undefined)
 
-  if (purpose === 'chat') {
-    if (isChatProviderDisabled(providerID)) {
-      return fail('PROVIDER_DISABLED', 'Provider is disabled')
-    }
-    if (!isOpenAICompatible(providerID) && chatKind !== 'anthropic') {
-      return fail('INCOMPATIBLE_PROVIDER', `Provider ${providerID} is not probeable`)
-    }
+  if (isChatProviderDisabled(providerID)) {
+    return fail('PROVIDER_DISABLED', 'Provider is disabled')
   }
-
-  if (purpose === 'embedding') {
-    if (!baseURL) return fail('MISSING_BASE_URL', 'Base URL is required')
-    if (!req.modelID?.trim()) return fail('MISSING_MODEL', 'Model id is required')
+  if (!isOpenAICompatible(providerID) && chatKind !== 'anthropic') {
+    return fail('INCOMPATIBLE_PROVIDER', `Provider ${providerID} is not probeable`)
   }
   // Official Anthropic may omit baseURL (SDK default). Other Anthropic-compatible
   // hosts always need an explicit base (catalog api or user override).
-  if (purpose === 'chat' && chatKind === 'openai' && !baseURL) {
+  if (chatKind === 'openai' && !baseURL) {
     return fail('MISSING_BASE_URL', 'Base URL is required')
   }
-  if (purpose === 'chat' && chatKind === 'anthropic' && providerID !== 'anthropic' && !baseURL) {
+  if (chatKind === 'anthropic' && providerID !== 'anthropic' && !baseURL) {
     return fail('MISSING_BASE_URL', 'Base URL is required')
   }
 
@@ -363,9 +301,7 @@ export async function runProviderProbe(req: ProviderProbeRequest): Promise<Provi
 
   const modelForCache = req.modelID?.trim() ?? ''
   const baseForCache =
-    purpose === 'chat' && chatKind === 'anthropic'
-      ? baseURL || ANTHROPIC_DEFAULT_BASE_URL
-      : baseURL
+    chatKind === 'anthropic' ? baseURL || ANTHROPIC_DEFAULT_BASE_URL : baseURL
   const ck = cacheKey(purpose, providerID, baseForCache, modelForCache, keyFingerprint(key))
 
   // 4. Cache lookup (before busy / rate)
@@ -389,9 +325,7 @@ export async function runProviderProbe(req: ProviderProbeRequest): Promise<Provi
   liveInFlight += 1
   try {
     let result: ProviderProbeResult
-    if (purpose === 'embedding') {
-      result = await probeEmbedding(baseURL, key, req.modelID!.trim())
-    } else if (chatKind === 'anthropic') {
+    if (chatKind === 'anthropic') {
       result = await probeAnthropicChat(baseURL || undefined, key, providerID, req.modelID)
     } else {
       result = await probeOpenAICompatibleChat(baseURL, key, providerID, req.modelID)

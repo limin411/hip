@@ -1011,7 +1011,7 @@ export const ja = {
     "model": "モデル設定",
     "modelConfig": {
       "currentModel": "現在のモデル",
-      "intro": "チャット、埋め込み、リランクを個別に設定します。埋め込みとリランクは独自のエンドポイントとAPIキーを使用します。",
+      "intro": "チャットプロバイダー、モデル、APIキーを設定します。",
       "noModel": "モデル未選択",
       "noModelHint": "以下のプロバイダーを選択し、現在のモデルを設定してください",
       "ready": "準備完了",
@@ -1085,8 +1085,6 @@ export const ja = {
       "addProvider": "追加",
       "tabs": {
         "base": "ベースモデル",
-        "embedding": "埋め込み",
-        "rerank": "再ランク",
         "ariaLabel": "モデルの用途"
       },
       "purpose": {
@@ -1097,46 +1095,11 @@ export const ja = {
           "setCurrent": "現在のモデルに設定",
           "current": "現在のモデル"
         },
-        "embedding": {
-          "currentModel": "現在の埋め込みモデル",
-          "noModel": "未設定",
-          "noModelHint": "OpenAI Embeddings エンドポイントを設定してください",
-          "setCurrent": "埋め込みモデルに設定",
-          "current": "埋め込み",
-          "clear": "埋め込みをクリア",
-          "privacyNote": "埋め込みはメモリテキストを設定されたエンドポイントに送信します。メモリ設定でハイブリッド検索がオンの場合に使用されます。"
-        },
-        "rerank": {
-          "currentModel": "現在の再ランクモデル",
-          "noModel": "未設定",
-          "noModelHint": "Cohere または Jina の再ランクエンドポイントを設定してください",
-          "setCurrent": "再ランクモデルに設定",
-          "current": "再ランク",
-          "clear": "再ランクをクリア",
-          "privacyNote": "ハイブリッド検索が有効な場合、再ランクはクエリとメモリの断片を設定されたエンドポイントに送信する可能性があります。"
-        }
-      },
-      "apiFormat": {
-        "openai": "OpenAI Embeddings",
-        "cohere": "Cohere",
-        "jina": "Jina",
-        "openaiHint": "業界標準の POST /embeddings プロトコル",
-        "rerankHint": "OpenAI 標準はありません — 設定時は Cohere または Jina を選択してください"
       },
       "edit": "編集",
       "configure": "設定",
       "baseDialogTitle": "ベースモデルの編集",
-      "baseDialogIntro": "会話やエージェントに使用するチャットプロバイダーとモデルです。埋め込みや再ランクの認証情報とは共有されません。",
-      "endpointDialog": {
-        "embeddingTitle": "埋め込みモデルの設定",
-        "rerankTitle": "再ランクモデルの設定",
-        "embeddingIntro": "チャットプロバイダーとは独立しています。業界標準の OpenAI Embeddings API（POST …/embeddings）を使用します。ベースURL、APIキー、モデルIDを入力してください。",
-        "rerankIntro": "チャットプロバイダーとは独立しています。OpenAI には公開の再ランクAPIはありません — エンドポイントに合わせて Cohere または Jina のワイヤーフォーマットを選択してください。",
-        "apiProtocol": "APIプロトコル",
-        "embeddingProtocolHint": "OpenAI、Azure OpenAI、Ollama、vLLM、LiteLLM、およびほとんどの「OpenAI互換」ゲートウェイと互換性があります。",
-        "rerankProtocolHint": "サービスのドキュメントに合わせた形式を指定してください。vLLMや多くのセルフホスト環境では両方に対応していますが、クラウドベンダーは通常1つのみをドキュメント化しています。",
-        "modelId": "モデルID"
-      }
+      "baseDialogIntro": "会話やエージェントに使用するチャットプロバイダーとモデルです。",
     },
     "mcpLabel": "MCPs",
     "connectorsLabel": "コネクター",
@@ -1317,17 +1280,6 @@ export const ja = {
       "extractModelPlain": "バックグラウンド学習のみに使用されるモデル。特定の安価なモデルが必要でない限り、デフォルトのままにしてください。",
       "extractModelDefault": "デフォルト（アクティブプロバイダーの安価なモデル）",
       "extractModelPlaceholder": "プロバイダー/モデル（オプション）",
-      "hybridSearch": "ハイブリッド検索",
-      "hybridSearchDesc": "プリフェッチおよびツール用の記憶のランク付け時に、キーワード（FTS）と埋め込み類似度を組み合わせます。",
-      "hybridSearchPlain": "オプション：埋め込みによるスマートな検索（テキストを埋め込みプロバイダーに送信します）。",
-      "hybridSearchNeedsEmbedding": "最初に「モデル→埋め込み」で埋め込みモデルを設定してください。",
-      "hybridNeedsEmbeddingTitle": "埋め込みモデルが必要です",
-      "hybridNeedsEmbeddingBody": "ハイブリッド検索には埋め込みモデルが必要です。「モデル→埋め込み」で設定してから、もう一度お試しください。",
-      "hybridPrivacyNote": "ハイブリッド検索は、クエリテキストと記憶スニペットを設定された埋め込み（および設定されている場合は再ランク）プロバイダーに送信します。完全にローカル（FTSのみ）を維持するには、ハイブリッドをオフにしてください。",
-      "indexStatus": "埋め込みインデックス：{{embedded}} / {{total}}",
-      "indexStatusNone": "埋め込みインデックス：モデルが設定されていません",
-      "reindex": "埋め込みを再インデックス",
-      "reindexing": "再インデックス中…",
       "save": "保存",
       "exportJsonl": "エクスポート",
       "importJsonl": "インポート",

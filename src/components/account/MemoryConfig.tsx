@@ -121,14 +121,6 @@ export function MemoryConfig() {
   const [addContent, setAddContent] = useState('')
   const [addKind, setAddKind] = useState<MemoryKind>('preference')
   const [addScope, setAddScope] = useState<MemoryScope>('global')
-  const [indexStatus, setIndexStatus] = useState<{
-    embedded: number
-    total: number
-    modelKey?: string
-    vecEnabled?: boolean
-  } | null>(null)
-  const [reindexing, setReindexing] = useState(false)
-  const [needEmbedOpen, setNeedEmbedOpen] = useState(false)
   const [pipelineStatus, setPipelineStatus] = useState<MemoryPipelineStatus | null>(null)
   const [showAdvanced, setShowAdvanced] = useState(false)
   const [showHowTo, setShowHowTo] = useState(true)
@@ -142,12 +134,6 @@ export function MemoryConfig() {
   const fileInputRef = useRef<HTMLInputElement>(null)
   const modelGroups = groupModelOptions(catalog, providersConfig, keyConfigured)
   const isTrash = listStatus === 'deleted'
-  const hasEmbeddingModel = !!(
-    config?.embeddingModel &&
-    typeof config.embeddingModel === 'object' &&
-    config.embeddingModel.providerID &&
-    config.embeddingModel.modelID
-  )
 
   const filteredItems = useMemo(() => {
     const q = listQuery.trim().toLowerCase()
@@ -160,15 +146,6 @@ export function MemoryConfig() {
 
   const loadItems = useCallback(async (status: MemoryStatus) => {
     return sessionService.listMemories({ limit: 200, status })
-  }, [])
-
-  const refreshIndexStatus = useCallback(async () => {
-    try {
-      const status = await sessionService.getMemoryIndexStatus()
-      setIndexStatus(status)
-    } catch {
-      setIndexStatus(null)
-    }
   }, [])
 
   const refreshPipelineStatus = useCallback(async () => {
@@ -191,14 +168,13 @@ export function MemoryConfig() {
       } else {
         setItems([])
       }
-      await refreshIndexStatus()
       await refreshPipelineStatus()
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e))
     } finally {
       setLoading(false)
     }
-  }, [listStatus, loadItems, refreshIndexStatus, refreshPipelineStatus])
+  }, [listStatus, loadItems, refreshPipelineStatus])
 
   const switchListStatus = async (status: MemoryStatus) => {
     if (status === listStatus) return
@@ -479,31 +455,6 @@ export function MemoryConfig() {
     } finally {
       setConsolidating(false)
     }
-  }
-
-  const onReindex = async () => {
-    if (!hasEmbeddingModel) {
-      setNeedEmbedOpen(true)
-      return
-    }
-    setReindexing(true)
-    setError(null)
-    try {
-      await sessionService.reindexMemories()
-      await refreshIndexStatus()
-    } catch (e) {
-      setError(e instanceof Error ? e.message : String(e))
-    } finally {
-      setReindexing(false)
-    }
-  }
-
-  const onHybridChange = (v: boolean) => {
-    if (v && !hasEmbeddingModel) {
-      setNeedEmbedOpen(true)
-      return
-    }
-    void applyConfig({ hybridSearchEnabled: v })
   }
 
   const onExtractModelChange = async (key: string) => {
@@ -1311,42 +1262,6 @@ export function MemoryConfig() {
                 />
               </div>
             )}
-
-            <div className="flex items-center justify-between gap-4 border-t border-border pt-4">
-              <div className="min-w-0 flex-1">
-                <div className="text-prose font-medium text-ink">{t('settings.memory.hybridSearch')}</div>
-                <div className="mt-0.5 text-meta text-ink-tertiary">{t('settings.memory.hybridSearchPlain')}</div>
-                <p className="mt-1 text-caption text-ink-tertiary" data-testid="memory-hybrid-privacy">
-                  {t('settings.memory.hybridPrivacyNote')}
-                </p>
-              </div>
-              <Switch
-                checked={!!config?.hybridSearchEnabled}
-                disabled={busy || !config}
-                ariaLabel={t('settings.memory.hybridSearch')}
-                data-testid="memory-switch-hybrid"
-                onCheckedChange={onHybridChange}
-              />
-            </div>
-            <div className="flex flex-wrap items-center justify-between gap-2">
-              <div className="min-w-0 flex-1 text-meta text-ink-secondary" data-testid="memory-index-status">
-                {hasEmbeddingModel && indexStatus
-                  ? t('settings.memory.indexStatus', {
-                      embedded: indexStatus.embedded,
-                      total: indexStatus.total,
-                    })
-                  : t('settings.memory.indexStatusNone')}
-              </div>
-              <Button
-                size="sm"
-                variant="secondary"
-                disabled={busy || reindexing}
-                data-testid="memory-reindex"
-                onClick={() => void onReindex()}
-              >
-                {reindexing ? t('settings.memory.reindexing') : t('settings.memory.reindex')}
-              </Button>
-            </div>
           </div>
         )}
       </section>
@@ -1405,26 +1320,6 @@ export function MemoryConfig() {
                 onClick={() => void onConfirmEmptyTrash()}
               >
                 {t('settings.memory.emptyTrash')}
-              </Button>
-            </div>
-          </div>
-        </Modal>
-      )}
-
-      {needEmbedOpen && (
-        <Modal
-          open
-          variant="confirm"
-          onOpenChange={(o) => {
-            if (!o) setNeedEmbedOpen(false)
-          }}
-          title={t('settings.memory.hybridNeedsEmbeddingTitle')}
-        >
-          <div className="p-5" data-testid="memory-need-embed-modal">
-            <p className="text-body text-ink-secondary">{t('settings.memory.hybridNeedsEmbeddingBody')}</p>
-            <div className="mt-5 flex justify-end">
-              <Button size="sm" data-testid="memory-need-embed-ok" onClick={() => setNeedEmbedOpen(false)}>
-                {t('common.close')}
               </Button>
             </div>
           </div>

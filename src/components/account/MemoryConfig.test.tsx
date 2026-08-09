@@ -68,10 +68,6 @@ const sampleItem: MemoryItem = {
 describe('MemoryConfig', () => {
   beforeEach(() => {
     vi.restoreAllMocks()
-    vi.spyOn(sessionService, 'getMemoryIndexStatus').mockResolvedValue({
-      embedded: 0,
-      total: 0,
-    })
     vi.spyOn(sessionService, 'getMemoryStatus').mockResolvedValue({
       extractsToday: 0,
       maxExtractsPerDay: 20,
@@ -80,11 +76,6 @@ describe('MemoryConfig', () => {
       summaryCounts: { global: 0, project: 0 },
       stage1Pending: 0,
       coreGeneration: 0,
-    })
-    vi.spyOn(sessionService, 'reindexMemories').mockResolvedValue({
-      embedded: 0,
-      total: 0,
-      failed: 0,
     })
   })
 
@@ -151,22 +142,12 @@ describe('MemoryConfig', () => {
     expect(screen.getByTestId('memory-item-m1')).toBeInTheDocument()
     expect(listSpy).toHaveBeenCalledWith({ limit: 200, status: 'active' })
     expect(screen.getByTestId('memory-filter-active')).toHaveAttribute('aria-pressed', 'true')
-    // Advanced section is collapsed; expand to reach hybrid controls
+    // Advanced section is collapsed; expand to reach the external-ACP toggle
     fireEvent.click(screen.getByTestId('memory-advanced-toggle'))
     await waitFor(() => {
-      expect(screen.getByTestId('memory-switch-hybrid')).toBeInTheDocument()
+      expect(screen.getByTestId('memory-switch-use-external')).toBeInTheDocument()
     })
-    // useMemories on → external ACP memory toggle visible
-    expect(screen.getByTestId('memory-switch-use-external')).toBeInTheDocument()
     expect(screen.getByTestId('memory-switch-use-external')).toHaveAttribute('aria-checked', 'false')
-    // Without embedding: controls stay interactive; enabling hybrid shows a prompt modal
-    expect(screen.getByTestId('memory-switch-hybrid')).not.toBeDisabled()
-    expect(screen.getByTestId('memory-reindex')).not.toBeDisabled()
-    fireEvent.click(screen.getByTestId('memory-switch-hybrid'))
-    await waitFor(() => {
-      expect(screen.getByTestId('memory-need-embed-modal')).toBeInTheDocument()
-    })
-    expect(screen.getByTestId('memory-index-status')).toBeInTheDocument()
   })
 
   it('toggles useMemoriesWithExternal when use memories is on', async () => {
@@ -210,43 +191,9 @@ describe('MemoryConfig', () => {
     })
     fireEvent.click(screen.getByTestId('memory-advanced-toggle'))
     await waitFor(() => {
-      expect(screen.getByTestId('memory-switch-hybrid')).toBeInTheDocument()
+      expect(screen.getByTestId('memory-extract-model')).toBeInTheDocument()
     })
     expect(screen.queryByTestId('memory-switch-use-external')).not.toBeInTheDocument()
-  })
-
-  it('enables hybrid toggle when embeddingModel is set', async () => {
-    vi.spyOn(sessionService, 'getMemoryConfig').mockResolvedValue({
-      ...onConfig,
-      embeddingModel: { providerID: 'openai', modelID: 'text-embedding-3-small' },
-      hybridSearchEnabled: false,
-    })
-    vi.spyOn(sessionService, 'listMemories').mockResolvedValue([])
-    vi.spyOn(sessionService, 'getMemoryIndexStatus').mockResolvedValue({
-      embedded: 1,
-      total: 2,
-      modelKey: 'openai/text-embedding-3-small',
-    })
-    const setSpy = vi.spyOn(sessionService, 'setMemoryConfig').mockResolvedValue({
-      ...onConfig,
-      embeddingModel: { providerID: 'openai', modelID: 'text-embedding-3-small' },
-      hybridSearchEnabled: true,
-    })
-
-    render(<MemoryConfig />)
-
-    await waitFor(() => {
-      expect(screen.getByTestId('memory-advanced-toggle')).toBeInTheDocument()
-    })
-    fireEvent.click(screen.getByTestId('memory-advanced-toggle'))
-    await waitFor(() => {
-      expect(screen.getByTestId('memory-switch-hybrid')).not.toBeDisabled()
-    })
-    expect(screen.getByTestId('memory-reindex')).not.toBeDisabled()
-    fireEvent.click(screen.getByTestId('memory-switch-hybrid'))
-    await waitFor(() => {
-      expect(setSpy).toHaveBeenCalledWith({ hybridSearchEnabled: true })
-    })
   })
 
   it('calls upsert when pin toggled', async () => {

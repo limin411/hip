@@ -16,7 +16,7 @@ import type { Transport } from '../transport'
 import { useDomainStore } from '../sessionStore'
 
 export type TestProviderRequest = {
-  purpose: 'chat' | 'embedding' | 'rerank'
+  purpose: 'chat'
   providerID: string
   baseURL?: string
   modelID?: string
@@ -89,42 +89,6 @@ export class MemoryWire {
       throw new Error(msg.message)
     }
     return msg.config
-  }
-
-  async getMemoryIndexStatus(): Promise<{
-    embedded: number
-    total: number
-    modelKey?: string
-    vecEnabled?: boolean
-  }> {
-    const wait = this.waiter.wait('memory:indexStatus:result')
-    this.transport.send({ type: 'memory:indexStatus' })
-    const msg = await wait
-    if (msg.error) throw new Error(msg.error)
-    return {
-      embedded: msg.embedded,
-      total: msg.total,
-      modelKey: msg.modelKey,
-      vecEnabled: msg.vecEnabled,
-    }
-  }
-
-  async reindexMemories(): Promise<{
-    embedded: number
-    total: number
-    failed: number
-    modelKey?: string
-  }> {
-    const wait = this.waiter.wait('memory:reindex:result')
-    this.transport.send({ type: 'memory:reindex' })
-    const msg = await wait
-    if (msg.error) throw new Error(msg.error)
-    return {
-      embedded: msg.embedded,
-      total: msg.total,
-      failed: msg.failed ?? 0,
-      modelKey: msg.modelKey,
-    }
   }
 
   async listMemories(filter?: {

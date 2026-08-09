@@ -117,7 +117,7 @@ export type ClientMessage =
   | {
       type: 'config:testProvider'
       requestId: string
-      purpose: 'chat' | 'embedding' | 'rerank'
+      purpose: 'chat'
       providerID: string
       baseURL?: string
       modelID?: string
@@ -204,8 +204,6 @@ export type ClientMessage =
   | { type: 'memory:getConfig' }
   | { type: 'memory:setConfig'; config: Partial<MemoryFileConfig> }
   | { type: 'memory:consolidate'; projectKeyHash?: string }
-  | { type: 'memory:reindex' }
-  | { type: 'memory:indexStatus' }
   | { type: 'memory:getStatus'; projectKeyHash?: string; contextWindowTokens?: number }
   | { type: 'memory:rewriteMirrors'; projectKeyHash?: string }
   | { type: 'memory:importMirror'; projectKeyHash?: string; conflict?: 'keep' | 'overwrite' }
@@ -634,22 +632,6 @@ export type ServerMessage =
   | { type: 'memory:import:result'; ok: boolean; imported: number; error?: string }
   | { type: 'memory:config'; config: MemoryFileConfig }
   | { type: 'memory:pipeline'; phase: 1 | 2; status: 'started' | 'succeeded' | 'failed' | 'noop'; detail?: string }
-  | {
-      type: 'memory:reindex:result'
-      embedded: number
-      total: number
-      failed?: number
-      modelKey?: string
-      error?: string
-    }
-  | {
-      type: 'memory:indexStatus:result'
-      embedded: number
-      total: number
-      modelKey?: string
-      vecEnabled?: boolean
-      error?: string
-    }
   | { type: 'memory:status'; status: MemoryPipelineStatus; error?: string }
   | { type: 'memory:rewriteMirrors:result'; written: string[]; error?: string }
   | { type: 'memory:importMirror:result'; imported: number; skipped: number; error?: string }

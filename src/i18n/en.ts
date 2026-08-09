@@ -1004,8 +1004,7 @@ export const en = {
       model: 'Model Configuration',
       modelConfig: {
         currentModel: 'Current model',
-        intro:
-          'Configure chat, embedding, and rerank separately. Embedding and rerank use their own endpoint and API key.',
+        intro: 'Configure chat providers, models, and API keys.',
         noModel: 'No model selected',
         noModelHint: 'Pick a provider below and set a current model',
         ready: 'Ready',
@@ -1080,8 +1079,6 @@ export const en = {
         addProvider: 'Add',
         tabs: {
           base: 'Base models',
-          embedding: 'Embedding',
-          rerank: 'Rerank',
           ariaLabel: 'Model purpose',
         },
         purpose: {
@@ -1092,53 +1089,12 @@ export const en = {
             setCurrent: 'Set as current',
             current: 'Current',
           },
-          embedding: {
-            currentModel: 'Current embedding model',
-            noModel: 'Not configured',
-            noModelHint: 'Configure an OpenAI Embeddings endpoint',
-            setCurrent: 'Set as embedding',
-            current: 'Embedding',
-            clear: 'Clear embedding',
-            privacyNote:
-              'Embeddings send memory text to the configured endpoint. Used when hybrid search is on under Memory.',
-          },
-          rerank: {
-            currentModel: 'Current rerank model',
-            noModel: 'Not configured',
-            noModelHint: 'Configure a Cohere or Jina rerank endpoint',
-            setCurrent: 'Set as rerank',
-            current: 'Rerank',
-            clear: 'Clear rerank',
-            privacyNote:
-              'Rerank may send query and memory snippets to the configured endpoint when hybrid search is enabled.',
-          },
-        },
-        apiFormat: {
-          openai: 'OpenAI Embeddings',
-          cohere: 'Cohere',
-          jina: 'Jina',
-          openaiHint: 'Industry-standard POST /embeddings protocol',
-          rerankHint: 'No OpenAI standard — pick Cohere or Jina when configuring',
         },
         edit: 'Edit',
         configure: 'Configure',
         baseDialogTitle: 'Edit base models',
         baseDialogIntro:
-          'Chat providers and models used for conversation and agents. Not shared with embedding or rerank credentials.',
-        endpointDialog: {
-          embeddingTitle: 'Configure embedding model',
-          rerankTitle: 'Configure rerank model',
-          embeddingIntro:
-            'Independent of chat providers. Uses the industry-standard OpenAI Embeddings API (POST …/embeddings). Enter base URL, API key, and model id.',
-          rerankIntro:
-            'Independent of chat providers. OpenAI has no public rerank API — choose Cohere or Jina wire format to match your endpoint.',
-          apiProtocol: 'API protocol',
-          embeddingProtocolHint:
-            'Compatible with OpenAI, Azure OpenAI, Ollama, vLLM, LiteLLM, and most “OpenAI-compatible” gateways.',
-          rerankProtocolHint:
-            'Match the format your service documents. vLLM and many self-hosted stacks support both; cloud vendors usually document one.',
-          modelId: 'Model ID',
-        },
+          'Chat providers and models used for conversation and agents.',
       },
       mcpLabel: 'MCPs',
       connectorsLabel: 'Connectors',
@@ -1339,20 +1295,6 @@ export const en = {
           'Model used only for background learning. Leave default unless you want a specific cheap model.',
         extractModelDefault: 'Default (cheap model for active provider)',
         extractModelPlaceholder: 'provider/model (optional)',
-        hybridSearch: 'Hybrid search',
-        hybridSearchDesc:
-          'Combine keyword (FTS) and embedding similarity when ranking memories for prefetch and tools.',
-        hybridSearchPlain: 'Optional: smarter search via embeddings (sends text to your embed provider).',
-        hybridSearchNeedsEmbedding: 'Set an embedding model under Models → Embedding first.',
-        hybridNeedsEmbeddingTitle: 'Embedding model required',
-        hybridNeedsEmbeddingBody:
-          'Hybrid search needs an embedding model. Configure it under Models → Embedding, then try again.',
-        hybridPrivacyNote:
-          'Hybrid search sends query text and memory snippets to the configured embedding (and rerank if set) provider. Keep hybrid off to stay fully local (FTS only).',
-        indexStatus: 'Embedding index: {{embedded}} / {{total}}',
-        indexStatusNone: 'Embedding index: no model configured',
-        reindex: 'Reindex embeddings',
-        reindexing: 'Reindexing…',
         save: 'Save',
         exportJsonl: 'Export',
         importJsonl: 'Import',
@@ -1453,7 +1395,7 @@ export const en = {
           'Markdown mirror still has entries missing from the database; auto-repair did not fully succeed. Safe to ignore, or delete ~/.hip/memories and restart.',
         advancedTitle: 'Advanced (usually leave alone)',
         advancedDesc:
-          'Timing thresholds, extraction model, and hybrid search. Defaults work for most people.',
+          'Timing thresholds and extraction model. Defaults work for most people.',
         advancedGates: 'Advanced extract gates',
         advancedGatesDesc: 'Idle debounce, interval, and content thresholds for background extraction.',
         idleMinutes: 'Idle minutes before learn',

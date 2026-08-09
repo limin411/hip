@@ -4,7 +4,7 @@
  * Regenerate: yarn product:content
  * Check:      yarn product:content:check
  *
- * contentHash=c41f03e640aaf37b skillVersion=3 productVersion=1.0.1
+ * contentHash=451755b81ed37030 skillVersion=3 productVersion=1.0.1
  */
 
 export type ProductHelpSectionId = 'overview' | 'memory' | 'config' | 'troubleshooting' | 'agents'
@@ -184,7 +184,6 @@ Managed sub-agents may get read-only core injection; external ACP agents default
 ## Privacy notes
 
 - Cold defaults: use/generate off
-- Hybrid search (optional) may send snippets to embedding providers
 - Threat-scan + secret redact on write
 - Soft-delete trash + retention
 `,
@@ -701,7 +700,6 @@ Managed sub-agents may get read-only core injection; external ACP agents default
 ## Privacy notes
 
 - Cold defaults: use/generate off
-- Hybrid search (optional) may send snippets to embedding providers
 - Threat-scan + secret redact on write
 - Soft-delete trash + retention
 `,

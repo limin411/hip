@@ -1085,8 +1085,6 @@ export const ko = {
       "addProvider": "추가",
       "tabs": {
         "base": "기본 모델",
-        "embedding": "임베딩",
-        "rerank": "재순위화",
         "ariaLabel": "모델 목적"
       },
       "purpose": {
@@ -1097,46 +1095,11 @@ export const ko = {
           "setCurrent": "현재 모델로 설정",
           "current": "현재"
         },
-        "embedding": {
-          "currentModel": "현재 임베딩 모델",
-          "noModel": "설정되지 않음",
-          "noModelHint": "OpenAI Embeddings 엔드포인트를 설정하세요",
-          "setCurrent": "임베딩으로 설정",
-          "current": "임베딩",
-          "clear": "임베딩 해제",
-          "privacyNote": "임베딩은 메모리 텍스트를 설정된 엔드포인트로 전송합니다. 메모리에서 하이브리드 검색이 켜져 있을 때 사용됩니다."
-        },
-        "rerank": {
-          "currentModel": "현재 재순위화 모델",
-          "noModel": "설정되지 않음",
-          "noModelHint": "Cohere 또는 Jina 재순위화 엔드포인트를 설정하세요",
-          "setCurrent": "재순위화로 설정",
-          "current": "재순위화",
-          "clear": "재순위화 해제",
-          "privacyNote": "하이브리드 검색이 활성화되면 재순위화가 쿼리와 메모리 조각을 설정된 엔드포인트로 전송할 수 있습니다."
-        }
-      },
-      "apiFormat": {
-        "openai": "OpenAI Embeddings",
-        "cohere": "Cohere",
-        "jina": "Jina",
-        "openaiHint": "업계 표준 POST /embeddings 프로토콜",
-        "rerankHint": "OpenAI 표준 없음 — 설정 시 Cohere 또는 Jina를 선택하세요"
       },
       "edit": "편집",
       "configure": "설정",
       "baseDialogTitle": "기본 모델 편집",
-      "baseDialogIntro": "대화와 에이전트에 사용되는 채팅 제공자 및 모델입니다. 임베딩 또는 재순위화 자격 증명과 공유되지 않습니다.",
-      "endpointDialog": {
-        "embeddingTitle": "임베딩 모델 설정",
-        "rerankTitle": "재순위화 모델 설정",
-        "embeddingIntro": "채팅 제공자와 독립적입니다. 업계 표준 OpenAI Embeddings API(POST …/embeddings)를 사용합니다. 기본 URL, API 키, 모델 ID를 입력하세요.",
-        "rerankIntro": "채팅 제공자와 독립적입니다. OpenAI에는 공개 재순위화 API가 없습니다. 엔드포인트에 맞게 Cohere 또는 Jina 와이어 형식을 선택하세요.",
-        "apiProtocol": "API 프로토콜",
-        "embeddingProtocolHint": "OpenAI, Azure OpenAI, Ollama, vLLM, LiteLLM 및 대부분의 'OpenAI 호환' 게이트웨이와 호환됩니다.",
-        "rerankProtocolHint": "서비스 문서에 명시된 형식을 따르세요. vLLM 및 많은 자체 호스팅 스택은 두 가지를 모두 지원하며, 클라우드 공급업체는 일반적으로 하나만 문서화합니다.",
-        "modelId": "모델 ID"
-      }
+      "baseDialogIntro": "대화와 에이전트에 사용되는 채팅 제공자 및 모델입니다.",
     },
     "mcpLabel": "MCPs",
     "connectorsLabel": "커넥터",
@@ -1317,17 +1280,6 @@ export const ko = {
       "extractModelPlain": "백그라운드 학습에만 사용되는 모델입니다. 특정 저렴한 모델을 원하지 않으면 기본값을 유지하세요.",
       "extractModelDefault": "기본값 (활성 제공자의 저렴한 모델)",
       "extractModelPlaceholder": "provider/model (선택 사항)",
-      "hybridSearch": "하이브리드 검색",
-      "hybridSearchDesc": "프리페치 및 도구용 기억 순위를 매길 때 키워드 (FTS)와 임베딩 유사도를 결합합니다.",
-      "hybridSearchPlain": "선택 사항: 임베딩을 통한 더 스마트한 검색 (텍스트를 임베드 제공자로 전송).",
-      "hybridSearchNeedsEmbedding": "먼저 모델 → 임베딩에서 임베딩 모델을 설정하세요.",
-      "hybridNeedsEmbeddingTitle": "임베딩 모델 필요",
-      "hybridNeedsEmbeddingBody": "하이브리드 검색에는 임베딩 모델이 필요합니다. 모델 → 임베딩에서 설정한 후 다시 시도하세요.",
-      "hybridPrivacyNote": "하이브리드 검색은 쿼리 텍스트와 기억 조각을 설정된 임베딩 (및 재순위화, 설정된 경우) 제공자로 전송합니다. 완전히 로컬로 유지하려면 하이브리드를 끄세요 (FTS만).",
-      "indexStatus": "임베딩 인덱스: {{embedded}} / {{total}}",
-      "indexStatusNone": "임베딩 인덱스: 설정된 모델 없음",
-      "reindex": "임베딩 재인덱싱",
-      "reindexing": "재인덱싱 중…",
       "save": "저장",
       "exportJsonl": "내보내기",
       "importJsonl": "가져오기",

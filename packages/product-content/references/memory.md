@@ -29,7 +29,6 @@ Managed sub-agents may get read-only core injection; external ACP agents default
 ## Privacy notes
 
 - Cold defaults: use/generate off
-- Hybrid search (optional) may send snippets to embedding providers
 - Threat-scan + secret redact on write
 - Soft-delete trash + retention
 

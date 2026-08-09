@@ -188,32 +188,6 @@ describe('runProviderProbe', () => {
     expect(fetchMock).not.toHaveBeenCalled()
   })
 
-  it('returns PROBE_UNSUPPORTED for rerank after prechecks', async () => {
-    const r = await runProviderProbe({
-      purpose: 'rerank',
-      providerID: 'hip-memory-rerank',
-      baseURL: 'https://api.example.com/v1',
-      modelID: 'rerank-1',
-      draftApiKey: 'sk-rerank-test-key-1234567890',
-    })
-    expect(r.code).toBe('PROBE_UNSUPPORTED')
-    expect(fetchMock).not.toHaveBeenCalled()
-  })
-
-  it('probes embedding and validates vector', async () => {
-    fetchMock.mockResolvedValueOnce(
-      jsonResponse(200, { data: [{ embedding: [0.1, 0.2], index: 0 }] }),
-    )
-    const r = await runProviderProbe({
-      purpose: 'embedding',
-      providerID: 'hip-memory-embedding',
-      baseURL: 'https://api.openai.com/v1',
-      modelID: 'text-embedding-3-small',
-    })
-    expect(r.ok).toBe(true)
-    expect(String(fetchMock.mock.calls[0][0])).toContain('/embeddings')
-  })
-
   it('returns cached result on second call without second fetch', async () => {
     fetchMock.mockResolvedValueOnce(jsonResponse(200, { data: [] }))
     const a = await runProviderProbe({

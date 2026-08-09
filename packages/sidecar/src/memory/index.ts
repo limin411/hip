@@ -16,36 +16,7 @@ export {
   type MemoryUpsertInput,
   type MemoryImportConflict,
   type MemoryInjectBlock,
-  type MemoryEmbeddingClientFactory,
-  type MemoryIndexStatus,
-  type MemoryReindexResult,
 } from './service.js'
-export {
-  createOpenAICompatibleEmbeddingClient,
-  embeddingModelKey,
-  truncateForEmbed,
-  type MemoryEmbeddingClient,
-} from './embedding-client.js'
-export {
-  encodeEmbedding,
-  decodeEmbedding,
-  upsertEmbedding,
-  getEmbedding,
-  deleteEmbedding,
-  deleteEmbeddings,
-  embeddingIndexStatus,
-  ensureVec0Table,
-  memoryVecTableName,
-} from './vec.js'
-export {
-  cosine,
-  hybridScore,
-  searchHybrid,
-  maybeRerank,
-  DEFAULT_HYBRID_WEIGHTS,
-  type HybridWeights,
-  type SearchHybridOpts,
-} from './hybrid-search.js'
 export { buildMemoryTools, buildMemorySearchToolOnly } from './tools.js'
 export {
   MemoryInjector,

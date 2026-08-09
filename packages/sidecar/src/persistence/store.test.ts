@@ -227,21 +227,9 @@ describe('SessionStore', () => {
         source_updated_at, created_at
       ) VALUES (?,?,?,?,?,?,?,?)
     `).run('st1', 's1', 'raw', 'sum', 'pending', 0, now, now)
-    // Embeddings for session mem must drop; project mem embeddings stay.
-    db.prepare(`
-      INSERT INTO memory_embedding_rows(memory_id, model_key, dim, embedding, updated_at)
-      VALUES (?,?,?,?,?)
-    `).run('sess-m', 'm', 1, Buffer.alloc(4), now)
-    db.prepare(`
-      INSERT INTO memory_embedding_rows(memory_id, model_key, dim, embedding, updated_at)
-      VALUES (?,?,?,?,?)
-    `).run('proj-m', 'm', 1, Buffer.alloc(4), now)
-
     store.deleteSession('s1')
 
     expect(db.prepare(`SELECT COUNT(*) AS n FROM memory_items WHERE id='sess-m'`).get() as { n: number }).toEqual({ n: 0 })
-    expect(db.prepare(`SELECT COUNT(*) AS n FROM memory_embedding_rows WHERE memory_id='sess-m'`).get() as { n: number }).toEqual({ n: 0 })
-    expect(db.prepare(`SELECT COUNT(*) AS n FROM memory_embedding_rows WHERE memory_id='proj-m'`).get() as { n: number }).toEqual({ n: 1 })
     const proj = db.prepare(`SELECT source_session_id AS src FROM memory_items WHERE id='proj-m'`).get() as { src: string | null }
     expect(proj.src).toBeNull()
     expect(db.prepare(`SELECT COUNT(*) AS n FROM memory_stage1 WHERE session_id='s1'`).get() as { n: number }).toEqual({ n: 0 })
@@ -263,21 +251,10 @@ describe('SessionStore', () => {
         source_session_id, tags_json, created_at, updated_at, use_count, pinned
       ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)
     `).run('other-m', 'project', 'preference', 'other', 'c', 0.5, 'active', 'extract', 's2', '[]', now, now, 0, 0)
-    db.prepare(`
-      INSERT INTO memory_embedding_rows(memory_id, model_key, dim, embedding, updated_at)
-      VALUES (?,?,?,?,?)
-    `).run('proj-m', 'm', 1, Buffer.alloc(4), now)
-    db.prepare(`
-      INSERT INTO memory_embedding_rows(memory_id, model_key, dim, embedding, updated_at)
-      VALUES (?,?,?,?,?)
-    `).run('other-m', 'm', 1, Buffer.alloc(4), now)
-
     store.deleteSession('s1', { deleteDerivedMemories: true })
 
     expect(db.prepare(`SELECT COUNT(*) AS n FROM memory_items WHERE id='proj-m'`).get() as { n: number }).toEqual({ n: 0 })
-    expect(db.prepare(`SELECT COUNT(*) AS n FROM memory_embedding_rows WHERE memory_id='proj-m'`).get() as { n: number }).toEqual({ n: 0 })
     expect(db.prepare(`SELECT COUNT(*) AS n FROM memory_items WHERE id='other-m'`).get() as { n: number }).toEqual({ n: 1 })
-    expect(db.prepare(`SELECT COUNT(*) AS n FROM memory_embedding_rows WHERE memory_id='other-m'`).get() as { n: number }).toEqual({ n: 1 })
   })
 
   it('round-trips tool calls + delegation through insertTurn/loadAgentRuns', () => {

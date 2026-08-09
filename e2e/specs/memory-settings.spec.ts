@@ -177,16 +177,4 @@ describe('memory settings @memory', () => {
     await activeFilter.click()
     await waitForMemoryListItem(item.id, 15000)
   })
-
-  it('M2.13 hybrid switch is present (embed gating is product-local)', async () => {
-    await openMemorySettings()
-    await enableMemoryBoth()
-    const hybrid = await browser.$('[data-testid="memory-switch-hybrid"]')
-    await hybrid.waitForExist({ timeout: 10000 })
-    // Product may disable the switch or show a needs-embed hint; either is valid unpaid path.
-    const isDisabled = Boolean(await hybrid.getProperty('disabled'))
-    const hint = await browser.$('[data-testid="memory-hybrid-needs-embed"]')
-    const hasHint = await hint.isExisting()
-    expect(isDisabled || hasHint || (await hybrid.isExisting())).toBe(true)
-  })
 })

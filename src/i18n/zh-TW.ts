@@ -1015,7 +1015,7 @@ export const zhTW = {
     "model": "模型配置",
     "modelConfig": {
       "currentModel": "當前模型",
-      "intro": "分別配置對話、嵌入與重排。嵌入與重排使用獨立端點與 API Key。",
+      "intro": "配置對話提供商、模型與 API Key。",
       "noModel": "未選擇模型",
       "noModelHint": "在下方選擇一個提供商並設為當前模型",
       "ready": "已就緒",
@@ -1089,8 +1089,6 @@ export const zhTW = {
       "addProvider": "新增",
       "tabs": {
         "base": "基礎模型",
-        "embedding": "嵌入",
-        "rerank": "重排",
         "ariaLabel": "模型用途"
       },
       "purpose": {
@@ -1101,46 +1099,11 @@ export const zhTW = {
           "setCurrent": "設為當前",
           "current": "當前"
         },
-        "embedding": {
-          "currentModel": "當前嵌入模型",
-          "noModel": "未配置",
-          "noModelHint": "配置 OpenAI Embeddings 端點",
-          "setCurrent": "設為嵌入",
-          "current": "嵌入",
-          "clear": "清除嵌入",
-          "privacyNote": "嵌入會將記憶文字傳送到所配置的端點。在「記憶」中開啟混合檢索時使用。"
-        },
-        "rerank": {
-          "currentModel": "當前重排模型",
-          "noModel": "未配置",
-          "noModelHint": "配置 Cohere 或 Jina 重排端點",
-          "setCurrent": "設為重排",
-          "current": "重排",
-          "clear": "清除重排",
-          "privacyNote": "開啟混合檢索時，重排可能將查詢與記憶片段傳送到所配置的端點。"
-        }
-      },
-      "apiFormat": {
-        "openai": "OpenAI Embeddings",
-        "cohere": "Cohere",
-        "jina": "Jina",
-        "openaiHint": "業界主流公共協議：POST /embeddings",
-        "rerankHint": "無 OpenAI 標準，配置時選擇 Cohere 或 Jina"
       },
       "edit": "編輯",
       "configure": "配置",
       "baseDialogTitle": "編輯基礎模型",
-      "baseDialogIntro": "用於對話與智慧體的 chat 提供商與模型。金鑰不與嵌入/重排共用。",
-      "endpointDialog": {
-        "embeddingTitle": "配置嵌入模型",
-        "rerankTitle": "配置重排模型",
-        "embeddingIntro": "與對話提供商完全獨立。使用業界主流的 OpenAI Embeddings 協議（POST …/embeddings）。填寫 Base URL、API Key 與模型 id。",
-        "rerankIntro": "與對話提供商完全獨立。OpenAI 沒有公開重排 API — 請按端點文件選擇 Cohere 或 Jina 協議。",
-        "apiProtocol": "API 協議",
-        "embeddingProtocolHint": "相容 OpenAI、Azure OpenAI、Ollama、vLLM、LiteLLM 以及大多數「OpenAI 相容」閘道器。",
-        "rerankProtocolHint": "請與服務文件中的協議保持一致。vLLM 等自託管棧常同時相容兩者；雲廠商通常只寫一種。",
-        "modelId": "模型 ID"
-      }
+      "baseDialogIntro": "用於對話與智慧體的 chat 提供商與模型。",
     },
     "mcpLabel": "MCPs",
     "connectorsLabel": "連接器",
@@ -1321,17 +1284,6 @@ export const zhTW = {
       "extractModelPlain": "只用於後臺學習。一般保持預設廉價模型即可。",
       "extractModelDefault": "預設（當前活動提供商的廉價模型）",
       "extractModelPlaceholder": "provider/model（可選）",
-      "hybridSearch": "混合檢索",
-      "hybridSearchDesc": "在預取與工具檢索時，將關鍵詞（FTS）與向量相似度結合排序。",
-      "hybridSearchPlain": "可選：用向量檢索（會把文字發給嵌入服務）。多數人保持關閉即可。",
-      "hybridSearchNeedsEmbedding": "請先在「模型 → 嵌入」中配置嵌入模型。",
-      "hybridNeedsEmbeddingTitle": "需要配置嵌入模型",
-      "hybridNeedsEmbeddingBody": "混合檢索需要嵌入模型。請先到「模型配置 → 嵌入」完成配置，然後再開啟。",
-      "hybridPrivacyNote": "混合檢索會將查詢與記憶片段傳送到已配置的嵌入（及已配置的重排序）服務商。關閉混合檢索可保持純本地 FTS。",
-      "indexStatus": "嵌入索引：{{embedded}} / {{total}}",
-      "indexStatusNone": "嵌入索引：未配置模型",
-      "reindex": "重建嵌入索引",
-      "reindexing": "正在重建…",
       "save": "儲存",
       "exportJsonl": "匯出",
       "importJsonl": "匯入",

@@ -1,4 +1,5 @@
 import { useMemo, type ReactNode } from 'react'
+import { useTranslation } from 'react-i18next'
 import { ChevronRight } from 'lucide-react'
 import { InlineDocTitle } from '../InlineDocTitle'
 import type { KnowledgeNode } from '@/domain/knowledge/types'
@@ -14,10 +15,10 @@ export interface PageHeaderProps {
   onTitleEnter?: () => void
   /** 活动文档路径 —— 渲染为标题上方的小字面包屑（T1）。 */
   pathNodes?: KnowledgeNode[]
-  /** 路径为空时的兜底标签（浏览根）。 */
-  fallbackLabel?: string
   /** 面包屑点击：文件夹 = 展开侧边栏目录；文档 = 打开。 */
   onCrumbClick?: (node: KnowledgeNode) => void
+  /** 面包屑根「我的空间」点击（跳浏览根）。 */
+  onRootClick?: () => void
   /** 页面级 ⋯ 菜单（T1：标题 hover 显示）。 */
   menu?: ReactNode
   className?: string
@@ -33,11 +34,13 @@ export function PageHeader({
   onTitleCommit,
   onTitleEnter,
   pathNodes = [],
-  fallbackLabel,
   onCrumbClick,
+  onRootClick,
   menu,
   className,
 }: PageHeaderProps) {
+  const { t } = useTranslation()
+
   /** Prefer first + last crumbs when the path is deep (max 4 visible nodes). */
   const crumbItems = useMemo(() => {
     if (pathNodes.length <= CRUMB_MAX) {
@@ -52,6 +55,9 @@ export function PageHeader({
     ]
   }, [pathNodes])
 
+  /** 根目录文档（pathNodes 为空或仅自身）：目录 = 我的空间。 */
+  const atRootDoc = pathNodes.length <= 1
+
   return (
     <header
       className={cn('group shrink-0', className)}
@@ -59,22 +65,32 @@ export function PageHeader({
     >
       <div className="knowledge-doc-inline-pad">
         <div className="knowledge-doc-measure pt-2.5 sm:pt-3">
-          {/* 小字路径（T1）：hover 项才显灰底，对齐正文列。 */}
+          {/* 小字路径（T1）：`目录 > 文件名`，hover 项才显灰底，对齐正文列。 */}
           <div className="flex min-w-0 items-center gap-1 truncate text-meta">
+            {/* 根：全部文档（点击回浏览根；样式区分当前位置） */}
+            <span
+              className={cn(
+                'shrink-0 cursor-pointer whitespace-nowrap rounded-sm px-1 py-0.5 text-ink-tertiary transition-colors hover:bg-state-hover hover:text-ink',
+                atRootDoc && 'font-medium text-ink hover:bg-transparent hover:text-ink',
+              )}
+              onClick={() => onRootClick?.()}
+            >
+              {t('knowledge.home.mySpaces')}
+            </span>
+            <ChevronRight size={12} className="shrink-0 text-ink-tertiary" aria-hidden />
             {pathNodes.length === 0 ? (
-              <span className="truncate text-ink-tertiary">{fallbackLabel}</span>
+              /* 节点未就绪（打开瞬间/异常态）：标题兜底 */
+              <span className="truncate px-1 font-medium text-ink">{title}</span>
             ) : (
               crumbItems.map((item, i) => {
                 if (item.kind === 'ellipsis') {
                   return (
                     <span key="crumb-ellipsis" className="flex min-w-0 items-center gap-1">
-                      {i > 0 && (
-                        <ChevronRight
-                          size={12}
-                          className="shrink-0 text-ink-tertiary"
-                          aria-hidden
-                        />
-                      )}
+                      <ChevronRight
+                        size={12}
+                        className="shrink-0 text-ink-tertiary"
+                        aria-hidden
+                      />
                       <span className="shrink-0 text-ink-tertiary" aria-hidden>
                         …
                       </span>

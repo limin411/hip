@@ -625,7 +625,7 @@ export function KnowledgeWorkspace() {
                   liveEditorRef.current?.focus({ at: 'start' })
                 }}
                 pathNodes={pathNodes}
-                fallbackLabel={space?.name}
+                onRootClick={() => void useKnowledgeStore.getState().navigateTo(null, null)}
                 onCrumbClick={onCrumbClick}
                 menu={docMenu}
               />
@@ -701,7 +701,7 @@ export function KnowledgeWorkspace() {
                   editorRef.current?.focus()
                 }}
                 pathNodes={pathNodes}
-                fallbackLabel={space?.name}
+                onRootClick={() => void useKnowledgeStore.getState().navigateTo(null, null)}
                 onCrumbClick={onCrumbClick}
                 menu={docMenu}
               />

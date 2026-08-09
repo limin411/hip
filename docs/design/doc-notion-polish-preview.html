@@ -1,0 +1,690 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="light">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>文档管理 × Notion 细节整改 — 整改后高保真预览</title>
+<style>
+/* ═══════════════ 基础与主题变量 ═══════════════ */
+:root{
+  --bg-app:#ffffff; --bg-subtle:#fafafa; --bg-muted:#f1f1f1; --bg-content:#ffffff;
+  --border:#e0e0e0; --border-strong:#c9c9c9;
+  --text-primary:#111111; --text-secondary:#5e5e5e; --text-tertiary:#757575;
+  --accent:#c2410c; --accent-strong:#7c2d12; --accent-subtle:#f0f0f0; --on-accent:#fff;
+  --btn-primary:#3a3a3a; --on-btn:#fafafa;
+  --state-hover:rgba(0,0,0,.055); --shadow-overlay:0 8px 30px rgba(0,0,0,.12);
+  /* 文档域子语言（整改后） */
+  --doc-text:#2f2c28; --doc-muted:#9b9893; --doc-hover:#f0efec; --doc-row:#f7f6f3;
+  --doc-border:#e8e8e8; --doc-code:#f7f6f3; --doc-selection:rgba(45,110,220,.18);
+  --doc-title:32px; --doc-h1:30px; --doc-h2:24px; --doc-h3:20px; --doc-body:16px;
+  --doc-quote:#2f2c28;
+}
+[data-theme="dark"]{
+  --bg-app:#1a1a1a; --bg-subtle:#1f1f1f; --bg-muted:#262626; --bg-content:#1a1a1a;
+  --border:#333333; --border-strong:#4a4a4a;
+  --text-primary:#e6e6e6; --text-secondary:#9d9d9d; --text-tertiary:#7a7a7a;
+  --accent:#fb923c; --accent-strong:#fdba74; --accent-subtle:#2b2b2b; --on-accent:#1a1a1a;
+  --btn-primary:#d8d8d8; --on-btn:#1a1a1a;
+  --state-hover:rgba(255,255,255,.07); --shadow-overlay:0 8px 30px rgba(0,0,0,.5);
+  --doc-text:#e8e6e1; --doc-muted:#7d7a75; --doc-hover:#2f2f2f; --doc-row:#2a2a2a;
+  --doc-border:#3a3a3a; --doc-code:#2f2f2f; --doc-selection:rgba(93,160,255,.25);
+  --doc-quote:#e8e6e1;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{background:var(--bg-app);color:var(--text-primary)}
+body{font-family:-apple-system,BlinkMacSystemFont,"SF Pro Text","PingFang SC","Hiragino Sans GB","Microsoft YaHei","Segoe UI",sans-serif;font-size:13px;line-height:1.5;padding:0 0 64px}
+button{font-family:inherit;cursor:pointer;border:0;background:none;color:inherit}
+.page{max-width:1180px;margin:0 auto;padding:0 24px}
+
+/* ═══════════════ 页面头部 ═══════════════ */
+.topbar{position:sticky;top:0;z-index:60;background:var(--bg-app);border-bottom:1px solid var(--border);padding:12px 0}
+.topbar-in{max-width:1180px;margin:0 auto;padding:0 24px;display:flex;align-items:center;gap:14px}
+.topbar h1{font-size:16px;font-weight:600;letter-spacing:-.01em}
+.topbar .sub{color:var(--text-tertiary);font-size:12px}
+.topbar .spacer{flex:1}
+.btn{border:1px solid var(--border);background:var(--bg-subtle);border-radius:6px;padding:5px 12px;font-size:12px;color:var(--text-secondary);transition:all .15s}
+.btn:hover{background:var(--state-hover);color:var(--text-primary)}
+.btn.on{background:var(--btn-primary);color:var(--on-btn);border-color:var(--btn-primary)}
+h2.sec{font-size:15px;font-weight:600;letter-spacing:-.01em;margin:42px 0 4px;display:flex;align-items:center;gap:8px}
+h2.sec .tag{font-size:10px;font-weight:600;color:var(--accent-strong);background:var(--accent-subtle);padding:2px 7px;border-radius:4px;letter-spacing:.04em}
+p.sec-sub{color:var(--text-tertiary);font-size:12px;margin-bottom:14px}
+
+/* ═══════════════ 对比卡 ═══════════════ */
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(352px,1fr));gap:14px}
+.cmp{background:var(--bg-subtle);border:1px solid var(--border);border-radius:10px;overflow:hidden;display:flex;flex-direction:column}
+.cmp-head{display:flex;align-items:center;gap:8px;padding:9px 12px;border-bottom:1px solid var(--border)}
+.cmp-no{font-size:10px;font-weight:700;color:var(--accent-strong);background:var(--accent-subtle);border-radius:4px;padding:2px 6px;letter-spacing:.03em}
+.cmp-title{font-size:12.5px;font-weight:600;flex:1}
+.cmp-pair{display:grid;grid-template-columns:1fr 1fr;gap:0;flex:1}
+.cmp-side{padding:12px;display:flex;flex-direction:column;gap:6px;min-height:0}
+.cmp-side.before{background:var(--bg-app);border-right:1px dashed var(--border)}
+.cmp-side.after{background:var(--bg-app)}
+.cmp-label{font-size:10.5px;font-weight:600;letter-spacing:.05em;color:var(--text-tertiary)}
+.cmp-label .dot{display:inline-block;width:6px;height:6px;border-radius:50%;margin-right:5px;vertical-align:1px}
+.cmp-label .dot.b{background:#999}.cmp-label .dot.a{background:var(--doc-text)}
+.cmp-foot{padding:8px 12px;border-top:1px solid var(--border);font-size:11.5px;color:var(--text-secondary);line-height:1.55;background:var(--bg-subtle)}
+.cmp-foot b{color:var(--text-primary);font-weight:600}
+.note{font-size:11px;color:var(--doc-muted)}
+
+/* —— before/after 内嵌 mini mockups —— */
+.mini{border:1px solid var(--border);border-radius:6px;background:var(--bg-app);overflow:hidden}
+/* 工具栏（before） */
+.tb{display:flex;align-items:center;gap:6px;height:30px;padding:0 8px;border-bottom:1px solid var(--border);font-size:10px;color:var(--text-secondary);background:var(--bg-content)}
+.tb .dot{width:5px;height:5px;border-radius:50%;background:#22a06b}
+.tb .grow{flex:1}
+.ic{width:14px;height:14px;color:var(--text-tertiary);flex:none}
+/* 文档正文 before */
+.paper{padding:10px 14px;font-size:13px}
+.paper .t1{font-size:22px;font-weight:600;letter-spacing:-.02em;margin-bottom:6px}
+.paper p{margin-bottom:8px;color:var(--text-primary)}
+.paper .dim{color:var(--text-tertiary)}
+/* 手柄 */
+.handle-row{position:relative;padding-left:30px}
+.handles{position:absolute;left:2px;top:2px;display:flex;gap:2px;align-items:center;padding:3px 4px;border-radius:5px;background:var(--doc-hover)}
+.handles .btn4{width:16px;height:16px;border-radius:4px;display:flex;align-items:center;justify-content:center;color:var(--text-tertiary)}
+.handles .btn4:hover{background:var(--state-hover);color:var(--text-primary)}
+.h6{width:14px;height:14px;color:var(--text-secondary)}
+.dot6{display:grid;grid-template-columns:repeat(2,2.5px);grid-auto-rows:2.5px;gap:2.5px;margin:0 4px}
+.dot6 i{width:2.5px;height:2.5px;border-radius:50%;background:currentColor}
+/* 待办 */
+.todo{display:flex;align-items:flex-start;gap:8px;margin:3px 0}
+.cb{width:15px;height:15px;border:1.2px solid #b0ada8;border-radius:3px;flex:none;margin-top:2px;background:var(--bg-app)}
+.cb.native{width:15px;height:15px;accent-color:var(--accent);margin-top:1px;flex:none}
+.cb.checked{background:#37352f;border-color:#37352f;position:relative}
+.cb.checked::after{content:"";position:absolute;left:4px;top:1.5px;width:4px;height:8px;border:solid #fff;border-width:0 1.8px 1.8px 0;transform:rotate(45deg)}
+.todo.done .txt{text-decoration:line-through;color:#9b9a97}
+/* 引用 */
+.quote{border-left:3px solid var(--doc-quote);padding:2px 10px;color:var(--doc-text);margin:6px 0}
+.quote.dimq{color:var(--text-tertiary)}
+/* 代码 */
+.code{border-radius:6px;padding:8px 12px;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:11px;line-height:1.6;margin:6px 0;position:relative}
+.code.dark{background:#0d1117;color:#e6edf3;border:1px solid #30363d}
+.code.paper{background:var(--doc-code);color:var(--doc-text)}
+.lang{position:absolute;top:6px;right:10px;font-size:9.5px;color:var(--text-tertiary)}
+/* 表格 */
+.tbl{width:100%;border-collapse:collapse;font-size:11.5px;margin:6px 0}
+.tbl th,.tbl td{border:1px solid var(--doc-border);padding:4px 8px;text-align:left;vertical-align:top}
+.tbl th{background:var(--doc-row);font-weight:600}
+.tbl tr.hov td{background:#f7f6f3}
+.tbl tr.hov-o td{background:rgba(194,65,12,.06)}
+/* 气泡 */
+.bubble{display:inline-flex;align-items:center;gap:1px;padding:3px;border:1px solid var(--border);border-radius:8px;background:var(--bg-app);box-shadow:var(--shadow-overlay)}
+.bubble .b{width:24px;height:24px;border-radius:5px;display:flex;align-items:center;justify-content:center;font-size:12px;color:var(--text-secondary)}
+.bubble .b:hover{background:var(--state-hover)}
+.bubble .b.hot{background:var(--doc-hover)}
+.bubble .sep{width:1px;height:16px;background:var(--border);margin:0 2px}
+/* 斜杠 */
+.slash{width:100%;border:1px solid var(--border);border-radius:8px;background:var(--bg-app);box-shadow:var(--shadow-overlay);overflow:hidden;font-size:11.5px}
+.slash .sg{padding:7px 10px 3px;font-size:10px;font-weight:600;letter-spacing:.06em;color:var(--text-tertiary);text-transform:uppercase}
+.slash .si{display:flex;align-items:center;gap:8px;padding:4px 10px}
+.slash .si.hot{background:var(--doc-hover)}
+.slash .itile{width:30px;height:30px;border-radius:6px;background:var(--doc-row);display:flex;align-items:center;justify-content:center;flex:none;font-size:14px}
+.slash .si .lb{flex:1}
+.slash .si .lb b{display:block;font-weight:500;color:var(--text-primary)}
+.slash .si .lb span{font-size:10px;color:var(--text-tertiary)}
+.slash .si .kbd{font-size:9.5px;color:var(--text-tertiary)}
+/* 保存状态 before */
+.savebar{display:flex;align-items:center;gap:5px;font-size:10px;color:var(--text-tertiary)}
+/* 面包屑 after */
+.crumb{font-size:11px;color:var(--text-tertiary);display:flex;align-items:center;gap:2px}
+.crumb .c{padding:1px 5px;border-radius:4px}
+.crumb .c:hover{background:var(--doc-hover);color:var(--text-primary)}
+.crumb .cur{color:var(--text-primary);font-weight:500;padding:1px 5px}
+
+/* ═══════════════ 整改后完整文档页 ═══════════════ */
+.appwin{border:1px solid var(--border-strong);border-radius:12px;overflow:hidden;box-shadow:var(--shadow-overlay);background:var(--bg-app);margin-top:8px}
+.appwin .winbar{display:flex;align-items:center;gap:8px;height:30px;padding:0 12px;border-bottom:1px solid var(--border);background:var(--bg-subtle);font-size:11px;color:var(--text-tertiary)}
+.winbar .lg{width:8px;height:8px;border-radius:50%;display:inline-block;margin-right:4px}
+.winbar .dots span{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:5px}
+.winbar .dots span:nth-child(1){background:#e0564d}.winbar .dots span:nth-child(2){background:#e0b24d}.winbar .dots span:nth-child(3){background:#58b96a}
+.appbody{display:flex;height:720px}
+/* 侧边栏（Flat Solid，保持不动） */
+.sb{width:236px;flex:none;background:var(--bg-subtle);border-right:1px solid var(--border);display:flex;flex-direction:column;overflow:hidden}
+.sb-search{margin:10px 12px 8px;height:28px;border:1px solid var(--border);background:var(--bg-app);border-radius:6px;display:flex;align-items:center;gap:6px;padding:0 8px;font-size:11px;color:var(--text-tertiary)}
+.sb-nav{padding:0 8px 8px}
+.sb-navi{display:flex;align-items:center;gap:8px;height:30px;padding:0 9px;border-radius:6px;font-size:12px;color:var(--text-secondary);margin-bottom:1px}
+.sb-navi.on{background:var(--accent-subtle);color:var(--text-primary);font-weight:600;position:relative}
+.sb-navi.on::before{content:"";position:absolute;left:0;top:7px;bottom:7px;width:2px;border-radius:2px;background:var(--accent)}
+.sb-navi .cnt{margin-left:auto;font-size:10px;color:var(--text-tertiary)}
+.sb-list{flex:1;overflow:hidden;display:flex;flex-direction:column;padding:0 8px}
+.sb-list .lb{display:flex;align-items:center;justify-content:space-between;padding:2px 8px 4px;font-size:10.5px;color:var(--text-tertiary);font-weight:600;letter-spacing:.02em}
+.sb-crumb{display:flex;align-items:center;gap:2px;padding:2px 6px 6px;font-size:10.5px;color:var(--text-tertiary)}
+.sb-crumb .c{padding:1px 4px;border-radius:3px}
+.sb-crumb .c:hover{background:var(--state-hover)}
+.sb-row{display:flex;align-items:center;gap:7px;height:28px;padding:0 8px;border-radius:6px;font-size:12px;color:var(--text-secondary);position:relative}
+.sb-row.on{background:var(--state-hover);color:var(--text-primary);font-weight:500}
+.sb-row .ops{display:none;margin-left:auto;align-items:center;gap:1px}
+.sb-row:hover{background:var(--state-hover)}
+.sb-row:hover .ops{display:flex}
+.sb-row .op{width:18px;height:18px;border-radius:4px;display:flex;align-items:center;justify-content:center;color:var(--text-tertiary)}
+.sb-row .op:hover{background:var(--bg-muted);color:var(--text-primary)}
+/* 主区（整改后纸张） */
+.main{flex:1;min-width:0;display:flex;flex-direction:column;background:var(--bg-content);position:relative}
+.main-scroll{flex:1;overflow-y:auto;scrollbar-width:thin}
+.doc{max-width:708px;margin:0 auto;padding:0 48px}
+.doc-crumb{margin-top:14px}
+.doc-title-row{display:flex;align-items:center;gap:6px;margin-top:14px}
+.doc-title-ops{display:flex;gap:2px;opacity:0;transition:opacity .12s}
+.doc-title-row:hover .doc-title-ops{opacity:1}
+.doc-title-ops .op{width:26px;height:26px;border-radius:6px;display:flex;align-items:center;justify-content:center;color:var(--text-tertiary)}
+.doc-title-ops .op:hover{background:var(--doc-hover);color:var(--text-primary)}
+.doc-title{font-size:var(--doc-title);font-weight:600;letter-spacing:-.02em;line-height:1.25;color:var(--doc-text);min-width:0}
+.doc-title[contenteditable]:focus{outline:none}
+.doc-hint{font-style:italic;color:var(--doc-muted);font-size:16px;margin-top:2px;padding-bottom:2px}
+.doc-blocks{margin-top:10px;font-size:16px;line-height:1.5;color:var(--doc-text);padding-bottom:120px}
+.blk{position:relative;padding:2px 0}
+.blk .gutter{position:absolute;left:-46px;top:4px;display:flex;align-items:center;gap:1px;opacity:0;transition:opacity .12s}
+.blk:hover .gutter{opacity:1}
+.gutter .plus{width:20px;height:20px;border-radius:5px;display:flex;align-items:center;justify-content:center;color:var(--doc-muted)}
+.gutter .plus:hover{background:var(--doc-hover);color:var(--doc-text)}
+.gutter .drag{width:22px;height:22px;border-radius:5px;display:flex;align-items:center;justify-content:center;color:var(--doc-muted)}
+.gutter .drag:hover{background:var(--doc-hover);color:var(--doc-text)}
+.gutter .drag .dot6{display:grid;grid-template-columns:repeat(2,2.5px);grid-auto-rows:2.5px;gap:2.5px;margin:0}
+.gutter .drag .dot6 i{width:2.5px;height:2.5px;border-radius:50%;background:currentColor}
+.blk.sim .gutter{opacity:1}
+.doc h1.dh{font-size:var(--doc-h1);font-weight:600;letter-spacing:-.02em;line-height:1.3;margin:14px 0 4px;color:var(--doc-text)}
+.doc h2.dh{font-size:var(--doc-h2);font-weight:600;letter-spacing:-.015em;line-height:1.3;margin:12px 0 3px;color:var(--doc-text)}
+.doc p.pb{margin:0;padding:2px 0}
+.doc .todo2{display:flex;align-items:flex-start;gap:10px;padding:2px 0}
+.doc .todo2 .cb{margin-top:4px}
+.doc .todo2.done .txt{text-decoration:line-through;color:var(--doc-muted)}
+.doc .quote2{border-left:3px solid var(--doc-quote);padding:2px 14px;margin:6px 0;color:var(--doc-text)}
+.doc .code2{border-radius:6px;padding:10px 14px;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:13px;line-height:1.6;background:var(--doc-code);color:var(--doc-text);margin:6px 0;position:relative}
+.doc .code2 .lang{top:7px;right:12px}
+.doc .tbl2{width:100%;border-collapse:collapse;font-size:14px;margin:8px 0}
+.doc .tbl2 th,.doc .tbl2 td{border:1px solid var(--doc-border);padding:6px 10px;text-align:left;vertical-align:top}
+.doc .tbl2 th{background:var(--doc-row);font-weight:600}
+.doc .tbl2 tr:hover td{background:var(--doc-row)}
+.doc .div2{border:0;border-top:1px solid var(--border);margin:18px 0}
+.doc .code2 .ln{color:var(--doc-muted)}
+/* 浮动层 */
+.float{position:absolute;z-index:30}
+#bubbleDemo{top:318px;left:calc(50% - 90px)}
+#slashDemo{top:170px;left:calc(50% - 210px);width:356px}
+.slash2{width:100%;border:1px solid var(--border);border-radius:10px;background:var(--bg-app);box-shadow:var(--shadow-overlay);overflow:hidden;font-size:13px}
+.slash2 .sg{padding:8px 12px 3px;font-size:10.5px;font-weight:600;letter-spacing:.07em;color:var(--text-tertiary)}
+.slash2 .si{display:flex;align-items:center;gap:10px;padding:5px 12px;height:40px}
+.slash2 .si.hot{background:var(--doc-hover)}
+.slash2 .itile{width:32px;height:32px;border-radius:7px;background:var(--doc-row);display:flex;align-items:center;justify-content:center;flex:none;font-size:15px}
+.slash2 .si .lb{flex:1;min-width:0}
+.slash2 .si .lb b{display:block;font-weight:500;font-size:13px}
+.slash2 .si .lb span{font-size:10.5px;color:var(--text-tertiary)}
+.slash2 .si .kbd{font-size:10px;color:var(--text-tertiary);display:flex;align-items:center;gap:2px}
+.bubble2{display:inline-flex;align-items:center;gap:1px;padding:4px;border:1px solid var(--border);border-radius:8px;background:var(--bg-app);box-shadow:var(--shadow-overlay)}
+.bubble2 .b{width:26px;height:26px;border-radius:5px;display:flex;align-items:center;justify-content:center;font-size:12.5px;color:var(--text-secondary);font-weight:600}
+.bubble2 .b:hover{background:var(--state-hover)}
+.bubble2 .b.hot{background:var(--doc-hover);color:var(--text-primary)}
+.bubble2 .sep{width:1px;height:18px;background:var(--border);margin:0 3px}
+/* 底部状态栏 */
+.doc-status{height:26px;border-top:1px solid var(--border);display:flex;align-items:center;padding:0 14px;font-size:10.5px;color:var(--text-tertiary);gap:6px;background:var(--bg-content)}
+
+/* ═══════════════ 浏览视图（整改后） ═══════════════ */
+.browse{border:1px solid var(--border-strong);border-radius:12px;overflow:hidden;background:var(--bg-app);box-shadow:var(--shadow-overlay);margin-top:8px}
+.browse-bar{display:flex;align-items:center;gap:10px;height:38px;padding:0 14px;border-bottom:1px solid var(--border)}
+.browse-bar .search{width:220px;height:26px;border:1px solid var(--border);border-radius:6px;display:flex;align-items:center;gap:6px;padding:0 8px;font-size:11.5px;color:var(--text-tertiary);background:var(--bg-app)}
+.browse-bar .new{margin-left:auto;height:26px;border-radius:6px;background:var(--btn-primary);color:var(--on-btn);font-size:11.5px;font-weight:500;padding:0 12px;display:flex;align-items:center;gap:5px}
+.browse-list{padding:4px 8px 16px}
+.brow{display:flex;align-items:center;gap:10px;height:38px;padding:0 8px;border-radius:6px;font-size:13px;color:var(--text-primary)}
+.brow:hover{background:var(--doc-hover)}
+.brow .fic{width:22px;height:22px;border-radius:5px;background:var(--doc-row);display:flex;align-items:center;justify-content:center;color:var(--text-secondary);flex:none}
+.brow .t{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.brow .upd{font-size:11px;color:var(--text-tertiary);flex:none}
+.brow .ops{display:none;align-items:center;gap:1px;flex:none}
+.brow:hover .ops{display:flex}
+.brow .op{width:22px;height:22px;border-radius:5px;display:flex;align-items:center;justify-content:center;color:var(--text-tertiary)}
+.brow .op:hover{background:var(--bg-muted);color:var(--text-primary)}
+.brow.folder .fic{background:var(--accent-subtle);color:var(--accent)}
+
+/* ═══════════════ 映射表 ═══════════════ */
+table.map{width:100%;border-collapse:collapse;font-size:12px;margin-top:10px}
+table.map th,table.map td{border:1px solid var(--border);padding:7px 10px;text-align:left;vertical-align:top}
+table.map th{background:var(--bg-subtle);font-weight:600;font-size:11.5px}
+table.map td code{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:11px;background:var(--bg-muted);padding:1px 5px;border-radius:4px}
+.legend{display:flex;gap:18px;flex-wrap:wrap;font-size:11.5px;color:var(--text-secondary);margin-top:8px}
+.legend span{display:flex;align-items:center;gap:6px}
+.legend .sw{width:14px;height:14px;border-radius:4px;display:inline-block;border:1px solid var(--border)}
+footer{margin-top:48px;padding-top:16px;border-top:1px solid var(--border);color:var(--text-tertiary);font-size:11.5px;text-align:center}
+.hidden{display:none!important}
+.fader{opacity:0;transition:opacity .2s}
+</style>
+</head>
+<body>
+
+<!-- ═══════ 顶部控制条 ═══════ -->
+<div class="topbar">
+  <div class="topbar-in">
+    <h1>文档管理 × Notion 细节整改</h1>
+    <span class="sub">整改后高保真预览 · 对应 spec：<b>docs/design/doc-notion-polish-spec.md</b> · chrome 保持 Flat Solid，仅文档域应用「纸张」子语言</span>
+    <div class="spacer"></div>
+    <button class="btn" id="btnTheme" onclick="toggleTheme()">🌓 切换亮/暗</button>
+    <button class="btn" id="btnHover" onclick="toggleHover()">👆 手柄 hover 模拟：开</button>
+    <button class="btn" id="btnBubble" onclick="toggleBubble()">⌘B 气泡工具栏：开</button>
+    <button class="btn" id="btnSlash" onclick="toggleSlash()">/ 斜杠菜单：开</button>
+  </div>
+</div>
+
+<div class="page">
+
+  <!-- ═══════ §0 根因摘要 ═══════ -->
+  <h2 class="sec"><span class="tag">根因</span>为什么差距大</h2>
+  <p class="sec-sub">四个原因：① 文档区完整继承了全局「工具壳」语言（48px 顶部工具栏、常驻保存状态、面包屑）——Notion 是「一张纸」；② BlockNote 侧边菜单/气泡/checkbox 仍是框架默认形态，CSS 只做了表面扁平化；③ 排版参数继承自阅读器心智（15px/1.7/大段距），不是块笔记节奏（16px/1.5/4px）；④ 浏览视图是 Finder 式图标网格+表格。详见 spec §1。</p>
+
+  <!-- ═══════ §1 关键差异 before/after ═══════ -->
+  <h2 class="sec"><span class="tag">P0</span>文档页关键差异 · 改造前 → 改造后</h2>
+  <p class="sec-sub">每个卡片左侧 = hip 现状（代码审计），右侧 = 整改后（对应 spec T1–T9）。</p>
+  <div class="grid">
+
+    <!-- T1 顶部工具栏 -->
+    <div class="cmp">
+      <div class="cmp-head"><span class="cmp-no">T1</span><span class="cmp-title">顶部工具栏 → 无工具栏</span></div>
+      <div class="cmp-pair">
+        <div class="cmp-side before"><span class="cmp-label"><span class="dot b"></span>现状</span>
+          <div class="mini">
+            <div class="tb"><span class="ic">⌂</span><span>我的空间 › 智能体研究 › Harness 工程</span><span class="grow"></span><span class="dot"></span><span>已保存</span><span class="ic">⋯</span></div>
+            <div class="paper"><div class="t1">智能体 Harness 工程研究报告</div><p>摘要：本次调研围绕 Harness 工程……</p></div>
+          </div>
+        </div>
+        <div class="cmp-side after"><span class="cmp-label"><span class="dot a"></span>整改后</span>
+          <div class="mini">
+            <div class="paper" style="padding-top:14px">
+              <div class="crumb"><span class="c">我的空间</span><span>›</span><span class="c">智能体研究</span><span>›</span><span class="cur">Harness 工程</span></div>
+              <div class="doc-title-row" style="margin-top:10px"><span style="font-size:15px;color:var(--text-tertiary);padding:3px">⋯</span><span style="font-size:20px;font-weight:600;letter-spacing:-.02em">智能体 Harness 工程研究报告</span></div>
+              <p style="margin-top:8px;font-size:13px">摘要：本次调研围绕 Harness 工程……</p>
+            </div>
+          </div>
+          <div class="note">48px 常驻条移除；面包屑降为标题上方 12px 小字；页面 ⋯ 移入标题 hover。</div>
+        </div>
+      </div>
+      <div class="cmp-foot">改动：<b>KnowledgeWorkspace.tsx</b> 删 h-12 条，面包屑移入 PageHeader；<b>保存状态</b>改底部状态栏（仅 saving/error 出现）。</div>
+    </div>
+
+    <!-- T2 标题 -->
+    <div class="cmp">
+      <div class="cmp-head"><span class="cmp-no">T2</span><span class="cmp-title">标题区：28px → 32px + 斜体占位</span></div>
+      <div class="cmp-pair">
+        <div class="cmp-side before"><span class="cmp-label"><span class="dot b"></span>现状</span>
+          <div class="mini"><div class="paper"><div class="t1">未命名文档</div><p class="dim">（正文紧贴标题，无占位提示）</p></div></div>
+        </div>
+        <div class="cmp-side after"><span class="cmp-label"><span class="dot a"></span>整改后</span>
+          <div class="mini"><div class="paper"><div style="font-size:24px;font-weight:600;letter-spacing:-.02em">未命名文档</div><div style="font-style:italic;color:var(--doc-muted);font-size:14px;margin-top:4px">输入 / 或输入文字开始……</div><p style="margin-top:8px;color:var(--doc-muted);font-size:12px">标题下留白 16px（pb-4），空文档显示斜体占位，首键即消失</p></div></div>
+        </div>
+      </div>
+      <div class="cmp-foot">改动：<b>InlineDocTitle.tsx</b> 32px（裁决值，预览页下方有 40px 备选对比）；<b>PageHeader.tsx</b> 占位行。</div>
+    </div>
+
+    <!-- T3 排版 -->
+    <div class="cmp">
+      <div class="cmp-head"><span class="cmp-no">T3</span><span class="cmp-title">正文节奏：文章体 → 块笔记</span></div>
+      <div class="cmp-pair">
+        <div class="cmp-side before"><span class="cmp-label"><span class="dot b"></span>现状</span>
+          <div class="mini"><div class="paper">
+            <div style="font-size:17px;font-weight:600">H1 · 26px</div>
+            <div style="font-size:14px;font-weight:600;margin-top:10px">H2 · 21px</div>
+            <p style="font-size:13px;line-height:1.7;margin-top:8px">正文 15px / 行高 1.7，段距 0.35em——博客文章节奏，块间距松散。</p>
+          </div></div>
+        </div>
+        <div class="cmp-side after"><span class="cmp-label"><span class="dot a"></span>整改后</span>
+          <div class="mini"><div class="paper" style="padding:12px 14px">
+            <div style="font-size:23px;font-weight:600;line-height:1.3">H1 · 30px</div>
+            <div style="font-size:18px;font-weight:600;line-height:1.3;margin-top:8px">H2 · 24px</div>
+            <div style="font-size:16px;line-height:1.5;margin-top:6px;padding:2px 0">正文 16px / 行高 1.5，块距、段距统一 4px。</div>
+            <div style="font-size:16px;line-height:1.5;padding:2px 0">相邻块间隙 4px——Notion 块节奏。</div>
+          </div></div>
+        </div>
+      </div>
+      <div class="cmp-foot">改动：<b>knowledge-doc-typography.css</b> 变量：--kb-font-body 16px、--kb-line-body 1.5、--kb-block-gap 4px、h1/h2/h3 固定 px、默认页宽 708px。</div>
+    </div>
+
+    <!-- T4 手柄 -->
+    <div class="cmp">
+      <div class="cmp-head"><span class="cmp-no">T4</span><span class="cmp-title">行首手柄：4 按钮组 → 六点手柄 + ＋</span></div>
+      <div class="cmp-pair">
+        <div class="cmp-side before"><span class="cmp-label"><span class="dot b"></span>现状</span>
+          <div class="mini"><div class="paper"><div class="handle-row">
+            <div class="handles">
+              <span class="btn4">＋</span><span class="btn4">☑</span>
+              <span class="btn4"><svg class="h6" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="9" cy="6" r="1"/><circle cx="15" cy="6" r="1"/><circle cx="9" cy="12" r="1"/><circle cx="15" cy="12" r="1"/><circle cx="9" cy="18" r="1"/><circle cx="15" cy="18" r="1"/></svg></span>
+              <span class="btn4">🔗</span>
+            </div>
+            <p style="font-size:13px">hover 整组淡入，4 个按钮，视觉重。</p>
+          </div></div></div>
+        </div>
+        <div class="cmp-side after"><span class="cmp-label"><span class="dot a"></span>整改后</span>
+          <div class="mini"><div class="paper"><div class="handle-row">
+            <div class="gutter" style="position:absolute;left:2px;top:2px;display:flex;gap:1px;opacity:1">
+              <span class="plus" style="width:20px;height:20px;display:flex;align-items:center;justify-content:center;border-radius:5px">＋</span>
+              <span class="drag" style="width:20px;height:20px;display:flex;align-items:center;justify-content:center;border-radius:5px"><span class="dot6" style="display:grid;grid-template-columns:repeat(2,2.5px);gap:2.5px"><i></i><i></i><i></i><i></i><i></i><i></i></span></span>
+            </div>
+            <p style="font-size:13px;padding-left:44px">hover 单行出现 ＋ 与六点手柄，点击手柄弹块菜单。</p>
+          </div></div></div>
+        </div>
+      </div>
+      <div class="cmp-foot">改动：<b>DocBlockNoteEditor.tsx</b> KnowledgeSideMenu 重构（多选/块链接入口移入手柄菜单）；CSS 六点手柄。</div>
+    </div>
+
+    <!-- T5 待办 -->
+    <div class="cmp">
+      <div class="cmp-head"><span class="cmp-no">T5</span><span class="cmp-title">待办：原生 checkbox → 自绘 + 删除线</span></div>
+      <div class="cmp-pair">
+        <div class="cmp-side before"><span class="cmp-label"><span class="dot b"></span>现状</span>
+          <div class="mini"><div class="paper">
+            <div class="todo"><input type="checkbox" class="cb native" checked><span class="txt" style="font-size:13px">调研 Notion 块模型</span></div>
+            <div class="todo"><input type="checkbox" class="cb native"><span class="txt" style="font-size:13px">对比飞书云文档交互</span></div>
+            <div class="note" style="margin-top:4px">原生控件：橙色 accent、无勾选删除线</div>
+          </div></div>
+        </div>
+        <div class="cmp-side after"><span class="cmp-label"><span class="dot a"></span>整改后</span>
+          <div class="mini"><div class="paper">
+            <div class="todo done"><span class="cb checked"></span><span class="txt" style="font-size:13px">调研 Notion 块模型</span></div>
+            <div class="todo"><span class="cb"></span><span class="txt" style="font-size:13px">对比飞书云文档交互</span></div>
+            <div class="note" style="margin-top:4px">自绘 16px 方块 / 圆角 3px / 勾选后删除线 + 暖灰</div>
+          </div></div>
+        </div>
+      </div>
+      <div class="cmp-foot">改动：<b>knowledge-blocknote.css</b> appearance:none 自绘（不动框架）；勾选态含文字删除线（确认 mdTasks 逻辑补齐）。</div>
+    </div>
+
+    <!-- T6 引用 -->
+    <div class="cmp">
+      <div class="cmp-head"><span class="cmp-no">T6</span><span class="cmp-title">引用块：降灰文字 → 正文色</span></div>
+      <div class="cmp-pair">
+        <div class="cmp-side before"><span class="cmp-label"><span class="dot b"></span>现状</span>
+          <div class="mini"><div class="paper"><div class="quote dimq" style="font-size:13px">「智能体 Harness 的核心价值在于把长任务拆成可验证的阶段。」<br><span style="font-size:11px;color:var(--text-tertiary)">（3px 边框 + 文字降灰）</span></div></div></div>
+        </div>
+        <div class="cmp-side after"><span class="cmp-label"><span class="dot a"></span>整改后</span>
+          <div class="mini"><div class="paper"><div class="quote" style="font-size:13px">「智能体 Harness 的核心价值在于把长任务拆成可验证的阶段。」<br><span style="font-size:11px;color:var(--text-tertiary)">（3px 边框用 currentColor，文字保持正文色）</span></div></div></div>
+        </div>
+      </div>
+      <div class="cmp-foot">改动：<b>knowledge-blocknote.css</b> quote 颜色改 currentColor，移除 text-secondary。</div>
+    </div>
+
+    <!-- T7 代码块 -->
+    <div class="cmp">
+      <div class="cmp-head"><span class="cmp-no">T7</span><span class="cmp-title">代码块：深色 GitHub 风 → 纸面浅灰</span></div>
+      <div class="cmp-pair">
+        <div class="cmp-side before"><span class="cmp-label"><span class="dot b"></span>现状</span>
+          <div class="mini"><div class="paper">
+            <div class="code dark"><span class="lang">typescript</span>const agent = createHarness({<br>&nbsp;&nbsp;phases: ['plan','verify'],<br>});</div>
+            <div class="note">默认 #0d1117 深底——浅色文档里反差最强</div>
+          </div></div>
+        </div>
+        <div class="cmp-side after"><span class="cmp-label"><span class="dot a"></span>整改后</span>
+          <div class="mini"><div class="paper">
+            <div class="code paper"><span class="lang">typescript</span>const agent = createHarness({<br>&nbsp;&nbsp;phases: ['plan','verify'],<br>});</div>
+            <div class="note">纸面 #f7f6f3 无边框 + 右上角语言徽标（设置可切回深色）</div>
+          </div></div>
+        </div>
+      </div>
+      <div class="cmp-foot">改动：<b>knowledge-blocknote.css</b> + <b>codeBlockTheme.ts</b>：新增「纸张」主题并入设置；深色主题保留为选项。</div>
+    </div>
+
+    <!-- T8 表格 -->
+    <div class="cmp">
+      <div class="cmp-head"><span class="cmp-no">T8</span><span class="cmp-title">表格：橙色 hover → 中性暖灰</span></div>
+      <div class="cmp-pair">
+        <div class="cmp-side before"><span class="cmp-label"><span class="dot b"></span>现状</span>
+          <div class="mini"><div class="paper">
+            <table class="tbl"><tr><th>阶段</th><th>产出</th></tr><tr class="hov-o"><td>plan</td><td>任务拆解</td></tr><tr><td>verify</td><td>回归报告</td></tr></table>
+            <div class="note">hover 行 = accent 6% 橙 tint</div>
+          </div></div>
+        </div>
+        <div class="cmp-side after"><span class="cmp-label"><span class="dot a"></span>整改后</span>
+          <div class="mini"><div class="paper">
+            <table class="tbl"><tr><th>阶段</th><th>产出</th></tr><tr class="hov"><td>plan</td><td>任务拆解</td></tr><tr><td>verify</td><td>回归报告</td></tr></table>
+            <div class="note">hover 行 = 中性暖灰 #f7f6f3，表头灰底保留</div>
+          </div></div>
+        </div>
+      </div>
+      <div class="cmp-foot">改动：<b>knowledge-blocknote.css</b> tr:hover 底色改 var(--doc-row)；选区、菜单项 hover 同批中性化（S5）。</div>
+    </div>
+
+    <!-- T9 气泡 -->
+    <div class="cmp">
+      <div class="cmp-head"><span class="cmp-no">T9</span><span class="cmp-title">气泡工具栏：精简 6 按钮</span></div>
+      <div class="cmp-pair">
+        <div class="cmp-side before"><span class="cmp-label"><span class="dot b"></span>现状</span>
+          <div class="mini"><div class="paper"><div class="bubble" style="font-size:10px">
+            <span class="b">≡ 标题1</span><span class="b" style="font-weight:700">B</span><span class="b" style="font-style:italic">I</span><span class="b" style="text-decoration:underline">U</span><span class="b" style="text-decoration:line-through">S</span><span class="b">⟨/⟩</span><span class="b">🔗</span><span class="b">◐</span>
+          </div><div class="note" style="margin-top:6px">含块类型下拉 + 8 按钮，偏宽</div></div></div>
+        </div>
+        <div class="cmp-side after"><span class="cmp-label"><span class="dot a"></span>整改后</span>
+          <div class="mini"><div class="paper"><div class="bubble" style="font-size:11px">
+            <span class="b hot" style="font-weight:700">B</span><span class="b" style="font-style:italic">I</span><span class="b" style="text-decoration:underline">U</span><span class="b" style="text-decoration:line-through">S</span><span class="sep"></span><span class="b">🔗</span><span class="b">A</span>
+          </div><div class="note" style="margin-top:6px">B/I/U/S + 链接 + 颜色；8px 圆角；选中态暖灰底</div></div></div>
+        </div>
+      </div>
+      <div class="cmp-foot">改动：<b>DocBlockNoteEditor.tsx</b> FormattingToolbar 组装移除 BlockTypeSelect/删除线/行内码；CSS 圆角与选中态。</div>
+    </div>
+
+    <!-- T10 保存状态 -->
+    <div class="cmp">
+      <div class="cmp-head"><span class="cmp-no">T10</span><span class="cmp-title">保存状态：常驻 → 静默</span></div>
+      <div class="cmp-pair">
+        <div class="cmp-side before"><span class="cmp-label"><span class="dot b"></span>现状</span>
+          <div class="mini"><div class="tb"><span class="grow"></span><span class="dot"></span><span>已保存</span></div>
+          <div class="paper"><p class="dim" style="font-size:12px">圆点 + 「已保存」常驻顶部工具栏，编辑 10 秒内一直亮着</p></div></div>
+        </div>
+        <div class="cmp-side after"><span class="cmp-label"><span class="dot a"></span>整改后</span>
+          <div class="mini">
+            <div style="display:flex;flex-direction:column;height:100%">
+              <div style="flex:1;display:flex;align-items:center;justify-content:center;color:var(--text-tertiary);font-size:12px">（无任何保存提示）</div>
+              <div style="border-top:1px solid var(--border);display:flex;align-items:center;height:24px;padding:0 8px;font-size:10px;color:var(--text-tertiary)">所有更改已保存 <span style="opacity:.5">· 仅 saving&gt;800ms / error 时出现</span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="cmp-foot">改动：<b>KnowledgeWorkspace.tsx</b> 保存状态移至底部状态栏；saved 静默（error 不变量必须可见）。</div>
+    </div>
+  </div>
+
+  <!-- ═══════ §2 整改后完整文档页 ═══════ -->
+  <h2 class="sec" style="margin-top:52px"><span class="tag">效果</span>整改后 · 文档页全貌（亮色）</h2>
+  <p class="sec-sub">左侧 Flat Solid 侧边栏保持不动（chrome 不整改）；主区为「纸张」：无工具栏、小字面包屑、32px 标题、16px/1.5 紧凑块节奏。悬停手柄、气泡、斜杠菜单可用上方按钮开关。</p>
+
+  <div class="appwin">
+    <div class="winbar"><span class="dots"><span></span><span></span><span></span></span><span>智能体 Harness 工程研究报告 — hip</span></div>
+    <div class="appbody">
+      <!-- 侧边栏 -->
+      <div class="sb">
+        <div class="sb-search">⌘K &nbsp;搜索命令、文档…</div>
+        <div class="sb-nav">
+          <div class="sb-navi">💬 会话 <span class="cnt">12</span></div>
+          <div class="sb-navi">📁 项目 <span class="cnt">4</span></div>
+          <div class="sb-navi on">🗂 文档 <span class="cnt">23</span></div>
+          <div class="sb-navi">▮▮ 终端</div>
+          <div class="sb-navi">☑ 任务</div>
+          <div class="sb-navi">⚡ 自动化</div>
+        </div>
+        <div class="sb-list">
+          <div class="lb"><span>文档 · 当前目录</span><span>＋</span></div>
+          <div class="sb-crumb"><span class="c">我的空间</span><span>›</span><span class="c">智能体研究</span><span>›</span><span style="color:var(--text-secondary)">Harness 工程</span></div>
+          <div class="sb-row folder">📁 一期 · 需求收集</div>
+          <div class="sb-row folder">📁 二期 · 架构设计</div>
+          <div class="sb-row folder">📁 三期 · 工程实现</div>
+          <div class="sb-row on">📄 报告 · Harness 综述</div>
+          <div class="sb-row">📄 报告 · 基准测试</div>
+          <div class="sb-row">📄 记录 · 踩坑笔记</div>
+          <div class="sb-row">📄 记录 · 例会纪要</div>
+        </div>
+      </div>
+      <!-- 主区 -->
+      <div class="main">
+        <div class="main-scroll">
+          <div class="doc">
+            <div class="doc-crumb">
+              <span class="crumb"><span class="c">我的空间</span><span>›</span><span class="c">智能体研究</span><span>›</span><span class="c">Harness 工程</span><span>›</span><span class="cur">报告 · Harness 综述</span></span>
+            </div>
+            <div class="doc-title-row">
+              <div class="doc-title-ops">
+                <span class="op" title="页面菜单">⋯</span>
+              </div>
+              <div class="doc-title" contenteditable="true" spellcheck="false">智能体 Harness 工程研究报告</div>
+            </div>
+            <div class="doc-blocks">
+
+              <div class="blk sim">
+                <div class="gutter"><span class="plus">＋</span><span class="drag"><span class="dot6"><i></i><i></i><i></i><i></i><i></i><i></i></span></span></div>
+                <p class="pb">本次调研围绕 <b>Harness 工程</b>的四个阶段展开：需求、架构、实现与验证。目标是把长任务拆解为可独立验证的阶段，并让每个阶段可被回放。</p>
+              </div>
+
+              <div class="blk">
+                <div class="gutter"><span class="plus">＋</span><span class="drag"><span class="dot6"><i></i><i></i><i></i><i></i><i></i><i></i></span></span></div>
+                <h1 class="dh">一、背景与动机</h1>
+              </div>
+
+              <div class="blk">
+                <div class="gutter"><span class="plus">＋</span><span class="drag"><span class="dot6"><i></i><i></i><i></i><i></i><i></i><i></i></span></span></div>
+                <p class="pb">现有单轮对话无法承载跨天的复杂任务。Harness 引入「阶段 + 验收」模型：每个阶段输出必须通过门禁测试，失败则回到规划器修正。</p>
+              </div>
+
+              <div class="blk">
+                <div class="gutter"><span class="plus">＋</span><span class="drag"><span class="dot6"><i></i><i></i><i></i><i></i><i></i><i></i></span></span></div>
+                <div class="todo2"><span class="cb"></span><span class="txt">完成需求评审（2026-08-09）</span></div>
+                <div class="todo2 done"><span class="cb checked"></span><span class="txt">搭建 Harness 骨架仓库</span></div>
+                <div class="todo2"><span class="cb"></span><span class="txt">编写验收门禁的回归用例</span></div>
+              </div>
+
+              <div class="blk">
+                <div class="gutter"><span class="plus">＋</span><span class="drag"><span class="dot6"><i></i><i></i><i></i><i></i><i></i><i></i></span></span></div>
+                <div class="quote2">「Harness 的核心价值在于把长任务拆成可验证的阶段——不是更快，而是更可靠。」</div>
+              </div>
+
+              <div class="blk">
+                <div class="gutter"><span class="plus">＋</span><span class="drag"><span class="dot6"><i></i><i></i><i></i><i></i><i></i><i></i></span></span></div>
+                <div class="code2"><span class="lang">typescript</span><span class="ln">const harness = createHarness({</span><br><span class="ln">&nbsp;&nbsp;phases: ['plan', 'verify'],</span><br><span class="ln">&nbsp;&nbsp;gate: runUnitTests,</span><br><span class="ln">});</span></div>
+              </div>
+
+              <div class="blk">
+                <div class="gutter"><span class="plus">＋</span><span class="drag"><span class="dot6"><i></i><i></i><i></i><i></i><i></i><i></i></span></span></div>
+                <h2 class="dh">二、阶段对比</h2>
+              </div>
+
+              <div class="blk">
+                <div class="gutter"><span class="plus">＋</span><span class="drag"><span class="dot6"><i></i><i></i><i></i><i></i><i></i><i></i></span></span></div>
+                <table class="tbl2">
+                  <tr><th>阶段</th><th>输入</th><th>产出</th><th>门禁</th></tr>
+                  <tr><td>plan</td><td>需求文档</td><td>任务拆解 + 风险表</td><td>拆解可执行</td></tr>
+                  <tr><td>verify</td><td>实现变更</td><td>回归报告</td><td>全量单测绿</td></tr>
+                </table>
+              </div>
+
+              <div class="blk">
+                <div class="gutter"><span class="plus">＋</span><span class="drag"><span class="dot6"><i></i><i></i><i></i><i></i><i></i><i></i></span></span></div>
+                <hr class="div2">
+              </div>
+
+              <div class="blk">
+                <div class="gutter"><span class="plus">＋</span><span class="drag"><span class="dot6"><i></i><i></i><i></i><i></i><i></i><i></i></span></span></div>
+                <p class="pb">下一步：把验收门禁接入 CI，并对 20+ 真实任务做回放采样。详见 <span style="color:var(--accent-strong)">[[基准测试]]</span>。</p>
+              </div>
+
+            </div>
+          </div>
+        </div>
+        <!-- 浮动层 -->
+        <div class="float" id="bubbleDemo">
+          <div class="bubble2">
+            <span class="b hot" style="font-weight:700">B</span><span class="b" style="font-style:italic">I</span><span class="b" style="text-decoration:underline">U</span><span class="b" style="text-decoration:line-through">S</span><span class="sep"></span><span class="b">🔗</span><span class="b">A</span>
+          </div>
+        </div>
+        <div class="float hidden" id="slashDemo">
+          <div class="slash2">
+            <div class="sg">基础块</div>
+            <div class="si hot"><span class="itile">📄</span><span class="lb"><b>文本</b><span>纯文本段落</span></span><span class="kbd">↵</span></div>
+            <div class="si"><span class="itile">＃</span><span class="lb"><b>标题 1</b><span>大号标题</span></span><span class="kbd">⌘⌥1</span></div>
+            <div class="si"><span class="itile">☑</span><span class="lb"><b>待办列表</b><span>带复选框的任务</span></span><span class="kbd">⌘⌥4</span></div>
+            <div class="sg">媒体</div>
+            <div class="si"><span class="itile">❝</span><span class="lb"><b>引用</b><span>引用文字</span></span></div>
+            <div class="si"><span class="itile">{ }</span><span class="lb"><b>代码</b><span>代码块</span></span><span class="kbd">⌘⌥6</span></div>
+          </div>
+        </div>
+        <!-- 底部状态栏 -->
+        <div class="doc-status"><span id="statusText">所有更改已保存</span><span style="opacity:.45">· 仅 saving &gt; 800ms 或 error 时出现</span></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══════ §3 整改后浏览视图 ═══════ -->
+  <h2 class="sec" style="margin-top:52px"><span class="tag">P1</span>整改后 · 文档管理浏览视图（列表为默认）</h2>
+  <p class="sec-sub">对应 spec T10–T12：默认紧凑列表（40px 行）、hover 行尾 ⋯、面包屑小字化、工具栏瘦身；网格保留可切换。</p>
+
+  <div class="browse">
+    <div class="browse-bar">
+      <span class="crumb"><span class="c">我的空间</span><span>›</span><span class="c">智能体研究</span><span>›</span><span class="cur">Harness 工程</span></span>
+      <div class="search">🔍 &nbsp;筛选当前目录…</div>
+      <button class="new">＋ 新建</button>
+    </div>
+    <div class="browse-list">
+      <div class="brow folder"><span class="fic">📁</span><span class="t">一期 · 需求收集</span><span class="upd">12 个条目</span><span class="ops"><span class="op">＋</span><span class="op">⋯</span></span></div>
+      <div class="brow folder"><span class="fic">📁</span><span class="t">二期 · 架构设计</span><span class="upd">8 个条目</span><span class="ops"><span class="op">＋</span><span class="op">⋯</span></span></div>
+      <div class="brow"><span class="fic">📄</span><span class="t">报告 · Harness 综述</span><span class="upd">2 小时前</span><span class="ops"><span class="op">⋯</span></span></div>
+      <div class="brow"><span class="fic">📄</span><span class="t">报告 · 基准测试</span><span class="upd">昨天 18:42</span><span class="ops"><span class="op">⋯</span></span></div>
+      <div class="brow"><span class="fic">📄</span><span class="t">记录 · 踩坑笔记</span><span class="upd">8 月 7 日</span><span class="ops"><span class="op">⋯</span></span></div>
+      <div class="brow"><span class="fic">📄</span><span class="t">记录 · 例会纪要</span><span class="upd">8 月 6 日</span><span class="ops"><span class="op">⋯</span></span></div>
+    </div>
+  </div>
+
+  <!-- ═══════ §4 标题尺寸裁决对比 ═══════ -->
+  <h2 class="sec" style="margin-top:52px"><span class="tag">评审</span>标题尺寸裁决：32px vs 40px（spec T2 评审点）</h2>
+  <p class="sec-sub">Notion 桌面宽窗口用 40px；hip 窗口 ~1200px，40px 占比过高。两版同屏对比供评审定稿。</p>
+  <div class="grid">
+    <div class="cmp">
+      <div class="cmp-head"><span class="cmp-title">裁决版 · 32px</span></div>
+      <div class="cmp-side after" style="border:0"><div class="mini"><div class="paper"><div style="font-size:32px;font-weight:600;letter-spacing:-.02em;line-height:1.25">智能体 Harness 工程研究报告</div><p style="margin-top:12px;font-size:13px;color:var(--text-tertiary)">标题 ≈ 3 行正文高，窗口 1200px 下占屏比平衡</p></div></div></div>
+      <div class="cmp-foot">推荐：32px / 600 / -0.02em / 行高 1.25</div>
+    </div>
+    <div class="cmp">
+      <div class="cmp-head"><span class="cmp-title">Notion 原值 · 40px</span></div>
+      <div class="cmp-side after" style="border:0"><div class="mini"><div class="paper"><div style="font-size:40px;font-weight:600;letter-spacing:-.02em;line-height:1.2">智能体 Harness 工程研究报告</div><p style="margin-top:12px;font-size:13px;color:var(--text-tertiary)">与 Notion 完全一致，但小窗内标题压迫感强</p></div></div></div>
+      <div class="cmp-foot">备选：若产品坚持 1:1 复刻，改 40px 只需改一个 token</div>
+    </div>
+  </div>
+
+  <!-- ═══════ §5 整改项映射 ═══════ -->
+  <h2 class="sec" style="margin-top:52px"><span class="tag">映射</span>整改项 ↔ 代码改动点（完整清单见 spec §3）</h2>
+  <table class="map">
+    <tr><th style="width:70px">编号</th><th style="width:150px">主题</th><th>主要改动文件</th><th style="width:170px">验收要点</th></tr>
+    <tr><td>T1</td><td>顶部工具栏瘦身</td><td><code>KnowledgeWorkspace.tsx</code>、<code>PageHeader.tsx</code></td><td>无 48px 常驻条；保存仅 saving/error 可见</td></tr>
+    <tr><td>T2</td><td>标题区对齐</td><td><code>InlineDocTitle.tsx</code></td><td>32px + 空文档斜体占位</td></tr>
+    <tr><td>T3</td><td>正文排版参数</td><td><code>knowledge-doc-typography.css</code></td><td>16px/1.5、块距 4px、h1 30px、页宽 708px</td></tr>
+    <tr><td>T4</td><td>行首手柄</td><td><code>DocBlockNoteEditor.tsx</code>、<code>knowledge-blocknote.css</code></td><td>六点手柄 + ＋；块菜单重构</td></tr>
+    <tr><td>T5</td><td>待办 checkbox</td><td><code>knowledge-blocknote.css</code>、<code>mdTasks</code> 相关</td><td>自绘方块 + 勾选删除线</td></tr>
+    <tr><td>T6</td><td>引用/分割线</td><td><code>knowledge-blocknote.css</code></td><td>引用不降灰、边框 currentColor</td></tr>
+    <tr><td>T7</td><td>代码块纸面主题</td><td><code>knowledge-blocknote.css</code>、<code>codeBlockTheme.ts</code></td><td>新增「纸张」代码主题选项</td></tr>
+    <tr><td>T8</td><td>表格/选区/菜单中性化</td><td><code>knowledge-blocknote.css</code></td><td>hover 全部暖灰，选区非橙色</td></tr>
+    <tr><td>T9</td><td>气泡工具栏精简</td><td><code>DocBlockNoteEditor.tsx</code></td><td>6 按钮，无块类型下拉</td></tr>
+    <tr><td>T10</td><td>保存状态静默</td><td><code>KnowledgeWorkspace.tsx</code></td><td>底部状态栏，saved 静默</td></tr>
+    <tr><td>T11</td><td>浏览视图列表化</td><td><code>DocManagerBrowse.tsx</code></td><td>默认列表 40px 行 + hover ⋯</td></tr>
+    <tr><td>T12</td><td>侧边栏行 hover 操作</td><td><code>DirNavList.tsx</code></td><td>hover 出现 ＋/⋯；选中态整行灰</td></tr>
+    <tr><td>T13</td><td>空态与首启引导</td><td><code>DocManagerBrowse.tsx</code>、<code>InlineDocTitle.tsx</code></td><td>大标题空态</td></tr>
+  </table>
+
+  <footer>docs/design/doc-notion-polish-spec.md · docs/design/doc-notion-polish-preview.html — 亮/暗主题与浮动层开关见顶部按钮</footer>
+</div>
+
+<script>
+function toggleTheme(){
+  const root = document.documentElement;
+  root.dataset.theme = root.dataset.theme === 'dark' ? 'light' : 'dark';
+  document.getElementById('btnTheme').textContent = root.dataset.theme === 'dark' ? '☀️ 切换亮/暗' : '🌓 切换亮/暗';
+}
+function toggleHover(){
+  const on = document.getElementById('btnHover').textContent.includes('开');
+  document.querySelectorAll('.blk').forEach(b => b.classList.toggle('sim', on));
+  document.getElementById('btnHover').textContent = on ? '👆 手柄 hover 模拟：关' : '👆 手柄 hover 模拟：开';
+}
+function toggleBubble(){
+  const el = document.getElementById('bubbleDemo');
+  const on = el.classList.contains('hidden');
+  el.classList.toggle('hidden', !on);
+  document.getElementById('btnBubble').textContent = on ? '⌘B 气泡工具栏：关' : '⌘B 气泡工具栏：开';
+}
+function toggleSlash(){
+  const el = document.getElementById('slashDemo');
+  const on = el.classList.contains('hidden');
+  el.classList.toggle('hidden', !on);
+  document.getElementById('btnSlash').textContent = on ? '/ 斜杠菜单：关' : '/ 斜杠菜单：开';
+}
+</script>
+</body>
+</html>

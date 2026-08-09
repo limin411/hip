@@ -30,6 +30,15 @@ import {
   type DefaultReactSuggestionItem,
 } from '@blocknote/react'
 import { SideMenuExtension } from '@blocknote/core/extensions'
+import {
+  en as bnEn,
+  ja as bnJa,
+  ko as bnKo,
+  zh as bnZh,
+  zhTW as bnZhTw,
+  type Dictionary as BlockNoteDictionary,
+} from '@blocknote/core/locales'
+import i18n from '@/i18n'
 import { BlockNoteHipSlashMenu } from './BlockNoteHipSlashMenu'
 import { MantineProvider } from '@mantine/core'
 import { useTranslation } from 'react-i18next'
@@ -88,6 +97,24 @@ import {
   handleBlockKeydown,
   type BlockKeymapEditor,
 } from '@/domain/knowledge/blocks/blockKeymap'
+
+/**
+ * BlockNote ships its own UI dictionaries (table handle menus, drag handle menu,
+ * side-menu labels, …). Pick the one matching the app locale. The editor instance
+ * is created once per doc, so a language switch applies on the next doc open —
+ * recreating mid-edit would re-seed from the last saved markdown and lose drafts.
+ */
+const BN_DICTIONARY_BY_LANGUAGE: Record<string, BlockNoteDictionary> = {
+  'zh-CN': bnZh,
+  'zh-TW': bnZhTw,
+  ja: bnJa,
+  ko: bnKo,
+  en: bnEn,
+}
+
+function blockNoteDictionary(): BlockNoteDictionary {
+  return BN_DICTIONARY_BY_LANGUAGE[i18n.language] ?? bnEn
+}
 import {
   hasInlineMath,
   splitInlineMath,
@@ -467,6 +494,7 @@ export const DocBlockNoteEditor = forwardRef<
   const editor = useCreateBlockNote(
     {
       schema: knowledgeBlockSchema,
+      dictionary: blockNoteDictionary(),
       placeholders: {
         default: resolvedPlaceholder,
       },

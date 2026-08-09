@@ -2,6 +2,8 @@
 import { createRef } from 'react'
 import { describe, expect, it, vi, beforeEach } from 'vitest'
 import { render, screen, act, cleanup } from '@testing-library/react'
+import { en as bnEn, zh as bnZh } from '@blocknote/core/locales'
+import i18n from '@/i18n'
 import {
   DocBlockNoteEditor,
   type DocBlockNoteEditorHandle,
@@ -25,6 +27,28 @@ const setTextCursorPosition = vi.fn()
 const getTextCursorPosition = vi.fn(() => ({
   block: { id: 'b0', type: 'paragraph', content: '', props: {}, children: [] },
 }))
+const useCreateBlockNote = vi.fn((..._args: unknown[]) => ({
+  document: [{ id: 'b0', type: 'paragraph', content: '', props: {}, children: [] }],
+  tryParseMarkdownToBlocks,
+  blocksToMarkdownLossy,
+  blocksToHTMLLossy,
+  tryParseHTMLToBlocks,
+  replaceBlocks,
+  insertBlocks,
+  updateBlock,
+  focus,
+  setTextCursorPosition,
+  getTextCursorPosition,
+  _tiptapEditor: {
+    isDestroyed: false,
+    state: { tr: { setMeta: (k: string, v: unknown) => ({ meta: { [k]: v } }) } },
+    view: {
+      dispatch: vi.fn(),
+      setProps: vi.fn(),
+      destroy: vi.fn(),
+    },
+  },
+}))
 
 vi.mock('@blocknote/core', () => ({
   insertOrUpdateBlockForSlashMenu: vi.fn(),
@@ -35,28 +59,7 @@ vi.mock('@blocknote/core', () => ({
 }))
 
 vi.mock('@blocknote/react', () => ({
-  useCreateBlockNote: () => ({
-    document: [{ id: 'b0', type: 'paragraph', content: '', props: {}, children: [] }],
-    tryParseMarkdownToBlocks,
-    blocksToMarkdownLossy,
-    blocksToHTMLLossy,
-    tryParseHTMLToBlocks,
-    replaceBlocks,
-    insertBlocks,
-    updateBlock,
-    focus,
-    setTextCursorPosition,
-    getTextCursorPosition,
-    _tiptapEditor: {
-      isDestroyed: false,
-      state: { tr: { setMeta: (k: string, v: unknown) => ({ meta: { [k]: v } }) } },
-      view: {
-        dispatch: vi.fn(),
-        setProps: vi.fn(),
-        destroy: vi.fn(),
-      },
-    },
-  }),
+  useCreateBlockNote: (...args: unknown[]) => useCreateBlockNote(...args),
   SuggestionMenuController: () => null,
   FormattingToolbarController: () => null,
   SideMenuController: () => null,
@@ -104,11 +107,15 @@ vi.mock('@mantine/core', () => ({
   ),
 }))
 
-vi.mock('react-i18next', () => ({
-  useTranslation: () => ({
-    t: (k: string, opts?: { defaultValue?: string }) => opts?.defaultValue ?? k,
-  }),
-}))
+vi.mock('react-i18next', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('react-i18next')>()
+  return {
+    ...actual,
+    useTranslation: () => ({
+      t: (k: string, opts?: { defaultValue?: string }) => opts?.defaultValue ?? k,
+    }),
+  }
+})
 
 vi.mock('@/domain/knowledge/importAsset', () => ({
   importAssetFromFile: vi.fn(),
@@ -239,5 +246,39 @@ Body`
     expect(insertBlocks).toHaveBeenCalled()
     expect(ref.current?.focus({ at: 'start' })).toBe(true)
     expect(focus).toHaveBeenCalled()
+  })
+
+  it('maps the app language to a BlockNote dictionary for table UI', async () => {
+    const prev = i18n.language
+    try {
+      await i18n.changeLanguage('zh-CN')
+      await act(async () => {
+        render(
+          <DocBlockNoteEditor docId="doc_i18n" initialMarkdown="" onDraftChange={() => {}} />,
+        )
+      })
+      const first = useCreateBlockNote.mock.calls[0]?.[0] as { dictionary?: unknown }
+      expect(first?.dictionary).toBe(bnZh)
+
+      cleanup()
+      useCreateBlockNote.mockClear()
+      await i18n.changeLanguage('en')
+      await act(async () => {
+        render(
+          <DocBlockNoteEditor docId="doc_i18n" initialMarkdown="" onDraftChange={() => {}} />,
+        )
+      })
+      const second = useCreateBlockNote.mock.calls[0]?.[0] as { dictionary?: unknown }
+      expect(second?.dictionary).toBe(bnEn)
+      // The picked dictionary actually carries the table handle strings.
+      expect(second?.dictionary).toMatchObject({
+        table_handle: {
+          add_above_menuitem: expect.any(String),
+          delete_row_menuitem: expect.any(String),
+        },
+      })
+    } finally {
+      await i18n.changeLanguage(prev)
+    }
   })
 })

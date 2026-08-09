@@ -8,6 +8,8 @@ import {
 } from '@/domain/knowledge/assetUrl'
 import { knowledgeErrorMessage, knowledgeRevealPath } from '@/ipc/knowledge'
 import { toast } from 'sonner'
+import { ImageLightbox } from '@/components/ui/ImageLightbox'
+import { cn } from '@/lib/utils'
 
 export interface KnowledgeAssetImageProps {
   spaceId: string
@@ -21,6 +23,7 @@ export interface KnowledgeAssetImageProps {
  * Preview local knowledge assets via `data:` URLs (K16).
  * Oversize / missing / non-image → placeholder + reveal.
  * Remote / data: / absolute http(s) pass through to plain <img>.
+ * Click opens a floating enlarged preview.
  */
 export function KnowledgeAssetImage({
   spaceId,
@@ -33,6 +36,7 @@ export function KnowledgeAssetImage({
   const [dataUrl, setDataUrl] = useState<string | null>(null)
   const [failed, setFailed] = useState(false)
   const [loading, setLoading] = useState(Boolean(rel))
+  const [lightboxOpen, setLightboxOpen] = useState(false)
 
   useEffect(() => {
     if (!rel) {
@@ -59,10 +63,39 @@ export function KnowledgeAssetImage({
     }
   }, [spaceId, rel])
 
+  const previewSrc = rel ? dataUrl : src && typeof src === 'string' ? src : null
+  const imgClass = cn(className, 'cursor-zoom-in')
+
   // Non-local: leave browser / CSP path (https may still be blocked by CSP — intentional).
   if (!rel) {
     if (!src) return null
-    return <img src={src} alt={alt} className={className} />
+    return (
+      <>
+        <img
+          src={src}
+          alt={alt}
+          className={imgClass}
+          data-testid="knowledge-asset-img-remote"
+          data-knowledge-lightbox-host=""
+          role="button"
+          tabIndex={0}
+          aria-label={alt ? `${t('knowledge.asset.previewOpen')}: ${alt}` : t('knowledge.asset.previewOpen')}
+          onClick={() => setLightboxOpen(true)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+              e.preventDefault()
+              setLightboxOpen(true)
+            }
+          }}
+        />
+        <ImageLightbox
+          open={lightboxOpen}
+          onOpenChange={setLightboxOpen}
+          src={previewSrc}
+          alt={alt}
+        />
+      </>
+    )
   }
 
   if (loading) {
@@ -101,12 +134,31 @@ export function KnowledgeAssetImage({
   }
 
   return (
-    <img
-      src={dataUrl}
-      alt={alt}
-      className={className}
-      data-testid="knowledge-asset-img"
-      data-asset-rel={rel}
-    />
+    <>
+      <img
+        src={dataUrl}
+        alt={alt}
+        className={imgClass}
+        data-testid="knowledge-asset-img"
+        data-asset-rel={rel}
+        data-knowledge-lightbox-host=""
+        role="button"
+        tabIndex={0}
+        aria-label={alt ? `${t('knowledge.asset.previewOpen')}: ${alt}` : t('knowledge.asset.previewOpen')}
+        onClick={() => setLightboxOpen(true)}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault()
+            setLightboxOpen(true)
+          }
+        }}
+      />
+      <ImageLightbox
+        open={lightboxOpen}
+        onOpenChange={setLightboxOpen}
+        src={dataUrl}
+        alt={alt}
+      />
+    </>
   )
 }

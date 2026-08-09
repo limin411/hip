@@ -2610,6 +2610,8 @@ export const zhCN = {
         unsupported: '不支持的文件类型。请使用 PNG、JPEG、GIF、WebP 或 PDF。',
         importFailed: '无法添加附件',
         placeholder: '图片不可用',
+        preview: '图片预览',
+        previewOpen: '放大查看图片',
       },
       folder: {
         untitled: '新建文件夹',

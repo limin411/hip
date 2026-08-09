@@ -1,10 +1,14 @@
-import type { CSSProperties, ReactNode } from 'react'
+import { useCallback, useState, type CSSProperties, type ReactNode } from 'react'
 import { cn } from '@/lib/utils'
 import { useHipConfigStore } from '@/store/hipConfigStore'
 import {
   DOC_WIDTH_MEASURE,
   normalizeDocWidthId,
 } from '@/domain/knowledge/docWidth'
+import {
+  ImageLightbox,
+  imageLightboxTargetFromEvent,
+} from '@/components/ui/ImageLightbox'
 import './knowledge-doc-typography.css'
 
 /**
@@ -23,6 +27,8 @@ export const DOC_PAPER_SHELL = DOC_PAGE_SHELL
  *
  * Mode overflow is applied by the parent via paperClassName — default classes omit
  * overflow so Workspace can pass mode-specific overflow without fighting the primitive.
+ *
+ * Click any content image (BlockNote / Typora live widgets) → floating enlarge preview.
  */
 export function KnowledgeDocCanvas({
   children,
@@ -41,6 +47,24 @@ export function KnowledgeDocCanvas({
     ['--kb-measure' as string]: DOC_WIDTH_MEASURE[docWidth],
   } as CSSProperties
 
+  const [preview, setPreview] = useState<{ src: string; alt: string } | null>(
+    null,
+  )
+
+  const onClickCapture = useCallback((e: React.MouseEvent) => {
+    // Nested React images own their own lightbox (KnowledgeAssetImage).
+    if ((e.target as Element | null)?.closest?.('[data-knowledge-lightbox-host]')) {
+      return
+    }
+    const img = imageLightboxTargetFromEvent(e.target)
+    if (!img) return
+    // Don't steal clicks from UI chrome buttons that embed icons as <img>.
+    if (img.closest('button')) return
+    const src = (img.currentSrc || img.src || '').trim()
+    if (!src) return
+    setPreview({ src, alt: img.alt ?? '' })
+  }, [])
+
   return (
     <div
       data-testid="knowledge-doc-canvas"
@@ -49,6 +73,7 @@ export function KnowledgeDocCanvas({
         'flex min-h-0 w-full flex-1 flex-col',
         className,
       )}
+      onClickCapture={onClickCapture}
     >
       <div
         data-testid="knowledge-doc-paper"
@@ -64,6 +89,14 @@ export function KnowledgeDocCanvas({
       >
         {children}
       </div>
+      <ImageLightbox
+        open={preview != null}
+        onOpenChange={(o) => {
+          if (!o) setPreview(null)
+        }}
+        src={preview?.src}
+        alt={preview?.alt}
+      />
     </div>
   )
 }

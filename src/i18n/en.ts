@@ -2676,6 +2676,8 @@ export const en = {
         unsupported: 'Unsupported file type. Use PNG, JPEG, GIF, WebP, or PDF.',
         importFailed: 'Could not attach file',
         placeholder: 'Image unavailable',
+        preview: 'Image preview',
+        previewOpen: 'Enlarge image',
       },
       folder: {
         untitled: 'New folder',

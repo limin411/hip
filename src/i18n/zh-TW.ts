@@ -2567,7 +2567,9 @@ export const zhTW = {
       "tooLargeDisk": "檔案超過 25 MB 附件上限。",
       "unsupported": "不支援的檔案類型。請使用 PNG、JPEG、GIF、WebP 或 PDF。",
       "importFailed": "無法新增附件",
-      "placeholder": "圖片不可用"
+      "placeholder": "圖片不可用",
+      "preview": "圖片預覽",
+      "previewOpen": "放大檢視圖片"
     },
     "folder": {
       "untitled": "新增資料夾"

@@ -5,7 +5,7 @@
  */
 import '@testing-library/jest-dom/vitest'
 import { describe, it, expect, afterEach, vi } from 'vitest'
-import { render, screen, cleanup } from '@testing-library/react'
+import { render, screen, cleanup, fireEvent } from '@testing-library/react'
 import { DOC_PAGE_SHELL, KnowledgeDocCanvas } from './KnowledgeDocCanvas'
 import { DOC_WIDTH_MEASURE } from '@/domain/knowledge/docWidth'
 
@@ -18,6 +18,12 @@ const hipConfigState = {
 
 vi.mock('@/store/hipConfigStore', () => ({
   useHipConfigStore: (sel: (s: typeof hipConfigState) => unknown) => sel(hipConfigState),
+}))
+
+vi.mock('react-i18next', () => ({
+  useTranslation: () => ({
+    t: (key: string) => key,
+  }),
 }))
 
 afterEach(() => {
@@ -108,5 +114,34 @@ describe('KnowledgeDocCanvas', () => {
     paper = screen.getByTestId('knowledge-doc-paper')
     expect(paper).toHaveAttribute('data-doc-width', 'full')
     expect(paper.style.getPropertyValue('--kb-measure')).toBe(DOC_WIDTH_MEASURE.full)
+  })
+
+  it('opens floating preview when a content image is clicked', () => {
+    render(
+      <KnowledgeDocCanvas>
+        <img src="data:image/png;base64,abc" alt="shot" data-testid="doc-inline-img" />
+      </KnowledgeDocCanvas>,
+    )
+    fireEvent.click(screen.getByTestId('doc-inline-img'))
+    expect(screen.getByTestId('image-lightbox')).toBeInTheDocument()
+    expect(screen.getByTestId('image-lightbox-img')).toHaveAttribute(
+      'src',
+      'data:image/png;base64,abc',
+    )
+  })
+
+  it('does not open preview for images that own their own lightbox host', () => {
+    render(
+      <KnowledgeDocCanvas>
+        <img
+          src="data:image/png;base64,abc"
+          alt="owned"
+          data-testid="owned-img"
+          data-knowledge-lightbox-host=""
+        />
+      </KnowledgeDocCanvas>,
+    )
+    fireEvent.click(screen.getByTestId('owned-img'))
+    expect(screen.queryByTestId('image-lightbox')).toBeNull()
   })
 })

@@ -2565,7 +2565,9 @@ export const ko = {
       "tooLargeDisk": "파일이 25MB 첨부 제한을 초과했습니다.",
       "unsupported": "지원되지 않는 파일 형식입니다. PNG, JPEG, GIF, WebP 또는 PDF를 사용하세요.",
       "importFailed": "파일을 첨부할 수 없습니다",
-      "placeholder": "이미지를 사용할 수 없음"
+      "placeholder": "이미지를 사용할 수 없음",
+      "preview": "이미지 미리보기",
+      "previewOpen": "이미지 확대 보기"
     },
     "folder": {
       "untitled": "새 폴더"

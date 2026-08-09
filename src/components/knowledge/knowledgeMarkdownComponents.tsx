@@ -148,12 +148,14 @@ export function knowledgeMarkdownComponents(opts: KnowledgeMarkdownOptions = {})
         )
       }
       if (!src || typeof src !== 'string') return null
+      // No spaceId: still mark as lightbox-host so a parent canvas does not double-fire.
+      // Plain img is clickable via nearest KnowledgeDocCanvas capture listener.
       return (
         <img
           src={src}
           alt={typeof alt === 'string' ? alt : ''}
           {...props}
-          className="my-2 max-h-[480px] max-w-full rounded-md border border-border"
+          className="my-2 max-h-[480px] max-w-full cursor-zoom-in rounded-md border border-border"
         />
       )
     },

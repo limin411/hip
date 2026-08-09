@@ -2565,7 +2565,9 @@ export const ja = {
       "tooLargeDisk": "ファイルが25 MBの添付制限を超えています。",
       "unsupported": "サポートされていないファイル形式です。PNG、JPEG、GIF、WebP、またはPDFを使用してください。",
       "importFailed": "ファイルを添付できませんでした",
-      "placeholder": "画像を表示できません"
+      "placeholder": "画像を表示できません",
+      "preview": "画像プレビュー",
+      "previewOpen": "画像を拡大表示"
     },
     "folder": {
       "untitled": "新規フォルダ"

@@ -212,6 +212,7 @@
   max-width: 100%;
   height: auto;
   border-radius: 0.375rem;
+  cursor: zoom-in;
 }
 
 .knowledge-doc-prose input[type='checkbox'] {

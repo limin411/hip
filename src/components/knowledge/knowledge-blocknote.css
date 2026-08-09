@@ -364,10 +364,11 @@
   ) !important;
 }
 
-/* Images */
+/* Images — click opens floating enlarge preview (KnowledgeDocCanvas). */
 .knowledge-blocknote-editor .bn-editor img {
   max-width: 100%;
   border-radius: 0.375rem;
+  cursor: zoom-in;
 }
 
 .knowledge-blocknote-editor .bn-editor img:hover {

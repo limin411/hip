@@ -148,4 +148,5 @@
   max-height: 360px;
   border-radius: 4px;
   margin: 0.25em 0;
+  cursor: zoom-in;
 }

@@ -2458,6 +2458,7 @@ export const ja = {
         "broken": "壊れたリンク",
         "emptyInbound": "被参照リンクはありません",
         "emptyOutbound": "参照先リンクはありません",
+        "outboundUnresolved": "リンク先が見つかりません",
         "emptyBroken": "壊れたリンクはありません 🎉",
         "expand": "すべて表示（{{count}}）",
         "collapse": "折りたたむ",

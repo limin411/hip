@@ -2458,6 +2458,7 @@ export const ko = {
         "broken": "끊긴 링크",
         "emptyInbound": "들어오는 링크 없음",
         "emptyOutbound": "나가는 링크 없음",
+        "outboundUnresolved": "링크 대상을 찾을 수 없음",
         "emptyBroken": "끊긴 링크 없음 🎉",
         "expand": "모두 표시({{count}})",
         "collapse": "접기",

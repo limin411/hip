@@ -108,11 +108,13 @@ export function KnowledgeWorkspace() {
   const editorRef = useRef<DocEditorHandle>(null)
   /** Live host handle for attach/paste (PR-2); wired now for insertMarkdown. */
   const liveEditorRef = useRef<DocLiveEditorHandle>(null)
-  // Best-effort scroll-to-match after opening a search hit (`pendingReveal`).
-  // Boards are title-only in search — never run Milkdown/CM reveal (Issue 18).
+  // Best-effort scroll-to-match after opening a search hit / outbound fragment
+  // (`pendingReveal`). Boards are title-only in search — never run reveal (Issue 18).
+  // Subscribe so same-doc fragment clicks (openDoc early-return) still re-run reveal.
+  const pendingReveal = useKnowledgeStore((s) => s.pendingReveal)
   useEffect(() => {
     if (!activeDocId || !activeSpaceId) return
-    const pending = useKnowledgeStore.getState().pendingReveal
+    const pending = pendingReveal
     if (!pending?.query) return
     // Only reveal when the pending target is still the active leaf.
     if (pending.spaceId !== activeSpaceId || pending.docId !== activeDocId) return
@@ -191,7 +193,7 @@ export function KnowledgeWorkspace() {
       cancelled = true
       if (timeoutId != null) clearTimeout(timeoutId)
     }
-  }, [activeDocId, activeSpaceId, editorMode, docBody, nodes])
+  }, [activeDocId, activeSpaceId, editorMode, docBody, nodes, pendingReveal])
 
   // Outline (AppLayout right rail) → scroll Live / Source (docs only).
   const pendingOutlineJump = useKnowledgeStore((s) => s.pendingOutlineJump)

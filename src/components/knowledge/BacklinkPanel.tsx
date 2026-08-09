@@ -8,8 +8,14 @@
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
+import { open as openExternal } from '@tauri-apps/plugin-shell'
 import { ArrowLeftRight, Plus } from 'lucide-react'
 import { useKnowledgeStore } from '@/store/knowledgeStore'
+import type { KnowledgeLinkOutboundRow } from '@/ipc/knowledge'
+import {
+  listDocsInTreeOrder,
+  resolveWikiTitle,
+} from '@/domain/knowledge/wikiLink'
 import { WikiLinkPicker } from './WikiLinkPicker'
 
 const COLLAPSE_AT = 5
@@ -19,7 +25,8 @@ type SectionId = 'inbound' | 'outbound' | 'broken'
 interface RowItem {
   key: string
   title: string
-  snippet: string
+  /** Secondary line; omit when it only repeats the title. */
+  snippet: string | null
   onClick: () => void
   broken: boolean
   fromDocId: string
@@ -49,20 +56,53 @@ export function BacklinkPanel() {
 
   if (!activeDocId) return null
 
-  const openDoc = (docId: string, fragment?: string | null) => {
+  /** Same-space leaf open — matches in-editor wiki chips (not openRecent→openSpace). */
+  const openDocNav = (docId: string, fragment?: string | null) => {
     const st = useKnowledgeStore.getState()
     const spaceId = st.activeSpaceId
     if (!spaceId) return
     if (fragment) {
-      st.setPendingReveal({ query: fragment, spaceId, docId, fragment })
+      st.setPendingReveal({
+        query: fragment,
+        spaceId,
+        docId,
+        fragment,
+      })
     }
-    void st.openRecent({
-      spaceId,
-      docId,
-      title: st.nodes.find((n) => n.id === docId)?.title ?? '',
-      spaceName: st.spaces.find((s) => s.id === spaceId)?.name ?? '',
-      at: Date.now(),
-    })
+    void st.openDoc(docId)
+  }
+
+  const openOutbound = (o: KnowledgeLinkOutboundRow) => {
+    // Markdown URL / path — open externally when not a wiki target.
+    if (o.kind === 'md') {
+      const href = extractMdLinkHref(o.raw)
+      if (href) {
+        void openExternalHref(href)
+        return
+      }
+    }
+
+    const st = useKnowledgeStore.getState()
+    let docId =
+      o.targetDocId && o.targetDocId.trim() ? o.targetDocId.trim() : null
+
+    // Index may lag renames; resolve title against the live tree.
+    if (!docId && o.targetTitle?.trim()) {
+      const docs = listDocsInTreeOrder(st.nodes)
+      docId = resolveWikiTitle(o.targetTitle, docs)?.id ?? null
+    }
+
+    // Same-document heading / block: `[[#Intro]]` → empty title + fragment.
+    if (!docId && o.fragment && !(o.targetTitle ?? '').trim()) {
+      docId = st.activeDocId
+    }
+
+    if (docId) {
+      openDocNav(docId, o.fragment)
+      return
+    }
+
+    toast.message(t('knowledge.backlinks.outboundUnresolved'))
   }
 
   const repair = async (row: { fromDocId: string; raw: string }) => {
@@ -78,7 +118,7 @@ export function BacklinkPanel() {
     )
     if (id) {
       toast.success(t('knowledge.backlinks.repaired', { title: target }))
-      openDoc(id)
+      openDocNav(id)
     } else {
       toast.error(t('knowledge.backlinks.repairFailed'))
     }
@@ -113,7 +153,7 @@ export function BacklinkPanel() {
         key: `${b.fromDocId}-${b.raw}`,
         title: b.fromTitle,
         snippet: b.raw,
-        onClick: () => openDoc(b.fromDocId, b.fragment),
+        onClick: () => openDocNav(b.fromDocId, b.fragment),
         broken: false,
         fromDocId: b.fromDocId,
         raw: b.raw,
@@ -123,29 +163,36 @@ export function BacklinkPanel() {
       id: 'outbound',
       label: t('knowledge.backlinks.outbound'),
       emptyText: t('knowledge.backlinks.emptyOutbound'),
-      rows: outboundLinks.map((o, i) => ({
-        key: `${o.raw}-${i}`,
-        title: o.targetTitle ?? o.raw,
-        snippet: o.raw,
-        onClick: () => (o.targetDocId ? openDoc(o.targetDocId, o.fragment) : undefined),
-        broken: false,
-        fromDocId: activeDocId,
-        raw: o.raw,
-      })),
+      rows: dedupeOutboundLinks(outboundLinks).map((o, i) => {
+        const label = outboundRowLabel(o)
+        return {
+          key: `${o.kind}-${o.targetDocId ?? o.targetTitle ?? o.raw}-${o.fragment ?? ''}-${i}`,
+          title: label.title,
+          snippet: label.snippet,
+          onClick: () => openOutbound(o),
+          broken: false,
+          fromDocId: activeDocId,
+          raw: o.raw,
+        }
+      }),
     },
     {
       id: 'broken',
       label: t('knowledge.backlinks.broken'),
       emptyText: t('knowledge.backlinks.emptyBroken'),
-      rows: brokenLinks.map((b) => ({
-        key: `${b.fromDocId}-${b.raw}`,
-        title: extractBrokenTarget(b.raw) ?? b.raw,
-        snippet: b.raw,
-        onClick: () => undefined,
-        broken: true,
-        fromDocId: b.fromDocId,
-        raw: b.raw,
-      })),
+      rows: brokenLinks.map((b) => {
+        const title = extractBrokenTarget(b.raw) ?? b.raw
+        return {
+          key: `${b.fromDocId}-${b.raw}`,
+          title,
+          // `[[Title]]` under Title is noise — only keep when raw adds context.
+          snippet: b.raw === title || b.raw === `[[${title}]]` ? null : b.raw,
+          onClick: () => undefined,
+          broken: true,
+          fromDocId: b.fromDocId,
+          raw: b.raw,
+        }
+      }),
     },
   ]
 
@@ -212,12 +259,14 @@ export function BacklinkPanel() {
                         <span className="block truncate text-meta font-medium text-ink">
                           {row.title}
                         </span>
-                        <span
-                          className="block truncate text-caption text-ink-tertiary"
-                          title={row.snippet}
-                        >
-                          {row.snippet}
-                        </span>
+                        {row.snippet ? (
+                          <span
+                            className="block truncate text-caption text-ink-tertiary"
+                            title={row.snippet}
+                          >
+                            {row.snippet}
+                          </span>
+                        ) : null}
                       </button>
                       {row.broken ? (
                         <div className="flex shrink-0 items-center gap-0.5">
@@ -272,4 +321,80 @@ export function BacklinkPanel() {
 export function extractBrokenTarget(raw: string): string | null {
   const m = raw.trim().match(/^\[\[([^\]|#]+?)(?:#|\]\]|\|)/)
   return m?.[1]?.trim() || null
+}
+
+/** `[label](dest)` / `![alt](dest)` → dest href. */
+export function extractMdLinkHref(raw: string): string | null {
+  const m = raw.trim().match(/^!?\[([^\]]*)\]\(([^)\s]+)(?:\s+"[^"]*")?\)$/)
+  const href = m?.[2]?.trim()
+  return href || null
+}
+
+/**
+ * Primary + optional secondary label for an outbound row.
+ * Avoids the old “Title / [[Title]]” double line when both say the same thing.
+ */
+export function outboundRowLabel(o: KnowledgeLinkOutboundRow): {
+  title: string
+  snippet: string | null
+} {
+  const display = o.display?.trim() || ''
+  const target = o.targetTitle?.trim() || ''
+  const title = display || target || extractBrokenTarget(o.raw) || o.raw
+
+  if (o.kind === 'md') {
+    const href = extractMdLinkHref(o.raw)
+    if (href && href !== title) return { title, snippet: href }
+    return { title, snippet: null }
+  }
+
+  // Alias different from target → show real target underneath.
+  if (display && target && display !== target) {
+    const frag = o.fragment?.trim()
+    return { title: display, snippet: frag ? `${target} #${frag}` : target }
+  }
+
+  // Fragment-only secondary (same-doc or title#heading already collapsed into title).
+  if (o.fragment?.trim()) {
+    const frag = o.fragment.trim()
+    // Title already ends with the fragment label → skip.
+    if (title === frag || title.endsWith(`#${frag}`)) return { title, snippet: null }
+    return { title, snippet: `#${frag}` }
+  }
+
+  return { title, snippet: null }
+}
+
+/** Unique targets for the panel (same doc linked twice → one row). */
+export function dedupeOutboundLinks(
+  links: readonly KnowledgeLinkOutboundRow[],
+): KnowledgeLinkOutboundRow[] {
+  const seen = new Set<string>()
+  const out: KnowledgeLinkOutboundRow[] = []
+  for (const o of links) {
+    const key = outboundDedupeKey(o)
+    if (seen.has(key)) continue
+    seen.add(key)
+    out.push(o)
+  }
+  return out
+}
+
+function outboundDedupeKey(o: KnowledgeLinkOutboundRow): string {
+  const frag = o.fragment?.trim() ?? ''
+  if (o.targetDocId?.trim()) return `${o.kind}|id:${o.targetDocId.trim()}|f:${frag}`
+  if (o.targetTitle?.trim()) return `${o.kind}|t:${o.targetTitle.trim()}|f:${frag}`
+  if (o.kind === 'md') {
+    const href = extractMdLinkHref(o.raw)
+    if (href) return `md|href:${href}|f:${frag}`
+  }
+  return `${o.kind}|r:${o.raw}`
+}
+
+async function openExternalHref(href: string): Promise<void> {
+  try {
+    await openExternal(href)
+  } catch {
+    window.open(href, '_blank', 'noopener,noreferrer')
+  }
 }

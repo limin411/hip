@@ -75,7 +75,7 @@ describe('KnowledgeOutlinePanel', () => {
   })
 
   it('lists backlinks in the tabbed panel and opens source on click', () => {
-    const openRecent = vi.fn().mockResolvedValue(undefined)
+    const openDoc = vi.fn().mockResolvedValue(undefined)
     useKnowledgeStore.setState({
       activeDocId: 'doc_1',
       activeSpaceId: 'spc_1',
@@ -114,13 +114,11 @@ describe('KnowledgeOutlinePanel', () => {
       outboundLinks: [],
       brokenLinks: [],
       linkPanelStatus: 'ready',
-      openRecent,
+      openDoc,
     })
     render(<KnowledgeOutlinePanel />)
     fireEvent.click(screen.getByTestId('knowledge-backlink-row-doc_other-[[Hello]]'))
-    expect(openRecent).toHaveBeenCalledWith(
-      expect.objectContaining({ spaceId: 'spc_1', docId: 'doc_other' }),
-    )
+    expect(openDoc).toHaveBeenCalledWith('doc_other')
   })
 
   it('shows doc stats (words + backlinks) stacked below the broken-links section', () => {

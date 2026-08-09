@@ -2460,6 +2460,7 @@ export const zhTW = {
         "broken": "斷鏈",
         "emptyInbound": "暫無入鏈",
         "emptyOutbound": "暫無出鏈",
+        "outboundUnresolved": "未找到連結目標",
         "emptyBroken": "沒有斷鏈 🎉",
         "expand": "展開全部（{{count}}）",
         "collapse": "收起",

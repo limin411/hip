@@ -2561,6 +2561,7 @@ export const en = {
         broken: 'Broken',
         emptyInbound: 'No inbound links',
         emptyOutbound: 'No outbound links',
+        outboundUnresolved: 'Link target not found',
         emptyBroken: 'No broken links 🎉',
         expand: 'Show all ({{count}})',
         collapse: 'Collapse',

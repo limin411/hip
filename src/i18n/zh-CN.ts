@@ -2497,6 +2497,7 @@ export const zhCN = {
         broken: '断链',
         emptyInbound: '暂无入链',
         emptyOutbound: '暂无出链',
+        outboundUnresolved: '未找到链接目标',
         emptyBroken: '没有断链 🎉',
         expand: '展开全部（{{count}}）',
         collapse: '收起',

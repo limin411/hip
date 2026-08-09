@@ -92,4 +92,26 @@ describe('InlineDocTitle', () => {
     expect(onCommit).not.toHaveBeenCalled()
     expect(onEnterCommit).toHaveBeenCalled()
   })
+
+  it('renders textarea (multi-line wrap) and strips newlines from paste', () => {
+    const onCommit = vi.fn()
+    render(<InlineDocTitle docId="d1" title="Note" onCommit={onCommit} />)
+    const el = screen.getByTestId('knowledge-doc-title')
+    expect(el.tagName).toBe('TEXTAREA')
+    // 粘贴带换行 → 剔除（标题仅视觉换行，存储保持单行）
+    fireEvent.change(el, { target: { value: 'Long\nTitle' } })
+    expect(el).toHaveValue('LongTitle')
+    fireEvent.keyDown(el, { key: 'Enter' })
+    expect(onCommit).toHaveBeenCalledWith('LongTitle')
+  })
+
+  it('auto-resizes textarea height for long titles (wrap visible)', () => {
+    render(<InlineDocTitle docId="d1" title="Note" onCommit={() => {}} />)
+    const el = screen.getByTestId('knowledge-doc-title') as HTMLTextAreaElement
+    // 模拟长标题换行：行高 32px，三行内容 → 高度 ≥ 2 行高
+    Object.defineProperty(el, 'scrollHeight', { value: 96, configurable: true })
+    fireEvent.change(el, { target: { value: '超长标题超长标题超长标题超长标题超长标题超长标题超长标题超长标题' } })
+    expect(parseInt(el.style.height, 10)).toBeGreaterThan(0)
+    expect(el.style.height).toBe('96px')
+  })
 })

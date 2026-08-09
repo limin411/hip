@@ -2501,6 +2501,8 @@ export const en = {
         viewLabel: 'View',
         viewGrid: 'Grid view',
         viewList: 'List view',
+        emptyTitle: 'This folder is empty',
+        emptyDesc: 'Create a document to start writing.',
         folderKind: 'Folder',
         docKind: 'Document',
         name: 'Name',

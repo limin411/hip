@@ -2399,6 +2399,8 @@ export const ja = {
       "viewLabel": "表示切り替え",
       "viewGrid": "グリッド表示",
       "viewList": "リスト表示",
+      "emptyTitle": "このフォルダは空です",
+      "emptyDesc": "ドキュメントを作成して記録を始めましょう。",
       "folderKind": "フォルダ",
       "docKind": "ドキュメント",
       "name": "名前",

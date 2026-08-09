@@ -2401,6 +2401,8 @@ export const zhTW = {
       "viewLabel": "檢視切換",
       "viewGrid": "網格檢視",
       "viewList": "列表檢視",
+      "emptyTitle": "此資料夾為空",
+      "emptyDesc": "建立一篇文件，開始記錄。",
       "folderKind": "資料夾",
       "docKind": "文件",
       "name": "名稱",

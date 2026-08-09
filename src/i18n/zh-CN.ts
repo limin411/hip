@@ -2437,6 +2437,8 @@ export const zhCN = {
         viewLabel: '视图切换',
         viewGrid: '网格视图',
         viewList: '列表视图',
+        emptyTitle: '此文件夹为空',
+        emptyDesc: '创建一篇文档，开始记录。',
         folderKind: '文件夹',
         docKind: '文档',
         name: '名称',

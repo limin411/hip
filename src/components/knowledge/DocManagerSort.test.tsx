@@ -6,7 +6,7 @@
 import '@testing-library/jest-dom/vitest'
 import type { ReactNode } from 'react'
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { render, screen, cleanup } from '@testing-library/react'
+import { render, screen, cleanup, fireEvent } from '@testing-library/react'
 import { useKnowledgeStore } from '@/store/knowledgeStore'
 import type { KnowledgeNode } from '@/domain/knowledge/types'
 import { DocManagerBrowse } from './DocManagerBrowse'
@@ -66,8 +66,22 @@ describe('DocManagerBrowse 排序', () => {
 
   afterEach(() => cleanup())
 
-  it('文件夹在前，目录与文件各自按名称升序', () => {
+  it('默认列表视图：文件夹在前，目录与文件各自按名称升序', () => {
     render(<DocManagerBrowse />)
+    const rows = screen
+      .getAllByTestId(/^browse-row-(?!menu-)/)
+      .map((el) => el.getAttribute('data-testid'))
+    expect(rows).toEqual([
+      'browse-row-nod_a',
+      'browse-row-nod_b',
+      'browse-row-doc_a',
+      'browse-row-doc_z',
+    ])
+  })
+
+  it('网格视图（切换后）：文件夹在前，目录与文件各自按名称升序', () => {
+    render(<DocManagerBrowse />)
+    fireEvent.click(screen.getByTestId('browse-view-grid'))
     const tiles = screen
       .getAllByTestId(/^browse-tile-/)
       .map((el) => el.getAttribute('data-testid'))

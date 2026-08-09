@@ -1,22 +1,27 @@
 /**
- * 文档管理 — 主区浏览模式（v2）。
+ * 文档管理 — 主区浏览模式（v3）。
  *
- * 无活动文档时显示当前目录内容：工具栏（↑ 返回上一层 + 面包屑 + 搜索 +
- * 视图切换 + 新建）+ 文件夹网格/文档列表。与侧边栏 DirNavList 共用同一
- * 导航状态（knowledgeStore.currentFolderId）。
+ * doc-notion-polish/PR-5：默认紧凑列表（Notion 页面列表心智）——40px 行 =
+ * 类型图标 + 标题 + 上次编辑 + hover 行尾 ⋯（与右键菜单共用同一 provider）；
+ * 网格保留可切换（tile 缩为 40px 图标）；工具栏瘦身（↑ 返回移除，面包屑承担；
+ * 新建改为实底主按钮）；空态大标题。
+ * 与侧边栏 DirNavList 共用同一导航状态（knowledgeStore.currentFolderId）。
  */
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
-import {
-  ArrowUp,
-  FileText,
-  Folder,
-  Grid3X3,
-  List,
-  Plus,
-} from 'lucide-react'
+import { FileText, Folder, Grid3X3, List, MoreHorizontal, Plus } from 'lucide-react'
 import { DeclarativeContextMenu } from '@/components/context-menu'
+import { buildContextMenuItems } from '@/components/context-menu/registry'
+import { createContextMenuBuildContext } from '@/components/context-menu/buildContext'
+import type { ContextMenuItemDef, ContextRequest } from '@/components/context-menu/types'
+import {
+  DropdownMenu,
+  DropdownMenuTrigger,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+} from '@/components/ui/DropdownMenu'
 import { knowledgeRevealDoc } from '@/ipc/knowledge'
 import { getPath, listChildren } from '@/domain/knowledge/tree'
 import type { KnowledgeNode } from '@/domain/knowledge/types'
@@ -41,6 +46,74 @@ function formatUpdated(ts: number): string {
   }
 }
 
+/** 行尾 ⋯ 菜单：与右键菜单共用 knowledgeNode provider（单一数据源）。 */
+function NodeRowMenu({
+  node,
+  payload,
+}: {
+  node: KnowledgeNode
+  payload: {
+    nodeId: string
+    kind: KnowledgeNode['kind']
+    spaceId: string
+    onNewDoc: () => void
+    onNewFolder: () => void
+    onRename: () => void
+    onDelete: () => void
+    onReveal?: () => void
+    onCopyPath: () => void
+  }
+}) {
+  const { t } = useTranslation()
+  const [items, setItems] = useState<ContextMenuItemDef[]>([])
+  const [open, setOpen] = useState(false)
+  return (
+    <DropdownMenu
+      modal={false}
+      open={open}
+      onOpenChange={(next) => {
+        setOpen(next)
+        if (next) {
+          const ctx = createContextMenuBuildContext(t, {})
+          setItems(
+            buildContextMenuItems(
+              { kind: 'knowledgeNode', payload } as ContextRequest,
+              ctx,
+            ),
+          )
+        }
+      }}
+    >
+      <DropdownMenuTrigger asChild>
+        <button
+          type="button"
+          data-testid={`browse-row-menu-${node.id}`}
+          aria-label={t('knowledge.tree.rename')}
+          onClick={(e) => e.stopPropagation()}
+          className="flex h-6 w-6 items-center justify-center rounded-md text-ink-tertiary transition-colors hover:bg-state-hover hover:text-ink"
+        >
+          <MoreHorizontal size={14} aria-hidden />
+        </button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end">
+        {items.map((item, i) => (
+          <div key={item.id}>
+            {i > 0 && items[i - 1].group !== item.group ? (
+              <DropdownMenuSeparator />
+            ) : null}
+            <DropdownMenuItem
+              className={item.danger ? 'text-danger' : undefined}
+              onSelect={() => item.run()}
+            >
+              {item.label}
+            </DropdownMenuItem>
+          </div>
+        ))}
+      </DropdownMenuContent>
+    </DropdownMenu>
+  )
+}
+
 export function DocManagerBrowse() {
   const { t } = useTranslation()
   const nodes = useKnowledgeStore((s) => s.nodes)
@@ -50,7 +123,7 @@ export function DocManagerBrowse() {
   const busy = useKnowledgeStore((s) => s.busy)
 
   const [query, setQuery] = useState('')
-  const [view, setView] = useState<'grid' | 'list'>('grid')
+  const [view, setView] = useState<'grid' | 'list'>('list')
   const [newKind, setNewKind] = useState<'folder' | 'doc' | null>(null)
   const [newTitle, setNewTitle] = useState('')
   const [menuOpen, setMenuOpen] = useState(false)
@@ -156,28 +229,11 @@ export function DocManagerBrowse() {
       className="flex min-h-0 min-w-0 flex-1 flex-col bg-surface-content"
       data-testid="doc-manager-browse"
     >
-      {/* 工具栏 */}
+      {/* 工具栏（PR-5 瘦身：面包屑小字 + 搜索 + 视图切换 + 新建主按钮） */}
       <div
         className="flex h-12 shrink-0 items-center gap-2 border-b border-border px-4"
         data-testid="browse-toolbar"
       >
-        <button
-          type="button"
-          data-testid="browse-up"
-          data-no-drag
-          disabled={atRoot}
-          title={t('sidebar.list.up')}
-          aria-label={t('sidebar.list.up')}
-          onClick={() => void nav().goUp()}
-          className={cn(
-            'flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-ink-tertiary transition-colors',
-            'hover:bg-state-hover hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink/20',
-            'disabled:pointer-events-none disabled:opacity-30',
-          )}
-        >
-          <ArrowUp size={15} strokeWidth={2} aria-hidden />
-        </button>
-
         {/* 面包屑（>3 段折叠 …，可跳任意祖先） */}
         <div className="flex min-w-0 flex-1 items-center gap-1 overflow-hidden text-meta">
           <span
@@ -278,7 +334,7 @@ export function DocManagerBrowse() {
           value={query}
           placeholder={t('knowledge.tree.filterPlaceholder')}
           onChange={(e) => setQuery(e.target.value)}
-          className="h-7 w-44 shrink-0 rounded-md border border-border bg-surface px-2 text-caption text-ink outline-none transition-colors placeholder:text-ink-tertiary focus:border-accent/50 focus:ring-1 focus:ring-accent/30"
+          className="h-7 w-40 shrink-0 rounded-md border border-border bg-surface px-2 text-caption text-ink outline-none transition-colors placeholder:text-ink-tertiary focus:border-accent/50 focus:ring-1 focus:ring-accent/30"
         />
 
         {/* 视图切换 */}
@@ -316,26 +372,26 @@ export function DocManagerBrowse() {
           </button>
         </div>
 
-        {/* 新建 */}
+        {/* 新建（实底主按钮 + 下拉） */}
         <div className="relative shrink-0" ref={menuRef}>
           <button
             type="button"
             data-testid="browse-new"
             data-no-drag
             disabled={busy}
-            title={t('sidebar.newSpace')}
             aria-label={t('sidebar.newSpace')}
             onClick={() => {
               setMenuOpen((v) => !v)
               setJumpOpen(false)
             }}
             className={cn(
-              'flex h-7 w-7 items-center justify-center rounded-md text-ink-tertiary transition-colors',
-              'hover:bg-state-hover hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink/20',
+              'flex h-7 items-center gap-1 rounded-md bg-btn-primary px-2.5 text-caption font-medium text-on-btn-primary transition-colors',
+              'hover:bg-btn-primary-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink/20',
               'disabled:pointer-events-none disabled:opacity-30',
             )}
           >
-            <Plus size={15} strokeWidth={2} aria-hidden />
+            <Plus size={13} strokeWidth={2} aria-hidden />
+            {t('knowledge.workspace.new')}
           </button>
           {menuOpen ? (
             <div
@@ -388,18 +444,24 @@ export function DocManagerBrowse() {
             </p>
           ) : noChildren ? (
             <div
-              className="flex flex-col items-center gap-2 px-4 py-14 text-center"
+              className="flex flex-col items-center gap-1.5 px-4 py-20 text-center"
               role="status"
               data-testid="browse-empty-folder"
             >
-              <p className="text-body text-ink-tertiary">{t('sidebar.list.folderEmpty')}</p>
+              <p className="text-display font-semibold text-ink">
+                {t('knowledge.browse.emptyTitle')}
+              </p>
+              <p className="text-meta text-ink-tertiary">
+                {t('knowledge.browse.emptyDesc')}
+              </p>
               <button
                 type="button"
                 data-no-drag
-                onClick={() => startNew('folder')}
-                className="rounded-md px-2 py-1 text-caption text-accent transition-colors hover:bg-accent/10"
+                onClick={() => startNew('doc')}
+                className="mt-2 flex items-center gap-1.5 rounded-md bg-btn-primary px-3.5 py-1.5 text-body font-medium text-on-btn-primary transition-colors hover:bg-btn-primary-hover"
               >
-                {t('knowledge.tree.newFolder')}
+                <Plus size={14} strokeWidth={2} aria-hidden />
+                {t('knowledge.tree.newDoc')}
               </button>
             </div>
           ) : view === 'grid' ? (
@@ -421,17 +483,20 @@ export function DocManagerBrowse() {
                         else void nav().openDoc(node.id)
                       }}
                       className={cn(
-                        'flex cursor-pointer flex-col items-center gap-2 rounded-xl border border-transparent p-3 text-center transition-colors',
+                        'group flex cursor-pointer flex-col items-center gap-2 rounded-xl border border-transparent p-3 text-center transition-colors',
                         'hover:border-border hover:bg-surface-muted/60',
                         activeDocId === node.id && 'border-border bg-surface-muted/60',
                       )}
                     >
-                      <div className="flex h-14 w-14 items-center justify-center rounded-lg bg-surface-muted">
+                      <div className="relative flex h-10 w-10 items-center justify-center rounded-lg bg-surface-muted">
                         {node.kind === 'folder' ? (
-                          <Folder size={26} className="text-accent" strokeWidth={1.6} aria-hidden />
+                          <Folder size={20} className="text-accent" strokeWidth={1.6} aria-hidden />
                         ) : (
-                          <FileText size={26} className="text-ink-tertiary" strokeWidth={1.6} aria-hidden />
+                          <FileText size={20} className="text-ink-tertiary" strokeWidth={1.6} aria-hidden />
                         )}
+                        <span className="absolute -right-1 -top-1 flex opacity-0 transition-opacity group-hover:opacity-100">
+                          <NodeRowMenu node={node} payload={rowMenuPayload(node)} />
+                        </span>
                       </div>
                       {editing ? (
                         <input
@@ -469,87 +534,80 @@ export function DocManagerBrowse() {
               })}
             </div>
           ) : (
-            <table className="w-full border-collapse" data-testid="browse-list-table">
-              <thead>
-                <tr className="text-left text-meta text-ink-tertiary">
-                  <th className="border-b border-border px-3 py-1.5 font-medium">
-                    {t('knowledge.browse.name')}
-                  </th>
-                  <th className="w-28 border-b border-border px-3 py-1.5 font-medium">
-                    {t('knowledge.browse.kind')}
-                  </th>
-                  <th className="w-40 border-b border-border px-3 py-1.5 font-medium">
-                    {t('knowledge.browse.modified')}
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
-                {level.map((node) => {
-                  const editing = editingId === node.id
-                  return (
-                    <tr
-                      key={node.id}
+            <div className="flex flex-col gap-0.5">
+              {level.map((node) => {
+                const editing = editingId === node.id
+                return (
+                  <DeclarativeContextMenu
+                    key={node.id}
+                    kind="knowledgeNode"
+                    payload={rowMenuPayload(node)}
+                    className="block"
+                  >
+                    <div
                       data-testid={`browse-row-${node.id}`}
                       data-node-kind={node.kind}
                       onClick={() => {
                         if (node.kind === 'folder') void nav().enterFolder(node.id)
                         else void nav().openDoc(node.id)
                       }}
-                      className="cursor-pointer transition-colors hover:bg-surface-muted/60"
+                      className={cn(
+                        'group flex h-10 cursor-pointer items-center gap-2.5 rounded-lg px-2 transition-colors',
+                        activeDocId === node.id ? 'bg-state-hover' : 'hover:bg-state-hover',
+                      )}
                     >
-                      <td className="border-b border-border/60 px-3 py-1.5">
-                        <DeclarativeContextMenu
-                          kind="knowledgeNode"
-                          payload={rowMenuPayload(node)}
-                          className="block"
-                        >
-                          <div className="flex items-center gap-2">
-                            {node.kind === 'folder' ? (
-                              <Folder size={14} className="shrink-0 text-accent" aria-hidden />
-                            ) : (
-                              <FileText size={14} className="shrink-0 text-ink-tertiary" aria-hidden />
-                            )}
-                            {editing ? (
-                              <input
-                                autoFocus
-                                data-testid={`browse-rename-${node.id}`}
-                                data-no-drag
-                                value={editTitle}
-                                onChange={(e) => setEditTitle(e.target.value)}
-                                onKeyDown={(e) => {
-                                  if (e.key === 'Enter') {
-                                    e.stopPropagation()
-                                    confirmRename(node)
-                                  } else if (e.key === 'Escape') {
-                                    e.stopPropagation()
-                                    setEditingId(null)
-                                  }
-                                }}
-                                onBlur={() => confirmRename(node)}
-                                onClick={(e) => e.stopPropagation()}
-                                className="min-w-0 flex-1 rounded-sm border border-accent/50 bg-surface px-1 py-0.5 text-caption text-ink outline-none"
-                              />
-                            ) : (
-                              <span className="truncate text-body text-ink">{node.title}</span>
-                            )}
-                          </div>
-                        </DeclarativeContextMenu>
-                      </td>
-                      <td className="border-b border-border/60 px-3 py-1.5">
-                        <span className="rounded-md bg-surface-muted px-1.5 py-px text-caption text-ink-tertiary">
-                          {node.kind === 'folder'
-                            ? t('knowledge.browse.folderKind')
-                            : t('knowledge.browse.docKind')}
+                      <span
+                        className={cn(
+                          'flex h-6 w-6 flex-none items-center justify-center rounded-md',
+                          node.kind === 'folder'
+                            ? 'bg-accent-subtle text-accent'
+                            : 'bg-surface-muted text-ink-tertiary',
+                        )}
+                      >
+                        {node.kind === 'folder' ? (
+                          <Folder size={14} aria-hidden />
+                        ) : (
+                          <FileText size={14} aria-hidden />
+                        )}
+                      </span>
+                      {editing ? (
+                        <input
+                          autoFocus
+                          data-testid={`browse-rename-${node.id}`}
+                          data-no-drag
+                          value={editTitle}
+                          onChange={(e) => setEditTitle(e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') {
+                              e.stopPropagation()
+                              confirmRename(node)
+                            } else if (e.key === 'Escape') {
+                              e.stopPropagation()
+                              setEditingId(null)
+                            }
+                          }}
+                          onBlur={() => confirmRename(node)}
+                          onClick={(e) => e.stopPropagation()}
+                          className="min-w-0 flex-1 rounded-sm border border-accent/50 bg-surface px-1 py-0.5 text-caption text-ink outline-none"
+                        />
+                      ) : (
+                        <span className="min-w-0 flex-1 truncate text-body text-ink">
+                          {node.title}
                         </span>
-                      </td>
-                      <td className="border-b border-border/60 px-3 py-1.5 text-caption text-ink-tertiary">
-                        {formatUpdated(node.updatedAt)}
-                      </td>
-                    </tr>
-                  )
-                })}
-              </tbody>
-            </table>
+                      )}
+                      <span className="flex-none text-meta text-ink-tertiary">
+                        {node.kind === 'folder'
+                          ? t('knowledge.browse.folderKind')
+                          : formatUpdated(node.updatedAt)}
+                      </span>
+                      <span className="flex-none opacity-0 transition-opacity group-hover:opacity-100">
+                        <NodeRowMenu node={node} payload={rowMenuPayload(node)} />
+                      </span>
+                    </div>
+                  </DeclarativeContextMenu>
+                )
+              })}
+            </div>
           )}
 
           {/* 内联新建行 */}

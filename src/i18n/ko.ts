@@ -2399,6 +2399,8 @@ export const ko = {
       "viewLabel": "보기 전환",
       "viewGrid": "그리드 보기",
       "viewList": "목록 보기",
+      "emptyTitle": "이 폴더는 비어 있습니다",
+      "emptyDesc": "문서를 만들어 기록을 시작하세요.",
       "folderKind": "폴더",
       "docKind": "문서",
       "name": "이름",

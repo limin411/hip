@@ -43,6 +43,8 @@ pub fn db_dir(app: &AppHandle) -> Option<PathBuf> { hip_subdir(app, "db") }
 pub fn config_dir(app: &AppHandle) -> Option<PathBuf> { hip_subdir(app, "config") }
 pub fn cache_dir(app: &AppHandle) -> Option<PathBuf> { hip_subdir(app, "cache") }
 pub fn scratch_dir(app: &AppHandle) -> Option<PathBuf> { hip_subdir(app, "scratch") }
+/// User-local tool binaries managed by hip (`rg`, …).
+pub fn bin_dir(app: &AppHandle) -> Option<PathBuf> { hip_subdir(app, "bin") }
 
 /// Create `dir` with mode `0700` on Unix (for voice models / scratch).
 fn ensure_private_dir(dir: &std::path::Path) -> Option<()> {

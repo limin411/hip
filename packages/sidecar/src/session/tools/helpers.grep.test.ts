@@ -1,9 +1,14 @@
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, beforeEach, afterEach } from 'vitest'
+import { mkdtempSync, writeFileSync, rmSync, mkdirSync } from 'node:fs'
+import { tmpdir } from 'node:os'
 import * as path from 'node:path'
 import {
   compileGrepPattern,
   isExcludedDirName,
+  resetRgBinCache,
   resolveFull,
+  resolveRgBin,
+  runRgGrep,
   sliceFileLines,
   toGlobRegex,
 } from './helpers.js'
@@ -125,5 +130,113 @@ describe('resolveFull', () => {
     const resolved = resolveFull('D:\\proj', '/src/a.ts')
     expect(resolved.toLowerCase()).toContain(path.join('proj', 'src', 'a.ts').toLowerCase())
     expect(resolved).not.toMatch(/^[a-zA-Z]:\\src\\/i)
+  })
+})
+
+describe('resolveRgBin / runRgGrep', () => {
+  const prevHipRg = process.env.HIP_RG_BIN
+  const prevHipData = process.env.HIP_DATA_DIR
+
+  beforeEach(() => {
+    resetRgBinCache()
+    delete process.env.HIP_RG_BIN
+    delete process.env.HIP_DATA_DIR
+  })
+
+  afterEach(() => {
+    resetRgBinCache()
+    if (prevHipRg === undefined) delete process.env.HIP_RG_BIN
+    else process.env.HIP_RG_BIN = prevHipRg
+    if (prevHipData === undefined) delete process.env.HIP_DATA_DIR
+    else process.env.HIP_DATA_DIR = prevHipData
+  })
+
+  it('honors HIP_RG_BIN when the path is executable', () => {
+    // System rg is expected on dev machines; skip soft if absent.
+    const system = resolveRgBin()
+    if (!system) return
+    resetRgBinCache()
+    process.env.HIP_RG_BIN = system
+    expect(resolveRgBin()).toBe(system)
+  })
+
+  it('runRgGrep returns null when binary is missing', async () => {
+    const out = await runRgGrep({
+      pattern: 'x',
+      absPath: process.cwd(),
+      scanBase: process.cwd(),
+      rgBin: path.join(tmpdir(), 'hip-no-such-rg-binary'),
+    })
+    expect(out).toBeNull()
+  })
+
+  it('runRgGrep finds matches and skips node_modules', async () => {
+    const bin = resolveRgBin()
+    if (!bin) return // environment without rg — JS fallback covered elsewhere
+
+    const dir = mkdtempSync(path.join(tmpdir(), 'hip-rg-'))
+    try {
+      mkdirSync(path.join(dir, 'node_modules', 'pkg'), { recursive: true })
+      writeFileSync(path.join(dir, 'node_modules', 'pkg', 'a.js'), 'NEEDLE hidden')
+      writeFileSync(path.join(dir, 'app.js'), 'NEEDLE visible\n')
+      const out = await runRgGrep({
+        pattern: 'NEEDLE',
+        absPath: dir,
+        scanBase: dir,
+        rgBin: bin,
+      })
+      expect(out).toBeTruthy()
+      expect(out!).toContain('/app.js')
+      expect(out!).toContain('NEEDLE visible')
+      expect(out!).not.toContain('node_modules')
+    } finally {
+      rmSync(dir, { recursive: true, force: true })
+    }
+  })
+
+  it('runRgGrep honors caseInsensitive and (?i)', async () => {
+    const bin = resolveRgBin()
+    if (!bin) return
+
+    const dir = mkdtempSync(path.join(tmpdir(), 'hip-rg-ci-'))
+    try {
+      writeFileSync(path.join(dir, 'Cfg.java'), 'class ZuolinConfig {}\n')
+      const viaFlag = await runRgGrep({
+        pattern: 'zuolin',
+        absPath: dir,
+        scanBase: dir,
+        caseInsensitive: true,
+        rgBin: bin,
+      })
+      expect(viaFlag).toMatch(/ZuolinConfig/)
+      const viaInline = await runRgGrep({
+        pattern: '(?i)zuolin',
+        absPath: dir,
+        scanBase: dir,
+        rgBin: bin,
+      })
+      expect(viaInline).toMatch(/ZuolinConfig/)
+    } finally {
+      rmSync(dir, { recursive: true, force: true })
+    }
+  })
+
+  it('runRgGrep reports no matches cleanly', async () => {
+    const bin = resolveRgBin()
+    if (!bin) return
+
+    const dir = mkdtempSync(path.join(tmpdir(), 'hip-rg-empty-'))
+    try {
+      writeFileSync(path.join(dir, 'a.txt'), 'hello\n')
+      const out = await runRgGrep({
+        pattern: 'ZZZ_NO_MATCH_ZZZ',
+        absPath: dir,
+        scanBase: dir,
+        rgBin: bin,
+      })
+      expect(out).toMatch(/No matches/)
+    } finally {
+      rmSync(dir, { recursive: true, force: true })
+    }
   })
 })

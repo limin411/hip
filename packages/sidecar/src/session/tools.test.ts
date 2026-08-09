@@ -122,7 +122,10 @@ describe('file tools', () => {
     writeFileSync(join(root, 'ZuolinConfig.java'), 'class ZuolinConfig {}')
     const viaInline = String(await byName(root, 'grep').invoke({ pattern: '(?i)zuolin|zuo_lin|zuo-lin' }))
     expect(viaInline).toMatch(/ZuolinConfig/)
-    expect(viaInline).toMatch(/Note:.*\(\?i\)/)
+    // JS fallback emits a Note about stripped (?i); ripgrep path is silent.
+    if (viaInline.includes('Note:')) {
+      expect(viaInline).toMatch(/Note:.*\(\?i\)/)
+    }
     const viaFlag = String(await byName(root, 'grep').invoke({ pattern: 'zuolin', caseInsensitive: true }))
     expect(viaFlag).toMatch(/ZuolinConfig/)
   })

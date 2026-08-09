@@ -1,10 +1,15 @@
-import { promises as fs } from 'node:fs'
+import { promises as fs, existsSync, accessSync, constants as fsConstants } from 'node:fs'
 import { promises as dns } from 'node:dns'
+import { execFile } from 'node:child_process'
+import { promisify } from 'node:util'
+import * as os from 'node:os'
 import * as path from 'node:path'
 import type { PermissionMode, SkillMeta } from '@hip/protocol'
 import type { StructuredToolInterface } from '@langchain/core/tools'
 import { resolveWithin } from '../workspace-fs.js'
 import type { NetworkPolicy } from '../network-policy.js'
+
+const execFileP = promisify(execFile)
 
 /** Directory basenames skipped by recursive file tools (grep/glob walks). */
 export const EXCLUDE_DIRS = new Set([
@@ -353,14 +358,204 @@ export function sliceFileLines(
 
 const GREP_INLINE_FLAGS = /^\(\?([ims]+)\)/
 const GREP_INVALID_HINT =
-  'Hint: This tool uses JavaScript RegExp. Do not use PCRE flags like (?i); set caseInsensitive=true instead.'
+  'Hint: Prefer caseInsensitive=true over PCRE (?i) flags. Patterns use ripgrep (Rust regex) when `rg` is available, otherwise JavaScript RegExp.'
 
 export type CompileGrepResult =
   | { ok: true; re: RegExp; notes: string[] }
   | { ok: false; error: string }
 
+/** Max hits returned by the grep tool (rg path and JS fallback). */
+export const GREP_MAX_HITS = 200
+export const GREP_RG_TIMEOUT_MS = 30_000
+
+/** @internal test seam — reset between tests. */
+let cachedRgBin: string | null | undefined
+
+/** Reset cached `rg` resolution (tests only). */
+export function resetRgBinCache(): void {
+  cachedRgBin = undefined
+}
+
+function isExecutableFile(p: string): boolean {
+  try {
+    accessSync(p, fsConstants.F_OK)
+    // On Windows, existence of rg.exe is enough; Unix checks X_OK.
+    if (process.platform === 'win32') return existsSync(p)
+    accessSync(p, fsConstants.X_OK)
+    return true
+  } catch {
+    return false
+  }
+}
+
+function hipBinRgCandidates(): string[] {
+  const base =
+    process.env.HIP_DATA_DIR?.trim() ||
+    path.join(process.env.USERPROFILE || process.env.HOME || os.homedir(), '.hip')
+  const name = process.platform === 'win32' ? 'rg.exe' : 'rg'
+  return [path.join(base, 'bin', name)]
+}
+
+function pathRgCandidates(): string[] {
+  const name = process.platform === 'win32' ? 'rg.exe' : 'rg'
+  const pathVar = process.env.PATH || ''
+  const sep = process.platform === 'win32' ? ';' : ':'
+  return pathVar
+    .split(sep)
+    .filter(Boolean)
+    .map((dir) => path.join(dir, name))
+}
+
 /**
- * Build a JS RegExp for the grep tool. Strips common PCRE-style leading inline flags
+ * Resolve a usable ripgrep binary.
+ * Order: `HIP_RG_BIN` → `~/.hip/bin/rg` (or `$HIP_DATA_DIR/bin`) → PATH.
+ * Returns null when none is runnable; caller falls back to JS walk.
+ * Positive hits are cached; misses are re-probed so a late hip-managed install is picked up.
+ */
+export function resolveRgBin(): string | null {
+  if (cachedRgBin) return cachedRgBin
+
+  const candidates: string[] = []
+  const envBin = process.env.HIP_RG_BIN?.trim()
+  if (envBin) candidates.push(envBin)
+  candidates.push(...hipBinRgCandidates())
+  candidates.push(...pathRgCandidates())
+
+  for (const c of candidates) {
+    if (c && isExecutableFile(c)) {
+      cachedRgBin = c
+      return c
+    }
+  }
+  // Do not cache misses — Tauri may still be downloading into ~/.hip/bin.
+  return null
+}
+
+export type RgGrepOpts = {
+  pattern: string
+  /** Absolute file or directory to search. */
+  absPath: string
+  /** Project/scan root used to rewrite paths as `/rel` in output. */
+  scanBase: string
+  caseInsensitive?: boolean
+  /** Override binary (tests). */
+  rgBin?: string
+}
+
+/**
+ * Run ripgrep and format hits like the JS fallback: `/rel:line: text` (max GREP_MAX_HITS).
+ * Returns null when rg is missing/failed in a way that warrants JS fallback (ENOENT).
+ * Returns an Error string for invalid patterns / real failures.
+ */
+export async function runRgGrep(opts: RgGrepOpts): Promise<string | null> {
+  const bin = opts.rgBin ?? resolveRgBin()
+  if (!bin) return null
+
+  // Strip leading (?i)/(?im) so we can map case to -i; remaining body is the rg pattern.
+  let body = opts.pattern
+  let caseInsensitive = Boolean(opts.caseInsensitive)
+  const m = body.match(GREP_INLINE_FLAGS)
+  if (m) {
+    body = body.slice(m[0].length)
+    if (m[1].includes('i')) caseInsensitive = true
+  }
+
+  const args: string[] = [
+    '--line-number',
+    '--with-filename', // always path:line:text (even for a single file target)
+    '--no-heading',
+    '--color=never',
+    '--no-messages',
+    // Match JS walk: skip hidden dirs/files by default (rg default), and heavy trees.
+    '--glob',
+    '!node_modules',
+    '--glob',
+    '!.git',
+    '--glob',
+    '!$RECYCLE.BIN',
+    '--glob',
+    '!$Recycle.Bin',
+    '--glob',
+    '!System Volume Information',
+    '--glob',
+    '!Recovery',
+    // Cap per-file matches high enough; we slice the combined stream to GREP_MAX_HITS.
+    '--max-count',
+    String(GREP_MAX_HITS),
+  ]
+  if (caseInsensitive) args.push('-i')
+  args.push('-e', body, '--', opts.absPath)
+
+  try {
+    const { stdout } = await execFileP(bin, args, {
+      timeout: GREP_RG_TIMEOUT_MS,
+      maxBuffer: 4 * 1024 * 1024,
+      windowsHide: true,
+    })
+    return formatRgStdout(stdout, opts.scanBase, opts.absPath, body)
+  } catch (err) {
+    const e = err as NodeJS.ErrnoException & {
+      stdout?: string | Buffer
+      stderr?: string | Buffer
+      code?: string | number | null
+      killed?: boolean
+    }
+    // rg exits 1 when no matches — still success with empty stdout.
+    if (e.code === 1 || e.code === '1') {
+      return formatRgStdout(String(e.stdout ?? ''), opts.scanBase, opts.absPath, body)
+    }
+    // Binary disappeared mid-session → JS fallback.
+    if (e.code === 'ENOENT') {
+      cachedRgBin = undefined
+      return null
+    }
+    const stderr = String(e.stderr ?? e.message ?? err)
+    if (/regex parse error|invalid regex|error parsing/i.test(stderr)) {
+      return `Error: invalid regex: ${stderr.trim()}\n${GREP_INVALID_HINT}`
+    }
+    if (e.killed || e.code === 'ETIMEDOUT') {
+      return `Error: ripgrep timed out after ${GREP_RG_TIMEOUT_MS}ms`
+    }
+    // Other failures: prefer JS fallback rather than hard-error the agent.
+    return null
+  }
+}
+
+function toPosixRel(scanBase: string, filePath: string): string {
+  const relRaw = path.relative(scanBase, filePath)
+  if (!relRaw || relRaw === '.') {
+    return '/' + path.basename(filePath)
+  }
+  return '/' + relRaw.split(path.sep).join('/')
+}
+
+function formatRgStdout(stdout: string, scanBase: string, _absPath: string, pattern: string): string {
+  const lines = stdout.split('\n').filter((l) => l.length > 0)
+  const hits: string[] = []
+  for (const line of lines) {
+    if (hits.length >= GREP_MAX_HITS) break
+    // rg: path:line:text  (Windows paths may include drive letters — match from the right).
+    const m = line.match(/^(.*):(\d+):(.*)$/)
+    if (!m) {
+      hits.push(line.slice(0, 400))
+      continue
+    }
+    const filePath = m[1]
+    const lineNo = m[2]
+    const text = m[3].trim().slice(0, 200)
+    let rel: string
+    try {
+      rel = toPosixRel(scanBase, filePath)
+    } catch {
+      rel = filePath
+    }
+    hits.push(`${rel}:${lineNo}: ${text}`)
+  }
+  return hits.join('\n') || `No matches for ${pattern}`
+}
+
+/**
+ * Build a JS RegExp for the grep tool fallback. Strips common PCRE-style leading inline flags
  * (e.g. `(?i)`) that models often emit but JavaScript does not accept as groups.
  */
 export function compileGrepPattern(pattern: string, caseInsensitive?: boolean): CompileGrepResult {

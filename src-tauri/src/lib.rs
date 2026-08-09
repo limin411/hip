@@ -7,6 +7,7 @@ mod plugins;
 mod marketplace;
 mod mcp_registry;
 mod path_env;
+mod ripgrep;
 mod logging;
 mod hip_config;
 mod window_tray;
@@ -815,6 +816,14 @@ pub fn run() {
                     maximize_if_window_exceeds_monitor(&window);
                 }
             }
+            // Make ~/.hip/bin visible to the sidecar before spawn; download rg if missing
+            // (non-blocking — sidecar JS grep is the fallback until install finishes).
+            ripgrep::prepend_hip_bin_to_path(app.handle());
+            let handle_rg = app.handle().clone();
+            tauri::async_runtime::spawn(async move {
+                ripgrep::ensure_ripgrep(&handle_rg).await;
+            });
+
             let handle = app.handle().clone();
             tauri::async_runtime::spawn(async move {
                 match sidecar::spawn_sidecar(&handle).await {

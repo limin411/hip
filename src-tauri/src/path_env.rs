@@ -62,6 +62,7 @@ pub(crate) fn common_dirs() -> String {
         }
         if let Ok(home) = std::env::var("USERPROFILE").or_else(|_| std::env::var("HOME")) {
             for sub in [
+                ".hip\\bin", // hip-managed tools (ripgrep, …)
                 ".cargo\\bin",
                 ".local\\bin",
                 ".bun\\bin",
@@ -90,6 +91,7 @@ pub(crate) fn common_dirs() -> String {
         ];
         if let Ok(home) = std::env::var("HOME") {
             for sub in [
+                ".hip/bin", // hip-managed tools (ripgrep, …)
                 ".npm-global/bin",
                 ".local/bin",
                 ".cargo/bin",
@@ -227,6 +229,7 @@ mod tests {
         let dirs = common_dirs();
         if cfg!(windows) {
             for needle in [
+                r".hip\bin",
                 r".grok\bin",
                 r".local\bin",
                 r".cargo\bin",
@@ -239,6 +242,7 @@ mod tests {
             }
         } else {
             for needle in [
+                ".hip/bin",        // hip-managed: ripgrep, …
                 ".grok/bin",       // grok (https://x.ai/cli)
                 ".npm-global/bin", // npm -g: opencode, pi, claude, codex, adapters
                 ".local/bin",

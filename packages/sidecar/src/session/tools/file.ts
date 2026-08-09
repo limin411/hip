@@ -8,6 +8,7 @@ import {
   compileGrepPattern,
   isExcludedDirName,
   realInSkill,
+  runRgGrep,
   sliceFileLines,
   toGlobRegex,
 } from './helpers.js'
@@ -363,67 +364,79 @@ export function buildFileTools(
 
   const grep = tool(
     async ({ pattern, path: p, caseInsensitive }) => {
-      const compiled = compileGrepPattern(pattern, caseInsensitive)
-      if (!compiled.ok) return compiled.error
-      const { re, notes } = compiled
-      const hits: string[] = []
-      const relOf = (full: string): string =>
-        '/' + path.relative(scanBase, full).split(path.sep).join('/')
-
-      async function scanFile(full: string): Promise<void> {
-        if (hits.length >= 200) return
-        const st = await fs.stat(full).catch(() => null)
-        if (!st || !st.isFile() || st.size > MAX_SCAN_FILE_BYTES) return
-        const text = await fs.readFile(full, 'utf8').catch(() => '')
-        if (text.slice(0, 8000).includes('\0')) return
-        text.split('\n').forEach((line, i) => {
-          if (hits.length < 200 && re.test(line)) {
-            hits.push(`${relOf(full)}:${i + 1}: ${line.trim().slice(0, 200)}`)
-          }
-        })
-      }
-
-      async function walk(dir: string): Promise<void> {
-        if (hits.length >= 200) return
-        for (const e of await fs.readdir(dir, { withFileTypes: true })) {
-          if (hits.length >= 200) return
-          if (e.name.startsWith('.')) continue
-          if (isExcludedDirName(e.name)) continue
-          const full = path.join(dir, e.name)
-          if (e.isDirectory()) {
-            await walk(full)
-          } else {
-            await scanFile(full)
-          }
-        }
-      }
-
       try {
         // Default `.` (project/cwd), never bare `/` — on Windows full mode `/` is the drive root
         // and previously walked into $RECYCLE.BIN.
         const abs = await resolvePath(p ?? DEFAULT_SCAN_PATH)
         const st = await fs.stat(abs)
-        if (st.isFile()) {
-          await scanFile(abs)
-        } else if (st.isDirectory()) {
-          await walk(abs)
-        } else {
+        if (!st.isFile() && !st.isDirectory()) {
           return `Error: path is neither a file nor a directory: ${p ?? DEFAULT_SCAN_PATH}`
         }
+
+        // Prefer ripgrep when available (installed by the Tauri shell into ~/.hip/bin or on PATH).
+        const rgOut = await runRgGrep({
+          pattern,
+          absPath: abs,
+          scanBase,
+          caseInsensitive,
+        })
+        if (rgOut !== null) return rgOut
+
+        // JS fallback when rg is missing / still downloading.
+        const compiled = compileGrepPattern(pattern, caseInsensitive)
+        if (!compiled.ok) return compiled.error
+        const { re, notes } = compiled
+        const hits: string[] = []
+        const relOf = (full: string): string =>
+          '/' + path.relative(scanBase, full).split(path.sep).join('/')
+
+        async function scanFile(full: string): Promise<void> {
+          if (hits.length >= 200) return
+          const fst = await fs.stat(full).catch(() => null)
+          if (!fst || !fst.isFile() || fst.size > MAX_SCAN_FILE_BYTES) return
+          const text = await fs.readFile(full, 'utf8').catch(() => '')
+          if (text.slice(0, 8000).includes('\0')) return
+          text.split('\n').forEach((line, i) => {
+            if (hits.length < 200 && re.test(line)) {
+              hits.push(`${relOf(full)}:${i + 1}: ${line.trim().slice(0, 200)}`)
+            }
+          })
+        }
+
+        async function walk(dir: string): Promise<void> {
+          if (hits.length >= 200) return
+          for (const e of await fs.readdir(dir, { withFileTypes: true })) {
+            if (hits.length >= 200) return
+            if (e.name.startsWith('.')) continue
+            if (isExcludedDirName(e.name)) continue
+            const full = path.join(dir, e.name)
+            if (e.isDirectory()) {
+              await walk(full)
+            } else {
+              await scanFile(full)
+            }
+          }
+        }
+
+        if (st.isFile()) {
+          await scanFile(abs)
+        } else {
+          await walk(abs)
+        }
+
+        const body = hits.slice(0, 200).join('\n') || `No matches for ${pattern}`
+        if (notes.length === 0) return body
+        return `${notes.map((n) => `Note: ${n}`).join('\n')}\n${body}`
       } catch (err) {
         return `Error: ${(err as Error).message}`
       }
-
-      const body = hits.slice(0, 200).join('\n') || `No matches for ${pattern}`
-      if (notes.length === 0) return body
-      return `${notes.map((n) => `Note: ${n}`).join('\n')}\n${body}`
     },
     {
       name: 'grep',
       description:
-        'Search file contents by JavaScript RegExp. Optional `path` scopes the search to a file or directory ' +
-        '(defaults to the project root). Set caseInsensitive=true for case-insensitive match ' +
-        '(prefer this over PCRE (?i) flags). Returns up to 200 `file:line` hits.',
+        'Search file contents (ripgrep when available, otherwise JavaScript RegExp). Optional `path` scopes ' +
+        'the search to a file or directory (defaults to the project root). Set caseInsensitive=true for ' +
+        'case-insensitive match (prefer this over PCRE (?i) flags). Returns up to 200 `file:line` hits.',
       schema: z.object({
         pattern: z.string(),
         path: z.string().optional(),

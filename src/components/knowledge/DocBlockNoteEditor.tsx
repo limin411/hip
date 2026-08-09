@@ -12,13 +12,12 @@ import {
   useRef,
   useState,
 } from 'react'
+import { offset, shift } from '@floating-ui/dom'
 import { BlockNoteView } from '@blocknote/mantine'
 import {
-  AddBlockButton,
   BasicTextStyleButton,
   ColorStyleButton,
   CreateLinkButton,
-  DragHandleButton,
   DragHandleMenu,
   FormattingToolbar,
   FormattingToolbarController,
@@ -27,6 +26,7 @@ import {
   useBlockNoteEditor,
   useComponentsContext,
   useCreateBlockNote,
+  useExtension,
   useExtensionState,
   RemoveBlockItem,
   BlockColorsItem,
@@ -46,7 +46,7 @@ import { BlockNoteHipSlashMenu } from './BlockNoteHipSlashMenu'
 import { MantineProvider } from '@mantine/core'
 import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
-import { Link2, ListChecks } from 'lucide-react'
+import { Copy, Link2, ListChecks, Trash2 } from 'lucide-react'
 import {
   joinYamlFrontmatter,
   splitYamlFrontmatter,
@@ -67,6 +67,14 @@ import {
   buildKnowledgeSlashItems,
   type BlockNoteSlashEditor,
 } from '@/domain/knowledge/blockNoteSlash'
+import {
+  SIDE_MENU_BLOCKS,
+  cloneBlockForDuplicate,
+  insertSideMenuBlock,
+  sideMenuLabelKey,
+  turnIntoSideMenuBlock,
+  type SideMenuBlockId,
+} from '@/domain/knowledge/sideMenuBlocks'
 import {
   formatWikiLink,
   listDocsInTreeOrder,
@@ -243,21 +251,109 @@ function usePrefersDark(): boolean {
   return dark
 }
 
-/**
- * T4 块菜单（点击六点手柄弹出）：复制块链接 / 多选切换 / 删除 / 块颜色。
- * 自定义项 + 默认项（children）混合渲染。
- */
+/** 细线 ＋（14 / stroke 2.25）— 非 MdAdd 填充。 */
+function SideMenuPlusIcon() {
+  return (
+    <svg
+      className="kb-side-icon"
+      width="14"
+      height="14"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2.25"
+      strokeLinecap="round"
+      aria-hidden
+    >
+      <path d="M12 5v14M5 12h14" />
+    </svg>
+  )
+}
+
+/** 实心 2×3 六点 SVG（非 radial-gradient）。 */
+function SideMenuSixDotIcon() {
+  return (
+    <svg
+      className="kb-side-icon"
+      width="10"
+      height="16"
+      viewBox="0 0 10 16"
+      fill="currentColor"
+      aria-hidden
+      data-test="dragHandle"
+    >
+      <circle cx="2.5" cy="2" r="1.25" />
+      <circle cx="7.5" cy="2" r="1.25" />
+      <circle cx="2.5" cy="8" r="1.25" />
+      <circle cx="7.5" cy="8" r="1.25" />
+      <circle cx="2.5" cy="14" r="1.25" />
+      <circle cx="7.5" cy="14" r="1.25" />
+    </svg>
+  )
+}
+
 function KnowledgeDragHandleMenu({ children }: { children?: React.ReactNode }) {
   const Components = useComponentsContext()
   if (!Components) return null
   return (
-    <Components.Generic.Menu.Dropdown className="bn-menu-dropdown">
+    <Components.Generic.Menu.Dropdown className="bn-menu-dropdown bn-drag-handle-menu">
       {children ?? <DragHandleMenu />}
     </Components.Generic.Menu.Dropdown>
   )
 }
 
-/** 块菜单项：复制块链接（V2-E1 hip://doc/<nodeId>#<blockId>）。 */
+function ComponentsSeparator() {
+  const Components = useComponentsContext()
+  if (!Components) return null
+  return <Components.Generic.Menu.Divider />
+}
+
+/** 转换成… ▸（对齐 BlockColorsItem 的 sub 写法）。 */
+function TurnIntoItem() {
+  const { t } = useTranslation()
+  const Components = useComponentsContext()
+  const editor = useBlockNoteEditor<any, any, any>()
+  const block = useExtensionState(SideMenuExtension, {
+    editor,
+    selector: (state) => state?.block,
+  })
+  if (!Components || !block) return null
+  return (
+    <Components.Generic.Menu.Root position="right" sub>
+      <Components.Generic.Menu.Trigger sub>
+        <Components.Generic.Menu.Item
+          className="bn-menu-item"
+          subTrigger
+          data-testid="kb-turn-into"
+        >
+          {t('knowledge.doc.blockMenuTurnInto')}
+        </Components.Generic.Menu.Item>
+      </Components.Generic.Menu.Trigger>
+      <Components.Generic.Menu.Dropdown sub className="bn-menu-dropdown">
+        {SIDE_MENU_BLOCKS.map((item) => (
+          <Components.Generic.Menu.Item
+            key={item.id}
+            className="bn-menu-item"
+            data-testid={`kb-turn-into-${item.id}`}
+            onClick={() => {
+              try {
+                turnIntoSideMenuBlock(editor, block, item.id)
+              } catch {
+                toast.error(t('knowledge.doc.blockMenuTurnIntoFailed'))
+              }
+            }}
+          >
+            <span className="kb-add-menu-icon" aria-hidden>
+              {item.icon}
+            </span>
+            {t(sideMenuLabelKey(item.id), { defaultValue: item.label })}
+          </Components.Generic.Menu.Item>
+        ))}
+      </Components.Generic.Menu.Dropdown>
+    </Components.Generic.Menu.Root>
+  )
+}
+
 function CopyBlockLinkItem({
   blockId,
   onCopy,
@@ -280,7 +376,34 @@ function CopyBlockLinkItem({
   )
 }
 
-/** 块菜单项：把当前块加入/移出多选（原 Shift+点击手柄入口，T4 移入菜单）。 */
+function DuplicateBlockItem() {
+  const { t } = useTranslation()
+  const Components = useComponentsContext()
+  const editor = useBlockNoteEditor<any, any, any>()
+  const block = useExtensionState(SideMenuExtension, {
+    editor,
+    selector: (state) => state?.block,
+  })
+  if (!Components || !block) return null
+  return (
+    <Components.Generic.Menu.Item
+      className="bn-menu-item"
+      data-testid="kb-duplicate-block"
+      icon={<Copy size={14} strokeWidth={1.75} />}
+      onClick={() => {
+        try {
+          const clone = cloneBlockForDuplicate(block)
+          editor.insertBlocks([clone], block, 'after')
+        } catch {
+          toast.error(t('knowledge.doc.blockMenuDuplicateFailed'))
+        }
+      }}
+    >
+      {t('knowledge.doc.blockMenuDuplicate')}
+    </Components.Generic.Menu.Item>
+  )
+}
+
 function MultiSelectItem({
   isSelected,
   onToggle,
@@ -308,9 +431,222 @@ function MultiSelectItem({
   )
 }
 
+function DeleteBlockItem() {
+  const { t } = useTranslation()
+  const Components = useComponentsContext()
+  if (!Components) return null
+  return (
+    <RemoveBlockItem>
+      <span className="kb-menu-danger-label" data-testid="kb-delete-block">
+        <Trash2 size={14} strokeWidth={1.75} style={{ marginRight: 8, verticalAlign: -2 }} />
+        {t('knowledge.doc.blockMenuDelete')}
+      </span>
+    </RemoveBlockItem>
+  )
+}
+
 /**
- * Side-menu handle row (T4): ＋ + Notion 六点拖拽手柄（点击弹块菜单）。
- * 多选/复制块链接入口移入手柄菜单；拖拽排序保持 DragHandleButton 语义。
+ * + 按钮：贴手柄打开插入菜单（空块转换 / 非空下方插入）。
+ * freezeMenu 保持侧栏在菜单打开时不卸载。
+ */
+function KnowledgeAddBlockButton({
+  menuOpen,
+  onOpenChange,
+}: {
+  menuOpen: boolean
+  onOpenChange: (open: boolean) => void
+}) {
+  const { t } = useTranslation()
+  const Components = useComponentsContext()
+  const editor = useBlockNoteEditor<any, any, any>()
+  const sideMenu = useExtension(SideMenuExtension)
+  const block = useExtensionState(SideMenuExtension, {
+    editor,
+    selector: (state) => state?.block,
+  })
+  const wrapRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    if (!sideMenu) return
+    if (menuOpen) sideMenu.freezeMenu()
+    else sideMenu.unfreezeMenu()
+    return () => {
+      sideMenu.unfreezeMenu()
+    }
+  }, [menuOpen, sideMenu])
+
+  useEffect(() => {
+    if (!menuOpen) return
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onOpenChange(false)
+    }
+    const onDown = (e: MouseEvent) => {
+      if (wrapRef.current && !wrapRef.current.contains(e.target as Node)) {
+        onOpenChange(false)
+      }
+    }
+    document.addEventListener('keydown', onKey)
+    document.addEventListener('mousedown', onDown)
+    return () => {
+      document.removeEventListener('keydown', onKey)
+      document.removeEventListener('mousedown', onDown)
+    }
+  }, [menuOpen, onOpenChange])
+
+  if (!Components || !block) return null
+
+  const runInsert = (id: SideMenuBlockId) => {
+    try {
+      editor.setTextCursorPosition(block)
+      insertSideMenuBlock(editor as BlockNoteSlashEditor, id)
+    } catch {
+      toast.error(t('knowledge.doc.blockMenuInsertFailed'))
+    }
+    onOpenChange(false)
+  }
+
+  return (
+    <div className="kb-add-wrap" ref={wrapRef}>
+      <Components.SideMenu.Button
+        className="bn-button kb-add-block"
+        label={t('knowledge.doc.sideMenuAdd')}
+        icon={
+          <span
+            data-test="dragHandleAdd"
+            data-testid="kb-add-block"
+            onClick={(e) => {
+              e.preventDefault()
+              e.stopPropagation()
+              onOpenChange(!menuOpen)
+            }}
+          >
+            <SideMenuPlusIcon />
+          </span>
+        }
+      />
+      {menuOpen ? (
+        <div className="kb-add-menu" role="menu" data-testid="kb-add-menu">
+          {SIDE_MENU_BLOCKS.map((item) => (
+            <button
+              key={item.id}
+              type="button"
+              role="menuitem"
+              className="kb-add-menu-item"
+              data-testid={`kb-add-${item.id}`}
+              onClick={() => runInsert(item.id)}
+            >
+              <span className="kb-add-menu-icon" aria-hidden>
+                {item.icon}
+              </span>
+              {t(sideMenuLabelKey(item.id), { defaultValue: item.label })}
+            </button>
+          ))}
+        </div>
+      ) : null}
+    </div>
+  )
+}
+
+/**
+ * 六点手柄：拖拽排序 + 点击块菜单（position right）。
+ * BN Generic.Menu 无受控 opened；拖/点冲突用 suppress + remount 关菜单。
+ */
+function KnowledgeDragHandleButton({
+  children,
+  closeSignal,
+  onMenuOpenChange,
+}: {
+  children?: React.ReactNode
+  /** Increment to force-close (e.g. when + menu opens). */
+  closeSignal: number
+  onMenuOpenChange: (open: boolean) => void
+}) {
+  const { t } = useTranslation()
+  const Components = useComponentsContext()
+  const sideMenu = useExtension(SideMenuExtension)
+  const block = useExtensionState(SideMenuExtension, {
+    selector: (state) => state?.block,
+  })
+  const suppressClickRef = useRef(false)
+  const downRef = useRef<{ x: number; y: number } | null>(null)
+  const [menuKey, setMenuKey] = useState(0)
+  const menuOpenRef = useRef(false)
+
+  useEffect(() => {
+    // Parent asked to close (mutual exclusion with + menu).
+    if (menuOpenRef.current) {
+      menuOpenRef.current = false
+      onMenuOpenChange(false)
+      sideMenu?.unfreezeMenu()
+      setMenuKey((k) => k + 1)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- closeSignal is the trigger
+  }, [closeSignal])
+
+  if (!Components || !block || !sideMenu) return null
+
+  return (
+    <Components.Generic.Menu.Root
+      key={menuKey}
+      onOpenChange={(open: boolean) => {
+        if (open && suppressClickRef.current) {
+          suppressClickRef.current = false
+          // Force-close: remount (BN Menu has no controlled `opened`).
+          setMenuKey((k) => k + 1)
+          return
+        }
+        menuOpenRef.current = open
+        onMenuOpenChange(open)
+        if (open) sideMenu.freezeMenu()
+        else sideMenu.unfreezeMenu()
+      }}
+      position="right"
+    >
+      <Components.Generic.Menu.Trigger>
+        <Components.SideMenu.Button
+          label={t('knowledge.doc.sideMenuDragHandle')}
+          draggable
+          onDragStart={(e: React.DragEvent) => {
+            suppressClickRef.current = true
+            sideMenu.blockDragStart(e, block)
+          }}
+          onDragEnd={() => {
+            sideMenu.blockDragEnd()
+            suppressClickRef.current = true
+            window.setTimeout(() => {
+              suppressClickRef.current = false
+            }, 0)
+          }}
+          className="bn-button kb-drag-handle"
+          icon={
+            <span
+              onPointerDown={(e) => {
+                downRef.current = { x: e.clientX, y: e.clientY }
+                suppressClickRef.current = false
+              }}
+              onPointerMove={(e) => {
+                if (!downRef.current) return
+                const dx = e.clientX - downRef.current.x
+                const dy = e.clientY - downRef.current.y
+                if (dx * dx + dy * dy > 16) suppressClickRef.current = true
+              }}
+              onPointerUp={() => {
+                downRef.current = null
+              }}
+            >
+              <SideMenuSixDotIcon />
+            </span>
+          }
+        />
+      </Components.Generic.Menu.Trigger>
+      <KnowledgeDragHandleMenu>{children}</KnowledgeDragHandleMenu>
+    </Components.Generic.Menu.Root>
+  )
+}
+
+/**
+ * Side-menu gutter (v3): 横向 [+][⋮⋮] + 真 SVG。
+ * + → 插入菜单；⋮⋮ → Notion 式块操作（拖拽排序保留）。
  */
 function KnowledgeSideMenu({
   selectedIds,
@@ -329,31 +665,53 @@ function KnowledgeSideMenu({
     editor,
     selector: (state) => state?.block,
   })
+  const [addOpen, setAddOpen] = useState(false)
+  const [dragCloseSignal, setDragCloseSignal] = useState(0)
+
   if (!block) return null
   const isSelected = selectedIds.includes(block.id)
+
   return (
-    <div className="bn-side-menu" data-testid="kb-side-menu" data-block-id={block.id}>
-      <AddBlockButton />
-      <DragHandleButton dragHandleMenu={KnowledgeDragHandleMenu}>
+    <div
+      className="bn-side-menu"
+      data-testid="kb-side-menu"
+      data-block-id={block.id}
+      data-block-type={block.type}
+    >
+      <KnowledgeAddBlockButton
+        menuOpen={addOpen}
+        onOpenChange={(open) => {
+          setAddOpen(open)
+          if (open) setDragCloseSignal((n) => n + 1)
+        }}
+      />
+      <KnowledgeDragHandleButton
+        closeSignal={dragCloseSignal}
+        onMenuOpenChange={(open) => {
+          if (open) setAddOpen(false)
+        }}
+      >
+        <TurnIntoItem />
+        <BlockColorsItem>{t('knowledge.doc.blockMenuColors')}</BlockColorsItem>
         <CopyBlockLinkItem blockId={block.id} onCopy={onCopyBlockLink} />
+        <DuplicateBlockItem />
+        <ComponentsSeparator />
         <MultiSelectItem
           isSelected={isSelected}
           onToggle={() => onToggleSelect(block.id)}
           onClear={onClearSelection}
         />
         <ComponentsSeparator />
-        <RemoveBlockItem>{t('knowledge.doc.blockMenuDelete')}</RemoveBlockItem>
-        <BlockColorsItem>{t('knowledge.doc.blockMenuColors')}</BlockColorsItem>
-      </DragHandleButton>
+        <DeleteBlockItem />
+      </KnowledgeDragHandleButton>
     </div>
   )
 }
 
-/** 块菜单分隔线（Mantine Menu 项之间的分隔）。 */
-function ComponentsSeparator() {
-  const Components = useComponentsContext()
-  if (!Components) return null
-  return <Components.Generic.Menu.Divider />
+const SIDE_MENU_FLOATING_UI = {
+  useFloatingOptions: {
+    middleware: [offset(6), shift({ padding: 8 })],
+  },
 }
 
 function blockPlainText(block: {
@@ -1403,6 +1761,7 @@ export const DocBlockNoteEditor = forwardRef<
               suggestionMenuComponent={BlockNoteHipSlashMenu}
             />
             <SideMenuController
+              floatingUIOptions={SIDE_MENU_FLOATING_UI}
               sideMenu={() => (
                 <KnowledgeSideMenu
                   selectedIds={selectedIds}

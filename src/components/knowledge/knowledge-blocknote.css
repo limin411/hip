@@ -228,20 +228,32 @@
   outline-offset: -1px;
 }
 
-/* ── Side menu / drag handles ──────────────────────────────────────── */
-/* SideMenuController 挂载即显示（hover 块时挂载，离开卸载）——不再用
-   opacity:0 + 子选择器控制显隐（decoration wrapper 使 `>` 不匹配，曾导致
-   手柄永久不可见）。仅保留入场淡入。 */
+/* ── Side menu / drag handles (sidemenu-fix v3) ───────────────────── */
+/* SideMenuController 挂载即显示（hover 块时挂载，离开卸载）。
+   Notion gutter：横向 [+][⋮⋮]，热区 18×24，真 SVG 图标（非渐变假点）。 */
+.knowledge-blocknote-editor {
+  --kb-grip: #b4b2ad;
+  --kb-grip-hover: #6b6862;
+  --kb-handle-shift: 0px;
+}
+
+:is(html.dark, html[data-theme='dark'], body[data-theme='dark'])
+  .knowledge-blocknote-editor {
+  --kb-grip: rgba(255, 255, 255, 0.35);
+  --kb-grip-hover: rgba(255, 255, 255, 0.6);
+}
+
 .knowledge-blocknote-editor .bn-side-menu {
-  /* Notion 布局：＋ 在上、六点手柄在下（纵向）。覆盖 BlockNote 默认
-     height:30px 行内排布，避免按钮溢出容器。 */
   display: flex;
-  flex-direction: column;
+  flex-direction: row;
+  align-items: center;
   height: auto;
   width: auto;
-  gap: 0.125rem;
-  padding: 0.125rem;
+  gap: 2px;
+  padding: 1px;
+  user-select: none;
   animation: kb-side-menu-in 120ms var(--ease-out, ease-out);
+  transform: translateY(var(--kb-handle-shift));
 }
 
 @keyframes kb-side-menu-in {
@@ -253,15 +265,26 @@
   }
 }
 
+/* codeBlock：手柄贴首行（内容区有内边距） */
+.knowledge-blocknote-editor
+  .bn-side-menu[data-block-type='codeBlock'] {
+  --kb-handle-shift: 10px;
+}
+
 .knowledge-blocknote-editor .bn-side-menu .bn-button,
-.knowledge-blocknote-editor .bn-side-menu button {
-  min-width: 1.5rem;
-  min-height: 1.5rem;
-  width: 1.5rem;
-  height: 1.5rem;
-  border-radius: 0.375rem !important;
-  color: var(--text-tertiary, #999) !important;
+.knowledge-blocknote-editor .bn-side-menu > .kb-add-wrap > .bn-button,
+.knowledge-blocknote-editor .bn-side-menu .kb-add-block,
+.knowledge-blocknote-editor .bn-side-menu .kb-drag-handle {
+  min-width: 18px !important;
+  min-height: 24px !important;
+  width: 18px !important;
+  height: 24px !important;
+  flex: none;
+  padding: 0 !important;
+  border-radius: 4px !important;
+  color: var(--kb-grip) !important;
   background-color: transparent !important;
+  background-image: none !important;
   border: 0 !important;
   box-shadow: none !important;
   transition:
@@ -270,38 +293,89 @@
 }
 
 .knowledge-blocknote-editor .bn-side-menu .bn-button:hover,
-.knowledge-blocknote-editor .bn-side-menu button:hover {
+.knowledge-blocknote-editor .bn-side-menu .kb-add-block:hover,
+.knowledge-blocknote-editor .bn-side-menu .kb-drag-handle:hover {
   background-color: var(--state-hover, rgba(0, 0, 0, 0.06)) !important;
-  color: var(--text-primary, inherit) !important;
+  color: var(--kb-grip-hover) !important;
 }
 
-/* T4: Notion 六点拖拽手柄（2×3 点阵）。
-   点阵画在按钮本体上（:has 选中 dragHandle 按钮，隐藏框架 svg）——
-   视觉与命中区域完全重合；点径 3.2px，整体约 15×22px。 */
-.knowledge-blocknote-editor .bn-side-menu [data-test='dragHandle'] {
-  display: none;
+.knowledge-blocknote-editor .bn-side-menu .kb-add-block:hover {
+  color: var(--text-primary, #2f2c28) !important;
 }
 
-.knowledge-blocknote-editor .bn-side-menu .bn-button:has([data-test='dragHandle']) {
-  background-image: radial-gradient(
-    circle at 3px 3px,
-    currentColor 1.6px,
-    transparent 2.3px
-  ) !important;
-  background-size: 10px 8px !important;
-  background-repeat: repeat !important;
-  background-position: center !important;
+.knowledge-blocknote-editor .bn-side-menu .bn-button:focus-visible,
+.knowledge-blocknote-editor .bn-side-menu .kb-add-block:focus-visible,
+.knowledge-blocknote-editor .bn-side-menu .kb-drag-handle:focus-visible {
+  outline: 2px solid rgba(59, 130, 246, 0.55);
+  outline-offset: 1px;
+}
+
+.knowledge-blocknote-editor .bn-side-menu .kb-drag-handle {
   cursor: grab;
 }
 
-.knowledge-blocknote-editor
-  .bn-side-menu
-  .bn-button:has([data-test='dragHandle']):active {
+.knowledge-blocknote-editor .bn-side-menu .kb-drag-handle:active {
   cursor: grabbing;
 }
 
-/* 块菜单（点击手柄弹出）：项显式布局——flex + 间距 + 最小宽度 + 行高，
-   不依赖 Mantine 变量，避免图标/文字挤成一团。 */
+.knowledge-blocknote-editor .bn-side-menu .kb-side-icon {
+  display: block;
+  pointer-events: none;
+}
+
+/* + 插入菜单（贴手柄右侧，非光标处 slash） */
+.knowledge-blocknote-editor .kb-add-wrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.knowledge-blocknote-editor .kb-add-menu {
+  position: absolute;
+  left: calc(100% + 6px);
+  top: -4px;
+  z-index: 40;
+  min-width: 220px;
+  max-height: 300px;
+  overflow: auto;
+  padding: 4px;
+  border-radius: 8px;
+  border: 1px solid var(--border-default, #e0e0e0);
+  background: var(--bg-elevated, var(--bg-primary, #fff));
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.12);
+}
+
+.knowledge-blocknote-editor .kb-add-menu-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  height: 30px;
+  padding: 4px 8px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-primary, inherit);
+  font-size: 13px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.knowledge-blocknote-editor .kb-add-menu-item:hover,
+.knowledge-blocknote-editor .kb-add-menu-item:focus-visible {
+  background: var(--state-hover, rgba(0, 0, 0, 0.06));
+  outline: none;
+}
+
+.knowledge-blocknote-editor .kb-add-menu-icon {
+  width: 1.25rem;
+  text-align: center;
+  color: var(--text-secondary, #5e5e5e);
+  font-size: 12px;
+  flex: none;
+}
+
+/* 块菜单（点击六点弹出） */
 .knowledge-blocknote-editor .bn-menu-dropdown .bn-menu-item {
   display: flex;
   align-items: center;
@@ -310,6 +384,11 @@
   padding: 0.45rem 0.65rem;
   line-height: 1.25;
   font-size: 13px;
+}
+
+.knowledge-blocknote-editor .bn-menu-dropdown .bn-menu-item:has(.kb-menu-danger-label),
+.bn-menu-dropdown .bn-menu-item:has(.kb-menu-danger-label) {
+  color: var(--status-danger, #c0392b);
 }
 
 /*

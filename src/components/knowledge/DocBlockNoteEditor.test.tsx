@@ -70,10 +70,22 @@ vi.mock('@blocknote/react', () => ({
   BlockTypeSelect: () => null,
   CreateLinkButton: () => null,
   ColorStyleButton: () => null,
-  AddBlockButton: () => null,
-  DragHandleButton: () => null,
   useBlockNoteEditor: () => ({}),
+  useExtension: () => ({
+    freezeMenu: vi.fn(),
+    unfreezeMenu: vi.fn(),
+    blockDragStart: vi.fn(),
+    blockDragEnd: vi.fn(),
+  }),
   useExtensionState: () => undefined,
+  RemoveBlockItem: ({ children }: { children?: React.ReactNode }) => (
+    <div>{children}</div>
+  ),
+  BlockColorsItem: ({ children }: { children?: React.ReactNode }) => (
+    <div>{children}</div>
+  ),
+  DragHandleMenu: () => null,
+  useComponentsContext: () => null,
   createReactBlockSpec: () => () => ({}),
   createReactInlineContentSpec: () => ({}),
   createReactStyleSpec: () => ({}),

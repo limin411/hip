@@ -1,7 +1,10 @@
 import { useTranslation } from 'react-i18next'
+import type { TFunction } from 'i18next'
 import { PanelLeft } from 'lucide-react'
 import { useActiveSession } from '@/domain'
 import { isMacPlatform } from '@/lib/platform'
+import { getPath } from '@/domain/knowledge/tree'
+import type { KnowledgeNode } from '@/domain/knowledge/types'
 import { useKnowledgeStore } from '@/store/knowledgeStore'
 import { useUiStore, type SettingsPageId } from '@/store/uiStore'
 import { useWindowDrag } from '@/lib/useWindowDrag'
@@ -56,6 +59,24 @@ function settingsPageTitleKey(
 }
 
 /**
+ * 知识库主区标题：`全部文档 › 目录 › 文件名`（替换固定「文档管理」/空间名）。
+ * 浏览态显示当前目录路径；文档态显示文档路径；根/未知节点回退到根标签。
+ */
+function knowledgeContextTitle(
+  t: TFunction,
+  nodes: KnowledgeNode[],
+  activeDocId: string | null,
+  currentFolderId: string | null,
+): string {
+  const root = t('knowledge.home.mySpaces')
+  const target = activeDocId ?? currentFolderId
+  if (!target) return root
+  const chain = getPath(nodes, target)
+  if (chain.length === 0) return root
+  return [root, ...chain.map((n) => n.title)].join(' › ')
+}
+
+/**
  * Main-column context bar (not a window titlebar).
  * Special views hide ConnectionStatus + PanelToggle; leave via sidebar.
  * History / recycle bin keep page h2 as sole title.
@@ -72,9 +93,9 @@ export function MainToolbar() {
   const settingsPage = useUiStore((s) => s.settingsPage)
   const sidebarOpen = useUiStore((s) => s.sidebarOpen)
   const activeSession = useActiveSession()
-  const kbMode = useKnowledgeStore((s) => s.mode)
-  const kbSpaces = useKnowledgeStore((s) => s.spaces)
-  const kbActiveSpaceId = useKnowledgeStore((s) => s.activeSpaceId)
+  const kbNodes = useKnowledgeStore((s) => s.nodes)
+  const kbActiveDocId = useKnowledgeStore((s) => s.activeDocId)
+  const kbCurrentFolderId = useKnowledgeStore((s) => s.currentFolderId)
   const isMac = isMacPlatform()
 
   // Terminals keeps MainToolbar panel chrome (right-rail toggle) like chat/code/knowledge.
@@ -98,11 +119,7 @@ export function MainToolbar() {
   } else if (activeView === 'tasks') {
     title = t('sidebar.nav.tasks')
   } else if (activeView === 'knowledge') {
-    if (kbMode === 'workspace' && kbActiveSpaceId) {
-      title = kbSpaces.find((s) => s.id === kbActiveSpaceId)?.name ?? t('knowledge.title')
-    } else {
-      title = t('knowledge.title')
-    }
+    title = knowledgeContextTitle(t, kbNodes, kbActiveDocId, kbCurrentFolderId)
   } else if (activeSession) {
     title = activeSession.title
   } else {

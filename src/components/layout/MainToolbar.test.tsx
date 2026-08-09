@@ -5,6 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { useUiStore } from '@/store/uiStore'
 import { useDomainStore } from '@/domain'
 import { DEFAULT_CONFIG } from '@/domain/sessionStore'
+import type { KnowledgeNode } from '@/domain/knowledge/types'
 
 const toggleMaximize = vi.fn().mockResolvedValue(undefined)
 
@@ -14,9 +15,17 @@ vi.mock('./ConnectionStatus', () => ({
 vi.mock('./PanelToggle', () => ({
   PanelToggle: () => <div data-testid="toggle-panel" />,
 }))
+const kbState = vi.hoisted(() => ({
+  mode: 'home' as string,
+  spaces: [] as unknown[],
+  activeSpaceId: null as string | null,
+  nodes: [] as KnowledgeNode[],
+  activeDocId: null as string | null,
+  currentFolderId: null as string | null,
+}))
+
 vi.mock('@/store/knowledgeStore', () => ({
-  useKnowledgeStore: (sel: (s: { mode: string; spaces: unknown[]; activeSpaceId: null }) => unknown) =>
-    sel({ mode: 'home', spaces: [], activeSpaceId: null }),
+  useKnowledgeStore: (sel: (s: typeof kbState) => unknown) => sel(kbState),
 }))
 vi.mock('@tauri-apps/api/window', () => ({
   getCurrentWindow: () => ({
@@ -120,6 +129,43 @@ describe('MainToolbar', () => {
     // PanelToggle is mocked always-present; connection + toggle chrome should show.
     expect(screen.getByTestId('connection-status')).toBeInTheDocument()
     expect(screen.getByTestId('toggle-panel')).toBeInTheDocument()
+  })
+
+  it('knowledge: title shows 全部文档 root when nothing open (no fixed 文档管理)', () => {
+    kbState.nodes = []
+    kbState.activeDocId = null
+    kbState.currentFolderId = null
+    useUiStore.setState({ activeView: 'knowledge', sidebarSection: 'knowledge' })
+    render(<MainToolbar />)
+    expect(screen.getByTestId('main-toolbar-title')).toHaveTextContent(/All documents|全部文档/i)
+  })
+
+  it('knowledge: title shows 目录 > 文件名 for an open doc', () => {
+    kbState.nodes = [
+      { id: 'fld_1', parentId: null, kind: 'folder', title: 'FolderA', order: 0, createdAt: 1, updatedAt: 1 },
+      { id: 'doc_1', parentId: 'fld_1', kind: 'doc', title: 'Note', order: 0, createdAt: 1, updatedAt: 1 },
+    ]
+    kbState.activeDocId = 'doc_1'
+    kbState.currentFolderId = null
+    useUiStore.setState({ activeView: 'knowledge', sidebarSection: 'knowledge' })
+    render(<MainToolbar />)
+    expect(screen.getByTestId('main-toolbar-title')).toHaveTextContent(
+      /All documents › FolderA › Note|全部文档 › FolderA › Note/i,
+    )
+  })
+
+  it('knowledge: title shows current folder path while browsing', () => {
+    kbState.nodes = [
+      { id: 'fld_1', parentId: null, kind: 'folder', title: 'FolderA', order: 0, createdAt: 1, updatedAt: 1 },
+      { id: 'fld_2', parentId: 'fld_1', kind: 'folder', title: 'FolderB', order: 0, createdAt: 1, updatedAt: 1 },
+    ]
+    kbState.activeDocId = null
+    kbState.currentFolderId = 'fld_2'
+    useUiStore.setState({ activeView: 'knowledge', sidebarSection: 'knowledge' })
+    render(<MainToolbar />)
+    expect(screen.getByTestId('main-toolbar-title')).toHaveTextContent(
+      /All documents › FolderA › FolderB|全部文档 › FolderA › FolderB/i,
+    )
   })
 
   it('double-click on the toolbar toggles window maximize', async () => {

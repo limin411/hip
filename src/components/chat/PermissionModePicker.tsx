@@ -60,7 +60,7 @@ export function PermissionModePicker() {
             }
           }}
         >
-          <ShieldCheck size={13} strokeWidth={1.75} className="shrink-0 opacity-80" aria-hidden />
+          <ShieldCheck size={13} strokeWidth={1.75} className="shrink-0" aria-hidden />
           <span className="max-w-[140px] truncate">{t(`chat.permission.modes.${current}`)}</span>
         </ComposerChip>
       </DropdownMenuTrigger>

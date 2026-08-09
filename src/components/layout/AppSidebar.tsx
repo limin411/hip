@@ -1008,7 +1008,7 @@ function NavItem({
         active ? SIDEBAR_ACTIVE_RAIL : 'text-ink-secondary hover:bg-state-hover hover:text-ink',
       )}
     >
-      <span className="shrink-0 opacity-70">{icon}</span>
+      <span className="shrink-0">{icon}</span>
       <span className="min-w-0 flex-1 truncate">{label}</span>
       {count != null ? (
         <span className="shrink-0 tabular-nums text-caption text-ink-tertiary">{count}</span>

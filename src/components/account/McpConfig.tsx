@@ -572,7 +572,7 @@ export function McpConfig() {
                     selected && 'bg-state-hover text-ink before:opacity-100',
                   )}
                 >
-                  <Icon size={15} strokeWidth={1.75} className="shrink-0 opacity-70" />
+                  <Icon size={15} strokeWidth={1.75} className="shrink-0" />
                   <span className="min-w-0 flex-1 truncate">{item.label}</span>
                   {item.count != null && item.count > 0 && (
                     <span className="shrink-0 tabular-nums text-caption text-ink-tertiary">
@@ -1021,7 +1021,7 @@ function McpServerCard({
                     className="inline-flex items-center gap-0.5 text-accent-strong transition-colors hover:text-accent"
                   >
                     {t('settings.mcp.manageTools')}
-                    <Settings2 size={13} className="opacity-70" />
+                    <Settings2 size={13} />
                   </button>
                 )}
               </div>

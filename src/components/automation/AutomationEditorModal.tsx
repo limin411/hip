@@ -667,7 +667,7 @@ export function AutomationEditorModal({
                   >
                     <span className="min-w-0 truncate">{agentLabel}</span>
                     <ChevronDown
-                      className="h-3 w-3 shrink-0 opacity-70"
+                      className="h-3 w-3 shrink-0"
                       strokeWidth={1.75}
                       aria-hidden
                     />
@@ -742,7 +742,7 @@ export function AutomationEditorModal({
                   >
                     <span className="min-w-0 truncate">{modelChipLabel}</span>
                     <ChevronDown
-                      className="h-3 w-3 shrink-0 opacity-70 transition-transform duration-chrome group-data-[state=open]:rotate-180"
+                      className="h-3 w-3 shrink-0 transition-transform duration-chrome group-data-[state=open]:rotate-180"
                       strokeWidth={1.75}
                       aria-hidden
                     />

@@ -231,7 +231,7 @@ export function EffortLevelPicker() {
           <Gauge
             size={13}
             strokeWidth={1.75}
-            className={cn('shrink-0 opacity-80', maxBudget && 'effort-max-icon')}
+            className={cn('shrink-0', maxBudget && 'effort-max-icon')}
             aria-hidden
           />
           <span className="max-w-[160px] truncate" data-testid="effort-chip-label">

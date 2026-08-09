@@ -55,7 +55,7 @@ export function ComposerControlRow({
               aria-label={t('chat.composer.more')}
               aria-haspopup="dialog"
             >
-              <Ellipsis size={13} strokeWidth={1.75} className="shrink-0 opacity-80" aria-hidden />
+              <Ellipsis size={13} strokeWidth={1.75} className="shrink-0" aria-hidden />
               <span className="max-w-[80px] truncate">{t('chat.composer.more')}</span>
             </ComposerChip>
           </PopoverTrigger>

@@ -102,7 +102,7 @@ function FooterNavButton({
       <Icon
         size={16}
         strokeWidth={1.75}
-        className={cn('shrink-0', active ? 'text-ink' : 'opacity-70')}
+        className="shrink-0"
         aria-hidden
       />
       <span className="min-w-0 flex-1 truncate">{label}</span>

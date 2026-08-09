@@ -74,7 +74,7 @@ export function RoundtableStarter({ disabled = false }: RoundtableStarterProps) 
             ) : active ? (
               <Users size={11} strokeWidth={1.75} className="shrink-0 text-effort-max" aria-hidden />
             ) : (
-              <SlidersHorizontal size={11} strokeWidth={1.75} className="shrink-0 opacity-70" aria-hidden />
+              <SlidersHorizontal size={11} strokeWidth={1.75} className="shrink-0" aria-hidden />
             )}
             <span className="max-w-[120px] truncate">{chipLabel}</span>
             <ChevronDown size={11} strokeWidth={1.75} className="shrink-0 opacity-60" aria-hidden />

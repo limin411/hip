@@ -85,7 +85,7 @@ export function WindowCaptionButtons({ className }: { className?: string }) {
   if (!active) return null
 
   const btn =
-    'flex h-full w-[46px] items-center justify-center text-ink-secondary transition-colors ' +
+    'flex h-full w-[46px] items-center justify-center text-ink transition-colors ' +
     'hover:bg-state-hover hover:text-ink focus-visible:outline-none focus-visible:bg-state-hover ' +
     'active:bg-state-active'
 

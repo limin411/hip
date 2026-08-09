@@ -82,7 +82,7 @@ export function ExecutionModePicker() {
             }
           }}
         >
-          <ListTree size={13} strokeWidth={1.75} className="shrink-0 opacity-80" aria-hidden />
+          <ListTree size={13} strokeWidth={1.75} className="shrink-0" aria-hidden />
           <span className="max-w-[100px] truncate">
             {t(`chat.executionMode.modes.${current}`)}
           </span>

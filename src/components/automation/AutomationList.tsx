@@ -187,7 +187,7 @@ export function AutomationList({
                 >
                   <Plus className="h-3.5 w-3.5" strokeWidth={2} aria-hidden />
                   {t('automation.startCta')}
-                  <ChevronDown className="h-3 w-3 opacity-70" strokeWidth={2} aria-hidden />
+                  <ChevronDown className="h-3 w-3" strokeWidth={2} aria-hidden />
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" data-testid="automation-new-menu">

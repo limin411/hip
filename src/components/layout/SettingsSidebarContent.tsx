@@ -61,7 +61,7 @@ export function SettingsSidebarContent() {
                     <Icon
                       size={16}
                       strokeWidth={1.75}
-                      className={cn('shrink-0', active ? 'text-ink' : 'opacity-70')}
+                      className="shrink-0"
                       aria-hidden
                     />
                     <span className="truncate">{t(page.labelKey)}</span>
@@ -89,7 +89,7 @@ export function SettingsSidebarContent() {
             'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink/20',
           )}
         >
-          <ArrowLeft size={16} strokeWidth={1.75} className="shrink-0 opacity-70" aria-hidden />
+          <ArrowLeft size={16} strokeWidth={1.75} className="shrink-0" aria-hidden />
           <span className="truncate">{t('common.back')}</span>
         </button>
       </div>

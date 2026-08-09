@@ -111,7 +111,7 @@ export function SessionAgentPicker() {
             title={t('composer.agentPicker.label')}
             data-testid={activeId ? 'session-agent-chip-active' : 'session-agent-chip'}
           >
-            <Bot size={13} strokeWidth={1.75} className="shrink-0 opacity-80" aria-hidden />
+            <Bot size={13} strokeWidth={1.75} className="shrink-0" aria-hidden />
             <span className="max-w-[120px] truncate">{currentName}</span>
           </ComposerChip>
         </DropdownMenuTrigger>
@@ -180,7 +180,7 @@ export function SessionAgentPicker() {
               aria-label={t('composer.agentSwitch.target', { name: pendingName })}
             >
               <span className="inline-flex max-w-[40%] items-center gap-1.5 rounded-md border border-border bg-surface-muted px-2.5 py-1.5 text-meta text-ink-secondary">
-                <Bot size={13} className="shrink-0 opacity-70" aria-hidden />
+                <Bot size={13} className="shrink-0" aria-hidden />
                 <span className="truncate">{currentName}</span>
               </span>
               <ArrowRight size={14} className="shrink-0 text-ink-tertiary" aria-hidden />

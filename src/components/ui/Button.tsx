@@ -14,7 +14,7 @@ export const buttonVariants = cva(
         // Solid inverse CTA — soft monochrome (not pure ink-black), never brand accent paint
         primary: 'bg-btn-primary text-on-btn-primary hover:bg-btn-primary-hover',
         secondary: 'bg-surface-subtle text-ink hover:bg-state-hover',
-        ghost: 'text-ink-secondary hover:bg-state-hover hover:text-ink',
+        ghost: 'text-ink hover:bg-state-hover',
         outline: 'border-border bg-transparent text-ink hover:bg-state-hover',
         danger:
           'bg-danger text-on-accent hover:bg-danger/90 focus-visible:ring-danger/40',

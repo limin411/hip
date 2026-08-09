@@ -177,7 +177,7 @@ export function HostGroupList({
                     'text-ink-secondary hover:bg-state-hover hover:text-ink',
                   )}
                 >
-                  <Plus size={15} strokeWidth={1.75} className="shrink-0 opacity-70" aria-hidden />
+                  <Plus size={15} strokeWidth={1.75} className="shrink-0" aria-hidden />
                   <span className="min-w-0 flex-1 truncate">{t('terminals.newGroup')}</span>
                 </button>
               ) : null}
@@ -201,7 +201,7 @@ export function HostGroupList({
                     selectedKey === UNGROUPED_KEY && 'text-ink',
                   )}
                 >
-                  <Server size={15} strokeWidth={1.75} className="shrink-0 opacity-70" aria-hidden />
+                  <Server size={15} strokeWidth={1.75} className="shrink-0" aria-hidden />
                   <span className="min-w-0 flex-1 truncate">{t('terminals.ungrouped')}</span>
                   <span className="shrink-0 tabular-nums text-caption text-ink-tertiary">
                     {ungrouped.length}
@@ -233,7 +233,7 @@ export function HostGroupList({
                         selected && 'text-ink',
                       )}
                     >
-                      <Folder size={15} strokeWidth={1.75} className="shrink-0 opacity-70" aria-hidden />
+                      <Folder size={15} strokeWidth={1.75} className="shrink-0" aria-hidden />
                       <span className="min-w-0 flex-1 truncate">{group.name}</span>
                       <span className="shrink-0 tabular-nums text-caption text-ink-tertiary">
                         {count}

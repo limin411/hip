@@ -51,7 +51,7 @@ describe('Button variants', () => {
   it('ghost is quiet chrome', () => {
     const { getByRole } = render(<Button variant="ghost">More</Button>)
     const cls = getByRole('button', { name: 'More' }).className
-    expect(cls).toMatch(/text-ink-secondary/)
+    expect(cls).toMatch(/text-ink/)
     expect(cls).not.toMatch(/\bbg-ink\b/)
   })
 

@@ -20,7 +20,7 @@ import { mcpManager } from './mcp/manager.js'
 import { readAgentsConfig } from './agents/index.js'
 import type { ApprovalFn } from './tools.js'
 import { SELF_GATED_TOOLS } from './tools.js'
-import { RealModelRunner, type ModelRunner } from './model-runner.js'
+import { RealModelRunner, LazyModelRunner, type ModelRunner } from './model-runner.js'
 import { buildChatModel, createSummarizer } from './model-factory.js'
 import { maxStepsForSession } from './loop-control.js'
 import { Activity, ActivityTracker } from './activity.js'
@@ -502,7 +502,12 @@ export class Session {
       orchestratorRunner: this.orchestratorRunner,
       networkPolicy: this.networkPolicy,
       toolOutputStore: this.toolOutputStore,
-      guardianReviewer: this.usesEnvModel ? new GuardianReviewer({ modelRunner: this.modelRunner() }) : undefined,
+      // Defer the real model build until the guardian actually reviews (LazyModelRunner) —
+      // constructing it eagerly here would demand an API key even on workflow turns that
+      // never consult the guardian (and for external-agent sessions it never runs).
+      guardianReviewer: this.usesEnvModel
+        ? new GuardianReviewer({ modelRunner: new LazyModelRunner(() => this.modelRunner()) })
+        : undefined,
       hooks: this.hooks,
     }
   }

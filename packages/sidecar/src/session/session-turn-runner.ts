@@ -35,7 +35,7 @@ import { SessionApprovalCache } from './tool-runner/approval-cache.js'
 import type { ToolPolicy } from './tool-runner/tool-policy.js'
 import { mcpManager } from './mcp/manager.js'
 import { readAgentsConfig } from './agents/index.js'
-import { RealModelRunner, type ModelRunner } from './model-runner.js'
+import { RealModelRunner, LazyModelRunner, type ModelRunner } from './model-runner.js'
 import { runSubagent } from './subagent.js'
 import { synthesizeSubagentResult } from './subagent-result.js'
 import { recursionLimit, childMaxStepsForAgent, maxStepsForSession } from './loop-control.js'
@@ -607,7 +607,7 @@ export async function runManagedAgentTurn(host: SessionTurnHost, input: SessionI
       title: host.store?.getSession(host.id)?.title,
       networkPolicy: host.networkPolicy,
       toolOutputStore: host.toolOutputStore,
-      guardianReviewer: host.usesEnvModel ? new GuardianReviewer({ modelRunner: host.modelRunner() }) : undefined,
+      guardianReviewer: host.usesEnvModel ? new GuardianReviewer({ modelRunner: new LazyModelRunner(() => host.modelRunner()) }) : undefined,
       attachmentParts: agentParts,
       pluginHooks: host.hooks,
       turnId,
@@ -891,7 +891,13 @@ export async function runTurn(host: SessionTurnHost, rawSend: SendFn, base?: {
   const cronMessages: BaseMessage[] = cronDue.map((p) => new SystemMessage(`<system-reminder>${p}</system-reminder>`))
 
   const cwd = host._config.cwd ?? process.cwd()
-  const runner = host.modelRunner(); const summarizer = host.summarizer()
+  // External agents (ACP/opencode) never invoke the built-in chat model — defer its
+  // construction so a missing chat-provider key can't break an external-agent turn
+  // (LazyModelRunner builds on first run(), which never happens on the ACP path).
+  const runner: ModelRunner = host.agentProv.isExternalAgent()
+    ? new LazyModelRunner(() => host.modelRunner())
+    : host.modelRunner()
+  const summarizer = host.summarizer()
   const skills = host.configMgr.skills; const pluginAgents = host.configMgr.pluginAgents
   const rawMode = host._config.permissionMode
   const mode: PermissionMode = rawMode === 'chat' || rawMode === 'full' ? rawMode : 'edit'

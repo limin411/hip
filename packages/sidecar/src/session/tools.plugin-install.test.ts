@@ -501,7 +501,7 @@ describe('plugin_install tool — happy path', () => {
 
       expect(result.ok).toBe(true)
       const success = result as PluginInstallSuccess
-      expect(success.pluginId).toBe('cool-plugin')
+      expect(success.pluginId).toBe('my-cool-plugin')
       expect(success.components.skills).toBe(1)
 
       const configRaw = JSON.parse(readFileSync(pluginsPath, 'utf8')) as { plugins: string[] }

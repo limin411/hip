@@ -171,7 +171,7 @@ describe('Session image agent dispatch', () => {
     expect(complete!.message.toolCalls![0].callId).toBe('c1')
     expect(complete!.message.timeline?.some((t) => t.kind === 'reasoning' && t.role === 'subagent')).toBe(true)
     expect(complete!.message.timeline?.some((t) => t.kind === 'tool' && t.callId === 'c1' && t.role === 'subagent')).toBe(true)
-    expect(complete!.message.usage).toEqual({ inputTokens: 10, outputTokens: 5, totalTokens: 15 })
+    expect(complete!.message.usage).toEqual({ inputTokens: 10, outputTokens: 5, totalTokens: 15, contextTokens: 10 })
   })
 
   it('keeps streamed text when the image agent returns an empty final string', async () => {

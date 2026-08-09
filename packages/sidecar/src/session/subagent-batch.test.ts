@@ -238,7 +238,7 @@ describe('task_batch in buildTools', () => {
       ],
     })
     expect(dispatchRun).toHaveBeenCalledWith('explore', 'read A', expect.any(AbortSignal))
-    expect(spawnFn).toHaveBeenCalledWith('generic B', undefined, undefined, expect.any(AbortSignal))
+    expect(spawnFn).toHaveBeenCalledWith('generic B', undefined, undefined, expect.any(AbortSignal), false)
     expect(result).toContain('[0] from-dispatch:read A')
     expect(result).toContain('[1] from-spawn')
   })

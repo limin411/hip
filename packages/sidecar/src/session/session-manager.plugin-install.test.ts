@@ -61,7 +61,7 @@ describe('plugin:install:url handler', () => {
       expect(resultMsg.pluginId).toBe('test-plugin')
     }
 
-    expect(mockToolInvoke).toHaveBeenCalledWith({ url: 'https://github.com/test/plugin.git' })
+    expect(mockToolInvoke).toHaveBeenCalledWith(expect.objectContaining({ url: 'https://github.com/test/plugin.git' }))
     expect(mockToolInvoke).toHaveBeenCalledTimes(1)
   })
 

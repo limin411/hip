@@ -77,6 +77,21 @@ export interface ModelRunner {
   run(messages: BaseMessage[], opts: ModelRunOptions): Promise<AIMessage>
 }
 
+/**
+ * Defers construction of the underlying ModelRunner until the first run() call.
+ * External-agent (ACP/opencode) sessions hold a runner only for typing and
+ * GuardianReviewer wiring — they never invoke the built-in chat model, so building
+ * it eagerly would demand an API key that may not exist. Also avoids an eager key
+ * check on workflow turns that never reach the guardian.
+ */
+export class LazyModelRunner implements ModelRunner {
+  private inner: ModelRunner | undefined
+  constructor(private readonly build: () => ModelRunner) {}
+  async run(messages: BaseMessage[], opts: ModelRunOptions): Promise<AIMessage> {
+    return (this.inner ??= this.build()).run(messages, opts)
+  }
+}
+
 /** Per-chunk text delta: plain string, or the text blocks of array content. */
 export function textDelta(chunk: AIMessageChunk): string {
   if (typeof chunk.content === 'string') return chunk.content

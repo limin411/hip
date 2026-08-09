@@ -1,0 +1,950 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>六点菜单 · 删除行 & 子菜单整改预览</title>
+<style>
+  :root {
+    --bg: #ffffff;
+    --bg-subtle: #fafafa;
+    --bg-muted: #f1f1f1;
+    --border: #e0e0e0;
+    --ink: #111111;
+    --sec: #5e5e5e;
+    --ter: #757575;
+    --hover: rgba(0,0,0,.06);
+    --danger: #c63b3b;
+    --danger-bg: color-mix(in srgb, #c63b3b 10%, transparent);
+    --grip: #b4b2ad;
+    --grip-h: #6b6862;
+    --shadow: 0 8px 30px rgba(0,0,0,.12);
+    --accent: #c2410c;
+    --ok: #2f7d40;
+    --bad: #c63b3b;
+    --callout: #fff7ed;
+    --callout-b: #fdba74;
+    --warn-bg: #fffbeb;
+    --warn-b: #fbbf24;
+    --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    --sans: system-ui, -apple-system, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+    /* block colors (notion-ish) */
+    --c-default: #111111;
+    --c-gray: #9b9a97;
+    --c-brown: #64473a;
+    --c-red: #e03e3e;
+    --c-orange: #d9730d;
+    --c-yellow: #dfab01;
+    --c-green: #4d6461;
+    --c-blue: #0b6e99;
+    --c-purple: #6940a5;
+    --c-pink: #ad1a72;
+    --bgc-default: transparent;
+    --bgc-gray: #ebeced;
+    --bgc-brown: #e9e5e3;
+    --bgc-red: #fbe4e4;
+    --bgc-orange: #f6e9d9;
+    --bgc-yellow: #fbf3db;
+    --bgc-green: #ddedea;
+    --bgc-blue: #ddebf1;
+    --bgc-purple: #eae4f2;
+    --bgc-pink: #f4dfeb;
+  }
+  html.dark {
+    --bg: #121212;
+    --bg-subtle: #181818;
+    --bg-muted: #1f1f1f;
+    --border: #2e2e2e;
+    --ink: #f0f0f0;
+    --sec: #a3a3a3;
+    --ter: #7a7a7a;
+    --hover: rgba(255,255,255,.08);
+    --danger: #e85a5a;
+    --danger-bg: color-mix(in srgb, #e85a5a 14%, transparent);
+    --grip: rgba(255,255,255,.35);
+    --grip-h: rgba(255,255,255,.6);
+    --shadow: 0 8px 30px rgba(0,0,0,.45);
+    --accent: #ffb300;
+    --callout: #1c1410;
+    --callout-b: #9a3412;
+    --warn-bg: #1c1808;
+    --warn-b: #a16207;
+    --c-default: #f0f0f0;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; font: 13px/1.55 var(--sans); color: var(--ink); background: var(--bg-subtle);
+  }
+  .top {
+    position: sticky; top: 0; z-index: 50;
+    border-bottom: 1px solid var(--border); background: var(--bg);
+  }
+  .top-in {
+    max-width: 1140px; margin: 0 auto; padding: 12px 20px;
+    display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+  }
+  h1 { margin: 0; font-size: 15px; font-weight: 600; letter-spacing: -.01em; }
+  .sub { color: var(--ter); font-size: 12px; }
+  .spacer { flex: 1; }
+  .btn {
+    border: 1px solid var(--border); background: var(--bg); color: var(--ink);
+    border-radius: 4px; padding: 5px 10px; font-size: 12px; cursor: pointer;
+  }
+  .btn:hover { background: var(--hover); }
+  .btn.on { border-color: color-mix(in srgb, var(--accent) 50%, var(--border)); background: color-mix(in srgb, var(--accent) 10%, var(--bg)); }
+  .page { max-width: 1140px; margin: 0 auto; padding: 22px 20px 64px; }
+  h2 { font-size: 14px; font-weight: 600; margin: 28px 0 10px; display: flex; align-items: center; gap: 8px; }
+  h3 { font-size: 12.5px; font-weight: 600; margin: 0 0 8px; color: var(--sec); }
+  .tag {
+    font-size: 10px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase;
+    color: var(--accent); border: 1px solid color-mix(in srgb, var(--accent) 35%, var(--border));
+    border-radius: 3px; padding: 1px 6px;
+  }
+  .pri {
+    font-size: 10px; font-weight: 700; letter-spacing: .03em; padding: 2px 6px; border-radius: 3px;
+  }
+  .pri.p0 { background: color-mix(in srgb, var(--bad) 14%, transparent); color: var(--bad); }
+  .pri.p1 { background: color-mix(in srgb, #d97706 16%, transparent); color: #d97706; }
+  .pri.p2 { background: color-mix(in srgb, #2563eb 14%, transparent); color: #2563eb; }
+  .pri.ok { background: color-mix(in srgb, var(--ok) 14%, transparent); color: var(--ok); }
+  .callout {
+    background: var(--callout); border: 1px solid var(--callout-b); border-radius: 6px;
+    padding: 12px 14px; line-height: 1.65; margin-bottom: 8px;
+  }
+  .callout.warn {
+    background: var(--warn-bg); border-color: var(--warn-b);
+  }
+  .callout b { font-weight: 600; }
+  .callout code, code {
+    font-family: var(--mono); font-size: 11.5px;
+    background: var(--bg-muted); padding: 1px 5px; border-radius: 3px;
+  }
+  p.lead { color: var(--sec); margin: 0 0 14px; max-width: 78ch; }
+  table {
+    width: 100%; border-collapse: collapse; font-size: 12.5px;
+    background: var(--bg); border: 1px solid var(--border); border-radius: 6px; overflow: hidden;
+  }
+  th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--border); vertical-align: top; }
+  th { background: var(--bg-muted); font-weight: 600; color: var(--sec); font-size: 11.5px; }
+  tr:last-child td { border-bottom: 0; }
+  .ok { color: var(--ok); font-weight: 500; }
+  .bad { color: var(--bad); font-weight: 500; }
+  .muted { color: var(--ter); }
+
+  .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+  .grid3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+  @media (max-width: 960px) {
+    .grid2, .grid3 { grid-template-columns: 1fr; }
+  }
+
+  .card {
+    background: var(--bg); border: 1px solid var(--border); border-radius: 8px; overflow: hidden;
+  }
+  .card-h {
+    display: flex; align-items: center; gap: 8px; padding: 9px 12px;
+    border-bottom: 1px solid var(--border); background: var(--bg-muted); font-weight: 600; font-size: 12.5px;
+  }
+  .card-b { padding: 16px; position: relative; }
+  .hint { margin-top: 10px; font-size: 11.5px; color: var(--ter); line-height: 1.55; }
+
+  /* gutter */
+  .doc-line { display: flex; align-items: flex-start; gap: 6px; padding: 2px 0 8px; }
+  .gutter { display: flex; align-items: center; gap: 2px; flex: none; user-select: none; }
+  .hb {
+    width: 18px; height: 24px; border: 0; border-radius: 4px; background: transparent;
+    color: var(--grip); display: inline-flex; align-items: center; justify-content: center;
+    cursor: pointer; padding: 0;
+  }
+  .hb:hover { background: var(--hover); color: var(--grip-h); }
+  .hb.grip { cursor: grab; }
+  .line-text { flex: 1; padding-top: 3px; font-size: 14px; line-height: 1.6; }
+
+  /* menus */
+  .menu {
+    width: 210px;
+    background: var(--bg); border: 1px solid var(--border); border-radius: 8px;
+    box-shadow: var(--shadow); padding: 4px; font-size: 13px;
+  }
+  .menu.sub { width: 188px; }
+  .menu.color-list { width: 200px; max-height: 340px; overflow: auto; }
+  .menu.color-swatch { width: 212px; }
+  .menu.live { position: absolute; z-index: 40; margin: 0; }
+  .sep { height: 1px; background: var(--border); margin: 3px 6px; }
+  .mlabel {
+    padding: 6px 10px 4px; font-size: 11px; font-weight: 600; color: var(--ter); letter-spacing: .02em;
+  }
+
+  .mi {
+    display: flex; align-items: center; flex-wrap: nowrap; gap: 8px;
+    min-height: 32px; padding: 6px 10px; border-radius: 6px;
+    cursor: pointer; color: var(--ink); white-space: nowrap; user-select: none; position: relative;
+  }
+  .mi:hover, .mi:focus-visible, .mi.open { background: var(--hover); outline: none; }
+  .mi .ic {
+    width: 16px; height: 16px; flex: none;
+    display: inline-flex; align-items: center; justify-content: center;
+    color: var(--sec); font-size: 11px; font-weight: 600; line-height: 1;
+  }
+  .mi .lab { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+  .mi .arr, .mi .tick {
+    flex: none; color: var(--ter); font-size: 11px; margin-left: 4px; width: 12px; text-align: center;
+  }
+  .mi .tick { color: var(--ink); font-weight: 700; }
+  .mi.danger { color: var(--danger); }
+  .mi.danger .ic { color: var(--danger); }
+  .mi.danger:hover, .mi.danger:focus-visible { background: var(--danger-bg); color: var(--danger); }
+
+  /* BEFORE broken delete */
+  .mi-bad {
+    display: flex; align-items: center; gap: 8px;
+    padding: 7px 10px; border-radius: 6px; color: var(--ink);
+  }
+  .mi-bad .ic { width: 16px; flex: none; color: var(--sec); font-size: 11px; font-weight: 600; text-align: center; }
+  .mi-bad .lab { flex: 1; }
+  .mi-bad .arr { color: var(--ter); font-size: 11px; }
+  .mi-bad.danger-broken { color: var(--danger); }
+  .mi-bad.danger-broken .kb-broken { display: block; width: 28px; }
+  .mi-bad.danger-broken .kb-broken svg { display: block; margin-bottom: 2px; }
+  .mi-bad.danger-broken .kb-broken .txt { display: block; }
+
+  /* turn-into BEFORE: icon in children flow (same anti-pattern) */
+  .mi-bad.child-flow .flow-ic {
+    display: inline; margin-right: 8px; color: var(--sec); font-size: 11px; font-weight: 600;
+  }
+
+  /* cascade demo frame */
+  .cascade {
+    display: flex; align-items: flex-start; gap: 6px; min-height: 360px;
+  }
+  .cascade .menu { flex: none; }
+  .cascade-note {
+    flex: 1; font-size: 11.5px; color: var(--ter); line-height: 1.6; padding: 8px 4px;
+  }
+
+  /* color list item (P1 / before) */
+  .color-a {
+    width: 18px; height: 18px; border-radius: 3px; flex: none;
+    display: inline-flex; align-items: center; justify-content: center;
+    font-size: 11px; font-weight: 700; border: 1px solid var(--border);
+  }
+
+  /* color swatch grid (P2) */
+  .swatch-grid {
+    display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px;
+    padding: 4px 10px 10px;
+  }
+  .swatch {
+    width: 28px; height: 28px; border-radius: 50%; border: 1px solid var(--border);
+    cursor: pointer; padding: 0; background: var(--bg);
+    display: inline-flex; align-items: center; justify-content: center;
+    position: relative;
+  }
+  .swatch.sq { border-radius: 6px; }
+  .swatch:hover { transform: scale(1.06); }
+  .swatch:focus-visible { outline: 2px solid color-mix(in srgb, var(--accent) 70%, transparent); outline-offset: 1px; }
+  .swatch.on { box-shadow: 0 0 0 2px var(--bg), 0 0 0 4px var(--ink); }
+  .swatch .dot {
+    width: 16px; height: 16px; border-radius: 50%;
+  }
+  .swatch.sq .dot { border-radius: 4px; width: 16px; height: 16px; }
+  .swatch .dot.default-t {
+    background: transparent; border: 1.5px solid var(--sec);
+    font-size: 9px; font-weight: 700; color: var(--sec);
+    display: flex; align-items: center; justify-content: center;
+  }
+  .swatch .dot.default-b {
+    background:
+      linear-gradient(135deg, transparent 46%, var(--sec) 46%, var(--sec) 54%, transparent 54%),
+      var(--bg-muted);
+    border: 1px solid var(--border);
+  }
+
+  /* stage */
+  .stage {
+    background: var(--bg); border: 1px solid var(--border); border-radius: 8px;
+    padding: 28px 24px 48px; position: relative; min-height: 320px;
+  }
+  .stage-note { position: absolute; right: 14px; top: 12px; font-size: 11px; color: var(--ter); }
+  .stage-tools {
+    display: flex; gap: 8px; margin-bottom: 14px; flex-wrap: wrap; align-items: center;
+  }
+  .toast {
+    position: fixed; bottom: 22px; left: 50%; transform: translateX(-50%);
+    background: #3a3a3a; color: #fafafa; border-radius: 8px; padding: 7px 14px;
+    font-size: 12px; opacity: 0; transition: opacity .18s; z-index: 99; pointer-events: none;
+    box-shadow: var(--shadow);
+  }
+  html.dark .toast { background: #d4d4d4; color: #141414; }
+  .toast.show { opacity: 1; }
+
+  .dom {
+    font-family: var(--mono); font-size: 11px; line-height: 1.55; white-space: pre;
+    background: var(--bg-muted); border: 1px solid var(--border); border-radius: 6px;
+    padding: 12px 14px; overflow-x: auto; color: var(--sec);
+  }
+  .dom .hi { color: var(--bad); font-weight: 600; }
+  .dom .okc { color: var(--ok); font-weight: 600; }
+  .dom .p1c { color: #d97706; font-weight: 600; }
+
+  .foot {
+    margin-top: 36px; border-top: 1px solid var(--border); padding-top: 12px;
+    font-size: 11.5px; color: var(--ter); line-height: 1.75;
+  }
+  .checklist { list-style: none; padding: 0; margin: 0; }
+  .checklist li {
+    display: flex; gap: 8px; padding: 6px 0; border-bottom: 1px solid var(--border); font-size: 12.5px;
+  }
+  .checklist li:last-child { border-bottom: 0; }
+  .checklist input { margin-top: 3px; }
+
+  .verdict {
+    display: flex; flex-direction: column; gap: 8px;
+  }
+  .verdict .row {
+    display: grid; grid-template-columns: 140px 72px 1fr; gap: 10px; align-items: start;
+    padding: 10px 12px; background: var(--bg); border: 1px solid var(--border); border-radius: 6px;
+  }
+  @media (max-width: 700px) {
+    .verdict .row { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+<div class="top"><div class="top-in">
+  <h1>六点菜单 · 删除行 &amp; 子菜单</h1>
+  <span class="sub">主菜单行几何 · 转换成… · 颜色 · 危险项</span>
+  <div class="spacer"></div>
+  <button class="btn" id="themeBtn" type="button">🌗 深色</button>
+</div></div>
+
+<div class="page">
+  <div class="callout">
+    <b>P0 已确认：</b>主菜单「删除」图标与文案换行——图标没走 <code>leftSection</code>。<br>
+    <b>子菜单结论：</b>
+    <span class="pri p1">P1 必做</span>「转换成…」子项与删除<strong>同构反模式</strong>（icon 塞 children），顺手改 <code>icon</code> 槽 + 当前类型 ✓ + 父行 leading icon；
+    <span class="pri p2">P2 建议</span>「颜色」布局未坏，但是 20 行列表，目标态改为 swatch 色板（可另 PR）。
+  </div>
+
+  <!-- ══════ §0 决策 ══════ -->
+  <h2><span class="tag">§0</span> 子菜单要不要整改？</h2>
+  <div class="verdict">
+    <div class="row">
+      <div><b>删除行</b></div>
+      <div><span class="pri p0">P0 必须</span></div>
+      <div>已换行。自定义 <code>Menu.Item</code> + <code>icon={Trash2}</code> + danger 态。</div>
+    </div>
+    <div class="row">
+      <div><b>转换成… 子菜单</b></div>
+      <div><span class="pri p1">P1 必须</span></div>
+      <div>子项 icon 在 children 内（与删除同构），暂未换行但是<strong>定时炸弹</strong>且与主菜单图标列不共线。改 <code>icon</code> prop + 当前 ✓。分组可选。</div>
+    </div>
+    <div class="row">
+      <div><b>颜色 子菜单</b></div>
+      <div><span class="pri p2">P2 建议</span></div>
+      <div>已走 <code>icon</code> prop，<strong>无换行</strong>。问题是 20 行线性列表 vs Notion 色板。P1 只做 label 皮肤；P2 换 swatch 网格。</div>
+    </div>
+    <div class="row">
+      <div><b>级联交互</b></div>
+      <div><span class="pri ok">维持</span></div>
+      <div>Mantine Sub：hover 打开、右展、Esc 分层关。只补 CSS，不重造。</div>
+    </div>
+  </div>
+
+  <!-- ══════ §1 主菜单 Before/After ══════ -->
+  <h2><span class="tag">§1</span> 主菜单 Before / After</h2>
+  <p class="lead">删除换行是爆点；After 同时给「转换成… / 颜色」补上 leading icon，使整列共线。</p>
+  <div class="grid2">
+    <div class="card">
+      <div class="card-h"><span class="pri p0">BEFORE</span> 删除换行 · 父行无图标</div>
+      <div class="card-b">
+        <div class="menu">
+          <div class="mi-bad"><span class="lab">转换成…</span><span class="arr">▸</span></div>
+          <div class="mi-bad"><span class="lab">颜色</span><span class="arr">▸</span></div>
+          <div class="mi-bad"><span class="ic">🔗</span><span class="lab">复制链接到块</span></div>
+          <div class="mi-bad"><span class="ic">⎘</span><span class="lab">创制副本</span></div>
+          <div class="sep"></div>
+          <div class="mi-bad"><span class="ic">☑</span><span class="lab">加入多选</span></div>
+          <div class="sep"></div>
+          <div class="mi-bad danger-broken">
+            <span class="kb-broken">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/><line x1="10" x2="10" y1="11" y2="17"/><line x1="14" x2="14" y1="11" y2="17"/></svg>
+              <span class="txt">删除</span>
+            </span>
+          </div>
+        </div>
+        <p class="hint"><span class="bad">坏</span>：删除两行；上两项无 icon 列，和下方不对齐。</p>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-h"><span class="pri ok">AFTER</span> 统一 icon 槽 · danger 单行</div>
+      <div class="card-b">
+        <div class="menu" id="mainAfter">
+          <div class="mi" data-sub="turn"><span class="ic">⇄</span><span class="lab">转换成…</span><span class="arr">▸</span></div>
+          <div class="mi" data-sub="color"><span class="ic">◐</span><span class="lab">颜色</span><span class="arr">▸</span></div>
+          <div class="mi"><span class="ic">🔗</span><span class="lab">复制链接到块</span></div>
+          <div class="mi"><span class="ic">⎘</span><span class="lab">创制副本</span></div>
+          <div class="sep"></div>
+          <div class="mi"><span class="ic">☑</span><span class="lab">加入多选</span></div>
+          <div class="sep"></div>
+          <div class="mi danger"><span class="ic">🗑</span><span class="lab">删除</span></div>
+        </div>
+        <p class="hint"><span class="ok">好</span>：六项图标左缘共线；删除单行 + 红字；悬停上两项见 §2 级联（本卡静态）。</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══════ §2 转换成 ══════ -->
+  <h2><span class="tag">§2</span> 子菜单「转换成…」</h2>
+  <p class="lead">目录 12 项与 <code>+</code> 菜单同源（<code>SIDE_MENU_BLOCKS</code>）。整改重点是<strong>装配</strong>与<strong>当前类型 ✓</strong>，不是改名单。</p>
+
+  <div class="grid2">
+    <div class="card">
+      <div class="card-h"><span class="pri p1">BEFORE</span> 子项 icon 在 children 流</div>
+      <div class="card-b">
+        <div class="cascade">
+          <div class="menu">
+            <div class="mi-bad" style="background:var(--hover)"><span class="lab">转换成…</span><span class="arr">▸</span></div>
+            <div class="mi-bad"><span class="lab">颜色</span><span class="arr">▸</span></div>
+            <div class="mi-bad"><span class="ic">🔗</span><span class="lab">复制链接…</span></div>
+          </div>
+          <div class="menu sub">
+            <div class="mi-bad child-flow"><span class="lab"><span class="flow-ic">¶</span>正文</span></div>
+            <div class="mi-bad child-flow"><span class="lab"><span class="flow-ic">H1</span>标题 1</span></div>
+            <div class="mi-bad child-flow"><span class="lab"><span class="flow-ic">H2</span>标题 2</span></div>
+            <div class="mi-bad child-flow"><span class="lab"><span class="flow-ic">H3</span>标题 3</span></div>
+            <div class="mi-bad child-flow"><span class="lab"><span class="flow-ic">☑</span>待办</span></div>
+            <div class="mi-bad child-flow"><span class="lab"><span class="flow-ic">•</span>无序列表</span></div>
+            <div class="mi-bad child-flow"><span class="lab"><span class="flow-ic">1.</span>有序列表</span></div>
+            <div class="mi-bad child-flow"><span class="lab"><span class="flow-ic">▸</span>折叠</span></div>
+            <div class="mi-bad child-flow"><span class="lab"><span class="flow-ic">{ }</span>代码</span></div>
+            <div class="mi-bad child-flow"><span class="lab"><span class="flow-ic">❝</span>引用</span></div>
+            <div class="mi-bad child-flow"><span class="lab"><span class="flow-ic">—</span>分割线</span></div>
+            <div class="mi-bad child-flow"><span class="lab"><span class="flow-ic">💡</span>标注</span></div>
+          </div>
+        </div>
+        <p class="hint">
+          <span class="bad">问题</span>：① 与删除同构（icon 不在 leftSection）② <b>无当前类型 ✓</b> ③ 父行无 leading icon ④ 主/子图标列不共线。<br>
+          暂未换行是因为 icon 是单字，不是 SVG 块级。
+        </p>
+        <div class="dom" style="margin-top:10px">Menu.Item
+  └─ span.kb-add-menu-icon → "H1"   <span class="hi">← children 流</span>
+  └─ "标题 1"</div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-h"><span class="pri ok">AFTER P1</span> leftSection + 当前 ✓</div>
+      <div class="card-b">
+        <div class="cascade">
+          <div class="menu">
+            <div class="mi open"><span class="ic">⇄</span><span class="lab">转换成…</span><span class="arr">▸</span></div>
+            <div class="mi"><span class="ic">◐</span><span class="lab">颜色</span><span class="arr">▸</span></div>
+            <div class="mi"><span class="ic">🔗</span><span class="lab">复制链接…</span></div>
+          </div>
+          <div class="menu sub" id="turnAfter">
+            <!-- filled by JS for DRY -->
+          </div>
+        </div>
+        <p class="hint">
+          <span class="ok">好</span>：glyph 进 icon 槽；当前「正文」打 ✓；行高 32 与主菜单一致；点击即 <code>updateBlock</code>。
+        </p>
+        <div class="dom" style="margin-top:10px">Menu.Item
+  ├─ leftSection → glyph "H1"     <span class="okc">← 固定槽</span>
+  ├─ label → "标题 1"
+  └─ rightSection → ✓             <span class="p1c">← checked</span></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="callout warn" style="margin-top:12px">
+    <b>P2 可选：</b>12 项可插分隔线分为「文字样式 / 列表 / 块」。不阻塞 P1。预览交互舞台可开关分组。
+  </div>
+
+  <!-- ══════ §3 颜色 ══════ -->
+  <h2><span class="tag">§3</span> 子菜单「颜色」</h2>
+  <p class="lead">布局未坏（已用 <code>icon</code> prop）。要判断的是：<b>维持 20 行列表</b>，还是 <b>升级为 swatch 色板</b>。</p>
+
+  <div class="grid3">
+    <div class="card">
+      <div class="card-h"><span class="pri p1">P1 现状/皮肤</span> 长列表</div>
+      <div class="card-b">
+        <div class="menu color-list" id="colorListDemo"></div>
+        <p class="hint">
+          BlockNote <code>ColorPicker</code>：文字 10 + 背景 10。<br>
+          <span class="ok">布局 OK</span> · <span class="bad">密度差</span>：一屏扫不完，是线性阅读而非空间选色。<br>
+          P1 只统一行高 / Label 次级色，不改结构。
+        </p>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-h"><span class="pri p2">P2 目标</span> Swatch 色板</div>
+      <div class="card-b">
+        <div class="menu color-swatch" id="colorSwatchDemo"></div>
+        <p class="hint">
+          两段 label + 5×2 圆点（文字）/ 方点（背景）。当前色外环。<br>
+          点击可连选试色，菜单保持打开；Esc / 外点关闭。<br>
+          <b>建议另 PR</b>，不堵删除与 Turn-into。
+        </p>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-h">决策</div>
+      <div class="card-b">
+        <table>
+          <tr><th>议题</th><th>决定</th></tr>
+          <tr><td>本迭代改网格？</td><td class="muted">不强制（P2）</td></tr>
+          <tr><td>P1 做什么？</td><td class="ok">Label 皮肤 + 行契约继承</td></tr>
+          <tr><td>父行 icon？</td><td class="ok">加 Palette（P1）</td></tr>
+          <tr><td>与 bubble 颜色？</td><td class="muted">并存；块级 vs 行内</td></tr>
+        </table>
+        <p class="hint">若只做一档：优先 P0 删除 + P1 Turn-into。颜色列表可先「难看但正确」。</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══════ §4 行几何 ══════ -->
+  <h2><span class="tag">§4</span> 共享行几何（主 = 子）</h2>
+  <p class="lead">禁止子菜单另搞一套字号/行高。级联只多 trailing（▸ / ✓）。</p>
+  <div class="card"><div class="card-b">
+    <div style="display:flex;flex-wrap:wrap;gap:16px;align-items:center">
+      <div style="font-family:var(--mono);font-size:11px;color:var(--ter);min-width:100px">32px 行<br>pad 8 · icon 16 · gap 8</div>
+      <div style="flex:1;min-width:240px">
+        <div style="display:flex;height:36px;border:1px dashed var(--border);border-radius:4px;overflow:hidden;font-size:10px;font-weight:600;color:var(--sec)">
+          <div style="width:10px;background:color-mix(in srgb,var(--accent) 12%,transparent);display:flex;align-items:center;justify-content:center">8</div>
+          <div style="width:16px;background:color-mix(in srgb,#2563eb 14%,transparent);display:flex;align-items:center;justify-content:center">ic</div>
+          <div style="width:8px;background:color-mix(in srgb,#16a34a 14%,transparent);display:flex;align-items:center;justify-content:center">8</div>
+          <div style="flex:1;background:color-mix(in srgb,#9333ea 10%,transparent);display:flex;align-items:center;padding:0 8px">label nowrap</div>
+          <div style="width:20px;background:color-mix(in srgb,#d97706 14%,transparent);display:flex;align-items:center;justify-content:center">▸✓</div>
+          <div style="width:10px;background:color-mix(in srgb,var(--accent) 12%,transparent);display:flex;align-items:center;justify-content:center">8</div>
+        </div>
+        <p class="hint" style="margin:8px 0 0"><code>flex-wrap: nowrap</code> 双保险覆盖 <code>.bn-drag-handle-menu</code> 及其子 dropdown。</p>
+      </div>
+    </div>
+  </div></div>
+
+  <!-- ══════ §5 交互舞台 ══════ -->
+  <h2><span class="tag">§5</span> 交互舞台（目标态）</h2>
+  <p class="lead">点击六点 → 主菜单。悬停「转换成… / 颜色」展开子菜单。可切换颜色面板形态与 Turn-into 分组。</p>
+  <div class="stage" id="stage">
+    <span class="stage-note">目标态演示 · Esc 关闭</span>
+    <div class="stage-tools">
+      <span class="muted">颜色面板：</span>
+      <button class="btn on" type="button" data-color-mode="swatch" id="btnSwatch">P2 Swatch</button>
+      <button class="btn" type="button" data-color-mode="list" id="btnList">P1 列表</button>
+      <span class="muted" style="margin-left:8px">转换成：</span>
+      <button class="btn" type="button" id="btnGroup">分组 P2：关</button>
+    </div>
+    <div class="doc-line" id="blockRow">
+      <div class="gutter">
+        <button class="hb" type="button" id="btnPlus" title="+">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.25" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
+        </button>
+        <button class="hb grip" type="button" id="btnGrip" title="块菜单">
+          <svg width="10" height="16" viewBox="0 0 10 16" fill="currentColor"><circle cx="2.5" cy="2" r="1.25"/><circle cx="7.5" cy="2" r="1.25"/><circle cx="2.5" cy="8" r="1.25"/><circle cx="7.5" cy="8" r="1.25"/><circle cx="2.5" cy="14" r="1.25"/><circle cx="7.5" cy="14" r="1.25"/></svg>
+        </button>
+      </div>
+      <div class="line-text" id="blockText">这是一段示例正文。打开六点菜单，检查删除单行，并悬停子菜单。</div>
+    </div>
+  </div>
+
+  <!-- ══════ §6 决策表 ══════ -->
+  <h2><span class="tag">§6</span> 决策表</h2>
+  <table>
+    <tr><th style="width:20%">议题</th><th style="width:32%">选项</th><th>决定</th></tr>
+    <tr>
+      <td>删除怎么修</td>
+      <td>span flex 热修 / 走 icon 槽 / 加宽菜单</td>
+      <td class="ok">走 icon 槽 + CSS nowrap。热修不对齐。</td>
+    </tr>
+    <tr>
+      <td>Turn-into 子项</td>
+      <td>不动 / 改 icon 槽 / 大缩略图选择器</td>
+      <td class="ok">P1 改 icon 槽 + checked ✓。不做缩略图。</td>
+    </tr>
+    <tr>
+      <td>Turn-into 分组</td>
+      <td>一级 12 项 / 三分组</td>
+      <td class="muted">P1 一级；P2 可选分组（舞台可开关）。</td>
+    </tr>
+    <tr>
+      <td>颜色形态</td>
+      <td>维持列表 / swatch 网格</td>
+      <td class="ok">P1 列表+皮肤；P2 swatch 另 PR。预览两种都给。</td>
+    </tr>
+    <tr>
+      <td>父行 leading icon</td>
+      <td>无 / 有</td>
+      <td class="ok">有（⇄ / ◐），与 Link/Copy 共线。</td>
+    </tr>
+    <tr>
+      <td>级联打开</td>
+      <td>仅 click / hover 意图</td>
+      <td class="ok">维持 Mantine hover 意图（+ click）。</td>
+    </tr>
+    <tr>
+      <td>删除确认</td>
+      <td>Modal / 无</td>
+      <td class="ok">无；Undo 兜底。</td>
+    </tr>
+    <tr>
+      <td>主/子两套视觉？</td>
+      <td>是 / 否</td>
+      <td class="ok">否。同一行几何契约。</td>
+    </tr>
+  </table>
+
+  <!-- ══════ §7 验收 ══════ -->
+  <h2><span class="tag">§7</span> 验收清单</h2>
+  <ul class="checklist">
+    <li><input type="checkbox" disabled /> <span class="pri p0">P0</span> 删除单行；图标与主菜单共线；danger hover 淡红底</li>
+    <li><input type="checkbox" disabled /> <span class="pri p0">P0</span> 单击删块无确认；多选删选区；<code>kb-delete-block</code> 可 query</li>
+    <li><input type="checkbox" disabled /> <span class="pri p1">P1</span> 转换成父行有 icon+▸；子项 leftSection glyph；当前类型 ✓</li>
+    <li><input type="checkbox" disabled /> <span class="pri p1">P1</span> 子菜单右展 / 贴边 flip / Esc 分层关</li>
+    <li><input type="checkbox" disabled /> <span class="pri p1">P1</span> 颜色父行 icon；列表 Label 次级色；选色仍生效</li>
+    <li><input type="checkbox" disabled /> <span class="pri p2">P2</span> 颜色 swatch 网格 + 当前环 + 键盘（可选本迭代）</li>
+    <li><input type="checkbox" disabled /> 亮色 / 暗色均通过</li>
+  </ul>
+
+  <div class="foot">
+    Spec：<code>docs/design/doc-block-menu-delete-row-spec.md</code>（v1.1）<br>
+    代码锚点：<code>DeleteBlockItem</code> / <code>TurnIntoItem</code> / <code>BlockColorsItem</code> · <code>SIDE_MENU_BLOCKS</code> · <code>knowledge-blocknote.css</code><br>
+    预览仅供审查，未改业务代码。
+  </div>
+</div>
+
+<div class="toast" id="toast" role="status"></div>
+
+<script>
+const COLORS = [
+  ['default','默认'],['gray','灰色'],['brown','棕色'],['red','红色'],['orange','橙色'],
+  ['yellow','黄色'],['green','绿色'],['blue','蓝色'],['purple','紫色'],['pink','粉色'],
+];
+const COLOR_VAL = {
+  default:'var(--c-default)', gray:'var(--c-gray)', brown:'var(--c-brown)', red:'var(--c-red)',
+  orange:'var(--c-orange)', yellow:'var(--c-yellow)', green:'var(--c-green)', blue:'var(--c-blue)',
+  purple:'var(--c-purple)', pink:'var(--c-pink)',
+};
+const BG_VAL = {
+  default:'var(--bgc-default)', gray:'var(--bgc-gray)', brown:'var(--bgc-brown)', red:'var(--bgc-red)',
+  orange:'var(--bgc-orange)', yellow:'var(--bgc-yellow)', green:'var(--bgc-green)', blue:'var(--bgc-blue)',
+  purple:'var(--bgc-purple)', pink:'var(--bgc-pink)',
+};
+
+const TURN = [
+  { id:'text', ic:'¶', lab:'正文', group:'text' },
+  { id:'h1', ic:'H1', lab:'标题 1', group:'text' },
+  { id:'h2', ic:'H2', lab:'标题 2', group:'text' },
+  { id:'h3', ic:'H3', lab:'标题 3', group:'text' },
+  { id:'task', ic:'☑', lab:'待办', group:'list' },
+  { id:'bullet', ic:'•', lab:'无序列表', group:'list' },
+  { id:'ordered', ic:'1.', lab:'有序列表', group:'list' },
+  { id:'toggle', ic:'▸', lab:'折叠', group:'list' },
+  { id:'fence', ic:'{ }', lab:'代码', group:'block' },
+  { id:'quote', ic:'❝', lab:'引用', group:'block' },
+  { id:'hr', ic:'—', lab:'分割线', group:'block' },
+  { id:'callout', ic:'💡', lab:'标注', group:'block' },
+];
+
+const state = {
+  colorMode: 'swatch', // swatch | list
+  groupTurn: false,
+  currentType: 'text',
+  textColor: 'default',
+  bgColor: 'default',
+  blockAlive: true,
+};
+
+const root = document.documentElement;
+const themeBtn = document.getElementById('themeBtn');
+themeBtn.onclick = () => {
+  root.classList.toggle('dark');
+  themeBtn.textContent = root.classList.contains('dark') ? '☀️ 浅色' : '🌗 深色';
+};
+
+let toastT;
+function toast(msg) {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.classList.add('show');
+  clearTimeout(toastT);
+  toastT = setTimeout(() => el.classList.remove('show'), 1600);
+}
+
+function trashIc() {
+  return `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/><line x1="10" x2="10" y1="11" y2="17"/><line x1="14" x2="14" y1="11" y2="17"/></svg>`;
+}
+
+function renderTurnItems(current, grouped) {
+  const parts = [];
+  let lastG = null;
+  for (const t of TURN) {
+    if (grouped && t.group !== lastG) {
+      if (lastG) parts.push('<div class="sep"></div>');
+      lastG = t.group;
+    }
+    const tick = t.id === current ? '<span class="tick">✓</span>' : '<span class="arr"></span>';
+    parts.push(`<div class="mi" data-turn="${t.id}"><span class="ic">${t.ic}</span><span class="lab">${t.lab}</span>${tick}</div>`);
+  }
+  return parts.join('');
+}
+
+// static AFTER turn menu
+document.getElementById('turnAfter').innerHTML = renderTurnItems('text', false);
+
+function colorListHTML(textCur, bgCur) {
+  let h = '<div class="mlabel">文字颜色</div>';
+  for (const [id, name] of COLORS) {
+    const tick = id === textCur ? '<span class="tick">✓</span>' : '<span class="arr"></span>';
+    const fg = COLOR_VAL[id];
+    h += `<div class="mi" data-tc="${id}"><span class="ic"><span class="color-a" style="color:${fg};border-color:var(--border)">A</span></span><span class="lab">${name}</span>${tick}</div>`;
+  }
+  h += '<div class="mlabel">背景颜色</div>';
+  for (const [id, name] of COLORS) {
+    const tick = id === bgCur ? '<span class="tick">✓</span>' : '<span class="arr"></span>';
+    const bg = id === 'default' ? 'var(--bg-muted)' : BG_VAL[id];
+    h += `<div class="mi" data-bc="${id}"><span class="ic"><span class="color-a" style="background:${bg}">A</span></span><span class="lab">${name}</span>${tick}</div>`;
+  }
+  return h;
+}
+
+function colorSwatchHTML(textCur, bgCur) {
+  let h = '<div class="mlabel">文字</div><div class="swatch-grid">';
+  for (const [id] of COLORS) {
+    const on = id === textCur ? ' on' : '';
+    if (id === 'default') {
+      h += `<button type="button" class="swatch${on}" data-tc="${id}" title="默认"><span class="dot default-t">A</span></button>`;
+    } else {
+      h += `<button type="button" class="swatch${on}" data-tc="${id}" title="${id}"><span class="dot" style="background:${COLOR_VAL[id]}"></span></button>`;
+    }
+  }
+  h += '</div><div class="mlabel">背景</div><div class="swatch-grid">';
+  for (const [id] of COLORS) {
+    const on = id === bgCur ? ' on' : '';
+    if (id === 'default') {
+      h += `<button type="button" class="swatch sq${on}" data-bc="${id}" title="默认"><span class="dot default-b"></span></button>`;
+    } else {
+      h += `<button type="button" class="swatch sq${on}" data-bc="${id}" title="${id}"><span class="dot" style="background:${BG_VAL[id]};border:1px solid var(--border)"></span></button>`;
+    }
+  }
+  h += '</div>';
+  return h;
+}
+
+document.getElementById('colorListDemo').innerHTML = colorListHTML('default', 'default');
+document.getElementById('colorSwatchDemo').innerHTML = colorSwatchHTML('blue', 'yellow');
+
+// —— live stage ——
+function closeMenus() {
+  document.querySelectorAll('.menu.live').forEach((n) => n.remove());
+}
+
+function applyBlockStyle() {
+  const el = document.getElementById('blockText');
+  if (!state.blockAlive) return;
+  el.style.color = state.textColor === 'default' ? '' : COLOR_VAL[state.textColor].replace('var(--c-default)', '');
+  // resolve via computed: set directly for demo
+  const map = {
+    default: '', gray: '#9b9a97', brown: '#64473a', red: '#e03e3e', orange: '#d9730d',
+    yellow: '#dfab01', green: '#4d6461', blue: '#0b6e99', purple: '#6940a5', pink: '#ad1a72',
+  };
+  const bgmap = {
+    default: 'transparent', gray: '#ebeced', brown: '#e9e5e3', red: '#fbe4e4', orange: '#f6e9d9',
+    yellow: '#fbf3db', green: '#ddedea', blue: '#ddebf1', purple: '#eae4f2', pink: '#f4dfeb',
+  };
+  el.style.color = map[state.textColor] || '';
+  el.style.background = bgmap[state.bgColor] || 'transparent';
+  el.style.borderRadius = state.bgColor === 'default' ? '' : '4px';
+  el.style.padding = state.bgColor === 'default' ? '' : '2px 6px';
+
+  // crude type preview
+  const t = TURN.find((x) => x.id === state.currentType);
+  if (state.currentType === 'h1') { el.style.fontSize = '22px'; el.style.fontWeight = '700'; }
+  else if (state.currentType === 'h2') { el.style.fontSize = '18px'; el.style.fontWeight = '650'; }
+  else if (state.currentType === 'h3') { el.style.fontSize = '16px'; el.style.fontWeight = '600'; }
+  else { el.style.fontSize = '14px'; el.style.fontWeight = '400'; }
+  if (state.currentType === 'quote') {
+    el.style.borderLeft = '3px solid var(--border)';
+    el.style.paddingLeft = '10px';
+    el.style.color = el.style.color || 'var(--sec)';
+  } else {
+    el.style.borderLeft = '';
+    el.style.paddingLeft = '';
+  }
+}
+
+function openMain(anchor) {
+  closeMenus();
+  if (!state.blockAlive) {
+    toast('块已删除 · 刷新页面可重置演示');
+    return;
+  }
+  const stage = document.getElementById('stage');
+  const sr = stage.getBoundingClientRect();
+  const r = anchor.getBoundingClientRect();
+  const main = document.createElement('div');
+  main.className = 'menu live';
+  main.dataset.role = 'main';
+  main.style.left = (r.right - sr.left + 6) + 'px';
+  main.style.top = (r.top - sr.top - 4) + 'px';
+  main.innerHTML = `
+    <div class="mi" data-sub="turn"><span class="ic">⇄</span><span class="lab">转换成…</span><span class="arr">▸</span></div>
+    <div class="mi" data-sub="color"><span class="ic">◐</span><span class="lab">颜色</span><span class="arr">▸</span></div>
+    <div class="mi" data-a="link"><span class="ic">🔗</span><span class="lab">复制链接到块</span></div>
+    <div class="mi" data-a="dup"><span class="ic">⎘</span><span class="lab">创制副本</span></div>
+    <div class="sep"></div>
+    <div class="mi" data-a="multi"><span class="ic">☑</span><span class="lab">加入多选</span></div>
+    <div class="sep"></div>
+    <div class="mi danger" data-a="del"><span class="ic">${trashIc()}</span><span class="lab">删除</span></div>`;
+  stage.appendChild(main);
+
+  let subEl = null;
+  let closeSubT = null;
+
+  function placeSub(trigger, html, extraClass) {
+    if (subEl) subEl.remove();
+    clearTimeout(closeSubT);
+    const tr = trigger.getBoundingClientRect();
+    const srr = stage.getBoundingClientRect();
+    subEl = document.createElement('div');
+    subEl.className = 'menu live sub ' + (extraClass || '');
+    subEl.dataset.role = 'sub';
+    let left = tr.right - srr.left + 4;
+    // flip if overflow
+    const estW = extraClass && extraClass.includes('color') ? 212 : 188;
+    if (tr.right + estW + 12 > window.innerWidth) {
+      left = tr.left - srr.left - estW - 4;
+    }
+    subEl.style.left = left + 'px';
+    subEl.style.top = (tr.top - srr.top - 4) + 'px';
+    subEl.innerHTML = html;
+    stage.appendChild(subEl);
+
+    subEl.addEventListener('mouseenter', () => clearTimeout(closeSubT));
+    subEl.addEventListener('mouseleave', () => {
+      closeSubT = setTimeout(() => { if (subEl) { subEl.remove(); subEl = null; } main.querySelectorAll('.mi.open').forEach(m => m.classList.remove('open')); }, 180);
+    });
+
+    subEl.addEventListener('click', (ev) => {
+      const turn = ev.target.closest('[data-turn]');
+      if (turn) {
+        state.currentType = turn.dataset.turn;
+        applyBlockStyle();
+        toast('已转换成「' + (TURN.find(t => t.id === state.currentType)?.lab || '') + '」');
+        closeMenus();
+        return;
+      }
+      const tc = ev.target.closest('[data-tc]');
+      if (tc) {
+        state.textColor = tc.dataset.tc;
+        applyBlockStyle();
+        // keep open: refresh sub
+        const triggerMi = main.querySelector('[data-sub="color"]');
+        openColorSub(triggerMi);
+        toast('文字色 → ' + tc.dataset.tc);
+        return;
+      }
+      const bc = ev.target.closest('[data-bc]');
+      if (bc) {
+        state.bgColor = bc.dataset.bc;
+        applyBlockStyle();
+        const triggerMi = main.querySelector('[data-sub="color"]');
+        openColorSub(triggerMi);
+        toast('背景色 → ' + bc.dataset.bc);
+      }
+    });
+  }
+
+  function openTurnSub(trigger) {
+    main.querySelectorAll('.mi.open').forEach(m => m.classList.remove('open'));
+    trigger.classList.add('open');
+    placeSub(trigger, renderTurnItems(state.currentType, state.groupTurn), '');
+  }
+  function openColorSub(trigger) {
+    main.querySelectorAll('.mi.open').forEach(m => m.classList.remove('open'));
+    trigger.classList.add('open');
+    const html = state.colorMode === 'swatch'
+      ? colorSwatchHTML(state.textColor, state.bgColor)
+      : colorListHTML(state.textColor, state.bgColor);
+    placeSub(trigger, html, state.colorMode === 'swatch' ? 'color-swatch' : 'color-list');
+  }
+
+  main.querySelectorAll('[data-sub]').forEach((mi) => {
+    mi.addEventListener('mouseenter', () => {
+      if (mi.dataset.sub === 'turn') openTurnSub(mi);
+      else openColorSub(mi);
+    });
+  });
+
+  main.addEventListener('mouseleave', () => {
+    closeSubT = setTimeout(() => {
+      // only close sub if not hovering sub
+    }, 200);
+  });
+
+  main.addEventListener('click', (ev) => {
+    const a = ev.target.closest('[data-a]');
+    if (!a) return;
+    const map = {
+      link: '已复制块链接',
+      dup: '已创制副本',
+      multi: '已加入多选',
+      del: '已删除块（无确认 · 可 Undo）',
+    };
+    if (a.dataset.a === 'del') {
+      state.blockAlive = false;
+      const t = document.getElementById('blockText');
+      t.textContent = '（块已删除）';
+      t.style.opacity = '1';
+      t.style.color = 'var(--ter)';
+      t.style.background = 'transparent';
+      t.style.fontSize = '14px';
+      t.style.fontWeight = '400';
+      t.style.borderLeft = '';
+      t.style.paddingLeft = '';
+      t.style.padding = '';
+    }
+    toast(map[a.dataset.a] || '');
+    closeMenus();
+  });
+}
+
+document.getElementById('btnGrip').onclick = (e) => {
+  e.stopPropagation();
+  openMain(e.currentTarget);
+};
+document.getElementById('btnPlus').onclick = (e) => {
+  e.stopPropagation();
+  closeMenus();
+  toast('＋ → 插入菜单（与 Turn-into 目录同源，入口不同）');
+};
+
+document.getElementById('btnSwatch').onclick = () => {
+  state.colorMode = 'swatch';
+  document.getElementById('btnSwatch').classList.add('on');
+  document.getElementById('btnList').classList.remove('on');
+  toast('颜色面板：P2 Swatch');
+  closeMenus();
+};
+document.getElementById('btnList').onclick = () => {
+  state.colorMode = 'list';
+  document.getElementById('btnList').classList.add('on');
+  document.getElementById('btnSwatch').classList.remove('on');
+  toast('颜色面板：P1 列表');
+  closeMenus();
+};
+document.getElementById('btnGroup').onclick = (e) => {
+  state.groupTurn = !state.groupTurn;
+  e.currentTarget.textContent = '分组 P2：' + (state.groupTurn ? '开' : '关');
+  e.currentTarget.classList.toggle('on', state.groupTurn);
+  closeMenus();
+};
+
+document.addEventListener('click', (e) => {
+  if (!e.target.closest('.menu.live') && !e.target.closest('#btnGrip')) closeMenus();
+});
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape') closeMenus();
+});
+</script>
+</body>
+</html>

@@ -14,6 +14,7 @@ import {
 } from 'react'
 import { offset, shift } from '@floating-ui/dom'
 import { BlockNoteView } from '@blocknote/mantine'
+import { blockHasType, editorHasBlockWithType } from '@blocknote/core'
 import {
   BasicTextStyleButton,
   ColorStyleButton,
@@ -28,8 +29,6 @@ import {
   useCreateBlockNote,
   useExtension,
   useExtensionState,
-  RemoveBlockItem,
-  BlockColorsItem,
   type DefaultReactSuggestionItem,
 } from '@blocknote/react'
 import { SideMenuExtension } from '@blocknote/core/extensions'
@@ -46,7 +45,7 @@ import { BlockNoteHipSlashMenu } from './BlockNoteHipSlashMenu'
 import { MantineProvider } from '@mantine/core'
 import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
-import { Copy, Link2, ListChecks, Trash2 } from 'lucide-react'
+import { Copy, Link2, ListChecks, Palette, Trash2, Type } from 'lucide-react'
 import {
   joinYamlFrontmatter,
   splitYamlFrontmatter,
@@ -71,6 +70,7 @@ import {
   SIDE_MENU_BLOCKS,
   cloneBlockForDuplicate,
   insertSideMenuBlock,
+  isCurrentSideMenuType,
   sideMenuLabelKey,
   turnIntoSideMenuBlock,
   type SideMenuBlockId,
@@ -325,6 +325,7 @@ function TurnIntoItem() {
           className="bn-menu-item"
           subTrigger
           data-testid="kb-turn-into"
+          icon={<Type size={14} strokeWidth={1.75} />}
         >
           {t('knowledge.doc.blockMenuTurnInto')}
         </Components.Generic.Menu.Item>
@@ -335,6 +336,12 @@ function TurnIntoItem() {
             key={item.id}
             className="bn-menu-item"
             data-testid={`kb-turn-into-${item.id}`}
+            icon={
+              <span className="kb-menu-glyph" aria-hidden>
+                {item.icon}
+              </span>
+            }
+            checked={isCurrentSideMenuType(block, item.id)}
             onClick={() => {
               try {
                 turnIntoSideMenuBlock(editor, block, item.id)
@@ -343,12 +350,140 @@ function TurnIntoItem() {
               }
             }}
           >
-            <span className="kb-add-menu-icon" aria-hidden>
-              {item.icon}
-            </span>
             {t(sideMenuLabelKey(item.id), { defaultValue: item.label })}
           </Components.Generic.Menu.Item>
         ))}
+      </Components.Generic.Menu.Dropdown>
+    </Components.Generic.Menu.Root>
+  )
+}
+
+const BLOCK_MENU_COLORS = [
+  'default',
+  'gray',
+  'brown',
+  'red',
+  'orange',
+  'yellow',
+  'green',
+  'blue',
+  'purple',
+  'pink',
+] as const
+
+type BlockMenuColor = (typeof BLOCK_MENU_COLORS)[number]
+
+/** 颜色 ▸ — BlockColorsItem 薄封装：父行 leading icon + 同源选色列表。 */
+function KnowledgeBlockColorsItem() {
+  const { t } = useTranslation()
+  const Components = useComponentsContext()
+  const editor = useBlockNoteEditor<any, any, any>()
+  const block = useExtensionState(SideMenuExtension, {
+    editor,
+    selector: (state) => state?.block,
+  })
+  const dict = blockNoteDictionary()
+
+  if (!Components || block === undefined) return null
+
+  const hasText =
+    blockHasType(block, editor, block.type, { textColor: 'string' }) &&
+    editorHasBlockWithType(editor, block.type, { textColor: 'string' })
+  const hasBackground =
+    blockHasType(block, editor, block.type, { backgroundColor: 'string' }) &&
+    editorHasBlockWithType(editor, block.type, { backgroundColor: 'string' })
+
+  if (!hasText && !hasBackground) return null
+
+  const textColor = hasText
+    ? String((block.props as { textColor?: string }).textColor ?? 'default')
+    : undefined
+  const backgroundColor = hasBackground
+    ? String(
+        (block.props as { backgroundColor?: string }).backgroundColor ??
+          'default',
+      )
+    : undefined
+
+  return (
+    <Components.Generic.Menu.Root position="right" sub>
+      <Components.Generic.Menu.Trigger sub>
+        <Components.Generic.Menu.Item
+          className="bn-menu-item"
+          subTrigger
+          data-testid="kb-block-colors"
+          icon={<Palette size={14} strokeWidth={1.75} />}
+        >
+          {t('knowledge.doc.blockMenuColors')}
+        </Components.Generic.Menu.Item>
+      </Components.Generic.Menu.Trigger>
+      <Components.Generic.Menu.Dropdown
+        sub
+        className="bn-menu-dropdown bn-color-picker-dropdown"
+      >
+        {hasText ? (
+          <>
+            <Components.Generic.Menu.Label>
+              {dict.color_picker.text_title}
+            </Components.Generic.Menu.Label>
+            {BLOCK_MENU_COLORS.map((color) => (
+              <Components.Generic.Menu.Item
+                key={`text-color-${color}`}
+                className="bn-menu-item"
+                data-test={`text-color-${color}`}
+                icon={
+                  <span
+                    className="kb-color-swatch kb-color-swatch-text"
+                    data-color={color}
+                    aria-hidden
+                  >
+                    A
+                  </span>
+                }
+                checked={textColor === color}
+                onClick={() =>
+                  editor.updateBlock(block, {
+                    type: block.type,
+                    props: { textColor: color },
+                  })
+                }
+              >
+                {dict.color_picker.colors[color as BlockMenuColor]}
+              </Components.Generic.Menu.Item>
+            ))}
+          </>
+        ) : null}
+        {hasBackground ? (
+          <>
+            <Components.Generic.Menu.Label>
+              {dict.color_picker.background_title}
+            </Components.Generic.Menu.Label>
+            {BLOCK_MENU_COLORS.map((color) => (
+              <Components.Generic.Menu.Item
+                key={`background-color-${color}`}
+                className="bn-menu-item"
+                data-test={`background-color-${color}`}
+                icon={
+                  <span
+                    className="kb-color-swatch kb-color-swatch-bg"
+                    data-color={color}
+                    aria-hidden
+                  >
+                    A
+                  </span>
+                }
+                checked={backgroundColor === color}
+                onClick={() =>
+                  editor.updateBlock(block, {
+                    props: { backgroundColor: color },
+                  })
+                }
+              >
+                {dict.color_picker.colors[color as BlockMenuColor]}
+              </Components.Generic.Menu.Item>
+            ))}
+          </>
+        ) : null}
       </Components.Generic.Menu.Dropdown>
     </Components.Generic.Menu.Root>
   )
@@ -434,14 +569,28 @@ function MultiSelectItem({
 function DeleteBlockItem() {
   const { t } = useTranslation()
   const Components = useComponentsContext()
-  if (!Components) return null
+  const editor = useBlockNoteEditor<any, any, any>()
+  const block = useExtensionState(SideMenuExtension, {
+    editor,
+    selector: (state) => state?.block,
+  })
+  if (!Components || block === undefined) return null
   return (
-    <RemoveBlockItem>
-      <span className="kb-menu-danger-label" data-testid="kb-delete-block">
-        <Trash2 size={14} strokeWidth={1.75} style={{ marginRight: 8, verticalAlign: -2 }} />
-        {t('knowledge.doc.blockMenuDelete')}
-      </span>
-    </RemoveBlockItem>
+    <Components.Generic.Menu.Item
+      className="bn-menu-item bn-menu-item-danger"
+      data-testid="kb-delete-block"
+      icon={<Trash2 size={14} strokeWidth={1.75} />}
+      onClick={() => {
+        const selectedBlocks = editor.getSelection()?.blocks
+        const blocksToRemove =
+          selectedBlocks && selectedBlocks.some((b: { id: string }) => b.id === block.id)
+            ? selectedBlocks
+            : [block]
+        editor.removeBlocks(blocksToRemove)
+      }}
+    >
+      {t('knowledge.doc.blockMenuDelete')}
+    </Components.Generic.Menu.Item>
   )
 }
 
@@ -666,7 +815,6 @@ function KnowledgeSideMenu({
   onClearSelection: () => void
   onCopyBlockLink: (blockId: string) => void
 }) {
-  const { t } = useTranslation()
   const editor = useBlockNoteEditor<any, any, any>()
   const block = useExtensionState(SideMenuExtension, {
     editor,
@@ -705,7 +853,7 @@ function KnowledgeSideMenu({
         }}
       >
         <TurnIntoItem />
-        <BlockColorsItem>{t('knowledge.doc.blockMenuColors')}</BlockColorsItem>
+        <KnowledgeBlockColorsItem />
         <CopyBlockLinkItem blockId={block.id} onCopy={onCopyBlockLink} />
         <DuplicateBlockItem />
         <ComponentsSeparator />

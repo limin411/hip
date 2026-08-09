@@ -154,6 +154,46 @@ export function turnIntoSideMenuBlock(
   editor.updateBlock(block, blockPartialForSideMenu(id))
 }
 
+/**
+ * Whether `block` already matches a side-menu catalog id.
+ * Paired with `blockPartialForSideMenu` (inverse mapping).
+ */
+export function isCurrentSideMenuType(
+  block: { type: string; props?: Record<string, unknown> },
+  id: SideMenuBlockId,
+): boolean {
+  switch (id) {
+    case 'text':
+      return block.type === 'paragraph'
+    case 'h1':
+      return block.type === 'heading' && Number(block.props?.level ?? 1) === 1
+    case 'h2':
+      return block.type === 'heading' && Number(block.props?.level) === 2
+    case 'h3':
+      return block.type === 'heading' && Number(block.props?.level) === 3
+    case 'quote':
+      return block.type === 'quote'
+    case 'hr':
+      return block.type === 'divider'
+    case 'bullet':
+      return block.type === 'bulletListItem'
+    case 'ordered':
+      return block.type === 'numberedListItem'
+    case 'task':
+      return block.type === 'checkListItem'
+    case 'fence':
+      return block.type === 'codeBlock'
+    case 'toggle':
+      return block.type === 'toggle'
+    case 'callout':
+      return block.type === 'callout'
+    default: {
+      const _exhaustive: never = id
+      return _exhaustive
+    }
+  }
+}
+
 /** Safe-ish clone for Duplicate (type/props/content only). */
 export function cloneBlockForDuplicate(block: {
   type: string

@@ -5,8 +5,10 @@ import {
   blockPartialForSideMenu,
   cloneBlockForDuplicate,
   insertSideMenuBlock,
+  isCurrentSideMenuType,
   sideMenuLabelKey,
   turnIntoSideMenuBlock,
+  type SideMenuBlockId,
 } from './sideMenuBlocks'
 import type { BlockNoteSlashEditor } from './blockNoteSlash'
 
@@ -113,5 +115,34 @@ describe('sideMenuBlocks', () => {
     expect(clone.content).not.toBe([
       { type: 'text', text: 'hi', styles: {} },
     ])
+  })
+
+  it('isCurrentSideMenuType pairs with blockPartialForSideMenu', () => {
+    const cases: Array<{
+      id: SideMenuBlockId
+      block: { type: string; props?: Record<string, unknown> }
+    }> = [
+      { id: 'text', block: { type: 'paragraph' } },
+      { id: 'h1', block: { type: 'heading', props: { level: 1 } } },
+      { id: 'h1', block: { type: 'heading' } }, // default level → h1
+      { id: 'h2', block: { type: 'heading', props: { level: 2 } } },
+      { id: 'h3', block: { type: 'heading', props: { level: 3 } } },
+      { id: 'task', block: { type: 'checkListItem' } },
+      { id: 'bullet', block: { type: 'bulletListItem' } },
+      { id: 'ordered', block: { type: 'numberedListItem' } },
+      { id: 'toggle', block: { type: 'toggle' } },
+      { id: 'fence', block: { type: 'codeBlock' } },
+      { id: 'quote', block: { type: 'quote' } },
+      { id: 'hr', block: { type: 'divider' } },
+      { id: 'callout', block: { type: 'callout' } },
+    ]
+    for (const { id, block } of cases) {
+      expect(isCurrentSideMenuType(block, id)).toBe(true)
+    }
+    expect(
+      isCurrentSideMenuType({ type: 'heading', props: { level: 2 } }, 'h1'),
+    ).toBe(false)
+    expect(isCurrentSideMenuType({ type: 'paragraph' }, 'h1')).toBe(false)
+    expect(isCurrentSideMenuType({ type: 'image' }, 'text')).toBe(false)
   })
 })

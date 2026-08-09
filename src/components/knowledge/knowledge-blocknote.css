@@ -388,21 +388,119 @@
   flex: none;
 }
 
-/* 块菜单（点击六点弹出） */
-.knowledge-blocknote-editor .bn-menu-dropdown .bn-menu-item {
+/* 块菜单（点击六点弹出）· 行几何契约：主菜单 = 子菜单 */
+.knowledge-blocknote-editor .bn-menu-dropdown .bn-menu-item,
+.bn-drag-handle-menu .bn-menu-item,
+.bn-menu-dropdown .bn-menu-item {
   display: flex;
   align-items: center;
+  flex-wrap: nowrap;
   gap: 0.5rem;
-  min-width: 11rem;
-  padding: 0.45rem 0.65rem;
+  min-width: 12rem;
+  min-height: 2rem;
+  padding: 0.375rem 0.625rem;
   line-height: 1.25;
   font-size: 13px;
+  white-space: nowrap;
 }
 
-.knowledge-blocknote-editor .bn-menu-dropdown .bn-menu-item:has(.kb-menu-danger-label),
-.bn-menu-dropdown .bn-menu-item:has(.kb-menu-danger-label) {
-  color: var(--status-danger, #c0392b);
+.bn-drag-handle-menu .bn-menu-item .mantine-Menu-itemLabel,
+.bn-menu-dropdown .bn-menu-item .mantine-Menu-itemLabel {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
+
+.bn-drag-handle-menu .bn-menu-item .mantine-Menu-itemSection,
+.bn-menu-dropdown .bn-menu-item .mantine-Menu-itemSection {
+  flex: none;
+}
+
+.bn-drag-handle-menu .bn-menu-item .mantine-Menu-itemSection[data-position='left'],
+.bn-menu-dropdown .bn-menu-item .mantine-Menu-itemSection[data-position='left'] {
+  width: 16px;
+  height: 16px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Turn-into glyph in leftSection */
+.kb-menu-glyph {
+  width: 16px;
+  height: 16px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1;
+  color: var(--text-secondary, #5e5e5e);
+}
+
+/* Danger row (delete) */
+.bn-menu-item.bn-menu-item-danger,
+.bn-menu-item.bn-menu-item-danger .mantine-Menu-itemSection,
+.bn-menu-item.bn-menu-item-danger .mantine-Menu-itemLabel {
+  color: var(--danger, #c63b3b) !important;
+}
+
+.bn-menu-item.bn-menu-item-danger:hover,
+.bn-menu-item.bn-menu-item-danger:focus-visible {
+  background: color-mix(in srgb, var(--danger, #c63b3b) 10%, transparent) !important;
+  color: var(--danger, #c63b3b) !important;
+}
+
+/* Color submenu list skin */
+.bn-color-picker-dropdown {
+  padding: 4px;
+  min-width: 12rem;
+}
+
+.bn-color-picker-dropdown .mantine-Menu-label {
+  color: var(--text-tertiary, #757575);
+  font-size: 11px;
+  font-weight: 600;
+  padding: 6px 10px 4px;
+}
+
+.kb-color-swatch {
+  width: 16px;
+  height: 16px;
+  border-radius: 3px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 1;
+  border: 1px solid var(--border, rgba(0, 0, 0, 0.12));
+  box-sizing: border-box;
+}
+
+.kb-color-swatch-text[data-color='default'] { color: var(--text-primary, #111); background: transparent; }
+.kb-color-swatch-text[data-color='gray'] { color: #9b9a97; }
+.kb-color-swatch-text[data-color='brown'] { color: #64473a; }
+.kb-color-swatch-text[data-color='red'] { color: #e03e3e; }
+.kb-color-swatch-text[data-color='orange'] { color: #d9730d; }
+.kb-color-swatch-text[data-color='yellow'] { color: #dfab01; }
+.kb-color-swatch-text[data-color='green'] { color: #4d6461; }
+.kb-color-swatch-text[data-color='blue'] { color: #0b6e99; }
+.kb-color-swatch-text[data-color='purple'] { color: #6940a5; }
+.kb-color-swatch-text[data-color='pink'] { color: #ad1a72; }
+
+.kb-color-swatch-bg[data-color='default'] { color: var(--text-primary, #111); background: transparent; }
+.kb-color-swatch-bg[data-color='gray'] { background: #ebeced; color: #111; }
+.kb-color-swatch-bg[data-color='brown'] { background: #e9e5e3; color: #111; }
+.kb-color-swatch-bg[data-color='red'] { background: #fbe4e4; color: #111; }
+.kb-color-swatch-bg[data-color='orange'] { background: #f6e9d9; color: #111; }
+.kb-color-swatch-bg[data-color='yellow'] { background: #fbf3db; color: #111; }
+.kb-color-swatch-bg[data-color='green'] { background: #ddedea; color: #111; }
+.kb-color-swatch-bg[data-color='blue'] { background: #ddebf1; color: #111; }
+.kb-color-swatch-bg[data-color='purple'] { background: #eae4f2; color: #111; }
+.kb-color-swatch-bg[data-color='pink'] { background: #f4dfeb; color: #111; }
 
 /*
  * Bubble toolbar + menus often portal outside the editor host.
@@ -474,6 +572,12 @@
 
 .bn-menu-item:hover {
   background: var(--state-hover, rgba(0, 0, 0, 0.06)) !important;
+}
+
+/* danger hover must win over generic item hover */
+.bn-menu-item.bn-menu-item-danger:hover {
+  background: color-mix(in srgb, var(--danger, #c63b3b) 10%, transparent) !important;
+  color: var(--danger, #c63b3b) !important;
 }
 
 /* Table handles also portal */

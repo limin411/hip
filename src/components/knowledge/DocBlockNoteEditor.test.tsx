@@ -56,6 +56,8 @@ vi.mock('@blocknote/core', () => ({
   defaultBlockSpecs: {},
   defaultInlineContentSpecs: {},
   defaultStyleSpecs: {},
+  blockHasType: () => false,
+  editorHasBlockWithType: () => false,
 }))
 
 vi.mock('@blocknote/react', () => ({
@@ -78,12 +80,6 @@ vi.mock('@blocknote/react', () => ({
     blockDragEnd: vi.fn(),
   }),
   useExtensionState: () => undefined,
-  RemoveBlockItem: ({ children }: { children?: React.ReactNode }) => (
-    <div>{children}</div>
-  ),
-  BlockColorsItem: ({ children }: { children?: React.ReactNode }) => (
-    <div>{children}</div>
-  ),
   DragHandleMenu: () => null,
   useComponentsContext: () => null,
   createReactBlockSpec: () => () => ({}),

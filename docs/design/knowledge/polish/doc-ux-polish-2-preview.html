@@ -1,0 +1,348 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="light">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>文档管理 × 操作交互与视觉体验第二弹 — 整改后高保真预览</title>
+<style>
+/* ═══════════════ 基础与主题变量（继承 V3 纸张 token） ═══════════════ */
+:root{
+  --bg-app:#ffffff; --bg-subtle:#fafafa; --bg-muted:#f1f1f1; --bg-content:#ffffff;
+  --border:#e0e0e0; --border-strong:#c9c9c9;
+  --text-primary:#111111; --text-secondary:#5e5e5e; --text-tertiary:#757575;
+  --accent:#c2410c; --accent-strong:#7c2d12; --accent-subtle:#f0f0f0; --on-accent:#fff;
+  --btn-primary:#3a3a3a; --on-btn:#fafafa;
+  --state-hover:rgba(0,0,0,.055); --shadow-overlay:0 8px 30px rgba(0,0,0,.12);
+  /* 文档域子语言（V3） */
+  --doc-text:#2f2c28; --doc-muted:#9b9893; --doc-hover:#f0efec; --doc-row:#f7f6f3;
+  --doc-border:#e8e8e8; --doc-code:#f7f6f3; --doc-selection:rgba(45,110,220,.18);
+  --doc-quote:#2f2c28;
+}
+[data-theme="dark"]{
+  --bg-app:#1a1a1a; --bg-subtle:#1f1f1f; --bg-muted:#262626; --bg-content:#1a1a1a;
+  --border:#333333; --border-strong:#4a4a4a;
+  --text-primary:#e6e6e6; --text-secondary:#9d9d9d; --text-tertiary:#7a7a7a;
+  --accent:#fb923c; --accent-strong:#fdba74; --accent-subtle:#2b2b2b; --on-accent:#1a1a1a;
+  --btn-primary:#d8d8d8; --on-btn:#1a1a1a;
+  --state-hover:rgba(255,255,255,.07); --shadow-overlay:0 8px 30px rgba(0,0,0,.5);
+  --doc-text:#e8e6e1; --doc-muted:#7d7a75; --doc-hover:#2f2f2f; --doc-row:#2a2a2a;
+  --doc-border:#3a3a3a; --doc-code:#2f2f2f; --doc-selection:rgba(93,160,255,.25);
+  --doc-quote:#e8e6e1;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{background:var(--bg-app);color:var(--text-primary)}
+body{font-family:-apple-system,BlinkMacSystemFont,"SF Pro Text","PingFang SC","Hiragino Sans GB","Microsoft YaHei","Segoe UI",sans-serif;font-size:13px;line-height:1.5;padding:0 0 64px}
+button{font-family:inherit;cursor:pointer;border:0;background:none;color:inherit}
+.page{max-width:1180px;margin:0 auto;padding:0 24px}
+
+/* ═══════════════ 页面头部 ═══════════════ */
+.topbar{position:sticky;top:0;z-index:60;background:var(--bg-app);border-bottom:1px solid var(--border);padding:12px 0}
+.topbar-in{max-width:1180px;margin:0 auto;padding:0 24px;display:flex;align-items:center;gap:14px}
+.topbar h1{font-size:16px;font-weight:600;letter-spacing:-.01em}
+.topbar .sub{color:var(--text-tertiary);font-size:12px}
+.topbar .spacer{flex:1}
+.btn{border:1px solid var(--border);background:var(--bg-subtle);border-radius:6px;padding:5px 12px;font-size:12px;color:var(--text-secondary);transition:all .15s}
+.btn:hover{background:var(--state-hover);color:var(--text-primary)}
+.btn.on{background:var(--btn-primary);color:var(--on-btn);border-color:var(--btn-primary)}
+h2.sec{font-size:15px;font-weight:600;letter-spacing:-.01em;margin:42px 0 4px;display:flex;align-items:center;gap:8px}
+h2.sec .tag{font-size:10px;font-weight:600;color:var(--accent-strong);background:var(--accent-subtle);padding:2px 7px;border-radius:4px;letter-spacing:.04em}
+p.sec-sub{color:var(--text-tertiary);font-size:12px;margin-bottom:14px}
+
+/* ═══════════════ 对比卡 ═══════════════ */
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(352px,1fr));gap:14px}
+.cmp{background:var(--bg-subtle);border:1px solid var(--border);border-radius:10px;overflow:hidden;display:flex;flex-direction:column}
+.cmp-head{display:flex;align-items:center;gap:8px;padding:9px 12px;border-bottom:1px solid var(--border)}
+.cmp-no{font-size:10px;font-weight:700;color:var(--accent-strong);background:var(--accent-subtle);border-radius:4px;padding:2px 6px;letter-spacing:.03em}
+.cmp-title{font-size:12.5px;font-weight:600;flex:1}
+.cmp-pair{display:grid;grid-template-columns:1fr 1fr;gap:0;flex:1}
+.cmp-side{padding:12px;display:flex;flex-direction:column;gap:8px;min-height:0}
+.cmp-side.before{background:var(--bg-app);border-right:1px dashed var(--border)}
+.cmp-side.after{background:var(--bg-app)}
+.cmp-label{font-size:10.5px;font-weight:600;letter-spacing:.05em;color:var(--text-tertiary)}
+.cmp-label .dot{display:inline-block;width:6px;height:6px;border-radius:50%;margin-right:5px;vertical-align:1px}
+.cmp-label .dot.b{background:#999}.cmp-label .dot.a{background:var(--doc-text)}
+.cmp-foot{padding:8px 12px;border-top:1px solid var(--border);font-size:11.5px;color:var(--text-secondary);line-height:1.55;background:var(--bg-subtle)}
+.cmp-foot b{color:var(--text-primary);font-weight:600}
+.note{font-size:11px;color:var(--doc-muted)}
+
+/* ═══════════════ 通用小部件 ═══════════════ */
+.mini{border:1px solid var(--border);border-radius:6px;background:var(--bg-app);overflow:hidden;width:100%}
+.row{display:flex;align-items:center;gap:8px;padding:5px 8px;font-size:11.5px;border-radius:5px;color:var(--doc-text)}
+.row + .row{margin-top:2px}
+.row.sel{background:var(--doc-hover)}
+.row .grow{flex:1;min-width:0}
+.row .dim{color:var(--doc-muted);font-size:10.5px;white-space:nowrap}
+.folder-ic{width:16px;height:16px;flex:none;color:var(--accent)}
+.doc-ic{width:16px;height:16px;flex:none;color:var(--text-tertiary)}
+.hint{font-size:10.5px;color:var(--doc-muted);line-height:1.5}
+.tag-pill{display:inline-block;font-size:9.5px;font-weight:600;letter-spacing:.04em;color:var(--accent-strong);background:var(--accent-subtle);border-radius:3px;padding:1px 5px;vertical-align:1px}
+
+/* ═══════════════ X1 斜杠菜单 ═══════════════ */
+.slash{width:100%;border:1px solid var(--border);border-radius:8px;background:var(--bg-app);box-shadow:var(--shadow-overlay);overflow:hidden;font-size:11.5px}
+.slash .sg{padding:8px 14px 4px;font-size:10px;font-weight:600;letter-spacing:.06em;color:var(--text-tertiary);text-transform:uppercase}
+.slash .si{display:flex;align-items:center;gap:10px;padding:0 12px;height:32px}
+.slash .si.h40{height:40px}
+.slash .si .ico{width:30px;height:30px;border-radius:6px;background:var(--doc-row);display:flex;align-items:center;justify-content:center;font-size:14px;flex:none}
+.slash .si.hot{background:var(--doc-hover)}
+.slash .si .arr{margin-left:auto;color:var(--doc-muted);font-size:10px;opacity:.9}
+.slash .si .sub{color:var(--doc-muted);font-size:10.5px}
+.slash.narrow{max-width:200px}
+.slash.wide{max-width:248px}
+
+/* ═══════════════ X2 手柄拖拽多选 ═══════════════ */
+.paper{position:relative;padding:10px 12px 10px 34px;font-size:12.5px}
+.h6{position:absolute;left:6px;top:9px;width:16px;height:16px;color:var(--text-secondary);display:flex;align-items:center;justify-content:center}
+.dot6{display:grid;grid-template-columns:repeat(2,2.5px);grid-auto-rows:2.5px;gap:2.5px}
+.dot6 i{width:2.5px;height:2.5px;border-radius:50%;background:currentColor}
+.para{margin:2px 0;color:var(--doc-text);line-height:1.6}
+.para.ms{background:var(--doc-selection);border-radius:3px;outline:1px solid rgba(45,110,220,.25)}
+.para.drag{opacity:.45}
+.drop-shadow{height:2px;background:var(--border-strong);border-radius:1px;margin:2px 0}
+.msbar{display:flex;align-items:center;gap:8px;margin-top:8px;background:var(--doc-row);border:1px solid var(--border);border-radius:8px;padding:5px 10px;font-size:11px;box-shadow:var(--shadow-overlay)}
+.msbar .cnt{font-weight:600;color:var(--doc-text)}
+.msbar .sep{width:1px;height:14px;background:var(--border)}
+.msbar .op{padding:3px 8px;border-radius:5px;color:var(--text-secondary)}
+.msbar .op:hover{background:var(--doc-hover);color:var(--text-primary)}
+.msbar .op.danger:hover{background:rgba(220,60,40,.1);color:#d5402a}
+
+/* ═══════════════ X3 浏览拖拽排序与移动 ═══════════════ */
+.dragrow{position:relative}
+.dragrow .ind{position:absolute;left:6px;right:6px;top:-1px;height:2px;background:var(--border-strong);border-radius:1px}
+.dragrow.into{background:var(--doc-hover);outline:1px dashed var(--border-strong);outline-offset:-1px}
+.breadcrumb{display:flex;align-items:center;gap:4px;padding:4px 8px;font-size:10.5px;color:var(--text-tertiary);border-bottom:1px solid var(--border);border-radius:6px 6px 0 0;background:var(--bg-content)}
+.breadcrumb .bc{padding:2px 6px;border-radius:4px}
+.breadcrumb .bc:hover{background:var(--state-hover)}
+.breadcrumb .bc.droptarget{background:var(--doc-selection);color:var(--doc-text);outline:1px dashed var(--border-strong)}
+
+/* ═══════════════ X4 批量操作 ═══════════════ */
+.check{width:14px;height:14px;border:1.2px solid var(--border-strong);border-radius:3px;flex:none;display:flex;align-items:center;justify-content:center;font-size:9px;color:#fff;background:var(--bg-app)}
+.row.sel .check{background:var(--doc-text);border-color:var(--doc-text)}
+.row.sel .check::after{content:"✓"}
+.row.sel{background:var(--doc-hover)}
+.confirm{width:260px;border:1px solid var(--border);border-radius:10px;background:var(--bg-app);box-shadow:var(--shadow-overlay);padding:14px;font-size:12px}
+.confirm h4{font-size:13px;font-weight:600;margin-bottom:6px;color:var(--text-primary)}
+.confirm p{color:var(--text-secondary);font-size:11.5px;line-height:1.6;margin-bottom:12px}
+.confirm .btns{display:flex;justify-content:flex-end;gap:6px}
+.primary{border:0;background:var(--btn-primary);color:var(--on-btn);border-radius:5px;padding:4px 10px;font-size:11px}
+.ghost{border:1px solid var(--border);background:var(--bg-app);color:var(--text-secondary);border-radius:5px;padding:4px 10px;font-size:11px}
+.ghost:hover{background:var(--state-hover);color:var(--text-primary)}
+.primary.danger{background:#c2410c;color:#fff}
+
+/* ═══════════════ X5 暗色微视觉 ═══════════════ */
+.scroll-thin{width:6px;border-radius:3px;background:var(--doc-row)}
+.scroll-thumb{width:6px;border-radius:3px;background:var(--doc-muted);opacity:.4}
+.emptystate{display:flex;flex-direction:column;align-items:center;gap:6px;padding:26px 10px;text-align:center}
+.emptystate h4{font-size:16px;font-weight:600;color:var(--text-primary)}
+.emptystate p{font-size:11px;color:var(--text-tertiary)}
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="topbar-in">
+    <h1>文档管理 × 操作交互与视觉体验第二弹</h1>
+    <span class="sub">doc-ux-polish-2 · 整改后高保真预览 · 对照 spec §3</span>
+    <div class="spacer"></div>
+    <button class="btn" id="theme-btn" type="button">🌗 切换暗色</button>
+  </div>
+</div>
+
+<div class="page">
+
+  <h2 class="sec"><span class="tag">P0</span> X1 · 斜杠菜单尺寸达标（V3 T8 收尾）</h2>
+  <p class="sec-sub">288px → 356px；图标列固定 46px（图标居中 30px 圆角块）；项高 40px；分组标题 12px 大写灰字；选中项暖灰底 + 右侧箭头淡显。</p>
+  <div class="grid">
+    <div class="cmp">
+      <div class="cmp-head"><span class="cmp-no">BEFORE</span><span class="cmp-title">现状：288px 窄菜单，32px 项，无图标列</span></div>
+      <div class="cmp-side before">
+        <div class="slash narrow">
+          <div class="sg">Basic blocks</div>
+          <div class="si"><span class="ico">📄</span><span>文本</span></div>
+          <div class="si"><span class="ico">#</span><span>标题 1</span></div>
+          <div class="si"><span class="ico">☑</span><span>待办</span></div>
+          <div class="si"><span class="ico">⏺</span><span>列表</span></div>
+        </div>
+        <div class="hint">行高 32px，图标非独立列，宽度仅 200px 演示（实为 288px），与正文列表视觉混同。</div>
+      </div>
+      <div class="cmp-side after">
+        <div class="slash wide">
+          <div class="sg">基础块</div>
+          <div class="si h40"><span class="ico">📄</span><span>文本</span><span class="sub">text</span></div>
+          <div class="si h40 hot"><span class="ico">#</span><span>标题 1</span><span class="sub">heading</span><span class="arr">›</span></div>
+          <div class="si h40"><span class="ico">☑</span><span>待办</span><span class="sub">todo</span></div>
+          <div class="si h40"><span class="ico">⏺</span><span>列表</span><span class="sub">list</span></div>
+        </div>
+        <div class="hint">356px 宽、46px 图标列、40px 项高；选中项整行暖灰 + 右侧箭头淡显。</div>
+      </div>
+      <div class="cmp-foot"><b>验收：</b>与 V3 preview §D7 一致；键盘导航（↑↓/Enter/Esc）回归。</div>
+    </div>
+  </div>
+
+  <h2 class="sec"><span class="tag">P0</span> X2 · 手柄拖拽连续多选（V3 T13）</h2>
+  <p class="sec-sub">按住六点手柄拖拽跨行 = 连续多选（Notion 手势）；位移 &gt;4px 才判定为拖拽（点击仍弹块菜单）；拖影半透明；Shift+点击保留。多选工具条补「批量删除」。</p>
+  <div class="grid">
+    <div class="cmp">
+      <div class="cmp-head"><span class="cmp-no">BEFORE</span><span class="cmp-title">现状：多选入口在块菜单内，一次只能 Shift+点击</span></div>
+      <div class="cmp-side before">
+        <div class="mini">
+          <div class="paper">
+            <div class="h6"><span class="dot6"><i></i><i></i><i></i><i></i><i></i><i></i></span></div>
+            <div class="para">第一段：介绍背景</div>
+            <div class="para">第二段：问题陈述</div>
+            <div class="para">第三段：方案对比</div>
+          </div>
+        </div>
+        <div class="hint">多选需先点击手柄 → 块菜单 → 「多选」，再逐个 Shift+点击；无连续拖选手势。</div>
+      </div>
+      <div class="cmp-side after">
+        <div class="mini">
+          <div class="paper">
+            <div class="h6 drag"><span class="dot6" style="color:var(--text-tertiary)"><i></i><i></i><i></i><i></i><i></i><i></i></span></div>
+            <div class="para ms">第一段：介绍背景</div>
+            <div class="para ms">第二段：问题陈述</div>
+            <div class="para ms">第三段：方案对比</div>
+            <div class="para drag">第四段：结论（拖影）</div>
+          </div>
+          <div style="padding:0 12px 12px">
+            <div class="msbar">
+              <span class="cnt">已选 3 块</span>
+              <span class="sep"></span>
+              <span class="op">转为标题</span>
+              <span class="op">转为段落</span>
+              <span class="op danger">批量删除</span>
+            </div>
+          </div>
+        </div>
+        <div class="hint">手柄按住向下拖过三行 = 连续选中（暖灰蓝选区）；松开即结束；工具条含批量删除。</div>
+      </div>
+      <div class="cmp-foot"><b>验收：</b>拖拽跨 3 行选中 3 块；无位移点击仍弹块菜单；`knowledge-multiselect.spec.ts` 回归。</div>
+    </div>
+  </div>
+
+  <h2 class="sec"><span class="tag">P1</span> X3 · 浏览视图拖拽 + 面包屑 drop 目标</h2>
+  <p class="sec-sub">列表行/网格 tile 同手势；面包屑行可作 drop 目标 = 移入该祖先文件夹（单层模型下跨目录移动的天然入口）。</p>
+  <div class="grid">
+    <div class="cmp">
+      <div class="cmp-head"><span class="cmp-no">BEFORE</span><span class="cmp-title">现状：跨目录移动需右键 → 移动</span></div>
+      <div class="cmp-side before">
+        <div class="mini">
+          <div class="breadcrumb"><span class="bc">全部文档</span><span>›</span><span class="bc">项目</span></div>
+          <div class="row"><span class="doc-ic">▤</span><span class="grow">设计稿评审</span><span class="dim">2 小时前</span></div>
+          <div class="row"><span class="doc-ic">▤</span><span class="grow">开发计划</span><span class="dim">昨天</span></div>
+        </div>
+        <div class="hint">「设计稿评审」想移到「归档」：右键 → ⋯ → 移动 → 展开目录树 → 确认，约 4–5 次点击。</div>
+      </div>
+      <div class="cmp-side after">
+        <div class="mini">
+          <div class="breadcrumb">
+            <span class="bc droptarget">全部文档</span><span>›</span><span class="bc droptarget">归档</span><span>›</span><span class="bc">项目</span>
+          </div>
+          <div class="row" style="opacity:.55"><span class="doc-ic">▤</span><span class="grow">设计稿评审</span><span class="dim">2 小时前</span></div>
+          <div class="row"><span class="doc-ic">▤</span><span class="grow">开发计划</span><span class="dim">昨天</span></div>
+          <div class="dragrow into"><span class="ind" style="bottom:-1px;top:auto"></span></div>
+        </div>
+        <div class="hint">拖起行后，面包屑可 drop 的祖先高亮（暖灰 + 虚线框）；松手即移入「归档」，1 次拖拽完成。</div>
+      </div>
+      <div class="cmp-foot"><b>验收：</b>列表内排序、拖入子文件夹、拖到 crumb 移入祖先，三路径均持久化；`tree.test.ts` toIndex 边界覆盖。</div>
+    </div>
+  </div>
+
+  <h2 class="sec"><span class="tag">P1</span> X4 · 浏览批量操作</h2>
+  <p class="sec-sub">Shift 连选 / ⌘ 点选；选中态 = 复选框 + 整行暖灰（与编辑器多选视觉一致）；底部浮动批量条：N 项 + 删除（确认弹层）/ 移动（目录选择）；Esc 退出。</p>
+  <div class="grid">
+    <div class="cmp">
+      <div class="cmp-head"><span class="cmp-no">BEFORE</span><span class="cmp-title">现状：删除/移动只能逐篇操作</span></div>
+      <div class="cmp-side before">
+        <div class="mini">
+          <div class="row"><span class="doc-ic">▤</span><span class="grow">草稿 A</span><span class="dim">⋯</span></div>
+          <div class="row"><span class="doc-ic">▤</span><span class="grow">草稿 B</span><span class="dim">⋯</span></div>
+          <div class="row"><span class="doc-ic">▤</span><span class="grow">草稿 C</span><span class="dim">⋯</span></div>
+        </div>
+        <div class="hint">3 篇草稿删除 = 3 次右键 → 删除 → 确认；无多选、无批量条。</div>
+      </div>
+      <div class="cmp-side after">
+        <div class="mini">
+          <div class="row sel"><span class="check"></span><span class="doc-ic">▤</span><span class="grow">草稿 A</span><span class="dim">⋯</span></div>
+          <div class="row sel"><span class="check"></span><span class="doc-ic">▤</span><span class="grow">草稿 B</span><span class="dim">⋯</span></div>
+          <div class="row sel"><span class="check"></span><span class="doc-ic">▤</span><span class="grow">草稿 C</span><span class="dim">⋯</span></div>
+          <div style="padding:0 10px 10px">
+            <div class="msbar">
+              <span class="cnt">已选 3 篇</span>
+              <span class="sep"></span>
+              <span class="op">移动到…</span>
+              <span class="op danger">删除</span>
+            </div>
+          </div>
+        </div>
+        <div class="confirm" style="margin-top:8px">
+          <h4>删除 3 篇文档？</h4>
+          <p>「草稿 A」「草稿 B」「草稿 C」将移入回收站，可随时恢复。</p>
+          <div class="btns">
+            <button class="ghost">取消</button>
+            <button class="primary danger">删除</button>
+          </div>
+        </div>
+        <div class="hint">批量删除带确认弹层；Esc / 点空白 / 全取消退出批量态。</div>
+      </div>
+      <div class="cmp-foot"><b>验收：</b>批量删除 3 篇 + 确认；批量移动跨目录；索引/搜索缓存同步（复用现有清理路径）。</div>
+    </div>
+  </div>
+
+  <h2 class="sec"><span class="tag">P2</span> X5 · 暗色与微视觉一致性</h2>
+  <p class="sec-sub">暗色抽查：滚动条细/低对比、选区中性蓝灰、`--kb-*` 对比度、代码块纸面调色板、多选高亮；标题 hover ⋯ 入口延迟 ≤100ms。全部复用现有 token，不新增变量域。</p>
+  <div class="grid">
+    <div class="cmp">
+      <div class="cmp-head"><span class="cmp-no">BEFORE</span><span class="cmp-title">现状：暗色下局部对比与反馈细节未逐项核对</span></div>
+      <div class="cmp-side before">
+        <div style="display:flex;gap:8px;align-items:stretch">
+          <div style="display:flex;flex-direction:column;gap:4px;align-items:center">
+            <div class="scroll-thin" style="flex:1"></div>
+            <span style="font-size:9px;color:var(--text-tertiary)">8px 滚动条</span>
+          </div>
+          <div style="flex:1">
+            <div class="para">滚动条默认宽度、选区色在暗色下偏亮、hover 无延迟控制——均为「未核对」而非「必错」。</div>
+            <div class="para" style="background:var(--doc-selection);border-radius:3px">暗色选区为中性蓝灰（已达标）</div>
+          </div>
+        </div>
+      </div>
+      <div class="cmp-side after">
+        <div style="display:flex;gap:8px;align-items:stretch">
+          <div style="display:flex;flex-direction:column;gap:4px;align-items:center">
+            <div style="width:6px;flex:1;background:var(--doc-row);border-radius:3px;display:flex;flex-direction:column;gap:2px;padding:2px 0">
+              <div style="width:6px;flex:1;background:var(--doc-muted);border-radius:3px;opacity:.4"></div>
+            </div>
+            <span style="font-size:9px;color:var(--text-tertiary)">6px 细滚动条</span>
+          </div>
+          <div style="flex:1">
+            <div class="para">6px 细滚动条 + 40% 透明度滑块；hover 时机统一 ≤100ms；对比度逐项 ≥4.5:1。</div>
+            <div class="para" style="background:var(--doc-selection);border-radius:3px">选区/多选高亮暗色核对</div>
+          </div>
+        </div>
+        <div class="emptystate" style="margin-top:8px;border:1px dashed var(--border);border-radius:8px">
+          <h4>从空白开始</h4>
+          <p>新建一篇文档，或从模板开始 · 空态排版与 V3 一致</p>
+          <button class="primary" style="margin-top:2px">新建文档</button>
+        </div>
+      </div>
+      <div class="cmp-foot"><b>验收：</b>暗色正文对比度 ≥4.5:1；无新增 token 域；hover 反馈 ≤100ms。</div>
+    </div>
+  </div>
+
+  <h2 class="sec"><span class="tag">门禁</span> 回归与交付</h2>
+  <p class="sec-sub">每个 PR：`yarn tsc` + `yarn test` 全绿 + 受影响 e2e 通过 + 与本文档对照截图（Playwright `--channel=chrome`）。非目标见 spec §5：无 AI 接入、无嵌套层级、无数据库/元数据、无导入导出、无新依赖；<b>本版范围裁剪：不做侧边栏拖拽排序与移动、页面 emoji 图标（v1.1）</b>。</p>
+
+</div>
+
+<script>
+(function () {
+  var btn = document.getElementById('theme-btn')
+  btn.addEventListener('click', function () {
+    var root = document.documentElement
+    var next = root.getAttribute('data-theme') === 'light' ? 'dark' : 'light'
+    root.setAttribute('data-theme', next)
+    btn.textContent = next === 'light' ? '🌗 切换暗色' : '☀️ 切换亮色'
+  })
+})()
+</script>
+</body>
+</html>

@@ -3,8 +3,8 @@
 > 版本：v3.0（2026-08）
 > 范围：**文档内细节体验与视觉样式**（区别于 V2 的编辑模型/功能补齐）。V2 已解决"有没有"（分栏/块引用/反链/⌘K/无源码模式），本版解决"像不像"——打开文档后的每一个交互细节与视觉呈现向 Notion 对齐。
 > 配套文件：
-> - `docs/design/doc-notion-polish-preview.html` — 整改后高保真效果（自包含，浏览器直接打开）；
-> - `docs/design/doc-notion-polish-plan.md` — **执行计划**（PR-1..7 拆解、文件级任务、测试与验收、风险、提交节奏）。
+> - `docs/design/knowledge/polish/doc-notion-polish-preview.html` — 整改后高保真效果（自包含，浏览器直接打开）；
+> - `docs/design/knowledge/polish/doc-notion-polish-plan.md` — **执行计划**（PR-1..7 拆解、文件级任务、测试与验收、风险、提交节奏）。
 > 前置基线：`docs/2026-08-08-02-doc-manager-vs-notion/spec.md`（V2.1 功能决策，本版继承其范围决策）；`DESIGN.md`（全局 Flat Solid 设计语言，本版提出**文档域子语言**特例并列出冲突裁决）。
 
 ---

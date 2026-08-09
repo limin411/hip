@@ -1,7 +1,7 @@
 # 文档编辑器「＋ / 六点手柄」整改 · 执行计划（Plan）
 
-> 依据：`docs/design/doc-editor-sidemenu-fix-spec.md`（**v3.0**，方向已确认）  
-> 视觉基准：`docs/design/doc-editor-sidemenu-fix-preview.html`（浏览器打开对照 §2 图标实验室 + §3 交互）  
+> 依据：`docs/design/knowledge/editor/doc-editor-sidemenu-fix-spec.md`（**v3.0**，方向已确认）  
+> 视觉基准：`docs/design/knowledge/editor/doc-editor-sidemenu-fix-preview.html`（浏览器打开对照 §2 图标实验室 + §3 交互）  
 > 范围护栏（spec §3.5，本计划**不包含**）：Move to、飞书分栏蓝线、Comment/AI、语雀缩进菜单、菜单 portal 到 body、全局设计语言改造。  
 > 文件域（窄）：几乎只动  
 > - `src/components/knowledge/DocBlockNoteEditor.tsx`  
@@ -203,7 +203,7 @@ fix(knowledge): sidemenu polish + regression (sidemenu S4)
 
 ```bash
 # 视觉对照
-open docs/design/doc-editor-sidemenu-fix-preview.html
+open docs/design/knowledge/editor/doc-editor-sidemenu-fix-preview.html
 
 # 改完 S1 后
 yarn test src/components/knowledge/DocBlockNoteEditor

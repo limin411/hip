@@ -1,6 +1,6 @@
 # 文档管理 × Notion 细节整改 · 执行计划（Plan）
 
-> 依据：`docs/design/doc-notion-polish-spec.md`（v3.0）+ 高保真预览 `docs/design/doc-notion-polish-preview.html`（视觉基准，浏览器打开对照）
+> 依据：`docs/design/knowledge/polish/doc-notion-polish-spec.md`（v3.0）+ 高保真预览 `docs/design/knowledge/polish/doc-notion-polish-preview.html`（视觉基准，浏览器打开对照）
 > 目标分支：`feature/doc-notion-polish`（从 trunk 切出，按 PR 拆分合入）
 > 规模估算：**P0 6–8 人日 + P1 2.5–3.5 人日 + P2 3–5 人日 ≈ 12–17 人日**（单人 3 周；如与 V2 遗留并行，P0 的 PR-1/PR-2 可穿插）
 > 范围护栏（spec §5 非目标，本计划不包含）：全局设计语言改造、嵌套树侧边栏/文档层级拖拽、数据库/元数据 UI、Notion 导入导出。

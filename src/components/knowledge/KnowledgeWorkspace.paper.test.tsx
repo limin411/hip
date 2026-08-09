@@ -5,7 +5,7 @@
  */
 import '@testing-library/jest-dom/vitest'
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { render, screen, cleanup } from '@testing-library/react'
+import { render, screen, cleanup, act } from '@testing-library/react'
 import { useKnowledgeStore } from '@/store/knowledgeStore'
 import { KNOWLEDGE_LIVE_FLAG_KEY } from '@/domain/knowledge/editorMode'
 import type { EditorMode } from '@/domain/knowledge/editorMode'
@@ -151,5 +151,33 @@ describe('KnowledgeWorkspace paper overflow contract', () => {
     }
     expect(props.spaceId).toBe('spc_1')
     expect(typeof props.onAssetImportError).toBe('function')
+  })
+
+  it('T10 save status: silent on saved, error always visible, saving after 800ms', () => {
+    vi.useFakeTimers()
+    seedWorkspace('live')
+    render(<KnowledgeWorkspace />)
+    // idle → no status bar
+    expect(screen.queryByTestId('knowledge-save-status')).toBeNull()
+
+    act(() => useKnowledgeStore.setState({ saveState: 'saved' }))
+    expect(screen.queryByTestId('knowledge-save-status')).toBeNull()
+
+    act(() => useKnowledgeStore.setState({ saveState: 'error' }))
+    expect(screen.getByTestId('knowledge-save-status')).toBeInTheDocument()
+    expect(screen.getByTestId('knowledge-save-retry')).toBeInTheDocument()
+
+    act(() => useKnowledgeStore.setState({ saveState: 'saving' }))
+    // <800ms: silent
+    expect(screen.queryByTestId('knowledge-save-status')).toBeNull()
+    act(() => {
+      vi.advanceTimersByTime(800)
+    })
+    expect(screen.getByTestId('knowledge-save-status')).toBeInTheDocument()
+
+    // saved → silent again
+    act(() => useKnowledgeStore.setState({ saveState: 'saved' }))
+    expect(screen.queryByTestId('knowledge-save-status')).toBeNull()
+    vi.useRealTimers()
   })
 })

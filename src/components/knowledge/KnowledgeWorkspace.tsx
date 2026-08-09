@@ -1,7 +1,6 @@
 import { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import {
-  ChevronRight,
   Download,
   FilePlus,
   History,
@@ -527,165 +526,71 @@ export function KnowledgeWorkspace() {
     }
   }
 
-  /** Prefer first + last crumbs when the path is deep (max 4 visible nodes). */
-  const crumbItems = useMemo(() => {
-    if (pathNodes.length <= 4) {
-      return pathNodes.map((node, index) => ({ kind: 'node' as const, node, index }))
+  /* V2-E0: 无源码模式切换 UI（live 唯一编辑表面；source 仅内部兜底）。
+     modal={false}: modal menu + version-history / save-as-template Modal both lock
+     body pointer-events; stacking leaves the app unclickable after close. */
+  const docMenu = (
+    <DropdownMenu modal={false}>
+      <DropdownMenuTrigger asChild>
+        <button
+          type="button"
+          className="flex h-7 w-7 items-center justify-center rounded-md text-ink-tertiary transition-colors hover:bg-state-hover hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink/20"
+          aria-label={t('knowledge.space.menu')}
+          data-testid="knowledge-doc-menu"
+        >
+          <MoreHorizontal size={16} />
+        </button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end">
+        <DropdownMenuItem
+          data-testid="knowledge-save-version"
+          onClick={() => void onSaveVersion()}
+        >
+          <History size={14} />
+          {t('knowledge.versions.menuSave')}
+        </DropdownMenuItem>
+        <DropdownMenuItem
+          data-testid="knowledge-version-history"
+          onClick={() => void openVersionHistory()}
+        >
+          <History size={14} />
+          {t('knowledge.versions.menuHistory')}
+        </DropdownMenuItem>
+        <DropdownMenuSeparator />
+        <DropdownMenuItem
+          data-testid="knowledge-export-doc"
+          onClick={() => void exportActiveDoc()}
+        >
+          <Download size={14} />
+          {t('knowledge.export.doc')}
+        </DropdownMenuItem>
+        <DropdownMenuItem
+          data-testid="knowledge-save-as-template"
+          onClick={() => {
+            setTemplateName(activeNode?.title ?? t('knowledge.doc.untitled'))
+            setSaveTemplateOpen(true)
+          }}
+        >
+          <FilePlus size={14} />
+          {t('knowledge.template.saveAs')}
+        </DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
+  )
+
+  // T10 保存状态静默化：saving 持续 >800ms 才显示，error 必须显示；saved 静默。
+  const [savingShown, setSavingShown] = useState(false)
+  useEffect(() => {
+    if (saveState === 'saving') {
+      const id = window.setTimeout(() => setSavingShown(true), 800)
+      return () => window.clearTimeout(id)
     }
-    const last = pathNodes.length - 1
-    return [
-      { kind: 'node' as const, node: pathNodes[0], index: 0 },
-      { kind: 'ellipsis' as const },
-      { kind: 'node' as const, node: pathNodes[last - 1], index: last - 1 },
-      { kind: 'node' as const, node: pathNodes[last], index: last },
-    ]
-  }, [pathNodes])
+    setSavingShown(false)
+  }, [saveState])
 
   return (
     <div className="flex min-h-0 flex-1" data-testid="knowledge-workspace">
-
-
       <main className="flex min-w-0 flex-1 flex-col bg-surface-content">
-        <div className="flex h-12 shrink-0 items-center gap-2.5 border-b border-border px-5">
-          <div className="flex min-w-0 flex-1 items-center gap-1 truncate text-meta">
-            {pathNodes.length === 0 ? (
-              <span className="truncate text-ink-tertiary">{space?.name}</span>
-            ) : (
-              crumbItems.map((item, i) => {
-                if (item.kind === 'ellipsis') {
-                  return (
-                    <span key="crumb-ellipsis" className="flex min-w-0 items-center gap-1">
-                      {i > 0 && (
-                        <ChevronRight
-                          size={12}
-                          className="shrink-0 text-ink-tertiary"
-                          aria-hidden
-                        />
-                      )}
-                      <span className="shrink-0 text-ink-tertiary" aria-hidden>
-                        …
-                      </span>
-                    </span>
-                  )
-                }
-                const n = item.node
-                const isLast = item.index === pathNodes.length - 1
-                return (
-                  <span key={n.id} className="flex min-w-0 items-center gap-1">
-                    {i > 0 && (
-                      <ChevronRight
-                        size={12}
-                        className="shrink-0 text-ink-tertiary"
-                        aria-hidden
-                      />
-                    )}
-                    {!isLast ? (
-                      <button
-                        type="button"
-                        className="truncate rounded-sm px-1 py-0.5 text-ink-secondary transition-colors hover:bg-state-hover hover:text-ink"
-                        onClick={() => onCrumbClick(n)}
-                      >
-                        {n.title}
-                      </button>
-                    ) : (
-                      <span className="truncate px-1 font-medium text-ink">{n.title}</span>
-                    )}
-                  </span>
-                )
-              })
-            )}
-          </div>
-          {(saveState === 'saving' ||
-            saveState === 'saved' ||
-            saveState === 'error') && (
-            <span
-              className={cn(
-                'flex shrink-0 items-center gap-1.5 text-meta transition-opacity duration-500',
-                saveState === 'error' ? 'text-danger' : 'text-ink-tertiary',
-                saveState === 'saved' && 'opacity-70',
-              )}
-              data-testid="knowledge-save-status"
-            >
-              <span
-                className={cn(
-                  'h-1.5 w-1.5 rounded-full',
-                  saveState === 'saving'
-                    ? 'bg-warning animate-pulse'
-                    : saveState === 'error'
-                      ? 'bg-danger'
-                      : 'bg-success',
-                )}
-                aria-hidden
-              />
-              {saveState === 'saving'
-                ? t('knowledge.doc.saving')
-                : saveState === 'error'
-                  ? t('knowledge.doc.saveFailed')
-                  : t('knowledge.doc.saved')}
-              {saveState === 'error' ? (
-                <button
-                  type="button"
-                  className="ml-1 rounded-sm px-1 text-meta font-medium text-accent-strong hover:underline"
-                  data-testid="knowledge-save-retry"
-                  onClick={() => void flushSave()}
-                >
-                  {t('knowledge.doc.saveRetry')}
-                </button>
-              ) : null}
-            </span>
-          )}
-          {activeDocId && !isBoard && (
-            /* V2-E0: 无源码模式切换 UI（live 唯一编辑表面；source 仅内部兜底）。
-               modal={false}: modal menu + version-history / save-as-template Modal both lock
-               body pointer-events; stacking leaves the app unclickable after close. */
-            <DropdownMenu modal={false}>
-              <DropdownMenuTrigger asChild>
-                <button
-                  type="button"
-                  className="rounded-sm p-1.5 text-ink-tertiary hover:bg-state-hover hover:text-ink"
-                  aria-label={t('knowledge.space.menu')}
-                  data-testid="knowledge-doc-menu"
-                >
-                  <MoreHorizontal size={16} />
-                </button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                <DropdownMenuItem
-                  data-testid="knowledge-save-version"
-                  onClick={() => void onSaveVersion()}
-                >
-                  <History size={14} />
-                  {t('knowledge.versions.menuSave')}
-                </DropdownMenuItem>
-                <DropdownMenuItem
-                  data-testid="knowledge-version-history"
-                  onClick={() => void openVersionHistory()}
-                >
-                  <History size={14} />
-                  {t('knowledge.versions.menuHistory')}
-                </DropdownMenuItem>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem
-                  data-testid="knowledge-export-doc"
-                  onClick={() => void exportActiveDoc()}
-                >
-                  <Download size={14} />
-                  {t('knowledge.export.doc')}
-                </DropdownMenuItem>
-                <DropdownMenuItem
-                  data-testid="knowledge-save-as-template"
-                  onClick={() => {
-                    setTemplateName(activeNode?.title ?? t('knowledge.doc.untitled'))
-                    setSaveTemplateOpen(true)
-                  }}
-                >
-                  <FilePlus size={14} />
-                  {t('knowledge.template.saveAs')}
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-          )}
-        </div>
         {!activeDocId ? (
           <DocManagerBrowse />
         ) : isBoard ? (
@@ -719,6 +624,10 @@ export function KnowledgeWorkspace() {
                 onTitleEnter={() => {
                   liveEditorRef.current?.focus({ at: 'start' })
                 }}
+                pathNodes={pathNodes}
+                fallbackLabel={space?.name}
+                onCrumbClick={onCrumbClick}
+                menu={docMenu}
               />
               <Suspense
                 fallback={
@@ -791,6 +700,10 @@ export function KnowledgeWorkspace() {
                 onTitleEnter={() => {
                   editorRef.current?.focus()
                 }}
+                pathNodes={pathNodes}
+                fallbackLabel={space?.name}
+                onCrumbClick={onCrumbClick}
+                menu={docMenu}
               />
               {liveSuppressed && activeDocId && !isCompatDismissed(activeDocId) ? (
                 <div
@@ -837,6 +750,38 @@ export function KnowledgeWorkspace() {
                 wikiNodes={nodes}
               />
             </KnowledgeDocCanvas>
+          </div>
+        ) : null}
+        {activeDocId &&
+        !isBoard &&
+        (saveState === 'error' || (saveState === 'saving' && savingShown)) ? (
+          /* T10: 保存状态底部状态栏——saved 静默，仅 saving>800ms / error 出现。 */
+          <div
+            className="flex h-6 shrink-0 items-center gap-1.5 border-t border-border px-4 text-meta"
+            data-testid="knowledge-save-status"
+          >
+            <span
+              className={cn(
+                'h-1.5 w-1.5 rounded-full',
+                saveState === 'error' ? 'bg-danger' : 'bg-warning animate-pulse',
+              )}
+              aria-hidden
+            />
+            {saveState === 'error' ? (
+              <span className="text-danger">{t('knowledge.doc.saveFailed')}</span>
+            ) : (
+              <span className="text-ink-tertiary">{t('knowledge.doc.saving')}</span>
+            )}
+            {saveState === 'error' ? (
+              <button
+                type="button"
+                className="ml-1 rounded-sm px-1 text-meta font-medium text-accent-strong hover:underline"
+                data-testid="knowledge-save-retry"
+                onClick={() => void flushSave()}
+              >
+                {t('knowledge.doc.saveRetry')}
+              </button>
+            ) : null}
           </div>
         ) : null}
       </main>

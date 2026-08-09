@@ -8,11 +8,12 @@ import { describe, it, expect, afterEach, vi } from 'vitest'
 import { render, screen, cleanup, fireEvent } from '@testing-library/react'
 import { DOC_PAGE_SHELL, KnowledgeDocCanvas } from './KnowledgeDocCanvas'
 import { DOC_WIDTH_MEASURE } from '@/domain/knowledge/docWidth'
+import type { DocWidthId } from '@hip/protocol'
 
 const hipConfigState = {
   config: {
     version: 1 as const,
-    knowledge: { docWidth: 'default' as const },
+    knowledge: { docWidth: 'default' as DocWidthId },
   },
 }
 

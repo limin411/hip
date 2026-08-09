@@ -154,13 +154,11 @@ describe('KnowledgeOutlinePanel', () => {
     render(<KnowledgeOutlinePanel />)
     const footer = screen.getByTestId('knowledge-panel-doc-stats')
     expect(footer).toBeInTheDocument()
-    // 正文 3 个词 + 1 条反向链接。
+    // 正文 3 个词。
     expect(screen.getByTestId('knowledge-doc-word-count')).toHaveTextContent(
       'knowledge.doc.wordCount:3',
     )
-    expect(screen.getByTestId('knowledge-doc-backlink-count')).toHaveTextContent(
-      'knowledge.doc.backlinkCount:1',
-    )
+    expect(screen.queryByTestId('knowledge-doc-backlink-count')).not.toBeInTheDocument()
   })
 
   it('omits the stats and refresh when no doc is open', () => {

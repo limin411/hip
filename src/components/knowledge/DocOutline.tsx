@@ -134,7 +134,7 @@ export function DocOutline({
             'hover:bg-state-hover',
             'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink/20',
             isActive
-              ? 'bg-accent/10 font-medium text-ink'
+              ? 'bg-accent/10 text-meta font-medium text-ink'
               : item.level === 1
                 ? 'text-meta font-medium text-ink'
                 : 'text-meta text-ink-secondary',

@@ -42,7 +42,6 @@ export function KnowledgeOutlinePanel() {
   const docBody = useKnowledgeStore((s) => s.docBody)
   const activeDocId = useKnowledgeStore((s) => s.activeDocId)
   const nodes = useKnowledgeStore((s) => s.nodes)
-  const backlinks = useKnowledgeStore((s) => s.backlinks)
   const requestOutlineJump = useKnowledgeStore((s) => s.requestOutlineJump)
 
   const activeNode = activeDocId ? nodes.find((n) => n.id === activeDocId) : undefined
@@ -75,7 +74,7 @@ export function KnowledgeOutlinePanel() {
 
   const outlineItems = useMemo(() => extractDocOutline(content), [content])
 
-  // 文档统计（字词/反向链接），随内容防抖刷新。
+  // 文档统计（字词），随内容防抖刷新。
   const wordCount = useMemo(() => {
     const body = parseFrontmatter(liveContent).bodyWithoutFm
     const words = body.trim().match(/\S+/g)
@@ -235,9 +234,6 @@ export function KnowledgeOutlinePanel() {
             >
               <span data-testid="knowledge-doc-word-count">
                 {t('knowledge.doc.wordCount', { count: wordCount })}
-              </span>
-              <span data-testid="knowledge-doc-backlink-count">
-                {t('knowledge.doc.backlinkCount', { count: backlinks.length })}
               </span>
             </div>
           </div>

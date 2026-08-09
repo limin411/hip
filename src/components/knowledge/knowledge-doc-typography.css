@@ -19,7 +19,8 @@
   --kb-para-gap: 4px;
   --kb-measure: min(100%, 44.25rem);
   --kb-pad-bottom: max(8rem, 30vh);
-  --kb-selection: color-mix(in srgb, var(--accent, #3b82f6) 22%, transparent);
+  /* T8: 选区中性蓝灰（非橙色） */
+  --kb-selection: rgba(45, 110, 220, 0.18);
 
   /* Doc open / mode-switch polish: soft fade + settle.
      Replays on key-remount (doc switch, Live/Source toggle).
@@ -40,6 +41,7 @@
   --kb-text-muted: #7d7a75;
   --kb-hover: #2f2f2f;
   --kb-row: #2a2a2a;
+  --kb-selection: rgba(93, 160, 255, 0.25);
 }
 
 @keyframes knowledge-doc-enter {

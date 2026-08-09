@@ -169,10 +169,10 @@
 }
 
 .knowledge-blocknote-editor [data-content-type='quote'] {
-  border-inline-start: 3px solid var(--border-strong, var(--border, #d4d4d8));
+  border-inline-start: 3px solid var(--kb-text, currentColor);
   padding-inline-start: 0.85rem;
   padding-block: 0.15rem;
-  color: var(--text-secondary, inherit);
+  color: var(--kb-text, inherit);
 }
 
 .knowledge-blocknote-editor [data-content-type='divider'] hr {
@@ -210,21 +210,21 @@
 
 .knowledge-blocknote-editor .bn-editor th,
 .knowledge-blocknote-editor .bn-editor tr:first-child td {
-  background: var(--surface-muted, rgba(0, 0, 0, 0.04));
+  background: var(--kb-row, rgba(0, 0, 0, 0.04));
   font-weight: 600;
-  color: var(--text-primary, inherit);
+  color: var(--kb-text, var(--text-primary, inherit));
 }
 
-/* Whole-row hover, Notion-style. Outranks the header tint. */
+/* Whole-row hover, Notion-style warm gray (T8 — was accent tint). */
 .knowledge-blocknote-editor .bn-editor tr:hover th,
 .knowledge-blocknote-editor .bn-editor tr:hover td {
-  background: color-mix(in srgb, var(--accent, #c2410c) 6%, transparent);
+  background: var(--kb-row, rgba(0, 0, 0, 0.04));
 }
 
 .knowledge-blocknote-editor .bn-editor td:focus-within,
 .knowledge-blocknote-editor .bn-editor th:focus-within {
-  background: color-mix(in srgb, var(--accent, #c2410c) 10%, transparent);
-  outline: 1px solid color-mix(in srgb, var(--accent, #c2410c) 35%, transparent);
+  background: var(--kb-hover, rgba(0, 0, 0, 0.06));
+  outline: 1px solid var(--border-strong, #c9c9c9);
   outline-offset: -1px;
 }
 
@@ -301,8 +301,8 @@
 .bn-formatting-toolbar .bn-button[data-selected='true'],
 .bn-formatting-toolbar button[aria-pressed='true'],
 .bn-formatting-toolbar .bn-button[data-active='true'] {
-  background: color-mix(in srgb, var(--accent, #c2410c) 14%, transparent) !important;
-  color: var(--accent-strong, var(--accent, #c2410c)) !important;
+  background: var(--kb-hover, rgba(0, 0, 0, 0.06)) !important;
+  color: var(--kb-text, var(--text-primary, inherit)) !important;
 }
 
 .bn-formatting-toolbar .bn-select {
@@ -371,13 +371,72 @@
   outline-offset: 2px;
 }
 
-/* Checkboxes */
-.knowledge-blocknote-editor input[type='checkbox'] {
-  width: 1rem;
-  height: 1rem;
-  margin-inline-end: 0.4rem;
-  accent-color: var(--accent, #3b82f6);
-  vertical-align: middle;
+/* Checkboxes — Notion-style self-drawn (T5): 16px box, 1.2px warm border,
+   checked = warm fill + white check + line-through text. Visual-only: the
+   `checked` prop still round-trips through md `[x]` untouched. */
+.knowledge-blocknote-editor [data-content-type='checkListItem'] {
+  display: flex;
+  gap: 8px;
+}
+
+.knowledge-blocknote-editor
+  [data-content-type='checkListItem']
+  > div[contenteditable='false'] {
+  flex: none;
+  display: flex;
+  align-items: flex-start;
+  padding-top: 4px; /* center against first text line (16px * 1.5) */
+}
+
+.knowledge-blocknote-editor [data-content-type='checkListItem'] input[type='checkbox'] {
+  appearance: none;
+  -webkit-appearance: none;
+  width: 16px;
+  height: 16px;
+  margin: 0;
+  border: 1.2px solid #b0ada8;
+  border-radius: 3px;
+  background: transparent;
+  cursor: pointer;
+  position: relative;
+  transition:
+    background-color 120ms ease,
+    border-color 120ms ease;
+}
+
+.knowledge-blocknote-editor
+  [data-content-type='checkListItem']
+  input[type='checkbox']:hover {
+  border-color: var(--kb-text-muted);
+}
+
+.knowledge-blocknote-editor
+  [data-content-type='checkListItem']
+  input[type='checkbox']:checked {
+  background: var(--kb-text);
+  border-color: var(--kb-text);
+}
+
+.knowledge-blocknote-editor
+  [data-content-type='checkListItem']
+  input[type='checkbox']:checked::after {
+  content: '';
+  position: absolute;
+  left: 4.5px;
+  top: 1.5px;
+  width: 4px;
+  height: 8px;
+  border: solid #fff;
+  border-width: 0 1.8px 1.8px 0;
+  transform: rotate(45deg);
+}
+
+/* Checked item text: line-through + warm gray (Notion). */
+.knowledge-blocknote-editor
+  [data-content-type='checkListItem']:has(input[type='checkbox']:checked)
+  p {
+  text-decoration: line-through;
+  color: var(--kb-text-muted);
 }
 
 /* Hide default Mantine slash if any residual portal skins leak */

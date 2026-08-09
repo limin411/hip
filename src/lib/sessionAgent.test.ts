@@ -4,6 +4,7 @@ import {
   runtimeModeOf,
   isExternalPrimary,
   isAcpCapableAgent,
+  isSelectableAcpAgent,
   resolveValidAcpAgentId,
 } from './sessionAgent'
 
@@ -11,7 +12,13 @@ const agent = (
   id: string,
   kind: AgentConfig['kind'],
   enabled = true,
-): Pick<AgentConfig, 'id' | 'kind' | 'enabled'> => ({ id, kind, enabled })
+  quirks?: string,
+): Pick<AgentConfig, 'id' | 'kind' | 'enabled' | 'quirks'> => ({
+  id,
+  kind,
+  enabled,
+  ...(quirks ? { quirks } : {}),
+})
 
 describe('runtimeModeOf', () => {
   it('treats undefined / empty / whitespace / builtin as builtin', () => {
@@ -46,12 +53,37 @@ describe('isAcpCapableAgent', () => {
   })
 })
 
+describe('isSelectableAcpAgent', () => {
+  it('matches isAcpCapableAgent when detection is unchecked', () => {
+    expect(isSelectableAcpAgent(agent('oc', 'acp', true, 'opencode'))).toBe(true)
+    expect(isSelectableAcpAgent(agent('oc', 'acp', false, 'opencode'))).toBe(false)
+  })
+  it('rejects preset agents whose binary is missing after detection', () => {
+    const oc = agent('oc', 'acp', true, 'opencode')
+    expect(
+      isSelectableAcpAgent(oc, { detectionChecked: true, installed: { opencode: false } }),
+    ).toBe(false)
+    expect(
+      isSelectableAcpAgent(oc, { detectionChecked: true, installed: { opencode: true } }),
+    ).toBe(true)
+  })
+  it('keeps custom non-preset ACP selectable after detection', () => {
+    expect(
+      isSelectableAcpAgent(agent('custom', 'acp', true, 'my-tool'), {
+        detectionChecked: true,
+        installed: {},
+      }),
+    ).toBe(true)
+  })
+})
+
 describe('resolveValidAcpAgentId', () => {
   const agents = [
     agent('acp-1', 'acp'),
     agent('legacy', 'opencode'),
     agent('off', 'acp', false),
     agent('coder', 'internal'),
+    agent('oc', 'acp', true, 'opencode'),
   ]
   it('returns id for enabled acp/opencode', () => {
     expect(resolveValidAcpAgentId('acp-1', agents)).toBe('acp-1')
@@ -65,5 +97,19 @@ describe('resolveValidAcpAgentId', () => {
     expect(resolveValidAcpAgentId('gone', agents)).toBeUndefined()
     expect(resolveValidAcpAgentId('off', agents)).toBeUndefined()
     expect(resolveValidAcpAgentId('coder', agents)).toBeUndefined()
+  })
+  it('omits preset agents with missing binaries when detection checked', () => {
+    expect(
+      resolveValidAcpAgentId('oc', agents, {
+        detectionChecked: true,
+        installed: { opencode: false },
+      }),
+    ).toBeUndefined()
+    expect(
+      resolveValidAcpAgentId('oc', agents, {
+        detectionChecked: true,
+        installed: { opencode: true },
+      }),
+    ).toBe('oc')
   })
 })

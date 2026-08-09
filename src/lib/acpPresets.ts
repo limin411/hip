@@ -132,6 +132,23 @@ export function agentBinaryStatus(
   }
 }
 
+/**
+ * Whether PATH detection allows using this agent as a primary/switch target.
+ * - Detection not checked yet → ready (no evidence of a missing binary yet; matches AgentCard).
+ * - Non-preset / custom ACP → ready (no known install probe).
+ * - Preset-backed agent → ready only when agent (+ adapter) binaries are on PATH.
+ */
+export function isAcpBinaryReady(
+  agent: Pick<AgentConfig, 'quirks'>,
+  installed: Record<string, boolean>,
+  detectionChecked: boolean,
+): boolean {
+  if (!detectionChecked) return true
+  const status = agentBinaryStatus(agent, installed)
+  if (!status) return true
+  return status.installed
+}
+
 /** All bare names worth probing on PATH (agent + adapter CLIs). */
 export function acpDetectNames(): string[] {
   const s = new Set<string>()

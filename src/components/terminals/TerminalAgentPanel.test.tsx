@@ -16,7 +16,10 @@ const mocks = vi.hoisted(() => ({
     name: string
     kind: string
     enabled: boolean
+    quirks?: string
   }>,
+  installed: {} as Record<string, boolean>,
+  detectionChecked: false,
   sshWrite: vi.fn(async (_terminalId: string, _data: string) => {}),
 }))
 
@@ -31,6 +34,20 @@ vi.mock('react-i18next', () => ({
 
 vi.mock('@/store/hipConfigStore', () => ({
   useAgents: () => mocks.agents,
+}))
+
+const refreshDetection = vi.fn(async () => {})
+vi.mock('@/store/detectionStore', () => ({
+  useDetectionStore: (sel: (s: {
+    installed: Record<string, boolean>
+    checked: boolean
+    refresh: typeof refreshDetection
+  }) => unknown) =>
+    sel({
+      installed: mocks.installed,
+      checked: mocks.detectionChecked,
+      refresh: refreshDetection,
+    }),
 }))
 
 vi.mock('@/ipc/ssh', () => ({
@@ -77,6 +94,9 @@ describe('TerminalAgentPanel tool card collapsing', () => {
     mocks.agents = [
       { id: 'a1', name: 'Ops-Agent', kind: 'internal', enabled: true },
     ]
+    mocks.installed = {}
+    mocks.detectionChecked = false
+    refreshDetection.mockClear()
     useManagedTerminalStore.setState({
       terminals: [
         {
@@ -225,6 +245,21 @@ describe('TerminalAgentPanel tool card collapsing', () => {
       'data-selected',
       'true',
     )
+    unmount()
+  })
+
+  it('hides unavailable OpenCode ACP from the ops agent picker', () => {
+    mocks.agents = [
+      { id: 'a1', name: 'Ops-Agent', kind: 'internal', enabled: true },
+      { id: 'oc', name: 'OpenCode', kind: 'acp', enabled: true, quirks: 'opencode' },
+      { id: 'ready', name: 'Grok', kind: 'acp', enabled: true, quirks: 'grok-build' },
+    ]
+    mocks.detectionChecked = true
+    mocks.installed = { opencode: false, grok: true }
+    const { unmount } = render(<TerminalAgentPanel terminalId="tm_1" />)
+    expect(screen.getByTestId('terminal-agent-option-a1')).toBeInTheDocument()
+    expect(screen.getByTestId('terminal-agent-option-ready')).toBeInTheDocument()
+    expect(screen.queryByTestId('terminal-agent-option-oc')).not.toBeInTheDocument()
     unmount()
   })
 

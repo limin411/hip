@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach } from 'vitest'
 import { configFromDraft } from './sessionService'
 import { useProvidersStore } from '@/store/providersStore'
 import { useHipConfigStore } from '@/store/hipConfigStore'
+import { useDetectionStore } from '@/store/detectionStore'
 import type { AgentConfig } from '@hip/protocol'
 
 const acpAgent = (id: string, overrides?: Partial<AgentConfig>): AgentConfig => ({
@@ -35,11 +36,13 @@ describe('configFromDraft', () => {
           acpAgent('legacy-oc', { kind: 'opencode' }),
           acpAgent('disabled-acp', { enabled: false }),
           acpAgent('internal-coder', { kind: 'internal', command: '', prompt: 'x' }),
+          acpAgent('oc-preset', { quirks: 'opencode' }),
         ],
       },
       loaded: true,
       error: null,
     })
+    useDetectionStore.setState({ installed: {}, checked: false })
   })
 
   it('null draft → default config + surface chat (no cwd)', () => {
@@ -135,6 +138,16 @@ describe('configFromDraft', () => {
     expect(
       'agentId' in configFromDraft({ tempId: 't', mode: 'chat', text: '', agentId: 'internal-coder' }),
     ).toBe(false)
+  })
+  it('omits agentId when preset ACP binary is missing after detection', () => {
+    useDetectionStore.setState({ installed: { opencode: false }, checked: true })
+    expect(
+      'agentId' in configFromDraft({ tempId: 't', mode: 'chat', text: '', agentId: 'oc-preset' }),
+    ).toBe(false)
+    useDetectionStore.setState({ installed: { opencode: true }, checked: true })
+    expect(
+      configFromDraft({ tempId: 't', mode: 'chat', text: '', agentId: 'oc-preset' }).agentId,
+    ).toBe('oc-preset')
   })
   it('carries external agentId on project drafts too', () => {
     const cfg = configFromDraft({

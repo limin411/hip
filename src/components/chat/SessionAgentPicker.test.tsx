@@ -149,6 +149,22 @@ vi.mock('@/store/hipConfigStore', () => ({
   useAgents: () => mockAgents,
 }))
 
+const refreshDetection = vi.fn(async () => {})
+let mockInstalled: Record<string, boolean> = {}
+let mockDetectionChecked = false
+vi.mock('@/store/detectionStore', () => ({
+  useDetectionStore: (sel: (s: {
+    installed: Record<string, boolean>
+    checked: boolean
+    refresh: typeof refreshDetection
+  }) => unknown) =>
+    sel({
+      installed: mockInstalled,
+      checked: mockDetectionChecked,
+      refresh: refreshDetection,
+    }),
+}))
+
 const { setAgent, createSession } = vi.hoisted(() => ({
   setAgent: vi.fn(async (_sessionId: string, _agentId: string) => {}),
   createSession: vi.fn((_config?: unknown) => 'new-s'),
@@ -168,13 +184,20 @@ let mockSession: {
   status?: 'idle' | 'running' | 'error'
 } | null = null
 
-const acp = (id: string, name: string, enabled = true, kind: AgentConfig['kind'] = 'acp'): AgentConfig => ({
+const acp = (
+  id: string,
+  name: string,
+  enabled = true,
+  kind: AgentConfig['kind'] = 'acp',
+  quirks?: string,
+): AgentConfig => ({
   id,
   name,
   kind,
   command: 'cmd',
   args: [],
   enabled,
+  ...(quirks ? { quirks } : {}),
 })
 
 describe('enabledAcpAgents / resolvePrimaryAgentId', () => {
@@ -186,6 +209,18 @@ describe('enabledAcpAgents / resolvePrimaryAgentId', () => {
       acp('d', 'Legacy', true, 'opencode'),
     ]
     expect(enabledAcpAgents(list).map((a) => a.id)).toEqual(['a', 'd'])
+  })
+  it('hides preset agents whose binaries are missing after detection', () => {
+    const list = [
+      acp('oc', 'OpenCode', true, 'acp', 'opencode'),
+      acp('custom', 'Custom ACP', true, 'acp', 'my-tool'),
+    ]
+    expect(
+      enabledAcpAgents(list, {
+        detectionChecked: true,
+        installed: { opencode: false },
+      }).map((a) => a.id),
+    ).toEqual(['custom'])
   })
   it('resolvePrimaryAgentId defaults empty to builtin', () => {
     expect(resolvePrimaryAgentId(undefined)).toBe('builtin')
@@ -201,8 +236,15 @@ describe('SessionAgentPicker', () => {
     setAgentId.mockClear()
     setAgent.mockClear()
     createSession.mockClear()
+    refreshDetection.mockClear()
+    mockInstalled = {}
+    mockDetectionChecked = false
     mockDraft = { tempId: 't1', mode: 'chat', text: '' }
-    mockAgents = [acp('opencode', 'OpenCode'), acp('grok', 'Grok Build'), acp('legacy', 'Old OC', true, 'opencode')]
+    mockAgents = [
+      acp('opencode', 'OpenCode', true, 'acp', 'opencode'),
+      acp('grok', 'Grok Build', true, 'acp', 'grok-build'),
+      acp('legacy', 'Old OC', true, 'opencode'),
+    ]
     mockActiveSessionId = null
     mockSession = null
   })
@@ -227,6 +269,15 @@ describe('SessionAgentPicker', () => {
     mockAgents = [acp('x', 'X', false)]
     render(<SessionAgentPicker />)
     expect(screen.getByTestId('session-agent-empty')).toHaveTextContent(/No external agents/)
+  })
+
+  it('hides unavailable OpenCode when detection reports binary missing', () => {
+    mockDetectionChecked = true
+    mockInstalled = { opencode: false, grok: true }
+    render(<SessionAgentPicker />)
+    expect(screen.queryByTestId('session-agent-option-opencode')).not.toBeInTheDocument()
+    expect(screen.getByTestId('session-agent-option-grok')).toBeInTheDocument()
+    expect(refreshDetection).toHaveBeenCalled()
   })
 
   it('unlocks on active session and confirms mid-switch via setAgent', () => {

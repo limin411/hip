@@ -12,6 +12,7 @@ import { projectPathKey } from '@/lib/sessionProjectGroups'
 import { DEFAULT_CONFIG } from '@/domain/sessionStore'
 import i18n from '@/i18n'
 import { normalizeAppLanguage, type AppLanguage } from '@/store/uiStore'
+import { useDetectionStore } from '@/store/detectionStore'
 import { useHipConfigStore } from '@/store/hipConfigStore'
 import { useProvidersStore } from '@/store/providersStore'
 import { useProjectPathStore } from '@/store/projectPathStore'
@@ -80,7 +81,11 @@ export async function buildSessionConfigFromAutomation(
 
   // 2. Mirror configFromDraft model/agent path
   const agents = useHipConfigStore.getState().config.agents ?? []
-  const externalAgentId = resolveValidAcpAgentId(a.agentId, agents)
+  const { installed, checked: detectionChecked } = useDetectionStore.getState()
+  const externalAgentId = resolveValidAcpAgentId(a.agentId, agents, {
+    installed,
+    detectionChecked,
+  })
 
   let base: SessionConfig =
     surface === 'code'

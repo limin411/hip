@@ -22,6 +22,8 @@ import { useManagedTerminalStore, type ManagedTerminalStatus } from '@/store/man
 import { useTerminalAgentStore, terminalSessionsFor } from '@/store/terminalAgentStore'
 import { useTerminalHostStore } from '@/store/terminalHostStore'
 import { useAgents } from '@/store/hipConfigStore'
+import { useDetectionStore } from '@/store/detectionStore'
+import { isSelectableAcpAgent } from '@/lib/sessionAgent'
 import { sshWrite } from '@/ipc/ssh'
 import { isTerminalSession } from '@/lib/sessions'
 import { abortExecFlight } from '@/domain/terminalAgentBridge'
@@ -765,8 +767,22 @@ export function TerminalAgentPanel({ terminalId }: { terminalId: string }) {
   const host = useTerminalHostStore((s) =>
     term?.hostId ? s.hosts.find((h) => h.id === term.hostId) : undefined,
   )
-  const agents = useAgents().filter((a) => a.enabled)
+  const installed = useDetectionStore((s) => s.installed)
+  const detectionChecked = useDetectionStore((s) => s.checked)
+  const refreshDetection = useDetectionStore((s) => s.refresh)
+  const agents = useAgents().filter((a) => {
+    if (!a.enabled) return false
+    // Internal/custom stay selectable when enabled; preset ACP needs binaries on PATH.
+    if (a.kind === 'acp' || a.kind === 'opencode') {
+      return isSelectableAcpAgent(a, { installed, detectionChecked })
+    }
+    return true
+  })
   const [pickedAgent, setPickedAgent] = useState('builtin')
+
+  useEffect(() => {
+    void refreshDetection()
+  }, [refreshDetection])
   const [pickedMode, setPickedMode] = useState<'chat' | 'edit' | 'full'>('edit')
   const scrollRef = useRef<HTMLDivElement>(null)
   const bottomRef = useRef<HTMLDivElement>(null)

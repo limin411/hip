@@ -21,6 +21,7 @@ import { useDiffStore } from '@/store/diffStore'
 import { useDraftStore, type Draft } from '@/store/draftStore'
 import { useFocusStore } from '@/store/focusStore'
 import { useFsStore } from '@/store/fsStore'
+import { useDetectionStore } from '@/store/detectionStore'
 import { useHipConfigStore } from '@/store/hipConfigStore'
 import { useManagedTerminalStore } from '@/store/managedTerminalStore'
 import { useNavHistoryStore } from '@/store/navHistoryStore'
@@ -55,8 +56,12 @@ export function currentLanguage(): AppLanguage {
 export function configFromDraft(draft: Draft | null): SessionConfig {
   const surface: 'chat' | 'code' = draft?.mode === 'project' ? 'code' : 'chat'
   const agents = useHipConfigStore.getState().config.agents ?? []
-  // Only emit agentId when the id still names an enabled ACP-capable agent (stale drafts omit).
-  const externalAgentId = resolveValidAcpAgentId(draft?.agentId, agents)
+  const { installed, checked: detectionChecked } = useDetectionStore.getState()
+  // Only emit agentId when the id still names a selectable ACP agent (stale/missing-binary omit).
+  const externalAgentId = resolveValidAcpAgentId(draft?.agentId, agents, {
+    installed,
+    detectionChecked,
+  })
   const base: SessionConfig =
     surface === 'code' && draft?.cwd
       ? { ...DEFAULT_CONFIG, surface, cwd: draft.cwd }

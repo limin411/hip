@@ -6,6 +6,7 @@ import { AUTOMATION_NAME_MAX, isAutomationNameTaken } from '@/domain/automations
 import { useAutomationStore } from '@/store/automationStore'
 import { useProvidersStore } from '@/store/providersStore'
 import { useAgents } from '@/store/hipConfigStore'
+import { useDetectionStore } from '@/store/detectionStore'
 import { Button } from '@/components/ui/Button'
 import { Input, inputClassName } from '@/components/ui/Input'
 import { Modal } from '@/components/ui/Modal'
@@ -22,7 +23,7 @@ import {
   currentModelLabel,
   filterModelGroups,
 } from '@/lib/modelPickerSearch'
-import { isAcpCapableAgent } from '@/lib/sessionAgent'
+import { isSelectableAcpAgent } from '@/lib/sessionAgent'
 import { cn } from '@/lib/utils'
 import {
   getAutomationTemplate,
@@ -183,14 +184,21 @@ export function AutomationEditorModal({
   const providersConfig = useProvidersStore((s) => s.config)
   const keyConfigured = useProvidersStore((s) => s.keyConfigured)
   const agents = useAgents()
+  const installed = useDetectionStore((s) => s.installed)
+  const detectionChecked = useDetectionStore((s) => s.checked)
+  const refreshDetection = useDetectionStore((s) => s.refresh)
+
+  useEffect(() => {
+    void refreshDetection()
+  }, [refreshDetection])
 
   const modelGroups = useMemo(
     () => groupModelOptions(catalog, providersConfig, keyConfigured),
     [catalog, providersConfig, keyConfigured],
   )
   const acpAgents = useMemo(
-    () => agents.filter((a) => isAcpCapableAgent(a)),
-    [agents],
+    () => agents.filter((a) => isSelectableAcpAgent(a, { installed, detectionChecked })),
+    [agents, installed, detectionChecked],
   )
 
   const open = state.mode !== 'closed'

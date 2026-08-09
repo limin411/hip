@@ -9,6 +9,7 @@ import {
   presetAdapterInstalled,
   presetAdded,
   agentBinaryStatus,
+  isAcpBinaryReady,
   type AcpPreset,
 } from './acpPresets'
 
@@ -218,5 +219,24 @@ describe('agentBinaryStatus', () => {
       adapterInstalled: true,
       installed: false,
     })
+  })
+})
+
+describe('isAcpBinaryReady', () => {
+  const agent = (quirks?: string): Pick<AgentConfig, 'quirks'> => ({ quirks })
+
+  it('is ready before detection runs', () => {
+    expect(isAcpBinaryReady(agent('opencode'), { opencode: false }, false)).toBe(true)
+  })
+
+  it('is ready for non-preset agents after detection', () => {
+    expect(isAcpBinaryReady(agent('custom'), {}, true)).toBe(true)
+    expect(isAcpBinaryReady(agent(undefined), {}, true)).toBe(true)
+  })
+
+  it('requires installed binaries for preset agents after detection', () => {
+    expect(isAcpBinaryReady(agent('opencode'), { opencode: true }, true)).toBe(true)
+    expect(isAcpBinaryReady(agent('opencode'), { opencode: false }, true)).toBe(false)
+    expect(isAcpBinaryReady(agent('pi'), { pi: true, 'pi-acp': false }, true)).toBe(false)
   })
 })

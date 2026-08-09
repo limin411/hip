@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { ArrowRight, Bot, Check } from 'lucide-react'
 import type { AgentConfig, SessionConfig } from '@hip/protocol'
@@ -9,13 +9,14 @@ import { Button } from '@/components/ui/Button'
 import { ComposerChip } from './ComposerChip'
 import { useDraftStore } from '@/store/draftStore'
 import { useAgents } from '@/store/hipConfigStore'
+import { useDetectionStore } from '@/store/detectionStore'
 import { sessionService, useActiveSession, useActiveSessionId } from '@/domain'
-import { isAcpCapableAgent } from '@/lib/sessionAgent'
+import { isSelectableAcpAgent, type AcpDetectionOpts } from '@/lib/sessionAgent'
 import { cn } from '@/lib/utils'
 
-/** Enabled ACP-capable agents available as session primary (acp + legacy opencode). */
-export function enabledAcpAgents(agents: AgentConfig[]): AgentConfig[] {
-  return agents.filter((a) => isAcpCapableAgent(a))
+/** Enabled + install-ready ACP agents available as session primary (acp + legacy opencode). */
+export function enabledAcpAgents(agents: AgentConfig[], opts?: AcpDetectionOpts): AgentConfig[] {
+  return agents.filter((a) => isSelectableAcpAgent(a, opts))
 }
 
 /** Normalize draft/session agent id for display (empty → builtin). */
@@ -49,9 +50,16 @@ export function SessionAgentPicker() {
   const setAgentId = useDraftStore((s) => s.setAgentId)
   const activeId = useActiveSessionId()
   const session = useActiveSession()
+  const installed = useDetectionStore((s) => s.installed)
+  const detectionChecked = useDetectionStore((s) => s.checked)
+  const refreshDetection = useDetectionStore((s) => s.refresh)
   const [pendingAgentId, setPendingAgentId] = useState<string | null>(null)
 
-  const enabled = enabledAcpAgents(agents)
+  useEffect(() => {
+    void refreshDetection()
+  }, [refreshDetection])
+
+  const enabled = enabledAcpAgents(agents, { installed, detectionChecked })
   const builtinLabel = t('composer.agentPicker.builtin')
   /** Mid-switch while a turn runs is rejected server-side; hide the action on FE. */
   const turnRunning = session?.status === 'running'

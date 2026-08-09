@@ -66,6 +66,7 @@
 - 底色压低：`--bg-app #121212` / `--bg-subtle #181818` / `--bg-muted #1f1f1f`；边框 `#2e2e2e / #3e3e3e`。
 - 文字：`#f0f0f0 / #a3a3a3 / #7a7a7a`（tertiary 仍满足暗底可读）。
 - 品牌：`--accent #ffb300`（更亮，贴 logo `#FF9800`，保证暗底可识别）、`--accent-strong #ffcc80`、`--on-accent #111111`。
+- 交互底（对齐亮色，**中性灰、无品牌 tint**）：`--accent-subtle #222222`（hover）/ `--accent-active #2e2e2e`（选中，比 hover 深一档）；侧栏 active = `bg-state-active`。
 - 状态色提亮：success `#4caf50`、danger `#ff5252`、warning `#ffb74d`、effort-max `#a78bfa`。
 - 主按钮反转：`--btn-primary #d4d4d4`（软白底）+ `--on-btn-primary #141414`。
 - 遮罩加重：`--overlay-scrim rgba(0,0,0,.48)`。

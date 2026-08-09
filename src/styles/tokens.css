@@ -144,12 +144,12 @@ html[data-platform="linux"] {
   --text-primary: #f0f0f0;
   --text-secondary: #b3b3b3;
   --text-tertiary: #8a8a8a; /* 小字元数据仍过 AA */
-  /* 品牌强调：亮琥珀可读；hover 略提亮；subtle 带淡橙 tint */
+  /* 品牌强调：亮琥珀可读；hover/选中底对齐亮色 —— 中性灰阶，不带品牌色调 */
   --accent: #ffb300;
   --accent-hover: #ffc233;
   --accent-strong: #ffcc80;
-  --accent-subtle: color-mix(in srgb, #ffb300 12%, #0f0f0f);
-  --accent-active: color-mix(in srgb, #ffb300 18%, #0f0f0f);
+  --accent-subtle: #222222; /* 中性 hover / 头像 / chip 底（侧栏 #161616 上约 +1 档） */
+  --accent-active: #2e2e2e; /* 中性选中底 —— 比 hover 深一档，安静可读 */
   --on-accent: #111111; /* 浅 accent 填充上的近黑字 */
   /* 功能状态色 —— 暗底可读，略降饱和避免抢内容 */
   --success: #5aad5e;

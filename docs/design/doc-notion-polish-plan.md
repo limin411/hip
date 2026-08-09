@@ -168,10 +168,12 @@
 
 ## 12. 实施记录（随执行更新）
 
-- [ ] PR-1 页面骨架整改（T1/T10）
-- [ ] PR-2 排版参数整改（T2/T3）
-- [ ] PR-3 块级视觉整改（T5/T6/T8）
-- [ ] PR-4 编辑器交互整改（T4/T7/T9）
-- [ ] PR-5 浏览视图整改（T11/T13）
-- [ ] PR-6 侧边栏目录行整改（T12）
-- [ ] PR-7 P2 交互补齐（T13–T15，按裁决）
+- [x] **PR-1 页面骨架整改（T1/T10）** — commit `1b0fa6d1`：删 48px 工具栏、面包屑移入标题上方小字、⋯ 移入标题 hover（PageHeader 新 props）、保存状态移底部状态栏（saved 静默、saving>800ms/error 显示 + 重试）；T10 契约单测（fake timers）；顺带修复 `KnowledgeDocCanvas.test.tsx` 预存窄类型 bug
+- [x] **PR-2 排版参数整改（T2/T3）** — commit `0f857bd4`：body 16px/1.5、块/段距 4px、h1 30/h2 24/h3 20 固定 px、标题 margin 收敛、默认页宽 44.25rem（708px）；`--kb-text/--kb-text-muted/--kb-hover/--kb-row` 纸张 token（亮/暗）；标题 32px（`text-page`）+ 标题-正文 16px；BlockNote 空块占位斜体暖灰
+- [x] **PR-3 块级视觉整改（T5/T6/T8）** — commit `ce4f48ef`：待办自绘 16px 方块（勾选删除线，纯 CSS 不动 md 序列化）、引用 currentColor 不降灰、表格行 hover/表头/焦点格中性暖灰、选区中性蓝灰（亮/暗）、气泡选中态暖灰
+- [x] **PR-4 编辑器交互整改（T4/T7/T9）** — commit `a664c43f`：侧边菜单 4 按钮 → ＋ + 六点手柄（CSS 点阵）；手柄点击弹块菜单（复制块链接/多选切换/删除/颜色）；气泡精简 B/I/U/S+链接+颜色；代码块文档域默认「纸张」调色板（follow+亮色）；i18n 5 键 ×5 语言；e2e multiselect spec 迁移到菜单入口
+- [x] **PR-5 浏览视图整改（T11/T13）** — commit `5ab5d9b2`：默认紧凑列表（40px 行：图标+标题+上次编辑，hover 行尾 ⋯，与右键菜单同一 provider）；网格保留（40px tile + hover ⋯）；工具栏瘦身（↑ 移除、新建主按钮）；空态大标题 + 主 CTA；`DocManagerSort` 适配
+- [x] **PR-6 侧边栏目录行整改（T12）** — commit `2f632c8d`：行 hover ＋/⋯（18px）；选中态 = 整行灰 + 中性深灰左条（去橙色）；`NodeRowMenu` 抽为共享组件
+- [ ] **PR-7 P2 交互补齐（T13–T15）** — 块菜单结构已随 PR-4 完成；**拖拽多选（T13）与 emoji 页面图标（T14，需 v2.1 裁决）暂缓**，按需启动
+
+**执行备注**：全量单测中 16 个失败（sidecar plugin-install/ACP/workflow + terminals localOpenLoop）为**基线既有失败**（stash 验证与本改动无关）；knowledge 域 73 文件 / 759 测试全绿；`yarn tsc` 通过。e2e（wdio）需桌面端运行，未在本轮执行——`knowledge-multiselect.spec.ts` 已按新入口更新。

@@ -153,12 +153,14 @@ describe('KnowledgeWorkspace paper overflow contract', () => {
     expect(typeof props.onAssetImportError).toBe('function')
   })
 
-  it('crumb row shows 目录 > 文件名 with 我的空间 root (no space-name fallback)', () => {
+  it('page header shows no breadcrumb row (path lives in MainToolbar only)', () => {
     seedWorkspace('live')
     render(<KnowledgeWorkspace />)
     const header = screen.getByTestId('knowledge-page-header')
-    // 根目录文档：我的空间 › 文件名（空间名不再作为兜底）
-    expect(header.textContent).toBe('knowledge.home.mySpacesNote')
+    // 标题存在 + 无路径展示（input value 不在 textContent）
+    expect(screen.getByTestId('knowledge-doc-title')).toHaveValue('Note')
+    expect(header.textContent).not.toContain('knowledge.home.mySpaces')
+    expect(header.textContent).not.toContain('›')
   })
 
   it('T10 save status: silent on saved, error always visible, saving after 800ms', () => {

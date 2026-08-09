@@ -1,4 +1,4 @@
-import { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react'
+import { lazy, Suspense, useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import {
   Download,
@@ -11,7 +11,6 @@ import {
   registerBeforeOpenDocFlush,
   useKnowledgeStore,
 } from '@/store/knowledgeStore'
-import { getPath } from '@/domain/knowledge/tree'
 import { resolveParentForNew } from '@/domain/knowledge/parentForNew'
 import { isKnowledgeLiveEnabled } from '@/domain/knowledge/editorMode'
 import { KNOWLEDGE_LARGE_DOC_CHARS } from '@/domain/knowledge/limits'
@@ -90,7 +89,6 @@ export function KnowledgeWorkspace() {
   const setEditorMode = useKnowledgeStore((s) => s.setEditorMode)
   const setDraftBody = useKnowledgeStore((s) => s.setDraftBody)
   const flushSave = useKnowledgeStore((s) => s.flushSave)
-  const toggleFolder = useKnowledgeStore((s) => s.toggleFolder)
   const openDocStore = useKnowledgeStore((s) => s.openDoc)
   const saveDocAsTemplate = useKnowledgeStore((s) => s.saveDocAsTemplate)
   const saveVersionManual = useKnowledgeStore((s) => s.saveVersionManual)
@@ -99,11 +97,6 @@ export function KnowledgeWorkspace() {
 
   const space = spaces.find((s) => s.id === activeSpaceId)
   const activeNode = nodes.find((n) => n.id === activeDocId)
-  const pathNodes = useMemo(
-    () => (activeDocId ? getPath(nodes, activeDocId) : []),
-    [nodes, activeDocId],
-  )
-
   const editorRef = useRef<DocEditorHandle>(null)
   /** Live host handle for attach/paste (PR-2); wired now for insertMarkdown. */
   const liveEditorRef = useRef<DocLiveEditorHandle>(null)
@@ -517,15 +510,6 @@ export function KnowledgeWorkspace() {
 
   const openDoc = openDocStore
 
-  const onCrumbClick = (node: KnowledgeNode) => {
-    if (node.kind === 'folder') {
-      toggleFolder(node.id)
-      // keep active doc; only expand
-    } else {
-      void openDoc(node.id)
-    }
-  }
-
   /* V2-E0: 无源码模式切换 UI（live 唯一编辑表面；source 仅内部兜底）。
      modal={false}: modal menu + version-history / save-as-template Modal both lock
      body pointer-events; stacking leaves the app unclickable after close. */
@@ -624,9 +608,6 @@ export function KnowledgeWorkspace() {
                 onTitleEnter={() => {
                   liveEditorRef.current?.focus({ at: 'start' })
                 }}
-                pathNodes={pathNodes}
-                onRootClick={() => void useKnowledgeStore.getState().navigateTo(null, null)}
-                onCrumbClick={onCrumbClick}
                 menu={docMenu}
               />
               <Suspense
@@ -700,9 +681,6 @@ export function KnowledgeWorkspace() {
                 onTitleEnter={() => {
                   editorRef.current?.focus()
                 }}
-                pathNodes={pathNodes}
-                onRootClick={() => void useKnowledgeStore.getState().navigateTo(null, null)}
-                onCrumbClick={onCrumbClick}
                 menu={docMenu}
               />
               {liveSuppressed && activeDocId && !isCompatDismissed(activeDocId) ? (

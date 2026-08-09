@@ -465,13 +465,20 @@ function KnowledgeAddBlockButton({
     selector: (state) => state?.block,
   })
   const wrapRef = useRef<HTMLDivElement>(null)
+  const hasOpenedRef = useRef(false)
 
   useEffect(() => {
     if (!sideMenu) return
-    if (menuOpen) sideMenu.freezeMenu()
-    else sideMenu.unfreezeMenu()
-    return () => {
+    if (menuOpen) {
+      hasOpenedRef.current = true
+      sideMenu.freezeMenu()
+    } else if (hasOpenedRef.current) {
+      // 仅在实际关闭菜单时解冻——挂载时调用 unfreezeMenu 会把
+      // SideMenuExtension 的 show 重置为 false，导致手柄瞬间消失。
       sideMenu.unfreezeMenu()
+    }
+    return () => {
+      if (menuOpen) sideMenu.unfreezeMenu()
     }
   }, [menuOpen, sideMenu])
 

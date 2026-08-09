@@ -926,11 +926,28 @@
 }
 
 /* ── Multi-select ─────────────────────────────────────────────────────── */
+/* doc-ux-polish-2 X2: 选区 = 中性蓝灰底 + 细描边（--kb-selection 蓝灰，
+   与预览 X2 一致）；拖拽中的源块 = 半透明拖影；拖拽进行时禁文本选择。 */
 .kb-multiselect {
   border-radius: 0.375rem;
-  outline: 2px solid var(--accent);
+  background: var(--kb-selection, rgba(45, 110, 220, 0.18));
+  outline: 1px solid rgba(45, 110, 220, 0.25);
   outline-offset: 1px;
 }
+
+:is(html.dark, html[data-theme='dark'], body[data-theme='dark']) .kb-multiselect {
+  background: var(--kb-selection, rgba(93, 160, 255, 0.25));
+  outline: 1px solid rgba(93, 160, 255, 0.32);
+}
+
+.kb-multiselect-drag {
+  opacity: 0.45;
+}
+
+.knowledge-blocknote-editor.kb-drag-select-active {
+  user-select: none;
+}
+
 .kb-multiselect-handle {
   display: flex;
   height: 1.5rem;

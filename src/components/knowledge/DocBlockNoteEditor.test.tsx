@@ -4,6 +4,7 @@ import { describe, expect, it, vi, beforeEach } from 'vitest'
 import { render, screen, act, cleanup } from '@testing-library/react'
 import { en as bnEn, zh as bnZh } from '@blocknote/core/locales'
 import i18n from '@/i18n'
+import { isDragArmed, rangeBetween } from '@/domain/knowledge/blockDragSelect'
 import {
   DocBlockNoteEditor,
   type DocBlockNoteEditorHandle,
@@ -151,6 +152,28 @@ describe('DocBlockNoteEditor', () => {
         : [],
     )
     blocksToMarkdownLossy.mockReturnValue('serialized body')
+  })
+
+  describe('handle drag multi-select (X2)', () => {
+    it('isDragArmed separates click from drag at the 4px threshold', () => {
+      expect(isDragArmed(0, 0)).toBe(false)
+      expect(isDragArmed(4, 0)).toBe(false)
+      expect(isDragArmed(0, 4)).toBe(false)
+      expect(isDragArmed(3, 3)).toBe(true) // 9+9=18 > 16 → armed
+      expect(isDragArmed(5, 0)).toBe(true)
+      expect(isDragArmed(0, -5)).toBe(true)
+    })
+
+    it('rangeBetween selects the contiguous inclusive block range', () => {
+      const ids = ['a', 'b', 'c', 'd', 'e']
+      expect(rangeBetween(ids, 'a', 'c')).toEqual(['a', 'b', 'c'])
+      expect(rangeBetween(ids, 'c', 'a')).toEqual(['a', 'b', 'c'])
+      expect(rangeBetween(ids, 'b', 'b')).toEqual(['b'])
+      expect(rangeBetween(ids, 'd', 'e')).toEqual(['d', 'e'])
+      expect(rangeBetween(ids, 'a', 'zz')).toEqual([])
+      expect(rangeBetween(ids, 'zz', 'a')).toEqual([])
+      expect(rangeBetween([], 'a', 'a')).toEqual([])
+    })
   })
 
   it('applies light code-block chrome CSS vars from settings', async () => {

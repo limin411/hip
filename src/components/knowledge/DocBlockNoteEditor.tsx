@@ -108,6 +108,10 @@ import {
   handleBlockKeydown,
   type BlockKeymapEditor,
 } from '@/domain/knowledge/blocks/blockKeymap'
+import {
+  isDragArmed,
+  rangeBetween,
+} from '@/domain/knowledge/blockDragSelect'
 
 /**
  * BlockNote ships its own UI dictionaries (table handle menus, drag handle menu,
@@ -704,18 +708,26 @@ function KnowledgeAddBlockButton({
 }
 
 /**
- * 六点手柄：拖拽排序 + 点击块菜单（position right）。
- * BN Generic.Menu 无受控 opened；拖/点冲突用 suppress + remount 关菜单。
+ * 六点手柄：拖拽多选（Notion 手势）+ 点击块菜单（position right）。
+ * doc-ux-polish-2 X2：pointerdown 后位移 >4px 进入拖拽 = 连续多选；
+ * 无位移点击仍弹块菜单（suppressClick 机制保留）；HTML5 拖拽排序移除
+ * （与拖拽多选手势互斥，排序在浏览视图承担）。
  */
 function KnowledgeDragHandleButton({
   children,
   closeSignal,
   onMenuOpenChange,
+  onSetSelection,
+  onDragOriginChange,
 }: {
   children?: React.ReactNode
   /** Increment to force-close (e.g. when + menu opens). */
   closeSignal: number
   onMenuOpenChange: (open: boolean) => void
+  /** Replace the whole multi-selection (drag gesture is exclusive). */
+  onSetSelection: (ids: string[]) => void
+  /** Origin block id while a multi-select drag is active (ghost). */
+  onDragOriginChange: (id: string | null) => void
 }) {
   const { t } = useTranslation()
   const Components = useComponentsContext()
@@ -723,10 +735,64 @@ function KnowledgeDragHandleButton({
   const block = useExtensionState(SideMenuExtension, {
     selector: (state) => state?.block,
   })
+  const editor = useBlockNoteEditor<any, any, any>()
   const suppressClickRef = useRef(false)
-  const downRef = useRef<{ x: number; y: number } | null>(null)
+  const downRef = useRef<{ x: number; y: number; blockId: string } | null>(null)
+  const dragRef = useRef<{ lastId: string | null } | null>(null)
   const [menuKey, setMenuKey] = useState(0)
   const menuOpenRef = useRef(false)
+
+  // Stable refs so window listeners never re-register.
+  const onSetSelectionRef = useRef(onSetSelection)
+  onSetSelectionRef.current = onSetSelection
+  const onDragOriginChangeRef = useRef(onDragOriginChange)
+  onDragOriginChangeRef.current = onDragOriginChange
+  const editorRef = useRef(editor)
+  editorRef.current = editor
+
+  const endDrag = useCallback(() => {
+    dragRef.current = null
+    downRef.current = null
+    onDragOriginChangeRef.current(null)
+    window.removeEventListener('pointermove', onWindowPointerMove)
+    window.removeEventListener('pointerup', onWindowPointerUp)
+    window.removeEventListener('pointercancel', onWindowPointerUp)
+    // Released elsewhere (no click fired): un-suppress for the next click.
+    // If a click did fire, Menu.Root resets it on open — the timeout is a no-op.
+    if (suppressClickRef.current) {
+      window.setTimeout(() => {
+        suppressClickRef.current = false
+      }, 0)
+    }
+  }, [])
+
+  const onWindowPointerMove = useCallback((e: PointerEvent) => {
+    const down = downRef.current
+    if (!down) return
+    const dx = e.clientX - down.x
+    const dy = e.clientY - down.y
+    if (!dragRef.current) {
+      if (!isDragArmed(dx, dy)) return
+      // Armed: click semantics are dead for this press — menu must not open.
+      suppressClickRef.current = true
+      dragRef.current = { lastId: down.blockId }
+      onDragOriginChangeRef.current(down.blockId)
+      onSetSelectionRef.current([down.blockId])
+    }
+    const hit = document.elementFromPoint(e.clientX, e.clientY)
+    const blockEl = hit?.closest('.bn-block') as HTMLElement | null
+    const targetId = blockEl?.getAttribute('data-id') ?? null
+    if (targetId && dragRef.current && targetId !== dragRef.current.lastId) {
+      dragRef.current.lastId = targetId
+      const ids = editorRef.current.document.map((b) => b.id)
+      onSetSelectionRef.current(rangeBetween(ids, down.blockId, targetId))
+    }
+  }, [])
+
+  const onWindowPointerUp = useCallback(() => {
+    if (!downRef.current) return
+    endDrag()
+  }, [endDrag])
 
   useEffect(() => {
     // Parent asked to close (mutual exclusion with + menu).
@@ -738,6 +804,15 @@ function KnowledgeDragHandleButton({
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps -- closeSignal is the trigger
   }, [closeSignal])
+
+  useEffect(
+    () => () => {
+      window.removeEventListener('pointermove', onWindowPointerMove)
+      window.removeEventListener('pointerup', onWindowPointerUp)
+      window.removeEventListener('pointercancel', onWindowPointerUp)
+    },
+    [onWindowPointerMove, onWindowPointerUp],
+  )
 
   if (!Components || !block || !sideMenu) return null
 
@@ -761,33 +836,20 @@ function KnowledgeDragHandleButton({
       <Components.Generic.Menu.Trigger>
         <Components.SideMenu.Button
           label={t('knowledge.doc.sideMenuDragHandle')}
-          draggable
-          onDragStart={(e: React.DragEvent) => {
-            suppressClickRef.current = true
-            sideMenu.blockDragStart(e, block)
-          }}
-          onDragEnd={() => {
-            sideMenu.blockDragEnd()
-            suppressClickRef.current = true
-            window.setTimeout(() => {
-              suppressClickRef.current = false
-            }, 0)
-          }}
           className="bn-button kb-drag-handle"
           icon={
             <span
               onPointerDown={(e) => {
-                downRef.current = { x: e.clientX, y: e.clientY }
+                if (e.button !== 0) return
+                downRef.current = {
+                  x: e.clientX,
+                  y: e.clientY,
+                  blockId: block.id,
+                }
                 suppressClickRef.current = false
-              }}
-              onPointerMove={(e) => {
-                if (!downRef.current) return
-                const dx = e.clientX - downRef.current.x
-                const dy = e.clientY - downRef.current.y
-                if (dx * dx + dy * dy > 16) suppressClickRef.current = true
-              }}
-              onPointerUp={() => {
-                downRef.current = null
+                window.addEventListener('pointermove', onWindowPointerMove)
+                window.addEventListener('pointerup', onWindowPointerUp)
+                window.addEventListener('pointercancel', onWindowPointerUp)
               }}
             >
               <SideMenuSixDotIcon />
@@ -802,17 +864,21 @@ function KnowledgeDragHandleButton({
 
 /**
  * Side-menu gutter (v3): 横向 [+][⋮⋮] + 真 SVG。
- * + → 插入菜单；⋮⋮ → Notion 式块操作（拖拽排序保留）。
+ * + → 插入菜单；⋮⋮ → Notion 式块操作（拖拽多选 + 点击菜单）。
  */
 function KnowledgeSideMenu({
   selectedIds,
   onToggleSelect,
   onClearSelection,
+  onSetSelection,
+  onDragOriginChange,
   onCopyBlockLink,
 }: {
   selectedIds: string[]
   onToggleSelect: (id: string) => void
   onClearSelection: () => void
+  onSetSelection: (ids: string[]) => void
+  onDragOriginChange: (id: string | null) => void
   onCopyBlockLink: (blockId: string) => void
 }) {
   const editor = useBlockNoteEditor<any, any, any>()
@@ -851,6 +917,8 @@ function KnowledgeSideMenu({
         onMenuOpenChange={(open) => {
           if (open) setAddOpen(false)
         }}
+        onSetSelection={onSetSelection}
+        onDragOriginChange={onDragOriginChange}
       >
         <TurnIntoItem />
         <KnowledgeBlockColorsItem />
@@ -1032,6 +1100,8 @@ export const DocBlockNoteEditor = forwardRef<
   const [losses, setLosses] = useState<string[]>([])
   /** Multi-selected block ids (Shift+click on side-menu handle). */
   const [selectedIds, setSelectedIds] = useState<string[]>([])
+  /** Drag origin block id while a handle multi-select drag is active. */
+  const [dragOriginId, setDragOriginId] = useState<string | null>(null)
 
   const { fmText, body } = useMemo(
     () => splitYamlFrontmatter(initialMarkdown),
@@ -1275,19 +1345,30 @@ export const DocBlockNoteEditor = forwardRef<
   }, [editor, selectedIds, scheduleDraft, clearSelection])
 
   // Visual selection: reflect selected ids onto block DOM (class-based).
+  // The drag origin gets a translucent ghost while its drag is active.
   useEffect(() => {
     const root = rootRef.current
     if (!root) return
     root
       .querySelectorAll('.kb-multiselect')
       .forEach((el) => el.classList.remove('kb-multiselect'))
+    root
+      .querySelectorAll('.kb-multiselect-drag')
+      .forEach((el) => el.classList.remove('kb-multiselect-drag'))
     for (const id of selectedIds) {
       const el =
         root.querySelector(`[data-id="${id}"]`) ??
         root.querySelector(`#${CSS.escape(id)}`)
       el?.classList.add('kb-multiselect')
     }
-  }, [selectedIds])
+    if (dragOriginId) {
+      const el =
+        root.querySelector(`[data-id="${dragOriginId}"]`) ??
+        root.querySelector(`#${CSS.escape(dragOriginId)}`)
+      el?.classList.add('kb-multiselect-drag')
+    }
+    root.classList.toggle('kb-drag-select-active', dragOriginId != null)
+  }, [selectedIds, dragOriginId])
 
   // Stable refs for effects that must not re-register when selection changes.
   const clearSelectionRef = useRef(clearSelection)
@@ -1928,6 +2009,8 @@ export const DocBlockNoteEditor = forwardRef<
                   selectedIds={selectedIds}
                   onToggleSelect={toggleSelect}
                   onClearSelection={clearSelection}
+                  onSetSelection={setSelectedIds}
+                  onDragOriginChange={setDragOriginId}
                   onCopyBlockLink={(blockId) => {
                     // V2-E1 块引用：`hip://doc/<nodeId>#<blockId>`（粘贴时还原为 wiki 引用）。
                     const link = `hip://doc/${boundDocIdRef.current}#${blockId}`

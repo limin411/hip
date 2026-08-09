@@ -2202,6 +2202,62 @@ export async function dragKnowledgeLiveFirstBlockDown(): Promise<boolean> {
 }
 
 /**
+ * doc-ux-polish-2 X2: handle drag multi-select gesture.
+ * pointerdown on the six-dot handle, move >4px (arm), then drag onto
+ * block `toIndex` and release — selects the contiguous block range.
+ * Uses real elementFromPoint coordinates so hover detection works.
+ */
+export async function dragKnowledgeLiveHandleToBlock(toIndex: number): Promise<void> {
+  const grip = await browser.$('[data-test="dragHandle"]')
+  await grip.waitForExist({ timeout: 5000 })
+  await browser.execute(
+    (targetIndex: number) => {
+      const g = document.querySelector('[data-test="dragHandle"]') as HTMLElement | null
+      if (!g) return
+      const gRect = g.getBoundingClientRect()
+      const x = gRect.left + gRect.width / 2
+      const y0 = gRect.top + gRect.height / 2
+      const fire = (type: string, cx: number, cy: number, button = 0) =>
+        window.dispatchEvent(
+          new PointerEvent(type, {
+            bubbles: true,
+            cancelable: true,
+            clientX: cx,
+            clientY: cy,
+            pointerType: 'mouse',
+            button,
+          }),
+        )
+      g.dispatchEvent(
+        new PointerEvent('pointerdown', {
+          bubbles: true,
+          cancelable: true,
+          clientX: x,
+          clientY: y0,
+          pointerType: 'mouse',
+          button: 0,
+        }),
+      )
+      // Arm the drag (>4px) while still over the origin block.
+      fire('pointermove', x, y0 + 10)
+      const blocks = [
+        ...document.querySelectorAll(
+          '[data-testid="knowledge-doc-live-editor"] .bn-block',
+        ),
+      ]
+      const target = blocks[targetIndex]
+      if (!target) return
+      const r = target.getBoundingClientRect()
+      const cy = r.top + r.height / 2
+      fire('pointermove', x, cy)
+      fire('pointerup', x, cy)
+    },
+    toIndex,
+  )
+  await browser.pause(250)
+}
+
+/**
  * Open Live slash and type a filter query (e.g. Chinese「表格」).
  * Asserts matching slash item exists.
  */

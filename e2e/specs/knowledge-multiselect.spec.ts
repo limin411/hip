@@ -13,6 +13,7 @@ import {
   closeKnowledgeChipIfOpen,
   createDocAndExpectEditor,
   createSpaceAndOpen,
+  dragKnowledgeLiveHandleToBlock,
   ensureKnowledgeLive,
   openKnowledgeFromMenu,
   setKnowledgeDocTitle,
@@ -90,5 +91,49 @@ describe('knowledge phase A3 multi-select @knowledge', () => {
     await del.click()
     await browser.$(barTestId).waitForExist({ timeout: 5000, reverse: true })
     await waitForSaveStatusSaved(15000)
+  })
+
+  it('A3c: dragging the handle across rows selects the contiguous range (X2)', async () => {
+    await createDocAndExpectEditor()
+    await setKnowledgeDocTitle(`MSDrag-${stamp}`)
+    await ensureKnowledgeLive()
+    await typeInKnowledgeLiveEditor('drag one')
+    await browser.keys(['Enter'])
+    await typeInKnowledgeLiveEditor('drag two')
+    await browser.keys(['Enter'])
+    await typeInKnowledgeLiveEditor('drag three')
+    await waitForSaveStatusSaved(15000)
+
+    // Reveal the floating side menu on the first block.
+    const firstBlock = await browser.$(
+      '[data-testid="knowledge-doc-live-editor"] .bn-block',
+    )
+    await firstBlock.waitForExist({ timeout: 10000 })
+    await firstBlock.moveTo()
+    const handle = await browser.$(handleTestId)
+    await handle.waitForExist({ timeout: 5000 })
+
+    // Handle drag: origin block 0 → release over block 2 (3 blocks total).
+    await dragKnowledgeLiveHandleToBlock(2)
+
+    const bar = await browser.$(barTestId)
+    await bar.waitForExist({ timeout: 5000 })
+    const count = await browser.$('[data-testid="kb-multiselect-count"]')
+    expect((await count.getText()).trim()).toContain('3')
+
+    // Ghost cleared after release: origin block no longer translucent.
+    const ghost = await browser.execute(() => {
+      const blocks = [
+        ...document.querySelectorAll(
+          '[data-testid="knowledge-doc-live-editor"] .bn-block',
+        ),
+      ]
+      return blocks.some((b) => b.classList.contains('kb-multiselect-drag'))
+    })
+    expect(ghost).toBe(false)
+
+    // Clean exit: Esc clears the selection.
+    await browser.keys(['Escape'])
+    await browser.$(barTestId).waitForExist({ timeout: 5000, reverse: true })
   })
 })

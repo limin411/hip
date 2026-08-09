@@ -174,44 +174,31 @@
   border-top: 1px solid var(--border, #e4e4e7);
 }
 
-/* ── Tables (Feishu-leaning everyday polish) ───────────────────────── */
+/* ── Tables (Notion-leaning: no outer frame, self-drawn full-width grid) ─── */
 .knowledge-blocknote-editor .bn-editor table,
 .knowledge-blocknote-editor [data-content-type='table'] table {
-  width: max-content;
+  width: 100%;
   min-width: 100%;
-  border-collapse: separate;
-  border-spacing: 0;
+  border-collapse: collapse;
   font-size: 0.95em;
 }
 
+/* Scroll shell only — no border/radius/background so the table grid owns its
+   edges. BlockNote's asymmetric handle padding (9px/22px) stays invisible. */
 .knowledge-blocknote-editor .bn-table-wrapper,
 .knowledge-blocknote-editor .tableWrapper {
   overflow-x: auto;
   max-width: 100%;
   margin-block: 0.65rem;
-  border: 1px solid var(--border, #e4e4e7);
-  border-radius: 0.5rem;
-  background: var(--surface, transparent);
 }
 
 .knowledge-blocknote-editor .bn-editor th,
 .knowledge-blocknote-editor .bn-editor td {
-  border-right: 1px solid var(--border, #e4e4e7);
-  border-bottom: 1px solid var(--border, #e4e4e7);
+  border: 1px solid var(--border, #e4e4e7);
   padding: 0.5rem 0.75rem;
   min-width: 3.5rem;
   vertical-align: top;
   transition: background-color 120ms ease;
-}
-
-.knowledge-blocknote-editor .bn-editor th:last-child,
-.knowledge-blocknote-editor .bn-editor td:last-child {
-  border-right: 0;
-}
-
-.knowledge-blocknote-editor .bn-editor tr:last-child th,
-.knowledge-blocknote-editor .bn-editor tr:last-child td {
-  border-bottom: 0;
 }
 
 .knowledge-blocknote-editor .bn-editor th,
@@ -221,8 +208,9 @@
   color: var(--text-primary, inherit);
 }
 
-.knowledge-blocknote-editor .bn-editor td:hover,
-.knowledge-blocknote-editor .bn-editor th:hover {
+/* Whole-row hover, Notion-style. Outranks the header tint. */
+.knowledge-blocknote-editor .bn-editor tr:hover th,
+.knowledge-blocknote-editor .bn-editor tr:hover td {
   background: color-mix(in srgb, var(--accent, #c2410c) 6%, transparent);
 }
 

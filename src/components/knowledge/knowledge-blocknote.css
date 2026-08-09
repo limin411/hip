@@ -229,17 +229,28 @@
 }
 
 /* ── Side menu / drag handles ──────────────────────────────────────── */
+/* SideMenuController 挂载即显示（hover 块时挂载，离开卸载）——不再用
+   opacity:0 + 子选择器控制显隐（decoration wrapper 使 `>` 不匹配，曾导致
+   手柄永久不可见）。仅保留入场淡入。 */
 .knowledge-blocknote-editor .bn-side-menu {
-  min-width: 2rem;
-  gap: 0.15rem;
-  opacity: 0;
-  transition: opacity 120ms ease;
+  /* Notion 布局：＋ 在上、六点手柄在下（纵向）。覆盖 BlockNote 默认
+     height:30px 行内排布，避免按钮溢出容器。 */
+  display: flex;
+  flex-direction: column;
+  height: auto;
+  width: auto;
+  gap: 0.125rem;
+  padding: 0.125rem;
+  animation: kb-side-menu-in 120ms var(--ease-out, ease-out);
 }
 
-.knowledge-blocknote-editor .bn-block-outer:hover > .bn-side-menu,
-.knowledge-blocknote-editor .bn-side-menu:focus-within,
-.knowledge-blocknote-editor .bn-side-menu:hover {
-  opacity: 1;
+@keyframes kb-side-menu-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
 }
 
 .knowledge-blocknote-editor .bn-side-menu .bn-button,
@@ -250,7 +261,7 @@
   height: 1.5rem;
   border-radius: 0.375rem !important;
   color: var(--text-tertiary, #999) !important;
-  background: transparent !important;
+  background-color: transparent !important;
   border: 0 !important;
   box-shadow: none !important;
   transition:
@@ -260,29 +271,45 @@
 
 .knowledge-blocknote-editor .bn-side-menu .bn-button:hover,
 .knowledge-blocknote-editor .bn-side-menu button:hover {
-  background: var(--state-hover, rgba(0, 0, 0, 0.06)) !important;
+  background-color: var(--state-hover, rgba(0, 0, 0, 0.06)) !important;
   color: var(--text-primary, inherit) !important;
 }
 
-/* T4: Notion 六点拖拽手柄（2×3 点阵）——隐藏框架图标，CSS 绘制点阵。 */
-.knowledge-blocknote-editor .bn-side-menu [data-test='dragHandle'] svg {
+/* T4: Notion 六点拖拽手柄（2×3 点阵）。
+   点阵画在按钮本体上（:has 选中 dragHandle 按钮，隐藏框架 svg）——
+   视觉与命中区域完全重合；点径 3.2px，整体约 15×22px。 */
+.knowledge-blocknote-editor .bn-side-menu [data-test='dragHandle'] {
   display: none;
 }
 
-.knowledge-blocknote-editor .bn-side-menu [data-test='dragHandle'] {
+.knowledge-blocknote-editor .bn-side-menu .bn-button:has([data-test='dragHandle']) {
   background-image: radial-gradient(
-    circle at 2.5px 2.5px,
-    currentColor 1.4px,
-    transparent 2.1px
-  );
-  background-size: 7px 7px;
-  background-repeat: repeat;
-  background-position: 5px 3px;
+    circle at 3px 3px,
+    currentColor 1.6px,
+    transparent 2.3px
+  ) !important;
+  background-size: 10px 8px !important;
+  background-repeat: repeat !important;
+  background-position: center !important;
   cursor: grab;
 }
 
-.knowledge-blocknote-editor .bn-side-menu [data-test='dragHandle']:active {
+.knowledge-blocknote-editor
+  .bn-side-menu
+  .bn-button:has([data-test='dragHandle']):active {
   cursor: grabbing;
+}
+
+/* 块菜单（点击手柄弹出）：项显式布局——flex + 间距 + 最小宽度 + 行高，
+   不依赖 Mantine 变量，避免图标/文字挤成一团。 */
+.knowledge-blocknote-editor .bn-menu-dropdown .bn-menu-item {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-width: 11rem;
+  padding: 0.45rem 0.65rem;
+  line-height: 1.25;
+  font-size: 13px;
 }
 
 /*

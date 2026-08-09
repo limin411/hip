@@ -272,9 +272,9 @@ function CopyBlockLinkItem({
     <Components.Generic.Menu.Item
       className="bn-menu-item"
       data-testid="kb-copy-block-link"
+      icon={<Link2 size={14} strokeWidth={1.75} />}
       onClick={() => onCopy(blockId)}
     >
-      <Link2 size={14} strokeWidth={1.75} />
       {t('knowledge.doc.copyBlockLink')}
     </Components.Generic.Menu.Item>
   )
@@ -298,9 +298,9 @@ function MultiSelectItem({
       className="bn-menu-item"
       data-testid="kb-multiselect-item"
       aria-pressed={isSelected}
+      icon={<ListChecks size={14} strokeWidth={1.75} />}
       onClick={() => (isSelected ? onClear() : onToggle())}
     >
-      <ListChecks size={14} strokeWidth={1.75} />
       {isSelected
         ? t('knowledge.doc.multiSelectClear')
         : t('knowledge.doc.multiSelectAdd')}

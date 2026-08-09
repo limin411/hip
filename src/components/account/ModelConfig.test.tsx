@@ -11,17 +11,6 @@ vi.mock('react-i18next', () => ({
 
 vi.mock('sonner', () => ({ toast: { error: vi.fn(), message: vi.fn() } }))
 
-vi.mock('@/domain', () => ({
-  sessionService: {
-    testProvider: vi.fn(async () => ({
-      ok: true,
-      code: 'OK',
-      message: 'ok',
-      checkedAt: Date.now(),
-    })),
-  },
-}))
-
 vi.mock('@/domain/sessionService', () => ({
   sessionService: {
     testProvider: vi.fn(async () => ({
@@ -55,12 +44,23 @@ vi.mock('@/store/providersStore', () => ({
         npm: '@ai-sdk/openai',
         models: {
           'gpt-4o': { id: 'gpt-4o', name: 'gpt-4o' },
+          'gpt-4o-mini': { id: 'gpt-4o-mini', name: 'gpt-4o-mini' },
         },
         api: 'https://api.openai.com/v1',
       },
+      anthropic: {
+        id: 'anthropic',
+        name: 'Anthropic',
+        env: ['ANTHROPIC_API_KEY'],
+        npm: '@ai-sdk/anthropic',
+        models: {
+          'claude-sonnet-4': { id: 'claude-sonnet-4', name: 'Claude Sonnet 4' },
+        },
+        api: 'https://api.anthropic.com',
+      },
     },
     config: {
-      providers: { openai: { enabled: true, baseURL: 'https://api.openai.com/v1' } },
+      providers: { openai: { enabled: true } },
       activeModel: { providerID: 'openai', modelID: 'gpt-4o' },
     },
     keyConfigured: { openai: true },
@@ -70,6 +70,7 @@ vi.mock('@/store/providersStore', () => ({
     clearKey: vi.fn(),
     setBaseURL: vi.fn(),
     setEnabled: vi.fn(),
+    setApiKind: vi.fn(),
     setActiveModel: vi.fn(),
   }),
 }))
@@ -78,21 +79,25 @@ afterEach(() => {
   cleanup()
 })
 
-describe('ModelConfig cards + dialogs', () => {
-  it('renders the base model card and no embedding/rerank cards', async () => {
+describe('ModelConfig page', () => {
+  it('renders the current-model summary and provider workspace inline', async () => {
     render(<ModelConfig />)
     expect(screen.getByTestId('model-config-cards')).toBeInTheDocument()
-    expect(screen.getByTestId('model-card-base')).toBeInTheDocument()
-    expect(screen.queryByTestId('model-card-embedding')).not.toBeInTheDocument()
-    expect(screen.queryByTestId('model-card-rerank')).not.toBeInTheDocument()
+    expect(screen.getByTestId('model-current-summary')).toBeInTheDocument()
+    expect(screen.getAllByText('gpt-4o').length).toBeGreaterThan(0)
+    // Provider list + detail are on the page body, not inside a dialog
+    expect(screen.getAllByText('OpenAI').length).toBeGreaterThan(0)
+    expect(screen.getByTestId('provider-verify-config')).toBeInTheDocument()
+    expect(screen.queryByTestId('model-card-base')).not.toBeInTheDocument()
+    expect(screen.queryByTestId('base-model-dialog')).not.toBeInTheDocument()
   })
 
-  it('opens base model dialog with provider workspace', async () => {
+  it('switches the detail pane when a provider is selected', async () => {
     render(<ModelConfig />)
-    fireEvent.click(screen.getByTestId('model-card-base-edit'))
+    fireEvent.click(screen.getByText('Anthropic'))
     await waitFor(() => {
-      expect(screen.getByTestId('base-model-dialog')).toBeInTheDocument()
+      expect(screen.getByText('Claude Sonnet 4')).toBeInTheDocument()
     })
-    expect(screen.getAllByText('gpt-4o').length).toBeGreaterThan(0)
+    expect(screen.getByTestId('provider-verify-config')).toBeInTheDocument()
   })
 })

@@ -64,16 +64,10 @@ describe('settings smoke @settings @smoke', () => {
     const cards = await browser.$('[data-testid="model-config-cards"]')
     await cards.waitForExist({ timeout: 10000 })
 
-    const editBase = await browser.$('[data-testid="model-card-base-edit"]')
-    await editBase.waitForClickable({ timeout: 10000 })
-    await editBase.click()
-
-    const dialog = await browser.$('[data-testid="base-model-dialog"]')
-    await dialog.waitForExist({ timeout: 10000 })
+    const summary = await browser.$('[data-testid="model-current-summary"]')
+    await summary.waitForExist({ timeout: 10000 })
 
     const verify = await browser.$('[data-testid="provider-verify-config"]')
-    await verify.waitForExist({ timeout: 10000 })
-    expect(await verify.isExisting()).toBe(true)
 
     // Local precheck only when the control is enabled (provider on + sidecar connected).
     // Do not assert a live upstream probe (would require paid keys).

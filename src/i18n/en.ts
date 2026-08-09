@@ -1077,10 +1077,6 @@ export const en = {
         customName: 'Name',
         customModels: 'Model ids (comma-separated)',
         addProvider: 'Add',
-        tabs: {
-          base: 'Base models',
-          ariaLabel: 'Model purpose',
-        },
         purpose: {
           base: {
             currentModel: 'Current chat model',
@@ -1090,11 +1086,6 @@ export const en = {
             current: 'Current',
           },
         },
-        edit: 'Edit',
-        configure: 'Configure',
-        baseDialogTitle: 'Edit base models',
-        baseDialogIntro:
-          'Chat providers and models used for conversation and agents.',
       },
       mcpLabel: 'MCPs',
       connectorsLabel: 'Connectors',

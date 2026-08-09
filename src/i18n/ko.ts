@@ -1083,10 +1083,6 @@ export const ko = {
       "customName": "이름",
       "customModels": "모델 ID (쉼표로 구분)",
       "addProvider": "추가",
-      "tabs": {
-        "base": "기본 모델",
-        "ariaLabel": "모델 목적"
-      },
       "purpose": {
         "base": {
           "currentModel": "현재 채팅 모델",
@@ -1096,10 +1092,6 @@ export const ko = {
           "current": "현재"
         },
       },
-      "edit": "편집",
-      "configure": "설정",
-      "baseDialogTitle": "기본 모델 편집",
-      "baseDialogIntro": "대화와 에이전트에 사용되는 채팅 제공자 및 모델입니다.",
     },
     "mcpLabel": "MCPs",
     "connectorsLabel": "커넥터",

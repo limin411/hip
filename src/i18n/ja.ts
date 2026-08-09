@@ -1083,10 +1083,6 @@ export const ja = {
       "customName": "名前",
       "customModels": "モデルID（カンマ区切り）",
       "addProvider": "追加",
-      "tabs": {
-        "base": "ベースモデル",
-        "ariaLabel": "モデルの用途"
-      },
       "purpose": {
         "base": {
           "currentModel": "現在のチャットモデル",
@@ -1096,10 +1092,6 @@ export const ja = {
           "current": "現在のモデル"
         },
       },
-      "edit": "編集",
-      "configure": "設定",
-      "baseDialogTitle": "ベースモデルの編集",
-      "baseDialogIntro": "会話やエージェントに使用するチャットプロバイダーとモデルです。",
     },
     "mcpLabel": "MCPs",
     "connectorsLabel": "コネクター",

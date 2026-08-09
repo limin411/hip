@@ -1087,10 +1087,6 @@ export const zhTW = {
       "customName": "名稱",
       "customModels": "模型 id（逗號分隔）",
       "addProvider": "新增",
-      "tabs": {
-        "base": "基礎模型",
-        "ariaLabel": "模型用途"
-      },
       "purpose": {
         "base": {
           "currentModel": "當前對話模型",
@@ -1100,10 +1096,6 @@ export const zhTW = {
           "current": "當前"
         },
       },
-      "edit": "編輯",
-      "configure": "配置",
-      "baseDialogTitle": "編輯基礎模型",
-      "baseDialogIntro": "用於對話與智慧體的 chat 提供商與模型。",
     },
     "mcpLabel": "MCPs",
     "connectorsLabel": "連接器",

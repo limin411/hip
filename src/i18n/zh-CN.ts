@@ -1057,10 +1057,6 @@ export const zhCN = {
         customName: '名称',
         customModels: '模型 id（逗号分隔）',
         addProvider: '添加',
-        tabs: {
-          base: '基础模型',
-          ariaLabel: '模型用途',
-        },
         purpose: {
           base: {
             currentModel: '当前对话模型',
@@ -1070,10 +1066,6 @@ export const zhCN = {
             current: '当前',
           },
         },
-        edit: '编辑',
-        configure: '配置',
-        baseDialogTitle: '编辑基础模型',
-        baseDialogIntro: '用于对话与智能体的 chat 提供商与模型。',
       },
       mcpLabel: 'MCPs',
       connectorsLabel: '连接器',

@@ -43,6 +43,8 @@ export function resolveShikiTheme(
  * Fixed chrome palettes for forced light/dark code blocks.
  * Values match GitHub Light/Dark so syntax tokens stay readable even when the
  * app theme is the opposite. `follow` keeps app design tokens (no palette here).
+ * `paper` (T7): Notion-style warm paper surface — the doc-domain default in
+ * light theme (warm gray, no border, warm text).
  */
 export const CODE_BLOCK_CHROME = {
   light: {
@@ -58,6 +60,13 @@ export const CODE_BLOCK_CHROME = {
     headerBackground: '#161b22',
     text: '#e6edf3',
     headerText: '#8b949e',
+  },
+  paper: {
+    background: '#f7f6f3',
+    border: 'transparent',
+    headerBackground: '#f0efec',
+    text: '#2f2c28',
+    headerText: '#6f6a63',
   },
 } as const
 

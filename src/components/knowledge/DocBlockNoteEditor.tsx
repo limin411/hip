@@ -16,17 +16,20 @@ import { BlockNoteView } from '@blocknote/mantine'
 import {
   AddBlockButton,
   BasicTextStyleButton,
-  BlockTypeSelect,
   ColorStyleButton,
   CreateLinkButton,
   DragHandleButton,
+  DragHandleMenu,
   FormattingToolbar,
   FormattingToolbarController,
   SideMenuController,
   SuggestionMenuController,
   useBlockNoteEditor,
+  useComponentsContext,
   useCreateBlockNote,
   useExtensionState,
+  RemoveBlockItem,
+  BlockColorsItem,
   type DefaultReactSuggestionItem,
 } from '@blocknote/react'
 import { SideMenuExtension } from '@blocknote/core/extensions'
@@ -43,7 +46,7 @@ import { BlockNoteHipSlashMenu } from './BlockNoteHipSlashMenu'
 import { MantineProvider } from '@mantine/core'
 import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
-import { Eraser, Link2, ListChecks } from 'lucide-react'
+import { Link2, ListChecks } from 'lucide-react'
 import {
   joinYamlFrontmatter,
   splitYamlFrontmatter,
@@ -240,27 +243,74 @@ function usePrefersDark(): boolean {
   return dark
 }
 
-/** Toolbar: one-click clear text/background/highlight styles on selection. */
-function ClearFormattingButton({ onClear }: { onClear: () => void }) {
-  const { t } = useTranslation()
+/**
+ * T4 块菜单（点击六点手柄弹出）：复制块链接 / 多选切换 / 删除 / 块颜色。
+ * 自定义项 + 默认项（children）混合渲染。
+ */
+function KnowledgeDragHandleMenu({ children }: { children?: React.ReactNode }) {
+  const Components = useComponentsContext()
+  if (!Components) return null
   return (
-    <button
-      type="button"
-      className="bn-button"
-      data-testid="kb-clear-format"
-      title={t('knowledge.doc.clearFormat')}
-      aria-label={t('knowledge.doc.clearFormat')}
-      onClick={onClear}
+    <Components.Generic.Menu.Dropdown className="bn-menu-dropdown">
+      {children ?? <DragHandleMenu />}
+    </Components.Generic.Menu.Dropdown>
+  )
+}
+
+/** 块菜单项：复制块链接（V2-E1 hip://doc/<nodeId>#<blockId>）。 */
+function CopyBlockLinkItem({
+  blockId,
+  onCopy,
+}: {
+  blockId: string
+  onCopy: (blockId: string) => void
+}) {
+  const { t } = useTranslation()
+  const Components = useComponentsContext()
+  if (!Components) return null
+  return (
+    <Components.Generic.Menu.Item
+      className="bn-menu-item"
+      data-testid="kb-copy-block-link"
+      onClick={() => onCopy(blockId)}
     >
-      <Eraser size={16} />
-    </button>
+      <Link2 size={14} strokeWidth={1.75} />
+      {t('knowledge.doc.copyBlockLink')}
+    </Components.Generic.Menu.Item>
+  )
+}
+
+/** 块菜单项：把当前块加入/移出多选（原 Shift+点击手柄入口，T4 移入菜单）。 */
+function MultiSelectItem({
+  isSelected,
+  onToggle,
+  onClear,
+}: {
+  isSelected: boolean
+  onToggle: () => void
+  onClear: () => void
+}) {
+  const { t } = useTranslation()
+  const Components = useComponentsContext()
+  if (!Components) return null
+  return (
+    <Components.Generic.Menu.Item
+      className="bn-menu-item"
+      data-testid="kb-multiselect-item"
+      aria-pressed={isSelected}
+      onClick={() => (isSelected ? onClear() : onToggle())}
+    >
+      <ListChecks size={14} strokeWidth={1.75} />
+      {isSelected
+        ? t('knowledge.doc.multiSelectClear')
+        : t('knowledge.doc.multiSelectAdd')}
+    </Components.Generic.Menu.Item>
   )
 }
 
 /**
- * Side-menu handle row: default add/drag buttons + a multi-select handle.
- * Shift+click on the multi-select handle toggles the hovered block in the
- * selection; a plain click clears the selection.
+ * Side-menu handle row (T4): ＋ + Notion 六点拖拽手柄（点击弹块菜单）。
+ * 多选/复制块链接入口移入手柄菜单；拖拽排序保持 DragHandleButton 语义。
  */
 function KnowledgeSideMenu({
   selectedIds,
@@ -284,42 +334,26 @@ function KnowledgeSideMenu({
   return (
     <div className="bn-side-menu" data-testid="kb-side-menu" data-block-id={block.id}>
       <AddBlockButton />
-      <button
-        type="button"
-        className={isSelected ? 'kb-multiselect-handle kb-multiselect-active' : 'kb-multiselect-handle'}
-        data-testid="kb-multiselect-handle"
-        aria-pressed={isSelected}
-        title={t('knowledge.doc.multiSelectHint')}
-        aria-label={t('knowledge.doc.multiSelectHint')}
-        onMouseDown={(e) => {
-          if (!e.shiftKey) return
-          e.preventDefault()
-          e.stopPropagation()
-          onToggleSelect(block.id)
-        }}
-        onClick={(e) => {
-          if (e.shiftKey) return
-          onClearSelection()
-        }}
-      >
-        <ListChecks size={14} strokeWidth={1.75} />
-      </button>
-      <DragHandleButton />
-      <button
-        type="button"
-        className="bn-side-menu-item"
-        data-testid="kb-copy-block-link"
-        title={undefined}
-        aria-label={undefined}
-        onClick={(e) => {
-          e.stopPropagation()
-          onCopyBlockLink(block.id)
-        }}
-      >
-        <Link2 size={14} strokeWidth={1.75} />
-      </button>
+      <DragHandleButton dragHandleMenu={KnowledgeDragHandleMenu}>
+        <CopyBlockLinkItem blockId={block.id} onCopy={onCopyBlockLink} />
+        <MultiSelectItem
+          isSelected={isSelected}
+          onToggle={() => onToggleSelect(block.id)}
+          onClear={onClearSelection}
+        />
+        <ComponentsSeparator />
+        <RemoveBlockItem>{t('knowledge.doc.blockMenuDelete')}</RemoveBlockItem>
+        <BlockColorsItem>{t('knowledge.doc.blockMenuColors')}</BlockColorsItem>
+      </DragHandleButton>
     </div>
   )
+}
+
+/** 块菜单分隔线（Mantine Menu 项之间的分隔）。 */
+function ComponentsSeparator() {
+  const Components = useComponentsContext()
+  if (!Components) return null
+  return <Components.Generic.Menu.Divider />
 }
 
 function blockPlainText(block: {
@@ -448,11 +482,12 @@ export const DocBlockNoteEditor = forwardRef<
     normalizeCodeBlockThemeId(s.config.codeBlock?.colorTheme),
   )
   const codeBlockChrome = useMemo(() => {
+    // T7: 文档域默认 = 纸张（浅色跟随主题时）；显式 light/dark 保持 GitHub 风。
     const mode =
       codeBlockThemePref === 'follow'
         ? isDark
           ? 'dark'
-          : 'light'
+          : 'paper'
         : codeBlockThemePref
     return CODE_BLOCK_CHROME[mode]
   }, [codeBlockThemePref, isDark])
@@ -913,7 +948,6 @@ export const DocBlockNoteEditor = forwardRef<
       if (!target) return
       if (
         target.closest('.kb-multiselect') ||
-        target.closest('[data-testid="kb-multiselect-handle"]') ||
         target.closest('[data-testid="kb-multiselect-bar"]')
       ) {
         return
@@ -1387,8 +1421,8 @@ export const DocBlockNoteEditor = forwardRef<
             />
             <FormattingToolbarController
               formattingToolbar={() => (
+                /* T9: B/I/U/S + 链接 + 颜色（移除块类型下拉/行内码/清除格式——Notion 气泡风格）。 */
                 <FormattingToolbar>
-                  <BlockTypeSelect key="blockTypeSelect" />
                   <BasicTextStyleButton basicTextStyle="bold" key="bold" />
                   <BasicTextStyleButton basicTextStyle="italic" key="italic" />
                   <BasicTextStyleButton
@@ -1399,29 +1433,8 @@ export const DocBlockNoteEditor = forwardRef<
                     basicTextStyle="strike"
                     key="strike"
                   />
-                  <BasicTextStyleButton basicTextStyle="code" key="code" />
                   <CreateLinkButton key="createLink" />
                   <ColorStyleButton key="color" />
-                  <ClearFormattingButton
-                    key="clearFormat"
-                    onClear={() => {
-                      try {
-                        editor.removeStyles({
-                          textColor: 'default',
-                          backgroundColor: 'default',
-                        })
-                        const active = editor.getActiveStyles() as {
-                          highlight?: boolean
-                        }
-                        if (active.highlight) {
-                          editor.toggleStyles({ highlight: false })
-                        }
-                        scheduleDraft()
-                      } catch {
-                        // ignore
-                      }
-                    }}
-                  />
                 </FormattingToolbar>
               )}
             />

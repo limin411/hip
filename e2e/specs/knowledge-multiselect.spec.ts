@@ -1,9 +1,10 @@
 /**
- * Phase A3: block multi-select (Shift+click side-menu handle → batch ops).
+ * Phase A3: block multi-select (drag-handle menu → batch ops).
  * Tags: @knowledge (not @core — longer / optional gate)
  *
- * Note: the side menu is hover-triggered (floating); shift+click on the
- * multi-select handle toggles the hovered block in the selection.
+ * Note: the side menu is hover-triggered (floating). Clicking the six-dot
+ * drag handle opens the block menu; the "add to selection" item toggles the
+ * hovered block in the selection (T4 entry migration).
  */
 import { expect } from 'expect-webdriverio'
 import { waitForAppReady, waitForMainApp, leaveSpecialViewsIfOpen } from '../helpers/app.js'
@@ -19,7 +20,8 @@ import {
   waitForSaveStatusSaved,
 } from '../helpers/knowledge.js'
 
-const handleTestId = '[data-testid="kb-multiselect-handle"]'
+const handleTestId = '[data-test="dragHandle"]'
+const multiItemTestId = '[data-testid="kb-multiselect-item"]'
 const barTestId = '[data-testid="kb-multiselect-bar"]'
 const deleteTestId = '[data-testid="kb-multiselect-delete"]'
 
@@ -41,7 +43,7 @@ describe('knowledge phase A3 multi-select @knowledge', () => {
     await closeKnowledgeChipIfOpen()
   })
 
-  it('A3a: Shift+click side-menu handle selects a block and batch bar appears', async () => {
+  it('A3a: drag-handle menu "add to selection" selects a block and batch bar appears', async () => {
     await createDocAndExpectEditor()
     await setKnowledgeDocTitle(`MSDoc-${stamp}`)
     await ensureKnowledgeLive()
@@ -59,19 +61,26 @@ describe('knowledge phase A3 multi-select @knowledge', () => {
 
     const handle = await browser.$(handleTestId)
     await handle.waitForExist({ timeout: 5000 })
-    // Shift+click toggles the hovered block into the selection.
-    await handle.click({ button: 'left', shiftKey: true })
+    // Click the six-dot handle → block menu opens.
+    await handle.click()
+
+    const item = await browser.$(multiItemTestId)
+    await item.waitForExist({ timeout: 5000 })
+    await item.click()
 
     const bar = await browser.$(barTestId)
     await bar.waitForExist({ timeout: 5000 })
     const count = await browser.$('[data-testid="kb-multiselect-count"]')
     expect((await count.getText()).trim()).toContain('1')
 
-    // Select a second block: hover it, shift+click again.
+    // Select a second block: hover it, open its menu, add to selection.
     await firstBlock.moveTo({ x: 0, y: 40 })
     const handle2 = await browser.$(handleTestId)
     await handle2.waitForExist({ timeout: 5000 })
-    await handle2.click({ button: 'left', shiftKey: true })
+    await handle2.click()
+    const item2 = await browser.$(multiItemTestId)
+    await item2.waitForExist({ timeout: 5000 })
+    await item2.click()
     expect((await count.getText()).trim()).toContain('2')
   })
 

@@ -264,6 +264,27 @@
   color: var(--text-primary, inherit) !important;
 }
 
+/* T4: Notion 六点拖拽手柄（2×3 点阵）——隐藏框架图标，CSS 绘制点阵。 */
+.knowledge-blocknote-editor .bn-side-menu [data-test='dragHandle'] svg {
+  display: none;
+}
+
+.knowledge-blocknote-editor .bn-side-menu [data-test='dragHandle'] {
+  background-image: radial-gradient(
+    circle at 2.5px 2.5px,
+    currentColor 1.4px,
+    transparent 2.1px
+  );
+  background-size: 7px 7px;
+  background-repeat: repeat;
+  background-position: 5px 3px;
+  cursor: grab;
+}
+
+.knowledge-blocknote-editor .bn-side-menu [data-test='dragHandle']:active {
+  cursor: grabbing;
+}
+
 /*
  * Bubble toolbar + menus often portal outside the editor host.
  * BlockNote is knowledge-only, so global bn-* skins are safe.

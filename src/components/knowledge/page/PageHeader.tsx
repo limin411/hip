@@ -32,13 +32,8 @@ export function PageHeader({
     >
       <div className="knowledge-doc-inline-pad">
         <div className="knowledge-doc-measure pt-2.5 sm:pt-3">
-          {/* 标题行：hover 标题区显示页面 ⋯ 菜单（组内 hover + 焦点态）。 */}
+          {/* 标题行：hover 标题区显示页面 ⋯ 菜单（组内 hover + 焦点态，位于标题右侧）。 */}
           <div className="flex items-start gap-1 pt-1">
-            {menu ? (
-              <div className="flex h-8 w-8 shrink-0 items-center justify-center opacity-0 transition-opacity duration-100 group-hover:opacity-100 focus-within:opacity-100">
-                {menu}
-              </div>
-            ) : null}
             <InlineDocTitle
               docId={docId}
               title={title}
@@ -47,6 +42,11 @@ export function PageHeader({
               embedded
               className="!pt-0"
             />
+            {menu ? (
+              <div className="flex h-8 w-8 shrink-0 items-center justify-center opacity-0 transition-opacity duration-100 group-hover:opacity-100 focus-within:opacity-100">
+                {menu}
+              </div>
+            ) : null}
           </div>
         </div>
       </div>

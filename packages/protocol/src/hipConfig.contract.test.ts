@@ -20,9 +20,11 @@ import type {
 } from './index.js'
 import {
   CODE_BLOCK_COLOR_THEME_IDS,
+  DOC_WIDTH_IDS,
   TERMINAL_COLOR_THEME_IDS,
   CONTEXT_GATE_MODES,
   isCodeBlockColorThemeId,
+  isDocWidthId,
   isTerminalColorThemeId,
   isContextGateMode,
   parseContextGateMode,
@@ -915,6 +917,23 @@ describe('protocol: McpServerConfig extended fields (Todo 1)', () => {
     expect(isCodeBlockColorThemeId('light')).toBe(true)
     expect(isCodeBlockColorThemeId('dark')).toBe(true)
     expect(isCodeBlockColorThemeId('not-a-theme')).toBe(false)
+  })
+
+  it('round-trips knowledge on HipConfig through JSON', () => {
+    const cfg: HipConfig = {
+      version: 1,
+      knowledge: { docWidth: 'wide' },
+    }
+    const round = JSON.parse(JSON.stringify(cfg)) as HipConfig
+    expect(round.knowledge).toEqual({ docWidth: 'wide' })
+  })
+
+  it('DOC_WIDTH_IDS covers default/wide/full', () => {
+    expect(DOC_WIDTH_IDS).toEqual(['default', 'wide', 'full'])
+    expect(isDocWidthId('default')).toBe(true)
+    expect(isDocWidthId('wide')).toBe(true)
+    expect(isDocWidthId('full')).toBe(true)
+    expect(isDocWidthId('narrow')).toBe(false)
   })
 
   it('round-trips window on HipConfig through JSON', () => {

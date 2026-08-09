@@ -4,11 +4,26 @@
  * Mode overflow stays in KnowledgeWorkspace.paper.test.tsx.
  */
 import '@testing-library/jest-dom/vitest'
-import { describe, it, expect, afterEach } from 'vitest'
+import { describe, it, expect, afterEach, vi } from 'vitest'
 import { render, screen, cleanup } from '@testing-library/react'
 import { DOC_PAGE_SHELL, KnowledgeDocCanvas } from './KnowledgeDocCanvas'
+import { DOC_WIDTH_MEASURE } from '@/domain/knowledge/docWidth'
 
-afterEach(() => cleanup())
+const hipConfigState = {
+  config: {
+    version: 1 as const,
+    knowledge: { docWidth: 'default' as const },
+  },
+}
+
+vi.mock('@/store/hipConfigStore', () => ({
+  useHipConfigStore: (sel: (s: typeof hipConfigState) => unknown) => sel(hipConfigState),
+}))
+
+afterEach(() => {
+  cleanup()
+  hipConfigState.config.knowledge = { docWidth: 'default' }
+})
 
 describe('KnowledgeDocCanvas', () => {
   it('locks full-page shell contract (no card chrome)', () => {
@@ -60,5 +75,38 @@ describe('KnowledgeDocCanvas', () => {
     expect(paper.className).not.toMatch(/\bsm:px-12\b/)
     expect(paper.className).not.toMatch(/\blg:px-16\b/)
     expect(paper.className).not.toContain('knowledge-doc-inline-pad')
+  })
+
+  it('applies default doc width measure on the paper host', () => {
+    render(
+      <KnowledgeDocCanvas>
+        <span>body</span>
+      </KnowledgeDocCanvas>,
+    )
+    const paper = screen.getByTestId('knowledge-doc-paper')
+    expect(paper).toHaveAttribute('data-doc-width', 'default')
+    expect(paper.style.getPropertyValue('--kb-measure')).toBe(DOC_WIDTH_MEASURE.default)
+  })
+
+  it('applies wide and full doc width measures from config', () => {
+    hipConfigState.config.knowledge = { docWidth: 'wide' }
+    const { rerender } = render(
+      <KnowledgeDocCanvas>
+        <span>body</span>
+      </KnowledgeDocCanvas>,
+    )
+    let paper = screen.getByTestId('knowledge-doc-paper')
+    expect(paper).toHaveAttribute('data-doc-width', 'wide')
+    expect(paper.style.getPropertyValue('--kb-measure')).toBe(DOC_WIDTH_MEASURE.wide)
+
+    hipConfigState.config.knowledge = { docWidth: 'full' }
+    rerender(
+      <KnowledgeDocCanvas>
+        <span>body</span>
+      </KnowledgeDocCanvas>,
+    )
+    paper = screen.getByTestId('knowledge-doc-paper')
+    expect(paper).toHaveAttribute('data-doc-width', 'full')
+    expect(paper.style.getPropertyValue('--kb-measure')).toBe(DOC_WIDTH_MEASURE.full)
   })
 })

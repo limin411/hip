@@ -822,6 +822,13 @@ export const ko = {
       "light": "라이트",
       "dark": "다크"
     },
+    "docWidth": "문서 너비",
+    "docWidthDesc": "문서 관리에서 본문 열의 최대 너비입니다. 변경 사항이 즉시 적용됩니다.",
+    "docWidths": {
+      "default": "기본",
+      "wide": "넓게",
+      "full": "전체 너비"
+    },
     "density": "밀도",
     "densityDesc": "사이드바 및 활동 행 간격을 제어합니다.",
     "densities": {

@@ -5,7 +5,9 @@ import {
   type TerminalShellPref,
   type TerminalColorThemeId,
   type CodeBlockColorThemeId,
+  type DocWidthId,
   CODE_BLOCK_COLOR_THEME_IDS,
+  DOC_WIDTH_IDS,
   TERMINAL_COLOR_THEME_IDS,
 } from '@hip/protocol'
 import { cn } from '@/lib/utils'
@@ -29,6 +31,7 @@ import { CODE_TERMINAL } from '@/components/artifact/terminalFeature'
 import { TERMINAL_MANAGEMENT } from '@/components/terminals/feature'
 import { normalizeTerminalColorThemeId } from '@/components/artifact/terminalTheme'
 import { normalizeCodeBlockThemeId } from '@/domain/knowledge/codeBlockTheme'
+import { normalizeDocWidthId } from '@/domain/knowledge/docWidth'
 import { Switch } from '@/components/ui/Switch'
 
 const LANGUAGE_KEYS: AppLanguage[] = ['zh-CN', 'zh-TW', 'en', 'ja', 'ko']
@@ -59,6 +62,9 @@ export function GeneralSettings() {
 
   const codeBlockTheme = useHipConfigStore((s) =>
     normalizeCodeBlockThemeId(s.config.codeBlock?.colorTheme),
+  )
+  const docWidth = useHipConfigStore((s) =>
+    normalizeDocWidthId(s.config.knowledge?.docWidth),
   )
   const terminalShell = useHipConfigStore((s) => s.config.terminal?.shell ?? 'default')
   const terminalColor = useHipConfigStore((s) =>
@@ -99,6 +105,9 @@ export function GeneralSettings() {
   }
   const setCodeBlockTheme = (colorTheme: CodeBlockColorThemeId) => {
     void updateSection('codeBlock', (prev) => ({ ...(prev ?? {}), colorTheme }))
+  }
+  const setDocWidth = (width: DocWidthId) => {
+    void updateSection('knowledge', (prev) => ({ ...(prev ?? {}), docWidth: width }))
   }
   const setTerminalColor = (colorTheme: TerminalColorThemeId) => {
     void updateSection('terminal', (prev) => ({ ...(prev ?? {}), colorTheme }))
@@ -215,6 +224,49 @@ export function GeneralSettings() {
                     )}
                   />
                   <span>{t(`settings.codeBlockColors.${themeId}`)}</span>
+                </DropdownMenuItem>
+              ))}
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
+      </div>
+      <div
+        className="flex items-center justify-between gap-6 px-8 py-4"
+        data-testid="settings-doc-width"
+      >
+        <div className="min-w-0 flex-1">
+          <div className="text-body font-medium text-ink">{t('settings.docWidth')}</div>
+          <div className="mt-0.5 text-meta leading-relaxed text-ink-tertiary">
+            {t('settings.docWidthDesc')}
+          </div>
+        </div>
+        <div className="relative shrink-0">
+          <DropdownMenu modal={false}>
+            <DropdownMenuTrigger asChild>
+              <button
+                type="button"
+                className={selectTriggerCls}
+                data-testid="settings-doc-width-trigger"
+              >
+                <span>{t(`settings.docWidths.${docWidth}`)}</span>
+                <ChevronDown size={14} strokeWidth={1.75} className="shrink-0 text-ink-tertiary" />
+              </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              {DOC_WIDTH_IDS.map((widthId) => (
+                <DropdownMenuItem
+                  key={widthId}
+                  data-testid={`settings-doc-width-${widthId}`}
+                  onSelect={() => setDocWidth(widthId)}
+                >
+                  <Check
+                    size={14}
+                    className={cn(
+                      'shrink-0',
+                      docWidth === widthId ? 'opacity-100' : 'opacity-0',
+                    )}
+                  />
+                  <span>{t(`settings.docWidths.${widthId}`)}</span>
                 </DropdownMenuItem>
               ))}
             </DropdownMenuContent>

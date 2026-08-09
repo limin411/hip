@@ -797,6 +797,14 @@ export const en = {
         light: 'Light',
         dark: 'Dark',
       },
+      docWidth: 'Document width',
+      docWidthDesc:
+        'Maximum width of the document body in Document Management. Applies immediately.',
+      docWidths: {
+        default: 'Default',
+        wide: 'Wide',
+        full: 'Full width',
+      },
       density: 'Density',
       densityDesc: 'Control sidebar and activity row spacing.',
       densities: {

@@ -29,6 +29,7 @@ import { groupSessionsByProjectPath, projectPathKey } from '@/lib/sessionProject
 import { groupSessionsByDate } from '@/lib/sessionDateGroups'
 import { cn } from '@/lib/utils'
 import { useWindowDrag } from '@/lib/useWindowDrag'
+import { useCaptionTitleDoubleClick } from './WindowCaptionButtons'
 import { useKnowledgeStore } from '@/store/knowledgeStore'
 import { useProjectPathStore } from '@/store/projectPathStore'
 import {
@@ -83,6 +84,7 @@ const titlebarNavBtnClass = cn(
 export function AppSidebar() {
   const { t } = useTranslation()
   const handlePointerDown = useWindowDrag()
+  const handleTitleDblClick = useCaptionTitleDoubleClick()
   /** Project path keys whose session list is collapsed (default = expanded). */
   const [projectGroupCollapsed, setProjectGroupCollapsed] = useState<Record<string, boolean>>({})
   /** Chat date-bucket keys whose session list is collapsed (default = expanded). */
@@ -286,6 +288,7 @@ export function AppSidebar() {
         data-tauri-drag-region
         data-testid="sidebar-drag-region"
         onPointerDown={handlePointerDown}
+        onDoubleClick={handleTitleDblClick}
         className={cn(titlebarRowClass, 'border-b-0')}
       >
         {isMac ? (

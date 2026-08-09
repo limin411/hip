@@ -115,6 +115,7 @@ export function MainToolbar() {
       data-testid="main-toolbar"
       data-tauri-drag-region
       onPointerDown={handlePointerDown}
+      onDoubleClick={handleTitleDblClick}
       aria-label={t('mainToolbar.aria')}
       className={cn(
         titlebarRowClass,
@@ -155,7 +156,6 @@ export function MainToolbar() {
       <div
         data-testid="main-toolbar-title"
         className="flex min-w-0 flex-1 items-center self-stretch"
-        onDoubleClick={handleTitleDblClick}
       >
         <span className="min-w-0 truncate text-body font-medium leading-none text-ink">
           {title}

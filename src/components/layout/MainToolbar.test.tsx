@@ -6,6 +6,8 @@ import { useUiStore } from '@/store/uiStore'
 import { useDomainStore } from '@/domain'
 import { DEFAULT_CONFIG } from '@/domain/sessionStore'
 
+const toggleMaximize = vi.fn().mockResolvedValue(undefined)
+
 vi.mock('./ConnectionStatus', () => ({
   ConnectionStatus: () => <div data-testid="connection-status" />,
 }))
@@ -16,11 +18,21 @@ vi.mock('@/store/knowledgeStore', () => ({
   useKnowledgeStore: (sel: (s: { mode: string; spaces: unknown[]; activeSpaceId: null }) => unknown) =>
     sel({ mode: 'home', spaces: [], activeSpaceId: null }),
 }))
+vi.mock('@tauri-apps/api/window', () => ({
+  getCurrentWindow: () => ({
+    toggleMaximize,
+    minimize: vi.fn(),
+    close: vi.fn(),
+    isMaximized: vi.fn().mockResolvedValue(false),
+    onResized: vi.fn().mockResolvedValue(() => {}),
+  }),
+}))
 
 import { MainToolbar } from './MainToolbar'
 
 describe('MainToolbar', () => {
   beforeEach(() => {
+    toggleMaximize.mockClear()
     useUiStore.setState({
       activeView: 'chat',
       sidebarSection: 'chats',
@@ -108,5 +120,17 @@ describe('MainToolbar', () => {
     // PanelToggle is mocked always-present; connection + toggle chrome should show.
     expect(screen.getByTestId('connection-status')).toBeInTheDocument()
     expect(screen.getByTestId('toggle-panel')).toBeInTheDocument()
+  })
+
+  it('double-click on the toolbar toggles window maximize', async () => {
+    render(<MainToolbar />)
+    fireEvent.doubleClick(screen.getByTestId('main-toolbar'))
+    await vi.waitFor(() => expect(toggleMaximize).toHaveBeenCalledTimes(1))
+  })
+
+  it('double-click on command palette button does not maximize', async () => {
+    render(<MainToolbar />)
+    fireEvent.doubleClick(screen.getByTestId('main-toolbar-command-palette'))
+    await vi.waitFor(() => expect(toggleMaximize).not.toHaveBeenCalled())
   })
 })

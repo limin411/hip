@@ -788,6 +788,13 @@ export const zhCN = {
         light: '浅色',
         dark: '深色',
       },
+      docWidth: '文档宽度',
+      docWidthDesc: '文档管理中正文栏的最大宽度。修改后立即生效。',
+      docWidths: {
+        default: '默认',
+        wide: '加宽',
+        full: '全宽',
+      },
       density: '密度',
       densityDesc: '控制侧边栏与活动行的间距。',
       densities: {

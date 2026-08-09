@@ -142,12 +142,16 @@ export function WindowCaptionButtons({ className }: { className?: string }) {
   )
 }
 
-/** Double-click title area → toggle maximize (Windows convention). */
+/**
+ * Double-click titlebar drag surface → toggle maximize.
+ * Used on macOS Overlay / Windows frameless chrome (native titlebar is hidden).
+ * Skips interactive targets (buttons, inputs, explicit no-drag).
+ */
 export function useCaptionTitleDoubleClick() {
   return useCallback((e: MouseEvent) => {
-    if (!isCustomCaptionActive()) return
-    if (e.detail !== 2) return
-    if ((e.target as Element).closest('button, a, input, [data-no-drag]')) return
+    if ((e.target as Element | null)?.closest?.('button, a, input, textarea, select, [data-no-drag]')) {
+      return
+    }
     void getWin()
       .then((w) => w.toggleMaximize())
       .catch(() => {})

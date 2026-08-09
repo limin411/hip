@@ -397,6 +397,57 @@ color_theme = "not-a-theme"
     expect(readHipConfig().codeBlock).toBeUndefined()
   })
 
+  it('parses [knowledge] doc_width', () => {
+    const dir = tmpDir()
+    const p = writeToml(
+      dir,
+      'knowledge-doc-width.toml',
+      `version = 1
+[knowledge]
+doc_width = "wide"
+`,
+    )
+    process.env.HIP_CONFIG_PATH = p
+    const cfg = readHipConfig()
+    expect(cfg.knowledge).toEqual({ docWidth: 'wide' })
+  })
+
+  it('parses [knowledge] docWidth (camelCase alias)', () => {
+    const dir = tmpDir()
+    const p = writeToml(
+      dir,
+      'knowledge-doc-width-camel.toml',
+      `version = 1
+[knowledge]
+docWidth = "full"
+`,
+    )
+    process.env.HIP_CONFIG_PATH = p
+    const cfg = readHipConfig()
+    expect(cfg.knowledge).toEqual({ docWidth: 'full' })
+  })
+
+  it('drops unknown knowledge.doc_width values', () => {
+    const dir = tmpDir()
+    const p = writeToml(
+      dir,
+      'knowledge-doc-width-bad.toml',
+      `version = 1
+[knowledge]
+doc_width = "narrow"
+`,
+    )
+    process.env.HIP_CONFIG_PATH = p
+    expect(readHipConfig().knowledge).toEqual({})
+  })
+
+  it('omits knowledge when section is absent', () => {
+    const dir = tmpDir()
+    const p = writeToml(dir, 'hip-no-knowledge.toml', 'version = 1\n')
+    process.env.HIP_CONFIG_PATH = p
+    expect(readHipConfig().knowledge).toBeUndefined()
+  })
+
   it('ignores unknown terminal.color_theme values', () => {
     const dir = tmpDir()
     const p = writeToml(

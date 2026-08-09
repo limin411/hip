@@ -160,6 +160,16 @@ pub(crate) struct CodeBlockConfig {
     pub(crate) color_theme: Option<String>,
 }
 
+/// Optional `[knowledge]` section. JSON uses camelCase for the UI.
+/// Must be preserved on set_hip_config rewrites so doc width is not stripped.
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct KnowledgeConfig {
+    /// Document content column width (default | wide | full). JSON key: docWidth.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub(crate) doc_width: Option<String>,
+}
+
 /// Optional `[window]` section. JSON uses camelCase for the UI.
 /// Must be preserved on set_hip_config rewrites so close/tray policy is not stripped.
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
@@ -279,6 +289,9 @@ pub(crate) struct HipConfig {
     /// Optional code-block color preference. Preserved on set_hip_config rewrites.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub(crate) code_block: Option<CodeBlockConfig>,
+    /// Optional document-management UI prefs. Preserved on set_hip_config rewrites.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub(crate) knowledge: Option<KnowledgeConfig>,
     /// Optional window close / tray policy. Preserved on set_hip_config rewrites.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub(crate) window: Option<WindowConfig>,
@@ -472,6 +485,15 @@ pub(crate) struct TomlCodeBlockConfig {
     pub(crate) color_theme: Option<String>,
 }
 
+/// TOML mirror for `[knowledge]` (snake_case keys; camelCase aliases for hand-edited files).
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+#[allow(dead_code)]
+pub(crate) struct TomlKnowledgeConfig {
+    #[serde(default, skip_serializing_if = "Option::is_none", alias = "docWidth")]
+    pub(crate) doc_width: Option<String>,
+}
+
 /// TOML mirror for `[window]` (snake_case keys; camelCase aliases for hand-edited files).
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
@@ -586,6 +608,8 @@ pub(crate) struct TomlHipConfig {
     pub(crate) terminal: Option<TomlTerminalConfig>,
     #[serde(default, skip_serializing_if = "Option::is_none", alias = "codeBlock")]
     pub(crate) code_block: Option<TomlCodeBlockConfig>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub(crate) knowledge: Option<TomlKnowledgeConfig>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub(crate) window: Option<TomlWindowConfig>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -725,6 +749,7 @@ pub fn load_hip_config(app: &tauri::AppHandle) -> Result<HipConfig, String> {
             agent_loop: None,
             terminal: None,
             code_block: None,
+            knowledge: None,
             window: None,
             acp: None,
             plan: None,
@@ -891,6 +916,22 @@ impl From<TomlCodeBlockConfig> for CodeBlockConfig {
     }
 }
 
+impl From<KnowledgeConfig> for TomlKnowledgeConfig {
+    fn from(k: KnowledgeConfig) -> Self {
+        TomlKnowledgeConfig {
+            doc_width: k.doc_width,
+        }
+    }
+}
+
+impl From<TomlKnowledgeConfig> for KnowledgeConfig {
+    fn from(k: TomlKnowledgeConfig) -> Self {
+        KnowledgeConfig {
+            doc_width: k.doc_width,
+        }
+    }
+}
+
 impl From<WindowConfig> for TomlWindowConfig {
     fn from(w: WindowConfig) -> Self {
         TomlWindowConfig {
@@ -1025,6 +1066,7 @@ impl From<HipConfig> for TomlHipConfig {
             agent_loop: cfg.agent_loop.map(|x| x.into()),
             terminal: cfg.terminal.map(|x| x.into()),
             code_block: cfg.code_block.map(|x| x.into()),
+            knowledge: cfg.knowledge.map(|x| x.into()),
             window: cfg.window.map(|x| x.into()),
             acp: cfg.acp.map(|x| x.into()),
             plan: cfg.plan.map(|x| x.into()),
@@ -1048,6 +1090,7 @@ impl From<TomlHipConfig> for HipConfig {
             agent_loop: cfg.agent_loop.map(|x| x.into()),
             terminal: cfg.terminal.map(|x| x.into()),
             code_block: cfg.code_block.map(|x| x.into()),
+            knowledge: cfg.knowledge.map(|x| x.into()),
             window: cfg.window.map(|x| x.into()),
             acp: cfg.acp.map(|x| x.into()),
             plan: cfg.plan.map(|x| x.into()),
@@ -1078,6 +1121,7 @@ mod voice_preserve_tests {
                 color_theme: Some("dracula".into()),
             }),
             code_block: None,
+            knowledge: None,
             window: Some(WindowConfig {
                 close_action: Some("hide".into()),
                 tray_enabled: Some(true),

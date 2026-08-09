@@ -125,6 +125,7 @@ fn get_hip_config(app: tauri::AppHandle) -> Result<String, String> {
                 agent_loop: None,
                 terminal: None,
                 code_block: None,
+                knowledge: None,
                 window: None,
                 acp: None,
                 plan: None,
@@ -1136,6 +1137,7 @@ mod tests {
             agent_loop: None,
             terminal: None,
             code_block: None,
+            knowledge: None,
             window: None,
             acp: None,
             plan: None,
@@ -1329,6 +1331,7 @@ mod tests {
             agent_loop: None,
             terminal: None,
             code_block: None,
+            knowledge: None,
             window: None,
             acp: None,
             plan: None,
@@ -1512,6 +1515,7 @@ mod tests {
             agent_loop: None,
             terminal: None,
             code_block: None,
+            knowledge: None,
             window: None,
             acp: None,
             plan: None,
@@ -1632,6 +1636,7 @@ mod tests {
             agent_loop: None,
             terminal: None,
             code_block: None,
+            knowledge: None,
             window: None,
             acp: None,
             plan: None,
@@ -1673,6 +1678,7 @@ mod tests {
             }),
             terminal: None,
             code_block: None,
+            knowledge: None,
             window: None,
             acp: None,
             plan: None,
@@ -1752,6 +1758,7 @@ doomLoopStrategy = "auto_continue"
                 color_theme: Some("dracula".into()),
             }),
             code_block: None,
+            knowledge: None,
             window: None,
             acp: None,
             plan: None,
@@ -1852,6 +1859,7 @@ colorTheme = "one-dark"
             code_block: Some(super::hip_config::CodeBlockConfig {
                 color_theme: Some("dark".into()),
             }),
+            knowledge: None,
             window: None,
             acp: None,
             plan: None,
@@ -1908,6 +1916,79 @@ colorTheme = "follow"
     }
 
     #[test]
+    fn knowledge_survives_json_toml_roundtrip() {
+        // set_hip_config rewrites hip.toml from typed HipConfig; [knowledge] must not be stripped.
+        let cfg = super::HipConfig {
+            version: 1,
+            providers: vec![],
+            active_model: None,
+            mcp_servers: vec![],
+            skills: vec![],
+            agents: vec![],
+            fixed_agents: None,
+            permissions: None,
+            agent_loop: None,
+            terminal: None,
+            code_block: None,
+            knowledge: Some(super::hip_config::KnowledgeConfig {
+                doc_width: Some("wide".into()),
+            }),
+            window: None,
+            acp: None,
+            plan: None,
+            voice: None,
+            proxy: None,
+        };
+
+        let json = serde_json::to_string(&cfg).unwrap();
+        assert!(json.contains("\"knowledge\""), "JSON must emit knowledge: {json}");
+        assert!(json.contains("\"docWidth\""), "JSON must emit docWidth: {json}");
+        let from_json: super::HipConfig = serde_json::from_str(&json).unwrap();
+        let toml_cfg: super::TomlHipConfig = from_json.into();
+        let toml_str = toml::to_string_pretty(&toml_cfg).unwrap();
+        assert!(
+            toml_str.contains("[knowledge]") || toml_str.contains("knowledge"),
+            "TOML should contain knowledge: {toml_str}"
+        );
+        assert!(
+            toml_str.contains("doc_width") || toml_str.contains("wide"),
+            "TOML should emit doc_width: {toml_str}"
+        );
+        let from_toml: super::TomlHipConfig = toml::from_str(&toml_str).unwrap();
+        let back: super::HipConfig = from_toml.into();
+        assert_eq!(
+            back.knowledge.as_ref().and_then(|k| k.doc_width.as_deref()),
+            Some("wide")
+        );
+
+        // Raw TOML snake_case fixture
+        let snake = r#"
+version = 1
+[knowledge]
+doc_width = "full"
+"#;
+        let snake_cfg: super::TomlHipConfig = toml::from_str(snake).unwrap();
+        let snake_hip: super::HipConfig = snake_cfg.into();
+        assert_eq!(
+            snake_hip.knowledge.as_ref().and_then(|k| k.doc_width.as_deref()),
+            Some("full")
+        );
+
+        // Raw TOML camelCase alias fixture
+        let camel = r#"
+version = 1
+[knowledge]
+docWidth = "default"
+"#;
+        let camel_cfg: super::TomlHipConfig = toml::from_str(camel).unwrap();
+        let camel_hip: super::HipConfig = camel_cfg.into();
+        assert_eq!(
+            camel_hip.knowledge.as_ref().and_then(|k| k.doc_width.as_deref()),
+            Some("default")
+        );
+    }
+
+    #[test]
     fn window_survives_json_toml_roundtrip() {
         // set_hip_config rewrites hip.toml from typed HipConfig; [window] must not be stripped.
         let cfg = super::HipConfig {
@@ -1922,6 +2003,7 @@ colorTheme = "follow"
             agent_loop: None,
             terminal: None,
             code_block: None,
+            knowledge: None,
             window: Some(super::hip_config::WindowConfig {
                 close_action: Some("hide".into()),
                 tray_enabled: Some(true),
@@ -2026,6 +2108,7 @@ trayEnabled = true
             agent_loop: None,
             terminal: None,
             code_block: None,
+            knowledge: None,
             window: None,
             acp: Some(super::hip_config::AcpHostConfig {
                 fs_bridge: Some(true),
@@ -2102,6 +2185,7 @@ fsReadMaxBytes = 2000000
             agent_loop: None,
             terminal: None,
             code_block: None,
+            knowledge: None,
             window: None,
             acp: None,
             plan: Some(super::hip_config::PlanConfig {

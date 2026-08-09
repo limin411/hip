@@ -822,6 +822,13 @@ export const ja = {
       "light": "ライト",
       "dark": "ダーク"
     },
+    "docWidth": "ドキュメント幅",
+    "docWidthDesc": "ドキュメント管理の本文欄の最大幅です。変更はすぐに適用されます。",
+    "docWidths": {
+      "default": "デフォルト",
+      "wide": "広め",
+      "full": "全幅"
+    },
     "density": "密度",
     "densityDesc": "サイドバーとアクティビティ行の間隔を制御します。",
     "densities": {

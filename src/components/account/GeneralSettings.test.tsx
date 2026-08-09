@@ -13,6 +13,7 @@ const hipConfigState = {
     version: 1 as const,
     terminal: { shell: 'default' as const, colorTheme: 'follow' as const },
     codeBlock: { colorTheme: 'follow' as const },
+    knowledge: { docWidth: 'default' as const },
     window: { closeAction: 'quit' as const, trayEnabled: false },
   },
   loaded: true,
@@ -177,5 +178,37 @@ describe('GeneralSettings terminal color', () => {
       shell: 'zsh',
       colorTheme: 'dracula',
     })
+  })
+})
+
+describe('GeneralSettings document width', () => {
+  beforeEach(() => {
+    updateSection.mockClear()
+    load.mockClear()
+    hipConfigState.config.knowledge = { docWidth: 'default' }
+  })
+  afterEach(() => {
+    cleanup()
+  })
+
+  it('renders document width control', () => {
+    render(<GeneralSettings />)
+    const row = screen.getByTestId('settings-doc-width')
+    expect(row).toBeInTheDocument()
+    expect(within(row).getByTestId('settings-doc-width-trigger')).toHaveTextContent(
+      'settings.docWidths.default',
+    )
+  })
+
+  it('persists docWidth via functional merge', async () => {
+    render(<GeneralSettings />)
+    fireEvent.click(screen.getByTestId('settings-doc-width-wide'))
+    await waitFor(() => {
+      expect(updateSection).toHaveBeenCalledWith('knowledge', expect.any(Function))
+    })
+    const updater = updateSection.mock.calls[0][1] as (prev: {
+      docWidth?: string
+    }) => { docWidth?: string }
+    expect(updater({ docWidth: 'default' })).toEqual({ docWidth: 'wide' })
   })
 })

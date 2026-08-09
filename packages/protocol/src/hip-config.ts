@@ -188,6 +188,38 @@ export interface CodeBlockConfig {
 }
 
 /**
+ * Document content column width (General Settings → 文档宽度).
+ * Applied via `--kb-measure` on the knowledge doc paper host.
+ * - `default`: comfortable reading measure (~46rem)
+ * - `wide`: wider column (~72rem)
+ * - `full`: fill the available main panel
+ */
+export const DOC_WIDTH_IDS = ['default', 'wide', 'full'] as const
+
+export type DocWidthId = (typeof DOC_WIDTH_IDS)[number]
+
+/** Runtime membership (FE normalize + sidecar normalize). */
+export function isDocWidthId(v: string): v is DocWidthId {
+  return (DOC_WIDTH_IDS as readonly string[]).includes(v)
+}
+
+/**
+ * Optional `[knowledge]` section in hip.toml — document management UI prefs.
+ *
+ * ```toml
+ * [knowledge]
+ * doc_width = "wide"   # or docWidth
+ * ```
+ */
+export interface KnowledgeConfig {
+  /**
+   * Document content column width. Omitted / unknown → `default`.
+   * JSON/TS: `docWidth`. TOML: `doc_width` (camelCase alias accepted).
+   */
+  docWidth?: DocWidthId
+}
+
+/**
  * Optional `[trash]` section in hip.toml — product recycle-bin retention.
  *
  * ```toml
@@ -545,6 +577,8 @@ export interface HipConfig {
   terminal?: TerminalConfig
   /** Optional code-block color preference. */
   codeBlock?: CodeBlockConfig
+  /** Optional document-management UI prefs (width, etc.). */
+  knowledge?: KnowledgeConfig
   /** Optional product recycle-bin retention. */
   trash?: TrashConfig
   /** Optional main-window close behavior & system tray. */

@@ -1,5 +1,10 @@
-import type { ReactNode } from 'react'
+import type { CSSProperties, ReactNode } from 'react'
 import { cn } from '@/lib/utils'
+import { useHipConfigStore } from '@/store/hipConfigStore'
+import {
+  DOC_WIDTH_MEASURE,
+  normalizeDocWidthId,
+} from '@/domain/knowledge/docWidth'
 import './knowledge-doc-typography.css'
 
 /**
@@ -29,6 +34,13 @@ export function KnowledgeDocCanvas({
   /** Classes on the page body (overflow, flex grow). */
   paperClassName?: string
 }) {
+  const docWidth = useHipConfigStore((s) =>
+    normalizeDocWidthId(s.config.knowledge?.docWidth),
+  )
+  const paperStyle = {
+    ['--kb-measure' as string]: DOC_WIDTH_MEASURE[docWidth],
+  } as CSSProperties
+
   return (
     <div
       data-testid="knowledge-doc-canvas"
@@ -40,6 +52,8 @@ export function KnowledgeDocCanvas({
     >
       <div
         data-testid="knowledge-doc-paper"
+        data-doc-width={docWidth}
+        style={paperStyle}
         className={cn(
           DOC_PAGE_SHELL,
           // No horizontal pad on the paper host — scrollports own

@@ -829,6 +829,13 @@ export const zhTW = {
       "light": "淺色",
       "dark": "深色"
     },
+    "docWidth": "文件寬度",
+    "docWidthDesc": "文件管理中正文欄的最大寬度。修改後立即生效。",
+    "docWidths": {
+      "default": "預設",
+      "wide": "加寬",
+      "full": "全寬"
+    },
     "density": "密度",
     "densityDesc": "控制側邊欄與活動行的間距。",
     "densities": {

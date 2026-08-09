@@ -1,0 +1,1025 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="light">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>hip · 功能图标系统升级 v2 — 高保真预览</title>
+<style>
+/* ============ 设计令牌（对齐 src/styles/tokens.css + DESIGN.md） ============ */
+:root {
+  --bg-app: #ffffff;
+  --bg-subtle: #F9F8F5;
+  --bg-muted: #f1f1f1;
+  --bg-content: #ffffff;
+  --border: #e0e0e0;
+  --border-strong: #c9c9c9;
+  --text-primary: #111111;
+  --text-secondary: #5e5e5e;
+  --text-tertiary: #757575;
+  --accent: #c2410c;
+  --accent-hover: #9a3412;
+  --accent-strong: #7c2d12;
+  --accent-subtle: #f0f0f0;
+  --accent-active: #e6e6e6;
+  --on-accent: #ffffff;
+  --btn-primary: #3a3a3a;
+  --on-btn-primary: #fafafa;
+  --success: #2f7d40;
+  --danger: #c63b3b;
+  --warning: #9a5d10;
+  --effort-max: #7c3aed;
+  --role-supervisor: #5b5bd6;
+  --role-planner: #1a8cd8;
+  --role-coder: #3d9a50;
+  --role-reviewer: #c77a1a;
+  --role-worker: #0d8a8a;
+  --overlay-scrim: rgba(17,17,17,.28);
+  --focus-ring: var(--accent);
+  --titlebar-h: 40px;
+  --row-h: 34px;
+  --radius-btn: 2px;
+  --radius-card: 4px;
+  --radius-panel: 6px;
+  --shadow-overlay: 0 12px 32px -12px rgba(17,17,17,.12);
+  --font: system-ui, -apple-system, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Noto Sans CJK SC", sans-serif;
+  --mono: ui-monospace, "SF Mono", "JetBrains Mono", Consolas, monospace;
+}
+html[data-theme="dark"] {
+  --bg-app: #121212;
+  --bg-subtle: #181818;
+  --bg-muted: #1f1f1f;
+  --bg-content: #121212;
+  --border: #2e2e2e;
+  --border-strong: #3e3e3e;
+  --text-primary: #f0f0f0;
+  --text-secondary: #a3a3a3;
+  --text-tertiary: #7a7a7a;
+  --accent: #ffb300;
+  --accent-hover: #ffc233;
+  --accent-strong: #ffcc80;
+  --accent-subtle: rgba(255,179,0,.12);
+  --accent-active: rgba(255,179,0,.18);
+  --on-accent: #111111;
+  --btn-primary: #d4d4d4;
+  --on-btn-primary: #141414;
+  --success: #4caf50;
+  --danger: #ff5252;
+  --warning: #ffb74d;
+  --effort-max: #a78bfa;
+  --role-supervisor: #7c7cf0;
+  --role-planner: #4db8ff;
+  --role-coder: #5dc96c;
+  --role-reviewer: #ffab40;
+  --role-worker: #2ee6e6;
+  --shadow-overlay: 0 12px 32px -12px rgba(0,0,0,.5);
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html { -webkit-font-smoothing: antialiased; }
+body {
+  font-family: var(--font);
+  font-size: 13px; line-height: 1.6;
+  color: var(--text-primary);
+  background: var(--bg-app);
+  color-scheme: light;
+}
+html[data-theme="dark"] body { color-scheme: dark; }
+::selection { background: var(--accent-subtle); }
+h1,h2,h3,h4 { font-weight: 600; line-height: 1.35; }
+a { color: var(--text-primary); }
+.container { max-width: 1120px; margin: 0 auto; padding: 0 28px; }
+.mono { font-family: var(--mono); font-size: 12px; }
+
+/* ============ 顶栏 ============ */
+.topbar {
+  position: sticky; top: 0; z-index: 50;
+  height: 52px; display: flex; align-items: center;
+  background: var(--bg-app); border-bottom: 1px solid var(--border);
+}
+.topbar .container { display: flex; align-items: center; gap: 14px; width: 100%; }
+.topbar .brand { display: flex; align-items: center; gap: 9px; font-weight: 600; font-size: 13.5px; }
+.topbar .brand .logo {
+  width: 22px; height: 22px; border-radius: 5px; background: var(--accent);
+  display: inline-flex; align-items: center; justify-content: center; color: var(--on-accent);
+}
+.topbar .spacer { flex: 1; }
+.tag {
+  font-size: 11px; line-height: 1; padding: 4px 8px; border-radius: var(--radius-btn);
+  border: 1px solid var(--border-strong); color: var(--text-secondary); background: var(--bg-app);
+}
+.tag.badge-accent { color: var(--accent-strong); border-color: var(--accent); background: var(--accent-subtle); }
+.theme-toggle {
+  display: inline-flex; align-items: center; gap: 4px; padding: 4px 4px;
+  background: var(--bg-muted); border: 1px solid var(--border); border-radius: var(--radius-btn);
+}
+.theme-toggle button {
+  border: 0; background: transparent; cursor: pointer; padding: 5px 10px;
+  font: inherit; font-size: 12px; color: var(--text-secondary); border-radius: 1px;
+}
+.theme-toggle button.active { background: var(--btn-primary); color: var(--on-btn-primary); }
+.theme-toggle button:hover:not(.active) { color: var(--text-primary); }
+
+/* ============ Hero ============ */
+.hero { padding: 52px 0 36px; border-bottom: 1px solid var(--border); }
+.hero h1 { font-size: 27px; letter-spacing: -.01em; }
+.hero .sub { margin-top: 8px; color: var(--text-secondary); max-width: 640px; font-size: 13.5px; }
+.hero .stats { display: flex; gap: 10px; margin-top: 22px; flex-wrap: wrap; }
+.stat {
+  display: flex; flex-direction: column; gap: 2px; min-width: 128px;
+  padding: 12px 14px; border: 1px solid var(--border); border-radius: var(--radius-card);
+  background: var(--bg-subtle);
+}
+.stat .num { font-size: 19px; font-weight: 600; font-variant-numeric: tabular-nums; }
+.stat .lbl { font-size: 11.5px; color: var(--text-tertiary); }
+
+/* ============ Section ============ */
+section { padding: 44px 0 8px; }
+.sec-head { display: flex; align-items: baseline; gap: 12px; margin-bottom: 20px; }
+.sec-no {
+  font-family: var(--mono); font-size: 12px; color: var(--accent-strong);
+  border: 1px solid var(--accent); padding: 2px 7px; border-radius: var(--radius-btn);
+  background: var(--accent-subtle); white-space: nowrap;
+}
+.sec-head h2 { font-size: 19px; }
+.sec-head .desc { color: var(--text-secondary); font-size: 12.5px; }
+
+/* ============ 卡片网格 ============ */
+.grid { display: grid; gap: 14px; }
+.g2 { grid-template-columns: repeat(2, 1fr); }
+.g3 { grid-template-columns: repeat(3, 1fr); }
+.g4 { grid-template-columns: repeat(4, 1fr); }
+.card {
+  border: 1px solid var(--border); border-radius: var(--radius-card);
+  background: var(--bg-app); padding: 18px;
+}
+.card h4 { font-size: 13.5px; margin-bottom: 8px; display: flex; align-items: center; gap: 8px; }
+.card p { color: var(--text-secondary); font-size: 12.5px; }
+.card .tag-row { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 12px; }
+.card .tag-row .tag { border-color: var(--border); }
+
+/* ============ 图标网格演示 ============ */
+.icon-grid {
+  display: grid; gap: 8px;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+}
+.icon-cell {
+  display: flex; flex-direction: column; align-items: center; gap: 9px;
+  padding: 16px 8px 13px; border: 1px solid var(--border); border-radius: var(--radius-card);
+  cursor: default; transition: background-color .1s, border-color .1s;
+}
+.icon-cell:hover { background: var(--accent-subtle); border-color: var(--border-strong); }
+.icon-cell .ic-name { font-size: 11.5px; color: var(--text-secondary); text-align: center; line-height: 1.35; }
+.icon-cell .ic-en { font-family: var(--mono); font-size: 10px; color: var(--text-tertiary); }
+.icon-cell.spec-note { border-style: dashed; background: transparent; }
+.icon-cell.spec-note:hover { background: transparent; }
+
+/* ============ 新旧对比 ============ */
+.compare-row { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; align-items: stretch; }
+.compare-card { border: 1px solid var(--border); border-radius: var(--radius-card); overflow: hidden; }
+.compare-card .cc-head {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 9px 14px; border-bottom: 1px solid var(--border); font-size: 12.5px; font-weight: 600;
+}
+.cc-head .cc-state { font-size: 11px; font-weight: 400; color: var(--text-tertiary); }
+.compare-card.old .cc-head { background: var(--bg-muted); color: var(--text-secondary); }
+.compare-card.new .cc-head { background: var(--accent-subtle); }
+.role-chip {
+  font-size: 10.5px; font-weight: 500; padding: 2px 7px; border-radius: 10px; line-height: 1.5;
+}
+.role-chip.bad { background: var(--danger); color: #fff; }
+.role-chip.good { background: var(--success); color: #fff; }
+.role-chip.warn { background: var(--warning); color: #fff; }
+.cc-body { padding: 20px; }
+
+/* 大图标对比卡（6 大功能） */
+.big-icon-card { display: flex; flex-direction: column; align-items: center; text-align: center; padding: 22px 16px 18px; }
+.big-icon-card .bi-row { display: flex; align-items: center; gap: 22px; margin-bottom: 14px; }
+.big-icon-card .bi-arrow { color: var(--text-tertiary); font-size: 16px; }
+.big-icon-card h4 { margin: 0 0 4px; font-size: 14px; }
+.big-icon-card .bi-sub { font-size: 11.5px; color: var(--text-tertiary); margin-bottom: 12px; font-family: var(--mono); }
+.big-icon-card .bi-desc { font-size: 12px; color: var(--text-secondary); line-height: 1.65; max-width: 260px; }
+
+/* ============ 侧栏 mockup ============ */
+.mockup-stage { display: flex; gap: 26px; align-items: flex-start; flex-wrap: wrap; }
+.sidebar {
+  width: 264px; border: 1px solid var(--border-strong); border-radius: var(--radius-panel);
+  overflow: hidden; background: var(--bg-subtle);
+  box-shadow: var(--shadow-overlay);
+  flex-shrink: 0;
+}
+.sb-titlebar {
+  height: var(--titlebar-h); display: flex; align-items: center; gap: 10px;
+  padding: 0 12px; border-bottom: 1px solid var(--border); background: var(--bg-app);
+  -webkit-user-select: none; user-select: none;
+}
+.tl-lights { display: flex; gap: 7px; }
+.tl-lights i { width: 11px; height: 11px; border-radius: 50%; display: block; }
+.tl-lights i:nth-child(1) { background: #ff5f57; }
+.tl-lights i:nth-child(2) { background: #febc2e; }
+.tl-lights i:nth-child(3) { background: #28c840; }
+.sb-titlebar .tl-actions { display: flex; gap: 2px; margin-left: 4px; }
+.tl-btn {
+  width: 26px; height: 26px; display: inline-flex; align-items: center; justify-content: center;
+  color: var(--text-secondary); border-radius: var(--radius-btn);
+}
+.tl-btn.on { background: var(--accent-subtle); color: var(--text-primary); }
+.sb-titlebar .tl-right { margin-left: auto; display: flex; align-items: center; gap: 6px; }
+.sb-ver { font-size: 10px; color: var(--text-tertiary); font-family: var(--mono); }
+.sb-body { padding: 9px 8px 0; }
+.sb-nav { display: flex; flex-direction: column; gap: 1px; }
+.sb-item {
+  display: flex; align-items: center; gap: 9px; height: var(--row-h);
+  padding: 0 9px; border-radius: var(--radius-btn); color: var(--text-secondary);
+  position: relative; font-size: 13px;
+}
+.sb-item .ic { flex-shrink: 0; display: inline-flex; }
+.sb-item .cnt {
+  margin-left: auto; font-size: 10.5px; color: var(--text-tertiary);
+  background: var(--bg-muted); border: 1px solid var(--border); padding: 1px 6px; border-radius: 9px;
+  font-variant-numeric: tabular-nums; min-width: 20px; text-align: center;
+}
+/* 新侧栏 active 态：accent 底 + 深橙图标（方案核心状态） */
+.sb-item.active { background: var(--accent-active); color: var(--text-primary); }
+.sb-item.active .ic { color: var(--accent-strong); }
+.sb-item.active .cnt { background: var(--bg-app); color: var(--accent-strong); border-color: var(--accent); }
+/* 旧侧栏 active 态：只有灰底，图标同色 */
+.sidebar.old .sb-item.active .ic { color: var(--text-primary); }
+.sb-divider { height: 1px; background: var(--border); margin: 8px 4px; }
+.sb-list-head {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 4px 9px 5px; font-size: 11px; color: var(--text-tertiary); font-weight: 500;
+}
+.sb-list-head .more { color: var(--text-tertiary); }
+.sb-sess { display: flex; align-items: center; gap: 9px; height: var(--row-h); padding: 0 9px; border-radius: var(--radius-btn); }
+.sb-sess:hover { background: var(--accent-subtle); }
+.sb-sess .av {
+  width: 22px; height: 22px; border-radius: 4px; background: var(--accent-subtle);
+  color: var(--accent-strong); font-size: 10.5px; font-weight: 600;
+  display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0;
+}
+.sb-sess .meta { min-width: 0; flex: 1; }
+.sb-sess .t { font-size: 12.5px; color: var(--text-primary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.sb-sess .tm { font-size: 10.5px; color: var(--text-tertiary); }
+.sb-sess .st { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
+.sb-footer { border-top: 1px solid var(--border); padding: 9px 10px; display: flex; align-items: center; gap: 4px; margin-top: 8px; }
+.sb-footer .me { display: flex; align-items: center; gap: 8px; margin-right: auto; min-width: 0; }
+.sb-footer .me .av { width: 24px; height: 24px; border-radius: 50%; background: var(--accent); color: var(--on-accent); font-size: 11px; font-weight: 600; display: inline-flex; align-items: center; justify-content: center; }
+.sb-footer .me .nm { font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.sb-footer .me .em { font-size: 10px; color: var(--text-tertiary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.sb-footer .fbtn {
+  width: 27px; height: 27px; display: inline-flex; align-items: center; justify-content: center;
+  color: var(--text-secondary); border-radius: var(--radius-btn);
+}
+.sb-footer .fbtn:hover { background: var(--accent-subtle); color: var(--text-primary); }
+
+/* 差异标注 */
+.diff-notes { margin-top: 18px; display: grid; gap: 8px; grid-template-columns: repeat(auto-fill, minmax(300px,1fr)); }
+.diff-note {
+  display: flex; gap: 9px; align-items: flex-start; font-size: 12px; color: var(--text-secondary);
+  border: 1px dashed var(--border-strong); border-radius: var(--radius-card); padding: 9px 11px;
+}
+.diff-note .dn-no {
+  font-family: var(--mono); font-size: 10.5px; color: var(--accent-strong); background: var(--accent-subtle);
+  border: 1px solid var(--accent); border-radius: 10px; padding: 1px 6px; flex-shrink: 0; line-height: 1.6;
+}
+.diff-note b { color: var(--text-primary); font-weight: 600; }
+
+/* ============ 状态演示 ============ */
+.state-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
+.state-card { border: 1px solid var(--border); border-radius: var(--radius-card); padding: 18px 14px; display: flex; flex-direction: column; align-items: center; gap: 10px; }
+.state-card .st-name { font-size: 12px; font-weight: 600; }
+.state-card .st-desc { font-size: 11px; color: var(--text-tertiary); text-align: center; }
+.state-card.demo-hover { background: var(--accent-subtle); }
+.state-card.demo-active { background: var(--accent-active); }
+.state-card.demo-active .ic { color: var(--accent-strong); }
+.state-card.demo-disabled { opacity: .38; }
+
+/* ============ 色板 ============ */
+.swatches { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px,1fr)); gap: 10px; }
+.swatch { border: 1px solid var(--border); border-radius: var(--radius-card); overflow: hidden; }
+.swatch .sw-color { height: 44px; }
+.swatch .sw-meta { padding: 7px 10px; font-size: 11px; color: var(--text-secondary); display: flex; justify-content: space-between; }
+.swatch .sw-meta .hex { font-family: var(--mono); color: var(--text-tertiary); }
+
+/* ============ 表格 ============ */
+.spec-table { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+.spec-table th {
+  text-align: left; font-weight: 600; font-size: 11.5px; color: var(--text-tertiary);
+  padding: 8px 12px; border-bottom: 1px solid var(--border-strong); white-space: nowrap;
+}
+.spec-table td { padding: 9px 12px; border-bottom: 1px solid var(--border); vertical-align: top; }
+.spec-table tr:last-child td { border-bottom: 0; }
+.spec-table .k { font-family: var(--mono); color: var(--accent-strong); white-space: nowrap; }
+.spec-table td.dim { color: var(--text-secondary); }
+
+/* ============ 迁移路线 ============ */
+.roadmap { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
+.phase { border: 1px solid var(--border); border-radius: var(--radius-card); padding: 15px; display: flex; flex-direction: column; gap: 8px; background: var(--bg-app); }
+.phase .ph-tag { font-family: var(--mono); font-size: 10.5px; }
+.phase.p0 .ph-tag { color: var(--accent-strong); }
+.phase h4 { font-size: 13px; margin: 0; }
+.phase ul { list-style: none; display: flex; flex-direction: column; gap: 5px; }
+.phase li { font-size: 11.8px; color: var(--text-secondary); padding-left: 13px; position: relative; line-height: 1.55; }
+.phase li::before { content: "—"; position: absolute; left: 0; color: var(--text-tertiary); }
+.phase .ph-done { border-color: var(--success); }
+.phase .ph-done .ph-tag { color: var(--success); }
+
+.checklist { margin-top: 16px; border: 1px solid var(--border); border-radius: var(--radius-card); overflow: hidden; }
+.checklist .cl-head { padding: 10px 14px; background: var(--bg-muted); font-size: 12px; font-weight: 600; border-bottom: 1px solid var(--border); }
+.checklist .cl-row { display: flex; align-items: center; gap: 10px; padding: 8px 14px; border-bottom: 1px solid var(--border); font-size: 12px; }
+.checklist .cl-row:last-child { border-bottom: 0; }
+.checklist .cl-file { font-family: var(--mono); font-size: 11.5px; color: var(--text-primary); min-width: 230px; }
+.checklist .cl-what { color: var(--text-secondary); }
+
+/* ============ 页脚 ============ */
+.page-foot { margin-top: 56px; border-top: 1px solid var(--border); padding: 22px 0 40px; color: var(--text-tertiary); font-size: 11.5px; display: flex; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
+
+/* 小工具 */
+.note-box {
+  border: 1px solid var(--border); border-left: 3px solid var(--accent);
+  border-radius: var(--radius-card); padding: 13px 15px; font-size: 12.5px; color: var(--text-secondary);
+  background: var(--bg-subtle); margin-top: 16px; line-height: 1.7;
+}
+.note-box b { color: var(--text-primary); }
+.note-box code { font-family: var(--mono); font-size: 11.5px; background: var(--bg-muted); border: 1px solid var(--border); padding: 1px 5px; border-radius: 3px; }
+.tight { margin-bottom: 6px; }
+.bump { margin-top: 22px; }
+hr.soft { border: 0; border-top: 1px solid var(--border); margin: 26px 0; }
+
+/* 网格参考线 demo */
+.grid-demo { display: flex; gap: 26px; align-items: center; flex-wrap: wrap; }
+.grid-frame {
+  width: 120px; height: 120px; position: relative; flex-shrink: 0;
+  background-image:
+    linear-gradient(var(--border) 1px, transparent 1px),
+    linear-gradient(90deg, var(--border) 1px, transparent 1px);
+  background-size: 24px 24px;
+  background-color: var(--bg-subtle);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-card);
+  display: flex; align-items: center; justify-content: center;
+}
+.grid-frame .gf-center { position: absolute; top: 50%; left: 50%; width: 9px; height: 9px; transform: translate(-50%,-50%); border-radius: 50%; border: 1.5px solid var(--accent); }
+.grid-frame .gf-pad { position: absolute; inset: 8px; border: 1px dashed var(--accent); opacity: .55; border-radius: 3px; }
+
+@media (max-width: 900px) {
+  .g2, .g3, .g4, .state-row, .roadmap { grid-template-columns: 1fr 1fr; }
+  .compare-row { grid-template-columns: 1fr; }
+}
+@media (max-width: 640px) {
+  .g2, .g3, .g4, .state-row, .roadmap { grid-template-columns: 1fr; }
+  .hero { padding-top: 34px; }
+}
+</style>
+</head>
+<body>
+
+<!-- ===================== 顶栏 ===================== -->
+<div class="topbar">
+  <div class="container">
+    <div class="brand">
+      <span class="logo">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="square"><path d="M13 2 3 14h8l-1 8L20 10h-8z"/></svg>
+      </span>
+      hip · 图标系统升级 v2
+      <span class="tag badge-accent">设计提案 · 高保真预览</span>
+    </div>
+    <div class="spacer"></div>
+    <div class="theme-toggle" id="themeToggle">
+      <button data-theme="light" class="active">亮色</button>
+      <button data-theme="dark">暗色</button>
+    </div>
+  </div>
+</div>
+
+<div class="container">
+
+<!-- ===================== HERO ===================== -->
+<div class="hero">
+  <h1>全面升级功能图标：从「通用 Lucide 混用」到「品牌化图标体系」</h1>
+  <p class="sub">
+    现状是 135 个组件文件直接散用 ~110 个 Lucide 图标，描边粗细 5 种、尺寸 5 档并存，侧栏六大功能图标缺乏识别度与品牌记忆点。
+    本方案以「品牌功能图标 + 统一规格 + 语义状态」三层重构图标体系，不引入任何新依赖，与现有扁平化设计令牌（DESIGN.md）完全对齐。
+  </p>
+  <div class="stats">
+    <div class="stat"><span class="num">135</span><span class="lbl">组件文件引用图标</span></div>
+    <div class="stat"><span class="num">~110</span><span class="lbl">Lucide 图标（1 个依赖）</span></div>
+    <div class="stat"><span class="num">5 → 1</span><span class="lbl">strokeWidth 档位收敛</span></div>
+    <div class="stat"><span class="num">5 → 4</span><span class="lbl">尺寸档位收敛（14/16/18/20）</span></div>
+    <div class="stat"><span class="num">6</span><span class="lbl">自绘品牌功能图标（新增）</span></div>
+  </div>
+</div>
+
+<!-- ===================== 01 现状诊断 ===================== -->
+<section>
+  <div class="sec-head">
+    <span class="sec-no">01</span>
+    <h2>现状诊断：四个问题</h2>
+    <span class="desc">来自全库扫描（src/ 135 个文件、lucide-react 引用统计）</span>
+  </div>
+  <div class="grid g4">
+    <div class="card">
+      <h4>① 风格漂移</h4>
+      <p>strokeWidth 混用 <span class="mono">1.5 / 1.6 / 1.75 / 2 / 2.5</span> 五种；尺寸混用 <span class="mono">14 / 16 / 18 / 20 / 24</span> 五档。同一界面内粗细不齐，视觉噪点明显。</p>
+      <div class="tag-row">
+        <span class="tag">1.75 × 143 处</span>
+        <span class="tag">2.0 × 10 处</span>
+        <span class="tag">1.5 × 3 处</span>
+      </div>
+    </div>
+    <div class="card">
+      <h4>② 语义含混</h4>
+      <p>「会话」用 MessageSquare 单气泡、「任务」用 CheckSquare 方框勾 —— 形状雷同、信息量低；「知识库」用 FolderTree 文件夹树，与「项目」的文件夹意象打架。</p>
+      <div class="tag-row">
+        <span class="tag">MessageSquare ×4</span>
+        <span class="tag">Zap 双重含义</span>
+        <span class="tag">Folder 家族 ×4</span>
+      </div>
+    </div>
+    <div class="card">
+      <h4>③ 品牌缺失</h4>
+      <p>六大导航图标与 VS Code / Linear / 任意 Electron 应用无差异 —— 打开应用先看到的不是「hip」，而是「通用图标包」。空状态、欢迎页同样缺乏品牌触点。</p>
+      <div class="tag-row"><span class="tag">0 个自绘图标</span><span class="tag">无品牌符号</span></div>
+    </div>
+    <div class="card">
+      <h4>④ 状态表达单一</h4>
+      <p>导航选中态只有灰底（bg-active），图标不参与状态表达；禁用态、hover 态无图标级区分。颜色语义（accent 橙）没有进入图标层。</p>
+      <div class="tag-row"><span class="tag">active = 灰底</span><span class="tag">无图标色</span></div>
+    </div>
+  </div>
+</section>
+
+<!-- ===================== 02 设计原则 ===================== -->
+<section>
+  <div class="sec-head">
+    <span class="sec-no">02</span>
+    <h2>升级原则</h2>
+    <span class="desc">与 DESIGN.md 五原则一一对应，不引入新风格</span>
+  </div>
+  <div class="grid g4">
+    <div class="card">
+      <h4>直角优先</h4>
+      <p>品牌图标描边端点/连接用 <b>square</b>（直角），与产品「Sharp over Round」一致，形成与 Lucide 圆头描边的差异层级：圆头=通用，直角=品牌。</p>
+    </div>
+    <div class="card">
+      <h4>单色为主，一色强调</h4>
+      <p>图标默认中性灰继承文字色；仅导航选中态用 accent 橙。禁止渐变、发光、多彩填充。角色色只保留给 agent 角色指示点。</p>
+    </div>
+    <div class="card">
+      <h4>语义即形状</h4>
+      <p>每个功能图标携带一个「记忆点」：会话=双气泡、自动化=循环+闪电、知识库=书+星标。形状本身可被 16px 小尺寸辨认。</p>
+    </div>
+    <div class="card">
+      <h4>零新增依赖</h4>
+      <p>品牌图标为内联 SVG React 组件，兼容 <span class="mono">LucideIcon</span> 类型签名；通用图标继续用 lucide-react。无网络字体、无图标字体、无第三方库。</p>
+    </div>
+  </div>
+</section>
+
+<!-- ===================== 03 图标规格 ===================== -->
+<section>
+  <div class="sec-head">
+    <span class="sec-no">03</span>
+    <h2>统一规格</h2>
+    <span class="desc">一套参数，全库对齐</span>
+  </div>
+
+  <div class="grid-demo">
+    <div class="grid-frame">
+      <div class="gf-center"></div>
+      <div class="gf-pad"></div>
+      <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="square" stroke-linejoin="miter" style="color: var(--accent-strong)">
+        <path d="M4.5 5.5h10a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-4.4l-3 2.8v-2.8H4.5a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2z"/>
+        <rect x="10.5" y="2" width="10.5" height="7" rx="2"/>
+        <circle cx="6" cy="10.5" r="1" fill="currentColor" stroke="none"/>
+        <circle cx="9.5" cy="10.5" r="1" fill="currentColor" stroke="none"/>
+        <path d="M12.6 10.5h2.4"/>
+        <path d="M14.4 6h4"/>
+      </svg>
+    </div>
+    <div style="flex:1; min-width: 300px;">
+      <table class="spec-table">
+        <tr><th>参数</th><th>规范</th><th>说明</th></tr>
+        <tr>
+          <td class="k">网格</td><td>24 × 24 viewBox</td><td class="dim">安全区 16×16（虚线框），留 8px 呼吸边；与 Lucide 同网格可混排</td>
+        </tr>
+        <tr>
+          <td class="k">描边</td><td>1.75（唯一）</td><td class="dim">全库收敛：导航 16px / 工具栏 16px / 列表 18px 同一粗细；24px 展示级用 1.5</td>
+        </tr>
+        <tr>
+          <td class="k">圆角</td><td>2px（r=2）</td><td class="dim">品牌图标内部图形圆角 ≤2，与外框 4px 卡片、2px 按钮同语言</td>
+        </tr>
+        <tr>
+          <td class="k">端点</td><td>品牌 square / 通用 round</td><td class="dim">品牌图标 linecap=square；Lucide 保持其 round 以区分层级</td>
+        </tr>
+        <tr>
+          <td class="k">尺寸</td><td>14 / 16 / 18 / 20</td><td class="dim">14 内联 meta · 16 默认（导航/按钮）· 18 列表行 · 20 空状态；24 仅品牌展示/欢迎</td>
+        </tr>
+      </table>
+    </div>
+  </div>
+
+  <div class="icon-grid bump" id="sizeDemo">
+    <div class="icon-cell"><span id="sz14"></span><span class="ic-name">14 · 内联 meta</span></div>
+    <div class="icon-cell"><span id="sz16"></span><span class="ic-name">16 · 默认（导航/工具栏）</span></div>
+    <div class="icon-cell"><span id="sz18"></span><span class="ic-name">18 · 列表行</span></div>
+    <div class="icon-cell"><span id="sz20"></span><span class="ic-name">20 · 空状态</span></div>
+    <div class="icon-cell"><span id="sz24"></span><span class="ic-name">24 · 品牌展示</span></div>
+  </div>
+</section>
+
+<!-- ===================== 04 六大功能图标 ===================== -->
+<section>
+  <div class="sec-head">
+    <span class="sec-no">04</span>
+    <h2>六大功能品牌图标</h2>
+    <span class="desc">新 vs 旧 —— 每个图标一个记忆点</span>
+  </div>
+  <div class="grid g3" id="bigIcons">
+    <!-- JS 渲染 -->
+  </div>
+  <div class="note-box">
+    <b>接入方式：</b>新增 <code>src/components/icons/hipIcons.tsx</code>，导出与 <code>LucideIcon</code> 类型签名兼容的组件
+    <code>{ size?, strokeWidth?, className? }</code>；侧栏仅需改动 <code>AppSidebar.tsx</code> 中 6 个
+    <code>&lt;NavItem icon=… /&gt;</code> 的图标传入。零样式改动 —— 颜色/尺寸全部走现有 class 与 token。
+  </div>
+</section>
+
+<!-- ===================== 05 侧栏对比 ===================== -->
+<section>
+  <div class="sec-head">
+    <span class="sec-no">05</span>
+    <h2>侧栏高保真对比</h2>
+    <span class="desc">264px 侧栏 · 40px 标题栏 · 34px 导航行 · 真实 tokens</span>
+  </div>
+
+  <div class="mockup-stage">
+    <!-- ===== 旧侧栏 ===== -->
+    <div class="sidebar old">
+      <div class="sb-titlebar">
+        <div class="tl-lights"><i></i><i></i><i></i></div>
+        <div class="tl-actions">
+          <span class="tl-btn"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"/></svg></span>
+          <span class="tl-btn on"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg></span>
+        </div>
+        <div class="tl-right">
+          <span class="sb-ver">v0.30.1</span>
+        </div>
+      </div>
+      <div class="sb-body">
+        <nav class="sb-nav" style="margin-top:6px">
+          <div class="sb-item active"><span class="ic" data-ic="MessageSquare" data-sz="16"></span>会话<span class="cnt">12</span></div>
+          <div class="sb-item"><span class="ic" data-ic="Code2" data-sz="16"></span>项目<span class="cnt">3</span></div>
+          <div class="sb-item"><span class="ic" data-ic="FolderTree" data-sz="16"></span>知识库<span class="cnt">24</span></div>
+          <div class="sb-item"><span class="ic" data-ic="Terminal" data-sz="16"></span>终端<span class="cnt">2</span></div>
+          <div class="sb-item"><span class="ic" data-ic="CheckSquare" data-sz="16"></span>任务<span class="cnt">5</span></div>
+          <div class="sb-item"><span class="ic" data-ic="Zap" data-sz="16"></span>自动化<span class="cnt">4</span></div>
+        </nav>
+        <div class="sb-divider"></div>
+        <div class="sb-list-head"><span>最近会话</span></div>
+        <div class="sb-sess"><span class="av">修</span><span class="meta"><div class="t">修复登录页焦点环回归</div><div class="tm">13:42</div></span><span class="st" style="background:var(--success)"></span></div>
+        <div class="sb-sess"><span class="av">知</span><span class="meta"><div class="t">知识库 DocReader 缓存策略</div><div class="tm">昨天</div></span><span class="st" style="background:var(--warning)"></span></div>
+        <div class="sb-sess"><span class="av">构</span><span class="meta"><div class="t">构建产物瘦身 · tree-shaking</div><div class="tm">周二</div></span><span class="st" style="background:var(--accent)"></span></div>
+      </div>
+      <div class="sb-footer">
+        <div class="me"><span class="av">JM</span><div style="min-width:0"><div class="nm">lijiamin</div><div class="em">hip sync ✓</div></div></div>
+        <span class="fbtn" data-ic="History" data-sz="15"></span>
+        <span class="fbtn" data-ic="Trash2" data-sz="15"></span>
+        <span class="fbtn" data-ic="Settings" data-sz="15"></span>
+      </div>
+    </div>
+
+    <!-- ===== 新侧栏 ===== -->
+    <div class="sidebar new">
+      <div class="sb-titlebar">
+        <div class="tl-lights"><i></i><i></i><i></i></div>
+        <div class="tl-actions">
+          <span class="tl-btn"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="square" stroke-linejoin="miter"><path d="m15 18-6-6 6-6"/></svg></span>
+          <span class="tl-btn on"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="square" stroke-linejoin="miter"><path d="m9 18 6-6-6-6"/></svg></span>
+          <span class="tl-btn"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="square" stroke-linejoin="miter"><rect x="4" y="4" width="16" height="16" rx="2"/><path d="M9 4v16"/></svg></span>
+        </div>
+        <div class="tl-right">
+          <span class="sb-ver">v0.31.0</span>
+        </div>
+      </div>
+      <div class="sb-body">
+        <nav class="sb-nav" style="margin-top:6px">
+          <div class="sb-item active"><span class="ic" data-ic="ChatsIcon" data-sz="16"></span>会话<span class="cnt">12</span></div>
+          <div class="sb-item"><span class="ic" data-ic="ProjectsIcon" data-sz="16"></span>项目<span class="cnt">3</span></div>
+          <div class="sb-item"><span class="ic" data-ic="KnowledgeIcon" data-sz="16"></span>知识库<span class="cnt">24</span></div>
+          <div class="sb-item"><span class="ic" data-ic="TerminalsIcon" data-sz="16"></span>终端<span class="cnt">2</span></div>
+          <div class="sb-item"><span class="ic" data-ic="TasksIcon" data-sz="16"></span>任务<span class="cnt">5</span></div>
+          <div class="sb-item"><span class="ic" data-ic="AutomationIcon" data-sz="16"></span>自动化<span class="cnt">4</span></div>
+        </nav>
+        <div class="sb-divider"></div>
+        <div class="sb-list-head"><span>最近会话</span><span class="more">全部 12 →</span></div>
+        <div class="sb-sess"><span class="av">修</span><span class="meta"><div class="t">修复登录页焦点环回归</div><div class="tm">13:42</div></span><span class="st" style="background:var(--success)"></span></div>
+        <div class="sb-sess"><span class="av">知</span><span class="meta"><div class="t">知识库 DocReader 缓存策略</div><div class="tm">昨天</div></span><span class="st" style="background:var(--warning)"></span></div>
+        <div class="sb-sess"><span class="av">构</span><span class="meta"><div class="t">构建产物瘦身 · tree-shaking</div><div class="tm">周二</div></span><span class="st" style="background:var(--accent)"></span></div>
+      </div>
+      <div class="sb-footer">
+        <div class="me"><span class="av">JM</span><div style="min-width:0"><div class="nm">lijiamin</div><div class="em">hip sync ✓</div></div></div>
+        <span class="fbtn" data-ic="History" data-sz="15"></span>
+        <span class="fbtn" data-ic="Trash2" data-sz="15"></span>
+        <span class="fbtn" data-ic="SlidersHorizontal" data-sz="15" style="color:var(--accent-strong)"></span>
+      </div>
+    </div>
+  </div>
+
+  <div class="diff-notes">
+    <div class="diff-note"><span class="dn-no">①</span><span><b>六枚品牌图标</b>：会话=双气泡、项目=文件夹+代码、知识库=书+星、终端=窗口+提示符、任务=勾选清单、自动化=循环闪电。直角描边 1.75。</span></div>
+    <div class="diff-note"><span class="dn-no">②</span><span><b>选中态升级</b>：accent 底色 + <b>accent-strong 图标色</b>（亮 #7c2d12 / 暗 #ffcc80）+ 计数 chip 反白。图标参与状态表达，不再只有灰底。</span></div>
+    <div class="diff-note"><span class="dn-no">③</span><span><b>工具栏统一</b>：后退/前进/面板按钮全部 1.75 直角描边，与品牌图标同语言。</span></div>
+    <div class="diff-note"><span class="dn-no">④</span><span><b>设置图标换为 SlidersHorizontal</b>（滑块）：比齿轮更「工具感」，与 Linear 系一致；旧齿轮仅保留在系统托盘等原生场景。</span></div>
+    <div class="diff-note"><span class="dn-no">⑤</span><span><b>列表头增强</b>：「全部 12 →」入口 —— 配合图标升级，会话列表可直达入口（P3 可选）。</span></div>
+  </div>
+</section>
+
+<!-- ===================== 06 状态规范 ===================== -->
+<section>
+  <div class="sec-head">
+    <span class="sec-no">06</span>
+    <h2>图标状态规范</h2>
+    <span class="desc">四个状态，一套规则 —— 只用底色 + 图标色，无位移无缩放</span>
+  </div>
+  <div class="state-row">
+    <div class="state-card">
+      <span class="ic" data-ic="ChatsIcon" data-sz="20"></span>
+      <span class="st-name">Default</span>
+      <span class="st-desc">color: text-secondary<br/>描边 1.75 · 无底</span>
+    </div>
+    <div class="state-card demo-hover">
+      <span class="ic" data-ic="ChatsIcon" data-sz="20"></span>
+      <span class="st-name">Hover</span>
+      <span class="st-desc">底 bg-state-hover<br/>color: text-primary（100ms）</span>
+    </div>
+    <div class="state-card demo-active">
+      <span class="ic" data-ic="ChatsIcon" data-sz="20"></span>
+      <span class="st-name">Active</span>
+      <span class="st-desc">底 bg-state-active<br/>图标 accent-strong · 计数 chip 反白</span>
+    </div>
+    <div class="state-card demo-disabled">
+      <span class="ic" data-ic="ChatsIcon" data-sz="20"></span>
+      <span class="st-name">Disabled</span>
+      <span class="st-desc">opacity: 0.38<br/>pointer-events: none</span>
+    </div>
+  </div>
+  <div class="note-box">
+    <b>动效纪律：</b>图标本身<u>永不位移/缩放/旋转</u>；只允许 <code>background-color</code> 与 <code>color</code> 过渡（≤100ms）。
+    与 DESIGN.md「克制动画 Fade-only Motion」一致。加载态用 <code>Loader2</code> 旋转（既有保留项，旋转是其语义本身）。
+  </div>
+</section>
+
+<!-- ===================== 07 色彩语义 ===================== -->
+<section>
+  <div class="sec-head">
+    <span class="sec-no">07</span>
+    <h2>色彩语义</h2>
+    <span class="desc">中性灰承载图标 · accent 橙承载状态 · 角色色只做指示点</span>
+  </div>
+  <div class="swatches">
+    <div class="swatch"><div class="sw-color" style="background:#111111"></div><div class="sw-meta"><span>text-primary</span><span class="hex">#111111</span></div></div>
+    <div class="swatch"><div class="sw-color" style="background:#5e5e5e"></div><div class="sw-meta"><span>text-secondary（默认图标）</span><span class="hex">#5e5e5e</span></div></div>
+    <div class="swatch"><div class="sw-color" style="background:#757575"></div><div class="sw-meta"><span>text-tertiary</span><span class="hex">#757575</span></div></div>
+    <div class="swatch"><div class="sw-color" style="background:#c2410c"></div><div class="sw-meta"><span>accent</span><span class="hex">#c2410c</span></div></div>
+    <div class="swatch"><div class="sw-color" style="background:#7c2d12"></div><div class="sw-meta"><span>accent-strong（选中图标）</span><span class="hex">#7c2d12</span></div></div>
+    <div class="swatch"><div class="sw-color" style="background:#2f7d40"></div><div class="sw-meta"><span>success（运行/通过）</span><span class="hex">#2f7d40</span></div></div>
+    <div class="swatch"><div class="sw-color" style="background:#c63b3b"></div><div class="sw-meta"><span>danger（失败/删除）</span><span class="hex">#c63b3b</span></div></div>
+    <div class="swatch"><div class="sw-color" style="background:#9a5d10"></div><div class="sw-meta"><span>warning（警告）</span><span class="hex">#9a5d10</span></div></div>
+  </div>
+  <div class="bump" style="display:flex; gap:26px; flex-wrap:wrap; align-items:flex-start;">
+    <div style="flex:1; min-width:280px;">
+      <h4 style="font-size:13px; margin-bottom:10px;">角色指示点（保留，不进图标本体）</h4>
+      <div style="display:flex; gap:10px; flex-wrap:wrap;">
+        <span style="display:inline-flex; align-items:center; gap:6px; font-size:12px; color:var(--text-secondary)"><i style="width:9px;height:9px;border-radius:50%;background:var(--role-supervisor)"></i>supervisor</span>
+        <span style="display:inline-flex; align-items:center; gap:6px; font-size:12px; color:var(--text-secondary)"><i style="width:9px;height:9px;border-radius:50%;background:var(--role-planner)"></i>planner</span>
+        <span style="display:inline-flex; align-items:center; gap:6px; font-size:12px; color:var(--text-secondary)"><i style="width:9px;height:9px;border-radius:50%;background:var(--role-coder)"></i>coder</span>
+        <span style="display:inline-flex; align-items:center; gap:6px; font-size:12px; color:var(--text-secondary)"><i style="width:9px;height:9px;border-radius:50%;background:var(--role-reviewer)"></i>reviewer</span>
+        <span style="display:inline-flex; align-items:center; gap:6px; font-size:12px; color:var(--text-secondary)"><i style="width:9px;height:9px;border-radius:50%;background:var(--role-worker)"></i>worker</span>
+      </div>
+    </div>
+    <div style="flex:1; min-width:280px;">
+      <h4 style="font-size:13px; margin-bottom:10px;">暗色主题（.dark 自动适配）</h4>
+      <div style="display:flex; gap:10px; flex-wrap:wrap;">
+        <span style="display:inline-flex; align-items:center; gap:6px; font-size:12px; color:var(--text-secondary)"><i style="width:13px;height:13px;border-radius:3px;background:#ffb300"></i>accent #ffb300</span>
+        <span style="display:inline-flex; align-items:center; gap:6px; font-size:12px; color:var(--text-secondary)"><i style="width:13px;height:13px;border-radius:3px;background:#ffcc80"></i>accent-strong #ffcc80</span>
+        <span style="display:inline-flex; align-items:center; gap:6px; font-size:12px; color:var(--text-secondary)"><i style="width:13px;height:13px;border-radius:3px;background:#a3a3a3"></i>图标默认 #a3a3a3</span>
+      </div>
+      <p style="font-size:12px; color:var(--text-tertiary); margin-top:8px;">图标全部用 currentColor 继承，主题切换零改动。</p>
+    </div>
+  </div>
+</section>
+
+<!-- ===================== 08 通用图标库 ===================== -->
+<section>
+  <div class="sec-head">
+    <span class="sec-no">08</span>
+    <h2>通用图标库（Lucide，统一规格）</h2>
+    <span class="desc">全库收敛为唯一参数：size 16（默认）· strokeWidth 1.75 · 继承色</span>
+  </div>
+  <div class="icon-grid" id="libraryGrid"><!-- JS 渲染 --></div>
+  <div class="note-box">
+    <b>替换映射（语义去重）：</b>Zap 仅保留「自动化/快」语义并退出聊天区（聊天加速改 <code>Sparkles</code>）；Folder 家族收敛：
+    项目=<code>ProjectsIcon</code>、知识库=<code>KnowledgeIcon</code>、文件浏览=<code>FolderOpen</code>、目录树=<code>ListTree</code>；
+    CheckSquare / ListChecks 统一为 <code>TasksIcon</code> 家族（任务列表内仍可用 <code>Check</code> 做行内勾选）。
+  </div>
+</section>
+
+<!-- ===================== 09 迁移路线 ===================== -->
+<section>
+  <div class="sec-head">
+    <span class="sec-no">09</span>
+    <h2>迁移路线图</h2>
+    <span class="desc">四阶段，每阶段可独立合入、可独立回滚</span>
+  </div>
+  <div class="roadmap">
+    <div class="phase p0">
+      <span class="ph-tag">P0 · 品牌图标落地</span>
+      <h4>6 枚图标 + 侧栏接入</h4>
+      <ul>
+        <li>新增 <span class="mono">hipIcons.tsx</span>（6 组件 + 工厂函数）</li>
+        <li>AppSidebar 6 行 NavItem 换新图标</li>
+        <li>快照/单测更新（AppSidebar.test.tsx）</li>
+        <li>验收：yarn tsc && yarn test</li>
+      </ul>
+    </div>
+    <div class="phase">
+      <span class="ph-tag">P1 · 参数收敛</span>
+      <h4>strokeWidth / 尺寸统一</h4>
+      <ul>
+        <li>全库 1.5/1.6/2/2.5 → 1.75（~15 处）</li>
+        <li>尺寸归位 14/16/18/20（~40 处）</li>
+        <li>grep 守卫脚本（CI 可选 lint）</li>
+      </ul>
+    </div>
+    <div class="phase">
+      <span class="ph-tag">P2 · 状态语义</span>
+      <h4>选中态 + 禁用态</h4>
+      <ul>
+        <li>导航选中：accent 底 + accent-strong 图标</li>
+        <li>footer / 工具栏同规则</li>
+        <li>视觉回归（playwright 截图对比）</li>
+      </ul>
+    </div>
+    <div class="phase">
+      <span class="ph-tag">P3 · 品牌延展</span>
+      <h4>空状态 / 欢迎 / 设置</h4>
+      <ul>
+        <li>EmptyState 默认图标换品牌 Inbox 变体</li>
+        <li>设置页入口换 SlidersHorizontal</li>
+        <li>新建会话空状态品牌化</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="checklist">
+    <div class="cl-head">改动文件清单（P0 最小集）</div>
+    <div class="cl-row"><span class="cl-file">src/components/icons/hipIcons.tsx</span><span class="cl-what">新增：6 个品牌图标组件（SVG 内联，兼容 LucideIcon 签名）</span></div>
+    <div class="cl-row"><span class="cl-file">src/components/layout/AppSidebar.tsx</span><span class="cl-what">6 处 NavItem icon 替换 + 选中态图标色 class（active 态已有）</span></div>
+    <div class="cl-row"><span class="cl-file">src/components/layout/SidebarAccountFooter.tsx</span><span class="cl-what">Settings → SlidersHorizontal（P3 或随 P0）</span></div>
+    <div class="cl-row"><span class="cl-file">src/components/layout/AppSidebar.test.tsx</span><span class="cl-what">图标断言随 P0 更新（若有 icon 名称断言）</span></div>
+    <div class="cl-row"><span class="cl-file">docs/design/icon-upgrade-spec.md</span><span class="cl-what">本文档配套 spec（含 SVG path 全集与验收标准）</span></div>
+  </div>
+</section>
+
+</div><!-- /container -->
+
+<div class="page-foot">
+  <div class="container" style="display:flex; justify-content:space-between; width:100%; flex-wrap:wrap; gap:10px">
+    <span>hip · 功能图标系统升级 v2 — 设计提案预览（对齐 DESIGN.md / tokens.css）</span>
+    <span>自包含 HTML · 无外部依赖 · 亮/暗双主题</span>
+  </div>
+</div>
+
+<script>
+/* ==================== 图标定义 ==================== */
+/* 品牌图标：直角端点（linecap square）· 1.75 描边 · 24 网格 */
+/* 通用图标：Lucide 圆头（round）· 统一 1.75（原 2.0） */
+const B = 'square';               // brand cap
+const R = 'round';                // lucide cap
+const I = {
+  /* ---- 品牌六件套 ---- */
+  ChatsIcon: {
+    brand: true,
+    stroke: [
+      '<path d="M4.5 5.5h10a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-4.4l-3 2.8v-2.8H4.5a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2z"/>',
+      '<rect x="10.5" y="2" width="10.5" height="7" rx="2"/>',
+      '<path d="M12.6 10.5h2.4"/><path d="M14.4 6h4"/>'
+    ],
+    fill: ['<circle cx="6" cy="10.5" r="1.05"/>', '<circle cx="9.5" cy="10.5" r="1.05"/>']
+  },
+  ProjectsIcon: {
+    brand: true,
+    stroke: [
+      '<path d="M3.5 9.5v7a2 2 0 0 0 2 2h13a2 2 0 0 0 2-2v-5a2 2 0 0 0-2-2h-7l-1.9-2h-4.1a2 2 0 0 0-2 2z"/>',
+      '<path d="M9.4 12.4 7.9 13.9l1.5 1.5"/><path d="M14.6 12.4l1.5 1.5-1.5 1.5"/><path d="M13.2 11.9 11.6 15.9"/>'
+    ],
+    fill: []
+  },
+  KnowledgeIcon: {
+    brand: true,
+    stroke: [
+      '<path d="M4.8 5.2h4.5L12 6.9v11.8L9.3 17.2H4.8z"/><path d="M19.2 5.2h-4.5L12 6.9v11.8l2.7-1.5h4.5z"/>',
+      '<path d="M12 6.9v11.8"/>',
+      '<path d="M6.2 8.8h2.7"/><path d="M6.2 11.3h2.7"/><path d="M6.2 13.8h1.8"/>',
+      '<path d="M15.2 8.8h2.7"/><path d="M15.2 11.3h2.7"/><path d="M16.2 13.8h1.7"/>'
+    ],
+    fill: [
+      '<path d="M19.9 3.7l.72 1.98 1.98.72-1.98.72-.72 1.98-.72-1.98-1.98-.72 1.98-.72z"/>'
+    ]
+  },
+  TerminalsIcon: {
+    brand: true,
+    stroke: [
+      '<rect x="2.5" y="4.5" width="19" height="15" rx="2.5"/>',
+      '<path d="M10.8 10.6l2.9 2.6-2.9 2.6"/><path d="M16.8 15.8h3"/>'
+    ],
+    fill: ['<circle cx="7.2" cy="8" r="1.15"/>']
+  },
+  TasksIcon: {
+    brand: true,
+    stroke: [
+      '<rect x="3" y="3" width="8" height="8" rx="2"/>',
+      '<path d="M5 7.2l1.7 1.7 2.9-3.5"/>',
+      '<path d="M14 6h6.8"/><path d="M14 10.2h6.8"/><path d="M14 14.4h5.2"/>'
+    ],
+    fill: []
+  },
+  AutomationIcon: {
+    brand: true,
+    stroke: ['<circle cx="12" cy="12" r="8.75"/>'],
+    fill: ['<path d="M13.3 6.9 8.7 12.8h3.1l-1.3 4.7 5.1-6.1h-3.1z"/>']
+  },
+  /* ---- Lucide 通用（统一 1.75） ---- */
+  MessageSquare: { stroke: ['<path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>'] },
+  Code2: { stroke: ['<path d="m18 16 4-4-4-4"/><path d="m6 8-4 4 4 4"/><path d="m14.5 4-5 16"/>'] },
+  FolderTree: { stroke: ['<path d="M13 10h7a1 1 0 0 0 1-1V6a1 1 0 0 0-1-1h-2.5a1 1 0 0 1-.8-.4l-.9-1.2a1 1 0 0 0-.8-.4H11a1 1 0 0 0-1 1v4a1 1 0 0 0 1 1z"/><path d="M13 21h7a1 1 0 0 0 1-1v-3a1 1 0 0 0-1-1h-2.9a1 1 0 0 1-.88-.55l-.42-.85a1 1 0 0 0-.92-.6H11a1 1 0 0 0-1 1v5a1 1 0 0 0 1 1z"/><path d="M3 5a2 2 0 0 0 2 2h3"/><path d="M3 3v13a2 2 0 0 0 2 2h3"/>'] },
+  Terminal: { stroke: ['<polyline points="4 17 10 11 4 5"/><line x1="12" x2="20" y1="19" y2="19"/>'] },
+  CheckSquare: { stroke: ['<polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/>'] },
+  Zap: { stroke: ['<polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>'] },
+  History: { stroke: ['<path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/><path d="M12 7v5l4 2"/>'] },
+  Trash2: { stroke: ['<path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/><line x1="10" x2="10" y1="11" y2="17"/><line x1="14" x2="14" y1="11" y2="17"/>'] },
+  Settings: { stroke: ['<path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/>'] },
+  SlidersHorizontal: { stroke: ['<line x1="21" x2="14" y1="4" y2="4"/><line x1="10" x2="3" y1="4" y2="4"/><line x1="21" x2="12" y1="12" y2="12"/><line x1="8" x2="3" y1="12" y2="12"/><line x1="21" x2="16" y1="20" y2="20"/><line x1="12" x2="3" y1="20" y2="20"/><line x1="14" x2="14" y1="2" y2="6"/><line x1="8" x2="8" y1="10" y2="14"/><line x1="16" x2="16" y1="18" y2="22"/>'] },
+  Search: { stroke: ['<circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/>'] },
+  Plus: { stroke: ['<path d="M5 12h14"/><path d="M12 5v14"/>'] },
+  ChevronDown: { stroke: ['<path d="m6 9 6 6 6-6"/>'] },
+  ChevronRight: { stroke: ['<path d="m9 18 6-6-6-6"/>'] },
+  ChevronLeft: { stroke: ['<path d="m15 18-6-6 6-6"/>'] },
+  ChevronUp: { stroke: ['<path d="m18 15-6-6-6 6"/>'] },
+  X: { stroke: ['<path d="M18 6 6 18"/><path d="m6 6 12 12"/>'] },
+  Check: { stroke: ['<path d="M20 6 9 17l-5-5"/>'] },
+  Loader2: { stroke: ['<path d="M21 12a9 9 0 1 1-6.219-8.56"/>'] },
+  Inbox: { stroke: ['<polyline points="22 12 16 12 14 15 10 15 8 12 2 12"/><path d="M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"/>'] },
+  FileText: { stroke: ['<path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="M10 9H8"/><path d="M16 13H8"/><path d="M16 17H8"/>'] },
+  Folder: { stroke: ['<path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z"/>'] },
+  FolderOpen: { stroke: ['<path d="m6 14 1.5-2.9A2 2 0 0 1 9.24 10H20a2 2 0 0 1 1.94 2.5l-1.54 6a2 2 0 0 1-1.95 1.5H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h3.9a2 2 0 0 1 1.69.9l.81 1.2a2 2 0 0 0 1.67.9H18a2 2 0 0 1 2 2v2"/>'] },
+  GitBranch: { stroke: ['<line x1="6" x2="6" y1="3" y2="15"/><circle cx="18" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><path d="M18 9a9 9 0 0 1-9 9"/>'] },
+  RefreshCw: { stroke: ['<path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M8 16H3v5"/>'] },
+  Play: { stroke: ['<polygon points="6 3 20 12 6 21 6 3"/>'] },
+  RotateCcw: { stroke: ['<path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/>'] },
+  MoreVertical: { stroke: ['<circle cx="12" cy="12" r="1"/><circle cx="12" cy="5" r="1"/><circle cx="12" cy="19" r="1"/>'] },
+  MoreHorizontal: { stroke: ['<circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/>'] },
+  ExternalLink: { stroke: ['<path d="M15 3h6v6"/><path d="M10 14 21 3"/><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/>'] },
+  Copy: { stroke: ['<rect width="14" height="14" x="8" y="8" rx="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/>'] },
+  Pencil: { stroke: ['<path d="M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z"/><path d="m15 5 4 4"/>'] },
+  Eye: { stroke: ['<path d="M2.062 12.348a1 1 0 0 1 0-.696 10.75 10.75 0 0 1 19.876 0 1 1 0 0 1 0 .696 10.75 10.75 0 0 1-19.876 0"/><circle cx="12" cy="12" r="3"/>'] },
+  EyeOff: { stroke: ['<path d="M10.733 5.076a10.744 10.744 0 0 1 11.205 6.575 1 1 0 0 1 0 .696 10.747 10.747 0 0 1-1.444 2.49"/><path d="M14.084 14.158a3 3 0 0 1-4.242-4.242"/><path d="M17.479 17.499a10.75 10.75 0 0 1-15.417-5.151 1 1 0 0 1 0-.696 10.75 10.75 0 0 1 4.446-5.143"/><path d="m2 2 20 20"/>'] },
+  Link2: { stroke: ['<path d="M9 17H7A5 5 0 0 1 7 7h2"/><path d="M15 7h2a5 5 0 1 1 0 10h-2"/><line x1="8" x2="16" y1="12" y2="12"/>'] },
+  Unlink: { stroke: ['<path d="m18.84 12.25 1.72-1.71h-.02a5.004 5.004 0 0 0-.12-7.07 5.006 5.006 0 0 0-6.95 0l-1.72 1.71"/><path d="m5.17 11.75-1.71 1.71a5.004 5.004 0 0 0 .12 7.07 5.006 5.006 0 0 0 6.95 0l1.71-1.71"/><line x1="8" x2="16" y1="2" y2="22"/>'] },
+  Circle: { stroke: ['<circle cx="12" cy="12" r="10"/>'] },
+  CircleDot: { stroke: ['<circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="1"/>'] },
+  ListChecks: { stroke: ['<path d="m3 17 2 2 4-4"/><path d="m3 7 2 2 4-4"/><path d="M13 6h8"/><path d="M13 12h8"/><path d="M13 18h8"/>'] },
+  ListTree: { stroke: ['<path d="M21 12h-8"/><path d="M21 6H8"/><path d="M21 18h-8"/><path d="M3 6v4c0 1.1.9 2 2 2h3"/><path d="M3 10v6c0 1.1.9 2 2 2h3"/>'] },
+  BookOpen: { stroke: ['<path d="M12 7v14"/><path d="M3 18a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h5a4 4 0 0 1 4 4 4 4 0 0 1 4-4h5a1 1 0 0 1 1 1v13a1 1 0 0 1-1 1h-6a3 3 0 0 0-3 3 3 3 0 0 0-3-3z"/>'] },
+  Globe: { stroke: ['<circle cx="12" cy="12" r="10"/><path d="M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20"/><path d="M2 12h20"/>'] },
+  Users: { stroke: ['<path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>'] },
+  Lock: { stroke: ['<rect width="18" height="11" x="3" y="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>'] },
+  KeyRound: { stroke: ['<path d="M2.586 17.414A2 2 0 0 0 2 18.828V21a1 1 0 0 0 1 1h3a1 1 0 0 0 1-1v-1a1 1 0 0 1 1-1h1a1 1 0 0 0 1-1v-1a1 1 0 0 1 1-1h.172a2 2 0 0 0 1.414-.586l.814-.814a6.5 6.5 0 1 0-4-4z"/><circle cx="16.5" cy="7.5" r=".5" fill="currentColor"/>'] },
+  Power: { stroke: ['<path d="M12 2v10"/><path d="M18.4 6.6a9 9 0 1 1-12.77.04"/>'] },
+  Plug: { stroke: ['<path d="M12 22v-5"/><path d="M9 8V2"/><path d="M15 8V2"/><path d="M18 8v5a4 4 0 0 1-4 4h-4a4 4 0 0 1-4-4V8Z"/>'] },
+  Package: { stroke: ['<path d="m7.5 4.27 9 5.15"/><path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"/><path d="m3.3 7 8.7 5 8.7-5"/><path d="M12 22V12"/>'] },
+  LayoutTemplate: { stroke: ['<rect width="18" height="7" x="3" y="3" rx="1"/><rect width="9" height="7" x="3" y="14" rx="1"/><rect width="5" height="7" x="16" y="14" rx="1"/>'] },
+  CalendarDays: { stroke: ['<path d="M8 2v4"/><path d="M16 2v4"/><rect width="18" height="18" x="3" y="4" rx="2"/><path d="M3 10h18"/><path d="M8 14h.01"/><path d="M12 14h.01"/><path d="M16 14h.01"/><path d="M8 18h.01"/><path d="M12 18h.01"/>'] },
+  Target: { stroke: ['<circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/>'] },
+  Server: { stroke: ['<rect width="20" height="8" x="2" y="2" rx="2"/><rect width="20" height="8" x="2" y="14" rx="2"/><line x1="6" x2="6.01" y1="6" y2="6"/><line x1="6" x2="6.01" y1="18" y2="18"/>'] },
+  Wrench: { stroke: ['<path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/>'] },
+  Archive: { stroke: ['<rect width="20" height="5" x="2" y="3" rx="1"/><path d="M4 8v11a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8"/><path d="M10 12h4"/>'] },
+  Ban: { stroke: ['<circle cx="12" cy="12" r="10"/><path d="m4.9 4.9 14.2 14.2"/>'] },
+  Download: { stroke: ['<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" x2="12" y1="15" y2="3"/>'] },
+  Upload: { stroke: ['<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" x2="12" y1="3" y2="15"/>'] },
+  ArrowLeft: { stroke: ['<path d="m12 19-7-7 7-7"/><path d="M19 12H5"/>'] },
+  ArrowRight: { stroke: ['<path d="M5 12h14"/><path d="m12 5 7 7-7 7"/>'] },
+  ArrowUp: { stroke: ['<path d="m5 12 7-7 7 7"/><path d="M12 19V5"/>'] },
+  ArrowDown: { stroke: ['<path d="M12 5v14"/><path d="m19 12-7 7-7-7"/>'] },
+  ArrowUpFromLine: { stroke: ['<path d="m18 9-6-6-6 6"/><path d="M12 3v14"/><path d="M5 21h14"/>'] },
+  Square: { stroke: ['<rect width="18" height="18" x="3" y="3" rx="2"/>'] },
+  Minus: { stroke: ['<path d="M5 12h14"/>'] },
+  Mic: { stroke: ['<path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" x2="12" y1="19" y2="22"/>'] },
+  MicOff: { stroke: ['<line x1="2" x2="22" y1="2" y2="22"/><path d="M18.89 13.23A7.12 7.12 0 0 0 19 12v-2"/><path d="M5 10v2a7 7 0 0 0 12 5"/><path d="M15 9.34V5a3 3 0 0 0-5.68-1.33"/><path d="M9 9v3a3 3 0 0 0 5.12 2.12"/><line x1="12" x2="12" y1="19" y2="22"/>'] },
+  Cpu: { stroke: ['<rect width="16" height="16" x="4" y="4" rx="2"/><rect width="6" height="6" x="9" y="9" rx="1"/><path d="M15 2v2"/><path d="M15 20v2"/><path d="M2 15h2"/><path d="M2 9h2"/><path d="M20 15h2"/><path d="M20 9h2"/><path d="M9 2v2"/><path d="M9 20v2"/>'] },
+  Sparkles: { stroke: ['<path d="m12 3-1.912 5.813a2 2 0 0 1-1.275 1.275L3 12l5.813 1.912a2 2 0 0 1 1.275 1.275L12 21l1.912-5.813a2 2 0 0 1 1.275-1.275L21 12l-5.813-1.912a2 2 0 0 1-1.275-1.275L12 3Z"/><path d="M5 3v4"/><path d="M19 17v4"/><path d="M3 5h4"/><path d="M17 19h4"/>'] },
+  Bot: { stroke: ['<path d="M12 8V4H8"/><rect width="16" height="12" x="4" y="8" rx="2"/><path d="M2 14h2"/><path d="M20 14h2"/><path d="M15 13v2"/><path d="M9 13v2"/>'] },
+  Gauge: { stroke: ['<path d="m12 14 4-4"/><path d="M3.34 19a10 10 0 1 1 17.32 0"/>'] },
+  ShieldCheck: { stroke: ['<path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/><path d="m9 12 2 2 4-4"/>'] },
+  ShieldAlert: { stroke: ['<path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/><path d="M12 8v4"/><path d="M12 16h.01"/>'] },
+  AlertTriangle: { stroke: ['<path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><path d="M12 9v4"/><path d="M12 17h.01"/>'] },
+  AlertCircle: { stroke: ['<circle cx="12" cy="12" r="10"/><line x1="12" x2="12" y1="8" y2="12"/><line x1="12" x2="12.01" y1="16" y2="16"/>'] },
+  Info: { stroke: ['<circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/>'] },
+  XCircle: { stroke: ['<circle cx="12" cy="12" r="10"/><path d="m15 9-6 6"/><path d="m9 9 6 6"/>'] },
+  CheckCircle2: { stroke: ['<circle cx="12" cy="12" r="10"/><path d="m9 12 2 2 4-4"/>'] },
+  FileWarning: { stroke: ['<path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="M12 9v4"/><path d="M12 17h.01"/>'] },
+  FileCode: { stroke: ['<path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="m10 13-2 2 2 2"/><path d="m14 17 2-2-2-2"/>'] },
+  FileImage: { stroke: ['<path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><circle cx="10" cy="12" r="2"/><path d="m20 17-1.3-1.3a2 2 0 0 0-2.8 0L10 21"/>'] },
+  FileType: { stroke: ['<path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="M9 13v-1h6v1"/><path d="M12 12v6"/><path d="M11 18h2"/>'] },
+  Eraser: { stroke: ['<path d="m7 21-4.3-4.3c-1-1-1-2.5 0-3.4l9.6-9.6c1-1 2.5-1 3.4 0l5.6 5.6c1 1 1 2.5 0 3.4L13 21"/><path d="M22 21H7"/><path d="m5 11 9 9"/>'] },
+  GitCommitHorizontal: { stroke: ['<circle cx="12" cy="12" r="3"/><line x1="3" x2="9" y1="12" y2="12"/><line x1="15" x2="21" y1="12" y2="12"/>'] },
+  GitFork: { stroke: ['<circle cx="12" cy="18" r="3"/><circle cx="6" cy="6" r="3"/><circle cx="18" cy="6" r="3"/><path d="M18 9v2c0 .6-.4 1-1 1H7c-.6 0-1-.4-1-1V9"/><path d="M12 12v3"/>'] },
+  List: { stroke: ['<line x1="8" x2="21" y1="6" y2="6"/><line x1="8" x2="21" y1="12" y2="12"/><line x1="8" x2="21" y1="18" y2="18"/><line x1="3" x2="3.01" y1="6" y2="6"/><line x1="3" x2="3.01" y1="12" y2="12"/><line x1="3" x2="3.01" y1="18" y2="18"/>'] },
+  Paperclip: { stroke: ['<path d="m21.44 11.05-9.19 9.19a6 6 0 0 1-8.49-8.49l8.57-8.57A4 4 0 1 1 18 8.84l-8.59 8.57a2 2 0 0 1-2.83-2.83l8.49-8.48"/>'] },
+  PanelRight: { stroke: ['<rect width="18" height="18" x="3" y="3" rx="2"/><path d="M15 3v18"/>'] },
+  PanelRightClose: { stroke: ['<rect width="18" height="18" x="3" y="3" rx="2"/><path d="M15 3v18"/><path d="m8 9 3 3-3 3"/>'] },
+  PanelLeft: { stroke: ['<rect width="18" height="18" x="3" y="3" rx="2"/><path d="M9 3v18"/>'] },
+  Command: { stroke: ['<path d="M15 6v12a3 3 0 1 0 3-3H6a3 3 0 1 0 3 3V6a3 3 0 1 0-3 3h12a3 3 0 1 0-3-3"/>'] },
+  Construction: { stroke: ['<rect x="2" y="6" width="20" height="8" rx="1"/><path d="M17 14v7"/><path d="M7 14v7"/><path d="M17 3v3"/><path d="M7 3v3"/><path d="m10 14-3-3"/><path d="m14 10 3 3"/>'] },
+  SearchX: { stroke: ['<path d="m13.5 8.5-5 5"/><path d="m8.5 8.5 5 5"/><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/>'] },
+  Ellipsis: { stroke: ['<circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/>'] },
+  Bell: { stroke: ['<path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/>'] },
+  Brain: { stroke: ['<path d="M12 5a3 3 0 1 0-5.997.125 4 4 0 0 0-2.526 5.77 4 4 0 0 0 .556 6.588A4 4 0 1 0 12 18Z"/><path d="M12 5a3 3 0 1 1 5.997.125 4 4 0 0 1 2.526 5.77 4 4 0 0 1-.556 6.588A4 4 0 1 1 12 18Z"/><path d="M15 13a4.5 4.5 0 0 1-3-4 4.5 4.5 0 0 1-3 4"/><path d="M17.599 6.5a3 3 0 0 0 .399-1.375"/><path d="M6.003 5.125A3 3 0 0 0 6.401 6.5"/><path d="M3.477 10.896a4 4 0 0 1 .585-.396"/><path d="M19.938 10.5a4 4 0 0 1 .585.396"/><path d="M6 18a4 4 0 0 1-1.967-.516"/><path d="M19.967 17.484A4 4 0 0 1 18 18"/>'] }
+};
+
+/* 六大功能图标的展示元数据 */
+const BIG = [
+  ['ChatsIcon', '会话', 'MessageSquare', '单气泡 + 圆点（Lucide 默认）', '双气泡交叠：主气泡承载会话、右上副气泡暗示「多路/连续」。记忆点：交谈感。'],
+  ['ProjectsIcon', '项目', 'Code2', '斜杠代码（通用符号）', '文件夹 + <span class="mono">&lt;/&gt;</span>：项目=代码仓库的直接隐喻。记忆点：仓库。'],
+  ['KnowledgeIcon', '知识库', 'FolderTree', '文件夹树（与项目意象冲突）', '打开的书 + 星标书签：文库语义；星 = 知识亮点。记忆点：书+星。'],
+  ['TerminalsIcon', '终端', 'Terminal', '裸提示符（无窗口语境）', '终端窗口 + 运行状态点 + 提示符：容器即语境。记忆点：窗口。'],
+  ['TasksIcon', '任务', 'CheckSquare', '单勾选框（信息量低）', '勾选清单：已勾事项 + 待办行。记忆点：清单。'],
+  ['AutomationIcon', '自动化', 'Zap', '闪电（与「快/加速」含义混用）', '循环圆环 + 闪电：自动=重复执行，行业通用语义（GitHub Actions 同款）。记忆点：循环。']
+];
+
+/* ==================== 渲染 ==================== */
+function iconSVG(name, size) {
+  const d = I[name]; if (!d) return '';
+  const cap = d.brand ? B : R;
+  const sw = d.brand ? 1.75 : 1.75;
+  const stroke = (d.stroke || []).map(p => p).join('');
+  const fill = (d.fill || []).join('');
+  return `<svg width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+    stroke-width="${sw}" stroke-linecap="${cap}" stroke-linejoin="miter" aria-hidden="true">${stroke}${fill ? `<g fill="currentColor" stroke="none">${fill}</g>` : ''}</svg>`;
+}
+function render() {
+  document.querySelectorAll('[data-ic]').forEach(el => {
+    const name = el.getAttribute('data-ic');
+    const size = parseInt(el.getAttribute('data-sz') || '16', 10);
+    el.innerHTML = iconSVG(name, size);
+  });
+  /* 尺寸演示 */
+  const sizes = [[14,'sz14'],[16,'sz16'],[18,'sz18'],[20,'sz20'],[24,'sz24']];
+  sizes.forEach(([s, id]) => { document.getElementById(id).innerHTML = iconSVG('ChatsIcon', s); });
+  /* 六大功能对比卡 */
+  const host = document.getElementById('bigIcons');
+  host.innerHTML = BIG.map(([name, zh, old, oldDesc, desc]) => `
+    <div class="card big-icon-card">
+      <div class="bi-row">
+        <div style="display:flex;flex-direction:column;align-items:center;gap:6px;color:var(--text-tertiary)">
+          ${iconSVG(old, 34)}
+          <span style="font-size:10px;font-family:var(--mono)">${old}</span>
+        </div>
+        <span class="bi-arrow">→</span>
+        <div style="display:flex;flex-direction:column;align-items:center;gap:6px;color:var(--accent-strong)">
+          ${iconSVG(name, 42)}
+          <span style="font-size:10px;font-family:var(--mono);color:var(--text-tertiary)">${name}</span>
+        </div>
+      </div>
+      <h4>${zh}</h4>
+      <div class="bi-sub">${oldDesc}</div>
+      <div class="bi-desc">${desc}</div>
+    </div>`).join('');
+  /* 通用库 grid */
+  const groups = [
+    ['导航', ['ChatsIcon','ProjectsIcon','KnowledgeIcon','TerminalsIcon','TasksIcon','AutomationIcon','Inbox','Command']],
+    ['操作', ['Search','Plus','Pencil','Copy','Trash2','ExternalLink','MoreVertical','MoreHorizontal','Check','X','Download','Upload']],
+    ['文件', ['FileText','FileCode','FileImage','FileType','FileWarning','Folder','FolderOpen','FolderTree','ListTree','Paperclip','Archive','Package']],
+    ['终端/进程', ['Terminal','TerminalsIcon','Play','Square','Power','RefreshCw','RotateCcw','Loader2','Gauge','Server','Cpu','Plug']],
+    ['状态', ['CheckCircle2','XCircle','AlertTriangle','AlertCircle','Info','Ban','ShieldCheck','ShieldAlert','CircleDot','Circle','Target']],
+    ['系统/设置', ['Settings','SlidersHorizontal','History','Wrench','KeyRound','Lock','Globe','Users','Bell','CalendarDays','LayoutTemplate','Sparkles']]
+  ];
+  const lib = document.getElementById('libraryGrid');
+  lib.innerHTML = groups.map(([g, names]) => `
+    <div class="icon-cell spec-note" style="grid-column:1/-1; border:0; padding:2px 0 0; align-items:flex-start; color:var(--text-tertiary); font-size:11.5px; font-weight:600;">${g}</div>
+    ${names.map(n => `<div class="icon-cell"><span class="ic" style="display:inline-flex">${iconSVG(n, 18)}</span><span class="ic-name">${n}</span></div>`).join('')}
+  `).join('');
+}
+render();
+
+/* ==================== 主题切换 ==================== */
+const tgl = document.getElementById('themeToggle');
+tgl.querySelectorAll('button').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.documentElement.setAttribute('data-theme', btn.dataset.theme);
+    tgl.querySelectorAll('button').forEach(b => b.classList.toggle('active', b === btn));
+  });
+});
+</script>
+</body>
+</html>

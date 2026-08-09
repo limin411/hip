@@ -87,7 +87,7 @@ function buildProseTheme(isDark: boolean) {
         caretColor: 'var(--text-primary)',
         minHeight: '100%',
         color: 'var(--text-primary)',
-        maxWidth: 'var(--kb-measure, 46rem)',
+        maxWidth: 'var(--kb-measure, 44.25rem)',
         marginInline: 'auto',
       },
       '.cm-line': {

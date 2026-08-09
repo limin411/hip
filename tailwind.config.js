@@ -96,7 +96,8 @@ export default {
         stat: ['24px', { lineHeight: '1.2' }],
         // page = document/page H1 only (e.g. Knowledge InlineDocTitle).
         // Not for section headers, cards, stats, or chrome.
-        page: ['28px', { lineHeight: '1.25', letterSpacing: '-0.02em' }],
+        // 32px = T2 裁决值（Notion 40px 在小窗口内占比过高）。
+        page: ['32px', { lineHeight: '1.25', letterSpacing: '-0.02em' }],
       },
       // 扁平化：直角优先。按钮/输入 2px，卡片 4px，浮层 6px；full 仅保留给状态点/开关/avatar。
       borderRadius: {

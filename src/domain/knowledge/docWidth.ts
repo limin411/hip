@@ -17,7 +17,7 @@ export function normalizeDocWidthId(raw: string | undefined | null): DocWidthId 
 
 /** CSS `--kb-measure` values for each preference. */
 export const DOC_WIDTH_MEASURE: Record<DocWidthId, string> = {
-  default: 'min(100%, 46rem)',
+  default: 'min(100%, 44.25rem)',
   wide: 'min(100%, 72rem)',
   full: '100%',
 }

@@ -3,21 +3,21 @@
  * Host: [data-testid="knowledge-doc-paper"]
  */
 [data-testid='knowledge-doc-paper'] {
-  --kb-font-body: 15px;
-  --kb-line-body: 1.7;
+  --kb-font-body: 16px;
+  --kb-line-body: 1.5;
   --kb-font-family:
     ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI',
     'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', sans-serif;
   --kb-font-mono:
     ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono',
     'Courier New', monospace;
-  --kb-h1-size: 1.75em;
-  --kb-h2-size: 1.375em;
-  --kb-h3-size: 1.15em;
+  --kb-h1-size: 30px;
+  --kb-h2-size: 24px;
+  --kb-h3-size: 20px;
   --kb-heading-weight: 600;
-  --kb-block-gap: 0.2rem;
-  --kb-para-gap: 0.35em;
-  --kb-measure: min(100%, 46rem);
+  --kb-block-gap: 4px;
+  --kb-para-gap: 4px;
+  --kb-measure: min(100%, 44.25rem);
   --kb-pad-bottom: max(8rem, 30vh);
   --kb-selection: color-mix(in srgb, var(--accent, #3b82f6) 22%, transparent);
 
@@ -27,6 +27,19 @@
      containing block for fixed-positioned editor menus.
      Reduced-motion is globally clamped in tokens.css. */
   animation: knowledge-doc-enter 140ms var(--ease-out, cubic-bezier(0.2, 0, 0, 1));
+
+  /* 文档域「纸张」子语言（spec S1/S5）：暖色文字 + 中性暖灰 hover，主题自适应。 */
+  --kb-text: #2f2c28;
+  --kb-text-muted: #9b9893;
+  --kb-hover: #f0efec;
+  --kb-row: #f7f6f3;
+}
+
+.dark [data-testid='knowledge-doc-paper'] {
+  --kb-text: #e8e6e1;
+  --kb-text-muted: #7d7a75;
+  --kb-hover: #2f2f2f;
+  --kb-row: #2a2a2a;
 }
 
 @keyframes knowledge-doc-enter {
@@ -93,12 +106,12 @@
   );
   font-size: var(--kb-font-body, 15px);
   line-height: var(--kb-line-body, 1.7);
-  color: var(--text-primary, inherit);
+  color: var(--kb-text, var(--text-primary, inherit));
 }
 
 .knowledge-doc-prose h1 {
-  margin: 1.1em 0 0.35em;
-  font-size: var(--kb-h1-size, 1.75em);
+  margin: 0.9em 0 0.3em;
+  font-size: var(--kb-h1-size, 30px);
   font-weight: var(--kb-heading-weight, 600);
   line-height: 1.25;
   letter-spacing: -0.02em;
@@ -106,8 +119,8 @@
 }
 
 .knowledge-doc-prose h2 {
-  margin: 0.95em 0 0.3em;
-  font-size: var(--kb-h2-size, 1.375em);
+  margin: 0.9em 0 0.3em;
+  font-size: var(--kb-h2-size, 24px);
   font-weight: var(--kb-heading-weight, 600);
   line-height: 1.3;
   letter-spacing: -0.015em;
@@ -115,8 +128,8 @@
 }
 
 .knowledge-doc-prose h3 {
-  margin: 0.8em 0 0.25em;
-  font-size: var(--kb-h3-size, 1.15em);
+  margin: 0.9em 0 0.3em;
+  font-size: var(--kb-h3-size, 20px);
   font-weight: var(--kb-heading-weight, 600);
   line-height: 1.35;
   scroll-margin-top: 4.5rem;

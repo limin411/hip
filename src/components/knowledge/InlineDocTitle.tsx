@@ -89,8 +89,8 @@ export function InlineDocTitle({
       aria-label={resolvedAria}
       className={cn(
         embedded
-          ? 'w-full min-w-0 flex-1 shrink-0 border-0 bg-transparent px-0 pb-2 pt-1.5 sm:pt-2 text-page font-semibold tracking-tight text-ink'
-          : 'knowledge-doc-measure w-full shrink-0 border-0 bg-transparent px-0 pb-2 pt-1.5 sm:pt-2 text-page font-semibold tracking-tight text-ink',
+          ? 'w-full min-w-0 flex-1 shrink-0 border-0 bg-transparent px-0 pb-4 pt-1.5 sm:pt-2 text-page font-semibold tracking-tight text-ink'
+          : 'knowledge-doc-measure w-full shrink-0 border-0 bg-transparent px-0 pb-4 pt-1.5 sm:pt-2 text-page font-semibold tracking-tight text-ink',
         'placeholder:text-ink-tertiary focus:outline-none focus-visible:ring-0',
         className,
       )}

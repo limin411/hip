@@ -677,13 +677,19 @@ function KnowledgeSideMenu({
 
   if (!block) return null
   const isSelected = selectedIds.includes(block.id)
+  const blockType = block.type
+  const blockLevel =
+    blockType === 'heading'
+      ? String((block.props as { level?: number } | undefined)?.level ?? 1)
+      : undefined
 
   return (
     <div
       className="bn-side-menu"
       data-testid="kb-side-menu"
       data-block-id={block.id}
-      data-block-type={block.type}
+      data-block-type={blockType}
+      data-level={blockLevel}
     >
       <KnowledgeAddBlockButton
         menuOpen={addOpen}

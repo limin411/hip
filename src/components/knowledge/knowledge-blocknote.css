@@ -234,7 +234,9 @@
 .knowledge-blocknote-editor {
   --kb-grip: #b4b2ad;
   --kb-grip-hover: #6b6862;
-  --kb-handle-shift: 0px;
+  /* 块顶到首行文字中心 = strut 4px + content padding 3px + 行高 24/2 = 19px；
+     菜单中心 = 15px（30px 高）→ 下移 4px */
+  --kb-handle-shift: 4px;
 }
 
 :is(html.dark, html[data-theme='dark'], body[data-theme='dark'])
@@ -247,13 +249,24 @@
   display: flex;
   flex-direction: row;
   align-items: center;
-  height: auto;
+  height: 30px; /* BN 默认：块 content padding 3px + 行高 24px → 中心 +15px 对齐 */
   width: auto;
   gap: 2px;
-  padding: 1px;
+  padding: 0;
   user-select: none;
   animation: kb-side-menu-in 120ms var(--ease-out, ease-out);
   transform: translateY(var(--kb-handle-shift));
+}
+
+/* heading：沿用 BN 高度，按钮居中于标题块（含 data-level，见 KnowledgeSideMenu） */
+.knowledge-blocknote-editor .bn-side-menu[data-block-type='heading'][data-level='1'] {
+  height: 108px;
+}
+.knowledge-blocknote-editor .bn-side-menu[data-block-type='heading'][data-level='2'] {
+  height: 84px;
+}
+.knowledge-blocknote-editor .bn-side-menu[data-block-type='heading'][data-level='3'] {
+  height: 67px;
 }
 
 @keyframes kb-side-menu-in {
@@ -265,10 +278,10 @@
   }
 }
 
-/* codeBlock：手柄贴首行（内容区有内边距） */
+/* codeBlock：pre padding 24px + strut 4px + 行高 21.7/2 → 中心约 +39px，菜单中心 +15px */
 .knowledge-blocknote-editor
   .bn-side-menu[data-block-type='codeBlock'] {
-  --kb-handle-shift: 10px;
+  --kb-handle-shift: 24px;
 }
 
 .knowledge-blocknote-editor .bn-side-menu .bn-button,

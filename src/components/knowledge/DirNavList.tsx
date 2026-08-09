@@ -21,6 +21,7 @@ import type { KnowledgeNode } from '@/domain/knowledge/types'
 import { cn } from '@/lib/utils'
 import { useKnowledgeStore } from '@/store/knowledgeStore'
 import { NodeRowMenu } from './NodeRowMenu'
+import { SIDEBAR_ACTIVE_RAIL } from '@/components/layout/sidebarActiveRail'
 
 /** 当前层级排序：文件夹优先，其次按名称排序。 */
 function sortLevel(a: KnowledgeNode, b: KnowledgeNode): number {
@@ -372,7 +373,7 @@ export function DirNavList() {
                           'flex w-full items-center gap-2 rounded-lg px-2.5 py-[var(--row-pad-y-session)] pr-12 text-left transition-colors',
                           'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink/20',
                           active
-                            ? 'relative bg-state-hover font-medium text-ink before:absolute before:inset-y-1.5 before:left-0 before:w-0.5 before:rounded-full before:bg-border-strong'
+                            ? cn(SIDEBAR_ACTIVE_RAIL, 'font-medium')
                             : 'hover:bg-state-hover',
                         )}
                       >

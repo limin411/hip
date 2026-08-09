@@ -1,11 +1,24 @@
 // @vitest-environment happy-dom
 import '@testing-library/jest-dom/vitest'
-import { describe, it, expect, afterEach } from 'vitest'
-import { render, cleanup, fireEvent, screen } from '@testing-library/react'
+import { describe, it, expect, afterEach, vi } from 'vitest'
+import { render, cleanup, fireEvent, screen, waitFor } from '@testing-library/react'
 import { ProviderLogo } from './ProviderLogo'
+
+vi.mock('@/lib/providerLogo', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/lib/providerLogo')>()
+  return {
+    ...actual,
+    getCachedProviderLogo: vi.fn(async () => null),
+  }
+})
+
+import { getCachedProviderLogo } from '@/lib/providerLogo'
+
+const mockGetCached = vi.mocked(getCachedProviderLogo)
 
 afterEach(() => {
   cleanup()
+  mockGetCached.mockClear()
 })
 
 const LOGO_BASE = 'https://logo.test/logos'
@@ -120,5 +133,44 @@ describe('ProviderLogo', () => {
     const root = screen.getByTestId('provider-logo-fallback')
     expect(root.className).toMatch(/bg-accent-subtle/)
     expect(root.className).toMatch(/text-accent-strong/)
+  })
+})
+
+describe('ProviderLogo local cache path (no logoBase)', () => {
+  it('queries the shell cache and renders the data URL when cached', async () => {
+    mockGetCached.mockResolvedValue('data:image/svg+xml;base64,QUJD')
+    render(<ProviderLogo providerId="openai" name="OpenAI" />)
+    // Cache fetch pending → letter underlay, no img yet
+    expect(screen.getByTestId('provider-logo-fallback')).toHaveTextContent('O')
+    expect(screen.queryByTestId('provider-logo-img')).toBeNull()
+    await waitFor(() => {
+      expect(screen.getByTestId('provider-logo-img')).toHaveAttribute(
+        'src',
+        'data:image/svg+xml;base64,QUJD',
+      )
+    })
+    expect(mockGetCached).toHaveBeenCalledWith('openai')
+  })
+
+  it('falls back to the CDN when the shell cache has no copy', async () => {
+    mockGetCached.mockResolvedValue(null)
+    render(<ProviderLogo providerId="anthropic" name="Anthropic" />)
+    await waitFor(() => {
+      expect(screen.getByTestId('provider-logo-img')).toHaveAttribute(
+        'src',
+        'https://models.dev/logos/anthropic.svg',
+      )
+    })
+  })
+
+  it('letter-only when the cached data URL errors on load', async () => {
+    mockGetCached.mockResolvedValue('data:image/svg+xml;base64,QUJD')
+    render(<ProviderLogo providerId="xai" name="X" />)
+    await waitFor(() => {
+      expect(screen.getByTestId('provider-logo-img')).toBeInTheDocument()
+    })
+    fireEvent.error(screen.getByTestId('provider-logo-img'))
+    expect(screen.getByTestId('provider-logo-fallback')).toHaveTextContent('X')
+    expect(screen.queryByTestId('provider-logo-img')).toBeNull()
   })
 })

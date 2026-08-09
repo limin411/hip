@@ -29,6 +29,7 @@ mod knowledge_trash;
 mod knowledge_link_index;
 mod voice_models;
 mod voice;
+mod provider_logo;
 // Production SSH (default feature `ssh`); stubs keep IPC registered when stripped.
 #[cfg(feature = "ssh")]
 mod ssh_session;
@@ -986,6 +987,7 @@ pub fn run() {
             voice::voice_cancel_download,
             voice::voice_transcribe,
             voice::voice_open_models_dir,
+            provider_logo::provider_logo,
         ])
         .build(tauri::generate_context!())
         .expect("error while running tauri application");

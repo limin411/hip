@@ -1,9 +1,22 @@
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, vi, beforeEach } from 'vitest'
 import {
   DEFAULT_MODELS_LOGO_BASE,
   providerLogoUrl,
   shouldLoadProviderLogo,
+  getCachedProviderLogo,
 } from './providerLogo'
+
+vi.mock('@tauri-apps/api/core', () => ({
+  invoke: vi.fn(),
+}))
+
+import { invoke } from '@tauri-apps/api/core'
+const mockInvoke = vi.mocked(invoke)
+
+beforeEach(() => {
+  mockInvoke.mockReset()
+  mockInvoke.mockResolvedValue('data:image/svg+xml;base64,QUJD')
+})
 
 describe('providerLogoUrl', () => {
   it('builds models.dev logo URL for a normal id', () => {
@@ -57,5 +70,24 @@ describe('shouldLoadProviderLogo', () => {
 
   it('respects custom logoBase for validation', () => {
     expect(shouldLoadProviderLogo({ id: 'openai' }, 'https://mirror.example/logos')).toBe(true)
+  })
+})
+
+describe('getCachedProviderLogo', () => {
+  it('invokes provider_logo once per provider and memoizes', async () => {
+    await expect(getCachedProviderLogo('openai')).resolves.toBe('data:image/svg+xml;base64,QUJD')
+    await expect(getCachedProviderLogo('openai')).resolves.toBe('data:image/svg+xml;base64,QUJD')
+    expect(mockInvoke).toHaveBeenCalledTimes(1)
+    expect(mockInvoke).toHaveBeenCalledWith('provider_logo', { providerId: 'openai' })
+  })
+
+  it('returns null for unsafe ids without invoking', async () => {
+    await expect(getCachedProviderLogo('a/b')).resolves.toBeNull()
+    expect(mockInvoke).not.toHaveBeenCalled()
+  })
+
+  it('coerces invoke failures to null', async () => {
+    mockInvoke.mockRejectedValue(new Error('command not registered'))
+    await expect(getCachedProviderLogo('deepseek')).resolves.toBeNull()
   })
 })

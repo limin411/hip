@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import {
   providerLogoUrl,
   shouldLoadProviderLogo,
+  getCachedProviderLogo,
 } from '@/lib/providerLogo'
 import { cn } from '@/lib/utils'
 
@@ -23,6 +24,9 @@ export type ProviderLogoProps = {
 /**
  * Provider brand mark from models.dev logos CDN, with letter underlay until load
  * and permanent letter fallback on error / custom / offline.
+ *
+ * Load order: local cache (shell-downloaded SVG, data URL) → CDN → letter.
+ * A custom `logoBase` skips the local cache (tests / mirrors) and goes CDN-first.
  */
 export function ProviderLogo({
   providerId,
@@ -37,15 +41,36 @@ export function ProviderLogo({
     : ''
   const [failed, setFailed] = useState(false)
   const [loaded, setLoaded] = useState(false)
+  // Local-cache fetch state: pending → letter; done(null) → CDN; done(dataUrl) → img.
+  const [local, setLocal] = useState<{ state: 'pending' } | { state: 'done'; src: string | null }>(
+    { state: 'pending' },
+  )
 
   // Clear error/load state when URL identity changes (shared-component contract).
   useEffect(() => {
     setFailed(false)
     setLoaded(false)
-  }, [src])
+    setLocal({ state: 'pending' })
+    if (src && !logoBase) {
+      let alive = true
+      void getCachedProviderLogo(providerId).then((v) => {
+        if (alive) setLocal({ state: 'done', src: v })
+      })
+      return () => {
+        alive = false
+      }
+    }
+  }, [src, providerId, logoBase])
 
   const letter = (name || providerId || '?').charAt(0).toUpperCase()
-  const showImg = Boolean(src) && !failed
+  // logoBase path (tests/mirrors) skips the shell cache; production waits for the
+  // cache fetch (letter meanwhile), then uses the data URL or falls back to CDN.
+  const effectiveSrc = logoBase
+    ? src
+    : local.state === 'done'
+      ? (local.src ?? src)
+      : ''
+  const showImg = Boolean(effectiveSrc) && !failed
 
   return (
     <span
@@ -68,7 +93,7 @@ export function ProviderLogo({
       </span>
       {showImg && (
         <img
-          src={src}
+          src={effectiveSrc}
           alt=""
           width={size}
           height={size}

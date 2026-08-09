@@ -19,6 +19,7 @@ import {
   FolderTree,
   MessageSquare,
   PanelLeftClose,
+  Search,
   Terminal,
   Zap,
 } from 'lucide-react'
@@ -32,6 +33,7 @@ import { useWindowDrag } from '@/lib/useWindowDrag'
 import { useCaptionTitleDoubleClick } from './WindowCaptionButtons'
 import { useKnowledgeStore } from '@/store/knowledgeStore'
 import { useProjectPathStore } from '@/store/projectPathStore'
+import { useCommandPaletteStore } from '@/store/commandPaletteStore'
 import {
   isPlaceholderSidebarSection,
   useUiStore,
@@ -348,6 +350,28 @@ export function AppSidebar() {
         <SettingsSidebarContent />
       ) : (
         <>
+      <div className="shrink-0 px-2 pb-2">
+        <button
+          type="button"
+          data-testid="sidebar-search"
+          data-no-drag
+          aria-label={t('commandPalette.openTriggerAria')}
+          title={t('commandPalette.openTrigger')}
+          onClick={() => useCommandPaletteStore.getState().setOpen(true)}
+          className={cn(
+            'flex h-8 w-full items-center gap-2 rounded-lg border border-border/80 bg-surface px-2.5 text-left',
+            'text-body text-ink-tertiary transition-colors duration-chrome',
+            'hover:border-border hover:bg-state-hover hover:text-ink-secondary',
+            'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink/20',
+          )}
+        >
+          <Search size={14} strokeWidth={1.75} className="shrink-0" aria-hidden />
+          <span className="min-w-0 flex-1 truncate">{t('sidebar.searchPlaceholder')}</span>
+          <kbd className="shrink-0 rounded-md bg-surface-muted px-1.5 py-px font-mono text-caption text-ink-tertiary">
+            {isMac ? '⌘K' : 'Ctrl+K'}
+          </kbd>
+        </button>
+      </div>
       <nav className="flex shrink-0 flex-col gap-0.5 px-2 pb-3" aria-label={t('sidebar.navAria')}>
         <NavItem
           section="chats"

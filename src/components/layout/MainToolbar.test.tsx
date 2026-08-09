@@ -54,7 +54,7 @@ describe('MainToolbar', () => {
     expect(screen.getByTestId('connection-status')).toBeInTheDocument()
     // PanelToggle returns null without session in real impl; mock always renders —
     // just ensure toolbar chrome is present.
-    expect(screen.getByTestId('main-toolbar-command-palette')).toBeInTheDocument()
+    expect(screen.queryByTestId('main-toolbar-command-palette')).not.toBeInTheDocument()
     expect(screen.queryByTestId('main-toolbar-sidebar-chrome')).not.toBeInTheDocument()
   })
 
@@ -126,11 +126,5 @@ describe('MainToolbar', () => {
     render(<MainToolbar />)
     fireEvent.doubleClick(screen.getByTestId('main-toolbar'))
     await vi.waitFor(() => expect(toggleMaximize).toHaveBeenCalledTimes(1))
-  })
-
-  it('double-click on command palette button does not maximize', async () => {
-    render(<MainToolbar />)
-    fireEvent.doubleClick(screen.getByTestId('main-toolbar-command-palette'))
-    await vi.waitFor(() => expect(toggleMaximize).not.toHaveBeenCalled())
   })
 })

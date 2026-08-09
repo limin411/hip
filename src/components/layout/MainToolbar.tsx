@@ -1,8 +1,7 @@
 import { useTranslation } from 'react-i18next'
-import { Command, PanelLeft } from 'lucide-react'
+import { PanelLeft } from 'lucide-react'
 import { useActiveSession } from '@/domain'
 import { isMacPlatform } from '@/lib/platform'
-import { useCommandPaletteStore } from '@/store/commandPaletteStore'
 import { useKnowledgeStore } from '@/store/knowledgeStore'
 import { useUiStore, type SettingsPageId } from '@/store/uiStore'
 import { useWindowDrag } from '@/lib/useWindowDrag'
@@ -164,18 +163,6 @@ export function MainToolbar() {
 
       <div className="flex h-full shrink-0 items-center gap-0.5">
         {showPanelChrome ? <ConnectionStatus /> : null}
-        <button
-          type="button"
-          data-testid="main-toolbar-command-palette"
-          data-tauri-drag-region="false"
-          data-no-drag
-          aria-label={t('commandPalette.openTriggerAria')}
-          title={t('commandPalette.openTrigger')}
-          onClick={() => useCommandPaletteStore.getState().setOpen(true)}
-          className={titlebarIconBtnClass}
-        >
-          <Command {...titlebarIconProps} />
-        </button>
         {showPanelChrome ? <PanelToggle /> : null}
       </div>
       <WindowCaptionButtons />

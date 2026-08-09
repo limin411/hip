@@ -10,6 +10,7 @@ import {
 } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { useUiStore } from '@/store/uiStore'
+import { useCommandPaletteStore } from '@/store/commandPaletteStore'
 import { sessionService, useDomainStore } from '@/domain'
 import { DEFAULT_CONFIG } from '@/domain/sessionStore'
 import { useManagedTerminalStore } from '@/store/managedTerminalStore'
@@ -116,6 +117,7 @@ describe('AppSidebar', () => {
       sidebarOpen: true,
       overlay: null,
     })
+    useCommandPaletteStore.setState({ open: false, page: null, previousSearch: '' })
     useDomainStore.setState({
       sessions: [
         {
@@ -155,7 +157,7 @@ describe('AppSidebar', () => {
     expect(screen.getByTestId('app-sidebar')).toBeInTheDocument()
     expect(screen.getByTestId('sidebar-nav-back')).toBeInTheDocument()
     expect(screen.getByTestId('sidebar-nav-forward')).toBeInTheDocument()
-    expect(screen.queryByTestId('sidebar-search')).not.toBeInTheDocument()
+    expect(screen.getByTestId('sidebar-search')).toBeInTheDocument()
     expect(screen.getByTestId('sidebar-toggle')).toBeInTheDocument()
     expect(screen.queryByTestId('sidebar-app-version')).not.toBeInTheDocument()
     expect(screen.getByTestId('sidebar-nav-terminals')).toBeInTheDocument()
@@ -164,6 +166,16 @@ describe('AppSidebar', () => {
     expect(screen.getByTestId('sidebar-nav-chats')).toHaveAttribute('aria-current', 'page')
     expect(screen.getByTestId('sidebar-session-chat-1')).toBeInTheDocument()
     expect(screen.queryByTestId('sidebar-session-code-1')).not.toBeInTheDocument()
+  })
+
+  it('search trigger sits above Chat nav and opens command palette', () => {
+    render(<AppSidebar />)
+    const search = screen.getByTestId('sidebar-search')
+    const chats = screen.getByTestId('sidebar-nav-chats')
+    const position = search.compareDocumentPosition(chats)
+    expect(position & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    fireEvent.click(search)
+    expect(useCommandPaletteStore.getState().open).toBe(true)
   })
 
   it('back/forward sit right of collapse and start disabled after seed', () => {

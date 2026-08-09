@@ -16,7 +16,8 @@ import { DirNavList } from './DirNavList'
 
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({
-    t: (key: string) => key,
+    t: (key: string, opts?: { count?: number }) =>
+      opts?.count != null ? `${key}:${opts.count}` : key,
     i18n: { language: 'en' },
   }),
   initReactI18next: { type: '3rdParty', init: () => {} },
@@ -243,6 +244,86 @@ describe('DocManagerBrowse 排序（X3 后 = order 序）', () => {
 
     fireDrag(input, 'dragstart', 0, dt)
     expect(dt.setData).not.toHaveBeenCalled()
+  })
+})
+
+describe('DocManagerBrowse 批量操作（X4）', () => {
+  beforeEach(() => {
+    knowledgeSaveTree.mockResolvedValue(undefined)
+    knowledgeReadDoc.mockResolvedValue('')
+    useKnowledgeStore.setState({
+      loaded: true,
+      spaces: [],
+      activeSpaceId: 'sp_1',
+      nodes: MIXED_NODES,
+      currentFolderId: null,
+      activeDocId: null,
+      busy: false,
+    })
+  })
+
+  afterEach(() => cleanup())
+
+  it('⌘+点击进入批量态：复选框 + 计数批量条出现', () => {
+    render(<DocManagerBrowse />)
+    expect(screen.queryByTestId('kb-browse-multiselect-bar')).not.toBeInTheDocument()
+    fireEvent.click(screen.getByTestId('browse-row-doc_a'), { metaKey: true })
+    expect(screen.getByTestId('kb-browse-multiselect-bar')).toBeInTheDocument()
+    expect(
+      screen.getByTestId('kb-browse-multiselect-count').textContent,
+    ).toContain(':1')
+    expect(screen.getByTestId('browse-check-doc_a')).toBeInTheDocument()
+    expect(screen.getByTestId('browse-check-doc_z')).toBeInTheDocument()
+    // 选中行暖灰 + 复选框勾选
+    expect(screen.getByTestId('browse-row-doc_a').textContent).toContain('✓')
+    // 文件夹行不参与选择
+    expect(screen.queryByTestId('browse-check-nod_a')).not.toBeInTheDocument()
+  })
+
+  it('Shift 连选：从锚点扩展连续范围', () => {
+    render(<DocManagerBrowse />)
+    fireEvent.click(screen.getByTestId('browse-row-doc_a'), { metaKey: true })
+    fireEvent.click(screen.getByTestId('browse-row-doc_z'), { shiftKey: true })
+    expect(
+      screen.getByTestId('kb-browse-multiselect-count').textContent,
+    ).toContain(':2')
+    expect(screen.getByTestId('browse-row-doc_a').textContent).toContain('✓')
+    expect(screen.getByTestId('browse-row-doc_z').textContent).toContain('✓')
+  })
+
+  it('Esc 退出批量态，批量条消失', () => {
+    render(<DocManagerBrowse />)
+    fireEvent.click(screen.getByTestId('browse-row-doc_a'), { metaKey: true })
+    fireEvent.keyDown(window, { key: 'Escape' })
+    expect(screen.queryByTestId('kb-browse-multiselect-bar')).not.toBeInTheDocument()
+  })
+
+  it('点击内容空白退出批量态', () => {
+    render(<DocManagerBrowse />)
+    fireEvent.click(screen.getByTestId('browse-row-doc_a'), { metaKey: true })
+    fireEvent.click(screen.getByTestId('browse-content'))
+    expect(screen.queryByTestId('kb-browse-multiselect-bar')).not.toBeInTheDocument()
+  })
+
+  it('批量删除：确认弹层 → 调用 deleteNodes → 清空选区', async () => {
+    const calls: string[][] = []
+    useKnowledgeStore.setState({
+      deleteNodes: async (ids: string[]) => {
+        calls.push(ids)
+      },
+    })
+    render(<DocManagerBrowse />)
+    fireEvent.click(screen.getByTestId('browse-row-doc_a'), { metaKey: true })
+    fireEvent.click(screen.getByTestId('browse-row-doc_z'), { metaKey: true })
+    fireEvent.click(screen.getByTestId('kb-browse-multiselect-delete'))
+    const confirm = screen.getByTestId('kb-browse-delete-confirm')
+    await act(async () => {
+      fireEvent.click(confirm)
+    })
+    expect(calls).toEqual([['doc_a', 'doc_z']])
+    expect(
+      screen.queryByTestId('kb-browse-multiselect-bar'),
+    ).not.toBeInTheDocument()
   })
 })
 

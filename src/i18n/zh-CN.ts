@@ -2371,6 +2371,13 @@ export const zhCN = {
     knowledge: {
       title: '文档管理',
       browse: {
+        multiSelectCount: '已选 {{count}} 篇',
+        multiSelectDelete: '删除',
+        multiSelectMove: '移动到…',
+        multiSelectDeleteTitle: '删除 {{count}} 篇文档？',
+        multiSelectDeleteBody: '选中的 {{count}} 篇文档将移入回收站，可随时恢复。',
+        moveTitle: '移动到',
+        moveConfirm: '移动',
         viewLabel: '视图切换',
         viewGrid: '网格视图',
         viewList: '列表视图',

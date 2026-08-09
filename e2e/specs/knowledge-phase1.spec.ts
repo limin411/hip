@@ -237,4 +237,32 @@ describe('knowledge phase1 surfaces @knowledge', () => {
     })
     expect(await rowOrder()).toEqual([b, a])
   })
+
+  it('K1I: batch select + batch delete via floating bar (X4)', async () => {
+    const a = `SortA-${stamp}`
+    const b = `SortB-${stamp}`
+    const rowA = await browser.$
+      (`//div[contains(@data-testid,'browse-row-') and contains(., '${a}')]`)
+    const rowB = await browser.$
+      (`//div[contains(@data-testid,'browse-row-') and contains(., '${b}')]`)
+    await rowA.waitForExist({ timeout: 5000 })
+    await rowB.waitForExist({ timeout: 5000 })
+
+    // ⌘+点选两行 → 批量条计数 2
+    await rowA.click({ button: 0, metaKey: true })
+    await rowB.click({ button: 0, metaKey: true })
+    const bar = await browser.$('[data-testid="kb-browse-multiselect-bar"]')
+    await bar.waitForExist({ timeout: 5000 })
+    const count = await browser.$('[data-testid="kb-browse-multiselect-count"]')
+    expect((await count.getText()).trim()).toContain('2')
+
+    // 删除 → 确认弹层 → 两行消失、批量条退出
+    await (await browser.$('[data-testid="kb-browse-multiselect-delete"]')).click()
+    const confirm = await browser.$('[data-testid="kb-browse-delete-confirm"]')
+    await confirm.waitForExist({ timeout: 5000 })
+    await confirm.click()
+    await bar.waitForExist({ timeout: 10000, reverse: true })
+    await rowA.waitForExist({ timeout: 10000, reverse: true })
+    await rowB.waitForExist({ timeout: 10000, reverse: true })
+  })
 })

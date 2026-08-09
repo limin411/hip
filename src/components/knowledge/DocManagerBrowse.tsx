@@ -7,15 +7,18 @@
  * 新建改为实底主按钮）；空态大标题。
  * 与侧边栏 DirNavList 共用同一导航状态（knowledgeStore.currentFolderId）。
  */
-import { useEffect, useMemo, useRef, useState, type DragEvent } from 'react'
+import { useEffect, useMemo, useRef, useState, type DragEvent, type MouseEvent } from 'react'
 import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
 import { FileText, Folder, Grid3X3, List, Plus } from 'lucide-react'
 import { DeclarativeContextMenu } from '@/components/context-menu'
 import { knowledgeRevealDoc } from '@/ipc/knowledge'
 import { getPath, isUnderSubtree, listChildren } from '@/domain/knowledge/tree'
+import { rangeBetween } from '@/domain/knowledge/blockDragSelect'
 import type { KnowledgeNode } from '@/domain/knowledge/types'
 import { cn } from '@/lib/utils'
+import { Button } from '@/components/ui/Button'
+import { Modal } from '@/components/ui/Modal'
 import { useKnowledgeStore } from '@/store/knowledgeStore'
 import { NodeRowMenu } from './NodeRowMenu'
 
@@ -61,6 +64,18 @@ export function DocManagerBrowse() {
   // X3: 拖拽排序/移动状态（native DnD）。
   const [dragId, setDragId] = useState<string | null>(null)
   const [dropHint, setDropHint] = useState<DropHint | null>(null)
+
+  // X4: 批量选择（Shift 连选 / ⌘ 点选）+ 批量条。
+  const [selectedIds, setSelectedIds] = useState<string[]>([])
+  const [selectAnchor, setSelectAnchor] = useState<string | null>(null)
+  const [batchDeleteOpen, setBatchDeleteOpen] = useState(false)
+  const [moveOpen, setMoveOpen] = useState(false)
+  const [moveTarget, setMoveTarget] = useState<string | null>(null)
+
+  const clearSelection = () => {
+    setSelectedIds([])
+    setSelectAnchor(null)
+  }
 
   useEffect(() => {
     if (!menuOpen && !jumpOpen) return
@@ -239,6 +254,80 @@ export function DocManagerBrowse() {
 
   const crumbKey = (crumbId: string | null) => `crumb:${crumbId ?? 'root'}`
 
+  // ── X4 批量选择 ──────────────────────────────────────────────
+  /** 行点击：⌘ 点选 / Shift 连选 / 普通点击（退出批量态并打开）。 */
+  const openRow = (e: MouseEvent, node: KnowledgeNode) => {
+    if (node.kind !== 'doc') {
+      if (selectedIds.length > 0) clearSelection()
+      void nav().enterFolder(node.id)
+      return
+    }
+    if (e.metaKey || e.ctrlKey) {
+      e.stopPropagation()
+      setSelectedIds((prev) =>
+        prev.includes(node.id)
+          ? prev.filter((x) => x !== node.id)
+          : [...prev, node.id],
+      )
+      setSelectAnchor((prev) => prev ?? node.id)
+      return
+    }
+    if (e.shiftKey) {
+      e.stopPropagation()
+      const docs = level.filter((n) => n.kind === 'doc').map((n) => n.id)
+      const anchor = selectAnchor ?? selectedIds[selectedIds.length - 1] ?? node.id
+      setSelectAnchor(anchor)
+      const range = rangeBetween(docs, anchor, node.id)
+      if (range.length > 0) setSelectedIds(range)
+      return
+    }
+    if (selectedIds.length > 0) clearSelection()
+    void nav().openDoc(node.id)
+  }
+
+  // Esc 退出批量态。
+  useEffect(() => {
+    if (selectedIds.length === 0) return
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') clearSelection()
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [selectedIds.length])
+
+  // 点击内容空白退出批量态（行内点击已 stopPropagation）。
+  const clearOnBlank = () => {
+    if (selectedIds.length > 0) clearSelection()
+  }
+
+  /** 移动目标选择：全部文件夹（含根 = null）。 */
+  const folders = useMemo(() => {
+    const out: { id: string | null; title: string; depth: number }[] = []
+    const walk = (parentId: string | null, depth: number) => {
+      for (const ch of listChildren(nodes, parentId)) {
+        if (ch.kind !== 'folder') continue
+        out.push({ id: ch.id, title: ch.title, depth })
+        walk(ch.id, depth + 1)
+      }
+    }
+    walk(null, 0)
+    return out
+  }, [nodes])
+
+  const confirmBatchDelete = () => {
+    void nav().deleteNodes(selectedIds)
+    setBatchDeleteOpen(false)
+    clearSelection()
+  }
+
+  const confirmBatchMove = () => {
+    if (moveOpen && moveTarget !== undefined) {
+      void nav().moveNodes(selectedIds, moveTarget)
+    }
+    setMoveOpen(false)
+    clearSelection()
+  }
+
   const overCrumb = (e: DragEvent, crumbId: string | null) => {
     if (!dragId) return
     e.preventDefault()
@@ -261,7 +350,7 @@ export function DocManagerBrowse() {
 
   return (
     <div
-      className="flex min-h-0 min-w-0 flex-1 flex-col bg-surface-content"
+      className="relative flex min-h-0 min-w-0 flex-1 flex-col bg-surface-content"
       data-testid="doc-manager-browse"
       data-dragging={dragId ? 'true' : undefined}
     >
@@ -475,7 +564,11 @@ export function DocManagerBrowse() {
       </div>
 
       {/* 内容 */}
-      <div className="min-h-0 flex-1 overflow-y-auto" data-testid="browse-content">
+      <div
+        className="min-h-0 flex-1 overflow-y-auto"
+        data-testid="browse-content"
+        onClick={clearOnBlank}
+      >
         <DeclarativeContextMenu
           kind="knowledgeTree"
           payload={{
@@ -534,20 +627,32 @@ export function DocManagerBrowse() {
                     onDragOver={(e) => overRow(e, node)}
                     onDragLeave={(e) => leaveRow(e, node)}
                     onDrop={(e) => dropOnRow(e, node)}
-                    onClick={() => {
-                      if (node.kind === 'folder') void nav().enterFolder(node.id)
-                      else void nav().openDoc(node.id)
-                    }}
+                    onClick={(e) => openRow(e, node)}
                     className={cn(
                       'group relative flex cursor-pointer flex-col items-center gap-2 rounded-xl border border-transparent p-3 text-center transition-colors',
                       'hover:border-border hover:bg-surface-muted/60',
                       activeDocId === node.id && 'border-border bg-surface-muted/60',
+                      selectedIds.includes(node.id) &&
+                        'border-border bg-state-hover outline outline-1 outline-dashed outline-[color:var(--border-strong)]',
                       dragId === node.id && 'opacity-40',
                       dropHint?.id === node.id &&
                         dropHint.pos === 'into' &&
                         'border-[var(--border-strong)] bg-state-hover outline outline-1 outline-dashed outline-[color:var(--border-strong)]',
                     )}
                   >
+                      {node.kind === 'doc' && selectedIds.length > 0 ? (
+                        <span
+                          className={cn(
+                            'absolute left-2 top-2 flex h-4 w-4 items-center justify-center rounded-[4px] border text-[10px] text-on-btn-primary',
+                            selectedIds.includes(node.id)
+                              ? 'border-[var(--border-strong)] bg-btn-primary'
+                              : 'border-[var(--border-strong)] bg-surface',
+                          )}
+                          data-testid={`browse-check-${node.id}`}
+                        >
+                          {selectedIds.includes(node.id) ? '✓' : ''}
+                        </span>
+                      ) : null}
                       <div className="relative flex h-10 w-10 items-center justify-center rounded-lg bg-surface-muted">
                         {node.kind === 'folder' ? (
                           <Folder size={20} className="text-accent" strokeWidth={1.6} aria-hidden />
@@ -626,19 +731,31 @@ export function DocManagerBrowse() {
                       onDragOver={(e) => overRow(e, node)}
                       onDragLeave={(e) => leaveRow(e, node)}
                       onDrop={(e) => dropOnRow(e, node)}
-                      onClick={() => {
-                        if (node.kind === 'folder') void nav().enterFolder(node.id)
-                        else void nav().openDoc(node.id)
-                      }}
+                      onClick={(e) => openRow(e, node)}
                       className={cn(
                         'group relative flex h-10 cursor-pointer items-center gap-2.5 rounded-lg px-2 transition-colors',
                         activeDocId === node.id ? 'bg-state-hover' : 'hover:bg-state-hover',
+                        selectedIds.includes(node.id) &&
+                          'bg-state-hover outline outline-1 outline-dashed outline-[color:var(--border-strong)]',
                         dragId === node.id && 'opacity-40',
                         dropHint?.id === node.id &&
                           dropHint.pos === 'into' &&
                           'bg-state-hover outline outline-1 outline-dashed outline-[color:var(--border-strong)]',
                       )}
                     >
+                      {node.kind === 'doc' && selectedIds.length > 0 ? (
+                        <span
+                          className={cn(
+                            'flex h-4 w-4 flex-none items-center justify-center rounded-[4px] border text-[10px] text-on-btn-primary',
+                            selectedIds.includes(node.id)
+                              ? 'border-[var(--border-strong)] bg-btn-primary'
+                              : 'border-[var(--border-strong)] bg-surface',
+                          )}
+                          data-testid={`browse-check-${node.id}`}
+                        >
+                          {selectedIds.includes(node.id) ? '✓' : ''}
+                        </span>
+                      ) : null}
                       <span
                         className={cn(
                           'flex h-6 w-6 flex-none items-center justify-center rounded-md',
@@ -743,6 +860,148 @@ export function DocManagerBrowse() {
           ) : null}
         </DeclarativeContextMenu>
       </div>
+
+      {/* X4 底部浮动批量条 */}
+      {selectedIds.length > 0 ? (
+        <div
+          className="absolute inset-x-0 bottom-4 z-30 mx-auto flex w-fit items-center gap-1.5 rounded-full border border-border bg-surface px-3 py-1.5 text-body shadow-overlay"
+          data-testid="kb-browse-multiselect-bar"
+        >
+          <span
+            className="mr-1 font-medium text-ink"
+            data-testid="kb-browse-multiselect-count"
+          >
+            {t('knowledge.browse.multiSelectCount', { count: selectedIds.length })}
+          </span>
+          <button
+            type="button"
+            className="rounded-full px-2.5 py-1 text-ink-secondary transition-colors hover:bg-state-hover hover:text-ink"
+            data-testid="kb-browse-multiselect-move"
+            onClick={() => {
+              setMoveTarget(null)
+              setMoveOpen(true)
+            }}
+          >
+            {t('knowledge.browse.multiSelectMove')}
+          </button>
+          <button
+            type="button"
+            className="rounded-full px-2.5 py-1 text-danger transition-colors hover:bg-danger/10"
+            data-testid="kb-browse-multiselect-delete"
+            onClick={() => setBatchDeleteOpen(true)}
+          >
+            {t('knowledge.browse.multiSelectDelete')}
+          </button>
+          <button
+            type="button"
+            className="rounded-full px-2 py-1 text-ink-tertiary transition-colors hover:bg-state-hover"
+            data-testid="kb-browse-multiselect-clear"
+            aria-label={t('common.clear')}
+            onClick={clearSelection}
+          >
+            ✕
+          </button>
+        </div>
+      ) : null}
+
+      {/* X4 批量删除确认 */}
+      <Modal
+        open={batchDeleteOpen}
+        onOpenChange={setBatchDeleteOpen}
+        variant="confirm"
+        title={t('knowledge.browse.multiSelectDeleteTitle', {
+          count: selectedIds.length,
+        })}
+        className="max-w-sm"
+        footer={
+          <div className="flex justify-end gap-2">
+            <Button
+              variant="secondary"
+              data-testid="kb-browse-delete-cancel"
+              onClick={() => setBatchDeleteOpen(false)}
+            >
+              {t('common.cancel')}
+            </Button>
+            <Button
+              variant="danger"
+              data-testid="kb-browse-delete-confirm"
+              onClick={confirmBatchDelete}
+            >
+              {t('knowledge.browse.multiSelectDelete')}
+            </Button>
+          </div>
+        }
+      >
+        <div className="px-5 py-4">
+          <p className="text-body leading-relaxed text-ink-secondary">
+            {t('knowledge.browse.multiSelectDeleteBody', {
+              count: selectedIds.length,
+            })}
+          </p>
+        </div>
+      </Modal>
+
+      {/* X4 批量移动（目录选择） */}
+      <Modal
+        open={moveOpen}
+        onOpenChange={setMoveOpen}
+        variant="confirm"
+        title={t('knowledge.browse.moveTitle')}
+        className="max-w-sm"
+        footer={
+          <div className="flex justify-end gap-2">
+            <Button
+              variant="secondary"
+              data-testid="kb-browse-move-cancel"
+              onClick={() => setMoveOpen(false)}
+            >
+              {t('common.cancel')}
+            </Button>
+            <Button
+              variant="primary"
+              data-testid="kb-browse-move-confirm"
+              onClick={confirmBatchMove}
+            >
+              {t('knowledge.browse.moveConfirm')}
+            </Button>
+          </div>
+        }
+      >
+        <div className="flex max-h-72 flex-col overflow-y-auto px-5 py-4" role="listbox">
+          <button
+            type="button"
+            role="option"
+            aria-selected={moveTarget === null}
+            data-testid="kb-browse-move-root"
+            onClick={() => setMoveTarget(null)}
+            className={cn(
+              'flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-body text-ink transition-colors hover:bg-state-hover',
+              moveTarget === null && 'bg-state-hover',
+            )}
+          >
+            <Folder size={13} className="shrink-0 text-accent" aria-hidden />
+            {t('knowledge.home.mySpaces')}
+          </button>
+          {folders.map((f) => (
+            <button
+              key={f.id}
+              type="button"
+              role="option"
+              aria-selected={moveTarget === f.id}
+              data-testid={`kb-browse-move-folder-${f.id}`}
+              onClick={() => setMoveTarget(f.id)}
+              className={cn(
+                'flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-body text-ink transition-colors hover:bg-state-hover',
+                moveTarget === f.id && 'bg-state-hover',
+              )}
+              style={{ paddingLeft: 8 + f.depth * 14 }}
+            >
+              <Folder size={13} className="shrink-0 text-accent" aria-hidden />
+              <span className="min-w-0 flex-1 truncate">{f.title}</span>
+            </button>
+          ))}
+        </div>
+      </Modal>
     </div>
   )
 }

@@ -2342,6 +2342,13 @@ export const zhTW = {
   "knowledge": {
     "title": "文件管理",
     "browse": {
+      "multiSelectCount": "已選 {{count}} 篇",
+      "multiSelectDelete": "刪除",
+      "multiSelectMove": "移動到…",
+      "multiSelectDeleteTitle": "刪除 {{count}} 篇文件？",
+      "multiSelectDeleteBody": "選中的 {{count}} 篇文件將移入資源回收筒，可隨時還原。",
+      "moveTitle": "移動到",
+      "moveConfirm": "移動",
       "viewLabel": "檢視切換",
       "viewGrid": "網格檢視",
       "viewList": "列表檢視",

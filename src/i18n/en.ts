@@ -2431,6 +2431,13 @@ export const en = {
     knowledge: {
       title: 'Documents',
       browse: {
+        multiSelectCount: '{{count}} selected',
+        multiSelectDelete: 'Delete',
+        multiSelectMove: 'Move to…',
+        multiSelectDeleteTitle: 'Delete {{count}} documents?',
+        multiSelectDeleteBody: '{{count}} selected documents will move to the recycle bin and can be restored.',
+        moveTitle: 'Move to',
+        moveConfirm: 'Move',
         viewLabel: 'View',
         viewGrid: 'Grid view',
         viewList: 'List view',

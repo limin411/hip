@@ -2340,6 +2340,13 @@ export const ko = {
   "knowledge": {
     "title": "문서",
     "browse": {
+      "multiSelectCount": "{{count}}개 선택됨",
+      "multiSelectDelete": "삭제",
+      "multiSelectMove": "이동…",
+      "multiSelectDeleteTitle": "{{count}}개 문서를 삭제할까요?",
+      "multiSelectDeleteBody": "선택한 {{count}}개 문서가 휴지통으로 이동하며 언제든 복원할 수 있습니다.",
+      "moveTitle": "이동",
+      "moveConfirm": "이동",
       "viewLabel": "보기 전환",
       "viewGrid": "그리드 보기",
       "viewList": "목록 보기",

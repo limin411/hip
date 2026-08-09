@@ -2340,6 +2340,13 @@ export const ja = {
   "knowledge": {
     "title": "ドキュメント",
     "browse": {
+      "multiSelectCount": "{{count}} 件選択中",
+      "multiSelectDelete": "削除",
+      "multiSelectMove": "移動先…",
+      "multiSelectDeleteTitle": "{{count}} 件のドキュメントを削除しますか？",
+      "multiSelectDeleteBody": "選択した {{count}} 件のドキュメントはゴミ箱に移動します。いつでも復元できます。",
+      "moveTitle": "移動先",
+      "moveConfirm": "移動",
       "viewLabel": "表示切り替え",
       "viewGrid": "グリッド表示",
       "viewList": "リスト表示",

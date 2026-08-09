@@ -1311,6 +1311,52 @@ describe('knowledgeStore index progress + openSearchHit', () => {
   })
 })
 
+describe('knowledgeStore batch ops (doc-ux-polish-2 X4)', () => {
+  it('deleteNodes removes each node through the delete path', async () => {
+    knowledgeSoftDeleteNodes.mockReset()
+    knowledgeSoftDeleteNodes.mockResolvedValue(['tentry_1'])
+    useKnowledgeStore.setState({
+      activeSpaceId: 'spc_1',
+      mode: 'workspace',
+      nodes: [
+        { id: 'doc_1', parentId: null, kind: 'doc', title: 'One', order: 0, createdAt: 1, updatedAt: 1 },
+        { id: 'doc_2', parentId: null, kind: 'doc', title: 'Two', order: 1, createdAt: 1, updatedAt: 1 },
+        { id: 'doc_3', parentId: null, kind: 'doc', title: 'Three', order: 2, createdAt: 1, updatedAt: 1 },
+      ],
+      spaceDocCounts: { spc_1: 3 },
+      busy: false,
+    })
+    await useKnowledgeStore.getState().deleteNodes(['doc_1', 'doc_3'])
+    const s = useKnowledgeStore.getState()
+    expect(s.nodes.map((n) => n.id)).toEqual(['doc_2'])
+    expect(knowledgeSoftDeleteNodes).toHaveBeenCalledTimes(2)
+    expect(s.spaceDocCounts.spc_1).toBe(1)
+  })
+
+  it('moveNodes appends each node to the target folder in order', async () => {
+    knowledgeSaveTree.mockResolvedValue(undefined)
+    knowledgeReadDoc.mockResolvedValue('')
+    useKnowledgeStore.setState({
+      activeSpaceId: 'spc_1',
+      mode: 'workspace',
+      nodes: [
+        { id: 'nod_1', parentId: null, kind: 'folder', title: 'F', order: 0, createdAt: 1, updatedAt: 1 },
+        { id: 'doc_1', parentId: null, kind: 'doc', title: 'One', order: 1, createdAt: 1, updatedAt: 1 },
+        { id: 'doc_2', parentId: null, kind: 'doc', title: 'Two', order: 2, createdAt: 1, updatedAt: 1 },
+      ],
+      busy: false,
+    })
+    await useKnowledgeStore.getState().moveNodes(['doc_1', 'doc_2'], 'nod_1')
+    const s = useKnowledgeStore.getState()
+    expect(s.nodes.find((n) => n.id === 'doc_1')?.parentId).toBe('nod_1')
+    expect(s.nodes.find((n) => n.id === 'doc_2')?.parentId).toBe('nod_1')
+    const kids = s.nodes
+      .filter((n) => n.parentId === 'nod_1')
+      .sort((a, b) => a.order - b.order)
+    expect(kids.map((k) => k.id)).toEqual(['doc_1', 'doc_2'])
+  })
+})
+
 describe('knowledgeStore frontmatter facets + filters', () => {
   beforeEach(() => {
     knowledgeReadDoc.mockReset()

@@ -468,6 +468,10 @@ interface KnowledgeState {
   renameNode: (id: string, title: string) => Promise<void>
   deleteNode: (id: string) => Promise<void>
   moveNode: (id: string, parentId: string | null, toIndex?: number) => Promise<void>
+  /** 批量删除（doc-ux-polish-2 X4）：逐节点走既有 deleteNode 清理路径。 */
+  deleteNodes: (ids: string[]) => Promise<void>
+  /** 批量移动（X4）：逐节点追加到目标层末尾，保持传入顺序。 */
+  moveNodes: (ids: string[], parentId: string | null) => Promise<void>
   openDoc: (id: string) => Promise<void>
   /** Switch Live / Source / Preview. Live without flag clamps to Source. */
   setEditorMode: (mode: EditorMode) => Promise<void>
@@ -1558,6 +1562,18 @@ export const useKnowledgeStore = create<KnowledgeState>((set, get) => ({
       const msg = knowledgeErrorMessage(e)
       set({ busy: false, error: msg })
       toast.error(msg)
+    }
+  },
+
+  deleteNodes: async (ids) => {
+    for (const id of ids) {
+      await get().deleteNode(id)
+    }
+  },
+
+  moveNodes: async (ids, parentId) => {
+    for (const id of ids) {
+      await get().moveNode(id, parentId)
     }
   },
 

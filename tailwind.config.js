@@ -6,25 +6,25 @@ export default {
     extend: {
       colors: {
         border: {
-          DEFAULT: 'var(--border)',
+          DEFAULT: 'rgb(var(--border-rgb) / <alpha-value>)',
           strong: 'var(--border-strong)',
         },
         surface: {
-          DEFAULT: 'var(--bg-app)',
-          subtle: 'var(--bg-subtle)',
-          muted: 'var(--bg-muted)',
+          DEFAULT: 'rgb(var(--bg-app-rgb) / <alpha-value>)',
+          subtle: 'rgb(var(--bg-subtle-rgb) / <alpha-value>)',
+          muted: 'rgb(var(--bg-muted-rgb) / <alpha-value>)',
           content: 'var(--bg-content)',
         },
         ink: {
-          DEFAULT: 'var(--text-primary)',
-          secondary: 'var(--text-secondary)',
-          tertiary: 'var(--text-tertiary)',
+          DEFAULT: 'rgb(var(--text-primary-rgb) / <alpha-value>)',
+          secondary: 'rgb(var(--text-secondary-rgb) / <alpha-value>)',
+          tertiary: 'rgb(var(--text-tertiary-rgb) / <alpha-value>)',
         },
         accent: {
-          DEFAULT: 'var(--accent)',
+          DEFAULT: 'rgb(var(--accent-rgb) / <alpha-value>)',
           hover: 'var(--accent-hover)',
           strong: 'var(--accent-strong)',
-          subtle: 'var(--accent-subtle)',
+          subtle: 'rgb(var(--accent-subtle-rgb) / <alpha-value>)',
           active: 'var(--accent-active)',
         },
         'on-accent': 'var(--on-accent)',
@@ -32,14 +32,17 @@ export default {
           DEFAULT: 'var(--btn-primary)',
           hover: 'var(--btn-primary-hover)',
         },
-        'on-btn-primary': 'var(--on-btn-primary)',
-        success: 'var(--success)',
-        danger: 'var(--danger)',
-        warning: 'var(--warning)',
+        'on-btn-primary': 'rgb(var(--on-btn-primary-rgb) / <alpha-value>)',
+        success: 'rgb(var(--success-rgb) / <alpha-value>)',
+        danger: 'rgb(var(--danger-rgb) / <alpha-value>)',
+        warning: 'rgb(var(--warning-rgb) / <alpha-value>)',
         state: {
-          hover: 'var(--state-hover)',
+          hover: 'rgb(var(--state-hover-rgb) / <alpha-value>)',
           active: 'var(--state-active)',
           disabled: 'var(--state-disabled)',
+        },
+        effort: {
+          max: 'rgb(var(--effort-max-rgb) / <alpha-value>)',
         },
         'focus-ring': 'var(--focus-ring)',
         overlay: {

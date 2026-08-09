@@ -105,6 +105,24 @@
   --status-chip-fg-pct: 70%;
   --status-bar-bg-pct: 22%;
   --status-bar-fg-pct: 0%; /* pure --status-tint-fg on light */
+  /* RGB channel triplets — Tailwind v3 alpha modifiers (e.g. bg-danger/10,
+     border-border/60, ring-ink/20) need `rgb(var(--x-rgb) / <alpha-value>)`
+     to compile; keep each triplet in sync with the hex above. */
+  --bg-app-rgb: 255 255 255;
+  --bg-subtle-rgb: 249 248 245;
+  --bg-muted-rgb: 241 241 241;
+  --border-rgb: 224 224 224;
+  --text-primary-rgb: 17 17 17;
+  --text-secondary-rgb: 94 94 94;
+  --text-tertiary-rgb: 117 117 117;
+  --accent-rgb: 194 65 12;
+  --accent-subtle-rgb: 240 240 240;
+  --state-hover-rgb: var(--accent-subtle-rgb); /* resolved from --accent-subtle */
+  --success-rgb: 47 125 64;
+  --danger-rgb: 198 59 59;
+  --warning-rgb: 154 93 16;
+  --on-btn-primary-rgb: 250 250 250;
+  --effort-max-rgb: 124 58 237;
 }
 
 /* Compact density overrides — consumers use var(--row-h-*) / var(--trail-min-h) */
@@ -186,6 +204,22 @@ html[data-platform="linux"] {
   --status-chip-fg-pct: 42%;
   --status-bar-bg-pct: 28%;
   --status-bar-fg-pct: 42%;
+  /* RGB channel triplets — same purpose as the :root block, dark values. */
+  --bg-app-rgb: 15 15 15;
+  --bg-subtle-rgb: 22 22 22;
+  --bg-muted-rgb: 30 30 30;
+  --border-rgb: 51 51 51;
+  --text-primary-rgb: 240 240 240;
+  --text-secondary-rgb: 179 179 179;
+  --text-tertiary-rgb: 138 138 138;
+  --accent-rgb: 255 179 0;
+  --accent-subtle-rgb: 34 34 34;
+  --state-hover-rgb: var(--accent-subtle-rgb); /* resolved from --accent-subtle */
+  --success-rgb: 90 173 94;
+  --danger-rgb: 232 90 90;
+  --warning-rgb: 230 162 60;
+  --on-btn-primary-rgb: 20 20 20;
+  --effort-max-rgb: 167 139 250;
 }
 
 html.dark[data-platform="windows"],

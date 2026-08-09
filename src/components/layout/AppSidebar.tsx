@@ -359,7 +359,7 @@ export function AppSidebar() {
           title={t('commandPalette.openTrigger')}
           onClick={() => useCommandPaletteStore.getState().setOpen(true)}
           className={cn(
-            'flex h-8 w-full items-center gap-2 rounded-lg border border-border/80 bg-surface px-2.5 text-left',
+            'flex h-8 w-full items-center gap-2 rounded-lg border border-border bg-surface px-2.5 text-left',
             'text-body text-ink-tertiary transition-colors duration-chrome',
             'hover:border-border hover:bg-state-hover hover:text-ink-secondary',
             'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink/20',

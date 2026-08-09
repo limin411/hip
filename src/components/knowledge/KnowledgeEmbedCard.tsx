@@ -155,7 +155,7 @@ export function KnowledgeEmbedCard({
   return (
     <aside
       className={cn(
-        'my-3 overflow-hidden rounded-lg border border-border bg-surface-secondary/40',
+        'my-3 overflow-hidden rounded-lg border border-border bg-surface-muted/40',
         className,
       )}
       data-testid="knowledge-embed"

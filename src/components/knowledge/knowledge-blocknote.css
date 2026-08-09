@@ -683,6 +683,35 @@
   color: var(--kb-text-muted);
 }
 
+/* ── Slash menu (doc-ux-polish-2 X1): 356px width, 46px icon column,
+   40px rows, warm-gray selected + faded arrow. Vars cascade from the
+   paper host (--kb-row / --kb-hover) with app-token fallbacks. ─────── */
+[data-testid='knowledge-slash-menu'] .kb-slash-icon {
+  width: 30px;
+  height: 30px;
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 6px;
+  background: var(--kb-row, var(--bg-muted, #f4f4f5));
+  color: var(--text-secondary, #5e5e5e);
+  font-size: 12px;
+  font-weight: 500;
+}
+
+[data-testid='knowledge-slash-menu'] .kb-slash-selected {
+  background: var(--kb-hover, var(--state-hover, rgba(0, 0, 0, 0.055)));
+}
+
+[data-testid='knowledge-slash-menu'] .kb-slash-arrow {
+  margin-left: auto;
+  flex: none;
+  color: var(--kb-text-muted, var(--text-tertiary, #757575));
+  font-size: 12px;
+  opacity: 0.9;
+}
+
 /* Hide default Mantine slash if any residual portal skins leak */
 .knowledge-blocknote-editor .bn-suggestion-menu:not([data-testid='knowledge-slash-menu']) {
   border-radius: 0.75rem !important;

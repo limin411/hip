@@ -45,6 +45,48 @@ describe('BlockNoteHipSlashMenu', () => {
     expect(screen.getByText('H1')).toBeInTheDocument()
   })
 
+  it('uses the X1 356px width and 40px rows', () => {
+    render(
+      <BlockNoteHipSlashMenu
+        items={items}
+        loadingState="loaded"
+        selectedIndex={0}
+        onItemClick={() => {}}
+      />,
+    )
+    const menu = screen.getByTestId('knowledge-slash-menu')
+    // 22.25rem = 356px
+    expect(menu.className).toContain('w-[min(100vw-2rem,22.25rem)]')
+    for (const row of menu.querySelectorAll('button.kb-slash-item')) {
+      expect(row.className).toContain('h-10')
+    }
+    // Fixed 46px icon column with a 30px tile inside
+    const iconCol = menu.querySelector('.kb-slash-item > span.flex')
+    expect(iconCol?.className).toContain('w-[46px]')
+    const tile = menu.querySelector('.kb-slash-icon')
+    expect(tile).toBeInTheDocument()
+    expect(tile?.className).toContain('kb-slash-icon')
+  })
+
+  it('marks the selected row warm-gray with a trailing arrow', () => {
+    render(
+      <BlockNoteHipSlashMenu
+        items={items}
+        loadingState="loaded"
+        selectedIndex={0}
+        onItemClick={() => {}}
+      />,
+    )
+    const selected = screen.getByTestId('knowledge-slash-h1')
+    expect(selected.className).toContain('kb-slash-selected')
+    const arrow = selected.querySelector('.kb-slash-arrow')
+    expect(arrow).toBeInTheDocument()
+    expect(arrow?.textContent).toBe('›')
+    const other = screen.getByTestId('knowledge-slash-table')
+    expect(other.className).not.toContain('kb-slash-selected')
+    expect(other.querySelector('.kb-slash-arrow')).not.toBeInTheDocument()
+  })
+
   it('fires onItemClick for selected row', () => {
     const onItemClick = vi.fn()
     render(

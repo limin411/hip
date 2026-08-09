@@ -61,7 +61,7 @@ export function BlockNoteHipSlashMenu({
         safeIndex >= 0 ? `bn-suggestion-menu-item-${safeIndex}` : undefined
       }
       data-testid="knowledge-slash-menu"
-      className="z-50 max-h-72 w-[min(100vw-2rem,18rem)] animate-menu-in overflow-y-auto rounded-xl border border-border bg-surface shadow-overlay"
+      className="z-50 max-h-72 w-[min(100vw-2rem,22.25rem)] animate-menu-in overflow-y-auto rounded-xl border border-border bg-surface shadow-overlay"
     >
       {!loaded ? (
         <div
@@ -90,7 +90,7 @@ export function BlockNoteHipSlashMenu({
             }
           >
             {group.label ? (
-              <div className="px-3 pb-1 pt-2 text-caption font-semibold uppercase tracking-wide text-ink-tertiary">
+              <div className="px-3.5 pb-1 pt-2 text-meta font-semibold uppercase tracking-wide text-ink-tertiary">
                 {group.label}
               </div>
             ) : null}
@@ -121,26 +121,32 @@ export function BlockNoteHipSlashMenu({
                   onMouseDown={(e) => e.preventDefault()}
                   onClick={() => onItemClick?.(item)}
                   className={cn(
-                    'flex w-full items-center gap-2 px-3 py-2 text-left text-body text-ink transition-colors hover:bg-state-hover',
-                    selected && 'bg-accent-subtle',
+                    'kb-slash-item flex h-10 w-full items-center gap-2.5 px-3 text-left text-body text-ink transition-colors hover:bg-state-hover',
+                    selected && 'kb-slash-selected',
                   )}
                 >
                   <span
-                    className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-surface-muted text-caption font-medium text-ink-secondary"
+                    className="flex w-[46px] shrink-0 justify-center"
                     aria-hidden
                   >
-                    {icon}
+                    <span className="kb-slash-icon">{icon}</span>
                   </span>
-                  <span className="min-w-0 flex-1">
-                    <span className="block truncate font-medium text-ink">
-                      {item.title}
+                  <span className="min-w-0 flex-1 truncate font-medium text-ink">
+                    {item.title}
+                  </span>
+                  {subtitle ? (
+                    <span className="shrink-0 truncate text-caption text-ink-tertiary">
+                      {subtitle}
                     </span>
-                    {subtitle ? (
-                      <span className="block truncate text-caption text-ink-tertiary">
-                        {subtitle}
-                      </span>
-                    ) : null}
-                  </span>
+                  ) : null}
+                  {selected ? (
+                    <span
+                      className="kb-slash-arrow"
+                      aria-hidden
+                    >
+                      ›
+                    </span>
+                  ) : null}
                 </button>
               )
             })}

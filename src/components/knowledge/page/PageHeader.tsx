@@ -82,7 +82,7 @@ export function PageHeader({
           {/* 元数据行：更新时间 / 创建时间（小字，hover 显示精确时间）。 */}
           {meta ? (
             <div
-              className="pb-4 text-meta"
+              className="pb-6 text-meta"
               title={meta.tooltip}
               data-testid="knowledge-doc-meta"
             >

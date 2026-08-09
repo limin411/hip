@@ -605,6 +605,8 @@ export function KnowledgeWorkspace() {
                 docId={activeDocId}
                 title={activeNode?.title ?? t('knowledge.doc.untitled')}
                 onTitleCommit={(title) => void renameNode(activeDocId, title)}
+                createdAt={activeNode?.createdAt}
+                updatedAt={activeNode?.updatedAt}
                 onTitleEnter={() => {
                   liveEditorRef.current?.focus({ at: 'start' })
                 }}
@@ -678,6 +680,8 @@ export function KnowledgeWorkspace() {
                 docId={activeDocId}
                 title={activeNode?.title ?? t('knowledge.doc.untitled')}
                 onTitleCommit={(title) => void renameNode(activeDocId, title)}
+                createdAt={activeNode?.createdAt}
+                updatedAt={activeNode?.updatedAt}
                 onTitleEnter={() => {
                   editorRef.current?.focus()
                 }}

@@ -2872,6 +2872,8 @@ export const en = {
         viewSource: 'View source',
         viewLive: 'Visual edit',
         untitled: 'Untitled',
+        metaUpdated: 'Updated {{time}}',
+        metaCreated: 'Created {{time}}',
         emptyTitle: 'Empty document',
         emptyHint: 'Start writing…',
         saveFailed: 'Could not save document',

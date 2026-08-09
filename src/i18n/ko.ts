@@ -2761,6 +2761,8 @@ export const ko = {
       "viewSource": "소스 보기",
       "viewLive": "시각 편집",
       "untitled": "제목 없음",
+      "metaUpdated": "업데이트 {{time}}",
+      "metaCreated": "생성 {{time}}",
       "emptyTitle": "빈 문서",
       "emptyHint": "작성 시작…",
       "saveFailed": "문서를 저장할 수 없습니다",

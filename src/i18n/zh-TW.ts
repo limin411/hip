@@ -2763,6 +2763,8 @@ export const zhTW = {
       "viewSource": "檢視原始碼",
       "viewLive": "視覺化編輯",
       "untitled": "未命名",
+      "metaUpdated": "更新於 {{time}}",
+      "metaCreated": "建立於 {{time}}",
       "emptyTitle": "文件為空",
       "emptyHint": "開始寫作…",
       "saveFailed": "儲存失敗",

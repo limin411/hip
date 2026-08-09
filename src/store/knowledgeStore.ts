@@ -1868,6 +1868,20 @@ export const useKnowledgeStore = create<KnowledgeState>((set, get) => ({
       set({ saveState: 'saving' })
       try {
         await knowledgeWriteDoc(spaceId, docId, body)
+        // 内容保存成功 → 节点更新时间（标题下元数据行 / 列表实时反映）。
+        // tree 写盘失败不阻断内容保存（单独容错）。
+        const now = Date.now()
+        const s2 = get()
+        if (s2.activeSpaceId === spaceId && s2.activeDocId === docId) {
+          set((s) => ({
+            nodes: s.nodes.map((n) => (n.id === docId ? { ...n, updatedAt: now } : n)),
+          }))
+        }
+        try {
+          await knowledgeSaveTree(spaceId, { version: 1, nodes: get().nodes })
+        } catch {
+          // 忽略：内容已写盘，tree 更新时间下一次保存会补写。
+        }
         // Prefer not to clobber a newer doc's docBody if the user already switched.
         if (get().activeDocId === docId && get().activeSpaceId === spaceId) {
           set({ docBody: body, saveState: 'saved' })

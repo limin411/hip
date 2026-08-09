@@ -2761,6 +2761,8 @@ export const ja = {
       "viewSource": "ソースを表示",
       "viewLive": "ビジュアル編集",
       "untitled": "無題",
+      "metaUpdated": "更新 {{time}}",
+      "metaCreated": "作成 {{time}}",
       "emptyTitle": "空のドキュメント",
       "emptyHint": "書き始めてください…",
       "saveFailed": "ドキュメントを保存できませんでした",

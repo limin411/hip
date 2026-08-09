@@ -2805,6 +2805,8 @@ export const zhCN = {
         viewSource: '查看源码',
         viewLive: '可视化编辑',
         untitled: '未命名',
+        metaUpdated: '更新于 {{time}}',
+        metaCreated: '创建于 {{time}}',
         emptyTitle: '文档为空',
         emptyHint: '开始写作…',
         saveFailed: '保存失败',

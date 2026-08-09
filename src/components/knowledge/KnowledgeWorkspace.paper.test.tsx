@@ -163,6 +163,20 @@ describe('KnowledgeWorkspace paper overflow contract', () => {
     expect(header.textContent).not.toContain('›')
   })
 
+  it('meta row under title shows updated/created relative times', () => {
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date('2026-06-09T12:00:00Z'))
+    seedWorkspace('live')
+    render(<KnowledgeWorkspace />)
+    const meta = screen.getByTestId('knowledge-doc-meta')
+    expect(meta.textContent).toContain('knowledge.doc.metaUpdated')
+    expect(meta.textContent).toContain('knowledge.doc.metaCreated')
+    // hover 提示绝对时间
+    expect(meta.getAttribute('title')).toContain('knowledge.doc.metaUpdated')
+    expect(meta.getAttribute('title')).toContain('knowledge.doc.metaCreated')
+    vi.useRealTimers()
+  })
+
   it('T10 save status: silent on saved, error always visible, saving after 800ms', () => {
     vi.useFakeTimers()
     seedWorkspace('live')

@@ -528,6 +528,28 @@ describe('knowledgeStore flush-abort navigation', () => {
     expect(s.activeDocId).toBeNull()
     expect(knowledgeWriteDoc).toHaveBeenCalledWith('spc_1', 'doc_a', 'dirty-a')
   })
+
+  it('flushSave bumps node updatedAt and persists tree (doc meta row)', async () => {
+    knowledgeWriteDoc.mockResolvedValue(undefined)
+    knowledgeSaveTree.mockResolvedValue(undefined)
+    useKnowledgeStore.setState({
+      activeDocId: 'doc_a',
+      docBody: 'saved',
+      draftBody: 'dirty-meta',
+      editorMode: 'live',
+      saveState: 'idle',
+    })
+
+    await useKnowledgeStore.getState().flushSave()
+
+    const node = useKnowledgeStore.getState().nodes.find((n) => n.id === 'doc_a')
+    expect(node?.updatedAt).toBeGreaterThan(1)
+    expect(knowledgeSaveTree).toHaveBeenCalledWith('spc_1', expect.objectContaining({ version: 1 }))
+    const savedTree = knowledgeSaveTree.mock.calls.at(-1)?.[1] as {
+      nodes: { id: string; updatedAt: number }[]
+    }
+    expect(savedTree.nodes.find((n) => n.id === 'doc_a')?.updatedAt).toBeGreaterThan(1)
+  })
 })
 
 describe('knowledgeStore setDraftBody persist modes', () => {

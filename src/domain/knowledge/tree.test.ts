@@ -88,6 +88,38 @@ describe('knowledge tree helpers', () => {
     assertTreeInvariants(next)
   })
 
+  it('moveNode toIndex boundaries: row head (0) / row tail (len) / beyond clamps', () => {
+    const r1 = n({ id: 'doc_r0000001', kind: 'doc', title: 'R1', order: 0 })
+    const r2 = n({ id: 'doc_r0000002', kind: 'doc', title: 'R2', order: 1 })
+    const r3 = n({ id: 'doc_r0000003', kind: 'doc', title: 'R3', order: 2 })
+    const nodes = [r1, r2, r3]
+    // 拖到行首 → toIndex 0
+    let next = moveNode(nodes, 'doc_r0000002', null, 0)
+    expect(next.find((x) => x.id === 'doc_r0000002')!.order).toBe(0)
+    // 拖到行尾 → toIndex = 兄弟数-1（调用方语义：目标行 index+1）
+    next = moveNode(nodes, 'doc_r0000001', null, 2)
+    expect(next.find((x) => x.id === 'doc_r0000001')!.order).toBe(2)
+    // 越界 toIndex 收敛到末尾
+    next = moveNode(nodes, 'doc_r0000001', null, 99)
+    expect(next.find((x) => x.id === 'doc_r0000001')!.order).toBe(2)
+    // 越界负数收敛到 0
+    next = moveNode(nodes, 'doc_r0000001', null, -5)
+    expect(next.find((x) => x.id === 'doc_r0000001')!.order).toBe(0)
+    // 空层（空文件夹）：无 toIndex → 唯一子节点 order 0
+    const emptyFolder = n({
+      id: 'nod_empty001',
+      kind: 'folder',
+      title: '空',
+      parentId: null,
+      order: 9,
+    })
+    next = moveNode([emptyFolder, docA], 'doc_aaaaaaa1', 'nod_empty001')
+    const moved = next.find((x) => x.id === 'doc_aaaaaaa1')!
+    expect(moved.parentId).toBe('nod_empty001')
+    expect(moved.order).toBe(0)
+    assertTreeInvariants(next)
+  })
+
   it('moveNode rejects cycle into descendant folder', () => {
     const child = n({
       id: 'nod_child0001',

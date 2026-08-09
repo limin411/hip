@@ -174,4 +174,67 @@ describe('knowledge phase1 surfaces @knowledge', () => {
     // K1F attached a PNG under this space
     expect(joined).toMatch(/assets\//)
   })
+
+  it('K1H: browse drag reorders docs and persists (X3)', async () => {
+    const a = `SortA-${stamp}`
+    const b = `SortB-${stamp}`
+    await createDocAndExpectEditor()
+    await setKnowledgeDocTitle(a)
+    await ensureKnowledgeLive()
+    await typeInKnowledgeLiveEditor(`sort-body-${stamp}`)
+    await waitForSaveStatusSaved(15000)
+    await createDocAndExpectEditor()
+    await setKnowledgeDocTitle(b)
+    await ensureKnowledgeLive()
+    await typeInKnowledgeLiveEditor(`sort-body2-${stamp}`)
+    await waitForSaveStatusSaved(15000)
+
+    // Back to browse root (sidebar 全部文档)
+    await (await browser.$('[data-testid="dir-crumb-root"]')).click()
+    await (await browser.$('[data-testid="doc-manager-browse"]')).waitForExist({
+      timeout: 10000,
+    })
+
+    const rowOrder = () =>
+      browser.execute(() => {
+        const rows = Array.from(
+          document.querySelectorAll('[data-testid^="browse-row-"]'),
+        ) as HTMLElement[]
+        return rows.map(
+          (r) => r.querySelector('.truncate')?.textContent?.trim() ?? '',
+        )
+      })
+    expect(await rowOrder()).toEqual([a, b])
+
+    const rowA = await browser.$(
+      `//div[contains(@data-testid,'browse-row-') and contains(., '${a}')]`,
+    )
+    const rowB = await browser.$(
+      `//div[contains(@data-testid,'browse-row-') and contains(., '${b}')]`,
+    )
+    await rowA.waitForExist({ timeout: 5000 })
+    await rowB.waitForExist({ timeout: 5000 })
+
+    // Drag B onto the upper half of A → B lands before A.
+    await rowB.moveTo({ x: 2, y: 2 })
+    await browser.buttonDown()
+    await rowA.moveTo({ x: 2, y: 2 })
+    await browser.pause(200)
+    await browser.buttonUp()
+    await browser.pause(500)
+    expect(await rowOrder()).toEqual([b, a])
+
+    // Persistence: open a doc, come back, order still holds (tree on disk).
+    const rowAAgain = await browser.$
+      (`//div[contains(@data-testid,'browse-row-') and contains(., '${a}')]`)
+    await rowAAgain.click()
+    await (
+      await browser.$('[data-testid="knowledge-doc-live-editor"]')
+    ).waitForExist({ timeout: 10000 })
+    await (await browser.$('[data-testid="dir-crumb-root"]')).click()
+    await (await browser.$('[data-testid="doc-manager-browse"]')).waitForExist({
+      timeout: 10000,
+    })
+    expect(await rowOrder()).toEqual([b, a])
+  })
 })

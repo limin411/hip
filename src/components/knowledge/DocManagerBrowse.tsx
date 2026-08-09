@@ -7,23 +7,26 @@
  * 新建改为实底主按钮）；空态大标题。
  * 与侧边栏 DirNavList 共用同一导航状态（knowledgeStore.currentFolderId）。
  */
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState, type DragEvent } from 'react'
 import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
 import { FileText, Folder, Grid3X3, List, Plus } from 'lucide-react'
 import { DeclarativeContextMenu } from '@/components/context-menu'
 import { knowledgeRevealDoc } from '@/ipc/knowledge'
-import { getPath, listChildren } from '@/domain/knowledge/tree'
+import { getPath, isUnderSubtree, listChildren } from '@/domain/knowledge/tree'
 import type { KnowledgeNode } from '@/domain/knowledge/types'
 import { cn } from '@/lib/utils'
 import { useKnowledgeStore } from '@/store/knowledgeStore'
 import { NodeRowMenu } from './NodeRowMenu'
 
-function sortLevel(a: KnowledgeNode, b: KnowledgeNode): number {
-  if (a.kind === 'folder' && b.kind !== 'folder') return -1
-  if (a.kind !== 'folder' && b.kind === 'folder') return 1
-  return a.title.localeCompare(b.title)
-}
+/**
+ * doc-ux-polish-2 X3: 浏览行/网格 tile 同层拖拽排序（改 order）+
+ * 拖入文件夹行 / 面包屑 = 移入（改 parentId）。native HTML5 DnD；
+ * 行内交互元素保持 `data-no-drag`，行编辑态不可拖。
+ */
+
+type DropHint = { id: string; pos: 'before' | 'after' | 'into' }
+
 
 const CRUMB_MAX = 3
 
@@ -55,6 +58,10 @@ export function DocManagerBrowse() {
   const [editTitle, setEditTitle] = useState('')
   const menuRef = useRef<HTMLDivElement>(null)
 
+  // X3: 拖拽排序/移动状态（native DnD）。
+  const [dragId, setDragId] = useState<string | null>(null)
+  const [dropHint, setDropHint] = useState<DropHint | null>(null)
+
   useEffect(() => {
     if (!menuOpen && !jumpOpen) return
     const onDown = (e: PointerEvent) => {
@@ -74,10 +81,11 @@ export function DocManagerBrowse() {
   }, [nodes, currentFolderId])
 
   const level = useMemo(() => {
+    // X3: 展示顺序 = 树内 order（listChildren），拖拽排序直接可见。
     const children = listChildren(nodes, currentFolderId)
     const q = query.trim().toLowerCase()
-    if (!q) return [...children].sort(sortLevel)
-    return children.filter((n) => n.title.toLowerCase().includes(q)).sort(sortLevel)
+    if (!q) return children
+    return children.filter((n) => n.title.toLowerCase().includes(q))
   }, [nodes, currentFolderId, query])
 
   const atRoot = currentFolderId == null
@@ -147,26 +155,136 @@ export function DocManagerBrowse() {
     onCopyPath: () => copyPath(node),
   })
 
+  // ── X3 拖拽（行/tile/面包屑共用） ──────────────────────────────
+  const endDrag = () => {
+    setDragId(null)
+    setDropHint(null)
+  }
+
+  const startDrag = (e: DragEvent, node: KnowledgeNode) => {
+    // 行内交互元素（按钮/输入框）与编辑态不发起拖拽。
+    if ((e.target as Element | null)?.closest?.('[data-no-drag]')) {
+      e.preventDefault()
+      return
+    }
+    if (editingId === node.id) {
+      e.preventDefault()
+      return
+    }
+    e.dataTransfer.setData('text/plain', node.id)
+    e.dataTransfer.effectAllowed = 'move'
+    setDragId(node.id)
+    setDropHint(null)
+  }
+
+  /** 目标位置：文件夹行 = 移入末尾；文档行 = 上/下半（before/after）。 */
+  const hoverPos = (
+    e: DragEvent,
+    node: KnowledgeNode,
+  ): DropHint['pos'] => {
+    if (node.kind === 'folder') return 'into'
+    const rect = e.currentTarget.getBoundingClientRect()
+    return e.clientY < rect.top + rect.height / 2 ? 'before' : 'after'
+  }
+
+  const overRow = (e: DragEvent, node: KnowledgeNode) => {
+    if (!dragId || dragId === node.id) return
+    e.preventDefault()
+    e.dataTransfer.dropEffect = 'move'
+    const pos = hoverPos(e, node)
+    setDropHint((prev) =>
+      prev?.id === node.id && prev.pos === pos ? prev : { id: node.id, pos },
+    )
+  }
+
+  const leaveRow = (e: DragEvent, node: KnowledgeNode) => {
+    if (!e.currentTarget.contains(e.relatedTarget as Node | null)) {
+      setDropHint((prev) => (prev?.id === node.id ? null : prev))
+    }
+  }
+
+  /**
+   * toIndex 语义（moveNodePure）：插入目标在「移除被拖节点后的兄弟列表」中的位置。
+   * 同层拖拽需按被拖节点相对位置修正；跨层（dragIdx<0）无需修正。
+   */
+  const toIndexFor = (node: KnowledgeNode, pos: DropHint['pos']): number => {
+    const siblings = listChildren(nodes, currentFolderId)
+    const idx = siblings.findIndex((n) => n.id === node.id)
+    const dragIdx = siblings.findIndex((n) => n.id === dragId)
+    if (dragIdx < 0) return pos === 'after' ? idx + 1 : idx
+    return pos === 'after'
+      ? dragIdx <= idx
+        ? idx
+        : idx + 1
+      : dragIdx < idx
+        ? idx - 1
+        : idx
+  }
+
+  const dropOnRow = (e: DragEvent, node: KnowledgeNode) => {
+    if (!dragId || dragId === node.id) return
+    e.preventDefault()
+    e.stopPropagation()
+    if (node.kind === 'folder') {
+      // 移入文件夹末尾；禁止移入自身/后代。
+      if (!isUnderSubtree(nodes, dragId, node.id)) {
+        void nav().moveNode(dragId, node.id)
+      }
+    } else {
+      const pos = hoverPos(e, node)
+      void nav().moveNode(dragId, currentFolderId, toIndexFor(node, pos))
+    }
+    endDrag()
+  }
+
+  const crumbKey = (crumbId: string | null) => `crumb:${crumbId ?? 'root'}`
+
+  const overCrumb = (e: DragEvent, crumbId: string | null) => {
+    if (!dragId) return
+    e.preventDefault()
+    e.dataTransfer.dropEffect = 'move'
+    setDropHint((prev) => {
+      const key = crumbKey(crumbId)
+      return prev?.id === key ? prev : { id: key, pos: 'into' }
+    })
+  }
+
+  const dropOnCrumb = (e: DragEvent, crumbId: string | null) => {
+    if (!dragId) return
+    e.preventDefault()
+    e.stopPropagation()
+    if (crumbId == null || !isUnderSubtree(nodes, dragId, crumbId)) {
+      void nav().moveNode(dragId, crumbId)
+    }
+    endDrag()
+  }
+
   return (
     <div
       className="flex min-h-0 min-w-0 flex-1 flex-col bg-surface-content"
       data-testid="doc-manager-browse"
+      data-dragging={dragId ? 'true' : undefined}
     >
       {/* 工具栏（PR-5 瘦身：面包屑小字 + 搜索 + 视图切换 + 新建主按钮） */}
       <div
         className="flex h-12 shrink-0 items-center gap-2 border-b border-border px-4"
         data-testid="browse-toolbar"
       >
-        {/* 面包屑（>3 段折叠 …，可跳任意祖先） */}
+        {/* 面包屑（>3 段折叠 …，可跳任意祖先；X3 可作 drop 目标 = 移入该祖先） */}
         <div className="flex min-w-0 flex-1 items-center gap-1 overflow-hidden text-meta">
           <span
             data-testid="browse-crumb-root"
+            data-dragging={dropHint?.id === crumbKey(null) ? 'true' : undefined}
             className={cn(
               'shrink-0 cursor-pointer whitespace-nowrap rounded-sm px-1 py-0.5',
               atRoot
                 ? 'font-medium text-ink'
                 : 'text-ink-tertiary transition-colors hover:bg-state-hover hover:text-ink',
+              dropHint?.id === crumbKey(null) &&
+                'bg-state-hover outline outline-1 outline-dashed outline-[color:var(--border-strong)]',
             )}
+            onDragOver={(e) => overCrumb(e, null)}
+            onDrop={(e) => dropOnCrumb(e, null)}
             onClick={() => void nav().navigateTo(null, null)}
           >
             {t('knowledge.home.mySpaces')}
@@ -236,7 +354,16 @@ export function DocManagerBrowse() {
               </span>
               <span
                 data-testid={`browse-crumb-${a.id}`}
-                className="min-w-0 cursor-pointer truncate whitespace-nowrap rounded-sm px-1 py-0.5 text-ink-tertiary transition-colors hover:bg-state-hover hover:text-ink"
+                data-dragging={
+                  dropHint?.id === crumbKey(a.id) ? 'true' : undefined
+                }
+                className={cn(
+                  'min-w-0 cursor-pointer truncate whitespace-nowrap rounded-sm px-1 py-0.5 text-ink-tertiary transition-colors hover:bg-state-hover hover:text-ink',
+                  dropHint?.id === crumbKey(a.id) &&
+                    'bg-state-hover outline outline-1 outline-dashed outline-[color:var(--border-strong)]',
+                )}
+                onDragOver={(e) => overCrumb(e, a.id)}
+                onDrop={(e) => dropOnCrumb(e, a.id)}
                 onClick={() => void nav().navigateTo(a.id, null)}
               >
                 {a.title}
@@ -398,19 +525,29 @@ export function DocManagerBrowse() {
                     payload={rowMenuPayload(node)}
                     className="block"
                   >
-                    <div
-                      data-testid={`browse-tile-${node.id}`}
-                      data-node-kind={node.kind}
-                      onClick={() => {
-                        if (node.kind === 'folder') void nav().enterFolder(node.id)
-                        else void nav().openDoc(node.id)
-                      }}
-                      className={cn(
-                        'group flex cursor-pointer flex-col items-center gap-2 rounded-xl border border-transparent p-3 text-center transition-colors',
-                        'hover:border-border hover:bg-surface-muted/60',
-                        activeDocId === node.id && 'border-border bg-surface-muted/60',
-                      )}
-                    >
+                  <div
+                    data-testid={`browse-tile-${node.id}`}
+                    data-node-kind={node.kind}
+                    draggable={editingId !== node.id}
+                    onDragStart={(e) => startDrag(e, node)}
+                    onDragEnd={endDrag}
+                    onDragOver={(e) => overRow(e, node)}
+                    onDragLeave={(e) => leaveRow(e, node)}
+                    onDrop={(e) => dropOnRow(e, node)}
+                    onClick={() => {
+                      if (node.kind === 'folder') void nav().enterFolder(node.id)
+                      else void nav().openDoc(node.id)
+                    }}
+                    className={cn(
+                      'group relative flex cursor-pointer flex-col items-center gap-2 rounded-xl border border-transparent p-3 text-center transition-colors',
+                      'hover:border-border hover:bg-surface-muted/60',
+                      activeDocId === node.id && 'border-border bg-surface-muted/60',
+                      dragId === node.id && 'opacity-40',
+                      dropHint?.id === node.id &&
+                        dropHint.pos === 'into' &&
+                        'border-[var(--border-strong)] bg-state-hover outline outline-1 outline-dashed outline-[color:var(--border-strong)]',
+                    )}
+                  >
                       <div className="relative flex h-10 w-10 items-center justify-center rounded-lg bg-surface-muted">
                         {node.kind === 'folder' ? (
                           <Folder size={20} className="text-accent" strokeWidth={1.6} aria-hidden />
@@ -455,6 +592,15 @@ export function DocManagerBrowse() {
                           ? t('knowledge.browse.folderKind')
                           : formatUpdated(node.updatedAt)}
                       </span>
+                      {dropHint?.id === node.id && dropHint.pos !== 'into' ? (
+                        <span
+                          className={cn(
+                            'pointer-events-none absolute inset-x-1.5 h-0.5 rounded-full bg-[var(--border-strong)]',
+                            dropHint.pos === 'before' ? 'top-0' : 'bottom-0',
+                          )}
+                          data-testid={`browse-drop-line-${node.id}`}
+                        />
+                      ) : null}
                     </div>
                   </DeclarativeContextMenu>
                 )
@@ -474,13 +620,23 @@ export function DocManagerBrowse() {
                     <div
                       data-testid={`browse-row-${node.id}`}
                       data-node-kind={node.kind}
+                      draggable={editingId !== node.id}
+                      onDragStart={(e) => startDrag(e, node)}
+                      onDragEnd={endDrag}
+                      onDragOver={(e) => overRow(e, node)}
+                      onDragLeave={(e) => leaveRow(e, node)}
+                      onDrop={(e) => dropOnRow(e, node)}
                       onClick={() => {
                         if (node.kind === 'folder') void nav().enterFolder(node.id)
                         else void nav().openDoc(node.id)
                       }}
                       className={cn(
-                        'group flex h-10 cursor-pointer items-center gap-2.5 rounded-lg px-2 transition-colors',
+                        'group relative flex h-10 cursor-pointer items-center gap-2.5 rounded-lg px-2 transition-colors',
                         activeDocId === node.id ? 'bg-state-hover' : 'hover:bg-state-hover',
+                        dragId === node.id && 'opacity-40',
+                        dropHint?.id === node.id &&
+                          dropHint.pos === 'into' &&
+                          'bg-state-hover outline outline-1 outline-dashed outline-[color:var(--border-strong)]',
                       )}
                     >
                       <span
@@ -534,6 +690,15 @@ export function DocManagerBrowse() {
                           className="flex h-6 w-6 items-center justify-center rounded-md text-ink-tertiary transition-colors hover:bg-state-hover hover:text-ink"
                         />
                       </span>
+                      {dropHint?.id === node.id && dropHint.pos !== 'into' ? (
+                        <span
+                          className={cn(
+                            'pointer-events-none absolute inset-x-1.5 h-0.5 rounded-full bg-[var(--border-strong)]',
+                            dropHint.pos === 'before' ? 'top-0' : 'bottom-0',
+                          )}
+                          data-testid={`browse-drop-line-${node.id}`}
+                        />
+                      ) : null}
                     </div>
                   </DeclarativeContextMenu>
                 )

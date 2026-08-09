@@ -2,8 +2,8 @@
 
 > 版本：v1.1（2026-08）— 在 v1.0「删除换行」上扩展：**子菜单（转换成… / 颜色）是否整改**的分析与决策。  
 > 范围：Live 文档编辑器中，点击行首 **六点手柄 `⋮⋮`** 弹出的**块操作菜单**及其**级联子菜单**。  
-> 配套预览：`docs/design/knowledge/editor/doc-block-menu-delete-row-preview.html`  
-> 前置：`docs/design/knowledge/editor/doc-editor-sidemenu-fix-spec.md`（v3，手柄/菜单项序已落地）  
+> 配套预览：`docs/design/doc-block-menu-delete-row/doc-block-menu-delete-row-preview.html`  
+> 前置：`docs/design/doc-editor-sidemenu-fix-spec.md`（v3，手柄/菜单项序已落地）  
 > 涉及代码：
 > - `src/components/knowledge/DocBlockNoteEditor.tsx`（`DeleteBlockItem` / `TurnIntoItem` / 菜单装配）
 > - `src/components/knowledge/knowledge-blocknote.css`

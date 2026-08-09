@@ -1,8 +1,8 @@
 # 六点手柄菜单 · 行几何与子菜单整改 · 执行计划（Plan）
 
-> 依据：`docs/design/knowledge/editor/doc-block-menu-delete-row-spec.md`（**v1.1**，方向已确认）  
-> 视觉基准：`docs/design/knowledge/editor/doc-block-menu-delete-row-preview.html`（§1 主菜单 · §2 转换成… · §3 颜色 · §5 交互舞台）  
-> 前置已落地：`docs/design/knowledge/editor/doc-editor-sidemenu-fix-spec.md` v3 / plan S1–S4（手柄 gutter、菜单项序、Turn into / Duplicate 已在）  
+> 依据：`docs/design/doc-block-menu-delete-row/doc-block-menu-delete-row-spec.md`（**v1.1**，方向已确认）  
+> 视觉基准：`docs/design/doc-block-menu-delete-row/doc-block-menu-delete-row-preview.html`（§1 主菜单 · §2 转换成… · §3 颜色 · §5 交互舞台）  
+> 前置已落地：`docs/design/doc-editor-sidemenu-fix-spec.md` v3 / plan S1–S4（手柄 gutter、菜单项序、Turn into / Duplicate 已在）  
 > 范围护栏（spec §3.6，本计划**不包含**）：
 > - 删除确认 Modal  
 > - 菜单 portal 到 body  
@@ -192,7 +192,7 @@ feat(knowledge): block color swatch panel (menu M4)
 - [B] Turn-into 子项 icon 槽 + 当前类型 ✓；颜色父行/列表皮肤
 
 ## Preview
-open docs/design/knowledge/editor/doc-block-menu-delete-row-preview.html
+open docs/design/doc-block-menu-delete-row/doc-block-menu-delete-row-preview.html
 
 ## Test
 yarn test src/components/knowledge/DocBlockNoteEditor
@@ -264,7 +264,7 @@ yarn test src/domain/knowledge/sideMenuBlocks
 
 ```bash
 # 预览金样
-open docs/design/knowledge/editor/doc-block-menu-delete-row-preview.html
+open docs/design/doc-block-menu-delete-row/doc-block-menu-delete-row-preview.html
 
 # 单测
 yarn test src/components/knowledge/DocBlockNoteEditor

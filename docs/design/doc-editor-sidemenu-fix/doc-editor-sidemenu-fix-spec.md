@@ -5,7 +5,7 @@
 > 本版先对照 **Notion 官方帮助中心 / 飞书文档体验拆解 / 语雀块编辑** 的公开说明，再定 hip 目标。
 >
 > 范围：Live BlockNote 文档正文行首 **`+` 与 `⋮⋮`（六点）** 的布局、图标、颜色、hover、点击菜单。  
-> 配套：`docs/design/knowledge/editor/doc-editor-sidemenu-fix-preview.html`  
+> 配套：`docs/design/doc-editor-sidemenu-fix/doc-editor-sidemenu-fix-preview.html`  
 > 基线：BlockNote 0.52.1 · 改动文件：
 > - `src/components/knowledge/DocBlockNoteEditor.tsx`
 > - `src/components/knowledge/knowledge-blocknote.css`

@@ -1,6 +1,6 @@
 # 文档管理 × 操作交互与视觉体验第二弹 · 执行计划（Plan）
 
-> 依据：`docs/design/knowledge/polish/doc-ux-polish-2-spec.md`（V1.0）+ 高保真预览 `docs/design/knowledge/polish/doc-ux-polish-2-preview.html`（视觉基准，浏览器打开对照）
+> 依据：`docs/design/doc-ux-polish-2/doc-ux-polish-2-spec.md`（V1.0）+ 高保真预览 `docs/design/doc-ux-polish-2/doc-ux-polish-2-preview.html`（视觉基准，浏览器打开对照）
 > 目标分支：`feature/doc-ux-polish-2`（从 trunk 切出，按 PR 拆分合入）
 > 规模估算：**P0 2–3 人日 + P1 2.5–3.5 人日 + P2 0.5–1 人日 ≈ 5–7.5 人日**（单人 1–2 周）
 > 范围护栏（spec §5 非目标，本计划不包含）：AI 接入、嵌套层级、数据库/元数据、导入导出、新依赖；**侧边栏拖拽排序与移动、页面 emoji 图标（v1.1 裁剪）**。

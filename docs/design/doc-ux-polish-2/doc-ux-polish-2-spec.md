@@ -2,10 +2,10 @@
 
 > 版本：v1.1（2026-08）——v1.0 范围裁剪：本版不做「侧边栏拖拽排序与移动」「页面 emoji 图标」，见 §5 非目标
 > 范围：**纯操作交互与视觉体验升级**——不含任何新功能域（无 AI 接入、无嵌套层级、无数据库/元数据 UI、无导入导出）。
-> 前置基线：`docs/design/knowledge/polish/doc-notion-polish-spec.md`（V3-polish）——本版承接其**遗留未完成项**（T8 斜杠菜单尺寸、T13 拖拽多选；T14 emoji 页面图标暂缓，见 §5），并新增**结构操作交互**（浏览拖拽、批量操作）与**微视觉一致性**。
+> 前置基线：`docs/design/doc-notion-polish-spec.md`（V3-polish）——本版承接其**遗留未完成项**（T8 斜杠菜单尺寸、T13 拖拽多选；T14 emoji 页面图标暂缓，见 §5），并新增**结构操作交互**（浏览拖拽、批量操作）与**微视觉一致性**。
 > 配套文件：
-> - `docs/design/knowledge/polish/doc-ux-polish-2-preview.html` — 整改后高保真预览（自包含，浏览器直接打开）；
-> - `docs/design/knowledge/polish/doc-ux-polish-2-plan.md` — 执行计划（PR-1..5 拆解、文件级任务、测试与验收、风险、提交节奏）。
+> - `docs/design/doc-ux-polish-2/doc-ux-polish-2-preview.html` — 整改后高保真预览（自包含，浏览器直接打开）；
+> - `docs/design/doc-ux-polish-2/doc-ux-polish-2-plan.md` — 执行计划（PR-1..5 拆解、文件级任务、测试与验收、风险、提交节奏）。
 
 ---
 

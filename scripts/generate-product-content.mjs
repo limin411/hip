@@ -385,11 +385,42 @@ function assertFresh(path, expected, label) {
   }
 }
 
+/** Skill eval case guard: every builtin skill (meta.json + ops/meta.json) must
+ *  ship a routing case under e2e/eval/skills/cases/<skillId>.json, so the free
+ *  routing regression (router.eval.test.ts) always covers the real catalog. */
+function checkSkillEvalCases(meta) {
+  const casesDir = join(ROOT, 'e2e', 'eval', 'skills', 'cases')
+  const skills = [meta.skillId]
+  const opsMetaPath = join(SOT, 'ops', 'meta.json')
+  if (existsSync(opsMetaPath)) {
+    try {
+      skills.push(JSON.parse(readFileSync(opsMetaPath, 'utf8')).skillId)
+    } catch {
+      die(`ops/meta.json unreadable: ${opsMetaPath}`)
+    }
+  }
+  for (const skillId of skills) {
+    const casePath = join(casesDir, `${skillId}.json`)
+    if (!existsSync(casePath)) {
+      die(`skill "${skillId}" has no routing case — add e2e/eval/skills/cases/${skillId}.json (see skills/README)`)
+    }
+    try {
+      const c = JSON.parse(readFileSync(casePath, 'utf8'))
+      if (c.schemaVersion !== 1 || !Array.isArray(c.trigger?.positive) || !c.trigger.positive.length) {
+        die(`case ${skillId}.json must be schemaVersion 1 with non-empty trigger.positive`)
+      }
+    } catch (e) {
+      die(`case ${skillId}.json invalid: ${e.message}`)
+    }
+  }
+}
+
 function main() {
   const check = process.argv.includes('--check')
   const { sidecarOut, uiOut, contentHash, productVersion, meta } = build()
   checkReadmePaths()
   checkTauriVersion(productVersion)
+  checkSkillEvalCases(meta)
 
   if (check) {
     assertFresh(OUT_SIDECAR, sidecarOut, 'sidecar content.ts')

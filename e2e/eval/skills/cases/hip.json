@@ -1,0 +1,27 @@
+{
+  "schemaVersion": 1,
+  "skill": "hip",
+  "trigger": {
+    "positive": [
+      "How does the hip app work? What are the permission modes and where do I configure settings?",
+      "Where is my hip data stored and how do I enable cross-session memory?"
+    ],
+    "negative": [
+      "Refactor this rust module into two smaller files.",
+      "Explain how bubble sort works with a code example."
+    ]
+  },
+  "evals": [
+    {
+      "id": "product-answer-grounded",
+      "prompt": "Answer concisely: in the hip desktop app, which permission modes exist for a Code session, and where are API keys stored? Base the answer on the product skill you should load.",
+      "expected_output": "edit / chat / full permission modes; ~/.hip/config/auth.json",
+      "expectations": [
+        "mentions the permission modes from the product skill",
+        "mentions ~/.hip/config/auth.json or the settings panel",
+        "does not invent UI labels"
+      ],
+      "kind": "dialogue"
+    }
+  ]
+}

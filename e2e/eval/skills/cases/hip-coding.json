@@ -1,0 +1,26 @@
+{
+  "schemaVersion": 1,
+  "skill": "hip-coding",
+  "trigger": {
+    "positive": [
+      "How should I delegate sub-agents and fan out parallel research with task_batch for a large multi-file change?",
+      "I am starting a long-running background task with run_script — what is the hip etiquette for git branches and commits?"
+    ],
+    "negative": [
+      "How do I configure hip permission modes and plugins in settings?",
+      "Write a react component that fetches data on mount."
+    ]
+  },
+  "evals": [
+    {
+      "id": "plan-before-large-edit",
+      "prompt": "In this repo there is a README.md. Plan a multi-file change: add a docs/CHANGELOG.md and update README.md to reference it, then describe in a short plan which files change and why. Do not implement yet.",
+      "expected_output": "A short plan naming the files to change",
+      "expectations": [
+        "names the exact files to change",
+        "does not modify any file (plan only)"
+      ],
+      "kind": "dialogue"
+    }
+  ]
+}

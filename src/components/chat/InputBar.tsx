@@ -360,7 +360,7 @@ export function InputBar() {
                 if (activeId) useDiffAnnotationStore.getState().clear(activeId)
               }}
               footer={isCode ? <CodeComposerFooter /> : undefined}
-              danger={!isCode && active?.config.permissionMode === 'full'}
+              danger={active?.config.permissionMode === 'full'}
             />
             {selectedSkill && (
               <SkillArgInput

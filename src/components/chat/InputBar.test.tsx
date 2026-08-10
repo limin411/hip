@@ -106,6 +106,30 @@ describe('InputBar', () => {
     expect(root.className).not.toContain('border-danger')
   })
 
+  it('project (code) composer keeps a red border when permission mode is full', () => {
+    baseMocks()
+    vi.spyOn(domain, 'useActiveSession').mockReturnValue({
+      id: 's1',
+      config: {
+        llmProvider: 'openai',
+        model: 'gpt-4o',
+        tools: [],
+        surface: 'code' as const,
+        cwd: '/tmp/p',
+        permissionMode: 'full',
+      },
+      title: '',
+      preview: '',
+      messages: [],
+    } as any)
+    useDomainStore.setState({ activeSessionId: 's1' })
+
+    render(<InputBar />)
+    const root = screen.getByTestId('composer')
+    expect(root.className).toContain('border-danger-soft')
+    expect(root.className).not.toContain('border-border')
+  })
+
   it('insertComposerText preserves existing draft (does not replace)', async () => {
     baseMocks()
     vi.spyOn(domain, 'useActiveSession').mockReturnValue({

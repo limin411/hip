@@ -150,14 +150,14 @@
 /*
  * Chat CodeBlock-style chrome: header row owns the language picker, code
  * lives below it — the label never overlaps the text. Pill sits at the
- * right end of the header (GitHub-style, top-right of the block).
+ * left end of the header (top-left of the block).
  */
 .knowledge-blocknote-editor
   .bn-block-content[data-content-type='codeBlock']
   > div {
   display: flex;
   align-items: center;
-  justify-content: flex-end;
+  justify-content: flex-start;
   width: 100%;
   height: 28px;
   padding: 0 10px;
@@ -187,7 +187,7 @@
 /*
  * Language picker: BN core hides it (opacity 0, hover/focus only) — docs keep
  * the language label always visible (常显). Low-key label like chat's CodeBlock
- * (muted small text + tiny chevron), no border/bg/glow. Sits at the right end
+ * (muted small text + tiny chevron), no border/bg/glow. Sits at the left end
  * of the header row (static flow) instead of BN's absolute corner overlay.
  */
 .knowledge-blocknote-editor

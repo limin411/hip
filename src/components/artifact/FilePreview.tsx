@@ -72,7 +72,16 @@ function withPreviewMenu(
   )
 }
 
-export function FilePreview() {
+export function FilePreview({
+  surface = 'code',
+  htmlMode,
+  onHtmlModeChange,
+}: {
+  /** 'chat' lifts the HTML mode toggle + open-browser button into the titlebar. */
+  surface?: 'code' | 'chat'
+  htmlMode?: 'render' | 'source'
+  onHtmlModeChange?: (mode: 'render' | 'source') => void
+}) {
   const { t } = useTranslation()
   const { scopeId, cwd } = useFsScope()
   const preview = useFsStore((s) => (scopeId ? s.bySession[scopeId]?.preview : undefined))
@@ -150,6 +159,9 @@ export function FilePreview() {
         cwd={cwd}
         truncated={preview.truncated}
         truncatedLabel={truncLabel}
+        surface={surface}
+        mode={htmlMode}
+        onModeChange={onHtmlModeChange}
       />,
     )
   }

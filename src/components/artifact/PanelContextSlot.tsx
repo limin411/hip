@@ -26,6 +26,12 @@ import { CODE_TERMINAL } from './terminalFeature'
 import { useCodeTerminalControllerOptional } from './codeTerminalController'
 import { pathBasename } from './panelContextSlotModel'
 import { ChangesTitlebarActions } from './ChangesTitlebarActions'
+import { previewKind } from './previewKind'
+import {
+  HtmlOpenBrowserButton,
+  ModeToggle,
+  resolvePreviewAbsolutePath,
+} from './htmlPreviewToolbar'
 
 const GIT_GATED: ReadonlySet<ArtifactTab> = new Set(['changes'])
 
@@ -128,9 +134,15 @@ function CodeFilesSlot() {
   )
 }
 
-function ChatFilesSlot() {
+function ChatFilesSlot({
+  htmlMode,
+  onHtmlModeChange,
+}: {
+  htmlMode?: 'render' | 'source'
+  onHtmlModeChange?: (mode: 'render' | 'source') => void
+}) {
   const { t } = useTranslation()
-  const { scopeId, isDraft } = useFsScope()
+  const { scopeId, isDraft, cwd } = useFsScope()
   const messages = useActiveMessages()
   const artifacts = collectConversationArtifacts(messages)
   const selected = useUiStore((s) => s.selectedArtifactPath)
@@ -172,6 +184,16 @@ function ChatFilesSlot() {
     artifacts.find((a) => a.path === previewPath) ??
     artifacts[0]
   const showFileActions = artifacts.length > 0
+
+  // HTML deliverable: mode toggle + open-browser live in the titlebar, right of the
+  // artifact dropdown (the preview body keeps only the path chrome).
+  const isHtmlPreview = Boolean(
+    ready &&
+      previewPath != null &&
+      previewKind(previewPath, preview.mimeType) === 'html',
+  )
+  const absolutePath = isHtmlPreview ? resolvePreviewAbsolutePath(previewPath!, cwd) : null
+  const canOpenBrowser = isHtmlPreview && Boolean(cwd && absolutePath)
 
   if (!showFileActions) {
     return <SlotShell />
@@ -251,6 +273,24 @@ function ChatFilesSlot() {
             </DropdownMenuContent>
           </DropdownMenu>
         ))}
+      {isHtmlPreview && htmlMode != null && onHtmlModeChange != null && (
+        <>
+          <ModeToggle
+            testidPrefix="preview-html"
+            modes={[
+              { id: 'render', label: t('artifact.previewViewRendered') },
+              { id: 'source', label: t('artifact.previewViewSource') },
+            ]}
+            value={htmlMode}
+            onChange={(id) => onHtmlModeChange(id as 'render' | 'source')}
+          />
+          <HtmlOpenBrowserButton
+            absolutePath={absolutePath}
+            canOpenBrowser={canOpenBrowser}
+            cwd={cwd}
+          />
+        </>
+      )}
     </SlotShell>
   )
 }
@@ -338,7 +378,16 @@ function TerminalSlot() {
  * Right-rail titlebar left slot: tab-contextual identity + primary actions.
  * Tabs stay on the right edge (PanelTabBar); this fills the former empty drag strip.
  */
-export function PanelContextSlot({ surface }: { surface: 'code' | 'chat' }) {
+export function PanelContextSlot({
+  surface,
+  htmlMode,
+  onHtmlModeChange,
+}: {
+  surface: 'code' | 'chat'
+  /** Chat surface: rendered/source mode for the HTML preview (titlebar toggle). */
+  htmlMode?: 'render' | 'source'
+  onHtmlModeChange?: (mode: 'render' | 'source') => void
+}) {
   const activeTab = useUiStore((s) => s.activeTab)
   const chatActiveTab = useUiStore((s) => s.chatActiveTab) as ChatTab
   const sid = useDomainStore((s) => s.activeSessionId)
@@ -347,7 +396,7 @@ export function PanelContextSlot({ surface }: { surface: 'code' | 'chat' }) {
   if (surface === 'chat') {
     if (chatActiveTab === 'outline') body = <OutlineSlot />
     else if (chatActiveTab === 'sources') body = <SourcesSlot />
-    else body = <ChatFilesSlot />
+    else body = <ChatFilesSlot htmlMode={htmlMode} onHtmlModeChange={onHtmlModeChange} />
   } else {
     const tab = resolveEffectiveTab(activeTab, isGitRepo)
     if (tab === 'outline') body = <OutlineSlot />

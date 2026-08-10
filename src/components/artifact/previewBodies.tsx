@@ -4,10 +4,7 @@
  */
 import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
-import { ChevronDown, ChevronRight, ExternalLink } from 'lucide-react'
-import { cn } from '@/lib/utils'
-import { openWithDefaultApp } from '@/ipc/openPath'
-import { resolvePathUnderCwd } from '@/lib/pathScope'
+import { ChevronDown, ChevronRight } from 'lucide-react'
 import { sessionService } from '@/domain'
 import { useFsScope } from '@/store/useFsScope'
 import { useFsStore } from '@/store/fsStore'
@@ -32,6 +29,11 @@ import {
   prepareHtmlReportForPreview,
   resolveSiblingHtmlFile,
 } from './htmlReportNav'
+import {
+  HtmlOpenBrowserButton,
+  ModeToggle,
+  resolvePreviewAbsolutePath,
+} from './htmlPreviewToolbar'
 
 function TruncBanner({ text }: { text: string }) {
   return (
@@ -58,50 +60,6 @@ function useIsDark(enabled: boolean): boolean {
     return () => obs.disconnect()
   }, [enabled])
   return dark
-}
-
-function ModeToggle({
-  modes,
-  value,
-  onChange,
-  testidPrefix,
-  className,
-}: {
-  modes: Array<{ id: string; label: string }>
-  value: string
-  onChange: (id: string) => void
-  testidPrefix: string
-  className?: string
-}) {
-  return (
-    <div
-      className={cn(
-        'inline-flex shrink-0 rounded-md border border-border/80 bg-surface-muted/60 p-0.5',
-        className,
-      )}
-      role="tablist"
-      data-testid={`${testidPrefix}-mode`}
-    >
-      {modes.map((m) => (
-        <button
-          key={m.id}
-          type="button"
-          role="tab"
-          aria-selected={value === m.id}
-          data-testid={`${testidPrefix}-mode-${m.id}`}
-          className={cn(
-            'rounded px-2 py-0.5 text-caption transition-colors',
-            value === m.id
-              ? 'bg-surface text-ink'
-              : 'text-ink-tertiary hover:text-ink',
-          )}
-          onClick={() => onChange(m.id)}
-        >
-          {m.label}
-        </button>
-      ))}
-    </div>
-  )
 }
 
 function PlainPre({
@@ -475,31 +433,39 @@ export function HtmlPreviewBody({
   cwd,
   truncated,
   truncatedLabel,
+  surface = 'code',
+  mode: controlledMode,
+  onModeChange,
 }: {
   path: string
   content: string
   cwd?: string | null
   truncated?: boolean
   truncatedLabel: string
+  /** 'chat' lifts the mode toggle + open-browser button into the chat titlebar. */
+  surface?: 'code' | 'chat'
+  /** Controlled mode for the chat surface (owned by the titlebar toggle). */
+  mode?: 'render' | 'source'
+  onModeChange?: (mode: 'render' | 'source') => void
 }) {
   const { t } = useTranslation()
   const { scopeId, isDraft } = useFsScope()
   const large = !shouldAutoRenderHtml(content)
-  const [mode, setMode] = useState<'render' | 'source'>(() => (large ? 'source' : 'render'))
+  const [localMode, setLocalMode] = useState<'render' | 'source'>(() =>
+    large ? 'source' : 'render',
+  )
+  const controlled = onModeChange != null
+  const mode = controlled && controlledMode != null ? controlledMode : localMode
   const [iframeReady, setIframeReady] = useState(false)
-  // Resolve relative deliverables (e.g. roundtable-report.html) against session cwd.
-  // Root-relative forms (`/index.html`, the documented write_file style) are jailed under
-  // cwd by the sidecar's path resolver, so resolve them the same way before trusting.
-  const absolutePath =
-    resolvePathUnderCwd(cwd, path) ??
-    resolvePathUnderCwd(cwd, path.replace(/^[/\\]+/, '')) ??
-    (path.startsWith('/') || /^[A-Za-z]:[\\/]/.test(path) ? path : null)
+  const absolutePath = resolvePreviewAbsolutePath(path, cwd)
   const canOpenBrowser = Boolean(cwd && absolutePath)
 
-  // Reset mode when the selected file changes.
+  // Reset mode when the selected file changes (code: local state; chat: titlebar owner).
   useEffect(() => {
-    setMode(shouldAutoRenderHtml(content) ? 'render' : 'source')
-  }, [path, content])
+    const next = shouldAutoRenderHtml(content) ? 'render' : 'source'
+    if (controlled) onModeChange(next)
+    else setLocalMode(next)
+  }, [path, content, controlled, onModeChange])
 
   // Defer iframe mount so chrome / toggle paint before the browser parses HTML.
   useEffect(() => {
@@ -542,7 +508,8 @@ export function HtmlPreviewBody({
 
   return (
     <div className="flex h-full min-h-0 flex-col" data-testid="preview-html-shell">
-      {/* Compact toolbar: path + mode + open browser on one row */}
+      {/* Compact toolbar: path + mode + open browser on one row (chat surface
+          keeps only the path — mode + open-browser live in the titlebar). */}
       <div className="flex shrink-0 items-center gap-2 border-b border-border/80 bg-surface-subtle px-2 py-1">
         <div
           className="min-w-0 flex-1 truncate font-mono text-caption text-ink-tertiary"
@@ -551,38 +518,24 @@ export function HtmlPreviewBody({
         >
           {path}
         </div>
-        <ModeToggle
-          testidPrefix="preview-html"
-          modes={[
-            { id: 'render', label: t('artifact.previewViewRendered') },
-            { id: 'source', label: t('artifact.previewViewSource') },
-          ]}
-          value={mode}
-          onChange={(id) => setMode(id as 'render' | 'source')}
-        />
-        <button
-          type="button"
-          data-testid="preview-html-open-browser"
-          disabled={!canOpenBrowser}
-          title={
-            canOpenBrowser
-              ? t('artifact.previewHtmlOpenBrowser')
-              : t('contextMenu.file.pathOutsideCwd')
-          }
-          className={cn(
-            'inline-flex shrink-0 items-center gap-1 rounded-md border border-border/80 bg-surface px-2 py-0.5 text-caption text-ink',
-            'hover:bg-surface-muted disabled:pointer-events-none disabled:opacity-40',
-          )}
-          onClick={() => {
-            if (!canOpenBrowser || !absolutePath) return
-            void openWithDefaultApp(absolutePath, { cwd: cwd ?? null })
-          }}
-        >
-          <ExternalLink className="size-3 shrink-0" aria-hidden />
-          <span className="max-w-[10rem] truncate sm:max-w-none">
-            {t('artifact.previewHtmlOpenBrowser')}
-          </span>
-        </button>
+        {surface !== 'chat' && (
+          <>
+            <ModeToggle
+              testidPrefix="preview-html"
+              modes={[
+                { id: 'render', label: t('artifact.previewViewRendered') },
+                { id: 'source', label: t('artifact.previewViewSource') },
+              ]}
+              value={mode}
+              onChange={(id) => setLocalMode(id as 'render' | 'source')}
+            />
+            <HtmlOpenBrowserButton
+              absolutePath={absolutePath}
+              canOpenBrowser={canOpenBrowser}
+              cwd={cwd}
+            />
+          </>
+        )}
       </div>
       <div className="flex min-h-0 flex-1 flex-col">
         {(truncated || large || (hardTruncated && mode === 'render')) && (

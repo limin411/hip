@@ -1,6 +1,7 @@
 // @vitest-environment happy-dom
 import '@testing-library/jest-dom/vitest'
 import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { useState } from 'react'
 import { render, screen, cleanup, waitFor, fireEvent } from '@testing-library/react'
 import { FilePreview } from './FilePreview'
 import { useFsStore } from '@/store/fsStore'
@@ -219,6 +220,54 @@ describe('FilePreview', () => {
     render(<FilePreview />)
     fireEvent.click(screen.getByTestId('preview-html-open-browser'))
     expect(openWithDefaultApp).toHaveBeenCalledWith('/tmp/index.html', { cwd: '/tmp' })
+  })
+
+  it('chat surface: mode toggle + open-browser live in the titlebar, body keeps only path chrome', async () => {
+    setPreview({
+      status: 'ready',
+      path: '/tmp/index.html',
+      content: '<p>hi</p>',
+      mimeType: 'text/html',
+      encoding: 'utf8',
+    })
+    function ChatHarness() {
+      const [mode, setMode] = useState<'render' | 'source'>('render')
+      return (
+        <FilePreview surface="chat" htmlMode={mode} onHtmlModeChange={setMode} />
+      )
+    }
+    render(<ChatHarness />)
+    expect(screen.getByTestId('preview-html-shell')).toBeInTheDocument()
+    expect(screen.getByTestId('preview-chrome')).toHaveTextContent('/tmp/index.html')
+    // Toolbar chrome is lifted out of the body on the chat surface.
+    expect(screen.queryByTestId('preview-html-mode')).toBeNull()
+    expect(screen.queryByTestId('preview-html-open-browser')).toBeNull()
+    // Still renders the iframe in render mode.
+    await waitFor(() => {
+      expect(screen.getByTestId('preview-html')).toHaveAttribute('sandbox', 'allow-scripts')
+    })
+  })
+
+  it('chat surface: large HTML auto-switches controlled mode to source', async () => {
+    const big = `<html><body>${'x'.repeat(130_000)}</body></html>`
+    setPreview({
+      status: 'ready',
+      path: 'big.html',
+      content: big,
+      mimeType: 'text/html',
+      encoding: 'utf8',
+    })
+    function ChatHarness() {
+      const [mode, setMode] = useState<'render' | 'source'>('render')
+      return (
+        <FilePreview surface="chat" htmlMode={mode} onHtmlModeChange={setMode} />
+      )
+    }
+    render(<ChatHarness />)
+    expect(screen.getByTestId('preview-html-large-warn')).toBeInTheDocument()
+    // Controlled mode reset to source by the body; no iframe mounts.
+    expect(screen.getByTestId('preview-html-source')).toBeInTheDocument()
+    expect(screen.queryByTestId('preview-html')).toBeNull()
   })
 
   it('resolves relative HTML paths against cwd for open-in-browser', async () => {

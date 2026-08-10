@@ -88,7 +88,7 @@ export function ExecutionModePicker() {
           </span>
         </ComposerChip>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="start" data-testid="execution-mode-menu">
+      <DropdownMenuContent align="start" className="bg-surface-subtle" data-testid="execution-mode-menu">
         <div className="px-2 py-1.5 text-meta font-medium text-ink-tertiary">
           {t('chat.executionMode.menuTitle')}
         </div>

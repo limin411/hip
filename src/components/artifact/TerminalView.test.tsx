@@ -358,6 +358,12 @@ describe('TerminalView surface integrations (P0.1 search / P0.3 title / P0.4 bel
         'ring',
         expect.objectContaining({ caseSensitive: false }),
       )
+      // decorations must stay on: the addon only fires onDidChangeResults
+      // (which drives the match counter) when decorations are enabled.
+      expect(termMocks.last.searchAddon?.findNext).toHaveBeenCalledWith(
+        'ring',
+        expect.objectContaining({ decorations: true }),
+      )
     })
 
     // Case toggle re-runs the current query with the new sensitivity.

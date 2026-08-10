@@ -518,7 +518,10 @@ export function XtermSurface({
     }
     const s = searchRef.current
     if (!s) return
-    const opts = { caseSensitive: searchCaseRef.current, incremental: true }
+    // decorations: true is required — the addon only fires onDidChangeResults
+    // (which drives the match counter) when decorations are enabled, and it
+    // also renders the progressive match highlights.
+    const opts = { caseSensitive: searchCaseRef.current, incremental: true, decorations: true }
     if (dir === -1) s.findPrevious(q, opts)
     else s.findNext(q, opts)
   }, [])

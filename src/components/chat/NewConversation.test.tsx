@@ -232,6 +232,23 @@ describe('NewConversation', () => {
     expect(useDraftStore.getState().draft?.roundtable).toBeUndefined()
   })
 
+  it('project (code) new-task composer turns red when permission mode is full', () => {
+    mockActiveView = 'code'
+    useDraftStore.setState({
+      draft: {
+        tempId: 'draft-1',
+        mode: 'project',
+        text: '',
+        modelKey: 'openai/gpt-4o',
+        permissionMode: 'full',
+      },
+    })
+    render(<NewConversation />)
+    // Full permission selected in the picker tints the composer card red (chat parity).
+    expect(screen.getByTestId('composer').className).toContain('border-danger-soft')
+    expect(screen.getByTestId('composer').className).not.toContain('border-border')
+  })
+
   it('hides roundtable starter on code surface', () => {
     mockActiveView = 'code'
     setDraftModel('openai/gpt-4o')

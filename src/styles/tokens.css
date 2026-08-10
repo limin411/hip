@@ -28,7 +28,7 @@
    * 主列内容区另用 --bg-content（淡黄纸感），左右边栏仍走 --bg-app / --bg-subtle。
    */
   --bg-app: #ffffff;
-  --bg-subtle: #F9F8F5; /* 侧栏 / Composer 输入框共用暖纸白 */
+  --bg-subtle: #F6F5F3; /* 侧栏 / Composer 输入框共用暖纸白 */
   --bg-muted: #f1f1f1;
   --bg-content: #ffffff; /* 仅主内容列：淡暖黄 / 奶油纸（略深于极淡） */
   --border: #e0e0e0;
@@ -109,7 +109,7 @@
      border-border/60, ring-ink/20) need `rgb(var(--x-rgb) / <alpha-value>)`
      to compile; keep each triplet in sync with the hex above. */
   --bg-app-rgb: 255 255 255;
-  --bg-subtle-rgb: 249 248 245;
+  --bg-subtle-rgb: 246 245 243;
   --bg-muted-rgb: 241 241 241;
   --border-rgb: 224 224 224;
   --text-primary-rgb: 17 17 17;

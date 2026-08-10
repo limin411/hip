@@ -15,6 +15,7 @@ import { buildTaskRuntimeExtraTools } from './task-runtime-tools.js'
 import { EnterPlanModeTool } from './enter-plan-mode.js'
 import { ExitPlanModeTool } from './exit-plan-mode.js'
 import { buildTerminalTools } from './terminal.js'
+import { buildElicitationTool } from './elicitation.js'
 import { real, realInSkill, resolveFull } from './helpers.js'
 import type { BuildToolsOpts, DispatchSpec } from './helpers.js'
 import {
@@ -131,6 +132,11 @@ export function buildAllTools(
   if (planMode && opts.sessionId) {
     base.push(new EnterPlanModeTool(planMode, opts.sessionId))
     base.push(new ExitPlanModeTool(planMode))
+  }
+
+  // ── Elicitation tool (G3): ask_user pauses the turn for a clarifying question ──
+  if (opts.elicitation) {
+    base.push(...buildElicitationTool(opts.elicitation))
   }
 
   // ── Skill / script / MCP extras (apply on hip's own loop, every assembly path) ─

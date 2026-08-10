@@ -11,4 +11,6 @@ export type SessionEvent =
   | { type: 'tool_called'; sessionId: string; callId: string; name: string; input: string; timestamp: number }
   | { type: 'tool_success'; sessionId: string; callId: string; output: string; timestamp: number }
   | { type: 'tool_failed'; sessionId: string; callId: string; error: string; timestamp: number }
+  | { type: 'elicitation_started'; sessionId: string; id: string; question: string; timestamp: number }
+  | { type: 'elicitation_resolved'; sessionId: string; id: string; answer: string; by: 'user' | 'timeout' | 'cancel'; timestamp: number }
   | { type: 'compaction_ended'; sessionId: string; summary: string; timestamp: number; replacedMessageIds?: string[] }

@@ -622,6 +622,11 @@ export interface BuildToolsOpts {
   skills?: SkillMeta[]
   /** When present, adds the HITL-gated run_script tool. */
   requestApproval?: ApprovalFn
+  /**
+   * Elicitation coordinator (G3). When present, adds the ask_user tool;
+   * the agent loop pauses the turn while a question is pending.
+   */
+  elicitation?: import('../elicitation.js').ElicitationCoordinator
   /** Conversation permission mode. 'chat' = read-only (no write/edit + no run_script, reads jailed);
    *  'edit' = DEFAULT (write/edit jailed to root); 'full' = file tools un-jailed (any absolute path).
    *  Defaults to 'edit'. Unknown values are treated as 'edit'. MCP tools are unaffected by mode;

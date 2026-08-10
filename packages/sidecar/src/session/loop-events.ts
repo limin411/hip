@@ -15,7 +15,7 @@ import type { LoopMetricsCounters, TokensByType } from '@hip/protocol'
 import type { TurnTimingStats } from './turn-timing.js'
 
 export type LoopNudgeReason = 'doom' | 'error_streak' | 'path_hit' | 'replan' | 'plan_exit'
-export type LoopPauseKind = 'doom' | 'plan' | 'subagent_pause'
+export type LoopPauseKind = 'doom' | 'plan' | 'subagent_pause' | 'elicitation'
 export type LoopEndReason = 'completed' | 'max_steps' | 'interrupt' | 'abort' | 'circuit_breaker'
 
 /** Why a compact / context-management action ran. */

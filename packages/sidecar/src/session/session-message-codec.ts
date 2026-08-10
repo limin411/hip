@@ -90,6 +90,10 @@ export function sessionEventToEventData(
       return { callId: event.callId, stepId: context?.stepId, output: event.output }
     case 'tool_failed':
       return { callId: event.callId, stepId: context?.stepId, error: event.error }
+    case 'elicitation_started':
+      return { elicitationId: event.id, question: event.question }
+    case 'elicitation_resolved':
+      return { elicitationId: event.id, answer: event.answer, by: event.by }
     case 'compaction_ended':
       return {
         summary: event.summary,

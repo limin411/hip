@@ -242,6 +242,12 @@ export interface GraphCtx {
   contextPolicy?: ResolvedContextPolicy
   planMode?: PlanMode
   /**
+   * Elicitation coordinator (G3). When present, the `ask_user` tool is
+   * registered and the agent node stops the turn (awaiting_user) while a
+   * question is pending.
+   */
+  elicitation?: import('./elicitation.js').ElicitationCoordinator
+  /**
    * @experimental Test / harness only. Product session-turn paths never inject.
    * Optional circuit breaker for stalled-loop / budget experiments. Prefer doom /
    * error-streak / MAX_STEPS for product loop safety.
@@ -924,6 +930,27 @@ export function buildGraph(maxSteps: number = MAX_STEPS, compactBudget: number =
           if (decision.action === 'warn') {
             state.messages.push(new SystemMessage(`⚠️ ${decision.reason}`))
           }
+        }
+      }
+
+      // G3: elicitation — stop the turn while a clarifying question is pending.
+      // The ask_user tool has already registered the question; the answer arrives
+      // as a rewritten deferred ToolMessage on the next turn.
+      const pendingElicitation = ctx.elicitation?.current()
+      if (pendingElicitation) {
+        emitLoopSignal(emit.loopSignal, {
+          type: 'loop.pause',
+          ...loopIds(ctx),
+          question: pendingElicitation.question,
+          kind: 'elicitation',
+        })
+        return {
+          ...result,
+          messages: [...(deferredResolved.messages ?? []), ...(result.messages ?? [])],
+          deferredMessages: deferredResolved.deferredMessages,
+          status: 'awaiting_user' as const,
+          pendingQuestion: `elicitation:${pendingElicitation.id}: ${pendingElicitation.question}`,
+          planStepsSinceInjection,
         }
       }
 

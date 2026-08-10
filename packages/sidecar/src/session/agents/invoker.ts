@@ -50,6 +50,8 @@ export interface InvokerExtras {
   systemPromptExtra?: string
   /** Extra tools merged before toolNames / prompt construction (e.g. memory_search). */
   extraTools?: StructuredToolInterface[]
+  /** Elicitation coordinator (G3) — wires ask_user + pause-on-question. */
+  elicitation?: import('../elicitation.js').ElicitationCoordinator
 }
 
 export interface AgentInvoker {

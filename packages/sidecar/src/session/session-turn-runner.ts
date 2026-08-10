@@ -21,7 +21,7 @@ import type {
 } from '@hip/protocol'
 import { isAutopilot, resolveExecutionMode } from '@hip/protocol'
 import { FIXED_AGENTS } from '@hip/protocol'
-import { HumanMessage, AIMessage, SystemMessage, type BaseMessage } from '@langchain/core/messages'
+import { HumanMessage, AIMessage, SystemMessage, ToolMessage, type BaseMessage } from '@langchain/core/messages'
 import type { BaseLanguageModel } from '@langchain/core/language_models/base'
 import { clipForTool, stringify, trajectoryToRuns, trajectoryToTimeline, ReasoningTracker, TextBurstTracker, type TraceRun, type TraceRecorder } from './tool-trace.js'
 import { IdleWatchdog, idleTimeoutMessage } from './idle-watchdog.js'
@@ -39,6 +39,7 @@ import { RealModelRunner, LazyModelRunner, type ModelRunner } from './model-runn
 import { runSubagent } from './subagent.js'
 import { synthesizeSubagentResult } from './subagent-result.js'
 import { collectTurnDiff } from './turn-diff-tracker.js'
+import { ELICITATION_PENDING_PREFIX } from './elicitation.js'
 import { recursionLimit, childMaxStepsForAgent, maxStepsForSession } from './loop-control.js'
 import type { Activity, ActivityTracker } from './activity.js'
 import type { GoalManager } from './goal.js'
@@ -195,6 +196,11 @@ export interface SessionTurnHost {
   ownerConnectionId: string | null
   /** Multi-client: connection for the current request path (bg origin). */
   currentConnectionId: string | null
+  /**
+   * Elicitation coordinator (G3): ask_user pauses the turn; the answer is
+   * delivered as a rewritten deferred ToolMessage on the next turn.
+   */
+  elicitation: import('./elicitation.js').ElicitationCoordinator
   inputQueue: SessionInput[]
   steerAbortFlag: boolean
   paused: TurnBase | null
@@ -311,7 +317,60 @@ export interface SessionTurnHost {
 }
 
 
+/**
+ * Rewrite the deferred ask_user ToolMessage in the session history with the
+ * user's answer, so the next turn sees the question resolved. When the
+ * placeholder is missing (e.g. history was compacted), appends a fresh
+ * ToolMessage after the asking AIMessage.
+ */
+function deliverElicitationAnswer(host: SessionTurnHost, id: string, answer: string): void {
+  const content = `用户答复: ${answer}`
+  const placeholderPrefix = ELICITATION_PENDING_PREFIX
+  const msgs = host.messages
+  // Prefer rewriting the existing placeholder (keeps a single ToolMessage per call id).
+  const existing = msgs.find(
+    (m) =>
+      m instanceof ToolMessage &&
+      m.tool_call_id === id &&
+      typeof m.content === 'string' &&
+      m.content.startsWith(placeholderPrefix),
+  )
+  if (existing) {
+    existing.content = content
+    return
+  }
+  // Placeholder gone (compaction) — append next to the AIMessage that asked.
+  let aiIdx = -1
+  for (let i = msgs.length - 1; i >= 0; i--) {
+    const m = msgs[i]
+    if (m instanceof AIMessage && m.tool_calls?.some((tc) => tc.id === id)) {
+      aiIdx = i
+      break
+    }
+  }
+  const tm = new ToolMessage({ content, tool_call_id: id, name: 'ask_user' })
+  if (aiIdx >= 0) msgs.splice(aiIdx + 1, 0, tm)
+  else msgs.push(tm)
+}
+
+
 export async function processInput(host: SessionTurnHost, input: SessionInput, _send: SendFn): Promise<string> {
+  // G3: a pending elicitation means the user's next message answers the
+  // question — rewrite the deferred ask_user ToolMessage and continue the
+  // turn normally (the model sees the answer as the tool result).
+  const pendingQ = host.elicitation.current()
+  if (pendingQ && input.type === 'message') {
+    const answer = input.content.trim()
+    if (answer) {
+      const resolved = host.elicitation.resolve(pendingQ.id, answer, 'user')
+      if (resolved) {
+        deliverElicitationAnswer(host, pendingQ.id, answer)
+      }
+    }
+    // Fall through: the message also enters the conversation as a normal
+    // user turn, so the model can react to the answer and continue.
+  }
+
   if (host.modelDirty) { host.buildAgent(); host.modelDirty = false }
   if (!host.requireCompatibleModel(_send)) return ''
   if (!host.requireApiKey(_send)) return ''
@@ -608,6 +667,7 @@ export async function runManagedAgentTurn(host: SessionTurnHost, input: SessionI
       title: host.store?.getSession(host.id)?.title,
       networkPolicy: host.networkPolicy,
       toolOutputStore: host.toolOutputStore,
+      elicitation: host.elicitation,
       guardianReviewer: host.usesEnvModel ? new GuardianReviewer({ modelRunner: new LazyModelRunner(() => host.modelRunner()) }) : undefined,
       attachmentParts: agentParts,
       pluginHooks: host.hooks,
@@ -1314,6 +1374,7 @@ export async function runTurn(host: SessionTurnHost, rawSend: SendFn, base?: {
         return JSON.stringify(structured)
       },
       taskRuntime: host.backgroundManager,
+      elicitation: host.elicitation,
       onActivity: () => emit.activity?.(),
       signal: host.abortController?.signal,
       originTurnId: turnId,

@@ -80,6 +80,8 @@ export interface BuildSessionToolingInput {
   planMode?: PlanMode
   memoryService?: MemoryService
   useMemories?: boolean
+  /** Elicitation coordinator (G3) — wires the ask_user tool. */
+  elicitation?: import('./elicitation.js').ElicitationCoordinator
   /** Optional HookContext frame fields for the supervisor tool loop. */
   turnId?: string
   agentId?: string
@@ -119,6 +121,7 @@ export async function buildSessionTooling(input: BuildSessionToolingInput): Prom
       monitorEnabled: input.monitorEnabled,
       schedulerWakeEnabled: input.schedulerWakeEnabled,
       onWriteTodos: input.onWriteTodos,
+      elicitation: input.elicitation,
     },
     input.retrySubagent,
     input.stopBackgroundTask,

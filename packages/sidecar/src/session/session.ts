@@ -115,6 +115,7 @@ import {
 import { rowToBaseMessage, projectionRowIds, sessionEventToEventData, isRichContentParts } from './session-message-codec.js'
 import { emitSessionEvent, finalizeAndPersistTurn } from './session-persist.js'
 import { processInput, runTurn, runManagedAgentTurn, type SessionTurnHost } from './session-turn-runner.js'
+import { ElicitationCoordinator } from './elicitation.js'
 import { runBackgroundSubagent, loadSubagentMessages } from './session-background.js'
 import { resume, regenerate, handlePlanResponse, retrySubagent, resumeSubagent } from './session-turn-ops.js'
 
@@ -144,6 +145,31 @@ export class Session {
   private app!: ReturnType<typeof buildGraph>
   private orchestratorRunner?: AgentRunner
   private readonly hooks = new HookRegistry()
+  /**
+   * Elicitation coordinator (G3): ask_user pauses the turn for a clarifying
+   * question; started/resolved events mirror to the UI as SessionEvents.
+   */
+  readonly elicitation = new ElicitationCoordinator({
+    onStarted: (e) => {
+      this.emit?.({
+        type: 'elicitation_started',
+        sessionId: this.id,
+        id: e.id,
+        question: e.question,
+        timestamp: e.createdAt,
+      })
+    },
+    onResolved: (_e, r) => {
+      this.emit?.({
+        type: 'elicitation_resolved',
+        sessionId: this.id,
+        id: r.id,
+        answer: r.answer,
+        by: r.by,
+        timestamp: Date.now(),
+      })
+    },
+  })
   private readonly injectedRunner?: ModelRunner
   _config: SessionConfig
   private readonly injectedModel?: BaseLanguageModel

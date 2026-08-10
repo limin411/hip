@@ -537,10 +537,10 @@ a:hover {
   0%,
   100% {
     border-color: color-mix(in srgb, var(--danger) 50%, transparent);
-    box-shadow: 0 0 0 0 color-mix(in srgb, var(--danger) 12%, transparent);
+    box-shadow: 0 0 0 0 color-mix(in srgb, var(--danger) 8%, transparent);
   }
   50% {
     border-color: color-mix(in srgb, var(--danger) 78%, transparent);
-    box-shadow: 0 0 16px 2px color-mix(in srgb, var(--danger) 24%, transparent);
+    box-shadow: 0 0 16px 2px color-mix(in srgb, var(--danger) 16%, transparent);
   }
 }

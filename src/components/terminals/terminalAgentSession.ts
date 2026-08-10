@@ -9,10 +9,11 @@ import { useHipConfigStore } from '@/store/hipConfigStore'
  * Create a terminal agent session under `terminalId` (spec §3.5.5) and make it the
  * per-terminal active session without stealing the domain chat/code active pointer.
  * Returns the new session id (null when the terminal is not an SSH record).
+ * Terminal ops assistant always runs the built-in hip agent (no external ACP primary).
  */
 export async function startTerminalAgentChat(
   terminalId: string,
-  opts?: { agentId?: string; permissionMode?: 'chat' | 'edit' | 'full' },
+  opts?: { permissionMode?: 'chat' | 'edit' | 'full' },
 ): Promise<string | null> {
   // Lazy import keeps context-menu / HostLibrary tests free of the i18n chain.
   const { sessionService } = await import('@/domain')
@@ -33,7 +34,6 @@ export async function startTerminalAgentChat(
     managedTerminalId: terminalId,
     hostId: term.hostId,
     ...(term.remotePath ? { remotePathHint: term.remotePath } : {}),
-    ...(opts?.agentId && opts.agentId !== 'builtin' ? { agentId: opts.agentId } : {}),
     ...(opts?.permissionMode ? { permissionMode: opts.permissionMode } : {}),
     workspaceMode: 'sandbox',
     cwd: undefined,

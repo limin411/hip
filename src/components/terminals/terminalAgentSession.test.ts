@@ -69,7 +69,6 @@ describe('startTerminalAgentChat', () => {
 
   it('creates a terminal surface session without activating the domain pointer', async () => {
     const id = await startTerminalAgentChat('tm_ssh', {
-      agentId: 'builtin',
       permissionMode: 'edit',
     })
     expect(id).toBe('sess_new')
@@ -92,9 +91,5 @@ describe('startTerminalAgentChat', () => {
     expect(useTerminalAgentStore.getState().activeSessionByTerminal.tm_ssh).toBe('sess_new')
     expect(useUiStore.getState().terminalPanelOpen).toBe(true)
     expect(useUiStore.getState().activeTerminalPanelTab.tm_ssh).toBe('agent')
-  })
-  it('forwards non-builtin agentId', async () => {
-    await startTerminalAgentChat('tm_ssh', { agentId: 'custom-agent' })
-    expect(createSession.mock.calls[0][0].agentId).toBe('custom-agent')
   })
 })

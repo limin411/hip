@@ -7,19 +7,11 @@ import { useDomainStore } from '@/domain/sessionStore'
 import { useManagedTerminalStore } from '@/store/managedTerminalStore'
 import { useTerminalAgentStore } from '@/store/terminalAgentStore'
 import { useTerminalHostStore } from '@/store/terminalHostStore'
+import { useProvidersStore } from '@/store/providersStore'
 import { sessionService } from '@/domain'
 import { TerminalAgentPanel } from './TerminalAgentPanel'
 
 const mocks = vi.hoisted(() => ({
-  agents: [] as Array<{
-    id: string
-    name: string
-    kind: string
-    enabled: boolean
-    quirks?: string
-  }>,
-  installed: {} as Record<string, boolean>,
-  detectionChecked: false,
   sshWrite: vi.fn(async (_terminalId: string, _data: string) => {}),
 }))
 
@@ -30,24 +22,6 @@ vi.mock('react-i18next', () => ({
   }),
   // sessionService → i18n/index.ts calls i18n.use(initReactI18next)
   initReactI18next: { type: '3rdParty', init: () => {} },
-}))
-
-vi.mock('@/store/hipConfigStore', () => ({
-  useAgents: () => mocks.agents,
-}))
-
-const refreshDetection = vi.fn(async () => {})
-vi.mock('@/store/detectionStore', () => ({
-  useDetectionStore: (sel: (s: {
-    installed: Record<string, boolean>
-    checked: boolean
-    refresh: typeof refreshDetection
-  }) => unknown) =>
-    sel({
-      installed: mocks.installed,
-      checked: mocks.detectionChecked,
-      refresh: refreshDetection,
-    }),
 }))
 
 vi.mock('@/ipc/ssh', () => ({
@@ -91,12 +65,24 @@ function baseConfig(overrides: Record<string, unknown> = {}) {
 
 describe('TerminalAgentPanel tool card collapsing', () => {
   beforeEach(() => {
-    mocks.agents = [
-      { id: 'a1', name: 'Ops-Agent', kind: 'internal', enabled: true },
-    ]
-    mocks.installed = {}
-    mocks.detectionChecked = false
-    refreshDetection.mockClear()
+    mocks.sshWrite.mockClear()
+    // Model switcher (chat/project parity): one enabled provider with two models.
+    useProvidersStore.setState({
+      catalog: {
+        openai: {
+          id: 'openai',
+          name: 'OpenAI',
+          env: ['OPENAI_API_KEY'],
+          api: 'https://api.openai.com/v1',
+          models: { 'gpt-4o': { id: 'gpt-4o', name: 'GPT-4o' }, 'gpt-4o-mini': { id: 'gpt-4o-mini', name: 'GPT-4o mini' } },
+        },
+      },
+      config: {
+        providers: { openai: { enabled: true } },
+        activeModel: { providerID: 'openai', modelID: 'gpt-4o' },
+      },
+      keyConfigured: { openai: true },
+    })
     useManagedTerminalStore.setState({
       terminals: [
         {
@@ -213,24 +199,22 @@ describe('TerminalAgentPanel tool card collapsing', () => {
     unmount()
   })
 
-  it('agent picker and permission mode use chat-style dropdown options', () => {
+  it('model switcher (chat/project parity) switches the terminal session model', () => {
+    const setModelFor = vi
+      .spyOn(sessionService, 'setSessionModelFor')
+      .mockImplementation(() => {})
     const { unmount } = render(<TerminalAgentPanel terminalId="tm_1" />)
 
-    // Agent picker: builtin selected by default, dropdown lists builtin + agent.
-    const agentChip = screen.getByTestId('terminal-agent-picker')
-    expect(agentChip).toHaveTextContent('terminals.agent.emptyTitle')
-    expect(screen.getByTestId('terminal-agent-option-builtin')).toHaveAttribute(
-      'data-selected',
-      'true',
-    )
-    expect(screen.getByTestId('terminal-agent-option-a1')).toHaveAttribute(
-      'data-selected',
-      'false',
-    )
+    // Model chip bound to the terminal session shows its current model.
+    const modelChip = screen.getByTestId('model-chip')
+    expect(modelChip).toHaveTextContent('MiniMax-M3')
 
-    // Select the external agent → label updates.
-    fireEvent.click(screen.getByTestId('terminal-agent-option-a1'))
-    expect(agentChip).toHaveTextContent('Ops-Agent')
+    // Open the picker: the session model is selected, picking another model
+    // calls the session-scoped switch (never the global active session).
+    fireEvent.click(modelChip)
+    expect(screen.getByTestId('model-picker-popover')).toBeInTheDocument()
+    fireEvent.click(screen.getByText('gpt-4o-mini'))
+    expect(setModelFor).toHaveBeenCalledWith('ta_1', 'openai/gpt-4o-mini')
 
     // Permission mode: edit default; pick full → label + selection update.
     const modeChip = screen.getByTestId('terminal-permission-mode')
@@ -245,21 +229,14 @@ describe('TerminalAgentPanel tool card collapsing', () => {
       'data-selected',
       'true',
     )
+    setModelFor.mockRestore()
     unmount()
   })
 
-  it('hides unavailable OpenCode ACP from the ops agent picker', () => {
-    mocks.agents = [
-      { id: 'a1', name: 'Ops-Agent', kind: 'internal', enabled: true },
-      { id: 'oc', name: 'OpenCode', kind: 'acp', enabled: true, quirks: 'opencode' },
-      { id: 'ready', name: 'Grok', kind: 'acp', enabled: true, quirks: 'grok-build' },
-    ]
-    mocks.detectionChecked = true
-    mocks.installed = { opencode: false, grok: true }
+  it('does not offer ACP/external agents in the ops composer (builtin hip only)', () => {
     const { unmount } = render(<TerminalAgentPanel terminalId="tm_1" />)
-    expect(screen.getByTestId('terminal-agent-option-a1')).toBeInTheDocument()
-    expect(screen.getByTestId('terminal-agent-option-ready')).toBeInTheDocument()
-    expect(screen.queryByTestId('terminal-agent-option-oc')).not.toBeInTheDocument()
+    expect(screen.queryByTestId('terminal-agent-picker')).not.toBeInTheDocument()
+    expect(screen.queryByTestId('terminal-acp-limited')).not.toBeInTheDocument()
     unmount()
   })
 

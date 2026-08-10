@@ -3,7 +3,6 @@ import { useTranslation } from 'react-i18next'
 import type { TFunction } from 'i18next'
 import {
   ArrowUp,
-  Bot,
   Check,
   ChevronDown,
   ChevronRight,
@@ -21,9 +20,6 @@ import { useDomainStore } from '@/domain/sessionStore'
 import { useManagedTerminalStore, type ManagedTerminalStatus } from '@/store/managedTerminalStore'
 import { useTerminalAgentStore, terminalSessionsFor } from '@/store/terminalAgentStore'
 import { useTerminalHostStore } from '@/store/terminalHostStore'
-import { useAgents } from '@/store/hipConfigStore'
-import { useDetectionStore } from '@/store/detectionStore'
-import { isSelectableAcpAgent } from '@/lib/sessionAgent'
 import { sshWrite } from '@/ipc/ssh'
 import { isTerminalSession } from '@/lib/sessions'
 import { abortExecFlight } from '@/domain/terminalAgentBridge'
@@ -32,6 +28,7 @@ import { formatTokensCompact } from '@/lib/formatTokens'
 import { formatUsdMaybeIncomplete } from '@/lib/usageCost'
 import { MarkdownBody } from '@/components/chat/MarkdownBody'
 import { ComposerChip } from '@/components/chat/ComposerChip'
+import { ModelPicker } from '@/components/chat/ModelPicker'
 import {
   applyCommand,
   extractSlashQuery,
@@ -566,15 +563,14 @@ function SessionUsageChip({ meter, t }: { meter: SessionTokenMeter; t: TFunction
   )
 }
 
-/** Compact card composer mirroring the chat Composer (`variant="card"`). */
+/** Compact card composer mirroring the chat Composer (`variant="card"`).
+ *  Terminal ops assistant only runs the built-in hip agent — the left slot carries
+ *  a session-bound model switcher (chat/project parity) + permission mode. */
 function CompactComposer({
   sessionId,
   disabled,
   running,
   onStop,
-  agents,
-  selectedAgentId,
-  onSelectAgent,
   permissionMode,
   onSelectPermissionMode,
 }: {
@@ -582,9 +578,6 @@ function CompactComposer({
   disabled: boolean
   running: boolean
   onStop: () => void
-  agents: Array<{ id: string; name: string }>
-  selectedAgentId: string
-  onSelectAgent: (id: string) => void
   permissionMode: 'chat' | 'edit' | 'full'
   onSelectPermissionMode: (m: 'chat' | 'edit' | 'full') => void
 }) {
@@ -592,10 +585,8 @@ function CompactComposer({
   const [text, setText] = useState('')
   const meter = useSessionTokenMeterFor(sessionId)
   // Optimistic local selection: apply immediately, reconcile when the sidecar
-  // echoes the config change (session:agentChanged / session:permissionMode).
-  const [agent, setAgent] = useState(selectedAgentId)
+  // echoes the config change (session:permissionMode).
   const [mode, setMode] = useState(permissionMode)
-  useEffect(() => setAgent(selectedAgentId), [selectedAgentId])
   useEffect(() => setMode(permissionMode), [permissionMode])
   const runCompact = (focus?: string) => {
     sessionService.compactSession(sessionId, focus)
@@ -655,43 +646,7 @@ function CompactComposer({
         />
         <div className="mt-1 flex items-center justify-between gap-2 border-t border-border/60 pt-1.5">
           <div className="flex min-w-0 items-center gap-1.5">
-            <DropdownChip
-              icon={<Bot size={13} strokeWidth={1.75} />}
-              label={
-                agent === 'builtin'
-                  ? t('terminals.agent.emptyTitle')
-                  : (agents.find((a) => a.id === agent)?.name ?? agent)
-              }
-              active={agent !== 'builtin'}
-              disabled={disabled}
-              title={t('terminals.agent.emptyTitle')}
-              testid="terminal-agent-picker"
-              menuTestid="terminal-agent-picker-menu"
-            >
-              <DropdownCheckItem
-                selected={agent === 'builtin'}
-                testid="terminal-agent-option-builtin"
-                onSelect={() => {
-                  setAgent('builtin')
-                  onSelectAgent('builtin')
-                }}
-              >
-                {t('terminals.agent.emptyTitle')}
-              </DropdownCheckItem>
-              {agents.map((a) => (
-                <DropdownCheckItem
-                  key={a.id}
-                  selected={agent === a.id}
-                  testid={`terminal-agent-option-${a.id}`}
-                  onSelect={() => {
-                    setAgent(a.id)
-                    onSelectAgent(a.id)
-                  }}
-                >
-                  {a.name}
-                </DropdownCheckItem>
-              ))}
-            </DropdownChip>
+            <ModelPicker sessionId={sessionId} />
             <DropdownChip
               icon={<KeyRound size={13} strokeWidth={1.75} />}
               label={mode}
@@ -767,22 +722,6 @@ export function TerminalAgentPanel({ terminalId }: { terminalId: string }) {
   const host = useTerminalHostStore((s) =>
     term?.hostId ? s.hosts.find((h) => h.id === term.hostId) : undefined,
   )
-  const installed = useDetectionStore((s) => s.installed)
-  const detectionChecked = useDetectionStore((s) => s.checked)
-  const refreshDetection = useDetectionStore((s) => s.refresh)
-  const agents = useAgents().filter((a) => {
-    if (!a.enabled) return false
-    // Internal/custom stay selectable when enabled; preset ACP needs binaries on PATH.
-    if (a.kind === 'acp' || a.kind === 'opencode') {
-      return isSelectableAcpAgent(a, { installed, detectionChecked })
-    }
-    return true
-  })
-  const [pickedAgent, setPickedAgent] = useState('builtin')
-
-  useEffect(() => {
-    void refreshDetection()
-  }, [refreshDetection])
   const [pickedMode, setPickedMode] = useState<'chat' | 'edit' | 'full'>('edit')
   const scrollRef = useRef<HTMLDivElement>(null)
   const bottomRef = useRef<HTMLDivElement>(null)
@@ -792,12 +731,6 @@ export function TerminalAgentPanel({ terminalId }: { terminalId: string }) {
     useDomainStore((s) =>
       activeSessionId ? s.sessions.find((x) => x.id === activeSessionId) : undefined,
     ) ?? sessionsForTerminal[0]
-
-  const activeAgentKind = active?.config.agentId
-    ? agents.find((a) => a.id === active.config.agentId)?.kind
-    : undefined
-  const acpLimited =
-    activeAgentKind === 'acp' || activeAgentKind === 'opencode'
 
   useEffect(() => {
     if (active && !active.loaded) {
@@ -825,7 +758,7 @@ export function TerminalAgentPanel({ terminalId }: { terminalId: string }) {
 
   const startChat = () => {
     if (!term) return
-    void startTerminalAgentChat(terminalId, { agentId: pickedAgent, permissionMode: pickedMode })
+    void startTerminalAgentChat(terminalId, { permissionMode: pickedMode })
   }
 
   const connected = term?.kind === 'ssh' && term.status === 'connected'
@@ -922,16 +855,6 @@ export function TerminalAgentPanel({ terminalId }: { terminalId: string }) {
             ) : null}
           </div>
 
-          {acpLimited ? (
-            <div
-              className="mx-3 mb-2 flex shrink-0 items-start gap-1.5 rounded-md border border-warning/30 bg-warning/5 px-2.5 py-1.5 text-caption text-ink-secondary"
-              data-testid="terminal-acp-limited"
-            >
-              <TriangleAlert size={12} className="mt-0.5 shrink-0 text-warning" aria-hidden />
-              {t('terminals.agent.acpLimited')}
-            </div>
-          ) : null}
-
           {active.pendingPermission ? (
             <div className="shrink-0 px-3 pb-2">
               <PermissionCard
@@ -967,12 +890,6 @@ export function TerminalAgentPanel({ terminalId }: { terminalId: string }) {
                 void sshWrite(terminalId, '\x03').catch(() => {})
               }
               sessionService.cancelSessionTurn(active.id)
-            }}
-            agents={agents.map((a) => ({ id: a.id, name: a.name }))}
-            selectedAgentId={active.config.agentId ?? 'builtin'}
-            onSelectAgent={(id) => {
-              setPickedAgent(id)
-              sessionService.setAgent(active.id, id === 'builtin' ? '' : id)
             }}
             permissionMode={active.config.permissionMode ?? 'edit'}
             onSelectPermissionMode={(m) => {

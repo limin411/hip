@@ -83,6 +83,32 @@ describe('SessionService', () => {
     expect((t.sent.at(-1) as { id?: string }).id).toBeTruthy()
   })
 
+  it('setSessionModelFor switches a non-active session model (terminal ops composer)', () => {
+    useDomainStore.setState({
+      sessions: [
+        { id: 's1', config: { llmProvider: 'deepseek', model: 'm', tools: [], surface: 'chat' }, title: 'T', preview: 'P', updatedAtMs: 0, loaded: true, messages: [], status: 'idle', error: null },
+        { id: 'ta_1', config: { llmProvider: 'deepseek', model: 'm', tools: [], surface: 'terminal' }, title: 'ops', preview: '', updatedAtMs: 0, loaded: true, messages: [], status: 'idle', error: null },
+      ],
+      activeSessionId: 's1',
+    })
+    const t = new FakeTransport()
+    const svc = new SessionService(t)
+
+    svc.setSessionModelFor('ta_1', 'openai/gpt-4o')
+
+    // Optimistic local apply targets the bound session only.
+    const byId = Object.fromEntries(useDomainStore.getState().sessions.map((s) => [s.id, s]))
+    expect(byId.ta_1!.config).toMatchObject({ llmProvider: 'openai', model: 'gpt-4o' })
+    expect(byId.s1!.config).toMatchObject({ llmProvider: 'deepseek', model: 'm' })
+    // Wire message is session-scoped (never the global active session).
+    expect(t.sent.at(-1)).toMatchObject({
+      type: 'session:setModel',
+      sessionId: 'ta_1',
+      llmProvider: 'openai',
+      model: 'gpt-4o',
+    })
+  })
+
   it('sendMessage blocks code sessions without a project folder', () => {
     useDomainStore.setState({
       sessions: [

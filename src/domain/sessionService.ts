@@ -562,6 +562,10 @@ export class SessionService {
     return this.sessionActions.setSessionModel(modelKey)
   }
 
+  setSessionModelFor(sessionId: string, modelKey: string) {
+    return this.sessionActions.setSessionModelFor(sessionId, modelKey)
+  }
+
   setAgentConfigOption(sessionId: string, configId: string, value: string) {
     return this.sessionActions.setAgentConfigOption(sessionId, configId, value)
   }

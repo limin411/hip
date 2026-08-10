@@ -9,6 +9,15 @@ and this project aims to follow [Semantic Versioning](https://semver.org/).
 
 ### Changed
 
+- **Terminal ops assistant is builtin-hip-only** (`src/components/terminals/TerminalAgentPanel.tsx`):
+  - ACP/external agents are no longer first-class in the ops composer — the agent
+    picker is gone and new terminal chats always run the built-in hip agent
+    (`startTerminalAgentChat` no longer accepts `agentId`).
+  - The composer's left slot now carries the chat/project-style **model switcher**
+    (`ModelPicker` bound to the terminal session via `sessionId`;
+    `sessionService.setSessionModelFor` targets the bound session, never the
+    global active session), next to the permission-mode picker.
+
 - **Terminal embeds a subset of JetBrainsMono Nerd Font Mono** (`docs/design/doc-terminal-nerd-fonts/terminal_nerd_font_spec.md`):
   - p10k / starship / lsd / eza style private-use-area icons now render in the
     xterm surface without users installing fonts (≈1.05 MB woff2, both weights).

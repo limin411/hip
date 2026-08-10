@@ -451,20 +451,27 @@ export class SessionActions {
    *  model / baseURL, sends session:setModel to the sidecar (which also updates the global active
    *  model), and optimistically updates the session's config. */
   setSessionModel(modelKey: string): void {
-    const { activeSessionId, sessions } = useDomainStore.getState()
+    const { activeSessionId } = useDomainStore.getState()
     if (!activeSessionId) return
+    this.setSessionModelFor(activeSessionId, modelKey)
+  }
+
+  /** Session-scoped model switch (terminal ops composer: the bound session is not the global
+   *  active session). Same resolve/optimistic/send flow as setSessionModel. */
+  setSessionModelFor(sessionId: string, modelKey: string): void {
+    const { sessions } = useDomainStore.getState()
     const { catalog, config } = useProvidersStore.getState()
     const { llmProvider, model, baseURL } = resolveModelConfig(catalog, config, modelKey)
     // Optimistic — the sidecar echoes session:model to confirm.
-    useDomainStore.getState().apply({ type: 'session:model', sessionId: activeSessionId, llmProvider, model })
-    this.transport.send({ type: 'session:setModel', sessionId: activeSessionId, llmProvider, model, baseURL })
+    useDomainStore.getState().apply({ type: 'session:model', sessionId, llmProvider, model })
+    this.transport.send({ type: 'session:setModel', sessionId, llmProvider, model, baseURL })
 
     // Effort is model-specific (OpenAI has none/xhigh; Anthropic has max; many models have none).
     // Clamp or clear so a leftover `max` is never sent to a model that does not advertise it.
-    const prev = sessions.find((s) => s.id === activeSessionId)?.config.effort
+    const prev = sessions.find((s) => s.id === sessionId)?.config.effort
     const next = clampEffortForKey(catalog, modelKey, prev)
     if (next !== prev && (next !== undefined || prev !== undefined)) {
-      this.setEffort(activeSessionId, next ?? null)
+      this.setEffort(sessionId, next ?? null)
     }
   }
 

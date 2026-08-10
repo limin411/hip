@@ -94,11 +94,17 @@ vi.mock('@/store/providersStore', () => ({
 let mockActiveSessionId: string | null = 'sess-1'
 let mockSession: { config: { model?: string; llmProvider?: string } } | null = null
 const setSessionModel = vi.fn()
+const setSessionModelFor = vi.fn()
+// Bound-session lookup used when ModelPicker is rendered with a `sessionId` prop.
+let mockBoundSessions: Array<{ id: string; config: { model?: string; llmProvider?: string } }> = []
 vi.mock('@/domain', () => ({
   useActiveSessionId: () => mockActiveSessionId,
   useActiveSession: () => mockSession,
+  useDomainStore: (sel: (s: { sessions: typeof mockBoundSessions }) => unknown) =>
+    sel({ sessions: mockBoundSessions }),
   sessionService: {
     setSessionModel: (...args: unknown[]) => setSessionModel(...args),
+    setSessionModelFor: (...args: unknown[]) => setSessionModelFor(...args),
   },
 }))
 
@@ -139,6 +145,8 @@ describe('ModelPicker', () => {
     mockDraftStore.draft = null
     mockDraftStore.setModelKey.mockReset()
     setSessionModel.mockReset()
+    setSessionModelFor.mockReset()
+    mockBoundSessions = []
     mockGroups.length = 0
     mockGroups.push({
       providerID: 'openai',
@@ -214,6 +222,20 @@ describe('ModelPicker', () => {
     render(<ModelPicker />)
     fireEvent.click(screen.getByText('gpt-4o-mini'))
     expect(mockDraftStore.setModelKey).toHaveBeenCalledWith('openai/gpt-4o-mini')
+  })
+
+  it('binds to an explicit sessionId and switches that session model only', () => {
+    // Bound terminal session, no global active session.
+    mockActiveSessionId = null
+    mockSession = null
+    mockBoundSessions = [{ id: 'ta_1', config: { model: 'deepseek-chat', llmProvider: 'deepseek' } }]
+    render(<ModelPicker sessionId="ta_1" />)
+    expect(screen.getByText('deepseek-chat')).toBeInTheDocument()
+
+    fireEvent.click(screen.getByText('gpt-4o-mini'))
+    expect(setSessionModelFor).toHaveBeenCalledWith('ta_1', 'openai/gpt-4o-mini')
+    expect(setSessionModel).not.toHaveBeenCalled()
+    expect(mockDraftStore.setModelKey).not.toHaveBeenCalled()
   })
 
   it('does not show orchMode toggle (agent-driven orchestration)', () => {

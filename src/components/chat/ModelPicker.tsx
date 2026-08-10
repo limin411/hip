@@ -5,7 +5,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/Popover
 import { ComposerChip } from './ComposerChip'
 import { useDraftStore } from '@/store/draftStore'
 import { useProvidersStore } from '@/store/providersStore'
-import { useActiveSession, useActiveSessionId, sessionService } from '@/domain'
+import { useDomainStore, useActiveSession, useActiveSessionId, sessionService } from '@/domain'
 import { groupModelOptions } from '@/lib/agentModelOptions'
 import { activeModelKey } from '@/lib/modelKey'
 import {
@@ -29,7 +29,12 @@ export {
   MODEL_SEARCH_THRESHOLD,
 }
 
-export function ModelPicker() {
+/**
+ * Chat/project composer model switcher. When `sessionId` is given (terminal ops
+ * composer), the picker binds to that session instead of the global active
+ * session / draft — switching calls session:setModel on that session only.
+ */
+export function ModelPicker({ sessionId }: { sessionId?: string }) {
   const { t } = useTranslation()
   const draft = useDraftStore((s) => s.draft)
   const setModelKey = useDraftStore((s) => s.setModelKey)
@@ -38,7 +43,11 @@ export function ModelPicker() {
   const config = useProvidersStore((s) => s.config)
   const keyConfigured = useProvidersStore((s) => s.keyConfigured)
   const activeId = useActiveSessionId()
-  const session = useActiveSession()
+  const activeSession = useActiveSession()
+  const boundSession = useDomainStore((s) =>
+    sessionId ? s.sessions.find((x) => x.id === sessionId) : undefined,
+  )
+  const session = sessionId ? boundSession : activeSession
 
   const [open, setOpen] = useState(false)
   const [query, setQuery] = useState('')
@@ -59,7 +68,7 @@ export function ModelPicker() {
 
   // Active session: show the session's current model (pinned or global fallback) and allow switching.
   // Draft (no session): show the draft's modelKey (or global fallback).
-  const currentKey = activeId && session
+  const currentKey = session
     ? (session.config.model ? `${session.config.llmProvider}/${session.config.model}` : activeModelKey(config))
     : (draft?.modelKey ?? activeModelKey(config))
   const label = currentModelLabel(currentKey) || t('chat.noModelSelected')
@@ -94,7 +103,9 @@ export function ModelPicker() {
   }, [safeIndex, open, flatKeys])
 
   const selectKey = (key: string) => {
-    if (activeId && session) {
+    if (sessionId && session) {
+      sessionService.setSessionModelFor(sessionId, key)
+    } else if (activeId && session) {
       sessionService.setSessionModel(key)
     } else {
       setModelKey(key)

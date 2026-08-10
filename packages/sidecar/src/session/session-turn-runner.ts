@@ -206,6 +206,10 @@ export interface SessionTurnHost {
    * Completed background task results awaiting one-shot injection (G5).
    */
   pendingBackgroundResults: import('./background-inject.js').PendingBackgroundResults
+  /**
+   * Cross-agent-tree token budget (G6); 0 = unlimited.
+   */
+  rolloutBudget: import('./rollout-budget.js').RolloutBudget
   inputQueue: SessionInput[]
   steerAbortFlag: boolean
   paused: TurnBase | null
@@ -680,6 +684,7 @@ export async function runManagedAgentTurn(host: SessionTurnHost, input: SessionI
       networkPolicy: host.networkPolicy,
       toolOutputStore: host.toolOutputStore,
       elicitation: host.elicitation,
+      rolloutBudget: host.rolloutBudget,
       // G5: after LLM compaction, remind the model about still-running
       // background tasks (compaction would otherwise erase that memory).
       afterCompact: () => backgroundStatusText(host.backgroundManager),
@@ -745,7 +750,7 @@ export async function runManagedAgentTurn(host: SessionTurnHost, input: SessionI
         sessionId: host.id,
         turnId,
         agentId: 'supervisor',
-        step: (trajectory.get(agent.id)?.stepCount ?? 0) + 1,
+        step: (trajectory.get(agent.id)?.toolCalls.size ?? 0) + 1,
         timing: { ttftMs: 0, ttfmMs: 0, totalMs: 0 },
         turnDiff,
       })

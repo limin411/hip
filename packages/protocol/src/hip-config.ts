@@ -78,6 +78,13 @@ export interface AgentLoopConfig {
    * (`code` 180s, others 60s). Clamped to [5000, 1800000].
    */
   idleTimeoutMs?: number
+  /**
+   * Cross-agent-tree token budget (G6): weighted spend cap for the supervisor
+   * loop PLUS all sub-agent trees (task / task_batch / dispatch_agent / bg).
+   * 0 (default) = unlimited. Threshold reminders at 50/80/90%; hard cap ends
+   * the turn with a budget-exceeded notice.
+   */
+  rolloutBudgetTokens?: number
 }
 
 /**

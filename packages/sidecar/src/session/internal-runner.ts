@@ -70,6 +70,8 @@ export interface RunManagedAgentArgs {
   elicitation?: import('./elicitation.js').ElicitationCoordinator
   /** Post-compaction injection hook (G5) — returns extra system text or null. */
   afterCompact?: (summaryText: string) => string | null
+  /** Cross-agent-tree token budget (G6). */
+  rolloutBudget?: import('./rollout-budget.js').RolloutBudget
 }
 
 /**
@@ -85,7 +87,7 @@ export async function runManagedAgent(args: RunManagedAgentArgs): Promise<string
     resolved, cwd, prompt, task, attachments, attachmentParts, emit, signal, childMaxSteps,
     mcpTools, skills, requestApproval, permissionMode, networkPolicy, toolOutputStore, guardianReviewer,
     hooks, turnId, runId, nodeId, agentId, parentAgentId, allowedTools,
-    systemPromptExtra, extraTools, elicitation, afterCompact,
+    systemPromptExtra, extraTools, elicitation, afterCompact, rolloutBudget,
   } = args
   const runner = args.runner ?? new RealModelRunner(buildChatModel(resolved ?? getActiveModel()))
   const summarizer = args.summarizer ?? createSummarizer()
@@ -146,6 +148,7 @@ export async function runManagedAgent(args: RunManagedAgentArgs): Promise<string
     },
     elicitation,
     afterCompact,
+    rolloutBudget,
   }
   let humanParts: ContentPart[]
   if (attachmentParts?.length) {

@@ -22,6 +22,7 @@ describe('product-prompt dogfood harness', () => {
     }
     expect(summary.ok).toBe(true)
     expect(summary.hitRate).toBe(1)
-    expect(summary.codeBareChars).toBeLessThanOrEqual(4200)
+    // 4400 mirrors the soft budget in scripts/product-prompt-dogfood.mjs.
+    expect(summary.codeBareChars).toBeLessThanOrEqual(4400)
   }, 30_000)
 })

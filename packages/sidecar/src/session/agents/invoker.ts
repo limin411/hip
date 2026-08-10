@@ -54,6 +54,8 @@ export interface InvokerExtras {
   elicitation?: import('../elicitation.js').ElicitationCoordinator
   /** Post-compaction injection hook (G5) — returns extra system text or null. */
   afterCompact?: (summaryText: string) => string | null
+  /** Cross-agent-tree token budget (G6). */
+  rolloutBudget?: import('../rollout-budget.js').RolloutBudget
 }
 
 export interface AgentInvoker {
@@ -97,6 +99,8 @@ export interface RunInternalArgs {
   elicitation?: import('../elicitation.js').ElicitationCoordinator
   /** Post-compaction injection hook (G5). */
   afterCompact?: (summaryText: string) => string | null
+  /** Cross-agent-tree token budget (G6). */
+  rolloutBudget?: import('../rollout-budget.js').RolloutBudget
 }
 
 export interface InvokerDeps {
@@ -187,6 +191,7 @@ export function createAgentInvoker(cwd: string, deps: InvokerDeps = {}): AgentIn
           extraTools: extras?.extraTools,
           elicitation: extras?.elicitation,
           afterCompact: extras?.afterCompact,
+          rolloutBudget: extras?.rolloutBudget,
           // Enforce read-only tools for the fixed explore agent (not prompt-only).
           ...(agentId === 'explore' ? { allowedTools: [...EXPLORE_ALLOWED_TOOLS] } : {}),
         })

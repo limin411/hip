@@ -117,6 +117,7 @@ import { emitSessionEvent, finalizeAndPersistTurn } from './session-persist.js'
 import { processInput, runTurn, runManagedAgentTurn, type SessionTurnHost } from './session-turn-runner.js'
 import { ElicitationCoordinator } from './elicitation.js'
 import { PendingBackgroundResults } from './background-inject.js'
+import { RolloutBudget, formatRolloutReminder } from './rollout-budget.js'
 import { runBackgroundSubagent, loadSubagentMessages } from './session-background.js'
 import { resume, regenerate, handlePlanResponse, retrySubagent, resumeSubagent } from './session-turn-ops.js'
 
@@ -175,6 +176,11 @@ export class Session {
    * Completed background task results awaiting one-shot injection (G5).
    */
   readonly pendingBackgroundResults = new PendingBackgroundResults()
+  /**
+   * Cross-agent-tree token budget (G6); configured via
+   * `[agentLoop].rolloutBudgetTokens` (0 = unlimited).
+   */
+  readonly rolloutBudget: RolloutBudget
   private readonly injectedRunner?: ModelRunner
   _config: SessionConfig
   private readonly injectedModel?: BaseLanguageModel
@@ -309,6 +315,10 @@ export class Session {
   ): void {
     const now = Date.now()
     if (step) {
+      // G6: cross-tree token budget accounting at the single-writer fold.
+      this.rolloutBudget.record(
+        (step.inputTokens ?? 0) + (step.outputTokens ?? 0),
+      )
       this.sessionUsage = foldTurnIntoSessionAggregate(this.sessionUsage, step, now)
     }
     if (opts?.incomplete) {
@@ -432,6 +442,15 @@ export class Session {
     this.injectedModel = model
     this.injectedRunner = runner
     this.injectedSummarizer = summarizer
+    // G6: cross-tree token budget from hip.toml [agentLoop].rolloutBudgetTokens (0 = unlimited).
+    let budgetTokens = 0
+    try {
+      const cwd = config.cwd ?? process.cwd()
+      budgetTokens = resolveEffectiveConfig(cwd).agentLoop?.rolloutBudgetTokens ?? 0
+    } catch {
+      budgetTokens = 0
+    }
+    this.rolloutBudget = new RolloutBudget(budgetTokens)
     this.invokerFactory = invokerFactory ?? ((cwd) => createAgentInvoker(cwd, { readAgents: () => [...FIXED_AGENTS.filter(a => this.getFixedAgents()?.[a.id] !== false), ...readAgentsConfig(cwd)].filter(a => a.enabled) }))
     this.usesEnvModel = !model && !runner
     this.planMode = new PlanMode()

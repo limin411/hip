@@ -245,9 +245,11 @@ try {
   })
 
   // size budget soft check
+  // 4400: raised from 4200 for the G3 task-boundary guidance (ask_user).
+  // The guard still caps unannounced prompt growth (~200 chars headroom).
   runCheck('size.code_bare_under_4k', () => {
-    if (codeBare.length > 4200) {
-      throw new Error(`code bare prompt ${codeBare.length} chars exceeds 4200 soft budget`)
+    if (codeBare.length > 4400) {
+      throw new Error(`code bare prompt ${codeBare.length} chars exceeds 4400 soft budget`)
     }
   })
 

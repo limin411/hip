@@ -35,6 +35,7 @@ import {
   type DoomLoopStrategy,
 } from './doom-loop.js'
 import { PLAN_APPROVAL_QUESTION_TOKEN } from './plan-approval-constants.js'
+import { formatRolloutReminder } from './rollout-budget.js'
 import {
   compactMessages,
   applyCompactResult,
@@ -253,6 +254,11 @@ export interface GraphCtx {
    * (e.g. still-running background task status). Return null/undefined for none.
    */
   afterCompact?: (summaryText: string) => string | null
+  /**
+   * Cross-agent-tree token budget (G6). The agent node injects threshold
+   * reminders and stops the turn once the hard cap is exhausted.
+   */
+  rolloutBudget?: import('./rollout-budget.js').RolloutBudget
   /**
    * @experimental Test / harness only. Product session-turn paths never inject.
    * Optional circuit breaker for stalled-loop / budget experiments. Prefer doom /
@@ -913,6 +919,14 @@ export function buildGraph(maxSteps: number = MAX_STEPS, compactBudget: number =
 
     const messages = prepareMessages(state.messages)
     try {
+      // G6: budget threshold reminder before the model call (fires once per
+      // threshold).
+      const budgetReminder = ctx.rolloutBudget?.pollReminder()
+      if (budgetReminder) {
+        state.messages.push(
+          new SystemMessage(formatRolloutReminder(budgetReminder)),
+        )
+      }
       const result = await execute(messages)
 
       // Circuit breaker check
@@ -942,6 +956,28 @@ export function buildGraph(maxSteps: number = MAX_STEPS, compactBudget: number =
           if (decision.action === 'warn') {
             state.messages.push(new SystemMessage(`⚠️ ${decision.reason}`))
           }
+        }
+      }
+
+      // G6: hard budget cap — stop the turn with a budget-exceeded notice.
+      const budget = ctx.rolloutBudget
+      if (budget?.enabled && budget.exhausted()) {
+        emitLoopSignal(emit.loopSignal, {
+          type: 'loop.end',
+          ...loopIds(ctx),
+          reason: 'budget',
+        })
+        return {
+          messages: [
+            new AIMessage(
+              `[budget] Token budget exhausted (${budget.spent}/${budget.total}). ` +
+                `Wrap up with a summary of what is done and what remains.`,
+            ),
+          ],
+          steps: state.steps + 1,
+          status: 'awaiting_user' as const,
+          deferredMessages: deferredResolved.deferredMessages,
+          planStepsSinceInjection,
         }
       }
 

@@ -332,7 +332,7 @@ export function buildSystemPrompt({ cwd, userInstructions, skills, permissionMod
     base = `${base}\n\n## MCP Tools\n${mcpCatalog}\nUse \`mcp_search\` to find tools by keyword, then call them by their namespaced name (\`mcp__<server>__<tool>\`).`
   }
   // G3: task-boundary clarification guidance (prompt-level, non-forcing).
-  base = `${base}\n\n## Task boundaries\nBefore large multi-step work — first turn of a big task, a major refactor, or when the request is ambiguous about scope/acceptance — consider calling \`ask_user\` to clarify instead of guessing. The turn pauses until the user answers. Do not overuse it: for routine, well-scoped requests proceed directly.`
+  base = `${base}\n\n## Task boundaries\nAmbiguous scope on large work → call \`ask_user\` before guessing; the turn pauses until answered. Do not overuse.`
   const extra = userInstructions?.trim()
   return extra
     ? `${base}\n\n## Additional instructions from the user (for this conversation)\n${extra}`

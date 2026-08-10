@@ -45,6 +45,7 @@ tsconfig.node.tsbuildinfo
 .claude/
 .hip/
 .temp/
+.pi-subagents/
 
 # Worktrees
 .worktrees/

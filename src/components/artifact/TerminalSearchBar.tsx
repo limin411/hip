@@ -39,11 +39,11 @@ export function TerminalSearchBar({
 
   return (
     <div
-      className="absolute left-2 right-2 top-2 z-20 flex items-center gap-2 rounded-lg border border-black/40 bg-[#1c1c1c] px-2.5 py-1.5 shadow-lg shadow-black/40"
+      className="absolute left-2 right-2 top-2 z-20 flex items-center gap-2 rounded-lg border border-[#3a3a3a] bg-[#1c1c1c] px-2.5 py-1.5 shadow-lg shadow-black/40"
       data-testid="terminal-searchbar"
       role="search"
     >
-      <span className="text-ink-tertiary" aria-hidden>
+      <span className="text-[#9d9d9d]" aria-hidden>
         ⌕
       </span>
       <input
@@ -60,17 +60,17 @@ export function TerminalSearchBar({
           }
         }}
         placeholder={t('artifact.terminalView.searchPlaceholder')}
-        className="min-w-0 flex-1 bg-transparent font-mono text-body text-ink outline-none placeholder:text-ink-tertiary/70"
+        className="min-w-0 flex-1 bg-transparent font-mono text-body text-[#f0f0f0] outline-none placeholder:text-[#6a6a6a]"
         data-testid="terminal-searchbar-input"
         spellCheck={false}
       />
       <span
-        className="shrink-0 font-mono text-meta text-ink-tertiary"
+        className="shrink-0 font-mono text-meta text-[#9d9d9d]"
         data-testid="terminal-searchbar-count"
       >
         {matchCount > 0 ? `${matchIndex} / ${matchCount}` : '0 / 0'}
       </span>
-      <span className="h-3.5 w-px shrink-0 bg-ink-tertiary/25" aria-hidden />
+      <span className="h-3.5 w-px shrink-0 bg-[#3a3a3a]" aria-hidden />
       <button
         type="button"
         onClick={onToggleCase}
@@ -78,8 +78,8 @@ export function TerminalSearchBar({
         className={cn(
           'shrink-0 rounded px-1.5 py-0.5 font-mono text-meta transition-colors',
           caseSensitive
-            ? 'bg-accent/15 text-accent-strong'
-            : 'text-ink-tertiary hover:bg-state-hover hover:text-ink',
+            ? 'bg-white/10 text-[#2ee6e6]'
+            : 'text-[#bdbdbd] hover:bg-white/10 hover:text-white',
         )}
         data-testid="terminal-searchbar-case"
       >
@@ -89,7 +89,7 @@ export function TerminalSearchBar({
         type="button"
         onClick={() => onStep(-1)}
         title={t('artifact.terminalView.searchPrev')}
-        className="shrink-0 rounded px-1.5 py-0.5 text-meta text-ink-tertiary hover:bg-state-hover hover:text-ink"
+        className="shrink-0 rounded px-1.5 py-0.5 text-meta text-[#bdbdbd] hover:bg-white/10 hover:text-white"
         data-testid="terminal-searchbar-prev"
       >
         ↑
@@ -98,7 +98,7 @@ export function TerminalSearchBar({
         type="button"
         onClick={() => onStep(1)}
         title={t('artifact.terminalView.searchNext')}
-        className="shrink-0 rounded px-1.5 py-0.5 text-meta text-ink-tertiary hover:bg-state-hover hover:text-ink"
+        className="shrink-0 rounded px-1.5 py-0.5 text-meta text-[#bdbdbd] hover:bg-white/10 hover:text-white"
         data-testid="terminal-searchbar-next"
       >
         ↓
@@ -107,7 +107,7 @@ export function TerminalSearchBar({
         type="button"
         onClick={onClose}
         title={t('artifact.terminalView.searchClose')}
-        className="shrink-0 rounded px-1.5 py-0.5 text-meta text-ink-tertiary hover:bg-state-hover hover:text-ink"
+        className="shrink-0 rounded px-1.5 py-0.5 text-meta text-[#bdbdbd] hover:bg-white/10 hover:text-white"
         data-testid="terminal-searchbar-close"
       >
         ✕

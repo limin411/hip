@@ -333,10 +333,11 @@
   }
 }
 
-/* codeBlock：pre padding 24px + strut 4px + 行高 21.7/2 → 中心约 +39px，菜单中心 +15px */
+/* codeBlock（含头栏）：头栏 28px + pre 上距 12px + strut 3px + 行高 21.7/2
+    → 首行中心约 +54px，菜单中心 +15px → 下移 39px（headless 实测校准） */
 .knowledge-blocknote-editor
   .bn-side-menu[data-block-type='codeBlock'] {
-  --kb-handle-shift: 24px;
+  --kb-handle-shift: 39px;
 }
 
 .knowledge-blocknote-editor .bn-side-menu .bn-button,

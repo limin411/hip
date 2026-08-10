@@ -16,6 +16,11 @@ export interface SpawnShellOptions {
   signal?: AbortSignal
   onStdout?: (chunk: string) => void
   onStderr?: (chunk: string) => void
+  /**
+   * Optional argv prefix that replaces the plain shell spawn (G4): the whole
+   * command runs inside this wrapper (e.g. sandbox-exec -p <profile> …).
+   */
+  wrapperArgv?: string[]
 }
 
 export interface SpawnedShell {
@@ -68,9 +73,10 @@ export async function killProcessTree(pid: number | null | undefined, child?: Ch
  */
 export function spawnShell(opts: SpawnShellOptions): SpawnedShell {
   const win = isWin()
-  const shell = win ? 'cmd' : 'sh'
-  const shellArgs = win ? ['/c', opts.command] : ['-c', opts.command]
-  const child = spawn(shell, shellArgs, {
+  // G4: sandbox wrapper replaces the plain `sh -c <command>` spawn.
+  const wrapper = opts.wrapperArgv && opts.wrapperArgv.length > 0 ? opts.wrapperArgv : null
+  const argv = wrapper ?? (win ? ['cmd', '/c', opts.command] : ['sh', '-c', opts.command])
+  const child = spawn(argv[0], argv.slice(1), {
     cwd: opts.cwd,
     env: opts.env ?? process.env,
     detached: !win,

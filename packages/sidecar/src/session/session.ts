@@ -118,6 +118,7 @@ import { processInput, runTurn, runManagedAgentTurn, type SessionTurnHost } from
 import { ElicitationCoordinator } from './elicitation.js'
 import { PendingBackgroundResults } from './background-inject.js'
 import { RolloutBudget, formatRolloutReminder } from './rollout-budget.js'
+import { decideSandbox } from './sandbox/index.js'
 import { runBackgroundSubagent, loadSubagentMessages } from './session-background.js'
 import { resume, regenerate, handlePlanResponse, retrySubagent, resumeSubagent } from './session-turn-ops.js'
 
@@ -461,6 +462,26 @@ export class Session {
       maxTasks: Session.MAX_BACKGROUND_TASKS,
       maxRetainedMeta: Session.MAX_RETAINED_BACKGROUND_META,
       caps: { agent: Session.MAX_BACKGROUND_TASKS, shell: 20, monitor: 10, schedule: 50, globalRunning: 40 },
+      // G4: OS-level sandbox for unattended shell/monitor spawns ([sandbox] mode).
+      sandbox: (kind) => {
+        try {
+          const cwd = this._config.cwd ?? process.cwd()
+          const sb = resolveEffectiveConfig(cwd).sandbox
+          if (!sb || !sb.mode || sb.mode === 'off') {
+            return { active: false, reason: 'off' }
+          }
+          return decideSandbox({
+            cwd,
+            permissionMode: this._config.permissionMode,
+            unattended: true,
+            mode: sb.mode,
+            readOnlyRoots: sb.readOnlyRoots,
+            allowNetwork: sb.allowNetwork,
+          })
+        } catch {
+          return { active: false, reason: 'off' }
+        }
+      },
     })
 
     this.cronManager = new CronManager(id, store)

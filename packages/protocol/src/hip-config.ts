@@ -112,6 +112,18 @@ export interface TaskRuntimeConfig {
 }
 
 /**
+ * Optional `[sandbox]` section in hip.toml — OS-level sandbox enforcement (G4).
+ * `off` (default) | `auto` (unattended executions only) | `require` (every shell spawn).
+ */
+export interface SandboxConfig {
+  mode?: 'off' | 'auto' | 'require'
+  /** Extra read-only roots for the sandbox (absolute paths). */
+  readOnlyRoots?: string[]
+  /** Allow outbound network inside the sandbox (default false). */
+  allowNetwork?: boolean
+}
+
+/**
  * Preferred interactive shell for the code-panel Terminal tab.
  * - `default`: platform default (Windows → cmd; Unix → `$SHELL` then zsh/bash)
  * - `cmd` / `powershell` / `pwsh`: Windows shells
@@ -580,6 +592,11 @@ export interface HipConfig {
   context?: ContextConfig
   /** Optional TaskRuntime (shell bg / monitor / scheduler / wake). */
   taskRuntime?: TaskRuntimeConfig
+  /**
+   * Optional OS-level sandbox enforcement (G4): `off` (default), `auto`
+   * (unattended executions only), `require` (every shell spawn).
+   */
+  sandbox?: SandboxConfig
   /** Optional interactive Terminal defaults. */
   terminal?: TerminalConfig
   /** Optional code-block color preference. */

@@ -189,6 +189,8 @@ export interface TaskRuntimeOpts {
   caps?: Partial<TaskCaps>
   /** Session-level broadcast (no IdleWatchdog). */
   broadcast?: (msg: ServerMessage) => void
+  /** G4: per-spawn sandbox decision resolver (shell/monitor). */
+  sandbox?: SandboxResolver
 }
 
 export interface SpawnShellOpts {
@@ -199,6 +201,12 @@ export interface SpawnShellOpts {
   originTurnId?: string | null
   originToolCallId?: string | null
 }
+
+/**
+ * G4: sandbox resolver — returns an active SandboxDecision (with argv) or
+ * inactive. Consulted per shell/monitor spawn.
+ */
+export type SandboxResolver = (kind: 'shell' | 'monitor') => import('./sandbox/index.js').SandboxDecision
 
 export interface SpawnMonitorOpts {
   command: string
@@ -241,6 +249,8 @@ export class BackgroundManager {
   private broadcast?: (msg: ServerMessage) => void
   private shellSeq = 0
   private monSeq = 0
+  /** G4: per-spawn sandbox decision resolver. */
+  private readonly sandbox?: SandboxResolver
 
   constructor(
     private readonly sessionId: string,
@@ -253,6 +263,13 @@ export class BackgroundManager {
     this.maxRetainedMeta = opts?.maxRetainedMeta ?? 50
     this.persistence = opts?.persistence
     this.broadcast = opts?.broadcast
+    this.sandbox = opts?.sandbox
+  }
+
+  /** G4: resolve wrapper argv for a spawn kind, or undefined when inactive. */
+  private sandboxArgv(kind: 'shell' | 'monitor'): string[] | undefined {
+    const decision = this.sandbox?.(kind)
+    return decision?.active ? decision.argv : undefined
   }
 
   setBroadcast(fn: (msg: ServerMessage) => void): void {
@@ -502,6 +519,7 @@ export class BackgroundManager {
       signal: ac.signal,
       onStdout: (c) => this.appendOutput(taskId, c),
       onStderr: (c) => this.appendOutput(taskId, c),
+      ...(this.sandboxArgv('shell') ? { wrapperArgv: this.sandboxArgv('shell') } : {}),
     })
 
     const meta: BackgroundTaskMeta = {
@@ -651,6 +669,7 @@ export class BackgroundManager {
       signal: ac.signal,
       onStdout: onData,
       onStderr: onData,
+      ...(this.sandboxArgv('monitor') ? { wrapperArgv: this.sandboxArgv('monitor') } : {}),
     })
 
     const meta: BackgroundTaskMeta = {

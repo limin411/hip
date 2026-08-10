@@ -567,6 +567,24 @@ function validateConfig(parsed: unknown, filePath: string): HipConfig {
     config.context = normalizeContext(context as Record<string, unknown>)
   }
 
+  const sandbox = obj.sandbox
+  if (sandbox && typeof sandbox === 'object' && !Array.isArray(sandbox)) {
+    const raw = sandbox as Record<string, unknown>
+    const mode = raw.mode
+    config.sandbox = {
+      mode:
+        mode === 'off' || mode === 'auto' || mode === 'require'
+          ? mode
+          : mode === undefined
+            ? undefined
+            : 'auto',
+      ...(Array.isArray(raw.readOnlyRoots ?? raw.read_only_roots)
+        ? { readOnlyRoots: (raw.readOnlyRoots ?? raw.read_only_roots) as string[] }
+        : {}),
+      ...(typeof raw.allowNetwork === 'boolean' ? { allowNetwork: raw.allowNetwork } : {}),
+    }
+  }
+
   const terminal = obj.terminal
   if (terminal && typeof terminal === 'object' && !Array.isArray(terminal)) {
     config.terminal = normalizeTerminal(terminal as Record<string, unknown>)

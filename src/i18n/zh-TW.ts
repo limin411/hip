@@ -1817,7 +1817,6 @@ export const zhTW = {
       "stop": "停止本輪",
       "reconnect": "重新連接",
       "ptyDead": "終端已斷線。重新連接後才能執行指令。",
-      "acpLimited": "該智能體的內建 shell 不會寫入本 SSH 工作階段。",
       "execTitle": "在 SSH 終端中執行",
       "execHint": "指令會輸入到你可見的共享終端。",
       "execTimedOut": "指令可能仍在執行",

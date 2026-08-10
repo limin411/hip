@@ -1873,8 +1873,6 @@ export const en = {
         stop: 'Stop turn',
         reconnect: 'Reconnect',
         ptyDead: 'Terminal disconnected. Reconnect to run commands.',
-        acpLimited:
-          'This agent\u2019s built-in shell does not drive the SSH session.',
         execTitle: 'Run in SSH terminal',
         execHint: 'This will be typed into the shared session.',
         execTimedOut: 'Command may still be running',

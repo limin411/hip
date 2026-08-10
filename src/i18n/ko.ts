@@ -1814,7 +1814,6 @@ export const ko = {
       "stop": "턴 중지",
       "reconnect": "다시 연결",
       "ptyDead": "터미널이 연결 해제되었습니다. 명령을 실행하려면 다시 연결하세요.",
-      "acpLimited": "이 에이전트의 내장 셸은 SSH 세션에 쓰지 않습니다.",
       "execTitle": "SSH 터미널에서 실행",
       "execHint": "보이는 공유 터미널에 입력됩니다.",
       "execTimedOut": "명령이 아직 실행 중일 수 있습니다",

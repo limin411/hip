@@ -1831,7 +1831,6 @@ export const zhCN = {
         stop: '停止本轮',
         reconnect: '重新连接',
         ptyDead: '终端已断开。重新连接后才能执行命令。',
-        acpLimited: '该智能体的内置 shell 不会写入本 SSH 会话。',
         execTitle: '在 SSH 终端中执行',
         execHint: '命令会输入到你可见的共享终端。',
         execTimedOut: '命令可能仍在运行',

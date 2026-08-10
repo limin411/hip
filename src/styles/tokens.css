@@ -490,3 +490,57 @@ a:hover {
 .border-danger-soft {
   border-color: color-mix(in srgb, var(--danger) 60%, transparent);
 }
+
+/* Composer danger animations — full-access permission state.
+   Running (turn in flight) → gradient border flow; idle/stopped → soft glow pulse.
+   Static base stays .border-danger-soft; prefers-reduced-motion global fallback
+   (above) freezes both to the static red border. */
+.composer-danger-flow {
+  border-color: transparent;
+}
+.composer-danger-flow::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  padding: 1.5px;
+  background: conic-gradient(
+    from var(--danger-flow-angle),
+    transparent 0deg,
+    var(--danger) 55deg,
+    transparent 115deg,
+    transparent 180deg,
+    var(--danger) 235deg,
+    transparent 295deg
+  );
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  mask-composite: exclude;
+  pointer-events: none;
+  animation: danger-flow-spin 3.6s linear infinite;
+}
+@property --danger-flow-angle {
+  syntax: "<angle>";
+  initial-value: 0deg;
+  inherits: false;
+}
+@keyframes danger-flow-spin {
+  to {
+    --danger-flow-angle: 360deg;
+  }
+}
+.composer-danger-glow {
+  animation: danger-glow 2.2s ease-in-out infinite;
+}
+@keyframes danger-glow {
+  0%,
+  100% {
+    border-color: color-mix(in srgb, var(--danger) 60%, transparent);
+    box-shadow: 0 0 0 0 color-mix(in srgb, var(--danger) 18%, transparent);
+  }
+  50% {
+    border-color: var(--danger);
+    box-shadow: 0 0 16px 2px color-mix(in srgb, var(--danger) 32%, transparent);
+  }
+}

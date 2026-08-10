@@ -595,8 +595,13 @@ function CompactComposer({
       <div
         className={cn(
           'relative rounded-lg border bg-surface-subtle p-2.5 transition-colors duration-chrome',
-          // Full access — red border, chat composer parity (keep the danger border on focus).
-          mode === 'full' ? 'border-danger-soft' : 'border-border focus-within:border-accent/40',
+          // Full access — red border, chat composer parity: gradient flow while a
+          // turn runs, glow pulse when idle/stopped.
+          mode === 'full'
+            ? running
+              ? 'composer-danger-flow'
+              : 'composer-danger-glow border-danger-soft'
+            : 'border-border focus-within:border-accent/40',
         )}
         data-testid="terminal-composer-card"
       >

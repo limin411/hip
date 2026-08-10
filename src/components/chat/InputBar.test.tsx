@@ -130,6 +130,24 @@ describe('InputBar', () => {
     expect(root.className).not.toContain('border-border')
   })
 
+  it('full-access composer switches to the gradient flow border while a turn runs', () => {
+    baseMocks()
+    vi.mocked(domain.useActiveSessionStatus).mockReturnValue('running')
+    vi.spyOn(domain, 'useActiveSession').mockReturnValue({
+      id: 's1',
+      config: { llmProvider: 'openai', model: 'gpt-4o', tools: [], surface: 'chat' as const, permissionMode: 'full' },
+      title: '',
+      preview: '',
+      messages: [],
+    } as any)
+
+    render(<InputBar />)
+    const root = screen.getByTestId('composer')
+    // Turn in flight → animated gradient border (not the idle glow).
+    expect(root.className).toContain('composer-danger-flow')
+    expect(root.className).not.toContain('composer-danger-glow')
+  })
+
   it('insertComposerText preserves existing draft (does not replace)', async () => {
     baseMocks()
     vi.spyOn(domain, 'useActiveSession').mockReturnValue({

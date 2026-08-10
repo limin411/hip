@@ -74,8 +74,9 @@ export function Composer({
    */
   footer?: React.ReactNode
   /**
-   * Danger tone: swaps the card border to danger red (armed control-permission
-   * mode). Only affects the `card` variant.
+   * Danger tone (full-access permission state): swaps the card border to danger red.
+   * While `running` the border animates as a flowing gradient; idle/stopped it
+   * settles into a soft glow pulse. Only affects the `card` variant.
    */
   danger?: boolean
 }) {
@@ -89,8 +90,12 @@ export function Composer({
       className={cn(
         isCard
           ? cn(
-              'rounded-lg border bg-surface-subtle p-2.5',
-              danger ? 'border-danger-soft' : 'border-border',
+              'relative rounded-lg border bg-surface-subtle p-2.5',
+              danger
+                ? running
+                  ? 'composer-danger-flow'
+                  : 'composer-danger-glow border-danger-soft'
+                : 'border-border',
             )
           // Flat dock: no focus chrome — InputBar already draws the top rule.
           : 'bg-surface-subtle',

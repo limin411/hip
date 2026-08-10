@@ -383,6 +383,26 @@ describe('TerminalAgentPanel tool card collapsing', () => {
     unmount()
   })
 
+  it('full-access composer shows the gradient flow border while a turn runs', () => {
+    useDomainStore.setState((s) => ({
+      sessions: s.sessions.map((x) =>
+        x.id === 'ta_1'
+          ? {
+              ...x,
+              status: 'running',
+              config: { ...x.config, permissionMode: 'full' as const },
+            }
+          : x,
+      ),
+    }))
+    const { unmount } = render(<TerminalAgentPanel terminalId="tm_1" />)
+    const card = screen.getByTestId('terminal-composer-card')
+    // Turn in flight → animated gradient border (not the idle glow).
+    expect(card.className).toContain('composer-danger-flow')
+    expect(card.className).not.toContain('composer-danger-glow')
+    unmount()
+  })
+
   it('sends unknown slash text (e.g. /compcat typo) as a normal message', () => {
     const sendSpy = vi.spyOn(sessionService, 'sendMessageToSession').mockImplementation(() => {})
     const { unmount } = render(<TerminalAgentPanel terminalId="tm_1" />)

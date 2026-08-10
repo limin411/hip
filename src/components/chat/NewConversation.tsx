@@ -365,7 +365,13 @@ export function NewConversation() {
             autoFocus
             submitDisabled={!canSend}
             inputRef={inputRef}
-            danger={draft?.controlPermission === true || draft?.permissionMode === 'full'}
+            // Surface-scoped danger, mirroring configFromDraft: chat only arms via its
+            // own controlPermission radio; the code permission picker (permissionMode)
+            // must not tint the chat empty state.
+            danger={
+              draft?.controlPermission === true ||
+              (surface === 'code' && draft?.permissionMode === 'full')
+            }
             leftSlot={
               <ComposerLeftSlot
                 surface={surface}

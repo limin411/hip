@@ -249,6 +249,22 @@ describe('NewConversation', () => {
     expect(screen.getByTestId('composer').className).not.toContain('border-border')
   })
 
+  it('chat new-conversation composer is not red from a code-surface permissionMode leak', () => {
+    // Permission picker is code-only; a full value left on the shared draft by the
+    // project new-task must not tint the chat empty-state composer (chat arms via
+    // its own controlPermission radio only).
+    setDraftModel('openai/gpt-4o')
+    useDraftStore.setState({
+      draft: {
+        ...useDraftStore.getState().draft!,
+        permissionMode: 'full',
+      },
+    })
+    render(<NewConversation />)
+    expect(screen.getByTestId('composer').className).toContain('border-border')
+    expect(screen.getByTestId('composer').className).not.toContain('border-danger')
+  })
+
   it('hides roundtable starter on code surface', () => {
     mockActiveView = 'code'
     setDraftModel('openai/gpt-4o')

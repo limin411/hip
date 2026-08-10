@@ -38,6 +38,7 @@ import { readAgentsConfig } from './agents/index.js'
 import { RealModelRunner, LazyModelRunner, type ModelRunner } from './model-runner.js'
 import { runSubagent } from './subagent.js'
 import { synthesizeSubagentResult } from './subagent-result.js'
+import { collectTurnDiff } from './turn-diff-tracker.js'
 import { recursionLimit, childMaxStepsForAgent, maxStepsForSession } from './loop-control.js'
 import type { Activity, ActivityTracker } from './activity.js'
 import type { GoalManager } from './goal.js'
@@ -659,6 +660,22 @@ export async function runManagedAgentTurn(host: SessionTurnHost, input: SessionI
   // cwd/project state) returns a stripped message and the sub-agent activity vanishes.
   // Persist assistant even when agentText is empty so tool-only turns keep message_id linkage.
   const hasWork = !!finalAgentText || runs.length > 0 || timeline.length > 0
+  // G2: best-effort per-turn workspace diff, fired and forgotten (100ms cap).
+  // Rides the last step's loop.timing event via `turnDiff` when cwd is a git repo.
+  if (cwd) {
+    void collectTurnDiff(cwd).then((turnDiff) => {
+      if (!turnDiff) return
+      emitLoopSignal(emit.loopSignal, {
+        type: 'loop.timing',
+        sessionId: host.id,
+        turnId,
+        agentId: 'supervisor',
+        step: (trajectory.get(agent.id)?.stepCount ?? 0) + 1,
+        timing: { ttftMs: 0, ttfmMs: 0, totalMs: 0 },
+        turnDiff,
+      })
+    })
+  }
   host.emit({ type: 'step_ended', sessionId: host.id, turnId, agentId: 'supervisor', timestamp: Date.now() }, {
     usage: turnUsage,
     runs,

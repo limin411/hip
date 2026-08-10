@@ -39,6 +39,17 @@ export interface HipRunResult {
     outputTokens: number
     totalTokens: number
   }
+  /**
+   * Per-step model-call timing (G2, optional, backward compatible): derived
+   * from trace.jsonl loop.timing events. Absent on older sidecars / when
+   * timing is disabled.
+   */
+  turnTiming?: Array<{
+    step: number
+    ttftMs: number
+    ttfmMs: number
+    totalMs: number
+  }>
   tools: Array<{
     callId: string
     name: string

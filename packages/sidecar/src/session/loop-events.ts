@@ -12,6 +12,7 @@
  */
 
 import type { LoopMetricsCounters, TokensByType } from '@hip/protocol'
+import type { TurnTimingStats } from './turn-timing.js'
 
 export type LoopNudgeReason = 'doom' | 'error_streak' | 'path_hit' | 'replan' | 'plan_exit'
 export type LoopPauseKind = 'doom' | 'plan' | 'subagent_pause'
@@ -107,6 +108,21 @@ export type LoopEvent =
       metrics: LoopMetricsCounters
       tokens?: TokensByType
       hybrid?: boolean
+    }
+  /**
+   * Per-step model-call timing (G2): TTFT/TTFM/total for one model call.
+   * Emitted by the supervisor graph after each `runModel`; turn-level diff
+   * summary rides on the final step's event via `turnDiff`.
+   */
+  | {
+      type: 'loop.timing'
+      sessionId: string
+      turnId: string
+      agentId: string
+      step: number
+      timing: TurnTimingStats
+      /** Turn-level workspace diff summary, present on the last step of a turn. */
+      turnDiff?: { files: number; additions: number; deletions: number }
     }
 
 /** Sync, best-effort sink. Implementations must not throw into the agent loop. */

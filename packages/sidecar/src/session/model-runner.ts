@@ -9,6 +9,7 @@ import { withRetry, isRetryable, MAX_RETRIES } from './retry.js'
 import { logInfo, logDebug } from '../debug-logger.js'
 import { parseDsmlToolCalls, hasDsmlToolCalls } from './dsml.js'
 import { createThinkTagStreamSplitter } from './think-tags.js'
+import type { TurnTimingStats } from './turn-timing.js'
 import { prepareAnthropicMessages } from './anthropic-messages.js'
 import {
   applyAnthropicToolCacheBreakpoints,
@@ -57,6 +58,11 @@ export interface ModelRunOptions {
   promptCacheKeyMode?: PromptCacheKeyMode | string
   /** Session id for OpenAI prompt_cache_key (also read from metadata.sessionId). */
   sessionId?: string
+  /**
+   * Optional per-call timing callback (G2): called once when the model call
+   * finishes, with TTFT/TTFM/total in ms. Zero-cost when omitted.
+   */
+  onTiming?: (t: TurnTimingStats) => void
 }
 
 /**
@@ -258,6 +264,10 @@ export class RealModelRunner implements ModelRunner {
     let emitted = false
     const attempt = async (): Promise<AIMessage> => {
       const t0 = Date.now()
+      let firstTokenAt: number | null = null
+      const markFirstToken = () => {
+        if (firstTokenAt === null) firstTokenAt = Date.now()
+      }
       logDebug('model', 'stream:start', { model: (bound as any).model ?? (bound as any).modelName ?? 'unknown' })
       const stream = await bound.stream(input, {
         signal: opts.signal,
@@ -277,12 +287,12 @@ export class RealModelRunner implements ModelRunner {
         if (!raw) return
         const { text, reasoning } = thinkSplit.push(raw)
         if (text) {
-          if (firstToken) { firstToken = false; logDebug('model', 'first-token', { latencyMs: Date.now() - t0 }) }
+          if (firstToken) { firstToken = false; markFirstToken(); logDebug('model', 'first-token', { latencyMs: Date.now() - t0 }) }
           emitted = true
           opts.onText(text)
         }
         if (reasoning) {
-          if (firstToken) { firstToken = false; logDebug('model', 'first-token', { latencyMs: Date.now() - t0, kind: 'reasoning' }) }
+          if (firstToken) { firstToken = false; markFirstToken(); logDebug('model', 'first-token', { latencyMs: Date.now() - t0, kind: 'reasoning' }) }
           emitted = true
           opts.onReasoning(reasoning)
         }
@@ -292,7 +302,7 @@ export class RealModelRunner implements ModelRunner {
         // Native reasoning blocks / reasoning_content first (DeepSeek, Anthropic thinking, MiniMax reasoning_split).
         const r = reasoningDelta(chunk)
         if (r) {
-          if (firstToken) { firstToken = false; logDebug('model', 'first-token', { latencyMs: Date.now() - t0, kind: 'reasoning' }) }
+          if (firstToken) { firstToken = false; markFirstToken(); logDebug('model', 'first-token', { latencyMs: Date.now() - t0, kind: 'reasoning' }) }
           emitted = true
           opts.onReasoning(r)
         }
@@ -301,7 +311,7 @@ export class RealModelRunner implements ModelRunner {
         // Tool-call arg streams often have empty content; still count as progress so
         // the turn idle watchdog does not fire mid write_file / large edit generation.
         if (hasToolCallStreamActivity(chunk)) {
-          if (firstToken) { firstToken = false; logDebug('model', 'first-token', { latencyMs: Date.now() - t0, kind: 'tool_call' }) }
+          if (firstToken) { firstToken = false; markFirstToken(); logDebug('model', 'first-token', { latencyMs: Date.now() - t0, kind: 'tool_call' }) }
           emitted = true
           opts.onActivity?.()
         }
@@ -309,7 +319,19 @@ export class RealModelRunner implements ModelRunner {
       const tail = thinkSplit.flush()
       if (tail.text) { emitted = true; opts.onText(tail.text) }
       if (tail.reasoning) { emitted = true; opts.onReasoning(tail.reasoning) }
-      logInfo('model', 'stream:end', { totalMs: Date.now() - t0, contentLen: typeof gathered?.content === 'string' ? gathered.content.length : 0, hadText: emitted })
+      const endedAt = Date.now()
+      logInfo('model', 'stream:end', { totalMs: endedAt - t0, contentLen: typeof gathered?.content === 'string' ? gathered.content.length : 0, hadText: emitted })
+      if (opts.onTiming) {
+        try {
+          opts.onTiming({
+            ttftMs: firstTokenAt !== null ? firstTokenAt - t0 : endedAt - t0,
+            ttfmMs: endedAt - t0,
+            totalMs: endedAt - t0,
+          })
+        } catch {
+          /* observability must never throw into the loop */
+        }
+      }
       if (!gathered) throw new Error('model produced no output')
       // Collapse micro text/reasoning blocks from stream concat before DSML recovery
       // and before the message enters graph state.

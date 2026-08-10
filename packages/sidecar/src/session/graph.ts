@@ -843,6 +843,16 @@ export function buildGraph(maxSteps: number = MAX_STEPS, compactBudget: number =
         onText: (d) => emit.token(d),
         onReasoning: (d) => emit.reasoning(d),
         onActivity: () => emit.activity?.(),
+        // G2: per-step model-call timing → loop.timing observability event.
+        onTiming: (timing) => {
+          emitLoopSignal(emit.loopSignal, {
+            type: 'loop.timing',
+            ...loopIds(ctx),
+            agentId: ctx.agentId ?? 'supervisor',
+            step: state.steps + 1,
+            timing,
+          })
+        },
         // PR-7b: provider cache policy from [context] + env
         cachePolicy: cp.cachePolicy,
         promptCacheKeyMode: cp.promptCacheKey,

@@ -146,13 +146,15 @@
 
 /*
  * Chat CodeBlock-style chrome: header row owns the language picker, code
- * lives below it — the label never overlaps the text.
+ * lives below it — the label never overlaps the text. Pill sits at the
+ * right end of the header (GitHub-style, top-right of the block).
  */
 .knowledge-blocknote-editor
   .bn-block-content[data-content-type='codeBlock']
   > div {
   display: flex;
   align-items: center;
+  justify-content: flex-end;
   height: 28px;
   padding: 0 10px;
   border-bottom: 1px solid color-mix(in srgb, var(--kb-code-fg) 14%, transparent);

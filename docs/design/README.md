@@ -1,6 +1,6 @@
 # docs/design 目录索引
 
-按系列分目录，目录名 = 原文件名前缀；每个系列三件套：`*-spec.md`（规格）· `*-plan.md`（执行计划）· `*-preview.html`（高保真预览，浏览器直接打开）。
+按系列分目录，目录名 = 原文件名前缀。通常包含 `*-spec.md`（规格）与 `*-plan.md`（执行计划）；涉及视觉/交互的系列另有 `*-preview.html`（高保真预览，浏览器直接打开），无 UI 改动的系列不提供。
 
 ## 文档管理域（knowledge）
 
@@ -10,9 +10,17 @@
 | `doc-block-menu-delete-row/` | 块菜单删除行整改（Turn into/Duplicate/删除） | `doc-block-menu-delete-row-{spec,plan,preview}` |
 | `doc-notion-polish/` | 文档域 Notion 化整改（纸张子语言/视觉） | `doc-notion-polish-{spec,plan,preview}` |
 | `doc-ux-polish-2/` | 操作交互与视觉体验第二弹 | `doc-ux-polish-2-{spec,plan,preview}` |
-| `doc-terminal-capability-gap/` | 终端能力补齐（对照 alacritty 差距分析） | `terminal-capability-gap-spec.md` + `-plan.md`（P0 执行中）+ `terminal-capability-gap-preview.html`（高保真原型） |
+| `doc-terminal-capability-gap/` | 终端能力补齐（对照 alacritty 差距分析） | `terminal-capability-gap-spec.md` + `-plan.md`（P0 已完成 2026-08-10，P1–P3 待排期）+ `terminal-capability-gap-preview.html`（高保真原型） |
+
+## 其它系列
+
+| 目录 | 业务 | 文件 |
+|---|---|---|
+| `agent-capability-upgrade/` | 内置智能体能力升级（长编程工程任务方向） | `agent-capability-upgrade-{spec,plan}`（草案待评审；无 UI 改动，无 preview） |
+| `doc-international-font-guide/` | 跨平台字体体系（拉丁打包 + CJK 系统回退） | `international_font_guide.md` + `international_font_plan.md`（计划待执行） |
+| `doc-terminal-nerd-fonts/` | 终端内嵌 JetBrainsMono Nerd Font 子集 | `terminal_nerd_font_spec.md`（已实施） |
 
 ## 约定
 
-- 新系列文档：目录名沿用系列前缀（如 `chat-xxx/`、`memory-xxx/`），保持 `spec/plan/preview` 三件套。
+- 新系列文档：目录名沿用系列前缀（如 `chat-xxx/`、`memory-xxx/`），按需提供 `spec/plan`（视觉类系列附 `preview`）。
 - 系列内互相引用使用仓库根绝对路径（`docs/design/<series>/<file>`）。

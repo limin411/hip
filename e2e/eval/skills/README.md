@@ -16,7 +16,7 @@
    - `trigger.positive`：应路由到该技能的查询（会被断言 top-1）；
    - `trigger.negative`：不应路由到该技能的查询（会被断言弱匹配）；
    - `evals[]`（可选）：行为样例 `{ id, prompt, expectations[], kind }`。
-3. `yarn product:content --check` 会强制第 2 步（`scripts/generate-product-content.mjs` 的 `checkSkillEvalCases`），CI 同路径拦截。
+3. `yarn product:content:check` 会强制第 2 步（`scripts/generate-product-content.mjs` 的 `checkSkillEvalCases`），CI 同路径拦截。
 
 ## 已知限制
 

@@ -40,7 +40,7 @@ yarn tauri build
   - `src/domain/` — session facade + wire actions（2026-08 重构后）
     - `sessionService.ts` — 瘦 facade：传输 + 入站分发 + 方法转发
     - `sessionStore/` — 会话视图模型目录（types/messageUtils/constants/store + reducers/ 四域分派，2026-08 拆分）
-    - `terminalLifecycle.ts` — 终端生命周期协调层（唯一跨 store 写入点，见 store-dependencies.md）
+    - `terminalLifecycle.ts` — 终端生命周期协调层（唯一跨 store 写入点）
     - `actions/sessionActions.ts` — 会话生命周期/配置/消息
     - `actions/fsActions.ts` — diff/git/文件浏览
     - `actions/memoryWire.ts` — 记忆/provider 探测
@@ -50,12 +50,12 @@ yarn tauri build
 - `packages/sidecar/` — Node.js sidecar that runs agents / tools
 - `packages/protocol/` — shared types between UI and sidecar
 
-Store 依赖纪律见 `docs/architecture/store-dependencies.md`（`yarn check:store-deps` 守护）。
+Store 依赖纪律由 `yarn check:store-deps` 守护。
 
 ## Long-task dogfood target
 
 - Repo: `/Users/lijiamin/data/code-repository/project-rust/make-stock-money` (`HIP_EVAL_MSM_PATH`)
-- Pack: `e2e/eval/tasks/make-stock-money/` · journal: `docs/design/msm-dogfood-journal.md`
+- Pack: `e2e/eval/tasks/make-stock-money/`
 - Unpaid gate: `yarn test:longrun-unit` or `yarn test:longrun-gate`
 - Live: `eval "$(scripts/hip-eval-bootstrap-msm.sh)"` then `yarn dogfood:msm -- --list`
 

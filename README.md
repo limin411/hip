@@ -27,7 +27,7 @@ _Screenshots coming soon — contributions welcome._
 | **Surfaces** | **Code** — full project workbench (files, git guidance, MCP, tools). **Chat** — lighter conversation; write previewable deliverables into the workspace for the artifacts panel. |
 | **Permissions** | **edit** (default, project sandbox), **chat** (read-only), **full** (user-granted whole filesystem). |
 | **Agents** | Supervisor plus roster agents (**explore** / **plan** / **coder**); agent-driven isolation and true parallel work via `task_batch`. |
-| **Extensibility** | Skills (`SKILL.md`), plugins, MCP servers, hooks — global under `~/.hip/` and project under `.hip/`. Conflict resolution: [extension-registry](./docs/design/extension-registry.md). |
+| **Extensibility** | Skills (`SKILL.md`), plugins, MCP servers, hooks — global under `~/.hip/` and project under `.hip/`. Conflict resolution via the extension registry (skill precedence: project > user > plugin > builtin; hip.toml MCP id wins). |
 | **Memory** | Cross-session memory **off by default**; enable under **Settings → Memory**. |
 | **CLI** | Attach-only `@hip/cli` for the **running** desktop app (`doctor`, `session`, `run`, `repl`). |
 | **Local-first** | Config, SQLite DB, skills, plugins, and logs live under `~/.hip/`. |
@@ -70,8 +70,8 @@ src-tauri/           Rust shell
 > API keys (e.g. DeepSeek) are entered in the app's **Settings** panel and stored in
 > `~/.hip/config/auth.json` (file mode `0600`) — primary store for LLM API keys.
 > The desktop app, standalone sidecar, and tests resolve keys from there (then
-> standard env vars such as `ANTHROPIC_API_KEY`, then `HIP_MODEL_*`). See
-> `docs/design/byok-spec.md`. **`~/.hip/config/` holds plaintext secrets; do not
+> standard env vars such as `ANTHROPIC_API_KEY`, then `HIP_MODEL_*`).
+> **`~/.hip/config/` holds plaintext secrets; do not
 > sync it to cloud drives or public dotfile repos.**
 
 ### Prerequisites

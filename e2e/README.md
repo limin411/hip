@@ -56,7 +56,6 @@ yarn test:e2e:eval-smoke
 #   yarn test:e2e:eval-orch     # L3 orchestration
 #   yarn test:e2e:eval-adv      # L4 adversarial
 #   scripts/hip-eval-ui-matrix.sh
-# Design: docs/design/2026-07-16-hip-capability-matrix-spec.md
 
 # Memory UI (unpaid; Settings / slash / citations harness)
 E2E_GREP=@memory yarn test:e2e

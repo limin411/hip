@@ -20,7 +20,7 @@
 | **界面（Surfaces）** | **Code** — 完整项目工作台（文件、git 指导、MCP、工具）。**Chat** — 更轻的会话面；可预览交付物写入工作区供工件面板展示。 |
 | **权限模式** | **edit**（默认，项目根沙箱）、**chat**（只读）、**full**（用户明确授权的全文件系统）。 |
 | **智能体** | Supervisor 与专用花名册（**explore** / **plan** / **coder**）；通过 `task_batch` 做真正的并行子任务。 |
-| **扩展** | 技能（`SKILL.md`）、插件、MCP、钩子——全局在 `~/.hip/`，项目在 `.hip/`。冲突裁决见 [extension-registry](./docs/design/extension-registry.md)（Skill 编排 / MCP 访问 / Plugin 打包）。 |
+| **扩展** | 技能（`SKILL.md`）、插件、MCP、钩子——全局在 `~/.hip/`，项目在 `.hip/`。冲突裁决走扩展注册表（技能优先级：项目 > 用户 > 插件 > 内置；hip.toml 的 MCP id 优先）。 |
 | **记忆** | 跨会话记忆**默认关闭**；在 **设置 → 记忆** 中开启。 |
 | **CLI** | 仅附着到**已运行**桌面应用的 `@hip/cli`（`doctor`、`session`、`run`、`repl`）。 |
 | **本地优先** | 配置、SQLite、技能、插件与日志均在 `~/.hip/`。 |

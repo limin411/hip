@@ -2,7 +2,6 @@
 
 > 本文档描述 hip **当前**的视觉风格（现代扁平化 / Flat Solid UI）。
 > 设计令牌的权威来源：`src/styles/tokens.css` 与 `tailwind.config.js`，本文档与之保持同步；若不一致，以代码为准。
-> 改造历史与迁移记录见 `docs/flat-design-spec.md`。
 
 ## 1. 设计原则
 
@@ -201,7 +200,6 @@
 |---|---|
 | `src/styles/tokens.css` | 全部颜色/间距/动效/滚动条 token（权威来源） |
 | `tailwind.config.js` | 颜色映射、字阶、圆角、阴影、keyframes/animation |
-| `docs/flat-design-spec.md` | 扁平化改造的历史 Spec 与迁移记录 |
 | `src/components/theme/ThemeProvider.tsx` | 主题/密度/window-focus 数据集切换 |
 | `src/components/ui/*` | 通用控件皮肤（Button / Input / Modal / Dropdown 等） |
 | `src/components/layout/*` | 侧栏 / 工具栏 / 标题栏 chrome |

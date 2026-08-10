@@ -26,7 +26,7 @@ and this project aims to follow [Semantic Versioning](https://semver.org/).
   - Pipeline: `yarn fonts:fetch` (scripts/fetch-nerd-font.mjs + font-manifest.json,
     pinned v3.5.0 with sha256 verification); OFL/MIT license texts ship with the assets.
 
-- **Flat design visual overhaul** (`docs/flat-design-spec.md`):
+- **Flat design visual overhaul**:
   - Surfaces are solid — native window vibrancy (macOS Sidebar / Win11 Mica /
     Win10 Acrylic) removed; window theme sync kept. `data-vibrancy` is always `solid`.
   - Hierarchy via 1px borders and value steps instead of shadows/translucency:
@@ -48,14 +48,13 @@ and this project aims to follow [Semantic Versioning](https://semver.org/).
   tiny/base/small under `~/.hip/models/whisper/`; mic appears only when enabled.
   **Release packages bundle `whisper-cli` by default** (`yarn package:macos` /
   `package:windows`; opt out with `HIP_BUNDLE_WHISPER=0`). Models are still not
-  shipped — download in Settings. Dev can use Homebrew or `scripts/make-whisper-bin.sh`
-  (`docs/design/composer-voice-input-whisper.md`). Audio stays on-device; no cloud ASR.
+  shipped — download in Settings. Dev can use Homebrew or `scripts/make-whisper-bin.sh`.
+  Audio stays on-device; no cloud ASR.
 - Apache License 2.0 (`LICENSE`, `NOTICE`) and open-source contributor docs
   (`CONTRIBUTING.md`, `CODE_OF_CONDUCT.md`, `SECURITY.md`, GitHub issue/PR templates)
 - Example config: `docs/examples/hip.toml.example`
 - Release notes: `docs/release.md`
-- **Extension registry** for plugin / skill / MCP conflict resolution
-  (`docs/design/extension-registry.md`):
+- **Extension registry** for plugin / skill / MCP conflict resolution:
   - Skill precedence: project > user > plugin > builtin (aligned with Settings / Tauri)
   - MCP: hip.toml id wins (including `enabled = false` name veto); capability
     fingerprint demotes duplicate packages/URLs unless `allowDuplicate = true`

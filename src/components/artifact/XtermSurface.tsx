@@ -21,6 +21,16 @@ import {
 } from '@/components/context-menu'
 import { cn } from '@/lib/utils'
 
+// ── 内置 Nerd Font 常量（SPEC: docs/design/doc-terminal-nerd-fonts/terminal_nerd_font_spec.md §6）──
+/** 内置 Nerd Font 族名（@font-face 见 src/styles/terminal-fonts.css） */
+const NERD_FONT_FAMILY = '"JetBrainsMono Nerd Font Mono"'
+/** 终端字号：fonts.load 与 Terminal 构造共用同一常量（§6.3 防测量错位） */
+const TERMINAL_FONT_SIZE = 13
+/** 字体栈：内置 Nerd Font 优先（p10k/starship 等图标），其余沿 --font-code 回退 */
+export const TERMINAL_FONT_STACK = `${NERD_FONT_FAMILY}, var(--font-code)`
+/** 字体加载兜底超时：字体失败不阻塞终端启动 */
+const FONT_LOAD_TIMEOUT_MS = 1500
+
 /**
  * Shared xterm host (D6a).
  *
@@ -128,18 +138,32 @@ export function XtermSurface({
       const [{ Terminal }, { FitAddon }] = await Promise.all([
         import('@xterm/xterm'),
         import('@xterm/addon-fit'),
+        import('@/styles/terminal-fonts.css'),
       ])
       await import('@xterm/xterm/css/xterm.css')
       if (disposed) return
+
+      // SPEC §6.3：内置 Nerd Font 必须在 Terminal open() 前完成度量，否则首屏
+      // 行宽错位、图标叠字。兜底超时：字体加载失败按回退栈照常启动。
+      if (typeof document.fonts?.load === 'function') {
+        await Promise.race([
+          Promise.all([
+            document.fonts.load(`400 ${TERMINAL_FONT_SIZE}px ${NERD_FONT_FAMILY}`),
+            document.fonts.load(`700 ${TERMINAL_FONT_SIZE}px ${NERD_FONT_FAMILY}`),
+            document.fonts.ready,
+          ]),
+          new Promise((r) => setTimeout(r, FONT_LOAD_TIMEOUT_MS)),
+        ])
+      }
 
       setLoadingXterm(false)
 
       term = new Terminal({
         scrollback: 5000,
         cursorBlink: true,
-        fontSize: 13,
+        fontSize: TERMINAL_FONT_SIZE,
         lineHeight: 1.25,
-        fontFamily: 'var(--font-code)',
+        fontFamily: TERMINAL_FONT_STACK,
         theme: resolveXtermTheme(
           useHipConfigStore.getState().config.terminal?.colorTheme,
         ),

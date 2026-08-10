@@ -9,6 +9,14 @@ and this project aims to follow [Semantic Versioning](https://semver.org/).
 
 ### Changed
 
+- **Terminal embeds a subset of JetBrainsMono Nerd Font Mono** (`docs/design/doc-terminal-nerd-fonts/terminal_nerd_font_spec.md`):
+  - p10k / starship / lsd / eza style private-use-area icons now render in the
+    xterm surface without users installing fonts (≈1.05 MB woff2, both weights).
+  - Fonts are loaded before the Terminal opens (timeout-guarded) so first paint
+    is not mis-measured; global `--font-code` and code blocks are untouched.
+  - Pipeline: `yarn fonts:fetch` (scripts/fetch-nerd-font.mjs + font-manifest.json,
+    pinned v3.5.0 with sha256 verification); OFL/MIT license texts ship with the assets.
+
 - **Flat design visual overhaul** (`docs/flat-design-spec.md`):
   - Surfaces are solid — native window vibrancy (macOS Sidebar / Win11 Mica /
     Win10 Acrylic) removed; window theme sync kept. `data-vibrancy` is always `solid`.

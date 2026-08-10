@@ -1,0 +1,25 @@
+/**
+ * 终端内置 Nerd Font（子集化 woff2）— SPEC:
+ * docs/design/doc-terminal-nerd-fonts/terminal_nerd_font_spec.md（§6.1）
+ *
+ * - 仅由 XtermSurface 按需 import（与 xterm 本体同生命周期，不污染全局字体栈）
+ * - 资产在 public/fonts/nerd/，dev 与 Tauri 生产均以 /fonts/nerd/ 可达，
+ *   CSP font-src 'self' data: 天然放行，无需改 CSP / tauri.conf.json
+ * - font-display: swap + boot 期 document.fonts.load 等待（§6.3），无 FOUT
+ * - 生成方式：yarn fonts:fetch（scripts/fetch-nerd-font.mjs + font-manifest.json）
+ */
+@font-face {
+  font-family: 'JetBrainsMono Nerd Font Mono';
+  src: url('/fonts/nerd/JetBrainsMonoNerdFontMono-Regular.woff2') format('woff2');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'JetBrainsMono Nerd Font Mono';
+  src: url('/fonts/nerd/JetBrainsMonoNerdFontMono-Bold.woff2') format('woff2');
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}

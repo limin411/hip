@@ -16,3 +16,15 @@ Whisper model weights are subject to the OpenAI Whisper model license /
 use terms as redistributed by the Hugging Face ggerganov/whisper.cpp repo.
 Models are downloaded on demand to ~/.hip/models/whisper/ and are not
 shipped in the hip application package.
+
+---
+
+The terminal embeds a subset of JetBrainsMono Nerd Font Mono (SIL OFL 1.1)
+  https://github.com/ryanoasis/nerd-fonts (release v3.5.0)
+  https://github.com/JetBrains/JetBrainsMono
+Generated via scripts/fetch-nerd-font.mjs (see scripts/font-manifest.json
+for pinned version and checksums). License texts ship alongside the font
+assets in public/fonts/nerd/ (LICENSE-OFL.txt, LICENSE-NerdFonts.txt).
+The underlying JetBrains Mono font is SIL OFL 1.1; the Nerd Fonts patch
+scripts are MIT. The subset woff2 files are included in all release
+packages by default.

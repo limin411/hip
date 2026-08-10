@@ -1,0 +1,36 @@
+{
+  "family": "JetBrainsMono Nerd Font Mono",
+  "upstream": {
+    "project": "ryanoasis/nerd-fonts",
+    "tag": "v3.5.0",
+    "zipUrl": "https://github.com/ryanoasis/nerd-fonts/releases/download/v3.5.0/JetBrainsMono.zip",
+    "zipSha256": "9577de1ae84ec523df16fc69bac5338b89497a5b4fb91489e2dcb79dc06ac2b5"
+  },
+  "fonts": [
+    {
+      "weight": 400,
+      "zipEntry": "JetBrainsMonoNerdFontMono-Regular.ttf",
+      "sha256": "474634cb9b0697a3a10b3da589e896794e1128b0c7c9b49678ec2e03194ce45a",
+      "output": "public/fonts/nerd/JetBrainsMonoNerdFontMono-Regular.woff2"
+    },
+    {
+      "weight": 700,
+      "zipEntry": "JetBrainsMonoNerdFontMono-Bold.ttf",
+      "sha256": "065befdc92f7ceb456ea76c76d95af5ef8e4bfd6beffa379bed11c41c4c74c2f",
+      "output": "public/fonts/nerd/JetBrainsMonoNerdFontMono-Bold.woff2"
+    }
+  ],
+  "glyphRanges": {
+    "ascii": [32, 126],
+    "latin1": [160, 255],
+    "punctuation": [8210, 8213, 8216, 8221, 8230],
+    "arrows": [8592, 8703],
+    "boxDrawingAndBlocks": [9472, 9631],
+    "miscSymbols": [11008, 11263],
+    "nerdPua": [57344, 63743]
+  },
+  "budget": {
+    "targetBytes": 3145728,
+    "hardLimitBytes": 4194304
+  }
+}

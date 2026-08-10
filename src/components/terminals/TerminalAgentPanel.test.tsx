@@ -224,6 +224,9 @@ describe('TerminalAgentPanel tool card collapsing', () => {
       'data-selected',
       'true',
     )
+    // Default border; full access turns the composer card red (chat composer parity).
+    expect(screen.getByTestId('terminal-composer-card')).toHaveClass('border-border')
+    expect(screen.getByTestId('terminal-composer-card')).not.toHaveClass('border-danger-soft')
     // Menu carries the title + per-mode descriptions (chat picker parity).
     expect(screen.getByTestId('terminal-permission-mode-menu')).toHaveTextContent(
       'chat.permission.menuTitle',
@@ -237,6 +240,8 @@ describe('TerminalAgentPanel tool card collapsing', () => {
       'data-selected',
       'true',
     )
+    expect(screen.getByTestId('terminal-composer-card')).toHaveClass('border-danger-soft')
+    expect(screen.getByTestId('terminal-composer-card')).not.toHaveClass('border-border')
     setModelFor.mockRestore()
     unmount()
   })

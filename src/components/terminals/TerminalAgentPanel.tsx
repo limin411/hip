@@ -592,7 +592,14 @@ function CompactComposer({
   const slashQuery = extractSlashQuery(text)
   return (
     <div className="shrink-0 px-3 pb-3 pt-1.5" data-testid="terminal-composer">
-      <div className="relative rounded-lg border border-border bg-surface-subtle p-2.5 transition-colors duration-chrome focus-within:border-accent/40">
+      <div
+        className={cn(
+          'relative rounded-lg border bg-surface-subtle p-2.5 transition-colors duration-chrome',
+          // Full access — red border, chat composer parity (keep the danger border on focus).
+          mode === 'full' ? 'border-danger-soft' : 'border-border focus-within:border-accent/40',
+        )}
+        data-testid="terminal-composer-card"
+      >
         {slashQuery !== null ? (
           <SlashCommandPalette
             value={text}

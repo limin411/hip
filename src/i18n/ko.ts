@@ -2939,6 +2939,7 @@ export const ko = {
       "copySelection": "복사",
       "copySelectionDisabled": "복사할 선택 항목 없음",
       "sendSelectionToChat": "선택 항목을 채팅으로 보내기",
+      "sendSelectionToChatNoComposer": "채팅 입력창을 찾을 수 없어 선택 항목을 클립보드에 복사했습니다.",
       "explainInAgent": "터미널 에이전트에서 설명",
       "explainInAgentDisabled": "SSH 관리 터미널에서만 사용할 수 있습니다",
       "paste": "붙여넣기"

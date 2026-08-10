@@ -2977,6 +2977,7 @@ export const zhCN = {
         copySelection: '复制',
         copySelectionDisabled: '没有可复制的选区',
         sendSelectionToChat: '发送选区到对话',
+        sendSelectionToChatNoComposer: '没有找到对话输入框，选区已复制到剪贴板。',
         explainInAgent: '在终端智能体中解释',
         explainInAgentDisabled: '仅 SSH 托管终端可用',
         paste: '粘贴',

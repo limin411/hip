@@ -4,6 +4,7 @@ import {
   bindTerminalCanvas,
 } from '@/components/artifact/terminalCanvasUi'
 import { useDomainStore } from '@/domain/sessionStore'
+import { useUiStore } from '@/store/uiStore'
 import { buildContextMenuItems } from '../registry'
 import { terminalProvider } from './terminal'
 import type { ContextMenuBuildContext } from '../types'
@@ -27,7 +28,7 @@ vi.mock('@/domain/sessionService', () => ({
   },
 }))
 
-function makeCtx(): ContextMenuBuildContext {
+function makeCtx(overrides?: Partial<ContextMenuBuildContext>): ContextMenuBuildContext {
   return {
     t: ((key: string) => key) as ContextMenuBuildContext['t'],
     isMac: true,
@@ -37,6 +38,7 @@ function makeCtx(): ContextMenuBuildContext {
     sessionStatus: 'idle',
     sessionInterrupt: false,
     copyText,
+    ...overrides,
   }
 }
 
@@ -184,5 +186,71 @@ describe('terminalProvider', () => {
     )
     const copy = items.find((i) => i.id === 'terminal.copySelection')!
     expect(copy.disabled).toBe(true)
+  })
+})
+
+describe('terminal.sendSelectionToChat run()', () => {
+  beforeEach(() => {
+    bindTerminalCanvas('s1', {
+      getSelection: () => 'tail -f app.log',
+      hasSelection: () => true,
+      paste: () => {},
+    })
+    useDomainStore.setState({
+      sessions: [
+        {
+          id: 's1',
+          title: 't',
+          status: 'idle',
+          config: { surface: 'code', cwd: '/work/proj' },
+        } as never,
+      ],
+      activeSessionId: 's1',
+    })
+  })
+
+  function runItem(ctxOverrides?: Partial<ContextMenuBuildContext>) {
+    const items = terminalProvider(
+      { kind: 'terminal', payload: { sessionId: 's1', status: 'running', target: 'canvas' } },
+      makeCtx(ctxOverrides),
+    )
+    return items.find((i) => i.id === 'terminal.sendSelectionToChat')!
+  }
+
+  it('returns to the active conversation when no composer is mounted (management page)', async () => {
+    // No composer registered → setComposerQuote fails; active session exists.
+    const setActiveView = vi.spyOn(useUiStore.getState(), 'setActiveView')
+    const item = runItem({ activeView: 'terminals', surface: null })
+    item.run()
+    expect(setActiveView).toHaveBeenCalledWith('code')
+    expect(copyText).not.toHaveBeenCalled()
+    setActiveView.mockRestore()
+  })
+
+  it('falls back to clipboard + toast without any conversation', async () => {
+    const item = runItem({ activeView: 'terminals', surface: null, activeSessionId: null })
+    useDomainStore.setState({ activeSessionId: null })
+    item.run()
+    await vi.waitFor(() => expect(copyText).toHaveBeenCalledWith('tail -f app.log'))
+  })
+
+  it('does not navigate when the active session is a terminal agent session', async () => {
+    useDomainStore.setState({
+      sessions: [
+        {
+          id: 'ag1',
+          title: 'agent',
+          status: 'idle',
+          config: { surface: 'terminal', managedTerminalId: 'tm_1' },
+        } as never,
+      ],
+      activeSessionId: 'ag1',
+    })
+    const setActiveView = vi.spyOn(useUiStore.getState(), 'setActiveView')
+    const item = runItem({ activeView: 'terminals', surface: null, activeSessionId: 'ag1' })
+    item.run()
+    expect(setActiveView).not.toHaveBeenCalled()
+    await vi.waitFor(() => expect(copyText).toHaveBeenCalled())
+    setActiveView.mockRestore()
   })
 })

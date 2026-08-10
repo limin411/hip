@@ -120,3 +120,15 @@ export function replaceComposerTextWhenReady(
 ): Promise<boolean> {
   return whenReady(() => replaceComposerText(text), opts)
 }
+
+/**
+ * Set a pending quote chip once a composer mounts (e.g. after switching from
+ * the terminal-management page back to a conversation surface). Resolves true
+ * if the quote landed within the attempt budget.
+ */
+export function setComposerQuoteWhenReady(
+  text: string | null,
+  opts?: { attempts?: number; intervalMs?: number },
+): Promise<boolean> {
+  return whenReady(() => setComposerQuote(text), opts)
+}

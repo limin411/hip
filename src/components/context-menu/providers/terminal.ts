@@ -1,12 +1,17 @@
 import { pickDirectory } from '@/ipc/dialog'
 import { readText } from '@/ipc/clipboard'
+import { toast } from 'sonner'
 import { requestTerminalRestart } from '@/components/artifact/terminalRestartUi'
 import {
   getTerminalCanvasSelection,
   pasteToTerminalCanvas,
   terminalCanvasHasSelection,
 } from '@/components/artifact/terminalCanvasUi'
-import { setComposerQuote } from '@/components/command-palette/composerBridge'
+import {
+  setComposerQuote,
+  setComposerQuoteWhenReady,
+} from '@/components/command-palette/composerBridge'
+import { surfaceOf } from '@/lib/sessions'
 import { useDomainStore } from '@/domain/sessionStore'
 import { sessionService } from '@/domain/sessionService'
 import { useUiStore } from '@/store/uiStore'
@@ -60,7 +65,23 @@ function canvasItems(
       run: () => {
         const text = getTerminalCanvasSelection(sessionId)
         if (!text) return
-        setComposerQuote(text)
+        // Chat/code surfaces have a mounted InputBar → quote chip lands immediately.
+        if (setComposerQuote(text)) return
+        // Terminal-management page has no composer (InputBar is chat/code only).
+        // Return to the active conversation and retry once its InputBar mounts;
+        // without a conversation, fall back to clipboard + a visible toast.
+        const activeId = ctx.activeSessionId
+        if (activeId) {
+          const sess = useDomainStore.getState().sessions.find((s) => s.id === activeId)
+          const surface = sess ? surfaceOf(sess.config) : 'chat'
+          if (surface === 'chat' || surface === 'code') {
+            useUiStore.getState().setActiveView(surface)
+            void setComposerQuoteWhenReady(text, { attempts: 20, intervalMs: 60 })
+            return
+          }
+        }
+        void ctx.copyText(text)
+        toast.info(ctx.t('contextMenu.terminal.sendSelectionToChatNoComposer'))
       },
     },
     {

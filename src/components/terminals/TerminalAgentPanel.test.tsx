@@ -217,14 +217,22 @@ describe('TerminalAgentPanel tool card collapsing', () => {
     expect(setModelFor).toHaveBeenCalledWith('ta_1', 'openai/gpt-4o-mini')
 
     // Permission mode: edit default; pick full → label + selection update.
+    // (test t() returns the key; chip shows the localized mode label.)
     const modeChip = screen.getByTestId('terminal-permission-mode')
-    expect(modeChip).toHaveTextContent('edit')
+    expect(modeChip).toHaveTextContent('chat.permission.modes.edit')
     expect(screen.getByTestId('terminal-permission-option-edit')).toHaveAttribute(
       'data-selected',
       'true',
     )
+    // Menu carries the title + per-mode descriptions (chat picker parity).
+    expect(screen.getByTestId('terminal-permission-mode-menu')).toHaveTextContent(
+      'chat.permission.menuTitle',
+    )
+    expect(screen.getByTestId('terminal-permission-option-edit')).toHaveTextContent(
+      'chat.permission.desc.edit',
+    )
     fireEvent.click(screen.getByTestId('terminal-permission-option-full'))
-    expect(modeChip).toHaveTextContent('full')
+    expect(modeChip).toHaveTextContent('chat.permission.modes.full')
     expect(screen.getByTestId('terminal-permission-option-full')).toHaveAttribute(
       'data-selected',
       'true',

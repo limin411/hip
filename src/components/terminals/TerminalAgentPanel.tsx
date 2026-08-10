@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import type { TFunction } from 'i18next'
 import {
@@ -6,7 +6,6 @@ import {
   Check,
   ChevronDown,
   ChevronRight,
-  KeyRound,
   Loader2,
   Plus,
   ShieldCheck,
@@ -370,81 +369,66 @@ function PermissionCard({
   )
 }
 
-function DropdownChip({
-  icon,
-  label,
-  active,
+/** Permission mode picker — chat composer parity: ShieldCheck chip with a
+ *  localized label; menu with title and per-mode descriptions. */
+function PermissionModeChip({
+  mode,
   disabled,
-  title,
-  testid,
-  menuTestid,
-  children,
+  onSelect,
 }: {
-  icon: ReactNode
-  label: string
-  active: boolean
-  disabled?: boolean
-  title: string
-  testid: string
-  menuTestid: string
-  children: ReactNode
+  mode: 'chat' | 'edit' | 'full'
+  disabled: boolean
+  onSelect: (m: 'chat' | 'edit' | 'full') => void
 }) {
+  const { t } = useTranslation()
   return (
     <DropdownMenu modal={false}>
       <DropdownMenuTrigger asChild>
         <ComposerChip
-          active={active}
+          active={mode !== 'edit'}
           disabled={disabled}
-          data-testid={testid}
-          title={title}
-          aria-label={title}
+          title={t('chat.permission.label')}
+          aria-label={t('chat.permission.label')}
+          data-testid="terminal-permission-mode"
         >
-          <span className="shrink-0" aria-hidden>
-            {icon}
-          </span>
-          <span className="max-w-[7rem] truncate">{label}</span>
+          <ShieldCheck size={13} strokeWidth={1.75} className="shrink-0" aria-hidden />
+          <span className="max-w-[7rem] truncate">{t(`chat.permission.modes.${mode}`)}</span>
         </ComposerChip>
       </DropdownMenuTrigger>
       <DropdownMenuContent
         align="start"
         side="top"
-        className="min-w-[10rem]"
-        data-testid={menuTestid}
+        className="min-w-[12rem] bg-surface-subtle"
+        data-testid="terminal-permission-mode-menu"
       >
-        {children}
+        <div className="px-2 py-1.5 text-meta font-medium text-ink-tertiary">
+          {t('chat.permission.menuTitle')}
+        </div>
+        {(['chat', 'edit', 'full'] as const).map((m) => (
+          <DropdownMenuItem
+            key={m}
+            disabled={disabled}
+            onSelect={() => onSelect(m)}
+            data-testid={`terminal-permission-option-${m}`}
+            data-selected={mode === m ? 'true' : 'false'}
+            className="flex-col items-start gap-0.5"
+          >
+            <div className="flex items-center gap-2">
+              <Check
+                size={14}
+                strokeWidth={1.75}
+                className={cn('shrink-0', mode === m ? 'opacity-100' : 'opacity-0')}
+                aria-hidden
+              />
+              <span>{t(`chat.permission.modes.${m}`)}</span>
+            </div>
+            <span className="pl-6 text-meta text-ink-tertiary">
+              {t(`chat.permission.desc.${m}`)}
+            </span>
+          </DropdownMenuItem>
+        ))}
       </DropdownMenuContent>
     </DropdownMenu>
-  )
-}
-
-function DropdownCheckItem({
-  selected,
-  testid,
-  onSelect,
-  children,
-}: {
-  selected: boolean
-  testid: string
-  onSelect: () => void
-  children: ReactNode
-}) {
-  return (
-    <DropdownMenuItem
-      onSelect={onSelect}
-      data-testid={testid}
-      data-selected={selected ? 'true' : 'false'}
-      className="gap-2 py-1"
-    >
-      <Check
-        size={13}
-        strokeWidth={1.75}
-        className={cn('shrink-0', selected ? 'opacity-100' : 'opacity-0')}
-        aria-hidden
-      />
-      <span className={cn('min-w-0 flex-1 truncate text-meta', selected && 'font-medium')}>
-        {children}
-      </span>
-    </DropdownMenuItem>
   )
 }
 
@@ -647,29 +631,14 @@ function CompactComposer({
         <div className="mt-1 flex items-center justify-between gap-2 border-t border-border/60 pt-1.5">
           <div className="flex min-w-0 items-center gap-1.5">
             <ModelPicker sessionId={sessionId} />
-            <DropdownChip
-              icon={<KeyRound size={13} strokeWidth={1.75} />}
-              label={mode}
-              active={mode !== 'edit'}
+            <PermissionModeChip
+              mode={mode}
               disabled={disabled}
-              title="permission mode"
-              testid="terminal-permission-mode"
-              menuTestid="terminal-permission-mode-menu"
-            >
-              {(['chat', 'edit', 'full'] as const).map((m) => (
-                <DropdownCheckItem
-                  key={m}
-                  selected={mode === m}
-                  testid={`terminal-permission-option-${m}`}
-                  onSelect={() => {
-                    setMode(m)
-                    onSelectPermissionMode(m)
-                  }}
-                >
-                  {m}
-                </DropdownCheckItem>
-              ))}
-            </DropdownChip>
+              onSelect={(m) => {
+                setMode(m)
+                onSelectPermissionMode(m)
+              }}
+            />
           </div>
           <div className="flex shrink-0 items-center gap-1.5">
             {meter ? <SessionUsageChip meter={meter} t={t} /> : null}

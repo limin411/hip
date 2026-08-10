@@ -362,7 +362,7 @@ describe('TerminalView surface integrations (P0.1 search / P0.3 title / P0.4 bel
       // (which drives the match counter) when decorations are enabled.
       expect(termMocks.last.searchAddon?.findNext).toHaveBeenCalledWith(
         'ring',
-        expect.objectContaining({ decorations: true }),
+        expect.objectContaining({ decorations: expect.objectContaining({ matchOverviewRuler: '#ffff00' }) }),
       )
     })
 

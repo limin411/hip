@@ -518,10 +518,22 @@ export function XtermSurface({
     }
     const s = searchRef.current
     if (!s) return
-    // decorations: true is required — the addon only fires onDidChangeResults
+    // decorations are required — the addon only fires onDidChangeResults
     // (which drives the match counter) when decorations are enabled, and it
-    // also renders the progressive match highlights.
-    const opts = { caseSensitive: searchCaseRef.current, incremental: true, decorations: true }
+    // also renders the progressive match highlights. addon-search 0.16
+    // switched decorations from boolean to ISearchDecorationOptions.
+    const opts = {
+      caseSensitive: searchCaseRef.current,
+      incremental: true,
+      decorations: {
+        matchBackground: '#ffff00',
+        matchBorder: '#ff0000',
+        matchOverviewRuler: '#ffff00',
+        activeMatchBackground: '#00ff00',
+        activeMatchBorder: '#ff0000',
+        activeMatchColorOverviewRuler: '#00ff00',
+      },
+    }
     if (dir === -1) s.findPrevious(q, opts)
     else s.findNext(q, opts)
   }, [])

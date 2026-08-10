@@ -3,6 +3,13 @@ import './i18n'
 import React from "react";
 import ReactDOM from "react-dom/client";
 import App from "./App";
+// Bundled variable fonts (Latin UI / code / mono fallback). Must precede tokens.css
+// so font faces are registered before the font-family tokens resolve.
+// CJK deliberately stays on system fonts (English-first product; see
+// docs/design/doc-international-font-guide).
+import '@fontsource-variable/inter'
+import '@fontsource-variable/jetbrains-mono'
+import '@fontsource-variable/noto-sans-mono'
 import "./styles/tokens.css";
 import { ThemeProvider } from "./components/theme/ThemeProvider";
 import { LanguageProvider } from "./components/theme/LanguageProvider";

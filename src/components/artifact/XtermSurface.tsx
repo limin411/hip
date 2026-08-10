@@ -139,7 +139,7 @@ export function XtermSurface({
         cursorBlink: true,
         fontSize: 13,
         lineHeight: 1.25,
-        fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace',
+        fontFamily: 'var(--font-code)',
         theme: resolveXtermTheme(
           useHipConfigStore.getState().config.terminal?.colorTheme,
         ),

@@ -902,7 +902,7 @@
 .kb-attach-path {
   overflow: hidden;
   color: var(--text-tertiary, #9ca3af);
-  font-family: ui-monospace, monospace;
+  font-family: var(--font-code);
   font-size: 0.75rem;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -967,12 +967,12 @@
   color: var(--accent-strong);
 }
 
-.kb-math-error { color: var(--danger); font-family: ui-monospace, monospace; font-size: 0.8rem; white-space: pre-wrap; text-align: left; }
+.kb-math-error { color: var(--danger); font-family: var(--font-code); font-size: 0.8rem; white-space: pre-wrap; text-align: left; }
 .kb-math-src,
 .kb-fence-src {
   width: 100%;
   min-height: 4rem;
-  font-family: ui-monospace, monospace;
+  font-family: var(--font-code);
   font-size: 0.85rem;
   border: 1px solid var(--border);
   border-radius: 0.375rem;

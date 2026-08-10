@@ -5,12 +5,9 @@
 [data-testid='knowledge-doc-paper'] {
   --kb-font-body: 16px;
   --kb-line-body: 1.5;
-  --kb-font-family:
-    ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI',
-    'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', sans-serif;
-  --kb-font-mono:
-    ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono',
-    'Courier New', monospace;
+  /* 跟随全局统一字体 token（英文优先：拉丁打包 Inter，CJK 系统回退） */
+  --kb-font-family: var(--font-ui);
+  --kb-font-mono: var(--font-code);
   --kb-h1-size: 30px;
   --kb-h2-size: 24px;
   --kb-h3-size: 20px;

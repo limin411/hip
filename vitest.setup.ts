@@ -21,3 +21,11 @@ try {
 // and don't re-read the real ~/.hip/config/auth.json. (HIP_AUTH_PATH → a path that never
 // exists.) auth-file.test.ts passes explicit paths, so it is unaffected.
 process.env.HIP_AUTH_PATH = path.join(os.tmpdir(), '__hip_no_auth__', 'auth.json')
+
+// happy-dom reports `document.compatMode` as undefined (no doctype), which KaTeX reads
+// as quirks mode and answers with a console.warn at module load. Vitest 2.x `list` mode
+// crashes on any console output during collection (reporter bug); the warning is also
+// pure noise. Simulate a standards-mode document for DOM environments.
+if (typeof document !== 'undefined') {
+  Object.defineProperty(document, 'compatMode', { value: 'CSS1Compat', configurable: true })
+}

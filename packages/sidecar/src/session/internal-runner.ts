@@ -66,6 +66,10 @@ export interface RunManagedAgentArgs {
   systemPromptExtra?: string
   /** Extra tools merged BEFORE toolNames / prompt (must be in toolNames for explore allowlist). */
   extraTools?: StructuredToolInterface[]
+  /** Elicitation coordinator (G3) — wires ask_user + pause-on-question. */
+  elicitation?: import('./elicitation.js').ElicitationCoordinator
+  /** Post-compaction injection hook (G5) — returns extra system text or null. */
+  afterCompact?: (summaryText: string) => string | null
 }
 
 /**
@@ -81,7 +85,7 @@ export async function runManagedAgent(args: RunManagedAgentArgs): Promise<string
     resolved, cwd, prompt, task, attachments, attachmentParts, emit, signal, childMaxSteps,
     mcpTools, skills, requestApproval, permissionMode, networkPolicy, toolOutputStore, guardianReviewer,
     hooks, turnId, runId, nodeId, agentId, parentAgentId, allowedTools,
-    systemPromptExtra, extraTools,
+    systemPromptExtra, extraTools, elicitation, afterCompact,
   } = args
   const runner = args.runner ?? new RealModelRunner(buildChatModel(resolved ?? getActiveModel()))
   const summarizer = args.summarizer ?? createSummarizer()
@@ -96,6 +100,7 @@ export async function runManagedAgent(args: RunManagedAgentArgs): Promise<string
           skills,
           requestApproval,
           permissionMode,
+          elicitation,
           webSearchEnabled: true,
           sessionId: args.sessionId,
           networkPolicy,
@@ -139,6 +144,8 @@ export async function runManagedAgent(args: RunManagedAgentArgs): Promise<string
       ...contextPolicy,
       autoCompactPercent: contextPolicy.subagentCompactPercent,
     },
+    elicitation,
+    afterCompact,
   }
   let humanParts: ContentPart[]
   if (attachmentParts?.length) {

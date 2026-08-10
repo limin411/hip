@@ -52,6 +52,8 @@ export interface InvokerExtras {
   extraTools?: StructuredToolInterface[]
   /** Elicitation coordinator (G3) — wires ask_user + pause-on-question. */
   elicitation?: import('../elicitation.js').ElicitationCoordinator
+  /** Post-compaction injection hook (G5) — returns extra system text or null. */
+  afterCompact?: (summaryText: string) => string | null
 }
 
 export interface AgentInvoker {
@@ -91,6 +93,10 @@ export interface RunInternalArgs {
   allowedTools?: string[]
   systemPromptExtra?: string
   extraTools?: StructuredToolInterface[]
+  /** Elicitation coordinator (G3) — wires ask_user + pause-on-question. */
+  elicitation?: import('../elicitation.js').ElicitationCoordinator
+  /** Post-compaction injection hook (G5). */
+  afterCompact?: (summaryText: string) => string | null
 }
 
 export interface InvokerDeps {
@@ -179,6 +185,8 @@ export function createAgentInvoker(cwd: string, deps: InvokerDeps = {}): AgentIn
           parentAgentId: extras?.parentAgentId,
           systemPromptExtra: extras?.systemPromptExtra,
           extraTools: extras?.extraTools,
+          elicitation: extras?.elicitation,
+          afterCompact: extras?.afterCompact,
           // Enforce read-only tools for the fixed explore agent (not prompt-only).
           ...(agentId === 'explore' ? { allowedTools: [...EXPLORE_ALLOWED_TOOLS] } : {}),
         })

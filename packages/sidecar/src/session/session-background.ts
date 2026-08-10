@@ -65,6 +65,9 @@ export async function runBackgroundSubagent(
 
   host.backgroundManager.completeTask(taskId, status, error === undefined ? result : undefined, error)
 
+  // G5: hold completed results for one-shot injection on the next user turn.
+  host.pendingBackgroundResults.collect(taskId, status, error === undefined ? result : undefined)
+
   // stop() may have already marked the task killed; do not publish completed/failed over a kill
   const finalMeta = host.backgroundManager.meta.get(taskId)
   const killed = finalMeta?.status === 'killed' || aborted

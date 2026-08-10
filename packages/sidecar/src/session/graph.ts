@@ -248,6 +248,12 @@ export interface GraphCtx {
    */
   elicitation?: import('./elicitation.js').ElicitationCoordinator
   /**
+   * Post-compaction injection hook (G5). Called after an LLM compaction with
+   * the summary text; may return extra system text appended after the summary
+   * (e.g. still-running background task status). Return null/undefined for none.
+   */
+  afterCompact?: (summaryText: string) => string | null
+  /**
    * @experimental Test / harness only. Product session-turn paths never inject.
    * Optional circuit breaker for stalled-loop / budget experiments. Prefer doom /
    * error-streak / MAX_STEPS for product loop safety.
@@ -756,10 +762,16 @@ export function buildGraph(maxSteps: number = MAX_STEPS, compactBudget: number =
       resetPressureOnUsage(ensurePressure(ctx), afterEst, afterMsgs.length)
       ctx.lastPromptTokens = afterEst
     }
+    // G5: post-compact injection hook (e.g. background task status). The hook
+    // returns extra system text appended AFTER the summary so the model keeps
+    // knowing that background work is still running (compaction would otherwise
+    // erase that memory).
+    const postCompactExtra = ctx.afterCompact?.(summaryText) ?? null
     return {
       messages: [
         ...out,
         result.summary,
+        ...(postCompactExtra ? [new SystemMessage(postCompactExtra)] : []),
         ...result.removeIds.map((id) => new RemoveMessage({ id })),
       ],
       compacted: true,

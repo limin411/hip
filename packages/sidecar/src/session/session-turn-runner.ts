@@ -40,6 +40,7 @@ import { runSubagent } from './subagent.js'
 import { synthesizeSubagentResult } from './subagent-result.js'
 import { collectTurnDiff } from './turn-diff-tracker.js'
 import { ELICITATION_PENDING_PREFIX } from './elicitation.js'
+import { backgroundStatusText } from './background-inject.js'
 import { recursionLimit, childMaxStepsForAgent, maxStepsForSession } from './loop-control.js'
 import type { Activity, ActivityTracker } from './activity.js'
 import type { GoalManager } from './goal.js'
@@ -201,6 +202,10 @@ export interface SessionTurnHost {
    * delivered as a rewritten deferred ToolMessage on the next turn.
    */
   elicitation: import('./elicitation.js').ElicitationCoordinator
+  /**
+   * Completed background task results awaiting one-shot injection (G5).
+   */
+  pendingBackgroundResults: import('./background-inject.js').PendingBackgroundResults
   inputQueue: SessionInput[]
   steerAbortFlag: boolean
   paused: TurnBase | null
@@ -355,6 +360,13 @@ function deliverElicitationAnswer(host: SessionTurnHost, id: string, answer: str
 
 
 export async function processInput(host: SessionTurnHost, input: SessionInput, _send: SendFn): Promise<string> {
+  // G5: inject completed background task results once, before the new turn
+  // builds its context (system-level so the model can react to them).
+  const pendingResults = host.pendingBackgroundResults.drain()
+  if (pendingResults) {
+    host.messages.push(new SystemMessage(pendingResults))
+  }
+
   // G3: a pending elicitation means the user's next message answers the
   // question — rewrite the deferred ask_user ToolMessage and continue the
   // turn normally (the model sees the answer as the tool result).
@@ -668,6 +680,9 @@ export async function runManagedAgentTurn(host: SessionTurnHost, input: SessionI
       networkPolicy: host.networkPolicy,
       toolOutputStore: host.toolOutputStore,
       elicitation: host.elicitation,
+      // G5: after LLM compaction, remind the model about still-running
+      // background tasks (compaction would otherwise erase that memory).
+      afterCompact: () => backgroundStatusText(host.backgroundManager),
       guardianReviewer: host.usesEnvModel ? new GuardianReviewer({ modelRunner: new LazyModelRunner(() => host.modelRunner()) }) : undefined,
       attachmentParts: agentParts,
       pluginHooks: host.hooks,

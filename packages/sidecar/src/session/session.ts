@@ -116,6 +116,7 @@ import { rowToBaseMessage, projectionRowIds, sessionEventToEventData, isRichCont
 import { emitSessionEvent, finalizeAndPersistTurn } from './session-persist.js'
 import { processInput, runTurn, runManagedAgentTurn, type SessionTurnHost } from './session-turn-runner.js'
 import { ElicitationCoordinator } from './elicitation.js'
+import { PendingBackgroundResults } from './background-inject.js'
 import { runBackgroundSubagent, loadSubagentMessages } from './session-background.js'
 import { resume, regenerate, handlePlanResponse, retrySubagent, resumeSubagent } from './session-turn-ops.js'
 
@@ -170,6 +171,10 @@ export class Session {
       })
     },
   })
+  /**
+   * Completed background task results awaiting one-shot injection (G5).
+   */
+  readonly pendingBackgroundResults = new PendingBackgroundResults()
   private readonly injectedRunner?: ModelRunner
   _config: SessionConfig
   private readonly injectedModel?: BaseLanguageModel

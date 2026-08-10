@@ -186,9 +186,9 @@
 
 /*
  * Language picker: BN core hides it (opacity 0, hover/focus only) — docs keep
- * the language label always visible (常显), styled as a pill chip with a
- * chevron affordance (appearance:none removes the native arrow). Sits in the
- * header row (static flow) instead of BN's absolute corner overlay.
+ * the language label always visible (常显). Low-key label like chat's CodeBlock
+ * (muted small text + tiny chevron), no border/bg/glow. Sits at the right end
+ * of the header row (static flow) instead of BN's absolute corner overlay.
  */
 .knowledge-blocknote-editor
   .bn-block-content[data-content-type='codeBlock']
@@ -196,37 +196,37 @@
   > select {
   position: static;
   margin: 0;
-  color: color-mix(in srgb, var(--kb-code-fg) 92%, transparent);
+  color: color-mix(in srgb, var(--kb-code-fg) 62%, transparent);
   opacity: 1;
-  background-color: color-mix(in srgb, var(--kb-code-fg) 8%, transparent);
+  background-color: transparent;
   background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'><path d='m6 9 6 6 6-6'/></svg>");
   background-repeat: no-repeat;
-  background-position: right 6px center;
-  background-size: 11px 11px;
-  border: 1px solid color-mix(in srgb, var(--kb-code-fg) 20%, transparent);
-  border-radius: 9999px;
-  padding: 1px 20px 1px 9px;
-  font-size: 0.72em;
+  background-position: right 1px center;
+  background-size: 9px 9px;
+  border: 0;
+  border-radius: 0;
+  padding: 1px 13px 1px 4px;
+  font-size: 0.85em;
   font-weight: 500;
   line-height: 1.6;
   cursor: pointer;
-  transition: background-color 0.15s ease, border-color 0.15s ease;
+  transition: color 0.15s ease;
 }
 
 .knowledge-blocknote-editor
   .bn-block-content[data-content-type='codeBlock']
   > div
   > select:hover {
-  background-color: color-mix(in srgb, var(--kb-code-fg) 14%, transparent);
-  border-color: color-mix(in srgb, var(--kb-code-fg) 34%, transparent);
+  color: color-mix(in srgb, var(--kb-code-fg) 88%, transparent);
 }
 
-/* BN forces outline:none !important on the select — ring via box-shadow. */
+/* BN forces outline:none !important on the select — subtle ring via box-shadow. */
 .knowledge-blocknote-editor
   .bn-block-content[data-content-type='codeBlock']
   > div
   > select:focus-visible {
-  box-shadow: 0 0 0 2px color-mix(in srgb, var(--kb-code-fg) 45%, transparent);
+  border-radius: 2px;
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--kb-code-fg) 28%, transparent);
 }
 
 .knowledge-blocknote-editor [data-content-type='quote'] {

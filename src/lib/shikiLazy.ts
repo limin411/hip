@@ -20,7 +20,9 @@ import {
   kbPerfShiki,
 } from '@/domain/knowledge/knowledgePerf'
 
-type LangLoader = () => Promise<{ default: Parameters<HighlighterCore['loadLanguage']>[0] }>
+export type ShikiLangRegistration = Parameters<HighlighterCore['loadLanguage']>[0]
+
+type LangLoader = () => Promise<{ default: ShikiLangRegistration }>
 
 /** Dynamic grammar loaders keyed by canonical allowlist id. */
 const LANG_LOADERS: Record<string, LangLoader> = {
@@ -132,13 +134,31 @@ async function getHighlighter(): Promise<HighlighterCore> {
   return highlighterPromise
 }
 
-async function ensureLang(hl: HighlighterCore, lang: string): Promise<boolean> {
-  if (loadedLangs.has(lang)) return true
+/**
+ * Resolve a canonical allowlist id to its lazy-loaded grammar registration.
+ * Returns null when the id is unknown or the chunk fails to load.
+ * Shared with the BlockNote Live highlighter — shiki `core` cannot resolve
+ * bare language id strings, only registration objects.
+ */
+export async function resolveLangRegistration(
+  lang: string,
+): Promise<ShikiLangRegistration | null> {
   const loader = LANG_LOADERS[lang]
-  if (!loader) return false
+  if (!loader) return null
   try {
     const mod = await loader()
-    await hl.loadLanguage(mod.default)
+    return mod.default
+  } catch {
+    return null
+  }
+}
+
+async function ensureLang(hl: HighlighterCore, lang: string): Promise<boolean> {
+  if (loadedLangs.has(lang)) return true
+  const reg = await resolveLangRegistration(lang)
+  if (!reg) return false
+  try {
+    await hl.loadLanguage(reg)
     loadedLangs.add(lang)
     return true
   } catch {

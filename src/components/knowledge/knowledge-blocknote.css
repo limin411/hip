@@ -161,11 +161,21 @@
 }
 
 
+/*
+ * Language picker: BN core hides it (opacity 0, hover/focus only) — docs keep
+ * the language label always visible (常显), styled as a small chip.
+ */
 .knowledge-blocknote-editor
   .bn-block-content[data-content-type='codeBlock']
   > div
   > select {
   color: var(--kb-code-fg);
+  opacity: 1;
+  background: color-mix(in srgb, var(--kb-code-fg) 12%, transparent);
+  border: 1px solid var(--kb-code-border);
+  border-radius: 0.375rem;
+  padding: 0 6px;
+  transition: none;
 }
 
 .knowledge-blocknote-editor [data-content-type='quote'] {

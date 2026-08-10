@@ -23,6 +23,7 @@ import {
   type CodeBlockThemeId,
 } from '../codeBlockTheme'
 import { isDocDark } from '@/lib/docTheme'
+import { resolveLangRegistration } from '@/lib/shikiLazy'
 
 type ShikiThemeName = 'github-light' | 'github-dark'
 
@@ -108,8 +109,25 @@ export async function createLiveCodeHighlighter(): Promise<HighlighterCore> {
         return () => target.getLoadedLanguages()
       }
       if (prop === 'loadLanguage') {
-        return (lang: Parameters<HighlighterCore['loadLanguage']>[0]) =>
-          target.loadLanguage(lang)
+        return (
+          lang: Parameters<HighlighterCore['loadLanguage']>[0],
+        ) => {
+          // Shiki `core` cannot resolve bare language id strings (only the
+          // bundled highlighter can via its registry). BN's parser calls
+          // loadLanguage with the canonical id string — resolve it through
+          // the same allowlist dynamic importers as shikiLazy first.
+          // Unknown/failed loads reject so prosemirror-highlight stops
+          // retrying instead of looping on refresh.
+          if (typeof lang === 'string') {
+            return resolveLangRegistration(lang).then((reg) => {
+              if (!reg) {
+                throw new Error(`[codeBlockHighlight] unknown Shiki lang \`${lang}\``)
+              }
+              return target.loadLanguage(reg)
+            })
+          }
+          return target.loadLanguage(lang)
+        }
       }
       const value = Reflect.get(target, prop, receiver)
       return typeof value === 'function' ? value.bind(target) : value

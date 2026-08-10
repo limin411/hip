@@ -141,6 +141,22 @@
   background-color: var(--kb-code-bg) !important;
   border: 1px solid var(--kb-code-border);
   border-radius: 0.5rem;
+  overflow: hidden;
+}
+
+/*
+ * Chat CodeBlock-style chrome: header row owns the language picker, code
+ * lives below it — the label never overlaps the text.
+ */
+.knowledge-blocknote-editor
+  .bn-block-content[data-content-type='codeBlock']
+  > div {
+  display: flex;
+  align-items: center;
+  height: 28px;
+  padding: 0 10px;
+  border-bottom: 1px solid color-mix(in srgb, var(--kb-code-fg) 14%, transparent);
+  background: color-mix(in srgb, var(--kb-code-fg) 5%, transparent);
 }
 
 .knowledge-blocknote-editor
@@ -148,6 +164,7 @@
   > pre {
   color: inherit !important;
   background: transparent !important;
+  padding: 12px 16px 16px;
 }
 
 .knowledge-blocknote-editor
@@ -164,12 +181,15 @@
 /*
  * Language picker: BN core hides it (opacity 0, hover/focus only) — docs keep
  * the language label always visible (常显), styled as a pill chip with a
- * chevron affordance (appearance:none removes the native arrow).
+ * chevron affordance (appearance:none removes the native arrow). Sits in the
+ * header row (static flow) instead of BN's absolute corner overlay.
  */
 .knowledge-blocknote-editor
   .bn-block-content[data-content-type='codeBlock']
   > div
   > select {
+  position: static;
+  margin: 0;
   color: color-mix(in srgb, var(--kb-code-fg) 92%, transparent);
   opacity: 1;
   background-color: color-mix(in srgb, var(--kb-code-fg) 8%, transparent);
@@ -195,12 +215,12 @@
   border-color: color-mix(in srgb, var(--kb-code-fg) 34%, transparent);
 }
 
+/* BN forces outline:none !important on the select — ring via box-shadow. */
 .knowledge-blocknote-editor
   .bn-block-content[data-content-type='codeBlock']
   > div
   > select:focus-visible {
-  outline: 2px solid color-mix(in srgb, var(--kb-code-fg) 45%, transparent);
-  outline-offset: 1px;
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--kb-code-fg) 45%, transparent);
 }
 
 .knowledge-blocknote-editor [data-content-type='quote'] {

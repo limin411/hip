@@ -34,7 +34,8 @@ import { normalizeCodeBlockThemeId } from '@/domain/knowledge/codeBlockTheme'
 import { normalizeDocWidthId } from '@/domain/knowledge/docWidth'
 import { Switch } from '@/components/ui/Switch'
 
-const LANGUAGE_KEYS: AppLanguage[] = ['zh-CN', 'zh-TW', 'en', 'ja', 'ko']
+// 英文优先：English 置顶，中文次之（与产品字体/文案定位一致）
+const LANGUAGE_KEYS: AppLanguage[] = ['en', 'zh-CN', 'zh-TW', 'ja', 'ko']
 
 const THEME_KEYS: Theme[] = ['light', 'dark', 'system']
 

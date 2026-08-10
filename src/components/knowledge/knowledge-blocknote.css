@@ -142,6 +142,9 @@
   border: 1px solid var(--kb-code-border);
   border-radius: 0.5rem;
   overflow: hidden;
+  /* BN renders block-content as a flex row (header div + pre side by side) —
+     wrap so the header owns the first full row and pre drops below it. */
+  flex-wrap: wrap;
 }
 
 /*
@@ -155,6 +158,7 @@
   display: flex;
   align-items: center;
   justify-content: flex-end;
+  width: 100%;
   height: 28px;
   padding: 0 10px;
   border-bottom: 1px solid color-mix(in srgb, var(--kb-code-fg) 14%, transparent);
@@ -335,11 +339,11 @@
   }
 }
 
-/* codeBlock（含头栏）：头栏 28px + pre 上距 12px + strut 3px + 行高 21.7/2
-    → 首行中心约 +54px，菜单中心 +15px → 下移 39px（headless 实测校准） */
+/* codeBlock（含头栏，flex-wrap 整行）：首行中心约 +57px，菜单中心 +15px → 下移 42px
+   （真实 BN DOM headless 实测校准） */
 .knowledge-blocknote-editor
   .bn-side-menu[data-block-type='codeBlock'] {
-  --kb-handle-shift: 39px;
+  --kb-handle-shift: 42px;
 }
 
 .knowledge-blocknote-editor .bn-side-menu .bn-button,

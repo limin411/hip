@@ -150,7 +150,7 @@ export function normalizeAppLanguage(raw: string | null | undefined): AppLanguag
   return null
 }
 
-/** Seed language before rehydrate: prefer i18next cache, then navigator, then zh-CN. */
+/** Seed language before rehydrate: prefer i18next cache, then navigator, then en. */
 function seedLanguage(): AppLanguage {
   if (typeof localStorage !== 'undefined') {
     try {
@@ -164,7 +164,8 @@ function seedLanguage(): AppLanguage {
     const fromNav = normalizeAppLanguage(navigator.language)
     if (fromNav) return fromNav
   }
-  return 'zh-CN'
+  // 英文优先：无法识别时冷启动默认为英文（历史为 zh-CN）
+  return 'en'
 }
 
 /** Slice of uiStore written to localStorage under `hip-ui`. */

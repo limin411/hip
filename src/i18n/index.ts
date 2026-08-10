@@ -22,7 +22,8 @@ i18nChain.init({
       ja,
       ko,
     },
-    fallbackLng: 'zh-CN',
+    // 英文优先：缺键/未知语言回退 English（历史为 zh-CN）
+    fallbackLng: 'en',
     // Exact codes only. Do NOT enable nonExplicitSupportedLngs: it breaks lookup for
     // region-tagged locales like zh-CN / zh-TW (bundle exists but t() returns keys).
     // Browser tags (en-US, zh, ja-JP, ko-KR, …) are normalized in uiStore / LanguageProvider instead.

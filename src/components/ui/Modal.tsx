@@ -202,14 +202,14 @@ export function Modal({
             }
           }}
         >
-          <div className="flex h-12 shrink-0 items-center justify-between border-b border-border px-5">
-            <DialogPrimitive.Title className="text-title font-semibold tracking-tight text-ink">
+          <div className="flex min-h-12 shrink-0 items-center justify-between gap-3 border-b border-border px-5 py-2.5">
+            <DialogPrimitive.Title className="min-w-0 break-words text-title font-semibold tracking-tight text-ink line-clamp-2">
               {title}
             </DialogPrimitive.Title>
             <DialogPrimitive.Close
               disabled={closeDisabled}
               className={cn(
-                'flex h-7 w-7 items-center justify-center rounded-sm text-ink-tertiary transition-[background-color,color] duration-chrome ease-out hover:bg-state-hover hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink/20',
+                'flex h-7 w-7 shrink-0 items-center justify-center rounded-sm text-ink-tertiary transition-[background-color,color] duration-chrome ease-out hover:bg-state-hover hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink/20',
                 closeDisabled && 'pointer-events-none opacity-40',
               )}
               title={t('common.close')}

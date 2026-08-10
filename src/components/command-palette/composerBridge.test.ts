@@ -5,7 +5,6 @@ import {
   insertComposerText,
   replaceComposerText,
   setComposerQuote,
-  setComposerQuoteWhenReady,
   insertComposerTextWhenReady,
   replaceComposerTextWhenReady,
   hasComposerInserter,
@@ -83,19 +82,3 @@ describe('composerBridge', () => {
     expect(insert).not.toHaveBeenCalled()
   })
 })
-
-  it('setComposerQuoteWhenReady lands once a setQuote handler appears', async () => {
-    const setQuote = vi.fn()
-    queueMicrotask(() => {
-      registerComposerHandlers({ insert: vi.fn(), replace: vi.fn(), setQuote })
-    })
-    const ok = await setComposerQuoteWhenReady('sel', { attempts: 5, intervalMs: 0 })
-    expect(ok).toBe(true)
-    expect(setQuote).toHaveBeenCalledWith('sel')
-  })
-
-  it('setComposerQuoteWhenReady resolves false when no handler ever appears', async () => {
-    registerComposerInserter(null)
-    const ok = await setComposerQuoteWhenReady('sel', { attempts: 3, intervalMs: 0 })
-    expect(ok).toBe(false)
-  })

@@ -2938,8 +2938,6 @@ export const ja = {
       "openFiles": "ファイルで開く",
       "copySelection": "コピー",
       "copySelectionDisabled": "コピーする選択範囲がありません",
-      "sendSelectionToChat": "選択範囲をチャットに送信",
-      "sendSelectionToChatNoComposer": "チャット入力欄が見つからないため、選択範囲をクリップボードにコピーしました。",
       "explainInAgent": "ターミナルエージェントで説明",
       "explainInAgentDisabled": "SSH 管理ターミナルでのみ利用できます",
       "paste": "貼り付け"

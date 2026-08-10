@@ -3043,8 +3043,6 @@ export const en = {
         openFiles: 'Open in Files',
         copySelection: 'Copy',
         copySelectionDisabled: 'No selection to copy',
-        sendSelectionToChat: 'Send selection to chat',
-        sendSelectionToChatNoComposer: 'No chat composer found — selection copied to clipboard.',
         explainInAgent: 'Explain in terminal agent',
         explainInAgentDisabled: 'Only available for SSH managed terminals',
         paste: 'Paste',

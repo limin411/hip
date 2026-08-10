@@ -479,12 +479,6 @@ const STATIC_CATALOG: ContextMenuItemMeta[] = [
     group: 'clipboard',
   },
   {
-    id: 'terminal.sendSelectionToChat',
-    labelKey: 'contextMenu.terminal.sendSelectionToChat',
-    kind: 'terminal',
-    group: 'agent',
-  },
-  {
     id: 'terminal.paste',
     labelKey: 'contextMenu.terminal.paste',
     kind: 'terminal',

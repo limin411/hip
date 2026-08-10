@@ -2940,8 +2940,6 @@ export const zhTW = {
       "openFiles": "在檔案中開啟",
       "copySelection": "複製",
       "copySelectionDisabled": "沒有可複製的選區",
-      "sendSelectionToChat": "傳送選區到對話",
-      "sendSelectionToChatNoComposer": "找不到對話輸入框，選區已複製到剪貼簿。",
       "explainInAgent": "在終端智能體中解釋",
       "explainInAgentDisabled": "僅 SSH 託管終端可用",
       "paste": "貼上"

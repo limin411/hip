@@ -11,6 +11,8 @@ export interface SessionPtyUi {
   cwd?: string
   lastError?: string
   exitCode?: number | null
+  /** OSC 0/2 window title reported by the shell (P0.3); undefined = keep launch title. */
+  title?: string
   /** Decoded text chunks for rehydrate / live write. */
   ring: string[]
   ringBytes: number
@@ -42,6 +44,8 @@ interface TerminalState {
   setExit: (sessionId: string, code: number | null, generation?: number) => void
   setError: (sessionId: string, message: string) => void
   setGeneration: (sessionId: string, generation: number) => void
+  /** Record an OSC 0/2 title; empty string is ignored (shell reset clears the field). */
+  setTitle: (sessionId: string, title: string) => void
   setAttached: (sessionId: string | null) => void
   clearSession: (sessionId: string) => void
   getRing: (sessionId: string) => string[]
@@ -173,6 +177,21 @@ export const useTerminalStore = create<TerminalState>((set, get) => ({
         bySession: {
           ...st.bySession,
           [sessionId]: { ...prev, generation },
+        },
+      }
+    })
+  },
+
+  setTitle: (sessionId, title) => {
+    // Empty title = shell reset (OSC 0 with empty arg) → clear the override.
+    const next = title.trim()
+    set((st) => {
+      const prev = st.bySession[sessionId]
+      if (!prev || (prev.title ?? '') === next) return st
+      return {
+        bySession: {
+          ...st.bySession,
+          [sessionId]: { ...prev, title: next ? next : undefined },
         },
       }
     })

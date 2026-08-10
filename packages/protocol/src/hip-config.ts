@@ -156,12 +156,22 @@ export function isTerminalColorThemeId(v: string): v is TerminalColorThemeId {
 }
 
 /**
+ * Bell behavior for the terminal surface (P0.4).
+ * - `visual`: one-shot flash bar at the top of the terminal (default)
+ * - `off`: silent — no app-side indication at all
+ */
+export type TerminalBellPref = 'visual' | 'off'
+
+export const TERMINAL_BELL_PREFS: readonly TerminalBellPref[] = ['visual', 'off']
+
+/**
  * Optional `[terminal]` section in hip.toml.
  *
  * ```toml
  * [terminal]
  * shell = "cmd"
  * color_theme = "dracula"   # or colorTheme
+ * bell = "off"              # visual (default) | off
  * ```
  */
 export interface TerminalConfig {
@@ -172,6 +182,8 @@ export interface TerminalConfig {
    * JSON/TS: `colorTheme`. TOML: `color_theme` (camelCase alias accepted).
    */
   colorTheme?: TerminalColorThemeId
+  /** Bell indication. JSON/TS: `bell`. TOML: `bell`. Default `visual`. */
+  bell?: TerminalBellPref
 }
 
 /**

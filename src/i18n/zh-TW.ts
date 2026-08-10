@@ -747,7 +747,12 @@ export const zhTW = {
       "error": "無法啟動終端",
       "unsupportedPlatform": "當前平臺暫不支援終端",
       "noShell": "找不到可用的 shell。請在「通用設定」中更換預設終端。",
-      "softCap": "開啟的終端過多（最多 8 個，含程式碼面板終端）。請先關閉一個。"
+      "softCap": "開啟的終端過多（最多 8 個，含程式碼面板終端）。請先關閉一個。",
+    "searchPlaceholder": "搜尋終端輸出（支援正則）",
+      "searchCase": "大小寫敏感",
+      "searchPrev": "上一個相符 (Shift+Enter)",
+      "searchNext": "下一個相符 (Enter)",
+      "searchClose": "關閉搜尋 (Esc)",
     },
     "changeFolder": "更換資料夾",
     "refresh": "重新整理",
@@ -863,6 +868,12 @@ export const zhTW = {
       "dracula": "Dracula",
       "one-dark": "One Dark"
     },
+      "terminalBell": "終端響鈴提示",
+      "terminalBellDesc": "終端發出響鈴（\\a）時的應用內提示方式。關閉後無任何提示。",
+      "terminalBells": {
+        "visual": "視覺提示（頂部閃爍條）",
+        "off": "關閉"
+      },
     "trashRetention": "回收站保留天數",
     "trashRetentionDesc": "移入回收站的會話將在此天數後自動永久刪除（1–365）。",
     "trashRetentionUnit": "天",
@@ -1841,7 +1852,7 @@ export const zhTW = {
       "connectFirst": "請先連接"
     },
     "softCap": "開啟的終端過多（最多 8 個，含程式碼面板終端）。請先關閉一個。",
-    "emptyLibrary": "還沒有儲存的連線",
+        "emptyLibrary": "還沒有儲存的連線",
     "emptyLibraryHint": "儲存遠端主機以便稍後連線，或立即開啟本機終端。",
     "connect": "連線",
     "editHost": "編輯",

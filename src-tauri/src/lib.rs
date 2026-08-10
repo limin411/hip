@@ -1767,6 +1767,7 @@ doomLoopStrategy = "auto_continue"
             terminal: Some(super::hip_config::TerminalConfig {
                 shell: Some("cmd".into()),
                 color_theme: Some("dracula".into()),
+                bell: None,
             }),
             code_block: None,
             knowledge: None,

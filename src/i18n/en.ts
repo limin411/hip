@@ -711,6 +711,11 @@ export const en = {
         noShell: 'No usable shell found. Change the default terminal in General Settings.',
         softCap:
           'Too many terminals open (max 8, including code-panel terminals). Close one first.',
+        searchPlaceholder: 'Search terminal output (regex ok)',
+        searchCase: 'Match case',
+        searchPrev: 'Previous match (Shift+Enter)',
+        searchNext: 'Next match (Enter)',
+        searchClose: 'Close search (Esc)',
       },
       changeFolder: 'Change Folder',
       refresh: 'Refresh',
@@ -834,6 +839,13 @@ export const en = {
         'solarized-light': 'Solarized Light',
         dracula: 'Dracula',
         'one-dark': 'One Dark',
+      },
+      terminalBell: 'Terminal bell',
+      terminalBellDesc:
+        'In-app indication when the terminal rings (\\a). Off shows nothing.',
+      terminalBells: {
+        visual: 'Visual flash bar',
+        off: 'Off',
       },
       trashRetention: 'Recycle bin retention',
       trashRetentionDesc:

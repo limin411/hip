@@ -105,6 +105,7 @@
     "@tauri-apps/plugin-shell": "^2",
     "@uiw/react-codemirror": "^4.25.11",
     "@xterm/addon-fit": "^0.10.0",
+    "@xterm/addon-search": "^0.16.0",
     "@xterm/xterm": "^5.5.0",
     "@xyflow/react": "^12.11.2",
     "class-variance-authority": "^0.7",

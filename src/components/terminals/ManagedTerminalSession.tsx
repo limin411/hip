@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { RotateCcw, X } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { ptyKill, ptyOpen, ptyResize, ptyWrite } from '@/ipc/pty'
@@ -32,6 +32,9 @@ export function ManagedTerminalSession({ terminalId }: { terminalId: string }) {
   const [bootKey, setBootKey] = useState(0)
   const [hostKeyError, setHostKeyError] = useState<HostKeyMismatchError | null>(null)
   const reconnectNonce = useManagedTerminalStore((s) => s.reconnectNonce[terminalId] ?? 0)
+  // P0.3: OSC 0/2 title reported by the shell overrides the launch title.
+  const oscTitle = useTerminalStore((s) => s.bySession[terminalId]?.title)
+  const displayTitle = oscTitle ?? term?.title ?? ''
 
   const cwd = term?.cwd
   const kind = term?.kind ?? 'local'
@@ -56,6 +59,34 @@ export function ManagedTerminalSession({ terminalId }: { terminalId: string }) {
   const close = useCallback(() => {
     void useManagedTerminalStore.getState().close(terminalId)
   }, [terminalId])
+
+  // P0.3: window title follows the terminal title while this session is focused.
+  // Update effect tracks title changes; a separate mount-only effect restores the
+  // default on true unmount (no flash on dep changes).
+  useEffect(() => {
+    const next = displayTitle ? `${displayTitle} — hip` : 'hip'
+    void (async () => {
+      try {
+        const { getCurrentWindow } = await import('@tauri-apps/api/window')
+        await getCurrentWindow().setTitle(next)
+      } catch {
+        /* non-Tauri env (unit tests / web preview) */
+      }
+    })()
+  }, [terminalId, displayTitle])
+
+  useEffect(() => {
+    return () => {
+      void (async () => {
+        try {
+          const { getCurrentWindow } = await import('@tauri-apps/api/window')
+          await getCurrentWindow().setTitle('hip')
+        } catch {
+          /* noop */
+        }
+      })()
+    }
+  }, [])
 
   if (!term) {
     return (
@@ -126,7 +157,7 @@ export function ManagedTerminalSession({ terminalId }: { terminalId: string }) {
               className="min-w-0 truncate text-body font-medium text-ink"
               data-testid="managed-terminal-title"
             >
-              {term.title}
+              {displayTitle}
             </span>
             {subtitle ? (
               <>

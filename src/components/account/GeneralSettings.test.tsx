@@ -11,7 +11,11 @@ const load = vi.fn().mockResolvedValue(undefined)
 const hipConfigState = {
   config: {
     version: 1 as const,
-    terminal: { shell: 'default' as const, colorTheme: 'follow' as const },
+    terminal: {
+      shell: 'default' as const,
+      colorTheme: 'follow' as const,
+      bell: 'visual' as const,
+    },
     codeBlock: { colorTheme: 'follow' as const },
     knowledge: { docWidth: 'default' as const },
     window: { closeAction: 'quit' as const, trayEnabled: false },
@@ -80,7 +84,7 @@ describe('GeneralSettings terminal shell', () => {
   beforeEach(() => {
     updateSection.mockClear()
     load.mockClear()
-    hipConfigState.config.terminal = { shell: 'default', colorTheme: 'follow' }
+    hipConfigState.config.terminal = { shell: 'default', colorTheme: 'follow', bell: 'visual' }
     hipConfigState.config.codeBlock = { colorTheme: 'follow' }
   })
   afterEach(() => {
@@ -149,7 +153,7 @@ describe('GeneralSettings terminal color', () => {
   beforeEach(() => {
     updateSection.mockClear()
     load.mockClear()
-    hipConfigState.config.terminal = { shell: 'default', colorTheme: 'follow' }
+    hipConfigState.config.terminal = { shell: 'default', colorTheme: 'follow', bell: 'visual' }
   })
   afterEach(() => {
     cleanup()
@@ -210,5 +214,43 @@ describe('GeneralSettings document width', () => {
       docWidth?: string
     }) => { docWidth?: string }
     expect(updater({ docWidth: 'default' })).toEqual({ docWidth: 'wide' })
+  })
+})
+
+describe('GeneralSettings terminal bell (P0.5)', () => {
+  beforeEach(() => {
+    updateSection.mockClear()
+    load.mockClear()
+    hipConfigState.config.terminal = { shell: 'default', colorTheme: 'follow', bell: 'visual' }
+  })
+  afterEach(() => {
+    cleanup()
+  })
+
+  it('renders bell control with the configured value', () => {
+    render(<GeneralSettings />)
+    const row = screen.getByTestId('settings-terminal-bell')
+    expect(row).toBeInTheDocument()
+    expect(within(row).getByTestId('settings-terminal-bell-trigger')).toHaveTextContent(
+      'settings.terminalBells.visual',
+    )
+  })
+
+  it('persists bell via functional merge and preserves shell + colorTheme', async () => {
+    render(<GeneralSettings />)
+    fireEvent.click(screen.getByTestId('settings-terminal-bell-off'))
+    await waitFor(() => {
+      expect(updateSection).toHaveBeenCalledWith('terminal', expect.any(Function))
+    })
+    const updater = updateSection.mock.calls[0][1] as (prev: {
+      shell?: string
+      colorTheme?: string
+      bell?: string
+    }) => { shell?: string; colorTheme?: string; bell?: string }
+    expect(updater({ shell: 'zsh', colorTheme: 'dracula', bell: 'visual' })).toEqual({
+      shell: 'zsh',
+      colorTheme: 'dracula',
+      bell: 'off',
+    })
   })
 })

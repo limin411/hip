@@ -740,7 +740,12 @@ export const ko = {
       "error": "터미널을 시작할 수 없음",
       "unsupportedPlatform": "이 플랫폼에서는 아직 터미널을 지원하지 않습니다",
       "noShell": "사용 가능한 셸을 찾을 수 없습니다. 일반 설정에서 기본 터미널을 변경하세요.",
-      "softCap": "너무 많은 터미널이 열려 있습니다(최대 8개, 코드 패널 터미널 포함). 먼저 하나를 닫으세요."
+      "softCap": "너무 많은 터미널이 열려 있습니다(최대 8개, 코드 패널 터미널 포함). 먼저 하나를 닫으세요.",
+    "searchPlaceholder": "터미널 출력 검색(정규식 가능)",
+      "searchCase": "대소문자 구분",
+      "searchPrev": "이전 일치 (Shift+Enter)",
+      "searchNext": "다음 일치 (Enter)",
+      "searchClose": "검색 닫기 (Esc)",
     },
     "changeFolder": "폴더 변경",
     "refresh": "새로고침",
@@ -856,6 +861,12 @@ export const ko = {
       "dracula": "Dracula",
       "one-dark": "One Dark"
     },
+      "terminalBell": "터미널 벨 알림",
+      "terminalBellDesc": "터미널이 벨(\\a)을 울릴 때의 앱 내 표시 방식. 끄면 표시하지 않습니다.",
+      "terminalBells": {
+        "visual": "시각 표시(상단 플래시 바)",
+        "off": "끄기"
+      },
     "trashRetention": "휴지통 보관 기간",
     "trashRetentionDesc": "소프트 삭제된 세션은 이 일수(1~365일) 후에 영구적으로 제거됩니다.",
     "trashRetentionUnit": "일",
@@ -1838,7 +1849,7 @@ export const ko = {
       "connectFirst": "먼저 연결"
     },
     "softCap": "너무 많은 터미널이 열려 있습니다(최대 8개, 코드 패널 터미널 포함). 먼저 하나를 닫으세요.",
-    "emptyLibrary": "저장된 연결이 없습니다",
+        "emptyLibrary": "저장된 연결이 없습니다",
     "emptyLibraryHint": "나중에 연결할 원격 호스트를 저장하거나 지금 로컬 터미널을 여세요.",
     "connect": "연결",
     "editHost": "편집",

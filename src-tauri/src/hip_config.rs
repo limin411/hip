@@ -148,6 +148,9 @@ pub(crate) struct TerminalConfig {
     /// xterm color palette id (follow | light | dark | named presets). JSON key: colorTheme.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub(crate) color_theme: Option<String>,
+    /// Bell indication: visual (default) | off. JSON key: bell.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub(crate) bell: Option<String>,
 }
 
 /// Optional `[code_block]` section. JSON uses camelCase for the UI.
@@ -474,6 +477,8 @@ pub(crate) struct TomlTerminalConfig {
     pub(crate) shell: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none", alias = "colorTheme")]
     pub(crate) color_theme: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub(crate) bell: Option<String>,
 }
 
 /// TOML mirror for `[code_block]` (snake_case keys; camelCase aliases for hand-edited files).
@@ -887,6 +892,7 @@ impl From<TerminalConfig> for TomlTerminalConfig {
         TomlTerminalConfig {
             shell: t.shell,
             color_theme: t.color_theme,
+            bell: t.bell,
         }
     }
 }
@@ -896,6 +902,7 @@ impl From<TomlTerminalConfig> for TerminalConfig {
         TerminalConfig {
             shell: t.shell,
             color_theme: t.color_theme,
+            bell: t.bell,
         }
     }
 }
@@ -1119,6 +1126,7 @@ mod voice_preserve_tests {
             terminal: Some(TerminalConfig {
                 shell: Some("zsh".into()),
                 color_theme: Some("dracula".into()),
+                bell: Some("off".into()),
             }),
             code_block: None,
             knowledge: None,

@@ -740,7 +740,12 @@ export const ja = {
       "error": "ターミナルを起動できませんでした",
       "unsupportedPlatform": "このプラットフォームではターミナルはまだサポートされていません",
       "noShell": "使用可能なシェルが見つかりません。一般設定でデフォルトのターミナルを変更してください。",
-      "softCap": "開いているターミナルが多すぎます（最大8個、コードパネル端末を含む）。先に1つ閉じてください。"
+      "softCap": "開いているターミナルが多すぎます（最大8個、コードパネル端末を含む）。先に1つ閉じてください。",
+    "searchPlaceholder": "ターミナル出力を検索（正規表現可）",
+      "searchCase": "大文字小文字を区別",
+      "searchPrev": "前の一致 (Shift+Enter)",
+      "searchNext": "次の一致 (Enter)",
+      "searchClose": "検索を閉じる (Esc)",
     },
     "changeFolder": "フォルダを変更",
     "refresh": "更新",
@@ -856,6 +861,12 @@ export const ja = {
       "dracula": "Dracula",
       "one-dark": "One Dark"
     },
+      "terminalBell": "ターミナルベル通知",
+      "terminalBellDesc": "ターミナルがベル（\\a）を鳴らしたときのアプリ内表示。オフで表示なし。",
+      "terminalBells": {
+        "visual": "視覚表示（上部フラッシュバー）",
+        "off": "オフ"
+      },
     "trashRetention": "ゴミ箱の保持期間",
     "trashRetentionDesc": "論理削除されたセッションは、この日数（1～365日）経過後に完全に削除されます。",
     "trashRetentionUnit": "日",
@@ -1838,7 +1849,7 @@ export const ja = {
       "connectFirst": "先に接続"
     },
     "softCap": "開いているターミナルが多すぎます（最大8個、コードパネル端末を含む）。先に1つ閉じてください。",
-    "emptyLibrary": "保存済みの接続はまだありません",
+        "emptyLibrary": "保存済みの接続はまだありません",
     "emptyLibraryHint": "あとでつなぐリモートホストを保存するか、今すぐローカル端末を開いてください。",
     "connect": "接続",
     "editHost": "編集",

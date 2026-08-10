@@ -178,3 +178,45 @@ describe('getRingSince cursor slices (exec bridge)', () => {
     expect(useTerminalStore.getState().consumeUserInterleaved('tm_1')).toBe(false)
   })
 })
+
+describe('setTitle (OSC 0/2, P0.3)', () => {
+  it('records a non-empty title override', () => {
+    useTerminalStore.setState({ bySession: {} })
+    const store = useTerminalStore.getState()
+    store.ensureSession('tm_1')
+    store.setTitle('tm_1', 'npm test')
+    expect(useTerminalStore.getState().getSession('tm_1')?.title).toBe('npm test')
+  })
+
+  it('ignores empty / whitespace-only titles (shell reset clears the field)', () => {
+    useTerminalStore.setState({ bySession: {} })
+    const store = useTerminalStore.getState()
+    store.ensureSession('tm_1')
+    store.setTitle('tm_1', '   ')
+    expect(useTerminalStore.getState().getSession('tm_1')?.title).toBeUndefined()
+    store.setTitle('tm_1', 'hello')
+    expect(useTerminalStore.getState().getSession('tm_1')?.title).toBe('hello')
+    // Empty OSC0 argument resets to undefined.
+    store.setTitle('tm_1', '')
+    expect(useTerminalStore.getState().getSession('tm_1')?.title).toBeUndefined()
+  })
+
+  it('trims surrounding whitespace and is idempotent for the same value', () => {
+    useTerminalStore.setState({ bySession: {} })
+    const store = useTerminalStore.getState()
+    store.ensureSession('tm_1')
+    store.setTitle('tm_1', '  tail -f  ')
+    expect(useTerminalStore.getState().getSession('tm_1')?.title).toBe('tail -f')
+    store.setTitle('tm_1', 'tail -f')
+    expect(useTerminalStore.getState().getSession('tm_1')?.title).toBe('tail -f')
+  })
+
+  it('no-ops on a cleared session', () => {
+    useTerminalStore.setState({ bySession: {} })
+    const store = useTerminalStore.getState()
+    store.ensureSession('tm_1')
+    store.clearSession('tm_1')
+    store.setTitle('tm_1', 'late')
+    expect(useTerminalStore.getState().getSession('tm_1')).toBeUndefined()
+  })
+})

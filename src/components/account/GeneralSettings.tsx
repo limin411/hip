@@ -4,11 +4,13 @@ import { Check, ChevronDown } from 'lucide-react'
 import {
   type TerminalShellPref,
   type TerminalColorThemeId,
+  type TerminalBellPref,
   type CodeBlockColorThemeId,
   type DocWidthId,
   CODE_BLOCK_COLOR_THEME_IDS,
   DOC_WIDTH_IDS,
   TERMINAL_COLOR_THEME_IDS,
+  TERMINAL_BELL_PREFS,
 } from '@hip/protocol'
 import { cn } from '@/lib/utils'
 import { detectHipPlatform } from '@/lib/platform'
@@ -71,6 +73,8 @@ export function GeneralSettings() {
   const terminalColor = useHipConfigStore((s) =>
     normalizeTerminalColorThemeId(s.config.terminal?.colorTheme),
   )
+  // P0.5: bell pref — visual (default) | off.
+  const terminalBell = useHipConfigStore((s) => s.config.terminal?.bell ?? 'visual')
   const trashRetention = resolveTrashRetentionDays(
     useHipConfigStore((s) => s.config.trash?.retentionDays),
   )
@@ -112,6 +116,9 @@ export function GeneralSettings() {
   }
   const setTerminalColor = (colorTheme: TerminalColorThemeId) => {
     void updateSection('terminal', (prev) => ({ ...(prev ?? {}), colorTheme }))
+  }
+  const setTerminalBell = (bell: TerminalBellPref) => {
+    void updateSection('terminal', (prev) => ({ ...(prev ?? {}), bell }))
   }
 
   const commitTrashRetention = () => {
@@ -369,6 +376,51 @@ export function GeneralSettings() {
                       )}
                     />
                     <span>{t(`settings.terminalColors.${themeId}`)}</span>
+                  </DropdownMenuItem>
+                ))}
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
+        </div>
+      ) : null}
+      {showTerminalColor ? (
+        <div
+          className="flex items-center justify-between gap-6 px-8 py-4"
+          data-testid="settings-terminal-bell"
+        >
+          <div className="min-w-0 flex-1">
+            <div className="text-body font-medium text-ink">{t('settings.terminalBell')}</div>
+            <div className="mt-0.5 text-meta leading-relaxed text-ink-tertiary">
+              {t('settings.terminalBellDesc')}
+            </div>
+          </div>
+          <div className="relative shrink-0">
+            <DropdownMenu modal={false}>
+              <DropdownMenuTrigger asChild>
+                <button
+                  type="button"
+                  className={selectTriggerCls}
+                  data-testid="settings-terminal-bell-trigger"
+                >
+                  <span>{t(`settings.terminalBells.${terminalBell}`)}</span>
+                  <ChevronDown size={14} strokeWidth={1.75} className="shrink-0 text-ink-tertiary" />
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                {TERMINAL_BELL_PREFS.map((bellKey) => (
+                  <DropdownMenuItem
+                    key={bellKey}
+                    data-testid={`settings-terminal-bell-${bellKey}`}
+                    onSelect={() => setTerminalBell(bellKey)}
+                  >
+                    <Check
+                      size={14}
+                      className={cn(
+                        'shrink-0',
+                        terminalBell === bellKey ? 'opacity-100' : 'opacity-0',
+                      )}
+                    />
+                    <span>{t(`settings.terminalBells.${bellKey}`)}</span>
                   </DropdownMenuItem>
                 ))}
               </DropdownMenuContent>

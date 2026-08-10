@@ -3,11 +3,15 @@ import { AlertCircle, Loader2 } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import type { Terminal as XTerm } from '@xterm/xterm'
 import type { FitAddon as FitAddonType } from '@xterm/addon-fit'
+import type { SearchAddon as SearchAddonType } from '@xterm/addon-search'
 import { attachDrainWrites, ringIndexForCursor, useTerminalStore } from '@/store/terminalStore'
 import { useTerminalAgentStore } from '@/store/terminalAgentStore'
 import { useManagedTerminalStore } from '@/store/managedTerminalStore'
 import { useUiStore } from '@/store/uiStore'
 import { useHipConfigStore } from '@/store/hipConfigStore'
+import { copyText, readText } from '@/ipc/clipboard'
+import { matchTerminalKey } from '@/lib/terminalKeymap'
+import { TerminalSearchBar } from './TerminalSearchBar'
 import {
   isDarkDom,
   normalizeTerminalColorThemeId,
@@ -30,6 +34,13 @@ const TERMINAL_FONT_SIZE = 13
 export const TERMINAL_FONT_STACK = `${NERD_FONT_FAMILY}, var(--font-code)`
 /** 字体加载兜底超时：字体失败不阻塞终端启动 */
 const FONT_LOAD_TIMEOUT_MS = 1500
+
+/** 字号快捷键范围（P0.2）：默认 13，允许 10–18 */
+const FONT_SIZE_MIN = 10
+const FONT_SIZE_MAX = 18
+
+/** Bell 视觉提示持续时长（P0.4） */
+const BELL_FLASH_MS = 700
 
 /**
  * Shared xterm host (D6a).
@@ -74,13 +85,30 @@ export function XtermSurface({
   const containerRef = useRef<HTMLDivElement | null>(null)
   const termRef = useRef<XTerm | null>(null)
   const fitRef = useRef<FitAddonType | null>(null)
+  const searchRef = useRef<SearchAddonType | null>(null)
   const cursorRef = useRef(0)
   const openRef = useRef(open)
   const writeRef = useRef(write)
   const resizeRef = useRef(resize)
+  const onRestartRef = useRef(onRestart)
   openRef.current = open
   writeRef.current = write
   resizeRef.current = resize
+  onRestartRef.current = onRestart
+
+  // ── Search state (P0.1) ──
+  const [searchOpen, setSearchOpen] = useState(false)
+  const [searchQuery, setSearchQuery] = useState('')
+  const [searchCase, setSearchCase] = useState(false)
+  const [searchMatch, setSearchMatch] = useState({ index: 0, count: 0 })
+  // Live-sync refs so the boot-effect key handler sees current values.
+  const searchCaseRef = useRef(searchCase)
+  searchCaseRef.current = searchCase
+  const searchQueryRef = useRef(searchQuery)
+  searchQueryRef.current = searchQuery
+
+  // ── Bell state (P0.4) ──
+  const [bellVisible, setBellVisible] = useState(false)
 
   const [starting, setStarting] = useState(false)
   const [loadingXterm, setLoadingXterm] = useState(false)
@@ -125,6 +153,8 @@ export function XtermSurface({
     let ro: ResizeObserver | undefined
     let resizeTimer: ReturnType<typeof setTimeout> | undefined
     let dataDisp: { dispose: () => void } | undefined
+    let titleDisp: { dispose: () => void } | undefined
+    let bellDisp: { dispose: () => void } | undefined
     let mo: MutationObserver | undefined
     let term: XTerm | null = null
 
@@ -135,9 +165,10 @@ export function XtermSurface({
     setLoadingXterm(true)
 
     void (async () => {
-      const [{ Terminal }, { FitAddon }] = await Promise.all([
+      const [{ Terminal }, { FitAddon }, { SearchAddon }] = await Promise.all([
         import('@xterm/xterm'),
         import('@xterm/addon-fit'),
+        import('@xterm/addon-search'),
         import('@/styles/terminal-fonts.css'),
       ])
       await import('@xterm/xterm/css/xterm.css')
@@ -171,6 +202,13 @@ export function XtermSurface({
       })
       const fit = new FitAddon()
       term.loadAddon(fit)
+      // P0.1: search addon — incremental find + progressive match decorations.
+      const search = new SearchAddon({ highlightLimit: 500 })
+      term.loadAddon(search)
+      searchRef.current = search
+      search.onDidChangeResults(({ resultIndex, resultCount }) => {
+        setSearchMatch({ index: resultCount > 0 ? resultIndex + 1 : 0, count: resultCount })
+      })
       term.open(el)
       termRef.current = term
       fitRef.current = fit
@@ -196,6 +234,83 @@ export function XtermSurface({
           },
         })
       }
+
+      // P0.2: default keybindings — terminal-focused keys win over xterm / global.
+      // Returns false so the combo is never forwarded to the PTY as escape bytes.
+      // P0.2: default keybindings — terminal-focused keys win over xterm / global.
+      // Returns false so the combo is never forwarded to the PTY as escape bytes.
+      // `xterm` is the narrowed non-null instance for closure capture (TS18047 guard).
+      const xterm = term
+      xterm.attachCustomKeyEventHandler((e) => {
+        const action = matchTerminalKey(e)
+        if (!action) return true
+        switch (action) {
+          case 'copy': {
+            const sel = xterm.getSelection()
+            if (sel) void copyText(sel)
+            break
+          }
+          case 'paste': {
+            void readText().then((text) => {
+              if (text && !disposed) xterm.paste(text)
+            })
+            break
+          }
+          case 'clear':
+            xterm.clear()
+            break
+          case 'search':
+            setSearchOpen((o) => !o)
+            break
+          case 'font-up':
+          case 'font-down': {
+            const cur = xterm.options.fontSize ?? TERMINAL_FONT_SIZE
+            const next = Math.min(
+              FONT_SIZE_MAX,
+              Math.max(FONT_SIZE_MIN, cur + (action === 'font-up' ? 1 : -1)),
+            )
+            xterm.options.fontSize = next
+            try {
+              fit.fit()
+            } catch {
+              /* container may be 0-sized briefly */
+            }
+            void resizeRef.current(xterm.cols || 80, xterm.rows || 24).catch(() => {})
+            break
+          }
+          case 'font-reset':
+            xterm.options.fontSize = TERMINAL_FONT_SIZE
+            try {
+              fit.fit()
+            } catch {
+              /* noop */
+            }
+            void resizeRef.current(xterm.cols || 80, xterm.rows || 24).catch(() => {})
+            break
+          case 'scroll-top':
+            xterm.scrollToTop()
+            break
+          case 'scroll-bottom':
+            xterm.scrollToBottom()
+            break
+          case 'restart':
+            if (onRestartRef.current) void onRestartRef.current()
+            break
+        }
+        return false
+      })
+
+      // P0.3: OSC 0/2 title → terminalStore (chrome / window title consumers).
+      titleDisp = xterm.onTitleChange((title) => {
+        useTerminalStore.getState().setTitle(terminalId, title)
+      })
+
+      // P0.4: Bell → visual flash unless [terminal].bell = "off".
+      bellDisp = xterm.onBell(() => {
+        const pref = useHipConfigStore.getState().config.terminal?.bell
+        if (pref === 'off') return
+        setBellVisible(true)
+      })
 
       // Canvas menu bridge: copy selection / paste into live xterm (keyed by terminalId).
       bindTerminalCanvas(terminalId, {
@@ -363,8 +478,11 @@ export function XtermSurface({
       if (resizeTimer) clearTimeout(resizeTimer)
       unsubStore?.()
       dataDisp?.dispose()
+      titleDisp?.dispose()
+      bellDisp?.dispose()
       mo?.disconnect()
       ro?.disconnect()
+      searchRef.current = null
       const st = useTerminalStore.getState()
       const attached = st.attachedTerminalId ?? st.attachedSessionId
       if (attached === terminalId) {
@@ -384,6 +502,52 @@ export function XtermSurface({
     if (term) term.options.theme = theme
     setTerminalBg(theme.background)
   }, [uiTheme, colorTheme])
+
+  // P0.4: bell flash auto-dismiss.
+  useEffect(() => {
+    if (!bellVisible) return
+    const t = setTimeout(() => setBellVisible(false), BELL_FLASH_MS)
+    return () => clearTimeout(t)
+  }, [bellVisible])
+
+  // ── P0.1 search actions (component-level; refs keep the boot-effect handler fresh) ──
+  const runSearch = useCallback((q: string, dir?: 1 | -1) => {
+    if (!q.trim()) {
+      setSearchMatch({ index: 0, count: 0 })
+      return
+    }
+    const s = searchRef.current
+    if (!s) return
+    const opts = { caseSensitive: searchCaseRef.current, incremental: true }
+    if (dir === -1) s.findPrevious(q, opts)
+    else s.findNext(q, opts)
+  }, [])
+
+  const handleSearchQuery = useCallback(
+    (q: string) => {
+      setSearchQuery(q)
+      runSearch(q)
+    },
+    [runSearch],
+  )
+
+  const toggleSearchCase = useCallback(() => {
+    const next = !searchCaseRef.current
+    searchCaseRef.current = next
+    setSearchCase(next)
+    runSearch(searchQueryRef.current)
+  }, [runSearch])
+
+  const stepSearch = useCallback(
+    (dir: 1 | -1) => runSearch(searchQueryRef.current, dir),
+    [runSearch],
+  )
+
+  const closeSearch = useCallback(() => {
+    setSearchOpen(false)
+    searchRef.current?.clearDecorations()
+    termRef.current?.focus()
+  }, [])
 
   const exited = status === 'exited'
   const errored = status === 'error'
@@ -424,7 +588,7 @@ export function XtermSurface({
 
   return (
     <div
-      className="flex h-full min-h-0 flex-col"
+      className="relative flex h-full min-h-0 flex-col"
       style={{ backgroundColor: terminalBg }}
       data-testid="xterm-surface"
     >
@@ -502,6 +666,28 @@ export function XtermSurface({
           onContextMenu={onCanvasContextMenu}
         />
       </div>
+
+      {/* P0.4: bell visual flash — one-shot 700ms (config [terminal].bell = "off" disables). */}
+      {bellVisible && (
+        <div
+          data-testid="terminal-bell-flash"
+          className="pointer-events-none absolute inset-x-3 top-1 z-10 h-0.5 animate-pulse rounded-full bg-danger/70"
+        />
+      )}
+
+      {/* P0.1: terminal search overlay (⌘/Ctrl+F). */}
+      {searchOpen && (
+        <TerminalSearchBar
+          query={searchQuery}
+          onQueryChange={handleSearchQuery}
+          matchIndex={searchMatch.index}
+          matchCount={searchMatch.count}
+          caseSensitive={searchCase}
+          onToggleCase={toggleSearchCase}
+          onStep={stepSearch}
+          onClose={closeSearch}
+        />
+      )}
 
       {CONTEXT_MENUS ? (
         <ControlledContextMenu

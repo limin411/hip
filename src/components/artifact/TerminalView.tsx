@@ -1,6 +1,7 @@
 import { Folder, Power, RotateCcw } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { ptyOpen, ptyResize, ptyWrite } from '@/ipc/pty'
+import { useTerminalStore } from '@/store/terminalStore'
 import { DeclarativeContextMenu } from '@/components/context-menu'
 import { Button } from '@/components/ui/Button'
 import { cn } from '@/lib/utils'
@@ -21,6 +22,8 @@ function TerminalViewBody({ showChrome }: { showChrome: boolean }) {
   const { t } = useTranslation()
   const { sessionId, cwd, status, closed, bootKey, restart, close, chooseFolder } =
     useCodeTerminalController()
+  // P0.3: OSC 0/2 title reported by the shell (chrome shows it when present).
+  const oscTitle = useTerminalStore((s) => (sessionId ? s.bySession[sessionId]?.title : undefined))
 
   if (!sessionId) return null
 
@@ -68,6 +71,15 @@ function TerminalViewBody({ showChrome }: { showChrome: boolean }) {
             >
               {cwd}
             </span>
+            {oscTitle ? (
+              <span
+                className="shrink-0 truncate rounded-sm border border-border/60 bg-surface-muted/60 px-1.5 py-px font-mono text-caption text-ink-secondary"
+                title={oscTitle}
+                data-testid="terminal-title"
+              >
+                {oscTitle}
+              </span>
+            ) : null}
             <div className="flex shrink-0 items-center gap-0.5">
               <button
                 type="button"

@@ -4,6 +4,7 @@ import React from 'react'
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen, fireEvent, createEvent, cleanup, waitFor } from '@testing-library/react'
 import { useTerminalStore } from '@/store/terminalStore'
+import { useHipConfigStore } from '@/store/hipConfigStore'
 
 const pickDirectory = vi.fn()
 const setProjectDir = vi.fn()
@@ -78,6 +79,17 @@ vi.mock('@/store/uiStore', () => ({
 
 // Minimal xterm stub — enough for mount/dispose without canvas.
 // Lazy import() resolves the same mocked modules.
+// Capture the live xterm stub instance + registered handlers for surface-integration
+// tests (P0.1 search / P0.3 title / P0.4 bell).
+const termMocks = vi.hoisted(() => ({
+  last: {
+    searchAddon: null as null | { findNext?: (t: string, o?: object) => boolean; findPrevious?: (t: string, o?: object) => boolean; clearDecorations?: () => void },
+    keyHandler: null as null | ((e: KeyboardEvent) => boolean),
+    titleHandler: null as null | ((t: string) => void),
+    bellHandler: null as null | (() => void),
+  },
+}))
+
 vi.mock('@xterm/xterm', () => {
   class Terminal {
     cols = 80
@@ -87,15 +99,42 @@ vi.mock('@xterm/xterm', () => {
     write = vi.fn()
     reset = vi.fn()
     dispose = vi.fn()
-    loadAddon = vi.fn()
+    loadAddon = vi.fn((a: unknown) => {
+      // The SearchAddon is the addon exposing findNext.
+      const candidate = a as { findNext?: unknown } | null
+      if (candidate && typeof candidate.findNext === 'function') termMocks.last.searchAddon = a as never
+    })
     focus = vi.fn()
     getSelection = vi.fn(() => '')
     hasSelection = vi.fn(() => false)
     paste = vi.fn()
+    clear = vi.fn()
+    scrollToTop = vi.fn()
+    scrollToBottom = vi.fn()
+    attachCustomKeyEventHandler = vi.fn((h: (e: KeyboardEvent) => boolean) => {
+      termMocks.last.keyHandler = h
+    })
     onData = vi.fn(() => ({ dispose: vi.fn() }))
+    onTitleChange = vi.fn((h: (t: string) => void) => {
+      termMocks.last.titleHandler = h
+      return { dispose: vi.fn() }
+    })
+    onBell = vi.fn((h: () => void) => {
+      termMocks.last.bellHandler = h
+      return { dispose: vi.fn() }
+    })
   }
   return { Terminal }
 })
+
+vi.mock('@xterm/addon-search', () => ({
+  SearchAddon: class {
+    findNext = vi.fn(() => true)
+    findPrevious = vi.fn(() => true)
+    clearDecorations = vi.fn()
+    onDidChangeResults = vi.fn(() => ({ dispose: vi.fn() }))
+  },
+}))
 
 vi.mock('@xterm/addon-fit', () => ({
   FitAddon: class {
@@ -129,6 +168,12 @@ describe('TerminalView', () => {
     ptyResize.mockReset().mockResolvedValue(undefined)
     ptyKill.mockReset().mockResolvedValue(undefined)
     useTerminalStore.setState({ bySession: {}, attachedSessionId: null, attachedTerminalId: null })
+    useHipConfigStore.setState({ config: { version: 1 } })
+    // Reset captured xterm handlers between renders (each render rebinds).
+    termMocks.last.searchAddon = null
+    termMocks.last.keyHandler = null
+    termMocks.last.titleHandler = null
+    termMocks.last.bellHandler = null
   })
 
   afterEach(() => {
@@ -271,5 +316,101 @@ describe('TerminalView', () => {
     expect(ptyKill).not.toHaveBeenCalled()
     expect(useTerminalStore.getState().attachedTerminalId).toBe('s2')
     expect(useTerminalStore.getState().attachedSessionId).toBe('s2')
+  })
+})
+
+describe('TerminalView surface integrations (P0.1 search / P0.3 title / P0.4 bell)', () => {
+  beforeEach(() => {
+    cleanup()
+    mockSession = { config: { cwd: '/Users/me/hip' } }
+    useTerminalStore.setState({ bySession: {}, attachedSessionId: null, attachedTerminalId: null })
+    useHipConfigStore.setState({ config: { version: 1 } })
+    termMocks.last.searchAddon = null
+    termMocks.last.keyHandler = null
+    termMocks.last.titleHandler = null
+    termMocks.last.bellHandler = null
+  })
+
+  async function mountHosted(): Promise<void> {
+    render(<TerminalView />)
+    await waitFor(() => expect(ptyOpen).toHaveBeenCalled())
+  }
+
+  it('⌘/Ctrl+F toggles the search bar and typing drives the SearchAddon', async () => {
+    await mountHosted()
+    expect(screen.queryByTestId('terminal-searchbar')).toBeNull()
+
+    // ⌘F through the registered custom key handler (matches macOS prefix).
+    const keyHandler = termMocks.last.keyHandler
+    expect(keyHandler).not.toBeNull()
+    const consumed = keyHandler!({
+      key: 'f', metaKey: true, ctrlKey: false, shiftKey: false, altKey: false, isComposing: false,
+    } as KeyboardEvent)
+    expect(consumed).toBe(false) // suppressed so the PTY never sees the combo
+    await waitFor(() => {
+      expect(screen.getByTestId('terminal-searchbar')).toBeInTheDocument()
+    })
+
+    // Typing forwards to the search addon with current case preference.
+    fireEvent.change(screen.getByTestId('terminal-searchbar-input'), { target: { value: 'ring' } })
+    await waitFor(() => {
+      expect(termMocks.last.searchAddon?.findNext).toHaveBeenCalledWith(
+        'ring',
+        expect.objectContaining({ caseSensitive: false }),
+      )
+    })
+
+    // Case toggle re-runs the current query with the new sensitivity.
+    fireEvent.click(screen.getByTestId('terminal-searchbar-case'))
+    await waitFor(() => {
+      expect(termMocks.last.searchAddon?.findNext).toHaveBeenCalledWith(
+        'ring',
+        expect.objectContaining({ caseSensitive: true }),
+      )
+    })
+
+    // Close button hides the bar and clears decorations.
+    fireEvent.click(screen.getByTestId('terminal-searchbar-close'))
+    await waitFor(() => {
+      expect(screen.queryByTestId('terminal-searchbar')).toBeNull()
+    })
+  })
+
+  it('plain Ctrl+F (no shift) also opens search; unrelated combos pass through to xterm', async () => {
+    await mountHosted()
+    const keyHandler = termMocks.last.keyHandler!
+    // Ctrl+K must NOT be consumed (global palette owns it).
+    expect(keyHandler({ key: 'k', metaKey: true } as KeyboardEvent)).toBe(true)
+    expect(screen.queryByTestId('terminal-searchbar')).toBeNull()
+    // Ctrl+F opens.
+    expect(keyHandler({ key: 'f', ctrlKey: true } as KeyboardEvent)).toBe(false)
+    await waitFor(() => {
+      expect(screen.getByTestId('terminal-searchbar')).toBeInTheDocument()
+    })
+  })
+
+  it('OSC 0/2 title flows into terminalStore (P0.3)', async () => {
+    await mountHosted()
+    termMocks.last.titleHandler!('npm test')
+    expect(useTerminalStore.getState().getSession('s1')?.title).toBe('npm test')
+    // Empty OSC0 arg resets the override.
+    termMocks.last.titleHandler!('')
+    expect(useTerminalStore.getState().getSession('s1')?.title).toBeUndefined()
+  })
+
+  it('bell renders the flash bar (P0.4)', async () => {
+    await mountHosted()
+    expect(screen.queryByTestId('terminal-bell-flash')).toBeNull()
+    termMocks.last.bellHandler!()
+    await waitFor(() => {
+      expect(screen.getByTestId('terminal-bell-flash')).toBeInTheDocument()
+    })
+  })
+
+  it('bell is suppressed when [terminal].bell = off (P0.4/P0.5)', async () => {
+    useHipConfigStore.setState({ config: { version: 1, terminal: { bell: 'off' } } })
+    await mountHosted()
+    termMocks.last.bellHandler!()
+    expect(screen.queryByTestId('terminal-bell-flash')).toBeNull()
   })
 })

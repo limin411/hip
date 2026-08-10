@@ -46,7 +46,7 @@ hip 的内置智能体（sidecar 中的 Supervisor ReAct 循环）已具备业�
 | 项目 | 一句话定位 | 对长任务最有借鉴价值的机制 |
 |---|---|---|
 | **codex**（Rust） | OpenAI 终端 agent | OS 级沙箱（seatbelt/bwrap/seccomp）；elicitation 暂停协调；turn 级时序（TTFT/TTFM）+ 每 turn diff 追踪；跨线程 rollout token 预算+阈值提醒注入；远程压缩 v2；session 持久化与 resume 重构；guardian 会话预热复用 |
-| **opencode** | 终端 agent（Effect） | **LSP 集成**（9 操作工具 + 启动符号上下文）；git worktree；plan mode；后台任务 promote 前台；快照/undo（独立 git 目录 + alternates 去重）；session 共享/同步事件源 |
+| **opencode** | 终端 agent（Effect） | git worktree；plan mode；后台任务 promote 前台；快照/undo（独立 git 目录 + alternates 去重）；session 共享/同步事件源。<br>注：其 LSP 集成（9 操作工具 + 启动符号上下文）调研完成但**本方案不采纳**（见 §4 附注） |
 | **grok-build** | xAI 终端 agent | nono 沙箱 profile；deterministic workflow journal（seq+req_hash 重放，发散即失败）；turn 边界 rewind 检查点；子代理协调器（并发上限+输出引用）；token budget 强校验 |
 | **pi** | 本机 coding agent | 技能发现与按需加载；durable AgentHarness（lane/checkpoint/resume，无程序计数器）；扩展（hooks 后继）事件体系；harness telemetry 词汇表 |
 | **hermes-agent** | 通用 agent 框架 | batch runner（多进程+checkpoint+Arrow 轨迹）；cron 调度器；ACP 服务端；MoA 多模型编排；学习图 |
@@ -67,45 +67,24 @@ hip 的内置智能体（sidecar 中的 Supervisor ReAct 循环）已具备业�
 
 | # | 方向 | hip 现状 | 参照 | 价值 | 工作量 | 优先级 |
 |---|---|---|---|---|---|---|
-| G1 | **LSP 语义导航** | 无（仅 grep/read 文本检索） | opencode `lsp/`、`tool/lsp.ts` | 高：语义跳转/引用/符号/诊断，替代长任务中大量 grep→read 轮次，直接降 token 与错误率 | 中 | **P0** |
-| G2 | **技能路由与行为评估** | e2e/eval 有任务级场景，无按技能的 trigger 回归 | agent-skills `evals/`（3 层） | 高：hip 技能面大，路由质量决定长任务是否「用对流程」；缺 CI 护栏 | 小-中 | **P0** |
-| G3 | **Turn 级可观测性**（TTFT/TTFM、turn profile、每 turn diff） | 有 token-metrics/usage，无延迟分解与变更审计 | codex `turn_timing.rs`、`turn_diff_tracker.rs` | 高：长任务成本归因、卡顿定位、回归审计的前提 | 中 | **P0** |
-| G4 | **Elicitation 澄清暂停** | plan-mode 有 AskUserQuestion，但无「turn 内暂停等待用户答复再继续」的协调机制 | codex `elicitation.rs`（引用计数 paused 协调） | 中-高：800 步任务开工前澄清范围，避免方向性返工 | 小 | **P1** |
-| G5 | **OS 级沙箱执行** | 仅 permission HITL + network-policy；无进程级强制 | codex `sandboxing/`（seatbelt/bwrap/seccomp）；grok-build `xai-grok-sandbox` | 中-高：无人值守长任务（background/cron/automation）的安全底线 | 大 | **P1** |
-| G6 | **后台任务状态注入与 promote** | 有 background-manager；无压缩后状态注入、无 background→前台提升 | kimi-code `taskService.ts`；opencode `background-job.ts` | 中：长任务并行子任务收尾衔接 | 小 | **P1** |
-| G7 | **跨代理树 token 预算与提醒注入** | 有 usage 记账与 loop 上限；无跨树预算阈值提醒 | codex `rollout_budget.rs` | 中：长任务成本失控预警 | 小-中 | **P1** |
-| G8 | 远程/服务端压缩 | 本地 LLM+token-budget 压缩 | codex `compact_remote_v2.rs` | 中：压缩质量与上下文保留 | 中 | P2（依赖 provider 支持） |
-| G9 | 记忆实体图/关系 | 有 FTS+合并进化，无实体图 | mem0 `entity_store`；ragflow GraphRAG light | 中：跨会话主题关联 | 中-大 | P2 |
-| G10 | 语音/实时对话 | 无 | codex `realtime_conversation`；openworker `stt/` | 低-中：长任务值守场景 | 大 | P2 |
-| G11 | 会话共享/同步、MoA 多模型、GUI 自动化 | 无 | opencode `share/`；hermes `moa_loop.py`；UI-TARS operators | 低 | 大 | P2（不进入本 spec 详设） |
+| G1 | **技能路由与行为评估** | e2e/eval 有任务级场景，无按技能的 trigger 回归 | agent-skills `evals/`（3 层） | 高：hip 技能面大，路由质量决定长任务是否「用对流程」；缺 CI 护栏 | 小-中 | **P0** |
+| G2 | **Turn 级可观测性**（TTFT/TTFM、turn profile、每 turn diff） | 有 token-metrics/usage，无延迟分解与变更审计 | codex `turn_timing.rs`、`turn_diff_tracker.rs` | 高：长任务成本归因、卡顿定位、回归审计的前提 | 中 | **P0** |
+| G3 | **Elicitation 澄清暂停** | plan-mode 有 AskUserQuestion，但无「turn 内暂停等待用户答复再继续」的协调机制 | codex `elicitation.rs`（引用计数 paused 协调） | 中-高：800 步任务开工前澄清范围，避免方向性返工 | 小 | **P1** |
+| G4 | **OS 级沙箱执行** | 仅 permission HITL + network-policy；无进程级强制 | codex `sandboxing/`（seatbelt/bwrap/seccomp）；grok-build `xai-grok-sandbox` | 中-高：无人值守长任务（background/cron/automation）的安全底线 | 大 | **P1** |
+| G5 | **后台任务状态注入与 promote** | 有 background-manager；无压缩后状态注入、无 background→前台提升 | kimi-code `taskService.ts`；opencode `background-job.ts` | 中：长任务并行子任务收尾衔接 | 小 | **P1** |
+| G6 | **跨代理树 token 预算与提醒注入** | 有 usage 记账与 loop 上限；无跨树预算阈值提醒 | codex `rollout_budget.rs` | 中：长任务成本失控预警 | 小-中 | **P1** |
+| G7 | 远程/服务端压缩 | 本地 LLM+token-budget 压缩 | codex `compact_remote_v2.rs` | 中：压缩质量与上下文保留 | 中 | P2（依赖 provider 支持） |
+| G8 | 记忆实体图/关系 | 有 FTS+合并进化，无实体图 | mem0 `entity_store`；ragflow GraphRAG light | 中：跨会话主题关联 | 中-大 | P2 |
+| G9 | 语音/实时对话 | 无 | codex `realtime_conversation`；openworker `stt/` | 低-中：长任务值守场景 | 大 | P2 |
+| G10 | 会话共享/同步、MoA 多模型、GUI 自动化 | 无 | opencode `share/`；hermes `moa_loop.py`；UI-TARS operators | 低 | 大 | P2（不进入本 spec 详设） |
+
+> **附注（不采纳项）**：opencode 的 LSP 语义导航（`lsp/lsp.ts`、`tool/lsp.ts`）经调研评估后**不在本方案实施**——长任务探索效率收益显著，但引入服务器生态碎片化维护成本与每会话常驻进程开销，与 hip「工具面保持克制」的取向冲突；若后续需要，可在 G2 观测性数据（探索 token 占比）支撑下重新评估。
 
 **已覆盖、不升级的项**（避免重复建设）：turn 级回滚（hip shadow checkpoint 已等价 grok-build rewind）；durable 工作流（durable-executor+replay 已等价 grok-build journal 的大部分）；会话恢复（crash-recovery 已有）；AGENTS.md（已有）；guardian（已有）；cron（已有）；worktree 隔离（已有）。
 
 ## 5. 方案详情（P0 / P1）
 
-### 5.1 G1 — LSP 语义导航工具（P0）
-
-**目标**：为内置 agent 增加语义级代码查询，将「猜路径 → grep → 读文件」的探索链压缩为一次语义查询。
-
-**设计要点**：
-
-1. 新增 `session/lsp/` 模块：
-   - `manager.ts` — 按 服务器×工作区根 惰性拉起一个 LSP client（JSON-RPC over stdio），去重 in-flight spawn，跟踪坏服务器并标记下线（参照 opencode `lsp/launch.ts` 的失败记账）；
-   - `server.ts` — 服务器二进制解析：优先用项目内 `node_modules/.bin/` 与 `~/.hip/lsp-servers/`，配置项 `[lsp] servers = { "typescript": { "command": [...], "args": [...] } }`（与 `[mcpServers]` 同构）；
-   - `session.ts` — 会话级生命周期：打开时初始化、空闲 N 分钟后 shutdown、关闭时 dispose。
-2. 工具面：新增**一个** `lsp` 工具 + 若干 operation（参照 opencode 单工具 9 操作）：
-   - `goToDefinition` / `findReferences` / `implementations` / `callHierarchy` / `documentSymbol` / `workspaceSymbol` / `hover` / `diagnostics`（按文件，含 `waitForDiagnostics` 的短超时）；
-   - operation 返回统一 markdown 块（路径:行:列 + 签名 + 前 N 行摘录），并受现有 tool-output-store 截断约束。
-3. 提示集成：在 system-prompt 的可用工具清单中给出 `lsp` 的「何时用」指引（语义查询 > grep 文本检索）；可选：会话启动时注入顶层 `documentSymbol` 摘要作为符号上下文（受 context-budget 约束，超出预算则不注入）。
-4. 权限：`lsp` 只读，走 `read` 权限档（chat 面可用）；不允许 agent 配置/启动任意二进制（`[lsp] servers` 视为项目/用户信任配置，与 MCP 服务器同等级对待）。
-
-**验收标准**：
-
-- 单测：manager 去重/坏服务器标记/超时；operation 参数 schema 校验（复用 tools-skill-params 风格测试）。
-- 集成测试（`--lsp` 标记、无 key 也可跑）：对 `fixtures/` 下小型 TS 项目，`findReferences` 返回预期位置；`diagnostics` 对含错误的 fixture 返回非空诊断。
-- 长任务评估：在 `e2e/eval/tasks/` 新增 1 个 LSP 场景（如 mini-go 变体「跨包重命名」），断言 agent 在启用 LSP 时「探索 token 消耗 ≤ 关闭时的 60%」或「完成 turn 数下降」，作为 P0 效果的量化证据。
-
-### 5.2 G2 — 技能路由与行为评估（P0）
+### 5.1 G1 — 技能路由与行为评估（P0）
 
 **目标**：为 hip 的内置/用户技能建立可回归的路由与行为评估，防止「技能越多路由越差」。
 
@@ -126,7 +105,7 @@ hip 的内置智能体（sidecar 中的 Supervisor ReAct 循环）已具备业�
 - 行为评估样例在 `yarn test:longrun-gate` 下与现有 MSM 场景同通道通过。
 - 新增技能 PR 检查清单含「附 case」。
 
-### 5.3 G3 — Turn 级可观测性（P0）
+### 5.2 G2 — Turn 级可观测性（P0）
 
 **目标**：长任务可解释、可归因、可回归。
 
@@ -143,7 +122,7 @@ hip 的内置智能体（sidecar 中的 Supervisor ReAct 循环）已具备业�
 - `trace.jsonl` 可复现每 turn 的 TTFT/TTFM 与工具耗时 Top 榜（用于长任务成本归因）。
 - 不改变现有会话行为（纯观测，开关 `[agentLoop].turnTiming = true` 默认开）。
 
-### 5.4 G4 — Elicitation 澄清暂停（P1）
+### 5.3 G3 — Elicitation 澄清暂停（P1）
 
 **目标**：长任务开工与关键分支前，模型可暂停 turn 等待用户回答，而不是「边猜边做 800 步」。
 
@@ -161,7 +140,7 @@ hip 的内置智能体（sidecar 中的 Supervisor ReAct 循环）已具备业�
 - 集成测试：fake runner 中模型先 ask_user 再继续，断言工具结果在 resolve 前不投递。
 - 长任务评估（可选）：MSM 变体开启引导后「首轮返工次数」下降。
 
-### 5.5 G5 — OS 级沙箱执行（P1）
+### 5.4 G4 — OS 级沙箱执行（P1）
 
 **目标**：无人值守执行（background/cron/automation、`--hitl auto`）时，权限策略能落到进程级强制，而不是只靠人工确认。
 
@@ -180,7 +159,7 @@ hip 的内置智能体（sidecar 中的 Supervisor ReAct 循环）已具备业�
 - 集成测试（macOS CI）：沙箱内 `touch $HOME/x` 被拒绝、`touch 工作区根/x` 被允许；网络被拒时错误归一化。
 - 回归：现有 `--hitl auto` 的 CLI 测试在 `[sandbox] mode=require` 下通过。
 
-### 5.6 G6 — 后台任务状态注入与 promote（P1）
+### 5.5 G5 — 后台任务状态注入与 promote（P1）
 
 **目标**：长任务期间后台子代理的收尾衔接不再「做完了但主代理不知道」。
 
@@ -195,7 +174,7 @@ hip 的内置智能体（sidecar 中的 Supervisor ReAct 循环）已具备业�
 - 单测：压缩 hook 触发注入；注入内容包含任务 id/状态/剩余；完成结果挂起并在下一 turn 注入一次。
 - 集成测试：background-subagent.integration 扩展——后台任务完成后主代理在下个 turn 能引用其结果。
 
-### 5.7 G7 — 跨代理树 token 预算与提醒（P1）
+### 5.6 G6 — 跨代理树 token 预算与提醒（P1）
 
 **目标**：长任务（含 task_batch 扇形展开）的累计成本可设上限、可预警。
 
@@ -208,38 +187,37 @@ hip 的内置智能体（sidecar 中的 Supervisor ReAct 循环）已具备业�
 **验收标准**：
 
 - 单测：加权记账正确；阈值注入只触发一次；硬上限触发收尾。
-- 与 G3 的 turn-timing 共用记账数据源（usage 事件），不重复实现 token 统计。
+- 与 G2 的 turn-timing 共用记账数据源（usage 事件），不重复实现 token 统计。
 
-### 5.8 P2 备选（本 spec 只给方向，不做详设）
+### 5.7 P2 备选（本 spec 只给方向，不做详设）
 
-- **G8 远程压缩**：在 `compaction.ts` 抽一层 `RemoteCompactor` 接口（现无 provider 支持，接口先留空实现=本地回退）。
-- **G9 记忆实体图**：在 `memory/pipeline/` 增加 phase3 实体抽取与 `memory/entity-store.ts`（复用现有 LLM 客户端与 FTS 基建）。
-- **G10 语音**：参照 openworker STT（whisper.cpp）做听写输入，P2 最低优先级。
-- **G11**（共享/同步、MoA、GUI 自动化）：不在本 spec 范围。
+- **G7 远程压缩**：在 `compaction.ts` 抽一层 `RemoteCompactor` 接口（现无 provider 支持，接口先留空实现=本地回退）。
+- **G8 记忆实体图**：在 `memory/pipeline/` 增加 phase3 实体抽取与 `memory/entity-store.ts`（复用现有 LLM 客户端与 FTS 基建）。
+- **G9 语音**：参照 openworker STT（whisper.cpp）做听写输入，P2 最低优先级。
+- **G10**（共享/同步、MoA、GUI 自动化）：不在本 spec 范围。
 
 ## 6. 路线图与分期
 
 | 阶段 | 内容 | 依赖 | 出口判据 |
 |---|---|---|---|
-| M1（P0） | G1 LSP + G2 技能评估 + G3 观测性 | 无 | 三者的验收标准全部绿；`yarn test:longrun-gate` 不回归 |
-| M2（P1） | G4 elicitation + G6 后台注入 + G7 预算 | M1（G3 数据源） | 集成测试绿；MSM 变体（G4 引导）跑通 |
-| M3（P1） | G5 沙箱 | M1 | macOS 沙箱验收绿；`--hitl auto` 回归绿 |
-| M4（P2） | G8/G9/G10 按需 | M1 | 单项各自验收绿 |
+| M1（P0） | G1 技能评估 + G2 观测性 | 无 | 两者的验收标准全部绿；`yarn test:longrun-gate` 不回归 |
+| M2（P1） | G3 elicitation + G5 后台注入 + G6 预算 | M1（G2 数据源） | 集成测试绿；MSM 变体（G3 引导）跑通 |
+| M3（P1） | G4 沙箱 | M1 | macOS 沙箱验收绿；`--hitl auto` 回归绿 |
+| M4（P2） | G7/G8/G9 按需 | M1 | 单项各自验收绿 |
 
 每阶段结束提交（遵循 AGENTS.md §4：分批提交、每阶段可验证）。
 
 ## 7. 验收与回归策略
 
-1. **免费路径**：G2 路由评估、G3 单测、G4/G6/G7 单测均无 LLM 依赖，纳入 `yarn test`。
-2. **付费门禁**：G1 LSP 场景与 G2 行为样例、MSM 回归纳入 `yarn test:longrun-gate`（`HIP_EVAL_MSM_PATH` 现有机制）。
-3. **量化对照**：G1 的「探索 token 下降」、G4 的「首轮返工下降」用 e2e/eval 报告对比启用/关闭效果，写入 `docs/design/msm-dogfood-journal.md` 风格的效果记录。
-4. **兼容性**：G3 的 `HipRunResult` 新字段可选、向后兼容；G5 默认 `auto` 不改交互前台行为；G6/G7 默认关闭或阈值默认无限，均不破坏现有会话。
+1. **免费路径**：G1 路由评估、G2 单测、G3/G5/G6 单测均无 LLM 依赖，纳入 `yarn test`。
+2. **付费门禁**：G1 行为样例、MSM 回归纳入 `yarn test:longrun-gate`（`HIP_EVAL_MSM_PATH` 现有机制）。
+3. **量化对照**：G3 的「首轮返工下降」用 e2e/eval 报告对比启用/关闭效果，写入 `docs/design/msm-dogfood-journal.md` 风格的效果记录。
+4. **兼容性**：G2 的 `HipRunResult` 新字段可选、向后兼容；G4 默认 `auto` 不改交互前台行为；G5/G6 默认关闭或阈值默认无限，均不破坏现有会话。
 
 ## 8. 风险与开放问题
 
 | 风险/问题 | 说明 | 缓解 |
 |---|---|---|
-| LSP 服务器生态碎片化（各语言二进制不同） | 维护成本 | 先只内置 TS/JS（typescript-language-server）；其余走 `[lsp] servers` 用户配置；坏服务器记账+下线，不阻塞会话 |
 | 沙箱与终端宿主（SSH）冲突 | 远程执行无本地沙箱 | 沙箱仅作用于本地进程启动路径；SSH 终端维持现状并在文档注明 |
 | 远程压缩依赖 provider | DeepSeek 等无 compact 端点 | 接口先行、实现后置（P2） |
 | 行为评估的 LLM 成本 | longrun 门禁变贵 | 样例保持每个技能 1 条；与 MSM 共用 gate 配额 |
@@ -250,7 +228,7 @@ hip 的内置智能体（sidecar 中的 Supervisor ReAct 循环）已具备业�
 对比仓库机制对应的源码位置（完整清单见 `/tmp/hip-survey/{codex,opencode,pi,memory,skills-proc}.md`，本 spec 随仓库归档时可复制为 `agent-capability-upgrade-research.md` 附件）：
 
 - codex：`codex-rs/sandboxing/src/manager.rs`、`codex-rs/core/src/elicitation.rs`、`turn_timing.rs`、`turn_diff_tracker.rs`、`rollout_budget.rs`、`compact_remote_v2.rs`、`guardian/review_session.rs`
-- opencode：`packages/opencode/src/lsp/lsp.ts`、`tool/lsp.ts`、`snapshot/index.ts`、`background/job.ts`、`tool/plan.ts`
+- opencode：`packages/opencode/src/lsp/lsp.ts`、`tool/lsp.ts`（调研完成，**未采纳**，见 §4 附注）、`snapshot/index.ts`、`background/job.ts`、`tool/plan.ts`
 - kimi-code：`packages/agent-core-v2/src/agent/task/taskService.ts`
 - agent-skills：`evals/cases/<skill>.json`、`scripts/run-evals.js`
 - grok-build：`crates/codegen/xai-grok-sandbox/src/lib.rs`、`xai-workflow/src/journal.rs`

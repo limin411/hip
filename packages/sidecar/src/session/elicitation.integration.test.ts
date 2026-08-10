@@ -57,7 +57,7 @@ describe('ask_user elicitation in the supervisor loop', () => {
             sessionId: 'el-test',
             runner,
             tools,
-            emit: { ...noopEmit, loopSignal: (e) => { if (e.type === 'loop.pause') pauses.push(`${e.kind}:${e.question}`) } },
+            emit: { ...noopEmit, loopSignal: (e: import('./loop-events.js').LoopEvent) => { if (e.type === 'loop.pause') pauses.push(`${e.kind}:${e.question}`) } },
             summarizer: noopSummarizer,
             elicitation: coordinator,
           },

@@ -442,7 +442,7 @@ export function HtmlPreviewBody({
   cwd?: string | null
   truncated?: boolean
   truncatedLabel: string
-  /** 'chat' lifts the mode toggle + open-browser button into the chat titlebar. */
+  /** 'chat' lifts the whole toolbar (path + mode + open browser) into the titlebar. */
   surface?: 'code' | 'chat'
   /** Controlled mode for the chat surface (owned by the titlebar toggle). */
   mode?: 'render' | 'source'
@@ -508,35 +508,33 @@ export function HtmlPreviewBody({
 
   return (
     <div className="flex h-full min-h-0 flex-col" data-testid="preview-html-shell">
-      {/* Compact toolbar: path + mode + open browser on one row (chat surface
-          keeps only the path — mode + open-browser live in the titlebar). */}
-      <div className="flex shrink-0 items-center gap-2 border-b border-border/80 bg-surface-subtle px-2 py-1">
-        <div
-          className="min-w-0 flex-1 truncate font-mono text-caption text-ink-tertiary"
-          data-testid="preview-chrome"
-          title={absolutePath ?? path}
-        >
-          {path}
+      {/* Toolbar (path + mode + open browser on one row) — chat surface has no
+          toolbar: path is in the titlebar dropdown, mode + open-browser live there too. */}
+      {surface !== 'chat' && (
+        <div className="flex shrink-0 items-center gap-2 border-b border-border/80 bg-surface-subtle px-2 py-1">
+          <div
+            className="min-w-0 flex-1 truncate font-mono text-caption text-ink-tertiary"
+            data-testid="preview-chrome"
+            title={absolutePath ?? path}
+          >
+            {path}
+          </div>
+          <ModeToggle
+            testidPrefix="preview-html"
+            modes={[
+              { id: 'render', label: t('artifact.previewViewRendered') },
+              { id: 'source', label: t('artifact.previewViewSource') },
+            ]}
+            value={mode}
+            onChange={(id) => setLocalMode(id as 'render' | 'source')}
+          />
+          <HtmlOpenBrowserButton
+            absolutePath={absolutePath}
+            canOpenBrowser={canOpenBrowser}
+            cwd={cwd}
+          />
         </div>
-        {surface !== 'chat' && (
-          <>
-            <ModeToggle
-              testidPrefix="preview-html"
-              modes={[
-                { id: 'render', label: t('artifact.previewViewRendered') },
-                { id: 'source', label: t('artifact.previewViewSource') },
-              ]}
-              value={mode}
-              onChange={(id) => setLocalMode(id as 'render' | 'source')}
-            />
-            <HtmlOpenBrowserButton
-              absolutePath={absolutePath}
-              canOpenBrowser={canOpenBrowser}
-              cwd={cwd}
-            />
-          </>
-        )}
-      </div>
+      )}
       <div className="flex min-h-0 flex-1 flex-col">
         {(truncated || large || (hardTruncated && mode === 'render')) && (
           <div className="shrink-0 space-y-2 px-3 pt-3 pb-2">

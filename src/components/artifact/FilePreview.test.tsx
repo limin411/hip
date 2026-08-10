@@ -238,8 +238,9 @@ describe('FilePreview', () => {
     }
     render(<ChatHarness />)
     expect(screen.getByTestId('preview-html-shell')).toBeInTheDocument()
-    expect(screen.getByTestId('preview-chrome')).toHaveTextContent('/tmp/index.html')
-    // Toolbar chrome is lifted out of the body on the chat surface.
+    // No toolbar row on the chat surface: path lives in the titlebar dropdown,
+    // mode toggle + open-browser live in the titlebar too.
+    expect(screen.queryByTestId('preview-chrome')).toBeNull()
     expect(screen.queryByTestId('preview-html-mode')).toBeNull()
     expect(screen.queryByTestId('preview-html-open-browser')).toBeNull()
     // Still renders the iframe in render mode.

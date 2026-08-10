@@ -64,7 +64,7 @@ export function PermissionModePicker() {
           <span className="max-w-[140px] truncate">{t(`chat.permission.modes.${current}`)}</span>
         </ComposerChip>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="start" data-testid="permission-mode-menu">
+      <DropdownMenuContent align="start" className="bg-surface-subtle" data-testid="permission-mode-menu">
         <div className="px-2 py-1.5 text-meta font-medium text-ink-tertiary">
           {t('chat.permission.menuTitle')}
         </div>

@@ -196,8 +196,16 @@ export function serializeCsv(rows: string[][]): string {
  * 整体非法（非对象 / cols 非数组 / 空）→ null（调用方走行宽推导回退）。
  */
 export function normalizeMeta(raw: unknown): TableColumn[] | null {
-  if (!raw || typeof raw !== 'object') return null
-  const m = raw as { cols?: unknown }
+  let input: unknown = raw
+  if (typeof raw === 'string') {
+    try {
+      input = JSON.parse(raw)
+    } catch {
+      return null
+    }
+  }
+  if (!input || typeof input !== 'object') return null
+  const m = input as { cols?: unknown }
   if (!Array.isArray(m.cols)) return null
   const cols: TableColumn[] = []
   for (const c of m.cols) {

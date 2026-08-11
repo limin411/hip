@@ -2579,7 +2579,56 @@ export const ko = {
       "delRow": "행 삭제",
       "delCol": "열 삭제",
       "untitled": "제목 없는 표",
-      "loadFailed": "표를 열 수 없습니다"
+      "loadFailed": "표를 열 수 없습니다",
+
+      columnLabel: "열 {{n}}",
+      types: {
+        text: "텍스트",
+        number: "숫자",
+        checkbox: "체크",
+        date: "날짜",
+        select: "선택",
+        selectNewOption: "새 옵션…",
+      },
+      columnMenu: {
+        rename: "이름 바꾸기",
+        type: "유형",
+        insertLeft: "왼쪽에 열 추가",
+        insertRight: "오른쪽에 열 추가",
+        deleteColumn: "열 삭제",
+      },
+      rowMenu: {
+        insertAbove: "위에 행 추가",
+        insertBelow: "아래에 행 추가",
+        duplicate: "행 복제",
+        deleteRow: "행 삭제",
+      },
+      grid: {
+        addRow: "행 추가",
+        addColumn: "열 추가",
+        emptyHint: "셀을 더블클릭하여 입력",
+        firstCellHint: "더블클릭하여 입력",
+      },
+      toolbar: {
+        undo: "실행 취소",
+        redo: "다시 실행",
+        sort: "정렬",
+        filter: "필터",
+        stats: "통계",
+        importCsv: "CSV 가져오기",
+        exportCsv: "CSV 내보내기",
+        freezeHeader: "첫 행 고정",
+      },
+      status: {
+        rowsCols: "{{rows}}개 행 · {{cols}}개 열",
+        saved: "저장됨",
+        saving: "저장 중…",
+        ready: "준비됨",
+      },
+      toasts: {
+        columnDeleted: "열이 삭제되었습니다(실행 취소 가능)",
+        rowDeleted: "행이 삭제되었습니다(실행 취소 가능)",
+      },
     },
     "image": {
       "alt": "대체 텍스트",

@@ -2579,7 +2579,56 @@ export const ja = {
       "delRow": "行を削除",
       "delCol": "列を削除",
       "untitled": "無題のテーブル",
-      "loadFailed": "テーブルを開けませんでした"
+      "loadFailed": "テーブルを開けませんでした",
+
+      columnLabel: "列 {{n}}",
+      types: {
+        text: "テキスト",
+        number: "数値",
+        checkbox: "チェック",
+        date: "日付",
+        select: "選択",
+        selectNewOption: "新しい選択肢…",
+      },
+      columnMenu: {
+        rename: "名前を変更",
+        type: "タイプ",
+        insertLeft: "左に列を挿入",
+        insertRight: "右に列を挿入",
+        deleteColumn: "列を削除",
+      },
+      rowMenu: {
+        insertAbove: "上に行を挿入",
+        insertBelow: "下に行を挿入",
+        duplicate: "行を複製",
+        deleteRow: "行を削除",
+      },
+      grid: {
+        addRow: "行を追加",
+        addColumn: "列を追加",
+        emptyHint: "セルをダブルクリックして入力",
+        firstCellHint: "ダブルクリックで入力",
+      },
+      toolbar: {
+        undo: "元に戻す",
+        redo: "やり直す",
+        sort: "並べ替え",
+        filter: "フィルター",
+        stats: "統計",
+        importCsv: "CSV インポート",
+        exportCsv: "CSV エクスポート",
+        freezeHeader: "先頭行を固定",
+      },
+      status: {
+        rowsCols: "{{rows}} 行 · {{cols}} 列",
+        saved: "保存済み",
+        saving: "保存中…",
+        ready: "準備完了",
+      },
+      toasts: {
+        columnDeleted: "列を削除しました（元に戻せます）",
+        rowDeleted: "行を削除しました（元に戻せます）",
+      },
     },
     "image": {
       "alt": "代替テキスト",

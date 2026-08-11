@@ -489,6 +489,8 @@ interface KnowledgeState {
   updateTableDraft: (id: string, csv: string, meta: string) => void
   /** Persist table draft to disk; returns false on IPC failure (editor keeps local state). */
   commitTable: (id?: string) => Promise<boolean>
+  /** Leave the active leaf (table editor back) and show browse for the current folder. */
+  backToBrowse: () => Promise<void>
   /** Switch Live / Source / Preview. Live without flag clamps to Source. */
   setEditorMode: (mode: EditorMode) => Promise<void>
   /**
@@ -2032,6 +2034,33 @@ export const useKnowledgeStore = create<KnowledgeState>((set, get) => ({
       toast.error(msg)
       return false
     }
+  },
+
+  backToBrowse: async () => {
+    const s = get()
+    syncActiveEditorToDraft({ leaveActiveLeaf: true })
+    const tableDirty =
+      !!s.tableDraft &&
+      !!s.tableDoc &&
+      (s.tableDraft.csv !== s.tableDoc.csv || s.tableDraft.meta !== s.tableDoc.meta)
+    if (tableDirty) {
+      const ok = await get().flushSave({ phase: 'write' })
+      if (!ok) return
+    }
+    set({
+      activeDocId: null,
+      treeFocusId: null,
+      docBody: '',
+      draftBody: '',
+      editorMode: 'live',
+      tableDoc: null,
+      tableDraft: null,
+      tableSaveState: 'idle',
+      pendingReveal: null,
+      backlinks: [],
+      outboundLinks: [],
+      linkPanelStatus: 'idle',
+    })
   },
 
   setEditorMode: async (mode) => {

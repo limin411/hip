@@ -1,0 +1,247 @@
+// @vitest-environment happy-dom
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { render, fireEvent, screen, within, cleanup } from '@testing-library/react'
+import { TableEditor } from './TableEditor'
+import { useKnowledgeStore } from '@/store/knowledgeStore'
+
+const knowledgeReadTable = vi.fn()
+const knowledgeWriteTable = vi.fn()
+const commitTableSpy = vi.fn()
+
+vi.mock('@/ipc/knowledge', () => ({
+  knowledgeReadTable: (...a: unknown[]) => knowledgeReadTable(...a),
+  knowledgeWriteTable: (...a: unknown[]) => knowledgeWriteTable(...a),
+  knowledgeErrorMessage: (e: unknown) => (e instanceof Error ? e.message : String(e)),
+}))
+
+vi.mock('sonner', () => ({
+  toast: { error: vi.fn(), success: vi.fn(), info: vi.fn(), message: vi.fn(), warning: vi.fn() },
+}))
+
+vi.mock('react-i18next', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('react-i18next')>()
+  return {
+    ...actual,
+    useTranslation: () => ({
+    t: (key: string, opts?: Record<string, unknown>) => {
+      if (key === 'knowledge.table.columnLabel') return `列 ${opts?.n}`
+      if (key === 'knowledge.table.status.rowsCols') return `${opts?.rows} 行 · ${opts?.cols} 列`
+      if (key === 'knowledge.table.types.text') return '文本'
+      if (key === 'knowledge.table.types.number') return '数字'
+      if (key === 'knowledge.table.types.checkbox') return '勾选'
+      if (key === 'knowledge.table.types.date') return '日期'
+      if (key === 'knowledge.table.types.select') return '单选'
+      return key
+    },
+  }),
+  }
+})
+
+const CSV = 'a,b,c\n1,2,3\nx,y,z\n'
+const META = JSON.stringify({
+  cols: [
+    { id: 'col_1', name: '任务', type: 'text', width: 150 },
+    { id: 'col_2', name: '预算', type: 'number', width: 150 },
+    { id: 'col_3', name: '状态', type: 'select', options: ['待办', '完成'], width: 150 },
+  ],
+})
+
+function mountTable() {
+  useKnowledgeStore.setState({
+    loaded: true,
+    spaces: [{ id: 'spc_1', name: 'S', createdAt: 1, updatedAt: 1 }],
+    activeSpaceId: 'spc_1',
+    nodes: [{ id: 'tbl_1', parentId: null, kind: 'table', title: '预算', order: 0, createdAt: 1, updatedAt: 1 }],
+    activeDocId: 'tbl_1',
+    docBody: '',
+    draftBody: '',
+    tableDoc: { id: 'tbl_1', csv: CSV, meta: META },
+    tableDraft: { id: 'tbl_1', csv: CSV, meta: META },
+    tableSaveState: 'idle',
+    editorMode: 'live',
+    mode: 'workspace',
+    currentFolderId: null,
+    searchQuery: '',
+    searchHits: [],
+    indexStatus: 'idle',
+    spaceDocCounts: { spc_1: 1 },
+    recent: [],
+    expandedFolderIds: {},
+    busy: false,
+    error: null,
+    saveState: 'idle',
+  })
+}
+
+describe('TableEditor (knowledge-table PR-3)', () => {
+  beforeEach(() => {
+    mountTable()
+    commitTableSpy.mockReset()
+    // 让防抖保存不真跑 IPC：直接替换 commitTable
+    useKnowledgeStore.setState({
+      commitTable: vi.fn(async () => {
+        commitTableSpy()
+        return true
+      }) as never,
+    })
+  })
+  afterEach(() => {
+    cleanup()
+    vi.useRealTimers()
+  })
+
+  it('renders grid with cols/rows and header names', () => {
+    render(<TableEditor tableId="tbl_1" />)
+    const grid = screen.getByTestId('table-grid')
+    expect(grid.dataset.cols).toBe('3')
+    expect(grid.dataset.rows).toBe('3')
+    expect(screen.getByTestId('table-grid').querySelector('th[data-col="0"]')!.textContent).toContain('任务')
+    expect(screen.getByTestId('table-grid').querySelector('th[data-col="1"]')!.textContent).toContain('预算')
+    expect(screen.getByTestId('table-grid').querySelector('th[data-col="2"]')!.textContent).toContain('状态')
+    // 数字列右对齐
+    expect(document.querySelector('td[data-cell="0,1"]')!.className).toContain('text-right')
+    // 状态栏（标题栏与状态栏各一处）
+    expect(screen.getAllByText('3 行 · 3 列').length).toBeGreaterThanOrEqual(1)
+  })
+
+  it('edits a cell on double click and commits on Enter', () => {
+        render(<TableEditor tableId="tbl_1" />)
+    const cell = screen.getByTestId('table-cell-0-0')
+    fireEvent.doubleClick(cell)
+    const input = screen.getByTestId('table-cell-input') as HTMLInputElement
+    fireEvent.change(input, { target: { value: '新任务' } })
+    fireEvent.keyDown(input, { key: 'Enter' })
+    expect(screen.getByTestId('table-cell-0-0').textContent).toContain('新任务')
+    // draft 已同步（csv 含新值）
+    const draft = useKnowledgeStore.getState().tableDraft
+    expect(draft?.csv).toContain('新任务')
+  })
+
+  it('edits via direct character input and Escape cancels', async () => {
+    render(<TableEditor tableId="tbl_1" />)
+    const grid = screen.getByTestId('table-grid')
+    // 直接输入 'q' 进入编辑
+    fireEvent.keyDown(grid, { key: 'q' })
+    const input = screen.getByTestId('table-cell-input')
+    expect((input as HTMLInputElement).value).toBe('q')
+    fireEvent.keyDown(input, { key: 'Escape' })
+    expect(screen.queryByTestId('table-cell-input')).toBeNull()
+    expect(screen.getByTestId('table-cell-0-0').textContent).toContain('a')
+  })
+
+  it('Tab moves right, Enter moves down and appends a row at the end', () => {
+    render(<TableEditor tableId="tbl_1" />)
+    const grid = screen.getByTestId('table-grid')
+    fireEvent.keyDown(grid, { key: 'Tab' })
+    expect(document.querySelector('td[data-cell="0,1"]')!.className).toContain('outline')
+    fireEvent.keyDown(grid, { key: 'Enter' })
+    expect(document.querySelector('td[data-cell="1,1"]')!.className).toContain('outline')
+    // 最后一行 Enter → 自动加行
+    fireEvent.keyDown(grid, { key: 'ArrowDown' })
+    fireEvent.keyDown(grid, { key: 'ArrowDown' })
+    fireEvent.keyDown(grid, { key: 'Enter' })
+    expect(useKnowledgeStore.getState().tableDraft?.csv.split('\n')).toHaveLength(4)
+  })
+
+  it('Delete clears the selected cell', () => {
+    render(<TableEditor tableId="tbl_1" />)
+    const grid = screen.getByTestId('table-grid')
+    fireEvent.keyDown(grid, { key: 'Delete' })
+    expect(useKnowledgeStore.getState().tableDraft?.csv).toBe(',b,c\n1,2,3\nx,y,z')
+    expect(document.querySelector('td[data-cell="0,0"]')!.textContent).toBe('')
+  })
+
+  it('checkbox column toggles on click (space too)', () => {
+    useKnowledgeStore.setState({
+      tableDoc: {
+        id: 'tbl_1',
+        csv: 'x\n',
+        meta: JSON.stringify({ cols: [{ id: 'col_1', name: '勾选', type: 'checkbox', width: 150 }] }),
+      },
+      tableDraft: {
+        id: 'tbl_1',
+        csv: 'x\n',
+        meta: JSON.stringify({ cols: [{ id: 'col_1', name: '勾选', type: 'checkbox', width: 150 }] }),
+      },
+    })
+    render(<TableEditor tableId="tbl_1" />)
+    fireEvent.click(screen.getByTestId('table-check-0-0'))
+    expect(screen.getByTestId('table-check-0-0').textContent).toContain('✓')
+    expect(useKnowledgeStore.getState().tableDraft?.csv).toBe('1')
+    // 空格切换回 0
+    const grid = screen.getByTestId('table-grid')
+    fireEvent.keyDown(grid, { key: ' ' })
+    expect(useKnowledgeStore.getState().tableDraft?.csv).toBe('0')
+  })
+
+  it('column menu: rename + type switch + insert/delete column', async () => {
+    render(<TableEditor tableId="tbl_1" />)
+    // 打开列菜单（点第 0 列头）
+    fireEvent.click(screen.getByTestId('table-grid').querySelector('th[data-col="0"]')!)
+    expect(screen.getByTestId('table-col-menu')).toBeTruthy()
+    // 重命名
+    fireEvent.click(screen.getByTestId('table-col-rename'))
+    const renameInput = screen.getByTestId('table-col-rename-input') as HTMLInputElement
+    fireEvent.change(renameInput, { target: { value: '事项' } })
+    fireEvent.keyDown(renameInput, { key: 'Enter' })
+    expect(screen.getByText('事项')).toBeTruthy()
+    // 类型切换 → number
+    fireEvent.click(screen.getByTestId('table-grid').querySelector('th[data-col="0"]')!)
+    fireEvent.click(screen.getByTestId('table-col-type-number'))
+    expect((screen.getByTestId('table-grid').querySelector('th[data-col="0"]') as HTMLElement).dataset.colType).toBe('number')
+    // 插右列
+    fireEvent.click(screen.getByTestId('table-grid').querySelector('th[data-col="0"]')!)
+    fireEvent.click(screen.getByTestId('table-col-insert-right'))
+    expect(screen.getByTestId('table-grid').dataset.cols).toBe('4')
+    // 删除列
+    fireEvent.click(screen.getByTestId('table-grid').querySelector('th[data-col="3"]')!)
+    fireEvent.click(screen.getByTestId('table-col-delete'))
+    expect(screen.getByTestId('table-grid').dataset.cols).toBe('3')
+    // 非法数字值保留原样：把 text 列改回 text 后值仍在
+    expect(screen.getByTestId('table-cell-0-0').textContent).toContain('a')
+  })
+
+  it('row menu: insert above / duplicate / delete', () => {
+    render(<TableEditor tableId="tbl_1" />)
+    fireEvent.click(screen.getByTestId('table-row-menu-1'))
+    expect(screen.getByTestId('table-row-menu')).toBeTruthy()
+    // 复制行
+    fireEvent.click(within(screen.getByTestId('table-row-menu')).getByText('knowledge.table.rowMenu.duplicate'))
+    expect(useKnowledgeStore.getState().tableDraft?.csv.split('\n')).toHaveLength(4)
+    // 删除行
+    fireEvent.click(screen.getByTestId('table-row-menu-3'))
+    fireEvent.click(within(screen.getByTestId('table-row-menu')).getByText('knowledge.table.rowMenu.deleteRow'))
+    expect(useKnowledgeStore.getState().tableDraft?.csv.split('\n')).toHaveLength(3)
+  })
+
+  it('select column opens option popup and can add a new option', () => {
+    render(<TableEditor tableId="tbl_1" />)
+    fireEvent.click(document.querySelector('td[data-cell="0,2"]')!)
+    expect(screen.getByTestId('table-select-popup')).toBeTruthy()
+    fireEvent.click(screen.getByTestId('table-select-opt-0-2-0'))
+    expect(useKnowledgeStore.getState().tableDraft?.csv).toContain('待办')
+    // 新建选项
+    fireEvent.click(document.querySelector('td[data-cell="0,2"]')!)
+    const newInput = screen.getByTestId('table-select-new-input') as HTMLInputElement
+    fireEvent.change(newInput, { target: { value: '暂停' } })
+    // change 后重查输入框（避免旧闭包）
+    const fresh = screen.getByTestId('table-select-new-input') as HTMLInputElement
+    fireEvent.keyDown(fresh, { key: 'Enter' })
+    const meta = JSON.parse(useKnowledgeStore.getState().tableDraft!.meta)
+    expect(meta.cols[2].options).toContain('暂停')
+    expect(useKnowledgeStore.getState().tableDraft?.csv).toContain('暂停')
+  })
+
+  it('debounced commit writes after 800ms', async () => {
+    vi.useFakeTimers()
+    render(<TableEditor tableId="tbl_1" />)
+    const cell = screen.getByTestId('table-cell-0-0')
+    fireEvent.doubleClick(cell)
+    const input = screen.getByTestId('table-cell-input') as HTMLInputElement
+    fireEvent.change(input, { target: { value: '保存我' } })
+    fireEvent.keyDown(input, { key: 'Enter' })
+    expect(commitTableSpy).not.toHaveBeenCalled()
+    vi.advanceTimersByTime(900)
+    expect(commitTableSpy).toHaveBeenCalled()
+  })
+})

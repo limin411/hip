@@ -2581,7 +2581,56 @@ export const zhTW = {
       "delRow": "刪除列",
       "delCol": "刪除欄",
       "untitled": "未命名表格",
-      "loadFailed": "無法開啟表格"
+      "loadFailed": "無法開啟表格",
+
+      columnLabel: "欄 {{n}}",
+      types: {
+        text: "文字",
+        number: "數字",
+        checkbox: "勾選",
+        date: "日期",
+        select: "單選",
+        selectNewOption: "新增選項…",
+      },
+      columnMenu: {
+        rename: "重新命名",
+        type: "類型",
+        insertLeft: "左側插入欄",
+        insertRight: "右側插入欄",
+        deleteColumn: "刪除欄",
+      },
+      rowMenu: {
+        insertAbove: "上方插入列",
+        insertBelow: "下方插入列",
+        duplicate: "複製列",
+        deleteRow: "刪除列",
+      },
+      grid: {
+        addRow: "新增列",
+        addColumn: "新增欄",
+        emptyHint: "雙擊儲存格開始輸入",
+        firstCellHint: "雙擊輸入",
+      },
+      toolbar: {
+        undo: "復原",
+        redo: "重做",
+        sort: "排序",
+        filter: "篩選",
+        stats: "統計",
+        importCsv: "匯入 CSV",
+        exportCsv: "匯出 CSV",
+        freezeHeader: "凍結首列",
+      },
+      status: {
+        rowsCols: "{{rows}} 列 · {{cols}} 欄",
+        saved: "已儲存",
+        saving: "儲存中…",
+        ready: "就緒",
+      },
+      toasts: {
+        columnDeleted: "已刪除欄（可復原）",
+        rowDeleted: "已刪除列（可復原）",
+      },
     },
     "image": {
       "alt": "替代文字",

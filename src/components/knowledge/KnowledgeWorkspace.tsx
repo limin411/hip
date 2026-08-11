@@ -53,6 +53,7 @@ import {
   isCompatDismissed,
 } from '@/domain/knowledge/editorMode'
 import { DocManagerBrowse } from './DocManagerBrowse'
+import { TableEditor } from './table/TableEditor'
 import { DocEditor, type DocEditorHandle } from './DocEditor'
 import type { DocLiveEditorHandle } from './DocBlockNoteEditor'
 import { KnowledgeDocCanvas } from './KnowledgeDocCanvas'
@@ -579,17 +580,7 @@ export function KnowledgeWorkspace() {
         {!activeDocId ? (
           <DocManagerBrowse />
         ) : isTable ? (
-          <div
-            className="flex min-h-0 flex-1 items-center justify-center px-8 py-6"
-            data-testid="knowledge-table-editor"
-          >
-            <EmptyState
-              tier="friendly"
-              title={activeNode?.title ?? t('knowledge.table.untitled')}
-              description={t('knowledge.table.loadFailed')}
-              className="w-full max-w-md border-0 py-16"
-            />
-          </div>
+          <TableEditor tableId={activeDocId} />
         ) : isBoard ? (
           <div
             className="flex min-h-0 flex-1 items-center justify-center px-8 py-6"

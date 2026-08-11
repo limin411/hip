@@ -1,0 +1,777 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="light">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>文档管理 × 右侧面板关联性整改 — 升级预览</title>
+<style>
+/* ═══════════════ 设计令牌（对齐 src/styles/tokens.css）═══════════════ */
+:root{
+  --bg-app:#ffffff; --bg-subtle:#F6F5F3; --bg-muted:#f1f1f1; --bg-content:#ffffff;
+  --border:#e6e4e1; --border-strong:#c9c6c2;
+  --text-primary:#2f2c28; --text-secondary:#6b6762; --text-tertiary:#9b9893;
+  --accent:#c2410c; --accent-strong:#7c2d12; --accent-subtle:#f3eee8; --on-accent:#fff;
+  --btn-primary:#37352f; --btn-primary-hover:#2b2923; --on-btn-primary:#fafafa;
+  --state-hover:rgba(55,53,47,.07); --shadow-overlay:0 8px 30px rgba(15,15,15,.12);
+  /* 表格域（Notion 化） */
+  --tbl-row-hover:#f7f6f3; --tbl-header:#faf9f8; --tbl-sel:rgba(45,110,220,.12);
+  --tbl-sel-strong:rgba(45,110,220,.22); --tbl-focus:#2d6edc;
+  --chip0:#c2410c; --chip1:#1a8cd8; --chip2:#2f7d40; --chip3:#7c3aed; --chip4:#c026d3; --chip5:#0d8a8a;
+}
+[data-theme="dark"]{
+  --bg-app:#1a1a1a; --bg-subtle:#1f1f1f; --bg-muted:#262626; --bg-content:#1a1a1a;
+  --border:#333333; --border-strong:#4a4a4a;
+  --text-primary:#e8e6e1; --text-secondary:#a6a39e; --text-tertiary:#7d7a75;
+  --accent:#fb923c; --accent-strong:#fdba74; --accent-subtle:#2b251f; --on-accent:#1a1a1a;
+  --btn-primary:#dcd8d2; --btn-primary-hover:#eeeae4; --on-btn-primary:#1a1a1a;
+  --state-hover:rgba(255,255,255,.07); --shadow-overlay:0 8px 30px rgba(0,0,0,.5);
+  --tbl-row-hover:#2a2a2a; --tbl-header:#202020; --tbl-sel:rgba(93,160,255,.16); --tbl-sel-strong:rgba(93,160,255,.28); --tbl-focus:#5da0ff;
+  --chip0:#fb923c; --chip1:#5bb8f0; --chip2:#5cb86a; --chip3:#a78bfa; --chip4:#f472b6; --chip5:#3dcccc;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{background:var(--bg-app);color:var(--text-primary)}
+body{font-family:-apple-system,BlinkMacSystemFont,"SF Pro Text","PingFang SC","Hiragino Sans GB","Microsoft YaHei","Segoe UI",sans-serif;font-size:13px;line-height:1.5;padding-bottom:64px}
+button{font-family:inherit;cursor:pointer;border:0;background:none;color:inherit}
+input,select,textarea{font-family:inherit;color:inherit}
+svg{display:block;flex:none}
+.wrap{max-width:1240px;margin:0 auto;padding:0 24px}
+
+/* ═══════════════ 顶部说明条 ═══════════════ */
+.topbar{position:sticky;top:0;z-index:80;background:var(--bg-app);border-bottom:1px solid var(--border);padding:10px 0}
+.topbar .row{display:flex;align-items:center;gap:12px}
+.topbar h1{font-size:15.5px;font-weight:650;letter-spacing:-.01em;white-space:nowrap}
+.topbar .sub{color:var(--text-tertiary);font-size:11.5px;white-space:nowrap}
+.spacer{flex:1}
+.btn{border:1px solid var(--border);background:var(--bg-subtle);border-radius:7px;padding:5px 11px;font-size:12px;color:var(--text-secondary);transition:all .15s;white-space:nowrap}
+.btn:hover{background:var(--state-hover);color:var(--text-primary)}
+.btn.primary{background:var(--btn-primary);color:var(--on-btn-primary);border-color:var(--btn-primary)}
+.btn.primary:hover{background:var(--btn-primary-hover)}
+.tabs{display:flex;border:1px solid var(--border);border-radius:8px;overflow:hidden}
+.tabs button{padding:5px 13px;font-size:12px;color:var(--text-secondary);background:var(--bg-subtle)}
+.tabs button+.tabs button{border-left:1px solid var(--border)}
+.tabs button.on{background:var(--state-hover);color:var(--text-primary);font-weight:600}
+.hintbar{font-size:11.5px;color:var(--text-tertiary);margin:10px 0;line-height:1.6}
+.hintbar kbd{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:10.5px;background:var(--bg-muted);border:1px solid var(--border);border-radius:4px;padding:0 4px;color:var(--text-primary)}
+.hintbar b{color:var(--text-primary);font-weight:600}
+
+/* ═══════════════ 场景一：问题对照卡 ═══════════════ */
+h2.sec{font-size:15px;font-weight:650;letter-spacing:-.01em;margin:30px 0 4px;display:flex;align-items:center;gap:8px}
+h2.sec .tag{font-size:10px;font-weight:700;color:var(--accent-strong);background:var(--accent-subtle);padding:2px 7px;border-radius:4px;letter-spacing:.04em}
+p.sec-sub{color:var(--text-tertiary);font-size:12px;margin-bottom:14px}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(380px,1fr));gap:14px}
+.cmp{background:var(--bg-subtle);border:1px solid var(--border);border-radius:10px;overflow:hidden;display:flex;flex-direction:column}
+.cmp-head{display:flex;align-items:center;gap:8px;padding:9px 12px;border-bottom:1px solid var(--border)}
+.cmp-no{font-size:10px;font-weight:700;color:var(--accent-strong);background:var(--accent-subtle);border-radius:4px;padding:2px 6px;letter-spacing:.03em}
+.cmp-title{font-size:12.5px;font-weight:600;flex:1}
+.cmp-pair{display:grid;grid-template-columns:1fr 1fr;flex:1}
+.cmp-side{padding:12px;display:flex;flex-direction:column;gap:6px;min-height:0}
+.cmp-side.before{background:var(--bg-app);border-right:1px dashed var(--border)}
+.cmp-side.after{background:var(--bg-app)}
+.cmp-label{font-size:10.5px;font-weight:600;letter-spacing:.05em;color:var(--text-tertiary)}
+.cmp-label .dot{display:inline-block;width:6px;height:6px;border-radius:50%;margin-right:5px;vertical-align:1px}
+.cmp-label .dot.b{background:#9b9893}.cmp-label .dot.a{background:var(--tbl-focus)}
+.cmp-foot{padding:8px 12px;border-top:1px solid var(--border);font-size:11px;color:var(--text-secondary);line-height:1.55;background:var(--bg-subtle)}
+.cmp-foot b{color:var(--text-primary);font-weight:600}
+.cmp-foot code{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:10px;background:var(--accent-subtle);border-radius:3px;padding:0 4px;color:var(--text-primary)}
+
+/* —— 右侧 rail mini mock —— */
+.rail-m{border:1px solid var(--border);border-radius:8px;background:var(--bg-app);overflow:hidden;font-size:10px;display:flex;flex-direction:column;height:100%}
+.rail-m .rh{display:flex;align-items:center;gap:6px;padding:6px 8px;border-bottom:1px solid var(--border);background:var(--bg-subtle);font-weight:600;font-size:10.5px}
+.rail-m .rh .ric{width:14px;height:14px;border-radius:4px;background:var(--bg-muted);color:var(--text-tertiary);display:flex;align-items:center;justify-content:center;font-size:9px;margin-left:auto}
+.rail-m .rb{padding:7px 8px;display:flex;flex-direction:column;gap:6px;flex:1}
+.rm-sec{display:flex;flex-direction:column;gap:3px}
+.rm-sec .rs-t{font-size:9px;font-weight:600;color:var(--text-tertiary);letter-spacing:.03em}
+.rm-sec .rs-t .c{color:var(--text-tertiary);font-weight:400}
+.rm-item{display:flex;align-items:center;gap:5px;padding:2.5px 6px;border-radius:5px;color:var(--text-secondary)}
+.rm-item.hot{background:var(--tbl-row-hover);color:var(--text-primary)}
+.rm-item .chip{width:12px;height:12px;border-radius:4px;flex:none;font-size:7.5px;color:#fff;display:flex;align-items:center;justify-content:center;font-weight:700}
+.rm-item .w{margin-left:auto;color:var(--text-tertiary);font-size:9px;font-variant-numeric:tabular-nums}
+.rm-empty{color:var(--text-tertiary);font-size:9.5px;padding:3px 6px}
+.rm-stat{display:flex;align-items:baseline;gap:6px;padding:3px 6px}
+.rm-stat .n{font-size:13px;font-weight:650;color:var(--text-primary);font-variant-numeric:tabular-nums}
+.rm-stat .l{color:var(--text-tertiary);font-size:9.5px}
+.rm-dist{display:flex;flex-wrap:wrap;gap:3px;padding:3px 6px 1px}
+.rm-dist .dch{font-size:8.5px;padding:1px 6px;border-radius:5px;color:#fff;font-weight:500}
+.rail-m .outline-dot{width:5px;height:5px;border-radius:1px;background:var(--text-tertiary);flex:none;opacity:.7}
+.rail-m .no-doc{display:flex;align-items:center;justify-content:center;height:100%;color:var(--text-tertiary);font-size:9.5px;text-align:center;line-height:1.6;padding:8px}
+.rail-m .num{color:var(--text-tertiary);font-variant-numeric:tabular-nums}
+.mt-tag{font-size:8.5px;font-weight:600;border-radius:4px;padding:1px 5px}
+.mt-tag.ok{background:color-mix(in srgb,var(--tbl-focus) 12%,transparent);color:var(--tbl-focus)}
+.mt-tag.bad{background:color-mix(in srgb,#c63b3b 10%,transparent);color:#c63b3b}
+
+/* ═══════════════ 场景二：应用框架 ═══════════════ */
+.stage{display:flex;height:660px;border:1px solid var(--border-strong);border-radius:12px;overflow:hidden;background:var(--bg-app);box-shadow:var(--shadow-overlay)}
+#sidebar{width:210px;flex:none;display:flex;flex-direction:column;background:var(--bg-subtle);border-right:1px solid var(--border)}
+#main{flex:1;min-width:0;display:flex;flex-direction:column;background:var(--bg-content)}
+.sb-head{height:40px;flex:none;display:flex;align-items:center;gap:7px;padding:0 13px;border-bottom:1px solid var(--border);font-size:12px;font-weight:650}
+.sb-scroll{flex:1;overflow:auto;padding:8px}
+.sb-sec{font-size:9.5px;font-weight:700;letter-spacing:.06em;color:var(--text-tertiary);padding:8px 8px 4px}
+.tnode{display:flex;align-items:center;gap:6px;padding:4px 8px;border-radius:7px;cursor:pointer;font-size:12px;color:var(--text-secondary)}
+.tnode:hover{background:var(--state-hover);color:var(--text-primary)}
+.tnode.active{background:var(--tbl-row-hover);color:var(--text-primary);font-weight:600}
+.tnode .ik{width:14px;height:14px;display:flex;align-items:center;justify-content:center;flex:none;font-size:11px;color:var(--text-tertiary)}
+.tnode .ik.doc{color:#9b9893}.tnode .ik.table{color:var(--chip1)}.tnode .ik.board{color:var(--chip3)}
+.tnode .tt{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.pg-bread{display:flex;align-items:center;gap:2px;padding:8px 20px 0;font-size:11px;color:var(--text-tertiary)}
+.pg-bread .cr{padding:1px 6px;border-radius:5px;cursor:pointer}
+.pg-bread .cr:hover{background:var(--state-hover);color:var(--text-primary)}
+.pg-bread .cr.cur{color:var(--text-primary);font-weight:600}
+.pg-title{display:flex;align-items:center;gap:8px;padding:2px 20px 8px;font-size:19px;font-weight:650;letter-spacing:-.015em}
+.pg-title .tm{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+
+/* —— 表格网格（对齐 table-ux-notion 原型） —— */
+#view-table{display:flex;flex-direction:column;flex:1;min-height:0}
+.grid-wrap{flex:1;overflow:auto;outline:none;position:relative}
+table.grid{border-collapse:separate;border-spacing:0;min-width:100%;width:max-content;user-select:none}
+.grid thead th{position:sticky;top:0;z-index:5;background:var(--tbl-header);border-bottom:1px solid var(--border-strong);border-right:1px solid var(--border);height:32px;font-size:11.5px;font-weight:600;color:var(--text-secondary);text-align:left;padding:0 9px;white-space:nowrap;transition:background .1s}
+.grid thead th:hover{background:var(--tbl-row-hover)}
+.grid thead th.flash{animation:colflash 1.2s ease-out}
+@keyframes colflash{0%{background:color-mix(in srgb,var(--tbl-focus) 38%,var(--tbl-header))}100%{background:var(--tbl-header)}}
+.grid thead th .th-n{font-weight:600}
+.grid tbody td{border-right:1px solid var(--border);border-bottom:1px solid var(--border);height:34px;font-size:12.5px;color:var(--text-primary);padding:0 9px;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;vertical-align:middle;transition:background .08s}
+.grid tbody tr:hover td{background:var(--tbl-row-hover)}
+.grid tbody td.num{text-align:right;font-variant-numeric:tabular-nums}
+td.rn,th.corner{position:sticky;left:0;z-index:4;background:var(--bg-subtle);border-bottom:1px solid var(--border);border-right:1px solid var(--border);width:42px;min-width:42px;max-width:42px;text-align:center}
+th.corner{border-bottom:1px solid var(--border-strong);z-index:6}
+td.rn{color:var(--text-tertiary);font-size:11px;font-variant-numeric:tabular-nums;padding:0}
+tr:hover td.rn{background:var(--tbl-row-hover)}
+.chip-lg{display:inline-block;border-radius:7px;padding:2px 9px;font-size:11px;font-weight:500;color:#fff;white-space:nowrap}
+.chip-lg.c0{background:var(--chip0)}.chip-lg.c1{background:var(--chip1)}.chip-lg.c2{background:var(--chip2)}.chip-lg.c3{background:var(--chip3)}.chip-lg.c4{background:var(--chip4)}.chip-lg.c5{background:var(--chip5)}
+.chk{width:15px;height:15px;border-radius:4px;border:1.5px solid var(--border-strong);background:var(--bg-app);display:inline-block;vertical-align:middle;flex:none}
+.chk.on{background:var(--btn-primary);border-color:var(--btn-primary)}
+/* 空表格提示 */
+.tbl-empty{flex:1;display:flex;align-items:center;justify-content:center;color:var(--text-tertiary);font-size:12px;gap:6px;flex-direction:column}
+.tbl-empty .plus{width:18px;height:18px;border-radius:5px;border:1px solid var(--border);display:inline-flex;align-items:center;justify-content:center}
+
+/* —— 文档视图 —— */
+#view-doc{display:flex;flex-direction:column;flex:1;min-height:0}
+.doc-body{flex:1;overflow:auto;padding:12px 22px 30px;max-width:760px}
+.doc-body h2{font-size:16px;margin:18px 0 6px;font-weight:650;letter-spacing:-.01em}
+.doc-body p{font-size:12.5px;color:var(--text-secondary);margin:6px 0;line-height:1.75}
+/* —— 画板占位 —— */
+#view-board{display:flex;flex-direction:column;flex:1;min-height:0}
+.board-body{flex:1;display:flex;align-items:center;justify-content:center;color:var(--text-tertiary);font-size:12px;flex-direction:column;gap:6px}
+.board-body .bic{font-size:26px;opacity:.5}
+.statusbar{display:flex;align-items:center;gap:14px;height:26px;flex:none;border-top:1px solid var(--border);padding:0 14px;font-size:11px;color:var(--text-tertiary)}
+.statusbar .sp{flex:1}
+.sb-save{display:flex;align-items:center;gap:5px}
+.sb-save .dot{width:6px;height:6px;border-radius:50%;background:#22a06b}
+
+/* ═══════════════ 右侧 rail（本系列主角）═══════════════ */
+#rail{width:248px;flex:none;display:flex;flex-direction:column;background:var(--bg-app);border-left:1px solid var(--border)}
+.rail-head{display:flex;align-items:center;gap:6px;height:40px;flex:none;padding:0 10px;border-bottom:1px solid var(--border);font-size:12px;font-weight:600}
+.rail-head .rh-title{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;padding-left:4px}
+.rail-head .rh-btn{width:22px;height:22px;border-radius:5px;display:flex;align-items:center;justify-content:center;color:var(--text-tertiary);font-size:11px;flex:none}
+.rail-head .rh-btn:hover{background:var(--tbl-row-hover);color:var(--text-primary)}
+.rail-body{flex:1;min-height:0;overflow-y:auto;padding:10px 10px 16px;display:flex;flex-direction:column;gap:16px}
+.rail-section{display:flex;flex-direction:column;gap:4px}
+.rail-section .rs-h{display:flex;align-items:center;gap:6px;padding:0 4px 2px;font-size:10.5px;font-weight:600;color:var(--text-tertiary);letter-spacing:.02em}
+.rail-section .rs-h .c{margin-left:auto;font-weight:400;color:var(--text-tertiary)}
+.rail-section .rs-h .refresh{display:inline-flex;align-items:center;gap:4px;margin-left:auto;color:var(--text-tertiary);font-weight:400;font-size:10px;cursor:pointer;border-radius:4px;padding:1px 5px}
+.rail-section .rs-h .refresh:hover{background:var(--tbl-row-hover);color:var(--text-primary)}
+/* —— 表格信息（T2 核心） —— */
+.ti-stat{display:flex;align-items:baseline;gap:7px;padding:2px 6px 0}
+.ti-stat .n{font-size:15px;font-weight:650;color:var(--text-primary);font-variant-numeric:tabular-nums}
+.ti-stat .l{color:var(--text-tertiary);font-size:10.5px}
+.ti-dist{display:flex;flex-wrap:wrap;gap:4px;padding:3px 6px}
+.ti-dist .dch{font-size:9px;padding:1.5px 7px;border-radius:5px;color:#fff;font-weight:500;display:inline-flex;align-items:center;gap:4px}
+.ti-dist .dch .x{opacity:.75;font-weight:400}
+.ti-cols{display:flex;flex-direction:column;gap:1px;margin-top:2px}
+.ti-col{display:flex;align-items:center;gap:7px;padding:5px 7px;border-radius:6px;cursor:pointer;transition:background .1s;border:1px solid transparent}
+.ti-col:hover{background:var(--tbl-row-hover)}
+.ti-col.on{background:color-mix(in srgb,var(--tbl-sel) 55%,transparent);border-color:color-mix(in srgb,var(--tbl-focus) 30%,transparent)}
+.ti-col.flash{animation:colflash2 1.2s ease-out}
+@keyframes colflash2{0%{background:color-mix(in srgb,var(--tbl-sel-strong) 75%,transparent)}100%{background:transparent}}
+.ti-col .tch{width:14px;height:14px;border-radius:4.5px;flex:none;font-size:8px;color:#fff;display:flex;align-items:center;justify-content:center;font-weight:700}
+.ti-col .cn{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:11.5px;color:var(--text-primary)}
+.ti-col .cw{margin-left:auto;font-size:9.5px;color:var(--text-tertiary);font-variant-numeric:tabular-nums;flex:none}
+.ti-col:hover .cw{color:var(--text-secondary)}
+.ti-empty{color:var(--text-tertiary);font-size:11px;padding:6px;line-height:1.6}
+/* —— 大纲（文档） —— */
+.outline-list{display:flex;flex-direction:column;gap:1px}
+.outline-item{display:flex;align-items:center;gap:6px;padding:3.5px 6px;border-radius:6px;font-size:11.5px;color:var(--text-secondary);cursor:pointer}
+.outline-item:hover{background:var(--tbl-row-hover);color:var(--text-primary)}
+.outline-item.lv2{padding-left:16px}
+.outline-item.lv3{padding-left:26px;font-size:11px}
+.outline-item.on{background:color-mix(in srgb,var(--tbl-sel) 55%,transparent);color:var(--text-primary)}
+.outline-item .od{width:5px;height:5px;border-radius:1.5px;background:var(--text-tertiary);flex:none;opacity:.7}
+.rail-empty{flex:1;display:flex;align-items:center;justify-content:center;color:var(--text-tertiary);font-size:11.5px;text-align:center;line-height:1.7;padding:12px}
+.link-row{display:flex;align-items:center;gap:6px;padding:3.5px 6px;border-radius:6px;font-size:11.5px;color:var(--text-primary);cursor:pointer}
+.link-row:hover{background:var(--tbl-row-hover)}
+.link-row .li-ic{width:15px;height:15px;border-radius:4px;background:var(--bg-muted);display:flex;align-items:center;justify-content:center;font-size:8.5px;color:var(--text-tertiary);flex:none}
+.link-row .lt{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.link-row .ls{font-size:9.5px;color:var(--text-tertiary);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:80px;flex:none}
+.link-empty{color:var(--text-tertiary);font-size:10.5px;padding:3px 6px;line-height:1.6}
+.rail-foot{flex:none;padding:0 10px 10px;font-size:10px;color:var(--text-tertiary);display:flex;gap:10px}
+
+/* 滚动条 */
+.grid-wrap::-webkit-scrollbar,.doc-body::-webkit-scrollbar,.rail-body::-webkit-scrollbar,.sb-scroll::-webkit-scrollbar{width:9px;height:9px}
+.grid-wrap::-webkit-scrollbar-thumb,.doc-body::-webkit-scrollbar-thumb,.rail-body::-webkit-scrollbar-thumb,.sb-scroll::-webkit-scrollbar-thumb{background:var(--border-strong);border-radius:5px;border:2px solid transparent;background-clip:content-box}
+.grid-wrap::-webkit-scrollbar-thumb:hover,.doc-body::-webkit-scrollbar-thumb:hover,.rail-body::-webkit-scrollbar-thumb:hover,.sb-scroll::-webkit-scrollbar-thumb:hover{background:var(--text-tertiary);background-clip:content-box}
+.grid-wrap::-webkit-scrollbar-corner,.doc-body::-webkit-scrollbar-corner,.rail-body::-webkit-scrollbar-corner,.sb-scroll::-webkit-scrollbar-corner{background:transparent}
+
+/* toast */
+#toasts{position:fixed;left:50%;bottom:22px;transform:translateX(-50%);z-index:300;display:flex;flex-direction:column;gap:6px;align-items:center}
+.toast{background:var(--btn-primary);color:var(--on-btn-primary);font-size:11.5px;padding:6px 14px;border-radius:8px;box-shadow:var(--shadow-overlay);animation:toastin .18s ease-out;white-space:nowrap}
+.toast.warn{background:#b45309}
+@keyframes toastin{from{opacity:0;transform:translateY(8px)}}
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="wrap row">
+    <h1>文档管理 × 右侧面板关联性整改</h1>
+    <span class="sub">table-right-panel · spec 配套预览</span>
+    <div class="spacer"></div>
+    <div class="tabs" id="scene-tabs">
+      <button data-scene="1" class="on">① 问题对照（现状 → 整改后）</button>
+      <button data-scene="2">② 右侧面板联动原型</button>
+    </div>
+    <button class="btn" id="theme-btn">🌙 深色</button>
+  </div>
+</div>
+
+<div class="wrap">
+
+  <!-- ══════════ SCENE 1：问题对照 ══════════ -->
+  <section id="scene1">
+    <h2 class="sec"><span class="tag">SCENE 1</span> 现状问题 → 整改后行为（5 项）</h2>
+    <p class="sec-sub">左侧 = 当前实现（KnowledgeOutlinePanel.tsx 代码证据），右侧 = 整改后（表格不再被当作文档渲染）。</p>
+
+    <div class="grid">
+
+      <!-- K1 -->
+      <div class="cmp" data-testid="k1">
+        <div class="cmp-head"><span class="cmp-no">K1</span><span class="cmp-title">类型判定遗漏：表格被当「文档」</span></div>
+        <div class="cmp-pair">
+          <div class="cmp-side before">
+            <div class="cmp-label"><span class="dot b"></span>现状</div>
+            <div class="rail-m">
+              <div class="rh">目录 <span class="ric">↻</span></div>
+              <div class="rb">
+                <div class="rm-sec"><span class="rs-t">大纲 <span class="c">(0)</span></span>
+                  <div class="rm-empty">本文档暂无标题</div>
+                </div>
+                <div class="rm-sec"><span class="rs-t">入链 <span class="c">(0)</span></span><div class="rm-empty">暂无入链</div></div>
+                <div class="rm-stat"><span class="n">0</span><span class="l">字词</span></div>
+              </div>
+            </div>
+          </div>
+          <div class="cmp-side after">
+            <div class="cmp-label"><span class="dot a"></span>整改后</div>
+            <div class="rail-m">
+              <div class="rh">表格信息 <span class="ric">↻</span></div>
+              <div class="rb">
+                <div class="rm-stat"><span class="n">8</span><span class="l">行 · </span><span class="n">6</span><span class="l">列</span></div>
+                <div class="rm-dist">
+                  <span class="dch" style="background:var(--chip0)">文本 2</span>
+                  <span class="dch" style="background:var(--chip1)">数字 1</span>
+                  <span class="dch" style="background:var(--chip2)">多选 1</span>
+                  <span class="dch" style="background:var(--chip3)">日期 1</span>
+                  <span class="dch" style="background:var(--chip4)">勾选 1</span>
+                </div>
+                <div class="rm-sec"><span class="rs-t">列结构</span>
+                  <div class="rm-item"><span class="chip" style="background:var(--chip0)">文</span>任务 <span class="w">180px</span></div>
+                  <div class="rm-item"><span class="chip" style="background:var(--chip1)">数</span>预算 <span class="w">120px</span></div>
+                  <div class="rm-item"><span class="chip" style="background:var(--chip2)">多</span>标签 <span class="w">160px</span></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="cmp-foot"><b>根因</b>：<code>KnowledgeOutlinePanel.tsx</code> 的 <code>isDoc</code> 只排除 <code>board</code>，<code>kind==='table'</code> 落入文档分支。表格信息（行/列/类型）来自 <code>tableDraft</code>，与文档正文无关。</div>
+      </div>
+
+      <!-- K2 -->
+      <div class="cmp" data-testid="k2">
+        <div class="cmp-head"><span class="cmp-no">K2</span><span class="cmp-title">数据源错位：空正文 → 空大纲/0 字</span></div>
+        <div class="cmp-pair">
+          <div class="cmp-side before">
+            <div class="cmp-label"><span class="dot b"></span>现状</div>
+            <div class="rail-m">
+              <div class="rh">目录</div>
+              <div class="rb">
+                <div class="rm-sec"><span class="rs-t">大纲 <span class="c">(0)</span></span><div class="rm-empty">本文档暂无标题</div></div>
+                <div class="rm-sec"><span class="rs-t">出链 <span class="c">(0)</span></span><div class="rm-empty">暂无出链</div></div>
+                <div class="rm-stat"><span class="n">0</span><span class="l">字词</span></div>
+              </div>
+            </div>
+          </div>
+          <div class="cmp-side after">
+            <div class="cmp-label"><span class="dot a"></span>整改后</div>
+            <div class="rail-m">
+              <div class="rh">表格信息</div>
+              <div class="rb">
+                <div class="rm-stat"><span class="n">8</span><span class="l">行 · </span><span class="n">6</span><span class="l">列</span></div>
+                <div class="rm-sec"><span class="rs-t">列结构</span>
+                  <div class="rm-item hot"><span class="chip" style="background:var(--chip3)">日</span>截止日期 <span class="w">150px</span></div>
+                  <div class="rm-item"><span class="chip" style="background:var(--chip4)">勾</span>已完成 <span class="w">90px</span></div>
+                </div>
+                <div class="rm-item" style="padding:3px 6px;color:var(--text-tertiary);font-size:9.5px">点击列 → 表格滚动定位 + 列头高亮</div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="cmp-foot"><b>根因</b>：打开表格时 store 清空 <code>docBody</code>（<code>knowledgeStore.ts</code> 打开表格分支），内容在 <code>tableDraft.csv/meta</code>；rail 却从 <code>docBody</code> 提取大纲与字数 → 永远空。</div>
+      </div>
+
+      <!-- K3 -->
+      <div class="cmp" data-testid="k3">
+        <div class="cmp-head"><span class="cmp-no">K3</span><span class="cmp-title">反向链接语义断裂：表格可被引用却恒空</span></div>
+        <div class="cmp-pair">
+          <div class="cmp-side before">
+            <div class="cmp-label"><span class="dot b"></span>现状</div>
+            <div class="rail-m">
+              <div class="rh">目录</div>
+              <div class="rb">
+                <div class="rm-sec"><span class="rs-t">入链 <span class="c">(0)</span></span><div class="rm-empty">暂无入链</div></div>
+                <div class="rm-sec"><span class="rs-t">出链 <span class="c">(0)</span></span><div class="rm-empty">暂无出链</div></div>
+                <div class="rm-sec"><span class="rs-t">断链 <span class="c">(0)</span></span><div class="rm-empty">没有断链 🎉</div></div>
+              </div>
+            </div>
+          </div>
+          <div class="cmp-side after">
+            <div class="cmp-label"><span class="dot a"></span>整改后</div>
+            <div class="rail-m">
+              <div class="rh">表格信息 <span class="ric">↻</span></div>
+              <div class="rb">
+                <div class="rm-sec"><span class="rs-t">入链 <span class="c">(2)</span></span>
+                  <div class="rm-item"><span class="li-ic" style="width:12px;height:12px">📄</span>迭代规划 · 里程碑 <span class="w" style="font-size:8.5px">[[任务看板]]</span></div>
+                  <div class="rm-item"><span class="li-ic" style="width:12px;height:12px">📄</span>周会纪要 · 跟进项 <span class="w" style="font-size:8.5px">[[任务看板]]</span></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="cmp-foot"><b>根因</b>：打开表格分支直接置空 <code>backlinks: []</code>；刷新按钮触发正文索引，表格无正文 → 入链永远扫不到。表格标题应参与 <code>[[引用]]</code> 匹配（P1 数据跟随项）。</div>
+      </div>
+
+      <!-- K4 -->
+      <div class="cmp" data-testid="k4">
+        <div class="cmp-head"><span class="cmp-no">K4</span><span class="cmp-title">大纲跳转空转：文档→表格切换的残留</span></div>
+        <div class="cmp-pair">
+          <div class="cmp-side before">
+            <div class="cmp-label"><span class="dot b"></span>现状</div>
+            <div class="rail-m">
+              <div class="rh">目录</div>
+              <div class="rb">
+                <div class="rm-sec"><span class="rs-t">大纲 <span class="c">(3)</span></span>
+                  <div class="rm-item"><span class="outline-dot"></span># 概览 <span class="w" style="font-size:8.5px">点击 → 空转</span></div>
+                  <div class="rm-item"><span class="outline-dot"></span>## 里程碑 <span class="w" style="font-size:8.5px">无反馈</span></div>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="cmp-side after">
+            <div class="cmp-label"><span class="dot a"></span>整改后</div>
+            <div class="rail-m">
+              <div class="rh">表格信息</div>
+              <div class="rb">
+                <div class="rm-stat"><span class="n">8</span><span class="l">行 · </span><span class="n">6</span><span class="l">列</span></div>
+                <div class="rm-sec"><span class="rs-t">列结构</span>
+                  <div class="rm-item hot"><span class="chip" style="background:var(--chip0)">文</span>任务 <span class="w">180px</span></div>
+                </div>
+                <div class="rm-item" style="padding:3px 6px;color:var(--text-tertiary);font-size:9.5px">表格下无大纲区块 → 无跳转请求</div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="cmp-foot"><b>根因</b>：<code>KnowledgeWorkspace.tsx</code> 的 <code>pendingOutlineJump</code> 只对 board 提前返回，表格下残留大纲点击会在表格 DOM 中找 heading → 空转。</div>
+      </div>
+
+      <!-- K5 -->
+      <div class="cmp" data-testid="k5">
+        <div class="cmp-head"><span class="cmp-no">K5</span><span class="cmp-title">同为非文档叶子：画板有占位，表格没有</span></div>
+        <div class="cmp-pair">
+          <div class="cmp-side before">
+            <div class="cmp-label"><span class="dot b"></span>现状 · 画板（有占位）</div>
+            <div class="rail-m">
+              <div class="rh">目录</div>
+              <div class="rb"><div class="no-doc">画板没有大纲</div></div>
+            </div>
+            <div class="cmp-label" style="margin-top:6px"><span class="dot b"></span>现状 · 表格（无占位）</div>
+            <div class="rail-m">
+              <div class="rh">目录</div>
+              <div class="rb">
+                <div class="rm-sec"><span class="rs-t">大纲 <span class="c">(0)</span></span><div class="rm-empty">本文档暂无标题</div></div>
+                <div class="rm-stat"><span class="n">0</span><span class="l">字词</span></div>
+              </div>
+            </div>
+          </div>
+          <div class="cmp-side after">
+            <div class="cmp-label"><span class="dot a"></span>整改后 · 画板（不变）</div>
+            <div class="rail-m">
+              <div class="rh">目录</div>
+              <div class="rb"><div class="no-doc">画板没有大纲</div></div>
+            </div>
+            <div class="cmp-label" style="margin-top:6px"><span class="dot a"></span>整改后 · 表格（信息面板）</div>
+            <div class="rail-m">
+              <div class="rh">表格信息</div>
+              <div class="rb">
+                <div class="rm-stat"><span class="n">8</span><span class="l">行 · </span><span class="n">6</span><span class="l">列</span></div>
+                <div class="rm-sec"><span class="rs-t">列结构</span>
+                  <div class="rm-item"><span class="chip" style="background:var(--chip2)">多</span>标签 <span class="w">160px</span></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="cmp-foot"><b>根因</b>：面板曾为画板打补丁（<code>outline.noBoard</code> 文案），表格漏打同款补丁；且补丁形态（空占位）本身不提供表格相关信息。</div>
+      </div>
+
+    </div>
+  </section>
+
+  <!-- ══════════ SCENE 2：交互原型 ══════════ -->
+  <section id="scene2" style="display:none">
+    <h2 class="sec"><span class="tag">SCENE 2</span> 右侧面板联动原型（文档 / 表格 / 画板）</h2>
+    <p class="sec-sub">在左侧树切换叶子：<b>文档</b> → rail 保持大纲+反链+字数；<b>表格</b> → rail 切换为「表格信息」（行×列统计、类型分布、列清单）；<b>画板</b> → 占位。试试：表格内<b>水平滚动</b>看 rail 列清单跟随高亮；<b>点击列清单</b>让表格滚动定位并闪烁列头。</p>
+    <div class="hintbar">
+      <b>验证路径</b>：树点「任务看板」→ rail 标题变「表格信息」+ 列清单；点清单第 2 列「预算」→ 表格水平滚动 + 该列头闪烁 + 清单项短暂高亮；水平拖动表格滚动条 → 清单当前可见列高亮；点「迭代规划」→ rail 恢复大纲（# 概览 / ## 里程碑 …）+ 字数；点「架构图」→ 画板占位。
+    </div>
+
+    <div class="stage">
+      <!-- 侧边栏树 -->
+      <div id="sidebar">
+        <div class="sb-head">📚 产品空间 <span style="margin-left:auto;font-size:10px;color:var(--text-tertiary)">2 个叶子</span></div>
+        <div class="sb-scroll">
+          <div class="sb-sec">页面</div>
+          <div class="tnode" data-leaf="doc" data-testid="leaf-doc">
+            <span class="ik doc">📄</span><span class="tt">迭代规划</span>
+          </div>
+          <div class="tnode active" data-leaf="table" data-testid="leaf-table">
+            <span class="ik table">▦</span><span class="tt">任务看板</span>
+          </div>
+          <div class="sb-sec">画板</div>
+          <div class="tnode" data-leaf="board" data-testid="leaf-board">
+            <span class="ik board">◈</span><span class="tt">架构图</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- 主区 -->
+      <div id="main">
+        <div class="pg-bread">
+          <span class="cr">产品空间</span><span>/</span><span class="cr cur" id="bread-cur">任务看板</span>
+        </div>
+        <div class="pg-title"><span class="tm" data-testid="doc-title">任务看板</span></div>
+
+        <!-- 表格视图 -->
+        <div id="view-table">
+          <div class="grid-wrap" data-testid="tbl-scroller">
+            <table class="grid" data-testid="tbl-grid"></table>
+          </div>
+          <div class="statusbar">
+            <span data-testid="sb-rows">8 行</span><span>·</span><span data-testid="sb-cols">6 列</span>
+            <span class="sp"></span>
+            <span class="sb-save"><span class="dot"></span>已保存</span>
+          </div>
+        </div>
+
+        <!-- 文档视图 -->
+        <div id="view-doc" style="display:none">
+          <div class="doc-body" data-testid="doc-body">
+            <h2 id="doc-h-1"># 概览</h2>
+            <p>本期迭代聚焦表格体验与知识沉淀，目标在 8 月末前完成三个里程碑（见 <span class="flink" style="color:var(--tbl-focus)">[[任务看板]]</span>）。</p>
+            <h2 id="doc-h-2">## 里程碑</h2>
+            <p>M1 交互整改 → M2 右侧面板联动 → M3 数据索引对齐。每个里程碑独立评审、独立合入。</p>
+            <h2 id="doc-h-3">## 风险与依赖</h2>
+            <p>表格入链索引依赖 Rust 侧按标题匹配，需单独验证（见「跟进项」）。</p>
+            <h2 id="doc-h-4">### 跟进项</h2>
+            <p>下周周会确认索引口径。</p>
+          </div>
+          <div class="statusbar">
+            <span data-testid="doc-wordcount">84 字词</span><span class="sp"></span><span class="sb-save"><span class="dot"></span>已保存</span>
+          </div>
+        </div>
+
+        <!-- 画板视图 -->
+        <div id="view-board" style="display:none">
+          <div class="board-body" data-testid="board-body">
+            <span class="bic">◈</span>
+            <span>架构图画板占位（本原型不渲染画布）</span>
+          </div>
+          <div class="statusbar"><span class="sp"></span><span class="sb-save"><span class="dot"></span>已保存</span></div>
+        </div>
+      </div>
+
+      <!-- 右侧 rail -->
+      <div id="rail" data-testid="rail">
+        <div class="rail-head">
+          <span class="rh-title" data-testid="rail-title">表格信息</span>
+          <button class="rh-btn" data-testid="rail-refresh" title="刷新链接面板">↻</button>
+          <button class="rh-btn" data-testid="rail-close" title="收起面板">✕</button>
+        </div>
+        <div class="rail-body" data-testid="rail-body"></div>
+        <div class="rail-foot"><span>当前叶子类型：<b data-testid="rail-leaf-kind">table</b></span></div>
+      </div>
+    </div>
+  </section>
+
+  <h2 class="sec" style="margin-top:44px"><span class="tag">NEXT</span> 落地顺序（对应 spec §3）</h2>
+  <p class="sec-sub">T1 类型感知 → T2 表格信息面板 → T4 头部联动 → T6 字数收敛（P0 一组提交）；T3 反链数据跟随项、T8 滚动 scrollspy 反向（P1）。</p>
+</div>
+
+<div id="toasts"></div>
+
+<script>
+/* ═══════════════ 数据 ═══════════════ */
+const TYPES = [
+  { k: 'text', n: '文本', ci: 0 },
+  { k: 'number', n: '数字', ci: 1 },
+  { k: 'multi', n: '多选', ci: 2 },
+  { k: 'date', n: '日期', ci: 3 },
+  { k: 'check', n: '勾选', ci: 4 },
+  { k: 'select', n: '单选', ci: 5 },
+]
+const TBL = {
+  cols: [
+    { name: '任务', type: 'text', w: 180 },
+    { name: '预算', type: 'number', w: 120 },
+    { name: '标签', type: 'multi', w: 170 },
+    { name: '截止日期', type: 'date', w: 150 },
+    { name: '已完成', type: 'check', w: 96 },
+    { name: '优先级', type: 'select', w: 130 },
+  ],
+  rows: [
+    ['表格编辑焦点闭环', '8000', '交互\n表格', '2026-08-15', true, '高'],
+    ['选区模型与批量操作', '12000', '交互', '2026-08-18', false, '高'],
+    ['右侧面板关联性整改', '5000', '面板\n文档', '2026-08-21', true, '中'],
+    ['类型化单元格补齐', '4000', '交互', '2026-08-24', true, '低'],
+    ['工具栏三段式布局', '6000', '呈现', '2026-08-27', false, '中'],
+    ['筛选 popover 化', '3000', '交互', '2026-08-29', false, '低'],
+    ['导出 CSV 全量提示', '1500', '文档', '2026-09-01', false, '低'],
+    ['入链索引按标题匹配', '2500', '数据', '2026-09-03', false, '高'],
+  ],
+}
+const DOC = [
+  { id: 'h1', text: '# 概览', lv: 1 },
+  { id: 'h2', text: '## 里程碑', lv: 2 },
+  { id: 'h3', text: '## 风险与依赖', lv: 2 },
+  { id: 'h4', text: '### 跟进项', lv: 3 },
+]
+const INBOUND = [
+  { from: '迭代规划', snippet: '[[任务看板]]' },
+  { from: '周会纪要', snippet: '[[任务看板]]' },
+]
+const TYPE_OF = Object.fromEntries(TYPES.map((t) => [t.k, t]))
+
+/* ═══════════════ DOM 助手 ═══════════════ */
+const $ = (s, el = document) => el.querySelector(s)
+const $$ = (s, el = document) => [...el.querySelectorAll(s)]
+function toast(msg, cls = '') {
+  const el = document.createElement('div')
+  el.className = `toast ${cls}`
+  el.textContent = msg
+  $('#toasts').appendChild(el)
+  setTimeout(() => el.remove(), 2600)
+}
+
+/* ═══════════════ 表格渲染 ═══════════════ */
+function cellHtml(type, v) {
+  const t = TYPE_OF[type]
+  if (type === 'number') return `<span class="num">${Number(v).toLocaleString()}</span>`
+  if (type === 'multi') return v.split('\n').map((x) => `<span class="chip-lg c${t.ci}" style="margin-right:3px">${x}</span>`).join('')
+  if (type === 'check') return `<span class="chk ${v ? 'on' : ''}"></span>`
+  if (type === 'select') return `<span class="chip-lg c${t.ci}">${v}</span>`
+  if (type === 'date') return v
+  return v
+}
+function renderTable() {
+  const grid = $('[data-testid="tbl-grid"]')
+  const w = TBL.cols.reduce((s, c) => s + c.w, 0) + 42
+  grid.style.width = Math.max(w, 520) + 'px'
+  grid.innerHTML = `
+    <thead>
+      <tr>
+        <th class="corner" data-testid="tbl-corner"></th>
+        ${TBL.cols.map((c, i) => `<th style="width:${c.w}px" data-col="${i}" data-testid="tbl-col-${i}"><span class="th-n">${c.name}</span></th>`).join('')}
+      </tr>
+    </thead>
+    <tbody>
+      ${TBL.rows.map((r, ri) => `
+        <tr data-row="${ri}">
+          <td class="rn">${ri + 1}</td>
+          ${r.map((v, ci) => `<td data-cell="${ri},${ci}" class="${TBL.cols[ci].type === 'number' ? 'num' : ''}" style="width:${TBL.cols[ci].w}px">${cellHtml(TBL.cols[ci].type, v)}</td>`).join('')}
+        </tr>`).join('')}
+    </tbody>`
+  $('#view-table').style.display = 'flex'
+  $('[data-testid="sb-rows"]').textContent = `${TBL.rows.length} 行`
+  $('[data-testid="sb-cols"]').textContent = `${TBL.cols.length} 列`
+}
+
+/* ═══════════════ rail 渲染（本系列主角）═══════════════ */
+function railHeader(title, showRefresh) {
+  $('[data-testid="rail-title"]').textContent = title
+  $('[data-testid="rail-refresh"]').style.display = showRefresh ? '' : 'none'
+}
+function railTableInfo() {
+  const dist = {}
+  for (const c of TBL.cols) {
+    const t = TYPE_OF[c.type]
+    dist[t.n] = (dist[t.n] || 0) + 1
+  }
+  const distHtml = Object.entries(dist)
+    .map(([n, c]) => {
+      const t = TYPES.find((x) => x.n === n)
+      return `<span class="dch" style="background:var(--chip${t.ci})">${n}<span class="x">${c}</span></span>`
+    })
+    .join('')
+  return `
+    <div class="rail-section" data-testid="rail-ti">
+      <div class="rs-h">表格信息<span class="c" data-testid="rail-ti-count">${TBL.rows.length} 行 × ${TBL.cols.length} 列</span></div>
+      <div class="ti-stat"><span class="n" data-testid="rail-ti-rows">${TBL.rows.length}</span><span class="l">行 ·</span><span class="n" data-testid="rail-ti-cols">${TBL.cols.length}</span><span class="l">列</span></div>
+      <div class="ti-dist" data-testid="rail-ti-dist">${distHtml}</div>
+      <div class="ti-cols" data-testid="rail-ti-cols">
+        ${TBL.cols.map((c, i) => {
+          const t = TYPE_OF[c.type]
+          return `<div class="ti-col" data-ti-col="${i}" data-testid="rail-col-${i}">
+            <span class="tch" style="background:var(--chip${t.ci})">${t.n[0]}</span>
+            <span class="cn">${c.name}</span>
+            <span class="cw">${c.w}px</span>
+          </div>`
+        }).join('')}
+      </div>
+    </div>
+    <div class="rail-section" data-testid="rail-inbound">
+      <div class="rs-h">反向链接<span class="c">${INBOUND.length}</span><span class="refresh" data-testid="rail-inbound-refresh">↻ 刷新</span></div>
+      ${INBOUND.length === 0
+        ? '<div class="link-empty">暂无入链</div>'
+        : INBOUND.map((b) => `<div class="link-row" data-testid="rail-inbound-row"><span class="li-ic">📄</span><span class="lt">${b.from}</span><span class="ls">${b.snippet}</span></div>`).join('')}
+    </div>`
+}
+function railDocOutline() {
+  return `
+    <div class="rail-section" data-testid="rail-outline">
+      <div class="rs-h">大纲<span class="c">${DOC.length}</span></div>
+      <div class="outline-list">
+        ${DOC.map((d) => `<div class="outline-item lv${d.lv}" data-outline="${d.id}" data-testid="rail-outline-${d.id}"><span class="od"></span>${d.text}</div>`).join('')}
+      </div>
+    </div>
+    <div class="rail-section" data-testid="rail-inbound">
+      <div class="rs-h">反向链接<span class="c">1</span><span class="refresh" data-testid="rail-inbound-refresh">↻ 刷新</span></div>
+      <div class="link-row" data-testid="rail-inbound-row"><span class="li-ic">▦</span><span class="lt">任务看板</span><span class="ls">[[迭代规划]]</span></div>
+    </div>`
+}
+function railBoard() {
+  return `<div class="rail-empty" data-testid="rail-board-empty">画板没有大纲</div>`
+}
+function renderRail(kind) {
+  const body = $('[data-testid="rail-body"]')
+  if (kind === 'table') {
+    railHeader('表格信息', true)
+    body.innerHTML = railTableInfo()
+    bindTableInfo()
+  } else if (kind === 'doc') {
+    railHeader('目录', true)
+    body.innerHTML = railDocOutline()
+  } else {
+    railHeader('目录', false)
+    body.innerHTML = railBoard()
+  }
+}
+
+/* ═══════════════ 列清单 ↔ 表格联动 ═══════════════ */
+function colOffsetX(i) {
+  let x = 42 // 行号列
+  for (let j = 0; j < i; j++) x += TBL.cols[j].w
+  return x
+}
+function flashColHeader(i) {
+  const th = $(`[data-testid="tbl-col-${i}"]`)
+  th.classList.remove('flash')
+  void th.offsetWidth
+  th.classList.add('flash')
+  setTimeout(() => th.classList.remove('flash'), 1300)
+}
+function flashRailCol(i) {
+  const el = $(`[data-testid="rail-col-${i}"]`)
+  el.classList.remove('flash')
+  void el.offsetWidth
+  el.classList.add('flash')
+  setTimeout(() => el.classList.remove('flash'), 1300)
+}
+function bindTableInfo() {
+  const scroller = $('[data-testid="tbl-scroller"]')
+  // 点击列清单 → 表格滚动定位 + 列头闪烁 + 清单项闪烁
+  $$('[data-ti-col]').forEach((el) => {
+    el.addEventListener('click', () => {
+      const i = Number(el.dataset.tiCol)
+      const target = colOffsetX(i) - 20
+      scroller.scrollTo({ left: Math.max(0, target), behavior: 'smooth' })
+      flashColHeader(i)
+      flashRailCol(i)
+      toast(`已定位到列「${TBL.cols[i].name}」`)
+    })
+  })
+  // 表格水平滚动 → rail 列清单 scrollspy（反向联动）
+  scroller.addEventListener('scroll', () => {
+    const left = scroller.scrollLeft
+    let cur = 0
+    for (let i = 0; i < TBL.cols.length; i++) {
+      const x = colOffsetX(i)
+      if (left >= x - TBL.cols[i].w / 2) cur = i
+      else break
+    }
+    $$('[data-ti-col]').forEach((el, i) => el.classList.toggle('on', i === cur))
+  })
+  // 刷新按钮
+  const refresh = (e) => {
+    e.stopPropagation()
+    toast('已重新扫描入链：2 条引用本表格')
+  }
+  const rr = $('#rail-inbound-refresh')
+  if (rr) rr.addEventListener('click', refresh)
+}
+
+/* ═══════════════ 叶子切换 ═══════════════ */
+let currentLeaf = 'table'
+function openLeaf(kind) {
+  currentLeaf = kind
+  const meta = {
+    table: { title: '任务看板', icon: '▦' },
+    doc: { title: '迭代规划', icon: '📄' },
+    board: { title: '架构图', icon: '◈' },
+  }[kind]
+  $$('.tnode').forEach((n) => n.classList.toggle('active', n.dataset.leaf === kind))
+  $('#bread-cur').textContent = meta.title
+  $('[data-testid="doc-title"]').textContent = meta.title
+  $('#view-table').style.display = kind === 'table' ? 'flex' : 'none'
+  $('#view-doc').style.display = kind === 'doc' ? 'flex' : 'none'
+  $('#view-board').style.display = kind === 'board' ? 'flex' : 'none'
+  $('[data-testid="rail-leaf-kind"]').textContent = kind
+  renderRail(kind)
+}
+$$('.tnode').forEach((n) => n.addEventListener('click', () => openLeaf(n.dataset.leaf)))
+
+/* ═══════════════ 场景/主题/收起 ═══════════════ */
+$('#scene-tabs').addEventListener('click', (e) => {
+  const b = e.target.closest('button[data-scene]')
+  if (!b) return
+  $$('#scene-tabs button').forEach((x) => x.classList.toggle('on', x === b))
+  $('#scene1').style.display = b.dataset.scene === '1' ? '' : 'none'
+  $('#scene2').style.display = b.dataset.scene === '2' ? '' : 'none'
+})
+$('#theme-btn').addEventListener('click', () => {
+  const dark = document.documentElement.dataset.theme === 'dark'
+  document.documentElement.dataset.theme = dark ? 'light' : 'dark'
+  $('#theme-btn').textContent = dark ? '🌙 深色' : '☀️ 浅色'
+})
+$('[data-testid="rail-close"]').addEventListener('click', () => {
+  $('#rail').style.display = 'none'
+  toast('面板已收起（PanelToggle）')
+})
+$('[data-testid="rail-refresh"]').addEventListener('click', () => {
+  toast(currentLeaf === 'table' ? '已重新扫描入链：2 条引用本表格' : '已刷新链接面板')
+})
+$('[data-testid="rail-title"]').addEventListener('dblclick', () => {
+  toast('标题：' + $('[data-testid="rail-title"]').textContent)
+})
+
+/* ═══════════════ init ═══════════════ */
+renderTable()
+renderRail('table')
+</script>
+</body>
+</html>

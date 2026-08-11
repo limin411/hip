@@ -994,3 +994,61 @@ describe('TableEditor table-ux-notion PR-5 (view-consistent rows)', () => {
     expect(document.querySelector('tr[data-row="2"] td[data-cell$=",1"]')!.textContent).toContain('300')
   })
 })
+
+describe('TableEditor table-ux-notion PR-6 (portal menus)', () => {
+  beforeEach(() => {
+    mountTable()
+    useKnowledgeStore.setState({
+      commitTable: vi.fn(async () => {
+        commitTableSpy()
+        return true
+      }) as never,
+    })
+  })
+  afterEach(() => {
+    cleanup()
+    vi.useRealTimers()
+  })
+
+  it('column menu renders in body portal, not inside the grid', () => {
+    render(<TableEditor tableId="tbl_1" />)
+    fireEvent.click(screen.getByTestId('table-col-more-0'))
+    const menu = screen.getByTestId('table-col-menu')
+    // 不在 grid 内（原 absolute 方案会被 overflow 容器裁剪）
+    expect(screen.getByTestId('table-grid').contains(menu)).toBe(false)
+    expect(document.body.contains(menu)).toBe(true)
+    // 菜单项可点击
+    fireEvent.click(screen.getByTestId('table-col-sort-asc'))
+    expect(screen.getByTestId('table-sort-chip')).toBeTruthy()
+  })
+
+  it('row menu and select popup also render in body portal', () => {
+    render(<TableEditor tableId="tbl_1" />)
+    fireEvent.click(screen.getByTestId('table-row-menu-1'))
+    const rowMenu = screen.getByTestId('table-row-menu')
+    expect(screen.getByTestId('table-grid').contains(rowMenu)).toBe(false)
+    fireEvent.click(document.querySelector('td[data-cell="0,2"]')!)
+    const pop = screen.getByTestId('table-select-popup')
+    expect(screen.getByTestId('table-grid').contains(pop)).toBe(false)
+  })
+
+  it('scrolling the grid container closes open menus', () => {
+    render(<TableEditor tableId="tbl_1" />)
+    fireEvent.click(screen.getByTestId('table-col-more-0'))
+    expect(screen.getByTestId('table-col-menu')).toBeTruthy()
+    fireEvent.scroll(screen.getByTestId('table-grid-wrap'))
+    expect(screen.queryByTestId('table-col-menu')).toBeNull()
+  })
+
+  it('mousedown outside grid closes menus; inside grid keeps them until toggle', () => {
+    render(<TableEditor tableId="tbl_1" />)
+    fireEvent.click(screen.getByTestId('table-col-more-0'))
+    // 工具栏区域 mousedown → 关闭
+    fireEvent.mouseDown(screen.getByTestId('table-editor-toolbar'))
+    expect(screen.queryByTestId('table-col-menu')).toBeNull()
+    // 再开：grid 内 mousedown（其他单元格）不直接关闭
+    fireEvent.click(screen.getByTestId('table-col-more-0'))
+    fireEvent.mouseDown(screen.getByTestId('table-grid'))
+    expect(screen.getByTestId('table-col-menu')).toBeTruthy()
+  })
+})

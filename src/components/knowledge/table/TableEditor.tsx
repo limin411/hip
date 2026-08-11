@@ -9,7 +9,8 @@
  * - 冻结首行 + 行号列（sticky）；数字列右对齐
  * - 变更 → store.updateTableDraft + 800ms 防抖 commitTable（落盘）
  */
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
 import {
@@ -61,6 +62,56 @@ import {
   type TableSortState,
 } from '@/domain/knowledge/tableModel'
 
+/**
+ * 浮层容器（T6）：渲染到 body，按锚点 rect 定位并视口翻转；
+ * 高度未知 → 首次渲染 invisible，useLayoutEffect 测量后可见。
+ */
+function PortalMenu({
+  anchor,
+  minWidth,
+  children,
+  testid,
+}: {
+  anchor: HTMLElement | null
+  minWidth?: number
+  children: React.ReactNode
+  testid?: string
+}) {
+  const ref = useRef<HTMLDivElement>(null)
+  const [pos, setPos] = useState<{ left: number; top: number; ready: boolean }>({
+    left: 0,
+    top: 0,
+    ready: false,
+  })
+  useLayoutEffect(() => {
+    const el = ref.current
+    if (!el || !anchor) return
+    const r = anchor.getBoundingClientRect()
+    const w = el.offsetWidth || minWidth || 176
+    const h = el.offsetHeight
+    let left = r.left
+    let top = r.bottom + 4
+    if (left + w > window.innerWidth - 8) left = Math.max(8, window.innerWidth - w - 8)
+    if (top + h > window.innerHeight - 8) top = Math.max(8, r.top - h - 4)
+    setPos({ left, top, ready: true })
+  }, [anchor, minWidth])
+  return createPortal(
+    <div
+      ref={ref}
+      data-testid={testid}
+      className={cn(
+        'fixed z-50 rounded-lg border border-border bg-surface py-1 shadow-overlay',
+        !pos.ready && 'invisible',
+      )}
+      style={{ left: pos.left, top: pos.top, minWidth }}
+      onClick={(e) => e.stopPropagation()}
+    >
+      {children}
+    </div>,
+    document.body,
+  )
+}
+
 const TYPE_ICONS: Record<TableColType, typeof Type> = {
   text: Type,
   number: Hash,
@@ -92,6 +143,12 @@ export function TableEditor({ tableId }: { tableId: string }) {
   })
   const selRef = useRef(sel)
   selRef.current = sel
+
+  const closeMenus = () => {
+    setColMenuCi(null)
+    setRowMenuRi(null)
+    setSelectPopup(null)
+  }
   const [editing, setEditing] = useState<{ ri: number; ci: number; value: string; err?: boolean } | null>(null)
   /** 同步 ref：input 卸载时 blur 会带着旧闭包触发，需以最新值判定。 */
   const editingRef = useRef(editing)
@@ -186,6 +243,19 @@ export function TableEditor({ tableId }: { tableId: string }) {
     setHistTick((t) => t + 1)
     applySnapshot(snap)
   }
+
+  // 点击外部关闭浮层（portal 在 body，组件根 onClick 覆盖不到；grid 内点击交由各元素处理）
+  useEffect(() => {
+    const onDown = (e: MouseEvent) => {
+      const t = e.target as Node | null
+      if (!t) return
+      if (t instanceof Node && document.getElementById('table-menus')?.contains(t)) return
+      if (t instanceof Node && wrapRef.current?.contains(t)) return
+      closeMenus()
+    }
+    document.addEventListener('mousedown', onDown)
+    return () => document.removeEventListener('mousedown', onDown)
+  }, [])
 
   // 打开时初始化历史基线。
   useEffect(() => {
@@ -877,6 +947,9 @@ export function TableEditor({ tableId }: { tableId: string }) {
   }
 
   const wrapRef = useRef<HTMLDivElement>(null)
+  const thRef = useRef<HTMLTableHeaderCellElement | null>(null)
+  const rowRef = useRef<HTMLTableDataCellElement | null>(null)
+  const tdRef = useRef<HTMLTableDataCellElement | null>(null)
 
   const cellClass =
     'min-w-0 truncate border-b border-r border-border px-2 py-1.5 text-body text-ink focus:outline-none'
@@ -1146,6 +1219,9 @@ export function TableEditor({ tableId }: { tableId: string }) {
         className="min-h-0 flex-1 overflow-auto"
         data-testid="table-grid-wrap"
         ref={wrapRef}
+        onScroll={() => {
+          if (colMenuCi != null || rowMenuRi != null || selectPopup != null) closeMenus()
+        }}
       >
         <table
           className="grid-table w-max border-collapse select-none outline-none focus-visible:outline-2 focus-visible:outline-[var(--accent-strong)]"
@@ -1177,6 +1253,9 @@ export function TableEditor({ tableId }: { tableId: string }) {
                   data-col={ci}
                   data-col-id={col.id}
                   data-col-type={col.type}
+                  ref={(el) => {
+                    if (ci === colMenuCi) thRef.current = el
+                  }}
                   style={{ width: col.width, minWidth: col.width }}
                   className={cn(
                     'group sticky top-0 z-10 h-9 cursor-pointer border-b border-r border-border bg-surface-muted px-2 text-left text-caption font-medium text-ink',
@@ -1273,11 +1352,7 @@ export function TableEditor({ tableId }: { tableId: string }) {
                     }}
                   />
                   {colMenuCi === ci ? (
-                    <div
-                      className="absolute left-0 top-full z-30 w-44 rounded-lg border border-border bg-surface py-1 shadow-overlay"
-                      data-testid="table-col-menu"
-                      onClick={(e) => e.stopPropagation()}
-                    >
+                    <PortalMenu anchor={thRef.current} minWidth={176} testid="table-col-menu">
                       <button
                         type="button"
                         data-testid="table-col-rename"
@@ -1423,7 +1498,7 @@ export function TableEditor({ tableId }: { tableId: string }) {
                       >
                         {t('knowledge.table.columnMenu.deleteColumn')}
                       </button>
-                    </div>
+                    </PortalMenu>
                   ) : null}
                 </th>
               ))}
@@ -1442,6 +1517,9 @@ export function TableEditor({ tableId }: { tableId: string }) {
                     sel?.mode === 'row' && vi >= selSpan.r0 && vi <= selSpan.r1 && 'bg-state-hover',
                   )}
                   data-testid="table-row-idx"
+                  ref={(el) => {
+                    if (rowMenuRi === ri) rowRef.current = el
+                  }}
                   onClick={(e) => {
                     e.stopPropagation()
                     const cur = selRef.current
@@ -1485,11 +1563,7 @@ export function TableEditor({ tableId }: { tableId: string }) {
                         data-testid={`table-row-menu-${ri}`}
                       />
                       {rowMenuRi === ri ? (
-                        <div
-                          className="absolute left-6 top-0 z-30 w-40 rounded-lg border border-border bg-surface py-1 shadow-overlay"
-                          data-testid="table-row-menu"
-                          onClick={(e) => e.stopPropagation()}
-                        >
+                        <PortalMenu anchor={rowRef.current} minWidth={160} testid="table-row-menu">
                           <button
                             type="button"
                             onClick={() => {
@@ -1528,7 +1602,7 @@ export function TableEditor({ tableId }: { tableId: string }) {
                           >
                             {t('knowledge.table.rowMenu.deleteRow')}
                           </button>
-                        </div>
+                        </PortalMenu>
                       ) : null}
                     </span>
                   </div>
@@ -1652,12 +1726,8 @@ export function TableEditor({ tableId }: { tableId: string }) {
                               {value || <span className="text-ink-tertiary/60">—</span>}
                             </span>
                             <ChevronDown size={11} className="shrink-0 text-ink-tertiary" />
-                            {selectPopup?.ri === ri && selectPopup?.ci === ci ? (
-                              <span
-                                className="absolute left-0 top-full z-30 w-44 rounded-lg border border-border bg-surface py-1 shadow-overlay"
-                                data-testid="table-select-popup"
-                                onClick={(e) => e.stopPropagation()}
-                              >
+                            {selectPopup?.ri === vi && selectPopup?.ci === ci ? (
+                              <PortalMenu anchor={tdRef.current} minWidth={176} testid="table-select-popup">
                                 {(col.options ?? []).map((opt, oi) => (
                                   <button
                                     key={opt}
@@ -1684,7 +1754,7 @@ export function TableEditor({ tableId }: { tableId: string }) {
                                     className="min-w-0 flex-1 rounded-sm border border-border bg-surface px-1.5 py-0.5 text-caption text-ink outline-none placeholder:text-ink-tertiary"
                                   />
                                 </div>
-                              </span>
+                              </PortalMenu>
                             ) : null}
                           </span>
                         )
@@ -1705,6 +1775,9 @@ export function TableEditor({ tableId }: { tableId: string }) {
                       key={col.id}
                       data-cell={`${ri},${ci}`}
                       data-type={col.type}
+                      ref={(el) => {
+                        if (selectPopup?.ri === vi && selectPopup?.ci === ci) tdRef.current = el
+                      }}
                       tabIndex={-1}
                       onClick={(e) => {
                         e.stopPropagation()

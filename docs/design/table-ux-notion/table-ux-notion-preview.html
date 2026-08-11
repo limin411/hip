@@ -129,6 +129,30 @@ p.sec-sub{color:var(--text-tertiary);font-size:12px;margin-bottom:14px}
 .toolbar-mini{display:flex;align-items:center;gap:5px;border:1px solid var(--border);border-radius:5px;padding:3px 6px;font-size:10px;background:var(--bg-app)}
 .toolbar-mini .ic{width:12px;height:12px;border-radius:3px;background:var(--bg-muted);display:flex;align-items:center;justify-content:center;color:var(--text-tertiary)}
 .toolbar-mini .sep{width:1px;height:12px;background:var(--border)}
+/* —— 工具栏专项 mini（TB1–TB6） —— */
+.tb-mini{display:flex;align-items:center;gap:4px;border:1px solid var(--border);border-radius:6px;padding:4px 6px;background:var(--bg-app);font-size:10px;flex-wrap:wrap}
+.tb-mini .ib{width:18px;height:18px;border-radius:4px;display:flex;align-items:center;justify-content:center;color:var(--text-tertiary);background:var(--bg-muted);font-size:9px}
+.tb-mini .tbm{display:inline-flex;align-items:center;gap:3px;height:20px;padding:0 7px;border-radius:5px;color:var(--text-secondary);font-size:9.5px}
+.tb-mini .tbm.on{background:var(--btn-primary);color:var(--on-btn-primary);font-weight:600}
+.tb-mini .tbm.hov{background:var(--tbl-row-hover);color:var(--text-primary)}
+.tb-mini .sep{width:1px;height:12px;background:var(--border)}
+.tb-mini .chipm{display:inline-flex;align-items:center;gap:3px;height:18px;padding:0 6px;border-radius:5px;background:var(--tbl-row-hover);color:var(--text-primary);font-size:9px}
+.tb-mini .chipm .x{color:var(--text-tertiary)}
+.tb-mini .pill{background:var(--bg-muted);border-radius:4px;padding:1px 5px;font-size:8.5px;color:var(--text-tertiary)}
+.row3{border:1px solid var(--border);border-radius:6px;overflow:hidden;background:var(--bg-app)}
+.row3 .bc{font-size:8.5px;color:var(--text-tertiary);padding:3px 8px;border-bottom:1px solid var(--border)}
+.row3 .tt{font-size:11.5px;font-weight:650;padding:3px 8px 4px;letter-spacing:-.01em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.row3 .tb{border-top:1px solid var(--border);padding:3px 6px}
+.fpop{border:1px solid var(--border);border-radius:6px;background:var(--bg-app);box-shadow:var(--shadow-overlay);padding:4px;font-size:9.5px;width:158px}
+.fpop .fr{display:flex;gap:3px;align-items:center;padding:3px 4px}
+.fpop .ctl{border:1px solid var(--border);border-radius:4px;padding:1px 5px;background:var(--bg-app);color:var(--text-secondary);white-space:nowrap}
+.fpop .ft{display:flex;gap:6px;padding:3px 5px;color:var(--text-tertiary);font-size:8.5px}
+.fpop .fclose{margin-left:auto;color:var(--text-tertiary)}
+.saved-mini{display:flex;align-items:center;gap:4px;font-size:9px;color:var(--text-tertiary)}
+.saved-mini .d{width:6px;height:6px;border-radius:50%;flex:none}
+.saved-mini .d.g{background:#22a06b}
+.saved-mini .d.y{background:#e6a23c;animation:pulse 1s infinite}
+.sbline{display:flex;align-items:center;gap:8px;border:1px solid var(--border);border-radius:5px;padding:3px 8px;font-size:9px;color:var(--text-tertiary);background:var(--bg-app)}
 .note{font-size:10.5px;color:var(--text-tertiary);line-height:1.5}
 .note b{color:var(--text-primary)}
 
@@ -158,16 +182,37 @@ p.sec-sub{color:var(--text-tertiary);font-size:12px;margin-bottom:14px}
 .pg-title .page-more{width:26px;height:26px;border-radius:6px;display:none;align-items:center;justify-content:center;color:var(--text-tertiary);font-size:15px}
 .pg-title:hover .page-more{display:flex}
 .pg-title .page-more:hover{background:var(--state-hover);color:var(--text-primary)}
-.toolbar{display:flex;align-items:center;gap:2px;height:36px;padding:0 20px;border-top:1px solid var(--border);border-bottom:1px solid var(--border)}
-.tb-btn{width:26px;height:24px;border-radius:6px;display:flex;align-items:center;justify-content:center;color:var(--text-tertiary);transition:background .12s}
-.tb-btn:hover{background:var(--state-hover);color:var(--text-primary)}
-.tb-btn.on{background:var(--tbl-row-hover);color:var(--text-primary)}
+.toolbar{display:flex;align-items:center;gap:4px;height:36px;padding:0 20px;border-top:1px solid var(--border);border-bottom:1px solid var(--border)}
+.tb-btn{width:28px;height:28px;border-radius:6px;display:flex;align-items:center;justify-content:center;color:var(--text-tertiary);transition:background .12s,color .12s}
+.tb-btn:hover{background:var(--tbl-row-hover);color:var(--text-primary)}
+.tb-btn.on{background:var(--btn-primary);color:var(--on-btn-primary)}
 .tb-btn:disabled{opacity:.35;pointer-events:none}
+/* 文字按钮（Notion 化：图标+文案，激活实底） */
+.tb-text{display:inline-flex;align-items:center;gap:5px;height:28px;padding:0 10px;border-radius:6px;font-size:12px;color:var(--text-secondary);transition:background .12s,color .12s}
+.tb-text:hover{background:var(--tbl-row-hover);color:var(--text-primary)}
+.tb-text.on{background:var(--btn-primary);color:var(--on-btn-primary);font-weight:500}
+.tb-text .tb-badge{font-size:11px;opacity:.85}
 .tb-sep{width:1px;height:16px;background:var(--border);margin:0 5px}
-.tb-chip{display:flex;align-items:center;gap:4px;height:22px;padding:0 8px;border-radius:6px;font-size:11px;background:var(--tbl-row-hover);color:var(--text-primary);font-weight:500}
+.tb-chip{display:flex;align-items:center;gap:5px;height:24px;padding:0 9px;border-radius:6px;font-size:11.5px;background:var(--tbl-row-hover);color:var(--text-primary);font-weight:500}
 .tb-chip .x{cursor:pointer;color:var(--text-tertiary);font-size:12px;line-height:1}
 .tb-chip .x:hover{color:var(--text-primary)}
 .tb-spacer{flex:1}
+/* 筛选 popover 内条件行 */
+.frow{display:flex;align-items:center;gap:6px;padding:6px 9px}
+.frow select,.frow input{border:1px solid var(--border);border-radius:6px;padding:4px 8px;font-size:11.5px;background:var(--bg-app);outline:none;color:var(--text-primary)}
+.frow select:focus,.frow input:focus{border-color:var(--tbl-focus)}
+.frow input{flex:1;min-width:0}
+.pop-close{width:20px;height:20px;border-radius:5px;display:flex;align-items:center;justify-content:center;font-size:13px;color:var(--text-tertiary);cursor:pointer}
+.pop-close:hover{background:var(--tbl-row-hover);color:var(--text-primary)}
+.flink{font-size:11.5px;color:var(--tbl-focus);cursor:pointer;font-weight:500}
+.flink:hover{text-decoration:underline}
+.flink.dim{color:var(--text-tertiary);pointer-events:none}
+.fnote{font-size:10.5px;color:var(--text-tertiary);line-height:1.5}
+/* 冻结表头关闭态 */
+.grid thead th.nf{top:auto}
+th.corner.nf{top:auto}
+/* 遮罩（筛选/更多 popover 点击外部关闭） */
+#filter-scrim{position:fixed;inset:0;z-index:195;background:transparent}
 
 /* —— 表格网格 —— */
 .grid-wrap{flex:1;overflow:auto;outline:none;position:relative}
@@ -320,6 +365,7 @@ td.sel .cell-chip .ch-arrow{display:none}
     <div class="hintbar" style="margin-bottom:12px">
       <b>交互清单：</b>
       <kbd>单击</kbd> 选中（焦点入网格）· <kbd>双击</kbd> / <kbd>Enter</kbd> / <kbd>F2</kbd> / 直接打字 编辑 · <kbd>Tab</kbd>/<kbd>Shift+Tab</kbd> 提交并换位（末列自动换行）· <kbd>Shift+Enter</kbd> 格内换行 · <kbd>Esc</kbd> 分级退出 · <kbd>Delete</kbd> 清空选区 · <kbd>Shift+方向键</kbd> 扩展选区 · <kbd>⌘A</kbd> 全选 · <kbd>⌘C/⌘V</kbd> 复制粘贴 · <kbd>⌘Z/⇧⌘Z</kbd> 撤销重做 · 单击行号=整行 · 单击列头=整列 · 列头右缘拖拽调宽 / 双击自适应 · 列头/行号拖拽重排（排序/筛选下禁用）
+      <b>工具栏：</b>筛选/统计为<b>文字按钮</b>（激活实底）· 筛选为浮层弹窗 · 右侧 chip 显示视图状态 · <kbd>⋯</kbd> 含冻结表头 / 重置视图 · 保存静默
       <button class="btn" id="paste-demo" style="margin-left:8px">📋 模拟粘贴 4×3 示例数据</button>
     </div>
 
@@ -350,20 +396,13 @@ td.sel .cell-chip .ch-arrow{display:none}
           <button class="tb-btn" id="tb-undo" title="撤销 ⌘Z">↶</button>
           <button class="tb-btn" id="tb-redo" title="重做 ⇧⌘Z">↷</button>
           <div class="tb-sep"></div>
-          <button class="tb-btn" id="tb-stats" title="统计行 Σ">Σ</button>
-          <button class="tb-btn on" id="tb-filter" title="筛选 ⤓">⤓</button>
-          <button class="tb-btn" id="tb-export" title="导出 CSV">⇩</button>
+          <button class="tb-text" id="tb-filter" title="筛选可见行（仅视图，不写盘）">⤓ 筛选<span class="tb-badge" id="filter-count" style="display:none">· 1</span></button>
+          <button class="tb-text" id="tb-stats" title="显示 / 隐藏统计行">Σ 统计</button>
+          <button class="tb-text" id="tb-export" title="导出 CSV（全量数据，不随筛选）">⇩ 导出</button>
           <div class="tb-spacer"></div>
-          <div class="tb-chip" id="sort-chip" style="display:none">⤒ <span id="sort-chip-label"></span><span class="x" id="sort-clear">×</span></div>
-          <div class="tb-chip" id="filter-chip" style="display:none">⤓ <span id="filter-chip-label"></span><span class="x" id="filter-clear">×</span></div>
-        </div>
-        <div id="filter-panel" style="display:none;border-bottom:1px solid var(--border);padding:8px 20px;font-size:12px;display:none">
-          <select id="f-col" style="border:1px solid var(--border);border-radius:6px;padding:3px 7px;font-size:11.5px;background:var(--bg-app)"></select>
-          <select id="f-op" style="border:1px solid var(--border);border-radius:6px;padding:3px 7px;font-size:11.5px;margin-left:6px;background:var(--bg-app)">
-            <option value="contains">包含</option><option value="equals">等于</option><option value="notempty">不为空</option>
-          </select>
-          <input id="f-val" placeholder="筛选值" style="border:1px solid var(--border);border-radius:6px;padding:3px 7px;font-size:11.5px;margin-left:6px;width:140px;background:var(--bg-app);outline:none">
-          <span style="color:var(--text-tertiary);font-size:11px;margin-left:10px">仅影响视图，不写盘 · 排序/筛选下禁止行拖拽</span>
+          <div class="tb-chip" id="sort-chip" style="display:none"><span id="sort-chip-label"></span><span class="x" id="sort-clear">×</span></div>
+          <div class="tb-chip" id="filter-chip" style="display:none"><span id="filter-chip-label"></span><span class="x" id="filter-clear">×</span></div>
+          <button class="tb-btn" id="tb-more" title="更多（冻结表头 / 重置视图）">⋯</button>
         </div>
         <div class="grid-wrap" id="grid-wrap" tabindex="0">
           <table class="grid" id="grid"></table>
@@ -372,7 +411,7 @@ td.sel .cell-chip .ch-arrow{display:none}
           <span id="sb-count">6 行 · 7 列</span>
           <span class="sp"></span>
           <span class="sb-hint" id="sb-hint"></span>
-          <span class="sb-save" id="sb-save"><span class="dot"></span><span id="sb-save-text">已保存</span></span>
+          <span class="sb-save" id="sb-save" style="display:none"><span class="dot"></span><span id="sb-save-text"></span></span>
         </div>
       </div>
     </div>
@@ -488,6 +527,57 @@ const CARDS = [
     after:`<div style="font-size:10px;color:var(--text-tertiary);display:flex;gap:4px">我的空间 / 研发排期 / <b style="color:var(--text-primary)">表格交互整改</b></div>
       <div class="toolbar-mini" style="margin-top:5px"><span class="ic">↶</span><span class="ic">↷</span><span class="sep"></span><span class="ic">Σ</span><span class="ic">⤓</span><span class="ic">⇩</span></div>
       <div class="note" style="margin-top:4px">面包屑置顶、工具栏精简；「已保存」静默于底部状态栏</div>` },
+  { no:'TB1', title:'工具栏：纯图标 vs 文字按钮（O1）', foot:'<b>根因：</b>6 个按钮全是 24px 幽灵图标，Σ/Snowflake 语义不明，只能靠 hover title 猜。<b>整改：</b>筛选/统计/导出升级为图标+文字按钮（12px 文案、28px 命中区）；撤销/重做保留图标但放大；职责不再依赖悬停。',
+    before:`<div class="tb-mini"><span class="ib">↶</span><span class="ib">↷</span><span class="sep"></span><span class="ib">❄</span><span class="ib">⤓</span><span class="ib">Σ</span><span class="ib">⇩</span></div>
+      <div class="note" style="margin-top:4px">Σ=统计？❄=冻结？不 hover 不知道是干嘛的</div>`,
+    after:`<div class="tb-mini"><span class="ib">↶</span><span class="ib">↷</span><span class="sep"></span><span class="tbm">⤓ 筛选</span><span class="tbm">Σ 统计</span><span class="tbm">⇩ 导出</span></div>
+      <div class="note" style="margin-top:4px">文字化后职责可读；冻结首行移入 ⋯ 菜单（低频设置不上工具栏）</div>` },
+  { no:'TB2', title:'激活态与悬停态同构（O2/V3）', foot:'<b>根因：</b>aria-pressed 激活样式 = bg-state-hover（rgba 5% 灰），与 hover 完全相同——悬停时根本看不出开关状态。<b>整改：</b>激活 = 实底深灰白字（对比度 ≥3:1），与 hover 态可辨。',
+    before:`<div class="tb-mini"><span class="tbm hov">⤓ 筛选</span><span style="font-size:9px;color:var(--text-tertiary)">← hover 态</span><span class="sep"></span><span class="tbm hov">Σ 统计</span><span style="font-size:9px;color:var(--text-tertiary)">← 激活态？</span></div>
+      <div class="note" style="margin-top:4px">hover 与激活都是同一浅灰底，无法区分开关</div>`,
+    after:`<div class="tb-mini"><span class="tbm hov">⤓ 筛选</span><span style="font-size:9px;color:var(--text-tertiary)">← hover</span><span class="sep"></span><span class="tbm on">Σ 统计</span><span style="font-size:9px;color:var(--text-tertiary)">← 激活（实底）</span></div>
+      <div class="note" style="margin-top:4px">实底激活一眼可辨；筛选条件数随按钮显示「· 1」</div>` },
+  { no:'TB3', title:'筛选：嵌入式表单条 vs portal popover（O5/V6）', foot:'<b>根因：</b>filterOpen 时整条原生 select/input 平铺插入标题栏下，占表格可视高度、无关闭 ×、无 Esc。<b>整改：</b>筛选按钮点击 → portal 浮层（复用 T6 机制）：条件行 + × + 清除全部，贴边翻转永不裁剪。',
+    before:`<div style="border:1px solid var(--border);border-radius:6px;overflow:hidden">
+      <div class="tb-mini" style="border:0;border-bottom:1px solid var(--border);border-radius:0"><span class="ib">⤓</span></div>
+      <div style="display:flex;gap:4px;padding:6px;background:var(--bg-app)">
+        <span class="ctl" style="border:1px solid var(--border);border-radius:4px;padding:1px 6px;font-size:9px">列 ▾</span>
+        <span class="ctl" style="border:1px solid var(--border);border-radius:4px;padding:1px 6px;font-size:9px">包含 ▾</span>
+        <span class="ctl" style="flex:1;border:1px solid var(--border);border-radius:4px;padding:1px 6px;font-size:9px;color:var(--text-tertiary)">筛选值…</span>
+      </div></div>
+      <div class="note" style="margin-top:4px">占满整行挤压表格；无关闭 ×，只能再点按钮</div>`,
+    after:`<div class="tb-mini" style="max-width:150px"><span class="tbm on">⤓ 筛选</span></div>
+      <div class="fpop" style="margin-top:4px">
+        <div class="ft"><span>筛选</span><span class="fclose">×</span></div>
+        <div class="fr"><span class="ctl">状态 ▾</span><span class="ctl">包含 ▾</span><span class="ctl" style="flex:1">进行</span></div>
+        <div class="ft"><span style="font-size:8.5px;color:var(--tbl-focus)">清除全部</span><span>仅视图 · 不写盘</span></div>
+      </div>
+      <div class="note" style="margin-top:4px">浮层不占表格高度；Esc/外点/× 三种方式关闭</div>` },
+  { no:'TB4', title:'行数列数双栏重复 → 状态区收敛（O8/O4）', foot:'<b>根因：</b>「6行·7列」pill 同时出现在标题栏与底部状态栏（同一 statsLine）；排序 chip 与筛选 badge 又是两种视觉。<b>整改：</b>工具栏只留右侧统一 chip 状态区（排序/筛选），行数列数归底部状态栏。',
+    before:`<div class="tb-mini"><span class="ib">↶</span><span class="ib">↷</span><span class="pill">6行·7列</span><span class="chipm">状态 ↑</span><span class="ib" style="background:var(--btn-primary);color:var(--on-btn-primary)">⤓1</span></div>
+      <div class="sbline" style="margin-top:4px"><span>6 行 · 7 列</span><span style="margin-left:auto">● 已保存</span></div>
+      <div class="note" style="margin-top:4px">同一信息两处显示；chip/badge/pill 三种灰阶三种语义</div>`,
+    after:`<div class="tb-mini"><span class="ib">↶</span><span class="ib">↷</span><span class="sep"></span><span class="tbm">⤓ 筛选</span><span class="tbm">Σ 统计</span><span class="tbm">⇩ 导出</span><span style="flex:1"></span><span class="chipm">状态 ↓ ×</span><span class="chipm">筛选 · 1 ×</span></div>
+      <div class="sbline" style="margin-top:4px"><span>6 行 · 7 列</span></div>
+      <div class="note" style="margin-top:4px">操作按钮与视图状态分区分语言；行数列数只留底部</div>` },
+  { no:'TB5', title:'单行混排 8 控件 → 三段式布局（O11/V1/V2）', foot:'<b>根因：</b>返回按钮+分隔线+标题+最多 8 个控件挤在 44px 单行，标题被压成省略号；24px 按钮矮一截。<b>整改：</b>面包屑行 / 标题行 / 工具栏行三段式（对齐 doc-notion-polish T1/T2），工具栏 36px。',
+    before:`<div style="display:flex;align-items:center;gap:5px;border:1px solid var(--border);border-radius:6px;padding:4px 7px;background:var(--bg-app);font-size:9px">
+      <span style="color:var(--text-tertiary);white-space:nowrap">← 我的空间</span><span style="color:var(--border)">│</span>
+      <span style="flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">表格交互整改 · 任务看板…</span>
+      <span class="ib">↶</span><span class="ib">↷</span><span class="ib">❄</span><span class="ib">⤓</span><span class="ib">Σ</span><span class="ib">⇩</span>
+    </div>
+      <div class="note" style="margin-top:4px">窄窗口下标题只剩省略号；按钮 24px 视觉重心飘</div>`,
+    after:`<div class="row3">
+      <div class="bc">我的空间 / 研发排期 / 表格交互整改</div>
+      <div class="tt">表格交互整改 · 任务看板</div>
+      <div class="tb"><span class="tb-mini" style="border:0;padding:0;font-size:9px"><span class="ib">↶</span><span class="ib">↷</span><span class="sep"></span><span class="tbm">⤓ 筛选</span><span class="tbm">Σ 统计</span><span class="tbm">⇩ 导出</span></span></div>
+    </div>
+      <div class="note" style="margin-top:4px">标题独占一行不被压缩；工具栏 36px 与按钮协调</div>` },
+  { no:'TB6', title:'保存状态常驻 vs 静默（O7）', foot:'<b>根因：</b>saved 也常驻显示「● 已保存」，与 doc-notion-polish T1「保存静默」裁决冲突。<b>整改：</b>saving 才显示（琥珀点+文字，>800ms），saved 完全静默；error 必显+重试。',
+    before:`<div class="sbline"><span>6 行 · 7 列</span><span style="margin-left:auto"><span class="saved-mini"><span class="d g"></span>已保存</span></span></div>
+      <div class="note" style="margin-top:4px">「已保存」常驻 10 分钟不动——工具壳的确认强迫症</div>`,
+    after:`<div class="sbline"><span>6 行 · 7 列</span><span style="margin-left:auto"><span class="saved-mini" style="opacity:0"><span class="d g"></span>已保存</span></span></div>
+      <div class="note" style="margin-top:4px">静默（上图透明示意）；编辑瞬间仅 0.7s 显示「● 保存中…」</div>` },
 ]
 
 /* ═══════════════════════════════════════════════════════════════
@@ -526,8 +616,10 @@ let S = {
   popup:null,             // {r, c}
   sort:null,              // {ci, dir}
   filter:null,            // {ci, op, value}
-  stats:true,
-  filterOpen:false,
+  stats:false,            // 统计行（默认关，对齐 TableEditor useState(false)）
+  filterOpen:false,       // 筛选 popover 开合
+  moreOpen:false,         // ⋯ 菜单开合
+  freeze:true,            // 冻结表头（TB3：移入 ⋯ 菜单）
   undoStack:[], redoStack:[],
   colDrag:null, rowDrag:null, resize:null,
 }
@@ -800,20 +892,20 @@ function chipFor(col, v){
   return `<span class="${cls}">${esc(v)}</span>`
 }
 function renderAll(){
-  renderGrid(); renderStatus(); renderMenus(); renderFilterSelect(); renderToolbar()
+  renderGrid(); renderStatus(); renderMenus(); renderToolbar()
 }
 function renderGrid(){
   const order = viewOrder()
   let html = '<thead><tr>'
   // 角格
-  html += `<th class="corner"><span class="add-col" data-add-col title="添加列">＋</span></th>`
+  html += `<th class="corner ${S.freeze?'':'nf'}"><span class="add-col" data-add-col title="添加列">＋</span></th>`
   DATA.cols.forEach((col, ci) => {
     const sorted = S.sort?.ci === ci
     const colSel = (S.mode==='col' && ci>=Math.min(S.sel.ac,S.sel.fc) && ci<=Math.max(S.sel.ac,S.sel.fc))
     const dragCls = S.colDrag?.ci===ci ? 'dragging' : ''
     const dropCls = S.colDrag && S.colDrag.overCi===ci && S.colDrag.ci!==ci ? 'drop-target' : ''
     const renaming = S.renameCi===ci
-    html += `<th data-ci="${ci}" class="${colSel?'sel':''} ${dragCls} ${dropCls}" style="width:${col.width}px;min-width:${col.width}px">`
+    html += `<th data-ci="${ci}" class="${colSel?'sel':''} ${dragCls} ${dropCls} ${S.freeze?'':'nf'}" style="width:${col.width}px;min-width:${col.width}px">`
     html += `<div class="th-in" data-col-head="${ci}">`
     if (renaming){
       html += `<input class="th-edit" data-col-rename="${ci}" value="${esc(col.name)}" spellcheck="false">`
@@ -894,18 +986,93 @@ function renderToolbar(){
   $('tb-redo').disabled = !S.redoStack.length
   $('tb-stats').classList.toggle('on', S.stats)
   $('tb-filter').classList.toggle('on', S.filterOpen || !!S.filter)
+  $('tb-more').classList.toggle('on', S.moreOpen)
+  $('filter-count').style.display = S.filter ? 'inline' : 'none'
   const sc = $('sort-chip')
   sc.style.display = S.sort ? 'flex' : 'none'
   if (S.sort) $('sort-chip-label').textContent = `${DATA.cols[S.sort.ci].name} ${S.sort.dir==='asc'?'↑':'↓'}`
   const fc = $('filter-chip')
   fc.style.display = S.filter ? 'flex' : 'none'
-  if (S.filter) $('filter-chip-label').textContent = `${DATA.cols[S.filter.ci].name}`
+  if (S.filter) $('filter-chip-label').textContent = `${DATA.cols[S.filter.ci].name} · ${S.filter.op==='notempty' ? '非空' : S.filter.value || '…'}`
 }
-function renderFilterSelect(){
-  const sel = $('f-col')
-  if (!sel) return
+
+/* —— 筛选 popover（TB4：portal 浮层替代嵌入式表单条） —— */
+function showScrim(){
+  let s = document.getElementById('filter-scrim')
+  if (!s){
+    s = document.createElement('div')
+    s.id = 'filter-scrim'
+    s.addEventListener('click', closeMenus)
+    document.body.appendChild(s)
+  }
+}
+function renderFilterPop(){
+  $('portal').innerHTML=''
+  if (!S.filterOpen) return
+  showScrim()
+  const btn = $('tb-filter')
+  const node = document.createElement('div')
+  node.className = 'pop'
+  node.style.minWidth = '330px'
   const cur = S.filter ? S.filter.ci : 0
-  sel.innerHTML = DATA.cols.map((c,i)=>`<option value="${i}" ${i===cur?'selected':''}>${esc(c.name)}</option>`).join('')
+  const curOp = S.filter ? S.filter.op : 'contains'
+  const curVal = S.filter ? S.filter.value : ''
+  node.innerHTML = `
+    <div class="psub" style="display:flex;align-items:center"><span style="flex:1">筛选</span><span class="pop-close" data-fclose title="关闭 Esc">×</span></div>
+    <div class="frow">
+      <select data-f-col style="max-width:130px">${DATA.cols.map((c,i)=>`<option value="${i}" ${i===cur?'selected':''}>${esc(c.name)}</option>`).join('')}</select>
+      <select data-f-op style="max-width:90px">
+        <option value="contains" ${curOp==='contains'?'selected':''}>包含</option>
+        <option value="equals" ${curOp==='equals'?'selected':''}>等于</option>
+        <option value="notempty" ${curOp==='notempty'?'selected':''}>不为空</option>
+      </select>
+      <input data-f-val placeholder="筛选值" value="${esc(curVal)}">
+    </div>
+    <div class="psep"></div>
+    <div style="display:flex;align-items:center;gap:10px;padding:5px 9px">
+      <span class="flink ${curVal===''&&curOp!=='notempty'?'dim':''}" data-fclear>清除全部</span>
+      <span class="fnote">仅影响视图，不写盘 · 新增行可能被隐藏</span>
+    </div>`
+  openPop(node, btn)
+  const col = node.querySelector('[data-f-col]'), op = node.querySelector('[data-f-op]'), val = node.querySelector('[data-f-val]')
+  const apply = () => {
+    if (op.value==='notempty') S.filter = { ci:Number(col.value), op:'notempty', value:'' }
+    else if (val.value.trim()) S.filter = { ci:Number(col.value), op:op.value, value:val.value }
+    else S.filter = null
+    renderAll()   // renderMenus 早退，popover 保留、输入焦点不丢
+  }
+  col.addEventListener('change', apply)
+  op.addEventListener('change', apply)
+  val.addEventListener('input', apply)
+  node.querySelector('[data-fclose]').addEventListener('click', closeMenus)
+  node.querySelector('[data-fclear]').addEventListener('click', () => { S.filter=null; renderAll() })
+}
+
+/* —— ⋯ 菜单（TB1/TB3：冻结表头移入 + 重置视图） —— */
+function renderMorePop(){
+  $('portal').innerHTML=''
+  if (!S.moreOpen) return
+  showScrim()
+  const btn = $('tb-more')
+  const node = document.createElement('div')
+  node.className = 'pop'
+  node.style.minWidth = '200px'
+  node.innerHTML = `
+    <div class="pmi" data-freeze><span class="pi-ic">${S.freeze?'☑':'☐'}</span>冻结表头</div>
+    <div class="psep"></div>
+    <div class="pmi ${!S.sort&&!S.filter?'dim':''}" data-reset><span class="pi-ic">↺</span>重置视图（清除排序与筛选）</div>`
+  openPop(node, btn)
+  node.querySelector('[data-freeze]').addEventListener('click', () => {
+    S.freeze = !S.freeze
+    renderGrid()
+    renderMorePop()   // 刷新勾选态
+  })
+  node.querySelector('[data-reset]').addEventListener('click', () => {
+    if (!S.sort && !S.filter) return
+    S.sort = null; S.filter = null
+    closeMenus(); renderAll()
+    toast('已重置视图（排序与筛选清除）')
+  })
 }
 function renderStatus(){
   const order = viewOrder()
@@ -938,11 +1105,12 @@ function openPop(node, anchorEl){
   node.style.left = Math.max(8, Math.min(x, innerWidth - pw - 8)) + 'px'
   node.style.top = Math.max(8, Math.min(y, innerHeight - ph - 8)) + 'px'
 }
-function closeMenus(){ S.colMenu=null; S.rowMenu=null; S.popup=null; S.renameCi=null; portalEl=null; $('portal').innerHTML='' }
+function closeMenus(){ S.colMenu=null; S.rowMenu=null; S.popup=null; S.renameCi=null; S.filterOpen=false; S.moreOpen=false; portalEl=null; $('portal').innerHTML=''; const sc=document.getElementById('filter-scrim'); if (sc) sc.remove() }
 
 function renderMenus(){
-  $('portal').innerHTML=''
+  // 网格菜单（列/行/选项）互斥渲染；筛选/更多 popover 独立管理，不在此清空
   if (!S.colMenu && !S.rowMenu && !S.popup) return
+  $('portal').innerHTML=''
   // 依据触发元素重定位
   if (S.colMenu!=null){
     const th = grid.querySelector(`th[data-ci="${S.colMenu}"]`)
@@ -1346,41 +1514,41 @@ function commitRename(ren){
 $('tb-undo').addEventListener('click', undo)
 $('tb-redo').addEventListener('click', redo)
 $('tb-stats').addEventListener('click', () => { S.stats = !S.stats; renderAll() })
-$('tb-filter').addEventListener('click', () => { S.filterOpen = !S.filterOpen; $('filter-panel').style.display = S.filterOpen ? 'block' : 'none' })
+$('tb-filter').addEventListener('click', () => {
+  if (S.filterOpen){ closeMenus(); return }
+  S.moreOpen = false
+  S.filterOpen = true
+  renderFilterPop()
+})
+$('tb-more').addEventListener('click', () => {
+  if (S.moreOpen){ closeMenus(); return }
+  S.filterOpen = false
+  S.moreOpen = true
+  renderMorePop()
+})
 $('tb-export').addEventListener('click', () => {
   const csv = '\uFEFF' + [DATA.cols.map(c=>c.name).join(',')].concat(DATA.rows.map(r=>r.map(v=>`"${String(v??'').replace(/"/g,'""')}"`).join(','))).join('\n')
   const a = document.createElement('a')
   a.href = URL.createObjectURL(new Blob([csv], { type:'text/csv' }))
   a.download = '表格导出.csv'
   a.click()
-  toast('已导出 CSV')
+  toast(S.filter ? '已导出 CSV（全量数据，不含筛选）' : '已导出 CSV')
 })
 $('sort-clear').addEventListener('click', clearSort)
-$('filter-clear').addEventListener('click', () => { S.filter=null; $('filter-panel').style.display='none'; S.filterOpen=false; renderAll() })
-function bindFilter(){
-  const col = $('f-col'), op = $('f-op'), val = $('f-val')
-  const apply = () => {
-    if (op.value==='notempty') S.filter = { ci:Number(col.value), op:'notempty', value:'' }
-    else if (val.value) S.filter = { ci:Number(col.value), op:op.value, value:val.value }
-    else S.filter = null
-    renderAll()
-  }
-  col.addEventListener('change', apply)
-  op.addEventListener('change', apply)
-  val.addEventListener('input', apply)
-}
-bindFilter()
+$('filter-clear').addEventListener('click', () => { S.filter=null; renderAll() })
 
-/* —— 保存状态模拟 —— */
+/* —— 保存状态模拟（TB7：saved 静默，仅 saving 显示） —— */
 let saveTimer = null
 function markDirty(){
   const el = $('sb-save')
+  el.style.display = 'flex'
   el.className = 'sb-save saving'
   $('sb-save-text').textContent = '保存中…'
   clearTimeout(saveTimer)
   saveTimer = setTimeout(() => {
     el.className = 'sb-save'
-    $('sb-save-text').textContent = '已保存'
+    $('sb-save-text').textContent = ''
+    el.style.display = 'none'   // 已保存 → 静默（对齐 doc-notion-polish T1）
   }, 700)
 }
 

@@ -2645,6 +2645,7 @@ export const ja = {
         exportCsv: "CSV エクスポート",
         more: "その他",
         resetView: "表示をリセット",
+        exportFullNote: "全データをエクスポートしました（現在のフィルターは適用されません）",
         freezeHeader: "先頭行を固定",
       },
       status: {

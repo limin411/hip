@@ -2647,6 +2647,7 @@ export const zhTW = {
         exportCsv: "匯出 CSV",
         more: "更多操作",
         resetView: "重設檢視",
+        exportFullNote: "已匯出全量資料（不受目前篩選影響）",
         freezeHeader: "凍結首列",
       },
       status: {

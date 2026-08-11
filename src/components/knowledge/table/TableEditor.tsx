@@ -161,6 +161,7 @@ export function TableEditor({ tableId }: { tableId: string }) {
 
   const [moreOpen, setMoreOpen] = useState(false)
   const moreBtnRef = useRef<HTMLButtonElement>(null)
+  const filterBtnRef = useRef<HTMLButtonElement>(null)
   const closeMenus = () => {
     setColMenuCi(null)
     setRowMenuRi(null)
@@ -268,6 +269,18 @@ export function TableEditor({ tableId }: { tableId: string }) {
     applySnapshot(snap)
   }
 
+  // Esc 关闭全部浮层（popover 打开时焦点可能不在 grid）
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        closeMenus()
+        setFilterOpen(false)
+      }
+    }
+    document.addEventListener('keydown', onKey)
+    return () => document.removeEventListener('keydown', onKey)
+  }, [])
+
   // 点击外部关闭浮层（portal 在 body，组件根 onClick 覆盖不到；grid 内点击交由各元素处理）
   useEffect(() => {
     const onDown = (e: MouseEvent) => {
@@ -275,6 +288,7 @@ export function TableEditor({ tableId }: { tableId: string }) {
       if (!t) return
       if (t instanceof Node && document.getElementById('table-menus')?.contains(t)) return
       if (t instanceof Node && moreBtnRef.current?.contains(t)) return
+      if (t instanceof Node && filterBtnRef.current?.contains(t)) return
       if (t instanceof Node && wrapRef.current?.contains(t)) return
       closeMenus()
     }
@@ -735,15 +749,13 @@ export function TableEditor({ tableId }: { tableId: string }) {
   // ── 排序 / 筛选 / 统计 / 导出（PR-5 数据能力） ───────────────────────────
   const sortBy = (colId: string, dir: 'asc' | 'desc') => {
     if (sortRef.current?.col === colId && sortRef.current.dir === dir) return
-    // 推入变更后状态（含目标排序），避免与上一快照（排序前）去重冲突。
-    pushHistoryStep({ col: colId, dir })
+    // TB6：排序是视图态，不进撤销栈
     setSortState({ col: colId, dir })
     setColMenuCi(null)
   }
 
   const clearSort = () => {
     if (!sortRef.current) return
-    pushHistoryStep(null)
     setSortState(null)
     setColMenuCi(null)
   }
@@ -799,6 +811,9 @@ export function TableEditor({ tableId }: { tableId: string }) {
       // BOM 供 Excel 识别 UTF-8。导出全量数据（不随筛选）。
       await knowledgeExportText(dest, `\uFEFF${tableToCsv(tableRef.current)}`)
       toast.success(t('knowledge.export.docDone'))
+      if (filters.length > 0) {
+        toast.info(t('knowledge.table.toolbar.exportFullNote'))
+      }
     } catch (e) {
       toast.error(e instanceof Error ? e.message : String(e))
     }
@@ -1082,6 +1097,7 @@ export function TableEditor({ tableId }: { tableId: string }) {
           <button
             type="button"
             data-testid="table-filter"
+            ref={filterBtnRef}
             aria-pressed={filterOpen || filters.length > 0}
             onClick={() => setFilterOpen((v) => !v)}
             title={t('knowledge.table.toolbar.filter')}
@@ -1202,13 +1218,24 @@ export function TableEditor({ tableId }: { tableId: string }) {
         </div>
       </div>
 
-      {/* 筛选面板 */}
+      {/* 筛选 popover（portal，不再嵌入滚动容器） */}
       {filterOpen ? (
-        <div
-          className="relative z-30 shrink-0 border-b border-border bg-surface px-4 py-2.5 shadow-overlay"
-          data-testid="table-filter-panel"
-        >
-          <div className="flex flex-col gap-1.5">
+        <PortalMenu anchor={filterBtnRef.current} minWidth={300} testid="table-filter-panel">
+          <div className="flex items-center justify-between px-3 pb-1 pt-1.5">
+            <span className="text-caption font-medium text-ink">
+              {t('knowledge.table.filter.title')}
+            </span>
+            <button
+              type="button"
+              data-testid="table-filter-close"
+              onClick={() => setFilterOpen(false)}
+              className="flex h-5 w-5 items-center justify-center rounded text-ink-tertiary transition-colors hover:bg-state-hover hover:text-ink"
+              aria-label={t('knowledge.table.filter.clear')}
+            >
+              <X size={12} aria-hidden />
+            </button>
+          </div>
+          <div className="flex flex-col gap-1.5 px-3 pb-2">
             {filters.length === 0 ? (
               <p className="text-meta text-ink-tertiary">{t('knowledge.table.filter.title')}</p>
             ) : null}
@@ -1259,7 +1286,7 @@ export function TableEditor({ tableId }: { tableId: string }) {
                         next[fi] = { ...f, value: e.target.value }
                         setFilters(next)
                       }}
-                      className="h-7 w-36 rounded-md border border-border bg-surface px-2 text-caption text-ink outline-none placeholder:text-ink-tertiary focus:border-accent/50"
+                      className="h-7 w-28 rounded-md border border-border bg-surface px-2 text-caption text-ink outline-none placeholder:text-ink-tertiary focus:border-accent/50"
                     />
                   ) : null}
                   <button
@@ -1273,7 +1300,7 @@ export function TableEditor({ tableId }: { tableId: string }) {
                 </div>
               )
             })}
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 pt-0.5">
               <button
                 type="button"
                 data-testid="table-filter-add"
@@ -1294,7 +1321,7 @@ export function TableEditor({ tableId }: { tableId: string }) {
               ) : null}
             </div>
           </div>
-        </div>
+        </PortalMenu>
       ) : null}
 
       {/* 网格 */}
@@ -1516,12 +1543,11 @@ export function TableEditor({ tableId }: { tableId: string }) {
                           {t('knowledge.table.columnMenu.sortClear')}
                         </button>
                       ) : null}
-                      {statsOn ? (
-                        <>
-                          <div className="my-1 border-t border-border" />
-                          <div className="px-2.5 pb-1 pt-0.5 text-meta text-ink-tertiary">
-                            {t('knowledge.table.columnMenu.statsShow')}
-                          </div>
+                      <>
+                        <div className="my-1 border-t border-border" />
+                        <div className="px-2.5 pb-1 pt-0.5 text-meta text-ink-tertiary">
+                          {t('knowledge.table.columnMenu.statsShow')}
+                        </div>
                           {col.type === 'number' ? (
                             <>
                               <button
@@ -1529,6 +1555,7 @@ export function TableEditor({ tableId }: { tableId: string }) {
                                 data-testid="table-col-stats-sum"
                                 onClick={() => {
                                   setColStats((s) => ({ ...s, [ci]: 'sum' }))
+                                  setStatsOn(true)
                                   setColMenuCi(null)
                                 }}
                                 className="flex w-full items-center gap-2 px-2.5 py-1 text-left text-body text-ink transition-colors hover:bg-state-hover"
@@ -1540,6 +1567,7 @@ export function TableEditor({ tableId }: { tableId: string }) {
                                 data-testid="table-col-stats-avg"
                                 onClick={() => {
                                   setColStats((s) => ({ ...s, [ci]: 'avg' }))
+                                  setStatsOn(true)
                                   setColMenuCi(null)
                                 }}
                                 className="flex w-full items-center gap-2 px-2.5 py-1 text-left text-body text-ink transition-colors hover:bg-state-hover"
@@ -1553,6 +1581,7 @@ export function TableEditor({ tableId }: { tableId: string }) {
                             data-testid="table-col-stats-count"
                             onClick={() => {
                               setColStats((s) => ({ ...s, [ci]: 'count' }))
+                              setStatsOn(true)
                               setColMenuCi(null)
                             }}
                             className="flex w-full items-center gap-2 px-2.5 py-1 text-left text-body text-ink transition-colors hover:bg-state-hover"
@@ -1571,7 +1600,6 @@ export function TableEditor({ tableId }: { tableId: string }) {
                             {t('knowledge.table.columnMenu.statsOff')}
                           </button>
                         </>
-                      ) : null}
                       <div className="my-1 border-t border-border" />
                       <button
                         type="button"
@@ -1969,27 +1997,24 @@ export function TableEditor({ tableId }: { tableId: string }) {
           </span>
         ) : null}
         <span className="ml-auto flex items-center gap-1.5">
-          <span
-            className={cn(
-              'h-1.5 w-1.5 rounded-full',
-              tableSaveState === 'error' ? 'bg-danger' : 'bg-warning animate-pulse',
-            )}
-            aria-hidden
-          />
           {tableSaveState === 'error' ? (
-            <button
-              type="button"
-              data-testid="table-save-retry"
-              onClick={() => void commitTable(tableId)}
-              className="rounded-sm px-1 text-meta font-medium text-accent-strong hover:underline"
-            >
-              {t('knowledge.table.status.saving')} · {t('knowledge.doc.saveRetry')}
-            </button>
+            <>
+              <span className="h-1.5 w-1.5 rounded-full bg-danger" aria-hidden />
+              <button
+                type="button"
+                data-testid="table-save-retry"
+                onClick={() => void commitTable(tableId)}
+                className="rounded-sm px-1 text-meta font-medium text-accent-strong hover:underline"
+              >
+                {t('knowledge.table.status.saving')} · {t('knowledge.doc.saveRetry')}
+              </button>
+            </>
           ) : tableSaveState === 'saving' ? (
-            <span className="text-ink-tertiary">{t('knowledge.table.status.saving')}</span>
-          ) : (
-            <span className="text-ink-tertiary/70">{t('knowledge.table.status.saved')}</span>
-          )}
+            <>
+              <span className="h-1.5 w-1.5 rounded-full bg-warning animate-pulse" aria-hidden />
+              <span className="text-ink-tertiary">{t('knowledge.table.status.saving')}</span>
+            </>
+          ) : null /* saved/idle：静默，不打扰 */ }
         </span>
       </div>
     </div>

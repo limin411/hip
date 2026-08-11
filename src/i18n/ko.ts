@@ -2645,6 +2645,7 @@ export const ko = {
         exportCsv: "CSV 내보내기",
         more: "더 보기",
         resetView: "보기 초기화",
+        exportFullNote: "전체 데이터를 내보냈습니다(현재 필터 미적용)",
         freezeHeader: "첫 행 고정",
       },
       status: {

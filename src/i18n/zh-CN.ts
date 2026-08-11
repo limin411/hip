@@ -2682,6 +2682,7 @@ export const zhCN = {
           exportCsv: '导出 CSV',
           more: '更多操作',
           resetView: '重置视图',
+          exportFullNote: '已导出全量数据（不受当前筛选影响）',
           freezeHeader: '冻结首行',
         },
         status: {

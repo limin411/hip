@@ -2742,6 +2742,7 @@ export const en = {
           exportCsv: 'Export CSV',
           more: 'More',
           resetView: 'Reset view',
+          exportFullNote: 'Exported the full dataset (current filter not applied)',
           freezeHeader: 'Freeze header',
         },
         status: {

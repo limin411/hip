@@ -458,10 +458,10 @@ describe('TableEditor PR-5 (sort/filter/stats/export)', () => {
     expect(firstCol1()).toContain('300')
     expect(screen.getByTestId('table-col-sort-ind').textContent).toBe('↓')
     expect(screen.getByTestId('table-sort-chip')).toBeTruthy()
-    // 撤销排序恢复原序
+    // TB6：排序是视图态，不进撤销栈 → ⌘Z 不恢复排序
     fireEvent.keyDown(screen.getByTestId('table-grid'), { key: 'z', metaKey: true })
-    expect(firstCol1()).toContain('100')
-    expect(screen.queryByTestId('table-sort-chip')).toBeNull()
+    expect(firstCol1()).toContain('300')
+    expect(screen.getByTestId('table-sort-chip')).toBeTruthy()
   })
 
   it('filter panel: contains filter + badge + visible rows + clear', () => {
@@ -1183,5 +1183,79 @@ describe('TableEditor table-ux-notion PR-8 (toolbar structure)', () => {
     // ⋯ 菜单在 portal（body）
     fireEvent.click(screen.getByTestId('table-more'))
     expect(screen.getByTestId('table-grid').contains(screen.getByTestId('table-more-menu'))).toBe(false)
+  })
+})
+
+describe('TableEditor table-ux-notion PR-9 (filter popover / stats loop / silent save / export note)', () => {
+  beforeEach(() => {
+    mountTable()
+    useKnowledgeStore.setState({
+      commitTable: vi.fn(async () => {
+        commitTableSpy()
+        return true
+      }) as never,
+    })
+    vi.mocked(knowledgeExportText).mockReset()
+    vi.mocked(pickSavePath).mockReset()
+  })
+  afterEach(() => {
+    cleanup()
+    vi.useRealTimers()
+  })
+
+  it('filter lives in a body portal popover; Esc closes it; × closes it', () => {
+    render(<TableEditor tableId="tbl_1" />)
+    fireEvent.click(screen.getByTestId('table-filter'))
+    const panel = screen.getByTestId('table-filter-panel')
+    expect(screen.getByTestId('table-grid').contains(panel)).toBe(false)
+    expect(document.body.contains(panel)).toBe(true)
+    // Esc 关闭
+    fireEvent.click(screen.getByTestId('table-filter'))
+    fireEvent.click(screen.getByTestId('table-filter'))
+    expect(screen.getByTestId('table-filter-panel')).toBeTruthy()
+    fireEvent.keyDown(document, { key: 'Escape' })
+    expect(screen.queryByTestId('table-filter-panel')).toBeNull()
+    // × 关闭
+    fireEvent.click(screen.getByTestId('table-filter'))
+    fireEvent.click(screen.getByTestId('table-filter-close'))
+    expect(screen.queryByTestId('table-filter-panel')).toBeNull()
+  })
+
+  it('column menu shows stats section even when Σ is off; choosing a mode turns Σ on', () => {
+    render(<TableEditor tableId="tbl_1" />)
+    // Σ 未开
+    expect(screen.queryByTestId('table-stats-row')).toBeNull()
+    // 列菜单打开 → 统计区块常驻
+    fireEvent.click(screen.getByTestId('table-col-more-1'))
+    expect(screen.getByTestId('table-col-stats-avg')).toBeTruthy()
+    // 选均值 → 自动开 Σ + 统计行
+    fireEvent.click(screen.getByTestId('table-col-stats-avg'))
+    expect(screen.getByTestId('table-stats-row')).toBeTruthy()
+    expect(screen.getByTestId('table-stats-row').querySelector('[data-stats-cell="1"]')!.textContent).toBe('200')
+    // Σ 按钮激活
+    expect(screen.getByTestId('table-stats').className).toContain('bg-btn-primary')
+  })
+
+  it('saved state is silent (no visible status text when idle)', () => {
+    render(<TableEditor tableId="tbl_1" />)
+    // idle：状态栏右侧无保存文案
+    expect(screen.queryByTestId('table-save-retry')).toBeNull()
+    expect(screen.getByTestId('table-editor-status').textContent).not.toContain('saving')
+    expect(screen.getByTestId('table-editor-status').textContent).not.toContain('saved')
+  })
+
+  it('export while filtered shows full-data note toast', async () => {
+    vi.mocked(pickSavePath).mockResolvedValueOnce('/tmp/t.csv')
+    vi.mocked(knowledgeExportText).mockResolvedValueOnce(undefined)
+    render(<TableEditor tableId="tbl_1" />)
+    fireEvent.click(screen.getByTestId('table-filter'))
+    fireEvent.click(screen.getByTestId('table-filter-add'))
+    fireEvent.change(screen.getByTestId('table-filter-value-0'), { target: { value: 'x' } })
+    fireEvent.click(screen.getByTestId('table-export'))
+    await vi.waitFor(() => {
+      expect(knowledgeExportText).toHaveBeenCalledTimes(1)
+    })
+    const { toast } = await import('sonner')
+    expect(vi.mocked(toast.info)).toHaveBeenCalledWith('knowledge.table.toolbar.exportFullNote')
   })
 })

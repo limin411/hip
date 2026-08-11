@@ -2728,6 +2728,9 @@ export const en = {
           emptyHint: 'Double-click a cell to start typing',
           firstCellHint: 'Double-click to enter',
         },
+        edit: {
+          invalidValue: 'Invalid input for {{type}} column; not saved',
+        },
         toolbar: {
           undo: 'Undo',
           redo: 'Redo',

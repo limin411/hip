@@ -311,19 +311,19 @@ describe('TableEditor PR-4 (undo/resize/drag/freeze)', () => {
     fireEvent.change(input, { target: { value: 'AA' } })
     fireEvent.keyDown(input, { key: 'Enter' })
     expect(document.querySelector('td[data-cell="0,0"]')!.textContent).toContain('AA')
-    // 编辑 0,1 → 'BB'
+    // 编辑 0,1（数字列）→ '250'（合法数字）
     fireEvent.doubleClick(screen.getByTestId('table-cell-0-1'))
     input = screen.getByTestId('table-cell-input') as HTMLInputElement
-    fireEvent.change(input, { target: { value: 'BB' } })
+    fireEvent.change(input, { target: { value: '250' } })
     fireEvent.keyDown(input, { key: 'Enter' })
-    expect(document.querySelector('td[data-cell="0,1"]')!.textContent).toContain('BB')
+    expect(document.querySelector('td[data-cell="0,1"]')!.textContent).toContain('250')
     // ⌘Z → 回到 AA
     fireEvent.keyDown(grid, { key: 'z', metaKey: true })
     expect(document.querySelector('td[data-cell="0,1"]')!.textContent).toContain('100')
     expect(document.querySelector('td[data-cell="0,0"]')!.textContent).toContain('AA')
-    // ⇧⌘Z → 重做 BB
+    // ⇧⌘Z → 重做 250
     fireEvent.keyDown(grid, { key: 'z', metaKey: true, shiftKey: true })
-    expect(document.querySelector('td[data-cell="0,1"]')!.textContent).toContain('BB')
+    expect(document.querySelector('td[data-cell="0,1"]')!.textContent).toContain('250')
     // 按钮状态
     expect(screen.getByTestId('table-undo')).not.toBeDisabled()
   })
@@ -557,5 +557,142 @@ describe('TableEditor PR-6 (title inline edit)', () => {
     fireEvent.keyDown(input, { key: 'Escape' })
     const node = useKnowledgeStore.getState().nodes.find((n) => n.id === 'tbl_1')
     expect(node?.title).toBe('预算')
+  })
+})
+
+describe('TableEditor table-ux-notion PR-2 (focus loop + typed editing)', () => {
+  beforeEach(() => {
+    mountTable()
+    useKnowledgeStore.setState({
+      commitTable: vi.fn(async () => {
+        commitTableSpy()
+        return true
+      }) as never,
+    })
+  })
+  afterEach(() => {
+    cleanup()
+    vi.useRealTimers()
+  })
+
+  it('T1: cell click returns focus to grid (keyboard works right after mouse)', () => {
+    render(<TableEditor tableId="tbl_1" />)
+    fireEvent.click(document.querySelector('td[data-cell="1,0"]')!)
+    expect(document.activeElement).toBe(screen.getByTestId('table-grid'))
+    // 提交编辑后焦点仍在网格
+    fireEvent.doubleClick(document.querySelector('td[data-cell="0,0"]')!)
+    const input = screen.getByTestId('table-cell-input')
+    fireEvent.change(input, { target: { value: '焦点' } })
+    fireEvent.keyDown(input, { key: 'Enter' })
+    expect(document.activeElement).toBe(screen.getByTestId('table-grid'))
+  })
+
+  it('T2: text column edits with textarea; Shift+Enter inserts newline, Enter commits and moves down', () => {
+    render(<TableEditor tableId="tbl_1" />)
+    fireEvent.doubleClick(document.querySelector('td[data-cell="0,0"]')!)
+    const ta = screen.getByTestId('table-cell-input') as HTMLTextAreaElement
+    expect(ta.tagName).toBe('TEXTAREA')
+    fireEvent.change(ta, { target: { value: '第一行' } })
+    fireEvent.keyDown(ta, { key: 'Enter', shiftKey: true })
+    // Shift+Enter 不提交，仅在 textarea 中换行（value 由原生追加，此处验证编辑态仍在）
+    expect(screen.getByTestId('table-cell-input')).toBeTruthy()
+    fireEvent.change(screen.getByTestId('table-cell-input'), { target: { value: '第一行\n第二行' } })
+    fireEvent.keyDown(screen.getByTestId('table-cell-input'), { key: 'Enter' })
+    // 提交后单元格含换行
+    expect(document.querySelector('td[data-cell="0,0"]')!.textContent).toContain('第一行')
+    // 选区下移一格
+    expect(document.querySelector('td[data-cell="1,0"]')!.className).toContain('outline')
+  })
+
+  it('T2: number column rejects non-numeric input (err + not persisted), accepts valid', () => {
+    render(<TableEditor tableId="tbl_1" />)
+    fireEvent.doubleClick(document.querySelector('td[data-cell="0,1"]')!)
+    const input = screen.getByTestId('table-cell-input') as HTMLInputElement
+    expect(input.tagName).toBe('INPUT')
+    fireEvent.change(input, { target: { value: 'abc' } })
+    fireEvent.keyDown(input, { key: 'Enter' })
+    // 校验失败：保持编辑 + err 样式 + 不落盘
+    expect(screen.getByTestId('table-cell-input')).toBeTruthy()
+    expect((screen.getByTestId('table-cell-input') as HTMLElement).className).toContain('border-danger')
+    expect(useKnowledgeStore.getState().tableDraft?.csv).not.toContain('abc')
+    // 修正为合法值 → 提交落盘
+    fireEvent.change(screen.getByTestId('table-cell-input'), { target: { value: '250' } })
+    fireEvent.keyDown(screen.getByTestId('table-cell-input'), { key: 'Enter' })
+    expect(useKnowledgeStore.getState().tableDraft?.csv).toContain('250')
+  })
+
+  it('T2: date column edits with date input control', () => {
+    useKnowledgeStore.setState({
+      tableDoc: {
+        id: 'tbl_1',
+        csv: '2024-01-01\n',
+        meta: JSON.stringify({ cols: [{ id: 'col_1', name: '日期', type: 'date', width: 150 }] }),
+      },
+      tableDraft: {
+        id: 'tbl_1',
+        csv: '2024-01-01\n',
+        meta: JSON.stringify({ cols: [{ id: 'col_1', name: '日期', type: 'date', width: 150 }] }),
+      },
+    })
+    render(<TableEditor tableId="tbl_1" />)
+    fireEvent.doubleClick(document.querySelector('td[data-cell="0,0"]')!)
+    const input = screen.getByTestId('table-cell-input') as HTMLInputElement
+    expect(input.type).toBe('date')
+    fireEvent.change(input, { target: { value: '2024-06-15' } })
+    fireEvent.keyDown(input, { key: 'Enter' })
+    expect(useKnowledgeStore.getState().tableDraft?.csv).toContain('2024-06-15')
+  })
+
+  it('T2: Tab from edit commits and moves to next cell; last-col Tab wraps to next row', () => {
+    // 末列改为 text（select 列不可 dblclick 编辑）
+    useKnowledgeStore.setState({
+      tableDoc: {
+        id: 'tbl_1',
+        csv: CSV,
+        meta: JSON.stringify({
+          cols: [
+            { id: 'col_1', name: '任务', type: 'text', width: 150 },
+            { id: 'col_2', name: '预算', type: 'number', width: 150 },
+            { id: 'col_3', name: '备注', type: 'text', width: 150 },
+          ],
+        }),
+      },
+      tableDraft: {
+        id: 'tbl_1',
+        csv: CSV,
+        meta: JSON.stringify({
+          cols: [
+            { id: 'col_1', name: '任务', type: 'text', width: 150 },
+            { id: 'col_2', name: '预算', type: 'number', width: 150 },
+            { id: 'col_3', name: '备注', type: 'text', width: 150 },
+          ],
+        }),
+      },
+    })
+    render(<TableEditor tableId="tbl_1" />)
+    fireEvent.doubleClick(document.querySelector('td[data-cell="0,0"]')!)
+    let input = screen.getByTestId('table-cell-input') as HTMLInputElement
+    fireEvent.change(input, { target: { value: '制表' } })
+    fireEvent.keyDown(input, { key: 'Tab' })
+    expect(document.querySelector('td[data-cell="0,0"]')!.textContent).toContain('制表')
+    expect(document.querySelector('td[data-cell="0,1"]')!.className).toContain('outline')
+    // 末列 Tab → 下一行首列
+    fireEvent.doubleClick(document.querySelector('td[data-cell="0,2"]')!)
+    input = screen.getByTestId('table-cell-input') as HTMLInputElement
+    fireEvent.change(input, { target: { value: '末列' } })
+    fireEvent.keyDown(input, { key: 'Tab' })
+    expect(document.querySelector('td[data-cell="1,0"]')!.className).toContain('outline')
+  })
+
+  it('T2: Enter on last visible row appends a row (edited value persisted)', () => {
+    render(<TableEditor tableId="tbl_1" />)
+    fireEvent.doubleClick(document.querySelector('td[data-cell="2,0"]')!)
+    const input = screen.getByTestId('table-cell-input') as HTMLInputElement
+    fireEvent.change(input, { target: { value: '尾行' } })
+    fireEvent.keyDown(input, { key: 'Enter' })
+    expect(useKnowledgeStore.getState().tableDraft?.csv.split('\n')).toHaveLength(4)
+    expect(useKnowledgeStore.getState().tableDraft?.csv).toContain('尾行')
+    // 新行落在选区
+    expect(document.querySelector('td[data-cell="3,0"]')!.className).toContain('outline')
   })
 })

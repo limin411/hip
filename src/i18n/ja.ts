@@ -2631,6 +2631,9 @@ export const ja = {
         emptyHint: "セルをダブルクリックして入力",
         firstCellHint: "ダブルクリックで入力",
       },
+      edit: {
+        invalidValue: "{{type}}列に無効な入力のため保存しません",
+      },
       toolbar: {
         undo: "元に戻す",
         redo: "やり直す",

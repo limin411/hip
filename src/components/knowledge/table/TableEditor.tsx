@@ -82,7 +82,14 @@ export function TableEditor({ tableId }: { tableId: string }) {
     csvToTable(draft?.csv ?? '', draft?.meta ?? ''),
   )
   const [sel, setSel] = useState<CellPos>({ ri: 0, ci: 0 })
-  const [editing, setEditing] = useState<{ ri: number; ci: number; value: string } | null>(null)
+  const [editing, setEditing] = useState<{ ri: number; ci: number; value: string; err?: boolean } | null>(null)
+  /** 同步 ref：input 卸载时 blur 会带着旧闭包触发，需以最新值判定。 */
+  const editingRef = useRef(editing)
+  editingRef.current = editing
+  const setEditingSync = (v: typeof editing) => {
+    editingRef.current = v
+    setEditing(v)
+  }
   const [colMenuCi, setColMenuCi] = useState<number | null>(null)
   const [rowMenuRi, setRowMenuRi] = useState<number | null>(null)
   const [renamingCi, setRenamingCi] = useState<number | null>(null)
@@ -151,7 +158,7 @@ export function TableEditor({ tableId }: { tableId: string }) {
     setColMenuCi(null)
     setRowMenuRi(null)
     setSelectPopup(null)
-    setEditing(null)
+    setEditingSync(null)
     setSortState(snap.sort)
     onChange(snap.table, { history: false })
   }
@@ -194,15 +201,86 @@ export function TableEditor({ tableId }: { tableId: string }) {
   const colName = (ci: number) =>
     table.cols[ci]?.name?.trim() || t('knowledge.table.columnLabel', { n: ci + 1 })
 
-  const commitEdit = () => {
-    if (!editing) return
-    const { ri, ci, value } = editing
-    const next = structuredClone(table)
+  const gridRef = useRef<HTMLTableElement>(null)
+  /** 焦点闭环（T1）：任何鼠标操作后键盘焦点回到网格，保证方向键/Enter 直接可用。 */
+  const focusGrid = () => {
+    gridRef.current?.focus()
+  }
+
+  const cancelEdit = () => {
+    setEditingSync(null)
+    focusGrid()
+  }
+
+  const editValueValid = (ci: number, value: string): boolean => {
+    const type = table.cols[ci]?.type
+    if (type === 'number') {
+      if (value.trim() === '') return true
+      return Number.isFinite(Number(value.replace(/[,¥$€£\s]/g, '')))
+    }
+    if (type === 'date') {
+      if (value.trim() === '') return true
+      return /^\d{4}-\d{2}-\d{2}$/.test(value.trim())
+    }
+    return true
+  }
+
+  /**
+   * 提交编辑。`move` 为提交后的落点（编辑态 Enter 下移 / Tab 换位）；
+   * 校验失败时：Enter 保持编辑并标红（err 位），blur 回退不落盘。
+   */
+  const commitEdit = (move?: { dr?: number; dc?: number }, fromBlur = false) => {
+    const cur = editingRef.current
+    if (!cur) return
+    const { ri, ci, value } = cur
+    const valid = editValueValid(ci, value)
+    if (!valid) {
+      if (fromBlur) {
+        // 离开编辑且值非法：回退，不落盘（Notion 语义）
+        setEditingSync(null)
+        focusGrid()
+        return
+      }
+      setEditingSync({ ...(editingRef.current as NonNullable<typeof editing>), err: true })
+      toast.warning(
+        t('knowledge.table.edit.invalidValue', {
+          type: t(`knowledge.table.types.${table.cols[ci]?.type ?? 'text'}`),
+        }),
+      )
+      return
+    }
+    let next = structuredClone(table)
     next.rows[ri] = [...next.rows[ri]]
     next.rows[ri][ci] = value
+    // 一次落盘：写入 + 可选步进（末行/末列自动加行），避免旧闭包加行覆盖新值
+    let target = { ri, ci }
+    if (move) {
+      let nr = ri + (move.dr ?? 0)
+      let nc = ci + (move.dc ?? 0)
+      if (nc >= next.cols.length) {
+        nc = 0
+        nr += 1
+      }
+      if (nc < 0) {
+        nc = next.cols.length - 1
+        nr -= 1
+      }
+      if (nr < 0) {
+        nr = 0
+        nc = 0
+      }
+      if (nr >= next.rows.length) {
+        next = {
+          cols: next.cols,
+          rows: [...next.rows.map((r) => [...r]), Array(next.cols.length).fill('')],
+        }
+      }
+      target = { ri: Math.min(nr, next.rows.length), ci: nc }
+    }
     onChange(next)
-    setEditing(null)
-    setSel({ ri, ci })
+    setEditingSync(null)
+    setSel(target)
+    focusGrid()
   }
 
   const setCell = (ri: number, ci: number, value: string) => {
@@ -288,7 +366,7 @@ export function TableEditor({ tableId }: { tableId: string }) {
         break
       case 'F2':
         e.preventDefault()
-        setEditing({ ri, ci, value: table.rows[ri]?.[ci] ?? '' })
+        setEditingSync({ ri, ci, value: table.rows[ri]?.[ci] ?? '' })
         break
       case 'Escape':
         setColMenuCi(null)
@@ -299,7 +377,7 @@ export function TableEditor({ tableId }: { tableId: string }) {
         // 直接输入字符进入编辑（单字符、非组合键）。
         if (e.key.length === 1 && !e.nativeEvent.isComposing) {
           e.preventDefault()
-          setEditing({ ri, ci, value: e.key })
+          setEditingSync({ ri, ci, value: e.key })
         }
     }
   }
@@ -917,11 +995,12 @@ export function TableEditor({ tableId }: { tableId: string }) {
         ref={wrapRef}
       >
         <table
-          className="grid-table w-max border-collapse select-none"
+          className="grid-table w-max border-collapse select-none outline-none focus-visible:outline-2 focus-visible:outline-[var(--accent-strong)]"
           data-testid="table-grid"
           data-cols={table.cols.length}
           data-rows={table.rows.length}
           tabIndex={0}
+          ref={gridRef}
           onKeyDown={handleGridKeyDown}
         >
           <thead>
@@ -1256,31 +1335,86 @@ export function TableEditor({ tableId }: { tableId: string }) {
                   const value = row[ci] ?? ''
                   const isSel = sel.ri === ri && sel.ci === ci
                   const isEditing = editing?.ri === ri && editing?.ci === ci
+                  const isTextLike = col.type === 'text'
                   const cellContent = (() => {
                     if (isEditing) {
-                      return (
+                      const editClass = cn(
+                        'w-full min-w-0 rounded-sm border bg-surface px-1 text-body text-ink outline-none',
+                        editing.err
+                          ? 'border-danger ring-1 ring-danger/40'
+                          : 'border-accent',
+                        isTextLike && 'resize-none leading-snug',
+                      )
+                      // 文本列：textarea（Shift+Enter 换行，行高自适应）；日期列：date 控件；其余：普通 input
+                      return isTextLike ? (
+                        <textarea
+                          autoFocus
+                          data-testid="table-cell-input"
+                          rows={1}
+                          value={editing.value}
+                          onChange={(e) => setEditingSync({ ...(editingRef.current as NonNullable<typeof editing>), value: e.target.value, err: false })}
+                          onInput={(e) => {
+                            const el = e.currentTarget
+                            el.style.height = 'auto'
+                            el.style.height = `${Math.max(24, el.scrollHeight)}px`
+                          }}
+                          onKeyDown={(e) => {
+                            e.stopPropagation()
+                            if (e.key === 'Enter' && !e.shiftKey) {
+                              e.preventDefault()
+                              commitEdit({ dr: 1 })
+                            } else if (e.key === 'Tab') {
+                              e.preventDefault()
+                              commitEdit({ dc: e.shiftKey ? -1 : 1 }, true)
+                            } else if (e.key === 'Escape') {
+                              cancelEdit()
+                            }
+                          }}
+                          onBlur={() => commitEdit(undefined, true)}
+                          className={cn(editClass, 'h-6')}
+                        />
+                      ) : col.type === 'date' ? (
+                        <input
+                          autoFocus
+                          type="date"
+                          data-testid="table-cell-input"
+                          value={editing.value}
+                          onChange={(e) => setEditingSync({ ...(editingRef.current as NonNullable<typeof editing>), value: e.target.value, err: false })}
+                          onKeyDown={(e) => {
+                            e.stopPropagation()
+                            if (e.key === 'Enter') {
+                              e.preventDefault()
+                              commitEdit({ dr: 1 })
+                            } else if (e.key === 'Tab') {
+                              e.preventDefault()
+                              commitEdit({ dc: e.shiftKey ? -1 : 1 }, true)
+                            } else if (e.key === 'Escape') {
+                              cancelEdit()
+                            }
+                          }}
+                          onBlur={() => commitEdit(undefined, true)}
+                          className={cn(editClass, 'h-6 tabular-nums')}
+                        />
+                      ) : (
                         <input
                           autoFocus
                           data-testid="table-cell-input"
                           value={editing.value}
-                          onChange={(e) => setEditing({ ...editing, value: e.target.value })}
+                          onChange={(e) => setEditingSync({ ...(editingRef.current as NonNullable<typeof editing>), value: e.target.value, err: false })}
                           onKeyDown={(e) => {
                             e.stopPropagation()
                             if (e.key === 'Enter') {
-                              if (e.shiftKey) {
-                                setEditing({ ...editing, value: editing.value + '\n' })
-                              } else {
-                                commitEdit()
-                              }
+                              e.preventDefault()
+                              commitEdit({ dr: 1 })
                             } else if (e.key === 'Tab') {
-                              commitEdit()
-                              setSel({ ri, ci: ci + 1 })
+                              e.preventDefault()
+                              commitEdit({ dc: e.shiftKey ? -1 : 1 }, true)
                             } else if (e.key === 'Escape') {
-                              setEditing(null)
+                              cancelEdit()
                             }
                           }}
-                          onBlur={() => commitEdit()}
-                          className="h-full w-full min-w-0 rounded-sm border border-accent bg-surface px-1 text-body text-ink outline-none"
+                          onBlur={() => commitEdit(undefined, true)}
+                          className={cn(editClass, 'h-6')}
                         />
                       )
                     }
@@ -1369,14 +1503,16 @@ export function TableEditor({ tableId }: { tableId: string }) {
                         if (col.type === 'checkbox') return
                         if (col.type === 'select') {
                           setSelectPopup(selectPopup?.ri === ri && selectPopup?.ci === ci ? null : { ri, ci })
+                          focusGrid()
                           return
                         }
                         setSel({ ri, ci })
+                        focusGrid()
                       }}
                       onDoubleClick={(e) => {
                         e.stopPropagation()
                         if (col.type === 'checkbox' || col.type === 'select') return
-                        setEditing({ ri, ci, value })
+                        setEditingSync({ ri, ci, value })
                       }}
                       className={cn(
                         cellClass,

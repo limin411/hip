@@ -2668,6 +2668,9 @@ export const zhCN = {
           emptyHint: '双击单元格开始输入',
           firstCellHint: '双击输入',
         },
+        edit: {
+          invalidValue: '{{type}}列不接受该输入，未保存',
+        },
         toolbar: {
           undo: '撤销',
           redo: '重做',

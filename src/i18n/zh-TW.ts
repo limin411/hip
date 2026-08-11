@@ -2633,6 +2633,9 @@ export const zhTW = {
         emptyHint: "雙擊儲存格開始輸入",
         firstCellHint: "雙擊輸入",
       },
+      edit: {
+        invalidValue: "{{type}}欄不接受此輸入，未儲存",
+      },
       toolbar: {
         undo: "復原",
         redo: "重做",

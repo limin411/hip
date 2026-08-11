@@ -2631,6 +2631,9 @@ export const ko = {
         emptyHint: "셀을 더블클릭하여 입력",
         firstCellHint: "더블클릭하여 입력",
       },
+      edit: {
+        invalidValue: "{{type}} 열에 잘못된 입력입니다. 저장되지 않았습니다",
+      },
       toolbar: {
         undo: "실행 취소",
         redo: "다시 실행",

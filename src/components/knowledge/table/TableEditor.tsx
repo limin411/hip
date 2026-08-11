@@ -20,18 +20,24 @@ import {
   Hash,
   MoreHorizontal,
   Plus,
+  Redo2,
+  Snowflake,
   Table2,
   Type,
+  Undo2,
 } from 'lucide-react'
 import { useKnowledgeStore } from '@/store/knowledgeStore'
 import { cn } from '@/lib/utils'
 import {
+  clampWidth,
   createColumn,
+  createTableHistory,
   csvToTable,
   metaFromTable,
   tableToCsv,
   type TableColType,
   type TableData,
+  type TableSnapshot,
 } from '@/domain/knowledge/tableModel'
 
 const TYPE_ICONS: Record<TableColType, typeof Type> = {
@@ -67,6 +73,13 @@ export function TableEditor({ tableId }: { tableId: string }) {
   const [renameText, setRenameText] = useState('')
   const [selectPopup, setSelectPopup] = useState<CellPos | null>(null)
   const [newOptionText, setNewOptionText] = useState('')
+  const [freezeHeader, setFreezeHeader] = useState(true)
+  /** 撤销栈版本戳：任何 push/undo/redo 后 +1 以刷新按钮启用态。 */
+  const [histTick, setHistTick] = useState(0)
+
+  const historyRef = useRef(createTableHistory())
+  const tableRef = useRef(table)
+  tableRef.current = table
 
   const saveTimer = useRef<number | null>(null)
   const commitRef = useRef(commitTable)
@@ -76,8 +89,10 @@ export function TableEditor({ tableId }: { tableId: string }) {
   const idRef = useRef(tableId)
   idRef.current = tableId
 
-  /** 变更入口：更新本地状态 → 同步 store 草稿 → 防抖落盘。 */
-  const onChange = (next: TableData) => {
+  /** 变更入口：更新本地状态 → 同步 store 草稿 → 防抖落盘。
+   *  默认推入历史（变更后快照）；`history: false` 用于拖拽 live 态。 */
+  const onChange = (next: TableData, opts?: { history?: boolean }) => {
+    tableRef.current = next
     setTable(next)
     const csv = tableToCsv(next)
     const meta = JSON.stringify(metaFromTable(next))
@@ -87,7 +102,46 @@ export function TableEditor({ tableId }: { tableId: string }) {
       saveTimer.current = null
       void commitRef.current(idRef.current)
     }, 800)
+    if (opts?.history !== false) {
+      historyRef.current.push({ table: next, sort: null })
+      setHistTick((t) => t + 1)
+    }
   }
+
+  /** 拖拽等 live 变更结束后补推一步历史（当前状态入栈）。 */
+  const pushHistoryStep = () => {
+    historyRef.current.push({ table: tableRef.current, sort: null })
+    setHistTick((t) => t + 1)
+  }
+
+  const applySnapshot = (snap: TableSnapshot) => {
+    setSel({ ri: 0, ci: 0 })
+    setColMenuCi(null)
+    setRowMenuRi(null)
+    setSelectPopup(null)
+    setEditing(null)
+    onChange(snap.table, { history: false })
+  }
+
+  const undo = () => {
+    const snap = historyRef.current.undo()
+    if (!snap) return
+    setHistTick((t) => t + 1)
+    applySnapshot(snap)
+  }
+
+  const redo = () => {
+    const snap = historyRef.current.redo()
+    if (!snap) return
+    setHistTick((t) => t + 1)
+    applySnapshot(snap)
+  }
+
+  // 打开时初始化历史基线。
+  useEffect(() => {
+    historyRef.current.reset({ table: tableRef.current, sort: null })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tableId])
 
   // 卸载时冲刷未落盘草稿（门禁兜底）。
   useEffect(() => {
@@ -134,7 +188,15 @@ export function TableEditor({ tableId }: { tableId: string }) {
 
   /** 网格键盘导航（选中态）。编辑态由 input 自行处理。 */
   const handleGridKeyDown = (e: React.KeyboardEvent) => {
-    if (e.metaKey || e.ctrlKey || e.altKey) return
+    if (e.metaKey || e.ctrlKey) {
+      if (e.key.toLowerCase() === 'z') {
+        e.preventDefault()
+        if (e.shiftKey) redo()
+        else undo()
+      }
+      return
+    }
+    if (e.altKey) return
     const { ri, ci } = sel
     switch (e.key) {
       case 'Enter': {
@@ -301,9 +363,175 @@ export function TableEditor({ tableId }: { tableId: string }) {
     [t, table.rows.length, table.cols.length],
   )
 
+  const canUndo = useMemo(() => historyRef.current.canUndo(), [histTick, table])
+  const canRedo = useMemo(() => historyRef.current.canRedo(), [histTick, table])
+
   const backToBrowse = () => {
     void useKnowledgeStore.getState().backToBrowse()
   }
+
+  // ── 列宽拖拽 + 双击自适应 ────────────────────────────────────────────
+  const resizeRef = useRef<{ ci: number; startX: number; startW: number } | null>(null)
+  const onResizeDown = (e: React.PointerEvent, ci: number) => {
+    e.preventDefault()
+    e.stopPropagation()
+    const startX = e.clientX
+    const startW = tableRef.current.cols[ci]?.width ?? 150
+    resizeRef.current = { ci, startX, startW }
+    const onMove = (ev: PointerEvent) => {
+      const r = resizeRef.current
+      if (!r) return
+      const t = tableRef.current
+      const cols = t.cols.map((c, i) =>
+        i === r.ci ? { ...c, width: clampWidth(r.startW + (ev.clientX - r.startX)) } : c,
+      )
+      onChange({ cols, rows: t.rows }, { history: false })
+    }
+    const onUp = () => {
+      resizeRef.current = null
+      window.removeEventListener('pointermove', onMove)
+      window.removeEventListener('pointerup', onUp)
+      // 拖拽全程为 live 态；结束时补推一步，撤销可恢复原宽。
+      pushHistoryStep()
+    }
+    window.addEventListener('pointermove', onMove)
+    window.addEventListener('pointerup', onUp)
+  }
+
+  const onResizeDbl = (ci: number) => {
+    const t = tableRef.current
+    const maxLen = Math.max(
+      ...t.rows.map((r) => (r[ci] ?? '').length),
+      colName(ci).length,
+      1,
+    )
+    const cols = t.cols.map((c, i) =>
+      i === ci ? { ...c, width: clampWidth(Math.max(64, maxLen * 8 + 28)) } : c,
+    )
+    onChange({ cols, rows: t.rows })
+  }
+
+  // ── 列拖拽重排 ───────────────────────────────────────────────────────
+  const colDragRef = useRef<{
+    ci: number
+    startX: number
+    overCi: number
+    after: boolean
+  } | null>(null)
+  const [colDrag, setColDrag] = useState<{ ci: number; overCi: number; after: boolean } | null>(null)
+  const onColDragDown = (e: React.PointerEvent, ci: number) => {
+    e.preventDefault()
+    e.stopPropagation()
+    colDragRef.current = { ci, startX: e.clientX, overCi: ci, after: false }
+    setColDrag({ ci, overCi: ci, after: false })
+    const onMove = (ev: PointerEvent) => {
+      const d = colDragRef.current
+      if (!d) return
+      const wrap = wrapRef.current
+      if (!wrap) return
+      const ths = [...wrap.querySelectorAll<HTMLElement>('thead th[data-col]')]
+      let overCi = d.ci
+      let after = false
+      for (const th of ths) {
+        const r = th.getBoundingClientRect()
+        const ci = Number(th.dataset.col)
+        if (ci === d.ci) continue
+        if (ev.clientX >= r.left && ev.clientX <= r.right) {
+          overCi = ci
+          after = ev.clientX > r.left + r.width / 2
+          break
+        }
+      }
+      if (overCi !== d.overCi || after !== d.after) {
+        d.overCi = overCi
+        d.after = after
+        setColDrag({ ci: d.ci, overCi, after })
+      }
+    }
+    const onUp = () => {
+      const d = colDragRef.current
+      colDragRef.current = null
+      setColDrag(null)
+      window.removeEventListener('pointermove', onMove)
+      window.removeEventListener('pointerup', onUp)
+      if (!d) return
+      const from = d.ci
+      let to = d.overCi
+      if (to === from) return
+      if (d.after && to > from) to += 1
+      else if (!d.after && to < from) to += 1
+      const t = tableRef.current
+      const cols = [...t.cols]
+      const [moved] = cols.splice(from, 1)
+      cols.splice(to - (from < to ? 1 : 0), 0, moved)
+      const rows = t.rows.map((r) => {
+        const nr = [...r]
+        const [v] = nr.splice(from, 1)
+        nr.splice(to - (from < to ? 1 : 0), 0, v)
+        return nr
+      })
+      onChange({ cols, rows })
+    }
+    window.addEventListener('pointermove', onMove)
+    window.addEventListener('pointerup', onUp)
+  }
+
+  // ── 行拖拽移动 ───────────────────────────────────────────────────────
+  const rowDragRef = useRef<{ ri: number; overRi: number; after: boolean } | null>(null)
+  const [rowDrag, setRowDrag] = useState<{ ri: number; overRi: number; after: boolean } | null>(null)
+  const onRowDragDown = (e: React.PointerEvent, ri: number) => {
+    e.preventDefault()
+    e.stopPropagation()
+    rowDragRef.current = { ri, overRi: ri, after: false }
+    setRowDrag({ ri, overRi: ri, after: false })
+    const onMove = (ev: PointerEvent) => {
+      const d = rowDragRef.current
+      if (!d) return
+      const wrap = wrapRef.current
+      if (!wrap) return
+      const trs = [...wrap.querySelectorAll<HTMLElement>('tbody tr[data-row]')]
+      let overRi = d.ri
+      let after = false
+      for (const tr of trs) {
+        const r = tr.getBoundingClientRect()
+        const ri2 = Number(tr.dataset.row)
+        if (ri2 === d.ri) continue
+        if (ev.clientY >= r.top && ev.clientY <= r.bottom) {
+          overRi = ri2
+          after = ev.clientY > r.top + r.height / 2
+          break
+        }
+      }
+      if (overRi !== d.overRi || after !== d.after) {
+        d.overRi = overRi
+        d.after = after
+        setRowDrag({ ri: d.ri, overRi, after })
+      }
+    }
+    const onUp = () => {
+      const d = rowDragRef.current
+      rowDragRef.current = null
+      setRowDrag(null)
+      window.removeEventListener('pointermove', onMove)
+      window.removeEventListener('pointerup', onUp)
+      if (!d) return
+      const from = d.ri
+      const to = d.overRi
+      if (to === from) return
+      let insertAt = to
+      if (d.after && to > from) insertAt += 1
+      else if (!d.after && to < from) insertAt += 1
+      const t = tableRef.current
+      const rows = t.rows.map((r) => [...r])
+      const [moved] = rows.splice(from, 1)
+      rows.splice(insertAt - (from < to ? 1 : 0), 0, moved)
+      onChange({ cols: t.cols, rows })
+    }
+    window.addEventListener('pointermove', onMove)
+    window.addEventListener('pointerup', onUp)
+  }
+
+  const wrapRef = useRef<HTMLDivElement>(null)
 
   const cellClass =
     'min-w-0 truncate border-b border-r border-border px-2 py-1.5 text-body text-ink focus:outline-none'
@@ -342,8 +570,43 @@ export function TableEditor({ tableId }: { tableId: string }) {
           {useKnowledgeStore.getState().nodes.find((n) => n.id === tableId)?.title ??
             t('knowledge.table.untitled')}
         </h1>
-        {/* 工具栏（PR-4/5 激活：撤销/重做/排序/筛选/统计/导出） */}
+        {/* 工具栏（撤销/重做/冻结首行；排序/筛选/统计/导出在 PR-5 激活） */}
         <div className="flex items-center gap-1" data-testid="table-editor-toolbar">
+          <button
+            type="button"
+            data-testid="table-undo"
+            disabled={!canUndo}
+            onClick={undo}
+            title={t('knowledge.table.toolbar.undo')}
+            className="flex h-6 w-6 items-center justify-center rounded-md text-ink-secondary transition-colors hover:bg-state-hover hover:text-ink disabled:pointer-events-none disabled:opacity-30"
+          >
+            <Undo2 size={14} aria-hidden />
+          </button>
+          <button
+            type="button"
+            data-testid="table-redo"
+            disabled={!canRedo}
+            onClick={redo}
+            title={t('knowledge.table.toolbar.redo')}
+            className="flex h-6 w-6 items-center justify-center rounded-md text-ink-secondary transition-colors hover:bg-state-hover hover:text-ink disabled:pointer-events-none disabled:opacity-30"
+          >
+            <Redo2 size={14} aria-hidden />
+          </button>
+          <button
+            type="button"
+            data-testid="table-freeze"
+            aria-pressed={freezeHeader}
+            onClick={() => setFreezeHeader((v) => !v)}
+            title={t('knowledge.table.toolbar.freezeHeader')}
+            className={cn(
+              'flex h-6 items-center gap-1 rounded-md px-1.5 text-meta transition-colors',
+              freezeHeader
+                ? 'bg-state-hover font-medium text-ink'
+                : 'text-ink-tertiary hover:bg-state-hover hover:text-ink',
+            )}
+          >
+            <Snowflake size={13} aria-hidden />
+          </button>
           <span className="rounded-md bg-surface-muted px-2 py-0.5 text-meta text-ink-tertiary">
             {statsLine}
           </span>
@@ -351,7 +614,11 @@ export function TableEditor({ tableId }: { tableId: string }) {
       </div>
 
       {/* 网格 */}
-      <div className="min-h-0 flex-1 overflow-auto" data-testid="table-grid-wrap">
+      <div
+        className="min-h-0 flex-1 overflow-auto"
+        data-testid="table-grid-wrap"
+        ref={wrapRef}
+      >
         <table
           className="grid-table w-max border-collapse select-none"
           data-testid="table-grid"
@@ -384,6 +651,9 @@ export function TableEditor({ tableId }: { tableId: string }) {
                   style={{ width: col.width, minWidth: col.width }}
                   className={cn(
                     'sticky top-0 z-10 h-9 cursor-pointer border-b border-r border-border bg-surface-muted px-2 text-left text-caption font-medium text-ink',
+                    !freezeHeader && 'relative',
+                    colDrag?.ci === ci && 'opacity-40',
+                    colDrag && colDrag.ci !== ci && colDrag.overCi === ci && 'bg-state-hover',
                   )}
                   onClick={(e) => {
                     e.stopPropagation()
@@ -391,6 +661,14 @@ export function TableEditor({ tableId }: { tableId: string }) {
                   }}
                 >
                   <div className="flex items-center gap-1">
+                    <span
+                      className="shrink-0 cursor-grab text-ink-tertiary/50 transition-colors hover:text-ink"
+                      data-testid={`table-col-grip-${ci}`}
+                      title={t('knowledge.table.columnMenu.insertLeft')}
+                      onPointerDown={(e) => onColDragDown(e, ci)}
+                    >
+                      <ArrowUpDown size={11} aria-hidden />
+                    </span>
                     <span className="shrink-0 text-ink-tertiary">
                       {(() => {
                         const Icon = TYPE_ICONS[col.type]
@@ -424,6 +702,16 @@ export function TableEditor({ tableId }: { tableId: string }) {
                     )}
                     <ArrowUpDown size={11} className="shrink-0 text-ink-tertiary/70" aria-hidden />
                   </div>
+                  {/* 列宽拖拽手柄（右缘）+ 双击自适应 */}
+                  <span
+                    data-testid={`table-col-resize-${ci}`}
+                    className="absolute right-0 top-0 z-20 h-full w-1.5 cursor-col-resize transition-colors hover:bg-accent/40"
+                    onPointerDown={(e) => onResizeDown(e, ci)}
+                    onDoubleClick={(e) => {
+                      e.stopPropagation()
+                      onResizeDbl(ci)
+                    }}
+                  />
                   {colMenuCi === ci ? (
                     <div
                       className="absolute left-0 top-full z-30 w-44 rounded-lg border border-border bg-surface py-1 shadow-overlay"
@@ -502,10 +790,22 @@ export function TableEditor({ tableId }: { tableId: string }) {
             {table.rows.map((row, ri) => (
               <tr key={ri} data-row={ri}>
                 <td
-                  className="sticky left-0 z-10 border-b border-r border-border bg-surface-muted text-center text-meta text-ink-tertiary"
+                  className={cn(
+                    'sticky left-0 z-10 border-b border-r border-border bg-surface-muted text-center text-meta text-ink-tertiary',
+                    rowDrag?.ri === ri && 'opacity-40',
+                    rowDrag && rowDrag.ri !== ri && rowDrag.overRi === ri && 'bg-state-hover',
+                  )}
                   data-testid="table-row-idx"
                 >
                   <div className="relative flex h-full items-center justify-center gap-1 py-1.5">
+                    <span
+                      className="cursor-grab text-ink-tertiary/50 transition-colors hover:text-ink"
+                      data-testid={`table-row-grip-${ri}`}
+                      title={t('knowledge.table.rowMenu.insertAbove')}
+                      onPointerDown={(e) => onRowDragDown(e, ri)}
+                    >
+                      <MoreHorizontal size={12} aria-hidden />
+                    </span>
                     <span>{ri + 1}</span>
                     <span
                       className="group relative"

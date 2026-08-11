@@ -1,4 +1,5 @@
 // @vitest-environment happy-dom
+import '@testing-library/jest-dom/vitest'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { render, fireEvent, screen, within, cleanup } from '@testing-library/react'
 import { TableEditor } from './TableEditor'
@@ -243,5 +244,145 @@ describe('TableEditor (knowledge-table PR-3)', () => {
     expect(commitTableSpy).not.toHaveBeenCalled()
     vi.advanceTimersByTime(900)
     expect(commitTableSpy).toHaveBeenCalled()
+  })
+})
+
+describe('TableEditor PR-4 (undo/resize/drag/freeze)', () => {
+  afterEach(() => {
+    cleanup()
+    vi.useRealTimers()
+  })
+  beforeEach(() => {
+    mountTable()
+    useKnowledgeStore.setState({
+      commitTable: vi.fn(async () => {
+        commitTableSpy()
+        return true
+      }) as never,
+    })
+  })
+
+  it('undo/redo restores cell edits; ⌘Z keyboard works', () => {
+    render(<TableEditor tableId="tbl_1" />)
+    const grid = screen.getByTestId('table-grid')
+    // 编辑 0,0 → 'AA'
+    fireEvent.doubleClick(screen.getByTestId('table-cell-0-0'))
+    let input = screen.getByTestId('table-cell-input') as HTMLInputElement
+    fireEvent.change(input, { target: { value: 'AA' } })
+    fireEvent.keyDown(input, { key: 'Enter' })
+    expect(document.querySelector('td[data-cell="0,0"]')!.textContent).toContain('AA')
+    // 编辑 0,1 → 'BB'
+    fireEvent.doubleClick(screen.getByTestId('table-cell-0-1'))
+    input = screen.getByTestId('table-cell-input') as HTMLInputElement
+    fireEvent.change(input, { target: { value: 'BB' } })
+    fireEvent.keyDown(input, { key: 'Enter' })
+    expect(document.querySelector('td[data-cell="0,1"]')!.textContent).toContain('BB')
+    // ⌘Z → 回到 AA
+    fireEvent.keyDown(grid, { key: 'z', metaKey: true })
+    expect(document.querySelector('td[data-cell="0,1"]')!.textContent).toContain('b')
+    expect(document.querySelector('td[data-cell="0,0"]')!.textContent).toContain('AA')
+    // ⇧⌘Z → 重做 BB
+    fireEvent.keyDown(grid, { key: 'z', metaKey: true, shiftKey: true })
+    expect(document.querySelector('td[data-cell="0,1"]')!.textContent).toContain('BB')
+    // 按钮状态
+    expect(screen.getByTestId('table-undo')).not.toBeDisabled()
+  })
+
+  it('column resize via pointer drag updates width (live) and pushes one history step', () => {
+    render(<TableEditor tableId="tbl_1" />)
+    const th = screen.getByTestId('table-grid').querySelector('th[data-col="0"]')!
+    const startW = Number((th as HTMLElement).style.width.replace('px', ''))
+    fireEvent.pointerDown(screen.getByTestId('table-col-resize-0'), { clientX: 500, buttons: 1 })
+    fireEvent.pointerMove(window, { clientX: 560, buttons: 1 })
+    fireEvent.pointerUp(window, { clientX: 560 })
+    const th2 = screen.getByTestId('table-grid').querySelector('th[data-col="0"]')!
+    const endW = Number((th2 as HTMLElement).style.width.replace('px', ''))
+    expect(endW).toBe(startW + 60)
+    // 拖拽计入一次历史：撤销恢复原宽
+    fireEvent.keyDown(screen.getByTestId('table-grid'), { key: 'z', metaKey: true })
+    const th3 = screen.getByTestId('table-grid').querySelector('th[data-col="0"]')!
+    expect(Number((th3 as HTMLElement).style.width.replace('px', ''))).toBe(startW)
+  })
+
+  it('double-click resize handle auto-fits column', () => {
+    render(<TableEditor tableId="tbl_1" />)
+    // 先写入长文本，再双击列边自适应
+    fireEvent.doubleClick(screen.getByTestId('table-cell-0-0'))
+    let input = screen.getByTestId('table-cell-input') as HTMLInputElement
+    fireEvent.change(input, { target: { value: '这是一段用于触发自适应宽度的很长文本' } })
+    fireEvent.keyDown(input, { key: 'Enter' })
+    fireEvent.doubleClick(screen.getByTestId('table-col-resize-0'))
+    const w = Number(
+      (screen.getByTestId('table-grid').querySelector('th[data-col="0"]') as HTMLElement).style.width.replace('px', ''),
+    )
+    expect(w).toBeGreaterThan(150)
+  })
+
+  it('column drag reorders columns with data', () => {
+    render(<TableEditor tableId="tbl_1" />)
+    const ths = [...screen.getByTestId('table-grid').querySelectorAll('th[data-col]')] as HTMLElement[]
+    ths.forEach((th, i) => {
+      Object.defineProperty(th, 'getBoundingClientRect', {
+        value: () => ({ left: 100 + i * 150, right: 250 + i * 150, top: 0, bottom: 36, width: 150, height: 36, x: 100 + i * 150, y: 0, toJSON: () => ({}) }),
+        configurable: true,
+      })
+    })
+    const r0 = ths[0].getBoundingClientRect()
+    const r1 = ths[1].getBoundingClientRect()
+    fireEvent.pointerDown(screen.getByTestId('table-col-grip-0'), { clientX: r0.left + 5, buttons: 1 })
+    // 拖到第 1 列右侧
+    fireEvent.pointerMove(window, { clientX: r1.right - 2, buttons: 1 })
+    fireEvent.pointerUp(window, { clientX: r1.right - 2 })
+    // 列头顺序变了：第 1 列现在是原来的 col_1（预算）
+    const th0 = screen.getByTestId('table-grid').querySelector('th[data-col="0"]')!
+    expect((th0 as HTMLElement).dataset.colId).toBe('col_2')
+    // 数据随动：原 col_1 的值 'b' 移到 col_0，原 'a' 移到 col_1
+    expect(document.querySelector('td[data-cell="0,0"]')!.textContent).toContain('b')
+    expect(document.querySelector('td[data-cell="0,1"]')!.textContent).toContain('a')
+  })
+
+  it('row drag moves row with data', () => {
+    render(<TableEditor tableId="tbl_1" />)
+    const trs = [...screen.getByTestId('table-grid').querySelectorAll('tbody tr[data-row]')] as HTMLElement[]
+    trs.forEach((tr, i) => {
+      Object.defineProperty(tr, 'getBoundingClientRect', {
+        value: () => ({ left: 0, right: 500, top: 36 + i * 36, bottom: 72 + i * 36, width: 500, height: 36, x: 0, y: 36 + i * 36, toJSON: () => ({}) }),
+        configurable: true,
+      })
+    })
+    const r0 = trs[0].getBoundingClientRect()
+    const r1 = trs[1].getBoundingClientRect()
+    fireEvent.pointerDown(screen.getByTestId('table-row-grip-0'), { clientY: r0.top + 5, buttons: 1 })
+    fireEvent.pointerMove(window, { clientY: r1.bottom - 2, buttons: 1 })
+    fireEvent.pointerUp(window, { clientY: r1.bottom - 2 })
+    // 原第 0 行 'a' 下移：row0 现在是原 row1（'1'），row1 是原 row0（'a'）
+    expect(document.querySelector('td[data-cell="0,0"]')!.textContent).toContain('1')
+    expect(document.querySelector('td[data-cell="1,0"]')!.textContent).toContain('a')
+  })
+
+  it('freeze header toggle removes sticky positioning', () => {
+    render(<TableEditor tableId="tbl_1" />)
+    const th = screen.getByTestId('table-grid').querySelector('th[data-col="0"]')!
+    expect((th as HTMLElement).className).toContain('sticky')
+    fireEvent.click(screen.getByTestId('table-freeze'))
+    const th2 = screen.getByTestId('table-grid').querySelector('th[data-col="0"]')!
+    expect((th2 as HTMLElement).className).not.toContain('sticky')
+    expect((th2 as HTMLElement).className).toContain('relative')
+  })
+
+  it('undo restores deleted rows and columns', () => {
+    render(<TableEditor tableId="tbl_1" />)
+    // 删除第 0 行
+    fireEvent.click(screen.getByTestId('table-row-menu-0'))
+    fireEvent.click(within(screen.getByTestId('table-row-menu')).getByText('knowledge.table.rowMenu.deleteRow'))
+    expect(screen.getByTestId('table-grid').dataset.rows).toBe('2')
+    fireEvent.keyDown(screen.getByTestId('table-grid'), { key: 'z', metaKey: true })
+    expect(screen.getByTestId('table-grid').dataset.rows).toBe('3')
+    // 删除第 0 列
+    fireEvent.click(screen.getByTestId('table-grid').querySelector('th[data-col="0"]')!)
+    fireEvent.click(screen.getByTestId('table-col-delete'))
+    expect(screen.getByTestId('table-grid').dataset.cols).toBe('2')
+    fireEvent.keyDown(screen.getByTestId('table-grid'), { key: 'z', metaKey: true })
+    expect(screen.getByTestId('table-grid').dataset.cols).toBe('3')
   })
 })

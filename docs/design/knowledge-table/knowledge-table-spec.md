@@ -189,7 +189,7 @@ export type KnowledgeNodeKind = 'folder' | 'doc' | 'table'   // board 移除后�
 | 侧边栏树 | `DirNavList` 图标映射加 `table`（tree.ts `kindIcon` 级） |
 | 搜索/最近 | 叶子判断扩展；最近列表图标同左 |
 | 模板 | P0 不介入（表格无模板）；P1 扩展 `templates/` 支持 `tpl_*.csv` |
-| i18n | zh-CN / en / zh-TW / ja 四语言全量补 key（见 §7 清单） |
+| i18n | zh-CN / en / zh-TW / ja / ko 五语言全量补 key（见 §7 清单） |
 
 ---
 
@@ -230,7 +230,7 @@ export type KnowledgeNodeKind = 'folder' | 'doc' | 'table'   // board 移除后�
 3. 编辑器：网格渲染、5 种列类型、键盘导航、行列增删/拖拽/列宽、撤销重做、防抖保存、状态栏。
 4. 排序 / 筛选 / 统计行。
 5. 导出 CSV。
-6. 集成：列表/网格图标、批量、拖拽、i18n 四语言。
+6. 集成：列表/网格图标、批量、拖拽、i18n 五语言。
 7. 测试（见 §8）。
 
 ### P1
@@ -253,7 +253,7 @@ export type KnowledgeNodeKind = 'folder' | 'doc' | 'table'   // board 移除后�
 | Store | `src/store/knowledgeStore.ts`：`createTable`、`requestCreateTable`（跳过模板）、编辑器打开路由 |
 | UI | `DocManagerBrowse.tsx`（下拉/空态/图标）、`KnowledgeWorkspace.tsx`（`isTable` 分支）、新增 `components/knowledge/table/`（`TableEditor`、`ColumnMenu`、`FilterPanel`、`StatusBar`） |
 | 菜单 | `context-menu/catalog.ts` + 两个 provider 载荷 |
-| i18n | 4 个语言文件 |
+| i18n | 5 个语言文件 |
 
 ### 6.2 风险与对策
 
@@ -292,7 +292,7 @@ knowledge.table.*
 |---|---|
 | 单测（纯函数） | CSV parse/serialize round-trip（含转义边界）；meta 合并与缺失回退；排序比较器（数字/日期/文本/勾选）；筛选条件求值；统计聚合（可见行）；撤销栈 push/undo/redo/上限 |
 | 组件测试 | 新建下拉三入口渲染；内联命名 Enter/Esc/空标题；编辑器键盘导航矩阵（Tab/Enter/Esc/Delete/方向键）；列菜单类型切换与非法值保留；行列增删与拖拽重排；统计行开关 |
-| e2e | 新建表格 → 编辑多单元格 → 保存 → 重开文件数据不丢；导出 CSV 与文件一致；表格节点参与搜索/批量删除/回收站恢复；i18n 四语言 key 完整（既有 translation-keys 测试自动覆盖） |
+| e2e | 新建表格 → 编辑多单元格 → 保存 → 重开文件数据不丢；导出 CSV 与文件一致；表格节点参与搜索/批量删除/回收站恢复；i18n 五语言 key 完整（既有 translation-keys 测试自动覆盖） |
 
 ---
 
@@ -304,4 +304,4 @@ knowledge.table.*
 4. 排序、筛选、统计行实时生效且互不污染文件内容；
 5. 撤销/重做覆盖全部结构化操作；防抖保存后 `tbl_*.csv`/`meta.json` 落盘正确，重开不丢数据；
 6. 表格节点在列表/网格/侧边栏/搜索/最近/回收站中图标与行为正确；
-7. 四语言 key 齐全；`yarn tsc`、`yarn test` 通过。
+7. 五语言 key 齐全；`yarn tsc`、`yarn test` 通过。

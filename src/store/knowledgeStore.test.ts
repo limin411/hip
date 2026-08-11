@@ -4,6 +4,8 @@ import type { KnowledgeNode } from '@/domain/knowledge/types'
 
 const knowledgeReadDoc = vi.fn()
 const knowledgeWriteDoc = vi.fn()
+const knowledgeReadTable = vi.fn()
+const knowledgeWriteTable = vi.fn()
 const knowledgeGetTree = vi.fn()
 const knowledgeEnsureRoot = vi.fn()
 const knowledgeListSpaces = vi.fn()
@@ -43,6 +45,8 @@ vi.mock('@/ipc/knowledge', () => ({
   knowledgeSaveTree: (...a: unknown[]) => knowledgeSaveTree(...a),
   knowledgeReadDoc: (...a: unknown[]) => knowledgeReadDoc(...a),
   knowledgeWriteDoc: (...a: unknown[]) => knowledgeWriteDoc(...a),
+  knowledgeReadTable: (...a: unknown[]) => knowledgeReadTable(...a),
+  knowledgeWriteTable: (...a: unknown[]) => knowledgeWriteTable(...a),
   knowledgeDeleteDocFile: vi.fn(),
   knowledgeListTemplates: (...a: unknown[]) => knowledgeListTemplates(...a),
   knowledgeSaveTemplate: (...a: unknown[]) => knowledgeSaveTemplate(...a),
@@ -84,6 +88,8 @@ import {
 describe('knowledgeStore openDoc editorMode default', () => {
   beforeEach(() => {
     knowledgeReadDoc.mockReset()
+    knowledgeReadTable.mockReset()
+    knowledgeWriteTable.mockReset()
     knowledgeWriteDoc.mockReset()
     knowledgeGetTree.mockReset()
     knowledgeEnsureRoot.mockReset()
@@ -381,6 +387,8 @@ describe('knowledgeStore flush-abort navigation', () => {
 
   beforeEach(() => {
     knowledgeReadDoc.mockReset()
+    knowledgeReadTable.mockReset()
+    knowledgeWriteTable.mockReset()
     knowledgeWriteDoc.mockReset()
     knowledgeGetTree.mockReset()
     vi.mocked(toast.error).mockClear()
@@ -679,6 +687,8 @@ describe('knowledgeStore openDoc generation (rapid switch)', () => {
   beforeEach(() => {
     knowledgeWriteDoc.mockReset()
     knowledgeReadDoc.mockReset()
+    knowledgeReadTable.mockReset()
+    knowledgeWriteTable.mockReset()
     knowledgeWriteDoc.mockResolvedValue(undefined)
     useKnowledgeStore.setState({
       loaded: true,
@@ -899,6 +909,8 @@ describe('knowledgeStore setEditorMode', () => {
 describe('knowledgeStore loadSpaces early hydrate (cold-start counts)', () => {
   beforeEach(() => {
     knowledgeReadDoc.mockReset()
+    knowledgeReadTable.mockReset()
+    knowledgeWriteTable.mockReset()
     knowledgeGetTree.mockReset()
     knowledgeEnsureRoot.mockReset()
     knowledgeListSpaces.mockReset()
@@ -1024,6 +1036,8 @@ describe('knowledgeStore loadSpaces early hydrate (cold-start counts)', () => {
 describe('knowledgeStore index progress + openSearchHit', () => {
   beforeEach(() => {
     knowledgeReadDoc.mockReset()
+    knowledgeReadTable.mockReset()
+    knowledgeWriteTable.mockReset()
     knowledgeGetTree.mockReset()
     knowledgeEnsureRoot.mockReset()
     knowledgeListSpaces.mockReset()
@@ -1360,6 +1374,8 @@ describe('knowledgeStore batch ops (doc-ux-polish-2 X4)', () => {
 describe('knowledgeStore frontmatter facets + filters', () => {
   beforeEach(() => {
     knowledgeReadDoc.mockReset()
+    knowledgeReadTable.mockReset()
+    knowledgeWriteTable.mockReset()
     knowledgeGetTree.mockReset()
     knowledgeEnsureRoot.mockReset()
     knowledgeListSpaces.mockReset()
@@ -1553,6 +1569,8 @@ describe('knowledgeStore expand persist + treeFocusId', () => {
     knowledgeGetTree.mockReset()
     knowledgeWriteDoc.mockReset()
     knowledgeReadDoc.mockReset()
+    knowledgeReadTable.mockReset()
+    knowledgeWriteTable.mockReset()
     knowledgeGetTree.mockResolvedValue({
       version: 1,
       nodes: [
@@ -1718,6 +1736,8 @@ describe('knowledgeStore templates create flow (no orphans)', () => {
     knowledgeWriteDoc.mockReset()
     knowledgeSaveTree.mockReset()
     knowledgeReadDoc.mockReset()
+    knowledgeReadTable.mockReset()
+    knowledgeWriteTable.mockReset()
     knowledgeListTemplates.mockReset()
     knowledgeSaveTemplate.mockReset()
     knowledgeDeleteTemplate.mockReset()
@@ -2046,6 +2066,8 @@ describe('knowledgeStore version snapshots', () => {
 describe('knowledgeStore rejects boards / non-docs', () => {
   beforeEach(() => {
     knowledgeReadDoc.mockReset()
+    knowledgeReadTable.mockReset()
+    knowledgeWriteTable.mockReset()
     knowledgeSaveVersion.mockReset()
     knowledgeListVersions.mockReset()
     knowledgeRestoreVersion.mockReset()
@@ -2374,6 +2396,8 @@ describe('knowledgeStore recent list (V2-N1)', () => {
 
   beforeEach(() => {
     knowledgeReadDoc.mockReset()
+    knowledgeReadTable.mockReset()
+    knowledgeWriteTable.mockReset()
     knowledgeReadDoc.mockResolvedValue('# hello')
     knowledgeGetTree.mockReset()
     knowledgeEnsureRoot.mockReset()
@@ -2457,6 +2481,8 @@ describe('knowledgeStore recent list (V2-N1)', () => {
 describe('knowledgeStore broken-link repair (V2-L1 T5.3/T5.4)', () => {
   beforeEach(() => {
     knowledgeReadDoc.mockReset()
+    knowledgeReadTable.mockReset()
+    knowledgeWriteTable.mockReset()
     knowledgeWriteDoc.mockReset()
     knowledgeSaveTree.mockReset()
     knowledgeSaveTree.mockResolvedValue(undefined)
@@ -2579,6 +2605,8 @@ describe('knowledgeStore search index incremental update (V2-P1 T6.3)', () => {
     knowledgeWriteDoc.mockReset()
     knowledgeWriteDoc.mockResolvedValue(undefined)
     knowledgeReadDoc.mockReset()
+    knowledgeReadTable.mockReset()
+    knowledgeWriteTable.mockReset()
     knowledgeReadDoc.mockResolvedValue('# old')
     knowledgeGetTree.mockReset()
     knowledgeEnsureRoot.mockReset()
@@ -2648,5 +2676,183 @@ describe('knowledgeStore search index incremental update (V2-P1 T6.3)', () => {
     // 增量路径：doc_a 新内容可检索，doc_b 内容不受影响。
     expect(searchKnowledgeDocs('unique-token-alpha').map((h) => h.docId)).toContain('doc_a')
     expect(searchKnowledgeDocs('beta only').map((h) => h.docId)).toContain('doc_b')
+  })
+})
+
+describe('knowledgeStore table flows (knowledge-table)', () => {
+  beforeEach(() => {
+    knowledgeReadTable.mockReset()
+    knowledgeWriteTable.mockReset()
+    knowledgeSaveTree.mockReset()
+    knowledgeListTemplates.mockReset()
+    useKnowledgeStore.setState({
+      loaded: true,
+      spaces: [{ id: 'spc_1', name: 'S', createdAt: 1, updatedAt: 1 }],
+      activeSpaceId: 'spc_1',
+      nodes: [
+        {
+          id: 'doc_1',
+          parentId: null,
+          kind: 'doc',
+          title: 'Note',
+          order: 0,
+          createdAt: 1,
+          updatedAt: 1,
+        },
+      ],
+      activeDocId: null,
+      docBody: '',
+      draftBody: '',
+      tableDoc: null,
+      tableDraft: null,
+      tableSaveState: 'idle',
+      editorMode: 'live',
+      mode: 'workspace',
+      searchQuery: '',
+      searchHits: [],
+      indexStatus: 'idle',
+      spaceDocCounts: { spc_1: 1 },
+      recent: [],
+      expandedFolderIds: {},
+      busy: false,
+      error: null,
+      saveState: 'idle',
+    })
+  })
+
+  it('createTable writes blank csv+meta, adds node and opens it', async () => {
+    knowledgeListTemplates.mockResolvedValueOnce([])
+    knowledgeSaveTree.mockResolvedValueOnce(undefined)
+    // openTable echoes what createTable just wrote.
+    knowledgeReadTable.mockImplementation(() =>
+      Promise.resolve({
+        csv: (knowledgeWriteTable.mock.calls[0]?.[2] as string) ?? '',
+        meta: (knowledgeWriteTable.mock.calls[0]?.[3] as string) ?? '',
+      }),
+    )
+    await useKnowledgeStore.getState().createTable(null, '季度排期')
+    const s = useKnowledgeStore.getState()
+    const tableNode = s.nodes.find((n) => n.kind === 'table')
+    expect(tableNode).toBeDefined()
+    expect(tableNode!.id.startsWith('tbl_')).toBe(true)
+    expect(tableNode!.title).toBe('季度排期')
+    // csv + meta written (write order: csv then meta payload).
+    expect(knowledgeWriteTable).toHaveBeenCalledTimes(1)
+    const [, id, csv, meta] = knowledgeWriteTable.mock.calls[0]
+    expect(id.startsWith('tbl_')).toBe(true)
+    expect(csv).toContain(',,\n') // 3 empty cols
+    const metaObj = JSON.parse(meta)
+    expect(metaObj.cols).toHaveLength(3)
+    // Opened with same content.
+    expect(s.activeDocId).toBe(tableNode!.id)
+    expect(s.tableDraft?.id).toBe(tableNode!.id)
+    expect(s.tableDraft?.csv).toBe(csv)
+  })
+
+  it('requestCreateTable skips template picker', async () => {
+    knowledgeListTemplates.mockResolvedValueOnce([{ id: 'tpl_1', name: 'T', body: '# t', createdAt: 1, updatedAt: 1 }])
+    knowledgeSaveTree.mockResolvedValueOnce(undefined)
+    await useKnowledgeStore.getState().requestCreateTable(null, 'X')
+    // Template picker must NOT open for tables.
+    expect(useKnowledgeStore.getState().templatePicker).toBeNull()
+    expect(useKnowledgeStore.getState().nodes.some((n) => n.kind === 'table')).toBe(true)
+  })
+
+  it('openTable loads payload into draft and recent', async () => {
+    knowledgeReadTable.mockResolvedValueOnce({ csv: 'a,b\n1,2\n', meta: '{"cols":[{"id":"col_1","name":"x","type":"number","width":150}]}' })
+    useKnowledgeStore.setState({
+      nodes: [
+        {
+          id: 'tbl_1',
+          parentId: null,
+          kind: 'table',
+          title: '预算',
+          order: 0,
+          createdAt: 1,
+          updatedAt: 1,
+        },
+      ],
+    })
+    await useKnowledgeStore.getState().openTable('tbl_1')
+    const s = useKnowledgeStore.getState()
+    expect(s.activeDocId).toBe('tbl_1')
+    expect(s.tableDraft).toEqual({
+      id: 'tbl_1',
+      csv: 'a,b\n1,2\n',
+      meta: '{"cols":[{"id":"col_1","name":"x","type":"number","width":150}]}',
+    })
+    expect(s.tableSaveState).toBe('idle')
+    expect(s.recent[0].docId).toBe('tbl_1')
+  })
+
+  it('openTable on non-table node fails without toasting doc error', async () => {
+    await useKnowledgeStore.getState().openTable('doc_1')
+    expect(useKnowledgeStore.getState().activeDocId).toBeNull()
+    expect(knowledgeReadTable).not.toHaveBeenCalled()
+  })
+
+  it('updateTableDraft marks saving; commitTable writes and clears', async () => {
+    knowledgeReadTable.mockResolvedValueOnce({ csv: 'a\n', meta: '{"cols":[{"id":"col_1"}]}' })
+    useKnowledgeStore.setState({
+      nodes: [{ id: 'tbl_1', parentId: null, kind: 'table', title: 'T', order: 0, createdAt: 1, updatedAt: 1 }],
+    })
+    await useKnowledgeStore.getState().openTable('tbl_1')
+    useKnowledgeStore.getState().updateTableDraft('tbl_1', 'a,b\n1,2\n', '{"cols":[{"id":"col_1"}]}')
+    expect(useKnowledgeStore.getState().tableSaveState).toBe('saving')
+    knowledgeWriteTable.mockResolvedValueOnce(undefined)
+    const ok = await useKnowledgeStore.getState().commitTable('tbl_1')
+    expect(ok).toBe(true)
+    expect(knowledgeWriteTable).toHaveBeenCalledWith(
+      'spc_1',
+      'tbl_1',
+      'a,b\n1,2\n',
+      '{"cols":[{"id":"col_1"}]}',
+    )
+    const s = useKnowledgeStore.getState()
+    expect(s.tableSaveState).toBe('idle')
+    expect(s.tableDoc?.csv).toBe('a,b\n1,2\n')
+  })
+
+  it('commitTable failure keeps draft and marks error', async () => {
+    knowledgeReadTable.mockResolvedValueOnce({ csv: 'a\n', meta: '{"cols":[{"id":"col_1"}]}' })
+    useKnowledgeStore.setState({
+      nodes: [{ id: 'tbl_1', parentId: null, kind: 'table', title: 'T', order: 0, createdAt: 1, updatedAt: 1 }],
+    })
+    await useKnowledgeStore.getState().openTable('tbl_1')
+    useKnowledgeStore.getState().updateTableDraft('tbl_1', 'changed\n', '{"cols":[{"id":"col_1"}]}')
+    knowledgeWriteTable.mockRejectedValueOnce(new Error('disk full'))
+    const ok = await useKnowledgeStore.getState().commitTable('tbl_1')
+    expect(ok).toBe(false)
+    expect(useKnowledgeStore.getState().tableSaveState).toBe('error')
+    expect(useKnowledgeStore.getState().tableDraft?.csv).toBe('changed\n')
+  })
+
+  it('flushSave persists dirty table draft (leaf-switch gate)', async () => {
+    knowledgeReadTable.mockResolvedValueOnce({ csv: 'a\n', meta: '' })
+    useKnowledgeStore.setState({
+      nodes: [{ id: 'tbl_1', parentId: null, kind: 'table', title: 'T', order: 0, createdAt: 1, updatedAt: 1 }],
+    })
+    await useKnowledgeStore.getState().openTable('tbl_1')
+    useKnowledgeStore.getState().updateTableDraft('tbl_1', 'a,b\n1,2\n', '')
+    knowledgeWriteTable.mockResolvedValueOnce(undefined)
+    const ok = await useKnowledgeStore.getState().flushSave()
+    expect(ok).toBe(true)
+    expect(knowledgeWriteTable).toHaveBeenCalledWith('spc_1', 'tbl_1', 'a,b\n1,2\n', '')
+    expect(useKnowledgeStore.getState().tableSaveState).toBe('idle')
+  })
+
+  it('deleteNode removes table leaf and clears table editor state', async () => {
+    knowledgeSoftDeleteNodes.mockResolvedValueOnce(['tbl_1'])
+    knowledgeReadTable.mockResolvedValueOnce({ csv: 'a\n', meta: '' })
+    useKnowledgeStore.setState({
+      nodes: [{ id: 'tbl_1', parentId: null, kind: 'table', title: 'T', order: 0, createdAt: 1, updatedAt: 1 }],
+    })
+    await useKnowledgeStore.getState().openTable('tbl_1')
+    expect(useKnowledgeStore.getState().activeDocId).toBe('tbl_1')
+    await useKnowledgeStore.getState().deleteNode('tbl_1')
+    const s = useKnowledgeStore.getState()
+    expect(s.activeDocId).toBeNull()
+    expect(s.tableDoc).toBeNull()
+    expect(s.tableDraft).toBeNull()
   })
 })

@@ -155,6 +155,7 @@ export type ContextPayloadMap = {
     kind: 'folder' | 'doc' | 'table' | 'board'
     spaceId: string
     onNewDoc: () => void
+    onNewTable: () => void
     onNewFolder: () => void
     onRename: () => void
     onDelete: () => void
@@ -168,6 +169,7 @@ export type ContextPayloadMap = {
    */
   knowledgeTree: {
     onNewDoc: () => void
+    onNewTable: () => void
     onNewFolder: () => void
   }
   /**

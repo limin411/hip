@@ -2436,6 +2436,7 @@ export const ja = {
       },
 "tree": {
       "newDoc": "ドキュメント",
+      "newTable": "テーブル",
       "newBoard": "ホワイトボード",
       "newFolder": "フォルダ",
       "rename": "名前変更",
@@ -2576,7 +2577,9 @@ export const ja = {
       "addRow": "行を追加",
       "addCol": "列を追加",
       "delRow": "行を削除",
-      "delCol": "列を削除"
+      "delCol": "列を削除",
+      "untitled": "無題のテーブル",
+      "loadFailed": "テーブルを開けませんでした"
     },
     "image": {
       "alt": "代替テキスト",

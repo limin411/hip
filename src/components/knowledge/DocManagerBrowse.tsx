@@ -10,7 +10,7 @@
 import { useEffect, useMemo, useRef, useState, type DragEvent, type MouseEvent } from 'react'
 import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
-import { FileText, Folder, Grid3X3, List, Plus } from 'lucide-react'
+import { FileText, Folder, Grid3X3, List, Plus, Table2 } from 'lucide-react'
 import { DeclarativeContextMenu } from '@/components/context-menu'
 import { knowledgeRevealDoc } from '@/ipc/knowledge'
 import { getPath, isUnderSubtree, listChildren } from '@/domain/knowledge/tree'
@@ -53,7 +53,7 @@ export function DocManagerBrowse() {
 
   const [query, setQuery] = useState('')
   const [view, setView] = useState<'grid' | 'list'>('list')
-  const [newKind, setNewKind] = useState<'folder' | 'doc' | null>(null)
+  const [newKind, setNewKind] = useState<'folder' | 'doc' | 'table' | null>(null)
   const [newTitle, setNewTitle] = useState('')
   const [menuOpen, setMenuOpen] = useState(false)
   const [jumpOpen, setJumpOpen] = useState(false)
@@ -108,7 +108,7 @@ export function DocManagerBrowse() {
   const searchNoMatch = level.length === 0 && query.trim() !== ''
 
   const nav = () => useKnowledgeStore.getState()
-  const startNew = (kind: 'folder' | 'doc') => {
+  const startNew = (kind: 'folder' | 'doc' | 'table') => {
     setMenuOpen(false)
     setNewKind(kind)
     setNewTitle('')
@@ -118,6 +118,8 @@ export function DocManagerBrowse() {
     const title = newTitle.trim()
     if (newKind === 'folder') {
       void nav().createFolder(currentFolderId, title || t('knowledge.tree.newFolder'))
+    } else if (newKind === 'table') {
+      void nav().requestCreateTable(currentFolderId, title || t('knowledge.table.untitled'))
     } else {
       void nav().requestCreateDoc(currentFolderId, title || t('knowledge.doc.untitled'))
     }
@@ -160,6 +162,9 @@ export function DocManagerBrowse() {
     spaceId: activeSpaceId ?? '',
     onNewDoc: () => {
       void nav().requestCreateDoc(newIn(node), t('knowledge.doc.untitled'))
+    },
+    onNewTable: () => {
+      void nav().requestCreateTable(newIn(node), t('knowledge.table.untitled'))
     },
     onNewFolder: () => {
       void nav().createFolder(newIn(node), t('knowledge.tree.newFolder'))
@@ -257,7 +262,7 @@ export function DocManagerBrowse() {
   // ── X4 批量选择 ──────────────────────────────────────────────
   /** 行点击：⌘ 点选 / Shift 连选 / 普通点击（退出批量态并打开）。 */
   const openRow = (e: MouseEvent, node: KnowledgeNode) => {
-    if (node.kind !== 'doc') {
+    if (node.kind === 'folder') {
       if (selectedIds.length > 0) clearSelection()
       void nav().enterFolder(node.id)
       return
@@ -274,7 +279,7 @@ export function DocManagerBrowse() {
     }
     if (e.shiftKey) {
       e.stopPropagation()
-      const docs = level.filter((n) => n.kind === 'doc').map((n) => n.id)
+      const docs = level.filter((n) => n.kind !== 'folder').map((n) => n.id)
       const anchor = selectAnchor ?? selectedIds[selectedIds.length - 1] ?? node.id
       setSelectAnchor(anchor)
       const range = rangeBetween(docs, anchor, node.id)
@@ -282,6 +287,10 @@ export function DocManagerBrowse() {
       return
     }
     if (selectedIds.length > 0) clearSelection()
+    if (node.kind === 'table') {
+      void nav().openTable(node.id)
+      return
+    }
     void nav().openDoc(node.id)
   }
 
@@ -558,6 +567,16 @@ export function DocManagerBrowse() {
                 <FileText size={13} className="shrink-0 text-ink-tertiary" aria-hidden />
                 {t('knowledge.tree.newDoc')}
               </button>
+              <button
+                type="button"
+                role="menuitem"
+                data-no-drag
+                onClick={() => startNew('table')}
+                className="flex w-full items-center gap-2 px-2.5 py-1.5 text-left text-body text-ink transition-colors hover:bg-state-hover"
+              >
+                <Table2 size={13} className="shrink-0 text-ink-tertiary" aria-hidden />
+                {t('knowledge.tree.newTable')}
+              </button>
             </div>
           ) : null}
         </div>
@@ -573,6 +592,7 @@ export function DocManagerBrowse() {
           kind="knowledgeTree"
           payload={{
             onNewDoc: () => startNew('doc'),
+            onNewTable: () => startNew('table'),
             onNewFolder: () => startNew('folder'),
           }}
           className="block min-h-full p-4"
@@ -597,15 +617,26 @@ export function DocManagerBrowse() {
               <p className="text-meta text-ink-tertiary">
                 {t('knowledge.browse.emptyDesc')}
               </p>
-              <button
-                type="button"
-                data-no-drag
-                onClick={() => startNew('doc')}
-                className="mt-2 flex items-center gap-1.5 rounded-md bg-btn-primary px-3.5 py-1.5 text-body font-medium text-on-btn-primary transition-colors hover:bg-btn-primary-hover"
-              >
-                <Plus size={14} strokeWidth={2} aria-hidden />
-                {t('knowledge.tree.newDoc')}
-              </button>
+              <div className="mt-2 flex items-center gap-2">
+                <button
+                  type="button"
+                  data-no-drag
+                  onClick={() => startNew('doc')}
+                  className="flex items-center gap-1.5 rounded-md bg-btn-primary px-3.5 py-1.5 text-body font-medium text-on-btn-primary transition-colors hover:bg-btn-primary-hover"
+                >
+                  <Plus size={14} strokeWidth={2} aria-hidden />
+                  {t('knowledge.tree.newDoc')}
+                </button>
+                <button
+                  type="button"
+                  data-no-drag
+                  onClick={() => startNew('table')}
+                  className="flex items-center gap-1.5 rounded-md border border-border bg-surface px-3.5 py-1.5 text-body font-medium text-ink transition-colors hover:bg-state-hover"
+                >
+                  <Table2 size={14} strokeWidth={2} aria-hidden />
+                  {t('knowledge.tree.newTable')}
+                </button>
+              </div>
             </div>
           ) : view === 'grid' ? (
             <div className="grid grid-cols-[repeat(auto-fill,minmax(150px,1fr))] gap-3">
@@ -640,7 +671,7 @@ export function DocManagerBrowse() {
                         'border-[var(--border-strong)] bg-state-hover outline outline-1 outline-dashed outline-[color:var(--border-strong)]',
                     )}
                   >
-                      {node.kind === 'doc' && selectedIds.length > 0 ? (
+                      {node.kind !== 'folder' && selectedIds.length > 0 ? (
                         <span
                           className={cn(
                             'absolute left-2 top-2 flex h-4 w-4 items-center justify-center rounded-[4px] border text-[10px] text-on-btn-primary',
@@ -656,6 +687,8 @@ export function DocManagerBrowse() {
                       <div className="relative flex h-10 w-10 items-center justify-center rounded-lg bg-surface-muted">
                         {node.kind === 'folder' ? (
                           <Folder size={20} className="text-accent" strokeWidth={1.6} aria-hidden />
+                        ) : node.kind === 'table' ? (
+                          <Table2 size={20} className="text-ink-tertiary" strokeWidth={1.6} aria-hidden />
                         ) : (
                           <FileText size={20} className="text-ink-tertiary" strokeWidth={1.6} aria-hidden />
                         )}
@@ -743,7 +776,7 @@ export function DocManagerBrowse() {
                           'bg-state-hover outline outline-1 outline-dashed outline-[color:var(--border-strong)]',
                       )}
                     >
-                      {node.kind === 'doc' && selectedIds.length > 0 ? (
+                      {node.kind !== 'folder' && selectedIds.length > 0 ? (
                         <span
                           className={cn(
                             'flex h-4 w-4 flex-none items-center justify-center rounded-[4px] border text-[10px] text-on-btn-primary',
@@ -766,6 +799,8 @@ export function DocManagerBrowse() {
                       >
                         {node.kind === 'folder' ? (
                           <Folder size={14} aria-hidden />
+                        ) : node.kind === 'table' ? (
+                          <Table2 size={14} aria-hidden />
                         ) : (
                           <FileText size={14} aria-hidden />
                         )}
@@ -831,6 +866,8 @@ export function DocManagerBrowse() {
             >
               {newKind === 'folder' ? (
                 <Folder size={14} className="shrink-0 text-accent" aria-hidden />
+              ) : newKind === 'table' ? (
+                <Table2 size={14} className="shrink-0 text-ink-tertiary" aria-hidden />
               ) : (
                 <FileText size={14} className="shrink-0 text-ink-tertiary" aria-hidden />
               )}
@@ -841,7 +878,9 @@ export function DocManagerBrowse() {
                 placeholder={
                   newKind === 'folder'
                     ? t('knowledge.tree.newFolder')
-                    : t('knowledge.doc.untitled')
+                    : newKind === 'table'
+                      ? t('knowledge.table.untitled')
+                      : t('knowledge.doc.untitled')
                 }
                 onChange={(e) => setNewTitle(e.target.value)}
                 onKeyDown={(e) => {

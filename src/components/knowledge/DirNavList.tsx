@@ -13,6 +13,7 @@ import {
   FileText,
   Folder,
   Plus,
+  Table2,
 } from 'lucide-react'
 import { DeclarativeContextMenu } from '@/components/context-menu'
 import { knowledgeRevealDoc } from '@/ipc/knowledge'
@@ -41,7 +42,7 @@ export function DirNavList() {
   const activeSpaceId = useKnowledgeStore((s) => s.activeSpaceId)
   const busy = useKnowledgeStore((s) => s.busy)
 
-  const [newKind, setNewKind] = useState<'folder' | 'doc' | null>(null)
+  const [newKind, setNewKind] = useState<'folder' | 'doc' | 'table' | null>(null)
   const [newTitle, setNewTitle] = useState('')
   const [menuOpen, setMenuOpen] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
@@ -83,7 +84,7 @@ export function DirNavList() {
     void useKnowledgeStore.getState().goUp()
   }
 
-  const startNew = (kind: 'folder' | 'doc') => {
+  const startNew = (kind: 'folder' | 'doc' | 'table') => {
     setMenuOpen(false)
     setNewKind(kind)
     setNewTitle('')
@@ -94,6 +95,10 @@ export function DirNavList() {
     const title = newTitle.trim()
     if (newKind === 'folder') {
       void useKnowledgeStore.getState().createFolder(currentFolderId, title || t('knowledge.tree.newFolder'))
+    } else if (newKind === 'table') {
+      void useKnowledgeStore
+        .getState()
+        .requestCreateTable(currentFolderId, title || t('knowledge.table.untitled'))
     } else {
       void useKnowledgeStore
         .getState()
@@ -266,6 +271,16 @@ export function DirNavList() {
                 <FileText size={13} className="shrink-0 text-ink-tertiary" aria-hidden />
                 {t('knowledge.tree.newDoc')}
               </button>
+              <button
+                type="button"
+                role="menuitem"
+                data-no-drag
+                onClick={() => startNew('table')}
+                className="flex w-full items-center gap-2 px-2.5 py-1.5 text-left text-body text-ink transition-colors hover:bg-state-hover"
+              >
+                <Table2 size={13} className="shrink-0 text-ink-tertiary" aria-hidden />
+                {t('knowledge.tree.newTable')}
+              </button>
             </div>
           ) : null}
         </div>
@@ -320,6 +335,7 @@ export function DirNavList() {
           kind="knowledgeTree"
           payload={{
             onNewDoc: () => startNew('doc'),
+            onNewTable: () => startNew('table'),
             onNewFolder: () => startNew('folder'),
           }}
           className="block min-h-full"
@@ -339,6 +355,12 @@ export function DirNavList() {
                   void useKnowledgeStore
                     .getState()
                     .requestCreateDoc(parent, t('knowledge.doc.untitled'))
+                },
+                onNewTable: () => {
+                  const parent = newIn(node)
+                  void useKnowledgeStore
+                    .getState()
+                    .requestCreateTable(parent, t('knowledge.table.untitled'))
                 },
                 onNewFolder: () => {
                   const parent = newIn(node)
@@ -367,6 +389,8 @@ export function DirNavList() {
                         aria-current={active ? 'true' : undefined}
                         onClick={() => {
                           if (node.kind === 'folder') enterFolder(node.id)
+                          else if (node.kind === 'table')
+                            void useKnowledgeStore.getState().openTable(node.id)
                           else void useKnowledgeStore.getState().openDoc(node.id)
                         }}
                         className={cn(
@@ -379,6 +403,8 @@ export function DirNavList() {
                       >
                         {node.kind === 'folder' ? (
                           <Folder size={14} className="shrink-0 text-accent" aria-hidden />
+                        ) : node.kind === 'table' ? (
+                          <Table2 size={14} className="shrink-0 text-ink-tertiary" aria-hidden />
                         ) : (
                           <FileText size={14} className="shrink-0 text-ink-tertiary" aria-hidden />
                         )}
@@ -445,6 +471,8 @@ export function DirNavList() {
                 <div className="flex items-center gap-2 rounded-lg px-2.5 py-[var(--row-pad-y-session)]">
                   {newKind === 'folder' ? (
                     <Folder size={14} className="shrink-0 text-accent" aria-hidden />
+                  ) : newKind === 'table' ? (
+                    <Table2 size={14} className="shrink-0 text-ink-tertiary" aria-hidden />
                   ) : (
                     <FileText size={14} className="shrink-0 text-ink-tertiary" aria-hidden />
                   )}
@@ -456,7 +484,9 @@ export function DirNavList() {
                     placeholder={
                       newKind === 'folder'
                         ? t('knowledge.tree.newFolder')
-                        : t('knowledge.doc.untitled')
+                        : newKind === 'table'
+                          ? t('knowledge.table.untitled')
+                          : t('knowledge.doc.untitled')
                     }
                     onChange={(e) => setNewTitle(e.target.value)}
                     onKeyDown={(e) => {

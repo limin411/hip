@@ -397,6 +397,12 @@ const STATIC_CATALOG: ContextMenuItemMeta[] = [
     group: 'primary',
   },
   {
+    id: 'knowledgeNode.newTable',
+    labelKey: 'knowledge.tree.newTable',
+    kind: 'knowledgeNode',
+    group: 'primary',
+  },
+  {
     id: 'knowledgeNode.newFolder',
     labelKey: 'knowledge.tree.newFolder',
     kind: 'knowledgeNode',
@@ -424,6 +430,12 @@ const STATIC_CATALOG: ContextMenuItemMeta[] = [
   {
     id: 'knowledgeTree.newDoc',
     labelKey: 'knowledge.tree.newDoc',
+    kind: 'knowledgeTree',
+    group: 'primary',
+  },
+  {
+    id: 'knowledgeTree.newTable',
+    labelKey: 'knowledge.tree.newTable',
     kind: 'knowledgeTree',
     group: 'primary',
   },

@@ -2528,6 +2528,7 @@ export const en = {
       },
       tree: {
         newDoc: 'Doc',
+        newTable: 'Table',
         newBoard: 'Whiteboard',
         newFolder: 'Folder',
         rename: 'Rename',
@@ -2676,6 +2677,8 @@ export const en = {
         addCol: 'Add column',
         delRow: 'Delete row',
         delCol: 'Delete column',
+        untitled: 'Untitled table',
+        loadFailed: 'Failed to open table',
       },
       image: {
         alt: 'Alt text',

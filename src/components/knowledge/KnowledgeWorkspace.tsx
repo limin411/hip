@@ -283,6 +283,7 @@ export function KnowledgeWorkspace() {
   }
   // Boards / collection views removed — docs + folders only.
   const isBoard = activeNode?.kind === 'board'
+  const isTable = activeNode?.kind === 'table' && (activeDocId ?? '').startsWith('tbl_')
 
   // Single-canvas Live (Notion/Feishu). Source only as silent fallback:
   // flag off, large doc, parse fail, or explicit source. Never mount DocReader
@@ -493,7 +494,7 @@ export function KnowledgeWorkspace() {
       const currentId = st.activeDocId
       if (!currentId) return
       const node = st.nodes.find((n) => n.id === currentId)
-      if (node?.kind === 'board') return
+      if (node?.kind === 'board' || node?.kind === 'table') return
       liveEditorRef.current?.flushDraft()
       const view = editorRef.current?.getView()
       if (view) {
@@ -577,6 +578,18 @@ export function KnowledgeWorkspace() {
       <main className="flex min-w-0 flex-1 flex-col bg-surface-content">
         {!activeDocId ? (
           <DocManagerBrowse />
+        ) : isTable ? (
+          <div
+            className="flex min-h-0 flex-1 items-center justify-center px-8 py-6"
+            data-testid="knowledge-table-editor"
+          >
+            <EmptyState
+              tier="friendly"
+              title={activeNode?.title ?? t('knowledge.table.untitled')}
+              description={t('knowledge.table.loadFailed')}
+              className="w-full max-w-md border-0 py-16"
+            />
+          </div>
         ) : isBoard ? (
           <div
             className="flex min-h-0 flex-1 items-center justify-center px-8 py-6"
@@ -736,6 +749,7 @@ export function KnowledgeWorkspace() {
         ) : null}
         {activeDocId &&
         !isBoard &&
+        !isTable &&
         (saveState === 'error' || (saveState === 'saving' && savingShown)) ? (
           /* T10: 保存状态底部状态栏——saved 静默，仅 saving>800ms / error 出现。 */
           <div

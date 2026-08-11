@@ -2468,6 +2468,7 @@ export const zhCN = {
       },
       tree: {
         newDoc: '文档',
+        newTable: '表格',
         newBoard: '画板',
         newFolder: '文件夹',
         rename: '重命名',
@@ -2614,6 +2615,8 @@ export const zhCN = {
         addCol: '添加列',
         delRow: '删除行',
         delCol: '删除列',
+        untitled: '未命名表格',
+        loadFailed: '无法打开表格',
       },
       image: {
         alt: '替代文本',

@@ -8,8 +8,9 @@ const ctx = {
 } as ContextMenuBuildContext
 
 describe('knowledgeNodeProvider', () => {
-  it('returns folder actions including new doc/folder', () => {
+  it('returns folder actions including new doc/table/folder', () => {
     const onNewDoc = vi.fn()
+    const onNewTable = vi.fn()
     const onNewFolder = vi.fn()
     const onRename = vi.fn()
     const onDelete = vi.fn()
@@ -21,6 +22,7 @@ describe('knowledgeNodeProvider', () => {
           kind: 'folder',
           spaceId: 'spc_a',
           onNewDoc,
+          onNewTable,
           onNewFolder,
           onRename,
           onDelete,
@@ -30,12 +32,15 @@ describe('knowledgeNodeProvider', () => {
     )
     expect(items.map((i) => i.id)).toEqual([
       'knowledgeNode.newDoc',
+      'knowledgeNode.newTable',
       'knowledgeNode.newFolder',
       'knowledgeNode.rename',
       'knowledgeNode.delete',
     ])
     items.find((i) => i.id === 'knowledgeNode.newDoc')!.run()
+    items.find((i) => i.id === 'knowledgeNode.newTable')!.run()
     expect(onNewDoc).toHaveBeenCalled()
+    expect(onNewTable).toHaveBeenCalled()
   })
 
   it('includes reveal for docs when provided', () => {
@@ -48,6 +53,7 @@ describe('knowledgeNodeProvider', () => {
           kind: 'doc',
           spaceId: 'spc_a',
           onNewDoc: () => {},
+          onNewTable: () => {},
           onNewFolder: () => {},
           onRename: () => {},
           onDelete: () => {},
@@ -70,6 +76,7 @@ describe('knowledgeNodeProvider', () => {
           kind: 'board',
           spaceId: 'spc_a',
           onNewDoc: () => {},
+          onNewTable: () => {},
           onNewFolder: () => {},
           onRename: () => {},
           onDelete: () => {},

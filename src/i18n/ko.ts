@@ -2436,6 +2436,7 @@ export const ko = {
       },
 "tree": {
       "newDoc": "문서",
+      "newTable": "표",
       "newBoard": "화이트보드",
       "newFolder": "폴더",
       "rename": "이름 바꾸기",
@@ -2576,7 +2577,9 @@ export const ko = {
       "addRow": "행 추가",
       "addCol": "열 추가",
       "delRow": "행 삭제",
-      "delCol": "열 삭제"
+      "delCol": "열 삭제",
+      "untitled": "제목 없는 표",
+      "loadFailed": "표를 열 수 없습니다"
     },
     "image": {
       "alt": "대체 텍스트",

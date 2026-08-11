@@ -2438,6 +2438,7 @@ export const zhTW = {
       },
 "tree": {
       "newDoc": "文件",
+      "newTable": "表格",
       "newBoard": "畫板",
       "newFolder": "資料夾",
       "rename": "重新命名",
@@ -2578,7 +2579,9 @@ export const zhTW = {
       "addRow": "新增列",
       "addCol": "新增欄",
       "delRow": "刪除列",
-      "delCol": "刪除欄"
+      "delCol": "刪除欄",
+      "untitled": "未命名表格",
+      "loadFailed": "無法開啟表格"
     },
     "image": {
       "alt": "替代文字",

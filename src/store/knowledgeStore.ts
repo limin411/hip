@@ -8,7 +8,7 @@ import type {
   KnowledgeTemplate,
   KnowledgeVersionEntry,
 } from '@/domain/knowledge/types'
-import { newDocId, newFolderId } from '@/domain/knowledge/ids'
+import { newDocId, newFolderId, newTableId } from '@/domain/knowledge/ids'
 import {
   KNOWLEDGE_INDEX_YIELD_EVERY,
   KNOWLEDGE_LARGE_DOC_CHARS,
@@ -45,6 +45,7 @@ import {
   type KnowledgeSearchHit,
 } from '@/domain/knowledge/search'
 import { isSpaceNameTaken, normalizeSpaceName } from '@/domain/knowledge/spaceName'
+import { createEmptyTable, metaFromTable, tableToCsv } from '@/domain/knowledge/tableModel'
 import { expandTemplateVariables } from '@/domain/knowledge/templateVars'
 import {
   type EditorMode,
@@ -64,6 +65,7 @@ import {
   knowledgeListSpaces,
   knowledgeListTemplates,
   knowledgeReadDoc,
+  knowledgeReadTable,
   knowledgeSaveTemplate,
   knowledgeListVersions,
   knowledgeRestoreVersion,
@@ -71,6 +73,7 @@ import {
   knowledgeSaveVersion,
   knowledgeUpdateSpace,
   knowledgeWriteDoc,
+  knowledgeWriteTable,
   knowledgeLinkIndexUpsert,
   knowledgeLinkIndexRemoveDoc,
   knowledgeLinkIndexReplaceAll,
@@ -387,6 +390,10 @@ interface KnowledgeState {
   treeFocusId: string | null
   /** Template pick modal; set by `requestCreateDoc` when space has templates. */
   templatePicker: TemplatePickerState | null
+  /** Active table leaf (knowledge-table): on-disk baseline + in-memory draft + save state. */
+  tableDoc: { id: string; csv: string; meta: string } | null
+  tableDraft: { id: string; csv: string; meta: string } | null
+  tableSaveState: 'idle' | 'saving' | 'error'
   busy: boolean
   error: string | null
   saveState: SaveState
@@ -459,6 +466,9 @@ interface KnowledgeState {
    * Cancel on the picker leaves no orphan empty doc.
    */
   requestCreateDoc: (parentId: string | null, defaultTitle: string) => Promise<void>
+  /** Create a blank table (3×3) under parentId and open it. No template picker. */
+  createTable: (parentId: string | null, title: string) => Promise<void>
+  requestCreateTable: (parentId: string | null, defaultTitle: string) => Promise<void>
   /** Confirm picker: `null` templateId → empty body; cancel via `cancelTemplateCreate`. */
   confirmTemplateCreate: (templateId: string | null) => Promise<void>
   cancelTemplateCreate: () => void
@@ -473,6 +483,12 @@ interface KnowledgeState {
   /** 批量移动（X4）：逐节点追加到目标层末尾，保持传入顺序。 */
   moveNodes: (ids: string[], parentId: string | null) => Promise<void>
   openDoc: (id: string) => Promise<void>
+  /** Open a table leaf: reads csv + meta into tableDoc/tableDraft. */
+  openTable: (id: string) => Promise<void>
+  /** Table editor buffer → store draft (marks tableSaveState 'saving'). */
+  updateTableDraft: (id: string, csv: string, meta: string) => void
+  /** Persist table draft to disk; returns false on IPC failure (editor keeps local state). */
+  commitTable: (id?: string) => Promise<boolean>
   /** Switch Live / Source / Preview. Live without flag clamps to Source. */
   setEditorMode: (mode: EditorMode) => Promise<void>
   /**
@@ -727,6 +743,9 @@ export const useKnowledgeStore = create<KnowledgeState>((set, get) => ({
   expandedFolderIds: {},
   treeFocusId: null,
   templatePicker: null,
+  tableDoc: null,
+  tableDraft: null,
+  tableSaveState: 'idle',
   busy: false,
   error: null,
   saveState: 'idle',
@@ -962,6 +981,9 @@ export const useKnowledgeStore = create<KnowledgeState>((set, get) => ({
           docBody: '',
           draftBody: '',
           editorMode: 'live',
+          tableDoc: null,
+          tableDraft: null,
+          tableSaveState: 'idle',
           nodes: [],
           expandedFolderIds: {},
           currentFolderId: null,
@@ -1042,13 +1064,21 @@ export const useKnowledgeStore = create<KnowledgeState>((set, get) => ({
         // 文档管理 v2：打开文档时记录其所在目录，作为返回/历史上下文。
         const parent = nodes.find((n) => n.id === opts.selectDocId)?.parentId ?? null
         set({ currentFolderId: parent })
-        await get().openDoc(opts.selectDocId)
+        const target = nodes.find((n) => n.id === opts.selectDocId)
+        if (target?.kind === 'table') {
+          await get().openTable(opts.selectDocId)
+        } else {
+          await get().openDoc(opts.selectDocId)
+        }
       } else {
         set({
           activeDocId: null,
           docBody: '',
           draftBody: '',
           editorMode: 'live',
+          tableDoc: null,
+          tableDraft: null,
+          tableSaveState: 'idle',
           pendingReveal: null,
         })
       }
@@ -1288,6 +1318,9 @@ export const useKnowledgeStore = create<KnowledgeState>((set, get) => ({
       docBody: '',
       draftBody: '',
       editorMode: 'live',
+      tableDoc: null,
+      tableDraft: null,
+      tableSaveState: 'idle',
       // keep activeSpaceId for chip? design: clear active doc; can keep space or clear
       activeSpaceId: null,
       nodes: [],
@@ -1423,6 +1456,56 @@ export const useKnowledgeStore = create<KnowledgeState>((set, get) => ({
       // List failure should not block creation of a blank doc.
       await get().createDoc(parentId, defaultTitle)
     }
+  },
+
+  createTable: async (parentId, title) => {
+    const spaceId = get().activeSpaceId
+    if (!spaceId || get().busy) return
+    // Flush-gate before creating so a failed dirty save cannot orphan a new empty table.
+    syncActiveEditorToDraft({ leaveActiveLeaf: false })
+    const flushed = await get().flushSave()
+    if (!flushed) return
+    set({ busy: true })
+    try {
+      const now = Date.now()
+      const id = newTableId()
+      // Blank 3×3 table: csv + meta twin files written first, then tree node.
+      const t = createEmptyTable()
+      await knowledgeWriteTable(spaceId, id, tableToCsv(t), JSON.stringify(metaFromTable(t)))
+      const node = {
+        id,
+        parentId,
+        kind: 'table' as const,
+        title: title.trim() || i18n.t('knowledge.table.untitled'),
+        order: nextOrder(get().nodes, parentId),
+        createdAt: now,
+        updatedAt: now,
+      }
+      const nodes = insertNode(get().nodes, node)
+      await knowledgeSaveTree(spaceId, { version: 1, nodes })
+      const spaceName = get().spaces.find((s) => s.id === spaceId)?.name ?? ''
+      // Title-only search entry (table bodies are CSV; not body-indexed in P0).
+      indexCurrentDoc(spaceId, id, node.title, '', spaceName, nodes)
+      set({ nodes, busy: false })
+      syncFacetsToState(set)
+      if (parentId) {
+        set((s) => ({ expandedFolderIds: { ...s.expandedFolderIds, [parentId]: true } }))
+        schedulePersistExpand(spaceId, get)
+      }
+      get().runSearch(get().searchQuery)
+      await get().openTable(id)
+    } catch (e) {
+      const msg = knowledgeErrorMessage(e)
+      set({ busy: false, error: msg })
+      toast.error(msg)
+    }
+  },
+
+  requestCreateTable: async (parentId, defaultTitle) => {
+    const spaceId = get().activeSpaceId
+    if (!spaceId || get().busy) return
+    // Tables have no template flow — create straight through.
+    await get().createTable(parentId, defaultTitle)
   },
 
   confirmTemplateCreate: async (templateId) => {
@@ -1631,6 +1714,9 @@ export const useKnowledgeStore = create<KnowledgeState>((set, get) => ({
                 docBody: '',
                 draftBody: '',
                 editorMode: 'live' as const,
+                tableDoc: null,
+                tableDraft: null,
+                tableSaveState: 'idle' as const,
                 pendingReveal: null,
                 backlinks: [],
                 outboundLinks: [],
@@ -1673,7 +1759,11 @@ export const useKnowledgeStore = create<KnowledgeState>((set, get) => ({
     const cur = get()
     const leaveNeedsWrite =
       !!cur.activeDocId && cur.draftBody !== cur.docBody
-    if (leaveNeedsWrite) {
+    const tableNeedsWrite =
+      !!cur.tableDraft &&
+      !!cur.tableDoc &&
+      (cur.tableDraft.csv !== cur.tableDoc.csv || cur.tableDraft.meta !== cur.tableDoc.meta)
+    if (leaveNeedsWrite || tableNeedsWrite) {
       const ok = await get().flushSave({ phase: 'write' })
       if (!ok) return
     }
@@ -1694,6 +1784,9 @@ export const useKnowledgeStore = create<KnowledgeState>((set, get) => ({
         docBody: '',
         draftBody: '',
         editorMode: 'live',
+        tableDoc: null,
+        tableDraft: null,
+        tableSaveState: 'idle',
         pendingReveal: null,
         backlinks: [],
         outboundLinks: [],
@@ -1750,6 +1843,9 @@ export const useKnowledgeStore = create<KnowledgeState>((set, get) => ({
           draftBody: body,
           editorMode,
           saveState: 'idle' as const,
+          tableDoc: null,
+          tableDraft: null,
+          tableSaveState: 'idle' as const,
           treeFocusId: id,
           expandedFolderIds,
           backlinks: [],
@@ -1779,11 +1875,162 @@ export const useKnowledgeStore = create<KnowledgeState>((set, get) => ({
         docBody: '',
         draftBody: '',
         editorMode: 'live',
+        tableDoc: null,
+        tableDraft: null,
+        tableSaveState: 'idle',
         pendingReveal: null,
         backlinks: [],
         outboundLinks: [],
         linkPanelStatus: 'idle',
       })
+    }
+  },
+
+  openTable: async (id) => {
+    // Already focused: no flush + disk read + remount.
+    if (get().activeDocId === id && get().tableDraft?.id === id) {
+      if (get().treeFocusId !== id) set({ treeFocusId: id })
+      return
+    }
+
+    // Sync in-editor doc buffer → draftBody while activeDocId is still the old leaf.
+    syncActiveEditorToDraft({ leaveActiveLeaf: true })
+    const cur = get()
+    const leaveNeedsWrite = !!cur.activeDocId && cur.draftBody !== cur.docBody
+    if (leaveNeedsWrite) {
+      const ok = await get().flushSave({ phase: 'write' })
+      if (!ok) return
+    }
+
+    const spaceId = get().activeSpaceId
+    const node = get().nodes.find((n) => n.id === id)
+    const isTable = node?.kind === 'table' && id.startsWith('tbl_')
+    if (!spaceId || !node || !isTable) {
+      toast.error(i18n.t('knowledge.table.loadFailed'))
+      get().dropRecent(spaceId, id)
+      set({
+        activeDocId: null,
+        treeFocusId: null,
+        docBody: '',
+        draftBody: '',
+        editorMode: 'live',
+        tableDoc: null,
+        tableDraft: null,
+        tableSaveState: 'idle',
+        pendingReveal: null,
+        backlinks: [],
+        outboundLinks: [],
+        linkPanelStatus: 'idle',
+      })
+      return
+    }
+    // Claim this open; any prior in-flight open must not apply after us.
+    const gen = ++openDocGeneration
+    try {
+      const payload = await knowledgeReadTable(spaceId, id)
+      if (gen !== openDocGeneration) return
+      if (get().activeSpaceId !== spaceId) return
+
+      const expandedFolderIds = expandAncestorsOf(get().nodes, id, get().expandedFolderIds)
+      const spaceName = get().spaces.find((s) => s.id === spaceId)?.name ?? ''
+      const item: KnowledgeRecentItem = {
+        spaceId,
+        docId: id,
+        title: node.title,
+        spaceName,
+        at: Date.now(),
+      }
+      // Single set: table payload + selection + recent — avoid double React render.
+      set((s) => {
+        const rest = s.recent.filter(
+          (r) => !(r.spaceId === item.spaceId && r.docId === item.docId),
+        )
+        const recent = [item, ...rest].slice(0, RECENT_CAP)
+        persistRecent(recent)
+        return {
+          activeDocId: id,
+          docBody: '',
+          draftBody: '',
+          editorMode: 'live' as const,
+          saveState: 'idle' as const,
+          tableDoc: { id, csv: payload.csv, meta: payload.meta ?? '' },
+          tableDraft: { id, csv: payload.csv, meta: payload.meta ?? '' },
+          tableSaveState: 'idle' as const,
+          treeFocusId: id,
+          expandedFolderIds,
+          backlinks: [],
+          outboundLinks: [],
+          linkPanelStatus: 'idle' as const,
+          recent,
+          pendingReveal: null,
+        }
+      })
+      schedulePersistExpand(spaceId, get)
+      // Title-only search entry refresh (body is CSV; not body-indexed in P0).
+      indexCurrentDoc(spaceId, id, node.title, '', spaceName, get().nodes)
+      get().runSearch(get().searchQuery)
+    } catch (e) {
+      // Stale open failure must not clear a newer successful open.
+      if (gen !== openDocGeneration) return
+      toast.error(knowledgeErrorMessage(e))
+      get().dropRecent(spaceId, id)
+      set({
+        activeDocId: null,
+        treeFocusId: null,
+        docBody: '',
+        draftBody: '',
+        editorMode: 'live',
+        tableDoc: null,
+        tableDraft: null,
+        tableSaveState: 'idle',
+        pendingReveal: null,
+        backlinks: [],
+        outboundLinks: [],
+        linkPanelStatus: 'idle',
+      })
+    }
+  },
+
+  updateTableDraft: (id, csv, meta) => {
+    set((s) =>
+      s.activeDocId === id && s.tableDraft
+        ? { tableDraft: { id, csv, meta }, tableSaveState: 'saving' }
+        : {},
+    )
+  },
+
+  commitTable: async (id) => {
+    const s = get()
+    const tid = id ?? s.tableDraft?.id
+    if (!tid || !s.tableDraft || s.tableDraft.id !== tid) return true
+    const draft = s.tableDraft
+    // Already on disk — nothing to write.
+    if (s.tableDoc && s.tableDoc.csv === draft.csv && s.tableDoc.meta === draft.meta) {
+      if (s.tableSaveState === 'saving') set({ tableSaveState: 'idle' })
+      return true
+    }
+    const spaceId = s.activeSpaceId
+    if (!spaceId) return false
+    set({ tableSaveState: 'saving' })
+    try {
+      await knowledgeWriteTable(spaceId, tid, draft.csv, draft.meta)
+      // A newer draft may have arrived during the await — only mark clean if unchanged.
+      set((s2) => {
+        const curDraft = s2.tableDraft
+        if (curDraft && curDraft.id === tid && curDraft.csv === draft.csv && curDraft.meta === draft.meta) {
+          return {
+            tableDoc: { id: tid, csv: draft.csv, meta: draft.meta },
+            tableSaveState: 'idle',
+          }
+        }
+        return curDraft ? { tableSaveState: 'saving' } : { tableSaveState: 'idle' }
+      })
+      return true
+    } catch (e) {
+      const msg = knowledgeErrorMessage(e)
+      set({ tableSaveState: 'error' })
+      toast.error(msg)
+      return false
     }
   },
 
@@ -1870,6 +2117,51 @@ export const useKnowledgeStore = create<KnowledgeState>((set, get) => ({
       }
       const spaceName = s.spaces.find((sp) => sp.id === spaceId)?.name ?? ''
       const nodesSnap = s.nodes
+      // Table leaf: flush csv + meta draft (before the doc branch).
+      if (node.kind === 'table' || docId.startsWith('tbl_')) {
+        const draft = get().tableDraft
+        if (!draft || draft.id !== docId) {
+          resolveWrite?.(true)
+          return true
+        }
+        const base = s.tableDoc
+        if (base && base.csv === draft.csv && base.meta === draft.meta) {
+          if (get().tableSaveState === 'saving') set({ tableSaveState: 'idle' })
+          resolveWrite?.(true)
+          return true
+        }
+        try {
+          await knowledgeWriteTable(spaceId, docId, draft.csv, draft.meta)
+          set((s2) => {
+            const curDraft = s2.tableDraft
+            if (
+              curDraft &&
+              curDraft.id === docId &&
+              curDraft.csv === draft.csv &&
+              curDraft.meta === draft.meta
+            ) {
+              return {
+                tableDoc: { id: docId, csv: draft.csv, meta: draft.meta },
+                tableSaveState: 'idle' as const,
+                nodes: s2.nodes.map((n) =>
+                  n.id === docId ? { ...n, updatedAt: Date.now() } : n,
+                ),
+              }
+            }
+            return curDraft ? { tableSaveState: 'saving' as const } : {}
+          })
+        } catch (e) {
+          set({ tableSaveState: 'error' })
+          const msg = knowledgeErrorMessage(e)
+          toast.error(msg)
+          resolveWrite?.(false)
+          resolveWrite = null
+          return false
+        }
+        resolveWrite?.(true)
+        resolveWrite = null
+        return true
+      }
       if (node.kind !== 'doc' || !docId.startsWith('doc_')) {
         resolveWrite?.(true)
         return true

@@ -75,6 +75,9 @@ export function TableEditor({ tableId }: { tableId: string }) {
   const tableSaveState = useKnowledgeStore((s) => s.tableSaveState)
   const commitTable = useKnowledgeStore((s) => s.commitTable)
   const updateTableDraft = useKnowledgeStore((s) => s.updateTableDraft)
+  const tableTitle =
+    useKnowledgeStore((s) => s.nodes.find((n) => n.id === tableId)?.title) ??
+    t('knowledge.table.untitled')
 
   const [table, setTable] = useState<TableData>(() =>
     csvToTable(draft?.csv ?? '', draft?.meta ?? ''),
@@ -88,6 +91,8 @@ export function TableEditor({ tableId }: { tableId: string }) {
   const [selectPopup, setSelectPopup] = useState<CellPos | null>(null)
   const [newOptionText, setNewOptionText] = useState('')
   const [freezeHeader, setFreezeHeader] = useState(true)
+  const [titleEditing, setTitleEditing] = useState(false)
+  const [titleDraft, setTitleDraft] = useState('')
   /** 排序（列 id 引用 meta col id；数据行不变，视图重排；可撤销）。 */
   const [sortState, setSortState] = useState<TableSortState | null>(null)
   /** 筛选（仅视图，不写文件）。 */
@@ -679,9 +684,37 @@ export function TableEditor({ tableId }: { tableId: string }) {
         <h1
           className="min-w-0 flex-1 truncate text-body font-semibold text-ink"
           data-testid="table-editor-title"
+          onDoubleClick={() => {
+            setTitleDraft(tableTitle)
+            setTitleEditing(true)
+          }}
+          title={t('knowledge.tree.rename')}
         >
-          {useKnowledgeStore.getState().nodes.find((n) => n.id === tableId)?.title ??
-            t('knowledge.table.untitled')}
+          {titleEditing ? (
+            <input
+              autoFocus
+              data-testid="table-title-input"
+              value={titleDraft}
+              onChange={(e) => setTitleDraft(e.target.value)}
+              onKeyDown={(e) => {
+                e.stopPropagation()
+                if (e.key === 'Enter') {
+                  const next = titleDraft.trim()
+                  if (next) {
+                    void useKnowledgeStore.getState().renameNode(tableId, next)
+                  }
+                  setTitleEditing(false)
+                } else if (e.key === 'Escape') {
+                  setTitleEditing(false)
+                }
+              }}
+              onBlur={() => setTitleEditing(false)}
+              onClick={(e) => e.stopPropagation()}
+              className="min-w-0 w-full rounded-sm border border-accent/50 bg-surface px-1.5 py-0.5 text-body font-semibold text-ink outline-none"
+            />
+          ) : (
+            tableTitle
+          )}
         </h1>
         {/* 工具栏（撤销/重做/冻结首行；排序/筛选/统计/导出在 PR-5 激活） */}
         <div className="flex items-center gap-1" data-testid="table-editor-toolbar">

@@ -2334,3 +2334,53 @@ export async function setKnowledgeDocIcon(icon: string): Promise<void> {
   )
   await browser.pause(200)
 }
+
+// ── Tables (knowledge-table) ─────────────────────────────────────────────
+
+/** Recursively collect `tbl_*.csv` files under dir (knowledge spaces). */
+function walkTableCsvFiles(dir: string, out: string[] = []): string[] {
+  if (!fs.existsSync(dir)) return out
+  for (const ent of fs.readdirSync(dir, { withDirectories: true })) {
+    const full = path.join(dir, ent.name)
+    const st = fs.statSync(full)
+    if (st.isDirectory()) walkTableCsvFiles(full, out)
+    else if (st.isFile() && /^tbl_[A-Za-z0-9_-]+\.csv$/.test(ent.name)) out.push(full)
+  }
+  return out
+}
+
+/** Wait until some `tbl_*.csv` on disk contains marker text; returns file path. */
+export async function waitForTableCsvOnDisk(
+  marker: string,
+  timeoutMs = 15000,
+): Promise<string> {
+  let found = ''
+  await browser.waitUntil(
+    async () => {
+      const files = walkTableCsvFiles(knowledgeRootOnDisk())
+      for (const f of files) {
+        try {
+          const body = fs.readFileSync(f, 'utf8')
+          if (body.includes(marker)) {
+            found = f
+            return true
+          }
+        } catch {
+          // ignore mid-write races
+        }
+      }
+      return false
+    },
+    {
+      timeout: timeoutMs,
+      interval: 300,
+      timeoutMsg: `no tbl_*.csv on disk contains: ${marker}`,
+    },
+  )
+  return found
+}
+
+/** All `tbl_*.csv` paths on disk (for export comparisons). */
+export function listTableCsvOnDisk(): string[] {
+  return walkTableCsvFiles(knowledgeRootOnDisk())
+}

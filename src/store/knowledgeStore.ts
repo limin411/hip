@@ -1583,6 +1583,12 @@ export const useKnowledgeStore = create<KnowledgeState>((set, get) => ({
       await knowledgeSaveTree(spaceId, { version: 1, nodes })
       set({ nodes, busy: false })
       const renamed = nodes.find((n) => n.id === id)
+      if (renamed?.kind === 'table') {
+        // 表格标题仅参与标题索引（正文为 CSV，不索引）。
+        const spaceName = get().spaces.find((s) => s.id === spaceId)?.name ?? ''
+        indexCurrentDoc(spaceId, id, renamed.title, '', spaceName, nodes)
+        get().runSearch(get().searchQuery)
+      }
       if (renamed?.kind === 'doc') {
         const spaceName = get().spaces.find((s) => s.id === spaceId)?.name ?? ''
         let body = ''

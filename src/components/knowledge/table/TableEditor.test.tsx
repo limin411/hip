@@ -9,12 +9,14 @@ const knowledgeReadTable = vi.fn()
 const knowledgeWriteTable = vi.fn()
 const knowledgeExportText = vi.fn()
 const pickSavePath = vi.fn()
+const knowledgeSaveTree = vi.fn()
 const commitTableSpy = vi.fn()
 
 vi.mock('@/ipc/knowledge', () => ({
   knowledgeReadTable: (...a: unknown[]) => knowledgeReadTable(...a),
   knowledgeWriteTable: (...a: unknown[]) => knowledgeWriteTable(...a),
   knowledgeExportText: (...a: unknown[]) => knowledgeExportText(...a),
+  knowledgeSaveTree: (...a: unknown[]) => knowledgeSaveTree(...a),
   knowledgeErrorMessage: (e: unknown) => (e instanceof Error ? e.message : String(e)),
 }))
 
@@ -485,5 +487,45 @@ describe('TableEditor PR-5 (sort/filter/stats/export)', () => {
     expect(body.charCodeAt(0)).toBe(0xfeff)
     expect(body).toContain('a,100,c') // 全量数据（含被筛选隐藏的行）
     expect(body).toContain('1,200,3')
+  })
+})
+
+describe('TableEditor PR-6 (title inline edit)', () => {
+  afterEach(() => {
+    cleanup()
+    vi.useRealTimers()
+  })
+  beforeEach(() => {
+    mountTable()
+    useKnowledgeStore.setState({
+      commitTable: vi.fn(async () => {
+        commitTableSpy()
+        return true
+      }) as never,
+    })
+  })
+
+  it('double-click title → edit → Enter renames node in store', async () => {
+    render(<TableEditor tableId="tbl_1" />)
+    fireEvent.doubleClick(screen.getByTestId('table-editor-title'))
+    const input = screen.getByTestId('table-title-input') as HTMLInputElement
+    fireEvent.change(input, { target: { value: '季度排期 v2' } })
+    fireEvent.keyDown(input, { key: 'Enter' })
+    await vi.waitFor(() => {
+      expect(useKnowledgeStore.getState().nodes.find((n) => n.id === 'tbl_1')?.title).toBe(
+        '季度排期 v2',
+      )
+    })
+    expect(screen.getByTestId('table-editor-title').textContent).toContain('季度排期 v2')
+  })
+
+  it('Escape cancels title edit', () => {
+    render(<TableEditor tableId="tbl_1" />)
+    fireEvent.doubleClick(screen.getByTestId('table-editor-title'))
+    const input = screen.getByTestId('table-title-input') as HTMLInputElement
+    fireEvent.change(input, { target: { value: '不改' } })
+    fireEvent.keyDown(input, { key: 'Escape' })
+    const node = useKnowledgeStore.getState().nodes.find((n) => n.id === 'tbl_1')
+    expect(node?.title).toBe('预算')
   })
 })

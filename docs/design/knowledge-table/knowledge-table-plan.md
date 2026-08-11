@@ -167,12 +167,12 @@
 
 ## 11. 实施记录（随执行更新）
 
-- [ ] **PR-1 存储与域层** —
-- [ ] **PR-2 创建入口** —
-- [ ] **PR-3 编辑器骨架** —
-- [ ] **PR-4 编辑器进阶** —
-- [ ] **PR-5 数据能力** —
-- [ ] **PR-6 集成收尾** —
-- [ ] **P1 清单**（导入 CSV 预览、Markdown ⇄ 表格、合并单元格、公式子集、表格模板、虚拟滚动）—
+- [x] **PR-1 存储与域层** — commit `0e0b2057`：`tbl_` 节点（types/ids/tree 泛化）+ Rust `knowledge_read_table/write_table`（csv→meta 写序、尺寸上限）+ 版本快照/回收站/导出 ZIP 的 tbl_ 双文件支持 + `tableModel.ts` 纯函数库（RFC 4180、meta 回退、比较器、筛选、聚合、历史栈）；cargo 285 全绿
+- [x] **PR-2 创建入口** — commit `496a6e59`：新建下拉第三项/空态次级按钮/右键+行尾 ⋯ 三入口一致，内联命名与新建文档同构；store `createTable`（空表写盘→节点→打开）/`requestCreateTable`（跳过模板）/`openTable`/`updateTableDraft`/`commitTable`/flushSave 表格分支 + 全部叶子切换门禁；列表/网格/侧边栏图标、批量选择扩展；i18n 基础 key 五语言
+- [x] **PR-3 编辑器骨架** — commit `d5b69119`：`TableEditor`（冻结首行/行号 sticky、双击/Enter/F2/直接输入编辑、Tab/Enter/Esc/Delete/方向键矩阵、勾选与单选列交互、列/行菜单 v1）；变更→草稿→800ms 防抖落盘；`backToBrowse`；`normalizeMeta` 接受 JSON 字符串；i18n types/columnMenu/rowMenu/grid/toolbar/status/toasts 全量
+- [x] **PR-4 编辑器进阶** — commit `3615c1d9`：撤销/重做（⌘Z/⇧⌘Z + 按钮启用态，历史栈改推变更后状态修复首步去重）；列宽拖拽 + 双击自适应；列/行拖拽重排（数据随动）；冻结首行开关
+- [x] **PR-5 数据能力** — commit `c86db1b8`：列菜单排序（指示器/芯片/可撤销）；筛选面板（多条件 AND/徽标/清除，仅视图）；统计行（数字求和/均值/计数，仅可见行）；CSV 导出（BOM，全量）；`sortRowIndices`/`matchesAllFilters` 纯函数
+- [x] **PR-6 集成收尾** — commit `55689c4e`：标题双击内联编辑（renameNode 表格分支刷新标题索引）；e2e `knowledge-table.spec.ts` + helpers（新建→编辑→落盘→重开→改名→导出一致性）
+- [ ] **P1 清单**（导入 CSV 预览、Markdown ⇄ 表格、合并单元格、公式子集、表格模板、虚拟滚动）— 未启动，按需排期
 
-**执行备注**：待首 PR 合入后补充（基线测试状态、e2e 桌面端执行情况、与 preview 对照截图归档位置）。
+**执行备注**：全量单测 7930 通过（含新增 tableModel 39 + TableEditor 23 + store 表格流 8）；`yarn tsc` 通过；cargo 285 全绿。e2e（wdio）需桌面端运行，`knowledge-table.spec.ts` 已按新 testid 编写，未在本轮执行。

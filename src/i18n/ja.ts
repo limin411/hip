@@ -2626,6 +2626,11 @@ export const ja = {
         duplicate: "行を複製",
         deleteRow: "行を削除",
       },
+      ctx: {
+        copy: "コピー",
+        paste: "貼り付け",
+        clear: "クリア",
+      },
       grid: {
         addRow: "行を追加",
         addColumn: "列を追加",

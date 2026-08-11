@@ -2663,6 +2663,11 @@ export const zhCN = {
           duplicate: '复制行',
           deleteRow: '删除行',
         },
+        ctx: {
+          copy: '复制',
+          paste: '粘贴',
+          clear: '清空',
+        },
         grid: {
           addRow: '添加行',
           addColumn: '添加列',

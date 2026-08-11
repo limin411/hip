@@ -193,8 +193,8 @@ describe('TableEditor (knowledge-table PR-3)', () => {
     // 打开列菜单（点第 0 列头）
     fireEvent.click(screen.getByTestId('table-col-more-0'))
     expect(screen.getByTestId('table-col-menu')).toBeTruthy()
-    // 重命名
-    fireEvent.click(screen.getByTestId('table-col-rename'))
+    // 重命名（双击列名进入内联编辑）
+    fireEvent.doubleClick(screen.getByTestId('table-col-name-0'))
     const renameInput = screen.getByTestId('table-col-rename-input') as HTMLInputElement
     fireEvent.change(renameInput, { target: { value: '事项' } })
     fireEvent.keyDown(renameInput, { key: 'Enter' })
@@ -218,8 +218,7 @@ describe('TableEditor (knowledge-table PR-3)', () => {
   it('column rename commits on blur (Excel 式点击他处生效) and Tab; Esc cancels', () => {
     render(<TableEditor tableId="tbl_1" />)
     const openRename = () => {
-      fireEvent.click(screen.getByTestId('table-col-more-0'))
-      fireEvent.click(screen.getByTestId('table-col-rename'))
+      fireEvent.doubleClick(screen.getByTestId('table-col-name-0'))
       return screen.getByTestId('table-col-rename-input') as HTMLInputElement
     }
     // blur 提交
@@ -722,10 +721,10 @@ describe('TableEditor table-ux-notion PR-3 (selection model)', () => {
     fireEvent.click(document.querySelector('td[data-cell="1,1"]')!, { shiftKey: true })
     // 2×2 整格底色
     for (const r of ['0,0', '0,1', '1,0', '1,1']) {
-      expect(document.querySelector(`td[data-cell="${r}"]`)!.className).toContain('bg-state-hover')
+      expect(document.querySelector(`td[data-cell="${r}"]`)!.className).toContain('tbl-sel')
     }
     // 范围外不高亮
-    expect(document.querySelector('td[data-cell="2,0"]')!.className).not.toContain('bg-state-hover')
+    expect(document.querySelector('td[data-cell="2,0"]')!.className).not.toContain('tbl-sel')
     // anchor 格描边
     expect(document.querySelector('td[data-cell="0,0"]')!.className).toContain('outline')
     // 状态栏显示已选 4 格
@@ -762,14 +761,14 @@ describe('TableEditor table-ux-notion PR-3 (selection model)', () => {
     fireEvent.click(document.querySelector('tr[data-row="0"] td[data-testid="table-row-idx"]')!)
     // 整行 3 格高亮
     for (const c of ['0', '1', '2']) {
-      expect(document.querySelector(`td[data-cell="0,${c}"]`)!.className).toContain('bg-state-hover')
+      expect(document.querySelector(`td[data-cell="0,${c}"]`)!.className).toContain('tbl-sel')
     }
-    expect(document.querySelector('td[data-cell="1,0"]')!.className).not.toContain('bg-state-hover')
+    expect(document.querySelector('td[data-cell="1,0"]')!.className).not.toContain('tbl-sel')
     expect(screen.getByTestId('table-selection-info').textContent).toContain('3')
     // Shift 点击行 2 → 行 0..2 全高亮（9 格）
     fireEvent.click(document.querySelector('tr[data-row="2"] td[data-testid="table-row-idx"]')!, { shiftKey: true })
     expect(screen.getByTestId('table-selection-info').textContent).toContain('9')
-    expect(document.querySelector('td[data-cell="2,2"]')!.className).toContain('bg-state-hover')
+    expect(document.querySelector('td[data-cell="2,2"]')!.className).toContain('tbl-sel')
   })
 
   it('header click selects whole column; ⋯ still opens the column menu', () => {
@@ -777,7 +776,7 @@ describe('TableEditor table-ux-notion PR-3 (selection model)', () => {
     fireEvent.click(screen.getByTestId('table-grid').querySelector('th[data-col="1"]')!)
     // 整列 3 格高亮
     for (const r of ['0', '1', '2']) {
-      expect(document.querySelector(`td[data-cell="${r},1"]`)!.className).toContain('bg-state-hover')
+      expect(document.querySelector(`td[data-cell="${r},1"]`)!.className).toContain('tbl-sel')
     }
     expect(screen.getByTestId('table-selection-info').textContent).toContain('3')
     // ⋯ 打开列菜单（不触发列选择）
@@ -811,7 +810,7 @@ describe('TableEditor table-ux-notion PR-3 (selection model)', () => {
     // 单击单元格（非复选框本体）→ 只选中
     fireEvent.click(document.querySelector('td[data-cell="0,0"]')!)
     expect(useKnowledgeStore.getState().tableDraft?.csv).toBe('x\n')
-    expect(document.querySelector('td[data-cell="0,0"]')!.className).toContain('bg-state-hover')
+    expect(document.querySelector('td[data-cell="0,0"]')!.className).toContain('tbl-sel')
     // 空格切换
     fireEvent.keyDown(screen.getByTestId('table-grid'), { key: ' ' })
     expect(useKnowledgeStore.getState().tableDraft?.csv).toBe('1')
@@ -1257,5 +1256,71 @@ describe('TableEditor table-ux-notion PR-9 (filter popover / stats loop / silent
     })
     const { toast } = await import('sonner')
     expect(vi.mocked(toast.info)).toHaveBeenCalledWith('knowledge.table.toolbar.exportFullNote')
+  })
+})
+
+describe('TableEditor table-ux-notion PR-10 (add row / context menu / visuals)', () => {
+  beforeEach(() => {
+    mountTable()
+    useKnowledgeStore.setState({
+      commitTable: vi.fn(async () => {
+        commitTableSpy()
+        return true
+      }) as never,
+    })
+  })
+  afterEach(() => {
+    cleanup()
+    vi.useRealTimers()
+  })
+
+  it('T8: persistent add-row entry appends a row and selects its first cell', () => {
+    render(<TableEditor tableId="tbl_1" />)
+    const addRow = screen.getByTestId('table-add-row')
+    expect(addRow).toBeTruthy()
+    fireEvent.click(addRow)
+    expect(useKnowledgeStore.getState().tableDraft?.csv.split('\n')).toHaveLength(4)
+    // 新行首格选中
+    expect(document.querySelector('td[data-cell="3,0"]')!.className).toContain('outline')
+  })
+
+  it('context menu on cell: opens with selection; clear + insert column work', () => {
+    render(<TableEditor tableId="tbl_1" />)
+    const cell = document.querySelector('td[data-cell="1,1"]')!
+    fireEvent.contextMenu(cell, { clientX: 200, clientY: 150 })
+    const menu = screen.getByTestId('table-ctx-menu')
+    // 渲染在 body portal
+    expect(document.body.contains(menu)).toBe(true)
+    // 右键即选中
+    expect(cell.className).toContain('tbl-sel')
+    // 清空
+    fireEvent.click(screen.getByTestId('table-ctx-clear'))
+    expect(useKnowledgeStore.getState().tableDraft?.csv).toContain('1,,3')
+    // 再开右键 → 插入右列
+    fireEvent.contextMenu(document.querySelector('td[data-cell="0,0"]')!, { clientX: 200, clientY: 150 })
+    fireEvent.click(screen.getByTestId('table-ctx-col-right'))
+    expect(screen.getByTestId('table-grid').dataset.cols).toBe('4')
+  })
+
+  it('row-number right-click opens the row menu; header right-click opens column menu', () => {
+    render(<TableEditor tableId="tbl_1" />)
+    fireEvent.contextMenu(document.querySelector('tr[data-row="0"] td[data-testid="table-row-idx"]')!)
+    expect(screen.getByTestId('table-row-menu')).toBeTruthy()
+    // 关闭（点击 grid 内行号 → toggle 关闭？mousedown 在 wrap 内不关；用 Esc）
+    fireEvent.keyDown(document, { key: 'Escape' })
+    expect(screen.queryByTestId('table-row-menu')).toBeNull()
+    fireEvent.contextMenu(screen.getByTestId('table-grid').querySelector('th[data-col="1"]')!)
+    expect(screen.getByTestId('table-col-menu')).toBeTruthy()
+  })
+
+  it('T9: 44px row-number column, token-driven row hover class, header 32px', () => {
+    render(<TableEditor tableId="tbl_1" />)
+    const rowNum = document.querySelector('tr[data-row="0"] td[data-testid="table-row-idx"]')!
+    expect(rowNum.className).toContain('w-11')
+    const th = screen.getByTestId('table-grid').querySelector('th[data-col="0"]')!
+    expect(th.className).toContain('h-8')
+    // 单元格带行 hover token 类
+    const cell = document.querySelector('td[data-cell="0,0"]')!
+    expect(cell.className).toContain('tbl-row-hover')
   })
 })

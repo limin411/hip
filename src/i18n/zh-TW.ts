@@ -2628,6 +2628,11 @@ export const zhTW = {
         duplicate: "複製列",
         deleteRow: "刪除列",
       },
+      ctx: {
+        copy: "複製",
+        paste: "貼上",
+        clear: "清空",
+      },
       grid: {
         addRow: "新增列",
         addColumn: "新增欄",

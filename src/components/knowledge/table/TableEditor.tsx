@@ -162,11 +162,18 @@ export function TableEditor({ tableId }: { tableId: string }) {
   const [moreOpen, setMoreOpen] = useState(false)
   const moreBtnRef = useRef<HTMLButtonElement>(null)
   const filterBtnRef = useRef<HTMLButtonElement>(null)
+  const [ctxMenu, setCtxMenu] = useState<{
+    x: number
+    y: number
+    ri: number
+    ci: number
+  } | null>(null)
   const closeMenus = () => {
     setColMenuCi(null)
     setRowMenuRi(null)
     setSelectPopup(null)
     setMoreOpen(false)
+    setCtxMenu(null)
   }
   const resetView = () => {
     clearSort()
@@ -888,7 +895,7 @@ export function TableEditor({ tableId }: { tableId: string }) {
       let after = false
       for (const th of ths) {
         const r = th.getBoundingClientRect()
-        const ci = Number(th.dataset.col)
+        const ci = Number((th as HTMLElement).dataset.col)
         if (ci === d.ci) continue
         if (ev.clientX >= r.left && ev.clientX <= r.right) {
           overCi = ci
@@ -987,12 +994,78 @@ export function TableEditor({ tableId }: { tableId: string }) {
   }
 
   const wrapRef = useRef<HTMLDivElement>(null)
+
+  /** 右键：单元格 → 选中 + 上下文菜单；行号/列头 → 复用行/列菜单。 */
+  const onGridContextMenu = (e: React.MouseEvent) => {
+    const target = e.target as HTMLElement
+    const rowNumTd = target.closest('td[data-testid="table-row-idx"]')
+    const th = target.closest('th[data-col]')
+    const td = target.closest('td[data-cell]')
+    if (td) {
+      e.preventDefault()
+      const [ri, ci] = (td as HTMLElement).dataset.cell!.split(',').map(Number)
+      const vi = visibleIndices.indexOf(ri)
+      setSel({ anchor: { ri: Math.max(0, vi), ci }, focus: { ri: Math.max(0, vi), ci }, mode: 'cell' })
+      setCtxMenu({ x: e.clientX, y: e.clientY, ri, ci })
+    } else if (rowNumTd) {
+      e.preventDefault()
+      const ri = Number(rowNumTd.closest('tr')?.dataset.row ?? 0)
+      setRowMenuRi(rowMenuRi === ri ? null : ri)
+    } else if (th) {
+      e.preventDefault()
+      const ci = Number((th as HTMLElement).dataset.col)
+      setColMenuCi(colMenuCi === ci ? null : ci)
+    }
+  }
+
+  /** 右键菜单动作（数据坐标）。 */
+  const ctxAction = (kind: string) => {
+    const m = ctxMenu
+    if (!m) return
+    const { ri, ci } = m
+    switch (kind) {
+      case 'copy':
+        void navigator.clipboard?.writeText(tableRef.current.rows[ri]?.[ci] ?? '')
+        break
+      case 'paste':
+        void navigator.clipboard?.readText().then((t) => {
+          if (t) {
+            setCell(ri, ci, t)
+            focusGrid()
+          }
+        })
+        break
+      case 'clear':
+        setCell(ri, ci, '')
+        break
+      case 'rowAbove':
+        addRow(ri)
+        break
+      case 'rowBelow':
+        addRow(ri + 1)
+        break
+      case 'delRow':
+        deleteRow(ri)
+        break
+      case 'colLeft':
+        insertColumn(ci, 0)
+        break
+      case 'colRight':
+        insertColumn(ci, 1)
+        break
+      case 'delCol':
+        deleteColumn(ci)
+        break
+    }
+    closeMenus()
+    focusGrid()
+  }
   const thRef = useRef<HTMLTableHeaderCellElement | null>(null)
   const rowRef = useRef<HTMLTableDataCellElement | null>(null)
   const tdRef = useRef<HTMLTableDataCellElement | null>(null)
 
   const cellClass =
-    'min-w-0 truncate border-b border-r border-border px-2 py-1.5 text-body text-ink focus:outline-none'
+    'min-w-0 truncate border-b border-r border-border px-2 py-1.5 text-body text-ink focus:outline-none transition-colors group-hover:bg-[var(--tbl-row-hover)]'
 
   return (
     <div
@@ -1329,6 +1402,7 @@ export function TableEditor({ tableId }: { tableId: string }) {
         className="min-h-0 flex-1 overflow-auto"
         data-testid="table-grid-wrap"
         ref={wrapRef}
+        onContextMenu={onGridContextMenu}
         onScroll={() => {
           if (colMenuCi != null || rowMenuRi != null || selectPopup != null) closeMenus()
         }}
@@ -1346,7 +1420,7 @@ export function TableEditor({ tableId }: { tableId: string }) {
             <tr>
               {/* 行号角格 */}
               <th
-                className="sticky left-0 top-0 z-20 h-9 w-10 border-b border-r border-border bg-surface-muted"
+                className="sticky left-0 top-0 z-20 h-8 w-11 border-b border-r border-border bg-[var(--tbl-row-num-bg)]"
                 data-testid="table-corner"
               >
                 <Plus
@@ -1368,7 +1442,7 @@ export function TableEditor({ tableId }: { tableId: string }) {
                   }}
                   style={{ width: col.width, minWidth: col.width }}
                   className={cn(
-                    'group sticky top-0 z-10 h-9 cursor-pointer border-b border-r border-border bg-surface-muted px-2 text-left text-caption font-medium text-ink',
+                    'group sticky top-0 z-10 h-8 cursor-pointer border-b border-r border-border bg-[var(--tbl-header-bg)] px-2 text-left text-caption font-medium text-ink transition-colors hover:bg-[var(--tbl-row-hover)]',
                     !freezeHeader && 'relative',
                     sortRef.current?.col === col.id && 'bg-state-hover',
                     colDrag?.ci === ci && 'opacity-40',
@@ -1430,7 +1504,18 @@ export function TableEditor({ tableId }: { tableId: string }) {
                         className="min-w-0 flex-1 rounded-sm border border-accent/50 bg-surface px-1 py-0.5 text-caption text-ink outline-none"
                       />
                     ) : (
-                      <span className="min-w-0 flex-1 truncate">{colName(ci)}</span>
+                      <span
+                        className="min-w-0 flex-1 truncate"
+                        data-testid={`table-col-name-${ci}`}
+                        onDoubleClick={(e) => {
+                          e.stopPropagation()
+                          closeMenus()
+                          setRenameText(col.name)
+                          setRenamingCi(ci)
+                        }}
+                      >
+                        {colName(ci)}
+                      </span>
                     )}
                     {sortRef.current?.col === col.id ? (
                       <span className="shrink-0 text-ink-secondary" data-testid="table-col-sort-ind">
@@ -1463,19 +1548,6 @@ export function TableEditor({ tableId }: { tableId: string }) {
                   />
                   {colMenuCi === ci ? (
                     <PortalMenu anchor={thRef.current} minWidth={176} testid="table-col-menu">
-                      <button
-                        type="button"
-                        data-testid="table-col-rename"
-                        onClick={() => {
-                          setRenameText(col.name)
-                          setRenamingCi(ci)
-                          setColMenuCi(null)
-                        }}
-                        className="flex w-full items-center gap-2 px-2.5 py-1.5 text-left text-body text-ink transition-colors hover:bg-state-hover"
-                      >
-                        {t('knowledge.table.columnMenu.rename')}
-                      </button>
-                      <div className="my-1 border-t border-border" />
                       <div className="px-2.5 pb-1 pt-0.5 text-meta text-ink-tertiary">
                         {t('knowledge.table.columnMenu.type')}
                       </div>
@@ -1619,13 +1691,13 @@ export function TableEditor({ tableId }: { tableId: string }) {
             {visibleIndices.map((ri, vi) => {
               const row = table.rows[ri] ?? []
               return (
-              <tr key={ri} data-row={ri}>
+              <tr key={ri} data-row={ri} className="group">
                 <td
                   className={cn(
-                    'sticky left-0 z-10 border-b border-r border-border bg-surface-muted text-center text-meta text-ink-tertiary',
+                    'sticky left-0 z-10 w-11 border-b border-r border-border bg-[var(--tbl-row-num-bg)] text-center text-meta text-ink-tertiary',
                     rowDrag?.ri === ri && 'opacity-40',
                     rowDrag && rowDrag.ri !== ri && rowDrag.overRi === ri && 'bg-state-hover',
-                    sel?.mode === 'row' && vi >= selSpan.r0 && vi <= selSpan.r1 && 'bg-state-hover',
+                    sel?.mode === 'row' && vi >= selSpan.r0 && vi <= selSpan.r1 && 'bg-[var(--tbl-sel)]',
                   )}
                   data-testid="table-row-idx"
                   ref={(el) => {
@@ -1943,9 +2015,9 @@ export function TableEditor({ tableId }: { tableId: string }) {
                         cellClass,
                         col.type === 'number' && 'text-right tabular-nums',
                         col.type === 'date' && value !== '' && 'tabular-nums',
-                        inSel && 'bg-state-hover',
+                        inSel && 'bg-[var(--tbl-sel)]',
                         isAnchor &&
-                          'relative outline outline-1 outline-[var(--accent-strong)]',
+                          'relative outline outline-1 outline-[var(--tbl-sel-strong)]',
                       )}
                       style={{ width: col.width }}
                     >
@@ -1956,6 +2028,32 @@ export function TableEditor({ tableId }: { tableId: string }) {
               </tr>
               )
             })}
+            {/* 添加行（T8 常驻入口） */}
+            <tr
+              data-testid="table-add-row"
+              className="group cursor-pointer"
+              onClick={(e) => {
+                e.stopPropagation()
+                const at = table.rows.length
+                addRow(at)
+                const rows = table.rows.length + 1
+                setSel({ anchor: { ri: rows - 1, ci: 0 }, focus: { ri: rows - 1, ci: 0 }, mode: 'cell' })
+                focusGrid()
+              }}
+            >
+              <td className="sticky left-0 z-10 border-b border-r border-border bg-[var(--tbl-row-num-bg)] text-center text-ink-tertiary/60">
+                <Plus size={12} className="mx-auto" aria-hidden />
+              </td>
+              <td
+                colSpan={table.cols.length}
+                className="border-b border-r border-border px-2 py-1.5 text-caption text-ink-tertiary transition-colors group-hover:text-ink"
+              >
+                <span className="inline-flex items-center gap-1 font-medium">
+                  <Plus size={12} aria-hidden />
+                  {t('knowledge.table.grid.addRow')}
+                </span>
+              </td>
+            </tr>
             {/* 统计行（Σ；仅统计可见行；不参与数据） */}
             {statsOn ? (
               <tr data-testid="table-stats-row">
@@ -1976,6 +2074,99 @@ export function TableEditor({ tableId }: { tableId: string }) {
           </tbody>
         </table>
       </div>
+
+      {/* 右键上下文菜单（body portal；视口钳制） */}
+      {ctxMenu
+        ? createPortal(
+            <div id="table-menus">
+              <div
+                data-testid="table-ctx-menu"
+                className="fixed z-50 w-44 rounded-lg border border-border bg-surface py-1 shadow-overlay"
+                style={{
+                  left: Math.max(8, Math.min(ctxMenu.x, window.innerWidth - 190)),
+                  top: Math.max(8, Math.min(ctxMenu.y, window.innerHeight - 240)),
+                }}
+                onClick={(e) => e.stopPropagation()}
+              >
+                <button
+                  type="button"
+                  data-testid="table-ctx-copy"
+                  onClick={() => ctxAction('copy')}
+                  className="flex w-full items-center gap-2 px-2.5 py-1.5 text-left text-body text-ink transition-colors hover:bg-state-hover"
+                >
+                  {t('knowledge.table.ctx.copy')}
+                </button>
+                <button
+                  type="button"
+                  data-testid="table-ctx-paste"
+                  onClick={() => ctxAction('paste')}
+                  className="flex w-full items-center gap-2 px-2.5 py-1.5 text-left text-body text-ink transition-colors hover:bg-state-hover"
+                >
+                  {t('knowledge.table.ctx.paste')}
+                </button>
+                <button
+                  type="button"
+                  data-testid="table-ctx-clear"
+                  onClick={() => ctxAction('clear')}
+                  className="flex w-full items-center gap-2 px-2.5 py-1.5 text-left text-body text-ink-secondary transition-colors hover:bg-state-hover"
+                >
+                  {t('knowledge.table.ctx.clear')}
+                </button>
+                <div className="my-1 border-t border-border" />
+                <button
+                  type="button"
+                  data-testid="table-ctx-row-above"
+                  onClick={() => ctxAction('rowAbove')}
+                  className="flex w-full items-center gap-2 px-2.5 py-1.5 text-left text-body text-ink transition-colors hover:bg-state-hover"
+                >
+                  {t('knowledge.table.rowMenu.insertAbove')}
+                </button>
+                <button
+                  type="button"
+                  data-testid="table-ctx-row-below"
+                  onClick={() => ctxAction('rowBelow')}
+                  className="flex w-full items-center gap-2 px-2.5 py-1.5 text-left text-body text-ink transition-colors hover:bg-state-hover"
+                >
+                  {t('knowledge.table.rowMenu.insertBelow')}
+                </button>
+                <button
+                  type="button"
+                  data-testid="table-ctx-row-delete"
+                  onClick={() => ctxAction('delRow')}
+                  className="flex w-full items-center gap-2 px-2.5 py-1.5 text-left text-body text-danger transition-colors hover:bg-danger/10"
+                >
+                  {t('knowledge.table.rowMenu.deleteRow')}
+                </button>
+                <div className="my-1 border-t border-border" />
+                <button
+                  type="button"
+                  data-testid="table-ctx-col-left"
+                  onClick={() => ctxAction('colLeft')}
+                  className="flex w-full items-center gap-2 px-2.5 py-1.5 text-left text-body text-ink transition-colors hover:bg-state-hover"
+                >
+                  {t('knowledge.table.columnMenu.insertLeft')}
+                </button>
+                <button
+                  type="button"
+                  data-testid="table-ctx-col-right"
+                  onClick={() => ctxAction('colRight')}
+                  className="flex w-full items-center gap-2 px-2.5 py-1.5 text-left text-body text-ink transition-colors hover:bg-state-hover"
+                >
+                  {t('knowledge.table.columnMenu.insertRight')}
+                </button>
+                <button
+                  type="button"
+                  data-testid="table-ctx-col-delete"
+                  onClick={() => ctxAction('delCol')}
+                  className="flex w-full items-center gap-2 px-2.5 py-1.5 text-left text-body text-danger transition-colors hover:bg-danger/10"
+                >
+                  {t('knowledge.table.columnMenu.deleteColumn')}
+                </button>
+              </div>
+            </div>,
+            document.body,
+          )
+        : null}
 
       {/* 底部状态栏 */}
       <div

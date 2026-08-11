@@ -2626,6 +2626,11 @@ export const ko = {
         duplicate: "행 복제",
         deleteRow: "행 삭제",
       },
+      ctx: {
+        copy: "복사",
+        paste: "붙여넣기",
+        clear: "지우기",
+      },
       grid: {
         addRow: "행 추가",
         addColumn: "열 추가",

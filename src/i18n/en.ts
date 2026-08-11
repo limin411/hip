@@ -2723,6 +2723,11 @@ export const en = {
           duplicate: 'Duplicate row',
           deleteRow: 'Delete row',
         },
+        ctx: {
+          copy: 'Copy',
+          paste: 'Paste',
+          clear: 'Clear',
+        },
         grid: {
           addRow: 'Add row',
           addColumn: 'Add column',

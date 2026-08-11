@@ -75,6 +75,12 @@
   /* 公共交互状态 —— 由现有变量派生，不引入新的硬编码颜色 */
   --state-hover: var(--accent-subtle);
   --state-active: var(--accent-active);
+  /* 表格域（table-ux-notion PR-10）：Notion 式暖灰行 hover + 蓝灰选区，脱离橙 tint */
+  --tbl-row-hover: rgba(0, 0, 0, 0.045);
+  --tbl-sel: rgba(35, 131, 226, 0.1);
+  --tbl-sel-strong: rgba(35, 131, 226, 0.2);
+  --tbl-header-bg: #faf9f6;
+  --tbl-row-num-bg: #f7f6f3;
   --state-disabled: var(--text-tertiary);
   --focus-ring: var(--accent);
   /* 兼容别名 —— DagEditor 等第三方覆盖曾用 surface/ink 命名 */
@@ -219,6 +225,11 @@ html[data-platform="linux"] {
   --overlay-scrim-light: rgba(0, 0, 0, 0.32);
   --state-hover: var(--accent-subtle);
   --state-active: var(--accent-active);
+  --tbl-row-hover: rgba(255, 255, 255, 0.05);
+  --tbl-sel: rgba(120, 170, 255, 0.16);
+  --tbl-sel-strong: rgba(120, 170, 255, 0.28);
+  --tbl-header-bg: #242320;
+  --tbl-row-num-bg: #201f1d;
   --state-disabled: var(--text-tertiary);
   --focus-ring: var(--accent);
   --surface: var(--bg-app);

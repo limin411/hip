@@ -2615,6 +2615,7 @@ export const zhTW = {
         sortAsc: "升冪排列",
         sortDesc: "降冪排列",
         sortClear: "清除排序",
+        more: "欄操作",
         statsShow: "顯示統計",
         statsSum: "總和",
         statsAvg: "平均",
@@ -2647,6 +2648,7 @@ export const zhTW = {
         freezeHeader: "凍結首列",
       },
       status: {
+        "selectionCount": "已選 {{n}} 格",
         rowsCols: "{{rows}} 列 · {{cols}} 欄",
         saved: "已儲存",
         saving: "儲存中…",

@@ -2710,6 +2710,7 @@ export const en = {
           sortAsc: 'Sort ascending',
           sortDesc: 'Sort descending',
           sortClear: 'Clear sort',
+          more: 'Column actions',
           statsShow: 'Show stats',
           statsSum: 'Sum',
           statsAvg: 'Average',
@@ -2742,6 +2743,7 @@ export const en = {
           freezeHeader: 'Freeze header',
         },
         status: {
+          selectionCount: '{{n}} cells selected',
           rowsCols: '{{rows}} rows · {{cols}} columns',
           saved: 'Saved',
           saving: 'Saving…',

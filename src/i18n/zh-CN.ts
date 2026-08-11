@@ -2650,6 +2650,7 @@ export const zhCN = {
           sortAsc: '升序排列',
           sortDesc: '降序排列',
           sortClear: '清除排序',
+          more: '列操作',
           statsShow: '显示统计',
           statsSum: '求和',
           statsAvg: '均值',
@@ -2682,6 +2683,7 @@ export const zhCN = {
           freezeHeader: '冻结首行',
         },
         status: {
+          selectionCount: '已选 {{n}} 格',
           rowsCols: '{{rows}} 行 · {{cols}} 列',
           saved: '已保存',
           saving: '保存中…',

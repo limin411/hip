@@ -37,6 +37,7 @@ vi.mock('react-i18next', async (importOriginal) => {
     t: (key: string, opts?: Record<string, unknown>) => {
       if (key === 'knowledge.table.columnLabel') return `列 ${opts?.n}`
       if (key === 'knowledge.table.status.rowsCols') return `${opts?.rows} 行 · ${opts?.cols} 列`
+      if (key === 'knowledge.table.status.selectionCount') return `已选 ${opts?.n} 格`
       if (key === 'knowledge.table.types.text') return '文本'
       if (key === 'knowledge.table.types.number') return '数字'
       if (key === 'knowledge.table.types.checkbox') return '勾选'
@@ -128,16 +129,17 @@ describe('TableEditor (knowledge-table PR-3)', () => {
     expect(draft?.csv).toContain('新任务')
   })
 
-  it('edits via direct character input and Escape cancels', async () => {
+  it('edits via direct character input; Escape cancels the edit state (input already written, Notion semantics)', async () => {
     render(<TableEditor tableId="tbl_1" />)
     const grid = screen.getByTestId('table-grid')
-    // 直接输入 'q' 进入编辑
+    // 直接输入 'q' 进入编辑（值已写入单元格）
     fireEvent.keyDown(grid, { key: 'q' })
     const input = screen.getByTestId('table-cell-input')
     expect((input as HTMLInputElement).value).toBe('q')
     fireEvent.keyDown(input, { key: 'Escape' })
     expect(screen.queryByTestId('table-cell-input')).toBeNull()
-    expect(screen.getByTestId('table-cell-0-0').textContent).toContain('a')
+    // 新语义：输入即写入选区（Notion）；Esc 仅取消编辑态
+    expect(screen.getByTestId('table-cell-0-0').textContent).toContain('q')
   })
 
   it('Tab moves right, Enter moves down and appends a row at the end', () => {
@@ -188,7 +190,7 @@ describe('TableEditor (knowledge-table PR-3)', () => {
   it('column menu: rename + type switch + insert/delete column', async () => {
     render(<TableEditor tableId="tbl_1" />)
     // 打开列菜单（点第 0 列头）
-    fireEvent.click(screen.getByTestId('table-grid').querySelector('th[data-col="0"]')!)
+    fireEvent.click(screen.getByTestId('table-col-more-0'))
     expect(screen.getByTestId('table-col-menu')).toBeTruthy()
     // 重命名
     fireEvent.click(screen.getByTestId('table-col-rename'))
@@ -197,15 +199,15 @@ describe('TableEditor (knowledge-table PR-3)', () => {
     fireEvent.keyDown(renameInput, { key: 'Enter' })
     expect(screen.getByText('事项')).toBeTruthy()
     // 类型切换 → number
-    fireEvent.click(screen.getByTestId('table-grid').querySelector('th[data-col="0"]')!)
+    fireEvent.click(screen.getByTestId('table-col-more-0'))
     fireEvent.click(screen.getByTestId('table-col-type-number'))
     expect((screen.getByTestId('table-grid').querySelector('th[data-col="0"]') as HTMLElement).dataset.colType).toBe('number')
     // 插右列
-    fireEvent.click(screen.getByTestId('table-grid').querySelector('th[data-col="0"]')!)
+    fireEvent.click(screen.getByTestId('table-col-more-0'))
     fireEvent.click(screen.getByTestId('table-col-insert-right'))
     expect(screen.getByTestId('table-grid').dataset.cols).toBe('4')
     // 删除列
-    fireEvent.click(screen.getByTestId('table-grid').querySelector('th[data-col="3"]')!)
+    fireEvent.click(screen.getByTestId('table-col-more-3'))
     fireEvent.click(screen.getByTestId('table-col-delete'))
     expect(screen.getByTestId('table-grid').dataset.cols).toBe('3')
     // 非法数字值保留原样：把 text 列改回 text 后值仍在
@@ -215,7 +217,7 @@ describe('TableEditor (knowledge-table PR-3)', () => {
   it('column rename commits on blur (Excel 式点击他处生效) and Tab; Esc cancels', () => {
     render(<TableEditor tableId="tbl_1" />)
     const openRename = () => {
-      fireEvent.click(screen.getByTestId('table-grid').querySelector('th[data-col="0"]')!)
+      fireEvent.click(screen.getByTestId('table-col-more-0'))
       fireEvent.click(screen.getByTestId('table-col-rename'))
       return screen.getByTestId('table-col-rename-input') as HTMLInputElement
     }
@@ -419,7 +421,7 @@ describe('TableEditor PR-4 (undo/resize/drag/freeze)', () => {
     fireEvent.keyDown(screen.getByTestId('table-grid'), { key: 'z', metaKey: true })
     expect(screen.getByTestId('table-grid').dataset.rows).toBe('3')
     // 删除第 0 列
-    fireEvent.click(screen.getByTestId('table-grid').querySelector('th[data-col="0"]')!)
+    fireEvent.click(screen.getByTestId('table-col-more-0'))
     fireEvent.click(screen.getByTestId('table-col-delete'))
     expect(screen.getByTestId('table-grid').dataset.cols).toBe('2')
     fireEvent.keyDown(screen.getByTestId('table-grid'), { key: 'z', metaKey: true })
@@ -446,7 +448,7 @@ describe('TableEditor PR-5 (sort/filter/stats/export)', () => {
 
   it('sorts via column menu desc and shows indicator + chip', () => {
     render(<TableEditor tableId="tbl_1" />)
-    fireEvent.click(screen.getByTestId('table-grid').querySelector('th[data-col="1"]')!)
+    fireEvent.click(screen.getByTestId('table-col-more-1'))
     fireEvent.click(screen.getByTestId('table-col-sort-desc'))
     // 数字列 100,200,300 → 降序后首个可见行 col1 = '300'
     const firstCol1 = () =>
@@ -488,7 +490,7 @@ describe('TableEditor PR-5 (sort/filter/stats/export)', () => {
     expect(stats1()).toBe('600')
     expect(screen.getByTestId('table-stats-row').querySelector('[data-stats-cell="0"]')!.textContent).toBe('3')
     // 列菜单统计：均值 → 200
-    fireEvent.click(screen.getByTestId('table-grid').querySelector('th[data-col="1"]')!)
+    fireEvent.click(screen.getByTestId('table-col-more-1'))
     fireEvent.click(screen.getByTestId('table-col-stats-avg'))
     expect(stats1()).toBe('200')
     // 筛选后统计可见行：只留 'x' 行 → 均值 300
@@ -694,5 +696,125 @@ describe('TableEditor table-ux-notion PR-2 (focus loop + typed editing)', () => 
     expect(useKnowledgeStore.getState().tableDraft?.csv).toContain('尾行')
     // 新行落在选区
     expect(document.querySelector('td[data-cell="3,0"]')!.className).toContain('outline')
+  })
+})
+
+describe('TableEditor table-ux-notion PR-3 (selection model)', () => {
+  beforeEach(() => {
+    mountTable()
+    useKnowledgeStore.setState({
+      commitTable: vi.fn(async () => {
+        commitTableSpy()
+        return true
+      }) as never,
+    })
+  })
+  afterEach(() => {
+    cleanup()
+    vi.useRealTimers()
+  })
+
+  it('Shift+click extends selection rectangle with fill highlight', () => {
+    render(<TableEditor tableId="tbl_1" />)
+    fireEvent.click(document.querySelector('td[data-cell="0,0"]')!)
+    fireEvent.click(document.querySelector('td[data-cell="1,1"]')!, { shiftKey: true })
+    // 2×2 整格底色
+    for (const r of ['0,0', '0,1', '1,0', '1,1']) {
+      expect(document.querySelector(`td[data-cell="${r}"]`)!.className).toContain('bg-state-hover')
+    }
+    // 范围外不高亮
+    expect(document.querySelector('td[data-cell="2,0"]')!.className).not.toContain('bg-state-hover')
+    // anchor 格描边
+    expect(document.querySelector('td[data-cell="0,0"]')!.className).toContain('outline')
+    // 状态栏显示已选 4 格
+    expect(screen.getByTestId('table-selection-info').textContent).toContain('4')
+  })
+
+  it('⌘A selects all cells; Delete clears the whole range; ⌘Z restores', () => {
+    render(<TableEditor tableId="tbl_1" />)
+    const grid = screen.getByTestId('table-grid')
+    fireEvent.keyDown(grid, { key: 'a', metaKey: true })
+    expect(screen.getByTestId('table-selection-info').textContent).toContain('9')
+    fireEvent.keyDown(grid, { key: 'Delete' })
+    // 全部清空
+    expect(useKnowledgeStore.getState().tableDraft?.csv).toBe(',,\n,,\n,,')
+    fireEvent.keyDown(grid, { key: 'z', metaKey: true })
+    expect(useKnowledgeStore.getState().tableDraft?.csv).toBe('a,100,c\n1,200,3\nx,300,z')
+  })
+
+  it('Shift+ArrowDown extends; plain ArrowDown re-anchors', () => {
+    render(<TableEditor tableId="tbl_1" />)
+    const grid = screen.getByTestId('table-grid')
+    fireEvent.click(document.querySelector('td[data-cell="0,0"]')!)
+    fireEvent.keyDown(grid, { key: 'ArrowDown', shiftKey: true })
+    fireEvent.keyDown(grid, { key: 'ArrowDown', shiftKey: true })
+    expect(screen.getByTestId('table-selection-info').textContent).toContain('3')
+    // 非扩展移动 → 单格（末行钳制）
+    fireEvent.keyDown(grid, { key: 'ArrowDown' })
+    expect(screen.queryByTestId('table-selection-info')).toBeNull()
+    expect(document.querySelector('td[data-cell="2,0"]')!.className).toContain('outline')
+  })
+
+  it('row number click selects whole row; Shift+click extends to multiple rows', () => {
+    render(<TableEditor tableId="tbl_1" />)
+    fireEvent.click(document.querySelector('tr[data-row="0"] td[data-testid="table-row-idx"]')!)
+    // 整行 3 格高亮
+    for (const c of ['0', '1', '2']) {
+      expect(document.querySelector(`td[data-cell="0,${c}"]`)!.className).toContain('bg-state-hover')
+    }
+    expect(document.querySelector('td[data-cell="1,0"]')!.className).not.toContain('bg-state-hover')
+    expect(screen.getByTestId('table-selection-info').textContent).toContain('3')
+    // Shift 点击行 2 → 行 0..2 全高亮（9 格）
+    fireEvent.click(document.querySelector('tr[data-row="2"] td[data-testid="table-row-idx"]')!, { shiftKey: true })
+    expect(screen.getByTestId('table-selection-info').textContent).toContain('9')
+    expect(document.querySelector('td[data-cell="2,2"]')!.className).toContain('bg-state-hover')
+  })
+
+  it('header click selects whole column; ⋯ still opens the column menu', () => {
+    render(<TableEditor tableId="tbl_1" />)
+    fireEvent.click(screen.getByTestId('table-grid').querySelector('th[data-col="1"]')!)
+    // 整列 3 格高亮
+    for (const r of ['0', '1', '2']) {
+      expect(document.querySelector(`td[data-cell="${r},1"]`)!.className).toContain('bg-state-hover')
+    }
+    expect(screen.getByTestId('table-selection-info').textContent).toContain('3')
+    // ⋯ 打开列菜单（不触发列选择）
+    fireEvent.click(screen.getByTestId('table-col-more-1'))
+    expect(screen.getByTestId('table-col-menu')).toBeTruthy()
+  })
+
+  it('direct character input replaces the whole selection (Notion)', () => {
+    render(<TableEditor tableId="tbl_1" />)
+    fireEvent.click(document.querySelector('td[data-cell="0,0"]')!)
+    fireEvent.click(document.querySelector('td[data-cell="0,1"]')!, { shiftKey: true })
+    fireEvent.keyDown(screen.getByTestId('table-grid'), { key: 'x' })
+    const draft = useKnowledgeStore.getState().tableDraft?.csv.split('\n')[0]
+    expect(draft).toBe('x,x,c')
+  })
+
+  it('checkbox column: single click selects the cell (no toggle); space toggles', () => {
+    useKnowledgeStore.setState({
+      tableDoc: {
+        id: 'tbl_1',
+        csv: 'x\n',
+        meta: JSON.stringify({ cols: [{ id: 'col_1', name: '勾选', type: 'checkbox', width: 150 }] }),
+      },
+      tableDraft: {
+        id: 'tbl_1',
+        csv: 'x\n',
+        meta: JSON.stringify({ cols: [{ id: 'col_1', name: '勾选', type: 'checkbox', width: 150 }] }),
+      },
+    })
+    render(<TableEditor tableId="tbl_1" />)
+    // 单击单元格（非复选框本体）→ 只选中
+    fireEvent.click(document.querySelector('td[data-cell="0,0"]')!)
+    expect(useKnowledgeStore.getState().tableDraft?.csv).toBe('x\n')
+    expect(document.querySelector('td[data-cell="0,0"]')!.className).toContain('bg-state-hover')
+    // 空格切换
+    fireEvent.keyDown(screen.getByTestId('table-grid'), { key: ' ' })
+    expect(useKnowledgeStore.getState().tableDraft?.csv).toBe('1')
+    // 点复选框本体切换
+    fireEvent.click(screen.getByTestId('table-check-0-0'))
+    expect(useKnowledgeStore.getState().tableDraft?.csv).toBe('0')
   })
 })

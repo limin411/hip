@@ -2613,6 +2613,7 @@ export const ja = {
         sortAsc: "昇順で並べ替え",
         sortDesc: "降順で並べ替え",
         sortClear: "並べ替えをクリア",
+        more: "列の操作",
         statsShow: "統計を表示",
         statsSum: "合計",
         statsAvg: "平均",
@@ -2645,6 +2646,7 @@ export const ja = {
         freezeHeader: "先頭行を固定",
       },
       status: {
+        "selectionCount": "{{n}} セルを選択中",
         rowsCols: "{{rows}} 行 · {{cols}} 列",
         saved: "保存済み",
         saving: "保存中…",

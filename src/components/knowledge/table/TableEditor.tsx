@@ -41,9 +41,14 @@ import {
   csvToTable,
   defaultStatsMode,
   metaFromTable,
+  selectionCells,
+  selectionDataCells,
+  selectionSpan,
   statsValue,
   tableToCsv,
   viewIndexes,
+  type CellPos,
+  type TableSelection,
   type ColStatsMode,
   type TableColType,
   type TableData,
@@ -63,11 +68,6 @@ const TYPE_ICONS: Record<TableColType, typeof Type> = {
 
 const COL_TYPE_ORDER: TableColType[] = ['text', 'number', 'checkbox', 'date', 'select']
 
-interface CellPos {
-  ri: number
-  ci: number
-}
-
 export function TableEditor({ tableId }: { tableId: string }) {
   const { t } = useTranslation()
   const draft = useKnowledgeStore((s) => s.tableDraft)
@@ -81,7 +81,14 @@ export function TableEditor({ tableId }: { tableId: string }) {
   const [table, setTable] = useState<TableData>(() =>
     csvToTable(draft?.csv ?? '', draft?.meta ?? ''),
   )
-  const [sel, setSel] = useState<CellPos>({ ri: 0, ci: 0 })
+  /** 选区（视图坐标；anchor/focus 矩形 + mode）。见 tableModel.TableSelection。 */
+  const [sel, setSel] = useState<TableSelection | null>({
+    anchor: { ri: 0, ci: 0 },
+    focus: { ri: 0, ci: 0 },
+    mode: 'cell',
+  })
+  const selRef = useRef(sel)
+  selRef.current = sel
   const [editing, setEditing] = useState<{ ri: number; ci: number; value: string; err?: boolean } | null>(null)
   /** 同步 ref：input 卸载时 blur 会带着旧闭包触发，需以最新值判定。 */
   const editingRef = useRef(editing)
@@ -154,7 +161,7 @@ export function TableEditor({ tableId }: { tableId: string }) {
   }
 
   const applySnapshot = (snap: TableSnapshot) => {
-    setSel({ ri: 0, ci: 0 })
+    setSel(null)
     setColMenuCi(null)
     setRowMenuRi(null)
     setSelectPopup(null)
@@ -279,104 +286,149 @@ export function TableEditor({ tableId }: { tableId: string }) {
     }
     onChange(next)
     setEditingSync(null)
-    setSel(target)
+    setSel({ anchor: { ...target }, focus: { ...target }, mode: 'cell' })
     focusGrid()
   }
 
   const setCell = (ri: number, ci: number, value: string) => {
+    const dataRi = visibleIndices[ri] ?? ri
     const next = structuredClone(table)
-    next.rows[ri] = [...next.rows[ri]]
-    next.rows[ri][ci] = value
+    next.rows[dataRi] = [...next.rows[dataRi]]
+    next.rows[dataRi][ci] = value
     onChange(next)
-    setSel({ ri, ci })
+    setSel({ anchor: { ri, ci }, focus: { ri, ci }, mode: 'cell' })
   }
 
-  const moveSel = (ri: number, ci: number) => {
+  /** 选中态定位（视图坐标）。extend=true 时保持 anchor 扩展 focus。 */
+  const moveSel = (ri: number, ci: number, extend = false) => {
     const rows = table.rows.length
     const cols = table.cols.length
-    setSel({ ri: Math.max(0, Math.min(rows - 1, ri)), ci: Math.max(0, Math.min(cols - 1, ci)) })
+    const pos = { ri: Math.max(0, Math.min(rows - 1, ri)), ci: Math.max(0, Math.min(cols - 1, ci)) }
+    const cur = selRef.current
+    if (extend && cur) {
+      setSel({ anchor: { ...cur.anchor }, focus: pos, mode: cur.mode })
+    } else {
+      setSel({ anchor: { ...pos }, focus: { ...pos }, mode: 'cell' })
+    }
   }
 
-  /** 网格键盘导航（选中态）。编辑态由 input 自行处理。 */
+  /** 批量写入选区（数据坐标经视图序映射；Delete/直接输入共用）。 */
+  const applyToSelection = (write: (p: { ri: number; ci: number }, i: number) => string) => {
+    const cur = selRef.current
+    if (!cur) return
+    const cells = selectionDataCells(cur, visibleIndices, table.rows.length, table.cols.length)
+    if (cells.length === 0) return
+    const next = structuredClone(table)
+    cells.forEach((p, i) => {
+      next.rows[p.ri] = [...next.rows[p.ri]]
+      next.rows[p.ri][p.ci] = write(p, i)
+    })
+    onChange(next)
+  }
+
+  /** 视图坐标 → 数据行索引（选区/键盘都在视图空间）。 */
+  const dataRowOf = (vi: number): number => visibleIndices[vi] ?? vi
+
+  /** 剪贴板（⌘C/⌘V）。PR-4 接入 TSV 序列化/嗅探粘贴。 */
+  const handleClipboard = (_kind: 'copy' | 'paste') => {
+    // PR-4
+  }
+
+  /** 网格键盘导航（选中态）。编辑态由 input 自行处理。
+   *  方向键移动（Shift 扩展）；Enter 进入编辑；Delete 批量清空；⌘A 全选。 */
   const handleGridKeyDown = (e: React.KeyboardEvent) => {
     if (e.metaKey || e.ctrlKey) {
       if (e.key.toLowerCase() === 'z') {
         e.preventDefault()
         if (e.shiftKey) redo()
         else undo()
+      } else if (e.key.toLowerCase() === 'a') {
+        e.preventDefault()
+        const rows = table.rows.length
+        const cols = table.cols.length
+        if (rows > 0 && cols > 0) {
+          setSel({ anchor: { ri: 0, ci: 0 }, focus: { ri: rows - 1, ci: cols - 1 }, mode: 'cell' })
+        }
+      } else if (e.key.toLowerCase() === 'c' || e.key.toLowerCase() === 'v') {
+        // PR-4 接入剪贴板
+        handleClipboard(e.key.toLowerCase() === 'c' ? 'copy' : 'paste')
       }
       return
     }
     if (e.altKey) return
-    const { ri, ci } = sel
+    const cur = selRef.current
+    const ri = cur?.focus.ri ?? 0
+    const ci = cur?.focus.ci ?? 0
     switch (e.key) {
-      case 'Enter': {
+      case 'Enter':
+      case 'F2': {
         e.preventDefault()
-        const isShift = e.shiftKey
-        let nextRow = isShift ? ri - 1 : ri + 1
-        if (nextRow >= table.rows.length) {
-          onChange({ cols: table.cols, rows: [...table.rows.map((r) => [...r]), Array(table.cols.length).fill('')] })
-          nextRow = table.rows.length
+        const type = table.cols[ci]?.type
+        if (type === 'select' || type === 'checkbox') {
+          if (type === 'select') {
+            setSelectPopup({ ri, ci })
+            focusGrid()
+          }
+          return
         }
-        setSel({ ri: Math.max(0, nextRow), ci })
+        setEditingSync({ ri, ci, value: table.rows[dataRowOf(ri)]?.[ci] ?? '' })
         break
       }
       case 'Tab': {
         e.preventDefault()
         if (e.shiftKey) {
-          if (ci > 0) setSel({ ri, ci: ci - 1 })
-          else if (ri > 0) setSel({ ri: ri - 1, ci: table.cols.length - 1 })
+          if (ci > 0) moveSel(ri, ci - 1)
+          else if (ri > 0) moveSel(ri - 1, table.cols.length - 1)
         } else {
-          if (ci < table.cols.length - 1) setSel({ ri, ci: ci + 1 })
+          if (ci < table.cols.length - 1) moveSel(ri, ci + 1)
           else {
             if (ri >= table.rows.length - 1) {
               onChange({ cols: table.cols, rows: [...table.rows.map((r) => [...r]), Array(table.cols.length).fill('')] })
             }
-            setSel({ ri: Math.min(ri + 1, table.rows.length), ci: 0 })
+            moveSel(Math.min(ri + 1, table.rows.length), 0)
           }
         }
         break
       }
       case 'ArrowDown':
         e.preventDefault()
-        moveSel(ri + 1, ci)
+        moveSel(ri + 1, ci, e.shiftKey)
         break
       case 'ArrowUp':
         e.preventDefault()
-        moveSel(ri - 1, ci)
+        moveSel(ri - 1, ci, e.shiftKey)
         break
       case 'ArrowLeft':
         e.preventDefault()
-        moveSel(ri, ci - 1)
+        moveSel(ri, ci - 1, e.shiftKey)
         break
       case 'ArrowRight':
         e.preventDefault()
-        moveSel(ri, ci + 1)
+        moveSel(ri, ci + 1, e.shiftKey)
         break
       case 'Delete':
       case 'Backspace':
         e.preventDefault()
-        setCell(ri, ci, '')
+        applyToSelection(() => '')
         break
       case ' ':
         if (table.cols[ci]?.type === 'checkbox') {
           e.preventDefault()
-          setCell(ri, ci, table.rows[ri]?.[ci] === '1' ? '0' : '1')
+          const dataRi = dataRowOf(ri)
+          setCell(dataRi, ci, table.rows[dataRi]?.[ci] === '1' ? '0' : '1')
         }
-        break
-      case 'F2':
-        e.preventDefault()
-        setEditingSync({ ri, ci, value: table.rows[ri]?.[ci] ?? '' })
         break
       case 'Escape':
         setColMenuCi(null)
         setRowMenuRi(null)
         setSelectPopup(null)
+        setSel(null) // 再按 Esc 清选区
         break
       default:
-        // 直接输入字符进入编辑（单字符、非组合键）。
+        // 直接输入字符：整个选区替换为输入字符，并进入焦点格编辑（单字符、非组合键）。
         if (e.key.length === 1 && !e.nativeEvent.isComposing) {
           e.preventDefault()
+          applyToSelection(() => e.key)
           setEditingSync({ ri, ci, value: e.key })
         }
     }
@@ -402,7 +454,7 @@ export function TableEditor({ tableId }: { tableId: string }) {
     onChange({ cols: table.cols, rows })
     setRowMenuRi(null)
     toast.info(t('knowledge.table.toasts.rowDeleted'))
-    setSel({ ri: Math.min(ri, rows.length - 1), ci: sel.ci })
+    setSel(null)
   }
 
   const insertColumn = (ci: number, offset: 0 | 1) => {
@@ -430,7 +482,7 @@ export function TableEditor({ tableId }: { tableId: string }) {
     onChange({ cols, rows })
     setColMenuCi(null)
     toast.info(t('knowledge.table.toasts.columnDeleted'))
-    setSel({ ri: sel.ri, ci: Math.min(sel.ci, cols.length - 1) })
+    setSel(null)
   }
 
   const setColType = (ci: number, type: TableColType) => {
@@ -457,17 +509,23 @@ export function TableEditor({ tableId }: { tableId: string }) {
     const options = [...(table.cols[ci]?.options ?? [])]
     if (!options.includes(v)) options.push(v)
     const cols = table.cols.map((c, i) => (i === ci ? { ...c, options } : c))
+    const dataRi = dataRowOf(ri)
     const rows = table.rows.map((r, i) => {
-      if (i !== ri) return r
+      if (i !== dataRi) return r
       const nr = [...r]
       nr[ci] = v
       return nr
     })
     onChange({ cols, rows })
-    setSel({ ri, ci })
+    setSel({ anchor: { ri, ci }, focus: { ri, ci }, mode: 'cell' })
     setNewOptionText('')
     setSelectPopup(null)
   }
+
+  /** 选区跨度（视图坐标；供渲染高亮）。 */
+  const selSpan = sel ? selectionSpan(sel) : { r0: 0, r1: -1, c0: 0, c1: -1 }
+  /** 当前选区格数（状态栏）。 */
+  const selCount = sel ? selectionCells(sel, table.rows.length, table.cols.length).length : 0
 
   const statsLine = useMemo(
     () => t('knowledge.table.status.rowsCols', { rows: table.rows.length, cols: table.cols.length }),
@@ -1026,15 +1084,22 @@ export function TableEditor({ tableId }: { tableId: string }) {
                   data-col-type={col.type}
                   style={{ width: col.width, minWidth: col.width }}
                   className={cn(
-                    'sticky top-0 z-10 h-9 cursor-pointer border-b border-r border-border bg-surface-muted px-2 text-left text-caption font-medium text-ink',
+                    'group sticky top-0 z-10 h-9 cursor-pointer border-b border-r border-border bg-surface-muted px-2 text-left text-caption font-medium text-ink',
                     !freezeHeader && 'relative',
                     sortRef.current?.col === col.id && 'bg-state-hover',
                     colDrag?.ci === ci && 'opacity-40',
                     colDrag && colDrag.ci !== ci && colDrag.overCi === ci && 'bg-state-hover',
+                    sel?.mode === 'column' && ci >= selSpan.c0 && ci <= selSpan.c1 && 'bg-state-hover',
                   )}
                   onClick={(e) => {
                     e.stopPropagation()
-                    setColMenuCi(colMenuCi === ci ? null : ci)
+                    const cur = selRef.current
+                    if (e.shiftKey && cur) {
+                      setSel({ anchor: { ...cur.anchor }, focus: { ri: 0, ci }, mode: 'column' })
+                    } else {
+                      setSel({ anchor: { ri: 0, ci }, focus: { ri: 0, ci }, mode: 'column' })
+                    }
+                    focusGrid()
                   }}
                 >
                   <div className="flex items-center gap-1">
@@ -1079,6 +1144,19 @@ export function TableEditor({ tableId }: { tableId: string }) {
                         {sortRef.current.dir === 'asc' ? '↑' : '↓'}
                       </span>
                     ) : null}
+                    <span
+                      role="button"
+                      data-testid={`table-col-more-${ci}`}
+                      tabIndex={-1}
+                      aria-label={t('knowledge.table.columnMenu.more')}
+                      className="ml-auto flex h-5 w-5 shrink-0 cursor-pointer items-center justify-center rounded text-ink-tertiary opacity-0 transition-opacity hover:bg-state-hover hover:text-ink group-hover:opacity-100 focus:opacity-100"
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        setColMenuCi(colMenuCi === ci ? null : ci)
+                      }}
+                    >
+                      <MoreHorizontal size={13} aria-hidden />
+                    </span>
                   </div>
                   {/* 列宽拖拽手柄（右缘）+ 双击自适应 */}
                   <span
@@ -1248,7 +1326,7 @@ export function TableEditor({ tableId }: { tableId: string }) {
             </tr>
           </thead>
           <tbody>
-            {visibleIndices.map((ri) => {
+            {visibleIndices.map((ri, vi) => {
               const row = table.rows[ri] ?? []
               return (
               <tr key={ri} data-row={ri}>
@@ -1257,8 +1335,19 @@ export function TableEditor({ tableId }: { tableId: string }) {
                     'sticky left-0 z-10 border-b border-r border-border bg-surface-muted text-center text-meta text-ink-tertiary',
                     rowDrag?.ri === ri && 'opacity-40',
                     rowDrag && rowDrag.ri !== ri && rowDrag.overRi === ri && 'bg-state-hover',
+                    sel?.mode === 'row' && vi >= selSpan.r0 && vi <= selSpan.r1 && 'bg-state-hover',
                   )}
                   data-testid="table-row-idx"
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    const cur = selRef.current
+                    if (e.shiftKey && cur) {
+                      setSel({ anchor: { ...cur.anchor }, focus: { ri: vi, ci: 0 }, mode: 'row' })
+                    } else {
+                      setSel({ anchor: { ri: vi, ci: 0 }, focus: { ri: vi, ci: 0 }, mode: 'row' })
+                    }
+                    focusGrid()
+                  }}
                 >
                   <div className="relative flex h-full items-center justify-center gap-1 py-1.5">
                     <span
@@ -1333,8 +1422,14 @@ export function TableEditor({ tableId }: { tableId: string }) {
                 </td>
                 {table.cols.map((col, ci) => {
                   const value = row[ci] ?? ''
-                  const isSel = sel.ri === ri && sel.ci === ci
-                  const isEditing = editing?.ri === ri && editing?.ci === ci
+                  const inSel = (() => {
+                    if (!sel) return false
+                    if (sel.mode === 'row') return vi >= selSpan.r0 && vi <= selSpan.r1
+                    if (sel.mode === 'column') return ci >= selSpan.c0 && ci <= selSpan.c1
+                    return vi >= selSpan.r0 && vi <= selSpan.r1 && ci >= selSpan.c0 && ci <= selSpan.c1
+                  })()
+                  const isAnchor = !!sel && sel.anchor.ri === vi && sel.anchor.ci === ci && sel.mode !== 'row'
+                  const isEditing = editing?.ri === vi && editing?.ci === ci
                   const isTextLike = col.type === 'text'
                   const cellContent = (() => {
                     if (isEditing) {
@@ -1500,25 +1595,45 @@ export function TableEditor({ tableId }: { tableId: string }) {
                       tabIndex={-1}
                       onClick={(e) => {
                         e.stopPropagation()
-                        if (col.type === 'checkbox') return
-                        if (col.type === 'select') {
-                          setSelectPopup(selectPopup?.ri === ri && selectPopup?.ci === ci ? null : { ri, ci })
+                        const cur = selRef.current
+                        if (col.type === 'checkbox') {
+                          // T7：勾选列单击=先选中该格（空格/再点复选框切换）
+                          if (e.shiftKey && cur) {
+                            setSel({ anchor: { ...cur.anchor }, focus: { ri: vi, ci }, mode: 'cell' })
+                          } else {
+                            setSel({ anchor: { ri: vi, ci }, focus: { ri: vi, ci }, mode: 'cell' })
+                          }
                           focusGrid()
                           return
                         }
-                        setSel({ ri, ci })
+                        if (col.type === 'select') {
+                          if (e.shiftKey && cur) {
+                            setSel({ anchor: { ...cur.anchor }, focus: { ri: vi, ci }, mode: 'cell' })
+                          } else {
+                            setSel({ anchor: { ri: vi, ci }, focus: { ri: vi, ci }, mode: 'cell' })
+                          }
+                          setSelectPopup(selectPopup?.ri === vi && selectPopup?.ci === ci ? null : { ri: vi, ci })
+                          focusGrid()
+                          return
+                        }
+                        if (e.shiftKey && cur) {
+                          setSel({ anchor: { ...cur.anchor }, focus: { ri: vi, ci }, mode: 'cell' })
+                        } else {
+                          setSel({ anchor: { ri: vi, ci }, focus: { ri: vi, ci }, mode: 'cell' })
+                        }
                         focusGrid()
                       }}
                       onDoubleClick={(e) => {
                         e.stopPropagation()
                         if (col.type === 'checkbox' || col.type === 'select') return
-                        setEditingSync({ ri, ci, value })
+                        setEditingSync({ ri: vi, ci, value })
                       }}
                       className={cn(
                         cellClass,
                         col.type === 'number' && 'text-right tabular-nums',
-                        isSel &&
-                          'relative bg-state-hover outline outline-1 outline-[var(--accent-strong)]',
+                        inSel && 'bg-state-hover',
+                        isAnchor &&
+                          'relative outline outline-1 outline-[var(--accent-strong)]',
                       )}
                       style={{ width: col.width }}
                     >
@@ -1556,6 +1671,11 @@ export function TableEditor({ tableId }: { tableId: string }) {
         data-testid="table-editor-status"
       >
         <span className="text-ink-tertiary">{statsLine}</span>
+        {sel && selCount > 1 ? (
+          <span className="text-ink-secondary" data-testid="table-selection-info">
+            {t('knowledge.table.status.selectionCount', { n: selCount })}
+          </span>
+        ) : null}
         <span className="ml-auto flex items-center gap-1.5">
           <span
             className={cn(

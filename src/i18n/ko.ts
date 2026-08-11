@@ -2613,6 +2613,7 @@ export const ko = {
         sortAsc: "오름차순 정렬",
         sortDesc: "내림차순 정렬",
         sortClear: "정렬 지우기",
+        more: "열 작업",
         statsShow: "통계 표시",
         statsSum: "합계",
         statsAvg: "평균",
@@ -2645,6 +2646,7 @@ export const ko = {
         freezeHeader: "첫 행 고정",
       },
       status: {
+        "selectionCount": "{{n}}개 셀 선택됨",
         rowsCols: "{{rows}}개 행 · {{cols}}개 열",
         saved: "저장됨",
         saving: "저장 중…",

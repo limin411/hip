@@ -122,6 +122,16 @@ const TYPE_ICONS: Record<TableColType, typeof Type> = {
 
 const COL_TYPE_ORDER: TableColType[] = ['text', 'number', 'checkbox', 'date', 'select']
 
+/** 单选 chip 色板（浅底深字，暗色主题下仍可读）。 */
+const CHIP_STYLES = [
+  { bg: 'rgba(35, 131, 226, 0.14)', fg: '#1d4f91' },
+  { bg: 'rgba(217, 115, 13, 0.14)', fg: '#8a4a06' },
+  { bg: 'rgba(95, 173, 73, 0.14)', fg: '#2f6b1f' },
+  { bg: 'rgba(137, 87, 229, 0.14)', fg: '#5b2fa8' },
+  { bg: 'rgba(226, 75, 99, 0.14)', fg: '#9c1f36' },
+  { bg: 'rgba(6, 182, 212, 0.14)', fg: '#0b6e80' },
+]
+
 export function TableEditor({ tableId }: { tableId: string }) {
   const { t } = useTranslation()
   const draft = useKnowledgeStore((s) => s.tableDraft)
@@ -1722,9 +1732,23 @@ export function TableEditor({ tableId }: { tableId: string }) {
                       case 'select':
                         return (
                           <span className="relative flex items-center gap-1">
-                            <span className="min-w-0 flex-1 truncate">
-                              {value || <span className="text-ink-tertiary/60">—</span>}
-                            </span>
+                            {value ? (
+                              <span
+                                data-testid={`table-chip-${ri}-${ci}`}
+                                className="inline-flex max-w-full items-center gap-1 truncate rounded-full px-2 py-0.5 text-caption font-medium"
+                                style={
+                                  (() => {
+                                    const idx = col.options?.indexOf(value) ?? -1
+                                    const c = CHIP_STYLES[idx < 0 ? 0 : idx % CHIP_STYLES.length]
+                                    return { backgroundColor: c.bg, color: c.fg }
+                                  })()
+                                }
+                              >
+                                {value}
+                              </span>
+                            ) : (
+                              <span className="min-w-0 flex-1 truncate text-ink-tertiary/60">—</span>
+                            )}
                             <ChevronDown size={11} className="shrink-0 text-ink-tertiary" />
                             {selectPopup?.ri === vi && selectPopup?.ci === ci ? (
                               <PortalMenu anchor={tdRef.current} minWidth={176} testid="table-select-popup">
@@ -1817,6 +1841,7 @@ export function TableEditor({ tableId }: { tableId: string }) {
                       className={cn(
                         cellClass,
                         col.type === 'number' && 'text-right tabular-nums',
+                        col.type === 'date' && value !== '' && 'tabular-nums',
                         inSel && 'bg-state-hover',
                         isAnchor &&
                           'relative outline outline-1 outline-[var(--accent-strong)]',

@@ -1052,3 +1052,71 @@ describe('TableEditor table-ux-notion PR-6 (portal menus)', () => {
     expect(screen.getByTestId('table-col-menu')).toBeTruthy()
   })
 })
+
+describe('TableEditor table-ux-notion PR-7 (typed cells)', () => {
+  beforeEach(() => {
+    mountTable()
+    useKnowledgeStore.setState({
+      commitTable: vi.fn(async () => {
+        commitTableSpy()
+        return true
+      }) as never,
+    })
+  })
+  afterEach(() => {
+    cleanup()
+    vi.useRealTimers()
+  })
+
+  it('select column renders colored chips; different options get different colors', () => {
+    render(<TableEditor tableId="tbl_1" />)
+    // 初始值：c / 3 / z（非选项值）→ chip 仍按 options.indexOf 索引着色
+    const chip0 = screen.getByTestId('table-chip-0-2')
+    expect(chip0.style.backgroundColor).not.toBe('')
+    // 选择「待办」后 chip 颜色 = 色板第 0 个
+    fireEvent.click(document.querySelector('td[data-cell="0,2"]')!)
+    fireEvent.click(screen.getByTestId('table-select-opt-0-2-0'))
+    const chip = screen.getByTestId('table-chip-0-2')
+    expect(chip.textContent).toContain('待办')
+    expect(chip.style.backgroundColor).toContain('35, 131, 226')
+    // 选「完成」→ 色板第 1 个
+    fireEvent.click(document.querySelector('td[data-cell="0,2"]')!)
+    fireEvent.click(screen.getByTestId('table-select-opt-0-2-1'))
+    const chip2 = screen.getByTestId('table-chip-0-2')
+    expect(chip2.style.backgroundColor).toContain('217, 115, 13')
+  })
+
+  it('empty select cell shows placeholder, not a chip', () => {
+    useKnowledgeStore.setState({
+      tableDoc: {
+        id: 'tbl_1',
+        csv: '\n',
+        meta: JSON.stringify({ cols: [{ id: 'col_1', name: '状态', type: 'select', options: ['待办'], width: 150 }] }),
+      },
+      tableDraft: {
+        id: 'tbl_1',
+        csv: '\n',
+        meta: JSON.stringify({ cols: [{ id: 'col_1', name: '状态', type: 'select', options: ['待办'], width: 150 }] }),
+      },
+    })
+    render(<TableEditor tableId="tbl_1" />)
+    expect(screen.queryByTestId('table-chip-0-0')).toBeNull()
+  })
+
+  it('date column uses tabular-nums for values', () => {
+    useKnowledgeStore.setState({
+      tableDoc: {
+        id: 'tbl_1',
+        csv: '2024-01-01\n',
+        meta: JSON.stringify({ cols: [{ id: 'col_1', name: '日期', type: 'date', width: 150 }] }),
+      },
+      tableDraft: {
+        id: 'tbl_1',
+        csv: '2024-01-01\n',
+        meta: JSON.stringify({ cols: [{ id: 'col_1', name: '日期', type: 'date', width: 150 }] }),
+      },
+    })
+    render(<TableEditor tableId="tbl_1" />)
+    expect(document.querySelector('td[data-cell="0,0"]')!.className).toContain('tabular-nums')
+  })
+})

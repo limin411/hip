@@ -141,9 +141,6 @@ export function DocManagerBrowse() {
       void knowledgeRevealDoc(activeSpaceId, node.id).catch(() => {})
     }
   }
-  const newIn = (node: KnowledgeNode): string | null =>
-    node.kind === 'folder' ? node.id : node.parentId
-
   /** 复制标题路径（深链直达用）。 */
   const copyPath = (node: KnowledgeNode) => {
     const chain = [
@@ -160,15 +157,6 @@ export function DocManagerBrowse() {
     nodeId: node.id,
     kind: node.kind,
     spaceId: activeSpaceId ?? '',
-    onNewDoc: () => {
-      void nav().requestCreateDoc(newIn(node), t('knowledge.doc.untitled'))
-    },
-    onNewTable: () => {
-      void nav().requestCreateTable(newIn(node), t('knowledge.table.untitled'))
-    },
-    onNewFolder: () => {
-      void nav().createFolder(newIn(node), t('knowledge.tree.newFolder'))
-    },
     onRename: () => startRename(node),
     onDelete: () => deleteNode(node),
     onReveal: node.kind === 'doc' ? () => reveal(node) : undefined,

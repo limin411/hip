@@ -154,9 +154,6 @@ export type ContextPayloadMap = {
     /** Legacy `board` kind remains for removed-product payload compat. */
     kind: 'folder' | 'doc' | 'table' | 'board'
     spaceId: string
-    onNewDoc: () => void
-    onNewTable: () => void
-    onNewFolder: () => void
     onRename: () => void
     onDelete: () => void
     onReveal?: () => void

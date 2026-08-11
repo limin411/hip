@@ -350,24 +350,6 @@ export function DirNavList() {
                 nodeId: node.id,
                 kind: node.kind,
                 spaceId: activeSpaceId ?? '',
-                onNewDoc: () => {
-                  const parent = newIn(node)
-                  void useKnowledgeStore
-                    .getState()
-                    .requestCreateDoc(parent, t('knowledge.doc.untitled'))
-                },
-                onNewTable: () => {
-                  const parent = newIn(node)
-                  void useKnowledgeStore
-                    .getState()
-                    .requestCreateTable(parent, t('knowledge.table.untitled'))
-                },
-                onNewFolder: () => {
-                  const parent = newIn(node)
-                  void useKnowledgeStore
-                    .getState()
-                    .createFolder(parent, t('knowledge.tree.newFolder'))
-                },
                 onRename: () => startRename(node),
                 onDelete: () => deleteNode(node),
                 onReveal: node.kind === 'doc' ? () => reveal(node) : undefined,

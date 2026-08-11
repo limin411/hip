@@ -8,12 +8,31 @@ const ctx = {
 } as ContextMenuBuildContext
 
 describe('knowledgeNodeProvider', () => {
-  it('returns folder actions including new doc/table/folder', () => {
-    const onNewDoc = vi.fn()
-    const onNewTable = vi.fn()
-    const onNewFolder = vi.fn()
-    const onRename = vi.fn()
-    const onDelete = vi.fn()
+  it('no node kind offers new doc/table/folder — file actions only (Notion/Excel)', () => {
+    for (const kind of ['folder', 'doc', 'table'] as const) {
+      const items = knowledgeNodeProvider(
+        {
+          kind: 'knowledgeNode',
+          payload: {
+            nodeId: `nod_${kind}`,
+            kind,
+            spaceId: 'spc_a',
+            onRename: () => {},
+            onDelete: () => {},
+          },
+        },
+        ctx,
+      )
+      const ids = items.map((i) => i.id)
+      expect(ids).not.toContain('knowledgeNode.newDoc')
+      expect(ids).not.toContain('knowledgeNode.newTable')
+      expect(ids).not.toContain('knowledgeNode.newFolder')
+      expect(ids).toContain('knowledgeNode.rename')
+      expect(ids).toContain('knowledgeNode.delete')
+    }
+  })
+
+  it('folder menu is exactly rename + delete', () => {
     const items = knowledgeNodeProvider(
       {
         kind: 'knowledgeNode',
@@ -21,57 +40,13 @@ describe('knowledgeNodeProvider', () => {
           nodeId: 'nod_a',
           kind: 'folder',
           spaceId: 'spc_a',
-          onNewDoc,
-          onNewTable,
-          onNewFolder,
-          onRename,
-          onDelete,
-        },
-      },
-      ctx,
-    )
-    expect(items.map((i) => i.id)).toEqual([
-      'knowledgeNode.newDoc',
-      'knowledgeNode.newTable',
-      'knowledgeNode.newFolder',
-      'knowledgeNode.rename',
-      'knowledgeNode.delete',
-    ])
-    items.find((i) => i.id === 'knowledgeNode.newDoc')!.run()
-    items.find((i) => i.id === 'knowledgeNode.newTable')!.run()
-    expect(onNewDoc).toHaveBeenCalled()
-    expect(onNewTable).toHaveBeenCalled()
-  })
-
-  it('files (doc) get no new doc/table/folder entries — file actions only', () => {
-    const onNewDoc = vi.fn()
-    const onNewTable = vi.fn()
-    const onNewFolder = vi.fn()
-    const items = knowledgeNodeProvider(
-      {
-        kind: 'knowledgeNode',
-        payload: {
-          nodeId: 'doc_a',
-          kind: 'doc',
-          spaceId: 'spc_a',
-          onNewDoc,
-          onNewTable,
-          onNewFolder,
           onRename: () => {},
           onDelete: () => {},
         },
       },
       ctx,
     )
-    const ids = items.map((i) => i.id)
-    expect(ids).not.toContain('knowledgeNode.newDoc')
-    expect(ids).not.toContain('knowledgeNode.newTable')
-    expect(ids).not.toContain('knowledgeNode.newFolder')
-    expect(ids).toContain('knowledgeNode.rename')
-    expect(ids).toContain('knowledgeNode.delete')
-    expect(onNewDoc).not.toHaveBeenCalled()
-    expect(onNewTable).not.toHaveBeenCalled()
-    expect(onNewFolder).not.toHaveBeenCalled()
+    expect(items.map((i) => i.id)).toEqual(['knowledgeNode.rename', 'knowledgeNode.delete'])
   })
 
   it('tables get no new doc/table/folder entries either', () => {
@@ -82,20 +57,13 @@ describe('knowledgeNodeProvider', () => {
           nodeId: 'tbl_a',
           kind: 'table',
           spaceId: 'spc_a',
-          onNewDoc: () => {},
-          onNewTable: () => {},
-          onNewFolder: () => {},
           onRename: () => {},
           onDelete: () => {},
         },
       },
       ctx,
     )
-    const ids = items.map((i) => i.id)
-    expect(ids).not.toContain('knowledgeNode.newDoc')
-    expect(ids).not.toContain('knowledgeNode.newTable')
-    expect(ids).not.toContain('knowledgeNode.newFolder')
-    expect(ids).toEqual(['knowledgeNode.rename', 'knowledgeNode.delete'])
+    expect(items.map((i) => i.id)).toEqual(['knowledgeNode.rename', 'knowledgeNode.delete'])
   })
 
   it('includes reveal for docs when provided', () => {
@@ -107,9 +75,6 @@ describe('knowledgeNodeProvider', () => {
           nodeId: 'doc_a',
           kind: 'doc',
           spaceId: 'spc_a',
-          onNewDoc: () => {},
-          onNewTable: () => {},
-          onNewFolder: () => {},
           onRename: () => {},
           onDelete: () => {},
           onReveal,
@@ -130,9 +95,6 @@ describe('knowledgeNodeProvider', () => {
           nodeId: 'brd_a',
           kind: 'board',
           spaceId: 'spc_a',
-          onNewDoc: () => {},
-          onNewTable: () => {},
-          onNewFolder: () => {},
           onRename: () => {},
           onDelete: () => {},
           onReveal: () => {},

@@ -391,24 +391,6 @@ const STATIC_CATALOG: ContextMenuItemMeta[] = [
     danger: true,
   },
   {
-    id: 'knowledgeNode.newDoc',
-    labelKey: 'knowledge.tree.newDoc',
-    kind: 'knowledgeNode',
-    group: 'primary',
-  },
-  {
-    id: 'knowledgeNode.newTable',
-    labelKey: 'knowledge.tree.newTable',
-    kind: 'knowledgeNode',
-    group: 'primary',
-  },
-  {
-    id: 'knowledgeNode.newFolder',
-    labelKey: 'knowledge.tree.newFolder',
-    kind: 'knowledgeNode',
-    group: 'primary',
-  },
-  {
     id: 'knowledgeNode.rename',
     labelKey: 'knowledge.tree.rename',
     kind: 'knowledgeNode',

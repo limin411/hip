@@ -1,44 +1,13 @@
 import type { ContextMenuItemDef, ContextProvider } from '../types'
 
-/** Knowledge tree row: folder gets new doc/table/folder; files (doc/table) get
- *  file actions only (rename, optional reveal, copy path, delete). */
+/** Knowledge tree row: file actions only (rename, optional reveal, copy path,
+ *  delete). New doc/table/folder entries live on the blank-area (knowledgeTree)
+ *  and toolbar create menu — not on node context menus (Notion/Excel 语义). */
 export const knowledgeNodeProvider: ContextProvider = (req, ctx) => {
   if (req.kind !== 'knowledgeNode') return []
-  const { kind, onNewDoc, onNewFolder, onNewTable, onRename, onDelete, onReveal, onCopyPath } =
-    req.payload
+  const { kind, onRename, onDelete, onReveal, onCopyPath } = req.payload
 
   const items: ContextMenuItemDef[] = []
-
-  // 新建入口仅属于文件夹（在文件夹内新建）；右键文件只出现文件操作，
-  // 与 Notion/Excel 一致——避免在文件菜单里混入不相关的新建动作。
-  if (kind === 'folder') {
-    items.push(
-      {
-        id: 'knowledgeNode.newDoc',
-        label: ctx.t('knowledge.tree.newDoc'),
-        group: 'primary',
-        run: () => {
-          onNewDoc()
-        },
-      },
-      {
-        id: 'knowledgeNode.newTable',
-        label: ctx.t('knowledge.tree.newTable'),
-        group: 'primary',
-        run: () => {
-          onNewTable()
-        },
-      },
-      {
-        id: 'knowledgeNode.newFolder',
-        label: ctx.t('knowledge.tree.newFolder'),
-        group: 'primary',
-        run: () => {
-          onNewFolder()
-        },
-      },
-    )
-  }
 
   items.push({
     id: 'knowledgeNode.rename',

@@ -212,6 +212,36 @@ describe('TableEditor (knowledge-table PR-3)', () => {
     expect(screen.getByTestId('table-cell-0-0').textContent).toContain('a')
   })
 
+  it('column rename commits on blur (Excel 式点击他处生效) and Tab; Esc cancels', () => {
+    render(<TableEditor tableId="tbl_1" />)
+    const openRename = () => {
+      fireEvent.click(screen.getByTestId('table-grid').querySelector('th[data-col="0"]')!)
+      fireEvent.click(screen.getByTestId('table-col-rename'))
+      return screen.getByTestId('table-col-rename-input') as HTMLInputElement
+    }
+    // blur 提交
+    let input = openRename()
+    fireEvent.change(input, { target: { value: '计划' } })
+    fireEvent.blur(input)
+    expect(screen.getByText('计划')).toBeTruthy()
+    // Tab 提交
+    input = openRename()
+    fireEvent.change(input, { target: { value: '排期' } })
+    fireEvent.keyDown(input, { key: 'Tab' })
+    expect(screen.getByText('排期')).toBeTruthy()
+    // Esc 取消（不写回）
+    input = openRename()
+    fireEvent.change(input, { target: { value: '别改' } })
+    fireEvent.keyDown(input, { key: 'Escape' })
+    expect(screen.queryByText('别改')).toBeNull()
+    expect(screen.getByText('排期')).toBeTruthy()
+    // 空文本提交不生效（保留原名）
+    input = openRename()
+    fireEvent.change(input, { target: { value: '   ' } })
+    fireEvent.blur(input)
+    expect(screen.getByText('排期')).toBeTruthy()
+  })
+
   it('row menu: insert above / duplicate / delete', () => {
     render(<TableEditor tableId="tbl_1" />)
     fireEvent.click(screen.getByTestId('table-row-menu-1'))

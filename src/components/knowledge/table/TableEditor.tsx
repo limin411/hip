@@ -400,6 +400,15 @@ export function TableEditor({ tableId }: { tableId: string }) {
   const canUndo = useMemo(() => historyRef.current.canUndo(), [histTick, table])
   const canRedo = useMemo(() => historyRef.current.canRedo(), [histTick, table])
 
+  /** 列重命名：Enter/Tab/blur 均提交（Excel 式），Esc 取消。 */
+  const commitColRename = (ci: number) => {
+    setRenamingCi(null)
+    const name = renameText.trim()
+    if (!name || name === table.cols[ci]?.name) return
+    const cols = table.cols.map((c, i) => (i === ci ? { ...c, name } : c))
+    onChange({ cols, rows: table.rows })
+  }
+
   // ── 排序 / 筛选 / 统计 / 导出（PR-5 数据能力） ───────────────────────────
   const sortBy = (colId: string, dir: 'asc' | 'desc') => {
     if (sortRef.current?.col === colId && sortRef.current.dir === dir) return
@@ -986,17 +995,14 @@ export function TableEditor({ tableId }: { tableId: string }) {
                         onClick={(e) => e.stopPropagation()}
                         onKeyDown={(e) => {
                           e.stopPropagation()
-                          if (e.key === 'Enter') {
-                            const cols = table.cols.map((c, i) =>
-                              i === ci ? { ...c, name: renameText } : c,
-                            )
-                            onChange({ cols, rows: table.rows })
-                            setRenamingCi(null)
+                          if (e.key === 'Enter' || e.key === 'Tab') {
+                            e.preventDefault()
+                            commitColRename(ci)
                           } else if (e.key === 'Escape') {
                             setRenamingCi(null)
                           }
                         }}
-                        onBlur={() => setRenamingCi(null)}
+                        onBlur={() => commitColRename(ci)}
                         className="min-w-0 flex-1 rounded-sm border border-accent/50 bg-surface px-1 py-0.5 text-caption text-ink outline-none"
                       />
                     ) : (

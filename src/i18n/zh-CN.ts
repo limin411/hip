@@ -2680,6 +2680,8 @@ export const zhCN = {
           stats: '统计',
           importCsv: '导入 CSV',
           exportCsv: '导出 CSV',
+          more: '更多操作',
+          resetView: '重置视图',
           freezeHeader: '冻结首行',
         },
         status: {

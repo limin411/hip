@@ -141,6 +141,11 @@ export function TableEditor({ tableId }: { tableId: string }) {
   const tableTitle =
     useKnowledgeStore((s) => s.nodes.find((n) => n.id === tableId)?.title) ??
     t('knowledge.table.untitled')
+  const parentTitle = useKnowledgeStore((s) => {
+    const node = s.nodes.find((n) => n.id === tableId)
+    if (!node?.parentId) return null
+    return s.nodes.find((n) => n.id === node.parentId)?.title ?? null
+  })
 
   const [table, setTable] = useState<TableData>(() =>
     csvToTable(draft?.csv ?? '', draft?.meta ?? ''),
@@ -154,10 +159,19 @@ export function TableEditor({ tableId }: { tableId: string }) {
   const selRef = useRef(sel)
   selRef.current = sel
 
+  const [moreOpen, setMoreOpen] = useState(false)
+  const moreBtnRef = useRef<HTMLButtonElement>(null)
   const closeMenus = () => {
     setColMenuCi(null)
     setRowMenuRi(null)
     setSelectPopup(null)
+    setMoreOpen(false)
+  }
+  const resetView = () => {
+    clearSort()
+    setFilters([])
+    setStatsOn(false)
+    closeMenus()
   }
   const [editing, setEditing] = useState<{ ri: number; ci: number; value: string; err?: boolean } | null>(null)
   /** 同步 ref：input 卸载时 blur 会带着旧闭包触发，需以最新值判定。 */
@@ -260,6 +274,7 @@ export function TableEditor({ tableId }: { tableId: string }) {
       const t = e.target as Node | null
       if (!t) return
       if (t instanceof Node && document.getElementById('table-menus')?.contains(t)) return
+      if (t instanceof Node && moreBtnRef.current?.contains(t)) return
       if (t instanceof Node && wrapRef.current?.contains(t)) return
       closeMenus()
     }
@@ -976,67 +991,81 @@ export function TableEditor({ tableId }: { tableId: string }) {
         }
       }}
     >
-      {/* 标题栏 */}
+      {/* 标题区（三段式：面包屑 / 标题 / 工具栏） */}
       <div
-        className="flex h-11 shrink-0 items-center gap-2 border-b border-border px-4"
+        className="flex shrink-0 flex-col border-b border-border px-4 pt-1.5"
         data-testid="table-editor-header"
       >
-        <button
-          type="button"
-          data-testid="table-editor-back"
-          onClick={backToBrowse}
-          className="flex h-6 items-center gap-1 rounded-md px-1.5 text-meta text-ink-secondary transition-colors hover:bg-state-hover hover:text-ink"
-        >
-          <Table2 size={14} aria-hidden />
-          {t('knowledge.home.mySpaces')}
-        </button>
-        <span className="h-4 w-px bg-border" aria-hidden />
-        <h1
-          className="min-w-0 flex-1 truncate text-body font-semibold text-ink"
-          data-testid="table-editor-title"
-          onDoubleClick={() => {
-            setTitleDraft(tableTitle)
-            setTitleEditing(true)
-          }}
-          title={t('knowledge.tree.rename')}
-        >
-          {titleEditing ? (
-            <input
-              autoFocus
-              data-testid="table-title-input"
-              value={titleDraft}
-              onChange={(e) => setTitleDraft(e.target.value)}
-              onKeyDown={(e) => {
-                e.stopPropagation()
-                if (e.key === 'Enter') {
-                  const next = titleDraft.trim()
-                  if (next) {
-                    void useKnowledgeStore.getState().renameNode(tableId, next)
+        {/* 面包屑行：点「我的空间」回浏览页 */}
+        <div className="flex h-5 items-center gap-1 text-meta text-ink-tertiary">
+          <button
+            type="button"
+            data-testid="table-editor-back"
+            onClick={backToBrowse}
+            className="flex items-center gap-1 rounded-sm px-1 transition-colors hover:bg-state-hover hover:text-ink"
+          >
+            <Table2 size={12} aria-hidden />
+            {t('knowledge.home.mySpaces')}
+          </button>
+          {parentTitle ? (
+            <>
+              <span aria-hidden>/</span>
+              <span className="text-ink-secondary">{parentTitle}</span>
+            </>
+          ) : null}
+        </div>
+        {/* 标题行：双击改名；hover 出现页面 ⋯（PR-10 页面菜单） */}
+        <div className="flex items-center gap-1 pt-0.5">
+          <h1
+            className="min-w-0 flex-1 truncate text-body font-semibold text-ink"
+            data-testid="table-editor-title"
+            onDoubleClick={() => {
+              setTitleDraft(tableTitle)
+              setTitleEditing(true)
+            }}
+            title={t('knowledge.tree.rename')}
+          >
+            {titleEditing ? (
+              <input
+                autoFocus
+                data-testid="table-title-input"
+                value={titleDraft}
+                onChange={(e) => setTitleDraft(e.target.value)}
+                onKeyDown={(e) => {
+                  e.stopPropagation()
+                  if (e.key === 'Enter') {
+                    const next = titleDraft.trim()
+                    if (next) {
+                      void useKnowledgeStore.getState().renameNode(tableId, next)
+                    }
+                    setTitleEditing(false)
+                  } else if (e.key === 'Escape') {
+                    setTitleEditing(false)
                   }
-                  setTitleEditing(false)
-                } else if (e.key === 'Escape') {
-                  setTitleEditing(false)
-                }
-              }}
-              onBlur={() => setTitleEditing(false)}
-              onClick={(e) => e.stopPropagation()}
-              className="min-w-0 w-full rounded-sm border border-accent/50 bg-surface px-1.5 py-0.5 text-body font-semibold text-ink outline-none"
-            />
-          ) : (
-            tableTitle
-          )}
-        </h1>
-        {/* 工具栏（撤销/重做/冻结首行；排序/筛选/统计/导出在 PR-5 激活） */}
-        <div className="flex items-center gap-1" data-testid="table-editor-toolbar">
+                }}
+                onBlur={() => setTitleEditing(false)}
+                onClick={(e) => e.stopPropagation()}
+                className="min-w-0 w-full rounded-sm border border-accent/50 bg-surface px-1.5 py-0.5 text-body font-semibold text-ink outline-none"
+              />
+            ) : (
+              tableTitle
+            )}
+          </h1>
+        </div>
+        {/* 工具栏行：文字按钮 + 实底激活；视图状态 chip 组右对齐 */}
+        <div
+          className="flex items-center gap-1 py-1.5"
+          data-testid="table-editor-toolbar"
+        >
           <button
             type="button"
             data-testid="table-undo"
             disabled={!canUndo}
             onClick={undo}
             title={t('knowledge.table.toolbar.undo')}
-            className="flex h-6 w-6 items-center justify-center rounded-md text-ink-secondary transition-colors hover:bg-state-hover hover:text-ink disabled:pointer-events-none disabled:opacity-30"
+            className="flex h-7 w-7 items-center justify-center rounded-md text-ink-secondary transition-colors hover:bg-state-hover hover:text-ink disabled:pointer-events-none disabled:opacity-30"
           >
-            <Undo2 size={14} aria-hidden />
+            <Undo2 size={15} aria-hidden />
           </button>
           <button
             type="button"
@@ -1044,61 +1073,37 @@ export function TableEditor({ tableId }: { tableId: string }) {
             disabled={!canRedo}
             onClick={redo}
             title={t('knowledge.table.toolbar.redo')}
-            className="flex h-6 w-6 items-center justify-center rounded-md text-ink-secondary transition-colors hover:bg-state-hover hover:text-ink disabled:pointer-events-none disabled:opacity-30"
+            className="flex h-7 w-7 items-center justify-center rounded-md text-ink-secondary transition-colors hover:bg-state-hover hover:text-ink disabled:pointer-events-none disabled:opacity-30"
           >
-            <Redo2 size={14} aria-hidden />
+            <Redo2 size={15} aria-hidden />
           </button>
-          <button
-            type="button"
-            data-testid="table-freeze"
-            aria-pressed={freezeHeader}
-            onClick={() => setFreezeHeader((v) => !v)}
-            title={t('knowledge.table.toolbar.freezeHeader')}
-            className={cn(
-              'flex h-6 items-center gap-1 rounded-md px-1.5 text-meta transition-colors',
-              freezeHeader
-                ? 'bg-state-hover font-medium text-ink'
-                : 'text-ink-tertiary hover:bg-state-hover hover:text-ink',
-            )}
-          >
-            <Snowflake size={13} aria-hidden />
-          </button>
-          {/* 排序状态芯片：点击清除排序 */}
-          {sortState ? (
-            <button
-              type="button"
-              data-testid="table-sort-chip"
-              onClick={clearSort}
-              title={t('knowledge.table.columnMenu.sortClear')}
-              className="flex h-6 items-center gap-1 rounded-md bg-state-hover px-1.5 text-meta font-medium text-ink transition-colors hover:bg-state-hover"
-            >
-              <ArrowUpDown size={12} aria-hidden />
-              {colName(table.cols.findIndex((c) => c.id === sortState.col))} {sortState.dir === 'asc' ? '↑' : '↓'}
-            </button>
-          ) : null}
+          <span className="mx-0.5 h-4 w-px bg-border" aria-hidden />
+          {/* 筛选（文字按钮；激活实底） */}
           <button
             type="button"
             data-testid="table-filter"
-            aria-pressed={filterOpen}
+            aria-pressed={filterOpen || filters.length > 0}
             onClick={() => setFilterOpen((v) => !v)}
             title={t('knowledge.table.toolbar.filter')}
             className={cn(
-              'relative flex h-6 items-center gap-1 rounded-md px-1.5 text-meta transition-colors',
+              'relative flex h-7 items-center gap-1.5 rounded-md px-2.5 text-caption transition-colors',
               filterOpen || filters.length > 0
-                ? 'bg-state-hover font-medium text-ink'
-                : 'text-ink-tertiary hover:bg-state-hover hover:text-ink',
+                ? 'bg-btn-primary font-medium text-on-btn-primary'
+                : 'text-ink-secondary hover:bg-state-hover hover:text-ink',
             )}
           >
             <Filter size={13} aria-hidden />
+            {t('knowledge.table.toolbar.filter')}
             {filters.length > 0 ? (
               <span
-                className="flex h-4 min-w-4 items-center justify-center rounded-full bg-btn-primary px-1 text-[10px] font-semibold text-on-btn-primary"
+                className="flex h-4 min-w-4 items-center justify-center rounded-full bg-on-btn-primary/20 px-1 text-[10px] font-semibold"
                 data-testid="table-filter-badge"
               >
                 {filters.length}
               </span>
             ) : null}
           </button>
+          {/* 统计（文字按钮；激活实底） */}
           <button
             type="button"
             data-testid="table-stats"
@@ -1106,25 +1111,93 @@ export function TableEditor({ tableId }: { tableId: string }) {
             onClick={() => setStatsOn((v) => !v)}
             title={t('knowledge.table.toolbar.stats')}
             className={cn(
-              'flex h-6 w-6 items-center justify-center rounded-md transition-colors',
+              'flex h-7 items-center gap-1.5 rounded-md px-2.5 text-caption transition-colors',
               statsOn
-                ? 'bg-state-hover font-medium text-ink'
-                : 'text-ink-tertiary hover:bg-state-hover hover:text-ink',
+                ? 'bg-btn-primary font-medium text-on-btn-primary'
+                : 'text-ink-secondary hover:bg-state-hover hover:text-ink',
             )}
           >
-            <Sigma size={14} aria-hidden />
+            <Sigma size={13} aria-hidden />
+            {t('knowledge.table.toolbar.stats')}
           </button>
+          {/* 导出 */}
           <button
             type="button"
             data-testid="table-export"
             onClick={() => void exportCsv()}
             title={t('knowledge.table.toolbar.exportCsv')}
-            className="flex h-6 w-6 items-center justify-center rounded-md text-ink-tertiary transition-colors hover:bg-state-hover hover:text-ink"
+            className="flex h-7 items-center gap-1.5 rounded-md px-2.5 text-caption text-ink-secondary transition-colors hover:bg-state-hover hover:text-ink"
           >
-            <FileDown size={14} aria-hidden />
+            <FileDown size={13} aria-hidden />
+            {t('knowledge.table.toolbar.exportCsv')}
           </button>
-          <span className="rounded-md bg-surface-muted px-2 py-0.5 text-meta text-ink-tertiary">
-            {statsLine}
+          {/* ⋯：冻结首行 / 重置视图 */}
+          <button
+            type="button"
+            data-testid="table-more"
+            ref={moreBtnRef}
+            aria-haspopup="menu"
+            aria-expanded={moreOpen}
+            onClick={() => setMoreOpen((v) => !v)}
+            title={t('knowledge.table.toolbar.more')}
+            className="flex h-7 w-7 items-center justify-center rounded-md text-ink-secondary transition-colors hover:bg-state-hover hover:text-ink"
+          >
+            <MoreHorizontal size={15} aria-hidden />
+          </button>
+          {moreOpen ? (
+            <PortalMenu anchor={moreBtnRef.current} minWidth={160} testid="table-more-menu">
+              <button
+                type="button"
+                data-testid="table-freeze"
+                aria-pressed={freezeHeader}
+                onClick={() => {
+                  setFreezeHeader((v) => !v)
+                  closeMenus()
+                }}
+                className={cn(
+                  'flex w-full items-center gap-2 px-2.5 py-1.5 text-left text-body transition-colors hover:bg-state-hover',
+                  freezeHeader ? 'font-medium text-ink' : 'text-ink-secondary',
+                )}
+              >
+                <Snowflake size={13} aria-hidden />
+                {t('knowledge.table.toolbar.freezeHeader')}
+              </button>
+              <button
+                type="button"
+                data-testid="table-reset-view"
+                onClick={resetView}
+                className="flex w-full items-center gap-2 px-2.5 py-1.5 text-left text-body text-ink-secondary transition-colors hover:bg-state-hover"
+              >
+                {t('knowledge.table.toolbar.resetView')}
+              </button>
+            </PortalMenu>
+          ) : null}
+          {/* 视图状态 chip 组（右对齐） */}
+          <span className="ml-auto flex items-center gap-1">
+            {sortState ? (
+              <button
+                type="button"
+                data-testid="table-sort-chip"
+                onClick={clearSort}
+                title={t('knowledge.table.columnMenu.sortClear')}
+                className="flex h-6 items-center gap-1 rounded-md bg-state-hover px-1.5 text-meta font-medium text-ink transition-colors hover:bg-state-hover"
+              >
+                <ArrowUpDown size={12} aria-hidden />
+                {colName(table.cols.findIndex((c) => c.id === sortState.col))} {sortState.dir === 'asc' ? '↑' : '↓'}
+              </button>
+            ) : null}
+            {filters.length > 0 ? (
+              <button
+                type="button"
+                data-testid="table-filter-chip"
+                onClick={() => setFilterOpen(true)}
+                title={t('knowledge.table.filter.title')}
+                className="flex h-6 items-center gap-1 rounded-md bg-state-hover px-1.5 text-meta font-medium text-ink transition-colors hover:bg-state-hover"
+              >
+                <Filter size={12} aria-hidden />
+                {t('knowledge.table.toolbar.filter')} · {filters.length}
+              </button>
+            ) : null}
           </span>
         </div>
       </div>

@@ -2643,6 +2643,8 @@ export const ja = {
         stats: "統計",
         importCsv: "CSV インポート",
         exportCsv: "CSV エクスポート",
+        more: "その他",
+        resetView: "表示をリセット",
         freezeHeader: "先頭行を固定",
       },
       status: {

@@ -2740,6 +2740,8 @@ export const en = {
           stats: 'Stats',
           importCsv: 'Import CSV',
           exportCsv: 'Export CSV',
+          more: 'More',
+          resetView: 'Reset view',
           freezeHeader: 'Freeze header',
         },
         status: {

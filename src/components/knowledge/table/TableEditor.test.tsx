@@ -407,6 +407,7 @@ describe('TableEditor PR-4 (undo/resize/drag/freeze)', () => {
     render(<TableEditor tableId="tbl_1" />)
     const th = screen.getByTestId('table-grid').querySelector('th[data-col="0"]')!
     expect((th as HTMLElement).className).toContain('sticky')
+    fireEvent.click(screen.getByTestId('table-more'))
     fireEvent.click(screen.getByTestId('table-freeze'))
     const th2 = screen.getByTestId('table-grid').querySelector('th[data-col="0"]')!
     expect((th2 as HTMLElement).className).not.toContain('sticky')
@@ -1118,5 +1119,69 @@ describe('TableEditor table-ux-notion PR-7 (typed cells)', () => {
     })
     render(<TableEditor tableId="tbl_1" />)
     expect(document.querySelector('td[data-cell="0,0"]')!.className).toContain('tabular-nums')
+  })
+})
+
+describe('TableEditor table-ux-notion PR-8 (toolbar structure)', () => {
+  beforeEach(() => {
+    mountTable()
+    useKnowledgeStore.setState({
+      commitTable: vi.fn(async () => {
+        commitTableSpy()
+        return true
+      }) as never,
+    })
+  })
+  afterEach(() => {
+    cleanup()
+    vi.useRealTimers()
+  })
+
+  it('three-row header: breadcrumb / title / toolbar; no rows-cols pill in toolbar', () => {
+    render(<TableEditor tableId="tbl_1" />)
+    // 面包屑行：我的空间可点回浏览
+    expect(screen.getByTestId('table-editor-back').textContent).toContain('knowledge.home.mySpaces')
+    // 标题在独立行
+    expect(screen.getByTestId('table-editor-title')).toBeTruthy()
+    // 工具栏含文字按钮（筛选/统计/导出文案）
+    const tb = screen.getByTestId('table-editor-toolbar').textContent!
+    expect(tb).toContain('knowledge.table.toolbar.filter')
+    expect(tb).toContain('knowledge.table.toolbar.stats')
+    expect(tb).toContain('knowledge.table.toolbar.exportCsv')
+    // 标题栏不再有「行·列」pill（仅状态栏一处）
+    expect(screen.getAllByText('3 行 · 3 列')).toHaveLength(1)
+  })
+
+  it('active state uses solid primary fill; filter chip group shows condition count', () => {
+    render(<TableEditor tableId="tbl_1" />)
+    fireEvent.click(screen.getByTestId('table-stats'))
+    const statsBtn = screen.getByTestId('table-stats')
+    expect(statsBtn.className).toContain('bg-btn-primary')
+    expect(statsBtn.className).toContain('text-on-btn-primary')
+    // 筛选激活 + chip 组
+    fireEvent.click(screen.getByTestId('table-filter'))
+    fireEvent.click(screen.getByTestId('table-filter-add'))
+    fireEvent.change(screen.getByTestId('table-filter-value-0'), { target: { value: 'x' } })
+    expect(screen.getByTestId('table-filter').className).toContain('bg-btn-primary')
+    expect(screen.getByTestId('table-filter-chip').textContent).toContain('· 1')
+    // 点击 chip 打开面板
+    fireEvent.click(screen.getByTestId('table-filter-chip'))
+    expect(screen.getByTestId('table-filter-panel')).toBeTruthy()
+  })
+
+  it('⋯ menu hosts freeze + reset view', () => {
+    render(<TableEditor tableId="tbl_1" />)
+    // 先建排序态
+    fireEvent.click(screen.getByTestId('table-col-more-1'))
+    fireEvent.click(screen.getByTestId('table-col-sort-desc'))
+    expect(screen.getByTestId('table-sort-chip')).toBeTruthy()
+    fireEvent.click(screen.getByTestId('table-more'))
+    expect(screen.getByTestId('table-more-menu')).toBeTruthy()
+    // 重置视图：清排序
+    fireEvent.click(screen.getByTestId('table-reset-view'))
+    expect(screen.queryByTestId('table-sort-chip')).toBeNull()
+    // ⋯ 菜单在 portal（body）
+    fireEvent.click(screen.getByTestId('table-more'))
+    expect(screen.getByTestId('table-grid').contains(screen.getByTestId('table-more-menu'))).toBe(false)
   })
 })

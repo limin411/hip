@@ -2645,6 +2645,8 @@ export const zhTW = {
         stats: "統計",
         importCsv: "匯入 CSV",
         exportCsv: "匯出 CSV",
+        more: "更多操作",
+        resetView: "重設檢視",
         freezeHeader: "凍結首列",
       },
       status: {

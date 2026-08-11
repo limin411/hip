@@ -10,6 +10,7 @@
 | `doc-block-menu-delete-row/` | 块菜单删除行整改（Turn into/Duplicate/删除） | `doc-block-menu-delete-row-{spec,plan,preview}` |
 | `doc-notion-polish/` | 文档域 Notion 化整改（纸张子语言/视觉） | `doc-notion-polish-{spec,plan,preview}` |
 | `doc-ux-polish-2/` | 操作交互与视觉体验第二弹 | `doc-ux-polish-2-{spec,plan,preview}` |
+| `doc-browse-interaction/` | 文档管理浏览视图交互整改（选择/打开/组织分离、手柄多选、列头排序、新建置顶，对齐 Notion All pages） | `doc-browse-interaction-{spec,preview}`（plan 待评审后排期） |
 | `knowledge-table/` | 文档管理新增「新建表格」（轻表格：类型化列 + 键盘导航 + 排序/筛选/统计） | `knowledge-table-{spec,plan,preview}`（preview 为全交互原型） |
 | `doc-terminal-capability-gap/` | 终端能力补齐（对照 alacritty 差距分析） | `terminal-capability-gap-spec.md` + `-plan.md`（P0 已完成 2026-08-10，P1–P3 待排期）+ `terminal-capability-gap-preview.html`（高保真原型） |
 

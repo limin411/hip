@@ -2646,6 +2646,7 @@ export const ja = {
         freezeHeader: "先頭行を固定",
       },
       status: {
+        "visibleRows": "表示中 {{n}}/{{total}} 行",
         "selectionCount": "{{n}} セルを選択中",
         rowsCols: "{{rows}} 行 · {{cols}} 列",
         saved: "保存済み",
@@ -2657,7 +2658,9 @@ export const ja = {
         rowDeleted: "行を削除しました（元に戻せます）",
         clipboardUnavailable: "クリップボードが利用できません",
         pasteTooLarge: "貼り付け内容が大きすぎます（上限 {{rows}} 行 × {{cols}} 列）",
+        rowAddedFiltered: "行を追加しました（現在のフィルターで非表示の可能性があります）",
       },
+      dragDisabledHint: "並べ替え・フィルター中はドラッグできません",
     },
     "image": {
       "alt": "代替テキスト",

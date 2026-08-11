@@ -279,10 +279,14 @@ export function TableEditor({ tableId }: { tableId: string }) {
         nr = 0
         nc = 0
       }
-      if (nr >= next.rows.length) {
+      // 超出末可见行 → 追加数据行（筛选下可能不可见）
+      if (nr > visibleIndices.length - 1) {
         next = {
           cols: next.cols,
           rows: [...next.rows.map((r) => [...r]), Array(next.cols.length).fill('')],
+        }
+        if (filters.length > 0) {
+          toast.info(t('knowledge.table.toasts.rowAddedFiltered'))
         }
       }
       target = { ri: Math.min(nr, next.rows.length), ci: nc }
@@ -468,8 +472,11 @@ export function TableEditor({ tableId }: { tableId: string }) {
         } else {
           if (ci < table.cols.length - 1) moveSel(ri, ci + 1)
           else {
-            if (ri >= table.rows.length - 1) {
+            if (ri >= visibleIndices.length - 1) {
               onChange({ cols: table.cols, rows: [...table.rows.map((r) => [...r]), Array(table.cols.length).fill('')] })
+              if (filters.length > 0) {
+                toast.info(t('knowledge.table.toasts.rowAddedFiltered'))
+              }
             }
             moveSel(Math.min(ri + 1, table.rows.length), 0)
           }
@@ -756,6 +763,7 @@ export function TableEditor({ tableId }: { tableId: string }) {
   } | null>(null)
   const [colDrag, setColDrag] = useState<{ ci: number; overCi: number; after: boolean } | null>(null)
   const onColDragDown = (e: React.PointerEvent, ci: number) => {
+    if (sortState) return // 排序态禁拖（T5）
     e.preventDefault()
     e.stopPropagation()
     colDragRef.current = { ci, startX: e.clientX, overCi: ci, after: false }
@@ -816,6 +824,7 @@ export function TableEditor({ tableId }: { tableId: string }) {
   const rowDragRef = useRef<{ ri: number; overRi: number; after: boolean } | null>(null)
   const [rowDrag, setRowDrag] = useState<{ ri: number; overRi: number; after: boolean } | null>(null)
   const onRowDragDown = (e: React.PointerEvent, ri: number) => {
+    if (sortState || filters.length > 0) return // 视图态禁拖（T5）
     e.preventDefault()
     e.stopPropagation()
     rowDragRef.current = { ri, overRi: ri, after: false }
@@ -1190,9 +1199,18 @@ export function TableEditor({ tableId }: { tableId: string }) {
                 >
                   <div className="flex items-center gap-1">
                     <span
-                      className="shrink-0 cursor-grab text-ink-tertiary/50 transition-colors hover:text-ink"
+                      className={cn(
+                        'shrink-0 transition-colors',
+                        sortState
+                          ? 'cursor-not-allowed text-ink-tertiary/25'
+                          : 'cursor-grab text-ink-tertiary/50 hover:text-ink',
+                      )}
                       data-testid={`table-col-grip-${ci}`}
-                      title={t('knowledge.table.columnMenu.insertLeft')}
+                      title={
+                        sortState
+                          ? t('knowledge.table.dragDisabledHint')
+                          : t('knowledge.table.columnMenu.insertLeft')
+                      }
                       onPointerDown={(e) => onColDragDown(e, ci)}
                     >
                       <ArrowUpDown size={11} aria-hidden />
@@ -1437,14 +1455,23 @@ export function TableEditor({ tableId }: { tableId: string }) {
                 >
                   <div className="relative flex h-full items-center justify-center gap-1 py-1.5">
                     <span
-                      className="cursor-grab text-ink-tertiary/50 transition-colors hover:text-ink"
+                      className={cn(
+                        'transition-colors',
+                        sortState || filters.length > 0
+                          ? 'cursor-not-allowed text-ink-tertiary/25'
+                          : 'cursor-grab text-ink-tertiary/50 hover:text-ink',
+                      )}
                       data-testid={`table-row-grip-${ri}`}
-                      title={t('knowledge.table.rowMenu.insertAbove')}
+                      title={
+                        sortState || filters.length > 0
+                          ? t('knowledge.table.dragDisabledHint')
+                          : t('knowledge.table.rowMenu.insertAbove')
+                      }
                       onPointerDown={(e) => onRowDragDown(e, ri)}
                     >
                       <MoreHorizontal size={12} aria-hidden />
                     </span>
-                    <span>{ri + 1}</span>
+                    <span data-testid="table-row-num">{vi + 1}</span>
                     <span
                       className="group relative"
                       onClick={(e) => {
@@ -1757,6 +1784,14 @@ export function TableEditor({ tableId }: { tableId: string }) {
         data-testid="table-editor-status"
       >
         <span className="text-ink-tertiary">{statsLine}</span>
+        {filters.length > 0 ? (
+          <span className="text-ink-secondary" data-testid="table-visible-info">
+            {t('knowledge.table.status.visibleRows', {
+              n: visibleIndices.length,
+              total: table.rows.length,
+            })}
+          </span>
+        ) : null}
         {sel && selCount > 1 ? (
           <span className="text-ink-secondary" data-testid="table-selection-info">
             {t('knowledge.table.status.selectionCount', { n: selCount })}

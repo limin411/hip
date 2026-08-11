@@ -2648,6 +2648,7 @@ export const zhTW = {
         freezeHeader: "凍結首列",
       },
       status: {
+        "visibleRows": "可見 {{n}}/{{total}} 列",
         "selectionCount": "已選 {{n}} 格",
         rowsCols: "{{rows}} 列 · {{cols}} 欄",
         saved: "已儲存",
@@ -2659,7 +2660,9 @@ export const zhTW = {
         rowDeleted: "已刪除列（可復原）",
         clipboardUnavailable: "剪貼簿無法使用",
         pasteTooLarge: "貼上內容過大（上限 {{rows}} 列 × {{cols}} 欄）",
+        rowAddedFiltered: "已新增列（可能被目前篩選隱藏）",
       },
+      dragDisabledHint: "排序/篩選下不可拖曳",
     },
     "image": {
       "alt": "替代文字",

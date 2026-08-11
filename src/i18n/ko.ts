@@ -2646,6 +2646,7 @@ export const ko = {
         freezeHeader: "첫 행 고정",
       },
       status: {
+        "visibleRows": "표시 {{n}}/{{total}}개 행",
         "selectionCount": "{{n}}개 셀 선택됨",
         rowsCols: "{{rows}}개 행 · {{cols}}개 열",
         saved: "저장됨",
@@ -2657,7 +2658,9 @@ export const ko = {
         rowDeleted: "행이 삭제되었습니다(실행 취소 가능)",
         clipboardUnavailable: "클립보드를 사용할 수 없습니다",
         pasteTooLarge: "붙여넣기 내용이 너무 큽니다 (최대 {{rows}}행 × {{cols}}열)",
+        rowAddedFiltered: "행이 추가되었습니다(현재 필터로 숨겨졌을 수 있음)",
       },
+      dragDisabledHint: "정렬/필터 중에는 드래그할 수 없습니다",
     },
     "image": {
       "alt": "대체 텍스트",

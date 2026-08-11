@@ -2743,6 +2743,7 @@ export const en = {
           freezeHeader: 'Freeze header',
         },
         status: {
+          visibleRows: '{{n}}/{{total}} rows visible',
           selectionCount: '{{n}} cells selected',
           rowsCols: '{{rows}} rows · {{cols}} columns',
           saved: 'Saved',
@@ -2754,7 +2755,9 @@ export const en = {
           rowDeleted: 'Row deleted (undo to restore)',
           clipboardUnavailable: 'Clipboard unavailable',
           pasteTooLarge: 'Paste too large (limit {{rows}} rows × {{cols}} columns)',
+          rowAddedFiltered: 'Row added (may be hidden by the active filter)',
         },
+        dragDisabledHint: 'Dragging disabled while sorted/filtered',
       },
       image: {
         alt: 'Alt text',

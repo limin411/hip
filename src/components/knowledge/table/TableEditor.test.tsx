@@ -38,6 +38,7 @@ vi.mock('react-i18next', async (importOriginal) => {
       if (key === 'knowledge.table.columnLabel') return `列 ${opts?.n}`
       if (key === 'knowledge.table.status.rowsCols') return `${opts?.rows} 行 · ${opts?.cols} 列`
       if (key === 'knowledge.table.status.selectionCount') return `已选 ${opts?.n} 格`
+      if (key === 'knowledge.table.status.visibleRows') return `可见 ${opts?.n}/${opts?.total} 行`
       if (key === 'knowledge.table.types.text') return '文本'
       if (key === 'knowledge.table.types.number') return '数字'
       if (key === 'knowledge.table.types.checkbox') return '勾选'
@@ -908,5 +909,88 @@ describe('TableEditor table-ux-notion PR-4 (clipboard)', () => {
     })
     const { toast } = await import('sonner')
     expect(vi.mocked(toast.error)).toHaveBeenCalled()
+  })
+})
+
+describe('TableEditor table-ux-notion PR-5 (view-consistent rows)', () => {
+  beforeEach(() => {
+    mountTable()
+    useKnowledgeStore.setState({
+      commitTable: vi.fn(async () => {
+        commitTableSpy()
+        return true
+      }) as never,
+    })
+  })
+  afterEach(() => {
+    cleanup()
+    vi.useRealTimers()
+  })
+
+  it('row numbers stay 1..n under sort (view order, not data order)', () => {
+    render(<TableEditor tableId="tbl_1" />)
+    // 降序排 col_1（数字 100/200/300 → 视图行 = 数据 2,1,0）
+    fireEvent.click(screen.getByTestId('table-col-more-1'))
+    fireEvent.click(screen.getByTestId('table-col-sort-desc'))
+    const nums = [...document.querySelectorAll('tr[data-row] td[data-testid="table-row-idx"]')]
+      .map((td) => td.textContent!.match(/\d+/)?.[0])
+    expect(nums).toEqual(['1', '2', '3'])
+    // 首行是数据第 2 行（300）
+    expect(document.querySelector('tr[data-row="2"] td[data-cell$=",1"]')!.textContent).toContain('300')
+  })
+
+  it('row numbers stay 1..n under filter; status bar shows visible x/y', () => {
+    render(<TableEditor tableId="tbl_1" />)
+    fireEvent.click(screen.getByTestId('table-filter'))
+    fireEvent.click(screen.getByTestId('table-filter-add'))
+    fireEvent.change(screen.getByTestId('table-filter-value-0'), { target: { value: 'x' } })
+    expect(screen.getByTestId('table-visible-info').textContent).toContain('1')
+    const nums = [...document.querySelectorAll('tr[data-row] td[data-testid="table-row-idx"]')]
+      .map((td) => td.textContent!.match(/\d+/)?.[0])
+    expect(nums).toEqual(['1'])
+    // 可见信息含总数
+    expect(screen.getByTestId('table-visible-info').textContent).toContain('3')
+  })
+
+  it('Enter at last visible row under filter appends a data row + filtered toast', async () => {
+    render(<TableEditor tableId="tbl_1" />)
+    fireEvent.click(screen.getByTestId('table-filter'))
+    fireEvent.click(screen.getByTestId('table-filter-add'))
+    fireEvent.change(screen.getByTestId('table-filter-value-0'), { target: { value: 'x' } })
+    // 视图只有 1 行（x）；进入该行编辑并 Enter
+    fireEvent.doubleClick(document.querySelector('tr[data-row="2"] td[data-cell="2,0"]')!)
+    const input = screen.getByTestId('table-cell-input') as HTMLInputElement
+    fireEvent.change(input, { target: { value: 'x2' } })
+    fireEvent.keyDown(input, { key: 'Enter' })
+    // 数据 +1 行（4 行）；原值已更新
+    expect(useKnowledgeStore.getState().tableDraft?.csv.split('\n')).toHaveLength(4)
+    expect(useKnowledgeStore.getState().tableDraft?.csv).toContain('x2')
+    const { toast } = await import('sonner')
+    expect(vi.mocked(toast.info)).toHaveBeenCalledWith('knowledge.table.toasts.rowAddedFiltered')
+  })
+
+  it('row/col drag grips disabled (class + no-op) under sort/filter', () => {
+    render(<TableEditor tableId="tbl_1" />)
+    // 排序后：行 grip 置灰 + pointerdown 不启动拖拽
+    fireEvent.click(screen.getByTestId('table-col-more-1'))
+    fireEvent.click(screen.getByTestId('table-col-sort-desc'))
+    const grip = screen.getByTestId('table-row-grip-0')
+    expect(grip.className).toContain('cursor-not-allowed')
+    expect(grip.className).not.toContain('cursor-grab')
+    const colGrip = screen.getByTestId('table-col-grip-0')
+    expect(colGrip.className).toContain('cursor-not-allowed')
+    // 拖拽尝试不移动
+    const trs = [...screen.getByTestId('table-grid').querySelectorAll('tbody tr[data-row]')] as HTMLElement[]
+    trs.forEach((tr, i) => {
+      Object.defineProperty(tr, 'getBoundingClientRect', {
+        value: () => ({ left: 0, right: 500, top: 36 + i * 36, bottom: 72 + i * 36, width: 500, height: 36, x: 0, y: 36 + i * 36, toJSON: () => ({}) }),
+        configurable: true,
+      })
+    })
+    fireEvent.pointerDown(grip, { clientY: 40, buttons: 1 })
+    fireEvent.pointerMove(window, { clientY: 100, buttons: 1 })
+    fireEvent.pointerUp(window, { clientY: 100 })
+    // 视图第 0 行 = 数据行 2（排序未变数据序）；拖拽未发生 → 数据仍原序
+    expect(document.querySelector('tr[data-row="2"] td[data-cell$=",1"]')!.textContent).toContain('300')
   })
 })

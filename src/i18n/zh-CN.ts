@@ -2683,6 +2683,7 @@ export const zhCN = {
           freezeHeader: '冻结首行',
         },
         status: {
+          visibleRows: '可见 {{n}}/{{total}} 行',
           selectionCount: '已选 {{n}} 格',
           rowsCols: '{{rows}} 行 · {{cols}} 列',
           saved: '已保存',
@@ -2694,7 +2695,9 @@ export const zhCN = {
           rowDeleted: '已删除行（可撤销）',
           clipboardUnavailable: '剪贴板不可用',
           pasteTooLarge: '粘贴内容过大（上限 {{rows}} 行 × {{cols}} 列）',
+          rowAddedFiltered: '已添加行（可能被当前筛选隐藏）',
         },
+        dragDisabledHint: '排序/筛选下不可拖拽',
       },
       image: {
         alt: '替代文本',

@@ -2657,6 +2657,8 @@ export const zhTW = {
       toasts: {
         columnDeleted: "已刪除欄（可復原）",
         rowDeleted: "已刪除列（可復原）",
+        clipboardUnavailable: "剪貼簿無法使用",
+        pasteTooLarge: "貼上內容過大（上限 {{rows}} 列 × {{cols}} 欄）",
       },
     },
     "image": {

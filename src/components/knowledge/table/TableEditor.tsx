@@ -41,9 +41,12 @@ import {
   csvToTable,
   defaultStatsMode,
   metaFromTable,
+  PASTE_LIMIT,
+  parseClipboardText,
   selectionCells,
   selectionDataCells,
   selectionSpan,
+  serializeClipboard,
   statsValue,
   tableToCsv,
   viewIndexes,
@@ -329,9 +332,92 @@ export function TableEditor({ tableId }: { tableId: string }) {
   /** 视图坐标 → 数据行索引（选区/键盘都在视图空间）。 */
   const dataRowOf = (vi: number): number => visibleIndices[vi] ?? vi
 
-  /** 剪贴板（⌘C/⌘V）。PR-4 接入 TSV 序列化/嗅探粘贴。 */
-  const handleClipboard = (_kind: 'copy' | 'paste') => {
-    // PR-4
+  /** 剪贴板（⌘C/⌘V）：TSV 序列化/嗅探粘贴，自动扩表，上限 PASTE_LIMIT。 */
+  const handleClipboard = async (kind: 'copy' | 'paste') => {
+    const cur = selRef.current
+    if (!cur) return
+    if (typeof navigator === 'undefined' || !navigator.clipboard) {
+      toast.error(t('knowledge.table.toasts.clipboardUnavailable'))
+      return
+    }
+    try {
+      if (kind === 'copy') {
+        await navigator.clipboard.writeText(
+          serializeClipboard(tableRef.current, cur, visibleIndices),
+        )
+        return
+      }
+      const text = await navigator.clipboard.readText()
+      const parsed = parseClipboardText(text)
+      if (!parsed) {
+        // 纯文本（无制表符）：整段写入焦点格（含换行）
+        if (text !== '') {
+          const dataRi = dataRowOf(cur.focus.ri)
+          const next = structuredClone(tableRef.current)
+          next.rows[dataRi] = [...next.rows[dataRi]]
+          next.rows[dataRi][cur.focus.ci] = text
+          onChange(next)
+        }
+        return
+      }
+      const pRows = parsed.length
+      const pCols = Math.max(1, ...parsed.map((r) => r.length))
+      if (pRows > PASTE_LIMIT.rows || pCols > PASTE_LIMIT.cols) {
+        toast.error(
+          t('knowledge.table.toasts.pasteTooLarge', {
+            rows: PASTE_LIMIT.rows,
+            cols: PASTE_LIMIT.cols,
+          }),
+        )
+        return
+      }
+      const startDataRi = dataRowOf(cur.focus.ri)
+      const startCi = cur.focus.ci
+      let next = structuredClone(tableRef.current)
+      // 自动扩列
+      if (startCi + pCols > next.cols.length) {
+        const add = startCi + pCols - next.cols.length
+        const cols = [...next.cols]
+        for (let i = 0; i < add; i++) cols.push(createColumn('text', { cols, rows: next.rows }))
+        next = { cols, rows: next.rows.map((r) => [...r, ...Array(add).fill('')]) }
+      }
+      // 自动扩行
+      if (startDataRi + pRows > next.rows.length) {
+        const add = startDataRi + pRows - next.rows.length
+        next = {
+          cols: next.cols,
+          rows: [
+            ...next.rows.map((r) => [...r]),
+            ...Array.from({ length: add }, () => Array(next.cols.length).fill('')),
+          ],
+        }
+      }
+      // 逐格写入（数据方向展开）
+      parsed.forEach((rowVals, dr) => {
+        const ri2 = startDataRi + dr
+        rowVals.forEach((v, dc) => {
+          const ci2 = startCi + dc
+          if (ri2 < next.rows.length && ci2 < next.cols.length) {
+            next.rows[ri2] = [...next.rows[ri2]]
+            next.rows[ri2][ci2] = v
+          }
+        })
+      })
+      onChange(next)
+      // 粘贴后选区 = 粘贴区域（视图坐标，钳制到可见范围）
+      const rows = next.rows.length
+      const selRows = Math.min(pRows, Math.max(0, rows - startDataRi))
+      setSel({
+        anchor: { ri: cur.focus.ri, ci: startCi },
+        focus: {
+          ri: Math.min(cur.focus.ri + selRows - 1, rows - 1),
+          ci: Math.min(startCi + pCols - 1, next.cols.length - 1),
+        },
+        mode: 'cell',
+      })
+    } catch {
+      toast.error(t('knowledge.table.toasts.clipboardUnavailable'))
+    }
   }
 
   /** 网格键盘导航（选中态）。编辑态由 input 自行处理。

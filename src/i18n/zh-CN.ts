@@ -2692,6 +2692,8 @@ export const zhCN = {
         toasts: {
           columnDeleted: '已删除列（可撤销）',
           rowDeleted: '已删除行（可撤销）',
+          clipboardUnavailable: '剪贴板不可用',
+          pasteTooLarge: '粘贴内容过大（上限 {{rows}} 行 × {{cols}} 列）',
         },
       },
       image: {

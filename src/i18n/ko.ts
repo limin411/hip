@@ -2655,6 +2655,8 @@ export const ko = {
       toasts: {
         columnDeleted: "열이 삭제되었습니다(실행 취소 가능)",
         rowDeleted: "행이 삭제되었습니다(실행 취소 가능)",
+        clipboardUnavailable: "클립보드를 사용할 수 없습니다",
+        pasteTooLarge: "붙여넣기 내용이 너무 큽니다 (최대 {{rows}}행 × {{cols}}열)",
       },
     },
     "image": {

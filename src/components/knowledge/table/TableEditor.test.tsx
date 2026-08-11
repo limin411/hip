@@ -818,3 +818,95 @@ describe('TableEditor table-ux-notion PR-3 (selection model)', () => {
     expect(useKnowledgeStore.getState().tableDraft?.csv).toBe('0')
   })
 })
+
+describe('TableEditor table-ux-notion PR-4 (clipboard)', () => {
+  const clipboardData = { text: '' }
+  beforeEach(() => {
+    mountTable()
+    useKnowledgeStore.setState({
+      commitTable: vi.fn(async () => {
+        commitTableSpy()
+        return true
+      }) as never,
+    })
+    clipboardData.text = ''
+    Object.defineProperty(navigator, 'clipboard', {
+      value: {
+        writeText: vi.fn(async (t: string) => { clipboardData.text = t }),
+        readText: vi.fn(async () => clipboardData.text),
+      },
+      configurable: true,
+    })
+  })
+  afterEach(() => {
+    cleanup()
+    vi.useRealTimers()
+  })
+
+  it('⌘C serializes selection as TSV (view order respected under sort)', () => {
+    render(<TableEditor tableId="tbl_1" />)
+    fireEvent.click(document.querySelector('td[data-cell="0,0"]')!)
+    fireEvent.click(document.querySelector('td[data-cell="0,2"]')!, { shiftKey: true })
+    fireEvent.keyDown(screen.getByTestId('table-grid'), { key: 'c', metaKey: true })
+    expect(clipboardData.text).toBe('a\t100\tc')
+  })
+
+  it('⌘V pastes TSV expanding rows/cols beyond bounds (auto-add row + col)', async () => {
+    render(<TableEditor tableId="tbl_1" />)
+    // 焦点在 (0,0)，粘入 4 行 × 2 列
+    clipboardData.text = 'p1\tp2\nq1\tq2\nr1\tr2\ns1\ts2'
+    fireEvent.click(document.querySelector('td[data-cell="0,0"]')!)
+    fireEvent.keyDown(screen.getByTestId('table-grid'), { key: 'v', metaKey: true })
+    await vi.waitFor(() => {
+      const grid = screen.getByTestId('table-grid')
+      expect(grid.dataset.rows).toBe('4')
+      expect(grid.dataset.cols).toBe('3') // 2 列粘贴 + 原 3 列（不超界）
+    })
+    expect(useKnowledgeStore.getState().tableDraft?.csv.split('\n')).toHaveLength(4)
+    expect(document.querySelector('td[data-cell="3,1"]')!.textContent).toContain('s2')
+  })
+
+  it('⌘V pastes TSV expanding columns beyond bounds (adds new column)', async () => {
+    render(<TableEditor tableId="tbl_1" />)
+    // 焦点 (0,2)，粘入 1 行 × 3 列 → 需要第 4、5 列
+    clipboardData.text = 'x\ty\tz'
+    fireEvent.click(document.querySelector('td[data-cell="0,2"]')!)
+    fireEvent.keyDown(screen.getByTestId('table-grid'), { key: 'v', metaKey: true })
+    await vi.waitFor(() => {
+      expect(screen.getByTestId('table-grid').dataset.cols).toBe('5')
+    })
+    expect(document.querySelector('td[data-cell="0,4"]')!.textContent).toContain('z')
+  })
+
+  it('plain multiline text pastes as single cell; paste updates selection to pasted area', async () => {
+    render(<TableEditor tableId="tbl_1" />)
+    clipboardData.text = '第一行\n第二行'
+    fireEvent.click(document.querySelector('td[data-cell="1,0"]')!)
+    fireEvent.keyDown(screen.getByTestId('table-grid'), { key: 'v', metaKey: true })
+    await vi.waitFor(() => {
+      expect(useKnowledgeStore.getState().tableDraft?.csv).toContain('第一行\n第二行')
+    })
+    // 单格选区（无扩展信息）
+    expect(screen.queryByTestId('table-selection-info')).toBeNull()
+    // TSV 粘贴后选区 = 粘贴区域
+    clipboardData.text = 'a\tb\nc\td'
+    fireEvent.click(document.querySelector('td[data-cell="1,0"]')!)
+    fireEvent.keyDown(screen.getByTestId('table-grid'), { key: 'v', metaKey: true })
+    await vi.waitFor(() => {
+      expect(screen.getByTestId('table-selection-info')!.textContent).toContain('4')
+    })
+  })
+
+  it('oversized paste is rejected with toast', async () => {
+    render(<TableEditor tableId="tbl_1" />)
+    // 201 行 × 2 列
+    clipboardData.text = Array.from({ length: 201 }, (_, i) => `${i}\tx`).join('\n')
+    fireEvent.click(document.querySelector('td[data-cell="0,0"]')!)
+    fireEvent.keyDown(screen.getByTestId('table-grid'), { key: 'v', metaKey: true })
+    await vi.waitFor(() => {
+      expect(screen.getByTestId('table-grid').dataset.rows).toBe('3') // 未扩表
+    })
+    const { toast } = await import('sonner')
+    expect(vi.mocked(toast.error)).toHaveBeenCalled()
+  })
+})

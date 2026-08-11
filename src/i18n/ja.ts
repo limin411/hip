@@ -2655,6 +2655,8 @@ export const ja = {
       toasts: {
         columnDeleted: "列を削除しました（元に戻せます）",
         rowDeleted: "行を削除しました（元に戻せます）",
+        clipboardUnavailable: "クリップボードが利用できません",
+        pasteTooLarge: "貼り付け内容が大きすぎます（上限 {{rows}} 行 × {{cols}} 列）",
       },
     },
     "image": {

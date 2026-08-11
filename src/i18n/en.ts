@@ -2752,6 +2752,8 @@ export const en = {
         toasts: {
           columnDeleted: 'Column deleted (undo to restore)',
           rowDeleted: 'Row deleted (undo to restore)',
+          clipboardUnavailable: 'Clipboard unavailable',
+          pasteTooLarge: 'Paste too large (limit {{rows}} rows × {{cols}} columns)',
         },
       },
       image: {

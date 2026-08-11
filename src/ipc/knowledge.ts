@@ -128,6 +128,43 @@ export async function knowledgeDeleteDocFile(spaceId: string, docId: string): Pr
   await invoke('knowledge_delete_doc_file', { args: { spaceId, docId } })
 }
 
+// ── Tables (knowledge-table P0) ────────────────────────────────────────────
+
+export interface KnowledgeTablePayload {
+  csv: string
+  /** null when `tbl_*.meta.json` missing (frontend derives default columns). */
+  meta: string | null
+}
+
+export async function knowledgeReadTable(
+  spaceId: string,
+  tableId: string,
+): Promise<KnowledgeTablePayload> {
+  return invoke<KnowledgeTablePayload>('knowledge_read_table', {
+    args: { spaceId, tableId },
+  })
+}
+
+/**
+ * Write table data + column meta (Rust writes csv first, then meta).
+ * E2E can force failures via `globalThis.__hipKnowledgeTableWriteFail`.
+ */
+export async function knowledgeWriteTable(
+  spaceId: string,
+  tableId: string,
+  csv: string,
+  meta: string,
+): Promise<void> {
+  const fail = (globalThis as unknown as {
+    __hipKnowledgeTableWriteFail?: boolean | ((spaceId: string, tableId: string) => boolean)
+  }).__hipKnowledgeTableWriteFail
+  const shouldFail = typeof fail === 'function' ? fail(spaceId, tableId) : fail === true
+  if (shouldFail) {
+    throw new Error('e2e knowledge table write fail')
+  }
+  await invoke('knowledge_write_table', { args: { spaceId, tableId, csv, meta } })
+}
+
 
 /**
  * Write board body (dehydrated JSON). Shares `__hipKnowledgeWriteFail` with docs

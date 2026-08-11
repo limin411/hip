@@ -53,6 +53,13 @@ describe('knowledge tree helpers', () => {
     parentId: 'nod_folder001',
     order: 2,
   })
+  const tableA = n({
+    id: 'tbl_table0001',
+    kind: 'table',
+    title: '预算跟踪',
+    parentId: 'nod_folder001',
+    order: 3,
+  })
 
   it('listChildren sorts by order then title', () => {
     const kids = listChildren([folder, docA, docB, rootDoc], 'nod_folder001')
@@ -152,9 +159,9 @@ describe('knowledge tree helpers', () => {
     expect(collectDocIdsInSubtree([folder, docA, boardA], 'nod_folder001')).toEqual(['doc_aaaaaaa1'])
   })
 
-  it('collectLeafIdsInSubtree is doc ∪ board', () => {
-    expect(collectLeafIdsInSubtree([folder, docA, boardA], 'nod_folder001').sort()).toEqual(
-      ['brd_board0001', 'doc_aaaaaaa1'].sort(),
+  it('collectLeafIdsInSubtree is doc ∪ board ∪ table', () => {
+    expect(collectLeafIdsInSubtree([folder, docA, boardA, tableA], 'nod_folder001').sort()).toEqual(
+      ['brd_board0001', 'doc_aaaaaaa1', 'tbl_table0001'].sort(),
     )
   })
 
@@ -170,16 +177,18 @@ describe('knowledge tree helpers', () => {
     expect(next[0].updatedAt).toBe(99)
   })
 
-  it('removeNodeSubtree removes descendants and collects doc/board/leaf ids', () => {
-    const { nodes, removedDocIds, removedBoardIds, removedLeafIds } = removeNodeSubtree(
-      [folder, docA, docB, boardA, rootDoc],
-      'nod_folder001',
-    )
+  it('removeNodeSubtree removes descendants and collects doc/board/table/leaf ids', () => {
+    const { nodes, removedDocIds, removedBoardIds, removedTableIds, removedLeafIds } =
+      removeNodeSubtree(
+        [folder, docA, docB, boardA, tableA, rootDoc],
+        'nod_folder001',
+      )
     expect(nodes.map((x) => x.id)).toEqual(['doc_root0001'])
     expect(removedDocIds.sort()).toEqual(['doc_aaaaaaa1', 'doc_bbbbbbb2'].sort())
     expect(removedBoardIds).toEqual(['brd_board0001'])
+    expect(removedTableIds).toEqual(['tbl_table0001'])
     expect(removedLeafIds.sort()).toEqual(
-      ['brd_board0001', 'doc_aaaaaaa1', 'doc_bbbbbbb2'].sort(),
+      ['brd_board0001', 'doc_aaaaaaa1', 'doc_bbbbbbb2', 'tbl_table0001'].sort(),
     )
   })
 
@@ -214,8 +223,10 @@ describe('knowledge tree helpers', () => {
     expect(visible!.has('nod_folder001')).toBe(true)
   })
 
-  it('assertTreeInvariants accepts valid tree including board', () => {
-    expect(() => assertTreeInvariants([folder, docA, docB, rootDoc, boardA])).not.toThrow()
+  it('assertTreeInvariants accepts valid tree including board and table', () => {
+    expect(() =>
+      assertTreeInvariants([folder, docA, docB, rootDoc, boardA, tableA]),
+    ).not.toThrow()
   })
 
   it('assertTreeInvariants rejects duplicate ids', () => {

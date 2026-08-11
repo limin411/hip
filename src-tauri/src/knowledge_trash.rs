@@ -318,14 +318,17 @@ fn collect_subtree(nodes: &[KnowledgeNode], root_id: &str) -> Vec<KnowledgeNode>
     out
 }
 
-/// Classify soft-delete root (doc or folder only; boards removed from product).
+/// Classify soft-delete root (doc, folder or table; boards removed from product).
 fn classify_trash_root(root: &KnowledgeNode) -> Result<TrashEntityKind, String> {
     match root.kind.as_str() {
         "folder" => Ok(TrashEntityKind::Folder),
         "doc" => Ok(TrashEntityKind::Doc),
+        "table" => Ok(TrashEntityKind::Doc),
         "board" => Err("boards are no longer supported".into()),
         _ if root.id.starts_with("brd_") => Err("boards are no longer supported".into()),
-        _ if root.id.starts_with("doc_") => Ok(TrashEntityKind::Doc),
+        _ if root.id.starts_with("doc_") || root.id.starts_with("tbl_") => {
+            Ok(TrashEntityKind::Doc)
+        }
         _ if root.id.starts_with("nod_") => Ok(TrashEntityKind::Folder),
         _ => Err(format!(
             "cannot classify trash kind for node {} kind={}",
@@ -494,6 +497,21 @@ pub(crate) fn soft_delete_nodes_at(
                 let src_md = space_dir.join("docs").join(format!("{}.md", n.id));
                 if src_md.exists() {
                     let _ = fs::rename(&src_md, dest.join("docs").join(format!("{}.md", n.id)));
+                }
+                let src_ver = space_dir.join("versions").join(&n.id);
+                if src_ver.exists() {
+                    let _ = fs::rename(&src_ver, dest.join("versions").join(&n.id));
+                }
+            }
+            // Tables: csv + meta.json twin files.
+            if n.id.starts_with("tbl_") {
+                let src_csv = space_dir.join("docs").join(format!("{}.csv", n.id));
+                if src_csv.exists() {
+                    let _ = fs::rename(&src_csv, dest.join("docs").join(format!("{}.csv", n.id)));
+                }
+                let src_meta = space_dir.join("docs").join(format!("{}.meta.json", n.id));
+                if src_meta.exists() {
+                    let _ = fs::rename(&src_meta, dest.join("docs").join(format!("{}.meta.json", n.id)));
                 }
                 let src_ver = space_dir.join("versions").join(&n.id);
                 if src_ver.exists() {
@@ -710,6 +728,31 @@ pub(crate) fn restore_trash_entry_at(
                         fs::create_dir_all(space_dir.join("docs")).map_err(|e| e.to_string())?;
                         fs::rename(&src, space_dir.join("docs").join(format!("{}.md", n.id)))
                             .map_err(|e| e.to_string())?;
+                    }
+                    let src_ver = payload.join("versions").join(&n.id);
+                    if src_ver.exists() {
+                        fs::create_dir_all(space_dir.join("versions"))
+                            .map_err(|e| e.to_string())?;
+                        fs::rename(&src_ver, space_dir.join("versions").join(&n.id))
+                            .map_err(|e| e.to_string())?;
+                    }
+                }
+                // Tables: csv + meta.json twin files.
+                if n.id.starts_with("tbl_") {
+                    let src_csv = payload.join("docs").join(format!("{}.csv", n.id));
+                    if src_csv.exists() {
+                        fs::create_dir_all(space_dir.join("docs")).map_err(|e| e.to_string())?;
+                        fs::rename(&src_csv, space_dir.join("docs").join(format!("{}.csv", n.id)))
+                            .map_err(|e| e.to_string())?;
+                    }
+                    let src_meta = payload.join("docs").join(format!("{}.meta.json", n.id));
+                    if src_meta.exists() {
+                        fs::create_dir_all(space_dir.join("docs")).map_err(|e| e.to_string())?;
+                        fs::rename(
+                            &src_meta,
+                            space_dir.join("docs").join(format!("{}.meta.json", n.id)),
+                        )
+                        .map_err(|e| e.to_string())?;
                     }
                     let src_ver = payload.join("versions").join(&n.id);
                     if src_ver.exists() {
@@ -1004,6 +1047,42 @@ mod tests {
             let tree: KnowledgeTreeFile =
                 serde_json::from_str(&fs::read_to_string(space.join("tree.json")).unwrap()).unwrap();
             assert!(tree.nodes.is_empty());
+        });
+    }
+
+    #[test]
+    fn soft_delete_table_moves_csv_and_meta_and_restores() {
+        with_temp_roots(|kroot, trash| {
+            let space_id = "spc_trash001";
+            let table_id = "tbl_trash001";
+            let space = write_space_with_tree(
+                kroot,
+                space_id,
+                vec![node(table_id, "table", "预算", None, 0)],
+            );
+            fs::write(space.join("docs").join(format!("{table_id}.csv")), "a,b\n1,2\n").unwrap();
+            fs::write(
+                space.join("docs").join(format!("{table_id}.meta.json")),
+                r#"{"cols":[{"id":"col_1","name":"x","type":"number","width":150}]}"#,
+            )
+            .unwrap();
+            let ids = soft_delete_nodes_at(kroot, trash, space_id, &[table_id.to_string()]).unwrap();
+            assert_eq!(ids.len(), 1);
+            // Twin files both leave the live space.
+            assert!(!space.join("docs").join(format!("{table_id}.csv")).exists());
+            assert!(!space.join("docs").join(format!("{table_id}.meta.json")).exists());
+
+            // Restore brings both files back.
+            let manifest = load_manifest(trash).unwrap();
+            let entry = manifest.entries.iter().find(|e| e.entity_id == table_id).unwrap();
+            let restored = restore_trash_entry_at(kroot, trash, &entry.id).unwrap();
+            assert_eq!(restored.entity_id, table_id);
+            assert!(space.join("docs").join(format!("{table_id}.csv")).exists());
+            assert!(space.join("docs").join(format!("{table_id}.meta.json")).exists());
+            assert_eq!(
+                fs::read_to_string(space.join("docs").join(format!("{table_id}.csv"))).unwrap(),
+                "a,b\n1,2\n"
+            );
         });
     }
 

@@ -1,7 +1,7 @@
 import { nanoid } from 'nanoid'
 
 /** Shared with Rust: full prefix regex for knowledge entity ids. */
-export const KNOWLEDGE_ID_RE = /^(spc|nod|doc|brd)_[A-Za-z0-9_-]{3,64}$/
+export const KNOWLEDGE_ID_RE = /^(spc|nod|doc|tbl|brd)_[A-Za-z0-9_-]{3,64}$/
 
 /** Shared with Rust: template ids under `templates/tpl_*.md`. */
 export const KNOWLEDGE_TEMPLATE_ID_RE = /^tpl_[A-Za-z0-9_-]{6,64}$/
@@ -24,6 +24,10 @@ export function newFolderId(): string {
 
 export function newDocId(): string {
   return `doc_${nanoid(12)}`
+}
+
+export function newTableId(): string {
+  return `tbl_${nanoid(12)}`
 }
 
 export function newBoardId(): string {

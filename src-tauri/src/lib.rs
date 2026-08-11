@@ -962,6 +962,8 @@ pub fn run() {
             knowledge::knowledge_save_tree,
             knowledge::knowledge_read_doc,
             knowledge::knowledge_write_doc,
+            knowledge::knowledge_read_table,
+            knowledge::knowledge_write_table,
             knowledge::knowledge_delete_doc_file,
             knowledge::knowledge_export_bytes,
             knowledge::knowledge_save_version,

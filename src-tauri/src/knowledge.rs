@@ -18,6 +18,10 @@ const KNOWLEDGE_ASSET_MAX_BYTES: u64 = 25 * 1024 * 1024;
 const KNOWLEDGE_ASSET_INLINE_MAX_BYTES: u64 = 1_500_000;
 /// Max decoded payload for `knowledge_export_bytes` (PNG etc.).
 const KNOWLEDGE_EXPORT_BYTES_MAX: usize = 25 * 1024 * 1024;
+/// Max CSV body for a table leaf (≈ 400k cells of 15 bytes).
+const KNOWLEDGE_TABLE_BODY_MAX: usize = 8 * 1024 * 1024;
+/// Max meta.json for a table leaf.
+const KNOWLEDGE_TABLE_META_MAX: usize = 1024 * 1024;
 
 /// Same rule as TS `KNOWLEDGE_ID_RE`.
 pub(crate) fn is_knowledge_id(id: &str) -> bool {
@@ -26,7 +30,7 @@ pub(crate) fn is_knowledge_id(id: &str) -> bool {
         None => return false,
     };
     // `brd_` kept only so legacy tree/trash ids still validate during cleanup.
-    if prefix != "spc" && prefix != "nod" && prefix != "doc" && prefix != "brd" {
+    if prefix != "spc" && prefix != "nod" && prefix != "doc" && prefix != "tbl" && prefix != "brd" {
         return false;
     }
     let len = rest.len();
@@ -83,11 +87,49 @@ fn doc_path(root: &Path, space_id: &str, doc_id: &str) -> Result<PathBuf, String
     safe_join(&docs, &file).ok_or_else(|| "illegal doc path".to_string())
 }
 
+/// Table data file: `<space>/docs/tbl_*.csv` (RFC 4180; BOM optional on read).
+fn table_path(root: &Path, space_id: &str, table_id: &str) -> Result<PathBuf, String> {
+    require_id(space_id, "spaceId")?;
+    require_id(table_id, "tableId")?;
+    if !table_id.starts_with("tbl_") {
+        return Err(format!("tableId must start with tbl_: {table_id}"));
+    }
+    let space = space_dir(root, space_id)?;
+    let docs = safe_join(&space, "docs").ok_or_else(|| "illegal docs path".to_string())?;
+    let file = format!("{table_id}.csv");
+    safe_join(&docs, &file).ok_or_else(|| "illegal table path".to_string())
+}
+
+/// Table column metadata file: `<space>/docs/tbl_*.meta.json`.
+fn table_meta_path(root: &Path, space_id: &str, table_id: &str) -> Result<PathBuf, String> {
+    require_id(space_id, "spaceId")?;
+    require_id(table_id, "tableId")?;
+    if !table_id.starts_with("tbl_") {
+        return Err(format!("tableId must start with tbl_: {table_id}"));
+    }
+    let space = space_dir(root, space_id)?;
+    let docs = safe_join(&space, "docs").ok_or_else(|| "illegal docs path".to_string())?;
+    let file = format!("{table_id}.meta.json");
+    safe_join(&docs, &file).ok_or_else(|| "illegal table meta path".to_string())
+}
+
+/// Leaf content file path by id prefix (doc → `.md`, table → `.csv`).
+fn leaf_content_path(root: &Path, space_id: &str, leaf_id: &str) -> Result<PathBuf, String> {
+    if leaf_id.starts_with("doc_") {
+        doc_path(root, space_id, leaf_id)
+    } else if leaf_id.starts_with("tbl_") {
+        table_path(root, space_id, leaf_id)
+    } else {
+        Err(format!("leaf id must start with doc_ or tbl_: {leaf_id}"))
+    }
+}
+
 /// kind ⇔ id prefix (Issue 13). Used by save_tree validation.
 fn kind_prefix_ok(kind: &str, id: &str) -> bool {
     match kind {
         "folder" => id.starts_with("nod_"),
         "doc" => id.starts_with("doc_"),
+        "table" => id.starts_with("tbl_"),
         _ => false,
     }
 }
@@ -556,15 +598,94 @@ pub fn knowledge_write_doc(app: AppHandle, args: WriteDocArgs) -> Result<(), Str
     atomic_write_str(&path, &args.body)
 }
 
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ReadTableArgs {
+    pub space_id: String,
+    pub table_id: String,
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TablePayload {
+    pub csv: String,
+    /// None when `tbl_*.meta.json` missing (frontend falls back to derived columns).
+    pub meta: Option<String>,
+}
+
+#[tauri::command]
+pub fn knowledge_read_table(app: AppHandle, args: ReadTableArgs) -> Result<TablePayload, String> {
+    let root = knowledge_root(&app)?;
+    let path = table_path(&root, &args.space_id, &args.table_id)?;
+    let csv = if path.exists() {
+        fs::read_to_string(&path).map_err(|e| e.to_string())?
+    } else {
+        String::new()
+    };
+    let meta_path = table_meta_path(&root, &args.space_id, &args.table_id)?;
+    let meta = if meta_path.exists() {
+        Some(fs::read_to_string(&meta_path).map_err(|e| e.to_string())?)
+    } else {
+        None
+    };
+    Ok(TablePayload { csv, meta })
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct WriteTableArgs {
+    pub space_id: String,
+    pub table_id: String,
+    pub csv: String,
+    pub meta: String,
+}
+
+/// Size guard for table payloads (testable without AppHandle).
+fn table_body_ok(csv: &str, meta: &str) -> Result<(), String> {
+    if csv.len() > KNOWLEDGE_TABLE_BODY_MAX {
+        return Err(format!("table body too large: {} bytes", csv.len()));
+    }
+    if meta.len() > KNOWLEDGE_TABLE_META_MAX {
+        return Err(format!("table meta too large: {} bytes", meta.len()));
+    }
+    Ok(())
+}
+
+/// Write table data + column meta. **Write order fixed: csv → meta** (spec §6.2) —
+/// a meta write failure never loses data (frontend re-derives columns on missing meta).
+#[tauri::command]
+pub fn knowledge_write_table(app: AppHandle, args: WriteTableArgs) -> Result<(), String> {
+    let root = knowledge_root(&app)?;
+    table_body_ok(&args.csv, &args.meta)?;
+    let path = table_path(&root, &args.space_id, &args.table_id)?;
+    atomic_write_str(&path, &args.csv)?;
+    let meta_path = table_meta_path(&root, &args.space_id, &args.table_id)?;
+    atomic_write_str(&meta_path, &args.meta)?;
+    Ok(())
+}
+
 #[tauri::command]
 pub fn knowledge_delete_doc_file(app: AppHandle, args: DocArgs) -> Result<(), String> {
     let root = knowledge_root(&app)?;
-    let path = doc_path(&root, &args.space_id, &args.doc_id)?;
-    if path.exists() {
-        fs::remove_file(&path).map_err(|e| e.to_string())?;
+    let id = args.doc_id.as_str();
+    // Table leaves carry two files (csv + meta.json).
+    if id.starts_with("tbl_") {
+        let path = table_path(&root, &args.space_id, id)?;
+        if path.exists() {
+            fs::remove_file(&path).map_err(|e| e.to_string())?;
+        }
+        let meta_path = table_meta_path(&root, &args.space_id, id)?;
+        if meta_path.exists() {
+            fs::remove_file(&meta_path).map_err(|e| e.to_string())?;
+        }
+    } else {
+        let path = doc_path(&root, &args.space_id, id)?;
+        if path.exists() {
+            fs::remove_file(&path).map_err(|e| e.to_string())?;
+        }
     }
-    // Drop version history with the doc (space delete removes the whole tree).
-    if let Ok(vdir) = versions_dir(&root, &args.space_id, &args.doc_id) {
+    // Drop version history with the leaf (space delete removes the whole tree).
+    if let Ok(vdir) = versions_dir(&root, &args.space_id, id) {
         if vdir.exists() {
             let _ = fs::remove_dir_all(&vdir);
         }
@@ -642,15 +763,15 @@ fn empty_manifest() -> VersionManifest {
     }
 }
 
-fn versions_dir(root: &Path, space_id: &str, doc_id: &str) -> Result<PathBuf, String> {
+fn versions_dir(root: &Path, space_id: &str, leaf_id: &str) -> Result<PathBuf, String> {
     require_id(space_id, "spaceId")?;
-    require_id(doc_id, "docId")?;
-    if !doc_id.starts_with("doc_") {
-        return Err(format!("docId must start with doc_: {doc_id}"));
+    require_id(leaf_id, "leafId")?;
+    if !leaf_id.starts_with("doc_") && !leaf_id.starts_with("tbl_") {
+        return Err(format!("leafId must start with doc_ or tbl_: {leaf_id}"));
     }
     let space = space_dir(root, space_id)?;
     let versions = safe_join(&space, "versions").ok_or_else(|| "illegal versions path".to_string())?;
-    safe_join(&versions, doc_id).ok_or_else(|| "illegal version doc path".to_string())
+    safe_join(&versions, leaf_id).ok_or_else(|| "illegal version doc path".to_string())
 }
 
 fn version_manifest_path(vdir: &Path) -> PathBuf {
@@ -700,15 +821,18 @@ fn civil_from_days(z: i64) -> (i32, u32, u32) {
 
 fn version_file_path(vdir: &Path, file: &str) -> Result<PathBuf, String> {
     // Only allow simple filenames (no path separators / traversal).
+    let is_md = file.ends_with(".md");
+    let is_csv = file.ends_with(".csv");
     if file.is_empty()
         || file.contains('/')
         || file.contains('\\')
         || file.contains("..")
-        || !file.ends_with(".md")
+        || (!is_md && !is_csv)
     {
         return Err(format!("invalid version file: {file}"));
     }
-    let stem = file.trim_end_matches(".md");
+    let ext = if is_md { ".md" } else { ".csv" };
+    let stem = file.trim_end_matches(ext);
     if stem.is_empty()
         || !stem
             .chars()
@@ -736,20 +860,20 @@ fn enforce_version_cap(vdir: &Path, manifest: &mut VersionManifest) -> Result<()
 fn save_version_inner(
     root: &Path,
     space_id: &str,
-    doc_id: &str,
+    leaf_id: &str,
     kind: &str,
     day_key: Option<&str>,
 ) -> Result<Option<KnowledgeVersionEntry>, String> {
     if kind != "daily" && kind != "manual" {
         return Err(format!("invalid version kind: {kind}"));
     }
-    let doc = doc_path(root, space_id, doc_id)?;
-    // Doc gone (delete in flight / already cleaned) — do not recreate versions/.
-    if !doc.exists() {
+    let leaf = leaf_content_path(root, space_id, leaf_id)?;
+    // Leaf gone (delete in flight / already cleaned) — do not recreate versions/.
+    if !leaf.exists() {
         return Ok(None);
     }
-    let body = fs::read_to_string(&doc).map_err(|e| e.to_string())?;
-    let vdir = versions_dir(root, space_id, doc_id)?;
+    let body = fs::read_to_string(&leaf).map_err(|e| e.to_string())?;
+    let vdir = versions_dir(root, space_id, leaf_id)?;
     fs::create_dir_all(&vdir).map_err(|e| e.to_string())?;
     let mut manifest = load_version_manifest(&vdir)?;
 
@@ -794,7 +918,8 @@ fn save_version_inner(
             })
             .collect();
     }
-    let file = format!("{id}.md");
+    let ext = if leaf_id.starts_with("tbl_") { ".csv" } else { ".md" };
+    let file = format!("{id}{ext}");
     let path = version_file_path(&vdir, &file)?;
     atomic_write_str(&path, &body)?;
 
@@ -914,8 +1039,8 @@ pub fn knowledge_restore_version(app: AppHandle, args: VersionIdArgs) -> Result<
         return Err("version file missing".into());
     }
     let body = fs::read_to_string(&path).map_err(|e| e.to_string())?;
-    let doc = doc_path(&root, &args.space_id, &args.doc_id)?;
-    atomic_write_str(&doc, &body)?;
+    let leaf = leaf_content_path(&root, &args.space_id, &args.doc_id)?;
+    atomic_write_str(&leaf, &body)?;
     Ok(body)
 }
 
@@ -1043,10 +1168,10 @@ pub fn knowledge_export_space_zip(app: AppHandle, args: ExportSpaceZipArgs) -> R
         fs::create_dir_all(parent).map_err(|e| e.to_string())?;
     }
 
-    // Leaf cap: docs + boards combined (v1 aligns with prior 5000 doc spirit).
+    // Leaf cap: docs + tables (legacy boards are stripped from trees on save).
     let mut leaf_count = 0usize;
     for n in &tree.nodes {
-        if n.kind == "doc" {
+        if n.kind == "doc" || n.kind == "table" {
             leaf_count += 1;
         }
     }
@@ -1080,15 +1205,19 @@ pub fn knowledge_export_space_zip(app: AppHandle, args: ExportSpaceZipArgs) -> R
     zip.write_all(&tree_bytes).map_err(|e| e.to_string())?;
 
     for n in &tree.nodes {
-        if n.kind != "doc" {
+        if n.kind != "doc" && n.kind != "table" {
             continue;
         }
-        let entry_name = format!("docs/{}.md", n.id);
+        let entry_name = if n.kind == "table" {
+            format!("docs/{}.csv", n.id)
+        } else {
+            format!("docs/{}.md", n.id)
+        };
         if !is_safe_zip_entry(&entry_name) {
             return Err("illegal export path".into());
         }
         let body = {
-            let p = doc_path(&root, &args.space_id, &n.id)?;
+            let p = leaf_content_path(&root, &args.space_id, &n.id)?;
             if p.exists() {
                 fs::read(&p).map_err(|e| e.to_string())?
             } else {
@@ -1098,6 +1227,24 @@ pub fn knowledge_export_space_zip(app: AppHandle, args: ExportSpaceZipArgs) -> R
         zip.start_file(entry_name, opts)
             .map_err(|e| e.to_string())?;
         zip.write_all(&body).map_err(|e| e.to_string())?;
+        // Table column meta travels with the csv.
+        if n.kind == "table" {
+            let meta_entry = format!("docs/{}.meta.json", n.id);
+            if !is_safe_zip_entry(&meta_entry) {
+                return Err("illegal export path".into());
+            }
+            let meta_bytes = {
+                let p = table_meta_path(&root, &args.space_id, &n.id)?;
+                if p.exists() {
+                    fs::read(&p).map_err(|e| e.to_string())?
+                } else {
+                    Vec::new()
+                }
+            };
+            zip.start_file(meta_entry, opts)
+                .map_err(|e| e.to_string())?;
+            zip.write_all(&meta_bytes).map_err(|e| e.to_string())?;
+        }
     }
 
 
@@ -2094,9 +2241,92 @@ mod tests {
         assert!(is_knowledge_id("spc_xYzAbCdEfGhI"));
         assert!(is_knowledge_id("doc_abc123def456"));
         assert!(is_knowledge_id("nod_folder001"));
+        assert!(is_knowledge_id("tbl_table00001"));
+        assert!(!is_knowledge_id("tbl_ab"));
         // Imported/legacy spaces keep readable ids (may be shorter than 6 chars).
         assert!(is_knowledge_id("nod_agent"));
         assert!(is_knowledge_id("doc_abc"));
+    }
+
+    #[test]
+    fn table_paths_and_kind_prefix() {
+        let root = Path::new("/tmp/kb-root");
+        assert!(kind_prefix_ok("table", "tbl_abc123"));
+        assert!(!kind_prefix_ok("table", "doc_abc123"));
+        assert!(!kind_prefix_ok("doc", "tbl_abc123"));
+        // table_path lives under <space>/docs/ with .csv extension
+        let p = table_path(root, "spc_xtable", "tbl_abc123").unwrap();
+        assert_eq!(p, root.join("spc_xtable").join("docs").join("tbl_abc123.csv"));
+        let m = table_meta_path(root, "spc_xtable", "tbl_abc123").unwrap();
+        assert_eq!(m, root.join("spc_xtable").join("docs").join("tbl_abc123.meta.json"));
+        // Prefix-locked: tbl_ ids rejected by doc_path, doc_ ids rejected by table_path.
+        assert!(doc_path(root, "spc_xtable", "tbl_abc123").is_err());
+        assert!(table_path(root, "spc_xtable", "doc_abc123").is_err());
+        assert!(leaf_content_path(root, "spc_xtable", "brd_abc123").is_err());
+        assert_eq!(
+            leaf_content_path(root, "spc_xtable", "tbl_abc123").unwrap(),
+            root.join("spc_xtable").join("docs").join("tbl_abc123.csv")
+        );
+        assert_eq!(
+            leaf_content_path(root, "spc_xtable", "doc_abc123").unwrap(),
+            root.join("spc_xtable").join("docs").join("doc_abc123.md")
+        );
+    }
+
+    #[test]
+    fn table_version_snapshot_uses_csv_extension_and_restores() {
+        with_temp_root(|base| {
+            let root = base.join("knowledge");
+            fs::create_dir_all(&root).unwrap();
+            let space_id = "spc_versions001";
+            let table_id = "tbl_versions0001";
+            let space = space_dir(&root, space_id).unwrap();
+            fs::create_dir_all(space.join("docs")).unwrap();
+            let csv = "a,b\n1,2\n";
+            let leaf = leaf_content_path(&root, space_id, table_id).unwrap();
+            atomic_write_str(&leaf, csv).unwrap();
+
+            let entry = save_version_inner(&root, space_id, table_id, "daily", Some("2026-08-11"))
+                .unwrap()
+                .expect("snapshot created");
+            assert!(entry.file.ends_with(".csv"));
+            let vdir = versions_dir(&root, space_id, table_id).unwrap();
+            let snap = fs::read_to_string(vdir.join(&entry.file)).unwrap();
+            assert_eq!(snap, csv);
+
+            // Restore writes back through the leaf path (csv), not a doc .md.
+            let vdir = versions_dir(&root, space_id, table_id).unwrap();
+            let manifest = load_version_manifest(&vdir).unwrap();
+            let e = find_version_entry(&manifest, &entry.id).unwrap();
+            let path = version_file_path(&vdir, &e.file).unwrap();
+            let body = fs::read_to_string(&path).unwrap();
+            atomic_write_str(&leaf, &body).unwrap();
+            assert_eq!(fs::read_to_string(&leaf).unwrap(), csv);
+            assert!(!space.join("docs").join(format!("{table_id}.md")).exists());
+        });
+    }
+
+    #[test]
+    fn table_write_order_csv_before_meta() {
+        with_temp_root(|base| {
+            let root = base.join("knowledge");
+            fs::create_dir_all(&root).unwrap();
+            let space_id = "spc_tblwrite001";
+            let table_id = "tbl_tblwrite001";
+            let space = space_dir(&root, space_id).unwrap();
+            fs::create_dir_all(space.join("docs")).unwrap();
+            // csv lands even if the meta write is skipped (missing meta → frontend fallback).
+            let csv = "x,y\n";
+            atomic_write_str(&table_path(&root, space_id, table_id).unwrap(), csv).unwrap();
+            assert!(table_path(&root, space_id, table_id).unwrap().exists());
+            assert!(!table_meta_path(&root, space_id, table_id).unwrap().exists());
+            // Oversize bodies rejected before any write.
+            let big = "a".repeat(KNOWLEDGE_TABLE_BODY_MAX + 1);
+            let meta = "{}";
+            assert!(table_body_ok(&big, meta).is_err());
+            assert!(table_body_ok("ok", &"m".repeat(KNOWLEDGE_TABLE_META_MAX + 1)).is_err());
+            assert!(table_body_ok("ok", "{}").is_ok());
+        });
     }
 
     #[test]

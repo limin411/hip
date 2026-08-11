@@ -151,7 +151,8 @@ export type ContextPayloadMap = {
    */
   knowledgeNode: {
     nodeId: string
-    kind: 'folder' | 'doc' | 'board'
+    /** Legacy `board` kind remains for removed-product payload compat. */
+    kind: 'folder' | 'doc' | 'table' | 'board'
     spaceId: string
     onNewDoc: () => void
     onNewFolder: () => void
